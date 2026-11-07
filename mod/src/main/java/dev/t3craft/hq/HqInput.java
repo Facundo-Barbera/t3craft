@@ -16,7 +16,7 @@ import java.util.TreeSet;
  * lists things in never changes the plan (idempotence).
  *
  * <p>Active threads get a desk in one of their project's modules; settled threads get no desk, their
- * computer goes to the archive in the basement.
+ * computer goes onto the "Archived" shelf in the hub.
  *
  * @param projects projects sorted by {@link Project#key()}, keys unique
  */

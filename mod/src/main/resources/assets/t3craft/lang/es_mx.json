@@ -153,5 +153,21 @@
 	"t3craft.schedule.none": "No hay tareas programadas.",
 	"t3craft.schedule.waiting": "Esperando a que T3 envíe las tareas programadas…",
 	"t3craft.schedule.unavailable": "Las tareas programadas no están disponibles:",
-	"t3craft.schedule.direct_only": "Las tareas programadas solo se muestran en modo directo (empareja con /t3craft pair)."
+	"t3craft.schedule.direct_only": "Las tareas programadas solo se muestran en modo directo (empareja con /t3craft pair).",
+	"t3craft.archive.shelf.title": "Archivados",
+	"t3craft.archive.shelf.count": "%s hilos cerrados · clic para el catálogo",
+	"t3craft.archive.catalog.title": "Catálogo del archivo",
+	"t3craft.archive.catalog.older": "Más viejos",
+	"t3craft.archive.catalog.refresh": "Refrescar",
+	"t3craft.archive.catalog.loading": "Cargando…",
+	"t3craft.archive.catalog.empty": "No hay hilos settled ni archivados.",
+	"t3craft.archive.catalog.no_env": "No hay entornos en modo directo (el archivo necesita un entorno emparejado).",
+	"t3craft.archive.catalog.shell_only": "Solo hilos settled del shell en vivo (las lecturas de archivados y más viejos están desactivadas).",
+	"t3craft.archive.shell_only": "solo shell",
+	"t3craft.archive.full": "settled + archivados + páginas viejas",
+	"t3craft.archive.refreshing": "Archivo: releyendo desde T3.",
+	"t3craft.archive.recent": "Archivo: se leyó hace menos de 30 s, nada que hacer.",
+	"t3craft.archive.status": "Archivo: %s hilos cerrados, %s/%s slots ocupados, %s, %s.",
+	"t3craft.archive.site": "HQ colocado",
+	"t3craft.archive.no_site": "no hay HQ en este mundo (solo catálogo)"
 }

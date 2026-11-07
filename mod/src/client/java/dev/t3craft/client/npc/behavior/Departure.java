@@ -1,6 +1,5 @@
 package dev.t3craft.client.npc.behavior;
 
-import java.util.List;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -72,7 +71,10 @@ public final class Departure {
 		return ticks >= MAX_TICKS;
 	}
 
-	/** One tick. {@code nav} finds the route once, when it starts walking. */
+	/**
+	 * One tick. {@code nav} finds the route once, when it starts walking (A* over the real blocks;
+	 * moves are collision-resolved). No route, or stuck against something: it fades out in place.
+	 */
 	public void tick(NpcBrain.Navigator nav, @Nullable Pos player) {
 		ticks++;
 		stageTicks++;
@@ -84,12 +86,18 @@ public final class Departure {
 			}
 			case WALK -> {
 				if (!routed) {
+					Route r = nav.route(pos, exit, player);
+					if (r.status() == Route.Status.PENDING && stageTicks < WALK_TICKS) {
+						break; // still searching (node budget): ask again next tick
+					}
 					routed = true;
-					List<Pos> p = nav.path(pos, exit, player);
-					motion.walk(p != null ? p : List.of(pos, exit), exitYaw);
+					if (r.status() == Route.Status.FOUND) {
+						motion.walk(r.points(), exitYaw);
+					}
+					// No route: never a straight line through walls; it fades out where it stands.
 				}
-				pos = motion.step(pos, player);
-				if (!motion.walking() || stageTicks >= WALK_TICKS) {
+				pos = motion.step(pos, player, nav::move);
+				if (!motion.walking() || stageTicks >= WALK_TICKS || motion.stuckTicks() >= NpcBrain.STUCK_TICKS) {
 					motion.stand(motion.yaw());
 					next(Stage.FADE);
 				}

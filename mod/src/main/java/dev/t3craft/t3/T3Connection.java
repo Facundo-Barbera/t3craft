@@ -188,6 +188,20 @@ public final class T3Connection {
 	}
 
 	/**
+	 * {@code orchestration.getOlderSettledThreads} (read): settled threads below {@code before},
+	 * newest settle first, at most {@code limit} (0..{@value ArchiveWire#MAX_PAGE}).
+	 */
+	public CompletableFuture<ArchiveWire.OlderSettledPage> getOlderSettledThreads(ArchiveWire.Cursor before, int limit) {
+		return streams.call(ArchiveWire.GET_OLDER_SETTLED_THREADS, ArchiveWire.olderSettledRequest(before, limit, null))
+				.thenApply(ArchiveWire::decodeOlderSettledValues);
+	}
+
+	/** {@code orchestration.getArchivedShellSnapshot} (read): archived threads and their projects. */
+	public CompletableFuture<ArchiveWire.ArchivedSnapshot> getArchivedShellSnapshot() {
+		return streams.call(ArchiveWire.GET_ARCHIVED_SHELL_SNAPSHOT, ArchiveWire.archivedRequest()).thenApply(ArchiveWire::decodeArchivedValues);
+	}
+
+	/**
 	 * {@code GET /api/orchestration/threads/:threadId/history?cursor=…} with this environment's
 	 * session ({@code OrchestrationV2ThreadHistoryPage}). Fails with a secret-free message.
 	 */

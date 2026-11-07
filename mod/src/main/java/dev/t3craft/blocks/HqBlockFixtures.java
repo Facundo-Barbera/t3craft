@@ -34,6 +34,14 @@ public final class HqBlockFixtures implements HqFixtures {
 		this.states = states;
 	}
 
+	/** Bump when the substitution changes (cells, blocks or binding format): demo worlds then update. */
+	public static final String ID = "blocks-2";
+
+	@Override
+	public String id() {
+		return ID;
+	}
+
 	@Override
 	public BuildPlan apply(BuildPlan plan) {
 		Map<BlockPos, HqBindings.Fixture> fixtures = new HashMap<>();

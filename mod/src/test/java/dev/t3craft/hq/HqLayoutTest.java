@@ -176,8 +176,79 @@ class HqLayoutTest {
 		}
 		HqLayout l = HqLayout.plan(b.build());
 		assertEquals(HqLayout.ARCHIVE_CAPACITY, l.archive().size());
-		assertEquals(List.of(String.format("t%04d", n - 3), String.format("t%04d", n - 2), String.format("t%04d", n - 1)), l.overflow());
+		assertEquals(List.of("t0000", "t0001", "t0002"), l.overflow(), "no history: the first in id order count as the oldest");
 		assertTrue(l.modules().isEmpty());
+		assertEquals(l, HqLayout.allocate(b.build(), l), "fixed point with a full shelf");
+	}
+
+	@Test
+	void shelfKeepsTheNewestAndPushesTheOldestToTheOlderList() {
+		int cap = HqLayout.ARCHIVE_CAPACITY;
+		HqInput in = HqInput.EMPTY;
+		HqLayout l = null;
+		List<String> order = new ArrayList<>();
+		// threads settle one at a time, in an order unrelated to their ids
+		for (int i = 0; i < cap + 4; i++) {
+			String t = String.format("env:p0-t%02d", (i * 5) % (cap + 4));
+			order.add(t);
+			in = settle(plus(in, "env:p0", t), t);
+			HqLayout next = HqLayout.allocate(in, l);
+			if (l != null) {
+				for (HqLayout.Archived a : l.archive()) {
+					HqLayout.Archived now = next.archived(a.threadId());
+					if (now != null) {
+						assertEquals(a.slot(), now.slot(), "a shelved computer never moves");
+					}
+				}
+			}
+			l = next;
+			assertEquals(Math.min(i + 1, cap), l.archive().size());
+		}
+		List<String> newest = order.subList(4, order.size());
+		for (String t : newest) {
+			assertNotNull(l.archived(t), "newest on the shelf: " + t);
+		}
+		assertEquals(order.subList(0, 4).stream().sorted().toList(), l.overflow(), "oldest only listed");
+		assertEquals(l, HqLayout.allocate(in, l), "idempotent");
+		// the newest settled thread has the highest number
+		String last = order.getLast();
+		int lastSeq = l.archived(last).seq();
+		assertTrue(l.archive().stream().allMatch(a -> a.seq() <= lastSeq));
+		// one leaves the roster: its slot is refilled from the older list (lowest id first)
+		HqLayout.Archived gone = l.archived(newest.getFirst());
+		HqLayout after = HqLayout.allocate(minus(in, gone.threadId()), l);
+		String promoted = order.subList(0, 4).stream().sorted().findFirst().orElseThrow();
+		assertEquals(gone.slot(), after.archived(promoted).slot());
+		assertEquals(3, after.overflow().size());
+		assertTrue(after.archive().stream().allMatch(a -> a.seq() >= after.archived(promoted).seq()), "promoted counts as the oldest");
+		// a newer one pushes out the oldest shelved thread: the promoted one
+		HqInput newer = settle(plus(minus(in, gone.threadId()), "env:p0", "env:p0-zz"), "env:p0-zz");
+		HqLayout l3 = HqLayout.allocate(newer, after);
+		assertNull(l3.archived(promoted), "the oldest leaves first");
+		assertEquals(after.archived(promoted).slot(), l3.archived("env:p0-zz").slot());
+		assertTrue(l3.overflow().contains(promoted));
+	}
+
+	@Test
+	void settledThreadFreesItsDeskAndGoesOnTheShelf() {
+		HqInput in = input(1, 6);
+		HqLayout l1 = HqLayout.plan(in);
+		HqLayout l2 = HqLayout.allocate(settle(in, "env:p0-t4"), l1);
+		assertNull(l2.seat("env:p0-t4"));
+		assertNull(l2.moduleAt(0).threadAt(4), "desk freed");
+		assertEquals(0, l2.archived("env:p0-t4").slot());
+		HqLayout.Diff d = HqLayout.diff(l1, l2);
+		assertEquals(List.of(new HqLayout.FreedDesk(0, 4, "env:p0-t4")), d.freedDesks());
+		assertEquals(List.of("env:p0-t4"), d.archived().stream().map(HqLayout.Archived::threadId).toList());
+		// a whole module settling removes it
+		HqInput all = in;
+		for (int t = 0; t < 6; t++) {
+			all = settle(all, "env:p0-t" + t);
+		}
+		HqLayout l3 = HqLayout.allocate(all, l2);
+		assertTrue(l3.modules().isEmpty());
+		assertEquals(6, l3.archive().size());
+		assertEquals(0, l3.archived("env:p0-t4").slot(), "kept its shelf slot");
 	}
 
 	// ------------------------------------------------------------------ diff
@@ -193,7 +264,7 @@ class HqLayoutTest {
 		assertEquals(List.of(), d.removedModules());
 		assertEquals(List.of(new HqLayout.FreedDesk(1, 2, "env:p1-t2")), d.freedDesks());
 		assertEquals(java.util.Map.of("env:p0-x", new HqLayout.Seat(2, 0)), d.seated());
-		assertEquals(List.of(new HqLayout.Archived(0, "env:p1-t2", "env:p1", "env")), d.archived());
+		assertEquals(List.of(new HqLayout.Archived(0, "env:p1-t2", "env:p1", "env", 0)), d.archived());
 		assertEquals(List.of(), d.unarchived());
 		assertTrue(HqLayout.diff(l2, l2).isEmpty());
 		HqLayout.Diff back = HqLayout.diff(l2, HqLayout.allocate(in, l2));
@@ -205,12 +276,12 @@ class HqLayoutTest {
 
 	@Test
 	void envelopeFormula() {
-		assertEquals(new Box(-8, -5, -8, 8, 10, 13), HqLayout.envelope(0));
-		assertEquals(new Box(-8, -5, -23, 17, 10, 13), HqLayout.envelope(1));
-		assertEquals(new Box(-17, -5, -23, 17, 10, 13), HqLayout.envelope(2));
+		assertEquals(new Box(-8, 0, -8, 8, 10, 13), HqLayout.envelope(0));
+		assertEquals(new Box(-8, 0, -23, 17, 10, 13), HqLayout.envelope(1));
+		assertEquals(new Box(-17, 0, -23, 17, 10, 13), HqLayout.envelope(2));
 		for (int n = 2; n <= 12; n++) {
 			int rows = (n + 1) / 2;
-			assertEquals(new Box(-17, -5, -9 - 14 * rows, 17, 10, 13), HqLayout.envelope(n), "n=" + n);
+			assertEquals(new Box(-17, 0, -9 - 14 * rows, 17, 10, 13), HqLayout.envelope(n), "n=" + n);
 		}
 	}
 
@@ -221,5 +292,21 @@ class HqLayoutTest {
 		assertEquals(l, HqLayout.fromJson(l.toJson()));
 		assertSame(HqLayout.EMPTY, HqLayout.fromJson(null));
 		assertSame(HqLayout.EMPTY, HqLayout.fromJson(new com.google.gson.JsonPrimitive("junk")));
+	}
+
+	@Test
+	void basementLayoutsKeepTheirDesksAndReshelve() {
+		HqInput in = settle(input(2, 4), "env:p1-t2");
+		HqLayout l = HqLayout.plan(in);
+		com.google.gson.JsonObject old = l.toJson();
+		old.addProperty("format", 2);
+		for (var a : old.getAsJsonArray("archive")) {
+			a.getAsJsonObject().remove("seq");
+			a.getAsJsonObject().addProperty("slot", 140);
+		}
+		HqLayout read = HqLayout.fromJson(old);
+		assertEquals(l.modules(), read.modules(), "desks kept");
+		assertTrue(read.archive().isEmpty());
+		assertEquals(l, HqLayout.allocate(in, read), "settled threads shelved afresh");
 	}
 }
