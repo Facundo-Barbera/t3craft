@@ -7,9 +7,11 @@ import com.google.gson.JsonParser;
 import dev.t3craft.T3Craft;
 import dev.t3craft.build.BuildPlan;
 import dev.t3craft.build.Builders;
+import dev.t3craft.client.T3CraftClient;
 import dev.t3craft.client.T3CraftCommands;
 import dev.t3craft.client.config.ConfigManager;
 import dev.t3craft.client.debug.GuardedEvents;
+import dev.t3craft.hq.HqAnchorSource;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -27,6 +29,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.server.IntegratedServer;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import org.jspecify.annotations.Nullable;
 
@@ -58,6 +61,9 @@ public final class DemoClient implements ClientModInitializer {
 	private boolean checked;
 	private @Nullable DemoBuildRun run;
 	private Pending pending = Pending.NONE;
+	private @Nullable DemoHqSource hq;
+	/** Whether we installed the HQ's NPC anchors (so we only clear our own). */
+	private boolean anchorsInstalled;
 
 	/**
 	 * Integration point: register more {@link DemoStructureSource}s (the modular HQ, see
@@ -71,6 +77,8 @@ public final class DemoClient implements ClientModInitializer {
 	public void onInitializeClient() {
 		DemoStructures s = new DemoStructures();
 		s.register(new ShedStructureSource());
+		hq = new DemoHqSource(DemoClient::liveNpcs);
+		s.register(hq); // the real HQ (feat/hq-design); falls back to the shed if its plan fails
 		structures = s;
 
 		ServerLifecycleEvents.SERVER_STARTED.register(server -> {
@@ -158,6 +166,7 @@ public final class DemoClient implements ClientModInitializer {
 			ticksIn = 0;
 			checked = false;
 			run = null; // its crews died with the old level (BuildersClient cancels them)
+			clearAnchors();
 		}
 		Path root = demoRoot;
 		if (level == null || root == null || mc.player == null) {
@@ -203,26 +212,39 @@ public final class DemoClient implements ClientModInitializer {
 	private void start(Minecraft mc, Path root, boolean force) {
 		DemoConfig cfg = activeConfig;
 		DemoStructures s = structures;
+		DemoMarker marker = DemoMarkerFile.read(root);
+		if (s != null && mc.level != null) {
+			for (DemoStructureSource src : s.all()) {
+				try {
+					src.prepare(marker, cfg.spec(), mc.level.getMinY());
+				} catch (RuntimeException e) {
+					T3Craft.LOGGER.error("[demo] structure source {} failed to prepare", src.id(), e);
+				}
+			}
+		}
 		Optional<DemoStructureSource> chosen = s == null ? Optional.empty() : s.choose(cfg.structure());
 		if (chosen.isEmpty()) {
 			T3Craft.LOGGER.warn("[demo] no structure source available (structure = {})", cfg.structure());
 			return;
 		}
 		DemoStructureSource source = chosen.get();
-		DemoMarker marker = DemoMarkerFile.read(root);
 		if (!force && !marker.needsBuild(source)) {
 			T3Craft.LOGGER.info("[demo] {} v{} already built, nothing to do", source.id(), source.version());
+			installAnchors(source);
 			return;
 		}
 		List<BuildPlan> plans;
 		try {
-			plans = source.plans();
+			plans = force ? source.plans() : source.plansSince(marker);
 		} catch (RuntimeException e) {
 			T3Craft.LOGGER.error("[demo] structure source {} failed", source.id(), e);
 			say("HQ plan '" + source.id() + "' failed, see log");
 			return;
 		}
 		if (plans.isEmpty()) {
+			// Same content under a new marker format (or an empty diff): record it, nothing to place.
+			DemoMarkerFile.update(root, m -> m.withBuilt(source));
+			installAnchors(source);
 			return;
 		}
 		int delay = 0;
@@ -232,7 +254,8 @@ public final class DemoClient implements ClientModInitializer {
 			server.execute(() -> VanillaDemoWorld.teleportToViewpoint(server, name, cfg.spec()));
 			delay = TELEPORT_DELAY;
 		}
-		run = new DemoBuildRun(source, plans, root, cfg, delay, this::say);
+		clearAnchors(); // NPCs keep to the ring layout while the HQ changes
+		run = new DemoBuildRun(source, plans, root, cfg, delay, this::say, () -> installAnchors(source));
 		say("building HQ: " + source.id() + " v" + source.version() + ", " + plans.size() + " part(s)");
 	}
 
@@ -248,10 +271,43 @@ public final class DemoClient implements ClientModInitializer {
 			DemoMarker m = DemoMarkerFile.read(root);
 			say("built: " + (m.structure() == null ? "nothing yet" : m.structure() + " v" + m.version()));
 		}
+		DemoHqSource h = hq;
+		if (h != null) {
+			say("hq: " + h.describe() + (anchorsInstalled ? ", NPC desks active" : ""));
+		}
 		DemoBuildRun r = run;
 		if (r != null) {
 			say("running: " + r.describe());
 		}
+	}
+
+	// ---- HQ anchors -------------------------------------------------------------------------
+
+	private static List<dev.t3craft.client.npc.NpcInfo> liveNpcs() {
+		T3CraftClient c = T3CraftClient.get();
+		return c == null ? List.of() : c.npcs().all();
+	}
+
+	/** Once the HQ is in the world, NPCs walk to their desks in it (feat/hq-design's {@code HqAnchorSource}). */
+	private void installAnchors(DemoStructureSource source) {
+		T3CraftClient c = T3CraftClient.get();
+		if (!(source instanceof DemoHqSource h) || c == null || demoRoot == null) {
+			return;
+		}
+		DemoWorldSpec spec = activeConfig.spec();
+		HqAnchorSource anchors = h.anchors(new BlockPos(spec.originX(), spec.originY(), spec.originZ()));
+		if (anchors != null) {
+			c.npcs().behavior().setAnchorSource(anchors);
+			anchorsInstalled = true;
+		}
+	}
+
+	private void clearAnchors() {
+		T3CraftClient c = T3CraftClient.get();
+		if (anchorsInstalled && c != null) {
+			c.npcs().behavior().setAnchorSource(null);
+		}
+		anchorsInstalled = false;
 	}
 
 	// ---- helpers ----------------------------------------------------------------------------
