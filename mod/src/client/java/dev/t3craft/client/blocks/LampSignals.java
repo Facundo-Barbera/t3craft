@@ -19,6 +19,7 @@ import java.util.Map;
  *   <li>Board bulb {@code board:<i>}: the i-th thread that needs the player, most urgent first
  *       (errors, then "needs you"; ties by key), in its colour; bulbs beyond that count are OFF. So
  *       the board reads "how many are waiting, and how bad" from across the hub.</li>
+ *   <li>Beacon ({@code beacon}, the hub lantern): the whole HQ at a glance, {@link #beacon}.</li>
  * </ul>
  */
 public final class LampSignals {
@@ -60,7 +61,29 @@ public final class LampSignals {
 		return out;
 	}
 
-	/** Binding wire string → wanted status, for every thread lamp and {@link #BOARD_BULBS} board bulbs. */
+	/**
+	 * The HQ's aggregate state for the hub beacon, most urgent first: anything that needs you
+	 * (ATTENTION) &gt; an error &gt; work going on &gt; IDLE (also done threads and an empty HQ). Settled
+	 * threads do not count. Adapted from AgentCraft's {@code HqWorldDriver.beaconLamp}.
+	 */
+	public static LampStatus beacon(Collection<WorkstationThread> threads) {
+		boolean error = false;
+		boolean working = false;
+		for (WorkstationThread t : threads) {
+			switch (t.status()) {
+				case ATTENTION -> {
+					return LampStatus.ATTENTION;
+				}
+				case ERROR -> error = true;
+				case WORKING -> working = true;
+				default -> {
+				}
+			}
+		}
+		return error ? LampStatus.ERROR : working ? LampStatus.WORKING : LampStatus.IDLE;
+	}
+
+	/** Binding wire string → wanted status, for every thread lamp, {@link #BOARD_BULBS} board bulbs and the beacon. */
 	public static Map<String, LampStatus> wanted(Collection<WorkstationThread> threads) {
 		Map<String, LampStatus> out = new LinkedHashMap<>();
 		List<WorkstationThread> sorted = new ArrayList<>(threads);
@@ -72,6 +95,7 @@ public final class LampSignals {
 		for (int i = 0; i < board.size(); i++) {
 			out.put(Binding.board(i).wire(), board.get(i));
 		}
+		out.put(Binding.BEACON.wire(), beacon(threads));
 		return out;
 	}
 }

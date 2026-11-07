@@ -196,4 +196,20 @@ class HqBindingsTest {
 		}
 		throw new AssertionError("no fixture at " + rel);
 	}
+
+	@Test
+	void hubLanternCapIsTheBeacon() {
+		BuildPlan p = plan(BlocksTestSupport.roster());
+		List<HqBindings.Fixture> beacons = HqBindings.ofRole(p, HqBindings.Role.BEACON);
+		assertEquals(1, beacons.size());
+		HqBindings.Fixture f = beacons.get(0);
+		assertEquals(Binding.BEACON, f.binding());
+		assertEquals(p.anchor(AnchorNames.BEACON).block(), f.rel());
+		assertEquals(p.anchor(AnchorNames.HUB).block().above(8), f.rel(), "the lantern cap, above the hub floor");
+		assertFalse(p.at(f.rel()).state().isAir(), "a solid cap block to swap");
+		BuildPlan swapped = new HqBlockFixtures(STANDIN).apply(p);
+		Placement lamp = swapped.at(f.rel());
+		assertEquals(STANDIN.lamp(), lamp.state(), "the module puts a status lamp in the cap");
+		assertEquals("beacon", lamp.be().getStringOr(BoundBlockEntity.KEY, ""));
+	}
 }
