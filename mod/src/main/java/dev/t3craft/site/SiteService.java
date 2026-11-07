@@ -182,6 +182,14 @@ public final class SiteService {
 	 * idle (empty list otherwise). Block entities are not recorded (site plans never hold them).
 	 */
 	public List<Claimed> claim(List<CellChange> changes) {
+		return claim(changes, true);
+	}
+
+	/**
+	 * {@link #claim(List)}; with {@code record = false} nothing is saved (a dry run, e.g. to price the
+	 * change first). Cells that already hold the wanted state and have it recorded are left out.
+	 */
+	public List<Claimed> claim(List<CellChange> changes, boolean record) {
 		if (changes.isEmpty() || running != null) {
 			return List.of();
 		}
@@ -209,10 +217,17 @@ public final class SiteService {
 				continue;
 			}
 			Layer top = a.layers.get(newest);
+			String now = a.world.state(c.x(), c.y(), c.z());
+			if (now.equals(c.state()) && c.state().equals(top.plan.get(c.x(), c.y(), c.z()))) {
+				continue;
+			}
 			if (!Restorer.isOurs(a.world, top.snap, top.plan, c.x(), c.y(), c.z())) {
 				continue;
 			}
-			out.add(new Claimed(c.x(), c.y(), c.z(), a.world.state(c.x(), c.y(), c.z()), c.state()));
+			out.add(new Claimed(c.x(), c.y(), c.z(), now, c.state()));
+			if (!record) {
+				continue;
+			}
 			for (int k = 0; k <= newest; k++) {
 				Layer l = a.layers.get(k);
 				if (l.exp.box().contains(c.x(), c.y(), c.z()) && !c.state().equals(l.plan.get(c.x(), c.y(), c.z()))) {

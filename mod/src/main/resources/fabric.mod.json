@@ -9,7 +9,7 @@
 	"environment": "client",
 	"entrypoints": {
 		"main": ["dev.t3craft.T3Craft"],
-		"client": ["dev.t3craft.client.T3CraftClient", "dev.t3craft.build.client.BuildersClient", "dev.t3craft.client.config.ConfigClientInit", "dev.t3craft.client.debug.DevReloadClient", "dev.t3craft.client.demo.DemoClient", "dev.t3craft.survival.client.SurvivalClient", "dev.t3craft.client.workstation.WorkstationClient", "dev.t3craft.client.site.SiteClient"],
+		"client": ["dev.t3craft.client.T3CraftClient", "dev.t3craft.build.client.BuildersClient", "dev.t3craft.client.config.ConfigClientInit", "dev.t3craft.client.debug.DevReloadClient", "dev.t3craft.client.demo.DemoClient", "dev.t3craft.survival.client.SurvivalClient", "dev.t3craft.client.workstation.WorkstationClient", "dev.t3craft.client.site.SiteClient", "dev.t3craft.client.hq.HqConstructionClient"],
 		"modmenu": ["dev.t3craft.client.config.ModMenuIntegration"]
 	},
 	"depends": {

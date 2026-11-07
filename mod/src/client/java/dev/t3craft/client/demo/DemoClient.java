@@ -67,8 +67,23 @@ public final class DemoClient implements ClientModInitializer {
 		return structures;
 	}
 
+	private static volatile @Nullable DemoClient instance;
+
+	/** The running demo world's spec (origin), or null when the integrated server is not the demo save. */
+	public static @Nullable DemoWorldSpec activeSpec() {
+		DemoClient d = instance;
+		return d == null || d.demoRoot == null ? null : d.activeConfig.spec();
+	}
+
+	/** The running demo world's folder, or null when not in the demo. */
+	public static @Nullable Path activeRoot() {
+		DemoClient d = instance;
+		return d == null ? null : d.demoRoot;
+	}
+
 	@Override
 	public void onInitializeClient() {
+		instance = this;
 		DemoStructures s = new DemoStructures();
 		s.register(new ShedStructureSource());
 		structures = s;
