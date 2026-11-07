@@ -8,6 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -20,6 +21,7 @@ import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.Interaction;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.ObserverBlock;
+import net.minecraft.world.level.block.state.BlockState;
 import org.joml.Vector3f;
 import org.jspecify.annotations.Nullable;
 
@@ -60,6 +62,8 @@ final class WorkstationRenderer {
 		Display.@Nullable BlockDisplay prop;
 		@Nullable Interaction hitbox;
 		boolean archived;
+		/** The computer block draws its own screen (e.g. a t3craft monitor): our TextDisplay stays blank. */
+		boolean suppressed;
 
 		Station(String key, StationPlacement placement, Display.TextDisplay screen) {
 			this.key = key;
@@ -77,6 +81,13 @@ final class WorkstationRenderer {
 	private final Map<Integer, String> byEntity = new HashMap<>();
 	private int nextId = ID_BASE;
 	private int tick;
+	/** Computer blocks that draw their own screen; default none (vanilla blocks never do). */
+	private Predicate<BlockState> selfDisplay = state -> false;
+
+	/** See {@link WorkstationClient#setScreenSuppressor}. Null = none. */
+	void setSelfDisplay(@Nullable Predicate<BlockState> p) {
+		selfDisplay = p == null ? state -> false : p;
+	}
 
 	/** Thread key whose computer block is at {@code pos}, or null. */
 	@Nullable String stationAt(BlockPos pos) {
@@ -131,11 +142,21 @@ final class WorkstationRenderer {
 			if (created && screen == null) {
 				screen = cache.screen(t.key());
 			}
-			if (screen != null) {
-				apply(s.screen, screen);
-			}
 			if (created || checkBlocks) {
 				syncProp(lvl, s);
+				boolean suppress = selfDisplay.test(lvl.getBlockState(new BlockPos(p.computerX(), p.computerY(), p.computerZ())));
+				if (suppress != s.suppressed) {
+					s.suppressed = suppress;
+					if (suppress) {
+						s.screen.setText(Component.empty());
+						s.screen.setBackgroundColor(0);
+					} else if (screen == null) {
+						screen = cache.screen(t.key());
+					}
+				}
+			}
+			if (screen != null && !s.suppressed) {
+				apply(s.screen, screen);
 			}
 		}
 		for (String key : new ArrayList<>(stations.keySet())) {
