@@ -10,7 +10,7 @@ import org.jspecify.annotations.Nullable;
 /**
  * Simple entry points for consumers that just want buildable plans (the demo world, the builders).
  * All plans are {@link dev.t3craft.build.BuildPlan}s relative to the fixed HQ origin (the hub floor
- * centre; {@code y = 0} is the floor layer, the basement goes down to {@code y = -5}); build them with
+ * centre; {@code y = 0} is the floor layer and the lowest one, there is no basement); build them with
  * the {@code origin}/{@code rotation} of an {@link HqSite}.
  *
  * <pre>{@code
@@ -48,8 +48,8 @@ public final class HqPlans {
 	/**
 	 * The site that puts the HQ in the builders' demo convention: entrance facing north ({@code -z}),
 	 * the front edge of the portico on {@code z = 0}, growing towards {@code +z}, {@code x = 0} the
-	 * centre line. {@code y = 0} stays the hub floor; the basement goes down to {@code y = -5}, so the
-	 * demo origin must be at least 6 blocks above the world's minimum height.
+	 * centre line. {@code y = 0} stays the hub floor and is the lowest layer of the HQ, so the demo
+	 * origin must be at least 1 block above the world's minimum height.
 	 */
 	public static HqSite demoSite() {
 		return new HqSite(new net.minecraft.core.BlockPos(0, 0, HqGeometry.PORTICO_Z2), net.minecraft.world.level.block.Rotation.CLOCKWISE_180);
