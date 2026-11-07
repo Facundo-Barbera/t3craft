@@ -11,7 +11,6 @@ import dev.t3craft.client.link.BridgeListener;
 import dev.t3craft.client.link.LinkStatus;
 import dev.t3craft.client.npc.NpcInfo;
 import dev.t3craft.client.npc.NpcRegistry;
-import dev.t3craft.client.screen.ThreadChatScreen;
 import dev.t3craft.t3.DirectController;
 import dev.t3craft.t3.Environments;
 import dev.t3craft.t3.Pairing;
@@ -104,7 +103,7 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 			}
 			NpcInfo info = npcs.info(threadId);
 			if (info != null) {
-				Minecraft.getInstance().gui.setScreen(new ThreadChatScreen(info));
+				dev.t3craft.client.chat.ChatScreens.openFor(info);
 			}
 			return InteractionResult.SUCCESS;
 		});
