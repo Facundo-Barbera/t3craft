@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "t3craft:block/beam_cap"
+    }
+  }
+}

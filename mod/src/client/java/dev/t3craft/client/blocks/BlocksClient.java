@@ -105,6 +105,7 @@ public final class BlocksClient implements ClientModInitializer {
 	private volatile ScreenExtent.@Nullable Provider extents;
 	private final MonitorLiveLog liveLog = new MonitorLiveLog(MonitorSettings.DEFAULT);
 	private @Nullable MonitorRenderer renderer;
+	private @Nullable PlaqueRenderer plaqueRenderer;
 	private volatile @Nullable Map<Long, Binding> positional;
 	private volatile @Nullable Map<String, LampStatus> lastWanted;
 	private volatile @Nullable Supplier<@Nullable Map<Long, Binding>> hqBindings;
@@ -138,6 +139,11 @@ public final class BlocksClient implements ClientModInitializer {
 			return r;
 		});
 		BlockEntityRendererRegistry.register(c.lampType(), ctx -> new LampRenderer(this));
+		BlockEntityRendererRegistry.register(c.kit().plaqueType(), ctx -> {
+			PlaqueRenderer r = new PlaqueRenderer();
+			plaqueRenderer = r;
+			return r;
+		});
 		MonitorBlock.setClientUse(this::use);
 		ClientTickEvents.END_CLIENT_TICK.register(GuardedEvents.endClientTick(MODULE, this::tick));
 		ClientBlockEntityEvents.BLOCK_ENTITY_LOAD.register((be, level) -> liveLog.onLoad(be));
@@ -381,6 +387,10 @@ public final class BlocksClient implements ClientModInitializer {
 		MonitorRenderer r = renderer;
 		if (r != null) {
 			r.clear();
+		}
+		PlaqueRenderer pr = plaqueRenderer;
+		if (pr != null) {
+			pr.clear();
 		}
 	}
 
