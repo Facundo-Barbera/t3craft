@@ -1,0 +1,26 @@
+# Secrets: never commit tokens, tickets or env files
+.env
+.env.*
+!.env.example
+*.token
+*.secret
+
+# Build output / runtime dirs
+build/
+run/
+dist/
+out/
+.gradle/
+mod/.gradle/
+
+# Node
+node_modules/
+coverage/
+*.tsbuildinfo
+
+# Editors / OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
