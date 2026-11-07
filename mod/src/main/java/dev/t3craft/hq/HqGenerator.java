@@ -66,7 +66,7 @@ public final class HqGenerator {
 	public BuildPlan generate(HqLayout layout) {
 		PlanBuilder b = new PlanBuilder();
 		int rows = layout.rows();
-		hub(b, rows > 0);
+		hub(b, rows > 0, hubBinding(layout));
 		b.group(GROUP_ARCHIVE);
 		archive(b);
 		b.group(null);
@@ -85,6 +85,26 @@ public final class HqGenerator {
 		return b.build();
 	}
 
+	/**
+	 * What the hub's big screen shows: the environment with the most modules (ties: the first key), or
+	 * nothing while the HQ has no modules. Wire format of the blocks module's bindings ({@code env:<id>}).
+	 */
+	static String hubBinding(HqLayout layout) {
+		java.util.Map<String, Integer> count = new java.util.TreeMap<>();
+		for (HqLayout.Module m : layout.modules()) {
+			if (!m.envKey().isEmpty()) {
+				count.merge(m.envKey(), 1, Integer::sum);
+			}
+		}
+		String best = null;
+		for (java.util.Map.Entry<String, Integer> e : count.entrySet()) {
+			if (best == null || e.getValue() > count.get(best)) {
+				best = e.getKey();
+			}
+		}
+		return best == null ? "" : "env:" + best;
+	}
+
 	/** Group of the archive terminal's nook (in the hub's south wall). */
 	public static final String GROUP_ARCHIVE = "archive";
 
@@ -95,7 +115,7 @@ public final class HqGenerator {
 
 	// ------------------------------------------------------------------ hub
 
-	private void hub(PlanBuilder b, boolean northDoor) {
+	private void hub(PlanBuilder b, boolean northDoor, String hubBinding) {
 		try (PlanBuilder.Canvas c = b.module("hub", HqGeometry.hub(), List.of(HqGeometry.archiveNook()))) {
 			style.hub(c, northDoor);
 			board(b, c);
@@ -110,9 +130,11 @@ public final class HqGenerator {
 					b.anchor(Anchor.at(AnchorNames.bench(bench++), p.relative(look), look));
 				}
 			}
-			surface(b, c, HqGeometry.hubScreen(), AnchorNames.HUB_SCREEN);
+			bigScreen(b, c, HqGeometry.hubScreen(), "hub", hubBinding);
+			// the thread kanban wall (P3): reserved surface and anchor; feat/thread-wall fills it
 			HqGeometry.Surface wall = HqGeometry.threadWall();
-			surface(b, c, wall, AnchorNames.THREAD_WALL);
+			fill(c, wall);
+			b.anchor(Anchor.face(AnchorNames.THREAD_WALL, wall.anchorCell(), wall.facing()));
 			b.anchor(Anchor.at(AnchorNames.THREAD_WALL_FRONT, wall.anchorCell().relative(wall.facing(), 3).atY(1), wall.facing().getOpposite()));
 			// the hologram's column stays open; the beacon crowns the roof lantern over it
 			for (int y = 1; y <= HqGeometry.HOLOGRAM_TOP; y++) {
@@ -132,12 +154,17 @@ public final class HqGenerator {
 		}
 	}
 
-	/** Writes a reserved screen surface with the style's stand-in and publishes its anchor. */
-	private void surface(PlanBuilder b, PlanBuilder.Canvas c, HqGeometry.Surface s, String name) {
+	/** Writes a reserved surface with the style's screen stand-in (the blocks module swaps the cells). */
+	private void fill(PlanBuilder.Canvas c, HqGeometry.Surface s) {
 		for (BlockPos p : s.cells()) {
 			c.set(p, style.screen());
 		}
-		b.anchor(Anchor.face(name, s.anchorCell(), s.facing()));
+	}
+
+	/** A large screen (P1, feat/monitor-multiblock): the stand-in cells and its {@link AnchorNames#bigScreen} anchor at the top-left cell. */
+	private void bigScreen(PlanBuilder b, PlanBuilder.Canvas c, HqGeometry.Surface s, String key, String binding) {
+		fill(c, s);
+		b.anchor(Anchor.face(AnchorNames.bigScreen(key, s.width(), s.height(), binding), s.origin().above(s.height() - 1), s.facing()));
 	}
 
 	/** The "needs attention" board: the style's frame and face, then the bulbs and the anchors. */
@@ -224,7 +251,7 @@ public final class HqGenerator {
 			style.wingEndWall(c, i, 0, true);
 		}
 		for (int s = 0; s < w.segments(); s++) {
-			segment(b, i, s, accent, s == w.segments() - 1 ? HqGeometry.moduleScreen(i, w.segments()) : null);
+			segment(b, i, s, accent, s == w.segments() - 1 ? HqGeometry.moduleScreen(i, w.segments()) : null, "project:" + w.projectKey());
 		}
 		for (int slot = 0; slot < w.capacity(); slot++) {
 			desk(b, i, slot, w.threadAt(slot));
@@ -245,14 +272,14 @@ public final class HqGenerator {
 		}
 	}
 
-	private void segment(PlanBuilder b, int i, int s, DyeColor accent, HqGeometry.@Nullable Surface screen) {
+	private void segment(PlanBuilder b, int i, int s, DyeColor accent, HqGeometry.@Nullable Surface screen, String binding) {
 		List<Box> holes = new ArrayList<>(2);
 		holes.add(HqGeometry.desk(i, 2 * s));
 		holes.add(HqGeometry.desk(i, 2 * s + 1));
 		try (PlanBuilder.Canvas c = b.module("wing_" + i + "_seg_" + s, HqGeometry.segment(i, s), holes)) {
 			style.segment(c, i, s, accent);
 			if (screen != null) {
-				surface(b, c, screen, AnchorNames.moduleScreen(i));
+				bigScreen(b, c, screen, "module@" + i, binding);
 				for (int k = 0; k < screen.width(); k++) {
 					c.set(screen.origin().relative(screen.along(), k).below(), style.screenBase());
 				}

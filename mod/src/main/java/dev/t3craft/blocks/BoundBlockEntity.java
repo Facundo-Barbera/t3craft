@@ -45,8 +45,13 @@ public abstract class BoundBlockEntity extends BlockEntity {
 			Level level = getLevel();
 			if (level != null && !level.isClientSide()) {
 				level.sendBlockUpdated(getBlockPos(), getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
+				bindingChanged(level);
 			}
 		}
+	}
+
+	/** Server side, after {@link #setBinding} stored a different binding. */
+	protected void bindingChanged(Level level) {
 	}
 
 	@Override

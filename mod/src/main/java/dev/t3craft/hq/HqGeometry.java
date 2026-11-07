@@ -76,8 +76,8 @@ final class HqGeometry {
 	/**
 	 * Reserved screen surfaces, for the big multiblock screens (P1) and the thread kanban wall (P3).
 	 * Each is a vertical rectangle of cells, written by the generator with the style's screen stand-in
-	 * and published as an anchor (face centre of the rectangle's bottom-middle cell; see
-	 * {@link AnchorNames#HUB_SCREEN}, {@link AnchorNames#THREAD_WALL}, {@link AnchorNames#moduleScreen}).
+	 * and published as an anchor (big screens: {@link AnchorNames#bigScreen} at the top-left cell; the
+	 * kanban wall: {@link AnchorNames#THREAD_WALL} at the bottom-middle cell).
 	 *
 	 * @param origin bottom cell at the left end as seen from the front
 	 * @param along  direction the rectangle extends to the right as seen from the front
