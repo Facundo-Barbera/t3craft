@@ -60,9 +60,9 @@ public final class HqPlans {
 		return forRoster(roster, demoSite());
 	}
 
-	/** The HQ plan of a layout. */
+	/** The HQ plan of a layout, with the active {@link HqFixtures} (vanilla unless the blocks module is on). */
 	public static BuildPlan generate(HqLayout layout) {
-		return new HqGenerator().generate(layout);
+		return HqFixtures.active().apply(new HqGenerator().generate(layout));
 	}
 
 	/** Every group of {@code plan} as its own layered build plan, keyed by group, in build order. */

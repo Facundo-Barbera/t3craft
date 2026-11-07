@@ -66,6 +66,24 @@ index per cell, temp file + atomic move), and treat a cell that matches neither 
 the original as a player change that is never overwritten silently. t3craft's site code
 (`dev.t3craft.site`) reimplements this for arbitrary terrain with full snapshots and undo.
 
+Files adapted from AgentCraft's blocks (`mod/src/main/java/dev/agentcraft/block/`,
+`mod/src/client/java/dev/agentcraft/client/world/`, MIT), branch `feat/blocks-core`:
+
+- `mod/src/main/java/dev/t3craft/blocks/BoundBlockEntity.java` ← `block/entity/StationBlockEntity.java`
+  (binding string on a block entity: save/load, update packet and update tag for client sync).
+- `mod/src/main/java/dev/t3craft/blocks/StatusLampBlock.java` ← `block/StatusLampBlock.java`
+  (`status` enum block state with light per state + binding block entity).
+- `mod/src/main/java/dev/t3craft/blocks/LampStatus.java` ← `block/LampStatus.java` (status enum as a
+  `StringRepresentable`; t3craft's own states, colours and light levels).
+- `mod/src/main/java/dev/t3craft/blocks/MonitorBlock.java` ← `block/FacingEntityBlock.java`
+  (horizontal facing, placement, rotate and mirror).
+- `mod/src/client/java/dev/t3craft/client/blocks/MonitorRenderer.java` ← `client/world/StationRenderer.java`
+  (`toFace`: draw in screen pixel space on a block's front face).
+
+The lamp driver (`dev.t3craft.blocks.LampApplier` + `client.blocks.BlocksClient`: the client computes
+lamp states and the integrated server applies them) follows the idea of AgentCraft's
+`HqWorldDriver`; it is a new implementation, no code copied. Models and textures are t3craft's own.
+
 AgentCraft license:
 
 ```
