@@ -431,14 +431,25 @@ public final class DemoClient implements ClientModInitializer {
 			return;
 		}
 		DemoWorldSpec spec = activeConfig.spec();
-		HqAnchorSource anchors = h.anchors(new BlockPos(spec.originX(), spec.originY(), spec.originZ()));
+		BlockPos origin = new BlockPos(spec.originX(), spec.originY(), spec.originZ());
+		HqAnchorSource anchors = h.anchors(origin);
 		if (anchors != null) {
 			c.npcs().behavior().setAnchorSource(anchors);
 			anchorsInstalled = true;
 		}
+		installBindings(h.bindings(origin));
+	}
+
+	/** Monitors and lamps of the HQ follow the live roster on their own (blocks module on only). */
+	private static void installBindings(@Nullable DemoHqBindings bindings) {
+		dev.t3craft.client.blocks.BlocksClient b = dev.t3craft.client.blocks.BlocksClient.get();
+		if (b != null) {
+			b.setHqBindings(bindings == null ? null : () -> bindings.bindings(liveNpcs()));
+		}
 	}
 
 	private void clearAnchors() {
+		installBindings(null);
 		T3CraftClient c = T3CraftClient.get();
 		if (anchorsInstalled && c != null) {
 			c.npcs().behavior().setAnchorSource(null);
