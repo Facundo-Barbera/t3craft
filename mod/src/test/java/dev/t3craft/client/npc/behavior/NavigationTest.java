@@ -371,4 +371,33 @@ class NavigationTest {
 		}
 		assertEquals(start.pos(), b.pos());
 	}
+
+	@Test
+	void departureWalksOutThroughTheDoorNeverThroughTheWall() {
+		CellWorld w = wallAcross(field(), 4, -6);
+		Navigation nav = Navigation.over(w);
+		Departure d = new Departure(new Pos(1.5, Y, 0.5), -90, Anchor.at(8.5, Y, 0.5, 0));
+		boolean crossed = false;
+		for (int i = 0; i < Departure.WAVE_TICKS + Departure.WALK_TICKS + 5; i++) {
+			nav.beginTick();
+			d.tick(nav, null);
+			assertFalse(nav.embedded(d.pos()), "never inside a block: " + d.pos());
+			if (d.pos().x() >= 4 && d.pos().x() < 5) {
+				assertTrue(d.pos().z() >= -6 && d.pos().z() < -5, "in the wall column only at the doorway: " + d.pos());
+			}
+			crossed |= d.pos().x() >= 5;
+		}
+		assertTrue(crossed, "got out through the doorway: " + d.pos());
+
+		// Walled in: no route, it fades out where it stands.
+		CellWorld closed = wallAcross(field(), 4);
+		Navigation nc = Navigation.over(closed);
+		Departure stay = new Departure(new Pos(1.5, Y, 0.5), -90, Anchor.at(8.5, Y, 0.5, 0));
+		for (int i = 0; i < Departure.WAVE_TICKS + Departure.WALK_TICKS + 5; i++) {
+			nc.beginTick();
+			stay.tick(nc, null);
+		}
+		assertEquals(new Pos(1.5, Y, 0.5), stay.pos());
+		assertNotEquals(Departure.Stage.WALK, stay.stage());
+	}
 }
