@@ -9,7 +9,7 @@ import org.jspecify.annotations.Nullable;
  * by the bridge / {@code Presentation}).
  *
  * <p><b>Integration point.</b> A richer source (e.g. a turn summary from the chat feature) can be
- * plugged in with {@code NpcRegistry.behavior().setSummarySource(src)}. Called every tick per NPC
+ * plugged in with {@code T3CraftClient.get().npcs().behavior().setSummarySource(src)}. Called every tick per NPC
  * on the client thread: return a cached string.
  */
 @FunctionalInterface

@@ -10,7 +10,7 @@ import org.jspecify.annotations.Nullable;
  * NPCs behave with or without a base.
  *
  * <p><b>Integration point.</b> A base implementation registers itself with
- * {@code NpcRegistry.behavior().setAnchorSource(src)} (and {@code setAnchorSource(null)} when the
+ * {@code T3CraftClient.get().npcs().behavior().setAnchorSource(src)} (and {@code setAnchorSource(null)} when the
  * base is gone). Calls happen on the client thread, a few times per second at most per NPC: return
  * cached values, don't scan the world here.
  */
