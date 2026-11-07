@@ -27,7 +27,7 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>Only payloads and decoding live here: the requests go through the connection's shared
  * one-shot read path (feat/chat's {@code StreamRegistry.call}), never through a path of their own.
- * The {@code List<JsonObject>} overloads take the values {@code call} completes with.
+ * The {@code *Values} decoders take the values {@code call} completes with.
  */
 public final class ArchiveWire {
 	/** Read-only ({@code orchestration:read}) RPC tags. */
@@ -111,11 +111,11 @@ public final class ArchiveWire {
 		return new JsonObject();
 	}
 
-	public static OlderSettledPage decodeOlderSettled(@Nullable List<JsonObject> values) {
+	public static OlderSettledPage decodeOlderSettledValues(@Nullable List<JsonObject> values) {
 		return decodeOlderSettled(last(values));
 	}
 
-	public static ArchivedSnapshot decodeArchived(@Nullable List<JsonObject> values) {
+	public static ArchivedSnapshot decodeArchivedValues(@Nullable List<JsonObject> values) {
 		return decodeArchived(last(values));
 	}
 

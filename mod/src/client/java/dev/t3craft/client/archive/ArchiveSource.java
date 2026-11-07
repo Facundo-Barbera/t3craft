@@ -37,13 +37,13 @@ public interface ArchiveSource {
 			@Override
 			public CompletableFuture<ArchiveWire.ArchivedSnapshot> archived(String env) {
 				return caller.call(env, ArchiveWire.GET_ARCHIVED_SHELL_SNAPSHOT, ArchiveWire.archivedRequest())
-						.thenApply(ArchiveWire::decodeArchived);
+						.thenApply(ArchiveWire::decodeArchivedValues);
 			}
 
 			@Override
 			public CompletableFuture<ArchiveWire.OlderSettledPage> older(String env, ArchiveWire.Cursor before, int limit) {
 				return caller.call(env, ArchiveWire.GET_OLDER_SETTLED_THREADS, ArchiveWire.olderSettledRequest(before, limit, null))
-						.thenApply(ArchiveWire::decodeOlderSettled);
+						.thenApply(ArchiveWire::decodeOlderSettledValues);
 			}
 		};
 	}

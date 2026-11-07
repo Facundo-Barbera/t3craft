@@ -38,7 +38,7 @@ class ArchiveWireTest {
 		assertEquals(1, page.counts().size(), "malformed count rows are skipped");
 		assertEquals(5, page.total());
 
-		assertSame(ArchiveWire.OlderSettledPage.EMPTY, ArchiveWire.decodeOlderSettled(null));
+		assertSame(ArchiveWire.OlderSettledPage.EMPTY, ArchiveWire.decodeOlderSettled((com.google.gson.JsonElement) null));
 		assertSame(ArchiveWire.OlderSettledPage.EMPTY, ArchiveWire.decodeOlderSettled(JsonParser.parseString("[]")));
 		assertTrue(ArchiveWire.decodeOlderSettled(JsonParser.parseString("{}")).threads().isEmpty());
 	}
@@ -66,10 +66,10 @@ class ArchiveWireTest {
 
 	@Test
 	void decodesStreamCallValues() {
-		var page = ArchiveWire.decodeOlderSettled(List.of(json("{\"snapshotSequence\":1}"), json("{\"snapshotSequence\":2,\"threads\":[]}")));
+		var page = ArchiveWire.decodeOlderSettledValues(List.of(json("{\"snapshotSequence\":1}"), json("{\"snapshotSequence\":2,\"threads\":[]}")));
 		assertEquals(2, page.snapshotSequence(), "the last value wins");
-		assertSame(ArchiveWire.ArchivedSnapshot.EMPTY, ArchiveWire.decodeArchived(List.<JsonObject>of()));
-		assertSame(ArchiveWire.OlderSettledPage.EMPTY, ArchiveWire.decodeOlderSettled((List<JsonObject>) null));
+		assertSame(ArchiveWire.ArchivedSnapshot.EMPTY, ArchiveWire.decodeArchivedValues(List.of()));
+		assertSame(ArchiveWire.OlderSettledPage.EMPTY, ArchiveWire.decodeOlderSettledValues(null));
 		assertEquals(0, ArchiveWire.archivedRequest().size());
 	}
 }
