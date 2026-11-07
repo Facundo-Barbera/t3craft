@@ -54,11 +54,6 @@ public record ThreadRow(
 	}
 
 	static ThreadState state(@Nullable String wire) {
-		for (ThreadState s : ThreadState.values()) {
-			if (s.wire.equals(wire)) {
-				return s;
-			}
-		}
-		return ThreadState.IDLE;
+		return ThreadOrder.state(wire);
 	}
 }

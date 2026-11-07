@@ -43,7 +43,8 @@ class AttentionAgoBadgeTest {
 		assertEquals("V", a.initial());
 		assertEquals("VPS", a.text());
 		assertEquals(a, EnvBadge.of("my-vps", "my-vps"));
-		assertEquals("M", EnvBadge.of("mini", "Mini Acmesite").initial());
+		assertEquals("F", EnvBadge.of("mini", "Mini Acmesite").initial());
+		assertEquals("M", EnvBadge.of("m", "my-mini").initial());
 		assertEquals(0xFFFFFFFF & 0xFF000000 | 0xF0F0F0, EnvBadge.of("x", "x", 0xF0F0F0).background());
 		assertEquals(0xFF1F1E1D, EnvBadge.of("x", "x", 0xF0F0F0).foreground(), "ink on a light configured colour");
 		assertNotEquals(0xFF1F1E1D, EnvBadge.of("x", "x", 0x202020).foreground());

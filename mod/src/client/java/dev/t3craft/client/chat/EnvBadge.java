@@ -9,7 +9,7 @@ import org.jspecify.annotations.Nullable;
  * colour configured for it in {@code t3craft.json}), so the same environment always looks the
  * same. Filter chips use the longer {@link #text()}. Pure Java.
  *
- * @param initial    one upper-case character, e.g. "V" for "my-vps", "M" for "Mini Acmesite"
+ * @param initial    one upper-case character: the last word's initial, "V" for "my-vps", "M" for "my-mini"
  * @param text       1-3 upper-case characters, e.g. "VPS", "MF"
  * @param background ARGB fill of the badge
  * @param foreground ARGB text colour readable on {@code background}
@@ -35,7 +35,21 @@ public record EnvBadge(String initial, String text, int background, int foregrou
 	public static EnvBadge of(String envId, String label, @Nullable Integer rgb) {
 		String text = initials(label == null || label.isBlank() ? envId : label);
 		int bg = rgb != null ? 0xFF000000 | rgb : PALETTE[Math.floorMod(stableHash(envId == null ? "" : envId), PALETTE.length)];
-		return new EnvBadge(text.substring(0, text.offsetByCodePoints(0, 1)), text, bg, readableOn(bg));
+		return new EnvBadge(initial(label == null || label.isBlank() ? envId : label), text, bg, readableOn(bg));
+	}
+
+	/**
+	 * Initial of the label's last word: environments of one person often share a prefix
+	 * ("my-vps", "my-mini" → "V", "M"); a one-word label gives its first letter.
+	 */
+	static String initial(String label) {
+		String[] words = label.trim().split("[^\\p{L}\\p{N}]+");
+		for (int i = words.length - 1; i >= 0; i--) {
+			if (!words[i].isEmpty()) {
+				return words[i].substring(0, words[i].offsetByCodePoints(0, 1)).toUpperCase(Locale.ROOT);
+			}
+		}
+		return "?";
 	}
 
 	/** Ink on light colours, near-white on dark ones (relative luminance threshold). */

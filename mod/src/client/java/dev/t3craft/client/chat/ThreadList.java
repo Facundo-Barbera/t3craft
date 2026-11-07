@@ -5,7 +5,6 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -30,11 +29,8 @@ public final class ThreadList {
 	public record EnvInfo(String label, String status, @Nullable Integer color) {
 	}
 
-	public static final Comparator<ThreadRow> ORDER = Comparator.<ThreadRow>comparingInt(r -> r.attention().ordinal())
-			.thenComparing(r -> r.activityMs() == null ? Long.MIN_VALUE : r.activityMs(), Comparator.reverseOrder())
-			.thenComparing(ThreadRow::settled)
-			.thenComparing(r -> r.title().toLowerCase(Locale.ROOT))
-			.thenComparing(ThreadRow::key);
+	/** {@link ThreadOrder#ROWS}: the same order the portable terminal and the held screen use. */
+	public static final Comparator<ThreadRow> ORDER = ThreadOrder.ROWS;
 
 	private List<ThreadRow> all = List.of();
 	private List<ThreadRow> visible = List.of();
