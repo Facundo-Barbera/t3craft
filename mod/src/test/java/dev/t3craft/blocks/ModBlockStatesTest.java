@@ -73,8 +73,8 @@ class ModBlockStatesTest {
 				modIds.add(key.substring(0, key.indexOf('[') < 0 ? key.length() : key.indexOf('[')));
 			}
 		}
-		assertEquals(Set.of("t3craft:board_lamp", "t3craft:monitor", "t3craft:room_plaque", "t3craft:status_lamp"), modIds,
-				"the modded HQ uses every fixture block and plaques for its signs");
+		assertEquals(Set.of("t3craft:archive_terminal", "t3craft:board_lamp", "t3craft:monitor", "t3craft:room_plaque", "t3craft:status_lamp"), modIds,
+				"the modded HQ uses every fixture block, the archive terminal and plaques for its signs");
 		assertTrue(LevelBlockWorld.parse(BuiltInRegistries.BLOCK, "t3craft:monitor").getBlock() instanceof MonitorBlock);
 	}
 
