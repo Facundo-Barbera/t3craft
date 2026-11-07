@@ -11,6 +11,9 @@ import dev.t3craft.build.BuildHandle;
 import dev.t3craft.build.BuildJob;
 import dev.t3craft.build.BuildPlan;
 import dev.t3craft.build.DemoPlans;
+import dev.t3craft.survival.BuildMaterials;
+import dev.t3craft.survival.PlayContexts;
+import dev.t3craft.survival.Survival;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
@@ -74,6 +77,9 @@ final class BuildCommands {
 			BuildHandle h = b.build("shed", player.level().dimension(), origin, rotation, plan, blocksPerTick, crew);
 			src.sendFeedback(prefix().append(Component.literal(String.format(Locale.ROOT,
 					"%s: %d blocks at %s, %.2f blocks/tick, %d builders on their way", h.label(), plan.size(), origin.toShortString(), blocksPerTick, crew))));
+			if (BuildMaterials.decide(Survival.rules(), PlayContexts.of(player, true)).charged()) {
+				src.sendFeedback(prefix().append(Component.translatable("t3craft.survival.build_cost", BuildMaterials.describe(BuildMaterials.bill(plan).items()))));
+			}
 			return 1;
 		} catch (IllegalStateException e) {
 			src.sendError(prefix().append(e.getMessage()));
@@ -99,9 +105,20 @@ final class BuildCommands {
 					: String.format(Locale.ROOT, "%s, job #%d %s %d/%d (%.0f%%), placed %d, skipped %d, failed %d",
 							h.phase().name().toLowerCase(Locale.ROOT), j.id(), j.state().name().toLowerCase(Locale.ROOT),
 							j.done(), j.total(), j.progress() * 100, j.placed(), j.skipped(), j.failed());
-			src.sendFeedback(Component.literal("  " + h.label() + ": " + detail).withStyle(ChatFormatting.GRAY));
+			MutableComponent line = Component.literal("  " + h.label() + ": " + detail);
+			if (j != null && j.charged()) {
+				line.append(String.format(Locale.ROOT, ", materials %d/%d", total(j.spentMaterials()), total(j.requiredMaterials())));
+				if (j.waitingForMaterials()) {
+					line.append(", ").append(Component.translatable("t3craft.survival.missing_materials", BuildMaterials.describe(j.missingMaterials())));
+				}
+			}
+			src.sendFeedback(line.withStyle(ChatFormatting.GRAY));
 		}
 		return all.size();
+	}
+
+	private static int total(java.util.Map<String, Integer> items) {
+		return items.values().stream().mapToInt(Integer::intValue).sum();
 	}
 
 	private static MutableComponent prefix() {

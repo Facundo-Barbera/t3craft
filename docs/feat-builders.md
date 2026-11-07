@@ -59,6 +59,39 @@ una lista de colocaciones de bloques, y se van al terminar. Funciona en singlepl
    extenderlo o los NPC de hilos pueden usar `BuilderAvatar` para caminar.
 7. `/t3craft debug` lo puede registrar otra rama también: Brigadier fusiona los nodos, no hay conflicto.
 
+## Supervivencia: permiso y coste (feat/builders-survival)
+
+`BuildService.build(...)` consulta ahora la política (`Survival.rules()`) antes de mandar la cuadrilla, vía el
+adaptador `dev.t3craft.survival.BuildMaterials`:
+
+| Situación | Resultado |
+|---|---|
+| Espectador, aventura sin trucos, servidor remoto | `BuildDeniedException` (subclase de `IllegalStateException`) con el mensaje `t3craft.survival.*` ya traducido; `langKey()` da la clave. Los llamadores que ya capturaban `IllegalStateException` siguen funcionando. |
+| Creativo (o `builderMaterials: never`) | Gratis, igual que antes. |
+| Supervivencia / aventura con trucos (`builderMaterials: survival`, por defecto) | Se cobra en materiales. |
+| `build(..., Billing.FREE)` | Gratis y sin consultar la política: lo usa el mundo demo (`DemoBuildRun`). |
+
+**Cobro** (dentro del job, hilo servidor):
+- `BuildCost` en `BuildManager.submit(..., cost)` / `new BuildJob(..., cost)`; `null` = gratis (API anterior intacta).
+- `MaterialMeter` (Java puro): al empezar cada capa (tramo consecutivo con la misma y del plan) comprueba que haya
+  todo lo que esa capa necesita; después cobra **bloque a bloque** al colocar (`take` tras `PLACED`). Los bloques que
+  ya están en el mundo (`BlockSink.matches`) no se cobran.
+- Si falta algo: `BuildCursor.Outcome.BLOCKED` → el job pasa a `PAUSED` con `waitingForMaterials()` y
+  `missingMaterials()` (id → cantidad que falta para la capa). Reintenta cada `MATERIAL_RETRY_TICKS` (20) y se reanuda
+  solo. Si el jugador además pausa, no se reanuda solo; `resume()` vuelve a comprobar en el acto.
+- Coste por bloque (`BlockCosts.itemId`): aire, mitad superior de puertas/plantas altas, cabecera de cama y bloques sin
+  ítem son gratis; `wall_torch` → `torch`. El contenido de contenedores (`Items` del NBT) no se coloca en jobs cobrados.
+- `MaterialSupply`: `ContainerSupply` sobre cofres y barriles a ≤ 2 bloques alrededor de la obra (fuera de sus
+  límites, para no vaciar un cofre del propio plan) y después las 36 casillas principales del inventario del jugador.
+
+**Estado expuesto** (sin cambiar los métodos existentes de `BuildHandle`):
+- `BuildJob`: `charged()`, `waitingForMaterials()`, `missingMaterials()`, `requiredMaterials()`, `spentMaterials()`.
+- `BuildHandle.missingMaterials()` (método default).
+- `BuildListener.materials(job, missing)` (default): al empezar a esperar y al reanudarse (`missing` vacío).
+  `BuildersClient` lo usa para avisar en el chat (`t3craft.survival.missing_materials_job` / `materials_resumed`).
+- `/t3craft debug build-status` añade `materials gastados/total` y `faltan materiales: …`.
+- `BuildMaterials.bill(plan)` da el `MaterialBill` completo; `/t3craft debug build-demo` lo muestra en supervivencia.
+
 ## Verificación
 - `./gradlew build` en `mod/`: verde. Tests JUnit nuevos: `BuildCursorTest` (9) y `LayersTest` (4).
 - No se lanzó Minecraft (regla del VPS): la parte visual (caminar, brazo, partículas, sonido, NBT del cofre) está

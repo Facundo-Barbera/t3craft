@@ -54,9 +54,15 @@ public final class BuildManager {
 		listeners.remove(l);
 	}
 
-	/** Creates and queues a job; it starts on the next server tick. */
+	/** Creates and queues a free job; it starts on the next server tick. */
 	public BuildJob submit(String label, ResourceKey<Level> dimension, BlockPos origin, Rotation rotation, BuildPlan plan, double blocksPerTick) {
-		BuildJob job = new BuildJob(nextId.getAndIncrement(), label, dimension, origin, rotation, plan, blocksPerTick);
+		return submit(label, dimension, origin, rotation, plan, blocksPerTick, null);
+	}
+
+	/** Like {@link #submit(String, ResourceKey, BlockPos, Rotation, BuildPlan, double)}; a non-null {@code cost} charges materials. */
+	public BuildJob submit(String label, ResourceKey<Level> dimension, BlockPos origin, Rotation rotation, BuildPlan plan, double blocksPerTick,
+			@Nullable BuildCost cost) {
+		BuildJob job = new BuildJob(nextId.getAndIncrement(), label, dimension, origin, rotation, plan, blocksPerTick, cost);
 		byId.put(job.id(), job);
 		incoming.add(job);
 		return job;
@@ -89,11 +95,18 @@ public final class BuildManager {
 				if (level != null) {
 					BlockSink sink = sinks.apply(level);
 					try {
+						job.openSupply(server);
 						job.tick(sink, (jb, i, pos, state) -> {
 							for (BuildListener l : listeners) {
 								safe(() -> l.placed(jb, i, pos, state));
 							}
 						});
+						if (job.pollMaterialsChanged()) {
+							var missing = job.missingMaterials();
+							for (BuildListener l : listeners) {
+								safe(() -> l.materials(job, missing));
+							}
+						}
 					} catch (RuntimeException e) {
 						T3Craft.LOGGER.error("build job {} failed, cancelling", job, e);
 						job.cancel();

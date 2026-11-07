@@ -42,6 +42,11 @@ public final class ServerLevelSink implements BlockSink {
 	}
 
 	@Override
+	public boolean matches(BlockPos pos, BlockState state) {
+		return level.isLoaded(pos) && level.getBlockState(pos) == state;
+	}
+
+	@Override
 	public BuildCursor.Outcome place(BlockPos pos, BlockState state, @Nullable CompoundTag blockEntity) {
 		if (!level.isLoaded(pos) || level.isOutsideBuildHeight(pos)) {
 			return BuildCursor.Outcome.FAILED;
