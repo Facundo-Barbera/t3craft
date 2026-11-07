@@ -103,6 +103,15 @@ public final class NpcRegistry {
 		return wanted.size();
 	}
 
+	/**
+	 * Origin of the fallback layout (where the player stood when the first NPC appeared in this
+	 * level, offset by 4,0,4), or null before that. Read by feat/workstation to put the provisional
+	 * computers next to the same ring desks the behaviour director uses.
+	 */
+	public @Nullable Vec3 layoutOrigin() {
+		return anchor;
+	}
+
 	/** NPC behaviour: plug a physical base in with {@code behavior().setAnchorSource(...)}. */
 	public BehaviorDirector behavior() {
 		return behavior;
