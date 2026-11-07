@@ -30,7 +30,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Drives the thread NPCs: one {@link NpcBrain} per NPC, fed with the thread's {@link Mode}, the
- * spots from the {@link AnchorSource} (physical base) layered over the {@link RingLayout} fallback,
+ * spots from the {@link AnchorSource} (physical base) layered over the {@link GridLayout} fallback,
  * and the player's position; applies the brain's pose to the avatar and panel, and owns the extra
  * client-only entities it adds (speech bubble, floating attention icon). Client thread only.
  *
@@ -62,9 +62,6 @@ public final class BehaviorDirector {
 	private final Map<String, Overlay> overlays = new HashMap<>();
 	private AnchorSource anchors = AnchorSource.NONE;
 	private SummarySource summaries = SummarySource.ACTIVITY;
-	private @Nullable RingLayout ring;
-	private @Nullable List<RingLayout.Member> ringMembers;
-	private @Nullable Pos ringOrigin;
 	/** Client-only entity ids for bubbles and icons, far from the registry's range. */
 	private int nextClientId = -3_000_000;
 	private int tick;
@@ -73,7 +70,7 @@ public final class BehaviorDirector {
 	private @Nullable ApproachConfig approachOverride;
 	private ApproachConfig.@Nullable Watcher approachConfig;
 
-	/** Plug in a physical base (null = none, ring layout only). See {@link AnchorSource}. */
+	/** Plug in a physical base (null = none, grid layout only). See {@link AnchorSource}. */
 	public void setAnchorSource(@Nullable AnchorSource source) {
 		this.anchors = source == null ? AnchorSource.NONE : source;
 	}
@@ -127,18 +124,15 @@ public final class BehaviorDirector {
 		overlays.clear();
 		brains.clear();
 		approaches.reset();
-		ring = null;
-		ringMembers = null;
-		ringOrigin = null;
 	}
 
 	/**
-	 * One client tick. {@code origin} is the registry's layout anchor (where the neighbourhood grid
-	 * starts); {@code bodies} are the spawned NPCs.
+	 * One client tick. {@code fallback} is the registry's provisional {@link GridLayout} (used for
+	 * whatever the physical base leaves null); {@code bodies} are the spawned NPCs.
 	 */
-	public void tick(ClientLevel lvl, Player player, Vec3 origin, Collection<Body> bodies) {
+	public void tick(ClientLevel lvl, Player player, AnchorSource fallback, Collection<Body> bodies) {
 		tick++;
-		AnchorSource layout = new LayeredAnchors(anchors, ring(origin, bodies));
+		AnchorSource layout = new LayeredAnchors(anchors, fallback);
 		GridPathfinder finder = new GridPathfinder(new LevelWalkable(lvl));
 		NpcBrain.Navigator nav = finder::find;
 		Pos playerPos = pos(player.position());
@@ -200,21 +194,6 @@ public final class BehaviorDirector {
 				forget(id, lvl);
 			}
 		}
-	}
-
-	private RingLayout ring(Vec3 origin, Collection<Body> bodies) {
-		List<RingLayout.Member> members = new ArrayList<>(bodies.size());
-		for (Body b : bodies) {
-			members.add(new RingLayout.Member(b.id(), b.info().groupId(), b.info().priority()));
-		}
-		members.sort(Comparator.comparing(RingLayout.Member::id));
-		Pos o = pos(origin);
-		if (ring == null || !members.equals(ringMembers) || !o.equals(ringOrigin)) {
-			ring = RingLayout.of(o, members);
-			ringMembers = members;
-			ringOrigin = o;
-		}
-		return ring;
 	}
 
 	private void apply(ClientLevel lvl, Body b, NpcBrain brain, Overlay o, @Nullable String summary, Pos player) {
@@ -332,6 +311,11 @@ public final class BehaviorDirector {
 		if (e != null && lvl != null && !e.isRemoved()) {
 			lvl.removeEntity(e.getId(), Entity.RemovalReason.DISCARDED);
 		}
+	}
+
+	/** Ground probe over the client level for the {@link GridLayout} (same walkability as the pathfinder). */
+	public static GridLayout.Ground ground(ClientLevel lvl, double baseY) {
+		return GridLayout.Ground.near(new LevelWalkable(lvl), baseY);
 	}
 
 	static Pos pos(Vec3 v) {

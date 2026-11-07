@@ -1,7 +1,10 @@
 package dev.t3craft.client.npc;
 
 import dev.t3craft.T3Craft;
+import dev.t3craft.client.npc.behavior.Anchor;
 import dev.t3craft.client.npc.behavior.BehaviorDirector;
+import dev.t3craft.client.npc.behavior.GridLayout;
+import dev.t3craft.client.npc.behavior.Pos;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -32,14 +35,15 @@ import org.jspecify.annotations.Nullable;
  * are purged with their entities, and any unexpected error resets the registry: every entity in
  * our id range is removed from the level and the NPCs are rebuilt on the next tick.
  *
- * <p>Layout: neighbourhoods on a grid next to where the player stood when the first NPC appeared
- * in this level (most urgent neighbourhood first); NPCs on a ring inside each plot, ordered by
- * the resolved priority. Particles over the head by state. Avatars turn their head to a nearby
- * player.
+ * <p>Layout without an HQ: a {@link GridLayout} next to where the player stood when the first NPC
+ * appeared in this level: one block of desks per neighbourhood, in rows with aisles, signs over
+ * each block's header strip. Cells are stable (adding a thread never moves the others). With an
+ * HQ the behaviour director walks NPCs to its desks instead. Particles over the head by state.
+ * Avatars turn their head to a nearby player.
  */
 public final class NpcRegistry {
-	private static final double PLOT = 12.0;
-	private static final int PLOTS_PER_ROW = 3;
+	/** Sign height above its header strip's ground. */
+	private static final double SIGN_Y = 2.6;
 	private static final int PARTICLE_EVERY_TICKS = 15;
 	/** Client-only ids count down from here, far away from server-assigned (positive) ids. */
 	static final int ID_BASE = -1_000_000;
@@ -55,6 +59,8 @@ public final class NpcRegistry {
 	private final Map<Integer, String> npcByEntityId = new HashMap<>();
 	/** Walking, desks, board, bubbles (feat/npc-behavior). Owns its own entities; reset with ours. */
 	private final BehaviorDirector behavior = new BehaviorDirector();
+	/** Provisional desks when there is no HQ (fix/npc-grid-layout). Kept across reconciles. */
+	private final GridLayout grid = new GridLayout();
 	/** Extra panel line per NPC id (feat/npc-helpers: "⚒ 2 helpers +3"); null = none. */
 	private java.util.function.Function<String, @Nullable Component> panelExtra = id -> null;
 	private @Nullable ClientLevel level;
@@ -126,6 +132,14 @@ public final class NpcRegistry {
 	 */
 	public @Nullable Vec3 layoutOrigin() {
 		return anchor;
+	}
+
+	/**
+	 * The provisional no-HQ layout (desks, homes, board) the behaviour director falls back to. Read
+	 * by feat/workstation so the provisional computers stand in front of the same desks.
+	 */
+	public GridLayout fallbackLayout() {
+		return grid;
 	}
 
 	/** NPC behaviour: plug a physical base in with {@code behavior().setAnchorSource(...)}. */
@@ -272,6 +286,7 @@ public final class NpcRegistry {
 			behavior.reset(null);
 			level = lvl;
 			anchor = null;
+			grid.clear();
 			dirty = true;
 		}
 		if (lvl == null || mc.player == null) {
@@ -302,7 +317,7 @@ public final class NpcRegistry {
 			}
 		}
 		if (anchor != null) {
-			behavior.tick(lvl, mc.player, anchor, bodies);
+			behavior.tick(lvl, mc.player, grid, bodies);
 		}
 	}
 
@@ -320,6 +335,7 @@ public final class NpcRegistry {
 		signs.clear();
 		npcByEntityId.clear();
 		wanted.clear();
+		grid.clear();
 	}
 
 	static @Nullable SimpleParticleType particle(@Nullable String key) {
@@ -348,7 +364,13 @@ public final class NpcRegistry {
 			}
 		}
 
-		// Group into neighbourhoods; most urgent neighbourhood first.
+		// Provisional desks: stable grid cells, one block of desks per neighbourhood.
+		List<GridLayout.Member> members = new ArrayList<>(wanted.size());
+		for (NpcInfo n : wanted.values()) {
+			members.add(new GridLayout.Member(n.id(), n.groupId(), n.envLabel()));
+		}
+		grid.update(new Pos(a.x, a.y, a.z), members, BehaviorDirector.ground(lvl, a.y));
+
 		Map<String, List<NpcInfo>> groups = new LinkedHashMap<>();
 		List<NpcInfo> ordered = new ArrayList<>(wanted.values());
 		ordered.sort(Comparator.comparingInt(NpcInfo::priority).thenComparing(NpcInfo::id));
@@ -362,28 +384,26 @@ public final class NpcRegistry {
 			}
 		}
 
-		int g = 0;
 		for (Map.Entry<String, List<NpcInfo>> group : groups.entrySet()) {
-			List<NpcInfo> members = group.getValue();
-			Vec3 center = a.add((g % PLOTS_PER_ROW) * PLOT, 0, (g / PLOTS_PER_ROW) * PLOT);
-			g++;
-			NpcInfo first = members.get(0);
+			List<NpcInfo> inGroup = group.getValue();
+			NpcInfo first = inGroup.get(0);
+			Pos header = grid.header(group.getKey());
 			Display.TextDisplay sign = signs.get(group.getKey());
 			if (sign == null || sign.isRemoved()) {
 				sign = textDisplay(lvl, 0xA0000000);
 				signs.put(group.getKey(), sign);
 			}
-			sign.snapTo(center.x, center.y + 3.6, center.z, 0f, 0f);
-			setText(sign, Nameplate.sign(first.groupLabel(), first.envLabel(), members.size()));
+			if (header != null) {
+				sign.snapTo(header.x(), header.y() + SIGN_Y, header.z(), 0f, 0f);
+			}
+			setText(sign, Nameplate.sign(first.groupLabel(), first.envLabel(), inGroup.size()));
 
-			double radius = Math.max(2.0, Math.min(PLOT / 2 - 1, members.size() * 0.55));
-			for (int i = 0; i < members.size(); i++) {
-				NpcInfo info = members.get(i);
-				double angle = (Math.PI * 2 * i) / Math.max(1, members.size());
-				Vec3 pos = new Vec3(center.x + Math.cos(angle) * radius, center.y, center.z + Math.sin(angle) * radius);
+			for (NpcInfo info : inGroup) {
+				Anchor desk = grid.desk(info.id(), info.groupId());
+				Vec3 pos = desk == null ? a : new Vec3(desk.pos().x(), desk.pos().y(), desk.pos().z());
 				Spawned s = spawned.get(info.id());
 				if (s == null || s.avatar().isRemoved()) {
-					s = spawn(lvl, info, pos);
+					s = spawn(lvl, info, pos, desk == null ? 0f : desk.yaw());
 					spawned.put(info.id(), s);
 					npcByEntityId.put(s.avatar().getId(), info.id());
 					npcByEntityId.put(s.panel().getId(), info.id());
@@ -412,13 +432,13 @@ public final class NpcRegistry {
 		return d;
 	}
 
-	private static Spawned spawn(ClientLevel lvl, NpcInfo info, Vec3 pos) {
+	private static Spawned spawn(ClientLevel lvl, NpcInfo info, Vec3 pos, float yaw) {
 		ThreadAvatar avatar = new ThreadAvatar(lvl, info.id());
 		avatar.setId(nextClientId--);
 		avatar.setNoGravity(true);
 		avatar.setSilent(true);
 		avatar.update(info);
-		avatar.snapTo(pos.x, pos.y, pos.z, 0f, 0f);
+		avatar.snapTo(pos.x, pos.y, pos.z, yaw, 0f);
 		lvl.addEntity(avatar);
 		Display.TextDisplay panel = textDisplay(lvl, 0x60000000);
 		panel.snapTo(pos.x, pos.y + 2.45, pos.z, 0f, 0f);
