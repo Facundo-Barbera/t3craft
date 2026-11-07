@@ -1,6 +1,7 @@
 package dev.t3craft.client.npc;
 
 import dev.t3craft.T3Craft;
+import dev.t3craft.client.npc.behavior.BehaviorDirector;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -13,7 +14,6 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.core.particles.SimpleParticleType;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Display;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityTypes;
@@ -46,6 +46,8 @@ public final class NpcRegistry {
 	private final Map<String, Spawned> spawned = new LinkedHashMap<>();
 	private final Map<String, Display.TextDisplay> signs = new LinkedHashMap<>();
 	private final Map<Integer, String> npcByEntityId = new HashMap<>();
+	/** Walking, desks, board, bubbles (feat/npc-behavior). Owns its own entities; reset with ours. */
+	private final BehaviorDirector behavior = new BehaviorDirector();
 	private @Nullable ClientLevel level;
 	private @Nullable Vec3 anchor;
 	private boolean dirty;
@@ -93,6 +95,11 @@ public final class NpcRegistry {
 		return wanted.size();
 	}
 
+	/** NPC behaviour: plug a physical base in with {@code behavior().setAnchorSource(...)}. */
+	public BehaviorDirector behavior() {
+		return behavior;
+	}
+
 	public void tick(Minecraft mc) {
 		ClientLevel lvl = mc.level;
 		if (lvl != level) {
@@ -100,6 +107,7 @@ public final class NpcRegistry {
 			spawned.clear();
 			signs.clear();
 			npcByEntityId.clear();
+			behavior.reset(null);
 			level = lvl;
 			anchor = null;
 			dirty = true;
@@ -117,16 +125,22 @@ public final class NpcRegistry {
 			}
 		}
 		tick++;
+		List<BehaviorDirector.Body> bodies = new ArrayList<>(spawned.size());
 		for (Map.Entry<String, Spawned> e : spawned.entrySet()) {
 			ThreadAvatar a = e.getValue().avatar();
-			lookAt(a, mc.player.position().add(0, mc.player.getEyeHeight(), 0));
 			NpcInfo info = wanted.get(e.getKey());
+			if (info != null) {
+				bodies.add(new BehaviorDirector.Body(e.getKey(), info, a, e.getValue().panel()));
+			}
 			if (info != null && (tick + Math.abs(a.getId())) % PARTICLE_EVERY_TICKS == 0) {
 				SimpleParticleType p = particle(info.particle());
 				if (p != null) {
 					lvl.addParticle(p, a.getX() + (a.getRandom().nextDouble() - 0.5) * 0.6, a.getY() + 2.25, a.getZ() + (a.getRandom().nextDouble() - 0.5) * 0.6, 0, 0.02, 0);
 				}
 			}
+		}
+		if (anchor != null) {
+			behavior.tick(lvl, mc.player, anchor, bodies);
 		}
 	}
 
@@ -139,6 +153,7 @@ public final class NpcRegistry {
 			});
 			signs.values().forEach(s -> lvl.removeEntity(s.getId(), Entity.RemovalReason.DISCARDED));
 		}
+		behavior.reset(lvl);
 		spawned.clear();
 		signs.clear();
 		npcByEntityId.clear();
@@ -163,6 +178,7 @@ public final class NpcRegistry {
 		for (String id : new ArrayList<>(spawned.keySet())) {
 			if (!wanted.containsKey(id)) {
 				Spawned s = spawned.remove(id);
+				behavior.forget(id, lvl);
 				npcByEntityId.remove(s.avatar().getId());
 				npcByEntityId.remove(s.panel().getId());
 				lvl.removeEntity(s.avatar().getId(), Entity.RemovalReason.DISCARDED);
@@ -209,11 +225,9 @@ public final class NpcRegistry {
 					spawned.put(info.id(), s);
 					npcByEntityId.put(s.avatar().getId(), info.id());
 					npcByEntityId.put(s.panel().getId(), info.id());
-				} else if (s.avatar().position().distanceToSqr(pos) > 0.01) {
-					s.avatar().snapTo(pos.x, pos.y, pos.z, s.avatar().getYRot(), 0f);
 				}
+				// Once spawned, the BehaviorDirector moves the avatar and its panel.
 				s.avatar().update(info);
-				s.panel().snapTo(pos.x, pos.y + 2.45, pos.z, 0f, 0f);
 				setText(s.panel(), Nameplate.info(info));
 			}
 		}
@@ -247,18 +261,5 @@ public final class NpcRegistry {
 		panel.snapTo(pos.x, pos.y + 2.45, pos.z, 0f, 0f);
 		T3Craft.LOGGER.debug("spawned client-only NPC {} at {}", info.id(), pos);
 		return new Spawned(avatar, panel);
-	}
-
-	private static void lookAt(ThreadAvatar a, Vec3 eye) {
-		Vec3 head = a.position().add(0, a.getEyeHeight(), 0);
-		Vec3 d = eye.subtract(head);
-		if (d.lengthSqr() > 12 * 12) {
-			return;
-		}
-		float yaw = (float) (Mth.atan2(d.z, d.x) * (180 / Math.PI)) - 90f;
-		float pitch = (float) -(Mth.atan2(d.y, Math.sqrt(d.x * d.x + d.z * d.z)) * (180 / Math.PI));
-		a.setYHeadRot(yaw);
-		a.setYBodyRot(yaw);
-		a.setXRot(pitch);
 	}
 }
