@@ -5,6 +5,7 @@ import dev.t3craft.T3Craft;
 import dev.t3craft.build.BuildPlan;
 import dev.t3craft.client.npc.NpcInfo;
 import dev.t3craft.hq.HqAnchorSource;
+import dev.t3craft.hq.HqFixtures;
 import dev.t3craft.hq.HqLayout;
 import dev.t3craft.hq.HqPlans;
 import java.util.Collection;
@@ -61,18 +62,22 @@ public final class DemoHqSource implements DemoStructureSource {
 			boolean ours = ID.equals(built.structure());
 			HqLayout previous = null;
 			int previousLift = -1;
+			String previousFixtures = HqFixtures.fingerprint(HqFixtures.VANILLA);
 			JsonObject st = built.state();
 			if (ours && st != null && st.has("layout")) {
 				HqLayout l = HqLayout.fromJson(st.get("layout"));
 				previous = l == HqLayout.EMPTY ? null : l;
 				previousLift = st.has("lift") ? st.get("lift").getAsInt() : -1;
+				if (st.has(DemoHq.FIXTURES)) {
+					previousFixtures = st.get(DemoHq.FIXTURES).getAsString();
+				}
 			}
 			// The floor layer is the lowest HQ cell whatever the roster: use the empty HQ to size the lift.
 			int planMinY = HqPlans.generate(HqLayout.EMPTY).footprint().minY();
 			int lift = DemoHq.lift(spec.originY(), worldMinY, planMinY);
 			boolean diffable = built.builtWith(this) && previousLift == lift;
 			roster = r;
-			step = DemoHq.step(r.input(), previous, built.hash(), lift, diffable);
+			step = DemoHq.step(r.input(), previous, built.hash(), lift, diffable, previousFixtures);
 			failed = false;
 		} catch (RuntimeException e) {
 			T3Craft.LOGGER.error("[demo] HQ plan failed, falling back", e);
@@ -119,6 +124,12 @@ public final class DemoHqSource implements DemoStructureSource {
 		return s == null ? null : new HqAnchorSource(s.plan(), DemoHq.worldSite(demoOrigin, s.lift()));
 	}
 
+	/** Automatic fixture bindings for the prepared HQ at the demo origin, or null if not prepared. */
+	public @Nullable DemoHqBindings bindings(BlockPos demoOrigin) {
+		DemoHq.Step s = step;
+		return s == null ? null : new DemoHqBindings(s.layout(), DemoHq.worldSite(demoOrigin, s.lift()));
+	}
+
 	/** The prepared HQ standing at the demo origin (for NPCs and workstations), or null if not prepared. */
 	public dev.t3craft.client.hq.HqPresence.@Nullable Standing standing(BlockPos demoOrigin) {
 		DemoHq.Step s = step;
@@ -130,7 +141,7 @@ public final class DemoHqSource implements DemoStructureSource {
 		if (s == null) {
 			return failed ? "failed" : "not prepared";
 		}
-		return String.format(java.util.Locale.ROOT, "%s roster, %d module(s), hash %s, lift %d", sample() ? "example" : "live",
-				s.layout().modules().size(), s.hash(), s.lift());
+		return String.format(java.util.Locale.ROOT, "%s roster, %d module(s), hash %s, lift %d, fixtures %s", sample() ? "example" : "live",
+				s.layout().modules().size(), s.hash(), s.lift(), s.fixtures());
 	}
 }
