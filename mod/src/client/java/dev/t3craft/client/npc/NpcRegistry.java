@@ -1,6 +1,7 @@
 package dev.t3craft.client.npc;
 
 import dev.t3craft.T3Craft;
+import dev.t3craft.client.ClientEntityIds;
 import dev.t3craft.client.npc.behavior.BehaviorDirector;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -45,6 +46,10 @@ public final class NpcRegistry {
 	static final int ID_BASE = -1_000_000;
 	private static int nextClientId = ID_BASE;
 	private static final long ERROR_LOG_INTERVAL_MS = 30_000;
+	/** Re-apply the station policy this often, so done threads release their station on time (ticks). */
+	private static final int REGATE_TICKS = 20 * 10;
+	/** Sweep orphaned entities of our id range this often (ticks). */
+	private static final int SWEEP_TICKS = 20 * 10;
 
 	private record Spawned(ThreadAvatar avatar, Display.TextDisplay panel) {
 	}
@@ -62,24 +67,57 @@ public final class NpcRegistry {
 	private boolean dirty;
 	private int tick;
 	private long lastErrorLogMs;
+	/**
+	 * fix/hq-stale-stations: what the sources send, gated by {@link dev.t3craft.hq.StationPolicy};
+	 * {@link #wanted} holds only the stationed threads. Lazy ({@link #stations()}): null after a hot-swap.
+	 */
+	private @Nullable StationRoster stations;
+
+	/** The station gate (policy, released threads). */
+	public StationRoster stations() {
+		StationRoster s = stations;
+		if (s == null) {
+			stations = s = new StationRoster();
+		}
+		return s;
+	}
 
 	public void replaceAll(List<NpcInfo> npcs) {
-		wanted.clear();
-		for (NpcInfo n : npcs) {
-			wanted.put(n.id(), n);
-		}
-		dirty = true;
+		replaceAll(npcs, null);
+	}
+
+	/**
+	 * Every NPC the source shows. {@code lastActivity}: NPC id → last message/run (epoch ms); null or
+	 * missing = unknown (inactivity of done threads then counts from when they were first seen done).
+	 */
+	public void replaceAll(List<NpcInfo> npcs, @Nullable Map<String, Long> lastActivity) {
+		stations().replaceAll(npcs, lastActivity);
+		regate();
 	}
 
 	public void upsert(NpcInfo npc) {
-		wanted.put(npc.id(), npc);
-		dirty = true;
+		stations().upsert(npc);
+		regate();
 	}
 
 	public void remove(String id) {
-		if (wanted.remove(id) != null) {
-			dirty = true;
+		if (stations().remove(id)) {
+			regate();
 		}
+	}
+
+	/** Threads that released their station (settled, archived, done and inactive): for the HQ archive only, never spawned. */
+	public List<NpcInfo> released() {
+		return stations().released();
+	}
+
+	private void regate() {
+		stations().regate(System.currentTimeMillis());
+		wanted.clear();
+		for (NpcInfo n : stations().stationed()) {
+			wanted.put(n.id(), n);
+		}
+		dirty = true;
 	}
 
 	public @Nullable NpcInfo info(String npcId) {
@@ -148,9 +186,9 @@ public final class NpcRegistry {
 		}
 	}
 
-	/** True for entity ids in T3Craft's client-only range. */
+	/** True for entity ids in the registry's own client-only range ({@link ClientEntityIds#NPC}). */
 	static boolean isOurs(int entityId) {
-		return entityId <= ID_BASE;
+		return ClientEntityIds.NPC.contains(entityId);
 	}
 
 	/**
@@ -226,12 +264,11 @@ public final class NpcRegistry {
 		}
 		java.util.Set<Integer> tracked = new java.util.HashSet<>(npcByEntityId.keySet());
 		signs.values().forEach(d -> tracked.add(d.getId()));
-		List<Integer> orphans = new ArrayList<>();
+		List<Integer> present = new ArrayList<>();
 		for (Entity e : lvl.entitiesForRendering()) {
-			if (isOurs(e.getId()) && !tracked.contains(e.getId())) {
-				orphans.add(e.getId());
-			}
+			present.add(e.getId());
 		}
+		List<Integer> orphans = ClientEntityIds.NPC.orphans(present, tracked);
 		orphans.forEach(id -> lvl.removeEntity(id, Entity.RemovalReason.DISCARDED));
 	}
 
@@ -250,7 +287,8 @@ public final class NpcRegistry {
 			if (lvl != null) {
 				List<Integer> ours = new ArrayList<>();
 				for (Entity e : lvl.entitiesForRendering()) {
-					if (isOurs(e.getId())) {
+					// Only the registry's and the behaviour overlays' ranges: never builders, helpers or workstations.
+					if (isOurs(e.getId()) || ClientEntityIds.BEHAVIOR.contains(e.getId())) {
 						ours.add(e.getId());
 					}
 				}
@@ -277,6 +315,16 @@ public final class NpcRegistry {
 		if (lvl == null || mc.player == null) {
 			return;
 		}
+		tick++;
+		if (tick % REGATE_TICKS == 0 && stations().regate(System.currentTimeMillis())) {
+			// a done thread went past the idle threshold: it releases its station now
+			wanted.clear();
+			stations().stationed().forEach(n -> wanted.put(n.id(), n));
+			dirty = true;
+		}
+		if (tick % SWEEP_TICKS == 0) {
+			sweep(lvl); // NPCs, nametags and signs of threads that no longer hold a station
+		}
 		if (dirty) {
 			dirty = false;
 			if (anchor == null && !wanted.isEmpty()) {
@@ -286,7 +334,6 @@ public final class NpcRegistry {
 				reconcile(lvl, anchor);
 			}
 		}
-		tick++;
 		List<BehaviorDirector.Body> bodies = new ArrayList<>(spawned.size());
 		for (Map.Entry<String, Spawned> e : spawned.entrySet()) {
 			ThreadAvatar a = e.getValue().avatar();
@@ -320,6 +367,7 @@ public final class NpcRegistry {
 		signs.clear();
 		npcByEntityId.clear();
 		wanted.clear();
+		stations().clear();
 	}
 
 	static @Nullable SimpleParticleType particle(@Nullable String key) {

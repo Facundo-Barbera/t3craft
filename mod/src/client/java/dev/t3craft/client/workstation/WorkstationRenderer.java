@@ -38,9 +38,9 @@ import org.jspecify.annotations.Nullable;
  * </ul>
  *
  * <p><b>Entity ids</b> count down from {@link #ID_BASE} = −5,000,000 (NpcRegistry uses −1,000,000…,
- * builders −2,000,000…, BehaviorDirector −3,000,000…). {@code NpcRegistry}'s orphan sweep treats
- * every id ≤ −1,000,000 as its own and may discard ours after one of its rare recoveries: each tick
- * checks {@link Entity#isRemoved()} and rebuilds a station whose entities vanished. Entities are kept
+ * builders −2,000,000…, BehaviorDirector −3,000,000…; see {@code ClientEntityIds}). Each owner only
+ * sweeps its own range; still, each tick checks {@link Entity#isRemoved()} and rebuilds a station
+ * whose entities vanished, and every {@code SWEEP_TICKS} our range is swept for orphans. Entities are kept
  * by reference and never looked up by id with a cast (hot-swap safe).
  *
  * <p>Entities are created once per station and only re-created when the placement moves or they
@@ -54,6 +54,8 @@ final class WorkstationRenderer {
 	private static final float HITBOX_HEIGHT = 1.75f;
 	/** Re-check whether the computer block is air this often (ticks). */
 	private static final int BLOCK_CHECK_TICKS = 20;
+	/** Discard entities of our id range that no live station owns this often (ticks; also on the first tick). */
+	private static final int SWEEP_TICKS = 20 * 10;
 
 	private static final class Station {
 		final String key;
@@ -167,6 +169,25 @@ final class WorkstationRenderer {
 		Set<String> known = new HashSet<>();
 		threads.forEach(t -> known.add(t.key()));
 		cache.retain(known);
+		if (tick % SWEEP_TICKS == 1) {
+			sweep(lvl);
+		}
+	}
+
+	/**
+	 * fix/hq-stale-stations: removes every entity of the workstation id range
+	 * ({@link dev.t3craft.client.ClientEntityIds#WORKSTATION}) that no live station owns (a station of
+	 * a thread that released it, or left over by an earlier renderer after a hot-swap or reload).
+	 * Returns how many were discarded.
+	 */
+	int sweep(ClientLevel lvl) {
+		List<Integer> present = new ArrayList<>();
+		for (Entity e : lvl.entitiesForRendering()) {
+			present.add(e.getId());
+		}
+		List<Integer> orphans = dev.t3craft.client.ClientEntityIds.WORKSTATION.orphans(present, byEntity.keySet());
+		orphans.forEach(id -> lvl.removeEntity(id, Entity.RemovalReason.DISCARDED));
+		return orphans.size();
 	}
 
 	/** Keys of stations currently showing an archived (settled) thread. */
