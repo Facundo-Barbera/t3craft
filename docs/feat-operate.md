@@ -63,3 +63,24 @@ no se reintenta sola. Muestra el mensaje y deja que el jugador lo compruebe.
 - Tokens: solo en `credentials/`, nunca en logs, chat, `toString()` ni en el audit.
 - `T3Connection.sanitize` ahora también redacta `token=`, `access_token=`, `subject_token=` y
   campos JSON `accessToken`/`credential`.
+
+## Acción: settle, snooze, pin y mark-read (ítem 22, feat/op-settle)
+
+- **Pura**: `dev.t3craft.t3.ThreadOps` construye las `OperateAction` (`dispatchCommand`):
+  `thread.settle` (destructiva, pide confirmación), `thread.snooze {snoozedUntil}`,
+  `thread.pin`, `thread.unpin` (kind nuevo `THREAD_UNPIN`) y `thread.visit {visitedAt: ahora}`
+  para mark-read. Snooze tiene tres presets (`ThreadOps.Snooze`): 1 h, 4 h y mañana a las 9:00
+  (hora local). Reloj, zona y `commandId` son inyectables (tests: `ThreadOpsTest`).
+- **UI**: `ThreadOpsBar.add(screen, () -> target, x, y, w, h, this::addRenderableWidget)` es una
+  fila de botones (Settle, Snooze…, Pin, Unpin, Read) protegidos con `OperateUi.guard`. Está en el
+  menú del NPC (`ThreadChatScreen.addThreadOps`) y en la barra inferior del portable
+  (`PortableScreen.addThreadOps`/`updateThreadOps`, fáciles de mover al rediseño). Snooze… abre
+  `SnoozeScreen`. El resultado sale en un toast (`ThreadOpsUi.message`).
+- **Comando**: `/t3craft operate settle|snooze|pin|unpin|read <npc o env:thread> [1h|4h|tomorrow]`.
+  El objetivo es el id del NPC, su título (si es único) o un `env:thread`. Settle abre la
+  confirmación en el tick siguiente.
+- **El NPC se va a casa**: cuando el settle da `OK`, `BehaviorDirector.depart(npcId)` hace que el
+  NPC salude, camine hacia la salida (`AnchorSource.exit()`: la entrada del HQ; si no, el centro de
+  su barrio) como mucho 5 s y se desvanezca con partículas (`Departure`, sin teletransportes).
+  Queda oculto hasta que T3 refleje el settle (`NpcInfo.settled()`) y el HQ le libere el
+  escritorio; si a los 30 s no llegó, vuelve.

@@ -58,6 +58,7 @@ public final class PortableScreen extends Screen {
 	private Button notificationsTab;
 	private Button openButton;
 	private Button envButton;
+	private dev.t3craft.client.operate.@Nullable ThreadOpsBar threadOps;
 
 	// layout, recomputed in init()
 	private int x0;
@@ -108,6 +109,7 @@ public final class PortableScreen extends Screen {
 				.bounds(x0 + 6, y1 - 22, envColW - 6, 16).build());
 		search = new SearchBox(font, searchModel, this::openSearchHit);
 		addRenderableWidget(search.layout(x0 + envColW + 6, y0 + 32, x1 - 6 - (x0 + envColW + 6), 14));
+		addThreadOps();
 		updateButtons();
 	}
 
@@ -120,6 +122,7 @@ public final class PortableScreen extends Screen {
 		notificationsTab.active = threads;
 		notificationsTab.setMessage(Component.literal(log.unread() > 0 ? "Notifications (" + log.unread() + ")" : "Notifications"));
 		PortableThread sel = nav.selectedThread();
+		updateThreadOps(threads && (search == null || !search.active()));
 		openButton.visible = threads;
 		if (search != null) {
 			search.setVisible(threads);
@@ -132,6 +135,23 @@ public final class PortableScreen extends Screen {
 		openButton.active = sel != null && sel.threadId() != null && !sel.env().isEmpty()
 				&& nav.state().connection() == PortableState.Connection.CONNECTED;
 		envButton.visible = threads;
+	}
+
+	/** Item 22: thread actions in the bottom bar, between Environments… and Open chat. */
+	private void addThreadOps() {
+		int lx = x0 + envColW + 6;
+		threadOps = dev.t3craft.client.operate.ThreadOpsBar.add(this, this::threadOpsTarget, lx, y1 - 22, x1 - 102 - lx, 16, this::addRenderableWidget);
+	}
+
+	private dev.t3craft.t3.ThreadOps.@Nullable Target threadOpsTarget() {
+		PortableThread t = nav.selectedThread();
+		return t == null || t.threadId() == null || t.env().isEmpty() ? null : new dev.t3craft.t3.ThreadOps.Target(t.env(), t.threadId(), t.title());
+	}
+
+	private void updateThreadOps(boolean visible) {
+		if (threadOps != null) {
+			threadOps.update(visible);
+		}
 	}
 
 	private void showNotifications() {
