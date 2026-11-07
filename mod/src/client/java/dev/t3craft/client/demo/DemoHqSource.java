@@ -130,6 +130,12 @@ public final class DemoHqSource implements DemoStructureSource {
 		return s == null ? null : new DemoHqBindings(s.layout(), DemoHq.worldSite(demoOrigin, s.lift()));
 	}
 
+	/** The prepared HQ standing at the demo origin (for NPCs and workstations), or null if not prepared. */
+	public dev.t3craft.client.hq.HqPresence.@Nullable Standing standing(BlockPos demoOrigin) {
+		DemoHq.Step s = step;
+		return s == null ? null : new dev.t3craft.client.hq.HqPresence.Standing(s.plan(), DemoHq.worldSite(demoOrigin, s.lift()), null);
+	}
+
 	String describe() {
 		DemoHq.Step s = step;
 		if (s == null) {

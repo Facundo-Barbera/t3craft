@@ -11,7 +11,6 @@ import dev.t3craft.client.T3CraftClient;
 import dev.t3craft.client.T3CraftCommands;
 import dev.t3craft.client.config.ConfigManager;
 import dev.t3craft.client.debug.GuardedEvents;
-import dev.t3craft.hq.HqAnchorSource;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -432,9 +431,10 @@ public final class DemoClient implements ClientModInitializer {
 		}
 		DemoWorldSpec spec = activeConfig.spec();
 		BlockPos origin = new BlockPos(spec.originX(), spec.originY(), spec.originZ());
-		HqAnchorSource anchors = h.anchors(origin);
-		if (anchors != null) {
-			c.npcs().behavior().setAnchorSource(anchors);
+		// feat/hq-construction: one place plugs the HQ into NPCs (no ring fallback) and workstations
+		dev.t3craft.client.hq.HqPresence.Standing standing = h.standing(origin);
+		if (standing != null) {
+			dev.t3craft.client.hq.HqPresence.demo(standing);
 			anchorsInstalled = true;
 		}
 		installBindings(h.bindings(origin));
@@ -442,17 +442,14 @@ public final class DemoClient implements ClientModInitializer {
 
 	/** Monitors and lamps of the HQ follow the live roster on their own (blocks module on only). */
 	private static void installBindings(@Nullable DemoHqBindings bindings) {
-		dev.t3craft.client.blocks.BlocksClient b = dev.t3craft.client.blocks.BlocksClient.get();
-		if (b != null) {
-			b.setHqBindings(bindings == null ? null : () -> bindings.bindings(liveNpcs()));
-		}
+		dev.t3craft.client.hq.HqPresence.demoBindings(bindings == null ? null : () -> bindings.bindings(liveNpcs()));
 	}
 
 	private void clearAnchors() {
 		installBindings(null);
 		T3CraftClient c = T3CraftClient.get();
 		if (anchorsInstalled && c != null) {
-			c.npcs().behavior().setAnchorSource(null);
+			dev.t3craft.client.hq.HqPresence.demo(null);
 		}
 		anchorsInstalled = false;
 	}

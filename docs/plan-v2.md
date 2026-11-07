@@ -133,6 +133,12 @@ puente, sin reiniciar Minecraft. El mod no guarda credenciales de T3.
 
 ## 1. Dos zonas de permisos
 
+> **Actualización 2026-11-07:** Facundo dio el OK a la escritura. Primero como segundo
+> emparejamiento opcional (`feat/operate-core`) y luego, en `fix/pair-default-operate`, como
+> **emparejamiento por defecto** `read + operate` en una sola sesión, con `--read-only` como
+> opción explícita. Se mantienen (b) revocación por entorno, (c) confirmaciones y (d) audit log,
+> ahora en el mod. Ver `docs/feat-operate.md`.
+
 | | **SOLO LECTURA** (`orchestration:read`) | **REQUIERE `orchestration:operate`** |
 |---|---|---|
 | Métodos T3 | `subscribeShell`, `subscribeThread`, `getThreadProjection`, `getTurnItem`, `getTurnDiff`, `getFullThreadDiff`, `searchThreads` | `dispatchCommand` (`message.dispatch` / turn start, `run.interrupt`, `runtime-request.respond`, `thread.create`, settle), `launchThread` |

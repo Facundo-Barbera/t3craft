@@ -11,10 +11,12 @@ sin avisar en este archivo. Si necesitas un cambio, pídelo en vez de editar est
 tu rama.
 
 Reglas para todos:
-- **Solo lectura por defecto**: `T3Connection` y todo lo de lectura solo usan `orchestration:read`.
-  Las escrituras (chat, aprobaciones, crear o interrumpir threads) pasan **únicamente** por
-  `OperateGate` (§5), con el segundo emparejamiento operate opcional por entorno. Sin token
-  operate, todo sigue en solo lectura. Ver `docs/feat-operate.md`.
+- **Lectura y escritura separadas en el código**: `T3Connection` y todo lo de lectura solo hacen
+  llamadas de `orchestration:read`. Las escrituras (chat, aprobaciones, crear o interrumpir
+  threads) pasan **únicamente** por `OperateGate` (§5). Desde 2026-11-07 el emparejamiento por
+  defecto pide `orchestration:read` + `orchestration:operate` en una sola sesión;
+  `/t3craft pair --read-only` (o el toggle de la pantalla) pide solo lectura. Sin token operate,
+  todo sigue en solo lectura. Ver `docs/feat-operate.md`.
 - **Secretos**: los tokens y tickets nunca van a logs, al chat ni a `toString()`. Usa
   `T3Connection.sanitize(...)` para cualquier texto de error que pueda llevarlos.
 - **Hilos**: lo marcado *client thread* solo se llama desde el hilo de Minecraft
@@ -43,9 +45,9 @@ Reglas para todos:
 | `T3Connection` | Una conexión de solo lectura a un entorno (ticket → `/ws` → `subscribeShell` con `requestCompletionMarker`, Ack por chunk, Ping, backoff). `Status`: `CONNECTING, OK, AUTH_FAILED, NOT_PAIRED, OFFLINE, INCOMPATIBLE` (`wire` en minúsculas). `Listener.onStatus/onShell`. `sanitize(String)` es estático. Todo lo que no es el shell va por el mismo socket, con **un solo** generador de ids y **una** cola de envío (`StreamRegistry`, envíos en serie): `subscribeThread(threadId, StreamRegistry.Listener) → Subscription` (compartida con refcount: replay para quien llega tarde, resuscripción al reconectar, `Interrupt` al cerrar la última; cierra el handle al terminar), `getTurnItem(threadId, itemId)`, `getThreadProjection(threadId)`, `threadHistory(threadId, cursor)` (HTTP con la sesión del entorno) y `searchThreads(query, limit, timeoutMs) → CompletableFuture<ThreadSearch.Decoded>` (timeout, `Interrupt` al cancelar, falla si no está `OK`, mensajes sin secretos). Para leer otros streams agrega un método aquí (vía `StreamRegistry.call`/`subscribe`); no abras otra conexión por tu cuenta. |
 | `StreamRegistry` | Multiplexor puro (testeado) de `T3Connection`: `subscribe(threadId, listener)`, `call(tag, payload)` / `call(frameBuilder)` → `CompletableFuture<List<JsonElement>>` (cancelar = `Interrupt`), `abandon(future)`, `onOpen/onClosed`, enrutado de `Chunk`/`Exit` por request id ("1" es el shell). |
 | `RpcFrames` | Framing Effect RPC JSON: `request`, `subscribeShell(id)`, `subscribeThread(id, threadId)`, `ack`, `interrupt`, `ping`, `parse(text) → Chunk | Exit | Defect | Pong | Other`. Constantes `SUBSCRIBE_SHELL`, `SUBSCRIBE_THREAD`, `GET_TURN_ITEM`, `GET_THREAD_PROJECTION`, `SEARCH_THREADS`. `searchThreads(id, query, limit, envLabel)` y `searchQuery(q)` (recorta a 200). `Exit.value()` lleva el valor de éxito de las RPC no-stream (`null` en streams). |
-| `Pairing` | `parse(linkOrCode, hostUrl) → Target(baseUrl, credential)`, `tokenRequestBody`, `parseTokenResponse` (exige exactamente `orchestration:read` y Bearer) y `describeTokenError`. `READ_SCOPE`. `PairingException` lleva mensajes para el jugador, sin secretos. |
-| `PairingClient` | `exchange(Target, clientLabel, clientOs) → CompletableFuture<Pairing.Session>`. |
-| `Environments` | El almacén en `config/t3craft/`: `list() → List<Environment(id, label, url)>`, `save(env, session)`, `remove(id)` (también borra el token operate), `credential(id) → Session | null` (solo devuelve sesiones read-only), `slug(label)`. Los tokens solo se leen aquí. |
+| `Pairing` | `parse(linkOrCode, hostUrl) → Target(baseUrl, credential)`, `tokenRequestBody`, `parseTokenResponse` y `describeTokenError`. Las sobrecargas sin `scopes` son las de solo lectura (exigen exactamente `orchestration:read`); la UI siempre pasa los scopes (§5). `READ_SCOPE`. `PairingException` lleva mensajes para el jugador, sin secretos. |
+| `PairingClient` | `exchange(Target, clientLabel, clientOs) → CompletableFuture<Pairing.Session>` (solo lectura) y `exchange(…, scopes)`. |
+| `Environments` | El almacén en `config/t3craft/`: `list() → List<Environment(id, label, url)>`, `pair(env, session) → boolean` (guarda el resultado de un emparejamiento: con read + operate escribe también el token operate y devuelve `true`; uno de solo lectura borra el operate anterior), `save(env, session)` (solo la credencial de lectura; nunca toca el token operate), `remove(id)` (también borra el token operate), `credential(id) → Session | null` (sesión de la zona de lectura: `orchestration:read` o `read + operate`; cualquier otro conjunto se ignora), `slug(label)`. Los tokens solo se leen aquí. |
 | `Json` | Accesores tolerantes de Gson (`str`, `obj`, `arr`, `bool`, `optBool`, `num`, `time`). |
 
 ## 3. Entidades y registro (`dev.t3craft.client.npc`, source set `client`)
@@ -77,15 +79,16 @@ Detalle y receta para añadir acciones: `docs/feat-operate.md`.
 
 | Clase | Qué es |
 |---|---|
-| `Pairing` (añadidos) | `OPERATE_SCOPE`, `READ_SCOPES`, `OPERATE_SCOPES`; `tokenRequestBody(…, scopes)`, `parseTokenResponse(body, now, expected)`, `describeTokenError(status, body, scopes)` y `hostCommand(scopes, label, baseUrl)`. Solo aceptan `READ_SCOPES` u `OPERATE_SCOPES`: nunca sin scopes explícitos. `PairingClient.exchange(…, scopes)`. |
-| `OperateCredentials` | `credentials/operate/<env>.json`: `save`, `get(env, now)` (null si falta, vence o tiene otros scopes), `stored`, `has`, `revoke` (solo local). |
+| `Pairing` (añadidos) | `OPERATE_SCOPE`, `READ_SCOPES`, `OPERATE_SCOPES`, `DEFAULT_SCOPES` (= `OPERATE_SCOPES`, lo que pide el emparejamiento por defecto), `pairingScopes(readOnly)`, `pairingHostCommand(readOnly, baseUrl)`, `grantsOperate(scopes)`, `requireOperate(session)`; `tokenRequestBody(…, scopes)`, `parseTokenResponse(body, now, requested)` (acepta `read` o `read + operate` dentro de lo pedido; rechaza cualquier otro scope, operate en una petición de solo lectura y una concesión sin `read`; si se pidió read + operate y la credencial era de solo lectura, devuelve una sesión de solo lectura), `describeTokenError(status, body, scopes)` y `hostCommand(scopes, label, baseUrl)` (siempre `--scope orchestration:read [--scope orchestration:operate]`). Solo aceptan `READ_SCOPES` u `OPERATE_SCOPES`: nunca sin scopes explícitos. `PairingClient.exchange(…, scopes)`. |
+| `OperateCredentials` | `credentials/operate/<env>.json`, el interruptor del control: `save`, `get(env, now)` (null si falta, vence o tiene otros scopes), `stored`, `has`, `sharesReadSession(env)` (el token operate es la misma sesión combinada que la de lectura), `revoke` (solo local; el entorno queda en solo lectura). `HOST_REVOKE_HINT`, `SHARED_REVOKE_HINT`. |
 | `OperateKind` | Enum de acciones con `destructive`, `wire` y `langKey()`. `isDestructive(wire)`: lo desconocido cuenta como destructivo. |
 | `OperateAction` (record) | `kind, envId, threadId, threadTitle, rpcTag, payload`. Factoría `dispatch(...)`. El payload es una copia defensiva y no aparece en `toString()`. |
 | `OperateGate` | `availability(env)` (`ENABLED/READ_ONLY/EXPIRED`), `canOperate`, `operate(env)` → `Env{available, dispatch(kind, threadId, title, command), submit}`, `submit(action, origin, confirmed) → CompletableFuture<OperateResult>` (nunca falla) y `cancelled(action, origin)`. `Origin`: `UI`, `COMMAND`. |
 | `OperateResult` (record) | `outcome, message, value`. `Outcome`: `OK, READ_ONLY, NEEDS_CONFIRMATION, CANCELLED, AUTH_FAILED, OFFLINE, REJECTED, FAILED`. |
 | `OperateTransport` / `OperateConnection` | Transporte por entorno. `DirectController.operateTransport(env)` / `resetOperate(env)`: no abras sockets operate por tu cuenta. |
 | `AuditLog` | `config/t3craft/audit.log` (JSONL, rota a 1 MiB). `append(Entry)` nunca lanza. |
-| `client.operate.OperateUi` | *Client thread.* `run(action, origin, returnTo, done)`, `guard(widget, env)`, `canOperate(env)`, `gate()`. |
+| `client.operate.OperateUi` | *Client thread.* `run(action, origin, returnTo, done)`, `guard(widget, env)`, `canOperate(env)` (la consulta para textos y botones: `true` = no digas "solo lectura"), `availability(env)`, `enableControlScreen(parent, env)` (la pantalla que da control: "Habilitar control" si el entorno está emparejado, si no la de emparejar) y `gate()`. |
 | `client.operate.OperateClient` | `get().enable(env, link, origin, done)`, `revoke(env, origin)`, `environment(env)`, `label(env)`. |
 | `client.screen.ConfirmActionScreen` | `new ConfirmActionScreen(parent, action, envLabel, yes -> …)`. Normalmente la abre `OperateUi.run`. |
-| `client.screen.OperatePairScreen` | "Habilitar control (operate)…" para un entorno ya emparejado. |
+| `client.screen.OperatePairScreen` | "Habilitar control" para un entorno emparejado en solo lectura (mejora; el de lectura se mantiene). |
+| `client.screen.PairScreen` | Emparejar: lectura + control por defecto; `new PairScreen(parent, true)` o `/t3craft pair --read-only` para solo lectura. |

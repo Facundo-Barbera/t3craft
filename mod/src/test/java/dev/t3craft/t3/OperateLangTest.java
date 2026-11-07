@@ -24,8 +24,14 @@ class OperateLangTest {
 			for (OperateKind k : OperateKind.values()) {
 				assertTrue(o.has(k.langKey()), l + " misses " + k.langKey());
 			}
+			for (ThreadOps.Snooze d : ThreadOps.Snooze.values()) {
+				assertTrue(o.has(d.langKey()), l + " misses " + d.langKey());
+			}
 			for (String key : new String[] {"t3craft.operate.requires", "t3craft.operate.confirm.title", "t3craft.operate.enable.warning",
-					"t3craft.operate.revoke.button"}) {
+					"t3craft.operate.revoke.button",
+					"t3craft.operate.thread.settle", "t3craft.operate.thread.snooze", "t3craft.operate.thread.pin", "t3craft.operate.thread.unpin",
+					"t3craft.operate.thread.read", "t3craft.operate.thread.read.tooltip", "t3craft.operate.snooze.title",
+					"t3craft.operate.result.ok", "t3craft.operate.result.failed"}) {
 				assertTrue(o.has(key), l + " misses " + key);
 			}
 		}

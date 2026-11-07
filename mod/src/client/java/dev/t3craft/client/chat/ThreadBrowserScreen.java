@@ -1,8 +1,7 @@
 // Adapted from AgentCraft (https://github.com/blendi-remade/agentcraft)
 // Copyright (c) 2026 AgentCraft contributors. MIT License.
-// Placement and veil follow AgentCraft's console (console/ConsoleScreen.java): non-pausing, an 8 px
-// margin, the column anchored bottom-left so the world stays visible, a walnut dim over everything
-// that deepens towards the bottom.
+// The veil follows AgentCraft's console (console/ConsoleScreen.java): non-pausing, a walnut dim over
+// everything. Unlike the console, the browser is centred (BrowserLayout) so it reads at any GUI scale.
 package dev.t3craft.client.chat;
 
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -10,6 +9,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
+import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -18,17 +18,34 @@ import org.jspecify.annotations.Nullable;
  * No static state.
  */
 public final class ThreadBrowserScreen extends Screen {
-	private static final int MAX_W = 640;
+	private final Supplier<ThreadBrowser> factory;
+	private @Nullable ThreadBrowser browser;
+	/** Thread to open when the browser is (re)built; updated when the screen is left. */
+	private @Nullable String key;
 
-	private final ThreadBrowser browser;
-
-	public ThreadBrowserScreen(ThreadBrowser browser) {
+	/**
+	 * The browser is built in {@link #init()} and closed in {@link #removed()}, so the screen can be
+	 * the parent of another screen (pairing, control) and come back to the same thread without
+	 * keeping a live feed open while hidden.
+	 */
+	public ThreadBrowserScreen(Supplier<ThreadBrowser> factory, @Nullable String key) {
 		super(Component.literal("T3 threads"));
-		this.browser = browser;
+		this.factory = factory;
+		this.key = key;
 	}
 
-	public ThreadBrowser browser() {
+	public @Nullable ThreadBrowser browser() {
 		return browser;
+	}
+
+	@Override
+	protected void init() {
+		if (browser == null) {
+			browser = factory.get();
+			if (key != null) {
+				browser.open(key);
+			}
+		}
 	}
 
 	@Override
@@ -38,41 +55,51 @@ public final class ThreadBrowserScreen extends Screen {
 
 	@Override
 	public void removed() {
-		browser.close();
+		ThreadBrowser b = browser;
+		if (b != null) {
+			String k = b.conversation().key();
+			if (k != null) {
+				key = k;
+			}
+			b.close();
+			browser = null;
+		}
 		super.removed();
 	}
 
 	@Override
 	public void tick() {
-		browser.tick();
+		if (browser != null) {
+			browser.tick();
+		}
 	}
 
-	private Rect layout() {
-		ChatTheme t = browser.theme();
-		int m = t.margin();
-		int w = Math.min(MAX_W, width - 2 * m);
-		int h = Math.min(height - 2 * m, Math.max(180, height * 60 / 100 + 23));
-		return new Rect(m, height - m - h, w, h);
+	/** Centred in scaled GUI pixels ({@code width}/{@code height} of a Screen are guiWidth/guiHeight). */
+	private static Rect layout(ThreadBrowser b, int width, int height) {
+		ChatTheme t = b.theme();
+		return BrowserLayout.compute(width, height, t.margin(), t.gap()).frame();
 	}
 
 	@Override
 	public void extractBackground(GuiGraphicsExtractor g, int mouseX, int mouseY, float a) {
-		ChatTheme t = browser.theme();
+		ChatTheme t = browser != null ? browser.theme() : ChatTheme.warmStudio();
 		g.fill(0, 0, width, height, t.backdrop());
-		int h = height * 2 / 3;
-		g.fillGradient(0, height - h, width, height, t.backdropBottom() & 0x00FFFFFF, t.backdropBottom());
+		g.fillGradient(0, 0, width, height, t.backdropBottom() & 0x00FFFFFF, t.backdropBottom());
 	}
 
 	@Override
 	public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float a) {
 		super.extractRenderState(g, mouseX, mouseY, a);
-		browser.setBounds(layout());
-		browser.render(g, font, mouseX, mouseY);
+		ThreadBrowser b = browser;
+		if (b != null) {
+			b.setBounds(layout(b, width, height));
+			b.render(g, font, mouseX, mouseY);
+		}
 	}
 
 	@Override
 	public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-		if (browser.mouseClicked(event.x(), event.y(), event.button())) {
+		if (browser != null && browser.mouseClicked(event.x(), event.y(), event.button())) {
 			return true;
 		}
 		return super.mouseClicked(event, doubleClick);
@@ -80,22 +107,14 @@ public final class ThreadBrowserScreen extends Screen {
 
 	@Override
 	public boolean mouseScrolled(double x, double y, double scrollX, double scrollY) {
-		return browser.mouseScrolled(x, y, scrollY) || super.mouseScrolled(x, y, scrollX, scrollY);
+		return (browser != null && browser.mouseScrolled(x, y, scrollY)) || super.mouseScrolled(x, y, scrollX, scrollY);
 	}
 
 	@Override
 	public boolean keyPressed(KeyEvent event) {
-		if (browser.keyPressed(event)) {
+		if (browser != null && browser.keyPressed(event)) {
 			return true;
 		}
 		return super.keyPressed(event);
-	}
-
-	/** Convenience for hosts that only have a key. */
-	public static ThreadBrowserScreen of(ThreadBrowser b, @Nullable String key) {
-		if (key != null) {
-			b.open(key);
-		}
-		return new ThreadBrowserScreen(b);
 	}
 }

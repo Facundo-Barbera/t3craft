@@ -26,6 +26,8 @@ public enum OperateKind {
 	THREAD_SETTLE(true),
 	THREAD_SNOOZE(false),
 	THREAD_PIN(false),
+	/** Unpin the thread ({@code thread.unpin}). Item 22. */
+	THREAD_UNPIN(false),
 	THREAD_MARK_READ(false),
 	/** Create a thread ({@code thread.create}). Item 23. */
 	THREAD_CREATE(false),

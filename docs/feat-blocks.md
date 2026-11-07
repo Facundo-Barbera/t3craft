@@ -16,8 +16,8 @@ queda exactamente como sin él.
 | `t3craft:status_lamp` | `t3craft:status_lamp` (`LampBlockEntity`) | Lámpara del escritorio: color y luz según el estado del hilo. |
 | `t3craft:board_lamp` | el mismo tipo `t3craft:status_lamp` | Variante "bombilla del tablero": la i-ésima bombilla muestra el i-ésimo hilo que necesita al jugador (errores primero, luego "needs you"). |
 
-Ítems de bloque con el mismo id, en la pestaña vanilla **Functional blocks** (compartida, sin pestaña
-propia: una entrada de registro menos). Loot tables: cada bloque se suelta a sí mismo. Recetas
+Ítems de bloque con el mismo id, en la pestaña propia **T3Craft** (`dev.t3craft.T3CraftTab`, única
+del mod; el módulo aporta sus ítems con `T3CraftTab.contribute` solo si está prendido). Loot tables: cada bloque se suelta a sí mismo. Recetas
 (razonables y baratas): monitor = 7 hierro + panel de vidrio + redstone; lámpara = 4 cobre (en cruz) +
 glowstone + redstone; lámpara ⇄ bombilla, 1:1 sin forma. Modelos y texturas propios, sencillos
 (`textures/block/monitor_*`, `status_lamp_<estado>`, `board_lamp_<estado>`).
@@ -111,7 +111,10 @@ Nadie tiene que usar `/t3craft blocks link` en el HQ:
   libera su escritorio (monitor "NO THREAD", lámpara apagada), su monitor del archivo se vincula si la
   celda existe, y la bombilla de su módulo cambia; nada más. Un hilo nuevo toma un escritorio libre ya
   construido; si hace falta un módulo nuevo, sus celdas no existen todavía y se vinculan al reconstruir.
-- El HQ de site (`feat/hq-construction`) genera con `HqPlans.generate`, así que ya recibe fixtures.
+- El HQ de site (`feat/hq-construction`) genera con `HqPlans.generate` (objetivo y plan aplicado), así
+  que recibe fixtures y escribe su binding como dato de block entity. Además `HqPresence` (el único punto
+  que enchufa el HQ en pie) le pasa a `BlocksClient.setHqBindings` la tabla del HQ en pie: la del plan de
+  site (`HqBindings.world(plan, site)`) o, en el demo, la del roster en vivo (`HqPresence.demoBindings`).
 
 A mano: mirando un monitor o lámpara, `/t3craft blocks link <env:thread>` o `/t3craft blocks unlink`
 (solo singleplayer o anfitrión LAN; escribe el block entity en el servidor integrado).

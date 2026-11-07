@@ -51,4 +51,9 @@ public interface AnchorSource {
 	default @Nullable Anchor rest(String npcId, String groupId) {
 		return null;
 	}
+
+	/** Where a settled NPC walks to before fading out ({@link Departure}), e.g. the HQ entrance. Null = its {@link #home}. */
+	default @Nullable Anchor exit() {
+		return null;
+	}
 }
