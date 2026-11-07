@@ -20,6 +20,7 @@ import dev.t3craft.blocks.MonitorBlockEntity;
 import dev.t3craft.blocks.ScreenRect;
 import dev.t3craft.blocks.T3Blocks;
 import dev.t3craft.client.T3CraftClient;
+import dev.t3craft.client.chat.ChatScreens;
 import dev.t3craft.client.debug.GuardedEvents;
 import dev.t3craft.client.npc.NpcInfo;
 import dev.t3craft.client.workstation.ChatScreenOpener;
@@ -41,6 +42,8 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientBlockEntityEvents
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.BlockEntityRendererRegistry;
+import net.fabricmc.fabric.api.event.player.UseBlockCallback;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.server.IntegratedServer;
@@ -50,6 +53,8 @@ import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import org.jspecify.annotations.Nullable;
@@ -71,7 +76,9 @@ import org.jspecify.annotations.Nullable;
  * Lamps get {@link LampRenderer} (breathing glow, the hub beacon) and motes; {@link HubBeacon} runs
  * even with the module off (client-only glow over the hub lantern).
  *
- * <p>Using a monitor opens its thread through the workstations' {@link ThreadOpener}.
+ * <p>Using a monitor opens its thread through the workstations' {@link ThreadOpener}; so does using a
+ * card of a thread wall ({@link ThreadBoardRenderer}, {@link ThreadWalls}: any cell of the wall, hit-tested
+ * on the client).
  *
  * <p>Live log ({@link MonitorLiveLog}): monitors close to the player and in view hold a read-only
  * share of their thread's stream ({@link MonitorVisibility} decides, with hysteresis; one stream per
@@ -108,6 +115,8 @@ public final class BlocksClient implements ClientModInitializer {
 	private volatile ScreenExtent.@Nullable Provider extents;
 	private final MonitorLiveLog liveLog = new MonitorLiveLog(MonitorSettings.DEFAULT);
 	private @Nullable MonitorRenderer renderer;
+	private @Nullable ThreadBoardRenderer wallRenderer;
+	private @Nullable ThreadWalls walls;
 	private @Nullable PlaqueRenderer plaqueRenderer;
 	private volatile @Nullable Map<Long, Binding> positional;
 	private volatile @Nullable Map<String, LampStatus> lastWanted;
@@ -142,6 +151,21 @@ public final class BlocksClient implements ClientModInitializer {
 			return r;
 		});
 		BlockEntityRendererRegistry.register(c.lampType(), ctx -> new LampRenderer(this));
+		ThreadWalls tw = new ThreadWalls(ChatScreens::defaultDirectory, FabricLoader.getInstance().getConfigDir().resolve("t3craft.json"));
+		walls = tw;
+		BlockEntityRendererRegistry.register(c.threadBoardType(), ctx -> {
+			ThreadBoardRenderer r = new ThreadBoardRenderer(tw);
+			wallRenderer = r;
+			return r;
+		});
+		UseBlockCallback.EVENT.register((player, lvl, hand, hit) -> {
+			if (!lvl.isClientSide() || hand != InteractionHand.MAIN_HAND || player.isShiftKeyDown()) {
+				return InteractionResult.PASS;
+			}
+			var h = tw.hitAt(hit.getBlockPos(), hit.getDirection(), hit.getLocation());
+			// FAIL on the client: consumed, no packet to the server, so neither the block nor the held item acts
+			return h != null && openThread(h.key()) ? InteractionResult.FAIL : InteractionResult.PASS;
+		});
 		BlockEntityRendererRegistry.register(c.archiveTerminalType(), ctx -> new ArchiveTerminalRenderer());
 		BlockEntityRendererRegistry.register(c.kit().plaqueType(), ctx -> {
 			PlaqueRenderer r = new PlaqueRenderer();
@@ -312,6 +336,10 @@ public final class BlocksClient implements ClientModInitializer {
 
 	private void tick(Minecraft mc) {
 		ticks++;
+		ThreadWalls tw = walls;
+		if (tw != null && mc.level != null) {
+			tw.tick();
+		}
 		if (!suppressorInstalled) {
 			WorkstationClient ws = WorkstationClient.get();
 			if (ws != null) {
@@ -391,23 +419,32 @@ public final class BlocksClient implements ClientModInitializer {
 		if (b.kind() != Binding.Kind.THREAD) {
 			return false;
 		}
-		WorkstationThread t = threads.get(b.value());
+		openThread(b.value());
+		return true;
+	}
+
+	/** Opens a thread's chat by NPC key ({@code env:threadId}) through the workstations' opener. */
+	private boolean openThread(String key) {
+		if (key == null || key.isEmpty()) {
+			return false;
+		}
+		WorkstationThread t = threads.get(key);
 		String env;
 		String thread;
 		if (t != null) {
 			env = t.envId();
 			thread = t.threadId();
 		} else {
-			int colon = b.value().indexOf(':');
-			env = colon > 0 ? b.value().substring(0, colon) : "";
-			thread = colon > 0 ? b.value().substring(colon + 1) : b.value();
+			int colon = key.indexOf(':');
+			env = colon > 0 ? key.substring(0, colon) : "";
+			thread = colon > 0 ? key.substring(colon + 1) : key;
 		}
 		WorkstationClient ws = WorkstationClient.get();
 		ThreadOpener opener = ws != null ? ws.opener() : fallbackOpener;
 		try {
 			opener.open(env, thread);
 		} catch (RuntimeException e) {
-			T3Craft.LOGGER.warn("T3Craft: could not open thread {}", b.value(), e);
+			T3Craft.LOGGER.warn("T3Craft: could not open thread {}", key, e);
 		}
 		return true;
 	}
@@ -422,6 +459,15 @@ public final class BlocksClient implements ClientModInitializer {
 		MonitorRenderer r = renderer;
 		if (r != null) {
 			r.clear();
+		}
+		ThreadWalls tw = walls;
+		if (tw != null) {
+			tw.clear();
+			tw.reloadConfig();
+		}
+		ThreadBoardRenderer wr = wallRenderer;
+		if (wr != null) {
+			wr.clear();
 		}
 		PlaqueRenderer pr = plaqueRenderer;
 		if (pr != null) {

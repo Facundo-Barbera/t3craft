@@ -61,6 +61,7 @@
 	"t3craft.operate.kind.queue_cancel": "Cancelar ejecución en cola",
 	"t3craft.operate.kind.thread_archive": "Archivar hilo",
 	"block.t3craft.monitor": "Monitor de hilo",
+	"block.t3craft.thread_board": "Pared de hilos",
 	"block.t3craft.status_lamp": "Lámpara de estado de hilo",
 	"block.t3craft.board_lamp": "Bombilla del tablero",
 	"block.t3craft.standing_desk": "Escritorio de pie",

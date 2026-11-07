@@ -97,6 +97,16 @@ public final class QueueClient {
 		STORE.setBackground(new LinkedHashSet<>(QueueTargets.working(views(client), QueueTargets.BADGE_CAP)));
 	}
 
+	/**
+	 * Queued runs of an NPC id ({@code env:thread}) as far as the client watches them (the working
+	 * threads' background watches, or an open queue screen); 0 when none or unknown. Cheap: a map
+	 * lookup, no subscription of its own (thread wall cards).
+	 */
+	public static int queued(String npcId) {
+		QueueStore.Key k = QueueStore.Key.parse(npcId);
+		return STORE.count(k.envId(), k.threadId());
+	}
+
 	/** "⏳ n queued" for an NPC id ({@code env:thread}), or null when empty or unknown. */
 	public static @Nullable Component badge(String npcId) {
 		QueueStore.Key k = QueueStore.Key.parse(npcId);
