@@ -133,6 +133,19 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 			}
 			return InteractionResult.SUCCESS;
 		});
+		// Left-click on an NPC toggles its detail panel (compact labels). Our entities are unknown
+		// to the server, so the attack is consumed client-side.
+		net.fabricmc.fabric.api.event.player.AttackEntityCallback.EVENT.register((player, level, hand, entity, hit) -> {
+			if (!level.isClientSide()) {
+				return InteractionResult.PASS;
+			}
+			String threadId = npcs.threadFor(entity);
+			if (threadId == null) {
+				return InteractionResult.PASS;
+			}
+			npcs.toggleDetail(threadId);
+			return InteractionResult.FAIL;
+		});
 	}
 
 	// ---- source lifecycle ---------------------------------------------------------------------
