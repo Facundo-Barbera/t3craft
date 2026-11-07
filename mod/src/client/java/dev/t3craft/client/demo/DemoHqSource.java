@@ -5,6 +5,7 @@ import dev.t3craft.T3Craft;
 import dev.t3craft.build.BuildPlan;
 import dev.t3craft.client.npc.NpcInfo;
 import dev.t3craft.hq.HqAnchorSource;
+import dev.t3craft.hq.HqInput;
 import dev.t3craft.hq.HqLayout;
 import dev.t3craft.hq.HqPlans;
 import java.util.Collection;
@@ -27,6 +28,7 @@ public final class DemoHqSource implements DemoStructureSource {
 	private final Supplier<? extends Collection<NpcInfo>> live;
 	private DemoHq.@Nullable Roster roster;
 	private DemoHq.@Nullable Step step;
+	private @Nullable HqInput preparedInput;
 	private boolean failed;
 
 	public DemoHqSource(Supplier<? extends Collection<NpcInfo>> live) {
@@ -72,13 +74,32 @@ public final class DemoHqSource implements DemoStructureSource {
 			int lift = DemoHq.lift(spec.originY(), worldMinY, planMinY);
 			boolean diffable = built.builtWith(this) && previousLift == lift;
 			roster = r;
-			step = DemoHq.step(r.input(), previous, built.hash(), lift, diffable);
+			step = DemoHq.step(r.input(), previous, built.hash(), lift, diffable, previous != null && previousLift == lift);
+			preparedInput = r.input();
 			failed = false;
 		} catch (RuntimeException e) {
 			T3Craft.LOGGER.error("[demo] HQ plan failed, falling back", e);
 			roster = null;
 			step = null;
+			preparedInput = null;
 			failed = true;
+		}
+	}
+
+	/**
+	 * True when the live roster no longer matches the one the last {@link #prepare} built from (a
+	 * thread took or released a station): the demo reconciles the HQ again. False before any prepare
+	 * and after a failed one (nothing to compare against).
+	 */
+	public boolean rosterChanged() {
+		HqInput in = preparedInput;
+		if (in == null || failed) {
+			return false;
+		}
+		try {
+			return !DemoHq.chooseRoster(live.get()).input().equals(in);
+		} catch (RuntimeException e) {
+			return false;
 		}
 	}
 

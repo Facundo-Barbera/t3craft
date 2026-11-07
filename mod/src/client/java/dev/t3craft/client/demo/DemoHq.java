@@ -5,6 +5,8 @@ import dev.t3craft.build.BuildPlan;
 import dev.t3craft.build.Placement;
 import dev.t3craft.client.npc.NpcInfo;
 import dev.t3craft.hq.Box;
+import dev.t3craft.hq.HqBuild;
+import dev.t3craft.hq.HqDiff;
 import dev.t3craft.hq.HqGenerator;
 import dev.t3craft.hq.HqInput;
 import dev.t3craft.hq.HqLayout;
@@ -36,8 +38,11 @@ import org.jspecify.annotations.Nullable;
  * rotation {@code NONE}.
  */
 public final class DemoHq {
-	/** Bump when anything here changes the built result (plinth, lift rule): hashes change, the HQ is rebuilt. */
-	public static final int PLAN_VERSION = 1;
+	/**
+	 * Bump when anything here changes the built result (plinth, lift rule): hashes change, the HQ is
+	 * rebuilt. 2: vacant desks are no longer built (fix/hq-stale-stations); the rebuild clears them.
+	 */
+	public static final int PLAN_VERSION = 2;
 
 	private DemoHq() {
 	}
@@ -125,22 +130,58 @@ public final class DemoHq {
 	 * @param diffable     the world holds {@code previous} built with this plan version and lift, so a diff is valid
 	 */
 	public static Step step(HqInput input, @Nullable HqLayout previous, @Nullable String previousHash, int lift, boolean diffable) {
+		return step(input, previous, previousHash, lift, diffable, false);
+	}
+
+	/**
+	 * Like {@link #step(HqInput, HqLayout, String, int, boolean)}; {@code clearPrevious}: when the
+	 * world holds {@code previous} at the same lift but cannot be diffed (older plan version), the
+	 * full rebuild also clears the cells of {@code previous} that the new HQ no longer uses, so no
+	 * module or desk of an old session is left standing.
+	 *
+	 * <p>The diff goes through {@link HqDiff}: removals ({@code remove:<group>} parts: modules and
+	 * desks that were released, restored to air or ground, plus the plinth under a shrunken
+	 * footprint) come first, then the builds.
+	 */
+	public static Step step(HqInput input, @Nullable HqLayout previous, @Nullable String previousHash, int lift, boolean diffable,
+			boolean clearPrevious) {
 		HqGenerator.Result r = HqGenerator.plan(input, previous);
 		String h = hash(r.layout(), lift);
 		if (diffable && previous != null && h.equals(previousHash)) {
 			return new Step(r.layout(), r.plan(), h, lift, List.of(), false);
 		}
 		if (!diffable || previous == null) {
-			return new Step(r.layout(), r.plan(), h, lift, full(r.plan(), lift), true);
+			List<BuildPlan> parts = new ArrayList<>();
+			if (previous != null && clearPrevious) {
+				dev.t3craft.hq.BuildPlan before = HqPlans.generate(previous);
+				addIfAny(parts, plinthRemoval(before, r.plan(), lift));
+				for (List<dev.t3craft.hq.Placement> ps : HqDiff.between(before, r.plan(), vacated(lift, r.plan().footprint())).removals().values()) {
+					addIfAny(parts, bake(HqBuild.toBuildPlan(ps, HqBuild.Order.MODULES), lift));
+				}
+			}
+			parts.addAll(full(r.plan(), lift));
+			return new Step(r.layout(), r.plan(), h, lift, parts, true);
 		}
 		dev.t3craft.hq.BuildPlan before = HqPlans.generate(previous);
+		HqDiff diff = HqDiff.between(before, r.plan(), vacated(lift, r.plan().footprint()));
+		boolean reshaped = !before.footprint().equals(r.plan().footprint());
 		List<BuildPlan> parts = new ArrayList<>();
-		if (!before.footprint().equals(r.plan().footprint())) {
+		Map<String, BuildPlan> diffParts = diff.parts();
+		// 1. removals (released modules and desks), 2. the plinth follows the footprint, 3. builds.
+		diffParts.forEach((g, p) -> {
+			if (g.startsWith(HqDiff.REMOVE_PREFIX)) {
+				addIfAny(parts, bake(p, lift));
+			}
+		});
+		if (reshaped) {
+			addIfAny(parts, plinthRemoval(before, r.plan(), lift));
 			addIfAny(parts, plinth(r.plan(), lift));
 		}
-		for (BuildPlan p : HqPlans.expansion(before, r.plan(), vacated(lift)).values()) {
-			addIfAny(parts, bake(p, lift));
-		}
+		diffParts.forEach((g, p) -> {
+			if (!g.startsWith(HqDiff.REMOVE_PREFIX)) {
+				addIfAny(parts, bake(p, lift));
+			}
+		});
 		return new Step(r.layout(), r.plan(), h, lift, parts, false);
 	}
 
@@ -181,7 +222,19 @@ public final class DemoHq {
 		for (Placement p : hqRelative.placements()) {
 			out.add(new Placement(site.cell(p.pos()), p.state().rotate(site.rotation()), p.blockEntity()));
 		}
-		return BuildPlan.of(out).layered();
+		BuildPlan baked = BuildPlan.of(out);
+		// Removal parts keep their top-down order (decorations before what holds them); the rest is layered.
+		return isRemoval(hqRelative) ? baked : baked.layered();
+	}
+
+	/** A removal part: every placement is air (see {@link HqDiff#parts()}); kept in its own order. */
+	private static boolean isRemoval(BuildPlan p) {
+		for (Placement pl : p.placements()) {
+			if (!pl.state().isAir()) {
+				return false;
+			}
+		}
+		return !p.isEmpty();
 	}
 
 	/** Not a constant: touching {@code Blocks} must wait for the vanilla bootstrap. */
@@ -216,5 +269,39 @@ public final class DemoHq {
 			}
 			return y == -1 ? Blocks.GRASS_BLOCK.defaultBlockState() : Blocks.DIRT.defaultBlockState();
 		};
+	}
+
+	/** {@link #vacated(int)}, but plinth cells outside the new HQ's {@code footprint} become air (the plinth shrinks too). */
+	static dev.t3craft.hq.BuildPlan.Vacated vacated(int lift, Box footprint) {
+		dev.t3craft.hq.BuildPlan.Vacated inner = vacated(lift);
+		return rel -> {
+			int y = rel.getY() + lift;
+			boolean under = rel.getX() >= footprint.minX() && rel.getX() <= footprint.maxX() && rel.getZ() >= footprint.minZ()
+					&& rel.getZ() <= footprint.maxZ();
+			if (y >= 0 && y < lift && !under) {
+				return Blocks.AIR.defaultBlockState();
+			}
+			return inner.at(rel);
+		};
+	}
+
+	/** Air where the old plinth stood outside the new footprint (cells the old plan had no block in). */
+	static BuildPlan plinthRemoval(dev.t3craft.hq.BuildPlan before, dev.t3craft.hq.BuildPlan after, int lift) {
+		List<Placement> out = new ArrayList<>();
+		Box f = before.footprint();
+		Box g = after.footprint();
+		HqSite site = bakeSite(lift);
+		for (int y = -1; y >= -lift; y--) {
+			for (int x = f.minX(); x <= f.maxX(); x++) {
+				for (int z = f.minZ(); z <= f.maxZ(); z++) {
+					boolean under = x >= g.minX() && x <= g.maxX() && z >= g.minZ() && z <= g.maxZ();
+					BlockPos rel = new BlockPos(x, y, z);
+					if (!under && before.at(rel) == null) {
+						out.add(new Placement(site.cell(rel), Blocks.AIR.defaultBlockState()));
+					}
+				}
+			}
+		}
+		return BuildPlan.of(out);
 	}
 }

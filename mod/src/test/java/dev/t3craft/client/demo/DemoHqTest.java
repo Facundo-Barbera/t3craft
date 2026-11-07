@@ -213,6 +213,63 @@ class DemoHqTest {
 		}
 
 		@Test
+		void releasedDeskIsRemoved() {
+			List<NpcInfo> roster = live(2, 3);
+			DemoHq.Step before = DemoHq.step(DemoHq.fromNpcs(roster), null, null, LIFT, true);
+			List<NpcInfo> fewer = new ArrayList<>(roster);
+			NpcInfo gone = fewer.remove(1);
+			fewer.add(npc(gone.id(), "vps", "p0", true)); // released: archived, no desk
+			DemoHq.Step after = DemoHq.step(DemoHq.fromNpcs(fewer), before.layout(), before.hash(), LIFT, true);
+			assertFalse(after.full());
+			Map<BlockPos, BlockState> world = new HashMap<>();
+			apply(world, before.parts());
+			apply(world, after.parts());
+			Map<BlockPos, BlockState> expected = new HashMap<>();
+			apply(expected, DemoHq.full(after.plan(), LIFT));
+			assertEquals(expected, world, "the released desk is gone; the HQ equals a fresh build");
+		}
+
+		@Test
+		void olderPlanVersionRebuildClearsWhatTheNewHqNoLongerUses() {
+			DemoHq.Step before = DemoHq.step(DemoHq.fromNpcs(live(3, 2)), null, null, LIFT, true);
+			DemoHq.Step after = DemoHq.step(DemoHq.fromNpcs(live(2, 2)), before.layout(), "old-version-hash", LIFT, false, true);
+			assertTrue(after.full());
+			Map<BlockPos, BlockState> world = new HashMap<>();
+			apply(world, before.parts());
+			apply(world, after.parts());
+			Map<BlockPos, BlockState> expected = new HashMap<>();
+			apply(expected, DemoHq.full(after.plan(), LIFT));
+			for (Map.Entry<BlockPos, BlockState> e : world.entrySet()) {
+				if (!expected.containsKey(e.getKey()) && e.getKey().getY() >= 0) {
+					assertTrue(e.getValue().isAir(), "left over at " + e.getKey());
+				}
+			}
+		}
+
+		@Test
+		void sameRosterInAnyOrderBuildsNothing() {
+			List<NpcInfo> roster = live(3, 3);
+			DemoHq.Step before = DemoHq.step(DemoHq.fromNpcs(roster), null, null, LIFT, true);
+			List<NpcInfo> shuffled = new ArrayList<>(roster);
+			Collections.shuffle(shuffled, new Random(3));
+			DemoHq.Step again = DemoHq.step(DemoHq.fromNpcs(shuffled), before.layout(), before.hash(), LIFT, true);
+			assertTrue(again.upToDate());
+			assertEquals(before.hash(), again.hash());
+		}
+
+		@Test
+		void sourceNoticesWhenAThreadReleasesItsStation() {
+			List<NpcInfo> roster = new ArrayList<>(live(1, 2));
+			DemoHqSource src = new DemoHqSource(() -> roster);
+			assertFalse(src.rosterChanged(), "nothing prepared yet");
+			src.prepare(DemoMarker.EMPTY, DemoWorldSpec.defaults(), -64);
+			assertFalse(src.rosterChanged());
+			NpcInfo first = roster.removeFirst();
+			roster.add(npc(first.id(), "vps", "p0", true));
+			assertTrue(src.rosterChanged());
+		}
+
+		@Test
 		void bakedHqFollowsTheDemoConvention() {
 			DemoHq.Step s = DemoHq.step(DemoHq.sample(), null, null, LIFT, true);
 			int minZ = Integer.MAX_VALUE;
