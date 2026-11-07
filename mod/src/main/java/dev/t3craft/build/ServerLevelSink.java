@@ -17,7 +17,8 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Places blocks into a {@link ServerLevel} on the server thread, with the placement sound and
- * block particles (sent to every nearby client, so they show in singleplayer and on LAN).
+ * block particles (sent to every nearby client, so they show in singleplayer and on LAN). Effects are
+ * capped per tick for all builders together ({@link BuildBudget#effect()}, {@code build.maxEffectsPerTick}).
  *
  * <p>Default flags are {@link Block#UPDATE_CLIENTS} | {@link Block#UPDATE_KNOWN_SHAPE}: no
  * neighbour shape updates while building, so two-block parts (doors, beds) and attached blocks
@@ -66,7 +67,7 @@ public final class ServerLevelSink implements BlockSink {
 				level.sendBlockUpdated(pos, state, state, Block.UPDATE_CLIENTS);
 			}
 		}
-		if (effects) {
+		if (effects && BuildBudget.global().effect()) {
 			if (state.isAir()) {
 				if (!current.isAir()) {
 					level.levelEvent(LevelEvent.PARTICLES_AND_SOUND_DESTROY_BLOCK, pos, Block.getId(current));

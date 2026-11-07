@@ -86,6 +86,27 @@ public final class MaterialMeter {
 		return true;
 	}
 
+	/**
+	 * Fronts protocol (any order inside a layer): can every entry of {@code pending} (the rest of the
+	 * current layer, across all fronts) be paid now? Records {@link #missing()} either way.
+	 */
+	public boolean affordable(int[] pending, IntPredicate alreadyThere, MaterialSupply supply) {
+		Map<String, Integer> need = new LinkedHashMap<>();
+		for (int i : pending) {
+			String id = costs[i];
+			if (id != null && !alreadyThere.test(i)) {
+				need.merge(id, 1, Integer::sum);
+			}
+		}
+		return check(need, supply);
+	}
+
+	/** Fronts protocol: can entry {@code index} be paid right now (free, already there, or one item in stock)? */
+	public boolean canPay(int index, IntPredicate alreadyThere, MaterialSupply supply) {
+		String id = costs[index];
+		return id == null || supply.count(id) >= 1 || alreadyThere.test(index);
+	}
+
 	private boolean affordable(int from, int to, IntPredicate alreadyThere, MaterialSupply supply) {
 		Map<String, Integer> need = new LinkedHashMap<>();
 		for (int i = from; i < to; i++) {
@@ -94,6 +115,10 @@ public final class MaterialMeter {
 				need.merge(id, 1, Integer::sum);
 			}
 		}
+		return check(need, supply);
+	}
+
+	private boolean check(Map<String, Integer> need, MaterialSupply supply) {
 		if (need.isEmpty()) {
 			missing = Map.of();
 			return true;

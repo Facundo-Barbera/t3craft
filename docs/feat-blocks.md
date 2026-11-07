@@ -283,13 +283,105 @@ Ambos siguen los pasos de arriba; `LampStatus` y `MonitorRenderer.toFace` se pue
 - Sin payloads de red, sin mixins. `ServerLevel` solo en el comando `link` y en `LampApplier`
   (servidor integrado).
 
+## Kit del HQ (feat/hq-blocks-kit): bloques decorativos propios, por rol
+
+Once bloques decorativos propios para el estilo **C, campus de cerezo** (`docs/research/hq-styles.md`
+§C) y el oficio "agentes trabajando". Modelos JSON y texturas propias (`textures/block/kit_*.png`,
+pixel art original dibujado por `mod/tools/blocks_kit_textures.py`, determinista, sin nada de Mojang).
+Registro en `KitBlocks.register`, llamado solo desde `T3Blocks.init`: con el módulo apagado no existe
+ninguno. Ítems en la pestaña **T3Craft**, loot tables (se sueltan a sí mismos), tags `mineable/axe` y
+`mineable/pickaxe`, lang en `en_us`, `es_es` y `es_mx`. Sin recetas por ahora.
+
+| Bloque | Qué es | Estado / luz |
+|---|---|---|
+| `t3craft:standing_desk` | Escritorio de pie: tablero, cuatro patas, faldón atrás. El agente trabaja de pie delante (sin silla); el monitor va en la celda de arriba. | `facing` = frente (donde se para el agente) |
+| `t3craft:shoji_panel` | Panel shoji: papel en celosía de cerezo. Click → enciende/apaga. | `lit` (luz 12) |
+| `t3craft:cherry_floor_tile` | Loseta de tablas de cerezo con borde oscuro y clavos de latón. | — |
+| `t3craft:stone_floor_tile` | Piedra pulida con la marca de t3craft (una "T" turquesa) en una esquina. | — |
+| `t3craft:cherry_beam` | Viga/columna de cerezo. | `axis` |
+| `t3craft:beam_cap` | Remate de columna: cuello y corona laqueada con banda de latón. | — |
+| `t3craft:paper_lantern` | Farol de papel. Es un `LampBlockEntity` (mismo tipo que la lámpara de estado): con `{"binding": "thread:<k>"}` o `module:<k1>,…` respira con el hilo (BER de lamps-breathe, con el brillo sobre el cuerpo de papel); sin vincular es un farol cálido. | `status` (luz 12 apagado/sin vincular, ≥ 9 vinculado) |
+| `t3craft:room_plaque` | Placa de sala: marco de cerezo con placa de tinta; el texto lo dibuja `PlaqueRenderer`. Sin colisión, como un letrero. | `facing` = frente (cuelga del bloque de detrás) |
+| `t3craft:cherry_railing` | Barandilla en el borde `facing` de la celda (postes, pasamanos, balaustres). No conecta (sin tags). | `facing` = borde |
+| `t3craft:cherry_planter` | Maceta de cerezo (tiesto, tronco, copa en flor). Todo opaco: sin capas cutout. | — |
+| `t3craft:stone_lantern` | Linterna de piedra (tōrō) con musgo. | luz 13 |
+
+Ningún modelo usa transparencia (no hace falta registrar capas de render); los bloques que no son un
+cubo llevan `noOcclusion` y su `VoxelShape`.
+
+### `HqKit`: el mapeo por roles (para `HqStyle`)
+
+`dev.t3craft.hq.HqKit` (paquete hq, como `HqFixtures`): `HqKit.active()` es `VANILLA` hasta que
+`T3Blocks.init` instala `KitBlocks` (solo con el módulo encendido). El estilo pide un **rol** y recibe
+el bloque propio o su sustituto vanilla:
+
+| Rol (`HqKit.Role`) | Atajo | Con el módulo | Fallback vanilla (módulo apagado) |
+|---|---|---|---|
+| `DESK` | `desk(front)` | `standing_desk[facing]` | `cherry_slab[type=top]` |
+| `WALL_PANEL` | `wallPanel(false)` | `shoji_panel[lit=false]` | `calcite` |
+| `WALL_PANEL_LIT` | `wallPanel(true)` | `shoji_panel[lit=true]` | `pearlescent_froglight` |
+| `FLOOR` | `floor()` | `cherry_floor_tile` | `cherry_planks` |
+| `FLOOR_ACCENT` | `floorAccent()` | `stone_floor_tile` | `polished_andesite` |
+| `BEAM` | `beam(axis)` | `cherry_beam[axis]` | `stripped_cherry_log[axis]` |
+| `BEAM_CAP` | `beamCap()` | `beam_cap` | `polished_blackstone` |
+| `LANTERN` | `lantern()` | `paper_lantern` | `waxed_copper_lantern[hanging=false]` |
+| `PLAQUE` | `plaque(front)` + `plaqueData(dye, líneas…)` | `room_plaque[facing]` + texto | `cherry_wall_sign[facing]` + texto encerado |
+| `RAILING` | `railing(edge)` | `cherry_railing[facing]` | `waxed_copper_bars` (como el `Palette` actual) |
+| `GARDEN_PLANTER` | `gardenPlanter()` | `cherry_planter` | `potted_cherry_sapling` |
+| `GARDEN_LANTERN` | `gardenLantern()` | `stone_lantern` | `lantern[hanging=false]` |
+
+- `state(role, facing)`: `facing` es el frente (escritorio, placa), el borde (barandilla) o el eje
+  (viga; `UP`/`DOWN` = vertical). Los demás roles lo ignoran. Puro: mismos argumentos, mismo estado.
+- `plaqueData(DyeColor, String...)`: datos de block entity de la placa (o del letrero, en vanilla),
+  hasta 4 líneas; la primera en el color del entorno.
+- `custom()` (false en vanilla) e `id()`/`HqKit.fingerprint()` (`"vanilla"` o `KitBlocks.ID` =
+  `kit-1`) para los hashes de construcción: el estilo que use el kit debe incluirlo en su hash y
+  subir `KitBlocks.ID` si cambia algún estado.
+- Forma: cada rol tiene la misma "clase" que su fallback donde importa al caminar (suelos y paneles
+  son cubos enteros; escritorio, barandilla, farol y jardín no son de paso en ninguno de los dos).
+
+### La placa: texto cacheado por versión
+
+`PlaqueText` (puro) guarda las líneas normalizadas (recortadas a 17 caracteres, máx. 4, sin vacías al
+final) y el color de acento (los tintes demasiado oscuros se aclaran para leerse sobre la tinta). Cada
+cambio real toma una **versión nueva de un contador global**, así que dos placas nunca comparten
+versión (ni una placa reemplazada en la misma posición). `PlaqueRenderer` guarda los glyph runs y
+anchos en un `VersionedCache` por posición: con el mismo texto, cero reconstrucciones por frame.
+Datos: `{"line0": …, "line3": …, "color": 0xRRGGBB}`.
+
+**Sustituye a los letreros de los módulos**: con el módulo encendido, `HqBlockFixtures` (ahora
+`blocks-3`) convierte cada letrero de pared con texto del plan en una placa con las mismas líneas y el
+color del tinte (letrero de cada módulo: proyecto, `#n`, entorno; y la cabecera "Needs attention" del
+tablero). Los letreros que son **anclas** (cabecera del archivo y "older threads", que es un objetivo
+de click) siguen siendo letreros vanilla. Con `HqFixtures` de tests sin `plaque` (método por defecto
+null) los letreros no cambian.
+
+### Tests
+
+`ModBlockStatesTest` (registro real: todos los bloques del kit, ítems y todos sus estados en todas las
+rotaciones pasan por el parser del sitio; roles del kit = bloques t3craft; letreros → placas salvo
+anclas), `HqKitTest` (cada rol tiene fallback vanilla que parsea, orientación, placa vanilla
+encerada), `PlaqueTextTest` (versión solo con cambios, global, recorte, contraste, claves),
+`VersionedCacheTest` (una reconstrucción por versión) y `KitResourcesTest` (lang en_us/es_es/es_mx,
+blockstates → modelos → texturas propias `kit_*`, ítems y loot tables).
+
+### Pendiente
+
+- **No se probó dentro del juego**: revisar a ojo los modelos (sobre todo la orientación del
+  escritorio y la barandilla), el tamaño del texto de la placa y el brillo del farol vinculado.
+- El estilo C (`feat/hq-style-cherry`) es quien usa `HqKit`; esta rama no toca `HqGenerator` ni
+  `Palette` (salvo los letreros → placas vía fixtures).
+
 ## Cambios estructurales → **RESTART**
 
-- Bloques: `t3craft:monitor`, `t3craft:status_lamp`, `t3craft:board_lamp`.
+- Bloques: `t3craft:monitor`, `t3craft:status_lamp`, `t3craft:board_lamp` y el kit del HQ
+  (`standing_desk`, `shoji_panel`, `cherry_floor_tile`, `stone_floor_tile`, `cherry_beam`, `beam_cap`,
+  `paper_lantern`, `room_plaque`, `cherry_railing`, `cherry_planter`, `stone_lantern`).
 - Block entities: `t3craft:monitor`, `t3craft:status_lamp` (lámpara y bombilla).
 - Ítems de bloque: `t3craft:monitor`, `t3craft:status_lamp`, `t3craft:board_lamp` (pestaña Functional
   blocks).
-- Renderer: `MonitorRenderer` para `t3craft:monitor`.
+- Renderer: `MonitorRenderer` para `t3craft:monitor`; `PlaqueRenderer` para `t3craft:room_plaque`
+  (block entity nuevo `t3craft:room_plaque`; el farol usa el tipo `t3craft:status_lamp`).
 - Entrypoints nuevos: `main` `dev.t3craft.blocks.BlocksInit`, `client`
   `dev.t3craft.client.blocks.BlocksClient`.
 - Tick de cliente (`GuardedEvents`, módulo `blocks`), `CLIENT_STOPPING`, `DevReload`

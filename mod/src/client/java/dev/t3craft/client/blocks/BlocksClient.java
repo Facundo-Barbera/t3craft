@@ -114,6 +114,7 @@ public final class BlocksClient implements ClientModInitializer {
 	private @Nullable MonitorRenderer renderer;
 	private @Nullable ThreadBoardRenderer wallRenderer;
 	private @Nullable ThreadWalls walls;
+	private @Nullable PlaqueRenderer plaqueRenderer;
 	private volatile @Nullable Map<Long, Binding> positional;
 	private volatile @Nullable Map<String, LampStatus> lastWanted;
 	private volatile @Nullable Supplier<@Nullable Map<Long, Binding>> hqBindings;
@@ -161,6 +162,11 @@ public final class BlocksClient implements ClientModInitializer {
 			var h = tw.hitAt(hit.getBlockPos(), hit.getDirection(), hit.getLocation());
 			// FAIL on the client: consumed, no packet to the server, so neither the block nor the held item acts
 			return h != null && openThread(h.key()) ? InteractionResult.FAIL : InteractionResult.PASS;
+		});
+		BlockEntityRendererRegistry.register(c.kit().plaqueType(), ctx -> {
+			PlaqueRenderer r = new PlaqueRenderer();
+			plaqueRenderer = r;
+			return r;
 		});
 		MonitorBlock.setClientUse(this::use);
 		ClientTickEvents.END_CLIENT_TICK.register(GuardedEvents.endClientTick(MODULE, this::tick));
@@ -427,6 +433,10 @@ public final class BlocksClient implements ClientModInitializer {
 		ThreadBoardRenderer wr = wallRenderer;
 		if (wr != null) {
 			wr.clear();
+		}
+		PlaqueRenderer pr = plaqueRenderer;
+		if (pr != null) {
+			pr.clear();
 		}
 	}
 
