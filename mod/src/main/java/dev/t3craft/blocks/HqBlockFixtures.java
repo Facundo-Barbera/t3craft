@@ -26,7 +26,8 @@ import org.jspecify.annotations.Nullable;
  * module's blocks, cell for cell, as listed by {@link HqBindings}: computers → monitors (facing the
  * chair or the aisle), desk bulbs → status lamps, board bulbs → board lamps, the hub lantern's cap
  * → the beacon (a status lamp bound {@code beacon}), the archive terminal's lectern → the archive
- * terminal, the plan's large-screen cells → monitors, and wall signs with text (module signs, the
+ * terminal, the plan's large-screen cells → monitors, the plan's {@code thread_wall} anchor cell (if
+ * any) → the thread wall anchor with its size as data, and wall signs with text (module signs, the
  * board's header) → room plaques ({@link #plaque}). Monitors get the connection flags
  * {@link MonitorWall} gives them over the plan's monitor cells (the same rule the world applies, so a
  * built screen is already merged). Each gets its binding as
@@ -47,6 +48,11 @@ public final class HqBlockFixtures implements HqFixtures {
 		BlockState lamp();
 
 		BlockState boardLamp();
+
+		/** The thread wall anchor facing {@code facing}; null = leave the plan's block (stand-ins). */
+		default @Nullable BlockState threadBoard(Direction facing) {
+			return null;
+		}
 
 		/** The archive terminal, screen facing {@code facing} (default: the vanilla lectern stand-in). */
 		default BlockState archiveTerminal(Direction facing) {
@@ -85,12 +91,17 @@ public final class HqBlockFixtures implements HqFixtures {
 		for (HqBindings.Fixture f : HqBindings.of(plan)) {
 			fixtures.put(f.rel(), f);
 		}
+		HqBindings.ThreadWall wall = HqBindings.threadWall(plan);
+		BlockState wallState = wall == null ? null : states.threadBoard(wall.facing());
 		Map<BlockPos, ScreenRect> screens = screens(fixtures);
 		Set<BlockPos> anchored = new HashSet<>();
 		for (Anchor a : plan.anchors().values()) {
 			anchored.add(a.block());
 		}
 		return plan.replacing(p -> {
+			if (wallState != null && p.rel().equals(wall.rel())) {
+				return new Placement(p.rel(), wallState, wallData(wall));
+			}
 			HqBindings.Fixture f = fixtures.get(p.rel());
 			if (f == null) {
 				Placement plaque = anchored.contains(p.rel()) ? null : plaque(p);
@@ -107,6 +118,16 @@ public final class HqBlockFixtures implements HqFixtures {
 			};
 			return new Placement(p.rel(), s, data(f.binding()));
 		});
+	}
+
+	/** Block entity data of the thread wall anchor: its size when the plan gives one (else the config's). */
+	static CompoundTag wallData(HqBindings.ThreadWall w) {
+		CompoundTag t = new CompoundTag();
+		if (w.width() > 0 && w.height() > 0) {
+			t.putInt(ThreadBoardBlockEntity.WIDTH, w.width());
+			t.putInt(ThreadBoardBlockEntity.HEIGHT, w.height());
+		}
+		return t;
 	}
 
 	/** The screen of every monitor fixture, by the world's rule ({@link MonitorWall}) over the plan's monitor cells. */

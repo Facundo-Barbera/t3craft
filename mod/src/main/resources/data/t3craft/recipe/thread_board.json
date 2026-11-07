@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": [
+    "PPP",
+    "PMP",
+    "PPP"
+  ],
+  "key": {
+    "P": "#minecraft:planks",
+    "M": "t3craft:monitor"
+  },
+  "result": {
+    "id": "t3craft:thread_board"
+  }
+}
