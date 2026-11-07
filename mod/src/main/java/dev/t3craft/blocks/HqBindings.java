@@ -23,7 +23,8 @@ import net.minecraft.core.Direction;
  *   <li>each desk: {@code computerPos} → monitor facing the chair, {@code lampPos} → status lamp; both
  *       bound to {@code thread:<threadId>} (the HQ's thread id is the NPC key) or unbound when vacant;</li>
  *   <li>{@code board_lamp_<i>} anchors → board bulb {@code board:<i>};</li>
- *   <li>{@code archive_<threadId>} anchors → monitor facing the aisle, bound to that settled thread.</li>
+ *   <li>{@code archive_<threadId>} anchors → monitor facing the aisle, bound to that settled thread;</li>
+ *   <li>the {@code beacon} anchor (the hub lantern's cap) → status lamp bound {@code beacon}.</li>
  * </ul>
  *
  * Used twice with the same result: {@link HqBlockFixtures} writes it into the plan as block entity
@@ -32,7 +33,7 @@ import net.minecraft.core.Direction;
  */
 public final class HqBindings {
 	public enum Role {
-		MONITOR, LAMP, BOARD_LAMP
+		MONITOR, LAMP, BOARD_LAMP, BEACON
 	}
 
 	/** One fixture cell, relative to the HQ origin. {@code facing}: where the screen looks (monitors). */
@@ -65,6 +66,10 @@ public final class HqBindings {
 			if (n.startsWith(archive) && n.length() > archive.length()) {
 				out.putIfAbsent(a.block(), new Fixture(a.block(), Role.MONITOR, Binding.thread(n.substring(archive.length())), a.facing()));
 			}
+		}
+		Anchor beacon = plan.anchors().get(AnchorNames.BEACON);
+		if (beacon != null) {
+			out.putIfAbsent(beacon.block(), new Fixture(beacon.block(), Role.BEACON, Binding.BEACON, beacon.facing()));
 		}
 		return List.copyOf(out.values());
 	}

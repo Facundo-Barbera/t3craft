@@ -8,16 +8,20 @@ import org.jspecify.annotations.Nullable;
  *   <li>{@code thread:<npcKey>}: one thread; {@code npcKey} is the NPC id, {@code <envId>:<threadId>}
  *       in direct mode (the same key the HQ plan, {@code NpcRegistry} and the workstations use);</li>
  *   <li>{@code board:<i>}: bulb {@code i} of the "needs attention" board (the i-th most urgent thread);</li>
+ *   <li>{@code beacon}: the hub lantern's beacon, the whole HQ's aggregate state;</li>
  *   <li>empty: unbound (a block placed by hand, a vacant desk). The position source may still bind it.</li>
  * </ul>
  * Anything else parses as {@link #NONE}. Pure.
  */
 public record Binding(Kind kind, String value) {
 	public enum Kind {
-		NONE, THREAD, BOARD
+		NONE, THREAD, BOARD, BEACON
 	}
 
 	public static final Binding NONE = new Binding(Kind.NONE, "");
+	private static final String BEACON_WIRE = "beacon";
+	/** The hub beacon (adapted from AgentCraft's {@code beacon} binding of the cupola lamps). */
+	public static final Binding BEACON = new Binding(Kind.BEACON, BEACON_WIRE);
 	private static final String THREAD = "thread:";
 	private static final String BOARD = "board:";
 
@@ -41,6 +45,9 @@ public record Binding(Kind kind, String value) {
 		if (s == null || s.isEmpty()) {
 			return NONE;
 		}
+		if (s.equals(BEACON_WIRE)) {
+			return BEACON;
+		}
 		if (s.startsWith(THREAD)) {
 			return thread(s.substring(THREAD.length()));
 		}
@@ -60,6 +67,7 @@ public record Binding(Kind kind, String value) {
 			case NONE -> "";
 			case THREAD -> THREAD + value;
 			case BOARD -> BOARD + value;
+			case BEACON -> BEACON_WIRE;
 		};
 	}
 

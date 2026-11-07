@@ -57,4 +57,14 @@ class BindingTest {
 		assertTrue(LampStatus.ERROR.urgency() > LampStatus.ATTENTION.urgency());
 		assertTrue(LampStatus.ATTENTION.urgency() > LampStatus.WORKING.urgency());
 	}
+
+	@Test
+	void beaconBinding() {
+		assertEquals(Binding.BEACON, Binding.parse("beacon"));
+		assertEquals("beacon", Binding.BEACON.wire());
+		assertEquals(Binding.Kind.BEACON, Binding.BEACON.kind());
+		assertEquals(Binding.NONE, Binding.parse("beacons"), "only the exact word");
+		assertEquals(LampStatus.ERROR, LampApplier.want(Map.of("beacon", LampStatus.ERROR), Binding.BEACON));
+		assertEquals(LampStatus.OFF, LampApplier.want(Map.of(), Binding.BEACON));
+	}
 }

@@ -20,6 +20,12 @@ public final class AnchorNames {
 	/** Centre of the hub floor. */
 	public static final String HUB = "hub";
 	/**
+	 * The centre block of the hub lantern's cap (on top of the glazed light well, under the lightning
+	 * rod): the HQ's aggregate beacon, seen from outside. Plain copper in the vanilla HQ; the blocks
+	 * module puts a status lamp bound {@code beacon} there.
+	 */
+	public static final String BEACON = "beacon";
+	/**
 	 * Prefix of the standing spots in front of the board ({@code board_slot_0..}), nearest to the
 	 * board centre first, facing the board. NPCs that need attention gather here.
 	 */
