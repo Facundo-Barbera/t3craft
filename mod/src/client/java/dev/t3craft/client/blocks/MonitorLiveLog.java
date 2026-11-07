@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -82,7 +83,7 @@ final class MonitorLiveLog implements AutoCloseable {
 	}
 
 	/** One round (every {@value #EVERY_TICKS} ticks): measure, decide, open/close feeds. */
-	void tick(Minecraft mc, BiFunction<BlockPos, String, Binding> resolve) {
+	void tick(Minecraft mc, BiFunction<BlockPos, String, Binding> resolve, Function<MonitorBlockEntity, ScreenExtent> extents) {
 		if (++ticks % EVERY_TICKS != 0) {
 			return;
 		}
@@ -101,10 +102,14 @@ final class MonitorLiveLog implements AutoCloseable {
 		loaded.values().removeIf(m -> m.isRemoved() || m.getLevel() != level);
 		for (MonitorBlockEntity m : loaded.values()) {
 			BlockPos pos = m.getBlockPos();
+			ScreenExtent extent = extents.apply(m);
+			if (!extent.origin()) {
+				continue; // a panel is measured (and subscribed) once, through its origin block
+			}
 			Binding b = resolve.apply(pos, m.binding());
 			String key = b.kind() == Binding.Kind.THREAD ? b.value() : null;
 			Direction facing = m.getBlockState().hasProperty(MonitorBlock.FACING) ? m.getBlockState().getValue(MonitorBlock.FACING) : Direction.NORTH;
-			Vec3 face = MonitorRenderer.faceCenter(pos, facing);
+			Vec3 face = MonitorRenderer.screenCenter(pos, facing, extent);
 			double d = face.distanceTo(eye);
 			boolean visible = key != null && d <= keep && visible(level, eye, f, half, face, facing, pos, d, mc);
 			obs.add(new MonitorVisibility.Observation(pos.asLong(), key, d, visible));

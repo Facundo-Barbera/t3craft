@@ -201,10 +201,15 @@ juego; se atacaron todas las causas plausibles del renderer viejo):
 - Legibilidad: densidad 128 px/bloque de cerca (antes 160: letras de 0,05 bloque), nivel FAR con
   texto grande, fondo casi negro con texto claro, todo full-bright.
 
-**Para P1 (multibloque)**: todo el layout sale de `ScreenExtent` (ancho × alto en bloques):
-`MonitorLod.layout(level, extent)`, `nearLimit`, densidad 128/96 según el lado menor, y el renderer
-ya traslada hacia arriba `(alto − 1)` bloques desde el bloque de origen. P1 solo tiene que devolver
-el extent del panel en `MonitorRenderer.extent(be)` y no dibujar en los bloques que no son origen.
+**Interfaz con P1 (multibloque)**: `ScreenExtent(width, height, origin)` + `ScreenExtent.Provider`
+(`MonitorBlockEntity → ScreenExtent`, null = 1×1). P1 lo instala con
+`BlocksClient.get().setScreenExtents(provider)`. Contrato: el **origen es el bloque inferior izquierdo
+visto de frente**; el renderer dibuja desde su cara hacia la derecha y hacia arriba
+`width × height` bloques con el mismo facing. Los bloques `ScreenExtent.member(w, h)` no dibujan, y
+solo el origen se mide para la visibilidad (desde el centro de la pantalla, `screenCenter`) y se
+suscribe, con el binding del origen. Todo el layout sale del extent: `MonitorLod.layout(level, extent)`,
+`nearLimit` (escala con el lado menor) y densidad 128/96 px por bloque. P1 se encarga de los block
+states conectados, los modelos de bisel y el cálculo del extent.
 
 ## Lámparas
 

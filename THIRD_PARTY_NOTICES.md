@@ -63,6 +63,15 @@ Files adapted from AgentCraft (MIT; the `npc/behavior` files come from AgentCraf
   (`FLAGS`: clients updated, no neighbour/shape updates, no drops, no block-entity side effects,
   no `onPlace`) is taken from AgentCraft `mod/src/main/java/dev/agentcraft/hq/Plan.java`
   (commit `8fe3ad23489b06f9142c6382bc23d31090c6b406`).
+- `mod/src/client/java/dev/t3craft/client/hologram/HologramModel.java`, `HologramLayout.java` and
+  `HologramRenderer.java` ← `mod/src/client/java/dev/agentcraft/client/hq/StatusLampRenderer.java`
+  (`extractHologram`, `beam`, `card`, `HOLO_Y`) at commit `8fe3ad23489b06f9142c6382bc23d31090c6b406`
+  (design: a floating card about 3.5 blocks over the floor with a progress ring captioned
+  "done/total" that follows the done count, "n working · n need you" counts, an "offline · last
+  known state" line and a soft beam from the floor to the card, rebuilt only on change; rewritten
+  over T3 thread states of every environment with one ring per environment or project and the most
+  urgent thread, as client-only display entities instead of a block entity renderer, no sprites or
+  textures copied).
 
 Design ideas only (no code copied), from AgentCraft `hq/Plan.java` and `hq/PlanStore.java`:
 apply a build as a diff of a whole box, persist the applied plan in the world folder (palette +
@@ -102,6 +111,20 @@ Monitor live log (branch `feat/monitor-live-log`, AgentCraft commit `8fe3ad2`, s
 - `mod/src/client/java/dev/t3craft/client/blocks/MonitorVisibility.java` ← the idea of
   `monitor/MonitorFeature.java`'s sweep of screens unused for 30 s (new implementation: distance and
   view with hysteresis, one subscription per thread).
+
+Files adapted from AgentCraft (commit `8fe3ad2`, MIT), branch `feat/lamps-breathe`:
+
+- `mod/src/client/java/dev/t3craft/client/blocks/LampRenderer.java` ← `client/hq/StatusLampRenderer.java`
+  (`breathe`, `beacon` and `beam`: additive lightning-type quads over the lens with alpha gradients,
+  crossed upward-fading beam planes).
+- `mod/src/client/java/dev/t3craft/client/blocks/LampGlow.java` ← `client/hq/StatusLampRenderer.java` and
+  `client/hq/HqClientFeature.java` (sine-breathing glow, motes only on lamps that wait on the player;
+  t3craft's own per-state curves).
+- `mod/src/client/java/dev/t3craft/client/blocks/HubBeacon.java` and `LampSignals.beacon` ←
+  `client/hq/HqWorldDriver.java` (`BEACON_BINDING`, `beaconLamp`: the aggregate state, most urgent
+  first); the client-only display fallback is t3craft's own.
+- Motes in `client/blocks/BlocksClient.java` ← `client/hq/HqClientFeature.java` (`motes`: dust rising in
+  front of an exposed face).
 
 The lamp driver (`dev.t3craft.blocks.LampApplier` + `client.blocks.BlocksClient`: the client computes
 lamp states and the integrated server applies them) follows the idea of AgentCraft's

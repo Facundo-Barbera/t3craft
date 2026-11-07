@@ -27,7 +27,8 @@ import org.jspecify.annotations.Nullable;
  *   <li>each module: the lintel over its doorway (the inner wall's beam, one block in from the
  *       {@code module@<i>} anchor, three up) → board bulb {@code module:<threads at its desks>}, the
  *       module's most urgent thread; unbound (off) while the module has nobody;</li>
- *   <li>{@code archive_<threadId>} anchors → monitor facing the aisle, bound to that settled thread.</li>
+ *   <li>{@code archive_<threadId>} anchors → monitor facing the aisle, bound to that settled thread;</li>
+ *   <li>the {@code beacon} anchor (the hub lantern's cap) → status lamp bound {@code beacon}.</li>
  * </ul>
  *
  * Used twice with the same result: {@link HqBlockFixtures} writes it into the plan as block entity
@@ -36,7 +37,7 @@ import org.jspecify.annotations.Nullable;
  */
 public final class HqBindings {
 	public enum Role {
-		MONITOR, LAMP, BOARD_LAMP
+		MONITOR, LAMP, BOARD_LAMP, BEACON
 	}
 
 	/** One fixture cell, relative to the HQ origin. {@code facing}: where the screen looks (monitors). */
@@ -79,6 +80,10 @@ public final class HqBindings {
 			if (n.startsWith(archive) && n.length() > archive.length()) {
 				out.putIfAbsent(a.block(), new Fixture(a.block(), Role.MONITOR, Binding.thread(n.substring(archive.length())), a.facing()));
 			}
+		}
+		Anchor beacon = plan.anchors().get(AnchorNames.BEACON);
+		if (beacon != null) {
+			out.putIfAbsent(beacon.block(), new Fixture(beacon.block(), Role.BEACON, Binding.BEACON, beacon.facing()));
 		}
 		return List.copyOf(out.values());
 	}

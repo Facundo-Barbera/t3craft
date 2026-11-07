@@ -29,6 +29,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
+import java.util.Random;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
@@ -41,6 +42,8 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.level.ServerLevel;
@@ -49,8 +52,8 @@ import net.minecraft.world.phys.HitResult;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Client side of the blocks module (own {@code client} entrypoint). Does <b>nothing</b> when
- * {@link T3Blocks#active()} is false: no renderer, no tick, no hook; the workstations keep their own
+ * Client side of the blocks module (own {@code client} entrypoint). Does <b>nothing</b> block-related when
+ * {@link T3Blocks#active()} is false: no renderer, no lamp tick, no hook (only {@link HubBeacon}'s client-only glow); the workstations keep their own
  * screens and the HQ its vanilla blocks.
  *
  * <p>When active, once per tick it reads the threads the client already has ({@code NpcRegistry},
@@ -62,7 +65,10 @@ import org.jspecify.annotations.Nullable;
  *       them to the integrated server ({@link LampApplier}) when they change, plus a resync every
  *       {@value #RESYNC_TICKS} ticks for lamps that were just placed or loaded.</li>
  * </ul>
- * Using a monitor opens its thread through the workstations' {@link ThreadOpener}.
+ * Lamps get {@link LampRenderer} (breathing glow, the hub beacon) and motes; {@link HubBeacon} runs
+ * even with the module off (client-only glow over the hub lantern).
+ *
+ * <p>Using a monitor opens its thread through the workstations' {@link ThreadOpener}.
  *
  * <p>Live log ({@link MonitorLiveLog}): monitors close to the player and in view hold a read-only
  * share of their thread's stream ({@link MonitorVisibility} decides, with hysteresis; one stream per
@@ -82,10 +88,21 @@ public final class BlocksClient implements ClientModInitializer {
 
 	private static @Nullable BlocksClient instance;
 
+	private static final int MOTE_TTL_TICKS = 40;
+	private static final float MOTE_CHANCE = 0.15f;
+
+	/** A lamp the renderer drew recently (motes only rise from lamps in view). */
+	private record Seen(Binding.Kind kind, LampStatus status, int tick) {
+	}
+
+	private final HubBeacon beacon = new HubBeacon();
+	private final Map<Long, Seen> seenLamps = new HashMap<>();
+	private final Random random = new Random();
 	private final MonitorScreens screens = new MonitorScreens();
 	private final Map<String, WorkstationThread> threads = new HashMap<>();
 	private final ThreadOpener fallbackOpener = new ChatScreenOpener();
 	private volatile MonitorSettings monitorSettings = MonitorSettings.DEFAULT;
+	private volatile ScreenExtent.@Nullable Provider extents;
 	private final MonitorLiveLog liveLog = new MonitorLiveLog(MonitorSettings.DEFAULT);
 	private @Nullable MonitorRenderer renderer;
 	private volatile @Nullable Map<Long, Binding> positional;
@@ -103,6 +120,10 @@ public final class BlocksClient implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
+		// the hub beacon: the lamp's BER when the module put it in the lantern, a client-only glow otherwise
+		ClientTickEvents.END_CLIENT_TICK.register(GuardedEvents.endClientTick(MODULE + ".beacon", beacon::tick));
+		ClientLifecycleEvents.CLIENT_STOPPING.register(mc -> beacon.clear(mc.level));
+		DevReload.get().register("t3craft.blocks.beacon", reason -> beacon.clear(Minecraft.getInstance().level));
 		T3Blocks.Content c = T3Blocks.content();
 		if (c == null) {
 			T3Craft.LOGGER.info("T3Craft blocks module off ({}): no block renderers, workstations keep their own screens",
@@ -116,6 +137,7 @@ public final class BlocksClient implements ClientModInitializer {
 			renderer = r;
 			return r;
 		});
+		BlockEntityRendererRegistry.register(c.lampType(), ctx -> new LampRenderer(this));
 		MonitorBlock.setClientUse(this::use);
 		ClientTickEvents.END_CLIENT_TICK.register(GuardedEvents.endClientTick(MODULE, this::tick));
 		ClientBlockEntityEvents.BLOCK_ENTITY_LOAD.register((be, level) -> liveLog.onLoad(be));
@@ -161,6 +183,32 @@ public final class BlocksClient implements ClientModInitializer {
 		return screens;
 	}
 
+	/**
+	 * Integration point for connected (multi-block) monitors: {@code provider} tells the renderer
+	 * which screen each monitor block belongs to ({@link ScreenExtent}: size in blocks and whether
+	 * this block is the origin that draws it). Null = every monitor is a 1×1 screen. Client thread.
+	 */
+	public void setScreenExtents(ScreenExtent.@Nullable Provider provider) {
+		extents = provider;
+		MonitorRenderer r = renderer;
+		if (r != null) {
+			r.clear();
+		}
+	}
+
+	ScreenExtent extentOf(dev.t3craft.blocks.MonitorBlockEntity be) {
+		ScreenExtent.Provider p = extents;
+		if (p == null) {
+			return ScreenExtent.ONE;
+		}
+		try {
+			ScreenExtent e = p.extent(be);
+			return e == null ? ScreenExtent.ONE : e;
+		} catch (RuntimeException ex) {
+			return ScreenExtent.ONE;
+		}
+	}
+
 	MonitorSettings monitorSettings() {
 		return monitorSettings;
 	}
@@ -184,6 +232,39 @@ public final class BlocksClient implements ClientModInitializer {
 	Binding resolve(BlockPos pos, String own) {
 		Map<Long, Binding> p = positional;
 		return Binding.resolve(own, p == null ? null : p.get(pos.asLong()));
+	}
+
+	/** Render thread (= client thread): {@link LampRenderer} reports each lamp it draws. */
+	void sawLamp(BlockPos pos, Binding.Kind kind, LampStatus status) {
+		seenLamps.put(pos.asLong(), new Seen(kind, status, ticks));
+	}
+
+	/** Motes in the lamp's colour from seen lamps that ask for the player ({@link LampGlow#motes}). */
+	private void motes(Minecraft mc) {
+		if (seenLamps.isEmpty() || mc.level == null || mc.isPaused()) {
+			return;
+		}
+		var it = seenLamps.entrySet().iterator();
+		while (it.hasNext()) {
+			var e = it.next();
+			Seen s = e.getValue();
+			if (ticks - s.tick() > MOTE_TTL_TICKS) {
+				it.remove();
+				continue;
+			}
+			if (!LampGlow.motes(s.kind(), s.status()) || random.nextFloat() >= MOTE_CHANCE) {
+				continue;
+			}
+			BlockPos p = BlockPos.of(e.getKey());
+			Direction d = s.kind() == Binding.Kind.BEACON ? Direction.UP : Direction.from2DDataValue(random.nextInt(4));
+			if (!mc.level.getBlockState(p.relative(d)).isAir()) {
+				continue;
+			}
+			double x = p.getX() + 0.5 + d.getStepX() * 0.62 + (d.getStepX() == 0 ? (random.nextDouble() - 0.5) * 0.7 : 0);
+			double y = p.getY() + (d == Direction.UP ? 1.1 : 0.15 + random.nextDouble() * 0.7);
+			double z = p.getZ() + 0.5 + d.getStepZ() * 0.62 + (d.getStepZ() == 0 ? (random.nextDouble() - 0.5) * 0.7 : 0);
+			mc.level.addParticle(new DustParticleOptions(s.status().color, 0.6f), x, y, z, 0, 0.015, 0);
+		}
 	}
 
 	// ---- tick ---------------------------------------------------------------------------------
@@ -214,7 +295,8 @@ public final class BlocksClient implements ClientModInitializer {
 			threads.put(t.key(), t);
 		}
 		screens.tick(list, System.currentTimeMillis());
-		liveLog.tick(mc, this::resolve);
+		liveLog.tick(mc, this::resolve, this::extentOf);
+		motes(mc);
 
 		IntegratedServer server = mc.getSingleplayerServer();
 		if (server == null) {
@@ -292,6 +374,7 @@ public final class BlocksClient implements ClientModInitializer {
 	private void reset() {
 		screens.clear();
 		threads.clear();
+		seenLamps.clear();
 		lastWanted = null;
 		lastHq = null;
 		liveLog.clearTracking();

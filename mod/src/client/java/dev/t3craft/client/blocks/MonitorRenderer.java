@@ -99,9 +99,9 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 		this.client = client;
 	}
 
-	/** Size of the screen this block draws (P1 returns the connected panel's extent here). */
+	/** The screen this block belongs to ({@link BlocksClient#setScreenExtents}; 1×1 by default). */
 	ScreenExtent extent(MonitorBlockEntity be) {
-		return ScreenExtent.ONE;
+		return client.extentOf(be);
 	}
 
 	@Override
@@ -133,7 +133,10 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 		BlockState bs = be.getBlockState();
 		state.facing = bs.hasProperty(MonitorBlock.FACING) ? bs.getValue(MonitorBlock.FACING) : Direction.NORTH;
 		ScreenExtent extent = extent(be);
-		double distance = faceCenter(be.getBlockPos(), state.facing).distanceTo(cameraPosition);
+		if (!extent.origin()) {
+			return; // a panel member: the origin block draws the whole screen
+		}
+		double distance = screenCenter(be.getBlockPos(), state.facing, extent).distanceTo(cameraPosition);
 		long posKey = be.getBlockPos().asLong();
 		if (lods.size() > MAX_LODS) {
 			lods.clear();
@@ -390,6 +393,16 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 	/** Centre of the screen face of the block at {@code pos} facing {@code facing} (world space). */
 	static Vec3 faceCenter(BlockPos pos, Direction facing) {
 		return Vec3.atCenterOf(pos).add(facing.getStepX() * 0.5, 0, facing.getStepZ() * 0.5);
+	}
+
+	/**
+	 * Centre of a {@code extent} screen whose origin (bottom-left as the viewer faces it) is
+	 * {@code pos}: the viewer's right is the facing turned clockwise.
+	 */
+	static Vec3 screenCenter(BlockPos pos, Direction facing, ScreenExtent extent) {
+		Direction right = facing.getCounterClockWise();
+		return faceCenter(pos, facing).add(right.getStepX() * (extent.width() - 1) / 2.0, (extent.height() - 1) / 2.0,
+				right.getStepZ() * (extent.width() - 1) / 2.0);
 	}
 
 	/** Forget cached glyph runs and levels (hot-swap, level change). */

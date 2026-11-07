@@ -68,6 +68,22 @@ class LampSignalsTest {
 		}
 		assertEquals(LampStatus.WORKING, ref.get("thread:vps:t2"));
 		assertEquals(LampStatus.ERROR, ref.get("board:0"));
-		assertEquals(LampSignals.BOARD_BULBS + ts.size(), ref.size());
+		assertEquals(LampSignals.BOARD_BULBS + ts.size() + 1, ref.size(), "threads, bulbs and the beacon");
+	}
+
+	@Test
+	void beaconPriority() {
+		assertEquals(LampStatus.IDLE, LampSignals.beacon(List.of()), "an empty HQ idles");
+		assertEquals(LampStatus.IDLE, LampSignals.beacon(List.of(t("a", StationStatus.DONE), t("b", StationStatus.IDLE), t("c", StationStatus.ARCHIVED))));
+		assertEquals(LampStatus.WORKING, LampSignals.beacon(List.of(t("a", StationStatus.DONE), t("b", StationStatus.WORKING))));
+		assertEquals(LampStatus.ERROR, LampSignals.beacon(List.of(t("a", StationStatus.WORKING), t("b", StationStatus.ERROR))));
+		List<WorkstationThread> all = new ArrayList<>(List.of(t("a", StationStatus.WORKING), t("b", StationStatus.ERROR),
+				t("c", StationStatus.ATTENTION), t("d", StationStatus.IDLE)));
+		for (long seed = 0; seed < 5; seed++) {
+			Collections.shuffle(all, new Random(seed));
+			assertEquals(LampStatus.ATTENTION, LampSignals.beacon(all), "needs you beats error, in any order");
+		}
+		assertEquals(LampStatus.ATTENTION, LampSignals.wanted(all).get("beacon"), "the beacon is in the wanted map");
+		assertEquals(LampStatus.IDLE, LampSignals.wanted(List.of()).get("beacon"));
 	}
 }
