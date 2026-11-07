@@ -57,6 +57,10 @@ public final class NpcRegistry {
 	private final Map<String, Spawned> spawned = new LinkedHashMap<>();
 	private final Map<String, Display.TextDisplay> signs = new LinkedHashMap<>();
 	private final Map<Integer, String> npcByEntityId = new HashMap<>();
+	/** Near-panel text per NPC (compact mode shows it only when {@link NpcLabels.Visibility} says so). */
+	private final Map<String, Component> panelText = new HashMap<>();
+	private final Map<String, NpcLabels.Visibility> detail = new HashMap<>();
+	private boolean compactLabels = LabelConfig.DEFAULTS.compact();
 	/** Walking, desks, board, bubbles (feat/npc-behavior). Owns its own entities; reset with ours. */
 	private final BehaviorDirector behavior = new BehaviorDirector();
 	/**
@@ -126,6 +130,16 @@ public final class NpcRegistry {
 	 */
 	public void setPanelExtra(java.util.function.@Nullable Function<String, @Nullable Component> extra) {
 		this.panelExtra = extra == null ? id -> null : extra;
+	}
+
+	/** Left-click on an NPC: toggle its detail panel (compact labels). */
+	public void toggleDetail(String npcId) {
+		detail.computeIfAbsent(npcId, k -> new NpcLabels.Visibility()).toggle();
+	}
+
+	/** Open an NPC's detail panel for a while (e.g. when its chat is opened). */
+	public void revealDetail(String npcId) {
+		detail.computeIfAbsent(npcId, k -> new NpcLabels.Visibility()).reveal();
 	}
 
 	/**
@@ -263,6 +277,7 @@ public final class NpcRegistry {
 			spawned.clear();
 			signs.clear();
 			npcByEntityId.clear();
+			panelText.clear();
 			behavior.reset(lvl);
 			if (lvl != null) {
 				List<Integer> ours = new ArrayList<>();
@@ -286,6 +301,8 @@ public final class NpcRegistry {
 			spawned.clear();
 			signs.clear();
 			npcByEntityId.clear();
+			panelText.clear();
+			detail.clear();
 			behavior.reset(null);
 			level = lvl;
 			anchor = null;
@@ -305,6 +322,7 @@ public final class NpcRegistry {
 			}
 		}
 		tick++;
+		updatePanels(mc);
 		List<BehaviorDirector.Body> bodies = new ArrayList<>(spawned.size());
 		for (Map.Entry<String, Spawned> e : spawned.entrySet()) {
 			ThreadAvatar a = e.getValue().avatar();
@@ -337,6 +355,8 @@ public final class NpcRegistry {
 		spawned.clear();
 		signs.clear();
 		npcByEntityId.clear();
+		panelText.clear();
+		detail.clear();
 		wanted.clear();
 		fallbackLayout().clear();
 	}
@@ -362,6 +382,8 @@ public final class NpcRegistry {
 				behavior.forget(id, lvl);
 				npcByEntityId.remove(s.avatar().getId());
 				npcByEntityId.remove(s.panel().getId());
+				panelText.remove(id);
+				detail.remove(id);
 				lvl.removeEntity(s.avatar().getId(), Entity.RemovalReason.DISCARDED);
 				lvl.removeEntity(s.panel().getId(), Entity.RemovalReason.DISCARDED);
 			}
@@ -414,7 +436,46 @@ public final class NpcRegistry {
 				// Once spawned, the BehaviorDirector moves the avatar and its panel.
 				s.avatar().update(info);
 				Component extra = panelExtra.apply(info.id());
-				setText(s.panel(), extra == null ? Nameplate.info(info) : Nameplate.info(info).copy().append(extra));
+				Component body = compactLabels ? Nameplate.detail(info, ChipsConfig.current()) : Nameplate.info(info);
+				panelText.put(info.id(), extra == null ? body : body.copy().append(extra));
+			}
+		}
+		updatePanels(null);
+	}
+
+	/**
+	 * Applies each panel's text: always on in detailed mode; in compact mode only while the player
+	 * is near, aims at the NPC or clicked it (hysteresis in {@link NpcLabels.Visibility}). With
+	 * {@code mc == null} (from reconcile) only re-applies the current visibility.
+	 */
+	private void updatePanels(@Nullable Minecraft mc) {
+		LabelConfig cfg = LabelConfig.current();
+		if (cfg.compact() != compactLabels) {
+			compactLabels = cfg.compact();
+			dirty = true; // rebuild name tags and panel texts for the new mode
+		}
+		Vec3 eye = mc == null || mc.player == null ? null : mc.player.getEyePosition();
+		Vec3 look = mc == null || mc.player == null ? null : mc.player.getViewVector(1f);
+		for (Map.Entry<String, Spawned> e : spawned.entrySet()) {
+			Display.TextDisplay panel = e.getValue().panel();
+			Component text = panelText.get(e.getKey());
+			boolean show = text != null;
+			if (show && compactLabels) {
+				NpcLabels.Visibility v = detail.computeIfAbsent(e.getKey(), k -> new NpcLabels.Visibility());
+				if (eye != null) {
+					ThreadAvatar a = e.getValue().avatar();
+					double dist = a.position().distanceTo(mc.player.position());
+					double aim = NpcLabels.aimMiss(eye.x, eye.y, eye.z, look.x, look.y, look.z,
+							a.getX(), a.getY() + 1.2, a.getZ(), NpcLabels.AIM_RANGE);
+					show = v.update(dist, aim, cfg.detailDistance());
+				} else {
+					show = v.shown();
+				}
+			}
+			Component want = show ? text : Component.empty();
+			if (!Objects.equals(panel.getText(), want)) {
+				panel.setText(want);
+				panel.setBackgroundColor(show ? 0x60000000 : 0);
 			}
 		}
 	}
@@ -443,7 +504,7 @@ public final class NpcRegistry {
 		avatar.update(info);
 		avatar.snapTo(pos.x, pos.y, pos.z, yaw, 0f);
 		lvl.addEntity(avatar);
-		Display.TextDisplay panel = textDisplay(lvl, 0x60000000);
+		Display.TextDisplay panel = textDisplay(lvl, 0);
 		panel.snapTo(pos.x, pos.y + 2.45, pos.z, 0f, 0f);
 		T3Craft.LOGGER.debug("spawned client-only NPC {} at {}", info.id(), pos);
 		return new Spawned(avatar, panel);

@@ -226,7 +226,9 @@ public final class BehaviorDirector {
 		}
 
 		double dist = p.horizDist(player);
-		double top = at.y + BUBBLE_Y - drop;
+		// Stack above the panel's visible lines (fix/npc-labels) so bubble and panel never cross.
+		int panelLines = b.panel() == null ? 0 : dev.t3craft.client.npc.NpcLabels.lines(b.panel().getText().getString());
+		double top = at.y + dev.t3craft.client.npc.NpcLabels.bubbleBase(PANEL_Y, BUBBLE_Y, LINE_H, panelLines) - drop;
 		if (brain.bubbleWanted(dist)) {
 			if (o.bubble == null || o.bubble.isRemoved()) {
 				o.bubble = textDisplay(lvl, 0xB0101010, 1f);
