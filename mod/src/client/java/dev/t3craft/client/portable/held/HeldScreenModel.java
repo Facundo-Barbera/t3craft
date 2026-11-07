@@ -1,10 +1,10 @@
 package dev.t3craft.client.portable.held;
 
+import dev.t3craft.client.chat.EnvBadge;
 import dev.t3craft.client.portable.PortableEnv;
 import dev.t3craft.client.portable.PortableState;
 import dev.t3craft.client.portable.PortableThread;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Function;
@@ -33,11 +33,8 @@ public final class HeldScreenModel {
 	public static final int AMBER = 0xFFAA00;
 	public static final int RED = 0xFF5555;
 	public static final int GREEN = 0x55FF55;
-	/** Text colour on an environment chip. */
+	/** Text colour on an environment chip (kept for callers; chips now use {@code EnvBadge.foreground()}). */
 	public static final int CHIP_TEXT = 0x101418;
-
-	/** Readable on the dark panel; avoids the state colours' exact hues. */
-	static final int[] PALETTE = {0x5B8DEF, 0xC678DD, 0x2FA3A0, 0xD97757, 0xC9A227, 0x8FA98B, 0xE06C9F, 0x7F8C9A};
 
 	/** Extra px around a span that has a background (1 each side); the rasteriser draws it so. */
 	public static final int CHIP_PAD = 2;
@@ -71,30 +68,6 @@ public final class HeldScreenModel {
 		}
 	}
 
-	/**
-	 * The little environment icon on each row: one letter on a colour chip. Small on purpose so
-	 * round 2 can feed it from feat/chat's environment icon instead.
-	 */
-	public record Badge(String letter, int color) {
-		/**
-		 * Initial of the label's last word ("my-vps" → "V", "mini" → "M"); colour from the config
-		 * ({@code environments.<id>.color}) or a stable palette pick by id.
-		 */
-		public static Badge of(String envId, @Nullable String label, @Nullable Integer configColor) {
-			String src = label == null || label.isBlank() ? envId : label;
-			String letter = "?";
-			String[] words = src.split("[^\\p{L}\\p{N}]+");
-			for (int i = words.length - 1; i >= 0; i--) {
-				if (!words[i].isEmpty()) {
-					letter = words[i].substring(0, words[i].offsetByCodePoints(0, 1)).toUpperCase(Locale.ROOT);
-					break;
-				}
-			}
-			int color = configColor != null ? configColor & 0xFFFFFF : PALETTE[Math.floorMod(envId.hashCode(), PALETTE.length)];
-			return new Badge(letter, color);
-		}
-	}
-
 	@FunctionalInterface
 	public interface Measure {
 		int width(String s);
@@ -105,7 +78,7 @@ public final class HeldScreenModel {
 	 * @param widthPx text area width
 	 * @param maxRows rows that fit, header included
 	 */
-	public record Input(PortableState state, Function<String, Badge> badges, int widthPx, int maxRows, Measure measure) {
+	public record Input(PortableState state, Function<String, EnvBadge> badges, int widthPx, int maxRows, Measure measure) {
 	}
 
 	private HeldScreenModel() {
@@ -118,7 +91,7 @@ public final class HeldScreenModel {
 	 */
 	public static List<PortableThread> order(List<PortableThread> threads) {
 		List<PortableThread> out = new ArrayList<>(threads);
-		out.sort(Comparator.comparingInt(PortableThread::priority).thenComparing(PortableThread::settled));
+		out.sort(PortableState.ORDER);
 		return out;
 	}
 
@@ -139,7 +112,7 @@ public final class HeldScreenModel {
 			case DISCONNECTED -> {
 				wrap(rows, in, "Not connected.", RED);
 				for (PortableEnv e : s.environments()) {
-					Badge b = in.badges().apply(e.id());
+					EnvBadge b = in.badges().apply(e.id());
 					rows.add(Row.text(chip(b), Span.of(" " + clip(in, e.status(), in.widthPx() - CHIP_PAD - in.measure().width(chipText(b) + " ")),
 							statusColor(e.status()))));
 				}
@@ -187,19 +160,19 @@ public final class HeldScreenModel {
 	}
 
 	static Row threadRow(Input in, PortableThread t, int bg) {
-		Badge b = in.badges().apply(t.env());
+		EnvBadge b = in.badges().apply(t.env());
 		String glyph = " " + glyph(t.state()) + " ";
 		int used = in.measure().width(chipText(b)) + CHIP_PAD + in.measure().width(glyph);
 		String title = clip(in, t.title(), in.widthPx() - used);
 		return new Row(Kind.TEXT, List.of(chip(b), Span.of(glyph, t.color() & 0xFFFFFF), Span.of(title, t.settled() ? DIM : TEXT)), bg);
 	}
 
-	private static Span chip(Badge b) {
-		return new Span(chipText(b), CHIP_TEXT, b.color());
+	private static Span chip(EnvBadge b) {
+		return new Span(chipText(b), b.foreground() & 0xFFFFFF, b.background() & 0xFFFFFF);
 	}
 
-	private static String chipText(Badge b) {
-		return b.letter();
+	private static String chipText(EnvBadge b) {
+		return b.initial();
 	}
 
 	static int statusColor(String status) {

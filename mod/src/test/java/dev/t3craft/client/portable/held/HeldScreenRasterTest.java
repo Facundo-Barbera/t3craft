@@ -25,7 +25,7 @@ class HeldScreenRasterTest {
 		assertEquals(0xFF000000 | HeldScreenModel.BG, px[(HeldScreenRaster.HEIGHT - 3) * w + w / 2], "panel");
 		int topRowY = 1 + HeldScreenRaster.HEADER_H + HeldScreenRaster.PAD - 1;
 		assertEquals(0xFF000000 | HeldScreenModel.SELECTED, px[(topRowY + 4) * w + w - 3], "top thread highlighted");
-		int chip = 0xFF000000 | HeldScreenModel.Badge.of("vps", "my-vps", null).color();
+		int chip = dev.t3craft.client.chat.EnvBadge.of("vps", "my-vps", null).background();
 		assertEquals(chip, px[topRowY * w + HeldScreenRaster.PAD], "environment chip");
 		for (int p : px) {
 			assertEquals(0xFF, p >>> 24, "opaque: no see-through holes in the screen");
