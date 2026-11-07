@@ -37,4 +37,28 @@ class RpcFramesTest {
 		assertInstanceOf(RpcFrames.Defect.class, RpcFrames.parse("garbage"));
 		assertInstanceOf(RpcFrames.Other.class, RpcFrames.parse("{\"_tag\":\"Novel\"}"));
 	}
+
+	@Test
+	void exitCarriesTheSuccessValueOfOneShotRpcs() {
+		var ok = (RpcFrames.Exit) RpcFrames.parse("{\"_tag\":\"Exit\",\"requestId\":\"7\",\"exit\":{\"_tag\":\"Success\",\"value\":{\"matches\":[]}}}");
+		assertEquals("7", ok.requestId());
+		assertNull(ok.failure());
+		assertTrue(ok.value().getAsJsonObject().has("matches"));
+		var none = (RpcFrames.Exit) RpcFrames.parse("{\"_tag\":\"Exit\",\"requestId\":\"1\",\"exit\":{\"_tag\":\"Success\",\"value\":null}}");
+		assertNull(none.value());
+		assertNull(new RpcFrames.Exit("1", null).value());
+	}
+
+	@Test
+	void searchThreadsFraming() {
+		var o = com.google.gson.JsonParser.parseString(RpcFrames.searchThreads("5", "  " + "q".repeat(300) + " ", 0, "  ")).getAsJsonObject();
+		assertEquals("Request", o.get("_tag").getAsString());
+		assertEquals("orchestration.searchThreads", o.get("tag").getAsString());
+		var p = o.getAsJsonObject("payload");
+		assertEquals(RpcFrames.SEARCH_MAX_LENGTH, p.get("query").getAsString().length());
+		assertEquals(1, p.get("limit").getAsInt());
+		assertFalse(p.has("environmentLabel"), "blank label is omitted");
+		assertEquals("ab", RpcFrames.searchQuery("  ab \n"));
+		assertEquals("", RpcFrames.searchQuery(null));
+	}
 }
