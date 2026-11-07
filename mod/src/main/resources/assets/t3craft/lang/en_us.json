@@ -70,5 +70,11 @@
 	"t3craft.blocks.status": "Blocks module: %s (%s lamps loaded, %s changed last update). /t3craft blocks link <env:thread> | unlink",
 	"t3craft.blocks.singleplayer_only": "Only in singleplayer or as LAN host.",
 	"t3craft.blocks.look_at_block": "Look at a T3Craft monitor or lamp.",
-	"t3craft.blocks.linked": "Block bound to %s."
+	"t3craft.blocks.linked": "Block bound to %s.",
+	"t3craft.chat.history.bridge": "Bridge mode can't show chat history: the bridge doesn't serve it yet. Pair this environment and set \"mode\": \"direct\" in t3craft.json to read it here.",
+	"t3craft.chat.history.not_paired": "Environment \"%s\" is not paired, so its chat history can't be read.",
+	"t3craft.chat.history.pair_button": "Pair for direct mode…",
+	"t3craft.chat.reply.read_only": "Read-only: enable control to reply",
+	"t3craft.chat.reply.read_only_short": "Read-only",
+	"t3craft.chat.reply.enable_button": "Enable control"
 }

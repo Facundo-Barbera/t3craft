@@ -187,7 +187,7 @@ public final class ThreadBrowser implements AutoCloseable {
 	private void showRow(ThreadRow r) {
 		conversation.setBadge(model.badge(r));
 		if (r.threadId() == null) {
-			conversation.showNothing("This thread has no id in bridge mode: chat history needs direct mode (/t3craft pair).");
+			conversation.showNothing(net.minecraft.client.resources.language.I18n.get("t3craft.chat.history.bridge"), ChatSource.Unavailable.Action.PAIR);
 			return;
 		}
 		conversation.show(r.env(), r.envLabel(), r.threadId(), r.title());
