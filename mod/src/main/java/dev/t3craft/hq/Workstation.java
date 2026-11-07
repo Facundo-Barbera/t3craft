@@ -10,9 +10,10 @@ import org.jspecify.annotations.Nullable;
  *
  * @param module      module index ({@link HqLayout.Module#index()})
  * @param slot        desk slot in the module, {@code 0..HqLayout.DESKS-1}
- * @param threadId    who works here, or null when the desk is vacant
+ * @param threadId    who works here (vacant desks are not built, so plans only list taken ones;
+ *                    nullable for callers that model a free slot)
  * @param deskAnchor  where the NPC sits (the chair, foot level), facing the computer
- * @param computerPos the computer block (black concrete when taken, grey when vacant)
+ * @param computerPos the computer block (black concrete)
  * @param screen      centre of the computer's screen face, {@code facing} = outward normal (towards the
  *                    chair and the player): where a live screen or a sign is drawn
  * @param lampPos     the status lamp (a waxed copper bulb; toggle {@code lit})
