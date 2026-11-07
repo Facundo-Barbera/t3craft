@@ -71,6 +71,12 @@ public final class WorkstationCache {
 		return s;
 	}
 
+	/** Age label of the last rendered screen (null when unknown or never fed). */
+	public @Nullable String ageLabel(String key) {
+		Entry e = entries.get(key);
+		return e == null ? null : e.ageLabel;
+	}
+
 	/** Last rendered screen, or null if this thread was never fed. */
 	public @Nullable StationScreen screen(String key) {
 		Entry e = entries.get(key);

@@ -7,6 +7,7 @@ import com.mojang.math.Axis;
 import dev.t3craft.blocks.Binding;
 import dev.t3craft.blocks.MonitorBlock;
 import dev.t3craft.blocks.MonitorBlockEntity;
+import dev.t3craft.blocks.ScreenExtent;
 import dev.t3craft.client.workstation.StationScreen;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -32,12 +33,23 @@ import org.jspecify.annotations.Nullable;
  * from {@link MonitorScreens} (state the client already holds); glyph runs are rebuilt only when the
  * screen's version changes, so a steady monitor costs a map lookup per frame plus the draw.
  *
- * <p>The face transform ({@link #toFace}) is adapted from AgentCraft's {@code StationRenderer}.
+ * <p>Large screens: monitors merged into one screen ({@code MonitorWall}) are drawn <b>once</b>, by
+ * the screen's origin (top-left cell, {@link ScreenExtent}), over the whole surface at the density
+ * {@link ScreenExtent#pixelsPerBlock()} gives; the other cells draw nothing ({@link #shouldRender}).
+ * The whole screen shows the first bound cell's binding.
+ *
+ * <p>The face transform ({@link #toFace}) is adapted from AgentCraft's {@code StationRenderer}; drawing
+ * a multi-block surface once from its origin follows AgentCraft's {@code PanelBlock.origin/extent}.
  */
 public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEntity, MonitorRenderer.State> {
 	/** Screen pixels per block (one character ≈ 6 px; 22 characters fit inside the bezel). */
-	static final float PPB = 160f;
+	static final float PPB = ScreenExtent.PPB_SINGLE;
 	static final float BEZEL = 10f;
+	/** View distance of a large screen (a lone monitor: {@value #SMALL_VIEW}). */
+	static final int LARGE_VIEW = 96;
+	static final int SMALL_VIEW = 32;
+	/** Width of a character in screen pixels (for the large screens' column count). */
+	static final int CHAR_WIDTH = 6;
 	static final int LINE_HEIGHT = 10;
 	private static final int MAX_CACHED = 512;
 
@@ -46,6 +58,10 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 		List<FormattedCharSequence> lines = List.of();
 		int[] colors = new int[0];
 		int background;
+		/** The screen's size and density (1×1 at {@link #PPB} for a lone monitor). */
+		int width = 1;
+		int height = 1;
+		float ppb = PPB;
 	}
 
 	private record Glyphs(long version, List<FormattedCharSequence> lines, int[] colors, int background) {
@@ -69,8 +85,21 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 		BlockEntityRenderState.extractBase(be, state, breakProgress);
 		BlockState bs = be.getBlockState();
 		state.facing = bs.hasProperty(MonitorBlock.FACING) ? bs.getValue(MonitorBlock.FACING) : Direction.NORTH;
-		Binding b = client.resolve(be.getBlockPos(), be.binding());
-		MonitorScreens.Shown shown = client.screens().show(b);
+		ScreenExtent extent = be.getLevel() == null ? ScreenExtent.single(be.getBlockPos(), state.facing)
+				: MonitorBlock.extent(be.getLevel(), be.getBlockPos(), bs);
+		state.width = extent.width();
+		state.height = extent.height();
+		state.ppb = extent.pixelsPerBlock();
+		MonitorScreens.Shown shown;
+		if (extent.isMulti()) {
+			Binding b = client.resolve(extent.origin(), MonitorBlock.screenBinding(be.getLevel(), extent));
+			float inset = state.ppb / 16f;
+			int cols = (int) ((extent.width() * state.ppb - 2 * inset - 8) / CHAR_WIDTH);
+			int rows = (int) ((extent.height() * state.ppb - 2 * inset - 4) / LINE_HEIGHT);
+			shown = client.screens().show(b, cols, rows);
+		} else {
+			shown = client.screens().show(client.resolve(be.getBlockPos(), be.binding()));
+		}
 		Glyphs g = glyphs.get(shown.id());
 		if (g == null || g.version() != shown.version()) {
 			if (glyphs.size() > MAX_CACHED) {
@@ -100,11 +129,15 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 	public void submit(State s, PoseStack poseStack, SubmitNodeCollector collector, CameraRenderState camera) {
 		int light = LightCoordsUtil.FULL_BRIGHT;
 		poseStack.pushPose();
-		toFace(poseStack, s.facing, -0.003f, PPB);
-		collector.order(0).submitTextBackground(poseStack, BEZEL, BEZEL, PPB - BEZEL, PPB - BEZEL, s.background, Font.DisplayMode.NORMAL, light);
-		float y = (PPB - s.lines.size() * LINE_HEIGHT) / 2f + 1;
+		toFace(poseStack, s.facing, -0.003f, s.ppb);
+		float inset = s.ppb / 16f; // = BEZEL at the lone monitor's density
+		float w = s.width * s.ppb;
+		float h = s.height * s.ppb;
+		collector.order(0).submitTextBackground(poseStack, inset, inset, w - inset, h - inset, s.background, Font.DisplayMode.NORMAL, light);
+		// a lone monitor centres its few lines; a large screen reads from the top like a page
+		float y = s.width * s.height == 1 ? (h - s.lines.size() * LINE_HEIGHT) / 2f + 1 : inset + 4;
 		for (int i = 0; i < s.lines.size(); i++) {
-			collector.order(1).submitText(poseStack, BEZEL + 4, y, s.lines.get(i), false, Font.DisplayMode.POLYGON_OFFSET, light, s.colors[i], 0, 0);
+			collector.order(1).submitText(poseStack, inset + 4, y, s.lines.get(i), false, Font.DisplayMode.POLYGON_OFFSET, light, s.colors[i], 0, 0);
 			y += LINE_HEIGHT;
 		}
 		poseStack.popPose();
@@ -112,7 +145,24 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 
 	@Override
 	public int getViewDistance() {
-		return 32;
+		return LARGE_VIEW;
+	}
+
+	/** Only a screen's origin draws (the others are covered by its surface); large screens are seen from further away. */
+	@Override
+	public boolean shouldRender(MonitorBlockEntity be, Vec3 camera) {
+		BlockState bs = be.getBlockState();
+		if (!MonitorBlock.isOrigin(bs)) {
+			return false;
+		}
+		boolean large = bs.getValue(MonitorBlock.RIGHT) || bs.getValue(MonitorBlock.DOWN);
+		return Vec3.atCenterOf(be.getBlockPos()).closerThan(camera, large ? LARGE_VIEW : SMALL_VIEW);
+	}
+
+	/** The origin draws the whole surface, which reaches past its own block: do not cull it by its block alone. */
+	@Override
+	public boolean shouldRenderOffScreen() {
+		return true;
 	}
 
 	/** Forget cached glyph runs (hot-swap, level change). */

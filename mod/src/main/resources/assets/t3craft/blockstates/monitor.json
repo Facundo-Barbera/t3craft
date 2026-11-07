@@ -1,19 +1,195 @@
 {
-  "variants": {
-    "facing=north": {
-      "model": "t3craft:block/monitor"
+  "multipart": [
+    {
+      "when": {
+        "facing": "north"
+      },
+      "apply": {
+        "model": "t3craft:block/monitor_panel"
+      }
     },
-    "facing=east": {
-      "model": "t3craft:block/monitor",
-      "y": 90
+    {
+      "when": {
+        "facing": "north",
+        "up": "false"
+      },
+      "apply": {
+        "model": "t3craft:block/monitor_edge_up"
+      }
     },
-    "facing=south": {
-      "model": "t3craft:block/monitor",
-      "y": 180
+    {
+      "when": {
+        "facing": "north",
+        "down": "false"
+      },
+      "apply": {
+        "model": "t3craft:block/monitor_edge_down"
+      }
     },
-    "facing=west": {
-      "model": "t3craft:block/monitor",
-      "y": 270
+    {
+      "when": {
+        "facing": "north",
+        "left": "false"
+      },
+      "apply": {
+        "model": "t3craft:block/monitor_edge_left"
+      }
+    },
+    {
+      "when": {
+        "facing": "north",
+        "right": "false"
+      },
+      "apply": {
+        "model": "t3craft:block/monitor_edge_right"
+      }
+    },
+    {
+      "when": {
+        "facing": "east"
+      },
+      "apply": {
+        "model": "t3craft:block/monitor_panel",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "facing": "east",
+        "up": "false"
+      },
+      "apply": {
+        "model": "t3craft:block/monitor_edge_up",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "facing": "east",
+        "down": "false"
+      },
+      "apply": {
+        "model": "t3craft:block/monitor_edge_down",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "facing": "east",
+        "left": "false"
+      },
+      "apply": {
+        "model": "t3craft:block/monitor_edge_left",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "facing": "east",
+        "right": "false"
+      },
+      "apply": {
+        "model": "t3craft:block/monitor_edge_right",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "facing": "south"
+      },
+      "apply": {
+        "model": "t3craft:block/monitor_panel",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "facing": "south",
+        "up": "false"
+      },
+      "apply": {
+        "model": "t3craft:block/monitor_edge_up",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "facing": "south",
+        "down": "false"
+      },
+      "apply": {
+        "model": "t3craft:block/monitor_edge_down",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "facing": "south",
+        "left": "false"
+      },
+      "apply": {
+        "model": "t3craft:block/monitor_edge_left",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "facing": "south",
+        "right": "false"
+      },
+      "apply": {
+        "model": "t3craft:block/monitor_edge_right",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "facing": "west"
+      },
+      "apply": {
+        "model": "t3craft:block/monitor_panel",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "facing": "west",
+        "up": "false"
+      },
+      "apply": {
+        "model": "t3craft:block/monitor_edge_up",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "facing": "west",
+        "down": "false"
+      },
+      "apply": {
+        "model": "t3craft:block/monitor_edge_down",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "facing": "west",
+        "left": "false"
+      },
+      "apply": {
+        "model": "t3craft:block/monitor_edge_left",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "facing": "west",
+        "right": "false"
+      },
+      "apply": {
+        "model": "t3craft:block/monitor_edge_right",
+        "y": 270
+      }
     }
-  }
+  ]
 }
