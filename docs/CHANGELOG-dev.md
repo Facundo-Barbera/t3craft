@@ -10,6 +10,7 @@ One line per structural commit on `main`, newest first:
 
 ## Entries
 
+- 2026-11-07 feat/hub-hologram RELOAD — client-only hologram over the HQ hub (P4, AgentCraft MIT): aggregated counts (working · needs you · error · done today), one ring per environment/project, most urgent thread and a light beam; recomputed only on change; works without the blocks module; config hud.hologram (default on). No registries.
 - 2026-11-07 fix/hq-module-bounds RELOAD — module areas now come from the same geometry as the placements: no more 'placements outside its area skipped' or dropped block entities (monitors/lamps/signs) when building wings and the base.
 - 2026-11-07 feat/lamps-breathe RESTART — new BER for status_lamp/board_lamp: lamps breathe by state with clay motes when attention (P6, AgentCraft MIT); hub lantern beacon with aggregated state (P5), plus a client-only beacon at the hub anchor when the blocks module is off.
 - 2026-11-07 feat/schedule-board RESTART — new client entrypoint ScheduleClient (dev.t3craft.client.schedule): read-only scheduled tasks board as a client text display behind the fallback layout's board spot (HQ board anchor via setPlacementSource; entity ids from -7_000_000, rotating pages); command /t3craft schedule; new lang keys. Data via T3Connection.subscribeScheduledTasks over the shared StreamRegistry (additive overload subscribe(key, SubscribeFrame, Listener)); ScheduledTask decoder and RpcFrames.subscribeScheduledTasks in dev.t3craft.t3. No registries, no config.
