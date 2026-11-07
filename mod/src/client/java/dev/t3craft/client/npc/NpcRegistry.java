@@ -1,6 +1,7 @@
 package dev.t3craft.client.npc;
 
 import dev.t3craft.T3Craft;
+import dev.t3craft.client.npc.behavior.BehaviorDirector;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -13,7 +14,6 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.core.particles.SimpleParticleType;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Display;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityTypes;
@@ -27,6 +27,11 @@ import org.jspecify.annotations.Nullable;
  * {@link ClientLevel} with negative ids and are never known to any server. Runs on the client
  * thread.
  *
+ * <p>Robustness: {@link #tick} never throws. Map entries are type-checked every tick (after a
+ * dev hot-swap the live instance can still hold objects from older code, e.g. villagers), bad ones
+ * are purged with their entities, and any unexpected error resets the registry: every entity in
+ * our id range is removed from the level and the NPCs are rebuilt on the next tick.
+ *
  * <p>Layout: neighbourhoods on a grid next to where the player stood when the first NPC appeared
  * in this level (most urgent neighbourhood first); NPCs on a ring inside each plot, ordered by
  * the resolved priority. Particles over the head by state. Avatars turn their head to a nearby
@@ -37,7 +42,9 @@ public final class NpcRegistry {
 	private static final int PLOTS_PER_ROW = 3;
 	private static final int PARTICLE_EVERY_TICKS = 15;
 	/** Client-only ids count down from here, far away from server-assigned (positive) ids. */
-	private static int nextClientId = -1_000_000;
+	static final int ID_BASE = -1_000_000;
+	private static int nextClientId = ID_BASE;
+	private static final long ERROR_LOG_INTERVAL_MS = 30_000;
 
 	private record Spawned(ThreadAvatar avatar, Display.TextDisplay panel) {
 	}
@@ -46,10 +53,13 @@ public final class NpcRegistry {
 	private final Map<String, Spawned> spawned = new LinkedHashMap<>();
 	private final Map<String, Display.TextDisplay> signs = new LinkedHashMap<>();
 	private final Map<Integer, String> npcByEntityId = new HashMap<>();
+	/** Walking, desks, board, bubbles (feat/npc-behavior). Owns its own entities; reset with ours. */
+	private final BehaviorDirector behavior = new BehaviorDirector();
 	private @Nullable ClientLevel level;
 	private @Nullable Vec3 anchor;
 	private boolean dirty;
 	private int tick;
+	private long lastErrorLogMs;
 
 	public void replaceAll(List<NpcInfo> npcs) {
 		wanted.clear();
@@ -93,13 +103,148 @@ public final class NpcRegistry {
 		return wanted.size();
 	}
 
+	/** NPC behaviour: plug a physical base in with {@code behavior().setAnchorSource(...)}. */
+	public BehaviorDirector behavior() {
+		return behavior;
+	}
+
+	/** Never throws: errors are logged (rate-limited) and the registry rebuilds itself. */
 	public void tick(Minecraft mc) {
+		try {
+			validate(mc.level);
+			tickUnsafe(mc);
+		} catch (VirtualMachineError e) {
+			if (!(e instanceof StackOverflowError)) {
+				throw e;
+			}
+			recover(mc, e);
+		} catch (Throwable e) {
+			recover(mc, e);
+		}
+	}
+
+	/** True for entity ids in T3Craft's client-only range. */
+	static boolean isOurs(int entityId) {
+		return entityId <= ID_BASE;
+	}
+
+	/**
+	 * Drops map entries whose type is not what this code expects (stale objects after a hot-swap,
+	 * removed entities) and discards their entities. Raw views on purpose: the generic types cannot
+	 * be trusted in that situation.
+	 */
+	@SuppressWarnings({"rawtypes", "unchecked"})
+	private void validate(@Nullable ClientLevel lvl) {
+		boolean purged = false;
+		for (java.util.Iterator<Map.Entry> it = ((Map) spawned).entrySet().iterator(); it.hasNext(); ) {
+			Map.Entry e = it.next();
+			Object v = e.getValue();
+			if (e.getKey() instanceof String && v instanceof Spawned s && s.avatar() != null && s.panel() != null
+					&& !s.avatar().isRemoved() && !s.panel().isRemoved()) {
+				continue;
+			}
+			discard(lvl, v);
+			it.remove();
+			purged = true;
+		}
+		for (java.util.Iterator<Map.Entry> it = ((Map) signs).entrySet().iterator(); it.hasNext(); ) {
+			Map.Entry e = it.next();
+			if (e.getKey() instanceof String && e.getValue() instanceof Display.TextDisplay d && !d.isRemoved()) {
+				continue;
+			}
+			discard(lvl, e.getValue());
+			it.remove();
+			purged = true;
+		}
+		for (java.util.Iterator<Map.Entry> it = ((Map) npcByEntityId).entrySet().iterator(); it.hasNext(); ) {
+			Map.Entry e = it.next();
+			if (!(e.getKey() instanceof Integer) || !(e.getValue() instanceof String)) {
+				it.remove();
+				purged = true;
+			}
+		}
+		for (java.util.Iterator<Map.Entry> it = ((Map) wanted).entrySet().iterator(); it.hasNext(); ) {
+			Map.Entry e = it.next();
+			if (!(e.getKey() instanceof String) || !(e.getValue() instanceof NpcInfo)) {
+				it.remove();
+				purged = true;
+			}
+		}
+		if (purged) {
+			// Behaviour overlays share our id range; drop them first so the sweep does not orphan them.
+			behavior.reset(lvl);
+			sweep(lvl);
+			dirty = true;
+		}
+	}
+
+	private static void discard(@Nullable ClientLevel lvl, @Nullable Object v) {
+		if (lvl == null || v == null) {
+			return;
+		}
+		if (v instanceof Entity ent) {
+			lvl.removeEntity(ent.getId(), Entity.RemovalReason.DISCARDED);
+		} else if (v instanceof Spawned s) {
+			if (s.avatar() != null) {
+				lvl.removeEntity(s.avatar().getId(), Entity.RemovalReason.DISCARDED);
+			}
+			if (s.panel() != null) {
+				lvl.removeEntity(s.panel().getId(), Entity.RemovalReason.DISCARDED);
+			}
+		}
+	}
+
+	/** Removes every entity in our id range that the current maps do not track (orphans). */
+	private void sweep(@Nullable ClientLevel lvl) {
+		if (lvl == null) {
+			return;
+		}
+		java.util.Set<Integer> tracked = new java.util.HashSet<>(npcByEntityId.keySet());
+		signs.values().forEach(d -> tracked.add(d.getId()));
+		List<Integer> orphans = new ArrayList<>();
+		for (Entity e : lvl.entitiesForRendering()) {
+			if (isOurs(e.getId()) && !tracked.contains(e.getId())) {
+				orphans.add(e.getId());
+			}
+		}
+		orphans.forEach(id -> lvl.removeEntity(id, Entity.RemovalReason.DISCARDED));
+	}
+
+	private void recover(Minecraft mc, Throwable error) {
+		long now = System.currentTimeMillis();
+		if (now - lastErrorLogMs > ERROR_LOG_INTERVAL_MS) {
+			lastErrorLogMs = now;
+			T3Craft.LOGGER.warn("T3Craft NPC tick failed; rebuilding NPCs", error);
+		}
+		try {
+			ClientLevel lvl = mc.level;
+			spawned.clear();
+			signs.clear();
+			npcByEntityId.clear();
+			behavior.reset(lvl);
+			if (lvl != null) {
+				List<Integer> ours = new ArrayList<>();
+				for (Entity e : lvl.entitiesForRendering()) {
+					if (isOurs(e.getId())) {
+						ours.add(e.getId());
+					}
+				}
+				ours.forEach(id -> lvl.removeEntity(id, Entity.RemovalReason.DISCARDED));
+			}
+		} catch (Throwable ignored) {
+			// best effort; next tick starts from clean maps anyway
+		}
+		dirty = true;
+	}
+
+	private void tickUnsafe(Minecraft mc) {
 		ClientLevel lvl = mc.level;
 		if (lvl != level) {
 			// World changed or left: old entities died with the old level.
 			spawned.clear();
 			signs.clear();
 			npcByEntityId.clear();
+			behavior.reset(null);
 			level = lvl;
 			anchor = null;
 			dirty = true;
@@ -117,16 +262,22 @@ public final class NpcRegistry {
 			}
 		}
 		tick++;
+		List<BehaviorDirector.Body> bodies = new ArrayList<>(spawned.size());
 		for (Map.Entry<String, Spawned> e : spawned.entrySet()) {
 			ThreadAvatar a = e.getValue().avatar();
-			lookAt(a, mc.player.position().add(0, mc.player.getEyeHeight(), 0));
 			NpcInfo info = wanted.get(e.getKey());
+			if (info != null) {
+				bodies.add(new BehaviorDirector.Body(e.getKey(), info, a, e.getValue().panel()));
+			}
 			if (info != null && (tick + Math.abs(a.getId())) % PARTICLE_EVERY_TICKS == 0) {
 				SimpleParticleType p = particle(info.particle());
 				if (p != null) {
 					lvl.addParticle(p, a.getX() + (a.getRandom().nextDouble() - 0.5) * 0.6, a.getY() + 2.25, a.getZ() + (a.getRandom().nextDouble() - 0.5) * 0.6, 0, 0.02, 0);
 				}
 			}
+		}
+		if (anchor != null) {
+			behavior.tick(lvl, mc.player, anchor, bodies);
 		}
 	}
 
@@ -139,6 +290,7 @@ public final class NpcRegistry {
 			});
 			signs.values().forEach(s -> lvl.removeEntity(s.getId(), Entity.RemovalReason.DISCARDED));
 		}
+		behavior.reset(lvl);
 		spawned.clear();
 		signs.clear();
 		npcByEntityId.clear();
@@ -163,6 +315,7 @@ public final class NpcRegistry {
 		for (String id : new ArrayList<>(spawned.keySet())) {
 			if (!wanted.containsKey(id)) {
 				Spawned s = spawned.remove(id);
+				behavior.forget(id, lvl);
 				npcByEntityId.remove(s.avatar().getId());
 				npcByEntityId.remove(s.panel().getId());
 				lvl.removeEntity(s.avatar().getId(), Entity.RemovalReason.DISCARDED);
@@ -209,11 +362,9 @@ public final class NpcRegistry {
 					spawned.put(info.id(), s);
 					npcByEntityId.put(s.avatar().getId(), info.id());
 					npcByEntityId.put(s.panel().getId(), info.id());
-				} else if (s.avatar().position().distanceToSqr(pos) > 0.01) {
-					s.avatar().snapTo(pos.x, pos.y, pos.z, s.avatar().getYRot(), 0f);
 				}
+				// Once spawned, the BehaviorDirector moves the avatar and its panel.
 				s.avatar().update(info);
-				s.panel().snapTo(pos.x, pos.y + 2.45, pos.z, 0f, 0f);
 				setText(s.panel(), Nameplate.info(info));
 			}
 		}
@@ -247,18 +398,5 @@ public final class NpcRegistry {
 		panel.snapTo(pos.x, pos.y + 2.45, pos.z, 0f, 0f);
 		T3Craft.LOGGER.debug("spawned client-only NPC {} at {}", info.id(), pos);
 		return new Spawned(avatar, panel);
-	}
-
-	private static void lookAt(ThreadAvatar a, Vec3 eye) {
-		Vec3 head = a.position().add(0, a.getEyeHeight(), 0);
-		Vec3 d = eye.subtract(head);
-		if (d.lengthSqr() > 12 * 12) {
-			return;
-		}
-		float yaw = (float) (Mth.atan2(d.z, d.x) * (180 / Math.PI)) - 90f;
-		float pitch = (float) -(Mth.atan2(d.y, Math.sqrt(d.x * d.x + d.z * d.z)) * (180 / Math.PI));
-		a.setYHeadRot(yaw);
-		a.setYBodyRot(yaw);
-		a.setXRot(pitch);
 	}
 }

@@ -27,3 +27,9 @@ Thumbs.db
 
 # Minecraft instance credentials (T3 pairing tokens) — never commit
 **/config/t3craft/credentials/
+
+# Log4j output of the JUnit run (mod/logs/latest.log)
+mod/logs/
+
+# Source package dev.t3craft.build is not build output
+!mod/src/**/build/

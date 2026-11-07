@@ -24,6 +24,10 @@ import org.jspecify.annotations.Nullable;
  * Archived threads are dropped. Not thread-safe; owned by one connection thread.
  */
 public final class ShellState {
+	/**
+	 * A project shell. {@code title} is T3's title as sent (may be blank on some servers); use
+	 * {@link #displayName()} for display.
+	 */
 	public record Project(String id, String title, String workspaceRoot, @Nullable JsonElement repositoryIdentity) {
 		static @Nullable Project fromJson(@Nullable JsonObject o) {
 			String id = Json.str(o, "id");
@@ -31,16 +35,44 @@ public final class ShellState {
 				return null;
 			}
 			JsonElement identity = o.get("repositoryIdentity");
-			return new Project(id, Objects.requireNonNullElse(Json.str(o, "title"), id),
+			return new Project(id, Objects.requireNonNullElse(Json.str(o, "title"), ""),
 					Objects.requireNonNullElse(Json.str(o, "workspaceRoot"), ""),
 					identity == null || identity.isJsonNull() ? null : identity);
 		}
+
+		/** Title; else the repository name; else the workspace folder name; else null. */
+		public @Nullable String displayName() {
+			if (!title.isBlank()) {
+				return title.trim();
+			}
+			if (repositoryIdentity != null && repositoryIdentity.isJsonObject()) {
+				JsonObject ri = repositoryIdentity.getAsJsonObject();
+				for (String k : new String[] {"name", "displayName"}) {
+					String v = Json.str(ri, k);
+					if (v != null && !v.isBlank()) {
+						return v.contains("/") ? v.substring(v.lastIndexOf('/') + 1) : v;
+					}
+				}
+			}
+			return folderName(workspaceRoot);
+		}
+	}
+
+	/** Last path segment of a POSIX or Windows path, or null. */
+	public static @Nullable String folderName(@Nullable String path) {
+		if (path == null) {
+			return null;
+		}
+		String p = path.replace('\\', '/').replaceAll("/+$", "");
+		String leaf = p.contains("/") ? p.substring(p.lastIndexOf('/') + 1) : p;
+		return leaf.isBlank() ? null : leaf;
 	}
 
 	private final Map<String, ThreadShell> threads = new LinkedHashMap<>();
 	private final Map<String, Project> projects = new LinkedHashMap<>();
 	private long sequence = -1;
 	private boolean synchronizedFlag;
+	private boolean hadAuthoritative;
 
 	public Collection<ThreadShell> threads() {
 		return threads.values();
@@ -54,21 +86,44 @@ public final class ShellState {
 		return projects.get(id);
 	}
 
+	/** Display name of a known project (see {@link Project#displayName()}), or null if unknown. */
 	public @Nullable String projectTitle(String projectId) {
 		Project p = projects.get(projectId);
-		return p == null ? null : p.title();
+		return p == null ? null : p.displayName();
 	}
 
-	/** Immutable copy for other threads: visible threads + project titles + sync flag. */
+	/** Immutable copy for other threads: visible threads + project display names + sync flag. */
 	public record View(java.util.List<ThreadShell> threads, Map<String, String> projectTitles, boolean synced) {
+		/** Display name of the project, or null when the project is unknown. */
 		public @Nullable String projectTitle(String projectId) {
 			return projectTitles.get(projectId);
 		}
+
+		/** Never null: display name, else {@code project <id prefix>}, else {@code (no project)}. */
+		public String projectLabel(String projectId) {
+			return ShellState.projectLabel(projectTitles.get(projectId), projectId);
+		}
+	}
+
+	static String projectLabel(@Nullable String name, @Nullable String projectId) {
+		if (name != null && !name.isBlank()) {
+			return name;
+		}
+		if (projectId == null || projectId.isBlank()) {
+			return "(no project)";
+		}
+		String id = projectId.startsWith("mcp:") ? projectId.substring(4) : projectId;
+		return "project " + (id.length() > 8 ? id.substring(0, 8) : id);
 	}
 
 	public View view() {
 		Map<String, String> titles = new LinkedHashMap<>();
-		projects.forEach((id, p) -> titles.put(id, p.title()));
+		projects.forEach((id, p) -> {
+			String name = p.displayName();
+			if (name != null) {
+				titles.put(id, name);
+			}
+		});
 		return new View(java.util.List.copyOf(threads.values()), Map.copyOf(titles), synchronizedFlag);
 	}
 
@@ -105,6 +160,7 @@ public final class ShellState {
 				}
 				putProjects(Json.arr(snap, "projects"));
 				sequence = Json.num(snap, "snapshotSequence", sequence);
+				hadAuthoritative = true;
 				return true;
 			}
 			case "synchronized" -> {
@@ -164,8 +220,17 @@ public final class ShellState {
 		}
 	}
 
-	/** Same rules as upstream client-runtime shellReducer.mergeShellSnapshotProjects (enrichment). */
+	/**
+	 * Same rules as upstream client-runtime shellReducer.mergeShellSnapshotProjects (enrichment):
+	 * with no authoritative snapshot yet, the refresh's projects are adopted as they are; afterwards
+	 * it only updates repository identity of known projects (threads and sequence untouched).
+	 */
 	private boolean applyEnrichment(@Nullable JsonObject snap, @Nullable JsonArray roots) {
+		if (!hadAuthoritative) {
+			int before = projects.size();
+			putProjects(Json.arr(snap, "projects"));
+			return projects.size() != before;
+		}
 		java.util.Set<String> resolved = new java.util.HashSet<>();
 		if (roots != null) {
 			for (JsonElement r : roots) {
