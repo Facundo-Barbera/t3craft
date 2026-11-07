@@ -12,8 +12,8 @@ import net.minecraft.network.chat.Component;
 import org.jspecify.annotations.Nullable;
 
 /**
- * T3Craft settings: notification and sound toggles, the default visibility filter, links to the
- * environment list and the key binds. Edits go to a draft and are written on "Save" (then the mod
+ * T3Craft settings: notification and sound toggles, the default visibility filter, the portable
+ * terminal's held screen, links to the environment list and the key binds. Edits go to a draft and are written on "Save" (then the mod
  * reloads its sources, like {@code /t3craft reload}). Opened from Mod Menu, {@code /t3craft config}
  * or the J key. The bridge key is never shown, only whether one is set.
  */
@@ -79,6 +79,10 @@ public final class SettingsScreen extends BaseConfigScreen {
 		addRenderableWidget(maxBox);
 		toggle("Subagents", draft.includeSubagents(), x2, y + 72, colW,
 				v -> draft = draft.withVisibility(draft.recentWindowHours(), draft.maxPerEnvironment(), v));
+
+		// Portable T3 Terminal: live summary on the held item's screen (portable.heldScreen).
+		toggle("Held terminal screen", draft.portable().heldScreen(), x0, y + 96, colW,
+				v -> draft = draft.withPortable(draft.portable().withHeldScreen(v)));
 
 		int by = height - 52;
 		int bw = Math.min(120, (width - 40) / 3 - 4);
@@ -147,7 +151,8 @@ public final class SettingsScreen extends BaseConfigScreen {
 		String mode = "Mode: " + draft.mode() + (draft.mode().equals("bridge")
 				? " · bridge key " + (draft.bridgeKey() == null ? "not set" : "set")
 				: " · read-only");
-		g.centeredText(font, Component.literal(mode + " · " + ConfigManager.get().file().getFileName()).withStyle(ChatFormatting.DARK_GRAY),
-				width / 2, 44 + 100, 0xFFFFFFFF);
+		// Next to the "Held terminal screen" toggle (row 5 of the first column).
+		String modeLine = mode + " · " + ConfigManager.get().file().getFileName();
+		g.text(font, font.plainSubstrByWidth(modeLine, x2 + colW - x1), x1 + 4, 44 + 102, 0xFF555555);
 	}
 }
