@@ -79,10 +79,12 @@ SOFTWARE.
 ```
 
 Portable terminal (`mod/src/client/java/dev/t3craft/client/portable/`, `mod/src/main/java/dev/t3craft/portable/`):
-no AgentCraft file is copied. `PortableClient.category()` follows the approach of AgentCraft's
+no AgentCraft file is copied. The portable key category used to follow the approach of AgentCraft's
 `mod/src/client/java/dev/agentcraft/client/hud/Keys.java` (register the key category, reuse the
-equal-by-id record if another feature registered it first), and the 26.x API notes in AgentCraft's
-`mod/DEV.md` were used as a reference. MIT, Copyright (c) 2026 AgentCraft contributors.
+equal-by-id record if another feature registered it first); it now uses the shared
+`T3CraftKeys.CATEGORY`. The 26.x API notes in AgentCraft's `mod/DEV.md` were used as a reference.
+The held-item screen only aims to look coherent with AgentCraft's thread list in miniature (one
+list, environment chip per row); no AgentCraft code or asset is used for it. MIT, Copyright (c) 2026 AgentCraft contributors.
 
 ## Gradle wrapper (`mod/gradlew`, `mod/gradlew.bat`, `mod/gradle/wrapper/`)
 
