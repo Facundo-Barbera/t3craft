@@ -91,6 +91,14 @@ public final class DirectController implements T3Connection.Listener {
 		return out;
 	}
 
+	/**
+	 * The single live connection of one environment, or null when it is not paired/started. Views
+	 * read thread streams through it ({@link T3Connection#subscribeThread}); never open another.
+	 */
+	public synchronized @Nullable T3Connection connection(String envId) {
+		return connections.get(envId);
+	}
+
 	/** Last shell view of one environment (threads with their timestamps), or null before the first sync. */
 	public ShellState.@Nullable View view(String envId) {
 		return views.get(envId);

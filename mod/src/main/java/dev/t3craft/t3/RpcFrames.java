@@ -20,6 +20,21 @@ public final class RpcFrames {
 
 	public static final String SUBSCRIBE_SHELL = "orchestration.subscribeShell";
 	public static final String SUBSCRIBE_THREAD = "orchestration.subscribeThread";
+	public static final String GET_TURN_ITEM = "orchestration.getTurnItem";
+	public static final String GET_THREAD_PROJECTION = "orchestration.getThreadProjection";
+
+	/**
+	 * {@code orchestration.subscribeThread} as the chat uses it: completion marker and a bounded
+	 * snapshot (latest window + {@code historyCursor}; older pages over HTTP). No compact/dedupe
+	 * options, so items arrive as plain JSON.
+	 */
+	public static String subscribeThread(String id, String threadId) {
+		JsonObject p = new JsonObject();
+		p.addProperty("threadId", threadId);
+		p.addProperty("requestCompletionMarker", true);
+		p.addProperty("acceptBoundedSnapshot", true);
+		return request(id, SUBSCRIBE_THREAD, p);
+	}
 
 	public static String request(String id, String tag, JsonObject payload) {
 		JsonObject o = new JsonObject();
@@ -67,8 +82,14 @@ public final class RpcFrames {
 	public record Chunk(String requestId, List<JsonObject> values) implements Frame {
 	}
 
-	/** {@code failure} is a short, secret-free description when the exit is a failure, else null. */
-	public record Exit(String requestId, @Nullable String failure) implements Frame {
+	/**
+	 * {@code failure} is a short, secret-free description when the exit is a failure, else null.
+	 * {@code value}: the success value of a one-shot RPC when it is an object, else null.
+	 */
+	public record Exit(String requestId, @Nullable String failure, @Nullable JsonObject value) implements Frame {
+		public Exit(String requestId, @Nullable String failure) {
+			this(requestId, failure, null);
+		}
 	}
 
 	public record Defect(String detail) implements Frame {
@@ -108,10 +129,13 @@ public final class RpcFrames {
 			case "Exit" -> {
 				JsonObject exit = Json.obj(o, "exit");
 				String failure = null;
+				JsonObject value = null;
 				if ("Failure".equals(Json.str(exit, "_tag"))) {
 					failure = describeCause(Json.arr(exit, "cause"));
+				} else {
+					value = Json.obj(exit, "value");
 				}
-				yield new Exit(String.valueOf(Json.str(o, "requestId")), failure);
+				yield new Exit(String.valueOf(Json.str(o, "requestId")), failure, value);
 			}
 			case "Defect", "ClientProtocolError" -> new Defect(tag + ": " + truncate(String.valueOf(o.get("defect") != null ? o.get("defect") : o.get("error"))));
 			case "Pong" -> new Pong();
