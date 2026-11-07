@@ -7,6 +7,9 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -82,6 +85,14 @@ public final class DirectController implements T3Connection.Listener {
 		return out;
 	}
 
+	/**
+	 * Read-only snapshot of each environment's latest (unfiltered) shell view, keyed by environment
+	 * id. Used by feat/npc-helpers to find subagents and their parents; no extra connection or call.
+	 */
+	public Map<String, ShellState.View> shellViews() {
+		return Map.copyOf(views);
+	}
+
 	/** Filtered, ranked NPCs of every environment (cap applies per environment). */
 	public List<NpcView> npcs(long nowMs) {
 		List<NpcView> out = new ArrayList<>();
@@ -100,6 +111,75 @@ public final class DirectController implements T3Connection.Listener {
 		});
 		out.sort(Comparator.comparingInt(NpcView::priority).thenComparing(NpcView::envLabel).thenComparing(NpcView::title));
 		return out;
+	}
+
+	/**
+	 * Read-only {@code searchThreads} on every connected environment (each over its existing
+	 * connection), merged with {@link ThreadSearch#merge}. Environments that fail or time out are
+	 * reported in {@link ThreadSearch.Outcome#errors()}; the rest still count. With no connected
+	 * environment the outcome is empty with {@code searched == 0}. Cancelling the returned future
+	 * cancels (and interrupts) every per-environment request. Completes on a connection thread.
+	 */
+	public CompletableFuture<ThreadSearch.Outcome> search(String query, int limit, long timeoutMs) {
+		List<T3Connection> live = new ArrayList<>();
+		int paired;
+		synchronized (this) {
+			paired = connections.size();
+			connections.values().stream().filter(c -> c.status() == T3Connection.Status.OK).forEach(live::add);
+		}
+		String q = RpcFrames.searchQuery(query);
+		if (live.isEmpty()) {
+			return CompletableFuture.completedFuture(new ThreadSearch.Outcome(q, List.of(), 0, paired, List.of()));
+		}
+		List<CompletableFuture<Object>> parts = new ArrayList<>();
+		for (T3Connection c : live) {
+			Environments.Environment env = c.environment();
+			CompletableFuture<ThreadSearch.Decoded> raw = c.searchThreads(q, limit, timeoutMs);
+			parts.add(raw.handle((d, err) -> err == null
+					? ThreadSearch.enrich(env.id(), env.label(), q, d, views.get(env.id()))
+					: new ThreadSearch.EnvError(env.id(), env.label(), describe(err))));
+			// cancelling the merged future must reach the request itself
+			parts.getLast().whenComplete((x, e) -> {
+				if (e instanceof CancellationException) {
+					raw.cancel(true);
+				}
+			});
+		}
+		CompletableFuture<ThreadSearch.Outcome> out = CompletableFuture.allOf(parts.toArray(CompletableFuture[]::new)).thenApply(v -> {
+			List<List<ThreadSearch.Hit>> hits = new ArrayList<>();
+			List<ThreadSearch.EnvError> errors = new ArrayList<>();
+			for (CompletableFuture<Object> p : parts) {
+				Object r = p.join();
+				if (r instanceof ThreadSearch.EnvError e) {
+					errors.add(e);
+				} else {
+					@SuppressWarnings("unchecked")
+					List<ThreadSearch.Hit> h = (List<ThreadSearch.Hit>) r;
+					hits.add(h);
+				}
+			}
+			return new ThreadSearch.Outcome(q, ThreadSearch.merge(hits, limit), live.size(), paired, List.copyOf(errors));
+		});
+		out.whenComplete((r, e) -> {
+			if (out.isCancelled()) {
+				parts.forEach(p -> p.cancel(true));
+			}
+		});
+		return out;
+	}
+
+	static String describe(Throwable err) {
+		Throwable c = err;
+		while ((c instanceof CompletionException || c instanceof java.util.concurrent.ExecutionException) && c.getCause() != null) {
+			c = c.getCause();
+		}
+		if (c instanceof ThreadSearch.SearchException) {
+			return c.getMessage();
+		}
+		if (c instanceof CancellationException) {
+			return "cancelled";
+		}
+		return T3Connection.sanitize(c.getClass().getSimpleName() + (c.getMessage() == null ? "" : ": " + c.getMessage()));
 	}
 
 	@Override

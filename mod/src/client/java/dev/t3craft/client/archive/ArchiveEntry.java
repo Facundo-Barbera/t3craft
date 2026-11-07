@@ -28,8 +28,8 @@ public record ArchiveEntry(String key, String env, String envLabel, String threa
 
 	/** Newest close first; unknown close times last; then by key (total, deterministic order). */
 	public static final Comparator<ArchiveEntry> NEWEST_FIRST = Comparator
-			.comparing((ArchiveEntry e) -> e.closedAtMs() == null ? Long.MIN_VALUE : e.closedAtMs(), Comparator.reverseOrder())
-			.thenComparing(ArchiveEntry::key);
+			.comparingLong((ArchiveEntry e) -> e.closedAtMs() == null ? Long.MAX_VALUE : -e.closedAtMs())
+			.thenComparing(e -> e.key());
 
 	public ArchiveEntry {
 		Objects.requireNonNull(key, "key");
