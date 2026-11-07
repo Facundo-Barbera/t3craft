@@ -8,6 +8,7 @@ import dev.t3craft.client.T3CraftClient;
 import dev.t3craft.client.T3CraftCommands;
 import dev.t3craft.client.debug.GuardedEvents;
 import dev.t3craft.debug.DevReload;
+import dev.t3craft.client.hq.HqPresence;
 import dev.t3craft.hq.Anchor;
 import dev.t3craft.hq.HqSite;
 import dev.t3craft.t3.ArchiveWire;
@@ -56,9 +57,9 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>Integration points:
  * <ul>
- *   <li>{@link #setSite}: whoever places the HQ in the world (builders / site / demo) passes its
- *   {@link HqSite}; without a site nothing is drawn in the world, the catalog still works
- *   ({@code /t3craft archive}).</li>
+ *   <li>{@link #setSite}: override where the HQ stands. By default the HQ standing in the world
+ *   ({@code HqPresence.current()}, site or demo, once its hub is built); without one nothing is
+ *   drawn, the catalog still works ({@code /t3craft archive}).</li>
  *   <li>{@link #setShelf}: the plan's shelf ({@code ArchiveShelf.fromPlan(plan, AnchorNames::archiveShelfSlot)}
  *   once fix/hq-archive is on main); null = {@link ArchiveShelf#FALLBACK}.</li>
  *   <li>{@link #setCaller} / {@link #setSource}: replace where the reads go. Default: each
@@ -73,6 +74,8 @@ public final class ArchiveClient implements ClientModInitializer {
 	private static final String MODULE = "archive";
 	/** Feed the store this often (ticks); the store itself decides when to read (rarely). */
 	private static final int FEED_TICKS = 20;
+	/** The HQ plan group that holds the shelf (documented group name in feat-hq-design.md). */
+	private static final String HUB_GROUP = "hub";
 
 	private static @Nullable ArchiveClient instance;
 
@@ -156,7 +159,7 @@ public final class ArchiveClient implements ClientModInitializer {
 
 	// ---- integration points -------------------------------------------------------------------
 
-	/** Where the HQ stands (null = not in this world: nothing drawn). Client thread. */
+	/** Where the HQ stands (null = the HQ {@link HqPresence} reports, if any). Client thread. */
 	public void setSite(@Nullable HqSite site) {
 		this.site = site;
 	}
@@ -233,7 +236,7 @@ public final class ArchiveClient implements ClientModInitializer {
 		if (lvl == null || mc.player == null) {
 			return;
 		}
-		HqSite s = site;
+		HqSite s = currentSite();
 		if (s == null) {
 			if (renderer.size() > 0 || viewsSite != null) {
 				renderer.clear(lvl);
@@ -250,6 +253,21 @@ public final class ArchiveClient implements ClientModInitializer {
 		renderer.tick(lvl, views, head == null ? null : new ArchiveRenderer.HeaderView(head,
 				Component.translatable("t3craft.archive.shelf.title").getString(),
 				Component.translatable("t3craft.archive.shelf.count", store.entries().size()).getString()));
+	}
+
+	/**
+	 * {@link #setSite}'s site, else the HQ standing in this world ({@link HqPresence#current()}, read
+	 * only) once its hub is built; null when there is none.
+	 */
+	private @Nullable HqSite currentSite() {
+		if (site != null) {
+			return site;
+		}
+		HqPresence.Standing st = HqPresence.current();
+		if (st == null || (st.built() != null && !st.built().contains(HUB_GROUP))) {
+			return null;
+		}
+		return st.site();
 	}
 
 	/** One view per shelf slot (occupied or not). */

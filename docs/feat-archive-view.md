@@ -124,8 +124,10 @@ de NPCs no tiene hilos cerrados.
 
 ## Puntos de integración (`ArchiveClient.get()`)
 
-- `setSite(HqSite)`: quien coloca el HQ en el mundo (builders, site o demo). Sin sitio no se dibuja
-  nada en el mundo, pero el catálogo funciona igual.
+- Sitio: por defecto, el HQ que está en pie en el mundo (`HqPresence.current()` de
+  feat/hq-construction, sitio o demo; solo lectura), una vez construido su grupo `hub`.
+  `setSite(HqSite)` lo sobrescribe. Sin HQ no se dibuja nada en el mundo, pero el catálogo funciona
+  igual.
 - `setShelf(ArchiveShelf)`: las posiciones del plan (`null` = `FALLBACK`).
 - `slots()`: la asignación actual (clave → slot), para que el dueño del HQ ponga el bloque
   correspondiente en cada slot.
@@ -150,8 +152,6 @@ de NPCs no tiene hilos cerrados.
 - **fix/hq-archive**: cuando entre, llamar a `setShelf(ArchiveShelf.fromPlan(plan, AnchorNames::archiveShelfSlot))`
   y quitar el fallback si ya no hace falta. Si fix/hq-archive cambia la regla de asignación del
   archivo de `HqLayout`, revisar `ArchiveSlotsTest.matchesHqLayoutRules`.
-- Nadie llama todavía a `setSite`: en main no hay un HQ colocado en el mundo real que lo exponga.
-  Hay que llamarlo desde quien construya el HQ.
 - **No se probó dentro del juego** (por regla, no se lanza Minecraft). Falta revisar a ojo la escala
   y la altura del letrero, que el texto no quede espejado y que los `Interaction` reciban el clic.
 - La caché vive en memoria: al reiniciar se relee (son 2 lecturas por entorno).
