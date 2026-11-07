@@ -49,10 +49,42 @@ public final class AnchorNames {
 	/** Face of the shelf's "Archived" header sign (east of the entrance, facing into the hub). */
 	public static final String SHELF_HEADER = "shelf_header";
 
+	/**
+	 * Face of the archive terminal (the hub's nook east of the entrance): the one computer where the
+	 * archived threads are listed (feat/archive-terminal). {@link #ARCHIVE} is the standing spot in
+	 * front of it.
+	 */
+	public static final String ARCHIVE_TERMINAL = "archive_terminal";
+	/**
+	 * The hub's big screen (P1 multiblock): face centre of the bottom-middle cell of a 5 x 3 cell
+	 * surface on the east interior wall, looking west. Cells: {@code block} ± 2 along z, up 2.
+	 */
+	public static final String HUB_SCREEN = "hub_screen";
+	/**
+	 * The thread kanban wall (P3): face centre of the bottom-middle cell of a 9 x 4 cell surface on the
+	 * hub's west interior wall, looking east. Cells: {@code block} ± 4 along z, up 3.
+	 */
+	public static final String THREAD_WALL = "thread_wall";
+	/** Where viewers of the kanban wall stand (open floor three cells in front of its middle). */
+	public static final String THREAD_WALL_FRONT = "thread_wall_front";
+	/**
+	 * Point in the air over the hub centre where the hologram (P4) floats; the column from the hub floor
+	 * up to it is kept free of blocks in every style.
+	 */
+	public static final String HOLOGRAM = "hologram";
+
+	/**
+	 * A module's big screen (P1): face centre of the bottom-middle cell of a 3 x 2 cell surface on the
+	 * module's end cap, looking down the corridor towards the spine. Cells: {@code block} ± 1 along z, up 1.
+	 */
+	public static String moduleScreen(int index) {
+		return "module_screen@" + index;
+	}
+
 	private AnchorNames() {
 	}
 
-	/** The seat of a thread's desk: the NPC sits here looking at its monitor. */
+	/** Where a thread's NPC works: standing at its desk, in front of the monitor, looking at it. */
 	public static String desk(String threadId) {
 		return "desk_" + threadId;
 	}

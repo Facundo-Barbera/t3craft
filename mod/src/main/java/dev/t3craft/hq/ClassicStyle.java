@@ -15,9 +15,7 @@ import static dev.t3craft.hq.HqGeometry.WING_WALL;
 
 import java.util.Collections;
 import java.util.EnumMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
@@ -28,8 +26,8 @@ import org.jspecify.annotations.Nullable;
 /**
  * The original HQ look ("classic", AgentCraft-inspired "Warm Studio"): copper-roofed timber hall
  * with a glazed lantern, glass-roofed spine, timber-and-pale-oak wings with skylights and copper
- * trims. Byte for byte the plan the generator produced before styles existed (see
- * {@code HqStyleTest}). Materials in {@link Palette}.
+ * trims, on the redesigned layout (standing desks, archive terminal, reserved screens). Materials in
+ * {@link Palette}.
  */
 final class ClassicStyle extends HqStyle {
 	static final String ID = "classic";
@@ -55,11 +53,15 @@ final class ClassicStyle extends HqStyle {
 		m.put(Role.GARDEN_TREE, k.floweringAzalea);
 		m.put(Role.LIGHT, k.copperLantern(false));
 		m.put(Role.DESK, k.deskTop);
-		m.put(Role.CHAIR, k.chair(Direction.SOUTH));
+		m.put(Role.BENCH, k.bench(Direction.SOUTH));
 		m.put(Role.BOARD, k.boardFace);
 		m.put(Role.COMPUTER_ON, k.monitorOn);
 		m.put(Role.COMPUTER_OFF, k.monitorOff);
 		m.put(Role.STATUS_LAMP, k.lamp());
+		m.put(Role.SCREEN, k.boardFace);
+		m.put(Role.BEACON, k.copper);
+		m.put(Role.TERMINAL, k.darkPlanks);
+		m.put(Role.PLAQUE, k.wallSign(Direction.SOUTH));
 		palette = Collections.unmodifiableMap(m);
 	}
 
@@ -85,13 +87,6 @@ final class ClassicStyle extends HqStyle {
 				BlockState floor = m == HUB ? k.plinth : m == 7 ? k.stoneFloor : m == 6 ? k.copper
 						: Math.abs(x) <= 1 && Math.abs(z) <= 1 ? k.copperInlay : k.woodFloor;
 				c.set(x, 0, z, door ? k.stoneFloor : floor);
-				if (x >= HqGeometry.STAIR_X1 && x <= HqGeometry.STAIR_X2) {
-					if (z >= HqGeometry.STAIR_OPEN_Z1 && z <= HqGeometry.STAIR_OPEN_Z2) {
-						c.set(x, 0, z, k.air);
-					} else if (z == HqGeometry.STAIR_TOP_Z) {
-						c.set(x, 0, z, k.stairs(k.stairBlock, Direction.SOUTH));
-					}
-				}
 				if (m == HUB) {
 					hubWall(c, x, z, door);
 				}
@@ -128,26 +123,14 @@ final class ClassicStyle extends HqStyle {
 				c.set(7 * sx, 2, 7 * sz, k.bookshelf);
 				c.decor(7 * sx, 3, 7 * sz, k.fern);
 			}
-			// benches along the side walls, planters at their ends
-			Direction wall = sx > 0 ? Direction.EAST : Direction.WEST;
-			for (int z = -2; z <= 2; z++) {
-				c.set(7 * sx, 1, z, k.bench(wall));
-			}
-			c.decor(7 * sx, 1, -3, k.pottedFloweringAzalea);
-			c.decor(7 * sx, 1, 3, k.pottedFloweringAzalea);
+			// planters at the ends of the bench rows
+			c.decor(5 * sx, 1, -3, k.pottedFloweringAzalea);
+			c.decor(5 * sx, 1, 3, k.pottedFloweringAzalea);
 			// lamp pedestals by both doorways
 			for (int dz = -1; dz <= 1; dz += 2) {
 				c.set(2 * sx, 1, 7 * dz, k.copperGrate);
 				c.decor(2 * sx, 2, 7 * dz, k.copperLantern(false));
 			}
-		}
-		// railing around the stairwell down to the archive
-		for (int z = HqGeometry.STAIR_OPEN_Z1 - 1; z <= HqGeometry.STAIR_TOP_Z; z++) {
-			c.set(HqGeometry.STAIR_X1 - 1, 1, z, k.rail);
-			c.set(HqGeometry.STAIR_X2 + 1, 1, z, k.rail);
-		}
-		for (int x = HqGeometry.STAIR_X1; x <= HqGeometry.STAIR_X2; x++) {
-			c.set(x, 1, HqGeometry.STAIR_OPEN_Z1 - 1, k.rail);
 		}
 		// runner from the entrance to the board
 		for (int z = 2; z <= 7; z++) {
@@ -208,45 +191,21 @@ final class ClassicStyle extends HqStyle {
 
 	// ------------------------------------------------------------------ archive
 
-	/** The basement library: shelf rows of bookshelves, the stairs down from the hub, lanterns over the aisles. */
+	/** The archive nook: bookshelves either side of the terminal, a sign above it. */
 	@Override
-	void archive(PlanBuilder.Canvas c) {
-		int fy = HqGeometry.BASEMENT_FLOOR;
-		for (int z = -HUB; z <= HUB; z++) {
-			for (int x = -HUB; x <= HUB; x++) {
-				int m = Math.max(Math.abs(x), Math.abs(z));
-				c.set(x, fy, z, m == HUB ? k.plinth : (x + z) % 2 == 0 ? k.stoneFloor : k.plinthTile);
-				for (int y = fy + 1; y <= -2; y++) {
-					if (m == HUB) {
-						c.set(x, y, z, Math.abs(x) == HUB && Math.abs(z) == HUB || Math.abs(x) == 4 || Math.abs(z) == 4 ? k.post() : k.plinth);
-					}
-				}
-				c.set(x, -1, z, m == HUB ? k.plinth : k.darkPlanks);
+	void archiveNook(PlanBuilder.Canvas c) {
+		Box n = HqGeometry.archiveNook();
+		for (int x = n.minX(); x <= n.maxX(); x++) {
+			for (int y = 1; y <= 4; y++) {
+				c.set(x, y, n.minZ(), x == HqGeometry.ARCHIVE_TERMINAL.getX() ? k.air : y == 4 ? k.beam(Direction.Axis.X) : k.bookshelf);
 			}
 		}
-		// stairs: from the hub floor layer (top step, in the hub) down one block per block northwards
-		for (int x = HqGeometry.STAIR_X1; x <= HqGeometry.STAIR_X2; x++) {
-			for (int z = HqGeometry.STAIR_OPEN_Z1; z <= HqGeometry.STAIR_OPEN_Z2; z++) {
-				c.set(x, -1, z, k.air);
-			}
-			for (int step = 1; step <= -fy - 1; step++) {
-				c.set(x, -step, HqGeometry.STAIR_TOP_Z - step, k.stairs(k.stairBlock, Direction.SOUTH));
-			}
-		}
-		Set<Long> rowTops = new HashSet<>();
-		for (HqGeometry.ArchiveSlot slot : HqGeometry.archiveSlots()) {
-			c.set(slot.cell(), k.bookshelf);
-			rowTops.add(slot.cell().atY(fy + 3).asLong());
-		}
-		for (long t : rowTops) {
-			c.set(BlockPos.of(t), k.deskTop);
-		}
-		for (int x : new int[] {-4, 0}) {
-			c.hang(x, -2, -5, k.lantern(true));
-			c.hang(x, -2, 4, k.lantern(true));
-		}
-		c.hang(-4, -2, -1, k.lantern(true));
-		c.hang(4, -2, -1, k.lantern(true));
+		c.decor(HqGeometry.ARCHIVE_TERMINAL.above(), k.wallSign(Direction.NORTH), SignTags.sign(DyeColor.LIGHT_GRAY, true, "", "Archive", "", ""));
+	}
+
+	@Override
+	BlockState bench(Direction back) {
+		return k.bench(back);
 	}
 
 	// ------------------------------------------------------------------ portico
@@ -426,7 +385,7 @@ final class ClassicStyle extends HqStyle {
 		}
 	}
 
-	/** Desk row against the wall (drawer barrel, two desk tops, a fern), chair behind. */
+	/** Desk row against the wall (drawer barrel, two desk tops, a fern); the agent stands behind it. */
 	@Override
 	void desk(PlanBuilder.Canvas c, DeskCells d) {
 		BlockPos desk = d.computer().below();
@@ -434,12 +393,14 @@ final class ClassicStyle extends HqStyle {
 		Direction side = d.facing().getClockWise();
 		for (int dx = -1; dx <= 1; dx++) {
 			c.set(desk.below().relative(side, dx), k.woodFloor);
-			c.set(d.seat().below().relative(side, dx), k.woodFloor);
+			c.set(d.stand().below().relative(side, dx), k.woodFloor);
+		}
+		if (!d.occupied()) {
+			return;
 		}
 		c.set(d.drawer(), k.barrel(d.facing().getOpposite()));
 		c.set(desk, k.deskTop);
 		c.set(right, k.deskTop);
 		c.decor(d.drawer().above(), k.fern);
-		c.set(d.seat(), k.chair(d.facing().getOpposite()));
 	}
 }

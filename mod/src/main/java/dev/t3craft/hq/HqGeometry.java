@@ -58,6 +58,71 @@ final class HqGeometry {
 	/** Tiers in slot order: eye level first, then top, then bottom. */
 	private static final int[] SHELF_TIER_ORDER = {2, 3, 1};
 
+	/**
+	 * The archive terminal's nook, set into the hub's south wall east of the entrance: a 3-wide alcove
+	 * ({@code x = 4..6, z = ARCHIVE_Z}, {@code y = 1..4}) holding the terminal ({@link #ARCHIVE_TERMINAL}:
+	 * screen at eye level over a base) with a standing spot in front ({@code z = ARCHIVE_Z - 1}).
+	 * Replaces the per-thread "Archived" shelf in the plan (redesign 2026-11: one terminal lists every
+	 * archived thread).
+	 */
+	static final int ARCHIVE_Z = HUB - 1;
+	static final BlockPos ARCHIVE_TERMINAL = new BlockPos(5, 2, ARCHIVE_Z);
+	static final BlockPos ARCHIVE_STAND = new BlockPos(5, 1, ARCHIVE_Z - 1);
+
+	static Box archiveNook() {
+		return new Box(4, 1, ARCHIVE_Z, 6, 4, ARCHIVE_Z);
+	}
+
+	/**
+	 * Reserved screen surfaces, for the big multiblock screens (P1) and the thread kanban wall (P3).
+	 * Each is a vertical rectangle of cells, written by the generator with the style's screen stand-in
+	 * and published as an anchor (face centre of the rectangle's bottom-middle cell; see
+	 * {@link AnchorNames#HUB_SCREEN}, {@link AnchorNames#THREAD_WALL}, {@link AnchorNames#moduleScreen}).
+	 *
+	 * @param origin bottom cell at the left end as seen from the front
+	 * @param along  direction the rectangle extends to the right as seen from the front
+	 * @param facing outward normal of the visible face
+	 */
+	record Surface(BlockPos origin, Direction along, Direction facing, int width, int height) {
+		List<BlockPos> cells() {
+			List<BlockPos> out = new ArrayList<>();
+			for (int y = 0; y < height; y++) {
+				for (int i = 0; i < width; i++) {
+					out.add(origin.relative(along, i).above(y));
+				}
+			}
+			return out;
+		}
+
+		/** Bottom-middle cell (the anchor's block). */
+		BlockPos anchorCell() {
+			return origin.relative(along, width / 2);
+		}
+	}
+
+	/** Hub screen: east interior wall face, 5 wide x 3 tall, looking west into the hub. */
+	static Surface hubScreen() {
+		return new Surface(new BlockPos(HUB - 1, 2, -2), Direction.SOUTH, Direction.WEST, 5, 3);
+	}
+
+	/** Thread kanban wall: west interior wall face, 9 wide x 4 tall, looking east into the hub. */
+	static Surface threadWall() {
+		return new Surface(new BlockPos(-HUB + 1, 1, 4), Direction.NORTH, Direction.EAST, 9, 4);
+	}
+
+	/** A module's big screen: on its end cap, facing the corridor (towards the spine), 3 wide x 2 tall. */
+	static Surface moduleScreen(int wingIndex, int segments) {
+		int u = segmentU(segments);
+		Direction in = outward(wingIndex).getOpposite();
+		// left as seen from the corridor looking at the cap: east wing looks east, left is north
+		Direction along = side(wingIndex) > 0 ? Direction.SOUTH : Direction.NORTH;
+		int v0 = side(wingIndex) > 0 ? DOOR_V1 : DOOR_V2;
+		return new Surface(new BlockPos(wx(wingIndex, u), 2, wz(wingIndex, v0)), along, in, 3, 2);
+	}
+
+	/** The hologram's airspace over the hub centre (kept free from y = 1 to {@link #HOLOGRAM_TOP}). */
+	static final int HOLOGRAM_TOP = 8;
+
 	/** One shelf place: the computer cell and the direction its screen faces (into the hub). */
 	record ArchiveSlot(BlockPos cell, Direction facing) {
 	}
