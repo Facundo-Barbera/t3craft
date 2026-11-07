@@ -66,6 +66,15 @@ public final class AnchorNames {
 	public static final String SHELF_MORE = "shelf_more";
 	/** Face of the shelf's "Archived" header sign (east of the entrance, facing into the hub). */
 	public static final String SHELF_HEADER = "shelf_header";
+	/**
+	 * Front face of the archive terminal (feat/archive-terminal): the one place in the HQ where closed
+	 * threads are browsed. Against the hub's east wall, south of the benches, screen facing west into
+	 * the hub ({@code facing} = the face's normal; a player uses it standing one block west). Vanilla
+	 * HQ: a lectern stands there; with the blocks module, {@code t3craft:archive_terminal}. A redesign
+	 * of the hub only has to publish this anchor (any free floor cell, facing where the player stands)
+	 * and keep that cell for the terminal; the fixtures follow the anchor.
+	 */
+	public static final String ARCHIVE_TERMINAL = "archiveTerminal";
 
 	private AnchorNames() {
 	}

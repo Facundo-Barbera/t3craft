@@ -14,6 +14,7 @@ queda exactamente como sin él.
 |---|---|---|
 | `t3craft:monitor` | `t3craft:monitor` (`MonitorBlockEntity`) | Bloque entero con `facing`. La cara frontal es una pantalla: título, estado con color y antigüedad, último mensaje. Click → abre el chat del hilo. |
 | `t3craft:status_lamp` | `t3craft:status_lamp` (`LampBlockEntity`) | Lámpara del escritorio: color y luz según el estado del hilo. |
+| `t3craft:archive_terminal` | `t3craft:archive_terminal` (`ArchiveTerminalBlockEntity`) | Consola de archivo (feat/archive-terminal): la pantalla muestra "ARCHIVE · N hilos" y los últimos 3; click → pantalla de archivo. En el HQ, en el anchor `archiveTerminal`. Ver `docs/feat-archive-terminal.md`. |
 | `t3craft:board_lamp` | el mismo tipo `t3craft:status_lamp` | Variante "bombilla del tablero": la i-ésima bombilla muestra el i-ésimo hilo que necesita al jugador (errores primero, luego "needs you"). |
 | `t3craft:thread_board` | `t3craft:thread_board` (`ThreadBoardBlockEntity`) | Ancla de la pared kanban de hilos (P3): el BER dibuja una pared de `width × height` bloques desde la celda inferior izquierda. Click en una tarjeta → chat del hilo. Ver `docs/feat-thread-wall.md`. |
 
@@ -80,7 +81,8 @@ de la posición en el plan del HQ; si tampoco, sin vincular. Determinista.
 - cada módulo: el dintel de su puerta (la viga del muro interior, una celda hacia el pasillo desde el
   ancla `module@<i>` y tres arriba) → bombilla `module:<k1>,<k2>…`, el hilo más urgente de los
   escritorios de ese módulo (claves ordenadas; apagada si el módulo está vacío);
-- anclas `archive_<threadId>` → monitor mirando al pasillo, vinculado al hilo archivado.
+- ancla `archiveTerminal` → la terminal de archivo (sin binding). Las celdas `archive_<threadId>` del
+  estante ya **no** son fixtures (feat/archive-terminal: el archivo vive solo en la terminal).
 
 Como las celdas de un escritorio dependen solo de (módulo, slot) y `HqLayout` es estable, la tabla es
 determinista e idempotente: el mismo roster en cualquier orden da la misma tabla (test con rosters

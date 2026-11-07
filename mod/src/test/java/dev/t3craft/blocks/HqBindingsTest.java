@@ -111,12 +111,18 @@ class HqBindingsTest {
 		for (int i = 0; i < bulbs.size(); i++) {
 			assertTrue(idx.contains(i), "bulbs 0..n-1");
 		}
-		// the settled thread's computer in the archive is a monitor bound to it
+		// closed threads live only in the archive terminal: the shelf cell is no fixture
 		BlockPos archived = p.anchor(AnchorNames.archive("vps:t4")).block();
-		HqBindings.Fixture a = find(HqBindings.of(p), archived);
-		assertEquals(Binding.thread("vps:t4"), a.binding());
-		assertEquals(HqBindings.Role.MONITOR, a.role());
+		assertTrue(HqBindings.of(p).stream().noneMatch(f -> f.rel().equals(archived)), "no thread shown on the shelf");
+		assertTrue(HqBindings.of(p).stream().noneMatch(f -> f.binding().equals(Binding.thread("vps:t4"))));
 		assertNull(p.workstation("vps:t4"), "no desk for the settled thread");
+		// the terminal follows the plan's archiveTerminal anchor, unbound, screen facing the anchor's way
+		List<HqBindings.Fixture> terminals = HqBindings.ofRole(p, HqBindings.Role.ARCHIVE_TERMINAL);
+		assertEquals(1, terminals.size());
+		HqBindings.Fixture t = terminals.getFirst();
+		assertEquals(p.anchor(AnchorNames.ARCHIVE_TERMINAL).block(), t.rel());
+		assertEquals(p.anchor(AnchorNames.ARCHIVE_TERMINAL).facing(), t.facing());
+		assertTrue(t.binding().isNone());
 	}
 
 	@Test
@@ -152,6 +158,9 @@ class HqBindingsTest {
 				case MONITOR -> assertEquals(STANDIN.monitor(f.facing()), s.state());
 				case LAMP -> assertEquals(STANDIN.lamp(), s.state());
 				case BOARD_LAMP -> assertEquals(STANDIN.boardLamp(), s.state());
+				case ARCHIVE_TERMINAL -> assertEquals(STANDIN.archiveTerminal(f.facing()), s.state());
+				default -> {
+				}
 			}
 		}
 	}
