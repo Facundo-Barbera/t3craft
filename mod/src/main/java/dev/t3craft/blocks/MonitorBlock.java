@@ -26,7 +26,8 @@ import org.jspecify.annotations.Nullable;
 /**
  * The monitor: a full block whose front ({@link #FACING}) is a screen. The block model is a dark
  * bezel; the client's {@code MonitorRenderer} draws the bound thread's status on the front face.
- * Using it (client side) opens that thread's chat through {@link #setClientUse the client hook}.
+ * Using it opens that thread's chat (client side, through {@link #setClientUse the client hook});
+ * the use is consumed on both sides.
  *
  * <p>Facing/rotate/mirror handling adapted from AgentCraft's {@code FacingEntityBlock}.
  */
@@ -70,12 +71,16 @@ public final class MonitorBlock extends BaseEntityBlock {
 
 	@Override
 	protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
-		if (!level.isClientSide()) {
-			return InteractionResult.PASS;
+		// Consumed on both sides, always: if the server passed while the client opened the chat, the
+		// server would go on to use the held item (e.g. place a block against the monitor). Sneak to
+		// place blocks against it, as with any interactive block.
+		if (level.isClientSide()) {
+			ClientUse use = clientUse;
+			if (use != null) {
+				use.use(pos, level.getBlockEntity(pos) instanceof MonitorBlockEntity m ? m.binding() : "");
+			}
 		}
-		ClientUse use = clientUse;
-		String binding = level.getBlockEntity(pos) instanceof MonitorBlockEntity m ? m.binding() : "";
-		return use != null && use.use(pos, binding) ? InteractionResult.SUCCESS : InteractionResult.PASS;
+		return InteractionResult.SUCCESS;
 	}
 
 	@Override
