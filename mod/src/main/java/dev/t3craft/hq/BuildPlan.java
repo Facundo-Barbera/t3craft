@@ -31,7 +31,11 @@ import org.jspecify.annotations.Nullable;
  */
 public final class BuildPlan {
 	/** A part of the HQ that owns a box of cells (minus {@code holes}, owned by other modules). */
-	public record Module(String id, Box box, List<Box> holes) {
+	/**
+	 * @param group the buildable unit it belongs to ({@link #groups()}): {@code hub}, {@code portico},
+	 *              {@code archive}, {@code spine_<row>}, {@code spine_cap}, {@code module_<index>}
+	 */
+	public record Module(String id, Box box, List<Box> holes, String group) {
 		public Module {
 			holes = List.copyOf(holes);
 		}
@@ -54,10 +58,12 @@ public final class BuildPlan {
 	private final SortedMap<String, Anchor> anchors;
 	private final List<Module> modules;
 	private final Box footprint;
+	private final List<Workstation> workstations;
 	private @Nullable String fingerprint;
 
-	BuildPlan(List<Placement> placements, SortedMap<String, Anchor> anchors, List<Module> modules) {
+	BuildPlan(List<Placement> placements, SortedMap<String, Anchor> anchors, List<Module> modules, List<Workstation> workstations) {
 		this.placements = List.copyOf(placements);
+		this.workstations = List.copyOf(workstations);
 		Map<BlockPos, Placement> m = new LinkedHashMap<>(placements.size() * 2);
 		for (Placement p : placements) {
 			if (m.put(p.rel(), p) != null) {
@@ -94,6 +100,53 @@ public final class BuildPlan {
 	/** The modules in build order, with the boxes they own. */
 	public List<Module> modules() {
 		return modules;
+	}
+
+	/** Every desk of every module (taken or vacant), by module index then slot. */
+	public List<Workstation> workstations() {
+		return workstations;
+	}
+
+	/** The workstation of an active thread, or null. */
+	public @Nullable Workstation workstation(String threadId) {
+		for (Workstation w : workstations) {
+			if (threadId.equals(w.threadId())) {
+				return w;
+			}
+		}
+		return null;
+	}
+
+	/** Group of the module that owns {@code rel}, or null when no module owns it. */
+	public @Nullable String groupAt(BlockPos rel) {
+		for (Module m : modules) {
+			if (m.owns(rel.getX(), rel.getY(), rel.getZ())) {
+				return m.group();
+			}
+		}
+		return null;
+	}
+
+	/** Group names in build order (first module of each group). */
+	public List<String> groups() {
+		List<String> out = new ArrayList<>();
+		for (Module m : modules) {
+			if (!out.contains(m.group())) {
+				out.add(m.group());
+			}
+		}
+		return out;
+	}
+
+	/** Placements of one group, in plan order. */
+	public List<Placement> placements(String group) {
+		List<Placement> out = new ArrayList<>();
+		for (Placement p : placements) {
+			if (group.equals(groupAt(p.rel()))) {
+				out.add(p);
+			}
+		}
+		return out;
 	}
 
 	/** Bounding box of every module (relative to the origin). */

@@ -35,7 +35,18 @@ final class PlanBuilder {
 	private final Map<Long, Cell> cells = new HashMap<>();
 	private final List<BuildPlan.Module> modules = new ArrayList<>();
 	private final TreeMap<String, Anchor> anchors = new TreeMap<>();
+	private final List<Workstation> workstations = new ArrayList<>();
 	private @Nullable Canvas open;
+	private @Nullable String group;
+
+	/** Modules opened from now on belong to {@code group} (null: each module is its own group). */
+	void group(@Nullable String g) {
+		group = g;
+	}
+
+	void workstation(Workstation w) {
+		workstations.add(w);
+	}
 
 	Canvas module(String id, Box box, List<Box> holes) {
 		if (open != null) {
@@ -54,7 +65,7 @@ final class PlanBuilder {
 				throw new IllegalStateException("module " + id + " " + box + " collides with " + m.id() + " " + m.box());
 			}
 		}
-		BuildPlan.Module m = new BuildPlan.Module(id, box, holes);
+		BuildPlan.Module m = new BuildPlan.Module(id, box, holes, group == null ? id : group);
 		modules.add(m);
 		open = new Canvas(m, modules.size() - 1);
 		return open;
@@ -70,6 +81,7 @@ final class PlanBuilder {
 		if (open != null) {
 			throw new IllegalStateException("module " + open.module.id() + " still open");
 		}
+		resolveShapes();
 		List<Cell> all = new ArrayList<>(cells.values());
 		all.sort(Comparator.<Cell>comparingInt(c -> c.module)
 				.thenComparingInt(c -> c.layer)
@@ -80,7 +92,23 @@ final class PlanBuilder {
 		for (Cell c : all) {
 			out.add(c.placement);
 		}
-		return new BuildPlan(out, anchors, modules);
+		return new BuildPlan(out, anchors, modules, workstations);
+	}
+
+	/** Bakes pane, wall and stair connections into the states (see {@link PlanShapes}). */
+	private void resolveShapes() {
+		Map<Long, BlockState> states = new HashMap<>(cells.size() * 2);
+		for (Map.Entry<Long, Cell> e : cells.entrySet()) {
+			states.put(e.getKey(), e.getValue().placement.state());
+		}
+		PlanShapes.resolve(states);
+		for (Map.Entry<Long, Cell> e : cells.entrySet()) {
+			Cell c = e.getValue();
+			BlockState s = states.get(e.getKey());
+			if (s != c.placement.state()) {
+				e.setValue(new Cell(new Placement(c.placement.rel(), s, c.placement.be()), c.module, c.layer));
+			}
+		}
 	}
 
 	/** Write access to one module's cells. */
