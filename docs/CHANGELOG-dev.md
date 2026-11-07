@@ -10,6 +10,7 @@ One line per structural commit on `main`, newest first:
 
 ## Entries
 
+- 2026-11-07 feat/op-settle RESTART — new subcommands /t3craft operate settle|snooze|pin|unpin|read <npc|env:thread> [1h|4h|tomorrow]; thread action buttons (ThreadOpsBar) in the NPC screen and the portable bottom bar; new SnoozeScreen; new OperateKind THREAD_UNPIN; settled NPCs walk to the exit and fade out (Departure, AnchorSource.exit); new lang keys. No entrypoints, registries or keybinds.
 - 2026-11-07 feat/op-stop RESTART — interrupt / stop a thread from the NPC panel and /t3craft operate interrupt|stop <npc|env:thread> (operate, destructive → in-game confirmation, audited; disabled with tooltip without control).
 - 2026-11-07 feat/hq-construction RESTART — new client entrypoint HqConstructionClient; commands /t3craft hq build|status|pause|resume; builders construct the modular HQ on the confirmed site (base then modules as BuildJobs with animated crew), snapshot via site before each expansion, removals restore the site snapshot, rebuild after site move/resume, release-policy hook, no basement; NPCs leave the grid and go to their desks (HqAnchorSource) once modules are built; survival cost via GameModePolicy.
 - 2026-11-07 fix/npc-labels RELOAD — NPC labels are one short line (truncated title + status glyph/colour); the detail panel (env, project, model, branch, activity, +n helpers) only shows when close or looked at, with hysteresis; one far label and one near panel per NPC, no overlaps with bubbles; config label mode (compact default) and detail distance.

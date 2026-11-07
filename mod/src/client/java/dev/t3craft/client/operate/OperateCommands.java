@@ -36,6 +36,11 @@ public final class OperateCommands {
 		return literal("operate")
 				.executes(OperateCommands::status)
 				.then(literal("status").executes(OperateCommands::status))
+				.then(ThreadOpsCommands.settle())
+				.then(ThreadOpsCommands.snooze())
+				.then(ThreadOpsCommands.pin())
+				.then(ThreadOpsCommands.unpin())
+				.then(ThreadOpsCommands.read())
 				.then(literal("enable").then(argument("env", StringArgumentType.word()).suggests(ENVS).executes(c -> {
 					String env = StringArgumentType.getString(c, "env");
 					var e = OperateClient.environment(env);

@@ -69,6 +69,8 @@ public final class BehaviorDirector {
 	private final ApproachPlanner approaches = new ApproachPlanner();
 	private @Nullable ApproachConfig approachOverride;
 	private ApproachConfig.@Nullable Watcher approachConfig;
+	/** Settled NPCs going home (item 22); null value = requested, starts next tick. Lazy: hot-swap safe. */
+	private @Nullable Map<String, @Nullable Departure> departures;
 
 	/** Plug in a physical base (null = none, grid layout only). See {@link AnchorSource}. */
 	public void setAnchorSource(@Nullable AnchorSource source) {
@@ -105,9 +107,30 @@ public final class BehaviorDirector {
 		return b == null ? null : vec(b.pos());
 	}
 
+	/**
+	 * The thread was settled (item 22): the NPC waves, walks to the exit and fades out, and stays
+	 * hidden until T3 reflects the settle ({@code NpcInfo.settled()}). False if the NPC is unknown.
+	 */
+	public boolean depart(String npcId) {
+		if (!brains.containsKey(npcId)) {
+			return false;
+		}
+		departures().putIfAbsent(npcId, null);
+		return true;
+	}
+
+	private Map<String, @Nullable Departure> departures() {
+		return departures = dev.t3craft.debug.HotSwapFields.orInit(departures, HashMap::new);
+	}
+
+	public boolean departing(String npcId) {
+		return departures().containsKey(npcId);
+	}
+
 	/** Forget one NPC (it was removed) and discard its overlay entities. */
 	public void forget(String npcId, @Nullable ClientLevel lvl) {
 		brains.remove(npcId);
+		departures().remove(npcId);
 		Overlay o = overlays.remove(npcId);
 		if (o != null) {
 			discard(lvl, o.bubble);
@@ -123,6 +146,7 @@ public final class BehaviorDirector {
 		}
 		overlays.clear();
 		brains.clear();
+		departures().clear();
 		approaches.reset();
 	}
 
@@ -178,6 +202,9 @@ public final class BehaviorDirector {
 			NpcBrain.Targets t = new NpcBrain.Targets(desk, boardSlot, home, layout.wanderRadius(info.groupId()), rest);
 
 			Overlay o = overlays.computeIfAbsent(b.id(), id -> new Overlay());
+			if (departures().containsKey(b.id()) && depart(lvl, b, brain, o, layout, nav, playerPos)) {
+				continue;
+			}
 			String summary = summaries.summary(b.id(), info);
 			if (o.seenSummary && !Objects.equals(summary, o.lastSummary)) {
 				brain.summaryChanged();
@@ -194,6 +221,60 @@ public final class BehaviorDirector {
 				forget(id, lvl);
 			}
 		}
+	}
+
+	/** Drives a departing NPC; false once it is over (the brain takes over again). */
+	private boolean depart(ClientLevel lvl, Body b, NpcBrain brain, Overlay o, AnchorSource layout, NpcBrain.Navigator nav, Pos player) {
+		Departure d = departures().get(b.id());
+		if (d == null) {
+			Anchor exit = layout.exit();
+			if (exit == null) {
+				exit = layout.home(b.info().groupId());
+			}
+			d = new Departure(brain.pos(), brain.bodyYaw(), exit != null ? exit : new Anchor(brain.pos(), brain.bodyYaw()));
+			departures().put(b.id(), d);
+		}
+		if (d.stage() == Departure.Stage.GONE && (b.info().settled() || d.expired())) {
+			// Back (settle reflected: the HQ gave it a new spot; or T3 never confirmed). Hidden, so
+			// the fresh brain placing it straight on its spot is not a visible teleport.
+			departures().remove(b.id());
+			brains.put(b.id(), new NpcBrain(b.id(), d.pos()));
+			b.avatar().setInvisible(false);
+			return false;
+		}
+		d.tick(nav, player);
+		LivingEntity a = b.avatar();
+		Pos p = d.pos();
+		a.moveOrInterpolateTo(new Vec3(p.x(), p.y(), p.z()), d.yaw(), 0f);
+		a.setYBodyRot(d.yaw());
+		a.setYHeadRot(d.yaw());
+		if (o.crouching) {
+			o.crouching = false;
+			a.setPose(Pose.STANDING);
+		}
+		if (d.stage() == Departure.Stage.WAVE && d.stageTicks() % 7 == 1) {
+			a.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, false);
+		}
+		a.setInvisible(!d.visible());
+		discard(lvl, o.bubble);
+		discard(lvl, o.icon);
+		o.bubble = null;
+		o.icon = null;
+		o.bubbleText = null;
+		Vec3 at = a.position();
+		if (b.panel() != null) {
+			// Hidden: park the panel under the avatar, out of sight (client-only entity).
+			b.panel().moveOrInterpolateTo(new Vec3(at.x, at.y + (d.visible() ? PANEL_Y : -64), at.z), 0f, 0f);
+		}
+		if (d.stage() == Departure.Stage.FADE) {
+			var r = lvl.getRandom();
+			int n = d.stageTicks() == 1 ? 12 : 2;
+			for (int i = 0; i < n; i++) {
+				lvl.addParticle(i % 2 == 0 ? ParticleTypes.POOF : ParticleTypes.PORTAL, at.x + (r.nextDouble() - 0.5) * 0.8,
+						at.y + r.nextDouble() * 1.8, at.z + (r.nextDouble() - 0.5) * 0.8, 0, 0.03, 0);
+			}
+		}
+		return true;
 	}
 
 	private void apply(ClientLevel lvl, Body b, NpcBrain brain, Overlay o, @Nullable String summary, Pos player) {
