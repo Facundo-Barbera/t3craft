@@ -62,7 +62,7 @@ public final class AnchorNames {
 	/**
 	 * A large screen reserved by the plan, {@code width × height} blocks, showing {@code binding} (a
 	 * blocks-module binding string, e.g. {@code "project:" + projectKey}, {@code "env:" + envId} or
-	 * {@code "thread:" + threadId}; empty = unbound). {@code key} names the spot and must be unique in
+	 * {@code "thread:" + threadId}; empty = unbound). {@code key} (no {@code =}) names the spot and must be unique in
 	 * the plan ({@code "hub"}, {@code "module@3"}, ...). Publish it as
 	 * {@code Anchor.face(name, topLeft, facing)}: the anchor's block is the <b>top-left</b> cell as seen
 	 * from the front, its facing the screen's normal. The generator must place a block (any solid
@@ -70,7 +70,7 @@ public final class AnchorNames {
 	 * existing cells. Name format: {@code bigscreen_<key>@<w>x<h>=<binding>}.
 	 */
 	public static String bigScreen(String key, int width, int height, String binding) {
-		if (key.indexOf('@') >= 0 || key.indexOf('=') >= 0 || width < 1 || height < 1) {
+		if (key.isEmpty() || key.indexOf('=') >= 0 || width < 1 || height < 1) {
 			throw new IllegalArgumentException("bad big screen: " + key + " " + width + "x" + height);
 		}
 		return BIG_SCREEN + key + "@" + width + "x" + height + "=" + (binding == null ? "" : binding);
@@ -85,9 +85,10 @@ public final class AnchorNames {
 		if (name == null || !name.startsWith(BIG_SCREEN)) {
 			return null;
 		}
-		int at = name.indexOf('@', BIG_SCREEN.length());
-		int eq = at < 0 ? -1 : name.indexOf('=', at);
-		int x = at < 0 || eq < 0 ? -1 : name.indexOf('x', at);
+		// the key may contain '@' (module@3) but not '='; the size is between the last '@' and the first '='
+		int eq = name.indexOf('=', BIG_SCREEN.length());
+		int at = eq < 0 ? -1 : name.lastIndexOf('@', eq);
+		int x = at < 0 ? -1 : name.indexOf('x', at);
 		if (at <= BIG_SCREEN.length() || x < 0 || x > eq) {
 			return null;
 		}

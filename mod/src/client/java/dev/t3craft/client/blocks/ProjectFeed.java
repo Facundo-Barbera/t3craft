@@ -73,7 +73,7 @@ public final class ProjectFeed {
 			String event = TextFit.normalize(t.activity());
 			if (twoLines) {
 				lines.add(new StationScreen.Line(TextFit.clip(s.glyph + " " + title, cols), s.color));
-				lines.add(new StationScreen.Line(TextFit.clip("  " + (event.isEmpty() ? WorkstationModel.NO_ACTIVITY : event), cols),
+				lines.add(new StationScreen.Line(TextFit.clip("↳ " + (event.isEmpty() ? WorkstationModel.NO_ACTIVITY : event), cols),
 						WorkstationModel.ACTIVITY_COLOR));
 			} else {
 				String line = s.glyph + " " + title + (event.isEmpty() ? "" : " — " + event);
