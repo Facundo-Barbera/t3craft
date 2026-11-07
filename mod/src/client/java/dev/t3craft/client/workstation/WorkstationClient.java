@@ -8,6 +8,7 @@ import dev.t3craft.T3Craft;
 import dev.t3craft.client.T3CraftClient;
 import dev.t3craft.client.config.ConfigManager;
 import dev.t3craft.client.debug.GuardedEvents;
+import dev.t3craft.client.npc.ChipsConfig;
 import dev.t3craft.client.npc.NpcInfo;
 import dev.t3craft.client.npc.behavior.Pos;
 import dev.t3craft.debug.DevReload;
@@ -196,7 +197,7 @@ public final class WorkstationClient implements ClientModInitializer {
 		List<WorkstationThread> list = new ArrayList<>(npcs.size());
 		threads.clear();
 		for (NpcInfo n : npcs) {
-			WorkstationThread t = WorkstationThread.fromNpc(n);
+			WorkstationThread t = WorkstationThread.fromNpc(n, ChipsConfig.current().branchWorkstation());
 			list.add(t);
 			threads.put(t.key(), t);
 		}

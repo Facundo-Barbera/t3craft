@@ -10,6 +10,7 @@ import org.jspecify.annotations.Nullable;
  * <pre>
  *   Fix login redirect loop          ← title, white, clipped to one line
  *   ⚙ WORKING · 3m                   ← glyph + status word + age, in the status colour
+ *   ⎇ feat/login-fix                 ← branch, dim (only when known)
  *   Running tests in mod/: 12 of     ← last action / message, wrapped, light grey
  *   40 passed…
  * </pre>
@@ -53,11 +54,14 @@ public final class WorkstationModel {
 	 */
 	public StationScreen render(WorkstationThread t, @Nullable String ageLabel) {
 		StationStatus s = t.status();
-		List<StationScreen.Line> lines = new ArrayList<>(2 + layout.activityLines());
+		List<StationScreen.Line> lines = new ArrayList<>(3 + layout.activityLines());
 		String title = TextFit.clip(t.title().isBlank() ? "(untitled)" : t.title(), layout.width());
 		lines.add(new StationScreen.Line(title, s == StationStatus.ARCHIVED ? DIM_COLOR : TITLE_COLOR));
 		String status = s.glyph + " " + s.word + (ageLabel == null || ageLabel.isEmpty() ? "" : " · " + ageLabel);
 		lines.add(new StationScreen.Line(TextFit.clip(status, layout.width()), s.color));
+		if (t.branch() != null && !t.branch().isBlank()) {
+			lines.add(new StationScreen.Line(TextFit.clip("⎇ " + t.branch(), layout.width()), DIM_COLOR));
+		}
 		if (s != StationStatus.ARCHIVED) {
 			List<String> activity = TextFit.wrap(t.activity(), layout.width(), layout.activityLines());
 			if (activity.isEmpty()) {
