@@ -15,8 +15,26 @@ import org.jspecify.annotations.Nullable;
 public interface ChatSource {
 	/** Thrown with a player-facing reason (not paired, bridge mode, expired...). */
 	final class Unavailable extends Exception {
+		/** What the empty state offers next to the reason. */
+		public enum Action {
+			NONE,
+			/** A button to the pairing flow (bridge mode, or an environment that is not paired). */
+			PAIR
+		}
+
+		private final Action action;
+
 		public Unavailable(String message) {
+			this(message, Action.NONE);
+		}
+
+		public Unavailable(String message, Action action) {
 			super(message);
+			this.action = action;
+		}
+
+		public Action action() {
+			return action;
 		}
 	}
 

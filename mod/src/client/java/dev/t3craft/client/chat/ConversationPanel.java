@@ -28,6 +28,7 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.toasts.SystemToast;
 import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.resources.language.I18n;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.FontDescription;
 import net.minecraft.network.chat.MutableComponent;
@@ -52,7 +53,7 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>Inside its bounds, top to bottom: a paper panel with the header (title, environment, state dot,
  * optional ‹ n/N › navigation), the "who needs it" callout, the inset feed and a key-cap footer; then
- * the command bar, disabled because replying needs {@code orchestration:operate}. In the feed every
+ * the command bar (ready when the environment can operate; read-only shows an "Enable control" button). In the feed every
  * turn has a colour stripe and an avatar (clay "you", the agent colour for the agent), consecutive
  * tool calls are one collapsed line ("4 steps · $, Edit, Search") that unfolds into AgentCraft monitor
  * tool lines, each of which unfolds its output; Markdown is rendered; links copy on click.
@@ -69,7 +70,20 @@ public final class ConversationPanel implements AutoCloseable {
 	private static final int TURN_GAP = 4;
 	private static final Style MONO = Style.EMPTY.withFont(new FontDescription.Resource(Identifier.withDefaultNamespace("uniform")));
 	private static final SystemToast.SystemToastId COPIED = new SystemToast.SystemToastId(2000L);
-	public static final String REPLY_HINT = "Replying needs orchestration:operate (read-only pairing)";
+	/** How often the reply bar re-asks whether the environment can operate. */
+	private static final long OPERATE_RECHECK_MS = 1000;
+
+	/** What the conversation's buttons do; the host wires them ({@link ChatScreens#screenActions()}). */
+	public interface Actions {
+		/** True when {@code envId} can operate (write): the reply bar is ready, no read-only text. */
+		boolean canOperate(String envId);
+
+		/** "Enable control": opens {@code OperatePairScreen} for {@code envId}. */
+		void enableControl(String envId);
+
+		/** "Pair…": the pairing flow (bridge mode or an environment that is not paired). */
+		void pair();
+	}
 
 	/** Thread navigation shown as ‹ n/N › key caps in the header (AgentCraft decision queue). */
 	public interface Navigation {
@@ -95,6 +109,11 @@ public final class ConversationPanel implements AutoCloseable {
 	private String envLabel = "";
 	private @Nullable EnvBadge badge;
 	private @Nullable String message;
+	private ChatSource.Unavailable.Action messageAction = ChatSource.Unavailable.Action.NONE;
+	private @Nullable Actions actions;
+	private boolean canOperate;
+	private @Nullable String operateEnv;
+	private long operateCheckedAt;
 	private final Set<String> expanded = new HashSet<>();
 
 	// layout cache
@@ -111,6 +130,8 @@ public final class ConversationPanel implements AutoCloseable {
 	// last rectangles (hit-testing)
 	private Rect well = Rect.EMPTY;
 	private Rect bar = Rect.EMPTY;
+	private Rect pairButton = Rect.EMPTY;
+	private Rect controlButton = Rect.EMPTY;
 	private int prevX = -100;
 	private int nextX = -100;
 	private int navY;
@@ -183,6 +204,23 @@ public final class ConversationPanel implements AutoCloseable {
 		hints = keyThenVerb.clone();
 	}
 
+	/** Wires the buttons (pair, enable control) and the operate query; null hides the buttons. */
+	public void setActions(@Nullable Actions a) {
+		actions = a;
+		operateEnv = null;
+	}
+
+	/** The reply bar state for the thread shown (see {@link ChatAccess#reply}). */
+	public ChatAccess.Reply replyState() {
+		boolean shown = key != null && !envId.isEmpty();
+		if (shown && actions != null && (!envId.equals(operateEnv) || System.currentTimeMillis() - operateCheckedAt > OPERATE_RECHECK_MS)) {
+			operateEnv = envId;
+			operateCheckedAt = System.currentTimeMillis();
+			canOperate = actions.canOperate(envId);
+		}
+		return ChatAccess.reply(shown, shown && actions != null && canOperate);
+	}
+
 	/** Environment icon for the header (configured colour); null derives it from the id. */
 	public void setBadge(@Nullable EnvBadge b) {
 		badge = b;
@@ -214,6 +252,7 @@ public final class ConversationPanel implements AutoCloseable {
 		this.envLabel = envLabel;
 		this.title = title;
 		message = null;
+		messageAction = ChatSource.Unavailable.Action.NONE;
 		resetView();
 		try {
 			ChatSource.Env env = source.env(envId);
@@ -226,12 +265,19 @@ public final class ConversationPanel implements AutoCloseable {
 			feed.start();
 		} catch (ChatSource.Unavailable e) {
 			message = e.getMessage();
+			messageAction = e.action();
 		}
 	}
 
 	/** Shows a message and no thread (e.g. "Select a thread"). */
 	public void showNothing(String text) {
+		showNothing(text, ChatSource.Unavailable.Action.NONE);
+	}
+
+	/** Like {@link #showNothing(String)}, with a button next to the message (e.g. pair). */
+	public void showNothing(String text, ChatSource.Unavailable.Action action) {
 		closeFeed();
+		messageAction = action;
 		key = null;
 		title = "";
 		envId = "";
@@ -695,6 +741,14 @@ public final class ConversationPanel implements AutoCloseable {
 				return true;
 			}
 		}
+		if (actions != null && pairButton.contains(mx, my)) {
+			actions.pair();
+			return true;
+		}
+		if (actions != null && controlButton.contains(mx, my) && !envId.isEmpty()) {
+			actions.enableControl(envId);
+			return true;
+		}
 		Hit hit = hitTest((int) mx, (int) my);
 		if (hit == null) {
 			return bar.contains(mx, my);
@@ -826,12 +880,21 @@ public final class ConversationPanel implements AutoCloseable {
 		int contentH = lines.isEmpty() ? 0 : lines.getLast().y() + lines.getLast().h();
 		scroll.update(contentH, Math.max(1, well.h() - 8));
 
+		pairButton = Rect.EMPTY;
 		if (feed == null || message != null) {
 			String msg = message != null ? message : "Select a thread.";
-			int ly = well.y() + well.h() / 2 - 10;
-			for (var line : font.split(Component.literal(msg), Math.max(40, well.w() - 24))) {
-				g.centeredText(font, line, well.x() + well.w() / 2, ly, message != null && key != null ? t.errorText() : t.muted());
+			boolean offerPair = message != null && messageAction == ChatSource.Unavailable.Action.PAIR && actions != null;
+			var msgLines = font.split(Component.literal(msg), Math.max(40, well.w() - 24));
+			int blockH = msgLines.size() * font.lineHeight + (offerPair ? 20 : 0);
+			int ly = well.y() + Math.max(4, (well.h() - blockH) / 2);
+			// an empty state with a way out reads as guidance (muted), not as an error
+			int color = offerPair ? t.muted() : message != null && key != null ? t.errorText() : t.muted();
+			for (var line : msgLines) {
+				g.centeredText(font, line, well.x() + well.w() / 2, ly, color);
 				ly += font.lineHeight;
+			}
+			if (offerPair) {
+				pairButton = button(g, font, t, I18n.get("t3craft.chat.history.pair_button"), well.x() + well.w() / 2, ly + 6, true, mouseX, mouseY);
 			}
 		} else {
 			drawFeed(g, font, t, textW, mouseX, mouseY);
@@ -849,28 +912,43 @@ public final class ConversationPanel implements AutoCloseable {
 			}
 		}
 
-		// ---- command bar (disabled: read-only)
+		// ---- command bar: ready when the environment can operate (sending arrives with item 19),
+		// otherwise a neutral read-only line with an "Enable control" button
+		controlButton = Rect.EMPTY;
 		if (showPrompt) {
 			bar = new Rect(bounds.x(), bounds.bottom() - fieldH, bounds.w(), fieldH);
-			boolean hover = bar.contains(mouseX, mouseY);
+			ChatAccess.Reply reply = replyState();
 			ChatDraw.field(g, t, bar, false);
-			g.text(font, ">", bar.x() + 5, bar.y() + 5, t.brass(), false);
-			String hint = "read-only";
-			int hw = font.width(hint);
-			int room = bar.w() - 10 - font.width(">") - 4 - hw - 14;
-			String ph = ChatDraw.clip(font, compact ? "Read-only" : REPLY_HINT, Math.max(0, bar.w() - 10 - font.width(">") - 4));
-			g.text(font, ph, bar.x() + 5 + font.width(">") + 4, bar.y() + 5, t.ghost(), false);
-			if (!compact && font.width(ph) + 14 < room) {
-				g.text(font, hint, bar.right() - 6 - hw, bar.y() + 5, t.muted(), false);
-			}
-			if (hover) {
-				g.setTooltipForNextFrame(font, Component.literal(
-						"T3Craft is paired with orchestration:read only. Replying would need orchestration:operate, which is not enabled."), mouseX,
-						mouseY);
+			int px = bar.x() + 5;
+			g.text(font, ">", px, bar.y() + 5, t.brass(), false);
+			int tx = px + font.width(">") + 4;
+			if (reply == ChatAccess.Reply.READ_ONLY && actions != null) {
+				String label = I18n.get("t3craft.chat.reply.enable_button");
+				int bw = font.width(label) + 10;
+				controlButton = button(g, font, t, label, bar.right() - 3 - bw / 2, bar.y() + 3, false, mouseX, mouseY);
+				String ph = ChatDraw.clip(font, I18n.get(compact ? "t3craft.chat.reply.read_only_short" : "t3craft.chat.reply.read_only"),
+						Math.max(0, controlButton.x() - 6 - tx));
+				g.text(font, ph, tx, bar.y() + 5, t.ghost(), false);
+				if (controlButton.contains(mouseX, mouseY)) {
+					g.setTooltipForNextFrame(font, Component.translatable("t3craft.operate.enable.tooltip"), mouseX, mouseY);
+				}
 			}
 		} else {
 			bar = Rect.EMPTY;
 		}
+	}
+
+	/**
+	 * A small pill button centred on {@code cx} at {@code y} (12 px tall). Returns its rectangle for
+	 * hit-testing. {@code primary} draws it in the accent colour.
+	 */
+	private static Rect button(GuiGraphicsExtractor g, Font font, ChatTheme t, String label, int cx, int y, boolean primary, int mouseX, int mouseY) {
+		int w = font.width(label) + 10;
+		Rect r = new Rect(cx - w / 2, y, w, 12);
+		boolean hover = r.contains(mouseX, mouseY);
+		ChatDraw.pillBox(g, t, r.x(), r.y(), r.w(), hover);
+		g.text(font, label, r.x() + 5, r.y() + 2, hover || primary ? t.accent() : t.keycapText(), false);
+		return r;
 	}
 
 	private String subtitle(ChatTranscript.@Nullable Status status, ThreadFeed.@Nullable State st) {

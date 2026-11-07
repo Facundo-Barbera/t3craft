@@ -16,8 +16,8 @@ queda exactamente como sin él.
 | `t3craft:status_lamp` | `t3craft:status_lamp` (`LampBlockEntity`) | Lámpara del escritorio: color y luz según el estado del hilo. |
 | `t3craft:board_lamp` | el mismo tipo `t3craft:status_lamp` | Variante "bombilla del tablero": la i-ésima bombilla muestra el i-ésimo hilo que necesita al jugador (errores primero, luego "needs you"). |
 
-Ítems de bloque con el mismo id, en la pestaña vanilla **Functional blocks** (compartida, sin pestaña
-propia: una entrada de registro menos). Loot tables: cada bloque se suelta a sí mismo. Recetas
+Ítems de bloque con el mismo id, en la pestaña propia **T3Craft** (`dev.t3craft.T3CraftTab`, única
+del mod; el módulo aporta sus ítems con `T3CraftTab.contribute` solo si está prendido). Loot tables: cada bloque se suelta a sí mismo. Recetas
 (razonables y baratas): monitor = 7 hierro + panel de vidrio + redstone; lámpara = 4 cobre (en cruz) +
 glowstone + redstone; lámpara ⇄ bombilla, 1:1 sin forma. Modelos y texturas propios, sencillos
 (`textures/block/monitor_*`, `status_lamp_<estado>`, `board_lamp_<estado>`).
