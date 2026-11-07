@@ -52,6 +52,8 @@ public final class DemoClient implements ClientModInitializer {
 	private static final int SETTLE_TICKS = 40;
 	/** Ticks between the first-visit teleport and the crew setting off from the player. */
 	private static final int TELEPORT_DELAY = 20;
+	/** How often the HQ checks whether a thread took or released a station (ticks). */
+	private static final int RECONCILE_TICKS = 20 * 5;
 
 	private static volatile @Nullable DemoStructures structures;
 
@@ -68,6 +70,9 @@ public final class DemoClient implements ClientModInitializer {
 	private @Nullable ClientLevel level;
 	private int ticksIn;
 	private boolean checked;
+	/** Whether the demo world held an HQ when this level was entered (read once per level). */
+	private @Nullable Boolean builtBefore;
+	private long enteredAtMs;
 	private @Nullable DemoBuildRun run;
 	private Pending pending = Pending.NONE;
 	private @Nullable DemoHqSource hq;
@@ -180,6 +185,8 @@ public final class DemoClient implements ClientModInitializer {
 			level = mc.level;
 			ticksIn = 0;
 			checked = false;
+			builtBefore = null;
+			enteredAtMs = System.currentTimeMillis();
 			run = null; // its crews died with the old level (BuildersClient cancels them)
 			clearAnchors();
 		}
@@ -195,8 +202,21 @@ public final class DemoClient implements ClientModInitializer {
 			return;
 		}
 		if (!checked) {
+			// fix/hq-stale-stations: reconcile against the roster only once every environment has sent
+			// its first synced shell, so a world load never tears down the desks of one still connecting.
+			if (builtBefore == null) {
+				builtBefore = DemoMarkerFile.read(root).structure() != null;
+			}
+			if (!rosterReady(builtBefore)) {
+				return;
+			}
 			checked = true;
 			start(mc, root, false);
+		} else if (run == null && ticksIn % RECONCILE_TICKS == 0) {
+			DemoHqSource h = hq;
+			if (h != null && h.rosterChanged() && rosterReady(true)) {
+				start(mc, root, false, true); // a thread took or released a station: diff the HQ
+			}
 		}
 		DemoBuildRun r = run;
 		if (r != null) {
@@ -227,8 +247,24 @@ public final class DemoClient implements ClientModInitializer {
 		start(mc, root, true);
 	}
 
-	/** Builds the chosen source unless the marker says this version is already there (or {@code force}). */
+	private boolean rosterReady(boolean built) {
+		T3CraftClient c = T3CraftClient.get();
+		if (c == null) {
+			return true;
+		}
+		return dev.t3craft.hq.RosterGate.decide(c.rosterSources(), c.syncedRosterSources(), built,
+				System.currentTimeMillis() - enteredAtMs) == dev.t3craft.hq.RosterGate.Decision.RECONCILE;
+	}
+
 	private void start(Minecraft mc, Path root, boolean force) {
+		start(mc, root, force, false);
+	}
+
+	/**
+	 * Builds the chosen source unless the marker says this version is already there (or {@code force}).
+	 * {@code quiet}: an automatic reconcile (roster change), logged instead of announced in chat.
+	 */
+	private void start(Minecraft mc, Path root, boolean force, boolean quiet) {
 		DemoConfig cfg = activeConfig;
 		DemoStructures s = structures;
 		DemoMarker marker = DemoMarkerFile.read(root);
@@ -274,8 +310,14 @@ public final class DemoClient implements ClientModInitializer {
 			delay = TELEPORT_DELAY;
 		}
 		clearAnchors(); // NPCs keep to the ring layout while the HQ changes
-		run = new DemoBuildRun(source, plans, root, cfg, delay, this::say, () -> installAnchors(source));
-		say("building HQ: " + source.id() + " v" + source.version() + ", " + plans.size() + " part(s)");
+		run = new DemoBuildRun(source, plans, root, cfg, delay, quiet ? m -> T3Craft.LOGGER.info("[demo] {}", m) : this::say,
+				() -> installAnchors(source));
+		String msg = "building HQ: " + source.id() + " v" + source.version() + ", " + plans.size() + " part(s)";
+		if (quiet) {
+			T3Craft.LOGGER.info("[demo] roster changed, {}", msg);
+		} else {
+			say(msg);
+		}
 	}
 
 	private void status() {
@@ -420,7 +462,11 @@ public final class DemoClient implements ClientModInitializer {
 
 	private static List<dev.t3craft.client.npc.NpcInfo> liveNpcs() {
 		T3CraftClient c = T3CraftClient.get();
-		return c == null ? List.of() : c.npcs().all();
+		if (c == null) {
+			return List.of();
+		}
+		// Stationed threads get desks; released ones (settled, archived, done and inactive) only go to the archive.
+		return c.npcs().hqRoster();
 	}
 
 	/** Once the HQ is in the world, NPCs walk to their desks in it (feat/hq-design's {@code HqAnchorSource}). */

@@ -102,7 +102,7 @@ public final class BuildPlan {
 		return modules;
 	}
 
-	/** Every desk of every module (taken or vacant), by module index then slot. */
+	/** Every taken desk of every module, by module index then slot (vacant desks are not built). */
 	public List<Workstation> workstations() {
 		return workstations;
 	}
