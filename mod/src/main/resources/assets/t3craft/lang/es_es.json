@@ -8,5 +8,9 @@
 	"key.t3craft.pair": "Emparejar un entorno T3",
 	"key.t3craft.reconnect": "Reconectar con T3",
 	"key.t3craft.reload": "Recargar configuración de T3Craft",
-	"key.t3craft.toggle_notifications": "Silenciar/activar avisos de T3Craft"
+	"key.t3craft.toggle_notifications": "Silenciar/activar avisos de T3Craft",
+	"t3craft.demo.button": "T3Craft HQ",
+	"t3craft.demo.button.tooltip": "Abre el mundo demo T3Craft HQ (superplano, creativo). Se crea la primera vez y el HQ se construye al entrar.",
+	"t3craft.demo.confirm.title": "¿Abrir %s?",
+	"t3craft.demo.confirm.body": "Se guardará y cerrará este mundo, y luego se abrirá el mundo demo T3Craft HQ."
 }
