@@ -7,7 +7,7 @@ Only `/t3craft debug hq-preview` writes blocks, and only in a singleplayer super
 ```
 roster (env, project, thread, settled)
   └─ HqInput.fromRoster / fromNpcs        canonical: sorted, de-duplicated, order-independent
-       └─ HqLayout.allocate(in, previous)  modules, desk seats, archive slots   (plan(in) = no history)
+       └─ HqLayout.allocate(in, previous)  modules, desk seats, shelf slots     (plan(in) = no history)
             └─ HqGenerator.generate(layout) → hq.BuildPlan   placements + anchors + workstations + groups
                  ├─ HqPlans.byGroup / expansion / forRoster → dev.t3craft.build.BuildPlan (layered)
                  ├─ HqSite(origin, rotation)  world cells/anchors, same transform as BuildJob
@@ -24,18 +24,26 @@ The HQ origin `(0,0,0)` is the centre of the hub floor. `y = 0` is the floor lay
      module 3  ...  [ spine row 1 ]  ...  module 2        module i: spine row i/2,
      module 1  ...  [ spine row 0 ]  ...  module 0        east (+x) if i is even, west if odd
                     +---------------+
-                    |      hub      |   board at z=-4; stairs down to the archive at x=4..5
-                    +---- door -----+
+                    |      hub      |   board at z=-4
+                    +shelf door shelf   "Archived" shelf: z=7, 3<=|x|<=6, both sides of the door
                         portico           entrance z=8, spawn z=11 (looking north)
-           (basement under the hub, y=-5..-1: the archive)
+           (no basement: y=0 is the lowest layer)
 ```
 
 - **Hub** (17×17, `y 0..10`): a timber hall with a stepped waxed-copper roof and a glazed lantern. It
-  holds the "needs attention" board, benches, bookshelf corners and a railed stairwell down to the
-  archive.
-- **Archive** (basement, 17×5×17, `y -5..-1`): a library with shelf rows of bookshelves. When a slot
-  holds a settled thread's computer, that slot shows black concrete facing the aisle. Hanging
-  lanterns light the aisles.
+  holds the "needs attention" board, benches, bookshelf corners and the "Archived" shelf.
+- **"Archived" shelf** (group `archive`, modules `archive_shelf_east` / `archive_shelf_west`, each
+  4×4×1 set into holes of the hub): the inside of the hub's south wall, both sides of the entrance
+  (`z = 7`, `3 ≤ |x| ≤ 6`), three tiers (`y = 1..3`) facing north into the hub, so you see it on
+  your way out and the NPCs see it from the board. An empty slot is a bookshelf; a slot holding a
+  settled thread's computer shows black concrete (the blocks module swaps it for a monitor bound
+  to that thread through the `archive_<threadId>` anchor). Over the east half hangs an "Archived
+  threads" sign; over the west half an "Older threads / +N / click to list" sign, the click target
+  for the settled threads that no longer fit (`layout.overflow()`, N = its size).
+- **Why not a basement.** The first version put the archive in a 17×5×17 basement under the hub
+  with a stairwell. In the demo world it was hard to reach and badly joined to the hub floor, and
+  a room nobody visits does not show anything. It is gone from the layout (no config option): the
+  HQ has nothing below `y = 0`, the hub floor is solid, and the envelope starts at `y = 0`.
 - **Portico** and **spine** (a glass-roofed gallery with one 14-block row per pair of modules, and a
   sign over each module's doorway) work as before.
 - **Module** = a wing, always the same size: inner wall with doorway, **3 segments × 2 desks = 6
@@ -62,20 +70,28 @@ environment label.
    with the lowest `(module index, slot)` among that project's modules.
 4. **Annex.** If the project has no free desk, a new identical module is added at the **lowest free
    grid index**, and the thread takes slot 0. Projects are served in key order.
-5. **Archive.** A settled thread frees its desk (rule 2 can then remove the module). Its computer
-   goes to the archive. A thread that already had an archive slot keeps it. New settled threads,
-   ordered by `(project key, thread id)`, take the lowest free slot. A thread that leaves the roster
-   frees its slot, and a thread that becomes active again leaves the archive. Capacity is
-   `HqLayout.ARCHIVE_CAPACITY` = 148 slots (74 shelf columns × 2 tiers, in a fixed order). Beyond
-   that, settled threads are only listed in `layout.overflow()`.
+5. **"Archived" shelf.** A settled thread frees its desk (rule 2 can then remove the module). Its
+   computer goes onto the shelf, which shows the `HqLayout.ARCHIVE_CAPACITY` = 24 **most recently
+   archived** threads. Each shelved thread has an archive number `Archived.seq()`. A thread already
+   on the shelf keeps its slot and number (a shelved computer never moves). New settled threads,
+   ordered by `(project key, thread id)`, get the next numbers. If they do not all fit, the lowest
+   numbers (the oldest) leave the shelf for `layout.overflow()`, and the newcomers take the lowest
+   free slots. Threads in `overflow` stay there, since they are older than everything on the
+   shelf, except that a slot freed because a shelved thread left the roster or became active again
+   is refilled from `overflow` in thread-id order. A thread that leaves the roster leaves both, and
+   one that becomes active again gets a desk. Without history (`plan(in)`) "oldest" means first in
+   `(project key, thread id)` order.
 
 **Idempotence:** `HqInput` is canonical, so the same roster lines in any order give the same input,
 the same layout and the same plan (byte-for-byte fingerprint). `HqLayout.plan(in)` (no history) is a
 pure function of the roster, and `allocate(in, plan(in)).equals(plan(in))`. To keep the building
-stable across changes, persist the layout (`toJson`/`fromJson`, format 2) and pass it as `previous`.
+stable across changes, persist the layout (`toJson`/`fromJson`, format 3) and pass it as `previous`.
+A format 2 layout (the basement era) is still read: its modules and desks are kept and its archive
+is dropped, so the settled threads are shelved afresh on the next `allocate`.
 
 `HqLayout.diff(old, new)` returns: `addedModules`, `removedModules`, `freedDesks` (module, slot,
-thread), `seated` (thread → seat), `archived` (computers that go to the archive), `unarchived`.
+thread), `seated` (thread → seat), `archived` (computers that go onto the shelf), `unarchived` (computers that leave the shelf: active
+again, gone, or pushed to the older list).
 
 ### Growth envelope (`HqLayout.envelope(maxModules)`)
 
@@ -85,13 +101,13 @@ before the first build:
 ```
 rows = ceil(maxModules / 2)
 x: -17 .. 17     (-8 .. 17 when maxModules == 1; -8 .. 8 when 0)
-y:  -5 .. 10     (basement floor .. lightning rod)
+y:   0 .. 10     (floor .. lightning rod)
 z: -9 - 14*rows .. 13     (spine cap .. portico; -8 .. 13 when 0)
 ```
 
 Lowest-free allocation keeps every module index below the largest number of modules the HQ ever had
 at the same time, so `maxModules` is that peak, not the number of projects. Each extra pair of
-modules adds 14 blocks to the north. The size is 35 × 16 × (22 + 14·rows). Tests check this against
+modules adds 14 blocks to the north. The size is 35 × 11 × (22 + 14·rows). Tests check this against
 random histories. Rotate the box with `HqSite` for world coordinates.
 
 ## Output for builders
@@ -103,7 +119,7 @@ random histories. Rotate the box with `HqSite` for world coordinates.
 HqGenerator.Result r = HqGenerator.plan(HqInput.fromRoster(roster), lastLayout);   // persist r.layout()
 HqSite site = HqSite.at(r.plan(), AnchorNames.SPAWN, chosenCell, Direction.SOUTH);  // or new HqSite(origin, rotation)
 
-// first build: one plan per group, in build order (hub, archive, portico, spine_0.., spine_cap, module_0..)
+// first build: one plan per group, in build order (hub, archive [the shelf], portico, spine_0.., spine_cap, module_0..)
 Map<String, dev.t3craft.build.BuildPlan> parts = HqPlans.byGroup(r.plan());
 // later changes: only the groups that changed, each one on its own (snapshot / undo per expansion)
 Map<String, dev.t3craft.build.BuildPlan> step = HqPlans.expansion(lastPlan, r.plan(), HqBuild.AIR_ABOVE_GROUND);
@@ -124,7 +140,7 @@ List<dev.t3craft.build.BuildPlan> all = HqPlans.forRoster(roster);
 - **Shapes are baked into the plan.** Glass panes, copper bars, walls and stair corners get their
   connections at generation time (`PlanShapes` runs vanilla's `updateFromNeighbourShapes` against a
   read-only view of the plan). The builders' no-neighbour-update placement therefore gives the final
-  look without a post-pass, in any order and any rotation. The railing uses copper bars because
+  look without a post-pass, in any order and any rotation. Railings use copper bars because
   fences connect through block tags, which are not loaded in the JUnit tests.
 - Groups: `hub`, `archive`, `portico`, `spine_<row>`, `spine_cap`, `module_<index>`
   (`HqGenerator.group(i)`). `BuildPlan.groupAt(rel)` tells which group owns a cell.
@@ -141,8 +157,11 @@ List<dev.t3craft.build.BuildPlan> all = HqPlans.forRoster(roster);
 | `board_lamp_0..3` | the board's bulbs, left to right seen from the front | S |
 | `bench_0..9` | hub bench seats (resting spots) | into the hub |
 | `walk_hub_0..3` | open hub floor | S |
-| `archive` | main aisle of the basement | N |
-| `archive_<threadId>` | screen face of an archived computer | towards the aisle |
+| `archive` | standing spot in front of the shelf `(4,1,6)` | S (looking at it) |
+| `shelf@<i>` (`archiveShelfSlot(i)`, i = 0..23) | face of shelf slot i, taken or not; i = eye-level tier, then top, then bottom, nearest the door first, east before west | N (into the hub) |
+| `archive_<threadId>` | screen face of a shelved computer (same cell as its `shelf@<slot>`) | N |
+| `shelf_header` | the "Archived threads" sign `(4,4,7)` | N |
+| `shelf_more` | the "Older threads / +N / click to list" sign `(-4,4,7)`: click target for `overflow()` | N |
 | `wing_<projectKey>`, `walk_<projectKey>` | doorway / corridor of the project's **first** module | into the module |
 | `module@<i>`, `walk@<i>` | the same, for any module | into the module |
 | `desk_<threadId>` | the chair, at foot level | towards the computer |
@@ -153,6 +172,10 @@ List<dev.t3craft.build.BuildPlan> all = HqPlans.forRoster(roster);
 deskAnchor, computerPos, screen, lampPos)`. `screen` is the face centre of the computer with
 `screenFacing()`. That is the contract for feat/workstation (live screen, click opens the chat). A
 desk's positions depend only on `(module, slot)`. `plan.workstation(threadId)` looks one up.
+
+For feat/archive-view (settled threads read from T3): use `shelf@<i>` for the shelf positions and
+`layout.archive()` (slot → thread) to know which thread is on which slot, `layout.overflow()` for
+the paginated "older" list opened from `shelf_more`. Slot positions depend only on `i`.
 
 `HqAnchorSource(plan, site)` adapts this to `dev.t3craft.client.npc.behavior.AnchorSource`:
 
@@ -179,20 +202,22 @@ It only works in a singleplayer world where `ServerLevel.isFlat()` is true.
 Each run applies only the diff against the previous preview. It prints one line per module (index,
 side, environment, project, desks taken, `[new]`) and the layout diff (modules ±, desks freed,
 seated, archived). Try `demo 2 6` → `demo 2 9` (8 active threads: an annex module) → `demo 2 6` (the annex is
-removed again; `t4` stays archived). Superflat worlds are only 4 blocks deep, so the first preview lifts the HQ until its
-basement fits above bedrock.
+removed again; `t4` stays on the shelf). Superflat worlds are only 4 blocks deep, so the first preview keeps the HQ's
+floor above bedrock.
 
 ## Tests (`mod/src/test/java/dev/t3craft/hq/`)
 
 - `HqLayoutTest`: roster order independence (shuffles, duplicate lines, labels), fixed point, dense
   modules, annexes of identical modules at the lowest free index, removal and reuse of empty
-  modules, desk reuse, moving between projects, stable archive slots, overflow, layout diff,
-  envelope formula, JSON round trip.
+  modules, desk reuse, moving between projects, settling frees the desk (and removes an emptied
+  module), stable shelf slots, newest-on-the-shelf with the oldest pushed to the older list and
+  refilled from it, full shelf as a fixed point, layout diff, envelope formula, JSON round trip,
+  reading format 2 layouts.
 - `HqGeneratorTest` (boots vanilla `Bootstrap`): determinism (also shuffled roster → same plan and
   same `forRoster`), fixed footprint, envelope (also over a random 60-step history), fixed module
   sizes, no collisions (up to 20 projects), fixed anchors (board slots, benches, walk points,
-  archive), desks/workstations, stairs and headroom down to the archive, archive slots facing free
-  aisles, environment colours, baked shapes, annexes (a new desk, a new module touches only
+  archive spot), desks/workstations, no basement (nothing below `y = 0`, solid hub floor), fixed
+  named shelf slots inside the hub facing free cells, the shelf's signs and "+N" count, environment colours, baked shapes, annexes (a new desk, a new module touches only
   `module_n` / `spine_n` / `spine_cap`, a settled thread changes exactly two cells, a removed
   project), conversion to the builders' plan (layered, complete, per group), `HqSite` vs `BuildJob`.
 - `HqAnchorSourceTest`: world anchors under the four entrance directions, and fallbacks.
@@ -210,19 +235,20 @@ basement fits above bedrock.
    `new HqStructureSource(HQ_PLAN_VERSION, () -> HqPlans.forDemo(roster))`. `forDemo` bakes
    `HqPlans.demoSite()` into the plans, so they follow the demo/builders convention: entrance facing
    north, portico front on `z = 0`, growth towards `+z`, `x = 0` on the centre line, built with
-   rotation `NONE`. `y = 0` is the hub floor and the basement reaches `y = -5`. In the default
-   superflat world (`minY = -64`, grass at -61), the demo origin must have `y ≥ -58`, so the HQ stands
-   on a 2-block tuff plinth and the portico floats 2 blocks up. The other options are a deeper flat
-   preset or accepting that basement cells fail. Bump the demo plan version whenever generator
+   rotation `NONE`. `y = 0` is the hub floor and the lowest layer (no basement), so in the default
+   superflat world (`minY = -64`) the HQ needs no lift. `DemoHq.PLAN_VERSION` went to 2 when the
+   basement was removed, so an existing demo HQ is rebuilt whole. Its lift can drop too (default
+   superflat: 2 → 0), so the new HQ may stand lower than the old one and leave leftovers of it: use
+   "Reset HQ world" (`/t3craft debug reset-hq`) for a clean demo world. Bump the demo plan version whenever generator
    output changes. I did not register the source myself: it belongs to the demo module, and the
    origin decision above is needed first.
 
 ## Pending
 
 - The module type is only `WING`. "A floor above" is in the API (`Module.type()`) but not built.
-- The archive has a fixed capacity, and overflow is only listed. Rotating old computers out is a
-  product decision.
-- On real terrain the builders should lay a foundation under `footprint()` (`y < -5`) or level the
+- The shelf holds 24 computers; older settled threads are only listed (`overflow()`, the "+N" on
+  the `shelf_more` sign). The paginated list itself is feat/archive-view's.
+- On real terrain the builders should lay a foundation under `footprint()` (`y < 0`) or level the
   site. `HqBuild.AIR_ABOVE_GROUND` fills vacated cells with grass at `y ≤ 0`.
 - Walls connect through block tags, so in game a wall next to a wall can bake differently than in
   tests. Today no two HQ walls touch.
