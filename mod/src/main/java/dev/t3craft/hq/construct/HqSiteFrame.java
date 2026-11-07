@@ -110,17 +110,20 @@ public final class HqSiteFrame {
 	}
 
 	/**
-	 * The whole HQ plan in site plan coordinates (positions and states turned half a turn), ready for
-	 * {@code BuildPlanBridge.designer}, which turns it again to the site's facing and clips it to each
-	 * module's area.
+	 * The part of the HQ plan that site module {@code moduleId} builds, in site plan coordinates
+	 * (positions and states turned half a turn), ready for {@code BuildPlanBridge.designer}, which
+	 * turns it again to the site's facing. Only the cells {@link #owner} gives to that module (so
+	 * nothing falls outside its area) and nothing below {@link #MIN_Y}. Block entity data is left
+	 * out: site plans carry states only, and {@link HqConstruction} loads it (monitor and lamp
+	 * bindings, sign text) in place right after the expansion is built.
 	 */
-	public static dev.t3craft.build.BuildPlan sitePlan(dev.t3craft.hq.BuildPlan plan) {
-		List<dev.t3craft.build.Placement> out = new ArrayList<>(plan.size());
+	public static dev.t3craft.build.BuildPlan sitePlan(dev.t3craft.hq.BuildPlan plan, String moduleId) {
+		List<dev.t3craft.build.Placement> out = new ArrayList<>();
 		for (Placement p : plan.placements()) {
-			if (!builds(p.rel())) {
+			if (!builds(p.rel()) || !moduleId.equals(owner(p.rel().getX(), p.rel().getZ()))) {
 				continue;
 			}
-			out.add(new dev.t3craft.build.Placement(toSite(p.rel()), p.state().rotate(Rotation.CLOCKWISE_180), p.be()));
+			out.add(new dev.t3craft.build.Placement(toSite(p.rel()), p.state().rotate(Rotation.CLOCKWISE_180), null));
 		}
 		return dev.t3craft.build.BuildPlan.of(out);
 	}

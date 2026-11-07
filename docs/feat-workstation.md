@@ -86,10 +86,13 @@ snapshots de site.
 - **Ids de entidad**: rango propio desde **−5.000.000** hacia abajo (`WorkstationRenderer.ID_BASE`).
   NpcRegistry usa −1.000.000…, builders −2.000.000… y BehaviorDirector −3.000.000…. El contador es
   de instancia, no estático.
-- Ojo: el barrido de huérfanas de `NpcRegistry` (solo tras una recuperación por error o hot-swap)
-  considera suyo todo id ≤ −1.000.000 y puede borrar nuestras entidades. El renderer revisa
-  `isRemoved()` cada tick y reconstruye la estación, así que se cura solo. Las entidades se guardan
-  por referencia y nunca se buscan por id con cast.
+- Barrido de huérfanas (fix/hq-stale-stations, ver `docs/fix-hq-stale-stations.md`): cada dueño
+  barre solo su rango (`ClientEntityIds`). El renderer descarta en el primer tick y cada 10 s toda
+  entidad de su rango que no sea de una estación viva, y sigue revisando `isRemoved()` cada tick para
+  reconstruir una estación si desaparecieron sus entidades. Las entidades se guardan por referencia
+  y nunca se buscan por id con cast.
+- Los hilos que sueltan el puesto (settled, archivados, o `done` inactivos más de
+  `stations.releaseDoneAfterMinutes`) ya no llegan a `npcs.all()`, así que su estación se retira.
 - Las entidades se crean una vez por estación y solo se recrean si la posición cambia o si
   desaparecieron. Al cambiar de nivel se olvidan (murieron con el nivel) y se reconstruyen.
 

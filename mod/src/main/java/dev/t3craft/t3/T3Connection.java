@@ -23,6 +23,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Direct, read-only connection from the mod to one T3 environment:
@@ -72,6 +74,9 @@ public final class T3Connection {
 	private static final long SILENCE_MS = 20_000;
 	private static final long MIN_BACKOFF_MS = 1_000;
 	private static final long MAX_BACKOFF_MS = 30_000;
+	/** Socket open but the shell never reached {@code synchronized}: drop it and reconnect (never CONNECTING forever). */
+	static final long SHELL_SYNC_TIMEOUT_MS = 30_000;
+	private static final Logger LOG = LoggerFactory.getLogger("t3craft");
 
 	private final Environments.Environment env;
 	private final Supplier<Pairing.@Nullable Session> session;
@@ -88,6 +93,8 @@ public final class T3Connection {
 	private @Nullable ScheduledFuture<?> pinger;
 	private final StreamRegistry streams = new StreamRegistry(RpcFrames::subscribeThread);
 	private CompletableFuture<?> sendTail = CompletableFuture.completedFuture(null);
+	/** Tests shorten it. */
+	volatile long shellSyncTimeoutMs = SHELL_SYNC_TIMEOUT_MS;
 
 	public T3Connection(Environments.Environment env, Supplier<Pairing.@Nullable Session> session, Listener listener, HttpClient http) {
 		this.env = env;
@@ -152,6 +159,18 @@ public final class T3Connection {
 	 */
 	public StreamRegistry.Subscription subscribeThread(String threadId, StreamRegistry.Listener listener) {
 		return streams.subscribe(threadId, listener);
+	}
+
+	/** Stream key of {@code scheduledTasks.subscribe} in {@link StreamRegistry}. */
+	public static final String SCHEDULED_TASKS_STREAM = "rpc:" + RpcFrames.SUBSCRIBE_SCHEDULED_TASKS;
+
+	/**
+	 * Follows the environment's scheduled tasks ({@code scheduledTasks.subscribe}, read-only). Same
+	 * shared path as {@link #subscribeThread}: refcounted, resubscribed after every reconnect. Each
+	 * item is a full {@code {tasks: [...]}} list ({@link ScheduledTask#listFrom}).
+	 */
+	public StreamRegistry.Subscription subscribeScheduledTasks(StreamRegistry.Listener listener) {
+		return streams.subscribe(SCHEDULED_TASKS_STREAM, (id, key) -> RpcFrames.subscribeScheduledTasks(id), listener);
 	}
 
 	/** {@code orchestration.getTurnItem}: the full item (e.g. command output the stream withheld), or null. */
@@ -356,7 +375,26 @@ public final class T3Connection {
 		}
 	}
 
+	/**
+	 * Runs one step of the connection on {@link #exec}. A RuntimeException thrown there used to
+	 * vanish inside the executor's future, leaving the status stuck at CONNECTING with no log and
+	 * no further attempt (fix/chat-direct-connect): now it is logged (secret-free) and retried.
+	 */
+	private void guarded(int g, String step, Runnable r) {
+		try {
+			r.run();
+		} catch (RuntimeException e) {
+			String why = sanitize(e.getClass().getSimpleName() + (e.getMessage() == null ? "" : ": " + e.getMessage()));
+			LOG.warn("[t3] {}: {} failed: {}", env.id(), step, why);
+			retry(g, step + ": " + why);
+		}
+	}
+
 	private void connect(int g) {
+		guarded(g, "connect", () -> connectStep(g));
+	}
+
+	private void connectStep(int g) {
 		if (!current(g)) {
 			return;
 		}
@@ -376,7 +414,7 @@ public final class T3Connection {
 				.header("Accept", "application/json")
 				.POST(HttpRequest.BodyPublishers.noBody())
 				.build();
-		http.sendAsync(req, HttpResponse.BodyHandlers.ofString()).whenCompleteAsync((res, err) -> {
+		http.sendAsync(req, HttpResponse.BodyHandlers.ofString()).whenCompleteAsync((res, err) -> guarded(g, "ticket", () -> {
 			if (!current(g)) {
 				return;
 			}
@@ -404,7 +442,7 @@ public final class T3Connection {
 				return;
 			}
 			openSocket(g, ticket);
-		}, exec);
+		}), exec);
 	}
 
 	private void openSocket(int g, String ticket) {
@@ -412,7 +450,7 @@ public final class T3Connection {
 		http.newWebSocketBuilder()
 				.connectTimeout(Duration.ofSeconds(10))
 				.buildAsync(socketUri(env.url(), ticket), new Handler(g, state))
-				.whenCompleteAsync((ws, err) -> {
+				.whenCompleteAsync((ws, err) -> guarded(g, "upgrade", () -> {
 					if (err == null) {
 						if (!current(g)) {
 							ws.abort();
@@ -437,7 +475,7 @@ public final class T3Connection {
 						return;
 					}
 					retry(g, "upgrade: " + rootMessage(err));
-				}, exec);
+				}), exec);
 	}
 
 	private void retry(int g, String reason) {
@@ -501,6 +539,12 @@ public final class T3Connection {
 					}
 					send(ws, RpcFrames.ping());
 				}, PING_MS, PING_MS, TimeUnit.MILLISECONDS);
+				long syncMs = shellSyncTimeoutMs;
+				exec.schedule(() -> {
+					if (current(gen) && !ended && socket == ws && !state.isSynchronized()) {
+						end("T3 did not finish loading the shell in " + Math.max(1, syncMs / 1000) + " s");
+					}
+				}, syncMs, TimeUnit.MILLISECONDS);
 			});
 			ws.request(1);
 		}
@@ -522,6 +566,17 @@ public final class T3Connection {
 			if (!current(gen) || ended) {
 				return;
 			}
+			try {
+				dispatch(ws, text);
+			} catch (RuntimeException e) {
+				// never stall silently (an un-acked chunk stops the stream while pings keep it "alive")
+				String why = sanitize(e.getClass().getSimpleName() + (e.getMessage() == null ? "" : ": " + e.getMessage()));
+				LOG.warn("[t3] {}: frame handling failed: {}", env.id(), why);
+				end("internal error: " + why);
+			}
+		}
+
+		private void dispatch(WebSocket ws, String text) {
 			RpcFrames.Frame f = RpcFrames.parse(text);
 			switch (f) {
 				case RpcFrames.Chunk c when !SHELL_REQUEST.equals(c.requestId()) -> {
@@ -534,7 +589,12 @@ public final class T3Connection {
 					boolean changed = false;
 					boolean wasSynced = state.isSynchronized();
 					for (JsonObject item : c.values()) {
-						changed |= state.apply(item);
+						try {
+							changed |= state.apply(item);
+						} catch (RuntimeException e) {
+							// one odd item must not stop the shell (it would stay CONNECTING forever)
+							LOG.warn("[t3] {}: skipped a shell item ({}): {}", env.id(), Json.str(item, "kind"), e.getClass().getSimpleName());
+						}
 					}
 					send(ws, RpcFrames.ack(c.requestId()));
 					if (state.isSynchronized() && !wasSynced) {

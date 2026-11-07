@@ -92,4 +92,28 @@ class BrowserLayoutTest {
 			assertTrue(f.x() >= 0 && f.y() >= 0 && f.right() <= s[0] && f.bottom() <= s[1], f + " in " + s[0] + "x" + s[1]);
 		}
 	}
+
+	// ---- fix/chat-direct-connect: clicking a row in the centred list ---------------------------
+
+	@Test
+	void rowHitTestFollowsTheCentredLayoutAndScroll() {
+		BrowserLayout l = BrowserLayout.compute(960, 540); // 1920x1080 at scale 2: frame centred with wide margins
+		Rect list = l.list();
+		assertTrue(list.x() >= 100, "the list is offset by the centring: " + list);
+		int rowH = 14;
+		// rows drawn inside the list panel, below its header and chips
+		Rect rows = new Rect(list.x() + 6, list.y() + 40, list.w() - 16, 10 * rowH);
+		double cx = rows.x() + rows.w() / 2.0;
+		assertEquals(0, BrowserLayout.rowAt(cx, rows.y() + 1, rows, rowH, 0, 30));
+		assertEquals(3, BrowserLayout.rowAt(cx, rows.y() + 3 * rowH + 7, rows, rowH, 0, 30));
+		assertEquals(9, BrowserLayout.rowAt(cx, rows.bottom() - 1, rows, rowH, 0, 30));
+		// scrolled by 5: the same spot is row 8
+		assertEquals(8, BrowserLayout.rowAt(cx, rows.y() + 3 * rowH + 7, rows, rowH, 5, 30));
+		// below the last visible row, outside, in the uncentred position: nothing
+		assertEquals(-1, BrowserLayout.rowAt(cx, rows.y() + 4 * rowH + 1, rows, rowH, 0, 4));
+		assertEquals(-1, BrowserLayout.rowAt(cx, rows.y() - 1, rows, rowH, 0, 30));
+		assertEquals(-1, BrowserLayout.rowAt(rows.right() + 1, rows.y() + 1, rows, rowH, 0, 30), "scrollbar gutter");
+		assertEquals(-1, BrowserLayout.rowAt(cx - list.x(), rows.y() + 1, rows, rowH, 0, 30), "coordinates without the centring offset");
+		assertEquals(-1, BrowserLayout.rowAt(cx, rows.y() + 1, Rect.EMPTY, rowH, 0, 30), "not drawn yet");
+	}
 }
