@@ -20,6 +20,12 @@ public final class RpcFrames {
 
 	public static final String SUBSCRIBE_SHELL = "orchestration.subscribeShell";
 	public static final String SUBSCRIBE_THREAD = "orchestration.subscribeThread";
+	/**
+	 * Read-only stream of the environment's scheduled tasks: empty payload, needs only
+	 * {@code orchestration:read}; each chunk value is a full {@code {tasks: [...]}} list
+	 * ({@link ScheduledTask#listFrom}). Name only: requests go through the connection's shared path.
+	 */
+	public static final String SUBSCRIBE_SCHEDULED_TASKS = "scheduledTasks.subscribe";
 
 	public static String request(String id, String tag, JsonObject payload) {
 		JsonObject o = new JsonObject();
