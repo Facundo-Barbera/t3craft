@@ -31,6 +31,11 @@ public record Anchor(String name, double x, double y, double z, Direction facing
 		return facing.toYRot();
 	}
 
+	/** The same spot under another name. */
+	public Anchor renamed(String newName) {
+		return new Anchor(newName, x, y, z, facing, block);
+	}
+
 	/** A spot standing/sitting in {@code cell} (centre, foot level), looking along {@code facing}. */
 	static Anchor at(String name, BlockPos cell, Direction facing) {
 		return new Anchor(name, cell.getX() + 0.5, cell.getY(), cell.getZ() + 0.5, facing, cell);

@@ -1,6 +1,5 @@
 package dev.t3craft.hq;
 
-import java.util.List;
 import net.minecraft.core.Direction;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.block.Block;
@@ -26,6 +25,10 @@ final class Palette {
 	final BlockState plinth = Blocks.TUFF_BRICKS.defaultBlockState();
 	final BlockState plinthWall = Blocks.TUFF_BRICK_WALL.defaultBlockState();
 	final BlockState stoneFloor = Blocks.POLISHED_ANDESITE.defaultBlockState();
+	final BlockState plinthTile = Blocks.POLISHED_TUFF.defaultBlockState();
+	final Block stairBlock = Blocks.SPRUCE_STAIRS;
+	/** Railing: waxed copper bars (connections need no block tags, so they bake the same in tests and in game). */
+	final BlockState rail = Blocks.COPPER_BARS.waxed().unaffected().defaultBlockState();
 	final BlockState woodFloor = Blocks.SPRUCE_PLANKS.defaultBlockState();
 	final BlockState darkPlanks = Blocks.DARK_OAK_PLANKS.defaultBlockState();
 	final BlockState infill = Blocks.PALE_OAK_PLANKS.defaultBlockState();
@@ -50,10 +53,6 @@ final class Palette {
 	final BlockState pottedFloweringAzalea = Blocks.POTTED_FLOWERING_AZALEA.defaultBlockState();
 	final BlockState azalea = Blocks.AZALEA.defaultBlockState();
 	final BlockState floweringAzalea = Blocks.FLOWERING_AZALEA.defaultBlockState();
-
-	/** Wing accent colours (carpet runner), picked by project key. */
-	final List<DyeColor> accents = List.of(DyeColor.CYAN, DyeColor.ORANGE, DyeColor.LIME, DyeColor.MAGENTA, DyeColor.LIGHT_BLUE,
-			DyeColor.YELLOW, DyeColor.PINK, DyeColor.PURPLE, DyeColor.RED, DyeColor.GREEN, DyeColor.BLUE, DyeColor.BROWN);
 
 	/** Timber post (vertical stripped dark oak). */
 	BlockState post() {
@@ -107,7 +106,16 @@ final class Palette {
 		return Blocks.CARPET.pick(c).defaultBlockState();
 	}
 
-	DyeColor accent(String projectKey) {
-		return accents.get(Math.floorMod(projectKey.hashCode(), accents.size()));
+	/**
+	 * Colour of an environment (module carpet runner and sign text): one of the 16 dye colours, from a
+	 * Fibonacci mix of {@link String#hashCode()} (whose value the Java spec fixes), so an environment
+	 * keeps its colour across runs, machines and versions. Distinct keys may share a colour.
+	 */
+	DyeColor envColor(String envKey) {
+		return DyeColor.byId((envKey.hashCode() * 0x9E3779B9) >>> 28);
+	}
+
+	DyeColor envColor(HqLayout.Module m) {
+		return envColor(m.envKey().isEmpty() ? m.projectKey() : m.envKey());
 	}
 }

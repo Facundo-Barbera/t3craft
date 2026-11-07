@@ -48,17 +48,30 @@ public final class HqGenerator {
 		PlanBuilder b = new PlanBuilder();
 		int rows = layout.rows();
 		hub(b, rows > 0);
+		b.group(GROUP_ARCHIVE);
+		archive(b, layout);
+		b.group(null);
 		portico(b);
 		for (int r = 0; r < rows; r++) {
-			spineRow(b, r, layout.wingAt(2 * r), layout.wingAt(2 * r + 1));
+			spineRow(b, r, layout, layout.moduleAt(2 * r), layout.moduleAt(2 * r + 1));
 		}
 		if (rows > 0) {
 			spineCap(b, rows);
 		}
-		for (HqLayout.Wing w : layout.wings()) {
-			wing(b, w);
+		for (HqLayout.Module w : layout.modules()) {
+			b.group(group(w.index()));
+			wing(b, layout, w);
 		}
+		b.group(null);
 		return b.build();
+	}
+
+	/** Group of the archive (basement). */
+	public static final String GROUP_ARCHIVE = "archive";
+
+	/** Group name of project module {@code index} (see {@link BuildPlan#groups()}). */
+	public static String group(int index) {
+		return "module_" + index;
 	}
 
 	// ------------------------------------------------------------------ hub
@@ -73,6 +86,13 @@ public final class HqGenerator {
 					BlockState floor = m == HUB ? k.plinth : m == 7 ? k.stoneFloor : m == 6 ? k.copper
 							: Math.abs(x) <= 1 && Math.abs(z) <= 1 ? k.copperInlay : k.woodFloor;
 					c.set(x, 0, z, door ? k.stoneFloor : floor);
+					if (x >= HqGeometry.STAIR_X1 && x <= HqGeometry.STAIR_X2) {
+						if (z >= HqGeometry.STAIR_OPEN_Z1 && z <= HqGeometry.STAIR_OPEN_Z2) {
+							c.set(x, 0, z, k.air);
+						} else if (z == HqGeometry.STAIR_TOP_Z) {
+							c.set(x, 0, z, k.stairs(k.stairBlock, Direction.SOUTH));
+						}
+					}
 					if (m == HUB) {
 						hubWall(c, x, z, door);
 					}
@@ -122,6 +142,14 @@ public final class HqGenerator {
 					c.decor(2 * sx, 2, 7 * dz, k.copperLantern(false));
 				}
 			}
+			// railing around the stairwell down to the archive
+			for (int z = HqGeometry.STAIR_OPEN_Z1 - 1; z <= HqGeometry.STAIR_TOP_Z; z++) {
+				c.set(HqGeometry.STAIR_X1 - 1, 1, z, k.rail);
+				c.set(HqGeometry.STAIR_X2 + 1, 1, z, k.rail);
+			}
+			for (int x = HqGeometry.STAIR_X1; x <= HqGeometry.STAIR_X2; x++) {
+				c.set(x, 1, HqGeometry.STAIR_OPEN_Z1 - 1, k.rail);
+			}
 			// runner from the entrance to the board
 			for (int z = 2; z <= 7; z++) {
 				for (int x = -1; x <= 1; x++) {
@@ -129,6 +157,19 @@ public final class HqGenerator {
 				}
 			}
 			board(b, c);
+			int bench = 0;
+			for (int sx = -1; sx <= 1; sx += 2) {
+				Direction into = sx > 0 ? Direction.WEST : Direction.EAST;
+				for (int z = -2; z <= 2; z++) {
+					b.anchor(Anchor.at(AnchorNames.bench(bench++), new BlockPos(7 * sx, 1, z), into));
+				}
+			}
+			int walk = 0;
+			for (int wz : new int[] {-2, 0}) {
+				for (int sx = -1; sx <= 1; sx += 2) {
+					b.anchor(Anchor.at(AnchorNames.walkHub(walk++), new BlockPos(4 * sx, 1, wz), Direction.SOUTH));
+				}
+			}
 			b.anchor(Anchor.at(AnchorNames.HUB, new BlockPos(0, 1, 0), Direction.SOUTH));
 			b.anchor(Anchor.at(AnchorNames.ENTRANCE, new BlockPos(0, 1, HUB), Direction.SOUTH));
 		}
@@ -175,6 +216,15 @@ public final class HqGenerator {
 		}
 		c.decor(new BlockPos(0, 5, z + 1), k.wallSign(Direction.SOUTH), SignTags.sign(DyeColor.ORANGE, true, "", "Needs", "attention", ""));
 		b.anchor(Anchor.face(AnchorNames.BOARD, new BlockPos(0, 3, z), Direction.SOUTH));
+		b.anchor(Anchor.at(AnchorNames.BOARD_FRONT, new BlockPos(0, 1, z + 1), Direction.NORTH));
+		// two rows of standing spots, two and three blocks from the board, nearest the centre first
+		int slot = 0;
+		for (int row = 2; row <= 3; row++) {
+			for (int i = 0; i <= 2 * BOARD_HALF; i++) {
+				int x = i == 0 ? 0 : (i % 2 == 1 ? (i + 1) / 2 : -(i / 2));
+				b.anchor(Anchor.at(AnchorNames.boardSlot(slot++), new BlockPos(x, 1, z + row), Direction.NORTH));
+			}
+		}
 	}
 
 	/** Direction from an edge cell towards the centre (the tall side of a roof step). */
@@ -186,6 +236,62 @@ public final class HqGenerator {
 			return Direction.NORTH;
 		}
 		return x < 0 ? Direction.EAST : Direction.WEST;
+	}
+
+	// ------------------------------------------------------------------ archive
+
+	/**
+	 * The basement library under the hub: shelf rows of bookshelves where each archive slot that
+	 * holds a settled thread's computer shows it (black concrete, screen towards the aisle), the
+	 * stairs down from the hub, lanterns over the aisles.
+	 */
+	private void archive(PlanBuilder b, HqLayout layout) {
+		int fy = HqGeometry.BASEMENT_FLOOR;
+		try (PlanBuilder.Canvas c = b.module("archive", HqGeometry.basement(), List.of())) {
+			for (int z = -HUB; z <= HUB; z++) {
+				for (int x = -HUB; x <= HUB; x++) {
+					int m = Math.max(Math.abs(x), Math.abs(z));
+					c.set(x, fy, z, m == HUB ? k.plinth : (x + z) % 2 == 0 ? k.stoneFloor : k.plinthTile);
+					for (int y = fy + 1; y <= -2; y++) {
+						if (m == HUB) {
+							c.set(x, y, z, Math.abs(x) == HUB && Math.abs(z) == HUB || Math.abs(x) == 4 || Math.abs(z) == 4 ? k.post() : k.plinth);
+						}
+					}
+					c.set(x, -1, z, m == HUB ? k.plinth : k.darkPlanks);
+				}
+			}
+			// stairs: from the hub floor layer (top step, in the hub) down one block per block northwards
+			for (int x = HqGeometry.STAIR_X1; x <= HqGeometry.STAIR_X2; x++) {
+				for (int z = HqGeometry.STAIR_OPEN_Z1; z <= HqGeometry.STAIR_OPEN_Z2; z++) {
+					c.set(x, -1, z, k.air);
+				}
+				for (int step = 1; step <= -fy - 1; step++) {
+					c.set(x, -step, HqGeometry.STAIR_TOP_Z - step, k.stairs(k.stairBlock, Direction.SOUTH));
+				}
+			}
+			List<HqGeometry.ArchiveSlot> slots = HqGeometry.archiveSlots();
+			java.util.Set<Long> rowTops = new java.util.HashSet<>();
+			for (int s = 0; s < slots.size(); s++) {
+				HqGeometry.ArchiveSlot slot = slots.get(s);
+				c.set(slot.cell(), k.bookshelf);
+				rowTops.add(slot.cell().atY(fy + 3).asLong());
+			}
+			for (long t : rowTops) {
+				c.set(BlockPos.of(t), k.deskTop);
+			}
+			for (HqLayout.Archived a : layout.archive()) {
+				HqGeometry.ArchiveSlot slot = slots.get(a.slot());
+				c.set(slot.cell(), k.monitorOn);
+				b.anchor(Anchor.face(AnchorNames.archive(a.threadId()), slot.cell(), slot.facing()));
+			}
+			for (int x : new int[] {-4, 0}) {
+				c.hang(x, -2, -5, k.lantern(true));
+				c.hang(x, -2, 4, k.lantern(true));
+			}
+			c.hang(-4, -2, -1, k.lantern(true));
+			c.hang(4, -2, -1, k.lantern(true));
+			b.anchor(Anchor.at(AnchorNames.ARCHIVE, new BlockPos(0, fy + 1, -1), Direction.NORTH));
+		}
 	}
 
 	// ------------------------------------------------------------------ portico
@@ -228,7 +334,7 @@ public final class HqGenerator {
 
 	// ------------------------------------------------------------------ spine
 
-	private void spineRow(PlanBuilder b, int r, HqLayout.@Nullable Wing east, HqLayout.@Nullable Wing west) {
+	private void spineRow(PlanBuilder b, int r, HqLayout layout, HqLayout.@Nullable Module east, HqLayout.@Nullable Module west) {
 		int zn = HqGeometry.rowNorth(r);
 		try (PlanBuilder.Canvas c = b.module("spine_" + r, HqGeometry.spineRow(r), List.of())) {
 			for (int v = 0; v < ROW; v++) {
@@ -236,7 +342,7 @@ public final class HqGenerator {
 				boolean beamLine = v == 0 || v == 4 || v == 8 || v == ROW - 1;
 				for (int x = -SPINE; x <= SPINE; x++) {
 					int ax = Math.abs(x);
-					HqLayout.Wing w = x > 0 ? east : west;
+					HqLayout.Module w = x > 0 ? east : west;
 					boolean door = ax == SPINE && w != null && v >= DOOR_V1 && v <= DOOR_V2;
 					BlockState floor = ax == SPINE ? (door ? k.woodFloor : k.plinth) : ax == 2 ? k.darkPlanks
 							: x == 0 && v % 4 == 2 ? k.copperInlay : k.woodFloor;
@@ -271,19 +377,24 @@ public final class HqGenerator {
 			}
 			int zs = zn + (DOOR_V1 + DOOR_V2) / 2;
 			if (east != null) {
-				c.decor(new BlockPos(2, 4, zs), k.wallSign(Direction.WEST), wingSign(east));
+				c.decor(new BlockPos(2, 4, zs), k.wallSign(Direction.WEST), wingSign(layout, east));
 			}
 			if (west != null) {
-				c.decor(new BlockPos(-2, 4, zs), k.wallSign(Direction.EAST), wingSign(west));
+				c.decor(new BlockPos(-2, 4, zs), k.wallSign(Direction.EAST), wingSign(layout, west));
 			}
 		}
 	}
 
-	private net.minecraft.nbt.CompoundTag wingSign(HqLayout.Wing w) {
+	/** Module sign: project name (two lines), module number when the project has several, environment. */
+	private net.minecraft.nbt.CompoundTag wingSign(HqLayout layout, HqLayout.Module w) {
 		String label = w.label();
 		String l1 = label.length() <= SignTags.LINE ? label : label.substring(0, SignTags.LINE);
 		String l2 = label.length() <= SignTags.LINE ? "" : label.substring(SignTags.LINE);
-		return SignTags.sign(DyeColor.WHITE, true, l1, l2, "", w.envLabel());
+		List<HqLayout.Module> mine = layout.modulesOf(w.projectKey());
+		int nth = mine.indexOf(w);
+		// only annexes are numbered, so a project's first module's sign never changes when it grows
+		String l3 = nth > 0 ? "#" + (nth + 1) : "";
+		return SignTags.sign(k.envColor(w), true, l1, l2, l3, w.envLabel());
 	}
 
 	private void spineCap(PlanBuilder b, int rows) {
@@ -304,9 +415,9 @@ public final class HqGenerator {
 
 	// ------------------------------------------------------------------ wings
 
-	private void wing(PlanBuilder b, HqLayout.Wing w) {
+	private void wing(PlanBuilder b, HqLayout layout, HqLayout.Module w) {
 		int i = w.index();
-		DyeColor accent = k.accent(w.projectKey());
+		DyeColor accent = k.envColor(w);
 		try (PlanBuilder.Canvas c = b.module("wing_" + i + "_inner", HqGeometry.wingInner(i), List.of())) {
 			wingEndWall(c, i, 0, true);
 		}
@@ -316,11 +427,21 @@ public final class HqGenerator {
 		for (int slot = 0; slot < w.capacity(); slot++) {
 			desk(b, i, slot, w.threadAt(slot));
 		}
+		boolean first = layout.modulesOf(w.projectKey()).get(0) == w;
+		Anchor door = Anchor.at(AnchorNames.module(i), new BlockPos(HqGeometry.wx(i, 1), 1, HqGeometry.wz(i, (DOOR_V1 + DOOR_V2) / 2)),
+				HqGeometry.outward(i));
+		Anchor walk = Anchor.at(AnchorNames.walkModule(i),
+				new BlockPos(HqGeometry.wx(i, HqGeometry.segmentU(1) + 1), 1, HqGeometry.wz(i, (DOOR_V1 + DOOR_V2) / 2)), HqGeometry.outward(i));
+		b.anchor(door);
+		b.anchor(walk);
+		if (first) {
+			b.anchor(door.renamed(AnchorNames.wing(w.projectKey())));
+			b.anchor(walk.renamed(AnchorNames.walk(w.projectKey())));
+		}
 		try (PlanBuilder.Canvas c = b.module("wing_" + i + "_cap", HqGeometry.wingCap(i, w.segments()), List.of())) {
 			wingEndWall(c, i, HqGeometry.segmentU(w.segments()), false);
 		}
-		b.anchor(Anchor.at(AnchorNames.wing(w.projectKey()), new BlockPos(HqGeometry.wx(i, 1), 1, HqGeometry.wz(i, (DOOR_V1 + DOOR_V2) / 2)),
-				HqGeometry.outward(i)));
+
 	}
 
 	/** The wall across a wing at column {@code u}: the inner one with the doorway, or the end cap with windows. */
@@ -426,9 +547,12 @@ public final class HqGenerator {
 			c.decor(left.above(), k.fern);
 			BlockPos seat = new BlockPos(cx, 1, chz);
 			c.set(seat, k.chair(f.getOpposite()));
+			Anchor deskA = Anchor.at(AnchorNames.deskSlot(i, slot), seat, f);
+			Anchor screen = Anchor.face(AnchorNames.screenSlot(i, slot), monitor, f.getOpposite());
+			b.workstation(new Workstation(i, slot, threadId, deskA, monitor, screen, lamp));
 			if (threadId != null) {
-				b.anchor(Anchor.at(AnchorNames.desk(threadId), seat, f));
-				b.anchor(Anchor.face(AnchorNames.monitor(threadId), monitor, f.getOpposite()));
+				b.anchor(deskA.renamed(AnchorNames.desk(threadId)));
+				b.anchor(screen.renamed(AnchorNames.monitor(threadId)));
 				b.anchor(Anchor.face(AnchorNames.lamp(threadId), lamp, f.getOpposite()));
 			}
 		}

@@ -19,6 +19,20 @@ public final class AnchorNames {
 	public static final String BOARD_LAMP = "board_lamp_";
 	/** Centre of the hub floor. */
 	public static final String HUB = "hub";
+	/**
+	 * Prefix of the standing spots in front of the board ({@code board_slot_0..}), nearest to the
+	 * board centre first, facing the board. NPCs that need attention gather here.
+	 */
+	public static final String BOARD_SLOT = "board_slot_";
+	/** Standing spot right in front of the board, foot level, facing the board. */
+	public static final String BOARD_FRONT = "board_front";
+	/** Prefix of the hub benches' seats ({@code bench_0..}), facing into the hub. Resting spots. */
+	public static final String BENCH = "bench_";
+	/** Prefix of the hub's stroll points ({@code walk_hub_0..}), open floor away from furniture. */
+	public static final String WALK_HUB = "walk_hub_";
+
+	/** A standing spot in the middle of the basement archive's main aisle. */
+	public static final String ARCHIVE = "archive";
 
 	private AnchorNames() {
 	}
@@ -45,5 +59,49 @@ public final class AnchorNames {
 
 	public static String boardLamp(int i) {
 		return BOARD_LAMP + i;
+	}
+
+	public static String boardSlot(int i) {
+		return BOARD_SLOT + i;
+	}
+
+	public static String bench(int i) {
+		return BENCH + i;
+	}
+
+	public static String walkHub(int i) {
+		return WALK_HUB + i;
+	}
+
+	/**
+	 * A project's stroll point: the middle of its wing's corridor (segment 1, which every wing has),
+	 * where idle NPCs of that project wander. It never moves when the wing grows.
+	 */
+	public static String walk(String projectKey) {
+		return "walk_" + projectKey;
+	}
+
+	/** The doorway of module {@code index} (inside, looking in). {@link #wing} is an alias for a project's first module. */
+	public static String module(int index) {
+		return "module@" + index;
+	}
+
+	/** Stroll point of module {@code index}; {@link #walk} is an alias for a project's first module. */
+	public static String walkModule(int index) {
+		return "walk@" + index;
+	}
+
+	/** Name of a desk anchor by place (also for vacant desks; see {@link Workstation}). */
+	public static String deskSlot(int module, int slot) {
+		return "desk@" + module + "." + slot;
+	}
+
+	public static String screenSlot(int module, int slot) {
+		return "screen@" + module + "." + slot;
+	}
+
+	/** Screen face of a settled thread's computer in the archive. */
+	public static String archive(String threadId) {
+		return "archive_" + threadId;
 	}
 }

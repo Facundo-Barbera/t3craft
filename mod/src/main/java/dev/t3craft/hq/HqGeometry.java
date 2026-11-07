@@ -1,5 +1,8 @@
 package dev.t3craft.hq;
 
+import java.util.ArrayList;
+import java.util.List;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 
 /**
@@ -43,7 +46,65 @@ final class HqGeometry {
 	static final int BOARD_Z = -4;
 	static final int BOARD_HALF = 3;
 
+	/** Basement (the archive): floor at {@code y = BASEMENT_FLOOR}, ceiling at {@code y = -1}, under the hub. */
+	static final int BASEMENT_FLOOR = -5;
+	/** Stairwell from the hub down to the basement: columns {@code x = STAIR_X1..STAIR_X2}. */
+	static final int STAIR_X1 = 4;
+	static final int STAIR_X2 = 5;
+	/** Top step (in the hub floor layer) at this z; each step below is one block further north. */
+	static final int STAIR_TOP_Z = 6;
+	/** Open hub floor (and basement ceiling) over the stairs: {@code z = STAIR_OPEN_Z1..STAIR_OPEN_Z2}. */
+	static final int STAIR_OPEN_Z1 = 3;
+	static final int STAIR_OPEN_Z2 = 5;
+
+	/** One archive place: the computer cell and the direction its screen faces (the aisle). */
+	record ArchiveSlot(BlockPos cell, Direction facing) {
+	}
+
 	private HqGeometry() {
+	}
+
+	static Box basement() {
+		return new Box(-HUB, BASEMENT_FLOOR, -HUB, HUB, -1, HUB);
+	}
+
+	/**
+	 * Archive slots in a fixed order: shelf rows (north wall, two back-to-back double rows, south
+	 * wall), west to east, each column bottom tier then top tier. Slot {@code s} is always the same
+	 * cell, so archived computers never move.
+	 */
+	static List<ArchiveSlot> archiveSlots() {
+		List<ArchiveSlot> out = new ArrayList<>();
+		addRow(out, -7, -7, 7, Direction.SOUTH);
+		addRow(out, -4, -6, 6, Direction.NORTH);
+		addRow(out, -3, -6, 6, Direction.SOUTH);
+		addRow(out, 0, -6, 2, Direction.NORTH);
+		addRow(out, 1, -6, 2, Direction.SOUTH);
+		addRow(out, 7, -7, 7, Direction.NORTH);
+		return List.copyOf(out);
+	}
+
+	private static void addRow(List<ArchiveSlot> out, int z, int x1, int x2, Direction facing) {
+		for (int x = x1; x <= x2; x++) {
+			out.add(new ArchiveSlot(new BlockPos(x, BASEMENT_FLOOR + 1, z), facing));
+			out.add(new ArchiveSlot(new BlockPos(x, BASEMENT_FLOOR + 2, z), facing));
+		}
+	}
+
+	/**
+	 * Growth envelope: the box every plan with at most {@code maxModules} project modules fits in.
+	 * Hub, portico and basement always; with modules, the spine runs north one {@link #ROW} per
+	 * pair of modules and wings reach {@code |x| = SPINE + 1 + segmentU(SEGMENTS)}.
+	 */
+	static Box envelope(int maxModules) {
+		Box base = hub().union(portico()).union(basement());
+		if (maxModules <= 0) {
+			return base;
+		}
+		int rows = (maxModules + 1) / 2;
+		int reach = SPINE + 1 + segmentU(HqLayout.SEGMENTS);
+		int minX = maxModules >= 2 ? -reach : -HUB;
+		return base.union(new Box(minX, 0, spineCap(rows).minZ(), reach, TOP, -HUB - 1));
 	}
 
 	static Box hub() {

@@ -6,63 +6,121 @@ import com.google.gson.JsonObject;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.block.Rotation;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Who sits where: which wing each project gets and which desk slot each thread gets. This is the
- * only state the HQ needs to grow by annexes instead of being rebuilt; keep the last layout
- * (in memory or with {@link #toJson()}) and pass it to {@link #allocate} when threads change.
+ * Who sits where. The HQ is a grid of identical project <b>modules</b> (a wing off the spine with
+ * {@link #DESKS} desks), plus the archive in the basement for settled threads. This record is the
+ * only state the HQ needs to grow by annexes; keep the last one (in memory or {@link #toJson()}) and
+ * pass it to {@link #allocate} when the roster changes.
  *
- * <p>Stability rules of {@link #allocate(HqInput, HqLayout)}:
- * <ul>
- *   <li>a project that already had a wing keeps its index; a new project takes the lowest free
- *   index (new projects in key order); a project that is gone frees its wing;</li>
- *   <li>a thread that already had a desk in its project's wing keeps the slot; a new thread takes the
- *   lowest free slot (new threads in id order); a thread that is gone leaves a vacant desk;</li>
- *   <li>a wing never shrinks while its project exists ({@code segments} only grows); it grows by one
- *   segment (two desks) at the far end when every slot is taken.</li>
- * </ul>
- * Without a previous layout the result depends on the input only (fully deterministic).
+ * <h2>Rules of {@link #allocate(HqInput, HqLayout)}</h2>
+ * Inputs are canonical (sorted), so the result never depends on roster order. Then:
+ * <ol>
+ *   <li><b>Desks kept.</b> An active thread that had a desk in a module of its project keeps it.</li>
+ *   <li><b>Modules kept.</b> A module of a project keeps its grid index while at least one of its
+ *   desks is taken. A module with no active thread left is removed (its index is freed).</li>
+ *   <li><b>Desk reuse.</b> Each new active thread of a project (in thread-id order) takes the free
+ *   desk with the lowest {@code (module index, slot)} among its project's modules.</li>
+ *   <li><b>Annex.</b> When every desk of the project is taken, a new identical module is added at
+ *   the lowest free grid index (index {@code i}: spine row {@code i / 2}, east when even, west when
+ *   odd), and the thread takes its slot 0. Projects are served in key order.</li>
+ *   <li><b>Archive.</b> A settled thread frees its desk (rule 2 may then remove the module) and
+ *   its computer goes to the archive: it keeps its archive slot if it had one, otherwise new settled
+ *   threads (in {@code (project key, thread id)} order) take the lowest free slot. A thread that
+ *   leaves the roster frees its slot; one that becomes active again leaves the archive. When the
+ *   archive is full, further settled threads are only listed in {@link #overflow()}.</li>
+ * </ol>
+ * Without a previous layout ({@code plan(roster)}) the result is a pure function of the roster:
+ * dense modules, threads in id order. {@code allocate(in, allocate(in, null))} equals
+ * {@code allocate(in, null)}.
  *
- * @param wings sorted by index; indices unique (not necessarily contiguous)
+ * @param modules  sorted by index; indices unique (not necessarily contiguous)
+ * @param archive  sorted by slot; slots unique, below {@link #ARCHIVE_CAPACITY}
+ * @param overflow settled threads that found the archive full (sorted)
  */
-public record HqLayout(List<Wing> wings) {
-	/** A fresh wing has this many segments (two desks each). */
-	public static final int MIN_SEGMENTS = 3;
+public record HqLayout(List<Module> modules, List<Archived> archive, List<String> overflow) {
+	/** Desks per module (3 segments, a desk on each side of each segment). */
+	public static final int DESKS = 6;
+	/** Segments per module (2 desks each). */
+	public static final int SEGMENTS = DESKS / 2;
+	/** Computers the basement archive holds. */
+	public static final int ARCHIVE_CAPACITY = HqGeometry.archiveSlots().size();
 	/** JSON format version of {@link #toJson()}. */
-	public static final int FORMAT = 1;
+	public static final int FORMAT = 2;
 
-	public static final HqLayout EMPTY = new HqLayout(List.of());
+	public static final HqLayout EMPTY = new HqLayout(List.of(), List.of(), List.of());
 
-	/** One desk in a wing: slot {@code 2k} is segment {@code k}'s north desk, {@code 2k+1} its south desk. */
+	/** One taken desk of a module, slot {@code 0..DESKS-1}: {@code 2k} is segment k's north desk, {@code 2k+1} its south one. */
 	public record Desk(int slot, String threadId) {
 	}
 
+	/** An archived computer: slot in {@link HqGeometry#archiveSlots()} order. */
+	public record Archived(int slot, String threadId, String projectKey, String envKey) {
+	}
+
+	/** Module types. Only wings for now; the type is in the API so floors can be added later. */
+	public enum Type {
+		WING
+	}
+
 	/**
-	 * @param index    position along the spine: row {@code index / 2}, east side when even, west when odd
-	 * @param segments length of the wing in desk segments (capacity {@code 2 * segments})
-	 * @param desks    occupied desks sorted by slot
+	 * One project module.
+	 *
+	 * @param index position on the grid: spine row {@code index / 2}, east side when even, west when odd
+	 * @param desks taken desks sorted by slot
 	 */
-	public record Wing(int index, String projectKey, String label, String envLabel, int segments, List<Desk> desks) {
-		public Wing {
-			if (index < 0 || segments < 1) {
-				throw new IllegalArgumentException("bad wing " + index + "/" + segments);
+	public record Module(int index, String projectKey, String label, String envKey, String envLabel, List<Desk> desks) {
+		public Module {
+			if (index < 0) {
+				throw new IllegalArgumentException("bad module index " + index);
 			}
 			desks = desks.stream().sorted(Comparator.comparingInt(Desk::slot)).toList();
 			for (int i = 0; i < desks.size(); i++) {
 				Desk d = desks.get(i);
-				if (d.slot() < 0 || d.slot() >= 2 * segments || (i > 0 && desks.get(i - 1).slot() == d.slot())) {
-					throw new IllegalArgumentException("bad desk slot " + d + " in wing " + projectKey);
+				if (d.slot() < 0 || d.slot() >= DESKS || (i > 0 && desks.get(i - 1).slot() == d.slot())) {
+					throw new IllegalArgumentException("bad desk slot " + d + " in module " + index);
 				}
 			}
 		}
 
+		public Type type() {
+			return Type.WING;
+		}
+
+		/** Desk segments (fixed). */
+		public int segments() {
+			return SEGMENTS;
+		}
+
 		public int capacity() {
-			return 2 * segments;
+			return DESKS;
+		}
+
+		/**
+		 * The module's own origin relative to the HQ origin: the floor cell in the middle of its
+		 * doorway, on the spine side.
+		 */
+		public BlockPos origin() {
+			return new BlockPos(HqGeometry.wx(index, 0), 0, HqGeometry.wz(index, (HqGeometry.DOOR_V1 + HqGeometry.DOOR_V2) / 2));
+		}
+
+		/**
+		 * Orientation of the module relative to the HQ: {@code NONE} = it grows east (+x), {@code
+		 * CLOCKWISE_180} = it grows west. West modules are mirror images (their garden stays on the
+		 * south side), and the per-module plans are already in HQ coordinates, so builders never apply
+		 * this; it is for consumers that reason about modules (minimaps, labels).
+		 */
+		public Rotation rotation() {
+			return HqGeometry.side(index) > 0 ? Rotation.NONE : Rotation.CLOCKWISE_180;
 		}
 
 		public @Nullable String threadAt(int slot) {
@@ -73,93 +131,160 @@ public record HqLayout(List<Wing> wings) {
 			}
 			return null;
 		}
+
+		public boolean full() {
+			return desks.size() >= DESKS;
+		}
+	}
+
+	/** Where a thread sits: a module index and a desk slot. */
+	public record Seat(int module, int slot) {
 	}
 
 	public HqLayout {
-		wings = wings.stream().sorted(Comparator.comparingInt(Wing::index)).toList();
-		for (int i = 1; i < wings.size(); i++) {
-			if (wings.get(i - 1).index() == wings.get(i).index()) {
-				throw new IllegalArgumentException("two wings at index " + wings.get(i).index());
+		modules = modules.stream().sorted(Comparator.comparingInt(Module::index)).toList();
+		for (int i = 1; i < modules.size(); i++) {
+			if (modules.get(i - 1).index() == modules.get(i).index()) {
+				throw new IllegalArgumentException("two modules at index " + modules.get(i).index());
 			}
 		}
+		archive = archive.stream().sorted(Comparator.comparingInt(Archived::slot)).toList();
+		for (int i = 0; i < archive.size(); i++) {
+			int s = archive.get(i).slot();
+			if (s < 0 || s >= ARCHIVE_CAPACITY || (i > 0 && archive.get(i - 1).slot() == s)) {
+				throw new IllegalArgumentException("bad archive slot " + s);
+			}
+		}
+		overflow = List.copyOf(new TreeSet<>(overflow));
 	}
 
-	/** Spine rows needed (0 when there is no wing). */
+	/** Spine rows needed (0 when there is no module). */
 	public int rows() {
-		return wings.isEmpty() ? 0 : wings.get(wings.size() - 1).index() / 2 + 1;
+		return modules.isEmpty() ? 0 : modules.get(modules.size() - 1).index() / 2 + 1;
 	}
 
-	public @Nullable Wing wing(String projectKey) {
-		for (Wing w : wings) {
-			if (w.projectKey().equals(projectKey)) {
-				return w;
+	public @Nullable Module moduleAt(int index) {
+		for (Module m : modules) {
+			if (m.index() == index) {
+				return m;
 			}
 		}
 		return null;
 	}
 
-	public @Nullable Wing wingAt(int index) {
-		for (Wing w : wings) {
-			if (w.index() == index) {
-				return w;
+	/** The project's modules, by index. */
+	public List<Module> modulesOf(String projectKey) {
+		return modules.stream().filter(m -> m.projectKey().equals(projectKey)).toList();
+	}
+
+	/** thread id to seat, for every active thread. */
+	public Map<String, Seat> seats() {
+		Map<String, Seat> out = new LinkedHashMap<>();
+		for (Module m : modules) {
+			for (Desk d : m.desks()) {
+				out.put(d.threadId(), new Seat(m.index(), d.slot()));
+			}
+		}
+		return out;
+	}
+
+	public @Nullable Seat seat(String threadId) {
+		return seats().get(threadId);
+	}
+
+	public @Nullable Archived archived(String threadId) {
+		for (Archived a : archive) {
+			if (a.threadId().equals(threadId)) {
+				return a;
 			}
 		}
 		return null;
 	}
 
-	/** Allocates wings and desks for {@code input}, keeping what {@code previous} had (see class doc). */
+	/** The pure plan of a roster (no history): {@code allocate(input, null)}. */
+	public static HqLayout plan(HqInput input) {
+		return allocate(input, null);
+	}
+
+	/** Allocates modules, desks and archive slots for {@code input}, keeping what {@code previous} had (see class doc). */
 	public static HqLayout allocate(HqInput input, @Nullable HqLayout previous) {
 		HqLayout prev = previous == null ? EMPTY : previous;
-		TreeSet<Integer> used = new TreeSet<>();
-		Map<String, Integer> index = new HashMap<>();
+		Map<String, Seat> oldSeats = prev.seats();
+		// 1-2. kept desks, grouped by old module (only modules of the same project)
+		TreeMap<Integer, TreeMap<Integer, String>> desks = new TreeMap<>();
+		Map<Integer, HqInput.Project> owner = new HashMap<>();
+		Map<String, List<String>> fresh = new TreeMap<>();
 		for (HqInput.Project p : input.projects()) {
-			Wing old = prev.wing(p.key());
-			if (old != null) {
-				index.put(p.key(), old.index());
-				used.add(old.index());
-			}
-		}
-		for (HqInput.Project p : input.projects()) {
-			if (!index.containsKey(p.key())) {
-				int i = lowestFree(used);
-				index.put(p.key(), i);
-				used.add(i);
-			}
-		}
-		List<Wing> out = new ArrayList<>();
-		for (HqInput.Project p : input.projects()) {
-			Wing old = prev.wing(p.key());
-			TreeMap<Integer, String> slots = new TreeMap<>();
-			TreeSet<Integer> taken = new TreeSet<>();
-			List<String> fresh = new ArrayList<>();
+			List<String> f = new ArrayList<>();
 			for (String t : p.threads()) {
-				Integer s = null;
-				if (old != null) {
-					for (Desk d : old.desks()) {
-						if (d.threadId().equals(t)) {
-							s = d.slot();
-						}
-					}
-				}
-				if (s != null) {
-					slots.put(s, t);
-					taken.add(s);
+				Seat s = oldSeats.get(t);
+				Module om = s == null ? null : prev.moduleAt(s.module());
+				if (om != null && om.projectKey().equals(p.key())) {
+					desks.computeIfAbsent(s.module(), k -> new TreeMap<>()).put(s.slot(), t);
+					owner.put(s.module(), p);
 				} else {
-					fresh.add(t);
+					f.add(t);
 				}
 			}
-			for (String t : fresh) {
-				int s = lowestFree(taken);
-				slots.put(s, t);
-				taken.add(s);
-			}
-			int need = slots.isEmpty() ? 0 : (slots.lastKey() + 2) / 2;
-			int segments = Math.max(Math.max(MIN_SEGMENTS, need), old == null ? 0 : old.segments());
-			List<Desk> desks = new ArrayList<>();
-			slots.forEach((s, t) -> desks.add(new Desk(s, t)));
-			out.add(new Wing(index.get(p.key()), p.key(), p.label(), p.envLabel(), segments, desks));
+			fresh.put(p.key(), f);
 		}
-		return new HqLayout(out);
+		TreeSet<Integer> used = new TreeSet<>(desks.keySet());
+		// 3-4. new threads: lowest free desk of the project, else a new module at the lowest free index
+		for (HqInput.Project p : input.projects()) {
+			for (String t : fresh.get(p.key())) {
+				boolean seated = false;
+				for (var e : desks.entrySet()) {
+					if (owner.get(e.getKey()) != p || e.getValue().size() >= DESKS) {
+						continue;
+					}
+					int slot = lowestFree(new TreeSet<>(e.getValue().keySet()));
+					e.getValue().put(slot, t);
+					seated = true;
+					break;
+				}
+				if (!seated) {
+					int i = lowestFree(used);
+					used.add(i);
+					TreeMap<Integer, String> m = new TreeMap<>();
+					m.put(0, t);
+					desks.put(i, m);
+					owner.put(i, p);
+				}
+			}
+		}
+		List<Module> mods = new ArrayList<>();
+		for (var e : desks.entrySet()) {
+			HqInput.Project p = owner.get(e.getKey());
+			List<Desk> ds = new ArrayList<>();
+			e.getValue().forEach((s, t) -> ds.add(new Desk(s, t)));
+			mods.add(new Module(e.getKey(), p.key(), p.label(), p.envKey(), p.envLabel(), ds));
+		}
+		// 5. archive
+		List<Archived> arch = new ArrayList<>();
+		TreeSet<Integer> taken = new TreeSet<>();
+		List<String[]> newcomers = new ArrayList<>();
+		for (HqInput.Project p : input.projects()) {
+			for (String t : p.settled()) {
+				Archived old = prev.archived(t);
+				if (old != null) {
+					arch.add(new Archived(old.slot(), t, p.key(), p.envKey()));
+					taken.add(old.slot());
+				} else {
+					newcomers.add(new String[] {p.key(), t, p.envKey()});
+				}
+			}
+		}
+		List<String> over = new ArrayList<>();
+		for (String[] n : newcomers) {
+			int s = lowestFree(taken);
+			if (s >= ARCHIVE_CAPACITY) {
+				over.add(n[1]);
+				continue;
+			}
+			taken.add(s);
+			arch.add(new Archived(s, n[1], n[0], n[2]));
+		}
+		return new HqLayout(mods, arch, over);
 	}
 
 	private static int lowestFree(TreeSet<Integer> used) {
@@ -170,25 +295,133 @@ public record HqLayout(List<Wing> wings) {
 		return i;
 	}
 
+	// ------------------------------------------------------------------ diff
+
+	/** A desk that lost its thread (settled, gone or moved). */
+	public record FreedDesk(int module, int slot, String threadId) {
+	}
+
+	/**
+	 * What changed between two layouts, for builders and for the UI.
+	 *
+	 * @param addedModules   module indices that are new (build their module plan)
+	 * @param removedModules module indices that are gone (their cells are vacated)
+	 * @param freedDesks     desks whose thread left (the desk stays, now vacant, unless its module is removed)
+	 * @param seated         threads that got a desk (new or moved)
+	 * @param archived       threads whose computer went to the archive in this change
+	 * @param unarchived     threads that left the archive (active again or gone)
+	 */
+	public record Diff(List<Integer> addedModules, List<Integer> removedModules, List<FreedDesk> freedDesks, Map<String, Seat> seated,
+			List<Archived> archived, List<String> unarchived) {
+		public boolean isEmpty() {
+			return addedModules.isEmpty() && removedModules.isEmpty() && freedDesks.isEmpty() && seated.isEmpty() && archived.isEmpty()
+					&& unarchived.isEmpty();
+		}
+	}
+
+	public static Diff diff(@Nullable HqLayout oldLayout, HqLayout newLayout) {
+		HqLayout a = oldLayout == null ? EMPTY : oldLayout;
+		TreeSet<Integer> ai = new TreeSet<>();
+		a.modules.forEach(m -> ai.add(m.index()));
+		TreeSet<Integer> bi = new TreeSet<>();
+		newLayout.modules.forEach(m -> bi.add(m.index()));
+		List<Integer> added = new ArrayList<>();
+		for (int i : bi) {
+			Module om = a.moduleAt(i);
+			Module nm = newLayout.moduleAt(i);
+			if (om == null || !om.projectKey().equals(nm.projectKey())) {
+				added.add(i);
+			}
+		}
+		List<Integer> removed = new ArrayList<>();
+		for (int i : ai) {
+			Module nm = newLayout.moduleAt(i);
+			if (nm == null || !nm.projectKey().equals(a.moduleAt(i).projectKey())) {
+				removed.add(i);
+			}
+		}
+		Map<String, Seat> oldSeats = a.seats();
+		Map<String, Seat> newSeats = newLayout.seats();
+		List<FreedDesk> freed = new ArrayList<>();
+		for (var e : oldSeats.entrySet()) {
+			if (!Objects.equals(newSeats.get(e.getKey()), e.getValue())) {
+				freed.add(new FreedDesk(e.getValue().module(), e.getValue().slot(), e.getKey()));
+			}
+		}
+		freed.sort(Comparator.comparingInt(FreedDesk::module).thenComparingInt(FreedDesk::slot));
+		Map<String, Seat> seated = new TreeMap<>();
+		for (var e : newSeats.entrySet()) {
+			if (!Objects.equals(oldSeats.get(e.getKey()), e.getValue())) {
+				seated.put(e.getKey(), e.getValue());
+			}
+		}
+		List<Archived> arch = new ArrayList<>();
+		for (Archived x : newLayout.archive) {
+			if (a.archived(x.threadId()) == null) {
+				arch.add(x);
+			}
+		}
+		List<String> unarch = new ArrayList<>();
+		for (Archived x : a.archive) {
+			if (newLayout.archived(x.threadId()) == null) {
+				unarch.add(x.threadId());
+			}
+		}
+		return new Diff(added, removed, freed, seated, arch, unarch);
+	}
+
+	// ------------------------------------------------------------------ envelope
+
+	/**
+	 * The box (relative to the HQ origin) that every plan with at most {@code maxModules} modules
+	 * fits in, basement included. Reserve it before the first build so the HQ can grow in place:
+	 * <pre>
+	 *   rows = ceil(maxModules / 2)
+	 *   x: -17 .. 17          (-8 .. 17 when maxModules == 1; -8 .. 8 when 0)
+	 *   y: -5 .. 10           (basement floor .. lightning rod)
+	 *   z: -9 - 14 * rows .. 13    (spine cap .. portico; -8 .. 13 when 0)
+	 * </pre>
+	 * Lowest-free allocation keeps every module index below the largest number of modules the HQ
+	 * ever had at once, so {@code maxModules} is that peak, not the number of projects.
+	 */
+	public static Box envelope(int maxModules) {
+		return HqGeometry.envelope(maxModules);
+	}
+
+	// ------------------------------------------------------------------ json
+
 	public JsonObject toJson() {
 		JsonObject o = new JsonObject();
 		o.addProperty("format", FORMAT);
-		JsonArray ws = new JsonArray();
-		for (Wing w : wings) {
+		JsonArray ms = new JsonArray();
+		for (Module m : modules) {
 			JsonObject j = new JsonObject();
-			j.addProperty("index", w.index());
-			j.addProperty("project", w.projectKey());
-			j.addProperty("label", w.label());
-			j.addProperty("env", w.envLabel());
-			j.addProperty("segments", w.segments());
+			j.addProperty("index", m.index());
+			j.addProperty("project", m.projectKey());
+			j.addProperty("label", m.label());
+			j.addProperty("envKey", m.envKey());
+			j.addProperty("env", m.envLabel());
 			JsonObject desks = new JsonObject();
-			for (Desk d : w.desks()) {
+			for (Desk d : m.desks()) {
 				desks.addProperty(Integer.toString(d.slot()), d.threadId());
 			}
 			j.add("desks", desks);
-			ws.add(j);
+			ms.add(j);
 		}
-		o.add("wings", ws);
+		o.add("modules", ms);
+		JsonArray as = new JsonArray();
+		for (Archived a : archive) {
+			JsonObject j = new JsonObject();
+			j.addProperty("slot", a.slot());
+			j.addProperty("thread", a.threadId());
+			j.addProperty("project", a.projectKey());
+			j.addProperty("envKey", a.envKey());
+			as.add(j);
+		}
+		o.add("archive", as);
+		JsonArray ov = new JsonArray();
+		overflow.forEach(ov::add);
+		o.add("overflow", ov);
 		return o;
 	}
 
@@ -198,17 +431,28 @@ public record HqLayout(List<Wing> wings) {
 			if (e == null || !e.isJsonObject() || e.getAsJsonObject().get("format").getAsInt() != FORMAT) {
 				return EMPTY;
 			}
-			List<Wing> out = new ArrayList<>();
-			for (JsonElement we : e.getAsJsonObject().getAsJsonArray("wings")) {
-				JsonObject j = we.getAsJsonObject();
+			JsonObject root = e.getAsJsonObject();
+			List<Module> mods = new ArrayList<>();
+			for (JsonElement me : root.getAsJsonArray("modules")) {
+				JsonObject j = me.getAsJsonObject();
 				List<Desk> desks = new ArrayList<>();
 				for (var d : j.getAsJsonObject("desks").entrySet()) {
 					desks.add(new Desk(Integer.parseInt(d.getKey()), d.getValue().getAsString()));
 				}
-				out.add(new Wing(j.get("index").getAsInt(), j.get("project").getAsString(), j.get("label").getAsString(),
-						j.get("env").getAsString(), j.get("segments").getAsInt(), desks));
+				mods.add(new Module(j.get("index").getAsInt(), j.get("project").getAsString(), j.get("label").getAsString(),
+						j.get("envKey").getAsString(), j.get("env").getAsString(), desks));
 			}
-			return new HqLayout(out);
+			List<Archived> arch = new ArrayList<>();
+			for (JsonElement ae : root.getAsJsonArray("archive")) {
+				JsonObject j = ae.getAsJsonObject();
+				arch.add(new Archived(j.get("slot").getAsInt(), j.get("thread").getAsString(), j.get("project").getAsString(),
+						j.get("envKey").getAsString()));
+			}
+			List<String> over = new ArrayList<>();
+			for (JsonElement oe : root.getAsJsonArray("overflow")) {
+				over.add(oe.getAsString());
+			}
+			return new HqLayout(mods, arch, over);
 		} catch (RuntimeException ex) {
 			return EMPTY;
 		}
