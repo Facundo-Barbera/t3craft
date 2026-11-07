@@ -51,7 +51,9 @@ public final class OperateCommands {
 					c.getSource().sendFeedback(T3CraftCommands.prefix().append(Component.literal(r.message())
 							.withStyle(r.ok() ? ChatFormatting.GREEN : ChatFormatting.YELLOW)));
 					return r.ok() ? 1 : 0;
-				})));
+				})))
+				.then(LaunchCommand.build()) // feat/op-launch: /t3craft operate new <env> <project> <prompt…>
+				;
 	}
 
 	private static int status(CommandContext<FabricClientCommandSource> c) {
