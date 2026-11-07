@@ -59,6 +59,11 @@ public final class T3Blocks {
 		}
 
 		@Override
+		public BlockState monitor(Direction facing, ScreenRect.Sides sides) {
+			return MonitorBlock.connected(monitor(facing), sides);
+		}
+
+		@Override
 		public BlockState lamp() {
 			return statusLampBlock.defaultBlockState();
 		}

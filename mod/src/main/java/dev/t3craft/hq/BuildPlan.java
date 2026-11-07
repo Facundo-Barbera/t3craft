@@ -236,6 +236,22 @@ public final class BuildPlan {
 		return changed ? new BuildPlan(out, anchors, modules, workstations) : this;
 	}
 
+	/**
+	 * This plan with {@code extra} anchors added (same name: the new one wins). Placements, modules and
+	 * workstations are kept. For plan post-processing and tests (e.g. reserving a large screen with
+	 * {@link AnchorNames#bigScreen} on a generated plan).
+	 */
+	public BuildPlan withAnchors(java.util.Collection<Anchor> extra) {
+		if (extra.isEmpty()) {
+			return this;
+		}
+		TreeMap<String, Anchor> a = new TreeMap<>(anchors);
+		for (Anchor x : extra) {
+			a.put(x.name(), x);
+		}
+		return new BuildPlan(placements, a, modules, workstations);
+	}
+
 	/** The block that fills a cell a newer plan no longer uses. */
 	@FunctionalInterface
 	public interface Vacated {

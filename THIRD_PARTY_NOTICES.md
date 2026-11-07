@@ -130,6 +130,23 @@ Monitor live log (branch `feat/monitor-live-log`, AgentCraft commit `8fe3ad2`, s
   `monitor/MonitorFeature.java`'s sweep of screens unused for 30 s (new implementation: distance and
   view with hysteresis, one subscription per thread).
 
+Multi-block monitor (branch `feat/monitor-multiblock`, AgentCraft commit `8fe3ad2`, sources under
+`mod/src/main/java/dev/agentcraft/` and `mod/src/main/resources/assets/agentcraft/`):
+
+- `mod/src/main/java/dev/t3craft/blocks/MonitorBlock.java` ← `block/PanelBlock.java` (connection
+  properties `up/down/left/right` as seen by the viewer, `left = facing.getClockWise()`,
+  `right = facing.getCounterClockWise()`, the walk to the panel's corner and along its edges to get
+  origin and extent).
+- `mod/src/main/java/dev/t3craft/blocks/MonitorWall.java` ← `block/PanelBlock.java`
+  (`connect/origin/extent`; reworked: the group is validated as a whole, rectangles only, with
+  agreeing bindings and a size limit, over a Minecraft-free lookup).
+- `mod/src/main/java/dev/t3craft/blocks/ScreenRect.java` ← `block/PanelBlock.java` (origin + width ×
+  height of a connected panel, as a value).
+- `mod/src/main/resources/assets/t3craft/blockstates/monitor.json` and
+  `models/block/monitor_edge_{up,down,left,right}.json` ← `blockstates/monitor.json` and
+  `models/block/monitor_edge_*.json` (multipart: one bezel model per side, applied while that side is
+  not connected; adapted: full-block monitor, our own textures, no corner models).
+
 Files adapted from AgentCraft (commit `8fe3ad2`, MIT), branch `feat/lamps-breathe`:
 
 - `mod/src/client/java/dev/t3craft/client/blocks/LampRenderer.java` ← `client/hq/StatusLampRenderer.java`

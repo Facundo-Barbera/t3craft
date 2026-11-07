@@ -76,7 +76,56 @@ public final class AnchorNames {
 	 */
 	public static final String ARCHIVE_TERMINAL = "archiveTerminal";
 
+	/**
+	 * Prefix of the large screens the plan reserves ({@link #bigScreen}). With the blocks module on,
+	 * each cell of the rectangle becomes a {@code t3craft:monitor} and the cells merge into one screen;
+	 * without it they stay whatever the generator put there.
+	 */
+	public static final String BIG_SCREEN = "bigscreen_";
+
 	private AnchorNames() {
+	}
+
+	/**
+	 * A large screen reserved by the plan, {@code width × height} blocks, showing {@code binding} (a
+	 * blocks-module binding string, e.g. {@code "project:" + projectKey}, {@code "env:" + envId} or
+	 * {@code "thread:" + threadId}; empty = unbound). {@code key} (no {@code =}) names the spot and must be unique in
+	 * the plan ({@code "hub"}, {@code "module@3"}, ...). Publish it as
+	 * {@code Anchor.face(name, topLeft, facing)}: the anchor's block is the <b>top-left</b> cell as seen
+	 * from the front, its facing the screen's normal. The generator must place a block (any solid
+	 * one; a black wall reads well in the vanilla HQ) in every cell: the blocks module only swaps
+	 * existing cells. Name format: {@code bigscreen_<key>@<w>x<h>=<binding>}.
+	 */
+	public static String bigScreen(String key, int width, int height, String binding) {
+		if (key.isEmpty() || key.indexOf('=') >= 0 || width < 1 || height < 1) {
+			throw new IllegalArgumentException("bad big screen: " + key + " " + width + "x" + height);
+		}
+		return BIG_SCREEN + key + "@" + width + "x" + height + "=" + (binding == null ? "" : binding);
+	}
+
+	/** A parsed {@link #bigScreen} anchor name. */
+	public record BigScreen(String key, int width, int height, String binding) {
+	}
+
+	/** Parses a {@link #bigScreen} name; null when {@code name} is not one (or is malformed). */
+	public static @org.jspecify.annotations.Nullable BigScreen parseBigScreen(String name) {
+		if (name == null || !name.startsWith(BIG_SCREEN)) {
+			return null;
+		}
+		// the key may contain '@' (module@3) but not '='; the size is between the last '@' and the first '='
+		int eq = name.indexOf('=', BIG_SCREEN.length());
+		int at = eq < 0 ? -1 : name.lastIndexOf('@', eq);
+		int x = at < 0 ? -1 : name.indexOf('x', at);
+		if (at <= BIG_SCREEN.length() || x < 0 || x > eq) {
+			return null;
+		}
+		try {
+			int w = Integer.parseInt(name.substring(at + 1, x));
+			int h = Integer.parseInt(name.substring(x + 1, eq));
+			return w < 1 || h < 1 ? null : new BigScreen(name.substring(BIG_SCREEN.length(), at), w, h, name.substring(eq + 1));
+		} catch (NumberFormatException e) {
+			return null;
+		}
 	}
 
 	/**
@@ -87,7 +136,7 @@ public final class AnchorNames {
 	public static boolean standing(String name) {
 		if (name.equals(BOARD) || name.startsWith(BOARD_LAMP) || name.startsWith("monitor_") || name.startsWith("lamp_")
 				|| name.startsWith("screen@") || name.startsWith("archive_") || name.startsWith(SHELF_SLOT) || name.equals(SHELF_MORE)
-				|| name.equals(SHELF_HEADER) || name.equals(BEACON)) {
+				|| name.equals(SHELF_HEADER) || name.equals(BEACON) || name.startsWith(BIG_SCREEN)) {
 			return false;
 		}
 		return name.equals(SPAWN) || name.equals(ENTRANCE) || name.equals(HUB) || name.equals(BOARD_FRONT) || name.equals(ARCHIVE)

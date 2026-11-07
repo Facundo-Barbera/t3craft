@@ -16,6 +16,8 @@ import dev.t3craft.blocks.LampStatus;
 import dev.t3craft.blocks.LiveLamps;
 import dev.t3craft.blocks.ArchiveTerminalBlock;
 import dev.t3craft.blocks.MonitorBlock;
+import dev.t3craft.blocks.MonitorBlockEntity;
+import dev.t3craft.blocks.ScreenRect;
 import dev.t3craft.blocks.T3Blocks;
 import dev.t3craft.client.T3CraftClient;
 import dev.t3craft.client.chat.ChatScreens;
@@ -171,6 +173,7 @@ public final class BlocksClient implements ClientModInitializer {
 			return r;
 		});
 		MonitorBlock.setClientUse(this::use);
+		setScreenExtents(BlocksClient::connectedExtent);
 		ArchiveTerminalBlock.setClientUse(pos -> dev.t3craft.client.archive.ArchiveClient.openIfReady());
 		ClientTickEvents.END_CLIENT_TICK.register(GuardedEvents.endClientTick(MODULE, this::tick));
 		ClientBlockEntityEvents.BLOCK_ENTITY_LOAD.register((be, level) -> liveLog.onLoad(be));
@@ -227,6 +230,35 @@ public final class BlocksClient implements ClientModInitializer {
 		if (r != null) {
 			r.clear();
 		}
+	}
+
+	/**
+	 * The renderer's extent of a monitor from its connection flags ({@link MonitorBlock#extent}): null
+	 * (1×1) for a lone monitor, otherwise the screen's size and whether this is its bottom-left cell.
+	 */
+	static @Nullable ScreenExtent connectedExtent(MonitorBlockEntity be) {
+		var state = be.getBlockState();
+		if (be.getLevel() == null || !MonitorBlock.isConnected(state)) {
+			return null;
+		}
+		ScreenRect r = MonitorBlock.extent(be.getLevel(), be.getBlockPos(), state);
+		if (!r.isMulti()) {
+			return null;
+		}
+		return r.isDrawOrigin(be.getBlockPos()) ? new ScreenExtent(r.width(), r.height()) : ScreenExtent.member(r.width(), r.height());
+	}
+
+	/**
+	 * The binding a whole screen shows, for the monitor at {@code pos}: a merged screen's first bound
+	 * cell ({@link MonitorBlock#screenBinding}) through the position fallback; a lone monitor's own.
+	 */
+	Binding screenBinding(MonitorBlockEntity be) {
+		var state = be.getBlockState();
+		if (be.getLevel() == null || !MonitorBlock.isConnected(state)) {
+			return resolve(be.getBlockPos(), be.binding());
+		}
+		ScreenRect r = MonitorBlock.extent(be.getLevel(), be.getBlockPos(), state);
+		return resolve(r.origin(), MonitorBlock.screenBinding(be.getLevel(), r));
 	}
 
 	ScreenExtent extentOf(dev.t3craft.blocks.MonitorBlockEntity be) {
@@ -455,8 +487,15 @@ public final class BlocksClient implements ClientModInitializer {
 					return 1;
 				})
 				.then(literal("link").then(argument("thread", StringArgumentType.greedyString())
-						.executes(c -> link(c, Binding.thread(StringArgumentType.getString(c, "thread").trim())))))
+						.executes(c -> link(c, linkTarget(StringArgumentType.getString(c, "thread"))))))
 				.then(literal("unlink").executes(c -> link(c, Binding.NONE)))));
+	}
+
+	/** {@code project:<key>}, {@code env:<id>} or {@code thread:<key>} as typed; anything else is a thread key. */
+	static Binding linkTarget(String arg) {
+		String a = arg.trim();
+		Binding b = Binding.parse(a);
+		return b.isNone() || b.kind() == Binding.Kind.BOARD || b.kind() == Binding.Kind.MODULE ? Binding.thread(a) : b;
 	}
 
 	/** Binds the t3craft block the player looks at (singleplayer / LAN host only). */
@@ -477,8 +516,17 @@ public final class BlocksClient implements ClientModInitializer {
 		var dim = mc.level.dimension();
 		server.execute(() -> {
 			ServerLevel level = server.getLevel(dim);
-			if (level != null && level.getBlockEntity(pos) instanceof BoundBlockEntity be) {
-				be.setBinding(b.wire());
+			if (level == null) {
+				return;
+			}
+			// a merged screen is bound as a whole (bindings must agree, or it would split)
+			var state = level.getBlockState(pos);
+			java.util.List<BlockPos> cells = state.getBlock() instanceof MonitorBlock
+					? MonitorBlock.extent(level, pos, state).cells() : java.util.List.of(pos);
+			for (BlockPos p : cells) {
+				if (level.getBlockEntity(p) instanceof BoundBlockEntity be) {
+					be.setBinding(b.wire());
+				}
 			}
 		});
 		lastWanted = null;
