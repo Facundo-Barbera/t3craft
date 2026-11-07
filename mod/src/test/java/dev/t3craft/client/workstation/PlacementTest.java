@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import dev.t3craft.client.npc.behavior.Anchor;
 import dev.t3craft.client.npc.behavior.Pos;
-import dev.t3craft.client.npc.behavior.RingLayout;
+import dev.t3craft.client.npc.behavior.GridLayout;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -52,23 +52,23 @@ class PlacementTest {
 	}
 
 	@Test
-	void deskPlacementSitsInFrontOfRingDesk() {
+	void deskPlacementSitsInFrontOfGridDesk() {
 		Pos origin = new Pos(100.5, 64, 100.5);
-		DeskPlacement src = new DeskPlacement(() -> origin);
 		List<WorkstationThread> threads = List.of(t("vps:b", "g1", StationStatus.WORKING), t("vps:a", "g1", StationStatus.IDLE),
 				t("vps:c", "g2", StationStatus.ERROR));
-		src.prepare(threads);
-		List<RingLayout.Member> ms = new ArrayList<>();
+		GridLayout grid = new GridLayout();
+		List<GridLayout.Member> ms = new ArrayList<>();
 		for (WorkstationThread th : threads) {
-			ms.add(new RingLayout.Member(th.key(), th.groupId(), th.priority()));
+			ms.add(new GridLayout.Member(th.key(), th.groupId(), "vps"));
 		}
-		ms.sort(java.util.Comparator.comparing(RingLayout.Member::id));
-		RingLayout ring = RingLayout.of(origin, ms);
+		grid.update(origin, ms, GridLayout.Ground.UNKNOWN);
+		DeskPlacement src = new DeskPlacement(() -> grid);
+		src.prepare(threads);
 		Set<Long> used = new HashSet<>();
 		for (WorkstationThread th : threads) {
 			StationPlacement p = src.placement(th);
 			assertNotNull(p, th.key());
-			Anchor desk = ring.desk(th.key(), th.groupId());
+			Anchor desk = grid.desk(th.key(), th.groupId());
 			assertEquals(StationPlacement.inFrontOf(desk.pos().x(), desk.pos().y(), desk.pos().z(), desk.yaw(), DeskPlacement.DISTANCE), p);
 			assertTrue(used.add(p.computerKey()), "two stations on one block");
 		}
@@ -76,7 +76,9 @@ class PlacementTest {
 
 	@Test
 	void deskPlacementHidesArchivedAndNeedsOrigin() {
-		DeskPlacement src = new DeskPlacement(() -> new Pos(0, 64, 0));
+		GridLayout grid = new GridLayout();
+		grid.update(new Pos(0, 64, 0), List.of(new GridLayout.Member("vps:z", "g", "vps")), GridLayout.Ground.UNKNOWN);
+		DeskPlacement src = new DeskPlacement(() -> grid);
 		WorkstationThread archived = t("vps:z", "g", StationStatus.ARCHIVED);
 		src.prepare(List.of(archived));
 		assertNull(src.placement(archived));

@@ -10,7 +10,6 @@ import dev.t3craft.client.config.ConfigManager;
 import dev.t3craft.client.debug.GuardedEvents;
 import dev.t3craft.client.npc.ChipsConfig;
 import dev.t3craft.client.npc.NpcInfo;
-import dev.t3craft.client.npc.behavior.Pos;
 import dev.t3craft.debug.DevReload;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -38,7 +37,6 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.component.SwingAnimation;
-import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -70,7 +68,7 @@ public final class WorkstationClient implements ClientModInitializer {
 	private final WorkstationModel model = new WorkstationModel();
 	private final WorkstationCache cache = new WorkstationCache(model);
 	private final WorkstationRenderer renderer = new WorkstationRenderer();
-	private final DeskPlacement provisional = new DeskPlacement(WorkstationClient::registryOrigin);
+	private final DeskPlacement provisional = new DeskPlacement(WorkstationClient::registryLayout);
 	private final ThreadOpener defaultOpener = new ChatScreenOpener();
 	private final Map<String, WorkstationThread> threads = new HashMap<>();
 	private @Nullable WorkstationPlacementSource placementOverride;
@@ -205,10 +203,9 @@ public final class WorkstationClient implements ClientModInitializer {
 		renderer.tick(lvl, list, source, cache, System.currentTimeMillis());
 	}
 
-	private static @Nullable Pos registryOrigin() {
+	private static dev.t3craft.client.npc.behavior.@Nullable AnchorSource registryLayout() {
 		T3CraftClient client = T3CraftClient.get();
-		Vec3 o = client == null ? null : client.npcs().layoutOrigin();
-		return o == null ? null : new Pos(o.x, o.y, o.z);
+		return client == null ? null : client.npcs().fallbackLayout();
 	}
 
 	private InteractionResult use(Player player, InteractionHand hand, String key, InteractionResult consumed) {
