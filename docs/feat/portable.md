@@ -31,6 +31,7 @@ Build: `cd mod && ./gradlew build --no-daemon` → OK, 185 tests JUnit (tras mer
 - **No gestiona entornos.** Eso es de **feat/config**. "Environments…" abre su pantalla.
 - **No abre conexiones ni manda RPC.** Todo sale del modelo que el cliente ya tiene, así que no hace falta `getThreadProjection` ni una segunda conexión.
 - **No escribe en T3.** Ningún archivo del paquete referencia `dispatchCommand`, `launchThread`, `operate`, `chat.send` ni `sendText`. Lo comprueba un test.
+  - Excepción acotada (feat/op-launch): el botón "New thread…" solo abre `NewThreadScreen`, que vive fuera del paquete y es la dueña de la escritura protegida (ver `docs/feat-op-launch.md`).
 
 ## Arquitectura e interfaces
 
