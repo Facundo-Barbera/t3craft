@@ -5,11 +5,12 @@ One line per structural commit on `main`, newest first:
 
     - <date> <branch> RESTART|RELOAD — <what changed>
 
-- `RESTART`: close and relaunch the client (new items, registries, entrypoints, keybinds, mixins, dependencies).
-- `RELOAD`: in-game reload is enough (resources/lang, config, commands re-registered on rejoin).
+- `RESTART`: close and relaunch the client (new items, blocks, registries, entrypoints, keybinds, commands, HUD elements, mixins, dependencies).
+- `RELOAD`: no structural change; code/behaviour, resources/lang or config only (hot-reload / rebuild is enough).
 
 ## Entries
 
+- 2026-11-07 feat/search RESTART — new command /t3craft search <text> (clickable results across all environments, read-only searchThreads via T3Connection); search box in PortableScreen; lang keys.
 - 2026-11-07 feat/site RESTART — new client entrypoint SiteClient; commands /t3craft site here|pick|wand|confirm|cancel|undo|move|resume|status; terrain evaluation with growth reserve, leveling, per-expansion snapshots stored in the world folder (undo last expansion, move rebuilds modules elsewhere); wand click handler; particle preview.
 - 2026-11-07 feat/hud-bar RESTART — new HUD element t3craft:status_bar registered at client init (working / needs you / error counters + 'n waiting · key' badge, GoalBar-style, AgentCraft attribution); additive config (enabled, position, hide when empty) in Settings.
 - 2026-11-07 feat/npc-attention RELOAD — NPCs walk over to the player when their thread needs attention (approach state in the NPC brain), configurable (enabled, max distance, max concurrent, cooldown). No new entrypoints, registries, keybinds or commands.
