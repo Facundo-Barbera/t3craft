@@ -10,6 +10,7 @@ One line per structural commit on `main`, newest first:
 
 ## Entries
 
+- 2026-11-07 feat/workstation RESTART — new client entrypoint WorkstationClient (client UseBlockCallback: clicking a desk computer opens that thread's chat); in-world workstation screens via client display entities (no registered blocks); command /t3craft workstation [on|off]; config block workstations; new lang keys.
 - 2026-11-07 feat/survival RESTART — new client entrypoint SurvivalClient and main-init hook (T3Craft.java); crafting recipe t3craft:t3_terminal + recipe-book unlock advancement + 'First Contact' advancement (data pack: /reload is enough for data alone, but the entrypoint needs a restart); GameModePolicy/SurvivalRules config defaults; new lang keys.
 - 2026-11-07 feat/portable RESTART — live screen on the held T3 Terminal (first person, both hands) via a vanilla special model renderer t3craft:held_terminal_screen registered at client init + new item model JSON; portable key moved to the shared T3Craft key category (t3craft:general); new config key heldScreen (default on) in Settings.
 - 2026-11-07 feat/demo-world RESTART — new client entrypoint DemoClient; "T3Craft HQ" button on title/world-select screens; commands /t3craft demo [confirm|rebuild|status]; demo superflat world (creative) builds the HQ (shed plan for now) at a fixed origin; new lang keys.

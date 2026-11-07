@@ -19,5 +19,9 @@
 	"t3craft.survival.spectator": "Builders do not work in spectator mode",
 	"t3craft.survival.adventure": "Builders cannot edit an adventure world without cheats",
 	"t3craft.survival.needs_cheats": "Free debug builds need cheats or creative mode",
-	"t3craft.survival.ok": "Allowed"
+	"t3craft.survival.ok": "Allowed",
+	"t3craft.workstation.status": "Workstation screens: %s (%s shown, %s archived). /t3craft workstation on|off",
+	"t3craft.workstation.on": "Workstation screens on.",
+	"t3craft.workstation.off": "Workstation screens off.",
+	"t3craft.workstation.save_failed": "Could not save the setting: %s"
 }
