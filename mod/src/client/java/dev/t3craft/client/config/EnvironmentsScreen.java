@@ -13,12 +13,14 @@ import net.minecraft.network.chat.Component;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Paired T3 environments: status, show/hide, edit (name, colour, filter), unpair, and "Pair new…"
+ * Paired T3 environments: status, show/hide, edit (name, colour, filter), unpair, the optional
+ * control (operate) pairing ("Control…" / "Revoke control"), and "Pair new…"
  * (main's read-only pairing screen: paste the link, or the code plus the T3 URL). Paged so it fits
  * any GUI scale. Shows ids, labels, URLs and connection status only: never a token.
  */
 public final class EnvironmentsScreen extends BaseConfigScreen {
 	private static final int ROW = 24;
+	private static final int BUTTONS = 4;
 	private final EnvironmentActions actions;
 	private List<EnvRow> rows = List.of();
 	private int page;
@@ -33,7 +35,7 @@ public final class EnvironmentsScreen extends BaseConfigScreen {
 	}
 
 	private int listWidth() {
-		return Math.min(420, width - 32);
+		return Math.min(470, width - 32);
 	}
 
 	@Override
@@ -50,7 +52,7 @@ public final class EnvironmentsScreen extends BaseConfigScreen {
 			EnvRow r = rows.get(i);
 			EnvPrefs p = s.env(r.id());
 			int ry = y + (i - from) * ROW;
-			int bx = x + w - 3 * 54;
+			int bx = x + w - BUTTONS * 54;
 			addRenderableWidget(Button.builder(Component.literal(p.visible() ? "Hide" : "Show"), b -> {
 				ConfigManager.SaveResult res = ConfigManager.get().update(st -> st.withEnv(r.id(), st.env(r.id()).withVisible(!st.env(r.id()).visible())));
 				if (res.ok()) {
@@ -64,6 +66,22 @@ public final class EnvironmentsScreen extends BaseConfigScreen {
 			addRenderableWidget(Button.builder(Component.literal("Edit"),
 					b -> minecraft.gui.setScreen(new EnvironmentEditScreen(this, actions, r))).bounds(bx + 54, ry, 50, 20).build());
 			addRenderableWidget(Button.builder(Component.literal("Unpair"), b -> confirmUnpair(r)).bounds(bx + 108, ry, 50, 20).build());
+			boolean operate = actions.operateEnabled(r.id());
+			Button ctl = addRenderableWidget(Button.builder(operate
+					? Component.translatable("t3craft.operate.revoke.button").withStyle(ChatFormatting.RED)
+					: Component.translatable("t3craft.operate.enable.short"), b -> {
+						if (operate) {
+							confirmRevoke(r);
+						} else {
+							Screen next = actions.operateScreen(this, r.id());
+							if (next != null) {
+								minecraft.gui.setScreen(next);
+							}
+						}
+					}).bounds(bx + 162, ry, 50, 20).build());
+			ctl.setTooltip(net.minecraft.client.gui.components.Tooltip.create(operate
+					? Component.translatable("t3craft.operate.revoke.tooltip")
+					: Component.translatable("t3craft.operate.enable.tooltip")));
 		}
 
 		int by = height - 52;
@@ -97,6 +115,16 @@ public final class EnvironmentsScreen extends BaseConfigScreen {
 						+ ". Revoke it on the host too: t3 auth session list / t3 auth session revoke <id>.")));
 	}
 
+	private void confirmRevoke(EnvRow r) {
+		minecraft.gui.setScreen(new ConfirmScreen(yes -> {
+			if (yes) {
+				ok(actions.revokeOperate(r.id()));
+			}
+			minecraft.gui.setScreen(this);
+		}, Component.translatable("t3craft.operate.revoke.title", r.label()),
+				Component.translatable("t3craft.operate.revoke.body")));
+	}
+
 	@Override
 	public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float a) {
 		super.extractRenderState(g, mouseX, mouseY, a);
@@ -112,14 +140,14 @@ public final class EnvironmentsScreen extends BaseConfigScreen {
 		}
 		T3CraftSettings s = ConfigManager.get().settings();
 		int from = page * perPage();
-		int textW = w - 3 * 54 - 16;
+		int textW = w - BUTTONS * 54 - 16;
 		for (int i = from; i < Math.min(rows.size(), from + perPage()); i++) {
 			EnvRow r = rows.get(i);
 			EnvPrefs p = s.env(r.id());
 			int ry = y + (i - from) * ROW;
 			int swatch = p.color() == null ? 0xFF555555 : 0xFF000000 | p.color();
 			g.fill(x, ry + 2, x + 6, ry + 18, swatch);
-			String name = p.labelOr(r.label()) + (p.visible() ? "" : "  (hidden)");
+			String name = p.labelOr(r.label()) + (p.visible() ? "" : "  (hidden)") + (actions.operateEnabled(r.id()) ? "  [control]" : "");
 			g.text(font, font.plainSubstrByWidth(name, textW), x + 10, ry + 1, p.visible() ? 0xFFFFFFFF : 0xFF808080);
 			int sc = switch (r.status()) {
 				case "ok" -> 0xFF55FF55;

@@ -116,8 +116,12 @@ public final class Environments {
 		writeAtomically(credentialFile(env.id()), GSON.toJson(cred), true);
 	}
 
-	/** Removes the environment and deletes its local credential (revoke the session on the host too). */
+	/**
+	 * Removes the environment and deletes its local credentials, the read-only one and the
+	 * optional operate one ({@link OperateCredentials}). Revoke the sessions on the host too.
+	 */
 	public synchronized boolean remove(String id) throws IOException {
+		new OperateCredentials(dir).revoke(id);
 		List<Environment> all = new ArrayList<>(list());
 		boolean removed = all.removeIf(e -> e.id().equals(id));
 		JsonArray arr = new JsonArray();
@@ -162,7 +166,7 @@ public final class Environments {
 		}
 	}
 
-	private static void writeAtomically(Path target, String content, boolean secret) throws IOException {
+	static void writeAtomically(Path target, String content, boolean secret) throws IOException {
 		Files.createDirectories(target.getParent());
 		Path tmp = Files.createTempFile(target.getParent(), target.getFileName().toString(), ".tmp");
 		try {
