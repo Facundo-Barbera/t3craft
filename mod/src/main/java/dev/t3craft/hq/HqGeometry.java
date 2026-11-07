@@ -189,14 +189,20 @@ final class HqGeometry {
 		return northDesk(slot) ? 1 : WING_WALL - 1;
 	}
 
-	/** Chair row of a slot. */
+	/** Chair row of a slot: the seat cell, right in front of the computer (where the NPC stands). */
 	static int chairV(int slot) {
 		return northDesk(slot) ? 2 : WING_WALL - 2;
 	}
 
+	/** Backrest row of a slot: behind the seat, on the corridor side. */
+	static int backV(int slot) {
+		return northDesk(slot) ? 3 : WING_WALL - 3;
+	}
+
+	/** A desk module: desk row, seat row and backrest row, three columns wide. */
 	static Box desk(int wingIndex, int slot) {
 		int u = segmentU(slot / 2);
-		return wingBox(wingIndex, u, u + 2, deskV(slot), chairV(slot), 0, DESK_TOP);
+		return wingBox(wingIndex, u, u + 2, deskV(slot), backV(slot), 0, DESK_TOP);
 	}
 
 	/** Direction from a slot's chair to its desk (and the occupant's view). */

@@ -143,7 +143,9 @@ public final class HqGenerator {
 				}
 			}
 			// railing around the stairwell down to the archive
-			for (int z = HqGeometry.STAIR_OPEN_Z1 - 1; z <= HqGeometry.STAIR_TOP_Z; z++) {
+			// (no corner posts at the north end: the cap row and the sides already close it, and the
+			// cell east of it stays free for the resting spot in front of the last bench)
+			for (int z = HqGeometry.STAIR_OPEN_Z1; z <= HqGeometry.STAIR_TOP_Z; z++) {
 				c.set(HqGeometry.STAIR_X1 - 1, 1, z, k.rail);
 				c.set(HqGeometry.STAIR_X2 + 1, 1, z, k.rail);
 			}
@@ -161,7 +163,8 @@ public final class HqGenerator {
 			for (int sx = -1; sx <= 1; sx += 2) {
 				Direction into = sx > 0 ? Direction.WEST : Direction.EAST;
 				for (int z = -2; z <= 2; z++) {
-					b.anchor(Anchor.at(AnchorNames.bench(bench++), new BlockPos(7 * sx, 1, z), into));
+					// standing in front of the bench (the stairs themselves have collision)
+					b.anchor(Anchor.at(AnchorNames.bench(bench++), new BlockPos(6 * sx, 1, z), into));
 				}
 			}
 			int walk = 0;
@@ -425,7 +428,7 @@ public final class HqGenerator {
 			segment(b, i, s, accent);
 		}
 		for (int slot = 0; slot < w.capacity(); slot++) {
-			desk(b, i, slot, w.threadAt(slot));
+			desk(b, i, slot, w.threadAt(slot), accent);
 		}
 		boolean first = layout.modulesOf(w.projectKey()).get(0) == w;
 		Anchor door = Anchor.at(AnchorNames.module(i), new BlockPos(HqGeometry.wx(i, 1), 1, HqGeometry.wz(i, (DOOR_V1 + DOOR_V2) / 2)),
@@ -521,8 +524,13 @@ public final class HqGenerator {
 		}
 	}
 
-	/** One desk: desk row against the wall (drawer barrel, two desk tops, monitor, status lamp), chair behind. */
-	private void desk(PlanBuilder b, int i, int slot, @Nullable String threadId) {
+	/**
+	 * One desk: desk row against the wall (drawer barrel, two desk tops, monitor, status lamp), then
+	 * the chair: a carpet cushion (the seat, in front of the monitor) with an open-trapdoor backrest
+	 * in the cell behind it. The seat cell stays free of collision (air above a carpet), so the NPC
+	 * can walk in and stand there facing the computer; the cells beside the seat stay open to reach it.
+	 */
+	private void desk(PlanBuilder b, int i, int slot, @Nullable String threadId, DyeColor accent) {
 		Box box = HqGeometry.desk(i, slot);
 		try (PlanBuilder.Canvas c = b.module("wing_" + i + "_desk_" + slot, box, List.of())) {
 			Direction f = HqGeometry.deskFacing(slot);
@@ -530,9 +538,11 @@ public final class HqGenerator {
 			int cx = HqGeometry.wx(i, HqGeometry.segmentU(slot / 2) + 1);
 			int dz = HqGeometry.wz(i, HqGeometry.deskV(slot));
 			int chz = HqGeometry.wz(i, HqGeometry.chairV(slot));
+			int bkz = HqGeometry.wz(i, HqGeometry.backV(slot));
 			for (int dx = -1; dx <= 1; dx++) {
 				c.set(cx + dx, 0, dz, k.woodFloor);
 				c.set(cx + dx, 0, chz, k.woodFloor);
+				c.set(cx + dx, 0, bkz, k.woodFloor);
 			}
 			BlockPos desk = new BlockPos(cx, 1, dz);
 			BlockPos left = desk.relative(right.getOpposite());
@@ -546,7 +556,8 @@ public final class HqGenerator {
 			c.set(lamp, k.lamp());
 			c.decor(left.above(), k.fern);
 			BlockPos seat = new BlockPos(cx, 1, chz);
-			c.set(seat, k.chair(f.getOpposite()));
+			c.decor(seat, k.carpet(accent));
+			c.set(new BlockPos(cx, 1, bkz), k.backrest(f));
 			Anchor deskA = Anchor.at(AnchorNames.deskSlot(i, slot), seat, f);
 			Anchor screen = Anchor.face(AnchorNames.screenSlot(i, slot), monitor, f.getOpposite());
 			b.workstation(new Workstation(i, slot, threadId, deskA, monitor, screen, lamp));
