@@ -1,0 +1,15 @@
+{
+  "parent": "t3craft:item/t3_terminal",
+  "display": {
+    "firstperson_righthand": {
+      "rotation": [-15, 0, 0],
+      "translation": [-2.5, 2.5, -2],
+      "scale": [1.25, 1.25, 1.25]
+    },
+    "firstperson_lefthand": {
+      "rotation": [-15, 0, 0],
+      "translation": [-2.5, 2.5, -2],
+      "scale": [1.25, 1.25, 1.25]
+    }
+  }
+}
