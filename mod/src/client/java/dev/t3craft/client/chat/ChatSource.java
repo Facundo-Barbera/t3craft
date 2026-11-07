@@ -54,13 +54,31 @@ public interface ChatSource {
 		CompletableFuture<JsonObject> threadHistory(String threadId, String cursor);
 
 		CompletableFuture<@Nullable JsonObject> getTurnItem(String threadId, String itemId);
+
+		/**
+		 * False once this environment's connection was replaced (reload, pairing, Enable control):
+		 * the view must ask {@link ChatSource#env} again or it would follow a stopped connection.
+		 */
+		default boolean current() {
+			return true;
+		}
 	}
 
 	Env env(String envId) throws Unavailable;
 
 	/** Adapter over the environment's connection. */
 	static Env of(T3Connection c) {
+		return of(c, () -> true);
+	}
+
+	/** Same, with {@code current} telling whether {@code c} is still the environment's live connection. */
+	static Env of(T3Connection c, java.util.function.BooleanSupplier current) {
 		return new Env() {
+			@Override
+			public boolean current() {
+				return current.getAsBoolean();
+			}
+
 			@Override
 			public String id() {
 				return c.environment().id();

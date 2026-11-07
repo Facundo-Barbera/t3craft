@@ -70,4 +70,25 @@ class ShellStateTest {
 		assertEquals(NOW - 2 * H, t.createdAt());
 		assertNull(t.pendingRuntimeRequest().blocking());
 	}
+
+	@Test
+	void pinnedAtIsDecodedTolerantly() {
+		var base = Fixtures.threadJson("p", Fixtures.H, "");
+		assertFalse(ThreadShell.fromJson(base).pinned());
+		var iso = base.deepCopy();
+		iso.addProperty("pinnedAt", "2026-11-07T10:00:00.000Z");
+		assertEquals(java.time.Instant.parse("2026-11-07T10:00:00Z").toEpochMilli(), ThreadShell.fromJson(iso).pinnedAt());
+		var nul = base.deepCopy();
+		nul.add("pinnedAt", com.google.gson.JsonNull.INSTANCE);
+		assertFalse(ThreadShell.fromJson(nul).pinned(), "pinnedAt: null = not pinned (after thread.unpin)");
+		var num = base.deepCopy();
+		num.addProperty("pinnedAt", 1234L);
+		assertEquals(1234L, ThreadShell.fromJson(num).pinnedAt());
+		var bool = base.deepCopy();
+		bool.addProperty("pinned", true);
+		assertTrue(ThreadShell.fromJson(bool).pinned());
+		var odd = base.deepCopy();
+		odd.addProperty("pinnedAt", "yesterday");
+		assertTrue(ThreadShell.fromJson(odd).pinned());
+	}
 }

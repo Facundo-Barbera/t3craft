@@ -9,7 +9,8 @@ import org.jspecify.annotations.Nullable;
  * from the JSON wire format (vendored contract: bridge/vendor/t3-contracts, orchestrationV2.ts).
  * Timestamps are epoch millis or null. {@code parentThreadId} (from {@code lineage}) is the parent
  * thread of a subagent or fork, null for top-level threads; it is the last component so other
- * branches adding fields do not collide.
+ * branches adding fields do not collide. {@code pinnedAt} (fix/chat-direct-connect) is when the
+ * thread was pinned in T3, null when it is not pinned.
  */
 public record ThreadShell(
 		String id,
@@ -38,10 +39,49 @@ public record ThreadShell(
 		@Nullable Long settledAt,
 		@Nullable String settledOverride,
 		ThreadMeta meta,
-		@Nullable String parentThreadId) {
+		@Nullable String parentThreadId,
+		@Nullable Long pinnedAt) {
 
 	public ThreadShell {
 		meta = meta == null ? ThreadMeta.EMPTY : meta;
+	}
+
+	/** Shape before {@code pinnedAt}, kept so existing callers still compile. */
+	public ThreadShell(String id, String projectId, String title, String status, @Nullable String activityRunStatus,
+			@Nullable PendingRequest pendingRuntimeRequest, boolean hasActionableProposedPlan, long pendingGuestMessageCount,
+			int pendingBackgroundTasks, @Nullable String lastError, @Nullable String latestMessageText, @Nullable Long latestMessageAt,
+			@Nullable String activeRunId, @Nullable String relationshipToParent, boolean sideChat, @Nullable Long createdAt,
+			@Nullable Long latestUserMessageAt, @Nullable Long latestRunRequestedAt, @Nullable Long latestRunStartedAt,
+			@Nullable Long latestRunCompletedAt, @Nullable Long activityRunStartedAt, @Nullable Long archivedAt, @Nullable Long deletedAt,
+			@Nullable Long settledAt, @Nullable String settledOverride, ThreadMeta meta, @Nullable String parentThreadId) {
+		this(id, projectId, title, status, activityRunStatus, pendingRuntimeRequest, hasActionableProposedPlan, pendingGuestMessageCount,
+				pendingBackgroundTasks, lastError, latestMessageText, latestMessageAt, activeRunId, relationshipToParent, sideChat, createdAt,
+				latestUserMessageAt, latestRunRequestedAt, latestRunStartedAt, latestRunCompletedAt, activityRunStartedAt, archivedAt,
+				deletedAt, settledAt, settledOverride, meta, parentThreadId, null);
+	}
+
+	/** Pinned in T3 (shows first in every thread list). */
+	public boolean pinned() {
+		return pinnedAt != null;
+	}
+
+	/**
+	 * {@code pinnedAt} decoded tolerantly: an ISO time or epoch number; older or other servers may
+	 * send a boolean {@code pinned} / {@code isPinned} instead (true counts as pinned at 0).
+	 */
+	static @Nullable Long pinnedAt(JsonObject o) {
+		Long at = Json.time(o, "pinnedAt");
+		if (at != null) {
+			return at;
+		}
+		com.google.gson.JsonElement e = o.get("pinnedAt");
+		if (e != null && e.isJsonPrimitive() && e.getAsJsonPrimitive().isNumber()) {
+			return e.getAsLong();
+		}
+		if (e != null && e.isJsonPrimitive() && e.getAsJsonPrimitive().isString() && !e.getAsString().isBlank()) {
+			return 0L; // a time in a shape we do not parse still means pinned
+		}
+		return Json.bool(o, "pinned") || Json.bool(o, "isPinned") ? 0L : null;
 	}
 
 	/** Pre-{@link ThreadMeta} shape, kept so existing callers still compile. */
@@ -55,7 +95,7 @@ public record ThreadShell(
 		this(id, projectId, title, status, activityRunStatus, pendingRuntimeRequest, hasActionableProposedPlan, pendingGuestMessageCount,
 				pendingBackgroundTasks, lastError, latestMessageText, latestMessageAt, activeRunId, relationshipToParent, sideChat, createdAt,
 				latestUserMessageAt, latestRunRequestedAt, latestRunStartedAt, latestRunCompletedAt, activityRunStartedAt, archivedAt,
-				deletedAt, settledAt, settledOverride, ThreadMeta.EMPTY, null);
+				deletedAt, settledAt, settledOverride, ThreadMeta.EMPTY, null, null);
 	}
 
 	/** Shape before {@code parentThreadId} (feat/npc-helpers), kept so existing callers still compile. */
@@ -69,7 +109,7 @@ public record ThreadShell(
 		this(id, projectId, title, status, activityRunStatus, pendingRuntimeRequest, hasActionableProposedPlan, pendingGuestMessageCount,
 				pendingBackgroundTasks, lastError, latestMessageText, latestMessageAt, activeRunId, relationshipToParent, sideChat, createdAt,
 				latestUserMessageAt, latestRunRequestedAt, latestRunStartedAt, latestRunCompletedAt, activityRunStartedAt, archivedAt,
-				deletedAt, settledAt, settledOverride, meta, null);
+				deletedAt, settledAt, settledOverride, meta, null, null);
 	}
 
 	/** {@code pendingRuntimeRequest}: {@code blocking} is null when an older server omits it. */
@@ -115,7 +155,8 @@ public record ThreadShell(
 				Json.str(o, "settledOverride"),
 				ThreadMeta.fromJson(o),
 				// lineage.parentThreadId (feat/npc-helpers); some servers also put it at the top level.
-				Json.str(lineage, "parentThreadId") != null ? Json.str(lineage, "parentThreadId") : Json.str(o, "parentThreadId"));
+				Json.str(lineage, "parentThreadId") != null ? Json.str(lineage, "parentThreadId") : Json.str(o, "parentThreadId"),
+				pinnedAt(o));
 	}
 
 	private static String orEmpty(@Nullable String s) {
