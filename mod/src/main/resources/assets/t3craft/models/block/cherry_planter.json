@@ -1,0 +1,164 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "pot": "t3craft:block/kit_pot",
+    "soil": "t3craft:block/kit_soil",
+    "bark": "t3craft:block/kit_bark",
+    "blossom": "t3craft:block/kit_blossom",
+    "particle": "t3craft:block/kit_blossom"
+  },
+  "elements": [
+    {
+      "from": [
+        4,
+        0,
+        4
+      ],
+      "to": [
+        12,
+        6,
+        12
+      ],
+      "faces": {
+        "north": {
+          "texture": "#pot",
+          "uv": [
+            0,
+            4,
+            16,
+            10
+          ]
+        },
+        "south": {
+          "texture": "#pot",
+          "uv": [
+            0,
+            4,
+            16,
+            10
+          ]
+        },
+        "east": {
+          "texture": "#pot",
+          "uv": [
+            0,
+            4,
+            16,
+            10
+          ]
+        },
+        "west": {
+          "texture": "#pot",
+          "uv": [
+            0,
+            4,
+            16,
+            10
+          ]
+        },
+        "up": {
+          "texture": "#soil"
+        },
+        "down": {
+          "texture": "#pot"
+        }
+      }
+    },
+    {
+      "from": [
+        7,
+        6,
+        7
+      ],
+      "to": [
+        9,
+        10,
+        9
+      ],
+      "faces": {
+        "north": {
+          "texture": "#bark"
+        },
+        "south": {
+          "texture": "#bark"
+        },
+        "east": {
+          "texture": "#bark"
+        },
+        "west": {
+          "texture": "#bark"
+        },
+        "up": {
+          "texture": "#bark"
+        },
+        "down": {
+          "texture": "#bark"
+        }
+      }
+    },
+    {
+      "from": [
+        2,
+        9,
+        2
+      ],
+      "to": [
+        14,
+        14,
+        14
+      ],
+      "faces": {
+        "north": {
+          "texture": "#blossom"
+        },
+        "south": {
+          "texture": "#blossom"
+        },
+        "east": {
+          "texture": "#blossom"
+        },
+        "west": {
+          "texture": "#blossom"
+        },
+        "up": {
+          "texture": "#blossom"
+        },
+        "down": {
+          "texture": "#blossom"
+        }
+      }
+    },
+    {
+      "from": [
+        4,
+        14,
+        4
+      ],
+      "to": [
+        12,
+        16,
+        12
+      ],
+      "faces": {
+        "north": {
+          "texture": "#blossom"
+        },
+        "south": {
+          "texture": "#blossom"
+        },
+        "east": {
+          "texture": "#blossom"
+        },
+        "west": {
+          "texture": "#blossom"
+        },
+        "up": {
+          "texture": "#blossom"
+        },
+        "down": {
+          "texture": "#blossom"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=north": {
+      "model": "t3craft:block/standing_desk"
+    },
+    "facing=east": {
+      "model": "t3craft:block/standing_desk",
+      "y": 90
+    },
+    "facing=south": {
+      "model": "t3craft:block/standing_desk",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "t3craft:block/standing_desk",
+      "y": 270
+    }
+  }
+}
