@@ -86,7 +86,8 @@ equal-by-id record if another feature registered it first), and the 26.x API not
 
 The HQ generator (`mod/src/main/java/dev/t3craft/hq/`, branch `feat/hq-design`) takes its look
 from AgentCraft's `StudioHqBuilder` ("Warm Studio": timber frame, waxed copper roofs and lights,
-glass, warm lighting) and its anchor idea (`desk_<id>`, `entrance`, `spawn`). It is a new
+glass, warm lighting), its anchor idea (`desk_<id>`, `entrance`, `spawn`) and its one
+workstation (desk + computer) per agent. It is a new
 implementation: no AgentCraft source was copied or adapted (`Palette.java` says so in its header).
 
 ## Gradle wrapper (`mod/gradlew`, `mod/gradlew.bat`, `mod/gradle/wrapper/`)
