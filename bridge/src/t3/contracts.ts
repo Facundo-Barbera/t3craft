@@ -13,12 +13,16 @@ export {
 export {
   ORCHESTRATION_V2_WS_METHODS,
   OrchestrationV2GetShellSnapshotError,
+  OrchestrationV2GetThreadProjectionError,
+  OrchestrationV2ThreadStreamItem,
   OrchestrationV2RpcSchemas,
   OrchestrationV2ShellStreamItem,
   OrchestrationV2ThreadShell,
   isListedThreadLineage,
 } from "../../vendor/t3-contracts/src/orchestrationV2.ts";
 export type {
+  OrchestrationV2ConversationMessage,
+  OrchestrationV2SubscribeThreadInput,
   OrchestrationV2ShellSnapshot,
   OrchestrationV2SubscribeShellInput,
 } from "../../vendor/t3-contracts/src/orchestrationV2.ts";

@@ -15,6 +15,7 @@ import {
   ORCHESTRATION_PROTOCOL_VERSION,
   ORCHESTRATION_V2_WS_METHODS,
   OrchestrationV2GetShellSnapshotError,
+  OrchestrationV2GetThreadProjectionError,
   OrchestrationV2RpcSchemas,
 } from "./contracts.ts";
 import type { WebSocketTicket } from "./auth.ts";
@@ -24,9 +25,9 @@ import type { WebSocketTicket } from "./auth.ts";
  * payload, success and error schemas are the upstream ones, so the wire format is identical to the
  * official client's; the server's scope middleware runs server-side only.
  *
- * Phase 0/1 only needs `orchestration.subscribeShell` (scope `orchestration:read`).
- * TODO(phase 2): add `orchestration.subscribeThread` (chat history) and
- *   `orchestration.dispatchCommand` for `message.dispatch` / `run.interrupt` (scope `orchestration:operate`).
+ * Read-only (`orchestration:read`): `orchestration.subscribeShell`, `orchestration.subscribeThread`.
+ * TODO(operate phase, needs Facundo's OK): `orchestration.dispatchCommand` for `message.dispatch` /
+ *   `run.interrupt` (scope `orchestration:operate`).
  * TODO(phase 3): `runtime-request.respond` via `dispatchCommand`.
  * TODO(phase 4): `thread.create` via `dispatchCommand`, or `orchestration.launchThread`.
  */
@@ -37,9 +38,17 @@ export const SubscribeShellRpc = Rpc.make(ORCHESTRATION_V2_WS_METHODS.subscribeS
   stream: true,
 });
 
-export const ORCHESTRATION_SHELL_METHOD = ORCHESTRATION_V2_WS_METHODS.subscribeShell;
+export const SubscribeThreadRpc = Rpc.make(ORCHESTRATION_V2_WS_METHODS.subscribeThread, {
+  payload: OrchestrationV2RpcSchemas.subscribeThread.input,
+  success: OrchestrationV2RpcSchemas.subscribeThread.output,
+  error: Schema.Union([OrchestrationV2GetThreadProjectionError, EnvironmentAuthorizationError]),
+  stream: true,
+});
 
-export const T3BridgeRpcGroup = RpcGroup.make(SubscribeShellRpc);
+export const ORCHESTRATION_SHELL_METHOD = ORCHESTRATION_V2_WS_METHODS.subscribeShell;
+export const ORCHESTRATION_THREAD_METHOD = ORCHESTRATION_V2_WS_METHODS.subscribeThread;
+
+export const T3BridgeRpcGroup = RpcGroup.make(SubscribeShellRpc, SubscribeThreadRpc);
 
 export type T3RpcClient = RpcClient.FromGroup<typeof T3BridgeRpcGroup, RpcClientError>;
 

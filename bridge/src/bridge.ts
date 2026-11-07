@@ -3,7 +3,7 @@ import * as Redacted from "effect/Redacted";
 import type { BridgeConfig, EnvironmentConfig } from "./config.ts";
 import { readSecretFile } from "./config.ts";
 import { PROTOCOL_VERSION, type BridgeToMod, type EnvironmentStatus } from "./protocol.ts";
-import { notificationFor, NpcStore } from "./state/npcStore.ts";
+import { NpcStore, peekFor, transitionFor } from "./state/npcStore.ts";
 import { presentThread } from "./state/presentation.ts";
 import { selectVisibleThreads, type VisibilityOptions } from "./state/visibility.ts";
 import { runEnvironment, type ShellState } from "./t3/shell.ts";
@@ -34,6 +34,7 @@ export class Bridge {
   /** Latest shell state per environment: the filter's source, never trimmed by it. */
   private readonly shells = new Map<string, { env: EnvironmentConfig; state: ShellState }>();
   private broadcastFn: (msg: BridgeToMod) => void = () => {};
+  private lastPeek = "";
 
   private readonly config: BridgeConfig;
   private readonly log: (msg: string) => void;
@@ -53,7 +54,17 @@ export class Bridge {
     return [
       { v: PROTOCOL_VERSION, type: "snapshot", npcs: this.store.all() },
       { v: PROTOCOL_VERSION, type: "bridge.status", environments: [...this.statuses.values()] },
+      { v: PROTOCOL_VERSION, type: "hud.peek", ...peekFor(this.store.all()) },
     ];
+  }
+
+  /** Broadcasts `hud.peek` only when its content changed. */
+  private updatePeek(): void {
+    const peek = peekFor(this.store.all());
+    const key = JSON.stringify(peek);
+    if (key === this.lastPeek) return;
+    this.lastPeek = key;
+    this.broadcastFn({ v: PROTOCOL_VERSION, type: "hud.peek", ...peek });
   }
 
   private setStatus(env: EnvironmentConfig, status: EnvironmentStatus["status"], detail?: string): void {
@@ -78,10 +89,16 @@ export class Bridge {
         continue;
       }
       this.broadcastFn({ v: PROTOCOL_VERSION, type: "npc.upsert", npc: c.npc });
-      const n = notify ? notificationFor(previous.get(c.npc.id), c.npc) : null;
-      if (n) this.broadcastFn({ v: PROTOCOL_VERSION, type: "notify", ...n });
+      const tr = notify ? transitionFor(previous.get(c.npc.id), c.npc) : null;
+      if (tr) {
+        this.broadcastFn({ v: PROTOCOL_VERSION, type: "npc.transition", ...tr });
+        // Older mods only know `notify`.
+        const { level, title, text, color, npcId } = tr;
+        this.broadcastFn({ v: PROTOCOL_VERSION, type: "notify", level, title, text, color, npcId });
+      }
     }
     if (state.synchronized) this.synced.add(env.id);
+    if (changes.length > 0) this.updatePeek();
   }
 
   /**

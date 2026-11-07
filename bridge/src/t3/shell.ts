@@ -107,6 +107,8 @@ export interface EnvironmentListener {
   onStatus(status: EnvironmentLinkStatus, detail?: string): void;
   /** Called after every change with the environment's current state. */
   onShell(state: ShellState): void;
+  /** The live RPC client while connected, `null` when it goes away (used for thread subscriptions). */
+  onClient?(client: T3RpcClient | null): void;
 }
 
 const MIN_BACKOFF_MS = 1_000;
@@ -147,6 +149,8 @@ export const runEnvironment = (
           Effect.gen(function* () {
             const ticket = yield* issueWebSocketTicket(env.url, token);
             const client = yield* connectT3(env.url, ticket);
+            listener.onClient?.(client);
+            yield* Effect.addFinalizer(() => Effect.sync(() => listener.onClient?.(null)));
             yield* subscribeShell(client).pipe(
               Stream.runForEach((item) =>
                 Effect.sync(() => {

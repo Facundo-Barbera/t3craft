@@ -4,6 +4,12 @@ import { WebSocketServer, type WebSocket } from "ws";
 import { isAllowedListenHost } from "../config.ts";
 import { parseModFrame, PROTOCOL_VERSION, type BridgeToMod, type ModToBridge } from "../protocol.ts";
 
+/** One connected mod, for replies that go to it alone (chat history, ...). */
+export interface ModConnection {
+  readonly id: number;
+  send(msg: BridgeToMod): void;
+}
+
 export interface ModSocketOptions {
   /** Tailscale IP or loopback only (validated again here). */
   readonly host: string;
@@ -16,7 +22,9 @@ export interface ModSocketOptions {
   /** Called after a successful hello; return the frames to send (snapshot, status, ...). */
   readonly onReady: (send: (msg: BridgeToMod) => void) => void;
   /** A validated mod message (not hello). Return an error string to ack ok:false. */
-  readonly onMessage: (msg: { type: ModToBridge["type"] } & Record<string, unknown>) => string | null;
+  readonly onMessage: (msg: { type: ModToBridge["type"] } & Record<string, unknown>, conn: ModConnection) => string | null;
+  /** A mod that had said hello went away. */
+  readonly onDisconnect?: (conn: ModConnection) => void;
   readonly log?: (msg: string) => void;
 }
 
@@ -92,12 +100,20 @@ export const startModSocket = (opts: ModSocketOptions): Promise<ModSocketServer>
     sendTo(ws, { v: PROTOCOL_VERSION, type: "ack", re, ok: error === null, ...(error === null ? {} : { error }) });
   };
 
+  let nextConnId = 1;
   wss.on("connection", (ws, req) => {
     const peer = req.socket.remoteAddress ?? "?";
+    const conn: ModConnection = { id: nextConnId++, send: (m) => sendTo(ws, m) };
     const helloTimer = setTimeout(() => ws.close(4001, "hello timeout"), HELLO_TIMEOUT_MS);
     ws.on("close", () => {
       clearTimeout(helloTimer);
-      ready.delete(ws);
+      if (ready.delete(ws)) {
+        try {
+          opts.onDisconnect?.(conn);
+        } catch (e) {
+          log(`onDisconnect failed: ${(e as Error).message}`);
+        }
+      }
     });
     ws.on("message", (data, isBinary) => {
       if (isBinary) {
@@ -130,7 +146,7 @@ export const startModSocket = (opts: ModSocketOptions): Promise<ModSocketServer>
       }
       let error: string | null;
       try {
-        error = msg.type === "hello" ? "already said hello" : opts.onMessage(msg);
+        error = msg.type === "hello" ? "already said hello" : opts.onMessage(msg, conn);
       } catch (e) {
         error = `internal error: ${(e as Error).message}`;
       }

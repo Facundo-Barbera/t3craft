@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { notificationFor, NpcStore } from "../src/state/npcStore.ts";
+import { NpcStore, peekFor, transitionFor } from "../src/state/npcStore.ts";
 import { presentThread } from "../src/state/presentation.ts";
 import { shell } from "./fixtures.ts";
 
@@ -30,20 +30,36 @@ describe("NpcStore", () => {
   });
 });
 
-describe("notificationFor", () => {
-  it("warns on entering needs_attention", () => {
-    const before = presentThread(vps, shell({ status: "running" }), null);
-    const after = presentThread(vps, shell({ status: "waiting" }), null);
-    expect(notificationFor(before, after)?.level).toBe("warn");
+describe("transitionFor", () => {
+  it("warns with the attention sound on entering needs_attention", () => {
+    const before = presentThread(vps, shell({ status: "running" }), "telar");
+    const after = presentThread(vps, shell({ status: "waiting" }), "telar");
+    expect(transitionFor(before, after)).toMatchObject({ level: "warn", sound: "attention", from: "working", to: "needs_attention" });
   });
-  it("is silent for new NPCs and unchanged states", () => {
+  it("is silent for new NPCs (initial seed) and unchanged states", () => {
     const v = presentThread(vps, shell({ status: "waiting" }), null);
-    expect(notificationFor(undefined, v)).toBeNull();
-    expect(notificationFor(v, v)).toBeNull();
+    expect(transitionFor(undefined, v)).toBeNull();
+    expect(transitionFor(v, v)).toBeNull();
   });
-  it("announces working → done", () => {
-    const before = presentThread(vps, shell({ status: "running" }), null);
-    const after = presentThread(vps, shell({ status: "completed" }), null);
-    expect(notificationFor(before, after)?.title).toBe("Thread finished");
+  it("announces working → done and errors", () => {
+    const working = presentThread(vps, shell({ status: "running" }), null);
+    expect(transitionFor(working, presentThread(vps, shell({ status: "completed" }), null))).toMatchObject({ title: "Thread finished", sound: "done" });
+    expect(transitionFor(working, presentThread(vps, shell({ status: "failed" }), null))).toMatchObject({ level: "error", sound: "error" });
+  });
+  it("does not announce idle → done", () => {
+    const idle = presentThread(vps, shell(), null);
+    expect(transitionFor(idle, presentThread(vps, shell({ status: "completed" }), null))).toBeNull();
+  });
+});
+
+describe("peekFor", () => {
+  it("prefers needs_attention, then working, and hides otherwise", () => {
+    const w = presentThread(vps, shell({ id: "w", title: "Build", status: "running" }), null);
+    const a = presentThread(mini, shell({ id: "a", title: "Login", status: "waiting" }), null);
+    const i = presentThread(vps, shell({ id: "i" }), null);
+    expect(peekFor([a, w, i])).toMatchObject({ npcId: "acmesite:a", color: a.color });
+    expect(peekFor([a, w, i]).text).toContain("Login [my-acmesite]");
+    expect(peekFor([w, i])).toMatchObject({ npcId: "vps:w" });
+    expect(peekFor([i])).toEqual({ text: null, color: expect.any(String), npcId: null });
   });
 });

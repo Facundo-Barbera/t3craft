@@ -9,17 +9,19 @@ import { mapThreadState, type ThreadState } from "./mapper.ts";
 export interface StateStyle {
   readonly color: string;
   readonly glyph: string;
+  /** Particle over the head (the mod maps the key to a vanilla particle). */
+  readonly particle: NpcView["particle"];
   /** Lower sorts first (the mod lays NPCs out in this order). */
   readonly priority: number;
   readonly word: string;
 }
 
 export const STATE_STYLES: Readonly<Record<ThreadState, StateStyle>> = {
-  needs_attention: { color: "#FFAA00", glyph: "!", priority: 0, word: "needs you" },
-  error: { color: "#FF5555", glyph: "✖", priority: 1, word: "error" },
-  working: { color: "#55FFFF", glyph: "⚙", priority: 2, word: "working" },
-  done: { color: "#55FF55", glyph: "✔", priority: 3, word: "done" },
-  idle: { color: "#AAAAAA", glyph: "·", priority: 4, word: "idle" },
+  needs_attention: { color: "#FFAA00", glyph: "!", particle: "attention", priority: 0, word: "needs you" },
+  error: { color: "#FF5555", glyph: "✖", particle: "error", priority: 1, word: "error" },
+  working: { color: "#55FFFF", glyph: "⚙", particle: "working", priority: 2, word: "working" },
+  done: { color: "#55FF55", glyph: "✔", particle: null, priority: 3, word: "done" },
+  idle: { color: "#AAAAAA", glyph: "·", particle: null, priority: 4, word: "idle" },
 };
 
 export interface EnvironmentInfo {
@@ -34,6 +36,15 @@ const clip = (s: string, max: number): string => {
   const one = s.replace(/\s+/g, " ").trim();
   return one.length > max ? `${one.slice(0, max - 1)}…` : one;
 };
+
+/** Neighbourhood id: one per (environment, project). */
+export const groupId = (envId: string, projectId: string): string => `${envId}:${projectId}`;
+
+/**
+ * Skin seed: the environment picks the "family" and the state the variant, so threads of one
+ * machine look alike and a state change is visible from afar. The mod turns it into a skin.
+ */
+export const skinSeed = (envId: string, state: ThreadState): string => `${envId}/${state}`;
 
 /** NPC id: unique across environments (`<envId>:<threadId>`). */
 export const npcId = (envId: string, threadId: string): string => `${envId}:${threadId}`;
@@ -72,5 +83,10 @@ export const presentThread = (
     activity: activityFor(t, state),
     priority: style.priority,
     settled: t.settledAt !== null,
+    groupId: groupId(env.id, t.projectId),
+    groupLabel: clip(projectTitle ?? "(no project)", MAX_TITLE),
+    groupSublabel: env.label,
+    skin: skinSeed(env.id, state),
+    particle: style.particle,
   };
 };

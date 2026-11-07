@@ -37,6 +37,31 @@ export interface NpcView {
   /** Lower first. */
   readonly priority: number;
   readonly settled: boolean;
+  /** Neighbourhood key (`<env>:<projectId>`); NPCs with the same key are placed together. */
+  readonly groupId: string;
+  /** Neighbourhood sign, line 1 (project title). */
+  readonly groupLabel: string;
+  /** Neighbourhood sign, line 2 (environment label). */
+  readonly groupSublabel: string;
+  /** Seed for the player skin; the mod maps it to a skin deterministically. */
+  readonly skin: string;
+  /** Particle shown over the head, or null: `working | attention | error | done`. */
+  readonly particle: "working" | "attention" | "error" | "done" | null;
+}
+
+/** A chat line, resolved for display. */
+export interface ChatMessageView {
+  readonly id: string;
+  readonly role: "user" | "assistant" | "system";
+  /** Who to show as the author ("You", "Agent", "System"). */
+  readonly author: string;
+  /** `#RRGGBB` for the author. */
+  readonly color: string;
+  /** Raw message text (basic markdown); clipped by the bridge. */
+  readonly text: string;
+  /** ISO 8601. */
+  readonly createdAt: string;
+  readonly streaming: boolean;
 }
 
 export type EnvironmentLinkStatus = "connecting" | "ok" | "auth_failed" | "offline" | "incompatible";
@@ -64,6 +89,26 @@ export interface NpcRemove extends Envelope<"npc.remove"> {
   /** NpcView.id */
   readonly npcId: string;
 }
+/** A visible NPC changed state in a way worth telling the player. Never sent for initial state. */
+export interface NpcTransition extends Envelope<"npc.transition"> {
+  readonly npcId: string;
+  readonly from: ThreadState;
+  readonly to: ThreadState;
+  readonly level: "info" | "warn" | "error";
+  readonly title: string;
+  readonly text: string;
+  readonly color: string;
+  /** Sound cue key: `attention | done | error`. */
+  readonly sound: "attention" | "done" | "error";
+}
+
+/** One-line HUD summary of the most relevant thread, or `text: null` to hide it. */
+export interface HudPeek extends Envelope<"hud.peek"> {
+  readonly text: string | null;
+  readonly color: string;
+  readonly npcId: string | null;
+}
+
 export interface Notify extends Envelope<"notify"> {
   readonly level: "info" | "warn" | "error";
   readonly title: string;
@@ -81,15 +126,30 @@ export interface Ack extends Envelope<"ack"> {
   readonly error?: string;
 }
 
-// Stubs (phase 2/3). TODO: fill payloads when implemented.
+/** A page of history, oldest first. Reply to `chat.open` / `chat.history`; sent only to that mod. */
 export interface ChatHistory extends Envelope<"chat.history"> {
   readonly npcId: string;
-  readonly messages: ReadonlyArray<{ readonly role: string; readonly text: string }>;
+  readonly messages: ReadonlyArray<ChatMessageView>;
+  /** Older messages exist; ask with `chat.history { before: cursor }`. */
+  readonly hasMore: boolean;
+  /** Id of the oldest message in this page, or null when empty. */
+  readonly cursor: string | null;
+  /** True when this page ends at the newest message (the mod scrolls to bottom). */
+  readonly latest: boolean;
 }
-export interface ChatAppend extends Envelope<"chat.append"> {
+/** Live upsert by `message.id` (new message or streaming update) to mods with that chat open. */
+export interface ChatMessage extends Envelope<"chat.message"> {
   readonly npcId: string;
-  readonly message: { readonly role: string; readonly text: string };
+  readonly message: ChatMessageView;
 }
+/** Chat could not be loaded or stopped updating (environment offline, thread gone). */
+export interface ChatStatus extends Envelope<"chat.status"> {
+  readonly npcId: string;
+  readonly status: "loading" | "live" | "offline" | "error";
+  readonly detail?: string;
+}
+
+// Stubs (operate phase, see docs/plan-v2.md). TODO: fill payloads when implemented.
 export interface PermissionOpen extends Envelope<"permission.open"> {
   readonly npcId: string;
   readonly requestId: string;
@@ -108,12 +168,23 @@ export type BridgeToMod =
   | NpcUpsert
   | NpcRemove
   | Notify
+  | NpcTransition
+  | HudPeek
   | BridgeStatus
   | Ack
   | ChatHistory
-  | ChatAppend
+  | ChatMessage
+  | ChatStatus
   | PermissionOpen
   | PermissionClosed;
+
+/** Mod → bridge messages that need `orchestration:operate`; answered `read_only` until enabled. */
+export const OPERATE_MESSAGE_TYPES: ReadonlySet<string> = new Set([
+  "chat.send",
+  "run.interrupt",
+  "permission.respond",
+  "thread.create",
+]);
 
 // ---- mod → bridge -------------------------------------------------------------------------
 
@@ -130,6 +201,14 @@ export interface ChatOpen extends Envelope<"chat.open"> {
 export interface ChatClose extends Envelope<"chat.close"> {
   readonly npcId: string;
 }
+/** Older page: messages strictly before `before` (a message id from a previous page). */
+export interface ChatHistoryRequest extends Envelope<"chat.history"> {
+  readonly npcId: string;
+  readonly before?: string;
+  readonly limit?: number;
+}
+/** Re-read the bridge's `visibility` settings from bridge.json and re-evaluate (read-only op). */
+export interface BridgeReload extends Envelope<"bridge.reload"> {}
 export interface ChatSend extends Envelope<"chat.send"> {
   readonly npcId: string;
   readonly text: string;
@@ -154,6 +233,8 @@ export type ModToBridge =
   | ModHello
   | ChatOpen
   | ChatClose
+  | ChatHistoryRequest
+  | BridgeReload
   | ChatSend
   | RunInterrupt
   | PermissionRespond
@@ -163,6 +244,8 @@ export const MOD_MESSAGE_TYPES: ReadonlySet<ModToBridge["type"]> = new Set([
   "hello",
   "chat.open",
   "chat.close",
+  "chat.history",
+  "bridge.reload",
   "chat.send",
   "run.interrupt",
   "permission.respond",

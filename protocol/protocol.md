@@ -82,6 +82,21 @@ The chat screen shows `label`, `sublabel` and `activity`. NPCs are laid out by a
 `-Dt3craft.bridgeUrl=` override it. `bridgeKey` is only needed when the bridge sets
 `listen.clientKeyFile`. The mod never stores T3 tokens.
 
+### Added in v1.1 (additive, older mods ignore them)
+
+`NpcView` also carries `groupId` (`<env>:<projectId>`), `groupLabel` (project), `groupSublabel`
+(environment), `skin` (seed for a deterministic player skin) and `particle`
+(`working|attention|error|done|null`).
+
+| type | payload | notes |
+|---|---|---|
+| `npc.transition` | `npcId`, `from`, `to`, `level`, `title`, `text`, `color`, `sound: attention\|done\|error` | visible NPC changed state; never for initial state. A `notify` with the same text is still sent for older mods |
+| `hud.peek` | `text \| null`, `color`, `npcId \| null` | one-line HUD summary; sent on change and on connect |
+
+Declared for the chat history (`chat.history` page, `chat.message` upsert, `chat.status`) and
+`bridge.reload`; not served yet. The bridge is now the **legacy** path: see `docs/plan-v2.md`
+(direct mod ⇄ T3 pairing).
+
 ## Bridge → mod
 
 | type | payload | notes |

@@ -1,28 +1,55 @@
-import type { NpcView, Notify } from "../protocol.ts";
+import type { HudPeek, NpcTransition, NpcView } from "../protocol.ts";
 import { STATE_STYLES } from "./presentation.ts";
 
 export type NpcChange =
   | { readonly kind: "upsert"; readonly npc: NpcView }
   | { readonly kind: "remove"; readonly npcId: string };
 
-/** What a state change should tell the player (toast), or null. Bridge-side so it can be tuned live. */
-export const notificationFor = (
+/**
+ * What a state change of a visible NPC should tell the player (chat + toast + sound), or null.
+ * Decided here so wording and sounds change with a bridge restart only. New NPCs (no `before`)
+ * never notify: initial state is seeded silently.
+ */
+export const transitionFor = (
   before: NpcView | undefined,
   after: NpcView,
-): Omit<Notify, "v" | "type" | "id"> | null => {
+): Omit<NpcTransition, "v" | "type" | "id"> | null => {
   if (before === undefined || before.state === after.state) return null;
-  const color = STATE_STYLES[after.state].color;
-  const base = { color, npcId: after.id, text: `${after.title} (${after.envLabel})` };
+  const base = {
+    npcId: after.id,
+    from: before.state,
+    to: after.state,
+    color: STATE_STYLES[after.state].color,
+    text: `${after.title} · ${after.groupLabel} (${after.envLabel})`,
+  };
   switch (after.state) {
     case "needs_attention":
-      return { ...base, level: "warn", title: after.activity ?? "Needs your attention" };
+      return { ...base, level: "warn", sound: "attention", title: after.activity ?? "Needs your input" };
     case "error":
-      return { ...base, level: "error", title: "Thread failed" };
+      return { ...base, level: "error", sound: "error", title: "Thread failed" };
     case "done":
-      return before.state === "working" ? { ...base, level: "info", title: "Thread finished" } : null;
+      return before.state === "working" || before.state === "needs_attention"
+        ? { ...base, level: "info", sound: "done", title: "Thread finished" }
+        : null;
     default:
       return null;
   }
+};
+
+/**
+ * HUD peek: the single most relevant thread, one line. Needs-attention first, then working;
+ * nothing otherwise (the HUD hides). `npcs` must be in store order (priority first).
+ */
+export const peekFor = (npcs: ReadonlyArray<NpcView>): Omit<HudPeek, "v" | "type" | "id"> => {
+  const pick = npcs.find((n) => n.state === "needs_attention") ?? npcs.find((n) => n.state === "working");
+  if (pick === undefined) return { text: null, color: STATE_STYLES.idle.color, npcId: null };
+  const others = npcs.filter((n) => n.state === pick.state).length - 1;
+  const more = others > 0 ? `  (+${others} more)` : "";
+  return {
+    text: `${pick.glyph} ${pick.title} [${pick.envLabel}]${pick.activity ? ` — ${pick.activity}` : ""}${more}`,
+    color: pick.color,
+    npcId: pick.id,
+  };
 };
 
 /**
