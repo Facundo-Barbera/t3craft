@@ -27,6 +27,7 @@ public final class ThreadChatScreen extends Screen {
 		addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose())
 				.bounds(width / 2 - 100, height - 40, 200, 20)
 				.build());
+		dev.t3craft.client.operate.ThreadControlUi.addButtons(this, this::addRenderableWidget, thread, width / 2 - 100, height - 64, 200); // feat/op-stop
 	}
 
 	@Override
