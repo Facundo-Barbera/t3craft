@@ -4,6 +4,8 @@ import dev.t3craft.T3Craft;
 import dev.t3craft.site.BlockWorld;
 import dev.t3craft.site.InstantBuilder;
 import dev.t3craft.site.ModuleDesigner;
+import dev.t3craft.build.BuildBudget;
+import dev.t3craft.build.BuildTuning;
 import dev.t3craft.site.PacedBuilder;
 import dev.t3craft.site.SiteBuilder;
 import dev.t3craft.site.SiteHandle;
@@ -55,7 +57,9 @@ import org.jspecify.annotations.Nullable;
 public final class SiteRuntime {
 	private static @Nullable MinecraftServer server;
 	private static @Nullable SiteService service;
+	/** Pace of one front of the paced builder; it runs {@code build.frontsPerJob} fronts within the global budget. */
 	public static final double DEFAULT_BLOCKS_PER_TICK = 8;
+	private static final String BUDGET_RUNNER = "site";
 
 	private static final List<PacedBuilder> pacers = new ArrayList<>();
 	private static final List<SiteListener> listeners = new CopyOnWriteArrayList<>();
@@ -87,6 +91,7 @@ public final class SiteRuntime {
 			if (s != server || pacers.isEmpty()) {
 				return;
 			}
+			BuildBudget.global().beginTick(s.getTickCount(), s.getCurrentSmoothedTickTime());
 			for (PacedBuilder p : List.copyOf(pacers)) {
 				try {
 					p.tick();
@@ -101,7 +106,9 @@ public final class SiteRuntime {
 
 	/** Default builder: paced, with placement sound and particles. Server thread. */
 	public static SiteBuilder paced(ServerLevel level) {
-		PacedBuilder p = new PacedBuilder(new EffectsBlockWorld(new LevelBlockWorld(level)), DEFAULT_BLOCKS_PER_TICK);
+		BuildTuning t = BuildBudget.global().tuning();
+		PacedBuilder p = new PacedBuilder(new EffectsBlockWorld(new LevelBlockWorld(level)), DEFAULT_BLOCKS_PER_TICK, t.frontsPerJob(),
+				(states, rates) -> BuildBudget.global().allocate(BUDGET_RUNNER, states, rates));
 		pacers.add(p);
 		return p;
 	}

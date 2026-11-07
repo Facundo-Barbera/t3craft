@@ -35,7 +35,7 @@ public final class LampApplier {
 				continue;
 			}
 			BlockState s = level.getBlockState(pos);
-			if (!(s.getBlock() instanceof StatusLampBlock)) {
+			if (!s.hasProperty(StatusLampBlock.STATUS)) { // status lamp, board bulb or the kit's paper lantern
 				continue;
 			}
 			Binding b = Binding.resolve(lamp.binding(), positional == null ? null : positional.get(pos.asLong()));

@@ -2,6 +2,7 @@ package dev.t3craft.build;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.IntPredicate;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.MinecraftServer;
@@ -20,10 +21,17 @@ import org.jspecify.annotations.Nullable;
  * <p>World position of entry {@code i}: {@code origin + rotate(plan[i].pos)}; its state is rotated
  * too ({@link BlockState#rotate}), so facing blocks (doors, stairs, torches) turn with the plan.
  *
+ * <p><b>Fronts</b>: the plan is split into parallel fronts ({@link Fronts}, {@link FrontCursor}) that work
+ * the same layer at once and never start a layer before the one below is finished; each front has its
+ * own builder in the crew ({@link #frontOf}). The job wants {@link #rate()} blocks per tick and gets what
+ * the global {@link BuildBudget} grants ({@link BuildManager}).
+ *
  * <p><b>Charged jobs</b> (a non-null {@link BuildCost}, survival): every placed block takes its item
  * from a {@link MaterialSupply} ({@link MaterialMeter}). When something is missing the job goes to
  * {@link JobState#PAUSED} with {@link #missingMaterials()} non-empty, and resumes on its own once the
- * materials are there (checked about once a second), unless the player paused it too. Container
+ * materials are there (checked about once a second), unless the player paused it too. With fronts:
+ * the rest of the layer is checked when it starts; a front whose item ran out mid-layer waits alone
+ * while the others go on, and the job waits once every front with work left is waiting. Container
  * contents in block entity data ({@code Items}) are not placed in charged jobs: they would be free loot.
  */
 public final class BuildJob {
@@ -39,7 +47,8 @@ public final class BuildJob {
 	private final BlockPos origin;
 	private final Rotation rotation;
 	private final BuildPlan plan;
-	private final BuildCursor cursor;
+	private final FrontCursor cursor;
+	private final double blocksPerTick;
 	private final @Nullable BuildCost cost;
 	private final @Nullable MaterialMeter meter;
 	/** Server thread only. */
@@ -48,6 +57,10 @@ public final class BuildJob {
 	private volatile boolean userPaused;
 	private int retryIn;
 	private boolean materialsChanged;
+	/** Segment whose remaining entries were verified affordable; -1 = none. Server thread. */
+	private int verifiedSegment = -1;
+	/** Segment whose start check failed this round (other fronts block fast without re-checking). */
+	private int failedSegment = -1;
 
 	/** Retry cadence while waiting for materials, in ticks. */
 	public static final int MATERIAL_RETRY_TICKS = 20;
@@ -56,16 +69,29 @@ public final class BuildJob {
 		this(id, label, dimension, origin, rotation, plan, blocksPerTick, null);
 	}
 
-	/** @param cost null = free (creative, demo); otherwise every placed block is paid for. */
+	/** @param cost null = free (creative, demo); otherwise every placed block is paid for. One front. */
 	public BuildJob(int id, String label, ResourceKey<Level> dimension, BlockPos origin, Rotation rotation, BuildPlan plan, double blocksPerTick,
 			@Nullable BuildCost cost) {
+		this(id, label, dimension, origin, rotation, plan, blocksPerTick, cost, 1);
+	}
+
+	/**
+	 * @param fronts parallel fronts ({@link Fronts}); each works at {@code blocksPerTick}, so the job wants
+	 *               {@code blocksPerTick × fronts} per tick ({@link #rate()}), within the global budget.
+	 */
+	public BuildJob(int id, String label, ResourceKey<Level> dimension, BlockPos origin, Rotation rotation, BuildPlan plan, double blocksPerTick,
+			@Nullable BuildCost cost, int fronts) {
+		if (!(blocksPerTick > 0) || Double.isInfinite(blocksPerTick)) {
+			throw new IllegalArgumentException("blocksPerTick must be > 0 and finite: " + blocksPerTick);
+		}
 		this.id = id;
 		this.label = Objects.requireNonNull(label, "label");
 		this.dimension = Objects.requireNonNull(dimension, "dimension");
 		this.origin = origin.immutable();
 		this.rotation = Objects.requireNonNull(rotation, "rotation");
 		this.plan = Objects.requireNonNull(plan, "plan");
-		this.cursor = new BuildCursor(plan.size(), blocksPerTick);
+		this.blocksPerTick = blocksPerTick;
+		this.cursor = new FrontCursor(Fronts.of(plan, Math.max(1, fronts)));
 		this.cost = cost;
 		if (cost == null) {
 			this.meter = null;
@@ -91,10 +117,19 @@ public final class BuildJob {
 		supply = Objects.requireNonNull(s, "supply");
 	}
 
-	/** Places up to the budget into {@code sink}. Returns the number of entries processed. */
+	/** Places up to its own {@link #rate()} into {@code sink} (no global budget). Returns the entries processed. */
 	public int tick(BlockSink sink, PlacedCallback onPlaced) {
+		return tick(rate(), sink, onPlaced);
+	}
+
+	/**
+	 * Places up to {@code allowance} blocks this tick into {@code sink}, the fronts taking turns.
+	 * Returns the number of entries processed. Server thread.
+	 */
+	public int tick(double allowance, BlockSink sink, PlacedCallback onPlaced) {
 		MaterialMeter m = meter;
 		MaterialSupply sup = supply == null ? MaterialSupply.EMPTY : supply;
+		IntPredicate there = j -> sink.matches(worldPos(j), worldState(j));
 		if (m != null && waitingForMaterials) {
 			if (cursor.state() != JobState.PAUSED || userPaused) {
 				return 0;
@@ -103,23 +138,36 @@ public final class BuildJob {
 				return 0;
 			}
 			retryIn = MATERIAL_RETRY_TICKS;
-			if (!m.retry(cursor.done(), j -> sink.matches(worldPos(j), worldState(j)), sup)) {
+			if (!m.affordable(cursor.pendingInSegment(), there, sup)) {
 				return 0;
 			}
+			verifiedSegment = cursor.segment();
+			failedSegment = -1;
 			waitingForMaterials = false;
 			materialsChanged = true;
 			cursor.resume();
 		}
-		return cursor.tick(i -> {
+		int n = cursor.tick(allowance, (front, i) -> {
 			Placement p = plan.get(i);
+			if (m != null) {
+				int seg = cursor.segment();
+				if (seg != verifiedSegment) {
+					// Layer start: the rest of the layer (all fronts) must be affordable, so the job waits
+					// before a layer instead of stopping halfway through it.
+					if (seg == failedSegment || !m.affordable(cursor.pendingInSegment(), there, sup)) {
+						failedSegment = seg;
+						return BuildCursor.Outcome.BLOCKED;
+					}
+					verifiedSegment = seg;
+				}
+				if (!m.canPay(i, there, sup)) {
+					// Items gone mid-layer: this front waits; the others go on with what is there.
+					m.affordable(cursor.pendingInSegment(), there, sup);
+					return BuildCursor.Outcome.BLOCKED;
+				}
+			}
 			BlockPos wp = worldPos(i);
 			BlockState ws = worldState(i);
-			if (m != null && !m.before(i, j -> sink.matches(worldPos(j), worldState(j)), sup)) {
-				waitingForMaterials = true;
-				materialsChanged = true;
-				retryIn = MATERIAL_RETRY_TICKS;
-				return BuildCursor.Outcome.BLOCKED;
-			}
 			BuildCursor.Outcome o = sink.place(wp, ws, m == null ? p.blockEntity() : withoutItems(p.blockEntity()));
 			if (o == BuildCursor.Outcome.PLACED) {
 				if (m != null) {
@@ -129,6 +177,12 @@ public final class BuildJob {
 			}
 			return o;
 		});
+		if (m != null && cursor.blocked() && !waitingForMaterials) {
+			waitingForMaterials = true;
+			materialsChanged = true;
+			retryIn = MATERIAL_RETRY_TICKS;
+		}
+		return n;
 	}
 
 	private static @Nullable CompoundTag withoutItems(@Nullable CompoundTag tag) {
@@ -261,8 +315,29 @@ public final class BuildJob {
 		return plan;
 	}
 
+	/** Pace of one front. */
 	public double blocksPerTick() {
-		return cursor.blocksPerTick();
+		return blocksPerTick;
+	}
+
+	/** Parallel fronts of this job. */
+	public int fronts() {
+		return cursor.fronts().fronts();
+	}
+
+	/** The front that places plan entry {@code index} (for the crew: one builder per front). */
+	public int frontOf(int index) {
+		return cursor.fronts().frontOf(index);
+	}
+
+	/** Blocks per tick this job wants: {@code blocksPerTick × fronts}. */
+	public double rate() {
+		return blocksPerTick * fronts();
+	}
+
+	/** Whether front {@code f} is waiting for materials while others go on. Server thread. */
+	public boolean frontWaiting(int f) {
+		return cursor.frontBlocked(f);
 	}
 
 	@Override

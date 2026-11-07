@@ -1,6 +1,7 @@
 package dev.t3craft.build.client;
 
 import dev.t3craft.T3Craft;
+import dev.t3craft.build.BuildBudget;
 import dev.t3craft.build.BuildCost;
 import dev.t3craft.build.BuildDeniedException;
 import dev.t3craft.build.BuildHandle;
@@ -59,7 +60,7 @@ public final class BuildersClient implements ClientModInitializer, BuildService 
 		int jobId();
 	}
 
-	private record Placed(int jobId, BlockPos pos, BlockState state) implements Event {
+	private record Placed(int jobId, BlockPos pos, BlockState state, int front) implements Event {
 	}
 
 	private record Finished(int jobId, JobState state) implements Event {
@@ -82,7 +83,7 @@ public final class BuildersClient implements ClientModInitializer, BuildService 
 		manager.addListener(new BuildListener() {
 			@Override
 			public void placed(BuildJob job, int index, BlockPos worldPos, BlockState worldState) {
-				events.add(new Placed(job.id(), worldPos, worldState));
+				events.add(new Placed(job.id(), worldPos, worldState, job.frontOf(index)));
 			}
 
 			@Override
@@ -96,7 +97,9 @@ public final class BuildersClient implements ClientModInitializer, BuildService 
 			}
 		});
 
+		BuildBudget.reload(Survival.configFile());
 		ServerLifecycleEvents.SERVER_STARTED.register(s -> {
+			BuildBudget.reload(Survival.configFile());
 			manager.clear();
 			server = s;
 		});
@@ -156,7 +159,8 @@ public final class BuildersClient implements ClientModInitializer, BuildService 
 		}
 		Vec3 viewer = mc.player.position();
 		BuildCrew crew = new BuildCrew(label, lvl, BuildJob.boundsOf(plan, origin, rotation), crewSize, viewer, () -> nextEntityId--,
-				() -> manager.submit(label, dimension, origin, rotation, plan, blocksPerTick, jobCost, wrap));
+				() -> manager.submit(label, dimension, origin, rotation, plan, blocksPerTick, jobCost, wrap,
+						BuildBudget.global().tuning().frontsFor(crewSize)));
 		crews.add(crew);
 		return crew;
 	}
@@ -187,7 +191,7 @@ public final class BuildersClient implements ClientModInitializer, BuildService 
 				continue;
 			}
 			switch (e) {
-				case Placed p -> crew.placed(p.pos(), p.state());
+				case Placed p -> crew.placed(p.pos(), p.state(), p.front());
 				case Finished f -> crew.finished();
 				case Materials m -> notifyMaterials(mc, m);
 			}

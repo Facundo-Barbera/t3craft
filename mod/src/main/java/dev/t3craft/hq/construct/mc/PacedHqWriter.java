@@ -1,6 +1,7 @@
 package dev.t3craft.hq.construct.mc;
 
 import dev.t3craft.build.BlockSink;
+import dev.t3craft.build.BuildBudget;
 import dev.t3craft.build.ServerLevelSink;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -9,12 +10,13 @@ import java.util.function.Consumer;
 import net.minecraft.server.level.ServerLevel;
 
 /**
- * Default {@link HqWriter}: bottom layer first, {@link #PER_TICK} cells per server tick, through
+ * Default {@link HqWriter}: bottom layer first, up to {@link #PER_TICK} cells per server tick (within the
+ * global {@link BuildBudget}), through
  * {@link ServerLevelSink} (placement sound and particles) and the claim guard. Ticked by
  * {@link HqRuntime}.
  */
 public final class PacedHqWriter implements HqWriter {
-	public static final int PER_TICK = 8;
+	public static final int PER_TICK = 32;
 
 	private final class Job {
 		final List<Write> writes;
@@ -31,6 +33,9 @@ public final class PacedHqWriter implements HqWriter {
 
 	private final List<Job> jobs = new ArrayList<>();
 	private boolean paused;
+	private double credit;
+	private static final String BUDGET_RUNNER = "hq";
+	private static final int MAX_SKIPS_PER_TICK = dev.t3craft.build.BuildCursor.DEFAULT_MAX_SKIPS_PER_TICK;
 
 	@Override
 	public void write(String label, ServerLevel level, List<Write> writes, Consumer<Boolean> done) {
@@ -50,11 +55,15 @@ public final class PacedHqWriter implements HqWriter {
 			return;
 		}
 		Job j = jobs.get(0);
-		int budget = PER_TICK;
-		while (budget > 0 && j.next < j.writes.size()) {
+		// Within the global per-tick budget shared with the other builders; fractional grants carry over.
+		credit = Math.min(credit + BuildBudget.global().claim(BUDGET_RUNNER, PER_TICK), PER_TICK);
+		int skips = 0;
+		while (credit >= 1 && j.next < j.writes.size() && skips < MAX_SKIPS_PER_TICK) {
 			Write w = j.writes.get(j.next++);
 			if (j.sink.place(w.pos(), w.state(), w.blockEntity()) != dev.t3craft.build.BuildCursor.Outcome.SKIPPED) {
-				budget--;
+				credit--;
+			} else {
+				skips++;
 			}
 		}
 		if (j.next >= j.writes.size()) {
