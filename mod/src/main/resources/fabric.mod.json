@@ -9,7 +9,7 @@
 	"environment": "client",
 	"entrypoints": {
 		"main": ["dev.t3craft.T3Craft"],
-		"client": ["dev.t3craft.client.T3CraftClient"]
+		"client": ["dev.t3craft.client.T3CraftClient", "dev.t3craft.client.site.SiteClient"]
 	},
 	"depends": {
 		"fabricloader": ">=0.20.1",
