@@ -7,8 +7,10 @@ import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Adapter for the modular HQ plan (feat/hq-design), ready to be plugged in without touching the
- * rest of the demo. It is not registered today because the HQ generator is not on main yet.
+ * Generic adapter: any fixed list of plans as the {@code "hq"} source. The demo itself registers
+ * {@link DemoHqSource} (the real HQ with the live roster, layout hash and diffs); this class stays for
+ * callers that just want to plug a static plan list in (registering it replaces {@link DemoHqSource},
+ * same id).
  *
  * <p>Wiring, once {@code dev.t3craft.hq} is on main (one call, e.g. in {@code DemoClient} or in the
  * HQ feature's own init):
