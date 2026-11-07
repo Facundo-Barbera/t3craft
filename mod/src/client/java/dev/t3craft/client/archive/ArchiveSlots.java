@@ -1,46 +1,54 @@
 package dev.t3craft.client.archive;
 
-import dev.t3craft.hq.HqInput;
-import dev.t3craft.hq.HqLayout;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Which closed thread sits in which basement slot. Uses {@link HqLayout#allocate} itself with a
- * roster of only settled lines, so the slots are exactly the ones the HQ generator gives the same
- * threads (archive slots never depend on the active threads): a thread keeps its slot while it stays
- * listed, newcomers take the lowest free slot in {@code (project key, thread id)} order.
- *
- * <p>The archive has {@link HqLayout#ARCHIVE_CAPACITY} slots. When more threads are closed, the
- * {@code capacity} newest (by close time, {@link ArchiveEntry#NEWEST_FIRST}) get a slot; the rest
- * are only in the catalog. A new close therefore pushes out the oldest one and nobody else moves.
- * Thread ids in the layout are the entry keys ({@code <env>:<thread>}, as {@code NpcView.id()}).
+ * Which closed thread sits in which shelf slot. Same rules as the HQ layout's archive
+ * ({@code HqLayout.allocate}, rule 5), with the shelf's capacity:
+ * <ol>
+ *   <li>the {@code capacity} most recently closed threads get a slot ({@link ArchiveEntry#NEWEST_FIRST});
+ *   older ones are only in the catalog, so a new close pushes out the oldest and nobody else moves;</li>
+ *   <li>a thread that already had a slot keeps it;</li>
+ *   <li>newcomers, in {@code (project key, entry key)} order, take the lowest free slot.</li>
+ * </ol>
+ * Keys are {@code <env>:<thread>} (as {@code NpcView.id()}). Pure and deterministic: the same set
+ * of entries in any order, with the same previous assignment, gives the same slots.
  */
 public final class ArchiveSlots {
 	private ArchiveSlots() {
 	}
 
-	/** Slots for {@code entries} (any order), keeping {@code previous}'s slots where possible. */
-	public static HqLayout assign(List<ArchiveEntry> entries, @Nullable HqLayout previous) {
-		return assign(entries, previous, HqLayout.ARCHIVE_CAPACITY);
-	}
-
-	static HqLayout assign(List<ArchiveEntry> entries, @Nullable HqLayout previous, int capacity) {
+	/** Entry key → slot (0..capacity-1), keeping {@code previous}'s slots where possible. */
+	public static Map<String, Integer> assign(List<ArchiveEntry> entries, @Nullable Map<String, Integer> previous, int capacity) {
 		List<ArchiveEntry> chosen = entries.stream().sorted(ArchiveEntry.NEWEST_FIRST).limit(Math.max(0, capacity)).toList();
-		HqInput.Builder b = HqInput.builder();
-		for (ArchiveEntry e : chosen) {
-			b.thread(e.projectKey(), e.projectLabel(), e.env(), e.envLabel(), e.key(), true);
+		Map<String, Integer> prev = previous == null ? Map.of() : previous;
+		TreeMap<Integer, String> bySlot = new TreeMap<>();
+		TreeSet<Integer> taken = new TreeSet<>();
+		List<ArchiveEntry> newcomers = new java.util.ArrayList<>();
+		for (ArchiveEntry e : chosen.stream().sorted(Comparator.comparing((ArchiveEntry x) -> x.projectKey()).thenComparing(x -> x.key())).toList()) {
+			Integer old = prev.get(e.key());
+			if (old != null && old >= 0 && old < capacity && taken.add(old)) {
+				bySlot.put(old, e.key());
+			} else {
+				newcomers.add(e);
+			}
 		}
-		HqLayout prev = previous == null ? null : new HqLayout(List.of(), previous.archive(), List.of());
-		return HqLayout.allocate(b.build(), prev);
-	}
-
-	/** Entry key → slot index. */
-	public static Map<String, Integer> slots(HqLayout layout) {
+		int next = 0;
+		for (ArchiveEntry e : newcomers) {
+			while (taken.contains(next)) {
+				next++;
+			}
+			taken.add(next);
+			bySlot.put(next, e.key());
+		}
 		Map<String, Integer> out = new LinkedHashMap<>();
-		layout.archive().forEach(a -> out.put(a.threadId(), a.slot()));
+		bySlot.forEach((slot, key) -> out.put(key, slot));
 		return out;
 	}
 }

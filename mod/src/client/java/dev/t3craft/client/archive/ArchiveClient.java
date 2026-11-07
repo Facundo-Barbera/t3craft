@@ -8,7 +8,7 @@ import dev.t3craft.client.T3CraftClient;
 import dev.t3craft.client.T3CraftCommands;
 import dev.t3craft.client.debug.GuardedEvents;
 import dev.t3craft.debug.DevReload;
-import dev.t3craft.hq.HqLayout;
+import dev.t3craft.hq.Anchor;
 import dev.t3craft.hq.HqSite;
 import dev.t3craft.t3.ArchiveWire;
 import dev.t3craft.t3.DirectController;
@@ -21,7 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.Function;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
@@ -39,32 +38,35 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.component.SwingAnimation;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.LecternBlock;
+import net.minecraft.world.level.block.ChiseledBookShelfBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The HQ's basement archive, live (inventario item 13): closed threads (settled and archived) get
- * a label on their computer in a deterministic slot, and a catalog at the foot of the stairs lists
- * all of them page by page. Client entrypoint, client-only, read-only towards T3.
+ * The HQ's "Archived" shelf, live (inventario item 13): closed threads (settled and archived) get
+ * a label in a deterministic shelf slot inside the building, and the shelf's title (or an empty
+ * slot) opens the catalog, which lists all of them page by page. Client entrypoint, client-only,
+ * read-only towards T3.
  *
  * <p>Pieces: {@link ArchiveStore} (cache + rare refresh over {@link ArchiveSource}),
- * {@link ArchiveSlots} (slots, same rule as {@code HqLayout}), {@link ArchiveGeometry} (positions
- * from the HQ generator), {@link ArchiveRenderer} (client display entities, ids from −6,000,000),
- * {@link CatalogScreen} and {@link ArchiveOpener}.
+ * {@link ArchiveSlots} (slots, same rule as the HQ layout's archive), {@link ArchiveShelf} (slot
+ * positions: the plan's shelf anchors, or {@link ArchiveShelf#FALLBACK} by the board),
+ * {@link ArchiveRenderer} (client display entities, ids from −6,000,000), {@link CatalogScreen}
+ * and {@link ArchiveOpener}.
  *
  * <p>Integration points:
  * <ul>
  *   <li>{@link #setSite}: whoever places the HQ in the world (builders / site / demo) passes its
  *   {@link HqSite}; without a site nothing is drawn in the world, the catalog still works
  *   ({@code /t3craft archive}).</li>
+ *   <li>{@link #setShelf}: the plan's shelf ({@code ArchiveShelf.fromPlan(plan, AnchorNames::archiveShelfSlot)}
+ *   once fix/hq-archive is on main); null = {@link ArchiveShelf#FALLBACK}.</li>
  *   <li>{@link #setCaller} / {@link #setSource}: replace where the reads go. Default: each
  *   environment's {@code T3Connection} on the shared {@code StreamRegistry.call} path.</li>
  *   <li>{@link #setOpener}: what a click opens (default {@link ArchiveOpener#DEFAULT}).</li>
- *   <li>{@link #setCatalogProp}: hook for feat/blocks-core's own catalog block (default a vanilla
- *   lectern display while the cell is air). Any real block at the catalog cell opens the catalog.</li>
- *   <li>{@link #layout()}: the current slot layout (an {@code HqLayout} with only the archive), for
- *   the HQ owner to place the archived computers where the labels are.</li>
+ *   <li>{@link #setSlotProps}: hook for feat/blocks-core's own blocks: what an air slot shows
+ *   (default a vanilla chiseled bookshelf, full when occupied).</li>
+ *   <li>{@link #slots()}: the current assignment (entry key → slot), for the HQ owner.</li>
  * </ul>
  */
 public final class ArchiveClient implements ClientModInitializer {
@@ -99,9 +101,16 @@ public final class ArchiveClient implements ClientModInitializer {
 	private final ArchiveRenderer renderer = new ArchiveRenderer();
 	private @Nullable HqSite site;
 	private @Nullable ArchiveOpener opener;
-	private Function<Direction, BlockState> catalogProp = ArchiveClient::lectern;
-	private HqLayout layout = HqLayout.EMPTY;
-	private int layoutVersion = -1;
+	/** What an air slot shows: {@code (occupied, facing) → state}. */
+	@FunctionalInterface
+	public interface SlotProps {
+		BlockState prop(boolean occupied, Direction facing);
+	}
+
+	private SlotProps slotProps = ArchiveClient::bookshelf;
+	private ArchiveShelf shelf = ArchiveShelf.FALLBACK;
+	private Map<String, Integer> slots = Map.of();
+	private int slotsVersion = -1;
 	private @Nullable HqSite viewsSite;
 	private List<ArchiveRenderer.SlotView> views = List.of();
 	private @Nullable ClientLevel level;
@@ -123,14 +132,14 @@ public final class ArchiveClient implements ClientModInitializer {
 		});
 		DevReload.get().register("t3craft.archive", reason -> {
 			renderer.clear(Minecraft.getInstance().level);
-			layoutVersion = -1;
+			slotsVersion = -1;
 		});
 		UseBlockCallback.EVENT.register((player, lvl, hand, hit) -> {
 			if (!lvl.isClientSide() || hand != InteractionHand.MAIN_HAND || player.isShiftKeyDown()) {
 				return InteractionResult.PASS;
 			}
 			String key = renderer.at(hit.getBlockPos());
-			// FAIL on the client: consumed, nothing sent, the block's own action (lectern GUI…) never runs.
+			// FAIL on the client: consumed, nothing sent, the block's own action never runs.
 			return key == null ? InteractionResult.PASS : use(player, hand, key, InteractionResult.FAIL);
 		});
 		UseEntityCallback.EVENT.register((player, lvl, hand, entity, hit) -> {
@@ -166,22 +175,33 @@ public final class ArchiveClient implements ClientModInitializer {
 		this.opener = opener;
 	}
 
-	/** Hook for feat/blocks-core: the block state shown as the catalog while its cell is air (null = vanilla lectern). */
-	public void setCatalogProp(@Nullable Function<Direction, BlockState> prop) {
-		this.catalogProp = prop == null ? ArchiveClient::lectern : prop;
+	/** Slot positions (null = {@link ArchiveShelf#FALLBACK}). Client thread. */
+	public void setShelf(@Nullable ArchiveShelf shelf) {
+		this.shelf = shelf == null ? ArchiveShelf.FALLBACK : shelf;
+		slotsVersion = -1;
+	}
+
+	public ArchiveShelf shelf() {
+		return shelf;
+	}
+
+	/** Hook for feat/blocks-core: what an air slot shows (null = vanilla chiseled bookshelf). */
+	public void setSlotProps(@Nullable SlotProps props) {
+		this.slotProps = props == null ? ArchiveClient::bookshelf : props;
+		viewsSite = null;
 	}
 
 	public ArchiveStore store() {
 		return store;
 	}
 
-	/** Current slot layout (archive only). */
-	public HqLayout layout() {
-		return layout;
+	/** Current assignment: entry key → shelf slot. */
+	public Map<String, Integer> slots() {
+		return slots;
 	}
 
 	public void openCatalog() {
-		Set<String> slotted = new HashSet<>(ArchiveSlots.slots(layout).keySet());
+		Set<String> slotted = new HashSet<>(slots.keySet());
 		CatalogScreen screen = new CatalogScreen(store, this::open, slotted::contains);
 		T3CraftClient client = T3CraftClient.get();
 		if (client != null) {
@@ -205,9 +225,9 @@ public final class ArchiveClient implements ClientModInitializer {
 		}
 		store.tick(now);
 		int v = store.version();
-		if (v != layoutVersion) {
-			layout = ArchiveSlots.assign(store.entries(), layout);
-			layoutVersion = v;
+		if (v != slotsVersion) {
+			slots = Map.copyOf(ArchiveSlots.assign(store.entries(), slots, shelf.capacity()));
+			slotsVersion = v;
 			viewsSite = null;
 		}
 		if (lvl == null || mc.player == null) {
@@ -226,24 +246,28 @@ public final class ArchiveClient implements ClientModInitializer {
 			views = slotViews(s);
 			viewsSite = s;
 		}
-		ArchiveGeometry.WorldCatalog cat = ArchiveGeometry.catalog(s);
-		int count = store.entries().size();
-		renderer.tick(lvl, views, new ArchiveRenderer.CatalogView(cat.cell(), cat.facing(),
-				Component.translatable("t3craft.archive.catalog.title").getString(),
-				Component.translatable("t3craft.archive.catalog.count", count).getString(), catalogProp.apply(cat.facing())));
+		Anchor head = ArchiveShelf.header(shelf, s);
+		renderer.tick(lvl, views, head == null ? null : new ArchiveRenderer.HeaderView(head,
+				Component.translatable("t3craft.archive.shelf.title").getString(),
+				Component.translatable("t3craft.archive.shelf.count", store.entries().size()).getString()));
 	}
 
+	/** One view per shelf slot (occupied or not). */
 	private List<ArchiveRenderer.SlotView> slotViews(HqSite s) {
-		Map<String, Integer> slots = ArchiveSlots.slots(layout);
-		List<ArchiveRenderer.SlotView> out = new ArrayList<>();
-		ZoneId zone = ZoneId.systemDefault();
+		ArchiveEntry[] bySlot = new ArchiveEntry[shelf.capacity()];
 		for (ArchiveEntry e : store.entries()) {
 			Integer slot = slots.get(e.key());
-			if (slot == null) {
-				continue;
+			if (slot != null && slot < bySlot.length) {
+				bySlot[slot] = e;
 			}
-			ArchiveGeometry.WorldSlot w = ArchiveGeometry.world(s, slot);
-			out.add(new ArchiveRenderer.SlotView(e.key(), w.cell(), w.face(), ArchiveLabel.lines(e, zone)));
+		}
+		List<ArchiveRenderer.SlotView> out = new ArrayList<>();
+		ZoneId zone = ZoneId.systemDefault();
+		for (int i = 0; i < bySlot.length; i++) {
+			ArchiveShelf.WorldSlot w = ArchiveShelf.world(shelf, s, i);
+			ArchiveEntry e = bySlot[i];
+			out.add(new ArchiveRenderer.SlotView(i, e == null ? null : e.key(), w.cell(), w.face(),
+					e == null ? List.of() : ArchiveLabel.lines(e, zone), slotProps.prop(e != null, w.face().facing())));
 		}
 		return out;
 	}
@@ -293,8 +317,14 @@ public final class ArchiveClient implements ClientModInitializer {
 		o.open(e);
 	}
 
-	private static BlockState lectern(Direction facing) {
-		return Blocks.LECTERN.defaultBlockState().setValue(LecternBlock.FACING, facing);
+	private static BlockState bookshelf(boolean occupied, Direction facing) {
+		BlockState st = Blocks.CHISELED_BOOKSHELF.defaultBlockState().setValue(ChiseledBookShelfBlock.FACING, facing);
+		if (occupied) {
+			for (var prop : ChiseledBookShelfBlock.SLOT_OCCUPIED_PROPERTIES) {
+				st = st.setValue(prop, true);
+			}
+		}
+		return st;
 	}
 
 	// ---- commands -----------------------------------------------------------------------------
@@ -313,7 +343,7 @@ public final class ArchiveClient implements ClientModInitializer {
 				}))
 				.then(literal("status").executes(c -> {
 					c.getSource().sendFeedback(T3CraftCommands.prefix().append(Component.translatable("t3craft.archive.status",
-							store.entries().size(), layout.archive().size(), HqLayout.ARCHIVE_CAPACITY,
+							store.entries().size(), slots.size(), shelf.capacity(),
 							Component.translatable(site == null ? "t3craft.archive.no_site" : "t3craft.archive.site"),
 							Component.translatable(store.fullReads() ? "t3craft.archive.full" : "t3craft.archive.shell_only"))));
 					for (ArchiveStore.EnvStatus s : store.statuses()) {

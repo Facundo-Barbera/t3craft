@@ -1,13 +1,19 @@
-# feat/archive-view: el archivo del sótano, con datos reales
+# feat/archive-view: estante "Archivados" con datos reales
 
 Ítem 13 de `docs/research/inventario.md`. Paquete `dev.t3craft.client.archive` (source set
 `client`) y decodificadores en `dev.t3craft.t3.ArchiveWire` (`main`). Tests en
 `mod/src/test/java/dev/t3craft/client/archive/` y `dev/t3craft/t3/ArchiveWireTest.java`.
 
+> Cambio de diseño (Facundo): el sótano de archivo sale del layout por defecto. Lo reemplaza un
+> **estante de "Archivados" dentro del edificio** (fix/hq-archive), con anchors con nombre
+> `archiveShelfSlot(i)` en el plan. Este módulo muestra ahí los hilos cerrados. Las posiciones
+> pasan por la interfaz `ArchiveShelf` y, mientras fix/hq-archive no esté en main, se usa un
+> estante de fallback junto al tablero.
+
 ## Qué hace
 
-- **Slots**: cada hilo cerrado (settled o archivado) que cabe en el archivo del HQ
-  (`HqLayout.ARCHIVE_CAPACITY` = 148) tiene en la cara de su computadora un letrero de cliente:
+- **Slots del estante**: cada hilo cerrado (settled o archivado) que cabe en el estante muestra en
+  la cara de su slot un letrero de cliente:
 
   ```
   Fix login redirect l…     título (blanco, 22 caracteres como máximo)
@@ -16,21 +22,55 @@
   t3craft                   proyecto
   ```
 
-  Al hacer clic en el slot (en el bloque, o en un hitbox mientras la celda es aire), el hilo se
-  abre en solo lectura.
-- **Catálogo**: un atril al pie de la escalera del sótano, en `(6, -4, 1)` relativo al HQ y mirando
-  al oeste, hacia quien baja. Al usarlo, o con `/t3craft archive`, se abre `CatalogScreen`: todos
-  los hilos cerrados, primero los cerrados más recientemente, paginados (`<` `>` y la rueda del
-  ratón). Incluye los que no caben en los slots, marcados con `■` los que tienen slot. El botón
-  **Más viejos** lee la página siguiente de T3 y **Refrescar** relee todo. Al hacer clic en una
-  fila, el hilo se abre en solo lectura.
+  Un clic en un slot ocupado abre el hilo en solo lectura. Un clic en un slot vacío o en el cartel
+  **"Archivados · N hilos cerrados"**, centrado sobre el estante, abre el catálogo.
+- **Catálogo** (`CatalogScreen`, también con `/t3craft archive`): todos los hilos cerrados, primero
+  los cerrados más recientemente, paginados (`<` `>` y la rueda del ratón). Incluye los que no caben
+  en el estante, marcados con `■` los que tienen slot. **Más viejos** lee la página siguiente de T3
+  y **Refrescar** relee todo. Un clic en una fila abre el hilo en solo lectura.
 - Comandos: `/t3craft archive` (abre el catálogo), `refresh` y `status`.
+
+## Posiciones: `ArchiveShelf`
+
+```java
+public interface ArchiveShelf {
+    List<Anchor> slots();          // relativos al origen del HQ: celda del slot + cara visible (normal hacia fuera)
+    static ArchiveShelf fromPlan(BuildPlan plan, IntFunction<String> name);   // anchors name(0), name(1)… hasta el primero que falte
+    ArchiveShelf FALLBACK;          // estante junto al tablero (abajo)
+}
+```
+
+- **Cuando entre fix/hq-archive**, una línea en quien coloca el HQ:
+  `ArchiveClient.get().setShelf(ArchiveShelf.fromPlan(plan, AnchorNames::archiveShelfSlot))`.
+  El nombre se inyecta para no depender de esa rama. El orden de los anchors es el orden de los
+  slots: el 0 es el primero que se ocupa.
+- **Fallback** (activo hoy): dos alas a los lados del tablero de "needs attention" del hub
+  (`x = -7..-5` y `5..7`, `z = -4`, `y = 1..4`, mirando al sur como el tablero), sin las dos
+  esquinas bajas que tapan las macetas. Son **22 slots**. El slot 0 está a la altura de los ojos y
+  junto al tablero. Un test comprueba contra el generador que esas celdas y las de delante son aire
+  en todos los planes, que están en el grupo `hub` y en línea con el tablero. Allí no se construye
+  nada: mientras la celda es aire se dibuja un prop de cliente (una librería cincelada vanilla,
+  llena si el slot está ocupado y vacía si no).
+- El cartel se calcula a partir de los slots: centrado sobre ellos, justo encima de la fila más
+  alta y en el plano de las caras.
+
+## Slots: `ArchiveSlots`
+
+Son las mismas reglas que el archivo de `HqLayout` (regla 5), con la capacidad del estante:
+1. los `capacity` hilos cerrados más recientemente tienen slot; el resto aparece solo en el
+   catálogo, así que un cierre nuevo desplaza al más viejo y ningún otro se mueve;
+2. un hilo que ya tenía slot lo conserva;
+3. los nuevos, en orden `(project key, key)`, toman el slot libre más bajo.
+
+Las claves son `<env>:<thread>`, igual que en `NpcView.id()`. Un test comprueba que, con la
+capacidad de `HqLayout`, la asignación coincide con `HqLayout.allocate` sobre el roster completo
+(activos incluidos) en una historia aleatoria de 30 pasos.
 
 ## Datos (solo lectura)
 
 | Fuente | Qué aporta |
 |---|---|
-| `subscribeShell` (vista ya existente, `DirectController.shellViews()`) | settled en vivo, sin costo extra. Es la fuente prioritaria: un hilo activo en el shell sale del archivo. |
+| `subscribeShell` (vista existente, `DirectController.shellViews()`) | settled en vivo, sin costo extra. Es la fuente prioritaria: un hilo activo en el shell sale del archivo. |
 | `orchestration.getArchivedShellSnapshot` `{}` | hilos archivados y los nombres de sus proyectos |
 | `orchestration.getOlderSettledThreads` `{before:{settledAt, threadId?}, limit≤50}` | settled más viejos, por páginas (`settledAt` desc, id asc); el cursor sale del último hilo de la página |
 
@@ -40,9 +80,9 @@ chats) y está archivado o settled (la misma regla que `Visibility.isSettled`).
 **Caché y refresco** (`ArchiveStore`, puro y testeado): por entorno conectado se leen el snapshot
 archivado y la primera página al conectar, y después cada **10 min**. Las páginas siguientes solo
 se leen a pedido (botón **Más viejos**). Ante un fallo hay backoff de 30 s que se duplica en cada
-intento, hasta 10 min. El refresco manual se ignora si la última lectura tiene menos de 30 s. Nunca
-hay dos lecturas del mismo tipo en curso por entorno. Los resultados se aplican en el tick del
-cliente. Las páginas viejas que no traen nombre de proyecto lo toman del shell o del snapshot.
+intento consecutivo de ese tipo de lectura, hasta 10 min. El refresco manual se ignora si la
+última lectura tiene menos de 30 s. Nunca hay dos lecturas del mismo tipo en curso por entorno. Los
+resultados se aplican en el tick del cliente.
 
 ### Vía de peticiones
 
@@ -55,61 +95,44 @@ public CompletableFuture<ArchiveWire.OlderSettledPage> getOlderSettledThreads(Ar
 public CompletableFuture<ArchiveWire.ArchivedSnapshot> getArchivedShellSnapshot()
 ```
 
-El paquete solo ve la interfaz `ArchiveSource`. `ArchiveSource.direct(...)` es el adaptador que
-usa la conexión de cada entorno (`DirectController.connection(envId)`) y es el default. También
-están `ArchiveSource.of(Caller)`, para cualquier llamador crudo, y `ArchiveSource.UNAVAILABLE`, que
-deja solo los settled del shell. En modo bridge no hay lecturas y el catálogo lo avisa.
-
-## Slots coherentes con el HQ
-
-`ArchiveSlots.assign(entries, previous)` llama a **`HqLayout.allocate`** con un roster que solo
-tiene líneas settled. Los slots del archivo no dependen de los hilos activos, así que salen
-idénticos a los que el generador del HQ da a esos hilos (lo comprueba un test sobre una historia
-aleatoria de 30 pasos con el roster completo). Un hilo conserva su slot mientras siga en la lista,
-y los nuevos toman el slot libre más bajo en orden `(project key, thread id)`. Los ids son
-`<env>:<thread>`, igual que en `NpcView.id()`. Si hay más de 148 hilos cerrados, los **148 cerrados
-más recientemente** tienen slot y el resto aparece solo en el catálogo. Así, un cierre nuevo
-desplaza al más viejo y ningún otro hilo se mueve.
-
-Las posiciones salen del propio generador (`ArchiveGeometry`): se genera una vez un plan con los
-148 slots ocupados y se lee el anchor `archive_<thread>` de cada uno. No se duplica `HqGeometry`.
-Las coordenadas de mundo se calculan con `HqSite`.
+El paquete solo ve la interfaz `ArchiveSource`. El default es `ArchiveSource.direct(...)`, que usa
+`DirectController.connection(envId)`. También están `ArchiveSource.of(Caller)`, para un llamador
+crudo, y `ArchiveSource.UNAVAILABLE`, que deja solo los settled del shell. En modo bridge no hay
+entornos directos y el catálogo lo avisa.
 
 ## Render
 
-Solo entidades de cliente: `TextDisplay` FIXED en la cara de la pantalla (escala 0,18, a pleno
-brillo, fondo oscuro), un `Interaction` mientras la celda es aire y, en el catálogo, un título
-flotante más un `BlockDisplay` de atril vanilla mientras la celda es aire. No se escriben bloques en
-el mundo, no hay registros nuevos y nada lo ve el servidor.
+Solo entidades de cliente: un `TextDisplay` FIXED en la cara de cada slot ocupado (escala 0,18, a
+pleno brillo, fondo oscuro); un `BlockDisplay` como prop y un `Interaction` mientras la celda del
+slot es aire; y el cartel (`TextDisplay` con su `Interaction`). No se escriben bloques en el mundo,
+no hay registros nuevos y nada lo ve el servidor.
 
 **Ids de entidad: desde −6.000.000 hacia abajo** (`ArchiveRenderer.ID_BASE`). Rangos ocupados:
 NpcRegistry −1.000.000, builders −2.000.000, BehaviorDirector −3.000.000, ayudantes −4.000.000 y
 workstation −5.000.000. Si el barrido de huérfanos de `NpcRegistry` borra alguna entidad, se
 reconstruye en el tick siguiente (`isRemoved()`).
 
-Clics: con la mano principal y sin agacharse, sobre la celda de un slot o del catálogo, se devuelve
-`FAIL`: no se envía nada y no se abre la GUI del atril ni del bloque. Sobre nuestras entidades,
-`SUCCESS`. Los ataques a nuestras entidades se cancelan con `FAIL`.
+Clics: con la mano principal y sin agacharse, sobre la celda de un slot (cuando hay bloque real),
+se devuelve `FAIL`: no se envía nada y no se ejecuta la acción propia del bloque. Sobre nuestras
+entidades, `SUCCESS`. Los ataques a nuestras entidades se cancelan con `FAIL`.
 
 ## Abrir en solo lectura
 
 `ArchiveOpener.DEFAULT`: si existe `ChatScreens` de feat/chat (`PortableLinks.hasChat()`), se usa
-ese. Si no, se abre la `ThreadChatScreen` de main con un `NpcInfo` sintético settled (título,
-entorno · proyecto, fecha de cierre). El registro de NPCs no tiene hilos cerrados, así que los
-abridores basados en él no los encontrarían.
+ese. Si no, se abre la `ThreadChatScreen` de main con un `NpcInfo` sintético settled. El registro
+de NPCs no tiene hilos cerrados.
 
 ## Puntos de integración (`ArchiveClient.get()`)
 
 - `setSite(HqSite)`: quien coloca el HQ en el mundo (builders, site o demo). Sin sitio no se dibuja
   nada en el mundo, pero el catálogo funciona igual.
-- `layout()`: el `HqLayout` (solo el archivo), para que el dueño del HQ ponga las computadoras
-  archivadas donde están los letreros (`HqLayout.allocate` con el mismo roster settled da lo mismo).
-- `setCaller(Caller)` / `setSource(ArchiveSource)`: cambiar de dónde se lee (por defecto, las
-  conexiones directas).
+- `setShelf(ArchiveShelf)`: las posiciones del plan (`null` = `FALLBACK`).
+- `slots()`: la asignación actual (clave → slot), para que el dueño del HQ ponga el bloque
+  correspondiente en cada slot.
+- `setCaller(Caller)` / `setSource(ArchiveSource)`: cambiar de dónde se lee.
 - `setOpener(ArchiveOpener)`: otro visor.
-- **Hook para feat/blocks-core**: `setCatalogProp(Direction → BlockState)`, el bloque que se muestra
-  como catálogo mientras la celda es aire. Cualquier bloque real que haya en la celda del catálogo
-  abre el catálogo. No depende de blocks.
+- **Hook para feat/blocks-core**: `setSlotProps((occupied, facing) -> BlockState)`, el bloque que
+  se muestra en un slot de aire (por ejemplo, el `t3craft:monitor`). No depende de blocks.
 
 ## Cambios estructurales → **RESTART**
 
@@ -120,15 +143,16 @@ abridores basados en él no los encontrarían.
 - Fuera del paquete: `T3Connection.getOlderSettledThreads` / `getArchivedShellSnapshot` (sobre
   `streams.call`), `DirectController.labels()` (aditivos), `dev.t3craft.t3.ArchiveWire` (nuevo) y
   claves de lang `t3craft.archive.*`.
-- Sin mixins, keybinds, bloques, ítems, registros ni config.
+- Sin mixins, keybinds, bloques, ítems, registros ni config. No toca `hq`.
 
 ## Pendientes
 
-- feat/blocks-core entró a main pero no tiene un bloque de catálogo: el hook `setCatalogProp` queda
-  listo para cuando exista.
-- Nadie llama todavía a `setSite`: en main no hay un HQ colocado en el mundo real (solo
-  `hq-preview` y la demo, que no lo exponen). Hay que llamarlo desde quien construya el HQ.
+- **fix/hq-archive**: cuando entre, llamar a `setShelf(ArchiveShelf.fromPlan(plan, AnchorNames::archiveShelfSlot))`
+  y quitar el fallback si ya no hace falta. Si fix/hq-archive cambia la regla de asignación del
+  archivo de `HqLayout`, revisar `ArchiveSlotsTest.matchesHqLayoutRules`.
+- Nadie llama todavía a `setSite`: en main no hay un HQ colocado en el mundo real que lo exponga.
+  Hay que llamarlo desde quien construya el HQ.
 - **No se probó dentro del juego** (por regla, no se lanza Minecraft). Falta revisar a ojo la escala
-  y la altura del letrero, que el texto no quede espejado y que el `Interaction` reciba el clic.
+  y la altura del letrero, que el texto no quede espejado y que los `Interaction` reciban el clic.
 - La caché vive en memoria: al reiniciar se relee (son 2 lecturas por entorno).
 - No se copió código de AgentCraft.

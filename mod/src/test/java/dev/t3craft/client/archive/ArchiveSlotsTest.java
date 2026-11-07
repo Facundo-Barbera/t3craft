@@ -7,6 +7,8 @@ import dev.t3craft.hq.HqInput;
 import dev.t3craft.hq.HqLayout;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -21,13 +23,16 @@ class ArchiveSlotsTest {
 		return out;
 	}
 
-	/** Same slots as the HQ layout of the full roster (actives + settled), at every step of a history. */
+	/**
+	 * Same rules as the HQ layout's archive: with its capacity, the slots equal those of
+	 * {@code HqLayout.allocate} over the whole roster (actives included), at every step of a history.
+	 */
 	@Test
-	void matchesHqLayoutOfTheWholeRoster() {
+	void matchesHqLayoutRules() {
 		Random rnd = new Random(7);
 		List<ArchiveEntry> pool = entries(40);
 		HqLayout hq = null;
-		HqLayout ours = null;
+		Map<String, Integer> ours = null;
 		for (int step = 0; step < 30; step++) {
 			List<ArchiveEntry> closed = new ArrayList<>();
 			HqInput.Builder b = HqInput.builder();
@@ -42,24 +47,26 @@ class ArchiveSlotsTest {
 			}
 			hq = HqLayout.allocate(b.build(), hq);
 			Collections.shuffle(closed, rnd);
-			ours = ArchiveSlots.assign(closed, ours);
-			assertEquals(hq.archive(), ours.archive(), "step " + step);
+			ours = ArchiveSlots.assign(closed, ours, HqLayout.ARCHIVE_CAPACITY);
+			Map<String, Integer> expected = new LinkedHashMap<>();
+			hq.archive().forEach(a -> expected.put(a.threadId(), a.slot()));
+			assertEquals(expected, ours, "step " + step);
 		}
 	}
 
 	@Test
 	void slotsAreStableAndIndependentOfOrder() {
 		List<ArchiveEntry> list = entries(10);
-		HqLayout a = ArchiveSlots.assign(list, null);
+		Map<String, Integer> before = ArchiveSlots.assign(list, null, 24);
 		List<ArchiveEntry> shuffled = new ArrayList<>(list);
 		Collections.shuffle(shuffled, new Random(1));
-		assertEquals(a, ArchiveSlots.assign(shuffled, null));
+		assertEquals(before, ArchiveSlots.assign(shuffled, null, 24));
+		assertEquals(10, new HashSet<>(before.values()).size());
 
 		// one leaves, one arrives: nobody else moves; the newcomer takes the freed lowest slot
-		Map<String, Integer> before = ArchiveSlots.slots(a);
 		List<ArchiveEntry> next = new ArrayList<>(list.subList(1, 10));
 		next.add(entry("vps", "new", "p0", 0));
-		Map<String, Integer> after = ArchiveSlots.slots(ArchiveSlots.assign(next, a));
+		Map<String, Integer> after = ArchiveSlots.assign(next, before, 24);
 		for (ArchiveEntry e : list.subList(1, 10)) {
 			assertEquals(before.get(e.key()), after.get(e.key()), e.key());
 		}
@@ -69,20 +76,29 @@ class ArchiveSlotsTest {
 	@Test
 	void onlyTheNewestGetASlotWhenFull() {
 		List<ArchiveEntry> list = entries(8);
-		HqLayout l = ArchiveSlots.assign(list, null, 5);
+		Map<String, Integer> s = ArchiveSlots.assign(list, null, 5);
 		// entries(i) closed (i+1) hours ago: t0..t4 are the newest
-		assertEquals(List.of("acmesite:t1", "acmesite:t3", "vps:t0", "vps:t2", "vps:t4"),
-				l.archive().stream().map(HqLayout.Archived::threadId).sorted().toList());
-		assertTrue(l.overflow().isEmpty(), "older ones are catalog-only, not HQ overflow");
-		assertEquals(HqLayout.ARCHIVE_CAPACITY, ArchiveSlots.assign(entries(200), null).archive().size());
+		assertEquals(List.of("acmesite:t1", "acmesite:t3", "vps:t0", "vps:t2", "vps:t4"), s.keySet().stream().sorted().toList());
+		assertTrue(s.values().stream().allMatch(v -> v >= 0 && v < 5));
+
+		// a new close pushes out the oldest slotted one; the others keep their slots
+		List<ArchiveEntry> more = new ArrayList<>(list);
+		more.add(entry("vps", "fresh", "p9", 0));
+		Map<String, Integer> s2 = ArchiveSlots.assign(more, s, 5);
+		assertFalse(s2.containsKey("vps:t4"), "the oldest of the five leaves the shelf");
+		assertEquals(s.get("vps:t4"), s2.get("vps:fresh"));
+		for (String k : List.of("vps:t0", "acmesite:t1", "vps:t2", "acmesite:t3")) {
+			assertEquals(s.get(k), s2.get(k));
+		}
 	}
 
 	@Test
-	void ignoresModulesOfAPreviousFullLayout() {
-		HqInput in = HqInput.builder().thread("vps:p", "p", "vps", "vps", "vps:a", false).thread("vps:p", "p", "vps", "vps", "vps:s", true).build();
-		HqLayout full = HqLayout.plan(in);
-		HqLayout ours = ArchiveSlots.assign(List.of(entry("vps", "s", "p", H)), full);
-		assertTrue(ours.modules().isEmpty());
-		assertEquals(full.archive(), ours.archive());
+	void previousSlotsBeyondANewCapacityAreReassigned() {
+		Map<String, Integer> big = ArchiveSlots.assign(entries(30), null, 148);
+		Map<String, Integer> small = ArchiveSlots.assign(entries(30), big, 24);
+		assertEquals(24, small.size());
+		assertTrue(small.values().stream().allMatch(v -> v >= 0 && v < 24));
+		assertEquals(24, new HashSet<>(small.values()).size());
+		assertTrue(ArchiveSlots.assign(entries(3), null, 0).isEmpty());
 	}
 }

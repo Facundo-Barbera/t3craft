@@ -11,9 +11,9 @@ import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 
 /**
- * The archive catalog (the lectern at the foot of the basement stairs, or {@code /t3craft archive}):
+ * The archive catalog (the "Archived" shelf's title or an empty slot, or {@code /t3craft archive}):
  * every closed thread, newest close first, one page at a time, including the ones that do not fit
- * in the basement slots. "Older" reads the next page of older settled threads from T3; a click on a
+ * in the shelf. "Older" reads the next page of older settled threads from T3; a click on a
  * row opens the thread read-only ({@link ArchiveOpener}). Read-only: nothing here writes to T3.
  */
 public final class CatalogScreen extends Screen {
@@ -45,7 +45,7 @@ public final class CatalogScreen extends Screen {
 	private Button older;
 	private Button refresh;
 
-	/** {@code slotted}: whether an entry key currently has a basement slot (marked in the list). */
+	/** {@code slotted}: whether an entry key currently has a shelf slot (marked in the list). */
 	public CatalogScreen(ArchiveStore store, ArchiveOpener opener, java.util.function.Predicate<String> slotted) {
 		super(Component.translatable("t3craft.archive.catalog.title"));
 		this.store = store;
