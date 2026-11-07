@@ -59,6 +59,19 @@ public final class ShellState {
 		return p == null ? null : p.title();
 	}
 
+	/** Immutable copy for other threads: visible threads + project titles + sync flag. */
+	public record View(java.util.List<ThreadShell> threads, Map<String, String> projectTitles, boolean synced) {
+		public @Nullable String projectTitle(String projectId) {
+			return projectTitles.get(projectId);
+		}
+	}
+
+	public View view() {
+		Map<String, String> titles = new LinkedHashMap<>();
+		projects.forEach((id, p) -> titles.put(id, p.title()));
+		return new View(java.util.List.copyOf(threads.values()), Map.copyOf(titles), synchronizedFlag);
+	}
+
 	public long sequence() {
 		return sequence;
 	}
