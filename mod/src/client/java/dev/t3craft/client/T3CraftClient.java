@@ -11,8 +11,11 @@ import dev.t3craft.client.link.BridgeListener;
 import dev.t3craft.client.link.LinkStatus;
 import dev.t3craft.client.npc.NpcInfo;
 import dev.t3craft.client.npc.NpcRegistry;
+import dev.t3craft.client.npc.helpers.HelperConfig;
+import dev.t3craft.client.npc.helpers.HelperDirector;
+import dev.t3craft.client.npc.helpers.HelperRoster;
 import dev.t3craft.client.portable.PortableClient;
-import dev.t3craft.client.screen.ThreadChatScreen;
+import dev.t3craft.debug.HotSwapFields;
 import dev.t3craft.t3.DirectController;
 import dev.t3craft.t3.Environments;
 import dev.t3craft.t3.Pairing;
@@ -52,6 +55,12 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 	private static T3CraftClient instance;
 
 	private final NpcRegistry npcs = new NpcRegistry();
+	/**
+	 * feat/npc-helpers: subagents as small villagers following their parent's NPC (direct mode).
+	 * Read via {@link #helpers()} / {@link #helperConfig()}: may be null after a hot-swap (docs/dev.md).
+	 */
+	private @Nullable HelperDirector helpers;
+	private @Nullable HelperConfig helperConfig;
 	private final AtomicBoolean directDirty = new AtomicBoolean();
 	private final Map<String, String> envStatus = new HashMap<>();
 	private final Map<String, String[]> envDetail = new LinkedHashMap<>();
@@ -74,6 +83,8 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 		modVersion = FabricLoader.getInstance().getModContainer(T3Craft.MOD_ID)
 				.map(c -> c.getMetadata().getVersion().getFriendlyString()).orElse("dev");
 		config = ModConfig.load();
+		helperConfig = loadHelperConfig();
+		helpers(); // creates the director and wires its panel extra
 
 		ClientLifecycleEvents.CLIENT_STARTED.register(mc -> {
 			started = true;
@@ -94,12 +105,14 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 				}
 			}
 			npcs.tick(mc);
+			helpers().tick(mc, npcs::avatar);
 		});
 		T3CraftCommands.register(this);
 		dev.t3craft.hq.HqPreviewCommand.register(npcs::all); // feat/hq-design: /t3craft debug hq-preview
 		PeekHud.register();
 		dev.t3craft.client.hud.StatusBar.register(this); // feat/hud-bar
 		PortableClient.register(this);
+		dev.t3craft.client.search.SearchClient.register(this); // feat/search: /t3craft search
 
 		// Right-click on one of our client-only NPCs opens its chat screen. The entity is unknown to
 		// the server, so the interaction is consumed client-side.
@@ -109,11 +122,14 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 			}
 			String threadId = npcs.threadFor(entity);
 			if (threadId == null) {
+				threadId = helpers().parentFor(entity); // a helper opens its parent's chat
+			}
+			if (threadId == null) {
 				return InteractionResult.PASS;
 			}
 			NpcInfo info = npcs.info(threadId);
 			if (info != null) {
-				Minecraft.getInstance().gui.setScreen(new ThreadChatScreen(info));
+				dev.t3craft.client.chat.ChatScreens.openFor(info);
 			}
 			return InteractionResult.SUCCESS;
 		});
@@ -172,11 +188,31 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 	public ModConfig reload() {
 		stopSource();
 		config = ModConfig.load();
+		helperConfig = loadHelperConfig();
+		helpers().update(HelperRoster.Collected.EMPTY, List.of(), 0);
 		npcs.replaceAll(List.of());
 		if (started) {
 			startSource();
 		}
 		return config;
+	}
+
+	// Lazy getters: fields added by hot-swap are null and onInitializeClient does not run again.
+	private HelperDirector helpers() {
+		HelperDirector h = helpers;
+		if (h == null) {
+			helpers = h = new HelperDirector();
+			npcs.setPanelExtra(h::panelExtra);
+		}
+		return h;
+	}
+
+	private HelperConfig helperConfig() {
+		return helperConfig = HotSwapFields.orInit(helperConfig, T3CraftClient::loadHelperConfig);
+	}
+
+	private static HelperConfig loadHelperConfig() {
+		return HelperConfig.load(FabricLoader.getInstance().getConfigDir().resolve("t3craft.json"));
 	}
 
 	/** Opens a screen on the next tick (a command's chat screen closes right after it runs). */
@@ -224,6 +260,12 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 			return;
 		}
 		List<dev.t3craft.t3.NpcView> views = d.npcs(System.currentTimeMillis());
+		// feat/npc-helpers: with helpers on, subagents never get a desk/NPC of their own (even with
+		// includeSubagents); they follow their parent instead. Filtered before the registry, so every
+		// roster reader (behaviour, workstations, HQ preview, portable) sees parents only.
+		HelperRoster.Collected sub = helperConfig().enabled() ? HelperRoster.collect(d.shellViews()) : HelperRoster.Collected.EMPTY;
+		views = HelperRoster.deskRoster(views, dev.t3craft.t3.NpcView::id, sub.subagentNpcIds());
+		helpers().update(sub, views.stream().map(dev.t3craft.t3.NpcView::id).toList(), helperConfig().maxPerParent());
 		List<NpcInfo> list = new ArrayList<>();
 		views.forEach(v -> list.add(NpcInfo.fromView(v)));
 		npcs.replaceAll(list);

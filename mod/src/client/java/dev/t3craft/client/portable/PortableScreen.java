@@ -2,6 +2,10 @@ package dev.t3craft.client.portable;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.t3craft.client.T3CraftClient;
+import dev.t3craft.client.search.SearchBox;
+import dev.t3craft.client.search.SearchClient;
+import dev.t3craft.client.search.SearchModel;
+import dev.t3craft.t3.ThreadSearch;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -23,7 +27,8 @@ import org.jspecify.annotations.Nullable;
  * environment screen (feat/config, idem). Nothing here sends anything to T3.
  *
  * <p>Keys: ↑/↓ select, ←/→ environment, Enter open, Tab notifications, Esc/Backspace back, the
- * terminal key closes.
+ * terminal key closes, Ctrl+F search. Search is a separate component ({@link SearchBox} +
+ * {@link SearchModel}): this screen only places it and forwards input, so it moves easily.
  */
 public final class PortableScreen extends Screen {
 	private static final int REFRESH_TICKS = 10;
@@ -41,6 +46,9 @@ public final class PortableScreen extends Screen {
 	private final NotificationLog log = NotificationLog.INSTANCE;
 	private final PortableNav nav = new PortableNav();
 	private final List<Hit> hits = new ArrayList<>();
+	/** Survives re-init (resize); the {@link SearchBox} view is rebuilt in {@link #init()}. */
+	private final SearchModel searchModel;
+	private @Nullable SearchBox search;
 	private int ticks;
 	private int listFirst;
 	private int notifFirst;
@@ -68,6 +76,7 @@ public final class PortableScreen extends Screen {
 	public PortableScreen(T3CraftClient client) {
 		super(Component.literal("T3 Terminal"));
 		this.client = client;
+		this.searchModel = new SearchModel(q -> SearchClient.search(client, q, ThreadSearch.DEFAULT_LIMIT), SearchModel.DEFAULT_DEBOUNCE_MS);
 		refresh();
 	}
 
@@ -97,6 +106,8 @@ public final class PortableScreen extends Screen {
 				.bounds(x1 - 96, y1 - 22, 90, 16).build());
 		envButton = addRenderableWidget(Button.builder(Component.literal("Environments…"), b -> PortableLinks.openEnvironments(this))
 				.bounds(x0 + 6, y1 - 22, envColW - 6, 16).build());
+		search = new SearchBox(font, searchModel, this::openSearchHit);
+		addRenderableWidget(search.layout(x0 + envColW + 6, y0 + 32, x1 - 6 - (x0 + envColW + 6), 14));
 		updateButtons();
 	}
 
@@ -110,6 +121,14 @@ public final class PortableScreen extends Screen {
 		notificationsTab.setMessage(Component.literal(log.unread() > 0 ? "Notifications (" + log.unread() + ")" : "Notifications"));
 		PortableThread sel = nav.selectedThread();
 		openButton.visible = threads;
+		if (search != null) {
+			search.setVisible(threads);
+		}
+		if (threads && search != null && search.active()) {
+			openButton.active = search.selectedHit() != null;
+			envButton.visible = threads;
+			return;
+		}
 		openButton.active = sel != null && sel.threadId() != null && !sel.env().isEmpty()
 				&& nav.state().connection() == PortableState.Connection.CONNECTED;
 		envButton.visible = threads;
@@ -121,7 +140,19 @@ public final class PortableScreen extends Screen {
 		updateButtons();
 	}
 
+	private void openSearchHit(String env, String threadId) {
+		if (!PortableLinks.hasChat() && client.npcs().info(env.isEmpty() ? threadId : env + ":" + threadId) == null) {
+			flash = "That thread is not listed in the world right now, so there is no chat screen for it yet.";
+			return;
+		}
+		PortableLinks.openChat(env, threadId);
+	}
+
 	private void openSelected() {
+		if (search != null && search.active()) {
+			search.openSelected();
+			return;
+		}
 		PortableThread t = nav.selectedThread();
 		if (t == null || t.threadId() == null || t.env().isEmpty() || nav.state().connection() != PortableState.Connection.CONNECTED) {
 			return;
@@ -131,6 +162,9 @@ public final class PortableScreen extends Screen {
 
 	@Override
 	public void tick() {
+		if (search != null) {
+			search.tick();
+		}
 		if (++ticks % REFRESH_TICKS == 0) {
 			refresh();
 			if (nav.page() == PortableNav.Page.NOTIFICATIONS) {
@@ -145,6 +179,10 @@ public final class PortableScreen extends Screen {
 	@Override
 	public boolean keyPressed(KeyEvent e) {
 		flash = null;
+		if (nav.page() == PortableNav.Page.THREADS && search != null && search.keyPressed(this, e)) {
+			updateButtons();
+			return true;
+		}
 		int k = e.key();
 		if (k == InputConstants.KEY_ESCAPE || k == InputConstants.KEY_BACKSPACE) {
 			if (nav.back()) {
@@ -203,6 +241,13 @@ public final class PortableScreen extends Screen {
 		if (super.mouseClicked(e, doubleClick)) {
 			return true;
 		}
+		if (search != null) {
+			search.blur(this); // a click outside the field gives the screen's keys back
+		}
+		if (nav.page() == PortableNav.Page.THREADS && search != null && search.mouseClicked(e.x(), e.y(), doubleClick)) {
+			updateButtons();
+			return true;
+		}
 		for (Hit h : List.copyOf(hits)) {
 			if (h.contains(e.x(), e.y())) {
 				h.action().run();
@@ -218,6 +263,11 @@ public final class PortableScreen extends Screen {
 
 	@Override
 	public boolean mouseScrolled(double x, double y, double dx, double dy) {
+		if (dy != 0 && nav.page() == PortableNav.Page.THREADS && search != null && search.active()) {
+			search.move(dy > 0 ? -1 : 1);
+			updateButtons();
+			return true;
+		}
 		if (dy != 0) {
 			nav.move(dy > 0 ? -1 : 1);
 			updateButtons();
@@ -250,7 +300,9 @@ public final class PortableScreen extends Screen {
 			drawNotificationsPage(g);
 		}
 		String help = nav.page() == PortableNav.Page.THREADS
-				? "↑↓ select · ←→ environment · Enter open · Tab notifications · Esc close"
+				? (search != null && search.active()
+						? "↑↓ select · Enter open · Esc clear search"
+						: "↑↓ select · ←→ environment · Enter open · Ctrl+F search · Tab notifications · Esc close")
 				: "↑↓ select · Enter go to thread · Tab threads · Esc back";
 		if (y1 + 4 + font.lineHeight <= height) {
 			g.text(font, font.plainSubstrByWidth(help, x1 - x0 - 16), x0 + 8, y1 + 4, DIM);
@@ -300,19 +352,25 @@ public final class PortableScreen extends Screen {
 			y += ROW_H;
 		}
 		// selected environment's status detail (offline reason etc.) under the list
+		int envTop = top;
 		if (nav.envFilter() != null) {
 			s.environments().stream().filter(e -> e.id().equals(nav.envFilter())).findFirst().ifPresent(pe -> {
-				int yy = Math.max(top + 3 + choices.size() * ROW_H + 4, top + 40);
+				int yy = Math.max(envTop + 3 + choices.size() * ROW_H + 4, envTop + 40);
 				wrap(g, pe.status() + (pe.detail().isEmpty() ? "" : ": " + pe.detail()), ex + 3, yy, envColW - 10, bottom - yy, statusColor(pe.status()));
 			});
 		}
 
-		// right: threads
+		// right: search field (widget, placed in init) then threads or search results
 		int lx = x0 + envColW + 6;
 		int rx = x1 - 6;
+		top += 18;
 		int summaryH = 46;
 		int listBottom = bottom - summaryH;
 		g.fill(lx, top, rx, bottom, PANEL);
+		if (search != null && search.active()) {
+			search.render(g, lx, top, rx, bottom);
+			return;
+		}
 
 		String empty = emptyMessage(s);
 		List<PortableThread> rows = nav.visible();
@@ -451,6 +509,12 @@ public final class PortableScreen extends Screen {
 			case "connecting" -> 0xFFFFFF55;
 			default -> 0xFFFF5555;
 		};
+	}
+
+	@Override
+	public void removed() {
+		searchModel.close();
+		super.removed();
 	}
 
 	@Override

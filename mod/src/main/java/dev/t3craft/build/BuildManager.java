@@ -56,18 +56,24 @@ public final class BuildManager {
 		listeners.remove(l);
 	}
 
-	/** Creates and queues a job; it starts on the next server tick. */
+	/** Creates and queues a free job; it starts on the next server tick. */
 	public BuildJob submit(String label, ResourceKey<Level> dimension, BlockPos origin, Rotation rotation, BuildPlan plan, double blocksPerTick) {
-		BuildJob job = new BuildJob(nextId.getAndIncrement(), label, dimension, origin, rotation, plan, blocksPerTick);
-		byId.put(job.id(), job);
-		incoming.add(job);
-		return job;
+		return submit(label, dimension, origin, rotation, plan, blocksPerTick, (BuildCost) null);
 	}
 
-	/** Like {@link #submit}, with every block of this job placed through {@code wrap.apply(sink)}. */
+	/** Like {@link #submit(String, ResourceKey, BlockPos, Rotation, BuildPlan, double)}; a non-null {@code cost} charges materials. */
 	public BuildJob submit(String label, ResourceKey<Level> dimension, BlockPos origin, Rotation rotation, BuildPlan plan, double blocksPerTick,
-			@Nullable UnaryOperator<BlockSink> wrap) {
-		BuildJob job = new BuildJob(nextId.getAndIncrement(), label, dimension, origin, rotation, plan, blocksPerTick);
+			@Nullable BuildCost cost) {
+		return submit(label, dimension, origin, rotation, plan, blocksPerTick, cost, null);
+	}
+
+	/**
+	 * Like {@link #submit(String, ResourceKey, BlockPos, Rotation, BuildPlan, double, BuildCost)}, with every block of this job
+	 * placed through {@code wrap.apply(sink)} (the site's "never overwrite the player's changes" guard).
+	 */
+	public BuildJob submit(String label, ResourceKey<Level> dimension, BlockPos origin, Rotation rotation, BuildPlan plan, double blocksPerTick,
+			@Nullable BuildCost cost, @Nullable UnaryOperator<BlockSink> wrap) {
+		BuildJob job = new BuildJob(nextId.getAndIncrement(), label, dimension, origin, rotation, plan, blocksPerTick, cost);
 		if (wrap != null) {
 			wraps.put(job.id(), wrap);
 		}
@@ -105,11 +111,18 @@ public final class BuildManager {
 					UnaryOperator<BlockSink> wrap = wraps.get(job.id());
 					BlockSink sink = wrap == null ? base : wrap.apply(base);
 					try {
+						job.openSupply(server);
 						job.tick(sink, (jb, i, pos, state) -> {
 							for (BuildListener l : listeners) {
 								safe(() -> l.placed(jb, i, pos, state));
 							}
 						});
+						if (job.pollMaterialsChanged()) {
+							var missing = job.missingMaterials();
+							for (BuildListener l : listeners) {
+								safe(() -> l.materials(job, missing));
+							}
+						}
 					} catch (RuntimeException e) {
 						T3Craft.LOGGER.error("build job {} failed, cancelling", job, e);
 						job.cancel();

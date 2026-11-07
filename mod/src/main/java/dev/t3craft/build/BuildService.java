@@ -15,19 +15,44 @@ public interface BuildService {
 	/**
 	 * Sends {@code crewSize} builders to the site; once there they build {@code plan} at
 	 * {@code origin} (rotated) at {@code blocksPerTick}, then leave. Throws
-	 * {@link IllegalStateException} when there is no integrated server (multiplayer).
+	 * {@link IllegalStateException} when there is no integrated server (multiplayer), or its subclass
+	 * {@link BuildDeniedException} when the survival policy refuses (spectator, adventure). In survival
+	 * the blocks are charged as they are placed ({@link BuildJob#missingMaterials()}).
 	 */
 	BuildHandle build(String label, ResourceKey<Level> dimension, BlockPos origin, Rotation rotation, BuildPlan plan, double blocksPerTick, int crewSize);
 
+	/** Who pays for a build. */
+	enum Billing {
+		/**
+		 * Ask the survival policy (default of the method above): it may refuse
+		 * ({@link BuildDeniedException}), build for free (creative) or charge materials (survival).
+		 */
+		POLICY,
+		/** Always free and never refused by the policy (the demo world, trusted callers). */
+		FREE
+	}
+
 	/**
-	 * Same as {@link #build(String, ResourceKey, BlockPos, Rotation, BuildPlan, double, int)}, but every
+	 * Like {@link #build(String, ResourceKey, BlockPos, Rotation, BuildPlan, double, int)}, choosing who
+	 * pays. The default ignores {@code billing} so other implementations keep working.
+	 */
+	default BuildHandle build(String label, ResourceKey<Level> dimension, BlockPos origin, Rotation rotation, BuildPlan plan, double blocksPerTick, int crewSize,
+			Billing billing) {
+		return build(label, dimension, origin, rotation, plan, blocksPerTick, crewSize);
+	}
+
+	/**
+	 * Like {@link #build(String, ResourceKey, BlockPos, Rotation, BuildPlan, double, int, Billing)}, but every
 	 * block goes through {@code wrap.apply(realSink)}: the caller can refuse a cell (return
-	 * {@link BuildCursor.Outcome#SKIPPED} without placing) or watch what is placed. Used by the site to
-	 * keep its "never overwrite the player's changes" guard. Services that cannot wrap throw
-	 * {@link UnsupportedOperationException}.
+	 * {@link BuildCursor.Outcome#SKIPPED} without placing) or watch what is placed. Used by the site and the
+	 * HQ to keep the "never overwrite the player's changes" guard. Services that cannot wrap throw
+	 * {@link UnsupportedOperationException} for a non-null {@code wrap}.
 	 */
 	default BuildHandle build(String label, ResourceKey<Level> dimension, BlockPos origin, Rotation rotation, BuildPlan plan, double blocksPerTick,
-			int crewSize, UnaryOperator<BlockSink> wrap) {
+			int crewSize, Billing billing, @org.jspecify.annotations.Nullable UnaryOperator<BlockSink> wrap) {
+		if (wrap == null) {
+			return build(label, dimension, origin, rotation, plan, blocksPerTick, crewSize, billing);
+		}
 		throw new UnsupportedOperationException("this build service cannot wrap its block sink");
 	}
 

@@ -96,7 +96,7 @@ public final class CrewBridge {
 		boolean[] failed = new boolean[1];
 		Minecraft.getInstance().execute(() -> {
 			try {
-				handle[0] = svc.build(label, level.dimension(), BlockPos.ZERO, Rotation.NONE, plan, BLOCKS_PER_TICK, CREW, wrap);
+				handle[0] = svc.build(label, level.dimension(), BlockPos.ZERO, Rotation.NONE, plan, BLOCKS_PER_TICK, CREW, BuildService.Billing.POLICY, wrap);
 			} catch (RuntimeException e) {
 				T3Craft.LOGGER.warn("HQ crew could not start: {}", e.getMessage());
 				failed[0] = true;

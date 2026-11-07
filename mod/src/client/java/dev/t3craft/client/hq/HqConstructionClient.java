@@ -3,7 +3,6 @@ package dev.t3craft.client.hq;
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal;
 
 import dev.t3craft.client.T3CraftClient;
-import dev.t3craft.client.demo.DemoHq;
 import dev.t3craft.client.npc.NpcInfo;
 import dev.t3craft.hq.HqInput;
 import dev.t3craft.hq.HqLayout;
@@ -39,7 +38,7 @@ import org.jspecify.annotations.Nullable;
  *   <li>Feeds the live roster (the NPCs shown, so subagents are already filtered out) once every
  *   environment is in sync, never a half-loaded one.</li>
  *   <li>Plugs the standing HQ into NPCs and workstations ({@link HqPresence}); the demo world gets
- *   its own HQ ({@link DemoHq}).</li>
+ *   its own HQ ({@code DemoClient} hands it to {@link HqPresence#demo}).</li>
  *   <li>{@code /t3craft hq [status|build|pause|resume]} (merged into {@code /t3craft}).</li>
  * </ul>
  */
@@ -56,7 +55,6 @@ public final class HqConstructionClient implements ClientModInitializer {
 				b.plan() == null || b.site() == null ? null : new HqPresence.Standing(b.plan(), b.site(), b.modules()))));
 		ServerTickEvents.END_SERVER_TICK.register(s -> CrewBridge.tick());
 		ServerLifecycleEvents.SERVER_STOPPING.register(s -> CrewBridge.clear());
-		DemoHq.register(HqConstructionClient::liveRoster);
 		ClientTickEvents.END_CLIENT_TICK.register(this::tick);
 		ClientPlayConnectionEvents.DISCONNECT.register((h, mc) -> {
 			HqRuntime.roster(null);
@@ -82,7 +80,6 @@ public final class HqConstructionClient implements ClientModInitializer {
 	}
 
 	private void tick(Minecraft mc) {
-		DemoHq.tick(mc);
 		if (++ticks % ROSTER_TICKS != 0 || mc.level == null) {
 			return;
 		}

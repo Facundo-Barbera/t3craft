@@ -14,4 +14,12 @@ import org.jspecify.annotations.Nullable;
 @FunctionalInterface
 public interface BlockSink {
 	BuildCursor.Outcome place(BlockPos worldPos, BlockState state, @Nullable CompoundTag blockEntity);
+
+	/**
+	 * Whether the world already has {@code state} at {@code worldPos} (placing would be skipped), so a
+	 * charged job does not ask for materials it will not use. Default: unknown, assume not.
+	 */
+	default boolean matches(BlockPos worldPos, BlockState state) {
+		return false;
+	}
 }

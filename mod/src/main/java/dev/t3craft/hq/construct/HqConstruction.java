@@ -2,7 +2,6 @@ package dev.t3craft.hq.construct;
 
 import dev.t3craft.hq.BuildPlan;
 import dev.t3craft.hq.HqBuild;
-import dev.t3craft.hq.HqGenerator;
 import dev.t3craft.hq.HqInput;
 import dev.t3craft.hq.HqLayout;
 import dev.t3craft.hq.HqSite;
@@ -148,7 +147,7 @@ public final class HqConstruction {
 	public HqConstruction(Ports ports, Saved saved) {
 		this.ports = ports;
 		this.saved = saved;
-		this.appliedPlan = new HqGenerator().generate(saved.layout());
+		this.appliedPlan = dev.t3craft.hq.HqPlans.generate(saved.layout());
 		this.design = appliedPlan;
 	}
 

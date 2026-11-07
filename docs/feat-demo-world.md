@@ -35,30 +35,50 @@ nunca se recrea ni se sobrescribe. Toda la API vanilla de creación/carga está 
 - `DemoStructureSource` → `List<BuildPlan>` relativos al origen del demo (convención de `BuildPlan`: frente
   al norte, crece hacia `+z`). Se construyen en orden, uno tras otro, cada uno con su cuadrilla
   (`Builders.service().build(...)`, rotación `NONE`).
-- Hoy: `ShedStructureSource` (`DemoPlans.shed()`, id `shed`, v1, prioridad 0).
+- Fuentes registradas: **`DemoHqSource`** (id `hq`, prioridad 100, el HQ real de feat/hq-design) y
+  `ShedStructureSource` (id `shed`, prioridad 0) como **fallback**: si el plan del HQ lanza, `available()`
+  pasa a false y `"auto"` elige el shed.
+- Antes de elegir, `DemoClient.start` llama a `prepare(marker, spec, worldMinY)` en cada fuente (hook
+  opcional del interfaz, por defecto vacío). Otros hooks opcionales: `revision()` (hash de contenido),
+  `state()` (datos opacos para el marcador) y `plansSince(marker)` (lo que falta; por defecto todo).
 - Marcador **en el propio mundo**: `saves/<carpeta>/t3craft-demo.json`
-  `{"setup":1,"structure":"shed","version":1}`. Se escribe `structure/version` solo cuando **todas** las
-  partes terminaron (`JobState.COMPLETED`); si sales a mitad o se cancela, la próxima vez se vuelve a
-  construir (lo ya colocado se salta). Se reconstruye si cambia la fuente (shed → hq) o sube la versión.
+  `{"setup":1,"structure":"hq","version":1,"hash":"…","state":{"lift":2,"layout":{…}}}`. `hash`/`state` son
+  opcionales: los marcadores antiguos (`{"setup":1,"structure":"shed","version":1}`) se siguen leyendo.
+  Se escribe solo cuando **todas** las partes terminaron (`JobState.COMPLETED`); si sales a mitad o se
+  cancela, la próxima vez se vuelve a construir (lo ya colocado se salta).
+- `needsBuild`: fuente distinta, versión distinta, o (si la fuente tiene `revision()`) hash distinto.
 - En la primera construcción el jugador se teletransporta al punto de vista (mirando al sitio) y la
   cuadrilla sale 1 s después.
 - La comprobación se hace 2 s después de entrar al mundo, en el hilo cliente; si el jugador está en otra
   dimensión, espera.
 
-## Enchufar el HQ modular (feat/hq-design)
-`HqStructureSource` es el adaptador, listo pero **sin registrar** (el generador no está en main). Al entrar
-hq-design basta una línea, por ejemplo en `DemoClient.onInitializeClient` o en el init del HQ:
-```java
-DemoClient.structures().register(new HqStructureSource(HQ_PLAN_VERSION,
-        () -> HqPlans.forRoster(roster)));   // List<dev.t3craft.build.BuildPlan>
-```
-- Prioridad 100 > shed: con `"structure": "auto"` (por defecto) gana en cuanto está registrado; los mundos
-  demo que ya tenían el shed reciben el HQ en la siguiente entrada (fuente distinta en el marcador).
-- hq-design hoy tiene su propio `dev.t3craft.hq.BuildPlan`/`Placement`: la conversión a
-  `dev.t3craft.build.BuildPlan.of(...)` va dentro del supplier.
-- Si el supplier devuelve vacío o lanza, la fuente queda "no disponible" y se usa el shed.
-- Subir `HQ_PLAN_VERSION` cada vez que cambie el resultado del generador.
-- Si el HQ necesita ocupar más espacio hacia `-z`, mover el origen (`demo.origin`) o `DemoPlacement.VIEW_DISTANCE`.
+## El HQ real (`DemoHq` + `DemoHqSource`)
+- **Roster**: todos los NPC mostrados (`T3CraftClient.get().npcs().all()`, todos los entornos, agrupados por
+  `groupId` = entorno:proyecto; los `settled` van al archivo). Si no hay ninguno, `DemoHq.sample()`: 3
+  proyectos fijos en 2 entornos (`vps:t3craft`, `acmesite:forja`, `vps:telar`), 4 hilos cada uno, uno
+  archivado. Se fija en cada comprobación (al entrar y con `rebuild`); `status` dice cuál se usó.
+- **Layout estable**: `HqGenerator.plan(input, layoutAnterior)` con el layout guardado en `state.layout`,
+  así los escritorios no se barajan entre visitas.
+- **Hash** = SHA-256 (12 bytes, hex) de `DemoHq.PLAN_VERSION | lift | layout.toJson()`. Mismo hash que el
+  marcador → no se construye nada (solo se conectan los anclajes).
+- **Diff**: si el mundo tiene un HQ de la misma versión y lift, se construye solo
+  `HqPlans.expansion(planAnterior, planNuevo, vacated)` (por grupo; las celdas que sobran pasan a aire, a
+  toba en el zócalo y a hierba/tierra bajo el suelo). Si no (primera vez, venía del shed, otra versión u
+  otro lift): todo (`HqPlans.byGroup`). `/t3craft demo rebuild` siempre coloca todo (lo igual se salta).
+- **Coordenadas**: los planos del HQ se hornean con `HqPlans.demoSite()` (entrada al norte, pórtico en
+  `z = 0`, crece hacia `+z`) **elevados `lift` bloques** para que el sótano (`y = -5`) quede sobre el
+  bedrock: `lift = max(0, minY + 1 - (origen.y + suelo_sótano))`, 2 con el superplano por defecto (origen
+  -60, minY -64). Bajo la huella se pone un **zócalo de toba** entre la hierba y el suelo del hub (primera
+  parte del build; se repone si la huella cambia).
+- **Anclajes NPC**: al terminar (o si ya estaba construido) se registra
+  `HqAnchorSource(plan, DemoHq.worldSite(origen, lift))` con `npcs().behavior().setAnchorSource(...)`:
+  los NPC van a `desk_<threadId>`, pizarra y bancos. Se quita (solo si lo puso el demo) al cambiar de
+  mundo o al empezar otro build.
+- Subir `DemoHq.PLAN_VERSION` si cambia el horneado/zócalo/lift; los cambios del generador de hq-design
+  que no cambian el layout **no** cambian el hash: subir también `PLAN_VERSION` cuando hq-design cambie
+  su salida (o hacer `rebuild`).
+- `HqStructureSource` queda como adaptador genérico (lista fija de planos con id `hq`); registrarlo
+  reemplaza a `DemoHqSource`.
 
 ## Config (aditiva, opcional) en `config/t3craft.json`
 ```json
@@ -79,17 +99,29 @@ clave. Sin pantalla de ajustes para esto todavía.
 - Lang (`assets/t3craft/lang/{en_us,es_es}.json`): `t3craft.demo.button`, `.button.tooltip`,
   `.confirm.title`, `.confirm.body`.
 - Sin registros, ítems, mixins ni dependencias nuevas.
+- feat/demo-hq: clases nuevas `DemoHq`, `DemoHqSource`; métodos `default` nuevos en `DemoStructureSource`;
+  `DemoMarker` con dos componentes más (`hash`, `state`; constructor de 3 argumentos conservado);
+  `DemoBuildRun` con callback de fin. Sin entrypoints, lang ni config nuevos.
 
 ## Tests
 `DemoLogicTest` (45 casos): decisión crear/abrir/confirmar, idempotencia por fuente y versión del
 plan (y JSON del marcador tolerante), elección de la fuente (auto/explícita/fallback/empates/fallos),
 parámetros del preset y del punto de vista, y parseo de la sección `demo`.
+`DemoHqTest` (arranca el `Bootstrap` vanilla): roster vivo/de ejemplo/archivados, lift, hash
+(independiente del orden, sensible al contenido y al lift), idempotencia (mismo layout → nada; marcador
+con hash/state ida y vuelta; roster que crece → diff), diff aplicado sobre el HQ anterior = HQ nuevo,
+módulo eliminado → aire, convención del demo (pórtico en `z = 0`, sótano elevado, zócalo primero),
+anclajes de escritorio y fallback al shed.
 
 ## Pendientes
 - **Sin probar en juego** (regla: no lanzar Minecraft). Compilado contra 26.3. Lo más frágil:
   `createFreshLevel` con el preset FLAT, la salida/entrada encadenada desde `/t3craft demo`, y que
   `time set 6000` / `setworldspawn` acepten esa sintaxis en 26.3.
-- Registrar `HqStructureSource` cuando hq-design esté en main.
+- El roster se fija al entrar: si los hilos aparecen después (puente conectando), se ve el de ejemplo
+  hasta la próxima entrada o `/t3craft demo rebuild`.
+- El generador de hq-design no tiene versión propia: si cambia su salida sin cambiar el layout, hay que
+  subir `DemoHq.PLAN_VERSION`.
+- El pórtico y los módulos quedan sobre el zócalo de toba 2 bloques por encima de la hierba (sin escalera).
 - El teletransporte inicial se repite si la primera construcción no llegó a terminar.
 - `DemoClient.structures()` es un estático de tipo propio (como `Builders`); si se usa hot-swap con
   cambios de forma en `DemoStructures`, reiniciar.

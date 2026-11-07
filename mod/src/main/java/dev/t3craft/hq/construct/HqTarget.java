@@ -1,7 +1,6 @@
 package dev.t3craft.hq.construct;
 
 import dev.t3craft.hq.BuildPlan;
-import dev.t3craft.hq.HqGenerator;
 import dev.t3craft.hq.HqInput;
 import dev.t3craft.hq.HqLayout;
 import java.util.ArrayList;
@@ -34,7 +33,7 @@ public record HqTarget(HqInput input, HqLayout layout, BuildPlan plan, List<Stri
 			in = without(input, dropped);
 			layout = HqLayout.allocate(in, previous);
 		}
-		return new HqTarget(input, layout, new HqGenerator().generate(layout), List.copyOf(dropped));
+		return new HqTarget(input, layout, dev.t3craft.hq.HqPlans.generate(layout), List.copyOf(dropped));
 	}
 
 	private static boolean over(HqLayout layout, int max) {

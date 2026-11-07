@@ -7,7 +7,6 @@ Paquetes:
 - `dev.t3craft.hq.construct`: lógica pura y testeable (`HqSiteFrame`, `HqTarget`, `HqConstruction`, `HqCost`, `HqStore`).
 - `dev.t3craft.hq.construct.mc`: pegamento con el servidor integrado (`HqRuntime`, `HqWriter`, `PacedHqWriter`).
 - `dev.t3craft.client.hq`: entrypoint, cuadrilla y conexión con NPCs y workstations (`HqConstructionClient`, `CrewBridge`, `HqPresence`, `HqWorldAnchors`, `HqStations`).
-- `dev.t3craft.client.demo.DemoHq`: el mismo HQ en el mundo demo.
 
 ## Flujo
 
@@ -82,11 +81,15 @@ va dentro del sink. Si no hay cuadrilla posible (otra dimensión, sin servicio),
 `PacedBuilder` de site o el `PacedHqWriter`, a 8 bloques por tick.
 
 ## Demo
-`DemoHq` registra `HqStructureSource` (prioridad sobre la caseta) con el roster vivo, o uno
-inventado si todavía no hay conexión. Luego aplica los cambios del roster con
-`BuildPlan.diff` + cuadrilla. El layout se guarda en `<demo>/t3craft/hq/demo.json`. El hub queda
-**2 bloques sobre el origen del demo** para que el sótano no choque con el bedrock del superplano.
-NPCs y workstations se enchufan igual que con un sitio.
+El HQ del demo es el de `feat/demo-hq` (`DemoHq`/`DemoHqSource`, en main). Esta rama solo cambió
+cómo se engancha: `DemoClient.installAnchors` ahora pasa por `HqPresence.demo(...)`
+(`DemoHqSource.standing(origin)`). Así el demo también usa `HqWorldAnchors`, sin caer al anillo,
+y las workstations quedan sobre las computadoras del plan.
+
+## Paleta (blocks-core)
+El objetivo se genera con `HqPlans.generate`, que aplica `HqFixtures` cuando el módulo de bloques
+propios está activo. Si no, el HQ es vanilla. Los datos de block entity (bindings, carteles) se
+escriben en el paso in-place.
 
 ## Comandos
 | Comando | Qué hace |
@@ -101,8 +104,8 @@ NPCs y workstations se enchufan igual que con un sitio.
   - `SiteRequest.baseDepth` (aditivo, persistido como `baseDepth`, ausente = 0, con constructor de 2 argumentos intacto);
   - el evaluador y el diseño de la base bajan esa profundidad;
   - `SiteService.claim(...)` y `busy()` nuevos.
-- `build`: `BuildService.build(..., UnaryOperator<BlockSink> wrap)` (método default) y `BuildManager.submit(..., wrap)`; `BuildersClient` lo implementa. `BuildJob` no se tocó.
-- `DemoClient`: accesores `activeSpec()` / `activeRoot()`.
+- `build`: `BuildService.build(..., UnaryOperator<BlockSink> wrap)` (método default) con `Billing` y `BuildManager.submit(..., cost, wrap)`. `BuildersClient` lo implementa junto con la facturación de builders-survival (la cuadrilla del HQ usa `Billing.POLICY`, así que en supervivencia los bloques se cobran al colocarlos). `BuildJob` no se tocó.
+- `DemoClient` / `DemoHqSource` (de feat/demo-hq): anclas del demo vía `HqPresence` (más workstations).
 - `hq`: `HqFootprints`, una vista pública de la geometría.
 
 ## Tests (`mod/src/test/java/dev/t3craft/hq/construct/`)
@@ -125,4 +128,3 @@ NPCs y workstations se enchufan igual que con un sitio.
 - Un ala vaciada se "demuele" in-place (aire, pasto a nivel del piso) y su ampliación de site sigue en la pila. Se vuelve a usar si un proyecto ocupa ese índice.
 - Más de 4 alas exige subir `SiteRequest.MAX_ENVELOPE` (decisión de site).
 - Si un crash ocurre entre `claim` y la escritura, la celda queda registrada con el estado nuevo: un undo la reporta como conflicto.
-- Paleta: vanilla (no hay `feat/blocks-core` en main).
