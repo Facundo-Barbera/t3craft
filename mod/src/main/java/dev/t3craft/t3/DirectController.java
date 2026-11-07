@@ -73,6 +73,14 @@ public final class DirectController implements T3Connection.Listener {
 		return out;
 	}
 
+	/**
+	 * Read-only snapshot of each environment's latest (unfiltered) shell view, keyed by environment
+	 * id. Used by feat/npc-helpers to find subagents and their parents; no extra connection or call.
+	 */
+	public Map<String, ShellState.View> shellViews() {
+		return Map.copyOf(views);
+	}
+
 	/** Filtered, ranked NPCs of every environment (cap applies per environment). */
 	public List<NpcView> npcs(long nowMs) {
 		List<NpcView> out = new ArrayList<>();

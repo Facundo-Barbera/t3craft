@@ -55,6 +55,8 @@ public final class NpcRegistry {
 	private final Map<Integer, String> npcByEntityId = new HashMap<>();
 	/** Walking, desks, board, bubbles (feat/npc-behavior). Owns its own entities; reset with ours. */
 	private final BehaviorDirector behavior = new BehaviorDirector();
+	/** Extra panel line per NPC id (feat/npc-helpers: "⚒ 2 helpers +3"); null = none. */
+	private java.util.function.Function<String, @Nullable Component> panelExtra = id -> null;
 	private @Nullable ClientLevel level;
 	private @Nullable Vec3 anchor;
 	private boolean dirty;
@@ -101,6 +103,20 @@ public final class NpcRegistry {
 
 	public int size() {
 		return wanted.size();
+	}
+
+	/** The avatar of a spawned NPC (feat/npc-helpers follows it), or null. */
+	public net.minecraft.world.entity.@Nullable LivingEntity avatar(String npcId) {
+		Spawned s = spawned.get(npcId);
+		return s == null ? null : s.avatar();
+	}
+
+	/**
+	 * Hook for a line appended to each NPC's panel (feat/npc-helpers). Applied when the panel text
+	 * is refreshed, i.e. on the reconcile after the next {@link #replaceAll}/{@link #upsert}.
+	 */
+	public void setPanelExtra(java.util.function.@Nullable Function<String, @Nullable Component> extra) {
+		this.panelExtra = extra == null ? id -> null : extra;
 	}
 
 	/**
@@ -374,7 +390,8 @@ public final class NpcRegistry {
 				}
 				// Once spawned, the BehaviorDirector moves the avatar and its panel.
 				s.avatar().update(info);
-				setText(s.panel(), Nameplate.info(info));
+				Component extra = panelExtra.apply(info.id());
+				setText(s.panel(), extra == null ? Nameplate.info(info) : Nameplate.info(info).copy().append(extra));
 			}
 		}
 	}
