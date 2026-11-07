@@ -30,6 +30,9 @@ export class ShellState {
   apply(item: ShellItem): boolean {
     switch (item.kind) {
       case "snapshot": {
+        if (item.resolvedRepositoryIdentityRoots !== undefined) {
+          return this.applyEnrichment(item.snapshot.projects, item.resolvedRepositoryIdentityRoots);
+        }
         this.threads.clear();
         this.projects.clear();
         for (const t of item.snapshot.threads) this.threads.set(t.id, t);
@@ -58,14 +61,43 @@ export class ShellState {
     }
   }
 
+  /**
+   * Metadata-only enrichment refresh (a `snapshot` item carrying `resolvedRepositoryIdentityRoots`,
+   * always with `threads: []`). T3 sends one right after the authoritative snapshot and whenever a
+   * repository identity resolves. It never changes structure or sequence: it only updates the
+   * repository identity of projects we already have (same rules as upstream
+   * packages/client-runtime/src/state/shellReducer.ts `mergeShellSnapshotProjects`).
+   */
+  private applyEnrichment(projects: ReadonlyArray<ProjectShell>, resolvedRoots: ReadonlyArray<string>): boolean {
+    const resolved = new Set(resolvedRoots);
+    let changed = false;
+    for (const candidate of projects) {
+      const current = this.projects.get(candidate.id);
+      if (current === undefined || current.workspaceRoot !== candidate.workspaceRoot) continue;
+      const accept = resolved.has(current.workspaceRoot)
+        ? JSON.stringify(current.repositoryIdentity ?? null) !== JSON.stringify(candidate.repositoryIdentity ?? null)
+        : current.repositoryIdentity == null && candidate.repositoryIdentity != null;
+      if (accept) {
+        this.projects.set(current.id, { ...current, repositoryIdentity: candidate.repositoryIdentity ?? null });
+        changed = true;
+      }
+    }
+    return changed;
+  }
+
   projectTitle(projectId: string): string | null {
     return this.projects.get(projectId)?.title ?? null;
   }
 }
 
-/** `orchestration.subscribeShell` as a Stream. Full snapshot first (no compact-id options). */
+/**
+ * `orchestration.subscribeShell` as a Stream. Full snapshot first (no compact-id options).
+ * Always requests the completion marker: T3 only emits `{kind:"synchronized"}` after the initial
+ * snapshot when `requestCompletionMarker: true` (the official client does the same), and both
+ * `probe` and the bridge's "ok" status wait for it.
+ */
 export const subscribeShell = (client: T3RpcClient, input: OrchestrationV2SubscribeShellInput = {}) =>
-  client[ORCHESTRATION_SHELL_METHOD](input);
+  client[ORCHESTRATION_SHELL_METHOD]({ ...input, requestCompletionMarker: true });
 
 /** Strips anything that could carry a ticket out of error text. */
 export const sanitize = (text: string): string =>
