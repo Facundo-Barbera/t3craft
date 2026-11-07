@@ -9,7 +9,7 @@
 	"environment": "client",
 	"entrypoints": {
 		"main": ["dev.t3craft.T3Craft"],
-		"client": ["dev.t3craft.client.T3CraftClient", "dev.t3craft.build.client.BuildersClient", "dev.t3craft.client.config.ConfigClientInit"],
+		"client": ["dev.t3craft.client.T3CraftClient", "dev.t3craft.build.client.BuildersClient", "dev.t3craft.client.config.ConfigClientInit", "dev.t3craft.client.debug.DevReloadClient"],
 		"modmenu": ["dev.t3craft.client.config.ModMenuIntegration"]
 	},
 	"depends": {
