@@ -827,7 +827,12 @@ public final class SiteService {
 					if (running != null) {
 						return Reply.info("The build is running.");
 					}
-					Layer l = layer(j.top());
+					Layer l;
+					try {
+						l = layer(j.top());
+					} catch (Snapshot.BrokenSnapshotException e) {
+						return discardBroken(j);
+					}
 					startBuild(j, l.snap, l.plan);
 					return Reply.info("Resuming the build of " + l.exp.module().id() + " (cells you changed are left alone).");
 				}
@@ -851,7 +856,21 @@ public final class SiteService {
 		return Reply.fail("unreachable");
 	}
 
-	/** On world load: cleans temp files and reports an interrupted phase (or null when all is fine). */
+	/**
+	 * Drops the top expansion of a BUILDING journal whose snapshot is {@link Snapshot#BROKEN_VERSION}.
+	 * Safe: that version read every block as air and failed on its first non-air write, so it never
+	 * placed a block; its files are archived, not deleted.
+	 */
+	private Reply discardBroken(SiteJournal j) throws IOException {
+		Expansion top = j.top();
+		store.archive(top.key());
+		SiteJournal rest = j.pop(env.now());
+		store.saveJournal(rest.stack().isEmpty() ? SiteJournal.EMPTY : rest.with(SiteJournal.Phase.BUILT, env.now()));
+		return Reply.info("The interrupted build of " + top.module().id() + " came from a broken version and never placed a block;"
+				+ " it was discarded (files archived). Run " + CMD + " again.");
+	}
+
+		/** On world load: cleans temp files and reports an interrupted phase (or null when all is fine). */
 	public @Nullable String onLoad() {
 		try {
 			store.cleanTemp();

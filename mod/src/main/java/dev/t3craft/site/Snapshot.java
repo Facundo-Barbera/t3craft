@@ -28,7 +28,12 @@ import org.jspecify.annotations.Nullable;
  */
 public final class Snapshot {
 	public static final String FORMAT = "t3craft-site-snapshot";
-	public static final int VERSION = 1;
+	public static final int VERSION = 2;
+	/**
+	 * Version 1 snapshots were captured through a block reader broken on 26.x that saw every block as
+	 * air: they hold no real terrain and must never be restored.
+	 */
+	public static final int BROKEN_VERSION = 1;
 
 	private final String id;
 	private final String dimension;
@@ -182,6 +187,10 @@ public final class Snapshot {
 			throw new InvalidSnapshotException("not a t3craft site snapshot");
 		}
 		int version = root.getIntOr("version", -1);
+		if (version == BROKEN_VERSION) {
+			throw new BrokenSnapshotException("snapshot " + root.getStringOr("id", "?") + " was taken by a broken t3craft version (every block read as air)"
+					+ " and cannot be restored; run /t3craft site resume to discard it");
+		}
 		if (version != VERSION) {
 			throw new InvalidSnapshotException("unsupported snapshot version " + version);
 		}
@@ -235,8 +244,15 @@ public final class Snapshot {
 		return s;
 	}
 
-	public static final class InvalidSnapshotException extends Exception {
+	public static class InvalidSnapshotException extends Exception {
 		public InvalidSnapshotException(String message) {
+			super(message);
+		}
+	}
+
+	/** A {@link #BROKEN_VERSION} snapshot: its content is all air, not the area it was taken of. */
+	public static final class BrokenSnapshotException extends InvalidSnapshotException {
+		public BrokenSnapshotException(String message) {
 			super(message);
 		}
 	}

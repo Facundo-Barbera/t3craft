@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
@@ -254,6 +255,39 @@ class SiteServiceTest {
 		assertEquals(SiteJournal.Phase.BUILT, store.loadJournal().phase());
 		assertEquals(Leveling.PAD, world.state(0, 64, 0));
 		assertNull(fresh.onLoad());
+	}
+
+	@Test
+	void resumeDiscardsABuildWhoseSnapshotCameFromTheBrokenReader() throws Exception {
+		holdBuilds = true;
+		service.confirm(token(service.here(DIM, 0, 0, 0, 12), "/t3craft site confirm "));
+		SiteJournal j = store.loadJournal();
+		assertEquals(SiteJournal.Phase.BUILDING, j.phase());
+		// what the pre-fix version left on disk: a version 1 snapshot (all air) and a failed build
+		Path f = store.snapshotFile(j.siteId());
+		net.minecraft.nbt.CompoundTag tag = net.minecraft.nbt.NbtIo.readCompressed(f, net.minecraft.nbt.NbtAccounter.unlimitedHeap());
+		tag.putInt("version", Snapshot.BROKEN_VERSION);
+		net.minecraft.nbt.NbtIo.writeCompressed(tag, f);
+		assertThrows(Snapshot.BrokenSnapshotException.class, () -> store.loadSnapshot(j.siteId()));
+		holdBuilds = false;
+		int writes = world.writes;
+
+		SiteService fresh = newService();
+		assertNotNull(fresh.onLoad());
+		assertFalse(fresh.undo().ok(), "a broken snapshot is never restored");
+		SiteService.Reply r = fresh.resume();
+		assertTrue(r.ok(), r.lines().toString());
+		assertEquals(SiteJournal.Phase.NONE, store.loadJournal().phase());
+		assertEquals(writes, world.writes, "discarding writes no block");
+		assertTrue(Files.exists(store.root().resolve("archive").resolve(j.siteId() + ".nbt")), "files archived, not deleted");
+		assertNull(fresh.onLoad());
+		assertTrue(fresh.resume().ok(), "resume again is a no-op");
+
+		// and the site can be built again, with a fresh snapshot
+		SiteService.Reply c = fresh.confirm(token(fresh.here(DIM, 0, 0, 0, 12), "/t3craft site confirm "));
+		assertTrue(c.ok(), c.lines().toString());
+		assertEquals(SiteJournal.Phase.BUILT, store.loadJournal().phase());
+		assertEquals(Leveling.PAD, world.state(0, 64, 0));
 	}
 
 	@Test
