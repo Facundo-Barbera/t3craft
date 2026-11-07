@@ -106,6 +106,7 @@ public final class BlocksClient implements ClientModInitializer {
 	private volatile ScreenExtent.@Nullable Provider extents;
 	private final MonitorLiveLog liveLog = new MonitorLiveLog(MonitorSettings.DEFAULT);
 	private @Nullable MonitorRenderer renderer;
+	private @Nullable PlaqueRenderer plaqueRenderer;
 	private volatile @Nullable Map<Long, Binding> positional;
 	private volatile @Nullable Map<String, LampStatus> lastWanted;
 	private volatile @Nullable Supplier<@Nullable Map<Long, Binding>> hqBindings;
@@ -140,6 +141,11 @@ public final class BlocksClient implements ClientModInitializer {
 		});
 		BlockEntityRendererRegistry.register(c.lampType(), ctx -> new LampRenderer(this));
 		BlockEntityRendererRegistry.register(c.archiveTerminalType(), ctx -> new ArchiveTerminalRenderer());
+		BlockEntityRendererRegistry.register(c.kit().plaqueType(), ctx -> {
+			PlaqueRenderer r = new PlaqueRenderer();
+			plaqueRenderer = r;
+			return r;
+		});
 		MonitorBlock.setClientUse(this::use);
 		ArchiveTerminalBlock.setClientUse(pos -> dev.t3craft.client.archive.ArchiveClient.openIfReady());
 		ClientTickEvents.END_CLIENT_TICK.register(GuardedEvents.endClientTick(MODULE, this::tick));
@@ -384,6 +390,10 @@ public final class BlocksClient implements ClientModInitializer {
 		MonitorRenderer r = renderer;
 		if (r != null) {
 			r.clear();
+		}
+		PlaqueRenderer pr = plaqueRenderer;
+		if (pr != null) {
+			pr.clear();
 		}
 	}
 

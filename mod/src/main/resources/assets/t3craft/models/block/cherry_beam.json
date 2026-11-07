@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/cube_column",
+  "textures": {
+    "end": "t3craft:block/kit_beam_end",
+    "side": "t3craft:block/kit_beam_side"
+  }
+}

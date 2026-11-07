@@ -6,6 +6,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
 import dev.t3craft.blocks.Binding;
+import dev.t3craft.blocks.KitLanternBlock;
 import dev.t3craft.blocks.LampBlockEntity;
 import dev.t3craft.blocks.LampStatus;
 import dev.t3craft.blocks.StatusLampBlock;
@@ -24,6 +25,8 @@ import org.jspecify.annotations.Nullable;
  * Status lamp / board bulb BER. The lamp's colour and light are its block state; this adds what a
  * block state cannot: an additive glow over the lens of every side that follows {@link LampGlow}
  * (slow breath on "needs you", faster pulse on error, a shimmer while working, steady otherwise).
+ * The HQ kit's paper lantern shares the lamp's block entity, so it breathes the same way over its
+ * inset paper body.
  * The lamp bound {@code beacon} (hub lantern cap) also glows on top and sends a soft beam up past the
  * lightning rod, so the HQ's aggregate state reads from across the map.
  *
@@ -40,6 +43,8 @@ public final class LampRenderer implements BlockEntityRenderer<LampBlockEntity, 
 	public static final class State extends BlockEntityRenderState {
 		LampStatus status = LampStatus.OFF;
 		Binding.Kind kind = Binding.Kind.NONE;
+		/** How far inside the cell the glowing body's sides are (0 = full block; the paper lantern is inset). */
+		float inset;
 		float seconds;
 	}
 
@@ -60,6 +65,7 @@ public final class LampRenderer implements BlockEntityRenderer<LampBlockEntity, 
 		BlockEntityRenderState.extractBase(be, state, breakProgress);
 		BlockState bs = be.getBlockState();
 		state.status = bs.hasProperty(StatusLampBlock.STATUS) ? bs.getValue(StatusLampBlock.STATUS) : LampStatus.OFF;
+		state.inset = bs.getBlock() instanceof KitLanternBlock ? KitLanternBlock.BODY_INSET : 0f;
 		state.kind = client.resolve(be.getBlockPos(), be.binding()).kind();
 		state.seconds = be.getLevel() == null ? 0f : (be.getLevel().getGameTime() % 1_000_000L + partialTicks) / 20f;
 		client.sawLamp(be.getBlockPos(), state.kind, state.status);
@@ -76,7 +82,7 @@ public final class LampRenderer implements BlockEntityRenderer<LampBlockEntity, 
 		int halo = LampGlow.argb(s.status.color, LampGlow.alpha(level, beacon ? 50 : 0, beacon ? 150 : 70));
 		for (Direction d : Direction.Plane.HORIZONTAL) {
 			poseStack.pushPose();
-			toFace(poseStack, d, beacon ? -0.02f : -0.004f);
+			toFace(poseStack, d, s.inset + (beacon ? -0.02f : -0.004f));
 			lens(poseStack, collector, core, halo);
 			poseStack.popPose();
 		}

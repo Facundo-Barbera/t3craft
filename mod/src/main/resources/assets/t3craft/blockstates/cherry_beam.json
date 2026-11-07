@@ -1,0 +1,16 @@
+{
+  "variants": {
+    "axis=y": {
+      "model": "t3craft:block/cherry_beam"
+    },
+    "axis=z": {
+      "model": "t3craft:block/cherry_beam_horizontal",
+      "x": 90
+    },
+    "axis=x": {
+      "model": "t3craft:block/cherry_beam_horizontal",
+      "x": 90,
+      "y": 90
+    }
+  }
+}

@@ -49,7 +49,6 @@ final class BuildCrew implements BuildHandle {
 	private volatile boolean pauseRequested;
 	private volatile boolean cancelRequested;
 	private int phaseTicks;
-	private int nextBuilder;
 
 	BuildCrew(String label, ClientLevel level, BoundingBox bounds, int crewSize, Vec3 approachFrom, IdSource ids, Supplier<BuildJob> submitter) {
 		this.label = label;
@@ -170,12 +169,16 @@ final class BuildCrew implements BuildHandle {
 		return phase != Phase.DONE;
 	}
 
-	/** The server placed a block of this crew's job. */
-	void placed(BlockPos pos, BlockState state) {
+	/**
+	 * The server placed a block of this crew's job, on {@code front}: each front has its own builder
+	 * (fronts never outnumber the crew, see {@code BuildTuning.frontsFor}), so the builders work side
+	 * by side, each on its own band of the layer.
+	 */
+	void placed(BlockPos pos, BlockState state, int front) {
 		if (phase != Phase.BUILDING || builders.isEmpty()) {
 			return;
 		}
-		BuilderAvatar b = builders.get(nextBuilder++ % builders.size());
+		BuilderAvatar b = builders.get(Math.floorMod(front, builders.size()));
 		Vec3 block = Vec3.atCenterOf(pos);
 		b.walkTo(perimeterSpot(block.x, pos.getY(), block.z), WORK_SPEED);
 		b.lookAt(block);

@@ -146,7 +146,8 @@ public final class HqGenerator {
 			for (int sx = -1; sx <= 1; sx += 2) {
 				Direction into = sx > 0 ? Direction.WEST : Direction.EAST;
 				for (int z = -2; z <= 2; z++) {
-					b.anchor(Anchor.at(AnchorNames.bench(bench++), new BlockPos(7 * sx, 1, z), into));
+					// standing in front of the bench (the stairs themselves have collision)
+					b.anchor(Anchor.at(AnchorNames.bench(bench++), new BlockPos(6 * sx, 1, z), into));
 				}
 			}
 			int walk = 0;
@@ -501,7 +502,11 @@ public final class HqGenerator {
 		}
 	}
 
-	/** One desk: desk row against the wall (drawer barrel, two desk tops, monitor, status lamp), chair behind. */
+	/**
+	 * One desk: desk row against the wall (drawer barrel, two desk tops, monitor, status lamp) and
+	 * the free standing cell in front of the monitor. No chair: NPCs work standing, so that cell stays
+	 * air (feet and head) over the desk floor, and the cells beside it stay open to reach it.
+	 */
 	private void desk(PlanBuilder b, int i, int slot, @Nullable String threadId) {
 		Box box = HqGeometry.desk(i, slot);
 		try (PlanBuilder.Canvas c = b.module("wing_" + i + "_desk_" + slot, box, List.of())) {
@@ -516,7 +521,7 @@ public final class HqGenerator {
 			}
 			if (threadId == null) {
 				// fix/hq-stale-stations: a released desk leaves the world (floor only, the rest air):
-				// no desk, computer, lamp, chair or workstation until a thread takes the slot again.
+				// no desk, computer, lamp or workstation until a thread takes the slot again.
 				return;
 			}
 			BlockPos desk = new BlockPos(cx, 1, dz);
@@ -530,9 +535,9 @@ public final class HqGenerator {
 			c.set(monitor, k.monitorOn);
 			c.set(lamp, k.lamp());
 			c.decor(left.above(), k.fern);
-			BlockPos seat = new BlockPos(cx, 1, chz);
-			c.set(seat, k.chair(f.getOpposite()));
-			Anchor deskA = Anchor.at(AnchorNames.deskSlot(i, slot), seat, f);
+			// the standing cell is left unset: the canvas makes it air
+			BlockPos stand = new BlockPos(cx, 1, chz);
+			Anchor deskA = Anchor.at(AnchorNames.deskSlot(i, slot), stand, f);
 			Anchor screen = Anchor.face(AnchorNames.screenSlot(i, slot), monitor, f.getOpposite());
 			b.workstation(new Workstation(i, slot, threadId, deskA, monitor, screen, lamp));
 			b.anchor(deskA.renamed(AnchorNames.desk(threadId)));

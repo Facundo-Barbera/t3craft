@@ -190,7 +190,10 @@ final class HqGeometry {
 		return northDesk(slot) ? 1 : WING_WALL - 1;
 	}
 
-	/** Chair row of a slot. */
+	/**
+	 * Standing row of a slot: the free cell right in front of the computer, where the NPC works
+	 * standing (no chair; air at feet and head, desk floor below).
+	 */
 	static int chairV(int slot) {
 		return northDesk(slot) ? 2 : WING_WALL - 2;
 	}
@@ -200,7 +203,7 @@ final class HqGeometry {
 		return wingBox(wingIndex, u, u + 2, deskV(slot), chairV(slot), 0, DESK_TOP);
 	}
 
-	/** Direction from a slot's chair to its desk (and the occupant's view). */
+	/** Direction from a slot's standing cell to its desk (and the NPC's view). */
 	static Direction deskFacing(int slot) {
 		return northDesk(slot) ? Direction.NORTH : Direction.SOUTH;
 	}
