@@ -30,8 +30,19 @@ import org.jspecify.annotations.Nullable;
  *   <li>the {@code archiveTerminal} anchor → the archive terminal (unbound). Closed threads live only
  *       there: the "Archived" shelf's {@code archive_<threadId>} cells are <b>not</b> fixtures (they stay
  *       the plan's plain blocks, no thread shown on them);</li>
- *   <li>the {@code beacon} anchor (the hub lantern's cap) → status lamp bound {@code beacon}.</li>
+ *   <li>the {@code beacon} anchor (the hub lantern's cap) → status lamp bound {@code beacon};</li>
+ *   <li>each {@link AnchorNames#bigScreen bigscreen_<key>@<w>x<h>=<binding>} anchor → a large screen:
+ *       every cell of the {@code w × h} rectangle (top-left = the anchor's block, columns to the
+ *       viewer's right) becomes a monitor facing the anchor's facing, all bound to {@code binding}, so
+ *       they merge into one screen ({@link MonitorWall}). Cells the plan leaves empty, or already taken
+ *       by another fixture, are skipped.</li>
  * </ul>
+ *
+ * <p>Reserving a large screen from the HQ generator (e.g. one per module, or one in the hub):
+ * <pre>{@code
+ * b.anchor(Anchor.face(AnchorNames.bigScreen("module@" + i, 3, 2, Binding.project(projectKey).wire()), topLeft, facing));
+ * }</pre>
+ * and place a solid block in each of its cells. {@link #screens} lists them.
  *
  * Used twice with the same result: {@link HqBlockFixtures} writes it into the plan as block entity
  * data (the primary binding, travels with the block), and {@link #world} gives the position fallback
@@ -41,7 +52,9 @@ public final class HqBindings {
 	public enum Role {
 		MONITOR, LAMP, BOARD_LAMP, BEACON,
 		/** The archive terminal ({@code archiveTerminal} anchor): unbound, it always shows the whole archive. */
-		ARCHIVE_TERMINAL
+		ARCHIVE_TERMINAL,
+		/** One cell of a large screen reserved by the plan ({@link AnchorNames#bigScreen}). */
+		SCREEN
 	}
 
 	/** One fixture cell, relative to the HQ origin. {@code facing}: where the screen looks (monitors). */
@@ -51,7 +64,11 @@ public final class HqBindings {
 	private HqBindings() {
 	}
 
-	/** Every fixture of {@code plan}, one per cell, in a fixed order (desks, board bulbs, module bulbs, archive terminal, beacon). */
+	/** A large screen reserved by the plan: its plan-relative extent and what it shows. */
+	public record Screen(String key, ScreenRect extent, Binding binding) {
+	}
+
+	/** Every fixture of {@code plan}, one per cell, in a fixed order (desks, board bulbs, module bulbs, archive terminal, beacon, large screens). */
 	public static List<Fixture> of(BuildPlan plan) {
 		Map<BlockPos, Fixture> out = new LinkedHashMap<>();
 		for (Workstation w : plan.workstations()) {
@@ -86,7 +103,28 @@ public final class HqBindings {
 		if (beacon != null) {
 			out.putIfAbsent(beacon.block(), new Fixture(beacon.block(), Role.BEACON, Binding.BEACON, beacon.facing()));
 		}
+		for (Screen sc : screens(plan)) {
+			for (BlockPos cell : sc.extent().cells()) {
+				if (plan.at(cell) != null) {
+					out.putIfAbsent(cell, new Fixture(cell, Role.SCREEN, sc.binding(), sc.extent().facing()));
+				}
+			}
+		}
 		return List.copyOf(out.values());
+	}
+
+	/** The large screens the plan reserves ({@link AnchorNames#bigScreen} anchors), in anchor-name order. */
+	public static List<Screen> screens(BuildPlan plan) {
+		List<Screen> out = new ArrayList<>();
+		for (Anchor a : plan.anchors().values()) {
+			AnchorNames.BigScreen bs = AnchorNames.parseBigScreen(a.name());
+			if (bs != null) {
+				int w = Math.min(bs.width(), MonitorWall.MAX_WIDTH);
+				int h = Math.min(bs.height(), MonitorWall.MAX_HEIGHT);
+				out.add(new Screen(bs.key(), new ScreenRect(a.block(), a.facing(), w, h), Binding.parse(bs.binding())));
+			}
+		}
+		return out;
 	}
 
 	/**
