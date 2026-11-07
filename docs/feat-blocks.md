@@ -125,10 +125,12 @@ A mano: mirando un monitor o lámpara, `/t3craft blocks link <env:thread>` o `/t
   de la workstation, con layout de 22 columnas × 3 líneas de actividad para un bloque) y
   `WorkstationCache` (hash de contenido + etiqueta de edad por hilo; versión nueva solo si cambió).
 - `BlocksClient` lo alimenta **una vez por tick** con `NpcRegistry.all()`, el estado que el cliente ya
-  tiene (lo mantienen `ThreadShell`/`T3Connection` o el bridge). **No abre suscripciones propias.**
+  tiene (lo mantienen `ThreadShell`/`T3Connection` o el bridge). Es la pantalla de estado; el log en
+  vivo (abajo) solo se suscribe a los monitores cercanos y visibles.
 - `MonitorRenderer` (block entity renderer, API de render states de 26.x): en `extractRenderState`
-  resuelve el binding, pide la pantalla y **solo rehace los glyph runs cuando cambia la versión**; en
-  `submit` dibuja fondo (color del estado oscurecido) y líneas sobre la cara frontal, full-bright.
+  resuelve el binding, elige el nivel de detalle y **solo rehace los glyph runs cuando cambia la
+  versión** (contenido, nivel o tamaño); en `submit` dibuja capas opacas full-bright sobre la cara
+  frontal. Detalle en "Log en vivo" abajo.
 - Sin vincular: "T3Craft monitor · NO THREAD". Hilo desconocido: su id + "· OFFLINE".
 - Click (`useWithoutItem` en el cliente) → `ThreadOpener` de la workstation
   (`WorkstationClient.get().opener()`, que respeta el override de feat/chat; por defecto
@@ -137,6 +139,72 @@ A mano: mirando un monitor o lámpara, `/t3craft blocks link <env:thread>` o `/t
 - Integración con workstation: `WorkstationClient.setScreenSuppressor(state -> …instanceof MonitorBlock)`.
   Sobre un monitor, el `TextDisplay` flotante de la estación queda vacío (una pantalla, no dos).
   Sobre cualquier bloque vanilla, todo sigue igual.
+
+### Log en vivo (feat/monitor-live-log, P2 de `research/agentcraft-world-elements.md`)
+
+Paquete `client.blocks`, todo dentro del módulo (apagado, nada de esto existe). Tests:
+`MonitorVisibilityTest`, `MonitorFeedsTest`, `MonitorLogTest`, `MonitorLodTest`.
+
+**Qué se ve** (`MonitorRenderer`, dos niveles de detalle, `MonitorLod`):
+
+| Nivel | Cuándo | Contenido |
+|---|---|---|
+| **NEAR** | a ≤ `nearDistance` (8) bloques por bloque del lado menor de la pantalla; sale a +2 (histéresis) | Cabecera (punto de estado, título, palabra de estado) + **tail del log** (la fila más nueva abajo): tool calls con icono del kit (`t3craft:chat/icon_*`), nombre y argumento (`ToolLine` del chat), rutas recortadas por la izquierda (`…/blocks/Foo.java`), `+N -M` en verde y rojo, comandos fallidos en rojo, prosa del agente en ≤ 2 líneas sin Markdown, peticiones con fondo ámbar. Pie: **cursor** parpadeante si trabaja, **"! needs you: …"** pulsante si hay una petición pendiente. Sin stream (lejos, modo bridge, sin pairing): las líneas de estado de siempre (`MonitorScreens`). |
+| **FAR** | más lejos | Cara entera del color del estado (oscurecido), bandas del color arriba y abajo, **palabra de estado grande** (escala hasta 2,5×, ajustada al ancho) y el título debajo. Se lee de un lado a otro de la sala. |
+
+El modelo (`MonitorLog`) es puro: filas de `ChatTranscript.View` (las mismas `ChatEntry` y el mismo
+`ToolLine` que el chat), estado del shell (`NpcRegistry`) salvo que el transcript tenga una petición
+pendiente, que gana. Sin filas heredadas (fork).
+
+**Datos y política de visibilidad** (`MonitorLiveLog` + `MonitorVisibility` + `MonitorFeeds`):
+
+- `BlocksClient` sigue los `MonitorBlockEntity` cargados (`ClientBlockEntityEvents` load/unload) y cada
+  5 ticks mide cada uno: distancia del ojo al centro de la cara, si se ve de frente, si cae en el cono
+  de visión (FOV de las opciones + aspecto de la ventana + 15° de margen; a < 2,5 bloques cuenta
+  siempre) y, en modo `line_of_sight`, un `level.clip` hasta la pantalla.
+- **Adquiere** a ≤ `subscribeRadius` (16) y visible. **Mantiene** mientras siga a ≤ radio +
+  `releaseHysteresis` (4) y se haya visto hace ≤ `releaseAfterSeconds` (10). Si no, **suelta**.
+  Un monitor descargado se olvida.
+- Devuelve el conjunto de **claves de hilo** (no de monitores): `MonitorFeeds` mantiene **un
+  `ThreadFeed` por hilo**, abierto con `ChatScreens.defaultSource()` (la conexión compartida del
+  entorno, `subscribeThread` refcount de `StreamRegistry`, solo lectura). Tres monitores del mismo hilo
+  y el chat abierto encima = una sola suscripción en el servidor (test). Si no se puede abrir (modo
+  bridge, entorno sin pairing) reintenta a los 15 s, sin tormenta por tick.
+- Al salir del mundo, en `DevReload` y al cerrar el cliente se cierran todos los feeds.
+- `/t3craft blocks` añade una línea: monitores cargados, streams del log y sus hilos.
+
+**Config** (aditiva, `config/t3craft.json`; se relee con `DevReload`):
+
+```json
+"blocks": { "monitor": {
+  "liveLog": true, "subscribeRadius": 16, "releaseHysteresis": 4, "releaseAfterSeconds": 10,
+  "visibility": "frustum", "viewDistance": 64, "nearDistance": 8
+} }
+```
+
+`visibility`: `frustum` (cono de visión, por defecto), `line_of_sight` (cono + raycast) o `distance`.
+Valores fuera de rango se acotan; tipos incorrectos dejan el valor por defecto.
+
+**El bug "desaparece al acercarse / ilegible de lejos"** (no se pudo reproducir sin lanzar el
+juego; se atacaron todas las causas plausibles del renderer viejo):
+
+- El fondo se dibujaba con `submitTextBackground` (pipeline de texto **translúcido**): va después de lo
+  opaco, ordenado por distancia, contra una cara de bloque casi coplanaria. Ahora el fondo, las bandas,
+  el cursor y los iconos son **geometría opaca en la pasada sólida** con escritura de profundidad
+  (`ScreenDraw`, copia del pipeline de texto del mundo sin blending, como `DisplayDraw` de AgentCraft).
+- Separación fija de 0,003 bloques: un depth buffer de 24 bits resuelve ~d²/(0,05·2²⁴) bloques a
+  distancia d, así que pasados ~40 bloques el fondo parpadeaba con la cara. Ahora el paso entre capas
+  crece con d² (`MonitorLod.zStep`, mínimo 0,0012 como AgentCraft, ~0,02 a 64 bloques).
+- `shouldRenderOffScreen() = true`: el monitor no depende del culling de su sección (también lo
+  necesita P1 para dibujar desde el origen) y `getViewDistance`/`shouldRender` usan `viewDistance`
+  (64, configurable; antes 32 fijo).
+- Legibilidad: densidad 128 px/bloque de cerca (antes 160: letras de 0,05 bloque), nivel FAR con
+  texto grande, fondo casi negro con texto claro, todo full-bright.
+
+**Para P1 (multibloque)**: todo el layout sale de `ScreenExtent` (ancho × alto en bloques):
+`MonitorLod.layout(level, extent)`, `nearLimit`, densidad 128/96 según el lado menor, y el renderer
+ya traslada hacia arriba `(alto − 1)` bloques desde el bloque de origen. P1 solo tiene que devolver
+el extent del panel en `MonitorRenderer.extent(be)` y no dibujar en los bloques que no son origen.
 
 ## Lámparas
 
@@ -224,6 +292,13 @@ Ambos siguen los pasos de arriba; `LampStatus` y `MonitorRenderer.toFace` se pue
   `WorkstationClient.opener()`.
 - Datos: blockstates, modelos, texturas, loot tables, 4 recetas, lang.
 - Config aditiva: `"blocks": { "enabled": true }`.
+- feat/monitor-live-log (**RESTART**): listeners nuevos `ClientBlockEntityEvents` load/unload en
+  `BlocksClient.onInitializeClient`; `MonitorRenderer` reescrito (`shouldRenderOffScreen`, distancia de
+  vista configurable) con un `RenderPipeline`/`RenderType` propio (`t3craft:pipeline/monitor_solid`) y
+  textura dinámica `t3craft:dynamic/monitor_white`; clases nuevas `MonitorLiveLog`, `MonitorFeeds`,
+  `MonitorVisibility`, `MonitorLog`, `MonitorLod`, `MonitorSettings`, `ScreenExtent`, `ScreenDraw`;
+  lang `t3craft.blocks.monitor_status` (en_us, es_es, es_mx); config aditiva `blocks.monitor.*`.
+  Sin registros de bloques ni datos nuevos.
 
 ## Pendientes
 
@@ -231,6 +306,8 @@ Ambos siguen los pasos de arriba; `LampStatus` y `MonitorRenderer.toFace` se pue
   texto del monitor quede del lado correcto y no espejado (la transformación es la de AgentCraft, ya
   probada allí), el tamaño del texto, la luz de las lámparas y que el click del monitor no mande
   paquetes indebidos.
+- Log en vivo, sin probar en el juego: verificar a ojo que el monitor ya no desaparece al acercarse
+  (con y sin Sodium), el cambio NEAR/FAR, los iconos del kit en el mundo y el cursor.
 - La edad en el monitor tiene el mismo límite que la workstation (sin timestamp en `NpcInfo`).
 - Nadie llama todavía a `setPositionBindings`; el dueño del HQ en el mundo (site/builders) puede
   hacerlo con `HqBindings.world(plan, site)`.

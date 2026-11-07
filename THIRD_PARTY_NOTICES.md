@@ -84,6 +84,25 @@ Files adapted from AgentCraft's blocks (`mod/src/main/java/dev/agentcraft/block/
 - `mod/src/client/java/dev/t3craft/client/blocks/MonitorRenderer.java` ← `client/world/StationRenderer.java`
   (`toFace`: draw in screen pixel space on a block's front face).
 
+Monitor live log (branch `feat/monitor-live-log`, AgentCraft commit `8fe3ad2`, sources under
+`mod/src/client/java/dev/agentcraft/client/`):
+
+- `mod/src/client/java/dev/t3craft/client/blocks/MonitorRenderer.java` (rewritten) ←
+  `monitor/MonitorRenderer.java` (header with status dot, tail of tool rows with kit icons, blinking
+  caret while working, pulsing "waiting for you", opaque full-bright layers with explicit z steps,
+  off-screen rendering) on top of `world/StationRenderer.java`.
+- `mod/src/client/java/dev/t3craft/client/blocks/ScreenDraw.java` ← `monitor/DisplayDraw.java` and
+  `ui/WorldUi.java` (opaque copy of the world text pipeline drawn in the solid pass, flat rectangles
+  on a white texture, GUI-atlas sprites as opaque quads).
+- `mod/src/client/java/dev/t3craft/client/blocks/MonitorLog.java` ← `monitor/LogRows.java` and
+  `monitor/MonitorScreen.java` (one-line tool rows that never wrap, prose limited to a few lines
+  without Markdown markup, +/- counts in green/red, newest row at the bottom, caret / waiting line).
+- `mod/src/client/java/dev/t3craft/client/blocks/MonitorLod.java` ← `MonitorRenderer.density`
+  (128 px/block for one-block screens, 96 for bigger ones) and `DisplayDraw.Z_STEP`.
+- `mod/src/client/java/dev/t3craft/client/blocks/MonitorVisibility.java` ← the idea of
+  `monitor/MonitorFeature.java`'s sweep of screens unused for 30 s (new implementation: distance and
+  view with hysteresis, one subscription per thread).
+
 The lamp driver (`dev.t3craft.blocks.LampApplier` + `client.blocks.BlocksClient`: the client computes
 lamp states and the integrated server applies them) follows the idea of AgentCraft's
 `HqWorldDriver`; it is a new implementation, no code copied. Models and textures are t3craft's own.
