@@ -110,8 +110,18 @@ public final class ArchiveClient implements ClientModInitializer {
 		BlockState prop(boolean occupied, Direction facing);
 	}
 
+	/**
+	 * Anchor names of the plan's shelf: the same strings as fix/hq-archive's
+	 * {@code AnchorNames.archiveShelfSlot(i)} ({@code "shelf@" + i}), spelled out so this module
+	 * compiles without that branch. Replace with the method reference once it is on main.
+	 */
+	static final java.util.function.IntFunction<String> PLAN_SHELF_SLOT = i -> "shelf@" + i;
+
 	private SlotProps slotProps = ArchiveClient::bookshelf;
+	/** Explicit shelf ({@link #setShelf}); null = the standing HQ plan's shelf, else the fallback. */
+	private @Nullable ArchiveShelf shelfOverride;
 	private ArchiveShelf shelf = ArchiveShelf.FALLBACK;
+	private dev.t3craft.hq.@Nullable BuildPlan shelfPlan;
 	private Map<String, Integer> slots = Map.of();
 	private int slotsVersion = -1;
 	private @Nullable HqSite viewsSite;
@@ -180,8 +190,31 @@ public final class ArchiveClient implements ClientModInitializer {
 
 	/** Slot positions (null = {@link ArchiveShelf#FALLBACK}). Client thread. */
 	public void setShelf(@Nullable ArchiveShelf shelf) {
-		this.shelf = shelf == null ? ArchiveShelf.FALLBACK : shelf;
-		slotsVersion = -1;
+		this.shelfOverride = shelf;
+		resolveShelf();
+	}
+
+	/** The override, else the standing HQ plan's shelf anchors if it has them, else the fallback. */
+	private void resolveShelf() {
+		ArchiveShelf next;
+		if (shelfOverride != null) {
+			next = shelfOverride;
+			shelfPlan = null;
+		} else {
+			HqPresence.Standing st = site == null ? HqPresence.current() : null;
+			dev.t3craft.hq.BuildPlan plan = st == null ? null : st.plan();
+			if (plan == shelfPlan && shelf != null) {
+				return;
+			}
+			shelfPlan = plan;
+			ArchiveShelf fromPlan = plan == null ? null : ArchiveShelf.fromPlan(plan, PLAN_SHELF_SLOT);
+			next = fromPlan != null && fromPlan.capacity() > 0 ? fromPlan : ArchiveShelf.FALLBACK;
+		}
+		if (next != shelf) {
+			shelf = next;
+			slotsVersion = -1;
+			viewsSite = null;
+		}
 	}
 
 	public ArchiveShelf shelf() {
@@ -227,6 +260,7 @@ public final class ArchiveClient implements ClientModInitializer {
 			feed();
 		}
 		store.tick(now);
+		resolveShelf();
 		int v = store.version();
 		if (v != slotsVersion) {
 			slots = Map.copyOf(ArchiveSlots.assign(store.entries(), slots, shelf.capacity()));

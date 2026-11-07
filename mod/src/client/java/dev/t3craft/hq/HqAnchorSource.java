@@ -93,4 +93,10 @@ public final class HqAnchorSource implements AnchorSource {
 		}
 		return benches.get(Math.floorMod(npcId.hashCode(), benches.size()));
 	}
+
+	/** Settled NPCs leave through the hub's main doorway. */
+	@Override
+	public dev.t3craft.client.npc.behavior.@Nullable Anchor exit() {
+		return byName.get(AnchorNames.ENTRANCE);
+	}
 }

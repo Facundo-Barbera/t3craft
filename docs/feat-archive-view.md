@@ -40,10 +40,12 @@ public interface ArchiveShelf {
 }
 ```
 
-- **Cuando entre fix/hq-archive**, una línea en quien coloca el HQ:
-  `ArchiveClient.get().setShelf(ArchiveShelf.fromPlan(plan, AnchorNames::archiveShelfSlot))`.
-  El nombre se inyecta para no depender de esa rama. El orden de los anchors es el orden de los
-  slots: el 0 es el primero que se ocupa.
+- **Plan del HQ** (fix/hq-archive): si el plan del HQ en pie (`HqPresence.current()`) tiene anchors
+  `shelf@0`, `shelf@1`… (los nombres de `AnchorNames.archiveShelfSlot(i)` en esa rama), se usan
+  automáticamente con `ArchiveShelf.fromPlan`. El nombre está escrito en
+  `ArchiveClient.PLAN_SHELF_SLOT` para no depender de esa rama. Cuando entre a main, se puede
+  cambiar por `AnchorNames::archiveShelfSlot`. `setShelf(...)` lo sobrescribe. El orden de los
+  anchors es el orden de los slots: el 0 es el primero que se ocupa.
 - **Fallback** (activo hoy): dos alas a los lados del tablero de "needs attention" del hub
   (`x = -7..-5` y `5..7`, `z = -4`, `y = 1..4`, mirando al sur como el tablero), sin las dos
   esquinas bajas que tapan las macetas. Son **22 slots**. El slot 0 está a la altura de los ojos y
@@ -128,7 +130,7 @@ de NPCs no tiene hilos cerrados.
   feat/hq-construction, sitio o demo; solo lectura), una vez construido su grupo `hub`.
   `setSite(HqSite)` lo sobrescribe. Sin HQ no se dibuja nada en el mundo, pero el catálogo funciona
   igual.
-- `setShelf(ArchiveShelf)`: las posiciones del plan (`null` = `FALLBACK`).
+- `setShelf(ArchiveShelf)`: fuerza unas posiciones (`null` = las del plan en pie o el fallback).
 - `slots()`: la asignación actual (clave → slot), para que el dueño del HQ ponga el bloque
   correspondiente en cada slot.
 - `setCaller(Caller)` / `setSource(ArchiveSource)`: cambiar de dónde se lee.
@@ -149,8 +151,10 @@ de NPCs no tiene hilos cerrados.
 
 ## Pendientes
 
-- **fix/hq-archive**: cuando entre, llamar a `setShelf(ArchiveShelf.fromPlan(plan, AnchorNames::archiveShelfSlot))`
-  y quitar el fallback si ya no hace falta. Si fix/hq-archive cambia la regla de asignación del
+- **fix/hq-archive** (en origin, todavía no en main): su estante (pared sur del hub, `|x| = 3..6`,
+  `z = 7`, 3 niveles) se detecta solo por los anchors `shelf@i`. Al entrar, cambiar
+  `PLAN_SHELF_SLOT` por `AnchorNames::archiveShelfSlot` y decidir si el fallback junto al tablero
+  sigue haciendo falta (no choca con ese estante). Si fix/hq-archive cambia la regla de asignación del
   archivo de `HqLayout`, revisar `ArchiveSlotsTest.matchesHqLayoutRules`.
 - **No se probó dentro del juego** (por regla, no se lanza Minecraft). Falta revisar a ojo la escala
   y la altura del letrero, que el texto no quede espejado y que los `Interaction` reciban el clic.
