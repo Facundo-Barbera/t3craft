@@ -90,7 +90,7 @@ public final class T3CraftCommands {
 				})));
 	}
 
-	static MutableComponent prefix() {
+	public static MutableComponent prefix() {
 		return Component.literal("[T3Craft] ").withStyle(ChatFormatting.AQUA);
 	}
 

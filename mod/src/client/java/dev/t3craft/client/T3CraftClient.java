@@ -3,6 +3,8 @@ package dev.t3craft.client;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import dev.t3craft.T3Craft;
+import dev.t3craft.client.hud.Notifier;
+import dev.t3craft.client.hud.PeekHud;
 import dev.t3craft.client.hud.Toasts;
 import dev.t3craft.client.link.BridgeLink;
 import dev.t3craft.client.link.BridgeListener;
@@ -88,6 +90,7 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 			npcs.tick(mc);
 		});
 		T3CraftCommands.register(this);
+		PeekHud.register();
 
 		// Right-click on one of our client-only NPCs opens its chat screen. The entity is unknown to
 		// the server, so the interaction is consumed client-side.
@@ -137,6 +140,10 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 		lastStatus = LinkStatus.DISABLED;
 		envStatus.clear();
 		envDetail.clear();
+		lastViews.clear();
+		syncedEnvs.clear();
+		PeekHud.setPeek(null, 0);
+		PeekHud.setBanner(null);
 	}
 
 	/** {@code /t3craft reconnect}: same config, fresh sockets now (backoff reset). */
@@ -198,20 +205,42 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 
 	// ---- direct mode --------------------------------------------------------------------------
 
+	/** NPCs shown at the previous direct refresh, and environments that were in sync then. */
+	private final Map<String, dev.t3craft.t3.NpcView> lastViews = new HashMap<>();
+	private final java.util.Set<String> syncedEnvs = new java.util.HashSet<>();
+
 	private void refreshDirect(Minecraft mc) {
 		DirectController d = direct;
 		if (d == null) {
 			return;
 		}
+		List<dev.t3craft.t3.NpcView> views = d.npcs(System.currentTimeMillis());
 		List<NpcInfo> list = new ArrayList<>();
-		d.npcs(System.currentTimeMillis()).forEach(v -> list.add(NpcInfo.fromView(v)));
+		views.forEach(v -> list.add(NpcInfo.fromView(v)));
 		npcs.replaceAll(list);
+
+		for (dev.t3craft.t3.Transitions.Transition t : dev.t3craft.t3.Transitions.between(lastViews, views, syncedEnvs)) {
+			Notifier.transition(mc, t.title(), t.text(), t.color(), t.sound().name().toLowerCase(), true);
+		}
+		lastViews.clear();
+		views.forEach(v -> lastViews.put(v.id(), v));
+		dev.t3craft.t3.Transitions.Peek peek = dev.t3craft.t3.Transitions.peek(views);
+		PeekHud.setPeek(peek.text(), peek.color());
+
+		syncedEnvs.clear();
+		List<String> problems = new ArrayList<>();
 		for (DirectController.EnvStatus s : d.statuses()) {
+			if (s.status() == T3Connection.Status.OK) {
+				syncedEnvs.add(s.id());
+			} else if (s.status() != T3Connection.Status.CONNECTING) {
+				problems.add(s.label() + " " + s.status().wire);
+			}
 			String before = envStatus.put(s.id(), s.status().wire);
 			if (before != null && !before.equals(s.status().wire) && s.status() != T3Connection.Status.CONNECTING) {
 				Toasts.link(mc, s.label() + ": " + s.status().wire);
 			}
 		}
+		PeekHud.setBanner(problems.isEmpty() ? null : "T3: " + String.join(", ", problems) + "  (/t3craft status)");
 	}
 
 	/**
@@ -280,6 +309,7 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 		}
 		T3Craft.LOGGER.info("bridge link {}: {}", status, detail);
 		Minecraft mc = Minecraft.getInstance();
+		PeekHud.setBanner(status == LinkStatus.CONNECTED ? null : "T3Craft bridge: " + status.name().toLowerCase() + "  (/t3craft status)");
 		if (status == LinkStatus.CONNECTED) {
 			Toasts.link(mc, "Connected");
 		} else if (lastStatus == LinkStatus.CONNECTED) {
@@ -326,6 +356,10 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 			case "notify" -> Toasts.notify(mc, optString(msg, "title", "T3"), optString(msg, "text", ""),
 					NpcInfo.parseColor(optString(msg, "color", null)));
 			case "bridge.status" -> onEnvironments(mc, msg);
+			// Toast comes from the paired `notify`; transition adds chat line + sound.
+			case "npc.transition" -> Notifier.transition(mc, optString(msg, "title", "T3"), optString(msg, "text", ""),
+					NpcInfo.parseColor(optString(msg, "color", null)), optString(msg, "sound", ""), false);
+			case "hud.peek" -> PeekHud.setPeek(optString(msg, "text", null), NpcInfo.parseColor(optString(msg, "color", null)));
 			case "ack", "hello" -> T3Craft.LOGGER.debug("{}: {}", type, msg);
 			default -> T3Craft.LOGGER.debug("ignoring unknown message type {}", type);
 		}
