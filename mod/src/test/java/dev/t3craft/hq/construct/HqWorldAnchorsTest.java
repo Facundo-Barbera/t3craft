@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.t3craft.client.hq.HqStations;
 import dev.t3craft.client.hq.HqWorldAnchors;
@@ -50,7 +51,11 @@ class HqWorldAnchorsTest {
 				}
 			}
 			for (String id : p.settled()) {
-				assertEquals(raw.named(AnchorNames.archive(id)), a.desk(id, p.key()), "settled: at its archived computer");
+				// the basement archive is not built: a released thread waits in the hub, not underground
+				Anchor d = a.desk(id, p.key());
+				assertNotNull(d);
+				assertNotEquals(raw.named(AnchorNames.archive(id)), d);
+				assertTrue(d.pos().y() >= site.origin().getY(), "never below the floor");
 			}
 		}
 		assertNotNull(a.board());
@@ -68,8 +73,7 @@ class HqWorldAnchorsTest {
 		assertNotNull(p);
 		BlockPos c = site.cell(w.computerPos());
 		assertEquals(c, new BlockPos(p.computerX(), p.computerY(), p.computerZ()));
-		StationPlacement archived = s.placement(thread("vps:p0-s0"));
-		assertNotNull(archived, "settled threads show on their archived computer");
+		assertNull(s.placement(thread("vps:p0-s0")), "no station in the unbuilt basement");
 		assertNull(new HqStations(t.plan(), site, Set.of("base")).placement(thread("vps:p0-a0")), "no station before its wing stands");
 	}
 

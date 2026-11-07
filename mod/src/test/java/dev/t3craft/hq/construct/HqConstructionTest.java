@@ -70,7 +70,8 @@ class HqConstructionTest {
 			// the site designs the module from the plan, clipped to its slot
 			HqSite s = HqSiteFrame.hqSite(origin);
 			for (var p : design.placements()) {
-				if (module.id().equals(HqSiteFrame.owner(p.rel().getX(), p.rel().getZ()))) {
+				assertTrue(p.rel().getY() >= 0 || !HqSiteFrame.builds(p.rel()));
+				if (HqSiteFrame.builds(p.rel()) && module.id().equals(HqSiteFrame.owner(p.rel().getX(), p.rel().getZ()))) {
 					world.put(s.cell(p.rel()), p.state().rotate(s.rotation()));
 				}
 			}
@@ -90,7 +91,9 @@ class HqConstructionTest {
 			lastUpdate.clear();
 			int n = 0;
 			for (HqConstruction.Cell c : cells) {
-				if (!c.state().equals(world.get(c.pos()))) {
+				assertTrue(c.pos().getY() >= origin.y(), "nothing below the HQ floor: " + c.pos());
+				boolean differs = c.removal() ? world.containsKey(c.pos()) : !c.state().equals(world.get(c.pos()));
+				if (differs) {
 					lastUpdate.add(c);
 					n++;
 				}
@@ -99,7 +102,11 @@ class HqConstructionTest {
 				return HqConstruction.Update.NOTHING;
 			}
 			for (HqConstruction.Cell c : lastUpdate) {
-				world.put(c.pos(), c.state());
+				if (c.removal()) {
+					world.remove(c.pos()); // the site restores its snapshot (here: nothing)
+				} else {
+					world.put(c.pos(), c.state());
+				}
 			}
 			log.add("update:" + n);
 			updating = true;
@@ -249,12 +256,37 @@ class HqConstructionTest {
 		HqLayout after = f.saved.layout();
 		assertNotNull(after.archived("vps:p0-a1"));
 		assertNull(after.seat("vps:p0-a1"));
-		// the archive slot's computer was written in place
+		// its old desk's computer was rewritten in place (now vacant); nothing went to the unbuilt basement
 		HqSite s = HqSiteFrame.hqSite(ORIGIN);
-		BlockPos archived = s.cell(f.anchorsPlan.anchor(AnchorNames.archive("vps:p0-a1")).block());
-		assertTrue(f.lastUpdate.stream().anyMatch(c -> c.pos().equals(archived)), "archive computer not written");
+		BlockPos computer = s.cell(dev.t3craft.hq.HqPlans.generate(before).workstation("vps:p0-a1").computerPos());
+		assertTrue(f.lastUpdate.stream().anyMatch(c -> c.pos().equals(computer)), "freed desk not rewritten");
 		// its desk is vacant now: no desk anchor for it
 		assertNull(f.anchorsPlan.anchor(AnchorNames.desk("vps:p0-a1")));
+	}
+
+	@Test
+	void removedModulesGoBackToTheSnapshotAndThenNothingMore() {
+		hq.roster(ConstructFixtures.input(2, 4, 0));
+		settle();
+		f.log.clear();
+		// project 1 is gone: its wing leaves the layout; its cells are removals (restored by the site)
+		hq.roster(ConstructFixtures.input(1, 4, 0));
+		settle();
+		assertEquals(1, f.log.size(), f.log.toString());
+		assertEquals(1, f.saved.layout().modules().size());
+		HqSite s = HqSiteFrame.hqSite(ORIGIN);
+		long removals = f.lastUpdate.stream().filter(HqConstruction.Cell::removal).count();
+		assertTrue(removals > 100, "wing 1 removed: " + removals);
+		for (HqConstruction.Cell c : f.lastUpdate) {
+			if (c.removal()) {
+				assertNotNull(c.pos());
+			}
+		}
+		assertNull(f.anchorsPlan.anchor(AnchorNames.desk("acmesite:p1-a0")));
+		f.log.clear();
+		settle();
+		assertTrue(f.log.isEmpty(), "idempotent after removals: " + f.log);
+		assertNotNull(s);
 	}
 
 	@Test

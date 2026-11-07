@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
@@ -44,6 +45,18 @@ import org.jspecify.annotations.Nullable;
  */
 public final class HqConstructionClient implements ClientModInitializer {
 	private static final int ROSTER_TICKS = 20;
+	/**
+	 * Which threads give up their desk (settled by default). <b>Integration point for
+	 * fix/hq-stale-stations</b>: install its single release policy here (settle, archived, or DONE and
+	 * idle for more than X minutes), e.g. {@code setReleasePolicy(n -> StationRelease.released(n, now))}.
+	 * A released thread is passed to the HQ as settled: its desk is removed from the diff (the site
+	 * restores its cells from the snapshot) and its computer goes to the archive.
+	 */
+	private static volatile Predicate<NpcInfo> releasePolicy = NpcInfo::settled;
+
+	public static void setReleasePolicy(@Nullable Predicate<NpcInfo> policy) {
+		releasePolicy = policy == null ? NpcInfo::settled : policy;
+	}
 	private int ticks;
 
 	@Override
@@ -111,11 +124,12 @@ public final class HqConstructionClient implements ClientModInitializer {
 		} else if (npcs.isEmpty()) {
 			return null;
 		}
+		Predicate<NpcInfo> released = releasePolicy;
 		HqInput.Builder b = HqInput.builder();
 		for (NpcInfo n : npcs) {
 			String g = n.groupId();
 			String env = g.indexOf(':') > 0 ? g.substring(0, g.indexOf(':')) : g;
-			b.thread(g, n.groupLabel(), env, n.envLabel(), n.id(), n.settled());
+			b.thread(g, n.groupLabel(), env, n.envLabel(), n.id(), released.test(n));
 		}
 		return b.build();
 	}

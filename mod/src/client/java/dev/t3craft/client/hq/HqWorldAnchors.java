@@ -77,9 +77,11 @@ public final class HqWorldAnchors implements AnchorSource {
 				return d;
 			}
 		}
-		if (standing(HqSiteFrame.BASE)) {
+		dev.t3craft.hq.Anchor archived = plan.anchor(AnchorNames.archive(npcId));
+		if (archived != null && HqSiteFrame.builds(archived.block())) {
+			String owner = HqSiteFrame.owner(archived.block().getX(), archived.block().getZ());
 			Anchor a = hq.named(AnchorNames.archive(npcId));
-			if (a != null) {
+			if (a != null && owner != null && standing(owner)) {
 				return a;
 			}
 		}

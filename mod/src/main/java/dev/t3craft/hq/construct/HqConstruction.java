@@ -1,7 +1,6 @@
 package dev.t3craft.hq.construct;
 
 import dev.t3craft.hq.BuildPlan;
-import dev.t3craft.hq.HqBuild;
 import dev.t3craft.hq.HqInput;
 import dev.t3craft.hq.HqLayout;
 import dev.t3craft.hq.HqSite;
@@ -35,8 +34,10 @@ import org.jspecify.annotations.Nullable;
  *   survival policy is asked first ({@link Ports#cost}).</li>
  *   <li><b>In-place changes</b> in modules already built (a desk freed or taken, a computer moved to
  *   the archive, a wing emptied, sign text): {@link Ports#update} with the target cells of the
- *   built modules plus the cells the previous plan used and the target does not. The port only
- *   writes cells whose recorded state differs and that still hold the site's own blocks.</li>
+ *   built modules plus <b>removals</b>: the cells the previous plan used and the target does not
+ *   (a module or desk that is gone) go back to the site's snapshot, so a later {@code site undo}
+ *   stays exact. The port only writes cells whose recorded state differs and that still hold the
+ *   site's own blocks. Nothing below {@link HqSiteFrame#MIN_Y} (the basement) is built.</li>
  *   <li>Then the target layout becomes the applied one and is saved.</li>
  * </ol>
  * The same roster gives the same target, so once applied nothing is built again (idempotent).
@@ -78,8 +79,15 @@ public final class HqConstruction {
 		}
 	}
 
-	/** One world cell to set (state already turned to the world). */
-	public record Cell(BlockPos pos, BlockState state, @Nullable CompoundTag blockEntity) {
+	/**
+	 * One world cell to set (state already turned to the world). {@code state == null} is a
+	 * <b>removal</b>: the HQ no longer uses the cell, so the site puts back what was there before it
+	 * built (its snapshot), which keeps {@code site undo} exact.
+	 */
+	public record Cell(BlockPos pos, @Nullable BlockState state, @Nullable CompoundTag blockEntity) {
+		public boolean removal() {
+			return state == null;
+		}
 	}
 
 	/** Outcome of a survival check: allowed, or the message to show. */
@@ -357,7 +365,7 @@ public final class HqConstruction {
 		List<Cell> signs = new ArrayList<>();
 		for (Placement p : t.plan().placements()) {
 			String owner = HqSiteFrame.owner(p.rel().getX(), p.rel().getZ());
-			if (owner == null || !built.contains(owner)) {
+			if (owner == null || !built.contains(owner) || !HqSiteFrame.builds(p.rel())) {
 				continue;
 			}
 			Cell cell = new Cell(hqSite.cell(p.rel()), p.state().rotate(hqSite.rotation()), p.be());
@@ -371,8 +379,9 @@ public final class HqConstruction {
 		}
 		for (Placement p : appliedPlan.placements()) {
 			String owner = HqSiteFrame.owner(p.rel().getX(), p.rel().getZ());
-			if (t.plan().at(p.rel()) == null && owner != null && built.contains(owner)) {
-				cells.add(new Cell(hqSite.cell(p.rel()), HqBuild.AIR_ABOVE_GROUND.at(p.rel()).rotate(hqSite.rotation()), null));
+			// removals (module or desk no longer in the target): back to the site's snapshot
+			if (t.plan().at(p.rel()) == null && owner != null && built.contains(owner) && HqSiteFrame.builds(p.rel())) {
+				cells.add(new Cell(hqSite.cell(p.rel()), null, null));
 			}
 		}
 		Update u = ports.update("HQ update", cells, signs);
@@ -420,7 +429,7 @@ public final class HqConstruction {
 	static List<BlockState> statesIn(BuildPlan plan, String moduleId, HqSite site) {
 		List<BlockState> out = new ArrayList<>();
 		for (Placement p : plan.placements()) {
-			if (!p.state().isAir() && moduleId.equals(HqSiteFrame.owner(p.rel().getX(), p.rel().getZ()))) {
+			if (!p.state().isAir() && HqSiteFrame.builds(p.rel()) && moduleId.equals(HqSiteFrame.owner(p.rel().getX(), p.rel().getZ()))) {
 				out.add(p.state().rotate(site.rotation()));
 			}
 		}

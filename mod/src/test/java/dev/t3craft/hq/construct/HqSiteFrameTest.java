@@ -33,7 +33,7 @@ class HqSiteFrameTest {
 	void requestFitsTheSiteLimits() {
 		SiteRequest r = HqSiteFrame.request();
 		assertEquals(HqSiteFrame.BASE_DEPTH, r.baseDepth());
-		assertEquals(5, r.baseDepth());
+		assertEquals(0, r.baseDepth(), "the basement is not built");
 		assertTrue(r.envelope().depth() <= SiteRequest.MAX_ENVELOPE);
 		assertTrue(r.envelope().width() <= SiteRequest.MAX_ENVELOPE);
 		// the front of the site (-z) is the HQ entrance (+z): the portico is the base's front edge

@@ -11,8 +11,8 @@ Paquetes:
 ## Flujo
 
 1. `/t3craft site pick | here` → `confirm`. La petición del sitio ya es la del HQ
-   (`HqSiteFrame.request()`): la base es hub + pórtico + sótano del archivo, la envolvente tiene lugar
-   para 4 alas y la base pide 5 capas bajo el pad para el sótano. El diseñador del sitio corta cada
+   (`HqSiteFrame.request()`): la base es hub + pórtico y la envolvente tiene lugar para 4 alas. El
+   sótano no se construye (ver abajo). El diseñador del sitio corta cada
    módulo del plan actual del HQ, así que **confirmar ya construye el hub** (automático).
 2. `HqConstruction` (servidor, 1 vez por segundo) toma el roster vivo: los NPC que se muestran, o
    sea, sin subagentes (ya filtrados por `Visibility`). Solo usa un roster cuando todos los entornos
@@ -31,11 +31,27 @@ Paquetes:
 4. **Idempotente**: la misma lista de hilos (en cualquier orden) da el mismo objetivo. Si ya está
    aplicado, no se construye nada.
 
+### Remociones, política de liberación y sótano (feedback de Facundo)
+
+- **Remociones del diff.** Las celdas que el plan aplicado usaba y el objetivo ya no usa (módulo o
+  escritorio sobrante, ala vaciada) salen como `Cell(pos, null)`. `SiteService.claim` las resuelve con
+  `CellChange.restore`, que pone el estado del **snapshot** de la ampliación más vieja que cubre la
+  celda (el terreno antes del sitio) y lo registra en el plan guardado. Así `site undo` sigue exacto.
+  Restaurar es gratis: en supervivencia solo cuesta lo que el HQ coloca.
+- **Política de liberación de puesto (enganche).** `HqConstructionClient.setReleasePolicy(Predicate<NpcInfo>)`.
+  Por defecto es `NpcInfo::settled`. Cuando entre **fix/hq-stale-stations** (settle, archivado, o DONE
+  e inactivo más de X minutos), se instala su política ahí. Un hilo liberado se pasa al HQ como
+  settled: pierde el escritorio (remoción en el diff) y va al archivo. **Pendiente: aún no está en main.**
+- **Sin sótano.** `HqSiteFrame.MIN_Y = 0`: no se construye nada debajo del piso del HQ y la base no
+  pide profundidad (`BASE_DEPTH = 0`; `SiteRequest.baseDepth` queda disponible). Las anclas y las
+  estaciones del archivo solo se usan si están dentro del edificio, es decir, en el estante de
+  **fix/hq-archive** cuando entre. Mientras tanto, un hilo liberado espera en el hub.
+
 ### Geometría (`HqFootprints`, `HqSiteFrame`)
 
 - Coordenadas: `sitio = (-x, y, -z)` del HQ (media vuelta: el frente del sitio, `-z`, es la entrada
   del HQ). El origen del HQ (centro del piso del hub) es el origen del sitio. El piso apoya sobre el
-  pad y el sótano entra en él.
+  pad y no se construye nada por debajo.
 - Módulos de site: `base` y `wing-0..3`, rectángulos que no se solapan. El slot par de cada fila
   también es dueño de su tramo de la espina, y cada fila incluye la línea donde va la tapa de la
   espina. Un test verifica que toda colocación de cualquier plan de ≤ 4 módulos cae en un slot construido.
@@ -127,4 +143,6 @@ escriben en el paso in-place.
 - Las celdas de carteles con texto cuentan como "cambio del jugador" en un undo (site no guarda block entities en sus planes): undo pide keep/overwrite.
 - Un ala vaciada se "demuele" in-place (aire, pasto a nivel del piso) y su ampliación de site sigue en la pila. Se vuelve a usar si un proyecto ocupa ese índice.
 - Más de 4 alas exige subir `SiteRequest.MAX_ENVELOPE` (decisión de site).
+- Falta un test de `SiteService.claim` con `restore` contra `FakeWorld`. Hoy la remoción solo se prueba con el fake de `HqConstruction`.
+- Enganchar la política de fix/hq-stale-stations y el estante de fix/hq-archive cuando entren a main.
 - Si un crash ocurre entre `claim` y la escritura, la celda queda registrada con el estado nuevo: un undo la reporta como conflicto.

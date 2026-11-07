@@ -164,7 +164,15 @@ public final class SiteService {
 	}
 
 	/** One cell an owner wants to change in place: world coordinates and the new state key. */
-	public record CellChange(int x, int y, int z, String state) {
+	public record CellChange(int x, int y, int z, @Nullable String state) {
+		/** A cell the owner no longer uses: put back what was there before the site touched it. */
+		public static CellChange restore(int x, int y, int z) {
+			return new CellChange(x, y, z, null);
+		}
+
+		public boolean restores() {
+			return state == null;
+		}
 	}
 
 	/** A {@link CellChange} the site accepted, with the state the cell held when it was claimed. */
@@ -217,21 +225,37 @@ public final class SiteService {
 				continue;
 			}
 			Layer top = a.layers.get(newest);
+			String want = c.state();
+			if (want == null) {
+				// removal: the original terrain, from the snapshot of the oldest expansion covering the cell
+				Layer first = null;
+				for (Layer l : a.layers) {
+					if (l.exp.box().contains(c.x(), c.y(), c.z())) {
+						first = l;
+						break;
+					}
+				}
+				int i = first.snap.box().index(c.x(), c.y(), c.z());
+				if (first.snap.blockEntity(i) != null) {
+					continue;
+				}
+				want = first.snap.state(i);
+			}
 			String now = a.world.state(c.x(), c.y(), c.z());
-			if (now.equals(c.state()) && c.state().equals(top.plan.get(c.x(), c.y(), c.z()))) {
+			if (now.equals(want) && want.equals(top.plan.get(c.x(), c.y(), c.z()))) {
 				continue;
 			}
 			if (!Restorer.isOurs(a.world, top.snap, top.plan, c.x(), c.y(), c.z())) {
 				continue;
 			}
-			out.add(new Claimed(c.x(), c.y(), c.z(), now, c.state()));
+			out.add(new Claimed(c.x(), c.y(), c.z(), now, want));
 			if (!record) {
 				continue;
 			}
 			for (int k = 0; k <= newest; k++) {
 				Layer l = a.layers.get(k);
-				if (l.exp.box().contains(c.x(), c.y(), c.z()) && !c.state().equals(l.plan.get(c.x(), c.y(), c.z()))) {
-					l.plan.set(c.x(), c.y(), c.z(), c.state());
+				if (l.exp.box().contains(c.x(), c.y(), c.z()) && !want.equals(l.plan.get(c.x(), c.y(), c.z()))) {
+					l.plan.set(c.x(), c.y(), c.z(), want);
 					dirty[k] = true;
 				}
 			}

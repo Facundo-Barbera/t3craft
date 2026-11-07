@@ -270,18 +270,27 @@ public final class HqRuntime {
 			List<SiteService.CellChange> changes = new ArrayList<>(cells.size());
 			Map<Long, BlockState> wanted = new HashMap<>();
 			for (HqConstruction.Cell c : cells) {
-				changes.add(new SiteService.CellChange(c.pos().getX(), c.pos().getY(), c.pos().getZ(), LevelBlockWorld.keyOf(c.state())));
-				wanted.put(c.pos().asLong(), c.state());
+				int x = c.pos().getX();
+				int y = c.pos().getY();
+				int z = c.pos().getZ();
+				if (c.removal()) {
+					changes.add(SiteService.CellChange.restore(x, y, z));
+				} else {
+					changes.add(new SiteService.CellChange(x, y, z, LevelBlockWorld.keyOf(c.state())));
+					wanted.put(c.pos().asLong(), c.state());
+				}
 			}
 			List<SiteService.Claimed> dry = svc.claim(changes, false);
 			List<HqWriter.Write> signs = new ArrayList<>();
 			for (HqConstruction.Cell c : blockEntities) {
-				String key = LevelBlockWorld.keyOf(c.state());
-				signs.add(new HqWriter.Write(c.pos(), c.state(), key, c.blockEntity()));
+				if (c.state() != null) {
+					signs.add(new HqWriter.Write(c.pos(), c.state(), LevelBlockWorld.keyOf(c.state()), c.blockEntity()));
+				}
 			}
 			if (dry.isEmpty() && signs.isEmpty()) {
 				return HqConstruction.Update.NOTHING;
 			}
+			// Only what the HQ places costs materials; restoring the terrain is free.
 			List<BlockState> placed = new ArrayList<>();
 			for (SiteService.Claimed c : dry) {
 				BlockState st = wanted.get(net.minecraft.core.BlockPos.asLong(c.x(), c.y(), c.z()));
@@ -295,12 +304,19 @@ public final class HqRuntime {
 					return new HqConstruction.Update(false, 0, cost.message());
 				}
 			}
+			LevelBlockWorld lw = new LevelBlockWorld(level);
 			List<HqWriter.Write> writes = new ArrayList<>();
 			for (SiteService.Claimed c : svc.claim(changes, true)) {
-				BlockState st = wanted.get(net.minecraft.core.BlockPos.asLong(c.x(), c.y(), c.z()));
-				if (st != null) {
-					writes.add(new HqWriter.Write(new net.minecraft.core.BlockPos(c.x(), c.y(), c.z()), st, c.before(), null));
+				net.minecraft.core.BlockPos pos = new net.minecraft.core.BlockPos(c.x(), c.y(), c.z());
+				BlockState st = wanted.get(pos.asLong());
+				if (st == null) {
+					try {
+						st = lw.parse(c.state());
+					} catch (RuntimeException e) {
+						continue;
+					}
 				}
+				writes.add(new HqWriter.Write(pos, st, c.before(), null));
 			}
 			writes.addAll(signs);
 			HqConstruction c = construction;

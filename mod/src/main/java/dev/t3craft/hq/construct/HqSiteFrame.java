@@ -21,9 +21,8 @@ import org.jspecify.annotations.Nullable;
  *   <li><b>Frames.</b> HQ coordinates have the entrance south ({@code +z}) and grow north; site
  *   plan coordinates have the front at {@code -z} and grow towards {@code +z}. So
  *   {@code site = (-x, y, -z)} (a half turn) and the HQ origin (hub floor centre) is the site origin
- *   (pad centre, one above the pad). The HQ floor ({@code y = 0}) stands on the pad; the archive
- *   basement ({@code y = -5..-1}) goes into it, which is why the base asks for
- *   {@link #BASE_DEPTH} layers.</li>
+ *   (pad centre, one above the pad). The HQ floor ({@code y = 0}) stands on the pad; nothing below
+ *   it is built ({@link #MIN_Y}).</li>
  *   <li><b>Site modules.</b> {@code base} = hub + portico + archive, {@code wing-<i>} = grid slot
  *   {@code i} ({@link HqFootprints#slot}). One site module per HQ module: each new wing is one
  *   site expansion, with its own snapshot and undo step.</li>
@@ -34,8 +33,14 @@ import org.jspecify.annotations.Nullable;
 public final class HqSiteFrame {
 	/** Wings the site envelope can hold (2 rows: 23 + 14 × 2 = 51 ≤ 64 blocks deep). */
 	public static final int MAX_MODULES = 4;
-	/** Layers at and below the pad used by the base: the basement ({@code y = -5..-1}). */
-	public static final int BASE_DEPTH = -HqFootprints.bottom();
+	/**
+	 * Lowest HQ layer that is built: the floor. The archive basement of the generator
+	 * ({@code y = -5..-1}) is <b>not</b> built (Facundo: archived threads go to a shelf inside the
+	 * building, fix/hq-archive), so nothing goes into the pad.
+	 */
+	public static final int MIN_Y = 0;
+	/** Layers at and below the pad the base asks the site for: none, since the basement is not built. */
+	public static final int BASE_DEPTH = Math.max(0, -MIN_Y);
 	public static final String BASE = "base";
 	public static final String WING = "wing-";
 	public static final String SPEC_PREFIX = "t3craft-hq:1:";
@@ -95,6 +100,11 @@ public final class HqSiteFrame {
 		return null;
 	}
 
+	/** Whether an HQ cell is built at all (not below {@link #MIN_Y}). */
+	public static boolean builds(BlockPos hqRel) {
+		return hqRel.getY() >= MIN_Y;
+	}
+
 	/** HQ relative cell → site plan relative cell. */
 	public static BlockPos toSite(BlockPos hq) {
 		return hq.rotate(Rotation.CLOCKWISE_180);
@@ -108,6 +118,9 @@ public final class HqSiteFrame {
 	public static dev.t3craft.build.BuildPlan sitePlan(dev.t3craft.hq.BuildPlan plan) {
 		List<dev.t3craft.build.Placement> out = new ArrayList<>(plan.size());
 		for (Placement p : plan.placements()) {
+			if (!builds(p.rel())) {
+				continue;
+			}
 			out.add(new dev.t3craft.build.Placement(toSite(p.rel()), p.state().rotate(Rotation.CLOCKWISE_180), p.be()));
 		}
 		return dev.t3craft.build.BuildPlan.of(out);
