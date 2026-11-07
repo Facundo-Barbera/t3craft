@@ -43,14 +43,25 @@ public final class MonitorScreens {
 
 	private static final int MAX_LARGE = 64;
 
-	private record Large(long source, StationScreen screen, long version) {
+	private static final Shown UNBOUND_SHOWN = new Shown("#unbound", 0, UNBOUND);
+
+	/** A memoised feed screen; {@code shown} is handed out as is every frame (no allocation). */
+	private record Large(long source, StationScreen screen, long version, Shown shown) {
 	}
 
 	private final WorkstationCache cache = new WorkstationCache(new WorkstationModel(LAYOUT));
 	private final Map<String, WorkstationThread> threads = new HashMap<>();
 	private final Map<String, Large> large = new HashMap<>();
+	/** "Thread not known" screens by key: built once, not per frame (fix/hq-fps). */
+	private final Map<String, Shown> missing = new HashMap<>();
 	private long revision;
 	private long largeVersions;
+	/**
+	 * Bumped when threads are dropped from the cache (or on clear): a thread that comes back restarts
+	 * its cache version at 1, so the epoch keeps {@link Shown#version()} from repeating a version
+	 * the renderer already cached with other content.
+	 */
+	private long epoch;
 
 	/** Feeds every known thread; returns true when any screen changed. */
 	public boolean tick(Collection<WorkstationThread> threads, long nowMs) {
@@ -64,7 +75,13 @@ public final class MonitorScreens {
 		}
 		int before = cache.size();
 		cache.retain(keys);
-		changed |= cache.size() != before;
+		if (cache.size() != before) {
+			changed = true;
+			epoch++;
+		}
+		if (missing.size() > 256) {
+			missing.clear();
+		}
 		if (changed) {
 			revision++;
 		}
@@ -79,13 +96,13 @@ public final class MonitorScreens {
 	/** The screen of a monitor with the given effective binding. */
 	public Shown show(Binding b) {
 		if (b.kind() != Binding.Kind.THREAD) {
-			return new Shown("#unbound", 0, UNBOUND);
+			return UNBOUND_SHOWN;
 		}
 		StationScreen s = cache.screen(b.value());
 		if (s == null) {
-			return new Shown("#missing:" + b.value(), 0, missing(b.value()));
+			return missing.computeIfAbsent(b.value(), k -> new Shown("#missing:" + k, 0, missing(k)));
 		}
-		return new Shown(b.value(), cache.version(b.value()), s);
+		return new Shown(b.value(), (epoch << 32) | cache.version(b.value()), s);
 	}
 
 	/**
@@ -111,10 +128,10 @@ public final class MonitorScreens {
 			if (large.size() > MAX_LARGE) {
 				large.clear();
 			}
-			l = new Large(source, s, version);
+			l = new Large(source, s, version, new Shown(id, version, s));
 			large.put(id, l);
 		}
-		return new Shown(id, l.version(), l.screen());
+		return l.shown();
 	}
 
 	/** Threads fed by the last {@link #tick} (feeds, tests). */
@@ -135,6 +152,8 @@ public final class MonitorScreens {
 		cache.clear();
 		threads.clear();
 		large.clear();
+		missing.clear();
+		epoch++;
 		revision++;
 	}
 }

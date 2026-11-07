@@ -101,8 +101,23 @@ public final class BlocksClient implements ClientModInitializer {
 	private static final int MOTE_TTL_TICKS = 40;
 	private static final float MOTE_CHANCE = 0.15f;
 
-	/** A lamp the renderer drew recently (motes only rise from lamps in view). */
-	private record Seen(Binding.Kind kind, LampStatus status, int tick) {
+	/** A lamp the renderer drew recently (motes only rise from lamps in view). Mutable: updated every frame without allocating. */
+	private static final class Seen {
+		Binding.Kind kind;
+		LampStatus status;
+		int tick;
+
+		Binding.Kind kind() {
+			return kind;
+		}
+
+		LampStatus status() {
+			return status;
+		}
+
+		int tick() {
+			return tick;
+		}
 	}
 
 	private final HubBeacon beacon = new HubBeacon();
@@ -301,7 +316,10 @@ public final class BlocksClient implements ClientModInitializer {
 
 	/** Render thread (= client thread): {@link LampRenderer} reports each lamp it draws. */
 	void sawLamp(BlockPos pos, Binding.Kind kind, LampStatus status) {
-		seenLamps.put(pos.asLong(), new Seen(kind, status, ticks));
+		Seen s = seenLamps.computeIfAbsent(pos.asLong(), k -> new Seen());
+		s.kind = kind;
+		s.status = status;
+		s.tick = ticks;
 	}
 
 	/** Motes in the lamp's colour from seen lamps that ask for the player ({@link LampGlow#motes}). */

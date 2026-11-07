@@ -28,6 +28,7 @@ public final class BindingWriter {
 				changed++;
 			}
 		}
+		dev.t3craft.debug.PerfStats.count(dev.t3craft.debug.PerfStats.BINDING_WRITES, changed);
 		return changed;
 	}
 }

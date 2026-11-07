@@ -13,6 +13,7 @@ import dev.t3craft.blocks.Binding;
 import dev.t3craft.blocks.MonitorBlock;
 import dev.t3craft.blocks.MonitorBlockEntity;
 import dev.t3craft.client.chat.ChatTranscript;
+import dev.t3craft.debug.PerfStats;
 import dev.t3craft.client.workstation.StationScreen;
 import dev.t3craft.client.workstation.StationStatus;
 import dev.t3craft.client.workstation.WorkstationThread;
@@ -38,6 +39,7 @@ import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.LightCoordsUtil;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
+import org.joml.Vector3fc;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -123,7 +125,21 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 
 	@Override
 	public boolean shouldRender(MonitorBlockEntity be, Vec3 camera) {
-		return Vec3.atCenterOf(be.getBlockPos()).closerThan(camera, getViewDistance());
+		BlockPos pos = be.getBlockPos();
+		if (!Vec3.atCenterOf(pos).closerThan(camera, getViewDistance())) {
+			return false;
+		}
+		// fix/hq-fps: drawn "off screen", so vanilla never frustum-culls monitors; skip screens seen
+		// from behind or lying behind the camera (RenderLod.monitor).
+		BlockState bs = be.getBlockState();
+		Direction f = bs.hasProperty(MonitorBlock.FACING) ? bs.getValue(MonitorBlock.FACING) : Direction.NORTH;
+		ScreenExtent extent = extent(be);
+		Vec3 c = screenCenter(pos, f, extent);
+		Vector3fc look = RenderLod.cameraForward();
+		boolean draw = RenderLod.monitor(pos.getX() + 0.5 - camera.x, pos.getZ() + 0.5 - camera.z, f.getStepX(), f.getStepZ(),
+				c.x - camera.x, c.y - camera.y, c.z - camera.z, Math.max(extent.width(), extent.height()) / 2.0, look.x(), look.y(), look.z());
+		PerfStats.count(draw ? PerfStats.MONITOR_DRAWN : PerfStats.MONITOR_CULLED);
+		return draw;
 	}
 
 	@Override
@@ -186,6 +202,7 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 				g = nearStatic(font, cacheKey, version, shown.screen(), layout);
 			}
 			glyphs.put(cacheKey, g);
+			PerfStats.count(PerfStats.MONITOR_GLYPHS);
 		}
 		return g;
 	}

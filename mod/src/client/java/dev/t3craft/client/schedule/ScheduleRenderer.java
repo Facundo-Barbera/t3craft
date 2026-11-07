@@ -49,6 +49,7 @@ final class ScheduleRenderer {
 		}
 		if (!board.equals(shown)) {
 			d.setText(component(board));
+			dev.t3craft.debug.PerfStats.count(dev.t3craft.debug.PerfStats.DISPLAY_SET_TEXT);
 			d.setBackgroundColor(board.background());
 			shown = board;
 		}
@@ -77,6 +78,7 @@ final class ScheduleRenderer {
 		d.setTransformation(new Transformation(null, null, new Vector3f(SCALE), null));
 		d.snapTo(p.x(), p.y(), p.z(), p.yaw(), 0f);
 		lvl.addEntity(d);
+		dev.t3craft.debug.PerfStats.count(dev.t3craft.debug.PerfStats.DISPLAY_SPAWNED);
 		return d;
 	}
 

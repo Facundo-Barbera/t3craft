@@ -539,6 +539,7 @@ public final class NpcRegistry {
 			Component want = show ? text : Component.empty();
 			if (!Objects.equals(panel.getText(), want)) {
 				panel.setText(want);
+				dev.t3craft.debug.PerfStats.count(dev.t3craft.debug.PerfStats.DISPLAY_SET_TEXT);
 				panel.setBackgroundColor(show ? 0x60000000 : 0);
 			}
 		}
@@ -547,6 +548,7 @@ public final class NpcRegistry {
 	private static void setText(Display.TextDisplay d, Component text) {
 		if (!Objects.equals(d.getText(), text)) {
 			d.setText(text);
+			dev.t3craft.debug.PerfStats.count(dev.t3craft.debug.PerfStats.DISPLAY_SET_TEXT);
 		}
 	}
 
@@ -557,6 +559,7 @@ public final class NpcRegistry {
 		d.setBackgroundColor(background);
 		d.setLineWidth(220);
 		lvl.addEntity(d);
+		dev.t3craft.debug.PerfStats.count(dev.t3craft.debug.PerfStats.DISPLAY_SPAWNED);
 		return d;
 	}
 
@@ -568,6 +571,7 @@ public final class NpcRegistry {
 		avatar.update(info);
 		avatar.snapTo(pos.x, pos.y, pos.z, yaw, 0f);
 		lvl.addEntity(avatar);
+		dev.t3craft.debug.PerfStats.count(dev.t3craft.debug.PerfStats.DISPLAY_SPAWNED);
 		Display.TextDisplay panel = textDisplay(lvl, 0);
 		panel.snapTo(pos.x, pos.y + 2.45, pos.z, 0f, 0f);
 		T3Craft.LOGGER.debug("spawned client-only NPC {} at {}", info.id(), pos);
