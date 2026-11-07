@@ -46,11 +46,15 @@ Files adapted from AgentCraft (MIT; the `npc/behavior` files come from AgentCraf
 
 - `mod/src/client/java/dev/t3craft/client/npc/behavior/GridPathfinder.java` ← `GridPathfinder.java`
   (A* with 8 directions, 1-block steps, no corner cutting, string pulling; reworked over a
-  Minecraft-free `Walkable`, request-bounded search, player avoidance).
-- `mod/src/client/java/dev/t3craft/client/npc/behavior/LevelWalkable.java` ← the walkability test
-  of `GridPathfinder.java` (solid floor below, passable or thin feet block, headroom).
+  Minecraft-free `Walkable`, request-bounded search, player avoidance, body-sweep passages,
+  start/goal snapping and a resumable search for a per-tick node budget).
+- `mod/src/client/java/dev/t3craft/client/npc/behavior/Collision.java` ← the walkability test
+  of `GridPathfinder.java` (solid floor below, passable or thin feet block, headroom; formerly
+  `LevelWalkable.java`), rewritten over real collision boxes with an AABB body sweep and
+  collision-resolved movement.
 - `mod/src/client/java/dev/t3craft/client/npc/behavior/Motion.java` ← `AgentMotion.java` (calm
-  walking pace with ease in/out and smooth turning; Minecraft-free, holds for the player).
+  walking pace with ease in/out and smooth turning; Minecraft-free, holds for the player,
+  collision-resolved sub-moves and stuck detection).
 - `mod/src/client/java/dev/t3craft/client/hud/StatusBarModel.java` and `StatusBar.java` ←
   `mod/src/client/java/dev/agentcraft/client/hud/GoalBar.java` (design: top bar of counts with a
   "n waiting · KEY" badge under it, recounted only on change; rewritten over thread states, with a
