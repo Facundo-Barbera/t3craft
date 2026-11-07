@@ -24,8 +24,15 @@ import org.jspecify.annotations.Nullable;
  *   <li>{@code orchestration.getArchivedShellSnapshot} {@code {}} → {@code {schemaVersion,
  *   snapshotSequence, projects, threads}}.</li>
  * </ul>
+ *
+ * <p>Only payloads and decoding live here: the requests go through the connection's shared
+ * one-shot read path (feat/chat's {@code StreamRegistry.call}), never through a path of their own.
+ * The {@code List<JsonObject>} overloads take the values {@code call} completes with.
  */
 public final class ArchiveWire {
+	/** Read-only ({@code orchestration:read}) RPC tags. */
+	public static final String GET_OLDER_SETTLED_THREADS = "orchestration.getOlderSettledThreads";
+	public static final String GET_ARCHIVED_SHELL_SNAPSHOT = "orchestration.getArchivedShellSnapshot";
 	/** The server caps {@code limit} at 50. */
 	public static final int MAX_PAGE = 50;
 
@@ -97,6 +104,23 @@ public final class ArchiveWire {
 		}
 		p.addProperty("limit", Math.max(0, Math.min(MAX_PAGE, limit)));
 		return p;
+	}
+
+	/** Request payload of {@code getArchivedShellSnapshot}: an empty struct. */
+	public static JsonObject archivedRequest() {
+		return new JsonObject();
+	}
+
+	public static OlderSettledPage decodeOlderSettled(@Nullable List<JsonObject> values) {
+		return decodeOlderSettled(last(values));
+	}
+
+	public static ArchivedSnapshot decodeArchived(@Nullable List<JsonObject> values) {
+		return decodeArchived(last(values));
+	}
+
+	private static @Nullable JsonElement last(@Nullable List<JsonObject> values) {
+		return values == null || values.isEmpty() ? null : values.getLast();
 	}
 
 	public static OlderSettledPage decodeOlderSettled(@Nullable JsonElement value) {

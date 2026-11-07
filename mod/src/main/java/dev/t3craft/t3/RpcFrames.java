@@ -20,10 +20,6 @@ public final class RpcFrames {
 
 	public static final String SUBSCRIBE_SHELL = "orchestration.subscribeShell";
 	public static final String SUBSCRIBE_THREAD = "orchestration.subscribeThread";
-	/** One-shot read (scope {@code orchestration:read}): a page of older settled threads. */
-	public static final String GET_OLDER_SETTLED_THREADS = "orchestration.getOlderSettledThreads";
-	/** One-shot read (scope {@code orchestration:read}): archived threads and their projects. */
-	public static final String GET_ARCHIVED_SHELL_SNAPSHOT = "orchestration.getArchivedShellSnapshot";
 
 	public static String request(String id, String tag, JsonObject payload) {
 		JsonObject o = new JsonObject();
@@ -71,14 +67,8 @@ public final class RpcFrames {
 	public record Chunk(String requestId, List<JsonObject> values) implements Frame {
 	}
 
-	/**
-	 * {@code failure} is a short, secret-free description when the exit is a failure, else null.
-	 * {@code value} is the success value of a one-shot RPC (null on failure, or when T3 sent none).
-	 */
-	public record Exit(String requestId, @Nullable String failure, @Nullable JsonElement value) implements Frame {
-		public Exit(String requestId, @Nullable String failure) {
-			this(requestId, failure, null);
-		}
+	/** {@code failure} is a short, secret-free description when the exit is a failure, else null. */
+	public record Exit(String requestId, @Nullable String failure) implements Frame {
 	}
 
 	public record Defect(String detail) implements Frame {
@@ -118,14 +108,10 @@ public final class RpcFrames {
 			case "Exit" -> {
 				JsonObject exit = Json.obj(o, "exit");
 				String failure = null;
-				JsonElement value = null;
 				if ("Failure".equals(Json.str(exit, "_tag"))) {
 					failure = describeCause(Json.arr(exit, "cause"));
-				} else if (exit != null) {
-					JsonElement v = exit.get("value");
-					value = v == null || v.isJsonNull() ? null : v;
 				}
-				yield new Exit(String.valueOf(Json.str(o, "requestId")), failure, value);
+				yield new Exit(String.valueOf(Json.str(o, "requestId")), failure);
 			}
 			case "Defect", "ClientProtocolError" -> new Defect(tag + ": " + truncate(String.valueOf(o.get("defect") != null ? o.get("defect") : o.get("error"))));
 			case "Pong" -> new Pong();

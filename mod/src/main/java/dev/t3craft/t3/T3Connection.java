@@ -12,10 +12,6 @@ import java.net.http.WebSocket;
 import java.net.http.WebSocketHandshakeException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -23,7 +19,6 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Function;
 import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
 
@@ -32,9 +27,7 @@ import org.jspecify.annotations.Nullable;
  * {@code POST /api/auth/websocket-ticket/rpc} (Bearer) → {@code /ws?orchestrationProtocol=2&wsTicket=…}
  * → {@code orchestration.subscribeShell} with {@code requestCompletionMarker:true}, one Ack per
  * Chunk, Ping every 5 s, reconnect with jittered backoff and a fresh single-use ticket each time.
- * Only read-only RPCs are ever sent from this class: one-shot reads go through {@link #call}, which
- * only accepts the tags in {@link #ONE_SHOT_READS} and multiplexes them on the same socket (request
- * ids 2, 3, …; the shell subscription is id 1).
+ * Only read-only RPCs are ever sent from this class.
  *
  * <p>Secrets: the Bearer token and the ticket never appear in status details or logs
  * ({@link #sanitize}).
@@ -69,18 +62,6 @@ public final class T3Connection {
 	private static final long SILENCE_MS = 20_000;
 	private static final long MIN_BACKOFF_MS = 1_000;
 	private static final long MAX_BACKOFF_MS = 30_000;
-	/** A one-shot read that got no Exit by then fails (and is interrupted on the server). */
-	static final long CALL_TIMEOUT_MS = 15_000;
-	private static final String SHELL_REQUEST_ID = "1";
-	/** The only one-shot RPCs this class sends (all {@code orchestration:read}). */
-	public static final Set<String> ONE_SHOT_READS = Set.of(RpcFrames.GET_OLDER_SETTLED_THREADS, RpcFrames.GET_ARCHIVED_SHELL_SNAPSHOT);
-
-	/** Thrown into a one-shot read's future: not connected, timed out, socket dropped or T3 failure. */
-	public static final class CallException extends RuntimeException {
-		public CallException(String message) {
-			super(sanitize(message), null, false, false);
-		}
-	}
 
 	private final Environments.Environment env;
 	private final Supplier<Pairing.@Nullable Session> session;
@@ -95,9 +76,6 @@ public final class T3Connection {
 	private @Nullable WebSocket socket;
 	private @Nullable ScheduledFuture<?> pending;
 	private @Nullable ScheduledFuture<?> pinger;
-	/** Open one-shot reads by request id (connection thread only). */
-	private final Map<String, CompletableFuture<JsonElement>> calls = new HashMap<>();
-	private long nextRequestId = 2;
 
 	public T3Connection(Environments.Environment env, Supplier<Pairing.@Nullable Session> session, Listener listener, HttpClient http) {
 		this.env = env;
@@ -152,80 +130,6 @@ public final class T3Connection {
 		exec.shutdown();
 	}
 
-	/**
-	 * Older settled threads below {@code before}, newest settle first, at most {@code limit}
-	 * (0..{@value ArchiveWire#MAX_PAGE}; 0 reads only the counts). Fails with {@link CallException}
-	 * when the environment is not connected. Completes on this connection's thread.
-	 */
-	public CompletableFuture<ArchiveWire.OlderSettledPage> getOlderSettledThreads(ArchiveWire.Cursor before, int limit) {
-		return call(RpcFrames.GET_OLDER_SETTLED_THREADS, ArchiveWire.olderSettledRequest(before, limit, null), ArchiveWire::decodeOlderSettled);
-	}
-
-	/** Archived threads and their projects. Same failure and threading rules as {@link #getOlderSettledThreads}. */
-	public CompletableFuture<ArchiveWire.ArchivedSnapshot> getArchivedShellSnapshot() {
-		return call(RpcFrames.GET_ARCHIVED_SHELL_SNAPSHOT, new JsonObject(), ArchiveWire::decodeArchived);
-	}
-
-	/**
-	 * Sends one read-only, one-shot RPC on the open socket and decodes its Exit value. Only tags in
-	 * {@link #ONE_SHOT_READS} are accepted; anything else fails without being sent.
-	 */
-	<T> CompletableFuture<T> call(String tag, JsonObject payload, Function<@Nullable JsonElement, T> decode) {
-		CompletableFuture<JsonElement> raw = new CompletableFuture<>();
-		if (!ONE_SHOT_READS.contains(tag)) {
-			raw.completeExceptionally(new CallException("not a read-only one-shot RPC: " + tag));
-			return raw.thenApply(decode);
-		}
-		try {
-			exec.execute(() -> {
-				WebSocket ws = socket;
-				if (stopped || ws == null || status != Status.OK) {
-					raw.completeExceptionally(new CallException("not connected (" + status.wire + ")"));
-					return;
-				}
-				String id = Long.toString(nextRequestId++);
-				calls.put(id, raw);
-				ws.sendText(RpcFrames.request(id, tag, payload), true);
-				exec.schedule(() -> {
-					CompletableFuture<JsonElement> f = calls.remove(id);
-					if (f != null) {
-						WebSocket now = socket;
-						if (now != null) {
-							now.sendText(RpcFrames.interrupt(id), true);
-						}
-						f.completeExceptionally(new CallException(tag + ": no answer in " + (CALL_TIMEOUT_MS / 1000) + " s"));
-					}
-				}, CALL_TIMEOUT_MS, TimeUnit.MILLISECONDS);
-			});
-		} catch (java.util.concurrent.RejectedExecutionException e) {
-			raw.completeExceptionally(new CallException("connection stopped"));
-		}
-		return raw.thenApply(decode);
-	}
-
-	/** Completes a one-shot read from its Exit. Returns false when the id is not an open call. */
-	private boolean finishCall(RpcFrames.Exit e) {
-		CompletableFuture<JsonElement> f = calls.remove(e.requestId());
-		if (f == null) {
-			return false;
-		}
-		if (e.failure() != null) {
-			f.completeExceptionally(new CallException("T3: " + e.failure()));
-		} else {
-			f.complete(e.value());
-		}
-		return true;
-	}
-
-	private void failCalls(String reason) {
-		if (calls.isEmpty()) {
-			return;
-		}
-		Map<String, CompletableFuture<JsonElement>> open = new HashMap<>(calls);
-		calls.clear();
-		open.values().forEach(f -> f.completeExceptionally(new CallException(reason)));
-	}
-
 	/** Removes anything that could carry a credential from error text. */
 	public static String sanitize(@Nullable String s) {
 		if (s == null) {
@@ -267,7 +171,6 @@ public final class T3Connection {
 		if (ws != null) {
 			ws.abort();
 		}
-		failCalls("connection closed");
 	}
 
 	private void connect(int g) {
@@ -394,7 +297,7 @@ public final class T3Connection {
 					return;
 				}
 				socket = ws;
-				ws.sendText(RpcFrames.subscribeShell(SHELL_REQUEST_ID), true);
+				ws.sendText(RpcFrames.subscribeShell("1"), true);
 				pinger = exec.scheduleAtFixedRate(() -> {
 					if (!current(gen) || ended) {
 						return;
@@ -428,8 +331,6 @@ public final class T3Connection {
 			}
 			RpcFrames.Frame f = RpcFrames.parse(text);
 			switch (f) {
-				case RpcFrames.Chunk c when !SHELL_REQUEST_ID.equals(c.requestId()) -> ws.sendText(RpcFrames.ack(c.requestId()), true);
-				case RpcFrames.Exit e when !SHELL_REQUEST_ID.equals(e.requestId()) -> finishCall(e);
 				case RpcFrames.Chunk c -> {
 					boolean changed = false;
 					boolean wasSynced = state.isSynchronized();

@@ -82,11 +82,6 @@ public final class DirectController implements T3Connection.Listener {
 		return out;
 	}
 
-	/** The latest shell view of one environment, unfiltered (settled threads included), or null. */
-	public ShellState.@org.jspecify.annotations.Nullable View view(String envId) {
-		return views.get(envId);
-	}
-
 	/** Filtered, ranked NPCs of every environment (cap applies per environment). */
 	public List<NpcView> npcs(long nowMs) {
 		List<NpcView> out = new ArrayList<>();
