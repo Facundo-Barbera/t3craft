@@ -45,6 +45,7 @@ Reglas para todos:
 | `PairingClient` | `exchange(Target, clientLabel, clientOs) → CompletableFuture<Pairing.Session>`. |
 | `Environments` | El almacén en `config/t3craft/`: `list() → List<Environment(id, label, url)>`, `save(env, session)`, `remove(id)`, `credential(id) → Session | null` (solo devuelve sesiones read-only), `slug(label)`. Los tokens solo se leen aquí. |
 | `Json` | Accesores tolerantes de Gson (`str`, `obj`, `arr`, `bool`, `optBool`, `num`, `time`). |
+| `ScheduledTask` (record) | Tarea programada de `scheduledTasks.subscribe`, decodificada de forma tolerante: `fromJson` (null sin id), `listFrom({tasks:[…]})`, `name()`, `active()`, `RunStatus` (`NEVER, RUNNING, SUCCEEDED, FAILED, UNKNOWN`), `schedule` resumido. Solo lectura. `RpcFrames.SUBSCRIBE_SCHEDULED_TASKS` es solo el nombre del método. |
 
 ## 3. Entidades y registro (`dev.t3craft.client.npc`, source set `client`)
 
@@ -68,3 +69,7 @@ Reglas para todos:
 | `hud.Notifier`, `hud.PeekHud`, `hud.Toasts` | Avisos (chat + toast + sonido), la línea de HUD con el banner y los toasts. `PeekHud.setPeek(text, color)` y `setBanner(text)` (`null` oculta). |
 | `screen.ThreadChatScreen` | Placeholder del chat. Lo reemplaza `feat/chat` y se abre con `new ThreadChatScreen(NpcInfo)`. |
 | `screen.PairScreen` | UI de emparejado de solo lectura. |
+
+## Tablero de tareas programadas (`dev.t3craft.client.schedule`)
+
+Ver `docs/feat-schedule-board.md`. `ScheduleClient.get()`: `setSource(ScheduleSource)` (adaptador del stream; por defecto `PENDING` hasta que entre el `StreamRegistry` de feat/chat), `setPlacementSource(SchedulePlacementSource)` (anchor `board` del HQ), `setBoardHook(ScheduleBoardHook)` (bloque de feat/blocks-core) y `entries()`. Ids de entidad desde `-7_000_000`. Comando `/t3craft schedule`. Sin acciones de escritura.
