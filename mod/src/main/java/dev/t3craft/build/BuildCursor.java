@@ -20,7 +20,12 @@ public final class BuildCursor {
 		/** The target already matched; costs no budget. */
 		SKIPPED,
 		/** Could not place (unloaded chunk, refused); costs budget so a bad plan cannot spin. */
-		FAILED
+		FAILED,
+		/**
+		 * Cannot place yet (e.g. missing materials): the step is not consumed, the tick stops and the
+		 * cursor goes to {@link JobState#PAUSED}; the same index is retried after {@link #resume()}.
+		 */
+		BLOCKED
 	}
 
 	@FunctionalInterface
@@ -80,6 +85,10 @@ public final class BuildCursor {
 		int skipsThisTick = 0;
 		while (credit >= 1.0 && next < total && state == JobState.RUNNING) {
 			Outcome o = step.apply(next);
+			if (o == Outcome.BLOCKED) {
+				block();
+				break;
+			}
 			next++;
 			applied++;
 			switch (o) {
@@ -98,12 +107,19 @@ public final class BuildCursor {
 						credit = Math.min(credit, 0.999);
 					}
 				}
+				case BLOCKED -> throw new AssertionError(); // handled above
 			}
 		}
 		if (next >= total) {
 			finish();
 		}
 		return applied;
+	}
+
+	private synchronized void block() {
+		if (state == JobState.RUNNING) {
+			state = JobState.PAUSED;
+		}
 	}
 
 	private synchronized void finish() {
