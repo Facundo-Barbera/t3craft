@@ -58,6 +58,12 @@ is the cell in front of each hub bench. `HqAnchorPlacementTest` checks this with
 the plan for many rosters, annexes and a history. Surface anchors (board, lamps, monitors, screens,
 archived computers) mark a block face and are not standing spots.
 
+Without an HQ, the grid fallback (`GridLayout`, `dev.t3craft.client.npc.behavior`) grounds each
+desk with `Ground.near(LevelWalkable)`: the walkable cell of that column nearest the origin height,
+so desks land in free cells of the real world. Open (owned by npc behaviour, not the HQ): a column
+with no walkable cell within `MAX_STEP` falls back to the origin height unchecked, and `board()` /
+`home()` use the origin height without probing.
+
 ### Environments
 
 Environments are told apart by colour and sign, never by separate buildings. The carpet runner in a
