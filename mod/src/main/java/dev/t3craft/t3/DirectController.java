@@ -8,6 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Direct mode: one {@link T3Connection} per paired environment. Keeps each environment's latest
@@ -88,6 +89,11 @@ public final class DirectController implements T3Connection.Listener {
 		});
 		out.sort(Comparator.comparingInt(NpcView::priority).thenComparing(NpcView::envLabel).thenComparing(NpcView::title));
 		return out;
+	}
+
+	/** Last shell view of one environment (threads with their timestamps), or null before the first sync. */
+	public ShellState.@Nullable View view(String envId) {
+		return views.get(envId);
 	}
 
 	@Override
