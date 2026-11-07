@@ -84,6 +84,18 @@ public final class SettingsScreen extends BaseConfigScreen {
 		toggle("Held terminal screen", draft.portable().heldScreen(), x0, y + 96, colW,
 				v -> draft = draft.withPortable(draft.portable().withHeldScreen(v)));
 
+		// HUD status bar (hud.*): on/off next to "Held terminal screen"; placement cycle and "hide
+		// when idle" on the next row when the window is tall enough (else edit config/t3craft.json).
+		toggle("HUD status bar", draft.hud().statusBar(), x2, y + 96, colW, v -> draft = draft.withHud(draft.hud().withStatusBar(v)));
+		if (y + 144 <= height - 80) {
+			addRenderableWidget(Button.builder(placementText(), b -> {
+				draft = draft.withHud(draft.hud().nextPlacement());
+				b.setMessage(placementText());
+			}).bounds(x0, y + 120, colW, 20).build());
+			toggle("Hide bar when idle", draft.hud().hideWhenIdle(), x2, y + 120, colW,
+					v -> draft = draft.withHud(draft.hud().withHideWhenIdle(v)));
+		}
+
 		int by = height - 52;
 		int bw = Math.min(120, (width - 40) / 3 - 4);
 		int bx = width / 2 - (bw * 3 + 8) / 2;
@@ -103,6 +115,10 @@ public final class SettingsScreen extends BaseConfigScreen {
 		int half = Math.min(150, (width - 40) / 2 - 4);
 		addRenderableWidget(Button.builder(Component.literal("Save"), b -> save()).bounds(width / 2 - half - 4, by + 4, half, 20).build());
 		addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose()).bounds(width / 2 + 4, by + 4, half, 20).build());
+	}
+
+	private Component placementText() {
+		return Component.literal("Bar: " + draft.hud().position() + " " + draft.hud().align());
 	}
 
 	private Notifications n() {
@@ -153,6 +169,6 @@ public final class SettingsScreen extends BaseConfigScreen {
 				: " · read-only");
 		// Next to the "Held terminal screen" toggle (row 5 of the first column).
 		String modeLine = mode + " · " + ConfigManager.get().file().getFileName();
-		g.text(font, font.plainSubstrByWidth(modeLine, x2 + colW - x1), x1 + 4, 44 + 102, 0xFF555555);
+		g.text(font, font.plainSubstrByWidth(modeLine, colW - 4), x1 + 4, 44 + 102, 0xFF555555);
 	}
 }

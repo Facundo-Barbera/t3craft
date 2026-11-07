@@ -11,6 +11,7 @@ import org.jspecify.annotations.Nullable;
  *
  * @param updatedAtMs last activity of the thread (epoch ms) when the source knows it; null makes the
  *     {@link WorkstationCache} measure age from the last change it observed itself.
+ * @param branch the thread's git branch (already clipped), or null to show no branch line
  */
 public record WorkstationThread(
 		String key,
@@ -21,7 +22,14 @@ public record WorkstationThread(
 		int priority,
 		StationStatus status,
 		@Nullable String activity,
-		@Nullable Long updatedAtMs) {
+		@Nullable Long updatedAtMs,
+		@Nullable String branch) {
+
+	/** Without branch. */
+	public WorkstationThread(String key, String envId, String threadId, String title, String groupId, int priority, StationStatus status,
+			@Nullable String activity, @Nullable Long updatedAtMs) {
+		this(key, envId, threadId, title, groupId, priority, status, activity, updatedAtMs, null);
+	}
 
 	public WorkstationThread {
 		Objects.requireNonNull(key, "key");
@@ -41,7 +49,7 @@ public record WorkstationThread(
 	 * re-renders when this (or the age label) changes.
 	 */
 	public int contentHash() {
-		return Objects.hash(title, status, activity);
+		return Objects.hash(title, status, activity, branch);
 	}
 
 	/**
@@ -50,11 +58,16 @@ public record WorkstationThread(
 	 * and the env label as env.
 	 */
 	public static WorkstationThread fromNpc(NpcInfo n) {
+		return fromNpc(n, true);
+	}
+
+	/** @param withBranch false hides the branch line (config {@code chips.branchWorkstation}). */
+	public static WorkstationThread fromNpc(NpcInfo n, boolean withBranch) {
 		String id = n.id();
 		int colon = id.indexOf(':');
 		String env = colon > 0 ? id.substring(0, colon) : n.envLabel();
 		String thread = colon > 0 ? id.substring(colon + 1) : id;
 		return new WorkstationThread(id, env, thread, n.title(), n.groupId(), n.priority(), StationStatus.of(n.state(), n.settled()),
-				n.activity(), null);
+				n.activity(), null, withBranch ? n.branch() : null);
 	}
 }

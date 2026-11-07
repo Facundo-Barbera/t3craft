@@ -42,7 +42,7 @@ adapted from AgentCraft must keep this header and be listed here:
 // Copyright (c) 2026 AgentCraft contributors. MIT License.
 ```
 
-Files adapted from AgentCraft (from `mod/src/client/java/dev/agentcraft/client/agents/`, MIT):
+Files adapted from AgentCraft (MIT; the `npc/behavior` files come from AgentCraft `mod/src/client/java/dev/agentcraft/client/agents/`):
 
 - `mod/src/client/java/dev/t3craft/client/npc/behavior/GridPathfinder.java` ← `GridPathfinder.java`
   (A* with 8 directions, 1-block steps, no corner cutting, string pulling; reworked over a
@@ -51,6 +51,20 @@ Files adapted from AgentCraft (from `mod/src/client/java/dev/agentcraft/client/a
   of `GridPathfinder.java` (solid floor below, passable or thin feet block, headroom).
 - `mod/src/client/java/dev/t3craft/client/npc/behavior/Motion.java` ← `AgentMotion.java` (calm
   walking pace with ease in/out and smooth turning; Minecraft-free, holds for the player).
+- `mod/src/client/java/dev/t3craft/client/hud/StatusBarModel.java` and `StatusBar.java` ←
+  `mod/src/client/java/dev/agentcraft/client/hud/GoalBar.java` (design: top bar of counts with a
+  "n waiting · KEY" badge under it, recounted only on change; rewritten over thread states, with a
+  Minecraft-free model and top/bottom placement that keeps clear of the survival bars).
+- `mod/src/main/java/dev/t3craft/site/mc/LevelBlockWorld.java` — the block write flag set
+  (`FLAGS`: clients updated, no neighbour/shape updates, no drops, no block-entity side effects,
+  no `onPlace`) is taken from AgentCraft `mod/src/main/java/dev/agentcraft/hq/Plan.java`
+  (commit `8fe3ad23489b06f9142c6382bc23d31090c6b406`).
+
+Design ideas only (no code copied), from AgentCraft `hq/Plan.java` and `hq/PlanStore.java`:
+apply a build as a diff of a whole box, persist the applied plan in the world folder (palette +
+index per cell, temp file + atomic move), and treat a cell that matches neither the stored plan nor
+the original as a player change that is never overwritten silently. t3craft's site code
+(`dev.t3craft.site`) reimplements this for arbitrary terrain with full snapshots and undo.
 
 AgentCraft license:
 

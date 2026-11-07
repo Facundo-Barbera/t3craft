@@ -63,6 +63,10 @@ public final class Presentation {
 				env + ":" + t.projectId(),
 				clip(ShellState.projectLabel(projectTitle, t.projectId()), MAX_TITLE),
 				env + "/" + s.wire,
-				particle(s));
+				particle(s),
+				Chips.model(t.meta()),
+				Chips.provider(t.meta()),
+				Chips.branch(t.meta()),
+				Chips.worktree(t.meta().worktreePath()));
 	}
 }
