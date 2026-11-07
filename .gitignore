@@ -27,3 +27,6 @@ Thumbs.db
 
 # Minecraft instance credentials (T3 pairing tokens) — never commit
 **/config/t3craft/credentials/
+
+# Logs written by Minecraft/Fabric when tests or runs load logging config
+mod/logs/
