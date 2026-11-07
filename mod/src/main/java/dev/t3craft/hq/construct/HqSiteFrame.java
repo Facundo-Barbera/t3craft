@@ -23,7 +23,7 @@ import org.jspecify.annotations.Nullable;
  *   {@code site = (-x, y, -z)} (a half turn) and the HQ origin (hub floor centre) is the site origin
  *   (pad centre, one above the pad). The HQ floor ({@code y = 0}) stands on the pad; nothing below
  *   it is built ({@link #MIN_Y}).</li>
- *   <li><b>Site modules.</b> {@code base} = hub + portico + archive, {@code wing-<i>} = grid slot
+ *   <li><b>Site modules.</b> {@code base} = hub (with the "Archived" shelf) + portico, {@code wing-<i>} = grid slot
  *   {@code i} ({@link HqFootprints#slot}). One site module per HQ module: each new wing is one
  *   site expansion, with its own snapshot and undo step.</li>
  *   <li><b>Capacity.</b> The site's envelope is at most {@link SiteRequest#MAX_ENVELOPE} deep, which
@@ -34,12 +34,11 @@ public final class HqSiteFrame {
 	/** Wings the site envelope can hold (2 rows: 23 + 14 × 2 = 51 ≤ 64 blocks deep). */
 	public static final int MAX_MODULES = 4;
 	/**
-	 * Lowest HQ layer that is built: the floor. The archive basement of the generator
-	 * ({@code y = -5..-1}) is <b>not</b> built (Facundo: archived threads go to a shelf inside the
-	 * building, fix/hq-archive), so nothing goes into the pad.
+	 * Lowest HQ layer that is built: the floor. The generator has no basement any more (settled
+	 * threads go to the "Archived" shelf inside the hub, fix/hq-archive), so nothing goes into the pad.
 	 */
 	public static final int MIN_Y = 0;
-	/** Layers at and below the pad the base asks the site for: none, since the basement is not built. */
+	/** Layers at and below the pad the base asks the site for: none (the HQ has no basement). */
 	public static final int BASE_DEPTH = Math.max(0, -MIN_Y);
 	public static final String BASE = "base";
 	public static final String WING = "wing-";
@@ -48,7 +47,7 @@ public final class HqSiteFrame {
 	private HqSiteFrame() {
 	}
 
-	/** What the HQ asks the site for: the base (hub, portico, archive), room for the wings and the basement depth. */
+	/** What the HQ asks the site for: the base (hub with the "Archived" shelf, portico), room for the wings, no depth. */
 	public static SiteRequest request() {
 		return new SiteRequest(module(BASE), rect(HqFootprints.envelope(MAX_MODULES)), BASE_DEPTH);
 	}

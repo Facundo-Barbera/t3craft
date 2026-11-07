@@ -30,10 +30,12 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 /**
- * Plan validator: every standing anchor (desks, board, doors, stroll points, benches, spawn) is in a
- * free, standable cell (no collision at the feet or head, solid floor below) that NPCs can reach
- * from the spawn over free cells, for many rosters, annexes and histories. NPCs that clipped into
- * desks, walls and chairs in the demo world came from anchors that broke this rule.
+ * Plan validator: every standing anchor (desks, board, doors, stroll points, benches, spawn, the
+ * shelf spot) is in a free, standable cell where the NPC body fits exactly (no collision at the
+ * feet or head, a floor right under the anchor) and that NPCs can reach from the spawn over free
+ * cells, judged by the client navigation's own {@code Collision} (see {@link PlanWalkability}),
+ * for many rosters, annexes and histories. NPCs that clipped into desks, walls and chairs in the
+ * demo world came from anchors that broke this rule.
  */
 class HqAnchorPlacementTest {
 	@BeforeAll
@@ -100,13 +102,14 @@ class HqAnchorPlacementTest {
 			assertTrue(AnchorNames.standing(n), n);
 		}
 		for (String n : List.of(AnchorNames.BOARD, AnchorNames.boardLamp(0), AnchorNames.monitor("env:p0-t0"), AnchorNames.lamp("env:p0-t0"),
-				AnchorNames.screenSlot(0, 0), AnchorNames.archive("env:p0-t0"))) {
+				AnchorNames.screenSlot(0, 0), AnchorNames.archive("env:p0-t0"), AnchorNames.archiveShelfSlot(0), AnchorNames.SHELF_MORE,
+				AnchorNames.SHELF_HEADER)) {
 			assertFalse(AnchorNames.standing(n), n);
 		}
 		// every anchor of a real plan is one or the other, and standing ones sit at a cell centre at foot level
 		for (Anchor a : p.anchors().values()) {
 			if (AnchorNames.standing(a.name())) {
-				assertEquals(a.block().getY(), a.y(), 1e-9, a.toString());
+				assertTrue(a.y() >= a.block().getY() && a.y() <= a.block().getY() + PlanBuilder.THIN_FLOOR, a.toString());
 				assertEquals(a.block().getX() + 0.5, a.x(), 1e-9, a.toString());
 				assertEquals(a.block().getZ() + 0.5, a.z(), 1e-9, a.toString());
 			}
@@ -165,6 +168,20 @@ class HqAnchorPlacementTest {
 		assertEquals(r.plan().anchors(), again.plan().anchors());
 	}
 
+	@Test
+	void validatorRejectsTheCellsNpcsUsedToClipInto() {
+		BuildPlan p = HqGenerator.plan(input(1, 2), null).plan();
+		PlanWalkability walk = new PlanWalkability(p);
+		Anchor bench = p.anchor(AnchorNames.bench(0));
+		BlockPos benchStairs = bench.block().relative(bench.facing().getOpposite());
+		assertTrue(Double.isNaN(walk.floor(benchStairs)), "standing on/in the bench stairs (the old bench anchor)");
+		Workstation w = p.workstations().get(0);
+		assertTrue(Double.isNaN(walk.floor(w.computerPos().below())), "the desk top");
+		assertTrue(Double.isNaN(walk.floor(w.computerPos())), "the computer");
+		assertFalse(walk.fits(w.deskAnchor().x(), w.deskAnchor().block().getY(), w.deskAnchor().z()),
+				"an anchor sunk into the cushion would overlap it");
+	}
+
 	// ------------------------------------------------------------------ validator
 
 	static void assertAnchorsValid(BuildPlan p, String ctx) {
@@ -190,7 +207,8 @@ class HqAnchorPlacementTest {
 			double floor = walk.floor(c);
 			assertFalse(Double.isNaN(floor), ctx + ": " + a + " not standable (feet " + feet.state() + ", head " + p.at(c.above()).state()
 					+ ", below " + (p.at(c.below()) == null ? "nothing" : p.at(c.below()).state()) + ")");
-			assertTrue(floor - a.y() >= 0 && floor - a.y() <= PlanWalkability.THIN, ctx + ": " + a + " floats or sinks (floor " + floor + ")");
+			assertEquals(floor, a.y(), 1e-9, ctx + ": " + a + " floats or sinks (floor " + floor + ")");
+			assertTrue(walk.fits(a.x(), a.y(), a.z()), ctx + ": the NPC body does not fit exactly at " + a);
 			assertTrue(reach.contains(c), ctx + ": " + a + " not reachable from the spawn");
 		}
 	}

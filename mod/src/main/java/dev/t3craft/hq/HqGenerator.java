@@ -49,7 +49,7 @@ public final class HqGenerator {
 		int rows = layout.rows();
 		hub(b, rows > 0);
 		b.group(GROUP_ARCHIVE);
-		archive(b, layout);
+		shelf(b, layout);
 		b.group(null);
 		portico(b);
 		for (int r = 0; r < rows; r++) {
@@ -66,7 +66,7 @@ public final class HqGenerator {
 		return b.build();
 	}
 
-	/** Group of the archive (basement). */
+	/** Group of the "Archived" shelf (two shelf modules set into the hub's south wall). */
 	public static final String GROUP_ARCHIVE = "archive";
 
 	/** Group name of project module {@code index} (see {@link BuildPlan#groups()}). */
@@ -77,7 +77,7 @@ public final class HqGenerator {
 	// ------------------------------------------------------------------ hub
 
 	private void hub(PlanBuilder b, boolean northDoor) {
-		try (PlanBuilder.Canvas c = b.module("hub", HqGeometry.hub(), List.of())) {
+		try (PlanBuilder.Canvas c = b.module("hub", HqGeometry.hub(), HqGeometry.shelves())) {
 			for (int z = -HUB; z <= HUB; z++) {
 				for (int x = -HUB; x <= HUB; x++) {
 					int m = Math.max(Math.abs(x), Math.abs(z));
@@ -86,13 +86,6 @@ public final class HqGenerator {
 					BlockState floor = m == HUB ? k.plinth : m == 7 ? k.stoneFloor : m == 6 ? k.copper
 							: Math.abs(x) <= 1 && Math.abs(z) <= 1 ? k.copperInlay : k.woodFloor;
 					c.set(x, 0, z, door ? k.stoneFloor : floor);
-					if (x >= HqGeometry.STAIR_X1 && x <= HqGeometry.STAIR_X2) {
-						if (z >= HqGeometry.STAIR_OPEN_Z1 && z <= HqGeometry.STAIR_OPEN_Z2) {
-							c.set(x, 0, z, k.air);
-						} else if (z == HqGeometry.STAIR_TOP_Z) {
-							c.set(x, 0, z, k.stairs(k.stairBlock, Direction.SOUTH));
-						}
-					}
 					if (m == HUB) {
 						hubWall(c, x, z, door);
 					}
@@ -141,16 +134,6 @@ public final class HqGenerator {
 					c.set(2 * sx, 1, 7 * dz, k.copperGrate);
 					c.decor(2 * sx, 2, 7 * dz, k.copperLantern(false));
 				}
-			}
-			// railing around the stairwell down to the archive
-			// (no corner posts at the north end: the cap row and the sides already close it, and the
-			// cell east of it stays free for the resting spot in front of the last bench)
-			for (int z = HqGeometry.STAIR_OPEN_Z1; z <= HqGeometry.STAIR_TOP_Z; z++) {
-				c.set(HqGeometry.STAIR_X1 - 1, 1, z, k.rail);
-				c.set(HqGeometry.STAIR_X2 + 1, 1, z, k.rail);
-			}
-			for (int x = HqGeometry.STAIR_X1; x <= HqGeometry.STAIR_X2; x++) {
-				c.set(x, 1, HqGeometry.STAIR_OPEN_Z1 - 1, k.rail);
 			}
 			// runner from the entrance to the board
 			for (int z = 2; z <= 7; z++) {
@@ -241,60 +224,51 @@ public final class HqGenerator {
 		return x < 0 ? Direction.EAST : Direction.WEST;
 	}
 
-	// ------------------------------------------------------------------ archive
+	// ------------------------------------------------------------------ archived shelf
 
 	/**
-	 * The basement library under the hub: shelf rows of bookshelves where each archive slot that
-	 * holds a settled thread's computer shows it (black concrete, screen towards the aisle), the
-	 * stairs down from the hub, lanterns over the aisles.
+	 * The "Archived" shelf on the hub's south wall, both sides of the entrance: three tiers of
+	 * bookshelves facing into the hub where each slot holding a settled thread's computer shows it
+	 * (black concrete, screen into the hub), with an "Archived" header sign over the east half and
+	 * an "older threads" sign (the click target for the overflow list) over the west half.
 	 */
-	private void archive(PlanBuilder b, HqLayout layout) {
-		int fy = HqGeometry.BASEMENT_FLOOR;
-		try (PlanBuilder.Canvas c = b.module("archive", HqGeometry.basement(), List.of())) {
-			for (int z = -HUB; z <= HUB; z++) {
-				for (int x = -HUB; x <= HUB; x++) {
-					int m = Math.max(Math.abs(x), Math.abs(z));
-					c.set(x, fy, z, m == HUB ? k.plinth : (x + z) % 2 == 0 ? k.stoneFloor : k.plinthTile);
-					for (int y = fy + 1; y <= -2; y++) {
-						if (m == HUB) {
-							c.set(x, y, z, Math.abs(x) == HUB && Math.abs(z) == HUB || Math.abs(x) == 4 || Math.abs(z) == 4 ? k.post() : k.plinth);
-						}
-					}
-					c.set(x, -1, z, m == HUB ? k.plinth : k.darkPlanks);
-				}
-			}
-			// stairs: from the hub floor layer (top step, in the hub) down one block per block northwards
-			for (int x = HqGeometry.STAIR_X1; x <= HqGeometry.STAIR_X2; x++) {
-				for (int z = HqGeometry.STAIR_OPEN_Z1; z <= HqGeometry.STAIR_OPEN_Z2; z++) {
-					c.set(x, -1, z, k.air);
-				}
-				for (int step = 1; step <= -fy - 1; step++) {
-					c.set(x, -step, HqGeometry.STAIR_TOP_Z - step, k.stairs(k.stairBlock, Direction.SOUTH));
-				}
-			}
-			List<HqGeometry.ArchiveSlot> slots = HqGeometry.archiveSlots();
-			java.util.Set<Long> rowTops = new java.util.HashSet<>();
-			for (int s = 0; s < slots.size(); s++) {
-				HqGeometry.ArchiveSlot slot = slots.get(s);
-				c.set(slot.cell(), k.bookshelf);
-				rowTops.add(slot.cell().atY(fy + 3).asLong());
-			}
-			for (long t : rowTops) {
-				c.set(BlockPos.of(t), k.deskTop);
-			}
-			for (HqLayout.Archived a : layout.archive()) {
-				HqGeometry.ArchiveSlot slot = slots.get(a.slot());
-				c.set(slot.cell(), k.monitorOn);
-				b.anchor(Anchor.face(AnchorNames.archive(a.threadId()), slot.cell(), slot.facing()));
-			}
-			for (int x : new int[] {-4, 0}) {
-				c.hang(x, -2, -5, k.lantern(true));
-				c.hang(x, -2, 4, k.lantern(true));
-			}
-			c.hang(-4, -2, -1, k.lantern(true));
-			c.hang(4, -2, -1, k.lantern(true));
-			b.anchor(Anchor.at(AnchorNames.ARCHIVE, new BlockPos(0, fy + 1, -1), Direction.NORTH));
+	private void shelf(PlanBuilder b, HqLayout layout) {
+		List<HqGeometry.ArchiveSlot> slots = HqGeometry.archiveSlots();
+		java.util.Map<Integer, String> bySlot = new java.util.HashMap<>();
+		for (HqLayout.Archived a : layout.archive()) {
+			bySlot.put(a.slot(), a.threadId());
 		}
+		List<Box> boxes = HqGeometry.shelves();
+		for (int side = 0; side < boxes.size(); side++) {
+			Box box = boxes.get(side);
+			try (PlanBuilder.Canvas c = b.module(side == 0 ? "archive_shelf_east" : "archive_shelf_west", box, List.of())) {
+				for (int s = 0; s < slots.size(); s++) {
+					HqGeometry.ArchiveSlot slot = slots.get(s);
+					if (!box.contains(slot.cell())) {
+						continue;
+					}
+					String t = bySlot.get(s);
+					c.set(slot.cell(), t == null ? k.bookshelf : k.monitorOn);
+					b.anchor(Anchor.face(AnchorNames.archiveShelfSlot(s), slot.cell(), slot.facing()));
+					if (t != null) {
+						b.anchor(Anchor.face(AnchorNames.archive(t), slot.cell(), slot.facing()));
+					}
+				}
+				// header signs, hung on the hub's south wall above the middle of each half
+				int sx = side == 0 ? 1 : -1;
+				BlockPos sign = new BlockPos(sx * (HqGeometry.SHELF_X1 + 1), HqGeometry.SHELF_TIERS + 1, HqGeometry.SHELF_Z);
+				if (side == 0) {
+					c.decor(sign, k.wallSign(Direction.NORTH), SignTags.sign(DyeColor.LIGHT_GRAY, true, "", "Archived", "threads", ""));
+					b.anchor(Anchor.face(AnchorNames.SHELF_HEADER, sign, Direction.NORTH));
+				} else {
+					int older = layout.overflow().size();
+					c.decor(sign, k.wallSign(Direction.NORTH), SignTags.sign(DyeColor.LIGHT_GRAY, true, "Older threads", older == 0 ? "" : "+" + older,
+							"", "click to list"));
+					b.anchor(Anchor.face(AnchorNames.SHELF_MORE, sign, Direction.NORTH));
+				}
+			}
+		}
+		b.anchor(Anchor.at(AnchorNames.ARCHIVE, new BlockPos(HqGeometry.SHELF_X1 + 1, 1, HqGeometry.SHELF_Z - 1), Direction.SOUTH));
 	}
 
 	// ------------------------------------------------------------------ portico

@@ -3,17 +3,21 @@
 //
 // Changes for T3Craft: Minecraft-free (Pos instead of Vec3, own angle maths), no seat delays, and
 // player avoidance: the walker holds when the player stands right ahead and reports how long it
-// has been blocked so the brain can re-plan around them.
+// has been blocked so the brain can re-plan around them; every sub-move goes through a collision
+// resolver (the body never ends up inside a block) and the walker reports when it stops making
+// progress (stuck against something) so the brain can re-plan or get unstuck.
 package dev.t3craft.client.npc.behavior;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BinaryOperator;
 import org.jspecify.annotations.Nullable;
 
 /**
  * Deterministic walking for one client-side NPC: follows a path (from {@link GridPathfinder}) at
- * a calm pace, easing in and out and turning smoothly, then turns to the target's yaw. No physics,
- * no server: the position is a pure function of the path and time.
+ * a calm pace, easing in and out and turning smoothly, then turns to the target's yaw. No server:
+ * each tick's move is resolved by a collision function ({@code mover}, see {@link Collider#move});
+ * without obstacles the position is a pure function of the path and time.
  */
 public final class Motion {
 	/** Walking speed in blocks per tick (≈2.9 blocks/s, an unhurried walk; players sprint 5.6). */
@@ -25,6 +29,10 @@ public final class Motion {
 	private static final double ARRIVE_MIN = 0.32;
 	/** The walker holds when the avoided point is closer than this ahead of it. */
 	static final double PERSONAL_SPACE = 1.3;
+	/** Less than this closer to the next waypoint in a tick counts as no progress. */
+	static final double PROGRESS = 0.01;
+	/** A clipped walker this close (horizontally) to its waypoint takes it as reached. */
+	static final double REACHED = 0.08;
 
 	private final List<Pos> path = new ArrayList<>();
 	private int next;
@@ -34,6 +42,8 @@ public final class Motion {
 	private double pace = 1.0;
 	private double speed;
 	private int blockedTicks;
+	private int stuckTicks;
+	private double bestRemaining = Double.MAX_VALUE;
 	private @Nullable Float facing;
 
 	public boolean walking() {
@@ -51,6 +61,16 @@ public final class Motion {
 	/** Consecutive ticks the walker has been held up by the avoided point. */
 	public int blockedTicks() {
 		return blockedTicks;
+	}
+
+	/** Consecutive walking ticks without getting closer to the next waypoint (pushing against a block). */
+	public int stuckTicks() {
+		return stuckTicks;
+	}
+
+	/** The waypoint being walked to (null when standing). */
+	public @Nullable Pos heading() {
+		return walking && next < path.size() ? path.get(next) : null;
 	}
 
 	/** Last point of the current path (null when standing). */
@@ -75,6 +95,12 @@ public final class Motion {
 		speed = 0;
 		this.targetYaw = yaw;
 		blockedTicks = 0;
+		resetProgress();
+	}
+
+	private void resetProgress() {
+		stuckTicks = 0;
+		bestRemaining = Double.MAX_VALUE;
 	}
 
 	/** Snap the body yaw (first placement). */
@@ -92,13 +118,22 @@ public final class Motion {
 		walking = next < path.size();
 		targetYaw = endYaw;
 		blockedTicks = 0;
+		resetProgress();
 		if (!was) {
 			speed = 0;
 		}
 	}
 
-	/** Advance one tick from {@code pos}, holding back if {@code avoid} is right ahead. Returns the new position. */
+	/** {@link #step(Pos, Pos, BinaryOperator)} without obstacles. */
 	public Pos step(Pos pos, @Nullable Pos avoid) {
+		return step(pos, avoid, (from, to) -> to);
+	}
+
+	/**
+	 * Advance one tick from {@code pos}, holding back if {@code avoid} is right ahead; each move is
+	 * passed through {@code mover} (from, wanted → reached). Returns the new position.
+	 */
+	public Pos step(Pos pos, @Nullable Pos avoid, BinaryOperator<Pos> mover) {
 		if (!walking) {
 			speed = 0;
 			Float f = facing;
@@ -144,18 +179,38 @@ public final class Motion {
 				}
 			}
 			double dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-			if (dist <= budget) {
-				p = goal;
+			boolean reach = dist <= budget;
+			Pos wanted = reach ? goal : p.add(dx * budget / dist, dy * budget / dist, dz * budget / dist);
+			Pos got = mover.apply(p, wanted);
+			if (got.distSqr(wanted) > 1e-10) {
+				// Cut short by a block: stop here this tick.
+				p = got;
+				if (got.horizDist(goal) < REACHED && Math.abs(got.y() - goal.y()) < 0.6) {
+					next++;
+					resetProgress();
+				}
+				break;
+			}
+			p = wanted;
+			if (reach) {
 				budget -= dist;
 				next++;
+				resetProgress();
 			} else {
-				double k = budget / dist;
-				p = p.add(dx * k, dy * k, dz * k);
 				budget = 0;
 			}
 		}
 		if (next >= path.size()) {
 			walking = false;
+			resetProgress();
+		} else {
+			double rem = Math.sqrt(p.distSqr(path.get(next)));
+			if (rem < bestRemaining - PROGRESS) {
+				bestRemaining = rem;
+				stuckTicks = 0;
+			} else {
+				stuckTicks++;
+			}
 		}
 		return p;
 	}
