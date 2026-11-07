@@ -10,6 +10,7 @@ One line per structural commit on `main`, newest first:
 
 ## Entries
 
+- 2026-11-07 feat/site RESTART — new client entrypoint SiteClient; commands /t3craft site here|pick|wand|confirm|cancel|undo|move|resume|status; terrain evaluation with growth reserve, leveling, per-expansion snapshots stored in the world folder (undo last expansion, move rebuilds modules elsewhere); wand click handler; particle preview.
 - 2026-11-07 feat/hud-bar RESTART — new HUD element t3craft:status_bar registered at client init (working / needs you / error counters + 'n waiting · key' badge, GoalBar-style, AgentCraft attribution); additive config (enabled, position, hide when empty) in Settings.
 - 2026-11-07 feat/npc-attention RELOAD — NPCs walk over to the player when their thread needs attention (approach state in the NPC brain), configurable (enabled, max distance, max concurrent, cooldown). No new entrypoints, registries, keybinds or commands.
 - 2026-11-07 feat/panel-chips RELOAD — model/provider chip on NPC nameplate and panel, branch/worktree in the panel and workstation screen; tolerant decoding; additive config keys to show/hide chips. No new entrypoints, registries, keybinds or commands.
