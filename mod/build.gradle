@@ -102,6 +102,33 @@ tasks.named("check") {
 	dependsOn tasks.named("gametestClasses")
 }
 
+// hq-render (docs/research/hq-style-c/README.md): headless PNG renders of the HQ BuildPlan for
+// design review. Its own source set, so nothing of it ends up in the mod jar; it reads block models
+// and textures from the Minecraft jar already on the classpath (in memory, nothing is copied).
+// Not part of build: `./gradlew hqRender [-PhqArgs="--style classic --only full"]`.
+sourceSets {
+	hqrender {
+		compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+		runtimeClasspath += sourceSets.main.output + sourceSets.client.output + sourceSets.client.runtimeClasspath
+	}
+}
+
+tasks.named("check") {
+	dependsOn tasks.named("hqrenderClasses")
+}
+
+tasks.register("hqRender", JavaExec) {
+	group = "t3craft"
+	description = "Renders the HQ (every style view) to PNGs in build/hq-render, headless"
+	classpath = sourceSets.hqrender.runtimeClasspath
+	mainClass = "dev.t3craft.tools.hqrender.HqRender"
+	systemProperty "java.awt.headless", "true"
+	maxHeapSize = "4g"
+	workingDir = projectDir
+	args((project.findProperty("hqArgs") ?: "").toString().split(" ").findAll { it })
+	javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(25) }
+}
+
 test {
 	useJUnitPlatform()
 	testLogging {
