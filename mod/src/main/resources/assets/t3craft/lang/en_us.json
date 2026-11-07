@@ -23,5 +23,12 @@
 	"t3craft.workstation.status": "Workstation screens: %s (%s shown, %s archived). /t3craft workstation on|off",
 	"t3craft.workstation.on": "Workstation screens on.",
 	"t3craft.workstation.off": "Workstation screens off.",
-	"t3craft.workstation.save_failed": "Could not save the setting: %s"
+	"t3craft.workstation.save_failed": "Could not save the setting: %s",
+	"block.t3craft.monitor": "Thread Monitor",
+	"block.t3craft.status_lamp": "Thread Status Lamp",
+	"block.t3craft.board_lamp": "Board Status Bulb",
+	"t3craft.blocks.status": "Blocks module: %s (%s lamps loaded, %s changed last update). /t3craft blocks link <env:thread> | unlink",
+	"t3craft.blocks.singleplayer_only": "Only in singleplayer or as LAN host.",
+	"t3craft.blocks.look_at_block": "Look at a T3Craft monitor or lamp.",
+	"t3craft.blocks.linked": "Block bound to %s."
 }
