@@ -27,7 +27,12 @@ import org.jspecify.annotations.Nullable;
  *   source has no timestamps, from the moment {@link DoneClock} first saw it done.</li>
  * </ul>
  * Everything else ({@code working}, {@code needs_attention}, {@code error}, {@code idle}, a recent
- * {@code done}) keeps its station. Pure; the only state is in {@link DoneClock}.
+ * {@code done}) keeps its station. Pure; the only state is in {@link DoneClock} and the shared
+ * instance ({@link #active()}).
+ *
+ * <p><b>Scope</b>: this decides <b>desks per thread</b>. Which <b>rooms</b> (project modules) exist is
+ * fix/hq-rooms-real's call (projects with activity in the window); it reuses this policy through
+ * {@link #active()} (or {@code NpcRegistry.stationed()} / {@code released()}), never a copy of it.
  *
  * <p>Config ({@code config/t3craft.json}, additive, every key optional):
  * <pre>{@code "stations": { "release": true, "releaseDoneAfterMinutes": 5 }}</pre>
@@ -44,6 +49,40 @@ public record StationPolicy(boolean release, long doneIdleMs) {
 
 	public StationPolicy {
 		doneIdleMs = Math.max(0, doneIdleMs);
+	}
+
+	// ---- the single shared instance ------------------------------------------------------------
+
+	/**
+	 * The policy in force (config {@code stations}), shared by every reader: the NPC registry, the
+	 * demo and site HQ rosters and fix/hq-rooms-real. Set by the client when its source starts
+	 * ({@link #use}); {@link #DEFAULTS} until then. Read it here instead of parsing the config again.
+	 */
+	public static StationPolicy active() {
+		StationPolicy p = Holder.active;
+		return p == null ? DEFAULTS : p;
+	}
+
+	/** Installs the policy in force (null = {@link #DEFAULTS}). */
+	public static void use(@Nullable StationPolicy policy) {
+		Holder.active = policy;
+	}
+
+	/** The single piece of mutable state; volatile because readers may run on other threads. */
+	static final class Holder {
+		private static volatile @Nullable StationPolicy active;
+
+		private Holder() {
+		}
+	}
+
+	/**
+	 * Convenience for callers that have the raw fields (e.g. a {@code ThreadShell}: {@code settledAt},
+	 * {@code archivedAt}, {@code ThreadState.of(t).wire}, {@code Visibility.lastActivity(t)}): whether
+	 * that thread keeps its desk under the {@link #active()} policy.
+	 */
+	public static boolean holdsStationNow(boolean settled, boolean archived, String state, long lastActivityMs, long nowMs) {
+		return active().holdsStation(new Facts(settled, archived, state, lastActivityMs), nowMs);
 	}
 
 	/** Why a thread keeps or releases its station. */

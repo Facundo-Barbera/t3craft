@@ -154,6 +154,18 @@ public final class T3Connection {
 		return streams.subscribe(threadId, listener);
 	}
 
+	/** Stream key of {@code scheduledTasks.subscribe} in {@link StreamRegistry}. */
+	public static final String SCHEDULED_TASKS_STREAM = "rpc:" + RpcFrames.SUBSCRIBE_SCHEDULED_TASKS;
+
+	/**
+	 * Follows the environment's scheduled tasks ({@code scheduledTasks.subscribe}, read-only). Same
+	 * shared path as {@link #subscribeThread}: refcounted, resubscribed after every reconnect. Each
+	 * item is a full {@code {tasks: [...]}} list ({@link ScheduledTask#listFrom}).
+	 */
+	public StreamRegistry.Subscription subscribeScheduledTasks(StreamRegistry.Listener listener) {
+		return streams.subscribe(SCHEDULED_TASKS_STREAM, (id, key) -> RpcFrames.subscribeScheduledTasks(id), listener);
+	}
+
 	/** {@code orchestration.getTurnItem}: the full item (e.g. command output the stream withheld), or null. */
 	public CompletableFuture<@Nullable JsonObject> getTurnItem(String threadId, String itemId) {
 		JsonObject p = new JsonObject();

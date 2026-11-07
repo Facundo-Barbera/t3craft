@@ -35,6 +35,21 @@ Config (aditiva, todas las claves son opcionales):
 
 `release: false` vuelve al comportamiento anterior. Se lee al arrancar la fuente y en `/t3craft reload`.
 
+### Un solo punto para reutilizar (fix/hq-rooms-real y otros)
+
+- `StationPolicy.active()`: la política vigente, cargada de la config al arrancar la fuente
+  (`StationPolicy.use(...)` en `T3CraftClient.startSource` y en `/t3craft reload`). No hace falta
+  volver a leer la config ni copiar la regla.
+- `StationPolicy.holdsStationNow(settled, archived, state, lastActivityMs, nowMs)`: el veredicto
+  para un hilo a partir de sus campos crudos (por ejemplo, de un `ThreadShell`).
+- `NpcRegistry.stationed()`, `released()` y `hqRoster()`: la política ya aplicada al roster del
+  cliente.
+
+**Frontera.** Este fix decide los **escritorios por hilo**. Qué **habitaciones** (módulos de
+proyecto) existen lo decide fix/hq-rooms-real (proyectos con actividad en la ventana de 24 h), y
+para los escritorios usa esta política, sin duplicarla. Las remociones del diff (`HqDiff`) y la
+limpieza de huérfanos (`ClientEntityIds`) siguen en este fix.
+
 ### Dónde se aplica
 
 `NpcRegistry` guarda lo que mandan las fuentes en un `StationRoster`, que aplica la política al

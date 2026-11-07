@@ -26,36 +26,47 @@ public final class BuildPlanBridge {
 		return Rotation.values()[SiteFrame.quarterTurns(facing)];
 	}
 
+	/** A module plan cut for the site, with what did not make it (both should be 0). */
+	public record Cut(CellPlan plan, int clipped, int dropped) {
+	}
+
 	/**
 	 * A {@link ModuleDesigner} from module plans in the builders' format. {@code plans} returns, for a
 	 * module, a {@link BuildPlan} in <b>site plan-relative</b> coordinates: origin = site origin
-	 * (pad centre, {@code y = 0} = first layer above the pad), front = {@code -z}, unrotated. The
-	 * bridge turns positions and states (doors, stairs) to the site's facing and clips to the module
-	 * area; block entity data is dropped (site plans never carry block entities), with a warning.
+	 * (pad centre, {@code y = 0} = first layer above the pad), front = {@code -z}, unrotated, holding
+	 * only that module's cells. The bridge turns positions and states (doors, stairs) to the site's
+	 * facing ({@link #cut}); anything outside the module area or carrying block entity data (site
+	 * plans never carry block entities) is a mistake of the caller and is logged.
 	 */
 	public static ModuleDesigner designer(Function<SiteModule, BuildPlan> plans) {
 		return (module, area, origin) -> {
-			CellPlan out = new CellPlan(area, origin);
-			Rotation rot = rotation(origin.facing());
-			int clipped = 0;
-			int dropped = 0;
-			for (Placement p : plans.apply(module).placements()) {
-				BlockPos b = p.pos();
-				int[] w = SiteFrame.toWorld(origin, b.getX(), b.getY(), b.getZ());
-				if (!area.contains(w[0], w[1], w[2])) {
-					clipped++;
-					continue;
-				}
-				if (p.hasBlockEntity()) {
-					dropped++;
-				}
-				out.set(w[0], w[1], w[2], LevelBlockWorld.keyOf(p.state().rotate(rot)));
+			Cut c = cut(plans.apply(module), area, origin);
+			if (c.clipped() > 0 || c.dropped() > 0) {
+				T3Craft.LOGGER.warn("module {}: {} placements outside its area skipped, {} block entities dropped", module.id(), c.clipped(), c.dropped());
 			}
-			if (clipped > 0 || dropped > 0) {
-				T3Craft.LOGGER.warn("module {}: {} placements outside its area skipped, {} block entities dropped", module.id(), clipped, dropped);
-			}
-			return out;
+			return c.plan();
 		};
+	}
+
+	/** {@code plan} (site plan-relative) turned to {@code origin} and clipped to {@code area}. */
+	public static Cut cut(BuildPlan plan, Box area, CellPlan.Origin origin) {
+		CellPlan out = new CellPlan(area, origin);
+		Rotation rot = rotation(origin.facing());
+		int clipped = 0;
+		int dropped = 0;
+		for (Placement p : plan.placements()) {
+			BlockPos b = p.pos();
+			int[] w = SiteFrame.toWorld(origin, b.getX(), b.getY(), b.getZ());
+			if (!area.contains(w[0], w[1], w[2])) {
+				clipped++;
+				continue;
+			}
+			if (p.hasBlockEntity()) {
+				dropped++;
+			}
+			out.set(w[0], w[1], w[2], LevelBlockWorld.keyOf(p.state().rotate(rot)));
+		}
+		return new Cut(out, clipped, dropped);
 	}
 
 	/**

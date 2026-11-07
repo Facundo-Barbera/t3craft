@@ -21,16 +21,18 @@ public final class StationRoster {
 	private final Map<String, NpcInfo> incoming = new LinkedHashMap<>();
 	private final Map<String, Long> lastActivity = new LinkedHashMap<>();
 	private final StationPolicy.DoneClock clock = new StationPolicy.DoneClock();
-	private StationPolicy policy = StationPolicy.DEFAULTS;
+	private @Nullable StationPolicy policy;
 	private List<NpcInfo> stationed = List.of();
 	private List<NpcInfo> released = List.of();
 
-	public void setPolicy(StationPolicy policy) {
-		this.policy = policy == null ? StationPolicy.DEFAULTS : policy;
+	/** Overrides the shared policy for this roster (tests); null = {@link StationPolicy#active()}. */
+	public void setPolicy(@Nullable StationPolicy policy) {
+		this.policy = policy;
 	}
 
 	public StationPolicy policy() {
-		return policy;
+		StationPolicy p = policy;
+		return p == null ? StationPolicy.active() : p;
 	}
 
 	/** Every NPC the source shows now; {@code activity}: NPC id → last activity epoch ms (missing = unknown). */
@@ -67,7 +69,7 @@ public final class StationRoster {
 	 * content), i.e. the world must be reconciled.
 	 */
 	public boolean regate(long nowMs) {
-		StationPolicy.Split<NpcInfo> s = policy.split(incoming.values(), NpcInfo::id, this::facts, clock, nowMs);
+		StationPolicy.Split<NpcInfo> s = policy().split(incoming.values(), NpcInfo::id, this::facts, clock, nowMs);
 		List<NpcInfo> archived = s.released().stream().map(StationRoster::asSettled).toList();
 		boolean changed = !s.stationed().equals(stationed);
 		stationed = s.stationed();

@@ -154,7 +154,8 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 	private void startSource() {
 		T3Craft.LOGGER.info("T3Craft mode: {}", config.mode());
 		bridgeSnapshot = false;
-		npcs.stations().setPolicy(dev.t3craft.hq.StationPolicy.load(FabricLoader.getInstance().getConfigDir().resolve("t3craft.json")));
+		// fix/hq-stale-stations: the one release policy, shared (StationPolicy.active()) by every roster reader.
+		dev.t3craft.hq.StationPolicy.use(dev.t3craft.hq.StationPolicy.load(FabricLoader.getInstance().getConfigDir().resolve("t3craft.json")));
 		if (config.mode() == ModConfig.Mode.BRIDGE) {
 			T3Craft.LOGGER.info("bridge URL {}", config.bridgeUrl());
 			link = new BridgeLink(config.bridgeUrl(), config.bridgeKey(), modVersion, this, Minecraft.getInstance()::execute);

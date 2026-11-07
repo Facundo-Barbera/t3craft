@@ -91,4 +91,20 @@ class StationPolicyTest {
 		assertEquals(StationPolicy.DEFAULTS,
 				StationPolicy.parse(JsonParser.parseString("{\"stations\":{\"releaseDoneAfterMinutes\":-3}}").getAsJsonObject()));
 	}
+
+	@Test
+	void sharedInstanceIsTheOneEveryReaderUses() {
+		try {
+			assertEquals(StationPolicy.DEFAULTS, StationPolicy.active());
+			StationPolicy custom = new StationPolicy(true, 30 * MIN);
+			StationPolicy.use(custom);
+			assertEquals(custom, StationPolicy.active());
+			assertTrue(StationPolicy.holdsStationNow(false, false, "done", NOW - 20 * MIN, NOW));
+			assertFalse(StationPolicy.holdsStationNow(false, false, "done", NOW - 31 * MIN, NOW));
+			assertFalse(StationPolicy.holdsStationNow(true, false, "working", NOW, NOW));
+		} finally {
+			StationPolicy.use(null);
+		}
+		assertEquals(StationPolicy.DEFAULTS, StationPolicy.active());
+	}
 }
