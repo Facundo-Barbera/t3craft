@@ -24,12 +24,24 @@ public record NpcInfo(
 		String groupId,
 		String groupLabel,
 		String skin,
-		@Nullable String particle) {
+		@Nullable String particle,
+		@Nullable String model,
+		@Nullable String provider,
+		@Nullable String branch,
+		@Nullable String worktree) {
 	private static final int FALLBACK_COLOR = 0xAAAAAA;
+
+	/** Without chips (model/provider/branch/worktree unknown). */
+	public NpcInfo(String id, String title, String label, String envLabel, String sublabel, int color, @Nullable String activity,
+			int priority, boolean settled, String state, String groupId, String groupLabel, String skin, @Nullable String particle) {
+		this(id, title, label, envLabel, sublabel, color, activity, priority, settled, state, groupId, groupLabel, skin, particle, null,
+				null, null, null);
+	}
 
 	public static NpcInfo fromView(NpcView v) {
 		return new NpcInfo(v.id(), v.title(), v.label(), v.envLabel(), v.sublabel(), v.color(), v.activity(), v.priority(),
-				v.settled(), v.state().wire, v.groupId(), v.groupLabel(), v.skin(), v.particle());
+				v.settled(), v.state().wire, v.groupId(), v.groupLabel(), v.skin(), v.particle(),
+				v.model(), v.provider(), v.branch(), v.worktree());
 	}
 
 	public static @Nullable NpcInfo fromJson(JsonObject o) {
@@ -55,7 +67,15 @@ public record NpcInfo(
 				orElse(str(o, "groupId"), env),
 				orElse(str(o, "groupLabel"), orElse(str(o, "project"), "(no project)")),
 				orElse(str(o, "skin"), env + "/" + state),
-				str(o, "particle"));
+				str(o, "particle"),
+				blankToNull(str(o, "model")),
+				blankToNull(str(o, "provider")),
+				blankToNull(str(o, "branch")),
+				blankToNull(str(o, "worktree")));
+	}
+
+	private static @Nullable String blankToNull(@Nullable String s) {
+		return s == null || s.isBlank() ? null : s;
 	}
 
 	/** {@code #RRGGBB} → 0xRRGGBB. */
