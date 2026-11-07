@@ -99,6 +99,7 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 		dev.t3craft.hq.HqPreviewCommand.register(npcs::all); // feat/hq-design: /t3craft debug hq-preview
 		PeekHud.register();
 		PortableClient.register(this);
+		dev.t3craft.client.search.SearchClient.register(this); // feat/search: /t3craft search
 
 		// Right-click on one of our client-only NPCs opens its chat screen. The entity is unknown to
 		// the server, so the interaction is consumed client-side.
