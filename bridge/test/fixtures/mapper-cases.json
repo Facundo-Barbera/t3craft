@@ -1,0 +1,20 @@
+[
+  { "name": "idle thread", "overrides": {}, "expected": "idle" },
+  { "name": "blocking approval request", "overrides": { "status": "running", "activityRunStatus": "running", "pendingRuntimeRequest": { "id": "req-1", "kind": "command", "createdAt": "2026-11-01T10:05:00.000Z", "blocking": true } }, "expected": "needs_attention" },
+  { "name": "request without blocking flag (older server) counts as blocking", "overrides": { "status": "running", "pendingRuntimeRequest": { "id": "req-2", "kind": "file-change", "createdAt": "2026-11-01T10:05:00.000Z" } }, "expected": "needs_attention" },
+  { "name": "non-blocking async question keeps working", "overrides": { "status": "running", "activityRunStatus": "running", "pendingRuntimeRequest": { "id": "req-3", "kind": "user_input", "createdAt": "2026-11-01T10:05:00.000Z", "blocking": false } }, "expected": "working" },
+  { "name": "status waiting", "overrides": { "status": "waiting" }, "expected": "needs_attention" },
+  { "name": "actionable proposed plan", "overrides": { "status": "completed", "hasActionableProposedPlan": true }, "expected": "needs_attention" },
+  { "name": "guest messages pending", "overrides": { "pendingGuestMessageCount": 2 }, "expected": "needs_attention" },
+  { "name": "running", "overrides": { "status": "running", "activeRunId": "run-1", "latestRunId": "run-1" }, "expected": "working" },
+  { "name": "queued", "overrides": { "status": "queued" }, "expected": "working" },
+  { "name": "preparing", "overrides": { "status": "preparing" }, "expected": "working" },
+  { "name": "starting", "overrides": { "status": "starting" }, "expected": "working" },
+  { "name": "activity run on an otherwise completed shell", "overrides": { "status": "completed", "activityRunStatus": "starting" }, "expected": "working" },
+  { "name": "background task holds completion", "overrides": { "status": "completed", "pendingBackgroundTasks": [{ "kind": "shell", "taskId": "bg-1" }] }, "expected": "working" },
+  { "name": "failed", "overrides": { "status": "failed", "lastError": "Provider crashed" }, "expected": "error" },
+  { "name": "completed", "overrides": { "status": "completed", "latestRunId": "run-1", "latestRunCompletedAt": "2026-11-01T11:00:00.000Z" }, "expected": "done" },
+  { "name": "interrupted", "overrides": { "status": "interrupted" }, "expected": "idle" },
+  { "name": "cancelled", "overrides": { "status": "cancelled" }, "expected": "idle" },
+  { "name": "rolled back", "overrides": { "status": "rolled_back" }, "expected": "idle" }
+]
