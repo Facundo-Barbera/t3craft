@@ -12,7 +12,10 @@ import net.minecraft.nbt.CompoundTag;
  * <p>The envelope is a parameter because the module layout belongs to {@code feat/hq-design}; set
  * it with {@code SiteRuntime.setRequest}.
  */
-public record SiteRequest(SiteModule base, Rect envelope) {
+public record SiteRequest(SiteModule base, Rect envelope, int baseDepth) {
+	/** Largest {@link #baseDepth} (a basement of a few layers under the pad). */
+	public static final int MAX_BASE_DEPTH = 8;
+
 	/** Largest envelope side (keeps evaluation bounded and inside already-loaded chunks). */
 	public static final int MAX_ENVELOPE = 64;
 
@@ -26,8 +29,21 @@ public record SiteRequest(SiteModule base, Rect envelope) {
 	 */
 	public static final SiteRequest GROWABLE = new SiteRequest(SQUARE.base(), Rect.centred(31, 31, -(SiteLimits.FOOTPRINT / 2)));
 
+	/** No basement: the base design starts on the first layer above the pad. */
+	public SiteRequest(SiteModule base, Rect envelope) {
+		this(base, envelope, 0);
+	}
+
+	/**
+	 * @param baseDepth layers at and below the pad that the <b>base</b> design may use (a basement):
+	 *                  its design area then starts at {@code pad + 1 - baseDepth} and its snapshot box
+	 *                  reaches at least one layer below that. 0 = none (the original behaviour).
+	 */
 	public SiteRequest {
 		Objects.requireNonNull(base, "base");
+		if (baseDepth < 0 || baseDepth > MAX_BASE_DEPTH) {
+			throw new IllegalArgumentException("base depth " + baseDepth + " outside 0.." + MAX_BASE_DEPTH);
+		}
 		Objects.requireNonNull(envelope, "envelope");
 		if (!envelope.contains(base.rect())) {
 			throw new IllegalArgumentException("the base " + base.rect() + " must lie inside the envelope " + envelope);
@@ -49,10 +65,14 @@ public record SiteRequest(SiteModule base, Rect envelope) {
 		CompoundTag t = new CompoundTag();
 		t.put("base", base.toTag());
 		t.putIntArray("envelope", envelope.toArray());
+		if (baseDepth > 0) {
+			t.putInt("baseDepth", baseDepth);
+		}
 		return t;
 	}
 
 	public static SiteRequest fromTag(CompoundTag t) {
-		return new SiteRequest(SiteModule.fromTag(t.getCompoundOrEmpty("base")), Rect.fromArray(t.getIntArray("envelope").orElse(null)));
+		return new SiteRequest(SiteModule.fromTag(t.getCompoundOrEmpty("base")), Rect.fromArray(t.getIntArray("envelope").orElse(null)),
+				t.getIntOr("baseDepth", 0));
 	}
 }

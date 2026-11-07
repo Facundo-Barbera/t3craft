@@ -1,6 +1,7 @@
 package dev.t3craft.build;
 
 import java.util.List;
+import java.util.function.UnaryOperator;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
@@ -38,6 +39,21 @@ public interface BuildService {
 	default BuildHandle build(String label, ResourceKey<Level> dimension, BlockPos origin, Rotation rotation, BuildPlan plan, double blocksPerTick, int crewSize,
 			Billing billing) {
 		return build(label, dimension, origin, rotation, plan, blocksPerTick, crewSize);
+	}
+
+	/**
+	 * Like {@link #build(String, ResourceKey, BlockPos, Rotation, BuildPlan, double, int, Billing)}, but every
+	 * block goes through {@code wrap.apply(realSink)}: the caller can refuse a cell (return
+	 * {@link BuildCursor.Outcome#SKIPPED} without placing) or watch what is placed. Used by the site and the
+	 * HQ to keep the "never overwrite the player's changes" guard. Services that cannot wrap throw
+	 * {@link UnsupportedOperationException} for a non-null {@code wrap}.
+	 */
+	default BuildHandle build(String label, ResourceKey<Level> dimension, BlockPos origin, Rotation rotation, BuildPlan plan, double blocksPerTick,
+			int crewSize, Billing billing, @org.jspecify.annotations.Nullable UnaryOperator<BlockSink> wrap) {
+		if (wrap == null) {
+			return build(label, dimension, origin, rotation, plan, blocksPerTick, crewSize, billing);
+		}
+		throw new UnsupportedOperationException("this build service cannot wrap its block sink");
 	}
 
 	/** Builds that are not {@link BuildHandle.Phase#DONE} yet. */
