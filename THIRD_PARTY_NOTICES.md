@@ -59,6 +59,15 @@ Files adapted from AgentCraft (MIT; the `npc/behavior` files come from AgentCraf
   (`FLAGS`: clients updated, no neighbour/shape updates, no drops, no block-entity side effects,
   no `onPlace`) is taken from AgentCraft `mod/src/main/java/dev/agentcraft/hq/Plan.java`
   (commit `8fe3ad23489b06f9142c6382bc23d31090c6b406`).
+- `mod/src/client/java/dev/t3craft/client/hologram/HologramModel.java`, `HologramLayout.java` and
+  `HologramRenderer.java` ← `mod/src/client/java/dev/agentcraft/client/hq/StatusLampRenderer.java`
+  (`extractHologram`, `beam`, `card`, `HOLO_Y`) at commit `8fe3ad23489b06f9142c6382bc23d31090c6b406`
+  (design: a floating card about 3.5 blocks over the floor with a progress ring captioned
+  "done/total" that follows the done count, "n working · n need you" counts, an "offline · last
+  known state" line and a soft beam from the floor to the card, rebuilt only on change; rewritten
+  over T3 thread states of every environment with one ring per environment or project and the most
+  urgent thread, as client-only display entities instead of a block entity renderer, no sprites or
+  textures copied).
 
 Design ideas only (no code copied), from AgentCraft `hq/Plan.java` and `hq/PlanStore.java`:
 apply a build as a diff of a whole box, persist the applied plan in the world folder (palette +

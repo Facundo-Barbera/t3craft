@@ -171,7 +171,7 @@ public final class ConfigCodec {
 			w.add("hud.align must be left, center or right");
 		}
 		return new T3CraftSettings.Hud(bool(h, "statusBar", d.statusBar(), w), pos == null ? d.position() : pos,
-				align == null ? d.align() : align, bool(h, "hideWhenIdle", d.hideWhenIdle(), w));
+				align == null ? d.align() : align, bool(h, "hideWhenIdle", d.hideWhenIdle(), w), bool(h, "hologram", d.hologram(), w));
 	}
 
 	private static Notifications decodeNotifications(@Nullable JsonObject o, List<String> w) {
@@ -287,6 +287,7 @@ public final class ConfigCodec {
 		ho.addProperty("position", s.hud().position());
 		ho.addProperty("align", s.hud().align());
 		ho.addProperty("hideWhenIdle", s.hud().hideWhenIdle());
+		ho.addProperty("hologram", s.hud().hologram());
 		o.add("hud", ho);
 
 		JsonObject chat = obj(o, "chat") == null ? new JsonObject() : obj(o, "chat");
