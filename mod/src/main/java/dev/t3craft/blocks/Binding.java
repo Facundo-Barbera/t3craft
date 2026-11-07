@@ -8,18 +8,25 @@ import org.jspecify.annotations.Nullable;
  *   <li>{@code thread:<npcKey>}: one thread; {@code npcKey} is the NPC id, {@code <envId>:<threadId>}
  *       in direct mode (the same key the HQ plan, {@code NpcRegistry} and the workstations use);</li>
  *   <li>{@code board:<i>}: bulb {@code i} of the "needs attention" board (the i-th most urgent thread);</li>
+ *   <li>{@code module:<key>,<key>...}: a module's bulb over its doorway: the most urgent of the threads
+ *       sitting at that module's desks (sorted keys; off when the module is empty);</li>
+ *   <li>{@code beacon}: the hub lantern's beacon, the whole HQ's aggregate state;</li>
  *   <li>empty: unbound (a block placed by hand, a vacant desk). The position source may still bind it.</li>
  * </ul>
  * Anything else parses as {@link #NONE}. Pure.
  */
 public record Binding(Kind kind, String value) {
 	public enum Kind {
-		NONE, THREAD, BOARD
+		NONE, THREAD, BOARD, MODULE, BEACON
 	}
 
 	public static final Binding NONE = new Binding(Kind.NONE, "");
+	private static final String BEACON_WIRE = "beacon";
+	/** The hub beacon (adapted from AgentCraft's {@code beacon} binding of the cupola lamps). */
+	public static final Binding BEACON = new Binding(Kind.BEACON, BEACON_WIRE);
 	private static final String THREAD = "thread:";
 	private static final String BOARD = "board:";
+	private static final String MODULE = "module:";
 
 	public Binding {
 		value = value == null ? "" : value;
@@ -37,9 +44,28 @@ public record Binding(Kind kind, String value) {
 		return index < 0 ? NONE : new Binding(Kind.BOARD, Integer.toString(index));
 	}
 
+	/** A module bulb over {@code threads} (order and duplicates do not matter; empty → NONE). */
+	public static Binding module(java.util.Collection<String> threads) {
+		java.util.TreeSet<String> keys = new java.util.TreeSet<>();
+		for (String t : threads) {
+			if (t != null && !t.isEmpty() && t.indexOf(',') < 0) {
+				keys.add(t);
+			}
+		}
+		return keys.isEmpty() ? NONE : new Binding(Kind.MODULE, String.join(",", keys));
+	}
+
+	/** Thread keys of a module bulb (empty for other kinds). */
+	public java.util.List<String> moduleThreads() {
+		return kind == Kind.MODULE ? java.util.List.of(value.split(",")) : java.util.List.of();
+	}
+
 	public static Binding parse(@Nullable String s) {
 		if (s == null || s.isEmpty()) {
 			return NONE;
+		}
+		if (s.equals(BEACON_WIRE)) {
+			return BEACON;
 		}
 		if (s.startsWith(THREAD)) {
 			return thread(s.substring(THREAD.length()));
@@ -51,6 +77,9 @@ public record Binding(Kind kind, String value) {
 				return NONE;
 			}
 		}
+		if (s.startsWith(MODULE)) {
+			return module(java.util.List.of(s.substring(MODULE.length()).split(",")));
+		}
 		return NONE;
 	}
 
@@ -60,6 +89,8 @@ public record Binding(Kind kind, String value) {
 			case NONE -> "";
 			case THREAD -> THREAD + value;
 			case BOARD -> BOARD + value;
+			case MODULE -> MODULE + value;
+			case BEACON -> BEACON_WIRE;
 		};
 	}
 

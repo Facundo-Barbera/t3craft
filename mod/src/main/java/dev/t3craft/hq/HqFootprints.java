@@ -6,7 +6,7 @@ package dev.t3craft.hq;
  * per <b>grid slot</b>, in HQ coordinates (origin = hub floor centre, entrance south, growth north):
  *
  * <ul>
- *   <li>{@link #base()}: hub, portico and the archive basement under the hub;</li>
+ *   <li>{@link #base()}: hub (with the "Archived" shelf inside it) and portico; there is no basement;</li>
  *   <li>{@link #slot(int)}: grid slot {@code i} = module {@code i}'s wing. The even (east) slot of a
  *   row also owns that row's stretch of the spine. Every row's rectangle is shifted one line north
  *   so it also owns the line where the spine cap stands while it is the last row (that line is the
@@ -36,9 +36,9 @@ public final class HqFootprints {
 	private HqFootprints() {
 	}
 
-	/** Lowest y any HQ block uses (the archive floor). */
+	/** Lowest y any HQ block uses: the floor layer (there is no basement). */
 	public static int bottom() {
-		return HqGeometry.BASEMENT_FLOOR;
+		return 0;
 	}
 
 	/** Highest y any HQ block uses. */
@@ -46,9 +46,9 @@ public final class HqFootprints {
 		return HqGeometry.TOP;
 	}
 
-	/** Hub + portico (+ the basement below the hub). */
+	/** Hub (with the "Archived" shelf) + portico. */
 	public static Area base() {
-		Box b = HqGeometry.hub().union(HqGeometry.portico()).union(HqGeometry.basement());
+		Box b = HqGeometry.hub().union(HqGeometry.portico());
 		return new Area(b.minX(), b.minZ(), b.maxX(), b.maxZ());
 	}
 

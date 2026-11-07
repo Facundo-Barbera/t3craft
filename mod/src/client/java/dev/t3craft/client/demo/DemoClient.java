@@ -430,15 +430,23 @@ public final class DemoClient implements ClientModInitializer {
 			return;
 		}
 		DemoWorldSpec spec = activeConfig.spec();
+		BlockPos origin = new BlockPos(spec.originX(), spec.originY(), spec.originZ());
 		// feat/hq-construction: one place plugs the HQ into NPCs (no ring fallback) and workstations
-		dev.t3craft.client.hq.HqPresence.Standing standing = h.standing(new BlockPos(spec.originX(), spec.originY(), spec.originZ()));
+		dev.t3craft.client.hq.HqPresence.Standing standing = h.standing(origin);
 		if (standing != null) {
 			dev.t3craft.client.hq.HqPresence.demo(standing);
 			anchorsInstalled = true;
 		}
+		installBindings(h.bindings(origin));
+	}
+
+	/** Monitors and lamps of the HQ follow the live roster on their own (blocks module on only). */
+	private static void installBindings(@Nullable DemoHqBindings bindings) {
+		dev.t3craft.client.hq.HqPresence.demoBindings(bindings == null ? null : () -> bindings.bindings(liveNpcs()));
 	}
 
 	private void clearAnchors() {
+		installBindings(null);
 		T3CraftClient c = T3CraftClient.get();
 		if (anchorsInstalled && c != null) {
 			dev.t3craft.client.hq.HqPresence.demo(null);

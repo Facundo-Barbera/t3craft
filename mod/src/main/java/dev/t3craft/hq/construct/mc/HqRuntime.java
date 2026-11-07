@@ -67,7 +67,7 @@ public final class HqRuntime {
 	private static Consumer<Built> anchorSink = b -> {
 	};
 	private static @Nullable String designKey;
-	private static dev.t3craft.build.@Nullable BuildPlan designCache;
+	private static final Map<String, dev.t3craft.build.BuildPlan> designCache = new HashMap<>();
 	private static boolean registered;
 	private static int ticks;
 
@@ -113,7 +113,9 @@ public final class HqRuntime {
 				server = null;
 				construction = null;
 				designKey = null;
-				designCache = null;
+				synchronized (designCache) {
+					designCache.clear();
+				}
 			}
 			paced.cancelAll();
 		});
@@ -179,7 +181,7 @@ public final class HqRuntime {
 		}
 	}
 
-	/** The site plan the designer cuts modules from (the latest target), cached by fingerprint. */
+	/** The cells of {@code module} in the latest target, in site plan coordinates; cached by fingerprint. */
 	private static dev.t3craft.build.BuildPlan design(SiteModule module) {
 		HqConstruction c = construction;
 		MinecraftServer s = server;
@@ -191,11 +193,13 @@ public final class HqRuntime {
 		}
 		BuildPlan plan = c.design();
 		String k = plan.fingerprint();
-		if (!k.equals(designKey) || designCache == null) {
-			designCache = HqSiteFrame.sitePlan(plan);
-			designKey = k;
+		synchronized (designCache) {
+			if (!k.equals(designKey)) {
+				designCache.clear();
+				designKey = k;
+			}
+			return designCache.computeIfAbsent(module.id(), id -> HqSiteFrame.sitePlan(plan, id));
 		}
-		return designCache;
 	}
 
 	/** The owner of this singleplayer world, when online. */
@@ -281,10 +285,10 @@ public final class HqRuntime {
 				}
 			}
 			List<SiteService.Claimed> dry = svc.claim(changes, false);
-			List<HqWriter.Write> signs = new ArrayList<>();
+			Map<Long, HqWriter.Write> signs = new java.util.LinkedHashMap<>();
 			for (HqConstruction.Cell c : blockEntities) {
 				if (c.state() != null) {
-					signs.add(new HqWriter.Write(c.pos(), c.state(), LevelBlockWorld.keyOf(c.state()), c.blockEntity()));
+					signs.put(c.pos().asLong(), new HqWriter.Write(c.pos(), c.state(), LevelBlockWorld.keyOf(c.state()), c.blockEntity()));
 				}
 			}
 			if (dry.isEmpty() && signs.isEmpty()) {
@@ -316,9 +320,12 @@ public final class HqRuntime {
 						continue;
 					}
 				}
-				writes.add(new HqWriter.Write(pos, st, c.before(), null));
+				// A cell that changes and also carries block entity data (a monitor or lamp at a new desk)
+				// is one write: two writes at one position would share one guard entry and both be skipped.
+				HqWriter.Write sign = signs.remove(pos.asLong());
+				writes.add(new HqWriter.Write(pos, st, c.before(), sign == null || !sign.state().equals(st) ? null : sign.blockEntity()));
 			}
-			writes.addAll(signs);
+			writes.addAll(signs.values());
 			HqConstruction c = construction;
 			writer.write(label, level, writes, ok -> {
 				if (construction == c && c != null) {

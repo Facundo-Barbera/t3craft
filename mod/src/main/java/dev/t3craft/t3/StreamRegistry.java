@@ -69,14 +69,17 @@ public final class StreamRegistry {
 
 	private static final class Entry {
 		final String threadId;
+		/** Frame builder of a non-thread stream ({@link #subscribe(String, SubscribeFrame, Listener)}), else null. */
+		final @Nullable SubscribeFrame frame;
 		final List<Listener> listeners = new ArrayList<>();
 		final List<JsonObject> replay = new ArrayList<>();
 		boolean replayOverflow;
 		@Nullable String requestId;
 		@Nullable String endedWith;
 
-		Entry(String threadId) {
+		Entry(String threadId, @Nullable SubscribeFrame frame) {
 			this.threadId = threadId;
+			this.frame = frame;
 		}
 	}
 
@@ -113,12 +116,24 @@ public final class StreamRegistry {
 	}
 
 	public Subscription subscribe(String threadId, Listener l) {
+		return subscribe(threadId, null, l);
+	}
+
+	/**
+	 * Any other read-only stream (e.g. {@code scheduledTasks.subscribe}) with the same refcount,
+	 * replay, request ids, send queue and reconnect handling as the thread streams. {@code key}
+	 * identifies the stream instead of a thread id (use a prefix that cannot be a thread id, such as
+	 * {@code "rpc:" + tag}); {@code frame} builds its request as {@code (requestId, key)}. The first
+	 * subscriber's frame is kept for the stream's lifetime.
+	 */
+	public Subscription subscribe(String key, @Nullable SubscribeFrame frame, Listener l) {
+		String threadId = key;
 		boolean resubscribed = false;
 		String toSend = null;
 		synchronized (this) {
 			Entry e = threads.get(threadId);
 			if (e == null) {
-				e = new Entry(threadId);
+				e = new Entry(threadId, frame);
 				threads.put(threadId, e);
 				e.listeners.add(l);
 				safe(l::onSubscribed);
@@ -196,7 +211,7 @@ public final class StreamRegistry {
 		e.replay.clear();
 		e.replayOverflow = false;
 		byRequest.put(id, e);
-		return frames.build(id, e.threadId);
+		return (e.frame != null ? e.frame : frames).build(id, e.threadId);
 	}
 
 	/**

@@ -161,6 +161,18 @@ public final class T3Connection {
 		return streams.subscribe(threadId, listener);
 	}
 
+	/** Stream key of {@code scheduledTasks.subscribe} in {@link StreamRegistry}. */
+	public static final String SCHEDULED_TASKS_STREAM = "rpc:" + RpcFrames.SUBSCRIBE_SCHEDULED_TASKS;
+
+	/**
+	 * Follows the environment's scheduled tasks ({@code scheduledTasks.subscribe}, read-only). Same
+	 * shared path as {@link #subscribeThread}: refcounted, resubscribed after every reconnect. Each
+	 * item is a full {@code {tasks: [...]}} list ({@link ScheduledTask#listFrom}).
+	 */
+	public StreamRegistry.Subscription subscribeScheduledTasks(StreamRegistry.Listener listener) {
+		return streams.subscribe(SCHEDULED_TASKS_STREAM, (id, key) -> RpcFrames.subscribeScheduledTasks(id), listener);
+	}
+
 	/** {@code orchestration.getTurnItem}: the full item (e.g. command output the stream withheld), or null. */
 	public CompletableFuture<@Nullable JsonObject> getTurnItem(String threadId, String itemId) {
 		JsonObject p = new JsonObject();
@@ -180,6 +192,20 @@ public final class T3Connection {
 			JsonElement last = values.isEmpty() ? null : values.getLast();
 			return last != null && last.isJsonObject() ? last.getAsJsonObject() : new JsonObject();
 		});
+	}
+
+	/**
+	 * {@code orchestration.getOlderSettledThreads} (read): settled threads below {@code before},
+	 * newest settle first, at most {@code limit} (0..{@value ArchiveWire#MAX_PAGE}).
+	 */
+	public CompletableFuture<ArchiveWire.OlderSettledPage> getOlderSettledThreads(ArchiveWire.Cursor before, int limit) {
+		return streams.call(ArchiveWire.GET_OLDER_SETTLED_THREADS, ArchiveWire.olderSettledRequest(before, limit, null))
+				.thenApply(ArchiveWire::decodeOlderSettledValues);
+	}
+
+	/** {@code orchestration.getArchivedShellSnapshot} (read): archived threads and their projects. */
+	public CompletableFuture<ArchiveWire.ArchivedSnapshot> getArchivedShellSnapshot() {
+		return streams.call(ArchiveWire.GET_ARCHIVED_SHELL_SNAPSHOT, ArchiveWire.archivedRequest()).thenApply(ArchiveWire::decodeArchivedValues);
 	}
 
 	/**

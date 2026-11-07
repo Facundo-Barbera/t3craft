@@ -26,6 +26,24 @@ public interface HqFixtures {
 
 	BuildPlan apply(BuildPlan plan);
 
+	/**
+	 * Short stable name of what this substitution places (goes into build hashes and markers, so a
+	 * world built with other fixtures is detected and updated). Bump it when the output changes.
+	 */
+	default String id() {
+		return "custom";
+	}
+
+	/** {@link #id()} of the active fixtures, {@code "vanilla"} when none is installed. */
+	static String fingerprint() {
+		return fingerprint(active());
+	}
+
+	/** {@link #id()} of {@code f}, {@code "vanilla"} for {@link #VANILLA}. */
+	static String fingerprint(HqFixtures f) {
+		return f == VANILLA ? "vanilla" : f.id();
+	}
+
 	/** The fixtures in use (VANILLA unless a module installed its own). */
 	static HqFixtures active() {
 		HqFixtures f = Holder.active;

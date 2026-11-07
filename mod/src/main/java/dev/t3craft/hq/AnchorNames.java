@@ -20,6 +20,12 @@ public final class AnchorNames {
 	/** Centre of the hub floor. */
 	public static final String HUB = "hub";
 	/**
+	 * The centre block of the hub lantern's cap (on top of the glazed light well, under the lightning
+	 * rod): the HQ's aggregate beacon, seen from outside. Plain copper in the vanilla HQ; the blocks
+	 * module puts a status lamp bound {@code beacon} there.
+	 */
+	public static final String BEACON = "beacon";
+	/**
 	 * Prefix of the standing spots in front of the board ({@code board_slot_0..}), nearest to the
 	 * board centre first, facing the board. NPCs that need attention gather here.
 	 */
@@ -31,8 +37,17 @@ public final class AnchorNames {
 	/** Prefix of the hub's stroll points ({@code walk_hub_0..}), open floor away from furniture. */
 	public static final String WALK_HUB = "walk_hub_";
 
-	/** A standing spot in the middle of the basement archive's main aisle. */
+	/** A standing spot in front of the hub's "Archived" shelf (south wall, east of the entrance), facing it. */
 	public static final String ARCHIVE = "archive";
+	/** Prefix of the "Archived" shelf's slots ({@code shelf@0..}); see {@link #archiveShelfSlot}. */
+	public static final String SHELF_SLOT = "shelf@";
+	/**
+	 * Face of the "older threads" sign next to the shelf (west of the entrance, facing into the
+	 * hub): the click target that lists the settled threads that are no longer on the shelf.
+	 */
+	public static final String SHELF_MORE = "shelf_more";
+	/** Face of the shelf's "Archived" header sign (east of the entrance, facing into the hub). */
+	public static final String SHELF_HEADER = "shelf_header";
 
 	private AnchorNames() {
 	}
@@ -100,7 +115,17 @@ public final class AnchorNames {
 		return "screen@" + module + "." + slot;
 	}
 
-	/** Screen face of a settled thread's computer in the archive. */
+	/**
+	 * Shelf slot {@code i} of the "Archived" shelf ({@code 0 <= i < HqLayout.ARCHIVE_CAPACITY}),
+	 * published for every slot, taken or not: the face of the slot's block, facing into the hub.
+	 * Order: eye-level tier first, then top, then bottom; in each tier the columns nearest the
+	 * entrance first, east before west. Stable: slot {@code i} is always the same cell.
+	 */
+	public static String archiveShelfSlot(int i) {
+		return SHELF_SLOT + i;
+	}
+
+	/** Screen face of a settled thread's computer on the "Archived" shelf (same cell as its {@link #archiveShelfSlot}). */
 	public static String archive(String threadId) {
 		return "archive_" + threadId;
 	}
