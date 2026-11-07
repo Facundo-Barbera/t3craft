@@ -3,18 +3,25 @@ import * as Redacted from "effect/Redacted";
 import type { BridgeConfig, EnvironmentConfig } from "./config.ts";
 import { readSecretFile } from "./config.ts";
 import { PROTOCOL_VERSION, type BridgeToMod, type EnvironmentStatus } from "./protocol.ts";
-import { isVisibleThread } from "./state/mapper.ts";
 import { notificationFor, NpcStore } from "./state/npcStore.ts";
 import { presentThread } from "./state/presentation.ts";
+import { selectVisibleThreads, type VisibilityOptions } from "./state/visibility.ts";
 import { runEnvironment, type ShellState } from "./t3/shell.ts";
 
 export const BRIDGE_VERSION = "0.1.0";
 
-/** Turns one environment's shell state into NpcViews. */
-export const viewsFor = (env: EnvironmentConfig, state: ShellState, includeSubagents: boolean) =>
-  [...state.threads.values()]
-    .filter((t) => isVisibleThread(t, includeSubagents))
-    .map((t) => presentThread(env, t, state.projectTitle(t.projectId)));
+/** How often visibility is re-evaluated without T3 traffic (recent-window expiry). */
+export const REEVALUATE_INTERVAL_MS = 60_000;
+
+export const visibilityOptions = (config: Pick<BridgeConfig, "visibility" | "includeSubagents">): VisibilityOptions => ({
+  recentWindowMs: config.visibility.recentWindowHours * 3_600_000,
+  maxPerEnvironment: config.visibility.maxPerEnvironment,
+  includeSubagents: config.includeSubagents,
+});
+
+/** Turns one environment's shell state into NpcViews, applying the visibility filter. */
+export const viewsFor = (env: EnvironmentConfig, state: ShellState, opts: VisibilityOptions, nowMs: number = Date.now()) =>
+  selectVisibleThreads(state.threads.values(), nowMs, opts).map((t) => presentThread(env, t, state.projectTitle(t.projectId)));
 
 /**
  * Core: one shell subscription per environment → NpcStore → broadcast diffs to every mod.
@@ -24,6 +31,8 @@ export class Bridge {
   readonly store = new NpcStore();
   private readonly statuses = new Map<string, EnvironmentStatus>();
   private readonly synced = new Set<string>();
+  /** Latest shell state per environment: the filter's source, never trimmed by it. */
+  private readonly shells = new Map<string, { env: EnvironmentConfig; state: ShellState }>();
   private broadcastFn: (msg: BridgeToMod) => void = () => {};
 
   private readonly config: BridgeConfig;
@@ -57,8 +66,10 @@ export class Bridge {
   }
 
   /** Applies a new shell state for `env`, broadcasting upserts/removes and notifications. */
-  applyShell(env: EnvironmentConfig, state: ShellState): void {
-    const { changes, previous } = this.store.replaceEnvironment(env.id, viewsFor(env, state, this.config.includeSubagents));
+  applyShell(env: EnvironmentConfig, state: ShellState, nowMs: number = Date.now()): void {
+    this.shells.set(env.id, { env, state });
+    const views = viewsFor(env, state, visibilityOptions(this.config), nowMs);
+    const { changes, previous } = this.store.replaceEnvironment(env.id, views);
     // No toasts for the first snapshot after start/reconnect: only real transitions.
     const notify = this.synced.has(env.id);
     for (const c of changes) {
@@ -71,6 +82,14 @@ export class Bridge {
       if (n) this.broadcastFn({ v: PROTOCOL_VERSION, type: "notify", ...n });
     }
     if (state.synchronized) this.synced.add(env.id);
+  }
+
+  /**
+   * Re-runs the filter on every environment's stored state, so threads leave when their recent
+   * window expires even if T3 sends nothing. Only real changes are broadcast.
+   */
+  reevaluate(nowMs: number = Date.now()): void {
+    for (const { env, state } of this.shells.values()) this.applyShell(env, state, nowMs);
   }
 
   /** Runs every environment concurrently, forever. Tokens are read once per environment at start. */
@@ -93,6 +112,9 @@ export class Bridge {
         });
       }),
     );
-    return Effect.all(loops, { concurrency: "unbounded", discard: true });
+    const ticker = Effect.forever(
+      Effect.sleep(REEVALUATE_INTERVAL_MS).pipe(Effect.andThen(Effect.sync(() => this.reevaluate()))),
+    );
+    return Effect.all([...loops, ticker], { concurrency: "unbounded", discard: true });
   }
 }

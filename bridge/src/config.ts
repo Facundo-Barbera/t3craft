@@ -3,6 +3,7 @@ import { isIP } from "node:net";
 import { homedir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { DEFAULT_MAX_PER_ENVIRONMENT, DEFAULT_RECENT_WINDOW_HOURS } from "./state/visibility.ts";
 
 /** Repo root (bridge/..). Token files are refused inside it so secrets never land in git. */
 export const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -28,9 +29,17 @@ export interface ListenConfig {
   readonly clientKeyFile: string | null;
 }
 
+export interface VisibilityConfig {
+  /** Idle/done threads stay visible this long after their last activity. Default 24. */
+  readonly recentWindowHours: number;
+  /** Max NPCs per environment. Default 40. */
+  readonly maxPerEnvironment: number;
+}
+
 export interface BridgeConfig {
   readonly listen: ListenConfig;
   readonly includeSubagents: boolean;
+  readonly visibility: VisibilityConfig;
   readonly environments: ReadonlyArray<EnvironmentConfig>;
 }
 
@@ -111,6 +120,23 @@ const tokenPath = (raw: string, where: string): string => {
   return p;
 };
 
+/** Optional `visibility` block; absent fields (or the whole block) take the defaults. */
+export const parseVisibility = (raw: unknown): VisibilityConfig => {
+  if (raw === undefined || raw === null) {
+    return { recentWindowHours: DEFAULT_RECENT_WINDOW_HOURS, maxPerEnvironment: DEFAULT_MAX_PER_ENVIRONMENT };
+  }
+  const o = obj(raw, "visibility");
+  const hours = o.recentWindowHours ?? DEFAULT_RECENT_WINDOW_HOURS;
+  if (typeof hours !== "number" || !Number.isFinite(hours) || hours < 0) {
+    throw new ConfigError("visibility.recentWindowHours must be a number >= 0");
+  }
+  const max = o.maxPerEnvironment ?? DEFAULT_MAX_PER_ENVIRONMENT;
+  if (typeof max !== "number" || !Number.isInteger(max) || max < 1 || max > 1000) {
+    throw new ConfigError("visibility.maxPerEnvironment must be an integer 1..1000");
+  }
+  return { recentWindowHours: hours, maxPerEnvironment: max };
+};
+
 export const parseConfig = (data: unknown): BridgeConfig => {
   const root = obj(data, "config");
   const listen = obj(root.listen, "listen");
@@ -160,6 +186,7 @@ export const parseConfig = (data: unknown): BridgeConfig => {
       clientKeyFile,
     },
     includeSubagents: root.includeSubagents === true,
+    visibility: parseVisibility(root.visibility),
     environments,
   };
 };

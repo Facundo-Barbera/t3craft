@@ -39,7 +39,9 @@ cd bridge
 pnpm install
 pnpm typecheck && pnpm test
 cp config.example.json ~/.config/t3craft/bridge.json   # edit: listen.host, environments, token paths
-T3CRAFT_CONFIG=~/.config/t3craft/bridge.json pnpm probe   # prints each environment's threads + state, then exits
+T3CRAFT_CONFIG=~/.config/t3craft/bridge.json pnpm probe          # threads the mod would show (filtered), then exits
+T3CRAFT_CONFIG=~/.config/t3craft/bridge.json pnpm probe --all    # no window/cap (archived/settled still hidden)
+T3CRAFT_CONFIG=~/.config/t3craft/bridge.json pnpm probe --env vps
 T3CRAFT_CONFIG=~/.config/t3craft/bridge.json pnpm start   # runs the bridge
 ```
 
@@ -51,6 +53,16 @@ Config (`config.example.json`):
   It grants bridge access only, never T3 access.
 - `environments[]`: `id` (goes into NPC ids `<id>:<threadId>`), `label` (shown on the villager),
   `url` (no credentials), `tokenFile` (absolute path outside the repo).
+- `visibility` (optional; installed configs without it get the defaults): which threads get a
+  villager, decided per environment.
+  - Always hidden: archived, deleted, settled, and subagents/side chats (unless `includeSubagents`).
+  - Shown: threads that need you (approval, user input, `waiting`, plan to review), threads
+    working or with a turn in progress, and threads with activity (messages/runs) in the last
+    `recentWindowHours` (default `24`).
+  - At most `maxPerEnvironment` (default `40`) per environment: needs-you first, then working,
+    then most recent.
+  - Re-evaluated on every T3 update and every 60 s, so expired threads disappear on their own
+    and come back as soon as they qualify again (the bridge keeps the full state).
 - A missing or unreadable token file marks that environment `auth_failed`; restart the bridge
   after fixing it.
 

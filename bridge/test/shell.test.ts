@@ -123,6 +123,7 @@ describe("Bridge with a partial snapshot", () => {
   const config: BridgeConfig = {
     listen: { host: "127.0.0.1", port: 7878, allowedHostnames: [], clientKeyFile: null },
     includeSubagents: false,
+    visibility: { recentWindowHours: 24, maxPerEnvironment: 40 },
     environments: [
       { id: "vps", label: "my-vps", url: new URL("https://vps.example.ts.net"), tokenFile: "/nonexistent/vps.token" },
     ],
@@ -135,12 +136,13 @@ describe("Bridge with a partial snapshot", () => {
     const env = config.environments[0]!;
     const state = new ShellState();
 
+    const now = Date.parse("2026-11-01T12:00:00.000Z"); // fixtures were active at 10:00
     state.apply(authoritative([thread("a"), thread("b")]));
-    bridge.applyShell(env, state);
+    bridge.applyShell(env, state, now);
     expect(bridge.store.all().map((n) => n.id).sort()).toEqual(["vps:a", "vps:b"]);
 
     sent.length = 0;
-    if (state.apply(enrichment())) bridge.applyShell(env, state);
+    if (state.apply(enrichment())) bridge.applyShell(env, state, now);
     state.apply(synchronized);
     expect(sent.filter((m) => m.type === "npc.remove")).toEqual([]);
     expect(bridge.store.all()).toHaveLength(2);

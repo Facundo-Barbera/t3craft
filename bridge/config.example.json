@@ -2,10 +2,16 @@
   "listen": {
     "host": "100.64.0.10",
     "port": 7878,
-    "allowedHostnames": ["my-homelab.example.ts.net"],
+    "allowedHostnames": [
+      "my-homelab.example.ts.net"
+    ],
     "clientKeyFile": "/etc/t3craft/client.key"
   },
   "includeSubagents": false,
+  "visibility": {
+    "recentWindowHours": 24,
+    "maxPerEnvironment": 40
+  },
   "environments": [
     {
       "id": "vps",
