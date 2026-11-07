@@ -280,7 +280,9 @@ class HqGeneratorTest {
 				assertTrue(walkable(p, p.anchor(n).block()), "blocked anchor " + n);
 			}
 			if (n.startsWith(AnchorNames.BENCH)) {
-				assertTrue(p.at(p.anchor(n).block()).state().getBlock() instanceof StairBlock, n);
+				Anchor a = p.anchor(n);
+				assertTrue(walkable(p, a.block()), "resting spot is free " + n);
+				assertTrue(p.at(a.block().relative(a.facing().getOpposite())).state().getBlock() instanceof StairBlock, "in front of a bench " + n);
 			}
 		}
 		assertEquals(14, p.anchors().keySet().stream().filter(n -> n.startsWith(AnchorNames.BOARD_SLOT)).count());
@@ -308,8 +310,8 @@ class HqGeneratorTest {
 				assertNotNull(seat, t);
 				assertNotNull(mon, t);
 				assertNotNull(lamp, t);
-				assertTrue(p.at(seat.block()).state().getBlock() instanceof StairBlock, "seat is a chair");
-				assertEquals(seat.facing().getOpposite(), p.at(seat.block()).state().getValue(StairBlock.FACING), "backrest away from the desk");
+				assertTrue(p.at(seat.block()).state().isAir(), "no chair: the NPC stands at its desk");
+				assertTrue(walkable(p, seat.block()), "the standing cell is free");
 				assertTrue(p.at(seat.block().above()).state().isAir(), "headroom over the seat");
 				assertEquals(seat.block().relative(seat.facing()).above(), mon.block(), "monitor in front of the seat at eye level");
 				assertTrue(p.at(mon.block()).state().is(Blocks.CONCRETE.pick(net.minecraft.world.item.DyeColor.BLACK)));
