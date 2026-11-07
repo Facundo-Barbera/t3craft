@@ -84,6 +84,20 @@ Files adapted from AgentCraft's blocks (`mod/src/main/java/dev/agentcraft/block/
 - `mod/src/client/java/dev/t3craft/client/blocks/MonitorRenderer.java` ← `client/world/StationRenderer.java`
   (`toFace`: draw in screen pixel space on a block's front face).
 
+Files adapted from AgentCraft (commit `8fe3ad2`, MIT), branch `feat/lamps-breathe`:
+
+- `mod/src/client/java/dev/t3craft/client/blocks/LampRenderer.java` ← `client/hq/StatusLampRenderer.java`
+  (`breathe`, `beacon` and `beam`: additive lightning-type quads over the lens with alpha gradients,
+  crossed upward-fading beam planes).
+- `mod/src/client/java/dev/t3craft/client/blocks/LampGlow.java` ← `client/hq/StatusLampRenderer.java` and
+  `client/hq/HqClientFeature.java` (sine-breathing glow, motes only on lamps that wait on the player;
+  t3craft's own per-state curves).
+- `mod/src/client/java/dev/t3craft/client/blocks/HubBeacon.java` and `LampSignals.beacon` ←
+  `client/hq/HqWorldDriver.java` (`BEACON_BINDING`, `beaconLamp`: the aggregate state, most urgent
+  first); the client-only display fallback is t3craft's own.
+- Motes in `client/blocks/BlocksClient.java` ← `client/hq/HqClientFeature.java` (`motes`: dust rising in
+  front of an exposed face).
+
 The lamp driver (`dev.t3craft.blocks.LampApplier` + `client.blocks.BlocksClient`: the client computes
 lamp states and the integrated server applies them) follows the idea of AgentCraft's
 `HqWorldDriver`; it is a new implementation, no code copied. Models and textures are t3craft's own.

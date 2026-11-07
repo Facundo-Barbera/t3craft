@@ -156,6 +156,7 @@ public final class HqGenerator {
 				}
 			}
 			b.anchor(Anchor.at(AnchorNames.HUB, new BlockPos(0, 1, 0), Direction.SOUTH));
+			b.anchor(Anchor.at(AnchorNames.BEACON, new BlockPos(0, 9, 0), Direction.SOUTH));
 			b.anchor(Anchor.at(AnchorNames.ENTRANCE, new BlockPos(0, 1, HUB), Direction.SOUTH));
 		}
 	}
