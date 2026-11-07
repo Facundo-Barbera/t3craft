@@ -117,9 +117,7 @@ public final class HqRender {
 				views.add(new View(sid + "_section_wing", "Wing cross-section (segment 1, looking west), " + sid,
 						new Renderer.Clip(9, -1, -24, 9, fp.maxY(), -8), new Renderer.Camera(90, 0, 24)));
 				views.add(new View(sid + "_section_hub", "Hub cross-section (x=0, looking west), " + sid,
-						new Renderer.Clip(0, -6, -12, 0, fp.maxY(), 15), new Renderer.Camera(90, 0, 18)));
-				views.add(new View(sid + "_archive", "Archive basement (cut at y=-2), " + sid, new Renderer.Clip(-9, -6, -9, 9, -2, 9),
-						new Renderer.Camera(45, 50, 16)));
+						new Renderer.Clip(0, -1, -12, 0, fp.maxY(), 15), new Renderer.Camera(90, 0, 18)));
 				views.add(new View(sid + "_plan", "Plan view (cut at y=2), " + sid, new Renderer.Clip(gx1, -1, gz1, gx2, 2, gz2),
 						new Renderer.Camera(0, 90, 12)));
 			}
@@ -190,12 +188,13 @@ public final class HqRender {
 			int n = 0;
 			for (Workstation w : plan.workstations()) {
 				if (w.threadId() != null) {
-					npc(sc, w.deskAnchor(), true, n++);
+					npc(sc, w.deskAnchor(), false, n++);
 				}
 			}
 			for (Map.Entry<String, Anchor> e : plan.anchors().entrySet()) {
 				String k = e.getKey();
-				if (k.equals("board_slot_0") || k.equals("board_slot_3") || k.equals("bench_1") || k.equals("walk_hub_0")) {
+				if (k.equals("board_slot_0") || k.equals("board_slot_3") || k.equals("bench_1") || k.equals("bench_7") || k.equals("walk_hub_0")
+						|| k.equals("archive") || k.equals("thread_wall_front")) {
 					npc(sc, e.getValue(), k.startsWith("bench"), n++);
 				}
 			}

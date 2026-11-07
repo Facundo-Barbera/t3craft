@@ -75,7 +75,8 @@ public final class AnchorNames {
 
 	/**
 	 * A module's big screen (P1): face centre of the bottom-middle cell of a 3 x 2 cell surface on the
-	 * module's end cap, looking down the corridor towards the spine. Cells: {@code block} ± 1 along z, up 1.
+	 * module's end cap (on a base, at the end of the corridor), looking towards the spine. Cells: {@code block} ± 1 along
+	 * z, up 1.
 	 */
 	public static String moduleScreen(int index) {
 		return "module_screen@" + index;

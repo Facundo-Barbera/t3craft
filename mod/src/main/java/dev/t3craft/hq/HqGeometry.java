@@ -110,9 +110,12 @@ final class HqGeometry {
 		return new Surface(new BlockPos(-HUB + 1, 1, 4), Direction.NORTH, Direction.EAST, 9, 4);
 	}
 
-	/** A module's big screen: on its end cap, facing the corridor (towards the spine), 3 wide x 2 tall. */
+	/**
+	 * A module's big screen: standing just inside its end cap (the last segment's pillar column, at the
+	 * end of the corridor), facing the corridor towards the spine, 3 wide x 2 tall.
+	 */
 	static Surface moduleScreen(int wingIndex, int segments) {
-		int u = segmentU(segments);
+		int u = segmentU(segments) - 1;
 		Direction in = outward(wingIndex).getOpposite();
 		// left as seen from the corridor looking at the cap: east wing looks east, left is north
 		Direction along = side(wingIndex) > 0 ? Direction.SOUTH : Direction.NORTH;

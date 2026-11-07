@@ -222,7 +222,7 @@ public final class HqGenerator {
 			style.wingEndWall(c, i, 0, true);
 		}
 		for (int s = 0; s < w.segments(); s++) {
-			segment(b, i, s, accent);
+			segment(b, i, s, accent, s == w.segments() - 1 ? HqGeometry.moduleScreen(i, w.segments()) : null);
 		}
 		for (int slot = 0; slot < w.capacity(); slot++) {
 			desk(b, i, slot, w.threadAt(slot));
@@ -240,16 +240,21 @@ public final class HqGenerator {
 		}
 		try (PlanBuilder.Canvas c = b.module("wing_" + i + "_cap", HqGeometry.wingCap(i, w.segments()), List.of())) {
 			style.wingEndWall(c, i, HqGeometry.segmentU(w.segments()), false);
-			surface(b, c, HqGeometry.moduleScreen(i, w.segments()), AnchorNames.moduleScreen(i));
 		}
 	}
 
-	private void segment(PlanBuilder b, int i, int s, DyeColor accent) {
+	private void segment(PlanBuilder b, int i, int s, DyeColor accent, HqGeometry.@Nullable Surface screen) {
 		List<Box> holes = new ArrayList<>(2);
 		holes.add(HqGeometry.desk(i, 2 * s));
 		holes.add(HqGeometry.desk(i, 2 * s + 1));
 		try (PlanBuilder.Canvas c = b.module("wing_" + i + "_seg_" + s, HqGeometry.segment(i, s), holes)) {
 			style.segment(c, i, s, accent);
+			if (screen != null) {
+				surface(b, c, screen, AnchorNames.moduleScreen(i));
+				for (int k = 0; k < screen.width(); k++) {
+					c.set(screen.origin().relative(screen.along(), k).below(), style.terminalBase());
+				}
+			}
 		}
 	}
 
