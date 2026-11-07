@@ -191,7 +191,7 @@ public final class WorkstationClient implements ClientModInitializer {
 			return;
 		}
 		T3CraftClient client = T3CraftClient.get();
-		List<NpcInfo> npcs = client == null ? List.of() : client.npcs().all();
+		List<NpcInfo> npcs = client == null ? List.of() : client.npcs().stationed(); // fix/hq-stale-stations: released threads have no station
 		List<WorkstationThread> list = new ArrayList<>(npcs.size());
 		threads.clear();
 		for (NpcInfo n : npcs) {

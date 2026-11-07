@@ -98,6 +98,10 @@ public final class SettingsScreen extends BaseConfigScreen {
 			toggle("Hide bar when idle", draft.hud().hideWhenIdle(), x2, y + 120, colW,
 					v -> draft = draft.withHud(draft.hud().withHideWhenIdle(v)));
 		}
+		// feat/hub-hologram: hud.hologram, one more row when it fits (else edit config/t3craft.json).
+		if (y + 168 <= height - 80) {
+			toggle("Hub hologram", draft.hud().hologram(), x0, y + 144, colW, v -> draft = draft.withHud(draft.hud().withHologram(v)));
+		}
 
 		int by = height - 52;
 		int bw = Math.min(120, (width - 40) / 3 - 4);

@@ -169,7 +169,7 @@ public record T3CraftSettings(
 		}
 	}
 
-	public record Hud(boolean statusBar, String position, String align, boolean hideWhenIdle) {
+	public record Hud(boolean statusBar, String position, String align, boolean hideWhenIdle, boolean hologram) {
 		public static final java.util.List<String> POSITIONS = java.util.List.of("top", "bottom");
 		public static final java.util.List<String> ALIGNS = java.util.List.of("left", "center", "right");
 
@@ -178,8 +178,13 @@ public record T3CraftSettings(
 			align = ALIGNS.contains(align) ? align : "center";
 		}
 
+		/** Pre-{@code hologram} shape (feat/hub-hologram), kept so existing callers still compile: hologram on. */
+		public Hud(boolean statusBar, String position, String align, boolean hideWhenIdle) {
+			this(statusBar, position, align, hideWhenIdle, true);
+		}
+
 		public static Hud defaults() {
-			return new Hud(true, "top", "center", true);
+			return new Hud(true, "top", "center", true, true);
 		}
 
 		public boolean bottom() {
@@ -187,15 +192,20 @@ public record T3CraftSettings(
 		}
 
 		public Hud withStatusBar(boolean v) {
-			return new Hud(v, position, align, hideWhenIdle);
+			return new Hud(v, position, align, hideWhenIdle, hologram);
 		}
 
 		public Hud withPlacement(String pos, String al) {
-			return new Hud(statusBar, pos, al, hideWhenIdle);
+			return new Hud(statusBar, pos, al, hideWhenIdle, hologram);
 		}
 
 		public Hud withHideWhenIdle(boolean v) {
-			return new Hud(statusBar, position, align, v);
+			return new Hud(statusBar, position, align, v, hologram);
+		}
+
+		/** Hub hologram (feat/hub-hologram) on/off. */
+		public Hud withHologram(boolean v) {
+			return new Hud(statusBar, position, align, hideWhenIdle, v);
 		}
 
 		/** Next placement in the settings cycle: top left → top center → … → bottom right → top left. */
