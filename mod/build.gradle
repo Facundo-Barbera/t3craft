@@ -12,6 +12,11 @@ base {
 
 repositories {
 	mavenCentral()
+	// Mod Menu API (compile-only, optional integration in dev.t3craft.client.config).
+	exclusiveContent {
+		forRepository { maven { url = "https://maven.terraformersmc.com/releases/" } }
+		filter { includeGroup "com.terraformersmc" }
+	}
 }
 
 java {
@@ -44,6 +49,8 @@ dependencies {
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
 	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
 	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+	// Optional: only the API interfaces, never bundled nor required at runtime ("suggests" in fabric.mod.json).
+	clientCompileOnly("com.terraformersmc:modmenu:${project.modmenu_version}") { transitive = false }
 
 	// Unit tests for the pure T3 client logic (dev.t3craft.t3): framing, shell state, mapping,
 	// visibility, pairing. No Minecraft classes involved.
@@ -54,11 +61,12 @@ dependencies {
 }
 
 // Pure client-side logic lives in the client source set but its tests only touch Minecraft-free classes:
-// portable terminal (dev.t3craft.client.portable: navigation, state, notification log) and
-// NPC behaviour (dev.t3craft.client.npc.behavior: pathfinder, brain, layout, bubbles).
+// portable terminal (dev.t3craft.client.portable: navigation, state, notification log),
+// NPC behaviour (dev.t3craft.client.npc.behavior: pathfinder, brain, layout, bubbles) and
+// config (dev.t3craft.client.config).
 sourceSets.test {
-	compileClasspath += sourceSets.client.output
-	runtimeClasspath += sourceSets.client.output
+	compileClasspath += sourceSets.client.output + sourceSets.client.compileClasspath
+	runtimeClasspath += sourceSets.client.output + sourceSets.client.runtimeClasspath
 }
 
 test {
