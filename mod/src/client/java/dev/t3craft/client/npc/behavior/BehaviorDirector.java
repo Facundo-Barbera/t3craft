@@ -78,6 +78,14 @@ public final class BehaviorDirector {
 	/** Plug in a physical base (null = none, grid layout only). See {@link AnchorSource}. */
 	public void setAnchorSource(@Nullable AnchorSource source) {
 		this.anchors = source == null ? AnchorSource.NONE : source;
+		// The base was built, grew, moved or went away: routes, misses and blocked spots learnt in the
+		// old world are wrong now, and an NPC waiting out a "no route" must try again right away.
+		if (navigation != null) {
+			navigation.invalidate();
+		}
+		for (NpcBrain b : brains.values()) {
+			b.replan();
+		}
 	}
 
 	/** Plug in the speech-bubble text (null = {@link SummarySource#ACTIVITY}). */
@@ -168,6 +176,8 @@ public final class BehaviorDirector {
 		}
 		Navigation nav = navigation;
 		nav.beginTick();
+		Anchor entrance = layout.exit();
+		nav.setVia(entrance == null ? null : entrance.pos());
 		Pos playerPos = pos(player.position());
 
 		// Board slots: NPCs needing attention, most urgent first.
