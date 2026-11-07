@@ -108,7 +108,7 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 			helpers().tick(mc, npcs::avatar);
 		});
 		T3CraftCommands.register(this);
-		dev.t3craft.hq.HqPreviewCommand.register(npcs::all); // feat/hq-design: /t3craft debug hq-preview
+		dev.t3craft.hq.HqPreviewCommand.register(npcs::hqRoster); // feat/hq-design: /t3craft debug hq-preview
 		PeekHud.register();
 		dev.t3craft.client.hud.StatusBar.register(this); // feat/hud-bar
 		PortableClient.register(this);
@@ -153,6 +153,9 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 
 	private void startSource() {
 		T3Craft.LOGGER.info("T3Craft mode: {}", config.mode());
+		bridgeSnapshot = false;
+		// fix/hq-stale-stations: the one release policy, shared (StationPolicy.active()) by every roster reader.
+		dev.t3craft.hq.StationPolicy.use(dev.t3craft.hq.StationPolicy.load(FabricLoader.getInstance().getConfigDir().resolve("t3craft.json")));
 		if (config.mode() == ModConfig.Mode.BRIDGE) {
 			T3Craft.LOGGER.info("bridge URL {}", config.bridgeUrl());
 			link = new BridgeLink(config.bridgeUrl(), config.bridgeKey(), modVersion, this, Minecraft.getInstance()::execute);
@@ -282,7 +285,7 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 		helpers().update(sub, views.stream().map(dev.t3craft.t3.NpcView::id).toList(), helperConfig().maxPerParent());
 		List<NpcInfo> list = new ArrayList<>();
 		views.forEach(v -> list.add(NpcInfo.fromView(v)));
-		npcs.replaceAll(list);
+		npcs.replaceAll(list, lastActivity(d, views));
 
 		for (dev.t3craft.t3.Transitions.Transition t : dev.t3craft.t3.Transitions.between(lastViews, views, syncedEnvs)) {
 			Notifier.transition(mc, t.npcId(), t.title(), t.text(), t.color(), t.sound().name().toLowerCase(), true);
@@ -307,6 +310,63 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 		}
 		PeekHud.setBanner(problems.isEmpty() ? null : "T3: " + String.join(", ", problems) + "  (/t3craft status)");
 	}
+
+	/** NPC id → last message/run of its thread (epoch ms), for the station policy (fix/hq-stale-stations). */
+	private static Map<String, Long> lastActivity(DirectController d, List<dev.t3craft.t3.NpcView> views) {
+		Map<String, dev.t3craft.t3.ShellState.View> shells = d.shellViews();
+		Map<String, Map<String, dev.t3craft.t3.ThreadShell>> byEnv = new HashMap<>();
+		Map<String, Long> out = new HashMap<>();
+		for (dev.t3craft.t3.NpcView v : views) {
+			Map<String, dev.t3craft.t3.ThreadShell> threads = byEnv.computeIfAbsent(v.env(), env -> {
+				Map<String, dev.t3craft.t3.ThreadShell> m = new HashMap<>();
+				dev.t3craft.t3.ShellState.View sv = shells.get(env);
+				if (sv != null) {
+					sv.threads().forEach(t -> m.put(t.id(), t));
+				}
+				return m;
+			});
+			dev.t3craft.t3.ThreadShell t = threads.get(v.threadId());
+			if (t != null) {
+				long last = dev.t3craft.t3.Visibility.lastActivity(t);
+				if (last > 0) {
+					out.put(v.id(), last);
+				}
+			}
+		}
+		return out;
+	}
+
+	/**
+	 * Sources the HQ waits for before reconciling ({@link dev.t3craft.hq.RosterGate}): direct mode,
+	 * every paired environment; bridge mode, {@code "bridge"} until its first snapshot.
+	 */
+	public java.util.Set<String> rosterSources() {
+		DirectController d = direct;
+		if (d != null) {
+			java.util.Set<String> out = new java.util.HashSet<>();
+			d.statuses().forEach(st -> out.add(st.id()));
+			return out;
+		}
+		return link != null ? java.util.Set.of("bridge") : java.util.Set.of();
+	}
+
+	/** The sources of {@link #rosterSources()} whose first synced roster (shell or snapshot) has arrived. */
+	public java.util.Set<String> syncedRosterSources() {
+		DirectController d = direct;
+		if (d != null) {
+			java.util.Set<String> out = new java.util.HashSet<>();
+			for (DirectController.EnvStatus st : d.statuses()) {
+				if (d.view(st.id()) != null) {
+					out.add(st.id());
+				}
+			}
+			return out;
+		}
+		return bridgeSnapshot ? java.util.Set.of("bridge") : java.util.Set.of();
+	}
+
+	/** Whether a bridge snapshot has arrived since the link started. */
+	private volatile boolean bridgeSnapshot;
 
 	/** {@link #pair(String, String, String, boolean, Consumer)} with the default scopes (read + operate). */
 	public void pair(String label, String linkOrCode, String hostUrl, Consumer<PairResult> done) {
@@ -417,6 +477,7 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 					}
 				}
 				npcs.replaceAll(list);
+				bridgeSnapshot = true;
 				T3Craft.LOGGER.info("snapshot: {} threads", list.size());
 			}
 			case "npc.upsert" -> {

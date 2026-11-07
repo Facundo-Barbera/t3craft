@@ -27,7 +27,7 @@ public final class HqBlockFixtures implements HqFixtures {
 		BlockState monitor(Direction facing);
 
 		/** A monitor that is one cell of a screen ({@code sides}: neighbours in the same screen). Stand-ins may ignore it. */
-		default BlockState monitor(Direction facing, ScreenExtent.Sides sides) {
+		default BlockState monitor(Direction facing, ScreenRect.Sides sides) {
 			return monitor(facing);
 		}
 
@@ -56,7 +56,7 @@ public final class HqBlockFixtures implements HqFixtures {
 		for (HqBindings.Fixture f : HqBindings.of(plan)) {
 			fixtures.put(f.rel(), f);
 		}
-		Map<BlockPos, ScreenExtent> screens = screens(fixtures);
+		Map<BlockPos, ScreenRect> screens = screens(fixtures);
 		return plan.replacing(p -> {
 			HqBindings.Fixture f = fixtures.get(p.rel());
 			if (f == null) {
@@ -64,7 +64,7 @@ public final class HqBlockFixtures implements HqFixtures {
 			}
 			BlockState s = switch (f.role()) {
 				case MONITOR, SCREEN -> {
-					ScreenExtent e = screens.get(f.rel());
+					ScreenRect e = screens.get(f.rel());
 					yield e == null ? states.monitor(f.facing()) : states.monitor(f.facing(), e.sides(f.rel()));
 				}
 				case LAMP, BEACON -> states.lamp();
@@ -75,7 +75,7 @@ public final class HqBlockFixtures implements HqFixtures {
 	}
 
 	/** The screen of every monitor fixture, by the world's rule ({@link MonitorWall}) over the plan's monitor cells. */
-	static Map<BlockPos, ScreenExtent> screens(Map<BlockPos, HqBindings.Fixture> fixtures) {
+	static Map<BlockPos, ScreenRect> screens(Map<BlockPos, HqBindings.Fixture> fixtures) {
 		MonitorWall.Lookup lookup = p -> {
 			HqBindings.Fixture f = fixtures.get(p);
 			return f != null && (f.role() == HqBindings.Role.MONITOR || f.role() == HqBindings.Role.SCREEN)

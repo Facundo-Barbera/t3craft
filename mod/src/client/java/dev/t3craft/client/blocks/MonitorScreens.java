@@ -22,10 +22,9 @@ import java.util.Set;
  * {@link WorkstationCache} (per-thread content hash + age label → a new screen and a bumped
  * version only when something changed).
  *
- * <p>Large screens ({@link #show(Binding, int, int)}, sized by the renderer from the screen's extent):
- * a thread gets the same model with the screen's width and as many activity lines as fit (P2 replaces
- * it with the live log); a project or environment gets its {@link ProjectFeed}. Both are memoised and
- * rebuilt only when their source changes.
+ * <p>Screens bound to a project or environment get their {@link ProjectFeed} through
+ * {@link #show(Binding, int, int)} (sized by the renderer from the screen's extent), memoised and rebuilt
+ * only when a thread changed.
  *
  * <p>The renderer asks {@link #show(Binding)} each frame and rebuilds its glyph runs only when
  * {@link Shown#version()} changes. Pure (the caller passes the clock); client thread only.
@@ -90,26 +89,17 @@ public final class MonitorScreens {
 	}
 
 	/**
-	 * The content of a large screen of {@code cols} characters × {@code rows} lines: a thread's screen
-	 * at that size, or a project / environment feed. Other bindings show what a lone monitor shows.
+	 * A project / environment feed ({@link ProjectFeed}) laid out at {@code cols} characters ×
+	 * {@code rows} lines, memoised until any thread changes. Other bindings: {@link #show(Binding)}
+	 * (a thread's large screen is the renderer's live log).
 	 */
 	public Shown show(Binding b, int cols, int rows) {
-		cols = Math.max(8, cols);
-		rows = Math.max(2, rows);
-		String id = b.wire() + "@" + cols + "x" + rows;
-		if (b.isFeed()) {
-			return memo(id, revision, () -> ProjectFeed.render(b, threads.values(), cols, rows));
-		}
-		if (b.kind() != Binding.Kind.THREAD || cache.screen(b.value()) == null) {
+		if (!b.isFeed()) {
 			return show(b);
 		}
-		WorkstationThread t = threads.get(b.value());
-		if (t == null) {
-			return show(b);
-		}
-		WorkstationModel model = new WorkstationModel(new WorkstationModel.Layout(cols, Math.max(1, rows - 3)));
-		String age = cache.ageLabel(b.value());
-		return memo(id, cache.version(b.value()), () -> model.render(t, age));
+		int c = Math.max(8, cols);
+		int r = Math.max(2, rows);
+		return memo(b.wire() + "@" + c + "x" + r, revision, () -> ProjectFeed.render(b, threads.values(), c, r));
 	}
 
 	private Shown memo(String id, long source, java.util.function.Supplier<StationScreen> build) {

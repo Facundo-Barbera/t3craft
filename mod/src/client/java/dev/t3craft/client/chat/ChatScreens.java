@@ -120,7 +120,7 @@ public final class ChatScreens {
 						}
 						Long at = shell == null ? null : Visibility.lastActivity(shell);
 						boolean pending = shell != null && shell.pendingRuntimeRequest() != null;
-						out.add(ThreadRow.fromNpc(NpcInfo.fromView(v), at == null || at <= 0 ? null : at, pending));
+						out.add(ThreadRow.fromNpc(NpcInfo.fromView(v), at == null || at <= 0 ? null : at, pending, shell != null && shell.pinned()));
 					}
 					return out;
 				}
@@ -186,7 +186,12 @@ public final class ChatScreens {
 			DirectController direct = client == null ? null : client.direct();
 			T3Connection c = direct == null ? null : direct.connection(envId);
 			return switch (ChatAccess.history(direct != null, c != null)) {
-				case DIRECT -> ChatSource.of(c);
+				case DIRECT -> ChatSource.of(c, () -> {
+					// still the live connection? (a reload or a pairing replaces them all)
+					T3CraftClient now = T3CraftClient.get();
+					DirectController d = now == null ? null : now.direct();
+					return d != null && d.connection(envId) == c;
+				});
 				case PAIR_FOR_DIRECT -> throw new ChatSource.Unavailable(I18n.get("t3craft.chat.history.bridge"),
 						ChatSource.Unavailable.Action.PAIR);
 				case NOT_PAIRED -> throw new ChatSource.Unavailable(I18n.get("t3craft.chat.history.not_paired", envId),

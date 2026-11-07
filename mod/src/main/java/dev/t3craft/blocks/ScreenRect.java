@@ -10,24 +10,19 @@ import net.minecraft.core.Direction;
 /**
  * One screen made of monitors: a {@code width × height} rectangle of {@code t3craft:monitor} blocks
  * that all look along {@code facing}. A lone monitor is a 1×1 extent. This is what the renderer
- * consumes: it draws a screen <b>once</b>, from its {@link #origin}, over the whole surface, and the
- * other cells draw nothing.
+ * world-side geometry of a screen; the client turns it into the renderer's
+ * {@code dev.t3craft.client.blocks.ScreenExtent} (size + "this block draws it"), whose drawing origin is
+ * the <b>bottom-left</b> cell ({@link #bottomLeft()}); the other cells draw nothing.
  *
  * <p>Coordinates are as seen by a viewer standing in front of the screen: {@link #origin} is the
- * <b>top-left</b> cell, columns grow to the viewer's right ({@link #right()}) and rows grow downward.
- * (AgentCraft's {@code PanelBlock.origin/extent} uses the bottom-left; top-left matches the renderer's
- * face space, whose origin is the face's top-left corner.)
+ * <b>top-left</b> cell (the anchor of a plan's {@code bigscreen_*}), columns grow to the viewer's right
+ * ({@link #right()}) and rows grow downward.
  *
  * <p>Pure value; adapted from AgentCraft's {@code PanelBlock} ({@code left = facing.getClockWise()},
  * {@code right = facing.getCounterClockWise()}).
  */
-public record ScreenExtent(BlockPos origin, Direction facing, int width, int height) {
-	/** Pixel densities of the screen surface: a lone monitor, a small wall, a large one. */
-	public static final int PPB_SINGLE = 160;
-	public static final int PPB_SMALL = 128;
-	public static final int PPB_LARGE = 96;
-
-	public ScreenExtent {
+public record ScreenRect(BlockPos origin, Direction facing, int width, int height) {
+	public ScreenRect {
 		origin = origin.immutable();
 		if (!facing.getAxis().isHorizontal()) {
 			throw new IllegalArgumentException("screen facing must be horizontal: " + facing);
@@ -38,8 +33,8 @@ public record ScreenExtent(BlockPos origin, Direction facing, int width, int hei
 	}
 
 	/** A lone monitor. */
-	public static ScreenExtent single(BlockPos pos, Direction facing) {
-		return new ScreenExtent(pos, facing, 1, 1);
+	public static ScreenRect single(BlockPos pos, Direction facing) {
+		return new ScreenRect(pos, facing, 1, 1);
 	}
 
 	/** The viewer's right, along which columns grow. */
@@ -83,8 +78,14 @@ public record ScreenExtent(BlockPos origin, Direction facing, int width, int hei
 		return inPlane && c >= 0 && c < width && r >= 0 && r < height;
 	}
 
-	public boolean isOrigin(BlockPos p) {
-		return origin.equals(p);
+	/** The bottom-left cell as seen by the viewer: where the renderer draws the whole screen from. */
+	public BlockPos bottomLeft() {
+		return cell(0, height - 1);
+	}
+
+	/** True for the cell that draws the screen ({@link #bottomLeft()}). */
+	public boolean isDrawOrigin(BlockPos p) {
+		return bottomLeft().equals(p);
 	}
 
 	/** Every cell, row by row from the top-left (origin first). */
@@ -105,20 +106,9 @@ public record ScreenExtent(BlockPos origin, Direction facing, int width, int hei
 		return new Sides(r > 0, r < height - 1, c > 0, c < width - 1);
 	}
 
-	/**
-	 * Screen pixels per block for this size ("density by size"): 160 for a lone monitor, 128 for a
-	 * small wall (up to 3×2) and 96 beyond, so larger screens get larger text and more of it.
-	 */
-	public int pixelsPerBlock() {
-		if (!isMulti()) {
-			return PPB_SINGLE;
-		}
-		return width <= 3 && height <= 2 ? PPB_SMALL : PPB_LARGE;
-	}
-
 	/** The same screen moved by {@code offset} (plan-relative → world). */
-	public ScreenExtent offset(BlockPos offset) {
-		return new ScreenExtent(origin.offset(offset), facing, width, height);
+	public ScreenRect offset(BlockPos offset) {
+		return new ScreenRect(origin.offset(offset), facing, width, height);
 	}
 
 	/** Connections of one cell, as seen by the viewer (true = the neighbour on that side is in the same screen). */

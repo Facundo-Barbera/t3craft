@@ -61,7 +61,7 @@ public final class HqBindings {
 	}
 
 	/** A large screen reserved by the plan: its plan-relative extent and what it shows. */
-	public record Screen(String key, ScreenExtent extent, Binding binding) {
+	public record Screen(String key, ScreenRect extent, Binding binding) {
 	}
 
 	/** Every fixture of {@code plan}, one per cell, in a fixed order (desks, board bulbs, module bulbs, archive, beacon, large screens). */
@@ -120,7 +120,7 @@ public final class HqBindings {
 			if (bs != null) {
 				int w = Math.min(bs.width(), MonitorWall.MAX_WIDTH);
 				int h = Math.min(bs.height(), MonitorWall.MAX_HEIGHT);
-				out.add(new Screen(bs.key(), new ScreenExtent(a.block(), a.facing(), w, h), Binding.parse(bs.binding())));
+				out.add(new Screen(bs.key(), new ScreenRect(a.block(), a.facing(), w, h), Binding.parse(bs.binding())));
 			}
 		}
 		return out;

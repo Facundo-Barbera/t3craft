@@ -23,7 +23,14 @@ public record PortableThread(
 		int color,
 		@Nullable String activity,
 		int priority,
-		boolean settled) {
+		boolean settled,
+		boolean pinned) {
+
+	/** Shape before {@code pinned} (pinned in T3: listed first). */
+	public PortableThread(String id, String env, String envLabel, @Nullable String threadId, String title, String project, String state,
+			int color, @Nullable String activity, int priority, boolean settled) {
+		this(id, env, envLabel, threadId, title, project, state, color, activity, priority, settled, false);
+	}
 
 	public boolean needsAttention() {
 		return "needs_attention".equals(state);

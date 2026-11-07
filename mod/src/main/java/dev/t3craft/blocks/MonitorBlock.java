@@ -44,7 +44,7 @@ import org.jspecify.annotations.Nullable;
  * recomputed on the server one tick after a monitor is placed, removed or rebound (the delay lets a
  * structure or the HQ builder load the block entity data first), for the whole group at once.
  * {@link #extent} reads the screen back from the flags (the client renderer draws once, from the
- * origin) and {@link #screenBinding} gives what the whole screen shows.
+ * bottom-left cell, {@link #isDrawOrigin}) and {@link #screenBinding} gives what the whole screen shows.
  *
  * <p>Facing/rotate/mirror handling adapted from AgentCraft's {@code FacingEntityBlock}; the connection
  * properties and origin/extent walk from AgentCraft's {@code PanelBlock}.
@@ -103,7 +103,7 @@ public final class MonitorBlock extends BaseEntityBlock {
 		if (level.isClientSide()) {
 			ClientUse use = clientUse;
 			if (use != null) {
-				ScreenExtent e = extent(level, pos, state);
+				ScreenRect e = extent(level, pos, state);
 				use.use(e.origin(), screenBinding(level, e));
 			}
 		}
@@ -113,7 +113,7 @@ public final class MonitorBlock extends BaseEntityBlock {
 	// ---- large screens ------------------------------------------------------------------------
 
 	/** {@code state} with its connection flags set from {@code sides}. */
-	public static BlockState connected(BlockState state, ScreenExtent.Sides sides) {
+	public static BlockState connected(BlockState state, ScreenRect.Sides sides) {
 		return state.setValue(UP, sides.up()).setValue(DOWN, sides.down()).setValue(LEFT, sides.left()).setValue(RIGHT, sides.right());
 	}
 
@@ -157,9 +157,9 @@ public final class MonitorBlock extends BaseEntityBlock {
 
 	/** Server: recomputes the screens of the groups around {@code seeds}; writes only flags that change. Returns how many. */
 	public static int refresh(Level level, List<BlockPos> seeds) {
-		Map<BlockPos, ScreenExtent> screens = MonitorWall.resolve(lookup(level), seeds);
+		Map<BlockPos, ScreenRect> screens = MonitorWall.resolve(lookup(level), seeds);
 		int changed = 0;
-		for (Map.Entry<BlockPos, ScreenExtent> e : screens.entrySet()) {
+		for (Map.Entry<BlockPos, ScreenRect> e : screens.entrySet()) {
 			BlockState s = level.getBlockState(e.getKey());
 			if (!(s.getBlock() instanceof MonitorBlock)) {
 				continue;
@@ -192,13 +192,13 @@ public final class MonitorBlock extends BaseEntityBlock {
 	 * to the top-left corner, then along the top row and the left column). A monitor whose flags say
 	 * nothing is a 1×1 screen; a non-monitor state gives a 1×1 facing north.
 	 */
-	public static ScreenExtent extent(BlockGetter level, BlockPos pos, BlockState state) {
+	public static ScreenRect extent(BlockGetter level, BlockPos pos, BlockState state) {
 		if (!(state.getBlock() instanceof MonitorBlock)) {
-			return ScreenExtent.single(pos, Direction.NORTH);
+			return ScreenRect.single(pos, Direction.NORTH);
 		}
 		Direction facing = state.getValue(FACING);
 		if (!state.getValue(UP) && !state.getValue(DOWN) && !state.getValue(LEFT) && !state.getValue(RIGHT)) {
-			return ScreenExtent.single(pos, facing);
+			return ScreenRect.single(pos, facing);
 		}
 		Direction left = facing.getClockWise();
 		Direction right = facing.getCounterClockWise();
@@ -238,17 +238,23 @@ public final class MonitorBlock extends BaseEntityBlock {
 			}
 			c = n;
 		}
-		ScreenExtent e = new ScreenExtent(origin, facing, w, h);
-		return e.contains(pos) ? e : ScreenExtent.single(pos, facing);
+		ScreenRect e = new ScreenRect(origin, facing, w, h);
+		return e.contains(pos) ? e : ScreenRect.single(pos, facing);
 	}
 
-	/** True when the monitor at {@code pos} is a screen's origin (where the renderer draws it). */
-	public static boolean isOrigin(BlockState state) {
-		return state.getBlock() instanceof MonitorBlock && !state.getValue(UP) && !state.getValue(LEFT);
+	/** True when this monitor draws its screen: the bottom-left cell as seen by the viewer (a lone monitor always). */
+	public static boolean isDrawOrigin(BlockState state) {
+		return state.getBlock() instanceof MonitorBlock && !state.getValue(DOWN) && !state.getValue(LEFT);
+	}
+
+	/** True when the flags say this monitor is part of a larger screen. */
+	public static boolean isConnected(BlockState state) {
+		return state.getBlock() instanceof MonitorBlock
+				&& (state.getValue(UP) || state.getValue(DOWN) || state.getValue(LEFT) || state.getValue(RIGHT));
 	}
 
 	/** What a whole screen shows: the first bound cell's raw binding, origin first ("" when none is bound). */
-	public static String screenBinding(BlockGetter level, ScreenExtent e) {
+	public static String screenBinding(BlockGetter level, ScreenRect e) {
 		if (level.getBlockEntity(e.origin()) instanceof BoundBlockEntity o && !o.binding().isEmpty()) {
 			return o.binding();
 		}

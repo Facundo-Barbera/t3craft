@@ -15,6 +15,8 @@ import dev.t3craft.blocks.LampApplier;
 import dev.t3craft.blocks.LampStatus;
 import dev.t3craft.blocks.LiveLamps;
 import dev.t3craft.blocks.MonitorBlock;
+import dev.t3craft.blocks.MonitorBlockEntity;
+import dev.t3craft.blocks.ScreenRect;
 import dev.t3craft.blocks.T3Blocks;
 import dev.t3craft.client.T3CraftClient;
 import dev.t3craft.client.debug.GuardedEvents;
@@ -31,8 +33,10 @@ import java.util.Map;
 import java.util.function.Supplier;
 import java.util.Random;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientBlockEntityEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.BlockEntityRendererRegistry;
@@ -68,6 +72,10 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>Using a monitor opens its thread through the workstations' {@link ThreadOpener}.
  *
+ * <p>Live log ({@link MonitorLiveLog}): monitors close to the player and in view hold a read-only
+ * share of their thread's stream ({@link MonitorVisibility} decides, with hysteresis; one stream per
+ * thread however many monitors show it). Options: {@code blocks.monitor.*} ({@link MonitorSettings}).
+ *
  * <p>Integration points: {@link #setHqBindings} (HQ owner: the bindings the HQ's fixtures should have
  * for the live roster; written into the block entities, only where they change) and
  * {@link #setPositionBindings} (world cell → binding fallback for blocks without their own data).
@@ -95,6 +103,9 @@ public final class BlocksClient implements ClientModInitializer {
 	private final MonitorScreens screens = new MonitorScreens();
 	private final Map<String, WorkstationThread> threads = new HashMap<>();
 	private final ThreadOpener fallbackOpener = new ChatScreenOpener();
+	private volatile MonitorSettings monitorSettings = MonitorSettings.DEFAULT;
+	private volatile ScreenExtent.@Nullable Provider extents;
+	private final MonitorLiveLog liveLog = new MonitorLiveLog(MonitorSettings.DEFAULT);
 	private @Nullable MonitorRenderer renderer;
 	private volatile @Nullable Map<Long, Binding> positional;
 	private volatile @Nullable Map<String, LampStatus> lastWanted;
@@ -122,6 +133,7 @@ public final class BlocksClient implements ClientModInitializer {
 			return;
 		}
 		instance = this;
+		loadMonitorSettings();
 		BlockEntityRendererRegistry.register(c.monitorType(), ctx -> {
 			MonitorRenderer r = new MonitorRenderer(this);
 			renderer = r;
@@ -129,9 +141,18 @@ public final class BlocksClient implements ClientModInitializer {
 		});
 		BlockEntityRendererRegistry.register(c.lampType(), ctx -> new LampRenderer(this));
 		MonitorBlock.setClientUse(this::use);
+		setScreenExtents(BlocksClient::connectedExtent);
 		ClientTickEvents.END_CLIENT_TICK.register(GuardedEvents.endClientTick(MODULE, this::tick));
-		ClientLifecycleEvents.CLIENT_STOPPING.register(mc -> reset());
-		DevReload.get().register("t3craft.blocks", reason -> reset());
+		ClientBlockEntityEvents.BLOCK_ENTITY_LOAD.register((be, level) -> liveLog.onLoad(be));
+		ClientBlockEntityEvents.BLOCK_ENTITY_UNLOAD.register((be, level) -> liveLog.onUnload(be));
+		ClientLifecycleEvents.CLIENT_STOPPING.register(mc -> {
+			reset();
+			liveLog.close();
+		});
+		DevReload.get().register("t3craft.blocks", reason -> {
+			reset();
+			loadMonitorSettings();
+		});
 		ClientCommandRegistrationCallback.EVENT.register((d, ctx) -> registerCommands(d));
 	}
 
@@ -163,6 +184,80 @@ public final class BlocksClient implements ClientModInitializer {
 
 	MonitorScreens screens() {
 		return screens;
+	}
+
+	/**
+	 * Integration point for connected (multi-block) monitors: {@code provider} tells the renderer
+	 * which screen each monitor block belongs to ({@link ScreenExtent}: size in blocks and whether
+	 * this block is the origin that draws it). Null = every monitor is a 1×1 screen. Client thread.
+	 */
+	public void setScreenExtents(ScreenExtent.@Nullable Provider provider) {
+		extents = provider;
+		MonitorRenderer r = renderer;
+		if (r != null) {
+			r.clear();
+		}
+	}
+
+	/**
+	 * The renderer's extent of a monitor from its connection flags ({@link MonitorBlock#extent}): null
+	 * (1×1) for a lone monitor, otherwise the screen's size and whether this is its bottom-left cell.
+	 */
+	static @Nullable ScreenExtent connectedExtent(MonitorBlockEntity be) {
+		var state = be.getBlockState();
+		if (be.getLevel() == null || !MonitorBlock.isConnected(state)) {
+			return null;
+		}
+		ScreenRect r = MonitorBlock.extent(be.getLevel(), be.getBlockPos(), state);
+		if (!r.isMulti()) {
+			return null;
+		}
+		return r.isDrawOrigin(be.getBlockPos()) ? new ScreenExtent(r.width(), r.height()) : ScreenExtent.member(r.width(), r.height());
+	}
+
+	/**
+	 * The binding a whole screen shows, for the monitor at {@code pos}: a merged screen's first bound
+	 * cell ({@link MonitorBlock#screenBinding}) through the position fallback; a lone monitor's own.
+	 */
+	Binding screenBinding(MonitorBlockEntity be) {
+		var state = be.getBlockState();
+		if (be.getLevel() == null || !MonitorBlock.isConnected(state)) {
+			return resolve(be.getBlockPos(), be.binding());
+		}
+		ScreenRect r = MonitorBlock.extent(be.getLevel(), be.getBlockPos(), state);
+		return resolve(r.origin(), MonitorBlock.screenBinding(be.getLevel(), r));
+	}
+
+	ScreenExtent extentOf(dev.t3craft.blocks.MonitorBlockEntity be) {
+		ScreenExtent.Provider p = extents;
+		if (p == null) {
+			return ScreenExtent.ONE;
+		}
+		try {
+			ScreenExtent e = p.extent(be);
+			return e == null ? ScreenExtent.ONE : e;
+		} catch (RuntimeException ex) {
+			return ScreenExtent.ONE;
+		}
+	}
+
+	MonitorSettings monitorSettings() {
+		return monitorSettings;
+	}
+
+	MonitorFeeds feeds() {
+		return liveLog.feeds();
+	}
+
+	/** The thread the client knows under {@code key} (this tick), or null. */
+	@Nullable WorkstationThread thread(String key) {
+		return threads.get(key);
+	}
+
+	private void loadMonitorSettings() {
+		MonitorSettings s = MonitorSettings.load(FabricLoader.getInstance().getConfigDir().resolve("t3craft.json"));
+		monitorSettings = s;
+		liveLog.settings(s);
 	}
 
 	/** Effective binding of the block at {@code pos} with block entity binding {@code own}. */
@@ -217,6 +312,9 @@ public final class BlocksClient implements ClientModInitializer {
 			}
 		}
 		if (mc.level == null) {
+			if (liveLog.feeds().size() > 0) {
+				liveLog.clearTracking(); // left the world: no stream outlives it
+			}
 			return;
 		}
 		T3CraftClient client = T3CraftClient.get();
@@ -229,6 +327,7 @@ public final class BlocksClient implements ClientModInitializer {
 			threads.put(t.key(), t);
 		}
 		screens.tick(list, System.currentTimeMillis());
+		liveLog.tick(mc, this::resolve, this::extentOf);
 		motes(mc);
 
 		IntegratedServer server = mc.getSingleplayerServer();
@@ -310,6 +409,7 @@ public final class BlocksClient implements ClientModInitializer {
 		seenLamps.clear();
 		lastWanted = null;
 		lastHq = null;
+		liveLog.clearTracking();
 		MonitorRenderer r = renderer;
 		if (r != null) {
 			r.clear();
@@ -323,11 +423,20 @@ public final class BlocksClient implements ClientModInitializer {
 				.executes(c -> {
 					c.getSource().sendFeedback(prefix().append(Component.translatable("t3craft.blocks.status",
 							Component.translatable("options.on"), LiveLamps.size(), lastChanged)));
+					c.getSource().sendFeedback(prefix().append(Component.translatable("t3craft.blocks.monitor_status",
+							liveLog.loaded(), liveLog.feeds().size(), String.join(", ", liveLog.feeds().keys()))));
 					return 1;
 				})
 				.then(literal("link").then(argument("thread", StringArgumentType.greedyString())
-						.executes(c -> link(c, Binding.thread(StringArgumentType.getString(c, "thread").trim())))))
+						.executes(c -> link(c, linkTarget(StringArgumentType.getString(c, "thread"))))))
 				.then(literal("unlink").executes(c -> link(c, Binding.NONE)))));
+	}
+
+	/** {@code project:<key>}, {@code env:<id>} or {@code thread:<key>} as typed; anything else is a thread key. */
+	static Binding linkTarget(String arg) {
+		String a = arg.trim();
+		Binding b = Binding.parse(a);
+		return b.isNone() || b.kind() == Binding.Kind.BOARD || b.kind() == Binding.Kind.MODULE ? Binding.thread(a) : b;
 	}
 
 	/** Binds the t3craft block the player looks at (singleplayer / LAN host only). */
@@ -348,8 +457,17 @@ public final class BlocksClient implements ClientModInitializer {
 		var dim = mc.level.dimension();
 		server.execute(() -> {
 			ServerLevel level = server.getLevel(dim);
-			if (level != null && level.getBlockEntity(pos) instanceof BoundBlockEntity be) {
-				be.setBinding(b.wire());
+			if (level == null) {
+				return;
+			}
+			// a merged screen is bound as a whole (bindings must agree, or it would split)
+			var state = level.getBlockState(pos);
+			java.util.List<BlockPos> cells = state.getBlock() instanceof MonitorBlock
+					? MonitorBlock.extent(level, pos, state).cells() : java.util.List.of(pos);
+			for (BlockPos p : cells) {
+				if (level.getBlockEntity(p) instanceof BoundBlockEntity be) {
+					be.setBinding(b.wire());
+				}
 			}
 		});
 		lastWanted = null;

@@ -52,7 +52,7 @@ public final class MonitorWall {
 	}
 
 	/** The screen the monitor at {@code pos} belongs to; a 1×1 extent if it does not merge (null: no monitor). */
-	public static @Nullable ScreenExtent extentOf(Lookup world, BlockPos pos) {
+	public static @Nullable ScreenRect extentOf(Lookup world, BlockPos pos) {
 		Cell self = world.at(pos);
 		if (self == null) {
 			return null;
@@ -65,8 +65,8 @@ public final class MonitorWall {
 	 * are skipped). Each group is walked once. This is what a refresh after placing or removing a block
 	 * applies: pass the changed cell and its neighbours.
 	 */
-	public static Map<BlockPos, ScreenExtent> resolve(Lookup world, Collection<BlockPos> seeds) {
-		Map<BlockPos, ScreenExtent> out = new LinkedHashMap<>();
+	public static Map<BlockPos, ScreenRect> resolve(Lookup world, Collection<BlockPos> seeds) {
+		Map<BlockPos, ScreenRect> out = new LinkedHashMap<>();
 		Set<BlockPos> seen = new HashSet<>();
 		for (BlockPos s : seeds) {
 			BlockPos p = s.immutable();
@@ -86,7 +86,7 @@ public final class MonitorWall {
 		return new Direction[] {Direction.UP, Direction.DOWN, facing.getClockWise(), facing.getCounterClockWise()};
 	}
 
-	private static Map<BlockPos, ScreenExtent> screenOf(Lookup world, BlockPos start, Cell first, Set<BlockPos> seen) {
+	private static Map<BlockPos, ScreenRect> screenOf(Lookup world, BlockPos start, Cell first, Set<BlockPos> seen) {
 		Direction facing = first.facing();
 		Direction right = facing.getCounterClockWise();
 		int limit = MAX_WIDTH * MAX_HEIGHT;
@@ -139,16 +139,16 @@ public final class MonitorWall {
 		seen.addAll(group);
 		int w = maxC - minC + 1;
 		int h = maxR - minR + 1;
-		Map<BlockPos, ScreenExtent> out = new LinkedHashMap<>();
+		Map<BlockPos, ScreenRect> out = new LinkedHashMap<>();
 		if (!tooBig && agree && w <= MAX_WIDTH && h <= MAX_HEIGHT && w * h == group.size()) {
-			ScreenExtent e = new ScreenExtent(start.relative(right, minC).above(-minR), facing, w, h);
+			ScreenRect e = new ScreenRect(start.relative(right, minC).above(-minR), facing, w, h);
 			for (BlockPos p : e.cells()) {
 				out.put(p, e);
 			}
 		} else {
 			for (BlockPos p : group) {
 				if (world.at(p) instanceof Cell c && c.facing() == facing) {
-					out.put(p, ScreenExtent.single(p, facing));
+					out.put(p, ScreenRect.single(p, facing));
 				}
 			}
 		}

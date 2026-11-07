@@ -49,7 +49,7 @@ public final class T3Blocks {
 		}
 
 		@Override
-		public BlockState monitor(Direction facing, ScreenExtent.Sides sides) {
+		public BlockState monitor(Direction facing, ScreenRect.Sides sides) {
 			return MonitorBlock.connected(monitor(facing), sides);
 		}
 
