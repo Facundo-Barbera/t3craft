@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import dev.t3craft.client.portable.PortableState;
 import dev.t3craft.client.portable.PortableThread;
-import dev.t3craft.client.portable.held.HeldScreenModel.Badge;
+import dev.t3craft.client.chat.EnvBadge;
 import dev.t3craft.client.portable.held.HeldScreenModel.Kind;
 import dev.t3craft.client.portable.held.HeldScreenModel.Row;
 import java.util.ArrayList;
@@ -55,7 +55,7 @@ class HeldScreenModelTest {
 		assertTrue(t.get(rule + 1).startsWith("M * Working"), "threads of all environments in one list: " + t);
 		assertEquals("V v Done one", t.get(rule + 2));
 		Row chipRow = rows.get(1);
-		assertEquals(Badge.of("vps", "my-vps", null).color(), chipRow.spans().get(0).bg());
+		assertEquals(EnvBadge.of("vps", "my-vps", null).background() & 0xFFFFFF, chipRow.spans().get(0).bg());
 	}
 
 	@Test
@@ -101,10 +101,10 @@ class HeldScreenModelTest {
 
 	@Test
 	void badgeLetterAndColour() {
-		assertEquals("V", Badge.of("vps", "my-vps", null).letter());
-		assertEquals("M", Badge.of("mini", "mini", null).letter());
-		assertEquals("X", Badge.of("x1", " ", null).letter(), "blank label falls back to the id");
-		assertEquals(0x123456, Badge.of("vps", "my-vps", 0xFF123456).color(), "config colour wins");
-		assertEquals(Badge.of("vps", "a", null).color(), Badge.of("vps", "b", null).color(), "stable by id");
+		assertEquals("V", EnvBadge.of("vps", "my-vps", null).initial());
+		assertEquals("M", EnvBadge.of("mini", "mini", null).initial());
+		assertEquals("X", EnvBadge.of("x1", " ", null).initial(), "blank label falls back to the id");
+		assertEquals(0xFF123456, EnvBadge.of("vps", "my-vps", 0x123456).background(), "config colour wins");
+		assertEquals(EnvBadge.of("vps", "a", null).background(), EnvBadge.of("vps", "b", null).background(), "stable by id");
 	}
 }

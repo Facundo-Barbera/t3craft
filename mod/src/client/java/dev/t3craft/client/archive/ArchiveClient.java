@@ -58,9 +58,8 @@ import org.jspecify.annotations.Nullable;
  *   <li>{@link #setSite}: whoever places the HQ in the world (builders / site / demo) passes its
  *   {@link HqSite}; without a site nothing is drawn in the world, the catalog still works
  *   ({@code /t3craft archive}).</li>
- *   <li>{@link #setCaller} / {@link #setSource}: the connection's shared one-shot read path
- *   (feat/chat's {@code StreamRegistry.call}). Until it is set, only the shell's settled threads are
- *   listed.</li>
+ *   <li>{@link #setCaller} / {@link #setSource}: replace where the reads go. Default: each
+ *   environment's {@code T3Connection} on the shared {@code StreamRegistry.call} path.</li>
  *   <li>{@link #setOpener}: what a click opens (default {@link ArchiveOpener#DEFAULT}).</li>
  *   <li>{@link #setCatalogProp}: hook for feat/blocks-core's own catalog block (default a vanilla
  *   lectern display while the cell is air). Any real block at the catalog cell opens the catalog.</li>
@@ -75,7 +74,12 @@ public final class ArchiveClient implements ClientModInitializer {
 
 	private static @Nullable ArchiveClient instance;
 
-	private volatile ArchiveSource source = ArchiveSource.UNAVAILABLE;
+	private static final ArchiveSource DIRECT = ArchiveSource.direct(() -> {
+		T3CraftClient c = T3CraftClient.get();
+		return c == null ? null : c.direct();
+	});
+
+	private volatile ArchiveSource source = DIRECT;
 	private final ArchiveStore store = new ArchiveStore(new ArchiveSource() {
 		@Override
 		public CompletableFuture<ArchiveWire.ArchivedSnapshot> archived(String env) {
@@ -148,13 +152,14 @@ public final class ArchiveClient implements ClientModInitializer {
 		this.site = site;
 	}
 
-	/** The shared one-shot read path, as a {@link ArchiveSource.Caller} (null = shell only). */
+	/** A raw one-shot caller instead of the direct connections (null = the direct connections). */
 	public void setCaller(ArchiveSource.@Nullable Caller caller) {
 		setSource(caller == null ? null : ArchiveSource.of(caller));
 	}
 
+	/** Another source (null = the direct connections). */
 	public void setSource(@Nullable ArchiveSource source) {
-		this.source = source == null ? ArchiveSource.UNAVAILABLE : source;
+		this.source = source == null ? DIRECT : source;
 	}
 
 	public void setOpener(@Nullable ArchiveOpener opener) {

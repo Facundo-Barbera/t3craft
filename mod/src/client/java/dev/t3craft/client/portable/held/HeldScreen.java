@@ -7,7 +7,7 @@ import dev.t3craft.client.portable.PortableAdapter;
 import dev.t3craft.client.portable.PortableEnv;
 import dev.t3craft.client.portable.PortableState;
 import dev.t3craft.client.portable.PortableThread;
-import dev.t3craft.client.portable.held.HeldScreenModel.Badge;
+import dev.t3craft.client.chat.EnvBadge;
 import dev.t3craft.client.portable.held.HeldScreenModel.Row;
 import dev.t3craft.portable.PortableItems;
 import java.util.HashMap;
@@ -85,7 +85,7 @@ public final class HeldScreen {
 	}
 
 	/** Environment chips: label from the environment list (or a thread row), colour from the config. */
-	private static java.util.function.Function<String, Badge> badges(PortableState state) {
+	private static java.util.function.Function<String, EnvBadge> badges(PortableState state) {
 		Map<String, String> labels = new HashMap<>();
 		for (PortableThread t : state.threads()) {
 			labels.putIfAbsent(t.env(), t.envLabel());
@@ -94,8 +94,8 @@ public final class HeldScreen {
 			labels.put(e.id(), e.label());
 		}
 		T3CraftSettings s = ConfigManager.get().settings();
-		Map<String, Badge> memo = new HashMap<>();
-		return env -> memo.computeIfAbsent(env, id -> Badge.of(id, labels.get(id), s.env(id).color()));
+		Map<String, EnvBadge> memo = new HashMap<>();
+		return env -> memo.computeIfAbsent(env, id -> EnvBadge.of(id, labels.get(id) == null ? id : labels.get(id), s.env(id).color()));
 	}
 
 	/** Frees the GPU texture and forgets the cached rows (world closed / setting off / stopping). */

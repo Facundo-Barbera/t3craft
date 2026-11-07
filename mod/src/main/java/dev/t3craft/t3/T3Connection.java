@@ -12,17 +12,15 @@ import java.net.http.WebSocket;
 import java.net.http.WebSocketHandshakeException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.Map;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
 
@@ -32,6 +30,13 @@ import org.jspecify.annotations.Nullable;
  * → {@code orchestration.subscribeShell} with {@code requestCompletionMarker:true}, one Ack per
  * Chunk, Ping every 5 s, reconnect with jittered backoff and a fresh single-use ticket each time.
  * Only read-only RPCs are ever sent from this class.
+ *
+ * <p>The same socket also carries per-thread streams and one-shot reads for every view of this
+ * environment ({@link #subscribeThread}, {@link #getTurnItem}, {@link #getThreadProjection}; older
+ * history over HTTP with {@link #threadHistory}). Subscriptions are refcounted
+ * ({@link StreamRegistry}): any number of views of one thread share one server subscription, which
+ * is resubscribed after every reconnect and interrupted when the last view closes. Nothing else in
+ * the mod opens its own connection to T3.
  *
  * <p>Secrets: the Bearer token and the ticket never appear in status details or logs
  * ({@link #sanitize}).
@@ -74,10 +79,6 @@ public final class T3Connection {
 	private final HttpClient http;
 	private final ScheduledExecutorService exec;
 	private final AtomicInteger generation = new AtomicInteger();
-	/** Request ids of one-shot RPCs; "1" is the shell subscription. */
-	private final AtomicLong nextRequest = new AtomicLong(2);
-	/** In-flight one-shot RPCs on the current socket, by request id. */
-	private final Map<String, CompletableFuture<ThreadSearch.Decoded>> searches = new ConcurrentHashMap<>();
 	private volatile boolean stopped;
 	private volatile Status status = Status.CONNECTING;
 	private volatile String detail = "";
@@ -85,6 +86,8 @@ public final class T3Connection {
 	private @Nullable WebSocket socket;
 	private @Nullable ScheduledFuture<?> pending;
 	private @Nullable ScheduledFuture<?> pinger;
+	private final StreamRegistry streams = new StreamRegistry(RpcFrames::subscribeThread);
+	private CompletableFuture<?> sendTail = CompletableFuture.completedFuture(null);
 
 	public T3Connection(Environments.Environment env, Supplier<Pairing.@Nullable Session> session, Listener listener, HttpClient http) {
 		this.env = env;
@@ -139,12 +142,98 @@ public final class T3Connection {
 		exec.shutdown();
 	}
 
+	// ---- shared streams and reads ---------------------------------------------------------------
+
+	/**
+	 * Follows one thread ({@code orchestration.subscribeThread}, bounded snapshot then live events).
+	 * Shared and refcounted: close the returned handle when the view goes away. The listener runs on
+	 * this connection's thread; a late subscriber first gets {@code onSubscribed} and a replay of
+	 * what the others already received.
+	 */
+	public StreamRegistry.Subscription subscribeThread(String threadId, StreamRegistry.Listener listener) {
+		return streams.subscribe(threadId, listener);
+	}
+
+	/** {@code orchestration.getTurnItem}: the full item (e.g. command output the stream withheld), or null. */
+	public CompletableFuture<@Nullable JsonObject> getTurnItem(String threadId, String itemId) {
+		JsonObject p = new JsonObject();
+		p.addProperty("threadId", threadId);
+		p.addProperty("itemId", itemId);
+		return streams.call(RpcFrames.GET_TURN_ITEM, p).thenApply(values -> {
+			JsonElement last = values.isEmpty() ? null : values.getLast();
+			return last != null && last.isJsonObject() ? Json.obj(last.getAsJsonObject(), "item") : null;
+		});
+	}
+
+	/** {@code orchestration.getThreadProjection}: the thread's full projection (read once). */
+	public CompletableFuture<JsonObject> getThreadProjection(String threadId) {
+		JsonObject p = new JsonObject();
+		p.addProperty("threadId", threadId);
+		return streams.call(RpcFrames.GET_THREAD_PROJECTION, p).thenApply(values -> {
+			JsonElement last = values.isEmpty() ? null : values.getLast();
+			return last != null && last.isJsonObject() ? last.getAsJsonObject() : new JsonObject();
+		});
+	}
+
+	/**
+	 * {@code orchestration.getOlderSettledThreads} (read): settled threads below {@code before},
+	 * newest settle first, at most {@code limit} (0..{@value ArchiveWire#MAX_PAGE}).
+	 */
+	public CompletableFuture<ArchiveWire.OlderSettledPage> getOlderSettledThreads(ArchiveWire.Cursor before, int limit) {
+		return streams.call(ArchiveWire.GET_OLDER_SETTLED_THREADS, ArchiveWire.olderSettledRequest(before, limit, null))
+				.thenApply(ArchiveWire::decodeOlderSettledValues);
+	}
+
+	/** {@code orchestration.getArchivedShellSnapshot} (read): archived threads and their projects. */
+	public CompletableFuture<ArchiveWire.ArchivedSnapshot> getArchivedShellSnapshot() {
+		return streams.call(ArchiveWire.GET_ARCHIVED_SHELL_SNAPSHOT, ArchiveWire.archivedRequest()).thenApply(ArchiveWire::decodeArchivedValues);
+	}
+
+	/**
+	 * {@code GET /api/orchestration/threads/:threadId/history?cursor=…} with this environment's
+	 * session ({@code OrchestrationV2ThreadHistoryPage}). Fails with a secret-free message.
+	 */
+	public CompletableFuture<JsonObject> threadHistory(String threadId, String cursor) {
+		Pairing.Session s = session.get();
+		if (s == null) {
+			return CompletableFuture.failedFuture(new IllegalStateException("not paired"));
+		}
+		HttpRequest req = HttpRequest.newBuilder(historyUri(env.url(), threadId, cursor))
+				.timeout(Duration.ofSeconds(15))
+				.header("Authorization", "Bearer " + s.accessToken())
+				.header(PROTOCOL_HEADER, String.valueOf(ORCHESTRATION_PROTOCOL))
+				.header("Accept", "application/json")
+				.GET()
+				.build();
+		return http.sendAsync(req, HttpResponse.BodyHandlers.ofString()).handle((res, err) -> {
+			if (err != null) {
+				throw new IllegalStateException(rootMessage(err));
+			}
+			int code = res.statusCode();
+			if (code == 401 || code == 403) {
+				throw new IllegalStateException("T3 refused the history request (" + code + ")");
+			}
+			if (code == 404) {
+				throw new IllegalStateException("thread not found");
+			}
+			if (code != 200) {
+				throw new IllegalStateException("history: HTTP " + code);
+			}
+			JsonElement el = JsonParser.parseString(res.body());
+			if (!el.isJsonObject()) {
+				throw new IllegalStateException("history: unexpected response");
+			}
+			return el.getAsJsonObject();
+		});
+	}
+
 	/**
 	 * Read-only {@code orchestration.searchThreads} on this connection's socket (no second
-	 * connection). Completes with the decoded result, or exceptionally with a
-	 * {@link ThreadSearch.SearchException} (sanitized) when not connected, on a T3 failure, when the
-	 * socket drops or after {@code timeoutMs}. Cancelling the future interrupts the request on T3.
-	 * {@code query} must have at least {@link RpcFrames#SEARCH_MIN_LENGTH} characters once trimmed.
+	 * connection; same request ids and send queue as every other RPC, via {@link StreamRegistry}).
+	 * Completes with the decoded result, or exceptionally with a {@link ThreadSearch.SearchException}
+	 * (sanitized) when not connected, on a T3 failure, when the socket drops or after
+	 * {@code timeoutMs}. Cancelling the future interrupts the request on T3. {@code query} must have
+	 * at least {@link RpcFrames#SEARCH_MIN_LENGTH} characters once trimmed.
 	 */
 	public CompletableFuture<ThreadSearch.Decoded> searchThreads(String query, int limit, long timeoutMs) {
 		CompletableFuture<ThreadSearch.Decoded> f = new CompletableFuture<>();
@@ -153,59 +242,71 @@ public final class T3Connection {
 			f.completeExceptionally(new ThreadSearch.SearchException("query too short (at least " + RpcFrames.SEARCH_MIN_LENGTH + " characters)"));
 			return f;
 		}
-		String id = Long.toString(nextRequest.getAndIncrement());
+		Status st = status;
+		if (stopped || st != Status.OK) {
+			f.completeExceptionally(new ThreadSearch.SearchException("not connected (" + st.wire + ")"));
+			return f;
+		}
+		CompletableFuture<List<JsonElement>> raw = streams.call(id -> RpcFrames.searchThreads(id, q, limit, env.label()));
+		raw.whenComplete((values, err) -> {
+			if (err != null) {
+				f.completeExceptionally(new ThreadSearch.SearchException(callError(err, st)));
+				return;
+			}
+			try {
+				f.complete(ThreadSearch.decode(values.isEmpty() ? null : values.getLast()));
+			} catch (RuntimeException ex) {
+				f.completeExceptionally(new ThreadSearch.SearchException("unexpected search result"));
+			}
+		});
+		ScheduledFuture<?> timer;
 		try {
-			exec.execute(() -> {
-				WebSocket ws = socket;
-				if (stopped || ws == null || status != Status.OK) {
-					f.completeExceptionally(new ThreadSearch.SearchException("not connected (" + status.wire + ")"));
-					return;
+			timer = exec.schedule(() -> {
+				if (streams.abandon(raw)) {
+					f.completeExceptionally(new ThreadSearch.SearchException("timed out after " + Math.max(1, timeoutMs / 1000) + " s"));
 				}
-				if (f.isDone()) {
-					return;
-				}
-				searches.put(id, f);
-				ws.sendText(RpcFrames.searchThreads(id, q, limit, env.label()), true);
-				exec.schedule(() -> {
-					if (searches.remove(id, f)) {
-						f.completeExceptionally(new ThreadSearch.SearchException("timed out after " + Math.max(1, timeoutMs / 1000) + " s"));
-						interruptRequest(ws, id);
-					}
-				}, Math.max(1, timeoutMs), TimeUnit.MILLISECONDS);
-			});
+			}, Math.max(1, timeoutMs), TimeUnit.MILLISECONDS);
 		} catch (java.util.concurrent.RejectedExecutionException e) {
+			raw.cancel(true);
 			f.completeExceptionally(new ThreadSearch.SearchException("connection stopped"));
 			return f;
 		}
 		f.whenComplete((r, err) -> {
+			timer.cancel(false);
 			if (f.isCancelled()) {
-				try {
-					exec.execute(() -> {
-						WebSocket ws = socket;
-						if (searches.remove(id, f) && ws != null) {
-							interruptRequest(ws, id);
-						}
-					});
-				} catch (java.util.concurrent.RejectedExecutionException ignored) {
-					// stopped: nothing to interrupt
-				}
+				raw.cancel(true); // StreamRegistry interrupts it on T3
 			}
 		});
 		return f;
 	}
 
-	private void interruptRequest(WebSocket ws, String id) {
-		if (ws == socket) {
-			ws.sendText(RpcFrames.interrupt(id), true);
-		}
+	/** Secret-free message for a failed one-shot call. */
+	private static String callError(Throwable err, Status st) {
+		Throwable c = err instanceof java.util.concurrent.CompletionException && err.getCause() != null ? err.getCause() : err;
+		String m = c.getMessage() == null ? c.getClass().getSimpleName() : c.getMessage();
+		return switch (m) {
+			case "connection lost" -> "connection to T3 lost";
+			case "not connected" -> "not connected (" + st.wire + ")";
+			default -> "T3: " + sanitize(m);
+		};
 	}
 
-	private void failSearches(String reason) {
-		for (String id : searches.keySet()) {
-			CompletableFuture<ThreadSearch.Decoded> f = searches.remove(id);
-			if (f != null) {
-				f.completeExceptionally(new ThreadSearch.SearchException(reason));
-			}
+	/** Threads with at least one subscriber (diagnostics, tests). */
+	public int activeThreadSubscriptions() {
+		return streams.activeThreads();
+	}
+
+	public static final String PROTOCOL_HEADER = "x-t3-orchestration-protocol";
+
+	static URI historyUri(URI base, String threadId, String cursor) {
+		return base.resolve("/api/orchestration/threads/" + URLEncoder.encode(threadId, StandardCharsets.UTF_8).replace("+", "%20")
+				+ "/history?cursor=" + URLEncoder.encode(cursor, StandardCharsets.UTF_8));
+	}
+
+	/** One send at a time per socket (the JDK WebSocket rejects overlapping sends). */
+	private void send(WebSocket ws, String text) {
+		synchronized (this) {
+			sendTail = sendTail.handle((v, e) -> null).thenCompose(v -> ws.sendText(text, true));
 		}
 	}
 
@@ -214,7 +315,9 @@ public final class T3Connection {
 		if (s == null) {
 			return "";
 		}
-		return s.replaceAll("wsTicket=[^&\\s\"'<>]+", "wsTicket=<redacted>").replaceAll("(?i)Bearer\\s+\\S+", "Bearer <redacted>");
+		return s.replaceAll("wsTicket=[^&\\s\"'<>]+", "wsTicket=<redacted>").replaceAll("(?i)Bearer\\s+\\S+", "Bearer <redacted>")
+				.replaceAll("(?i)\\b(access_token|subject_token|token)=[^&\\s\"'<>]+", "$1=<redacted>")
+				.replaceAll("(?i)\"(access_token|accessToken|subject_token|credential)\"\\s*:\\s*\"[^\"]*\"", "\"$1\":\"<redacted>\"");
 	}
 
 	static URI socketUri(URI base, String ticket) {
@@ -247,9 +350,9 @@ public final class T3Connection {
 		}
 		WebSocket ws = socket;
 		socket = null;
-		failSearches("connection to T3 lost");
 		if (ws != null) {
 			ws.abort();
+			streams.onClosed();
 		}
 	}
 
@@ -377,7 +480,17 @@ public final class T3Connection {
 					return;
 				}
 				socket = ws;
-				ws.sendText(RpcFrames.subscribeShell(SHELL_REQUEST), true);
+				synchronized (T3Connection.this) {
+					sendTail = CompletableFuture.completedFuture(null);
+				}
+				send(ws, RpcFrames.subscribeShell("1"));
+				streams.onOpen(frame -> {
+					if (socket != ws || !current(gen)) {
+						return false;
+					}
+					send(ws, frame);
+					return true;
+				});
 				pinger = exec.scheduleAtFixedRate(() -> {
 					if (!current(gen) || ended) {
 						return;
@@ -386,7 +499,7 @@ public final class T3Connection {
 						end("no data from T3 for " + (SILENCE_MS / 1000) + " s");
 						return;
 					}
-					ws.sendText(RpcFrames.ping(), true);
+					send(ws, RpcFrames.ping());
 				}, PING_MS, PING_MS, TimeUnit.MILLISECONDS);
 			});
 			ws.request(1);
@@ -410,32 +523,20 @@ public final class T3Connection {
 				return;
 			}
 			RpcFrames.Frame f = RpcFrames.parse(text);
-			if (f instanceof RpcFrames.Exit e && !SHELL_REQUEST.equals(e.requestId())) {
-				CompletableFuture<ThreadSearch.Decoded> search = searches.remove(e.requestId());
-				if (search != null) {
-					if (e.failure() != null) {
-						search.completeExceptionally(new ThreadSearch.SearchException("T3: " + e.failure()));
-					} else {
-						try {
-							search.complete(ThreadSearch.decode(e.value()));
-						} catch (RuntimeException ex) {
-							search.completeExceptionally(new ThreadSearch.SearchException("unexpected search result"));
-						}
+			switch (f) {
+				case RpcFrames.Chunk c when !SHELL_REQUEST.equals(c.requestId()) -> {
+					if (streams.onChunk(c.requestId(), c.values())) {
+						send(ws, RpcFrames.ack(c.requestId()));
 					}
 				}
-				return;
-			}
-			if (f instanceof RpcFrames.Chunk c && !SHELL_REQUEST.equals(c.requestId())) {
-				return;
-			}
-			switch (f) {
+				case RpcFrames.Exit e when !SHELL_REQUEST.equals(e.requestId()) -> streams.onExit(e.requestId(), e.failure(), e.value());
 				case RpcFrames.Chunk c -> {
 					boolean changed = false;
 					boolean wasSynced = state.isSynchronized();
 					for (JsonObject item : c.values()) {
 						changed |= state.apply(item);
 					}
-					ws.sendText(RpcFrames.ack(c.requestId()), true);
+					send(ws, RpcFrames.ack(c.requestId()));
 					if (state.isSynchronized() && !wasSynced) {
 						attempt = 0;
 						setStatus(gen, Status.OK, "");

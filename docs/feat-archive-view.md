@@ -44,24 +44,21 @@ intento, hasta 10 min. El refresco manual se ignora si la última lectura tiene 
 hay dos lecturas del mismo tipo en curso por entorno. Los resultados se aplican en el tick del
 cliente. Las páginas viejas que no traen nombre de proyecto lo toman del shell o del snapshot.
 
-### Vía de peticiones: pendiente de feat/chat
+### Vía de peticiones
 
-Por indicación del coordinador, este módulo **no añade una vía propia de peticiones a
-`T3Connection`**: ni ids, ni `sendText`, ni ramas nuevas en el listener. Las lecturas pasan por la
-interfaz `ArchiveSource`. `ArchiveSource.of(Caller)` es el adaptador fino sobre la vía compartida
-de lecturas de un solo valor que trae feat/chat (`StreamRegistry.call(tag, payload)`, que completa
-con los valores del Exit). Mientras esa vía no esté en main se usa `ArchiveSource.UNAVAILABLE`: el
-archivo muestra solo los settled del shell y el catálogo lo dice.
-
-Cuando entre feat/chat, el cableado es una línea, más dos métodos finos en `T3Connection` (o un
-`call` público) que deleguen en `streams.call`:
+No hay una vía propia: las dos lecturas son métodos finos de `T3Connection` sobre la vía
+compartida de feat/chat (`streams.call(tag, payload)`), con un solo espacio de ids, envíos
+serializados y sin socket propio:
 
 ```java
-ArchiveClient.get().setCaller((env, tag, payload) -> {
-    T3Connection c = T3CraftClient.get().direct().connection(env);
-    return c == null ? CompletableFuture.failedFuture(new IllegalStateException("offline")) : c.call(tag, payload); // → streams.call
-});
+public CompletableFuture<ArchiveWire.OlderSettledPage> getOlderSettledThreads(ArchiveWire.Cursor before, int limit)
+public CompletableFuture<ArchiveWire.ArchivedSnapshot> getArchivedShellSnapshot()
 ```
+
+El paquete solo ve la interfaz `ArchiveSource`. `ArchiveSource.direct(...)` es el adaptador que
+usa la conexión de cada entorno (`DirectController.connection(envId)`) y es el default. También
+están `ArchiveSource.of(Caller)`, para cualquier llamador crudo, y `ArchiveSource.UNAVAILABLE`, que
+deja solo los settled del shell. En modo bridge no hay lecturas y el catálogo lo avisa.
 
 ## Slots coherentes con el HQ
 
@@ -107,7 +104,8 @@ abridores basados en él no los encontrarían.
   nada en el mundo, pero el catálogo funciona igual.
 - `layout()`: el `HqLayout` (solo el archivo), para que el dueño del HQ ponga las computadoras
   archivadas donde están los letreros (`HqLayout.allocate` con el mismo roster settled da lo mismo).
-- `setCaller(Caller)` / `setSource(ArchiveSource)`: la vía de lectura compartida (ver arriba).
+- `setCaller(Caller)` / `setSource(ArchiveSource)`: cambiar de dónde se lee (por defecto, las
+  conexiones directas).
 - `setOpener(ArchiveOpener)`: otro visor.
 - **Hook para feat/blocks-core**: `setCatalogProp(Direction → BlockState)`, el bloque que se muestra
   como catálogo mientras la celda es aire. Cualquier bloque real que haya en la celda del catálogo
@@ -119,14 +117,15 @@ abridores basados en él no los encontrarían.
 - Callbacks de cliente: `UseBlockCallback`, `UseEntityCallback`, `AttackEntityCallback`, tick
   (`GuardedEvents`, módulo `archive`), `CLIENT_STOPPING` y `DevReload` (`t3craft.archive`).
 - Comando `/t3craft archive [refresh|status]`.
-- Fuera del paquete: `DirectController.connection(envId)` y `labels()` (aditivos),
-  `dev.t3craft.t3.ArchiveWire` (nuevo) y claves de lang `t3craft.archive.*`.
+- Fuera del paquete: `T3Connection.getOlderSettledThreads` / `getArchivedShellSnapshot` (sobre
+  `streams.call`), `DirectController.labels()` (aditivos), `dev.t3craft.t3.ArchiveWire` (nuevo) y
+  claves de lang `t3craft.archive.*`.
 - Sin mixins, keybinds, bloques, ítems, registros ni config.
 
 ## Pendientes
 
-- Conectar `setCaller` a `StreamRegistry.call` cuando feat/chat entre a main (hasta entonces, solo
-  los settled del shell).
+- feat/blocks-core entró a main pero no tiene un bloque de catálogo: el hook `setCatalogProp` queda
+  listo para cuando exista.
 - Nadie llama todavía a `setSite`: en main no hay un HQ colocado en el mundo real (solo
   `hq-preview` y la demo, que no lo exponen). Hay que llamarlo desde quien construya el HQ.
 - **No se probó dentro del juego** (por regla, no se lanza Minecraft). Falta revisar a ojo la escala

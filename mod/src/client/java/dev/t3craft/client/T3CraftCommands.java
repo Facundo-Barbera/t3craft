@@ -26,6 +26,8 @@ import net.minecraft.network.chat.MutableComponent;
  *   <li>{@code reload}: re-read {@code config/t3craft.json}, paired environments and credentials, reconnect.</li>
  *   <li>{@code pair}: open the read-only pairing screen. {@code unpair <env>}: forget an environment.</li>
  *   <li>{@code envs}: list paired environments (no secrets).</li>
+ *   <li>{@code operate}: control (operate) status per environment; {@code operate enable <env>} opens
+ *   the optional operate pairing; {@code operate revoke <env>} deletes the local operate token.</li>
  * </ul>
  */
 public final class T3CraftCommands {
@@ -77,6 +79,7 @@ public final class T3CraftCommands {
 							}
 							return 1;
 						})))
+				.then(dev.t3craft.client.operate.OperateCommands.build(client))
 				.then(literal("envs").executes(c -> {
 					var list = new Environments(ModConfig.dataDir()).list();
 					if (list.isEmpty()) {

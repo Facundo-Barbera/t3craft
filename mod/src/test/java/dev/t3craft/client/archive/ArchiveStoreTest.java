@@ -183,7 +183,7 @@ class ArchiveStoreTest {
 			tags.add(env + " " + tag + " " + payload);
 			JsonObject v = new JsonObject();
 			v.addProperty("snapshotSequence", 5);
-			return CompletableFuture.completedFuture(List.of(v));
+			return CompletableFuture.completedFuture(List.<com.google.gson.JsonElement>of(v));
 		});
 		assertEquals(5, src.archived("vps").get().snapshotSequence());
 		assertEquals(5, src.older("vps", ArchiveWire.Cursor.before(NOW), 999).get().snapshotSequence());

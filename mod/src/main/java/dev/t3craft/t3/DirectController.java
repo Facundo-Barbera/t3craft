@@ -11,12 +11,17 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Direct mode: one {@link T3Connection} per paired environment. Keeps each environment's latest
  * shell view (the filter's source, never trimmed) and turns them into the NPC list with
  * {@link Visibility} + {@link Presentation}. {@code onChange} runs on a connection thread; the
  * caller hops to its own thread.
+ *
+ * <p>Also owns the optional operate sockets ({@link OperateConnection}, one per environment,
+ * opened on demand with the separate operate session) behind {@link #operateTransport}: the only
+ * way writes reach T3. Screens never open their own sockets.
  */
 public final class DirectController implements T3Connection.Listener {
 	public record EnvStatus(String id, String label, T3Connection.Status status, String detail) {
@@ -26,12 +31,40 @@ public final class DirectController implements T3Connection.Listener {
 	private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
 	private final Map<String, T3Connection> connections = new LinkedHashMap<>();
 	private final Map<String, ShellState.View> views = new ConcurrentHashMap<>();
+	private final Map<String, OperateConnection> operate = new LinkedHashMap<>();
+	private final OperateCredentials operateCredentials;
 	private final Runnable onChange;
 	private volatile Visibility.Options options = Visibility.Options.defaults();
 
 	public DirectController(Environments environments, Runnable onChange) {
 		this.environments = environments;
 		this.onChange = onChange;
+		this.operateCredentials = new OperateCredentials(environments.dir());
+	}
+
+	public OperateCredentials operateCredentials() {
+		return operateCredentials;
+	}
+
+	/**
+	 * The operate transport of a connected environment, or null when it is not connected here or
+	 * has no operate session. Feed it to {@link OperateGate} as its {@link OperateGate.Transports}.
+	 */
+	public synchronized @Nullable OperateTransport operateTransport(String envId) {
+		T3Connection c = connections.get(envId);
+		if (c == null || !operateCredentials.has(envId, System.currentTimeMillis())) {
+			return null;
+		}
+		return operate.computeIfAbsent(envId, id -> new OperateConnection(c.environment(),
+				() -> operateCredentials.get(id, System.currentTimeMillis()), http));
+	}
+
+	/** Drops the operate socket of an environment (after enabling or revoking control). */
+	public synchronized void resetOperate(String envId) {
+		OperateConnection o = operate.remove(envId);
+		if (o != null) {
+			o.stop();
+		}
 	}
 
 	public Environments environments() {
@@ -60,6 +93,8 @@ public final class DirectController implements T3Connection.Listener {
 	public synchronized void stop() {
 		connections.values().forEach(T3Connection::stop);
 		connections.clear();
+		operate.values().forEach(OperateConnection::stop);
+		operate.clear();
 		views.clear();
 	}
 
@@ -71,11 +106,6 @@ public final class DirectController implements T3Connection.Listener {
 		List<EnvStatus> out = new ArrayList<>();
 		connections.values().forEach(c -> out.add(new EnvStatus(c.environment().id(), c.environment().label(), c.status(), c.detail())));
 		return out;
-	}
-
-	/** The connection of one environment (for one-shot reads such as the archive), or null. */
-	public synchronized @org.jspecify.annotations.Nullable T3Connection connection(String envId) {
-		return connections.get(envId);
 	}
 
 	/** Environment id → label, in connection order. */
@@ -111,6 +141,19 @@ public final class DirectController implements T3Connection.Listener {
 		});
 		out.sort(Comparator.comparingInt(NpcView::priority).thenComparing(NpcView::envLabel).thenComparing(NpcView::title));
 		return out;
+	}
+
+	/**
+	 * The single live connection of one environment, or null when it is not paired/started. Views
+	 * read thread streams through it ({@link T3Connection#subscribeThread}); never open another.
+	 */
+	public synchronized @Nullable T3Connection connection(String envId) {
+		return connections.get(envId);
+	}
+
+	/** Last shell view of one environment (threads with their timestamps), or null before the first sync. */
+	public ShellState.@Nullable View view(String envId) {
+		return views.get(envId);
 	}
 
 	/**

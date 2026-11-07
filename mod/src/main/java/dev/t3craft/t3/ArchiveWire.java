@@ -26,8 +26,9 @@ import org.jspecify.annotations.Nullable;
  * </ul>
  *
  * <p>Only payloads and decoding live here: the requests go through the connection's shared
- * one-shot read path (feat/chat's {@code StreamRegistry.call}), never through a path of their own.
- * The {@code *Values} decoders take the values {@code call} completes with.
+ * one-shot read path ({@link StreamRegistry#call}, wrapped by {@link T3Connection#getOlderSettledThreads}
+ * and {@link T3Connection#getArchivedShellSnapshot}). The {@code *Values} decoders take the values
+ * {@code call} completes with (the last one is the Exit value).
  */
 public final class ArchiveWire {
 	/** Read-only ({@code orchestration:read}) RPC tags. */
@@ -111,15 +112,15 @@ public final class ArchiveWire {
 		return new JsonObject();
 	}
 
-	public static OlderSettledPage decodeOlderSettledValues(@Nullable List<JsonObject> values) {
+	public static OlderSettledPage decodeOlderSettledValues(@Nullable List<? extends JsonElement> values) {
 		return decodeOlderSettled(last(values));
 	}
 
-	public static ArchivedSnapshot decodeArchivedValues(@Nullable List<JsonObject> values) {
+	public static ArchivedSnapshot decodeArchivedValues(@Nullable List<? extends JsonElement> values) {
 		return decodeArchived(last(values));
 	}
 
-	private static @Nullable JsonElement last(@Nullable List<JsonObject> values) {
+	private static @Nullable JsonElement last(@Nullable List<? extends JsonElement> values) {
 		return values == null || values.isEmpty() ? null : values.getLast();
 	}
 

@@ -36,6 +36,22 @@ public interface EnvironmentActions {
 	/** Re-reads config + environments and reconnects (same as {@code /t3craft reload}). */
 	void reload();
 
+	/** Whether control (operate) is enabled (and not expired) for the environment. */
+	default boolean operateEnabled(String id) {
+		return dev.t3craft.client.operate.OperateUi.canOperate(id);
+	}
+
+	/** Opens "Enable control (operate)…" for the environment, or null when it is unknown. */
+	default net.minecraft.client.gui.screens.@Nullable Screen operateScreen(net.minecraft.client.gui.screens.Screen parent, String id) {
+		return dev.t3craft.client.operate.OperateClient.environment(id)
+				.map(e -> (net.minecraft.client.gui.screens.Screen) new dev.t3craft.client.screen.OperatePairScreen(parent, e)).orElse(null);
+	}
+
+	/** Deletes the local operate token (the host-side revocation is manual). Returns a player-facing message. */
+	default String revokeOperate(String id) {
+		return dev.t3craft.client.operate.OperateClient.get().revoke(id, dev.t3craft.t3.OperateGate.Origin.UI).message();
+	}
+
 	EnvironmentActions DEFAULT = new EnvironmentActions() {
 		@Override
 		public List<EnvRow> list() {

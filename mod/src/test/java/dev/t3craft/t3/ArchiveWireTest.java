@@ -72,4 +72,45 @@ class ArchiveWireTest {
 		assertSame(ArchiveWire.OlderSettledPage.EMPTY, ArchiveWire.decodeOlderSettledValues(null));
 		assertEquals(0, ArchiveWire.archivedRequest().size());
 	}
+
+	/** End to end: both reads go out on the shell's socket through the shared one-shot path. */
+	@Test
+	void readsGoThroughTheSharedConnection() throws Exception {
+		try (FakeT3Server fake = new FakeT3Server()) {
+			String settled = threadJson("old", 50 * H, "{\"settledOverride\":\"settled\",\"settledAt\":\"" + iso(48 * H) + "\"}").toString();
+			fake.script = msg -> {
+				var o = JsonParser.parseString(msg).getAsJsonObject();
+				if (!"Request".equals(o.get("_tag").getAsString())) {
+					return List.of();
+				}
+				String id = o.get("id").getAsString();
+				return switch (o.get("tag").getAsString()) {
+					case RpcFrames.SUBSCRIBE_SHELL -> List.of(T3ConnectionTest.chunk(authoritative(1).toString()),
+							T3ConnectionTest.chunk("{\"kind\":\"synchronized\"}"));
+					case ArchiveWire.GET_OLDER_SETTLED_THREADS -> List.of("{\"_tag\":\"Exit\",\"requestId\":\"" + id
+							+ "\",\"exit\":{\"_tag\":\"Success\",\"value\":{\"snapshotSequence\":9,\"threads\":[" + settled + "],\"counts\":[]}}}");
+					case ArchiveWire.GET_ARCHIVED_SHELL_SNAPSHOT -> List.of("{\"_tag\":\"Exit\",\"requestId\":\"" + id
+							+ "\",\"exit\":{\"_tag\":\"Success\",\"value\":{\"schemaVersion\":1,\"snapshotSequence\":4,\"projects\":[],\"threads\":[]}}}");
+					default -> List.of();
+				};
+			};
+			var events = new java.util.concurrent.LinkedBlockingQueue<T3ConnectionTest.Event>();
+			T3Connection c = T3ConnectionTest.connect(fake, FakeT3Server.TOKEN, events);
+			try {
+				T3ConnectionTest.await(events, e -> e.status() == T3Connection.Status.OK);
+				var page = c.getOlderSettledThreads(ArchiveWire.Cursor.before(NOW), 10).get(10, java.util.concurrent.TimeUnit.SECONDS);
+				assertEquals(9, page.snapshotSequence());
+				assertEquals("old", page.threads().get(0).id());
+				assertEquals(4, c.getArchivedShellSnapshot().get(10, java.util.concurrent.TimeUnit.SECONDS).snapshotSequence());
+				var req = fake.received.stream().map(x -> JsonParser.parseString(x).getAsJsonObject())
+						.filter(o -> o.has("tag") && ArchiveWire.GET_OLDER_SETTLED_THREADS.equals(o.get("tag").getAsString()))
+						.findFirst().orElseThrow();
+				assertNotEquals("1", req.get("id").getAsString(), "own request id, not the shell's");
+				assertEquals(10, req.getAsJsonObject("payload").get("limit").getAsInt());
+				assertEquals(T3Connection.Status.OK, c.status(), "the shell subscription is untouched");
+			} finally {
+				c.stop();
+			}
+		}
+	}
 }
