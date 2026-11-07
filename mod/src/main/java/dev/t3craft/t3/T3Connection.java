@@ -12,13 +12,17 @@ import java.net.http.WebSocket;
 import java.net.http.WebSocketHandshakeException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
 
@@ -58,6 +62,7 @@ public final class T3Connection {
 	}
 
 	public static final int ORCHESTRATION_PROTOCOL = 2;
+	private static final String SHELL_REQUEST = "1";
 	private static final long PING_MS = 5_000;
 	private static final long SILENCE_MS = 20_000;
 	private static final long MIN_BACKOFF_MS = 1_000;
@@ -69,6 +74,10 @@ public final class T3Connection {
 	private final HttpClient http;
 	private final ScheduledExecutorService exec;
 	private final AtomicInteger generation = new AtomicInteger();
+	/** Request ids of one-shot RPCs; "1" is the shell subscription. */
+	private final AtomicLong nextRequest = new AtomicLong(2);
+	/** In-flight one-shot RPCs on the current socket, by request id. */
+	private final Map<String, CompletableFuture<ThreadSearch.Decoded>> searches = new ConcurrentHashMap<>();
 	private volatile boolean stopped;
 	private volatile Status status = Status.CONNECTING;
 	private volatile String detail = "";
@@ -130,6 +139,76 @@ public final class T3Connection {
 		exec.shutdown();
 	}
 
+	/**
+	 * Read-only {@code orchestration.searchThreads} on this connection's socket (no second
+	 * connection). Completes with the decoded result, or exceptionally with a
+	 * {@link ThreadSearch.SearchException} (sanitized) when not connected, on a T3 failure, when the
+	 * socket drops or after {@code timeoutMs}. Cancelling the future interrupts the request on T3.
+	 * {@code query} must have at least {@link RpcFrames#SEARCH_MIN_LENGTH} characters once trimmed.
+	 */
+	public CompletableFuture<ThreadSearch.Decoded> searchThreads(String query, int limit, long timeoutMs) {
+		CompletableFuture<ThreadSearch.Decoded> f = new CompletableFuture<>();
+		String q = RpcFrames.searchQuery(query);
+		if (q.length() < RpcFrames.SEARCH_MIN_LENGTH) {
+			f.completeExceptionally(new ThreadSearch.SearchException("query too short (at least " + RpcFrames.SEARCH_MIN_LENGTH + " characters)"));
+			return f;
+		}
+		String id = Long.toString(nextRequest.getAndIncrement());
+		try {
+			exec.execute(() -> {
+				WebSocket ws = socket;
+				if (stopped || ws == null || status != Status.OK) {
+					f.completeExceptionally(new ThreadSearch.SearchException("not connected (" + status.wire + ")"));
+					return;
+				}
+				if (f.isDone()) {
+					return;
+				}
+				searches.put(id, f);
+				ws.sendText(RpcFrames.searchThreads(id, q, limit, env.label()), true);
+				exec.schedule(() -> {
+					if (searches.remove(id, f)) {
+						f.completeExceptionally(new ThreadSearch.SearchException("timed out after " + Math.max(1, timeoutMs / 1000) + " s"));
+						interruptRequest(ws, id);
+					}
+				}, Math.max(1, timeoutMs), TimeUnit.MILLISECONDS);
+			});
+		} catch (java.util.concurrent.RejectedExecutionException e) {
+			f.completeExceptionally(new ThreadSearch.SearchException("connection stopped"));
+			return f;
+		}
+		f.whenComplete((r, err) -> {
+			if (f.isCancelled()) {
+				try {
+					exec.execute(() -> {
+						WebSocket ws = socket;
+						if (searches.remove(id, f) && ws != null) {
+							interruptRequest(ws, id);
+						}
+					});
+				} catch (java.util.concurrent.RejectedExecutionException ignored) {
+					// stopped: nothing to interrupt
+				}
+			}
+		});
+		return f;
+	}
+
+	private void interruptRequest(WebSocket ws, String id) {
+		if (ws == socket) {
+			ws.sendText(RpcFrames.interrupt(id), true);
+		}
+	}
+
+	private void failSearches(String reason) {
+		for (String id : searches.keySet()) {
+			CompletableFuture<ThreadSearch.Decoded> f = searches.remove(id);
+			if (f != null) {
+				f.completeExceptionally(new ThreadSearch.SearchException(reason));
+			}
+		}
+	}
+
 	/** Removes anything that could carry a credential from error text. */
 	public static String sanitize(@Nullable String s) {
 		if (s == null) {
@@ -168,6 +247,7 @@ public final class T3Connection {
 		}
 		WebSocket ws = socket;
 		socket = null;
+		failSearches("connection to T3 lost");
 		if (ws != null) {
 			ws.abort();
 		}
@@ -297,7 +377,7 @@ public final class T3Connection {
 					return;
 				}
 				socket = ws;
-				ws.sendText(RpcFrames.subscribeShell("1"), true);
+				ws.sendText(RpcFrames.subscribeShell(SHELL_REQUEST), true);
 				pinger = exec.scheduleAtFixedRate(() -> {
 					if (!current(gen) || ended) {
 						return;
@@ -330,6 +410,24 @@ public final class T3Connection {
 				return;
 			}
 			RpcFrames.Frame f = RpcFrames.parse(text);
+			if (f instanceof RpcFrames.Exit e && !SHELL_REQUEST.equals(e.requestId())) {
+				CompletableFuture<ThreadSearch.Decoded> search = searches.remove(e.requestId());
+				if (search != null) {
+					if (e.failure() != null) {
+						search.completeExceptionally(new ThreadSearch.SearchException("T3: " + e.failure()));
+					} else {
+						try {
+							search.complete(ThreadSearch.decode(e.value()));
+						} catch (RuntimeException ex) {
+							search.completeExceptionally(new ThreadSearch.SearchException("unexpected search result"));
+						}
+					}
+				}
+				return;
+			}
+			if (f instanceof RpcFrames.Chunk c && !SHELL_REQUEST.equals(c.requestId())) {
+				return;
+			}
 			switch (f) {
 				case RpcFrames.Chunk c -> {
 					boolean changed = false;
