@@ -123,6 +123,7 @@ public final class HqRuntime {
 			if (s.isDedicatedServer()) {
 				return;
 			}
+			dev.t3craft.build.BuildBudget.global().beginTick(s.getTickCount(), s.getCurrentSmoothedTickTime());
 			paced.tick();
 			if (++ticks % 20 != 0) {
 				return;

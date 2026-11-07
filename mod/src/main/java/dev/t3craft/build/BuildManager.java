@@ -38,6 +38,9 @@ public final class BuildManager {
 	private final List<BuildListener> listeners = new CopyOnWriteArrayList<>();
 	private final Function<ServerLevel, BlockSink> sinks;
 	private final Map<Integer, UnaryOperator<BlockSink>> wraps = new ConcurrentHashMap<>();
+	/** Null = {@link BuildBudget#global()}. */
+	private final @Nullable BuildBudget budget;
+	static final String RUNNER = "builders";
 
 	public BuildManager() {
 		this(ServerLevelSink::new);
@@ -45,7 +48,13 @@ public final class BuildManager {
 
 	/** @param sinks how to place into a level (default {@link ServerLevelSink}). */
 	public BuildManager(Function<ServerLevel, BlockSink> sinks) {
+		this(sinks, null);
+	}
+
+	/** @param budget the per-tick budget to draw from (tests); null = {@link BuildBudget#global()}. */
+	public BuildManager(Function<ServerLevel, BlockSink> sinks, @Nullable BuildBudget budget) {
 		this.sinks = sinks;
+		this.budget = budget;
 	}
 
 	public void addListener(BuildListener l) {
@@ -73,7 +82,16 @@ public final class BuildManager {
 	 */
 	public BuildJob submit(String label, ResourceKey<Level> dimension, BlockPos origin, Rotation rotation, BuildPlan plan, double blocksPerTick,
 			@Nullable BuildCost cost, @Nullable UnaryOperator<BlockSink> wrap) {
-		BuildJob job = new BuildJob(nextId.getAndIncrement(), label, dimension, origin, rotation, plan, blocksPerTick, cost);
+		return submit(label, dimension, origin, rotation, plan, blocksPerTick, cost, wrap, 1);
+	}
+
+	/**
+	 * Like {@link #submit(String, ResourceKey, BlockPos, Rotation, BuildPlan, double, BuildCost, UnaryOperator)}, split into
+	 * {@code fronts} parallel fronts ({@link Fronts}), each at {@code blocksPerTick}, within the global {@link BuildBudget}.
+	 */
+	public BuildJob submit(String label, ResourceKey<Level> dimension, BlockPos origin, Rotation rotation, BuildPlan plan, double blocksPerTick,
+			@Nullable BuildCost cost, @Nullable UnaryOperator<BlockSink> wrap, int fronts) {
+		BuildJob job = new BuildJob(nextId.getAndIncrement(), label, dimension, origin, rotation, plan, blocksPerTick, cost, fronts);
 		if (wrap != null) {
 			wraps.put(job.id(), wrap);
 		}
@@ -93,6 +111,8 @@ public final class BuildManager {
 
 	/** Server thread. */
 	public void tick(MinecraftServer server) {
+		BuildBudget budget = this.budget != null ? this.budget : BuildBudget.global();
+		budget.beginTick(server.getTickCount(), server.getCurrentSmoothedTickTime());
 		BuildJob polled;
 		while ((polled = incoming.poll()) != null) {
 			BuildJob job = polled;
@@ -101,10 +121,14 @@ public final class BuildManager {
 				safe(() -> l.started(job));
 			}
 		}
+		double[] allowance = allocate(budget);
 		Iterator<BuildJob> it = active.iterator();
+		int k = -1;
 		while (it.hasNext()) {
 			BuildJob job = it.next();
-			if (!job.state().isTerminal()) {
+			double allow = allowance[++k];
+			// Queued behind maxConcurrentJobs: stays PENDING until it gets a slot.
+			if (!job.state().isTerminal() && !(allow <= 0 && job.state() == JobState.PENDING)) {
 				ServerLevel level = server.getLevel(job.dimension());
 				if (level != null) {
 					BlockSink base = sinks.apply(level);
@@ -112,7 +136,7 @@ public final class BuildManager {
 					BlockSink sink = wrap == null ? base : wrap.apply(base);
 					try {
 						job.openSupply(server);
-						job.tick(sink, (jb, i, pos, state) -> {
+						job.tick(allow, sink, (jb, i, pos, state) -> {
 							for (BuildListener l : listeners) {
 								safe(() -> l.placed(jb, i, pos, state));
 							}
@@ -139,6 +163,20 @@ public final class BuildManager {
 				}
 			}
 		}
+	}
+
+	/**
+	 * This tick's allowance per active job (same order as {@code active}): the first
+	 * {@code maxConcurrentJobs} running jobs share what the global budget grants, each at most its own rate.
+	 */
+	private double[] allocate(BuildBudget budget) {
+		List<JobState> states = new ArrayList<>(active.size());
+		double[] rates = new double[active.size()];
+		for (int i = 0; i < rates.length; i++) {
+			states.add(active.get(i).state());
+			rates[i] = active.get(i).rate();
+		}
+		return budget.allocate(RUNNER, states, rates);
 	}
 
 	/** Cancels and forgets every job (server stopping / world change). Listeners are kept. */

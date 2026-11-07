@@ -16,7 +16,8 @@ import org.jspecify.annotations.Nullable;
 /**
  * {@link LevelBlockWorld} that also plays the placement sound and block particles for each write
  * (the same feedback as the builders' {@code ServerLevelSink}), for the paced site builder. Used only
- * for building; restores stay silent. Server thread.
+ * for building; restores stay silent. Effects share the per-tick cap of all builders
+ * ({@code build.maxEffectsPerTick}). Server thread.
  */
 final class EffectsBlockWorld implements BlockWorld {
 	private final LevelBlockWorld world;
@@ -42,7 +43,7 @@ final class EffectsBlockWorld implements BlockWorld {
 		BlockState before = level.getBlockState(pos);
 		world.set(x, y, z, state, blockEntity);
 		BlockState now = level.getBlockState(pos);
-		if (now == before) {
+		if (now == before || !dev.t3craft.build.BuildBudget.global().effect()) {
 			return;
 		}
 		if (now.isAir()) {

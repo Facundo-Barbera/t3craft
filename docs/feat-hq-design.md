@@ -50,7 +50,27 @@ The HQ origin `(0,0,0)` is the centre of the hub floor. `y = 0` is the floor lay
   desks** (`HqLayout.DESKS`), end cap, and a garden strip. A module never grows. A project that
   needs more desks gets another identical module.
 - **Workstation** (one per desk): a barrel drawer, two desk tops, the **computer** (black concrete
-  when taken, grey when vacant), the status lamp (a waxed copper bulb), a fern and the chair.
+  when taken, grey when vacant), the status lamp (a waxed copper bulb), a fern, and the free cell in front of the
+  computer where the NPC works **standing** (no chairs: it is a game, chairs add nothing).
+
+### Anchor rule
+
+Every **standing** anchor (`AnchorNames.standing(name)`: spawn, entrance, hub, board front and
+slots, benches, stroll points, doors, desks, the spot in front of the "Archived" shelf) is a cell
+an NPC can walk into, judged by the client navigation's own `Collision` (0.6 × 1.8 body, real
+collision boxes, body sweep between cells): the body fits exactly at the anchor, standing on a
+floor, and the cell is reachable from the spawn. Anchors on a carpet (the wing runner)
+are raised onto its top (`PlanBuilder` lifts them), so the body never overlaps a block. So no
+anchor is ever a stair or a chair: the desk anchor is the free cell in front of the computer (the
+NPC works standing, facing it), and `bench_*` is the cell in front of each hub bench. `HqAnchorPlacementTest` checks this with a flood fill over
+the plan for many rosters, annexes and a history. Surface anchors (board, lamps, monitors, screens,
+archived computers, shelf slots and signs) mark a block face and are not standing spots.
+
+Without an HQ, the grid fallback (`GridLayout`, `dev.t3craft.client.npc.behavior`) grounds each
+desk with `Ground.near(Collision)`: the walkable cell of that column nearest the origin height,
+so desks land in free cells of the real world. Open (owned by npc behaviour, not the HQ): a column
+with no walkable cell within `MAX_STEP` falls back to the origin height unchecked, and `board()` /
+`home()` use the origin height without probing.
 
 ### Environments
 
@@ -155,7 +175,7 @@ List<dev.t3craft.build.BuildPlan> all = HqPlans.forRoster(roster);
 | `board` | centre of the board's front face `(0.5,3.5,-3)` | S (face normal) |
 | `board_front`, `board_slot_0..13` | standing spots in front of the board, nearest first | N (looking at it) |
 | `board_lamp_0..3` | the board's bulbs, left to right seen from the front | S |
-| `bench_0..9` | hub bench seats (resting spots) | into the hub |
+| `bench_0..9` | in front of the hub benches (resting spots) | into the hub |
 | `walk_hub_0..3` | open hub floor | S |
 | `archive` | standing spot in front of the shelf `(4,1,6)` | S (looking at it) |
 | `shelf@<i>` (`archiveShelfSlot(i)`, i = 0..23) | face of shelf slot i, taken or not; i = eye-level tier, then top, then bottom, nearest the door first, east before west | N (into the hub) |
@@ -164,9 +184,9 @@ List<dev.t3craft.build.BuildPlan> all = HqPlans.forRoster(roster);
 | `shelf_more` | the "Older threads / +N / click to list" sign `(-4,4,7)`: click target for `overflow()` | N |
 | `wing_<projectKey>`, `walk_<projectKey>` | doorway / corridor of the project's **first** module | into the module |
 | `module@<i>`, `walk@<i>` | the same, for any module | into the module |
-| `desk_<threadId>` | the chair, at foot level | towards the computer |
-| `monitor_<threadId>` | centre of the computer's screen face | towards the chair |
-| `lamp_<threadId>` | the status bulb (toggle `lit`) | towards the chair |
+| `desk_<threadId>` | the free cell in front of the computer, standing, at foot level | towards the computer |
+| `monitor_<threadId>` | centre of the computer's screen face | towards the NPC |
+| `lamp_<threadId>` | the status bulb (toggle `lit`) | towards the NPC |
 
 `BuildPlan.workstations()` lists **every** desk, taken or vacant: `Workstation(module, slot, threadId,
 deskAnchor, computerPos, screen, lampPos)`. `screen` is the face centre of the computer with
@@ -220,6 +240,9 @@ floor above bedrock.
   named shelf slots inside the hub facing free cells, the shelf's signs and "+N" count, environment colours, baked shapes, annexes (a new desk, a new module touches only
   `module_n` / `spine_n` / `spine_cap`, a settled thread changes exactly two cells, a removed
   project), conversion to the builders' plan (layered, complete, per group), `HqSite` vs `BuildJob`.
+- `HqAnchorPlacementTest`: the anchor rule above (free, standable, reachable from the spawn) over
+  many rosters, annexes and a history; NPCs standing at their desks facing the computer; determinism and
+  idempotence.
 - `HqAnchorSourceTest`: world anchors under the four entrance directions, and fallbacks.
 
 ## Integration points

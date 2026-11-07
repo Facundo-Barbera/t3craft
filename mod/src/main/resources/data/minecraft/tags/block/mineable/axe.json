@@ -1,0 +1,12 @@
+{
+  "replace": false,
+  "values": [
+    "t3craft:standing_desk",
+    "t3craft:shoji_panel",
+    "t3craft:cherry_floor_tile",
+    "t3craft:cherry_beam",
+    "t3craft:beam_cap",
+    "t3craft:room_plaque",
+    "t3craft:cherry_railing"
+  ]
+}

@@ -2,11 +2,15 @@ package dev.t3craft.blocks;
 
 import dev.t3craft.T3Craft;
 import dev.t3craft.hq.HqFixtures;
+import dev.t3craft.hq.HqKit;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.item.BlockItem;
@@ -20,13 +24,14 @@ import net.minecraft.world.level.material.MapColor;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The custom blocks module: monitor, status lamp and board bulb, their block entity types and block
- * items. <b>The single registration point</b>: {@link #init} is the only code in the mod that
+ * The custom blocks module: monitor, status lamp and board bulb, the HQ decorative kit
+ * ({@link KitBlocks}, installed as {@link HqKit}), their block entity types and block items. <b>The single registration point</b>: {@link #init} is the only code in the mod that
  * registers blocks, items or block entity types for this module, and it registers nothing at all
  * when {@link BlocksSwitch} says no. Everything else (client renderers, the lamp driver, the HQ
  * adapter) first asks {@link #active()} and falls back to vanilla when it is false:
  * <ul>
- *   <li>the HQ keeps its vanilla computers and copper bulbs ({@link HqFixtures#VANILLA});</li>
+ *   <li>the HQ keeps its vanilla computers, copper bulbs and signs ({@link HqFixtures#VANILLA}) and
+ *       its styles get vanilla stand-ins for every kit role ({@link HqKit#VANILLA});</li>
  *   <li>the workstations keep drawing their own client-side screens and props.</li>
  * </ul>
  *
@@ -42,7 +47,8 @@ public final class T3Blocks {
 			StatusLampBlock boardLampBlock,
 			List<Item> items,
 			BlockEntityType<MonitorBlockEntity> monitorType,
-			BlockEntityType<LampBlockEntity> lampType) implements HqBlockFixtures.States {
+			BlockEntityType<LampBlockEntity> lampType,
+			KitBlocks kit) implements HqBlockFixtures.States {
 		@Override
 		public BlockState monitor(Direction facing) {
 			return monitorBlock.defaultBlockState().setValue(MonitorBlock.FACING, facing);
@@ -61,6 +67,16 @@ public final class T3Blocks {
 		@Override
 		public BlockState boardLamp() {
 			return boardLampBlock.defaultBlockState();
+		}
+
+		@Override
+		public BlockState plaque(Direction facing) {
+			return kit.plaque(facing);
+		}
+
+		@Override
+		public CompoundTag plaqueData(int color, String... lines) {
+			return PlaqueText.data(color, lines);
 		}
 	}
 
@@ -96,6 +112,7 @@ public final class T3Blocks {
 		decision = sw;
 		if (!sw.enabled()) {
 			HqFixtures.use(null);
+			HqKit.use(null);
 			T3Craft.LOGGER.info("T3Craft blocks module disabled ({}): HQ and workstations stay vanilla", sw.reason());
 			return null;
 		}
@@ -103,24 +120,37 @@ public final class T3Blocks {
 		BlockEntityType<MonitorBlockEntity>[] monitorType = new BlockEntityType[1];
 		@SuppressWarnings("unchecked")
 		BlockEntityType<LampBlockEntity>[] lampType = new BlockEntityType[1];
+		@SuppressWarnings("unchecked")
+		BlockEntityType<PlaqueBlockEntity>[] plaqueType = new BlockEntityType[1];
 
 		MonitorBlock monitor = (MonitorBlock) block(r, "monitor", p -> new MonitorBlock(p, () -> monitorType[0]),
 				BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLACK).strength(1.5f).sound(SoundType.METAL));
 		StatusLampBlock lamp = (StatusLampBlock) block(r, "status_lamp", p -> new StatusLampBlock(p, () -> lampType[0]), lampProps());
 		StatusLampBlock board = (StatusLampBlock) block(r, "board_lamp", p -> new StatusLampBlock(p, () -> lampType[0]), lampProps());
+		Map<String, Block> kitBlocks = KitBlocks.register((name, factory, props) -> block(r, name, factory, props),
+				() -> lampType[0], () -> plaqueType[0]);
 
 		monitorType[0] = r.blockEntity(id("monitor"), new BlockEntityType<>(
 				(pos, state) -> new MonitorBlockEntity(monitorType[0], pos, state), Set.of(monitor)));
 		lampType[0] = r.blockEntity(id("status_lamp"), new BlockEntityType<>(
-				(pos, state) -> new LampBlockEntity(lampType[0], pos, state), Set.of(lamp, board)));
+				(pos, state) -> new LampBlockEntity(lampType[0], pos, state), Set.of(lamp, board, kitBlocks.get("paper_lantern"))));
+		plaqueType[0] = r.blockEntity(id("room_plaque"), new BlockEntityType<>(
+				(pos, state) -> new PlaqueBlockEntity(plaqueType[0], pos, state), Set.of(kitBlocks.get("room_plaque"))));
+		KitBlocks kit = KitBlocks.of(kitBlocks, plaqueType[0]);
 
-		List<Item> items = List.of(item(r, "monitor", monitor), item(r, "status_lamp", lamp), item(r, "board_lamp", board));
+		List<Item> items = new ArrayList<>(List.of(item(r, "monitor", monitor), item(r, "status_lamp", lamp), item(r, "board_lamp", board)));
+		for (String name : KitBlocks.IDS) {
+			items.add(item(r, name, kit.block(name)));
+		}
+		items = List.copyOf(items);
 		r.creativeTab(items);
 
-		Content c = new Content(monitor, lamp, board, items, monitorType[0], lampType[0]);
+		Content c = new Content(monitor, lamp, board, items, monitorType[0], lampType[0], kit);
 		HqFixtures.use(new HqBlockFixtures(c));
+		HqKit.use(kit);
 		content = c;
-		T3Craft.LOGGER.info("T3Craft blocks module on ({}): monitor, status_lamp, board_lamp", sw.reason());
+		T3Craft.LOGGER.info("T3Craft blocks module on ({}): monitor, status_lamp, board_lamp + HQ kit ({} blocks)", sw.reason(),
+				KitBlocks.IDS.size());
 		return c;
 	}
 
@@ -147,5 +177,6 @@ public final class T3Blocks {
 		content = null;
 		decision = BlocksSwitch.OFF;
 		HqFixtures.use(null);
+		HqKit.use(null);
 	}
 }
