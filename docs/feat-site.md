@@ -345,4 +345,4 @@ Verificación manual sugerida en un mundo de prueba, nunca el real:
 ## Build
 
 `cd mod && JAVA_HOME=$HOME/.local/jdks/jdk-25.0.5+8 ./gradlew build` (JDK 25). Verde en la rama
-con main mergeado: 204 tests, 0 fallos.
+con main mergeado (incluye demo-world y portable): 274 tests, 0 fallos.
