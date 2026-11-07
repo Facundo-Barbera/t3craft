@@ -10,6 +10,7 @@ One line per structural commit on `main`, newest first:
 
 ## Entries
 
+- 2026-11-07 feat/panel-chips RELOAD — model/provider chip on NPC nameplate and panel, branch/worktree in the panel and workstation screen; tolerant decoding; additive config keys to show/hide chips. No new entrypoints, registries, keybinds or commands.
 - 2026-11-07 feat/hq-design RESTART — modular HQ plan (dev.t3craft.hq: 6-desk modules per project, archive basement, env colours, deterministic/idempotent layout, HqPlans → BuildPlan, HqAnchorSource for NPCs); command /t3craft debug hq-preview registered at client init. No blocks are placed outside that debug command yet.
 - 2026-11-07 feat/workstation RESTART — new client entrypoint WorkstationClient (client UseBlockCallback: clicking a desk computer opens that thread's chat); in-world workstation screens via client display entities (no registered blocks); command /t3craft workstation [on|off]; config block workstations; new lang keys.
 - 2026-11-07 feat/survival RESTART — new client entrypoint SurvivalClient and main-init hook (T3Craft.java); crafting recipe t3craft:t3_terminal + recipe-book unlock advancement + 'First Contact' advancement (data pack: /reload is enough for data alone, but the entrypoint needs a restart); GameModePolicy/SurvivalRules config defaults; new lang keys.
