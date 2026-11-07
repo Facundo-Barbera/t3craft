@@ -58,12 +58,12 @@ public final class AnchorNames {
 	/**
 	 * True for anchors an NPC stands in (feet cell free and walkable, see {@link Anchor#block()}),
 	 * false for surface anchors (board, lamps, monitors, screens, archived computers, the shelf's
-	 * slots and signs) that only mark a block face.
+	 * slots and signs, the beacon) that only mark a block face.
 	 */
 	public static boolean standing(String name) {
 		if (name.equals(BOARD) || name.startsWith(BOARD_LAMP) || name.startsWith("monitor_") || name.startsWith("lamp_")
 				|| name.startsWith("screen@") || name.startsWith("archive_") || name.startsWith(SHELF_SLOT) || name.equals(SHELF_MORE)
-				|| name.equals(SHELF_HEADER)) {
+				|| name.equals(SHELF_HEADER) || name.equals(BEACON)) {
 			return false;
 		}
 		return name.equals(SPAWN) || name.equals(ENTRANCE) || name.equals(HUB) || name.equals(BOARD_FRONT) || name.equals(ARCHIVE)

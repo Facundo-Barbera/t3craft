@@ -103,7 +103,7 @@ class HqAnchorPlacementTest {
 		}
 		for (String n : List.of(AnchorNames.BOARD, AnchorNames.boardLamp(0), AnchorNames.monitor("env:p0-t0"), AnchorNames.lamp("env:p0-t0"),
 				AnchorNames.screenSlot(0, 0), AnchorNames.archive("env:p0-t0"), AnchorNames.archiveShelfSlot(0), AnchorNames.SHELF_MORE,
-				AnchorNames.SHELF_HEADER)) {
+				AnchorNames.SHELF_HEADER, AnchorNames.BEACON)) {
 			assertFalse(AnchorNames.standing(n), n);
 		}
 		// every anchor of a real plan is one or the other, and standing ones sit at a cell centre at foot level
