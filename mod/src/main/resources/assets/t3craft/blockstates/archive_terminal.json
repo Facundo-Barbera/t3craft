@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=north": {
+      "model": "t3craft:block/archive_terminal"
+    },
+    "facing=east": {
+      "model": "t3craft:block/archive_terminal",
+      "y": 90
+    },
+    "facing=south": {
+      "model": "t3craft:block/archive_terminal",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "t3craft:block/archive_terminal",
+      "y": 270
+    }
+  }
+}

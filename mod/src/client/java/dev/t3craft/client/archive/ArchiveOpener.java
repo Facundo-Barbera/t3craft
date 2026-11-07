@@ -1,39 +1,36 @@
 package dev.t3craft.client.archive;
 
-import dev.t3craft.client.npc.NpcInfo;
-import dev.t3craft.client.portable.PortableLinks;
-import dev.t3craft.client.screen.ThreadChatScreen;
-import java.time.ZoneId;
-import net.minecraft.client.Minecraft;
+import dev.t3craft.client.chat.ChatScreens;
 
 /**
- * Opens a closed thread read-only when the player uses its slot or a catalog row. Called on the
- * client thread.
+ * Opens a closed thread from the archive screen. Called on the client thread.
  *
- * <p>Default ({@link #DEFAULT}): the chat/history screen that exists. With feat/chat's
- * {@code ChatScreens} on the classpath ({@link PortableLinks#hasChat()}), that one, which reads
- * history over the shared connection and cannot send without operate. Otherwise main's
- * {@link ThreadChatScreen} with a synthetic, settled {@link NpcInfo} (title, environment · project,
- * close date): the registry does not hold closed threads, so the registry-based openers would find
- * nothing. Replace it with {@code ArchiveClient.get().setOpener(...)}.
+ * <p>Default ({@link #DEFAULT}): the chat's thread browser on that thread, <b>read-only</b>
+ * ({@link ChatScreens#openReadOnly}): its history over the environment's shared connection, and a
+ * reply bar that only says "read-only" (no send, no "Enable control"), whatever the environment's
+ * operate pairing. Replace it with {@code ArchiveClient.get().setOpener(...)}.
  */
 @FunctionalInterface
 public interface ArchiveOpener {
 	void open(ArchiveEntry entry);
 
-	ArchiveOpener DEFAULT = entry -> {
-		if (PortableLinks.hasChat()) {
-			PortableLinks.openChat(entry.env(), entry.threadId());
-			return;
-		}
-		Minecraft.getInstance().gui.setScreen(new ThreadChatScreen(npc(entry)));
-	};
-
-	/** The read-only stand-in the placeholder screen shows. */
-	static NpcInfo npc(ArchiveEntry e) {
-		String when = ArchiveLabel.date(e.closedAtMs(), ZoneId.systemDefault());
-		String label = e.kind().glyph + " " + (e.kind() == ArchiveEntry.Kind.ARCHIVED ? "ARCHIVED" : "SETTLED") + " · " + when;
-		return new NpcInfo(e.key(), e.title(), label, e.envLabel(), e.envLabel() + " · " + e.projectLabel(), ArchiveLabel.envColor(e.env()),
-				"read-only (archive)", 99, true, "idle", e.projectKey(), e.projectLabel(), e.env() + "/idle", null);
+	/**
+	 * What the archive asks the chat to open: always read-only.
+	 *
+	 * @param key {@code <env>:<threadId>}
+	 */
+	record Request(String key, String env, String threadId, String title, String envLabel, boolean readOnly) {
 	}
+
+	/** The request for {@code e}: its thread, labels for the header, read-only. */
+	static Request request(ArchiveEntry e) {
+		return new Request(e.key(), e.env(), e.threadId(), e.title(), e.envLabel(), true);
+	}
+
+	/** An opener that hands the {@link #request} to {@code sink}. */
+	static ArchiveOpener of(java.util.function.Consumer<Request> sink) {
+		return e -> sink.accept(request(e));
+	}
+
+	ArchiveOpener DEFAULT = of(r -> ChatScreens.openReadOnly(r.env(), r.threadId(), r.envLabel(), r.title()));
 }

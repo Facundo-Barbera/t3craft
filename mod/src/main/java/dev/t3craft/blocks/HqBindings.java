@@ -27,7 +27,9 @@ import org.jspecify.annotations.Nullable;
  *   <li>each module: the lintel over its doorway (the inner wall's beam, one block in from the
  *       {@code module@<i>} anchor, three up) → board bulb {@code module:<threads at its desks>}, the
  *       module's most urgent thread; unbound (off) while the module has nobody;</li>
- *   <li>{@code archive_<threadId>} anchors → monitor facing the aisle, bound to that settled thread;</li>
+ *   <li>the {@code archiveTerminal} anchor → the archive terminal (unbound). Closed threads live only
+ *       there: the "Archived" shelf's {@code archive_<threadId>} cells are <b>not</b> fixtures (they stay
+ *       the plan's plain blocks, no thread shown on them);</li>
  *   <li>the {@code beacon} anchor (the hub lantern's cap) → status lamp bound {@code beacon};</li>
  *   <li>each {@link AnchorNames#bigScreen bigscreen_<key>@<w>x<h>=<binding>} anchor → a large screen:
  *       every cell of the {@code w × h} rectangle (top-left = the anchor's block, columns to the
@@ -49,6 +51,8 @@ import org.jspecify.annotations.Nullable;
 public final class HqBindings {
 	public enum Role {
 		MONITOR, LAMP, BOARD_LAMP, BEACON,
+		/** The archive terminal ({@code archiveTerminal} anchor): unbound, it always shows the whole archive. */
+		ARCHIVE_TERMINAL,
 		/** One cell of a large screen reserved by the plan ({@link AnchorNames#bigScreen}). */
 		SCREEN
 	}
@@ -64,7 +68,7 @@ public final class HqBindings {
 	public record Screen(String key, ScreenRect extent, Binding binding) {
 	}
 
-	/** Every fixture of {@code plan}, one per cell, in a fixed order (desks, board bulbs, module bulbs, archive, beacon, large screens). */
+	/** Every fixture of {@code plan}, one per cell, in a fixed order (desks, board bulbs, module bulbs, archive terminal, beacon, large screens). */
 	public static List<Fixture> of(BuildPlan plan) {
 		Map<BlockPos, Fixture> out = new LinkedHashMap<>();
 		for (Workstation w : plan.workstations()) {
@@ -91,12 +95,9 @@ public final class HqBindings {
 				out.putIfAbsent(lintel, new Fixture(lintel, Role.BOARD_LAMP, Binding.module(moduleThreads(plan, i)), a.facing()));
 			}
 		}
-		String archive = AnchorNames.archive("");
-		for (Anchor a : plan.anchors().values()) {
-			String n = a.name();
-			if (n.startsWith(archive) && n.length() > archive.length()) {
-				out.putIfAbsent(a.block(), new Fixture(a.block(), Role.MONITOR, Binding.thread(n.substring(archive.length())), a.facing()));
-			}
+		Anchor terminal = plan.anchors().get(AnchorNames.ARCHIVE_TERMINAL);
+		if (terminal != null) {
+			out.putIfAbsent(terminal.block(), new Fixture(terminal.block(), Role.ARCHIVE_TERMINAL, Binding.NONE, terminal.facing()));
 		}
 		Anchor beacon = plan.anchors().get(AnchorNames.BEACON);
 		if (beacon != null) {

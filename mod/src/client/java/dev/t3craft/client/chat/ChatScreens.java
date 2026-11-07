@@ -49,6 +49,24 @@ public final class ChatScreens {
 		Minecraft.getInstance().gui.setScreen(create(envId + ":" + threadId));
 	}
 
+	/**
+	 * Opens the browser on a closed thread, read-only (the archive): no actions are wired, so the
+	 * reply bar only says "read-only" (no send, no "Enable control") even with operate. The labels
+	 * fill the header, since an archived thread is not in the live list.
+	 */
+	public static void openReadOnly(String envId, String threadId, String envLabel, String title) {
+		Minecraft.getInstance().gui.setScreen(createReadOnly(envId, threadId, envLabel, title));
+	}
+
+	public static Screen createReadOnly(String envId, String threadId, String envLabel, String title) {
+		return new ThreadBrowserScreen(() -> {
+			ThreadBrowser b = browser(ChatTheme.warmStudio());
+			b.conversation().setActions(null);
+			b.open(envId + ":" + threadId, envLabel, title);
+			return b;
+		}, null);
+	}
+
 	/** Opens the browser on an NPC's thread. */
 	public static void openFor(NpcInfo npc) {
 		Minecraft.getInstance().gui.setScreen(createFor(npc));

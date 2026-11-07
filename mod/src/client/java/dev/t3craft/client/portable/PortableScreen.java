@@ -105,6 +105,9 @@ public final class PortableScreen extends Screen {
 		}).bounds(x1 - 2 * tabW - 10, y0 + 4, tabW, 16).build());
 		notificationsTab = addRenderableWidget(Button.builder(Component.literal("Notifications"), b -> showNotifications())
 				.bounds(x1 - tabW - 6, y0 + 4, tabW, 16).build());
+		// feat/archive-terminal: the archive screen (the way in without the blocks module's terminal)
+		addRenderableWidget(Button.builder(Component.translatable("t3craft.archive.portable"), b -> dev.t3craft.client.archive.ArchiveClient.openIfReady())
+				.bounds(x1 - 2 * tabW - 10 - 64, y0 + 4, 60, 16).build());
 		openButton = addRenderableWidget(Button.builder(Component.literal("Open chat"), b -> openSelected())
 				.bounds(x1 - 96, y1 - 22, 90, 16).build());
 		envButton = addRenderableWidget(Button.builder(Component.literal("Environments…"), b -> PortableLinks.openEnvironments(this))

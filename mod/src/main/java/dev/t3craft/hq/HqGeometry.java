@@ -52,6 +52,11 @@ final class HqGeometry {
 	 * the hub, header signs on {@code y = SHELF_TIERS + 1}.
 	 */
 	static final int SHELF_Z = HUB - 1;
+	/**
+	 * The archive terminal's cell ({@link AnchorNames#ARCHIVE_TERMINAL}): hub floor against the east
+	 * wall, south of the benches' planter, north of the reading corner; its screen faces west.
+	 */
+	static final BlockPos ARCHIVE_TERMINAL = new BlockPos(HUB - 1, 1, 5);
 	static final int SHELF_X1 = 3;
 	static final int SHELF_X2 = 6;
 	static final int SHELF_TIERS = 3;

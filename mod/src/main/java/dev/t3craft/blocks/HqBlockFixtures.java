@@ -25,10 +25,11 @@ import org.jspecify.annotations.Nullable;
  * The HQ adapter (an {@link HqFixtures}): swaps the vanilla fixtures of a generated plan for the
  * module's blocks, cell for cell, as listed by {@link HqBindings}: computers → monitors (facing the
  * chair or the aisle), desk bulbs → status lamps, board bulbs → board lamps, the hub lantern's cap
- * → the beacon (a status lamp bound {@code beacon}), the plan's large-screen cells → monitors, and wall
- * signs with text (module signs, the board's header) → room plaques ({@link #plaque}). Monitors get the
- * connection flags {@link MonitorWall} gives them over the plan's monitor cells (the same rule the world
- * applies, so a built screen is already merged). Each gets its binding as
+ * → the beacon (a status lamp bound {@code beacon}), the archive terminal's lectern → the archive
+ * terminal, the plan's large-screen cells → monitors, and wall signs with text (module signs, the
+ * board's header) → room plaques ({@link #plaque}). Monitors get the connection flags
+ * {@link MonitorWall} gives them over the plan's monitor cells (the same rule the world applies, so a
+ * built screen is already merged). Each gets its binding as
  * block entity data ({@code {"binding": "thread:<id>"}}), which the builders and the preview load with
  * {@code loadCustomOnly}. Positions, anchors and workstations are untouched, so NPCs, workstations
  * and HQ diffs see the same plan shape. Installed by {@link T3Blocks#init} only when the module is on.
@@ -46,6 +47,12 @@ public final class HqBlockFixtures implements HqFixtures {
 		BlockState lamp();
 
 		BlockState boardLamp();
+
+		/** The archive terminal, screen facing {@code facing} (default: the vanilla lectern stand-in). */
+		default BlockState archiveTerminal(Direction facing) {
+			return net.minecraft.world.level.block.Blocks.LECTERN.defaultBlockState()
+					.setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING, facing);
+		}
 
 		/** Room plaque with its front towards {@code facing} (replaces the HQ's wall signs); null keeps the signs. */
 		default @Nullable BlockState plaque(Direction facing) {
@@ -96,6 +103,7 @@ public final class HqBlockFixtures implements HqFixtures {
 				}
 				case LAMP, BEACON -> states.lamp();
 				case BOARD_LAMP -> states.boardLamp();
+				case ARCHIVE_TERMINAL -> states.archiveTerminal(f.facing());
 			};
 			return new Placement(p.rel(), s, data(f.binding()));
 		});
