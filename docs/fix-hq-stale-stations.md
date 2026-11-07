@@ -51,9 +51,11 @@ recibir datos y cada 10 s (así un `done` suelta el puesto cuando le toca, aunqu
 - En el modo directo, `T3CraftClient.refreshDirect` pasa la última actividad real de cada hilo
   (`Visibility.lastActivity` de su `ThreadShell`).
 
-**Archivo:** el destino es `HqLayout.archive` (los hilos `settled` del `HqInput`). Hoy es el sótano.
-Cuando entre fix/hq-archive (estante "Archivados", `archiveShelfSlot(i)`), el cambio queda dentro
-del generador y este hilo no tiene que tocar nada: los hilos liberados ya llegan como `settled`.
+**Archivo:** el destino es `HqLayout.archive`, es decir, los hilos `settled` del `HqInput`. Desde
+fix/hq-archive-v2 es el estante "Archived" del hub: no hay sótano. Los hilos liberados llegan como
+`settled` y caen ahí sin código extra. En el HQ de site hay **una sola política**: el enganche
+`HqConstructionClient.setReleasePolicy` se queda con su valor por defecto (`NpcInfo::settled`), y
+`liveRoster` usa `npcs().hqRoster()`.
 
 ## El diff también quita (`dev.t3craft.hq.HqDiff`)
 
@@ -85,7 +87,7 @@ remociones ni quitaba escritorios).
 
 - `DemoHq.step(...)` usa `HqDiff`: primero las remociones, después el plinto (que también se encoge
   si se encoge la huella, con `plinthRemoval`) y por último las construcciones.
-- `PLAN_VERSION = 2`: los mundos existentes se reconstruyen una vez. Esa reconstrucción completa
+- `PLAN_VERSION = 3` (main ya iba por la 2): los mundos existentes se reconstruyen una vez. Esa reconstrucción completa
   también limpia las celdas del layout anterior que el nuevo ya no usa (`clearPrevious`), así que no
   quedan módulos ni escritorios de sesiones viejas.
 - **Al cargar el mundo** (`DemoClient.tick`), el HQ espera con `RosterGate` a que **cada entorno

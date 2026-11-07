@@ -1,6 +1,7 @@
 package dev.t3craft.client.workstation;
 
 import com.mojang.math.Transformation;
+import dev.t3craft.blocks.T3Blocks;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -20,7 +21,6 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.Interaction;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.ObserverBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import org.joml.Vector3f;
 import org.jspecify.annotations.Nullable;
@@ -32,8 +32,9 @@ import org.jspecify.annotations.Nullable;
  *   <li>a FIXED {@link Display.TextDisplay} screen at {@code screenPos} facing the desk, full-bright,
  *       background tinted by the status;</li>
  *   <li>only while the computer block is air (no HQ/builder block there yet): a
- *       {@link Display.BlockDisplay} "computer" prop (a vanilla observer, face towards the desk) and
- *       an {@link Interaction} hitbox so the player still has something to right-click. Over a real
+ *       {@link Display.BlockDisplay} "computer" prop chosen by {@link StationProp} (a
+ *       {@code t3craft:monitor} when the blocks module is on, a small black-concrete base in
+ *       GUI-only mode; never a technical block like an observer) and an {@link Interaction} hitbox so the player still has something to right-click. Over a real
  *       block neither exists and the click goes through {@code UseBlockCallback}.</li>
  * </ul>
  *
@@ -62,6 +63,7 @@ final class WorkstationRenderer {
 		final StationPlacement placement;
 		final Display.TextDisplay screen;
 		Display.@Nullable BlockDisplay prop;
+		StationProp propKind = StationProp.NONE;
 		@Nullable Interaction hitbox;
 		boolean archived;
 		/** The computer block draws its own screen (e.g. a t3craft monitor): our TextDisplay stays blank. */
@@ -83,6 +85,8 @@ final class WorkstationRenderer {
 	private final Map<Integer, String> byEntity = new HashMap<>();
 	private int nextId = ID_BASE;
 	private int tick;
+	/** One-shot sweep of stale props left by older builds (observers) in our id range. */
+	private boolean swept;
 	/** Computer blocks that draw their own screen; default none (vanilla blocks never do). */
 	private Predicate<BlockState> selfDisplay = state -> false;
 
@@ -120,6 +124,10 @@ final class WorkstationRenderer {
 	 */
 	void tick(ClientLevel lvl, List<WorkstationThread> threads, WorkstationPlacementSource source, WorkstationCache cache, long nowMs) {
 		tick++;
+		if (!swept) {
+			sweepStaleProps(lvl);
+			swept = true;
+		}
 		source.prepare(threads);
 		Set<String> alive = new HashSet<>();
 		boolean checkBlocks = tick % BLOCK_CHECK_TICKS == 0;
@@ -226,30 +234,61 @@ final class WorkstationRenderer {
 		return s;
 	}
 
-	/** Prop + hitbox only while the computer block is air. */
+	/** Prop + hitbox only while the computer block is air; kind per {@link StationProp}. */
 	private void syncProp(ClientLevel lvl, Station s) {
 		StationPlacement p = s.placement;
 		boolean air = lvl.getBlockState(new BlockPos(p.computerX(), p.computerY(), p.computerZ())).isAir();
-		if (air && s.prop == null) {
-			Display.BlockDisplay prop = new Display.BlockDisplay(EntityTypes.BLOCK_DISPLAY, lvl);
-			prop.setId(nextId--);
-			prop.setBlockState(Blocks.OBSERVER.defaultBlockState().setValue(ObserverBlock.FACING, Direction.fromYRot(p.screenYaw())));
-			prop.snapTo(p.computerX(), p.computerY(), p.computerZ(), 0f, 0f);
-			lvl.addEntity(prop);
-			s.prop = prop;
-			byEntity.put(prop.getId(), s.key);
-
-			Interaction hit = new Interaction(EntityTypes.INTERACTION, lvl);
-			hit.setId(nextId--);
-			hit.setWidth(1.0f);
-			hit.setHeight(HITBOX_HEIGHT);
-			hit.snapTo(p.computerX() + 0.5, p.computerY(), p.computerZ() + 0.5, 0f, 0f);
-			lvl.addEntity(hit);
-			s.hitbox = hit;
-			byEntity.put(hit.getId(), s.key);
-		} else if (!air && s.prop != null) {
-			removeProp(lvl, s);
+		StationProp want = StationProp.choose(T3Blocks.active(), !air);
+		if (want == s.propKind && (s.prop != null) == want.drawn()) {
+			return;
 		}
+		removeProp(lvl, s);
+		s.propKind = want;
+		if (!want.drawn()) {
+			return;
+		}
+		Display.BlockDisplay prop = new Display.BlockDisplay(EntityTypes.BLOCK_DISPLAY, lvl);
+		prop.setId(nextId--);
+		prop.setBlockState(propState(want, Direction.fromYRot(p.screenYaw())));
+		if (want == StationProp.PANEL) {
+			// a low 0.8×0.4×0.8 base, centred in the cell, under the floating screen
+			prop.setTransformation(new Transformation(new Vector3f(0.1f, 0f, 0.1f), null, new Vector3f(0.8f, 0.4f, 0.8f), null));
+		}
+		prop.snapTo(p.computerX(), p.computerY(), p.computerZ(), 0f, 0f);
+		lvl.addEntity(prop);
+		s.prop = prop;
+		byEntity.put(prop.getId(), s.key);
+
+		Interaction hit = new Interaction(EntityTypes.INTERACTION, lvl);
+		hit.setId(nextId--);
+		hit.setWidth(1.0f);
+		hit.setHeight(HITBOX_HEIGHT);
+		hit.snapTo(p.computerX() + 0.5, p.computerY(), p.computerZ() + 0.5, 0f, 0f);
+		lvl.addEntity(hit);
+		s.hitbox = hit;
+		byEntity.put(hit.getId(), s.key);
+	}
+
+	private static BlockState propState(StationProp kind, Direction facing) {
+		T3Blocks.Content c = T3Blocks.content();
+		if (kind == StationProp.MONITOR && c != null) {
+			return c.monitor(facing);
+		}
+		return Blocks.CONCRETE.pick(net.minecraft.world.item.DyeColor.BLACK).defaultBlockState();
+	}
+
+	/**
+	 * Older builds drew a vanilla observer as the stand-in computer. After a hot-swap those entities
+	 * may still be in the level, untracked: discard every observer BlockDisplay in our id range.
+	 */
+	private static void sweepStaleProps(ClientLevel lvl) {
+		List<Entity> stale = new ArrayList<>();
+		for (Entity e : lvl.entitiesForRendering()) {
+			if (e.getId() <= ID_BASE && e instanceof Display.BlockDisplay d && d.getBlockState().is(Blocks.OBSERVER)) {
+				stale.add(e);
+			}
+		}
+		stale.forEach(e -> remove(lvl, e));
 	}
 
 	private void removeProp(@Nullable ClientLevel lvl, Station s) {
@@ -258,6 +297,7 @@ final class WorkstationRenderer {
 			remove(lvl, s.prop);
 			s.prop = null;
 		}
+		s.propKind = StationProp.NONE;
 		if (s.hitbox != null) {
 			byEntity.remove(s.hitbox.getId());
 			remove(lvl, s.hitbox);

@@ -67,10 +67,22 @@ snapshots de site.
   (mirando al escritorio), escala 0,45 (28 caracteres ≈ 1,9 bloques de ancho), full-bright y fondo
   teñido.
 - **Computadora**: si en `computerPos` ya hay un bloque (lo puso hq-design o builders), se usa ese
-  bloque, cualquiera que sea. Mientras ese lugar es **aire** (hoy, sin HQ), se dibuja un
-  `Display.BlockDisplay` de un **observador vanilla** con la cara hacia el escritorio y una entidad
-  `Interaction` de cliente de 1×1,75 para que haya algo que clicar. En cuanto aparece un bloque
-  real (se revisa cada 20 ticks), los dos se retiran y el click pasa por `UseBlockCallback`.
+  bloque, cualquiera que sea. Mientras ese lugar es **aire** (fuente provisional, cuadrícula, sin
+  HQ), se dibuja un `Display.BlockDisplay` de relleno y una entidad `Interaction` de cliente de
+  1×1,75 para que haya algo que clicar. En cuanto aparece un bloque real (se revisa cada 20 ticks),
+  los dos se retiran y el click pasa por `UseBlockCallback`. El prop lo elige `StationProp.choose`
+  (lógica pura, con tests):
+
+  | Bloque real en `computerPos` | Módulo de bloques | Prop |
+  |---|---|---|
+  | sí | cualquiera | **ninguno** (el bloque real, p. ej. el monitor del HQ, ya es la computadora) |
+  | no | activo | `t3craft:monitor` mirando al escritorio |
+  | no | apagado (solo GUI) | base baja de **concreto negro** (0,8×0,4×0,8, centrada) bajo la pantalla flotante |
+
+  Nunca se usa un bloque técnico (antes era un **observador**, que parecía un artefacto de
+  redstone suelto junto a cada agente). Si el tipo de prop cambia, se rehace. Al primer tick tras
+  cargar (también tras un hot-swap), el renderer descarta cualquier `BlockDisplay` de observador
+  con id ≤ −5.000.000 que haya quedado huérfano de builds anteriores.
 - **Ids de entidad**: rango propio desde **−5.000.000** hacia abajo (`WorkstationRenderer.ID_BASE`).
   NpcRegistry usa −1.000.000…, builders −2.000.000… y BehaviorDirector −3.000.000…. El contador es
   de instancia, no estático.

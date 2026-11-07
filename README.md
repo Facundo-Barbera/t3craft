@@ -21,25 +21,34 @@ creation are stubs (see TODOs and `docs/plan.md` §6).
 
 ## Direct mode (default): pair the mod with each T3
 
-Since v2.1 the mod talks to each T3 Code environment itself, read-only, like the desktop app
-with a remote server. The bridge below is optional (legacy `"mode": "bridge"`).
+Since v2.1 the mod talks to each T3 Code environment itself, like the desktop app with a remote
+server. The bridge below is optional (legacy `"mode": "bridge"`).
 
-1. On each T3 host, issue a one-time **read-only** pairing credential (valid 5 minutes by default):
+1. On each T3 host, issue a one-time pairing credential (valid 5 minutes by default). By default
+   the mod pairs with **read + control** (`orchestration:operate`: send messages, approve, stop…)
+   in a single pairing:
    ```bash
-   t3 auth pairing create --scope orchestration:read --base-url https://my-vps.example.ts.net
+   t3 auth pairing create --scope orchestration:read --scope orchestration:operate --base-url https://my-vps.example.ts.net
    ```
-   Always pass `--scope orchestration:read`: without it the credential carries every scope. The mod
-   asks for `orchestration:read` only and refuses a session that grants anything else.
+   For a **read-only** pairing use only `--scope orchestration:read` and `/t3craft pair --read-only`
+   (or the "Access" toggle on the pairing screen). Always pass explicit `--scope`s: without them
+   the credential carries every scope. The mod refuses a session that grants anything beyond
+   `orchestration:read` + `orchestration:operate`. Destructive actions ask for an in-game
+   confirmation and every action lands in `config/t3craft/audit.log`. Details: `docs/feat-operate.md`.
 2. In Minecraft run `/t3craft pair`, enter a name (shown on the villagers, e.g. `my-vps`) and
    paste the link (`https://host/pair#token=…`), or the bare code plus the T3 URL
-   (e.g. `http://my-acmesite.<tailnet>.ts.net:3773`). Repeat for each environment.
+   (e.g. `http://my-acmesite.<tailnet>.ts.net:3773`). Repeat for each environment. An
+   environment paired read-only can get control later with "Enable control" in the environments
+   screen (or `/t3craft operate enable <env>`); `/t3craft operate revoke <env>` takes it back to
+   read-only.
 3. The session (Bearer, 30 days, no refresh: pair again when it expires) is stored in the
-   instance profile under `config/t3craft/credentials/<env>.json` (owner-only where the OS allows).
+   instance profile under `config/t3craft/credentials/<env>.json` (plus `credentials/operate/<env>.json`
+   when it has control; owner-only where the OS allows).
    It is never logged and never belongs in a repo. Revoke it on the host with
    `t3 auth session list` / `t3 auth session revoke <id>` (or Sharing & access), and forget it
    locally with `/t3craft unpair <env>`.
 
-Commands: `/t3craft status | reconnect | reload | pair | unpair <env> | envs`. `reload` re-reads
+Commands: `/t3craft status | reconnect | reload | pair [--read-only] | unpair <env> | envs | operate [enable|revoke <env>]`. `reload` re-reads
 `config/t3craft.json`, the paired environments and their credentials, and reconnects without
 restarting the game. Visibility in direct mode is set in `config/t3craft.json`
 (`visibility.recentWindowHours` 24, `visibility.maxPerEnvironment` 40, `includeSubagents`).

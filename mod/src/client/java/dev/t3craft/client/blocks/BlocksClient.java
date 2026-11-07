@@ -8,7 +8,9 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import dev.t3craft.T3Craft;
 import dev.t3craft.blocks.Binding;
+import dev.t3craft.blocks.BindingWriter;
 import dev.t3craft.blocks.BoundBlockEntity;
+import dev.t3craft.blocks.HqBindings;
 import dev.t3craft.blocks.LampApplier;
 import dev.t3craft.blocks.LampStatus;
 import dev.t3craft.blocks.LiveLamps;
@@ -26,6 +28,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
@@ -59,12 +62,17 @@ import org.jspecify.annotations.Nullable;
  * </ul>
  * Using a monitor opens its thread through the workstations' {@link ThreadOpener}.
  *
- * <p>Integration point: {@link #setPositionBindings} (HQ owner: world cell → binding fallback for
- * blocks without their own data, e.g. {@code HqBindings.world(plan, site)}).
+ * <p>Integration points: {@link #setHqBindings} (HQ owner: the bindings the HQ's fixtures should have
+ * for the live roster; written into the block entities, only where they change) and
+ * {@link #setPositionBindings} (world cell → binding fallback for blocks without their own data).
  */
 public final class BlocksClient implements ClientModInitializer {
 	private static final String MODULE = "blocks";
 	static final int RESYNC_TICKS = 40;
+	/** How often the HQ bindings are re-read (the source caches by roster, so this is cheap). */
+	static final int HQ_SYNC_TICKS = 20;
+	/** Full re-send of the HQ bindings (chunks loaded since, fixtures rebuilt); the writer skips equal ones. */
+	static final int HQ_RESYNC_TICKS = 200;
 
 	private static @Nullable BlocksClient instance;
 
@@ -73,7 +81,10 @@ public final class BlocksClient implements ClientModInitializer {
 	private final ThreadOpener fallbackOpener = new ChatScreenOpener();
 	private @Nullable MonitorRenderer renderer;
 	private volatile @Nullable Map<Long, Binding> positional;
-	private @Nullable Map<String, LampStatus> lastWanted;
+	private volatile @Nullable Map<String, LampStatus> lastWanted;
+	private volatile @Nullable Supplier<@Nullable Map<Long, Binding>> hqBindings;
+	private @Nullable Map<Long, Binding> lastHq;
+	private int lastHqChanged;
 	private boolean suppressorInstalled;
 	private int ticks;
 	private int lastChanged;
@@ -109,6 +120,24 @@ public final class BlocksClient implements ClientModInitializer {
 	public void setPositionBindings(@Nullable Map<Long, Binding> bindings) {
 		positional = bindings == null ? null : Map.copyOf(bindings);
 		lastWanted = null; // re-apply lamps with the new fallback
+	}
+
+	/**
+	 * Automatic HQ binding: {@code source} gives world cell ({@code BlockPos.asLong}) → binding for every
+	 * HQ fixture as the live roster wants it now (e.g. {@code HqBindings.world(plan, site)} of the plan
+	 * for the current roster against the built layout; null when unknown). Every
+	 * {@value #HQ_SYNC_TICKS} ticks the change since the last read ({@link HqBindings#changes}) is
+	 * written into the block entities on the integrated server, so a thread that moves desk or is
+	 * settled rebinds its monitor and lamp and the freed desk goes unbound (off). Null = stop.
+	 */
+	public void setHqBindings(@Nullable Supplier<@Nullable Map<Long, Binding>> source) {
+		hqBindings = source;
+		lastHq = null;
+	}
+
+	/** Block entities rewritten by the last HQ binding pass (status, tests). */
+	public int lastHqChanged() {
+		return lastHqChanged;
 	}
 
 	MonitorScreens screens() {
@@ -151,6 +180,7 @@ public final class BlocksClient implements ClientModInitializer {
 		if (server == null) {
 			return; // remote: lamps keep their saved state (the server owns block states)
 		}
+		syncHq(mc, server);
 		Map<String, LampStatus> wanted = LampSignals.wanted(list);
 		if (wanted.equals(lastWanted) && ticks % RESYNC_TICKS != 0) {
 			return;
@@ -158,6 +188,39 @@ public final class BlocksClient implements ClientModInitializer {
 		lastWanted = wanted;
 		Map<Long, Binding> pos = positional;
 		server.execute(() -> lastChanged = LampApplier.apply(wanted, pos));
+	}
+
+	private void syncHq(Minecraft mc, IntegratedServer server) {
+		Supplier<@Nullable Map<Long, Binding>> source = hqBindings;
+		if (source == null || mc.level == null || ticks % HQ_SYNC_TICKS != 0) {
+			return;
+		}
+		Map<Long, Binding> now;
+		try {
+			now = source.get();
+		} catch (RuntimeException e) {
+			T3Craft.LOGGER.warn("T3Craft: HQ bindings failed", e);
+			return;
+		}
+		if (now == null) {
+			return;
+		}
+		Map<Long, Binding> send = ticks % HQ_RESYNC_TICKS == 0 ? now : HqBindings.changes(lastHq, now);
+		lastHq = now;
+		if (send.isEmpty()) {
+			return;
+		}
+		var dim = mc.level.dimension();
+		server.execute(() -> {
+			ServerLevel level = server.getLevel(dim);
+			if (level != null) {
+				int n = BindingWriter.apply(level, send);
+				lastHqChanged = n;
+				if (n > 0) {
+					lastWanted = null; // lamps follow their new bindings on the next tick
+				}
+			}
+		});
 	}
 
 	private boolean use(BlockPos pos, String own) {
@@ -190,6 +253,7 @@ public final class BlocksClient implements ClientModInitializer {
 		screens.clear();
 		threads.clear();
 		lastWanted = null;
+		lastHq = null;
 		MonitorRenderer r = renderer;
 		if (r != null) {
 			r.clear();

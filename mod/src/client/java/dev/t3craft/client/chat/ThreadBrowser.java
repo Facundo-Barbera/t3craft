@@ -40,8 +40,8 @@ import org.jspecify.annotations.Nullable;
  * right-click solo, "All").
  */
 public final class ThreadBrowser implements AutoCloseable {
-	public static final int COMPACT_W = 300;
-	public static final int COMPACT_H = 150;
+	public static final int COMPACT_W = BrowserLayout.COMPACT_W;
+	public static final int COMPACT_H = BrowserLayout.COMPACT_H;
 
 	public enum Mode {
 		AUTO, SPLIT, COMPACT
@@ -134,7 +134,7 @@ public final class ThreadBrowser implements AutoCloseable {
 		if (mode != Mode.AUTO) {
 			return mode;
 		}
-		return bounds.w() < COMPACT_W || bounds.h() < COMPACT_H ? Mode.COMPACT : Mode.SPLIT;
+		return BrowserLayout.isCompact(bounds) ? Mode.COMPACT : Mode.SPLIT;
 	}
 
 	/** Selects and opens a thread by key ({@code env:threadId}), even before it is listed. */
@@ -187,7 +187,7 @@ public final class ThreadBrowser implements AutoCloseable {
 	private void showRow(ThreadRow r) {
 		conversation.setBadge(model.badge(r));
 		if (r.threadId() == null) {
-			conversation.showNothing("This thread has no id in bridge mode: chat history needs direct mode (/t3craft pair).");
+			conversation.showNothing(net.minecraft.client.resources.language.I18n.get("t3craft.chat.history.bridge"), ChatSource.Unavailable.Action.PAIR);
 			return;
 		}
 		conversation.show(r.env(), r.envLabel(), r.threadId(), r.title());
@@ -223,8 +223,7 @@ public final class ThreadBrowser implements AutoCloseable {
 		} else {
 			conversation.setCompact(false);
 			conversation.setHints("↑↓", "thread", "PgUp", "scroll", "End", "newest", "Esc", "close");
-			int lw = Math.max(130, Math.min(200, bounds.w() * 30 / 100));
-			Rect[] split = bounds.splitX(lw, t.gap());
+			Rect[] split = BrowserLayout.split(bounds, t.gap());
 			list.setBounds(split[0]);
 			conversation.setBounds(split[1]);
 			list.render(g, font, mouseX, mouseY);

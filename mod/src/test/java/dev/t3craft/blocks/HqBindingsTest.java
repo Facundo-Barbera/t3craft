@@ -90,8 +90,18 @@ class HqBindingsTest {
 	@Test
 	void boardBulbsAndArchive() {
 		BuildPlan p = plan(BlocksTestSupport.roster());
-		List<HqBindings.Fixture> bulbs = HqBindings.ofRole(p, HqBindings.Role.BOARD_LAMP);
+		List<HqBindings.Fixture> bulbs = new java.util.ArrayList<>();
+		int moduleBulbs = 0;
+		for (HqBindings.Fixture f : HqBindings.ofRole(p, HqBindings.Role.BOARD_LAMP)) {
+			if (f.binding().kind() == Binding.Kind.BOARD) {
+				bulbs.add(f);
+			} else {
+				assertTrue(f.binding().kind() != Binding.Kind.THREAD, "the other bulbs are the modules' own");
+				moduleBulbs++;
+			}
+		}
 		assertFalse(bulbs.isEmpty());
+		assertEquals(p.modules().stream().filter(m -> m.id().endsWith("_inner")).count(), moduleBulbs, "one bulb per module");
 		Set<Integer> idx = new HashSet<>();
 		for (HqBindings.Fixture f : bulbs) {
 			idx.add(f.binding().boardIndex());

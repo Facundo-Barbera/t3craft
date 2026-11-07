@@ -41,12 +41,15 @@ Paquetes:
 - **Política de liberación de puesto (enganche).** `HqConstructionClient.setReleasePolicy(Predicate<NpcInfo>)`.
   Por defecto es `NpcInfo::settled`. Cuando entre **fix/hq-stale-stations** (settle, archivado, o DONE
   e inactivo más de X minutos), se instala su política ahí. Un hilo liberado se pasa al HQ como
-  settled: pierde el escritorio (remoción en el diff) y va al archivo. **Hecho (fix/hq-stale-stations):** la política se
-  aplica en `NpcRegistry`, y `liveRoster` agrega `npcs().released()` (ya settled), así que el predicado por defecto alcanza.
-- **Sin sótano.** `HqSiteFrame.MIN_Y = 0`: no se construye nada debajo del piso del HQ y la base no
-  pide profundidad (`BASE_DEPTH = 0`; `SiteRequest.baseDepth` queda disponible). Las anclas y las
-  estaciones del archivo solo se usan si están dentro del edificio, es decir, en el estante de
-  **fix/hq-archive** cuando entre. Mientras tanto, un hilo liberado espera en el hub.
+  settled: pierde el escritorio (remoción en el diff) y va al estante "Archived" del hub. **Hecho (fix/hq-stale-stations):** la única política
+  (`StationPolicy`) se aplica en `NpcRegistry`; `liveRoster` usa `npcs().hqRoster()` (los liberados ya llegan settled), y el
+  predicado por defecto del hook (`NpcInfo::settled`) basta: no hay segunda política.
+- **Sin sótano.** El generador ya no tiene sótano (fix/hq-archive): `HqFootprints.bottom() = 0`,
+  `base()` = hub + pórtico, `HqSiteFrame.MIN_Y = 0` y la base no pide profundidad (`BASE_DEPTH = 0`;
+  `SiteRequest.baseDepth` queda disponible). Los hilos liberados van al estante "Archived" de la
+  pared sur del hub (parte del módulo de sitio `base`): su estación de workstation es su computadora
+  en el estante (`HqStations`) y su NPC se para en el piso del hub frente a ella, mirándola
+  (`HqWorldAnchors.desk`). Antes de que la base esté en pie, espera en el hub.
 
 ### Geometría (`HqFootprints`, `HqSiteFrame`)
 
@@ -145,5 +148,5 @@ escriben en el paso in-place.
 - Un ala vaciada se "demuele" in-place (aire, pasto a nivel del piso) y su ampliación de site sigue en la pila. Se vuelve a usar si un proyecto ocupa ese índice.
 - Más de 4 alas exige subir `SiteRequest.MAX_ENVELOPE` (decisión de site).
 - Falta un test de `SiteService.claim` con `restore` contra `FakeWorld`. Hoy la remoción solo se prueba con el fake de `HqConstruction`.
-- Enganchar la política de fix/hq-stale-stations y el estante de fix/hq-archive cuando entren a main.
+- Enganchar la política de fix/hq-stale-stations cuando entre a main.
 - Si un crash ocurre entre `claim` y la escritura, la celda queda registrada con el estado nuevo: un undo la reporta como conflicto.
