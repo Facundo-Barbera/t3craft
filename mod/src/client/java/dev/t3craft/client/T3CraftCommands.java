@@ -80,6 +80,7 @@ public final class T3CraftCommands {
 							return 1;
 						})))
 				.then(dev.t3craft.client.operate.OperateCommands.build(client))
+				.then(dev.t3craft.client.operate.ThreadControlUi.commands()) // feat/op-stop: operate interrupt|stop
 				.then(literal("envs").executes(c -> {
 					var list = new Environments(ModConfig.dataDir()).list();
 					if (list.isEmpty()) {
