@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import dev.t3craft.build.BuildPlan;
 import dev.t3craft.build.DemoPlans;
 import dev.t3craft.build.Placement;
+import dev.t3craft.hq.HqFixtures;
 import dev.t3craft.hq.HqGenerator;
 import dev.t3craft.hq.HqInput;
 import dev.t3craft.hq.HqPlans;
@@ -44,6 +45,7 @@ class TemplateBlockStatesTest {
 		SharedConstants.tryDetectVersion();
 		Bootstrap.bootStrap();
 		blocks = BuiltInRegistries.BLOCK;
+		HqFixtures.use(null); // blocks module off: vanilla HQ (the modded HQ is in blocks.ModBlockStatesTest)
 	}
 
 	private static List<HqInput.Entry> roster() {
@@ -124,6 +126,7 @@ class TemplateBlockStatesTest {
 		assertTrue(states.size() > 50, "template has " + states.size() + " states");
 		for (BlockState s : states) {
 			String key = LevelBlockWorld.keyOf(s);
+			assertTrue(key.startsWith("minecraft:"), "module off: vanilla only, got " + key);
 			assertSame(s, LevelBlockWorld.parse(blocks, key), key);
 			assertSame(s, LevelBlockWorld.parse(blocks, key.replaceFirst("^minecraft:", "")), "without namespace: " + key);
 		}
