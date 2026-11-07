@@ -33,6 +33,8 @@ public final class Motion {
 	static final double PROGRESS = 0.01;
 	/** A clipped walker this close (horizontally) to its waypoint takes it as reached. */
 	static final double REACHED = 0.08;
+	/** Rises above this (the auto step) are hopped: straight up first, then on. */
+	static final double HOP = 0.6;
 
 	private final List<Pos> path = new ArrayList<>();
 	private int next;
@@ -160,6 +162,17 @@ public final class Motion {
 		Pos p = pos;
 		while (budget > 1e-6 && next < path.size()) {
 			Pos goal = path.get(next);
+			if (goal.y() - p.y() > HOP + 1e-6 && goal.y() - p.y() <= 1.0 + 1e-6) {
+				// A whole block up with nothing to step on (the route only has these between neighbouring
+				// cells): hop up on the spot first, collision-checked, then walk on at the new height.
+				Pos up = new Pos(p.x(), goal.y(), p.z());
+				Pos got = mover.apply(p, up);
+				if (got.y() < goal.y() - 1e-6) {
+					p = got; // a ceiling: no hop, the walker reports being stuck
+					break;
+				}
+				p = got;
+			}
 			double dx = goal.x() - p.x();
 			double dy = goal.y() - p.y();
 			double dz = goal.z() - p.z();
