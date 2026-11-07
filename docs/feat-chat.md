@@ -248,3 +248,28 @@ sub.close();                                               // la última vista h
 - Al reconectar se vuelve a pedir el snapshot y se pierden las páginas viejas ya cargadas.
 - La UI aún no usa `fullItem()` (`getTurnItem`) al desplegar una tool con `outputOmitted`. La vía
   está lista.
+
+## fix/chat-polish (feedback a 1440p)
+
+- **Layout centrado**: `BrowserLayout.compute(guiW, guiH)` (pura, testeada) centra el navegador en
+  coordenadas escaladas, con márgenes iguales a izquierda y derecha y arriba y abajo (mínimo 8 px). Mide
+  como máximo 760×440, nunca es más de 2 veces más ancho que alto y pasa al modo compacto por debajo
+  de 300×150. `ThreadBrowserScreen` ya no lo ancla abajo a la izquierda y el velo cubre toda la
+  pantalla. Tests: 1920×1080 y 2560×1440 con GUI scale 2, 3 y auto.
+- **El "título gigante"** que se veía encima del mundo no lo dibujaba el chat: es el `TextDisplay`
+  de nombre del NPC (`NpcRegistry`, billboard a 2,45 bloques sobre la cabeza). Como se acaba de
+  hacer clic derecho sobre él, queda delante de la cámara. Ahora el panel centrado lo tapa. El
+  título del hilo sigue dentro de la cabecera del panel, a tamaño normal.
+- **Historial con bridge**: el protocolo v1 define `chat.open`/`chat.history`, pero el bridge
+  responde "not implemented" a todo mensaje del mod (`bridge/src/main.ts`, TODO de la fase 2), así
+  que no hay fallback de solo lectura. `ChatAccess.history(direct, conectado)` decide entre
+  `DIRECT`, `PAIR_FOR_DIRECT` (bridge) y `NOT_PAIRED`. Los dos últimos muestran un estado vacío con
+  el botón "Pair for direct mode…", que abre `EnvironmentsScreen` ("Pair new…").
+- **Caja de respuesta**: `ChatAccess.reply(hilo, canOperate)`. `READY` deja la caja sin ningún
+  texto (el envío llega con el ítem 19). `READ_ONLY` muestra "Read-only: enable control to reply" y
+  un botón "Enable control" que abre `OperatePairScreen` para ese entorno. La consulta pasa por
+  `ChatScreens.canOperate(env)`, que hoy delega en `OperateUi.canOperate`. Cuando el pairing por
+  defecto sea read+operate (fix/pair-default-operate), solo hay que cambiar ese método.
+- `ThreadBrowserScreen` construye su navegador en `init()` y lo cierra en `removed()`. Así puede ser
+  el padre de las pantallas de emparejar y de control y volver al mismo hilo sin dejar feeds
+  abiertos. `ThreadBrowserScreen.of(...)` se sustituyó por `new ThreadBrowserScreen(Supplier, key)`.
