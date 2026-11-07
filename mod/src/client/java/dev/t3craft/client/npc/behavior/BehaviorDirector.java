@@ -68,6 +68,10 @@ public final class BehaviorDirector {
 	/** Client-only entity ids for bubbles and icons, far from the registry's range. */
 	private int nextClientId = -3_000_000;
 	private int tick;
+	/** ATTENTION NPCs coming to the player (inventario item 16). */
+	private final ApproachPlanner approaches = new ApproachPlanner();
+	private @Nullable ApproachConfig approachOverride;
+	private ApproachConfig.@Nullable Watcher approachConfig;
 
 	/** Plug in a physical base (null = none, ring layout only). See {@link AnchorSource}. */
 	public void setAnchorSource(@Nullable AnchorSource source) {
@@ -77,6 +81,21 @@ public final class BehaviorDirector {
 	/** Plug in the speech-bubble text (null = {@link SummarySource#ACTIVITY}). */
 	public void setSummarySource(@Nullable SummarySource source) {
 		this.summaries = source == null ? SummarySource.ACTIVITY : source;
+	}
+
+	/** Force the approach settings (null = read {@code npcApproach} from {@code config/t3craft.json}). */
+	public void setApproachConfig(@Nullable ApproachConfig cfg) {
+		this.approachOverride = cfg;
+	}
+
+	private ApproachConfig approachConfig() {
+		if (approachOverride != null) {
+			return approachOverride;
+		}
+		if (approachConfig == null) {
+			approachConfig = new ApproachConfig.Watcher(net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir().resolve("t3craft.json"), 100);
+		}
+		return approachConfig.get();
 	}
 
 	public @Nullable NpcBrain brain(String npcId) {
@@ -107,6 +126,7 @@ public final class BehaviorDirector {
 		}
 		overlays.clear();
 		brains.clear();
+		approaches.reset();
 		ring = null;
 		ringMembers = null;
 		ringOrigin = null;
@@ -138,6 +158,15 @@ public final class BehaviorDirector {
 		Anchor board = layout.board();
 		List<Anchor> explicitSlots = board == null ? List.of() : layout.boardSlots();
 
+		List<ApproachPlanner.Candidate> candidates = new ArrayList<>(bodies.size());
+		for (Body b : bodies) {
+			NpcBrain known = brains.get(b.id());
+			if (known != null) {
+				candidates.add(new ApproachPlanner.Candidate(b.id(), known.pos(), Mode.of(b.info().state()) == Mode.ATTENTION, b.info().priority()));
+			}
+		}
+		Map<String, Anchor> approachSpots = approaches.update(tick, approachConfig(), playerPos, candidates);
+
 		Set<String> alive = new HashSet<>();
 		for (Body b : bodies) {
 			alive.add(b.id());
@@ -162,6 +191,7 @@ public final class BehaviorDirector {
 			o.seenSummary = true;
 			o.lastSummary = summary;
 
+			brain.approach(approachSpots.get(b.id()));
 			brain.tick(mode, "error".equals(info.state()), t, playerPos, nav);
 			apply(lvl, b, brain, o, summary, playerPos);
 		}
