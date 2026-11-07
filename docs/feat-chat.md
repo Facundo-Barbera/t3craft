@@ -1,36 +1,137 @@
-# feat/chat: chat/historial real de un hilo (solo lectura)
+# feat/chat: navegador de hilos y chat (solo lectura)
 
-Paquete: `dev.t3craft.client.chat` (mod/src/client/java). Tests: `mod/src/test/java/dev/t3craft/client/chat`.
+Paquete: `dev.t3craft.client.chat` (mod/src/client/java). Tests: `mod/src/test/java/dev/t3craft/client/chat`
+y `mod/src/test/java/dev/t3craft/client/config/ChatPrefsTest.java`.
 
 ## Qué hace
 
-Al hacer clic derecho sobre un NPC (o desde cualquier UI con `ChatScreens.open(envId, threadId)`),
-se abre una pantalla con el historial real del hilo:
+Clic derecho sobre un NPC (o `ChatScreens.open(envId, threadId)` desde cualquier UI) abre el
+**navegador de hilos**, que imita la consola de AgentCraft:
 
-- Filas con rol (You / Agent / Thinking / Plan / To-do / Tool / Subagent / Needs you / System /
-  Error), hora y color por rol. Si una fila viene del hilo padre (fork o side chat), lo indica.
-- Markdown básico: títulos, párrafos, listas con viñeta, numeradas, anidadas y de tareas, citas,
-  separadores, **negrita**, *cursiva*, `código` y bloques de código en fuente monoespaciada
-  (`minecraft:uniform`) sobre fondo oscuro. Los enlaces (`[texto](url)` y URLs sueltas) se ven
-  subrayados: al pasar el ratón muestran un tooltip y al hacer clic se copian al portapapeles
-  (con un toast). No se abre el navegador.
-- Tool calls plegables (comando, edición de archivo, búsqueda, web, herramienta dinámica,
-  subagente y razonamiento). Empiezan plegados; un clic en la cabecera los despliega y muestra la
-  salida o el diff en monoespaciado. La salida se recorta a 8000 caracteres.
-- Cabecera: título del hilo, entorno, estado actual (`ThreadState`: needs you / working / error /
-  done / idle, con su motivo) y **quién lo necesita**. Ejemplo: "You: approve command, asked by
-  subagent "Researcher" · 3 min ago". Sale de las `runtimeRequests` pendientes y los
-  `subagents` de la projection. También indica si la conexión está en vivo, reconectando o falló.
-- Scroll con rueda, flechas, PgUp/PgDn e Inicio/Fin, más una barra de scroll. La vista queda
-  pegada abajo mientras llegan mensajes; si subiste, conserva tu posición y aparece
-  "▼ newest (End)".
-- Carga incremental: llega primero el snapshot acotado (la ventana más reciente). Al llegar arriba
-  del todo, o con clic en "▲ Load earlier messages", se pide la página anterior y se antepone sin
-  mover lo que estabas mirando.
-- En vivo: upserts de turn items (texto en streaming, salida de herramientas), `message.updated`,
-  runs, runtime requests, subagentes y título.
-- El campo de respuesta está visible pero deshabilitado, con el aviso "Replying requires operate
-  (read-only pairing)" y un tooltip que explica que haría falta `orchestration:operate`.
+- **Una sola lista de hilos de todos los ambientes**, ordenada por atención y después por actividad
+  reciente: needs you → error → aprobación pendiente → working → done → idle; dentro de cada nivel,
+  primero lo más reciente (los de hora desconocida van al final) y los activos antes que los
+  settled. Cada fila lleva el **icono del ambiente** (inicial sobre un color estable por ambiente,
+  como el sidebar de T3 Code, o el color configurado en `t3craft.json`), el punto de estado de
+  AgentCraft (que pulsa si te necesita), el título y la antigüedad ("5m", "3h", "2d").
+- **Los ambientes solo existen como filtro**: una pastilla por ambiente encima de la lista. Clic
+  muestra u oculta ese ambiente, clic derecho deja solo ese y "All" los muestra todos. El filtro se
+  guarda en `t3craft.json` (`chat.hiddenEnvironments`). En la configuración siguen como siempre.
+- **La conversación del hilo seleccionado es el panel principal**, con el aspecto de la consola de
+  AgentCraft: papel crema, una franja de color por turno, avatar y nombre ("You" en arcilla, "Agent"
+  en el color de agente), separadores por minuto, markdown, herramientas plegadas como en los
+  monitores de AgentCraft, aprobaciones y peticiones en el bocadillo de AgentCraft, scroll que sigue
+  lo último y una barra de comando abajo (deshabilitada, porque es solo lectura).
+
+Del trabajo anterior se mantiene: Markdown, links que se copian al hacer clic, carga incremental del
+historial, quién lo necesita, eventos en vivo y la respuesta deshabilitada.
+
+## Estudio de la UI de AgentCraft (referencia)
+
+Clonado en `/tmp/agentcraft-repo/src` (commit `8fe3ad2`, MIT; no se ejecutó nada). Clases leídas:
+`console/ConsoleScreen.java`, `console/TextFieldView.java`, `console/TextModel.java`,
+`console/ConsoleLog.java`, `ui/{UiStyle,Panels,Kit,TextUtil,StatusMap}.java`, `hud/UiBits.java`,
+`monitor/{LogRows,ScreenStyle}.java`, `decisions/DecisionScreen.java`, más
+`assets/agentcraft/gui/{ui-style.json,kit.json}`, `palette.json`, `assets-src/ui-style.md` y
+`docs/console.md`.
+
+**Nota importante:** la consola de AgentCraft (su "chat") **no usa burbujas**. Es un registro con una
+franja de color por hablante. Su sprite `kit/bubble` solo aparece en los bocadillos del mundo
+(`agents/SpeechBubble.java`, máximo 3 líneas). Aquí replicamos el registro tal cual y usamos el
+bocadillo para lo que equivale a un agente "hablándote": las aprobaciones y peticiones (REQUEST) y
+el aviso de "quién lo necesita".
+
+| Aspecto | AgentCraft | Aquí |
+|---|---|---|
+| Layout | Columna anclada abajo a la izquierda con margen de 8: panel de papel de ancho `min(420, max(260, 62 % del ancho))` y alto `min(fondo − 46, max(120, 60 % del alto))`, barra de comando de 18 px, 5 px por debajo. Detrás, un velo nogal (alpha 92) más un degradado de tinta (0 → 120) en los 2/3 inferiores; el mundo sigue visible y el juego no se pausa. | `ThreadBrowserScreen`: misma columna anclada abajo a la izquierda, margen de 8, ancho `min(640, ancho − 16)` (cabe la lista), alto `max(180, 60 % + 23)` y el mismo velo, sin pausar. Dentro: lista (30 % del ancho, entre 130 y 200 px), un hueco de 4 px y la consola con su barra. |
+| Paneles | `panel_paper` nine-slice (padding de 8), cabecera de 20 px (título en tinta, resumen en gris, roster a la derecha), regla de 1 px `#C9BBA3`, pozo `panel_inset`, pie de 14 px con teclas. | Igual, con los mismos sprites copiados a `t3craft:chat/*`. A la derecha de la cabecera van el punto de estado y ‹ n/N ›. Hay una segunda línea con el estado y la conexión, que se omite en el modo compacto. |
+| Filas | 10 px de alto. Franja de 2 px en x+3, cara de 8 px en x+8, texto en x+19 con sangría colgante; nombre del hablante en su color (You en `#B4553A`), cuerpo en tinta o gris; separador "23:55" centrado entre reglas `#C9BBA3` cuando cambia el minuto, en `#A39B8E`. | Igual. El avatar es un cuadrado de 8 px con la inicial (Y o A), porque T3 no tiene retratos. El nombre ocupa su propia fila y el cuerpo va debajo: con Markdown, AgentCraft lo junta en una sola línea. Un separador por minuto, o con el día si no es hoy. |
+| Burbujas | Solo en el mundo (`bubble` con padding 6/4/6/5 y cola `bubble_tail`). | Sprite `bubble` detrás de las peticiones y aprobaciones, y en la franja "who needs it". |
+| Paleta | Papel `#F4EFE6`, papel claro `#FFFBF4`, inset `#E9E1D3`, borde `#C9BBA3`, tinta `#1F1E1D`, gris `#655E55`, deshabilitado `#A39B8E`, fantasma `#BCAD95`, arcilla `#D97757` / `#B4553A`, latón `#C9A227`, nogal `#3B2A20`. Estados: idle `#9C9488`, thinking `#C9A227`, working `#2FA3A0`, waiting `#D97757`, error `#C2413B`, done `#8FA98B`. Monitor: tool `#624E16`, result `#485A48`, error `#9A2F2B`. Diff: add `#455746` sobre `#D6DDCC`, del `#873C2A` sobre `#F2D5C4`, enlace `#874431`, ruta `#6C5415`. | `ChatTheme.warmStudio()` con esos mismos valores, token a token. |
+| Fuentes | Fuente vanilla sin sombra, línea de 10 px y escala 1:1 de la GUI. | Igual (`shadow=false`). Los bloques de código usan `minecraft:uniform`. |
+| Entrada | `text_field` de 18 px, `>` en latón, placeholder `#BCAD95`, pista a la derecha en gris, caret de 1 px que parpadea cada 500 ms. Enter envía, Shift+Enter añade una línea, crece hasta 6 líneas, Tab autocompleta, ↑↓ recorre el historial y el borrador se conserva. | La barra se dibuja igual (`>` en latón y placeholder "Replying needs orchestration:operate"), pero está **deshabilitada**: la sesión es de solo lectura. |
+| Scroll | Modelo por filas con *follow*: sigue lo último hasta que subes. Rueda: 3 filas. PgUp/PgDn: una página. Ctrl+End: lo último. Barra de 6 px (`scroll_track/thumb/grip`) y la pastilla "↓ newer below". | `FeedScroll`, el mismo modelo pero en píxeles (las filas de herramienta miden 13). Rueda: 3 filas. PgUp/PgDn, Home y End. La misma barra y la misma pastilla. Al llegar arriba carga la página anterior sin mover la vista. |
+| Herramientas y estado | Monitores: icono de kit de 12 px (bash, edit, read, git, test, memory, message, decision, merge) más el nombre en `tool` y el argumento en `tool_arg`. Nunca parte la línea, acorta los nombres snake_case y tiñe las filas de diff. Puntos de estado de 7 px y un halo que pulsa (1200 ms) solo cuando espera. Caret de bloque que parpadea mientras trabaja. | Las herramientas seguidas se agrupan en una línea plegada ("4 steps · $, Edit, Search", con "…" si alguna sigue en marcha y ✖ si falló). Al desplegarla salen las líneas de monitor (icono, nombre y argumento) y cada una despliega su salida o diff con las filas teñidas. El punto de estado de la cabecera y de las filas pulsa con "needs you". Hay un caret de bloque al final mientras el hilo está en working. |
+| Navegación | `` ` `` abre o cierra la consola. Clic en un retrato empieza un @mensaje. En las decisiones: Tab / Shift+Tab para la siguiente o la anterior, ‹ n/N › en la cabecera, 1-9 para elegir y Esc retrocede un nivel o cierra. | ↑↓ o Tab / Shift+Tab: hilo anterior o siguiente (se abre al instante). ‹ n/N › clicables en la cabecera. Clic en una fila. Esc cierra. En el modo compacto, Esc o Retroceso vuelven a la lista primero. |
+
+## Componente reutilizable (API)
+
+Todo se puede incrustar en cualquier `Screen` o marco: nada depende de una pantalla concreta, no
+hay estado estático y el tema siempre se inyecta.
+
+```java
+// 1. Todo junto: lista + conversación
+ThreadBrowser b = new ThreadBrowser(
+        ChatScreens.defaultDirectory(),      // ThreadDirectory: filas + ambientes
+        ChatScreens.defaultSource(),         // ChatSource: endpoint + token por ambiente
+        ChatTheme.terminal(),                // tema (o warmStudio(), o toBuilder()...)
+        ChatScreens.configFilterStore());    // FilterStore (o null para no persistir)
+b.setMode(ThreadBrowser.Mode.AUTO);         // AUTO | SPLIT | COMPACT
+b.open("vps:thr_123");                      // opcional
+// tick():   b.tick();
+// render:   b.setBounds(new Rect(x, y, w, h)); b.render(g, font, mouseX, mouseY);
+// input:    b.mouseClicked(mx, my, button); b.mouseScrolled(mx, my, dy);
+//           if (!b.keyPressed(keyEvent)) { /* el host: Esc cierra */ }
+// removed(): b.close();                    // cierra el socket del hilo
+// atajo:    ChatScreens.browser(theme) crea uno con las fuentes por defecto.
+
+// 2. Solo la lista
+ThreadList model = new ThreadList();
+ThreadListView list = new ThreadListView(model, theme);
+list.setOnFilterChanged(hidden -> ...);    // persistir si quieres
+model.update(dir.rows(), dir.environments());      // cada tick
+list.setBounds(rect); list.render(g, font, mx, my);
+ThreadRow r = list.mouseClicked(mx, my, button);   // fila seleccionada (o null si era una pastilla)
+list.tooltip(mx, my); list.mouseScrolled(mx, my, dy); list.setShowChips(false);
+
+// 3. Solo la conversación
+ConversationPanel conv = new ConversationPanel(source, theme);
+conv.show(envId, envLabel, threadId, title);       // o showNothing("…")
+conv.setCompact(true); conv.setShowPrompt(false);
+conv.setNavigation(nav);                            // ‹ n/N › (opcional)
+conv.setHints("Esc", "back");                       // teclas del pie
+conv.setBounds(rect); conv.render(g, font, mx, my); conv.tick(); conv.close();
+```
+
+- **`Rect`**: rectángulo en píxeles de GUI (`x, y, w, h`, más `contains`, `inset` y `splitX`).
+- **`ChatTheme`**: record inmutable con colores, métricas (`row`, `toolRow`, `listRow`, `margin`,
+  `gap`, `pad`), `shadow` y `sprites`. Si `sprites` es `null` (como en `terminal()`), todo se
+  dibuja con rellenos planos de los colores del tema, sin los sprites de AgentCraft. Así el portable
+  puede aplicar su estilo sin que nada quede cableado. Para variantes: `toBuilder()…build()`.
+- **Fuentes de datos**: `ThreadDirectory` (`rows()` y `environments()`, las dos en el hilo del
+  cliente), `ChatSource` (endpoint y token de cada ambiente) y `ThreadBrowser.FilterStore`.
+- **Pantalla completa**: `ThreadBrowserScreen` (la que usa `ChatScreens`).
+
+### Modo compacto y escalado (para el portable)
+
+- `Mode.AUTO` (por defecto) pasa a **COMPACT** cuando el rectángulo mide menos de **300 × 150**
+  píxeles de GUI. Si no, usa **SPLIT**.
+- **SPLIT**: lista a la izquierda (30 % del ancho, entre 130 y 200 px), un hueco de `theme.gap()` y
+  la conversación ocupando el resto. La conversación tiene cabecera de dos líneas, pie con teclas y
+  barra de comando.
+- **COMPACT**: un panel cada vez. Primero la lista, con sus pastillas si caben (como mucho dos
+  líneas). Enter o un clic abren la conversación a pantalla completa, con cabecera de una línea, sin
+  pie y con ‹ n/N › para cambiar de hilo. Esc o Retroceso vuelven a la lista (`keyPressed` devuelve
+  `true`). Con la lista a la vista, Esc devuelve `false` y el host decide qué hacer.
+- Los tamaños mínimos de dibujo son 40 × 40 para la lista y 60 × 50 para la conversación. Por debajo
+  no se dibuja nada. Los textos se recortan con "…" y las pastillas que no caben se omiten (el
+  filtro sigue disponible con clic derecho o "All").
+- El escalado lo pone el host: todo está en píxeles de GUI, a la escala de GUI de Minecraft. Para
+  una pantalla pequeña, el portable puede usar `ChatTheme.terminal().toBuilder().row(9).listRow(11)
+  .pad(3)` y `setShowPrompt(false)`.
+
+## Config (`t3craft.json`, aditivo)
+
+```json
+"chat": { "hiddenEnvironments": ["vps"] }
+```
+
+`T3CraftSettings` gana un componente `chat` (`ChatPrefs`). El constructor de 9 argumentos se
+mantiene, así que el cambio no rompe nada. Un archivo sin `chat` se lee como valores por defecto: no
+hace falta migración y `schemaVersion` sigue en 1. Los ids inválidos se descartan con un aviso, las
+claves desconocidas dentro de `chat` se conservan al guardar y el resto de `with*()` mantiene
+`chat`. Las etiquetas y colores de cada ambiente salen de `environments.<id>.label/color`, que ya
+existían, y se usan en los iconos.
 
 ## RPC de T3 que usa (solo `orchestration:read`)
 
@@ -55,64 +156,54 @@ Lo revisé en T3 Code (`packages/contracts/src/orchestrationV2.ts`, `environment
 Nunca se envía `dispatchCommand`, `launchThread` ni nada que requiera `operate` (hay un test que
 lo comprueba).
 
-## Diseño / archivos
+## Archivos
 
 | Archivo | Qué es | ¿Minecraft? |
 |---|---|---|
-| `Markdown.java` | Parser tolerante: bloques + spans inline | no (testeado) |
-| `TextWrap.java` | Word-wrap de spans con posiciones x (hit-test de enlaces) | no (testeado) |
-| `ChatEntry.java` | Fila del chat + `Kind` (rol, color, plegable) | no |
-| `TurnItems.java` | JSON de turn item → `ChatEntry` (todos los tipos del contrato) | no (testeado) |
-| `ChatTranscript.java` | Modelo thread-safe: snapshot, eventos, páginas, estado y quién lo necesita | no (testeado) |
-| `ThreadFeed.java` | Socket propio + HTTP de historial; vive mientras la pantalla está abierta | no (helpers testeados) |
-| `ChatSource.java` | Interfaz mínima: envId → (url, token, label) + HttpClient | no |
-| `ChatScreens.java` | Fachada: `open(envId, threadId)`, `openFor(NpcInfo)`, `create(...)`, `defaultSource()` | sí |
-| `ChatScreen.java` | La pantalla | sí |
+| `ThreadBrowser.java` | Widget compuesto (lista + conversación, SPLIT/COMPACT, teclas) | sí |
+| `ThreadListView.java` | Widget de la lista con las pastillas de ambiente | sí |
+| `ConversationPanel.java` | Widget de la conversación al estilo de la consola de AgentCraft; dueño del `ThreadFeed` | sí |
+| `ThreadBrowserScreen.java` | Pantalla completa que aloja el navegador | sí |
+| `ChatScreens.java` | Fachada y fuentes por defecto (directorio, origen y filtro en config) | sí |
+| `ChatDraw.java` | Kit de dibujo (sprites de AgentCraft o rellenos planos) | sí |
+| `ChatTheme.java` | Tema inyectable (`warmStudio`, `terminal`, builder) | no |
+| `ThreadList.java`, `ThreadRow.java`, `Attention.java`, `Ago.java`, `EnvBadge.java`, `Rect.java` | Modelo de la lista, orden, filtro e icono | no (testeado) |
+| `ChatTurns.java`, `ToolLine.java`, `FeedScroll.java`, `FeedRules.java` | Turnos, líneas de herramienta, scroll y separadores | no (testeado) |
+| `Markdown.java`, `TextWrap.java`, `ChatEntry.java`, `TurnItems.java`, `ChatTranscript.java`, `ThreadFeed.java`, `ChatSource.java`, `ThreadDirectory.java` | Datos del hilo (sin cambios de comportamiento) | no (testeado) |
+| `assets/t3craft/textures/gui/sprites/chat/*` | Sprites del kit de AgentCraft (MIT) | recurso |
 
-**Hot-swap:** no hay estado estático mutable (solo constantes inmutables). Cada `ChatScreen` es
-dueña de su `ThreadFeed`: lo arranca en el primer `init()` y lo cierra en `removed()` (Esc, Done,
-cambio de pantalla). Eso corta el socket y apaga su executor daemon. No queda ningún registro en
-memoria que haya que limpiar.
+`ChatScreen.java` (la pantalla anterior, que duplicaba el panel de conversación) se eliminó.
 
-## Puntos de integración (código fuera de mi paquete)
+## Puntos de integración y cambios estructurales
 
-1. **`T3CraftClient` (clic derecho sobre el NPC):** cambié una línea.
-   `new ThreadChatScreen(info)` pasó a ser `dev.t3craft.client.chat.ChatScreens.openFor(info)`, y
-   quité el import. Los ids de NPC en modo directo son `env:threadId` (`Presentation.npcId`). En
-   modo puente (legacy) se muestra un aviso: el chat necesita modo directo.
-2. **`mod/build.gradle`:** el source set `test` ahora ve `sourceSets.client.output`, para poder
-   testear las clases puras del cliente. Los tests no cargan clases de Minecraft.
-3. **`client/screen/ThreadChatScreen.java`:** ya nadie lo usa. Lo dejé sin tocar porque no es mío;
-   Taller puede borrarlo al integrar.
-4. **Para otras ramas:**
-   - `/t3craft history <npc>` (rama de comandos):
-     `client.openNextTick(ChatScreens.create(ChatSource-por-defecto, envId, threadId, título))` o
-     `ChatScreens.createFor(npcInfo)`. Hay que usar `openNextTick`, porque la pantalla de chat del
-     juego se cierra justo después del comando.
-   - Notificaciones clicables: lo mismo, con el `env:threadId` del NPC.
-   - Otra fuente de credenciales: implementar `ChatSource`.
-5. **Dependencias de `dev.t3craft.t3` (solo lectura, sin cambios):** `RpcFrames` (request, ack,
-   ping, parse y `SUBSCRIBE_THREAD`), `Json`, `T3Connection.sanitize/ORCHESTRATION_PROTOCOL`,
-   `DirectController.environments()/http()`, `Environments.list()/credential()`,
-   `Pairing.Session` y `ThreadState`.
+- **Entrypoints, keybinds, comandos y registros: ninguno nuevo.** El clic derecho sobre el NPC de
+  `T3CraftClient` ya llamaba a `ChatScreens.openFor(info)` y no se ha tocado.
+- **`DirectController.view(envId)`** (en `dev.t3craft.t3`): getter aditivo de una línea con el
+  `ShellState.View` de un ambiente. Las filas lo usan para sacar la actividad real
+  (`Visibility.lastActivity`) y saber si hay una petición pendiente.
+- **Config**: `T3CraftSettings.chat` / `ChatPrefs` / `withChat`, y la sección `chat` en
+  `ConfigCodec`. Todo aditivo.
+- **Recursos**: sprites en `assets/t3craft/textures/gui/sprites/chat/` (atlas GUI vanilla).
+- **Portable**: `PortableLinks` descubre `ChatScreens.open(String, String)` por reflexión, y esa
+  firma se mantiene. En la ronda 2 puede incrustar `ThreadBrowser` con su propio tema.
+- `PortableClient` todavía abre `client/screen/ThreadChatScreen` (el placeholder de main). Lo dejé
+  sin tocar porque no es de esta rama.
 
 ## Verificación
 
-- `./gradlew build` en `mod/`: verde. JUnit: 92 tests, de los cuales 42 son nuevos (`MarkdownTest`,
-  `TextWrapTest` y `ChatTranscriptTest`, este último con helpers de RPC y URI).
-- No lo probé contra un T3 real ni en Minecraft: las reglas lo prohíben en el VPS. Los JSON de los
-  tests siguen la forma de los contratos de T3 Code.
+- `./gradlew build` en `mod/`: verde. JUnit: 219 tests, 0 fallos. Los nuevos son `ThreadListTest`,
+  `AttentionAgoBadgeTest`, `ChatTurnsTest`, `ToolLineScrollRulesTest` y `ChatPrefsTest`, junto a
+  `MarkdownTest`, `TextWrapTest` y `ChatTranscriptTest`.
+- No lo probé en Minecraft ni contra un T3 real: las reglas no lo permiten aquí.
 
 ## Pendientes
 
-- Probar en el juego: layout con escalas de GUI distintas, rendimiento con hilos muy largos
-  (el layout se recalcula entero en cada cambio; si pesa, cachear por fila) y legibilidad de la
-  fuente `uniform`.
-- Comandos con `outputOmitted`: se puede traer la salida con `orchestration.getTurnItem` (read) al
-  desplegar.
-- `acceptDeferredWork` y las vistas `conversation`/`work` del historial, para colapsar el trabajo
-  como en T3 Code.
-- Al reconectar se pide un snapshot nuevo y se pierden las páginas antiguas ya cargadas, a
-  propósito, por simplicidad. Se podría reanudar con `afterSequence`.
-- El "hace X min" de la cabecera solo se recalcula cuando cambia el transcript.
-- Responder, aprobar e interrumpir quedan bloqueados (P3, requieren `operate`).
+- Probar en el juego: escalas de GUI, que los sprites `t3craft:chat/*` carguen en el atlas, la
+  legibilidad del papel y el rendimiento con hilos largos (hoy el layout se recalcula entero en
+  cada cambio).
+- Una tecla o un comando para abrir el navegador sin un NPC (`ChatScreens.openBrowser()` ya
+  existe): toca `T3CraftKeys` o los comandos, que no son de esta rama.
+- Responder, aprobar e interrumpir (requieren `operate`). Cuando se pueda, la barra pasará a ser
+  un `TextFieldView` real, como el de AgentCraft.
+- `outputOmitted`: se podría pedir la salida con `orchestration.getTurnItem` al desplegarla.
+- Al reconectar se vuelve a pedir el snapshot y se pierden las páginas viejas ya cargadas.
