@@ -3,6 +3,8 @@ package dev.t3craft.hq;
 import static dev.t3craft.hq.HqTestSupport.input;
 import static dev.t3craft.hq.HqTestSupport.minus;
 import static dev.t3craft.hq.HqTestSupport.plus;
+import static dev.t3craft.hq.HqTestSupport.roster;
+import static dev.t3craft.hq.HqTestSupport.settle;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -63,6 +65,23 @@ class HqGeneratorTest {
 	}
 
 	@Test
+	void shuffledRosterGivesTheSameBuilding() {
+		HqInput in = settle(input(4, 8), "env:p2-t5");
+		List<HqInput.Entry> lines = new ArrayList<>(roster(in));
+		BuildPlan a = plan(in);
+		Collections.shuffle(lines, new Random(3));
+		BuildPlan b = plan(HqInput.fromRoster(lines));
+		assertEquals(a.fingerprint(), b.fingerprint());
+		assertEquals(a.workstations(), b.workstations());
+		List<dev.t3craft.build.BuildPlan> pa = HqPlans.forRoster(roster(in));
+		List<dev.t3craft.build.BuildPlan> pb = HqPlans.forRoster(lines);
+		assertEquals(pa.size(), pb.size());
+		for (int i = 0; i < pa.size(); i++) {
+			assertEquals(pa.get(i).placements(), pb.get(i).placements());
+		}
+	}
+
+	@Test
 	void differentInputDifferentPlan() {
 		assertNotEquals(plan(input(3, 5)).fingerprint(), plan(input(3, 6)).fingerprint());
 	}
@@ -93,24 +112,53 @@ class HqGeneratorTest {
 	// ------------------------------------------------------------------ footprint
 
 	@Test
-	void emptyHqIsHubAndPortico() {
+	void emptyHqIsHubArchiveAndPortico() {
 		BuildPlan p = plan(HqInput.EMPTY);
-		assertEquals(new Box(-8, 0, -8, 8, 10, 13), p.footprint());
-		assertEquals(List.of("hub", "portico"), p.modules().stream().map(BuildPlan.Module::id).toList());
-		assertEquals(17 * 11 * 17 + 9 * 11 * 5, p.size(), "every cell of the volume is listed, air included");
+		assertEquals(new Box(-8, -5, -8, 8, 10, 13), p.footprint());
+		assertEquals(List.of("hub", "archive", "portico"), p.modules().stream().map(BuildPlan.Module::id).toList());
+		assertEquals(17 * 11 * 17 + 17 * 5 * 17 + 9 * 11 * 5, p.size(), "every cell of the volume is listed, air included");
 		assertTrue(p.at(new BlockPos(0, 2, -8)).state().is(Blocks.GLASS_PANE), "no spine: the hub's north wall is a window");
 	}
 
 	@ParameterizedTest(name = "{0} projects x {1} threads")
 	@CsvSource({
-		// projects, threads, minX, maxX, minZ  (maxZ = 13: portico; y = 0..10)
+		// projects, threads, minX, maxX, minZ  (maxZ = 13: portico; y = -5..10)
 		"1, 1,  -8, 17, -23",
+		"1, 7, -17, 17, -23",
 		"2, 4, -17, 17, -23",
 		"3, 4, -17, 17, -37",
-		"4, 7, -21, 21, -37",
-		"5, 0, -17, 17, -51"})
+		"2, 13, -17, 17, -51",
+		"5, 0,  -8,  8,  -8"})
 	void footprintFollowsTheFixedGrid(int projects, int threads, int minX, int maxX, int minZ) {
-		assertEquals(new Box(minX, 0, minZ, maxX, 10, 13), plan(input(projects, threads)).footprint());
+		assertEquals(new Box(minX, -5, minZ, maxX, 10, 13), plan(input(projects, threads)).footprint());
+	}
+
+	@ParameterizedTest(name = "{0} projects x {1} threads")
+	@CsvSource({"0,0", "1,1", "1,7", "3,4", "4,13", "7,6", "20,3"})
+	void footprintStaysInsideTheEnvelope(int projects, int threads) {
+		HqGenerator.Result r = HqGenerator.plan(input(projects, threads), null);
+		Box env = HqLayout.envelope(r.layout().modules().size());
+		Box fp = r.plan().footprint();
+		assertTrue(env.contains(fp), fp + " outside " + env);
+		assertEquals(env, fp.union(env));
+	}
+
+	@Test
+	void envelopeHoldsAcrossAHistory() {
+		Random rnd = new Random(11);
+		HqInput in = HqInput.EMPTY;
+		HqLayout layout = null;
+		int peak = 0;
+		for (int step = 0; step < 60; step++) {
+			String p = "env:p" + rnd.nextInt(4);
+			String t = p + "-t" + rnd.nextInt(14);
+			int op = rnd.nextInt(3);
+			in = op == 0 ? plus(minus(in, t), p, t) : op == 1 ? settle(in, t) : minus(in, t);
+			HqGenerator.Result r = HqGenerator.plan(in, layout);
+			layout = r.layout();
+			peak = Math.max(peak, layout.modules().size());
+			assertTrue(HqLayout.envelope(peak).contains(r.plan().footprint()), "step " + step);
+		}
 	}
 
 	@Test
@@ -121,7 +169,9 @@ class HqGeneratorTest {
 			String id = m.id();
 			int[] size = {b.sizeX(), b.sizeY(), b.sizeZ()};
 			int[] want;
-			if (id.equals("hub")) {
+			if (id.equals("archive")) {
+				want = new int[] {17, 5, 17};
+			} else if (id.equals("hub")) {
 				want = new int[] {17, 11, 17};
 			} else if (id.equals("portico")) {
 				want = new int[] {9, 11, 5};
@@ -217,6 +267,18 @@ class HqGeneratorTest {
 		for (BlockPos c : List.of(spawn.block(), entrance.block(), new BlockPos(0, 1, -3))) {
 			assertTrue(walkable(p, c), "blocked at " + c);
 		}
+		assertEquals(new BlockPos(0, 1, -3), p.anchor(AnchorNames.BOARD_FRONT).block());
+		assertEquals(Direction.NORTH, p.anchor(AnchorNames.BOARD_FRONT).facing());
+		for (String n : p.anchors().keySet()) {
+			if (n.startsWith(AnchorNames.BOARD_SLOT) || n.startsWith(AnchorNames.WALK_HUB) || n.startsWith("walk") || n.equals(AnchorNames.ARCHIVE)) {
+				assertTrue(walkable(p, p.anchor(n).block()), "blocked anchor " + n);
+			}
+			if (n.startsWith(AnchorNames.BENCH)) {
+				assertTrue(p.at(p.anchor(n).block()).state().getBlock() instanceof StairBlock, n);
+			}
+		}
+		assertEquals(14, p.anchors().keySet().stream().filter(n -> n.startsWith(AnchorNames.BOARD_SLOT)).count());
+		assertEquals(10, p.anchors().keySet().stream().filter(n -> n.startsWith(AnchorNames.BENCH)).count());
 		// signs carry text
 		Placement sign = p.at(new BlockPos(0, 5, -3));
 		assertTrue(sign.state().getBlock() instanceof WallSignBlock);
@@ -253,6 +315,19 @@ class HqGeneratorTest {
 		assertEquals(in.threadCount(), desks);
 		long deskAnchors = p.anchors().keySet().stream().filter(n -> n.startsWith("desk_")).count();
 		assertEquals(in.threadCount(), deskAnchors);
+		assertEquals(HqLayout.DESKS * 3, p.workstations().size(), "a workstation per desk, taken or vacant");
+		for (Workstation w : p.workstations()) {
+			assertEquals(w.deskAnchor().block().relative(w.deskAnchor().facing()).above(), w.computerPos());
+			assertEquals(w.computerPos(), w.screen().block());
+			assertEquals(w.deskAnchor().facing().getOpposite(), w.screenFacing());
+			if (w.threadId() != null) {
+				assertEquals(w, p.workstation(w.threadId()));
+				assertEquals(p.anchor(AnchorNames.desk(w.threadId())).block(), w.deskAnchor().block());
+				assertEquals(p.anchor(AnchorNames.monitor(w.threadId())).block(), w.computerPos());
+			} else {
+				assertTrue(p.at(w.computerPos()).state().is(Blocks.CONCRETE.pick(net.minecraft.world.item.DyeColor.GRAY)));
+			}
+		}
 	}
 
 	@Test
@@ -281,17 +356,146 @@ class HqGeneratorTest {
 	}
 
 	@Test
-	void fullWingGetsASegmentAnnex() {
+	void fullModuleGetsANewModuleAndNothingElseMoves() {
 		HqInput in = input(2, 6);
 		HqGenerator.Result r1 = HqGenerator.plan(in, null);
 		HqGenerator.Result r2 = HqGenerator.plan(plus(in, "env:p0", "env:p0-x"), r1.layout());
-		assertEquals(4, r2.layout().wing("env:p0").segments());
-		assertEquals(r1.plan().footprint().maxX() + HqGeometry.SEGMENT, r2.plan().footprint().maxX());
-		Box annex = HqGeometry.wingBox(0, HqGeometry.segmentU(3), HqGeometry.segmentU(4), 0, HqGeometry.ROW - 1, 0, HqGeometry.TOP);
+		assertEquals(2, r2.layout().modulesOf("env:p0").get(1).index());
+		assertEquals(r1.plan().footprint().maxX(), r2.plan().footprint().maxX());
+		Set<String> allowed = Set.of(HqGenerator.group(2), "spine_1", "spine_cap");
 		for (Placement pl : BuildPlan.diff(r1.plan(), r2.plan(), rel -> AIR)) {
-			assertTrue(annex.contains(pl.rel()), "changed outside the annex: " + pl.rel());
+			String g = r2.plan().groupAt(pl.rel());
+			assertTrue(allowed.contains(g), "changed " + g + " at " + pl.rel());
 		}
 		assertKeptAnchors(r1.plan(), r2.plan());
+		Map<String, dev.t3craft.build.BuildPlan> exp = HqPlans.expansion(r1.plan(), r2.plan(), rel -> AIR);
+		assertEquals(Set.of(HqGenerator.group(2), "spine_1", "spine_cap"), exp.keySet());
+		assertEquals(r2.plan().placements(HqGenerator.group(2)).size(), exp.get(HqGenerator.group(2)).size(), "a new module is built whole");
+	}
+
+	@Test
+	void settledThreadFreesItsDeskAndArchivesItsComputer() {
+		HqInput in = input(2, 4);
+		HqGenerator.Result r1 = HqGenerator.plan(in, null);
+		HqGenerator.Result r2 = HqGenerator.plan(settle(in, "env:p0-t1"), r1.layout());
+		assertNull(r2.plan().anchor(AnchorNames.desk("env:p0-t1")));
+		Anchor arch = r2.plan().anchor(AnchorNames.archive("env:p0-t1"));
+		assertNotNull(arch);
+		HqGeometry.ArchiveSlot slot0 = HqGeometry.archiveSlots().get(0);
+		assertEquals(slot0.cell(), arch.block());
+		assertEquals(slot0.facing(), arch.facing());
+		List<Placement> d = BuildPlan.diff(r1.plan(), r2.plan(), rel -> AIR);
+		assertEquals(2, d.size(), "the desk's computer turns off and the archive shows it: " + d);
+		assertTrue(d.stream().anyMatch(pl -> HqGeometry.desk(0, 1).contains(pl.rel())
+				&& pl.state().is(Blocks.CONCRETE.pick(net.minecraft.world.item.DyeColor.GRAY))));
+		assertTrue(d.stream().anyMatch(pl -> pl.rel().equals(slot0.cell())
+				&& pl.state().is(Blocks.CONCRETE.pick(net.minecraft.world.item.DyeColor.BLACK))));
+		assertEquals(Set.of(HqGenerator.group(0), HqGenerator.GROUP_ARCHIVE), HqPlans.expansion(r1.plan(), r2.plan(), rel -> AIR).keySet());
+		// the archive faces an aisle: the cell in front of every slot is free
+		for (HqGeometry.ArchiveSlot s : HqGeometry.archiveSlots()) {
+			BlockPos front = s.cell().relative(s.facing());
+			assertTrue(r2.plan().at(front).state().isAir(), "slot " + s + " faces a blocked cell");
+		}
+		// a new thread reuses the freed desk
+		HqGenerator.Result r3 = HqGenerator.plan(plus(settle(in, "env:p0-t1"), "env:p0", "env:p0-new"), r2.layout());
+		assertEquals(r1.plan().anchor(AnchorNames.desk("env:p0-t1")).block(), r3.plan().anchor(AnchorNames.desk("env:p0-new")).block());
+	}
+
+	@Test
+	void stairsLeadFromTheHubToTheArchive() {
+		BuildPlan p = plan(HqInput.EMPTY);
+		for (int x = HqGeometry.STAIR_X1; x <= HqGeometry.STAIR_X2; x++) {
+			for (int step = 0; step <= 4; step++) {
+				BlockPos c = new BlockPos(x, -step, HqGeometry.STAIR_TOP_Z - step);
+				assertTrue(p.at(c).state().getBlock() instanceof StairBlock, "step at " + c);
+				assertTrue(p.at(c.above()).state().isAir() && p.at(c.above(2)).state().isAir(), "headroom over " + c);
+			}
+			assertTrue(walkable(p, new BlockPos(x, -4, 1)), "landing");
+			assertTrue(walkable(p, new BlockPos(x, 1, 7)), "top");
+		}
+	}
+
+	@Test
+	void environmentsHaveStableDistinctRunnerColours() {
+		HqInput in = HqInput.builder()
+				.thread("vps:a", "A", "vps", "VPS", "a1")
+				.thread("acmesite:b", "B", "acmesite", "Acmesite", "b1")
+				.thread("vps:c", "C", "vps", "VPS", "c1")
+				.build();
+		HqGenerator.Result r = HqGenerator.plan(in, null);
+		Palette k = new Palette();
+		for (HqLayout.Module m : r.layout().modules()) {
+			BlockPos carpet = new BlockPos(HqGeometry.wx(m.index(), 1), 1, HqGeometry.wz(m.index(), 6));
+			assertEquals(k.carpet(k.envColor(m.envKey())), r.plan().at(carpet).state(), m.projectKey());
+		}
+		assertEquals(k.envColor("vps"), new Palette().envColor("vps"));
+		assertNotEquals(k.envColor("vps"), k.envColor("acmesite"));
+	}
+
+	@Test
+	void shapesAreBakedIntoThePlan() {
+		BuildPlan p = plan(HqInput.EMPTY);
+		BlockState pane = p.at(new BlockPos(0, 2, -8)).state();
+		assertTrue(pane.getValue(net.minecraft.world.level.block.CrossCollisionBlock.EAST)
+				&& pane.getValue(net.minecraft.world.level.block.CrossCollisionBlock.WEST), "hub window panes connect: " + pane);
+		BlockState corner = p.at(new BlockPos(8, 6, 8)).state();
+		assertNotEquals(net.minecraft.world.level.block.state.properties.StairsShape.STRAIGHT, corner.getValue(StairBlock.SHAPE), "roof corner");
+		BlockState rail = p.at(new BlockPos(HqGeometry.STAIR_X1 - 1, 1, 4)).state();
+		assertTrue(rail.getValue(net.minecraft.world.level.block.CrossCollisionBlock.NORTH)
+				&& rail.getValue(net.minecraft.world.level.block.CrossCollisionBlock.SOUTH), "railing connects: " + rail);
+	}
+
+	@Test
+	void buildPlanConversionIsLayeredAndComplete() {
+		BuildPlan p = plan(settle(input(2, 7), "env:p1-t0"));
+		dev.t3craft.build.BuildPlan b = HqBuild.toBuildPlan(p);
+		assertEquals(p.size(), b.size());
+		int lastY = Integer.MIN_VALUE;
+		Set<BlockPos> seen = new HashSet<>();
+		for (dev.t3craft.build.Placement pl : b.placements()) {
+			assertTrue(pl.pos().getY() >= lastY, "layers go bottom-up");
+			lastY = pl.pos().getY();
+			Placement src = p.at(pl.pos());
+			assertEquals(src.state(), pl.state());
+			assertEquals(src.be(), pl.blockEntity());
+			seen.add(pl.pos());
+		}
+		assertEquals(p.size(), seen.size());
+		assertEquals(p.placements().stream().map(Placement::rel).toList(),
+				HqBuild.toBuildPlan(p.placements(), HqBuild.Order.MODULES).placements().stream().map(dev.t3craft.build.Placement::pos).toList());
+		// one plan per group adds up to the whole plan
+		Map<String, dev.t3craft.build.BuildPlan> parts = HqPlans.byGroup(p);
+		assertEquals(p.groups(), new ArrayList<>(parts.keySet()));
+		assertEquals(p.size(), parts.values().stream().mapToInt(dev.t3craft.build.BuildPlan::size).sum());
+		assertTrue(parts.keySet().containsAll(List.of("hub", "archive", "portico", "spine_0", "spine_cap", "module_0", "module_1", "module_2")));
+	}
+
+	@Test
+	void siteTransformMatchesTheBuildersTransform() {
+		BuildPlan p = plan(input(2, 3));
+		dev.t3craft.build.BuildPlan b = HqBuild.toBuildPlan(p);
+		for (net.minecraft.world.level.block.Rotation rot : net.minecraft.world.level.block.Rotation.values()) {
+			HqSite site = new HqSite(new BlockPos(100, 64, -30), rot);
+			dev.t3craft.build.BuildJob job = new dev.t3craft.build.BuildJob(1, "hq", net.minecraft.world.level.Level.OVERWORLD, site.origin(), rot, b, 1);
+			for (int i = 0; i < b.size(); i += 97) {
+				assertEquals(job.worldPos(i), site.cell(b.get(i).pos()));
+			}
+			for (Anchor a : p.anchors().values()) {
+				Anchor w = site.anchor(a);
+				assertEquals(site.cell(a.block()), w.block());
+				assertEquals(rot.rotate(a.facing()), w.facing());
+				// the anchor point stays inside (or on the face of) its transformed cell, like the original
+				double[] c = site.point(a.block().getX() + 0.5, a.block().getY(), a.block().getZ() + 0.5);
+				assertEquals(w.block().getX() + 0.5, c[0], 1e-9);
+				assertEquals(w.block().getZ() + 0.5, c[2], 1e-9);
+			}
+			for (Direction e : Direction.Plane.HORIZONTAL) {
+				HqSite s2 = HqSite.at(p, AnchorNames.SPAWN, new BlockPos(7, 70, 7), e);
+				assertEquals(new BlockPos(7, 70, 7), s2.cell(p.anchor(AnchorNames.SPAWN).block()));
+				// the entrance looks out towards e
+				assertEquals(e, s2.anchor(p.anchor(AnchorNames.ENTRANCE)).facing());
+			}
+		}
 	}
 
 	@Test
@@ -314,10 +518,10 @@ class HqGeneratorTest {
 		HqInput in = input(2, 3);
 		HqGenerator.Result r1 = HqGenerator.plan(in, null);
 		HqGenerator.Result r2 = HqGenerator.plan(plus(in, "env:new", "env:new-t0"), r1.layout());
-		assertEquals(2, r2.layout().wing("env:new").index());
+		assertEquals(2, r2.layout().modulesOf("env:new").get(0).index());
 		List<Box> untouched = new ArrayList<>();
 		for (BuildPlan.Module m : r1.plan().modules()) {
-			if (m.id().startsWith("wing_") || m.id().equals("hub") || m.id().equals("portico") || m.id().equals("spine_0")) {
+			if (m.id().startsWith("wing_") || m.id().equals("hub") || m.id().equals("archive") || m.id().equals("portico") || m.id().equals("spine_0")) {
 				untouched.add(m.box());
 			}
 		}
