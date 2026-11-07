@@ -81,7 +81,7 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 				.map(c -> c.getMetadata().getVersion().getFriendlyString()).orElse("dev");
 		config = ModConfig.load();
 		helperConfig = HelperConfig.load(FabricLoader.getInstance().getConfigDir().resolve("t3craft.json"));
-		npcs.setPanelExtra(helpers::panelExtra);
+		npcs.setPanelExtra(dev.t3craft.client.queue.QueueClient.withBadge(helpers::panelExtra)); // feat/op-queue: + "⏳ n queued"
 
 		ClientLifecycleEvents.CLIENT_STARTED.register(mc -> {
 			started = true;
@@ -110,6 +110,7 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 		dev.t3craft.client.hud.StatusBar.register(this); // feat/hud-bar
 		PortableClient.register(this);
 		dev.t3craft.client.search.SearchClient.register(this); // feat/search: /t3craft search
+		dev.t3craft.client.queue.QueueClient.register(this); // feat/op-queue: /t3craft queue, QueueScreen
 
 		// Right-click on one of our client-only NPCs opens its chat screen. The entity is unknown to
 		// the server, so the interaction is consumed client-side.
