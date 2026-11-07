@@ -24,7 +24,8 @@ import org.jspecify.annotations.Nullable;
  * The portable T3 terminal: environments + threads (state, project, needs-attention) and recent
  * notifications, anywhere, without any block or base. Read-only: the only actions are navigating,
  * handing a thread to the chat/history screen (feat/chat, via {@link PortableLinks}) and opening the
- * environment screen (feat/config, idem). Nothing here sends anything to T3.
+ * environment screen (feat/config, idem). Nothing here sends anything to T3; "New thread…" only
+ * opens {@code NewThreadScreen} (feat/op-launch), which owns the guarded write.
  *
  * <p>Keys: ↑/↓ select, ←/→ environment, Enter open, Tab notifications, Esc/Backspace back, the
  * terminal key closes, Ctrl+F search. Search is a separate component ({@link SearchBox} +
@@ -58,6 +59,7 @@ public final class PortableScreen extends Screen {
 	private Button notificationsTab;
 	private Button openButton;
 	private Button envButton;
+	private Button newThreadButton; // feat/op-launch: opens NewThreadScreen (the write lives there)
 
 	// layout, recomputed in init()
 	private int x0;
@@ -106,6 +108,8 @@ public final class PortableScreen extends Screen {
 				.bounds(x1 - 96, y1 - 22, 90, 16).build());
 		envButton = addRenderableWidget(Button.builder(Component.literal("Environments…"), b -> PortableLinks.openEnvironments(this))
 				.bounds(x0 + 6, y1 - 22, envColW - 6, 16).build());
+		newThreadButton = addRenderableWidget(Button.builder(Component.translatable("t3craft.operate.launch.portable"), // feat/op-launch
+				b -> dev.t3craft.client.screen.NewThreadScreen.open(nav.envFilter(), null)).bounds(x1 - 192, y1 - 22, 90, 16).build());
 		search = new SearchBox(font, searchModel, this::openSearchHit);
 		addRenderableWidget(search.layout(x0 + envColW + 6, y0 + 32, x1 - 6 - (x0 + envColW + 6), 14));
 		updateButtons();
@@ -116,6 +120,7 @@ public final class PortableScreen extends Screen {
 			return;
 		}
 		boolean threads = nav.page() == PortableNav.Page.THREADS;
+		newThreadButton.visible = threads; // feat/op-launch
 		threadsTab.active = !threads;
 		notificationsTab.active = threads;
 		notificationsTab.setMessage(Component.literal(log.unread() > 0 ? "Notifications (" + log.unread() + ")" : "Notifications"));
