@@ -89,7 +89,8 @@ dependencies {
 
 // Pure client-side logic lives in the client source set but its tests only touch Minecraft-free classes:
 // portable terminal (dev.t3craft.client.portable: navigation, state, notification log),
-// NPC behaviour (dev.t3craft.client.npc.behavior: pathfinder, brain, layout, bubbles) and
+// NPC behaviour (dev.t3craft.client.npc.behavior: pathfinder, brain, layout, bubbles),
+// chat (dev.t3craft.client.chat: Markdown, wrap, transcript, thread list) and
 // config (dev.t3craft.client.config).
 sourceSets.test {
 	compileClasspath += sourceSets.client.output + sourceSets.client.compileClasspath

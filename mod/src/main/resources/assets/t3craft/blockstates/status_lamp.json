@@ -1,0 +1,22 @@
+{
+  "variants": {
+    "status=off": {
+      "model": "t3craft:block/status_lamp_off"
+    },
+    "status=idle": {
+      "model": "t3craft:block/status_lamp_idle"
+    },
+    "status=working": {
+      "model": "t3craft:block/status_lamp_working"
+    },
+    "status=attention": {
+      "model": "t3craft:block/status_lamp_attention"
+    },
+    "status=error": {
+      "model": "t3craft:block/status_lamp_error"
+    },
+    "status=done": {
+      "model": "t3craft:block/status_lamp_done"
+    }
+  }
+}

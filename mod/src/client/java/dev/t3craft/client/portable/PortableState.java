@@ -29,8 +29,16 @@ public record PortableState(Connection connection, String sourceLabel, List<Port
 	}
 
 	/**
-	 * Builds a state from raw environment statuses and thread rows: threads sorted by priority
-	 * (needs attention first), then environment, then title; per-environment counts filled in.
+	 * The shared thread order ({@link dev.t3craft.client.chat.ThreadOrder}): attention, then recent
+	 * activity (unknown here: the NPC model has no timestamps), then live before settled, then title.
+	 */
+	public static final Comparator<PortableThread> ORDER = dev.t3craft.client.chat.ThreadOrder.of(
+			t -> dev.t3craft.client.chat.ThreadOrder.attention(t.state(), false), t -> null, PortableThread::settled, PortableThread::title,
+			PortableThread::id);
+
+	/**
+	 * Builds a state from raw environment statuses and thread rows: threads in {@link #ORDER}
+	 * (needs attention first); per-environment counts filled in.
 	 * Environments are {id → {label, status, detail}} in display order.
 	 *
 	 * @param configured false when there is nothing to connect to (direct: no paired environment)
@@ -40,9 +48,7 @@ public record PortableState(Connection connection, String sourceLabel, List<Port
 	public static PortableState of(String sourceLabel, Map<String, String[]> envStatuses, List<PortableThread> threads, boolean configured,
 			@Nullable Boolean linkUp) {
 		List<PortableThread> sorted = new ArrayList<>(threads);
-		sorted.sort(Comparator.comparingInt(PortableThread::priority)
-				.thenComparing(PortableThread::envLabel)
-				.thenComparing(PortableThread::title));
+		sorted.sort(ORDER);
 		Map<String, int[]> counts = new LinkedHashMap<>();
 		for (PortableThread t : sorted) {
 			int[] c = counts.computeIfAbsent(t.env(), k -> new int[2]);

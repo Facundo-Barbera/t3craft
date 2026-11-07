@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 
 /** Decoding a thread stream into its queue (synthetic fixture, no T3). */
 class ThreadQueueTest {
-	static JsonObject snapshot() throws Exception {
+	public static JsonObject snapshot() throws Exception {
 		try (InputStream in = ThreadQueueTest.class.getResourceAsStream("/fixtures/thread-queue-snapshot.json")) {
 			return JsonParser.parseString(new String(in.readAllBytes(), StandardCharsets.UTF_8)).getAsJsonObject();
 		}

@@ -30,11 +30,13 @@ final class DemoBuildRun {
 	private final Path worldRoot;
 	private final DemoConfig config;
 	private final Consumer<String> say;
+	private final Runnable onComplete;
 	private int delay;
 	private @Nullable BuildHandle current;
 	private boolean done;
 
-	DemoBuildRun(DemoStructureSource source, List<BuildPlan> plans, Path worldRoot, DemoConfig config, int delayTicks, Consumer<String> say) {
+	DemoBuildRun(DemoStructureSource source, List<BuildPlan> plans, Path worldRoot, DemoConfig config, int delayTicks, Consumer<String> say,
+			Runnable onComplete) {
 		this.source = source;
 		this.queue = new ArrayDeque<>(plans);
 		this.total = plans.size();
@@ -42,6 +44,7 @@ final class DemoBuildRun {
 		this.config = config;
 		this.delay = delayTicks;
 		this.say = say;
+		this.onComplete = onComplete;
 	}
 
 	boolean done() {
@@ -95,13 +98,14 @@ final class DemoBuildRun {
 			DemoMarkerFile.update(worldRoot, m -> m.withBuilt(source));
 			say.accept("HQ built (" + source.id() + " v" + source.version() + ")");
 			done = true;
+			onComplete.run();
 			return;
 		}
 		DemoWorldSpec spec = config.spec();
 		try {
 			current = service.build("demo-" + source.id() + "-" + (total - queue.size()), Level.OVERWORLD,
 					new BlockPos(spec.originX(), spec.originY(), spec.originZ()), Rotation.NONE, next,
-					config.blocksPerTick(), config.crew());
+					config.blocksPerTick(), config.crew(), BuildService.Billing.FREE);
 		} catch (IllegalStateException e) {
 			say.accept("HQ build could not start: " + e.getMessage());
 			done = true;

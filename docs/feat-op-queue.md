@@ -33,25 +33,12 @@
 
 El shell (`subscribeShell`) **no trae runs**; están en la proyección del hilo
 (`orchestration.subscribeThread`: snapshot `projection.runs/messages` + eventos `run.created`,
-`run.updated`, `message.*`). Para no abrir otra vía de peticiones en `T3Connection`, el paquete
-lee de una interfaz pequeña, `QueueSource`, con la misma forma que `StreamRegistry.Listener` de
-feat/chat. Hasta que se enchufe (`QueueClient.install(...)`), la fuente es
-`QueueSource.UNAVAILABLE` y la pantalla/comandos dicen "Cola no disponible" (nunca "vacía").
-
-Adaptador previsto, una vez feat/chat esté en main:
-
-```java
-QueueClient.install((env, thread, l) -> {
-	T3Connection c = direct.connection(env);
-	if (c == null) return null;
-	StreamRegistry.Subscription s = c.subscribeThread(thread, new StreamRegistry.Listener() {
-		public void onSubscribed() { l.onSubscribed(); }
-		public void onItems(List<JsonObject> items) { l.onItems(items); }
-		public void onEnded(String failure) { l.onEnded(failure); }
-	});
-	return s::close;
-});
-```
+`run.updated`, `message.*`). El paquete no abre ninguna vía de peticiones propia: lee de una
+interfaz pequeña, `QueueSource`, y el adaptador fino `StreamQueueSource` la conecta a
+`T3Connection.subscribeThread` (el `StreamRegistry` de feat/chat). Un chat y la cola del mismo
+hilo comparten una única suscripción en el servidor (`StreamQueueSourceTest`). Sin conexión
+directa (modo bridge o entorno sin emparejar), la cola aparece como "no disponible", nunca como
+"vacía".
 
 `QueueStore` comparte un stream por hilo (refcount). Mientras la pantalla está abierta vigila el
 hilo enfocado y los hilos trabajando (máx. 16); en segundo plano, para el badge, los 4 hilos

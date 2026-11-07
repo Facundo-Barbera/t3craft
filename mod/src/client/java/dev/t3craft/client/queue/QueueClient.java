@@ -21,8 +21,8 @@ import org.jspecify.annotations.Nullable;
  * "n queued" line on NPC panels. One call from {@code T3CraftClient}.
  *
  * <p>Reading needs a thread stream ({@link QueueSource}); the shell carries no runs. The source is
- * {@link QueueSource#UNAVAILABLE} until {@link #install} plugs in the connection's shared thread
- * streams, so the views say "unavailable" instead of showing an empty queue. Writes go only
+ * {@link StreamQueueSource}: the connection's shared thread streams, no request path of its own.
+ * When a thread cannot be read the views say "unavailable", never "empty". Writes go only
  * through {@link OperateUi} / {@code OperateGate}.
  */
 public final class QueueClient {
@@ -39,6 +39,7 @@ public final class QueueClient {
 	}
 
 	public static void register(T3CraftClient client) {
+		install(new StreamQueueSource(client::direct)); // shared T3Connection thread streams (feat/chat)
 		ClientCommandRegistrationCallback.EVENT.register((dispatcher, ctx) -> QueueCommands.build(dispatcher, client));
 		ClientTickEvents.END_CLIENT_TICK.register(mc -> {
 			Runnable r = pending;
