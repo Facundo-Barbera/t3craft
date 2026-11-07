@@ -27,3 +27,6 @@ Thumbs.db
 
 # Minecraft instance credentials (T3 pairing tokens) — never commit
 **/config/t3craft/credentials/
+
+# Source package dev.t3craft.build is not build output
+!mod/src/**/build/
