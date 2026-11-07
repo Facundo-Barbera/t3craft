@@ -10,6 +10,8 @@ One line per structural commit on `main`, newest first:
 
 ## Entries
 
+- 2026-11-07 fix/hq-module-bounds RELOAD — module areas now come from the same geometry as the placements: no more 'placements outside its area skipped' or dropped block entities (monitors/lamps/signs) when building wings and the base.
+- 2026-11-07 feat/lamps-breathe RESTART — new BER for status_lamp/board_lamp: lamps breathe by state with clay motes when attention (P6, AgentCraft MIT); hub lantern beacon with aggregated state (P5), plus a client-only beacon at the hub anchor when the blocks module is off.
 - 2026-11-07 feat/schedule-board RESTART — new client entrypoint ScheduleClient (dev.t3craft.client.schedule): read-only scheduled tasks board as a client text display behind the fallback layout's board spot (HQ board anchor via setPlacementSource; entity ids from -7_000_000, rotating pages); command /t3craft schedule; new lang keys. Data via T3Connection.subscribeScheduledTasks over the shared StreamRegistry (additive overload subscribe(key, SubscribeFrame, Listener)); ScheduledTask decoder and RpcFrames.subscribeScheduledTasks in dev.t3craft.t3. No registries, no config.
 - 2026-11-07 fix/no-observer-props RELOAD — workstation props no longer use observer blocks: a t3craft:monitor display when the blocks module is on (nothing when a real HQ monitor is there), a discreet vanilla prop otherwise; stale observer displays are cleaned up.
 - 2026-11-07 fix/npc-navigation RELOAD — NPCs path with a 3D A* over the real client blocks (doors, stairs, slabs, collision shapes, node budget, cached routes, replanning, unstuck) and move with block collision, so they never end inside desks/walls; approach and departures use the same router.
