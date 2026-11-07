@@ -61,7 +61,7 @@ public final class Presentation {
 				s.priority,
 				t.settledAt() != null,
 				env + ":" + t.projectId(),
-				clip(projectTitle == null ? "(no project)" : projectTitle, MAX_TITLE),
+				clip(ShellState.projectLabel(projectTitle, t.projectId()), MAX_TITLE),
 				env + "/" + s.wire,
 				particle(s));
 	}

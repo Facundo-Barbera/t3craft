@@ -53,8 +53,9 @@ dependencies {
 	testRuntimeOnly "org.junit.platform:junit-platform-launcher"
 }
 
-// Pure client-side logic (dev.t3craft.client.chat: Markdown, wrap, transcript) is unit-tested
-// too; its tests never touch Minecraft classes.
+// Pure client logic (dev.t3craft.client.portable: navigation, state, notification log;
+// dev.t3craft.client.chat: Markdown, wrap, transcript, thread list) is plain Java in the client
+// source set; tests only touch those classes, never Minecraft's client.
 sourceSets.test {
 	compileClasspath += sourceSets.client.output
 	runtimeClasspath += sourceSets.client.output
