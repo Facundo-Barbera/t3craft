@@ -27,6 +27,13 @@ public final class ThreadChatScreen extends Screen {
 		addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose())
 				.bounds(width / 2 - 100, height - 40, 200, 20)
 				.build());
+		addThreadOps();
+	}
+
+	/** Item 22: settle / snooze / pin / unpin / read (needs control). Easy to move when chat lands. */
+	private void addThreadOps() {
+		var t = dev.t3craft.client.operate.ThreadOpsUi.target(thread);
+		dev.t3craft.client.operate.ThreadOpsBar.add(this, () -> t, width / 2 - 120, height - 64, 240, 20, this::addRenderableWidget);
 	}
 
 	@Override
