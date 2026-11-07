@@ -68,7 +68,7 @@ public final class OperateCommands {
 			String text = switch (av) {
 				case ENABLED -> "control enabled (revoke: /t3craft operate revoke " + e.id() + ")";
 				case EXPIRED -> "read-only (operate session expired)";
-				case READ_ONLY -> "read-only";
+				case READ_ONLY -> "read-only (enable control: /t3craft operate enable " + e.id() + ")";
 			};
 			c.getSource().sendFeedback(Component.literal("  " + e.id() + ": ").append(Component.literal(text).withStyle(color)));
 		}

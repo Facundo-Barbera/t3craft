@@ -294,12 +294,20 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 		PeekHud.setBanner(problems.isEmpty() ? null : "T3: " + String.join(", ", problems) + "  (/t3craft status)");
 	}
 
-	/**
-	 * Pairs this instance with a T3 environment, read-only: exchanges the one-time credential for an
-	 * {@code orchestration:read} session, stores it under {@code config/t3craft/credentials/} and
-	 * reconnects. {@code done} gets a player-facing message on the client thread (never a secret).
-	 */
+	/** {@link #pair(String, String, String, boolean, Consumer)} with the default scopes (read + operate). */
 	public void pair(String label, String linkOrCode, String hostUrl, Consumer<PairResult> done) {
+		pair(label, linkOrCode, hostUrl, false, done);
+	}
+
+	/**
+	 * Pairs this instance with a T3 environment: exchanges the one-time credential for a session
+	 * with {@link Pairing#DEFAULT_SCOPES} (read + operate, one pairing) or, with {@code readOnly},
+	 * {@code orchestration:read} only. {@link Environments#pair} stores it under
+	 * {@code config/t3craft/credentials/} (and {@code credentials/operate/} when it carries
+	 * operate), then reconnects. If the host issued a read-only credential the environment is
+	 * paired read-only. {@code done} gets a player-facing message on the client thread (never a secret).
+	 */
+	public void pair(String label, String linkOrCode, String hostUrl, boolean readOnly, Consumer<PairResult> done) {
 		Minecraft mc = Minecraft.getInstance();
 		Pairing.Target target;
 		try {
@@ -311,8 +319,9 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 		String shown = label == null || label.isBlank() ? target.baseUrl().getHost() : label.trim();
 		String id = Environments.slug(shown);
 		Environments envs = new Environments(ModConfig.dataDir());
+		java.util.Set<String> scopes = Pairing.pairingScopes(readOnly);
 		new PairingClient(java.net.http.HttpClient.newHttpClient())
-				.exchange(target, "T3Craft (Minecraft " + modVersion + ")", System.getProperty("os.name", ""))
+				.exchange(target, "T3Craft (Minecraft " + modVersion + ")", System.getProperty("os.name", ""), scopes)
 				.whenComplete((session, err) -> {
 					PairResult result;
 					if (err != null) {
@@ -322,11 +331,18 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 								: "Could not reach " + target.baseUrl() + ": " + T3Connection.sanitize(cause.getClass().getSimpleName()));
 					} else {
 						try {
-							envs.save(new Environments.Environment(id, shown, target.baseUrl()), session);
-							result = new PairResult(true, "Paired with " + shown + " (" + target.baseUrl() + "), read-only. Session valid until "
-									+ java.time.Instant.ofEpochMilli(session.expiresAtMs()).toString().substring(0, 10) + ".");
-						} catch (IOException e) {
-							result = new PairResult(false, "Paired, but could not save the credential: " + e.getMessage());
+							boolean control = envs.pair(new Environments.Environment(id, shown, target.baseUrl()), session);
+							String until = java.time.Instant.ofEpochMilli(session.expiresAtMs()).toString().substring(0, 10);
+							String how = control
+									? "with control (read + operate). Revoke control any time: /t3craft operate revoke " + id
+									: readOnly ? "read-only"
+									: "read-only: the credential had no orchestration:operate (use \"Enable control\" to add it)";
+							result = new PairResult(true, "Paired with " + shown + " (" + target.baseUrl() + "), " + how
+									+ ". Session valid until " + until + ".");
+							dev.t3craft.t3.AuditLog.in(ModConfig.dataDir()).append(new dev.t3craft.t3.AuditLog.Entry(System.currentTimeMillis(), id, null,
+									"pair", false, "ok", "ui", control ? "read+operate" : "read-only"));
+						} catch (IOException | IllegalArgumentException e) {
+							result = new PairResult(false, "Paired, but could not save the credential: " + e.getClass().getSimpleName());
 						}
 					}
 					PairResult r = result;

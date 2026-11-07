@@ -13,14 +13,18 @@ import net.minecraft.network.chat.Component;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Paired T3 environments: status, show/hide, edit (name, colour, filter), unpair, the optional
- * control (operate) pairing ("Control…" / "Revoke control"), and "Pair new…"
- * (main's read-only pairing screen: paste the link, or the code plus the T3 URL). Paged so it fits
- * any GUI scale. Shows ids, labels, URLs and connection status only: never a token.
+ * Paired T3 environments: status, show/hide, edit (name, colour, filter), unpair, control
+ * ("Enable control" upgrades a read-only pairing / "Revoke" goes back to read-only), and "Pair new…"
+ * (main's pairing screen, read + control by default: paste the link, or the code plus the T3 URL).
+ * Paged so it fits any GUI scale. Shows ids, labels, URLs and connection status only: never a token.
  */
 public final class EnvironmentsScreen extends BaseConfigScreen {
 	private static final int ROW = 24;
 	private static final int BUTTONS = 4;
+	/** Width of the "Enable control" / "Revoke" button (wider than the other three). */
+	private static final int CONTROL_W = 96;
+	/** Total width of a row's buttons. */
+	private static final int BUTTONS_W = (BUTTONS - 1) * 54 + CONTROL_W;
 	private final EnvironmentActions actions;
 	private List<EnvRow> rows = List.of();
 	private int page;
@@ -52,7 +56,7 @@ public final class EnvironmentsScreen extends BaseConfigScreen {
 			EnvRow r = rows.get(i);
 			EnvPrefs p = s.env(r.id());
 			int ry = y + (i - from) * ROW;
-			int bx = x + w - BUTTONS * 54;
+			int bx = x + w - BUTTONS_W;
 			addRenderableWidget(Button.builder(Component.literal(p.visible() ? "Hide" : "Show"), b -> {
 				ConfigManager.SaveResult res = ConfigManager.get().update(st -> st.withEnv(r.id(), st.env(r.id()).withVisible(!st.env(r.id()).visible())));
 				if (res.ok()) {
@@ -78,7 +82,7 @@ public final class EnvironmentsScreen extends BaseConfigScreen {
 								minecraft.gui.setScreen(next);
 							}
 						}
-					}).bounds(bx + 162, ry, 50, 20).build());
+					}).bounds(bx + 162, ry, CONTROL_W, 20).build());
 			ctl.setTooltip(net.minecraft.client.gui.components.Tooltip.create(operate
 					? Component.translatable("t3craft.operate.revoke.tooltip")
 					: Component.translatable("t3craft.operate.enable.tooltip")));
@@ -111,7 +115,7 @@ public final class EnvironmentsScreen extends BaseConfigScreen {
 			}
 			minecraft.gui.setScreen(this);
 		}, Component.literal("Unpair " + r.label() + "?"),
-				Component.literal("Deletes the local read-only session for " + r.url()
+				Component.literal("Deletes the local session(s) for " + r.url() + " (read and control)"
 						+ ". Revoke it on the host too: t3 auth session list / t3 auth session revoke <id>.")));
 	}
 
@@ -134,13 +138,15 @@ public final class EnvironmentsScreen extends BaseConfigScreen {
 		if (rows.isEmpty()) {
 			g.centeredText(font, Component.literal("No T3 environment paired yet. Use \"Pair new…\".").withStyle(ChatFormatting.YELLOW),
 					width / 2, y + 6, 0xFFFFFFFF);
-			g.centeredText(font, Component.literal("On the T3 host: t3 auth pairing create --scope orchestration:read").withStyle(ChatFormatting.GRAY),
+			g.centeredText(font, Component.literal("On the T3 host: " + dev.t3craft.t3.Pairing.pairingHostCommand(false, null)).withStyle(ChatFormatting.GRAY),
 					width / 2, y + 20, 0xFFFFFFFF);
+			g.centeredText(font, Component.literal("(read-only: " + dev.t3craft.t3.Pairing.pairingHostCommand(true, null) + ")").withStyle(ChatFormatting.DARK_GRAY),
+					width / 2, y + 32, 0xFFFFFFFF);
 			return;
 		}
 		T3CraftSettings s = ConfigManager.get().settings();
 		int from = page * perPage();
-		int textW = w - BUTTONS * 54 - 16;
+		int textW = w - BUTTONS_W - 16;
 		for (int i = from; i < Math.min(rows.size(), from + perPage()); i++) {
 			EnvRow r = rows.get(i);
 			EnvPrefs p = s.env(r.id());
