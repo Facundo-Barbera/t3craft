@@ -206,8 +206,16 @@ basement fits above bedrock.
    then `HqPlans.expansion(lastPlan, plan, vacated)` for each change.
 4. **feat/workstation**: `plan.workstations()` → `site.cell(computerPos)` and `site.anchor(screen)`.
 5. **NPC behaviour**: `setAnchorSource(new HqAnchorSource(plan, site))`.
-6. **feat/demo-world**: `HqPlans.forRoster(roster)` at a fixed origin. Make the world at least 6
-   blocks deep under the HQ floor for the basement, or lift the origin.
+6. **feat/demo-world** (`HqStructureSource` is in main but not registered): use
+   `new HqStructureSource(HQ_PLAN_VERSION, () -> HqPlans.forDemo(roster))`. `forDemo` bakes
+   `HqPlans.demoSite()` into the plans, so they follow the demo/builders convention: entrance facing
+   north, portico front on `z = 0`, growth towards `+z`, `x = 0` on the centre line, built with
+   rotation `NONE`. `y = 0` is the hub floor and the basement reaches `y = -5`. In the default
+   superflat world (`minY = -64`, grass at -61), the demo origin must have `y ≥ -58`, so the HQ stands
+   on a 2-block tuff plinth and the portico floats 2 blocks up. The other options are a deeper flat
+   preset or accepting that basement cells fail. Bump the demo plan version whenever generator
+   output changes. I did not register the source myself: it belongs to the demo module, and the
+   origin decision above is needed first.
 
 ## Pending
 

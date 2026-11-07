@@ -471,6 +471,29 @@ class HqGeneratorTest {
 	}
 
 	@Test
+	void demoPlansFollowTheBuildersConvention() {
+		List<HqInput.Entry> lines = roster(input(3, 4));
+		List<dev.t3craft.build.BuildPlan> demo = HqPlans.forDemo(lines);
+		List<dev.t3craft.build.BuildPlan> rel = HqPlans.forRoster(lines);
+		assertEquals(rel.size(), demo.size());
+		int minZ = Integer.MAX_VALUE;
+		int minY = Integer.MAX_VALUE;
+		int sum = 0;
+		for (dev.t3craft.build.BuildPlan b : demo) {
+			minZ = Math.min(minZ, b.min().getZ());
+			minY = Math.min(minY, b.min().getY());
+			sum += b.size();
+		}
+		assertEquals(0, minZ, "front edge on z = 0, growing to +z");
+		assertEquals(-5, minY);
+		assertEquals(rel.stream().mapToInt(dev.t3craft.build.BuildPlan::size).sum(), sum);
+		BuildPlan p = plan(input(3, 4));
+		HqSite site = HqPlans.demoSite();
+		assertEquals(Direction.NORTH, site.anchor(p.anchor(AnchorNames.ENTRANCE)).facing());
+		assertEquals(0, site.cell(p.anchor(AnchorNames.SPAWN).block()).getX());
+	}
+
+	@Test
 	void siteTransformMatchesTheBuildersTransform() {
 		BuildPlan p = plan(input(2, 3));
 		dev.t3craft.build.BuildPlan b = HqBuild.toBuildPlan(p);

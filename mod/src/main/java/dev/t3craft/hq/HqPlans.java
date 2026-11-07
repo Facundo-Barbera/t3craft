@@ -27,6 +27,39 @@ public final class HqPlans {
 		return List.copyOf(byGroup(generate(HqLayout.plan(HqInput.fromRoster(roster)))).values());
 	}
 
+	/**
+	 * The whole HQ of a roster with {@code site} baked in: positions are {@code site.cell(rel)} and states
+	 * are rotated, so the plans are built with origin {@code (0,0,0)} and rotation {@code NONE}. One
+	 * layered plan per group, in build order.
+	 */
+	public static List<dev.t3craft.build.BuildPlan> forRoster(Collection<HqInput.Entry> roster, HqSite site) {
+		BuildPlan plan = generate(HqLayout.plan(HqInput.fromRoster(roster)));
+		List<dev.t3craft.build.BuildPlan> out = new ArrayList<>();
+		for (String g : plan.groups()) {
+			List<dev.t3craft.build.Placement> ps = new ArrayList<>();
+			for (Placement p : plan.placements(g)) {
+				ps.add(new dev.t3craft.build.Placement(site.cell(p.rel()), p.state().rotate(site.rotation()), p.be()));
+			}
+			out.add(dev.t3craft.build.BuildPlan.of(ps).layered());
+		}
+		return List.copyOf(out);
+	}
+
+	/**
+	 * The site that puts the HQ in the builders' demo convention: entrance facing north ({@code -z}),
+	 * the front edge of the portico on {@code z = 0}, growing towards {@code +z}, {@code x = 0} the
+	 * centre line. {@code y = 0} stays the hub floor; the basement goes down to {@code y = -5}, so the
+	 * demo origin must be at least 6 blocks above the world's minimum height.
+	 */
+	public static HqSite demoSite() {
+		return new HqSite(new net.minecraft.core.BlockPos(0, 0, HqGeometry.PORTICO_Z2), net.minecraft.world.level.block.Rotation.CLOCKWISE_180);
+	}
+
+	/** {@link #forRoster(Collection, HqSite)} with {@link #demoSite()}: plug into the demo world's structure source. */
+	public static List<dev.t3craft.build.BuildPlan> forDemo(Collection<HqInput.Entry> roster) {
+		return forRoster(roster, demoSite());
+	}
+
 	/** The HQ plan of a layout. */
 	public static BuildPlan generate(HqLayout layout) {
 		return new HqGenerator().generate(layout);
