@@ -17,6 +17,21 @@ public final class AnchorNames {
 	public static final String BOARD = "board";
 	/** Prefix of the board's header lamps ({@code board_lamp_0..}) left to right as seen from the front. */
 	public static final String BOARD_LAMP = "board_lamp_";
+	/**
+	 * Optional: the thread wall (kanban of threads, {@code t3craft:thread_board} of the blocks
+	 * module). {@code block} = the wall's <b>bottom-left cell as seen from the front</b>; {@code facing}
+	 * = the outward normal of the wall face (where the viewer stands). The plan must put a solid block
+	 * in that cell (the blocks module swaps it for the anchor block) and keep the cells to the
+	 * viewer's right ({@code facing.getCounterClockWise()}) and above it a flat solid wall. Size: see
+	 * {@link #THREAD_WALL_END}. Without the blocks module the cell keeps the plan's block, unchanged.
+	 */
+	public static final String THREAD_WALL = "thread_wall";
+	/**
+	 * Optional, with {@link #THREAD_WALL}: the wall's top-right cell as seen from the front (same
+	 * plane). Width and height of the wall follow from the two cells; without it, the config's size
+	 * ({@code blocks.threadWall}) is used.
+	 */
+	public static final String THREAD_WALL_END = "thread_wall_end";
 	/** Centre of the hub floor. */
 	public static final String HUB = "hub";
 	/**

@@ -15,6 +15,7 @@ queda exactamente como sin él.
 | `t3craft:monitor` | `t3craft:monitor` (`MonitorBlockEntity`) | Bloque entero con `facing`. La cara frontal es una pantalla: título, estado con color y antigüedad, último mensaje. Click → abre el chat del hilo. |
 | `t3craft:status_lamp` | `t3craft:status_lamp` (`LampBlockEntity`) | Lámpara del escritorio: color y luz según el estado del hilo. |
 | `t3craft:board_lamp` | el mismo tipo `t3craft:status_lamp` | Variante "bombilla del tablero": la i-ésima bombilla muestra el i-ésimo hilo que necesita al jugador (errores primero, luego "needs you"). |
+| `t3craft:thread_board` | `t3craft:thread_board` (`ThreadBoardBlockEntity`) | Ancla de la pared kanban de hilos (P3): el BER dibuja una pared de `width × height` bloques desde la celda inferior izquierda. Click en una tarjeta → chat del hilo. Ver `docs/feat-thread-wall.md`. |
 
 Ítems de bloque con el mismo id, en la pestaña propia **T3Craft** (`dev.t3craft.T3CraftTab`, única
 del mod; el módulo aporta sus ítems con `T3CraftTab.contribute` solo si está prendido). Loot tables: cada bloque se suelta a sí mismo. Recetas

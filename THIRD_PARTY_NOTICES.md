@@ -93,6 +93,24 @@ Files adapted from AgentCraft's blocks (`mod/src/main/java/dev/agentcraft/block/
 - `mod/src/client/java/dev/t3craft/client/blocks/MonitorRenderer.java` ← `client/world/StationRenderer.java`
   (`toFace`: draw in screen pixel space on a block's front face).
 
+Files adapted from AgentCraft (commit `8fe3ad2`, MIT; task wall: `mod/src/client/java/dev/agentcraft/client/taskwall/`,
+`mod/src/main/java/dev/agentcraft/block/TaskBoardBlock.java`), branch `feat/thread-wall`:
+
+- `mod/src/main/java/dev/t3craft/blocks/ThreadBoardBlock.java` ← `block/TaskBoardBlock.java` and
+  `block/FacingEntityBlock.java` (the panel origin draws the whole board; facing, rotate, mirror).
+- `mod/src/client/java/dev/t3craft/client/blocks/WallColumns.java` ← `taskwall/TaskBoard.java` (`Col`:
+  fixed kanban columns with a status family each; t3craft's own columns and project/environment variants).
+- `mod/src/client/java/dev/t3craft/client/blocks/WallLayout.java` ← `taskwall/TaskBoard.java` (lanes,
+  headers with counts, "+N more" overflow chip whose click opens the first hidden card; fixed-size cards).
+- `mod/src/client/java/dev/t3craft/client/blocks/WallBoard.java` ← `taskwall/TaskBoard.java` (`step`:
+  exponential glide, `Card.arrivedFrom`: cards that change column fly and glow where they land; layout
+  cached until the input changes).
+- `mod/src/client/java/dev/t3craft/client/blocks/WallGeometry.java` ← `taskwall/TaskWallFeature.java`
+  (`toBoard`: world hit → board pixels for a panel drawn from its bottom-left origin).
+- `mod/src/client/java/dev/t3craft/client/blocks/ThreadBoardRenderer.java` ←
+  `taskwall/TaskBoardRenderer.java` (draw from the origin over the whole board, off-screen rendering,
+  lifted flying cards with shadows, hover from the crosshair, pulsing ring on cards that wait on the user).
+
 Files adapted from AgentCraft (commit `8fe3ad2`, MIT), branch `feat/lamps-breathe`:
 
 - `mod/src/client/java/dev/t3craft/client/blocks/LampRenderer.java` ← `client/hq/StatusLampRenderer.java`

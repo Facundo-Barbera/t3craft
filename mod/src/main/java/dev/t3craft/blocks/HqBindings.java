@@ -40,6 +40,13 @@ public final class HqBindings {
 		MONITOR, LAMP, BOARD_LAMP, BEACON
 	}
 
+	/**
+	 * The plan's thread wall: anchor cell (bottom-left as seen from the front, relative to the HQ
+	 * origin), the face's outward normal and the size in blocks ({@code 0} = the config's).
+	 */
+	public record ThreadWall(BlockPos rel, Direction facing, int width, int height) {
+	}
+
 	/** One fixture cell, relative to the HQ origin. {@code facing}: where the screen looks (monitors). */
 	public record Fixture(BlockPos rel, Role role, Binding binding, Direction facing) {
 	}
@@ -86,6 +93,40 @@ public final class HqBindings {
 			out.putIfAbsent(beacon.block(), new Fixture(beacon.block(), Role.BEACON, Binding.BEACON, beacon.facing()));
 		}
 		return List.copyOf(out.values());
+	}
+
+	/**
+	 * The thread wall the plan reserves ({@link AnchorNames#THREAD_WALL}, sized by
+	 * {@link AnchorNames#THREAD_WALL_END}), or null when the plan has none. Pure.
+	 */
+	public static @Nullable ThreadWall threadWall(BuildPlan plan) {
+		Anchor a = plan.anchors().get(AnchorNames.THREAD_WALL);
+		if (a == null) {
+			return null;
+		}
+		Anchor end = plan.anchors().get(AnchorNames.THREAD_WALL_END);
+		int[] size = end == null ? new int[] {0, 0} : wallSize(a.block(), end.block(), a.facing());
+		return new ThreadWall(a.block(), a.facing(), size[0], size[1]);
+	}
+
+	/**
+	 * {width, height} of a wall from its bottom-left cell {@code from} to its top-right cell {@code to}
+	 * (as seen from the front, {@code facing} = outward normal); {0, 0} when they do not span a
+	 * rectangle on one plane facing the viewer. Clamped to the renderer's maximum.
+	 */
+	static int[] wallSize(BlockPos from, BlockPos to, Direction facing) {
+		Direction right = facing.getCounterClockWise();
+		int dx = to.getX() - from.getX();
+		int dz = to.getZ() - from.getZ();
+		int along = dx * right.getStepX() + dz * right.getStepZ();
+		int depth = dx * facing.getStepX() + dz * facing.getStepZ();
+		int up = to.getY() - from.getY();
+		if (depth != 0 || along < 0 || up < 0) {
+			return new int[] {0, 0};
+		}
+		return new int[] {
+				Math.min(along + 1, ThreadBoardBlockEntity.MAX_WIDTH),
+				Math.min(up + 1, ThreadBoardBlockEntity.MAX_HEIGHT)};
 	}
 
 	/**
