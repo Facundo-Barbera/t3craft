@@ -72,8 +72,8 @@ public final class BehaviorDirector {
 	private final ApproachPlanner approaches = new ApproachPlanner();
 	private @Nullable ApproachConfig approachOverride;
 	private ApproachConfig.@Nullable Watcher approachConfig;
-	/** Settled NPCs going home (item 22); null value = requested, starts next tick. */
-	private final Map<String, @Nullable Departure> departures = new HashMap<>();
+	/** Settled NPCs going home (item 22); null value = requested, starts next tick. Lazy: hot-swap safe. */
+	private @Nullable Map<String, @Nullable Departure> departures;
 
 	/** Plug in a physical base (null = none, ring layout only). See {@link AnchorSource}. */
 	public void setAnchorSource(@Nullable AnchorSource source) {
@@ -118,18 +118,22 @@ public final class BehaviorDirector {
 		if (!brains.containsKey(npcId)) {
 			return false;
 		}
-		departures.putIfAbsent(npcId, null);
+		departures().putIfAbsent(npcId, null);
 		return true;
 	}
 
+	private Map<String, @Nullable Departure> departures() {
+		return departures = dev.t3craft.debug.HotSwapFields.orInit(departures, HashMap::new);
+	}
+
 	public boolean departing(String npcId) {
-		return departures.containsKey(npcId);
+		return departures().containsKey(npcId);
 	}
 
 	/** Forget one NPC (it was removed) and discard its overlay entities. */
 	public void forget(String npcId, @Nullable ClientLevel lvl) {
 		brains.remove(npcId);
-		departures.remove(npcId);
+		departures().remove(npcId);
 		Overlay o = overlays.remove(npcId);
 		if (o != null) {
 			discard(lvl, o.bubble);
@@ -145,7 +149,7 @@ public final class BehaviorDirector {
 		}
 		overlays.clear();
 		brains.clear();
-		departures.clear();
+		departures().clear();
 		approaches.reset();
 		ring = null;
 		ringMembers = null;
@@ -204,7 +208,7 @@ public final class BehaviorDirector {
 			NpcBrain.Targets t = new NpcBrain.Targets(desk, boardSlot, home, layout.wanderRadius(info.groupId()), rest);
 
 			Overlay o = overlays.computeIfAbsent(b.id(), id -> new Overlay());
-			if (departures.containsKey(b.id()) && depart(lvl, b, brain, o, layout, nav, playerPos)) {
+			if (departures().containsKey(b.id()) && depart(lvl, b, brain, o, layout, nav, playerPos)) {
 				continue;
 			}
 			String summary = summaries.summary(b.id(), info);
@@ -227,19 +231,19 @@ public final class BehaviorDirector {
 
 	/** Drives a departing NPC; false once it is over (the brain takes over again). */
 	private boolean depart(ClientLevel lvl, Body b, NpcBrain brain, Overlay o, AnchorSource layout, NpcBrain.Navigator nav, Pos player) {
-		Departure d = departures.get(b.id());
+		Departure d = departures().get(b.id());
 		if (d == null) {
 			Anchor exit = layout.exit();
 			if (exit == null) {
 				exit = layout.home(b.info().groupId());
 			}
 			d = new Departure(brain.pos(), brain.bodyYaw(), exit != null ? exit : new Anchor(brain.pos(), brain.bodyYaw()));
-			departures.put(b.id(), d);
+			departures().put(b.id(), d);
 		}
 		if (d.stage() == Departure.Stage.GONE && (b.info().settled() || d.expired())) {
 			// Back (settle reflected: the HQ gave it a new spot; or T3 never confirmed). Hidden, so
 			// the fresh brain placing it straight on its spot is not a visible teleport.
-			departures.remove(b.id());
+			departures().remove(b.id());
 			brains.put(b.id(), new NpcBrain(b.id(), d.pos()));
 			b.avatar().setInvisible(false);
 			return false;

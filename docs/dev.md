@@ -105,3 +105,8 @@ Rules of thumb for hot-swap-friendly code:
 - Keep state rebuildable from the source of truth (config, T3 snapshot, bridge) so a reset is
   cheap: clear, mark dirty, let the next tick rebuild.
 - Do not change `Resettable`'s shape: it is the one type shared across hot-swaps.
+- New fields on entrypoints (`T3CraftClient`, `*Client`) must be lazy or null-guarded:
+  `onInitializeClient` (and field initializers) do not run again after a hot-swap, so a field
+  added then is `null` on the live instance. Read it through a getter, e.g.
+  `return helpers = HotSwapFields.orInit(helpers, HelperDirector::new);`, or check for null
+  in every tick/render/callback that uses it.
