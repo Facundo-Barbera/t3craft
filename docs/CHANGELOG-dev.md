@@ -10,7 +10,6 @@ One line per structural commit on `main`, newest first:
 
 ## Entries
 
-- 2026-11-08 feat/thread-wall RESTART — new block t3craft:thread_board (P3, AgentCraft MIT): kanban wall of threads by state (Working / Needs you / Error / Done) with chat-kit cards, env badges, column moves, +N more, hover and click → chat; cached per shell version with distance LOD; variant by project/env; placed by the HQ plan in the hub when the blocks module is on.
 - 2026-11-08 feat/archive-terminal RESTART — archive is now one own block t3craft:archive_terminal (console with cached screen 'ARCHIVE · N threads' + last 3); click opens a paged, searchable list of settled/archived threads across environments (read-only chat on select); without the blocks module via /t3craft archive and the portable; per-thread archive slots/shelves removed.
 - 2026-11-08 feat/parallel-build RELOAD — builders place blocks on several fronts per job (layer order kept) and run several HQ jobs at once under a shared per-tick budget with MSPT auto-throttle; config build.maxBlocksPerTick / maxConcurrentJobs / frontsPerJob; snapshots, undo/resume and survival costs preserved.
 - 2026-11-08 feat/hq-blocks-kit RESTART — new t3craft decorative block kit for the HQ (standing desk, wall/shoji panels, floor tiles, beam, lantern, room plaque with cached text BER, railing, garden decor) with own models/textures, in the switchable blocks module and creative tab; HqKit role mapping with vanilla fallback.
