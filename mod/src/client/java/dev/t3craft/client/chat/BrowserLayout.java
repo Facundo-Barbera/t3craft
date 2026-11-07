@@ -62,6 +62,21 @@ public record BrowserLayout(Rect frame, Rect list, Rect conversation, boolean co
 		return frame.splitX(listWidth(frame.w()), gap);
 	}
 
+	/**
+	 * Row hit-test of the thread list, pure geometry (fix/chat-direct-connect): index into the
+	 * visible rows of the row under ({@code mx}, {@code my}), or -1. {@code rows} is the area the
+	 * rows are drawn in (absolute GUI pixels, so it works wherever the frame is centred),
+	 * {@code first} the first row drawn (scroll), {@code count} the visible row count.
+	 */
+	public static int rowAt(double mx, double my, Rect rows, int rowH, int first, int count) {
+		if (rowH <= 0 || !rows.contains(mx, my)) {
+			return -1;
+		}
+		int i = first + (int) Math.floor((my - rows.y()) / rowH);
+		int lastDrawn = Math.min(count, first + Math.max(1, rows.h() / rowH)) - 1;
+		return i >= first && i <= lastDrawn ? i : -1;
+	}
+
 	/** True when a host rectangle is too small for the split view. */
 	public static boolean isCompact(Rect r) {
 		return r.w() < COMPACT_W || r.h() < COMPACT_H;

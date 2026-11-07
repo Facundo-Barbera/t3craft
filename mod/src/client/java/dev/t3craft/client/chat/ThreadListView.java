@@ -46,6 +46,9 @@ public final class ThreadListView {
 	private @Nullable String emptyText;
 	private @Nullable Consumer<Set<String>> onFilterChanged;
 	private final List<Hit> hits = new ArrayList<>();
+	/** Where the rows were last drawn (x0..x1 × rowsTop..rowsBottom) and the first one drawn. */
+	private Rect rowsArea = Rect.EMPTY;
+	private int drawnFirst;
 	private int rowsTop;
 	private int rowsBottom;
 
@@ -122,6 +125,7 @@ public final class ThreadListView {
 	public void render(GuiGraphicsExtractor g, Font font, int mouseX, int mouseY) {
 		ChatTheme t = theme;
 		hits.clear();
+		rowsArea = Rect.EMPTY;
 		if (bounds.w() < 40 || bounds.h() < 40) {
 			return;
 		}
@@ -177,6 +181,8 @@ public final class ThreadListView {
 		int ry = rowsTop;
 		int rx0 = list.x() + 2;
 		int rx1 = list.right() - (rows.size() > cap ? 10 : 3);
+		rowsArea = new Rect(rx0, rowsTop, rx1 - rx0, cap * rh);
+		drawnFirst = first;
 		for (int i = first; i < rows.size() && i < first + cap; i++) {
 			ThreadRow r = rows.get(i);
 			Rect rr = new Rect(rx0, ry, rx1 - rx0, rh);
@@ -277,7 +283,7 @@ public final class ThreadListView {
 				List<String> out = new ArrayList<>();
 				out.add(r.title());
 				String age = Ago.phrase(System.currentTimeMillis(), r.activityMs());
-				out.add(r.attention().word + " · " + r.envLabel() + (r.project().isEmpty() ? "" : " · " + r.project())
+				out.add((r.pinned() ? "pinned · " : "") + r.attention().word + " · " + r.envLabel() + (r.project().isEmpty() ? "" : " · " + r.project())
 						+ (age.isEmpty() ? "" : " · " + age));
 				if (r.activity() != null && !r.activity().isBlank()) {
 					out.add(r.activity());
@@ -323,10 +329,14 @@ public final class ThreadListView {
 				}
 				return null;
 			}
-			if (hit.row() != null && button == 0) {
-				model.select(hit.row().key());
-				return hit.row();
-			}
+		}
+		// rows: pure geometry against where they were drawn (never depends on a per-frame hit list)
+		List<ThreadRow> rows = model.visible();
+		int i = BrowserLayout.rowAt(mx, my, rowsArea, theme.listRow(), drawnFirst, rows.size());
+		if (i >= 0 && button == 0) {
+			ThreadRow r = rows.get(i);
+			model.select(r.key());
+			return r;
 		}
 		return null;
 	}

@@ -282,8 +282,8 @@ class DemoHqFixturesTest {
 		HqSite site = DemoHq.worldSite(new BlockPos(0, -60, 0), LIFT);
 		DemoHqBindings b = new DemoHqBindings(s.layout(), site);
 		Map<Long, Binding> before = b.bindings(roster);
-		long vacant = s.plan().workstations().stream().filter(w -> w.threadId() == null && w.module() == 0).count();
-		assertTrue(vacant > 0, "the first module has a free desk");
+		// vacant desks are not built (fix/hq-stale-stations): the free slot is in the layout, not in the plan
+		assertTrue(!s.layout().modules().get(0).full(), "the first module has a free desk");
 
 		List<NpcInfo> grown = new ArrayList<>(roster);
 		String project = s.layout().modules().get(0).projectKey().substring("vps:".length());
