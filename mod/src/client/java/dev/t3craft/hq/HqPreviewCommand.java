@@ -126,7 +126,9 @@ public final class HqPreviewCommand {
 			if (prev != null && !prev.dimension().equals(dim)) {
 				prev = null;
 			}
-			HqGenerator.Result r = HqGenerator.plan(in, prev == null ? null : prev.layout());
+			HqGenerator.Result g = HqGenerator.plan(in, prev == null ? null : prev.layout());
+			// custom monitor/lamp blocks when the blocks module is on; vanilla otherwise
+			HqGenerator.Result r = new HqGenerator.Result(g.layout(), HqFixtures.active().apply(g.plan()));
 			BlockPos origin;
 			int groundY;
 			if (prev != null) {

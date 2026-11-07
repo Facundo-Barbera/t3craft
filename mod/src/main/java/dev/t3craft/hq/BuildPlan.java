@@ -213,6 +213,29 @@ public final class BuildPlan {
 		return out;
 	}
 
+	/**
+	 * This plan with some placements swapped (see {@link HqFixtures}). {@code f} gets every placement
+	 * in order and returns it unchanged, or a placement at the <b>same</b> position with another state
+	 * or block entity data. Anchors, modules and workstations are kept. Returns {@code this} when
+	 * nothing changed.
+	 */
+	public BuildPlan replacing(java.util.function.UnaryOperator<Placement> f) {
+		List<Placement> out = new ArrayList<>(placements.size());
+		boolean changed = false;
+		for (Placement p : placements) {
+			Placement q = f.apply(p);
+			if (q == null) {
+				q = p;
+			}
+			if (!q.rel().equals(p.rel())) {
+				throw new IllegalArgumentException("replacing must keep positions: " + p.rel() + " -> " + q.rel());
+			}
+			changed |= q != p;
+			out.add(q);
+		}
+		return changed ? new BuildPlan(out, anchors, modules, workstations) : this;
+	}
+
 	/** The block that fills a cell a newer plan no longer uses. */
 	@FunctionalInterface
 	public interface Vacated {
