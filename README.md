@@ -19,7 +19,37 @@ attention, done, error, idle) and tagged with the machine it runs on.
 Status: scaffolding plus phase 0/1 (list threads with colour). Chat, permissions and thread
 creation are stubs (see TODOs and `docs/plan.md` §6).
 
-## T3 token (one per environment)
+## Direct mode (default): pair the mod with each T3
+
+Since v2.1 the mod talks to each T3 Code environment itself, read-only, like the desktop app
+with a remote server. The bridge below is optional (legacy `"mode": "bridge"`).
+
+1. On each T3 host, issue a one-time **read-only** pairing credential (valid 5 minutes by default):
+   ```bash
+   t3 auth pairing create --scope orchestration:read --base-url https://my-vps.example.ts.net
+   ```
+   Always pass `--scope orchestration:read`: without it the credential carries every scope. The mod
+   asks for `orchestration:read` only and refuses a session that grants anything else.
+2. In Minecraft run `/t3craft pair`, enter a name (shown on the villagers, e.g. `my-vps`) and
+   paste the link (`https://host/pair#token=…`), or the bare code plus the T3 URL
+   (e.g. `http://my-acmesite.<tailnet>.ts.net:3773`). Repeat for each environment.
+3. The session (Bearer, 30 days, no refresh: pair again when it expires) is stored in the
+   instance profile under `config/t3craft/credentials/<env>.json` (owner-only where the OS allows).
+   It is never logged and never belongs in a repo. Revoke it on the host with
+   `t3 auth session list` / `t3 auth session revoke <id>` (or Sharing & access), and forget it
+   locally with `/t3craft unpair <env>`.
+
+Commands: `/t3craft status | reconnect | reload | pair | unpair <env> | envs`. `reload` re-reads
+`config/t3craft.json`, the paired environments and their credentials, and reconnects without
+restarting the game. Visibility in direct mode is set in `config/t3craft.json`
+(`visibility.recentWindowHours` 24, `visibility.maxPerEnvironment` 40, `includeSubagents`).
+
+Threads show up as player-like NPCs (default skins chosen per environment and state), grouped into
+neighbourhoods per environment + project with a floating sign. Each has its label in the state
+colour, a panel with environment · project and the current activity, and particles for working,
+needs-you and error.
+
+## T3 token for the legacy bridge (one per environment)
 
 On **each** T3 host, Facundo issues a minimal read-only session (needs nothing else for phase 0/1):
 
