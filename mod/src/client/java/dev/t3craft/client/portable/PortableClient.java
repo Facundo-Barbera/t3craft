@@ -1,8 +1,9 @@
 package dev.t3craft.client.portable;
 
 import com.mojang.blaze3d.platform.InputConstants;
-import dev.t3craft.T3Craft;
 import dev.t3craft.client.T3CraftClient;
+import dev.t3craft.client.config.T3CraftKeys;
+import dev.t3craft.client.portable.held.HeldScreen;
 import dev.t3craft.client.npc.NpcInfo;
 import dev.t3craft.client.screen.PairScreen;
 import dev.t3craft.client.screen.ThreadChatScreen;
@@ -11,12 +12,12 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
-import net.minecraft.resources.Identifier;
 
 /**
  * Client wiring of the portable T3 terminal: the configurable key (Options › Controls › T3Craft,
- * default {@code Y}), the T3 Terminal item's client hook, and the fallbacks for the screens owned
- * by feat/chat and feat/config. One call from {@code T3CraftClient.onInitializeClient}.
+ * default {@code Y}, in the shared {@link T3CraftKeys#CATEGORY}), the T3 Terminal item's client
+ * hook, the live held-item screen ({@link HeldScreen}) and the fallbacks for the screens owned by
+ * feat/chat and feat/config. One call from {@code T3CraftClient.onInitializeClient}.
  */
 public final class PortableClient {
 	public static final String KEY_NAME = "key.t3craft.portable";
@@ -26,7 +27,7 @@ public final class PortableClient {
 	}
 
 	public static void register(T3CraftClient client) {
-		key = KeyMappingHelper.registerKeyMapping(new KeyMapping(KEY_NAME, InputConstants.Type.KEYBOARD, InputConstants.KEY_Y, category()));
+		key = KeyMappingHelper.registerKeyMapping(new KeyMapping(KEY_NAME, InputConstants.Type.KEYBOARD, InputConstants.KEY_Y, T3CraftKeys.CATEGORY));
 
 		// Item use (singleplayer / integrated server) and the key both open the same screen.
 		PortableItems.setClientOpen(() -> open(client));
@@ -37,6 +38,9 @@ public final class PortableClient {
 				}
 			}
 		});
+
+		// Live screen on the held item (map-style); off with portable.heldScreen=false.
+		HeldScreen.register(client);
 
 		// Until feat/chat and feat/config are merged: the screens main already has.
 		PortableLinks.setFallbacks(
@@ -55,19 +59,5 @@ public final class PortableClient {
 
 	public static void open(T3CraftClient client) {
 		Minecraft.getInstance().gui.setScreen(new PortableScreen(client));
-	}
-
-	/**
-	 * The T3Craft key category. Shared with other branches that may register keys too: the
-	 * category is a record (equal by id), so whoever registers second reuses it. Same approach as
-	 * AgentCraft's hud/Keys (MIT, see THIRD_PARTY_NOTICES.md).
-	 */
-	private static KeyMapping.Category category() {
-		Identifier id = Identifier.fromNamespaceAndPath(T3Craft.MOD_ID, "t3craft");
-		try {
-			return KeyMapping.Category.register(id);
-		} catch (IllegalArgumentException alreadyRegistered) {
-			return new KeyMapping.Category(id);
-		}
 	}
 }

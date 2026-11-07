@@ -1,6 +1,26 @@
 {
   "model": {
-    "type": "minecraft:model",
-    "model": "t3craft:item/t3_terminal"
+    "type": "minecraft:select",
+    "property": "minecraft:display_context",
+    "cases": [
+      {
+        "when": ["firstperson_lefthand", "firstperson_righthand"],
+        "model": {
+          "type": "minecraft:composite",
+          "models": [
+            { "type": "minecraft:model", "model": "t3craft:item/t3_terminal_held" },
+            {
+              "type": "minecraft:special",
+              "base": "t3craft:item/t3_terminal_held",
+              "model": { "type": "t3craft:held_terminal_screen" }
+            }
+          ]
+        }
+      }
+    ],
+    "fallback": {
+      "type": "minecraft:model",
+      "model": "t3craft:item/t3_terminal"
+    }
   }
 }
