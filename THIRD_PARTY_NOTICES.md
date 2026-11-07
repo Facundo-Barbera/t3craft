@@ -43,7 +43,18 @@ header and be listed here:
 // Copyright (c) 2026 AgentCraft contributors. MIT License.
 ```
 
-Files adapted from AgentCraft: *(none yet)*
+Files adapted from AgentCraft:
+
+- `mod/src/main/java/dev/t3craft/site/mc/LevelBlockWorld.java` — the block write flag set
+  (`FLAGS`: clients updated, no neighbour/shape updates, no drops, no block-entity side effects,
+  no `onPlace`) is taken from AgentCraft `mod/src/main/java/dev/agentcraft/hq/Plan.java`
+  (commit `8fe3ad23489b06f9142c6382bc23d31090c6b406`).
+
+Design ideas only (no code copied), from AgentCraft `hq/Plan.java` and `hq/PlanStore.java`:
+apply a build as a diff of a whole box, persist the applied plan in the world folder (palette +
+index per cell, temp file + atomic move), and treat a cell that matches neither the stored plan nor
+the original as a player change that is never overwritten silently. t3craft's site code
+(`dev.t3craft.site`) reimplements this for arbitrary terrain with full snapshots and undo.
 
 ## Gradle wrapper (`mod/gradlew`, `mod/gradlew.bat`, `mod/gradle/wrapper/`)
 

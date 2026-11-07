@@ -41,6 +41,13 @@ public final class SiteService {
 
 		/** Asynchronous messages (build finished…) to the player. */
 		void tell(String line);
+
+		/**
+		 * Makes the world's chunks durable on disk. Called after a restore and before the journal
+		 * forgets the site, so a crash cannot leave the base on disk with no record of it.
+		 */
+		default void flushWorld() {
+		}
 	}
 
 	/**
@@ -458,6 +465,7 @@ public final class SiteService {
 		}
 		store.saveJournal(new SiteJournal(SiteJournal.Phase.RESTORING, a.snap.id(), next, a.snap.dimension(), mode, env.now()));
 		Restorer.Result r = Restorer.restore(a.world, a.snap, a.plan, mode);
+		env.flushWorld();
 		store.archive(a.snap.id());
 		store.saveJournal(next == null ? new SiteJournal(SiteJournal.Phase.NONE, null, null, "", null, env.now())
 				: new SiteJournal(SiteJournal.Phase.BUILDING, next, null, a.snap.dimension(), null, env.now()));
