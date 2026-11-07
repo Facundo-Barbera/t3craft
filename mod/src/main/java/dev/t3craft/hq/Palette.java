@@ -54,6 +54,11 @@ final class Palette {
 	final BlockState azalea = Blocks.AZALEA.defaultBlockState();
 	final BlockState floweringAzalea = Blocks.FLOWERING_AZALEA.defaultBlockState();
 
+	/** Vanilla stand-in of the archive terminal: a lectern looking {@code facing} (the blocks module swaps it). */
+	BlockState archiveTerminal(Direction facing) {
+		return Blocks.LECTERN.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, facing);
+	}
+
 	/** Timber post (vertical stripped dark oak). */
 	BlockState post() {
 		return beam(Direction.Axis.Y);

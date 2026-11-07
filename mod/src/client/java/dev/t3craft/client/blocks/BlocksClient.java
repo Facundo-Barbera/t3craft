@@ -14,6 +14,7 @@ import dev.t3craft.blocks.HqBindings;
 import dev.t3craft.blocks.LampApplier;
 import dev.t3craft.blocks.LampStatus;
 import dev.t3craft.blocks.LiveLamps;
+import dev.t3craft.blocks.ArchiveTerminalBlock;
 import dev.t3craft.blocks.MonitorBlock;
 import dev.t3craft.blocks.T3Blocks;
 import dev.t3craft.client.T3CraftClient;
@@ -139,12 +140,14 @@ public final class BlocksClient implements ClientModInitializer {
 			return r;
 		});
 		BlockEntityRendererRegistry.register(c.lampType(), ctx -> new LampRenderer(this));
+		BlockEntityRendererRegistry.register(c.archiveTerminalType(), ctx -> new ArchiveTerminalRenderer());
 		BlockEntityRendererRegistry.register(c.kit().plaqueType(), ctx -> {
 			PlaqueRenderer r = new PlaqueRenderer();
 			plaqueRenderer = r;
 			return r;
 		});
 		MonitorBlock.setClientUse(this::use);
+		ArchiveTerminalBlock.setClientUse(pos -> dev.t3craft.client.archive.ArchiveClient.openIfReady());
 		ClientTickEvents.END_CLIENT_TICK.register(GuardedEvents.endClientTick(MODULE, this::tick));
 		ClientBlockEntityEvents.BLOCK_ENTITY_LOAD.register((be, level) -> liveLog.onLoad(be));
 		ClientBlockEntityEvents.BLOCK_ENTITY_UNLOAD.register((be, level) -> liveLog.onUnload(be));

@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": [
+    "IGI",
+    "IBI",
+    "IRI"
+  ],
+  "key": {
+    "I": "minecraft:iron_ingot",
+    "G": "minecraft:glass_pane",
+    "B": "minecraft:bookshelf",
+    "R": "minecraft:redstone"
+  },
+  "result": {
+    "id": "t3craft:archive_terminal"
+  }
+}

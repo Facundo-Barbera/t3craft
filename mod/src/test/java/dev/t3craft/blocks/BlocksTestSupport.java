@@ -97,6 +97,11 @@ final class BlocksTestSupport {
 			}
 
 			@Override
+			public BlockState archiveTerminal(Direction facing) {
+				return registered("archive_terminal").defaultBlockState().setValue(ArchiveTerminalBlock.FACING, facing);
+			}
+
+			@Override
 			public BlockState plaque(Direction facing) {
 				return kit.plaque(facing);
 			}
