@@ -320,6 +320,16 @@ public final class ConversationPanel implements AutoCloseable {
 		if (f == null) {
 			return;
 		}
+		if (!f.env().current()) {
+			// the connection was replaced (reload, pairing, Enable control): follow the new one
+			String e = envId;
+			String l = envLabel;
+			String th = f.transcript().threadId();
+			String ti = title;
+			key = null;
+			show(e, l, th, ti);
+			return;
+		}
 		ChatTranscript.View v = f.transcript().view();
 		ThreadFeed.State st = f.state();
 		if (scroll.atTop() && !scroll.following() && v.hasMoreHistory() && !st.loadingOlder() && st.olderError() == null) {

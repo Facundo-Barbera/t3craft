@@ -6,6 +6,7 @@ import dev.t3craft.t3.T3Connection;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.function.LongSupplier;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -25,6 +26,12 @@ public final class ThreadFeed implements AutoCloseable {
 	public record State(Phase phase, String detail, boolean loadingOlder, @Nullable String olderError) {
 	}
 
+	/**
+	 * How long the view waits for the thread's snapshot before it says so (it keeps listening: the
+	 * snapshot still turns it live if it arrives later). Never an endless "connecting".
+	 */
+	public static final long ANSWER_TIMEOUT_MS = 20_000;
+
 	private final ChatSource.Env env;
 	private final ChatTranscript transcript;
 	private final Runnable onChange;
@@ -34,8 +41,15 @@ public final class ThreadFeed implements AutoCloseable {
 	private volatile @Nullable String ended;
 	private volatile boolean loadingOlder;
 	private volatile @Nullable String olderError;
+	private final LongSupplier clock;
+	private volatile long waitingSince;
 
 	public ThreadFeed(ChatSource.Env env, String threadId, Runnable onChange) {
+		this(env, threadId, onChange, System::currentTimeMillis);
+	}
+
+	ThreadFeed(ChatSource.Env env, String threadId, Runnable onChange, LongSupplier clock) {
+		this.clock = clock;
 		this.env = env;
 		this.transcript = new ChatTranscript(threadId);
 		this.onChange = onChange;
@@ -58,11 +72,13 @@ public final class ThreadFeed implements AutoCloseable {
 		if (closed || subscription != null) {
 			return;
 		}
+		waitingSince = clock.getAsLong();
 		subscription = env.subscribeThread(transcript.threadId(), new StreamRegistry.Listener() {
 			@Override
 			public void onSubscribed() {
 				subscribed = true;
 				ended = null;
+				waitingSince = clock.getAsLong(); // (re)subscribed: a fresh snapshot is on its way
 				onChange.run();
 			}
 
@@ -122,16 +138,28 @@ public final class ThreadFeed implements AutoCloseable {
 		return new State(phaseNow(), detailNow(), loadingOlder, olderError);
 	}
 
+	/**
+	 * The thread's own stream decides first: once its snapshot is in, the view is live even while
+	 * the environment's shell is still syncing (status CONNECTING). Before that, the connection
+	 * status; and past {@link #ANSWER_TIMEOUT_MS} without a snapshot, a clear failure instead of an
+	 * endless "connecting".
+	 */
 	private Phase phaseNow() {
 		if (ended != null) {
 			return Phase.FAILED;
 		}
+		if (subscribed && transcript.hasSnapshot()) {
+			return Phase.LIVE;
+		}
 		return switch (env.status()) {
-			case OK -> subscribed && transcript.hasSnapshot() ? Phase.LIVE : Phase.CONNECTING;
-			case CONNECTING -> Phase.CONNECTING;
+			case OK, CONNECTING -> timedOut() ? Phase.FAILED : Phase.CONNECTING;
 			case OFFLINE -> Phase.OFFLINE;
 			default -> Phase.FAILED;
 		};
+	}
+
+	private boolean timedOut() {
+		return clock.getAsLong() - waitingSince >= ANSWER_TIMEOUT_MS;
 	}
 
 	private String detailNow() {
@@ -139,9 +167,16 @@ public final class ThreadFeed implements AutoCloseable {
 		if (e != null) {
 			return e;
 		}
+		if (subscribed && transcript.hasSnapshot()) {
+			return "live";
+		}
+		long s = ANSWER_TIMEOUT_MS / 1000;
 		return switch (env.status()) {
-			case OK -> subscribed && transcript.hasSnapshot() ? "live" : "loading the thread";
-			case CONNECTING -> "connecting to " + env.label();
+			case OK -> timedOut() ? env.label() + " did not send the thread within " + s + " s (still waiting; reopen it to retry)"
+					: "loading the thread";
+			case CONNECTING -> timedOut() ? "could not connect to " + env.label() + " within " + s + " s"
+					+ (env.statusDetail().isBlank() ? "" : " (" + T3Connection.sanitize(env.statusDetail()) + ")") + "; still trying"
+					: "connecting to " + env.label();
 			default -> T3Connection.sanitize(env.statusDetail());
 		};
 	}

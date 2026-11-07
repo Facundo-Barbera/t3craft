@@ -22,8 +22,9 @@ public final class PortableAdapter {
 		Map<String, String[]> envs = client.environments();
 		List<NpcInfo> infos = client.npcs().all();
 		List<PortableThread> rows = new ArrayList<>(infos.size());
+		java.util.Set<String> pinned = client.direct() == null ? java.util.Set.of() : pinnedIds(client.direct().shellViews());
 		for (NpcInfo n : infos) {
-			rows.add(row(n));
+			rows.add(row(n, pinned.contains(n.id())));
 		}
 		BridgeLink link = client.link();
 		if (link != null) {
@@ -35,7 +36,22 @@ public final class PortableAdapter {
 		return PortableState.of("not started", envs, rows, false, null);
 	}
 
+	/** NPC ids ({@code env:threadId}) of the threads pinned in T3, from the direct-mode shells. */
+	static java.util.Set<String> pinnedIds(Map<String, dev.t3craft.t3.ShellState.View> views) {
+		java.util.Set<String> out = new java.util.HashSet<>();
+		views.forEach((env, v) -> v.threads().forEach(t -> {
+			if (t.pinned()) {
+				out.add(env + ":" + t.id());
+			}
+		}));
+		return out;
+	}
+
 	static PortableThread row(NpcInfo n) {
+		return row(n, false);
+	}
+
+	static PortableThread row(NpcInfo n, boolean pinned) {
 		String[] parts = PortableThread.splitId(n.id());
 		return new PortableThread(
 				n.id(),
@@ -48,6 +64,7 @@ public final class PortableAdapter {
 				n.color(),
 				n.activity(),
 				n.priority(),
-				n.settled());
+				n.settled(),
+				pinned);
 	}
 }
