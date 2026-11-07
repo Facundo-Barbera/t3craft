@@ -27,6 +27,14 @@ public final class RpcFrames {
 	 */
 	public static final String SUBSCRIBE_SCHEDULED_TASKS = "scheduledTasks.subscribe";
 
+	/** Read-only ({@code orchestration:read}) thread search; a single Exit carries the result. */
+	public static final String SEARCH_THREADS = "orchestration.searchThreads";
+	/** T3 rejects queries shorter than this (after trimming). */
+	public static final int SEARCH_MIN_LENGTH = 2;
+	/** T3 rejects longer queries; they are cut to this before sending. */
+	public static final int SEARCH_MAX_LENGTH = 200;
+	public static final int SEARCH_MAX_LIMIT = 50;
+
 	public static String request(String id, String tag, JsonObject payload) {
 		JsonObject o = new JsonObject();
 		o.addProperty("_tag", "Request");
@@ -45,6 +53,27 @@ public final class RpcFrames {
 		JsonObject p = new JsonObject();
 		p.addProperty("requestCompletionMarker", true);
 		return request(id, SUBSCRIBE_SHELL, p);
+	}
+
+	/**
+	 * {@code orchestration.searchThreads} with {@code query} trimmed and cut to
+	 * {@link #SEARCH_MAX_LENGTH} and {@code limit} clamped to 1..{@link #SEARCH_MAX_LIMIT}.
+	 * Callers check {@link #searchQuery} first: T3 rejects queries under two characters.
+	 */
+	public static String searchThreads(String id, String query, int limit, @Nullable String environmentLabel) {
+		JsonObject p = new JsonObject();
+		p.addProperty("query", searchQuery(query));
+		p.addProperty("limit", Math.max(1, Math.min(SEARCH_MAX_LIMIT, limit)));
+		if (environmentLabel != null && !environmentLabel.isBlank()) {
+			p.addProperty("environmentLabel", environmentLabel);
+		}
+		return request(id, SEARCH_THREADS, p);
+	}
+
+	/** The query as it is sent: trimmed and cut to {@link #SEARCH_MAX_LENGTH}. */
+	public static String searchQuery(@Nullable String query) {
+		String q = query == null ? "" : query.strip();
+		return q.length() > SEARCH_MAX_LENGTH ? q.substring(0, SEARCH_MAX_LENGTH).strip() : q;
 	}
 
 	public static String ack(String requestId) {
@@ -73,8 +102,14 @@ public final class RpcFrames {
 	public record Chunk(String requestId, List<JsonObject> values) implements Frame {
 	}
 
-	/** {@code failure} is a short, secret-free description when the exit is a failure, else null. */
-	public record Exit(String requestId, @Nullable String failure) implements Frame {
+	/**
+	 * {@code failure} is a short, secret-free description when the exit is a failure, else null.
+	 * {@code value} is the success value of a non-stream RPC (null for streams and failures).
+	 */
+	public record Exit(String requestId, @Nullable String failure, @Nullable JsonElement value) implements Frame {
+		public Exit(String requestId, @Nullable String failure) {
+			this(requestId, failure, null);
+		}
 	}
 
 	public record Defect(String detail) implements Frame {
@@ -114,10 +149,13 @@ public final class RpcFrames {
 			case "Exit" -> {
 				JsonObject exit = Json.obj(o, "exit");
 				String failure = null;
+				JsonElement value = null;
 				if ("Failure".equals(Json.str(exit, "_tag"))) {
 					failure = describeCause(Json.arr(exit, "cause"));
+				} else if (exit != null && exit.has("value") && !exit.get("value").isJsonNull()) {
+					value = exit.get("value");
 				}
-				yield new Exit(String.valueOf(Json.str(o, "requestId")), failure);
+				yield new Exit(String.valueOf(Json.str(o, "requestId")), failure, value);
 			}
 			case "Defect", "ClientProtocolError" -> new Defect(tag + ": " + truncate(String.valueOf(o.get("defect") != null ? o.get("defect") : o.get("error"))));
 			case "Pong" -> new Pong();

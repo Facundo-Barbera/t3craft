@@ -46,8 +46,8 @@ public final class ScheduleBook implements ScheduleSource.Sink {
 
 	/** Forgets environments that are no longer configured. */
 	public void retain(Set<String> envIds) {
-		if (tasks.keySet().retainAll(envIds) | unavailable.keySet().retainAll(envIds)) {
-			}
+		tasks.keySet().retainAll(envIds);
+		unavailable.keySet().retainAll(envIds);
 	}
 
 	public void clear() {
