@@ -96,6 +96,29 @@ layout (anillo igual al del registro, anchors físicos con fallback, lugares del
 superponerse) y los bocadillos (ajuste de línea y fallback). `./gradlew build` pasa en verde,
 incluidos los tests que ya había.
 
+## Viene hacia el jugador (ATTENTION, ítem 16)
+
+Cuando un hilo pasa a `ATTENTION` y el jugador está cerca, el NPC deja el tablero (o su escritorio),
+**camina** con el pathfinder hasta unos 2,5 bloques del jugador, del lado por el que viene, lo mira
+y lo saluda (brazo y emote `o/`). Si van varios, se abren en abanico para no pisarse. Si el jugador
+se mueve más de 3 bloques, recalcula el lugar. Si no hay ruta, se queda donde está y saluda desde
+ahí (nunca se teletransporta).
+
+Vuelve a su lugar cuando el hilo sale de `ATTENTION`, cuando el jugador se aleja (más de
+`maxDistance` + 8 bloques) o cuando pasa `maxSeconds`. Si se agota el tiempo, no vuelve a venir
+hasta que el hilo salga de `ATTENTION`. Después de cada acercamiento hay un cooldown por NPC.
+
+`ApproachPlanner` (lógica pura, con tests en `ApproachTest`) decide quién viene y adónde.
+`NpcBrain.approach(spot)` reemplaza el lugar del tablero mientras dura. `BehaviorDirector` solo
+llama al planner y le pasa el resultado a cada cerebro. Config aditiva en `config/t3craft.json`,
+que se vuelve a leer cuando cambia el archivo:
+
+```json
+"npcApproach": { "enabled": true, "maxDistance": 16, "maxConcurrent": 2, "cooldownSeconds": 60, "maxSeconds": 30 }
+```
+
+Por código: `behavior().setApproachConfig(cfg)` (con `null` vuelve a leer el archivo).
+
 ## Pendientes
 
 - **No se probó dentro del juego**: no se lanzó Minecraft, por regla. Falta verificar a ojo la

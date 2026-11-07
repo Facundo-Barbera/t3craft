@@ -66,6 +66,10 @@ public final class NpcBrain {
 	private int stepAsideCooldown;
 	private int wanderFailures;
 	private boolean placed;
+	/** Spot next to the player while coming to them in ATTENTION ({@link ApproachPlanner}); null = not approaching. */
+	private @Nullable Anchor approach;
+	/** No route to {@link #approach}: stay put and gesture from here instead. */
+	private boolean approachStuck;
 
 	// Pose snapshot, valid after tick().
 	private float headYaw;
@@ -155,6 +159,22 @@ public final class NpcBrain {
 
 	public boolean error() {
 		return error;
+	}
+
+	/**
+	 * Come to the player: in ATTENTION, walk to {@code spot} instead of the board slot (null = go back
+	 * to the normal spot). Call before {@link #tick}. Walks only; if there is no route the NPC stays
+	 * where it is and gestures at the player.
+	 */
+	public void approach(@Nullable Anchor spot) {
+		if (spot == null || approach == null || spot.pos().distSqr(approach.pos()) > 0.25) {
+			approachStuck = false;
+		}
+		approach = spot;
+	}
+
+	public boolean approaching() {
+		return approach != null && mode == Mode.ATTENTION;
 	}
 
 	/** One tick. {@code player} is the local player's feet position or null. */
@@ -255,7 +275,7 @@ public final class NpcBrain {
 		}
 		return switch (mode) {
 			case WORKING -> t.desk();
-			case ATTENTION -> t.boardSlot() != null ? t.boardSlot() : t.desk();
+			case ATTENTION -> approach != null ? (approachStuck ? null : approach) : t.boardSlot() != null ? t.boardSlot() : t.desk();
 			case COMPLETED -> phase == Phase.CELEBRATING ? null : t.rest();
 			case IDLE -> goal == null ? wanderPoint(t) : null;
 		};
@@ -282,6 +302,15 @@ public final class NpcBrain {
 
 	private void route(Pos to, float yaw, Navigator nav, @Nullable Pos player) {
 		List<Pos> p = nav.path(pos, to, player);
+		if (p == null && approaching() && to.equals(approach.pos())) {
+			// No way to the player: no teleport, no walking through walls; wave from here.
+			approachStuck = true;
+			goal = pos;
+			motion.stand(motion.yaw());
+			phase = Phase.WAITING;
+			phaseTicks = 0;
+			return;
+		}
 		if (p == null && mode == Mode.IDLE) {
 			// Unreachable wander point: try another one shortly.
 			wanderFailures++;
@@ -366,7 +395,7 @@ public final class NpcBrain {
 			}
 			case WAITING -> {
 				emote = error ? Emote.ERROR : Emote.EXCLAIM;
-				if (near) {
+				if (near || (approaching() && player != null)) {
 					motion.faceTowards(pos.yawTo(player));
 					headYaw = pos.yawTo(player);
 					pitch = (float) -Math.toDegrees(Math.atan2(player.y() + 1.6 - (pos.y() + 1.6), Math.max(0.1, pd)));
