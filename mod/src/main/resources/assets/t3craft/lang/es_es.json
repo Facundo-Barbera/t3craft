@@ -1,6 +1,5 @@
 {
 	"item.t3craft.t3_terminal": "Terminal T3",
-	"key.category.t3craft.t3craft": "T3Craft",
 	"key.t3craft.portable": "Abrir terminal T3",
 	"key.category.t3craft.general": "T3Craft",
 	"key.t3craft.open_settings": "Abrir ajustes de T3Craft",
@@ -8,5 +7,17 @@
 	"key.t3craft.pair": "Emparejar un entorno T3",
 	"key.t3craft.reconnect": "Reconectar con T3",
 	"key.t3craft.reload": "Recargar configuración de T3Craft",
-	"key.t3craft.toggle_notifications": "Silenciar/activar avisos de T3Craft"
+	"key.t3craft.toggle_notifications": "Silenciar/activar avisos de T3Craft",
+	"t3craft.demo.button": "T3Craft HQ",
+	"t3craft.demo.button.tooltip": "Abre el mundo demo T3Craft HQ (superplano, creativo). Se crea la primera vez y el HQ se construye al entrar.",
+	"t3craft.demo.confirm.title": "¿Abrir %s?",
+	"t3craft.demo.confirm.body": "Se guardará y cerrará este mundo, y luego se abrirá el mundo demo T3Craft HQ.",
+	"advancements.t3craft.first_contact.title": "Primer contacto",
+	"advancements.t3craft.first_contact.description": "Usa un Terminal T3 para ver a tus agentes",
+	"t3craft.survival.needs_terminal": "Necesitas un Terminal T3 en el inventario (receta: panel de vidrio + redstone + lingote de cobre)",
+	"t3craft.survival.needs_singleplayer": "Los constructores necesitan un mundo de un jugador",
+	"t3craft.survival.spectator": "Los constructores no funcionan en modo espectador",
+	"t3craft.survival.adventure": "Los constructores no pueden editar un mundo de aventura sin trucos",
+	"t3craft.survival.needs_cheats": "Las construcciones de depuración gratis requieren trucos o modo creativo",
+	"t3craft.survival.ok": "Permitido"
 }

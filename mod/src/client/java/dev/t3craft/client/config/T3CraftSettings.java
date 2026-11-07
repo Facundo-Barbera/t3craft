@@ -25,6 +25,7 @@ public record T3CraftSettings(
 		boolean includeSubagents,
 		Notifications notifications,
 		Map<String, EnvPrefs> environments,
+		Portable portable,
 		ChatPrefs chat) {
 
 	public static final int SCHEMA_VERSION = 1;
@@ -36,24 +37,27 @@ public record T3CraftSettings(
 
 	public T3CraftSettings {
 		environments = Map.copyOf(new LinkedHashMap<>(environments));
+		portable = portable == null ? Portable.defaults() : portable;
 		chat = chat == null ? ChatPrefs.DEFAULT : chat;
 	}
 
-	/** Schema-1 shape without the (additive, optional) {@code chat} section. */
+	/** Pre-{@code chat} shape (kept so callers written before that section still compile). */
+	public T3CraftSettings(int schemaVersion, String mode, String bridgeUrl, @Nullable String bridgeKey, double recentWindowHours,
+			int maxPerEnvironment, boolean includeSubagents, Notifications notifications, Map<String, EnvPrefs> environments, Portable portable) {
+		this(schemaVersion, mode, bridgeUrl, bridgeKey, recentWindowHours, maxPerEnvironment, includeSubagents, notifications, environments,
+				portable, ChatPrefs.DEFAULT);
+	}
+
+	/** Pre-{@code portable} shape (kept so callers written before that section still compile). */
 	public T3CraftSettings(int schemaVersion, String mode, String bridgeUrl, @Nullable String bridgeKey, double recentWindowHours,
 			int maxPerEnvironment, boolean includeSubagents, Notifications notifications, Map<String, EnvPrefs> environments) {
 		this(schemaVersion, mode, bridgeUrl, bridgeKey, recentWindowHours, maxPerEnvironment, includeSubagents, notifications, environments,
-				ChatPrefs.DEFAULT);
-	}
-
-	public T3CraftSettings withChat(ChatPrefs c) {
-		return new T3CraftSettings(schemaVersion, mode, bridgeUrl, bridgeKey, recentWindowHours, maxPerEnvironment, includeSubagents,
-				notifications, environments, c);
+				Portable.defaults(), ChatPrefs.DEFAULT);
 	}
 
 	public static T3CraftSettings defaults() {
 		return new T3CraftSettings(SCHEMA_VERSION, "direct", DEFAULT_BRIDGE_URL, null, DEFAULT_WINDOW_HOURS, DEFAULT_MAX, false,
-				Notifications.defaults(), Map.of());
+				Notifications.defaults(), Map.of(), Portable.defaults());
 	}
 
 	/** Preferences of one environment; defaults for an environment that has no entry. */
@@ -69,23 +73,34 @@ public record T3CraftSettings(
 			m.put(id, prefs);
 		}
 		return new T3CraftSettings(schemaVersion, mode, bridgeUrl, bridgeKey, recentWindowHours, maxPerEnvironment, includeSubagents,
-				notifications, m, chat);
+				notifications, m, portable, chat);
 	}
 
 	public T3CraftSettings withoutEnv(String id) {
 		Map<String, EnvPrefs> m = new LinkedHashMap<>(environments);
 		m.remove(id);
 		return new T3CraftSettings(schemaVersion, mode, bridgeUrl, bridgeKey, recentWindowHours, maxPerEnvironment, includeSubagents,
-				notifications, m, chat);
+				notifications, m, portable, chat);
 	}
 
 	public T3CraftSettings withNotifications(Notifications n) {
 		return new T3CraftSettings(schemaVersion, mode, bridgeUrl, bridgeKey, recentWindowHours, maxPerEnvironment, includeSubagents, n,
-				environments, chat);
+				environments, portable, chat);
 	}
 
 	public T3CraftSettings withVisibility(double windowHours, int max, boolean subagents) {
-		return new T3CraftSettings(schemaVersion, mode, bridgeUrl, bridgeKey, windowHours, max, subagents, notifications, environments, chat);
+		return new T3CraftSettings(schemaVersion, mode, bridgeUrl, bridgeKey, windowHours, max, subagents, notifications, environments,
+				portable, chat);
+	}
+
+	public T3CraftSettings withChat(ChatPrefs c) {
+		return new T3CraftSettings(schemaVersion, mode, bridgeUrl, bridgeKey, recentWindowHours, maxPerEnvironment, includeSubagents,
+				notifications, environments, portable, c);
+	}
+
+	public T3CraftSettings withPortable(Portable p) {
+		return new T3CraftSettings(schemaVersion, mode, bridgeUrl, bridgeKey, recentWindowHours, maxPerEnvironment, includeSubagents,
+				notifications, environments, p, chat);
 	}
 
 	public long recentWindowMs() {
@@ -96,7 +111,7 @@ public record T3CraftSettings(
 	public String toString() {
 		return "T3CraftSettings[v" + schemaVersion + ", mode=" + mode + ", bridgeUrl=" + bridgeUrl + ", bridgeKey="
 				+ (bridgeKey == null ? "none" : "<redacted>") + ", window=" + recentWindowHours + "h, max=" + maxPerEnvironment
-				+ ", subagents=" + includeSubagents + ", " + notifications + ", envs=" + environments.keySet() + ", " + chat + "]";
+				+ ", subagents=" + includeSubagents + ", " + notifications + ", envs=" + environments.keySet() + ", " + portable + ", " + chat + "]";
 	}
 
 	/**
@@ -114,6 +129,21 @@ public record T3CraftSettings(
 
 		public ChatPrefs withHiddenEnvironments(java.util.Set<String> ids) {
 			return new ChatPrefs(ids);
+		}
+	}
+
+	/**
+	 * Portable T3 Terminal section ({@code "portable": {...}}, additive: a file without it reads as
+	 * the defaults). {@code heldScreen}: the terminal held in either hand shows a live summary on its
+	 * screen, map-style; false = plain item. Default on.
+	 */
+	public record Portable(boolean heldScreen) {
+		public static Portable defaults() {
+			return new Portable(true);
+		}
+
+		public Portable withHeldScreen(boolean v) {
+			return new Portable(v);
 		}
 	}
 

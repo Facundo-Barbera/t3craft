@@ -37,14 +37,20 @@ class PortableWiringTest {
 
 	@Test
 	void itemHasModelTextureAndNames() throws IOException {
-		assertEquals("t3craft:item/t3_terminal", json("assets/t3craft/items/t3_terminal.json").getAsJsonObject("model").get("model").getAsString());
+		JsonObject item = json("assets/t3craft/items/t3_terminal.json").getAsJsonObject("model");
+		assertEquals("t3craft:item/t3_terminal", item.getAsJsonObject("fallback").get("model").getAsString(), "GUI, ground, frames: plain sprite");
+		String held = item.getAsJsonArray("cases").get(0).getAsJsonObject().toString();
+		assertTrue(held.contains("firstperson_lefthand") && held.contains("firstperson_righthand"), "live screen in both first-person hands");
+		assertTrue(held.contains("t3craft:held_terminal_screen"), "special renderer type registered by HeldScreen");
+		assertEquals("t3craft:item/t3_terminal", json("assets/t3craft/models/item/t3_terminal_held.json").get("parent").getAsString());
 		assertEquals("t3craft:item/t3_terminal", json("assets/t3craft/models/item/t3_terminal.json").getAsJsonObject("textures").get("layer0").getAsString());
 		assertTrue(Files.size(RES.resolve("assets/t3craft/textures/item/t3_terminal.png")) > 0);
 		for (String lang : List.of("en_us", "es_es")) {
 			JsonObject l = json("assets/t3craft/lang/" + lang + ".json");
 			assertTrue(l.has("item.t3craft.t3_terminal"), lang);
 			assertTrue(l.has(PortableClient.KEY_NAME), lang);
-			assertTrue(l.has("key.category.t3craft.t3craft"), lang);
+			assertTrue(l.has("key.category.t3craft.general"), lang); // shared T3CraftKeys.CATEGORY
+			assertFalse(l.has("key.category.t3craft.t3craft"), lang + ": the old portable-only category is gone");
 		}
 	}
 

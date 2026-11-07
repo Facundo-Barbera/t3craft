@@ -37,7 +37,7 @@ class ChatPrefsTest {
 	@Test
 	void otherWithersKeepChat() {
 		T3CraftSettings s = T3CraftSettings.defaults().withChat(new T3CraftSettings.ChatPrefs(Set.of("a")));
-		assertEquals(Set.of("a"), s.withVisibility(2, 3, true).withNotifications(s.notifications()).withEnv("x", T3CraftSettings.EnvPrefs.DEFAULT)
+		assertEquals(Set.of("a"), s.withVisibility(2, 3, true).withPortable(s.portable().withHeldScreen(false)).withNotifications(s.notifications()).withEnv("x", T3CraftSettings.EnvPrefs.DEFAULT)
 				.withoutEnv("x").chat().hiddenEnvironments());
 	}
 }

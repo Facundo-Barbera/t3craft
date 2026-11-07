@@ -1,6 +1,5 @@
 {
 	"item.t3craft.t3_terminal": "T3 Terminal",
-	"key.category.t3craft.t3craft": "T3Craft",
 	"key.t3craft.portable": "Open T3 Terminal",
 	"key.category.t3craft.general": "T3Craft",
 	"key.t3craft.open_settings": "Open T3Craft settings",
@@ -8,5 +7,17 @@
 	"key.t3craft.pair": "Pair a T3 environment",
 	"key.t3craft.reconnect": "Reconnect to T3",
 	"key.t3craft.reload": "Reload T3Craft config",
-	"key.t3craft.toggle_notifications": "Mute/unmute T3Craft notifications"
+	"key.t3craft.toggle_notifications": "Mute/unmute T3Craft notifications",
+	"t3craft.demo.button": "T3Craft HQ",
+	"t3craft.demo.button.tooltip": "Open the T3Craft HQ demo world (superflat, creative). Created the first time; the HQ is built when you enter.",
+	"t3craft.demo.confirm.title": "Open %s?",
+	"t3craft.demo.confirm.body": "This world will be saved and closed, then the T3Craft HQ demo world opens.",
+	"advancements.t3craft.first_contact.title": "First Contact",
+	"advancements.t3craft.first_contact.description": "Use a T3 Terminal to look in on your agents",
+	"t3craft.survival.needs_terminal": "You need a T3 Terminal in your inventory (craft: glass pane + redstone + copper ingot)",
+	"t3craft.survival.needs_singleplayer": "Builders need a singleplayer world",
+	"t3craft.survival.spectator": "Builders do not work in spectator mode",
+	"t3craft.survival.adventure": "Builders cannot edit an adventure world without cheats",
+	"t3craft.survival.needs_cheats": "Free debug builds need cheats or creative mode",
+	"t3craft.survival.ok": "Allowed"
 }
