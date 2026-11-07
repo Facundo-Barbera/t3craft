@@ -1,4 +1,6 @@
-package dev.t3craft.client.portable;
+package dev.t3craft.client.portable.pending;
+
+import dev.t3craft.client.portable.PortableThread;
 
 import com.google.gson.JsonParser;
 import dev.t3craft.T3Craft;

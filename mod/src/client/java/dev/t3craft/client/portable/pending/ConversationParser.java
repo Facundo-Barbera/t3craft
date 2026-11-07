@@ -1,4 +1,4 @@
-package dev.t3craft.client.portable;
+package dev.t3craft.client.portable.pending;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;

@@ -66,6 +66,23 @@ public final class BitmapFont {
 		return new BitmapFont(map, ch);
 	}
 
+	/**
+	 * The classic {@code ascii.png} layout (16×16 cells, code point = row × 16 + column) for the
+	 * printable ASCII range; other cells empty. Used when the provider JSON cannot be read.
+	 */
+	public static List<String> classicAsciiGrid() {
+		List<String> rows = new java.util.ArrayList<>(16);
+		for (int r = 0; r < 16; r++) {
+			StringBuilder b = new StringBuilder(16);
+			for (int c = 0; c < 16; c++) {
+				int cp = r * 16 + c;
+				b.append(cp >= 0x20 && cp <= 0x7E ? (char) cp : '\u0000');
+			}
+			rows.add(b.toString());
+		}
+		return rows;
+	}
+
 	/** Fallback when the sheet cannot be read: every character is a small box (still shows layout). */
 	public static BitmapFont boxes() {
 		Map<Integer, Glyph> map = new HashMap<>();

@@ -1,4 +1,6 @@
-package dev.t3craft.client.portable;
+package dev.t3craft.client.portable.pending;
+
+import dev.t3craft.client.portable.PortableThread;
 
 /**
  * When the minimal conversation reader asks T3 again (pure, tested). Cheap by default: nothing while
