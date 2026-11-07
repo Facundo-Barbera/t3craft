@@ -28,16 +28,16 @@ import org.jspecify.annotations.Nullable;
  * build idempotent, and what to build (everything, only the diff, or nothing). No Minecraft client
  * state here, so it is unit tested; {@link DemoHqSource} plugs it into the demo.
  *
- * <p>Coordinates: the HQ plans are relative to the HQ origin (hub floor centre, basement down to
- * {@code y = -5}). The demo bakes {@link HqPlans#demoSite()} into them (entrance north, portico front
- * on {@code z = 0}, growth to {@code +z}), lifted by {@code lift} blocks so the basement fits above
+ * <p>Coordinates: the HQ plans are relative to the HQ origin (hub floor centre, {@code y = 0} the
+ * lowest layer). The demo bakes {@link HqPlans#demoSite()} into them (entrance north, portico front
+ * on {@code z = 0}, growth to {@code +z}), lifted by {@code lift} blocks so the floor stays above
  * bedrock in a shallow superflat world, plus a tuff plinth that fills the gap between the ground
  * ({@code y = -1} relative to the demo origin) and the hub floor. Built at the demo origin with
  * rotation {@code NONE}.
  */
 public final class DemoHq {
 	/** Bump when anything here changes the built result (plinth, lift rule): hashes change, the HQ is rebuilt. */
-	public static final int PLAN_VERSION = 1;
+	public static final int PLAN_VERSION = 2;
 
 	private DemoHq() {
 	}
@@ -77,7 +77,7 @@ public final class DemoHq {
 		return b.build();
 	}
 
-	/** Fixed example: three projects in two environments, four threads each, one of them settled (archived). */
+	/** Fixed example: three projects in two environments, four threads each, one of them settled (on the "Archived" shelf). */
 	public static HqInput sample() {
 		String[][] projects = {{"vps", "t3craft"}, {"acmesite", "forja"}, {"vps", "telar"}};
 		HqInput.Builder b = HqInput.builder();
@@ -112,7 +112,7 @@ public final class DemoHq {
 		return o;
 	}
 
-	/** Blocks to raise the HQ so its lowest cell ({@code planMinY}, the basement floor) sits above the bedrock layer. */
+	/** Blocks to raise the HQ so its lowest cell ({@code planMinY}, the floor layer) sits above the bedrock layer. */
 	public static int lift(int originY, int worldMinY, int planMinY) {
 		return Math.max(0, worldMinY + 1 - (originY + planMinY));
 	}
