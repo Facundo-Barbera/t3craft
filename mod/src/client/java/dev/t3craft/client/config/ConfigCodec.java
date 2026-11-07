@@ -6,6 +6,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import dev.t3craft.client.config.T3CraftSettings.EnvPrefs;
 import dev.t3craft.client.config.T3CraftSettings.Notifications;
+import dev.t3craft.client.config.T3CraftSettings.Portable;
 import dev.t3craft.t3.Environments;
 import java.net.URI;
 import java.util.ArrayList;
@@ -107,7 +108,22 @@ public final class ConfigCodec {
 			w.add("environments must be an object");
 		}
 
-		return new Decoded(new T3CraftSettings(T3CraftSettings.SCHEMA_VERSION, mode, bridgeUrl, bridgeKey, window, max, subagents, n, envs), w);
+		Portable portable = decodePortable(o, w);
+
+		return new Decoded(new T3CraftSettings(T3CraftSettings.SCHEMA_VERSION, mode, bridgeUrl, bridgeKey, window, max, subagents, n, envs,
+				portable), w);
+	}
+
+	private static Portable decodePortable(JsonObject o, List<String> w) {
+		Portable d = Portable.defaults();
+		JsonObject p = obj(o, "portable");
+		if (p == null) {
+			if (o.has("portable") && !o.get("portable").isJsonNull()) {
+				w.add("portable must be an object");
+			}
+			return d;
+		}
+		return new Portable(bool(p, "heldScreen", d.heldScreen(), w));
 	}
 
 	private static Notifications decodeNotifications(@Nullable JsonObject o, List<String> w) {
@@ -213,6 +229,10 @@ public final class ConfigCodec {
 			envs.add(e.getKey(), eo);
 		});
 		o.add("environments", envs);
+
+		JsonObject po = obj(o, "portable") == null ? new JsonObject() : obj(o, "portable");
+		po.addProperty("heldScreen", s.portable().heldScreen());
+		o.add("portable", po);
 		return o;
 	}
 
