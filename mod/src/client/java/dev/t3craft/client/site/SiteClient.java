@@ -9,7 +9,6 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import dev.t3craft.T3Craft;
 import dev.t3craft.site.Restorer;
-import dev.t3craft.site.SiteLimits;
 import dev.t3craft.site.SiteService;
 import dev.t3craft.site.mc.SiteRuntime;
 import java.util.function.Function;
@@ -99,12 +98,12 @@ public final class SiteClient implements ClientModInitializer {
 					String dim = SiteRuntime.dimensionId(c.getSource().getLevel());
 					int x = p.getBlockX();
 					int z = p.getBlockZ();
-					// The site goes right in front of the player (outside the box), entrance facing them.
+					// The site goes right in front of the player (outside its reserve), entrance facing them.
 					var dir = p.getDirection();
-					int ahead = SiteLimits.FOOTPRINT / 2 + SiteLimits.APRON + 2;
-					int cx = x + dir.getStepX() * ahead;
-					int cz = z + dir.getStepZ() * ahead;
-					return run(c, s -> s.here(dim, cx, cz, x, z));
+					return run(c, s -> {
+						int ahead = s.request().frontReach();
+						return s.here(dim, x + dir.getStepX() * ahead, z + dir.getStepZ() * ahead, x, z);
+					});
 				}))
 				.then(literal("pick").executes(c -> {
 					var p = c.getSource().getPlayer();

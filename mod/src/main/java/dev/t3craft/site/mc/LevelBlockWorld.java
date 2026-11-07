@@ -48,7 +48,12 @@ public final class LevelBlockWorld implements BlockWorld {
 	}
 
 	public String key(BlockState s) {
-		return keys.computeIfAbsent(s, st -> StateKey.fromTag(NbtUtils.writeBlockState(st)));
+		return keys.computeIfAbsent(s, LevelBlockWorld::keyOf);
+	}
+
+	/** Canonical {@link StateKey} of a block state (uncached). */
+	public static String keyOf(BlockState s) {
+		return StateKey.fromTag(NbtUtils.writeBlockState(s));
 	}
 
 	/** Parses a key; unknown blocks are an error (never silently air). */
