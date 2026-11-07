@@ -98,6 +98,7 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 		T3CraftCommands.register(this);
 		dev.t3craft.hq.HqPreviewCommand.register(npcs::all); // feat/hq-design: /t3craft debug hq-preview
 		PeekHud.register();
+		dev.t3craft.client.hud.StatusBar.register(this); // feat/hud-bar
 		PortableClient.register(this);
 		dev.t3craft.client.search.SearchClient.register(this); // feat/search: /t3craft search
 
