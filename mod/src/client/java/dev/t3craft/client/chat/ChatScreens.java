@@ -2,6 +2,11 @@ package dev.t3craft.client.chat;
 
 import dev.t3craft.client.T3CraftClient;
 import dev.t3craft.client.config.ConfigManager;
+import dev.t3craft.client.config.EnvironmentActions;
+import dev.t3craft.client.config.EnvironmentsScreen;
+import dev.t3craft.client.operate.OperateClient;
+import dev.t3craft.client.operate.OperateUi;
+import dev.t3craft.client.screen.OperatePairScreen;
 import dev.t3craft.client.config.T3CraftSettings;
 import dev.t3craft.client.npc.NpcInfo;
 import dev.t3craft.t3.DirectController;
@@ -17,6 +22,7 @@ import java.util.Map;
 import java.util.Set;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.resources.language.I18n;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -59,13 +65,20 @@ public final class ChatScreens {
 
 	/** The browser screen, preselecting {@code key} ({@code env:threadId}) when not null. */
 	public static Screen create(@Nullable String key) {
-		return ThreadBrowserScreen.of(browser(ChatTheme.warmStudio()), key);
+		return new ThreadBrowserScreen(() -> {
+			ThreadBrowser b = browser(ChatTheme.warmStudio());
+			b.conversation().setActions(screenActions());
+			return b;
+		}, key);
 	}
 
 	/** Kept for callers of the first feat/chat API: a browser on one thread from a custom source. */
 	public static Screen create(ChatSource source, String envId, String threadId, String title) {
-		ThreadBrowser b = new ThreadBrowser(defaultDirectory(), source, ChatTheme.warmStudio(), configFilterStore());
-		return ThreadBrowserScreen.of(b, envId + ":" + threadId);
+		return new ThreadBrowserScreen(() -> {
+			ThreadBrowser b = new ThreadBrowser(defaultDirectory(), source, ChatTheme.warmStudio(), configFilterStore());
+			b.conversation().setActions(screenActions());
+			return b;
+		}, envId + ":" + threadId);
 	}
 
 	/** A browser wired to the default directory, source and config-backed filter. */
@@ -171,14 +184,56 @@ public final class ChatScreens {
 		return envId -> {
 			T3CraftClient client = T3CraftClient.get();
 			DirectController direct = client == null ? null : client.direct();
-			if (direct == null) {
-				throw new ChatSource.Unavailable("Chat history needs direct mode (set \"mode\": \"direct\" and /t3craft pair).");
+			T3Connection c = direct == null ? null : direct.connection(envId);
+			return switch (ChatAccess.history(direct != null, c != null)) {
+				case DIRECT -> ChatSource.of(c);
+				case PAIR_FOR_DIRECT -> throw new ChatSource.Unavailable(I18n.get("t3craft.chat.history.bridge"),
+						ChatSource.Unavailable.Action.PAIR);
+				case NOT_PAIRED -> throw new ChatSource.Unavailable(I18n.get("t3craft.chat.history.not_paired", envId),
+						ChatSource.Unavailable.Action.PAIR);
+			};
+		};
+	}
+
+	// ---- actions (buttons in the conversation) ------------------------------------------------
+
+	/**
+	 * Whether {@code envId} can operate (write). Small wrapper so the chat has one place to ask: today
+	 * {@link OperateUi#canOperate} (the operate token is present and valid); when the default pairing
+	 * becomes read+operate (fix/pair-default-operate) the same query answers for both. Never throws.
+	 */
+	public static boolean canOperate(String envId) {
+		try {
+			return OperateUi.canOperate(envId);
+		} catch (RuntimeException | LinkageError e) {
+			return false;
+		}
+	}
+
+	/**
+	 * The conversation's buttons for a browser hosted by a screen: each opens its screen with the
+	 * current one as the parent, so Done/Esc comes back to the same thread.
+	 */
+	public static ConversationPanel.Actions screenActions() {
+		return new ConversationPanel.Actions() {
+			@Override
+			public boolean canOperate(String envId) {
+				return ChatScreens.canOperate(envId);
 			}
-			T3Connection c = direct.connection(envId);
-			if (c == null) {
-				throw new ChatSource.Unavailable("Environment \"" + envId + "\" is not paired (/t3craft pair).");
+
+			@Override
+			public void enableControl(String envId) {
+				Minecraft mc = Minecraft.getInstance();
+				Screen back = mc.gui.screen();
+				var env = OperateClient.environment(envId);
+				mc.gui.setScreen(env.isPresent() ? new OperatePairScreen(back, env.get()) : new EnvironmentsScreen(back, EnvironmentActions.DEFAULT));
 			}
-			return ChatSource.of(c);
+
+			@Override
+			public void pair() {
+				Minecraft mc = Minecraft.getInstance();
+				mc.gui.setScreen(new EnvironmentsScreen(mc.gui.screen(), EnvironmentActions.DEFAULT));
+			}
 		};
 	}
 }

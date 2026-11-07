@@ -133,5 +133,11 @@
 	"t3craft.blocks.status": "Módulo de bloques: %s (%s lámparas cargadas, %s cambiadas en la última actualización). /t3craft blocks link <env:hilo> | unlink",
 	"t3craft.blocks.singleplayer_only": "Solo en un mundo individual o como anfitrión LAN.",
 	"t3craft.blocks.look_at_block": "Mira un monitor o una lámpara de T3Craft.",
-	"t3craft.blocks.linked": "Bloque vinculado a %s."
+	"t3craft.blocks.linked": "Bloque vinculado a %s.",
+	"t3craft.chat.history.bridge": "En modo bridge no hay historial: el bridge aún no lo sirve. Empareja este entorno y pon \"mode\": \"direct\" en t3craft.json para leerlo aquí.",
+	"t3craft.chat.history.not_paired": "El entorno \"%s\" no está emparejado, así que no se puede leer su historial.",
+	"t3craft.chat.history.pair_button": "Emparejar en modo directo…",
+	"t3craft.chat.reply.read_only": "Solo lectura: habilita el control para responder",
+	"t3craft.chat.reply.read_only_short": "Solo lectura",
+	"t3craft.chat.reply.enable_button": "Habilitar control"
 }
