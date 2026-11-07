@@ -72,6 +72,9 @@ public final class BehaviorDirector {
 	private final ApproachPlanner approaches = new ApproachPlanner();
 	private @Nullable ApproachConfig approachOverride;
 	private ApproachConfig.@Nullable Watcher approachConfig;
+	/** Shared A* + collision over the current level (route cache and node budget live across ticks). */
+	private @Nullable Navigation navigation;
+	private @Nullable ClientLevel navigationLevel;
 
 	/** Plug in a physical base (null = none, ring layout only). See {@link AnchorSource}. */
 	public void setAnchorSource(@Nullable AnchorSource source) {
@@ -130,6 +133,8 @@ public final class BehaviorDirector {
 		ring = null;
 		ringMembers = null;
 		ringOrigin = null;
+		navigation = null;
+		navigationLevel = null;
 	}
 
 	/**
@@ -139,8 +144,12 @@ public final class BehaviorDirector {
 	public void tick(ClientLevel lvl, Player player, Vec3 origin, Collection<Body> bodies) {
 		tick++;
 		AnchorSource layout = new LayeredAnchors(anchors, ring(origin, bodies));
-		GridPathfinder finder = new GridPathfinder(new LevelWalkable(lvl));
-		NpcBrain.Navigator nav = finder::find;
+		if (navigation == null || navigationLevel != lvl) {
+			navigation = Navigation.over(new LevelBlocks(lvl));
+			navigationLevel = lvl;
+		}
+		Navigation nav = navigation;
+		nav.beginTick();
 		Pos playerPos = pos(player.position());
 
 		// Board slots: NPCs needing attention, most urgent first.
