@@ -62,7 +62,22 @@ public final class HqPlans {
 
 	/** The HQ plan of a layout, with the active {@link HqFixtures} (vanilla unless the blocks module is on). */
 	public static BuildPlan generate(HqLayout layout) {
-		return HqFixtures.active().apply(new HqGenerator().generate(layout));
+		return generate(layout, HqFixtures.active());
+	}
+
+	/** The HQ plan of a layout with the given fixtures ({@link HqFixtures#VANILLA} for the bare generator output). */
+	public static BuildPlan generate(HqLayout layout, HqFixtures fixtures) {
+		return fixtures.apply(new HqGenerator().generate(layout));
+	}
+
+	/**
+	 * {@link HqGenerator#plan} (stable desk allocation against {@code previous}) with the active
+	 * {@link HqFixtures} applied. Use this, not {@code HqGenerator.plan}, for anything that is built in
+	 * the world: the generator alone always gives the vanilla HQ.
+	 */
+	public static HqGenerator.Result plan(HqInput input, @Nullable HqLayout previous) {
+		HqLayout layout = HqLayout.allocate(input, previous);
+		return new HqGenerator.Result(layout, generate(layout));
 	}
 
 	/** Every group of {@code plan} as its own layered build plan, keyed by group, in build order. */
