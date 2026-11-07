@@ -63,7 +63,7 @@ hay estado estático y el tema siempre se inyecta.
 // 1. Todo junto: lista + conversación
 ThreadBrowser b = new ThreadBrowser(
         ChatScreens.defaultDirectory(),      // ThreadDirectory: filas + ambientes
-        ChatScreens.defaultSource(),         // ChatSource: endpoint + token por ambiente
+        ChatScreens.defaultSource(),         // ChatSource: la T3Connection de cada ambiente
         ChatTheme.terminal(),                // tema (o warmStudio(), o toBuilder()...)
         ChatScreens.configFilterStore());    // FilterStore (o null para no persistir)
 b.setMode(ThreadBrowser.Mode.AUTO);         // AUTO | SPLIT | COMPACT
@@ -72,7 +72,7 @@ b.open("vps:thr_123");                      // opcional
 // render:   b.setBounds(new Rect(x, y, w, h)); b.render(g, font, mouseX, mouseY);
 // input:    b.mouseClicked(mx, my, button); b.mouseScrolled(mx, my, dy);
 //           if (!b.keyPressed(keyEvent)) { /* el host: Esc cierra */ }
-// removed(): b.close();                    // cierra el socket del hilo
+// removed(): b.close();                    // libera la suscripción compartida del hilo
 // atajo:    ChatScreens.browser(theme) crea uno con las fuentes por defecto.
 
 // 2. Solo la lista
@@ -99,7 +99,7 @@ conv.setBounds(rect); conv.render(g, font, mx, my); conv.tick(); conv.close();
   dibuja con rellenos planos de los colores del tema, sin los sprites de AgentCraft. Así el portable
   puede aplicar su estilo sin que nada quede cableado. Para variantes: `toBuilder()…build()`.
 - **Fuentes de datos**: `ThreadDirectory` (`rows()` y `environments()`, las dos en el hilo del
-  cliente), `ChatSource` (endpoint y token de cada ambiente) y `ThreadBrowser.FilterStore`.
+  cliente), `ChatSource` (acceso de lectura a cada ambiente: `ChatSource.of(T3Connection)`) y `ThreadBrowser.FilterStore`.
 - **Pantalla completa**: `ThreadBrowserScreen` (la que usa `ChatScreens`).
 
 ### Modo compacto y escalado (para el portable)
@@ -133,28 +133,58 @@ claves desconocidas dentro de `chat` se conservan al guardar y el resto de `with
 `chat`. Las etiquetas y colores de cada ambiente salen de `environments.<id>.label/color`, que ya
 existían, y se usan en los iconos.
 
-## RPC de T3 que usa (solo `orchestration:read`)
+## Conexión: una sola por entorno (`T3Connection`) y suscripciones con refcount
 
-Lo revisé en T3 Code (`packages/contracts/src/orchestrationV2.ts`, `environmentHttp.ts` y
-`apps/server/src/orchestration-v2/http.ts`). Los dos endpoints hacen
-`requireEnvironmentScope(AuthOrchestrationReadScope)`:
+El chat **no abre sockets propios** (regla de `docs/api.md`). Todo pasa por la conexión única de
+cada entorno:
 
-1. **WS `orchestration.subscribeThread`**
-   `{threadId, requestCompletionMarker:true, acceptBoundedSnapshot:true}`. Devuelve
-   `OrchestrationV2ThreadStreamItem`: un `snapshot` (projection acotada con `visibleTurnItems`,
-   `historyCursor`, `hasMoreHistory`), después `synchronized` y luego `event`s (`turn-item.updated`,
-   `message.updated`, `run.*`, `runtime-request.updated`, `subagent.updated`, `thread.*`). No
-   pide `compactIds`, `dedupeBodies`, `compactTurnItems` ni `deferredWork`, así que el JSON llega
-   plano. Usa el mismo framing que `T3Connection` (Ack por Chunk, Ping cada 5 s, ticket nuevo por
-   conexión y backoff con jitter).
-2. **HTTP `GET /api/orchestration/threads/:threadId/history?cursor=…`** con
-   `Authorization: Bearer` y `x-t3-orchestration-protocol: 2`. Devuelve
-   `OrchestrationV2ThreadHistoryPage` (`items` del más antiguo al más nuevo, `nextCursor`,
-   `hasMoreHistory`). La fusión se deduplica por `sourceThreadId:sourceItemId`, igual que
-   `client-runtime/state/threadHistoryMerge.ts`.
+```java
+T3Connection c = direct.connection(envId);                 // DirectController, aditivo
+StreamRegistry.Subscription sub = c.subscribeThread(threadId, listener);   // compartida
+c.threadHistory(threadId, cursor);                         // HTTP …/history con la sesión del entorno
+c.getTurnItem(threadId, itemId);                           // RPC puntual (salida completa de una tool)
+c.getThreadProjection(threadId);                           // RPC puntual
+sub.close();                                               // la última vista hace Interrupt
+```
 
-Nunca se envía `dispatchCommand`, `launchThread` ni nada que requiera `operate` (hay un test que
-lo comprueba).
+- **`StreamRegistry`** (`dev.t3craft.t3`, Java puro y testeado) multiplexa sobre el socket de la
+  conexión. Todas las vistas de un mismo hilo comparten **una sola** suscripción
+  `orchestration.subscribeThread` (`requestCompletionMarker`, `acceptBoundedSnapshot`). La primera
+  envía el Request y la última `close()` envía el Interrupt. Las que llegan tarde reciben
+  `onSubscribed` y un replay de lo ya recibido (snapshot + eventos). Pasado `REPLAY_CAP`
+  (4000 items) se fuerza una suscripción nueva para todas. Al reconectar se resuscribe cada hilo
+  vivo con un request id nuevo. Si se cae el socket, las llamadas puntuales fallan y las
+  suscripciones reciben `onEnded(null)` (pausa, no error). Un listener que lanza excepciones no
+  afecta a los demás.
+- `T3Connection` enruta los Chunk y Exit por request id ("1" es el shell; el resto va al
+  registro) y responde con un Ack a cada Chunk. Los envíos van **en serie** por socket (`send()`
+  encadena los futures), porque el WebSocket del JDK no admite envíos solapados.
+- **`ThreadFeed`** ya no tiene socket ni executor propios. Mantiene una suscripción vía
+  `ChatSource.Env` (adaptador de `T3Connection`) y vuelca el stream en su `ChatTranscript`. Su
+  estado (LIVE / CONNECTING / OFFLINE / FAILED) sale del estado de la conexión compartida.
+  `close()` libera la suscripción. `fullItem(itemId)` usa `getTurnItem`.
+- Se envía solo lectura: `subscribeThread`, `getTurnItem`, `getThreadProjection`, Ack, Ping e
+  Interrupt, más `GET …/history`. Nunca `dispatchCommand` ni nada que requiera `operate`.
+- Esto deja preparados los monitores en vivo: diez monitores mirando el mismo hilo hacen una sola
+  suscripción.
+
+## Consolidación con el portable (ya en main)
+
+- **Un solo `EnvBadge`**: `dev.t3craft.client.chat.EnvBadge`. Tiene un color estable por id (o
+  `environments.<id>.color` del config) y la inicial de la última palabra de la etiqueta
+  ("my-vps" → V, "my-mini" → M), con texto legible según la luminancia. El held screen
+  (`HeldScreen`, `HeldScreenModel`) lo usa. `HeldScreenModel.Badge` y `portable/pending/EnvBadge`
+  se eliminaron.
+- **Un solo modelo de conversación**: `ChatTranscript` + `ThreadFeed`. Se eliminó
+  `portable/pending` (`Conversation`, `ConversationParser`, `ConversationSource`,
+  `HttpConversationSource` con su lectura HTTP propia, `FetchPolicy`): nada lo usaba y no tenía
+  tests.
+- **Un solo orden**: `ThreadOrder` (atención → actividad → activos antes que settled → título →
+  clave). Lo usan `ThreadList.ORDER` (`ThreadOrder.ROWS`), `PortableState.ORDER` y
+  `HeldScreenModel.order()`. El portable no tiene marcas de tiempo (el modelo de NPC no las trae),
+  así que allí la actividad empata. `ThreadOrderTest` comprueba que coinciden.
+- Pendiente para D2: incrustar `ThreadBrowser` en `PortableScreen` (con `ChatTheme.terminal()` y
+  `Mode.AUTO`) y `/t3craft history`. La API ya está lista (arriba).
 
 ## Archivos
 
@@ -169,7 +199,10 @@ lo comprueba).
 | `ChatTheme.java` | Tema inyectable (`warmStudio`, `terminal`, builder) | no |
 | `ThreadList.java`, `ThreadRow.java`, `Attention.java`, `Ago.java`, `EnvBadge.java`, `Rect.java` | Modelo de la lista, orden, filtro e icono | no (testeado) |
 | `ChatTurns.java`, `ToolLine.java`, `FeedScroll.java`, `FeedRules.java` | Turnos, líneas de herramienta, scroll y separadores | no (testeado) |
-| `Markdown.java`, `TextWrap.java`, `ChatEntry.java`, `TurnItems.java`, `ChatTranscript.java`, `ThreadFeed.java`, `ChatSource.java`, `ThreadDirectory.java` | Datos del hilo (sin cambios de comportamiento) | no (testeado) |
+| `Markdown.java`, `TextWrap.java`, `ChatEntry.java`, `TurnItems.java`, `ChatTranscript.java`, `ThreadDirectory.java` | Datos del hilo | no (testeado) |
+| `ThreadFeed.java`, `ChatSource.java` | Feed de una vista sobre la suscripción compartida; adaptador de `T3Connection` | no (testeado) |
+| `ThreadOrder.java` | Orden único (chat, portable, held screen) | no (testeado) |
+| `t3/StreamRegistry.java` (main) | Refcount, replay, resuscripción y llamadas puntuales sobre `T3Connection` | no (testeado) |
 | `assets/t3craft/textures/gui/sprites/chat/*` | Sprites del kit de AgentCraft (MIT) | recurso |
 
 `ChatScreen.java` (la pantalla anterior, que duplicaba el panel de conversación) se eliminó.
@@ -178,9 +211,13 @@ lo comprueba).
 
 - **Entrypoints, keybinds, comandos y registros: ninguno nuevo.** El clic derecho sobre el NPC de
   `T3CraftClient` ya llamaba a `ChatScreens.openFor(info)` y no se ha tocado.
-- **`DirectController.view(envId)`** (en `dev.t3craft.t3`): getter aditivo de una línea con el
-  `ShellState.View` de un ambiente. Las filas lo usan para sacar la actividad real
-  (`Visibility.lastActivity`) y saber si hay una petición pendiente.
+- **`dev.t3craft.t3`** (aditivo): `DirectController.view(envId)` (actividad real de las filas) y
+  `connection(envId)`. En `T3Connection`: `subscribeThread`, `getTurnItem`,
+  `getThreadProjection`, `threadHistory` y `activeThreadSubscriptions`, con envíos en serie. Nuevo
+  `StreamRegistry`. En `RpcFrames`: `subscribeThread(...)`, `GET_TURN_ITEM`,
+  `GET_THREAD_PROJECTION` y `Exit.value` (con un constructor de 2 argumentos que se conserva).
+- **Portable** (consolidación): se borró `portable/pending`. `HeldScreenModel`/`HeldScreen` usan
+  `chat.EnvBadge`, y `PortableState.ORDER`/`HeldScreenModel.order` usan `ThreadOrder`.
 - **Config**: `T3CraftSettings.chat` / `ChatPrefs` / `withChat`, y la sección `chat` en
   `ConfigCodec`. Todo aditivo.
 - **Recursos**: sprites en `assets/t3craft/textures/gui/sprites/chat/` (atlas GUI vanilla).
@@ -191,9 +228,11 @@ lo comprueba).
 
 ## Verificación
 
-- `./gradlew build` en `mod/`: verde. JUnit: 219 tests, 0 fallos. Los nuevos son `ThreadListTest`,
-  `AttentionAgoBadgeTest`, `ChatTurnsTest`, `ToolLineScrollRulesTest` y `ChatPrefsTest`, junto a
-  `MarkdownTest`, `TextWrapTest` y `ChatTranscriptTest`.
+- `./gradlew build` en `mod/`: verde. JUnit: 323 tests, 0 fallos. Los nuevos son `StreamRegistryTest` (refcount, replay, overflow,
+  reconexión, fin desde el servidor, llamadas puntuales y listeners rotos), `ThreadFeedTest` (ciclo
+  de vida sobre el registro), `ThreadOrderTest`, `ThreadListTest`, `AttentionAgoBadgeTest`,
+  `ChatTurnsTest`, `ToolLineScrollRulesTest` y `ChatPrefsTest`, junto a `MarkdownTest`,
+  `TextWrapTest` y `ChatTranscriptTest`. Los tests del held screen se adaptaron a `EnvBadge`.
 - No lo probé en Minecraft ni contra un T3 real: las reglas no lo permiten aquí.
 
 ## Pendientes
@@ -207,3 +246,5 @@ lo comprueba).
   un `TextFieldView` real, como el de AgentCraft.
 - `outputOmitted`: se podría pedir la salida con `orchestration.getTurnItem` al desplegarla.
 - Al reconectar se vuelve a pedir el snapshot y se pierden las páginas viejas ya cargadas.
+- La UI aún no usa `fullItem()` (`getTurnItem`) al desplegar una tool con `outputOmitted`. La vía
+  está lista.
