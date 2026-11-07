@@ -96,7 +96,7 @@ final class PlanBuilder {
 	}
 
 	/**
-	 * Standing anchors whose cell holds a thin floor layer (a carpet: the desk cushion, a runner)
+	 * Standing anchors whose cell holds a thin floor layer (a carpet: a wing runner)
 	 * are raised onto its top, so the NPC body at the anchor never overlaps a block.
 	 */
 	private Anchor lift(Anchor a) {

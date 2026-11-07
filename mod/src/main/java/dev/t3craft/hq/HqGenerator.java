@@ -403,7 +403,7 @@ public final class HqGenerator {
 			segment(b, i, s, accent);
 		}
 		for (int slot = 0; slot < w.capacity(); slot++) {
-			desk(b, i, slot, w.threadAt(slot), accent);
+			desk(b, i, slot, w.threadAt(slot));
 		}
 		boolean first = layout.modulesOf(w.projectKey()).get(0) == w;
 		Anchor door = Anchor.at(AnchorNames.module(i), new BlockPos(HqGeometry.wx(i, 1), 1, HqGeometry.wz(i, (DOOR_V1 + DOOR_V2) / 2)),
@@ -500,12 +500,11 @@ public final class HqGenerator {
 	}
 
 	/**
-	 * One desk: desk row against the wall (drawer barrel, two desk tops, monitor, status lamp), then
-	 * the chair: a carpet cushion (the seat, in front of the monitor) with an open-trapdoor backrest
-	 * in the cell behind it. The seat cell stays free of collision (air above a carpet), so the NPC
-	 * can walk in and stand there facing the computer; the cells beside the seat stay open to reach it.
+	 * One desk: desk row against the wall (drawer barrel, two desk tops, monitor, status lamp) and
+	 * the free standing cell in front of the monitor. No chair: NPCs work standing, so that cell stays
+	 * air (feet and head) over the desk floor, and the cells beside it stay open to reach it.
 	 */
-	private void desk(PlanBuilder b, int i, int slot, @Nullable String threadId, DyeColor accent) {
+	private void desk(PlanBuilder b, int i, int slot, @Nullable String threadId) {
 		Box box = HqGeometry.desk(i, slot);
 		try (PlanBuilder.Canvas c = b.module("wing_" + i + "_desk_" + slot, box, List.of())) {
 			Direction f = HqGeometry.deskFacing(slot);
@@ -513,11 +512,9 @@ public final class HqGenerator {
 			int cx = HqGeometry.wx(i, HqGeometry.segmentU(slot / 2) + 1);
 			int dz = HqGeometry.wz(i, HqGeometry.deskV(slot));
 			int chz = HqGeometry.wz(i, HqGeometry.chairV(slot));
-			int bkz = HqGeometry.wz(i, HqGeometry.backV(slot));
 			for (int dx = -1; dx <= 1; dx++) {
 				c.set(cx + dx, 0, dz, k.woodFloor);
 				c.set(cx + dx, 0, chz, k.woodFloor);
-				c.set(cx + dx, 0, bkz, k.woodFloor);
 			}
 			BlockPos desk = new BlockPos(cx, 1, dz);
 			BlockPos left = desk.relative(right.getOpposite());
@@ -530,10 +527,9 @@ public final class HqGenerator {
 			c.set(monitor, threadId == null ? k.monitorOff : k.monitorOn);
 			c.set(lamp, k.lamp());
 			c.decor(left.above(), k.fern);
-			BlockPos seat = new BlockPos(cx, 1, chz);
-			c.decor(seat, k.carpet(accent));
-			c.set(new BlockPos(cx, 1, bkz), k.backrest(f));
-			Anchor deskA = Anchor.at(AnchorNames.deskSlot(i, slot), seat, f);
+			// the standing cell is left unset: the canvas makes it air
+			BlockPos stand = new BlockPos(cx, 1, chz);
+			Anchor deskA = Anchor.at(AnchorNames.deskSlot(i, slot), stand, f);
 			Anchor screen = Anchor.face(AnchorNames.screenSlot(i, slot), monitor, f.getOpposite());
 			b.workstation(new Workstation(i, slot, threadId, deskA, monitor, screen, lamp));
 			if (threadId != null) {

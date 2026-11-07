@@ -72,17 +72,9 @@ final class Palette {
 		return stairs(copperStairs, back);
 	}
 
-	/**
-	 * A chair's backrest: an open dark oak trapdoor standing in the cell behind the seat, its panel
-	 * against the seat ({@code towardsSeat} = direction from this cell to the seat). The seat itself
-	 * is a {@link #carpet} cushion, so the NPC's cell has no collision (see {@code HqGenerator#desk}).
-	 */
-	BlockState backrest(Direction towardsSeat) {
-		// an open trapdoor's panel lies on the side opposite its facing
-		return Blocks.DARK_OAK_TRAPDOOR.defaultBlockState()
-				.setValue(BlockStateProperties.HORIZONTAL_FACING, towardsSeat.getOpposite())
-				.setValue(BlockStateProperties.OPEN, true)
-				.setValue(BlockStateProperties.HALF, Half.BOTTOM);
+	/** A seat: stairs with the backrest on {@code back}. */
+	BlockState chair(Direction back) {
+		return stairs(Blocks.DARK_OAK_STAIRS, back);
 	}
 
 	BlockState bench(Direction back) {

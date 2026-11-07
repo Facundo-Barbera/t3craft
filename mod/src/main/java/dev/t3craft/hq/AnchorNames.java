@@ -72,8 +72,8 @@ public final class AnchorNames {
 	}
 
 	/**
-	 * The seat of a thread's desk: the cushion cell in front of the computer (no collision, floor
-	 * below), where the NPC stands looking at its monitor.
+	 * Where a thread's NPC works: the free cell in front of its computer (air at feet and head, desk
+	 * floor below), standing and looking at the monitor. There are no chairs.
 	 */
 	public static String desk(String threadId) {
 		return "desk_" + threadId;

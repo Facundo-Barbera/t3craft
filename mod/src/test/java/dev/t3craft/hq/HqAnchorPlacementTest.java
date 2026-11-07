@@ -18,11 +18,6 @@ import java.util.Set;
 import java.util.stream.Stream;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.world.level.EmptyBlockGetter;
-import net.minecraft.world.level.block.CarpetBlock;
-import net.minecraft.world.level.block.TrapDoorBlock;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.AABB;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -117,32 +112,26 @@ class HqAnchorPlacementTest {
 	}
 
 	@Test
-	void seatIsACushionWithABackrestFacingTheComputer() {
+	void npcsStandAtTheirDesksFacingTheComputer() {
 		BuildPlan p = HqGenerator.plan(input(3, 6), null).plan();
 		assertEquals(HqLayout.DESKS * 3, p.workstations().size());
 		Set<Direction> seen = new java.util.HashSet<>();
 		for (Workstation w : p.workstations()) {
-			Anchor seat = w.deskAnchor();
-			Direction f = seat.facing();
+			Anchor stand = w.deskAnchor();
+			Direction f = stand.facing();
 			seen.add(f);
-			assertEquals(seat.block().relative(f).above(), w.computerPos(), "computer right in front of the seat, at eye level");
-			assertEquals(f.getOpposite(), w.screenFacing(), "the screen faces the seat");
-			assertEquals(f.toYRot(), seat.yaw(), 1e-6, "the NPC looks at the computer");
-			BlockState cushion = p.at(seat.block()).state();
-			assertTrue(cushion.getBlock() instanceof CarpetBlock, "seat cushion " + cushion);
-			// the backrest stands behind the seat, its panel against the seat's side of the cell
-			BlockPos back = seat.block().relative(f.getOpposite());
-			BlockState rest = p.at(back).state();
-			assertTrue(rest.getBlock() instanceof TrapDoorBlock, "backrest " + rest);
-			AABB panel = rest.getCollisionShape(EmptyBlockGetter.INSTANCE, back).bounds();
-			assertTrue(panel.getSize() > 0 && Math.min(panel.getXsize(), panel.getZsize()) < 0.25, "a thin panel: " + panel);
-			// the seat is on the f side of the backrest cell
-			double gapToSeat = f.getAxisDirection() == Direction.AxisDirection.NEGATIVE ? panel.min(f.getAxis()) : 1 - panel.max(f.getAxis());
-			assertEquals(0.0, gapToSeat, 1e-9, "panel flush with the seat side: " + panel);
+			assertEquals(stand.block().relative(f).above(), w.computerPos(), "computer right in front of the NPC, at eye level");
+			assertEquals(f.getOpposite(), w.screenFacing(), "the screen faces the NPC");
+			assertEquals(f.toYRot(), stand.yaw(), 1e-6, "the NPC looks at the computer");
+			// no chair: air at the feet and the head, the desk floor below
+			assertTrue(p.at(stand.block()).state().isAir(), "feet " + p.at(stand.block()).state());
+			assertTrue(p.at(stand.block().above()).state().isAir(), "head " + p.at(stand.block().above()).state());
+			assertFalse(p.at(stand.block().below()).state().isAir(), "floor below");
+			assertEquals(stand.block().getY(), stand.y(), 1e-9, "feet on the floor");
 			// never the desk, computer, lamp or a wall
-			assertNotEquals(w.computerPos(), seat.block());
-			assertNotEquals(w.lampPos(), seat.block());
-			assertNotEquals(w.computerPos().below(), seat.block());
+			assertNotEquals(w.computerPos(), stand.block());
+			assertNotEquals(w.lampPos(), stand.block());
+			assertNotEquals(w.computerPos().below(), stand.block());
 		}
 		assertEquals(Set.of(Direction.NORTH, Direction.SOUTH), seen, "north and south desks");
 	}
@@ -158,7 +147,7 @@ class HqAnchorPlacementTest {
 			seats.put(w.module() + "." + w.slot(), w.deskAnchor());
 		}
 		for (Workstation w : a.workstations()) {
-			assertEquals(seats.get(w.module() + "." + w.slot()), w.deskAnchor(), "same place, same seat");
+			assertEquals(seats.get(w.module() + "." + w.slot()), w.deskAnchor(), "same place, same spot");
 		}
 		// idempotent: regenerating from the kept layout changes nothing
 		HqGenerator.Result r = HqGenerator.plan(input(3, 7), null);
@@ -178,8 +167,8 @@ class HqAnchorPlacementTest {
 		Workstation w = p.workstations().get(0);
 		assertTrue(Double.isNaN(walk.floor(w.computerPos().below())), "the desk top");
 		assertTrue(Double.isNaN(walk.floor(w.computerPos())), "the computer");
-		assertFalse(walk.fits(w.deskAnchor().x(), w.deskAnchor().block().getY(), w.deskAnchor().z()),
-				"an anchor sunk into the cushion would overlap it");
+		Anchor runner = p.anchor(AnchorNames.walk("env:p0"));
+		assertFalse(walk.fits(runner.x(), runner.block().getY(), runner.z()), "an anchor sunk into the runner carpet would overlap it");
 	}
 
 	// ------------------------------------------------------------------ validator

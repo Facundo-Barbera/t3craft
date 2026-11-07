@@ -50,10 +50,8 @@ The HQ origin `(0,0,0)` is the centre of the hub floor. `y = 0` is the floor lay
   desks** (`HqLayout.DESKS`), end cap, and a garden strip. A module never grows. A project that
   needs more desks gets another identical module.
 - **Workstation** (one per desk): a barrel drawer, two desk tops, the **computer** (black concrete
-  when taken, grey when vacant), the status lamp (a waxed copper bulb), a fern and the chair: a
-  carpet cushion in the environment colour right in front of the computer, with an open dark oak
-  trapdoor as backrest in the cell behind it. The desk module is 3 × 3 (desk row, seat row,
-  backrest row).
+  when taken, grey when vacant), the status lamp (a waxed copper bulb), a fern, and the free cell in front of the
+  computer where the NPC works **standing** (no chairs: it is a game, chairs add nothing).
 
 ### Anchor rule
 
@@ -61,10 +59,10 @@ Every **standing** anchor (`AnchorNames.standing(name)`: spawn, entrance, hub, b
 slots, benches, stroll points, doors, desks, the spot in front of the "Archived" shelf) is a cell
 an NPC can walk into, judged by the client navigation's own `Collision` (0.6 × 1.8 body, real
 collision boxes, body sweep between cells): the body fits exactly at the anchor, standing on a
-floor, and the cell is reachable from the spawn. Anchors on a carpet (desk cushion, wing runner)
-are raised onto its top (`PlanBuilder` lifts them), so the body never overlaps a block. So seats
-are never stairs: the desk seat is the cushion cell (the NPC stands at the desk facing the
-computer), and `bench_*` is the cell in front of each hub bench. `HqAnchorPlacementTest` checks this with a flood fill over
+floor, and the cell is reachable from the spawn. Anchors on a carpet (the wing runner)
+are raised onto its top (`PlanBuilder` lifts them), so the body never overlaps a block. So no
+anchor is ever a stair or a chair: the desk anchor is the free cell in front of the computer (the
+NPC works standing, facing it), and `bench_*` is the cell in front of each hub bench. `HqAnchorPlacementTest` checks this with a flood fill over
 the plan for many rosters, annexes and a history. Surface anchors (board, lamps, monitors, screens,
 archived computers, shelf slots and signs) mark a block face and are not standing spots.
 
@@ -186,9 +184,9 @@ List<dev.t3craft.build.BuildPlan> all = HqPlans.forRoster(roster);
 | `shelf_more` | the "Older threads / +N / click to list" sign `(-4,4,7)`: click target for `overflow()` | N |
 | `wing_<projectKey>`, `walk_<projectKey>` | doorway / corridor of the project's **first** module | into the module |
 | `module@<i>`, `walk@<i>` | the same, for any module | into the module |
-| `desk_<threadId>` | on the seat cushion in front of the computer (feet on the carpet top) | towards the computer |
-| `monitor_<threadId>` | centre of the computer's screen face | towards the chair |
-| `lamp_<threadId>` | the status bulb (toggle `lit`) | towards the chair |
+| `desk_<threadId>` | the free cell in front of the computer, standing, at foot level | towards the computer |
+| `monitor_<threadId>` | centre of the computer's screen face | towards the NPC |
+| `lamp_<threadId>` | the status bulb (toggle `lit`) | towards the NPC |
 
 `BuildPlan.workstations()` lists **every** desk, taken or vacant: `Workstation(module, slot, threadId,
 deskAnchor, computerPos, screen, lampPos)`. `screen` is the face centre of the computer with
@@ -243,7 +241,7 @@ floor above bedrock.
   `module_n` / `spine_n` / `spine_cap`, a settled thread changes exactly two cells, a removed
   project), conversion to the builders' plan (layered, complete, per group), `HqSite` vs `BuildJob`.
 - `HqAnchorPlacementTest`: the anchor rule above (free, standable, reachable from the spawn) over
-  many rosters, annexes and a history; seat cushion, backrest and orientation; seat determinism and
+  many rosters, annexes and a history; NPCs standing at their desks facing the computer; determinism and
   idempotence.
 - `HqAnchorSourceTest`: world anchors under the four entrance directions, and fallbacks.
 

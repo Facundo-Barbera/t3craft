@@ -31,7 +31,7 @@ class HqAnchorSourceTest {
 			BlockPos cell = site.cell(rel.block());
 			assertEquals(cell.getX() + 0.5, desk.pos().x(), 1e-9);
 			assertEquals(site.anchor(rel).y(), desk.pos().y(), 1e-9);
-			assertEquals(cell.getY() + 1 / 16.0, desk.pos().y(), 1e-9, "on the seat cushion");
+			assertEquals(cell.getY(), desk.pos().y(), 1e-9, "standing on the desk floor");
 			assertEquals(cell.getZ() + 0.5, desk.pos().z(), 1e-9);
 			assertEquals(site.direction(rel.facing()).toYRot(), desk.yaw(), 1e-6);
 

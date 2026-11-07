@@ -11,10 +11,10 @@ import org.jspecify.annotations.Nullable;
  * @param module      module index ({@link HqLayout.Module#index()})
  * @param slot        desk slot in the module, {@code 0..HqLayout.DESKS-1}
  * @param threadId    who works here, or null when the desk is vacant
- * @param deskAnchor  where the NPC sits (the chair, foot level), facing the computer
+ * @param deskAnchor  where the NPC works standing (the free cell in front of the computer, foot level), facing it
  * @param computerPos the computer block (black concrete when taken, grey when vacant)
  * @param screen      centre of the computer's screen face, {@code facing} = outward normal (towards the
- *                    chair and the player): where a live screen or a sign is drawn
+ *                    NPC and the player): where a live screen or a sign is drawn
  * @param lampPos     the status lamp (a waxed copper bulb; toggle {@code lit})
  */
 public record Workstation(int module, int slot, @Nullable String threadId, Anchor deskAnchor, BlockPos computerPos, Anchor screen,

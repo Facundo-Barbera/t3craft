@@ -186,7 +186,7 @@ class HqGeneratorTest {
 			} else if (id.startsWith("spine_")) {
 				want = new int[] {7, 11, 14};
 			} else if (id.contains("_desk_")) {
-				want = new int[] {3, 5, 3};
+				want = new int[] {3, 5, 2};
 			} else if (id.contains("_seg_")) {
 				want = new int[] {4, 11, 14};
 			} else {
@@ -310,9 +310,8 @@ class HqGeneratorTest {
 				assertNotNull(seat, t);
 				assertNotNull(mon, t);
 				assertNotNull(lamp, t);
-				assertTrue(walkable(p, seat.block()), "the seat cell is free to stand in");
-				assertTrue(p.at(seat.block().relative(seat.facing().getOpposite())).state().getBlock() instanceof net.minecraft.world.level.block.TrapDoorBlock,
-						"backrest behind the seat");
+				assertTrue(p.at(seat.block()).state().isAir(), "no chair: the NPC stands at its desk");
+				assertTrue(walkable(p, seat.block()), "the standing cell is free");
 				assertTrue(p.at(seat.block().above()).state().isAir(), "headroom over the seat");
 				assertEquals(seat.block().relative(seat.facing()).above(), mon.block(), "monitor in front of the seat at eye level");
 				assertTrue(p.at(mon.block()).state().is(Blocks.CONCRETE.pick(net.minecraft.world.item.DyeColor.BLACK)));
