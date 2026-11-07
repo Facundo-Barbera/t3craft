@@ -1,0 +1,20 @@
+{
+	"schemaVersion": 1,
+	"id": "t3craft",
+	"version": "${version}",
+	"name": "T3Craft",
+	"description": "Shows each T3 Code thread as a villager coloured by its state. Talks to a local bridge on 127.0.0.1.",
+	"authors": ["Facundo Barbera"],
+	"license": "MIT",
+	"environment": "client",
+	"entrypoints": {
+		"main": ["dev.t3craft.T3Craft"],
+		"client": ["dev.t3craft.client.T3CraftClient"]
+	},
+	"depends": {
+		"fabricloader": ">=0.20.1",
+		"minecraft": "~26.3",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}

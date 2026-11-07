@@ -1,0 +1,61 @@
+plugins {
+	// Non-remapping Loom plugin: Minecraft 26.x ships unobfuscated, so there is no mappings layer.
+	id 'net.fabricmc.fabric-loom' version "${loom_version}"
+}
+
+version = project.mod_version
+group = project.maven_group
+
+base {
+	archivesName = project.archives_base_name
+}
+
+repositories {
+	mavenCentral()
+}
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(25)
+	}
+}
+
+loom {
+	splitEnvironmentSourceSets()
+
+	mods {
+		"t3craft" {
+			sourceSet sourceSets.main
+			sourceSet sourceSets.client
+		}
+	}
+
+	runs {
+		client {
+			def player = (System.getenv("T3CRAFT_PLAYER") ?: System.getProperty("user.name") ?: "Player")
+					.replaceAll(/[^A-Za-z0-9_]/, "").take(16) ?: "Player"
+			programArgs "--username", player
+			runDir "run"
+		}
+	}
+}
+
+dependencies {
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+}
+
+processResources {
+	def version = project.version
+	inputs.property "version", version
+
+	filesMatching("fabric.mod.json") {
+		expand "version": version
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 25
+	it.options.encoding = "UTF-8"
+}
