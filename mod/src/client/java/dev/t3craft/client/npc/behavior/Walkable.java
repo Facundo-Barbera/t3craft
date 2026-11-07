@@ -31,6 +31,14 @@ public interface Walkable {
 	}
 
 	/**
+	 * Extra A* cost of the move A→B on top of its length (a {@link #passage} that is allowed but
+	 * unpleasant, e.g. a hop up a whole block). Default: none.
+	 */
+	default double extraCost(int ax, int ay, int az, double fa, int bx, int by, int bz, double fb) {
+		return 0;
+	}
+
+	/**
 	 * Can the body stand with feet at (x,y,z), not necessarily centred in a cell? Default: the
 	 * cells under the four corners of the 0.6-wide footprint are walkable at that height.
 	 */

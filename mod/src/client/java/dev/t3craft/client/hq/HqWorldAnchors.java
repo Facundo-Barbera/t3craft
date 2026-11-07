@@ -25,6 +25,7 @@ import org.jspecify.annotations.Nullable;
  *   benches by a stable hash.</li>
  *   <li>{@link #home}: the project's wing corridor when built, else the hub.</li>
  *   <li>{@link #board}, {@link #boardSlots}, {@link #rest}: the hub's board and benches.</li>
+ *   <li>{@link #exit}: the hub's main doorway (once the base stands).</li>
  * </ul>
  * {@code built} = site modules that stand ({@code base}, {@code wing-<i>}); null = all of them (demo).
  */
@@ -125,6 +126,12 @@ public final class HqWorldAnchors implements AnchorSource {
 	@Override
 	public double wanderRadius(String groupId) {
 		return hq.wanderRadius(groupId);
+	}
+
+	/** The hub's main doorway: where settled NPCs leave, and the via point of long routes into the HQ. */
+	@Override
+	public @Nullable Anchor exit() {
+		return standing(HqSiteFrame.BASE) ? hq.exit() : null;
 	}
 
 	@Override
