@@ -13,16 +13,34 @@ import org.jspecify.annotations.Nullable;
  * @param setup     world setup (game rules, time, first teleport) applied; version of that step
  * @param structure id of the structure source last built completely, or null
  * @param version   plan version of that structure
+ * @param hash      {@link DemoStructureSource#revision()} of what was built (e.g. the HQ layout hash), or null
+ * @param state     opaque data of the source to compute the next diff (e.g. the HQ layout), or null
  */
-public record DemoMarker(int setup, @Nullable String structure, int version) {
+public record DemoMarker(int setup, @Nullable String structure, int version, @Nullable String hash, @Nullable JsonObject state) {
 	public static final String FILE_NAME = "t3craft-demo.json";
 	/** Bump when {@link VanillaDemoWorld#applySetup} changes and should run again on old demo worlds. */
 	public static final int SETUP_VERSION = 1;
 	public static final DemoMarker EMPTY = new DemoMarker(0, null, 0);
 
-	/** Whether {@code source} still has to be built: never built, a different source, or an older plan. */
+	public DemoMarker(int setup, @Nullable String structure, int version) {
+		this(setup, structure, version, null, null);
+	}
+
+	/** Whether this marker records a complete build of {@code source} with its current version. */
+	public boolean builtWith(DemoStructureSource source) {
+		return structure != null && structure.equals(source.id()) && version == source.version();
+	}
+
+	/**
+	 * Whether {@code source} still has to be built: never built, a different source, an older plan, or
+	 * (for sources with a {@link DemoStructureSource#revision()}) different content.
+	 */
 	public boolean needsBuild(DemoStructureSource source) {
-		return structure == null || !structure.equals(source.id()) || version != source.version();
+		if (!builtWith(source)) {
+			return true;
+		}
+		String rev = source.revision();
+		return rev != null && !rev.equals(hash);
 	}
 
 	public boolean needsSetup() {
@@ -30,11 +48,11 @@ public record DemoMarker(int setup, @Nullable String structure, int version) {
 	}
 
 	public DemoMarker withBuilt(DemoStructureSource source) {
-		return new DemoMarker(setup, source.id(), source.version());
+		return new DemoMarker(setup, source.id(), source.version(), source.revision(), source.state());
 	}
 
 	public DemoMarker withSetup() {
-		return new DemoMarker(SETUP_VERSION, structure, version);
+		return new DemoMarker(SETUP_VERSION, structure, version, hash, state);
 	}
 
 	public String toJson() {
@@ -44,6 +62,12 @@ public record DemoMarker(int setup, @Nullable String structure, int version) {
 			o.addProperty("structure", structure);
 		}
 		o.addProperty("version", version);
+		if (hash != null) {
+			o.addProperty("hash", hash);
+		}
+		if (state != null) {
+			o.add("state", state);
+		}
 		return o.toString();
 	}
 
@@ -60,7 +84,9 @@ public record DemoMarker(int setup, @Nullable String structure, int version) {
 			JsonObject o = e.getAsJsonObject();
 			int setup = intOr(o, "setup", 0);
 			String structure = o.has("structure") && o.get("structure").isJsonPrimitive() ? o.get("structure").getAsString() : null;
-			return new DemoMarker(setup, structure, intOr(o, "version", 0));
+			String hash = o.has("hash") && o.get("hash").isJsonPrimitive() ? o.get("hash").getAsString() : null;
+			JsonObject state = o.has("state") && o.get("state").isJsonObject() ? o.getAsJsonObject("state") : null;
+			return new DemoMarker(setup, structure, intOr(o, "version", 0), hash, state);
 		} catch (RuntimeException ex) {
 			return EMPTY;
 		}
