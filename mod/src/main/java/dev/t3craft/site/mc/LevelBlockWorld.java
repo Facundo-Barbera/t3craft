@@ -2,17 +2,20 @@
 // Copyright (c) 2026 AgentCraft contributors. MIT License.
 package dev.t3craft.site.mc;
 
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import dev.t3craft.site.BlockWorld;
 import dev.t3craft.site.Canon;
 import dev.t3craft.site.StateKey;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
+import java.util.TreeMap;
+import net.minecraft.commands.arguments.blocks.BlockStateParser;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtUtils;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.level.block.Block;
@@ -51,24 +54,36 @@ public final class LevelBlockWorld implements BlockWorld {
 		return keys.computeIfAbsent(s, LevelBlockWorld::keyOf);
 	}
 
-	/** Canonical {@link StateKey} of a block state (uncached). */
+	/**
+	 * Canonical {@link StateKey} of a block state (uncached). Built from the state itself, not through
+	 * {@code NbtUtils.writeBlockState}, whose tag layout changed in 26.x ({@code id}/{@code properties}).
+	 */
 	public static String keyOf(BlockState s) {
-		return StateKey.fromTag(NbtUtils.writeBlockState(s));
+		Map<String, String> props = new TreeMap<>();
+		s.getValues().forEach(v -> props.put(v.property().getName(), v.valueName()));
+		return StateKey.of(BuiltInRegistries.BLOCK.getKey(s.getBlock()).toString(), props);
 	}
 
 	/** Parses a key; unknown blocks are an error (never silently air). */
 	public BlockState parse(String key) {
 		BlockState s = states.get(key);
-		if (s != null) {
-			return s;
+		if (s == null) {
+			s = parse(level.holderLookup(Registries.BLOCK), key);
+			states.put(key, s);
 		}
-		s = NbtUtils.readBlockState(level.holderLookup(Registries.BLOCK), StateKey.toTag(key));
-		String name = BuiltInRegistries.BLOCK.getKey(s.getBlock()).toString();
-		if (!name.equals(StateKey.name(key))) {
-			throw new IllegalArgumentException("unknown block state " + key);
-		}
-		states.put(key, s);
 		return s;
+	}
+
+	/**
+	 * Parses a block state in command syntax ({@code [namespace:]block[k=v,…]}, what {@link StateKey}
+	 * writes). Unknown blocks, properties or values throw {@link IllegalArgumentException}.
+	 */
+	public static BlockState parse(HolderLookup<Block> blocks, String key) {
+		try {
+			return BlockStateParser.parseForBlock(blocks, key, false).blockState();
+		} catch (CommandSyntaxException e) {
+			throw new IllegalArgumentException("unknown block state " + key + ": " + e.getMessage(), e);
+		}
 	}
 
 	@Override
