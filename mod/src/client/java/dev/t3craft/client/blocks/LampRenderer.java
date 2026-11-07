@@ -10,7 +10,6 @@ import dev.t3craft.blocks.LampBlockEntity;
 import dev.t3craft.blocks.LampStatus;
 import dev.t3craft.blocks.StatusLampBlock;
 import dev.t3craft.debug.PerfStats;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
 import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
@@ -21,7 +20,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
-import org.joml.Vector3f;
 import org.joml.Vector3fc;
 import org.jspecify.annotations.Nullable;
 
@@ -72,21 +70,11 @@ public final class LampRenderer implements BlockEntityRenderer<LampBlockEntity, 
 		double dy = p.getY() + 0.5 - camera.y;
 		double dz = p.getZ() + 0.5 - camera.z;
 		boolean beacon = client.resolve(p, be.binding()).kind() == Binding.Kind.BEACON;
-		Vector3fc f = forward();
+		Vector3fc f = RenderLod.cameraForward();
 		boolean draw = RenderLod.lamp(dx, dy, dz, beacon, f.x(), f.y(), f.z());
 		PerfStats.count(draw ? PerfStats.LAMP_DRAWN : PerfStats.LAMP_CULLED);
 		return draw;
 	}
-
-	private static Vector3fc forward() {
-		try {
-			return Minecraft.getInstance().gameRenderer.mainCamera().forwardVector();
-		} catch (RuntimeException e) {
-			return NO_DIRECTION; // no camera yet: distance only
-		}
-	}
-
-	private static final Vector3fc NO_DIRECTION = new Vector3f();
 
 	@Override
 	public void extractRenderState(LampBlockEntity be, State state, float partialTicks, Vec3 cameraPosition,

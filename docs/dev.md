@@ -127,7 +127,7 @@ than 1 ms per client tick on average):
 | `nav.miss_hits`, `nav.deferred` | asks answered from remembered misses (backoff); asks deferred by the node/time budget | `deferred` ~0 |
 | `nav` (timer) | time spent searching | ≤ 40 ms/s (2 ms per tick cap) |
 | `monitor.glyph_rebuilds` | monitor text re-laid out | 0/s unless a thread changes |
-| `monitor.drawn`, `monitor.lod`, `monitor.culled` | monitors drawn per second (of which background-only), skipped | culled > drawn when you look away |
+| `monitor.drawn`, `monitor.culled` | monitors in range drawn / skipped (seen from behind, behind the camera) per second | culled > drawn when you look away |
 | `lamp.drawn`, `lamp.culled` | lamp BER per frame, drawn vs skipped | — |
 | `display.set_text`, `display.spawned` | `setText` on our display entities, display/interaction entities created | ~0/s steady |
 | `lamp.sweeps`, `lamp.writes`, `binding.writes` | server: `LampApplier` sweeps, lamp states written, HQ bindings written | sweeps ½/s, writes 0 steady |
@@ -157,10 +157,12 @@ Static review of every per-tick / per-frame callback plus work-count tests and m
    frustum-culled *any* lamp, and every lamp within 160 blocks was drawn every frame. Now
    `shouldRender` decides per lamp (`RenderLod.lamp`): plain lamps within 48 blocks and not behind
    the camera, halos within 20; only the beacon keeps 160 blocks.
-3. **Monitors.** Text was submitted every frame up to 32 blocks, also from behind the screen.
-   Now nothing from behind / beyond 32 blocks, background only beyond 14 (`RenderLod.monitor`);
-   unbound/unknown screens are cached instead of re-allocated every frame; a version epoch stops
-   a returning thread from reusing stale glyphs.
+3. **Monitors.** The renderer from `feat/monitor-live-log` draws "off screen" (panels draw from their
+   origin block) with its own NEAR/FAR LOD, so vanilla never frustum-culled any monitor: every
+   monitor in range was laid out and drawn every frame, also from behind the screen and behind the
+   camera. `shouldRender` now skips those (`RenderLod.monitor`: face test on the block, behind-camera
+   test on the screen centre with the panel's radius). Unbound/unknown screens are cached instead of
+   re-allocated every frame, and a version epoch stops a returning thread from reusing stale glyphs.
 4. Small per-tick allocations: the NPC bubble placement re-flattened every panel's text
    (`getString()`) every tick (now only when it changes); `sawLamp` allocated a record per lamp per
    frame (now mutated in place).

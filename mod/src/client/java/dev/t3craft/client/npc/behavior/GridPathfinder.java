@@ -19,7 +19,7 @@ import org.jspecify.annotations.Nullable;
 /**
  * A* over a {@link Walkable} grid. Moves: 8 directions (no corner cutting, diagonals only on one
  * level) and steps of up to one block (straight only), each checked with
- * {@link Walkable#passage}. The raw cell path is shortened by line-of-sight string pulling
+ * {@link Walkable#passage} and priced with {@link Walkable#extraCost} (a hop up a whole block is dear). The raw cell path is shortened by line-of-sight string pulling
  * ({@link #clear}) so NPCs walk straight lines between corners. Deterministic and bounded (box
  * around both ends plus {@link #PAD}, {@link #MAX_NODES} per search); a {@link Search} can run in
  * slices ({@link Search#run}) so several NPCs share a per-tick node budget ({@link Navigation}).
@@ -165,6 +165,7 @@ public final class GridPathfinder {
 		private final int maxZ;
 		private int expanded;
 		private Status status = Status.RUNNING;
+		private String reason = "";
 		private @Nullable List<Cell> cells;
 
 		private Search(Pos from, Pos to, @Nullable Pos avoid) {
@@ -175,6 +176,7 @@ public final class GridPathfinder {
 			this.goal = cellAt(to);
 			if (start == null || goal == null) {
 				status = Status.NONE;
+				reason = start == null ? "no walkable cell near the NPC " + from : "no walkable cell near the target " + to;
 				minX = maxX = minZ = maxZ = 0;
 				return;
 			}
@@ -193,6 +195,11 @@ public final class GridPathfinder {
 
 		public Status status() {
 			return status;
+		}
+
+		/** Why there is no route ({@link Status#NONE}), for the debug log; empty otherwise. */
+		public String reason() {
+			return reason;
 		}
 
 		/** Nodes expanded so far. */
@@ -220,6 +227,9 @@ public final class GridPathfinder {
 			while (status == Status.RUNNING && used < budget) {
 				if (open.isEmpty() || expanded >= MAX_NODES) {
 					status = Status.NONE;
+					reason = open.isEmpty()
+							? "unreachable within x " + minX + ".." + maxX + ", z " + minZ + ".." + maxZ + " (" + expanded + " cells searched)"
+							: "gave up after " + MAX_NODES + " cells";
 					break;
 				}
 				Node n = open.poll();
@@ -275,7 +285,8 @@ public final class GridPathfinder {
 						continue;
 					}
 					double rise = Math.abs(fb - fa);
-					double cost = (diagonal ? 1.41421356 : 1.0) + (rise > 0.07 ? 0.3 + 0.5 * rise : 0);
+					double cost = (diagonal ? 1.41421356 : 1.0) + (rise > 0.07 ? 0.3 + 0.5 * rise : 0)
+							+ ground.extraCost(n.x, n.y, n.z, fa, nx, ny, nz, fb);
 					double gg = n.g + cost;
 					long key = pack(nx, ny, nz);
 					if (gg < best.getOrDefault(key, Double.MAX_VALUE) - 1e-9) {

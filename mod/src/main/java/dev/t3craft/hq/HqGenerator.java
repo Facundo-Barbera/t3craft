@@ -30,7 +30,7 @@ import org.jspecify.annotations.Nullable;
  * attention" board facing the entrance), the entrance portico, the spine (glass-roofed gallery,
  * one row per pair of wings, a sign over each wing's doorway), one wing per project (inner wall,
  * desk segments, end cap) and one desk per slot (occupied: black monitor, status lamp, anchors;
- * vacant: grey monitor).
+ * vacant: bare floor, the desk is removed until a thread takes the slot again).
  */
 public final class HqGenerator {
 	private final Palette k = new Palette();
@@ -511,6 +511,11 @@ public final class HqGenerator {
 				c.set(cx + dx, 0, dz, k.woodFloor);
 				c.set(cx + dx, 0, chz, k.woodFloor);
 			}
+			if (threadId == null) {
+				// fix/hq-stale-stations: a released desk leaves the world (floor only, the rest air):
+				// no desk, computer, lamp, chair or workstation until a thread takes the slot again.
+				return;
+			}
 			BlockPos desk = new BlockPos(cx, 1, dz);
 			BlockPos left = desk.relative(right.getOpposite());
 			BlockPos rightPos = desk.relative(right);
@@ -519,7 +524,7 @@ public final class HqGenerator {
 			c.set(rightPos, k.deskTop);
 			BlockPos monitor = desk.above();
 			BlockPos lamp = rightPos.above();
-			c.set(monitor, threadId == null ? k.monitorOff : k.monitorOn);
+			c.set(monitor, k.monitorOn);
 			c.set(lamp, k.lamp());
 			c.decor(left.above(), k.fern);
 			BlockPos seat = new BlockPos(cx, 1, chz);
@@ -527,11 +532,9 @@ public final class HqGenerator {
 			Anchor deskA = Anchor.at(AnchorNames.deskSlot(i, slot), seat, f);
 			Anchor screen = Anchor.face(AnchorNames.screenSlot(i, slot), monitor, f.getOpposite());
 			b.workstation(new Workstation(i, slot, threadId, deskA, monitor, screen, lamp));
-			if (threadId != null) {
-				b.anchor(deskA.renamed(AnchorNames.desk(threadId)));
-				b.anchor(screen.renamed(AnchorNames.monitor(threadId)));
-				b.anchor(Anchor.face(AnchorNames.lamp(threadId), lamp, f.getOpposite()));
-			}
+			b.anchor(deskA.renamed(AnchorNames.desk(threadId)));
+			b.anchor(screen.renamed(AnchorNames.monitor(threadId)));
+			b.anchor(Anchor.face(AnchorNames.lamp(threadId), lamp, f.getOpposite()));
 		}
 	}
 }

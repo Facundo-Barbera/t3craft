@@ -1,40 +1,40 @@
 package dev.t3craft.client.blocks;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import dev.t3craft.client.blocks.RenderLod.MonitorDetail;
 import org.junit.jupiter.api.Test;
 
 /** Culling and level of detail of the blocks' renderers (fix/hq-fps). d = block centre − camera. */
 class RenderLodTest {
-	@Test
-	void monitorFacingSouthIsSeenFromTheSouthOnly() {
-		// FACING south: normal (0, +1). The camera 5 blocks south of it: d = (0, 0, -5).
-		assertEquals(MonitorDetail.FULL, RenderLod.monitor(0, 0, -5, 0, 1));
-		// from the north (behind the screen): nothing
-		assertEquals(MonitorDetail.NONE, RenderLod.monitor(0, 0, 5, 0, 1));
-		// level with the face plane, beside it: grazing, not drawn
-		assertEquals(MonitorDetail.NONE, RenderLod.monitor(5, 0, 0, 0, 1));
-		// just in front of the face
-		assertEquals(MonitorDetail.FULL, RenderLod.monitor(3, 0, -0.6, 0, 1));
+	/** A one-block monitor at d = (dx, dz) from the camera, looking along (fx, fz). */
+	static boolean monitor(double dx, double dz, int nx, int nz, double fx, double fz) {
+		return RenderLod.monitor(dx, dz, nx, nz, dx + nx * 0.5, 0, dz + nz * 0.5, 0.5, fx, 0, fz);
 	}
 
 	@Test
-	void farMonitorsDrawTheBackgroundOnlyThenNothing() {
-		assertEquals(MonitorDetail.FULL, RenderLod.monitor(0, 0, -RenderLod.MONITOR_TEXT + 0.5, 0, 1));
-		assertEquals(MonitorDetail.BACKGROUND, RenderLod.monitor(0, 0, -RenderLod.MONITOR_TEXT - 1, 0, 1));
-		assertEquals(MonitorDetail.BACKGROUND, RenderLod.monitor(0, 0, -RenderLod.MONITOR_VIEW + 1, 0, 1));
-		assertEquals(MonitorDetail.NONE, RenderLod.monitor(0, 0, -RenderLod.MONITOR_VIEW - 1, 0, 1));
+	void monitorFacingSouthIsSeenFromTheSouthOnly() {
+		// FACING south: normal (0, +1). The camera 5 blocks south of it, looking north: d = (0, -5).
+		assertTrue(monitor(0, -5, 0, 1, 0, -1));
+		assertFalse(monitor(0, 5, 0, 1, 0, 1), "from the north (behind the screen)");
+		assertFalse(monitor(5, 0, 0, 1, -1, 0), "level with the face plane, beside it");
+		assertTrue(monitor(3, -0.6, 0, 1, 1, 0), "just in front of the face");
 	}
 
 	@Test
 	void eastAndWestFaces() {
 		// FACING east: normal (+1, 0); camera east of it → d.x < 0
-		assertEquals(MonitorDetail.FULL, RenderLod.monitor(-4, 1, 0, 1, 0));
-		assertEquals(MonitorDetail.NONE, RenderLod.monitor(4, 1, 0, 1, 0));
-		assertEquals(MonitorDetail.FULL, RenderLod.monitor(4, 1, 0, -1, 0));
+		assertTrue(monitor(-4, 0, 1, 0, -1, 0));
+		assertFalse(monitor(4, 0, 1, 0, -1, 0));
+		assertTrue(monitor(4, 0, -1, 0, 1, 0));
+	}
+
+	@Test
+	void monitorsBehindTheCameraAreSkippedButNotBigPanelsAround() {
+		// facing the camera (south) but the camera looks away (south): behind
+		assertFalse(monitor(0, -10, 0, 1, 0, 1));
+		// a 9-wide panel whose centre is behind but within its radius + NEAR: kept
+		assertTrue(RenderLod.monitor(0, -6, 0, 1, 0, 0, -5.5, 4.5, 0, 0, 1));
 	}
 
 	@Test

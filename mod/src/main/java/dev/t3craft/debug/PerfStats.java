@@ -144,11 +144,9 @@ public final class PerfStats {
 
 	/** Monitor BER: glyph runs rebuilt (should be ~0/s with steady threads). */
 	public static final String MONITOR_GLYPHS = "monitor.glyph_rebuilds";
-	/** Monitor BER: monitors drawn (text or LOD background). */
+	/** Monitor BER: monitors in range that passed the culling (drawn this frame). */
 	public static final String MONITOR_DRAWN = "monitor.drawn";
-	/** Monitor BER: monitors drawn as background only (far: text unreadable). */
-	public static final String MONITOR_LOD = "monitor.lod";
-	/** Monitor BER: skipped (behind the screen or too far). */
+	/** Monitor BER: in range but skipped (seen from behind, or behind the camera). */
 	public static final String MONITOR_CULLED = "monitor.culled";
 	public static final String LAMP_DRAWN = "lamp.drawn";
 	public static final String LAMP_CULLED = "lamp.culled";

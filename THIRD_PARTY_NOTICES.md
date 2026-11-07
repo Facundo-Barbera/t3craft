@@ -63,6 +63,15 @@ Files adapted from AgentCraft (MIT; the `npc/behavior` files come from AgentCraf
   (`FLAGS`: clients updated, no neighbour/shape updates, no drops, no block-entity side effects,
   no `onPlace`) is taken from AgentCraft `mod/src/main/java/dev/agentcraft/hq/Plan.java`
   (commit `8fe3ad23489b06f9142c6382bc23d31090c6b406`).
+- `mod/src/client/java/dev/t3craft/client/hologram/HologramModel.java`, `HologramLayout.java` and
+  `HologramRenderer.java` ← `mod/src/client/java/dev/agentcraft/client/hq/StatusLampRenderer.java`
+  (`extractHologram`, `beam`, `card`, `HOLO_Y`) at commit `8fe3ad23489b06f9142c6382bc23d31090c6b406`
+  (design: a floating card about 3.5 blocks over the floor with a progress ring captioned
+  "done/total" that follows the done count, "n working · n need you" counts, an "offline · last
+  known state" line and a soft beam from the floor to the card, rebuilt only on change; rewritten
+  over T3 thread states of every environment with one ring per environment or project and the most
+  urgent thread, as client-only display entities instead of a block entity renderer, no sprites or
+  textures copied).
 
 Design ideas only (no code copied), from AgentCraft `hq/Plan.java` and `hq/PlanStore.java`:
 apply a build as a diff of a whole box, persist the applied plan in the world folder (palette +
@@ -83,6 +92,25 @@ Files adapted from AgentCraft's blocks (`mod/src/main/java/dev/agentcraft/block/
   (horizontal facing, placement, rotate and mirror).
 - `mod/src/client/java/dev/t3craft/client/blocks/MonitorRenderer.java` ← `client/world/StationRenderer.java`
   (`toFace`: draw in screen pixel space on a block's front face).
+
+Monitor live log (branch `feat/monitor-live-log`, AgentCraft commit `8fe3ad2`, sources under
+`mod/src/client/java/dev/agentcraft/client/`):
+
+- `mod/src/client/java/dev/t3craft/client/blocks/MonitorRenderer.java` (rewritten) ←
+  `monitor/MonitorRenderer.java` (header with status dot, tail of tool rows with kit icons, blinking
+  caret while working, pulsing "waiting for you", opaque full-bright layers with explicit z steps,
+  off-screen rendering) on top of `world/StationRenderer.java`.
+- `mod/src/client/java/dev/t3craft/client/blocks/ScreenDraw.java` ← `monitor/DisplayDraw.java` and
+  `ui/WorldUi.java` (opaque copy of the world text pipeline drawn in the solid pass, flat rectangles
+  on a white texture, GUI-atlas sprites as opaque quads).
+- `mod/src/client/java/dev/t3craft/client/blocks/MonitorLog.java` ← `monitor/LogRows.java` and
+  `monitor/MonitorScreen.java` (one-line tool rows that never wrap, prose limited to a few lines
+  without Markdown markup, +/- counts in green/red, newest row at the bottom, caret / waiting line).
+- `mod/src/client/java/dev/t3craft/client/blocks/MonitorLod.java` ← `MonitorRenderer.density`
+  (128 px/block for one-block screens, 96 for bigger ones) and `DisplayDraw.Z_STEP`.
+- `mod/src/client/java/dev/t3craft/client/blocks/MonitorVisibility.java` ← the idea of
+  `monitor/MonitorFeature.java`'s sweep of screens unused for 30 s (new implementation: distance and
+  view with hysteresis, one subscription per thread).
 
 Files adapted from AgentCraft (commit `8fe3ad2`, MIT), branch `feat/lamps-breathe`:
 

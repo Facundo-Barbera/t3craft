@@ -61,7 +61,7 @@ public final class LampApplier {
 			LampStatus best = LampStatus.OFF;
 			for (String t : b.moduleThreads()) {
 				LampStatus s = wanted.get(Binding.thread(t).wire());
-				if (s != null && s.urgency() > best.urgency()) {
+				if (s != null && roomRank(s) > roomRank(best)) {
 					best = s;
 				}
 			}
@@ -69,5 +69,32 @@ public final class LampApplier {
 		}
 		LampStatus s = wanted.get(b.wire());
 		return s == null ? LampStatus.OFF : s;
+	}
+
+	/**
+	 * Order of a room's (module's) bulb, fix/hq-rooms-real: the room shows what most needs the
+	 * player in it, <b>needs you &gt; error &gt; working &gt; done &gt; idle</b>, off when nobody is
+	 * there. (Board bulbs keep {@link LampStatus#urgency()}, error first.)
+	 */
+	public static int roomRank(LampStatus s) {
+		return switch (s) {
+			case ATTENTION -> 5;
+			case ERROR -> 4;
+			case WORKING -> 3;
+			case DONE -> 2;
+			case IDLE -> 1;
+			case OFF -> 0;
+		};
+	}
+
+	/** A room's bulb for the statuses of the threads at its desks (unknown threads count as off). */
+	public static LampStatus room(java.util.Collection<LampStatus> threads) {
+		LampStatus best = LampStatus.OFF;
+		for (LampStatus s : threads) {
+			if (s != null && roomRank(s) > roomRank(best)) {
+				best = s;
+			}
+		}
+		return best;
 	}
 }

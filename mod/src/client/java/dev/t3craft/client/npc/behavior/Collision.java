@@ -25,6 +25,12 @@ public final class Collision implements Walkable, Collider {
 	public static final double HALF = 0.3;
 	public static final double HEIGHT = 1.8;
 	static final double STEP = 0.6;
+	/**
+	 * Extra A* cost of a hop (a whole-block rise with nothing to step on, like a vanilla mob's jump):
+	 * high, so routes hop only where there is no other way (the HQ floor stands a block above the
+	 * grass, natural terrain), never across desks to save a few steps.
+	 */
+	static final double HOP_COST = 12;
 	/** Floors within this height are "the same level" (carpets, snow layers). */
 	static final double LEVEL = 0.07;
 	private static final int FREE_RADIUS = 3;
@@ -131,9 +137,8 @@ public final class Collision implements Walkable, Collider {
 		if (Math.abs(fb - fa) > 1.0 + 1e-6) {
 			return false;
 		}
-		if (fb - fa > STEP + 1e-6 && !landing(fa, bx - ax, bz - az, bx, by, bz, fb)) {
-			return false; // a whole block up with nothing in between (desk top, a block): no climbing furniture
-		}
+		// A whole block up with nothing to step on is a hop (see HOP_COST): the body rises in A first,
+		// so A must have headroom at B's height, which the sweep below checks from its first sample.
 		double y = Math.max(fa, fb);
 		// Fast path (fix/hq-fps): every sample lies inside the sweep's bounding box, so when that box
 		// touches nothing the passage is clear; one box query instead of six on open floor.
@@ -149,6 +154,17 @@ public final class Collision implements Walkable, Collider {
 			}
 		}
 		return true;
+	}
+
+	/** A whole-block rise without a step in between costs {@link #HOP_COST}. */
+	@Override
+	public double extraCost(int ax, int ay, int az, double fa, int bx, int by, int bz, double fb) {
+		return isHop(ax, az, fa, bx, by, bz, fb) ? HOP_COST : 0;
+	}
+
+	/** Going up from A to B needs a hop (more than {@link #STEP} with nothing to step on). */
+	boolean isHop(int ax, int az, double fa, int bx, int by, int bz, double fb) {
+		return fb - fa > STEP + 1e-6 && !landing(fa, bx - ax, bz - az, bx, by, bz, fb);
 	}
 
 	/**
