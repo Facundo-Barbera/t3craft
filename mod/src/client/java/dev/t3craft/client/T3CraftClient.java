@@ -11,6 +11,7 @@ import dev.t3craft.client.link.BridgeListener;
 import dev.t3craft.client.link.LinkStatus;
 import dev.t3craft.client.npc.NpcInfo;
 import dev.t3craft.client.npc.NpcRegistry;
+import dev.t3craft.client.portable.PortableClient;
 import dev.t3craft.client.screen.ThreadChatScreen;
 import dev.t3craft.t3.DirectController;
 import dev.t3craft.t3.Environments;
@@ -91,6 +92,7 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 		});
 		T3CraftCommands.register(this);
 		PeekHud.register();
+		PortableClient.register(this);
 
 		// Right-click on one of our client-only NPCs opens its chat screen. The entity is unknown to
 		// the server, so the interaction is consumed client-side.
@@ -220,7 +222,7 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 		npcs.replaceAll(list);
 
 		for (dev.t3craft.t3.Transitions.Transition t : dev.t3craft.t3.Transitions.between(lastViews, views, syncedEnvs)) {
-			Notifier.transition(mc, t.title(), t.text(), t.color(), t.sound().name().toLowerCase(), true);
+			Notifier.transition(mc, t.npcId(), t.title(), t.text(), t.color(), t.sound().name().toLowerCase(), true);
 		}
 		lastViews.clear();
 		views.forEach(v -> lastViews.put(v.id(), v));
@@ -357,7 +359,7 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 					NpcInfo.parseColor(optString(msg, "color", null)));
 			case "bridge.status" -> onEnvironments(mc, msg);
 			// Toast comes from the paired `notify`; transition adds chat line + sound.
-			case "npc.transition" -> Notifier.transition(mc, optString(msg, "title", "T3"), optString(msg, "text", ""),
+			case "npc.transition" -> Notifier.transition(mc, optString(msg, "npcId", null), optString(msg, "title", "T3"), optString(msg, "text", ""),
 					NpcInfo.parseColor(optString(msg, "color", null)), optString(msg, "sound", ""), false);
 			case "hud.peek" -> PeekHud.setPeek(optString(msg, "text", null), NpcInfo.parseColor(optString(msg, "color", null)));
 			case "ack", "hello" -> T3Craft.LOGGER.debug("{}: {}", type, msg);
