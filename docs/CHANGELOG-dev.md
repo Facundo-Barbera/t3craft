@@ -10,6 +10,7 @@ One line per structural commit on `main`, newest first:
 
 ## Entries
 
+- 2026-11-07 feat/schedule-board RESTART — new client entrypoint ScheduleClient (dev.t3craft.client.schedule): read-only scheduled tasks board as a client text display behind the fallback layout's board spot (HQ board anchor via setPlacementSource; entity ids from -7_000_000, rotating pages); command /t3craft schedule; new lang keys. Data via T3Connection.subscribeScheduledTasks over the shared StreamRegistry (additive overload subscribe(key, SubscribeFrame, Listener)); ScheduledTask decoder and RpcFrames.subscribeScheduledTasks in dev.t3craft.t3. No registries, no config.
 - 2026-11-07 fix/no-observer-props RELOAD — workstation props no longer use observer blocks: a t3craft:monitor display when the blocks module is on (nothing when a real HQ monitor is there), a discreet vanilla prop otherwise; stale observer displays are cleaned up.
 - 2026-11-07 fix/npc-navigation RELOAD — NPCs path with a 3D A* over the real client blocks (doors, stairs, slabs, collision shapes, node budget, cached routes, replanning, unstuck) and move with block collision, so they never end inside desks/walls; approach and departures use the same router.
 - 2026-11-07 fix/hq-blocks-autobind RESTART — HQ desks now get a t3craft:monitor and status_lamp each and a board_lamp per module (HqFixtures applied on the demo and site paths with the blocks module on), auto-bound to the desk's thread from HqLayout and re-bound with a minimal diff when threads move or settle; no manual /t3craft blocks link.

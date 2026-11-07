@@ -50,6 +50,7 @@ Reglas para todos:
 | `PairingClient` | `exchange(Target, clientLabel, clientOs) → CompletableFuture<Pairing.Session>` (solo lectura) y `exchange(…, scopes)`. |
 | `Environments` | El almacén en `config/t3craft/`: `list() → List<Environment(id, label, url)>`, `pair(env, session) → boolean` (guarda el resultado de un emparejamiento: con read + operate escribe también el token operate y devuelve `true`; uno de solo lectura borra el operate anterior), `save(env, session)` (solo la credencial de lectura; nunca toca el token operate), `remove(id)` (también borra el token operate), `credential(id) → Session | null` (sesión de la zona de lectura: `orchestration:read` o `read + operate`; cualquier otro conjunto se ignora), `slug(label)`. Los tokens solo se leen aquí. |
 | `Json` | Accesores tolerantes de Gson (`str`, `obj`, `arr`, `bool`, `optBool`, `num`, `time`). |
+| `ScheduledTask` (record) | Tarea programada de `scheduledTasks.subscribe`, decodificada de forma tolerante: `fromJson` (null sin id), `listFrom({tasks:[…]})`, `name()`, `active()`, `RunStatus` (`NEVER, RUNNING, SUCCEEDED, FAILED, UNKNOWN`), `schedule` resumido. Solo lectura. `RpcFrames.SUBSCRIBE_SCHEDULED_TASKS` / `subscribeScheduledTasks(id)`. Se lee con `T3Connection.subscribeScheduledTasks(StreamRegistry.Listener)` (vía compartida; clave `SCHEDULED_TASKS_STREAM`). `StreamRegistry.subscribe(key, SubscribeFrame, Listener)`: overload aditivo para streams que no son de un hilo. |
 
 ## 3. Entidades y registro (`dev.t3craft.client.npc`, source set `client`)
 
@@ -93,3 +94,7 @@ Detalle y receta para añadir acciones: `docs/feat-operate.md`.
 | `client.screen.ConfirmActionScreen` | `new ConfirmActionScreen(parent, action, envLabel, yes -> …)`. Normalmente la abre `OperateUi.run`. |
 | `client.screen.OperatePairScreen` | "Habilitar control" para un entorno emparejado en solo lectura (mejora; el de lectura se mantiene). |
 | `client.screen.PairScreen` | Emparejar: lectura + control por defecto; `new PairScreen(parent, true)` o `/t3craft pair --read-only` para solo lectura. |
+
+## Tablero de tareas programadas (`dev.t3craft.client.schedule`)
+
+Ver `docs/feat-schedule-board.md`. `ScheduleClient.get()`: `setSource(ScheduleSource)` (por defecto `ConnectionScheduleSource`, sobre `T3Connection.subscribeScheduledTasks`), `setPlacementSource(SchedulePlacementSource)` (anchor `board` del HQ), `setBoardHook(ScheduleBoardHook)` (bloque de feat/blocks-core) y `entries()`. Ids de entidad desde `-7_000_000`. Comando `/t3craft schedule`. Sin acciones de escritura.
