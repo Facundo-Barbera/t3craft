@@ -52,11 +52,6 @@ final class HqGeometry {
 	 * the hub, header signs on {@code y = SHELF_TIERS + 1}.
 	 */
 	static final int SHELF_Z = HUB - 1;
-	/**
-	 * The archive terminal's cell ({@link AnchorNames#ARCHIVE_TERMINAL}): hub floor against the east
-	 * wall, south of the benches' planter, north of the reading corner; its screen faces west.
-	 */
-	static final BlockPos ARCHIVE_TERMINAL = new BlockPos(HUB - 1, 1, 5);
 	static final int SHELF_X1 = 3;
 	static final int SHELF_X2 = 6;
 	static final int SHELF_TIERS = 3;
@@ -65,13 +60,13 @@ final class HqGeometry {
 
 	/**
 	 * The archive terminal's nook, set into the hub's south wall east of the entrance: a 3-wide alcove
-	 * ({@code x = 4..6, z = ARCHIVE_Z}, {@code y = 1..4}) holding the terminal ({@link #ARCHIVE_TERMINAL}:
-	 * screen at eye level over a base) with a standing spot in front ({@code z = ARCHIVE_Z - 1}).
-	 * Replaces the per-thread "Archived" shelf in the plan (redesign 2026-11: one terminal lists every
-	 * archived thread).
+	 * ({@code x = 4..6, z = ARCHIVE_Z}, {@code y = 1..4}) holding the archive terminal on the floor
+	 * ({@link #ARCHIVE_TERMINAL}, {@link AnchorNames#ARCHIVE_TERMINAL}, screen facing north into the
+	 * hub) with a standing spot in front ({@code z = ARCHIVE_Z - 1}). One terminal lists every
+	 * archived thread (feat/archive-terminal); there are no per-thread shelves.
 	 */
 	static final int ARCHIVE_Z = HUB - 1;
-	static final BlockPos ARCHIVE_TERMINAL = new BlockPos(5, 2, ARCHIVE_Z);
+	static final BlockPos ARCHIVE_TERMINAL = new BlockPos(5, 1, ARCHIVE_Z);
 	static final BlockPos ARCHIVE_STAND = new BlockPos(5, 1, ARCHIVE_Z - 1);
 
 	static Box archiveNook() {

@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.Objects;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -126,9 +125,6 @@ public final class HqGenerator {
 					b.anchor(Anchor.at(AnchorNames.walkHub(walk++), new BlockPos(4 * sx, 1, wz), Direction.SOUTH));
 				}
 			}
-			// the archive terminal: east wall, between the benches' planter and the reading corner
-			c.set(HqGeometry.ARCHIVE_TERMINAL, k.archiveTerminal(Direction.WEST));
-			b.anchor(Anchor.face(AnchorNames.ARCHIVE_TERMINAL, HqGeometry.ARCHIVE_TERMINAL, Direction.WEST));
 			b.anchor(Anchor.at(AnchorNames.HUB, new BlockPos(0, 1, 0), Direction.SOUTH));
 			b.anchor(new Anchor(AnchorNames.HOLOGRAM, 0.5, 5.0, 0.5, Direction.SOUTH, new BlockPos(0, 5, 0)));
 			b.anchor(Anchor.at(AnchorNames.BEACON, new BlockPos(0, 9, 0), Direction.SOUTH));
@@ -147,7 +143,7 @@ public final class HqGenerator {
 	/** The "needs attention" board: the style's frame and face, then the bulbs and the anchors. */
 	private void board(PlanBuilder b, PlanBuilder.Canvas c) {
 		int z = BOARD_Z;
-		style.board(c, SignTags.sign(DyeColor.ORANGE, true, "", "Needs", "attention", ""));
+		style.board(c, new HqStyle.SignText(DyeColor.ORANGE, "", "Needs", "attention", ""));
 		int lamp = 0;
 		for (int x = -BOARD_HALF; x <= BOARD_HALF; x++) {
 			if (Math.floorMod(x + BOARD_HALF, 2) == 0) {
@@ -169,14 +165,16 @@ public final class HqGenerator {
 
 	// ------------------------------------------------------------------ archive
 
-	/** The archive terminal's nook: the style's alcove, then the terminal (screen over a base) and its anchors. */
+	/**
+	 * The archive terminal's nook: the style's alcove, then the terminal (a stand-in the blocks
+	 * module swaps for {@code t3craft:archive_terminal} by its anchor) and the anchors.
+	 */
 	private void archive(PlanBuilder b) {
 		try (PlanBuilder.Canvas c = b.module("archive", HqGeometry.archiveNook(), List.of())) {
 			style.archiveNook(c);
-			BlockPos screen = HqGeometry.ARCHIVE_TERMINAL;
-			c.set(screen.below(), style.terminalBase());
-			c.set(screen, style.computer(true));
-			b.anchor(Anchor.face(AnchorNames.ARCHIVE_TERMINAL, screen, Direction.NORTH));
+			BlockPos t = HqGeometry.ARCHIVE_TERMINAL;
+			c.set(t, style.archiveTerminal(Direction.NORTH));
+			b.anchor(Anchor.face(AnchorNames.ARCHIVE_TERMINAL, t, Direction.NORTH));
 			b.anchor(Anchor.at(AnchorNames.ARCHIVE, HqGeometry.ARCHIVE_STAND, Direction.SOUTH));
 		}
 	}
@@ -199,7 +197,7 @@ public final class HqGenerator {
 	}
 
 	/** Module sign: project name (two lines), module number when the project has several, environment. */
-	private static CompoundTag wingSign(HqLayout layout, HqLayout.Module w) {
+	private static HqStyle.SignText wingSign(HqLayout layout, HqLayout.Module w) {
 		String label = w.label();
 		String l1 = label.length() <= SignTags.LINE ? label : label.substring(0, SignTags.LINE);
 		String l2 = label.length() <= SignTags.LINE ? "" : label.substring(SignTags.LINE);
@@ -207,7 +205,7 @@ public final class HqGenerator {
 		int nth = mine.indexOf(w);
 		// only annexes are numbered, so a project's first module's sign never changes when it grows
 		String l3 = nth > 0 ? "#" + (nth + 1) : "";
-		return SignTags.sign(HqStyle.envColor(w), true, l1, l2, l3, w.envLabel());
+		return new HqStyle.SignText(HqStyle.envColor(w), l1, l2, l3, w.envLabel());
 	}
 
 	private void spineCap(PlanBuilder b, int rows) {
@@ -256,7 +254,7 @@ public final class HqGenerator {
 			if (screen != null) {
 				surface(b, c, screen, AnchorNames.moduleScreen(i));
 				for (int k = 0; k < screen.width(); k++) {
-					c.set(screen.origin().relative(screen.along(), k).below(), style.terminalBase());
+					c.set(screen.origin().relative(screen.along(), k).below(), style.screenBase());
 				}
 			}
 		}

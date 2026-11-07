@@ -42,8 +42,10 @@ public final class DemoHq {
 	/**
 	 * Bump when anything here changes the built result (plinth, lift rule): hashes change, the HQ is
 	 * rebuilt. 3: vacant desks are no longer built (fix/hq-stale-stations); the rebuild clears them.
+	 * 4: HQ redesign (HqStyle, cherry campus by default; standing desks, archive terminal nook,
+	 * reserved screens); the fixtures marker also carries the kit and the style ({@code HqPlans.buildKey}).
 	 */
-	public static final int PLAN_VERSION = 3;
+	public static final int PLAN_VERSION = 4;
 
 	private DemoHq() {
 	}
@@ -120,7 +122,7 @@ public final class DemoHq {
 	 * active {@link HqFixtures} (so turning the blocks module on or off rebuilds the fixtures).
 	 */
 	public static String hash(HqLayout layout, int lift) {
-		return hash(layout, lift, HqFixtures.fingerprint());
+		return hash(layout, lift, dev.t3craft.hq.HqPlans.buildKey());
 	}
 
 	static String hash(HqLayout layout, int lift, String fixtures) {
@@ -151,7 +153,7 @@ public final class DemoHq {
 
 	/** {@link #step(HqInput, HqLayout, String, int, boolean, String)} for a world built with the current fixtures. */
 	public static Step step(HqInput input, @Nullable HqLayout previous, @Nullable String previousHash, int lift, boolean diffable) {
-		return step(input, previous, previousHash, lift, diffable, HqFixtures.fingerprint());
+		return step(input, previous, previousHash, lift, diffable, dev.t3craft.hq.HqPlans.buildKey());
 	}
 
 	/** {@link #step(HqInput, HqLayout, String, int, boolean, String, boolean)} without clearing a non-diffable previous HQ. */
@@ -177,7 +179,7 @@ public final class DemoHq {
 	 */
 	public static Step step(HqInput input, @Nullable HqLayout previous, @Nullable String previousHash, int lift, boolean diffable,
 			String previousFixtures, boolean clearPrevious) {
-		String fixtures = HqFixtures.fingerprint();
+		String fixtures = dev.t3craft.hq.HqPlans.buildKey();
 		HqGenerator.Result r = HqPlans.plan(input, previous);
 		String h = hash(r.layout(), lift, fixtures);
 		if (diffable && previous != null && h.equals(previousHash)) {
@@ -187,7 +189,7 @@ public final class DemoHq {
 		if (diffable && previous != null) {
 			if (previousFixtures.equals(fixtures)) {
 				before = HqPlans.generate(previous);
-			} else if (previousFixtures.equals(HqFixtures.fingerprint(HqFixtures.VANILLA))) {
+			} else if (previousFixtures.equals(dev.t3craft.hq.HqPlans.buildKey(HqFixtures.VANILLA))) {
 				before = HqPlans.generate(previous, HqFixtures.VANILLA);
 			}
 			// else: built with fixtures that are not installed now, so the old plan is unknown: rebuild all

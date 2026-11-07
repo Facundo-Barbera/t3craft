@@ -18,7 +18,6 @@ import java.util.EnumMap;
 import java.util.Map;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jspecify.annotations.Nullable;
@@ -60,7 +59,7 @@ final class ClassicStyle extends HqStyle {
 		m.put(Role.STATUS_LAMP, k.lamp());
 		m.put(Role.SCREEN, k.boardFace);
 		m.put(Role.BEACON, k.copper);
-		m.put(Role.TERMINAL, k.darkPlanks);
+		m.put(Role.TERMINAL, k.archiveTerminal(Direction.NORTH));
 		m.put(Role.PLAQUE, k.wallSign(Direction.SOUTH));
 		palette = Collections.unmodifiableMap(m);
 	}
@@ -162,7 +161,7 @@ final class ClassicStyle extends HqStyle {
 
 	/** The "needs attention" board: a dark slate panel framed in timber with copper signal bulbs. */
 	@Override
-	void board(PlanBuilder.Canvas c, CompoundTag sign) {
+	void board(PlanBuilder.Canvas c, SignText sign) {
 		int z = BOARD_Z;
 		for (int y = 1; y <= 5; y++) {
 			c.set(-BOARD_HALF - 1, y, z, k.post());
@@ -175,7 +174,7 @@ final class ClassicStyle extends HqStyle {
 			}
 			c.set(x, 5, z, k.copper); // bulbs overwritten by the generator
 		}
-		c.decor(new BlockPos(0, 5, z + 1), k.wallSign(Direction.SOUTH), sign);
+		c.decor(new BlockPos(0, 5, z + 1), k.wallSign(Direction.SOUTH), sign.signTag());
 	}
 
 	/** Direction from an edge cell towards the centre (the tall side of a roof step). */
@@ -200,7 +199,7 @@ final class ClassicStyle extends HqStyle {
 				c.set(x, y, n.minZ(), x == HqGeometry.ARCHIVE_TERMINAL.getX() ? k.air : y == 4 ? k.beam(Direction.Axis.X) : k.bookshelf);
 			}
 		}
-		c.decor(HqGeometry.ARCHIVE_TERMINAL.above(), k.wallSign(Direction.NORTH), SignTags.sign(DyeColor.LIGHT_GRAY, true, "", "Archive", "", ""));
+		c.decor(HqGeometry.ARCHIVE_TERMINAL.above(2), k.wallSign(Direction.NORTH), SignTags.sign(DyeColor.LIGHT_GRAY, true, "", "Archive", "", ""));
 	}
 
 	@Override
@@ -247,7 +246,7 @@ final class ClassicStyle extends HqStyle {
 	// ------------------------------------------------------------------ spine
 
 	@Override
-	void spineRow(PlanBuilder.Canvas c, int r, @Nullable CompoundTag eastSign, @Nullable CompoundTag westSign) {
+	void spineRow(PlanBuilder.Canvas c, int r, @Nullable SignText eastSign, @Nullable SignText westSign) {
 		int zn = HqGeometry.rowNorth(r);
 		for (int v = 0; v < ROW; v++) {
 			int z = zn + v;
@@ -289,10 +288,10 @@ final class ClassicStyle extends HqStyle {
 		}
 		int zs = zn + (DOOR_V1 + DOOR_V2) / 2;
 		if (eastSign != null) {
-			c.decor(new BlockPos(2, 4, zs), k.wallSign(Direction.WEST), eastSign);
+			c.decor(new BlockPos(2, 4, zs), k.wallSign(Direction.WEST), eastSign.signTag());
 		}
 		if (westSign != null) {
-			c.decor(new BlockPos(-2, 4, zs), k.wallSign(Direction.EAST), westSign);
+			c.decor(new BlockPos(-2, 4, zs), k.wallSign(Direction.EAST), westSign.signTag());
 		}
 	}
 

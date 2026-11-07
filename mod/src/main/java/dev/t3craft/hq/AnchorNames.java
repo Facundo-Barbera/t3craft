@@ -40,7 +40,7 @@ public final class AnchorNames {
 	/** Prefix of the hub's stroll points ({@code walk_hub_0..}), open floor away from furniture. */
 	public static final String WALK_HUB = "walk_hub_";
 
-	/** A standing spot in front of the hub's "Archived" shelf (south wall, east of the entrance), facing it. */
+	/** The standing spot in front of the archive terminal ({@link #ARCHIVE_TERMINAL}), facing it. */
 	public static final String ARCHIVE = "archive";
 	/** Prefix of the "Archived" shelf's slots ({@code shelf@0..}); see {@link #archiveShelfSlot}. */
 	public static final String SHELF_SLOT = "shelf@";
@@ -53,20 +53,15 @@ public final class AnchorNames {
 	public static final String SHELF_HEADER = "shelf_header";
 	/**
 	 * Front face of the archive terminal (feat/archive-terminal): the one place in the HQ where closed
-	 * threads are browsed. Against the hub's east wall, south of the benches, screen facing west into
-	 * the hub ({@code facing} = the face's normal; a player uses it standing one block west). Vanilla
+	 * threads are browsed. In the nook in the hub's south wall, east of the entrance, screen facing
+	 * north into the hub ({@code facing} = the face's normal; {@link #ARCHIVE} is the standing spot in
+	 * front of it). Vanilla
 	 * HQ: a lectern stands there; with the blocks module, {@code t3craft:archive_terminal}. A redesign
 	 * of the hub only has to publish this anchor (any free floor cell, facing where the player stands)
 	 * and keep that cell for the terminal; the fixtures follow the anchor.
 	 */
 	public static final String ARCHIVE_TERMINAL = "archiveTerminal";
 
-	/**
-	 * Face of the archive terminal (the hub's nook east of the entrance): the one computer where the
-	 * archived threads are listed (feat/archive-terminal). {@link #ARCHIVE} is the standing spot in
-	 * front of it.
-	 */
-	public static final String ARCHIVE_TERMINAL = "archive_terminal";
 	/**
 	 * The hub's big screen (P1 multiblock): face centre of the bottom-middle cell of a 5 x 3 cell
 	 * surface on the east interior wall, looking west. Cells: {@code block} ± 2 along z, up 2.

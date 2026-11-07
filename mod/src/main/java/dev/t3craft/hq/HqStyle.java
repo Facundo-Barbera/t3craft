@@ -72,66 +72,18 @@ public abstract class HqStyle {
 		SCREEN,
 		/** The hub lantern's beacon cell (replaced by the blocks module's beacon lamp). */
 		BEACON,
-		/** Base under the archive terminal's screen. */
+		/** Stand-in of the archive terminal (the blocks module swaps it for {@code t3craft:archive_terminal}). */
 		TERMINAL,
 		/** Name plaque / sign. */
 		PLAQUE
 	}
 
-	/**
-	 * Optional replacement of a style's role blocks by another module's own blocks (feat/hq-blocks-kit:
-	 * standing desk, wall and shoji panels, floor tiles, lantern, plaque, beam…), installed once at
-	 * startup like {@link HqFixtures}. Without a kit every style is pure vanilla.
-	 */
-	@FunctionalInterface
-	public interface Kit {
-		/**
-		 * The block to use for {@code role} in style {@code styleId} instead of {@code vanilla}, or null to
-		 * keep it. Must be pure; the returned state should accept the same orientation properties as
-		 * {@code vanilla} where the piece orients it (stairs facing, log axis), others are ignored.
-		 */
-		@Nullable BlockState replace(String styleId, Role role, BlockState vanilla);
-
-		/** Short stable name (goes into build hashes, like {@link HqFixtures#id()}). */
-		default String id() {
-			return "kit";
+	/** A sign's or plaque's text: up to four lines, the text colour (the environment's, for wing signs). */
+	public record SignText(DyeColor color, String l1, String l2, String l3, String l4) {
+		/** As vanilla sign block entity data (glowing text). */
+		CompoundTag signTag() {
+			return SignTags.sign(color, true, l1, l2, l3, l4);
 		}
-	}
-
-	/** The installed kit, or null (vanilla). */
-	public static @Nullable Kit kit() {
-		return KitHolder.kit;
-	}
-
-	/** Installs a kit (null = vanilla). Called once by the blocks module. */
-	public static void useKit(@Nullable Kit kit) {
-		KitHolder.kit = kit;
-	}
-
-	private static final class KitHolder {
-		private static volatile @Nullable Kit kit;
-	}
-
-	/**
-	 * {@code vanilla}, or the kit's block for {@code role} with {@code vanilla}'s properties copied
-	 * where the kit block has them.
-	 */
-	@SuppressWarnings({"unchecked", "rawtypes"})
-	protected final BlockState kitted(Role role, BlockState vanilla) {
-		Kit k = kit();
-		if (k == null) {
-			return vanilla;
-		}
-		BlockState r = k.replace(id(), role, vanilla);
-		if (r == null) {
-			return vanilla;
-		}
-		for (net.minecraft.world.level.block.state.properties.Property p : vanilla.getProperties()) {
-			if (r.hasProperty(p)) {
-				r = r.setValue(p, vanilla.getValue(p));
-			}
-		}
-		return r;
 	}
 
 	HqStyle() {
@@ -165,9 +117,14 @@ public abstract class HqStyle {
 		return palette().get(Role.BEACON);
 	}
 
-	/** Base block under the archive terminal's screen. */
-	BlockState terminalBase() {
-		return palette().get(Role.TERMINAL);
+	/** The archive terminal's stand-in, screen facing {@code facing}. */
+	BlockState archiveTerminal(net.minecraft.core.Direction facing) {
+		return palette().get(Role.TERMINAL).setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING, facing);
+	}
+
+	/** Base under a module's big screen. */
+	BlockState screenBase() {
+		return palette().get(Role.BEAM);
 	}
 
 	/** A hub bench (a seat; NPCs rest here), its backrest on {@code back}. */
@@ -184,7 +141,7 @@ public abstract class HqStyle {
 	abstract void hub(PlanBuilder.Canvas c, boolean northDoor);
 
 	/** The board wall at {@link HqGeometry#BOARD_Z} (frame, face, sign). The generator writes the bulbs after. */
-	abstract void board(PlanBuilder.Canvas c, CompoundTag sign);
+	abstract void board(PlanBuilder.Canvas c, SignText sign);
 
 	/** The archive nook ({@link HqGeometry#archiveNook()}); the generator writes the terminal after. */
 	abstract void archiveNook(PlanBuilder.Canvas c);
@@ -192,10 +149,10 @@ public abstract class HqStyle {
 	abstract void portico(PlanBuilder.Canvas c);
 
 	/**
-	 * Spine row {@code r}; {@code eastSign}/{@code westSign} are the wing signs' block entity data
-	 * (null when that side has no wing).
+	 * Spine row {@code r}; {@code eastSign}/{@code westSign} are the wing signs' text (null when that
+	 * side has no wing).
 	 */
-	abstract void spineRow(PlanBuilder.Canvas c, int r, @Nullable CompoundTag eastSign, @Nullable CompoundTag westSign);
+	abstract void spineRow(PlanBuilder.Canvas c, int r, @Nullable SignText eastSign, @Nullable SignText westSign);
 
 	abstract void spineCap(PlanBuilder.Canvas c, Box box);
 

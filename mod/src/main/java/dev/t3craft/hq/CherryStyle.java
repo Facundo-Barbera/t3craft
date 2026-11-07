@@ -35,8 +35,10 @@ import org.jspecify.annotations.Nullable;
  * two-tier hub with a glazed clerestory and a lantern cupola that holds the beacon, a torii and
  * cherry trees at the entrance, gravel, moss, bamboo and stone lanterns in the garden strips.
  *
- * <p>Roles go through {@link HqStyle#kitted} so the blocks module's kit (feat/hq-blocks-kit) can
- * replace them with t3craft's own blocks; without it the style is all vanilla (26.3 blocks). Leaves
+ * <p>Built on {@link HqKit}: desks, wall and shoji panels, floor tiles, timber, lanterns, plaques,
+ * railings, planters and stone lanterns are t3craft's own blocks when the blocks module is on
+ * (feat/hq-blocks-kit); when it is off the style falls back to its own vanilla choices (26.3 blocks).
+ * Roofs, footing, gardens and trees are vanilla in both. Leaves
  * are always {@code persistent}, there are no trapdoors on walking floors and no fences or stone
  * walls that would need block tags to connect (a stone lantern is a lone wall post).
  */
@@ -73,7 +75,7 @@ final class CherryStyle extends HqStyle {
 		m.put(Role.STATUS_LAMP, Blocks.COPPER_BULB.waxed().unaffected().defaultBlockState().setValue(BlockStateProperties.LIT, false));
 		m.put(Role.SCREEN, Blocks.CONCRETE.pick(DyeColor.BLACK).defaultBlockState());
 		m.put(Role.BEACON, Blocks.OCHRE_FROGLIGHT.defaultBlockState());
-		m.put(Role.TERMINAL, log(Blocks.STRIPPED_CHERRY_WOOD, Direction.Axis.Y));
+		m.put(Role.TERMINAL, Blocks.LECTERN.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH));
 		m.put(Role.PLAQUE, Blocks.CHERRY_WALL_SIGN.defaultBlockState());
 		palette = Collections.unmodifiableMap(m);
 	}
@@ -91,7 +93,15 @@ final class CherryStyle extends HqStyle {
 	// ------------------------------------------------------------------ materials
 
 	private BlockState role(Role r) {
-		return kitted(r, palette.get(r));
+		return palette.get(r);
+	}
+
+	private static HqKit kit() {
+		return HqKit.active();
+	}
+
+	private static boolean custom() {
+		return kit().custom();
 	}
 
 	private static BlockState log(Block b, Direction.Axis axis) {
@@ -117,7 +127,12 @@ final class CherryStyle extends HqStyle {
 	private final BlockState bookshelf = Blocks.BOOKSHELF.defaultBlockState();
 
 	private BlockState floor() {
-		return role(Role.FLOOR);
+		return custom() ? kit().floor() : role(Role.FLOOR);
+	}
+
+	/** Thresholds, doorways and the hub's border. */
+	private BlockState accentFloor() {
+		return custom() ? kit().floorAccent() : role(Role.DOOR);
 	}
 
 	private BlockState footing() {
@@ -125,23 +140,24 @@ final class CherryStyle extends HqStyle {
 	}
 
 	private BlockState wall() {
-		return role(Role.WALL);
+		return kit().wallPanel(false);
 	}
 
+	/** Paper windows: lit shoji panels with the kit, white panes without. */
 	private BlockState shoji() {
-		return role(Role.WINDOW);
+		return custom() ? kit().wallPanel(true) : role(Role.WINDOW);
 	}
 
 	private BlockState post() {
-		return role(Role.COLUMN);
+		return custom() ? kit().beam(Direction.Axis.Y) : role(Role.COLUMN);
 	}
 
 	private BlockState beam(Direction.Axis axis) {
-		return kitted(Role.BEAM, log(Blocks.STRIPPED_CHERRY_LOG, axis));
+		return custom() ? kit().beam(axis) : log(Blocks.STRIPPED_CHERRY_LOG, axis);
 	}
 
 	private BlockState roof(Direction back) {
-		return kitted(Role.ROOF, stairs(Blocks.DEEPSLATE_TILE_STAIRS, back));
+		return stairs(Blocks.DEEPSLATE_TILE_STAIRS, back);
 	}
 
 	private BlockState roofSlab() {
@@ -157,11 +173,11 @@ final class CherryStyle extends HqStyle {
 	}
 
 	private BlockState lantern(boolean hanging) {
-		return kitted(Role.LIGHT, Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, hanging));
+		return hanging || !custom() ? Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, hanging) : kit().lantern();
 	}
 
 	private BlockState plaque(Direction facing) {
-		return kitted(Role.PLAQUE, Blocks.CHERRY_WALL_SIGN.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, facing));
+		return kit().plaque(facing);
 	}
 
 	private BlockState petals(int amount, Direction facing) {
@@ -181,13 +197,25 @@ final class CherryStyle extends HqStyle {
 
 	@Override
 	BlockState bench(Direction back) {
-		return kitted(Role.BENCH, stairs(Blocks.CHERRY_STAIRS, back));
+		return stairs(Blocks.CHERRY_STAIRS, back);
 	}
 
-	/** A stone lantern (tōrō): lone stone-brick post with a lantern on top. */
+	/** A stone lantern (tōrō): the kit's, or a lone stone-brick post with a lantern on top. */
 	private void stoneLantern(PlanBuilder.Canvas c, int x, int z) {
+		if (custom()) {
+			c.set(x, 1, z, kit().gardenLantern());
+			return;
+		}
 		c.set(x, 1, z, stoneLanternPost);
 		c.decor(x, 2, z, lantern(false));
+	}
+
+	private BlockState planter() {
+		return kit().gardenPlanter();
+	}
+
+	private CompoundTag plaqueData(SignText t) {
+		return kit().plaqueData(t.color(), t.l1(), t.l2(), t.l3(), t.l4());
 	}
 
 	// ------------------------------------------------------------------ hub
@@ -198,8 +226,8 @@ final class CherryStyle extends HqStyle {
 			for (int x = -HUB; x <= HUB; x++) {
 				int m = Math.max(Math.abs(x), Math.abs(z));
 				boolean door = Math.abs(x) <= 1 && (z == HUB || (northDoor && z == -HUB));
-				BlockState f = m == HUB ? footing() : m == 7 ? planks : floor();
-				c.set(x, 0, z, door ? role(Role.DOOR) : f);
+				BlockState f = m == HUB ? footing() : m == 7 ? accentFloor() : floor();
+				c.set(x, 0, z, door ? accentFloor() : f);
 				if (m == HUB) {
 					hubWall(c, x, z, door);
 				}
@@ -234,7 +262,7 @@ final class CherryStyle extends HqStyle {
 				// reading corners: bookshelf, cherry bonsai on top
 				c.set(7 * sx, 1, 7 * sz, bookshelf);
 				c.set(7 * sx, 2, 7 * sz, bookshelf);
-				c.decor(7 * sx, 3, 7 * sz, role(Role.DECOR));
+				c.decor(7 * sx, 3, 7 * sz, planter());
 			}
 			// planters at the ends of the bench rows (benches: generator, x = ±5)
 			c.decor(5 * sx, 1, -3, azaleaPot);
@@ -274,7 +302,7 @@ final class CherryStyle extends HqStyle {
 
 	/** The board: a dark slate notice board in a cherry frame under its own little tiled roof. */
 	@Override
-	void board(PlanBuilder.Canvas c, CompoundTag sign) {
+	void board(PlanBuilder.Canvas c, SignText sign) {
 		int z = BOARD_Z;
 		for (int y = 1; y <= 5; y++) {
 			c.set(-BOARD_HALF - 1, y, z, post());
@@ -292,7 +320,7 @@ final class CherryStyle extends HqStyle {
 			c.set(x, 6, z - 1, roof(Direction.SOUTH));
 			c.set(x, 6, z + 1, roof(Direction.NORTH));
 		}
-		c.decor(new BlockPos(0, 5, z + 1), plaque(Direction.SOUTH), sign);
+		c.decor(new BlockPos(0, 5, z + 1), plaque(Direction.SOUTH), plaqueData(sign));
 	}
 
 	// ------------------------------------------------------------------ archive nook
@@ -306,7 +334,7 @@ final class CherryStyle extends HqStyle {
 				c.set(x, y, n.minZ(), x == tx ? air : y == 4 ? beam(Direction.Axis.X) : shelf);
 			}
 		}
-		c.decor(HqGeometry.ARCHIVE_TERMINAL.above(), plaque(Direction.NORTH), SignTags.sign(DyeColor.BROWN, true, "", "Archive", "", ""));
+		c.decor(HqGeometry.ARCHIVE_TERMINAL.above(2), plaque(Direction.NORTH), plaqueData(new SignText(DyeColor.BROWN, "", "Archive", "", "")));
 	}
 
 	// ------------------------------------------------------------------ portico
@@ -319,7 +347,7 @@ final class CherryStyle extends HqStyle {
 			for (int x = -PORTICO_X; x <= PORTICO_X; x++) {
 				int ax = Math.abs(x);
 				boolean deck = ax <= 3 && z < gate;
-				c.set(x, 0, z, deck ? planks : ax <= 1 ? role(Role.PATH) : role(Role.GARDEN));
+				c.set(x, 0, z, deck ? (custom() ? kit().floor() : planks) : ax <= 1 ? role(Role.PATH) : role(Role.GARDEN));
 				if (!deck && ax >= 2 && !(ax == 2 && z == gate)) {
 					c.decor(x, 1, z, (x + z) % 3 == 0 ? petals(1 + Math.floorMod(x * 7 + z, 4), Direction.from2DDataValue(Math.floorMod(x + z, 4)))
 							: moss);
@@ -360,7 +388,7 @@ final class CherryStyle extends HqStyle {
 	// ------------------------------------------------------------------ spine
 
 	@Override
-	void spineRow(PlanBuilder.Canvas c, int r, @Nullable CompoundTag eastSign, @Nullable CompoundTag westSign) {
+	void spineRow(PlanBuilder.Canvas c, int r, @Nullable SignText eastSign, @Nullable SignText westSign) {
 		int zn = HqGeometry.rowNorth(r);
 		for (int v = 0; v < ROW; v++) {
 			int z = zn + v;
@@ -369,7 +397,7 @@ final class CherryStyle extends HqStyle {
 				int ax = Math.abs(x);
 				boolean wing = (x > 0 ? eastSign : westSign) != null;
 				boolean door = ax == SPINE && wing && v >= DOOR_V1 && v <= DOOR_V2;
-				c.set(x, 0, z, ax == SPINE ? (door ? role(Role.DOOR) : footing()) : ax <= 1 ? planks : floor());
+				c.set(x, 0, z, ax == SPINE ? (door ? accentFloor() : footing()) : ax <= 1 ? accentFloor() : floor());
 				if (ax == SPINE) {
 					for (int y = 1; y <= 4; y++) {
 						BlockState s;
@@ -382,8 +410,8 @@ final class CherryStyle extends HqStyle {
 						} else if (wing) {
 							s = y == 1 ? footing() : wall();
 						} else {
-							// open gallery side (engawa): a low cherry rail, open above
-							s = y == 1 ? beam(Direction.Axis.Z) : air;
+							// open gallery side (engawa): a low rail, open above
+							s = y == 1 ? (custom() ? kit().railing(x < 0 ? Direction.WEST : Direction.EAST) : beam(Direction.Axis.Z)) : air;
 						}
 						c.set(x, y, z, s);
 					}
@@ -396,16 +424,16 @@ final class CherryStyle extends HqStyle {
 				c.hang(0, 4, z, lantern(true));
 			}
 			if (v == 1 || v == ROW - 2) {
-				c.decor(-2, 1, z, role(Role.DECOR));
-				c.decor(2, 1, z, role(Role.DECOR));
+				c.decor(-2, 1, z, planter());
+				c.decor(2, 1, z, planter());
 			}
 		}
 		int zs = zn + (DOOR_V1 + DOOR_V2) / 2;
 		if (eastSign != null) {
-			c.decor(new BlockPos(2, 4, zs), plaque(Direction.WEST), eastSign);
+			c.decor(new BlockPos(2, 4, zs), plaque(Direction.WEST), plaqueData(eastSign));
 		}
 		if (westSign != null) {
-			c.decor(new BlockPos(-2, 4, zs), plaque(Direction.EAST), westSign);
+			c.decor(new BlockPos(-2, 4, zs), plaque(Direction.EAST), plaqueData(westSign));
 		}
 	}
 
@@ -473,7 +501,7 @@ final class CherryStyle extends HqStyle {
 				continue;
 			}
 			boolean door = inner && v >= DOOR_V1 && v <= DOOR_V2;
-			c.set(x, 0, z, door ? role(Role.DOOR) : footing());
+			c.set(x, 0, z, door ? accentFloor() : footing());
 			boolean post = v == 0 || v == 4 || v == 8 || v == WING_WALL;
 			boolean window = !inner && (v >= 1 && v <= 3 || v >= 9 && v <= 11);
 			for (int y = 1; y <= 4; y++) {
@@ -512,7 +540,7 @@ final class CherryStyle extends HqStyle {
 					continue;
 				}
 				if (c.owns(x, 0, z)) {
-					c.set(x, 0, z, v >= DOOR_V1 && v <= DOOR_V2 ? planks : pillar ? planks : floor());
+					c.set(x, 0, z, v >= DOOR_V1 && v <= DOOR_V2 || pillar ? accentFloor() : floor());
 				}
 				if (pillar) {
 					c.set(x, 5, z, beam(Direction.Axis.Z)); // tie beam across the hall
@@ -522,7 +550,7 @@ final class CherryStyle extends HqStyle {
 					c.hang(x, 4, z, lantern(true));
 				}
 				if (pillar && (v == 1 || v == WING_WALL - 1)) {
-					c.decor(x, 1, z, role(Role.DECOR));
+					c.decor(x, 1, z, planter());
 				}
 				if (v == WING_WALL / 2) {
 					c.decor(x, 1, z, carpet(accent));
@@ -572,9 +600,17 @@ final class CherryStyle extends HqStyle {
 		if (!d.occupied()) {
 			return;
 		}
-		c.set(d.drawer(), shelf.setValue(BlockStateProperties.HORIZONTAL_FACING, d.facing().getOpposite()));
-		c.set(top, role(Role.DESK));
-		c.set(right, role(Role.DESK));
-		c.decor(d.drawer().above(), role(Role.DECOR));
+		Direction front = d.facing().getOpposite();
+		if (custom()) {
+			// the kit's standing desk along the whole row
+			c.set(d.drawer(), kit().desk(front));
+			c.set(top, kit().desk(front));
+			c.set(right, kit().desk(front));
+		} else {
+			c.set(d.drawer(), shelf.setValue(BlockStateProperties.HORIZONTAL_FACING, front));
+			c.set(top, role(Role.DESK));
+			c.set(right, role(Role.DESK));
+		}
+		c.decor(d.drawer().above(), planter());
 	}
 }
