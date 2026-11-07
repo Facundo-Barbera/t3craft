@@ -27,7 +27,7 @@ final class HeldFixtures {
 	}
 
 	static HeldScreenModel.Input input(PortableState s) {
-		return new HeldScreenModel.Input(s, env -> HeldScreenModel.Badge.of(env, "my-" + env, null), HeldScreenRaster.textWidth(),
+		return new HeldScreenModel.Input(s, env -> dev.t3craft.client.chat.EnvBadge.of(env, "my-" + env, null), HeldScreenRaster.textWidth(),
 				HeldScreenRaster.maxRows(), MONO);
 	}
 

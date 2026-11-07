@@ -160,15 +160,14 @@ feat/chat va a replicar el chat de AgentCraft y expondrá la lista de hilos + co
 widget (bounds, tema inyectable, modo compacto). El portable lo incrustará dentro de su marco
 (carcasa, bordes y pantalla actuales se conservan). Por eso:
 
-- El WIP de conversación y badges quedó **aislado y sin conectar** en
-  `dev.t3craft.client.portable.pending` (`Conversation`, `ConversationParser`,
-  `ConversationSource`, `HttpConversationSource`, `FetchPolicy`, `EnvBadge`). Nada fuera de ese
-  paquete lo referencia. En la ronda 2 se borra o se migra lo que feat/chat no traiga.
+- El WIP de conversación y badges (`dev.t3craft.client.portable.pending`) **se eliminó** en
+  feat/chat: la conversación es `chat.ChatTranscript`/`ThreadFeed` (sobre la conexión única,
+  `T3Connection.subscribeThread`) y el badge es `chat.EnvBadge` (ver docs/feat-chat.md).
 - `PortableSettings` (con `heldShowsChat`) se eliminó: `heldScreen` vive ahora en `T3CraftSettings`;
   si la ronda 2 quiere que la pantalla en mano muestre la conversación, se añade otra clave en la
   sección `portable`.
-- `HeldScreenModel.Badge` es intencionadamente mínimo (una letra + color): cuando feat/chat exponga
-  su icono de entorno, `HeldScreen.badges()` debe alimentarse de él para que coincidan.
+- El held screen ya usa `chat.EnvBadge` (mismo icono que la lista unificada) y el orden compartido
+  `chat.ThreadOrder` (también `PortableState.ORDER`).
 - `PortableScreen` sigue con su lista propia hasta que el widget de feat/chat exista.
 
 ## Tests (`mod/src/test/java/dev/t3craft/client/portable/`)

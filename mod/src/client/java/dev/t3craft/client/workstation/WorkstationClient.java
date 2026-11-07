@@ -134,6 +134,20 @@ public final class WorkstationClient implements ClientModInitializer {
 		this.openerOverride = opener;
 	}
 
+	/**
+	 * Computer blocks that draw the thread's screen themselves (the blocks module's monitor): over
+	 * such a block the station's own TextDisplay stays blank, so there is one screen, not two. Clicks
+	 * still open the chat as before. Null = none (default: every vanilla block gets our screen).
+	 */
+	public void setScreenSuppressor(java.util.function.@Nullable Predicate<net.minecraft.world.level.block.state.BlockState> selfDisplay) {
+		renderer.setSelfDisplay(selfDisplay);
+	}
+
+	/** What a click on a thread opens right now (override or the default chat screen). */
+	public ThreadOpener opener() {
+		return openerOverride != null ? openerOverride : defaultOpener;
+	}
+
 	/** Thread keys ({@code <env>:<thread>}) whose station currently shows a settled (archived) thread. */
 	public Set<String> archived() {
 		return renderer.archived();
