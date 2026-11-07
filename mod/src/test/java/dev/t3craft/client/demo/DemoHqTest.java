@@ -222,7 +222,7 @@ class DemoHqTest {
 				minY = Math.min(minY, p.min().getY());
 			}
 			assertEquals(0, minZ, "portico front on z = 0, growth to +z");
-			assertEquals(-5 + LIFT, minY, "basement lifted above bedrock");
+			assertEquals(0, minY, "no basement: the plinth from the ground up is the lowest part");
 			assertEquals(Blocks.TUFF.defaultBlockState(), s.parts().getFirst().get(0).state(), "plinth first");
 		}
 

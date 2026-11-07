@@ -1,6 +1,7 @@
 package dev.t3craft.client.npc.behavior;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.SplittableRandom;
 import org.jspecify.annotations.Nullable;
 
@@ -22,16 +23,51 @@ import org.jspecify.annotations.Nullable;
  *
  * Player avoidance: paths avoid the player's cells; a walker holds when the player is right ahead
  * and re-plans around them after a moment; a standing NPC the player walks into steps aside.
+ *
+ * <p>Navigation: routes come from the {@link Navigator} (A* over the real blocks, see
+ * {@link Navigation}); moves go through its collision ({@link Navigator#move}), so the body never
+ * enters a block. No route means no walking (never a straight line through walls): the NPC stays
+ * and retries later. A walker that stops making progress re-plans around the spot, then slides
+ * back to the centre of the nearest free cell, then gives up for a while; an NPC found inside a
+ * block (spawn, chunk load, a block placed on it) is pushed to the nearest free cell.
  */
 public final class NpcBrain {
 	/** What the director resolved for this NPC this tick. {@code boardSlot} is null when not needed. */
 	public record Targets(Anchor desk, @Nullable Anchor boardSlot, Anchor home, double wanderRadius, Anchor rest) {
 	}
 
-	/** Finds a walking route; returns null when there is none (the brain then walks straight). */
+	/**
+	 * The world as the brain needs it: routes and collision. Only {@link #path} is required (null =
+	 * no route); the rest default to "no obstacles" for tests and the no-level case.
+	 */
 	@FunctionalInterface
 	public interface Navigator {
 		@Nullable List<Pos> path(Pos from, Pos to, @Nullable Pos avoid);
+
+		/** Route request; {@link Route.Status#PENDING} means "ask again next tick". */
+		default Route route(Pos from, Pos to, @Nullable Pos avoid) {
+			List<Pos> p = path(from, to, avoid);
+			return p == null ? Route.NONE : Route.found(p);
+		}
+
+		/** Collision-resolved move of the body (see {@link Collider#move}). */
+		default Pos move(Pos from, Pos to) {
+			return to;
+		}
+
+		/** Is the body at {@code p} inside a block? */
+		default boolean embedded(Pos p) {
+			return false;
+		}
+
+		/** Nearest free cell centre for the body (null = none known). */
+		default @Nullable Pos nearestFree(Pos p) {
+			return null;
+		}
+
+		/** A walker at {@code at} could not get on towards {@code toward}: avoid that spot when re-planning. */
+		default void blocked(Pos at, Pos toward, Pos goal) {
+		}
 
 		/** Straight lines only (no level). */
 		Navigator STRAIGHT = (from, to, avoid) -> List.of(from, to);
@@ -44,6 +80,15 @@ public final class NpcBrain {
 	static final int CELEBRATE_TICKS = 70;
 	static final int FLASH_TICKS = 120;
 	static final int REPLAN_BLOCKED_TICKS = 20;
+	/** Walking ticks without progress before re-planning / unsticking. */
+	static final int STUCK_TICKS = 25;
+	/** Re-plans around the stuck spot before sliding to a free cell centre; after more, give up for a while. */
+	static final int STUCK_REPLANS = 2;
+	static final int STUCK_NUDGES = 2;
+	/** Wait before trying again after no route was found or after giving up. */
+	static final int RETRY_TICKS = 40;
+	static final int GIVE_UP_TICKS = 160;
+	static final int EMBED_CHECK_TICKS = 20;
 	static final double SNAP_DISTANCE = 48;
 	static final double PLAYER_NEAR = 6;
 	static final double BUBBLE_NEAR = 4.5;
@@ -58,6 +103,14 @@ public final class NpcBrain {
 	private Pos pos;
 	private @Nullable Pos goal;
 	private float goalYaw;
+	/** Where the current route ends (the goal, or the nearest free spot when the goal is inside a block). */
+	private @Nullable Pos stand;
+	/** A route still being searched (asked again each tick). */
+	private @Nullable Pos pendingTo;
+	private float pendingYaw;
+	private boolean pendingAvoid;
+	private int retryAt;
+	private int stuckEpisodes;
 	private int phaseTicks;
 	private int tick;
 	private int flash;
@@ -200,6 +253,12 @@ public final class NpcBrain {
 			placed = true;
 		}
 		phaseTicks++;
+		if (teleported || (!motion.walking() && tick % EMBED_CHECK_TICKS == 0)) {
+			pushOut(nav);
+		}
+		if (pendingTo != null) {
+			route(pendingTo, pendingYaw, nav, pendingAvoid ? player : null);
+		}
 
 		// Re-target when the spot moved (layout change, base built or removed).
 		Anchor want = currentAnchor(t);
@@ -209,12 +268,14 @@ public final class NpcBrain {
 
 		if (motion.walking()) {
 			Pos before = pos;
-			pos = motion.step(pos, player);
+			pos = motion.step(pos, player, nav::move);
 			if (motion.blockedTicks() == REPLAN_BLOCKED_TICKS && goal != null) {
 				route(goal, goalYaw, nav, player);
 			} else if (motion.blockedTicks() > REPLAN_BLOCKED_TICKS * 4 && goal != null) {
-				// Still stuck (player parked on the route): walk straight past them.
-				motion.walk(List.of(pos, goal), goalYaw);
+				// Still held (player parked on the route): take the route that ignores them.
+				route(goal, goalYaw, nav, null);
+			} else if (motion.stuckTicks() == STUCK_TICKS) {
+				unstuck(nav, player);
 			}
 			if (!motion.walking()) {
 				arrived();
@@ -228,9 +289,9 @@ public final class NpcBrain {
 		} else if (player != null && stepAsideCooldown == 0 && pos.horizDist(player) < STEP_ASIDE && Math.abs(player.y() - pos.y()) < 2) {
 			stepAside(player, nav);
 			return;
-		} else if (goal != null && phase != Phase.WANDER_PAUSE && phase != Phase.CELEBRATING && pos.horizDist(goal) > 0.6
-				&& (player == null || goal.horizDist(player) > 1.0)) {
-			// Pushed off the spot (stepped aside): go back once the spot is free.
+		} else if (goal != null && pendingTo == null && tick >= retryAt && phase != Phase.WANDER_PAUSE && phase != Phase.CELEBRATING
+				&& pos.horizDist(target()) > 0.6 && (player == null || target().horizDist(player) > 1.0)) {
+			// Pushed off the spot (stepped aside, got unstuck, no route earlier): go back once the spot is free.
 			route(goal, goalYaw, nav, player);
 		}
 		motion.step(pos, null);
@@ -242,6 +303,10 @@ public final class NpcBrain {
 		crouch = false;
 		wanderFailures = 0;
 		goal = null;
+		stand = null;
+		pendingTo = null;
+		stuckEpisodes = 0;
+		retryAt = 0;
 		if (!first) {
 			flash = FLASH_TICKS;
 		}
@@ -262,7 +327,10 @@ public final class NpcBrain {
 			motion.stand(a.yaw());
 			motion.snapYaw(a.yaw());
 			teleported = true;
+			stand = null;
+			pendingTo = null;
 			phase = restingPhase();
+			pushOut(nav);
 			return;
 		}
 		setGoal(a, nav, player);
@@ -291,6 +359,10 @@ public final class NpcBrain {
 	private void setGoal(Anchor a, Navigator nav, @Nullable Pos player) {
 		goal = a.pos();
 		goalYaw = a.yaw();
+		stand = null;
+		pendingTo = null;
+		stuckEpisodes = 0;
+		retryAt = 0;
 		if (pos.horizDist(goal) < 0.05 && Math.abs(pos.y() - goal.y()) < 0.5) {
 			motion.stand(goalYaw);
 			phase = restingPhase();
@@ -300,8 +372,22 @@ public final class NpcBrain {
 		route(goal, goalYaw, nav, player);
 	}
 
+	/** The spot the NPC is going to stand on: the route's end when known, else the goal. */
+	private Pos target() {
+		return stand != null ? stand : Objects.requireNonNull(goal);
+	}
+
 	private void route(Pos to, float yaw, Navigator nav, @Nullable Pos player) {
-		List<Pos> p = nav.path(pos, to, player);
+		Route r = nav.route(pos, to, player);
+		if (r.status() == Route.Status.PENDING) {
+			// Still searching (node budget used up this tick): keep doing what we do, ask again next tick.
+			pendingTo = to;
+			pendingYaw = yaw;
+			pendingAvoid = player != null;
+			return;
+		}
+		pendingTo = null;
+		List<Pos> p = r.status() == Route.Status.FOUND ? r.points() : null;
 		if (p == null && approaching() && to.equals(approach.pos())) {
 			// No way to the player: no teleport, no walking through walls; wave from here.
 			approachStuck = true;
@@ -319,14 +405,72 @@ public final class NpcBrain {
 			phaseTicks = 0;
 			return;
 		}
-		motion.walk(p != null ? p : List.of(pos, to), yaw);
+		if (p == null) {
+			// No way there: never walk through walls. Stay, act as on the spot, try again in a while.
+			motion.stand(motion.yaw());
+			retryAt = tick + RETRY_TICKS;
+			phase = restingPhase();
+			phaseTicks = 0;
+			return;
+		}
+		stand = p.getLast();
+		motion.walk(p, yaw);
 		phase = Phase.WALKING;
 		phaseTicks = 0;
+	}
+
+	/** No progress for {@link #STUCK_TICKS}: re-plan around the spot, then slide to a free cell centre, then give up for a while. */
+	private void unstuck(Navigator nav, @Nullable Pos player) {
+		Pos heading = motion.heading();
+		stuckEpisodes++;
+		if (goal == null) {
+			motion.stand(motion.yaw());
+			return;
+		}
+		if (stuckEpisodes <= STUCK_REPLANS) {
+			if (heading != null) {
+				nav.blocked(pos, heading, target());
+			}
+			motion.stand(motion.yaw());
+			phase = restingPhase();
+			route(goal, goalYaw, nav, player);
+			return;
+		}
+		Pos free = nav.nearestFree(pos);
+		if (stuckEpisodes <= STUCK_REPLANS + STUCK_NUDGES && free != null && free.horizDist(pos) > 0.05) {
+			// Small nudge, collision-checked like any walk: back to the middle of a free cell, then re-plan.
+			motion.walk(List.of(pos, free), motion.yaw());
+			phase = Phase.WALKING;
+			phaseTicks = 0;
+			return;
+		}
+		motion.stand(motion.yaw());
+		stuckEpisodes = 0;
+		retryAt = tick + GIVE_UP_TICKS;
+		phase = restingPhase();
+		phaseTicks = 0;
+	}
+
+	/** Inside a block (spawned there, chunk loaded around it, block placed on it): move to the nearest free cell. */
+	private void pushOut(Navigator nav) {
+		if (!nav.embedded(pos)) {
+			return;
+		}
+		Pos free = nav.nearestFree(pos);
+		if (free != null) {
+			pos = free;
+			teleported = true;
+			motion.stand(motion.yaw());
+			stand = null;
+		}
 	}
 
 	private void arrived() {
 		phase = restingPhase();
 		phaseTicks = 0;
+		if (goal != null && pos.horizDist(target()) < 0.6) {
+			stuckEpisodes = 0;
+		}
 	}
 
 	/** The phase an NPC is in once standing on its spot in the current mode. */
@@ -354,8 +498,11 @@ public final class NpcBrain {
 			len = 1;
 		}
 		Pos to = pos.add(dx / len * 1.6, 0, dz / len * 1.6);
-		List<Pos> p = nav.path(pos, to, null);
-		motion.walk(p != null ? p : List.of(pos, to), pos.yawTo(player));
+		Route r = nav.route(pos, to, null);
+		if (r.status() != Route.Status.FOUND) {
+			return; // nowhere to step to (walls around): stay put
+		}
+		motion.walk(r.points(), pos.yawTo(player));
 		phase = Phase.WALKING;
 		crouch = false;
 	}

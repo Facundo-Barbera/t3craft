@@ -37,7 +37,7 @@ import org.jspecify.annotations.Nullable;
  *   built modules plus <b>removals</b>: the cells the previous plan used and the target does not
  *   (a module or desk that is gone) go back to the site's snapshot, so a later {@code site undo}
  *   stays exact. The port only writes cells whose recorded state differs and that still hold the
- *   site's own blocks. Nothing below {@link HqSiteFrame#MIN_Y} (the basement) is built.</li>
+ *   site's own blocks. Nothing below {@link HqSiteFrame#MIN_Y} is built (the HQ has no basement).</li>
  *   <li>Then the target layout becomes the applied one and is saved.</li>
  * </ol>
  * The same roster gives the same target, so once applied nothing is built again (idempotent).
