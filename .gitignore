@@ -24,3 +24,6 @@ coverage/
 *.iml
 .DS_Store
 Thumbs.db
+
+# Minecraft instance credentials (T3 pairing tokens) — never commit
+**/config/t3craft/credentials/
