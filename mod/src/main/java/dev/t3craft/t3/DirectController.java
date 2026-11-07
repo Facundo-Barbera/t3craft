@@ -108,6 +108,13 @@ public final class DirectController implements T3Connection.Listener {
 		return out;
 	}
 
+	/** Environment id → label, in connection order. */
+	public synchronized Map<String, String> labels() {
+		Map<String, String> out = new LinkedHashMap<>();
+		connections.values().forEach(c -> out.put(c.environment().id(), c.environment().label()));
+		return out;
+	}
+
 	/**
 	 * Read-only snapshot of each environment's latest (unfiltered) shell view, keyed by environment
 	 * id. Used by feat/npc-helpers to find subagents and their parents; no extra connection or call.

@@ -256,7 +256,7 @@ class HqConstructionTest {
 		HqLayout after = f.saved.layout();
 		assertNotNull(after.archived("vps:p0-a1"));
 		assertNull(after.seat("vps:p0-a1"));
-		// its old desk's computer was rewritten in place (now vacant); nothing went to the unbuilt basement
+		// its old desk's computer was rewritten in place (now vacant); it went onto the "Archived" shelf
 		HqSite s = HqSiteFrame.hqSite(ORIGIN);
 		BlockPos computer = s.cell(dev.t3craft.hq.HqPlans.generate(before).workstation("vps:p0-a1").computerPos());
 		assertTrue(f.lastUpdate.stream().anyMatch(c -> c.pos().equals(computer)), "freed desk not rewritten");

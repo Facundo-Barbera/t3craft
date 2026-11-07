@@ -47,6 +47,37 @@ class BindingTest {
 	}
 
 	@Test
+	void moduleBulbRoundTripAndOrderFree() {
+		Binding m = Binding.module(java.util.List.of("vps:b", "vps:a", "vps:b"));
+		assertEquals(Binding.Kind.MODULE, m.kind());
+		assertEquals("module:vps:a,vps:b", m.wire());
+		assertEquals(m, Binding.parse(m.wire()));
+		assertEquals(m, Binding.module(java.util.List.of("vps:a", "vps:b")));
+		assertEquals(java.util.List.of("vps:a", "vps:b"), m.moduleThreads());
+		assertEquals(Binding.NONE, Binding.module(java.util.List.of()), "empty module → unbound");
+		assertEquals(Binding.NONE, Binding.parse("module:"));
+	}
+
+	@Test
+	void moduleBulbShowsItsMostUrgentThread() {
+		Map<String, LampStatus> wanted = Map.of("thread:vps:a", LampStatus.WORKING, "thread:vps:b", LampStatus.ATTENTION,
+				"thread:vps:c", LampStatus.IDLE);
+		assertEquals(LampStatus.ATTENTION, LampApplier.want(wanted, Binding.module(java.util.List.of("vps:a", "vps:b", "vps:c"))));
+		assertEquals(LampStatus.WORKING, LampApplier.want(wanted, Binding.module(java.util.List.of("vps:a", "vps:c"))));
+		assertEquals(LampStatus.OFF, LampApplier.want(wanted, Binding.module(java.util.List.of("vps:gone"))));
+	}
+
+	@Test
+	void changesListOnlyWhatDiffers() {
+		Map<Long, Binding> before = Map.of(1L, Binding.thread("a"), 2L, Binding.thread("b"), 3L, Binding.NONE, 4L, Binding.board(0));
+		Map<Long, Binding> after = Map.of(1L, Binding.thread("a"), 2L, Binding.NONE, 3L, Binding.thread("c"), 5L, Binding.thread("d"));
+		Map<Long, Binding> ch = HqBindings.changes(before, after);
+		assertEquals(Map.of(2L, Binding.NONE, 3L, Binding.thread("c"), 4L, Binding.NONE, 5L, Binding.thread("d")), ch);
+		assertEquals(after, HqBindings.changes(null, after));
+		assertTrue(HqBindings.changes(after, after).isEmpty());
+	}
+
+	@Test
 	void lampLightAndUrgency() {
 		assertEquals(0, LampStatus.OFF.light);
 		for (LampStatus s : LampStatus.values()) {
@@ -56,5 +87,15 @@ class BindingTest {
 		assertTrue(LampStatus.ATTENTION.light > LampStatus.WORKING.light, "needs-you is the brightest");
 		assertTrue(LampStatus.ERROR.urgency() > LampStatus.ATTENTION.urgency());
 		assertTrue(LampStatus.ATTENTION.urgency() > LampStatus.WORKING.urgency());
+	}
+
+	@Test
+	void beaconBinding() {
+		assertEquals(Binding.BEACON, Binding.parse("beacon"));
+		assertEquals("beacon", Binding.BEACON.wire());
+		assertEquals(Binding.Kind.BEACON, Binding.BEACON.kind());
+		assertEquals(Binding.NONE, Binding.parse("beacons"), "only the exact word");
+		assertEquals(LampStatus.ERROR, LampApplier.want(Map.of("beacon", LampStatus.ERROR), Binding.BEACON));
+		assertEquals(LampStatus.OFF, LampApplier.want(Map.of(), Binding.BEACON));
 	}
 }

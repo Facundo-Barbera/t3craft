@@ -69,6 +69,9 @@ public final class BehaviorDirector {
 	private final ApproachPlanner approaches = new ApproachPlanner();
 	private @Nullable ApproachConfig approachOverride;
 	private ApproachConfig.@Nullable Watcher approachConfig;
+	/** Shared A* + collision over the current level (route cache and node budget live across ticks). */
+	private @Nullable Navigation navigation;
+	private @Nullable ClientLevel navigationLevel;
 	/** Settled NPCs going home (item 22); null value = requested, starts next tick. Lazy: hot-swap safe. */
 	private @Nullable Map<String, @Nullable Departure> departures;
 
@@ -148,6 +151,8 @@ public final class BehaviorDirector {
 		brains.clear();
 		departures().clear();
 		approaches.reset();
+		navigation = null;
+		navigationLevel = null;
 	}
 
 	/**
@@ -157,8 +162,12 @@ public final class BehaviorDirector {
 	public void tick(ClientLevel lvl, Player player, AnchorSource fallback, Collection<Body> bodies) {
 		tick++;
 		AnchorSource layout = new LayeredAnchors(anchors, fallback);
-		GridPathfinder finder = new GridPathfinder(new LevelWalkable(lvl));
-		NpcBrain.Navigator nav = finder::find;
+		if (navigation == null || navigationLevel != lvl) {
+			navigation = Navigation.over(new LevelBlocks(lvl));
+			navigationLevel = lvl;
+		}
+		Navigation nav = navigation;
+		nav.beginTick();
 		Pos playerPos = pos(player.position());
 
 		// Board slots: NPCs needing attention, most urgent first.
@@ -398,7 +407,7 @@ public final class BehaviorDirector {
 
 	/** Ground probe over the client level for the {@link GridLayout} (same walkability as the pathfinder). */
 	public static GridLayout.Ground ground(ClientLevel lvl, double baseY) {
-		return GridLayout.Ground.near(new LevelWalkable(lvl), baseY);
+		return GridLayout.Ground.near(new Collision(new LevelBlocks(lvl)), baseY);
 	}
 
 	static Pos pos(Vec3 v) {

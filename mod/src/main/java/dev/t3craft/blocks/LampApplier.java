@@ -47,10 +47,23 @@ public final class LampApplier {
 		return changed;
 	}
 
-	/** What a lamp with binding {@code b} shows: unbound or unknown → OFF. Pure. */
+	/**
+	 * What a lamp with binding {@code b} shows: unbound or unknown → OFF; a module bulb → the most
+	 * urgent of its threads. Pure.
+	 */
 	public static LampStatus want(Map<String, LampStatus> wanted, Binding b) {
 		if (b.isNone()) {
 			return LampStatus.OFF;
+		}
+		if (b.kind() == Binding.Kind.MODULE) {
+			LampStatus best = LampStatus.OFF;
+			for (String t : b.moduleThreads()) {
+				LampStatus s = wanted.get(Binding.thread(t).wire());
+				if (s != null && s.urgency() > best.urgency()) {
+					best = s;
+				}
+			}
+			return best;
 		}
 		LampStatus s = wanted.get(b.wire());
 		return s == null ? LampStatus.OFF : s;

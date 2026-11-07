@@ -14,7 +14,7 @@ import net.minecraft.core.Direction;
  *   (odd index)   ...  [ spine row 0 ]  ...  (even index)        east when even, west when odd
  *                     +---------------+
  *                     |      hub      |   board (needs attention) at z = -4, facing the entrance
- *                     +------ ------- +
+ *                     +--shelf  shelf-+   "Archived" shelf: south wall, both sides of the entrance
  *                         portico        entrance z = 8, spawn z = 11 (looking north)
  * </pre>
  *
@@ -46,58 +46,54 @@ final class HqGeometry {
 	static final int BOARD_Z = -4;
 	static final int BOARD_HALF = 3;
 
-	/** Basement (the archive): floor at {@code y = BASEMENT_FLOOR}, ceiling at {@code y = -1}, under the hub. */
-	static final int BASEMENT_FLOOR = -5;
-	/** Stairwell from the hub down to the basement: columns {@code x = STAIR_X1..STAIR_X2}. */
-	static final int STAIR_X1 = 4;
-	static final int STAIR_X2 = 5;
-	/** Top step (in the hub floor layer) at this z; each step below is one block further north. */
-	static final int STAIR_TOP_Z = 6;
-	/** Open hub floor (and basement ceiling) over the stairs: {@code z = STAIR_OPEN_Z1..STAIR_OPEN_Z2}. */
-	static final int STAIR_OPEN_Z1 = 3;
-	static final int STAIR_OPEN_Z2 = 5;
+	/**
+	 * The "Archived" shelf: the hub's south wall, both sides of the entrance ({@code z = SHELF_Z},
+	 * {@code SHELF_X1 <= |x| <= SHELF_X2}), three tiers ({@code y = 1..SHELF_TIERS}) facing north into
+	 * the hub, header signs on {@code y = SHELF_TIERS + 1}.
+	 */
+	static final int SHELF_Z = HUB - 1;
+	static final int SHELF_X1 = 3;
+	static final int SHELF_X2 = 6;
+	static final int SHELF_TIERS = 3;
+	/** Tiers in slot order: eye level first, then top, then bottom. */
+	private static final int[] SHELF_TIER_ORDER = {2, 3, 1};
 
-	/** One archive place: the computer cell and the direction its screen faces (the aisle). */
+	/** One shelf place: the computer cell and the direction its screen faces (into the hub). */
 	record ArchiveSlot(BlockPos cell, Direction facing) {
 	}
 
 	private HqGeometry() {
 	}
 
-	static Box basement() {
-		return new Box(-HUB, BASEMENT_FLOOR, -HUB, HUB, -1, HUB);
+	/** The two shelf boxes (east, west), header row included; holes of the hub filled by the archive group. */
+	static List<Box> shelves() {
+		return List.of(new Box(SHELF_X1, 1, SHELF_Z, SHELF_X2, SHELF_TIERS + 1, SHELF_Z),
+				new Box(-SHELF_X2, 1, SHELF_Z, -SHELF_X1, SHELF_TIERS + 1, SHELF_Z));
 	}
 
 	/**
-	 * Archive slots in a fixed order: shelf rows (north wall, two back-to-back double rows, south
-	 * wall), west to east, each column bottom tier then top tier. Slot {@code s} is always the same
-	 * cell, so archived computers never move.
+	 * Shelf slots in a fixed order: tier by tier (eye level, top, bottom), and in each tier the
+	 * columns nearest the entrance first, east before west ({@code x = 3, -3, 4, -4, ..}). Slot
+	 * {@code s} is always the same cell, so a shelved computer never moves while it stays shelved.
 	 */
 	static List<ArchiveSlot> archiveSlots() {
 		List<ArchiveSlot> out = new ArrayList<>();
-		addRow(out, -7, -7, 7, Direction.SOUTH);
-		addRow(out, -4, -6, 6, Direction.NORTH);
-		addRow(out, -3, -6, 6, Direction.SOUTH);
-		addRow(out, 0, -6, 2, Direction.NORTH);
-		addRow(out, 1, -6, 2, Direction.SOUTH);
-		addRow(out, 7, -7, 7, Direction.NORTH);
-		return List.copyOf(out);
-	}
-
-	private static void addRow(List<ArchiveSlot> out, int z, int x1, int x2, Direction facing) {
-		for (int x = x1; x <= x2; x++) {
-			out.add(new ArchiveSlot(new BlockPos(x, BASEMENT_FLOOR + 1, z), facing));
-			out.add(new ArchiveSlot(new BlockPos(x, BASEMENT_FLOOR + 2, z), facing));
+		for (int y : SHELF_TIER_ORDER) {
+			for (int ax = SHELF_X1; ax <= SHELF_X2; ax++) {
+				out.add(new ArchiveSlot(new BlockPos(ax, y, SHELF_Z), Direction.NORTH));
+				out.add(new ArchiveSlot(new BlockPos(-ax, y, SHELF_Z), Direction.NORTH));
+			}
 		}
+		return List.copyOf(out);
 	}
 
 	/**
 	 * Growth envelope: the box every plan with at most {@code maxModules} project modules fits in.
-	 * Hub, portico and basement always; with modules, the spine runs north one {@link #ROW} per
+	 * Hub and portico always (the "Archived" shelf is inside the hub); with modules, the spine runs north one {@link #ROW} per
 	 * pair of modules and wings reach {@code |x| = SPINE + 1 + segmentU(SEGMENTS)}.
 	 */
 	static Box envelope(int maxModules) {
-		Box base = hub().union(portico()).union(basement());
+		Box base = hub().union(portico());
 		if (maxModules <= 0) {
 			return base;
 		}

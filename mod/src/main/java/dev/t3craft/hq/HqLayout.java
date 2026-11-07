@@ -18,7 +18,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Who sits where. The HQ is a grid of identical project <b>modules</b> (a wing off the spine with
- * {@link #DESKS} desks), plus the archive in the basement for settled threads. This record is the
+ * {@link #DESKS} desks), plus the "Archived" shelf in the hub for settled threads. This record is the
  * only state the HQ needs to grow by annexes; keep the last one (in memory or {@link #toJson()}) and
  * pass it to {@link #allocate} when the roster changes.
  *
@@ -33,29 +33,36 @@ import org.jspecify.annotations.Nullable;
  *   <li><b>Annex.</b> When every desk of the project is taken, a new identical module is added at
  *   the lowest free grid index (index {@code i}: spine row {@code i / 2}, east when even, west when
  *   odd), and the thread takes its slot 0. Projects are served in key order.</li>
- *   <li><b>Archive.</b> A settled thread frees its desk (rule 2 may then remove the module) and
- *   its computer goes to the archive: it keeps its archive slot if it had one, otherwise new settled
- *   threads (in {@code (project key, thread id)} order) take the lowest free slot. A thread that
- *   leaves the roster frees its slot; one that becomes active again leaves the archive. When the
- *   archive is full, further settled threads are only listed in {@link #overflow()}.</li>
+ *   <li><b>Archived shelf.</b> A settled thread frees its desk (rule 2 may then remove the module)
+ *   and its computer goes to the "Archived" shelf on the hub's south wall, which shows the
+ *   {@link #ARCHIVE_CAPACITY} most recently archived threads. Every shelved thread has an archive
+ *   sequence number {@link Archived#seq()}: threads already on the shelf keep their slot and
+ *   number; new settled threads (in {@code (project key, thread id)} order) get the next numbers.
+ *   If they do not all fit, the lowest numbers (the oldest) leave the shelf for {@link #overflow()}
+ *   and the newcomers take the lowest free slots. Threads in {@code overflow} stay there (they are
+ *   older than everything shelved), except that a shelf slot freed because a shelved thread left
+ *   the roster or became active again is refilled from {@code overflow} in thread-id order. A
+ *   thread that leaves the roster leaves the shelf and the overflow; one that becomes active again
+ *   gets a desk.</li>
  * </ol>
+ * The overflow is the "older" list behind the shelf (a click target, {@link AnchorNames#SHELF_MORE}).
  * Without a previous layout ({@code plan(roster)}) the result is a pure function of the roster:
  * dense modules, threads in id order. {@code allocate(in, allocate(in, null))} equals
  * {@code allocate(in, null)}.
  *
  * @param modules  sorted by index; indices unique (not necessarily contiguous)
- * @param archive  sorted by slot; slots unique, below {@link #ARCHIVE_CAPACITY}
- * @param overflow settled threads that found the archive full (sorted)
+ * @param archive  the shelf, sorted by slot; slots unique, below {@link #ARCHIVE_CAPACITY}
+ * @param overflow settled threads not on the shelf, all older than the shelved ones (sorted)
  */
 public record HqLayout(List<Module> modules, List<Archived> archive, List<String> overflow) {
 	/** Desks per module (3 segments, a desk on each side of each segment). */
 	public static final int DESKS = 6;
 	/** Segments per module (2 desks each). */
 	public static final int SEGMENTS = DESKS / 2;
-	/** Computers the basement archive holds. */
+	/** Computers the "Archived" shelf holds ({@link HqGeometry#archiveSlots()}). */
 	public static final int ARCHIVE_CAPACITY = HqGeometry.archiveSlots().size();
 	/** JSON format version of {@link #toJson()}. */
-	public static final int FORMAT = 2;
+	public static final int FORMAT = 3;
 
 	public static final HqLayout EMPTY = new HqLayout(List.of(), List.of(), List.of());
 
@@ -63,8 +70,13 @@ public record HqLayout(List<Module> modules, List<Archived> archive, List<String
 	public record Desk(int slot, String threadId) {
 	}
 
-	/** An archived computer: slot in {@link HqGeometry#archiveSlots()} order. */
-	public record Archived(int slot, String threadId, String projectKey, String envKey) {
+	/**
+	 * A computer on the "Archived" shelf.
+	 *
+	 * @param slot shelf slot in {@link HqGeometry#archiveSlots()} order (anchor {@link AnchorNames#archiveShelfSlot})
+	 * @param seq  archive order: higher = archived later (only the order among present threads matters)
+	 */
+	public record Archived(int slot, String threadId, String projectKey, String envKey, int seq) {
 	}
 
 	/** Module types. Only wings for now; the type is in the API so floors can be added later. */
@@ -259,30 +271,66 @@ public record HqLayout(List<Module> modules, List<Archived> archive, List<String
 			e.getValue().forEach((s, t) -> ds.add(new Desk(s, t)));
 			mods.add(new Module(e.getKey(), p.key(), p.label(), p.envKey(), p.envLabel(), ds));
 		}
-		// 5. archive
-		List<Archived> arch = new ArrayList<>();
-		TreeSet<Integer> taken = new TreeSet<>();
+		// 5. the "Archived" shelf
+		List<Archived> kept = new ArrayList<>();
 		List<String[]> newcomers = new ArrayList<>();
+		TreeMap<String, String[]> older = new TreeMap<>();
+		java.util.Set<String> prevOverflow = new java.util.HashSet<>(prev.overflow());
 		for (HqInput.Project p : input.projects()) {
 			for (String t : p.settled()) {
 				Archived old = prev.archived(t);
 				if (old != null) {
-					arch.add(new Archived(old.slot(), t, p.key(), p.envKey()));
-					taken.add(old.slot());
+					kept.add(new Archived(old.slot(), t, p.key(), p.envKey(), old.seq()));
+				} else if (prevOverflow.contains(t)) {
+					older.put(t, new String[] {p.key(), t, p.envKey()});
 				} else {
 					newcomers.add(new String[] {p.key(), t, p.envKey()});
 				}
 			}
 		}
-		List<String> over = new ArrayList<>();
-		for (String[] n : newcomers) {
-			int s = lowestFree(taken);
-			if (s >= ARCHIVE_CAPACITY) {
-				over.add(n[1]);
+		int next = kept.stream().mapToInt(Archived::seq).max().orElse(-1) + 1;
+		// candidates newest first: newcomers (last one newest), then the kept ones by number
+		List<Archived> cands = new ArrayList<>();
+		for (int j = newcomers.size() - 1; j >= 0; j--) {
+			String[] n = newcomers.get(j);
+			cands.add(new Archived(-1, n[1], n[0], n[2], next + j));
+		}
+		kept.sort(Comparator.comparingInt(Archived::seq).reversed());
+		cands.addAll(kept);
+		List<String> over = new ArrayList<>(older.keySet());
+		List<Archived> stay = new ArrayList<>();
+		for (int j = 0; j < cands.size(); j++) {
+			if (j < ARCHIVE_CAPACITY) {
+				stay.add(cands.get(j));
+			} else {
+				over.add(cands.get(j).threadId());
+			}
+		}
+		TreeSet<Integer> taken = new TreeSet<>();
+		stay.forEach(a -> taken.add(a.slot()));
+		List<Archived> arch = new ArrayList<>();
+		// newcomers in archive order take the lowest free slots
+		stay.sort(Comparator.comparingInt(Archived::seq));
+		for (Archived a : stay) {
+			if (a.slot() >= 0) {
+				arch.add(a);
 				continue;
 			}
+			int s = lowestFree(taken);
 			taken.add(s);
-			arch.add(new Archived(s, n[1], n[0], n[2]));
+			arch.add(new Archived(s, a.threadId(), a.projectKey(), a.envKey(), a.seq()));
+		}
+		// refill free slots from the older list (only when nothing newer is waiting)
+		int low = arch.stream().mapToInt(Archived::seq).min().orElse(0);
+		for (var e : older.entrySet()) {
+			if (arch.size() >= ARCHIVE_CAPACITY) {
+				break;
+			}
+			int s = lowestFree(taken);
+			taken.add(s);
+			String[] n = e.getValue();
+			arch.add(new Archived(s, n[1], n[0], n[2], --low));
+			over.remove(n[1]);
 		}
 		return new HqLayout(mods, arch, over);
 	}
@@ -308,8 +356,8 @@ public record HqLayout(List<Module> modules, List<Archived> archive, List<String
 	 * @param removedModules module indices that are gone (their cells are vacated)
 	 * @param freedDesks     desks whose thread left (the desk stays, now vacant, unless its module is removed)
 	 * @param seated         threads that got a desk (new or moved)
-	 * @param archived       threads whose computer went to the archive in this change
-	 * @param unarchived     threads that left the archive (active again or gone)
+	 * @param archived       threads whose computer went onto the "Archived" shelf in this change
+	 * @param unarchived     threads that left the shelf (active again, gone, or pushed to the older list)
 	 */
 	public record Diff(List<Integer> addedModules, List<Integer> removedModules, List<FreedDesk> freedDesks, Map<String, Seat> seated,
 			List<Archived> archived, List<String> unarchived) {
@@ -374,11 +422,11 @@ public record HqLayout(List<Module> modules, List<Archived> archive, List<String
 
 	/**
 	 * The box (relative to the HQ origin) that every plan with at most {@code maxModules} modules
-	 * fits in, basement included. Reserve it before the first build so the HQ can grow in place:
+	 * fits in. Reserve it before the first build so the HQ can grow in place:
 	 * <pre>
 	 *   rows = ceil(maxModules / 2)
 	 *   x: -17 .. 17          (-8 .. 17 when maxModules == 1; -8 .. 8 when 0)
-	 *   y: -5 .. 10           (basement floor .. lightning rod)
+	 *   y: 0 .. 10            (floor .. lightning rod)
 	 *   z: -9 - 14 * rows .. 13    (spine cap .. portico; -8 .. 13 when 0)
 	 * </pre>
 	 * Lowest-free allocation keeps every module index below the largest number of modules the HQ
@@ -416,6 +464,7 @@ public record HqLayout(List<Module> modules, List<Archived> archive, List<String
 			j.addProperty("thread", a.threadId());
 			j.addProperty("project", a.projectKey());
 			j.addProperty("envKey", a.envKey());
+			j.addProperty("seq", a.seq());
 			as.add(j);
 		}
 		o.add("archive", as);
@@ -425,10 +474,15 @@ public record HqLayout(List<Module> modules, List<Archived> archive, List<String
 		return o;
 	}
 
-	/** Reads {@link #toJson()} output; anything unreadable gives {@link #EMPTY} (the HQ is then re-allocated). */
+	/**
+	 * Reads {@link #toJson()} output; anything unreadable gives {@link #EMPTY} (the HQ is then
+	 * re-allocated). Format 2 (basement archive) keeps its modules and drops the archive, so settled
+	 * threads are shelved afresh on the next {@link #allocate}.
+	 */
 	public static HqLayout fromJson(@Nullable JsonElement e) {
 		try {
-			if (e == null || !e.isJsonObject() || e.getAsJsonObject().get("format").getAsInt() != FORMAT) {
+			int format = e == null || !e.isJsonObject() ? -1 : e.getAsJsonObject().get("format").getAsInt();
+			if (format != FORMAT && format != 2) {
 				return EMPTY;
 			}
 			JsonObject root = e.getAsJsonObject();
@@ -443,12 +497,15 @@ public record HqLayout(List<Module> modules, List<Archived> archive, List<String
 						j.get("envKey").getAsString(), j.get("env").getAsString(), desks));
 			}
 			List<Archived> arch = new ArrayList<>();
+			List<String> over = new ArrayList<>();
+			if (format == 2) {
+				return new HqLayout(mods, arch, over);
+			}
 			for (JsonElement ae : root.getAsJsonArray("archive")) {
 				JsonObject j = ae.getAsJsonObject();
 				arch.add(new Archived(j.get("slot").getAsInt(), j.get("thread").getAsString(), j.get("project").getAsString(),
-						j.get("envKey").getAsString()));
+						j.get("envKey").getAsString(), j.get("seq").getAsInt()));
 			}
-			List<String> over = new ArrayList<>();
 			for (JsonElement oe : root.getAsJsonArray("overflow")) {
 				over.add(oe.getAsString());
 			}

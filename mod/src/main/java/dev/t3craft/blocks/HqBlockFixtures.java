@@ -13,7 +13,8 @@ import net.minecraft.world.level.block.state.BlockState;
 /**
  * The HQ adapter (an {@link HqFixtures}): swaps the vanilla fixtures of a generated plan for the
  * module's blocks, cell for cell, as listed by {@link HqBindings}: computers → monitors (facing the
- * chair or the aisle), desk bulbs → status lamps, board bulbs → board lamps. Each gets its binding as
+ * chair or the aisle), desk bulbs → status lamps, board bulbs → board lamps, the hub lantern's cap
+ * → the beacon (a status lamp bound {@code beacon}). Each gets its binding as
  * block entity data ({@code {"binding": "thread:<id>"}}), which the builders and the preview load with
  * {@code loadCustomOnly}. Positions, anchors and workstations are untouched, so NPCs, workstations
  * and HQ diffs see the same plan shape. Installed by {@link T3Blocks#init} only when the module is on.
@@ -34,6 +35,14 @@ public final class HqBlockFixtures implements HqFixtures {
 		this.states = states;
 	}
 
+	/** Bump when the substitution changes (cells, blocks or binding format): demo worlds then update. */
+	public static final String ID = "blocks-2";
+
+	@Override
+	public String id() {
+		return ID;
+	}
+
 	@Override
 	public BuildPlan apply(BuildPlan plan) {
 		Map<BlockPos, HqBindings.Fixture> fixtures = new HashMap<>();
@@ -47,7 +56,7 @@ public final class HqBlockFixtures implements HqFixtures {
 			}
 			BlockState s = switch (f.role()) {
 				case MONITOR -> states.monitor(f.facing());
-				case LAMP -> states.lamp();
+				case LAMP, BEACON -> states.lamp();
 				case BOARD_LAMP -> states.boardLamp();
 			};
 			return new Placement(p.rel(), s, data(f.binding()));
