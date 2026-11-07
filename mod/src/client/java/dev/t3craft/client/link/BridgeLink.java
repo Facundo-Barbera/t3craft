@@ -12,7 +12,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
@@ -22,6 +24,9 @@ import java.util.function.Consumer;
  * {@code java.net.http}. Reconnects forever with {@link Backoff}. Sends {@code hello} on open.
  * Incoming frames are parsed off-thread and handed to the listener on the client thread via
  * {@code clientExecutor}. Outgoing sends are chained so frames never interleave.
+ *
+ * <p>Every connection attempt has a generation number. {@link #reconnect()} bumps it, so
+ * callbacks from an older socket are ignored and no stale reconnect timer fires.
  */
 public final class BridgeLink {
 	public static final int PROTOCOL_VERSION = 1;
@@ -40,8 +45,12 @@ public final class BridgeLink {
 	private final Backoff backoff = new Backoff();
 	private final AtomicLong nextId = new AtomicLong(1);
 
+	private final AtomicInteger generation = new AtomicInteger();
 	private volatile WebSocket socket;
 	private volatile boolean stopped;
+	private volatile LinkStatus status = LinkStatus.DISABLED;
+	private volatile String statusDetail = "";
+	private ScheduledFuture<?> pending;
 	private CompletableFuture<?> sendChain = CompletableFuture.completedFuture(null);
 
 	/** {@code bridgeKey}: optional bridge access key (not a T3 credential), sent in {@code hello}. */
@@ -59,16 +68,49 @@ public final class BridgeLink {
 	}
 
 	public void start() {
-		scheduler.execute(this::connect);
+		int g = generation.get();
+		scheduler.execute(() -> connect(g));
+	}
+
+	/** Drops the current socket (if any) and connects again right away, resetting the backoff. */
+	public void reconnect() {
+		if (stopped) {
+			return;
+		}
+		scheduler.execute(() -> {
+			int g = generation.incrementAndGet();
+			backoff.reset();
+			if (pending != null) {
+				pending.cancel(false);
+				pending = null;
+			}
+			WebSocket ws = socket;
+			socket = null;
+			if (ws != null) {
+				ws.abort();
+			}
+			connect(g);
+		});
 	}
 
 	public void stop() {
 		stopped = true;
+		generation.incrementAndGet();
 		WebSocket ws = socket;
+		socket = null;
 		if (ws != null) {
-			ws.sendClose(WebSocket.NORMAL_CLOSURE, "client stopping");
+			ws.sendClose(WebSocket.NORMAL_CLOSURE, "client stopping").exceptionally(e -> null);
+			ws.abort();
 		}
 		scheduler.shutdownNow();
+	}
+
+	public LinkStatus status() {
+		return status;
+	}
+
+	public String statusDetail() {
+		return statusDetail;
 	}
 
 	public boolean isConnected() {
@@ -94,37 +136,57 @@ public final class BridgeLink {
 		return id;
 	}
 
-	private void connect() {
-		if (stopped) {
+	private boolean current(int g) {
+		return !stopped && g == generation.get();
+	}
+
+	private void connect(int g) {
+		if (!current(g)) {
 			return;
 		}
-		status(LinkStatus.CONNECTING, uri.toString());
+		pending = null;
+		status(g, LinkStatus.CONNECTING, uri.toString());
 		http.newWebSocketBuilder()
 				.connectTimeout(Duration.ofSeconds(5))
-				.buildAsync(uri, new Handler())
+				.buildAsync(uri, new Handler(g))
 				.whenComplete((ws, err) -> {
 					if (err != null) {
-						scheduleReconnect(rootMessage(err));
+						scheduleReconnect(g, rootMessage(err));
+					} else if (!current(g)) {
+						ws.abort(); // superseded while opening
 					}
 				});
 	}
 
-	private void scheduleReconnect(String reason) {
-		socket = null;
-		if (stopped) {
+	private void scheduleReconnect(int g, String reason) {
+		if (!current(g)) {
 			return;
 		}
+		socket = null;
 		long delay = backoff.nextDelayMs();
-		status(LinkStatus.BACKOFF, reason + " (retry in " + delay + " ms)");
+		status(g, LinkStatus.BACKOFF, reason + " (retry in " + delay + " ms)");
 		try {
-			scheduler.schedule(this::connect, delay, TimeUnit.MILLISECONDS);
+			scheduler.execute(() -> {
+				if (current(g)) {
+					pending = scheduler.schedule(() -> connect(g), delay, TimeUnit.MILLISECONDS);
+				}
+			});
 		} catch (java.util.concurrent.RejectedExecutionException ignored) {
 			// shutting down
 		}
 	}
 
-	private void status(LinkStatus s, String detail) {
-		clientExecutor.accept(() -> listener.onStatus(s, detail));
+	private void status(int g, LinkStatus s, String detail) {
+		if (!current(g)) {
+			return;
+		}
+		status = s;
+		statusDetail = detail;
+		clientExecutor.accept(() -> {
+			if (current(g)) {
+				listener.onStatus(s, detail);
+			}
+		});
 	}
 
 	private static String rootMessage(Throwable t) {
@@ -136,20 +198,29 @@ public final class BridgeLink {
 	}
 
 	private final class Handler implements WebSocket.Listener {
+		private final int gen;
 		private final StringBuilder buffer = new StringBuilder();
+
+		Handler(int gen) {
+			this.gen = gen;
+		}
 		private final java.util.concurrent.atomic.AtomicBoolean ended = new java.util.concurrent.atomic.AtomicBoolean();
 
 		private void end(String reason) {
 			if (ended.compareAndSet(false, true)) {
-				scheduleReconnect(reason);
+				scheduleReconnect(gen, reason);
 			}
 		}
 
 		@Override
 		public void onOpen(WebSocket webSocket) {
+			if (!current(gen)) {
+				webSocket.abort();
+				return;
+			}
 			socket = webSocket;
 			backoff.reset();
-			status(LinkStatus.CONNECTED, uri.toString());
+			status(gen, LinkStatus.CONNECTED, uri.toString());
 			JsonObject hello = new JsonObject();
 			hello.addProperty("client", "t3craft-mod");
 			hello.addProperty("version", modVersion);
@@ -204,7 +275,11 @@ public final class BridgeLink {
 				return;
 			}
 			String t = type.getAsString();
-			clientExecutor.accept(() -> listener.onMessage(t, msg));
+			clientExecutor.accept(() -> {
+				if (current(gen)) {
+					listener.onMessage(t, msg);
+				}
+			});
 		}
 	}
 }

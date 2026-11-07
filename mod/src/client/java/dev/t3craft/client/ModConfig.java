@@ -23,8 +23,12 @@ public record ModConfig(URI bridgeUrl, @Nullable String bridgeKey) {
 	public static final String DEFAULT_URL = "ws://127.0.0.1:7878/";
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
+	public static Path file() {
+		return FabricLoader.getInstance().getConfigDir().resolve("t3craft.json");
+	}
+
 	public static ModConfig load() {
-		Path file = FabricLoader.getInstance().getConfigDir().resolve("t3craft.json");
+		Path file = file();
 		String url = DEFAULT_URL;
 		String key = null;
 		try {

@@ -21,21 +21,34 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.world.InteractionResult;
 
 public final class T3CraftClient implements ClientModInitializer, BridgeListener {
+	private static T3CraftClient instance;
+
 	private final NpcRegistry npcs = new NpcRegistry();
+	private String modVersion = "dev";
+	private ModConfig config;
 	private BridgeLink link;
 	private LinkStatus lastStatus = LinkStatus.DISABLED;
+	private boolean started;
+
+	public static T3CraftClient get() {
+		return instance;
+	}
 
 	@Override
 	public void onInitializeClient() {
-		String version = FabricLoader.getInstance().getModContainer(T3Craft.MOD_ID)
+		instance = this;
+		modVersion = FabricLoader.getInstance().getModContainer(T3Craft.MOD_ID)
 				.map(c -> c.getMetadata().getVersion().getFriendlyString()).orElse("dev");
-		ModConfig config = ModConfig.load();
-		T3Craft.LOGGER.info("bridge URL {}", config.bridgeUrl());
-		link = new BridgeLink(config.bridgeUrl(), config.bridgeKey(), version, this, Minecraft.getInstance()::execute);
+		config = ModConfig.load();
+		link = newLink(config);
 
-		ClientLifecycleEvents.CLIENT_STARTED.register(mc -> link.start());
+		ClientLifecycleEvents.CLIENT_STARTED.register(mc -> {
+			started = true;
+			link.start();
+		});
 		ClientLifecycleEvents.CLIENT_STOPPING.register(mc -> link.stop());
 		ClientTickEvents.END_CLIENT_TICK.register(npcs::tick);
+		T3CraftCommands.register(this);
 
 		// Right-click on one of our client-only NPCs opens its (placeholder) chat screen. The entity
 		// is unknown to the server, so the interaction is consumed client-side.
@@ -53,6 +66,53 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 			}
 			return InteractionResult.SUCCESS;
 		});
+	}
+
+	private BridgeLink newLink(ModConfig cfg) {
+		T3Craft.LOGGER.info("bridge URL {}", cfg.bridgeUrl());
+		return new BridgeLink(cfg.bridgeUrl(), cfg.bridgeKey(), modVersion, this, Minecraft.getInstance()::execute);
+	}
+
+	/** {@code /t3craft reconnect}: same config, fresh socket now (backoff reset). */
+	public void reconnect() {
+		link.reconnect();
+	}
+
+	/**
+	 * {@code /t3craft reload}: re-reads {@code config/t3craft.json} (and the URL overrides), drops
+	 * the old link and connects with the new settings. No game restart needed. Returns the config
+	 * now in use.
+	 */
+	public ModConfig reload() {
+		ModConfig next = ModConfig.load();
+		BridgeLink old = link;
+		link = newLink(next);
+		config = next;
+		old.stop();
+		lastStatus = LinkStatus.DISABLED;
+		envStatus.clear();
+		envDetail.clear();
+		if (started) {
+			link.start();
+		}
+		return next;
+	}
+
+	public ModConfig config() {
+		return config;
+	}
+
+	public BridgeLink link() {
+		return link;
+	}
+
+	public NpcRegistry npcs() {
+		return npcs;
+	}
+
+	/** Last known status per environment, as sent by the bridge: id → {label, status, detail}. */
+	public java.util.Map<String, String[]> environments() {
+		return java.util.Collections.unmodifiableMap(envDetail);
 	}
 
 	@Override
@@ -118,6 +178,7 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 	}
 
 	private final java.util.Map<String, String> envStatus = new java.util.HashMap<>();
+	private final java.util.Map<String, String[]> envDetail = new java.util.LinkedHashMap<>();
 
 	/** Toast when an environment goes offline / fails auth / comes back. Text from the bridge. */
 	private void onEnvironments(Minecraft mc, JsonObject msg) {
@@ -132,6 +193,7 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 			JsonObject o = e.getAsJsonObject();
 			String id = optString(o, "id", "?");
 			String status = optString(o, "status", "?");
+			envDetail.put(id, new String[] {optString(o, "label", id), status, optString(o, "detail", "")});
 			String before = envStatus.put(id, status);
 			if (before != null && !before.equals(status) && !"connecting".equals(status)) {
 				Toasts.link(mc, optString(o, "label", id) + ": " + status);
