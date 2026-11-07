@@ -315,7 +315,7 @@ class HqGeneratorTest {
 		assertEquals(in.threadCount(), desks);
 		long deskAnchors = p.anchors().keySet().stream().filter(n -> n.startsWith("desk_")).count();
 		assertEquals(in.threadCount(), deskAnchors);
-		assertEquals(HqLayout.DESKS * 3, p.workstations().size(), "a workstation per desk, taken or vacant");
+		assertEquals(in.threadCount(), p.workstations().size(), "a workstation per taken desk; vacant desks are not built");
 		for (Workstation w : p.workstations()) {
 			assertEquals(w.deskAnchor().block().relative(w.deskAnchor().facing()).above(), w.computerPos());
 			assertEquals(w.computerPos(), w.screen().block());
@@ -324,8 +324,6 @@ class HqGeneratorTest {
 				assertEquals(w, p.workstation(w.threadId()));
 				assertEquals(p.anchor(AnchorNames.desk(w.threadId())).block(), w.deskAnchor().block());
 				assertEquals(p.anchor(AnchorNames.monitor(w.threadId())).block(), w.computerPos());
-			} else {
-				assertTrue(p.at(w.computerPos()).state().is(Blocks.CONCRETE.pick(net.minecraft.world.item.DyeColor.GRAY)));
 			}
 		}
 	}
@@ -385,9 +383,9 @@ class HqGeneratorTest {
 		assertEquals(slot0.cell(), arch.block());
 		assertEquals(slot0.facing(), arch.facing());
 		List<Placement> d = BuildPlan.diff(r1.plan(), r2.plan(), rel -> AIR);
-		assertEquals(2, d.size(), "the desk's computer turns off and the archive shows it: " + d);
-		assertTrue(d.stream().anyMatch(pl -> HqGeometry.desk(0, 1).contains(pl.rel())
-				&& pl.state().is(Blocks.CONCRETE.pick(net.minecraft.world.item.DyeColor.GRAY))));
+		assertTrue(d.stream().filter(pl -> HqGeometry.desk(0, 1).contains(pl.rel())).allMatch(pl -> pl.state().isAir()),
+				"the released desk leaves the world: " + d);
+		assertTrue(d.stream().allMatch(pl -> HqGeometry.desk(0, 1).contains(pl.rel()) || pl.rel().equals(slot0.cell())), "nothing else: " + d);
 		assertTrue(d.stream().anyMatch(pl -> pl.rel().equals(slot0.cell())
 				&& pl.state().is(Blocks.CONCRETE.pick(net.minecraft.world.item.DyeColor.BLACK))));
 		assertEquals(Set.of(HqGenerator.group(0), HqGenerator.GROUP_ARCHIVE), HqPlans.expansion(r1.plan(), r2.plan(), rel -> AIR).keySet());
@@ -522,7 +520,7 @@ class HqGeneratorTest {
 	}
 
 	@Test
-	void goneThreadLeavesAVacantDesk() {
+	void goneThreadRemovesItsDesk() {
 		HqInput in = input(2, 4);
 		HqGenerator.Result r1 = HqGenerator.plan(in, null);
 		HqGenerator.Result r2 = HqGenerator.plan(minus(in, "env:p0-t1"), r1.layout());
@@ -530,9 +528,12 @@ class HqGeneratorTest {
 		assertEquals(r1.plan().footprint(), r2.plan().footprint());
 		Box desk = HqGeometry.desk(0, 1);
 		List<Placement> d = BuildPlan.diff(r1.plan(), r2.plan(), rel -> AIR);
-		assertEquals(1, d.size(), "only the monitor turns off: " + d);
-		assertTrue(desk.contains(d.get(0).rel()));
-		assertTrue(d.get(0).state().is(Blocks.CONCRETE.pick(net.minecraft.world.item.DyeColor.GRAY)));
+		assertFalse(d.isEmpty());
+		for (Placement pl : d) {
+			assertTrue(desk.contains(pl.rel()), "changed outside the desk: " + pl.rel());
+			assertTrue(pl.state().isAir(), "desk, computer, lamp and chair are removed: " + pl);
+		}
+		assertFalse(r2.plan().at(new BlockPos(desk.minX(), 0, desk.minZ())).state().isAir(), "the floor stays");
 		assertKeptAnchors(r2.plan(), r1.plan());
 	}
 
