@@ -46,9 +46,10 @@ import org.jspecify.annotations.Nullable;
 public final class HqConstructionClient implements ClientModInitializer {
 	private static final int ROSTER_TICKS = 20;
 	/**
-	 * Which threads give up their desk (settled by default). <b>Integration point for
-	 * fix/hq-stale-stations</b>: install its single release policy here (settle, archived, or DONE and
-	 * idle for more than X minutes), e.g. {@code setReleasePolicy(n -> StationRelease.released(n, now))}.
+	 * Which threads give up their desk (settled by default). fix/hq-stale-stations applies its single
+	 * release policy ({@code dev.t3craft.hq.StationPolicy}: settled, archived, or DONE and idle for
+	 * more than X minutes) in {@code NpcRegistry}: released threads arrive here settled, through
+	 * {@code npcs().released()}, so the default predicate already archives them.
 	 * A released thread is passed to the HQ as settled: its desk is removed from the diff (the site
 	 * restores its cells from the snapshot) and its computer goes to the archive.
 	 */
@@ -111,7 +112,9 @@ public final class HqConstructionClient implements ClientModInitializer {
 			return null;
 		}
 		Map<String, String[]> envs = c.environments();
-		List<NpcInfo> npcs = c.npcs().all();
+		// fix/hq-stale-stations: all() holds the threads with a station (StationPolicy, applied in the
+		// registry); released() the ones that gave it up, already settled, so they go to the archive.
+		List<NpcInfo> npcs = c.npcs().hqRoster();
 		if (c.direct() != null) {
 			if (envs.isEmpty()) {
 				return null;
@@ -125,8 +128,10 @@ public final class HqConstructionClient implements ClientModInitializer {
 			return null;
 		}
 		Predicate<NpcInfo> released = releasePolicy;
+		// fix/hq-rooms-real: only projects with real activity within the window keep a room
+		List<NpcInfo> roomed = HqRooms.filter(npcs, released, HqRooms.current(), System.currentTimeMillis());
 		HqInput.Builder b = HqInput.builder();
-		for (NpcInfo n : npcs) {
+		for (NpcInfo n : roomed) {
 			String g = n.groupId();
 			String env = g.indexOf(':') > 0 ? g.substring(0, g.indexOf(':')) : g;
 			b.thread(g, n.groupLabel(), env, n.envLabel(), n.id(), released.test(n));

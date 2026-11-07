@@ -75,6 +75,7 @@
 	"block.t3craft.cherry_planter": "Maceta de cerezo",
 	"block.t3craft.stone_lantern": "Linterna de piedra",
 	"t3craft.blocks.status": "Módulo de bloques: %s (%s lámparas cargadas, %s cambiadas en la última actualización). /t3craft blocks link <env:hilo> | unlink",
+	"t3craft.blocks.monitor_status": "Monitores: %s cargados, %s stream(s) de log en vivo %s",
 	"t3craft.blocks.singleplayer_only": "Solo en un mundo individual o como anfitrión LAN.",
 	"t3craft.blocks.look_at_block": "Mira un monitor o una lámpara de T3Craft.",
 	"t3craft.blocks.linked": "Bloque vinculado a %s.",

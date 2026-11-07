@@ -69,6 +69,10 @@ public final class NpcBrain {
 		default void blocked(Pos at, Pos toward, Pos goal) {
 		}
 
+		/** Forget the spots marked {@link #blocked} and the remembered "no route" answers (an NPC has had no route for long). */
+		default void forgetBlocked() {
+		}
+
 		/** Straight lines only (no level). */
 		Navigator STRAIGHT = (from, to, avoid) -> List.of(from, to);
 	}
@@ -88,6 +92,12 @@ public final class NpcBrain {
 	/** Wait before trying again after no route was found or after giving up. */
 	static final int RETRY_TICKS = 40;
 	static final int GIVE_UP_TICKS = 160;
+	/**
+	 * After this many "no route" answers in a row (one every {@link #RETRY_TICKS}, so 10 s): forget the
+	 * spots marked blocked and take a short collision-checked step to the nearest free cell centre
+	 * (off an edge, out of a corner) before trying again. Never a teleport.
+	 */
+	static final int NO_ROUTE_NUDGE = 5;
 	static final int EMBED_CHECK_TICKS = 20;
 	static final double SNAP_DISTANCE = 48;
 	static final double PLAYER_NEAR = 6;
@@ -111,6 +121,10 @@ public final class NpcBrain {
 	private boolean pendingAvoid;
 	private int retryAt;
 	private int stuckEpisodes;
+	/** "No route" answers in a row for the current goal. */
+	private int noRoute;
+	/** The world or the spots changed under us ({@link #replan}): route again from here next tick. */
+	private boolean replan;
 	private int phaseTicks;
 	private int tick;
 	private int flash;
@@ -215,6 +229,14 @@ public final class NpcBrain {
 	}
 
 	/**
+	 * The base was built, moved or removed: forget waiting and give-up timers and route again from
+	 * where the NPC is on the next {@link #tick} (also when the spot itself did not move).
+	 */
+	public void replan() {
+		replan = true;
+	}
+
+	/**
 	 * Come to the player: in ATTENTION, walk to {@code spot} instead of the board slot (null = go back
 	 * to the normal spot). Call before {@link #tick}. Walks only; if there is no route the NPC stays
 	 * where it is and gestures at the player.
@@ -258,6 +280,19 @@ public final class NpcBrain {
 		}
 		if (pendingTo != null) {
 			route(pendingTo, pendingYaw, nav, pendingAvoid ? player : null);
+		}
+
+		if (replan) {
+			replan = false;
+			retryAt = 0;
+			stuckEpisodes = 0;
+			noRoute = 0;
+			approachStuck = false;
+			if (phase != Phase.CELEBRATING) {
+				goal = null; // re-targeted (and routed from here) just below
+				stand = null;
+				pendingTo = null;
+			}
 		}
 
 		// Re-target when the spot moved (layout change, base built or removed).
@@ -362,6 +397,7 @@ public final class NpcBrain {
 		stand = null;
 		pendingTo = null;
 		stuckEpisodes = 0;
+		noRoute = 0;
 		retryAt = 0;
 		if (pos.horizDist(goal) < 0.05 && Math.abs(pos.y() - goal.y()) < 0.5) {
 			motion.stand(goalYaw);
@@ -411,8 +447,18 @@ public final class NpcBrain {
 			retryAt = tick + RETRY_TICKS;
 			phase = restingPhase();
 			phaseTicks = 0;
+			if (++noRoute >= NO_ROUTE_NUDGE) {
+				noRoute = 0;
+				nav.forgetBlocked();
+				Pos free = nav.nearestFree(pos);
+				if (free != null && free.horizDist(pos) > 0.05) {
+					motion.walk(List.of(pos, free), motion.yaw());
+					phase = Phase.WALKING;
+				}
+			}
 			return;
 		}
+		noRoute = 0;
 		stand = p.getLast();
 		motion.walk(p, yaw);
 		phase = Phase.WALKING;

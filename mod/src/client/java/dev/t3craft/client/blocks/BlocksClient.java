@@ -31,8 +31,10 @@ import java.util.Map;
 import java.util.function.Supplier;
 import java.util.Random;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientBlockEntityEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.BlockEntityRendererRegistry;
@@ -68,6 +70,10 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>Using a monitor opens its thread through the workstations' {@link ThreadOpener}.
  *
+ * <p>Live log ({@link MonitorLiveLog}): monitors close to the player and in view hold a read-only
+ * share of their thread's stream ({@link MonitorVisibility} decides, with hysteresis; one stream per
+ * thread however many monitors show it). Options: {@code blocks.monitor.*} ({@link MonitorSettings}).
+ *
  * <p>Integration points: {@link #setHqBindings} (HQ owner: the bindings the HQ's fixtures should have
  * for the live roster; written into the block entities, only where they change) and
  * {@link #setPositionBindings} (world cell → binding fallback for blocks without their own data).
@@ -95,6 +101,9 @@ public final class BlocksClient implements ClientModInitializer {
 	private final MonitorScreens screens = new MonitorScreens();
 	private final Map<String, WorkstationThread> threads = new HashMap<>();
 	private final ThreadOpener fallbackOpener = new ChatScreenOpener();
+	private volatile MonitorSettings monitorSettings = MonitorSettings.DEFAULT;
+	private volatile ScreenExtent.@Nullable Provider extents;
+	private final MonitorLiveLog liveLog = new MonitorLiveLog(MonitorSettings.DEFAULT);
 	private @Nullable MonitorRenderer renderer;
 	private @Nullable PlaqueRenderer plaqueRenderer;
 	private volatile @Nullable Map<Long, Binding> positional;
@@ -123,6 +132,7 @@ public final class BlocksClient implements ClientModInitializer {
 			return;
 		}
 		instance = this;
+		loadMonitorSettings();
 		BlockEntityRendererRegistry.register(c.monitorType(), ctx -> {
 			MonitorRenderer r = new MonitorRenderer(this);
 			renderer = r;
@@ -136,8 +146,16 @@ public final class BlocksClient implements ClientModInitializer {
 		});
 		MonitorBlock.setClientUse(this::use);
 		ClientTickEvents.END_CLIENT_TICK.register(GuardedEvents.endClientTick(MODULE, this::tick));
-		ClientLifecycleEvents.CLIENT_STOPPING.register(mc -> reset());
-		DevReload.get().register("t3craft.blocks", reason -> reset());
+		ClientBlockEntityEvents.BLOCK_ENTITY_LOAD.register((be, level) -> liveLog.onLoad(be));
+		ClientBlockEntityEvents.BLOCK_ENTITY_UNLOAD.register((be, level) -> liveLog.onUnload(be));
+		ClientLifecycleEvents.CLIENT_STOPPING.register(mc -> {
+			reset();
+			liveLog.close();
+		});
+		DevReload.get().register("t3craft.blocks", reason -> {
+			reset();
+			loadMonitorSettings();
+		});
 		ClientCommandRegistrationCallback.EVENT.register((d, ctx) -> registerCommands(d));
 	}
 
@@ -169,6 +187,51 @@ public final class BlocksClient implements ClientModInitializer {
 
 	MonitorScreens screens() {
 		return screens;
+	}
+
+	/**
+	 * Integration point for connected (multi-block) monitors: {@code provider} tells the renderer
+	 * which screen each monitor block belongs to ({@link ScreenExtent}: size in blocks and whether
+	 * this block is the origin that draws it). Null = every monitor is a 1×1 screen. Client thread.
+	 */
+	public void setScreenExtents(ScreenExtent.@Nullable Provider provider) {
+		extents = provider;
+		MonitorRenderer r = renderer;
+		if (r != null) {
+			r.clear();
+		}
+	}
+
+	ScreenExtent extentOf(dev.t3craft.blocks.MonitorBlockEntity be) {
+		ScreenExtent.Provider p = extents;
+		if (p == null) {
+			return ScreenExtent.ONE;
+		}
+		try {
+			ScreenExtent e = p.extent(be);
+			return e == null ? ScreenExtent.ONE : e;
+		} catch (RuntimeException ex) {
+			return ScreenExtent.ONE;
+		}
+	}
+
+	MonitorSettings monitorSettings() {
+		return monitorSettings;
+	}
+
+	MonitorFeeds feeds() {
+		return liveLog.feeds();
+	}
+
+	/** The thread the client knows under {@code key} (this tick), or null. */
+	@Nullable WorkstationThread thread(String key) {
+		return threads.get(key);
+	}
+
+	private void loadMonitorSettings() {
+		MonitorSettings s = MonitorSettings.load(FabricLoader.getInstance().getConfigDir().resolve("t3craft.json"));
+		monitorSettings = s;
+		liveLog.settings(s);
 	}
 
 	/** Effective binding of the block at {@code pos} with block entity binding {@code own}. */
@@ -223,6 +286,9 @@ public final class BlocksClient implements ClientModInitializer {
 			}
 		}
 		if (mc.level == null) {
+			if (liveLog.feeds().size() > 0) {
+				liveLog.clearTracking(); // left the world: no stream outlives it
+			}
 			return;
 		}
 		T3CraftClient client = T3CraftClient.get();
@@ -235,6 +301,7 @@ public final class BlocksClient implements ClientModInitializer {
 			threads.put(t.key(), t);
 		}
 		screens.tick(list, System.currentTimeMillis());
+		liveLog.tick(mc, this::resolve, this::extentOf);
 		motes(mc);
 
 		IntegratedServer server = mc.getSingleplayerServer();
@@ -316,6 +383,7 @@ public final class BlocksClient implements ClientModInitializer {
 		seenLamps.clear();
 		lastWanted = null;
 		lastHq = null;
+		liveLog.clearTracking();
 		MonitorRenderer r = renderer;
 		if (r != null) {
 			r.clear();
@@ -333,6 +401,8 @@ public final class BlocksClient implements ClientModInitializer {
 				.executes(c -> {
 					c.getSource().sendFeedback(prefix().append(Component.translatable("t3craft.blocks.status",
 							Component.translatable("options.on"), LiveLamps.size(), lastChanged)));
+					c.getSource().sendFeedback(prefix().append(Component.translatable("t3craft.blocks.monitor_status",
+							liveLog.loaded(), liveLog.feeds().size(), String.join(", ", liveLog.feeds().keys()))));
 					return 1;
 				})
 				.then(literal("link").then(argument("thread", StringArgumentType.greedyString())

@@ -164,6 +164,7 @@
 	"block.t3craft.cherry_planter": "Potted Cherry",
 	"block.t3craft.stone_lantern": "Stone Lantern",
 	"t3craft.blocks.status": "Blocks module: %s (%s lamps loaded, %s changed last update). /t3craft blocks link <env:thread> | unlink",
+	"t3craft.blocks.monitor_status": "Monitors: %s loaded, %s live log stream(s) %s",
 	"t3craft.blocks.singleplayer_only": "Only in singleplayer or as LAN host.",
 	"t3craft.blocks.look_at_block": "Look at a T3Craft monitor or lamp.",
 	"t3craft.blocks.linked": "Block bound to %s.",
