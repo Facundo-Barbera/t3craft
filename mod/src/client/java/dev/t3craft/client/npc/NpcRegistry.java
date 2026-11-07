@@ -59,8 +59,11 @@ public final class NpcRegistry {
 	private final Map<Integer, String> npcByEntityId = new HashMap<>();
 	/** Walking, desks, board, bubbles (feat/npc-behavior). Owns its own entities; reset with ours. */
 	private final BehaviorDirector behavior = new BehaviorDirector();
-	/** Provisional desks when there is no HQ (fix/npc-grid-layout). Kept across reconciles. */
-	private final GridLayout grid = new GridLayout();
+	/**
+	 * Provisional desks when there is no HQ (fix/npc-grid-layout). Kept across reconciles. Lazy
+	 * (read via {@link #fallbackLayout()}) so a hot-swap that adds it never sees null.
+	 */
+	private @Nullable GridLayout grid;
 	/** Extra panel line per NPC id (feat/npc-helpers: "⚒ 2 helpers +3"); null = none. */
 	private java.util.function.Function<String, @Nullable Component> panelExtra = id -> null;
 	private @Nullable ClientLevel level;
@@ -139,7 +142,7 @@ public final class NpcRegistry {
 	 * by feat/workstation so the provisional computers stand in front of the same desks.
 	 */
 	public GridLayout fallbackLayout() {
-		return grid;
+		return grid = dev.t3craft.debug.HotSwapFields.orInit(grid, GridLayout::new);
 	}
 
 	/** NPC behaviour: plug a physical base in with {@code behavior().setAnchorSource(...)}. */
@@ -286,7 +289,7 @@ public final class NpcRegistry {
 			behavior.reset(null);
 			level = lvl;
 			anchor = null;
-			grid.clear();
+			fallbackLayout().clear();
 			dirty = true;
 		}
 		if (lvl == null || mc.player == null) {
@@ -317,7 +320,7 @@ public final class NpcRegistry {
 			}
 		}
 		if (anchor != null) {
-			behavior.tick(lvl, mc.player, grid, bodies);
+			behavior.tick(lvl, mc.player, fallbackLayout(), bodies);
 		}
 	}
 
@@ -335,7 +338,7 @@ public final class NpcRegistry {
 		signs.clear();
 		npcByEntityId.clear();
 		wanted.clear();
-		grid.clear();
+		fallbackLayout().clear();
 	}
 
 	static @Nullable SimpleParticleType particle(@Nullable String key) {
@@ -369,7 +372,7 @@ public final class NpcRegistry {
 		for (NpcInfo n : wanted.values()) {
 			members.add(new GridLayout.Member(n.id(), n.groupId(), n.envLabel()));
 		}
-		grid.update(new Pos(a.x, a.y, a.z), members, BehaviorDirector.ground(lvl, a.y));
+		fallbackLayout().update(new Pos(a.x, a.y, a.z), members, BehaviorDirector.ground(lvl, a.y));
 
 		Map<String, List<NpcInfo>> groups = new LinkedHashMap<>();
 		List<NpcInfo> ordered = new ArrayList<>(wanted.values());
@@ -387,7 +390,7 @@ public final class NpcRegistry {
 		for (Map.Entry<String, List<NpcInfo>> group : groups.entrySet()) {
 			List<NpcInfo> inGroup = group.getValue();
 			NpcInfo first = inGroup.get(0);
-			Pos header = grid.header(group.getKey());
+			Pos header = fallbackLayout().header(group.getKey());
 			Display.TextDisplay sign = signs.get(group.getKey());
 			if (sign == null || sign.isRemoved()) {
 				sign = textDisplay(lvl, 0xA0000000);
@@ -399,7 +402,7 @@ public final class NpcRegistry {
 			setText(sign, Nameplate.sign(first.groupLabel(), first.envLabel(), inGroup.size()));
 
 			for (NpcInfo info : inGroup) {
-				Anchor desk = grid.desk(info.id(), info.groupId());
+				Anchor desk = fallbackLayout().desk(info.id(), info.groupId());
 				Vec3 pos = desk == null ? a : new Vec3(desk.pos().x(), desk.pos().y(), desk.pos().z());
 				Spawned s = spawned.get(info.id());
 				if (s == null || s.avatar().isRemoved()) {
