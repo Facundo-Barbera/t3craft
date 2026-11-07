@@ -9,7 +9,8 @@ import net.minecraft.nbt.Tag;
  * Canonical text form of a block state, independent of any registry: {@code minecraft:oak_stairs[facing=north,half=bottom]}
  * with properties sorted by name ({@code minecraft:air} when there are none). Equal states give equal
  * keys, so the site code compares cells by string. Converts to and from the vanilla NBT block-state
- * form ({@code {Name:"…",Properties:{…}}}, what {@code NbtUtils.writeBlockState} writes).
+ * form used in the site files ({@code {Name:"…",Properties:{…}}}). That is the pre-26 vanilla layout,
+ * not what {@code NbtUtils} reads or writes now: never pass these tags to {@code NbtUtils}.
  */
 public final class StateKey {
 	public static final String AIR = "minecraft:air";
