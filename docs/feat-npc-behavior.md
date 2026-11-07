@@ -14,20 +14,45 @@ con el modo del hilo, sus puntos de destino y la posición del jugador:
 | `idle` | `IDLE` | deambula por su barrio: elige puntos alcanzables al azar (determinista por id) dentro del radio, se detiene, mira alrededor, a veces tararea (♪ con partículas de notas) |
 | `done` | `COMPLETED` | festeja unos 3,5 s (saltitos, brazos, partículas felices y fuegos artificiales) y después camina a su lugar de descanso y descansa agachado (emote z) |
 
-- **Pathfinding en grilla** (`GridPathfinder`, adaptado de AgentCraft): A* sobre los bloques del
-  nivel del cliente: 8 direcciones sin cortar esquinas, escalones de 1 bloque y suavizado por línea
-  de visión. La búsqueda está acotada (una caja alrededor del origen y del destino, más un límite de
-  nodos), así que no traba el tick. Si no hay ruta (terreno raro, chunk sin cargar, NPC flotando
-  como en el layout viejo), camina en línea recta. Ya no se teletransporta, salvo que esté a más de
-  48 bloques o recién se una al mundo.
+- **Navegación** (`Navigation`, `GridPathfinder` adaptado de AgentCraft, `Collision`): A* 3D sobre
+  las **cajas de colisión reales** (`getCollisionShape`) de los bloques del nivel del cliente
+  (`LevelBlocks`), no "sólido o no":
+  - una celda es caminable si hay apoyo bajo el centro (bloque abajo con tope entre 0,5 y 1, o algo
+    bajo en la celda: alfombra, losa inferior, trampilla cerrada abajo) y el cuerpo (0,6 × 1,8)
+    entra sin tocar ninguna caja; agua, lava, fuego y nieve polvo no se pisan;
+  - cada paso entre celdas barre la caja del cuerpo de centro a centro: un escritorio de losas
+    superiores, trampillas, vallas o el panel de una puerta de hierro bloquean; las puertas que se
+    abren a mano y las puertas de valla cuentan como abiertas (pasables, sin abrirlas visualmente);
+  - escalones de hasta 0,6 (losas, alfombras) y subidas de 1 bloque solo si hay un escalón intermedio
+    a la entrada (escaleras): los NPC no trepan muebles; bajar 1 bloque sí;
+  - si el destino (o el NPC) está dentro de un bloque, se usa la celda libre más cercana del mismo
+    nivel (a 2 bloques como mucho), así nunca se apunta al interior de un escritorio o una silla;
+  - 8 direcciones sin cortar esquinas, suavizado por línea de visión con la caja del cuerpo;
+  - **presupuesto**: 2500 nodos por tick para todos los NPC; una búsqueda que no termina responde
+    `PENDING` y sigue en el tick siguiente (el NPC sigue con lo que hacía). Máximo 16.000 nodos por
+    búsqueda, en una caja alrededor de origen y destino;
+  - **caché**: las rutas encontradas se guardan 5 s como celdas y se revalidan contra los bloques
+    actuales en cada uso; los fallos, 2 s. Las lecturas de bloques se cachean solo un tick.
+  - **sin ruta = no camina**: ya no hay línea recta de respaldo a través de paredes. El NPC se queda
+    (haciendo lo de su lugar) y reintenta a los 2 s.
 - **Movimiento** (`Motion`, adaptado de `AgentMotion` de AgentCraft): a paso tranquilo, acelera y
-  frena suave, y gira suave. El avatar se mueve con `moveOrInterpolateTo`, igual que un jugador
-  remoto, así que la animación de caminar de vanilla funciona sola. El panel, el bocadillo y el
-  ícono siguen la posición renderizada del avatar.
+  frena suave, y gira suave. Cada submovimiento pasa por `Collision.move` (como `Entity.move`: Y,
+  después el eje horizontal mayor, con auto-escalón de 0,6), así que la caja del NPC **nunca queda
+  dentro de un bloque**. El avatar se mueve con `moveOrInterpolateTo`, igual que un jugador remoto,
+  así que la animación de caminar de vanilla funciona sola. El panel, el bocadillo y el ícono siguen
+  la posición renderizada del avatar.
+- **Atorado**: si un NPC camina 25 ticks sin acercarse a su próximo punto, marca 10 s como bloqueada
+  la celda contra la que empuja y replanifica (2 veces); después se desliza al centro de la celda
+  libre más cercana (con colisión, nunca atraviesa paredes) y replanifica (2 veces); al final se
+  queda quieto 8 s y vuelve a intentar.
+- **Dentro de un bloque** (al aparecer, al cargar, si le ponen un bloque encima): se lo pasa a la
+  celda libre más cercana (se revisa al colocarlo y cada segundo mientras está quieto).
+- Ya no se teletransporta, salvo que esté a más de 48 bloques, recién se una al mundo o haya quedado
+  dentro de un bloque.
 - **Evitar al jugador**:
   1. las rutas no pasan por las celdas que rodean al jugador;
   2. si el jugador está justo adelante, el NPC se frena, lo mira y a los 20 ticks recalcula la
-     ruta para rodearlo (si sigue bloqueado mucho rato, pasa de largo);
+     ruta para rodearlo (si sigue bloqueado mucho rato, toma la ruta que no lo esquiva);
   3. si el NPC está quieto y el jugador se le mete encima, se corre un paso y vuelve a su lugar
      cuando el lugar queda libre.
 - **Bocadillos** (`BubbleText` y `SummarySource`): muestran el último resumen del hilo
@@ -95,8 +120,13 @@ padre.
 
 ## Tests
 
-`mod/src/test/java/dev/t3craft/client/npc/behavior/`: 25 tests en 5 clases. Cubren el
-pathfinder (línea recta, rodear una pared, encerrado, esquivar al jugador, escalón), el movimiento
+`mod/src/test/java/dev/t3craft/client/npc/behavior/`. `NavigationTest` usa un mundo falso de
+celdas con cajas (`CellWorld`): puertas abribles y de hierro, escaleras y losas, alfombras, rodeo de
+escritorios de losa, trampilla y valla, destino dentro de un escritorio, agua, presupuesto de nodos
+repartido en ticks y caché, replanificación al cerrarse un paso (también a mitad de camino), choque
+contra una pared y aviso de atorado, auto-escalón, desatasco sin atravesar paredes, empujar fuera de
+un bloque y "sin ruta no camina"; siempre comprueba que la caja nunca queda dentro de un bloque. El
+resto cubre el pathfinder (línea recta, rodear una pared, encerrado, esquivar al jugador, escalón), el movimiento
 (llega y frena, se detiene ante el jugador, ángulos), el cerebro (colocación al unirse, tecleo, ir
 al tablero con ícono y bocadillo, saludo, festejo y descanso, seeding sin festejo, deambular dentro
 del radio, correrse cuando el jugador lo pisa y volver, determinismo, destello del bocadillo), el
