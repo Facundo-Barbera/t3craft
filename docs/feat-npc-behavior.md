@@ -44,12 +44,20 @@ con el modo del hilo, sus puntos de destino y la posición del jugador:
 `AnchorSource` es la interfaz opcional por la que una base física le dice a cada NPC adónde ir:
 `desk(npcId, groupId)`, `board()`, `boardSlots()`, `home(groupId)`, `wanderRadius(groupId)` y
 `rest(npcId, groupId)`. Todos sus métodos pueden devolver `null`. Se combina por capas
-(`LayeredAnchors`) sobre `RingLayout`, que es **el mismo layout de siempre**: parcelas de barrio en
-grilla de 3 junto a donde estaba el jugador y los NPCs en anillo. En ese layout el escritorio es el
-lugar del anillo (mirando al centro), el hogar es el centro de la parcela y el tablero es una plaza
-delante de la primera fila de parcelas. Sin base, todo funciona como antes, pero con
-comportamiento. Con una base parcial (por ejemplo, solo escritorios), lo que falte sale del anillo
-para cada NPC.
+(`LayeredAnchors`) sobre `GridLayout` (fix/npc-grid-layout; antes era un anillo por barrio), una
+oficina provisional junto a donde estaba el jugador: una **manzana** de 3×3 escritorios por barrio
+(entorno + proyecto), con `GridLayout.SPACING` = 4 bloques entre NPCs para que las etiquetas no se
+pisen, un pasillo (`AISLE` = 4) entre manzanas, 3 manzanas por fila y una franja de cabecera con el
+letrero del barrio delante de cada una. Un barrio con más de 9 hilos ocupa otra manzana. Todos los
+NPCs miran a −z (hacia su computadora, el letrero y el tablero), así que los escritorios quedan
+alineados. Las celdas son deterministas (orden por entorno, barrio e id) y estables: se asignan una
+vez, y agregar o quitar un hilo nunca mueve a los demás (la celda libre se reutiliza). La altura se
+toma por columna al asignar la celda (el suelo transitable más cercano a la altura del origen,
+ignorando saltos de más de `MAX_STEP`), así que nadie queda enterrado ni flotando. El layout lo
+tiene el `NpcRegistry` (`fallbackLayout()`) y lo comparten el director y los escritorios
+provisionales de feat/workstation. Con HQ (`HqAnchorSource`) manda el HQ; con una base parcial lo
+que falte sale de la grilla para cada NPC. Los helpers (subagentes) no ocupan celda: siguen al
+padre.
 
 ## Puntos de integración
 
@@ -82,7 +90,7 @@ para cada NPC.
 - `BehaviorDirector.reset()` vacía los cerebros y descarta las entidades propias. Las entidades se
   guardan por referencia y nunca se buscan por id con cast, así que no puede repetirse el
   `ClassCastException` de `NpcRegistry`.
-- La lógica (`NpcBrain`, `Motion`, `GridPathfinder`, `RingLayout`, `BoardSlots`, `BubbleText`) no
+- La lógica (`NpcBrain`, `Motion`, `GridPathfinder`, `GridLayout`, `BoardSlots`, `BubbleText`) no
   usa clases de Minecraft: es determinista y tiene tests.
 
 ## Tests
@@ -92,7 +100,7 @@ pathfinder (línea recta, rodear una pared, encerrado, esquivar al jugador, esca
 (llega y frena, se detiene ante el jugador, ángulos), el cerebro (colocación al unirse, tecleo, ir
 al tablero con ícono y bocadillo, saludo, festejo y descanso, seeding sin festejo, deambular dentro
 del radio, correrse cuando el jugador lo pisa y volver, determinismo, destello del bocadillo), el
-layout (anillo igual al del registro, anchors físicos con fallback, lugares del tablero sin
+layout (grilla en `GridLayoutTest`: determinismo, estabilidad, separación, agrupación; anchors físicos con fallback, lugares del tablero sin
 superponerse) y los bocadillos (ajuste de línea y fallback). `./gradlew build` pasa en verde,
 incluidos los tests que ya había.
 

@@ -39,4 +39,10 @@ record LayeredAnchors(AnchorSource primary, AnchorSource fallback) implements An
 		Anchor a = primary.rest(npcId, groupId);
 		return a != null ? a : fallback.rest(npcId, groupId);
 	}
+
+	@Override
+	public @Nullable Anchor exit() {
+		Anchor a = primary.exit();
+		return a != null ? a : fallback.exit();
+	}
 }

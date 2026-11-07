@@ -10,35 +10,28 @@ class LayoutTest {
 	static final Pos O = new Pos(100, 64, 200);
 
 	@Test
-	void ringMatchesTheRegistryLayout() {
-		RingLayout r = RingLayout.of(O, List.of(new RingLayout.Member("a", "g1", 2), new RingLayout.Member("b", "g1", 2),
-				new RingLayout.Member("c", "g2", 0)));
-		// g2 is more urgent (priority 0) so it gets the first plot at the origin.
-		assertEquals(O, r.home("g2").pos());
-		assertEquals(O.add(RingLayout.PLOT, 0, 0), r.home("g1").pos());
-		Anchor c = r.desk("c", "g2");
-		assertEquals(RingLayout.ringRadius(1), c.pos().horizDist(O), 1e-9);
-		// desks face the plot centre
-		Pos ahead = c.pos().add(-Math.sin(Math.toRadians(c.yaw())), 0, Math.cos(Math.toRadians(c.yaw())));
-		assertTrue(ahead.horizDist(O) < c.pos().horizDist(O));
-		assertNotNull(r.board());
-		assertNull(r.desk("zzz", "g1"));
-	}
-
-	@Test
-	void physicalAnchorsWinOverTheRing() {
+	void physicalAnchorsWinOverTheGrid() {
 		Anchor desk = Anchor.at(1, 2, 3, 90);
+		Anchor hqBoard = Anchor.at(7, 8, 9, 0);
 		AnchorSource base = new AnchorSource() {
 			@Override
 			public @Nullable Anchor desk(String npcId, String groupId) {
 				return npcId.equals("a") ? desk : null;
 			}
+
+			@Override
+			public @Nullable Anchor board() {
+				return hqBoard;
+			}
 		};
-		RingLayout ring = RingLayout.of(O, List.of(new RingLayout.Member("a", "g", 0), new RingLayout.Member("b", "g", 0)));
-		AnchorSource l = new LayeredAnchors(base, ring);
+		GridLayout grid = new GridLayout();
+		grid.update(O, List.of(new GridLayout.Member("a", "g", "e"), new GridLayout.Member("b", "g", "e")), GridLayout.Ground.UNKNOWN);
+		AnchorSource l = new LayeredAnchors(base, grid);
 		assertEquals(desk, l.desk("a", "g"));
-		assertEquals(ring.desk("b", "g"), l.desk("b", "g"), "falls back per NPC");
-		assertEquals(ring.board(), l.board());
+		assertNotEquals(grid.desk("a", "g"), l.desk("a", "g"));
+		assertEquals(grid.desk("b", "g"), l.desk("b", "g"), "falls back per NPC");
+		assertEquals(hqBoard, l.board());
+		assertEquals(grid.board(), new LayeredAnchors(AnchorSource.NONE, grid).board(), "no HQ: grid board");
 	}
 
 	@Test

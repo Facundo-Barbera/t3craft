@@ -15,7 +15,7 @@ import dev.t3craft.client.npc.helpers.HelperConfig;
 import dev.t3craft.client.npc.helpers.HelperDirector;
 import dev.t3craft.client.npc.helpers.HelperRoster;
 import dev.t3craft.client.portable.PortableClient;
-import dev.t3craft.client.screen.ThreadChatScreen;
+import dev.t3craft.debug.HotSwapFields;
 import dev.t3craft.t3.DirectController;
 import dev.t3craft.t3.Environments;
 import dev.t3craft.t3.Pairing;
@@ -55,9 +55,12 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 	private static T3CraftClient instance;
 
 	private final NpcRegistry npcs = new NpcRegistry();
-	/** feat/npc-helpers: subagents as small villagers following their parent's NPC (direct mode). */
-	private final HelperDirector helpers = new HelperDirector();
-	private HelperConfig helperConfig = HelperConfig.DEFAULTS;
+	/**
+	 * feat/npc-helpers: subagents as small villagers following their parent's NPC (direct mode).
+	 * Read via {@link #helpers()} / {@link #helperConfig()}: may be null after a hot-swap (docs/dev.md).
+	 */
+	private @Nullable HelperDirector helpers;
+	private @Nullable HelperConfig helperConfig;
 	private final AtomicBoolean directDirty = new AtomicBoolean();
 	private final Map<String, String> envStatus = new HashMap<>();
 	private final Map<String, String[]> envDetail = new LinkedHashMap<>();
@@ -80,8 +83,8 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 		modVersion = FabricLoader.getInstance().getModContainer(T3Craft.MOD_ID)
 				.map(c -> c.getMetadata().getVersion().getFriendlyString()).orElse("dev");
 		config = ModConfig.load();
-		helperConfig = HelperConfig.load(FabricLoader.getInstance().getConfigDir().resolve("t3craft.json"));
-		npcs.setPanelExtra(helpers::panelExtra);
+		helperConfig = loadHelperConfig();
+		helpers(); // creates the director and wires its panel extra
 
 		ClientLifecycleEvents.CLIENT_STARTED.register(mc -> {
 			started = true;
@@ -102,7 +105,7 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 				}
 			}
 			npcs.tick(mc);
-			helpers.tick(mc, npcs::avatar);
+			helpers().tick(mc, npcs::avatar);
 		});
 		T3CraftCommands.register(this);
 		dev.t3craft.hq.HqPreviewCommand.register(npcs::all); // feat/hq-design: /t3craft debug hq-preview
@@ -110,6 +113,7 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 		dev.t3craft.client.hud.StatusBar.register(this); // feat/hud-bar
 		PortableClient.register(this);
 		dev.t3craft.client.search.SearchClient.register(this); // feat/search: /t3craft search
+		dev.t3craft.client.queue.QueueClient.register(this); // feat/op-queue: /t3craft queue, QueueScreen
 
 		// Right-click on one of our client-only NPCs opens its chat screen. The entity is unknown to
 		// the server, so the interaction is consumed client-side.
@@ -119,16 +123,29 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 			}
 			String threadId = npcs.threadFor(entity);
 			if (threadId == null) {
-				threadId = helpers.parentFor(entity); // a helper opens its parent's chat
+				threadId = helpers().parentFor(entity); // a helper opens its parent's chat
 			}
 			if (threadId == null) {
 				return InteractionResult.PASS;
 			}
 			NpcInfo info = npcs.info(threadId);
 			if (info != null) {
-				Minecraft.getInstance().gui.setScreen(new ThreadChatScreen(info));
+				dev.t3craft.client.chat.ChatScreens.openFor(info);
 			}
 			return InteractionResult.SUCCESS;
+		});
+		// Left-click on an NPC toggles its detail panel (compact labels). Our entities are unknown
+		// to the server, so the attack is consumed client-side.
+		net.fabricmc.fabric.api.event.player.AttackEntityCallback.EVENT.register((player, level, hand, entity, hit) -> {
+			if (!level.isClientSide()) {
+				return InteractionResult.PASS;
+			}
+			String threadId = npcs.threadFor(entity);
+			if (threadId == null) {
+				return InteractionResult.PASS;
+			}
+			npcs.toggleDetail(threadId);
+			return InteractionResult.FAIL;
 		});
 	}
 
@@ -185,13 +202,31 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 	public ModConfig reload() {
 		stopSource();
 		config = ModConfig.load();
-		helperConfig = HelperConfig.load(FabricLoader.getInstance().getConfigDir().resolve("t3craft.json"));
-		helpers.update(HelperRoster.Collected.EMPTY, List.of(), 0);
+		helperConfig = loadHelperConfig();
+		helpers().update(HelperRoster.Collected.EMPTY, List.of(), 0);
 		npcs.replaceAll(List.of());
 		if (started) {
 			startSource();
 		}
 		return config;
+	}
+
+	// Lazy getters: fields added by hot-swap are null and onInitializeClient does not run again.
+	private HelperDirector helpers() {
+		HelperDirector h = helpers;
+		if (h == null) {
+			helpers = h = new HelperDirector();
+			npcs.setPanelExtra(dev.t3craft.client.queue.QueueClient.withBadge(h::panelExtra)); // feat/op-queue: + "⏳ n queued"
+		}
+		return h;
+	}
+
+	private HelperConfig helperConfig() {
+		return helperConfig = HotSwapFields.orInit(helperConfig, T3CraftClient::loadHelperConfig);
+	}
+
+	private static HelperConfig loadHelperConfig() {
+		return HelperConfig.load(FabricLoader.getInstance().getConfigDir().resolve("t3craft.json"));
 	}
 
 	/** Opens a screen on the next tick (a command's chat screen closes right after it runs). */
@@ -242,9 +277,9 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 		// feat/npc-helpers: with helpers on, subagents never get a desk/NPC of their own (even with
 		// includeSubagents); they follow their parent instead. Filtered before the registry, so every
 		// roster reader (behaviour, workstations, HQ preview, portable) sees parents only.
-		HelperRoster.Collected sub = helperConfig.enabled() ? HelperRoster.collect(d.shellViews()) : HelperRoster.Collected.EMPTY;
+		HelperRoster.Collected sub = helperConfig().enabled() ? HelperRoster.collect(d.shellViews()) : HelperRoster.Collected.EMPTY;
 		views = HelperRoster.deskRoster(views, dev.t3craft.t3.NpcView::id, sub.subagentNpcIds());
-		helpers.update(sub, views.stream().map(dev.t3craft.t3.NpcView::id).toList(), helperConfig.maxPerParent());
+		helpers().update(sub, views.stream().map(dev.t3craft.t3.NpcView::id).toList(), helperConfig().maxPerParent());
 		List<NpcInfo> list = new ArrayList<>();
 		views.forEach(v -> list.add(NpcInfo.fromView(v)));
 		npcs.replaceAll(list);
@@ -273,12 +308,20 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 		PeekHud.setBanner(problems.isEmpty() ? null : "T3: " + String.join(", ", problems) + "  (/t3craft status)");
 	}
 
-	/**
-	 * Pairs this instance with a T3 environment, read-only: exchanges the one-time credential for an
-	 * {@code orchestration:read} session, stores it under {@code config/t3craft/credentials/} and
-	 * reconnects. {@code done} gets a player-facing message on the client thread (never a secret).
-	 */
+	/** {@link #pair(String, String, String, boolean, Consumer)} with the default scopes (read + operate). */
 	public void pair(String label, String linkOrCode, String hostUrl, Consumer<PairResult> done) {
+		pair(label, linkOrCode, hostUrl, false, done);
+	}
+
+	/**
+	 * Pairs this instance with a T3 environment: exchanges the one-time credential for a session
+	 * with {@link Pairing#DEFAULT_SCOPES} (read + operate, one pairing) or, with {@code readOnly},
+	 * {@code orchestration:read} only. {@link Environments#pair} stores it under
+	 * {@code config/t3craft/credentials/} (and {@code credentials/operate/} when it carries
+	 * operate), then reconnects. If the host issued a read-only credential the environment is
+	 * paired read-only. {@code done} gets a player-facing message on the client thread (never a secret).
+	 */
+	public void pair(String label, String linkOrCode, String hostUrl, boolean readOnly, Consumer<PairResult> done) {
 		Minecraft mc = Minecraft.getInstance();
 		Pairing.Target target;
 		try {
@@ -290,8 +333,9 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 		String shown = label == null || label.isBlank() ? target.baseUrl().getHost() : label.trim();
 		String id = Environments.slug(shown);
 		Environments envs = new Environments(ModConfig.dataDir());
+		java.util.Set<String> scopes = Pairing.pairingScopes(readOnly);
 		new PairingClient(java.net.http.HttpClient.newHttpClient())
-				.exchange(target, "T3Craft (Minecraft " + modVersion + ")", System.getProperty("os.name", ""))
+				.exchange(target, "T3Craft (Minecraft " + modVersion + ")", System.getProperty("os.name", ""), scopes)
 				.whenComplete((session, err) -> {
 					PairResult result;
 					if (err != null) {
@@ -301,11 +345,18 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 								: "Could not reach " + target.baseUrl() + ": " + T3Connection.sanitize(cause.getClass().getSimpleName()));
 					} else {
 						try {
-							envs.save(new Environments.Environment(id, shown, target.baseUrl()), session);
-							result = new PairResult(true, "Paired with " + shown + " (" + target.baseUrl() + "), read-only. Session valid until "
-									+ java.time.Instant.ofEpochMilli(session.expiresAtMs()).toString().substring(0, 10) + ".");
-						} catch (IOException e) {
-							result = new PairResult(false, "Paired, but could not save the credential: " + e.getMessage());
+							boolean control = envs.pair(new Environments.Environment(id, shown, target.baseUrl()), session);
+							String until = java.time.Instant.ofEpochMilli(session.expiresAtMs()).toString().substring(0, 10);
+							String how = control
+									? "with control (read + operate). Revoke control any time: /t3craft operate revoke " + id
+									: readOnly ? "read-only"
+									: "read-only: the credential had no orchestration:operate (use \"Enable control\" to add it)";
+							result = new PairResult(true, "Paired with " + shown + " (" + target.baseUrl() + "), " + how
+									+ ". Session valid until " + until + ".");
+							dev.t3craft.t3.AuditLog.in(ModConfig.dataDir()).append(new dev.t3craft.t3.AuditLog.Entry(System.currentTimeMillis(), id, null,
+									"pair", false, "ok", "ui", control ? "read+operate" : "read-only"));
+						} catch (IOException | IllegalArgumentException e) {
+							result = new PairResult(false, "Paired, but could not save the credential: " + e.getClass().getSimpleName());
 						}
 					}
 					PairResult r = result;

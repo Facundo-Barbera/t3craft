@@ -24,10 +24,10 @@ import net.minecraft.network.chat.MutableComponent;
  *   <li>{@code status}: mode, connections and per-environment state.</li>
  *   <li>{@code reconnect}: fresh sockets with the same config, now.</li>
  *   <li>{@code reload}: re-read {@code config/t3craft.json}, paired environments and credentials, reconnect.</li>
- *   <li>{@code pair}: open the read-only pairing screen. {@code unpair <env>}: forget an environment.</li>
+ *   <li>{@code pair}: open the pairing screen (read + operate by default); {@code pair --read-only}: only {@code orchestration:read}. {@code unpair <env>}: forget an environment.</li>
  *   <li>{@code envs}: list paired environments (no secrets).</li>
  *   <li>{@code operate}: control (operate) status per environment; {@code operate enable <env>} opens
- *   the optional operate pairing; {@code operate revoke <env>} deletes the local operate token.</li>
+ *   "Enable control" for an environment paired read-only; {@code operate revoke <env>} deletes the local operate token.</li>
  * </ul>
  */
 public final class T3CraftCommands {
@@ -58,10 +58,14 @@ public final class T3CraftCommands {
 							+ " (mode " + cfg.mode().name().toLowerCase() + "), connecting to " + what)));
 					return 1;
 				}))
+				// Default: read + operate in one pairing. "--read-only": orchestration:read only.
 				.then(literal("pair").executes(c -> {
 					client.openNextTick(new PairScreen(null));
 					return 1;
-				}))
+				}).then(literal(PairScreen.READ_ONLY_FLAG).executes(c -> {
+					client.openNextTick(new PairScreen(null, true));
+					return 1;
+				})))
 				.then(literal("unpair").then(argument("env", StringArgumentType.word())
 						.suggests((c, b) -> {
 							new Environments(ModConfig.dataDir()).list().forEach(e -> b.suggest(e.id()));
@@ -80,6 +84,7 @@ public final class T3CraftCommands {
 							return 1;
 						})))
 				.then(dev.t3craft.client.operate.OperateCommands.build(client))
+				.then(dev.t3craft.client.operate.ThreadControlUi.commands()) // feat/op-stop: operate interrupt|stop
 				.then(literal("envs").executes(c -> {
 					var list = new Environments(ModConfig.dataDir()).list();
 					if (list.isEmpty()) {

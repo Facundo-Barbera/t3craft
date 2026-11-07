@@ -16,6 +16,7 @@ public final class T3Craft implements ModInitializer {
 
 	@Override
 	public void onInitialize() {
+		T3CraftTab.register();
 		PortableItems.register();
 		SurvivalHooks.register();
 		LOGGER.info("T3Craft loaded (client-only mod; common side: portable T3 Terminal item)");

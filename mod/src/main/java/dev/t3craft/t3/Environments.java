@@ -24,8 +24,13 @@ import org.jspecify.annotations.Nullable;
  * <ul>
  *   <li>{@code environments.json}: {@code [{id, label, url}]}, no secrets.</li>
  *   <li>{@code credentials/<id>.json}: {@code {accessToken, scopes, expiresAt}}; owner-only
- *   permissions where the OS supports it. Lives in the player's instance profile, never in a repo.</li>
+ *   permissions where the OS supports it. Lives in the player's instance profile, never in a repo.
+ *   This is the <i>read</i> zone's token: {@code orchestration:read}, or the combined
+ *   {@code orchestration:read + orchestration:operate} session of a default pairing.</li>
  * </ul>
+ * Control (operate) is enabled only while {@link OperateCredentials} holds a token for the
+ * environment ({@code credentials/operate/<id>.json}); {@link #pair} writes both files for a
+ * combined session. See {@code docs/feat-operate.md} "Almacenamiento".
  */
 public final class Environments {
 	public static final Pattern ID = Pattern.compile("[a-z0-9][a-z0-9-]{0,31}");
@@ -93,7 +98,30 @@ public final class Environments {
 		return out;
 	}
 
-	/** Adds or replaces an environment and its credential. */
+	/**
+	 * Stores the result of a pairing: the environment plus its read-zone credential and, for a
+	 * combined read + operate session, the same session as the operate token (control enabled).
+	 * A read-only pairing deletes any previous operate token of the environment: re-pairing
+	 * read-only means read-only. Returns whether control is enabled afterwards.
+	 */
+	public synchronized boolean pair(Environment env, Pairing.Session session) throws IOException {
+		if (!Pairing.READ_SCOPES.equals(session.scopes()) && !Pairing.OPERATE_SCOPES.equals(session.scopes())) {
+			throw new IllegalArgumentException("not a pairing session: " + new java.util.TreeSet<>(session.scopes()));
+		}
+		save(env, session);
+		OperateCredentials operate = new OperateCredentials(dir);
+		if (Pairing.grantsOperate(session.scopes())) {
+			operate.save(env.id(), session);
+			return true;
+		}
+		operate.revoke(env.id());
+		return false;
+	}
+
+	/**
+	 * Adds or replaces an environment and its read-zone credential. Never touches the operate
+	 * token (rename re-saves the same session through here).
+	 */
 	public synchronized void save(Environment env, Pairing.Session session) throws IOException {
 		List<Environment> all = new ArrayList<>(list());
 		all.removeIf(e -> e.id().equals(env.id()));
@@ -138,7 +166,12 @@ public final class Environments {
 		return Files.deleteIfExists(credentialFile(id)) || removed;
 	}
 
-	/** The stored read-only session, or null when missing/invalid/not read-only. */
+	/**
+	 * The stored read-zone session, or null when missing/invalid. Accepts exactly
+	 * {@code orchestration:read} (read-only pairing, also every credential stored before
+	 * 2026-11-07) or {@code orchestration:read + orchestration:operate} (default combined pairing);
+	 * any other scope set (filesystem:write…) is ignored. The read connection only reads with it.
+	 */
 	public Pairing.@Nullable Session credential(String id) {
 		try {
 			Path f = credentialFile(id);
@@ -156,7 +189,7 @@ public final class Environments {
 			if (sc != null) {
 				sc.forEach(s -> scopes.add(s.getAsString()));
 			}
-			if (token == null || token.isBlank() || !scopes.equals(java.util.Set.of(Pairing.READ_SCOPE))) {
+			if (token == null || token.isBlank() || !(scopes.equals(Pairing.READ_SCOPES) || scopes.equals(Pairing.OPERATE_SCOPES))) {
 				return null;
 			}
 			Long exp = Json.time(o, "expiresAt");

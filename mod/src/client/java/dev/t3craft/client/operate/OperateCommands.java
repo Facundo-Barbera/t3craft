@@ -36,6 +36,11 @@ public final class OperateCommands {
 		return literal("operate")
 				.executes(OperateCommands::status)
 				.then(literal("status").executes(OperateCommands::status))
+				.then(ThreadOpsCommands.settle())
+				.then(ThreadOpsCommands.snooze())
+				.then(ThreadOpsCommands.pin())
+				.then(ThreadOpsCommands.unpin())
+				.then(ThreadOpsCommands.read())
 				.then(literal("enable").then(argument("env", StringArgumentType.word()).suggests(ENVS).executes(c -> {
 					String env = StringArgumentType.getString(c, "env");
 					var e = OperateClient.environment(env);
@@ -51,7 +56,9 @@ public final class OperateCommands {
 					c.getSource().sendFeedback(T3CraftCommands.prefix().append(Component.literal(r.message())
 							.withStyle(r.ok() ? ChatFormatting.GREEN : ChatFormatting.YELLOW)));
 					return r.ok() ? 1 : 0;
-				})));
+				})))
+				.then(LaunchCommand.build()) // feat/op-launch: /t3craft operate new <env> <project> <prompt…>
+				;
 	}
 
 	private static int status(CommandContext<FabricClientCommandSource> c) {
@@ -68,7 +75,7 @@ public final class OperateCommands {
 			String text = switch (av) {
 				case ENABLED -> "control enabled (revoke: /t3craft operate revoke " + e.id() + ")";
 				case EXPIRED -> "read-only (operate session expired)";
-				case READ_ONLY -> "read-only";
+				case READ_ONLY -> "read-only (enable control: /t3craft operate enable " + e.id() + ")";
 			};
 			c.getSource().sendFeedback(Component.literal("  " + e.id() + ": ").append(Component.literal(text).withStyle(color)));
 		}

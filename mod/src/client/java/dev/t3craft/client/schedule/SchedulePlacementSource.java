@@ -8,8 +8,8 @@ import org.jspecify.annotations.Nullable;
  *
  * <p><b>Integration point (hq).</b> Once the HQ is placed in the world, register
  * {@code ScheduleClient.get().setPlacementSource(() -> SchedulePlacement.onBoard(siteAnchor))} with the
- * world-space {@code AnchorNames.BOARD} anchor; {@code null} goes back to {@link RingBoardPlacement}
- * (in front of the behaviour director's provisional board).
+ * world-space {@code AnchorNames.BOARD} anchor; {@code null} goes back to {@link LayoutBoardPlacement}
+ * (behind the board spot of the registry's fallback layout).
  */
 @FunctionalInterface
 public interface SchedulePlacementSource {

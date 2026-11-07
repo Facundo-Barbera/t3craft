@@ -8,9 +8,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.t3craft.client.npc.behavior.Anchor;
 import dev.t3craft.client.npc.behavior.Pos;
-import dev.t3craft.client.npc.behavior.RingLayout;
+import dev.t3craft.client.npc.behavior.AnchorSource;
 import dev.t3craft.t3.ScheduledTask;
 import dev.t3craft.t3.ScheduledTask.RunStatus;
+import dev.t3craft.t3.StreamRegistry;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -212,28 +213,63 @@ class ScheduleBoardTest {
 	}
 
 	@Test
-	void ringPlacementFloatsBehindTheProvisionalBoard() {
-		Pos origin = new Pos(10, 64, 10);
-		List<RingLayout.Member> ms = List.of(new RingLayout.Member("e:a", "e:p", 1));
-		RingBoardPlacement src = new RingBoardPlacement(() -> origin, () -> ms);
-		SchedulePlacement p = src.placement();
-		Anchor board = RingLayout.of(origin, ms).board();
-		assertEquals(board.pos().x(), p.x(), 1e-6);
-		assertEquals(board.pos().y() + RingBoardPlacement.HEIGHT, p.y(), 1e-6);
-		assertEquals(board.pos().z() - RingBoardPlacement.DISTANCE, p.z(), 1e-6, "behind the spot, NPCs face -z");
+	void layoutPlacementFloatsBehindTheFallbackBoard() {
+		Anchor board = new Anchor(new Pos(16, 64, 4), 180f);
+		AnchorSource layout = new AnchorSource() {
+			@Override
+			public Anchor board() {
+				return board;
+			}
+		};
+		SchedulePlacement p = new LayoutBoardPlacement(() -> layout).placement();
+		assertEquals(16, p.x(), 1e-6);
+		assertEquals(64 + LayoutBoardPlacement.HEIGHT, p.y(), 1e-6);
+		assertEquals(4 - LayoutBoardPlacement.DISTANCE, p.z(), 1e-6, "behind the spot, NPCs face -z");
 		assertEquals(0f, p.yaw(), 1e-4f, "text turned back towards them");
-		assertNull(new RingBoardPlacement(() -> null, () -> ms).placement());
-		assertNull(new RingBoardPlacement(() -> origin, List::of).placement(), "no NPC, no board");
+		assertNull(new LayoutBoardPlacement(() -> null).placement());
+		assertNull(new LayoutBoardPlacement(() -> AnchorSource.NONE).placement(), "no board, no panel");
 	}
 
 	// ---- source -------------------------------------------------------------------------------
 
+	static final class Sink implements ScheduleSource.Sink {
+		final List<String> events = new ArrayList<>();
+
+		@Override
+		public void tasks(String envId, List<ScheduledTask> tasks) {
+			events.add(envId + ":" + tasks.stream().map(ScheduledTask::id).toList());
+		}
+
+		@Override
+		public void unavailable(String envId, String reason) {
+			events.add(envId + "!" + reason);
+		}
+	}
+
+	static com.google.gson.JsonObject json(String s) {
+		return com.google.gson.JsonParser.parseString(s).getAsJsonObject();
+	}
+
 	@Test
-	void pendingSourceIsReadOnlyAndExplainsItself() {
+	void connectionListenerDeliversTheNewestListAndEnds() {
+		Sink sink = new Sink();
+		StreamRegistry.Listener l = ConnectionScheduleSource.listener("vps", sink);
+		l.onSubscribed();
+		l.onItems(List.of(json("{\"tasks\":[{\"id\":\"a\"}]}"), json("{\"other\":1}"), json("{\"tasks\":[{\"id\":\"b\"},{\"id\":\"c\"}]}")));
+		l.onItems(List.of(json("{\"nope\":true}")));
+		l.onEnded(null);
+		l.onEnded("Failure ScheduledTaskError: Bearer abc123 refused");
+		assertEquals(List.of("vps:[b, c]", "vps!reconnecting", "vps!Failure ScheduledTaskError: Bearer <redacted> refused"), sink.events);
+	}
+
+	@Test
+	void bookIsTheSink() {
 		ScheduleBook book = new ScheduleBook();
-		ScheduleSource.Handle h = ScheduleSource.PENDING.open(new dev.t3craft.t3.DirectController(new dev.t3craft.t3.Environments(java.nio.file.Path.of("build", "no-such-dir")), () -> {
-		}), book);
-		h.close();
-		assertTrue(book.environments().isEmpty(), "nothing delivered");
+		StreamRegistry.Listener l = ConnectionScheduleSource.listener("vps", book);
+		l.onEnded(null);
+		assertEquals("reconnecting", book.unavailable("vps"));
+		l.onItems(List.of(json("{\"tasks\":[{\"id\":\"a\",\"title\":\"A\"}]}")));
+		assertNull(book.unavailable("vps"));
+		assertEquals("A", book.entries(x -> null, (x, y) -> null).getFirst().task().name());
 	}
 }

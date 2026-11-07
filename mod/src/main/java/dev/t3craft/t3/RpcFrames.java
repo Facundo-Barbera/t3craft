@@ -23,10 +23,30 @@ public final class RpcFrames {
 	/**
 	 * Read-only stream of the environment's scheduled tasks: empty payload, needs only
 	 * {@code orchestration:read}; each chunk value is a full {@code {tasks: [...]}} list
-	 * ({@link ScheduledTask#listFrom}). Name only: requests go through the connection's shared path.
+	 * ({@link ScheduledTask#listFrom}). Sent through the connection's {@link StreamRegistry}.
 	 */
 	public static final String SUBSCRIBE_SCHEDULED_TASKS = "scheduledTasks.subscribe";
 
+	public static final String GET_TURN_ITEM = "orchestration.getTurnItem";
+	public static final String GET_THREAD_PROJECTION = "orchestration.getThreadProjection";
+
+	/**
+	 * {@code orchestration.subscribeThread} as the chat uses it: completion marker and a bounded
+	 * snapshot (latest window + {@code historyCursor}; older pages over HTTP). No compact/dedupe
+	 * options, so items arrive as plain JSON.
+	 */
+	public static String subscribeThread(String id, String threadId) {
+		JsonObject p = new JsonObject();
+		p.addProperty("threadId", threadId);
+		p.addProperty("requestCompletionMarker", true);
+		p.addProperty("acceptBoundedSnapshot", true);
+		return request(id, SUBSCRIBE_THREAD, p);
+	}
+
+	/** {@code scheduledTasks.subscribe}: empty payload, needs only {@code orchestration:read}. */
+	public static String subscribeScheduledTasks(String id) {
+		return request(id, SUBSCRIBE_SCHEDULED_TASKS, new JsonObject());
+	}
 	/** Read-only ({@code orchestration:read}) thread search; a single Exit carries the result. */
 	public static final String SEARCH_THREADS = "orchestration.searchThreads";
 	/** T3 rejects queries shorter than this (after trimming). */

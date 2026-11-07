@@ -149,7 +149,9 @@ Verdict v = Survival.rules().debugWorldEdit(SurvivalClient.current(Minecraft.get
 if (!v.allowed()) { src.sendError(prefix().append(Component.translatable(v.langKey()))); return 0; }
 ```
 
-**builders / site / HQ**: construcciones de verdad, del lado servidor y antes de `submit`:
+**builders / site / HQ**: ✅ **aplicado en feat/builders-survival** dentro de `BuildService.build` (ver
+`docs/feat-builders.md`, «Supervivencia»): HQ y site solo tienen que llamar a `Builders.service().build(...)` y
+capturar `IllegalStateException`. Boceto original: construcciones de verdad, del lado servidor y antes de `submit`:
 ```java
 PlayContext ctx = PlayContexts.of(serverPlayer, PlayContexts.isIntegrated(serverPlayer));
 SurvivalRules rules = Survival.rules();

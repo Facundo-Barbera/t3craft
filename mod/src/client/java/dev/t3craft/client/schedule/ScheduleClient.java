@@ -6,13 +6,8 @@ import com.mojang.brigadier.context.CommandContext;
 import dev.t3craft.T3Craft;
 import dev.t3craft.client.T3CraftClient;
 import dev.t3craft.client.debug.GuardedEvents;
-import dev.t3craft.client.npc.NpcInfo;
-import dev.t3craft.client.npc.behavior.Pos;
-import dev.t3craft.client.npc.behavior.RingLayout;
 import dev.t3craft.debug.DevReload;
 import dev.t3craft.t3.DirectController;
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,7 +21,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -40,9 +34,9 @@ import org.jspecify.annotations.Nullable;
  * (order), {@link Countdown}, {@link SchedulePager} (rotation), {@link ScheduleText} (board and chat
  * text), {@link ScheduleRenderer} (display entity, ids from −7,000,000).
  *
- * <p>Integration points: {@link #setSource} (the stream adapter, default {@link ScheduleSource#PENDING}),
+ * <p>Integration points: {@link #setSource} (the stream adapter, default {@link ConnectionScheduleSource}),
  * {@link #setPlacementSource} (HQ board anchor; default
- * {@link RingBoardPlacement}), {@link #setBoardHook} (future "task board" block of the blocks
+ * {@link LayoutBoardPlacement}), {@link #setBoardHook} (future "task board" block of the blocks
  * module), {@link #entries()} (other UIs).
  */
 public final class ScheduleClient implements ClientModInitializer {
@@ -58,10 +52,11 @@ public final class ScheduleClient implements ClientModInitializer {
 
 	private final ScheduleBook book = new ScheduleBook();
 	private final ScheduleRenderer renderer = new ScheduleRenderer();
-	private final RingBoardPlacement provisional = new RingBoardPlacement(ScheduleClient::registryOrigin, ScheduleClient::ringMembers);
+	private final LayoutBoardPlacement provisional = new LayoutBoardPlacement(ScheduleClient::registryLayout);
 	private @Nullable SchedulePlacementSource placementOverride;
 	private @Nullable ScheduleBoardHook hook;
-	private ScheduleSource source = ScheduleSource.PENDING;
+	private static final ScheduleSource DEFAULT_SOURCE = new ConnectionScheduleSource();
+	private ScheduleSource source = DEFAULT_SOURCE;
 	private ScheduleSource.Handle handle = ScheduleSource.Handle.NONE;
 	private @Nullable DirectController subscribed;
 	private boolean resubscribe;
@@ -97,13 +92,13 @@ public final class ScheduleClient implements ClientModInitializer {
 
 	// ---- integration points -------------------------------------------------------------------
 
-	/** Plug the {@code scheduledTasks.subscribe} adapter in (null = {@link ScheduleSource#PENDING}). Client thread. */
+	/** Plug the {@code scheduledTasks.subscribe} adapter in (null = {@link ConnectionScheduleSource}). Client thread. */
 	public void setSource(@Nullable ScheduleSource source) {
-		this.source = source == null ? ScheduleSource.PENDING : source;
+		this.source = source == null ? DEFAULT_SOURCE : source;
 		resubscribe = true;
 	}
 
-	/** Plug the HQ's board in (null = provisional {@link RingBoardPlacement}). */
+	/** Plug the HQ's board in (null = provisional {@link LayoutBoardPlacement}). */
 	public void setPlacementSource(@Nullable SchedulePlacementSource source) {
 		this.placementOverride = source;
 	}
@@ -169,7 +164,7 @@ public final class ScheduleClient implements ClientModInitializer {
 	private void syncSubscription() {
 		T3CraftClient client = T3CraftClient.get();
 		DirectController d = client == null ? null : client.direct();
-		if (d == subscribed && !resubscribe) {
+		if (d == subscribed && !resubscribe && (ticks % REFRESH_TICKS != 0 || !handle.stale())) {
 			return;
 		}
 		resubscribe = false;
@@ -221,22 +216,9 @@ public final class ScheduleClient implements ClientModInitializer {
 		return view == null ? null : view.projectTitle(projectId);
 	}
 
-	private static @Nullable Pos registryOrigin() {
+	private static dev.t3craft.client.npc.behavior.@Nullable AnchorSource registryLayout() {
 		T3CraftClient client = T3CraftClient.get();
-		Vec3 o = client == null ? null : client.npcs().layoutOrigin();
-		return o == null ? null : new Pos(o.x, o.y, o.z);
-	}
-
-	/** Same member list as the behaviour director's ring: every NPC shown, sorted by id. */
-	private static List<RingLayout.Member> ringMembers() {
-		T3CraftClient client = T3CraftClient.get();
-		List<NpcInfo> npcs = client == null ? List.of() : client.npcs().all();
-		List<RingLayout.Member> ms = new ArrayList<>(npcs.size());
-		for (NpcInfo n : npcs) {
-			ms.add(new RingLayout.Member(n.id(), n.groupId(), n.priority()));
-		}
-		ms.sort(Comparator.comparing(RingLayout.Member::id));
-		return ms;
+		return client == null ? null : client.npcs().fallbackLayout();
 	}
 
 	// ---- chat ---------------------------------------------------------------------------------

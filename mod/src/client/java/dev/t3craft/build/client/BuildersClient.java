@@ -1,6 +1,8 @@
 package dev.t3craft.build.client;
 
 import dev.t3craft.T3Craft;
+import dev.t3craft.build.BuildCost;
+import dev.t3craft.build.BuildDeniedException;
 import dev.t3craft.build.BuildHandle;
 import dev.t3craft.build.BuildJob;
 import dev.t3craft.build.BuildListener;
@@ -9,11 +11,18 @@ import dev.t3craft.build.BuildPlan;
 import dev.t3craft.build.BuildService;
 import dev.t3craft.build.Builders;
 import dev.t3craft.build.JobState;
+import dev.t3craft.survival.BuildMaterials;
+import dev.t3craft.survival.PlayContexts;
+import dev.t3craft.survival.Survival;
+import dev.t3craft.survival.Verdict;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.function.UnaryOperator;
+import dev.t3craft.build.BlockSink;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -22,6 +31,7 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.level.Level;
@@ -55,6 +65,9 @@ public final class BuildersClient implements ClientModInitializer, BuildService 
 	private record Finished(int jobId, JobState state) implements Event {
 	}
 
+	private record Materials(int jobId, String label, Map<String, Integer> missing) implements Event {
+	}
+
 	/** Client-only entity ids, a range apart from the thread NPCs (which count down from -1_000_000). */
 	private int nextEntityId = -2_000_000;
 
@@ -70,6 +83,11 @@ public final class BuildersClient implements ClientModInitializer, BuildService 
 			@Override
 			public void placed(BuildJob job, int index, BlockPos worldPos, BlockState worldState) {
 				events.add(new Placed(job.id(), worldPos, worldState));
+			}
+
+			@Override
+			public void materials(BuildJob job, Map<String, Integer> missing) {
+				events.add(new Materials(job.id(), job.label(), Map.copyOf(missing)));
 			}
 
 			@Override
@@ -101,6 +119,18 @@ public final class BuildersClient implements ClientModInitializer, BuildService 
 
 	@Override
 	public BuildHandle build(String label, ResourceKey<Level> dimension, BlockPos origin, Rotation rotation, BuildPlan plan, double blocksPerTick, int crewSize) {
+		return build(label, dimension, origin, rotation, plan, blocksPerTick, crewSize, Billing.POLICY);
+	}
+
+	@Override
+	public BuildHandle build(String label, ResourceKey<Level> dimension, BlockPos origin, Rotation rotation, BuildPlan plan, double blocksPerTick, int crewSize,
+			Billing billing) {
+		return build(label, dimension, origin, rotation, plan, blocksPerTick, crewSize, billing, null);
+	}
+
+	@Override
+	public BuildHandle build(String label, ResourceKey<Level> dimension, BlockPos origin, Rotation rotation, BuildPlan plan, double blocksPerTick, int crewSize,
+			Billing billing, @Nullable UnaryOperator<BlockSink> wrap) {
 		Minecraft mc = Minecraft.getInstance();
 		ClientLevel lvl = mc.level;
 		if (!available() || lvl == null || mc.player == null) {
@@ -109,12 +139,24 @@ public final class BuildersClient implements ClientModInitializer, BuildService 
 		if (!lvl.dimension().equals(dimension)) {
 			throw new IllegalStateException("builders can only work in the dimension you are in");
 		}
+		BuildCost cost = null;
+		if (billing == Billing.POLICY) {
+			BuildMaterials.Decision d = BuildMaterials.decide(Survival.rules(), PlayContexts.of(mc.player, true));
+			Verdict v = d.verdict();
+			if (!v.allowed()) {
+				throw new BuildDeniedException(v.langKey(), Component.translatable(v.langKey()).getString());
+			}
+			if (d.charged()) {
+				cost = BuildMaterials.cost(mc.player.getUUID());
+			}
+		}
+		BuildCost jobCost = cost;
 		if (lvl != level) {
 			resetLevel(lvl);
 		}
 		Vec3 viewer = mc.player.position();
 		BuildCrew crew = new BuildCrew(label, lvl, BuildJob.boundsOf(plan, origin, rotation), crewSize, viewer, () -> nextEntityId--,
-				() -> manager.submit(label, dimension, origin, rotation, plan, blocksPerTick));
+				() -> manager.submit(label, dimension, origin, rotation, plan, blocksPerTick, jobCost, wrap));
 		crews.add(crew);
 		return crew;
 	}
@@ -147,6 +189,7 @@ public final class BuildersClient implements ClientModInitializer, BuildService 
 			switch (e) {
 				case Placed p -> crew.placed(p.pos(), p.state());
 				case Finished f -> crew.finished();
+				case Materials m -> notifyMaterials(mc, m);
 			}
 		}
 		Iterator<BuildCrew> it = crews.iterator();
@@ -165,6 +208,17 @@ public final class BuildersClient implements ClientModInitializer, BuildService 
 				it.remove();
 			}
 		}
+	}
+
+	/** Tells the player a build waits for materials, or resumed. */
+	private static void notifyMaterials(Minecraft mc, Materials m) {
+		if (mc.player == null) {
+			return;
+		}
+		Component msg = m.missing().isEmpty()
+				? Component.translatable("t3craft.survival.materials_resumed", m.label())
+				: Component.translatable("t3craft.survival.missing_materials_job", m.label(), BuildMaterials.describe(m.missing()));
+		mc.player.sendSystemMessage(Component.literal("[T3Craft] ").withStyle(net.minecraft.ChatFormatting.AQUA).append(msg));
 	}
 
 	private @Nullable BuildCrew crewFor(int jobId) {

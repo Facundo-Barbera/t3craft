@@ -30,7 +30,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Drives the thread NPCs: one {@link NpcBrain} per NPC, fed with the thread's {@link Mode}, the
- * spots from the {@link AnchorSource} (physical base) layered over the {@link RingLayout} fallback,
+ * spots from the {@link AnchorSource} (physical base) layered over the {@link GridLayout} fallback,
  * and the player's position; applies the brain's pose to the avatar and panel, and owns the extra
  * client-only entities it adds (speech bubble, floating attention icon). Client thread only.
  *
@@ -62,9 +62,6 @@ public final class BehaviorDirector {
 	private final Map<String, Overlay> overlays = new HashMap<>();
 	private AnchorSource anchors = AnchorSource.NONE;
 	private SummarySource summaries = SummarySource.ACTIVITY;
-	private @Nullable RingLayout ring;
-	private @Nullable List<RingLayout.Member> ringMembers;
-	private @Nullable Pos ringOrigin;
 	/** Client-only entity ids for bubbles and icons, far from the registry's range. */
 	private int nextClientId = -3_000_000;
 	private int tick;
@@ -72,8 +69,10 @@ public final class BehaviorDirector {
 	private final ApproachPlanner approaches = new ApproachPlanner();
 	private @Nullable ApproachConfig approachOverride;
 	private ApproachConfig.@Nullable Watcher approachConfig;
+	/** Settled NPCs going home (item 22); null value = requested, starts next tick. Lazy: hot-swap safe. */
+	private @Nullable Map<String, @Nullable Departure> departures;
 
-	/** Plug in a physical base (null = none, ring layout only). See {@link AnchorSource}. */
+	/** Plug in a physical base (null = none, grid layout only). See {@link AnchorSource}. */
 	public void setAnchorSource(@Nullable AnchorSource source) {
 		this.anchors = source == null ? AnchorSource.NONE : source;
 	}
@@ -108,9 +107,30 @@ public final class BehaviorDirector {
 		return b == null ? null : vec(b.pos());
 	}
 
+	/**
+	 * The thread was settled (item 22): the NPC waves, walks to the exit and fades out, and stays
+	 * hidden until T3 reflects the settle ({@code NpcInfo.settled()}). False if the NPC is unknown.
+	 */
+	public boolean depart(String npcId) {
+		if (!brains.containsKey(npcId)) {
+			return false;
+		}
+		departures().putIfAbsent(npcId, null);
+		return true;
+	}
+
+	private Map<String, @Nullable Departure> departures() {
+		return departures = dev.t3craft.debug.HotSwapFields.orInit(departures, HashMap::new);
+	}
+
+	public boolean departing(String npcId) {
+		return departures().containsKey(npcId);
+	}
+
 	/** Forget one NPC (it was removed) and discard its overlay entities. */
 	public void forget(String npcId, @Nullable ClientLevel lvl) {
 		brains.remove(npcId);
+		departures().remove(npcId);
 		Overlay o = overlays.remove(npcId);
 		if (o != null) {
 			discard(lvl, o.bubble);
@@ -126,19 +146,17 @@ public final class BehaviorDirector {
 		}
 		overlays.clear();
 		brains.clear();
+		departures().clear();
 		approaches.reset();
-		ring = null;
-		ringMembers = null;
-		ringOrigin = null;
 	}
 
 	/**
-	 * One client tick. {@code origin} is the registry's layout anchor (where the neighbourhood grid
-	 * starts); {@code bodies} are the spawned NPCs.
+	 * One client tick. {@code fallback} is the registry's provisional {@link GridLayout} (used for
+	 * whatever the physical base leaves null); {@code bodies} are the spawned NPCs.
 	 */
-	public void tick(ClientLevel lvl, Player player, Vec3 origin, Collection<Body> bodies) {
+	public void tick(ClientLevel lvl, Player player, AnchorSource fallback, Collection<Body> bodies) {
 		tick++;
-		AnchorSource layout = new LayeredAnchors(anchors, ring(origin, bodies));
+		AnchorSource layout = new LayeredAnchors(anchors, fallback);
 		GridPathfinder finder = new GridPathfinder(new LevelWalkable(lvl));
 		NpcBrain.Navigator nav = finder::find;
 		Pos playerPos = pos(player.position());
@@ -184,6 +202,9 @@ public final class BehaviorDirector {
 			NpcBrain.Targets t = new NpcBrain.Targets(desk, boardSlot, home, layout.wanderRadius(info.groupId()), rest);
 
 			Overlay o = overlays.computeIfAbsent(b.id(), id -> new Overlay());
+			if (departures().containsKey(b.id()) && depart(lvl, b, brain, o, layout, nav, playerPos)) {
+				continue;
+			}
 			String summary = summaries.summary(b.id(), info);
 			if (o.seenSummary && !Objects.equals(summary, o.lastSummary)) {
 				brain.summaryChanged();
@@ -202,19 +223,58 @@ public final class BehaviorDirector {
 		}
 	}
 
-	private RingLayout ring(Vec3 origin, Collection<Body> bodies) {
-		List<RingLayout.Member> members = new ArrayList<>(bodies.size());
-		for (Body b : bodies) {
-			members.add(new RingLayout.Member(b.id(), b.info().groupId(), b.info().priority()));
+	/** Drives a departing NPC; false once it is over (the brain takes over again). */
+	private boolean depart(ClientLevel lvl, Body b, NpcBrain brain, Overlay o, AnchorSource layout, NpcBrain.Navigator nav, Pos player) {
+		Departure d = departures().get(b.id());
+		if (d == null) {
+			Anchor exit = layout.exit();
+			if (exit == null) {
+				exit = layout.home(b.info().groupId());
+			}
+			d = new Departure(brain.pos(), brain.bodyYaw(), exit != null ? exit : new Anchor(brain.pos(), brain.bodyYaw()));
+			departures().put(b.id(), d);
 		}
-		members.sort(Comparator.comparing(RingLayout.Member::id));
-		Pos o = pos(origin);
-		if (ring == null || !members.equals(ringMembers) || !o.equals(ringOrigin)) {
-			ring = RingLayout.of(o, members);
-			ringMembers = members;
-			ringOrigin = o;
+		if (d.stage() == Departure.Stage.GONE && (b.info().settled() || d.expired())) {
+			// Back (settle reflected: the HQ gave it a new spot; or T3 never confirmed). Hidden, so
+			// the fresh brain placing it straight on its spot is not a visible teleport.
+			departures().remove(b.id());
+			brains.put(b.id(), new NpcBrain(b.id(), d.pos()));
+			b.avatar().setInvisible(false);
+			return false;
 		}
-		return ring;
+		d.tick(nav, player);
+		LivingEntity a = b.avatar();
+		Pos p = d.pos();
+		a.moveOrInterpolateTo(new Vec3(p.x(), p.y(), p.z()), d.yaw(), 0f);
+		a.setYBodyRot(d.yaw());
+		a.setYHeadRot(d.yaw());
+		if (o.crouching) {
+			o.crouching = false;
+			a.setPose(Pose.STANDING);
+		}
+		if (d.stage() == Departure.Stage.WAVE && d.stageTicks() % 7 == 1) {
+			a.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, false);
+		}
+		a.setInvisible(!d.visible());
+		discard(lvl, o.bubble);
+		discard(lvl, o.icon);
+		o.bubble = null;
+		o.icon = null;
+		o.bubbleText = null;
+		Vec3 at = a.position();
+		if (b.panel() != null) {
+			// Hidden: park the panel under the avatar, out of sight (client-only entity).
+			b.panel().moveOrInterpolateTo(new Vec3(at.x, at.y + (d.visible() ? PANEL_Y : -64), at.z), 0f, 0f);
+		}
+		if (d.stage() == Departure.Stage.FADE) {
+			var r = lvl.getRandom();
+			int n = d.stageTicks() == 1 ? 12 : 2;
+			for (int i = 0; i < n; i++) {
+				lvl.addParticle(i % 2 == 0 ? ParticleTypes.POOF : ParticleTypes.PORTAL, at.x + (r.nextDouble() - 0.5) * 0.8,
+						at.y + r.nextDouble() * 1.8, at.z + (r.nextDouble() - 0.5) * 0.8, 0, 0.03, 0);
+			}
+		}
+		return true;
 	}
 
 	private void apply(ClientLevel lvl, Body b, NpcBrain brain, Overlay o, @Nullable String summary, Pos player) {
@@ -247,7 +307,9 @@ public final class BehaviorDirector {
 		}
 
 		double dist = p.horizDist(player);
-		double top = at.y + BUBBLE_Y - drop;
+		// Stack above the panel's visible lines (fix/npc-labels) so bubble and panel never cross.
+		int panelLines = b.panel() == null ? 0 : dev.t3craft.client.npc.NpcLabels.lines(b.panel().getText().getString());
+		double top = at.y + dev.t3craft.client.npc.NpcLabels.bubbleBase(PANEL_Y, BUBBLE_Y, LINE_H, panelLines) - drop;
 		if (brain.bubbleWanted(dist)) {
 			if (o.bubble == null || o.bubble.isRemoved()) {
 				o.bubble = textDisplay(lvl, 0xB0101010, 1f);
@@ -332,6 +394,11 @@ public final class BehaviorDirector {
 		if (e != null && lvl != null && !e.isRemoved()) {
 			lvl.removeEntity(e.getId(), Entity.RemovalReason.DISCARDED);
 		}
+	}
+
+	/** Ground probe over the client level for the {@link GridLayout} (same walkability as the pathfinder). */
+	public static GridLayout.Ground ground(ClientLevel lvl, double baseY) {
+		return GridLayout.Ground.near(new LevelWalkable(lvl), baseY);
 	}
 
 	static Pos pos(Vec3 v) {

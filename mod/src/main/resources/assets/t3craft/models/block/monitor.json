@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/orientable",
+  "textures": {
+    "top": "t3craft:block/monitor_side",
+    "front": "t3craft:block/monitor_front",
+    "side": "t3craft:block/monitor_side"
+  }
+}

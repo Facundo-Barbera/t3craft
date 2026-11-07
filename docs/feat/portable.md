@@ -31,6 +31,7 @@ Build: `cd mod && ./gradlew build --no-daemon` → OK, 185 tests JUnit (tras mer
 - **No gestiona entornos.** Eso es de **feat/config**. "Environments…" abre su pantalla.
 - **No abre conexiones ni manda RPC.** Todo sale del modelo que el cliente ya tiene, así que no hace falta `getThreadProjection` ni una segunda conexión.
 - **No escribe en T3.** Ningún archivo del paquete referencia `dispatchCommand`, `launchThread`, `operate`, `chat.send` ni `sendText`. Lo comprueba un test.
+  - Excepción acotada (feat/op-launch): el botón "New thread…" solo abre `NewThreadScreen`, que vive fuera del paquete y es la dueña de la escritura protegida (ver `docs/feat-op-launch.md`).
 
 ## Arquitectura e interfaces
 
@@ -160,15 +161,14 @@ feat/chat va a replicar el chat de AgentCraft y expondrá la lista de hilos + co
 widget (bounds, tema inyectable, modo compacto). El portable lo incrustará dentro de su marco
 (carcasa, bordes y pantalla actuales se conservan). Por eso:
 
-- El WIP de conversación y badges quedó **aislado y sin conectar** en
-  `dev.t3craft.client.portable.pending` (`Conversation`, `ConversationParser`,
-  `ConversationSource`, `HttpConversationSource`, `FetchPolicy`, `EnvBadge`). Nada fuera de ese
-  paquete lo referencia. En la ronda 2 se borra o se migra lo que feat/chat no traiga.
+- El WIP de conversación y badges (`dev.t3craft.client.portable.pending`) **se eliminó** en
+  feat/chat: la conversación es `chat.ChatTranscript`/`ThreadFeed` (sobre la conexión única,
+  `T3Connection.subscribeThread`) y el badge es `chat.EnvBadge` (ver docs/feat-chat.md).
 - `PortableSettings` (con `heldShowsChat`) se eliminó: `heldScreen` vive ahora en `T3CraftSettings`;
   si la ronda 2 quiere que la pantalla en mano muestre la conversación, se añade otra clave en la
   sección `portable`.
-- `HeldScreenModel.Badge` es intencionadamente mínimo (una letra + color): cuando feat/chat exponga
-  su icono de entorno, `HeldScreen.badges()` debe alimentarse de él para que coincidan.
+- El held screen ya usa `chat.EnvBadge` (mismo icono que la lista unificada) y el orden compartido
+  `chat.ThreadOrder` (también `PortableState.ORDER`).
 - `PortableScreen` sigue con su lista propia hasta que el widget de feat/chat exista.
 
 ## Tests (`mod/src/test/java/dev/t3craft/client/portable/`)

@@ -27,44 +27,48 @@ sin ejecutar aún, gris = pausada o bloqueada.
 
 | Clase | Qué es |
 |---|---|
-| `ScheduleSource` | De dónde vienen los datos. `open(DirectController, Sink) → Handle`. Este módulo **no** abre conexiones ni envía peticiones por su cuenta. |
+| `ScheduleSource` / `ConnectionScheduleSource` | De dónde vienen los datos: `open(DirectController, Sink) → Handle` (`close`, `stale`). Por defecto, el adaptador sobre `T3Connection.subscribeScheduledTasks`. |
 | `ScheduleBook` | Últimas listas por entorno (`Sink`, thread-safe). `entries(envLabel, projectTitle)` ya ordenadas. |
 | `ScheduleEntry` | Tarea + entorno + proyecto. `ORDER` (próxima ejecución, nulls al final, desempate estable). |
 | `Countdown` | `span`, `until`, `ago`, `next(task)`, `last(task)`. |
 | `SchedulePager` | `page`, `rotating(items, pageSize, elapsedMs, rotateMs)`. |
 | `ScheduleText` | Texto del tablero (`Board(lines, background)`) y de la línea de chat. |
-| `SchedulePlacement` / `SchedulePlacementSource` / `RingBoardPlacement` | Dónde va el tablero. |
+| `SchedulePlacement` / `SchedulePlacementSource` / `LayoutBoardPlacement` | Dónde va el tablero. |
 | `ScheduleBoardHook` | Hook para el bloque "tablero de tareas" de feat/blocks-core. |
 | `ScheduleRenderer` | El display (ids de entidad desde **−7.000.000**). |
 | `ScheduleClient` | Entrypoint de cliente, tick, comando. |
 
 Decodificación en `dev.t3craft.t3.ScheduledTask` (tolerante: campos de más se ignoran, campos que
 faltan llevan defaults, sin id se descarta; estados desconocidos → `UNKNOWN`).
-`RpcFrames.SUBSCRIBE_SCHEDULED_TASKS` es solo el nombre del método. Solo pide `orchestration:read`:
+`RpcFrames.SUBSCRIBE_SCHEDULED_TASKS` y `RpcFrames.subscribeScheduledTasks(id)` (payload vacío). Solo pide `orchestration:read`:
 no aparece en `clientRpcPermissions.ts`.
 
-## Fuente de datos: estado del adaptador
+## Fuente de datos
 
-El coordinador pidió no añadir otra vía de peticiones a `T3Connection` (ids propios, `sendText`
-directo, early-returns en el listener). La vía compartida (`StreamRegistry`, con
-`streams.subscribe` con refcount, un único generador de ids y `send()` serializado por socket)
-llega con feat/chat, que **aún no está en main**. Mientras tanto, la fuente por defecto es
-`ScheduleSource.PENDING`: no envía nada a T3 y marca cada entorno como *waiting for the shared
-stream path (feat/chat)*. El tablero y el comando lo muestran tal cual.
+`ConnectionScheduleSource` (la fuente por defecto) llama a `T3Connection.subscribeScheduledTasks(listener)`
+en la conexión existente de cada entorno. Va por la vía compartida de feat/chat (`StreamRegistry`):
+un único generador de ids, el `send()` serializado del socket, refcount, réplica para los que llegan
+tarde y resuscripción tras cada reconexión. No hay ids propios, ni `sendText` directo, ni early-returns
+en el listener de la conexión.
 
-Cuando entre feat/chat, el adaptador queda en pocas líneas:
+Para eso, `StreamRegistry` gana un overload **aditivo**, `subscribe(key, SubscribeFrame, Listener)`,
+para streams que no son de un hilo. La clave es `T3Connection.SCHEDULED_TASKS_STREAM`
+(`"rpc:scheduledTasks.subscribe"`, que no puede ser un id de hilo) y el frame se guarda por entrada.
+`subscribe(threadId, listener)` no cambia.
 
-```java
-ScheduleClient.get().setSource((controller, sink) -> {
-	// por entorno: streams.subscribe(RpcFrames.SUBSCRIBE_SCHEDULED_TASKS, {}, value ->
-	//     sink.tasks(envId, ScheduledTask.listFrom(value)))   // null = no era una lista: ignorar
-	// fallo o fin del stream → sink.unavailable(envId, T3Connection.sanitize(reason))
-	return () -> { /* cerrar las suscripciones */ };
-});
-```
+- Cada item del stream es una lista completa: se entrega la más nueva decodificable del lote; lo que
+  no es una lista se ignora.
+- `onEnded(null)` (se cayó el socket) → el entorno queda como *reconnecting* hasta la siguiente
+  lista. Un fallo del servidor (T3 viejo sin el RPC, error de política…) → *unavailable (motivo
+  saneado)*.
+- `ScheduleClient` reabre la fuente si se recrea el `DirectController`, si cambia el conjunto de
+  conexiones (`Handle.stale()`, comprobado cada 10 ticks: emparejar o desemparejar un entorno) o al
+  llamar a `setSource`. En modo bridge no hay tablero.
 
-`ScheduleClient` vuelve a abrir la fuente cuando se recrea el `DirectController` (reload) o al
-llamar a `setSource`. En modo bridge no hay tablero.
+Nota: la réplica de `StreamRegistry` guarda hasta `REPLAY_CAP` items por stream. Aquí cada item es
+una lista entera, así que en una sesión larga con muchos cambios se acumulan listas viejas hasta ese
+tope. Es acotado, pero si molesta, `StreamRegistry` podría limitar la réplica de los streams de
+"lista completa" al último item.
 
 ## Puntos de integración
 
@@ -72,8 +76,9 @@ llamar a `setSource`. En modo bridge no hay tablero.
   `setPlacementSource(() -> SchedulePlacement.onBoard(anchorDelBoardEnCoordenadasDeMundo))` con el
   anchor `AnchorNames.BOARD` (centro de la cara del tablero, 7×3 bloques). El texto se apoya
   1,35 bloques por debajo del centro y 0,05 por delante de la cara. Mientras tanto,
-  `RingBoardPlacement` lo pone flotando detrás del tablero provisional del `RingLayout` del
-  BehaviorDirector, mirando a los NPCs (solo si hay NPCs visibles).
+  `LayoutBoardPlacement` lo pone flotando 2,5 bloques detrás del sitio del tablero en el
+  layout de reserva del registro (`NpcRegistry.fallbackLayout()`, el `GridLayout` que usan el
+  BehaviorDirector y las workstations provisionales), mirando a los NPCs (solo si hay NPCs visibles).
 - **Bloques** (`setBoardHook`): si feat/blocks-core trae su bloque "tablero de tareas", registra un
   `ScheduleBoardHook` y dibuja el mismo `ScheduleText.Board`. Si devuelve `true`, se ocultan los
   displays. Este módulo no depende de blocks.

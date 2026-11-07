@@ -1,5 +1,6 @@
 package dev.t3craft.build;
 
+import java.util.Map;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -31,6 +32,12 @@ public interface BuildHandle {
 	void resume();
 
 	void cancel();
+
+	/** Item id → count the build is waiting for (survival); empty otherwise. See {@link BuildJob#missingMaterials()}. */
+	default Map<String, Integer> missingMaterials() {
+		BuildJob j = job();
+		return j == null ? Map.of() : j.missingMaterials();
+	}
 
 	/** 0..1; 0 while arriving. */
 	default double progress() {

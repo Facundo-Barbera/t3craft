@@ -5,9 +5,9 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Where NPCs go, supplied by whoever owns the physical base (HQ builder, schematic, ...). Every
- * method may return null: the {@link BehaviorDirector} then falls back to the {@link RingLayout}
- * (neighbourhood plots with a ring of NPCs next to where the player first stood, as before), so
- * NPCs behave with or without a base.
+ * method may return null: the {@link BehaviorDirector} then falls back to the {@link GridLayout}
+ * (a provisional office of desk rows, one block per neighbourhood, next to where the player first
+ * stood), so NPCs behave with or without a base.
  *
  * <p><b>Integration point.</b> A base implementation registers itself with
  * {@code T3CraftClient.get().npcs().behavior().setAnchorSource(src)} (and {@code setAnchorSource(null)} when the
@@ -15,7 +15,7 @@ import org.jspecify.annotations.Nullable;
  * cached values, don't scan the world here.
  */
 public interface AnchorSource {
-	/** Nothing physical: everything comes from the fallback ring layout. */
+	/** Nothing physical: everything comes from the fallback grid layout. */
 	AnchorSource NONE = new AnchorSource() {
 	};
 
@@ -49,6 +49,11 @@ public interface AnchorSource {
 
 	/** Where a completed NPC rests (bench, couch). Null = at its desk, else near home. */
 	default @Nullable Anchor rest(String npcId, String groupId) {
+		return null;
+	}
+
+	/** Where a settled NPC walks to before fading out ({@link Departure}), e.g. the HQ entrance. Null = its {@link #home}. */
+	default @Nullable Anchor exit() {
 		return null;
 	}
 }
