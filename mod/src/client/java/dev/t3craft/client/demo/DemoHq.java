@@ -5,6 +5,7 @@ import dev.t3craft.build.BuildPlan;
 import dev.t3craft.build.Placement;
 import dev.t3craft.client.npc.NpcInfo;
 import dev.t3craft.hq.Box;
+import dev.t3craft.hq.HqFixtures;
 import dev.t3craft.hq.HqGenerator;
 import dev.t3craft.hq.HqInput;
 import dev.t3craft.hq.HqLayout;
@@ -28,16 +29,16 @@ import org.jspecify.annotations.Nullable;
  * build idempotent, and what to build (everything, only the diff, or nothing). No Minecraft client
  * state here, so it is unit tested; {@link DemoHqSource} plugs it into the demo.
  *
- * <p>Coordinates: the HQ plans are relative to the HQ origin (hub floor centre, basement down to
- * {@code y = -5}). The demo bakes {@link HqPlans#demoSite()} into them (entrance north, portico front
- * on {@code z = 0}, growth to {@code +z}), lifted by {@code lift} blocks so the basement fits above
+ * <p>Coordinates: the HQ plans are relative to the HQ origin (hub floor centre, {@code y = 0} the
+ * lowest layer). The demo bakes {@link HqPlans#demoSite()} into them (entrance north, portico front
+ * on {@code z = 0}, growth to {@code +z}), lifted by {@code lift} blocks so the floor stays above
  * bedrock in a shallow superflat world, plus a tuff plinth that fills the gap between the ground
  * ({@code y = -1} relative to the demo origin) and the hub floor. Built at the demo origin with
  * rotation {@code NONE}.
  */
 public final class DemoHq {
 	/** Bump when anything here changes the built result (plinth, lift rule): hashes change, the HQ is rebuilt. */
-	public static final int PLAN_VERSION = 1;
+	public static final int PLAN_VERSION = 2;
 
 	private DemoHq() {
 	}
@@ -47,7 +48,7 @@ public final class DemoHq {
 	}
 
 	/** What to build for a roster against what the marker says is already there. */
-	public record Step(HqLayout layout, dev.t3craft.hq.BuildPlan plan, String hash, int lift, List<BuildPlan> parts, boolean full) {
+	public record Step(HqLayout layout, dev.t3craft.hq.BuildPlan plan, String hash, int lift, List<BuildPlan> parts, boolean full, String fixtures) {
 		public Step {
 			parts = List.copyOf(parts);
 		}
@@ -77,7 +78,7 @@ public final class DemoHq {
 		return b.build();
 	}
 
-	/** Fixed example: three projects in two environments, four threads each, one of them settled (archived). */
+	/** Fixed example: three projects in two environments, four threads each, one of them settled (on the "Archived" shelf). */
 	public static HqInput sample() {
 		String[][] projects = {{"vps", "t3craft"}, {"acmesite", "forja"}, {"vps", "telar"}};
 		HqInput.Builder b = HqInput.builder();
@@ -93,9 +94,19 @@ public final class DemoHq {
 
 	// ---- hash / state -------------------------------------------------------------------------
 
-	/** Stable hash of what the demo puts in the world: plan version, lift and the allocated layout. */
+	/** Marker key of the fixtures the HQ was built with ({@link HqFixtures#fingerprint()}). */
+	public static final String FIXTURES = "fixtures";
+
+	/**
+	 * Stable hash of what the demo puts in the world: plan version, lift, the allocated layout and the
+	 * active {@link HqFixtures} (so turning the blocks module on or off rebuilds the fixtures).
+	 */
 	public static String hash(HqLayout layout, int lift) {
-		String text = PLAN_VERSION + "|" + lift + "|" + layout.toJson();
+		return hash(layout, lift, HqFixtures.fingerprint());
+	}
+
+	static String hash(HqLayout layout, int lift, String fixtures) {
+		String text = PLAN_VERSION + "|" + lift + "|" + fixtures + "|" + layout.toJson();
 		try {
 			byte[] d = MessageDigest.getInstance("SHA-256").digest(text.getBytes(StandardCharsets.UTF_8));
 			return HexFormat.of().formatHex(d, 0, 12);
@@ -108,32 +119,50 @@ public final class DemoHq {
 	public static JsonObject state(Step step) {
 		JsonObject o = new JsonObject();
 		o.addProperty("lift", step.lift());
+		o.addProperty(FIXTURES, step.fixtures());
 		o.add("layout", step.layout().toJson());
 		return o;
 	}
 
-	/** Blocks to raise the HQ so its lowest cell ({@code planMinY}, the basement floor) sits above the bedrock layer. */
+	/** Blocks to raise the HQ so its lowest cell ({@code planMinY}, the floor layer) sits above the bedrock layer. */
 	public static int lift(int originY, int worldMinY, int planMinY) {
 		return Math.max(0, worldMinY + 1 - (originY + planMinY));
 	}
 
 	// ---- step ---------------------------------------------------------------------------------
 
-	/**
-	 * @param previous     layout already built (null = nothing); also reused for stable desk allocation
-	 * @param previousHash hash stored with it
-	 * @param diffable     the world holds {@code previous} built with this plan version and lift, so a diff is valid
-	 */
+	/** {@link #step(HqInput, HqLayout, String, int, boolean, String)} for a world built with the current fixtures. */
 	public static Step step(HqInput input, @Nullable HqLayout previous, @Nullable String previousHash, int lift, boolean diffable) {
-		HqGenerator.Result r = HqGenerator.plan(input, previous);
-		String h = hash(r.layout(), lift);
+		return step(input, previous, previousHash, lift, diffable, HqFixtures.fingerprint());
+	}
+
+	/**
+	 * @param previous         layout already built (null = nothing); also reused for stable desk allocation
+	 * @param previousHash     hash stored with it
+	 * @param diffable         the world holds {@code previous} built with this plan version and lift, so a diff is valid
+	 * @param previousFixtures {@link HqFixtures#fingerprint()} it was built with ({@code "vanilla"} for markers
+	 *                         written before fixtures were recorded: the demo never applied them then)
+	 */
+	public static Step step(HqInput input, @Nullable HqLayout previous, @Nullable String previousHash, int lift, boolean diffable,
+			String previousFixtures) {
+		String fixtures = HqFixtures.fingerprint();
+		HqGenerator.Result r = HqPlans.plan(input, previous);
+		String h = hash(r.layout(), lift, fixtures);
 		if (diffable && previous != null && h.equals(previousHash)) {
-			return new Step(r.layout(), r.plan(), h, lift, List.of(), false);
+			return new Step(r.layout(), r.plan(), h, lift, List.of(), false, fixtures);
 		}
-		if (!diffable || previous == null) {
-			return new Step(r.layout(), r.plan(), h, lift, full(r.plan(), lift), true);
+		dev.t3craft.hq.BuildPlan before = null;
+		if (diffable && previous != null) {
+			if (previousFixtures.equals(fixtures)) {
+				before = HqPlans.generate(previous);
+			} else if (previousFixtures.equals(HqFixtures.fingerprint(HqFixtures.VANILLA))) {
+				before = HqPlans.generate(previous, HqFixtures.VANILLA);
+			}
+			// else: built with fixtures that are not installed now, so the old plan is unknown: rebuild all
 		}
-		dev.t3craft.hq.BuildPlan before = HqPlans.generate(previous);
+		if (before == null) {
+			return new Step(r.layout(), r.plan(), h, lift, full(r.plan(), lift), true, fixtures);
+		}
 		List<BuildPlan> parts = new ArrayList<>();
 		if (!before.footprint().equals(r.plan().footprint())) {
 			addIfAny(parts, plinth(r.plan(), lift));
@@ -141,7 +170,7 @@ public final class DemoHq {
 		for (BuildPlan p : HqPlans.expansion(before, r.plan(), vacated(lift)).values()) {
 			addIfAny(parts, bake(p, lift));
 		}
-		return new Step(r.layout(), r.plan(), h, lift, parts, false);
+		return new Step(r.layout(), r.plan(), h, lift, parts, false, fixtures);
 	}
 
 	/** Plinth first, then every group of the HQ in build order, all baked into demo coordinates. */

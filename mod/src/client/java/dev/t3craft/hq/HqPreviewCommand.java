@@ -37,7 +37,7 @@ import org.jspecify.annotations.Nullable;
  * world reuse that origin and the previous layout and only apply the diff, which shows how modules
  * are annexed, desks freed and computers archived when threads appear, settle and disappear. Each
  * run lists the modules (index, side, environment, project, desks taken) and the layout diff.
- * Superflat worlds are shallow, so the HQ is lifted until its basement fits above bedrock.
+ * Superflat worlds are shallow, so the HQ is lifted until its floor sits above bedrock.
  *
  * <p>State lives in this instance only (no statics) and is dropped on disconnect.
  */
@@ -139,8 +139,8 @@ public final class HqPreviewCommand {
 				BlockPos sr = spawn == null ? BlockPos.ZERO : spawn.block();
 				origin = feet.subtract(sr);
 				groundY = feet.getY() - 1;
-				// a superflat world is only a few blocks deep: lift the HQ until its basement fits above bedrock
-				int lowest = level.getMinY() + 1 - HqGeometry.BASEMENT_FLOOR;
+				// a superflat world is only a few blocks deep: keep the HQ's lowest layer above bedrock
+				int lowest = level.getMinY() + 1 - r.plan().footprint().minY();
 				if (origin.getY() < lowest) {
 					origin = origin.atY(lowest);
 				}
