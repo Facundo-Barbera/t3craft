@@ -1,0 +1,39 @@
+# Example systemd unit for the t3craft bridge on my-homelab. No secrets here: tokens live in
+# the files referenced by /etc/t3craft/bridge.json (chmod 600, owned by the service user).
+#
+# The bridge only binds the IP in listen.host (Tailscale IP or loopback); it refuses 0.0.0.0/public.
+# Adjust paths/user, then: systemctl daemon-reload && systemctl enable --now t3craft-bridge
+[Unit]
+Description=t3craft bridge (T3 Code -> Minecraft mod)
+Wants=network-online.target tailscaled.service
+After=network-online.target tailscaled.service
+
+[Service]
+Type=simple
+User=t3craft
+Group=t3craft
+WorkingDirectory=/opt/t3craft/bridge
+Environment=NODE_ENV=production
+Environment=T3CRAFT_CONFIG=/etc/t3craft/bridge.json
+ExecStart=/usr/bin/env node --import tsx src/main.ts
+Restart=always
+RestartSec=5
+
+# Tailscale may assign the IP a little after boot; the bind fails until then and systemd retries.
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadOnlyPaths=/etc/t3craft
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target
