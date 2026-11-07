@@ -67,7 +67,7 @@ public final class DemoHqSource implements DemoStructureSource {
 				previous = l == HqLayout.EMPTY ? null : l;
 				previousLift = st.has("lift") ? st.get("lift").getAsInt() : -1;
 			}
-			// The basement floor is the lowest HQ cell whatever the roster: use the empty HQ to size the lift.
+			// The floor layer is the lowest HQ cell whatever the roster: use the empty HQ to size the lift.
 			int planMinY = HqPlans.generate(HqLayout.EMPTY).footprint().minY();
 			int lift = DemoHq.lift(spec.originY(), worldMinY, planMinY);
 			boolean diffable = built.builtWith(this) && previousLift == lift;
