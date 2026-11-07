@@ -85,7 +85,12 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 				pendingScreen = null;
 			}
 			if (direct != null && (directDirty.getAndSet(false) || ++ticks % REEVALUATE_TICKS == 0)) {
-				refreshDirect(mc);
+				try {
+					refreshDirect(mc);
+				} catch (RuntimeException | LinkageError e) {
+					// Retried by the next change or the periodic re-evaluation; never per tick.
+					T3Craft.LOGGER.warn("T3Craft refresh failed; will retry", e);
+				}
 			}
 			npcs.tick(mc);
 		});
