@@ -51,6 +51,10 @@ Files adapted from AgentCraft (from `mod/src/client/java/dev/agentcraft/client/a
   of `GridPathfinder.java` (solid floor below, passable or thin feet block, headroom).
 - `mod/src/client/java/dev/t3craft/client/npc/behavior/Motion.java` ← `AgentMotion.java` (calm
   walking pace with ease in/out and smooth turning; Minecraft-free, holds for the player).
+- `mod/src/client/java/dev/t3craft/client/hud/StatusBarModel.java` and `StatusBar.java` ←
+  `mod/src/client/java/dev/agentcraft/client/hud/GoalBar.java` (design: top bar of counts with a
+  "n waiting · KEY" badge under it, recounted only on change; rewritten over thread states, with a
+  Minecraft-free model and top/bottom placement that keeps clear of the survival bars).
 
 AgentCraft license:
 
