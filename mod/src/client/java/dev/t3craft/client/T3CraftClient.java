@@ -15,7 +15,6 @@ import dev.t3craft.client.npc.helpers.HelperConfig;
 import dev.t3craft.client.npc.helpers.HelperDirector;
 import dev.t3craft.client.npc.helpers.HelperRoster;
 import dev.t3craft.client.portable.PortableClient;
-import dev.t3craft.client.screen.ThreadChatScreen;
 import dev.t3craft.debug.HotSwapFields;
 import dev.t3craft.t3.DirectController;
 import dev.t3craft.t3.Environments;
@@ -130,7 +129,7 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 			}
 			NpcInfo info = npcs.info(threadId);
 			if (info != null) {
-				Minecraft.getInstance().gui.setScreen(new ThreadChatScreen(info));
+				dev.t3craft.client.chat.ChatScreens.openFor(info);
 			}
 			return InteractionResult.SUCCESS;
 		});
