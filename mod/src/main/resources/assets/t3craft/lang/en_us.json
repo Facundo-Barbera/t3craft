@@ -23,5 +23,10 @@
 	"t3craft.workstation.status": "Workstation screens: %s (%s shown, %s archived). /t3craft workstation on|off",
 	"t3craft.workstation.on": "Workstation screens on.",
 	"t3craft.workstation.off": "Workstation screens off.",
-	"t3craft.workstation.save_failed": "Could not save the setting: %s"
+	"t3craft.workstation.save_failed": "Could not save the setting: %s",
+	"t3craft.schedule.header": "Scheduled tasks (%s), soonest first:",
+	"t3craft.schedule.none": "No scheduled tasks.",
+	"t3craft.schedule.waiting": "Waiting for T3 to send the scheduled tasks…",
+	"t3craft.schedule.unavailable": "Scheduled tasks are unavailable:",
+	"t3craft.schedule.direct_only": "Scheduled tasks are only shown in direct mode (pair with /t3craft pair)."
 }
