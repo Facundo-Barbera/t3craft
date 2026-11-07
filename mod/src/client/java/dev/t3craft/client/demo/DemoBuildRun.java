@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
+import java.util.Locale;
 import java.util.function.Consumer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
@@ -54,8 +55,8 @@ final class DemoBuildRun {
 	String describe() {
 		int index = total - queue.size();
 		BuildHandle h = current;
-		return String.format(java.util.Locale.ROOT, "%s v%d, plan %d/%d%s", source.id(), source.version(), index, total,
-				h == null ? "" : String.format(java.util.Locale.ROOT, " %s %.0f%%", h.phase().name().toLowerCase(java.util.Locale.ROOT), h.progress() * 100));
+		return String.format(Locale.ROOT, "%s v%d, plan %d/%d%s", source.id(), source.version(), index, total,
+				h == null ? "" : String.format(Locale.ROOT, " %s %.0f%%", h.phase().name().toLowerCase(Locale.ROOT), h.progress() * 100));
 	}
 
 	void cancel() {
@@ -86,7 +87,7 @@ final class DemoBuildRun {
 			}
 			current = null;
 		}
-		if (service == null || !service.available() || mc.level == null || mc.level.dimension() != Level.OVERWORLD) {
+		if (service == null || !service.available() || mc.level == null || !Level.OVERWORLD.equals(mc.level.dimension())) {
 			return; // wait: no builders yet, or the player is in another dimension
 		}
 		BuildPlan next = queue.poll();
