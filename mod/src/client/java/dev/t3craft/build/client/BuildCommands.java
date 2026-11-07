@@ -59,7 +59,24 @@ final class BuildCommands {
 				.then(literal("build-pause").executes(c -> each(c, b, "paused", BuildHandle::pause)))
 				.then(literal("build-resume").executes(c -> each(c, b, "resumed", BuildHandle::resume)))
 				.then(literal("build-cancel").executes(c -> each(c, b, "cancelled", BuildHandle::cancel)))
-				.then(literal("build-status").executes(c -> status(c, b)))));
+				.then(literal("build-status").executes(c -> status(c, b)))
+				.then(literal("build-tuning").executes(BuildCommands::tuning)
+						.then(literal("reload").executes(c -> {
+							java.util.List<String> w = dev.t3craft.build.BuildBudget.reload(dev.t3craft.survival.Survival.configFile());
+							c.getSource().sendFeedback(prefix().append("reloaded build section" + (w.isEmpty() ? "" : ", defaults used for " + String.join(", ", w))));
+							return tuning(c);
+						})))));
+	}
+
+	/** Shared throughput settings and the live budget (after auto-throttle). */
+	private static int tuning(CommandContext<FabricClientCommandSource> c) {
+		dev.t3craft.build.BuildBudget bb = dev.t3craft.build.BuildBudget.global();
+		dev.t3craft.build.BuildTuning t = bb.tuning();
+		c.getSource().sendFeedback(prefix().append(String.format(Locale.ROOT,
+				"build: %d blocks/tick max (now %d, throttle %.0f%%), %d concurrent jobs, %d fronts/job, %d effects/tick, autoThrottle %s @ %.0f ms",
+				t.maxBlocksPerTick(), bb.effectiveMax(), bb.throttle() * 100, t.maxConcurrentJobs(), t.frontsPerJob(), t.maxEffectsPerTick(),
+				t.autoThrottle(), t.targetMspt())));
+		return 1;
 	}
 
 	private static int demo(CommandContext<FabricClientCommandSource> c, BuildersClient b, double blocksPerTick, int crew) {
@@ -102,9 +119,9 @@ final class BuildCommands {
 			BuildJob j = h.job();
 			String detail = j == null
 					? h.phase().name().toLowerCase(Locale.ROOT)
-					: String.format(Locale.ROOT, "%s, job #%d %s %d/%d (%.0f%%), placed %d, skipped %d, failed %d",
+					: String.format(Locale.ROOT, "%s, job #%d %s %d/%d (%.0f%%), placed %d, skipped %d, failed %d, %d front(s)",
 							h.phase().name().toLowerCase(Locale.ROOT), j.id(), j.state().name().toLowerCase(Locale.ROOT),
-							j.done(), j.total(), j.progress() * 100, j.placed(), j.skipped(), j.failed());
+							j.done(), j.total(), j.progress() * 100, j.placed(), j.skipped(), j.failed(), j.fronts());
 			MutableComponent line = Component.literal("  " + h.label() + ": " + detail);
 			if (j != null && j.charged()) {
 				line.append(String.format(Locale.ROOT, ", materials %d/%d", total(j.spentMaterials()), total(j.requiredMaterials())));

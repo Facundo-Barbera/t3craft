@@ -32,7 +32,10 @@ public final class AnchorNames {
 	public static final String BOARD_SLOT = "board_slot_";
 	/** Standing spot right in front of the board, foot level, facing the board. */
 	public static final String BOARD_FRONT = "board_front";
-	/** Prefix of the hub benches' seats ({@code bench_0..}), facing into the hub. Resting spots. */
+	/**
+	 * Prefix of the hub's resting spots ({@code bench_0..}): standing in front of each bench seat
+	 * (the bench stairs have collision), facing into the hub.
+	 */
 	public static final String BENCH = "bench_";
 	/** Prefix of the hub's stroll points ({@code walk_hub_0..}), open floor away from furniture. */
 	public static final String WALK_HUB = "walk_hub_";
@@ -85,7 +88,27 @@ public final class AnchorNames {
 	private AnchorNames() {
 	}
 
-	/** Where a thread's NPC works: standing at its desk, in front of the monitor, looking at it. */
+	/**
+	 * True for anchors an NPC stands in (feet cell free and walkable, see {@link Anchor#block()}),
+	 * false for surface anchors (board, lamps, monitors, screens, archived computers, the shelf's
+	 * slots and signs, the beacon) that only mark a block face.
+	 */
+	public static boolean standing(String name) {
+		if (name.equals(BOARD) || name.startsWith(BOARD_LAMP) || name.startsWith("monitor_") || name.startsWith("lamp_")
+				|| name.startsWith("screen@") || name.startsWith("archive_") || name.startsWith(SHELF_SLOT) || name.equals(SHELF_MORE)
+				|| name.equals(SHELF_HEADER) || name.equals(BEACON) || name.equals(HUB_SCREEN) || name.equals(THREAD_WALL)
+				|| name.equals(HOLOGRAM) || name.startsWith("module_screen@")) {
+			return false;
+		}
+		return name.equals(SPAWN) || name.equals(ENTRANCE) || name.equals(HUB) || name.equals(BOARD_FRONT) || name.equals(ARCHIVE)
+				|| name.equals(THREAD_WALL_FRONT) || name.startsWith(BOARD_SLOT) || name.startsWith(BENCH) || name.startsWith("walk") || name.startsWith("desk")
+				|| name.startsWith("wing_") || name.startsWith("module@");
+	}
+
+	/**
+	 * Where a thread's NPC works: the free cell in front of its computer (air at feet and head, desk
+	 * floor below), standing and looking at the monitor. There are no chairs.
+	 */
 	public static String desk(String threadId) {
 		return "desk_" + threadId;
 	}

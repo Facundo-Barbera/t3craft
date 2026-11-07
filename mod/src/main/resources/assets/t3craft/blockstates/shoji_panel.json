@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "lit=false": {
+      "model": "t3craft:block/shoji_panel"
+    },
+    "lit=true": {
+      "model": "t3craft:block/shoji_panel_lit"
+    }
+  }
+}

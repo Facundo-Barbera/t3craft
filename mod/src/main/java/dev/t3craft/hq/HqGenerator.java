@@ -107,7 +107,8 @@ public final class HqGenerator {
 				for (int z = -2; z <= 2; z++) {
 					BlockPos p = new BlockPos(5 * sx, 1, z);
 					c.set(p, style.bench(look.getOpposite()));
-					b.anchor(Anchor.at(AnchorNames.bench(bench++), p, look));
+					// the resting spot is in front of the seat (the bench stairs have collision), facing the screen
+					b.anchor(Anchor.at(AnchorNames.bench(bench++), p.relative(look), look));
 				}
 			}
 			surface(b, c, HqGeometry.hubScreen(), AnchorNames.HUB_SCREEN);

@@ -92,7 +92,45 @@ final class PlanBuilder {
 		for (Cell c : all) {
 			out.add(c.placement);
 		}
-		return new BuildPlan(out, anchors, modules, workstations);
+		return new BuildPlan(out, liftedAnchors(), modules, liftedWorkstations());
+	}
+
+	/**
+	 * Standing anchors whose cell holds a thin floor layer (a carpet: a wing runner)
+	 * are raised onto its top, so the NPC body at the anchor never overlaps a block.
+	 */
+	private Anchor lift(Anchor a) {
+		if (!AnchorNames.standing(a.name())) {
+			return a;
+		}
+		Cell c = cells.get(a.block().asLong());
+		if (c == null || a.y() != a.block().getY()) {
+			return a;
+		}
+		BlockState s = c.placement.state();
+		if (s.isAir()) {
+			return a;
+		}
+		net.minecraft.world.phys.shapes.VoxelShape shape = s.getCollisionShape(net.minecraft.world.level.EmptyBlockGetter.INSTANCE, a.block());
+		double top = shape.isEmpty() ? 0 : shape.max(net.minecraft.core.Direction.Axis.Y);
+		return top > 0 && top <= THIN_FLOOR ? new Anchor(a.name(), a.x(), a.y() + top, a.z(), a.facing(), a.block()) : a;
+	}
+
+	/** Thickest floor layer an anchor is lifted onto (carpets are 1/16). */
+	static final double THIN_FLOOR = 0.125;
+
+	private TreeMap<String, Anchor> liftedAnchors() {
+		TreeMap<String, Anchor> out = new TreeMap<>();
+		anchors.forEach((n, a) -> out.put(n, lift(a)));
+		return out;
+	}
+
+	private List<Workstation> liftedWorkstations() {
+		List<Workstation> out = new ArrayList<>(workstations.size());
+		for (Workstation w : workstations) {
+			out.add(new Workstation(w.module(), w.slot(), w.threadId(), lift(w.deskAnchor()), w.computerPos(), w.screen(), w.lampPos()));
+		}
+		return out;
 	}
 
 	/** Bakes pane, wall and stair connections into the states (see {@link PlanShapes}). */

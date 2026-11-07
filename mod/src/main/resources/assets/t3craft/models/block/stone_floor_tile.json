@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:block/cube_all",
+  "textures": {
+    "all": "t3craft:block/kit_floor_stone"
+  }
+}

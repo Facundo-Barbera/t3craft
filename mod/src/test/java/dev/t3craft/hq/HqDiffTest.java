@@ -87,7 +87,9 @@ class HqDiffTest {
 		assertTrue(removed != null && !removed.isEmpty(), "the desk is a removal: " + d.removals().keySet());
 		assertTrue(removed.stream().anyMatch(p -> p.rel().equals(w.computerPos())), "computer removed");
 		assertTrue(removed.stream().anyMatch(p -> p.rel().equals(w.lampPos())), "lamp removed");
-		assertTrue(removed.stream().anyMatch(p -> p.rel().equals(w.deskAnchor().block())), "chair removed");
+		// no chairs: the NPC's standing cell is air before and after, so it is not part of the diff
+		assertTrue(r1.plan().at(w.deskAnchor().block()).state().isAir(), "standing cell is free");
+		assertTrue(removed.stream().noneMatch(p -> p.rel().equals(w.deskAnchor().block())), "nothing to remove where the NPC stood");
 		assertTrue(removed.stream().allMatch(p -> p.state().isAir()));
 		assertTrue(d.builds().isEmpty(), "nothing else changes: " + d.builds().keySet());
 		assertReconciles(r1.plan(), r2.plan(), d);
