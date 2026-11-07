@@ -75,6 +75,9 @@ nada). Se relee con el hot-reload (`DevReload`) o al reiniciar.
 - **LOD** por distancia al centro de la pared: `FULL` (texto, badges, hover) ≤ `detailDistance`;
   `SIMPLE` (carriles y tarjetas de color, sin texto) ≤ `viewDistance`; más allá no se dibuja.
 - `shouldRenderOffScreen() = true`: la pared es más grande que su bloque ancla.
+- Capas opacas en la pasada sólida (`ScreenDraw.fill()`, como el monitor de feat/monitor-live-log) con
+  pasos z que crecen con la distancia (`MonitorLod.zStep`): no parpadea contra las caras de los bloques
+  de detrás. Por eso sombras, brillo y anillo son colores opacos mezclados, no alfa.
 
 ## Clic
 
