@@ -107,7 +107,34 @@ public final class ConfigCodec {
 			w.add("environments must be an object");
 		}
 
-		return new Decoded(new T3CraftSettings(T3CraftSettings.SCHEMA_VERSION, mode, bridgeUrl, bridgeKey, window, max, subagents, n, envs), w);
+		T3CraftSettings.ChatPrefs chat = decodeChat(o, w);
+
+		return new Decoded(new T3CraftSettings(T3CraftSettings.SCHEMA_VERSION, mode, bridgeUrl, bridgeKey, window, max, subagents, n, envs, chat), w);
+	}
+
+	/** {@code "chat": {"hiddenEnvironments": ["vps", ...]}}; absent → defaults (additive, no migration). */
+	private static T3CraftSettings.ChatPrefs decodeChat(JsonObject o, List<String> w) {
+		JsonObject c = obj(o, "chat");
+		if (c == null) {
+			if (o.has("chat") && !o.get("chat").isJsonNull()) {
+				w.add("chat must be an object");
+			}
+			return T3CraftSettings.ChatPrefs.DEFAULT;
+		}
+		java.util.Set<String> hidden = new java.util.TreeSet<>();
+		JsonElement h = c.get("hiddenEnvironments");
+		if (h != null && h.isJsonArray()) {
+			for (JsonElement e : h.getAsJsonArray()) {
+				if (e.isJsonPrimitive() && Environments.ID.matcher(e.getAsString()).matches()) {
+					hidden.add(e.getAsString());
+				} else {
+					w.add("chat.hiddenEnvironments: ignoring invalid id");
+				}
+			}
+		} else if (h != null && !h.isJsonNull()) {
+			w.add("chat.hiddenEnvironments must be an array");
+		}
+		return new T3CraftSettings.ChatPrefs(hidden);
 	}
 
 	private static Notifications decodeNotifications(@Nullable JsonObject o, List<String> w) {
@@ -213,6 +240,12 @@ public final class ConfigCodec {
 			envs.add(e.getKey(), eo);
 		});
 		o.add("environments", envs);
+
+		JsonObject chat = obj(o, "chat") == null ? new JsonObject() : obj(o, "chat");
+		com.google.gson.JsonArray hidden = new com.google.gson.JsonArray();
+		s.chat().hiddenEnvironments().forEach(hidden::add);
+		chat.add("hiddenEnvironments", hidden);
+		o.add("chat", chat);
 		return o;
 	}
 
