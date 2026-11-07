@@ -17,14 +17,21 @@ import java.util.Set;
  *  −3,000,000 … −3,999,999  BehaviorDirector (bubbles, icons)
  *  −4,000,000 … −4,999,999  HelperDirector (helpers)
  *  −5,000,000 … −5,999,999  workstations (screens, computer props, hitboxes)
+ *  −6,000,000 … −6,999,999  archive shelf (ArchiveRenderer)
+ *  −7,000,000 … −7,999,999  schedule board (ScheduleRenderer)
+ *  −8,000,000 … −8,999,999  hub hologram (HologramRenderer)
  * </pre>
+ * A new client-only owner takes the next free million and is added here.
  */
 public enum ClientEntityIds {
 	NPC(-1_000_000),
 	BUILDERS(-2_000_000),
 	BEHAVIOR(-3_000_000),
 	HELPERS(-4_000_000),
-	WORKSTATION(-5_000_000);
+	WORKSTATION(-5_000_000),
+	ARCHIVE(-6_000_000),
+	SCHEDULE(-7_000_000),
+	HOLOGRAM(-8_000_000);
 
 	public static final int SPAN = 1_000_000;
 

@@ -123,6 +123,9 @@ remociones ni quitaba escritorios).
 | −3.000.000 … −3.999.999 | `BehaviorDirector` |
 | −4.000.000 … −4.999.999 | `HelperDirector` |
 | −5.000.000 … −5.999.999 | workstations |
+| −6.000.000 … −6.999.999 | estante de archivados (`ArchiveRenderer`) |
+| −7.000.000 … −7.999.999 | tablero de agenda (`ScheduleRenderer`) |
+| −8.000.000 … −8.999.999 | holograma del hub (`HologramRenderer`) |
 
 - Cada dueño barre **solo su rango**. Antes, el barrido de `NpcRegistry` trataba como suyo todo id
   ≤ −1.000.000 y podía borrar workstations, ayudantes y cuadrillas de builders.
