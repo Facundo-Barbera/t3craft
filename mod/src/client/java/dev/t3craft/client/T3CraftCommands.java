@@ -1,10 +1,16 @@
 package dev.t3craft.client;
 
+import static net.fabricmc.fabric.api.client.command.v2.ClientCommands.argument;
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import dev.t3craft.client.link.BridgeLink;
+import dev.t3craft.client.link.LinkStatus;
+import dev.t3craft.client.screen.PairScreen;
+import dev.t3craft.t3.Environments;
+import java.io.IOException;
 import java.util.Map;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
@@ -15,9 +21,11 @@ import net.minecraft.network.chat.MutableComponent;
 /**
  * Client-side {@code /t3craft} command (never reaches the server).
  * <ul>
- *   <li>{@code status}: bridge URL, link state, per-environment state.</li>
- *   <li>{@code reconnect}: fresh socket to the same bridge, now.</li>
- *   <li>{@code reload}: re-read {@code config/t3craft.json} and reconnect with it.</li>
+ *   <li>{@code status}: mode, connections and per-environment state.</li>
+ *   <li>{@code reconnect}: fresh sockets with the same config, now.</li>
+ *   <li>{@code reload}: re-read {@code config/t3craft.json}, paired environments and credentials, reconnect.</li>
+ *   <li>{@code pair}: open the read-only pairing screen. {@code unpair <env>}: forget an environment.</li>
+ *   <li>{@code envs}: list paired environments (no secrets).</li>
  * </ul>
  */
 public final class T3CraftCommands {
@@ -34,13 +42,50 @@ public final class T3CraftCommands {
 				.then(literal("status").executes(c -> status(c, client)))
 				.then(literal("reconnect").executes(c -> {
 					client.reconnect();
-					c.getSource().sendFeedback(prefix().append(Component.literal("reconnecting to " + client.config().bridgeUrl())));
+					c.getSource().sendFeedback(prefix().append(Component.literal(client.config().mode() == ModConfig.Mode.BRIDGE
+							? "reconnecting to " + client.config().bridgeUrl()
+							: "reconnecting to " + client.environments().size() + " T3 environment(s)")));
 					return 1;
 				}))
 				.then(literal("reload").executes(c -> {
 					ModConfig cfg = client.reload();
+					String what = cfg.mode() == ModConfig.Mode.BRIDGE
+							? "bridge " + cfg.bridgeUrl() + (cfg.bridgeKey() == null ? "" : " (with bridge key)")
+							: new Environments(ModConfig.dataDir()).list().size() + " paired T3 environment(s)";
 					c.getSource().sendFeedback(prefix().append(Component.literal("reloaded " + ModConfig.file().getFileName()
-							+ ", connecting to " + cfg.bridgeUrl() + (cfg.bridgeKey() == null ? "" : " (with bridge key)"))));
+							+ " (mode " + cfg.mode().name().toLowerCase() + "), connecting to " + what)));
+					return 1;
+				}))
+				.then(literal("pair").executes(c -> {
+					client.openNextTick(new PairScreen(null));
+					return 1;
+				}))
+				.then(literal("unpair").then(argument("env", StringArgumentType.word())
+						.suggests((c, b) -> {
+							new Environments(ModConfig.dataDir()).list().forEach(e -> b.suggest(e.id()));
+							return b.buildFuture();
+						})
+						.executes(c -> {
+							String env = StringArgumentType.getString(c, "env");
+							try {
+								boolean ok = client.unpair(env);
+								c.getSource().sendFeedback(prefix().append(Component.literal(ok
+										? "forgot " + env + " (also revoke its session on the host: t3 auth session list / revoke)"
+										: "no paired environment " + env)));
+							} catch (IOException e) {
+								c.getSource().sendError(prefix().append(Component.literal("could not remove " + env + ": " + e.getMessage())));
+							}
+							return 1;
+						})))
+				.then(literal("envs").executes(c -> {
+					var list = new Environments(ModConfig.dataDir()).list();
+					if (list.isEmpty()) {
+						c.getSource().sendFeedback(prefix().append(Component.literal("no T3 environment paired: /t3craft pair")));
+					}
+					for (Environments.Environment e : list) {
+						c.getSource().sendFeedback(Component.literal("  " + e.id() + " ").withStyle(ChatFormatting.AQUA)
+								.append(Component.literal(e.label() + "  " + e.url()).withStyle(ChatFormatting.GRAY)));
+					}
 					return 1;
 				})));
 	}
@@ -50,17 +95,24 @@ public final class T3CraftCommands {
 	}
 
 	private static int status(CommandContext<FabricClientCommandSource> c, T3CraftClient client) {
-		BridgeLink link = client.link();
 		FabricClientCommandSource src = c.getSource();
-		ChatFormatting color = switch (link.status()) {
-			case CONNECTED -> ChatFormatting.GREEN;
-			case CONNECTING -> ChatFormatting.YELLOW;
-			default -> ChatFormatting.RED;
-		};
-		src.sendFeedback(prefix().append(Component.literal("bridge " + link.uri() + ": ")).append(
-				Component.literal(link.status().name().toLowerCase()).withStyle(color)));
-		if (!link.statusDetail().isEmpty() && link.status() != dev.t3craft.client.link.LinkStatus.CONNECTED) {
-			src.sendFeedback(Component.literal("  " + link.statusDetail()).withStyle(ChatFormatting.GRAY));
+		BridgeLink link = client.link();
+		if (link != null) {
+			ChatFormatting color = switch (link.status()) {
+				case CONNECTED -> ChatFormatting.GREEN;
+				case CONNECTING -> ChatFormatting.YELLOW;
+				default -> ChatFormatting.RED;
+			};
+			src.sendFeedback(prefix().append(Component.literal("bridge mode, " + link.uri() + ": ")).append(
+					Component.literal(link.status().name().toLowerCase()).withStyle(color)));
+			if (!link.statusDetail().isEmpty() && link.status() != LinkStatus.CONNECTED) {
+				src.sendFeedback(Component.literal("  " + link.statusDetail()).withStyle(ChatFormatting.GRAY));
+			}
+		} else {
+			src.sendFeedback(prefix().append(Component.literal("direct mode, read-only")));
+			if (client.environments().isEmpty()) {
+				src.sendFeedback(Component.literal("  no T3 environment paired: /t3craft pair").withStyle(ChatFormatting.YELLOW));
+			}
 		}
 		for (Map.Entry<String, String[]> e : client.environments().entrySet()) {
 			String[] v = e.getValue();
