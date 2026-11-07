@@ -3,6 +3,7 @@
 package dev.t3craft.client.blocks;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
 import dev.t3craft.blocks.ThreadBoardBlock;
 import dev.t3craft.blocks.ThreadBoardBlockEntity;
 import dev.t3craft.client.chat.Attention;
@@ -39,6 +40,10 @@ import org.jspecify.annotations.Nullable;
  * chips, hover outline under the crosshair, a pulsing ring on cards that need the player, and cards
  * that fly (lifted, with a shadow) to their new column and glow where they land.
  *
+ * <p>Opaque layers drawn in the solid pass with explicit z steps that grow with the distance
+ * ({@link ScreenDraw}, {@link MonitorLod#zStep}, as the monitor does), so the wall never ghosts
+ * against the block faces behind it; text in front with polygon offset.
+ *
  * <p>Cost: the model ({@link WallBoard}) is rebuilt only when the cards change, and glyph runs only
  * when its version changes; a steady wall is one list comparison plus the draw. LOD by distance to
  * the wall's centre ({@link WallGeometry.Lod}): text and hover up to {@code detailDistance}, coloured
@@ -50,11 +55,9 @@ import org.jspecify.annotations.Nullable;
 public final class ThreadBoardRenderer implements BlockEntityRenderer<ThreadBoardBlockEntity, ThreadBoardRenderer.State> {
 	/** Board pixels per block (one character ≈ 6 px). */
 	public static final float PPB = 64f;
-	/** Depth step between layers (blocks), enough not to z-fight at the view distance. */
-	static final float LAYER = 0.0016f;
 	static final int WALNUT = 0xFF3B2F25;
 	static final int LANE = 0xFF46372B;
-	static final int SHADOW = 0x50000000;
+	static final int SHADOW = 0xFF261E18;
 	private static final int MAX_CACHED = 64;
 
 	public static final class State extends BlockEntityRenderState {
@@ -65,6 +68,8 @@ public final class ThreadBoardRenderer implements BlockEntityRenderer<ThreadBoar
 		@Nullable WallBoard board;
 		@Nullable Glyphs glyphs;
 		float time;
+		/** Layer separation for this distance ({@link MonitorLod#zStep}). */
+		float zStep = MonitorLod.MIN_Z_STEP;
 	}
 
 	/** Glyph runs of one board version. */
@@ -108,7 +113,9 @@ public final class ThreadBoardRenderer implements BlockEntityRenderer<ThreadBoar
 		BlockPos origin = be.getBlockPos();
 		double[] c = WallGeometry.center(origin, s.facing, w.width(), w.height());
 		double dx = c[0] - camera.x, dy = c[1] - camera.y, dz = c[2] - camera.z;
-		s.lod = WallGeometry.Lod.of(dx * dx + dy * dy + dz * dz, cfg.detailDistance(), cfg.viewDistance());
+		double distSq = dx * dx + dy * dy + dz * dz;
+		s.lod = WallGeometry.Lod.of(distSq, cfg.detailDistance(), cfg.viewDistance());
+		s.zStep = MonitorLod.zStep(Math.sqrt(distSq));
 		if (s.lod == WallGeometry.Lod.HIDDEN) {
 			s.board = null;
 			s.glyphs = null;
@@ -194,162 +201,141 @@ public final class ThreadBoardRenderer implements BlockEntityRenderer<ThreadBoar
 			return;
 		}
 		int light = LightCoordsUtil.FULL_BRIGHT;
+		float z = s.zStep;
 		boolean text = s.lod == WallGeometry.Lod.FULL && s.glyphs != null;
-		Glyphs g = s.glyphs;
 		float w = l.width();
 		float h = l.height();
+		List<WallLayout.Slot> flying = new ArrayList<>();
+		for (WallLayout.Slot slot : l.cards()) {
+			WallBoard.Anim a = b.anim(slot.key());
+			if (a != null && a.flying) {
+				flying.add(slot);
+			}
+		}
 		ps.pushPose();
-		MonitorRenderer.toFace(ps, s.facing, -0.004f, PPB);
+		MonitorRenderer.toFace(ps, s.facing, -z, PPB);
 		ps.translate(0, -(s.height - 1) * PPB, 0);
 
-		// layer 0: board + brass trim; layer 1: lanes and headers
-		rect(collector.order(0), ps, 0, 0, w, h, theme.brass(), light);
-		layer(ps);
-		rect(collector.order(1), ps, 2, 2, w - 2, h - 2, WALNUT, light);
-		layer(ps);
-		OrderedSubmitNodeCollector lanes = collector.order(2);
-		for (WallLayout.Lane lane : l.lanes()) {
-			float x0 = lane.x(), x1 = lane.x() + lane.w();
-			rect(lanes, ps, x0, WallLayout.PAD + WallLayout.HEADER_H + 1, x1, h - WallLayout.PAD, LANE, light);
-			rect(lanes, ps, x0, WallLayout.PAD, x1, WallLayout.PAD + WallLayout.HEADER_H - 2, theme.panel(), light);
-			rect(lanes, ps, x0, WallLayout.PAD + WallLayout.HEADER_H - 2, x1, WallLayout.PAD + WallLayout.HEADER_H, 0xFF000000 | lane.color(), light);
-		}
-		for (WallLayout.More m : l.more()) {
-			rect(lanes, ps, m.x(), m.y(), m.x() + m.w(), m.y() + m.h(), theme.inset(), light);
-		}
-		layer(ps);
-
-		// cards: settled ones, then the flying ones lifted above everything
-		List<WallLayout.Slot> flying = new ArrayList<>();
-		ps.pushPose();
-		drawCards(collector, ps, s, b, l, false, flying, light);
-		ps.popPose();
+		// opaque layers (solid pass, explicit z steps): board, lanes, settled cards; then the flying ones
+		collector.order(0).submitCustomGeometry(ps, ScreenDraw.fill(), (pose, vc) -> {
+			ScreenDraw.rect(pose, vc, 0, 0, w, h, 0, theme.brass(), light);
+			ScreenDraw.rect(pose, vc, 2, 2, w - 2, h - 2, -z, WALNUT, light);
+			for (WallLayout.Lane lane : l.lanes()) {
+				float x0 = lane.x(), x1 = lane.x() + lane.w();
+				ScreenDraw.rect(pose, vc, x0, WallLayout.PAD + WallLayout.HEADER_H + 1, x1, h - WallLayout.PAD, -2 * z, LANE, light);
+				ScreenDraw.rect(pose, vc, x0, WallLayout.PAD, x1, WallLayout.PAD + WallLayout.HEADER_H - 2, -2 * z, theme.panel(), light);
+				ScreenDraw.rect(pose, vc, x0, WallLayout.PAD + WallLayout.HEADER_H - 2, x1, WallLayout.PAD + WallLayout.HEADER_H, -2 * z,
+						0xFF000000 | lane.color(), light);
+			}
+			for (WallLayout.More m : l.more()) {
+				ScreenDraw.rect(pose, vc, m.x(), m.y(), m.x() + m.w(), m.y() + m.h(), -3 * z, theme.inset(), light);
+			}
+			cards(pose, vc, s, b, l.cards(), false, 3 * z, text, light);
+			cards(pose, vc, s, b, flying, true, 8 * z, text, light);
+		});
 		if (text) {
+			Glyphs g = s.glyphs;
+			Font font = Minecraft.getInstance().font;
 			ps.pushPose();
-			ps.translate(0, 0, -4 * LAYER);
-			OrderedSubmitNodeCollector t = collector.order(7);
+			ps.translate(0, 0, -6 * z);
+			OrderedSubmitNodeCollector t = collector.order(1);
 			for (int i = 0; i < l.lanes().size(); i++) {
 				WallLayout.Lane lane = l.lanes().get(i);
-				t.submitText(ps, lane.x() + WallLayout.CARD_PAD, WallLayout.PAD + 2, g.lanes().get(i), false, Font.DisplayMode.POLYGON_OFFSET,
-						light, theme.text(), 0, 0);
-				t.submitText(ps, lane.x() + lane.w() - WallLayout.CARD_PAD - g.countW()[i], WallLayout.PAD + 2, g.counts().get(i), false,
-						Font.DisplayMode.POLYGON_OFFSET, light, theme.muted(), 0, 0);
+				text(t, ps, g.lanes().get(i), lane.x() + WallLayout.CARD_PAD, WallLayout.PAD + 2, theme.text(), light);
+				text(t, ps, g.counts().get(i), lane.x() + lane.w() - WallLayout.CARD_PAD - g.countW()[i], WallLayout.PAD + 2, theme.muted(), light);
 			}
 			for (int i = 0; i < l.more().size(); i++) {
 				WallLayout.More m = l.more().get(i);
 				boolean hot = ("#more:" + m.column()).equals(b.hovered());
-				t.submitText(ps, m.x() + 5, m.y() + 2, g.more().get(i), false, Font.DisplayMode.POLYGON_OFFSET, light,
-						hot ? theme.text() : theme.muted(), 0, 0);
+				text(t, ps, g.more().get(i), m.x() + 5, m.y() + 2, hot ? theme.text() : theme.muted(), light);
 			}
 			if (g.empty() != null) {
-				Font font = Minecraft.getInstance().font;
-				t.submitText(ps, (w - font.width(g.empty())) / 2f, h / 2f - 4, g.empty(), false, Font.DisplayMode.POLYGON_OFFSET, light,
-						theme.panel(), 0, 0);
+				text(t, ps, g.empty(), (w - font.width(g.empty())) / 2f, h / 2f - 4, theme.panel(), light);
 			}
+			cardText(t, ps, b, g, l.cards(), false, font, light);
 			ps.popPose();
-		}
-		if (!flying.isEmpty()) {
-			ps.pushPose();
-			ps.translate(0, 0, -6 * LAYER);
-			drawCards(collector, ps, s, b, l, true, flying, light);
-			ps.popPose();
+			if (!flying.isEmpty()) {
+				ps.pushPose();
+				ps.translate(0, 0, -11 * z);
+				cardText(collector.order(2), ps, b, g, flying, true, font, light);
+				ps.popPose();
+			}
 		}
 		ps.popPose();
 	}
 
 	/**
-	 * One pass of cards: the settled ones ({@code lifted == false}, collecting the flying ones into
-	 * {@code flying}) or the flying ones (shadow first). Layers: outline/shadow, paper, stripe and
-	 * badge, text.
+	 * Opaque layers of a pass of cards from depth {@code -z0}: outline or shadow, paper, then the
+	 * attention stripe and the badge.
 	 */
-	private void drawCards(SubmitNodeCollector collector, PoseStack ps, State s, WallBoard b, WallLayout.Layout l, boolean lifted,
-			List<WallLayout.Slot> flying, int light) {
-		int base = lifted ? 8 : 3;
-		boolean text = s.lod == WallGeometry.Lod.FULL && s.glyphs != null;
-		List<WallLayout.Slot> list = lifted ? flying : l.cards();
-		OrderedSubmitNodeCollector under = collector.order(base);
-		for (WallLayout.Slot slot : list) {
-			WallBoard.Anim a = b.anim(slot.key());
-			if (a == null) {
-				continue;
-			}
-			if (!lifted && a.flying) {
-				flying.add(slot);
-				continue;
-			}
-			if (lifted) {
-				rect(under, ps, a.x + 2, a.y + 3, a.x + a.w + 2, a.y + a.h + 3, SHADOW, light);
-			}
-			int ring = ring(s, b, slot, a);
-			if (ring != 0) {
-				rect(under, ps, a.x - 1.5f, a.y - 1.5f, a.x + a.w + 1.5f, a.y + a.h + 1.5f, ring, light);
-			}
-		}
-		ps.pushPose();
-		ps.translate(0, 0, -LAYER);
-		OrderedSubmitNodeCollector paper = collector.order(base + 1);
-		for (WallLayout.Slot slot : list) {
-			WallBoard.Anim a = b.anim(slot.key());
-			if (a != null && a.flying == lifted) {
-				rect(paper, ps, a.x, a.y, a.x + a.w, a.y + a.h, theme.panelHi(), light);
-			}
-		}
-		ps.translate(0, 0, -LAYER);
-		OrderedSubmitNodeCollector marks = collector.order(base + 2);
+	private void cards(PoseStack.Pose pose, VertexConsumer vc, State s, WallBoard b, List<WallLayout.Slot> list, boolean lifted, float z0,
+			boolean text, int light) {
+		float z = s.zStep;
 		for (WallLayout.Slot slot : list) {
 			WallBoard.Anim a = b.anim(slot.key());
 			if (a == null || a.flying != lifted) {
 				continue;
 			}
-			rect(marks, ps, a.x, a.y, a.x + WallLayout.STRIPE, a.y + a.h, theme.color(slot.attention()), light);
+			if (lifted) {
+				ScreenDraw.rect(pose, vc, a.x + 2, a.y + 3, a.x + a.w + 2, a.y + a.h + 3, -z0, SHADOW, light);
+			}
+			int ring = ring(s, b, slot, a);
+			if (ring != 0) {
+				ScreenDraw.rect(pose, vc, a.x - 1.5f, a.y - 1.5f, a.x + a.w + 1.5f, a.y + a.h + 1.5f, -z0, ring, light);
+			}
+			ScreenDraw.rect(pose, vc, a.x, a.y, a.x + a.w, a.y + a.h, -z0 - z, theme.panelHi(), light);
+			ScreenDraw.rect(pose, vc, a.x, a.y, a.x + WallLayout.STRIPE, a.y + a.h, -z0 - 2 * z, 0xFF000000 | theme.color(slot.attention()), light);
 			if (text && a.h >= WallLayout.CARD_H - 1) {
 				float bx = a.x + WallLayout.STRIPE + WallLayout.CARD_PAD;
 				float by = a.y + 13;
-				rect(marks, ps, bx, by, bx + WallLayout.BADGE, by + WallLayout.BADGE, slot.badge().background(), light);
+				ScreenDraw.rect(pose, vc, bx, by, bx + WallLayout.BADGE, by + WallLayout.BADGE, -z0 - 2 * z, 0xFF000000 | slot.badge().background(), light);
 			}
 		}
-		if (text) {
-			ps.translate(0, 0, -LAYER);
-			Glyphs g = s.glyphs;
-			Font font = Minecraft.getInstance().font;
-			OrderedSubmitNodeCollector t = collector.order(base + 3);
-			for (WallLayout.Slot slot : list) {
-				WallBoard.Anim a = b.anim(slot.key());
-				FormattedCharSequence[] seqs = g.cards().get(slot.key());
-				if (a == null || a.flying != lifted || seqs == null || a.h < WallLayout.CARD_H - 1) {
-					continue;
-				}
-				float tx = a.x + WallLayout.STRIPE + WallLayout.CARD_PAD;
-				t.submitText(ps, tx, a.y + 3, seqs[0], false, Font.DisplayMode.POLYGON_OFFSET, light, theme.text(), 0, 0);
-				float bx = tx + (WallLayout.BADGE - font.width(seqs[2])) / 2f + 0.5f;
-				t.submitText(ps, bx, a.y + 14, seqs[2], false, Font.DisplayMode.POLYGON_OFFSET, light, slot.badge().foreground(), 0, 0);
-				t.submitText(ps, tx + WallLayout.BADGE + 3, a.y + 14, seqs[1], false, Font.DisplayMode.POLYGON_OFFSET, light, theme.muted(), 0, 0);
-			}
-		}
-		ps.popPose();
 	}
 
-	/** Outline colour of a card: hover (brass), arrival glow, or a pulsing ring when it needs the player; 0 = none. */
+	private void cardText(OrderedSubmitNodeCollector t, PoseStack ps, WallBoard b, Glyphs g, List<WallLayout.Slot> list, boolean lifted,
+			Font font, int light) {
+		for (WallLayout.Slot slot : list) {
+			WallBoard.Anim a = b.anim(slot.key());
+			FormattedCharSequence[] seqs = g.cards().get(slot.key());
+			if (a == null || a.flying != lifted || seqs == null || a.h < WallLayout.CARD_H - 1) {
+				continue;
+			}
+			float tx = a.x + WallLayout.STRIPE + WallLayout.CARD_PAD;
+			text(t, ps, seqs[0], tx, a.y + 3, theme.text(), light);
+			text(t, ps, seqs[2], tx + (WallLayout.BADGE - font.width(seqs[2])) / 2f + 0.5f, a.y + 14, slot.badge().foreground(), light);
+			text(t, ps, seqs[1], tx + WallLayout.BADGE + 3, a.y + 14, theme.muted(), light);
+		}
+	}
+
+	/**
+	 * Outline of a card (opaque, the solid pass ignores alpha): hover (brass), the arrival glow fading
+	 * from brass into the lane, or a ring pulsing between the lane and the needs-you colour; 0 = none.
+	 */
 	private int ring(State s, WallBoard b, WallLayout.Slot slot, WallBoard.Anim a) {
 		if (slot.key().equals(b.hovered())) {
 			return theme.brass();
 		}
 		if (a.glow > 0) {
-			return ChatTheme.withAlpha(theme.brass(), (int) (255 * Math.min(1f, a.glow / WallBoard.GLOW_S)));
+			return mix(LANE, theme.brass(), Math.min(1f, a.glow / WallBoard.GLOW_S));
 		}
 		if (slot.attention() == Attention.NEEDS_YOU) {
-			float pulse = 0.5f + 0.5f * (float) Math.sin(s.time * 3.2f);
-			return ChatTheme.withAlpha(theme.needsYou(), (int) (60 + 150 * pulse));
+			return mix(LANE, theme.needsYou(), 0.35f + 0.65f * (0.5f + 0.5f * (float) Math.sin(s.time * 3.2f)));
 		}
 		return 0;
 	}
 
-	private static void layer(PoseStack ps) {
-		ps.translate(0, 0, -LAYER);
+	/** Opaque colour {@code t} of the way from {@code a} to {@code b}. */
+	static int mix(int a, int b, float t) {
+		float u = Math.max(0, Math.min(1, t));
+		int r = Math.round(((a >> 16) & 0xFF) * (1 - u) + ((b >> 16) & 0xFF) * u);
+		int g = Math.round(((a >> 8) & 0xFF) * (1 - u) + ((b >> 8) & 0xFF) * u);
+		int bl = Math.round((a & 0xFF) * (1 - u) + (b & 0xFF) * u);
+		return 0xFF000000 | (r << 16) | (g << 8) | bl;
 	}
 
-	private static void rect(OrderedSubmitNodeCollector c, PoseStack ps, float x0, float y0, float x1, float y1, int argb, int light) {
-		c.submitTextBackground(ps, x0, y0, x1, y1, argb, Font.DisplayMode.NORMAL, light);
+	private static void text(OrderedSubmitNodeCollector c, PoseStack ps, FormattedCharSequence t, float x, float y, int argb, int light) {
+		c.submitText(ps, x, y, t, false, Font.DisplayMode.POLYGON_OFFSET, light, 0xFF000000 | argb, 0, 0);
 	}
 
 	/** Forget cached glyph runs (hot-swap, level change). */

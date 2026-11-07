@@ -68,6 +68,23 @@ class BindingTest {
 	}
 
 	@Test
+	void roomBulbAggregatesItsThreadsNeedsYouFirst() {
+		// fix/hq-rooms-real: needs you > error > working > done > idle, off when nobody is there
+		Map<String, LampStatus> wanted = Map.of("thread:vps:a", LampStatus.ERROR, "thread:vps:b", LampStatus.ATTENTION,
+				"thread:vps:c", LampStatus.WORKING, "thread:vps:d", LampStatus.DONE, "thread:vps:e", LampStatus.IDLE);
+		assertEquals(LampStatus.ATTENTION, LampApplier.want(wanted, Binding.module(java.util.List.of("vps:a", "vps:b", "vps:c"))));
+		assertEquals(LampStatus.ERROR, LampApplier.want(wanted, Binding.module(java.util.List.of("vps:a", "vps:c", "vps:e"))));
+		assertEquals(LampStatus.WORKING, LampApplier.want(wanted, Binding.module(java.util.List.of("vps:c", "vps:d", "vps:e"))));
+		assertEquals(LampStatus.DONE, LampApplier.want(wanted, Binding.module(java.util.List.of("vps:d", "vps:e"))));
+		assertEquals(LampStatus.IDLE, LampApplier.want(wanted, Binding.module(java.util.List.of("vps:e", "vps:gone"))));
+		// live: the same bulb follows the threads' current states, nothing is frozen at build time
+		Map<String, LampStatus> later = Map.of("thread:vps:a", LampStatus.DONE, "thread:vps:b", LampStatus.IDLE, "thread:vps:c", LampStatus.DONE);
+		assertEquals(LampStatus.DONE, LampApplier.want(later, Binding.module(java.util.List.of("vps:a", "vps:b", "vps:c"))));
+		assertEquals(LampStatus.ATTENTION, LampApplier.room(java.util.List.of(LampStatus.IDLE, LampStatus.ERROR, LampStatus.ATTENTION)));
+		assertEquals(LampStatus.OFF, LampApplier.room(java.util.List.of()));
+	}
+
+	@Test
 	void changesListOnlyWhatDiffers() {
 		Map<Long, Binding> before = Map.of(1L, Binding.thread("a"), 2L, Binding.thread("b"), 3L, Binding.NONE, 4L, Binding.board(0));
 		Map<Long, Binding> after = Map.of(1L, Binding.thread("a"), 2L, Binding.NONE, 3L, Binding.thread("c"), 5L, Binding.thread("d"));

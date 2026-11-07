@@ -128,8 +128,10 @@ public final class HqConstructionClient implements ClientModInitializer {
 			return null;
 		}
 		Predicate<NpcInfo> released = releasePolicy;
+		// fix/hq-rooms-real: only projects with real activity within the window keep a room
+		List<NpcInfo> roomed = HqRooms.filter(npcs, released, HqRooms.current(), System.currentTimeMillis());
 		HqInput.Builder b = HqInput.builder();
-		for (NpcInfo n : npcs) {
+		for (NpcInfo n : roomed) {
 			String g = n.groupId();
 			String env = g.indexOf(':') > 0 ? g.substring(0, g.indexOf(':')) : g;
 			b.thread(g, n.groupLabel(), env, n.envLabel(), n.id(), released.test(n));
