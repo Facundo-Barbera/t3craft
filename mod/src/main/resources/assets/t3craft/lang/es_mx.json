@@ -148,5 +148,10 @@
 	"t3craft.pair.mode.tooltip": "Lectura + control: ver y actuar sobre los hilos (enviar, aprobar, detener…). Solo lectura: solo ver; puedes habilitar el control después desde Entornos.",
 	"t3craft.pair.warning.control": "Control: este Minecraft puede arrancar agentes y aprobar comandos en ese host. Las acciones destructivas piden confirmación y todo queda en audit.log.",
 	"t3craft.pair.button": "Emparejar",
-	"t3craft.pair.button.read": "Emparejar (solo lectura)"
+	"t3craft.pair.button.read": "Emparejar (solo lectura)",
+	"t3craft.schedule.header": "Tareas programadas (%s), primero las más próximas:",
+	"t3craft.schedule.none": "No hay tareas programadas.",
+	"t3craft.schedule.waiting": "Esperando a que T3 envíe las tareas programadas…",
+	"t3craft.schedule.unavailable": "Las tareas programadas no están disponibles:",
+	"t3craft.schedule.direct_only": "Las tareas programadas solo se muestran en modo directo (empareja con /t3craft pair)."
 }
