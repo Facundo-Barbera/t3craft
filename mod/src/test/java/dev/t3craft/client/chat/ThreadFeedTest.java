@@ -12,6 +12,7 @@ import dev.t3craft.t3.T3Connection;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
@@ -149,5 +150,78 @@ class ThreadFeedTest {
 		assertFalse(f.state().loadingOlder());
 		assertTrue(f.state().olderError().contains("HTTP 500"));
 		f.close();
+	}
+
+	// ---- fix/chat-direct-connect --------------------------------------------------------------
+
+	@Test
+	void openedWhileConnectingSubscribesOnOpenAndGoesLiveBeforeTheShellSyncs() {
+		FakeEnv env = new FakeEnv();
+		env.status = T3Connection.Status.CONNECTING;
+		ThreadFeed f = new ThreadFeed(env, "T", () -> {
+		});
+		f.start();
+		assertEquals(ThreadFeed.Phase.CONNECTING, f.state().phase());
+		assertEquals("connecting to VPS", f.state().detail());
+		Wire w = new Wire();
+		env.registry.onOpen(w); // socket up, shell not synchronized yet
+		assertEquals(1, w.sent.size(), "the queued subscription goes out as soon as the socket opens");
+		assertEquals(RpcFrames.SUBSCRIBE_THREAD, w.sent.getFirst().get("tag").getAsString());
+		env.registry.onChunk(w.lastRequestId(), List.of(JsonParser.parseString(SNAPSHOT).getAsJsonObject()));
+		assertEquals(ThreadFeed.Phase.LIVE, f.state().phase(), "the thread's snapshot makes it live even while the env is CONNECTING");
+		env.status = T3Connection.Status.OK;
+		assertEquals(ThreadFeed.Phase.LIVE, f.state().phase());
+		f.close();
+	}
+
+	@Test
+	void neverConnectingForeverTimesOutWithAClearMessageAndRecovers() {
+		FakeEnv env = new FakeEnv();
+		env.status = T3Connection.Status.CONNECTING;
+		AtomicLong now = new AtomicLong(1_000);
+		ThreadFeed f = new ThreadFeed(env, "T", () -> {
+		}, now::get);
+		f.start();
+		now.addAndGet(ThreadFeed.ANSWER_TIMEOUT_MS - 1);
+		assertEquals(ThreadFeed.Phase.CONNECTING, f.state().phase());
+		now.addAndGet(1);
+		assertEquals(ThreadFeed.Phase.FAILED, f.state().phase());
+		assertTrue(f.state().detail().startsWith("could not connect to VPS within 20 s"), f.state().detail());
+
+		// connected, subscribed, but T3 does not send the thread
+		env.status = T3Connection.Status.OK;
+		Wire w = new Wire();
+		env.registry.onOpen(w);
+		assertEquals(ThreadFeed.Phase.CONNECTING, f.state().phase(), "(re)subscribing restarts the wait");
+		assertEquals("loading the thread", f.state().detail());
+		now.addAndGet(ThreadFeed.ANSWER_TIMEOUT_MS);
+		assertEquals(ThreadFeed.Phase.FAILED, f.state().phase());
+		assertTrue(f.state().detail().startsWith("VPS did not send the thread within 20 s"), f.state().detail());
+
+		// a late snapshot still turns it live
+		env.registry.onChunk(w.lastRequestId(), List.of(JsonParser.parseString(SNAPSHOT).getAsJsonObject()));
+		assertEquals(ThreadFeed.Phase.LIVE, f.state().phase());
+		f.close();
+	}
+
+	@Test
+	void anEnvFromAReplacedConnectionIsNotCurrent() {
+		java.util.concurrent.atomic.AtomicBoolean live = new java.util.concurrent.atomic.AtomicBoolean(true);
+		var c = new T3Connection(new dev.t3craft.t3.Environments.Environment("vps", "VPS", java.net.URI.create("https://vps.example")),
+				() -> null, new T3Connection.Listener() {
+					@Override
+					public void onStatus(String envId, T3Connection.Status status, String detail) {
+					}
+
+					@Override
+					public void onShell(String envId, dev.t3craft.t3.ShellState.View view) {
+					}
+				}, java.net.http.HttpClient.newHttpClient());
+		ChatSource.Env env = ChatSource.of(c, live::get);
+		assertTrue(env.current());
+		live.set(false); // DirectController restarted (reload / pairing)
+		assertFalse(env.current());
+		assertTrue(ChatSource.of(c).current());
+		c.stop();
 	}
 }

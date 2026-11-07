@@ -32,7 +32,7 @@ public record PortableState(Connection connection, String sourceLabel, List<Port
 	 * The shared thread order ({@link dev.t3craft.client.chat.ThreadOrder}): attention, then recent
 	 * activity (unknown here: the NPC model has no timestamps), then live before settled, then title.
 	 */
-	public static final Comparator<PortableThread> ORDER = dev.t3craft.client.chat.ThreadOrder.of(
+	public static final Comparator<PortableThread> ORDER = dev.t3craft.client.chat.ThreadOrder.of(PortableThread::pinned,
 			t -> dev.t3craft.client.chat.ThreadOrder.attention(t.state(), false), t -> null, PortableThread::settled, PortableThread::title,
 			PortableThread::id);
 

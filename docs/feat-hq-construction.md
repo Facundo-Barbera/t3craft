@@ -41,7 +41,9 @@ Paquetes:
 - **Política de liberación de puesto (enganche).** `HqConstructionClient.setReleasePolicy(Predicate<NpcInfo>)`.
   Por defecto es `NpcInfo::settled`. Cuando entre **fix/hq-stale-stations** (settle, archivado, o DONE
   e inactivo más de X minutos), se instala su política ahí. Un hilo liberado se pasa al HQ como
-  settled: pierde el escritorio (remoción en el diff) y va al estante "Archived" del hub. **Pendiente: aún no está en main.**
+  settled: pierde el escritorio (remoción en el diff) y va al estante "Archived" del hub. **Hecho (fix/hq-stale-stations):** la única política
+  (`StationPolicy`) se aplica en `NpcRegistry`; `liveRoster` usa `npcs().hqRoster()` (los liberados ya llegan settled), y el
+  predicado por defecto del hook (`NpcInfo::settled`) basta: no hay segunda política.
 - **Sin sótano.** El generador ya no tiene sótano (fix/hq-archive): `HqFootprints.bottom() = 0`,
   `base()` = hub + pórtico, `HqSiteFrame.MIN_Y = 0` y la base no pide profundidad (`BASE_DEPTH = 0`;
   `SiteRequest.baseDepth` queda disponible). Los hilos liberados van al estante "Archived" de la
