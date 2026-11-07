@@ -1,24 +1,17 @@
 package dev.t3craft.client.archive;
 
-import static net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal;
-
 import com.mojang.brigadier.CommandDispatcher;
-import dev.t3craft.T3Craft;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import dev.t3craft.client.T3CraftClient;
 import dev.t3craft.client.T3CraftCommands;
 import dev.t3craft.client.debug.GuardedEvents;
 import dev.t3craft.debug.DevReload;
-import dev.t3craft.client.hq.HqPresence;
-import dev.t3craft.hq.Anchor;
-import dev.t3craft.hq.HqSite;
 import dev.t3craft.t3.ArchiveWire;
 import dev.t3craft.t3.DirectController;
 import dev.t3craft.t3.ShellState;
 import dev.t3craft.t3.T3Connection;
 import java.time.ZoneId;
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -27,55 +20,36 @@ import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallba
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.event.player.AttackEntityCallback;
-import net.fabricmc.fabric.api.event.player.UseBlockCallback;
-import net.fabricmc.fabric.api.event.player.UseEntityCallback;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.core.Direction;
+import net.minecraft.client.resources.language.I18n;
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResult;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.component.SwingAnimation;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.ChiseledBookShelfBlock;
-import net.minecraft.world.level.block.state.BlockState;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The HQ's "Archived" shelf, live (inventario item 13): closed threads (settled and archived) get
- * a label in a deterministic shelf slot inside the building, and the shelf's title (or an empty
- * slot) opens the catalog, which lists all of them page by page. Client entrypoint, client-only,
- * read-only towards T3.
+ * The archive: closed threads (settled and archived) of every environment, browsed in one place,
+ * the {@link ArchiveScreen}. Client entrypoint, client-only, read-only towards T3.
+ *
+ * <p>The archive lives <b>only</b> in that screen: nothing is drawn in the world for each closed
+ * thread (no shelf slots, labels or props). It is reached from:
+ * <ul>
+ *   <li>the archive terminal block ({@code t3craft:archive_terminal}, blocks module on): its screen
+ *   shows {@link #display()} and a click calls {@link #openArchive()} (wired by {@code BlocksClient});</li>
+ *   <li>{@value ArchiveAccess#COMMAND} (always registered, the way in for "GUI only" without the blocks
+ *   module) and the portable terminal's "Archive" button.</li>
+ * </ul>
  *
  * <p>Pieces: {@link ArchiveStore} (cache + rare refresh over {@link ArchiveSource}),
- * {@link ArchiveSlots} (slots, same rule as the HQ layout's archive), {@link ArchiveShelf} (slot
- * positions: the plan's shelf anchors, or {@link ArchiveShelf#FALLBACK} by the board),
- * {@link ArchiveRenderer} (client display entities, ids from −6,000,000), {@link CatalogScreen}
- * and {@link ArchiveOpener}.
+ * {@link ArchiveList} (search, filters, pages), {@link TerminalDisplay} (the block's screen, cached by
+ * store version) and {@link ArchiveOpener} (read-only chat).
  *
- * <p>Integration points:
- * <ul>
- *   <li>{@link #setSite}: override where the HQ stands. By default the HQ standing in the world
- *   ({@code HqPresence.current()}, site or demo, once its hub is built); without one nothing is
- *   drawn, the catalog still works ({@code /t3craft archive}).</li>
- *   <li>{@link #setShelf}: the plan's shelf ({@code ArchiveShelf.fromPlan(plan, AnchorNames::archiveShelfSlot)}
- *   once fix/hq-archive is on main); null = {@link ArchiveShelf#FALLBACK}.</li>
- *   <li>{@link #setCaller} / {@link #setSource}: replace where the reads go. Default: each
- *   environment's {@code T3Connection} on the shared {@code StreamRegistry.call} path.</li>
- *   <li>{@link #setOpener}: what a click opens (default {@link ArchiveOpener#DEFAULT}).</li>
- *   <li>{@link #setSlotProps}: hook for feat/blocks-core's own blocks: what an air slot shows
- *   (default a vanilla chiseled bookshelf, full when occupied).</li>
- *   <li>{@link #slots()}: the current assignment (entry key → slot), for the HQ owner.</li>
- * </ul>
+ * <p>Integration points: {@link #setCaller} / {@link #setSource} (where reads go; default each
+ * environment's {@code T3Connection} on the shared {@code StreamRegistry.call} path) and
+ * {@link #setOpener} (what a row opens).
  */
 public final class ArchiveClient implements ClientModInitializer {
 	private static final String MODULE = "archive";
 	/** Feed the store this often (ticks); the store itself decides when to read (rarely). */
 	private static final int FEED_TICKS = 20;
-	/** The HQ plan group that holds the shelf (documented group name in feat-hq-design.md). */
-	private static final String HUB_GROUP = "hub";
 
 	private static @Nullable ArchiveClient instance;
 
@@ -101,32 +75,10 @@ public final class ArchiveClient implements ClientModInitializer {
 			return source.available();
 		}
 	});
-	private final ArchiveRenderer renderer = new ArchiveRenderer();
-	private @Nullable HqSite site;
+	private final TerminalDisplay display = new TerminalDisplay();
+	/** Kept across openings: the screen comes back with the same search, filters and page. */
+	private final ArchiveList list = new ArchiveList();
 	private @Nullable ArchiveOpener opener;
-	/** What an air slot shows: {@code (occupied, facing) → state}. */
-	@FunctionalInterface
-	public interface SlotProps {
-		BlockState prop(boolean occupied, Direction facing);
-	}
-
-	/**
-	 * Anchor names of the plan's shelf: the same strings as fix/hq-archive's
-	 * {@code AnchorNames.archiveShelfSlot(i)} ({@code "shelf@" + i}), spelled out so this module
-	 * compiles without that branch. Replace with the method reference once it is on main.
-	 */
-	static final java.util.function.IntFunction<String> PLAN_SHELF_SLOT = i -> "shelf@" + i;
-
-	private SlotProps slotProps = ArchiveClient::bookshelf;
-	/** Explicit shelf ({@link #setShelf}); null = the standing HQ plan's shelf, else the fallback. */
-	private @Nullable ArchiveShelf shelfOverride;
-	private ArchiveShelf shelf = ArchiveShelf.FALLBACK;
-	private dev.t3craft.hq.@Nullable BuildPlan shelfPlan;
-	private Map<String, Integer> slots = Map.of();
-	private int slotsVersion = -1;
-	private @Nullable HqSite viewsSite;
-	private List<ArchiveRenderer.SlotView> views = List.of();
-	private @Nullable ClientLevel level;
 	private int ticks;
 
 	public static @Nullable ArchiveClient get() {
@@ -138,41 +90,15 @@ public final class ArchiveClient implements ClientModInitializer {
 		instance = this;
 		ClientTickEvents.END_CLIENT_TICK.register(GuardedEvents.endClientTick(MODULE, this::tick));
 		ClientLifecycleEvents.CLIENT_STOPPING.register(mc -> {
-			renderer.clear(mc.level);
 			if (instance == this) {
 				instance = null;
 			}
 		});
-		DevReload.get().register("t3craft.archive", reason -> {
-			renderer.clear(Minecraft.getInstance().level);
-			slotsVersion = -1;
-		});
-		UseBlockCallback.EVENT.register((player, lvl, hand, hit) -> {
-			if (!lvl.isClientSide() || hand != InteractionHand.MAIN_HAND || player.isShiftKeyDown()) {
-				return InteractionResult.PASS;
-			}
-			String key = renderer.at(hit.getBlockPos());
-			// FAIL on the client: consumed, nothing sent, the block's own action never runs.
-			return key == null ? InteractionResult.PASS : use(player, hand, key, InteractionResult.FAIL);
-		});
-		UseEntityCallback.EVENT.register((player, lvl, hand, entity, hit) -> {
-			if (!lvl.isClientSide()) {
-				return InteractionResult.PASS;
-			}
-			String key = renderer.of(entity);
-			return key == null ? InteractionResult.PASS : use(player, hand, key, InteractionResult.SUCCESS);
-		});
-		AttackEntityCallback.EVENT.register((player, lvl, hand, entity, hit) ->
-				lvl.isClientSide() && renderer.of(entity) != null ? InteractionResult.FAIL : InteractionResult.PASS);
+		DevReload.get().register("t3craft.archive", reason -> display.invalidate());
 		ClientCommandRegistrationCallback.EVENT.register((d, ctx) -> registerCommands(d));
 	}
 
 	// ---- integration points -------------------------------------------------------------------
-
-	/** Where the HQ stands (null = the HQ {@link HqPresence} reports, if any). Client thread. */
-	public void setSite(@Nullable HqSite site) {
-		this.site = site;
-	}
 
 	/** A raw one-shot caller instead of the direct connections (null = the direct connections). */
 	public void setCaller(ArchiveSource.@Nullable Caller caller) {
@@ -188,57 +114,19 @@ public final class ArchiveClient implements ClientModInitializer {
 		this.opener = opener;
 	}
 
-	/** Slot positions (null = {@link ArchiveShelf#FALLBACK}). Client thread. */
-	public void setShelf(@Nullable ArchiveShelf shelf) {
-		this.shelfOverride = shelf;
-		resolveShelf();
-	}
-
-	/** The override, else the standing HQ plan's shelf anchors if it has them, else the fallback. */
-	private void resolveShelf() {
-		ArchiveShelf next;
-		if (shelfOverride != null) {
-			next = shelfOverride;
-			shelfPlan = null;
-		} else {
-			HqPresence.Standing st = site == null ? HqPresence.current() : null;
-			dev.t3craft.hq.BuildPlan plan = st == null ? null : st.plan();
-			if (plan == shelfPlan && shelf != null) {
-				return;
-			}
-			shelfPlan = plan;
-			ArchiveShelf fromPlan = plan == null ? null : ArchiveShelf.fromPlan(plan, PLAN_SHELF_SLOT);
-			next = fromPlan != null && fromPlan.capacity() > 0 ? fromPlan : ArchiveShelf.FALLBACK;
-		}
-		if (next != shelf) {
-			shelf = next;
-			slotsVersion = -1;
-			viewsSite = null;
-		}
-	}
-
-	public ArchiveShelf shelf() {
-		return shelf;
-	}
-
-	/** Hook for feat/blocks-core: what an air slot shows (null = vanilla chiseled bookshelf). */
-	public void setSlotProps(@Nullable SlotProps props) {
-		this.slotProps = props == null ? ArchiveClient::bookshelf : props;
-		viewsSite = null;
-	}
-
 	public ArchiveStore store() {
 		return store;
 	}
 
-	/** Current assignment: entry key → shelf slot. */
-	public Map<String, Integer> slots() {
-		return slots;
+	/** What the archive terminal's screen shows now (cached until the store's version moves). Render thread. */
+	public TerminalDisplay.Screen display() {
+		return display.show(store.version(), store::entries, ZoneId.systemDefault(),
+				n -> I18n.get("t3craft.archive.terminal.header", n), I18n.get("t3craft.archive.terminal.empty"));
 	}
 
-	public void openCatalog() {
-		Set<String> slotted = new HashSet<>(slots.keySet());
-		CatalogScreen screen = new CatalogScreen(store, this::open, slotted::contains);
+	/** Opens the archive screen (next tick, so it also works from a command or a block click). */
+	public void openArchive() {
+		ArchiveScreen screen = new ArchiveScreen(store, this::open, list);
 		T3CraftClient client = T3CraftClient.get();
 		if (client != null) {
 			client.openNextTick(screen);
@@ -247,81 +135,23 @@ public final class ArchiveClient implements ClientModInitializer {
 		}
 	}
 
+	/** Opens the archive screen if the client module is up; false otherwise. */
+	public static boolean openIfReady() {
+		ArchiveClient c = instance;
+		if (c == null) {
+			return false;
+		}
+		c.openArchive();
+		return true;
+	}
+
 	// ---- tick ---------------------------------------------------------------------------------
 
 	private void tick(Minecraft mc) {
-		ClientLevel lvl = mc.level;
-		if (lvl != level) {
-			renderer.clear(null);
-			level = lvl;
-		}
-		long now = System.currentTimeMillis();
 		if (++ticks % FEED_TICKS == 0) {
 			feed();
 		}
-		store.tick(now);
-		resolveShelf();
-		int v = store.version();
-		if (v != slotsVersion) {
-			slots = Map.copyOf(ArchiveSlots.assign(store.entries(), slots, shelf.capacity()));
-			slotsVersion = v;
-			viewsSite = null;
-		}
-		if (lvl == null || mc.player == null) {
-			return;
-		}
-		HqSite s = currentSite();
-		if (s == null) {
-			if (renderer.size() > 0 || viewsSite != null) {
-				renderer.clear(lvl);
-				viewsSite = null;
-			}
-			renderer.tick(lvl, List.of(), null);
-			return;
-		}
-		if (!s.equals(viewsSite)) {
-			views = slotViews(s);
-			viewsSite = s;
-		}
-		Anchor head = ArchiveShelf.header(shelf, s);
-		renderer.tick(lvl, views, head == null ? null : new ArchiveRenderer.HeaderView(head,
-				Component.translatable("t3craft.archive.shelf.title").getString(),
-				Component.translatable("t3craft.archive.shelf.count", store.entries().size()).getString()));
-	}
-
-	/**
-	 * {@link #setSite}'s site, else the HQ standing in this world ({@link HqPresence#current()}, read
-	 * only) once its hub is built; null when there is none.
-	 */
-	private @Nullable HqSite currentSite() {
-		if (site != null) {
-			return site;
-		}
-		HqPresence.Standing st = HqPresence.current();
-		if (st == null || (st.built() != null && !st.built().contains(HUB_GROUP))) {
-			return null;
-		}
-		return st.site();
-	}
-
-	/** One view per shelf slot (occupied or not). */
-	private List<ArchiveRenderer.SlotView> slotViews(HqSite s) {
-		ArchiveEntry[] bySlot = new ArchiveEntry[shelf.capacity()];
-		for (ArchiveEntry e : store.entries()) {
-			Integer slot = slots.get(e.key());
-			if (slot != null && slot < bySlot.length) {
-				bySlot[slot] = e;
-			}
-		}
-		List<ArchiveRenderer.SlotView> out = new ArrayList<>();
-		ZoneId zone = ZoneId.systemDefault();
-		for (int i = 0; i < bySlot.length; i++) {
-			ArchiveShelf.WorldSlot w = ArchiveShelf.world(shelf, s, i);
-			ArchiveEntry e = bySlot[i];
-			out.add(new ArchiveRenderer.SlotView(i, e == null ? null : e.key(), w.cell(), w.face(),
-					e == null ? List.of() : ArchiveLabel.lines(e, zone), slotProps.prop(e != null, w.face().facing())));
-		}
-		return out;
+		store.tick(System.currentTimeMillis());
 	}
 
 	/** Feeds every paired environment's shell view and connection state into the store. */
@@ -344,60 +174,38 @@ public final class ArchiveClient implements ClientModInitializer {
 		store.retainEnvs(labels.keySet());
 	}
 
-	private InteractionResult use(Player player, InteractionHand hand, String key, InteractionResult consumed) {
-		if (consumed == InteractionResult.FAIL) {
-			player.swing(hand, SwingAnimation.DEFAULT, false);
-		}
-		try {
-			if (ArchiveRenderer.CATALOG.equals(key)) {
-				openCatalog();
-			} else {
-				ArchiveEntry e = store.entry(key);
-				if (e == null) {
-					return InteractionResult.PASS;
-				}
-				open(e);
-			}
-		} catch (RuntimeException ex) {
-			T3Craft.LOGGER.warn("T3Craft: archive click failed for {}", key, ex);
-		}
-		return consumed;
-	}
-
 	private void open(ArchiveEntry e) {
 		ArchiveOpener o = opener != null ? opener : ArchiveOpener.DEFAULT;
 		o.open(e);
 	}
 
-	private static BlockState bookshelf(boolean occupied, Direction facing) {
-		BlockState st = Blocks.CHISELED_BOOKSHELF.defaultBlockState().setValue(ChiseledBookShelfBlock.FACING, facing);
-		if (occupied) {
-			for (var prop : ChiseledBookShelfBlock.SLOT_OCCUPIED_PROPERTIES) {
-				st = st.setValue(prop, true);
-			}
-		}
-		return st;
-	}
-
 	// ---- commands -----------------------------------------------------------------------------
 
+	/**
+	 * {@code t3craft archive}: opens the archive screen. Registered in every mode (with or without the
+	 * blocks module), so "GUI only" reaches the archive without the terminal block.
+	 */
+	static <S> LiteralArgumentBuilder<S> openCommand(Runnable open) {
+		return LiteralArgumentBuilder.<S>literal("t3craft").then(LiteralArgumentBuilder.<S>literal("archive").executes(c -> {
+			open.run();
+			return 1;
+		}));
+	}
+
 	private void registerCommands(CommandDispatcher<FabricClientCommandSource> d) {
-		d.register(literal("t3craft").then(literal("archive")
-				.executes(c -> {
-					openCatalog();
-					return 1;
-				})
-				.then(literal("refresh").executes(c -> {
+		d.register(openCommand(this::openArchive));
+		d.register(LiteralArgumentBuilder.<FabricClientCommandSource>literal("t3craft").then(LiteralArgumentBuilder.<FabricClientCommandSource>literal("archive")
+				.then(LiteralArgumentBuilder.<FabricClientCommandSource>literal("refresh").executes(c -> {
 					boolean will = store.refreshNow(System.currentTimeMillis());
 					c.getSource().sendFeedback(T3CraftCommands.prefix().append(Component.translatable(
 							!store.fullReads() ? "t3craft.archive.shell_only" : will ? "t3craft.archive.refreshing" : "t3craft.archive.recent")));
 					return 1;
 				}))
-				.then(literal("status").executes(c -> {
+				.then(LiteralArgumentBuilder.<FabricClientCommandSource>literal("status").executes(c -> {
 					c.getSource().sendFeedback(T3CraftCommands.prefix().append(Component.translatable("t3craft.archive.status",
-							store.entries().size(), slots.size(), shelf.capacity(),
-							Component.translatable(site == null ? "t3craft.archive.no_site" : "t3craft.archive.site"),
-							Component.translatable(store.fullReads() ? "t3craft.archive.full" : "t3craft.archive.shell_only"))));
+							store.entries().size(),
+							Component.translatable(store.fullReads() ? "t3craft.archive.full" : "t3craft.archive.shell_only"),
+							Component.translatable(ArchiveAccess.hintKey(dev.t3craft.blocks.T3Blocks.active()), ArchiveAccess.COMMAND))));
 					for (ArchiveStore.EnvStatus s : store.statuses()) {
 						c.getSource().sendFeedback(Component.literal("  " + s.label() + ": " + s.listed() + (s.hasMore() ? "+" : "")
 								+ (s.connected() ? "" : " (offline)") + (s.error() == null ? "" : " · " + s.error())));

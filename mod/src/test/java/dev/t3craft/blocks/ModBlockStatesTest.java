@@ -72,6 +72,11 @@ class ModBlockStatesTest {
 			public BlockState boardLamp() {
 				return BuiltInRegistries.BLOCK.getValue(T3Blocks.id("board_lamp")).defaultBlockState();
 			}
+
+			@Override
+			public BlockState archiveTerminal(net.minecraft.core.Direction facing) {
+				return BuiltInRegistries.BLOCK.getValue(T3Blocks.id("archive_terminal")).defaultBlockState().setValue(ArchiveTerminalBlock.FACING, facing);
+			}
 		}));
 	}
 
@@ -106,7 +111,7 @@ class ModBlockStatesTest {
 				modIds.add(key.substring(0, key.indexOf('[') < 0 ? key.length() : key.indexOf('[')));
 			}
 		}
-		assertEquals(Set.of("t3craft:board_lamp", "t3craft:monitor", "t3craft:status_lamp"), modIds, "the modded HQ uses every module block");
+		assertEquals(Set.of("t3craft:archive_terminal", "t3craft:board_lamp", "t3craft:monitor", "t3craft:status_lamp"), modIds, "the modded HQ uses every module block");
 		assertTrue(LevelBlockWorld.parse(BuiltInRegistries.BLOCK, "t3craft:monitor").getBlock() instanceof MonitorBlock);
 	}
 }

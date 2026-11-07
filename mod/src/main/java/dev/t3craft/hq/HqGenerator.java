@@ -155,6 +155,9 @@ public final class HqGenerator {
 					b.anchor(Anchor.at(AnchorNames.walkHub(walk++), new BlockPos(4 * sx, 1, wz), Direction.SOUTH));
 				}
 			}
+			// the archive terminal: east wall, between the benches' planter and the reading corner
+			c.set(HqGeometry.ARCHIVE_TERMINAL, k.archiveTerminal(Direction.WEST));
+			b.anchor(Anchor.face(AnchorNames.ARCHIVE_TERMINAL, HqGeometry.ARCHIVE_TERMINAL, Direction.WEST));
 			b.anchor(Anchor.at(AnchorNames.HUB, new BlockPos(0, 1, 0), Direction.SOUTH));
 			b.anchor(Anchor.at(AnchorNames.BEACON, new BlockPos(0, 9, 0), Direction.SOUTH));
 			b.anchor(Anchor.at(AnchorNames.ENTRANCE, new BlockPos(0, 1, HUB), Direction.SOUTH));

@@ -20,7 +20,7 @@ import net.minecraft.world.level.material.MapColor;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The custom blocks module: monitor, status lamp and board bulb, their block entity types and block
+ * The custom blocks module: monitor, status lamp, board bulb and archive terminal, their block entity types and block
  * items. <b>The single registration point</b>: {@link #init} is the only code in the mod that
  * registers blocks, items or block entity types for this module, and it registers nothing at all
  * when {@link BlocksSwitch} says no. Everything else (client renderers, the lamp driver, the HQ
@@ -42,7 +42,9 @@ public final class T3Blocks {
 			StatusLampBlock boardLampBlock,
 			List<Item> items,
 			BlockEntityType<MonitorBlockEntity> monitorType,
-			BlockEntityType<LampBlockEntity> lampType) implements HqBlockFixtures.States {
+			BlockEntityType<LampBlockEntity> lampType,
+			ArchiveTerminalBlock archiveTerminalBlock,
+			BlockEntityType<ArchiveTerminalBlockEntity> archiveTerminalType) implements HqBlockFixtures.States {
 		@Override
 		public BlockState monitor(Direction facing) {
 			return monitorBlock.defaultBlockState().setValue(MonitorBlock.FACING, facing);
@@ -56,6 +58,11 @@ public final class T3Blocks {
 		@Override
 		public BlockState boardLamp() {
 			return boardLampBlock.defaultBlockState();
+		}
+
+		@Override
+		public BlockState archiveTerminal(Direction facing) {
+			return archiveTerminalBlock.defaultBlockState().setValue(ArchiveTerminalBlock.FACING, facing);
 		}
 	}
 
@@ -98,24 +105,32 @@ public final class T3Blocks {
 		BlockEntityType<MonitorBlockEntity>[] monitorType = new BlockEntityType[1];
 		@SuppressWarnings("unchecked")
 		BlockEntityType<LampBlockEntity>[] lampType = new BlockEntityType[1];
+		@SuppressWarnings("unchecked")
+		BlockEntityType<ArchiveTerminalBlockEntity>[] terminalType = new BlockEntityType[1];
 
 		MonitorBlock monitor = (MonitorBlock) block(r, "monitor", p -> new MonitorBlock(p, () -> monitorType[0]),
 				BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLACK).strength(1.5f).sound(SoundType.METAL));
 		StatusLampBlock lamp = (StatusLampBlock) block(r, "status_lamp", p -> new StatusLampBlock(p, () -> lampType[0]), lampProps());
 		StatusLampBlock board = (StatusLampBlock) block(r, "board_lamp", p -> new StatusLampBlock(p, () -> lampType[0]), lampProps());
+		ArchiveTerminalBlock terminal = (ArchiveTerminalBlock) block(r, "archive_terminal", p -> new ArchiveTerminalBlock(p, () -> terminalType[0]),
+				BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GRAY).strength(1.5f).sound(SoundType.METAL).noOcclusion()
+						.lightLevel(s -> 5));
 
 		monitorType[0] = r.blockEntity(id("monitor"), new BlockEntityType<>(
 				(pos, state) -> new MonitorBlockEntity(monitorType[0], pos, state), Set.of(monitor)));
 		lampType[0] = r.blockEntity(id("status_lamp"), new BlockEntityType<>(
 				(pos, state) -> new LampBlockEntity(lampType[0], pos, state), Set.of(lamp, board)));
+		terminalType[0] = r.blockEntity(id("archive_terminal"), new BlockEntityType<>(
+				(pos, state) -> new ArchiveTerminalBlockEntity(terminalType[0], pos, state), Set.of(terminal)));
 
-		List<Item> items = List.of(item(r, "monitor", monitor), item(r, "status_lamp", lamp), item(r, "board_lamp", board));
+		List<Item> items = List.of(item(r, "monitor", monitor), item(r, "status_lamp", lamp), item(r, "board_lamp", board),
+				item(r, "archive_terminal", terminal));
 		r.creativeTab(items);
 
-		Content c = new Content(monitor, lamp, board, items, monitorType[0], lampType[0]);
+		Content c = new Content(monitor, lamp, board, items, monitorType[0], lampType[0], terminal, terminalType[0]);
 		HqFixtures.use(new HqBlockFixtures(c));
 		content = c;
-		T3Craft.LOGGER.info("T3Craft blocks module on ({}): monitor, status_lamp, board_lamp", sw.reason());
+		T3Craft.LOGGER.info("T3Craft blocks module on ({}): monitor, status_lamp, board_lamp, archive_terminal", sw.reason());
 		return c;
 	}
 

@@ -14,7 +14,8 @@ import net.minecraft.world.level.block.state.BlockState;
  * The HQ adapter (an {@link HqFixtures}): swaps the vanilla fixtures of a generated plan for the
  * module's blocks, cell for cell, as listed by {@link HqBindings}: computers → monitors (facing the
  * chair or the aisle), desk bulbs → status lamps, board bulbs → board lamps, the hub lantern's cap
- * → the beacon (a status lamp bound {@code beacon}). Each gets its binding as
+ * → the beacon (a status lamp bound {@code beacon}), the archive terminal's lectern → the archive
+ * terminal. Each gets its binding as
  * block entity data ({@code {"binding": "thread:<id>"}}), which the builders and the preview load with
  * {@code loadCustomOnly}. Positions, anchors and workstations are untouched, so NPCs, workstations
  * and HQ diffs see the same plan shape. Installed by {@link T3Blocks#init} only when the module is on.
@@ -27,6 +28,12 @@ public final class HqBlockFixtures implements HqFixtures {
 		BlockState lamp();
 
 		BlockState boardLamp();
+
+		/** The archive terminal, screen facing {@code facing} (default: the vanilla lectern stand-in). */
+		default BlockState archiveTerminal(Direction facing) {
+			return net.minecraft.world.level.block.Blocks.LECTERN.defaultBlockState()
+					.setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING, facing);
+		}
 	}
 
 	private final States states;
@@ -36,7 +43,7 @@ public final class HqBlockFixtures implements HqFixtures {
 	}
 
 	/** Bump when the substitution changes (cells, blocks or binding format): demo worlds then update. */
-	public static final String ID = "blocks-2";
+	public static final String ID = "blocks-3";
 
 	@Override
 	public String id() {
@@ -58,6 +65,7 @@ public final class HqBlockFixtures implements HqFixtures {
 				case MONITOR -> states.monitor(f.facing());
 				case LAMP, BEACON -> states.lamp();
 				case BOARD_LAMP -> states.boardLamp();
+				case ARCHIVE_TERMINAL -> states.archiveTerminal(f.facing());
 			};
 			return new Placement(p.rel(), s, data(f.binding()));
 		});
