@@ -163,6 +163,24 @@ public final class RpcFrames {
 		};
 	}
 
+	/** The success value of an {@code Exit} frame ({@code exit.value}), or null. */
+	public static @Nullable JsonElement exitValue(String text) {
+		try {
+			JsonElement el = JsonParser.parseString(text);
+			if (!el.isJsonObject()) {
+				return null;
+			}
+			JsonObject exit = Json.obj(el.getAsJsonObject(), "exit");
+			if (exit == null || !"Success".equals(Json.str(exit, "_tag"))) {
+				return null;
+			}
+			JsonElement v = exit.get("value");
+			return v == null || v.isJsonNull() ? null : v;
+		} catch (RuntimeException e) {
+			return null;
+		}
+	}
+
 	private static String describeCause(@Nullable JsonArray cause) {
 		if (cause == null || cause.isEmpty()) {
 			return "failure";

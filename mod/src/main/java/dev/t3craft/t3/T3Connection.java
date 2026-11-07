@@ -214,7 +214,9 @@ public final class T3Connection {
 		if (s == null) {
 			return "";
 		}
-		return s.replaceAll("wsTicket=[^&\\s\"'<>]+", "wsTicket=<redacted>").replaceAll("(?i)Bearer\\s+\\S+", "Bearer <redacted>");
+		return s.replaceAll("wsTicket=[^&\\s\"'<>]+", "wsTicket=<redacted>").replaceAll("(?i)Bearer\\s+\\S+", "Bearer <redacted>")
+				.replaceAll("(?i)\\b(access_token|subject_token|token)=[^&\\s\"'<>]+", "$1=<redacted>")
+				.replaceAll("(?i)\"(access_token|accessToken|subject_token|credential)\"\\s*:\\s*\"[^\"]*\"", "\"$1\":\"<redacted>\"");
 	}
 
 	static URI socketUri(URI base, String ticket) {
