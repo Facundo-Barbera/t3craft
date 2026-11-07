@@ -1,0 +1,65 @@
+# feat/operate-core: infraestructura de escritura (`orchestration:operate`)
+
+Decisión de Facundo (2026-11-07): **sí a la escritura** mediante un **segundo emparejamiento
+opcional por entorno**. Esta rama solo trae la infraestructura (`plan-v2.md` §1, puntos b–d):
+las acciones concretas (inventario §2, ítems 19–24) las implementan otros hilos sobre esta API.
+Los ítems 25 (PR, `source-control:write`) y 26 (tareas programadas) quedan fuera.
+
+## Modelo
+
+| Pieza | Dónde | Qué hace |
+|---|---|---|
+| `Pairing.OPERATE_SCOPES` | `dev.t3craft.t3` | Exactamente `orchestration:read` + `orchestration:operate`. `tokenRequestBody(…, scopes)` y `hostCommand(scopes, …)` **solo aceptan** `READ_SCOPES` u `OPERATE_SCOPES`: nunca sale una petición ni un comando sin `--scope` (sin `--scope`, T3 concede todos los scopes: filesystem:write, terminal:operate…). La respuesta debe conceder exactamente esos dos. |
+| `OperateCredentials` | `dev.t3craft.t3` | Token operate en `config/t3craft/credentials/operate/<env>.json` (600), aparte del de lectura (`credentials/<env>.json`). Nunca en `t3craft.json` ni en `environments.json`. `revoke(env)` borra solo el archivo local. `Environments.remove` (unpair) también lo borra. |
+| `OperateKind` | `dev.t3craft.t3` | Tipos de acción y si son **destructivos**: `RUN_INTERRUPT`, `THREAD_STOP`, `REQUEST_DENY`, `THREAD_SETTLE`, `QUEUE_CANCEL` y `THREAD_ARCHIVE`. Un tipo desconocido cuenta como destructivo. |
+| `OperateAction` | `dev.t3craft.t3` | Kind + env + hilo + RPC (`orchestration.*`) + payload. El payload nunca se loguea. |
+| `OperateGate` | `dev.t3craft.t3` | La única puerta: sin token, `READ_ONLY`; si es destructiva y no está confirmada, `NEEDS_CONFIRMATION`; si pasa, la manda el transporte del entorno. Todo intento queda en el audit log. Nunca lanza excepciones. |
+| `OperateConnection` | `dev.t3craft.t3` | Socket operate por entorno, gestionado por `DirectController` junto a la `T3Connection` de lectura (`operateTransport(env)` y `resetOperate(env)`). Se abre bajo demanda y se cierra tras 60 s inactivo. No reintenta escrituras. |
+| `AuditLog` | `dev.t3craft.t3` | `config/t3craft/audit.log`, JSON lines: `time, env, thread, action, destructive, result, origin, detail`. Sin payload ni títulos; `detail` pasa por `T3Connection.sanitize`. Rota a `audit.log.1` al superar 1 MiB. |
+| `OperateUi` | `dev.t3craft.client.operate` | Para las pantallas: `run(action, origin, returnTo, done)` abre la confirmación si hace falta; `guard(widget, env)` deshabilita el widget con el tooltip "Requiere control (operate)". |
+| `ConfirmActionScreen` | `dev.t3craft.client.screen` | Confirmación reutilizable: acción, hilo y entorno. |
+| `OperatePairScreen` | `dev.t3craft.client.screen` | "Habilitar control (operate)…", con la advertencia de riesgo y el comando exacto para el host. |
+| `OperateClient` | `dev.t3craft.client.operate` | Dueño del gate en el cliente; `enable(env, link, origin, done)` y `revoke(env, origin)`. |
+
+## Para el jugador
+
+- **Habilitar**: en Entornos, botón `Control…` de la fila, o `/t3craft operate enable <env>`.
+  En el host:
+  `t3 auth pairing create --scope orchestration:operate --scope orchestration:read --ttl 5m --label "T3Craft operate" --base-url https://host`.
+  Se pega el link (debe ser del mismo host que el entorno).
+- **Revocar**: botón `Revocar` en la fila, o `/t3craft operate revoke <env>`. Solo borra el token
+  local. **En el servidor T3 la revocación es manual**: `t3 auth session list` y luego
+  `t3 auth session revoke <id>` (o Sharing & access). T3Craft no hace escrituras para revocar.
+- **Estado**: `/t3craft operate`. La fila del entorno muestra `[control]` cuando el control está
+  activo.
+- Sin token operate, todo sigue en solo lectura.
+
+## Cómo añadir una acción nueva (hilos 19–24)
+
+1. **Elige o añade el `OperateKind`** en `dev.t3craft.t3.OperateKind`, pensando bien si es
+   `destructive`, y añade `t3craft.operate.kind.<wire>` en `lang/en_us.json` y `lang/es_es.json`
+   (`OperateLangTest` lo comprueba).
+2. **Construye la acción** con el payload del RPC (para `dispatchCommand`, un
+   `OrchestrationV2Command`; revisa el contrato en `t3code-ref`):
+   `OperateAction a = OperateUi.gate().operate(env).dispatch(OperateKind.THREAD_STOP, threadId, title, command);`
+   Para otro RPC: `new OperateAction(kind, env, threadId, title, "orchestration.launchThread", payload)`.
+3. **Ejecútala desde la UI**: `OperateUi.run(a, OperateGate.Origin.UI, this, r -> …)`. Si es
+   destructiva, sale la confirmación; `done` siempre se llama una vez en el hilo cliente con un
+   `OperateResult` (`OK`, `READ_ONLY`, `CANCELLED`, `REJECTED`, `AUTH_FAILED`, `OFFLINE`, `FAILED`).
+   Desde un comando, usa `Origin.COMMAND`.
+4. **Protege el botón**: `OperateUi.guard(button, env)`. Queda deshabilitado con el tooltip
+   "Requiere control (operate)" cuando el entorno es solo lectura.
+5. **Testea con un fake**: `new OperateGate(creds, env -> fakeTransport, AuditLog.in(tmp), () -> now)`
+   (ver `OperateGateTest.exampleSettle`). Nunca contra un T3 real durante el desarrollo.
+
+`FAILED` significa "se envió y no llegó la respuesta": la acción puede haberse aplicado, así que
+no se reintenta sola. Muestra el mensaje y deja que el jugador lo compruebe.
+
+## Seguridad
+
+- Las dos zonas de §1 siguen separadas: el socket de lectura nunca lleva el token operate, y el
+  socket operate solo existe mientras hay escrituras.
+- `OperateAction` solo acepta RPC `orchestration.*`; cualquier otra cosa necesitaría otros scopes.
+- Tokens: solo en `credentials/`, nunca en logs, chat, `toString()` ni en el audit.
+- `T3Connection.sanitize` ahora también redacta `token=`, `access_token=`, `subject_token=` y
+  campos JSON `accessToken`/`credential`.
