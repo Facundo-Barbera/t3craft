@@ -20,6 +20,21 @@ public final class RpcFrames {
 
 	public static final String SUBSCRIBE_SHELL = "orchestration.subscribeShell";
 	public static final String SUBSCRIBE_THREAD = "orchestration.subscribeThread";
+	public static final String GET_TURN_ITEM = "orchestration.getTurnItem";
+	public static final String GET_THREAD_PROJECTION = "orchestration.getThreadProjection";
+
+	/**
+	 * {@code orchestration.subscribeThread} as the chat uses it: completion marker and a bounded
+	 * snapshot (latest window + {@code historyCursor}; older pages over HTTP). No compact/dedupe
+	 * options, so items arrive as plain JSON.
+	 */
+	public static String subscribeThread(String id, String threadId) {
+		JsonObject p = new JsonObject();
+		p.addProperty("threadId", threadId);
+		p.addProperty("requestCompletionMarker", true);
+		p.addProperty("acceptBoundedSnapshot", true);
+		return request(id, SUBSCRIBE_THREAD, p);
+	}
 	/** Read-only ({@code orchestration:read}) thread search; a single Exit carries the result. */
 	public static final String SEARCH_THREADS = "orchestration.searchThreads";
 	/** T3 rejects queries shorter than this (after trimming). */

@@ -26,7 +26,8 @@ public record T3CraftSettings(
 		Notifications notifications,
 		Map<String, EnvPrefs> environments,
 		Portable portable,
-		Hud hud) {
+		Hud hud,
+		ChatPrefs chat) {
 
 	public static final int SCHEMA_VERSION = 1;
 	public static final String DEFAULT_BRIDGE_URL = "ws://127.0.0.1:7878/";
@@ -39,6 +40,15 @@ public record T3CraftSettings(
 		environments = Map.copyOf(new LinkedHashMap<>(environments));
 		portable = portable == null ? Portable.defaults() : portable;
 		hud = hud == null ? Hud.defaults() : hud;
+		chat = chat == null ? ChatPrefs.DEFAULT : chat;
+	}
+
+	/** Pre-{@code chat} shape (kept so callers written before that section still compile). */
+	public T3CraftSettings(int schemaVersion, String mode, String bridgeUrl, @Nullable String bridgeKey, double recentWindowHours,
+			int maxPerEnvironment, boolean includeSubagents, Notifications notifications, Map<String, EnvPrefs> environments,
+			Portable portable, Hud hud) {
+		this(schemaVersion, mode, bridgeUrl, bridgeKey, recentWindowHours, maxPerEnvironment, includeSubagents, notifications, environments,
+				portable, hud, ChatPrefs.DEFAULT);
 	}
 
 	/** Pre-{@code hud} shape (kept so callers written before that section still compile). */
@@ -74,34 +84,39 @@ public record T3CraftSettings(
 			m.put(id, prefs);
 		}
 		return new T3CraftSettings(schemaVersion, mode, bridgeUrl, bridgeKey, recentWindowHours, maxPerEnvironment, includeSubagents,
-				notifications, m, portable, hud);
+				notifications, m, portable, hud, chat);
 	}
 
 	public T3CraftSettings withoutEnv(String id) {
 		Map<String, EnvPrefs> m = new LinkedHashMap<>(environments);
 		m.remove(id);
 		return new T3CraftSettings(schemaVersion, mode, bridgeUrl, bridgeKey, recentWindowHours, maxPerEnvironment, includeSubagents,
-				notifications, m, portable, hud);
+				notifications, m, portable, hud, chat);
 	}
 
 	public T3CraftSettings withNotifications(Notifications n) {
 		return new T3CraftSettings(schemaVersion, mode, bridgeUrl, bridgeKey, recentWindowHours, maxPerEnvironment, includeSubagents, n,
-				environments, portable, hud);
+				environments, portable, hud, chat);
 	}
 
 	public T3CraftSettings withVisibility(double windowHours, int max, boolean subagents) {
 		return new T3CraftSettings(schemaVersion, mode, bridgeUrl, bridgeKey, windowHours, max, subagents, notifications, environments,
-				portable, hud);
+				portable, hud, chat);
 	}
 
 	public T3CraftSettings withPortable(Portable p) {
 		return new T3CraftSettings(schemaVersion, mode, bridgeUrl, bridgeKey, recentWindowHours, maxPerEnvironment, includeSubagents,
-				notifications, environments, p, hud);
+				notifications, environments, p, hud, chat);
+	}
+
+	public T3CraftSettings withChat(ChatPrefs c) {
+		return new T3CraftSettings(schemaVersion, mode, bridgeUrl, bridgeKey, recentWindowHours, maxPerEnvironment, includeSubagents,
+				notifications, environments, portable, hud, c);
 	}
 
 	public T3CraftSettings withHud(Hud h) {
 		return new T3CraftSettings(schemaVersion, mode, bridgeUrl, bridgeKey, recentWindowHours, maxPerEnvironment, includeSubagents,
-				notifications, environments, portable, h);
+				notifications, environments, portable, h, chat);
 	}
 
 	public long recentWindowMs() {
@@ -112,7 +127,7 @@ public record T3CraftSettings(
 	public String toString() {
 		return "T3CraftSettings[v" + schemaVersion + ", mode=" + mode + ", bridgeUrl=" + bridgeUrl + ", bridgeKey="
 				+ (bridgeKey == null ? "none" : "<redacted>") + ", window=" + recentWindowHours + "h, max=" + maxPerEnvironment
-				+ ", subagents=" + includeSubagents + ", " + notifications + ", envs=" + environments.keySet() + ", " + portable + ", " + hud + "]";
+				+ ", subagents=" + includeSubagents + ", " + notifications + ", envs=" + environments.keySet() + ", " + portable + ", " + hud + ", " + chat + "]";
 	}
 
 	/**
@@ -136,6 +151,24 @@ public record T3CraftSettings(
 	 * {@code position}: {@code top} | {@code bottom}. {@code align}: {@code left} | {@code center} |
 	 * {@code right}. {@code hideWhenIdle}: hide the bar while every count is zero.
 	 */
+	/**
+	 * Thread browser preferences ({@code chat} in the file, added by feat/chat; absent in older files,
+	 * which then read as {@link #DEFAULT}). {@code hiddenEnvironments}: environment ids the unified
+	 * thread list filters out (environments are only a filter there).
+	 */
+	public record ChatPrefs(java.util.Set<String> hiddenEnvironments) {
+		public static final ChatPrefs DEFAULT = new ChatPrefs(java.util.Set.of());
+
+		public ChatPrefs {
+			hiddenEnvironments = hiddenEnvironments == null ? java.util.Set.of()
+					: java.util.Collections.unmodifiableSet(new java.util.TreeSet<>(hiddenEnvironments));
+		}
+
+		public ChatPrefs withHiddenEnvironments(java.util.Set<String> ids) {
+			return new ChatPrefs(ids);
+		}
+	}
+
 	public record Hud(boolean statusBar, String position, String align, boolean hideWhenIdle) {
 		public static final java.util.List<String> POSITIONS = java.util.List.of("top", "bottom");
 		public static final java.util.List<String> ALIGNS = java.util.List.of("left", "center", "right");
