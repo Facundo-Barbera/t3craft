@@ -6,7 +6,7 @@
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import * as Stream from "effect/Stream";
-import { defaultConfigPath, loadConfig, readSecretFile, type EnvironmentConfig } from "../config.ts";
+import { defaultConfigPath, loadConfig, loadDotEnv, readSecretFile, type EnvironmentConfig } from "../config.ts";
 import { viewsFor } from "../bridge.ts";
 import { issueWebSocketTicket } from "../t3/auth.ts";
 import { connectT3 } from "../t3/rpc.ts";
@@ -33,6 +33,7 @@ const probe = (env: EnvironmentConfig, token: string, includeSubagents: boolean)
   ).pipe(Effect.timeout("30 seconds"));
 
 const main = async () => {
+  loadDotEnv();
   const config = loadConfig(defaultConfigPath());
   let failed = false;
   for (const env of config.environments) {

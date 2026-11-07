@@ -187,3 +187,9 @@ export const readSecretFile = (file: string, what: string, warn: (m: string) => 
   if (!value) throw new ConfigError(`${what}: file is empty (${file})`);
   return value;
 };
+
+/** Loads `bridge/.env` (gitignored) if present; real env vars win. Only for local runs. */
+export const loadDotEnv = (): void => {
+  const file = path.join(REPO_ROOT, "bridge", ".env");
+  if (existsSync(file)) process.loadEnvFile(file);
+};

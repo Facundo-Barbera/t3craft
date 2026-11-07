@@ -1,12 +1,13 @@
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
-import { defaultConfigPath, loadConfig, readSecretFile } from "./config.ts";
+import { defaultConfigPath, loadConfig, loadDotEnv, readSecretFile } from "./config.ts";
 import { Bridge, BRIDGE_VERSION } from "./bridge.ts";
 import { startModSocket } from "./server/modSocket.ts";
 
 const log = (m: string) => console.log(`${new Date().toISOString()} ${m}`);
 
 const main = async () => {
+  loadDotEnv();
   const configPath = defaultConfigPath();
   const config = loadConfig(configPath);
   log(`t3craft bridge ${BRIDGE_VERSION}, config ${configPath}, ${config.environments.length} environment(s)`);
