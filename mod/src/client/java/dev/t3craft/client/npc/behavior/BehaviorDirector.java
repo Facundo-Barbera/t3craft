@@ -53,6 +53,9 @@ public final class BehaviorDirector {
 		Display.@Nullable TextDisplay icon;
 		@Nullable Component bubbleText;
 		int bubbleLines;
+		/** The panel text last measured and its visible line count (getString() only when the text changes). */
+		@Nullable Component panelText;
+		int panelLines;
 		@Nullable String lastSummary;
 		boolean seenSummary;
 		boolean crouching;
@@ -171,7 +174,7 @@ public final class BehaviorDirector {
 		tick++;
 		AnchorSource layout = new LayeredAnchors(anchors, fallback);
 		if (navigation == null || navigationLevel != lvl) {
-			navigation = Navigation.over(new LevelBlocks(lvl));
+			navigation = Navigation.forLevel(new LevelBlocks(lvl));
 			navigationLevel = lvl;
 		}
 		Navigation nav = navigation;
@@ -327,7 +330,15 @@ public final class BehaviorDirector {
 
 		double dist = p.horizDist(player);
 		// Stack above the panel's visible lines (fix/npc-labels) so bubble and panel never cross.
-		int panelLines = b.panel() == null ? 0 : dev.t3craft.client.npc.NpcLabels.lines(b.panel().getText().getString());
+		int panelLines = 0;
+		if (b.panel() != null) {
+			Component pt = b.panel().getText();
+			if (pt != o.panelText) {
+				o.panelText = pt;
+				o.panelLines = dev.t3craft.client.npc.NpcLabels.lines(pt.getString());
+			}
+			panelLines = o.panelLines;
+		}
 		double top = at.y + dev.t3craft.client.npc.NpcLabels.bubbleBase(PANEL_Y, BUBBLE_Y, LINE_H, panelLines) - drop;
 		if (brain.bubbleWanted(dist)) {
 			if (o.bubble == null || o.bubble.isRemoved()) {
@@ -338,6 +349,7 @@ public final class BehaviorDirector {
 			Component text = bubble(lines);
 			if (!text.equals(o.bubbleText)) {
 				o.bubble.setText(text);
+				dev.t3craft.debug.PerfStats.count(dev.t3craft.debug.PerfStats.DISPLAY_SET_TEXT);
 				o.bubbleText = text;
 				o.bubbleLines = lines.size();
 			}
@@ -356,6 +368,7 @@ public final class BehaviorDirector {
 			Component glyph = Component.literal(brain.error() ? "✖" : "!").withStyle(ChatFormatting.BOLD).withColor(brain.error() ? 0xFF5555 : 0xFFAA00);
 			if (!glyph.equals(o.icon.getText())) {
 				o.icon.setText(glyph);
+				dev.t3craft.debug.PerfStats.count(dev.t3craft.debug.PerfStats.DISPLAY_SET_TEXT);
 			}
 			double bob = Math.sin((tick + Math.abs(b.id().hashCode() % 40)) * 0.12) * 0.12;
 			o.icon.moveOrInterpolateTo(new Vec3(at.x, top + 0.1 + bob, at.z), 0f, 0f);
@@ -406,6 +419,7 @@ public final class BehaviorDirector {
 			d.setTransformation(new Transformation(null, null, new Vector3f(scale, scale, scale), null));
 		}
 		lvl.addEntity(d);
+		dev.t3craft.debug.PerfStats.count(dev.t3craft.debug.PerfStats.DISPLAY_SPAWNED);
 		return d;
 	}
 

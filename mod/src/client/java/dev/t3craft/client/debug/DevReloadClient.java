@@ -7,6 +7,7 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import dev.t3craft.debug.DevReload;
 import dev.t3craft.debug.ModuleGuard;
+import dev.t3craft.debug.PerfStats;
 import dev.t3craft.debug.ResetReason;
 import java.util.ArrayList;
 import java.util.List;
@@ -16,6 +17,7 @@ import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,6 +63,8 @@ public final class DevReloadClient implements ClientModInitializer {
 	@Override
 	public void onInitializeClient() {
 		ClientCommandRegistrationCallback.EVENT.register((dispatcher, ctx) -> registerCommand(dispatcher));
+		// /t3dev perf: per-second rates over the last full second (one roll per second, a few map reads)
+		ClientTickEvents.END_CLIENT_TICK.register(mc -> PerfStats.get().roll(1_000_000_000L));
 		if (!pollingEnabled()) {
 			return;
 		}
@@ -91,6 +95,13 @@ public final class DevReloadClient implements ClientModInitializer {
 					c.getSource().sendFeedback(prefix().append("reset " + ok + "/" + DevReload.get().ids().size() + " state holder(s)"));
 					return 1;
 				}))
+				.then(literal("perf")
+						.executes(c -> perf(c.getSource()))
+						.then(literal("reset").executes(c -> {
+							PerfStats.get().reset();
+							c.getSource().sendFeedback(prefix().append("perf counters reset"));
+							return 1;
+						})))
 				.then(literal("check").executes(c -> {
 					boolean changed = DevReload.get().checkForRedefinition();
 					c.getSource().sendFeedback(prefix().append(changed ? "redefinition found; state reset" : "no class layout change"));
@@ -108,6 +119,24 @@ public final class DevReloadClient implements ClientModInitializer {
 					c.getSource().sendFeedback(prefix().append("disabled " + m));
 					return 1;
 				}))));
+	}
+
+	/** FPS and every counter with activity in the last second (see docs/dev.md, "Performance"). */
+	private static int perf(FabricClientCommandSource src) {
+		src.sendFeedback(prefix().append(Minecraft.getInstance().getFps() + " fps; per second over the last second:"));
+		int shown = 0;
+		for (PerfStats.Rate r : PerfStats.get().rates()) {
+			if (r.perSecond() <= 0) {
+				continue;
+			}
+			shown++;
+			boolean hot = r.timer() && r.perSecond() > 20e6; // > 1 ms per tick on average
+			src.sendFeedback(Component.literal("  " + PerfStats.format(r)).withStyle(hot ? ChatFormatting.RED : ChatFormatting.GRAY));
+		}
+		if (shown == 0) {
+			src.sendFeedback(Component.literal("  (nothing counted yet)").withStyle(ChatFormatting.GRAY));
+		}
+		return 1;
 	}
 
 	private static int status(FabricClientCommandSource src) {
