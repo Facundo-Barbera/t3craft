@@ -190,23 +190,47 @@ class StreamRegistryTest {
 	@Test
 	void oneShotCallsCollectValuesAndFailOnDisconnect() throws Exception {
 		StreamRegistry r = registry();
-		CompletableFuture<List<JsonObject>> offline = r.call(RpcFrames.GET_TURN_ITEM, new JsonObject());
+		CompletableFuture<List<com.google.gson.JsonElement>> offline = r.call(RpcFrames.GET_TURN_ITEM, new JsonObject());
 		assertTrue(offline.isCompletedExceptionally());
 
 		Wire w = new Wire();
 		r.onOpen(w);
-		CompletableFuture<List<JsonObject>> f = r.call(RpcFrames.GET_TURN_ITEM, new JsonObject());
+		CompletableFuture<List<com.google.gson.JsonElement>> f = r.call(RpcFrames.GET_TURN_ITEM, new JsonObject());
 		String id = w.lastRequestId();
 		assertEquals("orchestration.getTurnItem", w.sent.getLast().get("tag").getAsString());
 		JsonObject value = item("result");
 		assertTrue(r.onExit(id, null, value));
-		assertEquals("result", f.get().getFirst().get("n").getAsString());
+		assertEquals("result", f.get().getFirst().getAsJsonObject().get("n").getAsString());
 		assertEquals(0, r.pendingCalls());
 
-		CompletableFuture<List<JsonObject>> lost = r.call(RpcFrames.GET_THREAD_PROJECTION, new JsonObject());
+		CompletableFuture<List<com.google.gson.JsonElement>> lost = r.call(RpcFrames.GET_THREAD_PROJECTION, new JsonObject());
 		r.onClosed();
 		assertTrue(lost.isCompletedExceptionally());
 		assertTrue(r.call(RpcFrames.GET_TURN_ITEM, new JsonObject()).isCompletedExceptionally(), "offline: fails at once");
+	}
+
+	@Test
+	void cancelAndAbandonInterruptInTheSameIdSpace() {
+		StreamRegistry r = registry();
+		Wire w = new Wire();
+		r.onOpen(w);
+		r.subscribe("T1", new Rec());
+		String streamId = w.lastRequestId();
+		var search = r.call(id -> RpcFrames.searchThreads(id, "hello", 10, "VPS"));
+		String searchId = w.lastRequestId();
+		assertEquals("orchestration.searchThreads", w.sent.getLast().get("tag").getAsString());
+		assertFalse(searchId.equals(streamId), "one id generator for streams and calls");
+		assertTrue(search.cancel(true));
+		assertEquals("Interrupt", w.sent.getLast().get("_tag").getAsString());
+		assertEquals(searchId, w.sent.getLast().get("requestId").getAsString());
+		assertTrue(r.onExit(searchId, null, item("late")), "a late answer is still ours (dropped)");
+
+		var slow = r.call(RpcFrames.GET_TURN_ITEM, new JsonObject());
+		String slowId = w.lastRequestId();
+		assertTrue(r.abandon(slow));
+		assertFalse(r.abandon(slow), "only once");
+		assertEquals(slowId, w.sent.getLast().get("requestId").getAsString());
+		assertEquals(0, r.pendingCalls());
 	}
 
 	@Test
@@ -248,6 +272,6 @@ class StreamRegistryTest {
 		RpcFrames.Exit e = (RpcFrames.Exit) RpcFrames.parse("{\"_tag\":\"Exit\",\"requestId\":\"9\",\"exit\":{\"_tag\":\"Success\",\"value\":{\"item\":null}}}");
 		assertEquals("9", e.requestId());
 		assertNull(e.failure());
-		assertTrue(e.value().has("item"));
+		assertTrue(e.value().getAsJsonObject().has("item"));
 	}
 }

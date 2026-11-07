@@ -15,6 +15,8 @@ public final class PeekHud {
 	private static volatile @Nullable String text;
 	private static volatile int color = 0xAAAAAA;
 	private static volatile @Nullable String banner;
+	/** Bottom edge of what was drawn last frame (0 = nothing); {@link StatusBar} stacks under it. */
+	private static volatile int bottom;
 
 	private PeekHud() {
 	}
@@ -22,7 +24,8 @@ public final class PeekHud {
 	public static void register() {
 		HudElementRegistry.addLast(Identifier.fromNamespaceAndPath("t3craft", "peek"), (g, delta) -> {
 			Minecraft mc = Minecraft.getInstance();
-			if (mc.player == null || mc.gui.screen() != null) {
+			bottom = 0;
+			if (mc.player == null || mc.gui.hud.isHidden() || mc.gui.screen() != null) {
 				return;
 			}
 			int y = 4;
@@ -32,6 +35,7 @@ public final class PeekHud {
 				g.fill(g.guiWidth() / 2 - w / 2 - 4, y - 2, g.guiWidth() / 2 + w / 2 + 4, y + 10, 0xA0400000);
 				g.centeredText(mc.font, b, g.guiWidth() / 2, y, 0xFFFFC0C0);
 				y += 14;
+				bottom = y - 2;
 			}
 			String t = text;
 			if (t != null) {
@@ -39,8 +43,13 @@ public final class PeekHud {
 				int w = mc.font.width(shown);
 				g.fill(g.guiWidth() / 2 - w / 2 - 4, y - 2, g.guiWidth() / 2 + w / 2 + 4, y + 10, 0x80000000);
 				g.centeredText(mc.font, Component.literal(shown).withColor(color), g.guiWidth() / 2, y, 0xFFFFFFFF);
+				bottom = y + 10;
 			}
 		});
+	}
+
+	public static int bottom() {
+		return bottom;
 	}
 
 	public static void setPeek(@Nullable String t, int c) {

@@ -35,6 +35,13 @@ public final class RpcFrames {
 		p.addProperty("acceptBoundedSnapshot", true);
 		return request(id, SUBSCRIBE_THREAD, p);
 	}
+	/** Read-only ({@code orchestration:read}) thread search; a single Exit carries the result. */
+	public static final String SEARCH_THREADS = "orchestration.searchThreads";
+	/** T3 rejects queries shorter than this (after trimming). */
+	public static final int SEARCH_MIN_LENGTH = 2;
+	/** T3 rejects longer queries; they are cut to this before sending. */
+	public static final int SEARCH_MAX_LENGTH = 200;
+	public static final int SEARCH_MAX_LIMIT = 50;
 
 	public static String request(String id, String tag, JsonObject payload) {
 		JsonObject o = new JsonObject();
@@ -54,6 +61,27 @@ public final class RpcFrames {
 		JsonObject p = new JsonObject();
 		p.addProperty("requestCompletionMarker", true);
 		return request(id, SUBSCRIBE_SHELL, p);
+	}
+
+	/**
+	 * {@code orchestration.searchThreads} with {@code query} trimmed and cut to
+	 * {@link #SEARCH_MAX_LENGTH} and {@code limit} clamped to 1..{@link #SEARCH_MAX_LIMIT}.
+	 * Callers check {@link #searchQuery} first: T3 rejects queries under two characters.
+	 */
+	public static String searchThreads(String id, String query, int limit, @Nullable String environmentLabel) {
+		JsonObject p = new JsonObject();
+		p.addProperty("query", searchQuery(query));
+		p.addProperty("limit", Math.max(1, Math.min(SEARCH_MAX_LIMIT, limit)));
+		if (environmentLabel != null && !environmentLabel.isBlank()) {
+			p.addProperty("environmentLabel", environmentLabel);
+		}
+		return request(id, SEARCH_THREADS, p);
+	}
+
+	/** The query as it is sent: trimmed and cut to {@link #SEARCH_MAX_LENGTH}. */
+	public static String searchQuery(@Nullable String query) {
+		String q = query == null ? "" : query.strip();
+		return q.length() > SEARCH_MAX_LENGTH ? q.substring(0, SEARCH_MAX_LENGTH).strip() : q;
 	}
 
 	public static String ack(String requestId) {
@@ -84,9 +112,9 @@ public final class RpcFrames {
 
 	/**
 	 * {@code failure} is a short, secret-free description when the exit is a failure, else null.
-	 * {@code value}: the success value of a one-shot RPC when it is an object, else null.
+	 * {@code value} is the success value of a non-stream RPC (null for streams and failures).
 	 */
-	public record Exit(String requestId, @Nullable String failure, @Nullable JsonObject value) implements Frame {
+	public record Exit(String requestId, @Nullable String failure, @Nullable JsonElement value) implements Frame {
 		public Exit(String requestId, @Nullable String failure) {
 			this(requestId, failure, null);
 		}
@@ -129,11 +157,11 @@ public final class RpcFrames {
 			case "Exit" -> {
 				JsonObject exit = Json.obj(o, "exit");
 				String failure = null;
-				JsonObject value = null;
+				JsonElement value = null;
 				if ("Failure".equals(Json.str(exit, "_tag"))) {
 					failure = describeCause(Json.arr(exit, "cause"));
-				} else {
-					value = Json.obj(exit, "value");
+				} else if (exit != null && exit.has("value") && !exit.get("value").isJsonNull()) {
+					value = exit.get("value");
 				}
 				yield new Exit(String.valueOf(Json.str(o, "requestId")), failure, value);
 			}

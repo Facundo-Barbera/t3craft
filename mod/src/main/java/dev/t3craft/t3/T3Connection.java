@@ -160,8 +160,8 @@ public final class T3Connection {
 		p.addProperty("threadId", threadId);
 		p.addProperty("itemId", itemId);
 		return streams.call(RpcFrames.GET_TURN_ITEM, p).thenApply(values -> {
-			JsonObject last = values.isEmpty() ? null : values.getLast();
-			return Json.obj(last, "item");
+			JsonElement last = values.isEmpty() ? null : values.getLast();
+			return last != null && last.isJsonObject() ? Json.obj(last.getAsJsonObject(), "item") : null;
 		});
 	}
 
@@ -169,7 +169,10 @@ public final class T3Connection {
 	public CompletableFuture<JsonObject> getThreadProjection(String threadId) {
 		JsonObject p = new JsonObject();
 		p.addProperty("threadId", threadId);
-		return streams.call(RpcFrames.GET_THREAD_PROJECTION, p).thenApply(values -> values.isEmpty() ? new JsonObject() : values.getLast());
+		return streams.call(RpcFrames.GET_THREAD_PROJECTION, p).thenApply(values -> {
+			JsonElement last = values.isEmpty() ? null : values.getLast();
+			return last != null && last.isJsonObject() ? last.getAsJsonObject() : new JsonObject();
+		});
 	}
 
 	/**
@@ -208,6 +211,70 @@ public final class T3Connection {
 			}
 			return el.getAsJsonObject();
 		});
+	}
+
+	/**
+	 * Read-only {@code orchestration.searchThreads} on this connection's socket (no second
+	 * connection; same request ids and send queue as every other RPC, via {@link StreamRegistry}).
+	 * Completes with the decoded result, or exceptionally with a {@link ThreadSearch.SearchException}
+	 * (sanitized) when not connected, on a T3 failure, when the socket drops or after
+	 * {@code timeoutMs}. Cancelling the future interrupts the request on T3. {@code query} must have
+	 * at least {@link RpcFrames#SEARCH_MIN_LENGTH} characters once trimmed.
+	 */
+	public CompletableFuture<ThreadSearch.Decoded> searchThreads(String query, int limit, long timeoutMs) {
+		CompletableFuture<ThreadSearch.Decoded> f = new CompletableFuture<>();
+		String q = RpcFrames.searchQuery(query);
+		if (q.length() < RpcFrames.SEARCH_MIN_LENGTH) {
+			f.completeExceptionally(new ThreadSearch.SearchException("query too short (at least " + RpcFrames.SEARCH_MIN_LENGTH + " characters)"));
+			return f;
+		}
+		Status st = status;
+		if (stopped || st != Status.OK) {
+			f.completeExceptionally(new ThreadSearch.SearchException("not connected (" + st.wire + ")"));
+			return f;
+		}
+		CompletableFuture<List<JsonElement>> raw = streams.call(id -> RpcFrames.searchThreads(id, q, limit, env.label()));
+		raw.whenComplete((values, err) -> {
+			if (err != null) {
+				f.completeExceptionally(new ThreadSearch.SearchException(callError(err, st)));
+				return;
+			}
+			try {
+				f.complete(ThreadSearch.decode(values.isEmpty() ? null : values.getLast()));
+			} catch (RuntimeException ex) {
+				f.completeExceptionally(new ThreadSearch.SearchException("unexpected search result"));
+			}
+		});
+		ScheduledFuture<?> timer;
+		try {
+			timer = exec.schedule(() -> {
+				if (streams.abandon(raw)) {
+					f.completeExceptionally(new ThreadSearch.SearchException("timed out after " + Math.max(1, timeoutMs / 1000) + " s"));
+				}
+			}, Math.max(1, timeoutMs), TimeUnit.MILLISECONDS);
+		} catch (java.util.concurrent.RejectedExecutionException e) {
+			raw.cancel(true);
+			f.completeExceptionally(new ThreadSearch.SearchException("connection stopped"));
+			return f;
+		}
+		f.whenComplete((r, err) -> {
+			timer.cancel(false);
+			if (f.isCancelled()) {
+				raw.cancel(true); // StreamRegistry interrupts it on T3
+			}
+		});
+		return f;
+	}
+
+	/** Secret-free message for a failed one-shot call. */
+	private static String callError(Throwable err, Status st) {
+		Throwable c = err instanceof java.util.concurrent.CompletionException && err.getCause() != null ? err.getCause() : err;
+		String m = c.getMessage() == null ? c.getClass().getSimpleName() : c.getMessage();
+		return switch (m) {
+			case "connection lost" -> "connection to T3 lost";
+			case "not connected" -> "not connected (" + st.wire + ")";
+			default -> "T3: " + sanitize(m);
+		};
 	}
 
 	/** Threads with at least one subscriber (diagnostics, tests). */

@@ -109,11 +109,11 @@ public final class ConfigCodec {
 		}
 
 		Portable portable = decodePortable(o, w);
-
+		T3CraftSettings.Hud hud = decodeHud(o, w);
 		T3CraftSettings.ChatPrefs chat = decodeChat(o, w);
 
 		return new Decoded(new T3CraftSettings(T3CraftSettings.SCHEMA_VERSION, mode, bridgeUrl, bridgeKey, window, max, subagents, n, envs,
-				portable, chat), w);
+				portable, hud, chat), w);
 	}
 
 	/** {@code "chat": {"hiddenEnvironments": ["vps", ...]}}; absent → defaults (additive, no migration). */
@@ -151,6 +151,27 @@ public final class ConfigCodec {
 			return d;
 		}
 		return new Portable(bool(p, "heldScreen", d.heldScreen(), w));
+	}
+
+	private static T3CraftSettings.Hud decodeHud(JsonObject o, List<String> w) {
+		T3CraftSettings.Hud d = T3CraftSettings.Hud.defaults();
+		JsonObject h = obj(o, "hud");
+		if (h == null) {
+			if (o.has("hud") && !o.get("hud").isJsonNull()) {
+				w.add("hud must be an object");
+			}
+			return d;
+		}
+		String pos = str(h, "position");
+		String align = str(h, "align");
+		if (pos != null && !T3CraftSettings.Hud.POSITIONS.contains(pos)) {
+			w.add("hud.position must be top or bottom");
+		}
+		if (align != null && !T3CraftSettings.Hud.ALIGNS.contains(align)) {
+			w.add("hud.align must be left, center or right");
+		}
+		return new T3CraftSettings.Hud(bool(h, "statusBar", d.statusBar(), w), pos == null ? d.position() : pos,
+				align == null ? d.align() : align, bool(h, "hideWhenIdle", d.hideWhenIdle(), w));
 	}
 
 	private static Notifications decodeNotifications(@Nullable JsonObject o, List<String> w) {
@@ -260,6 +281,13 @@ public final class ConfigCodec {
 		JsonObject po = obj(o, "portable") == null ? new JsonObject() : obj(o, "portable");
 		po.addProperty("heldScreen", s.portable().heldScreen());
 		o.add("portable", po);
+
+		JsonObject ho = obj(o, "hud") == null ? new JsonObject() : obj(o, "hud");
+		ho.addProperty("statusBar", s.hud().statusBar());
+		ho.addProperty("position", s.hud().position());
+		ho.addProperty("align", s.hud().align());
+		ho.addProperty("hideWhenIdle", s.hud().hideWhenIdle());
+		o.add("hud", ho);
 
 		JsonObject chat = obj(o, "chat") == null ? new JsonObject() : obj(o, "chat");
 		com.google.gson.JsonArray hidden = new com.google.gson.JsonArray();

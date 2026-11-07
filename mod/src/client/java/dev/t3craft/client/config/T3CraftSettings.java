@@ -26,6 +26,7 @@ public record T3CraftSettings(
 		Notifications notifications,
 		Map<String, EnvPrefs> environments,
 		Portable portable,
+		Hud hud,
 		ChatPrefs chat) {
 
 	public static final int SCHEMA_VERSION = 1;
@@ -38,26 +39,36 @@ public record T3CraftSettings(
 	public T3CraftSettings {
 		environments = Map.copyOf(new LinkedHashMap<>(environments));
 		portable = portable == null ? Portable.defaults() : portable;
+		hud = hud == null ? Hud.defaults() : hud;
 		chat = chat == null ? ChatPrefs.DEFAULT : chat;
 	}
 
 	/** Pre-{@code chat} shape (kept so callers written before that section still compile). */
 	public T3CraftSettings(int schemaVersion, String mode, String bridgeUrl, @Nullable String bridgeKey, double recentWindowHours,
-			int maxPerEnvironment, boolean includeSubagents, Notifications notifications, Map<String, EnvPrefs> environments, Portable portable) {
+			int maxPerEnvironment, boolean includeSubagents, Notifications notifications, Map<String, EnvPrefs> environments,
+			Portable portable, Hud hud) {
 		this(schemaVersion, mode, bridgeUrl, bridgeKey, recentWindowHours, maxPerEnvironment, includeSubagents, notifications, environments,
-				portable, ChatPrefs.DEFAULT);
+				portable, hud, ChatPrefs.DEFAULT);
+	}
+
+	/** Pre-{@code hud} shape (kept so callers written before that section still compile). */
+	public T3CraftSettings(int schemaVersion, String mode, String bridgeUrl, @Nullable String bridgeKey, double recentWindowHours,
+			int maxPerEnvironment, boolean includeSubagents, Notifications notifications, Map<String, EnvPrefs> environments,
+			Portable portable) {
+		this(schemaVersion, mode, bridgeUrl, bridgeKey, recentWindowHours, maxPerEnvironment, includeSubagents, notifications, environments,
+				portable, Hud.defaults());
 	}
 
 	/** Pre-{@code portable} shape (kept so callers written before that section still compile). */
 	public T3CraftSettings(int schemaVersion, String mode, String bridgeUrl, @Nullable String bridgeKey, double recentWindowHours,
 			int maxPerEnvironment, boolean includeSubagents, Notifications notifications, Map<String, EnvPrefs> environments) {
 		this(schemaVersion, mode, bridgeUrl, bridgeKey, recentWindowHours, maxPerEnvironment, includeSubagents, notifications, environments,
-				Portable.defaults(), ChatPrefs.DEFAULT);
+				Portable.defaults());
 	}
 
 	public static T3CraftSettings defaults() {
 		return new T3CraftSettings(SCHEMA_VERSION, "direct", DEFAULT_BRIDGE_URL, null, DEFAULT_WINDOW_HOURS, DEFAULT_MAX, false,
-				Notifications.defaults(), Map.of(), Portable.defaults());
+				Notifications.defaults(), Map.of(), Portable.defaults(), Hud.defaults());
 	}
 
 	/** Preferences of one environment; defaults for an environment that has no entry. */
@@ -73,34 +84,39 @@ public record T3CraftSettings(
 			m.put(id, prefs);
 		}
 		return new T3CraftSettings(schemaVersion, mode, bridgeUrl, bridgeKey, recentWindowHours, maxPerEnvironment, includeSubagents,
-				notifications, m, portable, chat);
+				notifications, m, portable, hud, chat);
 	}
 
 	public T3CraftSettings withoutEnv(String id) {
 		Map<String, EnvPrefs> m = new LinkedHashMap<>(environments);
 		m.remove(id);
 		return new T3CraftSettings(schemaVersion, mode, bridgeUrl, bridgeKey, recentWindowHours, maxPerEnvironment, includeSubagents,
-				notifications, m, portable, chat);
+				notifications, m, portable, hud, chat);
 	}
 
 	public T3CraftSettings withNotifications(Notifications n) {
 		return new T3CraftSettings(schemaVersion, mode, bridgeUrl, bridgeKey, recentWindowHours, maxPerEnvironment, includeSubagents, n,
-				environments, portable, chat);
+				environments, portable, hud, chat);
 	}
 
 	public T3CraftSettings withVisibility(double windowHours, int max, boolean subagents) {
 		return new T3CraftSettings(schemaVersion, mode, bridgeUrl, bridgeKey, windowHours, max, subagents, notifications, environments,
-				portable, chat);
-	}
-
-	public T3CraftSettings withChat(ChatPrefs c) {
-		return new T3CraftSettings(schemaVersion, mode, bridgeUrl, bridgeKey, recentWindowHours, maxPerEnvironment, includeSubagents,
-				notifications, environments, portable, c);
+				portable, hud, chat);
 	}
 
 	public T3CraftSettings withPortable(Portable p) {
 		return new T3CraftSettings(schemaVersion, mode, bridgeUrl, bridgeKey, recentWindowHours, maxPerEnvironment, includeSubagents,
-				notifications, environments, p, chat);
+				notifications, environments, p, hud, chat);
+	}
+
+	public T3CraftSettings withChat(ChatPrefs c) {
+		return new T3CraftSettings(schemaVersion, mode, bridgeUrl, bridgeKey, recentWindowHours, maxPerEnvironment, includeSubagents,
+				notifications, environments, portable, hud, c);
+	}
+
+	public T3CraftSettings withHud(Hud h) {
+		return new T3CraftSettings(schemaVersion, mode, bridgeUrl, bridgeKey, recentWindowHours, maxPerEnvironment, includeSubagents,
+				notifications, environments, portable, h, chat);
 	}
 
 	public long recentWindowMs() {
@@ -111,9 +127,30 @@ public record T3CraftSettings(
 	public String toString() {
 		return "T3CraftSettings[v" + schemaVersion + ", mode=" + mode + ", bridgeUrl=" + bridgeUrl + ", bridgeKey="
 				+ (bridgeKey == null ? "none" : "<redacted>") + ", window=" + recentWindowHours + "h, max=" + maxPerEnvironment
-				+ ", subagents=" + includeSubagents + ", " + notifications + ", envs=" + environments.keySet() + ", " + portable + ", " + chat + "]";
+				+ ", subagents=" + includeSubagents + ", " + notifications + ", envs=" + environments.keySet() + ", " + portable + ", " + hud + ", " + chat + "]";
 	}
 
+	/**
+	 * Portable T3 Terminal section ({@code "portable": {...}}, additive: a file without it reads as
+	 * the defaults). {@code heldScreen}: the terminal held in either hand shows a live summary on its
+	 * screen, map-style; false = plain item. Default on.
+	 */
+	public record Portable(boolean heldScreen) {
+		public static Portable defaults() {
+			return new Portable(true);
+		}
+
+		public Portable withHeldScreen(boolean v) {
+			return new Portable(v);
+		}
+	}
+
+	/**
+	 * HUD status bar section ({@code "hud": {...}}, additive: a file without it reads as the
+	 * defaults). {@code statusBar}: show the bar with the working / needs you / error counts.
+	 * {@code position}: {@code top} | {@code bottom}. {@code align}: {@code left} | {@code center} |
+	 * {@code right}. {@code hideWhenIdle}: hide the bar while every count is zero.
+	 */
 	/**
 	 * Thread browser preferences ({@code chat} in the file, added by feat/chat; absent in older files,
 	 * which then read as {@link #DEFAULT}). {@code hiddenEnvironments}: environment ids the unified
@@ -132,18 +169,40 @@ public record T3CraftSettings(
 		}
 	}
 
-	/**
-	 * Portable T3 Terminal section ({@code "portable": {...}}, additive: a file without it reads as
-	 * the defaults). {@code heldScreen}: the terminal held in either hand shows a live summary on its
-	 * screen, map-style; false = plain item. Default on.
-	 */
-	public record Portable(boolean heldScreen) {
-		public static Portable defaults() {
-			return new Portable(true);
+	public record Hud(boolean statusBar, String position, String align, boolean hideWhenIdle) {
+		public static final java.util.List<String> POSITIONS = java.util.List.of("top", "bottom");
+		public static final java.util.List<String> ALIGNS = java.util.List.of("left", "center", "right");
+
+		public Hud {
+			position = POSITIONS.contains(position) ? position : "top";
+			align = ALIGNS.contains(align) ? align : "center";
 		}
 
-		public Portable withHeldScreen(boolean v) {
-			return new Portable(v);
+		public static Hud defaults() {
+			return new Hud(true, "top", "center", true);
+		}
+
+		public boolean bottom() {
+			return "bottom".equals(position);
+		}
+
+		public Hud withStatusBar(boolean v) {
+			return new Hud(v, position, align, hideWhenIdle);
+		}
+
+		public Hud withPlacement(String pos, String al) {
+			return new Hud(statusBar, pos, al, hideWhenIdle);
+		}
+
+		public Hud withHideWhenIdle(boolean v) {
+			return new Hud(statusBar, position, align, v);
+		}
+
+		/** Next placement in the settings cycle: top left → top center → … → bottom right → top left. */
+		public Hud nextPlacement() {
+			int i = POSITIONS.indexOf(position) * ALIGNS.size() + ALIGNS.indexOf(align) + 1;
+			i %= POSITIONS.size() * ALIGNS.size();
+			return withPlacement(POSITIONS.get(i / ALIGNS.size()), ALIGNS.get(i % ALIGNS.size()));
 		}
 	}
 

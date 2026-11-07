@@ -1,5 +1,6 @@
 package dev.t3craft.t3;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -79,7 +80,7 @@ public final class StreamRegistry {
 		}
 	}
 
-	private record Call(CompletableFuture<List<JsonObject>> result, List<JsonObject> values) {
+	private record Call(CompletableFuture<List<JsonElement>> result, List<JsonElement> values) {
 	}
 
 	/**
@@ -216,13 +217,24 @@ public final class StreamRegistry {
 
 	// ---- one-shot calls -------------------------------------------------------------------------
 
+	/** Builds a request frame for a request id this registry allocated. */
+	@FunctionalInterface
+	public interface RequestFrame {
+		String build(String requestId);
+	}
+
 	/**
 	 * Sends a one-shot read request ({@code tag} + payload) and completes with every value it
 	 * returns (chunks, then the exit value if any). Fails when the socket is down or goes away, or
-	 * when the server answers with a failure.
+	 * when the server answers with a failure. Cancelling the future sends an Interrupt.
 	 */
-	public CompletableFuture<List<JsonObject>> call(String tag, JsonObject payload) {
-		CompletableFuture<List<JsonObject>> f = new CompletableFuture<>();
+	public CompletableFuture<List<JsonElement>> call(String tag, JsonObject payload) {
+		return call(id -> RpcFrames.request(id, tag, payload));
+	}
+
+	/** Same, with the caller's frame builder (e.g. {@link RpcFrames#searchThreads}); one id space for everything. */
+	public CompletableFuture<List<JsonElement>> call(RequestFrame frameFor) {
+		CompletableFuture<List<JsonElement>> f = new CompletableFuture<>();
 		String frame;
 		synchronized (this) {
 			if (!open) {
@@ -231,15 +243,49 @@ public final class StreamRegistry {
 			}
 			String id = Long.toString(nextId++);
 			calls.put(id, new Call(f, new ArrayList<>()));
-			frame = RpcFrames.request(id, tag, payload);
+			frame = frameFor.build(id);
 		}
+		f.whenComplete((v, e) -> {
+			if (f.isCancelled()) {
+				abandon(f);
+			}
+		});
 		if (!sender.send(frame)) {
 			failCall(f, "not connected");
 		}
 		return f;
 	}
 
-	private void failCall(CompletableFuture<List<JsonObject>> f, String why) {
+	/**
+	 * Gives up on a pending call (timeout, cancel): forgets it and interrupts it on the server.
+	 * Returns false when it was no longer pending (already answered or abandoned). A late answer is
+	 * acked and dropped.
+	 */
+	public boolean abandon(CompletableFuture<?> f) {
+		String interrupt = null;
+		synchronized (this) {
+			String id = null;
+			for (Map.Entry<String, Call> e : calls.entrySet()) {
+				if (e.getValue().result() == f) {
+					id = e.getKey();
+					break;
+				}
+			}
+			if (id == null) {
+				return false;
+			}
+			calls.remove(id);
+			if (open) {
+				interrupt = RpcFrames.interrupt(id);
+			}
+		}
+		if (interrupt != null) {
+			sender.send(interrupt);
+		}
+		return true;
+	}
+
+	private void failCall(CompletableFuture<List<JsonElement>> f, String why) {
 		synchronized (this) {
 			calls.values().removeIf(c -> c.result() == f);
 		}
@@ -331,7 +377,7 @@ public final class StreamRegistry {
 	}
 
 	/** An Exit for one of our requests (true) or not (false). {@code value}: success value, if any. */
-	public boolean onExit(String requestId, @Nullable String failure, @Nullable JsonObject value) {
+	public boolean onExit(String requestId, @Nullable String failure, @Nullable JsonElement value) {
 		List<Listener> to = null;
 		Call c;
 		synchronized (this) {

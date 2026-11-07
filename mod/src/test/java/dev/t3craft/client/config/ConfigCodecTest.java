@@ -95,4 +95,23 @@ class ConfigCodecTest {
 		assertTrue(s.environments().isEmpty());
 		assertTrue(decode("{\"environments\":{\"e\":{\"visible\":true}}}").settings().environments().isEmpty());
 	}
+
+	@Test
+	void hudSectionRoundTripsAndIsAdditive() {
+		T3CraftSettings s = T3CraftSettings.defaults().withHud(new T3CraftSettings.Hud(false, "bottom", "right", false));
+		JsonObject o = ConfigCodec.encode(s, new JsonObject());
+		assertEquals("bottom", o.getAsJsonObject("hud").get("position").getAsString());
+		assertEquals(s, ConfigCodec.decode(o).settings());
+		ConfigCodec.Decoded old = decode("{\"schemaVersion\":1}");
+		assertEquals(T3CraftSettings.Hud.defaults(), old.settings().hud());
+	}
+
+	@Test
+	void hudInvalidValuesWarnAndFallBack() {
+		ConfigCodec.Decoded d = decode("{\"schemaVersion\":1,\"hud\":{\"position\":\"middle\",\"align\":\"left\",\"statusBar\":\"yes\"}}");
+		assertEquals("top", d.settings().hud().position());
+		assertEquals("left", d.settings().hud().align());
+		assertTrue(d.settings().hud().statusBar());
+		assertEquals(2, d.warnings().size(), d.warnings().toString());
+	}
 }
