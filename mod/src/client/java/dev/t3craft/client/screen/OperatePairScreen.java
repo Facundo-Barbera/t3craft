@@ -16,10 +16,11 @@ import net.minecraft.util.FormattedCharSequence;
 import org.jspecify.annotations.Nullable;
 
 /**
- * "Enable control (operate)…" for one already paired environment: the risk warning, the exact host
+ * "Enable control" for one environment paired read-only (upgrade): the risk warning, the exact host
  * command (always with explicit {@code --scope orchestration:read --scope orchestration:operate})
  * and a field for the one-time link or code. The operate session is stored apart from the
- * read-only one; nothing is shown or logged.
+ * read-only one, which is kept; nothing is shown or logged. New pairings already get control by
+ * default ({@link PairScreen}).
  */
 public final class OperatePairScreen extends Screen {
 	private final @Nullable Screen parent;

@@ -70,6 +70,8 @@ public final class ShellState {
 
 	private final Map<String, ThreadShell> threads = new LinkedHashMap<>();
 	private final Map<String, Project> projects = new LinkedHashMap<>();
+	/** feat/op-launch: raw {@code defaultModelSelection} per project id (absent when null/missing). */
+	private final Map<String, JsonObject> defaultModels = new LinkedHashMap<>();
 	private long sequence = -1;
 	private boolean synchronizedFlag;
 	private boolean hadAuthoritative;
@@ -92,8 +94,27 @@ public final class ShellState {
 		return p == null ? null : p.displayName();
 	}
 
-	/** Immutable copy for other threads: visible threads + project display names + sync flag. */
-	public record View(java.util.List<ThreadShell> threads, Map<String, String> projectTitles, boolean synced) {
+	/**
+	 * Immutable copy for other threads: visible threads + project display names + sync flag, and
+	 * (feat/op-launch) each project's raw {@code defaultModelSelection} (only projects that have one).
+	 */
+	public record View(java.util.List<ThreadShell> threads, Map<String, String> projectTitles, boolean synced,
+			Map<String, JsonObject> projectDefaultModels) {
+		public View {
+			projectDefaultModels = projectDefaultModels == null ? Map.of() : projectDefaultModels;
+		}
+
+		/** Pre-feat/op-launch shape, kept so existing callers still compile. */
+		public View(java.util.List<ThreadShell> threads, Map<String, String> projectTitles, boolean synced) {
+			this(threads, projectTitles, synced, Map.of());
+		}
+
+		/** A copy of the project's {@code defaultModelSelection}, or null when it has none. */
+		public @Nullable JsonObject projectDefaultModel(String projectId) {
+			JsonObject m = projectDefaultModels.get(projectId);
+			return m == null ? null : m.deepCopy();
+		}
+
 		/** Display name of the project, or null when the project is unknown. */
 		public @Nullable String projectTitle(String projectId) {
 			return projectTitles.get(projectId);
@@ -124,7 +145,9 @@ public final class ShellState {
 				titles.put(id, name);
 			}
 		});
-		return new View(java.util.List.copyOf(threads.values()), Map.copyOf(titles), synchronizedFlag);
+		Map<String, JsonObject> models = new LinkedHashMap<>();
+		defaultModels.forEach((id, m) -> models.put(id, m.deepCopy()));
+		return new View(java.util.List.copyOf(threads.values()), Map.copyOf(titles), synchronizedFlag, java.util.Collections.unmodifiableMap(models));
 	}
 
 	public long sequence() {
@@ -149,6 +172,7 @@ public final class ShellState {
 				}
 				threads.clear();
 				projects.clear();
+				defaultModels.clear();
 				JsonArray ts = Json.arr(snap, "threads");
 				if (ts != null) {
 					for (JsonElement e : ts) {
@@ -187,15 +211,20 @@ public final class ShellState {
 			}
 			case "project.updated" -> {
 				bump(item);
-				Project p = Project.fromJson(Json.obj(item, "project"));
+				JsonObject raw = Json.obj(item, "project");
+				Project p = Project.fromJson(raw);
 				if (p != null) {
 					projects.put(p.id(), p);
+					rememberDefaultModel(p.id(), raw);
 				}
 				return p != null;
 			}
 			case "project.removed" -> {
 				bump(item);
 				String id = Json.str(item, "projectId");
+				if (id != null) {
+					defaultModels.remove(id);
+				}
 				return id != null && projects.remove(id) != null;
 			}
 			default -> {
@@ -216,7 +245,17 @@ public final class ShellState {
 			Project p = e.isJsonObject() ? Project.fromJson(e.getAsJsonObject()) : null;
 			if (p != null) {
 				projects.put(p.id(), p);
+				rememberDefaultModel(p.id(), e.getAsJsonObject());
 			}
+		}
+	}
+
+	private void rememberDefaultModel(String projectId, @Nullable JsonObject raw) {
+		JsonElement m = raw == null ? null : raw.get("defaultModelSelection");
+		if (m instanceof JsonObject o) {
+			defaultModels.put(projectId, o.deepCopy());
+		} else {
+			defaultModels.remove(projectId);
 		}
 	}
 

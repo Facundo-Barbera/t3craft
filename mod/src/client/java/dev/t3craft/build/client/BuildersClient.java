@@ -21,6 +21,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.function.UnaryOperator;
+import dev.t3craft.build.BlockSink;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -123,6 +125,12 @@ public final class BuildersClient implements ClientModInitializer, BuildService 
 	@Override
 	public BuildHandle build(String label, ResourceKey<Level> dimension, BlockPos origin, Rotation rotation, BuildPlan plan, double blocksPerTick, int crewSize,
 			Billing billing) {
+		return build(label, dimension, origin, rotation, plan, blocksPerTick, crewSize, billing, null);
+	}
+
+	@Override
+	public BuildHandle build(String label, ResourceKey<Level> dimension, BlockPos origin, Rotation rotation, BuildPlan plan, double blocksPerTick, int crewSize,
+			Billing billing, @Nullable UnaryOperator<BlockSink> wrap) {
 		Minecraft mc = Minecraft.getInstance();
 		ClientLevel lvl = mc.level;
 		if (!available() || lvl == null || mc.player == null) {
@@ -148,7 +156,7 @@ public final class BuildersClient implements ClientModInitializer, BuildService 
 		}
 		Vec3 viewer = mc.player.position();
 		BuildCrew crew = new BuildCrew(label, lvl, BuildJob.boundsOf(plan, origin, rotation), crewSize, viewer, () -> nextEntityId--,
-				() -> manager.submit(label, dimension, origin, rotation, plan, blocksPerTick, jobCost));
+				() -> manager.submit(label, dimension, origin, rotation, plan, blocksPerTick, jobCost, wrap));
 		crews.add(crew);
 		return crew;
 	}

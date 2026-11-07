@@ -149,9 +149,11 @@ public final class SiteEvaluator {
 		}
 		int[] cf = cutFill(fpSorted, floorY);
 		int[] rcf = cutFill(envSorted, floorY);
-		Box box = new Box(fp.minX() - a, Math.min(minBase, floorY) - 1, fp.minZ() - a, fp.maxX() + a,
+		// a base with a basement (request.baseDepth) needs its box to reach below the basement floor
+		int deep = floorY + 1 - request.baseDepth();
+		Box box = new Box(fp.minX() - a, Math.min(Math.min(minBase, floorY), deep) - 1, fp.minZ() - a, fp.maxX() + a,
 				Math.max(floorY + SiteLimits.HEADROOM, maxBase + 2), fp.maxZ() + a);
-		Box reserve = new Box(env.minX() - a, Math.min(minAll, floorY) - 1, env.minZ() - a, env.maxX() + a,
+		Box reserve = new Box(env.minX() - a, Math.min(Math.min(minAll, floorY), deep) - 1, env.minZ() - a, env.maxX() + a,
 				Math.max(floorY + SiteLimits.HEADROOM, maxAll + 2), env.maxZ() + a);
 		if (reserve.minY() < probe.minBuildY() || reserve.maxY() > probe.maxBuildY()) {
 			problems.add("outside build height");

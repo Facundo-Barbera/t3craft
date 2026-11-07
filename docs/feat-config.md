@@ -44,9 +44,10 @@ Tests: `mod/src/test/java/dev/t3craft/client/config/` (25 tests JUnit, todos en 
   a Entornos, Key binds (pantalla vanilla) y "Reload from disk". Edita un borrador; "Save" valida,
   guarda y recarga las fuentes (`T3CraftClient.reload()`).
 - `EnvironmentsScreen`: lista paginada con color, nombre, estado de conexión, id y URL;
-  Hide/Show, Edit, Unpair (con `ConfirmScreen` y recordatorio de revocar en el host) y "Pair new…",
-  que abre la `PairScreen` de main (pegar link o código + URL; flujo de pairing de main, sólo
-  `orchestration:read`).
+  Hide/Show, Edit, Unpair (con `ConfirmScreen` y recordatorio de revocar en el host),
+  "Habilitar control" / "Revocar" (control `orchestration:operate`, ver `docs/feat-operate.md`) y
+  "Pair new…", que abre la `PairScreen` de main (pegar link o código + URL; lectura + control por
+  defecto, toggle "solo lectura" para pedir solo `orchestration:read`).
 - `EnvironmentEditScreen`: renombrar, color (paleta de chat de MC + color custom del archivo), visible,
   toggles needs-you / working / recent, ventana y máximo por entorno (vacío = global), reset.
 - Renombrar usa la API pública de main: `Environments.save(env con nuevo label, credential(id))`

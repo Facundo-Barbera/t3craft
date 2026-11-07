@@ -95,11 +95,17 @@ class PairingTest {
 	}
 
 	@Test
-	void ignoresStoredNonReadOnlyCredential(@TempDir Path dir) throws Exception {
+	void ignoresStoredCredentialWithForeignScopes(@TempDir Path dir) throws Exception {
 		Environments envs = new Environments(dir);
 		Files.createDirectories(dir.resolve("credentials"));
-		Files.writeString(dir.resolve("credentials/vps.json"), "{\"accessToken\":\"t\",\"scopes\":[\"orchestration:read\",\"orchestration:operate\"]}");
+		Files.writeString(dir.resolve("credentials/vps.json"),
+				"{\"accessToken\":\"t\",\"scopes\":[\"orchestration:read\",\"orchestration:operate\",\"filesystem:write\"]}");
 		assertNull(envs.credential("vps"));
+		Files.writeString(dir.resolve("credentials/vps.json"), "{\"accessToken\":\"t\",\"scopes\":[\"orchestration:operate\"]}");
+		assertNull(envs.credential("vps"));
+		// the combined read + operate session of a default pairing is a valid read-zone credential
+		Files.writeString(dir.resolve("credentials/vps.json"), "{\"accessToken\":\"t\",\"scopes\":[\"orchestration:read\",\"orchestration:operate\"]}");
+		assertEquals(Pairing.OPERATE_SCOPES, envs.credential("vps").scopes());
 	}
 
 	@Test
