@@ -1,0 +1,23 @@
+{
+  "listen": {
+    "host": "100.64.0.10",
+    "port": 7878,
+    "allowedHostnames": ["my-homelab.example.ts.net"],
+    "clientKeyFile": "/etc/t3craft/client.key"
+  },
+  "includeSubagents": false,
+  "environments": [
+    {
+      "id": "vps",
+      "label": "my-vps",
+      "url": "https://my-vps.example.ts.net",
+      "tokenFile": "/etc/t3craft/tokens/vps.token"
+    },
+    {
+      "id": "acmesite",
+      "label": "my-acmesite",
+      "url": "http://my-acmesite.example.ts.net:3773",
+      "tokenFile": "/etc/t3craft/tokens/acmesite.token"
+    }
+  ]
+}
