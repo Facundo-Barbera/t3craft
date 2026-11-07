@@ -12,9 +12,11 @@ import dev.t3craft.client.T3CraftCommands;
 import dev.t3craft.client.config.ConfigManager;
 import dev.t3craft.client.debug.GuardedEvents;
 import dev.t3craft.hq.HqAnchorSource;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import net.fabricmc.api.ClientModInitializer;
@@ -24,13 +26,16 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.AlertScreen;
 import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -40,7 +45,8 @@ import org.jspecify.annotations.Nullable;
  * animated builders, once per plan version.
  *
  * <p>Commands (merged under {@code /t3craft}): {@code demo} (asks before leaving another world),
- * {@code demo confirm}, {@code demo rebuild}, {@code demo status}.
+ * {@code demo confirm}, {@code demo rebuild}, {@code demo status}; {@code debug reset-hq [confirm]}
+ * deletes the demo world (zip backup first by default) and creates it fresh ({@link HqReset}).
  */
 public final class DemoClient implements ClientModInitializer {
 	/** Ticks after joining before the build check (chunks and builders settle). */
@@ -50,7 +56,11 @@ public final class DemoClient implements ClientModInitializer {
 
 	private static volatile @Nullable DemoStructures structures;
 
-	private enum Pending { NONE, OPEN, OPEN_CONFIRMED, OPEN_AFTER_LEAVE, REBUILD }
+	private enum Pending { NONE, OPEN, OPEN_CONFIRMED, OPEN_AFTER_LEAVE, REBUILD, RESET, RESET_CONFIRMED }
+
+	private static volatile @Nullable DemoClient instance;
+	/** Shown in chat once the player is in a world again (the reset result: chat is gone meanwhile). */
+	private @Nullable String notice;
 
 	/** Set on the server thread when the integrated server runs the demo save; null otherwise. */
 	private volatile @Nullable Path demoRoot;
@@ -80,6 +90,7 @@ public final class DemoClient implements ClientModInitializer {
 		hq = new DemoHqSource(DemoClient::liveNpcs);
 		s.register(hq); // the real HQ (feat/hq-design); falls back to the shed if its plan fails
 		structures = s;
+		instance = this;
 
 		ServerLifecycleEvents.SERVER_STARTED.register(server -> {
 			DemoConfig cfg = loadConfig();
@@ -115,7 +126,10 @@ public final class DemoClient implements ClientModInitializer {
 						.then(literal("status").executes(c -> {
 							status();
 							return 1;
-						})))));
+						})))
+				.then(literal("debug").then(literal("reset-hq")
+						.executes(c -> queue(Pending.RESET))
+						.then(literal("confirm").executes(c -> queue(Pending.RESET_CONFIRMED)))))));
 	}
 
 	private int queue(Pending p) {
@@ -157,6 +171,8 @@ public final class DemoClient implements ClientModInitializer {
 			case OPEN -> open(mc, null, false);
 			case OPEN_CONFIRMED, OPEN_AFTER_LEAVE -> leaveThenOpen(mc);
 			case REBUILD -> rebuild(mc);
+			case RESET -> reset(mc, false);
+			case RESET_CONFIRMED -> reset(mc, true);
 			case NONE -> {
 			}
 		}
@@ -167,6 +183,10 @@ public final class DemoClient implements ClientModInitializer {
 			checked = false;
 			run = null; // its crews died with the old level (BuildersClient cancels them)
 			clearAnchors();
+		}
+		if (notice != null && mc.player != null) {
+			say(notice);
+			notice = null;
 		}
 		Path root = demoRoot;
 		if (level == null || root == null || mc.player == null) {
@@ -278,6 +298,122 @@ public final class DemoClient implements ClientModInitializer {
 		DemoBuildRun r = run;
 		if (r != null) {
 			say("running: " + r.describe());
+		}
+	}
+
+	// ---- reset ------------------------------------------------------------------------------
+
+	/**
+	 * For the settings button: null if a reset may be offered (then ask, then {@link #requestReset}),
+	 * else why not (in another world, demo not created, mod not initialised).
+	 */
+	public static @Nullable String resetRefusal() {
+		DemoClient d = instance;
+		if (d == null) {
+			return "demo mode is not initialised";
+		}
+		Minecraft mc = Minecraft.getInstance();
+		DemoConfig cfg = d.loadConfig();
+		return switch (d.resetAction(mc, cfg, false)) {
+			case REFUSE_OTHER_WORLD -> "Only inside " + cfg.spec().displayName() + ": this world is never reset";
+			case NOTHING_TO_RESET -> cfg.spec().displayName() + " does not exist yet";
+			case CONFIRM, RESET -> null;
+		};
+	}
+
+	/** Queues a confirmed reset for the next client tick (after the confirm screen closes). */
+	public static void requestReset() {
+		DemoClient d = instance;
+		if (d != null) {
+			d.pending = Pending.RESET_CONFIRMED;
+		}
+	}
+
+	private HqReset.Action resetAction(Minecraft mc, DemoConfig cfg, boolean confirmed) {
+		boolean inWorld = mc.level != null;
+		boolean inDemo = inWorld && mc.isLocalServer() && demoRoot != null;
+		return HqReset.decide(inWorld, inDemo, VanillaDemoWorld.exists(mc, cfg.spec().folderId()), confirmed);
+	}
+
+	private void reset(Minecraft mc, boolean confirmed) {
+		DemoConfig cfg = loadConfig();
+		HqReset.Action action = resetAction(mc, cfg, confirmed);
+		T3Craft.LOGGER.info("[demo] reset-hq: {} '{}'", action, cfg.spec().folderId());
+		switch (action) {
+			case REFUSE_OTHER_WORLD -> error("reset-hq only works inside " + cfg.spec().displayName() + "; this world is never touched");
+			case NOTHING_TO_RESET -> say(cfg.spec().displayName() + " does not exist yet (/t3craft demo creates it)");
+			case CONFIRM -> {
+				Component confirm = Component.literal("[" + Component.translatable("t3craft.demo.reset.confirm").getString() + "]")
+						.withStyle(s -> s.withColor(ChatFormatting.RED)
+								.withClickEvent(new ClickEvent.RunCommand("t3craft debug reset-hq confirm"))
+								.withHoverEvent(new HoverEvent.ShowText(Component.literal("/t3craft debug reset-hq confirm"))));
+				if (mc.player != null) {
+					mc.player.sendSystemMessage(T3CraftCommands.prefix()
+							.append(Component.translatable("t3craft.demo.reset.body").withStyle(ChatFormatting.YELLOW))
+							.append(" ").append(confirm));
+				}
+			}
+			case RESET -> doReset(mc, cfg);
+		}
+	}
+
+	/** Leave (saving), validate, zip, delete, recreate. Never touches anything but saves/<demo folder>. */
+	private void doReset(Minecraft mc, DemoConfig cfg) {
+		String folder = cfg.spec().folderId();
+		if (run != null) {
+			run.cancel();
+			run = null;
+		}
+		clearAnchors();
+		if (mc.level != null) {
+			VanillaDemoWorld.leaveWorld(mc); // blocks until the integrated server has stopped
+		}
+		Path saves = VanillaDemoWorld.savesDir(mc);
+		HqReset.Check check = HqReset.validate(saves, folder);
+		if (!check.ok() || check.target() == null) {
+			fail(mc, "refused: " + check.reason());
+			return;
+		}
+		String backup = "no backup (demo.resetBackup = false)";
+		if (HqReset.shouldBackup(cfg)) {
+			try {
+				Path zip = HqReset.zip(check.target(), VanillaDemoWorld.backupDir(mc), folder, LocalDateTime.now());
+				backup = "backup: " + zip.getFileName();
+				T3Craft.LOGGER.info("[demo] reset-hq backup written to {}", zip);
+			} catch (IOException | RuntimeException e) {
+				T3Craft.LOGGER.error("[demo] reset-hq backup failed, world left untouched", e);
+				fail(mc, "backup failed, nothing deleted (" + e.getClass().getSimpleName() + ")");
+				return;
+			}
+		}
+		try {
+			HqReset.delete(saves, folder);
+		} catch (IOException | RuntimeException e) {
+			T3Craft.LOGGER.error("[demo] reset-hq could not delete {}", folder, e);
+			fail(mc, "could not delete the old world (" + e.getClass().getSimpleName() + "); " + backup);
+			return;
+		}
+		T3Craft.LOGGER.info("[demo] reset-hq deleted saves/{} ({})", folder, backup);
+		notice = cfg.spec().displayName() + " reset; " + backup;
+		VanillaDemoWorld.create(mc, cfg.spec(), new TitleScreen());
+	}
+
+	private void fail(Minecraft mc, String msg) {
+		T3Craft.LOGGER.warn("[demo] reset-hq: {}", msg);
+		if (mc.level != null) {
+			error("reset-hq " + msg);
+		} else {
+			mc.gui.setScreen(new AlertScreen(() -> mc.gui.setScreen(new TitleScreen()),
+					Component.translatable("t3craft.demo.reset.title"), Component.literal(msg)));
+		}
+	}
+
+	private void error(String text) {
+		Minecraft mc = Minecraft.getInstance();
+		if (mc.player != null) {
+			mc.player.sendSystemMessage(T3CraftCommands.prefix().append(Component.literal(text).withStyle(ChatFormatting.RED)));
+		} else {
+			T3Craft.LOGGER.warn("[demo] {}", text);
 		}
 	}
 
