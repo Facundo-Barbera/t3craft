@@ -20,7 +20,13 @@ public final class Nameplate {
 
 	/** Vanilla name tag: the label (glyph + title) in the state colour, then the chips in grey. */
 	public static Component of(NpcInfo info) {
-		return of(info, ChipsConfig.current());
+		LabelConfig labels = LabelConfig.current();
+		return labels.compact() ? compact(info, labels) : of(info, ChipsConfig.current());
+	}
+
+	/** Compact name tag (default): one short line, state glyph + truncated title, state colour. */
+	public static Component compact(NpcInfo info, LabelConfig labels) {
+		return Component.literal(NpcLabels.compactLine(info.state(), info.title(), labels.titleMax())).withColor(info.color());
 	}
 
 	public static Component of(NpcInfo info, ChipsConfig cfg) {
@@ -35,6 +41,19 @@ public final class Nameplate {
 	/** Floating panel above the name tag: environment · project, chips, then the current activity. */
 	public static Component info(NpcInfo info) {
 		return info(info, ChipsConfig.current());
+	}
+
+	/**
+	 * The near panel in compact mode: environment · project, then the chips. No activity: the
+	 * speech bubble shows it in the same radius, so it would be drawn twice.
+	 */
+	public static Component detail(NpcInfo info, ChipsConfig cfg) {
+		MutableComponent c = Component.literal(info.sublabel()).withStyle(ChatFormatting.GRAY);
+		String chips = panelChips(info, cfg);
+		if (chips != null) {
+			c.append(Component.literal("\n" + chips).withColor(CHIP_COLOR));
+		}
+		return c;
 	}
 
 	public static Component info(NpcInfo info, ChipsConfig cfg) {
