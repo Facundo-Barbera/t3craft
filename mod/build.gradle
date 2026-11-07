@@ -53,6 +53,15 @@ dependencies {
 	testRuntimeOnly "org.junit.platform:junit-platform-launcher"
 }
 
+// feat/npc-behavior: the pure behaviour logic (dev.t3craft.client.npc.behavior: pathfinder, brain,
+// layout, bubbles) lives in the client source set; its tests only touch the Minecraft-free classes.
+sourceSets {
+	test {
+		compileClasspath += sourceSets.client.output
+		runtimeClasspath += sourceSets.client.output
+	}
+}
+
 test {
 	useJUnitPlatform()
 	testLogging {
