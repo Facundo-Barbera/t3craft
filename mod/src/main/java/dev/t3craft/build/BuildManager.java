@@ -12,6 +12,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
+import java.util.function.UnaryOperator;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
@@ -36,6 +37,7 @@ public final class BuildManager {
 	private final Map<Integer, BuildJob> byId = new ConcurrentHashMap<>();
 	private final List<BuildListener> listeners = new CopyOnWriteArrayList<>();
 	private final Function<ServerLevel, BlockSink> sinks;
+	private final Map<Integer, UnaryOperator<BlockSink>> wraps = new ConcurrentHashMap<>();
 
 	public BuildManager() {
 		this(ServerLevelSink::new);
@@ -57,6 +59,18 @@ public final class BuildManager {
 	/** Creates and queues a job; it starts on the next server tick. */
 	public BuildJob submit(String label, ResourceKey<Level> dimension, BlockPos origin, Rotation rotation, BuildPlan plan, double blocksPerTick) {
 		BuildJob job = new BuildJob(nextId.getAndIncrement(), label, dimension, origin, rotation, plan, blocksPerTick);
+		byId.put(job.id(), job);
+		incoming.add(job);
+		return job;
+	}
+
+	/** Like {@link #submit}, with every block of this job placed through {@code wrap.apply(sink)}. */
+	public BuildJob submit(String label, ResourceKey<Level> dimension, BlockPos origin, Rotation rotation, BuildPlan plan, double blocksPerTick,
+			@Nullable UnaryOperator<BlockSink> wrap) {
+		BuildJob job = new BuildJob(nextId.getAndIncrement(), label, dimension, origin, rotation, plan, blocksPerTick);
+		if (wrap != null) {
+			wraps.put(job.id(), wrap);
+		}
 		byId.put(job.id(), job);
 		incoming.add(job);
 		return job;
@@ -87,7 +101,9 @@ public final class BuildManager {
 			if (!job.state().isTerminal()) {
 				ServerLevel level = server.getLevel(job.dimension());
 				if (level != null) {
-					BlockSink sink = sinks.apply(level);
+					BlockSink base = sinks.apply(level);
+					UnaryOperator<BlockSink> wrap = wraps.get(job.id());
+					BlockSink sink = wrap == null ? base : wrap.apply(base);
 					try {
 						job.tick(sink, (jb, i, pos, state) -> {
 							for (BuildListener l : listeners) {
@@ -104,6 +120,7 @@ public final class BuildManager {
 			if (s.isTerminal()) {
 				it.remove();
 				byId.remove(job.id());
+				wraps.remove(job.id());
 				for (BuildListener l : listeners) {
 					safe(() -> l.finished(job, s));
 				}
@@ -120,6 +137,7 @@ public final class BuildManager {
 		}
 		active.clear();
 		byId.clear();
+		wraps.clear();
 		for (BuildJob job : all) {
 			job.cancel();
 			for (BuildListener l : listeners) {

@@ -163,6 +163,82 @@ public final class SiteService {
 		}
 	}
 
+	/** One cell an owner wants to change in place: world coordinates and the new state key. */
+	public record CellChange(int x, int y, int z, String state) {
+	}
+
+	/** A {@link CellChange} the site accepted, with the state the cell held when it was claimed. */
+	public record Claimed(int x, int y, int z, String before, String state) {
+	}
+
+	/**
+	 * In-place changes to modules that are already built (a desk freed, a computer moved to the
+	 * archive): the HQ changes cells of an expansion after it was built. Keeps only the cells that lie
+	 * in some expansion's box and still hold the site's own block (its plan value or the original
+	 * terrain, judged on the newest expansion covering the cell, like undo does), then records the new
+	 * state in the saved plan of <b>every</b> expansion covering it, so undo and later expansions keep
+	 * treating it as the site's own block. The caller writes the returned cells itself, ideally only
+	 * while each one still holds {@link Claimed#before}. Server thread; only when the site is built and
+	 * idle (empty list otherwise). Block entities are not recorded (site plans never hold them).
+	 */
+	public List<Claimed> claim(List<CellChange> changes) {
+		if (changes.isEmpty() || running != null) {
+			return List.of();
+		}
+		Active a;
+		try {
+			a = active();
+		} catch (IOException | Snapshot.InvalidSnapshotException e) {
+			T3Craft.LOGGER.warn("site claim refused: {}", e.getMessage());
+			return List.of();
+		}
+		if (a.journal.phase() != SiteJournal.Phase.BUILT) {
+			return List.of();
+		}
+		List<Claimed> out = new ArrayList<>();
+		boolean[] dirty = new boolean[a.layers.size()];
+		for (CellChange c : changes) {
+			int newest = -1;
+			for (int k = a.layers.size() - 1; k >= 0; k--) {
+				if (a.layers.get(k).exp.box().contains(c.x(), c.y(), c.z())) {
+					newest = k;
+					break;
+				}
+			}
+			if (newest < 0) {
+				continue;
+			}
+			Layer top = a.layers.get(newest);
+			if (!Restorer.isOurs(a.world, top.snap, top.plan, c.x(), c.y(), c.z())) {
+				continue;
+			}
+			out.add(new Claimed(c.x(), c.y(), c.z(), a.world.state(c.x(), c.y(), c.z()), c.state()));
+			for (int k = 0; k <= newest; k++) {
+				Layer l = a.layers.get(k);
+				if (l.exp.box().contains(c.x(), c.y(), c.z()) && !c.state().equals(l.plan.get(c.x(), c.y(), c.z()))) {
+					l.plan.set(c.x(), c.y(), c.z(), c.state());
+					dirty[k] = true;
+				}
+			}
+		}
+		try {
+			for (int k = 0; k < dirty.length; k++) {
+				if (dirty[k]) {
+					store.savePlan(a.layers.get(k).exp.key(), a.layers.get(k).plan);
+				}
+			}
+		} catch (IOException e) {
+			T3Craft.LOGGER.warn("site claim: could not save a plan: {}", e.getMessage());
+			return List.of();
+		}
+		return out;
+	}
+
+	/** True while the site's own builder is writing (a base, an expansion or a resume). */
+	public boolean busy() {
+		return running != null;
+	}
+
 	/**
 	 * Adds a module to the built site: checks it fits the envelope and overlaps no module, that its
 	 * box (footprint + apron, below the ground to the headroom) holds no fluid and nothing built
@@ -397,7 +473,7 @@ public final class SiteService {
 		CellPlan.Origin origin = e.origin();
 		CellPlan plan = Leveling.plan(cols, e.box(), e.footprint(), origin, Leveling.Keep.NOTHING);
 		Box fp = e.footprint();
-		Box area = new Box(fp.minX(), e.floorY() + 1, fp.minZ(), fp.maxX(), e.floorY() + SiteLimits.HEADROOM, fp.maxZ());
+		Box area = new Box(fp.minX(), e.floorY() + 1 - request.baseDepth(), fp.minZ(), fp.maxX(), e.floorY() + SiteLimits.HEADROOM, fp.maxZ());
 		plan.overlay(designer.design(base, area, origin));
 		return plan;
 	}
