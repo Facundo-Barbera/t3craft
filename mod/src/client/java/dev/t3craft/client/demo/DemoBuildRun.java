@@ -101,7 +101,7 @@ final class DemoBuildRun {
 		try {
 			current = service.build("demo-" + source.id() + "-" + (total - queue.size()), Level.OVERWORLD,
 					new BlockPos(spec.originX(), spec.originY(), spec.originZ()), Rotation.NONE, next,
-					config.blocksPerTick(), config.crew());
+					config.blocksPerTick(), config.crew(), BuildService.Billing.FREE);
 		} catch (IllegalStateException e) {
 			say.accept("HQ build could not start: " + e.getMessage());
 			done = true;

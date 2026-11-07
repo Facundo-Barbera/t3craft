@@ -23,5 +23,9 @@
 	"t3craft.workstation.status": "Pantallas de estaciones: %s (%s visibles, %s archivadas). /t3craft workstation on|off",
 	"t3craft.workstation.on": "Pantallas de estaciones encendidas.",
 	"t3craft.workstation.off": "Pantallas de estaciones apagadas.",
-	"t3craft.workstation.save_failed": "No se pudo guardar el ajuste: %s"
+	"t3craft.workstation.save_failed": "No se pudo guardar el ajuste: %s",
+	"t3craft.survival.missing_materials": "faltan materiales: %s",
+	"t3craft.survival.missing_materials_job": "%s en pausa, faltan materiales: %s (los constructores los toman de cofres o barriles junto a la obra y de tu inventario; la obra se reanuda sola)",
+	"t3craft.survival.materials_resumed": "%s: materiales encontrados, se reanuda la obra",
+	"t3craft.survival.build_cost": "Supervivencia: los constructores usarán %s, de cofres o barriles junto a la obra y de tu inventario"
 }
