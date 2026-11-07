@@ -19,18 +19,28 @@ import org.jspecify.annotations.Nullable;
  *   "structure": "auto",             // "auto" | "hq" | "shed"
  *   "blocksPerTick": 2.0,
  *   "crew": 4,
- *   "titleButton": true              // button on the title and world-select screens
+ *   "titleButton": true,             // button on the title and world-select screens
+ *   "resetBackup": true              // zip the old HQ world before "reset HQ world" deletes it
  * }
  * }</pre>
  */
 public record DemoConfig(DemoWorldSpec spec, String structure, double blocksPerTick, int crew, boolean titleButton,
-		List<String> warnings) {
+		List<String> warnings, boolean resetBackup) {
 
 	public static final double DEFAULT_BLOCKS_PER_TICK = 2.0;
 	public static final int DEFAULT_CREW = 4;
 
 	public DemoConfig {
 		warnings = List.copyOf(warnings);
+	}
+
+	/** Pre-reset-hq constructor (backup on). */
+	public DemoConfig(DemoWorldSpec spec, String structure, double blocksPerTick, int crew, boolean titleButton, List<String> warnings) {
+		this(spec, structure, blocksPerTick, crew, titleButton, warnings, true);
+	}
+
+	public DemoConfig withResetBackup(boolean on) {
+		return new DemoConfig(spec, structure, blocksPerTick, crew, titleButton, warnings, on);
 	}
 
 	public static DemoConfig defaults() {
@@ -70,7 +80,8 @@ public record DemoConfig(DemoWorldSpec spec, String structure, double blocksPerT
 		double bpt = number(d, "blocksPerTick", DEFAULT_BLOCKS_PER_TICK, 0.05, 64, warn);
 		int crew = (int) number(d, "crew", DEFAULT_CREW, 1, 8, warn);
 		boolean button = bool(d, "titleButton", true, warn);
-		return new DemoConfig(spec, structure.isBlank() ? DemoStructures.AUTO : structure, bpt, crew, button, warn);
+		boolean backup = bool(d, "resetBackup", true, warn);
+		return new DemoConfig(spec, structure.isBlank() ? DemoStructures.AUTO : structure, bpt, crew, button, warn, backup);
 	}
 
 	private static int @Nullable [] origin(JsonElement e) {
