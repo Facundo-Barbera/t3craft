@@ -17,6 +17,25 @@ terreno. Es la versión T3Craft del "AgentCraft HQ" (solo la idea, no se usó c�
 - **`/t3craft demo status`**: carpeta, si existe, si estás dentro, la fuente elegida, qué está construido
   y el progreso.
 
+## Reiniciar el mundo HQ (feat/reset-hq, etapa de pruebas)
+- **Botón "Reiniciar mundo HQ"**: arriba a la derecha de la pantalla de ajustes de T3Craft (J, Mod Menu o
+  `/t3craft config`). Pide confirmación con un `ConfirmScreen` ("¿Seguro? Se pierde todo lo construido en el HQ").
+- **`/t3craft debug reset-hq`**: muestra el aviso con un `[Confirmar reinicio]` clicable;
+  **`/t3craft debug reset-hq confirm`** lo hace sin preguntar.
+- Solo dentro del mundo HQ (o desde el menú, sin mundo abierto). En otro mundo o en un servidor, botón y
+  comando se niegan y no tocan nada. Si el HQ no existe todavía, avisa (`/t3craft demo` lo crea).
+- Pasos (`DemoClient.doReset`): cancela la construcción, guarda y sale, **valida**
+  (`HqReset.validate`), hace el **zip**, borra la carpeta y la vuelve a crear con el flujo del demo
+  (`VanillaDemoWorld.create`); al entrar se aplica el setup (spawn en el punto de vista) y se construye el HQ.
+- **Validación**: el id de carpeta debe pasar `DemoWorldSpec.validFolderId` (sin `.`, `/`, `..`, comodines);
+  el destino es `realpath(saves)/<carpeta>` y debe ser un directorio real (no symlink) cuyo realpath sea
+  hijo directo de `saves` con el nombre **exacto** (sensible a mayúsculas). Si existe `t3craft-demo.json`,
+  tiene que ser un marcador del demo. El borrado revalida y no sigue symlinks internos. Nada de patrones.
+- **Respaldo** (por defecto): `backups/<carpeta>_<yyyy-MM-dd_HH-mm-ss>_reset.zip` en la carpeta de backups
+  de Minecraft (`-2`, `-3`… si ya existe), sin `session.lock`. Si el zip falla, no se borra nada.
+  Desactivar con `"demo": {"resetBackup": false}` (aditivo, default `true`).
+- No toca los sitios de supervivencia (`/t3craft site`): viven en otros mundos; se deshacen con `site undo`.
+
 ## Mundo
 | | |
 |---|---|
@@ -85,7 +104,8 @@ nunca se recrea ni se sobrescribe. Toda la API vanilla de creación/carga está 
 "demo": {
   "worldFolder": "t3craft-hq", "worldName": "T3Craft HQ",
   "origin": [0, -60, 8], "structure": "auto",
-  "blocksPerTick": 2.0, "crew": 4, "titleButton": true
+  "blocksPerTick": 2.0, "crew": 4, "titleButton": true,
+  "resetBackup": true
 }
 ```
 Lo lee `DemoConfig` directamente del archivo (no se tocó `dev.t3craft.client.config`; su codec conserva
@@ -99,6 +119,8 @@ clave. Sin pantalla de ajustes para esto todavía.
 - Lang (`assets/t3craft/lang/{en_us,es_es}.json`): `t3craft.demo.button`, `.button.tooltip`,
   `.confirm.title`, `.confirm.body`.
 - Sin registros, ítems, mixins ni dependencias nuevas.
+- feat/reset-hq: comando `/t3craft debug reset-hq [confirm]`, botón en `SettingsScreen`, clase `HqReset`,
+  clave de config `demo.resetBackup`, lang `t3craft.demo.reset.*`. Sin entrypoints nuevos.
 - feat/demo-hq: clases nuevas `DemoHq`, `DemoHqSource`; métodos `default` nuevos en `DemoStructureSource`;
   `DemoMarker` con dos componentes más (`hash`, `state`; constructor de 3 argumentos conservado);
   `DemoBuildRun` con callback de fin. Sin entrypoints, lang ni config nuevos.
