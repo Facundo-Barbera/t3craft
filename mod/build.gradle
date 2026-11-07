@@ -40,6 +40,28 @@ loom {
 	}
 }
 
+// Client GameTests (src/gametest): `./gradlew runClientGameTest` boots a real client, so it is NOT
+// part of `build`/`check` and must not run on the VPS. CI runs it in its own job under xvfb.
+// Server GameTests stay off: Loom would hook them into `check` and the mod is client-only anyway.
+fabricApi {
+	configureTests {
+		createSourceSet = true
+		modId = "t3craft-gametest"
+		enableGameTests = false
+		enableClientGameTests = true
+		eula = true
+		clearRunDirectory = true
+	}
+}
+
+sourceSets {
+	gametest {
+		// The tests poke at client-side classes (dev.t3craft.client.*), not just main.
+		compileClasspath += sourceSets.client.output
+		runtimeClasspath += sourceSets.client.output
+	}
+}
+
 dependencies {
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
 	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
@@ -51,6 +73,11 @@ dependencies {
 	testImplementation "org.junit.jupiter:junit-jupiter"
 	testImplementation "org.junit.jupiter:junit-jupiter-params"
 	testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+}
+
+// Compile (not run) the client GameTests on every build so they cannot rot silently.
+tasks.named("check") {
+	dependsOn tasks.named("gametestClasses")
 }
 
 test {
