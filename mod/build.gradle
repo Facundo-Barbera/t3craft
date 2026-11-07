@@ -12,6 +12,11 @@ base {
 
 repositories {
 	mavenCentral()
+	// Mod Menu API (compile-only, optional integration in dev.t3craft.client.config).
+	exclusiveContent {
+		forRepository { maven { url = "https://maven.terraformersmc.com/releases/" } }
+		filter { includeGroup "com.terraformersmc" }
+	}
 }
 
 java {
@@ -36,7 +41,34 @@ loom {
 					.replaceAll(/[^A-Za-z0-9_]/, "").take(16) ?: "Player"
 			programArgs "--username", player
 			runDir "run"
+			// Opt-in enhanced hot-swap (docs/dev.md): `./gradlew runClient -Pt3craft.hotswap`.
+			// Needs a JetBrains Runtime as the run JVM; plain JDKs refuse to start with this flag.
+			if (project.hasProperty("t3craft.hotswap")) {
+				vmArgs "-XX:+AllowEnhancedClassRedefinition", "-Dt3craft.devreload=true"
+			}
 		}
+	}
+}
+
+// Client GameTests (src/gametest): `./gradlew runClientGameTest` boots a real client, so it is NOT
+// part of `build`/`check` and must not run on the VPS. CI runs it in its own job under xvfb.
+// Server GameTests stay off: Loom would hook them into `check` and the mod is client-only anyway.
+fabricApi {
+	configureTests {
+		createSourceSet = true
+		modId = "t3craft-gametest"
+		enableGameTests = false
+		enableClientGameTests = true
+		eula = true
+		clearRunDirectory = true
+	}
+}
+
+sourceSets {
+	gametest {
+		// The tests poke at client-side classes (dev.t3craft.client.*), not just main.
+		compileClasspath += sourceSets.client.output
+		runtimeClasspath += sourceSets.client.output
 	}
 }
 
@@ -44,6 +76,8 @@ dependencies {
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
 	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
 	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+	// Optional: only the API interfaces, never bundled nor required at runtime ("suggests" in fabric.mod.json).
+	clientCompileOnly("com.terraformersmc:modmenu:${project.modmenu_version}") { transitive = false }
 
 	// Unit tests for the pure T3 client logic (dev.t3craft.t3): framing, shell state, mapping,
 	// visibility, pairing. No Minecraft classes involved.
@@ -53,12 +87,19 @@ dependencies {
 	testRuntimeOnly "org.junit.platform:junit-platform-launcher"
 }
 
-// Pure client logic (dev.t3craft.client.portable: navigation, state, notification log;
-// dev.t3craft.client.chat: Markdown, wrap, transcript, thread list) is plain Java in the client
-// source set; tests only touch those classes, never Minecraft's client.
+// Pure client-side logic lives in the client source set but its tests only touch Minecraft-free classes:
+// portable terminal (dev.t3craft.client.portable: navigation, state, notification log),
+// NPC behaviour (dev.t3craft.client.npc.behavior: pathfinder, brain, layout, bubbles),
+// chat (dev.t3craft.client.chat: Markdown, wrap, transcript, thread list) and
+// config (dev.t3craft.client.config).
 sourceSets.test {
-	compileClasspath += sourceSets.client.output
-	runtimeClasspath += sourceSets.client.output
+	compileClasspath += sourceSets.client.output + sourceSets.client.compileClasspath
+	runtimeClasspath += sourceSets.client.output + sourceSets.client.runtimeClasspath
+}
+
+// Compile (not run) the client GameTests on every build so they cannot rot silently.
+tasks.named("check") {
+	dependsOn tasks.named("gametestClasses")
 }
 
 test {
