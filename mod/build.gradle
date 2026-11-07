@@ -53,6 +53,13 @@ dependencies {
 	testRuntimeOnly "org.junit.platform:junit-platform-launcher"
 }
 
+// Portable terminal logic (dev.t3craft.client.portable: navigation, state, notification log) is
+// plain Java in the client source set; tests only touch those classes, never Minecraft's client.
+sourceSets.test {
+	compileClasspath += sourceSets.client.output
+	runtimeClasspath += sourceSets.client.output
+}
+
 test {
 	useJUnitPlatform()
 	testLogging {
