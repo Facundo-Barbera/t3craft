@@ -16,12 +16,16 @@ public final class SiteLimits {
 	public static final int HEADROOM = 12;
 	/** Highest minus lowest ground top inside the footprint; above this a site is refused. */
 	public static final int MAX_RELIEF = 6;
+	/** Highest minus lowest ground top inside the growth envelope (modules share one pad level). */
+	public static final int MAX_ENVELOPE_RELIEF = 10;
 	/** How far down below each column's ground top lava/structures are looked for. */
 	public static final int SCAN_BELOW = MAX_RELIEF + 2;
 	/** Hard cap on cells per snapshot/plan (the real box is ~19x24x19 ≈ 8.7k). */
 	public static final int MAX_VOLUME = 32 * 32 * 48;
-	/** Hard cap on chunk columns a site may touch. */
+	/** Hard cap on chunk columns one snapshot box (one module) may touch. */
 	public static final int MAX_CHUNKS = 9;
+	/** Hard cap on chunk columns the growth reserve (envelope + apron) may touch. */
+	public static final int MAX_RESERVE_CHUNKS = 36;
 	/** {@code pick}: search radius (blocks) around the player, and candidate step. */
 	public static final int SEARCH_RADIUS = 32;
 	public static final int SEARCH_STEP = 2;

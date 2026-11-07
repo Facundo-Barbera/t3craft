@@ -23,17 +23,35 @@ public final class Leveling {
 	private Leveling() {
 	}
 
+	/** Columns a module's leveling must leave alone (the pads of modules already built). */
+	@FunctionalInterface
+	public interface Keep {
+		boolean keep(int x, int z);
+
+		Keep NOTHING = (x, z) -> false;
+	}
+
 	public static CellPlan plan(Columns cols, SiteEvaluator.Evaluation e, CellPlan.Facing facing) {
 		Box box = e.box();
 		if (box == null || !e.ok()) {
 			throw new IllegalArgumentException("cannot level a refused site");
 		}
-		Box fp = e.footprint();
-		int floor = e.floorY();
-		CellPlan plan = new CellPlan(box, new CellPlan.Origin(e.centerX(), floor + 1, e.centerZ(), facing));
+		return plan(cols, box, e.footprint(), new CellPlan.Origin(e.centerX(), e.floorY() + 1, e.centerZ(), facing), Keep.NOTHING);
+	}
+
+	/**
+	 * Levels the footprint {@code fp} (world xz) of one module to the pad at {@code origin.y() - 1},
+	 * blending the apron of {@code box} around it. Columns where {@code keep} is true are not touched.
+	 */
+	public static CellPlan plan(Columns cols, Box box, Box fp, CellPlan.Origin origin, Keep keep) {
+		int floor = origin.y() - 1;
+		CellPlan plan = new CellPlan(box, origin);
 		int a = SiteLimits.APRON;
 		for (int x = box.minX(); x <= box.maxX(); x++) {
 			for (int z = box.minZ(); z <= box.maxZ(); z++) {
+				if (keep.keep(x, z)) {
+					continue;
+				}
 				Columns.Column col = cols.at(x, z);
 				int top = col.top();
 				if (fp.containsXZ(x, z)) {
