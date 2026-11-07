@@ -24,7 +24,7 @@ public interface EnvironmentActions {
 
 	List<EnvRow> list();
 
-	/** Opens main's read-only pairing screen (paste link, or code + URL). */
+	/** Opens main's pairing screen (read + control by default, "read-only" toggle; paste link, or code + URL). */
 	net.minecraft.client.gui.screens.Screen pairScreen(net.minecraft.client.gui.screens.Screen parent);
 
 	/** Forgets the environment locally (credential deleted) and reconnects. Returns a player-facing message. */
@@ -41,7 +41,7 @@ public interface EnvironmentActions {
 		return dev.t3craft.client.operate.OperateUi.canOperate(id);
 	}
 
-	/** Opens "Enable control (operate)…" for the environment, or null when it is unknown. */
+	/** Opens "Enable control" (upgrade a read-only pairing) for the environment, or null when it is unknown. */
 	default net.minecraft.client.gui.screens.@Nullable Screen operateScreen(net.minecraft.client.gui.screens.Screen parent, String id) {
 		return dev.t3craft.client.operate.OperateClient.environment(id)
 				.map(e -> (net.minecraft.client.gui.screens.Screen) new dev.t3craft.client.screen.OperatePairScreen(parent, e)).orElse(null);

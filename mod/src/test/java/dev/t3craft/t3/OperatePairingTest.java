@@ -60,14 +60,19 @@ class OperatePairingTest {
 	}
 
 	@Test
-	void operateResponseMustGrantExactlyReadAndOperate() throws Exception {
+	void operateResponseGrantsReadAndOperateOrFallsBackToRead() throws Exception {
 		String ok = "{\"access_token\":\"op\",\"token_type\":\"Bearer\",\"expires_in\":60,\"scope\":\"orchestration:read orchestration:operate\"}";
 		var s = Pairing.parseTokenResponse(ok, 1000, Pairing.OPERATE_SCOPES);
 		assertEquals(Pairing.OPERATE_SCOPES, s.scopes());
 		assertEquals(61_000, s.expiresAtMs());
 
+		// A read-only credential (T3 grants requested ∩ credential): accepted as read-only, and
+		// "Enable control" refuses it via requireOperate.
 		String onlyRead = "{\"access_token\":\"op\",\"token_type\":\"Bearer\",\"scope\":\"orchestration:read\"}";
-		assertThrows(Pairing.PairingException.class, () -> Pairing.parseTokenResponse(onlyRead, 0, Pairing.OPERATE_SCOPES));
+		var ro = Pairing.parseTokenResponse(onlyRead, 0, Pairing.OPERATE_SCOPES);
+		assertEquals(Pairing.READ_SCOPES, ro.scopes());
+		var noOp = assertThrows(Pairing.PairingException.class, () -> Pairing.requireOperate(ro));
+		assertTrue(noOp.getMessage().contains("--scope orchestration:operate"), noOp.getMessage());
 		String more = "{\"access_token\":\"op\",\"token_type\":\"Bearer\",\"scope\":\"orchestration:read orchestration:operate filesystem:write\"}";
 		var ex = assertThrows(Pairing.PairingException.class, () -> Pairing.parseTokenResponse(more, 0, Pairing.OPERATE_SCOPES));
 		assertFalse(ex.getMessage().contains("op\""));

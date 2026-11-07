@@ -30,8 +30,29 @@ public final class OperateUi {
 		return OperateClient.get().gate();
 	}
 
+	/**
+	 * Whether this Minecraft can write to {@code envId} right now (operate session present and not
+	 * expired). The query for UI text and buttons, e.g. the chat reply box: true means do not say
+	 * "read-only". Cheap (reads one small file); call it when building widgets, not every frame.
+	 */
 	public static boolean canOperate(String envId) {
 		return gate().canOperate(envId);
+	}
+
+	/** {@link OperateGate.Availability} of {@code envId}: enabled, read-only, or expired. */
+	public static OperateGate.Availability availability(String envId) {
+		return gate().availability(envId);
+	}
+
+	/**
+	 * The screen that gives {@code envId} control: "Enable control" for a paired environment, or
+	 * the pairing screen (read + operate by default) when it is not paired. For a "pair / enable
+	 * control" button wherever {@link #canOperate} is false.
+	 */
+	public static Screen enableControlScreen(@Nullable Screen parent, @Nullable String envId) {
+		return (envId == null ? java.util.Optional.<dev.t3craft.t3.Environments.Environment>empty() : OperateClient.environment(envId))
+				.<Screen>map(e -> new dev.t3craft.client.screen.OperatePairScreen(parent, e))
+				.orElseGet(() -> new dev.t3craft.client.screen.PairScreen(parent));
 	}
 
 	/** Disables {@code widget} with the "Requires control (operate)" tooltip when the env is read-only. */

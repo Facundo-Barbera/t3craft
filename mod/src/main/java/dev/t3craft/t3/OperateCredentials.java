@@ -16,10 +16,16 @@ import java.util.TreeSet;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The optional operate sessions ({@link Pairing#OPERATE_SCOPES}), stored apart from the read-only
- * ones: {@code <config>/t3craft/credentials/operate/<env>.json} ({@code {accessToken, scopes,
- * expiresAt}}, owner-only permissions where the OS allows). Never in {@code t3craft.json} nor in
- * {@code environments.json}.
+ * The operate sessions ({@link Pairing#OPERATE_SCOPES}): {@code <config>/t3craft/credentials/operate/<env>.json}
+ * ({@code {accessToken, scopes, expiresAt}}, owner-only permissions where the OS allows). Never in
+ * {@code t3craft.json} nor in {@code environments.json}. <b>This file is the switch</b>: control is
+ * enabled for an environment exactly while it holds a valid token here ({@link OperateGate}).
+ * <ul>
+ *   <li>Default pairing (read + operate in one): {@link Environments#pair} writes the same
+ *   session here and in {@code credentials/<env>.json} ({@link #sharesReadSession}).</li>
+ *   <li>"Enable control" on a read-only environment, or anything stored before 2026-11-07: a
+ *   separate operate session here, the read-only one stays untouched (additive).</li>
+ * </ul>
  *
  * <p>{@link #revoke} only deletes the local file. Revoking the session on the T3 host is a manual
  * step ({@code t3 auth session list} / {@code t3 auth session revoke <id>}, or Sharing &amp; access):
@@ -30,6 +36,14 @@ public final class OperateCredentials {
 
 	/** Shown wherever the player revokes control: the host-side step is manual. */
 	public static final String HOST_REVOKE_HINT = "also revoke the operate session on the T3 host: t3 auth session list / t3 auth session revoke <id>";
+
+	/**
+	 * Shown when control is revoked on a combined pairing: the read zone keeps the same session,
+	 * which still carries operate on the host.
+	 */
+	public static final String SHARED_REVOKE_HINT = "This environment was paired with read + control in one session, which still reads "
+			+ "and still carries operate on the T3 host: revoke it there (t3 auth session list / t3 auth session revoke <id>) "
+			+ "and re-pair with /t3craft pair --read-only for a read-only session";
 
 	private final Path dir;
 
@@ -104,11 +118,26 @@ public final class OperateCredentials {
 		}
 	}
 
+	/**
+	 * Whether the operate token is the same session as the environment's read-zone credential
+	 * (default combined pairing). After {@link #revoke} that session still carries operate on the
+	 * T3 host, though T3Craft no longer writes with it: revoke it there, or re-pair read-only.
+	 */
+	public boolean sharesReadSession(String envId) {
+		Pairing.Session op = stored(envId);
+		Pairing.Session read = new Environments(dir).credential(envId);
+		return op != null && read != null && op.accessToken().equals(read.accessToken());
+	}
+
 	public boolean has(String envId, long nowMs) {
 		return get(envId, nowMs) != null;
 	}
 
-	/** Deletes the local operate token. Returns whether there was one. Never contacts T3. */
+	/**
+	 * Deletes the local operate token: the environment goes back to read-only and keeps its read
+	 * pairing (with a combined session the read zone keeps reading with it). Returns whether there
+	 * was one. Never contacts T3.
+	 */
 	public synchronized boolean revoke(String envId) throws IOException {
 		try {
 			checkId(envId);
