@@ -10,6 +10,7 @@ One line per structural commit on `main`, newest first:
 
 ## Entries
 
+- 2026-11-07 feat/hud-bar RESTART — new HUD element t3craft:status_bar registered at client init (working / needs you / error counters + 'n waiting · key' badge, GoalBar-style, AgentCraft attribution); additive config (enabled, position, hide when empty) in Settings.
 - 2026-11-07 feat/npc-attention RELOAD — NPCs walk over to the player when their thread needs attention (approach state in the NPC brain), configurable (enabled, max distance, max concurrent, cooldown). No new entrypoints, registries, keybinds or commands.
 - 2026-11-07 feat/panel-chips RELOAD — model/provider chip on NPC nameplate and panel, branch/worktree in the panel and workstation screen; tolerant decoding; additive config keys to show/hide chips. No new entrypoints, registries, keybinds or commands.
 - 2026-11-07 feat/hq-design RESTART — modular HQ plan (dev.t3craft.hq: 6-desk modules per project, archive basement, env colours, deterministic/idempotent layout, HqPlans → BuildPlan, HqAnchorSource for NPCs); command /t3craft debug hq-preview registered at client init. No blocks are placed outside that debug command yet.
