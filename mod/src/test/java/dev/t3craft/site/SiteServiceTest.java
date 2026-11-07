@@ -267,7 +267,7 @@ class SiteServiceTest {
 		for (int i = 0; i < snap.size() / 2; i++) {
 			world.set(snap.box().xOf(i), snap.box().yOf(i), snap.box().zOf(i), snap.state(i), snap.blockEntity(i));
 		}
-		store.saveJournal(new SiteJournal(SiteJournal.Phase.RESTORING, built.siteId(), null, DIM, Restorer.Mode.KEEP_PLAYER_CHANGES, now));
+		store.saveJournal(built.restoring(Restorer.Mode.KEEP_PLAYER_CHANGES, 0, null, now));
 		SiteService fresh = newService();
 		assertTrue(fresh.onLoad().contains("restore"));
 		SiteService.Reply r = fresh.resume();

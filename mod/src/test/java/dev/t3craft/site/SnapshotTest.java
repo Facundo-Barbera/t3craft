@@ -171,10 +171,22 @@ class SnapshotTest {
 
 	@Test
 	void journalRoundTrips() throws Exception {
-		SiteJournal j = new SiteJournal(SiteJournal.Phase.RESTORING, "site-a", "site-b", "minecraft:overworld", Restorer.Mode.OVERWRITE, 5L);
+		CellPlan.Origin o = new CellPlan.Origin(1, 65, 2, CellPlan.Facing.EAST);
+		Box box = new Box(-9, 60, -9, 9, 76, 9);
+		SiteModule extra = new SiteModule("project-a", "desks=4", new Rect(8, -7, 22, 7));
+		SiteJournal next = new SiteJournal(SiteJournal.Phase.BUILDING, "minecraft:overworld", o, SiteRequest.GROWABLE, box,
+				List.of(new Expansion("site-c", SiteRequest.GROWABLE.base(), box)), null, 0, null, List.of(extra), 4L);
+		SiteJournal j = new SiteJournal(SiteJournal.Phase.RESTORING, "minecraft:overworld", o, SiteRequest.GROWABLE, box,
+				List.of(new Expansion("site-a", SiteRequest.GROWABLE.base(), box), new Expansion("site-b", extra, box)), Restorer.Mode.OVERWRITE, 1, next,
+				List.of(), 5L);
 		assertEquals(j, SiteJournal.fromTag(j.toTag()));
+		assertEquals("site-a", j.siteId());
+		assertEquals("site-b", j.top().key());
 		CompoundTag bad = j.toTag();
-		bad.remove("site");
+		bad.remove("stack");
 		assertThrows(java.io.IOException.class, () -> SiteJournal.fromTag(bad));
+		CompoundTag old = j.toTag();
+		old.putInt("version", 1);
+		assertThrows(java.io.IOException.class, () -> SiteJournal.fromTag(old), "a v1 journal is refused, never guessed");
 	}
 }

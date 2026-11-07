@@ -1,5 +1,6 @@
 package dev.t3craft.site;
 
+import dev.t3craft.T3Craft;
 import java.io.IOException;
 import java.security.SecureRandom;
 import java.time.Instant;
@@ -9,6 +10,8 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -16,17 +19,21 @@ import org.jspecify.annotations.Nullable;
  * from one thread (the integrated server thread in game).
  *
  * <pre>
- * here|pick ─▶ preview (outline, report, token) ─▶ confirm &lt;token&gt;
- *      re-evaluate + re-capture (must equal the preview) ─▶ snapshot saved, fsynced, read back
- *      ─▶ plan saved ─▶ journal BUILDING ─▶ builder.submit(plan, origin) ─▶ journal BUILT
- * undo ─▶ report (conflicts = cells the player changed) ─▶ undo-confirm &lt;token&gt; [keep|overwrite]
- *      ─▶ journal RESTORING ─▶ exact restore ─▶ snapshot archived ─▶ journal NONE
- * move (needs a preview) ─▶ report ─▶ move-confirm &lt;token&gt; [keep|overwrite]
- *      ─▶ new snapshot + plan saved ─▶ RESTORING old ─▶ archive old ─▶ BUILDING new
+ * here|pick ─▶ preview (reserve outline, report, token) ─▶ confirm &lt;token&gt;
+ *      re-evaluate + re-capture (must equal the preview) ─▶ base snapshot saved, fsynced, read back
+ *      ─▶ plan saved ─▶ journal BUILDING [base] ─▶ builder.submit ─▶ journal BUILT
+ * expand(module) (API, for the builders) ─▶ checks (envelope, overlap, nothing built/fluid there)
+ *      ─▶ module snapshot saved ─▶ journal BUILDING [base, …, module] ─▶ builder.submit ─▶ BUILT
+ * undo ─▶ report for the newest expansion ─▶ undo confirm &lt;token&gt; [keep|overwrite]
+ *      ─▶ RESTORING ─▶ exact restore of that expansion ─▶ archived ─▶ BUILT (or NONE after the base)
+ * move (needs a preview) ─▶ report ─▶ move confirm &lt;token&gt; [keep|overwrite]
+ *      ─▶ new base snapshot + plan saved ─▶ RESTORING every expansion, newest first ─▶ BUILDING new base
+ *      ─▶ the other modules are handed back ({@link #modulesToRebuild()}) for the builders to re-expand
  * </pre>
- * Nothing is written to the world before an explicit confirm with a fresh token; any change to the
- * area between preview and confirm, or to the conflicts between undo/move and its confirm, cancels
- * the confirm. Interrupted phases are finished by {@code resume} (idempotent).
+ * Nothing is written to the world before an explicit confirm with a fresh token (or an
+ * {@link #expand} call); any change to the area between preview and confirm, or to the conflicts
+ * between undo/move and its confirm, cancels the confirm. Interrupted phases are finished by
+ * {@code resume} (idempotent).
  */
 public final class SiteService {
 	/** World access for the service. */
@@ -43,8 +50,8 @@ public final class SiteService {
 		void tell(String line);
 
 		/**
-		 * Makes the world's chunks durable on disk. Called after a restore and before the journal
-		 * forgets the site, so a crash cannot leave the base on disk with no record of it.
+		 * Makes the world's chunks durable on disk. Called after each restore and before the journal
+		 * forgets the expansion, so a crash cannot leave blocks on disk with no record of them.
 		 */
 		default void flushWorld() {
 		}
@@ -75,7 +82,7 @@ public final class SiteService {
 		BUILD, UNDO, MOVE
 	}
 
-	private record Candidate(String dimension, SiteEvaluator.Evaluation eval, CellPlan plan, Snapshot before, long expires) {
+	private record Candidate(String dimension, SiteRequest request, SiteEvaluator.Evaluation eval, CellPlan plan, Snapshot before, long expires) {
 	}
 
 	private record Pending(Kind kind, String token, long expires, int conflicts) {
@@ -83,29 +90,223 @@ public final class SiteService {
 
 	private final SiteStore store;
 	private final Env env;
-	private final StructureSource structure;
+	private final ModuleDesigner designer;
+	private final SiteRequest request;
 	private final SecureRandom random = new SecureRandom();
+	private final List<SiteListener> listeners = new CopyOnWriteArrayList<>();
 	private @Nullable Candidate candidate;
 	private @Nullable Pending pending;
 	private SiteBuilder.@Nullable Handle running;
 	private SiteBuilder.@Nullable Report lastReport;
 
+	/** Fixed 15×15 site ({@link SiteRequest#SQUARE}) with a structure source for the base. */
 	public SiteService(SiteStore store, Env env, StructureSource structure) {
+		this(store, env, ModuleDesigner.of(structure), SiteRequest.SQUARE);
+	}
+
+	public SiteService(SiteStore store, Env env, ModuleDesigner designer, SiteRequest request) {
 		this.store = store;
 		this.env = env;
-		this.structure = structure;
+		this.designer = designer;
+		this.request = request;
+	}
+
+	public SiteRequest request() {
+		return request;
+	}
+
+	// ---- integration surface ------------------------------------------------------------------
+
+	public void addListener(SiteListener l) {
+		listeners.add(l);
+	}
+
+	public void removeListener(SiteListener l) {
+		listeners.remove(l);
+	}
+
+	private void fire(Consumer<SiteListener> call) {
+		for (SiteListener l : listeners) {
+			try {
+				call.accept(l);
+			} catch (RuntimeException e) {
+				T3Craft.LOGGER.warn("site listener failed", e);
+			}
+		}
+	}
+
+	/** The active site (any phase but NONE), or null when there is none or the journal is unreadable. */
+	public @Nullable SiteHandle handle() {
+		try {
+			SiteJournal j = store.loadJournal();
+			return j.phase() == SiteJournal.Phase.NONE ? null : SiteHandle.of(j);
+		} catch (IOException e) {
+			return null;
+		}
+	}
+
+	/** Modules a move left for the builders to rebuild here (oldest first); empty when none. */
+	public List<SiteModule> modulesToRebuild() {
+		try {
+			return store.loadJournal().pending();
+		} catch (IOException e) {
+			return List.of();
+		}
+	}
+
+	/** The saved plan (leveling + structure) of an expansion of the active site, or null. */
+	public @Nullable CellPlan plan(Expansion e) {
+		try {
+			return store.loadPlan(e.key());
+		} catch (IOException | Snapshot.InvalidSnapshotException ex) {
+			return null;
+		}
+	}
+
+	/**
+	 * Adds a module to the built site: checks it fits the envelope and overlaps no module, that its
+	 * box (footprint + apron, below the ground to the headroom) holds no fluid and nothing built
+	 * except the site's own blocks, then saves and verifies a snapshot of that box <b>before</b>
+	 * leveling it and building {@link ModuleDesigner#design} there through the {@link SiteBuilder}.
+	 * {@code site undo} removes it again. Server thread.
+	 */
+	public Reply expand(SiteModule module) {
+		SiteJournal j;
+		try {
+			j = store.loadJournal();
+		} catch (IOException e) {
+			return Reply.fail("Cannot read the site journal: " + e.getMessage());
+		}
+		if (j.phase() == SiteJournal.Phase.NONE) {
+			return Reply.fail("There is no site yet. " + CMD + " here | pick first.");
+		}
+		if (j.phase() != SiteJournal.Phase.BUILT || running != null) {
+			return Reply.fail("The site is busy (" + j.phase().name().toLowerCase() + "). Wait for the build or run " + CMD + " resume.");
+		}
+		SiteHandle h = SiteHandle.of(j);
+		for (SiteModule m : h.modules()) {
+			if (m.id().equals(module.id())) {
+				return Reply.fail("Module " + module.id() + " is already built.");
+			}
+		}
+		if (!h.request().envelope().contains(module.rect())) {
+			return Reply.fail("Module " + module.id() + " " + module.rect() + " does not fit the growth envelope " + h.request().envelope() + ".");
+		}
+		if (!h.fits(module.rect())) {
+			return Reply.fail("Module " + module.id() + " " + module.rect() + " overlaps a module already built.");
+		}
+		BlockWorld world = env.world(j.dimension());
+		TerrainProbe probe = env.terrain(j.dimension());
+		if (world == null || probe == null) {
+			return Reply.fail("The site's dimension (" + j.dimension() + ") is not loaded.");
+		}
+		// Earlier plans: their cells are the site's own blocks, not "something built in the way".
+		List<CellPlan> earlier = new ArrayList<>();
+		List<Box> pads = new ArrayList<>();
+		try {
+			for (Expansion e : j.stack()) {
+				earlier.add(store.loadPlan(e.key()));
+				pads.add(h.footprint(e.module().rect()));
+			}
+		} catch (IOException | Snapshot.InvalidSnapshotException e) {
+			return Reply.fail("Cannot read the site's plans: " + e.getMessage());
+		}
+		Leveling.Keep keep = (x, z) -> {
+			for (Box p : pads) {
+				if (p.containsXZ(x, z)) {
+					return true;
+				}
+			}
+			return false;
+		};
+		Columns cols = new Columns(probe);
+		Box fp = h.footprint(module.rect());
+		int a = SiteLimits.APRON;
+		int floor = h.padY();
+		int minTop = floor;
+		int maxTop = floor;
+		for (int x = fp.minX() - a; x <= fp.maxX() + a; x++) {
+			for (int z = fp.minZ() - a; z <= fp.maxZ() + a; z++) {
+				if (!probe.loaded(x, z)) {
+					return Reply.fail("Part of the module's area is not loaded (move closer).");
+				}
+				if (!keep.keep(x, z)) {
+					minTop = Math.min(minTop, cols.at(x, z).top());
+					maxTop = Math.max(maxTop, cols.at(x, z).top());
+				}
+			}
+		}
+		Box box = new Box(fp.minX() - a, minTop - 1, fp.minZ() - a, fp.maxX() + a, Math.max(floor + SiteLimits.HEADROOM, maxTop + 2), fp.maxZ() + a);
+		if (box.minY() < probe.minBuildY() || box.maxY() > probe.maxBuildY() || box.volume() > SiteLimits.MAX_VOLUME
+				|| box.chunkCount() > SiteLimits.MAX_CHUNKS) {
+			return Reply.fail("Module " + module.id() + " needs a box " + box.shortString() + " outside the limits.");
+		}
+		String blocked = blocked(probe, world, box, earlier);
+		if (blocked != null) {
+			return Reply.fail("Module " + module.id() + " cannot go there: " + blocked + ". Nothing was changed.");
+		}
+		List<String> ents = probe.foreignEntities(box);
+		if (!ents.isEmpty()) {
+			return Reply.fail("Module " + module.id() + ": entities in the way: " + String.join(", ", ents.subList(0, Math.min(3, ents.size()))) + ".");
+		}
+		CellPlan plan = Leveling.plan(cols, box, fp, j.origin(), keep);
+		plan.overlay(designer.design(module, h.moduleArea(module.rect()), j.origin()));
+		String key = newKey();
+		Snapshot snap = Snapshot.capture(key, j.dimension(), env.now(), world, box);
+		Expansion exp = new Expansion(key, module, box);
+		List<SiteModule> stillPending = new ArrayList<>(j.pending());
+		stillPending.removeIf(m -> m.id().equals(module.id()));
+		SiteJournal next = j.push(exp, stillPending, env.now());
+		try {
+			store.saveSnapshot(snap);
+			store.savePlan(key, plan);
+			store.saveJournal(next);
+		} catch (IOException e) {
+			return Reply.fail("Could not save the module's snapshot safely, nothing was modified: " + e.getMessage());
+		}
+		startBuild(next, snap, plan);
+		return new Reply(true, List.of("Module " + module.id() + ": snapshot " + key + " saved and verified (" + snap.size() + " cells). Building…",
+				"Undo it any time: " + CMD + " undo"), box, fp, List.of(), List.of());
+	}
+
+	/** First reason the box cannot be built on (fluid, or a block that is neither natural nor the site's own), or null. */
+	private static @Nullable String blocked(TerrainProbe probe, BlockWorld world, Box box, List<CellPlan> earlier) {
+		for (int y = box.minY(); y <= box.maxY(); y++) {
+			for (int z = box.minZ(); z <= box.maxZ(); z++) {
+				for (int x = box.minX(); x <= box.maxX(); x++) {
+					TerrainProbe.Kind k = probe.kind(x, y, z);
+					if (k == TerrainProbe.Kind.WATER || k == TerrainProbe.Kind.LAVA) {
+						return k.name().toLowerCase() + " at " + x + " " + y + " " + z;
+					}
+					if (k == TerrainProbe.Kind.ARTIFICIAL && !ours(world.state(x, y, z), earlier, x, y, z)) {
+						return "built blocks in the way: " + probe.describe(x, y, z) + " at " + x + " " + y + " " + z;
+					}
+				}
+			}
+		}
+		return null;
+	}
+
+	private static boolean ours(String state, List<CellPlan> plans, int x, int y, int z) {
+		for (CellPlan p : plans) {
+			if (state.equals(p.get(x, y, z))) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	// ---- selection ----------------------------------------------------------------------------
 
-	/** Preview the site centred on (cx, cz); the entrance faces (px, pz). */
+	/** Preview the site with its origin at (cx, cz); the entrance faces (px, pz). */
 	public Reply here(String dimension, int cx, int cz, int px, int pz) {
 		TerrainProbe probe = env.terrain(dimension);
 		if (probe == null) {
 			return Reply.fail("This dimension is not available.");
 		}
 		Columns cols = new Columns(probe);
-		return preview(dimension, cols, SiteEvaluator.evaluate(cols, cx, cz), px, pz, null);
+		CellPlan.Facing facing = CellPlan.Facing.towards(px - cx, pz - cz);
+		return preview(dimension, cols, SiteEvaluator.evaluate(cols, cx, cz, facing, request), null);
 	}
 
 	/** Search around (px, pz) for the best site and preview it. */
@@ -117,34 +318,34 @@ public final class SiteService {
 		Box avoid = null;
 		try {
 			SiteJournal j = store.loadJournal();
-			if (j.phase() != SiteJournal.Phase.NONE && j.dimension().equals(dimension) && j.siteId() != null) {
-				avoid = store.loadSnapshot(j.siteId()).box();
+			if (j.phase() != SiteJournal.Phase.NONE && j.dimension().equals(dimension)) {
+				avoid = j.reserve();
 			}
-		} catch (IOException | Snapshot.InvalidSnapshotException e) {
+		} catch (IOException e) {
 			return Reply.fail("Cannot read the current site: " + e.getMessage());
 		}
 		Columns cols = new Columns(probe);
-		SiteEvaluator.Search s = SiteEvaluator.search(cols, px, pz, SiteLimits.SEARCH_RADIUS, SiteLimits.SEARCH_STEP, avoid);
+		SiteEvaluator.Search s = SiteEvaluator.search(cols, px, pz, SiteLimits.SEARCH_RADIUS, SiteLimits.SEARCH_STEP, avoid, request);
 		if (s.best() == null) {
 			List<String> lines = new ArrayList<>();
-			lines.add("No suitable " + SiteLimits.FOOTPRINT + "x" + SiteLimits.FOOTPRINT + " site within " + SiteLimits.SEARCH_RADIUS
-					+ " blocks (" + s.evaluated() + " checked).");
+			lines.add("No suitable site (base " + request.base().rect().width() + "x" + request.base().rect().depth() + ", room to grow to "
+					+ request.envelope().width() + "x" + request.envelope().depth() + ") within " + SiteLimits.SEARCH_RADIUS + " blocks (" + s.evaluated()
+					+ " checked).");
 			for (Map.Entry<String, Integer> e : s.rejected().entrySet()) {
 				lines.add("  " + e.getValue() + "× " + e.getKey());
 			}
 			return new Reply(false, lines, null, null, List.of(), List.of());
 		}
-		return preview(dimension, cols, s.best(), px, pz, s.evaluated() + " spots checked");
+		return preview(dimension, cols, s.best(), s.evaluated() + " spots checked");
 	}
 
-	private Reply preview(String dimension, Columns cols, SiteEvaluator.Evaluation e, int px, int pz, @Nullable String extra) {
-		Box fpFlat = e.footprint();
+	private Reply preview(String dimension, Columns cols, SiteEvaluator.Evaluation e, @Nullable String extra) {
 		if (!e.ok() || e.box() == null) {
 			candidate = null;
 			List<String> lines = new ArrayList<>();
 			lines.add("Site at " + e.centerX() + " " + e.centerZ() + " refused:");
 			e.problems().forEach(p -> lines.add("  " + p));
-			Box outline = e.box();
+			Box outline = e.reserve() != null ? e.reserve() : e.box();
 			return new Reply(false, lines, outline, null, List.of(), List.of());
 		}
 		BlockWorld world = env.world(dimension);
@@ -157,16 +358,19 @@ public final class SiteService {
 		} catch (IOException ex) {
 			return Reply.fail("Cannot read the site journal: " + ex.getMessage());
 		}
-		CellPlan.Facing facing = CellPlan.Facing.towards(px - e.centerX(), pz - e.centerZ());
-		CellPlan plan = fullPlan(cols, e, facing);
+		CellPlan plan = basePlan(cols, e, request.base());
 		Snapshot before = Snapshot.capture("preview", dimension, env.now(), world, e.box());
 		long expires = env.now() + SiteLimits.PREVIEW_TTL_MS;
-		candidate = new Candidate(dimension, e, plan, before, expires);
+		candidate = new Candidate(dimension, request, e, plan, before, expires);
+		Box fpFlat = e.footprint();
 		Box footprint = new Box(fpFlat.minX(), e.floorY(), fpFlat.minZ(), fpFlat.maxX(), e.floorY(), fpFlat.maxZ());
 		List<String> lines = new ArrayList<>();
-		lines.add("Site preview at " + e.centerX() + " " + e.floorY() + " " + e.centerZ() + " (entrance " + facing.name().toLowerCase()
+		lines.add("Site preview at " + e.centerX() + " " + e.floorY() + " " + e.centerZ() + " (entrance " + e.facing().name().toLowerCase()
 				+ "): " + e.summary() + (extra == null ? "" : ", " + extra) + ".");
-		lines.add("Area " + e.box().shortString() + ": " + plan.count() + " blocks would change. A snapshot is saved before any change.");
+		lines.add("Base " + e.box().shortString() + ": " + plan.count() + " blocks would change. A snapshot is saved before any change.");
+		if (!e.envelope().equals(e.footprint())) {
+			lines.add("Reserved to grow: " + e.reserve().shortString() + " (checked now, leveled module by module later).");
+		}
 		List<String> actions = new ArrayList<>();
 		switch (j.phase()) {
 			case NONE -> {
@@ -177,7 +381,7 @@ public final class SiteService {
 			}
 			case BUILT -> {
 				pending = null;
-				lines.add("You already have a base. To move it here (the old place is restored): " + CMD + " move");
+				lines.add("You already have a base. To move it here (the old place is restored, the modules rebuilt here): " + CMD + " move");
 				actions.add(CMD + " move");
 			}
 			default -> {
@@ -186,15 +390,15 @@ public final class SiteService {
 			}
 		}
 		actions.add(CMD + " cancel");
-		return new Reply(true, lines, e.box(), footprint, List.of(), actions);
+		return new Reply(true, lines, e.reserve(), footprint, List.of(), actions);
 	}
 
-	private CellPlan fullPlan(Columns cols, SiteEvaluator.Evaluation e, CellPlan.Facing facing) {
-		CellPlan plan = Leveling.plan(cols, e, facing);
+	private CellPlan basePlan(Columns cols, SiteEvaluator.Evaluation e, SiteModule base) {
+		CellPlan.Origin origin = e.origin();
+		CellPlan plan = Leveling.plan(cols, e.box(), e.footprint(), origin, Leveling.Keep.NOTHING);
 		Box fp = e.footprint();
 		Box area = new Box(fp.minX(), e.floorY() + 1, fp.minZ(), fp.maxX(), e.floorY() + SiteLimits.HEADROOM, fp.maxZ());
-		CellPlan design = structure.design(area, plan.origin());
-		plan.overlay(design);
+		plan.overlay(designer.design(base, area, origin));
 		return plan;
 	}
 
@@ -224,20 +428,26 @@ public final class SiteService {
 			clear();
 			return Reply.fail(e.getMessage());
 		}
-		String id = newSiteId();
-		Snapshot snap = Snapshot.capture(id, c.dimension, env.now(), env.world(c.dimension), c.eval.box());
+		String key = newKey();
+		Snapshot snap = Snapshot.capture(key, c.dimension, env.now(), env.world(c.dimension), c.eval.box());
+		SiteJournal j = newSite(c, c.request.base(), key, List.of());
 		try {
 			store.saveSnapshot(snap);
-			store.savePlan(id, c.plan);
-			store.saveJournal(new SiteJournal(SiteJournal.Phase.BUILDING, id, null, c.dimension, null, env.now()));
+			store.savePlan(key, c.plan);
+			store.saveJournal(j);
 		} catch (IOException e) {
 			clear();
 			return Reply.fail("Could not save the snapshot safely, nothing was modified: " + e.getMessage());
 		}
 		clear();
-		startBuild(id, c.dimension, snap, c.plan);
-		return new Reply(true, List.of("Snapshot " + id + " saved and verified (" + snap.size() + " cells, " + snap.blockEntityCount()
+		startBuild(j, snap, c.plan);
+		return new Reply(true, List.of("Snapshot " + key + " saved and verified (" + snap.size() + " cells, " + snap.blockEntityCount()
 				+ " block entities). Building…", "Undo any time: " + CMD + " undo"), c.eval.box(), null, List.of(), List.of());
+	}
+
+	private SiteJournal newSite(Candidate c, SiteModule base, String key, List<SiteModule> pend) {
+		return new SiteJournal(SiteJournal.Phase.BUILDING, c.dimension, c.eval.origin(), c.request, c.eval.reserve(),
+				List.of(new Expansion(key, base, c.eval.box())), null, 0, null, pend, env.now());
 	}
 
 	/**
@@ -251,7 +461,7 @@ public final class SiteService {
 		if (probe == null || world == null) {
 			throw new IllegalStateException("The site's dimension is not loaded.");
 		}
-		SiteEvaluator.Evaluation now = SiteEvaluator.evaluate(new Columns(probe), c.eval.centerX(), c.eval.centerZ());
+		SiteEvaluator.Evaluation now = SiteEvaluator.evaluate(new Columns(probe), c.eval.centerX(), c.eval.centerZ(), c.eval.facing(), c.request);
 		if (!now.ok() || !c.eval.box().equals(now.box()) || now.floorY() != c.eval.floorY()) {
 			throw new IllegalStateException("The area changed since the preview (" + (now.ok() ? "different ground" : now.problems().get(0))
 					+ "). Nothing was modified; preview again.");
@@ -263,54 +473,102 @@ public final class SiteService {
 		return s;
 	}
 
-	private void startBuild(String id, String dimension, Snapshot snap, CellPlan plan) {
-		BlockWorld world = env.world(dimension);
-		if (world == null) {
-			env.tell("Site " + id + ": dimension not loaded, build paused. Run " + CMD + " resume there.");
+	/** Builds the top expansion of {@code j} (journal already BUILDING and durable). */
+	private void startBuild(SiteJournal j, Snapshot snap, CellPlan plan) {
+		Expansion top = j.top();
+		BlockWorld world = env.world(j.dimension());
+		if (world == null || top == null) {
+			env.tell("Site: dimension " + j.dimension() + " not loaded, build paused. Run " + CMD + " resume there.");
 			return;
 		}
 		lastReport = null;
+		SiteHandle h = SiteHandle.of(j);
+		fire(l -> l.beforeExpansion(h, top, snap, plan));
 		SiteBuilder.CellGuard guard = (x, y, z) -> Restorer.isOurs(world, snap, plan, x, y, z);
-		running = env.builder(dimension).submit(plan, plan.origin(), guard, report -> {
+		SiteBuilder.Handle handle = env.builder(j.dimension()).submit(plan, plan.origin(), guard, report -> {
 			running = null;
 			lastReport = report;
 			if (report.cancelled()) {
 				return;
 			}
+			SiteJournal done = null;
 			try {
-				SiteJournal j = store.loadJournal();
-				if (j.phase() == SiteJournal.Phase.BUILDING && id.equals(j.siteId())) {
-					store.saveJournal(new SiteJournal(SiteJournal.Phase.BUILT, id, null, dimension, null, env.now()));
+				SiteJournal cur = store.loadJournal();
+				Expansion t = cur.top();
+				if (cur.phase() == SiteJournal.Phase.BUILDING && t != null && top.key().equals(t.key())) {
+					done = cur.with(SiteJournal.Phase.BUILT, env.now());
+					store.saveJournal(done);
 				}
 			} catch (IOException e) {
 				env.tell("Site built, but the journal could not be updated: " + e.getMessage());
 			}
-			env.tell("Site built: " + report.placed() + " blocks placed" + (report.skipped() > 0
-					? ", " + report.skipped() + " left alone because you changed them (" + String.join("; ", report.skippedSample()) + ")"
-					: "") + ".");
+			SiteHandle after = done == null ? h : SiteHandle.of(done);
+			fire(l -> l.built(after, top, report));
+			env.tell((j.stack().size() == 1 ? "Site built: " : "Module " + top.module().id() + " built: ") + report.placed() + " blocks placed" + (report.skipped() > 0 ? ", " + report.skipped()
+					+ " left alone because you changed them (" + String.join("; ", report.skippedSample()) + ")" : "") + ".");
 		});
+		// A builder may finish inside submit (instant): then nothing is running any more.
+		running = handle.finished() ? null : handle;
 	}
 
 	// ---- undo / move --------------------------------------------------------------------------
 
-	private record Active(SiteJournal journal, Snapshot snap, CellPlan plan, BlockWorld world) {
+	private record Layer(Expansion exp, Snapshot snap, CellPlan plan) {
+	}
+
+	private record Active(SiteJournal journal, List<Layer> layers, BlockWorld world) {
+		Layer top() {
+			return layers.get(layers.size() - 1);
+		}
 	}
 
 	private Active active() throws IOException, Snapshot.InvalidSnapshotException {
 		SiteJournal j = store.loadJournal();
-		if (j.phase() == SiteJournal.Phase.NONE || j.siteId() == null) {
+		if (j.phase() == SiteJournal.Phase.NONE) {
 			throw new IOException("There is no site to undo.");
 		}
-		Snapshot snap = store.loadSnapshot(j.siteId());
-		CellPlan plan = store.loadPlan(j.siteId());
-		if (!plan.box().equals(snap.box())) {
-			throw new Snapshot.InvalidSnapshotException("plan and snapshot boxes differ");
-		}
-		BlockWorld w = env.world(snap.dimension());
+		BlockWorld w = env.world(j.dimension());
 		if (w == null) {
-			throw new IOException("The site's dimension (" + snap.dimension() + ") is not loaded.");
+			throw new IOException("The site's dimension (" + j.dimension() + ") is not loaded.");
 		}
-		return new Active(j, snap, plan, w);
+		List<Layer> layers = new ArrayList<>();
+		for (Expansion e : j.stack()) {
+			layers.add(layer(e));
+		}
+		return new Active(j, layers, w);
+	}
+
+	private Layer layer(Expansion e) throws IOException, Snapshot.InvalidSnapshotException {
+		Snapshot snap = store.loadSnapshot(e.key());
+		CellPlan plan = store.loadPlan(e.key());
+		if (!plan.box().equals(snap.box()) || !snap.box().equals(e.box())) {
+			throw new Snapshot.InvalidSnapshotException("plan, snapshot and journal boxes of " + e.key() + " differ");
+		}
+		return new Layer(e, snap, plan);
+	}
+
+	/**
+	 * Player changes in {@code layers[from..]}: each layer is judged on the cells no newer layer
+	 * covers (a newer snapshot already holds the older layer's blocks).
+	 */
+	private static List<Restorer.Conflict> conflicts(BlockWorld w, List<Layer> layers, int from) {
+		List<Restorer.Conflict> out = new ArrayList<>();
+		for (int k = layers.size() - 1; k >= from; k--) {
+			Layer l = layers.get(k);
+			for (Restorer.Conflict c : Restorer.conflicts(w, l.snap, l.plan)) {
+				boolean covered = false;
+				for (int h = k + 1; h < layers.size(); h++) {
+					if (layers.get(h).exp.box().contains(c.x(), c.y(), c.z())) {
+						covered = true;
+						break;
+					}
+				}
+				if (!covered) {
+					out.add(c);
+				}
+			}
+		}
+		return out;
 	}
 
 	public Reply undo() {
@@ -320,15 +578,24 @@ public final class SiteService {
 		} catch (IOException | Snapshot.InvalidSnapshotException e) {
 			return Reply.fail(e.getMessage());
 		}
-		List<Restorer.Conflict> conflicts = Restorer.conflicts(a.world, a.snap, a.plan);
+		if (a.journal.phase() == SiteJournal.Phase.RESTORING) {
+			return Reply.fail("A restore was interrupted. Run " + CMD + " resume first.");
+		}
+		Layer top = a.top();
+		List<Restorer.Conflict> conflicts = conflicts(a.world, a.layers, a.layers.size() - 1);
 		String token = token();
 		pending = new Pending(Kind.UNDO, token, env.now() + SiteLimits.PREVIEW_TTL_MS, conflicts.size());
 		List<String> lines = new ArrayList<>();
-		lines.add("Undo restores the area " + a.snap.box().shortString() + " exactly as it was before (snapshot " + a.snap.id() + ").");
+		if (a.layers.size() == 1) {
+			lines.add("Undo removes the base and restores the area " + top.snap.box().shortString() + " exactly as it was (snapshot " + top.snap.id() + ").");
+		} else {
+			lines.add("Undo removes the newest module, " + top.exp.module().id() + " (" + a.layers.size() + " in the site), and restores "
+					+ top.snap.box().shortString() + " as it was before it. Undo again to go further back.");
+		}
 		List<String> actions = new ArrayList<>();
 		describeConflicts(conflicts, lines, actions, CMD + " undo confirm " + token);
 		actions.add(CMD + " cancel");
-		return new Reply(true, lines, a.snap.box(), null, marks(conflicts), actions);
+		return new Reply(true, lines, top.snap.box(), null, marks(conflicts), actions);
 	}
 
 	public Reply undoConfirm(String token, Restorer.@Nullable Mode mode) {
@@ -347,19 +614,21 @@ public final class SiteService {
 			clear();
 			return Reply.fail(e.getMessage());
 		}
-		List<Restorer.Conflict> conflicts = Restorer.conflicts(a.world, a.snap, a.plan);
+		List<Restorer.Conflict> conflicts = conflicts(a.world, a.layers, a.layers.size() - 1);
 		Reply refused = checkConflicts(p, conflicts.size(), mode, CMD + " undo");
 		if (refused != null) {
 			return refused;
 		}
 		clear();
 		Restorer.Mode m = mode == null ? Restorer.Mode.KEEP_PLAYER_CHANGES : mode;
+		Layer top = a.top();
 		try {
-			Restorer.Result r = restoreAndArchive(a, m, null);
-			return new Reply(true, List.of("Restored " + r.restored() + " blocks" + (r.keptPlayerChanges() > 0
-					? ", kept " + r.keptPlayerChanges() + " of your changes" : "") + ". The snapshot is archived in "
-					+ store.root().resolve("archive").getFileName() + "/."), a.snap.box(), null, List.of(), List.of());
-		} catch (IOException e) {
+			Restored r = restore(a.journal, m, a.layers.size() - 1, null);
+			String left = r.journal.phase() == SiteJournal.Phase.NONE ? "The original terrain is back; there is no site now."
+					: r.journal.stack().size() + " module(s) left; undo again to remove " + r.journal.top().module().id() + ".";
+			return new Reply(true, List.of("Restored " + r.restored + " blocks" + (r.kept > 0 ? ", kept " + r.kept + " of your changes" : "")
+					+ ". The snapshot is archived in " + store.root().resolve("archive").getFileName() + "/.", left), top.snap.box(), null, List.of(), List.of());
+		} catch (IOException | Snapshot.InvalidSnapshotException e) {
 			return Reply.fail("Restore stopped: " + e.getMessage() + ". Run " + CMD + " resume to finish it.");
 		}
 	}
@@ -378,19 +647,23 @@ public final class SiteService {
 		if (a.journal.phase() != SiteJournal.Phase.BUILT) {
 			return Reply.fail("The current site is not finished (" + a.journal.phase() + "). Run " + CMD + " resume first.");
 		}
-		if (c.dimension.equals(a.snap.dimension()) && c.eval.box().grow(1, 0).intersects(a.snap.box())) {
-			return Reply.fail("The new place overlaps the current site. Pick a spot further away.");
+		if (c.dimension.equals(a.journal.dimension()) && c.eval.reserve().grow(1, 0).intersects(a.journal.reserve())) {
+			return Reply.fail("The new place overlaps the current site (including its room to grow). Pick a spot further away.");
 		}
-		List<Restorer.Conflict> conflicts = Restorer.conflicts(a.world, a.snap, a.plan);
+		List<Restorer.Conflict> conflicts = conflicts(a.world, a.layers, 0);
 		String token = token();
 		pending = new Pending(Kind.MOVE, token, Math.min(c.expires, env.now() + SiteLimits.PREVIEW_TTL_MS), conflicts.size());
 		List<String> lines = new ArrayList<>();
-		lines.add("Move: restore the old area " + a.snap.box().shortString() + ", then build at " + c.eval.centerX() + " " + c.eval.floorY() + " "
-				+ c.eval.centerZ() + " (" + c.eval.summary() + "). The new place is snapshotted before anything changes.");
+		lines.add("Move: restore the old area " + a.journal.reserve().shortString() + " (" + a.layers.size() + " module(s), newest first), then build at "
+				+ c.eval.centerX() + " " + c.eval.floorY() + " " + c.eval.centerZ() + " (" + c.eval.summary() + "). The new place is snapshotted before anything changes.");
+		if (a.layers.size() > 1) {
+			lines.add("The builders then rebuild the other modules there: "
+					+ String.join(", ", a.journal.modules().subList(1, a.layers.size()).stream().map(SiteModule::id).toList()) + ".");
+		}
 		List<String> actions = new ArrayList<>();
 		describeConflicts(conflicts, lines, actions, CMD + " move confirm " + token);
 		actions.add(CMD + " cancel");
-		return new Reply(true, lines, c.eval.box(), null, marks(conflicts), actions);
+		return new Reply(true, lines, c.eval.reserve(), null, marks(conflicts), actions);
 	}
 
 	public Reply moveConfirm(String token, Restorer.@Nullable Mode mode) {
@@ -410,7 +683,7 @@ public final class SiteService {
 			clear();
 			return Reply.fail(e.getMessage());
 		}
-		List<Restorer.Conflict> conflicts = Restorer.conflicts(a.world, a.snap, a.plan);
+		List<Restorer.Conflict> conflicts = conflicts(a.world, a.layers, 0);
 		Reply refused = checkConflicts(p, conflicts.size(), mode, CMD + " move");
 		if (refused != null) {
 			return refused;
@@ -421,29 +694,40 @@ public final class SiteService {
 			clear();
 			return Reply.fail(e.getMessage());
 		}
+		// The same base module (its spec), on the new place's base footprint; the others are handed back.
+		List<SiteModule> old = a.journal.modules();
+		SiteModule base = old.get(0).withRect(c.request.base().rect());
+		List<SiteModule> toRebuild = List.copyOf(old.subList(1, old.size()));
+		CellPlan plan = basePlan(new Columns(env.terrain(c.dimension)), c.eval, base);
 		// 1. The new place first: if its snapshot cannot be saved, nothing at all has changed.
-		String id = newSiteId();
-		Snapshot snap = Snapshot.capture(id, c.dimension, env.now(), env.world(c.dimension), c.eval.box());
+		String key = newKey();
+		Snapshot snap = Snapshot.capture(key, c.dimension, env.now(), env.world(c.dimension), c.eval.box());
+		SiteJournal next = newSite(c, base, key, toRebuild);
 		try {
 			store.saveSnapshot(snap);
-			store.savePlan(id, c.plan);
+			store.savePlan(key, plan);
 		} catch (IOException e) {
 			clear();
 			return Reply.fail("Could not save the new place's snapshot, nothing was modified: " + e.getMessage());
 		}
 		clear();
 		Restorer.Mode m = mode == null ? Restorer.Mode.KEEP_PLAYER_CHANGES : mode;
-		Restorer.Result r;
+		Restored r;
 		try {
-			r = restoreAndArchive(a, m, id);
-			store.saveJournal(new SiteJournal(SiteJournal.Phase.BUILDING, id, null, c.dimension, null, env.now()));
-		} catch (IOException e) {
+			r = restore(a.journal, m, 0, next);
+		} catch (IOException | Snapshot.InvalidSnapshotException e) {
 			return Reply.fail("Move stopped: " + e.getMessage() + ". Run " + CMD + " resume to finish it.");
 		}
-		startBuild(id, c.dimension, snap, c.plan);
-		return new Reply(true, List.of("Old area restored (" + r.restored() + " blocks" + (r.keptPlayerChanges() > 0 ? ", kept "
-				+ r.keptPlayerChanges() + " of your changes" : "") + "). Snapshot " + id + " saved and verified; building the new site…"),
-				c.eval.box(), null, List.of(), List.of());
+		startBuild(next, snap, plan);
+		SiteHandle h = SiteHandle.of(next);
+		fire(l -> l.moved(h, toRebuild));
+		List<String> lines = new ArrayList<>();
+		lines.add("Old area restored (" + r.restored + " blocks" + (r.kept > 0 ? ", kept " + r.kept + " of your changes" : "") + "). Snapshot " + key
+				+ " saved and verified; building the new base…");
+		if (!toRebuild.isEmpty()) {
+			lines.add(toRebuild.size() + " module(s) to rebuild here: " + String.join(", ", toRebuild.stream().map(SiteModule::id).toList()) + ".");
+		}
+		return new Reply(true, lines, c.eval.reserve(), null, List.of(), List.of());
 	}
 
 	private @Nullable Reply checkConflicts(Pending p, int now, Restorer.@Nullable Mode mode, String again) {
@@ -458,18 +742,43 @@ public final class SiteService {
 		return null;
 	}
 
-	private Restorer.Result restoreAndArchive(Active a, Restorer.Mode mode, @Nullable String next) throws IOException {
+	private record Restored(SiteJournal journal, int restored, int kept) {
+	}
+
+	/**
+	 * Restores expansions newest first until {@code downTo} remain, then saves the final journal:
+	 * {@code then} (a move's new site), BUILT with what is left, or no site. Idempotent: a restored
+	 * cell equals its snapshot, so running it again after a crash skips it.
+	 */
+	private Restored restore(SiteJournal from, Restorer.Mode mode, int downTo, @Nullable SiteJournal then)
+			throws IOException, Snapshot.InvalidSnapshotException {
 		if (running != null) {
 			running.cancel();
 			running = null;
 		}
-		store.saveJournal(new SiteJournal(SiteJournal.Phase.RESTORING, a.snap.id(), next, a.snap.dimension(), mode, env.now()));
-		Restorer.Result r = Restorer.restore(a.world, a.snap, a.plan, mode);
-		env.flushWorld();
-		store.archive(a.snap.id());
-		store.saveJournal(next == null ? new SiteJournal(SiteJournal.Phase.NONE, null, null, "", null, env.now())
-				: new SiteJournal(SiteJournal.Phase.BUILDING, next, null, a.snap.dimension(), null, env.now()));
-		return r;
+		BlockWorld w = env.world(from.dimension());
+		if (w == null) {
+			throw new IOException("the site's dimension (" + from.dimension() + ") is not loaded");
+		}
+		SiteJournal j = from.restoring(mode, downTo, then, env.now());
+		store.saveJournal(j);
+		int restored = 0;
+		int kept = 0;
+		while (j.stack().size() > downTo) {
+			SiteHandle before = SiteHandle.of(j);
+			Layer l = layer(j.top());
+			Restorer.Result r = Restorer.restore(w, l.snap, l.plan, mode);
+			env.flushWorld();
+			j = j.pop(env.now());
+			store.saveJournal(j);
+			store.archive(l.exp.key());
+			restored += r.restored();
+			kept += r.keptPlayerChanges();
+			fire(x -> x.restored(before, l.exp, r));
+		}
+		SiteJournal fin = then != null ? then : j.stack().isEmpty() ? SiteJournal.EMPTY : j.with(SiteJournal.Phase.BUILT, env.now());
+		store.saveJournal(fin);
+		return new Restored(fin, restored, kept);
 	}
 
 	private static void describeConflicts(List<Restorer.Conflict> conflicts, List<String> lines, List<String> actions, String confirm) {
@@ -518,22 +827,22 @@ public final class SiteService {
 					if (running != null) {
 						return Reply.info("The build is running.");
 					}
-					Snapshot snap = store.loadSnapshot(j.siteId());
-					CellPlan plan = store.loadPlan(j.siteId());
-					startBuild(j.siteId(), snap.dimension(), snap, plan);
-					return Reply.info("Resuming the build of " + j.siteId() + " (cells you changed are left alone).");
+					Layer l = layer(j.top());
+					startBuild(j, l.snap, l.plan);
+					return Reply.info("Resuming the build of " + l.exp.module().id() + " (cells you changed are left alone).");
 				}
 				case RESTORING -> {
-					Active a = active();
 					Restorer.Mode m = j.restoreMode() == null ? Restorer.Mode.KEEP_PLAYER_CHANGES : j.restoreMode();
-					Restorer.Result r = restoreAndArchive(a, m, j.nextSiteId());
-					if (j.nextSiteId() != null) {
-						Snapshot snap = store.loadSnapshot(j.nextSiteId());
-						CellPlan plan = store.loadPlan(j.nextSiteId());
-						startBuild(j.nextSiteId(), snap.dimension(), snap, plan);
-						return Reply.info("Old area restored (" + r.restored() + " blocks); building the new site " + j.nextSiteId() + ".");
+					Restored r = restore(j, m, j.restoreDownTo(), j.next());
+					SiteJournal next = j.next();
+					if (next != null) {
+						Layer l = layer(next.top());
+						startBuild(next, l.snap, l.plan);
+						SiteHandle h = SiteHandle.of(next);
+						fire(x -> x.moved(h, next.pending()));
+						return Reply.info("Old area restored (" + r.restored + " blocks); building the new base " + next.siteId() + ".");
 					}
-					return Reply.info("Restore finished (" + r.restored() + " blocks).");
+					return Reply.info("Restore finished (" + r.restored + " blocks).");
 				}
 			}
 		} catch (IOException | Snapshot.InvalidSnapshotException e) {
@@ -548,8 +857,8 @@ public final class SiteService {
 			store.cleanTemp();
 			SiteJournal j = store.loadJournal();
 			return switch (j.phase()) {
-				case BUILDING -> "T3Craft site " + j.siteId() + ": the build was interrupted. " + CMD + " resume to finish it, or " + CMD
-						+ " undo to restore the area.";
+				case BUILDING -> "T3Craft site " + j.siteId() + ": the build of " + j.top().module().id() + " was interrupted. " + CMD
+						+ " resume to finish it, or " + CMD + " undo to restore its area.";
 				case RESTORING -> "T3Craft site " + j.siteId() + ": a restore was interrupted. " + CMD + " resume to finish it.";
 				default -> null;
 			};
@@ -566,22 +875,19 @@ public final class SiteService {
 			return Reply.fail("Cannot read the site journal: " + e.getMessage());
 		}
 		if (j.phase() == SiteJournal.Phase.NONE) {
-			return Reply.info("No site yet. " + CMD + " here (where you stand) or " + CMD + " pick (search nearby).");
+			return Reply.info("No site yet. " + CMD + " here (in front of you) or " + CMD + " pick (search nearby).");
 		}
 		List<String> lines = new ArrayList<>();
-		Box box = null;
-		try {
-			Snapshot s = store.loadSnapshot(j.siteId());
-			box = s.box();
-			lines.add("Site " + j.siteId() + " (" + j.phase().name().toLowerCase() + ") in " + s.dimension() + ", area " + box.shortString() + ".");
-		} catch (IOException | Snapshot.InvalidSnapshotException e) {
-			lines.add("Site " + j.siteId() + " (" + j.phase().name().toLowerCase() + "): snapshot unreadable: " + e.getMessage());
+		lines.add("Site " + j.siteId() + " (" + j.phase().name().toLowerCase() + ") in " + j.dimension() + ", reserve " + j.reserve().shortString() + ".");
+		lines.add("Modules (oldest first): " + String.join(", ", j.modules().stream().map(m -> m.id() + " " + m.rect()).toList()) + ".");
+		if (!j.pending().isEmpty()) {
+			lines.add("To rebuild after the move: " + String.join(", ", j.pending().stream().map(SiteModule::id).toList()) + ".");
 		}
 		SiteBuilder.Report r = lastReport;
 		if (r != null) {
 			lines.add("Last build: " + r.placed() + " placed, " + r.skipped() + " left alone, " + r.alreadyThere() + " already in place.");
 		}
-		return new Reply(true, lines, box, null, List.of(), List.of());
+		return new Reply(true, lines, j.reserve(), null, List.of(), List.of());
 	}
 
 	public Reply cancel() {
@@ -601,7 +907,7 @@ public final class SiteService {
 		return HexFormat.of().formatHex(b);
 	}
 
-	private String newSiteId() {
+	private String newKey() {
 		String ts = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC).format(Instant.ofEpochMilli(env.now()));
 		return "site-" + ts + "-" + token();
 	}
