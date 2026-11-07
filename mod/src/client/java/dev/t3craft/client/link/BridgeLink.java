@@ -17,7 +17,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
 /**
- * WebSocket client to the local t3craft bridge ({@code ws://127.0.0.1:7878} by default), using
+ * WebSocket client to the t3craft bridge (URL from {@code config/t3craft.json}; default
+ * {@code ws://127.0.0.1:7878/}, normally the homelab's Tailscale address), using
  * {@code java.net.http}. Reconnects forever with {@link Backoff}. Sends {@code hello} on open.
  * Incoming frames are parsed off-thread and handed to the listener on the client thread via
  * {@code clientExecutor}. Outgoing sends are chained so frames never interleave.
@@ -29,6 +30,7 @@ public final class BridgeLink {
 	private final BridgeListener listener;
 	private final Consumer<Runnable> clientExecutor;
 	private final String modVersion;
+	private final @org.jspecify.annotations.Nullable String bridgeKey;
 	private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
 	private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
 		Thread t = new Thread(r, "t3craft-bridge-link");
@@ -42,8 +44,11 @@ public final class BridgeLink {
 	private volatile boolean stopped;
 	private CompletableFuture<?> sendChain = CompletableFuture.completedFuture(null);
 
-	public BridgeLink(URI uri, String modVersion, BridgeListener listener, Consumer<Runnable> clientExecutor) {
+	/** {@code bridgeKey}: optional bridge access key (not a T3 credential), sent in {@code hello}. */
+	public BridgeLink(URI uri, @org.jspecify.annotations.Nullable String bridgeKey, String modVersion,
+			BridgeListener listener, Consumer<Runnable> clientExecutor) {
 		this.uri = uri;
+		this.bridgeKey = bridgeKey;
 		this.modVersion = modVersion;
 		this.listener = listener;
 		this.clientExecutor = clientExecutor;
@@ -149,6 +154,9 @@ public final class BridgeLink {
 			hello.addProperty("client", "t3craft-mod");
 			hello.addProperty("version", modVersion);
 			hello.addProperty("protocol", PROTOCOL_VERSION);
+			if (bridgeKey != null) {
+				hello.addProperty("key", bridgeKey);
+			}
 			send("hello", hello);
 			webSocket.request(1);
 		}

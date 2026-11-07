@@ -66,6 +66,22 @@ reconnect the mod sends `hello` again and replaces its whole NPC set with the ne
 
 The mod must not derive anything from `state`; it renders `label`/`sublabel`/`color`/`activity`.
 
+Phase 1 nameplate (vanilla custom name, one line): `label` in `color`, then `  [envLabel]` in grey.
+The chat screen shows `label`, `sublabel` and `activity`. NPCs are laid out by ascending
+`priority`, then `id`.
+
+## Mod configuration
+
+`config/t3craft.json` in the Minecraft instance (created with defaults on first start):
+
+```json
+{ "bridgeUrl": "ws://my-homelab.<tailnet>.ts.net:7878/", "bridgeKey": null }
+```
+
+`bridgeUrl` defaults to `ws://127.0.0.1:7878/`; env `T3CRAFT_BRIDGE_URL` or
+`-Dt3craft.bridgeUrl=` override it. `bridgeKey` is only needed when the bridge sets
+`listen.clientKeyFile`. The mod never stores T3 tokens.
+
 ## Bridge → mod
 
 | type | payload | notes |

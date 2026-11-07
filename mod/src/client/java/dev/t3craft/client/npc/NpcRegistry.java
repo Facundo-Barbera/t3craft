@@ -20,7 +20,7 @@ import org.jspecify.annotations.Nullable;
  * wanted set comes from the bridge; {@link #tick} reconciles it with the entities in the level.
  * All methods run on the client thread.
  *
- * <p>Layout (phase 1): a ring "corral" anchored where the player stood when the first NPC
+ * <p>Layout (phase 1): NPCs ordered by the bridge's {@code priority}, on a ring "corral" anchored where the player stood when the first NPC
  * appeared in this level. TODO(phase 5): configurable anchor / stations / pathfinding.
  */
 public final class NpcRegistry {
@@ -92,9 +92,11 @@ public final class NpcRegistry {
 			}
 		}
 
+		List<NpcInfo> ordered = new ArrayList<>(wanted.values());
+		ordered.sort(java.util.Comparator.comparingInt(NpcInfo::priority).thenComparing(NpcInfo::id));
 		int i = 0;
-		int count = wanted.size();
-		for (NpcInfo info : wanted.values()) {
+		int count = ordered.size();
+		for (NpcInfo info : ordered) {
 			Vec3 pos = slot(i++, count);
 			Villager v = spawned.get(info.id());
 			if (v == null || v.isRemoved()) {

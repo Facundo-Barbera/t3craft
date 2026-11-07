@@ -35,8 +35,9 @@ public final class ThreadChatScreen extends Screen {
 		int y = 30;
 		graphics.centeredText(font, title, width / 2, y, 0xFFFFFFFF);
 		y += 14;
-		String meta = thread.state().wire + (thread.project() == null ? "" : " · " + thread.project());
-		graphics.centeredText(font, Component.literal(meta).withStyle(thread.state().color), width / 2, y, 0xFFFFFFFF);
+		graphics.centeredText(font, Component.literal(thread.label()).withColor(thread.color()), width / 2, y, 0xFFFFFFFF);
+		y += 14;
+		graphics.centeredText(font, thread.sublabel(), width / 2, y, 0xFFAAAAAA);
 		if (thread.activity() != null) {
 			y += 14;
 			graphics.centeredText(font, thread.activity(), width / 2, y, 0xFFAAAAAA);

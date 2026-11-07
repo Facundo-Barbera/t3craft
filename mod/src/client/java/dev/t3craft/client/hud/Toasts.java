@@ -3,7 +3,6 @@ package dev.t3craft.client.hud;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.toasts.SystemToast;
 import net.minecraft.network.chat.Component;
-import org.jspecify.annotations.Nullable;
 
 /** Vanilla system toasts for bridge {@code notify} messages and link changes. */
 public final class Toasts {
@@ -14,14 +13,9 @@ public final class Toasts {
 	private Toasts() {
 	}
 
-	public static void notify(Minecraft mc, String level, String text, @Nullable String threadTitle) {
-		Component title = Component.literal(switch (level) {
-			case "warn" -> "T3 · needs attention";
-			case "error" -> "T3 · error";
-			default -> "T3";
-		});
-		Component body = Component.literal(threadTitle == null ? text : threadTitle + ": " + text);
-		SystemToast.addOrUpdate(mc.gui.toastManager(), NOTIFY, title, body);
+	/** Wording and colour come from the bridge ({@code notify.title/text/color}). */
+	public static void notify(Minecraft mc, String title, String text, int color) {
+		SystemToast.addOrUpdate(mc.gui.toastManager(), NOTIFY, Component.literal(title).withColor(color), Component.literal(text));
 		// TODO(phase 3): sound cue + "!" over the NPC for needs_attention.
 	}
 

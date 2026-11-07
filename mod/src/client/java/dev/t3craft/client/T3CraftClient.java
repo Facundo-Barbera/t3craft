@@ -10,7 +10,6 @@ import dev.t3craft.client.link.LinkStatus;
 import dev.t3craft.client.npc.NpcInfo;
 import dev.t3craft.client.npc.NpcRegistry;
 import dev.t3craft.client.screen.ThreadChatScreen;
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import net.fabricmc.api.ClientModInitializer;
@@ -30,7 +29,9 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 	public void onInitializeClient() {
 		String version = FabricLoader.getInstance().getModContainer(T3Craft.MOD_ID)
 				.map(c -> c.getMetadata().getVersion().getFriendlyString()).orElse("dev");
-		link = new BridgeLink(bridgeUri(), version, this, Minecraft.getInstance()::execute);
+		ModConfig config = ModConfig.load();
+		T3Craft.LOGGER.info("bridge URL {}", config.bridgeUrl());
+		link = new BridgeLink(config.bridgeUrl(), config.bridgeKey(), version, this, Minecraft.getInstance()::execute);
 
 		ClientLifecycleEvents.CLIENT_STARTED.register(mc -> link.start());
 		ClientLifecycleEvents.CLIENT_STOPPING.register(mc -> link.stop());
@@ -52,18 +53,6 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 			}
 			return InteractionResult.SUCCESS;
 		});
-	}
-
-	/** {@code T3CRAFT_PORT} (env) or {@code -Dt3craft.port}; host is always loopback. */
-	private static URI bridgeUri() {
-		String port = System.getProperty("t3craft.port", System.getenv().getOrDefault("T3CRAFT_PORT", "7878"));
-		int p;
-		try {
-			p = Integer.parseInt(port.trim());
-		} catch (NumberFormatException e) {
-			p = 7878;
-		}
-		return URI.create("ws://127.0.0.1:" + p + "/");
 	}
 
 	@Override
@@ -112,21 +101,41 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 				}
 			}
 			case "npc.remove" -> {
-				JsonElement id = msg.get("id");
+				JsonElement id = msg.get("npcId");
 				if (id != null && id.isJsonPrimitive()) {
 					npcs.remove(id.getAsString());
 				}
 			}
 			case "notify" -> {
-				String level = optString(msg, "level", "info");
-				String text = optString(msg, "text", "");
-				String threadId = optString(msg, "threadId", null);
-				NpcInfo info = threadId == null ? null : npcs.info(threadId);
-				Toasts.notify(mc, level, text, info == null ? null : info.title());
+				Toasts.notify(mc, optString(msg, "title", "T3"), optString(msg, "text", ""),
+						NpcInfo.parseColor(optString(msg, "color", null)));
 			}
-			case "ack", "bridge.status" -> T3Craft.LOGGER.debug("{}: {}", type, msg);
+			case "bridge.status" -> onEnvironments(mc, msg);
+			case "ack", "hello" -> T3Craft.LOGGER.debug("{}: {}", type, msg);
 			// TODO(phase 2/3): chat.history, chat.append, permission.open, permission.closed
 			default -> T3Craft.LOGGER.debug("ignoring unknown message type {}", type);
+		}
+	}
+
+	private final java.util.Map<String, String> envStatus = new java.util.HashMap<>();
+
+	/** Toast when an environment goes offline / fails auth / comes back. Text from the bridge. */
+	private void onEnvironments(Minecraft mc, JsonObject msg) {
+		JsonElement arr = msg.get("environments");
+		if (arr == null || !arr.isJsonArray()) {
+			return;
+		}
+		for (JsonElement e : arr.getAsJsonArray()) {
+			if (!e.isJsonObject()) {
+				continue;
+			}
+			JsonObject o = e.getAsJsonObject();
+			String id = optString(o, "id", "?");
+			String status = optString(o, "status", "?");
+			String before = envStatus.put(id, status);
+			if (before != null && !before.equals(status) && !"connecting".equals(status)) {
+				Toasts.link(mc, optString(o, "label", id) + ": " + status);
+			}
 		}
 	}
 
