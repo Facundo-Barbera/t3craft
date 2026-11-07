@@ -26,6 +26,8 @@ final class PlanBuilder {
 	/** Structure first, attached decoration after (see {@link BuildPlan} order contract). */
 	static final int SOLID = 0;
 	static final int DECOR = 1;
+	/** Hanging things (chains, hanging lanterns): last, top-down, so each comes after what holds it. */
+	static final int HANGING = 2;
 
 	private record Cell(Placement placement, int module, int layer) {
 	}
@@ -71,7 +73,7 @@ final class PlanBuilder {
 		List<Cell> all = new ArrayList<>(cells.values());
 		all.sort(Comparator.<Cell>comparingInt(c -> c.module)
 				.thenComparingInt(c -> c.layer)
-				.thenComparingInt(c -> c.placement.rel().getY())
+				.thenComparingInt(c -> c.layer == HANGING ? -c.placement.rel().getY() : c.placement.rel().getY())
 				.thenComparingInt(c -> c.placement.rel().getZ())
 				.thenComparingInt(c -> c.placement.rel().getX()));
 		List<Placement> out = new ArrayList<>(all.size());
@@ -110,6 +112,10 @@ final class PlanBuilder {
 
 		Canvas decor(BlockPos p, BlockState state) {
 			return put(p.getX(), p.getY(), p.getZ(), state, null, DECOR);
+		}
+
+		Canvas hang(int x, int y, int z, BlockState state) {
+			return put(x, y, z, state, null, HANGING);
 		}
 
 		Canvas decor(BlockPos p, BlockState state, @Nullable CompoundTag be) {

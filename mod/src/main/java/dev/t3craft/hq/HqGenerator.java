@@ -98,12 +98,12 @@ public final class HqGenerator {
 			}
 			c.decor(0, 10, 0, k.lightningRod);
 			// chandelier hanging from the lantern cap into the light well
-			c.decor(0, 8, 0, k.chain);
-			c.decor(0, 7, 0, k.chain);
-			c.decor(0, 6, 0, k.copperLantern(true));
+			c.hang(0, 8, 0, k.chain);
+			c.hang(0, 7, 0, k.chain);
+			c.hang(0, 6, 0, k.copperLantern(true));
 			for (int sx = -1; sx <= 1; sx += 2) {
 				for (int sz = -1; sz <= 1; sz += 2) {
-					c.decor(5 * sx, 5, 5 * sz, k.lantern(true));
+					c.hang(5 * sx, 5, 5 * sz, k.lantern(true));
 					// reading corners
 					c.set(7 * sx, 1, 7 * sz, k.bookshelf);
 					c.set(7 * sx, 2, 7 * sz, k.bookshelf);
@@ -221,7 +221,7 @@ public final class HqGenerator {
 				c.set(x, 4, front, k.beam(Direction.Axis.X));
 				c.set(x, 4, PORTICO_Z1, k.beam(Direction.Axis.X));
 			}
-			c.decor(0, 4, PORTICO_Z1 + 2, k.copperLantern(true));
+			c.hang(0, 4, PORTICO_Z1 + 2, k.copperLantern(true));
 			b.anchor(Anchor.at(AnchorNames.SPAWN, new BlockPos(0, 1, PORTICO_Z1 + 2), Direction.NORTH));
 		}
 	}
@@ -262,7 +262,7 @@ public final class HqGenerator {
 					}
 				}
 				if (v == 4 || v == 8) {
-					c.decor(0, 4, z, k.copperLantern(true));
+					c.hang(0, 4, z, k.copperLantern(true));
 				}
 				if (v == 1 || v == ROW - 2) {
 					c.decor(-2, 1, z, k.fern);
@@ -390,7 +390,7 @@ public final class HqGenerator {
 						c.decor(x, 2, z, k.pottedAzalea);
 					}
 					if (pillar && (v == 3 || v == WING_WALL - 3)) {
-						c.decor(x, 4, z, k.copperLantern(true));
+						c.hang(x, 4, z, k.copperLantern(true));
 					}
 					if (v >= DOOR_V1 && v <= DOOR_V2) {
 						c.decor(x, 1, z, k.carpet(accent));

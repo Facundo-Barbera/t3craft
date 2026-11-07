@@ -23,7 +23,8 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>Order contract: modules in build order (hub, portico, spine, wings, desks, caps); inside a
  * module, structural blocks first and attached decorations (lanterns, signs, pots, carpets) after,
- * each pass bottom-up ({@code y}, then {@code z}, then {@code x}). Every cell of every module's
+ * each pass bottom-up ({@code y}, then {@code z}, then {@code x}), and hanging things (chains,
+ * hanging lanterns) last, top-down, so every block comes after the block that holds it. Every cell of every module's
  * volume is listed, air included, so applying a plan on any terrain gives the same building.
  *
  * <p>No two placements share a position (a generation-time invariant; see {@link PlanBuilder}).
