@@ -76,6 +76,9 @@ de la posición en el plan del HQ; si tampoco, sin vincular. Determinista.
 - cada escritorio: `computerPos` → monitor mirando a la silla, `lampPos` → lámpara; ambos
   `thread:<threadId>` o sin vincular si el escritorio está libre;
 - anclas `board_lamp_<i>` → bombilla `board:<i>`;
+- cada módulo: el dintel de su puerta (la viga del muro interior, una celda hacia el pasillo desde el
+  ancla `module@<i>` y tres arriba) → bombilla `module:<k1>,<k2>…`, el hilo más urgente de los
+  escritorios de ese módulo (claves ordenadas; apagada si el módulo está vacío);
 - anclas `archive_<threadId>` → monitor mirando al pasillo, vinculado al hilo archivado.
 
 Como las celdas de un escritorio dependen solo de (módulo, slot) y `HqLayout` es estable, la tabla es
@@ -89,6 +92,29 @@ barajados), y aplicarla dos veces no cambia nada. Se usa dos veces con el mismo 
    bloques sin datos propios. Se enchufa con `BlocksClient.get().setPositionBindings(map)` (punto de
    integración para el dueño del HQ en el mundo; hoy nadie lo llama porque el dato ya viaja en el
    block entity).
+
+### Binding automático (fix/hq-blocks-autobind)
+
+Nadie tiene que usar `/t3craft blocks link` en el HQ:
+
+- **Al construir**: el demo genera su plan con `HqPlans.plan(input, previous)` (aplica `HqFixtures`).
+  Antes usaba `HqGenerator.plan`, que **nunca** aplica fixtures: por eso los bloques no aparecían en el
+  HQ del demo aunque el módulo estuviera prendido. El hash del demo incluye `HqFixtures.fingerprint()`
+  (`"vanilla"` o `HqBlockFixtures.ID`) y el marcador guarda `"fixtures"`, así que un mundo construido en
+  vanilla recibe solo las celdas de fixtures como diff (un marcador sin `"fixtures"` cuenta como vanilla;
+  con fixtures desconocidas, reconstrucción completa). Sube `HqBlockFixtures.ID` si cambia la sustitución.
+- **En vivo**: `DemoHqBindings` recalcula, cuando cambia el roster, el layout contra el construido (y
+  luego contra el último en vivo: `HqLayout.allocate` no mueve a nadie) y da `HqBindings.world(plan,
+  site)`. `BlocksClient.setHqBindings(source)` lo lee cada 20 ticks y escribe en el servidor integrado
+  solo `HqBindings.changes(antes, ahora)` con `BindingWriter` (que además solo toca block entities cuyo
+  binding difiere; reenvío completo cada 200 ticks para chunks recién cargados). Un hilo que hace settle
+  libera su escritorio (monitor "NO THREAD", lámpara apagada), su monitor del archivo se vincula si la
+  celda existe, y la bombilla de su módulo cambia; nada más. Un hilo nuevo toma un escritorio libre ya
+  construido; si hace falta un módulo nuevo, sus celdas no existen todavía y se vinculan al reconstruir.
+- El HQ de site (`feat/hq-construction`) genera con `HqPlans.generate` (objetivo y plan aplicado), así
+  que recibe fixtures y escribe su binding como dato de block entity. Además `HqPresence` (el único punto
+  que enchufa el HQ en pie) le pasa a `BlocksClient.setHqBindings` la tabla del HQ en pie: la del plan de
+  site (`HqBindings.world(plan, site)`) o, en el demo, la del roster en vivo (`HqPresence.demoBindings`).
 
 A mano: mirando un monitor o lámpara, `/t3craft blocks link <env:thread>` o `/t3craft blocks unlink`
 (solo singleplayer o anfitrión LAN; escribe el block entity en el servidor integrado).

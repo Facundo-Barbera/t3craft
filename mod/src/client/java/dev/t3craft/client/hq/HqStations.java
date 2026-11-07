@@ -17,8 +17,8 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Workstation screens on the HQ's own computers: a seated thread's screen sits on its desk's
- * {@code computerPos} (when its wing stands), a released thread's on its archived computer when that
- * is inside the building (not in the basement, which is not built). Threads without a computer in the building get no station (null), never one on the
+ * {@code computerPos} (when its wing stands), a released thread's on its computer on the hub's
+ * "Archived" shelf (when the base stands; the HQ has no basement). Threads without a computer in the building get no station (null), never one on the
  * grass. Precomputed once per plan; lookups are map reads.
  */
 public final class HqStations implements WorkstationPlacementSource {

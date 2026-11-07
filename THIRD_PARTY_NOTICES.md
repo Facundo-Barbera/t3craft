@@ -46,11 +46,15 @@ Files adapted from AgentCraft (MIT; the `npc/behavior` files come from AgentCraf
 
 - `mod/src/client/java/dev/t3craft/client/npc/behavior/GridPathfinder.java` ← `GridPathfinder.java`
   (A* with 8 directions, 1-block steps, no corner cutting, string pulling; reworked over a
-  Minecraft-free `Walkable`, request-bounded search, player avoidance).
-- `mod/src/client/java/dev/t3craft/client/npc/behavior/LevelWalkable.java` ← the walkability test
-  of `GridPathfinder.java` (solid floor below, passable or thin feet block, headroom).
+  Minecraft-free `Walkable`, request-bounded search, player avoidance, body-sweep passages,
+  start/goal snapping and a resumable search for a per-tick node budget).
+- `mod/src/client/java/dev/t3craft/client/npc/behavior/Collision.java` ← the walkability test
+  of `GridPathfinder.java` (solid floor below, passable or thin feet block, headroom; formerly
+  `LevelWalkable.java`), rewritten over real collision boxes with an AABB body sweep and
+  collision-resolved movement.
 - `mod/src/client/java/dev/t3craft/client/npc/behavior/Motion.java` ← `AgentMotion.java` (calm
-  walking pace with ease in/out and smooth turning; Minecraft-free, holds for the player).
+  walking pace with ease in/out and smooth turning; Minecraft-free, holds for the player,
+  collision-resolved sub-moves and stuck detection).
 - `mod/src/client/java/dev/t3craft/client/hud/StatusBarModel.java` and `StatusBar.java` ←
   `mod/src/client/java/dev/agentcraft/client/hud/GoalBar.java` (design: top bar of counts with a
   "n waiting · KEY" badge under it, recounted only on change; rewritten over thread states, with a
@@ -79,6 +83,20 @@ Files adapted from AgentCraft's blocks (`mod/src/main/java/dev/agentcraft/block/
   (horizontal facing, placement, rotate and mirror).
 - `mod/src/client/java/dev/t3craft/client/blocks/MonitorRenderer.java` ← `client/world/StationRenderer.java`
   (`toFace`: draw in screen pixel space on a block's front face).
+
+Files adapted from AgentCraft (commit `8fe3ad2`, MIT), branch `feat/lamps-breathe`:
+
+- `mod/src/client/java/dev/t3craft/client/blocks/LampRenderer.java` ← `client/hq/StatusLampRenderer.java`
+  (`breathe`, `beacon` and `beam`: additive lightning-type quads over the lens with alpha gradients,
+  crossed upward-fading beam planes).
+- `mod/src/client/java/dev/t3craft/client/blocks/LampGlow.java` ← `client/hq/StatusLampRenderer.java` and
+  `client/hq/HqClientFeature.java` (sine-breathing glow, motes only on lamps that wait on the player;
+  t3craft's own per-state curves).
+- `mod/src/client/java/dev/t3craft/client/blocks/HubBeacon.java` and `LampSignals.beacon` ←
+  `client/hq/HqWorldDriver.java` (`BEACON_BINDING`, `beaconLamp`: the aggregate state, most urgent
+  first); the client-only display fallback is t3craft's own.
+- Motes in `client/blocks/BlocksClient.java` ← `client/hq/HqClientFeature.java` (`motes`: dust rising in
+  front of an exposed face).
 
 The lamp driver (`dev.t3craft.blocks.LampApplier` + `client.blocks.BlocksClient`: the client computes
 lamp states and the integrated server applies them) follows the idea of AgentCraft's

@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Thread ↔ block binding from the HQ plan: which cell of the plan is which fixture, and what it
@@ -23,6 +24,9 @@ import net.minecraft.core.Direction;
  *   <li>each desk: {@code computerPos} → monitor facing the chair, {@code lampPos} → status lamp; both
  *       bound to {@code thread:<threadId>} (the HQ's thread id is the NPC key) or unbound when vacant;</li>
  *   <li>{@code board_lamp_<i>} anchors → board bulb {@code board:<i>};</li>
+ *   <li>each module: the lintel over its doorway (the inner wall's beam, one block in from the
+ *       {@code module@<i>} anchor, three up) → board bulb {@code module:<threads at its desks>}, the
+ *       module's most urgent thread; unbound (off) while the module has nobody;</li>
  *   <li>{@code archive_<threadId>} anchors → monitor facing the aisle, bound to that settled thread;</li>
  *   <li>the {@code beacon} anchor (the hub lantern's cap) → status lamp bound {@code beacon}.</li>
  * </ul>
@@ -43,7 +47,7 @@ public final class HqBindings {
 	private HqBindings() {
 	}
 
-	/** Every fixture of {@code plan}, one per cell, in a fixed order (desks, board bulbs, archive). */
+	/** Every fixture of {@code plan}, one per cell, in a fixed order (desks, board bulbs, module bulbs, archive). */
 	public static List<Fixture> of(BuildPlan plan) {
 		Map<BlockPos, Fixture> out = new LinkedHashMap<>();
 		for (Workstation w : plan.workstations()) {
@@ -58,6 +62,16 @@ public final class HqBindings {
 				if (i >= 0) {
 					out.putIfAbsent(a.block(), new Fixture(a.block(), Role.BOARD_LAMP, Binding.board(i), a.facing()));
 				}
+			}
+		}
+		for (Anchor a : plan.anchors().values()) {
+			int i = moduleIndex(a.name());
+			if (i < 0) {
+				continue;
+			}
+			BlockPos lintel = moduleLamp(a);
+			if (plan.at(lintel) != null) {
+				out.putIfAbsent(lintel, new Fixture(lintel, Role.BOARD_LAMP, Binding.module(moduleThreads(plan, i)), a.facing()));
 			}
 		}
 		String archive = AnchorNames.archive("");
@@ -95,6 +109,50 @@ public final class HqBindings {
 			}
 		}
 		return out;
+	}
+
+	/**
+	 * The bindings that change from {@code before} to {@code after} (both {@link #world} maps, or any
+	 * cell → binding maps): cells whose binding differs or that are new, and cells that are gone,
+	 * mapped to {@link Binding#NONE}. Unchanged cells are left out, so applying the result touches
+	 * only the blocks that must change. {@code before == null}: everything in {@code after}.
+	 */
+	public static Map<Long, Binding> changes(@Nullable Map<Long, Binding> before, Map<Long, Binding> after) {
+		Map<Long, Binding> out = new LinkedHashMap<>();
+		for (Map.Entry<Long, Binding> e : after.entrySet()) {
+			if (before == null || !e.getValue().equals(before.get(e.getKey()))) {
+				out.put(e.getKey(), e.getValue());
+			}
+		}
+		if (before != null) {
+			for (Map.Entry<Long, Binding> e : before.entrySet()) {
+				if (!after.containsKey(e.getKey()) && !e.getValue().isNone()) {
+					out.put(e.getKey(), Binding.NONE);
+				}
+			}
+		}
+		return Collections.unmodifiableMap(out);
+	}
+
+	/** The cell of a module's bulb: the lintel of its doorway, seen from the {@code module@<i>} anchor. */
+	static BlockPos moduleLamp(Anchor door) {
+		return door.block().relative(door.facing().getOpposite()).above(3);
+	}
+
+	private static List<String> moduleThreads(BuildPlan plan, int module) {
+		List<String> out = new ArrayList<>();
+		for (Workstation w : plan.workstations()) {
+			if (w.module() == module && w.threadId() != null) {
+				out.add(w.threadId());
+			}
+		}
+		return out;
+	}
+
+	private static int moduleIndex(String anchor) {
+		String prefix = AnchorNames.module(0);
+		prefix = prefix.substring(0, prefix.length() - 1);
+		return anchor.startsWith(prefix) ? parseIndex(anchor.substring(prefix.length())) : -1;
 	}
 
 	private static int parseIndex(String s) {

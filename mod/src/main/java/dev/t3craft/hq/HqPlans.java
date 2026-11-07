@@ -10,7 +10,7 @@ import org.jspecify.annotations.Nullable;
 /**
  * Simple entry points for consumers that just want buildable plans (the demo world, the builders).
  * All plans are {@link dev.t3craft.build.BuildPlan}s relative to the fixed HQ origin (the hub floor
- * centre; {@code y = 0} is the floor layer, the basement goes down to {@code y = -5}); build them with
+ * centre; {@code y = 0} is the floor layer and the lowest one, there is no basement); build them with
  * the {@code origin}/{@code rotation} of an {@link HqSite}.
  *
  * <pre>{@code
@@ -48,8 +48,8 @@ public final class HqPlans {
 	/**
 	 * The site that puts the HQ in the builders' demo convention: entrance facing north ({@code -z}),
 	 * the front edge of the portico on {@code z = 0}, growing towards {@code +z}, {@code x = 0} the
-	 * centre line. {@code y = 0} stays the hub floor; the basement goes down to {@code y = -5}, so the
-	 * demo origin must be at least 6 blocks above the world's minimum height.
+	 * centre line. {@code y = 0} stays the hub floor and is the lowest layer of the HQ, so the demo
+	 * origin must be at least 1 block above the world's minimum height.
 	 */
 	public static HqSite demoSite() {
 		return new HqSite(new net.minecraft.core.BlockPos(0, 0, HqGeometry.PORTICO_Z2), net.minecraft.world.level.block.Rotation.CLOCKWISE_180);
@@ -62,7 +62,22 @@ public final class HqPlans {
 
 	/** The HQ plan of a layout, with the active {@link HqFixtures} (vanilla unless the blocks module is on). */
 	public static BuildPlan generate(HqLayout layout) {
-		return HqFixtures.active().apply(new HqGenerator().generate(layout));
+		return generate(layout, HqFixtures.active());
+	}
+
+	/** The HQ plan of a layout with the given fixtures ({@link HqFixtures#VANILLA} for the bare generator output). */
+	public static BuildPlan generate(HqLayout layout, HqFixtures fixtures) {
+		return fixtures.apply(new HqGenerator().generate(layout));
+	}
+
+	/**
+	 * {@link HqGenerator#plan} (stable desk allocation against {@code previous}) with the active
+	 * {@link HqFixtures} applied. Use this, not {@code HqGenerator.plan}, for anything that is built in
+	 * the world: the generator alone always gives the vanilla HQ.
+	 */
+	public static HqGenerator.Result plan(HqInput input, @Nullable HqLayout previous) {
+		HqLayout layout = HqLayout.allocate(input, previous);
+		return new HqGenerator.Result(layout, generate(layout));
 	}
 
 	/** Every group of {@code plan} as its own layered build plan, keyed by group, in build order. */

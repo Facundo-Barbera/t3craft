@@ -18,8 +18,9 @@ import org.jspecify.annotations.Nullable;
  * every NPC gets a spot inside the building, so none stays in the fallback ring on the grass.
  *
  * <ul>
- *   <li>{@link #desk}: its desk ({@code desk_<id>}) when its wing is built; a settled thread stands at
- *   its archived computer in the basement ({@code archive_<id>}); anyone else (no desk yet: wing
+ *   <li>{@link #desk}: its desk ({@code desk_<id>}) when its wing is built; a settled thread stands on
+ *   the hub floor in front of its computer on the "Archived" shelf ({@code archive_<id>}), looking at
+ *   it; anyone else (no desk yet: wing
  *   still being built, or the HQ is full) waits in the hub, spread over the hub walk points and
  *   benches by a stable hash.</li>
  *   <li>{@link #home}: the project's wing corridor when built, else the hub.</li>
@@ -30,6 +31,7 @@ import org.jspecify.annotations.Nullable;
 public final class HqWorldAnchors implements AnchorSource {
 	private final HqAnchorSource hq;
 	private final BuildPlan plan;
+	private final HqSite site;
 	private final @Nullable Set<String> built;
 	private final List<Anchor> lobby;
 	private final List<Anchor> benches;
@@ -37,6 +39,7 @@ public final class HqWorldAnchors implements AnchorSource {
 	public HqWorldAnchors(BuildPlan plan, HqSite site, @Nullable Set<String> built) {
 		this.hq = new HqAnchorSource(plan, site);
 		this.plan = plan;
+		this.site = site;
 		this.built = built == null ? null : Set.copyOf(built);
 		List<Anchor> l = new ArrayList<>();
 		for (int i = 0; hq.named(AnchorNames.walkHub(i)) != null; i++) {
@@ -80,9 +83,12 @@ public final class HqWorldAnchors implements AnchorSource {
 		dev.t3craft.hq.Anchor archived = plan.anchor(AnchorNames.archive(npcId));
 		if (archived != null && HqSiteFrame.builds(archived.block())) {
 			String owner = HqSiteFrame.owner(archived.block().getX(), archived.block().getZ());
-			Anchor a = hq.named(AnchorNames.archive(npcId));
-			if (a != null && owner != null && standing(owner)) {
-				return a;
+			if (owner != null && standing(owner)) {
+				// the anchor is the screen face on the shelf; stand on the floor in front of it, facing it
+				net.minecraft.core.BlockPos front = archived.block().relative(archived.facing()).atY(1);
+				dev.t3craft.hq.Anchor spot = new dev.t3craft.hq.Anchor(AnchorNames.archive(npcId), front.getX() + 0.5, front.getY(),
+						front.getZ() + 0.5, archived.facing().getOpposite(), front);
+				return HqAnchorSource.convert(site.anchor(spot));
 			}
 		}
 		return lobby(npcId);
