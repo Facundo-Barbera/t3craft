@@ -81,7 +81,7 @@ class VisibilityTest {
 		assertEquals("my-vps · telar", a.sublabel());
 		assertEquals(ThreadState.NEEDS_ATTENTION.color, a.color());
 		assertEquals("vps:project-1", a.groupId());
-		assertEquals("(no project)", b.groupLabel());
+		assertEquals("project project-", b.groupLabel(), "unknown project falls back to its id, not (no project)");
 		assertEquals("attention", a.particle());
 		assertEquals("vps/needs_attention", a.skin());
 	}
