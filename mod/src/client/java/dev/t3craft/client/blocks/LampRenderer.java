@@ -9,15 +9,20 @@ import dev.t3craft.blocks.Binding;
 import dev.t3craft.blocks.LampBlockEntity;
 import dev.t3craft.blocks.LampStatus;
 import dev.t3craft.blocks.StatusLampBlock;
+import dev.t3craft.debug.PerfStats;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
 import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
 import net.minecraft.client.renderer.feature.ModelFeatureRenderer;
 import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
+import org.joml.Vector3f;
+import org.joml.Vector3fc;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -26,6 +31,11 @@ import org.jspecify.annotations.Nullable;
  * (slow breath on "needs you", faster pulse on error, a shimmer while working, steady otherwise).
  * The lamp bound {@code beacon} (hub lantern cap) also glows on top and sends a soft beam up past the
  * lightning rod, so the HQ's aggregate state reads from across the map.
+ *
+ * <p>Cost per frame: vanilla cannot frustum-cull this renderer (it renders "off screen" for the
+ * beacon's beam), so {@link #shouldRender} does it per block with {@link RenderLod#lamp}: plain
+ * lamps only within {@value RenderLod#LAMP_VIEW} blocks and not behind the camera, halos only within
+ * {@value RenderLod#LAMP_HALO}; the beacon from {@value RenderLod#BEACON_VIEW}.
  *
  * <p>Seen lamps are reported to {@link BlocksClient#sawLamp} for the motes (only lamps in view get
  * them; no chunk scan).
@@ -41,6 +51,7 @@ public final class LampRenderer implements BlockEntityRenderer<LampBlockEntity, 
 		LampStatus status = LampStatus.OFF;
 		Binding.Kind kind = Binding.Kind.NONE;
 		float seconds;
+		boolean halo = true;
 	}
 
 	private final BlocksClient client;
@@ -55,12 +66,38 @@ public final class LampRenderer implements BlockEntityRenderer<LampBlockEntity, 
 	}
 
 	@Override
+	public boolean shouldRender(LampBlockEntity be, Vec3 camera) {
+		BlockPos p = be.getBlockPos();
+		double dx = p.getX() + 0.5 - camera.x;
+		double dy = p.getY() + 0.5 - camera.y;
+		double dz = p.getZ() + 0.5 - camera.z;
+		boolean beacon = client.resolve(p, be.binding()).kind() == Binding.Kind.BEACON;
+		Vector3fc f = forward();
+		boolean draw = RenderLod.lamp(dx, dy, dz, beacon, f.x(), f.y(), f.z());
+		PerfStats.count(draw ? PerfStats.LAMP_DRAWN : PerfStats.LAMP_CULLED);
+		return draw;
+	}
+
+	private static Vector3fc forward() {
+		try {
+			return Minecraft.getInstance().gameRenderer.mainCamera().forwardVector();
+		} catch (RuntimeException e) {
+			return NO_DIRECTION; // no camera yet: distance only
+		}
+	}
+
+	private static final Vector3fc NO_DIRECTION = new Vector3f();
+
+	@Override
 	public void extractRenderState(LampBlockEntity be, State state, float partialTicks, Vec3 cameraPosition,
 			ModelFeatureRenderer.@Nullable CrumblingOverlay breakProgress) {
 		BlockEntityRenderState.extractBase(be, state, breakProgress);
 		BlockState bs = be.getBlockState();
 		state.status = bs.hasProperty(StatusLampBlock.STATUS) ? bs.getValue(StatusLampBlock.STATUS) : LampStatus.OFF;
 		state.kind = client.resolve(be.getBlockPos(), be.binding()).kind();
+		BlockPos p = be.getBlockPos();
+		state.halo = RenderLod.within(p.getX() + 0.5 - cameraPosition.x, p.getY() + 0.5 - cameraPosition.y, p.getZ() + 0.5 - cameraPosition.z,
+				RenderLod.LAMP_HALO) || state.kind == Binding.Kind.BEACON;
 		state.seconds = be.getLevel() == null ? 0f : (be.getLevel().getGameTime() % 1_000_000L + partialTicks) / 20f;
 		client.sawLamp(be.getBlockPos(), state.kind, state.status);
 	}
@@ -77,7 +114,7 @@ public final class LampRenderer implements BlockEntityRenderer<LampBlockEntity, 
 		for (Direction d : Direction.Plane.HORIZONTAL) {
 			poseStack.pushPose();
 			toFace(poseStack, d, beacon ? -0.02f : -0.004f);
-			lens(poseStack, collector, core, halo);
+			lens(poseStack, collector, core, halo, s.halo);
 			poseStack.popPose();
 		}
 		if (beacon) {
@@ -87,17 +124,20 @@ public final class LampRenderer implements BlockEntityRenderer<LampBlockEntity, 
 			poseStack.rotateDegrees(Axis.XP, 90f);
 			poseStack.translate(-0.5f, -0.5f, -0.5f);
 			toFace(poseStack, Direction.NORTH, -0.02f);
-			lens(poseStack, collector, core, halo);
+			lens(poseStack, collector, core, halo, true);
 			poseStack.popPose();
 			beam(poseStack, collector, LampGlow.argb(s.status.color, LampGlow.alpha(level, 40, 130)), s.status.color & 0xFFFFFF);
 		}
 	}
 
 	/** The lens (3..13 px) at {@code core} with a halo fading out to the face's edge. */
-	private static void lens(PoseStack poseStack, SubmitNodeCollector collector, int core, int halo) {
+	private static void lens(PoseStack poseStack, SubmitNodeCollector collector, int core, int halo, boolean withHalo) {
 		int clear = halo & 0xFFFFFF;
 		collector.submitCustomGeometry(poseStack, RenderTypes.lightning(), (pose, vc) -> {
 			quad(pose, vc, 3, 3, 13, 13, core, core);
+			if (!withHalo) {
+				return; // far: the core alone (LOD)
+			}
 			float e = 0.5f;
 			quad(pose, vc, 3, e, 13, 3, clear, halo);
 			quad(pose, vc, 3, 13, 13, 16 - e, halo, clear);
@@ -141,7 +181,7 @@ public final class LampRenderer implements BlockEntityRenderer<LampBlockEntity, 
 
 	@Override
 	public int getViewDistance() {
-		return 160;
+		return (int) RenderLod.BEACON_VIEW; // upper bound; shouldRender narrows it per lamp
 	}
 
 	private static void quad(PoseStack.Pose pose, VertexConsumer vc, float x0, float y0, float x1, float y1, int top, int bottom) {

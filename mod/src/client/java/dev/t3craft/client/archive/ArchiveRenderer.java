@@ -182,10 +182,12 @@ final class ArchiveRenderer {
 			Direction f = v.face().facing();
 			d.snapTo(v.face().x() + f.getStepX() * FACE_OFFSET, v.face().y() - LABEL_DROP, v.face().z() + f.getStepZ() * FACE_OFFSET, f.toYRot(), 0f);
 			lvl.addEntity(d);
+			dev.t3craft.debug.PerfStats.count(dev.t3craft.debug.PerfStats.DISPLAY_SPAWNED);
 			byEntity.put(d.getId(), v.slot());
 			s.label = d;
 		}
 		s.label.setText(component(v.lines()));
+		dev.t3craft.debug.PerfStats.count(dev.t3craft.debug.PerfStats.DISPLAY_SET_TEXT);
 	}
 
 	/** Prop + hitbox only while the cell is air; {@code restate}: the prop's block state changed. */
@@ -198,6 +200,7 @@ final class ArchiveRenderer {
 				prop.setBlockState(s.view.prop());
 				prop.snapTo(s.view.cell().getX(), s.view.cell().getY(), s.view.cell().getZ(), 0f, 0f);
 				lvl.addEntity(prop);
+				dev.t3craft.debug.PerfStats.count(dev.t3craft.debug.PerfStats.DISPLAY_SPAWNED);
 				byEntity.put(prop.getId(), s.view.slot());
 				s.prop = prop;
 			} else if (restate) {
@@ -250,11 +253,14 @@ final class ArchiveRenderer {
 			Anchor a = v.at();
 			t.snapTo(a.x() + a.facing().getStepX() * FACE_OFFSET, a.y(), a.z() + a.facing().getStepZ() * FACE_OFFSET, a.facing().toYRot(), 0f);
 			lvl.addEntity(t);
+			dev.t3craft.debug.PerfStats.count(dev.t3craft.debug.PerfStats.DISPLAY_SPAWNED);
 			Interaction hit = hitbox(lvl, a.x() + a.facing().getStepX() * 0.3, a.y(), a.z() + a.facing().getStepZ() * 0.3, 1.6f, 0.5f);
 			header = h = new Header(v, t, hit);
 			t.setText(headerText(v));
+			dev.t3craft.debug.PerfStats.count(dev.t3craft.debug.PerfStats.DISPLAY_SET_TEXT);
 		} else if (!Objects.equals(h.view.title(), v.title()) || !Objects.equals(h.view.subtitle(), v.subtitle())) {
 			h.text.setText(headerText(v));
+			dev.t3craft.debug.PerfStats.count(dev.t3craft.debug.PerfStats.DISPLAY_SET_TEXT);
 			header = new Header(v, h.text, h.hitbox);
 		}
 	}
@@ -291,6 +297,7 @@ final class ArchiveRenderer {
 		hit.setHeight(height);
 		hit.snapTo(x, y, z, 0f, 0f);
 		lvl.addEntity(hit);
+		dev.t3craft.debug.PerfStats.count(dev.t3craft.debug.PerfStats.DISPLAY_SPAWNED);
 		return hit;
 	}
 

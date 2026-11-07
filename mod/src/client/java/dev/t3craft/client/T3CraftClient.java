@@ -49,6 +49,8 @@ import org.jspecify.annotations.Nullable;
  * {@code /t3craft reconnect} and {@code /t3craft reload} work for both without restarting the game.
  */
 public final class T3CraftClient implements ClientModInitializer, BridgeListener {
+	private static final String NPC_TICK_TIMER = dev.t3craft.debug.PerfStats.TICK_PREFIX + "npcs.ns";
+	private static final String HELPER_TICK_TIMER = dev.t3craft.debug.PerfStats.TICK_PREFIX + "helpers.ns";
 	/** Re-run the direct-mode filter this often so the recent window expires on its own (ticks). */
 	private static final int REEVALUATE_TICKS = 20 * 60;
 
@@ -104,8 +106,12 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 					T3Craft.LOGGER.warn("T3Craft refresh failed; will retry", e);
 				}
 			}
+			long t0 = System.nanoTime();
 			npcs.tick(mc);
+			dev.t3craft.debug.PerfStats.since(NPC_TICK_TIMER, t0);
+			t0 = System.nanoTime();
 			helpers().tick(mc, npcs::avatar);
+			dev.t3craft.debug.PerfStats.since(HELPER_TICK_TIMER, t0);
 		});
 		T3CraftCommands.register(this);
 		dev.t3craft.hq.HqPreviewCommand.register(npcs::all); // feat/hq-design: /t3craft debug hq-preview

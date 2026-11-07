@@ -24,6 +24,7 @@ public final class LampApplier {
 	/** Effective binding → wanted status ({@code positional}: HQ plan fallback, may be null). */
 	public static int apply(Map<String, LampStatus> wanted, @Nullable Map<Long, Binding> positional) {
 		int changed = 0;
+		dev.t3craft.debug.PerfStats.count(dev.t3craft.debug.PerfStats.LAMP_SWEEPS);
 		for (LampBlockEntity lamp : LiveLamps.snapshot()) {
 			Level level = lamp.getLevel();
 			if (level == null || level.isClientSide() || lamp.isRemoved()) {
@@ -44,6 +45,7 @@ public final class LampApplier {
 				changed++;
 			}
 		}
+		dev.t3craft.debug.PerfStats.count(dev.t3craft.debug.PerfStats.LAMP_WRITES, changed);
 		return changed;
 	}
 

@@ -6,10 +6,9 @@
 // cells and collision-resolved movement with auto step.
 package dev.t3craft.client.npc.behavior;
 
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -31,7 +30,8 @@ public final class Collision implements Walkable, Collider {
 	private static final int FREE_RADIUS = 3;
 
 	private final BlockShapes blocks;
-	private final Map<Long, List<Box>> boxCache = new HashMap<>();
+	/** Primitive keys: this is looked up hundreds of times per A* node (no Long boxing). */
+	private final Long2ObjectOpenHashMap<List<Box>> boxCache = new Long2ObjectOpenHashMap<>();
 
 	public Collision(BlockShapes blocks) {
 		this.blocks = blocks;
@@ -135,6 +135,12 @@ public final class Collision implements Walkable, Collider {
 			return false; // a whole block up with nothing in between (desk top, a block): no climbing furniture
 		}
 		double y = Math.max(fa, fb);
+		// Fast path (fix/hq-fps): every sample lies inside the sweep's bounding box, so when that box
+		// touches nothing the passage is clear; one box query instead of six on open floor.
+		if (!collides(Math.min(ax, bx) + 0.5 - HALF, y, Math.min(az, bz) + 0.5 - HALF,
+				Math.max(ax, bx) + 0.5 + HALF, y + HEIGHT, Math.max(az, bz) + 0.5 + HALF)) {
+			return true;
+		}
 		// Samples 0.2 apart (< the 0.6 body width), so the boxes overlap and cover the sweep.
 		for (int s = 0; s <= 5; s++) {
 			double t = s / 5.0;

@@ -110,3 +110,82 @@ Rules of thumb for hot-swap-friendly code:
   added then is `null` on the live instance. Read it through a getter, e.g.
   `return helpers = HotSwapFields.orInit(helpers, HelperDirector::new);`, or check for null
   in every tick/render/callback that uses it.
+
+## Performance
+
+### In game: `/t3dev perf`
+
+`/t3dev perf` prints the FPS and every counter that moved during the last second
+(`dev.t3craft.debug.PerfStats`, rolled once a second from the client tick). `/t3dev perf reset`
+zeroes them. Timers end in `.ns` and print as **ms per second** (red when above 20 ms/s, i.e. more
+than 1 ms per client tick on average):
+
+| Counter | What | Healthy steady HQ |
+|---|---|---|
+| `tick.<module>` | client tick time of each guarded module (`GuardedEvents`), plus `tick.npcs`, `tick.helpers` | a few ms/s each |
+| `nav.searches`, `nav.nodes`, `nav.failed` | A* searches started, nodes expanded, searches without a route | ~0 once NPCs sit at their desks |
+| `nav.miss_hits`, `nav.deferred` | asks answered from remembered misses (backoff); asks deferred by the node/time budget | `deferred` ~0 |
+| `nav` (timer) | time spent searching | ≤ 40 ms/s (2 ms per tick cap) |
+| `monitor.glyph_rebuilds` | monitor text re-laid out | 0/s unless a thread changes |
+| `monitor.drawn`, `monitor.lod`, `monitor.culled` | monitors drawn per second (of which background-only), skipped | culled > drawn when you look away |
+| `lamp.drawn`, `lamp.culled` | lamp BER per frame, drawn vs skipped | — |
+| `display.set_text`, `display.spawned` | `setText` on our display entities, display/interaction entities created | ~0/s steady |
+| `lamp.sweeps`, `lamp.writes`, `binding.writes` | server: `LampApplier` sweeps, lamp states written, HQ bindings written | sweeps ½/s, writes 0 steady |
+
+To bisect a module: `/t3dev disable <module>` and watch the FPS (and `/t3dev enable <module>`).
+
+### fix/hq-fps: what made the FPS drop after the HQ was built
+
+Static review of every per-tick / per-frame callback plus work-count tests and microbenchmarks
+(`NavigationBudgetTest`, `MonitorWorkCountTest`, `RenderLodTest`, `PerfStatsTest`):
+
+1. **Pathfinding (main cause).** Once the HQ stands, every NPC gets a desk inside it. When there
+   is no route (closed door, unfinished wing, `fix/npc-enter-hq`), each NPC re-ran a full A*
+   (up to 16,000 nodes) every 40 ticks, forever, and a node over real collision shapes cost
+   **~33 µs** (6 body sweeps × ~8 block lookups with `Long` boxing per neighbour, 16 neighbours).
+   The shared 2,500-node tick budget was then always spent: up to **~80 ms per client tick** on
+   the render thread. Fixed:
+   - misses back off exponentially per route (40 → 80 → … → 1,200 ticks; `Navigation.missTtl`),
+     kept across `blocked()` (which only makes them retry now);
+   - a **2 ms per tick** wall-clock cap on top of the node budget (`Navigation.forLevel`,
+     checked every 64 nodes);
+   - `Collision.passage` fast path (one bounding-box query for the whole sweep on open floor)
+     and fastutil primitive maps for the block/floor/score caches: **33 → 12 µs per node**.
+   - Before/after (10 NPCs, desk unreachable, 2 min): 600 → 60 searches, ~1.2 M → 125 k nodes;
+     worst tick ~80 ms → ~2–3 ms.
+2. **Lamps.** `LampRenderer.shouldRenderOffScreen()` is true (the beacon's beam), so vanilla never
+   frustum-culled *any* lamp, and every lamp within 160 blocks was drawn every frame. Now
+   `shouldRender` decides per lamp (`RenderLod.lamp`): plain lamps within 48 blocks and not behind
+   the camera, halos within 20; only the beacon keeps 160 blocks.
+3. **Monitors.** Text was submitted every frame up to 32 blocks, also from behind the screen.
+   Now nothing from behind / beyond 32 blocks, background only beyond 14 (`RenderLod.monitor`);
+   unbound/unknown screens are cached instead of re-allocated every frame; a version epoch stops
+   a returning thread from reusing stale glyphs.
+4. Small per-tick allocations: the NPC bubble placement re-flattened every panel's text
+   (`getString()`) every tick (now only when it changes); `sawLamp` allocated a record per lamp per
+   frame (now mutated in place).
+
+Checked and fine (no change): workstation, archive, schedule board and NPC panels push `setText`
+only when the content changes; HQ reconciliation runs every 20 server ticks with cached targets and
+deduplicated anchor publication; `LampApplier` writes only differing states (sweep every 40 ticks);
+`BindingWriter` skips equal bindings; the orphan scan (`entitiesForRendering`) only runs on
+recovery, never per tick.
+
+### Rules for future threads
+
+- **Nothing O(n) per frame that can be per change.** BER `extractRenderState` reads cached data;
+  rebuild glyphs/models only on a version change (`MonitorScreens.Shown.version`) and count it.
+- **Cull in `shouldRender`.** Override it per block (distance + facing); never return true from
+  `shouldRenderOffScreen()` without a per-instance `shouldRender` that culls what is behind the
+  camera. Add a far LOD (background, core quad) for anything with text or many quads.
+- **Display entities:** create once, re-create only when removed or moved, `setText` only when the
+  `Component` differs (compare a cached value, not `getText()` of a fresh component per tick).
+- **Searches and other open-ended work on the client tick** need a node budget *and* a time cap,
+  and failures must back off; never retry a failed expensive operation at a fixed short interval.
+- Never scan `entitiesForRendering()` or a chunk per tick; keep references.
+- Reconcile on events or with a debounce (≥ 20 ticks), not every tick; write block states/entities
+  only when they differ.
+- Hot paths: no `Long`/`Integer` boxing in maps (fastutil is on the classpath), no string building
+  (`PerfStats` keys are constants), no lambdas capturing per-call state where avoidable.
+- Add a `PerfStats` counter to any new per-tick/per-frame path and a work-count test (steady state
+  ⇒ 0 rebuilds / 0 `setText`).

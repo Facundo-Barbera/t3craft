@@ -8,6 +8,7 @@ import dev.t3craft.blocks.Binding;
 import dev.t3craft.blocks.MonitorBlock;
 import dev.t3craft.blocks.MonitorBlockEntity;
 import dev.t3craft.client.workstation.StationScreen;
+import dev.t3craft.debug.PerfStats;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -32,6 +33,10 @@ import org.jspecify.annotations.Nullable;
  * from {@link MonitorScreens} (state the client already holds); glyph runs are rebuilt only when the
  * screen's version changes, so a steady monitor costs a map lookup per frame plus the draw.
  *
+ * <p>Per-frame cost ({@link RenderLod#monitor}): nothing from behind the screen or beyond
+ * {@value RenderLod#MONITOR_VIEW} blocks ({@link #shouldRender}); beyond {@value RenderLod#MONITOR_TEXT}
+ * blocks only the status background (the text would be unreadable).
+ *
  * <p>The face transform ({@link #toFace}) is adapted from AgentCraft's {@code StationRenderer}.
  */
 public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEntity, MonitorRenderer.State> {
@@ -46,6 +51,7 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 		List<FormattedCharSequence> lines = List.of();
 		int[] colors = new int[0];
 		int background;
+		boolean text = true;
 	}
 
 	private record Glyphs(long version, List<FormattedCharSequence> lines, int[] colors, int background) {
@@ -64,11 +70,32 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 	}
 
 	@Override
+	public boolean shouldRender(MonitorBlockEntity be, Vec3 camera) {
+		boolean draw = detail(be, camera) != RenderLod.MonitorDetail.NONE;
+		if (!draw) {
+			PerfStats.count(PerfStats.MONITOR_CULLED);
+		}
+		return draw;
+	}
+
+	private static RenderLod.MonitorDetail detail(MonitorBlockEntity be, Vec3 camera) {
+		BlockState bs = be.getBlockState();
+		Direction f = bs.hasProperty(MonitorBlock.FACING) ? bs.getValue(MonitorBlock.FACING) : Direction.NORTH;
+		var p = be.getBlockPos();
+		return RenderLod.monitor(p.getX() + 0.5 - camera.x, p.getY() + 0.5 - camera.y, p.getZ() + 0.5 - camera.z, f.getStepX(), f.getStepZ());
+	}
+
+	@Override
 	public void extractRenderState(MonitorBlockEntity be, State state, float partialTicks, Vec3 cameraPosition,
 			ModelFeatureRenderer.@Nullable CrumblingOverlay breakProgress) {
 		BlockEntityRenderState.extractBase(be, state, breakProgress);
 		BlockState bs = be.getBlockState();
 		state.facing = bs.hasProperty(MonitorBlock.FACING) ? bs.getValue(MonitorBlock.FACING) : Direction.NORTH;
+		state.text = detail(be, cameraPosition) == RenderLod.MonitorDetail.FULL;
+		PerfStats.count(PerfStats.MONITOR_DRAWN);
+		if (!state.text) {
+			PerfStats.count(PerfStats.MONITOR_LOD);
+		}
 		Binding b = client.resolve(be.getBlockPos(), be.binding());
 		MonitorScreens.Shown shown = client.screens().show(b);
 		Glyphs g = glyphs.get(shown.id());
@@ -78,6 +105,7 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 			}
 			g = glyphs(shown);
 			glyphs.put(shown.id(), g);
+			PerfStats.count(PerfStats.MONITOR_GLYPHS);
 		}
 		state.lines = g.lines();
 		state.colors = g.colors();
@@ -102,6 +130,10 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 		poseStack.pushPose();
 		toFace(poseStack, s.facing, -0.003f, PPB);
 		collector.order(0).submitTextBackground(poseStack, BEZEL, BEZEL, PPB - BEZEL, PPB - BEZEL, s.background, Font.DisplayMode.NORMAL, light);
+		if (!s.text) {
+			poseStack.popPose();
+			return; // far: background only (LOD)
+		}
 		float y = (PPB - s.lines.size() * LINE_HEIGHT) / 2f + 1;
 		for (int i = 0; i < s.lines.size(); i++) {
 			collector.order(1).submitText(poseStack, BEZEL + 4, y, s.lines.get(i), false, Font.DisplayMode.POLYGON_OFFSET, light, s.colors[i], 0, 0);
@@ -112,7 +144,7 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 
 	@Override
 	public int getViewDistance() {
-		return 32;
+		return (int) RenderLod.MONITOR_VIEW;
 	}
 
 	/** Forget cached glyph runs (hot-swap, level change). */

@@ -8,11 +8,10 @@
 // walkable cell, and the search is resumable so it can be spread over ticks with a node budget.
 package dev.t3craft.client.npc.behavior;
 
+import it.unimi.dsi.fastutil.longs.Long2DoubleOpenHashMap;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.function.LongPredicate;
 import org.jspecify.annotations.Nullable;
@@ -37,7 +36,7 @@ public final class GridPathfinder {
 
 	private final Walkable ground;
 	private final LongPredicate blocked;
-	private final Map<Long, Double> floorCache = new HashMap<>();
+	private final Long2DoubleOpenHashMap floorCache = new Long2DoubleOpenHashMap();
 
 	public GridPathfinder(Walkable ground) {
 		this(ground, k -> false);
@@ -74,9 +73,8 @@ public final class GridPathfinder {
 	/** Feet height of a walkable cell, or NaN. Cached until {@link #clearCache}. */
 	public double floor(int x, int y, int z) {
 		long key = pack(x, y, z);
-		Double cached = floorCache.get(key);
-		if (cached != null) {
-			return cached;
+		if (floorCache.containsKey(key)) {
+			return floorCache.get(key);
 		}
 		double v = ground.floor(x, y, z);
 		floorCache.put(key, v);
@@ -160,7 +158,7 @@ public final class GridPathfinder {
 		private final @Nullable Cell start;
 		private final @Nullable Cell goal;
 		private final PriorityQueue<Node> open = new PriorityQueue<>((a, b) -> a.f != b.f ? Double.compare(a.f, b.f) : Double.compare(b.g, a.g));
-		private final Map<Long, Double> best = new HashMap<>();
+		private final Long2DoubleOpenHashMap best = new Long2DoubleOpenHashMap();
 		private final int minX;
 		private final int maxX;
 		private final int minZ;

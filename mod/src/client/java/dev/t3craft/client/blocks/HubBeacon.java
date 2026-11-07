@@ -122,6 +122,7 @@ public final class HubBeacon {
 		d.setTransformation(new Transformation(null, null, new Vector3f(SCALE), null));
 		d.snapTo(x, y, z, 0f, 0f);
 		level.addEntity(d);
+		dev.t3craft.debug.PerfStats.count(dev.t3craft.debug.PerfStats.DISPLAY_SPAWNED);
 		display = d;
 		lastBackground = 0;
 		return d;

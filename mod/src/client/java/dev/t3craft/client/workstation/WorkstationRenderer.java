@@ -157,6 +157,7 @@ final class WorkstationRenderer {
 					s.suppressed = suppress;
 					if (suppress) {
 						s.screen.setText(Component.empty());
+						dev.t3craft.debug.PerfStats.count(dev.t3craft.debug.PerfStats.DISPLAY_SET_TEXT);
 						s.screen.setBackgroundColor(0);
 					} else if (screen == null) {
 						screen = cache.screen(t.key());
@@ -207,6 +208,7 @@ final class WorkstationRenderer {
 		d.setTransformation(new Transformation(null, null, new Vector3f(SCREEN_SCALE), null));
 		d.snapTo(p.screenX(), p.screenY(), p.screenZ(), p.screenYaw(), 0f);
 		lvl.addEntity(d);
+		dev.t3craft.debug.PerfStats.count(dev.t3craft.debug.PerfStats.DISPLAY_SPAWNED);
 		Station s = new Station(key, p, d);
 		byComputer.put(p.computerKey(), key);
 		byEntity.put(d.getId(), key);
@@ -235,6 +237,7 @@ final class WorkstationRenderer {
 		}
 		prop.snapTo(p.computerX(), p.computerY(), p.computerZ(), 0f, 0f);
 		lvl.addEntity(prop);
+		dev.t3craft.debug.PerfStats.count(dev.t3craft.debug.PerfStats.DISPLAY_SPAWNED);
 		s.prop = prop;
 		byEntity.put(prop.getId(), s.key);
 
@@ -244,6 +247,7 @@ final class WorkstationRenderer {
 		hit.setHeight(HITBOX_HEIGHT);
 		hit.snapTo(p.computerX() + 0.5, p.computerY(), p.computerZ() + 0.5, 0f, 0f);
 		lvl.addEntity(hit);
+		dev.t3craft.debug.PerfStats.count(dev.t3craft.debug.PerfStats.DISPLAY_SPAWNED);
 		s.hitbox = hit;
 		byEntity.put(hit.getId(), s.key);
 	}
@@ -302,6 +306,7 @@ final class WorkstationRenderer {
 
 	private static void apply(Display.TextDisplay d, StationScreen screen) {
 		d.setText(component(screen));
+		dev.t3craft.debug.PerfStats.count(dev.t3craft.debug.PerfStats.DISPLAY_SET_TEXT);
 		d.setBackgroundColor(screen.background());
 	}
 

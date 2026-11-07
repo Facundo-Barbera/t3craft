@@ -8,8 +8,10 @@ import dev.t3craft.client.workstation.WorkstationCache;
 import dev.t3craft.client.workstation.WorkstationModel;
 import dev.t3craft.client.workstation.WorkstationThread;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -34,8 +36,18 @@ public final class MonitorScreens {
 			new StationScreen.Line("T3Craft monitor", WorkstationModel.DIM_COLOR),
 			new StationScreen.Line("· NO THREAD", StationStatus.IDLE.color)), StationStatus.IDLE, 0xF0101010);
 
+	private static final Shown UNBOUND_SHOWN = new Shown("#unbound", 0, UNBOUND);
+
 	private final WorkstationCache cache = new WorkstationCache(new WorkstationModel(LAYOUT));
+	/** "Thread not known" screens by key: built once, not per frame. */
+	private final Map<String, Shown> missing = new HashMap<>();
 	private long revision;
+	/**
+	 * Bumped when threads are dropped from the cache (or on clear): a thread that comes back restarts
+	 * its cache version at 1, so the epoch keeps {@link Shown#version()} from repeating a version
+	 * the renderer already cached with other content.
+	 */
+	private long epoch;
 
 	/** Feeds every known thread; returns true when any screen changed. */
 	public boolean tick(Collection<WorkstationThread> threads, long nowMs) {
@@ -47,7 +59,13 @@ public final class MonitorScreens {
 		}
 		int before = cache.size();
 		cache.retain(keys);
-		changed |= cache.size() != before;
+		if (cache.size() != before) {
+			changed = true;
+			epoch++;
+		}
+		if (missing.size() > 256) {
+			missing.clear();
+		}
 		if (changed) {
 			revision++;
 		}
@@ -62,13 +80,13 @@ public final class MonitorScreens {
 	/** The screen of a monitor with the given effective binding. */
 	public Shown show(Binding b) {
 		if (b.kind() != Binding.Kind.THREAD) {
-			return new Shown("#unbound", 0, UNBOUND);
+			return UNBOUND_SHOWN;
 		}
 		StationScreen s = cache.screen(b.value());
 		if (s == null) {
-			return new Shown("#missing:" + b.value(), 0, missing(b.value()));
+			return missing.computeIfAbsent(b.value(), k -> new Shown("#missing:" + k, 0, missing(k)));
 		}
-		return new Shown(b.value(), cache.version(b.value()), s);
+		return new Shown(b.value(), (epoch << 32) | cache.version(b.value()), s);
 	}
 
 	/** A thread the client does not know (not connected yet, hidden, or gone). */
@@ -82,6 +100,8 @@ public final class MonitorScreens {
 
 	public void clear() {
 		cache.clear();
+		missing.clear();
+		epoch++;
 		revision++;
 	}
 }
