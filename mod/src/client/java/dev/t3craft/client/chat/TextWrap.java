@@ -8,7 +8,7 @@ import java.util.List;
  * Word wrap of styled spans into lines no wider than {@code maxWidth}, keeping each piece's x so
  * the screen can hit-test links. Breaks at spaces; a word wider than the line is split by
  * characters. Pure Java: the width of a piece comes from {@link Measure} (the game font in
- * {@link ChatScreen}, a fixed-width stub in tests).
+ * {@link ConversationPanel}, a fixed-width stub in tests).
  */
 public final class TextWrap {
 	private TextWrap() {

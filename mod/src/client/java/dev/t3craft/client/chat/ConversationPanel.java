@@ -1,13 +1,23 @@
-// Layout ideas adapted from AgentCraft (https://github.com/blendi-remade/agentcraft)
+// Adapted from AgentCraft (https://github.com/blendi-remade/agentcraft)
 // Copyright (c) 2026 AgentCraft contributors. MIT License.
+// Layout, metrics and drawing follow AgentCraft's console (mod/src/client/java/dev/agentcraft/client/
+// console/ConsoleScreen.java: paper panel, 20 px header with a rule, inset feed with a 2 px speaker
+// stripe, 8 px avatar and hanging text, minute separators, 6 px scrollbar, "↓ newer below" pill,
+// key-cap footer, 18 px command bar with a brass ">" under the panel), the tool lines of its desk
+// monitors (monitor/LogRows.java: 12 px icon + tool name + argument, 13 px rows, tinted diff rows) and
+// the decision screen's header navigation (decisions/DecisionScreen.java: ‹ n/N › key caps).
 package dev.t3craft.client.chat;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.t3craft.client.chat.ChatEntry.Kind;
+import dev.t3craft.client.chat.ChatTurns.Block;
+import dev.t3craft.client.chat.ChatTurns.Message;
+import dev.t3craft.client.chat.ChatTurns.Role;
+import dev.t3craft.client.chat.ChatTurns.ToolRun;
+import dev.t3craft.client.chat.ChatTurns.Turn;
 import dev.t3craft.client.chat.Markdown.Span;
-import java.time.Instant;
+import dev.t3craft.t3.ThreadState;
 import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -26,76 +36,159 @@ import net.minecraft.resources.Identifier;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Reusable widget: the read-only conversation of one T3 thread, drawn in any rectangle. Owns the
- * live {@link ThreadFeed} of the thread it shows (one at a time): {@link #show} switches threads,
- * {@link #close()} drops the socket. Embed it in any screen and forward render/input/tick:
+ * Reusable widget: the read-only conversation of one T3 thread, drawn as an AgentCraft console in
+ * any rectangle with any {@link ChatTheme}. Owns the live {@link ThreadFeed} of the thread it shows
+ * (one at a time): {@link #show} switches threads, {@link #close()} drops the socket. No dependency
+ * on a particular Screen: the host forwards render, input and tick.
  *
  * <pre>{@code
- * ConversationPanel conv = new ConversationPanel(ChatScreens.defaultSource());
+ * ConversationPanel conv = new ConversationPanel(ChatScreens.defaultSource(), ChatTheme.warmStudio());
  * conv.show(envId, envLabel, threadId, title);
- * // tick: conv.tick();   render: conv.extract(g, font, x, y, w, h, mouseX, mouseY);
- * // input: conv.mouseClicked(mx, my, button); conv.mouseScrolled(mx, my, dy); conv.keyPressed(event);
- * // screen removed(): conv.close();
+ * // tick:   conv.tick();
+ * // render: conv.setBounds(new Rect(x, y, w, h)); conv.render(g, font, mouseX, mouseY);
+ * // input:  conv.mouseClicked(mx, my, button); conv.mouseScrolled(mx, my, dy); conv.keyPressed(event);
+ * // removed(): conv.close();
  * }</pre>
  *
- * <p>Layout (after AgentCraft's console): header with title, environment badge, state and who needs
- * it; an inset feed with a colour stripe per speaker, time separators, foldable tool calls, basic
- * Markdown and copyable links; a "newer below" pill; a prompt bar at the bottom that is disabled
- * (replying needs {@code orchestration:operate}). Colours: {@link ChatTheme} (portable terminal).
+ * <p>Inside its bounds, top to bottom: a paper panel with the header (title, environment, state dot,
+ * optional ‹ n/N › navigation), the "who needs it" callout, the inset feed and a key-cap footer; then
+ * the command bar, disabled because replying needs {@code orchestration:operate}. In the feed every
+ * turn has a colour stripe and an avatar (clay "you", the agent colour for the agent), consecutive
+ * tool calls are one collapsed line ("4 steps · $, Edit, Search") that unfolds into AgentCraft monitor
+ * tool lines, each of which unfolds its output; Markdown is rendered; links copy on click.
+ * {@link #setCompact(boolean) Compact} drops the footer and the second header line for small hosts.
  */
 public final class ConversationPanel implements AutoCloseable {
-	private static final int HEADER_H = 26;
-	private static final int PROMPT_H = 16;
-	private static final int PAD = 6;
+	private static final int FIELD_H = 18;
+	private static final int HEADER_H = 20;
+	private static final int COMPACT_HEADER_H = 14;
+	private static final int FOOTER_H = 14;
 	private static final int STRIPE_X = 3;
-	private static final int TEXT_X = 9;
-	private static final int INDENT = 6;
-	private static final int ENTRY_GAP = 5;
+	private static final int AVATAR_X = 8;
+	private static final int TEXT_X = 19;
+	private static final int TURN_GAP = 4;
 	private static final Style MONO = Style.EMPTY.withFont(new FontDescription.Resource(Identifier.withDefaultNamespace("uniform")));
-	private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault());
 	private static final SystemToast.SystemToastId COPIED = new SystemToast.SystemToastId(2000L);
-	public static final String REPLY_HINT = "Replying requires orchestration:operate · read-only";
+	public static final String REPLY_HINT = "Replying needs orchestration:operate (read-only pairing)";
+
+	/** Thread navigation shown as ‹ n/N › key caps in the header (AgentCraft decision queue). */
+	public interface Navigation {
+		/** "3/12", or empty to hide the control. */
+		String position();
+
+		/** -1 previous, +1 next. */
+		void step(int dir);
+	}
 
 	private final ChatSource source;
+	private ChatTheme theme;
+	private Rect bounds = Rect.EMPTY;
+	private boolean compact;
+	private boolean showPrompt = true;
+	private @Nullable Navigation nav;
+	private String[] hints = {"PgUp", "scroll", "End", "newest"};
+
 	private @Nullable ThreadFeed feed;
 	private @Nullable String key;
 	private String title = "";
 	private String envId = "";
 	private String envLabel = "";
+	private @Nullable EnvBadge badge;
 	private @Nullable String message;
 	private final Set<String> expanded = new HashSet<>();
 
 	// layout cache
 	private List<RLine> lines = List.of();
-	private int contentHeight;
-	private double scroll;
-	private boolean stickToBottom = true;
+	private List<Box> boxes = List.of();
+	private final FeedScroll scroll = new FeedScroll();
 	private long builtVersion = -1;
 	private int builtWidth = -1;
 	private boolean layoutDirty = true;
 	private @Nullable String firstKey;
 	private boolean lastLoading;
 	private @Nullable String lastOlderError;
-	private @Nullable Font font;
 
 	// last rectangles (hit-testing)
-	private int px;
-	private int py;
-	private int pw;
-	private int ph;
-	private int wellX;
-	private int wellY;
-	private int wellW;
-	private int wellH;
+	private Rect well = Rect.EMPTY;
+	private Rect bar = Rect.EMPTY;
+	private int prevX = -100;
+	private int nextX = -100;
+	private int navY;
 
-	/** A rendered feed line; x of pieces is relative to {@code indent}. */
-	private record RLine(int indent, List<TextWrap.Piece> pieces, int color, int height, int background, int stripe,
-			@Nullable String toggleKey, boolean loadMore, boolean rule, boolean separator) {
+	/**
+	 * A feed line at content y {@code y}. Pieces' x are relative to the text column + {@code indent}.
+	 * {@code avatar}: initial drawn in an 8 px square of {@code avatarColor}. {@code icon}: 12 px tool
+	 * icon at the text column. {@code bg}: full-width row tint from the indent.
+	 */
+	private record RLine(int y, int h, int indent, List<TextWrap.Piece> pieces, int color, int stripe, int bg,
+			@Nullable String avatar, int avatarColor, @Nullable String icon, @Nullable String toggle, boolean loadMore,
+			@Nullable String sep, boolean rule, boolean caret) {
+	}
+
+	/** A bubble behind lines {@code y0..y1} (content y), from the indent to the right edge. */
+	private record Box(int y0, int y1, int indent) {
+	}
+
+	public ConversationPanel(ChatSource source, ChatTheme theme) {
+		this.source = source;
+		this.theme = theme;
 	}
 
 	public ConversationPanel(ChatSource source) {
-		this.source = source;
+		this(source, ChatTheme.warmStudio());
 	}
+
+	// ---- configuration ----------------------------------------------------------------------
+
+	public ChatTheme theme() {
+		return theme;
+	}
+
+	public void setTheme(ChatTheme t) {
+		theme = t;
+		layoutDirty = true;
+	}
+
+	public Rect bounds() {
+		return bounds;
+	}
+
+	public void setBounds(Rect r) {
+		bounds = r;
+	}
+
+	/** Small hosts: one header line, no footer hints. */
+	public void setCompact(boolean v) {
+		if (compact != v) {
+			compact = v;
+			layoutDirty = true;
+		}
+	}
+
+	public boolean compact() {
+		return compact;
+	}
+
+	/** Shows or hides the (disabled) command bar under the panel. */
+	public void setShowPrompt(boolean v) {
+		showPrompt = v;
+	}
+
+	public void setNavigation(@Nullable Navigation n) {
+		nav = n;
+	}
+
+	/** Footer key-cap hints as key/verb pairs (the host's keys). */
+	public void setHints(String... keyThenVerb) {
+		hints = keyThenVerb.clone();
+	}
+
+	/** Environment icon for the header (configured colour); null derives it from the id. */
+	public void setBadge(@Nullable EnvBadge b) {
+		badge = b;
+	}
+
+	// ---- thread -------------------------------------------------------------------------------
 
 	/** Key {@code env:threadId} of the thread shown, or null. */
 	public @Nullable String key() {
@@ -146,7 +239,6 @@ public final class ConversationPanel implements AutoCloseable {
 		resetView();
 	}
 
-	/** Reconnects the current feed now. */
 	public void reconnect() {
 		if (feed != null) {
 			feed.reconnect();
@@ -156,9 +248,9 @@ public final class ConversationPanel implements AutoCloseable {
 	private void resetView() {
 		expanded.clear();
 		lines = List.of();
-		contentHeight = 0;
-		scroll = 0;
-		stickToBottom = true;
+		boxes = List.of();
+		scroll.update(0, 1);
+		scroll.toBottom();
 		builtVersion = -1;
 		layoutDirty = true;
 		firstKey = null;
@@ -183,7 +275,7 @@ public final class ConversationPanel implements AutoCloseable {
 		}
 		ChatTranscript.View v = f.transcript().view();
 		ThreadFeed.State st = f.state();
-		if (scroll <= 0 && !stickToBottom && v.hasMoreHistory() && !st.loadingOlder() && st.olderError() == null) {
+		if (scroll.atTop() && !scroll.following() && v.hasMoreHistory() && !st.loadingOlder() && st.olderError() == null) {
 			f.loadOlder(); // reached the top: fetch the previous page by itself
 		}
 		if (st.loadingOlder() != lastLoading || !Objects.equals(st.olderError(), lastOlderError)) {
@@ -193,10 +285,34 @@ public final class ConversationPanel implements AutoCloseable {
 		}
 	}
 
-	// ---- layout ------------------------------------------------------------------------------
+	// ---- layout -------------------------------------------------------------------------------
 
-	private int lineH() {
-		return ChatTheme.LINE_H;
+	/** Line builder with a running content y. */
+	private final class Layout {
+		final Font font;
+		final int w;
+		final List<RLine> out = new ArrayList<>();
+		final List<Box> bx = new ArrayList<>();
+		int y;
+
+		Layout(Font font, int w) {
+			this.font = font;
+			this.w = w;
+		}
+
+		void add(int h, int indent, List<TextWrap.Piece> pieces, int color, int stripe, int bg, @Nullable String avatar, int avatarColor,
+				@Nullable String icon, @Nullable String toggle, boolean loadMore, @Nullable String sep, boolean rule, boolean caret) {
+			out.add(new RLine(y, h, indent, pieces, color, stripe, bg, avatar, avatarColor, icon, toggle, loadMore, sep, rule, caret));
+			y += h;
+		}
+
+		void text(int indent, List<TextWrap.Piece> pieces, int color, int stripe) {
+			add(theme.row(), indent, pieces, color, stripe, 0, null, 0, null, null, false, null, false, false);
+		}
+
+		void gap(int h, int stripe) {
+			add(h, 0, List.of(), 0, stripe, 0, null, 0, null, null, false, null, false, false);
+		}
 	}
 
 	private void relayoutIfNeeded(Font font, int w) {
@@ -208,242 +324,326 @@ public final class ConversationPanel implements AutoCloseable {
 		if (!layoutDirty && v.version() == builtVersion && w == builtWidth) {
 			return;
 		}
-		int oldHeight = contentHeight;
+		ChatTheme t = theme;
+		int oldHeight = lines.isEmpty() ? 0 : lines.getLast().y() + lines.getLast().h();
 		String oldFirst = firstKey;
-		List<RLine> out = new ArrayList<>();
+		Layout L = new Layout(font, w);
 		ThreadFeed.State st = f.state();
 		if (v.hasMoreHistory() || st.olderError() != null) {
 			String label = st.loadingOlder() ? "Loading earlier messages…"
 					: st.olderError() != null ? "⚠ " + st.olderError() + " (click to retry)" : "▲ Load earlier messages";
-			out.add(new RLine(0, List.of(piece(font, label)), ChatTheme.LINK, lineH() + 4, 0, 0, null, true, false, false));
+			L.add(t.row() + 4, 0, List.of(piece(font, label)), t.link(), 0, 0, null, 0, null, null, true, null, false, false);
 		} else if (v.synced() || !v.entries().isEmpty()) {
-			out.add(new RLine(0, List.of(piece(font, "Start of thread")), ChatTheme.DIM, lineH() + 4, 0, 0, null, false, false, true));
+			L.add(t.row() + 2, 0, List.of(), 0, 0, 0, null, 0, null, null, false, "Start of thread", false, false);
 		}
 		Long prevAt = null;
 		long now = System.currentTimeMillis();
-		for (ChatEntry e : v.entries()) {
-			String sep = FeedRules.separator(prevAt, e.at(), ZoneId.systemDefault(), now);
+		for (Turn turn : ChatTurns.group(v.entries())) {
+			String sep = FeedRules.separator(prevAt, turn.at(), ZoneId.systemDefault(), now);
 			if (sep != null) {
-				out.add(new RLine(0, List.of(piece(font, sep)), ChatTheme.DIM, lineH() + 3, 0, 0, null, false, false, true));
+				L.add(t.row() + 2, 0, List.of(), 0, 0, 0, null, 0, null, null, false, sep, false, false);
 			}
-			if (e.at() != null) {
-				prevAt = e.at();
+			if (turn.at() != null) {
+				prevAt = turn.at();
 			}
-			layoutEntry(font, out, e, w);
+			layoutTurn(L, turn);
 		}
-		int h = 0;
-		for (RLine l : out) {
-			h += l.height();
+		if (v.status().state() == ThreadState.WORKING) {
+			L.add(t.row(), 0, List.of(), 0, t.agent(), 0, null, 0, null, null, false, null, false, true);
 		}
-		lines = out;
-		contentHeight = h;
+		lines = L.out;
+		boxes = L.bx;
+		int newHeight = L.y;
 		firstKey = v.entries().isEmpty() ? null : v.entries().getFirst().key();
-		if (!stickToBottom && oldFirst != null && firstKey != null && !oldFirst.equals(firstKey)) {
-			scroll += contentHeight - oldHeight; // older page prepended: keep the view in place
+		if (oldFirst != null && firstKey != null && !oldFirst.equals(firstKey)) {
+			scroll.update(oldHeight, Math.max(1, scroll.view()));
+			scroll.prepended(newHeight - oldHeight); // older page prepended: keep the view in place
 		}
 		builtVersion = v.version();
 		builtWidth = w;
 		layoutDirty = false;
-		clampScroll();
 	}
 
 	private static TextWrap.Piece piece(Font font, String s) {
 		return new TextWrap.Piece(Span.plain(s), 0, font.width(s));
 	}
 
-	private static int stripeColor(Kind k) {
-		return switch (k) {
-			case USER -> 0xFF7FD4FF;
-			case ASSISTANT -> 0xFF55FFFF;
-			case REQUEST -> ChatTheme.ATTENTION;
-			case ERROR -> ChatTheme.ERROR;
-			case TOOL, SUBAGENT -> 0xFF4A5A64;
-			default -> 0xFF39454D;
-		};
+	private void layoutTurn(Layout L, Turn turn) {
+		ChatTheme t = theme;
+		switch (turn.role()) {
+			case NOTICE -> {
+				ChatEntry e = ((Message) turn.blocks().getFirst()).entry();
+				String s = (e.title().isBlank() ? "" : e.title() + ": ") + ToolLine.firstLine(e.body());
+				for (TextWrap.Line l : TextWrap.wrap(List.of(Span.plain(s)), L.w, sp -> measure(L.font, sp))) {
+					L.text(0, l.pieces(), t.muted(), 0);
+				}
+			}
+			case USER -> {
+				ChatEntry e = ((Message) turn.blocks().getFirst()).entry();
+				lead(L, "You", t.youText(), "Y", t.you(), t.you(), e.inherited() ? "from parent thread" : null);
+				body(L, e, t.text(), t.you());
+			}
+			case AGENT -> {
+				boolean first = true;
+				for (Block b : turn.blocks()) {
+					int stripe = stripeOf(b);
+					if (first) {
+						String extra = b instanceof Message m && m.entry().inherited() ? "from parent thread" : null;
+						lead(L, "Agent", t.agentText(), "A", t.agent(), stripe, extra);
+						first = false;
+					}
+					switch (b) {
+						case Message m -> message(L, m.entry(), stripe);
+						case ToolRun r -> toolRun(L, r, stripe);
+					}
+				}
+			}
+		}
+		L.gap(TURN_GAP, 0);
 	}
 
-	private void layoutEntry(Font font, List<RLine> out, ChatEntry e, int w) {
-		boolean folded = e.kind().foldable && !expanded.contains(e.key());
-		int stripe = stripeColor(e.kind());
-		StringBuilder head = new StringBuilder();
-		if (e.kind().foldable) {
-			head.append(folded ? "▸ " : "▾ ");
-			head.append(e.title().isBlank() ? e.kind().role : e.title());
-		} else {
-			head.append(e.kind().role);
-			if (!e.title().isBlank()) {
-				head.append(" · ").append(e.title());
+	private int stripeOf(Block b) {
+		ChatTheme t = theme;
+		if (b instanceof Message m) {
+			return switch (m.entry().kind()) {
+				case REQUEST -> t.needsYou();
+				case ERROR -> t.error();
+				default -> t.agent();
+			};
+		}
+		return t.agent();
+	}
+
+	/** Speaker row: avatar + name (+ muted extra). */
+	private void lead(Layout L, String name, int nameColor, String avatar, int avatarColor, int stripe, @Nullable String extra) {
+		List<TextWrap.Piece> p = new ArrayList<>();
+		Span s = new Span(name, false, false, false, null);
+		p.add(new TextWrap.Piece(s, 0, L.font.width(name)));
+		L.add(theme.row(), 0, p, nameColor, stripe, 0, avatar, avatarColor, null, null, false, null, false, false);
+		if (extra != null) {
+			L.text(0, List.of(piece(L.font, extra)), theme.muted(), stripe);
+		}
+	}
+
+	private void message(Layout L, ChatEntry e, int stripe) {
+		ChatTheme t = theme;
+		switch (e.kind()) {
+			case PLAN, TODO -> {
+				L.text(0, List.of(piece(L.font, e.kind().role + (e.title().isBlank() ? "" : " · " + e.title()))), t.brass(), stripe);
+				body(L, e, t.text(), stripe);
 			}
-		}
-		if (e.inherited()) {
-			head.append("  (parent thread)");
-		}
-		if (e.streaming() || "running".equals(e.status()) || "pending".equals(e.status())) {
-			head.append("  …");
-		} else if ("failed".equals(e.status())) {
-			head.append("  ✖");
-		}
-		String time = e.at() == null ? "" : TIME.format(Instant.ofEpochMilli(e.at()));
-		boolean bold = !e.kind().foldable;
-		List<TextWrap.Line> headLines = TextWrap.wrap(List.of(new Span(head.toString(), bold, false, false, null)), w - font.width(time) - 8,
-				s -> measure(font, s));
-		String toggle = e.kind().foldable ? e.key() : null;
-		int headColor = e.kind().foldable ? ChatTheme.DIM : e.kind().color;
-		for (int i = 0; i < headLines.size(); i++) {
-			List<TextWrap.Piece> pieces = new ArrayList<>(headLines.get(i).pieces());
-			if (i == 0 && !time.isEmpty()) {
-				pieces.add(new TextWrap.Piece(new Span(time, false, false, false, null), w - font.width(time), font.width(time)));
+			case REQUEST -> {
+				// "needs you" callout in AgentCraft's speech bubble
+				int y0 = L.y;
+				L.gap(3, stripe);
+				String head = (e.title().isBlank() ? "Needs you" : e.title()) + (e.streaming() ? "" : "");
+				L.text(6, List.of(new TextWrap.Piece(new Span(head, true, false, false, null), 0, measure(L.font, new Span(head, true, false, false, null)))),
+						t.youText(), stripe);
+				bodyAt(L, e, t.text(), stripe, 6, L.w - 12);
+				L.gap(4, stripe);
+				L.bx.add(new Box(y0, L.y, 0));
+				L.gap(2, stripe);
 			}
-			out.add(new RLine(0, pieces, headColor, lineH() + 1, 0, stripe, toggle, false, false, false));
+			case ERROR -> {
+				L.text(0, List.of(piece(L.font, "Error" + (e.title().isBlank() ? "" : " · " + e.title()))), t.errorText(), stripe);
+				body(L, e, t.errorText(), stripe);
+			}
+			default -> body(L, e, t.text(), stripe);
 		}
-		if (folded) {
-			out.add(spacer(e.kind().foldable ? 2 : ENTRY_GAP));
-			return;
-		}
-		int textColor = e.kind() == Kind.REASONING || e.kind() == Kind.SYSTEM ? ChatTheme.DIM
-				: e.kind() == Kind.ERROR ? 0xFFFF8888 : ChatTheme.TEXT;
-		int bodyW = w - INDENT;
+	}
+
+	private void body(Layout L, ChatEntry e, int color, int stripe) {
+		bodyAt(L, e, color, stripe, 0, L.w);
+	}
+
+	private void bodyAt(Layout L, ChatEntry e, int color, int stripe, int indent, int w) {
 		if (!e.body().isBlank()) {
 			if (e.markdown()) {
-				layoutMarkdown(font, out, Markdown.parse(e.body()), bodyW, textColor, stripe);
+				markdown(L, Markdown.parse(e.body()), indent, w, color, stripe);
 			} else {
-				addWrapped(font, out, List.of(Span.plain(e.body())), INDENT, bodyW, textColor, stripe);
+				wrapped(L, List.of(Span.plain(e.body())), indent, w, color, stripe);
 			}
 		}
-		if (e.detail() != null && !e.detail().isBlank()) {
-			layoutCode(font, out, List.of(e.detail().split("\n", -1)), bodyW, stripe);
+		if (e.detail() != null && !e.detail().isBlank() && !ChatTurns.toolLike(e.kind())) {
+			code(L, List.of(e.detail().split("\n", -1)), indent, w, stripe, false);
 		}
-		out.add(spacer(ENTRY_GAP));
 	}
 
-	private void layoutMarkdown(Font font, List<RLine> out, List<Markdown.Block> blocks, int w, int color, int stripe) {
+	/** Collapsed run: one line; unfolded: one monitor tool line per step, each foldable. */
+	private void toolRun(Layout L, ToolRun r, int stripe) {
+		ChatTheme t = theme;
+		boolean open = expanded.contains(r.key());
+		ToolLine firstTool = ToolLine.of(r.entries().getFirst());
+		if (r.entries().size() > 1 || !open) {
+			String head = (open ? "▾ " : "▸ ") + r.summary(3) + (r.running() ? "  …" : "") + (r.failed() ? "  ✖" : "");
+			int color = r.failed() ? t.errorText() : t.tool();
+			L.add(t.toolRow(), 15, List.of(piece(L.font, head)), color, stripe, 0, null, 0, firstTool.icon(), r.key(), false, null, false,
+					false);
+			if (!open) {
+				return;
+			}
+		}
+		for (ChatEntry e : r.entries()) {
+			toolLine(L, e, stripe, r.entries().size() > 1 ? 8 : 0);
+		}
+	}
+
+	private void toolLine(Layout L, ChatEntry e, int stripe, int indent) {
+		ChatTheme t = theme;
+		ToolLine tl = ToolLine.of(e);
+		boolean open = expanded.contains(e.key());
+		int avail = L.w - indent - 15;
+		String name = tl.name().contains("_") && !tl.arg().isEmpty() && L.font.width(tl.name()) > avail / 2 ? ToolLine.shortName(tl.name()) : tl.name();
+		name = ChatDraw.clip(L.font, name, avail);
+		List<TextWrap.Piece> p = new ArrayList<>();
+		int nw = L.font.width(name);
+		boolean failed = "failed".equals(e.status());
+		p.add(new TextWrap.Piece(Span.plain(name), 0, nw));
+		String suffix = (e.streaming() || "running".equals(e.status()) || "pending".equals(e.status())) ? " …" : failed ? " ✖" : "";
+		if (!tl.arg().isEmpty() && avail - nw > 12) {
+			String a = ChatDraw.clip(L.font, " " + tl.arg(), avail - nw - L.font.width(suffix));
+			p.add(new TextWrap.Piece(new Span(a, false, true, false, null), nw, L.font.width(a)));
+			nw += L.font.width(a);
+		}
+		if (!suffix.isEmpty()) {
+			p.add(new TextWrap.Piece(Span.plain(suffix), nw, L.font.width(suffix)));
+		}
+		boolean hasDetail = e.detail() != null && !e.detail().isBlank() || e.kind() == Kind.REASONING && !e.body().isBlank();
+		L.add(t.toolRow(), indent + 15, p, failed ? t.errorText() : t.tool(), stripe, 0, null, 0, tl.icon(), hasDetail ? e.key() : null,
+				false, null, false, false);
+		if (open && hasDetail) {
+			if (e.kind() == Kind.REASONING) {
+				markdown(L, Markdown.parse(e.body()), indent + 15, L.w - indent - 15, t.muted(), stripe);
+			} else {
+				code(L, List.of(e.detail().split("\n", -1)), indent + 15, L.w - indent - 15, stripe, failed);
+			}
+			L.gap(2, stripe);
+		}
+	}
+
+	private void markdown(Layout L, List<Markdown.Block> blocks, int indent, int w, int color, int stripe) {
+		ChatTheme t = theme;
 		Markdown.Block prev = null;
 		for (Markdown.Block b : blocks) {
 			if (prev != null && !(b instanceof Markdown.ListItem && prev instanceof Markdown.ListItem)) {
-				out.add(new RLine(0, List.of(), 0, 3, 0, stripe, null, false, false, false));
+				L.gap(3, stripe);
 			}
 			switch (b) {
 				case Markdown.Heading hd -> {
-					int c = hd.level() <= 1 ? ChatTheme.ACCENT : hd.level() == 2 ? 0xFF9FEFEF : ChatTheme.TEXT;
+					int c = hd.level() <= 2 ? t.text() : t.muted();
 					List<Span> spans = hd.spans().stream().map(s -> new Span(s.text(), true, s.italic(), s.code(), s.url())).toList();
-					addWrapped(font, out, spans, INDENT, w, c, stripe);
+					wrapped(L, spans, indent, w, c, stripe);
 				}
-				case Markdown.Paragraph p -> addWrapped(font, out, p.spans(), INDENT, w, color, stripe);
+				case Markdown.Paragraph p -> wrapped(L, p.spans(), indent, w, color, stripe);
 				case Markdown.ListItem li -> {
-					int ind = INDENT + li.depth() * 10;
+					int ind = indent + li.depth() * 10;
 					String marker = li.marker() + " ";
-					int mw = font.width(marker);
-					List<TextWrap.Line> wrapped = TextWrap.wrap(li.spans(), w - (ind - INDENT) - mw, s -> measure(font, s));
-					for (int i = 0; i < wrapped.size(); i++) {
+					int mw = L.font.width(marker);
+					List<TextWrap.Line> wr = TextWrap.wrap(li.spans(), w - (ind - indent) - mw, s -> measure(L.font, s));
+					for (int i = 0; i < wr.size(); i++) {
 						List<TextWrap.Piece> pieces = new ArrayList<>();
 						if (i == 0) {
 							pieces.add(new TextWrap.Piece(Span.plain(marker), 0, mw));
 						}
-						for (TextWrap.Piece pc : wrapped.get(i).pieces()) {
+						for (TextWrap.Piece pc : wr.get(i).pieces()) {
 							pieces.add(new TextWrap.Piece(pc.span(), pc.x() + mw, pc.width()));
 						}
-						out.add(new RLine(ind, pieces, color, lineH(), 0, stripe, null, false, false, false));
+						L.text(ind, pieces, color, stripe);
 					}
 				}
-				case Markdown.CodeBlock cb -> layoutCode(font, out, cb.lines(), w, stripe);
+				case Markdown.CodeBlock cb -> code(L, cb.lines(), indent, w, stripe, false);
 				case Markdown.Quote q -> {
 					List<Span> spans = new ArrayList<>();
 					spans.add(Span.plain("│ "));
 					q.spans().forEach(s -> spans.add(new Span(s.text(), s.bold(), true, s.code(), s.url())));
-					addWrapped(font, out, spans, INDENT, w, ChatTheme.DIM, stripe);
+					wrapped(L, spans, indent, w, t.muted(), stripe);
 				}
-				case Markdown.Rule r -> out.add(new RLine(INDENT, List.of(), color, 7, 0, stripe, null, false, true, false));
+				case Markdown.Rule r -> L.add(7, indent, List.of(), color, stripe, 0, null, 0, null, null, false, null, true, false);
 			}
 			prev = b;
 		}
 	}
 
-	private void layoutCode(Font font, List<RLine> out, List<String> codeLines, int w, int stripe) {
-		out.add(new RLine(INDENT, List.of(), 0, 2, ChatTheme.CODE_BG, stripe, null, false, false, false));
+	/**
+	 * Monospaced block. Diff lines get AgentCraft's tinted rows (+ add, - del, @@ hunk); output of a
+	 * failed step is drawn in the error colour.
+	 */
+	private void code(Layout L, List<String> codeLines, int indent, int w, int stripe, boolean failed) {
+		ChatTheme t = theme;
+		boolean diff = codeLines.stream().anyMatch(s -> s.startsWith("@@") || s.startsWith("+++ ") || s.startsWith("--- "));
+		L.add(2, indent, List.of(), 0, stripe, t.codeBg(), null, 0, null, null, false, null, false, false);
 		for (String raw : codeLines) {
-			List<Span> spans = List.of(new Span(raw.isEmpty() ? " " : raw, false, false, true, null));
-			for (TextWrap.Line l : TextWrap.wrap(spans, w - 8, s -> measure(font, s))) {
+			int color = failed ? t.delFg() : t.codeText();
+			int bg = t.codeBg();
+			if (diff && raw.startsWith("+") && !raw.startsWith("+++")) {
+				color = t.addFg();
+				bg = t.addBg();
+			} else if (diff && raw.startsWith("-") && !raw.startsWith("---")) {
+				color = t.delFg();
+				bg = t.delBg();
+			} else if (diff && raw.startsWith("@@")) {
+				color = t.link();
+			}
+			List<Span> spans = List.of(new Span(raw.isEmpty() ? " " : raw.replace("\t", "  "), false, false, true, null));
+			for (TextWrap.Line l : TextWrap.wrap(spans, w - 8, s -> measure(L.font, s))) {
 				List<TextWrap.Piece> shifted = new ArrayList<>();
 				l.pieces().forEach(p -> shifted.add(new TextWrap.Piece(p.span(), p.x() + 4, p.width())));
-				out.add(new RLine(INDENT, shifted, ChatTheme.CODE_TEXT, lineH(), ChatTheme.CODE_BG, stripe, null, false, false, false));
+				L.add(theme.row(), indent, shifted, color, stripe, bg, null, 0, null, null, false, null, false, false);
 			}
 		}
-		out.add(new RLine(INDENT, List.of(), 0, 2, ChatTheme.CODE_BG, stripe, null, false, false, false));
+		L.add(2, indent, List.of(), 0, stripe, t.codeBg(), null, 0, null, null, false, null, false, false);
 	}
 
-	private void addWrapped(Font font, List<RLine> out, List<Span> spans, int indent, int w, int color, int stripe) {
-		for (TextWrap.Line l : TextWrap.wrap(spans, w, s -> measure(font, s))) {
-			out.add(new RLine(indent, l.pieces(), color, lineH(), 0, stripe, null, false, false, false));
+	private void wrapped(Layout L, List<Span> spans, int indent, int w, int color, int stripe) {
+		for (TextWrap.Line l : TextWrap.wrap(spans, w, s -> measure(L.font, s))) {
+			L.text(indent, l.pieces(), color, stripe);
 		}
-	}
-
-	private static RLine spacer(int h) {
-		return new RLine(0, List.of(), 0, h, 0, 0, null, false, false, false);
 	}
 
 	private static int measure(Font font, Span s) {
-		return font.width(component(s, 0xFFFFFFFF));
+		return font.width(component(s, 0xFFFFFFFF, null));
 	}
 
-	private static MutableComponent component(Span s, int color) {
+	private static MutableComponent component(Span s, int color, @Nullable ChatTheme t) {
 		Style style = s.code() ? MONO : Style.EMPTY;
 		style = style.withBold(s.bold()).withItalic(s.italic());
 		int c = color;
-		if (s.url() != null) {
+		if (t != null && s.url() != null) {
 			style = style.withUnderlined(true);
-			c = ChatTheme.LINK;
-		} else if (s.code() && color != ChatTheme.CODE_TEXT) {
-			c = ChatTheme.INLINE_CODE;
+			c = t.link();
+		} else if (t != null && s.code() && color != t.codeText() && color != t.addFg() && color != t.delFg() && color != t.link()) {
+			c = t.inlineCode();
 		}
 		return Component.literal(s.text()).withStyle(style.withColor(c & 0xFFFFFF));
 	}
 
-	// ---- scrolling ---------------------------------------------------------------------------
-
-	private int maxScroll() {
-		return Math.max(0, contentHeight - (wellH - 6));
-	}
-
-	private void clampScroll() {
-		int max = maxScroll();
-		if (stickToBottom) {
-			scroll = max;
-		}
-		scroll = Math.max(0, Math.min(scroll, max));
-	}
-
-	public void scrollBy(double dy) {
-		scroll += dy;
-		int max = maxScroll();
-		scroll = Math.max(0, Math.min(scroll, max));
-		stickToBottom = scroll >= max - 1;
-	}
-
-	public void scrollToEnd() {
-		stickToBottom = true;
-		clampScroll();
-	}
+	// ---- input --------------------------------------------------------------------------------
 
 	public boolean contains(double mx, double my) {
-		return mx >= px && mx < px + pw && my >= py && my < py + ph;
+		return bounds.contains(mx, my);
 	}
 
+	/** Wheel: 3 rows per notch (AgentCraft console). */
 	public boolean mouseScrolled(double mx, double my, double dy) {
 		if (!contains(mx, my)) {
 			return false;
 		}
-		scrollBy(-dy * lineH() * 3);
+		scroll.scrollBy(dy > 0 ? -3 * theme.row() : 3 * theme.row());
 		return true;
 	}
 
-	/** PgUp/PgDn/Home/End scroll the feed. Arrow keys are left to the host (thread list). */
+	public void scrollToEnd() {
+		scroll.toBottom();
+	}
+
+	/** PgUp/PgDn page the feed, Home/End jump. Arrows and Tab are left to the host. */
 	public boolean keyPressed(KeyEvent event) {
-		int page = Math.max(lineH(), wellH - 20);
+		int page = Math.max(theme.row(), well.h() - 6 - theme.row());
 		switch (event.key()) {
-			case InputConstants.KEY_PAGEUP -> scrollBy(-page);
-			case InputConstants.KEY_PAGEDOWN -> scrollBy(page);
-			case InputConstants.KEY_HOME -> scrollBy(-contentHeight);
-			case InputConstants.KEY_END -> scrollToEnd();
+			case InputConstants.KEY_PAGEUP -> scroll.scrollBy(-page);
+			case InputConstants.KEY_PAGEDOWN -> scroll.scrollBy(page);
+			case InputConstants.KEY_HOME -> scroll.toTop();
+			case InputConstants.KEY_END -> scroll.toBottom();
 			default -> {
 				return false;
 			}
@@ -454,14 +654,19 @@ public final class ConversationPanel implements AutoCloseable {
 	private record Hit(RLine line, @Nullable String url) {
 	}
 
+	private int feedTop() {
+		return well.y() + 4 - scroll.offset();
+	}
+
 	private @Nullable Hit hitTest(int mx, int my) {
-		if (mx < wellX || mx >= wellX + wellW || my < wellY || my >= wellY + wellH) {
+		if (!well.contains(mx, my) || mx >= well.right() - 9) {
 			return null;
 		}
-		int y = wellY + 3 - (int) Math.round(scroll);
+		int top = feedTop();
 		for (RLine l : lines) {
-			if (my >= y && my < y + l.height()) {
-				int rel = mx - wellX - TEXT_X - l.indent();
+			int y = top + l.y();
+			if (my >= y && my < y + l.h()) {
+				int rel = mx - well.x() - TEXT_X - l.indent();
 				String url = null;
 				for (TextWrap.Piece p : l.pieces()) {
 					if (p.span().url() != null && rel >= p.x() && rel < p.x() + p.width()) {
@@ -470,19 +675,28 @@ public final class ConversationPanel implements AutoCloseable {
 				}
 				return new Hit(l, url);
 			}
-			y += l.height();
 		}
 		return null;
 	}
 
-	/** Click in the feed: copy a link, load earlier messages, fold/unfold a tool call. */
+	/** Click: header ‹ ›, copy a link, load earlier messages, fold/unfold a tool run or step. */
 	public boolean mouseClicked(double mx, double my, int button) {
 		if (button != 0 || !contains(mx, my)) {
 			return false;
 		}
+		if (nav != null && my >= navY && my < navY + 12) {
+			if (mx >= prevX && mx < prevX + 12) {
+				nav.step(-1);
+				return true;
+			}
+			if (mx >= nextX && mx < nextX + 12) {
+				nav.step(1);
+				return true;
+			}
+		}
 		Hit hit = hitTest((int) mx, (int) my);
 		if (hit == null) {
-			return false;
+			return bar.contains(mx, my);
 		}
 		if (hit.url() != null) {
 			Minecraft mc = Minecraft.getInstance();
@@ -495,26 +709,32 @@ public final class ConversationPanel implements AutoCloseable {
 			feed.loadOlder();
 			return true;
 		}
-		if (hit.line().toggleKey() != null) {
-			if (!expanded.remove(hit.line().toggleKey())) {
-				expanded.add(hit.line().toggleKey());
+		if (hit.line().toggle() != null) {
+			if (!expanded.remove(hit.line().toggle())) {
+				expanded.add(hit.line().toggle());
 			}
-			stickToBottom = false;
+			scroll.hold();
 			layoutDirty = true;
 			return true;
 		}
 		return false;
 	}
 
-	// ---- rendering ---------------------------------------------------------------------------
+	// ---- rendering ----------------------------------------------------------------------------
 
-	public void extract(GuiGraphicsExtractor g, Font font, int x, int y, int w, int h, int mouseX, int mouseY) {
-		this.font = font;
-		px = x;
-		py = y;
-		pw = w;
-		ph = h;
-		g.fill(x, y, x + w, y + h, ChatTheme.PANEL);
+	public void render(GuiGraphicsExtractor g, Font font, int mouseX, int mouseY) {
+		ChatTheme t = theme;
+		if (bounds.w() < 60 || bounds.h() < 50) {
+			return;
+		}
+		int fieldH = showPrompt ? FIELD_H : 0;
+		Rect panel = new Rect(bounds.x(), bounds.y(), bounds.w(), bounds.h() - (showPrompt ? fieldH + 5 : 0));
+		ChatDraw.panel(g, t, panel);
+		int pad = t.pad();
+		int x = panel.x() + pad;
+		int w = panel.w() - 2 * pad;
+		int y = panel.y() + pad;
+
 		ChatTranscript.Status status = null;
 		ThreadFeed.State st = null;
 		String shownTitle = title;
@@ -527,131 +747,223 @@ public final class ConversationPanel implements AutoCloseable {
 			st = feed.state();
 		}
 
-		// ---- header: title + badge/env on the right; state + connection below
-		int hx = x + PAD;
-		int hw = w - 2 * PAD;
-		int right = hx + hw;
+		// ---- header: [env icon] title · sub ............ ‹ 3/12 ›
+		int right = x + w;
+		prevX = nextX = -100;
+		String pos = nav == null ? "" : nav.position();
+		navY = y;
+		if (!pos.isEmpty()) {
+			nextX = right - 12;
+			ChatDraw.keycap(g, font, t, "›", nextX, y);
+			int pw = font.width(pos) + 10;
+			int pillX = nextX - 3 - pw;
+			ChatDraw.pill(g, font, t, pos, pillX, y, t.text());
+			prevX = pillX - 15;
+			ChatDraw.keycap(g, font, t, "‹", prevX, y);
+			right = prevX - 6;
+		}
+		int hx = x;
 		if (!envId.isEmpty()) {
-			EnvBadge b = EnvBadge.of(envId, envLabel);
-			String env = envLabel;
-			int ew = Math.min(font.width(env), hw / 3);
-			int bw = ChatDraw.badgeWidth(font, b);
-			g.text(font, ChatDraw.clip(font, env, ew), right - ew, y + 4, ChatTheme.DIM, false);
-			ChatDraw.badge(g, font, b, right - ew - bw - 3, y + 3);
-			right -= ew + bw + 8;
+			EnvBadge b = badge != null ? badge : EnvBadge.of(envId, envLabel);
+			ChatDraw.envIcon(g, font, b, hx, y + 1, 10);
+			hx += 14;
 		}
-		String t = shownTitle.isBlank() ? "Conversation" : shownTitle;
-		g.text(font, Component.literal(ChatDraw.clip(font, t, right - hx)).withStyle(Style.EMPTY.withBold(true)), hx, y + 4, ChatTheme.TEXT, false);
-		int sy = y + 15;
-		int statusEnd = hx;
 		if (status != null) {
-			Component line = Component.literal(status.state().glyph + " " + status.state().word).withColor(status.state().color)
-					.append(Component.literal(status.detail().equals(status.state().word) ? "" : " · " + status.detail()).withColor(ChatTheme.DIM & 0xFFFFFF));
-			g.text(font, line, hx, sy, ChatTheme.TEXT, false);
-			statusEnd = hx + font.width(line) + 8;
+			String fam = ChatTheme.family(status.state());
+			if (status.state() == ThreadState.NEEDS_ATTENTION) {
+				ChatDraw.pulsingDot(g, t, fam, t.color(status.state()), right - 7, y + 2);
+			} else {
+				ChatDraw.dot(g, t, fam, t.color(status.state()), right - 7, y + 2);
+			}
+			right -= 12;
 		}
-		if (st != null) {
-			String conn = st.phase() == ThreadFeed.Phase.LIVE ? "● live" : (st.phase() == ThreadFeed.Phase.FAILED ? "✖ " : "⟳ ") + st.detail();
-			int color = st.phase() == ThreadFeed.Phase.LIVE ? ChatTheme.OK : st.phase() == ThreadFeed.Phase.FAILED ? ChatTheme.ERROR : ChatTheme.ATTENTION;
-			conn = ChatDraw.clip(font, conn, Math.max(0, x + w - PAD - statusEnd));
-			g.text(font, conn, x + w - PAD - font.width(conn), sy, color, false);
+		String tt = shownTitle.isBlank() ? (key == null ? "Conversation" : "Thread") : shownTitle;
+		String sub = subtitle(status, st);
+		int titleW = Math.min(font.width(tt), right - hx);
+		g.text(font, ChatDraw.clip(font, tt, right - hx), hx, y + 2, t.text(), t.shadow());
+		int subX = hx + titleW + 6;
+		if (!compact && right - subX > 30) {
+			g.text(font, ChatDraw.clip(font, sub, right - subX), subX, y + 2, t.muted(), t.shadow());
 		}
-		int top = y + HEADER_H;
-		g.fill(x + 3, top - 1, x + w - 3, top, ChatTheme.BORDER);
+		if (status != null && mouseY >= y && mouseY < y + 12 && mouseX >= right && mouseX < right + 12) {
+			g.setTooltipForNextFrame(font, Component.literal(status.state().word + (status.detail().isBlank() ? "" : " · " + status.detail())),
+					mouseX, mouseY);
+		}
+		if (!compact) {
+			// second line: state detail and connection
+			String detail = status == null ? "" : status.state().word + (status.detail().isBlank() || status.detail().equals(status.state().word)
+					? "" : " · " + status.detail());
+			String conn = connection(st);
+			int cw = font.width(conn);
+			int ly = y + 13;
+			g.text(font, ChatDraw.clip(font, detail, w - cw - 8), x, ly, status == null ? t.muted() : t.color(status.state()), t.shadow());
+			int connColor = st == null ? t.muted() : st.phase() == ThreadFeed.Phase.LIVE ? t.done()
+					: st.phase() == ThreadFeed.Phase.FAILED ? t.error() : t.pending();
+			g.text(font, conn, x + w - cw, ly, connColor, t.shadow());
+			y += HEADER_H + 4;
+		} else {
+			y += COMPACT_HEADER_H;
+		}
+		g.fill(x, y, x + w, y + 1, t.edge());
+		y += 4;
 
-		// ---- who needs it
+		// ---- who needs it (AgentCraft speech bubble)
 		if (status != null && status.needs() != null) {
-			g.fill(x + 3, top + 2, x + w - 3, top + 14, 0x40FFAA00);
-			g.fill(x + 3, top + 2, x + 5, top + 14, ChatTheme.ATTENTION);
-			g.text(font, ChatDraw.clip(font, "⚑ " + status.needs(), w - 16), x + 9, top + 4, ChatTheme.ATTENTION, false);
-			top += 15;
+			Rect nb = new Rect(x, y, w, 16);
+			ChatDraw.bubble(g, t, nb, ChatTheme.withAlpha(t.needsYou(), 60));
+			ChatDraw.pulsingDot(g, t, "waiting", t.needsYou(), x + 6, y + 4);
+			g.text(font, ChatDraw.clip(font, status.needs(), w - 24), x + 17, y + 4, t.youText(), t.shadow());
+			y += 19;
 		}
 
 		// ---- feed well
-		wellX = x + 3;
-		wellY = top + 3;
-		wellW = w - 6;
-		wellH = y + h - PROMPT_H - 6 - wellY;
-		g.fill(wellX, wellY, wellX + wellW, wellY + wellH, ChatTheme.WELL);
-		int textW = wellW - TEXT_X - 8;
+		int footerH = compact ? 0 : FOOTER_H;
+		well = new Rect(x, y, w, panel.bottom() - pad - footerH - (compact ? 0 : 3) - y);
+		ChatDraw.inset(g, t, well);
+		int textW = well.w() - TEXT_X - 12;
 		relayoutIfNeeded(font, textW);
-		clampScroll();
+		int contentH = lines.isEmpty() ? 0 : lines.getLast().y() + lines.getLast().h();
+		scroll.update(contentH, Math.max(1, well.h() - 8));
 
 		if (feed == null || message != null) {
-			String msg = message != null ? message : "Select a thread on the left.";
-			int ly = wellY + wellH / 2 - 10;
-			for (var line : font.split(Component.literal(msg), Math.max(40, wellW - 30))) {
-				g.centeredText(font, line, wellX + wellW / 2, ly, message != null && key != null ? ChatTheme.ATTENTION : ChatTheme.DIM);
+			String msg = message != null ? message : "Select a thread.";
+			int ly = well.y() + well.h() / 2 - 10;
+			for (var line : font.split(Component.literal(msg), Math.max(40, well.w() - 24))) {
+				g.centeredText(font, line, well.x() + well.w() / 2, ly, message != null && key != null ? t.errorText() : t.muted());
 				ly += font.lineHeight;
 			}
 		} else {
-			g.enableScissor(wellX, wellY + 1, wellX + wellW, wellY + wellH - 1);
-			int ly = wellY + 3 - (int) Math.round(scroll);
-			Hit hover = hitTest(mouseX, mouseY);
-			int tx0 = wellX + TEXT_X;
-			for (RLine l : lines) {
-				int lh = l.height();
-				if (ly + lh >= wellY && ly <= wellY + wellH) {
-					if (l.stripe() != 0) {
-						g.fill(wellX + STRIPE_X, ly, wellX + STRIPE_X + 2, ly + lh, l.stripe());
-					}
-					int lx = tx0 + l.indent();
-					if (l.background() != 0) {
-						g.fill(lx, ly, tx0 + textW, ly + lh, l.background());
-					}
-					if (l.rule()) {
-						g.fill(lx, ly + lh / 2, tx0 + textW, ly + lh / 2 + 1, ChatTheme.RULE);
-					}
-					if (l.separator() && !l.pieces().isEmpty()) {
-						// ── 14:05 ── centred, rules on both sides
-						TextWrap.Piece p = l.pieces().getFirst();
-						int mid = tx0 + textW / 2;
-						int half = p.width() / 2;
-						g.fill(tx0, ly + 4, mid - half - 5, ly + 5, ChatTheme.RULE);
-						g.fill(mid + half + 5, ly + 4, tx0 + textW, ly + 5, ChatTheme.RULE);
-						g.text(font, p.span().text(), mid - half, ly, l.color(), false);
-					} else {
-						boolean hot = hover != null && hover.line() == l && (l.toggleKey() != null || l.loadMore());
-						for (TextWrap.Piece p : l.pieces()) {
-							g.text(font, component(p.span(), hot ? ChatTheme.TEXT : l.color()), lx + p.x(), ly + 1, 0xFFFFFFFF, false);
-						}
-					}
-				}
-				ly += lh;
+			drawFeed(g, font, t, textW, mouseX, mouseY);
+		}
+
+		// ---- footer: key-cap hints
+		if (!compact) {
+			int fy = panel.bottom() - pad - footerH + 2;
+			String[] hs = hints;
+			while (hs.length > 2 && ChatDraw.hintsWidth(font, hs) > w) {
+				hs = java.util.Arrays.copyOf(hs, hs.length - 2);
 			}
-			g.disableScissor();
-			ThreadFeed.State fs = feed.state();
-			if (feed.transcript().view().entries().isEmpty()) {
-				String msg = fs.phase() == ThreadFeed.Phase.LIVE ? "No messages yet." : fs.detail();
-				g.centeredText(font, Component.literal(ChatDraw.clip(font, msg, wellW - 20)), wellX + wellW / 2, wellY + wellH / 2, ChatTheme.DIM);
-			}
-			int max = maxScroll();
-			if (max > 0) {
-				int track = wellH - 4;
-				int thumb = Math.max(10, (int) ((long) track * track / Math.max(contentHeight, 1)));
-				int ty = wellY + 2 + (int) ((track - thumb) * (scroll / max));
-				g.fill(wellX + wellW - 3, ty, wellX + wellW - 1, ty + thumb, ChatTheme.BORDER);
-			}
-			if (!stickToBottom && max > 0) {
-				String more = "↓ newer below (End)";
-				int mw = font.width(more) + 8;
-				ChatDraw.pill(g, font, more, wellX + wellW - mw - 8, wellY + wellH - 14, ChatTheme.KEYCAP_BG, ChatTheme.DIM);
-			}
-			if (hover != null && hover.url() != null) {
-				g.setTooltipForNextFrame(font, Component.literal("Click to copy: " + hover.url()), mouseX, mouseY);
+			if (ChatDraw.hintsWidth(font, hs) <= w) {
+				ChatDraw.hints(g, font, t, x, fy, hs);
 			}
 		}
 
-		// ---- prompt bar (disabled: read-only)
-		int by = y + h - PROMPT_H - 3;
-		boolean barHover = mouseX >= x + 3 && mouseX < x + w - 3 && mouseY >= by && mouseY < by + PROMPT_H;
-		g.fill(x + 3, by, x + w - 3, by + PROMPT_H, ChatTheme.WELL);
-		g.outline(x + 3, by, w - 6, PROMPT_H, barHover ? ChatTheme.BORDER : ChatTheme.RULE);
-		g.text(font, "›", x + 8, by + 4, ChatTheme.BORDER, false);
-		g.text(font, ChatDraw.clip(font, REPLY_HINT, w - 30), x + 16, by + 4, ChatTheme.DIM, false);
-		if (barHover) {
-			g.setTooltipForNextFrame(font, Component.literal(
-					"T3Craft is paired with orchestration:read only. Replying would need orchestration:operate, which is not enabled."), mouseX, mouseY);
+		// ---- command bar (disabled: read-only)
+		if (showPrompt) {
+			bar = new Rect(bounds.x(), bounds.bottom() - fieldH, bounds.w(), fieldH);
+			boolean hover = bar.contains(mouseX, mouseY);
+			ChatDraw.field(g, t, bar, false);
+			g.text(font, ">", bar.x() + 5, bar.y() + 5, t.brass(), false);
+			String hint = "read-only";
+			int hw = font.width(hint);
+			int room = bar.w() - 10 - font.width(">") - 4 - hw - 14;
+			String ph = ChatDraw.clip(font, compact ? "Read-only" : REPLY_HINT, Math.max(0, bar.w() - 10 - font.width(">") - 4));
+			g.text(font, ph, bar.x() + 5 + font.width(">") + 4, bar.y() + 5, t.ghost(), false);
+			if (!compact && font.width(ph) + 14 < room) {
+				g.text(font, hint, bar.right() - 6 - hw, bar.y() + 5, t.muted(), false);
+			}
+			if (hover) {
+				g.setTooltipForNextFrame(font, Component.literal(
+						"T3Craft is paired with orchestration:read only. Replying would need orchestration:operate, which is not enabled."), mouseX,
+						mouseY);
+			}
+		} else {
+			bar = Rect.EMPTY;
+		}
+	}
+
+	private String subtitle(ChatTranscript.@Nullable Status status, ThreadFeed.@Nullable State st) {
+		String env = envLabel.isBlank() ? envId : envLabel;
+		return env.isBlank() ? "" : "· " + env;
+	}
+
+	private static String connection(ThreadFeed.@Nullable State st) {
+		if (st == null) {
+			return "";
+		}
+		return switch (st.phase()) {
+			case LIVE -> "● live";
+			case FAILED -> "✖ " + st.detail();
+			default -> "⟳ " + st.detail();
+		};
+	}
+
+	private void drawFeed(GuiGraphicsExtractor g, Font font, ChatTheme t, int textW, int mouseX, int mouseY) {
+		ThreadFeed f = feed;
+		g.enableScissor(well.x() + 2, well.y() + 2, well.right() - 2, well.bottom() - 2);
+		int top = feedTop();
+		Hit hover = hitTest(mouseX, mouseY);
+		int tx0 = well.x() + TEXT_X;
+		int x1 = tx0 + textW;
+		for (Box b : boxes) {
+			int y0 = top + b.y0();
+			int y1 = top + b.y1();
+			if (y1 >= well.y() && y0 <= well.bottom()) {
+				ChatDraw.bubble(g, t, new Rect(tx0 + b.indent() - 2, y0, x1 - tx0 - b.indent() + 4, y1 - y0), ChatTheme.withAlpha(t.needsYou(), 40));
+			}
+		}
+		for (RLine l : lines) {
+			int ly = top + l.y();
+			int lh = l.h();
+			if (ly + lh < well.y() || ly > well.bottom()) {
+				continue;
+			}
+			if (l.sep() != null) {
+				ChatDraw.separator(g, font, t, l.sep(), well.x() + 6, well.right() - 10, ly + 1);
+				continue;
+			}
+			if (l.stripe() != 0) {
+				g.fill(well.x() + STRIPE_X, ly - (l.avatar() != null ? 1 : 0), well.x() + STRIPE_X + 2, ly + lh, l.stripe());
+			}
+			if (l.avatar() != null) {
+				g.fill(well.x() + AVATAR_X, ly, well.x() + AVATAR_X + 8, ly + 8, l.avatarColor());
+				g.text(font, l.avatar(), well.x() + AVATAR_X + (9 - font.width(l.avatar())) / 2, ly, t.panelHi(), false);
+			}
+			int lx = tx0 + l.indent();
+			if (l.bg() != 0) {
+				g.fill(lx, ly, x1, ly + lh, l.bg());
+			}
+			if (l.rule()) {
+				g.fill(lx, ly + lh / 2, x1, ly + lh / 2 + 1, t.edge());
+			}
+			if (l.caret() && ChatDraw.caretOn()) {
+				g.fill(tx0, ly, tx0 + 5, ly + 8, t.text());
+			}
+			int textY = ly + (lh - 8) / 2;
+			if (l.icon() != null) {
+				ChatDraw.toolIcon(g, font, t, l.icon(), lx - 15, ly + (lh - 12) / 2);
+			}
+			boolean hot = hover != null && hover.line() == l && (l.toggle() != null || l.loadMore());
+			for (TextWrap.Piece p : l.pieces()) {
+				int c = l.color();
+				if (l.icon() != null && p.span().italic() && !p.span().code()) {
+					// tool argument: AgentCraft draws it in tool_arg, upright
+					g.text(font, Component.literal(p.span().text()).withColor((hot ? t.text() : t.toolArg()) & 0xFFFFFF), lx + p.x(), textY,
+							0xFFFFFFFF, t.shadow());
+					continue;
+				}
+				if (hot) {
+					c = t.text();
+				}
+				g.text(font, component(p.span(), c, t), lx + p.x(), textY, 0xFFFFFFFF, t.shadow());
+			}
+		}
+		g.disableScissor();
+		if (f != null && f.transcript().view().entries().isEmpty()) {
+			ThreadFeed.State fs = f.state();
+			String msg = fs.phase() == ThreadFeed.Phase.LIVE ? "No messages yet." : fs.detail();
+			g.centeredText(font, Component.literal(ChatDraw.clip(font, msg, well.w() - 20)), well.x() + well.w() / 2, well.y() + well.h() / 2,
+					t.muted());
+		}
+		boolean barHover = mouseX >= well.right() - 8 && mouseX < well.right() - 2 && well.contains(mouseX, mouseY);
+		ChatDraw.scrollbar(g, t, well.right() - 8, well.y() + 2, well.h() - 4, scroll.content(), scroll.view(), scroll.fraction(), barHover);
+		if (!scroll.following() && scroll.scrollable()) {
+			String more = "↓ newer below";
+			int mw = font.width(more) + 10;
+			ChatDraw.pill(g, font, t, more, well.right() - 14 - mw, well.bottom() - 15, t.muted());
+		}
+		if (hover != null && hover.url() != null) {
+			g.setTooltipForNextFrame(font, Component.literal("Click to copy: " + hover.url()), mouseX, mouseY);
 		}
 	}
 }

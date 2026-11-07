@@ -4,15 +4,15 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Minimal integration point: where the unified thread list gets its rows. The default
- * ({@link ChatScreens#defaultDirectory()}) reads the NPC model of {@code T3CraftClient}, which is
- * the same filtered set the world shows. Another source (for example one with real activity
- * timestamps from the shell) can implement this. Called on the client thread.
+ * Where the unified thread list gets its rows. The default ({@link ChatScreens#defaultDirectory()})
+ * reads the direct-mode controller (every visible thread of every paired environment, with real
+ * activity timestamps) or, in bridge mode, the NPC model. Another source can implement this.
+ * Called on the client thread, once per tick while a list is shown: keep it cheap.
  */
 public interface ThreadDirectory {
 	/** Every known thread of every environment, any order (the list sorts them). */
 	List<ThreadRow> rows();
 
-	/** Environment id → {label, status wire, detail}, in display order (filter choices). */
-	Map<String, String[]> environments();
+	/** Environment id → info, in display order (filter chips). */
+	Map<String, ThreadList.EnvInfo> environments();
 }

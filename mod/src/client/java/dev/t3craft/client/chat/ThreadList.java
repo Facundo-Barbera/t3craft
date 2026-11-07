@@ -3,41 +3,48 @@ package dev.t3craft.client.chat;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Model of the unified thread list: one list across environments, sorted by attention then
- * activity, with an optional environment filter and a selection that follows the thread (by key)
- * when the list reorders. Pure Java, not thread-safe (client thread only).
+ * Model of the unified thread list: one list across every environment, sorted by attention then
+ * recent activity, with an environment filter (a set of hidden environments: environments are only
+ * a filter, never a section) and a selection that follows the thread (by key) when the list
+ * reorders. Pure Java, not thread-safe (client thread only).
  *
- * <p>Order: state priority (needs you → error → working → done → idle), then most recent activity
- * first (when known), then settled last, then title, then key (stable).
+ * <p>Order ({@link #ORDER}): {@link Attention} (needs you → error → approval pending → working →
+ * done → idle), then most recent activity first (unknown last), then active before settled, then
+ * title, then key (stable).
  */
 public final class ThreadList {
-	/** One environment as a filter choice. */
-	public record Env(String id, String label, String status, int threads, int attention) {
-		public EnvBadge badge() {
-			return EnvBadge.of(id, label);
-		}
+	/** One environment as a filter chip. */
+	public record Env(String id, String label, String status, int threads, int attention, EnvBadge badge) {
 	}
 
-	static final Comparator<ThreadRow> ORDER = Comparator.<ThreadRow>comparingInt(r -> r.state().priority)
+	/** Environment as given by the host: label, connection status wire, optional colour. */
+	public record EnvInfo(String label, String status, @Nullable Integer color) {
+	}
+
+	public static final Comparator<ThreadRow> ORDER = Comparator.<ThreadRow>comparingInt(r -> r.attention().ordinal())
 			.thenComparing(r -> r.activityMs() == null ? Long.MIN_VALUE : r.activityMs(), Comparator.reverseOrder())
 			.thenComparing(ThreadRow::settled)
-			.thenComparing(r -> r.title().toLowerCase(java.util.Locale.ROOT))
+			.thenComparing(r -> r.title().toLowerCase(Locale.ROOT))
 			.thenComparing(ThreadRow::key);
 
 	private List<ThreadRow> all = List.of();
 	private List<ThreadRow> visible = List.of();
 	private List<Env> envs = List.of();
-	private @Nullable String filter;
+	private Map<String, EnvBadge> badges = Map.of();
+	private Set<String> hidden = Set.of();
 	private @Nullable String selectedKey;
 
-	/** Replaces the rows (any order) and the environments (id → {label, status, detail}). */
-	public void update(List<ThreadRow> rows, Map<String, String[]> environments) {
+	/** Replaces the rows (any order) and the environments (id → info, display order). */
+	public void update(List<ThreadRow> rows, Map<String, EnvInfo> environments) {
 		List<ThreadRow> sorted = new ArrayList<>(rows);
 		sorted.sort(ORDER);
 		all = List.copyOf(sorted);
@@ -52,28 +59,33 @@ public final class ThreadList {
 			labels.putIfAbsent(r.env(), r.envLabel());
 		}
 		List<Env> out = new ArrayList<>();
-		for (Map.Entry<String, String[]> e : environments.entrySet()) {
-			String[] v = e.getValue();
+		Map<String, EnvBadge> b = new LinkedHashMap<>();
+		for (Map.Entry<String, EnvInfo> e : environments.entrySet()) {
+			EnvInfo v = e.getValue();
 			int[] c = counts.getOrDefault(e.getKey(), new int[2]);
-			out.add(new Env(e.getKey(), v.length > 0 ? v[0] : e.getKey(), v.length > 1 ? v[1] : "", c[0], c[1]));
+			String label = v.label() == null || v.label().isBlank() ? labels.getOrDefault(e.getKey(), e.getKey()) : v.label();
+			EnvBadge badge = EnvBadge.of(e.getKey(), label, v.color());
+			out.add(new Env(e.getKey(), label, v.status() == null ? "" : v.status(), c[0], c[1], badge));
+			b.put(e.getKey(), badge);
 			labels.remove(e.getKey());
 		}
 		// Environments that have rows but no status entry (bridge mode before its status arrives).
 		labels.forEach((id, label) -> {
 			int[] c = counts.get(id);
-			out.add(new Env(id, label, "", c[0], c[1]));
+			EnvBadge badge = EnvBadge.of(id, label);
+			out.add(new Env(id, label, "", c[0], c[1], badge));
+			b.put(id, badge);
 		});
 		envs = List.copyOf(out);
-		if (filter != null && envs.stream().noneMatch(e -> e.id().equals(filter))) {
-			filter = null;
-		}
+		badges = Map.copyOf(b);
 		refilter();
 	}
 
 	private void refilter() {
-		visible = filter == null ? all : all.stream().filter(r -> filter.equals(r.env())).toList();
+		visible = hidden.isEmpty() ? all : all.stream().filter(r -> !hidden.contains(r.env())).toList();
 	}
 
+	/** Every row of every environment, in display order. */
 	public List<ThreadRow> all() {
 		return all;
 	}
@@ -87,36 +99,70 @@ public final class ThreadList {
 		return envs;
 	}
 
-	public @Nullable String filter() {
-		return filter;
+	/** Badge of an environment (configured colour when known). */
+	public EnvBadge badge(ThreadRow r) {
+		EnvBadge b = badges.get(r.env());
+		return b != null ? b : EnvBadge.of(r.env(), r.envLabel());
 	}
 
-	public @Nullable Env filterEnv() {
-		return filter == null ? null : envs.stream().filter(e -> e.id().equals(filter)).findFirst().orElse(null);
+	// ---- filter -------------------------------------------------------------------------------
+
+	/**
+	 * Hidden environment ids. Unknown ids are kept (an environment can come back later, and the set
+	 * is what the config persists).
+	 */
+	public Set<String> hidden() {
+		return hidden;
 	}
 
-	/** {@code null} shows every environment. Unknown ids are ignored. */
-	public void setFilter(@Nullable String envId) {
-		if (envId != null && envs.stream().noneMatch(e -> e.id().equals(envId))) {
-			return;
-		}
-		filter = envId;
+	public void setHidden(Set<String> ids) {
+		hidden = Set.copyOf(new LinkedHashSet<>(ids));
 		refilter();
 	}
 
-	/** All → first env → … → last env → All ({@code dir} = ±1). */
-	public void cycleFilter(int dir) {
-		List<@Nullable String> choices = new ArrayList<>();
-		choices.add(null);
-		envs.forEach(e -> choices.add(e.id()));
-		int i = choices.indexOf(filter);
-		int n = choices.size();
-		setFilter(choices.get(Math.floorMod(i + (dir >= 0 ? 1 : -1), n)));
+	public boolean isShown(String envId) {
+		return !hidden.contains(envId);
 	}
 
-	public int attention() {
-		return (int) all.stream().filter(ThreadRow::needsAttention).count();
+	/** Shows or hides one environment. Hiding the last shown environment shows them all instead. */
+	public void toggle(String envId) {
+		Set<String> h = new LinkedHashSet<>(hidden);
+		if (!h.remove(envId)) {
+			h.add(envId);
+		}
+		if (!envs.isEmpty() && envs.stream().allMatch(e -> h.contains(e.id()))) {
+			h.clear();
+		}
+		setHidden(h);
 	}
+
+	/** Shows only {@code envId}; called again on the same one, shows every environment. */
+	public void solo(String envId) {
+		Set<String> h = new LinkedHashSet<>();
+		envs.forEach(e -> {
+			if (!e.id().equals(envId)) {
+				h.add(e.id());
+			}
+		});
+		boolean alreadySolo = envs.stream().allMatch(e -> e.id().equals(envId) ? !hidden.contains(e.id()) : hidden.contains(e.id()));
+		setHidden(alreadySolo ? Set.of() : h);
+	}
+
+	public void showAll() {
+		setHidden(Set.of());
+	}
+
+	/** True when at least one known environment is hidden. */
+	public boolean filtered() {
+		return envs.stream().anyMatch(e -> hidden.contains(e.id()));
+	}
+
+	/** Urgent threads (needs you, error, approval pending) among the visible ones. */
+	public int attention() {
+		return (int) visible.stream().filter(ThreadRow::needsAttention).count();
+	}
+
+	// ---- selection ----------------------------------------------------------------------------
 
 	public @Nullable String selectedKey() {
 		return selectedKey;
@@ -124,19 +170,15 @@ public final class ThreadList {
 
 	/** The selected row if it is visible under the current filter. */
 	public @Nullable ThreadRow selected() {
-		if (selectedKey == null) {
-			return null;
-		}
-		for (ThreadRow r : visible) {
-			if (r.key().equals(selectedKey)) {
-				return r;
-			}
-		}
-		return null;
+		int i = selectedIndex();
+		return i < 0 ? null : visible.get(i);
 	}
 
 	/** Index of the selection in {@link #visible()}, or -1. */
 	public int selectedIndex() {
+		if (selectedKey == null) {
+			return -1;
+		}
 		for (int i = 0; i < visible.size(); i++) {
 			if (visible.get(i).key().equals(selectedKey)) {
 				return i;

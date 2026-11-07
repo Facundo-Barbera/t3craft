@@ -12,7 +12,7 @@ import org.jspecify.annotations.Nullable;
  * {@code **bold**}, {@code *italic*}/{@code _italic_}, {@code `code`}, {@code [text](url)} and bare
  * {@code http(s)://} links. Anything else is kept as plain text. Never throws.
  *
- * <p>Pure Java (no Minecraft classes) so it is unit-tested; {@link ChatScreen} turns the result
+ * <p>Pure Java (no Minecraft classes) so it is unit-tested; {@link ConversationPanel} turns the result
  * into styled lines.
  */
 public final class Markdown {

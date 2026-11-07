@@ -1,18 +1,20 @@
 package dev.t3craft.client.chat;
 
 import java.util.Locale;
+import org.jspecify.annotations.Nullable;
 
 /**
- * The small environment marker shown on each thread row (T3 Code shows the environment only as
- * an icon per sidebar item). Short text (1-3 characters from the label) on a colour picked
- * deterministically from the environment id, so the same environment always looks the same.
- * Pure Java.
+ * The small environment icon shown on each thread row, like the environment icon of T3 Code's
+ * sidebar: one initial on a colour picked deterministically from the environment id (or the
+ * colour configured for it in {@code t3craft.json}), so the same environment always looks the
+ * same. Filter chips use the longer {@link #text()}. Pure Java.
  *
- * @param text       1-3 upper-case characters, e.g. "VPS" for "my-vps", "MF" for "Mini Acmesite"
+ * @param initial    one upper-case character, e.g. "V" for "my-vps", "M" for "Mini Acmesite"
+ * @param text       1-3 upper-case characters, e.g. "VPS", "MF"
  * @param background ARGB fill of the badge
  * @param foreground ARGB text colour readable on {@code background}
  */
-public record EnvBadge(String text, int background, int foreground) {
+public record EnvBadge(String initial, String text, int background, int foreground) {
 	/** Muted, distinguishable tones that sit well on the dark terminal palette. */
 	static final int[] PALETTE = {
 			0xFF2F7F8A, // teal
@@ -26,9 +28,23 @@ public record EnvBadge(String text, int background, int foreground) {
 	};
 
 	public static EnvBadge of(String envId, String label) {
+		return of(envId, label, null);
+	}
+
+	/** {@code rgb}: configured 0xRRGGBB colour of the environment, or null for the stable default. */
+	public static EnvBadge of(String envId, String label, @Nullable Integer rgb) {
 		String text = initials(label == null || label.isBlank() ? envId : label);
-		int bg = PALETTE[Math.floorMod(stableHash(envId == null ? "" : envId), PALETTE.length)];
-		return new EnvBadge(text, bg, 0xFFF2F2F2);
+		int bg = rgb != null ? 0xFF000000 | rgb : PALETTE[Math.floorMod(stableHash(envId == null ? "" : envId), PALETTE.length)];
+		return new EnvBadge(text.substring(0, text.offsetByCodePoints(0, 1)), text, bg, readableOn(bg));
+	}
+
+	/** Ink on light colours, near-white on dark ones (relative luminance threshold). */
+	static int readableOn(int argb) {
+		double r = ((argb >> 16) & 0xFF) / 255.0;
+		double g = ((argb >> 8) & 0xFF) / 255.0;
+		double b = (argb & 0xFF) / 255.0;
+		double lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+		return lum > 0.6 ? 0xFF1F1E1D : 0xFFF2F2F2;
 	}
 
 	/**
