@@ -139,6 +139,14 @@ public final class ThreadBrowser implements AutoCloseable {
 
 	/** Selects and opens a thread by key ({@code env:threadId}), even before it is listed. */
 	public void open(String key) {
+		open(key, "", "");
+	}
+
+	/**
+	 * Like {@link #open(String)}; {@code envLabel} and {@code title} fill the header when the thread
+	 * is not listed (an archived thread).
+	 */
+	public void open(String key, String envLabel, String title) {
 		model.select(key);
 		autoSelected = true;
 		ThreadRow r = model.find(key);
@@ -147,7 +155,7 @@ public final class ThreadBrowser implements AutoCloseable {
 		} else {
 			int colon = key.indexOf(':');
 			if (colon > 0 && colon < key.length() - 1) {
-				conversation.show(key.substring(0, colon), "", key.substring(colon + 1), "");
+				conversation.show(key.substring(0, colon), envLabel, key.substring(colon + 1), title);
 			}
 		}
 		compactConversation = true;

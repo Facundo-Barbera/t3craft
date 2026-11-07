@@ -14,6 +14,7 @@ queda exactamente como sin él.
 |---|---|---|
 | `t3craft:monitor` | `t3craft:monitor` (`MonitorBlockEntity`) | Bloque entero con `facing`. La cara frontal es una pantalla: título, estado con color y antigüedad, último mensaje. Click → abre el chat del hilo. |
 | `t3craft:status_lamp` | `t3craft:status_lamp` (`LampBlockEntity`) | Lámpara del escritorio: color y luz según el estado del hilo. |
+| `t3craft:archive_terminal` | `t3craft:archive_terminal` (`ArchiveTerminalBlockEntity`) | Consola de archivo (feat/archive-terminal): la pantalla muestra "ARCHIVE · N hilos" y los últimos 3; click → pantalla de archivo. En el HQ, en el anchor `archiveTerminal`. Ver `docs/feat-archive-terminal.md`. |
 | `t3craft:board_lamp` | el mismo tipo `t3craft:status_lamp` | Variante "bombilla del tablero": la i-ésima bombilla muestra el i-ésimo hilo que necesita al jugador (errores primero, luego "needs you"). |
 
 Ítems de bloque con el mismo id, en la pestaña propia **T3Craft** (`dev.t3craft.T3CraftTab`, única
@@ -79,7 +80,8 @@ de la posición en el plan del HQ; si tampoco, sin vincular. Determinista.
 - cada módulo: el dintel de su puerta (la viga del muro interior, una celda hacia el pasillo desde el
   ancla `module@<i>` y tres arriba) → bombilla `module:<k1>,<k2>…`, el hilo más urgente de los
   escritorios de ese módulo (claves ordenadas; apagada si el módulo está vacío);
-- anclas `archive_<threadId>` → monitor mirando al pasillo, vinculado al hilo archivado.
+- ancla `archiveTerminal` → la terminal de archivo (sin binding). Las celdas `archive_<threadId>` del
+  estante ya **no** son fixtures (feat/archive-terminal: el archivo vive solo en la terminal).
 
 Como las celdas de un escritorio dependen solo de (módulo, slot) y `HqLayout` es estable, la tabla es
 determinista e idempotente: el mismo roster en cualquier orden da la misma tabla (test con rosters
@@ -210,6 +212,59 @@ solo el origen se mide para la visibilidad (desde el centro de la pantalla, `scr
 suscribe, con el binding del origen. Todo el layout sale del extent: `MonitorLod.layout(level, extent)`,
 `nearLimit` (escala con el lado menor) y densidad 128/96 px por bloque. P1 se encarga de los block
 states conectados, los modelos de bisel y el cálculo del extent.
+
+### Pantallas grandes (feat/monitor-multiblock, P1 de `research/agentcraft-world-elements.md`)
+
+Monitores contiguos (arriba, abajo, izquierda o derecha vistos de frente) con **el mismo facing** forman
+un grupo (`MonitorWall`, puro). El grupo es **una sola pantalla** si:
+- llena exactamente su rectángulo (formas en L o con huecos → cada monitor sigue siendo 1×1);
+- mide como mucho 12 × 8 bloques;
+- sus bindings coinciden: todos los monitores vinculados tienen el mismo binding, y los sin vincular se
+  suman a cualquiera. Así dos escritorios o dos ranuras del archivo que se tocan (cada una con su hilo)
+  no se fusionan, y una pared puesta a mano (sin vincular) sí, y luego se vincula entera.
+
+Block states nuevos de `t3craft:monitor`: `up`, `down`, `left`, `right` (booleanos, vistos de frente:
+`left = facing.getClockWise()`), como en `PanelBlock` de AgentCraft. `true` = ese vecino es de la misma
+pantalla. El blockstate es multipart: `monitor_panel` (cubo con la pantalla sin bisel) más
+`monitor_edge_<lado>` (tira de bisel de 1 px de modelo, la misma que reserva `MonitorLod`) en cada lado
+no conectado. El ítem sigue usando `models/block/monitor.json` (con bisel completo).
+
+Actualización: el servidor recalcula **un tick después** de poner, quitar, girar o revincular un monitor
+(`onPlace`, `affectNeighborsAfterRemoval`, `MonitorBlockEntity.bindingChanged` → `scheduleTick` →
+`MonitorBlock.refresh`), para el grupo entero, y escribe solo los flags que cambian
+(`UPDATE_CLIENTS | UPDATE_KNOWN_SHAPE`, sin cascada). El retraso deja que el builder del HQ o una
+estructura carguen antes los datos del block entity (el binding). Las celdas sin cargar cuentan como
+vacías.
+
+Cliente: `MonitorBlock.extent(level, pos, state)` lee la pantalla desde los flags (`ScreenRect`: esquina
+superior izquierda, ancho × alto). `BlocksClient` instala el `ScreenExtent.Provider` de P2
+(`connectedExtent`): `null` para un monitor suelto; si no, el tamaño y si el bloque es el **inferior
+izquierdo** (`ScreenRect.bottomLeft()`, el origen de dibujo de P2). El renderer de P2 no cambia salvo
+dos ganchos: el binding de la pantalla (`BlocksClient.screenBinding`: la primera celda vinculada, el
+origen primero, con el fallback posicional) y el contenido de los feeds. El clic en cualquier celda abre
+lo que muestra la pantalla entera. `/t3craft blocks link` vincula **todas** las celdas de la pantalla
+que miras y acepta `project:<env:proyecto>`, `env:<envId>` o `thread:<key>` (sin prefijo = hilo).
+
+Contenido de una pantalla grande:
+- vinculada a un hilo: el log en vivo de P2 a su tamaño (`MonitorLod` reparte filas y columnas);
+- vinculada a un **proyecto** (`project:<groupId>`, el `groupId` de la NPC, `env:proyecto`) o a un
+  **entorno** (`env:<envId>`), bindings nuevos: `ProjectFeed`, una cabecera "▤ nombre · n active
+  threads" y los hilos activos (no archivados), el más urgente primero (needs you, error, working,
+  done, idle), con el título en el color de su estado y su último evento debajo (o en la misma línea si
+  no caben, y "+N more" si sobran). Memoizado por `MonitorScreens.revision()`.
+
+**Desde el plan del HQ** (para feat/hq-style-cherry): el generador reserva una pantalla con un ancla
+```java
+b.anchor(Anchor.face(AnchorNames.bigScreen("module@" + i, 3, 2, "project:" + projectKey), topLeft, facing));
+```
+(`bigscreen_<clave>@<w>x<h>=<binding>`; la clave es única y no lleva `=`; el bloque del ancla es la
+celda **superior izquierda** vista de frente y el facing es la normal de la pantalla) y pone un bloque
+sólido en cada celda (el módulo solo sustituye celdas existentes; sin módulo se quedan como estén).
+`HqBindings.screens(plan)` las lista; `HqBindings.of` da un `Fixture` `Role.SCREEN` por celda, todas con
+el binding de la pantalla, y `HqBlockFixtures` pone monitores con los flags que `MonitorWall` calcula
+sobre las celdas de monitor del plan (la misma regla que el mundo, así que la pantalla ya sale
+fusionada). `BuildPlan.withAnchors` añade anclas a un plan ya generado. `HqBlockFixtures.ID` pasa a
+`blocks-4` (junto con las placas de hq-blocks-kit; los mundos demo se actualizan).
 
 ## Lámparas
 
@@ -396,6 +451,11 @@ blockstates → modelos → texturas propias `kit_*`, ítems y loot tables).
   `MonitorVisibility`, `MonitorLog`, `MonitorLod`, `MonitorSettings`, `ScreenExtent`, `ScreenDraw`;
   lang `t3craft.blocks.monitor_status` (en_us, es_es, es_mx); config aditiva `blocks.monitor.*`.
   Sin registros de bloques ni datos nuevos.
+- feat/monitor-multiblock (**RESTART**): block states nuevos en `t3craft:monitor` (`up`, `down`, `left`,
+  `right`), blockstate multipart, modelos `monitor_panel` y `monitor_edge_{up,down,left,right}`, textura
+  `monitor_screen`; ticks programados del bloque; bindings nuevos `project:`/`env:`; `HqBlockFixtures.ID`
+  `blocks-4`; API nueva `AnchorNames.bigScreen/parseBigScreen`, `BuildPlan.withAnchors`,
+  `HqBindings.screens`/`Role.SCREEN`, `MonitorWall`, `ScreenRect`.
 
 ## Pendientes
 

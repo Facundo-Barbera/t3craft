@@ -52,8 +52,10 @@ import org.jspecify.annotations.Nullable;
  *       blinking caret while the agent works or a pulsing "needs you" line.</li>
  *   <li><b>FAR</b>: the face in the status colour, the status word as large as fits and the title.</li>
  * </ul>
- * Every layout decision takes the screen's {@link ScreenExtent} ({@link #extent}); today that is one
- * block, a connected panel only has to return its size there and draw from its origin block.
+ * Every layout decision takes the screen's {@link ScreenExtent} ({@link #extent}): monitors merged into
+ * one large screen ({@code MonitorWall}) give their size there and only the bottom-left cell draws.
+ * A screen bound to a project or environment ({@code project:}/{@code env:}) shows its
+ * {@link ProjectFeed} (header = feed title, rows = threads and their last event).
  *
  * <p><b>Visibility fixes</b> (the old screen vanished up close and was unreadable from afar): the
  * background is opaque geometry in the solid pass (no translucent sorting against the block face),
@@ -174,8 +176,9 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 	}
 
 	private Glyphs glyphsFor(MonitorBlockEntity be, MonitorLod.Layout layout) {
-		Binding b = client.resolve(be.getBlockPos(), be.binding());
-		MonitorScreens.Shown shown = client.screens().show(b);
+		// a merged screen shows its first bound cell's binding; a project/env feed is laid out at the screen's size
+		Binding b = client.screenBinding(be);
+		MonitorScreens.Shown shown = b.isFeed() ? client.screens().show(b, layout.cols(), layout.rows() + 1) : client.screens().show(b);
 		String key = b.kind() == Binding.Kind.THREAD ? b.value() : null;
 		MonitorFeeds.Feed feed = key == null ? null : client.feeds().feed(key);
 		ChatTranscript.View view = feed != null && feed.live() ? feed.transcript().view() : null;

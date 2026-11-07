@@ -25,8 +25,11 @@ import org.jspecify.annotations.Nullable;
  * The HQ adapter (an {@link HqFixtures}): swaps the vanilla fixtures of a generated plan for the
  * module's blocks, cell for cell, as listed by {@link HqBindings}: computers → monitors (facing the
  * chair or the aisle), desk bulbs → status lamps, board bulbs → board lamps, the hub lantern's cap
- * → the beacon (a status lamp bound {@code beacon}), and wall signs with text (module signs, the
- * board's header) → room plaques ({@link #plaque}). Each gets its binding as
+ * → the beacon (a status lamp bound {@code beacon}), the archive terminal's lectern → the archive
+ * terminal, the plan's large-screen cells → monitors, and wall signs with text (module signs, the
+ * board's header) → room plaques ({@link #plaque}). Monitors get the connection flags
+ * {@link MonitorWall} gives them over the plan's monitor cells (the same rule the world applies, so a
+ * built screen is already merged). Each gets its binding as
  * block entity data ({@code {"binding": "thread:<id>"}}), which the builders and the preview load with
  * {@code loadCustomOnly}. Positions, anchors and workstations are untouched, so NPCs, workstations
  * and HQ diffs see the same plan shape. Installed by {@link T3Blocks#init} only when the module is on.
@@ -36,9 +39,20 @@ public final class HqBlockFixtures implements HqFixtures {
 	public interface States {
 		BlockState monitor(Direction facing);
 
+		/** A monitor that is one cell of a screen ({@code sides}: neighbours in the same screen). Stand-ins may ignore it. */
+		default BlockState monitor(Direction facing, ScreenRect.Sides sides) {
+			return monitor(facing);
+		}
+
 		BlockState lamp();
 
 		BlockState boardLamp();
+
+		/** The archive terminal, screen facing {@code facing} (default: the vanilla lectern stand-in). */
+		default BlockState archiveTerminal(Direction facing) {
+			return net.minecraft.world.level.block.Blocks.LECTERN.defaultBlockState()
+					.setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING, facing);
+		}
 
 		/** Room plaque with its front towards {@code facing} (replaces the HQ's wall signs); null keeps the signs. */
 		default @Nullable BlockState plaque(Direction facing) {
@@ -58,7 +72,7 @@ public final class HqBlockFixtures implements HqFixtures {
 	}
 
 	/** Bump when the substitution changes (cells, blocks or binding format): demo worlds then update. */
-	public static final String ID = "blocks-3";
+	public static final String ID = "blocks-4";
 
 	@Override
 	public String id() {
@@ -71,6 +85,7 @@ public final class HqBlockFixtures implements HqFixtures {
 		for (HqBindings.Fixture f : HqBindings.of(plan)) {
 			fixtures.put(f.rel(), f);
 		}
+		Map<BlockPos, ScreenRect> screens = screens(fixtures);
 		Set<BlockPos> anchored = new HashSet<>();
 		for (Anchor a : plan.anchors().values()) {
 			anchored.add(a.block());
@@ -82,12 +97,33 @@ public final class HqBlockFixtures implements HqFixtures {
 				return plaque == null ? p : plaque;
 			}
 			BlockState s = switch (f.role()) {
-				case MONITOR -> states.monitor(f.facing());
+				case MONITOR, SCREEN -> {
+					ScreenRect e = screens.get(f.rel());
+					yield e == null ? states.monitor(f.facing()) : states.monitor(f.facing(), e.sides(f.rel()));
+				}
 				case LAMP, BEACON -> states.lamp();
 				case BOARD_LAMP -> states.boardLamp();
+				case ARCHIVE_TERMINAL -> states.archiveTerminal(f.facing());
 			};
 			return new Placement(p.rel(), s, data(f.binding()));
 		});
+	}
+
+	/** The screen of every monitor fixture, by the world's rule ({@link MonitorWall}) over the plan's monitor cells. */
+	static Map<BlockPos, ScreenRect> screens(Map<BlockPos, HqBindings.Fixture> fixtures) {
+		MonitorWall.Lookup lookup = p -> {
+			HqBindings.Fixture f = fixtures.get(p);
+			return f != null && (f.role() == HqBindings.Role.MONITOR || f.role() == HqBindings.Role.SCREEN)
+					? new MonitorWall.Cell(f.facing(), f.binding().wire()) : null;
+		};
+		java.util.List<BlockPos> seeds = new java.util.ArrayList<>();
+		for (HqBindings.Fixture f : fixtures.values()) {
+			if (f.role() == HqBindings.Role.MONITOR || f.role() == HqBindings.Role.SCREEN) {
+				seeds.add(f.rel());
+			}
+		}
+		seeds.sort(java.util.Comparator.comparingLong(BlockPos::asLong)); // deterministic walk
+		return MonitorWall.resolve(lookup, seeds);
 	}
 
 	/**
