@@ -40,11 +40,14 @@ Config (aditiva, todas las claves son opcionales):
 `NpcRegistry` guarda lo que mandan las fuentes en un `StationRoster`, que aplica la política al
 recibir datos y cada 10 s (así un `done` suelta el puesto cuando le toca, aunque no cambie nada más).
 
-- `npcs.all()` devuelve **solo los hilos con puesto**. De ahí leen el NPC y su nametag, las
-  workstations (`WorkstationClient`), el HQ del demo, el portable y `hq-preview`. Un hilo que suelta
-  el puesto pierde NPC, nametag y pantallas en el siguiente tick.
-- `npcs.released()` devuelve los hilos que soltaron el puesto, marcados `settled = true`. Solo los
-  consume el roster del HQ, que los manda al **archivo**.
+- `npcs.stationed()` devuelve **solo los hilos con puesto**. De ahí salen el NPC y su nametag (el
+  registro solo crea esos), las workstations (`WorkstationClient`) y los escritorios. Un hilo que
+  suelta el puesto pierde NPC, nametag y pantallas en el siguiente tick.
+- `npcs.released()` devuelve los hilos que soltaron el puesto, marcados `settled = true`, y
+  `npcs.hqRoster()` = `stationed()` + `released()` es el roster del HQ: el del demo, el de site
+  (`HqConstructionClient.liveRoster`) y el de `hq-preview`. Los liberados van al **archivo**.
+- `npcs.all()` no cambia: es todo lo que manda la fuente. Lo siguen usando el chat, la búsqueda,
+  operate, la barra de estado, el portable y los bindings de bloques, porque no son puestos.
 - En el modo directo, `T3CraftClient.refreshDirect` pasa la última actividad real de cada hilo
   (`Visibility.lastActivity` de su `ThreadShell`).
 
@@ -130,7 +133,9 @@ remociones ni quitaba escritorios).
 
 ## Pendiente / notas
 
-- feat/hq-construction (HQ de site): usar `HqDiff.between(...)` con `HqDiff.restoring(snapshot…)` y
-  el mismo roster (`npcs.all()` + `npcs.released()`), detrás de `RosterGate`.
+- feat/hq-construction (HQ de site) entró a main mientras se hacía este fix. Su diff ya restaura el
+  snapshot del sitio (`CellChange.restore`), y su `liveRoster` ahora usa `npcs.hqRoster()`, así que
+  la política le llega sin tocar su orquestación. Su propia espera de sync (todos los entornos en
+  "ok") sigue igual. `HqDiff`/`RosterGate` quedan disponibles si quiere unificar.
 - Si un entorno no conecta nunca, el HQ de un mundo ya construido no se reconcilia (a propósito) y
   los NPC no reciben los anchors del HQ hasta que conecte.

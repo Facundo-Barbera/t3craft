@@ -108,7 +108,7 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 			helpers().tick(mc, npcs::avatar);
 		});
 		T3CraftCommands.register(this);
-		dev.t3craft.hq.HqPreviewCommand.register(npcs::all); // feat/hq-design: /t3craft debug hq-preview
+		dev.t3craft.hq.HqPreviewCommand.register(npcs::hqRoster); // feat/hq-design: /t3craft debug hq-preview
 		PeekHud.register();
 		dev.t3craft.client.hud.StatusBar.register(this); // feat/hud-bar
 		PortableClient.register(this);
@@ -132,6 +132,19 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 				dev.t3craft.client.chat.ChatScreens.openFor(info);
 			}
 			return InteractionResult.SUCCESS;
+		});
+		// Left-click on an NPC toggles its detail panel (compact labels). Our entities are unknown
+		// to the server, so the attack is consumed client-side.
+		net.fabricmc.fabric.api.event.player.AttackEntityCallback.EVENT.register((player, level, hand, entity, hit) -> {
+			if (!level.isClientSide()) {
+				return InteractionResult.PASS;
+			}
+			String threadId = npcs.threadFor(entity);
+			if (threadId == null) {
+				return InteractionResult.PASS;
+			}
+			npcs.toggleDetail(threadId);
+			return InteractionResult.FAIL;
 		});
 	}
 

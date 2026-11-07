@@ -11,7 +11,6 @@ import dev.t3craft.client.T3CraftClient;
 import dev.t3craft.client.T3CraftCommands;
 import dev.t3craft.client.config.ConfigManager;
 import dev.t3craft.client.debug.GuardedEvents;
-import dev.t3craft.hq.HqAnchorSource;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -467,9 +466,7 @@ public final class DemoClient implements ClientModInitializer {
 			return List.of();
 		}
 		// Stationed threads get desks; released ones (settled, archived, done and inactive) only go to the archive.
-		List<dev.t3craft.client.npc.NpcInfo> out = new java.util.ArrayList<>(c.npcs().all());
-		out.addAll(c.npcs().released());
-		return out;
+		return c.npcs().hqRoster();
 	}
 
 	/** Once the HQ is in the world, NPCs walk to their desks in it (feat/hq-design's {@code HqAnchorSource}). */
@@ -479,9 +476,10 @@ public final class DemoClient implements ClientModInitializer {
 			return;
 		}
 		DemoWorldSpec spec = activeConfig.spec();
-		HqAnchorSource anchors = h.anchors(new BlockPos(spec.originX(), spec.originY(), spec.originZ()));
-		if (anchors != null) {
-			c.npcs().behavior().setAnchorSource(anchors);
+		// feat/hq-construction: one place plugs the HQ into NPCs (no ring fallback) and workstations
+		dev.t3craft.client.hq.HqPresence.Standing standing = h.standing(new BlockPos(spec.originX(), spec.originY(), spec.originZ()));
+		if (standing != null) {
+			dev.t3craft.client.hq.HqPresence.demo(standing);
 			anchorsInstalled = true;
 		}
 	}
@@ -489,7 +487,7 @@ public final class DemoClient implements ClientModInitializer {
 	private void clearAnchors() {
 		T3CraftClient c = T3CraftClient.get();
 		if (anchorsInstalled && c != null) {
-			c.npcs().behavior().setAnchorSource(null);
+			dev.t3craft.client.hq.HqPresence.demo(null);
 		}
 		anchorsInstalled = false;
 	}

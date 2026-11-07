@@ -75,6 +75,11 @@ public final class StationRoster {
 		return changed;
 	}
 
+	/** Everything the source shows (stationed or not), in source order. */
+	public List<NpcInfo> all() {
+		return List.copyOf(incoming.values());
+	}
+
 	/** Threads that hold a station (NPC, nametag, desk, screens), in source order. */
 	public List<NpcInfo> stationed() {
 		return stationed;
