@@ -63,6 +63,16 @@ final class VanillaDemoWorld {
 		mc.disconnectFromWorld(ClientLevel.DEFAULT_QUIT_MESSAGE);
 	}
 
+	/** The {@code saves/} directory. */
+	static Path savesDir(Minecraft mc) {
+		return mc.getLevelSource().getBaseDir();
+	}
+
+	/** Minecraft's own {@code backups/} directory (next to {@code saves/}). */
+	static Path backupDir(Minecraft mc) {
+		return mc.getLevelSource().getBackupPath();
+	}
+
 	static Path worldRoot(MinecraftServer server) {
 		return server.getWorldPath(LevelResource.ROOT).toAbsolutePath().normalize();
 	}
