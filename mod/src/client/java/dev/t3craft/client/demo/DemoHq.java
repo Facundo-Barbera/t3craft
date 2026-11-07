@@ -62,8 +62,21 @@ public final class DemoHq {
 	// ---- roster -------------------------------------------------------------------------------
 
 	public static Roster chooseRoster(Collection<NpcInfo> live) {
-		HqInput in = fromNpcs(live);
-		return in.projects().isEmpty() ? new Roster(sample(), true) : new Roster(in, false);
+		return chooseRoster(live, dev.t3craft.client.hq.HqRooms.current(), System.currentTimeMillis());
+	}
+
+	/**
+	 * fix/hq-rooms-real: only projects with real activity within the window get a room
+	 * ({@link dev.t3craft.client.hq.HqRooms}), and the example roster is used <b>only</b> when no
+	 * environment is paired. With environments paired an empty roster is an empty HQ (hub only),
+	 * never the fixed example (its "telar (vps)" room was showing up in real HQs).
+	 */
+	public static Roster chooseRoster(Collection<NpcInfo> live, dev.t3craft.client.hq.HqRooms.Context rooms, long nowMs) {
+		HqInput in = fromNpcs(dev.t3craft.client.hq.HqRooms.filter(live, rooms, nowMs));
+		if (in.projects().isEmpty() && !rooms.paired()) {
+			return new Roster(sample(), true);
+		}
+		return new Roster(in, false);
 	}
 
 	/** Every NPC shown (all environments), grouped by neighbourhood ({@code groupId} = env:project). */
