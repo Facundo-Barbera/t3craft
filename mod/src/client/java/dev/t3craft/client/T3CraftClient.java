@@ -113,6 +113,7 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 		dev.t3craft.client.hud.StatusBar.register(this); // feat/hud-bar
 		PortableClient.register(this);
 		dev.t3craft.client.search.SearchClient.register(this); // feat/search: /t3craft search
+		dev.t3craft.client.queue.QueueClient.register(this); // feat/op-queue: /t3craft queue, QueueScreen
 
 		// Right-click on one of our client-only NPCs opens its chat screen. The entity is unknown to
 		// the server, so the interaction is consumed client-side.
@@ -217,7 +218,7 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 		HelperDirector h = helpers;
 		if (h == null) {
 			helpers = h = new HelperDirector();
-			npcs.setPanelExtra(h::panelExtra);
+			npcs.setPanelExtra(dev.t3craft.client.queue.QueueClient.withBadge(h::panelExtra)); // feat/op-queue: + "⏳ n queued"
 		}
 		return h;
 	}
