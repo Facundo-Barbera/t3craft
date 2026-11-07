@@ -222,26 +222,6 @@ class ChatTranscriptTest {
 	}
 
 	@Test
-	void subscribeFrameAndHistoryUri() {
-		JsonObject f = json(ThreadFeed.subscribeFrame("1", T, -1));
-		assertEquals("Request", f.get("_tag").getAsString());
-		assertEquals("orchestration.subscribeThread", f.get("tag").getAsString());
-		JsonObject p = f.getAsJsonObject("payload");
-		assertEquals(T, p.get("threadId").getAsString());
-		assertTrue(p.get("requestCompletionMarker").getAsBoolean());
-		assertTrue(p.get("acceptBoundedSnapshot").getAsBoolean());
-		assertFalse(p.has("afterSequence"));
-		assertEquals(42, json(ThreadFeed.subscribeFrame("2", T, 42)).getAsJsonObject("payload").get("afterSequence").getAsLong());
-		// Read-only: never a dispatch.
-		assertFalse(ThreadFeed.subscribeFrame("1", T, -1).contains("dispatchCommand"));
-
-		URI u = ThreadFeed.historyUri(URI.create("https://host:3773"), "th/1 x", "a+b/c=");
-		assertEquals("https://host:3773/api/orchestration/threads/th%2F1%20x/history?cursor=a%2Bb%2Fc%3D", u.toString());
-		URI ws = ThreadFeed.socketUri(URI.create("http://127.0.0.1:3773"), "t+/=");
-		assertEquals("ws://127.0.0.1:3773/ws?orchestrationProtocol=2&wsTicket=t%2B%2F%3D", ws.toString());
-	}
-
-	@Test
 	void agoFormatting() {
 		assertEquals("5 s ago", ChatTranscript.ago(5_000));
 		assertEquals("3 min ago", ChatTranscript.ago(180_000));

@@ -37,8 +37,8 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Reusable widget: the read-only conversation of one T3 thread, drawn as an AgentCraft console in
- * any rectangle with any {@link ChatTheme}. Owns the live {@link ThreadFeed} of the thread it shows
- * (one at a time): {@link #show} switches threads, {@link #close()} drops the socket. No dependency
+ * any rectangle with any {@link ChatTheme}. Owns the {@link ThreadFeed} of the thread it shows
+ * (one at a time): {@link #show} switches threads, {@link #close()} releases its subscription. No dependency
  * on a particular Screen: the host forwards render, input and tick.
  *
  * <pre>{@code
@@ -216,11 +216,12 @@ public final class ConversationPanel implements AutoCloseable {
 		message = null;
 		resetView();
 		try {
-			ChatSource.Endpoint endpoint = source.endpoint(envId);
+			ChatSource.Env env = source.env(envId);
 			if (envLabel.isBlank()) {
-				this.envLabel = endpoint.label();
+				this.envLabel = env.label();
 			}
-			feed = new ThreadFeed(endpoint, threadId, source.http(), () -> {
+			// shared, refcounted subscription on the environment's connection (no socket of our own)
+			feed = new ThreadFeed(env, threadId, () -> {
 			});
 			feed.start();
 		} catch (ChatSource.Unavailable e) {

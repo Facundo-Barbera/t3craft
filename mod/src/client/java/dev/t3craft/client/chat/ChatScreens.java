@@ -5,13 +5,11 @@ import dev.t3craft.client.config.ConfigManager;
 import dev.t3craft.client.config.T3CraftSettings;
 import dev.t3craft.client.npc.NpcInfo;
 import dev.t3craft.t3.DirectController;
-import dev.t3craft.t3.Environments;
 import dev.t3craft.t3.NpcView;
-import dev.t3craft.t3.Pairing;
 import dev.t3craft.t3.ShellState;
+import dev.t3craft.t3.T3Connection;
 import dev.t3craft.t3.ThreadShell;
 import dev.t3craft.t3.Visibility;
-import java.net.http.HttpClient;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -165,37 +163,22 @@ public final class ChatScreens {
 		};
 	}
 
-	/** Reads environments and credentials from the direct-mode controller of {@link T3CraftClient}. */
+	/**
+	 * The environments of the direct-mode controller of {@link T3CraftClient}: each one is its single
+	 * {@code T3Connection} (thread streams are shared subscriptions on it).
+	 */
 	public static ChatSource defaultSource() {
-		return new ChatSource() {
-			@Override
-			public Endpoint endpoint(String envId) throws Unavailable {
-				T3CraftClient client = T3CraftClient.get();
-				DirectController direct = client == null ? null : client.direct();
-				if (direct == null) {
-					throw new Unavailable("Chat history needs direct mode (set \"mode\": \"direct\" and /t3craft pair).");
-				}
-				Environments envs = direct.environments();
-				Environments.Environment env = envs.list().stream().filter(e -> e.id().equals(envId)).findFirst().orElse(null);
-				if (env == null) {
-					throw new Unavailable("Environment \"" + envId + "\" is not paired (/t3craft pair).");
-				}
-				Pairing.Session s = envs.credential(envId);
-				if (s == null) {
-					throw new Unavailable("No credential for " + env.label() + ": pair again (/t3craft pair).");
-				}
-				if (s.expiresAtMs() > 0 && s.expiresAtMs() < System.currentTimeMillis()) {
-					throw new Unavailable("The session for " + env.label() + " expired: pair again (/t3craft pair).");
-				}
-				return new Endpoint(env.id(), env.label(), env.url(), s.accessToken());
+		return envId -> {
+			T3CraftClient client = T3CraftClient.get();
+			DirectController direct = client == null ? null : client.direct();
+			if (direct == null) {
+				throw new ChatSource.Unavailable("Chat history needs direct mode (set \"mode\": \"direct\" and /t3craft pair).");
 			}
-
-			@Override
-			public @Nullable HttpClient http() {
-				T3CraftClient client = T3CraftClient.get();
-				DirectController direct = client == null ? null : client.direct();
-				return direct == null ? null : direct.http();
+			T3Connection c = direct.connection(envId);
+			if (c == null) {
+				throw new ChatSource.Unavailable("Environment \"" + envId + "\" is not paired (/t3craft pair).");
 			}
+			return ChatSource.of(c);
 		};
 	}
 }
