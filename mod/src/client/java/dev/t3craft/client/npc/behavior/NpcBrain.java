@@ -237,6 +237,14 @@ public final class NpcBrain {
 	}
 
 	/**
+	 * Waiting out a failed route (no route, gave up after being stuck, no way to the player): a change
+	 * of the world is a reason to try again right away ({@code BehaviorDirector.replanAffected}).
+	 */
+	public boolean waitingForRoute() {
+		return noRoute > 0 || retryAt > tick || stuckEpisodes > 0 || approachStuck;
+	}
+
+	/**
 	 * Come to the player: in ATTENTION, walk to {@code spot} instead of the board slot (null = go back
 	 * to the normal spot). Call before {@link #tick}. Walks only; if there is no route the NPC stays
 	 * where it is and gestures at the player.

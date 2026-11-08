@@ -309,7 +309,9 @@ public final class DemoClient implements ClientModInitializer {
 			server.execute(() -> VanillaDemoWorld.teleportToViewpoint(server, name, cfg.spec()));
 			delay = TELEPORT_DELAY;
 		}
-		clearAnchors(); // NPCs keep to the ring layout while the HQ changes
+		if (clearsAnchorsBeforeBuild(quiet)) {
+			clearAnchors(); // NPCs keep to the ring layout while the HQ is (re)built from scratch
+		}
 		run = new DemoBuildRun(source, plans, root, cfg, delay, quiet ? m -> T3Craft.LOGGER.info("[demo] {}", m) : this::say,
 				() -> installAnchors(source));
 		String msg = "building HQ: " + source.id() + " v" + source.version() + ", " + plans.size() + " part(s)";
@@ -318,6 +320,17 @@ public final class DemoClient implements ClientModInitializer {
 		} else {
 			say(msg);
 		}
+	}
+
+	/**
+	 * fix/npc-position-reset: an automatic reconcile (a thread took or released a station) keeps the
+	 * standing HQ's anchors while the diff is built. Clearing them sent every NPC back to the
+	 * provisional grid (their first spot) each time a new agent appeared; now the newcomer waits in the
+	 * hub until its desk stands, and once the new plan is installed only NPCs whose spot moved re-plan.
+	 * A manual build or rebuild still clears them.
+	 */
+	static boolean clearsAnchorsBeforeBuild(boolean quiet) {
+		return !quiet;
 	}
 
 	private void status() {
