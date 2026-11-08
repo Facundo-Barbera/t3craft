@@ -94,6 +94,14 @@ public final class HqRender {
 		Files.createDirectories(out);
 		BlockModels models = new BlockModels();
 		String sid = style.id();
+		if (sid.equals("vertical")) {
+			// layout/vertical: towers, bridges and podium for 4, 10 and 20 projects (VerticalRender)
+			VerticalRender.run(models, style, out, only, scaleMul, ss, npcs);
+			for (String p : models.problems) {
+				System.out.println("note: " + p);
+			}
+			return;
+		}
 		if (style.ownLayout() || !projects.isEmpty()) {
 			CampusViews.render(models, style, out, projects.isEmpty() ? List.of(4, 10, 20) : projects, only, scaleMul, ss, npcs);
 			for (String p : models.problems) {

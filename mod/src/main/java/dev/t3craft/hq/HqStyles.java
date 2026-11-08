@@ -17,7 +17,7 @@ import org.jspecify.annotations.Nullable;
  * section of {@code config/t3craft.json} (read-only here; the client's ConfigStore keeps unknown
  * sections on save, so this key survives without this class ever writing):
  * <pre>{@code
- * "hq": { "style": "cherry" }     // cherry (default) | classic | campus (own layout: CampusStyle)
+ * "hq": { "style": "cherry" }     // cherry (default) | classic | campus | ring | vertical (own layouts)
  * }</pre>
  * Absent file, section or key: {@link #DEFAULT_ID}. Unknown id: the default plus a warning.
  */
@@ -32,9 +32,9 @@ public final class HqStyles {
 	/**
 	 * Styles with their own layout ({@link HqStyle#ownLayout()}): selectable by id like the others,
 	 * but not in {@link #all()}, which lists the styles that paint the shared spine geometry.
-	 * layout/campus: {@link CampusStyle}; layout/ring: {@link RingStyle}.
+	 * layout/campus: {@link CampusStyle}; layout/ring: {@link RingStyle}; layout/vertical: {@link VerticalStyle}.
 	 */
-	private static final List<HqStyle> LAYOUTS = List.of(new CampusStyle(), new RingStyle());
+	private static final List<HqStyle> LAYOUTS = List.of(new CampusStyle(), new RingStyle(), new VerticalStyle());
 	private static volatile @Nullable HqStyle active;
 
 	private HqStyles() {
