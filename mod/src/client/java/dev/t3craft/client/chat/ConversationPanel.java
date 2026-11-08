@@ -693,6 +693,11 @@ public final class ConversationPanel implements AutoCloseable {
 		scroll.toBottom();
 	}
 
+	/** True while the feed follows the newest line (a thread just opened starts there). */
+	public boolean followingNewest() {
+		return scroll.following();
+	}
+
 	/** PgUp/PgDn page the feed, Home/End jump. Arrows and Tab are left to the host. */
 	public boolean keyPressed(KeyEvent event) {
 		int page = Math.max(theme.row(), well.h() - 6 - theme.row());
@@ -738,7 +743,7 @@ public final class ConversationPanel implements AutoCloseable {
 
 	/** Click: header ‹ ›, copy a link, load earlier messages, fold/unfold a tool run or step. */
 	public boolean mouseClicked(double mx, double my, int button) {
-		if (button != 0 || !contains(mx, my)) {
+		if (!MouseButtons.isLeft(button) || !contains(mx, my)) {
 			return false;
 		}
 		if (nav != null && my >= navY && my < navY + 12) {
