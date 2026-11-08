@@ -54,6 +54,48 @@ import net.minecraft.world.level.block.state.BlockState;
  * {@code --layout hybrid-ringcampus} renders that hybrid's own gallery ({@link RingCampusViews}, default 4,10,20).
  * {@code --packs DIR} (feat/hq-layout-packs) generates with the layout packs in {@code DIR} (the game's
  * {@code config/t3craft/hq-layouts}): materials, parameters and {@code .nbt} rooms, exactly as in game.
+ *
+ * <h2>Pieces and report (tools/hq-piece-views)</h2>
+ * A region, module, group or anchor flag switches to <b>piece mode</b>: instead of the whole HQ it draws
+ * just that box (see {@link PieceViews}) and writes {@code report.txt} / {@code report.json} (see
+ * {@link PlanReport}) next to the PNGs. The plan is the one of {@code --layout} (default
+ * {@code hybrid-ringcampus}, the citadel) grown through {@code --projects} (default 10; give the chain,
+ * e.g. {@code 4,10,20}, to grow it the way the game does).
+ *
+ * <pre>
+ * ./gradlew hqRender -PhqArgs="--region -10,0,-10:10,12,10 --scale 0.5 --ss 1"
+ * ./gradlew hqRender -PhqArgs="--module module_3 --out build/hq-after --compare build/hq-before"
+ * ./gradlew hqRender -PhqArgs="--anchor walk_hub_0 --radius 12"
+ * ./gradlew hqRender -PhqArgs="--report-only"          # report of the whole plan, no images
+ * </pre>
+ *
+ * <ul>
+ *   <li>{@code --region x1,y1,z1:x2,y2,z2}: that box (plan-relative, inclusive, corners in any order).</li>
+ *   <li>{@code --module ID}: a module of the BuildPlan by id ({@code BuildPlan.modules()}), padded by
+ *   {@code --pad N} (default 1) blocks.</li>
+ *   <li>{@code --group NAME}: the blocks a group owns ({@code hub}, {@code module_3}…), same padding.</li>
+ *   <li>{@code --anchor NAME [--radius N]}: a cube of radius N (default 10) around an anchor; an
+ *   unambiguous part of the name is enough.</li>
+ *   <li>Views written, as {@code NAME_iso_se|iso_ne|iso_nw|iso_sw.png} (four corners), {@code NAME_plan.png}
+ *   (cut at {@code --cut-y Y}, default 5 above the base) and {@code NAME_section.png} (vertical cut through
+ *   the middle, or at {@code --section-at N}). {@code --name NAME} sets the prefix; {@code --only plan,iso}
+ *   keeps just views whose suffix contains one of the words.</li>
+ *   <li>{@code --scale F}: <b>in piece mode</b> multiplies the automatic fit (about 1100 px across the
+ *   piece, so 1 = full detail, 0.5 = small preview); {@code --ss 1} turns supersampling off for speed.</li>
+ *   <li>{@code --compare DIR}: after the run, for every PNG written here, the image of the same name in DIR
+ *   (before) next to the new one (after) as {@code compare_NAME.png}, and {@code compare.txt} with the
+ *   pixel difference and whether both {@code report.json} have the same plan signature. Works with any
+ *   mode.</li>
+ *   <li>Report: {@code --report-only} (no images; the whole plan unless a target is given),
+ *   {@code --no-report}, {@code --no-ticks} (skip the build simulation), {@code --ticks-limit N}
+ *   (entries above which it is skipped, default 600000), {@code --crew N} (builders, default 4),
+ *   {@code --bpt N} (blocks per tick, default 48), {@code --low-light N} (default 10).
+ *   {@code --report} alone is piece mode on the whole plan.</li>
+ * </ul>
+ *
+ * From Java (the render service): {@link #bootstrap}, then {@link PlanSource#plan} and
+ * {@link PieceViews#open()}{@code .render(plan, request)}; {@link PlanReport#analyze} and {@link ImageCompare#run}
+ * are public too.
  */
 public final class HqRender {
 	private HqRender() {
@@ -62,17 +104,59 @@ public final class HqRender {
 	private record View(String name, String title, Renderer.Clip clip, Renderer.Camera cam) {
 	}
 
+	/**
+	 * Boots Minecraft's registries (no game, no window) and installs the mod's render blocks, or the
+	 * vanilla fixtures with {@code vanilla}. Call once per JVM before anything that makes a plan.
+	 */
+	public static void bootstrap(boolean vanilla) throws ReflectiveOperationException {
+		SharedConstants.tryDetectVersion();
+		Bootstrap.bootStrap();
+		if (!vanilla) {
+			dev.t3craft.blocks.RenderBlocks.install();
+		} else {
+			HqFixtures.use(null);
+		}
+	}
+
+	/** Runs {@link #render} and then, with {@code --compare DIR}, puts the images side by side with those of DIR. */
 	public static void main(String[] args) throws Exception {
+		long started = System.currentTimeMillis() - 2000;
+		Path compare = null;
+		Path outDir = Path.of("build/hq-render");
+		List<String> rest = new ArrayList<>();
+		for (int i = 0; i < args.length; i++) {
+			if (args[i].equals("--compare") && i + 1 < args.length) {
+				compare = Path.of(args[++i]);
+				continue;
+			}
+			if (args[i].equals("--out") && i + 1 < args.length) {
+				outDir = Path.of(args[i + 1]);
+			}
+			rest.add(args[i]);
+		}
+		render(rest.toArray(new String[0]));
+		if (compare != null) {
+			ImageCompare.run(compare, outDir, started);
+		}
+	}
+
+	private static void render(String[] args) throws Exception {
 		Path out = Path.of("build/hq-render");
 		String styleId = null;
 		List<String> only = new ArrayList<>();
-		double scaleMul = 1.6;
+		Double scaleOpt = null;
 		int ss = 2;
 		boolean vanilla = false;
 		boolean npcs = true;
 		List<Integer> projects = new ArrayList<>();
 		String layoutId = null;
 		Path packs = null;
+		// piece mode (tools/hq-piece-views)
+		PieceViews.Target target = null;
+		PieceViews.Request piece = new PieceViews.Request();
+		int radius = 0;
+		String anchorName = null;
+		boolean pieceMode = false;
 		for (int i = 0; i < args.length; i++) {
 			switch (args[i]) {
 				case "--out" -> out = Path.of(args[++i]);
@@ -80,7 +164,7 @@ public final class HqRender {
 				case "--layout" -> layoutId = args[++i];
 				case "--packs" -> packs = Path.of(args[++i]);
 				case "--only" -> only.addAll(List.of(args[++i].split(",")));
-				case "--scale" -> scaleMul = Double.parseDouble(args[++i]);
+				case "--scale" -> scaleOpt = Double.parseDouble(args[++i]);
 				case "--ss" -> ss = Integer.parseInt(args[++i]);
 				case "--vanilla" -> vanilla = true;
 				case "--no-npcs" -> npcs = false;
@@ -89,15 +173,62 @@ public final class HqRender {
 						projects.add(Integer.parseInt(n.trim()));
 					}
 				}
+				case "--region" -> {
+					target = PieceViews.Target.region(args[++i]);
+					pieceMode = true;
+				}
+				case "--module" -> {
+					target = PieceViews.Target.module(args[++i]);
+					pieceMode = true;
+				}
+				case "--group" -> {
+					target = PieceViews.Target.group(args[++i]);
+					pieceMode = true;
+				}
+				case "--anchor" -> {
+					anchorName = args[++i];
+					pieceMode = true;
+				}
+				case "--radius" -> radius = Integer.parseInt(args[++i]);
+				case "--name" -> piece.name = args[++i];
+				case "--pad" -> piece.pad = Integer.parseInt(args[++i]);
+				case "--cut-y" -> piece.cutY = Integer.parseInt(args[++i]);
+				case "--section-at" -> piece.sectionAt = Integer.parseInt(args[++i]);
+				case "--report" -> pieceMode = true;
+				case "--report-only" -> {
+					piece.views = false;
+					pieceMode = true;
+				}
+				case "--no-report" -> piece.report = false;
+				case "--no-ticks" -> piece.reportOptions.ticks = false;
+				case "--ticks-limit" -> piece.reportOptions.ticksLimit = Integer.parseInt(args[++i]);
+				case "--crew" -> piece.reportOptions.crew = Integer.parseInt(args[++i]);
+				case "--bpt" -> piece.reportOptions.blocksPerTick = Double.parseDouble(args[++i]);
+				case "--low-light" -> piece.reportOptions.lowLight = Integer.parseInt(args[++i]);
 				default -> throw new IllegalArgumentException("unknown option " + args[i]);
 			}
 		}
-		SharedConstants.tryDetectVersion();
-		Bootstrap.bootStrap();
-		if (!vanilla) {
-			dev.t3craft.blocks.RenderBlocks.install();
-		} else {
-			HqFixtures.use(null);
+		double scaleMul = scaleOpt == null ? 1.6 : scaleOpt;
+		bootstrap(vanilla);
+		if (pieceMode) {
+			// tools/hq-piece-views: one box of the plan (or all of it) with its report
+			if (anchorName != null) {
+				target = PieceViews.Target.anchor(anchorName, radius);
+			}
+			piece.target = target == null ? PieceViews.Target.whole() : target;
+			piece.out = out;
+			piece.only = only;
+			piece.ss = ss;
+			piece.npcs = npcs;
+			piece.scale = scaleOpt == null ? 1.0 : scaleOpt;
+			if (packs != null) {
+				dev.t3craft.hq.pack.HqLayoutPacks.Load l = dev.t3craft.hq.pack.HqLayoutPacks.reload(packs);
+				for (String e : l.errors()) {
+					System.out.println("pack: " + e);
+				}
+			}
+			PieceViews.run(layoutId, projects, piece);
+			return;
 		}
 		if (packs != null) {
 			// feat/hq-layout-packs: the same folder the game reads (config/t3craft/hq-layouts), so a pack edit shows here first

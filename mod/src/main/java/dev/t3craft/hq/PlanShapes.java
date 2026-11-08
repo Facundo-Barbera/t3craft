@@ -68,7 +68,7 @@ final class PlanShapes {
 		}
 	}
 
-	private static LevelAccessor view(Map<Long, BlockState> cells) {
+	static LevelAccessor view(Map<Long, BlockState> cells) {
 		BlockState air = Blocks.AIR.defaultBlockState();
 		RandomSource random = RandomSource.create(0L);
 		InvocationHandler h = (proxy, m, args) -> {
