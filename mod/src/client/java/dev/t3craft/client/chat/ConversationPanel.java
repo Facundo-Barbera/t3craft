@@ -8,7 +8,9 @@
 // the decision screen's header navigation (decisions/DecisionScreen.java: ‹ n/N › key caps).
 package dev.t3craft.client.chat;
 
+import com.mojang.blaze3d.Blaze3D;
 import com.mojang.blaze3d.platform.InputConstants;
+import com.mojang.blaze3d.platform.cursor.CursorTypes;
 import dev.t3craft.client.chat.ChatEntry.Kind;
 import dev.t3craft.client.chat.ChatTurns.Block;
 import dev.t3craft.client.chat.ChatTurns.Message;
@@ -16,9 +18,13 @@ import dev.t3craft.client.chat.ChatTurns.Role;
 import dev.t3craft.client.chat.ChatTurns.ToolRun;
 import dev.t3craft.client.chat.ChatTurns.Turn;
 import dev.t3craft.client.chat.Markdown.Span;
+import dev.t3craft.client.t3ui.sidebar.Spinner;
 import dev.t3craft.t3.ThreadState;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -29,6 +35,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.toasts.SystemToast;
+import net.minecraft.client.gui.screens.ConfirmLinkScreen;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.network.chat.Component;
@@ -58,7 +66,9 @@ import org.jspecify.annotations.Nullable;
  * the command bar (ready when the environment can operate; read-only shows an "Enable control" button). In the feed every
  * turn has a colour stripe and an avatar (clay "you", the agent colour for the agent), consecutive
  * tool calls are one collapsed line ("4 steps · $, Edit, Search") that unfolds into AgentCraft monitor
- * tool lines, each of which unfolds its output; Markdown is rendered; links copy on click.
+ * tool lines, each of which unfolds its output; Markdown is rendered. Links (feat/chat-links): a T3
+ * thread link is a chip with the thread's state and title and opens it ({@link ThreadLinks}), a web
+ * link opens the browser after the vanilla confirmation, a file path is copied.
  * {@link #setCompact(boolean) Compact} drops the footer and the second header line for small hosts.
  */
 public final class ConversationPanel implements AutoCloseable {
@@ -104,6 +114,15 @@ public final class ConversationPanel implements AutoCloseable {
 		List<ChatEntry> entries();
 
 		long version();
+	}
+
+	/**
+	 * What a click on a {@code t3-thread://} link does (feat/chat-links). The T3 screen selects the
+	 * thread in place; without one the panel opens the T3 screen on it ({@link #defaultOpenThread}).
+	 */
+	public interface ThreadLinks {
+		/** Opens {@code ref}; {@code row} is its row in the thread list, null when the list does not have it. */
+		void open(Links.ThreadRef ref, @Nullable ThreadRow row);
 	}
 
 	/** Thread navigation shown as ‹ n/N › key caps in the header (AgentCraft decision queue). */
@@ -160,6 +179,21 @@ public final class ConversationPanel implements AutoCloseable {
 		}
 	};
 	private @Nullable Font tableFont;
+
+	// thread links (feat/chat-links)
+	/** Leading glyph of a thread chip; its place gets the thread's state dot or spinner. */
+	static final String CHIP = "●";
+	private static final int CHIP_MAX_CHARS = 48;
+	private @Nullable ThreadLinks threadLinks;
+	/** Where thread links find titles and states; null = {@link ChatScreens#defaultDirectory()}. */
+	private @Nullable ThreadDirectory directory;
+	/** Rows the url → row memo was built from (the directory hands back the same list while unchanged). */
+	private @Nullable List<ThreadRow> linkRows;
+	private final Map<String, @Nullable ThreadRow> rowByUrl = new HashMap<>();
+	/** Chip labels used by the current layout (thread url → label): relayout when one changes. */
+	private Map<String, String> chipLabels = new HashMap<>();
+	private Map<String, String> buildingChips = new HashMap<>();
+	private @Nullable List<ThreadRow> chipRows;
 
 	// layout cache
 	private List<RLine> lines = List.of();
@@ -306,6 +340,18 @@ public final class ConversationPanel implements AutoCloseable {
 	public void setExtra(@Nullable Extra e) {
 		extra = e;
 		layoutDirty = true;
+	}
+
+	/** Handler of thread-link clicks; null opens the T3 screen on the thread. */
+	public void setThreadLinks(@Nullable ThreadLinks h) {
+		threadLinks = h;
+	}
+
+	/** Source of the titles and states of linked threads; null = the default directory. */
+	public void setDirectory(@Nullable ThreadDirectory d) {
+		directory = d;
+		linkRows = null;
+		chipRows = null;
 	}
 
 	public void setNavigation(@Nullable Navigation n) {
@@ -458,6 +504,18 @@ public final class ConversationPanel implements AutoCloseable {
 			show(e, l, th, ti);
 			return;
 		}
+		if (!chipLabels.isEmpty()) {
+			List<ThreadRow> rows = threadRows();
+			if (rows != chipRows) {
+				chipRows = rows;
+				for (Map.Entry<String, String> e : chipLabels.entrySet()) {
+					if (!chipLabel(e.getKey()).equals(e.getValue())) {
+						layoutDirty = true; // a linked thread got its title (or a new one)
+						break;
+					}
+				}
+			}
+		}
 		ChatTranscript.View v = f.transcript().view();
 		ThreadFeed.State st = f.state();
 		if (scroll.atTop() && !scroll.following() && v.hasMoreHistory() && !st.loadingOlder() && st.olderError() == null) {
@@ -530,6 +588,7 @@ public final class ConversationPanel implements AutoCloseable {
 		}
 		Long prevAt = null;
 		long now = System.currentTimeMillis();
+		buildingChips = new HashMap<>();
 		List<ChatEntry> all = v.entries();
 		if (extra != null) {
 			List<ChatEntry> more = extra.entries();
@@ -553,6 +612,8 @@ public final class ConversationPanel implements AutoCloseable {
 		}
 		lines = L.out;
 		boxes = L.bx;
+		chipLabels = buildingChips;
+		chipRows = threadRows();
 		int newHeight = L.y;
 		firstKey = v.entries().isEmpty() ? null : v.entries().getFirst().key();
 		if (oldFirst != null && firstKey != null && !oldFirst.equals(firstKey)) {
@@ -736,15 +797,15 @@ public final class ConversationPanel implements AutoCloseable {
 			switch (b) {
 				case Markdown.Heading hd -> {
 					int c = hd.level() <= 2 ? t.text() : t.muted();
-					List<Span> spans = hd.spans().stream().map(s -> new Span(s.text(), true, s.italic(), s.code(), s.url())).toList();
+					List<Span> spans = decorate(hd.spans()).stream().map(s -> new Span(s.text(), true, s.italic(), s.code(), s.url())).toList();
 					wrapped(L, spans, indent, w, c, stripe);
 				}
-				case Markdown.Paragraph p -> wrapped(L, p.spans(), indent, w, color, stripe);
+				case Markdown.Paragraph p -> wrapped(L, decorate(p.spans()), indent, w, color, stripe);
 				case Markdown.ListItem li -> {
 					int ind = indent + li.depth() * 10;
 					String marker = li.marker() + " ";
 					int mw = L.font.width(marker);
-					List<TextWrap.Line> wr = TextWrap.wrap(li.spans(), w - (ind - indent) - mw, s -> measure(L.font, s));
+					List<TextWrap.Line> wr = TextWrap.wrap(decorate(li.spans()), w - (ind - indent) - mw, s -> measure(L.font, s));
 					for (int i = 0; i < wr.size(); i++) {
 						List<TextWrap.Piece> pieces = new ArrayList<>();
 						if (i == 0) {
@@ -760,11 +821,11 @@ public final class ConversationPanel implements AutoCloseable {
 				case Markdown.Quote q -> {
 					List<Span> spans = new ArrayList<>();
 					spans.add(Span.plain("│ "));
-					q.spans().forEach(s -> spans.add(new Span(s.text(), s.bold(), true, s.code(), s.url())));
+					decorate(q.spans()).forEach(s -> spans.add(new Span(s.text(), s.bold(), true, s.code(), s.url())));
 					wrapped(L, spans, indent, w, t.muted(), stripe);
 				}
 				case Markdown.Rule r -> L.add(7, indent, List.of(), color, stripe, 0, null, 0, null, null, false, null, true, false);
-				case Markdown.Table tb -> table(L, tb, indent, w, color, stripe);
+				case Markdown.Table tb -> table(L, decorate(tb), indent, w, color, stripe);
 			}
 			prev = b;
 		}
@@ -854,16 +915,252 @@ public final class ConversationPanel implements AutoCloseable {
 		}
 	}
 
+	// ---- links (feat/chat-links) --------------------------------------------------------------------
+
+	private List<ThreadRow> threadRows() {
+		try {
+			ThreadDirectory d = directory;
+			if (d == null) {
+				directory = d = ChatScreens.defaultDirectory();
+			}
+			return d.rows();
+		} catch (RuntimeException | LinkageError e) {
+			return List.of(); // headless renders: no client, no list
+		}
+	}
+
+	/** Row of a thread link, memoized per directory list. */
+	private @Nullable ThreadRow rowFor(String url) {
+		List<ThreadRow> rows = threadRows();
+		if (rows != linkRows) {
+			linkRows = rows;
+			rowByUrl.clear();
+		}
+		if (rowByUrl.containsKey(url)) {
+			return rowByUrl.get(url);
+		}
+		Links.ThreadRef ref = Links.thread(url);
+		ThreadRow r = ref == null ? null : Links.find(rows, ref);
+		rowByUrl.put(url, r);
+		return r;
+	}
+
+	/** Chip text of a thread link: the thread's title, else "thread 1a2b3c4d". */
+	private String chipLabel(String url) {
+		Links.ThreadRef ref = Links.thread(url);
+		if (ref == null) {
+			return url;
+		}
+		ThreadRow r = rowFor(url);
+		String label = r != null && !r.title().isBlank() ? r.title().strip() : I18n.get("t3craft.chat.link.thread", Links.shortId(ref.threadId()));
+		return label.length() > CHIP_MAX_CHARS ? label.substring(0, CHIP_MAX_CHARS - 1).strip() + "…" : label;
+	}
+
+	/**
+	 * Thread links become chips: the raw url (autolink, bare) is replaced by the thread's title, a
+	 * labelled link keeps its label; both start with {@link #CHIP}, where the state is drawn.
+	 */
+	private List<Span> decorate(List<Span> spans) {
+		boolean any = false;
+		for (Span s : spans) {
+			if (Links.kind(s.url()) == Links.Kind.THREAD) {
+				any = true;
+				break;
+			}
+		}
+		if (!any) {
+			return spans;
+		}
+		List<Span> out = new ArrayList<>(spans.size());
+		String prev = null;
+		for (Span s : spans) {
+			String u = s.url();
+			if (u != null && Links.kind(u) == Links.Kind.THREAD && !u.equals(prev)) {
+				String label = chipLabel(u);
+				buildingChips.put(u, label);
+				String text = s.text().equals(u) ? label : s.text();
+				out.add(s.withText(CHIP + " " + text));
+			} else {
+				out.add(s);
+			}
+			prev = u;
+		}
+		return out;
+	}
+
+	private Markdown.Table decorate(Markdown.Table tb) {
+		boolean any = tb.header().stream().anyMatch(c -> c.stream().anyMatch(s -> Links.kind(s.url()) == Links.Kind.THREAD))
+				|| tb.rows().stream().anyMatch(r -> r.stream().anyMatch(c -> c.stream().anyMatch(s -> Links.kind(s.url()) == Links.Kind.THREAD)));
+		if (!any) {
+			return tb;
+		}
+		List<List<Span>> header = new ArrayList<>();
+		tb.header().forEach(c -> header.add(List.copyOf(decorate(c))));
+		List<List<List<Span>>> rows = new ArrayList<>();
+		for (List<List<Span>> r : tb.rows()) {
+			List<List<Span>> cells = new ArrayList<>();
+			r.forEach(c -> cells.add(List.copyOf(decorate(c))));
+			rows.add(List.copyOf(cells));
+		}
+		return new Markdown.Table(tb.aligns(), List.copyOf(header), List.copyOf(rows));
+	}
+
+	/** State of a linked thread in a {@code w} px slot: spinner while it runs, else the sidebar's dot. */
+	private static void drawThreadState(GuiGraphicsExtractor g, ChatTheme t, @Nullable ThreadRow r, int x, int y, int w) {
+		int dx = x + Math.max(0, (w - 7) / 2);
+		if (r == null) {
+			ChatDraw.dot(g, t, "idle", ChatTheme.withAlpha(t.muted(), 160), dx, y);
+		} else if (r.state() == ThreadState.WORKING && r.attention() != Attention.NEEDS_YOU) {
+			Spinner.draw(g, x + (w - Spinner.SIZE) / 2, y, t.working());
+		} else if (r.needsAttention()) {
+			ChatDraw.pulsingDot(g, t, ChatTheme.family(r.state()), t.color(r.state()), dx, y);
+		} else {
+			ChatDraw.dot(g, t, ChatTheme.family(r.state()), t.color(r.state()), dx, y);
+		}
+	}
+
+	private Component linkTooltip(String url) {
+		return switch (Links.kind(url)) {
+			case THREAD -> {
+				Links.ThreadRef ref = Links.thread(url);
+				ThreadRow r = rowFor(url);
+				if (ref == null) {
+					yield Component.literal(url);
+				}
+				if (r == null) {
+					yield Component.literal(I18n.get("t3craft.chat.link.thread_unknown_tip", Links.shortId(ref.threadId())));
+				}
+				String env = r.envLabel().isBlank() ? r.env() : r.envLabel();
+				String extra = (r.project().isBlank() ? "" : " · " + r.project()) + (env.isBlank() ? "" : " · " + env) + " · " + r.state().word;
+				yield Component.literal(I18n.get("t3craft.chat.link.thread_tip", chipLabel(url)) + extra);
+			}
+			case WEB -> Component.literal(I18n.get("t3craft.chat.link.web_tip", url));
+			case FILE -> Component.literal(I18n.get("t3craft.chat.link.file_tip", Links.filePath(url)));
+			case OTHER -> Component.literal(I18n.get("t3craft.chat.link.file_tip", url));
+		};
+	}
+
+	/** Click on a link: thread → open it, web → browser (vanilla confirmation), file → copy the path. */
+	private void openLink(String url) {
+		Minecraft mc = Minecraft.getInstance();
+		switch (Links.kind(url)) {
+			case THREAD -> {
+				Links.ThreadRef ref = Links.thread(url);
+				if (ref == null) {
+					copyLink(mc, url);
+					return;
+				}
+				ThreadRow row = Links.find(threadRows(), ref);
+				ThreadLinks h = threadLinks;
+				if (h != null) {
+					h.open(ref, row);
+				} else {
+					defaultOpenThread(directory, ref, row);
+				}
+			}
+			case WEB -> openWeb(mc, url);
+			case FILE -> {
+				String path = Links.filePath(url);
+				mc.keyboardHandler.setClipboard(path);
+				toast(mc, I18n.get("t3craft.chat.link.path_copied"), path);
+			}
+			case OTHER -> copyLink(mc, url);
+		}
+	}
+
+	/** As a chat link: off in the chat settings → copied; "prompt on links" → vanilla confirmation. */
+	private static void openWeb(Minecraft mc, String url) {
+		URI uri;
+		try {
+			uri = new URI(url);
+		} catch (URISyntaxException e) {
+			copyLink(mc, url);
+			return;
+		}
+		if (!mc.options.chatLinks().get()) {
+			copyLink(mc, url);
+			return;
+		}
+		if (mc.options.chatLinksPrompt().get()) {
+			Screen back = mc.gui.screen();
+			mc.gui.setScreen(new ConfirmLinkScreen(open -> {
+				if (open) {
+					Blaze3D.openUri(uri);
+				}
+				mc.gui.setScreen(back);
+			}, uri, false));
+		} else {
+			Blaze3D.openUri(uri);
+		}
+	}
+
+	private static void copyLink(Minecraft mc, String url) {
+		mc.keyboardHandler.setClipboard(url);
+		toast(mc, I18n.get("t3craft.chat.link.link_copied"), url);
+	}
+
+	private static void toast(Minecraft mc, String title, String detail) {
+		SystemToast.addOrUpdate(mc.gui.toastManager(), COPIED, Component.literal(title),
+				Component.literal(detail.length() > 60 ? detail.substring(0, 59) + "…" : detail));
+	}
+
+	/** Without a {@link ThreadLinks} host: the T3 screen opened on the thread. */
+	public static void defaultOpenThread(@Nullable ThreadDirectory dir, Links.ThreadRef ref, @Nullable ThreadRow row) {
+		if (row != null && row.threadId() != null) {
+			ChatScreens.open(row.env(), row.threadId());
+			return;
+		}
+		String env = unlistedEnv(dir, ref);
+		if (env != null) {
+			ChatScreens.open(env, ref.threadId());
+		}
+	}
+
+	/**
+	 * Environment to ask for a thread the list does not have (archived, not loaded yet): the link's own
+	 * environment when it is one of ours, the only environment when there is just one (links name T3's
+	 * environment id, not necessarily this mod's slug for it). Otherwise null after a toast: the thread
+	 * belongs to an environment that is not paired here, or there is none.
+	 */
+	public static @Nullable String unlistedEnv(@Nullable ThreadDirectory dir, Links.ThreadRef ref) {
+		Map<String, ThreadList.EnvInfo> envs = Map.of();
+		try {
+			if (dir != null) {
+				envs = dir.environments();
+			}
+		} catch (RuntimeException e) {
+			envs = Map.of();
+		}
+		if (!ref.envId().isEmpty() && envs.containsKey(ref.envId())) {
+			return ref.envId();
+		}
+		if (envs.size() == 1) {
+			return envs.keySet().iterator().next();
+		}
+		Minecraft mc = Minecraft.getInstance();
+		if (envs.isEmpty() || ref.envId().isEmpty()) {
+			toast(mc, I18n.get("t3craft.chat.link.thread_missing"), I18n.get("t3craft.chat.link.thread_missing_detail", Links.shortId(ref.threadId())));
+		} else {
+			toast(mc, I18n.get("t3craft.chat.link.thread_other_env"), I18n.get("t3craft.chat.link.thread_other_env_detail", ref.envId()));
+		}
+		return null;
+	}
+
 	private static int measure(Font font, Span s) {
 		return font.width(component(s, 0xFFFFFFFF, null));
 	}
 
 	private static MutableComponent component(Span s, int color, @Nullable ChatTheme t) {
+		return component(s, color, t, false);
+	}
+
+	/** Links in the link colour, underlined when {@code underline} (the hovered link). */
+	private static MutableComponent component(Span s, int color, @Nullable ChatTheme t, boolean underline) {
 		Style style = s.code() ? MONO : Style.EMPTY;
 		style = style.withBold(s.bold()).withItalic(s.italic());
 		int c = color;
 		if (t != null && s.url() != null) {
-			style = style.withUnderlined(true);
+			style = style.withUnderlined(underline);
 			c = t.link();
 		} else if (t != null && s.code() && color != t.codeText() && color != t.addFg() && color != t.delFg() && color != t.link()) {
 			c = t.inlineCode();
@@ -938,7 +1235,7 @@ public final class ConversationPanel implements AutoCloseable {
 		return null;
 	}
 
-	/** Click: header ‹ ›, copy a link, load earlier messages, fold/unfold a tool run or step. */
+	/** Click: header ‹ ›, open a link, load earlier messages, fold/unfold a tool run or step. */
 	public boolean mouseClicked(double mx, double my, int button) {
 		if (!MouseButtons.isLeft(button) || !contains(mx, my)) {
 			return false;
@@ -970,10 +1267,7 @@ public final class ConversationPanel implements AutoCloseable {
 			return bar.contains(mx, my);
 		}
 		if (hit.url() != null) {
-			Minecraft mc = Minecraft.getInstance();
-			mc.keyboardHandler.setClipboard(hit.url());
-			SystemToast.addOrUpdate(mc.gui.toastManager(), COPIED, Component.literal("Link copied"),
-					Component.literal(hit.url().length() > 60 ? hit.url().substring(0, 59) + "…" : hit.url()));
+			openLink(hit.url());
 			return true;
 		}
 		if (hit.line().loadMore() && feed != null) {
@@ -1206,6 +1500,7 @@ public final class ConversationPanel implements AutoCloseable {
 		g.enableScissor(well.x() + 2, well.y() + 2, well.right() - 2, well.bottom() - 2);
 		int top = feedTop();
 		Hit hover = hitTest(mouseX, mouseY);
+		String hoverUrl = hover == null ? null : hover.url();
 		int tx0 = well.x() + TEXT_X;
 		int x1 = tx0 + textW;
 		for (Box b : boxes) {
@@ -1252,6 +1547,22 @@ public final class ConversationPanel implements AutoCloseable {
 			boolean hot = hover != null && hover.line() == l && (l.toggle() != null || l.loadMore());
 			for (TextWrap.Piece p : l.pieces()) {
 				int c = l.color();
+				String u = p.span().url();
+				if (u != null) {
+					boolean under = u.equals(hoverUrl);
+					if (Links.kind(u) == Links.Kind.THREAD && p.span().text().startsWith(CHIP)) {
+						// thread chip: the state where the glyph is, then the title
+						int dw = measure(font, p.span().withText(CHIP));
+						drawThreadState(g, t, rowFor(u), lx + p.x(), textY, dw);
+						String rest = p.span().text().substring(CHIP.length());
+						if (!rest.isEmpty()) {
+							g.text(font, component(p.span().withText(rest), c, t, under), lx + p.x() + dw, textY, 0xFFFFFFFF, t.shadow());
+						}
+					} else {
+						g.text(font, component(p.span(), c, t, under), lx + p.x(), textY, 0xFFFFFFFF, t.shadow());
+					}
+					continue;
+				}
 				if (l.icon() != null && p.span().italic() && !p.span().code()) {
 					// tool argument: AgentCraft draws it in tool_arg, upright
 					g.text(font, Component.literal(p.span().text()).withColor((hot ? t.text() : t.toolArg()) & 0xFFFFFF), lx + p.x(), textY,
@@ -1296,7 +1607,8 @@ public final class ConversationPanel implements AutoCloseable {
 			ChatDraw.pill(g, font, t, more, well.right() - 14 - mw, well.bottom() - 15, t.muted());
 		}
 		if (hover != null && hover.url() != null) {
-			g.setTooltipForNextFrame(font, Component.literal("Click to copy: " + hover.url()), mouseX, mouseY);
+			g.requestCursor(CursorTypes.POINTING_HAND);
+			g.setTooltipForNextFrame(font, linkTooltip(hover.url()), mouseX, mouseY);
 		} else if (hover != null && hover.line().grid() != null && hover.line().grid().tips() != null) {
 			// table cell cut with "…": its full text
 			Grid gr = hover.line().grid();
