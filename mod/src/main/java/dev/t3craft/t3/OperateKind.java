@@ -37,7 +37,15 @@ public enum OperateKind {
 	QUEUE_REORDER(false),
 	/** Cancel a queued run ({@code queued-run.*}). Item 24. */
 	QUEUE_CANCEL(true),
-	THREAD_ARCHIVE(true);
+	THREAD_ARCHIVE(true),
+	/**
+	 * feat/t3-actions: change a thread's model / effort, runtime mode or plan mode
+	 * ({@code thread.model-selection.set}, {@code thread.runtime-mode.set},
+	 * {@code thread.interaction-mode.set}).
+	 */
+	THREAD_CONFIGURE(false),
+	/** feat/t3-actions: register a project ({@code projects.mutate} with {@code project.create}). */
+	PROJECT_CREATE(false);
 
 	public final boolean destructive;
 	/** Stable lower-case id for the audit log and lang keys, e.g. {@code thread_stop}. */

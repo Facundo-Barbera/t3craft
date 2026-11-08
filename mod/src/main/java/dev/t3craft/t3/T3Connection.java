@@ -184,6 +184,20 @@ public final class T3Connection {
 		});
 	}
 
+	/** feat/t3-actions: RPC tag of the read-only server configuration (providers and their models). */
+	public static final String SERVER_GET_CONFIG = "server.getConfig";
+
+	/**
+	 * feat/t3-actions: {@code server.getConfig} (scope {@code orchestration:read}): the
+	 * {@code ServerConfig}, whose {@code providers} list the provider instances and their models.
+	 */
+	public CompletableFuture<JsonObject> getServerConfig() {
+		return streams.call(SERVER_GET_CONFIG, new JsonObject()).thenApply(values -> {
+			JsonElement last = values.isEmpty() ? null : values.getLast();
+			return last != null && last.isJsonObject() ? last.getAsJsonObject() : new JsonObject();
+		});
+	}
+
 	/** {@code orchestration.getThreadProjection}: the thread's full projection (read once). */
 	public CompletableFuture<JsonObject> getThreadProjection(String threadId) {
 		JsonObject p = new JsonObject();
