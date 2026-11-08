@@ -12,6 +12,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Reads and writes {@code config/t3craft.json}. Pure java.nio + Gson (no Minecraft), so it is
@@ -102,6 +103,27 @@ public final class ConfigStore {
 			broken = false;
 		}
 		JsonObject out = ConfigCodec.encode(s, raw);
+		write(out);
+		raw = out;
+		return true;
+	}
+
+	/** A top-level key of the last loaded file as is (a copy), or null; for keys owned outside {@link T3CraftSettings}. */
+	public synchronized @Nullable JsonElement raw(String key) {
+		JsonElement e = raw.get(key);
+		return e == null ? null : e.deepCopy();
+	}
+
+	/**
+	 * Sets one top-level key owned outside {@link T3CraftSettings} (e.g. {@code hqLayout}) and writes
+	 * the file; later {@link #save}s keep it. False when the file is read-only (newer schema).
+	 */
+	public synchronized boolean putRaw(String key, JsonElement value) throws IOException {
+		if (fromFuture) {
+			return false;
+		}
+		JsonObject out = raw.deepCopy();
+		out.add(key, value.deepCopy());
 		write(out);
 		raw = out;
 		return true;

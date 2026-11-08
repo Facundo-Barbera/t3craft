@@ -115,6 +115,26 @@ public final class ConfigManager {
 		return r;
 	}
 
+	/** A top-level key owned outside {@link T3CraftSettings} (e.g. {@code hqLayout}), as last loaded or put; null if absent. */
+	public com.google.gson.@Nullable JsonElement extra(String key) {
+		return store.raw(key);
+	}
+
+	/** Sets and saves a top-level key owned outside {@link T3CraftSettings}; listeners are notified. */
+	public synchronized SaveResult putExtra(String key, com.google.gson.JsonElement value) {
+		SaveResult r;
+		try {
+			r = store.putRaw(key, value)
+					? new SaveResult(true, "Saved " + store.file().getFileName())
+					: new SaveResult(false, store.file().getFileName() + " was written by a newer T3Craft: not overwritten");
+		} catch (IOException e) {
+			r = new SaveResult(false, "Could not save " + store.file().getFileName() + ": " + e.getClass().getSimpleName());
+			warn.accept(r.message());
+		}
+		fire();
+		return r;
+	}
+
 	public void addListener(Consumer<T3CraftSettings> l) {
 		listeners.add(l);
 	}
