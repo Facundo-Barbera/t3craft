@@ -24,7 +24,7 @@ public final class HqPlans {
 
 	/** The whole HQ of a roster, one layered plan per group, in build order. Order of the roster does not matter. */
 	public static List<dev.t3craft.build.BuildPlan> forRoster(Collection<HqInput.Entry> roster) {
-		return List.copyOf(byGroup(generate(HqLayout.plan(HqInput.fromRoster(roster)))).values());
+		return List.copyOf(byGroup(generate(HqStyles.active().allocate(HqInput.fromRoster(roster), null))).values());
 	}
 
 	/**
@@ -33,7 +33,7 @@ public final class HqPlans {
 	 * layered plan per group, in build order.
 	 */
 	public static List<dev.t3craft.build.BuildPlan> forRoster(Collection<HqInput.Entry> roster, HqSite site) {
-		BuildPlan plan = generate(HqLayout.plan(HqInput.fromRoster(roster)));
+		BuildPlan plan = generate(HqStyles.active().allocate(HqInput.fromRoster(roster), null));
 		List<dev.t3craft.build.BuildPlan> out = new ArrayList<>();
 		for (String g : plan.groups()) {
 			List<dev.t3craft.build.Placement> ps = new ArrayList<>();
@@ -90,7 +90,7 @@ public final class HqPlans {
 	 * the world: the generator alone always gives the vanilla HQ.
 	 */
 	public static HqGenerator.Result plan(HqInput input, @Nullable HqLayout previous) {
-		HqLayout layout = HqLayout.allocate(input, previous);
+		HqLayout layout = HqStyles.active().allocate(input, previous);
 		return new HqGenerator.Result(layout, generate(layout));
 	}
 

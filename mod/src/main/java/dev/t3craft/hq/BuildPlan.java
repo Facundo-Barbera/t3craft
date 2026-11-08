@@ -35,14 +35,31 @@ public final class BuildPlan {
 	 * @param group the buildable unit it belongs to ({@link #groups()}): {@code hub}, {@code portico},
 	 *              {@code archive}, {@code spine_<row>}, {@code spine_cap}, {@code module_<index>}
 	 */
-	public record Module(String id, Box box, List<Box> holes, String group) {
+	public record Module(String id, Box box, List<Box> holes, String group, java.util.@Nullable Set<Long> cells) {
 		public Module {
 			holes = List.copyOf(holes);
+			cells = cells == null ? null : java.util.Set.copyOf(cells);
+		}
+
+		public Module(String id, Box box, List<Box> holes, String group) {
+			this(id, box, holes, group, null);
+		}
+
+		/**
+		 * True for a <b>sparse</b> module (campus grounds: paths, gardens, stairs): it owns only the
+		 * cells it wrote ({@link #cells}, {@link BlockPos#asLong} keys), not its whole box, so its box
+		 * is just its bounds and may overlap other modules' boxes.
+		 */
+		public boolean sparse() {
+			return cells != null;
 		}
 
 		public boolean owns(int x, int y, int z) {
 			if (!box.contains(x, y, z)) {
 				return false;
+			}
+			if (cells != null) {
+				return cells.contains(BlockPos.asLong(x, y, z));
 			}
 			for (Box h : holes) {
 				if (h.contains(x, y, z)) {
