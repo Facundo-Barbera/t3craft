@@ -89,6 +89,15 @@ public abstract class HqStyle {
 	HqStyle() {
 	}
 
+	/**
+	 * Where new modules go ({@link HqLayout#allocate(HqInput, HqLayout, HqLayout.Placer)}). The
+	 * classic grid styles keep {@link HqLayout.Placer#LOWEST_FREE}; layout styles (layout/ring)
+	 * give their own rule.
+	 */
+	public HqLayout.Placer placer() {
+		return HqLayout.Placer.LOWEST_FREE;
+	}
+
 	/** Stable id used by the config ({@code hq.style}) and the preview. */
 	public abstract String id();
 

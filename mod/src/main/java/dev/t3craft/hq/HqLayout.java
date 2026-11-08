@@ -218,8 +218,32 @@ public record HqLayout(List<Module> modules, List<Archived> archive, List<String
 		return allocate(input, null);
 	}
 
+	/**
+	 * Where a project's new module goes (rule 4, "Annex"): its grid index. The default,
+	 * {@link #LOWEST_FREE}, is the classic rule (lowest free index); a layout style can give its own
+	 * deterministic rule (layout/ring: an annex becomes a floor on the project's sector, a new project
+	 * the first free sector in a fixed order). Must return an index not in {@code used}.
+	 */
+	@FunctionalInterface
+	public interface Placer {
+		/** The classic rule: the lowest free index. */
+		Placer LOWEST_FREE = (project, own, used) -> lowestFree(used);
+
+		/**
+		 * @param project the project's key
+		 * @param own     indices of the project's modules so far (ascending)
+		 * @param used    every index taken so far (ascending)
+		 */
+		int place(String project, java.util.SortedSet<Integer> own, java.util.SortedSet<Integer> used);
+	}
+
 	/** Allocates modules, desks and archive slots for {@code input}, keeping what {@code previous} had (see class doc). */
 	public static HqLayout allocate(HqInput input, @Nullable HqLayout previous) {
+		return allocate(input, previous, Placer.LOWEST_FREE);
+	}
+
+	/** {@link #allocate(HqInput, HqLayout)} with another rule for where new modules go. */
+	public static HqLayout allocate(HqInput input, @Nullable HqLayout previous, Placer placer) {
 		HqLayout prev = previous == null ? EMPTY : previous;
 		Map<String, Seat> oldSeats = prev.seats();
 		// 1-2. kept desks, grouped by old module (only modules of the same project)
@@ -255,7 +279,16 @@ public record HqLayout(List<Module> modules, List<Archived> archive, List<String
 					break;
 				}
 				if (!seated) {
-					int i = lowestFree(used);
+					TreeSet<Integer> own = new TreeSet<>();
+					for (var o : owner.entrySet()) {
+						if (o.getValue() == p) {
+							own.add(o.getKey());
+						}
+					}
+					int i = placer.place(p.key(), java.util.Collections.unmodifiableSortedSet(own), java.util.Collections.unmodifiableSortedSet(used));
+					if (i < 0 || used.contains(i)) {
+						throw new IllegalStateException("placer gave a taken index " + i);
+					}
 					used.add(i);
 					TreeMap<Integer, String> m = new TreeMap<>();
 					m.put(0, t);
@@ -335,7 +368,7 @@ public record HqLayout(List<Module> modules, List<Archived> archive, List<String
 		return new HqLayout(mods, arch, over);
 	}
 
-	private static int lowestFree(TreeSet<Integer> used) {
+	static int lowestFree(java.util.Set<Integer> used) {
 		int i = 0;
 		while (used.contains(i)) {
 			i++;

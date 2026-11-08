@@ -90,7 +90,7 @@ public final class HqPlans {
 	 * the world: the generator alone always gives the vanilla HQ.
 	 */
 	public static HqGenerator.Result plan(HqInput input, @Nullable HqLayout previous) {
-		HqLayout layout = HqLayout.allocate(input, previous);
+		HqLayout layout = HqLayout.allocate(input, previous, HqStyles.active().placer());
 		return new HqGenerator.Result(layout, generate(layout));
 	}
 

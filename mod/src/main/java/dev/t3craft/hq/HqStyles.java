@@ -29,6 +29,12 @@ public final class HqStyles {
 	public static final String DEFAULT_ID = CherryStyle.ID;
 
 	private static final List<HqStyle> ALL = List.of(new CherryStyle(), new ClassicStyle());
+	/**
+	 * Styles that bring their own layout (not the spine grid of {@link #all()}): selectable by id
+	 * ({@link #byId}, {@code hq.style}), but kept out of {@link #all()}, whose contract is the shared
+	 * {@link HqGeometry}. layout/ring: {@link RingStyle}.
+	 */
+	private static final List<HqStyle> LAYOUTS = List.of(new RingStyle());
 	private static volatile @Nullable HqStyle active;
 
 	private HqStyles() {
@@ -44,7 +50,15 @@ public final class HqStyles {
 		for (HqStyle s : ALL) {
 			out.add(s.id());
 		}
+		for (HqStyle s : LAYOUTS) {
+			out.add(s.id());
+		}
 		return out;
+	}
+
+	/** Styles with their own layout ({@code ring}); not in {@link #all()}. */
+	public static List<HqStyle> layouts() {
+		return LAYOUTS;
 	}
 
 	/** The style with this id (case-insensitive, trimmed), or null. */
@@ -54,6 +68,11 @@ public final class HqStyles {
 		}
 		String k = id.trim().toLowerCase(Locale.ROOT);
 		for (HqStyle s : ALL) {
+			if (s.id().equals(k)) {
+				return s;
+			}
+		}
+		for (HqStyle s : LAYOUTS) {
 			if (s.id().equals(k)) {
 				return s;
 			}

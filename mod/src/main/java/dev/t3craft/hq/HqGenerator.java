@@ -59,11 +59,15 @@ public final class HqGenerator {
 	}
 
 	public static Result plan(HqInput input, @Nullable HqLayout previous, HqStyle style) {
-		HqLayout layout = HqLayout.allocate(input, previous);
+		HqLayout layout = HqLayout.allocate(input, previous, style.placer());
 		return new Result(layout, new HqGenerator(style).generate(layout));
 	}
 
 	public BuildPlan generate(HqLayout layout) {
+		if (style instanceof RingStyle ring) {
+			// layout/ring: its own geometry (hub, cloister, rings of sectors), not the spine grid
+			return new RingGenerator(ring).generate(layout);
+		}
 		PlanBuilder b = new PlanBuilder();
 		int rows = layout.rows();
 		hub(b, rows > 0, hubBinding(layout));
