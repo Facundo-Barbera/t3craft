@@ -203,5 +203,17 @@
 	"t3craft.archive.hint.terminal": "the archive terminal in the HQ or %s",
 	"t3craft.archive.hint.command": "%s or the portable (no blocks module)",
 	"t3craft.archive.portable": "Archive",
-	"block.t3craft.archive_terminal": "Archive Terminal"
+	"block.t3craft.archive_terminal": "Archive Terminal",
+	"t3craft.hq.layout.classic.name": "Classic",
+	"t3craft.hq.layout.classic.desc": "Hub, central spine and one wing per project (the original HQ).",
+	"t3craft.hq.layout.campus.name": "Campus",
+	"t3craft.hq.layout.campus.desc": "Hexagonal barrios round a central plaza with paths and ponds; very large, needs a lot of room.",
+	"t3craft.hq.layout.ring.name": "Ring",
+	"t3craft.hq.layout.ring.desc": "A domed hub inside rings of sectors joined by radial avenues.",
+	"t3craft.hq.layout.vertical.name": "Vertical",
+	"t3craft.hq.layout.vertical.desc": "Towers round an atrium joined by skybridges over a podium.",
+	"t3craft.hq.layout.ensanche.name": "Ensanche (blocks)",
+	"t3craft.hq.layout.ensanche.desc": "Blocks with inner patios on a street grid round a main square.",
+	"t3craft.hq.layout.village.name": "Village",
+	"t3craft.hq.layout.village.desc": "An organic hill village on terraces."
 }

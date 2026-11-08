@@ -203,5 +203,17 @@
 	"t3craft.archive.hint.terminal": "la terminal de archivo del HQ o %s",
 	"t3craft.archive.hint.command": "%s o el portátil (sin módulo de bloques)",
 	"t3craft.archive.portable": "Archivo",
-	"block.t3craft.archive_terminal": "Terminal de archivo"
+	"block.t3craft.archive_terminal": "Terminal de archivo",
+	"t3craft.hq.layout.classic.name": "Clásico",
+	"t3craft.hq.layout.classic.desc": "Vestíbulo, espina central y un ala por proyecto (el HQ original).",
+	"t3craft.hq.layout.campus.name": "Campus",
+	"t3craft.hq.layout.campus.desc": "Barrios hexagonales alrededor de una plaza con caminos y estanques; muy grande, necesita mucho espacio.",
+	"t3craft.hq.layout.ring.name": "Anillo",
+	"t3craft.hq.layout.ring.desc": "Vestíbulo con cúpula dentro de anillos de sectores unidos por avenidas radiales.",
+	"t3craft.hq.layout.vertical.name": "Vertical",
+	"t3craft.hq.layout.vertical.desc": "Torres alrededor de un atrio unidas por pasarelas sobre un podio.",
+	"t3craft.hq.layout.ensanche.name": "Ensanche (manzanas)",
+	"t3craft.hq.layout.ensanche.desc": "Manzanas con patio en una cuadrícula de calles alrededor de una plaza mayor.",
+	"t3craft.hq.layout.village.name": "Aldea",
+	"t3craft.hq.layout.village.desc": "Una aldea orgánica en terrazas sobre una colina."
 }

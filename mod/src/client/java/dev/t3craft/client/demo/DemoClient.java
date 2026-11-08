@@ -375,6 +375,22 @@ public final class DemoClient implements ClientModInitializer {
 		};
 	}
 
+	/**
+	 * feat/hq-layouts: the layout the HQ world is built with ({@code HqLayoutState}), or null when not
+	 * in the HQ world or nothing is built there yet.
+	 */
+	public static @Nullable String builtLayoutId() {
+		DemoClient d = instance;
+		Path root = d == null ? null : d.demoRoot;
+		return root == null ? null : builtLayoutId(root);
+	}
+
+	/** The layout recorded in the marker of the HQ world saved at {@code worldRoot} (null if nothing built). */
+	public static @Nullable String builtLayoutId(Path worldRoot) {
+		DemoMarker m = DemoMarkerFile.read(worldRoot);
+		return dev.t3craft.client.hq.layout.HqLayoutState.fromMarker(m.structure(), m.state());
+	}
+
 	/** Queues a confirmed reset for the next client tick (after the confirm screen closes). */
 	public static void requestReset() {
 		DemoClient d = instance;
