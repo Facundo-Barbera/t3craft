@@ -53,7 +53,7 @@ if pid="$(running)"; then
 	exit 0
 fi
 echo "--- $(date -Is) start $*" >>"$LOG"
-nohup nice -n 10 python3 -I "$HERE/studio.py" "$@" >>"$LOG" 2>&1 </dev/null &
+setsid nohup nice -n 10 python3 -I "$HERE/studio.py" "$@" >>"$LOG" 2>&1 </dev/null &
 echo $! >"$PIDFILE"
 sleep 1
 if pid="$(running)"; then
