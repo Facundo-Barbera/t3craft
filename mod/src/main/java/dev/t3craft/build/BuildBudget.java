@@ -28,6 +28,23 @@ public final class BuildBudget {
 	private int lastClaimants = 1;
 	private final Set<String> claimants = new HashSet<>();
 	private volatile int effectiveMax;
+	/** fix/hq-build-parallel: frame-rate side of the auto-throttle (client FPS, integrated server). */
+	private final TickGovernor fpsGovernor = new TickGovernor();
+	private volatile double clientFps = -1;
+	/** Placement work measured this tick ({@link #work}) and its running average, ns per placed block. */
+	private long workNanos;
+	private int workBlocks;
+	private double nanosPerBlock;
+
+	/**
+	 * Wall-clock budget for block placement per server tick (ms), out of the 50 ms tick: the
+	 * integrated server shares the CPU with the client. With the measured cost per block it caps the
+	 * blocks per tick (light updates and chunk-section marking are part of the measured setBlock).
+	 */
+	public static final double MS_PER_TICK = 8.0;
+	/** Below this client frame rate the budget drops (×0.7 per second); it recovers above {@link #RECOVER_FPS}. */
+	public static final double MIN_FPS = 30;
+	public static final double RECOVER_FPS = MIN_FPS / TickGovernor.RECOVER_BELOW;
 
 	public BuildBudget(BuildTuning tuning) {
 		this.tuning = tuning;
@@ -77,7 +94,17 @@ public final class BuildBudget {
 		tick = tickNumber;
 		BuildTuning t = tuning;
 		double factor = msptSmoothed < 0 ? governor.factor() : governor.observe(msptSmoothed, t.targetMspt(), t.autoThrottle());
-		effectiveMax = TickGovernor.apply(t.maxBlocksPerTick(), factor);
+		// Frame time against 1000 / MIN_FPS; unknown FPS (no build watching it) lets it recover.
+		double fps = clientFps;
+		double frameMs = fps > 0 ? 1000.0 / fps : 0;
+		factor = Math.min(factor, fpsGovernor.observe(frameMs, 1000.0 / MIN_FPS, t.autoThrottle()));
+		if (workBlocks > 0) {
+			double sample = (double) workNanos / workBlocks;
+			nanosPerBlock = nanosPerBlock <= 0 ? sample : nanosPerBlock * 0.8 + sample * 0.2;
+		}
+		workNanos = 0;
+		workBlocks = 0;
+		effectiveMax = capByTime(TickGovernor.apply(t.maxBlocksPerTick(), factor), nanosPerBlock, t.autoThrottle());
 		remaining = effectiveMax;
 		effectsLeft = t.maxEffectsPerTick();
 		lastClaimants = Math.max(1, claimants.size());
@@ -97,6 +124,38 @@ public final class BuildBudget {
 		double g = Math.max(0, Math.min(want, Math.min(remaining, cap)));
 		remaining -= g;
 		return g;
+	}
+
+	/** Blocks per tick that fit {@link #MS_PER_TICK} at {@code nanosPerBlock} (unknown cost = no cap), at least one. */
+	public static int capByTime(int blocks, double nanosPerBlock, boolean enabled) {
+		if (!enabled || !(nanosPerBlock > 0)) {
+			return blocks;
+		}
+		long fit = (long) Math.floor(MS_PER_TICK * 1_000_000.0 / nanosPerBlock);
+		return (int) Math.max(1, Math.min(blocks, fit));
+	}
+
+	/** Reports placement work done this tick (server thread): wall time and blocks actually placed. */
+	public synchronized void work(long nanos, int blocks) {
+		if (nanos > 0 && blocks > 0) {
+			workNanos += nanos;
+			workBlocks += blocks;
+		}
+	}
+
+	/** The client's current frame rate while a build is watched (client thread); ≤ 0 = unknown. */
+	public void clientFps(double fps) {
+		clientFps = fps;
+	}
+
+	/** Frame-rate throttle factor (1 = full budget). */
+	public double fpsThrottle() {
+		return fpsGovernor.factor();
+	}
+
+	/** Measured placement cost, ns per block (0 = not measured yet). */
+	public synchronized double nanosPerBlock() {
+		return nanosPerBlock;
 	}
 
 	/** One placement effect (sound + particles) allowed this tick? Counts it if so. */

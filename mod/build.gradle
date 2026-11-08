@@ -129,6 +129,19 @@ tasks.register("hqRender", JavaExec) {
 	javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(25) }
 }
 
+// fix/hq-build-parallel: headless build benchmark of every layout with 20 projects, no Minecraft launched.
+// `./gradlew hqBuildBench` → build/reports/hq-build-bench.md (also runs inside `test`).
+tasks.register("hqBuildBench", Test) {
+	group = "t3craft"
+	description = "Simulates the HQ world build of every layout (before/after parallel parts) and writes build/reports/hq-build-bench.md"
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+	useJUnitPlatform()
+	filter { includeTestsMatching "dev.t3craft.client.demo.HqBuildBenchTest" }
+	outputs.upToDateWhen { false }
+	testLogging { showStandardStreams = true }
+}
+
 test {
 	useJUnitPlatform()
 	testLogging {
