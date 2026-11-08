@@ -13,6 +13,11 @@ import org.jspecify.annotations.Nullable;
  * Ctrl moves by word), Home/End (visual line), Backspace/Delete (Ctrl: by word). Pure Java: key
  * codes are {@link InputConstants} compile-time constants (Minecraft 26.x codes, not GLFW's), the
  * clipboard is an interface and visual lines come from {@link #wrap} with any width function.
+ *
+ * <p>feat/t3-composer: undo / redo like a browser textarea (Ctrl+Z, Ctrl+Y or Ctrl+Shift+Z): typing
+ * is grouped into one step per word, every other edit (paste, cut, delete, newline) is its own
+ * step; {@link #set} (a thread switch, a restored draft) starts a fresh history. Double click
+ * selects a word ({@link #selectWordAt}).
  */
 public final class ComposerText {
 	/** Upper bound (same as the new-thread prompt): a pasted log never goes out by mistake. */
@@ -49,6 +54,83 @@ public final class ComposerText {
 	private int goalX = -1;
 	private List<Line> lines = List.of(new Line(0, 0, 0));
 	private ToIntFunction<String> measure = String::length;
+
+	// ---- undo / redo ----------------------------------------------------------------------------
+
+	/** Steps kept in each direction. */
+	static final int MAX_HISTORY = 200;
+
+	private record Snap(String text, int caret, int anchor) {
+	}
+
+	/** What the last recorded edit was, for grouping typed characters into one undo step. */
+	private enum EditKind {
+		NONE, TYPE, OTHER
+	}
+
+	private final java.util.ArrayDeque<Snap> undo = new java.util.ArrayDeque<>();
+	private final java.util.ArrayDeque<Snap> redo = new java.util.ArrayDeque<>();
+	private EditKind lastEdit = EditKind.NONE;
+
+	/** Records the state before an edit; consecutive typing inside a word is one step. */
+	private void checkpoint(EditKind kind, boolean breakGroup) {
+		if (kind == EditKind.TYPE && lastEdit == EditKind.TYPE && !breakGroup && !undo.isEmpty()) {
+			redo.clear();
+			return;
+		}
+		undo.push(new Snap(text.toString(), caret, anchor));
+		while (undo.size() > MAX_HISTORY) {
+			undo.removeLast();
+		}
+		redo.clear();
+		lastEdit = kind;
+	}
+
+	private void restore(Snap s) {
+		text.setLength(0);
+		text.append(s.text());
+		caret = Math.clamp(s.caret(), 0, text.length());
+		anchor = Math.clamp(s.anchor(), 0, text.length());
+		goalX = -1;
+		relayout();
+	}
+
+	public boolean canUndo() {
+		return !undo.isEmpty();
+	}
+
+	public boolean canRedo() {
+		return !redo.isEmpty();
+	}
+
+	/** Ctrl+Z: back to the state before the last step. */
+	public boolean undo() {
+		if (undo.isEmpty()) {
+			return false;
+		}
+		redo.push(new Snap(text.toString(), caret, anchor));
+		restore(undo.pop());
+		lastEdit = EditKind.NONE;
+		return true;
+	}
+
+	/** Ctrl+Y / Ctrl+Shift+Z: re-applies the step undone last. */
+	public boolean redo() {
+		if (redo.isEmpty()) {
+			return false;
+		}
+		undo.push(new Snap(text.toString(), caret, anchor));
+		restore(redo.pop());
+		lastEdit = EditKind.NONE;
+		return true;
+	}
+
+	/** Forgets the history (a new draft was loaded). */
+	public void clearHistory() {
+		undo.clear();
+		redo.clear();
+		lastEdit = EditKind.NONE;
+	}
 
 	public String text() {
 		return text.toString();
@@ -88,6 +170,17 @@ public final class ComposerText {
 		text.append(clean(s, MAX_CHARS));
 		caret = anchor = Math.clamp(caretAt, 0, text.length());
 		goalX = -1;
+		clearHistory();
+		relayout();
+	}
+
+	/** Like {@link #set} but as one undoable step (Ctrl+Z brings the old text back). */
+	public void replaceAll(String s, int caretAt) {
+		checkpoint(EditKind.OTHER, true);
+		text.setLength(0);
+		text.append(clean(s, MAX_CHARS));
+		caret = anchor = Math.clamp(caretAt, 0, text.length());
+		goalX = -1;
 		relayout();
 	}
 
@@ -105,6 +198,30 @@ public final class ComposerText {
 			anchor = caret;
 		}
 		goalX = -1;
+		lastEdit = EditKind.NONE; // a caret move ends the typing group
+	}
+
+	/** Double click: selects the word (or the run of spaces) around {@code pos}. */
+	public void selectWordAt(int pos) {
+		int p = Math.clamp(pos, 0, text.length());
+		int n = text.length();
+		if (n == 0) {
+			return;
+		}
+		int probe = p < n ? p : p - 1;
+		boolean space = Character.isWhitespace(text.charAt(probe));
+		int a = probe;
+		int b = probe;
+		while (a > 0 && Character.isWhitespace(text.charAt(a - 1)) == space && text.charAt(a - 1) != '\n') {
+			a--;
+		}
+		while (b < n && Character.isWhitespace(text.charAt(b)) == space && text.charAt(b) != '\n') {
+			b++;
+		}
+		anchor = a;
+		caret = Math.max(a, b);
+		goalX = -1;
+		lastEdit = EditKind.NONE;
 	}
 
 	public void selectAll() {
@@ -114,6 +231,11 @@ public final class ComposerText {
 
 	/** Types or pastes {@code s} over the selection. Control characters other than newline are dropped. */
 	public void insert(String s) {
+		checkpoint(EditKind.OTHER, true);
+		insertRaw(s);
+	}
+
+	private void insertRaw(String s) {
 		int room = MAX_CHARS - (text.length() - (selectionEnd() - selectionStart()));
 		String in = clean(s, Math.max(0, room));
 		int a = selectionStart();
@@ -138,6 +260,10 @@ public final class ComposerText {
 	}
 
 	public void backspace(boolean word) {
+		if (!hasSelection() && caret == 0) {
+			return;
+		}
+		checkpoint(EditKind.OTHER, true);
 		if (!deleteSelection()) {
 			int from = word ? wordLeft(caret) : prevCodePoint(caret);
 			remove(from, caret);
@@ -145,6 +271,10 @@ public final class ComposerText {
 	}
 
 	public void delete(boolean word) {
+		if (!hasSelection() && caret >= text.length()) {
+			return;
+		}
+		checkpoint(EditKind.OTHER, true);
 		if (!deleteSelection()) {
 			int to = word ? wordRight(caret) : nextCodePoint(caret);
 			remove(caret, to);
@@ -362,8 +492,13 @@ public final class ComposerText {
 				} else if (ctrl && key == InputConstants.KEY_X) {
 					if (clipboard != null && hasSelection()) {
 						clipboard.set(selected());
+						checkpoint(EditKind.OTHER, true);
 						deleteSelection();
 					}
+				} else if (ctrl && (key == InputConstants.KEY_Z && shift || key == InputConstants.KEY_Y)) {
+					redo();
+				} else if (ctrl && key == InputConstants.KEY_Z) {
+					undo();
 				} else if (ctrl && key == InputConstants.KEY_V) {
 					if (clipboard != null) {
 						String s = clipboard.get();
@@ -385,7 +520,9 @@ public final class ComposerText {
 		if (Character.isISOControl(codepoint) || !Character.isValidCodePoint(codepoint)) {
 			return false;
 		}
-		insert(new String(Character.toChars(codepoint)));
+		checkpoint(EditKind.TYPE, Character.isWhitespace(codepoint) || hasSelection());
+		insertRaw(new String(Character.toChars(codepoint)));
+		lastEdit = EditKind.TYPE;
 		return true;
 	}
 }

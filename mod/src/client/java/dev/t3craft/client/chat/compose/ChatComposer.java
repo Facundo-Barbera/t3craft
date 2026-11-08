@@ -25,6 +25,11 @@ public final class ChatComposer {
 
 	/** A composer whose confirmations and pairing screens return to {@code screen}. */
 	public static ComposerView create(Screen screen, ChatTheme theme, Runnable onSent) {
+		return create(screen, theme, onSent, () -> false);
+	}
+
+	/** Same, with what Esc in an empty draft thread does ({@link ComposerView.Host#escapeDraft}). */
+	public static ComposerView create(Screen screen, ChatTheme theme, Runnable onSent, java.util.function.BooleanSupplier escapeDraft) {
 		ChatSender sender = new ChatSender(OperateUi.gate(), (a, done) -> OperateUi.run(a, OperateGate.Origin.UI, screen, done));
 		return new ComposerView(new ComposerState(sender), theme, new ComposerView.Host() {
 			@Override
@@ -35,6 +40,11 @@ public final class ChatComposer {
 			@Override
 			public void sent() {
 				onSent.run();
+			}
+
+			@Override
+			public boolean escapeDraft() {
+				return escapeDraft.getAsBoolean();
 			}
 		});
 	}

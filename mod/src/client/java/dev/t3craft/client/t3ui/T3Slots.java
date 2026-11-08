@@ -10,7 +10,6 @@ import dev.t3craft.client.config.EnvironmentsScreen;
 import dev.t3craft.client.config.SettingsScreen;
 import dev.t3craft.client.T3CraftClient;
 import dev.t3craft.client.t3ui.actions.ActionsClient;
-import dev.t3craft.client.t3ui.actions.NewThreadDialog;
 import dev.t3craft.client.t3ui.actions.ProjectsService;
 import dev.t3craft.client.t3ui.actions.RegisterProjectDialog;
 import dev.t3craft.client.t3ui.actions.ThreadStatus;
@@ -36,14 +35,13 @@ import org.jspecify.annotations.Nullable;
  * <ul>
  *   <li>{@link #drawStatusChip}: feat/t3-actions' {@link ThreadStatusChip} (T3's status pill) from the
  *       thread's shell; fallback without a shell (bridge mode): a pill with the attention word.</li>
- *   <li>{@link #newThread}: feat/t3-actions' {@link NewThreadDialog}, environment and project
- *       preselected from the selection and the sidebar's project filter; the created thread is
- *       selected in the screen.</li>
+ *   <li>{@link #draftProject}: which project a new draft thread starts on (feat/t3-composer: "New
+ *       thread" opens no dialog, {@link T3Screen} adds a draft row and the composer launches it).</li>
  *   <li>{@link #menuItems}: "Register project…" ({@link RegisterProjectDialog}), "Archive thread"
  *       (T3's {@code thread.archive}) and the game shortcuts.</li>
  *   <li>{@link #composerControls}: feat/t3-actions' {@link dev.t3craft.client.t3ui.actions.ModelPicker}
- *       in the composer bar (the composer itself, feat/chat-compose, is mounted by {@link T3Screen} as
- *       the conversation's footer).</li>
+ *       as the composer bar's model chip, plus the access chip (the composer itself, feat/chat-compose,
+ *       is mounted by {@link T3Screen} as the conversation's footer).</li>
  * </ul>
  */
 public class T3Slots {
@@ -65,11 +63,22 @@ public class T3Slots {
 		boolean keyPressed(KeyEvent e);
 
 		boolean mouseScrolled(double mx, double my, double dy);
+
+		/** A typed character while open (a field inside the popover). */
+		default boolean charTyped(int codepoint) {
+			return false;
+		}
 	}
 
 	/** Controls in the composer bar's left slot: the model / provider / effort picker. */
 	public List<ComposerView.Control> composerControls(Screen screen, Supplier<@Nullable Target> target) {
-		return List.of(new ModelPickerControl(target));
+		return composerControls(screen, target, () -> null);
+	}
+
+	/** Same, aware of the screen's draft thread (its model chip edits the draft's model). */
+	List<ComposerView.Control> composerControls(Screen screen, Supplier<@Nullable Target> target, Supplier<@Nullable ThreadDraft> draft) {
+		ModelPickerControl model = new ModelPickerControl(target, draft);
+		return List.of(model.access(), model);
 	}
 
 	/** The thread's shell in direct mode (status, model), or null. */
@@ -110,18 +119,37 @@ public class T3Slots {
 		return w;
 	}
 
-	/** "New thread": environment and project preselected; the created thread opens in {@code parent}. */
-	public void newThread(Screen parent, @Nullable String envId, @Nullable String projectKey, @Nullable Target selected) {
-		ProjectsService.Project p = ProjectMatch.find(ActionsClient.projects().all(), projectKey != null ? projectKey
+	/**
+	 * The project a new draft thread starts on: the sidebar folder {@code projectKey} (filter or the
+	 * folder's "+"), else the selected thread's project, else the first project of {@code envId}
+	 * (preferring environments with control), else any. Null when no environment has a project.
+	 */
+	public ProjectsService.@Nullable Project draftProject(@Nullable String envId, @Nullable String projectKey, @Nullable Target selected) {
+		List<ProjectsService.Project> all = ActionsClient.projects().all();
+		ProjectsService.Project p = ProjectMatch.find(all, projectKey != null ? projectKey
 				: selected == null || selected.project() == null ? null : SidebarModel.fold(selected.project()).trim(), envId);
-		String env = p != null ? p.envId() : envId;
-		Minecraft.getInstance().gui.setScreen(new NewThreadDialog(parent, env, p == null ? null : p.projectId(), (e, threadId) -> {
-			if (parent instanceof T3Screen t) {
-				t.open(e + ":" + threadId);
-			} else {
-				ActionsClient.selectThread(e, threadId);
+		if (p != null) {
+			return p;
+		}
+		for (ProjectsService.Project q : all) {
+			if (envId != null && envId.equals(q.envId())) {
+				return q;
 			}
-		}));
+		}
+		for (ProjectsService.Project q : all) {
+			if (ActionsClient.gate().enabled(q.envId())) {
+				return q;
+			}
+		}
+		return all.isEmpty() ? null : all.getFirst();
+	}
+
+	/** A project by environment and id (a block's "new thread here"), or null. */
+	public ProjectsService.@Nullable Project project(@Nullable String envId, @Nullable String projectId) {
+		if (envId == null || projectId == null) {
+			return null;
+		}
+		return ActionsClient.projects().find(new ProjectsService.Key(envId, projectId));
 	}
 
 	/** Extra ⋯ menu rows: component actions and game shortcuts for the selected thread. */

@@ -38,7 +38,9 @@ import org.jspecify.annotations.Nullable;
  * and hit-tested; truncated texts come from a {@link ClipCache}. Pixel scrolling, scissored.
  *
  * <p>The screen keeps the actions: a {@link Host} opens a thread, prewarms on hover, runs the hover
- * quick actions (settle, pin) and opens the right-click menu (feat/t3-ui-clean). Client thread only.
+ * quick actions (settle, pin) and opens the right-click menu (feat/t3-ui-clean). feat/t3-composer:
+ * the draft thread ({@link Host#draftKey()}) is a rich row "New thread" under its project with a ✕
+ * on hover, and hovering a project folder shows its "+" (a new draft thread there). Client thread only.
  */
 public final class SidebarView {
 	/** Folder / Pinned header row in the top list. */
@@ -73,6 +75,18 @@ public final class SidebarView {
 
 		/** Right click on a row: its thread actions menu. */
 		void context(ThreadRow r, T3Slots.Target t);
+
+		/** Key of the draft thread's row (feat/t3-composer), or null when there is no draft. */
+		@Nullable String draftKey();
+
+		/** The ✕ on the draft row: drop the draft. */
+		void discardDraft();
+
+		/** New threads can be started from here (not a read-only screen): the folders' "+". */
+		boolean canNewThread();
+
+		/** The "+" on a project folder: a draft thread in that project ({@code folder} = its key). */
+		void newThreadIn(String folder);
 	}
 
 	private record Hit(Rect r, Runnable left, @Nullable Runnable right, @Nullable List<String> tip) {
@@ -363,7 +377,7 @@ public final class SidebarView {
 			if (it.kind() == SidebarModel.Kind.THREAD) {
 				drawThread(g, font, t, rr, hitR, it, hover, multi, mouseX, mouseY, now);
 			} else {
-				drawFolder(g, font, t, rr, hitR, it, hover);
+				drawFolder(g, font, t, rr, hitR, it, hover, mouseX, mouseY);
 			}
 		}
 		g.disableScissor();
@@ -413,7 +427,8 @@ public final class SidebarView {
 		return y1 <= y0 ? Rect.EMPTY : new Rect(r.x(), y0, r.w(), y1 - y0);
 	}
 
-	private void drawFolder(GuiGraphicsExtractor g, Font font, ChatTheme t, Rect rr, Rect hitR, SidebarModel.Item it, boolean hover) {
+	private void drawFolder(GuiGraphicsExtractor g, Font font, ChatTheme t, Rect rr, Rect hitR, SidebarModel.Item it, boolean hover, int mouseX,
+			int mouseY) {
 		if (hover) {
 			SidebarRow.roundBox(g, rr, t.hover(), 0);
 		}
@@ -426,6 +441,13 @@ public final class SidebarView {
 			right -= 11;
 		}
 		boolean section = it.kind() == SidebarModel.Kind.SECTION;
+		// T3: hovering a project shows its "new thread" button
+		boolean plus = hover && !section && host.canNewThread() && !SidebarModel.NO_PROJECT.equals(it.key());
+		Rect plusR = Rect.EMPTY;
+		if (plus) {
+			plusR = new Rect(right - 13, rr.y(), 11, rr.h());
+			right = plusR.x() - 2;
+		}
 		String arrow = it.collapsed() ? "› " : "▾ ";
 		g.text(font, clips.clip(font, arrow + it.label(), right - rr.x() - 4), rr.x() + 2, ty, section ? t.brass() : t.muted(), false);
 		String folder = it.key();
@@ -437,6 +459,10 @@ public final class SidebarView {
 		tip.add(section ? "Click: open/close" : "Click: open/close · Right-click: filter this project");
 		hits.add(new Hit(hitR, () -> model.toggleCollapsed(folder),
 				section ? null : () -> model.setProject(folder.equals(model.project()) ? null : folder), tip));
+		if (plus && clip(plusR, hitR).h() > 0) {
+			quickIcon(g, font, t, plusR, "+", true, mouseX, mouseY);
+			hits.add(new Hit(clip(plusR, hitR), () -> host.newThreadIn(folder), null, List.of("New thread in " + it.label())));
+		}
 	}
 
 	private void drawDockHeader(GuiGraphicsExtractor g, Font font, ChatTheme t, Rect head, SidebarModel.Dock d, boolean hover) {
@@ -464,6 +490,10 @@ public final class SidebarView {
 			return;
 		}
 		boolean selected = r.key().equals(model.selectedKey());
+		if (r.key().equals(host.draftKey())) {
+			drawDraft(g, font, t, rr, hitR, r, selected, hover, multi, mouseX, mouseY);
+			return;
+		}
 		if (hover) {
 			host.hover(r, selected);
 		}
@@ -495,6 +525,23 @@ public final class SidebarView {
 						host.pin(target, !pinned);
 					}
 				}, () -> host.context(r, target), List.of((pinned ? "Unpin" : "Pin") + ro)));
+			}
+		}
+	}
+
+	/** The draft thread's row (feat/t3-composer): project line, "✎ New thread", a ✕ on hover discards it. */
+	private void drawDraft(GuiGraphicsExtractor g, Font font, ChatTheme t, Rect rr, Rect hitR, ThreadRow r, boolean selected, boolean hover,
+			boolean multi, int mouseX, int mouseY) {
+		SidebarRow.drawDraft(g, font, t, clips, rr, r, selected, hover, multi);
+		if (hitR.h() <= 0) {
+			return;
+		}
+		hits.add(new Hit(hitR, () -> host.open(r), null, List.of("New thread · " + SidebarRow.projectLabel(r), "Esc or ✕ discards it")));
+		if (hover) {
+			Rect xr = new Rect(rr.right() - 14, rr.y() + 1, 11, SidebarRow.LINE + 2);
+			quickIcon(g, font, t, xr, "✕", true, mouseX, mouseY);
+			if (clip(xr, hitR).h() > 0) {
+				hits.add(new Hit(clip(xr, hitR), host::discardDraft, null, List.of("Discard the draft")));
 			}
 		}
 	}

@@ -136,6 +136,41 @@ final class SidebarRow {
 		}
 	}
 
+	/**
+	 * Draws the draft thread's row (feat/t3-composer): line 1 like a thread's (icon, project) with
+	 * "Draft" at the right (the view puts the ✕ there on hover), line 2 "✎ New thread" (or
+	 * "Starting…" while it launches).
+	 */
+	static void drawDraft(GuiGraphicsExtractor g, Font font, ChatTheme t, ClipCache clips, Rect rr, ThreadRow r, boolean selected, boolean hover,
+			boolean multiEnv) {
+		if (selected) {
+			roundBox(g, rr, t.panelHi(), ChatTheme.withAlpha(t.edge(), 200));
+		} else if (hover) {
+			roundBox(g, rr, t.hover(), 0);
+		}
+		int x0 = rr.x() + 4;
+		int x1 = rr.right() - 3;
+		int y1 = rr.y() + 3;
+		int y2 = y1 + LINE + 1;
+		EnvBadge badge = multiEnv ? EnvBadge.of(r.env(), r.envLabel()) : EnvBadge.of("project:" + SidebarModel.projectKey(r), projectLabel(r));
+		ChatDraw.envIcon(g, font, badge, x0, y1 - 1, 8);
+		int x = x0 + 11;
+		int right = x1;
+		if (hover) {
+			right -= 14;
+		} else {
+			String tag = "Draft";
+			int tw = clips.width(font, tag);
+			g.text(font, tag, x1 - tw, y1, t.accent(), false);
+			right -= tw + 4;
+		}
+		g.text(font, clips.clip(font, projectLabel(r), right - x - 3), x, y1, t.muted(), false);
+		String pen = "✎";
+		g.text(font, pen, x0, y2, t.accent(), false);
+		int tx = x0 + clips.width(font, pen) + 3;
+		g.text(font, clips.clip(font, r.title(), x1 - tx), tx, y2, selected ? t.text() : t.muted(), t.shadow());
+	}
+
 	/** Diff and PR text (to keep room for it when clipping the branch). */
 	private static String tail(ThreadDetails d) {
 		StringBuilder sb = new StringBuilder();
