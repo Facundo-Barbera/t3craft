@@ -15,6 +15,11 @@ import dev.t3craft.client.chat.ThreadRow;
 import dev.t3craft.client.chat.compose.ChatComposer;
 import dev.t3craft.client.chat.compose.ComposerInput;
 import dev.t3craft.client.chat.compose.ComposerView;
+import dev.t3craft.client.chat.request.PendingRequest;
+import dev.t3craft.client.chat.request.RequestCard;
+import dev.t3craft.client.chat.request.RequestFooter;
+import dev.t3craft.client.operate.OperateUi;
+import dev.t3craft.t3.OperateGate;
 import dev.t3craft.client.portable.NotificationLog;
 import dev.t3craft.client.t3ui.actions.ActionsClient;
 import dev.t3craft.client.t3ui.actions.ProjectsService;
@@ -87,6 +92,12 @@ public final class T3Screen extends Screen {
 	 * drafts, pending messages and errors survive the confirmation and pairing screens.
 	 */
 	private @Nullable ComposerView composer;
+	/**
+	 * feat/t3-user-input: the card of the selected thread's pending question or approval, drawn in
+	 * the composer's place ({@link RequestFooter}). Owned by the screen like the composer, so the
+	 * choices survive the confirmation and pairing screens.
+	 */
+	private @Nullable RequestCard requestCard;
 	/** Thread to open when the conversation is (re)built; follows the selection. */
 	private @Nullable String key;
 	private String fallbackEnvLabel = "";
@@ -251,6 +262,24 @@ public final class T3Screen extends Screen {
 			});
 			draftControls = new DraftControls(font, this::selectedDraft, this::moveDraft);
 			popups.addAll(draftControls.popups());
+			Screen self = this;
+			requestCard = new RequestCard(new RequestCard.Host() {
+				@Override
+				public boolean canOperate(String envId) {
+					return OperateUi.gate().canOperate(envId);
+				}
+
+				@Override
+				public void enableControl(String envId) {
+					ActionsClient.enableControl(self, envId);
+				}
+
+				@Override
+				public void run(dev.t3craft.t3.OperateAction action, java.util.function.Consumer<dev.t3craft.t3.OperateResult> done) {
+					OperateUi.run(action, OperateGate.Origin.UI, self, done);
+				}
+			});
+			requestCard.setMaxWidth(T3UiLayout.COLUMN_MAX);
 		}
 		if (conversation == null) {
 			ConversationPanel c = new ConversationPanel(source, theme);
@@ -266,6 +295,9 @@ public final class T3Screen extends Screen {
 			c.setThreadLinks(this::openThreadLink);
 			if (composer != null) {
 				ChatComposer.attach(c, composer);
+				if (requestCard != null) {
+					c.setFooter(new RequestFooter(requestCard, composer)); // the card takes the composer's place
+				}
 			}
 			conversation = c;
 			refresh();
@@ -325,6 +357,9 @@ public final class T3Screen extends Screen {
 		}
 		if (draftControls != null) {
 			draftControls.closeAll();
+		}
+		if (requestCard != null) {
+			requestCard.blurOther();
 		}
 		if (draft != null) {
 			draft.wasSelected = draft.is(model.selectedKey());
@@ -848,6 +883,7 @@ public final class T3Screen extends Screen {
 					ChatComposer.sync(conversation, cv);
 					cv.setLeftControls(List.of());
 				}
+				syncRequestCard(d != null);
 				cv.setBounds(Rect.EMPTY); // the conversation places it
 			}
 			conversation.setBounds(mr.conversation());
@@ -876,6 +912,32 @@ public final class T3Screen extends Screen {
 		contextItems = items;
 		contextX = anchor.x();
 		contextY = anchor.bottom() + 1;
+	}
+
+	/**
+	 * feat/t3-user-input: points the request card at the thread the conversation shows and its
+	 * pending requests (from the live stream's projection: runtime requests + their turn items).
+	 */
+	private void syncRequestCard(boolean draftSelected) {
+		RequestCard card = requestCard;
+		ConversationPanel c = conversation;
+		if (card == null) {
+			return;
+		}
+		String k = c == null || draftSelected ? null : c.key();
+		int colon = k == null ? -1 : k.indexOf(':');
+		if (c == null || colon <= 0 || colon == k.length() - 1) {
+			card.clear();
+			return;
+		}
+		var feed = c.feed();
+		List<PendingRequest> pending = feed == null ? List.of() : feed.transcript().pendingRequests();
+		T3Slots.Target t = selectedTarget();
+		card.setThread(k.substring(0, colon), k.substring(colon + 1), t == null ? null : t.title(), pending);
+		card.setMaxHeight(mr.conversation().h() * 3 / 5);
+		if (card.expanded() && composer != null && composer.focused()) {
+			composer.setFocused(false);
+		}
 	}
 
 	/** "project › New thread" and a ✕ that discards the draft (T3's draft header). */
@@ -1214,6 +1276,13 @@ public final class T3Screen extends Screen {
 			contextItems = null;
 			return true;
 		}
+		if (requestCard != null && !requestCard.contains(mx, my)) {
+			requestCard.blurOther();
+		} else if (requestCard != null && search != null) {
+			search.setFocused(false); // the conversation forwards the click to the card
+			setFocused(null);
+			focus = T3UiKeys.Focus.LIST;
+		}
 		if (composer != null && !composer.contains(mx, my)) {
 			composer.setFocused(false);
 		} else if (composer != null && search != null) {
@@ -1289,6 +1358,9 @@ public final class T3Screen extends Screen {
 		if (sr.list().contains(x, y) && sidebarView.mouseScrolled(x, y, scrollY)) {
 			return true;
 		}
+		if (requestCard != null && requestCard.mouseScrolled(x, y, scrollY)) {
+			return true;
+		}
 		if (composer != null && composer.mouseScrolled(x, y, scrollY)) {
 			return true;
 		}
@@ -1302,8 +1374,17 @@ public final class T3Screen extends Screen {
 				return true;
 			}
 		}
+		// feat/t3-user-input: the card's "Other" field owns the keyboard while focused
+		if (requestCard != null && requestCard.owns() && requestCard.keyPressed(e.key(), e.hasShiftDown(), e.hasControlDownWithQuirk())) {
+			return true;
+		}
 		// while the composer has focus every key is its own (Esc leaves it): no screen shortcut fires
 		if (ComposerInput.keyPressed(composer, e.key(), e.hasShiftDown(), e.hasControlDownWithQuirk())) {
+			return true;
+		}
+		// the open card: 1–9 choose, Enter next / send, ←/→ question, Tab "Other", Esc hides it
+		if (requestCard != null && focus != T3UiKeys.Focus.SEARCH && !anyMenuOpen() && !notifications
+				&& requestCard.keyPressed(e.key(), e.hasShiftDown(), e.hasControlDownWithQuirk())) {
 			return true;
 		}
 		if (e.isEscape() && !anyMenuOpen() && selectedDraft() != null && focus == T3UiKeys.Focus.LIST) {
@@ -1404,6 +1485,9 @@ public final class T3Screen extends Screen {
 			if (p.isOpen() && p.charTyped(event.codepoint())) {
 				return true;
 			}
+		}
+		if (requestCard != null && requestCard.owns()) {
+			return requestCard.charTyped(event.codepoint());
 		}
 		if (ComposerInput.owns(composer)) {
 			return ComposerInput.charTyped(composer, event.codepoint());

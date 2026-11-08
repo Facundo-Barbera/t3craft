@@ -68,8 +68,15 @@ public final class PortableClient {
 		return key;
 	}
 
-	/** The T3 key and the item: the unified T3 screen (feat/t3-ui-unified), most recent thread open. */
+	/**
+	 * The T3 key and the item: the unified T3 screen (feat/t3-ui-unified), most recent thread open.
+	 * feat/t3-user-input: right after a needs-input notice, the thread that asked (still waiting),
+	 * so its question / approval card is what opens.
+	 */
 	public static void open(T3CraftClient client) {
-		Minecraft.getInstance().gui.setScreen(ChatScreens.create(null));
+		String recent = dev.t3craft.client.hud.Notifier.takeRecentAsk(System.currentTimeMillis());
+		boolean waiting = recent != null
+				&& ChatScreens.defaultDirectory().rows().stream().anyMatch(r -> r.key().equals(recent) && (r.pendingRequest() || r.needsAttention()));
+		Minecraft.getInstance().gui.setScreen(ChatScreens.create(waiting ? recent : null));
 	}
 }
