@@ -2,6 +2,10 @@ package dev.t3craft.build.client;
 
 import dev.t3craft.build.BuildHandle;
 import dev.t3craft.build.BuildJob;
+import dev.t3craft.build.BuildPlanner;
+import dev.t3craft.client.npc.behavior.Collision;
+import dev.t3craft.client.npc.behavior.GridPathfinder;
+import dev.t3craft.client.npc.behavior.Pos;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Supplier;
@@ -31,6 +35,7 @@ final class BuildCrew implements BuildHandle {
 	private static final double LEAVE_DISTANCE = 18.0;
 	private static final double WALK_SPEED = 0.22;
 	private static final double WORK_SPEED = 0.35;
+	private static final double MAX_WORK_SPEED = 0.6;
 	private static final int ARRIVE_TIMEOUT_TICKS = 20 * 10;
 	private static final int LEAVE_TIMEOUT_TICKS = 20 * 6;
 
@@ -180,9 +185,60 @@ final class BuildCrew implements BuildHandle {
 		}
 		BuilderAvatar b = builders.get(Math.floorMod(front, builders.size()));
 		Vec3 block = Vec3.atCenterOf(pos);
-		b.walkTo(perimeterSpot(block.x, pos.getY(), block.z), WORK_SPEED);
+		BuildJob j = job;
+		if (j == null || j.planner() != BuildPlanner.CREW) {
+			// Layer order: no work spots from the server, stand outside the footprint as before.
+			b.walkTo(perimeterSpot(block.x, pos.getY(), block.z), WORK_SPEED);
+		}
 		b.lookAt(block);
 		b.place(state.isAir() ? ItemStack.EMPTY : new ItemStack(state.getBlock().asItem()));
+	}
+
+	/**
+	 * Crew plan ({@link BuildPlanner#CREW}): builder {@code front} walks to its next work spot
+	 * {@code stand} (feet cell) to place {@code target}; the server waits {@code ticks} before placing.
+	 * The route is the NPCs' A* over the real blocks; a straight line only when there is none (the
+	 * spot is on a virtual scaffold or the search gives up).
+	 */
+	void walking(int front, BlockPos stand, BlockPos target, int ticks) {
+		if (phase != Phase.BUILDING || builders.isEmpty()) {
+			return;
+		}
+		BuilderAvatar b = builders.get(Math.floorMod(front, builders.size()));
+		Vec3 goal = new Vec3(stand.getX() + 0.5, stand.getY(), stand.getZ() + 0.5);
+		Vec3 at = b.position();
+		List<Vec3> route = route(at, goal);
+		double len = 0;
+		Vec3 prev = at;
+		for (Vec3 p : route) {
+			len += Math.sqrt((p.x - prev.x) * (p.x - prev.x) + (p.z - prev.z) * (p.z - prev.z)) + Math.abs(p.y - prev.y);
+			prev = p;
+		}
+		// Arrive about when the server places: its walk time is for the straight distance.
+		double speed = Mth.clamp(len / Math.max(1, ticks), WALK_SPEED, MAX_WORK_SPEED);
+		b.follow(route, speed);
+		b.lookAt(Vec3.atCenterOf(target));
+	}
+
+	/** A* route over the real blocks from {@code from} to {@code goal}, ending exactly on {@code goal}. */
+	private List<Vec3> route(Vec3 from, Vec3 goal) {
+		List<Vec3> out = new ArrayList<>();
+		try {
+			GridPathfinder pf = new GridPathfinder(Collision.of(level));
+			List<Pos> path = pf.find(new Pos(from.x, from.y, from.z), new Pos(goal.x, goal.y, goal.z));
+			if (path != null) {
+				for (int i = 1; i < path.size(); i++) {
+					Pos p = path.get(i);
+					out.add(new Vec3(p.x(), p.y(), p.z()));
+				}
+			}
+		} catch (RuntimeException e) {
+			out.clear(); // unloaded chunk or similar: straight line below
+		}
+		if (out.isEmpty() || out.getLast().distanceToSqr(goal) > 1e-4) {
+			out.add(goal); // last stretch onto a scaffold spot, or no route at all
+		}
+		return out;
 	}
 
 	/** The job reached a terminal state (or the manager was cleared). */

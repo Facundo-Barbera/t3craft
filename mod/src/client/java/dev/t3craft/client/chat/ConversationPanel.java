@@ -118,6 +118,7 @@ public final class ConversationPanel implements AutoCloseable {
 	private Rect bounds = Rect.EMPTY;
 	private boolean compact;
 	private boolean showPrompt = true;
+	private boolean showHeader = true;
 	private @Nullable Navigation nav;
 	private @Nullable Footer footer;
 	private @Nullable Extra extra;
@@ -215,6 +216,17 @@ public final class ConversationPanel implements AutoCloseable {
 	/** Shows or hides the (disabled) command bar under the panel. */
 	public void setShowPrompt(boolean v) {
 		showPrompt = v;
+	}
+
+	/**
+	 * Shows or hides the header (title, environment, state, ‹ n/N ›): the unified T3 screen draws its
+	 * own thread header above the panel (feat/t3-ui-unified).
+	 */
+	public void setShowHeader(boolean v) {
+		if (showHeader != v) {
+			showHeader = v;
+			layoutDirty = true;
+		}
 	}
 
 	/** Puts {@code f} (the composer) where the reply bar was; null brings the bar back. */
@@ -864,65 +876,68 @@ public final class ConversationPanel implements AutoCloseable {
 			st = feed.state();
 		}
 
-		// ---- header: [env icon] title · sub ............ ‹ 3/12 ›
-		int right = x + w;
 		prevX = nextX = -100;
-		String pos = nav == null ? "" : nav.position();
-		navY = y;
-		if (!pos.isEmpty()) {
-			nextX = right - 12;
-			ChatDraw.keycap(g, font, t, "›", nextX, y);
-			int pw = font.width(pos) + 10;
-			int pillX = nextX - 3 - pw;
-			ChatDraw.pill(g, font, t, pos, pillX, y, t.text());
-			prevX = pillX - 15;
-			ChatDraw.keycap(g, font, t, "‹", prevX, y);
-			right = prevX - 6;
-		}
-		int hx = x;
-		if (!envId.isEmpty()) {
-			EnvBadge b = badge != null ? badge : EnvBadge.of(envId, envLabel);
-			ChatDraw.envIcon(g, font, b, hx, y + 1, 10);
-			hx += 14;
-		}
-		if (status != null) {
-			String fam = ChatTheme.family(status.state());
-			if (status.state() == ThreadState.NEEDS_ATTENTION) {
-				ChatDraw.pulsingDot(g, t, fam, t.color(status.state()), right - 7, y + 2);
-			} else {
-				ChatDraw.dot(g, t, fam, t.color(status.state()), right - 7, y + 2);
+		if (showHeader) {
+			// ---- header: [env icon] title · sub ............ ‹ 3/12 ›
+			int right = x + w;
+			prevX = nextX = -100;
+			String pos = nav == null ? "" : nav.position();
+			navY = y;
+			if (!pos.isEmpty()) {
+				nextX = right - 12;
+				ChatDraw.keycap(g, font, t, "›", nextX, y);
+				int pw = font.width(pos) + 10;
+				int pillX = nextX - 3 - pw;
+				ChatDraw.pill(g, font, t, pos, pillX, y, t.text());
+				prevX = pillX - 15;
+				ChatDraw.keycap(g, font, t, "‹", prevX, y);
+				right = prevX - 6;
 			}
-			right -= 12;
+			int hx = x;
+			if (!envId.isEmpty()) {
+				EnvBadge b = badge != null ? badge : EnvBadge.of(envId, envLabel);
+				ChatDraw.envIcon(g, font, b, hx, y + 1, 10);
+				hx += 14;
+			}
+			if (status != null) {
+				String fam = ChatTheme.family(status.state());
+				if (status.state() == ThreadState.NEEDS_ATTENTION) {
+					ChatDraw.pulsingDot(g, t, fam, t.color(status.state()), right - 7, y + 2);
+				} else {
+					ChatDraw.dot(g, t, fam, t.color(status.state()), right - 7, y + 2);
+				}
+				right -= 12;
+			}
+			String tt = shownTitle.isBlank() ? (key == null ? "Conversation" : "Thread") : shownTitle;
+			String sub = subtitle(status, st);
+			int titleW = Math.min(font.width(tt), right - hx);
+			g.text(font, ChatDraw.clip(font, tt, right - hx), hx, y + 2, t.text(), t.shadow());
+			int subX = hx + titleW + 6;
+			if (!compact && right - subX > 30) {
+				g.text(font, ChatDraw.clip(font, sub, right - subX), subX, y + 2, t.muted(), t.shadow());
+			}
+			if (status != null && mouseY >= y && mouseY < y + 12 && mouseX >= right && mouseX < right + 12) {
+				g.setTooltipForNextFrame(font, Component.literal(status.state().word + (status.detail().isBlank() ? "" : " · " + status.detail())),
+						mouseX, mouseY);
+			}
+			if (!compact) {
+				// second line: state detail and connection
+				String detail = status == null ? "" : status.state().word + (status.detail().isBlank() || status.detail().equals(status.state().word)
+						? "" : " · " + status.detail());
+				String conn = connection(st);
+				int cw = font.width(conn);
+				int ly = y + 13;
+				g.text(font, ChatDraw.clip(font, detail, w - cw - 8), x, ly, status == null ? t.muted() : t.color(status.state()), t.shadow());
+				int connColor = st == null ? t.muted() : st.phase() == ThreadFeed.Phase.LIVE ? t.done()
+						: st.phase() == ThreadFeed.Phase.FAILED ? t.error() : t.pending();
+				g.text(font, conn, x + w - cw, ly, connColor, t.shadow());
+				y += HEADER_H + 4;
+			} else {
+				y += COMPACT_HEADER_H;
+			}
+			g.fill(x, y, x + w, y + 1, t.edge());
+			y += 4;
 		}
-		String tt = shownTitle.isBlank() ? (key == null ? "Conversation" : "Thread") : shownTitle;
-		String sub = subtitle(status, st);
-		int titleW = Math.min(font.width(tt), right - hx);
-		g.text(font, ChatDraw.clip(font, tt, right - hx), hx, y + 2, t.text(), t.shadow());
-		int subX = hx + titleW + 6;
-		if (!compact && right - subX > 30) {
-			g.text(font, ChatDraw.clip(font, sub, right - subX), subX, y + 2, t.muted(), t.shadow());
-		}
-		if (status != null && mouseY >= y && mouseY < y + 12 && mouseX >= right && mouseX < right + 12) {
-			g.setTooltipForNextFrame(font, Component.literal(status.state().word + (status.detail().isBlank() ? "" : " · " + status.detail())),
-					mouseX, mouseY);
-		}
-		if (!compact) {
-			// second line: state detail and connection
-			String detail = status == null ? "" : status.state().word + (status.detail().isBlank() || status.detail().equals(status.state().word)
-					? "" : " · " + status.detail());
-			String conn = connection(st);
-			int cw = font.width(conn);
-			int ly = y + 13;
-			g.text(font, ChatDraw.clip(font, detail, w - cw - 8), x, ly, status == null ? t.muted() : t.color(status.state()), t.shadow());
-			int connColor = st == null ? t.muted() : st.phase() == ThreadFeed.Phase.LIVE ? t.done()
-					: st.phase() == ThreadFeed.Phase.FAILED ? t.error() : t.pending();
-			g.text(font, conn, x + w - cw, ly, connColor, t.shadow());
-			y += HEADER_H + 4;
-		} else {
-			y += COMPACT_HEADER_H;
-		}
-		g.fill(x, y, x + w, y + 1, t.edge());
-		y += 4;
 
 		// ---- who needs it (AgentCraft speech bubble)
 		if (status != null && status.needs() != null) {
