@@ -226,6 +226,8 @@
 	"t3craft.hq.layout.ensanche.desc": "Blocks with inner patios on a street grid round a main square.",
 	"t3craft.hq.layout.village.name": "Village",
 	"t3craft.hq.layout.village.desc": "An organic hill village on terraces.",
+	"t3craft.hq.layout.hybrid-terraces.name": "Terraced acropolis",
+	"t3craft.hq.layout.hybrid-terraces.desc": "A temple and plaza on the highest terrace, barrios on stepped terraces joined by stairways and bridges to sky islands.",
 	"t3craft.operate.kind.thread_configure": "Change model / mode",
 	"t3craft.operate.kind.project_create": "Register project",
 	"t3craft.actions.enable_control": "Enable control",

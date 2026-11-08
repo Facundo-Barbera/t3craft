@@ -34,10 +34,11 @@ public final class HqStyles {
 	 * but not in {@link #all()}, which lists the styles that paint the shared spine geometry.
 	 * layout/campus: {@link CampusStyle}; layout/ring: {@link RingStyle}; layout/vertical: {@link VerticalStyle};
 	 * layout/blocks: {@link EnsancheStyle}; design/hybrid-ringcampus: {@link RingCampusStyle};
-	 * design/hybrid-towncenter: {@link TowncenterStyle}.
+	 * design/hybrid-towncenter: {@link TowncenterStyle};
+	 * design/hybrid-terraces: {@link TerraceStyle}.
 	 */
 	private static final List<HqStyle> LAYOUTS = List.of(new CampusStyle(), new RingStyle(), new VerticalStyle(), new EnsancheStyle(),
-			new VillageStyle(), new RingCampusStyle(), new TowncenterStyle());
+			new VillageStyle(), new RingCampusStyle(), new TowncenterStyle(), new TerraceStyle());
 	private static volatile @Nullable HqStyle active;
 
 	private HqStyles() {
