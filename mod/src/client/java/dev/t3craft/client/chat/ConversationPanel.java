@@ -321,10 +321,12 @@ public final class ConversationPanel implements AutoCloseable {
 			if (envLabel.isBlank()) {
 				this.envLabel = env.label();
 			}
-			// shared, refcounted subscription on the environment's connection (no socket of our own)
+			// shared, refcounted subscription on the environment's connection (no socket of our own);
+			// a cached thread paints its rows at once and reconciles when the snapshot comes
 			feed = new ThreadFeed(env, threadId, () -> {
 			});
 			feed.start();
+			ThreadCache.get().noteOpened(k);
 		} catch (ChatSource.Unavailable e) {
 			message = e.getMessage();
 			messageAction = e.action();
@@ -1131,6 +1133,16 @@ public final class ConversationPanel implements AutoCloseable {
 			String msg = fs.phase() == ThreadFeed.Phase.LIVE ? "No messages yet." : fs.detail();
 			g.centeredText(font, Component.literal(ChatDraw.clip(font, msg, well.w() - 20)), well.x() + well.w() / 2, well.y() + well.h() / 2,
 					t.muted());
+		}
+		if (f != null) {
+			ThreadFeed.State rs = f.state();
+			if (rs.refreshing()) {
+				// subtle: the rows are the cached ones until the fresh snapshot is in
+				String tag = rs.phase() == ThreadFeed.Phase.OFFLINE ? (rs.fromDisk() ? "cached · offline" : "offline")
+						: rs.fromDisk() ? "⟳ cached" : "⟳ updating";
+				int tw = font.width(tag) + 10;
+				ChatDraw.pill(g, font, t, tag, well.right() - 12 - tw, well.y() + 4, t.muted());
+			}
 		}
 		boolean barHover = mouseX >= well.right() - 8 && mouseX < well.right() - 2 && well.contains(mouseX, mouseY);
 		ChatDraw.scrollbar(g, t, well.right() - 8, well.y() + 2, well.h() - 4, scroll.content(), scroll.view(), scroll.fraction(), barHover);

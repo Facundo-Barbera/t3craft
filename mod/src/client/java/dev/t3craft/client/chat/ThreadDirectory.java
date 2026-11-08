@@ -13,6 +13,14 @@ public interface ThreadDirectory {
 	/** Every known thread of every environment, any order (the list sorts them). */
 	List<ThreadRow> rows();
 
+	/**
+	 * True when some rows come from the disk cache (feat/t3-thread-cache) and the real list has not
+	 * arrived yet: the sidebar marks the list as cached.
+	 */
+	default boolean cached() {
+		return false;
+	}
+
 	/** Environment id → info, in display order (filter chips). */
 	Map<String, ThreadList.EnvInfo> environments();
 }

@@ -57,6 +57,10 @@ public final class ChatTranscript {
 	private @Nullable String historyCursor;
 	private long sequence = -1;
 	private long version;
+	/** Snapshots applied so far (the cache tells a fresh one from the one it painted from). */
+	private long snapshots;
+	/** Rows came from the disk cache ({@link #seed}) and no snapshot replaced them yet. */
+	private boolean seeded;
 	private @Nullable View cached;
 
 	public ChatTranscript(String threadId) {
@@ -74,6 +78,69 @@ public final class ChatTranscript {
 
 	public synchronized boolean hasSnapshot() {
 		return sequence >= 0;
+	}
+
+	/** Number of snapshots applied (0 before the first). */
+	public synchronized long snapshots() {
+		return snapshots;
+	}
+
+	/** True while the rows shown come from the disk cache only (no snapshot yet). */
+	public synchronized boolean seeded() {
+		return seeded;
+	}
+
+	/**
+	 * Applies a batch of stream items under one lock, so the screen never sees a half-applied batch
+	 * (a fresh snapshot without the events that follow it). Returns true when something changed.
+	 */
+	public synchronized boolean applyStreamItems(List<JsonObject> items) {
+		boolean changed = false;
+		for (JsonObject item : items) {
+			changed |= applyStreamItem(item);
+		}
+		return changed;
+	}
+
+	/**
+	 * Paints rows kept on disk (feat/t3-thread-cache) before the first snapshot. No-op once the
+	 * transcript has a snapshot or rows; the next snapshot replaces them entirely.
+	 */
+	public synchronized boolean seed(String cachedTitle, List<ChatEntry> tail) {
+		if (sequence >= 0 || !entries.isEmpty() || tail.isEmpty()) {
+			return false;
+		}
+		if (cachedTitle != null && !cachedTitle.isBlank()) {
+			title = cachedTitle;
+		}
+		entries.addAll(tail);
+		seeded = true;
+		touch();
+		return true;
+	}
+
+	/** The last {@code n} finished rows (no streaming ones), oldest first: what the disk cache keeps. */
+	public synchronized List<ChatEntry> tail(int n) {
+		List<ChatEntry> done = new ArrayList<>();
+		for (ChatEntry e : entries) {
+			if (!e.streaming()) {
+				done.add(e);
+			}
+		}
+		return List.copyOf(done.subList(Math.max(0, done.size() - n), done.size()));
+	}
+
+	public synchronized String title() {
+		return title;
+	}
+
+	/** Rough size in chars (bodies, details, titles + a per-row overhead): the cache's byte budget. */
+	public synchronized long approxChars() {
+		long n = 0;
+		for (ChatEntry e : entries) {
+			n += 96 + e.key().length() + e.title().length() + e.body().length() + (e.detail() == null ? 0 : e.detail().length());
+		}
+		return n;
 	}
 
 	/**
@@ -109,7 +176,15 @@ public final class ChatTranscript {
 		if (projection == null) {
 			return false;
 		}
+		// feat/t3-thread-cache: a re-snapshot over a cached transcript keeps the older pages the view
+		// already loaded when they line up with the new window (no jump, no re-fetch). Rows that came
+		// from disk are never kept: the snapshot replaces them.
+		List<ChatEntry> previous = sequence >= 0 && !seeded ? List.copyOf(entries) : List.of();
+		String previousCursor = historyCursor;
+		boolean previousMore = hasMoreHistory;
 		sequence = Json.num(item, "snapshotSequence", 0);
+		snapshots++;
+		seeded = false;
 		historyCursor = Json.str(item, "historyCursor");
 		hasMoreHistory = Json.bool(item, "hasMoreHistory") && historyCursor != null;
 		entries.clear();
@@ -136,6 +211,25 @@ public final class ChatTranscript {
 				if (e != null) {
 					seen.putIfAbsent(e.key(), e);
 				}
+			}
+		}
+		if (hasMoreHistory && !seen.isEmpty() && !previous.isEmpty()) {
+			String firstNew = seen.keySet().iterator().next();
+			int at = -1;
+			for (int i = 0; i < previous.size(); i++) {
+				if (previous.get(i).key().equals(firstNew)) {
+					at = i;
+					break;
+				}
+			}
+			if (at > 0) {
+				for (ChatEntry e : previous.subList(0, at)) {
+					if (!seen.containsKey(e.key())) {
+						entries.add(e);
+					}
+				}
+				historyCursor = previousCursor;
+				hasMoreHistory = previousMore && previousCursor != null;
 			}
 		}
 		entries.addAll(seen.values());

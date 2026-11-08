@@ -9,6 +9,8 @@ import dev.t3craft.client.chat.ConversationPanel;
 import dev.t3craft.client.chat.EnvBadge;
 import dev.t3craft.client.chat.MouseButtons;
 import dev.t3craft.client.chat.Rect;
+import dev.t3craft.client.chat.ThreadCache;
+import dev.t3craft.client.chat.ThreadListCache;
 import dev.t3craft.client.chat.ThreadDirectory;
 import dev.t3craft.client.chat.ThreadRow;
 import dev.t3craft.client.chat.compose.ChatComposer;
@@ -105,6 +107,17 @@ public final class T3Screen extends Screen {
 	/** Rows of the open menu (⋯ or project), drawn over everything. */
 	private final List<Hit> menuHits = new ArrayList<>();
 	private final Set<String> spansEnvs = new HashSet<>();
+
+	/** feat/t3-thread-cache: the rows last given to the model (skip the rebuild when unchanged). */
+	private @Nullable List<ThreadRow> lastRows;
+	/** Screen-open prewarm done (last opened, running, pinned threads; at most {@link #PREWARM_ON_OPEN}). */
+	private boolean prewarmed;
+	/** Sidebar row under the pointer and since when (hover prewarm after {@link #HOVER_PREWARM_MS}). */
+	private @Nullable String hoverKey;
+	private long hoverSince;
+	private @Nullable String hoverWarmed;
+	private static final int PREWARM_ON_OPEN = 3;
+	private static final long HOVER_PREWARM_MS = 250;
 
 	private record Hit(Rect r, Runnable action, @Nullable Runnable right, @Nullable List<String> tooltip) {
 	}
@@ -254,6 +267,7 @@ public final class T3Screen extends Screen {
 			c.close();
 			conversation = null;
 		}
+		ThreadListCache.get().save(); // feat/t3-thread-cache: list + recent tails for the next game start
 		super.removed();
 	}
 
@@ -268,9 +282,13 @@ public final class T3Screen extends Screen {
 
 	private void refresh() {
 		List<ThreadRow> rows = directory.rows();
-		model.update(rows);
-		spansEnvs.clear();
-		rows.forEach(r -> spansEnvs.add(r.env()));
+		// the directory hands back the same list while nothing changed: no rebuild per tick
+		if (rows != lastRows && !rows.equals(lastRows)) {
+			lastRows = rows;
+			model.update(rows);
+			spansEnvs.clear();
+			rows.forEach(r -> spansEnvs.add(r.env()));
+		}
 		if (!autoSelected && !model.threads().isEmpty()) {
 			// first fill with nothing asked for: open the first thread of the list
 			autoSelected = true;
@@ -280,9 +298,69 @@ public final class T3Screen extends Screen {
 				showRow(r);
 			}
 		}
+		if (!prewarmed && !rows.isEmpty() && conversation != null) {
+			prewarmed = true;
+			prewarmOnOpen(rows);
+		}
 		ConversationPanel c = conversation;
 		if (c != null && c.key() == null && model.selected() == null && key == null) {
 			c.showNothing(model.all().isEmpty() ? "No threads yet. Pair an environment from the menu (⋯ › Environments)." : "Select a thread.");
+		}
+	}
+
+	// ---- prewarm (feat/t3-thread-cache) --------------------------------------------------------
+
+	/** At most {@link #PREWARM_ON_OPEN} threads: the last one opened, then running, then pinned. */
+	private void prewarmOnOpen(List<ThreadRow> rows) {
+		List<ThreadRow> picks = new ArrayList<>();
+		String shown = key;
+		String last = ThreadCache.get().lastOpened();
+		if (last != null && !last.equals(shown)) {
+			rows.stream().filter(r -> r.key().equals(last)).findFirst().ifPresent(picks::add);
+		}
+		for (ThreadRow r : rows) {
+			if (r.state() == dev.t3craft.t3.ThreadState.WORKING && !picks.contains(r)) {
+				picks.add(r);
+			}
+		}
+		for (ThreadRow r : rows) {
+			if (r.pinned() && !picks.contains(r)) {
+				picks.add(r);
+			}
+		}
+		int n = 0;
+		for (ThreadRow r : picks) {
+			if (n >= PREWARM_ON_OPEN) {
+				break;
+			}
+			if (!r.key().equals(shown) && prewarm(r)) {
+				n++;
+			}
+		}
+	}
+
+	/** Hover over a sidebar thread: warm it once the pointer rests on it. */
+	private void hoverPrewarm(ThreadRow r, boolean selected) {
+		long now = System.currentTimeMillis();
+		if (!r.key().equals(hoverKey)) {
+			hoverKey = r.key();
+			hoverSince = now;
+			return;
+		}
+		if (!selected && !r.key().equals(hoverWarmed) && now - hoverSince >= HOVER_PREWARM_MS) {
+			hoverWarmed = r.key();
+			prewarm(r);
+		}
+	}
+
+	private boolean prewarm(ThreadRow r) {
+		if (r.threadId() == null || readOnly()) {
+			return false;
+		}
+		try {
+			return ThreadCache.get().prewarm(source.env(r.env()), r.threadId());
+		} catch (ChatSource.Unavailable | RuntimeException e) {
+			return false;
 		}
 	}
 
@@ -407,7 +485,8 @@ public final class T3Screen extends Screen {
 		Rect b = sr.brand();
 		g.text(font, "T3", b.x() + 1, b.y() + 2, t.accent(), t.shadow());
 		int attention = (int) model.all().stream().filter(ThreadRow::needsAttention).count();
-		String sub = model.all().size() + " threads" + (attention > 0 ? " · " + attention + " need you" : "");
+		String sub = model.all().size() + " threads" + (attention > 0 ? " · " + attention + " need you" : "")
+				+ (directory.cached() ? " · cached" : "");
 		int menuW = 16;
 		g.text(font, ChatDraw.clip(font, sub, b.w() - 20 - menuW - 4), b.x() + 16, b.y() + 2, attention > 0 ? t.needsYou() : t.muted(), t.shadow());
 		Rect menu = new Rect(b.right() - menuW, b.y(), menuW, b.h());
@@ -530,6 +609,9 @@ public final class T3Screen extends Screen {
 						continue;
 					}
 					boolean selected = r.key().equals(model.selectedKey());
+					if (hover) {
+						hoverPrewarm(r, selected);
+					}
 					if (selected) {
 						g.fill(rr.x(), ry, rr.right(), rr.bottom(), t.selected());
 						g.fill(rr.x(), ry, rr.x() + 2, rr.bottom(), focus == T3UiKeys.Focus.LIST ? t.accent() : t.edge());
