@@ -15,7 +15,8 @@ import org.jspecify.annotations.Nullable;
  * "demo": {
  *   "worldFolder": "t3craft-hq",     // save folder (letters, digits, _ and -)
  *   "worldName": "T3Craft HQ",       // name in the world list
- *   "origin": [0, -60, 8],           // plan origin; -60 stands on default superflat grass
+ *   "world": "void",                 // new HQ worlds: "void" (floating islands, default) or "flat" (superflat grass)
+ *   "origin": [0, 64, 8],            // plan origin; default y 64 in a void world, -60 (on the grass) in a flat one
  *   "structure": "auto",             // "auto" | "hq" | "shed"
  *   "blocksPerTick": 2.0,
  *   "crew": 4,
@@ -25,13 +26,23 @@ import org.jspecify.annotations.Nullable;
  * }</pre>
  */
 public record DemoConfig(DemoWorldSpec spec, String structure, double blocksPerTick, int crew, boolean titleButton,
-		List<String> warnings, boolean resetBackup) {
+		List<String> warnings, boolean resetBackup, String world, boolean originSet) {
 
 	public static final double DEFAULT_BLOCKS_PER_TICK = 2.0;
 	public static final int DEFAULT_CREW = 4;
+	/** feat/hq-void-world: {@code demo.world} values (what a newly created HQ world is). */
+	public static final String WORLD_VOID = "void";
+	public static final String WORLD_FLAT = "flat";
 
 	public DemoConfig {
 		warnings = List.copyOf(warnings);
+		world = WORLD_FLAT.equals(world) ? WORLD_FLAT : WORLD_VOID;
+	}
+
+	/** Pre-void-world constructor (new worlds void, origin not configured). */
+	public DemoConfig(DemoWorldSpec spec, String structure, double blocksPerTick, int crew, boolean titleButton, List<String> warnings,
+			boolean resetBackup) {
+		this(spec, structure, blocksPerTick, crew, titleButton, warnings, resetBackup, WORLD_VOID, false);
 	}
 
 	/** Pre-reset-hq constructor (backup on). */
@@ -40,7 +51,31 @@ public record DemoConfig(DemoWorldSpec spec, String structure, double blocksPerT
 	}
 
 	public DemoConfig withResetBackup(boolean on) {
-		return new DemoConfig(spec, structure, blocksPerTick, crew, titleButton, warnings, on);
+		return new DemoConfig(spec, structure, blocksPerTick, crew, titleButton, warnings, on, world, originSet);
+	}
+
+	/** Whether a world created now is a void world ({@code demo.world}, default {@code "void"}). */
+	public boolean createsVoid() {
+		return WORLD_VOID.equals(world);
+	}
+
+	/**
+	 * feat/hq-void-world: this config for the HQ world as it actually is (void or flat, detected from the
+	 * save; existing flat worlds stay flat whatever {@code demo.world} says). Without a configured
+	 * {@code demo.origin} the origin height follows the world: {@link DemoWorldSpec#VOID_ORIGIN_Y} in a
+	 * void world, {@link DemoWorldSpec#DEFAULT_ORIGIN_Y} on the superflat grass.
+	 */
+	public DemoConfig forWorld(boolean voidWorld) {
+		DemoWorldSpec s = spec.withVoid(voidWorld);
+		if (!originSet) {
+			s = s.withOrigin(s.originX(), voidWorld ? DemoWorldSpec.VOID_ORIGIN_Y : DemoWorldSpec.DEFAULT_ORIGIN_Y, s.originZ());
+		}
+		return new DemoConfig(s, structure, blocksPerTick, crew, titleButton, warnings, resetBackup, world, originSet);
+	}
+
+	/** The spec a new world is created with ({@link #createsVoid()}). */
+	public DemoWorldSpec newWorldSpec() {
+		return forWorld(createsVoid()).spec();
 	}
 
 	public static DemoConfig defaults() {
@@ -67,13 +102,20 @@ public record DemoConfig(DemoWorldSpec spec, String structure, double blocksPerT
 		}
 		spec = spec.withFolder(folder, name);
 
+		boolean originSet = false;
 		if (d.has("origin")) {
 			int[] o = origin(d.get("origin"));
 			if (o == null) {
 				warn.add("demo.origin");
 			} else {
 				spec = spec.withOrigin(o[0], o[1], o[2]);
+				originSet = true;
 			}
+		}
+		String world = string(d, "world", WORLD_VOID, warn);
+		if (!WORLD_VOID.equals(world) && !WORLD_FLAT.equals(world)) {
+			warn.add("demo.world");
+			world = WORLD_VOID;
 		}
 
 		String structure = string(d, "structure", DemoStructures.AUTO, warn);
@@ -81,7 +123,7 @@ public record DemoConfig(DemoWorldSpec spec, String structure, double blocksPerT
 		int crew = (int) number(d, "crew", DEFAULT_CREW, 1, 8, warn);
 		boolean button = bool(d, "titleButton", true, warn);
 		boolean backup = bool(d, "resetBackup", true, warn);
-		return new DemoConfig(spec, structure.isBlank() ? DemoStructures.AUTO : structure, bpt, crew, button, warn, backup);
+		return new DemoConfig(spec, structure.isBlank() ? DemoStructures.AUTO : structure, bpt, crew, button, warn, backup, world, originSet);
 	}
 
 	private static int @Nullable [] origin(JsonElement e) {

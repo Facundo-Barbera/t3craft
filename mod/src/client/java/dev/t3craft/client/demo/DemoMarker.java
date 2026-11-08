@@ -15,8 +15,14 @@ import org.jspecify.annotations.Nullable;
  * @param version   plan version of that structure
  * @param hash      {@link DemoStructureSource#revision()} of what was built (e.g. the HQ layout hash), or null
  * @param state     opaque data of the source to compute the next diff (e.g. the HQ layout), or null
+ * @param starter   feat/hq-void-world: world cell of the starter island's centre (its grass), once
+ *                  placed in a void HQ world; null in flat worlds and before it is placed
  */
-public record DemoMarker(int setup, @Nullable String structure, int version, @Nullable String hash, @Nullable JsonObject state) {
+public record DemoMarker(int setup, @Nullable String structure, int version, @Nullable String hash, @Nullable JsonObject state,
+		@Nullable Cell starter) {
+	/** A world block cell (kept free of Minecraft types). */
+	public record Cell(int x, int y, int z) {
+	}
 	public static final String FILE_NAME = "t3craft-demo.json";
 	/** Bump when {@link VanillaDemoWorld#applySetup} changes and should run again on old demo worlds. */
 	public static final int SETUP_VERSION = 1;
@@ -24,6 +30,10 @@ public record DemoMarker(int setup, @Nullable String structure, int version, @Nu
 
 	public DemoMarker(int setup, @Nullable String structure, int version) {
 		this(setup, structure, version, null, null);
+	}
+
+	public DemoMarker(int setup, @Nullable String structure, int version, @Nullable String hash, @Nullable JsonObject state) {
+		this(setup, structure, version, hash, state, null);
 	}
 
 	/** Whether this marker records a complete build of {@code source} with its current version. */
@@ -48,11 +58,15 @@ public record DemoMarker(int setup, @Nullable String structure, int version, @Nu
 	}
 
 	public DemoMarker withBuilt(DemoStructureSource source) {
-		return new DemoMarker(setup, source.id(), source.version(), source.revision(), source.state());
+		return new DemoMarker(setup, source.id(), source.version(), source.revision(), source.state(), starter);
 	}
 
 	public DemoMarker withSetup() {
-		return new DemoMarker(SETUP_VERSION, structure, version, hash, state);
+		return new DemoMarker(SETUP_VERSION, structure, version, hash, state, starter);
+	}
+
+	public DemoMarker withStarter(@Nullable Cell c) {
+		return new DemoMarker(setup, structure, version, hash, state, c);
 	}
 
 	public String toJson() {
@@ -67,6 +81,13 @@ public record DemoMarker(int setup, @Nullable String structure, int version, @Nu
 		}
 		if (state != null) {
 			o.add("state", state);
+		}
+		if (starter != null) {
+			com.google.gson.JsonArray a = new com.google.gson.JsonArray();
+			a.add(starter.x());
+			a.add(starter.y());
+			a.add(starter.z());
+			o.add("starter", a);
 		}
 		return o.toString();
 	}
@@ -86,9 +107,21 @@ public record DemoMarker(int setup, @Nullable String structure, int version, @Nu
 			String structure = o.has("structure") && o.get("structure").isJsonPrimitive() ? o.get("structure").getAsString() : null;
 			String hash = o.has("hash") && o.get("hash").isJsonPrimitive() ? o.get("hash").getAsString() : null;
 			JsonObject state = o.has("state") && o.get("state").isJsonObject() ? o.getAsJsonObject("state") : null;
-			return new DemoMarker(setup, structure, intOr(o, "version", 0), hash, state);
+			return new DemoMarker(setup, structure, intOr(o, "version", 0), hash, state, cell(o, "starter"));
 		} catch (RuntimeException ex) {
 			return EMPTY;
+		}
+	}
+
+	private static @Nullable Cell cell(JsonObject o, String key) {
+		try {
+			if (!o.has(key) || !o.get(key).isJsonArray() || o.getAsJsonArray(key).size() != 3) {
+				return null;
+			}
+			com.google.gson.JsonArray a = o.getAsJsonArray(key);
+			return new Cell(a.get(0).getAsInt(), a.get(1).getAsInt(), a.get(2).getAsInt());
+		} catch (RuntimeException ex) {
+			return null;
 		}
 	}
 

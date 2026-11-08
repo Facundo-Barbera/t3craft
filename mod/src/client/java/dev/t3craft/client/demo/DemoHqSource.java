@@ -122,7 +122,10 @@ public final class DemoHqSource implements DemoStructureSource {
 			int lift = DemoHq.lift(spec.originY(), worldMinY, planMinY);
 			boolean diffable = built.builtWith(this) && previousLift == lift;
 			roster = r;
-			step = DemoHq.step(r.input(), previous, built.hash(), lift, diffable, previousFixtures, previous != null && previousLift == lift, previousPack);
+			// feat/hq-void-world: in a void world the HQ stands on its island (grown from the one already built)
+			DemoHq.Island island = spec.voidWorld() ? new DemoHq.Island(ours ? DemoHq.island(st) : null, starter(built, spec)) : null;
+			step = DemoHq.step(r.input(), previous, built.hash(), lift, diffable, previousFixtures, previous != null && previousLift == lift, previousPack,
+					island);
 			preparedInput = r.input();
 			preparedPacks = dev.t3craft.hq.pack.HqLayoutPacks.generation();
 			failed = false;
@@ -133,6 +136,12 @@ public final class DemoHqSource implements DemoStructureSource {
 			preparedInput = null;
 			failed = true;
 		}
+	}
+
+	/** The starter island recorded in the marker, demo-relative (null when none was placed). */
+	static VoidIsland.@Nullable Starter starter(DemoMarker built, DemoWorldSpec spec) {
+		DemoMarker.Cell c = built.starter();
+		return c == null ? null : new VoidIsland.Starter(c.x() - spec.originX(), c.y() - spec.originY(), c.z() - spec.originZ());
 	}
 
 	/**
@@ -181,7 +190,7 @@ public final class DemoHqSource implements DemoStructureSource {
 	@Override
 	public List<BuildPlan> plans() {
 		DemoHq.Step s = step;
-		return s == null ? List.of() : DemoHq.full(s.plan(), s.lift());
+		return s == null ? List.of() : s.everything();
 	}
 
 	@Override
@@ -215,8 +224,8 @@ public final class DemoHqSource implements DemoStructureSource {
 			return failed ? "failed" : "not prepared";
 		}
 		String pending = pendingLayout;
-		return String.format(java.util.Locale.ROOT, "layout %s%s, %s roster, %d module(s), hash %s, lift %d, fixtures %s", layoutId,
+		return String.format(java.util.Locale.ROOT, "layout %s%s, %s roster, %d module(s), hash %s, lift %d, fixtures %s%s", layoutId,
 				pending == null ? "" : " (configured " + pending + ": applies after a reset)", sample() ? "example" : "live",
-				s.layout().modules().size(), s.hash(), s.lift(), s.fixtures());
+				s.layout().modules().size(), s.hash(), s.lift(), s.fixtures(), s.island() == null ? "" : ", void island " + s.island());
 	}
 }
