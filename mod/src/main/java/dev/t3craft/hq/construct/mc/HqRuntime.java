@@ -56,7 +56,10 @@ import org.jspecify.annotations.Nullable;
  */
 public final class HqRuntime {
 	/** What the client needs to place NPCs and workstations: plan, where it stands, built site modules. */
-	public record Built(@Nullable BuildPlan plan, @Nullable HqSite site, Set<String> modules) {
+	public record Built(@Nullable BuildPlan plan, @Nullable HqSite site, Set<String> modules, @Nullable String dimension) {
+		public Built(@Nullable BuildPlan plan, @Nullable HqSite site, Set<String> modules) {
+			this(plan, site, modules, null);
+		}
 	}
 
 	private static @Nullable MinecraftServer server;
@@ -343,7 +346,9 @@ public final class HqRuntime {
 
 		@Override
 		public void anchors(@Nullable BuildPlan plan, @Nullable HqSite site, Set<String> built) {
-			anchorSink.accept(new Built(plan, site, Set.copyOf(built)));
+			// fix/hq-gate-npcs: the site's dimension, so the client shows NPCs only there (HqPresence.allows)
+			SiteHandle h = SiteRuntime.service(s).handle();
+			anchorSink.accept(new Built(plan, site, Set.copyOf(built), h == null ? null : h.dimension()));
 		}
 
 		@Override

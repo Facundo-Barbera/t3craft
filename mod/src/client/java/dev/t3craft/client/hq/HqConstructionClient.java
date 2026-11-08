@@ -66,7 +66,7 @@ public final class HqConstructionClient implements ClientModInitializer {
 		SiteRuntime.setBuilderFactory(CrewBridge.siteBuilder());
 		HqRuntime.setWriter(CrewBridge.writer(HqRuntime.pacedWriter()));
 		HqRuntime.setAnchorSink(b -> Minecraft.getInstance().execute(() -> HqPresence.site(
-				b.plan() == null || b.site() == null ? null : new HqPresence.Standing(b.plan(), b.site(), b.modules()))));
+				b.plan() == null || b.site() == null ? null : new HqPresence.Standing(b.plan(), b.site(), b.modules(), b.dimension()))));
 		ServerTickEvents.END_SERVER_TICK.register(s -> CrewBridge.tick());
 		ServerLifecycleEvents.SERVER_STOPPING.register(s -> CrewBridge.clear());
 		ClientTickEvents.END_CLIENT_TICK.register(this::tick);

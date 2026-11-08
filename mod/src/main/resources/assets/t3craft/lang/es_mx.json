@@ -140,7 +140,7 @@
 	"t3craft.operate.launch.summary": "Vas a lanzar un hilo nuevo:",
 	"t3craft.operate.launch.summary.title": "Título: %s",
 	"t3craft.operate.launch.summary.prompt": "Prompt: %s",
-	"t3craft.operate.launch.summary.mode": "Se ejecuta pidiendo aprobaciones, en el checkout del proyecto. El NPC aparece cuando T3 lo liste.",
+	"t3craft.operate.launch.summary.mode": "Se ejecuta pidiendo aprobaciones, en el checkout del proyecto. Cuando T3 lo liste, su NPC trabaja en un escritorio de tu HQ (construye el HQ para verlo).",
 	"t3craft.operate.launch.no_envs": "Ningún entorno tiene el control (operate) habilitado. Habilítalo en Entornos → Control…",
 	"t3craft.operate.launch.no_projects": "No hay proyectos conocidos en este entorno (¿está conectado?).",
 	"t3craft.operate.launch.open": "Abrir chat",

@@ -104,7 +104,8 @@ public final class HologramClient implements ClientModInitializer {
 		if (client == null) {
 			return;
 		}
-		boolean enabled = ConfigManager.get().settings().hud().hologram();
+		// fix/hq-gate-npcs: the hologram stands only in the HQ's own world and dimension
+		boolean enabled = ConfigManager.get().settings().hud().hologram() && HqPresence.allows(mc);
 		if (!enabled) {
 			state.update(new HologramModel.Inputs(List.of(), 0, false, false));
 			renderer.clear(lvl);
@@ -166,11 +167,8 @@ public final class HologramClient implements ClientModInitializer {
 			lastStanding = s;
 			hqAnchor = s == null ? null : hqAnchor(s);
 		}
-		if (hqAnchor != null) {
-			return hqAnchor;
-		}
-		Anchor board = client.npcs().fallbackLayout().board();
-		return board == null ? null : board.pos();
+		// fix/hq-gate-npcs: no fallback over the provisional grid; without an HQ anchor, no hologram
+		return hqAnchor;
 	}
 
 	/** The hub anchor once the module holding it stands, else the HQ board, else null. */
