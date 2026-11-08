@@ -66,6 +66,10 @@ public final class HqGenerator {
 	/** The plan of {@code layout}, with its built-in lighting ({@link HqLighting}: no dark walkable cell). */
 	public BuildPlan generate(HqLayout layout) {
 		BuildPlan own = style.layoutPlan(layout);
+		if (own != null) {
+			// feat/lead-office: layouts that draw no office of their own get the fallback by the lead's desk
+			own = LeadOfficeDecor.apply(own, layout, style);
+		}
 		// feat/hq-layout-packs: the layout's pack (config/t3craft/hq-layouts) adds rooms, materials and its hash; none: as before
 		dev.t3craft.hq.pack.LayoutPack pack = dev.t3craft.hq.pack.HqLayoutPacks.pack(PackApply.layoutOf(style));
 		return PackApply.withPack(own != null ? own : spine(layout), style, pack);
@@ -263,8 +267,10 @@ public final class HqGenerator {
 		for (int s = 0; s < w.segments(); s++) {
 			segment(b, i, s, accent, s == w.segments() - 1 ? HqGeometry.moduleScreen(i, w.segments()) : null, "project:" + w.projectKey());
 		}
+		// feat/lead-office: a lead's own module is drawn as an office (vacant slots get its furniture)
+		boolean office = w.type() == HqLayout.Type.LEAD_OFFICE;
 		for (int slot = 0; slot < w.capacity(); slot++) {
-			desk(b, i, slot, w.threadAt(slot));
+			desk(b, i, slot, w.threadAt(slot), office ? accent : null);
 		}
 		boolean first = layout.modulesOf(w.projectKey()).get(0) == w;
 		Anchor door = Anchor.at(AnchorNames.module(i), new BlockPos(HqGeometry.wx(i, 1), 1, HqGeometry.wz(i, (DOOR_V1 + DOOR_V2) / 2)),
@@ -304,7 +310,7 @@ public final class HqGenerator {
 	 * the thread's state. A vacant slot is bare floor (fix/hq-stale-stations: no desk, screen or
 	 * workstation until a thread takes it again).
 	 */
-	private void desk(PlanBuilder b, int i, int slot, @Nullable String threadId) {
+	private void desk(PlanBuilder b, int i, int slot, @Nullable String threadId, @Nullable DyeColor office) {
 		Box box = HqGeometry.desk(i, slot);
 		try (PlanBuilder.Canvas c = b.module("wing_" + i + "_desk_" + slot, box, List.of())) {
 			Direction f = HqGeometry.deskFacing(slot);
@@ -318,6 +324,9 @@ public final class HqGenerator {
 			HqStyle.DeskCells cells = new HqStyle.DeskCells(i, slot, monitor, rightPos, left, stand, f, threadId != null);
 			style.desk(c, cells);
 			if (threadId == null) {
+				if (office != null) {
+					LeadOfficeRoom.furnish(c, style, i, slot, office);
+				}
 				return;
 			}
 			for (BlockPos p : cells.screen()) {

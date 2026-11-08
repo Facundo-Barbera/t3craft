@@ -169,6 +169,9 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 		bridgeSnapshot = false;
 		// fix/hq-stale-stations: the one release policy, shared (StationPolicy.active()) by every roster reader.
 		dev.t3craft.hq.StationPolicy.use(dev.t3craft.hq.StationPolicy.load(FabricLoader.getInstance().getConfigDir().resolve("t3craft.json")));
+		// feat/lead-office: lead detection thresholds (config "leadOffice", additive)
+		dev.t3craft.hq.lead.LeadPolicy.use(dev.t3craft.hq.lead.LeadPolicy.load(FabricLoader.getInstance().getConfigDir().resolve("t3craft.json")));
+		dev.t3craft.client.hq.lead.LeadOfficeClient.clear();
 		if (config.mode() == ModConfig.Mode.BRIDGE) {
 			T3Craft.LOGGER.info("bridge URL {}", config.bridgeUrl());
 			link = new BridgeLink(config.bridgeUrl(), config.bridgeKey(), modVersion, this, Minecraft.getInstance()::execute);
@@ -232,7 +235,8 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 		HelperDirector h = helpers;
 		if (h == null) {
 			helpers = h = new HelperDirector();
-			npcs.setPanelExtra(dev.t3craft.client.queue.QueueClient.withBadge(h::panelExtra)); // feat/op-queue: + "⏳ n queued"
+			// feat/op-queue: + "⏳ n queued"; feat/lead-office: "Coordinating N agents" first
+			npcs.setPanelExtra(dev.t3craft.client.queue.QueueClient.withBadge(dev.t3craft.client.hq.lead.LeadOfficeClient.withPlate(h::panelExtra)));
 		}
 		return h;
 	}
@@ -296,6 +300,8 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 		HelperRoster.Collected sub = helperConfig().enabled() ? HelperRoster.collect(d.shellViews()) : HelperRoster.Collected.EMPTY;
 		views = HelperRoster.deskRoster(views, dev.t3craft.t3.NpcView::id, sub.subagentNpcIds());
 		helpers().update(sub, views.stream().map(dev.t3craft.t3.NpcView::id).toList(), helperConfig().maxPerParent());
+		// feat/lead-office: leads (coordinators) among the threads with a desk; throttled, one pass over the shells
+		dev.t3craft.client.hq.lead.LeadOfficeClient.refresh(d.shellViews(), views, System.currentTimeMillis());
 		List<NpcInfo> list = new ArrayList<>();
 		views.forEach(v -> list.add(NpcInfo.fromView(v)));
 		npcs.replaceAll(list, lastActivity(d, views));

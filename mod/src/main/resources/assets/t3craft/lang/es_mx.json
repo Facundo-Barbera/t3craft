@@ -106,6 +106,7 @@
 	"t3craft.hqmenu.info.built": "Construido con: %s",
 	"t3craft.queue.title": "Cola de ejecuciones",
 	"t3craft.queue.badge": "⏳ %s en cola",
+	"t3craft.lead.coordinating": "★ Coordinando %s agentes",
 	"t3craft.queue.empty": "No hay nada en cola.",
 	"t3craft.queue.none": "No hay ejecuciones en cola en los hilos activos.",
 	"t3craft.queue.none_working": "Ningún hilo está trabajando ahora, así que no hay nada en cola.",
