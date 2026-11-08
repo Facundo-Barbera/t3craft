@@ -54,6 +54,9 @@ final class HqLighting {
 
 	private final BuildPlan plan;
 	private final HqStyle style;
+	/** feat/hq-layout-packs: {@link #GRID} and {@link #LATTICE} as the layout's pack sets them (clamped, never sparser than the code's). */
+	private final int grid;
+	private final int lattice;
 	private final Map<BlockPos, String> groups;
 	/** Cells of the classic desk modules above their floor: air to the walk estimate (taken or vacant alike). */
 	private final Set<BlockPos> desks = new HashSet<>();
@@ -82,6 +85,9 @@ final class HqLighting {
 	private HqLighting(BuildPlan plan, HqStyle style) {
 		this.plan = plan;
 		this.style = style;
+		String layoutId = PackApply.layoutOf(style);
+		this.grid = dev.t3craft.hq.pack.LayoutParams.LIGHT_GRID.get(layoutId);
+		this.lattice = dev.t3craft.hq.pack.LayoutParams.LIGHT_LATTICE.get(layoutId);
 		this.groups = plan.groupsByPos();
 		Box fp = plan.footprint();
 		for (Placement p : plan.placements()) {
@@ -286,7 +292,7 @@ final class HqLighting {
 		BlockState floorLamp = style.floorLight();
 		for (Map.Entry<BlockPos, String> e : groups.entrySet()) {
 			BlockPos f = e.getKey();
-			if (!g.equals(e.getValue()) || Math.floorMod(f.getX() - 2 * f.getZ(), LATTICE) != 0) {
+			if (!g.equals(e.getValue()) || Math.floorMod(f.getX() - 2 * f.getZ(), lattice) != 0) {
 				continue;
 			}
 			if (view(f.above()).isAir() && view(f.above(2)).isAir() && swappable(g, f, true)) {
@@ -330,7 +336,7 @@ final class HqLighting {
 		BlockState wallLamp = style.wallLight();
 		// 1. the floor grid
 		for (BlockPos c : walk) {
-			if (grid && Math.floorMod(c.getX(), GRID) == 0 && Math.floorMod(c.getZ(), GRID) == 0 && floorSlot(g, c) && darkNear(light, walkSet, c)) {
+			if (grid && Math.floorMod(c.getX(), this.grid) == 0 && Math.floorMod(c.getZ(), this.grid) == 0 && floorSlot(g, c) && darkNear(light, walkSet, c)) {
 				place(light, c.below(), floorLamp);
 			}
 		}

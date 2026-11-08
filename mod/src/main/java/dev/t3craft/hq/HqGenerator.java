@@ -66,7 +66,9 @@ public final class HqGenerator {
 	/** The plan of {@code layout}, with its built-in lighting ({@link HqLighting}: no dark walkable cell). */
 	public BuildPlan generate(HqLayout layout) {
 		BuildPlan own = style.layoutPlan(layout);
-		return HqLighting.light(own != null ? own : spine(layout), style);
+		// feat/hq-layout-packs: the layout's pack (config/t3craft/hq-layouts) adds rooms, materials and its hash; none: as before
+		dev.t3craft.hq.pack.LayoutPack pack = dev.t3craft.hq.pack.HqLayoutPacks.pack(PackApply.layoutOf(style));
+		return PackApply.withPack(own != null ? own : spine(layout), style, pack);
 	}
 
 	private BuildPlan spine(HqLayout layout) {

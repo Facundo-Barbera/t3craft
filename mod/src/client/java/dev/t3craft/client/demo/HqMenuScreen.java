@@ -52,6 +52,8 @@ public final class HqMenuScreen extends Screen {
 	private @Nullable Button rebuild;
 	private @Nullable Button reset;
 	private int infoY;
+	/** Result of the last Export / Reload layouts press, shown on the info line (null: the HQ status). */
+	private @Nullable String packStatus;
 
 	HqMenuScreen(@Nullable Screen parent, DemoClient demo) {
 		super(Component.translatable("t3craft.hqmenu.title"));
@@ -82,7 +84,19 @@ public final class HqMenuScreen extends Screen {
 		addRenderableWidget(Button.builder(CommonComponents.GUI_BACK, b -> onClose()).bounds(x + half + GAP, backY, w - half - GAP, 20).build());
 		int rebuildY = backY - 24;
 		rebuild = addRenderableWidget(Button.builder(Component.empty(), b -> confirmReset(true)).bounds(x, rebuildY, w, 20).build());
-		infoY = rebuildY - font.lineHeight - 4;
+		// feat/hq-layout-packs: [Export layouts | Reload layouts] (config/t3craft/hq-layouts, applied without restarting)
+		int packsY = rebuildY - 24;
+		addRenderableWidget(Button.builder(Component.translatable("t3craft.hqmenu.packs.export"),
+				b -> packStatus = dev.t3craft.client.hq.layout.HqLayoutPackWatcher.exportNow())
+				.bounds(x, packsY, half, 20)
+				.tooltip(Tooltip.create(Component.translatable("t3craft.hqmenu.packs.export.tooltip")))
+				.build());
+		addRenderableWidget(Button.builder(Component.translatable("t3craft.hqmenu.packs.reload"),
+				b -> packStatus = dev.t3craft.client.hq.layout.HqLayoutPackWatcher.reloadNow())
+				.bounds(x + half + GAP, packsY, w - half - GAP, 20)
+				.tooltip(Tooltip.create(Component.translatable("t3craft.hqmenu.packs.reload.tooltip")))
+				.build());
+		infoY = packsY - font.lineHeight - 4;
 
 		int listTop = y + 20 + 6 + font.lineHeight + 3; // under "Open HQ" and the "Layout" header
 		int listBottom = Math.max(listTop + ROW_H, infoY - 3); // at least one row, even at GUI scale 4 on a short window
@@ -203,6 +217,9 @@ public final class HqMenuScreen extends Screen {
 	}
 
 	private Component info() {
+		if (packStatus != null) {
+			return Component.literal(packStatus);
+		}
 		HqLayoutInfo built = model.built();
 		if (!model.hqExists()) {
 			return Component.translatable("t3craft.hqmenu.info.no_world", Component.translatable(model.selected().nameKey()));
@@ -259,6 +276,7 @@ public final class HqMenuScreen extends Screen {
 	}
 
 	private void choose(int i) {
+		packStatus = null;
 		model.select(i);
 		list.ensureVisible(model.selectedIndex());
 		refreshButtons();

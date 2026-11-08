@@ -52,6 +52,8 @@ import net.minecraft.world.level.block.state.BlockState;
  * {@code --layout ID} (feat/hq-layouts: classic, campus, ring, vertical, ensanche, village or all) renders a
  * registered layout through the game's pipeline with {@code --projects} (default 4), see {@link LayoutViews};
  * {@code --layout hybrid-ringcampus} renders that hybrid's own gallery ({@link RingCampusViews}, default 4,10,20).
+ * {@code --packs DIR} (feat/hq-layout-packs) generates with the layout packs in {@code DIR} (the game's
+ * {@code config/t3craft/hq-layouts}): materials, parameters and {@code .nbt} rooms, exactly as in game.
  */
 public final class HqRender {
 	private HqRender() {
@@ -70,11 +72,13 @@ public final class HqRender {
 		boolean npcs = true;
 		List<Integer> projects = new ArrayList<>();
 		String layoutId = null;
+		Path packs = null;
 		for (int i = 0; i < args.length; i++) {
 			switch (args[i]) {
 				case "--out" -> out = Path.of(args[++i]);
 				case "--style" -> styleId = args[++i];
 				case "--layout" -> layoutId = args[++i];
+				case "--packs" -> packs = Path.of(args[++i]);
 				case "--only" -> only.addAll(List.of(args[++i].split(",")));
 				case "--scale" -> scaleMul = Double.parseDouble(args[++i]);
 				case "--ss" -> ss = Integer.parseInt(args[++i]);
@@ -94,6 +98,14 @@ public final class HqRender {
 			dev.t3craft.blocks.RenderBlocks.install();
 		} else {
 			HqFixtures.use(null);
+		}
+		if (packs != null) {
+			// feat/hq-layout-packs: the same folder the game reads (config/t3craft/hq-layouts), so a pack edit shows here first
+			dev.t3craft.hq.pack.HqLayoutPacks.Load l = dev.t3craft.hq.pack.HqLayoutPacks.reload(packs);
+			for (String e : l.errors()) {
+				System.out.println("pack: " + e);
+			}
+			System.out.println("layout packs from " + packs + ": " + (l.changedLayouts().isEmpty() ? "none" : String.join(", ", l.changedLayouts())));
 		}
 		if (layoutId != null) {
 			// feat/hq-layouts: a registered layout (or "all") through the game's pipeline

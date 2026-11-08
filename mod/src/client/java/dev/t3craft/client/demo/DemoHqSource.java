@@ -35,6 +35,8 @@ public final class DemoHqSource implements DemoStructureSource {
 	private DemoHq.@Nullable Roster roster;
 	private DemoHq.@Nullable Step step;
 	private @Nullable HqInput preparedInput;
+	/** feat/hq-layout-packs: {@link dev.t3craft.hq.pack.HqLayoutPacks#generation()} of the last prepare. */
+	private int preparedPacks = -1;
 	private boolean failed;
 
 	public DemoHqSource(Supplier<? extends Collection<NpcInfo>> live) {
@@ -102,6 +104,7 @@ public final class DemoHqSource implements DemoStructureSource {
 			HqLayout previous = null;
 			int previousLift = -1;
 			String previousFixtures = dev.t3craft.hq.HqPlans.buildKey(HqFixtures.VANILLA);
+			String previousPack = "";
 			JsonObject st = built.state();
 			if (ours && st != null && st.has("layout")) {
 				HqLayout l = HqLayout.fromJson(st.get("layout"));
@@ -110,14 +113,18 @@ public final class DemoHqSource implements DemoStructureSource {
 				if (st.has(DemoHq.FIXTURES)) {
 					previousFixtures = st.get(DemoHq.FIXTURES).getAsString();
 				}
+				if (st.has(DemoHq.PACK)) {
+					previousPack = st.get(DemoHq.PACK).getAsString();
+				}
 			}
 			// The floor layer is the lowest HQ cell whatever the roster: use the empty HQ to size the lift.
 			int planMinY = HqPlans.generate(HqLayout.EMPTY).footprint().minY();
 			int lift = DemoHq.lift(spec.originY(), worldMinY, planMinY);
 			boolean diffable = built.builtWith(this) && previousLift == lift;
 			roster = r;
-			step = DemoHq.step(r.input(), previous, built.hash(), lift, diffable, previousFixtures, previous != null && previousLift == lift);
+			step = DemoHq.step(r.input(), previous, built.hash(), lift, diffable, previousFixtures, previous != null && previousLift == lift, previousPack);
 			preparedInput = r.input();
+			preparedPacks = dev.t3craft.hq.pack.HqLayoutPacks.generation();
 			failed = false;
 		} catch (RuntimeException e) {
 			T3Craft.LOGGER.error("[demo] HQ plan failed, falling back", e);
@@ -143,6 +150,14 @@ public final class DemoHqSource implements DemoStructureSource {
 		} catch (RuntimeException e) {
 			return false;
 		}
+	}
+
+	/**
+	 * feat/hq-layout-packs: true when a layout pack was reloaded since the last {@link #prepare} (the demo
+	 * reconciles the HQ again, as a diff). False before any prepare and after a failed one.
+	 */
+	public boolean packsChanged() {
+		return preparedInput != null && !failed && preparedPacks != dev.t3craft.hq.pack.HqLayoutPacks.generation();
 	}
 
 	/** Whether the last prepare used the example roster (no threads connected). */

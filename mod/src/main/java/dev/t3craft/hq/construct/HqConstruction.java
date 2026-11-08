@@ -139,6 +139,8 @@ public final class HqConstruction {
 	private @Nullable HqInput roster;
 	private long rosterAt;
 	private @Nullable HqTarget target;
+	/** {@link dev.t3craft.hq.pack.HqLayoutPacks#generation()} {@link #target} was computed with. */
+	private int targetPacks = -1;
 	private @Nullable HqLayout targetBase;
 	private @Nullable String busy;
 	private long idleSince = -1;
@@ -319,10 +321,13 @@ public final class HqConstruction {
 			return;
 		}
 		HqTarget t = target;
-		if (t == null || !t.input().equals(in) || targetBase != saved.layout()) {
+		int packs = dev.t3craft.hq.pack.HqLayoutPacks.generation();
+		if (t == null || !t.input().equals(in) || targetBase != saved.layout() || targetPacks != packs) {
+			// feat/hq-layout-packs: a reloaded layout pack re-plans too; the in-place pass below applies the difference
 			t = HqTarget.compute(in, saved.layout(), HqSiteFrame.MAX_MODULES);
 			target = t;
 			targetBase = saved.layout();
+			targetPacks = packs;
 		}
 		design = t.plan();
 		Object key = List.of(in, site.modules(), site.pending(), site.id());
