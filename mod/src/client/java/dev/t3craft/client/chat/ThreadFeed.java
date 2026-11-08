@@ -1,29 +1,34 @@
 package dev.t3craft.client.chat;
 
 import com.google.gson.JsonObject;
-import dev.t3craft.t3.StreamRegistry;
 import dev.t3craft.t3.T3Connection;
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.function.LongSupplier;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Live, read-only feed of one T3 thread for one view. It opens no socket: it holds a shared,
- * refcounted {@code orchestration.subscribeThread} subscription on the environment's
- * {@link T3Connection} (through {@link ChatSource.Env}) and folds the stream into its
- * {@link ChatTranscript}. Older pages come from {@code GET …/threads/:id/history}, full items from
- * {@code orchestration.getTurnItem}, both via the same connection. {@link #close()} releases the
- * subscription (the last view of a thread interrupts it on the server).
+ * Live, read-only feed of one T3 thread for one view. It opens no socket and owns no transcript: it
+ * is a view over the thread's {@link ThreadCache} entry, which holds the shared, refcounted
+ * {@code orchestration.subscribeThread} subscription on the environment's {@link T3Connection}
+ * (through {@link ChatSource.Env}) and the {@link ChatTranscript} it folds into. Reopening a thread
+ * therefore paints the cached rows at once ({@link State#refreshing()} until the new snapshot is in);
+ * {@link #close()} releases the view and the subscription lingers a while (feat/t3-thread-cache).
+ * Older pages come from {@code GET …/threads/:id/history}, full items from
+ * {@code orchestration.getTurnItem}, both via the same connection and cached per entry.
  *
  * <p>Never sends {@code dispatchCommand} or anything that needs {@code orchestration:operate}.
  */
 public final class ThreadFeed implements AutoCloseable {
 	public enum Phase { CONNECTING, LIVE, OFFLINE, FAILED }
 
-	/** Connection line for the view. {@code detail} is secret-free. */
-	public record State(Phase phase, String detail, boolean loadingOlder, @Nullable String olderError) {
+	/**
+	 * Connection line for the view. {@code detail} is secret-free. {@code refreshing}: rows are shown
+	 * from the cache while the fresh snapshot is on its way; {@code fromDisk}: those rows were kept on
+	 * disk from an earlier game session.
+	 */
+	public record State(Phase phase, String detail, boolean loadingOlder, @Nullable String olderError, boolean refreshing,
+			boolean fromDisk) {
 	}
 
 	/**
@@ -32,100 +37,73 @@ public final class ThreadFeed implements AutoCloseable {
 	 */
 	public static final long ANSWER_TIMEOUT_MS = 20_000;
 
+	private final ThreadCache cache;
 	private final ChatSource.Env env;
-	private final ChatTranscript transcript;
+	private final ThreadCache.Entry entry;
 	private final Runnable onChange;
-	private StreamRegistry.@Nullable Subscription subscription;
-	private volatile boolean closed;
-	private volatile boolean subscribed;
-	private volatile @Nullable String ended;
-	private volatile boolean loadingOlder;
-	private volatile @Nullable String olderError;
 	private final LongSupplier clock;
-	private volatile long waitingSince;
+	private boolean started;
+	private volatile boolean closed;
 
 	public ThreadFeed(ChatSource.Env env, String threadId, Runnable onChange) {
 		this(env, threadId, onChange, System::currentTimeMillis);
 	}
 
 	ThreadFeed(ChatSource.Env env, String threadId, Runnable onChange, LongSupplier clock) {
+		this(ThreadCache.get(), env, threadId, onChange, clock);
+	}
+
+	ThreadFeed(ThreadCache cache, ChatSource.Env env, String threadId, Runnable onChange, LongSupplier clock) {
+		this.cache = cache;
 		this.clock = clock;
 		this.env = env;
-		this.transcript = new ChatTranscript(threadId);
+		this.entry = cache.entry(env.id(), threadId);
 		this.onChange = onChange;
 	}
 
 	public ChatTranscript transcript() {
-		return transcript;
+		return entry.transcript;
 	}
 
 	public ChatSource.Env env() {
 		return env;
 	}
 
-	/** True while it holds a subscription (between {@link #start()} and {@link #close()}). */
+	/** True while it holds the thread (between {@link #start()} and {@link #close()}). */
 	public synchronized boolean subscribed() {
-		return subscription != null;
+		return started && !closed;
 	}
 
 	public synchronized void start() {
-		if (closed || subscription != null) {
+		if (closed || started) {
 			return;
 		}
-		waitingSince = clock.getAsLong();
-		subscription = env.subscribeThread(transcript.threadId(), new StreamRegistry.Listener() {
-			@Override
-			public void onSubscribed() {
-				subscribed = true;
-				ended = null;
-				waitingSince = clock.getAsLong(); // (re)subscribed: a fresh snapshot is on its way
-				onChange.run();
-			}
-
-			@Override
-			public void onItems(List<JsonObject> items) {
-				if (closed) {
-					return;
-				}
-				boolean changed = false;
-				for (JsonObject item : items) {
-					changed |= transcript.applyStreamItem(item);
-				}
-				if (changed) {
-					onChange.run();
-				}
-			}
-
-			@Override
-			public void onEnded(@Nullable String failure) {
-				subscribed = false;
-				if (failure != null) {
-					ended = failure.contains("NotFound") ? "thread not found on " + env.label() : T3Connection.sanitize(failure);
-				}
-				onChange.run();
-			}
-		});
+		started = true;
+		entry.listeners.add(onChange);
+		cache.acquire(entry, env);
 	}
 
-	/** Drops this view's subscription and takes a new one (a fresh snapshot, or the shared replay). */
+	/** Drops the thread's subscription and takes a new one (a fresh snapshot). */
 	public synchronized void reconnect() {
 		if (closed) {
 			return;
 		}
-		if (subscription != null) {
-			subscription.close();
-			subscription = null;
+		if (!started) {
+			start();
+			return;
 		}
-		ended = null;
-		start();
+		cache.reconnect(entry);
 	}
 
 	@Override
 	public synchronized void close() {
+		if (closed) {
+			return;
+		}
 		closed = true;
-		if (subscription != null) {
-			subscription.close();
-			subscription = null;
+		entry.listeners.remove(onChange);
+		if (started) {
+			cache.release(entry);
 		}
 	}
 
@@ -135,7 +113,8 @@ public final class ThreadFeed implements AutoCloseable {
 
 	/** What the view shows about the connection, derived from the shared connection's status. */
 	public State state() {
-		return new State(phaseNow(), detailNow(), loadingOlder, olderError);
+		boolean refreshing = entry.ended == null && !entry.fresh() && !entry.transcript.view().entries().isEmpty();
+		return new State(phaseNow(), detailNow(), entry.loadingOlder, entry.olderError, refreshing, refreshing && entry.transcript.seeded());
 	}
 
 	/**
@@ -145,10 +124,10 @@ public final class ThreadFeed implements AutoCloseable {
 	 * endless "connecting".
 	 */
 	private Phase phaseNow() {
-		if (ended != null) {
+		if (entry.ended != null) {
 			return Phase.FAILED;
 		}
-		if (subscribed && transcript.hasSnapshot()) {
+		if (entry.fresh()) {
 			return Phase.LIVE;
 		}
 		return switch (env.status()) {
@@ -159,15 +138,15 @@ public final class ThreadFeed implements AutoCloseable {
 	}
 
 	private boolean timedOut() {
-		return clock.getAsLong() - waitingSince >= ANSWER_TIMEOUT_MS;
+		return clock.getAsLong() - entry.waitingSince >= ANSWER_TIMEOUT_MS;
 	}
 
 	private String detailNow() {
-		String e = ended;
+		String e = entry.ended;
 		if (e != null) {
 			return e;
 		}
-		if (subscribed && transcript.hasSnapshot()) {
+		if (entry.fresh()) {
 			return "live";
 		}
 		long s = ANSWER_TIMEOUT_MS / 1000;
@@ -181,38 +160,58 @@ public final class ThreadFeed implements AutoCloseable {
 		};
 	}
 
-	/** Loads the page before the oldest row, if any and not already loading. */
+	/** Loads the page before the oldest row, if any and not already loading (cached pages apply at once). */
 	public void loadOlder() {
+		ChatTranscript transcript = entry.transcript;
 		String cursor = transcript.historyCursor();
-		synchronized (this) {
-			if (closed || cursor == null || loadingOlder) {
+		synchronized (entry) {
+			if (closed || cursor == null || entry.loadingOlder) {
 				return;
 			}
-			loadingOlder = true;
-			olderError = null;
+			JsonObject cached = entry.page(cursor);
+			if (cached != null) {
+				transcript.applyHistoryPage(cached, cursor);
+				entry.olderError = null;
+				entry.changed();
+				return;
+			}
+			entry.loadingOlder = true;
+			entry.olderError = null;
 		}
-		onChange.run();
-		env.threadHistory(transcript.threadId(), cursor).whenComplete((page, err) -> {
-			if (closed) {
-				return;
-			}
+		entry.changed();
+		env.threadHistory(entry.threadId, cursor).whenComplete((page, err) -> {
 			if (err != null) {
-				olderError = "could not load earlier messages: " + T3Connection.sanitize(message(err));
+				entry.olderError = "could not load earlier messages: " + T3Connection.sanitize(message(err));
 			} else {
 				try {
+					if (page != null) {
+						entry.putPage(cursor, page);
+					}
 					transcript.applyHistoryPage(page, cursor);
 				} catch (RuntimeException e) {
-					olderError = "history: unexpected response";
+					entry.olderError = "history: unexpected response";
 				}
 			}
-			loadingOlder = false;
-			onChange.run();
+			entry.loadingOlder = false;
+			entry.changed();
 		});
 	}
 
-	/** The complete turn item (e.g. command output the stream left out), or null when T3 has none. */
+	/**
+	 * The complete turn item (e.g. command output the stream left out), or null when T3 has none.
+	 * Finished items are cached (they no longer change): a second ask completes at once.
+	 */
 	public CompletableFuture<@Nullable JsonObject> fullItem(String itemId) {
-		return env.getTurnItem(transcript.threadId(), itemId);
+		JsonObject cached = entry.item(itemId);
+		if (cached != null) {
+			return CompletableFuture.completedFuture(cached);
+		}
+		return env.getTurnItem(entry.threadId, itemId).thenApply(item -> {
+			if (ThreadCache.finished(item)) {
+				entry.putItem(itemId, item);
+			}
+			return item;
+		});
 	}
 
 	private static String message(Throwable t) {

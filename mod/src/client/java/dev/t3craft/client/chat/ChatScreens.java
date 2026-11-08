@@ -12,11 +12,7 @@ import dev.t3craft.client.npc.NpcInfo;
 import dev.t3craft.client.t3ui.T3Screen;
 import dev.t3craft.client.t3ui.T3Slots;
 import dev.t3craft.t3.DirectController;
-import dev.t3craft.t3.NpcView;
-import dev.t3craft.t3.ShellState;
 import dev.t3craft.t3.T3Connection;
-import dev.t3craft.t3.ThreadShell;
-import dev.t3craft.t3.Visibility;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -115,31 +111,21 @@ public final class ChatScreens {
 					return List.of();
 				}
 				DirectController direct = client.direct();
-				List<ThreadRow> out = new ArrayList<>();
 				if (direct != null) {
-					long now = System.currentTimeMillis();
-					Map<String, ShellState.View> views = new LinkedHashMap<>();
-					for (NpcView v : direct.npcs(now)) {
-						ShellState.View sv = views.computeIfAbsent(v.env(), direct::view);
-						ThreadShell shell = null;
-						if (sv != null) {
-							for (ThreadShell s : sv.threads()) {
-								if (s.id().equals(v.threadId())) {
-									shell = s;
-									break;
-								}
-							}
-						}
-						Long at = shell == null ? null : Visibility.lastActivity(shell);
-						boolean pending = shell != null && shell.pendingRuntimeRequest() != null;
-						out.add(ThreadRow.fromNpc(NpcInfo.fromView(v), at == null || at <= 0 ? null : at, pending, shell != null && shell.pinned()));
-					}
-					return out;
+					// memoized per shell change, with the disk-cached rows until the shells arrive
+					return ThreadListCache.get().rows(direct);
 				}
+				List<ThreadRow> out = new ArrayList<>();
 				for (NpcInfo n : client.npcs().all()) {
 					out.add(ThreadRow.fromNpc(n));
 				}
 				return out;
+			}
+
+			@Override
+			public boolean cached() {
+				T3CraftClient client = T3CraftClient.get();
+				return client != null && client.direct() != null && ThreadListCache.get().cached();
 			}
 
 			@Override

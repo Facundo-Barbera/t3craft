@@ -106,6 +106,12 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 					T3Craft.LOGGER.warn("T3Craft refresh failed; will retry", e);
 				}
 			}
+			try {
+				// feat/t3-thread-cache: lingering subscriptions, archived threads, disk cache (1/s)
+				dev.t3craft.client.chat.ThreadListCache.get().clientTick(direct);
+			} catch (RuntimeException | LinkageError e) {
+				T3Craft.LOGGER.warn("T3Craft thread cache housekeeping failed", e);
+			}
 			long t0 = System.nanoTime();
 			npcs.tick(mc);
 			dev.t3craft.debug.PerfStats.since(NPC_TICK_TIMER, t0);
