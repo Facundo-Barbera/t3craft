@@ -85,13 +85,13 @@ final class TownRender {
 			HqLayout layout = layouts.get(n);
 			var fp = plan.footprint();
 			Renderer.Clip all = new Renderer.Clip(fp.minX() - 2, -2, fp.minZ() - 2, fp.maxX() + 2, fp.maxY(), fp.maxZ() + 2);
-			double s = 1700.0 / ((fp.sizeX() + fp.sizeZ()) * 0.7071);
+			double s = 1300.0 / ((fp.sizeX() + fp.sizeZ()) * 0.7071);
 			List<View> views = new ArrayList<>();
 			String pre = sid + "_" + n + "p_";
 			views.add(new View(pre + "aerial", "Ensanche, " + n + " proyectos: vista aerea (SE)", all, new Renderer.Camera(45, 35, s)));
 			views.add(new View(pre + "aerial_nw", "Ensanche, " + n + " proyectos: vista aerea (NO)", all, new Renderer.Camera(225, 35, s)));
 			views.add(new View(pre + "plan", "Ensanche, " + n + " proyectos: planta cortada a y=3",
-					new Renderer.Clip(all.minX(), -1, all.minZ(), all.maxX(), 3, all.maxZ()), new Renderer.Camera(0, 90, 1500.0 / Math.max(fp.sizeX(), fp.sizeZ()))));
+					new Renderer.Clip(all.minX(), -1, all.minZ(), all.maxX(), 3, all.maxZ()), new Renderer.Camera(0, 90, 1150.0 / Math.max(fp.sizeX(), fp.sizeZ()))));
 			views.add(new View(pre + "hub", "Plaza mayor y casa consistorial (hub), " + n + " proyectos, cortada a y=11",
 					new Renderer.Clip(-23, -1, -24, 23, 11, 28), new Renderer.Camera(25, 52, 16)));
 			views.add(new View(pre + "plaza", "Plaza mayor: torre del reloj, lonja de revision, soportales", new Renderer.Clip(-28, -1, -28, 28, 34, 28),
