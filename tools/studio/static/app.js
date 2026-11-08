@@ -81,6 +81,13 @@ function viewKey(name) {
 
 /* ------------------------------------------------------------ daemon heartbeat */
 
+// daemon.running: array of {id, agent, kind, priority, state, message} (older daemons: one id string)
+function runningJobs(d) {
+  const r = d && d.running;
+  if (Array.isArray(r)) return r.map((e) => (typeof e === "string" ? { id: e } : e)).filter((e) => e && e.id);
+  return typeof r === "string" && r ? [{ id: r }] : [];
+}
+
 function renderDaemon(d) {
   const box = $("#daemon");
   box.replaceChildren();
@@ -91,7 +98,13 @@ function renderDaemon(d) {
   box.append(
     h("span", {}, "Render ", pill(d.alive ? "running" : "stopped", d.alive ? "activo" : "detenido")),
     h("span", {}, "cola ", h("b", {}, d.queued ?? "—")),
-    d.running ? h("span", { class: "mono small", title: "renderizando ahora" }, "▶ ", d.running) : null,
+    ...runningJobs(d).map((j) => h("span", {
+      class: "mono small",
+      title: [j.agent, j.kind, j.priority, j.state, j.message].filter(Boolean).join(" · ") || "renderizando ahora",
+    }, j.state === "compiling" ? "⚙ " : "▶ ", j.id)),
+    typeof d.workers === "number" ? h("span", { class: "small", title: "trabajos en curso / workers" },
+      "en curso ", h("b", {}, runningJobs(d).length + "/" + d.workers)) : null,
+    d.loadPaused ? h("span", { class: "small", title: "carga alta: un solo trabajo a la vez" }, "⏸ carga") : null,
     h("span", { title: "carga 1 min / límite de pausa" },
       "carga ", h("b", {}, load == null ? "—" : load.toFixed(2)), " / " + limit + " ",
       h("span", { class: "meter" + (load != null && load > limit ? " hot" : "") }, h("i", { style: "width:" + pct + "%" }))),

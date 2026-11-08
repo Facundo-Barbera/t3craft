@@ -18,12 +18,24 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinWorkerThread;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Stream;
 
 /**
- * Runs one {@link RenderDaemon.Job} start to finish: cache, load gate, compile (only when the worktree's
+ * Runs one {@link RenderDaemon.Job} start to finish: cache, compile (only when the worktree's
  * code differs from the daemon's baseline), child class loader, the renderer itself, files and report.
- * Called from the single worker thread, so nothing here runs concurrently with another job.
+ * Each worker thread of the daemon owns one; several jobs run at once, so everything shared goes through
+ * the daemon's locks: {@link RenderDaemon#worktreeLock} (whole job), {@link RenderDaemon#compileLock}
+ * (compile), {@link RenderDaemon#globalsLock} (render). Always taken in that order, never two of the last
+ * two at once.
  */
 final class JobRunner {
 	private static final long PREVIEW_TIMEOUT_MS = 20L * 60 * 1000;
@@ -89,24 +101,6 @@ final class JobRunner {
 		} catch (IOException | RuntimeException e) {
 			double l = java.lang.management.ManagementFactory.getOperatingSystemMXBean().getSystemLoadAverage();
 			return l < 0 ? 0 : l;
-		}
-	}
-
-	private void waitForLoad(Spool.Status st, String phase) throws InterruptedException {
-		double l = load1();
-		if (l <= RenderDaemon.LOAD_MAX) {
-			return;
-		}
-		long last = 0;
-		while ((l = load1()) > RenderDaemon.LOAD_MAX) {
-			long now = System.currentTimeMillis();
-			if (now - last > 15000) {
-				st.message = String.format(Locale.ROOT, "paused: machine busy (load average %.1f > %.0f), waiting %s", l, RenderDaemon.LOAD_MAX, phase);
-				st.position = 0;
-				d.spool.write(st);
-				last = now;
-			}
-			Thread.sleep(10000);
 		}
 	}
 
@@ -244,7 +238,8 @@ final class JobRunner {
 
 	private void remember(String key, Request r) {
 		try {
-			Files.writeString(d.spool.cache.resolve(key), r.id());
+			// atomic: another worker may read this entry at the same moment
+			Spool.atomicWrite(d.spool.cache.resolve(key), r.id());
 		} catch (IOException e) {
 			d.log("cache write failed: " + e);
 		}
@@ -255,8 +250,25 @@ final class JobRunner {
 	void execute(RenderDaemon.Job job) throws Exception {
 		Request r = job.req;
 		Spool.Status st = job.status;
-		Path out = Files.createDirectories(d.spool.outDir(r.id()));
+		Files.createDirectories(d.spool.outDir(r.id()));
 		st.startedAt = System.currentTimeMillis();
+		// the worktree's build/ folder is compiled into and rendered from: one job of a worktree at a time
+		ReentrantLock wt = d.worktreeLock(r.worktree());
+		if (!wt.tryLock()) {
+			set(st, "compiling", "waiting: another request of the same worktree is compiling or rendering");
+			wt.lockInterruptibly();
+		}
+		try {
+			executeLocked(job);
+		} finally {
+			wt.unlock();
+		}
+	}
+
+	private void executeLocked(RenderDaemon.Job job) throws Exception {
+		Request r = job.req;
+		Spool.Status st = job.status;
+		Path out = d.spool.outDir(r.id());
 		long t0 = System.nanoTime();
 
 		// the worktree may have changed while the request waited: the key is recomputed now
@@ -270,11 +282,21 @@ final class JobRunner {
 		String origin;
 		long compileMs = 0;
 		boolean compile = needsCompile(r.worktree());
-		waitForLoad(st, compile ? "to compile" : "to render");
+		// RENDER_LOAD_MAX is applied when the job is admitted (RenderDaemon.admit), not here
 		if (compile) {
-			set(st, "compiling", "compiling the worktree (shared gradle daemon, offline, niced)");
+			// one compile at a time: the gradle daemon is shared
+			if (!d.compileLock.tryLock()) {
+				set(st, "compiling", "waiting for the compiler (one compile at a time; another job is compiling)");
+				d.compileLock.lockInterruptibly();
+			}
 			long c0 = System.nanoTime();
-			roots = compile(r, out, st);
+			try {
+				set(st, "compiling", "compiling the worktree (shared gradle daemon, offline, niced)");
+				c0 = System.nanoTime();
+				roots = compile(r, out, st);
+			} finally {
+				d.compileLock.unlock();
+			}
 			compileMs = (System.nanoTime() - c0) / 1_000_000;
 			if (roots == null) {
 				return; // compile() already reported the error
@@ -293,7 +315,7 @@ final class JobRunner {
 
 		set(st, "rendering", "rendering (" + (r.preview() ? "preview" : "final") + ")");
 		long r0 = System.nanoTime();
-		Run run = render(r, roots, out);
+		Run run = render(job, roots, out);
 		long renderMs = (System.nanoTime() - r0) / 1_000_000;
 
 		List<String> pngs = new ArrayList<>();
@@ -446,7 +468,30 @@ final class JobRunner {
 	private record Run(List<String> argv, String log, String error) {
 	}
 
-	private Run render(Request r, List<Path> roots, Path out) throws Exception {
+	/**
+	 * A thread of one job's fork-join pool: runs the job's code with the job's class loader as context and
+	 * carries the job's {@code run.log}, where {@link StdRouter} sends its {@code System.out/err}.
+	 */
+	static final class JobThread extends ForkJoinWorkerThread {
+		final PrintStream log;
+
+		JobThread(ForkJoinPool pool, ClassLoader cl, PrintStream log, String name) {
+			super(pool);
+			this.log = log;
+			setContextClassLoader(cl);
+			setName(name);
+			setDaemon(true);
+		}
+	}
+
+	/** Whether this render switches a shared global and must run alone (see the RenderDaemon class comment). */
+	private boolean exclusive(Request r) {
+		return r.args().contains("--vanilla") || (r.args().contains("--packs") && d.pinned.isShared(RenderDaemon.PACKS_CLASS));
+	}
+
+	private Run render(RenderDaemon.Job job, List<Path> roots, Path out) throws Exception {
+		Request r = job.req;
+		Spool.Status st = job.status;
 		List<String> argv = new ArrayList<>(r.args());
 		if (r.kind().equals("hq")) {
 			if (r.preview()) {
@@ -468,20 +513,30 @@ final class JobRunner {
 			urls[i] = roots.get(i).toUri().toURL();
 		}
 		Path logFile = out.resolve("run.log");
-		HqFixtures fixtures = HqFixtures.active();
-		PrintStream prevOut = System.out;
-		PrintStream prevErr = System.err;
+		long timeoutMs = r.preview() ? PREVIEW_TIMEOUT_MS : FINAL_TIMEOUT_MS;
+
+		boolean alone = exclusive(r);
+		Lock globals = alone ? d.globalsLock.writeLock() : d.globalsLock.readLock();
+		if (!globals.tryLock()) {
+			set(st, "rendering", alone ? "waiting for the other renders to finish (--vanilla / --packs switch shared state and render alone)"
+					: "waiting for a --vanilla / --packs render to finish (it switches shared state and renders alone)");
+			globals.lockInterruptibly();
+		}
+		set(st, "rendering", "rendering (" + (r.preview() ? "preview" : "final") + ", " + RenderDaemon.THREADS_PER_JOB + " thread(s)"
+				+ (alone ? ", alone" : "") + ")");
 		String error = null;
+		ForkJoinPool pool = null;
 		try (PrintStream cap = new PrintStream(new FileOutputStream(logFile.toFile()), true, StandardCharsets.UTF_8);
 				RenderClassLoader cl = new RenderClassLoader(urls, RenderDaemon.class.getClassLoader(), d.pinned::isShared)) {
-			System.setOut(cap);
-			System.setErr(cap);
 			try {
 				Method m = cl.loadClass(entry.className()).getMethod(entry.method(), String[].class);
 				Throwable[] failure = new Throwable[1];
 				String[] a = argv.toArray(new String[0]);
-				Thread t = new Thread(() -> {
-					Thread.currentThread().setContextClassLoader(cl);
+				AtomicInteger n = new AtomicInteger();
+				String name = "render-job-" + r.id();
+				// the job's own pool: its parallel streams stay on these THREADS_PER_JOB threads, which carry its run.log
+				pool = new ForkJoinPool(RenderDaemon.THREADS_PER_JOB, p -> new JobThread(p, cl, cap, name + "-" + n.incrementAndGet()), null, false);
+				Future<?> f = pool.submit(() -> {
 					try {
 						m.invoke(null, new Object[] {a});
 					} catch (InvocationTargetException e) {
@@ -489,24 +544,24 @@ final class JobRunner {
 					} catch (Throwable e) {
 						failure[0] = e;
 					}
-				}, "render-job-" + r.id());
-				t.start();
-				t.join(r.preview() ? PREVIEW_TIMEOUT_MS : FINAL_TIMEOUT_MS);
-				if (t.isAlive()) {
-					t.interrupt();
-					t.join(20000);
-					error = "timed out after " + (r.preview() ? PREVIEW_TIMEOUT_MS : FINAL_TIMEOUT_MS) / 60000 + " min";
-					if (t.isAlive()) {
+				});
+				try {
+					f.get(timeoutMs, TimeUnit.MILLISECONDS);
+					if (failure[0] != null) {
+						failure[0].printStackTrace(cap);
+						error = describe(failure[0]);
+					}
+				} catch (TimeoutException e) {
+					pool.shutdownNow(); // interrupts the job's threads
+					error = "timed out after " + timeoutMs / 60000 + " min";
+					if (!pool.awaitTermination(20, TimeUnit.SECONDS)) {
 						// a thread cannot be killed; the launch script restarts the daemon (exit 75)
 						cap.println("the render thread did not stop; the daemon restarts");
 						cap.flush();
 						Run dead = new Run(argv, readLog(logFile), error + " (daemon restarting)");
 						writeEarly(r, out, dead);
-						d.giveUp("render thread of " + r.id() + " is stuck");
+						d.giveUp("render thread of " + r.id() + " is stuck", job);
 					}
-				} else if (failure[0] != null) {
-					failure[0].printStackTrace(cap);
-					error = describe(failure[0]);
 				}
 			} catch (ClassNotFoundException e) {
 				error = "the worktree has no " + entry.className() + " (kind " + r.kind() + " is not available in this branch)";
@@ -515,11 +570,25 @@ final class JobRunner {
 			} catch (Throwable e) {
 				e.printStackTrace(cap);
 				error = describe(e);
+			} finally {
+				// the pool's threads hold the class loader (context) and the job's images: end them before the loader closes
+				if (pool != null) {
+					pool.shutdownNow();
+					pool.awaitTermination(20, TimeUnit.SECONDS);
+				}
 			}
 		} finally {
-			System.setOut(prevOut);
-			System.setErr(prevErr);
-			HqFixtures.use(fixtures == HqFixtures.VANILLA ? null : fixtures);
+			try {
+				if (alone) {
+					// put back what --vanilla / --packs switched, while no other render runs
+					HqFixtures.use(d.fixtures == HqFixtures.VANILLA ? null : d.fixtures);
+					if (r.args().contains("--packs") && d.pinned.isShared(RenderDaemon.PACKS_CLASS)) {
+						dev.t3craft.hq.pack.HqLayoutPacks.use(Map.of());
+					}
+				}
+			} finally {
+				globals.unlock();
+			}
 		}
 		return new Run(argv, readLog(logFile), error);
 	}

@@ -43,11 +43,20 @@ final class Spool {
 		return outbox.resolve(id);
 	}
 
-	/** Writes through a temp file + rename, so a reader never sees half a file. */
+	private static final java.util.concurrent.atomic.AtomicLong TMP = new java.util.concurrent.atomic.AtomicLong();
+
+	/**
+	 * Writes through a temp file + rename, so a reader never sees half a file. The temp name is unique per
+	 * write: several worker threads (and the scan thread) may write the same file at once; the last rename wins.
+	 */
 	static void atomicWrite(Path target, byte[] data) throws IOException {
-		Path tmp = target.resolveSibling("." + target.getFileName() + ".tmp");
-		Files.write(tmp, data);
-		Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+		Path tmp = target.resolveSibling("." + target.getFileName() + "." + TMP.incrementAndGet() + ".tmp");
+		try {
+			Files.write(tmp, data);
+			Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+		} finally {
+			Files.deleteIfExists(tmp);
+		}
 	}
 
 	static void atomicWrite(Path target, String text) throws IOException {
