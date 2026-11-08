@@ -10,8 +10,11 @@ import org.jspecify.annotations.Nullable;
  * Small, tolerant Markdown subset for the chat screen: ATX headings, paragraphs, bullet and
  * numbered lists (nested by indent), fenced code blocks, block quotes, horizontal rules, GFM tables
  * (header, delimiter row with {@code :} alignment, optional outer pipes, {@code \|}), and inline
- * {@code **bold**}, {@code *italic*}/{@code _italic_}, {@code `code`}, {@code [text](url)} and bare
- * {@code http(s)://} links. Anything else is kept as plain text. Never throws.
+ * {@code **bold**}, {@code *italic*}/{@code _italic_}, {@code `code`}, {@code [text](url)}, CommonMark
+ * autolinks ({@code <https://…>}, {@code <t3-thread://…>}, {@code <mailto:…>}, {@code <a@b.c>}), bare
+ * {@code http(s)://} and {@code t3-thread://} links and absolute file paths ({@code /home/…},
+ * {@code /Users/…} with an extension, as {@code file:} links, see {@link Links}). Nothing inside
+ * {@code `code`} becomes a link. Anything else is kept as plain text. Never throws.
  *
  * <p>Pure Java (no Minecraft classes) so it is unit-tested; {@link ConversationPanel} turns the result
  * into styled lines.
@@ -341,7 +344,13 @@ public final class Markdown {
 		}
 	}
 
-	private static final Pattern BARE_URL = Pattern.compile("https?://[^\\s<>()\\[\\]`]+[^\\s<>()\\[\\]`.,;:!?'\"]");
+	private static final Pattern BARE_URL = Pattern.compile("(?:https?|t3-thread)://[^\\s<>()\\[\\]`]+[^\\s<>()\\[\\]`.,;:!?'\"]");
+	/** CommonMark autolink body: {@code scheme:rest} with no spaces or angle brackets. */
+	private static final Pattern AUTOLINK = Pattern.compile("(?i)(?:https?|t3-thread|mailto):[^\\s<>]+");
+	private static final Pattern EMAIL = Pattern.compile("[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+");
+	/** Absolute path under a home directory; the end is trimmed and checked in {@link #filePathAt}. */
+	private static final Pattern FILE_PATH = Pattern.compile("/(?:home|Users)/[\\w.\\-+@%~=,/]+(?::\\d+){0,2}");
+	private static final Pattern EXTENSION = Pattern.compile("[^/]*[^/.]\\.[A-Za-z0-9]{1,10}");
 
 	/** Inline markup → spans. Unmatched markers stay literal. */
 	public static List<Span> inline(@Nullable String text) {
@@ -375,6 +384,38 @@ public final class Markdown {
 					}
 					out.add(new Span(code, bold, italic, true, null));
 					i = close + ticks;
+					continue;
+				}
+			}
+			if (c == '<') {
+				int close = s.indexOf('>', i + 1);
+				if (close > i + 1) {
+					String body = s.substring(i + 1, close);
+					String url = null;
+					String shown = body;
+					if (AUTOLINK.matcher(body).matches()) {
+						url = body;
+						if (body.regionMatches(true, 0, "mailto:", 0, 7)) {
+							shown = body.substring(7);
+						}
+					} else if (EMAIL.matcher(body).matches()) {
+						url = "mailto:" + body;
+					}
+					if (url != null) {
+						emit(out, buf, bold, italic);
+						out.add(new Span(shown, bold, italic, false, url));
+						i = close + 1;
+						continue;
+					}
+				}
+			}
+			if (c == '/') {
+				int end = filePathAt(s, i);
+				if (end > i) {
+					emit(out, buf, bold, italic);
+					String path = s.substring(i, end);
+					out.add(new Span(path, bold, italic, false, Links.FILE_PREFIX + path));
+					i = end;
 					continue;
 				}
 			}
@@ -422,7 +463,7 @@ public final class Markdown {
 					}
 				}
 			}
-			if ((c == 'h') && (s.startsWith("http://", i) || s.startsWith("https://", i))
+			if ((c == 'h' || c == 't') && (s.startsWith("http://", i) || s.startsWith("https://", i) || s.startsWith("t3-thread://", i))
 					&& (i == 0 || !Character.isLetterOrDigit(s.charAt(i - 1)))) {
 				Matcher m = BARE_URL.matcher(s);
 				if (m.find(i) && m.start() == i) {
@@ -437,6 +478,47 @@ public final class Markdown {
 		}
 		emit(out, buf, bold, italic);
 	}
+
+	/**
+	 * End of an absolute file path starting at {@code i} ({@code /home/…} or {@code /Users/…}, last
+	 * segment with an extension, optional {@code :line[:col]}), or -1. Not inside a word, a URL or
+	 * another path; trailing punctuation stays text.
+	 */
+	static int filePathAt(String s, int i) {
+		if (i > 0) {
+			char p = s.charAt(i - 1);
+			if (Character.isLetterOrDigit(p) || "/.:~_-\\".indexOf(p) >= 0) {
+				return -1;
+			}
+		}
+		Matcher m = FILE_PATH.matcher(s);
+		m.region(i, s.length());
+		if (!m.lookingAt()) {
+			return -1;
+		}
+		String path = m.group();
+		String suffix = "";
+		Matcher line = LINE_SUFFIX.matcher(path);
+		if (line.find()) {
+			suffix = line.group();
+			path = path.substring(0, line.start());
+		}
+		if (!suffix.isEmpty() && m.end() < s.length() && Character.isLetterOrDigit(s.charAt(m.end()))) {
+			return -1;
+		}
+		if (suffix.isEmpty()) {
+			while (!path.isEmpty() && ".,;:!?".indexOf(path.charAt(path.length() - 1)) >= 0) {
+				path = path.substring(0, path.length() - 1);
+			}
+		}
+		int slash = path.lastIndexOf('/');
+		if (slash < 0 || !EXTENSION.matcher(path.substring(slash + 1)).matches()) {
+			return -1;
+		}
+		return i + path.length() + suffix.length();
+	}
+
+	private static final Pattern LINE_SUFFIX = Pattern.compile("(?::\\d+){1,2}$");
 
 	private static int run(String s, int i, char c) {
 		int k = 0;

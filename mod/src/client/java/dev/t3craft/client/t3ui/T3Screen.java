@@ -4,6 +4,7 @@ import dev.t3craft.client.chat.ChatDraw;
 import dev.t3craft.client.chat.ChatSource;
 import dev.t3craft.client.chat.ChatTheme;
 import dev.t3craft.client.chat.ConversationPanel;
+import dev.t3craft.client.chat.Links;
 import dev.t3craft.client.chat.EnvBadge;
 import dev.t3craft.client.chat.MouseButtons;
 import dev.t3craft.client.chat.Rect;
@@ -260,6 +261,9 @@ public final class T3Screen extends Screen {
 			c.setShowSeparators(false);
 			c.setColumn(T3UiLayout.COLUMN_MAX); // T3's centred transcript + composer column
 			c.setTrailer(new WorkingStatus.Trailer(() -> model.selectedKey() == null ? null : model.find(model.selectedKey())));
+			// feat/chat-links: thread links in messages select the thread here
+			c.setDirectory(directory);
+			c.setThreadLinks(this::openThreadLink);
 			if (composer != null) {
 				ChatComposer.attach(c, composer);
 			}
@@ -467,6 +471,31 @@ public final class T3Screen extends Screen {
 		key = k;
 		notifications = false;
 		revealSelected();
+	}
+
+	/**
+	 * A {@code t3-thread://} link clicked in the conversation (feat/chat-links): the listed thread is
+	 * selected; one the list does not have is asked for in its environment, when that is known.
+	 */
+	private void openThreadLink(Links.ThreadRef ref, @Nullable ThreadRow row) {
+		String k = null;
+		if (row != null && row.threadId() != null) {
+			k = row.key();
+		} else {
+			String env = ConversationPanel.unlistedEnv(directory, ref);
+			if (env != null) {
+				k = env + ":" + ref.threadId();
+				fallbackTitle = "";
+				fallbackEnvLabel = "";
+			}
+		}
+		if (k == null || k.equals(model.selectedKey())) {
+			return;
+		}
+		if (layout.compact() && sidebarVisible) {
+			setSidebarVisible(false);
+		}
+		open(k);
 	}
 
 	private void showRow(ThreadRow r) {
