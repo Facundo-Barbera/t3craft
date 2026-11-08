@@ -128,7 +128,8 @@ public final class ScheduleClient implements ClientModInitializer {
 		}
 		long now = System.currentTimeMillis();
 		entries = subscribed == null ? List.of() : book.entries(ScheduleClient::envLabel, this::projectTitle);
-		if (lvl == null || mc.player == null || subscribed == null) {
+		if (lvl == null || mc.player == null || subscribed == null || !dev.t3craft.client.hq.HqPresence.allows(mc)) {
+			// fix/hq-gate-npcs: the board stands only in the HQ's own world and dimension
 			renderer.clear(lvl);
 			return;
 		}

@@ -124,7 +124,7 @@ public final class WorkstationClient implements ClientModInitializer {
 
 	// ---- integration points -------------------------------------------------------------------
 
-	/** Plug the HQ's desks in (null = provisional {@link DeskPlacement}). See {@link WorkstationPlacementSource}. */
+	/** Plug the HQ's desks in (null = no computers at all since fix/hq-gate-npcs). See {@link WorkstationPlacementSource}. */
 	public void setPlacementSource(@Nullable WorkstationPlacementSource source) {
 		this.placementOverride = source;
 	}
@@ -190,6 +190,16 @@ public final class WorkstationClient implements ClientModInitializer {
 			}
 			return;
 		}
+		// fix/hq-gate-npcs: computers only at the HQ's desks, in its own world and dimension; never the
+		// provisional ring around the player.
+		WorkstationPlacementSource hqDesks = placementOverride;
+		if (hqDesks == null || !dev.t3craft.client.hq.HqPresence.allows(mc)) {
+			if (renderer.size() > 0) {
+				renderer.clear(lvl);
+				cache.invalidateAll();
+			}
+			return;
+		}
 		T3CraftClient client = T3CraftClient.get();
 		List<NpcInfo> npcs = client == null ? List.of() : client.npcs().stationed(); // fix/hq-stale-stations: released threads have no station
 		List<WorkstationThread> list = new ArrayList<>(npcs.size());
@@ -199,8 +209,7 @@ public final class WorkstationClient implements ClientModInitializer {
 			list.add(t);
 			threads.put(t.key(), t);
 		}
-		WorkstationPlacementSource source = placementOverride != null ? placementOverride : provisional;
-		renderer.tick(lvl, list, source, cache, System.currentTimeMillis());
+		renderer.tick(lvl, list, hqDesks, cache, System.currentTimeMillis());
 	}
 
 	private static dev.t3craft.client.npc.behavior.@Nullable AnchorSource registryLayout() {

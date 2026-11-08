@@ -172,3 +172,11 @@ recovery, never per tick.
   (`PerfStats` keys are constants), no lambdas capturing per-call state where avoidable.
 - Add a `PerfStats` counter to any new per-tick/per-frame path and a work-count test (steady state
   ⇒ 0 rebuilds / 0 `setText`).
+
+## World presence: the HQ gate
+
+Anything the mod adds to a world (client-only entities, displays, NPCs, helpers, workstations,
+hologram, beacon, schedule board) must ask `HqPresence.allows(mc)` first and despawn when it turns
+false. It is open only on the integrated server, with this world's HQ built, in the HQ's
+dimension; on a server without the mod it is always shut, and only the T3 screen (key Y), HUD and
+client commands run there. Rules, the per-thing table and the open risks: `docs/feat-hq-gate.md`.

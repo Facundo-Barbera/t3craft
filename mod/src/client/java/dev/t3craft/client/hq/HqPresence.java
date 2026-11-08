@@ -21,10 +21,35 @@ import org.jspecify.annotations.Nullable;
  * <p>Also the one place that tells the blocks module which bindings the HQ's monitors and lamps must
  * have ({@code BlocksClient.setHqBindings}): the site HQ's plan as built ({@code HqBindings.world}),
  * or the demo's live roster ({@link #demoBindings}). No-op when the blocks module is off.
+ *
+ * <p><b>fix/hq-gate-npcs: the one gate</b> ({@link #allows}). Nothing of the mod's world presence
+ * (thread NPCs and their panels, helpers, behaviour overlays, workstations, the hologram, the hub
+ * beacon, the schedule board) exists unless the HQ of this world stands: the game runs its own
+ * (integrated) server, an HQ is standing here with its base built, and the player is in the HQ's
+ * dimension. On a server without the mod (or any remote server) the gate is always shut, so the mod
+ * puts nothing in the world; the T3 screen (key Y) does not depend on it. See docs/feat-hq-gate.md.
  */
 public final class HqPresence {
-	/** One standing HQ: plan, where it stands, built site modules (null = all, demo). */
-	public record Standing(BuildPlan plan, HqSite site, @Nullable Set<String> built) {
+	/** Where the demo HQ and a site HQ without a recorded dimension stand. */
+	public static final String OVERWORLD = "minecraft:overworld";
+
+	/**
+	 * One standing HQ: plan, where it stands, built site modules (null = all, demo), and the
+	 * dimension it stands in (its identifier, e.g. {@code minecraft:overworld}).
+	 */
+	public record Standing(BuildPlan plan, HqSite site, @Nullable Set<String> built, String dimension) {
+		public Standing {
+			dimension = dimension == null || dimension.isBlank() ? OVERWORLD : dimension;
+		}
+
+		public Standing(BuildPlan plan, HqSite site, @Nullable Set<String> built) {
+			this(plan, site, built, OVERWORLD);
+		}
+
+		/** Built enough to receive anyone: the demo HQ (built == null) or a site whose base stands. */
+		public boolean ready() {
+			return built == null || built.contains(dev.t3craft.hq.construct.HqSiteFrame.BASE);
+		}
 	}
 
 	private static @Nullable Standing site;
@@ -55,6 +80,34 @@ public final class HqPresence {
 
 	public static @Nullable Standing current() {
 		return site != null ? site : demo;
+	}
+
+	/**
+	 * fix/hq-gate-npcs: whether the mod may put anything in the world the player is in now. True
+	 * only on the game's own server ({@code hasSingleplayerServer}), with a standing, ready HQ
+	 * ({@link Standing#ready}) in the player's dimension. Never true on a remote server.
+	 */
+	public static boolean allows(@Nullable net.minecraft.client.Minecraft mc) {
+		if (mc == null || mc.level == null || mc.player == null || !mc.hasSingleplayerServer()) {
+			return false;
+		}
+		Standing s = current();
+		return s != null && allows(s, true, mc.level.dimension().identifier().toString());
+	}
+
+	/** {@link #allows(net.minecraft.client.Minecraft)} without the game: pure. */
+	public static boolean allows(@Nullable Standing s, boolean integratedServer, @Nullable String dimension) {
+		return integratedServer && s != null && s.ready() && s.dimension().equals(dimension);
+	}
+
+	/** {@link #allows(net.minecraft.client.Minecraft)} for the running game. */
+	public static boolean allows() {
+		return allows(net.minecraft.client.Minecraft.getInstance());
+	}
+
+	/** The standing HQ only when {@link #allows} lets it be shown here, else null. */
+	public static @Nullable Standing shown(@Nullable net.minecraft.client.Minecraft mc) {
+		return allows(mc) ? current() : null;
 	}
 
 	/** World left: forget both. */
@@ -124,6 +177,7 @@ public final class HqPresence {
 		if (a == null || b == null) {
 			return a == b;
 		}
-		return a.plan().fingerprint().equals(b.plan().fingerprint()) && a.site().equals(b.site()) && Objects.equals(a.built(), b.built());
+		return a.plan().fingerprint().equals(b.plan().fingerprint()) && a.site().equals(b.site()) && Objects.equals(a.built(), b.built())
+				&& a.dimension().equals(b.dimension());
 	}
 }

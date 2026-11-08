@@ -81,7 +81,7 @@ public final class HubBeacon {
 
 	void tick(Minecraft mc) {
 		ClientLevel level = mc.level;
-		HqPresence.Standing st = HqPresence.current();
+		HqPresence.Standing st = HqPresence.shown(mc); // fix/hq-gate-npcs: only in the HQ's own world and dimension
 		BlockPos rel = st == null ? null : spot(st.plan());
 		BlockPos cell = rel == null || level == null || !standing(rel, st.built()) ? null : st.site().cell(rel);
 		boolean lamp = cell != null && T3Blocks.active() && level.isLoaded(cell)

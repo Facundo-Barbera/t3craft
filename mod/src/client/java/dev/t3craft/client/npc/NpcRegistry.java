@@ -36,15 +36,14 @@ import org.jspecify.annotations.Nullable;
  * are purged with their entities, and any unexpected error resets the registry: every entity in
  * our id range is removed from the level and the NPCs are rebuilt on the next tick.
  *
- * <p>Layout without an HQ: a {@link GridLayout} next to where the player stood when the first NPC
- * appeared in this level: one block of desks per neighbourhood, in rows with aisles, signs over
- * each block's header strip. Cells are stable (adding a thread never moves the others). With an
- * HQ the behaviour director walks NPCs to its desks instead. Particles over the head by state.
+ * <p>fix/hq-gate-npcs: NPCs exist only while {@link dev.t3craft.client.hq.HqPresence#allows} is
+ * open (own world, HQ standing, its dimension). Shut gate = every NPC and panel is removed; no
+ * ring around the player, no group signs. They spawn at their HQ desk (else the HQ's way in) and
+ * the behaviour director walks them from there. The {@link GridLayout} is kept only to fill an
+ * anchor the HQ leaves empty, laid out from the HQ's way in. Particles over the head by state.
  * Avatars turn their head to a nearby player.
  */
 public final class NpcRegistry {
-	/** Sign height above its header strip's ground. */
-	private static final double SIGN_Y = 2.6;
 	private static final int PARTICLE_EVERY_TICKS = 15;
 	/** Client-only ids count down from here, far away from server-assigned (positive) ids. */
 	static final int ID_BASE = -1_000_000;
@@ -78,6 +77,8 @@ public final class NpcRegistry {
 	private @Nullable ClientLevel level;
 	private @Nullable Vec3 anchor;
 	private boolean dirty;
+	/** fix/hq-gate-npcs: {@link dev.t3craft.client.hq.HqPresence#allows} as of the last tick. */
+	private boolean hqOpen;
 	/** {@link NpcGate#version()} last reconciled with (fix/hq-build-parallel). */
 	private int gateSeen = -1;
 	private int tick;
@@ -199,8 +200,8 @@ public final class NpcRegistry {
 	}
 
 	/**
-	 * Origin of the fallback layout (where the player stood when the first NPC appeared in this
-	 * level, offset by 4,0,4), or null before that. Read by feat/workstation to put the provisional
+	 * Origin of the fallback layout (the HQ's way in, fix/hq-gate-npcs), or null while no NPC may
+	 * stand in this world. Read by feat/workstation to put the provisional
 	 * computers next to the same ring desks the behaviour director uses.
 	 */
 	public @Nullable Vec3 layoutOrigin() {
@@ -430,13 +431,28 @@ public final class NpcRegistry {
 			gateSeen = NpcGate.version();
 			dirty = true;
 		}
+		// fix/hq-gate-npcs: the one gate. Shut (no HQ here, remote server, other dimension, HQ reset or
+		// rebuilt from scratch): every NPC goes; open: they come back at their HQ desks.
+		boolean open = dev.t3craft.client.hq.HqPresence.allows(mc);
+		if (open != hqOpen) {
+			hqOpen = open;
+			anchor = null;
+			fallbackLayout().clear();
+			dirty = true;
+		}
 		if (dirty) {
 			dirty = false;
-			if (anchor == null && !wanted.isEmpty()) {
-				anchor = mc.player.position().add(4, 0, 4);
-			}
-			if (anchor != null) {
-				reconcile(lvl, anchor);
+			if (!hqOpen) {
+				if (!spawned.isEmpty() || !signs.isEmpty()) {
+					reconcile(lvl, mc.player.position()); // shown is empty: removes everyone
+				}
+			} else {
+				if (anchor == null && !wanted.isEmpty()) {
+					anchor = hqOrigin(mc);
+				}
+				if (anchor != null) {
+					reconcile(lvl, anchor);
+				}
 			}
 		}
 		updatePanels(mc);
@@ -454,9 +470,18 @@ public final class NpcRegistry {
 				}
 			}
 		}
-		if (anchor != null) {
+		if (hqOpen && anchor != null) {
 			behavior.tick(lvl, mc.player, fallbackLayout(), bodies);
 		}
+	}
+
+	/** Where the fallback grid starts: the HQ's way in, else its hub exit, else the player (HQ world only). */
+	private Vec3 hqOrigin(Minecraft mc) {
+		Anchor in = behavior.anchorSource().spawn();
+		if (in == null) {
+			in = behavior.anchorSource().exit();
+		}
+		return in != null ? new Vec3(in.pos().x(), in.pos().y(), in.pos().z()) : mc.player.position();
 	}
 
 	public void clear(Minecraft mc) {
@@ -496,7 +521,8 @@ public final class NpcRegistry {
 		// Incremental (fix/npc-position-reset): only NPCs no longer wanted go, only new ones spawn below;
 		// the others keep their entity (where it stands), brain and overlays.
 		// fix/hq-build-parallel: nobody waits around a half-built HQ (NpcGate).
-		Map<String, NpcInfo> shown = NpcGate.shown(wanted, spawned.keySet());
+		// fix/hq-gate-npcs: nobody at all while the HQ gate is shut.
+		Map<String, NpcInfo> shown = hqOpen ? NpcGate.shown(wanted, spawned.keySet()) : Map.of();
 		RosterDiff diff = RosterDiff.of(spawned.keySet(), shown.keySet());
 		for (String id : diff.removed()) {
 			Spawned s = spawned.remove(id);
@@ -523,28 +549,23 @@ public final class NpcRegistry {
 			groups.computeIfAbsent(n.groupId(), k -> new ArrayList<>()).add(n);
 		}
 
+		// fix/hq-gate-npcs: no neighbourhood signs any more (they floated over the provisional grid);
+		// the HQ has its own signage. Any left from older code go.
 		for (String gid : new ArrayList<>(signs.keySet())) {
-			if (!groups.containsKey(gid)) {
-				lvl.removeEntity(signs.remove(gid).getId(), Entity.RemovalReason.DISCARDED);
-			}
+			lvl.removeEntity(signs.remove(gid).getId(), Entity.RemovalReason.DISCARDED);
 		}
 
 		for (Map.Entry<String, List<NpcInfo>> group : groups.entrySet()) {
 			List<NpcInfo> inGroup = group.getValue();
-			NpcInfo first = inGroup.get(0);
-			Pos header = fallbackLayout().header(group.getKey());
-			Display.TextDisplay sign = signs.get(group.getKey());
-			if (sign == null || sign.isRemoved()) {
-				sign = textDisplay(lvl, 0xA0000000);
-				signs.put(group.getKey(), sign);
-			}
-			if (header != null) {
-				sign.snapTo(header.x(), header.y() + SIGN_Y, header.z(), 0f, 0f);
-			}
-			setText(sign, Nameplate.sign(first.groupLabel(), first.envLabel(), inGroup.size()));
-
 			for (NpcInfo info : inGroup) {
-				Anchor desk = fallbackLayout().desk(info.id(), info.groupId());
+				// Spawn at the HQ desk (or the HQ's way in) so nobody walks in from the grass.
+				Anchor desk = behavior.anchorSource().desk(info.id(), info.groupId());
+				if (desk == null) {
+					desk = behavior.anchorSource().spawn();
+				}
+				if (desk == null) {
+					desk = fallbackLayout().desk(info.id(), info.groupId());
+				}
 				Vec3 pos = desk == null ? a : new Vec3(desk.pos().x(), desk.pos().y(), desk.pos().z());
 				Spawned s = spawned.get(info.id());
 				if (s == null || s.avatar().isRemoved()) {
@@ -598,13 +619,6 @@ public final class NpcRegistry {
 				dev.t3craft.debug.PerfStats.count(dev.t3craft.debug.PerfStats.DISPLAY_SET_TEXT);
 				panel.setBackgroundColor(show ? 0x60000000 : 0);
 			}
-		}
-	}
-
-	private static void setText(Display.TextDisplay d, Component text) {
-		if (!Objects.equals(d.getText(), text)) {
-			d.setText(text);
-			dev.t3craft.debug.PerfStats.count(dev.t3craft.debug.PerfStats.DISPLAY_SET_TEXT);
 		}
 	}
 

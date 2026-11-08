@@ -122,7 +122,7 @@
 	"t3craft.operate.launch.summary": "About to launch a new thread:",
 	"t3craft.operate.launch.summary.title": "Title: %s",
 	"t3craft.operate.launch.summary.prompt": "Prompt: %s",
-	"t3craft.operate.launch.summary.mode": "Runs with approvals required, in the project checkout. The NPC appears when T3 lists it.",
+	"t3craft.operate.launch.summary.mode": "Runs with approvals required, in the project checkout. Once T3 lists it, its NPC works at a desk in your HQ (build the HQ to see it).",
 	"t3craft.operate.launch.no_envs": "No environment has control (operate) enabled. Enable it in Environments → Control…",
 	"t3craft.operate.launch.no_projects": "No projects known for this environment (is it connected?).",
 	"t3craft.operate.launch.open": "Open chat",

@@ -89,6 +89,11 @@ public final class BehaviorDirector {
 	 * the NPCs whose own spots moved, or that were waiting out a "no route", re-plan; they walk from
 	 * where they stand. Everyone else keeps brain, route and state untouched.
 	 */
+	/** The physical base plugged in ({@link AnchorSource#NONE} when none). */
+	public AnchorSource anchorSource() {
+		return anchors;
+	}
+
 	public void setAnchorSource(@Nullable AnchorSource source) {
 		AnchorSource now = source == null ? AnchorSource.NONE : source;
 		if (now == anchors) {

@@ -140,6 +140,17 @@ public final class HelperDirector {
 		if (lvl == null) {
 			return;
 		}
+		if (!dev.t3craft.client.hq.HqPresence.allows(mc)) {
+			// fix/hq-gate-npcs: no helper outside the HQ's world/dimension; they come back with the gate.
+			for (Body b : bodies.values()) {
+				if (b.avatar != null) {
+					discard(lvl, b.avatar);
+					b.avatar = null;
+				}
+			}
+			parentByEntity.clear();
+			return;
+		}
 		tick++;
 		if (dirty) {
 			dirty = false;
