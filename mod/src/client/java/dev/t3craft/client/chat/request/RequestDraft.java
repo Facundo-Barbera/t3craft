@@ -54,7 +54,7 @@ public final class RequestDraft {
 		index = Math.clamp(i, 0, Math.max(0, request.questions().size() - 1));
 	}
 
-	public @Nullable PendingRequest.Question active() {
+	public PendingRequest.@Nullable Question active() {
 		List<PendingRequest.Question> qs = request.questions();
 		return qs.isEmpty() ? null : qs.get(Math.clamp(index, 0, qs.size() - 1));
 	}
