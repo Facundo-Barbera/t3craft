@@ -20,7 +20,9 @@ import dev.t3craft.t3.ThreadState;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import net.minecraft.client.Minecraft;
@@ -142,6 +144,14 @@ public final class ConversationPanel implements AutoCloseable {
 	private @Nullable String operateEnv;
 	private long operateCheckedAt;
 	private final Set<String> expanded = new HashSet<>();
+	/** Table layouts by (table, width), least recently used dropped first; cleared when the font changes. */
+	private final Map<TableKey, TableLayout.Result> tableCache = new LinkedHashMap<>(16, 0.75f, true) {
+		@Override
+		protected boolean removeEldestEntry(Map.Entry<TableKey, TableLayout.Result> eldest) {
+			return size() > 64;
+		}
+	};
+	private @Nullable Font tableFont;
 
 	// layout cache
 	private List<RLine> lines = List.of();
@@ -170,7 +180,28 @@ public final class ConversationPanel implements AutoCloseable {
 	 */
 	private record RLine(int y, int h, int indent, List<TextWrap.Piece> pieces, int color, int stripe, int bg,
 			@Nullable String avatar, int avatarColor, @Nullable String icon, @Nullable String toggle, boolean loadMore,
-			@Nullable String sep, boolean rule, boolean caret) {
+			@Nullable String sep, boolean rule, boolean caret, @Nullable Grid grid) {
+	}
+
+	/**
+	 * Markdown table slice drawn behind one feed line: {@code edges} are the vertical borders (x
+	 * relative to the line's indent), {@code fill} the cell background, {@code lineTop}/{@code lineBottom}
+	 * a 1 px rule on the slice's first/last pixel row ({@code strongTop}: outer border or header rule
+	 * instead of a faint row separator), {@code tips} the full text of cells cut with "…" (per column).
+	 */
+	private record Grid(int[] edges, int fill, boolean lineTop, boolean strongTop, boolean lineBottom, @Nullable String @Nullable [] tips) {
+		int columnAt(int x) {
+			for (int k = 0; k + 1 < edges.length; k++) {
+				if (x >= edges[k] && x < edges[k + 1]) {
+					return k;
+				}
+			}
+			return -1;
+		}
+	}
+
+	/** Layout of a table at a width (tables are re-laid out on every streaming update otherwise). */
+	private record TableKey(Markdown.Table table, int width) {
 	}
 
 	/** A bubble behind lines {@code y0..y1} (content y), from the indent to the right edge. */
@@ -423,7 +454,12 @@ public final class ConversationPanel implements AutoCloseable {
 
 		void add(int h, int indent, List<TextWrap.Piece> pieces, int color, int stripe, int bg, @Nullable String avatar, int avatarColor,
 				@Nullable String icon, @Nullable String toggle, boolean loadMore, @Nullable String sep, boolean rule, boolean caret) {
-			out.add(new RLine(y, h, indent, pieces, color, stripe, bg, avatar, avatarColor, icon, toggle, loadMore, sep, rule, caret));
+			out.add(new RLine(y, h, indent, pieces, color, stripe, bg, avatar, avatarColor, icon, toggle, loadMore, sep, rule, caret, null));
+			y += h;
+		}
+
+		void grid(int h, int indent, List<TextWrap.Piece> pieces, int color, int stripe, Grid grid) {
+			out.add(new RLine(y, h, indent, pieces, color, stripe, 0, null, 0, null, null, false, null, false, false, grid));
 			y += h;
 		}
 
@@ -690,6 +726,7 @@ public final class ConversationPanel implements AutoCloseable {
 					wrapped(L, spans, indent, w, t.muted(), stripe);
 				}
 				case Markdown.Rule r -> L.add(7, indent, List.of(), color, stripe, 0, null, 0, null, null, false, null, true, false);
+				case Markdown.Table tb -> table(L, tb, indent, w, color, stripe);
 			}
 			prev = b;
 		}
@@ -723,6 +760,54 @@ public final class ConversationPanel implements AutoCloseable {
 			}
 		}
 		L.add(2, indent, List.of(), 0, stripe, t.codeBg(), null, 0, null, null, false, null, false, false);
+	}
+
+	/**
+	 * GFM table as T3 Code draws it: 1 px border, bold header on a lighter fill, faint rules between
+	 * rows and columns, 4 px cell padding. Every text line of a row is one feed line (so scrolling and
+	 * hit-testing measure it like any text); a 3 px slice above each row carries its top rule and
+	 * padding, a 2 px slice (3 px with the bottom border) closes it.
+	 */
+	private void table(Layout L, Markdown.Table tb, int indent, int w, int color, int stripe) {
+		ChatTheme t = theme;
+		TableLayout.Result r = tableLayout(L.font, tb, w);
+		tableRow(L, r.header(), r.edges(), indent, t.panelHi(), t.text(), stripe, true, true, r.rows().isEmpty());
+		for (int i = 0; i < r.rows().size(); i++) {
+			tableRow(L, r.rows().get(i), r.edges(), indent, t.panel(), color, stripe, i == 0, false, i == r.rows().size() - 1);
+		}
+	}
+
+	private void tableRow(Layout L, TableLayout.Row row, int[] edges, int indent, int fill, int color, int stripe, boolean strongTop,
+			boolean header, boolean last) {
+		@Nullable String @Nullable [] tips = null;
+		for (int k = 0; k < row.cells().size(); k++) {
+			String c = row.cells().get(k).clipped();
+			if (c != null) {
+				if (tips == null) {
+					tips = new String[edges.length - 1];
+				}
+				tips[k] = c;
+			}
+		}
+		L.grid(3, indent, List.of(), color, stripe, new Grid(edges, fill, true, strongTop || header, false, tips));
+		for (int i = 0; i < row.lines(); i++) {
+			List<TextWrap.Piece> pieces = new ArrayList<>();
+			for (TableLayout.Cell cell : row.cells()) {
+				if (i < cell.lines().size()) {
+					pieces.addAll(cell.lines().get(i).pieces());
+				}
+			}
+			L.grid(theme.row(), indent, pieces, color, stripe, new Grid(edges, fill, false, false, false, tips));
+		}
+		L.grid(last ? 3 : 2, indent, List.of(), color, stripe, new Grid(edges, fill, false, false, last, tips));
+	}
+
+	private TableLayout.Result tableLayout(Font font, Markdown.Table tb, int w) {
+		if (font != tableFont) {
+			tableCache.clear();
+			tableFont = font;
+		}
+		return tableCache.computeIfAbsent(new TableKey(tb, w), k -> TableLayout.layout(k.table(), k.width(), s -> measure(font, s)));
 	}
 
 	private void wrapped(Layout L, List<Span> spans, int indent, int w, int color, int stripe) {
@@ -1105,6 +1190,9 @@ public final class ConversationPanel implements AutoCloseable {
 			if (l.rule()) {
 				g.fill(lx, ly + lh / 2, x1, ly + lh / 2 + 1, t.edge());
 			}
+			if (l.grid() != null) {
+				drawGrid(g, t, l.grid(), lx, ly, lh);
+			}
 			if (l.caret() && ChatDraw.caretOn()) {
 				g.fill(tx0, ly, tx0 + 5, ly + 8, t.text());
 			}
@@ -1153,6 +1241,33 @@ public final class ConversationPanel implements AutoCloseable {
 		}
 		if (hover != null && hover.url() != null) {
 			g.setTooltipForNextFrame(font, Component.literal("Click to copy: " + hover.url()), mouseX, mouseY);
+		} else if (hover != null && hover.line().grid() != null && hover.line().grid().tips() != null) {
+			// table cell cut with "…": its full text
+			Grid gr = hover.line().grid();
+			int col = gr.columnAt(mouseX - tx0 - hover.line().indent());
+			String tip = col >= 0 && col < gr.tips().length ? gr.tips()[col] : null;
+			if (tip != null && !tip.isBlank()) {
+				g.setTooltipForNextFrame(font, Component.literal(tip), mouseX, mouseY);
+			}
+		}
+	}
+
+	/** One slice of a Markdown table: fill, outer border, faint inner column rules, top/bottom rule. */
+	private static void drawGrid(GuiGraphicsExtractor g, ChatTheme t, Grid gr, int lx, int ly, int lh) {
+		int[] e = gr.edges();
+		int left = lx + e[0];
+		int right = lx + e[e.length - 1] + 1;
+		int faint = ChatTheme.withAlpha(t.edge(), 140);
+		g.fill(left, ly, right, ly + lh, gr.fill());
+		for (int k = 0; k < e.length; k++) {
+			boolean outer = k == 0 || k == e.length - 1;
+			g.fill(lx + e[k], ly, lx + e[k] + 1, ly + lh, outer ? t.edge() : faint);
+		}
+		if (gr.lineTop()) {
+			g.fill(left, ly, right, ly + 1, gr.strongTop() ? t.edge() : faint);
+		}
+		if (gr.lineBottom()) {
+			g.fill(left, ly + lh - 1, right, ly + lh, t.edge());
 		}
 	}
 }
