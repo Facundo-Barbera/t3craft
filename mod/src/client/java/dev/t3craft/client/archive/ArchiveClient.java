@@ -126,7 +126,12 @@ public final class ArchiveClient implements ClientModInitializer {
 
 	/** Opens the archive screen (next tick, so it also works from a command or a block click). */
 	public void openArchive() {
-		ArchiveScreen screen = new ArchiveScreen(store, this::open, list);
+		openArchive(null);
+	}
+
+	/** Like {@link #openArchive()}; Done / Esc return to {@code parent} (e.g. the portable terminal). */
+	public void openArchive(net.minecraft.client.gui.screens.@Nullable Screen parent) {
+		ArchiveScreen screen = new ArchiveScreen(store, this::open, list, parent);
 		T3CraftClient client = T3CraftClient.get();
 		if (client != null) {
 			client.openNextTick(screen);
@@ -137,11 +142,16 @@ public final class ArchiveClient implements ClientModInitializer {
 
 	/** Opens the archive screen if the client module is up; false otherwise. */
 	public static boolean openIfReady() {
+		return openIfReady(null);
+	}
+
+	/** Like {@link #openIfReady()}, returning to {@code parent} on close. */
+	public static boolean openIfReady(net.minecraft.client.gui.screens.@Nullable Screen parent) {
 		ArchiveClient c = instance;
 		if (c == null) {
 			return false;
 		}
-		c.openArchive();
+		c.openArchive(parent);
 		return true;
 	}
 

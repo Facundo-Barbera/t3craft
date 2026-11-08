@@ -11,6 +11,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
@@ -37,6 +38,8 @@ public final class ArchiveScreen extends Screen {
 	private final ArchiveStore store;
 	private final ArchiveOpener opener;
 	private final ArchiveList list;
+	/** Where Done / Esc go (the portable terminal); null = back to the game. */
+	private final @Nullable Screen parent;
 	private final ChatTheme theme = ChatTheme.warmStudio();
 	private final List<Hit> hits = new ArrayList<>();
 	private Rect frame = Rect.EMPTY;
@@ -53,10 +56,21 @@ public final class ArchiveScreen extends Screen {
 
 	/** {@code list}: the list state to show (kept by the caller to come back to the same search). */
 	public ArchiveScreen(ArchiveStore store, ArchiveOpener opener, ArchiveList list) {
+		this(store, opener, list, null);
+	}
+
+	/** {@code parent}: the screen Done / Esc return to (null = close to the game). */
+	public ArchiveScreen(ArchiveStore store, ArchiveOpener opener, ArchiveList list, @Nullable Screen parent) {
 		super(Component.translatable("t3craft.archive.screen.title"));
 		this.store = store;
 		this.opener = opener;
 		this.list = list;
+		this.parent = parent;
+	}
+
+	@Override
+	public void onClose() {
+		minecraft.gui.setScreen(parent);
 	}
 
 	@Override
@@ -212,12 +226,29 @@ public final class ArchiveScreen extends Screen {
 				continue;
 			}
 			if (h.entry() != null) {
+				if (e.button() != 0) {
+					return false; // only a left click opens a thread (right/middle used to open it too)
+				}
 				opener.open(h.entry());
 			} else if (h.chip() == CHIP_ENV) {
 				list.cycleEnv(store.entries());
 			} else if (h.chip() == CHIP_PROJECT) {
 				list.cycleProject(store.entries());
 			}
+			return true;
+		}
+		return false;
+	}
+
+	/** PgUp / PgDn turn the page (also while typing in the search field, which ignores them). */
+	@Override
+	public boolean keyPressed(KeyEvent e) {
+		if (super.keyPressed(e)) {
+			return true;
+		}
+		int dir = ArchiveKeys.pageStep(e.key());
+		if (dir != 0) {
+			list.step(dir);
 			return true;
 		}
 		return false;
