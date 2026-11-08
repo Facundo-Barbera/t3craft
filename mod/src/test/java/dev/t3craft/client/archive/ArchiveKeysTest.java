@@ -25,4 +25,12 @@ class ArchiveKeysTest {
 		list.step(ArchiveKeys.pageStep(InputConstants.KEY_PAGEUP));
 		assertEquals(0, list.page(java.util.List.of(), 10).index());
 	}
+
+	@Test
+	void onlyMinecraftsLeftButtonOpensARow() {
+		// the archive's row filter: GLFW's 0 is not a left click in 26.x
+		org.junit.jupiter.api.Assertions.assertTrue(dev.t3craft.client.chat.MouseButtons.isLeft(InputConstants.MOUSE_BUTTON_LEFT));
+		org.junit.jupiter.api.Assertions.assertFalse(dev.t3craft.client.chat.MouseButtons.isLeft(0));
+		org.junit.jupiter.api.Assertions.assertFalse(dev.t3craft.client.chat.MouseButtons.isLeft(InputConstants.MOUSE_BUTTON_RIGHT));
+	}
 }

@@ -9,7 +9,6 @@ import dev.t3craft.client.config.EnvironmentsScreen;
 import dev.t3craft.client.config.T3CraftKeys;
 import dev.t3craft.client.npc.NpcInfo;
 import dev.t3craft.client.portable.held.HeldScreen;
-import dev.t3craft.client.screen.ThreadChatScreen;
 import dev.t3craft.portable.PortableItems;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
@@ -49,9 +48,10 @@ public final class PortableClient {
 		// Until feat/chat and feat/config are merged: the screens main already has.
 		PortableLinks.setFallbacks(
 				(env, thread) -> {
+					// the chat browser, like setChat below (was the ThreadChatScreen placeholder)
 					NpcInfo info = client.npcs().info(env + ":" + thread);
 					if (info != null) {
-						Minecraft.getInstance().gui.setScreen(new ThreadChatScreen(info));
+						ChatScreens.openFor(info);
 					}
 				},
 				// The environment list (pair new, show/hide, edit, unpair), back to the terminal on

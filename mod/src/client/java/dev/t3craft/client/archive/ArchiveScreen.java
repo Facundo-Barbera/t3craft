@@ -226,8 +226,8 @@ public final class ArchiveScreen extends Screen {
 				continue;
 			}
 			if (h.entry() != null) {
-				if (e.button() != 0) {
-					return false; // only a left click opens a thread (right/middle used to open it too)
+				if (!dev.t3craft.client.chat.MouseButtons.isLeft(e.button())) {
+					return false; // only a left click opens a thread (26.x buttons: left = 1, not GLFW's 0)
 				}
 				opener.open(h.entry());
 			} else if (h.chip() == CHIP_ENV) {
