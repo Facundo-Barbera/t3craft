@@ -155,7 +155,7 @@ public final class HqConstruction {
 	public HqConstruction(Ports ports, Saved saved) {
 		this.ports = ports;
 		this.saved = saved;
-		this.appliedPlan = dev.t3craft.hq.HqPlans.generate(saved.layout());
+		this.appliedPlan = dev.t3craft.hq.HqPlans.generate(saved.layout(), HqSiteFrame.style());
 		this.design = appliedPlan;
 	}
 

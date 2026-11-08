@@ -116,6 +116,28 @@ public abstract class HqStyle {
 		return null;
 	}
 
+	/**
+	 * Footprint of this layout for whoever reserves ground (site, builders, tests): the xz area every
+	 * placement of the plan of {@code layout} lies in. Default: the spine grid ({@link HqFootprints}).
+	 */
+	public HqFootprints.Area envelope(HqLayout layout) {
+		int n = 0;
+		for (HqLayout.Module m : layout.modules()) {
+			n = Math.max(n, m.index() + 1);
+		}
+		return HqFootprints.envelope(n);
+	}
+
+	/** Lowest y any block of this layout uses (relative to the HQ origin). */
+	public int bottom() {
+		return HqFootprints.bottom();
+	}
+
+	/** Highest y any block of this layout uses. */
+	public int top() {
+		return HqFootprints.top();
+	}
+
 	/** Representative block of every {@link Role} (all roles present; default orientations). */
 	public abstract Map<Role, BlockState> palette();
 

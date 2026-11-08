@@ -22,6 +22,15 @@ public final class HqLayoutConfig {
 		return HqLayouts.resolve(e != null && e.isJsonPrimitive() ? e.getAsString() : null);
 	}
 
+	/** {@link #selected()}'s id; {@code classic} when the config cannot be read (never throws). */
+	public static String selectedId() {
+		try {
+			return selected().id();
+		} catch (RuntimeException | LinkageError e) {
+			return HqLayouts.DEFAULT_ID;
+		}
+	}
+
 	/** Saves {@code hqLayout} (resolved: unknown ids become the default). */
 	public static ConfigManager.SaveResult select(String layoutId) {
 		return ConfigManager.get().putExtra(HqLayouts.CONFIG_KEY, new JsonPrimitive(HqLayouts.resolve(layoutId).id()));

@@ -56,6 +56,25 @@ public final class RingStyle extends HqStyle {
 	}
 
 	@Override
+	public HqFootprints.Area envelope(HqLayout layout) {
+		java.util.List<Integer> idx = layout.modules().stream().map(HqLayout.Module::index).toList();
+		int r = RingGeometry.radius(RingGeometry.rings(idx));
+		return new HqFootprints.Area(-r, -r, r, r);
+	}
+
+	@Override
+	public int bottom() {
+		// the sunken lounge's amphitheatre steps down to y = -3
+		return -3;
+	}
+
+	@Override
+	public int top() {
+		// podium, three floors of sectors and their roofs, the hub's dome and lantern
+		return 64;
+	}
+
+	@Override
 	public boolean ownLayout() {
 		return true;
 	}
@@ -67,37 +86,14 @@ public final class RingStyle extends HqStyle {
 
 	private static Map<Role, BlockState> palette0() {
 		Map<Role, BlockState> m = new EnumMap<>(Role.class);
-		m.put(Role.FLOOR, Blocks.POLISHED_TUFF.defaultBlockState());
-		m.put(Role.FOOTING, Blocks.TUFF_BRICKS.defaultBlockState());
-		m.put(Role.WALL, Blocks.SMOOTH_QUARTZ.defaultBlockState());
-		m.put(Role.COLUMN, Blocks.QUARTZ_PILLAR.defaultBlockState());
-		m.put(Role.BEAM, Blocks.CHISELED_TUFF.defaultBlockState());
-		m.put(Role.ROOF, Blocks.CUT_COPPER_STAIRS.waxed().oxidized().defaultBlockState());
-		m.put(Role.ROOF_TRIM, Blocks.DEEPSLATE_TILE_SLAB.defaultBlockState().setValue(BlockStateProperties.SLAB_TYPE, SlabType.BOTTOM));
-		m.put(Role.RIDGE, Blocks.CUT_COPPER.waxed().oxidized().defaultBlockState());
-		m.put(Role.WINDOW, Blocks.GLASS.defaultBlockState());
-		m.put(Role.DOOR, Blocks.CHISELED_TUFF_BRICKS.defaultBlockState());
-		m.put(Role.DECOR, Blocks.POTTED_FLOWERING_AZALEA.defaultBlockState());
-		m.put(Role.PATH, Blocks.TUFF_BRICKS.defaultBlockState());
-		m.put(Role.GARDEN, Blocks.MOSS_BLOCK.defaultBlockState());
-		m.put(Role.GARDEN_TREE, Blocks.FLOWERING_AZALEA_LEAVES.defaultBlockState().setValue(BlockStateProperties.PERSISTENT, true));
-		m.put(Role.LIGHT, Blocks.SEA_LANTERN.defaultBlockState());
-		m.put(Role.DESK, Blocks.SMOOTH_QUARTZ_SLAB.defaultBlockState().setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP));
-		m.put(Role.BENCH, Blocks.POLISHED_TUFF_STAIRS.defaultBlockState());
-		m.put(Role.BOARD, Blocks.CONCRETE.black().defaultBlockState());
-		m.put(Role.COMPUTER_ON, Blocks.CONCRETE.black().defaultBlockState());
-		m.put(Role.COMPUTER_OFF, Blocks.CONCRETE.gray().defaultBlockState());
-		m.put(Role.STATUS_LAMP, Blocks.COPPER_BULB.waxed().unaffected().defaultBlockState());
-		m.put(Role.SCREEN, Blocks.CONCRETE.black().defaultBlockState());
-		m.put(Role.BEACON, Blocks.SEA_LANTERN.defaultBlockState());
-		m.put(Role.TERMINAL, Blocks.LECTERN.defaultBlockState());
-		m.put(Role.PLAQUE, Blocks.CHERRY_WALL_SIGN.defaultBlockState());
+		// feat/hq-layouts: one visual style for every layout, cherry (the layout keeps its own per-barrio/tower materials)
+		m.putAll(new CherryStyle().palette());
 		return Map.copyOf(m);
 	}
 
 	@Override
 	BlockState bench(Direction back) {
-		return Blocks.POLISHED_TUFF_STAIRS.defaultBlockState().setValue(StairBlock.FACING, back).setValue(StairBlock.HALF, Half.BOTTOM);
+		return palette().get(Role.BENCH).setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING, back);
 	}
 
 	// ------------------------------------------------------------------ spine-grid pieces: unused (RingGenerator draws everything)

@@ -35,7 +35,8 @@ public final class HqStyles {
 	 * layout/campus: {@link CampusStyle}; layout/ring: {@link RingStyle}; layout/vertical: {@link VerticalStyle};
 	 * layout/blocks: {@link EnsancheStyle}.
 	 */
-	private static final List<HqStyle> LAYOUTS = List.of(new CampusStyle(), new RingStyle(), new VerticalStyle(), new EnsancheStyle());
+	private static final List<HqStyle> LAYOUTS = List.of(new CampusStyle(), new RingStyle(), new VerticalStyle(), new EnsancheStyle(),
+			new VillageStyle());
 	private static volatile @Nullable HqStyle active;
 
 	private HqStyles() {
@@ -99,6 +100,30 @@ public final class HqStyles {
 	public static HqStyle active() {
 		HqStyle s = active;
 		return s == null ? defaultStyle() : s;
+	}
+
+	/**
+	 * The style that draws layout {@code layoutId} ({@link dev.t3craft.hq.layout.HqLayouts}): for
+	 * {@code classic}, the configured spine style ({@link #active()}, cherry by default, exactly as
+	 * before layouts existed; a configured own-layout style falls back to the default); for every
+	 * other layout its own style (cherry palette plus the layout's own materials). Unknown id: classic.
+	 */
+	public static HqStyle forLayout(@Nullable String layoutId) {
+		String id = dev.t3craft.hq.layout.HqLayouts.resolve(layoutId).id();
+		if (id.equals(dev.t3craft.hq.layout.HqLayouts.CLASSIC)) {
+			HqStyle s = active();
+			return s.ownLayout() ? defaultStyle() : s;
+		}
+		HqStyle s = byId(id);
+		if (s == null) {
+			throw new IllegalStateException("no style for layout " + id);
+		}
+		return s;
+	}
+
+	/** {@link #forLayout} of the active layout ({@link dev.t3craft.hq.layout.HqLayouts#active()}): what plans are generated with. */
+	public static HqStyle current() {
+		return forLayout(dev.t3craft.hq.layout.HqLayouts.active().id());
 	}
 
 	/** Sets the active style (null: back to the default). */

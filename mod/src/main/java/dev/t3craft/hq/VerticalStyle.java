@@ -28,31 +28,8 @@ final class VerticalStyle extends HqStyle {
 
 	VerticalStyle() {
 		Map<Role, BlockState> m = new EnumMap<>(Role.class);
-		m.put(Role.FLOOR, Blocks.CHERRY_PLANKS.defaultBlockState());
-		m.put(Role.FOOTING, Blocks.SMOOTH_QUARTZ.defaultBlockState());
-		m.put(Role.WALL, Blocks.CALCITE.defaultBlockState());
-		m.put(Role.COLUMN, Blocks.STRIPPED_CHERRY_LOG.defaultBlockState().setValue(BlockStateProperties.AXIS, Direction.Axis.Y));
-		m.put(Role.BEAM, Blocks.STRIPPED_CHERRY_LOG.defaultBlockState().setValue(BlockStateProperties.AXIS, Direction.Axis.X));
-		m.put(Role.ROOF, Blocks.QUARTZ_STAIRS.defaultBlockState().setValue(BlockStateProperties.HALF, Half.BOTTOM));
-		m.put(Role.ROOF_TRIM, Blocks.SMOOTH_QUARTZ_SLAB.defaultBlockState().setValue(BlockStateProperties.SLAB_TYPE, SlabType.BOTTOM));
-		m.put(Role.RIDGE, Blocks.POLISHED_BLACKSTONE_BRICKS.defaultBlockState());
-		m.put(Role.WINDOW, Blocks.GLASS_PANE.defaultBlockState());
-		m.put(Role.DOOR, Blocks.POLISHED_ANDESITE.defaultBlockState());
-		m.put(Role.DECOR, Blocks.POTTED_FLOWERING_AZALEA.defaultBlockState());
-		m.put(Role.PATH, Blocks.SMOOTH_STONE.defaultBlockState());
-		m.put(Role.GARDEN, Blocks.MOSS_BLOCK.defaultBlockState());
-		m.put(Role.GARDEN_TREE, Blocks.FLOWERING_AZALEA_LEAVES.defaultBlockState().setValue(BlockStateProperties.PERSISTENT, true));
-		m.put(Role.LIGHT, Blocks.PEARLESCENT_FROGLIGHT.defaultBlockState());
-		m.put(Role.DESK, Blocks.CHERRY_SLAB.defaultBlockState().setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP));
-		m.put(Role.BENCH, Blocks.CHERRY_STAIRS.defaultBlockState().setValue(BlockStateProperties.HALF, Half.BOTTOM));
-		m.put(Role.BOARD, Blocks.POLISHED_DEEPSLATE.defaultBlockState());
-		m.put(Role.COMPUTER_ON, Blocks.CONCRETE.pick(DyeColor.BLACK).defaultBlockState());
-		m.put(Role.COMPUTER_OFF, Blocks.CONCRETE.pick(DyeColor.GRAY).defaultBlockState());
-		m.put(Role.STATUS_LAMP, Blocks.COPPER_BULB.waxed().unaffected().defaultBlockState().setValue(BlockStateProperties.LIT, false));
-		m.put(Role.SCREEN, Blocks.CONCRETE.pick(DyeColor.BLACK).defaultBlockState());
-		m.put(Role.BEACON, Blocks.OCHRE_FROGLIGHT.defaultBlockState());
-		m.put(Role.TERMINAL, Blocks.LECTERN.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH));
-		m.put(Role.PLAQUE, Blocks.CHERRY_WALL_SIGN.defaultBlockState());
+		// feat/hq-layouts: one visual style for every layout, cherry (the layout keeps its own per-barrio/tower materials)
+		m.putAll(new CherryStyle().palette());
 		palette = Collections.unmodifiableMap(m);
 	}
 
@@ -62,6 +39,16 @@ final class VerticalStyle extends HqStyle {
 	}
 
 	// ------------------------------------------------------------------ layout hook (HqStyle)
+
+	@Override
+	public HqFootprints.Area envelope(HqLayout layout) {
+		return TowerLayout.envelope(TowerLayout.towers(layout).size());
+	}
+
+	@Override
+	public int top() {
+		return TowerLayout.TOP;
+	}
 
 	@Override
 	public boolean ownLayout() {

@@ -47,6 +47,18 @@ public final class HqSiteFrame {
 	private HqSiteFrame() {
 	}
 
+	/**
+	 * The style the survival site builds (feat/hq-layouts): it asks the active layout
+	 * ({@link dev.t3craft.hq.HqStyles#current()}); a layout with its own ground plan (campus, ring,
+	 * vertical, ensanche, village) is far beyond the site's {@link SiteRequest#MAX_ENVELOPE} and its
+	 * one-slot-per-wing frame, so the site keeps the classic spine layout for those. The HQ world
+	 * (demo) builds every layout.
+	 */
+	public static dev.t3craft.hq.HqStyle style() {
+		dev.t3craft.hq.HqStyle s = dev.t3craft.hq.HqStyles.current();
+		return s.ownLayout() ? dev.t3craft.hq.HqStyles.forLayout(dev.t3craft.hq.layout.HqLayouts.CLASSIC) : s;
+	}
+
 	/** What the HQ asks the site for: the base (hub with the "Archived" shelf, portico), room for the wings, no depth. */
 	public static SiteRequest request() {
 		return new SiteRequest(module(BASE), rect(HqFootprints.envelope(MAX_MODULES)), BASE_DEPTH);

@@ -47,6 +47,8 @@ import net.minecraft.world.level.block.state.BlockState;
  * with their own layout, e.g. {@code --style campus}, which also renders a 4 → 10 → 20 comparison).
  * PNGs over 480 KB are written again with a 256-colour palette.
  * {@code --style village} renders the village layout (layout/village, {@link VillageRender}).
+ * {@code --layout ID} (feat/hq-layouts: classic, campus, ring, vertical, ensanche, village or all) renders a
+ * registered layout through the game's pipeline with {@code --projects} (default 4), see {@link LayoutViews}.
  */
 public final class HqRender {
 	private HqRender() {
@@ -64,10 +66,12 @@ public final class HqRender {
 		boolean vanilla = false;
 		boolean npcs = true;
 		List<Integer> projects = new ArrayList<>();
+		String layoutId = null;
 		for (int i = 0; i < args.length; i++) {
 			switch (args[i]) {
 				case "--out" -> out = Path.of(args[++i]);
 				case "--style" -> styleId = args[++i];
+				case "--layout" -> layoutId = args[++i];
 				case "--only" -> only.addAll(List.of(args[++i].split(",")));
 				case "--scale" -> scaleMul = Double.parseDouble(args[++i]);
 				case "--ss" -> ss = Integer.parseInt(args[++i]);
@@ -87,6 +91,16 @@ public final class HqRender {
 			dev.t3craft.blocks.RenderBlocks.install();
 		} else {
 			HqFixtures.use(null);
+		}
+		if (layoutId != null) {
+			// feat/hq-layouts: a registered layout (or "all") through the game's pipeline
+			Files.createDirectories(out);
+			BlockModels models = new BlockModels();
+			LayoutViews.render(models, layoutId, out, projects.isEmpty() ? List.of(4) : projects, only, scaleMul, ss, npcs);
+			for (String p : models.problems) {
+				System.out.println("note: " + p);
+			}
+			return;
 		}
 		if (dev.t3craft.hq.VillageGenerator.ID.equals(styleId)) {
 			// layout/village: its own generator and views (see VillageRender)
@@ -111,6 +125,14 @@ public final class HqRender {
 		if (sid.equals("vertical")) {
 			// layout/vertical: towers, bridges and podium for 4, 10 and 20 projects (VerticalRender)
 			VerticalRender.run(models, style, out, only, scaleMul, ss, npcs);
+			for (String p : models.problems) {
+				System.out.println("note: " + p);
+			}
+			return;
+		}
+		if (sid.equals("ring")) {
+			// layout/ring: growth through 4, 10 and 20 projects (Growth)
+			Growth.render(style, models, out, projects.isEmpty() ? List.of(4, 10, 20) : projects, only, scaleMul, ss, npcs);
 			for (String p : models.problems) {
 				System.out.println("note: " + p);
 			}

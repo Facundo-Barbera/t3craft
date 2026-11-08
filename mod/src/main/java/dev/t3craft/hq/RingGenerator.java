@@ -189,19 +189,22 @@ final class RingGenerator {
 		return b.defaultBlockState();
 	}
 
-	private static final BlockState TUFF_BRICKS = b(Blocks.TUFF_BRICKS);
-	private static final BlockState POLISHED_TUFF = b(Blocks.POLISHED_TUFF);
-	private static final BlockState QUARTZ = b(Blocks.SMOOTH_QUARTZ);
-	private static final BlockState PILLAR = b(Blocks.QUARTZ_PILLAR);
+	// feat/hq-layouts: one visual style (cherry) for every layout; the ring's former tuff, quartz,
+	// copper and mud-brick shell maps to the cherry palette's footing, floor, wall, column and roof.
+	// The names stay as the roles they fill in the ring.
+	private static final BlockState TUFF_BRICKS = b(Blocks.DEEPSLATE_TILES);
+	private static final BlockState POLISHED_TUFF = b(Blocks.BAMBOO_MOSAIC);
+	private static final BlockState QUARTZ = b(Blocks.CALCITE);
+	private static final BlockState PILLAR = b(Blocks.CHERRY_LOG);
 	private static final BlockState GLASS = b(Blocks.GLASS);
 	private static final BlockState GRASS = b(Blocks.GRASS_BLOCK);
 	private static final BlockState MOSS = b(Blocks.MOSS_BLOCK);
 	private static final BlockState WATER = b(Blocks.WATER);
 	private static final BlockState SEA_LANTERN = b(Blocks.SEA_LANTERN);
 	private static final BlockState DEEPSLATE_TILES = b(Blocks.DEEPSLATE_TILES);
-	private static final BlockState COPPER = Blocks.CUT_COPPER.waxed().oxidized().defaultBlockState();
-	private static final BlockState COPPER_WARM = Blocks.CUT_COPPER.waxed().exposed().defaultBlockState();
-	private static final BlockState MUD_BRICKS = b(Blocks.MUD_BRICKS);
+	private static final BlockState COPPER = b(Blocks.POLISHED_BLACKSTONE_BRICKS);
+	private static final BlockState COPPER_WARM = b(Blocks.CHERRY_PLANKS);
+	private static final BlockState MUD_BRICKS = b(Blocks.CALCITE);
 	private static final BlockState LOG = b(Blocks.CHERRY_LOG);
 
 	private static BlockState slab(Block b) {
@@ -246,10 +249,10 @@ final class RingGenerator {
 			case HUB, HUB_WALL -> set(x, 0, z, TUFF_BRICKS);
 			case BRIDGE, PATIO -> patioGround(x, z, r);
 			case GALLERY -> set(x, 0, z, r > RingGeometry.GALLERY_R - 1 ? TUFF_BRICKS : accent());
-			case RAMP -> stepped(x, z, rampHalves(r), POLISHED_TUFF, slab(Blocks.POLISHED_TUFF_SLAB));
+			case RAMP -> stepped(x, z, rampHalves(r), POLISHED_TUFF, slab(Blocks.BAMBOO_MOSAIC_SLAB));
 			case TERRACE -> {
 				int h = rampHalves(r);
-				stepped(x, z, h - h % 2, b(Blocks.TUFF), b(Blocks.TUFF));
+				stepped(x, z, h - h % 2, b(Blocks.DEEPSLATE_TILES), b(Blocks.DEEPSLATE_TILES));
 				int top = h / 2;
 				set(x, top, z, (x * 7 + z * 13 & 7) == 0 ? MOSS : GRASS);
 				if (Math.floorMod(x * 31 + z * 17, 23) == 0 && top + 1 < 6) {
@@ -483,7 +486,7 @@ final class RingGenerator {
 					for (int y = 1; y < y0 - i; y++) {
 						set(x, y, z, TUFF_BRICKS);
 					}
-					set(x, y0 - i, z, stairs(Blocks.POLISHED_TUFF_STAIRS, up));
+					set(x, y0 - i, z, stairs(Blocks.BAMBOO_MOSAIC_STAIRS, up));
 					for (int y = y0 - i + 1; y <= y0 + 3; y++) {
 						set(x, y, z, AIR);
 					}
@@ -745,7 +748,7 @@ final class RingGenerator {
 		int solid = k % 2 == 0 ? -k / 2 : -(k + 1) / 2;
 		set(x, solid, z, k % 2 == 0 ? (k == 6 ? accent() : MOSS) : TUFF_BRICKS);
 		if (k % 2 == 1) {
-			set(x, solid + 1, z, slab(Blocks.TUFF_BRICK_SLAB));
+			set(x, solid + 1, z, slab(Blocks.DEEPSLATE_TILE_SLAB));
 		}
 		for (int y = solid + (k % 2 == 1 ? 2 : 1); y <= 2; y++) {
 			set(x, y, z, AIR);
@@ -973,7 +976,7 @@ final class RingGenerator {
 			for (int v : st.lane(f)) {
 				for (int i = 0; i < 7; i++) {
 					BlockPos p = st.cell(st.stepU(f, i), v, y0 + 1 + i);
-					set(p, stairs(Blocks.POLISHED_TUFF_STAIRS, up));
+					set(p, stairs(Blocks.BAMBOO_MOSAIC_STAIRS, up));
 					for (int y = p.getY() + 1; y <= p.getY() + 3 && y < RingGeometry.floorY(f + 1) + 3; y++) {
 						if (y != RingGeometry.floorY(f + 1) || hole.contains(BlockPos.asLong(p.getX(), y, p.getZ()))) {
 							set(p.getX(), y, p.getZ(), AIR);

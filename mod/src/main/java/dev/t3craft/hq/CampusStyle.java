@@ -32,18 +32,8 @@ final class CampusStyle extends HqStyle {
 
 	CampusStyle() {
 		Map<Role, BlockState> m = new EnumMap<>(Role.class);
-		m.putAll(pieces.palette());
-		m.put(Role.FLOOR, Blocks.SPRUCE_PLANKS.defaultBlockState());
-		m.put(Role.FOOTING, Blocks.POLISHED_DEEPSLATE.defaultBlockState());
-		m.put(Role.WALL, Blocks.QUARTZ_BRICKS.defaultBlockState());
-		m.put(Role.ROOF, Blocks.DARK_PRISMARINE_STAIRS.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH)
-				.setValue(BlockStateProperties.HALF, Half.BOTTOM));
-		m.put(Role.ROOF_TRIM, Blocks.DARK_PRISMARINE_SLAB.defaultBlockState().setValue(BlockStateProperties.SLAB_TYPE, SlabType.BOTTOM));
-		m.put(Role.RIDGE, Blocks.DARK_PRISMARINE.defaultBlockState());
-		m.put(Role.PATH, Blocks.POLISHED_ANDESITE.defaultBlockState());
-		m.put(Role.WINDOW, Blocks.GLASS_PANE.defaultBlockState());
-		m.put(Role.BENCH, Blocks.SPRUCE_STAIRS.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.SOUTH)
-				.setValue(BlockStateProperties.HALF, Half.BOTTOM));
+		// feat/hq-layouts: one visual style for every layout, cherry (the layout keeps its own per-barrio/tower materials)
+		m.putAll(new CherryStyle().palette());
 		palette = Collections.unmodifiableMap(m);
 	}
 
@@ -60,6 +50,25 @@ final class CampusStyle extends HqStyle {
 	@Override
 	public HqLayout allocate(HqInput input, @Nullable HqLayout previous) {
 		return CampusLayout.allocate(input, previous);
+	}
+
+	@Override
+	public HqFootprints.Area envelope(HqLayout layout) {
+		int parcels = 0;
+		for (HqLayout.Module m : layout.modules()) {
+			parcels = Math.max(parcels, CampusLayout.parcelOf(m.index()) + 1);
+		}
+		return CampusFootprints.envelope(parcels);
+	}
+
+	@Override
+	public int bottom() {
+		return CampusFootprints.bottom();
+	}
+
+	@Override
+	public int top() {
+		return CampusFootprints.top();
 	}
 
 	@Override

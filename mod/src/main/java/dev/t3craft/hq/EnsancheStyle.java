@@ -35,31 +35,8 @@ final class EnsancheStyle extends HqStyle {
 
 	EnsancheStyle() {
 		Map<Role, BlockState> m = new EnumMap<>(Role.class);
-		m.put(Role.FLOOR, Blocks.SPRUCE_PLANKS.defaultBlockState());
-		m.put(Role.FOOTING, Blocks.POLISHED_ANDESITE.defaultBlockState());
-		m.put(Role.WALL, Blocks.BRICKS.defaultBlockState());
-		m.put(Role.COLUMN, Blocks.STONE_BRICKS.defaultBlockState());
-		m.put(Role.BEAM, Blocks.SMOOTH_STONE.defaultBlockState());
-		m.put(Role.ROOF, stairs(Blocks.DEEPSLATE_TILE_STAIRS, Direction.NORTH));
-		m.put(Role.ROOF_TRIM, slab(Blocks.DEEPSLATE_TILE_SLAB));
-		m.put(Role.RIDGE, Blocks.DEEPSLATE_TILES.defaultBlockState());
-		m.put(Role.WINDOW, Blocks.GLASS_PANE.defaultBlockState());
-		m.put(Role.DOOR, Blocks.DARK_OAK_PLANKS.defaultBlockState());
-		m.put(Role.DECOR, Blocks.POTTED_FLOWERING_AZALEA.defaultBlockState());
-		m.put(Role.PATH, Blocks.POLISHED_ANDESITE.defaultBlockState());
-		m.put(Role.GARDEN, Blocks.GRASS_BLOCK.defaultBlockState());
-		m.put(Role.GARDEN_TREE, Blocks.OAK_LEAVES.defaultBlockState().setValue(BlockStateProperties.PERSISTENT, true));
-		m.put(Role.LIGHT, Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, false));
-		m.put(Role.DESK, Blocks.DARK_OAK_SLAB.defaultBlockState().setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP));
-		m.put(Role.BENCH, stairs(Blocks.DARK_OAK_STAIRS, Direction.SOUTH));
-		m.put(Role.BOARD, Blocks.POLISHED_DEEPSLATE.defaultBlockState());
-		m.put(Role.COMPUTER_ON, Blocks.CONCRETE.pick(DyeColor.BLACK).defaultBlockState());
-		m.put(Role.COMPUTER_OFF, Blocks.CONCRETE.pick(DyeColor.GRAY).defaultBlockState());
-		m.put(Role.STATUS_LAMP, Blocks.COPPER_BULB.waxed().unaffected().defaultBlockState().setValue(BlockStateProperties.LIT, false));
-		m.put(Role.SCREEN, Blocks.CONCRETE.pick(DyeColor.BLACK).defaultBlockState());
-		m.put(Role.BEACON, Blocks.OCHRE_FROGLIGHT.defaultBlockState());
-		m.put(Role.TERMINAL, Blocks.LECTERN.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH));
-		m.put(Role.PLAQUE, Blocks.SPRUCE_WALL_SIGN.defaultBlockState());
+		// feat/hq-layouts: one visual style for every layout, cherry (the layout keeps its own per-barrio/tower materials)
+		m.putAll(new CherryStyle().palette());
 		palette = Collections.unmodifiableMap(m);
 	}
 
@@ -86,6 +63,16 @@ final class EnsancheStyle extends HqStyle {
 	}
 
 	@Override
+	public HqFootprints.Area envelope(HqLayout layout) {
+		return EnsancheGrid.envelope(EnsancheGrid.maxCell(layout));
+	}
+
+	@Override
+	public int top() {
+		return EnsancheGrid.TOP;
+	}
+
+	@Override
 	public boolean ownLayout() {
 		return true;
 	}
@@ -97,7 +84,7 @@ final class EnsancheStyle extends HqStyle {
 
 	@Override
 	BlockState bench(Direction back) {
-		return stairs(Blocks.DARK_OAK_STAIRS, back);
+		return palette().get(Role.BENCH).setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING, back);
 	}
 
 	// ------------------------------------------------------------------ barrios

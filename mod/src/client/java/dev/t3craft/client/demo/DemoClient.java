@@ -17,6 +17,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
@@ -76,6 +77,8 @@ public final class DemoClient implements ClientModInitializer {
 	private @Nullable DemoBuildRun run;
 	private Pending pending = Pending.NONE;
 	private @Nullable DemoHqSource hq;
+	/** The pending layout already announced in chat (once per value). */
+	private @Nullable String announcedLayout;
 	/** Whether we installed the HQ's NPC anchors (so we only clear our own). */
 	private boolean anchorsInstalled;
 
@@ -276,6 +279,13 @@ public final class DemoClient implements ClientModInitializer {
 					T3Craft.LOGGER.error("[demo] structure source {} failed to prepare", src.id(), e);
 				}
 			}
+		}
+		DemoHqSource h = hq;
+		if (h != null && h.pendingLayout() != null && !quiet && !Objects.equals(h.pendingLayout(), announcedLayout)) {
+			// feat/hq-layouts: another layout is configured, but the HQ standing here keeps its own until a reset
+			announcedLayout = h.pendingLayout();
+			say("HQ built with layout '" + h.layoutId() + "'; the configured layout '" + h.pendingLayout()
+					+ "' applies after a reset + rebuild (/t3craft debug reset-hq)");
 		}
 		Optional<DemoStructureSource> chosen = s == null ? Optional.empty() : s.choose(cfg.structure());
 		if (chosen.isEmpty()) {

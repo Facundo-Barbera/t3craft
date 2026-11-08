@@ -88,11 +88,14 @@ class CampusLayoutTest {
 			assertFalse(s.ownLayout(), s.id());
 			assertNull(s.layoutPlan(HqLayout.plan(roster(2))), s.id());
 		}
-		// the active style drives HqPlans' allocation
-		HqStyles.use(campus);
+		// the active layout (feat/hq-layouts) drives HqPlans' allocation
+		dev.t3craft.hq.layout.HqLayouts.use("campus");
 		HqInput in = roster(3);
-		assertEquals(CampusLayout.allocate(in, null), HqPlans.plan(in, null).layout());
-		HqStyles.use(null);
+		try {
+			assertEquals(CampusLayout.allocate(in, null), HqPlans.plan(in, null).layout());
+		} finally {
+			dev.t3craft.hq.layout.HqLayouts.use(null);
+		}
 		assertEquals(HqLayout.allocate(in, null), HqPlans.plan(in, null).layout());
 	}
 

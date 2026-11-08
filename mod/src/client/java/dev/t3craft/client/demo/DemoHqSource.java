@@ -27,13 +27,43 @@ public final class DemoHqSource implements DemoStructureSource {
 	public static final String ID = HqStructureSource.ID;
 
 	private final Supplier<? extends Collection<NpcInfo>> live;
+	/** The configured layout ({@code hqLayout}); used only while the HQ world holds no HQ. */
+	private final Supplier<String> configuredLayout;
+	/** feat/hq-layouts: the layout of the last prepare and the configured one when they differ (else null). */
+	private volatile String layoutId = dev.t3craft.hq.layout.HqLayouts.DEFAULT_ID;
+	private volatile @Nullable String pendingLayout;
 	private DemoHq.@Nullable Roster roster;
 	private DemoHq.@Nullable Step step;
 	private @Nullable HqInput preparedInput;
 	private boolean failed;
 
 	public DemoHqSource(Supplier<? extends Collection<NpcInfo>> live) {
+		this(live, dev.t3craft.client.hq.layout.HqLayoutConfig::selectedId);
+	}
+
+	/** {@code configuredLayout}: the {@code hqLayout} config value (tests pass their own). */
+	public DemoHqSource(Supplier<? extends Collection<NpcInfo>> live, Supplier<String> configuredLayout) {
 		this.live = Objects.requireNonNull(live, "live");
+		this.configuredLayout = Objects.requireNonNull(configuredLayout, "configuredLayout");
+	}
+
+	/**
+	 * The layout to plan with (feat/hq-layouts): the one the world's HQ is built with when there is
+	 * one (a different configured layout is never built over it, it waits for an explicit reset +
+	 * rebuild), else the configured one. Pure.
+	 */
+	public static String effectiveLayout(@Nullable String builtLayoutId, @Nullable String configuredLayoutId) {
+		return dev.t3craft.hq.layout.HqLayouts.resolve(builtLayoutId != null ? builtLayoutId : configuredLayoutId).id();
+	}
+
+	/** Layout of the last prepare. */
+	public String layoutId() {
+		return layoutId;
+	}
+
+	/** The configured layout when it differs from the one the HQ is built with (it waits for a reset), else null. */
+	public @Nullable String pendingLayout() {
+		return pendingLayout;
 	}
 
 	@Override
@@ -60,6 +90,13 @@ public final class DemoHqSource implements DemoStructureSource {
 	@Override
 	public void prepare(DemoMarker built, DemoWorldSpec spec, int worldMinY) {
 		try {
+			// feat/hq-layouts: plan with the layout the HQ is built with, or the configured one on an empty world
+			String builtLayout = dev.t3craft.client.hq.layout.HqLayoutState.fromMarker(built.structure(), built.state());
+			String configured = dev.t3craft.hq.layout.HqLayouts.resolve(configuredLayout.get()).id();
+			String effective = effectiveLayout(builtLayout, configured);
+			dev.t3craft.hq.layout.HqLayouts.use(effective);
+			layoutId = effective;
+			pendingLayout = builtLayout != null && !builtLayout.equals(configured) ? configured : null;
 			DemoHq.Roster r = DemoHq.chooseRoster(live.get());
 			boolean ours = ID.equals(built.structure());
 			HqLayout previous = null;
@@ -162,7 +199,9 @@ public final class DemoHqSource implements DemoStructureSource {
 		if (s == null) {
 			return failed ? "failed" : "not prepared";
 		}
-		return String.format(java.util.Locale.ROOT, "%s roster, %d module(s), hash %s, lift %d, fixtures %s", sample() ? "example" : "live",
+		String pending = pendingLayout;
+		return String.format(java.util.Locale.ROOT, "layout %s%s, %s roster, %d module(s), hash %s, lift %d, fixtures %s", layoutId,
+				pending == null ? "" : " (configured " + pending + ": applies after a reset)", sample() ? "example" : "live",
 				s.layout().modules().size(), s.hash(), s.lift(), s.fixtures());
 	}
 }
