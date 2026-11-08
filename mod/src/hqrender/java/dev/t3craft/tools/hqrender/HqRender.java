@@ -46,6 +46,7 @@ import net.minecraft.world.level.block.state.BlockState;
  * projects with varied thread counts, three environments and settled threads; the default for styles
  * with their own layout, e.g. {@code --style campus}, which also renders a 4 → 10 → 20 comparison).
  * PNGs over 480 KB are written again with a 256-colour palette.
+ * {@code --style village} renders the village layout (layout/village, {@link VillageRender}).
  */
 public final class HqRender {
 	private HqRender() {
@@ -86,6 +87,12 @@ public final class HqRender {
 			dev.t3craft.blocks.RenderBlocks.install();
 		} else {
 			HqFixtures.use(null);
+		}
+		if (dev.t3craft.hq.VillageGenerator.ID.equals(styleId)) {
+			// layout/village: its own generator and views (see VillageRender)
+			Files.createDirectories(out);
+			VillageRender.run(out, only, scaleMul, ss, npcs, new BlockModels());
+			return;
 		}
 		HqStyle style = styleId == null ? HqStyles.byId(HqStyles.DEFAULT_ID) : HqStyles.byId(styleId);
 		if (style == null) {
@@ -245,7 +252,7 @@ public final class HqRender {
 	private static final int[] ROBES = {0xFF6A4FB0, 0xFF2F7DB8, 0xFFC0543C, 0xFF3C9A5F, 0xFFD39A2A, 0xFF8E3F7E};
 
 	/** A stand-in NPC (robe, head, face on the side it looks at), seated or standing at an anchor. */
-	private static void npc(Scene sc, Anchor a, boolean seated, int i) {
+	static void npc(Scene sc, Anchor a, boolean seated, int i) {
 		BlockPos c = a.block();
 		BlockModels.Texture robe = BlockModels.Texture.solid(ROBES[i % ROBES.length]);
 		BlockModels.Texture skin = BlockModels.Texture.solid(0xFFE0B48C);
