@@ -125,7 +125,9 @@ public final class DemoHq {
 			String g = n.groupId();
 			int colon = g.indexOf(':');
 			String env = colon > 0 ? g.substring(0, colon) : g;
-			b.thread(g, n.groupLabel(), env, n.envLabel(), n.id(), n.settled());
+			// feat/lead-office: a lead works from its own office (a module of its own project, lead:<npcId>)
+			String[] p = dev.t3craft.client.hq.lead.LeadOfficeClient.project(n.id(), g, n.groupLabel(), n.settled());
+			b.thread(p[0], p[1], env, n.envLabel(), n.id(), n.settled());
 		}
 		return b.build();
 	}

@@ -116,6 +116,12 @@ public final class MonitorScreens {
 		}
 		int c = Math.max(8, cols);
 		int r = Math.max(2, rows);
+		if (LeadFeed.matches(b)) {
+			// feat/lead-office: a lead's office screen (its children), also memoised on the lead roster version
+			dev.t3craft.hq.lead.LeadRoster roster = dev.t3craft.hq.lead.LeadOffices.current();
+			long source = revision + ((long) dev.t3craft.hq.lead.LeadOffices.version() << 32);
+			return memo(b.wire() + "@" + c + "x" + r, source, () -> LeadFeed.render(b, roster, threads.values(), c, r));
+		}
 		return memo(b.wire() + "@" + c + "x" + r, revision, () -> ProjectFeed.render(b, threads.values(), c, r));
 	}
 

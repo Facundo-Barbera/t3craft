@@ -73,6 +73,7 @@ public final class HqConstructionClient implements ClientModInitializer {
 		ClientPlayConnectionEvents.DISCONNECT.register((h, mc) -> {
 			HqRuntime.roster(null);
 			HqPresence.clear();
+			dev.t3craft.client.hq.lead.LeadOfficeClient.clear();
 		});
 		ClientCommandRegistrationCallback.EVENT.register((d, ctx) -> d.register(literal("t3craft").then(literal("hq")
 				.executes(c -> run(c.getSource(), HqConstructionClient::status))
@@ -134,7 +135,10 @@ public final class HqConstructionClient implements ClientModInitializer {
 		for (NpcInfo n : roomed) {
 			String g = n.groupId();
 			String env = g.indexOf(':') > 0 ? g.substring(0, g.indexOf(':')) : g;
-			b.thread(g, n.groupLabel(), env, n.envLabel(), n.id(), released.test(n));
+			boolean out = released.test(n);
+			// feat/lead-office: a lead works from its own office (a module of its own project, lead:<npcId>)
+			String[] p = dev.t3craft.client.hq.lead.LeadOfficeClient.project(n.id(), g, n.groupLabel(), out);
+			b.thread(p[0], p[1], env, n.envLabel(), n.id(), out);
 		}
 		return b.build();
 	}

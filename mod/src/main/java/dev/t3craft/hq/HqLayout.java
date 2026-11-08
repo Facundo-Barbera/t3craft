@@ -79,9 +79,13 @@ public record HqLayout(List<Module> modules, List<Archived> archive, List<String
 	public record Archived(int slot, String threadId, String projectKey, String envKey, int seq) {
 	}
 
-	/** Module types. Only wings for now; the type is in the API so floors can be added later. */
+	/**
+	 * Module types. {@code LEAD_OFFICE} (feat/lead-office): the module of a lead's own project
+	 * ({@link dev.t3craft.hq.lead.LeadOffices#projectKey}); same box and slots as a wing, drawn as an
+	 * office by the layouts that know how.
+	 */
 	public enum Type {
-		WING
+		WING, LEAD_OFFICE
 	}
 
 	/**
@@ -105,7 +109,12 @@ public record HqLayout(List<Module> modules, List<Archived> archive, List<String
 		}
 
 		public Type type() {
-			return Type.WING;
+			return dev.t3craft.hq.lead.LeadOffices.isLeadProject(projectKey) ? Type.LEAD_OFFICE : Type.WING;
+		}
+
+		/** The lead's NPC id when this is a lead office, else null. */
+		public @Nullable String leadNpcId() {
+			return dev.t3craft.hq.lead.LeadOffices.leadOf(projectKey);
 		}
 
 		/** Desk segments (fixed). */

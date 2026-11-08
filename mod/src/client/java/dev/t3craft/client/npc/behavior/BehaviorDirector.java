@@ -86,6 +86,8 @@ public final class BehaviorDirector {
 	private WanderConfig.@Nullable Watcher wanderConfig;
 	/** NPC ids of the threads pinned in T3 (null = read from the direct-mode shells, {@link #pinnedFromClient}). */
 	private java.util.function.@Nullable Supplier<Set<String>> pinnedThreads;
+	/** feat/lead-office: new children stop by their lead's office first. Lazy: hot-swap safe. */
+	private @Nullable LeadBriefing briefing;
 
 	/**
 	 * Plug in a physical base (null = none, grid layout only). See {@link AnchorSource}.
@@ -230,6 +232,10 @@ public final class BehaviorDirector {
 		return true;
 	}
 
+	private LeadBriefing briefing() {
+		return briefing = dev.t3craft.debug.HotSwapFields.orInit(briefing, LeadBriefing::new);
+	}
+
 	private Map<String, @Nullable Departure> departures() {
 		return departures = dev.t3craft.debug.HotSwapFields.orInit(departures, HashMap::new);
 	}
@@ -337,6 +343,11 @@ public final class BehaviorDirector {
 			return nb == null ? null : nb.pos();
 		}, pinnedSrc, lvl);
 
+		LeadBriefing briefing = briefing();
+		long nowMs = System.currentTimeMillis();
+		if (tick % 100 == 0) {
+			briefing.prune();
+		}
 		Set<String> alive = new HashSet<>();
 		for (Body b : bodies) {
 			alive.add(b.id());
@@ -344,6 +355,7 @@ public final class BehaviorDirector {
 			NpcBrain brain = brains.computeIfAbsent(b.id(), id -> new NpcBrain(id, pos(b.avatar().position())));
 			Mode mode = Mode.of(info.state());
 			Anchor desk = layout.desk(b.id(), info.groupId());
+			desk = briefing.redirect(b.id(), desk, layout, brain.pos(), nowMs); // feat/lead-office
 			if (desk == null) {
 				desk = new Anchor(brain.pos(), brain.bodyYaw());
 			}
