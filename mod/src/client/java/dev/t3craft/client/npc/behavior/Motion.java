@@ -42,6 +42,8 @@ public final class Motion {
 	private float yaw;
 	private float targetYaw;
 	private double pace = 1.0;
+	/** feat/npc-idle-wander: extra speed factor (running back to the board); 1 = normal walk. */
+	private double rush = 1.0;
 	private double speed;
 	private int blockedTicks;
 	private int stuckTicks;
@@ -82,6 +84,11 @@ public final class Motion {
 
 	public void setPace(double pace) {
 		this.pace = Math.max(0.7, Math.min(1.3, pace));
+	}
+
+	/** feat/npc-idle-wander: run ({@code > 1}) or walk ({@code 1}); clamped to 1..2.2. */
+	public void setRush(double rush) {
+		this.rush = Math.max(1.0, Math.min(2.2, rush));
 	}
 
 	/** While standing, turn towards {@code yaw} instead of the target yaw (null = the target's). */
@@ -149,7 +156,7 @@ public final class Motion {
 			return pos;
 		}
 		blockedTicks = 0;
-		double stride = SPEED * pace;
+		double stride = SPEED * pace * Math.max(1.0, rush);
 		double remaining = remaining(pos);
 		double want = stride;
 		if (remaining < ARRIVE) {
