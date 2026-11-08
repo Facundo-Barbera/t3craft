@@ -2,6 +2,7 @@ package dev.t3craft.client.t3ui.actions;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.t3craft.client.chat.MouseButtons;
+import dev.t3craft.client.chat.compose.ComposerSkin;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -31,6 +32,11 @@ import org.jspecify.annotations.Nullable;
  * enable/pair screen. Host contract: {@link #setBounds}, {@link #render} last (the popup draws over
  * other widgets), {@link #mouseClicked} first (it consumes clicks while open), {@link #keyPressed}
  * (Esc closes), {@link #mouseScrolled}. Client thread only.
+ *
+ * <p>feat/t3-composer: {@link #composerChip()} draws the closed picker as T3's composer trigger
+ * ({@code ComposerModelPicker}): provider icon, model and effort ("✳ Opus 5.5 · Medium", plus
+ * "· Plan" in plan mode) as a ghost chip sized to its text ({@link #chipWidth()}); the popover opens
+ * upwards, aligned to the chip's right edge, over the transcript.
  */
 public final class ModelPicker {
 	@FunctionalInterface
@@ -71,6 +77,7 @@ public final class ModelPicker {
 	private int y;
 	private int w;
 	private int h = 14;
+	private boolean composerChip;
 	private boolean open;
 	private boolean busy;
 	private int modelScroll;
@@ -109,6 +116,98 @@ public final class ModelPicker {
 	}
 
 	// ---- host API -------------------------------------------------------------------------------
+
+	/** Draws the closed picker as the composer's model chip (see the class comment). */
+	public ModelPicker composerChip() {
+		composerChip = true;
+		h = ComposerSkin.CHIP_H;
+		return this;
+	}
+
+	/** Width of the composer chip for the current pick. */
+	public int chipWidth() {
+		String[] p = chipParts();
+		return ComposerSkin.chipWidth(font, p[0], p[1], withArrow(p[2]));
+	}
+
+	private String withArrow(String detail) {
+		String arrow = open ? "▴" : "▾";
+		return detail.isEmpty() ? arrow : detail + " " + arrow;
+	}
+
+	/** {icon, model, detail} of the composer chip. */
+	private String[] chipParts() {
+		if (gate.state(envId) != ActionGate.State.ENABLED) {
+			String key = ActionGate.disabledKey(gate.state(envId));
+			return new String[] {"⚠", Component.translatable(key == null ? "t3craft.actions.enable_control" : key).getString(), ""};
+		}
+		ModelPick p = logic.pick();
+		if (p == null) {
+			ProviderService.Entry entry = envId == null ? null : providers.catalog(envId);
+			return new String[] {"", entry != null && entry.phase() == ProviderService.Phase.LOADING ? "Loading models…" : "No models", ""};
+		}
+		ProviderCatalog cat = logic.catalog();
+		ProviderCatalog.Provider prov = cat == null ? null : cat.provider(p.instanceId());
+		ProviderCatalog.Model m = prov == null ? null : prov.model(p.model());
+		String model = m == null ? p.model() : m.label();
+		String provLabel = prov == null ? "" : prov.label();
+		if (!provLabel.isEmpty() && model.regionMatches(true, 0, provLabel + " ", 0, provLabel.length() + 1)) {
+			model = model.substring(provLabel.length() + 1); // "Claude Opus 5.5" → "Opus 5.5", as T3's trigger
+		}
+		StringBuilder detail = new StringBuilder();
+		if (p.effortValue() != null) {
+			detail.append(m != null && m.effort() != null ? m.effort().labelOf(p.effortValue()) : p.effortValue());
+		}
+		if (p.interaction() == Modes.Interaction.PLAN) {
+			detail.append(detail.isEmpty() ? "" : " · ").append("Plan");
+		}
+		return new String[] {providerGlyph(prov == null ? p.instanceId() : prov.driver()), model, detail.toString()};
+	}
+
+	/** A glyph standing for the provider's icon (the game font has no logos). */
+	static String providerGlyph(String driver) {
+		String d = driver.toLowerCase(java.util.Locale.ROOT);
+		if (d.contains("claude") || d.contains("anthropic")) {
+			return "✳";
+		}
+		if (d.contains("codex") || d.contains("openai") || d.contains("gpt")) {
+			return "◎";
+		}
+		if (d.contains("gemini") || d.contains("google")) {
+			return "✦";
+		}
+		if (d.contains("cursor")) {
+			return "▲";
+		}
+		return d.isEmpty() ? "•" : d.substring(0, 1).toUpperCase(java.util.Locale.ROOT);
+	}
+
+	static int providerColor(String glyph) {
+		return switch (glyph) {
+			case "✳" -> 0xFFD97757;
+			case "✦" -> 0xFF7AA7FF;
+			case "⚠" -> ComposerSkin.WARN;
+			default -> ComposerSkin.TEXT;
+		};
+	}
+
+	/** The pick's runtime mode (access), null until there is a pick. */
+	public Modes.@Nullable Runtime runtime() {
+		ModelPick p = logic.pick();
+		return p == null ? null : p.runtime();
+	}
+
+	/** Opens or closes the popover (the access chip opens the same one). */
+	public void toggle() {
+		if (busy || gate.state(envId) != ActionGate.State.ENABLED) {
+			return;
+		}
+		open = !open;
+		if (open && envId != null) {
+			providers.invalidate(envId);
+			status = Component.empty();
+		}
+	}
 
 	public void setBounds(int x, int y, int w, int h) {
 		this.x = x;
@@ -207,6 +306,10 @@ public final class ModelPicker {
 		refreshCatalog();
 		ActionGate.State st = gate.state(envId);
 		boolean hover = Hits.inside(mouseX, mouseY, x, y, x + w, y + h);
+		if (composerChip) {
+			renderComposerChip(g, st, hover, mouseX, mouseY);
+			return;
+		}
 		g.fill(x, y, x + w, y + h, hover ? CHIP_HOVER : CHIP);
 		int ty = y + (h - font.lineHeight) / 2 + 1;
 		if (st != ActionGate.State.ENABLED) {
@@ -252,6 +355,30 @@ public final class ModelPicker {
 		}
 	}
 
+	private void renderComposerChip(GuiGraphicsExtractor g, ActionGate.State st, boolean hover, int mouseX, int mouseY) {
+		String[] p = chipParts();
+		ComposerSkin.chip(g, font, x, y, p[0], providerColor(p[0]), p[1], st == ActionGate.State.ENABLED ? ComposerSkin.TEXT : ComposerSkin.WARN,
+				withArrow(p[2]), hover, open);
+		if (st != ActionGate.State.ENABLED) {
+			if (st != ActionGate.State.NO_ENV) {
+				String env = envId;
+				hits.add(x, y, x + w, y + h, () -> ActionsClient.enableControl(Minecraft.getInstance().gui.screen(), env));
+			}
+			open = false;
+			return;
+		}
+		if (hover && !open) {
+			String tip = status.getString().isEmpty() ? "Model · effort · access" : status.getString();
+			g.setTooltipForNextFrame(font, Component.literal(tip), mouseX, mouseY);
+		}
+		if (!busy) {
+			hits.add(x, y, x + w, y + h, this::toggle);
+		}
+		if (open) {
+			renderPopup(g, mouseX, mouseY);
+		}
+	}
+
 	private void refreshCatalog() {
 		if (envId == null) {
 			return;
@@ -289,12 +416,18 @@ public final class ModelPicker {
 		int screenH = Minecraft.getInstance().getWindow().getGuiScaledHeight();
 		int screenW = Minecraft.getInstance().getWindow().getGuiScaledWidth();
 		boolean up = y > screenH / 2;
-		popX0 = Math.max(2, Math.min(x, screenW - pw - 2));
+		int anchorX = composerChip ? x + w - pw : x;
+		popX0 = Math.max(2, Math.min(anchorX, screenW - pw - 2));
 		popX1 = popX0 + pw;
 		popY0 = up ? Math.max(2, y - ph - 1) : y + h + 1;
 		popY1 = popY0 + ph;
-		g.fill(popX0 - 1, popY0 - 1, popX1 + 1, popY1 + 1, BORDER);
-		g.fill(popX0, popY0, popX1, popY1, BG);
+		g.nextStratum(); // over the text drawn before (the transcript)
+		if (composerChip) {
+			ComposerSkin.box(g, popX0 - 1, popY0 - 1, pw + 2, ph + 2, ComposerSkin.POPUP, ComposerSkin.BORDER_FOCUS);
+		} else {
+			g.fill(popX0 - 1, popY0 - 1, popX1 + 1, popY1 + 1, BORDER);
+			g.fill(popX0, popY0, popX1, popY1, BG);
+		}
 		// Swallow clicks on the popup background.
 		hits.add(popX0, popY0, popX1, popY1, () -> {
 		});

@@ -40,6 +40,13 @@ public record T3UiLayout(Rect frame, Rect sidebar, Rect main, boolean compact) {
 	public static final int TITLE_H = 14;
 	/** No action row any more (feat/t3-ui-clean): kept for callers, 0. */
 	public static final int ACTIONS_H = 0;
+	/**
+	 * feat/t3-composer: max width of the transcript / composer column in the thread panel (T3 Code
+	 * centres both in one {@code max-w-3xl} column).
+	 */
+	public static final int COLUMN_MAX = 460;
+	/** Icon buttons at the end of the search row (project filter, new thread). */
+	public static final int ICON_W = 14;
 
 	public static T3UiLayout compute(int guiW, int guiH, boolean showSidebar) {
 		int sw = Math.max(0, guiW);
@@ -73,8 +80,10 @@ public record T3UiLayout(Rect frame, Rect sidebar, Rect main, boolean compact) {
 	}
 
 	/**
-	 * Inside the sidebar, top to bottom (T3's {@code SidebarChrome}: brand + menu, search, project
-	 * scope, "New thread"; the thread list; the footer with archive and settings).
+	 * Inside the sidebar, top to bottom (T3's {@code SidebarChrome}: brand + menu; the search row with
+	 * the project filter and "new thread" icons at its end, as T3 Code's search row with its filter
+	 * and compose icons; the thread list; the footer with archive and settings).
+	 * feat/t3-composer: {@code project} and {@code newThread} are those two icons, no rows of their own.
 	 */
 	public record SidebarRects(Rect brand, Rect search, Rect project, Rect newThread, Rect list, Rect footer) {
 	}
@@ -88,23 +97,11 @@ public record T3UiLayout(Rect frame, Rect sidebar, Rect main, boolean compact) {
 		int y = s.y() + PAD;
 		Rect brand = new Rect(x, y, w, BRAND_H);
 		y += BRAND_H + 2;
-		Rect search = new Rect(x, y, w, FIELD_H);
-		y += FIELD_H + 2;
-		// project filter and "New thread" share one row when the sidebar is short (high GUI scale)
-		boolean tight = s.h() < 150;
-		Rect project;
-		Rect newThread;
-		if (tight) {
-			int nw = Math.min(w / 2, 40);
-			project = new Rect(x, y, w - nw - 2, FIELD_H);
-			newThread = new Rect(x + w - nw, y, nw, FIELD_H);
-			y += FIELD_H + 3;
-		} else {
-			project = new Rect(x, y, w, FIELD_H);
-			y += FIELD_H + 2;
-			newThread = new Rect(x, y, w, FIELD_H);
-			y += FIELD_H + 3;
-		}
+		int icons = 2 * (ICON_W + 2);
+		Rect search = new Rect(x, y, Math.max(20, w - icons), FIELD_H);
+		Rect project = new Rect(x + w - 2 * ICON_W - 2, y, ICON_W, FIELD_H);
+		Rect newThread = new Rect(x + w - ICON_W, y, ICON_W, FIELD_H);
+		y += FIELD_H + 4;
 		int footerY = s.bottom() - PAD - FOOTER_H;
 		Rect list = new Rect(x, y, w, Math.max(0, footerY - 2 - y));
 		Rect footer = new Rect(x, footerY, w, FOOTER_H);

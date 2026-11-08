@@ -17,6 +17,8 @@ import dev.t3craft.client.chat.compose.ChatComposer;
 import dev.t3craft.client.chat.compose.ComposerInput;
 import dev.t3craft.client.chat.compose.ComposerView;
 import dev.t3craft.client.portable.NotificationLog;
+import dev.t3craft.client.t3ui.actions.ActionsClient;
+import dev.t3craft.client.t3ui.actions.ProjectsService;
 import dev.t3craft.client.portable.PortableClient;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -51,6 +53,13 @@ import org.jspecify.annotations.Nullable;
  * hovering a row shows settle and pin icons, and while the thread runs the header shows a small
  * Stop next to the state (the composer's send button turns into interrupt). No key-cap hint bar
  * and no time separators; the keys keep working.
+ *
+ * <p>feat/t3-composer: the composer sits in T3's centred column under the transcript, and "New
+ * thread" (the sidebar's ✎, a project folder's "+", Ctrl+N, the ⋯ menu) opens no window: it adds a
+ * {@link ThreadDraft} row under its project and the thread panel shows "project › New thread", an
+ * empty transcript and the composer with the draft's project and workspace chips. The first message
+ * launches the thread ({@link DraftLauncher}) and the real thread replaces the draft; Esc or ✕
+ * discards it.
  *
  * <p>Pure logic lives in {@link SidebarModel} (search/filter/grouping/order), {@link T3UiLayout}
  * (geometry and hit-testing) and {@link T3UiKeys} (keyboard); the slots for the self-contained
@@ -117,6 +126,14 @@ public final class T3Screen extends Screen {
 	private long hoverSince;
 	private @Nullable String hoverWarmed;
 	private static final int PREWARM_ON_OPEN = 3;
+
+	/** The draft thread (one at a time, like T3's draft per project), or null. */
+	private @Nullable ThreadDraft draft;
+	/** A draft asked for before the projects were known ({@link #withDraft}): env, projectId. */
+	private @Nullable String[] pendingDraft;
+	private @Nullable DraftControls draftControls;
+	/** Threads launched from a draft and not listed yet: selected as soon as they show. */
+	private @Nullable String awaitKey;
 	private static final long HOVER_PREWARM_MS = 250;
 
 	private record Hit(Rect r, Runnable action, @Nullable Runnable right, @Nullable List<String> tooltip) {
@@ -141,12 +158,34 @@ public final class T3Screen extends Screen {
 		if (key != null) {
 			autoSelected = true;
 		}
+		// feat/t3-composer: a draft thread outlives its screen (closing Y does not lose it)
+		if (actions != null) {
+			draft = ThreadDraft.kept;
+			ThreadDraft.kept = null;
+		}
+		if (draft != null && key == null && draft.wasSelected) {
+			model.select(draft.key());
+			this.key = draft.key();
+			this.sidebarVisible = false;
+			autoSelected = true;
+		}
 	}
 
 	/** Header labels for a thread that is not listed (archived). */
 	public T3Screen withFallbackLabels(String envLabel, String title) {
 		fallbackEnvLabel = envLabel == null ? "" : envLabel;
 		fallbackTitle = title == null ? "" : title;
+		return this;
+	}
+
+	/**
+	 * Opens on a new draft thread of {@code projectId} in {@code envId} (either may be null: the
+	 * selection or the first project), as T3's "new thread" (a block's {@code NewThreadScreen.open}).
+	 */
+	public T3Screen withDraft(@Nullable String envId, @Nullable String projectId) {
+		pendingDraft = new String[] {envId, projectId};
+		autoSelected = true;
+		sidebarVisible = false;
 		return this;
 	}
 
@@ -185,19 +224,31 @@ public final class T3Screen extends Screen {
 
 	@Override
 	protected void init() {
+		if (draft != null && ThreadDraft.kept == draft) {
+			ThreadDraft.kept = null; // back from a confirmation / pairing screen: still ours
+		}
 		if (composer == null && actions != null) {
 			composer = ChatComposer.create(this, theme, () -> {
 				if (conversation != null) {
 					conversation.scrollToEnd();
 				}
+			}, () -> {
+				if (selectedDraft() != null) {
+					discardDraft();
+					return true;
+				}
+				return false;
 			});
-			List<ComposerView.Control> controls = slots.composerControls(this, this::selectedTarget);
+			composer.setMaxWidth(T3UiLayout.COLUMN_MAX);
+			List<ComposerView.Control> controls = slots.composerControls(this, this::selectedTarget, this::selectedDraft);
 			composer.setControls(controls);
 			controls.forEach(c -> {
 				if (c instanceof T3Slots.Popup p) {
 					popups.add(p);
 				}
 			});
+			draftControls = new DraftControls(font, this::selectedDraft, this::moveDraft);
+			popups.addAll(draftControls.popups());
 		}
 		if (conversation == null) {
 			ConversationPanel c = new ConversationPanel(source, theme);
@@ -206,12 +257,16 @@ public final class T3Screen extends Screen {
 			// T3 Code shows neither a key-cap bar nor minute separators: the keys still work
 			c.setShowHints(false);
 			c.setShowSeparators(false);
+			c.setColumn(T3UiLayout.COLUMN_MAX); // T3's centred transcript + composer column
 			if (composer != null) {
 				ChatComposer.attach(c, composer);
 			}
 			conversation = c;
 			refresh();
-			if (key != null) {
+			if (draft != null && draft.is(key)) {
+				model.focus(key);
+				showRow(draft.row());
+			} else if (key != null) {
 				open(key);
 			}
 		}
@@ -222,10 +277,10 @@ public final class T3Screen extends Screen {
 		search = null;
 		if (sr.search().w() > 0) {
 			Rect s = sr.search();
-			EditBox box = new EditBox(font, s.x() + 4, s.y() + 3, s.w() - 8, s.h() - 4, null, Component.literal("Search threads"));
+			EditBox box = new EditBox(font, s.x() + 14, s.y() + 3, s.w() - 18, s.h() - 4, null, Component.literal("Search"));
 			box.setBordered(false);
 			box.setTextColor(theme.text());
-			box.setHint(Component.literal("Search threads").withColor(theme.ghost()));
+			box.setHint(Component.literal("Search").withColor(theme.ghost()));
 			box.setValue(model.query());
 			box.setResponder(q -> {
 				model.setQuery(q);
@@ -258,6 +313,17 @@ public final class T3Screen extends Screen {
 
 	@Override
 	public void removed() {
+		if (composer != null) {
+			composer.state().flush(); // feat/t3-composer: the text survives closing the screen (and the game)
+			composer.setFocused(false);
+		}
+		if (draftControls != null) {
+			draftControls.closeAll();
+		}
+		if (draft != null) {
+			draft.wasSelected = draft.is(model.selectedKey());
+			ThreadDraft.kept = draft;
+		}
 		ConversationPanel c = conversation;
 		if (c != null) {
 			String k = c.key();
@@ -281,7 +347,23 @@ public final class T3Screen extends Screen {
 	}
 
 	private void refresh() {
-		List<ThreadRow> rows = directory.rows();
+		List<ThreadRow> listed = directory.rows();
+		if (pendingDraft != null && !readOnly() && !ActionsClient.projects().all().isEmpty()) {
+			String[] pd = pendingDraft;
+			pendingDraft = null;
+			ProjectsService.Project p = slots.project(pd[0], pd[1]);
+			openDraft(p != null ? p : slots.draftProject(pd[0], null, null));
+		}
+		if (awaitKey != null && listed.stream().anyMatch(r -> r.key().equals(awaitKey))) {
+			String k = awaitKey;
+			awaitKey = null;
+			lastRows = null;
+			model.update(withDraft(listed));
+			if (k.equals(model.selectedKey()) || model.selectedKey() == null) {
+				open(k);
+			}
+		}
+		List<ThreadRow> rows = withDraft(listed);
 		// the directory hands back the same list while nothing changed: no rebuild per tick
 		if (rows != lastRows && !rows.equals(lastRows)) {
 			lastRows = rows;
@@ -298,12 +380,12 @@ public final class T3Screen extends Screen {
 				showRow(r);
 			}
 		}
-		if (!prewarmed && !rows.isEmpty() && conversation != null) {
+		if (!prewarmed && !listed.isEmpty() && conversation != null) {
 			prewarmed = true;
-			prewarmOnOpen(rows);
+			prewarmOnOpen(listed);
 		}
 		ConversationPanel c = conversation;
-		if (c != null && c.key() == null && model.selected() == null && key == null) {
+		if (c != null && c.key() == null && model.selected() == null && key == null && draft == null) {
 			c.showNothing(model.all().isEmpty() ? "No threads yet. Pair an environment from the menu (⋯ › Environments)." : "Select a thread.");
 		}
 	}
@@ -393,6 +475,13 @@ public final class T3Screen extends Screen {
 		if (c == null) {
 			return;
 		}
+		if (draft != null && draft.is(r.key())) {
+			c.showNothing(""); // a draft: empty transcript, the composer launches it
+			if (composer != null) {
+				composer.setFocused(true);
+			}
+			return;
+		}
 		c.setBadge(EnvBadge.of(r.env(), r.envLabel()));
 		if (r.threadId() == null) {
 			c.showNothing(I18n.get("t3craft.chat.history.bridge"), ChatSource.Unavailable.Action.PAIR);
@@ -417,7 +506,7 @@ public final class T3Screen extends Screen {
 
 	private T3Slots.@Nullable Target selectedTarget() {
 		String k = model.selectedKey();
-		if (k == null) {
+		if (k == null || draft != null && draft.is(k)) {
 			return null;
 		}
 		int colon = k.indexOf(':');
@@ -458,6 +547,9 @@ public final class T3Screen extends Screen {
 			drawMain(g, mouseX, mouseY);
 		}
 		super.extractRenderState(g, mouseX, mouseY, a);
+		if (anyMenuOpen()) {
+			g.nextStratum(); // menus over the text drawn below them
+		}
 		if (projectMenuOpen) {
 			drawProjectMenu(g, mouseX, mouseY);
 		}
@@ -496,21 +588,25 @@ public final class T3Screen extends Screen {
 			projectMenuOpen = false;
 		}, null, List.of("Menu: archive, environments, settings, game shortcuts")));
 
-		// search field (the EditBox is drawn over this by super)
-		ChatDraw.field(g, t, sr.search(), focus == T3UiKeys.Focus.SEARCH);
+		// search row (T3's: search, then the filter and compose icons); the EditBox is drawn over this by super
+		Rect sf = sr.search();
+		ChatDraw.field(g, t, sf, focus == T3UiKeys.Focus.SEARCH);
+		g.text(font, "⌕", sf.x() + 4, sf.y() + (sf.h() - 8) / 2, t.muted(), false);
 
-		// project filter (T3's project scope menu)
+		// project filter (T3's project scope menu), lit while a project is chosen
 		Rect p = sr.project();
-		String label = "▾ " + model.projectLabel();
-		pill(g, p, label, model.project() != null, mouseX, mouseY);
+		iconButton(g, p, "▾", mouseX, mouseY);
+		if (model.project() != null) {
+			g.fill(p.x() + 3, p.bottom() - 2, p.right() - 3, p.bottom() - 1, t.accent());
+		}
 		hits.add(new Hit(p, () -> {
 			projectMenuOpen = !projectMenuOpen;
 			menuOpen = false;
-		}, () -> model.cycleProject(1), List.of("Filter by project", "Click: choose · ←/→: previous/next")));
+		}, () -> model.cycleProject(1), List.of("Filter by project · " + model.projectLabel(), "Click: choose · ←/→: previous/next")));
 
-		// New thread
+		// new thread: a draft row under the project, no window (T3's compose icon)
 		Rect n = sr.newThread();
-		pill(g, n, n.w() < 60 ? "+" : "+ New thread", false, mouseX, mouseY);
+		iconButton(g, n, "✎", mouseX, mouseY);
 		hits.add(new Hit(n, this::newThread, null, List.of("New thread (Ctrl+N)")));
 
 		drawList(g, mouseX, mouseY);
@@ -592,6 +688,10 @@ public final class T3Screen extends Screen {
 						right -= 11;
 					}
 					int color = it.kind() == SidebarModel.Kind.SECTION ? t.brass() : t.text();
+					boolean plus = hover && it.kind() == SidebarModel.Kind.PROJECT && !readOnly() && !SidebarModel.NO_PROJECT.equals(it.key());
+					if (plus) {
+						right = Math.min(right, rr.right() - 3 - countW - 14);
+					}
 					g.text(font, ChatDraw.clip(font, arrow + it.label(), right - rr.x() - 4), rr.x() + 2, ty, color, t.shadow());
 					String folder = it.key();
 					List<String> tip = new ArrayList<>();
@@ -602,10 +702,20 @@ public final class T3Screen extends Screen {
 					tip.add("Click: open/close · Right-click: filter this project");
 					hits.add(new Hit(rr, () -> model.toggleCollapsed(folder),
 							it.kind() == SidebarModel.Kind.PROJECT ? () -> model.setProject(folder.equals(model.project()) ? null : folder) : null, tip));
+					if (plus) {
+						// T3: hovering a project shows its "new thread" button
+						Rect pr = new Rect(rr.right() - 3 - countW - 13, ry, 11, T3UiLayout.ROW_H);
+						quickIcon(g, pr, "+", true, mouseX, mouseY);
+						hits.add(new Hit(pr, () -> openDraft(slots.draftProject(null, folder, null)), null, List.of("New thread in " + it.label())));
+					}
 				}
 				case THREAD -> {
 					ThreadRow r = it.row();
 					if (r == null) {
+						continue;
+					}
+					if (draft != null && draft.is(r.key())) {
+						drawDraftRow(g, rr, ry, ty, r, hover, mouseX, mouseY);
 						continue;
 					}
 					boolean selected = r.key().equals(model.selectedKey());
@@ -689,6 +799,37 @@ public final class T3Screen extends Screen {
 		}
 	}
 
+	/** The draft's sidebar row: "New thread" muted with a ✎, a ✕ on hover discards it. */
+	private void drawDraftRow(GuiGraphicsExtractor g, Rect rr, int ry, int ty, ThreadRow r, boolean hover, int mouseX, int mouseY) {
+		ChatTheme t = theme;
+		boolean selected = r.key().equals(model.selectedKey());
+		if (selected) {
+			g.fill(rr.x(), ry, rr.right(), rr.bottom(), t.selected());
+			g.fill(rr.x(), ry, rr.x() + 2, rr.bottom(), t.accent());
+		} else if (hover) {
+			g.fill(rr.x(), ry, rr.right(), rr.bottom(), t.hover());
+		}
+		int x = rr.x() + 8;
+		g.text(font, "✎", x - 1, ty, t.accent(), false);
+		x += 10;
+		int right = rr.right() - (hover ? 14 : 2);
+		g.text(font, ChatDraw.clip(font, r.title(), right - x), x, ty, t.muted(), t.shadow());
+		String k = r.key();
+		hits.add(new Hit(rr, () -> {
+			model.select(k);
+			showRow(r);
+			focus = T3UiKeys.Focus.LIST;
+			if (layout.compact()) {
+				setSidebarVisible(false);
+			}
+		}, null, List.of("New thread · " + r.project(), "Esc or ✕ discards it")));
+		if (hover) {
+			Rect xr = new Rect(rr.right() - 12, ry, 11, T3UiLayout.ROW_H);
+			quickIcon(g, xr, "✕", true, mouseX, mouseY);
+			hits.add(new Hit(xr, this::discardDraft, null, List.of("Discard the draft")));
+		}
+	}
+
 	private void drawMain(GuiGraphicsExtractor g, int mouseX, int mouseY) {
 		ChatTheme t = theme;
 		// header panel behind the breadcrumb (T3's ChatHeader: project › thread, state)
@@ -708,30 +849,17 @@ public final class T3Screen extends Screen {
 			hits.add(new Hit(show, () -> setSidebarVisible(true), null, List.of("Show the sidebar (Ctrl+B)")));
 			x += 18;
 		}
+		ThreadDraft d = selectedDraft();
+		if (d != null) {
+			drawDraftHeader(g, d, tr, x, mouseX, mouseY);
+		}
 		T3Slots.Target target = selectedTarget();
-		ThreadRow row = model.selectedKey() == null ? null : model.find(model.selectedKey());
+		ThreadRow row = model.selectedKey() == null || d != null ? null : model.find(model.selectedKey());
 		int right = tr.right();
-		// state chip (feat/t3-actions ThreadStatusChip when merged, else a pill with the attention word)
+		// state chip (feat/t3-actions ThreadStatusChip); feat/t3-composer: no "■ Stop" next to it any more,
+		// the composer's round button interrupts and the row's right-click menu stops the thread
 		if (row != null) {
 			right -= slots.drawStatusChip(g, font, t, row, right, tr.y() + 1, mouseX, mouseY) + 4;
-			// while it runs: a small Stop next to the state (interrupt is the composer's ■)
-			if (actions != null && target != null && T3ThreadActions.running(row, target)) {
-				String stop = "■ Stop";
-				int sw = font.width(stop) + 8;
-				Rect sr0 = new Rect(right - sw, tr.y() + 1, sw, 12);
-				boolean can = T3ThreadActions.canOperate(target);
-				boolean hov = can && sr0.contains(mouseX, mouseY) && !anyMenuOpen();
-				ChatDraw.round(g, sr0.x(), sr0.y(), sr0.w(), sr0.h(), hov ? ChatTheme.withAlpha(t.errorText(), 70) : t.panelHi());
-				ChatDraw.outline(g, sr0.x(), sr0.y(), sr0.w(), sr0.h(), can ? ChatTheme.withAlpha(t.errorText(), 160) : t.edge());
-				g.text(font, stop, sr0.x() + 4, sr0.y() + 2, can ? t.errorText() : t.disabled(), false);
-				T3Slots.Target st = target;
-				hits.add(new Hit(sr0, () -> {
-					if (can) {
-						T3ThreadActions.stop(this, st);
-					}
-				}, null, List.of(can ? "Stop the thread (asks first)" : "Stop · needs control (operate)")));
-				right -= sw + 4;
-			}
 		} else if (readOnly() && target != null) {
 			String ro = "archived · read-only";
 			int w = font.width(ro) + 10;
@@ -752,7 +880,7 @@ public final class T3Screen extends Screen {
 				x += pw;
 			}
 			g.text(font, ChatDraw.clip(font, title, right - x), x, tr.y() + 3, t.text(), t.shadow());
-		} else {
+		} else if (d == null) {
 			g.text(font, notifications ? "Notifications" : "No thread selected", x, tr.y() + 3, t.muted(), t.shadow());
 		}
 
@@ -761,7 +889,15 @@ public final class T3Screen extends Screen {
 		} else if (conversation != null) {
 			ComposerView cv = composer;
 			if (cv != null) {
-				ChatComposer.sync(conversation, cv);
+				if (d != null) {
+					ThreadDraft dd = d;
+					cv.setDraft(d.envId, d.id, "New thread", (text, images, done) -> DraftLauncher.launch(this, dd, text, images, this::launched, done));
+					cv.observe(List.of(), false, null);
+					cv.setLeftControls(draftControls == null ? List.of() : draftControls.controls());
+				} else {
+					ChatComposer.sync(conversation, cv);
+					cv.setLeftControls(List.of());
+				}
 				cv.setBounds(Rect.EMPTY); // the conversation places it
 			}
 			conversation.setBounds(mr.conversation());
@@ -770,6 +906,22 @@ public final class T3Screen extends Screen {
 				cv.setFocused(false);
 			}
 		}
+	}
+
+	/** "project › New thread" and a ✕ that discards the draft (T3's draft header). */
+	private void drawDraftHeader(GuiGraphicsExtractor g, ThreadDraft d, Rect tr, int x, int mouseX, int mouseY) {
+		ChatTheme t = theme;
+		Rect close = new Rect(tr.right() - 14, tr.y(), 14, tr.h());
+		iconButton(g, close, "✕", mouseX, mouseY);
+		hits.add(new Hit(close, this::discardDraft, null, List.of("Discard the draft (Esc)")));
+		int right = close.x() - 4;
+		ChatDraw.envIcon(g, font, EnvBadge.of(d.envId, d.envLabel), x, tr.y() + 2, 10);
+		x += 14;
+		String crumb = d.projectLabel + " › ";
+		int pw = Math.min(font.width(crumb), (right - x) / 2);
+		g.text(font, ChatDraw.clip(font, crumb, pw), x, tr.y() + 3, t.muted(), t.shadow());
+		x += pw;
+		g.text(font, ChatDraw.clip(font, d.launching ? "Starting…" : "New thread", right - x), x, tr.y() + 3, t.text(), t.shadow());
 	}
 
 	private void drawNotifications(GuiGraphicsExtractor g, Rect area, int mouseX, int mouseY) {
@@ -818,7 +970,8 @@ public final class T3Screen extends Screen {
 		int rows = ps.size() + 1;
 		int maxRows = Math.max(1, (height - anchor.bottom() - 4) / T3UiLayout.ROW_H);
 		int shown = Math.min(rows, maxRows);
-		Rect box = new Rect(anchor.x(), anchor.bottom() + 1, Math.max(anchor.w(), 120), shown * T3UiLayout.ROW_H + 4);
+		int bw = Math.max(anchor.w(), 140);
+		Rect box = new Rect(Math.max(2, Math.min(anchor.right() - bw, width - bw - 2)), anchor.bottom() + 1, bw, shown * T3UiLayout.ROW_H + 4);
 		ChatDraw.panel(g, t, box);
 		int y = box.y() + 2;
 		for (int i = 0; i < shown; i++) {
@@ -935,8 +1088,137 @@ public final class T3Screen extends Screen {
 	// ---- actions ------------------------------------------------------------------------------
 
 	private void newThread() {
+		if (readOnly()) {
+			return;
+		}
 		T3Slots.Target target = selectedTarget();
-		slots.newThread(this, target == null ? null : target.envId(), model.project(), target);
+		ThreadDraft d = selectedDraft();
+		openDraft(slots.draftProject(target != null ? target.envId() : d != null ? d.envId : null, model.project(), target));
+	}
+
+	// ---- draft thread (feat/t3-composer) ---------------------------------------------------------
+
+	private @Nullable ThreadDraft selectedDraft() {
+		ThreadDraft d = draft;
+		return d != null && d.is(model.selectedKey()) && !notifications ? d : null;
+	}
+
+	/** The rows plus the draft's row (under its project, first in the folder). */
+	private List<ThreadRow> withDraft(List<ThreadRow> rows) {
+		ThreadDraft d = draft;
+		if (d == null) {
+			return rows;
+		}
+		List<ThreadRow> out = new ArrayList<>(rows.size() + 1);
+		out.add(d.row());
+		out.addAll(rows);
+		return out;
+	}
+
+	/** "New thread": a draft row under {@code p}, selected, composer focused. No window. */
+	private void openDraft(ProjectsService.@Nullable Project p) {
+		if (p == null) {
+			T3ThreadActions.notice("No project to start a thread in: register one (⋯ › Register project…) or pair an environment.");
+			return;
+		}
+		String back = draft != null && draft.is(model.selectedKey()) ? draft.returnKey : model.selectedKey();
+		if (draft == null) {
+			draft = new ThreadDraft(p);
+		} else if (!draft.envId.equals(p.envId()) || !draft.projectId.equals(p.projectId())) {
+			moveDraft(p); // one draft at a time: it moves to the project asked for, its text kept
+		}
+		draft.returnKey = back;
+		notifications = false;
+		lastRows = null;
+		refresh();
+		model.focus(draft.key());
+		ThreadRow r = model.find(draft.key());
+		if (r != null) {
+			showRow(r);
+		}
+		revealSelected();
+		if (layout.compact()) {
+			setSidebarVisible(false);
+		}
+		focusComposer(true);
+	}
+
+	/** The draft's project chip picked another project (maybe on another environment). */
+	private void moveDraft(ProjectsService.Project p) {
+		ThreadDraft d = draft;
+		if (d == null) {
+			return;
+		}
+		boolean selected = d.is(model.selectedKey());
+		String oldKey = d.key();
+		d.setProject(p);
+		if (composer != null) {
+			if (composer.state().key() != null && composer.state().key().equals(oldKey)) {
+				composer.state().rekeyDraft(d.envId, d.id);
+			} else {
+				composer.state().moveStored(oldKey, d.key());
+			}
+		}
+		lastRows = null;
+		refresh();
+		if (selected) {
+			model.select(d.key());
+			key = d.key();
+			revealSelected();
+		}
+	}
+
+	/** Esc / ✕: drops the draft and goes back to the thread shown before. */
+	private void discardDraft() {
+		ThreadDraft d = draft;
+		if (d == null) {
+			return;
+		}
+		boolean selected = d.is(model.selectedKey());
+		draft = null;
+		if (draftControls != null) {
+			draftControls.closeAll();
+		}
+		if (composer != null) {
+			composer.state().discard(d.key());
+			composer.setFocused(false);
+		}
+		lastRows = null;
+		refresh();
+		if (selected) {
+			String back = d.returnKey;
+			if (back != null && model.find(back) != null) {
+				open(back);
+			} else {
+				model.select(null);
+				key = null;
+				if (model.move(1) && model.selected() != null) {
+					showRow(model.selected());
+				} else if (conversation != null) {
+					conversation.showNothing("Select a thread.");
+				}
+			}
+		}
+	}
+
+	/** The draft's thread exists: it replaces the draft and stays selected. */
+	private void launched(String envId, String threadId) {
+		ThreadDraft d = draft;
+		if (d != null && composer != null) {
+			composer.state().discard(d.key());
+		}
+		draft = null;
+		if (draftControls != null) {
+			draftControls.closeAll();
+		}
+		String k = envId + ":" + threadId;
+		awaitKey = k;
+		lastRows = null;
+		refresh();
+		open(k);
+		if (conversation != null) {
+			conversation.scrollToEnd();
+		}
 	}
 
 	private void openArchive() {
@@ -1062,6 +1344,10 @@ public final class T3Screen extends Screen {
 		if (ComposerInput.keyPressed(composer, e.key(), e.hasShiftDown(), e.hasControlDownWithQuirk())) {
 			return true;
 		}
+		if (e.isEscape() && !anyMenuOpen() && selectedDraft() != null && focus == T3UiKeys.Focus.LIST) {
+			discardDraft(); // T3: Esc leaves a draft thread
+			return true;
+		}
 		boolean compactSidebar = layout.compact() && layout.sidebar().w() > 0;
 		boolean compactThread = layout.compact() && layout.main().w() > 0;
 		if (notifications && e.isEscape() && !anyMenuOpen()) {
@@ -1152,6 +1438,11 @@ public final class T3Screen extends Screen {
 
 	@Override
 	public boolean charTyped(CharacterEvent event) {
+		for (T3Slots.Popup p : popups) {
+			if (p.isOpen() && p.charTyped(event.codepoint())) {
+				return true;
+			}
+		}
 		if (ComposerInput.owns(composer)) {
 			return ComposerInput.charTyped(composer, event.codepoint());
 		}

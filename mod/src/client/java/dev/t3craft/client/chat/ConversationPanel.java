@@ -128,6 +128,11 @@ public final class ConversationPanel implements AutoCloseable {
 	private boolean showHints = true;
 	/** Minute separators between turns (off in the unified T3 screen, as in T3 Code). */
 	private boolean showSeparators = true;
+	/**
+	 * feat/t3-composer: max width of a centred column holding the feed and the footer (T3 Code's
+	 * transcript and composer share one max width); 0 = full width, footer under the panel.
+	 */
+	private int column;
 
 	private @Nullable ThreadFeed feed;
 	private @Nullable String key;
@@ -229,6 +234,17 @@ public final class ConversationPanel implements AutoCloseable {
 	public void setShowHeader(boolean v) {
 		if (showHeader != v) {
 			showHeader = v;
+			layoutDirty = true;
+		}
+	}
+
+	/**
+	 * T3 Code's column: the feed and the footer (composer) centred, at most {@code maxW} wide, the
+	 * footer inside the panel under the feed, no inset frame around the feed. 0 turns it off.
+	 */
+	public void setColumn(int maxW) {
+		if (column != maxW) {
+			column = Math.max(0, maxW);
 			layoutDirty = true;
 		}
 	}
@@ -511,6 +527,11 @@ public final class ConversationPanel implements AutoCloseable {
 			}
 			case USER -> {
 				ChatEntry e = ((Message) turn.blocks().getFirst()).entry();
+				// feat/t3-composer: T3's intent marker over a message that steered (or was queued behind) the turn
+				if (ChatEntry.STEER.equals(e.title()) || ChatEntry.QUEUED.equals(e.title())) {
+					String mark = ChatEntry.STEER.equals(e.title()) ? "↪ Steer" : "⏱ Queued";
+					L.text(0, List.of(piece(L.font, mark)), t.muted(), 0);
+				}
 				lead(L, "You", t.youText(), "Y", t.you(), t.you(), e.inherited() ? "from parent thread" : null);
 				body(L, e, t.text(), t.you());
 			}
@@ -875,13 +896,20 @@ public final class ConversationPanel implements AutoCloseable {
 		if (bounds.w() < 60 || bounds.h() < 50) {
 			return;
 		}
-		int fieldH = !showPrompt ? 0 : footer != null ? footer.height(bounds.w()) : FIELD_H;
-		Rect panel = new Rect(bounds.x(), bounds.y(), bounds.w(), bounds.h() - (showPrompt ? fieldH + 5 : 0));
+		boolean col = column > 0 && showPrompt && footer != null;
+		int colW = col ? Math.min(bounds.w() - 2 * t.pad(), column) : bounds.w();
+		int fieldH = !showPrompt ? 0 : footer != null ? footer.height(colW) : FIELD_H;
+		Rect panel = col ? bounds : new Rect(bounds.x(), bounds.y(), bounds.w(), bounds.h() - (showPrompt ? fieldH + 5 : 0));
 		ChatDraw.panel(g, t, panel);
 		int pad = t.pad();
 		int x = panel.x() + pad;
 		int w = panel.w() - 2 * pad;
 		int y = panel.y() + pad;
+		if (col) {
+			x += (w - colW) / 2;
+			w = colW;
+		}
+		int barY = panel.bottom() - pad - fieldH;
 
 		ChatTranscript.Status status = null;
 		ThreadFeed.State st = null;
@@ -970,8 +998,10 @@ public final class ConversationPanel implements AutoCloseable {
 		// ---- feed well
 		boolean hintsShown = !compact && showHints;
 		int footerH = hintsShown ? FOOTER_H : 0;
-		well = new Rect(x, y, w, panel.bottom() - pad - footerH - (hintsShown ? 3 : 0) - y);
-		ChatDraw.inset(g, t, well);
+		well = new Rect(x, y, w, Math.max(0, (col ? barY - 4 : panel.bottom() - pad - footerH - (hintsShown ? 3 : 0)) - y));
+		if (!col) {
+			ChatDraw.inset(g, t, well);
+		}
 		int textW = well.w() - TEXT_X - 12;
 		relayoutIfNeeded(font, textW);
 		int contentH = lines.isEmpty() ? 0 : lines.getLast().y() + lines.getLast().h();
@@ -1013,7 +1043,7 @@ public final class ConversationPanel implements AutoCloseable {
 		// otherwise a neutral read-only line with an "Enable control" button
 		controlButton = Rect.EMPTY;
 		if (showPrompt && footer != null) {
-			bar = new Rect(bounds.x(), bounds.bottom() - fieldH, bounds.w(), fieldH);
+			bar = col ? new Rect(x, barY, w, fieldH) : new Rect(bounds.x(), bounds.bottom() - fieldH, bounds.w(), fieldH);
 			footer.render(g, font, bar, mouseX, mouseY);
 		} else if (showPrompt) {
 			bar = new Rect(bounds.x(), bounds.bottom() - fieldH, bounds.w(), fieldH);

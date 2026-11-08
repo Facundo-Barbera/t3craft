@@ -42,7 +42,9 @@ public final class TurnItems {
 			case "user_message" -> {
 				kind = Kind.USER;
 				messageId = Json.str(item, "messageId");
-				head = "";
+				// feat/t3-composer: T3 marks messages that steered the running turn ("↪ Steer")
+				String intent = Json.str(item, "inputIntent");
+				head = "steer".equals(intent) || "promoted_queued_to_steer".equals(intent) ? ChatEntry.STEER : "";
 				body = orEmpty(Json.str(item, "text"));
 				int n = size(Json.arr(item, "attachments"));
 				if (n > 0) {

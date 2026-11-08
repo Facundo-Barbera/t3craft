@@ -1,5 +1,7 @@
 # feat/t3-actions: acciones y configuración como en T3 Code (⚠️ escritura)
 
+> feat/t3-composer-fidelity: `NewThreadDialog` was removed; "New thread" is now a draft thread in the T3 screen (docs/feat-t3-composer.md). The model picker is the composer's model chip (`ModelPicker.composerChip()`).
+
 Paquete `dev.t3craft.client.t3ui.actions` (source set `client`). Contiene servicios puros y widgets
 autocontenidos que montan **feat/t3-ui-unified** (sidebar y pantalla única) y **feat/chat-compose**
 (barra de controles del composer). Toda escritura pasa por `OperateGate` (con `OperateUi.run`, que

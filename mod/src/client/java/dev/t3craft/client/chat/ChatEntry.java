@@ -26,6 +26,14 @@ public record ChatEntry(
 		long ordinal,
 		boolean inherited) {
 
+	/**
+	 * {@link #title} of a user message that steered the running turn (T3's {@code inputIntent}
+	 * {@code steer} / {@code promoted_queued_to_steer}): the feed draws "↪ Steer" over it.
+	 */
+	public static final String STEER = "Steer";
+	/** {@link #title} of a user message queued after the running turn ({@code queued_turn}). */
+	public static final String QUEUED = "Queued";
+
 	public enum Kind {
 		USER("You", 0xFF7FD4FF, false),
 		ASSISTANT("Agent", 0xFFB6F09C, false),
