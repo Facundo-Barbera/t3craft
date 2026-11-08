@@ -54,6 +54,8 @@ public final class HqConstruction {
 	public static final long STALE_MS = 10_000;
 
 	public enum Phase {
+		/** fix/hq-load-npc-reconcile: the plan of the saved layout is being generated off-thread. */
+		LOADING,
 		/** No site yet: run {@code /t3craft site pick} and confirm. */
 		NO_SITE,
 		/** The site is building, restoring or interrupted ({@code /t3craft site resume}). */
@@ -135,7 +137,8 @@ public final class HqConstruction {
 
 	private final Ports ports;
 	private Saved saved;
-	private BuildPlan appliedPlan;
+	/** Null until the load finished ({@link #loading}); server thread. */
+	private @Nullable BuildPlan appliedPlan;
 	private @Nullable HqInput roster;
 	private long rosterAt;
 	private @Nullable HqTarget target;
@@ -150,9 +153,10 @@ public final class HqConstruction {
 	private final Set<String> signsPending = new LinkedHashSet<>();
 	private @Nullable String blocked;
 	private @Nullable Object blockedKey;
-	private Phase phase = Phase.NO_SITE;
+	private Phase phase = Phase.LOADING;
 	private @Nullable String anchorsKey;
-	private volatile BuildPlan design;
+	/** Null while {@link #loading} runs; then the plan of the saved layout (or of the last applied target). */
+	private volatile @Nullable BuildPlan design;
 	/**
 	 * fix/hq-build-stutter: the target being computed off-thread ({@link HqTarget#compute} generates the
 	 * whole HQ plan: layout, lighting, packs) and the inputs it was asked with. Server thread.
@@ -162,13 +166,94 @@ public final class HqConstruction {
 	private @Nullable HqLayout computingBase;
 	private int computingPacks = -1;
 
+	/**
+	 * fix/hq-load-npc-reconcile: the plan of the saved layout, generated on a worker
+	 * ({@link dev.t3craft.build.Offload}, timed as {@code hq.load_async}). The inputs (layout, style) are
+	 * captured on the server thread; nothing of the world is read by the worker. Applied in
+	 * {@link #reconcile} once done, if {@link #loadGen} still matches (a {@link #close} or a restart
+	 * after a style change bumps it, so a stale result is dropped).
+	 */
+	private java.util.concurrent.@Nullable CompletableFuture<Loaded> loading;
+	private int loadGen;
+	private @Nullable HqLayout loadLayout;
+	private @Nullable String loadStyle;
+
+	/** A load result tagged with the {@link #loadGen} it was started for. */
+	private record Loaded(int gen, BuildPlan plan) {
+	}
+
 	public HqConstruction(Ports ports, Saved saved) {
 		this.ports = ports;
 		this.saved = saved;
+		startLoad();
+	}
+
+	/** Server thread: (re)starts the load of the plan of {@code saved.layout()} with the current style. */
+	private void startLoad() {
 		long t0 = System.nanoTime();
-		this.appliedPlan = dev.t3craft.hq.HqPlans.generate(saved.layout(), HqSiteFrame.style());
+		java.util.concurrent.CompletableFuture<Loaded> old = loading;
+		if (old != null) {
+			old.cancel(false);
+		}
+		HqLayout layout = saved.layout();
+		dev.t3craft.hq.HqStyle style = HqSiteFrame.style();
+		int gen = ++loadGen;
+		loadLayout = layout;
+		loadStyle = style.id();
+		loading = dev.t3craft.build.Offload.supply(dev.t3craft.debug.PerfStats.STEP_HQ_LOAD_ASYNC,
+				() -> new Loaded(gen, dev.t3craft.hq.HqPlans.generate(layout, style)));
+		phase = Phase.LOADING;
 		dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_HQ_LOAD, t0);
-		this.design = appliedPlan;
+	}
+
+	/**
+	 * Server thread: true once the plan of the saved layout is in. While it loads, applies a finished
+	 * result of the current generation; a result for an older layout or style is dropped and the load
+	 * restarted.
+	 */
+	private boolean loaded() {
+		if (appliedPlan != null) {
+			return true;
+		}
+		java.util.concurrent.CompletableFuture<Loaded> f = loading;
+		if (f == null || saved.layout() != loadLayout || !HqSiteFrame.style().id().equals(loadStyle)) {
+			startLoad(); // the layout or the style changed while loading (or the load was closed)
+			return false;
+		}
+		if (!f.isDone()) {
+			phase = Phase.LOADING;
+			return false;
+		}
+		long t0 = System.nanoTime();
+		loading = null;
+		Loaded r = f.join(); // a failure propagates to the runtime, which pauses the construction (as before)
+		if (r.gen() != loadGen) {
+			startLoad(); // a result of an older load (token mismatch): ask again for the current inputs
+			return false;
+		}
+		BuildPlan plan = r.plan();
+		appliedPlan = plan;
+		if (design == null) {
+			design = plan;
+		}
+		anchorsKey = null;
+		dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_HQ_LOAD_APPLY, t0);
+		return true;
+	}
+
+	/** World closing (server stop) or replaced: drops a load still running. Server thread. */
+	public void close() {
+		loadGen++;
+		java.util.concurrent.CompletableFuture<Loaded> f = loading;
+		loading = null;
+		if (f != null) {
+			f.cancel(false);
+		}
+		java.util.concurrent.CompletableFuture<HqTarget> c = computing;
+		computing = null;
+		if (c != null) {
+			c.cancel(false);
+		}
 	}
 
 	// ---- inputs --------------------------------------------------------------------------------
@@ -181,9 +266,28 @@ public final class HqConstruction {
 		}
 	}
 
-	/** The plan site module designs are cut from (read by the site's designer, any thread). */
+	/**
+	 * The plan site module designs are cut from (read by the site's designer, any thread). While the
+	 * load still runs (a site confirmed in the first second of the world) this waits for it.
+	 */
 	public BuildPlan design() {
-		return design;
+		BuildPlan d = design;
+		if (d != null) {
+			return d;
+		}
+		java.util.concurrent.CompletableFuture<Loaded> f = loading;
+		if (f != null) {
+			try {
+				d = f.join().plan();
+			} catch (java.util.concurrent.CancellationException | java.util.concurrent.CompletionException e) {
+				d = null;
+			}
+		}
+		if (d == null) {
+			// closed, cancelled or failed: generate here (rare, same plan the load gives)
+			d = dev.t3craft.hq.HqPlans.generate(saved.layout(), HqSiteFrame.style());
+		}
+		return d;
 	}
 
 	/** {@code /t3craft hq build}: ignore the debounce and retry a blocked step. */
@@ -307,6 +411,10 @@ public final class HqConstruction {
 	}
 
 	private void reconcile() {
+		if (!loaded()) {
+			return; // fix/hq-load-npc-reconcile: phase LOADING until the plan of the saved layout is in
+		}
+		BuildPlan appliedPlan = java.util.Objects.requireNonNull(this.appliedPlan);
 		long now = ports.now();
 		SiteView site = ports.site();
 		if (busy != null) {

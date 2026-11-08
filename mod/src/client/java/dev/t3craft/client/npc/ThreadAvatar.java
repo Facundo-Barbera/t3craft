@@ -33,7 +33,12 @@ public final class ThreadAvatar extends RemotePlayer {
 	}
 
 	void update(NpcInfo info) {
-		this.label = Nameplate.of(info);
+		update(info, Nameplate.of(info));
+	}
+
+	/** fix/hq-load-npc-reconcile: with a name tag already built (off-thread, {@link Nameplate} is pure). */
+	void update(NpcInfo info, Component nameTag) {
+		this.label = nameTag;
 		// Only the environment colour can change the pick; re-resolve only then (cached lookup).
 		AgentSkins.Pick next = AgentSkins.forThread(npcId, AgentSkinTextures.envColor(AgentSkins.envOf(npcId)));
 		if (!next.equals(pick)) {

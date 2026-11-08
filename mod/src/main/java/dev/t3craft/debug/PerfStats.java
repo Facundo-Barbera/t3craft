@@ -260,8 +260,12 @@ public final class PerfStats {
 	public static final String STEP_HQ_DIFF = "step.hq.diff.ns";
 	/** Server: {@code Ports.update}: site claims (dry + real), cost check, writer start. */
 	public static final String STEP_HQ_UPDATE = "step.hq.update.ns";
-	/** Server: HQ construction created (plan of the saved layout), once per world. */
+	/** Server: HQ construction created; fix/hq-load-npc-reconcile: only starts the load (inputs captured, worker asked). */
 	public static final String STEP_HQ_LOAD = "step.hq.load.ns";
+	/** Async (fix/hq-load-npc-reconcile): plan of the saved layout ({@code HqPlans.generate}: generator, lighting, packs). */
+	public static final String STEP_HQ_LOAD_ASYNC = "step.hq.load_async.ns";
+	/** Server (fix/hq-load-npc-reconcile): the loaded plan taken in on the tick it is ready. */
+	public static final String STEP_HQ_LOAD_APPLY = "step.hq.load_apply.ns";
 	/** Server: a site expansion started (scan, snapshot capture and fsynced saves). */
 	public static final String STEP_SITE_EXPAND = "step.site.expand.ns";
 	/** Server: site cell claims ({@code SiteService.claim}). */
@@ -283,6 +287,16 @@ public final class PerfStats {
 	public static final String STEP_PRESENCE_PREP = "step.hq.presence_async.ns";
 	/** Client: NPC roster reconcile (spawns and removals). */
 	public static final String STEP_NPC_RECONCILE = "step.npc.reconcile.ns";
+	/** Client (fix/hq-load-npc-reconcile): reconcile part: gate, roster diff, fallback grid, grouping. */
+	public static final String STEP_NPC_PLAN = "step.npc.plan.ns";
+	/** Client (fix/hq-load-npc-reconcile): reconcile part: NPCs removed this tick (budgeted). */
+	public static final String STEP_NPC_REMOVE = "step.npc.remove.ns";
+	/** Client (fix/hq-load-npc-reconcile): reconcile part: NPCs spawned this tick (entities, skin, labels; budgeted). */
+	public static final String STEP_NPC_SPAWN = "step.npc.spawn.ns";
+	/** Client (fix/hq-load-npc-reconcile): changed labels handed to a worker or applied (inline when few). */
+	public static final String STEP_NPC_LABELS = "step.npc.labels.ns";
+	/** Async (fix/hq-load-npc-reconcile): name tags and panels of changed NPCs built ({@code Nameplate}). */
+	public static final String STEP_NPC_LABELS_ASYNC = "step.npc.labels_async.ns";
 	/** Client: workstation stations tick (spawns included). */
 	public static final String STEP_STATIONS = "step.stations.tick.ns";
 
