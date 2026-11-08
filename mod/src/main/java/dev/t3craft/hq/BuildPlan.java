@@ -158,6 +158,44 @@ public final class BuildPlan {
 		return null;
 	}
 
+	/**
+	 * The group of every placement in one pass (the same answer {@link #groupAt} gives for each, without
+	 * scanning the module list per cell). Placements no module owns are left out.
+	 */
+	Map<BlockPos, String> groupsByPos() {
+		Map<BlockPos, String> out = new java.util.HashMap<>(placements.size() * 2);
+		if (groupIndex != null) {
+			for (Map.Entry<BlockPos, String> e : groupIndex.entrySet()) {
+				if (byPos.containsKey(e.getKey())) {
+					out.put(e.getKey(), e.getValue());
+				}
+			}
+		}
+		for (Module m : modules) {
+			if (m.cells() != null) {
+				for (long k : m.cells()) {
+					BlockPos p = BlockPos.of(k);
+					if (byPos.containsKey(p)) {
+						out.putIfAbsent(p, m.group());
+					}
+				}
+				continue;
+			}
+			Box b = m.box();
+			for (int y = b.minY(); y <= b.maxY(); y++) {
+				for (int z = b.minZ(); z <= b.maxZ(); z++) {
+					for (int x = b.minX(); x <= b.maxX(); x++) {
+						BlockPos p = new BlockPos(x, y, z);
+						if (!out.containsKey(p) && byPos.containsKey(p) && m.owns(x, y, z)) {
+							out.put(p, m.group());
+						}
+					}
+				}
+			}
+		}
+		return out;
+	}
+
 	/** Group names in build order (first module of each group). */
 	public List<String> groups() {
 		List<String> out = new ArrayList<>();

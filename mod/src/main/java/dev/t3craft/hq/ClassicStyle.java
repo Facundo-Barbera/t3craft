@@ -389,8 +389,8 @@ final class ClassicStyle extends HqStyle {
 					c.set(x, 1, z, k.bookshelf);
 					c.decor(x, 2, z, k.pottedAzalea);
 				}
-				// one lantern down the hall's axis every other bay (the floor lamps do the lighting)
-				if (pillar && s % 2 == 0 && v == WING_WALL / 2) {
+				// one lantern down the hall's axis at every pillar (the floor lamps do the lighting)
+				if (pillar && v == WING_WALL / 2) {
 					c.hang(x, 4, z, k.copperLantern(true));
 				}
 				if (v >= DOOR_V1 && v <= DOOR_V2) {

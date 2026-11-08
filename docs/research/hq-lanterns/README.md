@@ -21,17 +21,25 @@ La luz se calcula con `HqLightMap` (main): un BFS en memoria a partir de la emis
   1. una retícula de lámparas empotradas en el suelo cada 5 bloques, en coordenadas del plan, así que es simétrica respecto al hub y estable al crecer, y solo donde hay celdas caminables oscuras;
   2. un relleno voraz para lo que quede: el bloque de suelo, muro o techo cercano que ilumina la celda y el mayor número de celdas oscuras, con puntuación exacta por BFS.
 
+  **Local a cada parte.** El HQ crece y se reduce por grupos (`BuildPlan.groups()`), y los diffs solo deben tocar lo que cambia. Por eso cada grupo se ilumina **por su cuenta**:
+  - solo cuentan sus propias lámparas;
+  - las celdas de otros grupos se toman como opacas y su luz no suma, así que el HQ real tiene como mínimo la luz estimada;
+  - las lámparas solo se empotran en bloques del propio grupo;
+  - las celdas de los escritorios (los módulos `_desk_` por encima del suelo, las pantallas y el tablero) se ven como aire tanto si el escritorio está ocupado como libre.
+
+  Así, sumar proyectos, ocupar o liberar un escritorio no mueve ninguna lámpara de las partes que ya existen. Lo cubren `CampusLayoutTest.addingProjectsAndThreadsMovesNothingThatExists`, `HqDiffTest.releasedDeskIsRemoved` y `HqGeneratorTest.goneThreadRemovesItsDesk`.
+
   Solo cambia bloques opacos completos, cristal de suelo y hojas de copas a las que se puede subir. Nunca toca pantallas, escritorios, la pizarra, la terminal, las lámparas de estado, los bloques con block entity ni nada a lo que apunte un anchor. La caminabilidad, los anchors y los módulos quedan intactos. Lámparas usadas:
   - **cherry:** froglight perlado en el suelo y panel shoji encendido de HqKit en muros y techos (con froglight perlado como fallback vainilla);
   - **classic:** shroomlight.
 - **ensanche:** las 6 linternas de los soportales colgaban de la cara inferior de una losa superior, que no las sostiene. Ahora cada una tiene encima un bloque completo de piedra lisa.
 - **ring:** las macetas del patio quedan solo en el anillo interior (r ≤ 14,5). En r = 14,9 cortaban el paso junto al tambor.
 - **vertical:** no se pone maceta en la logia cuando esta tiene 1 de ancho, es decir, cuando detrás queda el vacío del atrio o el hueco de la escalera (`narrowLoggia`).
-- **classic, en cherry y en el estilo classic:** en las alas queda un farol colgado en el eje de la nave en un tramo de cada dos (antes había dos por pilar), y los tōrō y farolas del jardín pasan a estar en los tramos alternos. La luz la ponen los paneles shoji encendidos y las lámparas empotradas.
+- **classic, en cherry y en el estilo classic:** en las alas queda un farol colgado por pilar en el eje de la nave (antes había dos por pilar), y los tōrō y farolas del jardín pasan a estar en los pilares alternos. La luz la ponen los paneles shoji encendidos y las lámparas empotradas.
 
 ## Incidencias antes → después (6 layouts con cherry, más el estilo classic)
 
-"Antes" es main (4ba5183) medido con el validador. "Después" es la última pasada local: la iluminación ya estaba completa y faltaban los arreglos de ensanche, ring, vertical y classic y la regla de tejados. Los valores finales los mide integration (TBD).
+"Antes" es main (4ba5183) medido con el validador. "Después" es la última pasada local de la primera versión, con la iluminación global. La versión por grupo pone más lámparas porque cada parte se ilumina sola, así que todos los valores finales los mide integration (TBD).
 
 | Layout | n | Decoración antes (F/O/E) | Decoración después | Celdas oscuras antes | Después (última pasada) | Luces antes → después |
 |---|---|---|---|---|---|---|

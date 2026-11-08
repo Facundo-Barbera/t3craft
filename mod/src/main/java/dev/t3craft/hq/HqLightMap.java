@@ -31,13 +31,13 @@ public final class HqLightMap {
 	private final BlockState[] states;
 	private final IntQueue[] buckets = new IntQueue[16];
 
-	private HqLightMap(Box b) {
-		this.minX = b.minX() - MARGIN;
-		this.minY = b.minY() - MARGIN;
-		this.minZ = b.minZ() - MARGIN;
-		this.sx = b.sizeX() + 2 * MARGIN;
-		this.sy = b.sizeY() + 2 * MARGIN;
-		this.sz = b.sizeZ() + 2 * MARGIN;
+	private HqLightMap(Box b, int margin) {
+		this.minX = b.minX() - margin;
+		this.minY = b.minY() - margin;
+		this.minZ = b.minZ() - margin;
+		this.sx = b.sizeX() + 2 * margin;
+		this.sy = b.sizeY() + 2 * margin;
+		this.sz = b.sizeZ() + 2 * margin;
 		this.level = new byte[sx * sy * sz];
 		this.states = new BlockState[level.length];
 		for (int i = 0; i < 16; i++) {
@@ -52,8 +52,36 @@ public final class HqLightMap {
 			fp = fp.contains(p.rel()) ? fp : fp.union(new Box(p.rel().getX(), p.rel().getY(), p.rel().getZ(),
 					p.rel().getX(), p.rel().getY(), p.rel().getZ()));
 		}
-		HqLightMap m = new HqLightMap(fp);
+		HqLightMap m = new HqLightMap(fp, MARGIN);
 		m.compute(plan);
+		return m;
+	}
+
+	/** What a {@link #ofView} map sees in a cell: a state, or null for air. */
+	@FunctionalInterface
+	interface View {
+		@org.jspecify.annotations.Nullable BlockState at(int x, int y, int z);
+	}
+
+	/**
+	 * The light of an arbitrary view of the cells in {@code bounds} (plus {@code margin}): every cell is
+	 * read from {@code view}, sources are whatever emits there. Cells outside read as dark and empty.
+	 */
+	static HqLightMap ofView(Box bounds, int margin, View view) {
+		HqLightMap m = new HqLightMap(bounds, margin);
+		for (int iy = 0; iy < m.sy; iy++) {
+			for (int iz = 0; iz < m.sz; iz++) {
+				for (int ix = 0; ix < m.sx; ix++) {
+					BlockState s = view.at(ix + m.minX, iy + m.minY, iz + m.minZ);
+					if (s != null && !s.isAir()) {
+						int i = (iy * m.sz + iz) * m.sx + ix;
+						m.states[i] = s;
+						m.seed(i, s.getLightEmission());
+					}
+				}
+			}
+		}
+		m.propagate();
 		return m;
 	}
 

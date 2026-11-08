@@ -546,8 +546,8 @@ final class CherryStyle extends HqStyle {
 					c.set(x, 5, z, beam(Direction.Axis.Z)); // tie beam across the hall
 				}
 				wingRoof(c, x, z, v);
-				// one lantern down the hall's axis every other bay (lit panels and the floor lamps do the lighting)
-				if (pillar && s % 2 == 0 && v == WING_WALL / 2) {
+				// one lantern down the hall's axis at every pillar (lit panels and the floor lamps do the lighting)
+				if (pillar && v == WING_WALL / 2) {
 					c.hang(x, 4, z, lantern(true));
 				}
 				if (pillar && (v == 1 || v == WING_WALL - 1)) {
