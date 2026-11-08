@@ -86,3 +86,39 @@ Cached history pages and finished items are not fetched again.
 
 Restart needed: this adds new classes with static state, a new call in the client tick and a
 changed record shape (`ThreadFeed.State`). No config keys, registries, keybinds or lang changes.
+
+## Sidebar: every thread, as T3 Code (fix/t3-sidebar-all-threads)
+
+Bug: a thread pinned on another machine, idle for 3 days, did not show in the Y screen although the
+environment was connected. The sidebar took its rows from `DirectController.npcs(now)`, the NPC
+selection of `dev.t3craft.t3.Visibility` (needs you / running / active in the last 24 h, at most 40
+per environment), so an old pinned thread was left out.
+
+Now `ThreadListCache.rows` builds the rows from each environment's full shell
+(`DirectController.shellViews()` → `ShellState.View.threads()`), like T3 Code's sidebar:
+
+- Listed: every thread that is not archived, deleted, a subagent or a side chat
+  (`ThreadListCache.listed`). No recent window, no per-environment cap.
+- Row fields as before (title/state/activity via `Presentation.present`, last activity via
+  `Visibility.lastActivity`, pending request, pinned); `settled` now uses `Visibility.isSettled`
+  (honours `settledOverride`).
+- `SidebarModel`: **Pinned** first (always, whatever the age or settled state), then one folder per
+  project with the active threads sorted by activity, then a **Settled** section with its count,
+  closed by default (`SidebarModel.SETTLED`; opens on click, while searching, or when `focus` opens a
+  settled thread). Search and project filter apply to all three.
+- Memo: the key is shells + labels + disk load only (rows no longer depend on time, the 5 s bucket is
+  gone), so `T3Screen` still rebuilds only on shell changes. The disk cache saves the real rows in
+  `SAVE_ORDER` (pinned, active, settled; each by activity), so the 400-row cap never drops a pinned one.
+- Drawing was already virtualized: `T3Screen.drawSidebar` draws only the rows in the visible window;
+  the model is rebuilt once per change (O(n)), not per frame.
+- The header "N threads" and the screen-open prewarm read the same list (so an old pinned thread is
+  counted and can be prewarmed).
+- NPCs unchanged: `DirectController.npcs` and `Visibility` are untouched.
+- Other users of `ChatScreens.defaultDirectory()` see the full list too: the embeddable
+  `ThreadBrowser` and the thread walls (walls already skip settled rows, so they now also show older
+  active threads).
+
+**Bridge mode limitation:** without a direct controller the rows come from the bridge's NPC model,
+which the bridge already filters with the same visibility rules (24 h, cap). An old pinned or settled
+thread does not show there; listing them would need a separate thread list from the bridge (the NPC
+list must stay as is), not done here.

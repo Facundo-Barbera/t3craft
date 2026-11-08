@@ -29,6 +29,10 @@ import org.jspecify.annotations.Nullable;
  * {@code pullRequestMatchesSearchQuery}) folds case and accents and keeps rows whose title, project
  * or environment contain every word of the query; while searching every folder is open.
  *
+ * <p>fix/t3-sidebar-all-threads: the rows are every listable thread (not the NPC selection). Pinned
+ * threads always go to Pinned, whatever their age or settled state; other settled threads go to a
+ * last <b>Settled</b> section, closed until the user opens it, with its count.
+ *
  * <p>The selection follows the thread by key when the list reorders; {@link #move} walks thread
  * rows only (headers are skipped) and never enters a collapsed folder.
  */
@@ -37,9 +41,11 @@ public final class SidebarModel {
 	public static final String NO_PROJECT = "";
 	/** Key of the Pinned section header. */
 	public static final String PINNED = "\u0000pinned";
+	/** Key of the Settled section header (collapsed by default, as in T3 Code). */
+	public static final String SETTLED = "\u0000settled";
 
 	public enum Kind {
-		/** "Pinned" section header. */
+		/** "Pinned" or "Settled" section header. */
 		SECTION,
 		/** A project folder header. */
 		PROJECT,
@@ -69,6 +75,8 @@ public final class SidebarModel {
 	private String query = "";
 	private @Nullable String project;
 	private final Set<String> collapsed = new HashSet<>();
+	/** The Settled section is closed by default: this is its "opened" flag. */
+	private boolean settledOpen;
 	private @Nullable String selectedKey;
 
 	private List<Item> items = List.of();
@@ -158,12 +166,14 @@ public final class SidebarModel {
 	}
 
 	public boolean isCollapsed(String folderKey) {
-		return collapsed.contains(folderKey);
+		return SETTLED.equals(folderKey) ? !settledOpen : collapsed.contains(folderKey);
 	}
 
 	/** Opens or closes a folder (no effect while searching: every folder is open then). */
 	public void toggleCollapsed(String folderKey) {
-		if (!collapsed.remove(folderKey)) {
+		if (SETTLED.equals(folderKey)) {
+			settledOpen = !settledOpen;
+		} else if (!collapsed.remove(folderKey)) {
 			collapsed.add(folderKey);
 		}
 		rebuild();
@@ -195,7 +205,13 @@ public final class SidebarModel {
 			query = "";
 			project = null;
 		}
-		collapsed.remove(r.pinned() ? PINNED : projectKey(r));
+		if (r.pinned()) {
+			collapsed.remove(PINNED);
+		} else if (r.settled()) {
+			settledOpen = true;
+		} else {
+			collapsed.remove(projectKey(r));
+		}
 		rebuild();
 		return true;
 	}
@@ -309,12 +325,23 @@ public final class SidebarModel {
 				}
 			}
 		}
-		Map<String, List<ThreadRow>> folders = group(matching.stream().filter(r -> !r.pinned()).toList());
+		Map<String, List<ThreadRow>> folders = group(matching.stream().filter(r -> !r.pinned() && !r.settled()).toList());
 		for (Map.Entry<String, List<ThreadRow>> e : folders.entrySet()) {
 			List<ThreadRow> rs = e.getValue();
 			boolean closed = !search && collapsed.contains(e.getKey());
 			out.add(new Item(Kind.PROJECT, e.getKey(), projectLabel(rs.getFirst()), null, rs.size(), attention(rs), closed, String.join(", ", envLabels(rs))));
 			for (ThreadRow r : rs) {
+				listed.add(r);
+				if (!closed) {
+					out.add(threadItem(r));
+				}
+			}
+		}
+		List<ThreadRow> settled = matching.stream().filter(r -> !r.pinned() && r.settled()).sorted(THREAD_ORDER).toList();
+		if (!settled.isEmpty()) {
+			boolean closed = !search && !settledOpen;
+			out.add(new Item(Kind.SECTION, SETTLED, "Settled", null, settled.size(), attention(settled), closed, String.join(", ", envLabels(settled))));
+			for (ThreadRow r : settled) {
 				listed.add(r);
 				if (!closed) {
 					out.add(threadItem(r));
