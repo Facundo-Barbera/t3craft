@@ -40,6 +40,8 @@ final class BuildCrew implements BuildHandle {
 	private static final double LEAP_SPEED = 2 * MAX_WORK_SPEED;
 	private static final int ARRIVE_TIMEOUT_TICKS = 20 * 10;
 	private static final int LEAVE_TIMEOUT_TICKS = 20 * 6;
+	/** fix/crew-route-stutter: a goal this close (straight, blocks) with a clear line is walked straight, no A*. */
+	static final double DIRECT_RANGE = 3.0;
 
 	interface IdSource {
 		int next();
@@ -60,12 +62,16 @@ final class BuildCrew implements BuildHandle {
 	private final int crewSize;
 	private final Vec3 spawnCenter;
 	private final IdSource ids;
+	/** fix/crew-route-stutter: shared route searches (snapshot + background A*, per-tick budget). */
+	private final CrewRoutes routes;
 	/** Builders that appear per client tick, and that vanish per tick when leaving. */
 	static final int SPAWNS_PER_TICK = 1;
 	private int despawned;
 
-	BuildCrew(String label, ClientLevel level, BoundingBox bounds, int crewSize, Vec3 approachFrom, IdSource ids, Supplier<BuildJob> submitter) {
+	BuildCrew(String label, ClientLevel level, BoundingBox bounds, int crewSize, Vec3 approachFrom, IdSource ids, CrewRoutes routes,
+			Supplier<BuildJob> submitter) {
 		this.label = label;
+		this.routes = routes;
 		this.level = level;
 		this.bounds = bounds;
 		this.submitter = submitter;
@@ -229,53 +235,107 @@ final class BuildCrew implements BuildHandle {
 	 * Crew plan ({@link BuildPlanner#CREW}): builder {@code front} walks to its next work spot
 	 * {@code stand} (feet cell) to place {@code target}, to arrive in {@code ticks} (the server may place
 	 * a little before, once the block is in reach; the avatar swings when it gets there).
-	 * The route is the NPCs' A* over the real blocks; a straight line only when there is none (the
-	 * spot is on a virtual scaffold or the search gives up).
+	 *
+	 * <p>fix/crew-route-stutter: this used to run a full A* over the live level right here, on the
+	 * render thread, for every event (180–900 ms per tick, once 3.6 s, with the independent builders).
+	 * Now only cheap checks run here; the A* is asked of {@link CrewRoutes} (snapshot of the stretch,
+	 * background worker, per-tick budget) and only when it can help:
+	 * <ul>
+	 *   <li>a walk faster than {@link #LEAP_SPEED} (even straight): leap, no route;</li>
+	 *   <li>a goal within {@link #DIRECT_RANGE} with a clear line: walk straight;</li>
+	 *   <li>a goal or start without built ground (virtual scaffold, cell not built yet): straight line;</li>
+	 *   <li>the same start and goal routed a few ticks ago: that route again.</li>
+	 * </ul>
+	 * While its route is searched the builder keeps doing what it did; a newer order replaces it.
 	 */
 	void walking(int front, BlockPos stand, BlockPos target, int ticks) {
 		if (phase != Phase.BUILDING || builders.isEmpty()) {
 			return;
 		}
-		BuilderAvatar b = builders.get(Math.floorMod(front, builders.size()));
+		int index = Math.floorMod(front, builders.size());
+		BuilderAvatar b = builders.get(index);
 		Vec3 goal = new Vec3(stand.getX() + 0.5, stand.getY(), stand.getZ() + 0.5);
 		Vec3 at = b.position();
-		List<Vec3> route = route(at, goal);
+		b.lookAt(Vec3.atCenterOf(target));
+		double straight = Math.sqrt((goal.x - at.x) * (goal.x - at.x) + (goal.z - at.z) * (goal.z - at.z)) + Math.abs(goal.y - at.y);
+		double needed = straight / Math.max(1, ticks);
+		// Arrive about when the server places: its walk time is for the straight distance, capped
+		// (CrewCursor.MAX_WALK_TICKS). Too far even in a straight run: a leap to the spot, no route.
+		if (needed > LEAP_SPEED) {
+			routes.cancel(this, index);
+			b.leapTo(goal);
+			return;
+		}
+		Collision live = Collision.of(level);
+		if (straight <= DIRECT_RANGE && clearLine(live, at, goal) || !grounded(live, goal) || !grounded(live, at)) {
+			routes.cancel(this, index);
+			b.follow(List.of(goal), Mth.clamp(needed, WALK_SPEED, MAX_WORK_SPEED)); // straight, as the old no-route fallback
+			return;
+		}
+		List<Vec3> cached = routes.cached(level, at, goal);
+		if (cached != null) {
+			routes.cancel(this, index);
+			follow(b, goal, cached, ticks);
+			return;
+		}
+		routes.request(this, index, goal, ticks);
+	}
+
+	/** {@link CrewRoutes}: where builder {@code index} starts its route from now, or null if it no longer walks for this crew. */
+	@Nullable Vec3 routeStart(int index) {
+		if (phase != Phase.BUILDING || index < 0 || index >= builders.size() || builders.get(index).isRemoved()) {
+			return null;
+		}
+		return builders.get(index).position();
+	}
+
+	/** {@link CrewRoutes}: the route builder {@code index} asked for, to walk in {@code ticks}. */
+	void routed(int index, List<Vec3> route, int ticks) {
+		if (phase != Phase.BUILDING || index < 0 || index >= builders.size() || route.isEmpty()) {
+			return;
+		}
+		follow(builders.get(index), route.getLast(), route, ticks);
+	}
+
+	/** Walks {@code route} (ending on {@code goal}) at the pace that arrives in {@code ticks}, or leaps if that is too fast. */
+	private static void follow(BuilderAvatar b, Vec3 goal, List<Vec3> route, int ticks) {
 		double len = 0;
-		Vec3 prev = at;
+		Vec3 prev = b.position();
 		for (Vec3 p : route) {
 			len += Math.sqrt((p.x - prev.x) * (p.x - prev.x) + (p.z - prev.z) * (p.z - prev.z)) + Math.abs(p.y - prev.y);
 			prev = p;
 		}
-		// Arrive about when the server places: its walk time is for the straight distance, capped
-		// (CrewCursor.MAX_WALK_TICKS). A way too long even for a run is a shortcut: a leap to the spot.
 		double needed = len / Math.max(1, ticks);
 		if (needed > LEAP_SPEED) {
 			b.leapTo(goal);
 		} else {
 			b.follow(route, Mth.clamp(needed, WALK_SPEED, MAX_WORK_SPEED));
 		}
-		b.lookAt(Vec3.atCenterOf(target));
 	}
 
-	/** A* route over the real blocks from {@code from} to {@code goal}, ending exactly on {@code goal}. */
-	private List<Vec3> route(Vec3 from, Vec3 goal) {
-		List<Vec3> out = new ArrayList<>();
+	/** Built ground under {@code p} (its column, a block up or down): else it is a scaffold spot or air. */
+	private static boolean grounded(Collision live, Vec3 p) {
+		int x = Mth.floor(p.x);
+		int y = Mth.floor(p.y + 0.01);
+		int z = Mth.floor(p.z);
 		try {
-			GridPathfinder pf = new GridPathfinder(Collision.of(level));
-			List<Pos> path = pf.find(new Pos(from.x, from.y, from.z), new Pos(goal.x, goal.y, goal.z));
-			if (path != null) {
-				for (int i = 1; i < path.size(); i++) {
-					Pos p = path.get(i);
-					out.add(new Vec3(p.x(), p.y(), p.z()));
-				}
-			}
+			return !Double.isNaN(live.floor(x, y, z)) || !Double.isNaN(live.floor(x, y - 1, z)) || !Double.isNaN(live.floor(x, y + 1, z));
 		} catch (RuntimeException e) {
-			out.clear(); // unloaded chunk or similar: straight line below
+			return false;
 		}
-		if (out.isEmpty() || out.getLast().distanceToSqr(goal) > 1e-4) {
-			out.add(goal); // last stretch onto a scaffold spot, or no route at all
+	}
+
+	/** A short straight walk the body fits all along (same level only). */
+	private static boolean clearLine(Collision live, Vec3 a, Vec3 b) {
+		try {
+			return new GridPathfinder(live).clear(pos(a), pos(b), null);
+		} catch (RuntimeException e) {
+			return false;
 		}
-		return out;
+	}
+
+	private static Pos pos(Vec3 v) {
+		return new Pos(v.x, v.y, v.z);
 	}
 
 	/** The job reached a terminal state (or the manager was cleared). */
@@ -294,10 +354,12 @@ final class BuildCrew implements BuildHandle {
 		}
 		builders.clear();
 		phase = Phase.DONE;
+		routes.forget(this);
 	}
 
 	private void leave() {
 		phase = Phase.LEAVING;
+		routes.forget(this);
 		phaseTicks = 0;
 		Vec3 c = center();
 		for (int i = 0; i < builders.size(); i++) {
