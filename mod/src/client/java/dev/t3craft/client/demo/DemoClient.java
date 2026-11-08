@@ -17,6 +17,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
@@ -76,6 +77,8 @@ public final class DemoClient implements ClientModInitializer {
 	private @Nullable DemoBuildRun run;
 	private Pending pending = Pending.NONE;
 	private @Nullable DemoHqSource hq;
+	/** The pending layout already announced in chat (once per value). */
+	private @Nullable String announcedLayout;
 	/** Whether we installed the HQ's NPC anchors (so we only clear our own). */
 	private boolean anchorsInstalled;
 
@@ -277,6 +280,13 @@ public final class DemoClient implements ClientModInitializer {
 				}
 			}
 		}
+		DemoHqSource h = hq;
+		if (h != null && h.pendingLayout() != null && !quiet && !Objects.equals(h.pendingLayout(), announcedLayout)) {
+			// feat/hq-layouts: another layout is configured, but the HQ standing here keeps its own until a reset
+			announcedLayout = h.pendingLayout();
+			say("HQ built with layout '" + h.layoutId() + "'; the configured layout '" + h.pendingLayout()
+					+ "' applies after a reset + rebuild (/t3craft debug reset-hq)");
+		}
 		Optional<DemoStructureSource> chosen = s == null ? Optional.empty() : s.choose(cfg.structure());
 		if (chosen.isEmpty()) {
 			T3Craft.LOGGER.warn("[demo] no structure source available (structure = {})", cfg.structure());
@@ -373,6 +383,22 @@ public final class DemoClient implements ClientModInitializer {
 			case NOTHING_TO_RESET -> cfg.spec().displayName() + " does not exist yet";
 			case CONFIRM, RESET -> null;
 		};
+	}
+
+	/**
+	 * feat/hq-layouts: the layout the HQ world is built with ({@code HqLayoutState}), or null when not
+	 * in the HQ world or nothing is built there yet.
+	 */
+	public static @Nullable String builtLayoutId() {
+		DemoClient d = instance;
+		Path root = d == null ? null : d.demoRoot;
+		return root == null ? null : builtLayoutId(root);
+	}
+
+	/** The layout recorded in the marker of the HQ world saved at {@code worldRoot} (null if nothing built). */
+	public static @Nullable String builtLayoutId(Path worldRoot) {
+		DemoMarker m = DemoMarkerFile.read(worldRoot);
+		return dev.t3craft.client.hq.layout.HqLayoutState.fromMarker(m.structure(), m.state());
 	}
 
 	/** Queues a confirmed reset for the next client tick (after the confirm screen closes). */

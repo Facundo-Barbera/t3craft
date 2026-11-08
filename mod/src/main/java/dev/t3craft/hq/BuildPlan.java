@@ -35,14 +35,31 @@ public final class BuildPlan {
 	 * @param group the buildable unit it belongs to ({@link #groups()}): {@code hub}, {@code portico},
 	 *              {@code archive}, {@code spine_<row>}, {@code spine_cap}, {@code module_<index>}
 	 */
-	public record Module(String id, Box box, List<Box> holes, String group) {
+	public record Module(String id, Box box, List<Box> holes, String group, java.util.@Nullable Set<Long> cells) {
 		public Module {
 			holes = List.copyOf(holes);
+			cells = cells == null ? null : java.util.Set.copyOf(cells);
+		}
+
+		public Module(String id, Box box, List<Box> holes, String group) {
+			this(id, box, holes, group, null);
+		}
+
+		/**
+		 * True for a <b>sparse</b> module (campus grounds: paths, gardens, stairs): it owns only the
+		 * cells it wrote ({@link #cells}, {@link BlockPos#asLong} keys), not its whole box, so its box
+		 * is just its bounds and may overlap other modules' boxes.
+		 */
+		public boolean sparse() {
+			return cells != null;
 		}
 
 		public boolean owns(int x, int y, int z) {
 			if (!box.contains(x, y, z)) {
 				return false;
+			}
+			if (cells != null) {
+				return cells.contains(BlockPos.asLong(x, y, z));
 			}
 			for (Box h : holes) {
 				if (h.contains(x, y, z)) {
@@ -60,8 +77,16 @@ public final class BuildPlan {
 	private final Box footprint;
 	private final List<Workstation> workstations;
 	private @Nullable String fingerprint;
+	/** Group of every placement, when the generator gives it (plans with many small modules: layout/ring). */
+	private final @Nullable Map<BlockPos, String> groupIndex;
 
 	BuildPlan(List<Placement> placements, SortedMap<String, Anchor> anchors, List<Module> modules, List<Workstation> workstations) {
+		this(placements, anchors, modules, workstations, null);
+	}
+
+	BuildPlan(List<Placement> placements, SortedMap<String, Anchor> anchors, List<Module> modules, List<Workstation> workstations,
+			@Nullable Map<BlockPos, String> groupIndex) {
+		this.groupIndex = groupIndex; // the generator hands an unmodifiable map; replacing() keeps positions, so it is shared
 		this.placements = List.copyOf(placements);
 		this.workstations = List.copyOf(workstations);
 		Map<BlockPos, Placement> m = new LinkedHashMap<>(placements.size() * 2);
@@ -119,6 +144,12 @@ public final class BuildPlan {
 
 	/** Group of the module that owns {@code rel}, or null when no module owns it. */
 	public @Nullable String groupAt(BlockPos rel) {
+		if (groupIndex != null) {
+			String g = groupIndex.get(rel);
+			if (g != null) {
+				return g;
+			}
+		}
 		for (Module m : modules) {
 			if (m.owns(rel.getX(), rel.getY(), rel.getZ())) {
 				return m.group();
@@ -233,7 +264,7 @@ public final class BuildPlan {
 			changed |= q != p;
 			out.add(q);
 		}
-		return changed ? new BuildPlan(out, anchors, modules, workstations) : this;
+		return changed ? new BuildPlan(out, anchors, modules, workstations, groupIndex) : this;
 	}
 
 	/**
@@ -249,7 +280,7 @@ public final class BuildPlan {
 		for (Anchor x : extra) {
 			a.put(x.name(), x);
 		}
-		return new BuildPlan(placements, a, modules, workstations);
+		return new BuildPlan(placements, a, modules, workstations, groupIndex);
 	}
 
 	/** The block that fills a cell a newer plan no longer uses. */

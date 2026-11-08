@@ -17,7 +17,7 @@ import org.jspecify.annotations.Nullable;
  * section of {@code config/t3craft.json} (read-only here; the client's ConfigStore keeps unknown
  * sections on save, so this key survives without this class ever writing):
  * <pre>{@code
- * "hq": { "style": "cherry" }     // cherry (default) | classic
+ * "hq": { "style": "cherry" }     // cherry (default) | classic | campus | ring | vertical | ensanche (own layouts)
  * }</pre>
  * Absent file, section or key: {@link #DEFAULT_ID}. Unknown id: the default plus a warning.
  */
@@ -29,19 +29,41 @@ public final class HqStyles {
 	public static final String DEFAULT_ID = CherryStyle.ID;
 
 	private static final List<HqStyle> ALL = List.of(new CherryStyle(), new ClassicStyle());
+	/**
+	 * Styles with their own layout ({@link HqStyle#ownLayout()}): selectable by id like the others,
+	 * but not in {@link #all()}, which lists the styles that paint the shared spine geometry.
+	 * layout/campus: {@link CampusStyle}; layout/ring: {@link RingStyle}; layout/vertical: {@link VerticalStyle};
+	 * layout/blocks: {@link EnsancheStyle}.
+	 */
+	private static final List<HqStyle> LAYOUTS = List.of(new CampusStyle(), new RingStyle(), new VerticalStyle(), new EnsancheStyle(),
+			new VillageStyle());
 	private static volatile @Nullable HqStyle active;
 
 	private HqStyles() {
 	}
 
-	/** Every style, default first. */
+	/** Every style that paints the shared spine geometry, default first. */
 	public static List<HqStyle> all() {
 		return ALL;
 	}
 
+	/** The styles with their own layout (campus, ring...); not in {@link #all()}. */
+	public static List<HqStyle> layouts() {
+		return LAYOUTS;
+	}
+
+	/** Styles with their own ground plan as a {@link TownLayout} (layout/blocks: {@code ensanche}). */
+	public static List<HqStyle> towns() {
+		return LAYOUTS.stream().filter(s -> s instanceof EnsancheStyle).toList();
+	}
+
+	/** Ids of every selectable style ({@link #all()} then {@link #layouts()}). */
 	public static List<String> ids() {
 		List<String> out = new ArrayList<>();
 		for (HqStyle s : ALL) {
+			out.add(s.id());
+		}
+		for (HqStyle s : LAYOUTS) {
 			out.add(s.id());
 		}
 		return out;
@@ -54,6 +76,11 @@ public final class HqStyles {
 		}
 		String k = id.trim().toLowerCase(Locale.ROOT);
 		for (HqStyle s : ALL) {
+			if (s.id().equals(k)) {
+				return s;
+			}
+		}
+		for (HqStyle s : LAYOUTS) {
 			if (s.id().equals(k)) {
 				return s;
 			}
@@ -73,6 +100,30 @@ public final class HqStyles {
 	public static HqStyle active() {
 		HqStyle s = active;
 		return s == null ? defaultStyle() : s;
+	}
+
+	/**
+	 * The style that draws layout {@code layoutId} ({@link dev.t3craft.hq.layout.HqLayouts}): for
+	 * {@code classic}, the configured spine style ({@link #active()}, cherry by default, exactly as
+	 * before layouts existed; a configured own-layout style falls back to the default); for every
+	 * other layout its own style (cherry palette plus the layout's own materials). Unknown id: classic.
+	 */
+	public static HqStyle forLayout(@Nullable String layoutId) {
+		String id = dev.t3craft.hq.layout.HqLayouts.resolve(layoutId).id();
+		if (id.equals(dev.t3craft.hq.layout.HqLayouts.CLASSIC)) {
+			HqStyle s = active();
+			return s.ownLayout() ? defaultStyle() : s;
+		}
+		HqStyle s = byId(id);
+		if (s == null) {
+			throw new IllegalStateException("no style for layout " + id);
+		}
+		return s;
+	}
+
+	/** {@link #forLayout} of the active layout ({@link dev.t3craft.hq.layout.HqLayouts#active()}): what plans are generated with. */
+	public static HqStyle current() {
+		return forLayout(dev.t3craft.hq.layout.HqLayouts.active().id());
 	}
 
 	/** Sets the active style (null: back to the default). */

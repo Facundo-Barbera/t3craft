@@ -42,7 +42,13 @@ import net.minecraft.world.level.block.state.BlockState;
  *
  * Options: {@code --out DIR}, {@code --style ID}, {@code --only SUBSTR} (comma-separated view-name
  * filters), {@code --scale F} (multiplies every view's pixels per block), {@code --ss N}
- * (supersampling), {@code --vanilla} (no mod blocks), {@code --no-npcs}.
+ * (supersampling), {@code --vanilla} (no mod blocks), {@code --no-npcs}, {@code --projects 4,10,20} (rosters of N
+ * projects with varied thread counts, three environments and settled threads; the default for styles
+ * with their own layout, e.g. {@code --style campus}, which also renders a 4 → 10 → 20 comparison).
+ * PNGs over 480 KB are written again with a 256-colour palette.
+ * {@code --style village} renders the village layout (layout/village, {@link VillageRender}).
+ * {@code --layout ID} (feat/hq-layouts: classic, campus, ring, vertical, ensanche, village or all) renders a
+ * registered layout through the game's pipeline with {@code --projects} (default 4), see {@link LayoutViews}.
  */
 public final class HqRender {
 	private HqRender() {
@@ -59,15 +65,23 @@ public final class HqRender {
 		int ss = 2;
 		boolean vanilla = false;
 		boolean npcs = true;
+		List<Integer> projects = new ArrayList<>();
+		String layoutId = null;
 		for (int i = 0; i < args.length; i++) {
 			switch (args[i]) {
 				case "--out" -> out = Path.of(args[++i]);
 				case "--style" -> styleId = args[++i];
+				case "--layout" -> layoutId = args[++i];
 				case "--only" -> only.addAll(List.of(args[++i].split(",")));
 				case "--scale" -> scaleMul = Double.parseDouble(args[++i]);
 				case "--ss" -> ss = Integer.parseInt(args[++i]);
 				case "--vanilla" -> vanilla = true;
 				case "--no-npcs" -> npcs = false;
+				case "--projects" -> {
+					for (String n : args[++i].split(",")) {
+						projects.add(Integer.parseInt(n.trim()));
+					}
+				}
 				default -> throw new IllegalArgumentException("unknown option " + args[i]);
 			}
 		}
@@ -78,6 +92,22 @@ public final class HqRender {
 		} else {
 			HqFixtures.use(null);
 		}
+		if (layoutId != null) {
+			// feat/hq-layouts: a registered layout (or "all") through the game's pipeline
+			Files.createDirectories(out);
+			BlockModels models = new BlockModels();
+			LayoutViews.render(models, layoutId, out, projects.isEmpty() ? List.of(4) : projects, only, scaleMul, ss, npcs);
+			for (String p : models.problems) {
+				System.out.println("note: " + p);
+			}
+			return;
+		}
+		if (dev.t3craft.hq.VillageGenerator.ID.equals(styleId)) {
+			// layout/village: its own generator and views (see VillageRender)
+			Files.createDirectories(out);
+			VillageRender.run(out, only, scaleMul, ss, npcs, new BlockModels());
+			return;
+		}
 		HqStyle style = styleId == null ? HqStyles.byId(HqStyles.DEFAULT_ID) : HqStyles.byId(styleId);
 		if (style == null) {
 			throw new IllegalArgumentException("unknown style " + styleId + "; known: " + HqStyles.ids());
@@ -85,7 +115,44 @@ public final class HqRender {
 		Files.createDirectories(out);
 		BlockModels models = new BlockModels();
 		String sid = style.id();
+		if (HqStyles.towns().contains(style)) {
+			TownRender.render(models, style, out, only, ss, npcs);
+			for (String p : models.problems) {
+				System.out.println("note: " + p);
+			}
+			return;
+		}
+		if (sid.equals("vertical")) {
+			// layout/vertical: towers, bridges and podium for 4, 10 and 20 projects (VerticalRender)
+			VerticalRender.run(models, style, out, only, scaleMul, ss, npcs);
+			for (String p : models.problems) {
+				System.out.println("note: " + p);
+			}
+			return;
+		}
+		if (sid.equals("ring")) {
+			// layout/ring: growth through 4, 10 and 20 projects (Growth)
+			Growth.render(style, models, out, projects.isEmpty() ? List.of(4, 10, 20) : projects, only, scaleMul, ss, npcs);
+			for (String p : models.problems) {
+				System.out.println("note: " + p);
+			}
+			return;
+		}
+		if (style.ownLayout() || !projects.isEmpty()) {
+			CampusViews.render(models, style, out, projects.isEmpty() ? List.of(4, 10, 20) : projects, only, scaleMul, ss, npcs);
+			for (String p : models.problems) {
+				System.out.println("note: " + p);
+			}
+			return;
+		}
 
+		if (!projects.isEmpty()) {
+			Growth.render(style, models, out, projects, only, scaleMul, ss, npcs);
+			for (String p : models.problems) {
+				System.out.println("note: " + p);
+			}
+			return;
+		}
 		Map<String, HqInput> rosters = new LinkedHashMap<>();
 		rosters.put("1p", roster(new int[] {4}, 0));
 		rosters.put("2p", roster(new int[] {8, 3}, 1));
@@ -170,7 +237,7 @@ public final class HqRender {
 	}
 
 	/** The plan in a grid, on flat ground (grass at y=0, dirt below) where the plan has nothing, plus NPC stand-ins. */
-	private static Scene scene(BlockModels models, BuildPlan plan, Renderer.Clip clip, boolean npcs) {
+	static Scene scene(BlockModels models, BuildPlan plan, Renderer.Clip clip, boolean npcs) {
 		Scene sc = new Scene(models, clip.minX(), Math.min(clip.minY(), -6), clip.minZ(), clip.maxX(), Math.max(clip.maxY(), 11), clip.maxZ());
 		BlockState grass = Blocks.GRASS_BLOCK.defaultBlockState();
 		BlockState dirt = Blocks.DIRT.defaultBlockState();
@@ -194,7 +261,9 @@ public final class HqRender {
 			for (Map.Entry<String, Anchor> e : plan.anchors().entrySet()) {
 				String k = e.getKey();
 				if (k.equals("board_slot_0") || k.equals("board_slot_3") || k.equals("bench_1") || k.equals("bench_7") || k.equals("walk_hub_0")
-						|| k.equals("archive") || k.equals("thread_wall_front")) {
+						|| k.equals("archive") || k.equals("thread_wall_front") || k.startsWith("walk_hub_")
+						|| k.startsWith("walk_room_") && (k.endsWith("_0") || k.endsWith("_2")) || k.startsWith("walk_lounge_") || k.equals("walk_clock")
+						|| k.equals("walk_review") || k.startsWith("walk_plazuela_")) {
 					npc(sc, e.getValue(), k.startsWith("bench"), n++);
 				}
 			}
@@ -205,7 +274,7 @@ public final class HqRender {
 	private static final int[] ROBES = {0xFF6A4FB0, 0xFF2F7DB8, 0xFFC0543C, 0xFF3C9A5F, 0xFFD39A2A, 0xFF8E3F7E};
 
 	/** A stand-in NPC (robe, head, face on the side it looks at), seated or standing at an anchor. */
-	private static void npc(Scene sc, Anchor a, boolean seated, int i) {
+	static void npc(Scene sc, Anchor a, boolean seated, int i) {
 		BlockPos c = a.block();
 		BlockModels.Texture robe = BlockModels.Texture.solid(ROBES[i % ROBES.length]);
 		BlockModels.Texture skin = BlockModels.Texture.solid(0xFFE0B48C);
@@ -232,7 +301,7 @@ public final class HqRender {
 		sc.overlay(c.getX(), c.getY() + 1, c.getZ(), "npc-high-" + i, high);
 	}
 
-	private static void caption(BufferedImage img, String text) {
+	static void caption(BufferedImage img, String text) {
 		try {
 			Graphics2D g = img.createGraphics();
 			g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);

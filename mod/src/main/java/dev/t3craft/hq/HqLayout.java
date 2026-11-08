@@ -218,8 +218,40 @@ public record HqLayout(List<Module> modules, List<Archived> archive, List<String
 		return allocate(input, null);
 	}
 
-	/** Allocates modules, desks and archive slots for {@code input}, keeping what {@code previous} had (see class doc). */
+	/**
+	 * Where a project's new module goes (rule 4, "Annex"): its grid index. The default,
+	 * {@link #LOWEST_FREE}, is the classic rule (lowest free index); a layout style can give its own
+	 * deterministic rule (layout/ring: an annex becomes a floor on the project's sector, a new project
+	 * the first free sector in a fixed order). Must return an index not in {@code used}.
+	 */
+	@FunctionalInterface
+	public interface Placer {
+		/** The classic rule: the lowest free index. */
+		Placer LOWEST_FREE = (project, own, used) -> lowestFree(used);
+
+		/**
+		 * @param project the project's key
+		 * @param own     indices of the project's modules so far (ascending)
+		 * @param used    every index taken so far (ascending)
+		 */
+		int place(String project, java.util.SortedSet<Integer> own, java.util.SortedSet<Integer> used);
+	}
+
+	/**
+	 * Allocates modules, desks and archive slots for {@code input}, keeping what {@code previous} had
+	 * (see class doc), on the shared spine grid (the classic layout).
+	 */
 	public static HqLayout allocate(HqInput input, @Nullable HqLayout previous) {
+		return allocate(input, previous, Placer.LOWEST_FREE);
+	}
+
+	/** Allocation for {@code style}: the spine grid, or the style's own layout ({@link HqStyle#allocate}). */
+	public static HqLayout allocate(HqInput input, @Nullable HqLayout previous, HqStyle style) {
+		return style.allocate(input, previous);
+	}
+
+	/** {@link #allocate(HqInput, HqLayout)} with another rule for where new modules go. */
+	public static HqLayout allocate(HqInput input, @Nullable HqLayout previous, Placer placer) {
 		HqLayout prev = previous == null ? EMPTY : previous;
 		Map<String, Seat> oldSeats = prev.seats();
 		// 1-2. kept desks, grouped by old module (only modules of the same project)
@@ -255,7 +287,16 @@ public record HqLayout(List<Module> modules, List<Archived> archive, List<String
 					break;
 				}
 				if (!seated) {
-					int i = lowestFree(used);
+					TreeSet<Integer> own = new TreeSet<>();
+					for (var o : owner.entrySet()) {
+						if (o.getValue() == p) {
+							own.add(o.getKey());
+						}
+					}
+					int i = placer.place(p.key(), java.util.Collections.unmodifiableSortedSet(own), java.util.Collections.unmodifiableSortedSet(used));
+					if (i < 0 || used.contains(i)) {
+						throw new IllegalStateException("placer gave a taken index " + i);
+					}
 					used.add(i);
 					TreeMap<Integer, String> m = new TreeMap<>();
 					m.put(0, t);
@@ -271,6 +312,16 @@ public record HqLayout(List<Module> modules, List<Archived> archive, List<String
 			e.getValue().forEach((s, t) -> ds.add(new Desk(s, t)));
 			mods.add(new Module(e.getKey(), p.key(), p.label(), p.envKey(), p.envLabel(), ds));
 		}
+		Shelf shelf = shelve(input, prev);
+		return new HqLayout(mods, shelf.archive(), shelf.overflow());
+	}
+
+	/** The "Archived" shelf and the older list of a roster (rule 5), whatever the module layout. */
+	record Shelf(List<Archived> archive, List<String> overflow) {
+	}
+
+	/** Rule 5 of the class doc: who is on the "Archived" shelf, in which slot, and who is in the overflow. */
+	static Shelf shelve(HqInput input, HqLayout prev) {
 		// 5. the "Archived" shelf
 		List<Archived> kept = new ArrayList<>();
 		List<String[]> newcomers = new ArrayList<>();
@@ -332,10 +383,10 @@ public record HqLayout(List<Module> modules, List<Archived> archive, List<String
 			arch.add(new Archived(s, n[1], n[0], n[2], --low));
 			over.remove(n[1]);
 		}
-		return new HqLayout(mods, arch, over);
+		return new Shelf(arch, over);
 	}
 
-	private static int lowestFree(TreeSet<Integer> used) {
+	static int lowestFree(java.util.Set<Integer> used) {
 		int i = 0;
 		while (used.contains(i)) {
 			i++;

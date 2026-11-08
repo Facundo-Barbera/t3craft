@@ -140,6 +140,8 @@ public final class DemoHq {
 		JsonObject o = new JsonObject();
 		o.addProperty("lift", step.lift());
 		o.addProperty(FIXTURES, step.fixtures());
+		// feat/hq-layouts: the layout this HQ is built with (HqLayoutState); never mixed with another one
+		o.addProperty(dev.t3craft.client.hq.layout.HqLayoutState.KEY, dev.t3craft.hq.layout.HqLayouts.active().id());
 		o.add("layout", step.layout().toJson());
 		return o;
 	}

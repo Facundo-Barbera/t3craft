@@ -49,6 +49,20 @@ final class PlanBuilder {
 	}
 
 	Canvas module(String id, Box box, List<Box> holes) {
+		return open(id, box, holes, false);
+	}
+
+	/**
+	 * A <b>sparse</b> module: it owns only the cells it writes (inside {@code bounds}), nothing is
+	 * filled with air on close, and its bounds may overlap other modules' boxes; writing a cell that
+	 * another module owns still throws. For grounds that weave between buildings (campus paths,
+	 * gardens, outdoor stairs). Must not be followed by a boxed module that overlaps its cells.
+	 */
+	Canvas sparse(String id, Box bounds) {
+		return open(id, bounds, List.of(), true);
+	}
+
+	private Canvas open(String id, Box box, List<Box> holes, boolean sparse) {
 		if (open != null) {
 			throw new IllegalStateException("module " + open.module.id() + " still open");
 		}
@@ -61,14 +75,19 @@ final class PlanBuilder {
 			if (m.id().equals(id)) {
 				throw new IllegalStateException("duplicate module id " + id);
 			}
-			if (m.box().intersects(box) && m.holes().stream().noneMatch(h -> h.contains(box))) {
+			if (!sparse && !m.sparse() && m.box().intersects(box) && m.holes().stream().noneMatch(h -> h.contains(box))) {
 				throw new IllegalStateException("module " + id + " " + box + " collides with " + m.id() + " " + m.box());
 			}
 		}
-		BuildPlan.Module m = new BuildPlan.Module(id, box, holes, group == null ? id : group);
+		BuildPlan.Module m = new BuildPlan.Module(id, box, holes, group == null ? id : group, sparse ? java.util.Set.of() : null);
 		modules.add(m);
-		open = new Canvas(m, modules.size() - 1);
+		open = new Canvas(m, modules.size() - 1, sparse);
 		return open;
+	}
+
+	/** True when some module already wrote this cell. */
+	boolean taken(int x, int y, int z) {
+		return cells.containsKey(BlockPos.asLong(x, y, z));
 	}
 
 	void anchor(Anchor a) {
@@ -153,11 +172,14 @@ final class PlanBuilder {
 	final class Canvas implements AutoCloseable {
 		final BuildPlan.Module module;
 		private final int index;
+		private final boolean sparse;
+		private final java.util.Set<Long> written = new java.util.HashSet<>();
 		private boolean closed;
 
-		private Canvas(BuildPlan.Module module, int index) {
+		private Canvas(BuildPlan.Module module, int index, boolean sparse) {
 			this.module = module;
 			this.index = index;
+			this.sparse = sparse;
 		}
 
 		Box box() {
@@ -204,14 +226,23 @@ final class PlanBuilder {
 		}
 
 		boolean owns(int x, int y, int z) {
+			if (sparse) {
+				Cell c = cells.get(BlockPos.asLong(x, y, z));
+				return module.box().contains(x, y, z) && (c == null || c.module == index);
+			}
 			return module.owns(x, y, z);
+		}
+
+		/** True when some module already wrote this cell (sparse grounds use it to skip taken cells). */
+		boolean taken(int x, int y, int z) {
+			return cells.containsKey(BlockPos.asLong(x, y, z));
 		}
 
 		private Canvas put(int x, int y, int z, BlockState state, @Nullable CompoundTag be, int layer) {
 			if (closed) {
 				throw new IllegalStateException(module.id() + " is closed");
 			}
-			if (!module.owns(x, y, z)) {
+			if (sparse ? !module.box().contains(x, y, z) : !module.owns(x, y, z)) {
 				throw new IllegalStateException(module.id() + " writes " + x + "," + y + "," + z + " outside what it owns " + module.box());
 			}
 			long key = BlockPos.asLong(x, y, z);
@@ -220,12 +251,25 @@ final class PlanBuilder {
 				throw new IllegalStateException(module.id() + " collides with " + modules.get(prev.module).id() + " at " + x + "," + y + "," + z);
 			}
 			cells.put(key, new Cell(new Placement(new BlockPos(x, y, z), state, be == null ? null : be.copy()), index, layer));
+			if (sparse) {
+				written.add(key);
+			}
 			return this;
 		}
 
 		@Override
 		public void close() {
 			if (closed) {
+				return;
+			}
+			if (sparse) {
+				if (written.isEmpty()) {
+					throw new IllegalStateException("sparse module " + module.id() + " wrote nothing");
+				}
+				BuildPlan.Module m = module;
+				modules.set(index, new BuildPlan.Module(m.id(), m.box(), m.holes(), m.group(), written));
+				closed = true;
+				open = null;
 				return;
 			}
 			BlockState air = Blocks.AIR.defaultBlockState();

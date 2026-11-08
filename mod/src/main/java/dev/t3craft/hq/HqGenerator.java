@@ -36,9 +36,9 @@ public final class HqGenerator {
 
 	private final HqStyle style;
 
-	/** A generator with the active style ({@link HqStyles#active()}). */
+	/** A generator for the active layout ({@link HqStyles#current()}; classic: the configured style). */
 	public HqGenerator() {
-		this(HqStyles.active());
+		this(HqStyles.current());
 	}
 
 	public HqGenerator(HqStyle style) {
@@ -55,15 +55,19 @@ public final class HqGenerator {
 
 	/** {@link #plan(HqInput, HqLayout, HqStyle)} with the active style. */
 	public static Result plan(HqInput input, @Nullable HqLayout previous) {
-		return plan(input, previous, HqStyles.active());
+		return plan(input, previous, HqStyles.current());
 	}
 
 	public static Result plan(HqInput input, @Nullable HqLayout previous, HqStyle style) {
-		HqLayout layout = HqLayout.allocate(input, previous);
+		HqLayout layout = style.allocate(input, previous);
 		return new Result(layout, new HqGenerator(style).generate(layout));
 	}
 
 	public BuildPlan generate(HqLayout layout) {
+		BuildPlan own = style.layoutPlan(layout);
+		if (own != null) {
+			return own;
+		}
 		PlanBuilder b = new PlanBuilder();
 		int rows = layout.rows();
 		hub(b, rows > 0, hubBinding(layout));

@@ -295,6 +295,11 @@ public final class ConfigCodec {
 		s.chat().hiddenEnvironments().forEach(hidden::add);
 		chat.add("hiddenEnvironments", hidden);
 		o.add("chat", chat);
+
+		// feat/hq-layouts: HQ layout (owned by HqLayoutConfig); only the default is filled in, never replaced
+		if (!o.has(dev.t3craft.hq.layout.HqLayouts.CONFIG_KEY)) {
+			o.addProperty(dev.t3craft.hq.layout.HqLayouts.CONFIG_KEY, dev.t3craft.hq.layout.HqLayouts.DEFAULT_ID);
+		}
 		return o;
 	}
 
