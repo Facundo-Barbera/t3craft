@@ -45,6 +45,8 @@ final class HqLighting {
 	static final int GRID = 5;
 	/** Farthest a fallback lamp may be from the dark cell it is for (blocks, each axis). */
 	private static final int REACH = 4;
+	/** Period of the sparse groups' floor-lamp lattice. */
+	static final int LATTICE = 9;
 	/** How far above a group's own blocks its light sees air (feet, head and one more). */
 	private static final int AIRSPACE = 3;
 	/** What a cell of another group is to a group's light: opaque. */
@@ -69,8 +71,13 @@ final class HqLighting {
 	private final List<String> groupNames = new ArrayList<>();
 	private final Set<BlockPos> keep = new HashSet<>();
 	private final Set<BlockState> fixtures = new HashSet<>();
+	/** The board's face block and centre: the same block elsewhere (plain walls) may become a lamp. */
+	private final BlockState boardState;
+	private final BlockPos board;
 	private final Map<BlockPos, BlockState> lamps = new HashMap<>();
 	private final Map<BlockPos, Double> floors = new HashMap<>();
+	/** Walkable cells that need more than {@link HqLightMap#MIN_LEVEL} (standing rows in front of free desks). */
+	private final Map<BlockPos, Integer> need = new HashMap<>();
 
 	private HqLighting(BuildPlan plan, HqStyle style) {
 		this.plan = plan;
@@ -148,7 +155,10 @@ final class HqLighting {
 				}
 			}
 		}
-		for (HqStyle.Role r : List.of(HqStyle.Role.BOARD, HqStyle.Role.SCREEN, HqStyle.Role.COMPUTER_ON, HqStyle.Role.COMPUTER_OFF,
+		boardState = style.palette().get(HqStyle.Role.BOARD);
+		Anchor boardAnchor = plan.anchor(AnchorNames.BOARD);
+		board = boardAnchor == null ? null : boardAnchor.block();
+		for (HqStyle.Role r : List.of(HqStyle.Role.SCREEN, HqStyle.Role.COMPUTER_ON, HqStyle.Role.COMPUTER_OFF,
 				HqStyle.Role.STATUS_LAMP, HqStyle.Role.BEACON, HqStyle.Role.DESK, HqStyle.Role.TERMINAL)) {
 			BlockState s = style.palette().get(r);
 			if (s != null) {
@@ -225,7 +235,15 @@ final class HqLighting {
 		Map<String, List<BlockPos>> byGroup = new TreeMap<>();
 		for (BlockPos c : reachable(spawn)) {
 			if (deskSolid.contains(c)) {
-				continue; // a free desk row: lit from the standing row next to it
+				// a free desk row is opaque to the estimate (a taken one shades): it is lit from the
+				// standing row in front of it, which then needs one level more
+				for (Direction d : Direction.Plane.HORIZONTAL) {
+					BlockPos n = c.relative(d);
+					if (desks.contains(n) && !deskSolid.contains(n)) {
+						need.merge(n, HqLightMap.MIN_LEVEL + 1, Math::max);
+					}
+				}
+				continue;
 			}
 			String g = owner(c);
 			if (g != null) {
@@ -238,17 +256,68 @@ final class HqLighting {
 			Box one = new Box(p.getX(), p.getY(), p.getZ(), p.getX(), p.getY(), p.getZ());
 			bounds.merge(e.getValue(), one, Box::union);
 		}
+		// sparse groups (campus grounds: paths and gardens that grow with the roster) get a fixed lattice
+		Set<String> sparse = new java.util.TreeSet<>();
+		for (BuildPlan.Module m : plan.modules()) {
+			if (m.sparse()) {
+				sparse.add(m.group());
+			}
+		}
+		for (String g : sparse) {
+			latticeGroup(g);
+			byGroup.put(g, standable(g));
+		}
 		for (Map.Entry<String, List<BlockPos>> e : byGroup.entrySet()) {
 			Box b = bounds.get(e.getKey());
 			for (BlockPos c : e.getValue()) {
 				b = b.union(new Box(c.getX(), c.getY(), c.getZ(), c.getX(), c.getY(), c.getZ()));
 			}
-			lightGroup(e.getKey(), b, e.getValue());
+			lightGroup(e.getKey(), b, e.getValue(), !sparse.contains(e.getKey()));
 		}
 	}
 
+	/**
+	 * Lamps of a sparse group, purely by position: every open floor block of the group on the lattice
+	 * {@code (x - 2z) mod }{@value #LATTICE}{@code  == 0} (one every {@value #LATTICE} blocks in every row
+	 * and every column, so any straight path is within 4 steps of one). Nothing else is looked at, so a
+	 * path tile keeps its lamp, or its lack of one, however the grounds around it grow.
+	 */
+	private void latticeGroup(String g) {
+		BlockState floorLamp = style.floorLight();
+		for (Map.Entry<BlockPos, String> e : groups.entrySet()) {
+			BlockPos f = e.getKey();
+			if (!g.equals(e.getValue()) || Math.floorMod(f.getX() - 2 * f.getZ(), LATTICE) != 0) {
+				continue;
+			}
+			if (view(f.above()).isAir() && view(f.above(2)).isAir() && swappable(g, f, true)) {
+				lamps.put(f, floorLamp);
+				cur[index(f)] = floorLamp;
+			}
+		}
+	}
+
+	/**
+	 * Every cell people could stand on over group {@code g}'s own blocks, reachable or not: what a sparse
+	 * group lights, so that a new path elsewhere that makes one of its cells reachable changes nothing.
+	 */
+	private List<BlockPos> standable(String g) {
+		List<BlockPos> out = new ArrayList<>();
+		Set<BlockPos> seen = new HashSet<>();
+		for (Map.Entry<BlockPos, String> e : groups.entrySet()) {
+			if (!g.equals(e.getValue()) || view(e.getKey()).isAir()) {
+				continue;
+			}
+			for (BlockPos c : new BlockPos[] {e.getKey(), e.getKey().above()}) {
+				if (!deskSolid.contains(c) && g.equals(owner(c)) && seen.add(c) && !Double.isNaN(floor(c))) {
+					out.add(c);
+				}
+			}
+		}
+		return out;
+	}
+
 	/** Lights the walkable cells {@code walk} of group {@code g} with its own lamps only. */
-	private void lightGroup(String g, Box bounds, List<BlockPos> walk) {
+	private void lightGroup(String g, Box bounds, List<BlockPos> walk, boolean grid) {
 		int me = groupNames.indexOf(g);
 		HqLightMap light = HqLightMap.ofView(bounds, 1, (x, y, z) -> lightView(me, x, y, z));
 		walk.sort(Comparator.<BlockPos>comparingInt(BlockPos::getY).thenComparingInt(BlockPos::getZ).thenComparingInt(BlockPos::getX));
@@ -261,14 +330,15 @@ final class HqLighting {
 		BlockState wallLamp = style.wallLight();
 		// 1. the floor grid
 		for (BlockPos c : walk) {
-			if (Math.floorMod(c.getX(), GRID) == 0 && Math.floorMod(c.getZ(), GRID) == 0 && floorSlot(g, c) && darkNear(light, walkSet, c)) {
+			if (grid && Math.floorMod(c.getX(), GRID) == 0 && Math.floorMod(c.getZ(), GRID) == 0 && floorSlot(g, c) && darkNear(light, walkSet, c)) {
 				place(light, c.below(), floorLamp);
 			}
 		}
 		// 2. what the grid misses (stairs, narrow rooms, cells whose grid point is a wall or a desk): the
 		// nearby floor, wall or ceiling block that lights this cell and the most other dark ones
 		for (BlockPos c : walk) {
-			if (light.at(c) >= HqLightMap.MIN_LEVEL) {
+			int want = need.getOrDefault(c, HqLightMap.MIN_LEVEL);
+			if (light.at(c) >= want) {
 				continue;
 			}
 			BlockPos best = null;
@@ -276,11 +346,24 @@ final class HqLighting {
 			int bestScore = -1;
 			for (BlockPos k : candidates(g, walkSet, c)) {
 				BlockState lamp = k.getY() < c.getY() && walkSet.contains(k.above()) ? floorLamp : wallLamp;
-				int score = light.gain(k, lamp, walkKeys::contains, c);
+				int score = light.gain(k, lamp, walkKeys::contains, c, want);
 				if (score > bestScore) {
 					best = k;
 					bestState = lamp;
 					bestScore = score;
+				}
+			}
+			if (best == null) {
+				// nothing of the group's own reaches it (a stair climbing through another part's floor):
+				// the block of a neighbouring part that lights it best
+				for (BlockPos k : candidates(null, walkSet, c)) {
+					BlockState lamp = k.getY() < c.getY() && walkSet.contains(k.above()) ? floorLamp : wallLamp;
+					int score = light.gain(k, lamp, walkKeys::contains, c, want);
+					if (score > bestScore) {
+						best = k;
+						bestState = lamp;
+						bestScore = score;
+					}
 				}
 			}
 			if (best != null) {
@@ -343,7 +426,7 @@ final class HqLighting {
 		java.util.LinkedHashSet<BlockPos> out = new java.util.LinkedHashSet<>();
 		for (int dx = -REACH; dx <= REACH; dx++) {
 			for (int dz = -REACH; dz <= REACH; dz++) {
-				for (int dy = -2; dy <= 2; dy++) {
+				for (int dy = -4; dy <= 2; dy++) {
 					BlockPos n = c.offset(dx, dy, dz);
 					if (!walk.contains(n)) {
 						continue;
@@ -351,7 +434,7 @@ final class HqLighting {
 					if (floorSlot(g, n)) {
 						out.add(n.below());
 					}
-					for (int h = 0; h <= 2; h++) {
+					for (int h = -1; h <= 2; h++) {
 						for (Direction d : Direction.Plane.HORIZONTAL) {
 							BlockPos w = n.above(h).relative(d);
 							if (swappable(g, w, false)) {
@@ -371,18 +454,33 @@ final class HqLighting {
 				}
 			}
 		}
+		// ceilings over the dark cell's surroundings (stairwells and voids have no walkable cell under them)
+		for (int dx = -REACH; dx <= REACH; dx++) {
+			for (int dz = -REACH; dz <= REACH; dz++) {
+				for (int h = 2; h <= 6; h++) {
+					BlockPos up = c.offset(dx, h, dz);
+					if (!view(up).isAir()) {
+						if (swappable(g, up, false)) {
+							out.add(up);
+						}
+						break;
+					}
+				}
+			}
+		}
 		List<BlockPos> list = new ArrayList<>(out);
 		list.sort(Comparator.comparingInt(k -> k.distManhattan(c)));
 		return list;
 	}
 
 	/**
-	 * A plain opaque full block of group {@code g} (or a leaf block of a canopy people can climb onto)
+	 * A plain opaque full block of group {@code g} (any group when null) (or a leaf block of a canopy people can climb onto)
 	 * that may become a lamp. Never a desk cell; walls and ceilings never swap a block that looks like a
 	 * fixture (board, screens, desks, lamps), wherever it is.
 	 */
 	private boolean swappable(String g, BlockPos p, boolean floor) {
-		if (keep.contains(p) || desks.contains(p) || lamps.containsKey(p) || !g.equals(groups.get(p))) {
+		String owner = groups.get(p);
+		if (keep.contains(p) || desks.contains(p) || lamps.containsKey(p) || owner == null || g != null && !g.equals(owner)) {
 			return false;
 		}
 		Placement pl = plan.at(p);
@@ -392,6 +490,9 @@ final class HqLighting {
 		BlockState s = pl.state();
 		if (s.isAir() || s.hasBlockEntity() || s.getLightEmission() > 0 || !floor && fixtures.contains(s)) {
 			return false;
+		}
+		if (!floor && s.equals(boardState) && (board == null || p.distManhattan(board) <= 8)) {
+			return false; // the board's face
 		}
 		boolean full = s.isCollisionShapeFullBlock(EmptyBlockGetter.INSTANCE, p);
 		return s.getBlock() instanceof net.minecraft.world.level.block.LeavesBlock

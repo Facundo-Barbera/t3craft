@@ -858,9 +858,8 @@ final class TowerGenerator {
 						}
 					}
 				}
-				for (int lz : new int[] {-13, 13}) {
-					v.set(w, 1, lz, kit.gardenPlanter());
-				}
+				// a planter at the south end only: at the north end the cell is the way past the first office
+				v.set(w, 1, 13, kit.gardenPlanter());
 			}
 			case MEZZANINE -> {
 				for (int u = 3; u <= w - 1; u++) {

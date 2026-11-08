@@ -1062,7 +1062,8 @@ final class RingGenerator {
 				BlockState skin = m == 1 ? (Math.abs(t) <= 1.0 ? GLASS : (Math.floorMod((int) Math.round(t), 6) == 0 ? COPPER_WARM : COPPER)) : DEEPSLATE_TILES;
 				set(x, base + h + 1, z, skin);
 			}
-			if (!wall && Math.abs(t) > 1.0 && Math.floorMod(x * 7 + z * 11, 17) == 0) {
+			// lanterns on a 6-block grid (at most 4 in any 9 × 9), only where the vault is tall enough to hang them in
+			if (!wall && h >= 3 && Math.abs(t) > 1.0 && Math.floorMod(x, 6) == 0 && Math.floorMod(z, 6) == 0) {
 				put(x, base + h, z, hangingLantern(), HANGING);
 			}
 		} else {

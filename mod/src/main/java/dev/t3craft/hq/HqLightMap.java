@@ -131,6 +131,11 @@ public final class HqLightMap {
 	 * Returns -1 when {@code must} would still be under {@link #MIN_LEVEL}.
 	 */
 	int gain(net.minecraft.core.BlockPos k, BlockState lamp, java.util.function.LongPredicate counts, net.minecraft.core.BlockPos must) {
+		return gain(k, lamp, counts, must, MIN_LEVEL);
+	}
+
+	/** {@link #gain(net.minecraft.core.BlockPos, BlockState, java.util.function.LongPredicate, net.minecraft.core.BlockPos)} with {@code must} needing {@code mustLevel}. */
+	int gain(net.minecraft.core.BlockPos k, BlockState lamp, java.util.function.LongPredicate counts, net.minecraft.core.BlockPos must, int mustLevel) {
 		int start = index(k.getX(), k.getY(), k.getZ());
 		int e = lamp.getLightEmission();
 		if (start < 0 || e < MIN_LEVEL) {
@@ -166,7 +171,7 @@ public final class HqLightMap {
 			}
 		}
 		int mi = index(must.getX(), must.getY(), must.getZ());
-		if (mi < 0 || lv.getOrDefault(mi, 0) < MIN_LEVEL) {
+		if (mi < 0 || Math.max(level[mi] & 0xff, lv.getOrDefault(mi, 0)) < mustLevel) {
 			return -1;
 		}
 		int gain = 0;
