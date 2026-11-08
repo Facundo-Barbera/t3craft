@@ -36,6 +36,10 @@ public final class HqWorldAnchors implements AnchorSource {
 	private final @Nullable Set<String> built;
 	private final List<Anchor> lobby;
 	private final List<Anchor> benches;
+	/** feat/npc-idle-wander: stroll spots, seats and sights of the built part, world coordinates. */
+	private final List<Anchor> strolls;
+	private final List<Anchor> seats;
+	private final List<dev.t3craft.client.npc.behavior.Pos> sights;
 
 	public HqWorldAnchors(BuildPlan plan, HqSite site, @Nullable Set<String> built) {
 		this.hq = new HqAnchorSource(plan, site);
@@ -57,6 +61,73 @@ public final class HqWorldAnchors implements AnchorSource {
 			l.add(hub);
 		}
 		this.lobby = List.copyOf(l);
+		List<Anchor> st = new ArrayList<>();
+		List<Anchor> se = new ArrayList<>();
+		List<dev.t3craft.client.npc.behavior.Pos> si = new ArrayList<>();
+		for (dev.t3craft.hq.Anchor a : plan.anchors().values()) {
+			String n = a.name();
+			if (!HqSiteFrame.builds(a.block()) || !standsAt(a.block())) {
+				continue;
+			}
+			if (n.startsWith(AnchorNames.BENCH)) {
+				se.add(HqAnchorSource.convert(site.anchor(a)));
+			} else if (strollPoint(n)) {
+				st.add(HqAnchorSource.convert(site.anchor(a)));
+			} else if (n.equals(AnchorNames.BOARD) || n.equals(AnchorNames.THREAD_WALL)) {
+				dev.t3craft.hq.Anchor w = site.anchor(a);
+				si.add(new dev.t3craft.client.npc.behavior.Pos(w.x(), w.y(), w.z()));
+			} else {
+				AnchorNames.BigScreen bs = AnchorNames.parseBigScreen(n);
+				if (bs != null) {
+					si.add(screenCentre(a, bs));
+				}
+			}
+		}
+		this.strolls = List.copyOf(st);
+		this.seats = List.copyOf(se);
+		this.sights = List.copyOf(si);
+	}
+
+	/** Standing spots worth strolling to: every stroll point ({@code walk*}), the hub, in front of the kanban wall and the archive. */
+	static boolean strollPoint(String name) {
+		if (!AnchorNames.standing(name)) {
+			return false;
+		}
+		return name.startsWith("walk") || name.equals(AnchorNames.HUB) || name.equals(AnchorNames.THREAD_WALL_FRONT) || name.equals(AnchorNames.ARCHIVE);
+	}
+
+	/** Middle of a big screen (its anchor is the top-left cell's face as seen from the front), world coordinates. */
+	private dev.t3craft.client.npc.behavior.Pos screenCentre(dev.t3craft.hq.Anchor a, AnchorNames.BigScreen bs) {
+		net.minecraft.core.Direction right = a.facing().getCounterClockWise();
+		double half = (bs.width() - 1) / 2.0;
+		dev.t3craft.hq.Anchor c = new dev.t3craft.hq.Anchor(a.name(), a.x() + right.getStepX() * half, a.y() - (bs.height() - 1) / 2.0,
+				a.z() + right.getStepZ() * half, a.facing(), a.block());
+		dev.t3craft.hq.Anchor w = site.anchor(c);
+		return new dev.t3craft.client.npc.behavior.Pos(w.x(), w.y(), w.z());
+	}
+
+	/** Whether the module owning an HQ-relative cell stands (cells outside every slot go with the base). */
+	private boolean standsAt(net.minecraft.core.BlockPos rel) {
+		if (built == null) {
+			return true;
+		}
+		String owner = HqSiteFrame.owner(rel.getX(), rel.getZ());
+		return standing(owner != null ? owner : HqSiteFrame.BASE);
+	}
+
+	@Override
+	public List<Anchor> strollSpots() {
+		return strolls;
+	}
+
+	@Override
+	public List<Anchor> seats() {
+		return seats;
+	}
+
+	@Override
+	public List<dev.t3craft.client.npc.behavior.Pos> sights() {
+		return sights;
 	}
 
 	private boolean standing(String moduleId) {

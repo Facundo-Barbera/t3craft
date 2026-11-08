@@ -65,4 +65,23 @@ public interface AnchorSource {
 	default @Nullable Anchor spawn() {
 		return null;
 	}
+
+	/**
+	 * feat/npc-idle-wander: the base's interesting standing spots (stroll points, hub, patios, in
+	 * front of the walls and the archive) that calm NPCs stroll between ({@link IdleWander}). Fewer
+	 * than two = nobody strolls. Precomputed: called every tick.
+	 */
+	default List<Anchor> strollSpots() {
+		return List.of();
+	}
+
+	/** feat/npc-idle-wander: spots in front of seats (benches, steps) where a stroller may sit a while. */
+	default List<Anchor> seats() {
+		return List.of();
+	}
+
+	/** feat/npc-idle-wander: points worth looking at (big screens, the board), for a stroller standing nearby. */
+	default List<Pos> sights() {
+		return List.of();
+	}
 }

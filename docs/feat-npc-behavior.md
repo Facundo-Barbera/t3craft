@@ -157,6 +157,39 @@ que se vuelve a leer cuando cambia el archivo:
 
 Por código: `behavior().setApproachConfig(cfg)` (con `null` vuelve a leer el archivo).
 
+## Paseo de los hilos tranquilos (feat/npc-idle-wander)
+
+Un NPC de un hilo **fijado** (pinned) en T3, en reposo (`IDLE` o `COMPLETED`, sin error ni festejo)
+desde hace `idleSeconds` (más un desfase de hasta 60 s por hilo), sale a pasear por el HQ.
+`IdleWander` (dueño: `BehaviorDirector`) arma una salida de 2 a 5 tramos. Cada tramo va a un
+punto de paseo (`walk*`: hub, patios, lounge, módulos; `hub`; frente al muro kanban y al archivo),
+a una banca (`bench_*`, se queda agachado un rato) o, a veces, al lado del escritorio de un hilo
+que está trabajando (lo mira unos segundos). En cada punto se queda de 12 a 32 s mirando la big
+screen o el tablero más cercano, a otro NPC cercano o alrededor. Después vuelve a su lugar (home o
+banca de descanso) y espera de 1 a 3 min hasta la próxima salida. Las pausas son aleatorias pero
+deterministas por hilo, así que no se mueven todos a la vez.
+
+Cuando el hilo pasa a working (incluye `waiting`) o pide algo, el paseo se corta en el acto y el
+cerebro lo lleva a su escritorio o al tablero; si necesita atención, **corre** (`NpcBrain.RUSH`).
+Los puntos salen de `AnchorSource.strollSpots()`, `seats()` y `sights()`: los calcula
+`HqWorldAnchors` una sola vez, en el worker de presencia, y solo incluye las partes construidas.
+Con menos de dos puntos no pasea nadie. Un punto inalcanzable se descarta por 2 min, sin contar
+para el rescate de NPCs varados.
+
+Rendimiento: como máximo `maxWalkers` paseantes a la vez y `routesPerTick` rutas nuevas por tick.
+Cada tramo mide hasta `hopDistance` bloques. Las rutas salen de `WanderRoutes`, el mismo esquema
+que `CrewRoutes` de los builders (sin tocarlo): se copia la colisión del tramo a un `SnapshotBlocks`
+en el hilo del cliente (≤ 12.000 celdas por tick), el A* acotado (≤ 3.000 nodos) corre en un worker
+de `Offload` (≤ 2 a la vez) y el resultado se cachea 30 s. Timers: `npc.wander` y
+`npc.wander_async`; contadores `npc.wander.*`. Solo funciona con el HQ abierto (gate de presencia).
+En modo bridge todavía no se sabe qué hilos están fijados: allí solo pasean con `includeUnpinned`.
+
+```json
+"npcWander": { "enabled": true, "idleSeconds": 120, "includeUnpinned": false, "maxWalkers": 6, "routesPerTick": 1, "hopDistance": 18 }
+```
+
+Por código: `behavior().setWanderConfig(cfg)` y `behavior().setPinnedThreads(supplier)`.
+
 ## Pendientes
 
 - **No se probó dentro del juego**: no se lanzó Minecraft, por regla. Falta verificar a ojo la

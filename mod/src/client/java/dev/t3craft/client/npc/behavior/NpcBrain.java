@@ -78,7 +78,9 @@ public final class NpcBrain {
 	}
 
 	public enum Phase {
-		WALKING, TYPING, WAITING, WANDER_PAUSE, CELEBRATING, RESTING
+		WALKING, TYPING, WAITING, WANDER_PAUSE, CELEBRATING, RESTING,
+		/** feat/npc-idle-wander: standing (or sitting) on a stroll spot, looking at something. */
+		STROLL_PAUSE
 	}
 
 	static final int CELEBRATE_TICKS = 70;
@@ -110,6 +112,8 @@ public final class NpcBrain {
 	static final double PLAYER_NEAR = 6;
 	static final double BUBBLE_NEAR = 4.5;
 	static final double STEP_ASIDE = 0.8;
+	/** feat/npc-idle-wander: walking speed factor of a stroller whose thread needs attention (it runs to the board). */
+	static final double RUSH = 1.9;
 
 	private final String id;
 	private final SplittableRandom rnd;
@@ -148,6 +152,16 @@ public final class NpcBrain {
 	private @Nullable Anchor approach;
 	/** No route to {@link #approach}: stay put and gesture from here instead. */
 	private boolean approachStuck;
+	/** feat/npc-idle-wander: the stroll spot {@link IdleWander} sent the NPC to (IDLE/COMPLETED only); null = none. */
+	private @Nullable Anchor stroll;
+	private boolean strollSit;
+	private @Nullable Pos strollLook;
+	/** No route to {@link #stroll}: it was dropped; read once by {@link #takeStrollFailed}. */
+	private boolean strollFailed;
+	/** {@link #tick} count when the last stroll ended (a mode change right after it means "came from a stroll"). */
+	private int strollEndedTick = -100;
+	/** Running back from a stroll (ATTENTION): faster walk until arrived. */
+	private boolean rushing;
 
 	// Pose snapshot, valid after tick().
 	private float headYaw;
@@ -301,6 +315,48 @@ public final class NpcBrain {
 		return approach != null && mode == Mode.ATTENTION;
 	}
 
+	/**
+	 * feat/npc-idle-wander: stroll to {@code spot} (null = stop strolling: back to the normal IDLE /
+	 * COMPLETED behaviour, i.e. wander around home or rest). Only IDLE and COMPLETED (not while
+	 * celebrating) follow it; any other mode ignores it. Once there, the NPC stands (or sits, crouched,
+	 * when {@code sit}) and looks at {@code look} (null = looks around). Call before {@link #tick}.
+	 */
+	public void stroll(@Nullable Anchor spot, boolean sit, @Nullable Pos look) {
+		if (spot == null) {
+			if (stroll != null) {
+				stroll = null;
+				strollEndedTick = tick;
+			}
+			strollSit = false;
+			strollLook = null;
+			return;
+		}
+		if (stroll == null || spot.pos().distSqr(stroll.pos()) > 0.25) {
+			strollFailed = false;
+		}
+		stroll = spot;
+		strollSit = sit;
+		strollLook = look;
+	}
+
+	/** Standing on the stroll spot (route done, nothing pending). */
+	public boolean strollArrived() {
+		return stroll != null && strollActive() && !motion.walking() && pendingTo == null && goal != null
+				&& goal.distSqr(stroll.pos()) < 0.25 && pos.horizDist(target()) < 1.0;
+	}
+
+	/** True once after the stroll spot turned out unreachable (the brain dropped it). */
+	public boolean takeStrollFailed() {
+		boolean f = strollFailed;
+		strollFailed = false;
+		return f;
+	}
+
+	/** The current mode follows {@link #stroll}. */
+	private boolean strollActive() {
+		return stroll != null && (mode == Mode.IDLE || mode == Mode.COMPLETED && phase != Phase.CELEBRATING);
+	}
+
 	/** One tick. {@code player} is the local player's feet position or null. */
 	public void tick(Mode newMode, boolean isError, Targets t, @Nullable Pos player, Navigator nav) {
 		tick++;
@@ -384,6 +440,9 @@ public final class NpcBrain {
 
 	private void enter(Mode m, @Nullable Mode old, boolean first, Targets t, Navigator nav, @Nullable Pos player) {
 		phaseTicks = 0;
+		// feat/npc-idle-wander: needs attention while out strolling: run back, it is what the player must see.
+		rushing = m == Mode.ATTENTION && !first && (strollActive() || tick - strollEndedTick <= 3);
+		motion.setRush(rushing ? RUSH : 1.0);
 		crouch = false;
 		wanderFailures = 0;
 		goal = null;
@@ -428,8 +487,8 @@ public final class NpcBrain {
 		return switch (mode) {
 			case WORKING -> t.desk();
 			case ATTENTION -> approach != null ? (approachStuck ? null : approach) : t.boardSlot() != null ? t.boardSlot() : t.desk();
-			case COMPLETED -> phase == Phase.CELEBRATING ? null : t.rest();
-			case IDLE -> goal == null ? wanderPoint(t) : null;
+			case COMPLETED -> phase == Phase.CELEBRATING ? null : stroll != null ? stroll : t.rest();
+			case IDLE -> stroll != null ? stroll : goal == null ? wanderPoint(t) : null;
 		};
 	}
 
@@ -473,6 +532,19 @@ public final class NpcBrain {
 		}
 		pendingTo = null;
 		List<Pos> p = r.status() == Route.Status.FOUND ? r.points() : null;
+		if (p == null && strollActive() && to.distSqr(stroll.pos()) < 0.25) {
+			// feat/npc-idle-wander: unreachable stroll spot: drop it (IdleWander picks another later), no
+			// "no route" streak (never counts towards stranded), stand where we are.
+			strollFailed = true;
+			stroll = null;
+			strollEndedTick = tick;
+			goal = pos;
+			stand = null;
+			motion.stand(motion.yaw());
+			phase = restingPhase();
+			phaseTicks = 0;
+			return;
+		}
 		if (p == null && approaching() && to.equals(approach.pos())) {
 			// No way to the player: no teleport, no walking through walls; wave from here.
 			approachStuck = true;
@@ -565,6 +637,10 @@ public final class NpcBrain {
 	}
 
 	private void arrived() {
+		if (rushing) {
+			rushing = false;
+			motion.setRush(1.0);
+		}
 		phase = restingPhase();
 		phaseTicks = 0;
 		if (goal != null && pos.horizDist(target()) < 0.6) {
@@ -576,6 +652,9 @@ public final class NpcBrain {
 	private Phase restingPhase() {
 		if (mode == null) {
 			return Phase.WAITING;
+		}
+		if (strollActive()) {
+			return Phase.STROLL_PAUSE;
 		}
 		return switch (mode) {
 			case WORKING -> Phase.TYPING;
@@ -662,7 +741,7 @@ public final class NpcBrain {
 					emote = Emote.WAVE;
 				}
 				int pause = 70 + (int) (Math.abs(id.hashCode() % 90)) + Math.min(wanderFailures, 5) * 10;
-				if (phaseTicks > pause && mode == Mode.IDLE) {
+				if (phaseTicks > pause && mode == Mode.IDLE && stroll == null) {
 					goal = null; // currentAnchor() picks a new wander point next tick
 				}
 			}
@@ -690,10 +769,37 @@ public final class NpcBrain {
 					pitch = 0;
 				}
 			}
+			case STROLL_PAUSE -> strollPause(player, pd);
 			case WALKING -> {
 				// Standing with nothing to do (e.g. route found nothing): act as on the spot.
 				phase = restingPhase();
 			}
+		}
+	}
+
+	/** feat/npc-idle-wander: on a stroll spot: look at the sight (screen, NPC, desk), or look around; sit when it is a seat. */
+	private void strollPause(@Nullable Pos player, double pd) {
+		if (!strollActive()) {
+			phase = restingPhase(); // the stroll ended: back to the mode's own pause
+			phaseTicks = 0;
+			return;
+		}
+		crouch = strollSit;
+		emote = strollSit ? Emote.NONE : (phaseTicks / 120) % 4 == 3 ? Emote.MUSIC : Emote.NONE;
+		Pos look = strollLook;
+		if (look != null) {
+			float yaw = pos.yawTo(look);
+			motion.faceTowards(yaw);
+			headYaw = clampHead(yaw + (float) Math.sin(tick * 0.03 + id.length()) * 10, motion.yaw());
+			double d = Math.max(0.5, pos.horizDist(look));
+			pitch = (float) Math.max(-35, Math.min(30, -Math.toDegrees(Math.atan2(look.y() - (pos.y() + 1.6), d))));
+		} else {
+			headYaw = motion.yaw() + (float) Math.sin(tick * 0.04 + id.length()) * 40;
+			pitch = strollSit ? 10 : 0;
+		}
+		if (player != null && pd < 3.5) {
+			headYaw = clampHead(pos.yawTo(player), motion.yaw());
+			pitch = 0;
 		}
 	}
 

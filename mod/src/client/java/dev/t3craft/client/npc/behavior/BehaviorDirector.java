@@ -80,6 +80,12 @@ public final class BehaviorDirector {
 	private @Nullable ClientLevel navigationLevel;
 	/** Settled NPCs going home (item 22); null value = requested, starts next tick. Lazy: hot-swap safe. */
 	private @Nullable Map<String, @Nullable Departure> departures;
+	/** feat/npc-idle-wander: calm pinned NPCs strolling around the HQ. Lazy ({@link #wander()}): hot-swap safe. */
+	private @Nullable IdleWander wander;
+	private @Nullable WanderConfig wanderOverride;
+	private WanderConfig.@Nullable Watcher wanderConfig;
+	/** NPC ids of the threads pinned in T3 (null = read from the direct-mode shells, {@link #pinnedFromClient}). */
+	private java.util.function.@Nullable Supplier<Set<String>> pinnedThreads;
 
 	/**
 	 * Plug in a physical base (null = none, grid layout only). See {@link AnchorSource}.
@@ -106,6 +112,7 @@ public final class BehaviorDirector {
 		if (navigation != null) {
 			navigation.invalidate();
 		}
+		wander().layoutChanged();
 	}
 
 	/**
@@ -161,6 +168,46 @@ public final class BehaviorDirector {
 		return approachConfig.get();
 	}
 
+	/** feat/npc-idle-wander: force the stroll settings (null = read {@code npcWander} from {@code config/t3craft.json}). */
+	public void setWanderConfig(@Nullable WanderConfig cfg) {
+		this.wanderOverride = cfg;
+	}
+
+	/** feat/npc-idle-wander: where the pinned threads come from (null = the direct-mode shells). Called every 2 s at most. */
+	public void setPinnedThreads(java.util.function.@Nullable Supplier<Set<String>> source) {
+		this.pinnedThreads = source;
+	}
+
+	private WanderConfig wanderConfig() {
+		if (wanderOverride != null) {
+			return wanderOverride;
+		}
+		if (wanderConfig == null) {
+			wanderConfig = new WanderConfig.Watcher(net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir().resolve("t3craft.json"), 100);
+		}
+		return wanderConfig.get();
+	}
+
+	private IdleWander wander() {
+		return wander = dev.t3craft.debug.HotSwapFields.orInit(wander, IdleWander::new);
+	}
+
+	/** NPC ids ({@code env:threadId}) of the threads pinned in T3, from the direct-mode shells (empty in bridge mode). */
+	static Set<String> pinnedFromClient() {
+		dev.t3craft.client.T3CraftClient c = dev.t3craft.client.T3CraftClient.get();
+		dev.t3craft.t3.DirectController d = c == null ? null : c.direct();
+		if (d == null) {
+			return Set.of();
+		}
+		Set<String> out = new HashSet<>();
+		d.shellViews().forEach((env, v) -> v.threads().forEach(t -> {
+			if (t.pinned()) {
+				out.add(env + ":" + t.id());
+			}
+		}));
+		return out;
+	}
+
 	public @Nullable NpcBrain brain(String npcId) {
 		return brains.get(npcId);
 	}
@@ -194,6 +241,7 @@ public final class BehaviorDirector {
 	/** Forget one NPC (it was removed) and discard its overlay entities. */
 	public void forget(String npcId, @Nullable ClientLevel lvl) {
 		brains.remove(npcId);
+		wander().forget(npcId);
 		departures().remove(npcId);
 		Overlay o = overlays.remove(npcId);
 		if (o != null) {
@@ -211,6 +259,7 @@ public final class BehaviorDirector {
 		overlays.clear();
 		brains.clear();
 		departures().clear();
+		wander().reset();
 		approaches.reset();
 		anchorsBefore = null;
 		navigation = null;
@@ -267,6 +316,27 @@ public final class BehaviorDirector {
 		}
 		Map<String, Anchor> approachSpots = approaches.update(tick, approachConfig(), playerPos, candidates);
 
+		// feat/npc-idle-wander: strollers (spots, visits to working threads, routes off-thread).
+		IdleWander strollers = wander();
+		WanderConfig wanderCfg = wanderConfig();
+		List<IdleWander.Worker> working = List.of();
+		if (wanderCfg.enabled()) {
+			working = new ArrayList<>();
+			for (Body b : bodies) {
+				if (Mode.of(b.info().state()) == Mode.WORKING) {
+					Anchor d = anchors.desk(b.id(), b.info().groupId()); // the base's desks only, never the fallback grid
+					if (d != null) {
+						working.add(new IdleWander.Worker(b.id(), d));
+					}
+				}
+			}
+		}
+		java.util.function.Supplier<Set<String>> pinnedSrc = pinnedThreads != null ? pinnedThreads : BehaviorDirector::pinnedFromClient;
+		strollers.begin(tick, wanderCfg, layout, working, id -> {
+			NpcBrain nb = brains.get(id);
+			return nb == null ? null : nb.pos();
+		}, pinnedSrc, lvl);
+
 		Set<String> alive = new HashSet<>();
 		for (Body b : bodies) {
 			alive.add(b.id());
@@ -284,8 +354,11 @@ public final class BehaviorDirector {
 			NpcBrain.Targets t = new NpcBrain.Targets(desk, boardSlot, home, layout.wanderRadius(info.groupId()), rest);
 
 			Overlay o = overlays.computeIfAbsent(b.id(), id -> new Overlay());
-			if (departures().containsKey(b.id()) && depart(lvl, b, brain, o, layout, nav, playerPos)) {
-				continue;
+			if (departures().containsKey(b.id())) {
+				strollers.forget(b.id());
+				if (depart(lvl, b, brain, o, layout, nav, playerPos)) {
+					continue;
+				}
 			}
 			String summary = summaries.summary(b.id(), info);
 			if (o.seenSummary && !Objects.equals(summary, o.lastSummary)) {
@@ -295,7 +368,10 @@ public final class BehaviorDirector {
 			o.lastSummary = summary;
 
 			brain.approach(approachSpots.get(b.id()));
-			brain.tick(mode, "error".equals(info.state()), t, playerPos, nav);
+			boolean error = "error".equals(info.state());
+			IdleWander.Plan stroll = strollers.update(b.id(), mode, error, brain, mode == Mode.COMPLETED ? rest : home);
+			brain.stroll(stroll == null ? null : stroll.spot(), stroll != null && stroll.sit(), stroll == null ? null : stroll.look());
+			brain.tick(mode, error, t, playerPos, stroll == null ? nav : strollers.navigator(b.id(), nav));
 			rescue(brain, layout.spawn());
 			apply(lvl, b, brain, o, summary, playerPos);
 		}
@@ -304,6 +380,7 @@ public final class BehaviorDirector {
 				forget(id, lvl);
 			}
 		}
+		dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_NPC_WANDER, System.nanoTime() - strollers.spentNs());
 	}
 
 	/** Farther than this (blocks) from the way in, a stranded NPC is put back there; nearer, it stays. */

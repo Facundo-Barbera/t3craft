@@ -51,4 +51,22 @@ record LayeredAnchors(AnchorSource primary, AnchorSource fallback) implements An
 		Anchor a = primary.spawn();
 		return a != null ? a : fallback.spawn();
 	}
+
+	@Override
+	public List<Anchor> strollSpots() {
+		List<Anchor> a = primary.strollSpots();
+		return a.isEmpty() ? fallback.strollSpots() : a;
+	}
+
+	@Override
+	public List<Anchor> seats() {
+		List<Anchor> a = primary.seats();
+		return a.isEmpty() ? fallback.seats() : a;
+	}
+
+	@Override
+	public List<Pos> sights() {
+		List<Pos> a = primary.sights();
+		return a.isEmpty() ? fallback.sights() : a;
+	}
 }
