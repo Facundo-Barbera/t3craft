@@ -26,6 +26,8 @@ import net.minecraft.network.chat.MutableComponent;
  *   <li>{@code reload}: re-read {@code config/t3craft.json}, paired environments and credentials, reconnect.</li>
  *   <li>{@code pair}: open the pairing screen (read + operate by default); {@code pair --read-only}: only {@code orchestration:read}. {@code unpair <env>}: forget an environment.</li>
  *   <li>{@code envs}: list paired environments (no secrets).</li>
+ *   <li>{@code answer <env:threadId>}: the T3 screen on that thread, where its pending question or
+ *   approval card is (feat/t3-user-input; the needs-input notice links to it).</li>
  *   <li>{@code operate}: control (operate) status per environment; {@code operate enable <env>} opens
  *   "Enable control" for an environment paired read-only; {@code operate revoke <env>} deletes the local operate token.</li>
  * </ul>
@@ -85,6 +87,13 @@ public final class T3CraftCommands {
 						})))
 				.then(dev.t3craft.client.operate.OperateCommands.build(client))
 				.then(dev.t3craft.client.operate.ThreadControlUi.commands()) // feat/op-stop: operate interrupt|stop
+				// feat/t3-user-input: open the T3 screen on a thread (its pending question / approval card);
+				// the "[Answer]" link of a needs-input notice runs it
+				.then(literal("answer").then(argument("thread", StringArgumentType.greedyString()).executes(c -> {
+					String key = StringArgumentType.getString(c, "thread").strip();
+					client.openNextTick(dev.t3craft.client.chat.ChatScreens.create(key.isEmpty() ? null : key));
+					return 1;
+				})))
 				.then(literal("envs").executes(c -> {
 					var list = new Environments(ModConfig.dataDir()).list();
 					if (list.isEmpty()) {

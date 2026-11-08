@@ -1,6 +1,7 @@
 package dev.t3craft.client.chat;
 
 import com.google.gson.JsonObject;
+import dev.t3craft.client.chat.request.PendingRequest;
 import dev.t3craft.t3.Json;
 import dev.t3craft.t3.ThreadState;
 import java.util.ArrayList;
@@ -40,7 +41,8 @@ public final class ChatTranscript {
 	private record Run(String id, long ordinal, String status) {
 	}
 
-	private record Request(String id, String nodeId, String kind, String status, @Nullable Long createdAt) {
+	private record Request(String id, String nodeId, String kind, String status, @Nullable Long createdAt, String capability,
+			boolean supportsFeedback) {
 	}
 
 	private static final Set<String> RUN_ACTIVE = Set.of("preparing", "queued", "starting", "running");
@@ -49,6 +51,13 @@ public final class ChatTranscript {
 	private final List<ChatEntry> entries = new ArrayList<>();
 	private final Map<String, Run> runs = new LinkedHashMap<>();
 	private final Map<String, Request> requests = new LinkedHashMap<>();
+	/**
+	 * feat/t3-user-input: the latest {@code user_input_request} / {@code approval_request} turn item
+	 * of this thread per {@code requestId} (the questions and options of a pending request live on
+	 * the item, not on the runtime request, as T3's {@code derivePendingThreadRequests}).
+	 */
+	private final Map<String, JsonObject> requestItems = new LinkedHashMap<>();
+	private @Nullable List<PendingRequest> pendingCache;
 	/** nodeId → readable name for subagent nodes ("who needs it"). */
 	private final Map<String, String> subagents = new LinkedHashMap<>();
 	private String title = "";
@@ -199,6 +208,7 @@ public final class ChatTranscript {
 		var rows = Json.arr(projection, "visibleTurnItems");
 		if (rows != null) {
 			for (JsonObject row : TurnItems.objects(rows)) {
+				noteRequestRow(row);
 				ChatEntry e = TurnItems.decodeRow(row, threadId);
 				if (e != null) {
 					seen.putIfAbsent(e.key(), e);
@@ -207,6 +217,7 @@ public final class ChatTranscript {
 		} else {
 			// Older servers: fall back to the thread's own turn items.
 			for (JsonObject ti : TurnItems.objects(Json.arr(projection, "turnItems"))) {
+				noteRequestItem(ti);
 				ChatEntry e = TurnItems.decode(ti, threadId, false);
 				if (e != null) {
 					seen.putIfAbsent(e.key(), e);
@@ -233,6 +244,11 @@ public final class ChatTranscript {
 			}
 		}
 		entries.addAll(seen.values());
+		// the thread's own turn items carry the questions even when the visible window is bounded
+		if (rows != null) {
+			TurnItems.objects(Json.arr(projection, "turnItems")).forEach(this::noteRequestItem);
+		}
+		requestItems.keySet().retainAll(requests.keySet());
 		return true;
 	}
 
@@ -254,7 +270,10 @@ public final class ChatTranscript {
 			return applyThread(payload);
 		}
 		return switch (type) {
-			case "turn-item.updated" -> upsert(TurnItems.decode(payload, threadId, false));
+			case "turn-item.updated" -> {
+				noteRequestItem(payload);
+				yield upsert(TurnItems.decode(payload, threadId, false));
+			}
 			case "message.updated" -> applyMessage(payload);
 			case "run.created", "run.updated" -> applyRun(payload);
 			case "runtime-request.updated" -> applyRequest(payload);
@@ -272,6 +291,7 @@ public final class ChatTranscript {
 		entries.forEach(e -> current.put(e.key(), e));
 		List<ChatEntry> older = new ArrayList<>();
 		for (JsonObject row : TurnItems.objects(Json.arr(page, "items"))) {
+			noteRequestRow(row);
 			ChatEntry e = TurnItems.decodeRow(row, threadId);
 			if (e != null && !current.containsKey(e.key())) {
 				current.put(e.key(), e);
@@ -354,9 +374,60 @@ public final class ChatTranscript {
 		if (id == null) {
 			return false;
 		}
+		JsonObject cap = Json.obj(r, "responseCapability");
 		Request req = new Request(id, String.valueOf(Json.str(r, "nodeId")), String.valueOf(Json.str(r, "kind")),
-				String.valueOf(Json.str(r, "status")), Json.time(r, "createdAt"));
+				String.valueOf(Json.str(r, "status")), Json.time(r, "createdAt"), cap == null ? "live" : String.valueOf(Json.str(cap, "type")),
+				Json.bool(cap, "supportsFeedback"));
 		return !req.equals(requests.put(id, req));
+	}
+
+	/** A {@code visibleTurnItems} / history row: only the thread's own items (a child's request is answered in the child). */
+	private void noteRequestRow(JsonObject row) {
+		String source = Json.str(row, "sourceThreadId");
+		if ("inherited".equals(Json.str(row, "visibility")) || source != null && !source.equals(threadId)) {
+			return;
+		}
+		noteRequestItem(Json.obj(row, "item"));
+	}
+
+	private void noteRequestItem(@Nullable JsonObject item) {
+		String type = Json.str(item, "type");
+		if (!"user_input_request".equals(type) && !"approval_request".equals(type)) {
+			return;
+		}
+		String src = Json.str(item, "threadId");
+		if (src != null && !src.equals(threadId)) {
+			return;
+		}
+		String rid = Json.str(item, "requestId");
+		if (rid != null && !rid.isEmpty()) {
+			requestItems.put(rid, item.deepCopy());
+			pendingCache = null;
+		}
+	}
+
+	/**
+	 * feat/t3-user-input: the requests this thread waits on, oldest first, each with what its card
+	 * needs (questions and options, or the approval's detail and choices), as T3's
+	 * {@code derivePendingThreadRequests}: a {@code user_input} without its turn item is left out
+	 * (nothing to ask), {@code auth_refresh} and {@code dynamic_tool_call} are not answered here.
+	 * Cached until the next change.
+	 */
+	public synchronized List<PendingRequest> pendingRequests() {
+		if (pendingCache == null) {
+			List<PendingRequest> out = new ArrayList<>();
+			requests.values().stream().filter(r -> "pending".equals(r.status()))
+					.sorted(Comparator.comparing(r -> r.createdAt() == null ? 0L : r.createdAt()))
+					.forEach(r -> {
+						PendingRequest p = PendingRequest.of(threadId, r.id(), r.kind(), r.createdAt(), r.capability(), r.supportsFeedback(),
+								requestItems.get(r.id()));
+						if (p != null) {
+							out.add(p);
+						}
+					});
+			pendingCache = List.copyOf(out);
+		}
+		return pendingCache;
 	}
 
 	private boolean applySubagent(JsonObject s) {
@@ -374,6 +445,7 @@ public final class ChatTranscript {
 	private void touch() {
 		version++;
 		cached = null;
+		pendingCache = null;
 	}
 
 	/** Immutable copy for the render thread; cached until the next change. */
