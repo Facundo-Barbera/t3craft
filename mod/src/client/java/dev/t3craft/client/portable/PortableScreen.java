@@ -106,7 +106,7 @@ public final class PortableScreen extends Screen {
 		notificationsTab = addRenderableWidget(Button.builder(Component.literal("Notifications"), b -> showNotifications())
 				.bounds(x1 - tabW - 6, y0 + 4, tabW, 16).build());
 		// feat/archive-terminal: the archive screen (the way in without the blocks module's terminal)
-		addRenderableWidget(Button.builder(Component.translatable("t3craft.archive.portable"), b -> dev.t3craft.client.archive.ArchiveClient.openIfReady())
+		addRenderableWidget(Button.builder(Component.translatable("t3craft.archive.portable"), b -> dev.t3craft.client.archive.ArchiveClient.openIfReady(this))
 				.bounds(x1 - 2 * tabW - 10 - 64, y0 + 4, 60, 16).build());
 		openButton = addRenderableWidget(Button.builder(Component.literal("Open chat"), b -> openSelected())
 				.bounds(x1 - 96, y1 - 22, 90, 16).build());
@@ -315,10 +315,12 @@ public final class PortableScreen extends Screen {
 
 		PortableState s = nav.state();
 		g.text(font, "T3 TERMINAL", x0 + 8, y0 + 6, ACCENT);
+		// Clipped left of the Archive button (x1 - 254): the old x1 - x0 - 210 ran 52 px under it.
+		int headW = PortableNav.headerTextWidth(x1 - x0);
 		if (flash != null) {
-			g.text(font, font.plainSubstrByWidth(flash, x1 - x0 - 210), x0 + 8, y0 + 16, 0xFFFFAA00);
+			g.text(font, font.plainSubstrByWidth(flash, headW), x0 + 8, y0 + 16, 0xFFFFAA00);
 		} else {
-			g.text(font, font.plainSubstrByWidth("read-only · " + s.sourceLabel(), x1 - x0 - 210), x0 + 8, y0 + 16, DIM);
+			g.text(font, font.plainSubstrByWidth("read-only · " + s.sourceLabel(), headW), x0 + 8, y0 + 16, DIM);
 		}
 		g.fill(x0 + 4, y0 + 26, x1 - 4, y0 + 27, BORDER);
 

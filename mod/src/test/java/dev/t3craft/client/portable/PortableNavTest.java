@@ -126,4 +126,14 @@ class PortableNavTest {
 		assertFalse(nav.focusThread(null));
 		assertEquals(PortableNav.Page.NOTIFICATIONS, nav.page());
 	}
+
+	@Test
+	void headerTextStopsLeftOfTheArchiveButton() {
+		for (int w = 100; w <= 440; w++) {
+			int archiveX = w - 2 * 90 - 10 - 64; // PortableScreen: x1 - 2 * tabW - 10 - 64
+			int textRight = 8 + PortableNav.headerTextWidth(w);
+			org.junit.jupiter.api.Assertions.assertTrue(textRight <= Math.max(8, archiveX - 4), "panel width " + w);
+			org.junit.jupiter.api.Assertions.assertTrue(PortableNav.headerTextWidth(w) >= 0);
+		}
+	}
 }
