@@ -289,6 +289,15 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 		if (d == null) {
 			return;
 		}
+		long t0 = System.nanoTime();
+		try {
+			refreshDirect(mc, d);
+		} finally {
+			dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_SHELL_REFRESH, t0);
+		}
+	}
+
+	private void refreshDirect(Minecraft mc, DirectController d) {
 		List<dev.t3craft.t3.NpcView> views = d.npcs(System.currentTimeMillis());
 		// feat/npc-helpers: with helpers on, subagents never get a desk/NPC of their own (even with
 		// includeSubagents); they follow their parent instead. Filtered before the registry, so every
@@ -302,6 +311,13 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 
 		for (dev.t3craft.t3.Transitions.Transition t : dev.t3craft.t3.Transitions.between(lastViews, views, syncedEnvs)) {
 			Notifier.transition(mc, t.npcId(), t.title(), t.text(), t.color(), t.sound().name().toLowerCase(), true);
+		}
+		if (dev.t3craft.debug.HitchWatch.get().enabled() && !lastViews.isEmpty()) {
+			for (dev.t3craft.t3.NpcView v : views) {
+				if (!lastViews.containsKey(v.id())) {
+					dev.t3craft.debug.HitchWatch.mark("thread+ " + v.id()); // fix/new-thread-hitch: context for [hitch] reports
+				}
+			}
 		}
 		lastViews.clear();
 		views.forEach(v -> lastViews.put(v.id(), v));

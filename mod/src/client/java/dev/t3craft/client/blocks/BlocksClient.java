@@ -404,6 +404,15 @@ public final class BlocksClient implements ClientModInitializer {
 		if (source == null || mc.level == null || ticks % HQ_SYNC_TICKS != 0) {
 			return;
 		}
+		long t0 = System.nanoTime();
+		try {
+			syncHq(mc, server, source);
+		} finally {
+			dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_HQ_SYNC, t0);
+		}
+	}
+
+	private void syncHq(Minecraft mc, IntegratedServer server, Supplier<@Nullable Map<Long, Binding>> source) {
 		Map<Long, Binding> now;
 		try {
 			now = source.get();

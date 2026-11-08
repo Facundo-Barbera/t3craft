@@ -115,6 +115,41 @@ than 1 ms per client tick on average):
 
 To bisect a module: `/t3dev disable <module>` and watch the FPS (and `/t3dev enable <module>`).
 
+### Hitches that no step explains: `/t3dev perf hitches` (fix/new-thread-hitch)
+
+`dev.t3craft.debug.HitchWatch` times every frame (end of one level render to the next, client ticks
+included), every client tick and every integrated-server tick, independent of the `PerfStats` steps.
+A daemon thread takes `Thread.getStackTrace()` of the render and server threads every 5 ms, **only
+while** the current frame / server tick already ran over 30 ms (normal frames cost two `nanoTime`).
+A frame or tick over 50 ms logs one WARN in latest.log:
+
+```
+[hitch] frame 184.2 ms on Render thread (client tick inside: 171.0 ms); 31 sample(s) every 5 ms after 30 ms; GC 12 ms; fps 58
+  ours (dev.t3craft, inclusive):
+    28/31 client.npc.NpcRegistry.reconcile:212      <- our method on the stack in 28 of 31 samples
+    ...
+  deepest game frame (net.minecraft / dev.t3craft / blaze3d):
+    19/31 net.minecraft.world.level.lighting.LevelLightEngine.runLightUpdates:...   <- what was really running
+  leaf:
+    ...                                              <- raw top of the stack (JDK / LWJGL / park = waiting)
+  most common stack: <deepest ours> → <deepest game frame> → <leaf>
+  server thread meanwhile: ...
+  during: thread+ env:abc [Render thread, -40 ms]; step build.job_new 6.1 ms [Server thread, +12 ms]
+```
+
+How to read it: `ours` = which of our methods the time went through (inclusive; the first line is
+usually the culprit's caller); `deepest game frame` = the engine or our code at the very top of the
+stack (light engine, chunk section rebuild, texture upload, JSON, file I/O…); `leaf` showing
+`Unsafe.park` / `Object.wait` = the thread was *waiting* (look at `server thread meanwhile`); no
+samples + GC = a garbage collection pause. `during` lists the marks (`HitchWatch.mark`: thread
+appeared, NPC / workstation spawned, crew spawned…) and every timed step of 2 ms or more from 250 ms
+before the hitch to its end. Frames stretched by the game's frame limiter (unfocused / AFK) are
+dropped. At most 4 detailed reports per 5 s; the rest are counted in the next one.
+
+`/t3dev perf hitches` lists the last 20 (time, kind, ms, top method). Config (additive, not written):
+`config/t3craft.json` → `"debug": {"hitches": true, "hitchMs": 50}`; default on in a dev
+environment, `-Dt3craft.hitches=false` turns it off.
+
 ### fix/hq-fps: what made the FPS drop after the HQ was built
 
 Static review of every per-tick / per-frame callback plus work-count tests and microbenchmarks

@@ -89,17 +89,39 @@ public final class DemoHqSource implements DemoStructureSource {
 		return !failed;
 	}
 
+	/**
+	 * fix/new-thread-hitch: everything {@link #prepare} computes, built off the client thread by
+	 * {@link #prepareLater} and installed by {@link #adopt}.
+	 */
+	public record Prepared(String layoutId, @Nullable String pendingLayout, DemoHq.Roster roster, DemoHq.Step step, int packs) {
+	}
+
 	@Override
 	public void prepare(DemoMarker built, DemoWorldSpec spec, int worldMinY) {
 		try {
-			// feat/hq-layouts: plan with the layout the HQ is built with, or the configured one on an empty world
-			String builtLayout = dev.t3craft.client.hq.layout.HqLayoutState.fromMarker(built.structure(), built.state());
-			String configured = dev.t3craft.hq.layout.HqLayouts.resolve(configuredLayout.get()).id();
-			String effective = effectiveLayout(builtLayout, configured);
-			dev.t3craft.hq.layout.HqLayouts.use(effective);
-			layoutId = effective;
-			pendingLayout = builtLayout != null && !builtLayout.equals(configured) ? configured : null;
-			DemoHq.Roster r = DemoHq.chooseRoster(live.get());
+			adopt(prepareLater(built, spec, worldMinY).get());
+		} catch (RuntimeException e) {
+			fail(e);
+		}
+	}
+
+	/**
+	 * fix/new-thread-hitch: the client-thread half of {@link #prepare}: reads the live roster and the
+	 * configured layout, selects the layout, and returns the heavy half (layout plan, old plan, diff,
+	 * baked parts, plan fingerprint) as a pure supplier for a background worker. Install its result with
+	 * {@link #adopt} on the client thread ({@link #fail} if it threw).
+	 */
+	public Supplier<Prepared> prepareLater(DemoMarker built, DemoWorldSpec spec, int worldMinY) {
+		// feat/hq-layouts: plan with the layout the HQ is built with, or the configured one on an empty world
+		String builtLayout = dev.t3craft.client.hq.layout.HqLayoutState.fromMarker(built.structure(), built.state());
+		String configured = dev.t3craft.hq.layout.HqLayouts.resolve(configuredLayout.get()).id();
+		String effective = effectiveLayout(builtLayout, configured);
+		dev.t3craft.hq.layout.HqLayouts.use(effective);
+		String pending = builtLayout != null && !builtLayout.equals(configured) ? configured : null;
+		DemoHq.Roster r = DemoHq.chooseRoster(live.get());
+		int packs = dev.t3craft.hq.pack.HqLayoutPacks.generation();
+		boolean builtWithThis = built.builtWith(this);
+		return () -> {
 			boolean ours = ID.equals(built.structure());
 			HqLayout previous = null;
 			int previousLift = -1;
@@ -120,22 +142,34 @@ public final class DemoHqSource implements DemoStructureSource {
 			// The floor layer is the lowest HQ cell whatever the roster: use the empty HQ to size the lift.
 			int planMinY = HqPlans.generate(HqLayout.EMPTY).footprint().minY();
 			int lift = DemoHq.lift(spec.originY(), worldMinY, planMinY);
-			boolean diffable = built.builtWith(this) && previousLift == lift;
-			roster = r;
+			boolean diffable = builtWithThis && previousLift == lift;
 			// feat/hq-void-world: in a void world the HQ stands on its island (grown from the one already built)
 			DemoHq.Island island = spec.voidWorld() ? new DemoHq.Island(ours ? DemoHq.island(st) : null, starter(built, spec)) : null;
-			step = DemoHq.step(r.input(), previous, built.hash(), lift, diffable, previousFixtures, previous != null && previousLift == lift, previousPack,
-					island);
-			preparedInput = r.input();
-			preparedPacks = dev.t3craft.hq.pack.HqLayoutPacks.generation();
-			failed = false;
-		} catch (RuntimeException e) {
-			T3Craft.LOGGER.error("[demo] HQ plan failed, falling back", e);
-			roster = null;
-			step = null;
-			preparedInput = null;
-			failed = true;
-		}
+			DemoHq.Step step = DemoHq.step(r.input(), previous, built.hash(), lift, diffable, previousFixtures,
+					previous != null && previousLift == lift, previousPack, island);
+			step.plan().fingerprint(); // lazy SHA-256 over every placement: here, not in HqPresence on the client thread
+			return new Prepared(effective, pending, r, step, packs);
+		};
+	}
+
+	/** Client thread: installs a {@link #prepareLater} result. */
+	public void adopt(Prepared p) {
+		layoutId = p.layoutId();
+		pendingLayout = p.pendingLayout();
+		roster = p.roster();
+		step = p.step();
+		preparedInput = p.roster().input();
+		preparedPacks = p.packs();
+		failed = false;
+	}
+
+	/** Client thread: a prepare failed: the demo falls back to the next source. */
+	public void fail(Throwable e) {
+		T3Craft.LOGGER.error("[demo] HQ plan failed, falling back", e);
+		roster = null;
+		step = null;
+		preparedInput = null;
+		failed = true;
 	}
 
 	/** The starter island recorded in the marker, demo-relative (null when none was placed). */
