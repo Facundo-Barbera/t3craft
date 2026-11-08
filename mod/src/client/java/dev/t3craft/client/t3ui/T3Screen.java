@@ -86,6 +86,8 @@ public final class T3Screen extends Screen {
 	private @Nullable EditBox search;
 	private @Nullable T3HeaderActions headerActions;
 	private final List<Hit> hits = new ArrayList<>();
+	/** Composer controls with a popup (the model picker): input goes to them first while open. */
+	private final List<T3Slots.Popup> popups = new ArrayList<>();
 	/** Rows of the open menu (⋯ or project), drawn over everything. */
 	private final List<Hit> menuHits = new ArrayList<>();
 	private final Set<String> spansEnvs = new HashSet<>();
@@ -162,7 +164,13 @@ public final class T3Screen extends Screen {
 					conversation.scrollToEnd();
 				}
 			});
-			composer.setControls(slots.composerControls(this));
+			List<ComposerView.Control> controls = slots.composerControls(this, this::selectedTarget);
+			composer.setControls(controls);
+			controls.forEach(c -> {
+				if (c instanceof T3Slots.Popup p) {
+					popups.add(p);
+				}
+			});
 		}
 		if (conversation == null) {
 			ConversationPanel c = new ConversationPanel(source, theme);
@@ -766,6 +774,11 @@ public final class T3Screen extends Screen {
 		double my = event.y();
 		int button = event.button();
 		flash = null;
+		for (T3Slots.Popup p : popups) {
+			if (p.isOpen() && p.mouseClicked(mx, my, button)) {
+				return true;
+			}
+		}
 		if (menuOpen || projectMenuOpen) {
 			// the open menu's rows are the last hits; anything else closes it
 			for (Hit h : List.copyOf(menuHits)) {
@@ -839,6 +852,11 @@ public final class T3Screen extends Screen {
 
 	@Override
 	public boolean mouseScrolled(double x, double y, double scrollX, double scrollY) {
+		for (T3Slots.Popup p : popups) {
+			if (p.isOpen() && p.mouseScrolled(x, y, scrollY)) {
+				return true;
+			}
+		}
 		if (menuOpen || projectMenuOpen) {
 			return true;
 		}
@@ -855,6 +873,11 @@ public final class T3Screen extends Screen {
 	@Override
 	public boolean keyPressed(KeyEvent e) {
 		flash = null;
+		for (T3Slots.Popup p : popups) {
+			if (p.isOpen() && p.keyPressed(e)) {
+				return true;
+			}
+		}
 		// while the composer has focus every key is its own (Esc leaves it): no screen shortcut fires
 		if (composer != null && composer.focused() && composer.keyPressed(e)) {
 			return true;

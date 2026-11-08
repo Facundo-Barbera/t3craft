@@ -13,7 +13,7 @@ All entry points go through `ChatScreens.create(key)` (returns a `T3Screen`): `P
 
 ```
 ┌ sidebar ──────────────┐ ┌ thread ───────────────────────────────────────┐
-│ T3  12 threads · 2 ⋯  │ │ [env] project › Thread title      (● Working) │  header: breadcrumb + state chip
+│ T3  12 threads · 2 ⋯  │ │ [env] project › Thread title      (● Working) │  header: breadcrumb + ThreadStatusChip
 │ [ Search threads    ] │ │ [Interrupt][Stop][Settle][Snooze][Pin][…]     │  header actions
 │ [ ▾ All projects    ] │ ├───────────────────────────────────────────────┤
 │ [ + New thread      ] │ │ conversation (ConversationPanel, no header)   │
@@ -21,7 +21,7 @@ All entry points go through `ChatScreens.create(key)` (returns a `T3Screen`): `P
 │     ● Pinned one   2h │ │                                               │
 │ ▾ t3craft        ● 3  │ │                                               │
 │     ⚙ HQ layouts   5m │ ├───────────────────────────────────────────────┤
-│     ! Fix login    1h │ │ composer slot (bottom)                        │
+│     ! Fix login    1h │ │ composer [model picker ▾]          [Send]     │
 │ [Archive][Envs][Set.] │ └───────────────────────────────────────────────┘
 └───────────────────────┘
 ```
@@ -65,17 +65,21 @@ or Esc goes back to the list.
   archive) are read-only: no actions, no composer.
 - Visuals: AgentCraft's warm-studio chat theme (`ChatTheme`, `ChatDraw`).
 
-## Slots for the parallel branches (`T3Slots`)
+## Components of the parallel branches (mounted)
 
-`T3Screen` only talks to `T3Slots`; mounting a component is a change there:
+Both branches were merged into this one (`origin/feat/chat-compose` 627e8e0, `origin/feat/t3-actions`
+0334fb2) because they were not on main yet. `T3Screen` only talks to `T3Slots`:
 
-| Slot | Component | Fallback on main |
+| Where | Component | How |
 |---|---|---|
-| composer (bottom of the thread panel) | feat/chat-compose `ComposerView` via `ChatComposer.create/attach/sync`: the conversation draws it as its `Footer`; `T3Screen` owns it (drafts survive dialogs) and forwards keys (all keys while focused, Esc leaves), chars, drag and scroll. **Mounted** (branch merged into this one). | — |
-| `composerControls()` (composer bar's left slot, `ComposerView.Control`) | feat/t3-actions `ModelPicker` | none |
-| `newThread(...)` (sidebar button, Ctrl+N, menu) | feat/t3-actions `NewThreadDialog` | `NewThreadScreen` |
-| `menuItems(...)` → "Register project…" | feat/t3-actions `RegisterProjectDialog` | not shown |
-| `drawStatusChip(...)` (header) | feat/t3-actions `ThreadStatusChip` | pill with the attention word |
+| Bottom of the thread panel | feat/chat-compose `ComposerView` | `ChatComposer.create/attach/sync`: the conversation draws it as its `Footer`; `T3Screen` owns it (drafts survive dialogs) and forwards keys (all keys while focused, Esc leaves), chars, drag and scroll. Read-only (archive): none. |
+| Composer bar, left slot | feat/t3-actions `ModelPicker` (provider · model · effort, access, plan) | `ModelPickerControl` (a `ComposerView.Control`), one picker per thread from `ModelPick.fromMeta(shell.meta())`; its popup gets clicks/keys/scroll first while open (`T3Slots.Popup`). |
+| Header, right | feat/t3-actions `ThreadStatusChip` / `ThreadStatus.of(shell)` | `T3Slots.drawStatusChip`; without a shell (bridge mode) a pill with the attention word. |
+| Sidebar "New thread", Ctrl+N, ⋯ | feat/t3-actions `NewThreadDialog` | environment from the selected thread, project from the sidebar filter (or the selected thread's project) mapped to a real T3 project by `ProjectMatch` (same name, selected environment first); the created thread is selected in the screen. |
+| ⋯ menu | feat/t3-actions `RegisterProjectDialog`, `ActionsClient.archive` | "Register project…", "Archive thread" (destructive, asks first). |
+
+feat/t3-actions' `ThreadActionsBar` is not used: the header keeps `T3HeaderActions` (Interrupt, Stop,
+Settle, Snooze, Pin, Unpin, Read) and Archive lives in the menu.
 
 ## Keys
 
