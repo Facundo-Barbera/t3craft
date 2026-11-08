@@ -87,7 +87,7 @@ public final class HqPresence {
 	 * only on the game's own server ({@code hasSingleplayerServer}), with a standing, ready HQ
 	 * ({@link Standing#ready}) in the player's dimension. Never true on a remote server.
 	 */
-	public static boolean allows(@Nullable net.minecraft.client.Minecraft mc) {
+	public static boolean allows(net.minecraft.client.@Nullable Minecraft mc) {
 		if (mc == null || mc.level == null || mc.player == null || !mc.hasSingleplayerServer()) {
 			return false;
 		}
@@ -106,7 +106,7 @@ public final class HqPresence {
 	}
 
 	/** The standing HQ only when {@link #allows} lets it be shown here, else null. */
-	public static @Nullable Standing shown(@Nullable net.minecraft.client.Minecraft mc) {
+	public static @Nullable Standing shown(net.minecraft.client.@Nullable Minecraft mc) {
 		return allows(mc) ? current() : null;
 	}
 
