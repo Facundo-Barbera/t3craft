@@ -45,13 +45,18 @@ final class HqLighting {
 	static final int GRID = 5;
 	/** Farthest a fallback lamp may be from the dark cell it is for (blocks, each axis). */
 	private static final int REACH = 4;
+	/** How far above a group's own blocks its light sees air (feet, head and one more). */
+	private static final int AIRSPACE = 3;
 	/** What a cell of another group is to a group's light: opaque. */
 	private static final BlockState OTHER = Blocks.STONE.defaultBlockState();
 
 	private final BuildPlan plan;
 	private final HqStyle style;
 	private final Map<BlockPos, String> groups;
+	/** Cells of the classic desk modules above their floor: air to the walk estimate (taken or vacant alike). */
 	private final Set<BlockPos> desks = new HashSet<>();
+	/** The desk rows among {@link #desks}: opaque to the light estimate (a taken desk shades), taken or vacant alike. */
+	private final Set<BlockPos> deskSolid = new HashSet<>();
 	/** Dense copy of the view over the plan's bounds (+1): group index (-1: nobody) and state (desks as air, lamps in). */
 	private final int minX;
 	private final int minY;
@@ -97,14 +102,26 @@ final class HqLighting {
 			}
 			gid[index(e.getKey())] = id;
 		}
+		// classic desk modules (wing_<i>_desk_<slot>): above their floor, the desk row (drawer, top, screen) is
+		// opaque to the light and the standing row is air, taken or vacant alike
+		java.util.regex.Pattern deskId = java.util.regex.Pattern.compile("wing_(\\d+)_desk_(\\d+)");
 		for (BuildPlan.Module m : plan.modules()) {
-			if (m.id().contains("_desk_") && !m.sparse()) {
-				Box b = m.box();
-				for (int y = b.minY() + 1; y <= b.maxY(); y++) {
-					for (int z = b.minZ(); z <= b.maxZ(); z++) {
-						for (int x = b.minX(); x <= b.maxX(); x++) {
-							if (m.owns(x, y, z)) {
-								desks.add(new BlockPos(x, y, z));
+			java.util.regex.Matcher mt = deskId.matcher(m.id());
+			if (!mt.matches() || m.sparse()) {
+				continue;
+			}
+			int wing = Integer.parseInt(mt.group(1));
+			int slot = Integer.parseInt(mt.group(2));
+			int deskZ = HqGeometry.wz(wing, HqGeometry.deskV(slot));
+			Box b = m.box();
+			for (int y = b.minY() + 1; y <= b.maxY(); y++) {
+				for (int z = b.minZ(); z <= b.maxZ(); z++) {
+					for (int x = b.minX(); x <= b.maxX(); x++) {
+						if (m.owns(x, y, z)) {
+							BlockPos p = new BlockPos(x, y, z);
+							desks.add(p);
+							if (z == deskZ) {
+								deskSolid.add(p);
 							}
 						}
 					}
@@ -112,8 +129,6 @@ final class HqLighting {
 			}
 		}
 		for (Workstation w : plan.workstations()) {
-			desks.addAll(w.screenCells());
-			desks.add(w.computerPos().below());
 			keep.addAll(w.screenCells());
 			keep.add(w.computerPos());
 			keep.add(w.computerPos().below());
@@ -193,15 +208,25 @@ final class HqLighting {
 		return s == null ? Blocks.AIR.defaultBlockState() : s;
 	}
 
-	/** The group a walkable cell belongs to: its feet cell's, or its floor's when nobody owns the feet. */
+	/**
+	 * The group a walkable cell belongs to: its floor's (so the lamp under it is the group's own), or its
+	 * feet cell's when the feet cell holds the walking surface (stairs, slabs, carpets) or nobody owns the floor.
+	 */
 	private String owner(BlockPos c) {
-		String g = groups.get(c);
-		return g != null ? g : groups.get(c.below());
+		String feet = groups.get(c);
+		String floor = groups.get(c.below());
+		if (floor == null || feet != null && !view(c).isAir()) {
+			return feet != null ? feet : floor;
+		}
+		return floor;
 	}
 
 	private void run(BlockPos spawn) {
 		Map<String, List<BlockPos>> byGroup = new TreeMap<>();
 		for (BlockPos c : reachable(spawn)) {
+			if (deskSolid.contains(c)) {
+				continue; // a free desk row: lit from the standing row next to it
+			}
 			String g = owner(c);
 			if (g != null) {
 				byGroup.computeIfAbsent(g, k -> new ArrayList<>()).add(c);
@@ -225,13 +250,7 @@ final class HqLighting {
 	/** Lights the walkable cells {@code walk} of group {@code g} with its own lamps only. */
 	private void lightGroup(String g, Box bounds, List<BlockPos> walk) {
 		int me = groupNames.indexOf(g);
-		HqLightMap light = HqLightMap.ofView(bounds, 1, (x, y, z) -> {
-			int i = index(x, y, z);
-			if (i < 0 || gid[i] < 0) {
-				return null;
-			}
-			return gid[i] == me ? cur[i] : OTHER;
-		});
+		HqLightMap light = HqLightMap.ofView(bounds, 1, (x, y, z) -> lightView(me, x, y, z));
 		walk.sort(Comparator.<BlockPos>comparingInt(BlockPos::getY).thenComparingInt(BlockPos::getZ).thenComparingInt(BlockPos::getX));
 		Set<BlockPos> walkSet = new HashSet<>(walk);
 		Set<Long> walkKeys = new HashSet<>();
@@ -268,6 +287,26 @@ final class HqLighting {
 				place(light, best, bestState);
 			}
 		}
+	}
+
+	/**
+	 * A cell as group {@code me}'s light sees it, from the group alone (so a neighbour that comes or goes
+	 * changes nothing): its own cells as they are (desk rows opaque, the rest of a desk air), the air over
+	 * its own floors (up to {@value #AIRSPACE} cells: where its people walk) as air, everything else opaque.
+	 */
+	private BlockState lightView(int me, int x, int y, int z) {
+		int i = index(x, y, z);
+		if (i >= 0 && gid[i] == me) {
+			BlockPos p = new BlockPos(x, y, z);
+			return deskSolid.contains(p) ? OTHER : cur[i];
+		}
+		for (int h = 1; h <= AIRSPACE; h++) {
+			int b = index(x, y - h, z);
+			if (b >= 0 && gid[b] == me && cur[b] != null) {
+				return null;
+			}
+		}
+		return OTHER;
 	}
 
 	private void place(HqLightMap light, BlockPos p, BlockState lamp) {

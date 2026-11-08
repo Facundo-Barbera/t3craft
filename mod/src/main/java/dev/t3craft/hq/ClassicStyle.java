@@ -136,11 +136,9 @@ final class ClassicStyle extends HqStyle {
 			// planters at the ends of the bench rows
 			c.decor(5 * sx, 1, -3, k.pottedFloweringAzalea);
 			c.decor(5 * sx, 1, 3, k.pottedFloweringAzalea);
-			// lamp pedestals by both doorways
-			for (int dz = -1; dz <= 1; dz += 2) {
-				c.set(2 * sx, 1, 7 * dz, k.copperGrate);
-				c.decor(2 * sx, 2, 7 * dz, k.copperLantern(false));
-			}
+			// lamp pedestals by the north doorway (the portico's lamp posts already frame the entrance)
+			c.set(2 * sx, 1, -7, k.copperGrate);
+			c.decor(2 * sx, 2, -7, k.copperLantern(false));
 		}
 		// runner from the entrance to the board
 		for (int z = 2; z <= 7; z++) {
