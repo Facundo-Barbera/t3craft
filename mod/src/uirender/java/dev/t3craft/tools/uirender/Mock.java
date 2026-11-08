@@ -10,7 +10,6 @@ import dev.t3craft.client.chat.ThreadRow;
 import dev.t3craft.client.t3ui.T3Screen;
 import dev.t3craft.client.t3ui.T3Slots;
 import dev.t3craft.client.t3ui.actions.ActionsClient;
-import dev.t3craft.client.t3ui.actions.NewThreadDialog;
 import dev.t3craft.client.t3ui.actions.ProjectsService;
 import dev.t3craft.client.t3ui.actions.ProviderService;
 import dev.t3craft.t3.Environments;
@@ -43,7 +42,7 @@ final class Mock {
 		this.fx = fx;
 	}
 
-	private @Nullable Fixture.Env env(String id) {
+	private Fixture.@Nullable Env env(String id) {
 		return fx.envs.stream().filter(e -> e.id().equals(id)).findFirst().orElse(null);
 	}
 
@@ -188,7 +187,7 @@ final class Mock {
 
 	// ---- screens ---------------------------------------------------------------------------------
 
-	/** The main screen, and for {@code new-thread} the dialog that opens over it (returned second). */
+	/** The main screen ({@code new-thread}: with a draft open), and a screen drawn over it if any. */
 	record Screens(T3Screen main, @Nullable Screen top) {
 	}
 
@@ -200,7 +199,7 @@ final class Mock {
 		JsonObject nt = fx.raw.has("newThread") && fx.raw.get("newThread").isJsonObject() ? fx.raw.getAsJsonObject("newThread") : new JsonObject();
 		String envId = nt.has("env") ? nt.get("env").getAsString() : fx.envs.isEmpty() ? null : fx.envs.get(0).id();
 		String projectId = nt.has("project") ? nt.get("project").getAsString() : null;
-		return new Screens(main, new NewThreadDialog(main, envId, projectId, (e, t) -> {
-		}));
+		// feat/t3-composer-fidelity: "New thread" is a draft row + the composer in the main screen, no dialog
+		return new Screens(main.withDraft(envId, projectId), null);
 	}
 }

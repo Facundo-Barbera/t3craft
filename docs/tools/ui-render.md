@@ -46,7 +46,7 @@ holds the Minecraft jars; the fixtures are classpath resources (`fixtures/*.json
 
 1. **Real screens.** `Mock` builds `new T3Screen(directory, source, actions, slots, selected)` with injected
    `ThreadDirectory`, `ChatSource` (answers `subscribeThread` synchronously with the fixture's snapshot, in the
-   real T3 stream format), `ConversationPanel.Actions`. The dialogs (`NewThreadDialog`) are built over it.
+   real T3 stream format), `ConversationPanel.Actions`. The `new-thread` scenario opens a draft (`T3Screen.withDraft`), as the game does since feat/t3-composer-fidelity.
    Nothing in the UI code was changed for this except one additive hook: `ModConfig.useDataDir(Path)`.
 2. **No game.** `Headless` allocates `Minecraft` without running its constructor (`Unsafe.allocateInstance`) and
    sets only what screens read: `font` (a real `Font` whose glyph advances come from the jar's bitmap fonts,

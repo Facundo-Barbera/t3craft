@@ -79,6 +79,11 @@ public final class DemoHq {
 			out.addAll(DemoHq.full(plan, lift)); // qualified: the record component full() hides the outer method
 			return out;
 		}
+
+		/** Nothing to build: this exact layout is already in the world. */
+		public boolean upToDate() {
+			return parts.isEmpty();
+		}
 	}
 
 	/**
@@ -92,12 +97,6 @@ public final class DemoHq {
 
 	/** Marker key of the island's core area (void worlds). */
 	public static final String ISLAND = "island";
-
-		/** Nothing to build: this exact layout is already in the world. */
-		public boolean upToDate() {
-			return parts.isEmpty();
-		}
-	}
 
 	// ---- roster -------------------------------------------------------------------------------
 

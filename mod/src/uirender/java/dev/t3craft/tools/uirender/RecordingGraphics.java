@@ -97,7 +97,7 @@ final class RecordingGraphics extends GuiGraphicsExtractor {
 	public void extractDeferredElements(int mouseX, int mouseY, float partialTick) {
 	}
 
-	private @Nullable Ops.Clip clip() {
+	private Ops.@Nullable Clip clip() {
 		return scissors.isEmpty() ? null : scissors.get(scissors.size() - 1);
 	}
 

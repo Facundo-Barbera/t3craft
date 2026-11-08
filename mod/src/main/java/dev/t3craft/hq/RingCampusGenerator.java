@@ -131,19 +131,4 @@ final class RingCampusGenerator {
 		canvas.anchor(Anchor.at(AnchorNames.SPAWN, CitadelFinish.SPAWN, Direction.NORTH));
 		return CitadelFinish.build(canvas);
 	}
-
-			}
-		}
-	}
-
-		}
-	}
-
-	/**
-		}
-	}
-
-	// ------------------------------------------------------------------ barrios
-
-	}
 }
