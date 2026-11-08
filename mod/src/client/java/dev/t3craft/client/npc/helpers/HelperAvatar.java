@@ -1,55 +1,65 @@
 package dev.t3craft.client.npc.helpers;
 
-import java.util.List;
+import com.mojang.authlib.GameProfile;
+import dev.t3craft.client.npc.AgentSkinTextures;
+import dev.t3craft.client.npc.AgentSkins;
+import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.client.player.RemotePlayer;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.world.entity.EntityTypes;
-import net.minecraft.world.entity.npc.villager.Villager;
-import net.minecraft.world.entity.npc.villager.VillagerProfession;
-import net.minecraft.world.entity.npc.villager.VillagerType;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.player.PlayerSkin;
 
 /**
- * A subagent drawn as a client-only baby villager (never sent to or known by any server). The
- * villager's biome type and profession are picked from the helper id, so each helper keeps its own
- * look; the name tag ({@code glyph title}) is tinted with the subagent's state colour.
+ * A subagent drawn as a small client-only player (never sent to or known by any server): the
+ * apprentice variant of its parent's agent skin ({@link AgentSkins#forHelper}: same face and shirt,
+ * plus an apron and a cap), at {@link #SCALE} of the parent's size. The name tag
+ * ({@code glyph title}) is tinted with the subagent's state colour.
  */
-final class HelperAvatar extends Villager {
-	static final List<ResourceKey<VillagerType>> TYPES = List.of(VillagerType.PLAINS, VillagerType.DESERT, VillagerType.JUNGLE,
-			VillagerType.SAVANNA, VillagerType.SNOW, VillagerType.SWAMP, VillagerType.TAIGA);
-	static final List<ResourceKey<VillagerProfession>> PROFESSIONS = List.of(VillagerProfession.LIBRARIAN, VillagerProfession.CARTOGRAPHER,
-			VillagerProfession.CLERIC, VillagerProfession.TOOLSMITH, VillagerProfession.MASON, VillagerProfession.FLETCHER);
+final class HelperAvatar extends RemotePlayer {
 	static final int TITLE_MAX = 22;
+	/** Model scale: about the height of the baby villagers helpers used to be. */
+	static final double SCALE = 0.6;
 
 	final String helperId;
-	private int variant = -1;
 	private Component label = Component.empty();
+	private AgentSkins.Pick pick = AgentSkins.DEFAULT;
+	private PlayerSkin skin;
 
 	HelperAvatar(ClientLevel level, String helperId) {
-		super(EntityTypes.VILLAGER, level);
+		super(level, new GameProfile(UUID.nameUUIDFromBytes(("t3craft-helper:" + helperId).getBytes(StandardCharsets.UTF_8)), "helper"));
 		this.helperId = helperId;
-		setBaby(true);
-		setNoAi(true);
+		this.skin = AgentSkinTextures.get(pick);
+		AttributeInstance scale = getAttribute(Attributes.SCALE);
+		if (scale != null) {
+			scale.setBaseValue(SCALE);
+		}
 		setNoGravity(true);
 		setSilent(true);
-		setCustomNameVisible(true);
 	}
 
 	void update(HelperView v) {
-		int want = v.variant(TYPES.size() * PROFESSIONS.size());
-		if (want != variant) {
-			variant = want;
-			// Built-in (static) registries: no dependency on what the server synced.
-			setVillagerData(getVillagerData()
-					.withType(BuiltInRegistries.VILLAGER_TYPE.getOrThrow(TYPES.get(want % TYPES.size())))
-					.withProfession(BuiltInRegistries.VILLAGER_PROFESSION.getOrThrow(PROFESSIONS.get(want / TYPES.size()))));
+		AgentSkins.Pick next = AgentSkins.forHelper(v.parentId(), AgentSkinTextures.envColor(AgentSkins.envOf(v.parentId())));
+		if (!next.equals(pick)) {
+			pick = next;
+			skin = AgentSkinTextures.get(next);
 		}
 		String title = dev.t3craft.t3.Presentation.clip(v.title().isBlank() ? "(subagent)" : v.title(), TITLE_MAX);
-		Component next = Component.literal(v.state().glyph + " " + title).withColor(v.color());
-		if (!next.equals(label)) {
-			label = next;
-			setCustomName(next);
+		Component nextLabel = Component.literal(v.state().glyph + " " + title).withColor(v.color());
+		if (!nextLabel.equals(label)) {
+			label = nextLabel;
 		}
+	}
+
+	@Override
+	public Component getDisplayName() {
+		return label;
+	}
+
+	@Override
+	public PlayerSkin getSkin() {
+		return skin;
 	}
 }
