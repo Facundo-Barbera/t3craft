@@ -35,7 +35,17 @@ import java.util.stream.Stream;
  */
 public final class RenderDaemon {
 	/** Pause new work while the 1-minute load average is above this. */
-	static final double LOAD_MAX = 8.0;
+	/** Pause while the 1-minute load average is above this; env RENDER_LOAD_MAX (default 8). */
+	static final double LOAD_MAX = loadMax();
+	private static double loadMax() {
+		try {
+			String v = System.getenv("RENDER_LOAD_MAX");
+			return v == null || v.isBlank() ? 8.0 : Double.parseDouble(v.strip());
+		} catch (NumberFormatException e) {
+			return 8.0;
+		}
+	}
+
 	static final long OUTBOX_MAX_AGE_MS = 24L * 60 * 60 * 1000;
 	/** A final render sorts as if it had arrived this much later than it did, so previews (cheap) go first, without starving finals. */
 	static final long FINAL_DELAY_MS = 10L * 60 * 1000;

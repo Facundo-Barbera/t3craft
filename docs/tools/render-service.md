@@ -84,7 +84,7 @@ The daemon also keeps `daemon.json` (heartbeat every 2 s: state, pid, queue leng
 - **One job at a time, one compilation at a time**, on a single worker. A single shared gradle daemon,
   `--offline`; the daemon JVM and gradle run `nice -n 19` / `ionice -c3`; the daemon has `-Xmx3g` and its
   render threads are capped (`RENDER_PARALLELISM`, default 6).
-- **Pause while the 1-minute load average is above 8**: the job waits (`message: paused: machine busy...`)
+- **Pause while the 1-minute load average is above 8** (`RENDER_LOAD_MAX` env when starting the daemon): the job waits (`message: paused: machine busy...`)
   and goes on when it drops.
 - **One pending request per agent.** A second request while the first is queued or running is rejected with
   a clear message; wait for the first (`submit.sh` waits by default). Repeated requests answered from the
