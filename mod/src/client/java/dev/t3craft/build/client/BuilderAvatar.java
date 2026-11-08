@@ -34,6 +34,8 @@ public final class BuilderAvatar extends RemotePlayer {
 	}
 
 	private static final double STEP_Y_PER_TICK = 0.35;
+	/** Ticks without progress before a builder on a path is put at its goal (only way out of a jam). */
+	static final int STUCK_TICKS = 60;
 
 	private final Component label;
 	private final UUID skinId;
@@ -42,6 +44,9 @@ public final class BuilderAvatar extends RemotePlayer {
 	private @Nullable Vec3 lookAt;
 	private double speed = 0.22;
 	private boolean swingWhenClose;
+	/** Waypoints still to walk (A* path, feet positions); the last one is {@link #target}. */
+	private final java.util.ArrayDeque<Vec3> path = new java.util.ArrayDeque<>();
+	private int stuckTicks;
 
 	public BuilderAvatar(ClientLevel level, String seed, String name, Ground ground) {
 		super(level, new GameProfile(uuid("t3craft-builder:" + seed), "builder"));
@@ -58,8 +63,22 @@ public final class BuilderAvatar extends RemotePlayer {
 
 	/** Walk toward {@code pos} (feet position) at {@code blocksPerTick}. */
 	public void walkTo(Vec3 pos, double blocksPerTick) {
+		this.path.clear();
 		this.target = pos;
 		this.speed = blocksPerTick;
+		this.stuckTicks = 0;
+	}
+
+	/** Walk along {@code waypoints} (feet positions, e.g. an A* path over the real blocks) to the last one. */
+	public void follow(java.util.List<Vec3> waypoints, double blocksPerTick) {
+		if (waypoints.isEmpty()) {
+			return;
+		}
+		this.path.clear();
+		this.path.addAll(waypoints);
+		this.target = waypoints.getLast();
+		this.speed = blocksPerTick;
+		this.stuckTicks = 0;
 	}
 
 	public void lookAt(@Nullable Vec3 point) {
@@ -98,7 +117,15 @@ public final class BuilderAvatar extends RemotePlayer {
 		Vec3 pos = position();
 		float yaw = getYRot();
 		boolean moving = false;
-		if (target != null) {
+		if (!path.isEmpty()) {
+			moving = followPath(pos);
+			if (moving) {
+				Vec3 head = path.peekFirst();
+				if (head != null) {
+					yaw = (float) (Mth.atan2(head.z - pos.z, head.x - pos.x) * (180 / Math.PI)) - 90f;
+				}
+			}
+		} else if (target != null) {
 			double dx = target.x - pos.x;
 			double dz = target.z - pos.z;
 			double dist = Math.sqrt(dx * dx + dz * dz);
@@ -130,6 +157,37 @@ public final class BuilderAvatar extends RemotePlayer {
 		setYRot(yaw);
 		setYHeadRot(yaw);
 		setYBodyRot(yaw);
+	}
+
+	/** One tick along the path: straight to the next waypoint, its height followed smoothly. */
+	private boolean followPath(Vec3 pos) {
+		Vec3 head = path.peekFirst();
+		while (head != null && horizontalDistance(pos, head) < 0.08 && Math.abs(pos.y - head.y) < 0.4) {
+			path.pollFirst();
+			head = path.peekFirst();
+		}
+		if (head == null) {
+			return false;
+		}
+		double dx = head.x - pos.x;
+		double dz = head.z - pos.z;
+		double dist = Math.sqrt(dx * dx + dz * dz);
+		double step = Math.min(speed, dist);
+		double nx = dist < 1e-6 ? pos.x : pos.x + dx / dist * step;
+		double nz = dist < 1e-6 ? pos.z : pos.z + dz / dist * step;
+		double ny = pos.y + Mth.clamp(head.y - pos.y, -STEP_Y_PER_TICK, STEP_Y_PER_TICK);
+		if (Math.abs(nx - pos.x) + Math.abs(nz - pos.z) + Math.abs(ny - pos.y) < 0.005) {
+			if (++stuckTicks >= STUCK_TICKS && target != null) {
+				snapTo(target.x, target.y, target.z, getYRot(), 0f); // out of a jam: the only teleport
+				path.clear();
+				stuckTicks = 0;
+				return false;
+			}
+		} else {
+			stuckTicks = 0;
+		}
+		setPos(nx, ny, nz);
+		return true;
 	}
 
 	private static double horizontalDistance(Vec3 a, Vec3 b) {
