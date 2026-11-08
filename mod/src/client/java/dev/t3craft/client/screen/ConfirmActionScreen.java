@@ -41,7 +41,8 @@ public final class ConfirmActionScreen extends Screen {
 	@Override
 	protected void init() {
 		int w = Math.min(320, width - 40);
-		int y = height / 2 + 40;
+		// below the (wrapped) text: a long thread title or warning used to run under the buttons
+		int y = DialogLayout.buttonsBelow(height, height / 2 + 40, textBottom(w));
 		addRenderableWidget(Button.builder(Component.translatable("t3craft.operate.confirm.yes", Component.translatable(action.kind().langKey()))
 				.withStyle(ChatFormatting.RED), b -> answer(true)).bounds(width / 2 - w / 2, y, w / 2 - 4, 20).build());
 		Button cancel = addRenderableWidget(Button.builder(CommonComponents.GUI_CANCEL, b -> answer(false))
@@ -69,22 +70,48 @@ public final class ConfirmActionScreen extends Screen {
 		return out;
 	}
 
-	@Override
-	public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float a) {
-		super.extractRenderState(g, mouseX, mouseY, a);
-		int w = Math.min(320, width - 40);
-		int y = height / 2 - 60;
-		g.centeredText(font, title.copy().withStyle(ChatFormatting.YELLOW), width / 2, y, 0xFFFFFFFF);
+	/** Top of the text block: centred-ish, but never above the screen on short windows. */
+	private int textTop() {
+		return Math.max(8, height / 2 - 60);
+	}
+
+	/** Where the text block ends for width {@code w} (same walk as the render, without drawing). */
+	private int textBottom(int w) {
+		return drawText(null, w);
+	}
+
+	/** Draws (when {@code g} is not null) the title, the wrapped lines and the warning; returns the bottom y. */
+	private int drawText(@Nullable GuiGraphicsExtractor g, int w) {
+		int x = width / 2 - w / 2;
+		int y = textTop();
+		if (g != null) {
+			g.centeredText(font, title.copy().withStyle(ChatFormatting.YELLOW), width / 2, y, 0xFFFFFFFF);
+		}
 		y += 18;
 		for (Component c : lines()) {
-			g.text(font, c, width / 2 - w / 2, y, 0xFFFFFFFF);
-			y += 12;
+			// wrapped: a long thread title or environment label ran past the dialog's edge
+			for (FormattedCharSequence s : font.split(c, w)) {
+				if (g != null) {
+					g.text(font, s, x, y, 0xFFFFFFFF);
+				}
+				y += font.lineHeight + 1;
+			}
+			y += 2;
 		}
 		y += 6;
 		for (FormattedCharSequence s : font.split(Component.translatable("t3craft.operate.confirm.warning").withStyle(ChatFormatting.RED), w)) {
-			g.text(font, s, width / 2 - w / 2, y, 0xFFFFFFFF);
+			if (g != null) {
+				g.text(font, s, x, y, 0xFFFFFFFF);
+			}
 			y += font.lineHeight;
 		}
+		return y;
+	}
+
+	@Override
+	public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float a) {
+		super.extractRenderState(g, mouseX, mouseY, a);
+		drawText(g, Math.min(320, width - 40));
 	}
 
 	@Override
