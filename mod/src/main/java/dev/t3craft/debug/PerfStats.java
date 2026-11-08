@@ -85,6 +85,7 @@ public final class PerfStats {
 		long ns = System.nanoTime() - startNs;
 		INSTANCE.add(key, ns);
 		INSTANCE.peak(key, ns);
+		HitchWatch.step(key, ns);
 		if (ns > STALL_WARN_NS) {
 			INSTANCE.add(STALLS, 1);
 			String line = String.format(java.util.Locale.ROOT, "%s %.1f ms on %s", stepName(key), ns / 1e6, Thread.currentThread().getName());

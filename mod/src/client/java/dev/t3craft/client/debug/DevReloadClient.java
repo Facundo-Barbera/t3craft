@@ -65,6 +65,8 @@ public final class DevReloadClient implements ClientModInitializer {
 		ClientCommandRegistrationCallback.EVENT.register((dispatcher, ctx) -> registerCommand(dispatcher));
 		// /t3dev perf: per-second rates over the last full second (one roll per second, a few map reads)
 		ClientTickEvents.END_CLIENT_TICK.register(mc -> PerfStats.get().roll(1_000_000_000L));
+		// fix/new-thread-hitch: frame/tick watchdog with stack samples of slow frames ([hitch] WARN, /t3dev perf hitches)
+		HitchWatchClient.init();
 		if (!pollingEnabled()) {
 			return;
 		}
@@ -98,8 +100,10 @@ public final class DevReloadClient implements ClientModInitializer {
 				.then(literal("perf")
 						.executes(c -> perf(c.getSource()))
 						.then(literal("steps").executes(c -> steps(c.getSource())))
+						.then(literal("hitches").executes(c -> hitches(c.getSource())))
 						.then(literal("reset").executes(c -> {
 							PerfStats.get().reset();
+							dev.t3craft.debug.HitchWatch.get().clear();
 							c.getSource().sendFeedback(prefix().append("perf counters reset"));
 							return 1;
 						})))
@@ -161,6 +165,27 @@ public final class DevReloadClient implements ClientModInitializer {
 		src.sendFeedback(prefix().append(stalls.size() + " recent slow step(s) (over " + (int) PerfStats.STALL_WARN_MS + " ms; WARN in latest.log):"));
 		for (String l : stalls) {
 			src.sendFeedback(Component.literal("  " + l).withStyle(ChatFormatting.RED));
+		}
+		return 1;
+	}
+
+	/**
+	 * fix/new-thread-hitch: the last slow frames / server ticks seen by {@link dev.t3craft.debug.HitchWatch}
+	 * (independent of the timed steps) with the method seen most in their stack samples; the full
+	 * report (methods, engine frames, stack, marks, GC) is the {@code [hitch]} WARN in latest.log.
+	 */
+	private static int hitches(FabricClientCommandSource src) {
+		dev.t3craft.debug.HitchWatch w = dev.t3craft.debug.HitchWatch.get();
+		java.util.List<dev.t3craft.debug.HitchWatch.Hitch> list = w.recent();
+		src.sendFeedback(prefix().append("watchdog " + (w.enabled() ? "on" : "off (config/t3craft.json debug.hitches)")
+				+ String.format(java.util.Locale.ROOT, ", over %.0f ms; ", w.reportMs()) + list.size() + " recent hitch(es), oldest first"
+				+ " (full report: [hitch] WARN in latest.log):"));
+		if (list.isEmpty()) {
+			src.sendFeedback(Component.literal("  (none)").withStyle(ChatFormatting.GRAY));
+		}
+		for (dev.t3craft.debug.HitchWatch.Hitch h : list) {
+			src.sendFeedback(Component.literal(String.format(java.util.Locale.ROOT, "  %s %s %.0f ms — %s", h.at(), h.kind(), h.ms(), h.summary()))
+					.withStyle(h.ms() > 100 ? ChatFormatting.RED : ChatFormatting.GOLD));
 		}
 		return 1;
 	}
