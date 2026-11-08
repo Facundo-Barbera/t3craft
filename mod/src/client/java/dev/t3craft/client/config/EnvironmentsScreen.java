@@ -2,6 +2,7 @@ package dev.t3craft.client.config;
 
 import dev.t3craft.client.config.EnvironmentActions.EnvRow;
 import dev.t3craft.client.config.T3CraftSettings.EnvPrefs;
+import dev.t3craft.client.screen.DialogLayout;
 import java.util.List;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -19,7 +20,8 @@ import org.jspecify.annotations.Nullable;
  * Paged so it fits any GUI scale. Shows ids, labels, URLs and connection status only: never a token.
  */
 public final class EnvironmentsScreen extends BaseConfigScreen {
-	private static final int ROW = 24;
+	/** Narrower text columns than this put a row's buttons on a line of their own. */
+	private static final int MIN_TEXT_W = 90;
 	private static final int BUTTONS = 4;
 	/** Width of the "Enable control" / "Revoke" button (wider than the other three). */
 	private static final int CONTROL_W = 96;
@@ -34,8 +36,14 @@ public final class EnvironmentsScreen extends BaseConfigScreen {
 		this.actions = actions;
 	}
 
+	/** Row layout for the current width: buttons beside the text, or under it when narrow. */
+	private DialogLayout.EnvRow rowLayout() {
+		return DialogLayout.EnvRow.of(listWidth(), BUTTONS_W, MIN_TEXT_W);
+	}
+
 	private int perPage() {
-		return Math.max(1, (height - 40 - 90) / ROW);
+		// rows from y = 36 down to the "< Pair new… Refresh >" row (height - 76), with a small gap
+		return DialogLayout.rowsPerPage(36, height - 80, rowLayout().rowH());
 	}
 
 	private int listWidth() {
@@ -52,11 +60,12 @@ public final class EnvironmentsScreen extends BaseConfigScreen {
 		int y = 36;
 		T3CraftSettings s = ConfigManager.get().settings();
 		int from = page * perPage();
+		DialogLayout.EnvRow layout = rowLayout();
 		for (int i = from; i < Math.min(rows.size(), from + perPage()); i++) {
 			EnvRow r = rows.get(i);
 			EnvPrefs p = s.env(r.id());
-			int ry = y + (i - from) * ROW;
-			int bx = x + w - BUTTONS_W;
+			int ry = y + (i - from) * layout.rowH() + layout.buttonsY();
+			int bx = x + layout.buttonsX();
 			addRenderableWidget(Button.builder(Component.literal(p.visible() ? "Hide" : "Show"), b -> {
 				ConfigManager.SaveResult res = ConfigManager.get().update(st -> st.withEnv(r.id(), st.env(r.id()).withVisible(!st.env(r.id()).visible())));
 				if (res.ok()) {
@@ -138,19 +147,29 @@ public final class EnvironmentsScreen extends BaseConfigScreen {
 		if (rows.isEmpty()) {
 			g.centeredText(font, Component.literal("No T3 environment paired yet. Use \"Pair new…\".").withStyle(ChatFormatting.YELLOW),
 					width / 2, y + 6, 0xFFFFFFFF);
-			g.centeredText(font, Component.literal("On the T3 host: " + dev.t3craft.t3.Pairing.pairingHostCommand(false, null)).withStyle(ChatFormatting.GRAY),
-					width / 2, y + 20, 0xFFFFFFFF);
-			g.centeredText(font, Component.literal("(read-only: " + dev.t3craft.t3.Pairing.pairingHostCommand(true, null) + ")").withStyle(ChatFormatting.DARK_GRAY),
-					width / 2, y + 32, 0xFFFFFFFF);
+			// wrapped to the list width: the host commands are longer than a narrow window
+			int ly = y + 20;
+			for (var line : font.split(Component.literal("On the T3 host: " + dev.t3craft.t3.Pairing.pairingHostCommand(false, null))
+					.withStyle(ChatFormatting.GRAY), w)) {
+				g.centeredText(font, line, width / 2, ly, 0xFFFFFFFF);
+				ly += font.lineHeight;
+			}
+			ly += 3;
+			for (var line : font.split(Component.literal("(read-only: " + dev.t3craft.t3.Pairing.pairingHostCommand(true, null) + ")")
+					.withStyle(ChatFormatting.DARK_GRAY), w)) {
+				g.centeredText(font, line, width / 2, ly, 0xFFFFFFFF);
+				ly += font.lineHeight;
+			}
 			return;
 		}
 		T3CraftSettings s = ConfigManager.get().settings();
 		int from = page * perPage();
-		int textW = w - BUTTONS_W - 16;
+		DialogLayout.EnvRow layout = rowLayout();
+		int textW = layout.textW();
 		for (int i = from; i < Math.min(rows.size(), from + perPage()); i++) {
 			EnvRow r = rows.get(i);
 			EnvPrefs p = s.env(r.id());
-			int ry = y + (i - from) * ROW;
+			int ry = y + (i - from) * layout.rowH();
 			int swatch = p.color() == null ? 0xFF555555 : 0xFF000000 | p.color();
 			g.fill(x, ry + 2, x + 6, ry + 18, swatch);
 			String name = p.labelOr(r.label()) + (p.visible() ? "" : "  (hidden)") + (actions.operateEnabled(r.id()) ? "  [control]" : "");

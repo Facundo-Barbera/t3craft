@@ -51,7 +51,9 @@ abstract class BaseConfigScreen extends Screen {
 	public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float a) {
 		super.extractRenderState(g, mouseX, mouseY, a);
 		g.centeredText(font, title, width / 2, 12, 0xFFFFFFFF);
-		g.centeredText(font, status, width / 2, height - 64, 0xFFFFFFFF);
+		// Under the lowest button row: at height - 64 the line sat on the "Environments… / Key binds…"
+		// and "< / Pair new… / Refresh / >" rows and was unreadable.
+		g.centeredText(font, status, width / 2, dev.t3craft.client.screen.DialogLayout.statusY(height, font.lineHeight), 0xFFFFFFFF);
 	}
 
 	@Override
