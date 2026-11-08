@@ -1,0 +1,13 @@
+{
+  "description": "Paired read-only (no operate session): the composer says Enable control, header actions are disabled.",
+  "environments": [{"id": "mini", "label": "Mini Acmesite", "status": "ok", "control": false}],
+  "projects": [{"env": "mini", "id": "p-docs", "title": "docs"}],
+  "threads": [
+    {"env": "mini", "id": "t1", "project": "p-docs", "title": "Write the API reference", "state": "working", "agoMin": 1, "transcript": "ro"},
+    {"env": "mini", "id": "t2", "project": "p-docs", "title": "Fix broken links", "state": "done", "agoMin": 90}
+  ],
+  "selected": "mini:t1",
+  "transcripts": {"ro": {"title": "Write the API reference", "runs": [{"id": "r1", "ordinal": 1, "status": "running"}], "items": [
+    {"type": "user_message", "text": "Escribe la referencia de la API."},
+    {"type": "assistant_message", "text": "Empiezo por los endpoints de `orchestration`.", "streaming": true}]}}
+}

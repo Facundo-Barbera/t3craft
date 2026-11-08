@@ -1,0 +1,19 @@
+{
+  "description": "The environment is unreachable: rows come from the disk cache of the last session (cached marker), the thread says it is offline.",
+  "cached": true,
+  "environments": [
+    {"id": "studio", "label": "Studio Mac", "status": "offline", "control": true},
+    {"id": "my-vps", "label": "my-vps", "status": "ok", "control": true}
+  ],
+  "projects": [
+    {"env": "studio", "id": "p-t3craft", "title": "t3craft"},
+    {"env": "my-vps", "id": "p-infra", "title": "infra"}
+  ],
+  "threads": [
+    {"env": "studio", "id": "t1", "project": "p-t3craft", "title": "fix/hq-builders-independent", "state": "working", "agoMin": 4},
+    {"env": "studio", "id": "t2", "project": "p-t3craft", "title": "feat/t3-composer-fidelity", "state": "done", "agoMin": 40},
+    {"env": "my-vps", "id": "t3", "project": "p-infra", "title": "Rotate the keys", "state": "idle", "agoMin": 300, "transcript": "ok"}
+  ],
+  "selected": "studio:t1",
+  "transcripts": {"ok": {"title": "Rotate the keys", "items": [{"type": "assistant_message", "text": "Done."}]}}
+}

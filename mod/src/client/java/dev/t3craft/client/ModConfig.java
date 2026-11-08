@@ -41,9 +41,18 @@ public record ModConfig(Mode mode, URI bridgeUrl, @Nullable String bridgeKey, Vi
 		return FabricLoader.getInstance().getConfigDir().resolve("t3craft.json");
 	}
 
+	/** tools/ui-render: a data dir to use instead of the game's (headless renders); null = the game's. */
+	private static volatile @Nullable Path dataDirOverride;
+
 	/** {@code config/t3craft/}: environments.json + credentials/. */
 	public static Path dataDir() {
-		return FabricLoader.getInstance().getConfigDir().resolve("t3craft");
+		Path o = dataDirOverride;
+		return o != null ? o : FabricLoader.getInstance().getConfigDir().resolve("t3craft");
+	}
+
+	/** Only for the headless UI renderer (docs/tools/ui-render.md): point {@link #dataDir()} at a scratch folder, null to undo. */
+	public static void useDataDir(@Nullable Path dir) {
+		dataDirOverride = dir;
 	}
 
 	public static ModConfig load() {

@@ -1,0 +1,3 @@
+{
+  "scenarios": ["empty", "many-threads", "running", "markdown", "attachments", "context-menu", "model-picker", "new-thread-draft", "no-control", "offline"]
+}

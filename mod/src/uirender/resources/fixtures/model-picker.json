@@ -1,0 +1,13 @@
+{
+  "description": "The composer's model picker open: providers on the left, models on the right, effort, access and plan rows.",
+  "environments": [{"id": "studio", "label": "Studio Mac", "status": "ok", "control": true}],
+  "projects": [{"env": "studio", "id": "p-t3craft", "title": "t3craft"}],
+  "threads": [
+    {"env": "studio", "id": "t1", "project": "p-t3craft", "title": "Polish the sidebar", "state": "idle", "agoMin": 2, "transcript": "tiny"}
+  ],
+  "selected": "studio:t1",
+  "transcripts": {"tiny": {"title": "Polish the sidebar", "items": [
+    {"type": "user_message", "text": "Pule la barra lateral."},
+    {"type": "assistant_message", "text": "Hecho: filas más compactas y el chip de estado a la derecha."}]}},
+  "steps": [{"op": "clickText", "text": "Opus"}]
+}

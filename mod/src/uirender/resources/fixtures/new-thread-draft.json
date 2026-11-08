@@ -1,0 +1,17 @@
+{
+  "description": "The New thread dialog over the screen: environment, project, model, prompt and worktree options.",
+  "screen": "new-thread",
+  "newThread": {"env": "studio", "project": "p-t3craft"},
+  "environments": [
+    {"id": "studio", "label": "Studio Mac", "status": "ok", "control": true},
+    {"id": "my-vps", "label": "my-vps", "status": "ok", "control": true}
+  ],
+  "projects": [
+    {"env": "studio", "id": "p-t3craft", "title": "t3craft"},
+    {"env": "studio", "id": "p-site", "title": "my-site"},
+    {"env": "my-vps", "id": "p-bridge", "title": "t3craft-bridge"}
+  ],
+  "threads": [
+    {"env": "studio", "id": "t1", "project": "p-t3craft", "title": "fix/hq-gate-npcs", "state": "done", "agoMin": 20}
+  ]
+}
