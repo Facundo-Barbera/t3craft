@@ -47,6 +47,7 @@ import net.minecraft.world.level.block.state.BlockState;
  * with their own layout, e.g. {@code --style campus}, which also renders a 4 → 10 → 20 comparison).
  * PNGs over 480 KB are written again with a 256-colour palette.
  * {@code --style village} renders the village layout (layout/village, {@link VillageRender}).
+ * {@code --style hybrid-terraces} renders the terraced acropolis (design/hybrid-terraces, {@link TerracesRender}).
  * {@code --layout ID} (feat/hq-layouts: classic, campus, ring, vertical, ensanche, village or all) renders a
  * registered layout through the game's pipeline with {@code --projects} (default 4), see {@link LayoutViews}.
  */
@@ -100,6 +101,12 @@ public final class HqRender {
 			for (String p : models.problems) {
 				System.out.println("note: " + p);
 			}
+			return;
+		}
+		if (dev.t3craft.hq.TerraceGenerator.ID.equals(styleId)) {
+			// design/hybrid-terraces: the terraced acropolis grown 4 -> 10 -> 20 (see TerracesRender)
+			Files.createDirectories(out);
+			TerracesRender.run(out, only, scaleMul, ss, npcs, new BlockModels());
 			return;
 		}
 		if (dev.t3craft.hq.VillageGenerator.ID.equals(styleId)) {
