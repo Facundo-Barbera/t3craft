@@ -56,6 +56,7 @@ public final class ServerLevelSink implements BlockSink {
 		if (current == state && blockEntity == null) {
 			return BuildCursor.Outcome.SKIPPED;
 		}
+		long t0 = System.nanoTime();
 		if (current != state && !level.setBlock(pos, state, flags) && level.getBlockState(pos) != state) {
 			return BuildCursor.Outcome.FAILED;
 		}
@@ -67,6 +68,8 @@ public final class ServerLevelSink implements BlockSink {
 				level.sendBlockUpdated(pos, state, state, Block.UPDATE_CLIENTS);
 			}
 		}
+		// fix/hq-build-parallel: the setBlock (light, section marking, packet) is what the time budget measures.
+		BuildBudget.global().work(System.nanoTime() - t0, 1);
 		if (effects && BuildBudget.global().effect()) {
 			if (state.isAir()) {
 				if (!current.isAir()) {

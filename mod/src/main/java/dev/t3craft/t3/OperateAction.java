@@ -20,12 +20,19 @@ public record OperateAction(OperateKind kind, String envId, @Nullable String thr
 		String rpcTag, JsonObject payload) {
 	public static final String DISPATCH_COMMAND = "orchestration.dispatchCommand";
 	public static final String LAUNCH_THREAD = "orchestration.launchThread";
+	/**
+	 * feat/t3-actions: {@code projects.mutate} ({@code ProjectMutation}: project.create / update /
+	 * delete). Not an {@code orchestration.*} tag, but T3 authorizes it with
+	 * {@code orchestration:operate} too ({@code apps/server/src/auth/RpcAuthorization.ts}), as long as
+	 * the mutation carries no {@code scripts}.
+	 */
+	public static final String PROJECTS_MUTATE = "projects.mutate";
 
 	public OperateAction {
 		if (kind == null || envId == null || rpcTag == null || payload == null) {
 			throw new IllegalArgumentException("kind, envId, rpcTag and payload are required");
 		}
-		if (!rpcTag.startsWith("orchestration.")) {
+		if (!rpcTag.startsWith("orchestration.") && !PROJECTS_MUTATE.equals(rpcTag)) {
 			// orchestration:operate only covers orchestration RPCs; anything else needs other scopes.
 			throw new IllegalArgumentException("not an orchestration RPC: " + rpcTag);
 		}
