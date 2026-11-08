@@ -1,0 +1,27 @@
+{
+  "description": "80 threads over 3 machines and 6 projects: pinned first, a Settled section, every state, times from minutes to days.",
+  "environments": [
+    {"id": "studio", "label": "Studio Mac", "status": "ok", "control": true},
+    {"id": "my-vps", "label": "my-vps", "status": "ok", "control": true, "color": "#e0af68"},
+    {"id": "mini", "label": "Mini Acmesite", "status": "ok", "control": false}
+  ],
+  "projects": [
+    {"env": "studio", "id": "p-t3craft", "title": "t3craft"},
+    {"env": "studio", "id": "p-site", "title": "my-site"},
+    {"env": "my-vps", "id": "p-bridge", "title": "t3craft-bridge"},
+    {"env": "my-vps", "id": "p-infra", "title": "infra"},
+    {"env": "mini", "id": "p-docs", "title": "docs"},
+    {"env": "mini", "id": "p-t3craft", "title": "t3craft"}
+  ],
+  "generate": {"threads": 80, "seed": 7, "pinned": 3, "settledPct": 25},
+  "threads": [
+    {"env": "studio", "id": "t-main", "project": "p-t3craft", "title": "t3craft integración ramas → main", "state": "done", "pinned": true, "agoMin": 0.2, "transcript": "short"}
+  ],
+  "transcripts": {
+    "short": {"title": "t3craft integración ramas → main", "items": [
+      {"type": "user_message", "text": "Integra las ramas listas a main de una en una."},
+      {"type": "assistant_message", "text": "Listo: **3 ramas** integradas, sin conflictos. Te aviso qué requiere reiniciar el juego."}
+    ]}
+  },
+  "selected": "studio:t-main"
+}

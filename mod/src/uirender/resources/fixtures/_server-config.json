@@ -1,0 +1,26 @@
+{
+  "providers": [
+    {
+      "instanceId": "claudeAgent", "driver": "claudeAgent", "displayName": "Claude",
+      "supportedRuntimeModes": ["approval-required", "auto-accept-edits", "full-access"],
+      "showInteractionModeToggle": true,
+      "models": [
+        {"slug": "claude-opus-5-5", "name": "Claude Opus 5.5", "shortName": "Opus 5.5", "isDefault": true,
+         "capabilities": {"optionDescriptors": [{"type": "select", "id": "effort", "label": "Effort",
+           "options": [{"id": "low", "label": "Low"}, {"id": "medium", "label": "Medium", "isDefault": true}, {"id": "high", "label": "High"}, {"id": "max", "label": "Max"}]}]}},
+        {"slug": "claude-sonnet-5-5", "name": "Claude Sonnet 5.5", "shortName": "Sonnet 5.5"},
+        {"slug": "claude-haiku-5-5", "name": "Claude Haiku 5.5", "shortName": "Haiku 5.5"}
+      ]
+    },
+    {
+      "instanceId": "codex", "driver": "codex", "displayName": "Codex",
+      "supportedRuntimeModes": ["approval-required", "full-access"],
+      "models": [
+        {"slug": "gpt-5.5", "name": "GPT-5.5", "shortName": "5.5", "isDefault": true,
+         "capabilities": {"optionDescriptors": [{"type": "select", "id": "reasoningEffort", "label": "Reasoning",
+           "options": [{"id": "low", "label": "Low"}, {"id": "medium", "label": "Medium", "isDefault": true}, {"id": "high", "label": "High"}]}]}},
+        {"slug": "gpt-5.5-codex", "name": "GPT-5.5 Codex", "shortName": "5.5 Codex"}
+      ]
+    }
+  ]
+}

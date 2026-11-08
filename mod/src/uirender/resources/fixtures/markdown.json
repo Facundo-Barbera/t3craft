@@ -1,0 +1,34 @@
+{
+  "description": "A long finished transcript: headings, bold/italic, inline code, fenced code, lists, a table-ish block, tool calls (command, edit, search, MCP), reasoning, a to-do list and a proposed plan; tool steps are folded like in the game.",
+  "environments": [{"id": "studio", "label": "Studio Mac", "status": "ok", "control": true}],
+  "projects": [{"env": "studio", "id": "p-t3craft", "title": "t3craft"}],
+  "threads": [
+    {"env": "studio", "id": "t-md", "project": "p-t3craft", "title": "Refactor the thread cache", "state": "done", "agoMin": 4, "pinned": true, "transcript": "md"},
+    {"env": "studio", "id": "t-b", "project": "p-t3craft", "title": "Polish the composer", "state": "idle", "agoMin": 55}
+  ],
+  "selected": "studio:t-md",
+  "transcripts": {
+    "md": {
+      "title": "Refactor the thread cache",
+      "runs": [{"id": "run-1", "ordinal": 1, "status": "completed"}],
+      "items": [
+        {"type": "user_message", "text": "Refactor `ThreadCache` so transcripts outlive their views. Keep the **LRU** small and don't hold sockets."},
+        {"type": "reasoning", "title": "Thinking", "text": "The cache needs a byte budget, not only a count. Subscriptions should linger for a minute."},
+        {"type": "command_execution", "input": "rg -n \"class ThreadCache\" mod/src", "output": "mod/src/client/java/dev/t3craft/client/chat/ThreadCache.java:24:public final class ThreadCache {", "exitCode": 0},
+        {"type": "file_change", "fileName": "ThreadCache.java", "additions": 42, "deletions": 7, "diffStr": "@@ -20,7 +20,12 @@\n-    private final Map<String, Entry> entries = new HashMap<>();\n+    private final LinkedHashMap<String, Entry> entries = new LinkedHashMap<>(32, 0.75f, true);\n+    public static final long LINGER_MS = 60_000;"},
+        {"type": "file_search", "pattern": "LINGER_MS", "results": [{"fileName": "ThreadCache.java", "line": 51, "preview": "public static final long LINGER_MS = 60_000;"}]},
+        {"type": "dynamic_tool", "toolName": "mcp__t3-code__t3_thread_read", "input": {"threadId": "abc"}, "output": {"ok": true}},
+        {"type": "todo_list", "title": "Plan", "steps": [
+          {"text": "Add the LRU with a char budget", "status": "completed"},
+          {"text": "Linger subscriptions for 60 s", "status": "running"},
+          {"text": "Prewarm on hover", "status": "pending"}]},
+        {"type": "assistant_message", "text": "# Thread cache\n\nDone. The cache now keeps **24 threads** (about *6 M chars*), and a closed view leaves its subscription alive for `60 s`.\n\n## What changed\n\n- `ThreadCache.entry()` creates the transcript once\n- `acquire` / `release` are refcounted\n  - release starts the linger timer\n  - at most 4 lingering subscriptions\n- the sidebar rows are memoized per shell change\n\n1. Open a thread: instant, with a subtle *updating* pill\n2. Close it: the stream lingers\n3. Reopen: no duplicates\n\n```java\npublic synchronized Entry entry(String envId, String threadId) {\n    String k = key(envId, threadId);\n    Entry e = entries.get(k);\n    if (e == null) {\n        e = new Entry(k, threadId);\n        entries.put(k, e);\n        enforceBudget();\n    }\n    return e;\n}\n```\n\n> Tip: a hover of 250 ms prewarms the thread under the pointer.\n\nSee [the doc](docs/feat-t3-thread-cache.md) for the rest."},
+        {"type": "user_message", "text": "Perfecto. ¿Qué tengo que hacer para probarlo en el juego?"},
+        {"type": "proposed_plan", "title": "Proposed plan", "markdown": "1. Pull `main`\n2. Reload the game (**RELOAD**)\n3. Press `Y` and open a long thread twice"},
+        {"type": "assistant_message", "text": "Solo recarga el juego: no hay cambios de registros. Abre un hilo largo con `Y`, ciérralo y vuelve a abrirlo; debería aparecer al instante.\n\n| Acción | Resultado |\n| --- | --- |\n| abrir | caché + pill |\n| cerrar | suscripción 60 s |"},
+        {"type": "error", "failure": {"class": "ToolError", "message": "MCP server timed out after 30 s"}},
+        {"type": "notification", "outcome": "completed", "summary": "Turn completed in 2 m 14 s"}
+      ]
+    }
+  }
+}

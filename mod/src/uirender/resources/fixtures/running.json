@@ -1,0 +1,26 @@
+{
+  "description": "A thread running: header Stop, the composer's round button as stop, a steering message the user sent mid-run, a draft in the composer.",
+  "environments": [{"id": "studio", "label": "Studio Mac", "status": "ok", "control": true}],
+  "projects": [{"env": "studio", "id": "p-t3craft", "title": "t3craft"}],
+  "threads": [
+    {"env": "studio", "id": "t-run", "project": "p-t3craft", "title": "fix/hq-builders-independent", "state": "working", "activity": "running tests", "agoMin": 0.1, "transcript": "run"},
+    {"env": "studio", "id": "t-2", "project": "p-t3craft", "title": "fix/hq-gate-npcs", "state": "working", "agoMin": 1, "transcript": "run"},
+    {"env": "studio", "id": "t-3", "project": "p-t3craft", "title": "docs: ui render", "state": "done", "agoMin": 12}
+  ],
+  "selected": "studio:t-run",
+  "transcripts": {
+    "run": {
+      "title": "fix/hq-builders-independent",
+      "runs": [{"id": "run-1", "ordinal": 1, "status": "running"}],
+      "items": [
+        {"type": "user_message", "text": "Que los builders no esperen unos a otros y construyan tan rápido como antes."},
+        {"type": "assistant_message", "text": "Voy a revisar `CrewCursor` y el presupuesto global antes de tocar nada."},
+        {"type": "command_execution", "input": "rg -n \"nextTarget\" mod/src", "output": "CrewCursor.java:88: nextTarget(...)\nCrewSchedule.java:41: nextTarget(...)", "exitCode": 0},
+        {"type": "assistant_message", "text": "Encontré el cuello de botella: cada builder espera su turno en la cola global.", "streaming": false},
+        {"type": "user_message", "text": "Steer: y que no se rompa el orden de las capas, por favor."},
+        {"type": "assistant_message", "text": "Entendido, mantengo el orden por capas mientras reparto objetivos…", "streaming": true, "status": "running"}
+      ]
+    }
+  },
+  "composer": {"draft": "Además revisa el caso de los builders lejanos"}
+}

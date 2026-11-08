@@ -1,0 +1,19 @@
+{
+  "description": "Three image attachments in the composer (thumbnails with the remove ✕) and a draft; the thread above shows a message that carried attachments.",
+  "environments": [{"id": "studio", "label": "Studio Mac", "status": "ok", "control": true}],
+  "projects": [{"env": "studio", "id": "p-t3craft", "title": "t3craft"}],
+  "threads": [
+    {"env": "studio", "id": "t-att", "project": "p-t3craft", "title": "Match the T3 Code sidebar", "state": "idle", "agoMin": 3, "transcript": "att"}
+  ],
+  "selected": "studio:t-att",
+  "transcripts": {
+    "att": {
+      "title": "Match the T3 Code sidebar",
+      "items": [
+        {"type": "user_message", "text": "Compara estas capturas con la UI real.", "attachments": [{"id": "a1"}, {"id": "a2"}]},
+        {"type": "assistant_message", "text": "Veo tres diferencias: el **espaciado** de las filas, el *chip de estado* y el pie de la barra lateral."}
+      ]
+    }
+  },
+  "composer": {"draft": "Y ahora con estas otras tres:", "images": 3}
+}

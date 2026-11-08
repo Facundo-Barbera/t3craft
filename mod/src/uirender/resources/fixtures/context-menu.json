@@ -1,0 +1,16 @@
+{
+  "description": "Right-click on a sidebar thread: Settle, Snooze…, Pin/Unpin, Mark as read, Archive, Interrupt.",
+  "environments": [{"id": "studio", "label": "Studio Mac", "status": "ok", "control": true}],
+  "projects": [{"env": "studio", "id": "p-t3craft", "title": "t3craft"}, {"env": "studio", "id": "p-site", "title": "my-site"}],
+  "threads": [
+    {"env": "studio", "id": "t1", "project": "p-t3craft", "title": "fix/hq-builders-independent", "state": "working", "activity": "running tests", "agoMin": 0.5, "transcript": "tiny"},
+    {"env": "studio", "id": "t2", "project": "p-t3craft", "title": "feat/t3-composer-fidelity", "state": "needs_attention", "agoMin": 6},
+    {"env": "studio", "id": "t3", "project": "p-t3craft", "title": "docs: render service", "state": "done", "agoMin": 30, "pinned": true},
+    {"env": "studio", "id": "t4", "project": "p-site", "title": "Landing page copy", "state": "idle", "agoMin": 200}
+  ],
+  "selected": "studio:t1",
+  "transcripts": {"tiny": {"title": "fix/hq-builders-independent", "runs": [{"id": "r1", "ordinal": 1, "status": "running"}], "items": [
+    {"type": "user_message", "text": "Haz que los builders no se esperen."},
+    {"type": "assistant_message", "text": "Revisando `CrewCursor`…", "streaming": true}]}},
+  "steps": [{"op": "rightClickText", "text": "docs: render service", "keepMouse": true}]
+}

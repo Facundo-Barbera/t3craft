@@ -85,6 +85,30 @@ tasks.register("hqRender", JavaExec) {
 	javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(25) }
 }
 
+// ui-render (docs/tools/ui-render.md): headless PNG renders of the game's own screens (T3Screen and
+// its popovers) with mock data, no game, no GL. Its own source set (nothing of it ends up in the mod
+// jar). It builds the real screens from the client classes, records what they draw through a
+// GuiGraphicsExtractor subclass and rasterises it with Java2D using the glyphs and sprites in the
+// Minecraft jar. Not part of build/check: `./gradlew uiRender [-PuiArgs="--scenario markdown --gui-scale 3"]`.
+sourceSets {
+	uirender {
+		compileClasspath += sourceSets.main.output + sourceSets.client.output + sourceSets.client.compileClasspath
+		runtimeClasspath += sourceSets.main.output + sourceSets.client.output + sourceSets.client.runtimeClasspath
+	}
+}
+
+tasks.register("uiRender", JavaExec) {
+	group = "t3craft"
+	description = "Renders the T3 screens with mock data to PNGs in build/ui-render, headless"
+	classpath = sourceSets.uirender.runtimeClasspath
+	mainClass = "dev.t3craft.tools.uirender.UiRender"
+	systemProperty "java.awt.headless", "true"
+	maxHeapSize = "2g"
+	workingDir = projectDir
+	args((project.findProperty("uiArgs") ?: "").toString().split(" ").findAll { it })
+	javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(25) }
+}
+
 // This repo does not use unit tests: adding or running them is forbidden; verification = compiling.
 // Tests are blocked outright, so `test`, `check` and `build` never run any even if someone adds them back:
 // no test sources, every Test task disabled, test compilation off, and `check` only compiles.
