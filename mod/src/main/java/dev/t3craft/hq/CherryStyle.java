@@ -546,7 +546,8 @@ final class CherryStyle extends HqStyle {
 					c.set(x, 5, z, beam(Direction.Axis.Z)); // tie beam across the hall
 				}
 				wingRoof(c, x, z, v);
-				if (pillar && (v == 4 || v == WING_WALL - 4)) {
+				// one lantern down the hall's axis every other bay (lit panels and the floor lamps do the lighting)
+				if (pillar && s % 2 == 0 && v == WING_WALL / 2) {
 					c.hang(x, 4, z, lantern(true));
 				}
 				if (pillar && (v == 1 || v == WING_WALL - 1)) {
@@ -564,7 +565,10 @@ final class CherryStyle extends HqStyle {
 		boolean pillar = col == SEGMENT - 1;
 		c.set(x, 0, z, pillar ? role(Role.PATH) : role(Role.GARDEN));
 		if (pillar) {
-			stoneLantern(c, x, z);
+			// a stone lantern at every other pillar, between the hall's lanterns
+			if (s % 2 == 1) {
+				stoneLantern(c, x, z);
+			}
 			return;
 		}
 		if (s % 2 == 0) {

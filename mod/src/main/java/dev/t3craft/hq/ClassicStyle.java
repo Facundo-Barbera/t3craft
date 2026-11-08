@@ -74,6 +74,17 @@ final class ClassicStyle extends HqStyle {
 		return palette;
 	}
 
+	/** Warm timber and copper: shroomlight lamps in floors, walls and ceilings (fix/hq-lanterns). */
+	@Override
+	BlockState floorLight() {
+		return net.minecraft.world.level.block.Blocks.SHROOMLIGHT.defaultBlockState();
+	}
+
+	@Override
+	BlockState wallLight() {
+		return net.minecraft.world.level.block.Blocks.SHROOMLIGHT.defaultBlockState();
+	}
+
 	// ------------------------------------------------------------------ hub
 
 	@Override
@@ -345,8 +356,11 @@ final class ClassicStyle extends HqStyle {
 					// garden strip between rows: grass, a bush mid-segment, a lamp post at the pillar
 					c.set(x, 0, z, k.grass);
 					if (pillar) {
-						c.set(x, 1, z, k.plinthWall);
-						c.decor(x, 2, z, k.copperLantern(false));
+						// a lamp post at every other pillar, between the hall's lanterns
+						if (s % 2 == 1) {
+							c.set(x, 1, z, k.plinthWall);
+							c.decor(x, 2, z, k.copperLantern(false));
+						}
 					} else {
 						c.decor(x, 1, z, col == 1 ? (s % 2 == 0 ? k.floweringAzalea : k.azalea) : k.shortGrass);
 					}
@@ -375,7 +389,8 @@ final class ClassicStyle extends HqStyle {
 					c.set(x, 1, z, k.bookshelf);
 					c.decor(x, 2, z, k.pottedAzalea);
 				}
-				if (pillar && (v == 3 || v == WING_WALL - 3)) {
+				// one lantern down the hall's axis every other bay (the floor lamps do the lighting)
+				if (pillar && s % 2 == 0 && v == WING_WALL / 2) {
 					c.hang(x, 4, z, k.copperLantern(true));
 				}
 				if (v >= DOOR_V1 && v <= DOOR_V2) {

@@ -595,7 +595,8 @@ final class RingGenerator {
 				set(x, 6, z, leaves(Blocks.CHERRY_LEAVES));
 			}
 		}
-		if (r <= 15.5 && Math.floorMod(x * 5 + z * 3, 11) == 0) {
+		// planters on the inner patio only: past r = 14.5 the way along the drum is too narrow (fix/hq-lanterns)
+		if (r <= 14.5 && Math.floorMod(x * 5 + z * 3, 11) == 0) {
 			set(x, 1, z, Math.floorMod(x + z, 2) == 0 ? b(Blocks.FLOWERING_AZALEA) : kit.gardenPlanter());
 		}
 	}

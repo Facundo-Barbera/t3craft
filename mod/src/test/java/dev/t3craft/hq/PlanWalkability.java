@@ -69,6 +69,14 @@ final class PlanWalkability {
 		return collision.fits(x, y, z);
 	}
 
+	/** One move of the client pathfinder from standable {@code a} to standable {@code b} (neighbours, dy -1..1). */
+	boolean step(BlockPos a, BlockPos b) {
+		double fa = floor(a);
+		double fb = floor(b);
+		return !Double.isNaN(fa) && !Double.isNaN(fb)
+				&& collision.passage(a.getX(), a.getY(), a.getZ(), fa, b.getX(), b.getY(), b.getZ(), fb);
+	}
+
 	/**
 	 * Every standable cell reachable from {@code start} by straight moves (one level, or a step up or
 	 * down) that the body can sweep through: the moves of the client {@code GridPathfinder}, whose
