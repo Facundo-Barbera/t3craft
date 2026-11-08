@@ -9,6 +9,8 @@ import dev.t3craft.client.operate.OperateUi;
 import dev.t3craft.client.screen.OperatePairScreen;
 import dev.t3craft.client.config.T3CraftSettings;
 import dev.t3craft.client.npc.NpcInfo;
+import dev.t3craft.client.t3ui.T3Screen;
+import dev.t3craft.client.t3ui.T3Slots;
 import dev.t3craft.t3.DirectController;
 import dev.t3craft.t3.NpcView;
 import dev.t3craft.t3.ShellState;
@@ -26,7 +28,8 @@ import net.minecraft.client.resources.language.I18n;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Entry points to the read-only thread browser, and the default data sources for embedding it.
+ * Entry points to the unified T3 screen ({@link T3Screen}), and the default data sources for
+ * embedding the thread browser widget.
  * Stateless (no static fields), so it is safe across hot swaps: each screen owns its browser and
  * closes it when removed.
  *
@@ -59,12 +62,7 @@ public final class ChatScreens {
 	}
 
 	public static Screen createReadOnly(String envId, String threadId, String envLabel, String title) {
-		return new ThreadBrowserScreen(() -> {
-			ThreadBrowser b = browser(ChatTheme.warmStudio());
-			b.conversation().setActions(null);
-			b.open(envId + ":" + threadId, envLabel, title);
-			return b;
-		}, null);
+		return new T3Screen(defaultDirectory(), defaultSource(), null, T3Slots.DEFAULT, envId + ":" + threadId).withFallbackLabels(envLabel, title);
 	}
 
 	/** Opens the browser on an NPC's thread. */
@@ -81,22 +79,18 @@ public final class ChatScreens {
 		return create(npc.id());
 	}
 
-	/** The browser screen, preselecting {@code key} ({@code env:threadId}) when not null. */
-	public static Screen create(@Nullable String key) {
-		return new ThreadBrowserScreen(() -> {
-			ThreadBrowser b = browser(ChatTheme.warmStudio());
-			b.conversation().setActions(screenActions());
-			return b;
-		}, key);
+	/**
+	 * The unified T3 screen (feat/t3-ui-unified: sidebar + thread, T3 Code's layout), preselecting
+	 * {@code key} ({@code env:threadId}) when not null. Every entry point ends here: the T3 key, the
+	 * terminal item, NPCs, desks, monitors, the thread wall and search hits.
+	 */
+	public static T3Screen create(@Nullable String key) {
+		return new T3Screen(defaultDirectory(), defaultSource(), screenActions(), T3Slots.DEFAULT, key);
 	}
 
-	/** Kept for callers of the first feat/chat API: a browser on one thread from a custom source. */
+	/** Kept for callers of the first feat/chat API: the screen on one thread from a custom source. */
 	public static Screen create(ChatSource source, String envId, String threadId, String title) {
-		return new ThreadBrowserScreen(() -> {
-			ThreadBrowser b = new ThreadBrowser(defaultDirectory(), source, ChatTheme.warmStudio(), configFilterStore());
-			b.conversation().setActions(screenActions());
-			return b;
-		}, envId + ":" + threadId);
+		return new T3Screen(defaultDirectory(), source, screenActions(), T3Slots.DEFAULT, envId + ":" + threadId).withFallbackLabels("", title);
 	}
 
 	/** A browser wired to the default directory, source and config-backed filter. */
