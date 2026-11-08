@@ -42,7 +42,8 @@ import net.minecraft.world.level.block.state.BlockState;
  *
  * Options: {@code --out DIR}, {@code --style ID}, {@code --only SUBSTR} (comma-separated view-name
  * filters), {@code --scale F} (multiplies every view's pixels per block), {@code --ss N}
- * (supersampling), {@code --vanilla} (no mod blocks), {@code --no-npcs}.
+ * (supersampling), {@code --vanilla} (no mod blocks), {@code --no-npcs}. {@code --style village} renders the
+ * village layout (layout/village, {@link VillageRender}).
  */
 public final class HqRender {
 	private HqRender() {
@@ -77,6 +78,12 @@ public final class HqRender {
 			dev.t3craft.blocks.RenderBlocks.install();
 		} else {
 			HqFixtures.use(null);
+		}
+		if (dev.t3craft.hq.VillageGenerator.ID.equals(styleId)) {
+			// layout/village: its own generator and views (see VillageRender)
+			Files.createDirectories(out);
+			VillageRender.run(out, only, scaleMul, ss, npcs, new BlockModels());
+			return;
 		}
 		HqStyle style = styleId == null ? HqStyles.byId(HqStyles.DEFAULT_ID) : HqStyles.byId(styleId);
 		if (style == null) {
@@ -205,7 +212,7 @@ public final class HqRender {
 	private static final int[] ROBES = {0xFF6A4FB0, 0xFF2F7DB8, 0xFFC0543C, 0xFF3C9A5F, 0xFFD39A2A, 0xFF8E3F7E};
 
 	/** A stand-in NPC (robe, head, face on the side it looks at), seated or standing at an anchor. */
-	private static void npc(Scene sc, Anchor a, boolean seated, int i) {
+	static void npc(Scene sc, Anchor a, boolean seated, int i) {
 		BlockPos c = a.block();
 		BlockModels.Texture robe = BlockModels.Texture.solid(ROBES[i % ROBES.length]);
 		BlockModels.Texture skin = BlockModels.Texture.solid(0xFFE0B48C);
