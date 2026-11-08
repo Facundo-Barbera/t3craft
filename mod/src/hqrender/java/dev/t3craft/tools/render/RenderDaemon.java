@@ -1,8 +1,10 @@
 package dev.t3craft.tools.render;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import dev.t3craft.hq.HqFixtures;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.file.Files;
@@ -10,15 +12,20 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.FileTime;
 import java.time.Instant;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.PriorityBlockingQueue;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Stream;
 
 /**
@@ -30,21 +37,40 @@ import java.util.stream.Stream;
  * the daemon answers in {@code outbox/<id>/} with the PNGs, {@code report.txt} and {@code status.json}
  * ({@code queued → compiling → rendering → done | error}).
  *
- * <p>What it does for each request, one at a time ({@link JobRunner}): checks the result cache, waits
- * while the machine's load is high, compiles the worktree when its code differs from the daemon's
- * baseline (a single shared gradle daemon, offline), loads the worktree's classes in a fresh child
- * class loader ({@link RenderClassLoader}) over the Minecraft classes booted once, runs the renderer
- * and publishes the files. Machine care: nice 19 / ionice idle (set by the launch script), a single
- * worker, at most one pending request per agent, previews at low resolution, outbox cleaned after 24 h.
+ * <p>What it does for each request ({@link JobRunner}): checks the result cache, compiles the worktree
+ * when its code differs from the daemon's baseline (a single shared gradle daemon, offline, ONE compile
+ * at a time: {@link #compileLock}), loads the worktree's classes in a fresh child class loader
+ * ({@link RenderClassLoader}) over the Minecraft classes booted once, runs the renderer in a small
+ * fork-join pool of its own and publishes the files.
+ *
+ * <p>Concurrency: {@link #WORKERS} worker threads (env {@code RENDER_WORKERS}, default 3) each take one
+ * job at a time, so up to N jobs compile-wait/render at once; {@code RENDER_PARALLELISM} render threads
+ * in total are split between them ({@link #THREADS_PER_JOB}). What is global and cannot be shared:
+ * <ul>
+ *   <li>the gradle daemon: {@link #compileLock} (fair), one compile at a time;</li>
+ *   <li>a worktree's {@code build/} folder: {@link #worktreeLock}, so a job never renders classes another
+ *       job of the same worktree is recompiling;</li>
+ *   <li>the pinned (shared) globals a render may switch: {@code HqFixtures} with {@code --vanilla}, and
+ *       {@code HqLayoutPacks} with {@code --packs} when that class is pinned. Such jobs take
+ *       {@link #globalsLock} for writing (they render alone and restore the globals after); every other
+ *       render takes it for reading;</li>
+ *   <li>{@code System.out/err}: routed per thread by {@link StdRouter} into the job's {@code run.log}.</li>
+ * </ul>
+ * {@code ModelCache} is concurrent maps of immutable data; the renderer's own statics live in each job's
+ * class loader, so they are per job.
+ *
+ * <p>Machine care: nice 19 / ionice idle (set by the launch script), at most one pending request per
+ * agent, round-robin between agents ({@link #ordered}), previews at low resolution, outbox cleaned after
+ * 24 h; when the 1-minute load is above {@link #LOAD_MAX} no job is STARTED while another one runs (it
+ * drops to one active worker, never to zero, so the queue keeps moving).
  *
  * <p>The queue survives restarts: at start ({@link #recover}) every {@code outbox/<id>} left in
  * {@code queued}, {@code compiling} or {@code rendering} is queued again under the same id, in its
- * original arrival order; a STOP ({@code start-daemon.sh --stop}) finishes the running job and leaves
+ * original arrival order; a STOP ({@code start-daemon.sh --stop}) finishes the running jobs and leaves
  * the rest {@code queued} on disk for the next start.
  */
 public final class RenderDaemon {
-	/** Pause new work while the 1-minute load average is above this. */
-	/** Pause while the 1-minute load average is above this; env RENDER_LOAD_MAX (default 8). */
+	/** Start no new job while another runs and the 1-minute load average is above this; env RENDER_LOAD_MAX (default 8). */
 	static final double LOAD_MAX = loadMax();
 	private static double loadMax() {
 		try {
@@ -54,6 +80,30 @@ public final class RenderDaemon {
 			return 8.0;
 		}
 	}
+
+	/** Jobs at once: -Dt3craft.render.workers or env RENDER_WORKERS (default 3). */
+	static final int WORKERS = setting("t3craft.render.workers", "RENDER_WORKERS", 3, 1, 32);
+	/** Render threads in total: -Dt3craft.render.parallelism or env RENDER_PARALLELISM (default 6). */
+	static final int PARALLELISM = setting("t3craft.render.parallelism", "RENDER_PARALLELISM", 6, 1, 256);
+	/** Fork-join threads of one job (RENDER_PARALLELISM / RENDER_WORKERS, at least 1). */
+	static final int THREADS_PER_JOB = Math.max(1, PARALLELISM / WORKERS);
+
+	private static int setting(String prop, String env, int dflt, int min, int max) {
+		String v = System.getProperty(prop);
+		if (v == null || v.isBlank()) {
+			v = System.getenv(env);
+		}
+		try {
+			return v == null || v.isBlank() ? dflt : Math.max(min, Math.min(max, Integer.parseInt(v.strip())));
+		} catch (NumberFormatException e) {
+			return dflt;
+		}
+	}
+
+	/** Round-robin window: an agent's job starts in the last 30 min decide its turn. */
+	static final long RR_WINDOW_MS = 30L * 60 * 1000;
+	/** Global layout-pack state a {@code --packs} render switches (shared between jobs only when pinned). */
+	static final String PACKS_CLASS = "dev.t3craft.hq.pack.HqLayoutPacks";
 
 	static final long OUTBOX_MAX_AGE_MS = 24L * 60 * 60 * 1000;
 	/** A final render sorts as if it had arrived this much later than it did, so previews (cheap) go first, without starving finals. */
@@ -69,7 +119,21 @@ public final class RenderDaemon {
 	final String baseCommonDir;
 	final List<Path> baselineDirs;
 	final Pinned pinned;
+	/** The fixtures the daemon booted with; restored after each {@code --vanilla} render. */
+	final HqFixtures fixtures;
 	final long startedAt = System.currentTimeMillis();
+
+	/** One compile at a time (the gradle daemon is shared); fair, so compiles go in arrival order. */
+	final ReentrantLock compileLock = new ReentrantLock(true);
+	/** Read: a normal render. Write: a render that switches a shared global (see the class comment). */
+	final ReentrantReadWriteLock globalsLock = new ReentrantReadWriteLock(true);
+	private final Map<Path, ReentrantLock> worktreeLocks = new ConcurrentHashMap<>();
+
+	/** The lock of one worktree's build folder, held for a job's compile and render. */
+	ReentrantLock worktreeLock(Path worktree) {
+		Path key = worktree.toAbsolutePath().normalize();
+		return worktreeLocks.computeIfAbsent(key, k -> new ReentrantLock(true));
+	}
 
 	/** A request waiting or running. */
 	static final class Job implements Comparable<Job> {
@@ -101,15 +165,21 @@ public final class RenderDaemon {
 	}
 
 	private final PriorityBlockingQueue<Job> queue = new PriorityBlockingQueue<>();
-	/** agent → id of its queued or running request (one at a time per agent). */
+	/** agent → id of its queued or running request (one at a time per agent). Guarded by {@code this}. */
 	private final Map<String, String> activeByAgent = new HashMap<>();
-	private volatile Job running;
+	/** The jobs being run, in start order. Guarded by {@code this}. */
+	private final List<Job> running = new ArrayList<>();
+	/** agent → start times of its jobs in the last {@link #RR_WINDOW_MS} (round-robin). Guarded by {@code this}. */
+	private final Map<String, Deque<Long>> starts = new HashMap<>();
+	/** Last admission found the load above the limit (only one job runs). */
+	private volatile boolean loadPaused;
 	private volatile boolean stop;
 	private long seq;
 	private long lastClean;
-	private int served;
+	private final AtomicInteger served = new AtomicInteger();
 
-	private RenderDaemon(PrintStream rawOut, Spool spool, Path repo, String baseSha, String baseCommonDir, List<Path> baselineDirs, Pinned pinned) {
+	private RenderDaemon(PrintStream rawOut, Spool spool, Path repo, String baseSha, String baseCommonDir, List<Path> baselineDirs, Pinned pinned,
+			HqFixtures fixtures) {
 		this.rawOut = rawOut;
 		this.spool = spool;
 		this.repo = repo;
@@ -117,6 +187,7 @@ public final class RenderDaemon {
 		this.baseCommonDir = baseCommonDir;
 		this.baselineDirs = baselineDirs;
 		this.pinned = pinned;
+		this.fixtures = fixtures;
 	}
 
 	public static void main(String[] args) throws Exception {
@@ -137,12 +208,16 @@ public final class RenderDaemon {
 		}
 		stamp(rawOut, "booting Minecraft registries and the mod's blocks (once)...");
 		Boot.boot();
+		// after the bootstrap wrapped the streams: from here each job's threads print into its own run.log
+		StdRouter.install();
 		Pinned pinned = Pinned.compute(dirs);
-		RenderDaemon d = new RenderDaemon(rawOut, spool, repoRoot, sha.trim(), common.trim(), dirs, pinned);
+		RenderDaemon d = new RenderDaemon(rawOut, spool, repoRoot, sha.trim(), common.trim(), dirs, pinned, HqFixtures.active());
 		d.log("baseline " + d.baseSha.substring(0, 10) + " from " + repoRoot + "; " + dirs.size() + " class dirs; shared with jobs: "
 				+ pinned.names.size() + " classes (blocks module + HQ kernel)");
 		d.log("pinned: " + String.join(" ", pinned.sorted()));
-		d.log("spool " + spool.root + "; load limit " + LOAD_MAX + "; pid " + ProcessHandle.current().pid());
+		d.log("spool " + spool.root + "; load limit " + LOAD_MAX + "; " + WORKERS + " worker(s) x " + THREADS_PER_JOB + " render thread(s); max heap "
+				+ (Runtime.getRuntime().maxMemory() >> 20) + " MB; HqLayoutPacks " + (pinned.isShared(PACKS_CLASS) ? "pinned (--packs renders alone)" : "per job")
+				+ "; pid " + ProcessHandle.current().pid());
 		Runtime.getRuntime().addShutdownHook(new Thread(() -> d.heartbeat("stopped")));
 		d.run();
 	}
@@ -163,9 +238,13 @@ public final class RenderDaemon {
 		} catch (Exception e) {
 			log("recovery error: " + e);
 		}
-		Thread worker = new Thread(this::workLoop, "render-worker");
-		worker.setDaemon(true);
-		worker.start();
+		List<Thread> workers = new ArrayList<>();
+		for (int i = 1; i <= WORKERS; i++) {
+			Thread worker = new Thread(this::workLoop, "render-worker-" + i);
+			worker.setDaemon(true);
+			worker.start();
+			workers.add(worker);
+		}
 		spool.clean(OUTBOX_MAX_AGE_MS, busyIds());
 		lastClean = System.currentTimeMillis();
 		while (!stop) {
@@ -181,7 +260,7 @@ public final class RenderDaemon {
 					}
 				}
 				if (Files.exists(spool.root.resolve("STOP"))) {
-					log("STOP file found: finishing the current job and exiting; " + queue.size() + " queued request(s) stay queued for the next start");
+					log("STOP file found: finishing the running job(s) and exiting; " + queue.size() + " queued request(s) stay queued for the next start");
 					Files.deleteIfExists(spool.root.resolve("STOP"));
 					stop = true;
 				}
@@ -190,10 +269,12 @@ public final class RenderDaemon {
 			}
 			Thread.sleep(2000);
 		}
-		// the worker sees `stop`, finishes the job in hand and takes no other
-		while (worker.isAlive()) {
-			heartbeat("stopping");
-			worker.join(2000);
+		// each worker sees `stop`, finishes the job in hand and takes no other
+		for (Thread worker : workers) {
+			while (worker.isAlive()) {
+				heartbeat("stopping");
+				worker.join(2000);
+			}
 		}
 		Job[] left = queue.toArray(new Job[0]);
 		java.util.Arrays.sort(left);
@@ -472,14 +553,85 @@ public final class RenderDaemon {
 		log(st.id + ": " + message);
 	}
 
-	/** Keeps "position n of m" fresh in the status of the queued requests. */
-	private void publishPositions() {
-		Job[] snapshot = queue.toArray(new Job[0]);
-		java.util.Arrays.sort(snapshot);
-		for (int i = 0; i < snapshot.length; i++) {
-			Spool.Status st = snapshot[i].status;
-			String msg = "queued: position " + (i + 1) + " of " + snapshot.length + (running != null ? " (behind " + running.req.id() + ")" : "")
-					+ (snapshot[i].requeued ? "; " + REQUEUED : "");
+	/**
+	 * The queued jobs in the order they will start: round-robin between agents (fewest job starts in the
+	 * last {@link #RR_WINDOW_MS} first), and within the same turn the usual order (previews first, finals by
+	 * age, {@link Job#compareTo}). With one pending request per agent this means every agent waiting gets a
+	 * turn before an agent that just had one gets another.
+	 */
+	private synchronized List<Job> ordered() {
+		long now = System.currentTimeMillis();
+		Map<String, Integer> turns = new HashMap<>();
+		List<Job> jobs = new ArrayList<>(List.of(queue.toArray(new Job[0])));
+		for (Job j : jobs) {
+			turns.computeIfAbsent(j.req.agent(), a -> recentStarts(a, now));
+		}
+		jobs.sort(Comparator.<Job>comparingInt(j -> turns.get(j.req.agent())).thenComparing(Comparator.naturalOrder()));
+		return jobs;
+	}
+
+	/** Guarded by {@code this}. */
+	private int recentStarts(String agent, long now) {
+		Deque<Long> d = starts.get(agent);
+		if (d == null) {
+			return 0;
+		}
+		while (!d.isEmpty() && now - d.peekFirst() > RR_WINDOW_MS) {
+			d.pollFirst();
+		}
+		if (d.isEmpty()) {
+			starts.remove(agent);
+			return 0;
+		}
+		return d.size();
+	}
+
+	/**
+	 * Admission: the next job to run, now marked running, or null (queue empty, stopping, or the load is
+	 * above {@link #LOAD_MAX} while another job runs: under load it drops to ONE active job, never zero).
+	 */
+	private synchronized Job admit() {
+		if (queue.isEmpty()) {
+			loadPaused = false;
+			return null;
+		}
+		if (stop || running.size() >= WORKERS) {
+			return null;
+		}
+		if (!running.isEmpty() && JobRunner.load1() > LOAD_MAX) {
+			loadPaused = true;
+			return null;
+		}
+		loadPaused = false;
+		List<Job> order = ordered();
+		if (order.isEmpty()) {
+			return null;
+		}
+		Job job = order.get(0);
+		if (!queue.remove(job)) {
+			return null;
+		}
+		running.add(job);
+		starts.computeIfAbsent(job.req.agent(), a -> new ArrayDeque<>()).addLast(System.currentTimeMillis());
+		return job;
+	}
+
+	private synchronized List<Job> runningJobs() {
+		return new ArrayList<>(running);
+	}
+
+	/**
+	 * Keeps "position n of m" fresh in the status of the queued requests. Holds the admission lock while
+	 * writing, so a job a worker just took is never written back as queued.
+	 */
+	private synchronized void publishPositions() {
+		List<Job> order = ordered();
+		String behind = running.isEmpty() ? "" : " (running: " + String.join(", ", running.stream().map(j -> j.req.id()).toList()) + ")";
+		String paused = loadPaused ? String.format(java.util.Locale.ROOT, "; machine busy (load > %.0f): one job at a time", LOAD_MAX) : "";
+		for (int i = 0; i < order.size(); i++) {
+			Job j = order.get(i);
+			Spool.Status st = j.status;
+			String msg = "queued: position " + (i + 1) + " of " + order.size() + behind + paused + (j.requeued ? "; " + REQUEUED : "");
 			if (st.position != i + 1 || !msg.equals(st.message)) {
 				st.position = i + 1;
 				st.message = msg;
@@ -497,35 +649,50 @@ public final class RenderDaemon {
 		o.addProperty("nowMillis", System.currentTimeMillis());
 		o.addProperty("baseline", baseSha);
 		o.addProperty("queued", queue.size());
-		Job r = running;
-		o.addProperty("running", r == null ? "" : r.req.id());
-		o.addProperty("served", served);
+		List<Job> now = runningJobs();
+		JsonArray arr = new JsonArray();
+		for (Job j : now) {
+			Spool.Status st = j.status;
+			JsonObject r = new JsonObject();
+			r.addProperty("id", j.req.id());
+			r.addProperty("agent", j.req.agent());
+			r.addProperty("kind", j.req.kind());
+			r.addProperty("priority", st.priority);
+			r.addProperty("state", st.state);
+			r.addProperty("message", st.message);
+			if (st.startedAt > 0) {
+				r.addProperty("startedAt", Instant.ofEpochMilli(st.startedAt).toString());
+			}
+			arr.add(r);
+		}
+		// every job in progress; runningId keeps the old single string (the first one, "" when idle)
+		o.add("running", arr);
+		o.addProperty("runningId", now.isEmpty() ? "" : now.get(0).req.id());
+		o.addProperty("workers", WORKERS);
+		o.addProperty("threadsPerJob", THREADS_PER_JOB);
+		o.addProperty("served", served.get());
 		o.addProperty("load1", JobRunner.load1());
 		o.addProperty("loadLimit", LOAD_MAX);
+		o.addProperty("loadPaused", loadPaused);
 		spool.heartbeat(o);
 	}
 
-	// ------------------------------------------------------------------ worker
+	// ------------------------------------------------------------------ workers
 
 	private void workLoop() {
 		JobRunner runner = new JobRunner(this);
 		while (!stop) {
-			Job job;
-			try {
-				job = queue.poll(1, TimeUnit.SECONDS);
-			} catch (InterruptedException e) {
-				return;
-			}
+			Job job = admit();
 			if (job == null) {
+				try {
+					Thread.sleep(1000);
+				} catch (InterruptedException e) {
+					return;
+				}
 				continue;
 			}
-			if (stop) {
-				queue.add(job); // stays queued on disk for the next start
-				return;
-			}
-			running = job;
 			try {
-				log(job.req.id() + ": start");
+				log(job.req.id() + ": start on " + Thread.currentThread().getName());
 				runner.execute(job);
 				log(job.req.id() + ": " + job.status.state + " - " + job.status.message);
 			} catch (Throwable t) {
@@ -536,22 +703,32 @@ public final class RenderDaemon {
 				log(job.req.id() + ": internal error " + t);
 				t.printStackTrace(rawOut);
 			} finally {
-				served++;
+				served.incrementAndGet();
 				synchronized (this) {
 					activeByAgent.remove(job.req.agent(), job.req.id());
+					running.remove(job);
 				}
-				running = null;
 			}
 		}
 	}
 
-	/** The daemon cannot kill a runaway render thread; the launch script restarts it on exit code 75. */
-	void giveUp(String why) {
+	/**
+	 * The daemon cannot kill a runaway render thread; the launch script restarts it on exit code 75. The
+	 * stuck job is failed (it would get stuck again); the other running jobs are left {@code queued} on disk
+	 * so {@link #recover} resumes them without counting a restart against them.
+	 */
+	void giveUp(String why, Job stuck) {
 		log("giving up: " + why);
-		Job r = running;
-		if (r != null && !r.status.terminal()) {
-			// not resumed after the restart: it would get stuck again
-			fail(r.status, "the render thread did not stop and the daemon restarted; not resumed. See report.txt");
+		if (stuck != null && !stuck.status.terminal()) {
+			fail(stuck.status, "the render thread did not stop and the daemon restarted; not resumed. See report.txt");
+		}
+		for (Job j : runningJobs()) {
+			if (j != stuck && !j.status.terminal()) {
+				j.status.state = "queued";
+				j.status.position = 0;
+				j.status.message = "queued; another job's stuck render restarted the daemon";
+				spool.write(j.status);
+			}
 		}
 		heartbeat("restarting");
 		Runtime.getRuntime().halt(75);

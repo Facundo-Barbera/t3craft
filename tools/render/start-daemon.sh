@@ -8,7 +8,11 @@
 #
 # Run it from the checkout whose code should be the baseline (normally main/integration, CLEAN: the
 # daemon decides "does this worktree need compiling?" by diffing against this checkout's HEAD).
-# One JVM, nice 19 / ionice idle, -Xmx3g, render threads capped (RENDER_PARALLELISM, default 6).
+# One JVM, nice 19 / ionice idle. Settings (environment, read at start):
+#   RENDER_WORKERS      jobs at once (default 3; compiles still go one at a time)
+#   RENDER_PARALLELISM  render threads in total, split between the workers (default 6 -> 2 per job)
+#   RENDER_LOAD_MAX     above this 1-min load no job starts while another runs (default 8)
+#   RENDER_XMX          max heap (default 2g + 1.5g per worker: 6656m with 3 workers)
 # It restarts itself on exit code 75 (a render thread that would not stop). Log: $RENDER_HOME/daemon.log.
 # Protocol and limits: docs/tools/render-service.md
 set -euo pipefail
@@ -20,12 +24,18 @@ mkdir -p "$RENDER_HOME"
 mode=background
 case "${1:-}" in
 	--foreground) mode=foreground ;;
-	--stop) touch "$RENDER_HOME/STOP"; echo "start-daemon: STOP left; the daemon exits after its current job (queued requests stay queued and resume on the next start)"; exit 0 ;;
+	--stop) touch "$RENDER_HOME/STOP"; echo "start-daemon: STOP left; the daemon exits after its running jobs (queued requests stay queued and resume on the next start)"; exit 0 ;;
 	--status) cat "$RENDER_HOME/daemon.json" 2>/dev/null || echo "no heartbeat in $RENDER_HOME"; exit 0 ;;
 	--supervise) mode=supervise ;;
 	"") ;;
 	*) echo "usage: $0 [--foreground|--stop|--status]" >&2; exit 2 ;;
 esac
+
+int_or() { case "$1" in ''|*[!0-9]*) echo "$2" ;; *) if [ "$1" -ge 1 ]; then echo "$1"; else echo "$2"; fi ;; esac; }
+WORKERS="$(int_or "${RENDER_WORKERS:-}" 3)"
+PARALLELISM="$(int_or "${RENDER_PARALLELISM:-}" 6)"
+XMX="${RENDER_XMX:-$((2048 + 1536 * WORKERS))m}"
+export RENDER_WORKERS="$WORKERS" RENDER_PARALLELISM="$PARALLELISM"
 
 NICE=(nice -n 19)
 if ionice -c3 true 2>/dev/null; then
@@ -41,8 +51,11 @@ launch_loop() {
 		java="$(cat build/render-daemon/java.txt)"
 		rm -f "$RENDER_HOME/STOP"
 		set +e
-		"${NICE[@]}" "$java" -Xmx3g -Djava.awt.headless=true \
-			-Djava.util.concurrent.ForkJoinPool.common.parallelism="${RENDER_PARALLELISM:-6}" \
+		echo "$(date -Is) render daemon: $WORKERS worker(s), $PARALLELISM render thread(s), -Xmx$XMX"
+		"${NICE[@]}" "$java" "-Xmx$XMX" -Djava.awt.headless=true \
+			-Djava.util.concurrent.ForkJoinPool.common.parallelism="$PARALLELISM" \
+			-Dt3craft.render.workers="$WORKERS" \
+			-Dt3craft.render.parallelism="$PARALLELISM" \
 			-Dt3craft.render.repo="$REPO" \
 			-cp "$cp" dev.t3craft.tools.render.RenderDaemon
 		rc=$?

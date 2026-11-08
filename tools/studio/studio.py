@@ -158,6 +158,23 @@ def all_jobs() -> list[dict]:
     return jobs
 
 
+def running_jobs(d: dict) -> list[dict]:
+    """Every job in progress: `running` is an array of objects (several workers); older daemons wrote one id string."""
+    r = d.get("running")
+    out: list[dict] = []
+    if isinstance(r, list):
+        for e in r:
+            if isinstance(e, dict) and isinstance(e.get("id"), str):
+                out.append({k: e.get(k) for k in ("id", "agent", "kind", "priority", "state", "message", "startedAt")})
+            elif isinstance(e, str) and e:
+                out.append({"id": e})
+    elif isinstance(r, str) and r:
+        out.append({"id": r})
+    elif isinstance(d.get("runningId"), str) and d["runningId"]:
+        out.append({"id": d["runningId"]})
+    return out
+
+
 def daemon_state() -> dict:
     d = read_json(DAEMON_JSON) or {}
     now = int(time.time() * 1000)
@@ -167,7 +184,9 @@ def daemon_state() -> dict:
         "state": d.get("state", "missing") if alive or not d else "stopped",
         "alive": alive,
         "queued": d.get("queued"),
-        "running": d.get("running"),
+        "running": running_jobs(d),
+        "workers": d.get("workers"),
+        "loadPaused": bool(d.get("loadPaused")),
         "served": d.get("served"),
         "load1": d.get("load1"),
         "loadLimit": d.get("loadLimit"),

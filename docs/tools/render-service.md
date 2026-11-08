@@ -77,19 +77,28 @@ and the booleans `vanilla`, `no-npcs`. `kind` is `hq` (default) or `ui`; `priori
 `status.json` is rewritten atomically; read it whole. `state` `error` also covers refusals; their
 `message` starts with `rejected:`.
 
-The daemon also keeps `daemon.json` (heartbeat every 2 s: state, pid, queue length, running job, load).
+The daemon also keeps `daemon.json` (heartbeat every 2 s): `state`, `pid`, `queued` (queue length),
+`running` (**array**, one object per job in progress: `id`, `agent`, `kind`, `priority`, `state`, `message`,
+`startedAt`), `runningId` (string, the first running id or `""`; what `running` used to be), `workers`,
+`threadsPerJob`, `served`, `load1`, `loadLimit`, `loadPaused`.
 
 ## Limits (to look after the machine)
 
-- **One job at a time, one compilation at a time**, on a single worker. A single shared gradle daemon,
-  `--offline`; the daemon JVM and gradle run `nice -n 19` / `ionice -c3`; the daemon has `-Xmx3g` and its
-  render threads are capped (`RENDER_PARALLELISM`, default 6).
-- **Pause while the 1-minute load average is above 8** (`RENDER_LOAD_MAX` env when starting the daemon): the job waits (`message: paused: machine busy...`)
-  and goes on when it drops.
+- **N jobs at once, one compilation at a time.** `RENDER_WORKERS` workers (default 3) each run one job;
+  compiles queue on a single lock (one shared gradle daemon, `--offline`; message `waiting for the compiler`).
+  `RENDER_PARALLELISM` render threads in total (default 6) are split between the workers (6 / 3 → 2 per job,
+  each job in a fork-join pool of its own). The daemon JVM and gradle run `nice -n 19` / `ionice -c3`; heap
+  `-Xmx` = 2 GB + 1.5 GB per worker (`RENDER_XMX` to override).
+- **Load gate at the start of each job.** While the 1-minute load average is above 8 (`RENDER_LOAD_MAX`) no
+  new job starts if another one is running: the service drops to **one** active job, never zero, so the queue
+  keeps moving (queued messages say `machine busy (load > 8): one job at a time`; `daemon.json` `loadPaused`).
+  A job that has started is not paused.
 - **One pending request per agent.** A second request while the first is queued or running is rejected with
   a clear message; wait for the first (`submit.sh` waits by default). Repeated requests answered from the
   cache do not count.
-- **Order:** previews first, then finals; a final that has waited 10 minutes is not overtaken any more.
+- **Order: round-robin between agents**, and within a turn the usual order: previews first, then finals; a
+  final that has waited 10 minutes is not overtaken any more. The turn is the number of jobs the agent started
+  in the last 30 min (fewest first), so an agent who just had a render goes behind everyone still waiting.
 - **Previews are low resolution** (`--scale 0.8 --ss 1`) unless you pass `--scale`/`--ss` yourself; finals
   use the renderer's defaults. A job over 20 min (preview) / 60 min (final) is stopped.
 - **Cache by hash**: baseline commit + kind + priority + arguments + the worktree's HEAD + its uncommitted
@@ -102,12 +111,28 @@ The daemon also keeps `daemon.json` (heartbeat every 2 s: state, pid, queue leng
 
 ## How the service works
 
+Several jobs run at once (one per worker), so whatever is global is either per job or behind a lock:
+
+| shared thing | how |
+| --- | --- |
+| gradle daemon | `compileLock` (fair): one compile at a time |
+| a worktree's `mod/build` | per-worktree lock for the whole job: two requests on the same worktree run one after the other |
+| `HqFixtures` (pinned) | `--vanilla` switches it: such a job takes `globalsLock` for writing, renders **alone** and restores the daemon's fixtures; every other render takes it for reading |
+| `HqLayoutPacks` | per job (fresh class loader) unless it is pinned (the boot log says which); then `--packs` renders alone too and the packs are reset after |
+| `System.out` / `err` | installed once (`StdRouter`): output of a job's threads goes to its `run.log`, the rest to `daemon.log` |
+| `HqRender`, `PieceViews`, `BlockModels` statics | per job: they live in the job's class loader |
+| `ModelCache` | concurrent maps of immutable data, shared on purpose |
+| hash cache, `status.json` | written atomically with a unique temp name per write |
+
+Each job's class loader and fork-join pool are dropped when it ends (the pool's threads are stopped before the
+loader closes), so its classes and images can be collected.
+
 1. **Boot once.** `dev.t3craft.tools.render.RenderDaemon` boots the vanilla registries and registers the
    mod's blocks (`Boot`, same as `hqRender`) a single time. Vanilla block models and textures are decoded once
    per JVM too (`ModelCache`, used by `BlockModels`).
 2. **Code per job.** A fresh `RenderClassLoader` per job: the worktree's compiled classes and resources
    first for every `dev.t3craft.*` class, Minecraft and libraries from the daemon. The loader is dropped after
-   the job, so nothing leaks between agents (`HqFixtures` is restored too). With no code changes the job
+   the job, so nothing leaks between agents (`HqFixtures` is restored after `--vanilla`). With no code changes the job
    runs the daemon's baseline classes in the same kind of fresh loader (packs and other statics start clean).
 3. **Kernel.** The registered blocks belong to the daemon's copy of `dev.t3craft.blocks.*` and of the few
    HQ classes they touch (computed at boot from the bytecode: `BuildPlan`, `Anchor`, `Placement`,
@@ -139,8 +164,8 @@ unfinished, before reading the inbox:
   deleted; the request already in the queue answers). Once it is finished, the same id is rejected as
   "already handled" as before: use a new number.
 
-**Orderly stop** (`start-daemon.sh --stop`, the `STOP` file): the daemon stops reading the inbox, the job in
-progress finishes, and the requests still waiting stay in the outbox as `queued` (*the render daemon stopped and
+**Orderly stop** (`start-daemon.sh --stop`, the `STOP` file): the daemon stops reading the inbox, the jobs in
+progress finish, and the requests still waiting stay in the outbox as `queued` (*the render daemon stopped and
 resumes this request when it starts again*); the next start takes them up. New inbox files wait in the inbox.
 While it finishes, `daemon.json` says `stopping`. A kill (or a crash) loses nothing either: the running job is
 `compiling`/`rendering` on disk and is started again.
@@ -164,11 +189,16 @@ it) or change `JobRunner.entryOf` / `compile`; one place each.
 ```bash
 tools/render/start-daemon.sh            # background; from a CLEAN checkout (its HEAD is the baseline)
 tools/render/start-daemon.sh --status   # heartbeat
-tools/render/start-daemon.sh --stop     # exits after the current job; the queue resumes on the next start
+tools/render/start-daemon.sh --stop     # exits after the running jobs; the queue resumes on the next start
+RENDER_WORKERS=4 RENDER_PARALLELISM=8 tools/render/start-daemon.sh   # settings are read at start
 ```
+
+- Settings (environment when starting): `RENDER_WORKERS` (3), `RENDER_PARALLELISM` (6, total render threads),
+  `RENDER_LOAD_MAX` (8), `RENDER_XMX` (2g + 1.5g per worker). The boot line in `daemon.log` shows the result.
 
 - It runs `./gradlew --offline renderDaemonClasspath` (writes `mod/build/render-daemon/{classpath,java}.txt`,
   compiling the checkout first), then `exec`s the Java 25 binary niced. Log: `~/.cache/t3craft-render/daemon.log`.
 - Restart it after merging into the baseline checkout (kernel changes, new baseline). It restarts itself by
-  itself (exit code 75) if a render thread cannot be stopped.
+  itself (exit code 75) if a render thread cannot be stopped: that job ends in `error`, the other running jobs
+  are left `queued` and resume after the restart.
 - Nothing in the game or the mod jar depends on it: it lives in the `hqrender` source set.
