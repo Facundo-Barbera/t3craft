@@ -22,9 +22,14 @@ public final class CrewSchedule {
 	private final int[] startY;
 	private final int[] startZ;
 	private final double walked;
+	private final int[] bx;
+	private final int[] by;
+	private final int[] bz;
+	private final boolean[] air;
+	private final int[] step;
 
 	CrewSchedule(int total, int[][] lanes, int[][] walk, int[][] stand, int[] order, int[][] deps, boolean[] forced, boolean[] relaxed, int[] owner,
-			int[] startX, int[] startY, int[] startZ, double walked) {
+			int[] startX, int[] startY, int[] startZ, double walked, int[] bx, int[] by, int[] bz, boolean[] air) {
 		this.total = total;
 		this.lanes = lanes;
 		this.walk = walk;
@@ -38,6 +43,16 @@ public final class CrewSchedule {
 		this.startY = startY;
 		this.startZ = startZ;
 		this.walked = walked;
+		this.bx = bx;
+		this.by = by;
+		this.bz = bz;
+		this.air = air;
+		this.step = new int[total];
+		for (int[] lane : lanes) {
+			for (int st = 0; st < lane.length; st++) {
+				step[lane[st]] = st;
+			}
+		}
 		this.rank = new int[total];
 		for (int r = 0; r < total; r++) {
 			rank[order[r]] = r;
@@ -119,6 +134,41 @@ public final class CrewSchedule {
 	/** The builder (front) that applies {@code i}. */
 	public int owner(int i) {
 		return owner[i];
+	}
+
+	/** Step of {@code i} in the lane of its planned {@link #owner}. */
+	public int step(int i) {
+		return step[i];
+	}
+
+	/** Where builder {@link #owner}{@code (i)} was planned to stand for {@code i} (plan-relative feet cell). */
+	public int[] standFor(int i) {
+		return stand(owner[i], step[i]);
+	}
+
+	/** Plan-relative cell {@code {x, y, z}} of entry {@code i}. */
+	public int[] block(int i) {
+		return new int[] {bx[i], by[i], bz[i]};
+	}
+
+	/** Plan-relative x of entry {@code i}. */
+	public int x(int i) {
+		return bx[i];
+	}
+
+	/** Plan-relative y of entry {@code i}. */
+	public int y(int i) {
+		return by[i];
+	}
+
+	/** Plan-relative z of entry {@code i}. */
+	public int z(int i) {
+		return bz[i];
+	}
+
+	/** Entry {@code i} clears its cell (air): done from wherever the builder is, without walking. */
+	public boolean air(int i) {
+		return air[i];
 	}
 
 	/** Total walking distance of the crew, blocks. */

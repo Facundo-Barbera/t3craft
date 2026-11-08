@@ -819,7 +819,7 @@ public final class CrewPlanner {
 			}
 			int[] sy = new int[k];
 			Arrays.fill(sy, n == 0 ? 0 : minY);
-			return new CrewSchedule(n, lane, walk, stand, order, deps, forced, relaxed, owner, startX.clone(), sy, startZ.clone(), walked);
+			return new CrewSchedule(n, lane, walk, stand, order, deps, forced, relaxed, owner, startX.clone(), sy, startZ.clone(), walked, x, y, z, air);
 		}
 	}
 }

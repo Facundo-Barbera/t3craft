@@ -166,3 +166,65 @@ cliente anima a cada builder hacia su punto con el A* de los NPC.
 ### Métrica de recorrido
 Ver `docs/feat-hq-builders-ai.md`: recorrido total de los builders con 20 proyectos, por layout, comparado con el
 orden por capa más franjas de antes, con el mismo evaluador de alcance.
+
+## Builders independientes y rápidos (fix/hq-builders-independent)
+
+**Síntomas (Facundo).** (1) "Los builders son como dependientes entre sí": uno espera a que otro, a veces al otro
+lado del mapa, ponga una pieza. (2) "Se ve mucho mejor, pero es mucho más lento" que el cursor por frentes de
+fix/hq-build-parallel (a8d23dd).
+
+**Causas.**
+- *Head-of-line blocking.* `CrewCursor` ejecutaba carriles fijos: la cabeza solo se aplicaba con sus dependencias
+  hechas. Los tiempos reales (presupuesto, caminatas, segmentos de materiales) no son los simulados, así que la
+  cabeza esperaba a una dependencia del carril de otro builder y el builder se quedaba parado con trabajo listo.
+- *Caminar bloquea colocar.* Cada paso fuera de alcance esperaba `⌈d / 0,3⌉` ticks completos (`WALK_PER_TICK`).
+- *Una colocación por parada.* Tras caminar, el builder ponía la entrada siguiente del carril, aunque estuviera
+  lejos y tuviera otras listas a mano.
+- *Créditos perdidos.* Si todos caminaban, el crédito del `BuildBudget` de ese tick se tiraba (tope `max(1, a)`).
+
+**Decisión: los carriles son un plan, no un contrato.** El planificador no cambia (zonas, orden, puntos de
+parada). `CrewCursor` decide en vivo, de forma determinista (frentes y carriles en orden fijo), el siguiente
+objetivo de cada builder libre:
+1. **Ráfaga:** una entrada lista que alcanza **sin caminar**, entre las 48 siguientes de su carril, o en la
+   ventana de un vecino que no la alcanza. En cada parada pone todo lo listo a su alrededor, varias por tick si hay
+   crédito.
+2. **Ventana propia:** la primera entrada lista de las 16 siguientes de su carril. Las saltadas se reintentan
+   en la siguiente elección.
+3. **Robar la dependencia que bloquea:** si la cabeza no está lista, busca (BFS acotada a 48 nodos) un ancestro
+   listo de la cabeza que alcance antes o igual que su dueño, o a menos de ~6 bloques. Lo toma si le cuesta menos
+   que la entrada de su ventana.
+4. **Robar trabajo:** si no tiene nada, toma la entrada lista más cercana de la ventana de otro carril, siempre que
+   llegue antes o igual que el dueño o que no sea una de las 4 siguientes del dueño.
+
+Reclamar es exclusivo (`by[i]`): nadie pone dos veces lo mismo, y `frontOf` dice quién la reclamó. El punto de
+parada es, entre los planificados de las ventanas (del suyo y del dueño de la entrada) que alcanzan la entrada,
+el que **cubre más entradas pendientes**, así la siguiente parada sirve una ráfaga. Si empata, gana el más
+cercano, y nunca se usa la celda de otro builder. El builder **trota** a 0,6 bloques por tick, **coloca en
+cuanto el bloque entra en alcance** (antes de llegar) y nunca espera más de **20 ticks** por una caminata.
+Si el cliente necesitaría más de 1,2 bloques por tick para llegar a tiempo, el avatar **salta** al punto
+(`BuilderAvatar.leapTo`). El crédito de un builder que camina lo usa el que está listo: un solo builder listo
+puede gastar todo el tick. El `Walker` avisa cada objetivo nuevo con el destino elegido (`BuildCrew` sigue el A*).
+
+**Garantías.** El presupuesto global por tick no cambia (crédito = asignación de `BuildBudget`). Sin deadlock: la
+entrada pendiente de menor rango del segmento está lista y es la cabeza del carril de su dueño (o ya la reclamó
+otro, que la pondrá), y lo forzado sigue al final del orden. Los materiales siguen igual: segmentos verificados al
+empezar, `BLOCKED` pausa solo ese frente (que conserva su objetivo) y la obra se pausa cuando ningún otro puede
+seguir. Al reanudar, lo que ya está bien en el mundo se salta sin caminar. El resultado final es idéntico: las
+entradas de una misma posición siguen encadenadas por dependencias.
+
+**Antes y después (estimación a mano, classic con 20 proyectos, 4 grupos en paralelo × 4 builders, presupuesto
+48/tick por grupo).** Son 73 821 entradas y 6 876 bloques de recorrido (tabla de `docs/feat-hq-builders-ai.md`).
+- *Frentes por capa (a8d23dd):* no caminan y les limita el presupuesto: 73 821 / (4 × 48) ≈ **385 ticks**.
+- *Crew antes:* 6 876 / 0,3 ≈ 22 900 ticks-builder caminando ÷ 16 builders ≈ 1 430 ticks por builder, sin
+  solaparse con colocar (el crédito se perdía). A eso se suman las esperas entre carriles: unos **1 500–1 800 ticks,
+  4–5× más lento**.
+- *Crew ahora:* caminar a 0,6 bloques por tick lo divide entre 2. Colocar al entrar en alcance ahorra ~2 de los ~5
+  bloques de una caminata media, otro ×1,6. Las paradas que cubren más reducen las caminatas en ~20 %, un ×1,25.
+  Queda 1 430 / (2 × 1,6 × 1,25) ≈ **360 ticks** de caminata por builder, y el robo y la ventana evitan las
+  esperas. Como el crédito pasa a quien está listo, caminar y colocar se solapan: total ≈ max(385, 360) más un
+  margen ≈ **420–500 ticks, 1,1–1,3× los frentes**. El tope de 20 ticks por caminata acota el peor caso, porque
+  una entrada nunca cuesta más que eso.
+
+No se añadieron builders por tamaño de plan: con el presupuesto global como límite, más builders solo reparten el
+mismo crédito. `frontsPerJob` sigue siendo la palanca. Velocidades y ventanas son constantes de `CrewCursor`
+(`RUN_PER_TICK`, `MAX_WALK_TICKS`, `WINDOW`, `BURST_WINDOW`), sin claves de configuración nuevas.
