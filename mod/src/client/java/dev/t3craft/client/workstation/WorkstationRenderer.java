@@ -53,6 +53,8 @@ final class WorkstationRenderer {
 	private static final float HITBOX_HEIGHT = 1.75f;
 	/** Re-check whether the computer block is air this often (ticks). */
 	private static final int BLOCK_CHECK_TICKS = 20;
+	/** fix/hq-build-stutter: stations (screen, prop, hitbox) created per client tick. */
+	static final int SPAWNS_PER_TICK = 3;
 	/** Discard entities of our id range that no live station owns this often (ticks; also on the first tick). */
 	private static final int SWEEP_TICKS = 20 * 10;
 
@@ -127,8 +129,10 @@ final class WorkstationRenderer {
 			swept = true;
 		}
 		source.prepare(threads);
+		long t0 = System.nanoTime();
 		Set<String> alive = new HashSet<>();
 		boolean checkBlocks = tick % BLOCK_CHECK_TICKS == 0;
+		int spawnedNow = 0;
 		for (WorkstationThread t : threads) {
 			StationPlacement p = source.placement(t);
 			if (p == null) {
@@ -137,7 +141,16 @@ final class WorkstationRenderer {
 			alive.add(t.key());
 			Station s = stations.get(t.key());
 			boolean created = false;
-			if (s == null || !s.placement.equals(p) || s.broken()) {
+			boolean needs = s == null || !s.placement.equals(p) || s.broken();
+			if (needs && spawnedNow >= SPAWNS_PER_TICK) {
+				// fix/hq-build-stutter: a few stations per tick; this one (old place kept meanwhile) next tick
+				if (s == null) {
+					continue;
+				}
+				needs = false;
+			}
+			if (needs) {
+				spawnedNow++;
 				if (s != null) {
 					discard(lvl, s);
 				}
@@ -179,6 +192,7 @@ final class WorkstationRenderer {
 		if (tick % SWEEP_TICKS == 1) {
 			sweep(lvl);
 		}
+		dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_STATIONS, t0);
 	}
 
 	/**

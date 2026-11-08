@@ -36,6 +36,10 @@ public final class PerfStats {
 	private volatile Map<String, Long> windowStart = Map.of();
 	private volatile List<Rate> rates = List.of();
 	private volatile long windowStartNs;
+	/** fix/hq-build-stutter: longest single run of each {@link #step} key since the last reset, ns. */
+	private final Map<String, AtomicLong> peaks = new ConcurrentHashMap<>();
+	/** The last {@link #MAX_STALLS} steps over {@link #STALL_WARN_MS} on a game thread, newest last. */
+	private final java.util.ArrayDeque<String> stalls = new java.util.ArrayDeque<>();
 
 	public PerfStats(LongSupplier nanoClock) {
 		this.clock = nanoClock;
@@ -58,6 +62,77 @@ public final class PerfStats {
 	/** Adds {@code System.nanoTime() - startNs} to timer {@code key} (must end in {@code .ns}). */
 	public static void since(String key, long startNs) {
 		INSTANCE.add(key, System.nanoTime() - startNs);
+	}
+
+	// ---- steps (fix/hq-build-stutter) ----------------------------------------------------------
+
+	/** A single step on a game thread (server tick or client frame) above this logs a WARN. */
+	public static final double STALL_WARN_MS = 20.0;
+	private static final long STALL_WARN_NS = (long) (STALL_WARN_MS * 1_000_000);
+	/** Counts the steps that went over {@link #STALL_WARN_MS} on a game thread. */
+	public static final String STALLS = "step.stalls";
+	/** Prefix of the step timers ({@code step.<area>.<what>.ns}). */
+	public static final String STEP_PREFIX = "step.";
+	static final int MAX_STALLS = 16;
+
+	/**
+	 * Ends one step that runs on a <b>game thread</b> (server or client tick): adds its time to timer
+	 * {@code key} (must end in {@code .ns}), keeps its peak, and logs a WARN when it took longer than
+	 * {@link #STALL_WARN_MS} (a visible hitch). Returns the elapsed nanoseconds. Cost: two nanoTime
+	 * calls and two map lookups.
+	 */
+	public static long step(String key, long startNs) {
+		long ns = System.nanoTime() - startNs;
+		INSTANCE.add(key, ns);
+		INSTANCE.peak(key, ns);
+		if (ns > STALL_WARN_NS) {
+			INSTANCE.add(STALLS, 1);
+			String line = String.format(java.util.Locale.ROOT, "%s %.1f ms on %s", stepName(key), ns / 1e6, Thread.currentThread().getName());
+			INSTANCE.stall(line);
+			dev.t3craft.T3Craft.LOGGER.warn("[perf] slow step {} (over {} ms: the game hitches)", line, (int) STALL_WARN_MS);
+		}
+		return ns;
+	}
+
+	/** Like {@link #step} for work done <b>off</b> the game threads (background planner): timed, peak kept, no WARN. */
+	public static long stepAsync(String key, long startNs) {
+		long ns = System.nanoTime() - startNs;
+		INSTANCE.add(key, ns);
+		INSTANCE.peak(key, ns);
+		return ns;
+	}
+
+	private void peak(String key, long ns) {
+		peaks.computeIfAbsent(key, k -> new AtomicLong()).accumulateAndGet(ns, Math::max);
+	}
+
+	private void stall(String line) {
+		synchronized (stalls) {
+			if (stalls.size() >= MAX_STALLS) {
+				stalls.removeFirst();
+			}
+			stalls.addLast(line);
+		}
+	}
+
+	/** Peak (ns) of every step timed since the last reset, sorted by key. */
+	public java.util.SortedMap<String, Long> peaks() {
+		java.util.TreeMap<String, Long> out = new java.util.TreeMap<>();
+		peaks.forEach((k, v) -> out.put(k, v.get()));
+		return out;
+	}
+
+	/** The last slow steps on a game thread ({@code "key 34.2 ms on Server thread"}), oldest first. */
+	public List<String> recentStalls() {
+		synchronized (stalls) {
+			return List.copyOf(stalls);
+		}
+	}
+
+	/** {@code step.build.job_new.ns} → {@code build.job_new}. */
+	public static String stepName(String key) {
+		String k = key.startsWith(STEP_PREFIX) ? key.substring(STEP_PREFIX.length()) : key;
+		return k.endsWith(".ns") ? k.substring(0, k.length() - 3) : k;
 	}
 
 	public void add(String key, long n) {
@@ -113,6 +188,10 @@ public final class PerfStats {
 
 	public void reset() {
 		totals.clear();
+		peaks.clear();
+		synchronized (stalls) {
+			stalls.clear();
+		}
 		windowStart = Map.of();
 		rates = List.of();
 		windowStartNs = clock.getAsLong();
@@ -160,6 +239,48 @@ public final class PerfStats {
 	public static final String LAMP_SWEEPS = "lamp.sweeps";
 	public static final String LAMP_WRITES = "lamp.writes";
 	public static final String BINDING_WRITES = "binding.writes";
+
+	// fix/hq-build-stutter: start and end of build work (game-thread steps unless marked "async")
+	/** Server: a BuildJob created (plan copy, small crew plans planned inline). Client thread when a crew submits. */
+	public static final String STEP_JOB_NEW = "step.build.job_new.ns";
+	/** Async: crew schedule ({@code CrewSchedule.of}: k-means and simulation). */
+	public static final String STEP_SCHEDULE = "step.build.schedule_async.ns";
+	/** Async: material costs and meter of a charged job ({@code BlockCosts}, {@code MaterialMeter}). */
+	public static final String STEP_METER = "step.build.meter_async.ns";
+	/** Server: listeners of jobs that started / finished, per tick. */
+	public static final String STEP_STARTED = "step.build.started.ns";
+	public static final String STEP_FINISHED = "step.build.finished.ns";
+	/** Server: one whole BuildManager tick (placing included). */
+	public static final String STEP_MANAGER_TICK = "step.build.manager_tick.ns";
+	/** Server: one HQ reconcile ({@code HqConstruction.tick}, once a second). */
+	public static final String STEP_HQ_TICK = "step.hq.construct_tick.ns";
+	/** Async: HQ target plan ({@code HqTarget.compute}: HqPlans, lighting, packs). */
+	public static final String STEP_HQ_TARGET = "step.hq.target_async.ns";
+	/** Server: the in-place diff of the HQ (cells and removals of the built modules). */
+	public static final String STEP_HQ_DIFF = "step.hq.diff.ns";
+	/** Server: {@code Ports.update}: site claims (dry + real), cost check, writer start. */
+	public static final String STEP_HQ_UPDATE = "step.hq.update.ns";
+	/** Server: HQ construction created (plan of the saved layout), once per world. */
+	public static final String STEP_HQ_LOAD = "step.hq.load.ns";
+	/** Server: a site expansion started (scan, snapshot capture and fsynced saves). */
+	public static final String STEP_SITE_EXPAND = "step.site.expand.ns";
+	/** Server: site cell claims ({@code SiteService.claim}). */
+	public static final String STEP_SITE_CLAIM = "step.site.claim.ns";
+	/** Async: a site module turned into a crew plan ({@code BuildPlanBridge.toBuildPlan}, layered). */
+	public static final String STEP_SITE_PLAN = "step.site.plan_async.ns";
+	/** Client: builders of one crew spawned / despawned this tick. */
+	public static final String STEP_CREW_SPAWN = "step.crew.spawn.ns";
+	public static final String STEP_CREW_DESPAWN = "step.crew.despawn.ns";
+	/** Client: build events of the tick applied to the crews (walk routes included). */
+	public static final String STEP_CREW_EVENTS = "step.crew.events.ns";
+	/** Client: HQ presence installed (NPC anchors, stations, fixture bindings). */
+	public static final String STEP_PRESENCE = "step.hq.presence.ns";
+	/** Async: HQ presence sources built ({@code HqWorldAnchors}, {@code HqStations}, {@code HqBindings}). */
+	public static final String STEP_PRESENCE_PREP = "step.hq.presence_async.ns";
+	/** Client: NPC roster reconcile (spawns and removals). */
+	public static final String STEP_NPC_RECONCILE = "step.npc.reconcile.ns";
+	/** Client: workstation stations tick (spawns included). */
+	public static final String STEP_STATIONS = "step.stations.tick.ns";
 
 	/** Prefix of the per-module client tick timers ({@code tick.<module>.ns}). */
 	public static final String TICK_PREFIX = "tick.";

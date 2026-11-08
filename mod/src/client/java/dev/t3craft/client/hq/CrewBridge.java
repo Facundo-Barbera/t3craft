@@ -125,16 +125,74 @@ public final class CrewBridge {
 		return true;
 	}
 
-	/** Site builder factory: the crew, or the site's paced builder when no crew can go. */
+	/**
+	 * Site builder factory: the crew, or the site's paced builder when no crew can go.
+	 *
+	 * <p>fix/hq-build-stutter: the module's cell plan is turned into the crew's plan (every cell parsed
+	 * into a block state, then sorted bottom-up) on a background worker, not inside the server tick that
+	 * started the expansion; the crew (or the paced builder) starts on the server thread once it is
+	 * ready, a tick or two later. Until then the returned handle is "running"; a cancel meanwhile
+	 * reports a cancelled build when the plan arrives.
+	 */
 	public static Function<ServerLevel, SiteBuilder> siteBuilder() {
 		return level -> (plan, origin, guard, done) -> {
-			Box b = plan.box();
-			BuildPlan rel = BuildPlanBridge.toBuildPlan(plan, new LevelBlockWorld(level));
-			List<dev.t3craft.build.Placement> abs = new ArrayList<>(rel.size());
-			for (dev.t3craft.build.Placement p : rel.placements()) {
-				abs.add(new dev.t3craft.build.Placement(p.pos().offset(b.minX(), b.minY(), b.minZ()), p.state(), p.blockEntity()));
+			PendingHandle pending = new PendingHandle();
+			java.util.concurrent.CompletableFuture<BuildPlan> converted = dev.t3craft.build.Offload.supply(
+					dev.t3craft.debug.PerfStats.STEP_SITE_PLAN, () -> worldPlan(plan, level));
+			converted.whenComplete((world, err) -> level.getServer().execute(() -> {
+				if (pending.cancelled) {
+					pending.finished = true;
+					done.accept(new SiteBuilder.Report(0, 0, 0, true, List.of()));
+					return;
+				}
+				if (err != null || world == null) {
+					T3Craft.LOGGER.warn("HQ crew plan failed off-thread, the paced builder takes over", err);
+					pending.delegate = SiteRuntime.paced(level).submit(plan, origin, guard, done);
+					return;
+				}
+				pending.delegate = startSite(level, plan, origin, guard, done, world);
+			}));
+			return pending;
+		};
+	}
+
+	/** A site build whose builder is not chosen yet (its plan is still being converted off-thread). */
+	private static final class PendingHandle implements SiteBuilder.Handle {
+		volatile SiteBuilder.@Nullable Handle delegate;
+		volatile boolean cancelled;
+		volatile boolean finished;
+
+		@Override
+		public boolean finished() {
+			SiteBuilder.Handle d = delegate;
+			return d != null ? d.finished() : finished;
+		}
+
+		@Override
+		public void cancel() {
+			cancelled = true;
+			SiteBuilder.Handle d = delegate;
+			if (d != null) {
+				d.cancel();
 			}
-			BuildPlan world = BuildPlan.of(abs).layered();
+		}
+	}
+
+	/** The site plan in world coordinates, bottom-up: pure (block states parsed from their keys), any thread. */
+	private static BuildPlan worldPlan(dev.t3craft.site.CellPlan plan, ServerLevel level) {
+		Box b = plan.box();
+		BuildPlan rel = BuildPlanBridge.toBuildPlan(plan, new LevelBlockWorld(level));
+		List<dev.t3craft.build.Placement> abs = new ArrayList<>(rel.size());
+		for (dev.t3craft.build.Placement p : rel.placements()) {
+			abs.add(new dev.t3craft.build.Placement(p.pos().offset(b.minX(), b.minY(), b.minZ()), p.state(), p.blockEntity()));
+		}
+		return BuildPlan.of(abs).layered();
+	}
+
+	/** Server thread: the crew for {@code world} (the converted {@code plan}), or the paced builder. */
+	private static SiteBuilder.Handle startSite(ServerLevel level, dev.t3craft.site.CellPlan plan, dev.t3craft.site.CellPlan.Origin origin,
+			SiteBuilder.CellGuard guard, Consumer<SiteBuilder.Report> done, BuildPlan world) {
+		{
 			AtomicInteger refused = new AtomicInteger();
 			List<String> sample = new CopyOnWriteArrayList<>();
 			UnaryOperator<BlockSink> wrap = inner -> (pos, state, be) -> {
@@ -175,7 +233,7 @@ public final class CrewBridge {
 					});
 				}
 			};
-		};
+		}
 	}
 
 	/** In-place writer: the crew, or {@code fallback} when no crew can go. */
@@ -183,15 +241,26 @@ public final class CrewBridge {
 		return new HqWriter() {
 			@Override
 			public void write(String label, ServerLevel level, List<Write> writes, Consumer<Boolean> done) {
-				List<dev.t3craft.build.Placement> ps = new ArrayList<>(writes.size());
-				for (Write w : writes) {
-					ps.add(new dev.t3craft.build.Placement(w.pos(), w.state(), w.blockEntity()));
-				}
-				boolean ok = !ps.isEmpty() && start(label, level, BuildPlan.of(ps).layered(), HqWriter.guard(level, writes),
-						job -> done.accept(job != null && job.state() == JobState.COMPLETED));
-				if (!ok) {
+				if (writes.isEmpty()) {
 					fallback.write(label, level, writes, done);
+					return;
 				}
+				List<Write> copy = List.copyOf(writes);
+				// fix/hq-build-stutter: the crew's plan (sorted bottom-up) is made off-thread; the crew or
+				// the paced fallback starts on the server thread when it is ready.
+				dev.t3craft.build.Offload.supply(dev.t3craft.debug.PerfStats.STEP_SITE_PLAN, () -> {
+					List<dev.t3craft.build.Placement> ps = new ArrayList<>(copy.size());
+					for (Write w : copy) {
+						ps.add(new dev.t3craft.build.Placement(w.pos(), w.state(), w.blockEntity()));
+					}
+					return BuildPlan.of(ps).layered();
+				}).whenComplete((plan, err) -> level.getServer().execute(() -> {
+					boolean ok = err == null && plan != null && start(label, level, plan, HqWriter.guard(level, copy),
+							job -> done.accept(job != null && job.state() == JobState.COMPLETED));
+					if (!ok) {
+						fallback.write(label, level, copy, done);
+					}
+				}));
 			}
 
 			@Override
