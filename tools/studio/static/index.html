@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Citadel Studio</title>
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&display=swap">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span>Citadel Studio</a>
+  <nav class="nav">
+    <a href="/" data-nav="/">Tablero</a>
+    <a href="/render" data-nav="/render">Pedir render</a>
+  </nav>
+  <div id="daemon" class="daemon" aria-live="polite"></div>
+</header>
+<main id="app" class="wrap"><p class="muted">Cargando…</p></main>
+<div id="viewer" class="viewer" hidden>
+  <div class="viewer-bar">
+    <span id="viewer-title" class="viewer-title"></span>
+    <span class="grow"></span>
+    <button type="button" data-v="prev" title="Anterior (←)">‹</button>
+    <button type="button" data-v="next" title="Siguiente (→)">›</button>
+    <button type="button" data-v="out" title="Alejar (−)">−</button>
+    <button type="button" data-v="fit" title="Ajustar (0)">Ajustar</button>
+    <button type="button" data-v="one" title="Tamaño real (1)">1:1</button>
+    <button type="button" data-v="in" title="Acercar (+)">+</button>
+    <button type="button" data-v="ref" title="Usar como referencia en una nota">Nota</button>
+    <a id="viewer-open" class="btn" target="_blank" rel="noopener" title="Abrir el PNG">PNG</a>
+    <button type="button" data-v="close" title="Cerrar (Esc)">✕</button>
+  </div>
+  <div id="viewer-stage" class="viewer-stage"><img id="viewer-img" alt="" draggable="false"></div>
+</div>
+<script src="/static/app.js"></script>
+</body>
+</html>
