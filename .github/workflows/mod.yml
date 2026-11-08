@@ -20,7 +20,7 @@ defaults:
 
 jobs:
   build:
-    name: Build + JUnit
+    name: Build (compile only, no tests)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -36,7 +36,7 @@ jobs:
           # Only main writes the cache; branches read it.
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
-      - name: Build (compile, JUnit, compile GameTests, jar)
+      - name: Build (compile + jar; this repo has no tests)
         run: ./gradlew build --no-daemon --stacktrace
 
       - name: Upload mod jar
@@ -48,47 +48,3 @@ jobs:
             !mod/build/libs/*-sources.jar
           if-no-files-found: error
           retention-days: 14
-
-      - name: Upload test reports
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-reports-${{ github.sha }}
-          path: mod/build/reports/tests/
-          if-no-files-found: ignore
-
-  client-gametest:
-    name: Client GameTests (xvfb)
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    # Boots a real Minecraft client; still experimental in Fabric API, so it does not block merges yet.
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "25"
-
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          cache-read-only: true
-
-      - name: Install virtual display and GL
-        run: sudo apt-get update -q && sudo apt-get install -y -q xvfb libgl1 libglx-mesa0 mesa-utils
-
-      - name: Run client GameTests
-        run: xvfb-run -a -s "-screen 0 1280x720x24" ./gradlew runClientGameTest --no-daemon --stacktrace
-
-      - name: Upload GameTest run dir (logs, screenshots)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: client-gametest-${{ github.sha }}
-          path: |
-            mod/build/run/clientGameTest/logs/
-            mod/build/run/clientGameTest/screenshots/
-            mod/build/run/clientGameTest/crash-reports/
-          if-no-files-found: ignore

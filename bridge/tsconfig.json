@@ -20,5 +20,5 @@
     "resolveJsonModule": true,
     "types": ["node"]
   },
-  "include": ["src", "test", "vendor/t3-contracts/src", "vitest.config.ts"]
+  "include": ["src", "vendor/t3-contracts/src"]
 }

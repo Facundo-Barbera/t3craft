@@ -76,7 +76,7 @@ will need `--scope orchestration:operate`, which is close to admin: issue it sep
 ```bash
 cd bridge
 pnpm install
-pnpm typecheck && pnpm test
+pnpm typecheck
 cp config.example.json ~/.config/t3craft/bridge.json   # edit: listen.host, environments, token paths
 T3CRAFT_CONFIG=~/.config/t3craft/bridge.json pnpm probe          # threads the mod would show (filtered), then exits
 T3CRAFT_CONFIG=~/.config/t3craft/bridge.json pnpm probe --all    # no window/cap (archived/settled still hidden)
@@ -132,7 +132,8 @@ Right-click one to open its (placeholder) chat screen.
 ## Security rules for this repo
 
 - No tokens, tickets or credentialed URLs in git (`.gitignore` covers `.env`, `*.token`, `run/`, `build/`).
-- No servers on `0.0.0.0` or public IPs. Tests bind 127.0.0.1 on ephemeral ports.
+- No servers on `0.0.0.0` or public IPs.
+- Este repo no usa tests unitarios; prohibido agregarlos o correrlos. Verificación = compilar.
 - No GPL or unlicensed code. AgentCraft (MIT) only with attribution (`THIRD_PARTY_NOTICES.md`).
 
 ## License

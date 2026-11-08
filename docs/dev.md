@@ -5,46 +5,27 @@ that runs it is not 25 (foojay resolver in `settings.gradle`).
 
 ## Fast loop
 
+**Este repo no usa tests unitarios; prohibido agregarlos o correrlos. Verificación = compilar.**
+Gradle blocks them outright (`mod/build.gradle`): no test source set, every `Test` task disabled,
+and `check`/`build` only compile.
+
 | What | Command | Boots Minecraft? |
 |---|---|---|
-| Compile + JUnit + compile GameTests + jar | `./gradlew build` | no |
-| Only JUnit (pure logic: `dev.t3craft.t3`, `dev.t3craft.debug`) | `./gradlew test` | no |
-| One test class | `./gradlew test --tests 'dev.t3craft.debug.ModuleGuardTest'` | no |
+| Compile (verification) | `./gradlew compileJava compileClientJava` | no |
+| Compile + jar | `./gradlew build` | no |
 | Play / debug locally | `./gradlew runClient` | **yes** |
-| Client GameTests | `./gradlew runClientGameTest` | **yes** (headless only with xvfb) |
 
-The shared VPS never runs the last two: no Minecraft, no long-running processes. Use
+The shared VPS never runs Minecraft or long-running processes, and runs one Gradle at a time. Use
 `--no-daemon` there so Gradle does not leave a daemon behind (or `./gradlew --stop` afterwards).
 On your own machine the daemon is fine.
 
-Put as much logic as you can in plain Java under `src/main` (no `net.minecraft.*` in the class)
-and cover it with JUnit; that is the loop that takes seconds. Client glue under `src/client`
-stays thin.
-
 ## CI
 
-`.github/workflows/mod.yml` runs on every push and PR touching `mod/**`:
-
-- **Build + JUnit**: `./gradlew build` (compile, unit tests, compile GameTests, jar). The mod jar
-  is uploaded as the artifact `t3craft-mod-<sha>` (14 days); test reports on failure.
-- **Client GameTests (xvfb)**: `runClientGameTest` under a virtual display, after the build job.
-  Logs, screenshots and crash reports are uploaded as `client-gametest-<sha>`. It is
-  `continue-on-error` for now (the Fabric client GameTest API is still marked experimental), so a
-  red run is a warning, not a merge blocker.
+`.github/workflows/mod.yml` runs on every push and PR touching `mod/**`: `./gradlew build`
+(compile + jar, no tests). The mod jar is uploaded as the artifact `t3craft-mod-<sha>` (14 days).
 
 To grab a build from CI: Actions → the run → Artifacts → `t3craft-mod-<sha>` → drop the jar into
 your instance's `mods/` with Fabric API.
-
-## GameTests
-
-`src/gametest` is its own mod (`t3craft-gametest`, never shipped in the jar) with a
-`fabric-client-gametest` entrypoint. Its classpath includes `src/client`, so tests can touch client
-classes. Add a class implementing `FabricClientGameTest` and list it in
-`src/gametest/resources/fabric.mod.json`. Useful pieces of `ClientGameTestContext`:
-`worldBuilder().create()` (singleplayer world, close it with try-with-resources),
-`waitTicks(n)`, `runOnClient(mc -> ...)`, `waitForScreen(...)`, `takeScreenshot(...)`. Throwing
-from the test (e.g. `AssertionError`) fails the run. Server GameTests are disabled on purpose:
-the mod is client-only and Loom would attach them to `check`.
 
 ## Hot-swap
 
