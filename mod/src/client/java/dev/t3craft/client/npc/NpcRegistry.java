@@ -78,6 +78,8 @@ public final class NpcRegistry {
 	private @Nullable ClientLevel level;
 	private @Nullable Vec3 anchor;
 	private boolean dirty;
+	/** {@link NpcGate#version()} last reconciled with (fix/hq-build-parallel). */
+	private int gateSeen = -1;
 	private int tick;
 	private long lastErrorLogMs;
 	/**
@@ -424,6 +426,10 @@ public final class NpcRegistry {
 		if (tick % SWEEP_TICKS == 0) {
 			sweep(lvl); // NPCs, nametags and signs of threads that no longer hold a station
 		}
+		if (gateSeen != NpcGate.version()) {
+			gateSeen = NpcGate.version();
+			dirty = true;
+		}
 		if (dirty) {
 			dirty = false;
 			if (anchor == null && !wanted.isEmpty()) {
@@ -489,7 +495,9 @@ public final class NpcRegistry {
 	private void reconcile(ClientLevel lvl, Vec3 a) {
 		// Incremental (fix/npc-position-reset): only NPCs no longer wanted go, only new ones spawn below;
 		// the others keep their entity (where it stands), brain and overlays.
-		RosterDiff diff = RosterDiff.of(spawned.keySet(), wanted.keySet());
+		// fix/hq-build-parallel: nobody waits around a half-built HQ (NpcGate).
+		Map<String, NpcInfo> shown = NpcGate.shown(wanted, spawned.keySet());
+		RosterDiff diff = RosterDiff.of(spawned.keySet(), shown.keySet());
 		for (String id : diff.removed()) {
 			Spawned s = spawned.remove(id);
 			behavior.forget(id, lvl);
@@ -502,14 +510,14 @@ public final class NpcRegistry {
 		}
 
 		// Provisional desks: stable grid cells, one block of desks per neighbourhood.
-		List<GridLayout.Member> members = new ArrayList<>(wanted.size());
-		for (NpcInfo n : wanted.values()) {
+		List<GridLayout.Member> members = new ArrayList<>(shown.size());
+		for (NpcInfo n : shown.values()) {
 			members.add(new GridLayout.Member(n.id(), n.groupId(), n.envLabel()));
 		}
 		fallbackLayout().update(new Pos(a.x, a.y, a.z), members, BehaviorDirector.ground(lvl, a.y));
 
 		Map<String, List<NpcInfo>> groups = new LinkedHashMap<>();
-		List<NpcInfo> ordered = new ArrayList<>(wanted.values());
+		List<NpcInfo> ordered = new ArrayList<>(shown.values());
 		ordered.sort(Comparator.comparingInt(NpcInfo::priority).thenComparing(NpcInfo::id));
 		for (NpcInfo n : ordered) {
 			groups.computeIfAbsent(n.groupId(), k -> new ArrayList<>()).add(n);

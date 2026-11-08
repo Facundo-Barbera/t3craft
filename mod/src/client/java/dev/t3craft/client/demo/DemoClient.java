@@ -191,6 +191,7 @@ public final class DemoClient implements ClientModInitializer {
 			builtBefore = null;
 			enteredAtMs = System.currentTimeMillis();
 			run = null; // its crews died with the old level (BuildersClient cancels them)
+			dev.t3craft.client.npc.NpcGate.open();
 			clearAnchors();
 		}
 		if (notice != null && mc.player != null) {
@@ -226,6 +227,7 @@ public final class DemoClient implements ClientModInitializer {
 			r.tick(mc, Builders.service());
 			if (r.done()) {
 				run = null;
+				dev.t3craft.client.npc.NpcGate.open(); // fix/hq-build-parallel: the HQ stands, NPCs come in
 			}
 		}
 	}
@@ -322,6 +324,9 @@ public final class DemoClient implements ClientModInitializer {
 		if (clearsAnchorsBeforeBuild(quiet)) {
 			clearAnchors(); // NPCs keep to the ring layout while the HQ is (re)built from scratch
 		}
+		// fix/hq-build-parallel: the structure first. A full build keeps every NPC away until it stands;
+		// a diff keeps the ones already at work and holds only the newcomers until their desk is built.
+		dev.t3craft.client.npc.NpcGate.set(npcGateFor(quiet));
 		run = new DemoBuildRun(source, plans, root, cfg, delay, quiet ? m -> T3Craft.LOGGER.info("[demo] {}", m) : this::say,
 				() -> installAnchors(source));
 		String msg = "building HQ: " + source.id() + " v" + source.version() + ", " + plans.size() + " part(s)";
@@ -341,6 +346,11 @@ public final class DemoClient implements ClientModInitializer {
 	 */
 	static boolean clearsAnchorsBeforeBuild(boolean quiet) {
 		return !quiet;
+	}
+
+	/** Who may stand in the HQ world while it is built (fix/hq-build-parallel). */
+	static dev.t3craft.client.npc.NpcGate.Mode npcGateFor(boolean quiet) {
+		return quiet ? dev.t3craft.client.npc.NpcGate.Mode.HOLD_NEW : dev.t3craft.client.npc.NpcGate.Mode.HOLD_ALL;
 	}
 
 	private void status() {
@@ -444,6 +454,7 @@ public final class DemoClient implements ClientModInitializer {
 			run.cancel();
 			run = null;
 		}
+		dev.t3craft.client.npc.NpcGate.open();
 		clearAnchors();
 		if (mc.level != null) {
 			VanillaDemoWorld.leaveWorld(mc); // blocks until the integrated server has stopped
