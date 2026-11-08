@@ -1,15 +1,18 @@
 package dev.t3craft.client.screen;
 
 /**
- * Pure layout arithmetic shared by the mod's vanilla-style screens (no Minecraft classes, so it is
+ * Pure layout arithmetic shared by the mod's vanilla-style screens (only compile-time constants from Minecraft, so it is
  * unit-tested): where a status line goes so it never sits on a button row, how many wrapped lines
  * fit above a widget, where a dialog's buttons go under a text block of unknown height, and the
  * "submit" keys of a form.
  */
 public final class DialogLayout {
-	/** GLFW key codes (same values as {@code InputConstants}), kept here so the class stays pure. */
-	public static final int KEY_ENTER = 257;
-	public static final int KEY_KP_ENTER = 335;
+	/**
+	 * Minecraft's key codes. Not GLFW's (257/335) any more in 26.x: always go through
+	 * {@code InputConstants}. Compile-time constants, so the class stays loadable in unit tests.
+	 */
+	public static final int KEY_ENTER = com.mojang.blaze3d.platform.InputConstants.KEY_RETURN;
+	public static final int KEY_KP_ENTER = com.mojang.blaze3d.platform.InputConstants.KEY_NUMPADENTER;
 
 	/** Height of a vanilla button. */
 	public static final int BUTTON_H = 20;

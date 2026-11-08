@@ -56,7 +56,10 @@ class DialogLayoutTest {
 	void submitKeys() {
 		assertTrue(DialogLayout.isSubmit(DialogLayout.KEY_ENTER));
 		assertTrue(DialogLayout.isSubmit(DialogLayout.KEY_KP_ENTER));
-		assertFalse(DialogLayout.isSubmit(32));
+		assertTrue(DialogLayout.isSubmit(com.mojang.blaze3d.platform.InputConstants.KEY_RETURN));
+		assertTrue(DialogLayout.isSubmit(com.mojang.blaze3d.platform.InputConstants.KEY_NUMPADENTER));
+		assertFalse(DialogLayout.isSubmit(257), "GLFW's Enter is not Minecraft 26's Enter");
+		assertFalse(DialogLayout.isSubmit(com.mojang.blaze3d.platform.InputConstants.KEY_SPACE));
 	}
 
 	@Test
