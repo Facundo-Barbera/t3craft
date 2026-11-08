@@ -49,7 +49,9 @@ destino, la ruta entra por la vía (la entrada de la base). Con la caja crecient
 directa ya encuentra una abertura a 40 bloques, y eso es justo el arreglo. El test conserva su
 intención con la abertura más allá de la caja máxima (`MAX_PAD + 16`): ahí la ruta directa sigue
 siendo NONE y la vía mete al NPC. Un test nuevo, `theSearchBoxGrowsToAnOpeningPastThePad`, fija el
-caso de los 40 bloques como ruta directa.
+caso de los 40 bloques como ruta directa. Como esa ruta por la entrada mide unos 330 bloques, el tope fijo de 2000
+ticks de `NavigationTest.walk` (unos 290 bloques a `Motion.SPEED`) la cortaba antes del final.
+Ahora el tope es el doble del tiempo que la ruta necesita a paso normal, con un mínimo de 2000.
 
 ## Red de seguridad: recolocación
 
