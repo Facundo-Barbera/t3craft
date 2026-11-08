@@ -71,8 +71,8 @@ or Esc goes back to the list.
 
 | Slot | Component | Fallback on main |
 |---|---|---|
-| `composer()` (bottom of the thread panel; `setThread`, `render`, events, `setBounds`) | feat/chat-compose, `dev.t3craft.client.chat.compose` | `ConversationPanel`'s read-only command bar with "Enable control" |
-| `modelPicker()` (composer bar) | feat/t3-actions `ModelPicker` | none |
+| composer (bottom of the thread panel) | feat/chat-compose `ComposerView` via `ChatComposer.create/attach/sync`: the conversation draws it as its `Footer`; `T3Screen` owns it (drafts survive dialogs) and forwards keys (all keys while focused, Esc leaves), chars, drag and scroll. **Mounted** (branch merged into this one). | — |
+| `composerControls()` (composer bar's left slot, `ComposerView.Control`) | feat/t3-actions `ModelPicker` | none |
 | `newThread(...)` (sidebar button, Ctrl+N, menu) | feat/t3-actions `NewThreadDialog` | `NewThreadScreen` |
 | `menuItems(...)` → "Register project…" | feat/t3-actions `RegisterProjectDialog` | not shown |
 | `drawStatusChip(...)` (header) | feat/t3-actions `ThreadStatusChip` | pill with the attention word |
@@ -86,7 +86,7 @@ or Esc goes back to the list.
 | Ctrl+F | search (↑/↓ still step; Esc clears, then leaves the field) |
 | Ctrl+N | new thread |
 | Ctrl+B | hide/show sidebar (compact: switch panel) |
-| Enter | compact: open the selected thread; wide: focus the composer |
+| Enter | compact: open the selected thread; wide: focus the composer (then Enter sends, Shift+Enter newline, Esc leaves) |
 | PgUp/PgDn/End | scroll the conversation |
 | Esc | close menu → leave field → back to the list (compact) → close |
 | Y | close (list focused) |

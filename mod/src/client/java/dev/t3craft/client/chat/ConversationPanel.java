@@ -85,6 +85,25 @@ public final class ConversationPanel implements AutoCloseable {
 		void pair();
 	}
 
+	/**
+	 * Replaces the reply bar under the panel (feat/chat-compose: the composer). The panel reserves
+	 * {@link #height(int)} px at the bottom of its bounds and forwards render and clicks there.
+	 */
+	public interface Footer {
+		int height(int width);
+
+		void render(GuiGraphicsExtractor g, Font font, Rect r, int mouseX, int mouseY);
+
+		boolean mouseClicked(double mx, double my, int button);
+	}
+
+	/** Rows appended after the transcript (the composer's optimistic messages), with a change counter. */
+	public interface Extra {
+		List<ChatEntry> entries();
+
+		long version();
+	}
+
 	/** Thread navigation shown as ‹ n/N › key caps in the header (AgentCraft decision queue). */
 	public interface Navigation {
 		/** "3/12", or empty to hide the control. */
@@ -101,6 +120,9 @@ public final class ConversationPanel implements AutoCloseable {
 	private boolean showPrompt = true;
 	private boolean showHeader = true;
 	private @Nullable Navigation nav;
+	private @Nullable Footer footer;
+	private @Nullable Extra extra;
+	private long builtExtra = -1;
 	private String[] hints = {"PgUp", "scroll", "End", "newest"};
 
 	private @Nullable ThreadFeed feed;
@@ -205,6 +227,17 @@ public final class ConversationPanel implements AutoCloseable {
 			showHeader = v;
 			layoutDirty = true;
 		}
+	}
+
+	/** Puts {@code f} (the composer) where the reply bar was; null brings the bar back. */
+	public void setFooter(@Nullable Footer f) {
+		footer = f;
+	}
+
+	/** Extra rows after the transcript (optimistic messages); null for none. */
+	public void setExtra(@Nullable Extra e) {
+		extra = e;
+		layoutDirty = true;
 	}
 
 	public void setNavigation(@Nullable Navigation n) {
@@ -390,9 +423,11 @@ public final class ConversationPanel implements AutoCloseable {
 			return;
 		}
 		ChatTranscript.View v = f.transcript().view();
-		if (!layoutDirty && v.version() == builtVersion && w == builtWidth) {
+		long extraVersion = extra == null ? -1 : extra.version();
+		if (!layoutDirty && v.version() == builtVersion && w == builtWidth && extraVersion == builtExtra) {
 			return;
 		}
+		builtExtra = extraVersion;
 		ChatTheme t = theme;
 		int oldHeight = lines.isEmpty() ? 0 : lines.getLast().y() + lines.getLast().h();
 		String oldFirst = firstKey;
@@ -407,7 +442,15 @@ public final class ConversationPanel implements AutoCloseable {
 		}
 		Long prevAt = null;
 		long now = System.currentTimeMillis();
-		for (Turn turn : ChatTurns.group(v.entries())) {
+		List<ChatEntry> all = v.entries();
+		if (extra != null) {
+			List<ChatEntry> more = extra.entries();
+			if (!more.isEmpty()) {
+				all = new ArrayList<>(all);
+				all.addAll(more);
+			}
+		}
+		for (Turn turn : ChatTurns.group(all)) {
 			String sep = FeedRules.separator(prevAt, turn.at(), ZoneId.systemDefault(), now);
 			if (sep != null) {
 				L.add(t.row() + 2, 0, List.of(), 0, 0, 0, null, 0, null, null, false, sep, false, false);
@@ -776,6 +819,10 @@ public final class ConversationPanel implements AutoCloseable {
 			actions.enableControl(envId);
 			return true;
 		}
+		if (footer != null && showPrompt && bar.contains(mx, my)) {
+			footer.mouseClicked(mx, my, button);
+			return true;
+		}
 		Hit hit = hitTest((int) mx, (int) my);
 		if (hit == null) {
 			return bar.contains(mx, my);
@@ -809,7 +856,7 @@ public final class ConversationPanel implements AutoCloseable {
 		if (bounds.w() < 60 || bounds.h() < 50) {
 			return;
 		}
-		int fieldH = showPrompt ? FIELD_H : 0;
+		int fieldH = !showPrompt ? 0 : footer != null ? footer.height(bounds.w()) : FIELD_H;
 		Rect panel = new Rect(bounds.x(), bounds.y(), bounds.w(), bounds.h() - (showPrompt ? fieldH + 5 : 0));
 		ChatDraw.panel(g, t, panel);
 		int pad = t.pad();
@@ -945,7 +992,10 @@ public final class ConversationPanel implements AutoCloseable {
 		// ---- command bar: ready when the environment can operate (sending arrives with item 19),
 		// otherwise a neutral read-only line with an "Enable control" button
 		controlButton = Rect.EMPTY;
-		if (showPrompt) {
+		if (showPrompt && footer != null) {
+			bar = new Rect(bounds.x(), bounds.bottom() - fieldH, bounds.w(), fieldH);
+			footer.render(g, font, bar, mouseX, mouseY);
+		} else if (showPrompt) {
 			bar = new Rect(bounds.x(), bounds.bottom() - fieldH, bounds.w(), fieldH);
 			ChatAccess.Reply reply = replyState();
 			ChatDraw.field(g, t, bar, false);

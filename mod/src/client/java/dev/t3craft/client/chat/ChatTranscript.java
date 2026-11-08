@@ -290,6 +290,15 @@ public final class ChatTranscript {
 		return cached;
 	}
 
+	/**
+	 * Id of the latest run while it is active (preparing, queued, starting, running), else null:
+	 * the {@code runId} the composer's Stop interrupts ({@code run.interrupt}).
+	 */
+	public synchronized @Nullable String activeRunId() {
+		Run latest = runs.values().stream().max(Comparator.comparingLong(Run::ordinal)).orElse(null);
+		return latest != null && RUN_ACTIVE.contains(latest.status()) ? latest.id() : null;
+	}
+
 	public synchronized @Nullable String historyCursor() {
 		return hasMoreHistory ? historyCursor : null;
 	}

@@ -3,8 +3,8 @@ package dev.t3craft.client.t3ui;
 import dev.t3craft.client.chat.Attention;
 import dev.t3craft.client.chat.ChatDraw;
 import dev.t3craft.client.chat.ChatTheme;
-import dev.t3craft.client.chat.Rect;
 import dev.t3craft.client.chat.ThreadRow;
+import dev.t3craft.client.chat.compose.ComposerView;
 import dev.t3craft.client.config.EnvironmentActions;
 import dev.t3craft.client.config.EnvironmentsScreen;
 import dev.t3craft.client.config.SettingsScreen;
@@ -16,8 +16,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.input.CharacterEvent;
-import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.Component;
 import org.jspecify.annotations.Nullable;
 
@@ -26,14 +24,13 @@ import org.jspecify.annotations.Nullable;
  * fallbacks main already has. {@link T3Screen} only talks to this class, so mounting a component is
  * one change here:
  * <ul>
- *   <li>{@link #composer()}: feat/chat-compose's composer ({@code dev.t3craft.client.chat.compose});
- *       null = the conversation's own read-only command bar ("Enable control").</li>
  *   <li>{@link #drawStatusChip}: feat/t3-actions' {@code ThreadStatusChip}; fallback: a pill with
  *       the attention word.</li>
  *   <li>{@link #newThread}: feat/t3-actions' {@code NewThreadDialog}; fallback: {@link NewThreadScreen}.</li>
  *   <li>{@link #menuItems}: "Register project…" (feat/t3-actions' {@code RegisterProjectDialog}) and
  *       the game shortcuts.</li>
- *   <li>{@link #modelPicker}: feat/t3-actions' {@code ModelPicker} for the composer bar.</li>
+ *   <li>{@link #composerControls}: feat/t3-actions' {@code ModelPicker} in the composer bar (the
+ *       composer itself, feat/chat-compose, is mounted by {@link T3Screen} as the conversation's footer).</li>
  * </ul>
  */
 public class T3Slots {
@@ -47,35 +44,12 @@ public class T3Slots {
 	public record MenuItem(String label, boolean enabled, Runnable action) {
 	}
 
-	/** What the screen needs from a composer (setThread, render, events, bounds). */
-	public interface Composer extends AutoCloseable {
-		void setThread(String envId, @Nullable String threadId);
-
-		/** Height wanted at the bottom of the thread panel, in GUI pixels. */
-		int preferredHeight();
-
-		void setBounds(Rect r);
-
-		void render(GuiGraphicsExtractor g, Font font, int mouseX, int mouseY);
-
-		boolean mouseClicked(double mx, double my, int button);
-
-		boolean mouseScrolled(double mx, double my, double dy);
-
-		boolean keyPressed(KeyEvent e);
-
-		boolean charTyped(CharacterEvent e);
-
-		void setFocused(boolean focused);
-
-		void tick();
-
-		@Override
-		void close();
-	}
-
-	public T3Slots.@Nullable Composer composer() {
-		return null;
+	/**
+	 * Controls in the composer bar's left slot (feat/t3-actions' {@code ModelPicker}: model,
+	 * provider, effort). Empty on main.
+	 */
+	public List<ComposerView.Control> composerControls(Screen screen) {
+		return List.of();
 	}
 
 	/**
@@ -99,11 +73,6 @@ public class T3Slots {
 	/** "New thread": project and environment preselected from the sidebar. */
 	public void newThread(Screen parent, @Nullable String envId, @Nullable String projectKey, @Nullable Target selected) {
 		Minecraft.getInstance().gui.setScreen(new NewThreadScreen(parent, envId, null));
-	}
-
-	/** Model picker for the composer bar (feat/t3-actions); null = none. */
-	public @Nullable Object modelPicker() {
-		return null;
 	}
 
 	/** Extra ⋯ menu rows: component actions and game shortcuts for the selected thread. */

@@ -11,6 +11,8 @@ import dev.t3craft.client.chat.MouseButtons;
 import dev.t3craft.client.chat.Rect;
 import dev.t3craft.client.chat.ThreadDirectory;
 import dev.t3craft.client.chat.ThreadRow;
+import dev.t3craft.client.chat.compose.ChatComposer;
+import dev.t3craft.client.chat.compose.ComposerView;
 import dev.t3craft.client.portable.NotificationLog;
 import dev.t3craft.client.portable.PortableClient;
 import java.time.Instant;
@@ -57,7 +59,11 @@ public final class T3Screen extends Screen {
 	private final ChatTheme theme = ChatTheme.warmStudio();
 
 	private @Nullable ConversationPanel conversation;
-	private T3Slots.@Nullable Composer composer;
+	/**
+	 * The composer (feat/chat-compose), drawn by the conversation as its footer. Owned by the screen so
+	 * drafts, pending messages and errors survive the confirmation and pairing screens.
+	 */
+	private @Nullable ComposerView composer;
 	/** Thread to open when the conversation is (re)built; follows the selection. */
 	private @Nullable String key;
 	private String fallbackEnvLabel = "";
@@ -150,26 +156,31 @@ public final class T3Screen extends Screen {
 
 	@Override
 	protected void init() {
+		if (composer == null && actions != null) {
+			composer = ChatComposer.create(this, theme, () -> {
+				if (conversation != null) {
+					conversation.scrollToEnd();
+				}
+			});
+			composer.setControls(slots.composerControls(this));
+		}
 		if (conversation == null) {
 			ConversationPanel c = new ConversationPanel(source, theme);
 			c.setShowHeader(false);
 			c.setActions(actions);
 			c.setHints("↑↓", "thread", "PgUp", "scroll", "Ctrl+F", "search", "Esc", "close");
+			if (composer != null) {
+				ChatComposer.attach(c, composer);
+			}
 			conversation = c;
 			refresh();
 			if (key != null) {
 				open(key);
 			}
 		}
-		if (composer == null && actions != null) {
-			composer = slots.composer();
-		}
-		if (conversation != null) {
-			conversation.setShowPrompt(composer == null);
-		}
 		layout = T3UiLayout.compute(width, height, showSidebarFlag());
 		sr = T3UiLayout.sidebar(layout.sidebar());
-		mr = T3UiLayout.main(layout.main(), composer == null ? 0 : composer.preferredHeight());
+		mr = T3UiLayout.main(layout.main(), 0); // the composer is the conversation's footer
 
 		search = null;
 		if (sr.search().w() > 0) {
@@ -195,9 +206,6 @@ public final class T3Screen extends Screen {
 		headerActions = null;
 		if (actions != null && mr.actions().w() > 0) {
 			headerActions = T3HeaderActions.add(this, this::selectedTarget, mr.actions(), slots, this::addRenderableWidget);
-		}
-		if (composer != null) {
-			composer.setBounds(mr.composer());
 		}
 	}
 
@@ -226,10 +234,6 @@ public final class T3Screen extends Screen {
 			c.close();
 			conversation = null;
 		}
-		if (composer != null) {
-			composer.close();
-			composer = null;
-		}
 		super.removed();
 	}
 
@@ -238,9 +242,6 @@ public final class T3Screen extends Screen {
 		refresh();
 		if (conversation != null) {
 			conversation.tick();
-		}
-		if (composer != null) {
-			composer.tick();
 		}
 		if (++ticks % 10 == 0 && headerActions != null) {
 			headerActions.update(!notifications);
@@ -301,9 +302,6 @@ public final class T3Screen extends Screen {
 			c.showNothing(I18n.get("t3craft.chat.history.bridge"), ChatSource.Unavailable.Action.PAIR);
 		} else {
 			c.show(r.env(), r.envLabel(), r.threadId(), r.title());
-		}
-		if (composer != null) {
-			composer.setThread(r.env(), r.threadId());
 		}
 		if (headerActions != null) {
 			headerActions.update(!notifications);
@@ -607,12 +605,16 @@ public final class T3Screen extends Screen {
 		if (notifications) {
 			drawNotifications(g, mr.conversation(), mouseX, mouseY);
 		} else if (conversation != null) {
+			ComposerView cv = composer;
+			if (cv != null) {
+				ChatComposer.sync(conversation, cv);
+				cv.setBounds(Rect.EMPTY); // the conversation places it
+			}
 			conversation.setBounds(mr.conversation());
 			conversation.render(g, font, mouseX, mouseY);
-		}
-		if (composer != null && mr.composer().w() > 0) {
-			composer.setBounds(mr.composer());
-			composer.render(g, font, mouseX, mouseY);
+			if (cv != null && cv.bounds().w() == 0) {
+				cv.setFocused(false);
+			}
 		}
 	}
 
@@ -776,11 +778,12 @@ public final class T3Screen extends Screen {
 			projectMenuOpen = false;
 			return true;
 		}
-		if (composer != null && mr.composer().contains(mx, my)) {
-			focusComposer(true);
-			if (composer.mouseClicked(mx, my, button)) {
-				return true;
-			}
+		if (composer != null && !composer.contains(mx, my)) {
+			composer.setFocused(false);
+		} else if (composer != null && search != null) {
+			search.setFocused(false); // the conversation forwards the click to the composer
+			setFocused(null);
+			focus = T3UiKeys.Focus.LIST;
 		}
 		if (super.mouseClicked(event, doubleClick)) {
 			syncFocusFromWidgets();
@@ -790,9 +793,6 @@ public final class T3Screen extends Screen {
 			search.setFocused(false);
 			setFocused(null);
 			focus = T3UiKeys.Focus.LIST;
-		}
-		if (focus == T3UiKeys.Focus.COMPOSER) {
-			focusComposer(false);
 		}
 		for (int i = hits.size() - 1; i >= 0; i--) {
 			Hit h = hits.get(i);
@@ -820,11 +820,21 @@ public final class T3Screen extends Screen {
 			return;
 		}
 		composer.setFocused(on);
-		focus = on ? T3UiKeys.Focus.COMPOSER : T3UiKeys.Focus.LIST;
-		if (on && search != null) {
+		if (composer.focused() && search != null) {
 			search.setFocused(false);
 			setFocused(null);
 		}
+		focus = T3UiKeys.Focus.LIST;
+	}
+
+	@Override
+	public boolean mouseDragged(MouseButtonEvent event, double dx, double dy) {
+		return (composer != null && composer.mouseDragged(event.x(), event.y())) || super.mouseDragged(event, dx, dy);
+	}
+
+	@Override
+	public boolean mouseReleased(MouseButtonEvent event) {
+		return (composer != null && composer.mouseReleased()) || super.mouseReleased(event);
 	}
 
 	@Override
@@ -836,7 +846,7 @@ public final class T3Screen extends Screen {
 			first = T3UiLayout.clampFirst(first + (scrollY > 0 ? -3 : 3), model.items().size(), sr.list());
 			return true;
 		}
-		if (composer != null && mr.composer().contains(x, y) && composer.mouseScrolled(x, y, scrollY)) {
+		if (composer != null && composer.mouseScrolled(x, y, scrollY)) {
 			return true;
 		}
 		return (conversation != null && !notifications && conversation.mouseScrolled(x, y, scrollY)) || super.mouseScrolled(x, y, scrollX, scrollY);
@@ -845,6 +855,10 @@ public final class T3Screen extends Screen {
 	@Override
 	public boolean keyPressed(KeyEvent e) {
 		flash = null;
+		// while the composer has focus every key is its own (Esc leaves it): no screen shortcut fires
+		if (composer != null && composer.focused() && composer.keyPressed(e)) {
+			return true;
+		}
 		boolean compactSidebar = layout.compact() && layout.sidebar().w() > 0;
 		boolean compactThread = layout.compact() && layout.main().w() > 0;
 		if (notifications && e.isEscape() && !menuOpen && !projectMenuOpen) {
@@ -862,9 +876,6 @@ public final class T3Screen extends Screen {
 				return (conversation != null && !notifications && conversation.keyPressed(e)) || super.keyPressed(e);
 			}
 			case TYPE -> {
-				if (focus == T3UiKeys.Focus.COMPOSER && composer != null) {
-					return composer.keyPressed(e);
-				}
 				return search != null && search.keyPressed(e);
 			}
 			case PREV_THREAD -> step(-1);
@@ -896,9 +907,6 @@ public final class T3Screen extends Screen {
 				model.setQuery("");
 			}
 			case BLUR -> {
-				if (focus == T3UiKeys.Focus.COMPOSER) {
-					focusComposer(false);
-				}
 				if (search != null) {
 					search.setFocused(false);
 				}
@@ -932,7 +940,7 @@ public final class T3Screen extends Screen {
 
 	@Override
 	public boolean charTyped(CharacterEvent event) {
-		if (focus == T3UiKeys.Focus.COMPOSER && composer != null) {
+		if (composer != null && composer.focused()) {
 			return composer.charTyped(event);
 		}
 		if (focus == T3UiKeys.Focus.SEARCH) {
