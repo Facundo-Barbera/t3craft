@@ -50,7 +50,7 @@ public record ArchiveEntry(String key, String env, String envLabel, String threa
 	 * chat), and archived or settled (same settle rule as {@link Visibility#isSettled}).
 	 */
 	public static boolean isCandidate(ThreadShell t) {
-		if (t.deletedAt() != null || "subagent".equals(t.relationshipToParent()) || t.sideChat()) {
+		if (t.deletedAt() != null || (t.isSubagent() && !t.isDelegated()) || t.sideChat()) { // delegated tasks archive like any thread (feat/thread-lineage)
 			return false;
 		}
 		return t.archivedAt() != null || Visibility.isSettled(t);

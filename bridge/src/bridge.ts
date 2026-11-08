@@ -21,7 +21,11 @@ export const visibilityOptions = (config: Pick<BridgeConfig, "visibility" | "inc
 
 /** Turns one environment's shell state into NpcViews, applying the visibility filter. */
 export const viewsFor = (env: EnvironmentConfig, state: ShellState, opts: VisibilityOptions, nowMs: number = Date.now()) =>
-  selectVisibleThreads(state.threads.values(), nowMs, opts).map((t) => presentThread(env, t, state.projectTitle(t.projectId)));
+  selectVisibleThreads(state.threads.values(), nowMs, opts).map((t) => {
+    const parentId = t.lineage.relationshipToParent === "subagent" ? t.lineage.parentThreadId : null;
+    const parentTitle = parentId === null ? null : (state.threads.get(parentId)?.title ?? null);
+    return presentThread(env, t, state.projectTitle(t.projectId), parentTitle);
+  });
 
 /**
  * Core: one shell subscription per environment → NpcStore → broadcast diffs to every mod.

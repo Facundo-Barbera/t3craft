@@ -788,7 +788,42 @@ public final class T3Screen extends Screen {
 			// T3's breadcrumb: project › title
 			String project = target.project() == null || target.project().isBlank() ? "" : target.project();
 			String title = target.title() == null || target.title().isBlank() ? target.threadId() : target.title();
-			if (!project.isEmpty()) {
+			// feat/thread-lineage: a parent lists its delegated children (state, click to open)
+			List<ThreadRow> kids = row == null ? List.of() : model.childrenOf(row.key());
+			if (!kids.isEmpty()) {
+				String label = kids.size() + (kids.size() == 1 ? " agent ▾" : " agents ▾");
+				int w = font.width(label) + 10;
+				if (right - w > x + 60) {
+					Rect chipR = new Rect(right - w, tr.y(), w, tr.h());
+					pill(g, chipR, label, false, mouseX, mouseY);
+					List<String> tip = new ArrayList<>();
+					tip.add("Delegated agents");
+					for (ThreadRow k : kids) {
+						tip.add(childLine(k));
+					}
+					tip.add("Click: open one");
+					hits.add(new Hit(chipR, () -> openChildrenMenu(kids, chipR), null, tip));
+					right = chipR.x() - 4;
+				}
+			}
+			dev.t3craft.client.chat.RowLineage lin = row == null ? dev.t3craft.client.chat.RowLineage.NONE : row.lineage();
+			if (lin.delegated() && lin.hasParent()) {
+				// feat/thread-lineage: a delegated child's breadcrumb is "parent › child", the parent clickable
+				String pt = lin.parentTitle().isBlank() ? "parent" : lin.parentTitle();
+				String parentKey = lin.parentKey();
+				String crumb = "↳ " + pt;
+				int pw = Math.min(font.width(crumb), (right - x) / 2);
+				Rect pr = new Rect(x, tr.y(), pw, tr.h());
+				boolean hov = parentKey != null && pr.contains(mouseX, mouseY);
+				g.text(font, ChatDraw.clip(font, crumb, pw), x, tr.y() + 3, hov ? t.accent() : t.muted(), t.shadow());
+				if (parentKey != null) {
+					hits.add(new Hit(pr, () -> open(parentKey), null, List.of("Open the parent thread", pt)));
+				}
+				x += pw;
+				String sep = " › ";
+				g.text(font, sep, x, tr.y() + 3, t.muted(), t.shadow());
+				x += font.width(sep);
+			} else if (!project.isEmpty()) {
 				String crumb = project + " › ";
 				int pw = Math.min(font.width(crumb), (right - x) / 3);
 				g.text(font, ChatDraw.clip(font, crumb, pw), x, tr.y() + 3, t.muted(), t.shadow());
@@ -821,6 +856,26 @@ public final class T3Screen extends Screen {
 				cv.setFocused(false);
 			}
 		}
+	}
+
+	/** One child in the header list: state glyph, title, state word (feat/thread-lineage). */
+	private static String childLine(ThreadRow k) {
+		String state = SidebarModel.working(k) ? "working" : k.attention().word;
+		return k.state().glyph + " " + k.title() + " · " + state;
+	}
+
+	/** The header's children popup: one row per delegated child, choosing it opens that thread. */
+	private void openChildrenMenu(List<ThreadRow> kids, Rect anchor) {
+		menuOpen = false;
+		projectMenuOpen = false;
+		List<T3Slots.MenuItem> items = new ArrayList<>();
+		for (ThreadRow k : kids) {
+			String key = k.key();
+			items.add(new T3Slots.MenuItem(childLine(k), true, () -> open(key)));
+		}
+		contextItems = items;
+		contextX = anchor.x();
+		contextY = anchor.bottom() + 1;
 	}
 
 	/** "project › New thread" and a ✕ that discards the draft (T3's draft header). */

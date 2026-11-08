@@ -6,7 +6,7 @@ import java.util.List;
 
 /**
  * Which threads of ONE environment get an NPC (port of bridge/src/state/visibility.ts):
- * never archived/deleted/settled/subagent/side-chat; shown when they need the user, are working or
+ * never archived/deleted/settled/provider-subagent/side-chat (delegated tasks do show, feat/thread-lineage); shown when they need the user, are working or
  * have a turn in progress, or had message/run activity within the recent window. Ranked by tier
  * then most recent activity, capped per environment. Pure: the shell state is never modified.
  */
@@ -44,7 +44,9 @@ public final class Visibility {
 		if (t.archivedAt() != null || t.deletedAt() != null) {
 			return -1;
 		}
-		if (!o.includeSubagents() && ("subagent".equals(t.relationshipToParent()) || t.sideChat())) {
+		// feat/thread-lineage: delegated tasks (delegate_task children) are real threads and show like
+		// any other; only provider subagents and side chats stay hidden.
+		if (!o.includeSubagents() && ((t.isSubagent() && !t.isDelegated()) || t.sideChat())) {
 			return -1;
 		}
 		if (isSettled(t)) {

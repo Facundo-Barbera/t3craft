@@ -6,6 +6,11 @@
 Paquete: `mod/src/client/java/dev/t3craft/client/npc/helpers/`.
 Tests: `mod/src/test/java/dev/t3craft/client/npc/helpers/` (JUnit, lógica pura).
 
+> **feat/thread-lineage**: solo los subagentes **del proveedor** (`creationSource == "provider"`,
+> p. ej. el Agent tool de Claude) son ayudantes. Las tareas delegadas de T3 (`delegate_task`,
+> cualquier otro `creationSource`) son hilos completos con NPC, escritorio y nameplate `↳ <padre>`;
+> ver `docs/feat-thread-lineage.md`.
+
 ## Qué se ve
 
 - Cada subagente **en marcha** aparece como un **aprendiz** solo de cliente (jugador pequeño, escala 0,6), detrás de su padre,

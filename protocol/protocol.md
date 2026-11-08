@@ -88,6 +88,11 @@ The chat screen shows `label`, `sublabel` and `activity`. NPCs are laid out by a
 (environment), `skin` (seed for a deterministic player skin) and `particle`
 (`working|attention|error|done|null`).
 
+feat/thread-lineage (optional, additive): T3 `delegate_task` children (subagents whose
+`creationSource` is not `provider`) are visible NPCs now; a subagent's `NpcView` carries
+`parentThreadId` and `delegated`, and a delegated task's `sublabel` reads `↳ <parent title>`.
+Provider subagents stay hidden unless `includeSubagents`.
+
 | type | payload | notes |
 |---|---|---|
 | `npc.transition` | `npcId`, `from`, `to`, `level`, `title`, `text`, `color`, `sound: attention\|done\|error` | visible NPC changed state; never for initial state. A `notify` with the same text is still sent for older mods |

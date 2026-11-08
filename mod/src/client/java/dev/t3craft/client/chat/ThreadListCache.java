@@ -5,6 +5,7 @@ import dev.t3craft.client.npc.NpcInfo;
 import dev.t3craft.t3.DirectController;
 import dev.t3craft.t3.NpcView;
 import dev.t3craft.t3.Presentation;
+import dev.t3craft.t3.Lineage;
 import dev.t3craft.t3.ShellState;
 import dev.t3craft.t3.ThreadShell;
 import dev.t3craft.t3.Visibility;
@@ -101,9 +102,10 @@ public final class ThreadListCache {
 			if (sv == null) {
 				return;
 			}
+			Lineage lineage = Lineage.of(env, sv);
 			for (ThreadShell t : sv.threads()) {
 				if (listed(t)) {
-					out.add(row(env, label, t, sv.projectTitle(t.projectId())));
+					out.add(row(env, label, t, sv.projectTitle(t.projectId()), lineage));
 				}
 			}
 		});
@@ -139,9 +141,12 @@ public final class ThreadListCache {
 		return memo;
 	}
 
-	/** In the sidebar: everything but archived, deleted, subagents and side chats (T3 Code's rule). */
+	/**
+	 * In the sidebar: everything but archived, deleted, provider subagents and side chats (T3 Code's
+	 * rule). feat/thread-lineage: delegated tasks are listed (nested under their parent by the model).
+	 */
 	public static boolean listed(ThreadShell t) {
-		return t.archivedAt() == null && t.deletedAt() == null && !"subagent".equals(t.relationshipToParent()) && !t.sideChat();
+		return t.archivedAt() == null && t.deletedAt() == null && (!t.isSubagent() || t.isDelegated()) && !t.sideChat();
 	}
 
 	/**
@@ -149,12 +154,17 @@ public final class ThreadListCache {
 	 * rich-row details (branch, PR, diff, model, unread, run start, snooze: feat/t3-sidebar-rows).
 	 */
 	static ThreadRow row(String env, String envLabel, ThreadShell t, @Nullable String projectTitle) {
+		return row(env, envLabel, t, projectTitle, Lineage.EMPTY);
+	}
+
+	/** {@link #row(String, String, ThreadShell, String)} with the parent link of a delegated task (feat/thread-lineage). */
+	static ThreadRow row(String env, String envLabel, ThreadShell t, @Nullable String projectTitle, Lineage lineage) {
 		NpcView v = Presentation.present(env, envLabel, t, projectTitle);
 		ThreadRow r = ThreadRow.fromNpc(NpcInfo.fromView(v), null, false, false);
 		long at = Visibility.lastActivity(t);
 		return new ThreadRow(r.key(), r.env(), r.envLabel(), r.threadId(), r.title(), r.project(), r.state(),
 				t.pendingRuntimeRequest() != null, r.activity(), Visibility.isSettled(t), at <= 0 ? null : at, t.pinned(),
-				ThreadDetails.of(t, r.state()));
+				ThreadDetails.of(t, r.state()), RowLineage.of(env, t, lineage));
 	}
 
 	/**

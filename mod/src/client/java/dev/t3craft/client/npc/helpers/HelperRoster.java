@@ -19,8 +19,9 @@ import java.util.function.Function;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Pure helper logic (no Minecraft): finds subagents in the T3 shell (read-only {@code lineage}:
- * {@code relationshipToParent == "subagent"} + {@code parentThreadId}), groups them under their
+ * Pure helper logic (no Minecraft): finds provider subagents in the T3 shell (read-only {@code lineage}:
+ * {@code relationshipToParent == "subagent"} + {@code parentThreadId}, {@code creationSource == "provider"};
+ * delegated tasks are full NPCs since feat/thread-lineage), groups them under their
  * parent NPC with a per-parent cap and a "+n" overflow, and filters them out of the desk roster.
  */
 public final class HelperRoster {
@@ -52,8 +53,13 @@ public final class HelperRoster {
 		}
 	}
 
+	/**
+	 * A thread that becomes a helper: a provider-native subagent (Claude's Agent tool, …). Since
+	 * feat/thread-lineage, T3 {@code delegate_task} children ({@link ThreadShell#isDelegated()}) are
+	 * full threads with their own NPC and desk, so they are not helpers (and stay in the desk roster).
+	 */
 	public static boolean isSubagent(ThreadShell t) {
-		return "subagent".equals(t.relationshipToParent());
+		return t.isSubagent() && !t.isDelegated();
 	}
 
 	/**

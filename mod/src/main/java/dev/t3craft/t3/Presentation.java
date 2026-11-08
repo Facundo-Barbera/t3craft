@@ -43,6 +43,31 @@ public final class Presentation {
 	}
 
 	public static NpcView present(String env, String envLabel, ThreadShell t, @Nullable String projectTitle) {
+		return present(env, envLabel, t, projectTitle, null);
+	}
+
+	/**
+	 * feat/thread-lineage: with {@code parent} (the parent thread of a delegated task, same
+	 * environment) the second nameplate line reads {@code ↳ <parent title>}. Its neighbourhood stays
+	 * its own project (a delegate_task child shares its parent's project, hence its wing). Null parent = {@link #present(String, String, ThreadShell, String)}.
+	 */
+	public static NpcView present(String env, String envLabel, ThreadShell t, @Nullable String projectTitle, @Nullable ThreadShell parent) {
+		NpcView v = present0(env, envLabel, t, projectTitle);
+		if (parent == null || !t.isDelegated()) {
+			return v;
+		}
+		String pt = clip(parent.title().isBlank() ? "(untitled)" : parent.title(), MAX_TITLE);
+		return new NpcView(v.id(), v.env(), v.envLabel(), v.threadId(), v.title(), v.project(), v.state(), v.color(), v.glyph(), v.label(),
+				parentSublabel(pt), v.activity(), v.priority(), v.settled(), v.groupId(), v.groupLabel(), v.skin(), v.particle(), v.model(),
+				v.provider(), v.branch(), v.worktree());
+	}
+
+	/** Nameplate second line of a delegated task: {@code ↳ <parent title>}. */
+	public static String parentSublabel(String parentTitle) {
+		return "↳ " + parentTitle;
+	}
+
+	private static NpcView present0(String env, String envLabel, ThreadShell t, @Nullable String projectTitle) {
 		ThreadState s = ThreadState.of(t);
 		String title = clip(t.title().isBlank() ? "(untitled)" : t.title(), MAX_TITLE);
 		return new NpcView(
