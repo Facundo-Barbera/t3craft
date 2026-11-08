@@ -16,7 +16,8 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * "T3Craft HQ" button on the title screen (right of Singleplayer) and on the world-select screen
- * (top right), added with Fabric's {@code ScreenEvents.AFTER_INIT}: no mixin.
+ * (top right), added with Fabric's {@code ScreenEvents.AFTER_INIT}: no mixin. It opens the HQ menu
+ * ({@link HqMenuScreen}: open, layout, rebuild, reset), which returns to the screen it came from.
  */
 final class DemoButtons {
 	private static final int W = 98;
@@ -54,7 +55,7 @@ final class DemoButtons {
 	}
 
 	private static Button button(Minecraft mc, DemoClient demo, Screen screen, int x, int y) {
-		return Button.builder(Component.translatable("t3craft.demo.button"), b -> demo.open(mc, screen, false))
+		return Button.builder(Component.translatable("t3craft.demo.button"), b -> mc.gui.setScreen(new HqMenuScreen(screen, demo)))
 				.bounds(x, y, W, H)
 				.tooltip(Tooltip.create(Component.translatable("t3craft.demo.button.tooltip")))
 				.build();
