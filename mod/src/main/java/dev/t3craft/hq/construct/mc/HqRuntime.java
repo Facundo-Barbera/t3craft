@@ -114,6 +114,10 @@ public final class HqRuntime {
 		ServerLifecycleEvents.SERVER_STOPPING.register(s -> {
 			if (s == server) {
 				server = null;
+				HqConstruction old = construction;
+				if (old != null) {
+					old.close(); // fix/hq-load-npc-reconcile: drop a plan load still running
+				}
 				construction = null;
 				designKey = null;
 				synchronized (designCache) {
@@ -170,6 +174,10 @@ public final class HqRuntime {
 	/** The construction of this integrated server (created on first use). Server thread. */
 	public static HqConstruction construction(MinecraftServer s) {
 		if (s != server || construction == null) {
+			HqConstruction old = construction;
+			if (old != null) {
+				old.close();
+			}
 			server = s;
 			HqStore store = new HqStore(s.getWorldPath(LevelResource.ROOT));
 			construction = new HqConstruction(new Ports(s, store), store.load());

@@ -54,6 +54,19 @@ public final class NpcRegistry {
 	/** Sweep orphaned entities of our id range this often (ticks). */
 	private static final int SWEEP_TICKS = 20 * 10;
 
+	/** What an NPC's name tag and panel are built from (all immutable records). */
+	private record LabelKey(NpcInfo info, LabelConfig labels, ChipsConfig chips, boolean compact) {
+	}
+
+	/** Built labels of one NPC, tagged with their key and the {@link #labelGen} of the batch. */
+	private record Labels(String id, LabelKey key, int gen, Component nameTag, Component body) {
+		static Labels of(String id, LabelKey k, int gen) {
+			Component tag = k.labels().compact() ? Nameplate.compact(k.info(), k.labels()) : Nameplate.of(k.info(), k.chips());
+			Component body = k.compact() ? Nameplate.detail(k.info(), k.chips()) : Nameplate.info(k.info(), k.chips());
+			return new Labels(id, k, gen, tag, body);
+		}
+	}
+
 	private record Spawned(ThreadAvatar avatar, Display.TextDisplay panel) {
 	}
 
@@ -64,6 +77,17 @@ public final class NpcRegistry {
 	/** Near-panel text per NPC (compact mode shows it only when {@link NpcLabels.Visibility} says so). */
 	private final Map<String, Component> panelText = new HashMap<>();
 	private final Map<String, NpcLabels.Visibility> detail = new HashMap<>();
+	/**
+	 * fix/hq-load-npc-reconcile: what each NPC's labels were built (or are being built) from; an NPC whose
+	 * key did not change is not re-labelled. Client thread.
+	 */
+	private final Map<String, LabelKey> labelKey = new HashMap<>();
+	/** The panel body last applied per NPC (before {@code panelExtra}). */
+	private final Map<String, Component> panelBody = new HashMap<>();
+	/** Label batches on the {@link dev.t3craft.build.Offload} workers, applied in the tick they are done. */
+	private final List<java.util.concurrent.CompletableFuture<List<Labels>>> labelJobs = new ArrayList<>();
+	/** Bumped when the labels are dropped (world change, clear): results of older batches are ignored. */
+	private int labelGen;
 	private boolean compactLabels = LabelConfig.DEFAULTS.compact();
 	/** Walking, desks, board, bubbles (feat/npc-behavior). Owns its own entities; reset with ours. */
 	private final BehaviorDirector behavior = new BehaviorDirector();
@@ -382,6 +406,7 @@ public final class NpcRegistry {
 			signs.clear();
 			npcByEntityId.clear();
 			panelText.clear();
+			dropLabels();
 			behavior.reset(lvl);
 			if (lvl != null) {
 				List<Integer> ours = new ArrayList<>();
@@ -407,6 +432,7 @@ public final class NpcRegistry {
 			signs.clear();
 			npcByEntityId.clear();
 			panelText.clear();
+			dropLabels();
 			detail.clear();
 			behavior.reset(null);
 			level = lvl;
@@ -455,6 +481,7 @@ public final class NpcRegistry {
 				}
 			}
 		}
+		applyLabels(); // fix/hq-load-npc-reconcile: labels built off-thread since the last tick
 		updatePanels(mc);
 		List<BehaviorDirector.Body> bodies = new ArrayList<>(spawned.size());
 		for (Map.Entry<String, Spawned> e : spawned.entrySet()) {
@@ -498,6 +525,7 @@ public final class NpcRegistry {
 		signs.clear();
 		npcByEntityId.clear();
 		panelText.clear();
+		dropLabels();
 		detail.clear();
 		wanted.clear();
 		stations().clear();
@@ -518,37 +546,41 @@ public final class NpcRegistry {
 	}
 
 	/**
-	 * fix/hq-build-stutter: NPCs (avatar + panel) spawned per client tick when the HQ gate opens or a
-	 * wing brings many at once; the rest come on the next ticks (a {@code dirty} reconcile each).
+	 * fix/hq-build-stutter, fix/hq-load-npc-reconcile: NPCs (avatar + panel) spawned per client tick when
+	 * the HQ gate opens or a wing brings many at once; the rest come on the next ticks (a {@code dirty}
+	 * reconcile each).
 	 */
-	static final int SPAWNS_PER_TICK = 3;
+	static final int SPAWNS_PER_TICK = 2;
+	/** fix/hq-load-npc-reconcile: NPCs removed per client tick (two entities each, plus overlays). */
+	static final int REMOVALS_PER_TICK = 4;
+	/** fix/hq-load-npc-reconcile: once a reconcile has spent this long, further spawns and removals wait a tick. */
+	static final long RECONCILE_BUDGET_NS = 4_000_000L;
+	/** Changed labels built inline below this count; more go to a worker. */
+	static final int INLINE_LABELS = 2;
 
 	private void reconcile(ClientLevel lvl, Vec3 a) {
 		long t0 = System.nanoTime();
 		try {
-			reconcileRoster(lvl, a);
+			reconcileRoster(lvl, a, t0);
 		} finally {
 			dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_NPC_RECONCILE, t0);
 		}
 	}
 
-	private void reconcileRoster(ClientLevel lvl, Vec3 a) {
+	private static boolean overBudget(long t0, int doneThisTick) {
+		return doneThisTick > 0 && System.nanoTime() - t0 >= RECONCILE_BUDGET_NS;
+	}
+
+	private void reconcileRoster(ClientLevel lvl, Vec3 a, long t0) {
 		// Incremental (fix/npc-position-reset): only NPCs no longer wanted go, only new ones spawn below;
 		// the others keep their entity (where it stands), brain and overlays.
 		// fix/hq-build-parallel: nobody waits around a half-built HQ (NpcGate).
 		// fix/hq-gate-npcs: nobody at all while the HQ gate is shut.
+		// fix/hq-load-npc-reconcile: timed in parts (plan, remove, spawn, labels), spawns and removals
+		// spread over ticks (SPAWNS_PER_TICK, REMOVALS_PER_TICK, RECONCILE_BUDGET_NS).
+		long p0 = System.nanoTime();
 		Map<String, NpcInfo> shown = hqOpen ? NpcGate.shown(wanted, spawned.keySet()) : Map.of();
 		RosterDiff diff = RosterDiff.of(spawned.keySet(), shown.keySet());
-		for (String id : diff.removed()) {
-			Spawned s = spawned.remove(id);
-			behavior.forget(id, lvl);
-			npcByEntityId.remove(s.avatar().getId());
-			npcByEntityId.remove(s.panel().getId());
-			panelText.remove(id);
-			detail.remove(id);
-			lvl.removeEntity(s.avatar().getId(), Entity.RemovalReason.DISCARDED);
-			lvl.removeEntity(s.panel().getId(), Entity.RemovalReason.DISCARDED);
-		}
 
 		// Provisional desks: stable grid cells, one block of desks per neighbourhood.
 		List<GridLayout.Member> members = new ArrayList<>(shown.size());
@@ -563,51 +595,165 @@ public final class NpcRegistry {
 		for (NpcInfo n : ordered) {
 			groups.computeIfAbsent(n.groupId(), k -> new ArrayList<>()).add(n);
 		}
+		dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_NPC_PLAN, p0);
 
+		boolean more = false;
+		long r0 = System.nanoTime();
+		int removedNow = 0;
+		for (String id : diff.removed()) {
+			if (removedNow >= REMOVALS_PER_TICK || overBudget(t0, removedNow)) {
+				more = true; // the rest on the next ticks
+				break;
+			}
+			removedNow++;
+			Spawned s = spawned.remove(id);
+			behavior.forget(id, lvl);
+			npcByEntityId.remove(s.avatar().getId());
+			npcByEntityId.remove(s.panel().getId());
+			panelText.remove(id);
+			panelBody.remove(id);
+			labelKey.remove(id);
+			detail.remove(id);
+			lvl.removeEntity(s.avatar().getId(), Entity.RemovalReason.DISCARDED);
+			lvl.removeEntity(s.panel().getId(), Entity.RemovalReason.DISCARDED);
+		}
 		// fix/hq-gate-npcs: no neighbourhood signs any more (they floated over the provisional grid);
 		// the HQ has its own signage. Any left from older code go.
 		for (String gid : new ArrayList<>(signs.keySet())) {
 			lvl.removeEntity(signs.remove(gid).getId(), Entity.RemovalReason.DISCARDED);
 		}
+		if (removedNow > 0) {
+			dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_NPC_REMOVE, r0);
+		}
 
+		long s0 = System.nanoTime();
+		long labelNs = 0;
 		int spawnedNow = 0;
-		boolean more = false;
+		LabelConfig labelCfg = LabelConfig.current();
+		ChipsConfig chips = ChipsConfig.current();
+		List<Map.Entry<String, LabelKey>> relabel = new ArrayList<>();
 		for (Map.Entry<String, List<NpcInfo>> group : groups.entrySet()) {
-			List<NpcInfo> inGroup = group.getValue();
-			for (NpcInfo info : inGroup) {
-				Spawned have = spawned.get(info.id());
-				if ((have == null || have.avatar().isRemoved()) && spawnedNow >= SPAWNS_PER_TICK) {
-					more = true; // fix/hq-build-stutter: the next ones on the next tick
-					continue;
-				}
-				// Spawn at the HQ desk (or the HQ's way in) so nobody walks in from the grass.
-				Anchor desk = behavior.anchorSource().desk(info.id(), info.groupId());
-				if (desk == null) {
-					desk = behavior.anchorSource().spawn();
-				}
-				if (desk == null) {
-					desk = fallbackLayout().desk(info.id(), info.groupId());
-				}
-				Vec3 pos = desk == null ? a : new Vec3(desk.pos().x(), desk.pos().y(), desk.pos().z());
+			for (NpcInfo info : group.getValue()) {
+				LabelKey key = new LabelKey(info, labelCfg, chips, compactLabels);
 				Spawned s = spawned.get(info.id());
 				if (s == null || s.avatar().isRemoved()) {
+					if (spawnedNow >= SPAWNS_PER_TICK || overBudget(t0, spawnedNow)) {
+						more = true; // fix/hq-build-stutter: the next ones on the next tick
+						continue;
+					}
+					// Spawn at the HQ desk (or the HQ's way in) so nobody walks in from the grass.
+					Anchor desk = behavior.anchorSource().desk(info.id(), info.groupId());
+					if (desk == null) {
+						desk = behavior.anchorSource().spawn();
+					}
+					if (desk == null) {
+						desk = fallbackLayout().desk(info.id(), info.groupId());
+					}
+					Vec3 pos = desk == null ? a : new Vec3(desk.pos().x(), desk.pos().y(), desk.pos().z());
 					spawnedNow++;
-					s = spawn(lvl, info, pos, desk == null ? 0f : desk.yaw());
+					Labels l = Labels.of(info.id(), key, labelGen);
+					s = spawn(lvl, info, l.nameTag(), pos, desk == null ? 0f : desk.yaw());
 					spawned.put(info.id(), s);
 					npcByEntityId.put(s.avatar().getId(), info.id());
 					npcByEntityId.put(s.panel().getId(), info.id());
+					labelKey.put(info.id(), key);
+					panelBody.put(info.id(), l.body());
+					setPanelText(info.id());
+					continue;
 				}
-				// Once spawned, the BehaviorDirector moves the avatar and its panel.
-				s.avatar().update(info);
-				Component extra = panelExtra.apply(info.id());
-				Component body = compactLabels ? Nameplate.detail(info, ChipsConfig.current()) : Nameplate.info(info);
-				panelText.put(info.id(), extra == null ? body : body.copy().append(extra));
+				// Once spawned, the BehaviorDirector moves the avatar and its panel; labels only when they changed.
+				long l0 = System.nanoTime();
+				if (!key.equals(labelKey.get(info.id()))) {
+					labelKey.put(info.id(), key); // pending: the batch result must still match it
+					relabel.add(Map.entry(info.id(), key));
+				} else {
+					setPanelText(info.id()); // panelExtra may have changed
+				}
+				labelNs += System.nanoTime() - l0;
 			}
+		}
+		if (spawnedNow > 0) {
+			dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_NPC_SPAWN, s0 + labelNs);
+		}
+		if (!relabel.isEmpty()) {
+			long l0 = System.nanoTime();
+			int gen = labelGen;
+			if (relabel.size() <= INLINE_LABELS) {
+				for (Map.Entry<String, LabelKey> e : relabel) {
+					applyLabel(Labels.of(e.getKey(), e.getValue(), gen));
+				}
+			} else {
+				List<Map.Entry<String, LabelKey>> batch = List.copyOf(relabel);
+				labelJobs.add(dev.t3craft.build.Offload.supply(dev.t3craft.debug.PerfStats.STEP_NPC_LABELS_ASYNC, () -> {
+					List<Labels> out = new ArrayList<>(batch.size());
+					for (Map.Entry<String, LabelKey> e : batch) {
+						out.add(Labels.of(e.getKey(), e.getValue(), gen));
+					}
+					return out;
+				}));
+			}
+			dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_NPC_LABELS, l0);
 		}
 		updatePanels(null);
 		if (more) {
 			dirty = true;
 		}
+	}
+
+	/** Panel text = the last built body plus {@code panelExtra}. Client thread. */
+	private void setPanelText(String id) {
+		Component body = panelBody.get(id);
+		if (body == null) {
+			return;
+		}
+		Component extra = panelExtra.apply(id);
+		panelText.put(id, extra == null ? body : body.copy().append(extra));
+	}
+
+	/** Applies labels built for the current NPC, if they are still the wanted ones (key and generation). */
+	private void applyLabel(Labels l) {
+		Spawned s = spawned.get(l.id());
+		if (s == null || l.gen() != labelGen || !l.key().equals(labelKey.get(l.id()))) {
+			return; // gone, dropped, or re-labelled again since
+		}
+		s.avatar().update(l.key().info(), l.nameTag());
+		panelBody.put(l.id(), l.body());
+		setPanelText(l.id());
+	}
+
+	/** Takes in the label batches the workers finished. Client thread. */
+	private void applyLabels() {
+		if (labelJobs.isEmpty()) {
+			return;
+		}
+		long t0 = System.nanoTime();
+		for (java.util.Iterator<java.util.concurrent.CompletableFuture<List<Labels>>> it = labelJobs.iterator(); it.hasNext();) {
+			java.util.concurrent.CompletableFuture<List<Labels>> f = it.next();
+			if (!f.isDone()) {
+				continue;
+			}
+			it.remove();
+			List<Labels> done;
+			try {
+				done = f.join();
+			} catch (RuntimeException e) {
+				T3Craft.LOGGER.debug("NPC label batch failed; relabelling on the next reconcile", e);
+				labelKey.clear(); // forces a fresh batch for everyone
+				dirty = true;
+				continue;
+			}
+			done.forEach(this::applyLabel);
+		}
+		dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_NPC_LABELS, t0);
+	}
+
+	/** Forgets every label (world change, clear): batches still running are dropped by generation. */
+	private void dropLabels() {
+		labelGen++;
+		labelJobs.forEach(f -> f.cancel(false));
+		labelJobs.clear();
+		labelKey.clear();
+		panelBody.clear();
 	}
 
 	/**
@@ -659,12 +805,12 @@ public final class NpcRegistry {
 		return d;
 	}
 
-	private static Spawned spawn(ClientLevel lvl, NpcInfo info, Vec3 pos, float yaw) {
+	private static Spawned spawn(ClientLevel lvl, NpcInfo info, Component nameTag, Vec3 pos, float yaw) {
 		ThreadAvatar avatar = new ThreadAvatar(lvl, info.id());
 		avatar.setId(nextClientId--);
 		avatar.setNoGravity(true);
 		avatar.setSilent(true);
-		avatar.update(info);
+		avatar.update(info, nameTag);
 		avatar.snapTo(pos.x, pos.y, pos.z, yaw, 0f);
 		lvl.addEntity(avatar);
 		dev.t3craft.debug.PerfStats.count(dev.t3craft.debug.PerfStats.DISPLAY_SPAWNED);
