@@ -191,7 +191,13 @@ public final class QueueScreen extends Screen {
 			Row row = rows.get(i);
 			int ry = 36 + (i - from) * ROW;
 			if (row.run() == null) {
-				g.text(font, header(row.thread()), x, ry + 6, 0xFFFFFFFF);
+				// clipped like the run lines: a long thread title ran past the list (and off narrow windows)
+				Component head = header(row.thread());
+				if (font.width(head) <= w) {
+					g.text(font, head, x, ry + 6, 0xFFFFFFFF);
+				} else {
+					g.text(font, font.substrByWidth(head, w - font.width("…")).getString() + "…", x, ry + 6, 0xFFFFFFFF);
+				}
 			} else {
 				int textW = w - 3 * (BTN + 2) - 8;
 				Component line = runLine(row);
@@ -203,7 +209,9 @@ public final class QueueScreen extends Screen {
 			}
 		}
 		if (status != null) {
-			g.centeredText(font, status, width / 2, height - 42, 0xFFFFFFFF);
+			String st = status.getString(); // result messages can be wider than the window
+			g.centeredText(font, font.width(status) <= width - 8 ? status
+					: Component.literal(font.plainSubstrByWidth(st, width - 16) + "…").withStyle(status.getStyle()), width / 2, height - 42, 0xFFFFFFFF);
 		}
 	}
 

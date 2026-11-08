@@ -13,7 +13,11 @@ import net.minecraft.network.chat.Component;
  * <p>TODO(phase 2): on open send {@code chat.open{threadId}}, render {@code chat.history} /
  * {@code chat.append}, an input box that sends {@code chat.send} (bridge → {@code message.dispatch})
  * and an interrupt button ({@code run.interrupt}); send {@code chat.close} on close.
+ *
+ * @deprecated No longer opened by anything (fix/ui-audit): NPCs, workstations, monitors, thread wall
+ *     cards and the portable all open the chat browser ({@code dev.t3craft.client.chat.ChatScreens}).
  */
+@Deprecated
 public final class ThreadChatScreen extends Screen {
 	private final NpcInfo thread;
 

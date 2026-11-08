@@ -38,6 +38,24 @@ public final class ThreadBrowserScreen extends Screen {
 		return browser;
 	}
 
+	/** Screen to go back to on Esc (the archive, the portable terminal); null = close to the game. */
+	private @Nullable Screen parent;
+
+	/** Sets the screen Esc returns to (fix/ui-audit: the archive and the portable used to be lost). */
+	public ThreadBrowserScreen withParent(@Nullable Screen parent) {
+		this.parent = parent;
+		return this;
+	}
+
+	@Override
+	public void onClose() {
+		if (parent != null) {
+			minecraft.gui.setScreen(parent);
+		} else {
+			super.onClose();
+		}
+	}
+
 	@Override
 	protected void init() {
 		if (browser == null) {

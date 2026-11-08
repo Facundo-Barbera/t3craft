@@ -247,11 +247,11 @@ public final class NewThreadScreen extends Screen {
 		int x = left();
 		int w = w();
 		g.centeredText(font, title.copy().withStyle(ChatFormatting.YELLOW), width / 2, 14, 0xFFFFFFFF);
-		if (env == null) {
-			drawWrapped(g, Component.translatable("t3craft.operate.launch.no_envs").withStyle(ChatFormatting.GRAY), x, height / 2 - 30, w);
-		} else if (projectId == null) {
-			drawWrapped(g, Component.translatable("t3craft.operate.launch.no_projects").withStyle(ChatFormatting.GRAY), x, 24, w);
-		}
+		// Why "Review" is disabled, on the message line under the buttons. It used to be drawn at
+		// height / 2 - 30 (inside the prompt box) or at y 24 (under the environment button).
+		Component why = env == null ? Component.translatable("t3craft.operate.launch.no_envs")
+				: projectId == null ? Component.translatable("t3craft.operate.launch.no_projects") : null;
+		Component bottom = message.getString().isEmpty() && why != null ? why.copy().withStyle(ChatFormatting.GRAY) : message;
 		if (!review) {
 			if (promptBox != null) {
 				g.text(font, Component.translatable("t3craft.operate.launch.prompt"), x, promptBox.getY() - 10, 0xFFA0A0A0);
@@ -269,7 +269,16 @@ public final class NewThreadScreen extends Screen {
 			y = drawPreview(g, x, y, w, Math.max(0, height - 64 - y - 30));
 			drawWrapped(g, Component.translatable("t3craft.operate.launch.summary.mode").withStyle(ChatFormatting.DARK_GRAY), x, y + 4, w);
 		}
-		g.centeredText(font, message, width / 2, height - 24, 0xFFFFFFFF);
+		// Review page: above the Launch/Back row, since "Open chat" (height - 28) covered height - 24.
+		int my = review ? height - 64 : height - 24;
+		int limit = review ? height - 52 : height;
+		for (FormattedCharSequence s : font.split(bottom, w)) {
+			if (my + font.lineHeight > limit) {
+				break;
+			}
+			g.centeredText(font, s, width / 2, my, 0xFFFFFFFF);
+			my += font.lineHeight;
+		}
 	}
 
 	/** The first lines of the prompt, as far as they fit in {@code maxH}. */

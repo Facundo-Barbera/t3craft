@@ -8,6 +8,7 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
@@ -31,6 +32,7 @@ public final class PairScreen extends Screen {
 	private EditBox link;
 	private EditBox host;
 	private Button pairButton;
+	private Button modeButton;
 	private Component message = Component.empty();
 	private boolean busy;
 
@@ -69,12 +71,12 @@ public final class PairScreen extends Screen {
 		host.setMaxLength(512);
 		host.setHint(Component.literal("Only for a bare code: https://host.ts.net or http://host:3773").withStyle(ChatFormatting.DARK_GRAY));
 		addRenderableWidget(host);
-		Button mode = addRenderableWidget(Button.builder(modeLabel(), b -> {
+		modeButton = addRenderableWidget(Button.builder(modeLabel(), b -> {
 			readOnly = !readOnly;
 			rebuildWidgets();
 		}).bounds(x, y + 94, w, 20).build());
-		mode.setTooltip(Tooltip.create(Component.translatable("t3craft.pair.mode.tooltip")));
-		mode.active = !busy;
+		modeButton.setTooltip(Tooltip.create(Component.translatable("t3craft.pair.mode.tooltip")));
+		modeButton.active = !busy;
 		pairButton = addRenderableWidget(Button.builder(Component.translatable(readOnly ? "t3craft.pair.button.read" : "t3craft.pair.button"), b -> submit())
 				.bounds(x, y + 118, w / 2 - 4, 20).build());
 		addRenderableWidget(Button.builder(CommonComponents.GUI_CANCEL, b -> onClose())
@@ -95,12 +97,17 @@ public final class PairScreen extends Screen {
 		}
 		busy = true;
 		pairButton.active = false;
+		modeButton.active = false;
 		message = Component.literal("Pairing…").withStyle(ChatFormatting.YELLOW);
 		String linkValue = link.getValue();
 		T3CraftClient.get().pair(label.getValue(), linkValue, host.getValue(), readOnly, r -> {
 			busy = false;
+			// both buttons: the access toggle used to stay greyed out until the screen was rebuilt
 			if (pairButton != null) {
 				pairButton.active = true;
+			}
+			if (modeButton != null) {
+				modeButton.active = true;
 			}
 			message = Component.literal(r.message()).withStyle(r.ok() ? ChatFormatting.GREEN : ChatFormatting.RED);
 			if (r.ok()) {
@@ -139,6 +146,16 @@ public final class PairScreen extends Screen {
 			graphics.text(font, s, width / 2 - font.width(s) / 2, my, 0xFFFFFFFF);
 			my += font.lineHeight;
 		}
+	}
+
+	/** Enter in any of the fields pairs, like the button (vanilla EditBox ignores Enter). */
+	@Override
+	public boolean keyPressed(KeyEvent e) {
+		if (DialogLayout.isSubmit(e.key()) && getFocused() instanceof EditBox && pairButton != null && pairButton.active) {
+			submit();
+			return true;
+		}
+		return super.keyPressed(e);
 	}
 
 	@Override

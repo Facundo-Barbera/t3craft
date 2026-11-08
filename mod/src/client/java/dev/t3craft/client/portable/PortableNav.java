@@ -173,4 +173,15 @@ public final class PortableNav {
 	private static int clamp(int i, int size) {
 		return size <= 0 ? 0 : Math.max(0, Math.min(i, size - 1));
 	}
+
+	/** Width of the "Archive" + tab buttons in the header, measured from the panel's right edge. */
+	static final int HEADER_BUTTONS_W = 2 * 90 + 10 + 64;
+
+	/**
+	 * Width the header's subtitle / flash line may use in a panel {@code panelW} wide: from its
+	 * x ({@code +8}) to 4 px left of the Archive button, never negative.
+	 */
+	static int headerTextWidth(int panelW) {
+		return Math.max(0, panelW - HEADER_BUTTONS_W - 8 - 4);
+	}
 }

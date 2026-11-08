@@ -2,16 +2,19 @@ package dev.t3craft.client.portable;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.t3craft.client.T3CraftClient;
+import dev.t3craft.client.chat.ChatScreens;
+import dev.t3craft.client.chat.ThreadBrowserScreen;
+import dev.t3craft.client.config.EnvironmentActions;
+import dev.t3craft.client.config.EnvironmentsScreen;
 import dev.t3craft.client.config.T3CraftKeys;
-import dev.t3craft.client.portable.held.HeldScreen;
 import dev.t3craft.client.npc.NpcInfo;
-import dev.t3craft.client.screen.PairScreen;
-import dev.t3craft.client.screen.ThreadChatScreen;
+import dev.t3craft.client.portable.held.HeldScreen;
 import dev.t3craft.portable.PortableItems;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
 
 /**
  * Client wiring of the portable T3 terminal: the configurable key (Options › Controls › T3Craft,
@@ -45,12 +48,22 @@ public final class PortableClient {
 		// Until feat/chat and feat/config are merged: the screens main already has.
 		PortableLinks.setFallbacks(
 				(env, thread) -> {
+					// the chat browser, like setChat below (was the ThreadChatScreen placeholder)
 					NpcInfo info = client.npcs().info(env + ":" + thread);
 					if (info != null) {
-						Minecraft.getInstance().gui.setScreen(new ThreadChatScreen(info));
+						ChatScreens.openFor(info);
 					}
 				},
-				parent -> Minecraft.getInstance().gui.setScreen(new PairScreen(parent)));
+				// The environment list (pair new, show/hide, edit, unpair), back to the terminal on
+				// Done. It used to be the bare pairing screen, so "Environments…" never listed them.
+				parent -> Minecraft.getInstance().gui.setScreen(new EnvironmentsScreen(parent, EnvironmentActions.DEFAULT)));
+		// Chat from the terminal: the browser, with Esc back to the terminal (it used to close to the game).
+		PortableLinks.setChat((env, thread) -> {
+			Minecraft mc = Minecraft.getInstance();
+			Screen back = mc.gui.screen();
+			Screen chat = ChatScreens.create(env.isEmpty() ? thread : env + ":" + thread);
+			mc.gui.setScreen(chat instanceof ThreadBrowserScreen b ? b.withParent(back) : chat);
+		});
 	}
 
 	public static KeyMapping key() {

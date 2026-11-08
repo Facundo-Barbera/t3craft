@@ -10,6 +10,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
@@ -40,14 +41,26 @@ public final class OperatePairScreen extends Screen {
 		return Pairing.hostCommand(Pairing.OPERATE_SCOPES, "T3Craft operate", env.url());
 	}
 
+	/** Set in {@link #init()}: below the warning and host command when they are tall. */
+	private int fieldY;
+
 	private int fieldY() {
-		return height / 2 + 4;
+		return fieldY;
+	}
+
+	/** Bottom of the header text (title, wrapped warning, host command) for width {@code w}. */
+	private int headerBottom(int w) {
+		int warn = font.split(Component.translatable("t3craft.operate.enable.warning", env.label()), w).size();
+		int cmd = font.split(Component.literal(hostCommand(env)), w).size();
+		return 16 + 16 + warn * font.lineHeight + 6 + 11 + cmd * font.lineHeight + 12;
 	}
 
 	@Override
 	protected void init() {
 		int w = Math.min(380, width - 40);
 		int x = width / 2 - w / 2;
+		// the field, the buttons (+28) and the result line (+56) must stay on screen
+		fieldY = Math.max(height / 2 + 4, Math.min(headerBottom(w), height - 68));
 		link = new EditBox(font, x, fieldY(), w, 20, link, Component.literal("Pairing link or code"));
 		link.setMaxLength(4096);
 		link.setHint(Component.literal("https://host/pair#token=…  or the code").withStyle(ChatFormatting.DARK_GRAY));
@@ -94,12 +107,30 @@ public final class OperatePairScreen extends Screen {
 		y += 6;
 		g.text(font, Component.translatable("t3craft.operate.enable.host").withStyle(ChatFormatting.GRAY), x, y, 0xFFFFFFFF);
 		y += 11;
-		for (FormattedCharSequence s : font.split(Component.literal(hostCommand(env)).withStyle(ChatFormatting.AQUA), w)) {
-			g.text(font, s, x, Math.min(y, fieldY() - 22), 0xFFFFFFFF);
+		// Only the lines that fit above the field's label: clamping every line to the same y drew
+		// the overflow on top of each other (unreadable) on short windows.
+		List<FormattedCharSequence> cmd = font.split(Component.literal(hostCommand(env)).withStyle(ChatFormatting.AQUA), w);
+		int fit = DialogLayout.linesThatFit(y, font.lineHeight, fieldY() - 12, cmd.size());
+		for (int i = 0; i < fit; i++) {
+			g.text(font, cmd.get(i), x, y, 0xFFFFFFFF);
 			y += font.lineHeight;
 		}
 		g.text(font, "Pairing link or code", x, fieldY() - 10, 0xFFA0A0A0);
-		g.centeredText(font, message, width / 2, fieldY() + 56, 0xFFFFFFFF);
+		int my = fieldY() + 56; // wrapped: pairing errors are often wider than the window
+		for (FormattedCharSequence s : font.split(message, w)) {
+			g.centeredText(font, s, width / 2, my, 0xFFFFFFFF);
+			my += font.lineHeight;
+		}
+	}
+
+	/** Enter in the field enables control, like the button (vanilla EditBox ignores Enter). */
+	@Override
+	public boolean keyPressed(KeyEvent e) {
+		if (DialogLayout.isSubmit(e.key()) && getFocused() == link && enableButton != null && enableButton.active) {
+			submit();
+			return true;
+		}
+		return super.keyPressed(e);
 	}
 
 	@Override
