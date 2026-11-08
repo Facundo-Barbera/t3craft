@@ -3,7 +3,6 @@ package dev.t3craft.client.portable;
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.t3craft.client.T3CraftClient;
 import dev.t3craft.client.chat.ChatScreens;
-import dev.t3craft.client.chat.ThreadBrowserScreen;
 import dev.t3craft.client.config.EnvironmentActions;
 import dev.t3craft.client.config.EnvironmentsScreen;
 import dev.t3craft.client.config.T3CraftKeys;
@@ -61,8 +60,7 @@ public final class PortableClient {
 		PortableLinks.setChat((env, thread) -> {
 			Minecraft mc = Minecraft.getInstance();
 			Screen back = mc.gui.screen();
-			Screen chat = ChatScreens.create(env.isEmpty() ? thread : env + ":" + thread);
-			mc.gui.setScreen(chat instanceof ThreadBrowserScreen b ? b.withParent(back) : chat);
+			mc.gui.setScreen(ChatScreens.create(env.isEmpty() ? thread : env + ":" + thread).withParent(back instanceof dev.t3craft.client.t3ui.T3Screen ? null : back));
 		});
 	}
 
@@ -70,7 +68,8 @@ public final class PortableClient {
 		return key;
 	}
 
+	/** The T3 key and the item: the unified T3 screen (feat/t3-ui-unified), most recent thread open. */
 	public static void open(T3CraftClient client) {
-		Minecraft.getInstance().gui.setScreen(new PortableScreen(client));
+		Minecraft.getInstance().gui.setScreen(ChatScreens.create(null));
 	}
 }

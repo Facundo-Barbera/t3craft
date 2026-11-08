@@ -37,6 +37,6 @@ public interface ArchiveOpener {
 		net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
 		net.minecraft.client.gui.screens.Screen back = mc.gui.screen();
 		net.minecraft.client.gui.screens.Screen chat = ChatScreens.createReadOnly(r.env(), r.threadId(), r.envLabel(), r.title());
-		mc.gui.setScreen(chat instanceof dev.t3craft.client.chat.ThreadBrowserScreen b ? b.withParent(back) : chat);
+		mc.gui.setScreen(chat instanceof dev.t3craft.client.t3ui.T3Screen t ? t.withParent(back) : chat);
 	});
 }
