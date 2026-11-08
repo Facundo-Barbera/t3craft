@@ -2,7 +2,8 @@
 # COORDINATOR ONLY. Starts (or stops) the shared render daemon; agents never run this, gradle or java.
 #
 #   tools/render/start-daemon.sh [--foreground]   start it (in the background unless --foreground)
-#   tools/render/start-daemon.sh --stop           ask it to finish the current job and exit
+#   tools/render/start-daemon.sh --stop           ask it to finish the current job and exit (the queue
+#                                                 stays in the outbox and resumes on the next start)
 #   tools/render/start-daemon.sh --status         print its heartbeat
 #
 # Run it from the checkout whose code should be the baseline (normally main/integration, CLEAN: the
@@ -19,7 +20,7 @@ mkdir -p "$RENDER_HOME"
 mode=background
 case "${1:-}" in
 	--foreground) mode=foreground ;;
-	--stop) touch "$RENDER_HOME/STOP"; echo "start-daemon: STOP left; the daemon exits after its current job"; exit 0 ;;
+	--stop) touch "$RENDER_HOME/STOP"; echo "start-daemon: STOP left; the daemon exits after its current job (queued requests stay queued and resume on the next start)"; exit 0 ;;
 	--status) cat "$RENDER_HOME/daemon.json" 2>/dev/null || echo "no heartbeat in $RENDER_HOME"; exit 0 ;;
 	--supervise) mode=supervise ;;
 	"") ;;
@@ -62,7 +63,7 @@ if [ -f "$RENDER_HOME/daemon.json" ]; then
 	if python3 -I - "$RENDER_HOME/daemon.json" <<'PY'
 import json, sys, time
 d = json.load(open(sys.argv[1]))
-sys.exit(0 if d.get("state") == "running" and time.time() * 1000 - d.get("nowMillis", 0) < 30000 else 1)
+sys.exit(0 if d.get("state") in ("running", "stopping") and time.time() * 1000 - d.get("nowMillis", 0) < 30000 else 1)
 PY
 	then
 		echo "start-daemon: a daemon is already running (see --status); use --stop first" >&2

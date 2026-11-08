@@ -1,6 +1,8 @@
 package dev.t3craft.tools.render;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.file.Files;
@@ -9,12 +11,14 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.FileTime;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.PriorityBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
 /**
@@ -32,6 +36,11 @@ import java.util.stream.Stream;
  * class loader ({@link RenderClassLoader}) over the Minecraft classes booted once, runs the renderer
  * and publishes the files. Machine care: nice 19 / ionice idle (set by the launch script), a single
  * worker, at most one pending request per agent, previews at low resolution, outbox cleaned after 24 h.
+ *
+ * <p>The queue survives restarts: at start ({@link #recover}) every {@code outbox/<id>} left in
+ * {@code queued}, {@code compiling} or {@code rendering} is queued again under the same id, in its
+ * original arrival order; a STOP ({@code start-daemon.sh --stop}) finishes the running job and leaves
+ * the rest {@code queued} on disk for the next start.
  */
 public final class RenderDaemon {
 	/** Pause new work while the 1-minute load average is above this. */
@@ -49,6 +58,9 @@ public final class RenderDaemon {
 	static final long OUTBOX_MAX_AGE_MS = 24L * 60 * 60 * 1000;
 	/** A final render sorts as if it had arrived this much later than it did, so previews (cheap) go first, without starving finals. */
 	static final long FINAL_DELAY_MS = 10L * 60 * 1000;
+	/** A request interrupted mid-job by more daemon restarts than this is failed instead of queued again (it may be what kills the daemon). */
+	static final int MAX_RESTARTS = 2;
+	static final String REQUEUED = "requeued after daemon restart";
 
 	final PrintStream rawOut;
 	final Spool spool;
@@ -65,12 +77,20 @@ public final class RenderDaemon {
 		final Spool.Status status;
 		final long seq;
 		final long sortKey;
+		/** Recovered from the outbox at start (shown in its queued message). */
+		final boolean requeued;
 
 		Job(Request req, Spool.Status status, long seq) {
+			this(req, status, seq, System.currentTimeMillis(), false);
+		}
+
+		/** {@code arrivedAt}: when the request first arrived, so a recovered job keeps its place. */
+		Job(Request req, Spool.Status status, long seq, long arrivedAt, boolean requeued) {
 			this.req = req;
 			this.status = status;
 			this.seq = seq;
-			this.sortKey = System.currentTimeMillis() + (req.preview() ? 0 : FINAL_DELAY_MS);
+			this.sortKey = arrivedAt + (req.preview() ? 0 : FINAL_DELAY_MS);
+			this.requeued = requeued;
 		}
 
 		@Override
@@ -138,6 +158,11 @@ public final class RenderDaemon {
 	// ------------------------------------------------------------------ main loop
 
 	private void run() throws Exception {
+		try {
+			recover();
+		} catch (Exception e) {
+			log("recovery error: " + e);
+		}
 		Thread worker = new Thread(this::workLoop, "render-worker");
 		worker.setDaemon(true);
 		worker.start();
@@ -156,7 +181,7 @@ public final class RenderDaemon {
 					}
 				}
 				if (Files.exists(spool.root.resolve("STOP"))) {
-					log("STOP file found: finishing the current job and exiting");
+					log("STOP file found: finishing the current job and exiting; " + queue.size() + " queued request(s) stay queued for the next start");
 					Files.deleteIfExists(spool.root.resolve("STOP"));
 					stop = true;
 				}
@@ -165,10 +190,177 @@ public final class RenderDaemon {
 			}
 			Thread.sleep(2000);
 		}
-		while (running != null || !queue.isEmpty()) {
-			Thread.sleep(1000); // let the worker drain what is already accepted
+		// the worker sees `stop`, finishes the job in hand and takes no other
+		while (worker.isAlive()) {
+			heartbeat("stopping");
+			worker.join(2000);
+		}
+		Job[] left = queue.toArray(new Job[0]);
+		java.util.Arrays.sort(left);
+		for (Job j : left) {
+			Spool.Status st = j.status;
+			st.state = "queued";
+			st.position = 0;
+			st.message = "queued; the render daemon stopped and resumes this request when it starts again";
+			spool.write(st);
+		}
+		if (left.length > 0) {
+			log(left.length + " request(s) left queued in the outbox for the next start");
 		}
 		heartbeat("stopped");
+	}
+
+	// ------------------------------------------------------------------ recovery
+
+	/** One unfinished outbox folder found at start. */
+	private record Unfinished(String id, Request req, Spool.Status status, long arrivedAt) {
+	}
+
+	/**
+	 * Requeues what a previous daemon left unfinished: {@code outbox/<id>/status.json} in {@code queued},
+	 * {@code compiling} or {@code rendering}. Same id (an agent waiting on it with {@code submit.sh} just sees
+	 * the state move on), original arrival order, still one pending request per agent (the newest wins, older
+	 * ones end as "superseded by &lt;id&gt;"). Without a valid {@code request.json} the folder ends in
+	 * {@code error} asking to send it again. Runs before the worker starts and before the first inbox scan.
+	 */
+	private void recover() throws IOException {
+		List<Path> dirs = new ArrayList<>();
+		try (Stream<Path> s = Files.list(spool.outbox)) {
+			s.filter(Files::isDirectory).forEach(dirs::add);
+		}
+		List<Unfinished> found = new ArrayList<>();
+		long now = System.currentTimeMillis();
+		for (Path dir : dirs) {
+			String id = dir.getFileName().toString();
+			Path statusFile = dir.resolve("status.json");
+			if (!Files.isRegularFile(statusFile)) {
+				continue;
+			}
+			JsonObject old;
+			try {
+				JsonElement e = JsonParser.parseString(Files.readString(statusFile));
+				if (!e.isJsonObject()) {
+					continue;
+				}
+				old = e.getAsJsonObject();
+			} catch (IOException | RuntimeException e) {
+				log("recovery: unreadable " + statusFile + ": " + e);
+				continue;
+			}
+			String state = str(old, "state");
+			if (!"queued".equals(state) && !"compiling".equals(state) && !"rendering".equals(state)) {
+				continue;
+			}
+			boolean wasRunning = !state.equals("queued");
+			int restarts = (old.has("restarts") ? intOr(old.get("restarts"), 0) : 0) + (wasRunning ? 1 : 0);
+			long arrivedAt = instantOr(str(old, "queuedAt"), fileTime(dir.resolve("request.json"), fileTime(statusFile, now)));
+
+			Request req = null;
+			String why = null;
+			Path reqFile = dir.resolve("request.json");
+			if (!Request.ID.matcher(id).matches()) {
+				why = "its id is not valid";
+			} else if (!Files.isRegularFile(reqFile)) {
+				why = "its request.json is missing";
+			} else {
+				try {
+					req = Request.parse(id, Files.readString(reqFile));
+				} catch (IOException | RuntimeException e) {
+					why = "its request.json is not valid (" + e.getMessage() + ")";
+				}
+			}
+			if (req == null) {
+				Spool.Status st = new Spool.Status(id, strOr(old, "agent", Request.agentOf(id)), strOr(old, "kind", "?"), strOr(old, "priority", "?"));
+				st.queuedAt = arrivedAt;
+				fail(st, "the render daemon restarted and could not resume this request: " + why
+						+ ". Send it again (tools/render/submit.sh, a new number in the file name).");
+				continue;
+			}
+			Spool.Status st = new Spool.Status(req);
+			st.queuedAt = arrivedAt;
+			st.restarts = restarts;
+			if (now - arrivedAt > OUTBOX_MAX_AGE_MS) {
+				fail(st, "the render daemon restarted and this request is older than 24 h; send it again if you still need it (a new number in the file name)");
+				continue;
+			}
+			if (restarts > MAX_RESTARTS) {
+				fail(st, "the render daemon restarted " + restarts + " times while running this request, so it is not resumed again "
+						+ "(it may be what brings the daemon down). Check report.txt / run.log, then send it again with a new number.");
+				continue;
+			}
+			found.add(new Unfinished(id, req, st, arrivedAt));
+		}
+		if (found.isEmpty()) {
+			return;
+		}
+		// arrival order; within one agent the newest one stays pending
+		found.sort(Comparator.comparingLong(Unfinished::arrivedAt).thenComparing(Unfinished::id));
+		Map<String, Unfinished> newest = new HashMap<>();
+		for (Unfinished u : found) {
+			newest.put(u.req().agent(), u); // later in arrival order overwrites
+		}
+		int requeued = 0;
+		for (Unfinished u : found) {
+			Unfinished keep = newest.get(u.req().agent());
+			if (keep != u) {
+				fail(u.status(), "superseded by " + keep.id());
+				continue;
+			}
+			String bad = JobRunner.checkWorktree(this, u.req());
+			if (bad != null) {
+				fail(u.status(), "rejected: " + bad);
+				continue;
+			}
+			synchronized (this) {
+				activeByAgent.put(u.req().agent(), u.id());
+			}
+			Spool.Status st = u.status();
+			st.state = "queued";
+			st.position = 0;
+			st.message = REQUEUED;
+			queue.add(new Job(u.req(), st, seq++, u.arrivedAt(), true));
+			spool.write(st);
+			requeued++;
+			log(u.id() + ": " + REQUEUED + " (" + u.req().kind() + ", " + st.priority + (st.restarts > 0 ? ", interrupted " + st.restarts + "x" : "") + ")");
+		}
+		log("recovery: " + requeued + " request(s) requeued, " + (found.size() - requeued) + " closed");
+	}
+
+	private static String str(JsonObject o, String k) {
+		JsonElement e = o.get(k);
+		return e == null || !e.isJsonPrimitive() ? null : e.getAsString();
+	}
+
+	private static String strOr(JsonObject o, String k, String dflt) {
+		String v = str(o, k);
+		return v == null || v.isBlank() ? dflt : v;
+	}
+
+	private static int intOr(JsonElement e, int dflt) {
+		try {
+			return e.getAsInt();
+		} catch (RuntimeException ex) {
+			return dflt;
+		}
+	}
+
+	private static long instantOr(String iso, long dflt) {
+		if (iso == null) {
+			return dflt;
+		}
+		try {
+			return Instant.parse(iso).toEpochMilli();
+		} catch (RuntimeException e) {
+			return dflt;
+		}
+	}
+
+	private static long fileTime(Path p, long dflt) {
+		try {
+			return Files.getLastModifiedTime(p).toMillis();
+		} catch (IOException e) {
+			return dflt;
+		}
 	}
 
 	private synchronized Set<String> busyIds() {
@@ -207,6 +399,12 @@ public final class RenderDaemon {
 		if (!Request.ID.matcher(id).matches()) {
 			log("rejected inbox file with a bad name: " + name + " (use letters, digits, . _ - only)");
 			Files.move(file, spool.inbox.resolve("." + name + ".rejected"), StandardCopyOption.REPLACE_EXISTING);
+			return;
+		}
+		if (busyIds().contains(id)) {
+			// the same request written again (e.g. after a daemon restart): it is already queued or running
+			Files.deleteIfExists(file);
+			log(id + ": inbox copy ignored, the request is already queued or running");
 			return;
 		}
 		if (Files.exists(spool.outDir(id).resolve("status.json"))) {
@@ -280,7 +478,8 @@ public final class RenderDaemon {
 		java.util.Arrays.sort(snapshot);
 		for (int i = 0; i < snapshot.length; i++) {
 			Spool.Status st = snapshot[i].status;
-			String msg = "queued: position " + (i + 1) + " of " + snapshot.length + (running != null ? " (behind " + running.req.id() + ")" : "");
+			String msg = "queued: position " + (i + 1) + " of " + snapshot.length + (running != null ? " (behind " + running.req.id() + ")" : "")
+					+ (snapshot[i].requeued ? "; " + REQUEUED : "");
 			if (st.position != i + 1 || !msg.equals(st.message)) {
 				st.position = i + 1;
 				st.message = msg;
@@ -310,11 +509,18 @@ public final class RenderDaemon {
 
 	private void workLoop() {
 		JobRunner runner = new JobRunner(this);
-		while (true) {
+		while (!stop) {
 			Job job;
 			try {
-				job = queue.take();
+				job = queue.poll(1, TimeUnit.SECONDS);
 			} catch (InterruptedException e) {
+				return;
+			}
+			if (job == null) {
+				continue;
+			}
+			if (stop) {
+				queue.add(job); // stays queued on disk for the next start
 				return;
 			}
 			running = job;
@@ -342,6 +548,11 @@ public final class RenderDaemon {
 	/** The daemon cannot kill a runaway render thread; the launch script restarts it on exit code 75. */
 	void giveUp(String why) {
 		log("giving up: " + why);
+		Job r = running;
+		if (r != null && !r.status.terminal()) {
+			// not resumed after the restart: it would get stuck again
+			fail(r.status, "the render thread did not stop and the daemon restarted; not resumed. See report.txt");
+		}
 		heartbeat("restarting");
 		Runtime.getRuntime().halt(75);
 	}

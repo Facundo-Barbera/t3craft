@@ -68,6 +68,8 @@ final class Spool {
 		long queuedAt = System.currentTimeMillis();
 		long startedAt;
 		long finishedAt;
+		/** How many daemon restarts interrupted this request while it ran (see RenderDaemon.recover). */
+		int restarts;
 		final List<String> files = new ArrayList<>();
 		String report;
 
@@ -107,6 +109,9 @@ final class Spool {
 			}
 			if (finishedAt > 0) {
 				o.addProperty("finishedAt", Instant.ofEpochMilli(finishedAt).toString());
+			}
+			if (restarts > 0) {
+				o.addProperty("restarts", restarts);
 			}
 			JsonArray fs = new JsonArray();
 			files.forEach(fs::add);
