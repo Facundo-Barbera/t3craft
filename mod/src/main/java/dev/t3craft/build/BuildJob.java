@@ -41,13 +41,20 @@ public final class BuildJob {
 		void placed(BuildJob job, int index, BlockPos worldPos, BlockState worldState);
 	}
 
+	/** A builder of a {@link BuildPlanner#CREW} job starts walking to {@code standWorld} (feet) for plan entry {@code index}. */
+	@FunctionalInterface
+	public interface WalkCallback {
+		void walking(BuildJob job, int front, int index, BlockPos standWorld, int ticks);
+	}
+
 	private final int id;
 	private final String label;
 	private final ResourceKey<Level> dimension;
 	private final BlockPos origin;
 	private final Rotation rotation;
 	private final BuildPlan plan;
-	private final FrontCursor cursor;
+	private final JobCursor cursor;
+	private final BuildPlanner planner;
 	private final double blocksPerTick;
 	private final @Nullable BuildCost cost;
 	private final @Nullable MaterialMeter meter;
@@ -81,6 +88,16 @@ public final class BuildJob {
 	 */
 	public BuildJob(int id, String label, ResourceKey<Level> dimension, BlockPos origin, Rotation rotation, BuildPlan plan, double blocksPerTick,
 			@Nullable BuildCost cost, int fronts) {
+		this(id, label, dimension, origin, rotation, plan, blocksPerTick, cost, fronts, BuildPlanner.LAYERS);
+	}
+
+	/**
+	 * @param planner how the plan is ordered among the fronts: {@link BuildPlanner#LAYERS} (layer bands)
+	 *                or {@link BuildPlanner#CREW} (one builder per front, zones, reach and support; the
+	 *                schedule is computed here, deterministic for a plan)
+	 */
+	public BuildJob(int id, String label, ResourceKey<Level> dimension, BlockPos origin, Rotation rotation, BuildPlan plan, double blocksPerTick,
+			@Nullable BuildCost cost, int fronts, BuildPlanner planner) {
 		if (!(blocksPerTick > 0) || Double.isInfinite(blocksPerTick)) {
 			throw new IllegalArgumentException("blocksPerTick must be > 0 and finite: " + blocksPerTick);
 		}
@@ -91,7 +108,17 @@ public final class BuildJob {
 		this.rotation = Objects.requireNonNull(rotation, "rotation");
 		this.plan = Objects.requireNonNull(plan, "plan");
 		this.blocksPerTick = blocksPerTick;
-		this.cursor = new FrontCursor(Fronts.of(plan, Math.max(1, fronts)));
+		this.planner = Objects.requireNonNull(planner, "planner");
+		int f = Math.max(1, fronts);
+		if (planner == BuildPlanner.CREW) {
+			int segment = cost == null ? 0 : BuildPlanner.CREW_SEGMENT;
+			java.util.function.Supplier<JobCursor> crew = () -> new CrewCursor(CrewSchedule.of(plan, f), segment, BuildCursor.DEFAULT_MAX_SKIPS_PER_TICK);
+			// Small plans are planned right here; big HQ parts off-thread (the job waits in PENDING meanwhile).
+			this.cursor = plan.size() <= BuildPlanner.SYNC_PLAN_LIMIT ? crew.get()
+					: new DeferredCursor(crew, () -> new FrontCursor(Fronts.of(plan, f)), plan.size(), f);
+		} else {
+			this.cursor = new FrontCursor(Fronts.of(plan, f));
+		}
 		this.cost = cost;
 		if (cost == null) {
 			this.meter = null;
@@ -127,9 +154,18 @@ public final class BuildJob {
 	 * Returns the number of entries processed. Server thread.
 	 */
 	public int tick(double allowance, BlockSink sink, PlacedCallback onPlaced) {
+		return tick(allowance, sink, onPlaced, null);
+	}
+
+	/** Like {@link #tick(double, BlockSink, PlacedCallback)}; {@code onWalk} hears when a crew builder starts walking. */
+	public int tick(double allowance, BlockSink sink, PlacedCallback onPlaced, @Nullable WalkCallback onWalk) {
 		MaterialMeter m = meter;
 		MaterialSupply sup = supply == null ? MaterialSupply.EMPTY : supply;
 		IntPredicate there = j -> sink.matches(worldPos(j), worldState(j));
+		if (crew() instanceof CrewCursor cc) {
+			cc.probe(there);
+			cc.walker(onWalk == null ? null : (front, index, step, ticks) -> onWalk.walking(this, front, index, standWorld(front, step), ticks));
+		}
 		if (m != null && waitingForMaterials) {
 			if (cursor.state() != JobState.PAUSED || userPaused) {
 				return 0;
@@ -322,12 +358,49 @@ public final class BuildJob {
 
 	/** Parallel fronts of this job. */
 	public int fronts() {
-		return cursor.fronts().fronts();
+		return cursor.frontCount();
 	}
 
 	/** The front that places plan entry {@code index} (for the crew: one builder per front). */
 	public int frontOf(int index) {
-		return cursor.fronts().frontOf(index);
+		return cursor.frontOf(index);
+	}
+
+	public BuildPlanner planner() {
+		return planner;
+	}
+
+	/** The crew schedule of a {@link BuildPlanner#CREW} job; null otherwise. */
+	public @Nullable CrewSchedule schedule() {
+		CrewCursor cc = crew();
+		return cc == null ? null : cc.schedule();
+	}
+
+	/** The crew cursor, once planned; null for layer jobs and while planning. */
+	private @Nullable CrewCursor crew() {
+		JobCursor c = cursor instanceof DeferredCursor d ? d.ready() : cursor;
+		return c instanceof CrewCursor cc ? cc : null;
+	}
+
+	/** Waits until a {@link BuildPlanner#CREW} job finished planning (tests; never on the server thread). */
+	public void awaitPlan() {
+		if (cursor instanceof DeferredCursor d) {
+			d.await();
+		}
+	}
+
+	/** World feet cell where builder {@code front} stands for step {@code step} of its lane (CREW jobs). */
+	public BlockPos standWorld(int front, int step) {
+		CrewSchedule s = java.util.Objects.requireNonNull(schedule(), "not a crew job");
+		int[] c = s.stand(front, step);
+		return origin.offset(new BlockPos(c[0], c[1], c[2]).rotate(rotation));
+	}
+
+	/** World feet cell where builder {@code front} starts (CREW jobs). */
+	public BlockPos startWorld(int front) {
+		CrewSchedule s = java.util.Objects.requireNonNull(schedule(), "not a crew job");
+		int[] c = s.start(front);
+		return origin.offset(new BlockPos(c[0], c[1], c[2]).rotate(rotation));
 	}
 
 	/** Blocks per tick this job wants: {@code blocksPerTick × fronts}. */
