@@ -24,7 +24,7 @@ import net.minecraft.core.Direction;
  * a garden strip at {@code v = 13} that separates it from the next row. All modules span
  * {@code y = 0} (floor) to {@link #TOP}.
  */
-final class HqGeometry {
+public final class HqGeometry {
 	static final int TOP = 10;
 	/** Hub half size: walls at |x| = 8, |z| = 8. */
 	static final int HUB = 8;
@@ -84,8 +84,8 @@ final class HqGeometry {
 	 * @param along  direction the rectangle extends to the right as seen from the front
 	 * @param facing outward normal of the visible face
 	 */
-	record Surface(BlockPos origin, Direction along, Direction facing, int width, int height) {
-		List<BlockPos> cells() {
+	public record Surface(BlockPos origin, Direction along, Direction facing, int width, int height) {
+		public List<BlockPos> cells() {
 			List<BlockPos> out = new ArrayList<>();
 			for (int y = 0; y < height; y++) {
 				for (int i = 0; i < width; i++) {
@@ -96,7 +96,7 @@ final class HqGeometry {
 		}
 
 		/** Bottom-middle cell (the anchor's block). */
-		BlockPos anchorCell() {
+		public BlockPos anchorCell() {
 			return origin.relative(along, width / 2);
 		}
 	}
@@ -125,7 +125,7 @@ final class HqGeometry {
 	}
 
 	/** The hologram's airspace over the hub centre (kept free from y = 1 to {@link #HOLOGRAM_TOP}). */
-	static final int HOLOGRAM_TOP = 8;
+	public static final int HOLOGRAM_TOP = 8;
 
 	/** One shelf place: the computer cell and the direction its screen faces (into the hub). */
 	record ArchiveSlot(BlockPos cell, Direction facing) {

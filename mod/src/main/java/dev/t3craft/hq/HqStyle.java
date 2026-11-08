@@ -81,7 +81,7 @@ public abstract class HqStyle {
 	/** A sign's or plaque's text: up to four lines, the text colour (the environment's, for wing signs). */
 	public record SignText(DyeColor color, String l1, String l2, String l3, String l4) {
 		/** As vanilla sign block entity data (glowing text). */
-		CompoundTag signTag() {
+		public CompoundTag signTag() {
 			return SignTags.sign(color, true, l1, l2, l3, l4);
 		}
 	}
@@ -144,17 +144,17 @@ public abstract class HqStyle {
 	// ------------------------------------------------------------------ fixtures (written by the generator)
 
 	/** Desk computer: on (occupied) or off (vacant). */
-	BlockState computer(boolean on) {
+	public BlockState computer(boolean on) {
 		return palette().get(on ? Role.COMPUTER_ON : Role.COMPUTER_OFF);
 	}
 
 	/** Bulb of the board (off; other modules toggle {@code lit}). Desks have no lamp: their screen shows the state. */
-	BlockState statusLamp() {
+	public BlockState statusLamp() {
 		return palette().get(Role.STATUS_LAMP);
 	}
 
 	/** Stand-in block of the reserved screen surfaces. */
-	BlockState screen() {
+	public BlockState screen() {
 		return palette().get(Role.SCREEN);
 	}
 
@@ -169,17 +169,17 @@ public abstract class HqStyle {
 	}
 
 	/** The beacon cell's block (the blocks module swaps it for its beacon lamp). */
-	BlockState beacon() {
+	public BlockState beacon() {
 		return palette().get(Role.BEACON);
 	}
 
 	/** The archive terminal's stand-in, screen facing {@code facing}. */
-	BlockState archiveTerminal(net.minecraft.core.Direction facing) {
+	public BlockState archiveTerminal(net.minecraft.core.Direction facing) {
 		return palette().get(Role.TERMINAL).setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING, facing);
 	}
 
 	/** Base under a module's big screen. */
-	BlockState screenBase() {
+	public BlockState screenBase() {
 		return palette().get(Role.BEAM);
 	}
 
@@ -245,11 +245,11 @@ public abstract class HqStyle {
 	 * Colour of an environment (module carpet runner and sign text): one of the 16 dye colours, from a
 	 * Fibonacci mix of {@link String#hashCode()} (whose value the Java spec fixes). Same for every style.
 	 */
-	static DyeColor envColor(String envKey) {
+	public static DyeColor envColor(String envKey) {
 		return DyeColor.byId((envKey.hashCode() * 0x9E3779B9) >>> 28);
 	}
 
-	static DyeColor envColor(HqLayout.Module m) {
+	public static DyeColor envColor(HqLayout.Module m) {
 		return envColor(m.envKey().isEmpty() ? m.projectKey() : m.envKey());
 	}
 

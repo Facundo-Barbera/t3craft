@@ -48,9 +48,9 @@ public final class RingCampusGeometry {
 	static final double HUB_IN = 12.0;
 	static final double HUB_OUT = 13.2;
 	static final double OCT_K = 0.62;
-	static final double PATIO_R = 21.0;
-	static final double GALLERY_R = 27.0;
-	static final double RAMP_R = 35.0;
+	public static final double PATIO_R = 21.0;
+	public static final double GALLERY_R = 27.0;
+	public static final double RAMP_R = 35.0;
 	static final double INNER_STREET_R = 40.0;
 	public static final int STREET = 6;
 	static final double AVENUE_HALF = 3.4;
@@ -215,11 +215,11 @@ public final class RingCampusGeometry {
 
 	// ------------------------------------------------------------------ zones
 
-	enum Kind {
+	public enum Kind {
 		HUB, HUB_WALL, BRIDGE, PATIO, GALLERY, RAMP, TERRACE, INNER_STREET, AVENUE, LOT, STREET, NODE, LAWN, NONE
 	}
 
-	enum NodeKind {
+	public enum NodeKind {
 		REVIEW_TOWER, SCHEDULE_ROTUNDA, ARCHIVE_CLOISTER, LOUNGE_SUNKEN, PILLAR
 	}
 
@@ -228,17 +228,17 @@ public final class RingCampusGeometry {
 	 * @param lot  lot id for {@link Kind#LOT}, else -1
 	 * @param node radial index k (0..7) of a ring-1 street node for {@link Kind#NODE}, else -1
 	 */
-	record Zone(Kind kind, int ring, int lot, int node) {
-		static final Zone NONE = new Zone(Kind.NONE, 0, -1, -1);
+	public record Zone(Kind kind, int ring, int lot, int node) {
+		public static final Zone NONE = new Zone(Kind.NONE, 0, -1, -1);
 	}
 
 	/** Radius of the ring-1 street's centre line, where the node rooms stand. */
-	static double nodeRadius() {
+	public static double nodeRadius() {
 		return ringOuter(1) + STREET / 2.0;
 	}
 
-	record Node(int k, NodeKind kind, int cx, int cz) {
-		boolean contains(int x, int z) {
+	public record Node(int k, NodeKind kind, int cx, int cz) {
+		public boolean contains(int x, int z) {
 			int dx = Math.abs(x - cx);
 			int dz = Math.abs(z - cz);
 			return switch (kind) {
@@ -250,7 +250,7 @@ public final class RingCampusGeometry {
 		}
 	}
 
-	static Node node(int k) {
+	public static Node node(int k) {
 		double a = k * Math.PI / 4;
 		double rc = nodeRadius();
 		NodeKind kind = switch (k) {
@@ -263,22 +263,22 @@ public final class RingCampusGeometry {
 		return new Node(k, kind, (int) Math.round(rc * Math.sin(a)), (int) Math.round(-rc * Math.cos(a)));
 	}
 
-	static double r(int x, int z) {
+	public static double r(int x, int z) {
 		return Math.hypot(x, z);
 	}
 
 	/** Angle of a cell from north, clockwise, in [0, 2π). */
-	static double theta(double x, double z) {
+	public static double theta(double x, double z) {
 		double a = Math.atan2(x, -z);
 		return a < 0 ? a + 2 * Math.PI : a;
 	}
 
-	static double octagon(int x, int z) {
+	public static double octagon(int x, int z) {
 		return Math.max(Math.max(Math.abs(x), Math.abs(z)), (Math.abs(x) + Math.abs(z)) * OCT_K);
 	}
 
 	/** Perpendicular distance to the nearest of {@code n} radials (angles k·2π/n). */
-	static double radialDistance(int x, int z, int n) {
+	public static double radialDistance(int x, int z, int n) {
 		double a = theta(x, z);
 		int k = (int) Math.round(a * n / (2 * Math.PI)) % n;
 		double b = k * 2 * Math.PI / n;
@@ -289,7 +289,7 @@ public final class RingCampusGeometry {
 	 * The zone of a ground column with {@code rings} open rings. A lot's cells depend only on its own
 	 * ring and the ring-1 nodes, never on how many rings are open.
 	 */
-	static Zone zone(int x, int z, int rings) {
+	public static Zone zone(int x, int z, int rings) {
 		double o = octagon(x, z);
 		if (o <= HUB_IN) {
 			return new Zone(Kind.HUB, 0, -1, -1);
@@ -341,7 +341,7 @@ public final class RingCampusGeometry {
 	// ------------------------------------------------------------------ barrio frames
 
 	/** The cardinal direction nearest an angle (from north, clockwise). */
-	static Direction cardinal(double angle) {
+	public static Direction cardinal(double angle) {
 		int i = Math.floorMod((int) Math.round(angle / (Math.PI / 2)), 4);
 		return switch (i) {
 			case 0 -> Direction.NORTH;
@@ -351,7 +351,7 @@ public final class RingCampusGeometry {
 		};
 	}
 
-	static BlockPos polar(double radius, double angle, int y) {
+	public static BlockPos polar(double radius, double angle, int y) {
 		return new BlockPos((int) Math.round(radius * Math.sin(angle)), y, (int) Math.round(-radius * Math.cos(angle)));
 	}
 
@@ -360,28 +360,28 @@ public final class RingCampusGeometry {
 	 * {@code across} ({@code out}'s clockwise neighbour), the courtyard's half side and the sizes of
 	 * its halls and gatehouse.
 	 */
-	record Lot(int id, int ring, BlockPos centre, Direction out, Direction across, int court, int hallW, int hallD, int gateW, int gateD) {
+	public record Lot(int id, int ring, BlockPos centre, Direction out, Direction across, int court, int hallW, int hallD, int gateW, int gateD) {
 		/** Coordinate of a cell along {@code out}. */
-		int a(int x, int z) {
+		public int a(int x, int z) {
 			return (x - centre.getX()) * out.getStepX() + (z - centre.getZ()) * out.getStepZ();
 		}
 
 		/** Coordinate of a cell along {@code across}. */
-		int b(int x, int z) {
+		public int b(int x, int z) {
 			return (x - centre.getX()) * across.getStepX() + (z - centre.getZ()) * across.getStepZ();
 		}
 
-		BlockPos at(int a, int b, int y) {
+		public BlockPos at(int a, int b, int y) {
 			return centre.relative(out, a).relative(across, b).atY(y);
 		}
 
 		/** Half side of the paved cluster square (courtyard, halls, gatehouse). */
-		int reach() {
+		public int reach() {
 			return court + 2 + hallD;
 		}
 
 		/** Hall {@code h} (0 across-left, 1 across-right, 2 outer). */
-		Room hall(int h) {
+		public Room hall(int h) {
 			Direction back = switch (h) {
 				case 0 -> across.getOpposite();
 				case 1 -> across;
@@ -394,7 +394,7 @@ public final class RingCampusGeometry {
 		}
 
 		/** The gatehouse, its depth running towards the hub side ({@code -out}). */
-		Room gate() {
+		public Room gate() {
 			Direction back = out.getOpposite();
 			Direction side = back.getClockWise();
 			int c = (gateW - 1) / 2;
@@ -407,25 +407,25 @@ public final class RingCampusGeometry {
 	 * from {@code origin} along {@code back} (door wall at {@code u = -1}, back wall at {@code u = d})
 	 * and {@code side} (side walls at {@code v = -1} and {@code v = w}).
 	 */
-	record Room(BlockPos origin, Direction back, Direction side, int w, int d) {
-		BlockPos cell(int u, int v, int y) {
+	public record Room(BlockPos origin, Direction back, Direction side, int w, int d) {
+		public BlockPos cell(int u, int v, int y) {
 			return origin.relative(back, u).relative(side, v).atY(y);
 		}
 
-		int c() {
+		public int c() {
 			return (w - 1) / 2;
 		}
 
-		boolean wall(int u, int v) {
+		public boolean wall(int u, int v) {
 			return u == -1 || u == d || v == -1 || v == w;
 		}
 
-		boolean corner(int u, int v) {
+		public boolean corner(int u, int v) {
 			return (u == -1 || u == d) && (v == -1 || v == w);
 		}
 	}
 
-	static Lot lot(int id) {
+	public static Lot lot(int id) {
 		int m = ringOfLot(id);
 		double a = centreAngle(id);
 		Direction out = cardinal(a);
@@ -437,13 +437,13 @@ public final class RingCampusGeometry {
 	 * desk. Slots 0/1: against the back wall; 2/3: against the side walls near the back; 4/5: against
 	 * the side walls near the front. The centre line ({@code v = c}) stays free for the stairs.
 	 */
-	record DeskSpot(BlockPos desk, Direction facing) {
-		BlockPos stand() {
+	public record DeskSpot(BlockPos desk, Direction facing) {
+		public BlockPos stand() {
 			return desk.relative(facing.getOpposite());
 		}
 	}
 
-	static DeskSpot desk(Room h, int floor, int slot) {
+	public static DeskSpot desk(Room h, int floor, int slot) {
 		int y = floor * FLOOR_H + 1;
 		int c = h.c();
 		return switch (slot) {
@@ -457,7 +457,7 @@ public final class RingCampusGeometry {
 	}
 
 	/** Straight stairs of a two-floor hall: steps {@code i = 0..5} at {@code (u = 1 + i, v = c, y = 1 + i)}, climbing towards the back. */
-	static final int STAIR_STEPS = FLOOR_H;
+	public static final int STAIR_STEPS = FLOOR_H;
 
 	// ------------------------------------------------------------------ public views (renders, docs)
 

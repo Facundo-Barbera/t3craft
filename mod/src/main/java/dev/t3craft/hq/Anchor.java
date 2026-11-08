@@ -37,12 +37,12 @@ public record Anchor(String name, double x, double y, double z, Direction facing
 	}
 
 	/** A spot standing/sitting in {@code cell} (centre, foot level), looking along {@code facing}. */
-	static Anchor at(String name, BlockPos cell, Direction facing) {
+	public static Anchor at(String name, BlockPos cell, Direction facing) {
 		return new Anchor(name, cell.getX() + 0.5, cell.getY(), cell.getZ() + 0.5, facing, cell);
 	}
 
 	/** The centre of {@code cell}'s face that points to {@code facing}. */
-	static Anchor face(String name, BlockPos cell, Direction facing) {
+	public static Anchor face(String name, BlockPos cell, Direction facing) {
 		return new Anchor(name,
 				cell.getX() + 0.5 + facing.getStepX() * 0.5,
 				cell.getY() + 0.5,

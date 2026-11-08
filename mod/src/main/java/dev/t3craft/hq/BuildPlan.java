@@ -86,7 +86,7 @@ public final class BuildPlan {
 		this(placements, anchors, modules, workstations, null);
 	}
 
-	BuildPlan(List<Placement> placements, SortedMap<String, Anchor> anchors, List<Module> modules, List<Workstation> workstations,
+	public BuildPlan(List<Placement> placements, SortedMap<String, Anchor> anchors, List<Module> modules, List<Workstation> workstations,
 			@Nullable Map<BlockPos, String> groupIndex) {
 		this(placements, anchors, modules, workstations, groupIndex, "");
 	}

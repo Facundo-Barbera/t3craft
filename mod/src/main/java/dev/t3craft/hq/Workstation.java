@@ -55,11 +55,11 @@ public record Workstation(int module, int slot, @Nullable String threadId, Ancho
 	}
 
 	/** The top-left cell of a desk screen whose bottom-middle cell is {@code bottomMiddle}. */
-	static BlockPos screenOriginFor(BlockPos bottomMiddle, Direction screenFacing) {
+	public static BlockPos screenOriginFor(BlockPos bottomMiddle, Direction screenFacing) {
 		return bottomMiddle.relative(screenFacing.getCounterClockWise().getOpposite(), SCREEN_WIDTH / 2).above(SCREEN_HEIGHT - 1);
 	}
 
-	static List<BlockPos> screenCells(BlockPos topLeft, Direction right) {
+	public static List<BlockPos> screenCells(BlockPos topLeft, Direction right) {
 		List<BlockPos> out = new ArrayList<>(SCREEN_WIDTH * SCREEN_HEIGHT);
 		for (int r = 0; r < SCREEN_HEIGHT; r++) {
 			for (int c = 0; c < SCREEN_WIDTH; c++) {

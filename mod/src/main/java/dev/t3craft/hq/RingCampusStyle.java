@@ -83,7 +83,7 @@ public final class RingCampusStyle extends HqStyle {
 	}
 
 	@Override
-	BlockState bench(Direction back) {
+	public BlockState bench(Direction back) {
 		return palette().get(Role.BENCH).setValue(BlockStateProperties.HORIZONTAL_FACING, back);
 	}
 
