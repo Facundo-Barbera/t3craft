@@ -15,17 +15,28 @@ import org.jspecify.annotations.Nullable;
  *       {@code model}) or as a bare model string; legacy top-level {@code model} / {@code provider}.
  *   <li>{@code branch} or {@code gitBranch}; {@code worktreePath} or {@code worktree}.
  * </ul>
+ *
+ * <p>{@code extras} (feat/t3-sidebar-rows): snooze/read watermarks and the linked PR with its diff
+ * size ({@link ThreadExtras}), decoded from the same shell object; never null.
  */
 public record ThreadMeta(
 		@Nullable String provider,
 		@Nullable String instanceId,
 		@Nullable String model,
 		@Nullable String branch,
-		@Nullable String worktreePath) {
+		@Nullable String worktreePath,
+		ThreadExtras extras) {
 
 	public static final ThreadMeta EMPTY = new ThreadMeta(null, null, null, null, null);
 
+	/** Shape before {@code extras}, kept so existing callers still compile. */
+	public ThreadMeta(@Nullable String provider, @Nullable String instanceId, @Nullable String model, @Nullable String branch,
+			@Nullable String worktreePath) {
+		this(provider, instanceId, model, branch, worktreePath, ThreadExtras.EMPTY);
+	}
+
 	public ThreadMeta {
+		extras = extras == null ? ThreadExtras.EMPTY : extras;
 		provider = blankToNull(provider);
 		instanceId = blankToNull(instanceId);
 		model = blankToNull(model);
@@ -59,7 +70,7 @@ public record ThreadMeta(
 		}
 		String branch = first(Json.str(o, "branch"), Json.str(o, "gitBranch"));
 		String worktree = first(Json.str(o, "worktreePath"), Json.str(o, "worktree"));
-		return new ThreadMeta(provider, instance, model, branch, worktree);
+		return new ThreadMeta(provider, instance, model, branch, worktree, ThreadExtras.fromJson(o));
 	}
 
 	/** Instance id when known, else the legacy provider name. */

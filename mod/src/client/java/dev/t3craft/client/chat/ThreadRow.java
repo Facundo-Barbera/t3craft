@@ -17,6 +17,8 @@ import org.jspecify.annotations.Nullable;
  * @param settled        the thread was settled in T3 (sorts after active ones of the same rank)
  * @param activityMs     last activity in epoch ms when the source knows it, else null
  * @param pinned         pinned in T3 (listed first)
+ * @param details        branch, PR, diff, model, unread, run start, snooze (feat/t3-sidebar-rows);
+ *                       never null, {@link ThreadDetails#EMPTY} when unknown
  */
 public record ThreadRow(
 		String key,
@@ -30,7 +32,18 @@ public record ThreadRow(
 		@Nullable String activity,
 		boolean settled,
 		@Nullable Long activityMs,
-		boolean pinned) {
+		boolean pinned,
+		ThreadDetails details) {
+
+	public ThreadRow {
+		details = details == null ? ThreadDetails.EMPTY : details;
+	}
+
+	/** Shape before {@code details}. */
+	public ThreadRow(String key, String env, String envLabel, @Nullable String threadId, String title, String project, ThreadState state,
+			boolean pendingRequest, @Nullable String activity, boolean settled, @Nullable Long activityMs, boolean pinned) {
+		this(key, env, envLabel, threadId, title, project, state, pendingRequest, activity, settled, activityMs, pinned, ThreadDetails.EMPTY);
+	}
 
 	/** Shape before {@code pinned}. */
 	public ThreadRow(String key, String env, String envLabel, @Nullable String threadId, String title, String project, ThreadState state,
@@ -57,8 +70,11 @@ public record ThreadRow(
 		String env = colon > 0 ? id.substring(0, colon) : n.envLabel();
 		String thread = colon > 0 && colon < id.length() - 1 ? id.substring(colon + 1) : null;
 		String project = n.groupLabel() == null || "(no project)".equals(n.groupLabel()) ? "" : n.groupLabel();
+		// bridge mode: the chips the NPC carries (branch, worktree, model) feed the rich row too
+		ThreadDetails d = n.branch() == null && n.worktree() == null && n.model() == null && n.provider() == null ? ThreadDetails.EMPTY
+				: new ThreadDetails(n.branch(), n.worktree() != null, 0, null, null, -1, -1, n.model(), n.provider(), false, null, null);
 		return new ThreadRow(id, env, n.envLabel(), thread, n.title(), project, state(n.state()), pendingRequest, n.activity(), n.settled(),
-				activityMs, pinned);
+				activityMs, pinned, d);
 	}
 
 	public static ThreadRow fromNpc(NpcInfo n) {

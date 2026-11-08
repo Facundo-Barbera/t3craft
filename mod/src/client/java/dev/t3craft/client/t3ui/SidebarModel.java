@@ -33,8 +33,18 @@ import org.jspecify.annotations.Nullable;
  * threads always go to Pinned, whatever their age or settled state; other settled threads go to a
  * last <b>Settled</b> section, closed until the user opens it, with its count.
  *
+ * <p>feat/t3-sidebar-rows: like T3 Code, the sidebar has a <b>dock</b> stuck to its bottom
+ * ({@link #dock()}): <b>Working</b> (running threads that are not pinned, open by default),
+ * <b>Snoozed</b> (snoozed until later, closed by default) and <b>Settled</b> (closed by default),
+ * each with its count. {@link #items()} is only the scrolling part on top (Pinned + projects); a
+ * thread is in exactly one place: pinned → Pinned (running or not); else running → Working; else
+ * snoozed → Snoozed; else settled → Settled; else its project folder. A snooze that runs out moves
+ * the thread back on the next {@link #expireSnoozes} (the view calls it every frame; it is a long
+ * compare until then).
+ *
  * <p>The selection follows the thread by key when the list reorders; {@link #move} walks thread
- * rows only (headers are skipped) and never enters a collapsed folder.
+ * rows only (headers are skipped), top list first then the open dock sections, and never enters a
+ * collapsed folder.
  */
 public final class SidebarModel {
 	/** Folder key of threads without a project. */
@@ -43,6 +53,10 @@ public final class SidebarModel {
 	public static final String PINNED = "\u0000pinned";
 	/** Key of the Settled section header (collapsed by default, as in T3 Code). */
 	public static final String SETTLED = "\u0000settled";
+	/** Key of the Working dock section (open by default). */
+	public static final String WORKING = "\u0000working";
+	/** Key of the Snoozed dock section (collapsed by default). */
+	public static final String SNOOZED = "\u0000snoozed";
 
 	public enum Kind {
 		/** "Pinned" or "Settled" section header. */
@@ -67,6 +81,13 @@ public final class SidebarModel {
 	public record Item(Kind kind, String key, String label, @Nullable ThreadRow row, int count, int attention, boolean collapsed, String envs) {
 	}
 
+	/**
+	 * A section of the bottom dock (Working, Snoozed, Settled): header with the count, and its thread
+	 * rows when open ({@code rows} is empty while collapsed).
+	 */
+	public record Dock(String key, String label, int count, int attention, boolean collapsed, List<Item> rows) {
+	}
+
 	/** A project filter choice (every project with threads, search ignored). */
 	public record Project(String key, String label, int threads, int attention, List<String> envLabels) {
 	}
@@ -77,9 +98,14 @@ public final class SidebarModel {
 	private final Set<String> collapsed = new HashSet<>();
 	/** The Settled section is closed by default: this is its "opened" flag. */
 	private boolean settledOpen;
+	/** Snoozed is closed by default too. */
+	private boolean snoozedOpen;
+	/** Earliest snooze end among the listed rows after the last build (0 = none). */
+	private long nextWake;
 	private @Nullable String selectedKey;
 
 	private List<Item> items = List.of();
+	private List<Dock> dock = List.of();
 	private List<ThreadRow> threads = List.of();
 	private List<Project> projects = List.of();
 
@@ -102,6 +128,23 @@ public final class SidebarModel {
 	/** Drawn lines, top to bottom. */
 	public List<Item> items() {
 		return items;
+	}
+
+	/** Bottom dock sections (Working, Snoozed, Settled), only those with threads, top to bottom. */
+	public List<Dock> dock() {
+		return dock;
+	}
+
+	/** Rebuilds when a snooze ended since the last build (cheap otherwise). */
+	public void expireSnoozes(long nowMs) {
+		if (nextWake > 0 && nowMs >= nextWake) {
+			rebuild();
+		}
+	}
+
+	/** Running in T3 (spinner, Working section). */
+	public static boolean working(ThreadRow r) {
+		return r.state() == dev.t3craft.t3.ThreadState.WORKING;
 	}
 
 	/** Thread rows after search and project filter, in drawn order (collapsed folders included). */
@@ -166,13 +209,21 @@ public final class SidebarModel {
 	}
 
 	public boolean isCollapsed(String folderKey) {
-		return SETTLED.equals(folderKey) ? !settledOpen : collapsed.contains(folderKey);
+		if (SETTLED.equals(folderKey)) {
+			return !settledOpen;
+		}
+		if (SNOOZED.equals(folderKey)) {
+			return !snoozedOpen;
+		}
+		return collapsed.contains(folderKey);
 	}
 
 	/** Opens or closes a folder (no effect while searching: every folder is open then). */
 	public void toggleCollapsed(String folderKey) {
 		if (SETTLED.equals(folderKey)) {
 			settledOpen = !settledOpen;
+		} else if (SNOOZED.equals(folderKey)) {
+			snoozedOpen = !snoozedOpen;
 		} else if (!collapsed.remove(folderKey)) {
 			collapsed.add(folderKey);
 		}
@@ -205,8 +256,13 @@ public final class SidebarModel {
 			query = "";
 			project = null;
 		}
+		long now = System.currentTimeMillis();
 		if (r.pinned()) {
 			collapsed.remove(PINNED);
+		} else if (working(r)) {
+			collapsed.remove(WORKING);
+		} else if (r.details().snoozed(now)) {
+			snoozedOpen = true;
 		} else if (r.settled()) {
 			settledOpen = true;
 		} else {
@@ -246,6 +302,11 @@ public final class SidebarModel {
 		List<String> keys = new ArrayList<>();
 		for (Item it : items) {
 			if (it.kind() == Kind.THREAD) {
+				keys.add(it.key());
+			}
+		}
+		for (Dock d : dock) {
+			for (Item it : d.rows()) {
 				keys.add(it.key());
 			}
 		}
@@ -325,7 +386,32 @@ public final class SidebarModel {
 				}
 			}
 		}
-		Map<String, List<ThreadRow>> folders = group(matching.stream().filter(r -> !r.pinned() && !r.settled()).toList());
+		long now = System.currentTimeMillis();
+		long wake = 0;
+		List<ThreadRow> work = new ArrayList<>();
+		List<ThreadRow> snoozed = new ArrayList<>();
+		List<ThreadRow> settled = new ArrayList<>();
+		List<ThreadRow> active = new ArrayList<>();
+		for (ThreadRow r : matching) {
+			Long until = r.details().snoozedUntilMs();
+			if (until != null && until > now && (wake == 0 || until < wake)) {
+				wake = until;
+			}
+			if (r.pinned()) {
+				continue;
+			}
+			if (working(r)) {
+				work.add(r);
+			} else if (r.details().snoozed(now)) {
+				snoozed.add(r);
+			} else if (r.settled()) {
+				settled.add(r);
+			} else {
+				active.add(r);
+			}
+		}
+		nextWake = wake;
+		Map<String, List<ThreadRow>> folders = group(active);
 		for (Map.Entry<String, List<ThreadRow>> e : folders.entrySet()) {
 			List<ThreadRow> rs = e.getValue();
 			boolean closed = !search && collapsed.contains(e.getKey());
@@ -337,19 +423,29 @@ public final class SidebarModel {
 				}
 			}
 		}
-		List<ThreadRow> settled = matching.stream().filter(r -> !r.pinned() && r.settled()).sorted(THREAD_ORDER).toList();
-		if (!settled.isEmpty()) {
-			boolean closed = !search && !settledOpen;
-			out.add(new Item(Kind.SECTION, SETTLED, "Settled", null, settled.size(), attention(settled), closed, String.join(", ", envLabels(settled))));
-			for (ThreadRow r : settled) {
-				listed.add(r);
-				if (!closed) {
-					out.add(threadItem(r));
-				}
-			}
-		}
+		List<Dock> docks = new ArrayList<>();
+		dockSection(docks, listed, WORKING, "Working", work, !search && collapsed.contains(WORKING));
+		dockSection(docks, listed, SNOOZED, "Snoozed", snoozed, !search && !snoozedOpen);
+		dockSection(docks, listed, SETTLED, "Settled", settled, !search && !settledOpen);
+		dock = List.copyOf(docks);
 		items = List.copyOf(out);
 		threads = List.copyOf(listed);
+	}
+
+	private static void dockSection(List<Dock> docks, List<ThreadRow> listed, String key, String label, List<ThreadRow> rows, boolean closed) {
+		if (rows.isEmpty()) {
+			return;
+		}
+		List<ThreadRow> sorted = new ArrayList<>(rows);
+		sorted.sort(THREAD_ORDER);
+		List<Item> its = new ArrayList<>();
+		for (ThreadRow r : sorted) {
+			listed.add(r);
+			if (!closed) {
+				its.add(threadItem(r));
+			}
+		}
+		docks.add(new Dock(key, label, sorted.size(), attention(sorted), closed, List.copyOf(its)));
 	}
 
 	private static Item threadItem(ThreadRow r) {
