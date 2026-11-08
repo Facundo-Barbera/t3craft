@@ -81,6 +81,14 @@ public final class BuilderAvatar extends RemotePlayer {
 		this.stuckTicks = 0;
 	}
 
+	/** Shortcut to a far work spot: put at {@code pos} (feet) right away, nothing left to walk. */
+	public void leapTo(Vec3 pos) {
+		this.path.clear();
+		this.target = pos;
+		this.stuckTicks = 0;
+		snapTo(pos.x, pos.y, pos.z, getYRot(), 0f);
+	}
+
 	public void lookAt(@Nullable Vec3 point) {
 		this.lookAt = point;
 	}
@@ -178,7 +186,7 @@ public final class BuilderAvatar extends RemotePlayer {
 		double ny = pos.y + Mth.clamp(head.y - pos.y, -STEP_Y_PER_TICK, STEP_Y_PER_TICK);
 		if (Math.abs(nx - pos.x) + Math.abs(nz - pos.z) + Math.abs(ny - pos.y) < 0.005) {
 			if (++stuckTicks >= STUCK_TICKS && target != null) {
-				snapTo(target.x, target.y, target.z, getYRot(), 0f); // out of a jam: the only teleport
+				snapTo(target.x, target.y, target.z, getYRot(), 0f); // out of a jam (the other teleport is leapTo)
 				path.clear();
 				stuckTicks = 0;
 				return false;

@@ -3,7 +3,7 @@ package dev.t3craft.build;
 /**
  * Scheduling core of a {@link BuildJob}, pluggable: {@link FrontCursor} (layer bands with a barrier
  * per layer, the original order) or {@link CrewCursor} (the crew plan of {@link CrewPlanner}: own
- * zones, nearest supported block in reach, walking between work spots). Both take an allowance per
+ * zones, nearest supported block in reach, walking between work spots; targets picked at run time). Both take an allowance per
  * tick from the global {@link BuildBudget} and apply every plan index exactly once.
  */
 public interface JobCursor {

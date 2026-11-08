@@ -36,6 +36,8 @@ final class BuildCrew implements BuildHandle {
 	private static final double WALK_SPEED = 0.22;
 	private static final double WORK_SPEED = 0.35;
 	private static final double MAX_WORK_SPEED = 0.6;
+	/** Pace a walk would need (blocks per tick) above which the builder leaps to its spot instead. */
+	private static final double LEAP_SPEED = 2 * MAX_WORK_SPEED;
 	private static final int ARRIVE_TIMEOUT_TICKS = 20 * 10;
 	private static final int LEAVE_TIMEOUT_TICKS = 20 * 6;
 
@@ -196,7 +198,8 @@ final class BuildCrew implements BuildHandle {
 
 	/**
 	 * Crew plan ({@link BuildPlanner#CREW}): builder {@code front} walks to its next work spot
-	 * {@code stand} (feet cell) to place {@code target}; the server waits {@code ticks} before placing.
+	 * {@code stand} (feet cell) to place {@code target}, to arrive in {@code ticks} (the server may place
+	 * a little before, once the block is in reach; the avatar swings when it gets there).
 	 * The route is the NPCs' A* over the real blocks; a straight line only when there is none (the
 	 * spot is on a virtual scaffold or the search gives up).
 	 */
@@ -214,9 +217,14 @@ final class BuildCrew implements BuildHandle {
 			len += Math.sqrt((p.x - prev.x) * (p.x - prev.x) + (p.z - prev.z) * (p.z - prev.z)) + Math.abs(p.y - prev.y);
 			prev = p;
 		}
-		// Arrive about when the server places: its walk time is for the straight distance.
-		double speed = Mth.clamp(len / Math.max(1, ticks), WALK_SPEED, MAX_WORK_SPEED);
-		b.follow(route, speed);
+		// Arrive about when the server places: its walk time is for the straight distance, capped
+		// (CrewCursor.MAX_WALK_TICKS). A way too long even for a run is a shortcut: a leap to the spot.
+		double needed = len / Math.max(1, ticks);
+		if (needed > LEAP_SPEED) {
+			b.leapTo(goal);
+		} else {
+			b.follow(route, Mth.clamp(needed, WALK_SPEED, MAX_WORK_SPEED));
+		}
 		b.lookAt(Vec3.atCenterOf(target));
 	}
 

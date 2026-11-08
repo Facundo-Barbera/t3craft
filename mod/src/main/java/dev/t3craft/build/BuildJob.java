@@ -165,7 +165,7 @@ public final class BuildJob {
 		CrewCursor cc = crew();
 		if (cc != null) {
 			cc.probe(there);
-			cc.walker(onWalk == null ? null : (front, index, step, ticks) -> onWalk.walking(this, front, index, standWorld(front, step), ticks));
+			cc.walker(onWalk == null ? null : (front, index, stand, ticks) -> onWalk.walking(this, front, index, toWorld(stand), ticks));
 		}
 		if (m != null && waitingForMaterials) {
 			if (cursor.state() != JobState.PAUSED || userPaused) {
@@ -393,7 +393,11 @@ public final class BuildJob {
 	/** World feet cell where builder {@code front} stands for step {@code step} of its lane (CREW jobs). */
 	public BlockPos standWorld(int front, int step) {
 		CrewSchedule s = java.util.Objects.requireNonNull(schedule(), "not a crew job");
-		int[] c = s.stand(front, step);
+		return toWorld(s.stand(front, step));
+	}
+
+	/** World cell of plan-relative cell {@code c = {x, y, z}}. */
+	private BlockPos toWorld(int[] c) {
 		return origin.offset(new BlockPos(c[0], c[1], c[2]).rotate(rotation));
 	}
 
