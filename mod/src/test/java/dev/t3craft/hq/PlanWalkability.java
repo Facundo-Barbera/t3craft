@@ -23,6 +23,13 @@ import net.minecraft.world.phys.shapes.VoxelShape;
  * landings) over the plan's block states, the same way {@code LevelBlocks} feeds it the level.
  * Cells the plan does not set read as air (like unloaded chunks: no ground there), so nothing
  * outside the plan counts as walkable.
+ *
+ * <p>fix/hq-npc-spawn: {@link #reachable} is an unbounded flood fill, while the NPCs' A*
+ * ({@code GridPathfinder}) searched only a box around both ends (+16 blocks) and at most 16 000
+ * cells. Desks whose only way in went further than that (upper floors with the stairs at the far
+ * end, plots round a whole block) passed here and were unreachable in game. The A* now grows its
+ * box when it cut a move off; {@code DemoHqReachabilityTest} checks every layout with the real
+ * {@code Navigation} over the HQ as the demo builds it.
  */
 final class PlanWalkability {
 	private final Collision collision;

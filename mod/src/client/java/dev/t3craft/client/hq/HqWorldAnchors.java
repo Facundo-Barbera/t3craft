@@ -134,6 +134,12 @@ public final class HqWorldAnchors implements AnchorSource {
 		return standing(HqSiteFrame.BASE) ? hq.exit() : null;
 	}
 
+	/** The plan's spawn (the way in), once the base stands: where stranded NPCs are put back. */
+	@Override
+	public @Nullable Anchor spawn() {
+		return standing(HqSiteFrame.BASE) ? hq.spawn() : null;
+	}
+
 	@Override
 	public @Nullable Anchor rest(String npcId, String groupId) {
 		return benches.isEmpty() ? lobby(npcId) : benches.get(Math.floorMod(npcId.hashCode(), benches.size()));

@@ -96,7 +96,7 @@ final class VanillaDemoWorld {
 		for (Map.Entry<DemoWorldSpec.Rule, Boolean> e : spec.rules().entrySet()) {
 			rules.set(rule(e.getKey()), e.getValue(), server);
 		}
-		int[] view = DemoPlacement.viewpoint(spec);
+		int[] view = DemoPlacement.viewpoint(spec, server.overworld().getMinY());
 		command(server, "time set " + spec.dayTime());
 		command(server, "weather clear");
 		command(server, String.format(Locale.ROOT, "setworldspawn %d %d %d", view[0], view[1], view[2]));
@@ -104,7 +104,7 @@ final class VanillaDemoWorld {
 
 	/** Puts the player at the viewpoint, looking at the site (south, the plan's growth direction). */
 	static void teleportToViewpoint(MinecraftServer server, String playerName, DemoWorldSpec spec) {
-		int[] v = DemoPlacement.viewpoint(spec);
+		int[] v = DemoPlacement.viewpoint(spec, server.overworld().getMinY());
 		command(server, String.format(Locale.ROOT, "tp %s %d %d %d 0 10", playerName, v[0], v[1], v[2]));
 	}
 
