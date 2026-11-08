@@ -32,8 +32,9 @@ public final class HqStyles {
 	/**
 	 * Styles with their own layout ({@link HqStyle#ownLayout()}): selectable by id like the others,
 	 * but not in {@link #all()}, which lists the styles that paint the shared spine geometry.
+	 * layout/campus: {@link CampusStyle}; layout/ring: {@link RingStyle}.
 	 */
-	private static final List<HqStyle> LAYOUTS = List.of(new CampusStyle());
+	private static final List<HqStyle> LAYOUTS = List.of(new CampusStyle(), new RingStyle());
 	private static volatile @Nullable HqStyle active;
 
 	private HqStyles() {
@@ -44,7 +45,7 @@ public final class HqStyles {
 		return ALL;
 	}
 
-	/** The styles with their own layout (campus...). */
+	/** The styles with their own layout (campus, ring...); not in {@link #all()}. */
 	public static List<HqStyle> layouts() {
 		return LAYOUTS;
 	}

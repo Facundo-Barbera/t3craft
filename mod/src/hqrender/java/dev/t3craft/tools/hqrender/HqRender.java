@@ -102,6 +102,13 @@ public final class HqRender {
 			return;
 		}
 
+		if (!projects.isEmpty()) {
+			Growth.render(style, models, out, projects, only, scaleMul, ss, npcs);
+			for (String p : models.problems) {
+				System.out.println("note: " + p);
+			}
+			return;
+		}
 		Map<String, HqInput> rosters = new LinkedHashMap<>();
 		rosters.put("1p", roster(new int[] {4}, 0));
 		rosters.put("2p", roster(new int[] {8, 3}, 1));
@@ -210,7 +217,8 @@ public final class HqRender {
 			for (Map.Entry<String, Anchor> e : plan.anchors().entrySet()) {
 				String k = e.getKey();
 				if (k.equals("board_slot_0") || k.equals("board_slot_3") || k.equals("bench_1") || k.equals("bench_7") || k.equals("walk_hub_0")
-						|| k.equals("archive") || k.equals("thread_wall_front") || k.startsWith("walk_room_") && (k.endsWith("_0") || k.endsWith("_2"))) {
+						|| k.equals("archive") || k.equals("thread_wall_front") || k.startsWith("walk_hub_")
+						|| k.startsWith("walk_room_") && (k.endsWith("_0") || k.endsWith("_2"))) {
 					npc(sc, e.getValue(), k.startsWith("bench"), n++);
 				}
 			}
