@@ -9,17 +9,15 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.LOG;
 import static dev.t3craft.hq.citadel.CitadelCanvas.MOSS;
 import static dev.t3craft.hq.citadel.CitadelCanvas.WATER;
 import static dev.t3craft.hq.citadel.CitadelCanvas.Y0;
-import static dev.t3craft.hq.citadel.CitadelCanvas.b;
-import static dev.t3craft.hq.citadel.CitadelCanvas.colX;
-import static dev.t3craft.hq.citadel.CitadelCanvas.colZ;
 import static dev.t3craft.hq.citadel.CitadelCanvas.lattice;
 import static dev.t3craft.hq.citadel.CitadelCanvas.leaves;
 import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
 
 import dev.t3craft.hq.RingCampusGeometry;
-import dev.t3craft.hq.RingCampusGeometry.Lot;
 import dev.t3craft.hq.RingCampusGeometry.Zone;
-import java.util.List;
+import dev.t3craft.hq.citadel.nature.Gardens;
+import dev.t3craft.hq.citadel.nature.Plots;
+import dev.t3craft.hq.citadel.nature.Trees;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.Blocks;
@@ -66,13 +64,13 @@ import net.minecraft.world.level.block.state.BlockState;
  *     between the ramps. Skips the top steps of the patio stairs. Variants: {@link #promenadePlinth},
  *     {@link #promenadeDeck}, {@link #promenadeRail}, {@link #promenadePost}.</li>
  * <li>{@link #patio(CitadelCanvas, int, int, double)}: the planting of the patio over its ground: eight
- *     cherry trees on a ring of radius 19.3 ({@link #patioCherries}) and the flowerbeds of the lawn,
- *     azaleas and planters ({@link #patioBeds}). Skips the stairs.</li>
- * <li>{@link #tree(CitadelCanvas, int, int)}: a cherry tree (trunk {@code LOG} 4 high, cherry canopy
- *     from y = 4 to 6) on a ground cell, keeping the canopy off any bush underneath. Also used by the
- *     barrios (courtyard centre and empty hall slots).</li>
- * <li>{@link #emptyLot(CitadelCanvas, int)}: a lot with no project: a flowering azaleas bush every so
- *     often and a {@link #tree} at the centre of the lot.</li>
+ *     cherry trees on a ring of radius 19.3 ({@link #patioCherries}) and the flower macizos of the lawn,
+ *     azaleas, planters and the lily pads of the pool ({@link #patioBeds}); the living part is
+ *     {@link Gardens}. Skips the stairs.</li>
+ * <li>{@link #tree(CitadelCanvas, int, int)}: a tree on a ground cell, one of six species with roots
+ *     ({@link Trees}). Also used by the barrios (courtyard centre and empty hall slots).</li>
+ * <li>{@link #emptyLot(CitadelCanvas, int)}: a lot with no project: a plot waiting for its barrio in
+ *     a meadow ({@link Plots}). The terrace's vegetation is {@link Gardens#terrace}.</li>
  * </ul>
  *
  * <p>Nothing here may change a value or the order of the calls: the plan must stay identical block by
@@ -126,7 +124,7 @@ public final class CitadelGrounds {
 		stepped(c, x, z, rampHalves(r), BAMBOO, slab(Blocks.BAMBOO_MOSAIC_SLAB));
 	}
 
-	/** A terrace column: a stone step with grass (one in eight moss) and a bush every so often. */
+	/** A terrace column: a stone step with grass (one in eight moss), a bush every so often and the vegetation of {@link Gardens#terrace}. */
 	private static void terrace(CitadelCanvas c, int x, int z, double r) {
 		int h = rampHalves(r);
 		stepped(c, x, z, h - h % 2, FOOT, FOOT);
@@ -134,6 +132,8 @@ public final class CitadelGrounds {
 		c.set(x, top, z, (x * 7 + z * 13 & 7) == 0 ? MOSS : GRASS);
 		if (Math.floorMod(x * 31 + z * 17, dev.t3craft.hq.pack.LayoutParams.RINGCAMPUS_TERRACE_BUSH.get()) == 0 && top + 1 < 6) {
 			c.set(x, top + 1, z, leaves(Blocks.FLOWERING_AZALEA_LEAVES));
+		} else {
+			Gardens.terrace(c, x, z, top, h);
 		}
 	}
 
@@ -260,67 +260,31 @@ public final class CitadelGrounds {
 		patioBeds(c, x, z, r);
 	}
 
-	/** Eight cherry trees on a ring of radius 19.3: a trunk of 4 and a small canopy at y = 5 and 6. */
+	/** Eight cherry trees on a ring of radius 19.3 (round and slender, with roots and petals): see {@link Gardens#patioCherries}. */
 	private static void patioCherries(CitadelCanvas c, int x, int z) {
-		for (int k = 0; k < 8; k++) {
-			double a = (k + 0.5) * Math.PI / 4;
-			BlockPos t = RingCampusGeometry.polar(19.3, a, 0);
-			int dx = x - t.getX();
-			int dz = z - t.getZ();
-			if (dx == 0 && dz == 0) {
-				c.fill(x, 1, 4, z, LOG);
-				c.set(x, 5, z, leaves(Blocks.CHERRY_LEAVES));
-				c.set(x, 6, z, leaves(Blocks.CHERRY_LEAVES));
-			} else if (Math.abs(dx) <= 2 && Math.abs(dz) <= 2 && Math.abs(dx) + Math.abs(dz) <= 3) {
-				c.set(x, 5, z, leaves(Blocks.CHERRY_LEAVES));
-				if (Math.abs(dx) + Math.abs(dz) <= 1) {
-					c.set(x, 6, z, leaves(Blocks.CHERRY_LEAVES));
-				}
-			}
-		}
+		Gardens.patioCherries(c, x, z);
 	}
 
-	/** Flowerbeds on the inner lawn ({@code r <= 15.5}): flowering azalea or a garden planter. */
+	/** Flower macizos on the inner lawn, planters and azaleas, lily pads on the pool: see {@link Gardens#patioBeds}. */
 	private static void patioBeds(CitadelCanvas c, int x, int z, double r) {
-		if (r <= 15.5 && Math.floorMod(x * 5 + z * 3, 11) == 0 && c.at(x, 0, z) != LIGHT) {
-			c.set(x, 1, z, Math.floorMod(x + z, 2) == 0 ? b(Blocks.FLOWERING_AZALEA) : c.kit.gardenPlanter());
-		}
+		Gardens.patioBeds(c, x, z, r);
 	}
 
 	// ------------------------------------------------------------------ empty lots and trees
 
-	/** A lot with no project: a flowering azalea bush every so often and a tree at its centre. */
+	/**
+	 * A lot with no project: a plot waiting for its barrio (vegetable garden, formal garden, building
+	 * site, pond meadow or cherry grove, by lot id) in a meadow with a few lone trees; see {@link Plots}.
+	 */
 	public static void emptyLot(CitadelCanvas c, int lot) {
-		Lot l = RingCampusGeometry.lot(lot);
-		for (long col : c.lotCols.getOrDefault(lot, List.of())) {
-			int x = colX(col);
-			int z = colZ(col);
-			if (Math.floorMod(x * 7 + z * 11, 29) == 0 && !lattice(x, z)) {
-				c.set(x, 1, z, leaves(Blocks.FLOWERING_AZALEA_LEAVES));
-			}
-		}
-		tree(c, l.centre().getX(), l.centre().getZ());
+		Plots.lot(c, lot);
 	}
 
-	/** A cherry tree (trunk 4, canopy from y = 4) on a ground cell. */
+	/**
+	 * A tree on a ground cell: one of six species (three cherries, an azalea tree, a birch, a small
+	 * oak) picked by the cell, with roots and a crown without floating leaves; see {@link Trees}.
+	 */
 	public static void tree(CitadelCanvas c, int x, int z) {
-		c.fill(x, 1, 4, z, LOG);
-		for (int dx = -2; dx <= 2; dx++) {
-			for (int dz = -2; dz <= 2; dz++) {
-				int m = Math.abs(dx) + Math.abs(dz);
-				if (m == 0 || m > 2) {
-					continue;
-				}
-				if (c.at(x + dx, 1, z + dz) != null && c.at(x + dx, 1, z + dz) != AIR) {
-					continue; // a bush underneath: keep the canopy off it
-				}
-				c.set(x + dx, 4, z + dz, leaves(Blocks.CHERRY_LEAVES));
-				if (m == 1) {
-					c.set(x + dx, 5, z + dz, leaves(Blocks.CHERRY_LEAVES));
-				}
-			}
-		}
-		c.set(x, 5, z, leaves(Blocks.CHERRY_LEAVES));
-		c.set(x, 6, z, leaves(Blocks.CHERRY_LEAVES));
+		Trees.tree(c, x, z);
 	}
 }
