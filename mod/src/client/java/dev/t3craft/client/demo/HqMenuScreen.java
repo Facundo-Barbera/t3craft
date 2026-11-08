@@ -107,7 +107,7 @@ public final class HqMenuScreen extends Screen {
 
 	/** Asks first; on yes runs the reset (zip backup, only the HQ folder) with the chosen layout. */
 	private void confirmReset(boolean rebuildChosen) {
-		@Nullable String refusal = DemoClient.resetRefusal();
+		@Nullable String refusal = HqMenuBridge.refusal();
 		if (refusal != null) {
 			minecraft.gui.setScreen(new AlertScreen(() -> minecraft.gui.setScreen(this), Component.translatable("t3craft.demo.reset.title"),
 					Component.literal(refusal)));
@@ -124,7 +124,11 @@ public final class HqMenuScreen extends Screen {
 		minecraft.gui.setScreen(new ConfirmScreen(yes -> {
 			minecraft.gui.setScreen(this);
 			if (yes) {
-				HqMenuBridge.resetAndRebuild(layout.id());
+				@Nullable String why = HqMenuBridge.resetAndRebuild(layout.id()); // runs on the next client tick
+				if (why != null) {
+					minecraft.gui.setScreen(new AlertScreen(() -> minecraft.gui.setScreen(this),
+							Component.translatable("t3craft.demo.reset.title"), Component.literal(why)));
+				}
 			}
 		}, title.copy().withStyle(ChatFormatting.YELLOW), body));
 	}
