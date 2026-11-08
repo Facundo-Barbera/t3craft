@@ -117,15 +117,30 @@ public final class BuildManager {
 
 	/** Server thread. */
 	public void tick(MinecraftServer server) {
+		long tickStart = System.nanoTime();
+		try {
+			tickJobs(server);
+		} finally {
+			dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_MANAGER_TICK, tickStart);
+		}
+	}
+
+	private void tickJobs(MinecraftServer server) {
 		BuildBudget budget = this.budget != null ? this.budget : BuildBudget.global();
 		budget.beginTick(server.getTickCount(), server.getCurrentSmoothedTickTime());
 		BuildJob polled;
+		long t0 = System.nanoTime();
+		boolean anyStarted = false;
 		while ((polled = incoming.poll()) != null) {
 			BuildJob job = polled;
 			active.add(job);
+			anyStarted = true;
 			for (BuildListener l : listeners) {
 				safe(() -> l.started(job));
 			}
+		}
+		if (anyStarted) {
+			dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_STARTED, t0);
 		}
 		double[] allowance = allocate(budget);
 		Iterator<BuildJob> it = active.iterator();
@@ -168,9 +183,11 @@ public final class BuildManager {
 				it.remove();
 				byId.remove(job.id());
 				wraps.remove(job.id());
+				long f0 = System.nanoTime();
 				for (BuildListener l : listeners) {
 					safe(() -> l.finished(job, s));
 				}
+				dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_FINISHED, f0);
 			}
 		}
 	}

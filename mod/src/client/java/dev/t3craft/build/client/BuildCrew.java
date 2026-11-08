@@ -56,21 +56,45 @@ final class BuildCrew implements BuildHandle {
 	private volatile boolean pauseRequested;
 	private volatile boolean cancelRequested;
 	private int phaseTicks;
+	/** fix/hq-build-stutter: builders still to spawn (one per tick while arriving), and what they need. */
+	private final int crewSize;
+	private final Vec3 spawnCenter;
+	private final IdSource ids;
+	/** Builders that appear per client tick, and that vanish per tick when leaving. */
+	static final int SPAWNS_PER_TICK = 1;
+	private int despawned;
 
 	BuildCrew(String label, ClientLevel level, BoundingBox bounds, int crewSize, Vec3 approachFrom, IdSource ids, Supplier<BuildJob> submitter) {
 		this.label = label;
 		this.level = level;
 		this.bounds = bounds;
 		this.submitter = submitter;
+		this.ids = ids;
 		Vec3 c = center();
+		this.spawnCenter = c;
 		Vec3 toViewer = new Vec3(approachFrom.x - c.x, 0, approachFrom.z - c.z);
 		double base = toViewer.lengthSqr() < 1e-4 ? 0 : Math.atan2(toViewer.z, toViewer.x);
 		int n = Math.max(1, crewSize);
+		this.crewSize = n;
 		for (int i = 0; i < n; i++) {
 			// Fan out from the viewer's side so the crew is seen arriving.
 			double angle = base + (i - (n - 1) / 2.0) * 0.6;
-			Vec3 dir = new Vec3(Math.cos(angle), 0, Math.sin(angle));
-			outward.add(dir);
+			outward.add(new Vec3(Math.cos(angle), 0, Math.sin(angle)));
+		}
+		// fix/hq-build-stutter: the builders appear one per tick from the first tick on (spawnSome),
+		// not all inside the call that started the build.
+	}
+
+	/** Spawns up to {@link #SPAWNS_PER_TICK} builders still missing. Client thread. */
+	private void spawnSome() {
+		if (builders.size() >= crewSize) {
+			return;
+		}
+		long t0 = System.nanoTime();
+		Vec3 c = spawnCenter;
+		for (int k = 0; k < SPAWNS_PER_TICK && builders.size() < crewSize; k++) {
+			int i = builders.size();
+			Vec3 dir = outward.get(i);
 			BuilderAvatar b = new BuilderAvatar(level, label + "#" + i + "@" + System.identityHashCode(this), "Builder " + (i + 1), this::groundY);
 			b.setId(ids.next());
 			double sx = c.x + dir.x * SPAWN_DISTANCE;
@@ -83,6 +107,7 @@ final class BuildCrew implements BuildHandle {
 			b.lookAt(c.add(0, 1, 0));
 			builders.add(b);
 		}
+		dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_CREW_SPAWN, t0);
 	}
 
 	// ---- BuildHandle --------------------------------------------------------------------------
@@ -147,6 +172,8 @@ final class BuildCrew implements BuildHandle {
 			case ARRIVING -> {
 				if (cancelRequested) {
 					leave();
+				} else if (builders.size() < crewSize) {
+					spawnSome();
 				} else if (phaseTicks >= ARRIVE_TIMEOUT_TICKS || builders.stream().allMatch(b -> b.arrived(1.0))) {
 					BuildJob j = submitter.get();
 					job = j;
@@ -164,9 +191,11 @@ final class BuildCrew implements BuildHandle {
 				// finished() moves us on; nothing to do per tick.
 			}
 			case LEAVING -> {
-				if (phaseTicks >= LEAVE_TIMEOUT_TICKS || builders.stream().allMatch(b -> b.arrived(1.0))) {
-					despawn();
-					phase = Phase.DONE;
+				if (despawned > 0 || phaseTicks >= LEAVE_TIMEOUT_TICKS || builders.stream().allMatch(b -> b.arrived(1.0))) {
+					// fix/hq-build-stutter: they vanish one per tick, not all in the same frame
+					if (despawnSome()) {
+						phase = Phase.DONE;
+					}
 				}
 			}
 			case DONE -> {
@@ -282,11 +311,22 @@ final class BuildCrew implements BuildHandle {
 		}
 	}
 
-	private void despawn() {
-		for (BuilderAvatar b : builders) {
+	/** Removes up to {@link #SPAWNS_PER_TICK} builders (with a puff); true once all are gone. */
+	private boolean despawnSome() {
+		long t0 = System.nanoTime();
+		for (int k = 0; k < SPAWNS_PER_TICK && despawned < builders.size(); k++) {
+			BuilderAvatar b = builders.get(despawned++);
 			poof(b.position());
+			if (!b.isRemoved()) {
+				level.removeEntity(b.getId(), Entity.RemovalReason.DISCARDED);
+			}
+		}
+		dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_CREW_DESPAWN, t0);
+		if (despawned < builders.size()) {
+			return false;
 		}
 		discard();
+		return true;
 	}
 
 	private void poof(Vec3 at) {

@@ -97,6 +97,7 @@ public final class DevReloadClient implements ClientModInitializer {
 				}))
 				.then(literal("perf")
 						.executes(c -> perf(c.getSource()))
+						.then(literal("steps").executes(c -> steps(c.getSource())))
 						.then(literal("reset").executes(c -> {
 							PerfStats.get().reset();
 							c.getSource().sendFeedback(prefix().append("perf counters reset"));
@@ -135,6 +136,31 @@ public final class DevReloadClient implements ClientModInitializer {
 		}
 		if (shown == 0) {
 			src.sendFeedback(Component.literal("  (nothing counted yet)").withStyle(ChatFormatting.GRAY));
+		}
+		return 1;
+	}
+
+	/**
+	 * fix/hq-build-stutter: the longest run of every timed step since the last {@code perf reset}
+	 * (red over {@link PerfStats#STALL_WARN_MS} on a game thread) and the last slow steps, as in the log.
+	 */
+	private static int steps(FabricClientCommandSource src) {
+		java.util.SortedMap<String, Long> peaks = PerfStats.get().peaks();
+		src.sendFeedback(prefix().append("longest single run per step since the last reset (async = off the game threads):"));
+		if (peaks.isEmpty()) {
+			src.sendFeedback(Component.literal("  (no step timed yet: start or finish a build)").withStyle(ChatFormatting.GRAY));
+		}
+		for (java.util.Map.Entry<String, Long> e : peaks.entrySet()) {
+			double ms = e.getValue() / 1e6;
+			String name = PerfStats.stepName(e.getKey());
+			boolean hot = ms > PerfStats.STALL_WARN_MS && !name.endsWith("_async");
+			src.sendFeedback(Component.literal(String.format(java.util.Locale.ROOT, "  %s %.1f ms (total %.0f ms)", name, ms,
+					PerfStats.get().total(e.getKey()) / 1e6)).withStyle(hot ? ChatFormatting.RED : ChatFormatting.GRAY));
+		}
+		java.util.List<String> stalls = PerfStats.get().recentStalls();
+		src.sendFeedback(prefix().append(stalls.size() + " recent slow step(s) (over " + (int) PerfStats.STALL_WARN_MS + " ms; WARN in latest.log):"));
+		for (String l : stalls) {
+			src.sendFeedback(Component.literal("  " + l).withStyle(ChatFormatting.RED));
 		}
 		return 1;
 	}

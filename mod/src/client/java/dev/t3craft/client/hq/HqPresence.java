@@ -59,6 +59,17 @@ public final class HqPresence {
 	private static @Nullable Supplier<@Nullable Map<Long, dev.t3craft.blocks.Binding>> demoBindings;
 	private static @Nullable Object boundTo;
 
+	/**
+	 * fix/hq-build-stutter: the sources of a standing HQ, built off-thread (each walks the whole plan)
+	 * and installed on the client thread once ready; until then the previous HQ stays installed.
+	 */
+	private record Prepared(Standing standing, HqWorldAnchors anchors, HqStations stations, Map<Long, dev.t3craft.blocks.Binding> bindings) {
+	}
+
+	private static @Nullable Prepared prepared;
+	private static @Nullable Standing preparing;
+	private static java.util.concurrent.@Nullable CompletableFuture<Prepared> preparingFuture;
+
 	private HqPresence() {
 	}
 
@@ -75,7 +86,9 @@ public final class HqPresence {
 	/** The demo's live fixture bindings (used while the demo HQ is the standing one; null = none). */
 	public static void demoBindings(@Nullable Supplier<@Nullable Map<Long, dev.t3craft.blocks.Binding>> b) {
 		demoBindings = b;
-		bindFixtures(current());
+		Standing now = current();
+		Prepared p = prepared;
+		bindFixtures(now, p != null && now != null && p.standing() == now ? p : null);
 	}
 
 	public static @Nullable Standing current() {
@@ -91,7 +104,9 @@ public final class HqPresence {
 		if (mc == null || mc.level == null || mc.player == null || !mc.hasSingleplayerServer()) {
 			return false;
 		}
-		Standing s = current();
+		// fix/hq-build-stutter: the HQ whose sources are installed (they are prepared off-thread), so
+		// nobody spawns before the NPC anchors and stations exist, and a new wing does not shut the gate.
+		Standing s = installed ? applied : null;
 		return s != null && allows(s, true, mc.level.dimension().identifier().toString());
 	}
 
@@ -107,7 +122,7 @@ public final class HqPresence {
 
 	/** The standing HQ only when {@link #allows} lets it be shown here, else null. */
 	public static @Nullable Standing shown(net.minecraft.client.@Nullable Minecraft mc) {
-		return allows(mc) ? current() : null;
+		return allows(mc) ? applied : null;
 	}
 
 	/** World left: forget both. */
@@ -115,16 +130,85 @@ public final class HqPresence {
 		site = null;
 		demo = null;
 		demoBindings = null;
+		prepared = null;
+		preparing = null;
+		if (preparingFuture != null) {
+			preparingFuture.cancel(false);
+			preparingFuture = null;
+		}
 		apply();
 	}
 
 	/** (Re)installs the sources when the standing HQ changed. */
 	public static void apply() {
 		Standing now = current();
-		bindFixtures(now);
+		Prepared p = null;
+		if (now != null) {
+			p = prepared(now);
+			if (p == null) {
+				return; // being prepared off-thread; apply() runs again when it is ready
+			}
+		}
+		bindFixtures(now, p);
 		if (installed && sameAs(now, applied)) {
 			return;
 		}
+		long t0 = System.nanoTime();
+		try {
+			install(now, p);
+		} finally {
+			dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_PRESENCE, t0);
+		}
+	}
+
+	/**
+	 * The prepared sources for {@code now}: ready ones, or null after starting (or while waiting for)
+	 * their off-thread preparation. Client thread.
+	 */
+	private static @Nullable Prepared prepared(Standing now) {
+		Prepared p = prepared;
+		if (p != null && (p.standing() == now || sameAs(p.standing(), now))) {
+			return p;
+		}
+		java.util.concurrent.CompletableFuture<Prepared> f = preparingFuture;
+		Standing want = preparing;
+		if (f == null || want == null || !(want == now || sameAs(want, now))) {
+			if (f != null) {
+				f.cancel(false);
+			}
+			preparing = now;
+			f = dev.t3craft.build.Offload.supply(dev.t3craft.debug.PerfStats.STEP_PRESENCE_PREP, () -> prepare(now));
+			preparingFuture = f;
+			java.util.concurrent.CompletableFuture<Prepared> mine = f;
+			f.whenComplete((r, err) -> net.minecraft.client.Minecraft.getInstance().execute(() -> {
+				if (preparingFuture == mine) {
+					apply();
+				}
+			}));
+			return null;
+		}
+		if (!f.isDone()) {
+			return null;
+		}
+		preparingFuture = null;
+		preparing = null;
+		try {
+			p = f.join();
+		} catch (RuntimeException e) {
+			T3Craft.LOGGER.warn("[hq] preparing the HQ presence off-thread failed, building it here", e);
+			p = prepare(now);
+		}
+		prepared = p;
+		return p;
+	}
+
+	/** Pure: every source of one standing HQ. Any thread. */
+	private static Prepared prepare(Standing s) {
+		return new Prepared(s, new HqWorldAnchors(s.plan(), s.site(), s.built()), new HqStations(s.plan(), s.site(), s.built()),
+				dev.t3craft.blocks.HqBindings.world(s.plan(), s.site()));
+	}
+
+	private static void install(@Nullable Standing now, @Nullable Prepared p) {
 		T3CraftClient c;
 		try {
 			c = T3CraftClient.get();
@@ -144,16 +228,16 @@ public final class HqPresence {
 			}
 			return;
 		}
-		c.npcs().behavior().setAnchorSource(new HqWorldAnchors(now.plan(), now.site(), now.built()));
+		c.npcs().behavior().setAnchorSource(p.anchors());
 		if (w != null) {
-			w.setPlacementSource(new HqStations(now.plan(), now.site(), now.built()));
+			w.setPlacementSource(p.stations());
 		}
 		T3Craft.LOGGER.info("[hq] NPCs and workstations follow the HQ at {} ({} modules built)", now.site().origin().toShortString(),
 				now.built() == null ? "all" : now.built().size());
 	}
 
 	/** Monitors and lamps follow the standing HQ: the site plan's bindings, or the demo's live ones. */
-	private static void bindFixtures(@Nullable Standing now) {
+	private static void bindFixtures(@Nullable Standing now, @Nullable Prepared p) {
 		dev.t3craft.client.blocks.BlocksClient b = dev.t3craft.client.blocks.BlocksClient.get();
 		if (b == null) {
 			return;
@@ -166,7 +250,7 @@ public final class HqPresence {
 		if (now == null) {
 			b.setHqBindings(null);
 		} else if (now == site) {
-			Map<Long, dev.t3craft.blocks.Binding> m = dev.t3craft.blocks.HqBindings.world(now.plan(), now.site());
+			Map<Long, dev.t3craft.blocks.Binding> m = p != null ? p.bindings() : dev.t3craft.blocks.HqBindings.world(now.plan(), now.site());
 			b.setHqBindings(() -> m);
 		} else {
 			b.setHqBindings(demoBindings);

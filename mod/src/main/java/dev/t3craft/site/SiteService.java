@@ -198,12 +198,54 @@ public final class SiteService {
 	 * change first). Cells that already hold the wanted state and have it recorded are left out.
 	 */
 	public List<Claimed> claim(List<CellChange> changes, boolean record) {
+		long t0 = System.nanoTime();
+		try {
+			return claimCells(changes, record);
+		} finally {
+			dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_SITE_CLAIM, t0);
+		}
+	}
+
+	/**
+	 * fix/hq-build-stutter: snapshots and plans of the built expansions, kept between claims (every HQ
+	 * update claims twice, a dry run then the real one, and each used to read and decompress every
+	 * snapshot of the site from disk on the server thread). A snapshot never changes under its key; a
+	 * plan of an existing key is only changed by {@link #claimCells}, on the cached object itself, and
+	 * saved right after (dropped from the cache if that save fails). Server thread.
+	 */
+	private final java.util.Map<String, Layer> layerCache = new java.util.HashMap<>();
+
+	private Active activeCached() throws IOException, Snapshot.InvalidSnapshotException {
+		SiteJournal j = store.loadJournal();
+		if (j.phase() == SiteJournal.Phase.NONE) {
+			throw new IOException("There is no site.");
+		}
+		BlockWorld w = env.world(j.dimension());
+		if (w == null) {
+			throw new IOException("The site's dimension (" + j.dimension() + ") is not loaded.");
+		}
+		java.util.Set<String> keys = new java.util.HashSet<>();
+		List<Layer> layers = new ArrayList<>();
+		for (Expansion e : j.stack()) {
+			keys.add(e.key());
+			Layer l = layerCache.get(e.key());
+			if (l == null || !l.exp.equals(e)) {
+				l = layer(e);
+				layerCache.put(e.key(), l);
+			}
+			layers.add(l);
+		}
+		layerCache.keySet().retainAll(keys);
+		return new Active(j, layers, w);
+	}
+
+	private List<Claimed> claimCells(List<CellChange> changes, boolean record) {
 		if (changes.isEmpty() || running != null) {
 			return List.of();
 		}
 		Active a;
 		try {
-			a = active();
+			a = activeCached();
 		} catch (IOException | Snapshot.InvalidSnapshotException e) {
 			T3Craft.LOGGER.warn("site claim refused: {}", e.getMessage());
 			return List.of();
@@ -268,6 +310,7 @@ public final class SiteService {
 			}
 		} catch (IOException e) {
 			T3Craft.LOGGER.warn("site claim: could not save a plan: {}", e.getMessage());
+			layerCache.clear(); // the cached plans may hold changes the disk does not
 			return List.of();
 		}
 		return out;
@@ -286,6 +329,15 @@ public final class SiteService {
 	 * {@code site undo} removes it again. Server thread.
 	 */
 	public Reply expand(SiteModule module) {
+		long t0 = System.nanoTime();
+		try {
+			return expandModule(module);
+		} finally {
+			dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_SITE_EXPAND, t0);
+		}
+	}
+
+	private Reply expandModule(SiteModule module) {
 		SiteJournal j;
 		try {
 			j = store.loadJournal();

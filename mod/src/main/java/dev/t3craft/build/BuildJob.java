@@ -57,7 +57,12 @@ public final class BuildJob {
 	private final BuildPlanner planner;
 	private final double blocksPerTick;
 	private final @Nullable BuildCost cost;
-	private final @Nullable MaterialMeter meter;
+	/**
+	 * fix/hq-build-stutter: the meter of a charged job is built off-thread ({@link Offload}); the job
+	 * places nothing until it is there (a tick or two). Null future = free job.
+	 */
+	private final java.util.concurrent.@Nullable CompletableFuture<MaterialMeter> meterFuture;
+	private volatile @Nullable MaterialMeter meter;
 	/** Server thread only. */
 	private @Nullable MaterialSupply supply;
 	private volatile boolean waitingForMaterials;
@@ -109,25 +114,66 @@ public final class BuildJob {
 		this.plan = Objects.requireNonNull(plan, "plan");
 		this.blocksPerTick = blocksPerTick;
 		this.planner = Objects.requireNonNull(planner, "planner");
+		long t0 = System.nanoTime();
 		int f = Math.max(1, fronts);
+		java.util.function.Supplier<JobCursor> layered = () -> new FrontCursor(PlacementOrders.current().create(plan, f));
 		if (planner == BuildPlanner.CREW) {
 			int segment = cost == null ? 0 : BuildPlanner.CREW_SEGMENT;
-			java.util.function.Supplier<JobCursor> crew = () -> new CrewCursor(CrewSchedule.of(plan, f), segment, BuildCursor.DEFAULT_MAX_SKIPS_PER_TICK);
-			// Small plans are planned right here; big HQ parts off-thread (the job waits in PENDING meanwhile).
-			this.cursor = plan.size() <= BuildPlanner.SYNC_PLAN_LIMIT ? crew.get()
-					: new DeferredCursor(crew, () -> new FrontCursor(PlacementOrders.current().create(plan, f)), plan.size(), f);
+			java.util.function.Supplier<JobCursor> crew = () -> {
+				long s0 = System.nanoTime();
+				try {
+					return new CrewCursor(CrewSchedule.of(plan, f), segment, BuildCursor.DEFAULT_MAX_SKIPS_PER_TICK);
+				} finally {
+					dev.t3craft.debug.PerfStats.stepAsync(dev.t3craft.debug.PerfStats.STEP_SCHEDULE, s0);
+				}
+			};
+			// fix/hq-build-stutter: only tiny plans are planned right here (this runs on the client thread
+			// when a crew submits); everything else off-thread (the job waits in PENDING meanwhile). The
+			// schedule is deterministic for a plan, so where it is computed does not change the build.
+			this.cursor = plan.size() <= BuildPlanner.SYNC_PLAN_LIMIT ? crew.get() : new DeferredCursor(crew, layered, plan.size(), f);
 		} else {
-			this.cursor = new FrontCursor(PlacementOrders.current().create(plan, f));
+			this.cursor = plan.size() <= BuildPlanner.SYNC_PLAN_LIMIT ? layered.get() : new DeferredCursor(layered, layered, plan.size(), f);
 		}
 		this.cost = cost;
 		if (cost == null) {
-			this.meter = null;
+			this.meterFuture = null;
 		} else {
-			int[] layers = new int[plan.size()];
-			for (int i = 0; i < layers.length; i++) {
-				layers[i] = plan.get(i).pos().getY();
+			java.util.function.Function<BlockState, @Nullable String> itemOf = cost.itemOf();
+			this.meterFuture = Offload.supply(dev.t3craft.debug.PerfStats.STEP_METER, () -> {
+				int[] layers = new int[plan.size()];
+				for (int i = 0; i < layers.length; i++) {
+					layers[i] = plan.get(i).pos().getY();
+				}
+				return new MaterialMeter(BlockCosts.of(plan, itemOf), layers);
+			});
+		}
+		dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_JOB_NEW, t0);
+	}
+
+	/**
+	 * The material meter once it is built (installing it if it just finished); null for free jobs and
+	 * while it is being built. If building it failed it is built here once (never stuck).
+	 */
+	private @Nullable MaterialMeter meter() {
+		MaterialMeter m = meter;
+		java.util.concurrent.CompletableFuture<MaterialMeter> f = meterFuture;
+		if (m != null || f == null || !f.isDone()) {
+			return m;
+		}
+		synchronized (this) {
+			if (meter == null) {
+				try {
+					meter = f.join();
+				} catch (RuntimeException e) {
+					dev.t3craft.T3Craft.LOGGER.warn("material meter failed off-thread, building it here", e);
+					int[] layers = new int[plan.size()];
+					for (int i = 0; i < layers.length; i++) {
+						layers[i] = plan.get(i).pos().getY();
+					}
+					meter = new MaterialMeter(BlockCosts.of(plan, java.util.Objects.requireNonNull(cost).itemOf()), layers);
+				}
 			}
-			this.meter = new MaterialMeter(BlockCosts.of(plan, cost.itemOf()), layers);
+			return meter;
 		}
 	}
 
@@ -159,7 +205,10 @@ public final class BuildJob {
 
 	/** Like {@link #tick(double, BlockSink, PlacedCallback)}; {@code onWalk} hears when a crew builder starts walking. */
 	public int tick(double allowance, BlockSink sink, PlacedCallback onPlaced, @Nullable WalkCallback onWalk) {
-		MaterialMeter m = meter;
+		MaterialMeter m = meter();
+		if (cost != null && m == null) {
+			return 0; // fix/hq-build-stutter: costs still being computed off-thread
+		}
 		MaterialSupply sup = supply == null ? MaterialSupply.EMPTY : supply;
 		IntPredicate there = j -> sink.matches(worldPos(j), worldState(j));
 		CrewCursor cc = crew();
@@ -238,7 +287,7 @@ public final class BuildJob {
 
 	/** Whether blocks cost materials (survival); false for free jobs. */
 	public boolean charged() {
-		return meter != null;
+		return cost != null;
 	}
 
 	/** Paused because materials are missing (see {@link #missingMaterials()}). */
@@ -248,17 +297,20 @@ public final class BuildJob {
 
 	/** Item id → count the job is waiting for; empty when not waiting (and always for free jobs). */
 	public Map<String, Integer> missingMaterials() {
-		return meter == null || !waitingForMaterials ? Map.of() : meter.missing();
+		MaterialMeter m = meter();
+		return m == null || !waitingForMaterials ? Map.of() : m.missing();
 	}
 
 	/** What the whole plan costs (item id → count); empty for free jobs. */
 	public Map<String, Integer> requiredMaterials() {
-		return meter == null ? Map.of() : meter.required();
+		MaterialMeter m = meter();
+		return m == null ? Map.of() : m.required();
 	}
 
 	/** Items taken so far; empty for free jobs. */
 	public Map<String, Integer> spentMaterials() {
-		return meter == null ? Map.of() : meter.spent();
+		MaterialMeter m = meter();
+		return m == null ? Map.of() : m.spent();
 	}
 
 	public BlockPos worldPos(int index) {

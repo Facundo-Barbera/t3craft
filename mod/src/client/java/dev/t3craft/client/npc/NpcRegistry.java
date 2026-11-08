@@ -517,7 +517,22 @@ public final class NpcRegistry {
 		};
 	}
 
+	/**
+	 * fix/hq-build-stutter: NPCs (avatar + panel) spawned per client tick when the HQ gate opens or a
+	 * wing brings many at once; the rest come on the next ticks (a {@code dirty} reconcile each).
+	 */
+	static final int SPAWNS_PER_TICK = 3;
+
 	private void reconcile(ClientLevel lvl, Vec3 a) {
+		long t0 = System.nanoTime();
+		try {
+			reconcileRoster(lvl, a);
+		} finally {
+			dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_NPC_RECONCILE, t0);
+		}
+	}
+
+	private void reconcileRoster(ClientLevel lvl, Vec3 a) {
 		// Incremental (fix/npc-position-reset): only NPCs no longer wanted go, only new ones spawn below;
 		// the others keep their entity (where it stands), brain and overlays.
 		// fix/hq-build-parallel: nobody waits around a half-built HQ (NpcGate).
@@ -555,9 +570,16 @@ public final class NpcRegistry {
 			lvl.removeEntity(signs.remove(gid).getId(), Entity.RemovalReason.DISCARDED);
 		}
 
+		int spawnedNow = 0;
+		boolean more = false;
 		for (Map.Entry<String, List<NpcInfo>> group : groups.entrySet()) {
 			List<NpcInfo> inGroup = group.getValue();
 			for (NpcInfo info : inGroup) {
+				Spawned have = spawned.get(info.id());
+				if ((have == null || have.avatar().isRemoved()) && spawnedNow >= SPAWNS_PER_TICK) {
+					more = true; // fix/hq-build-stutter: the next ones on the next tick
+					continue;
+				}
 				// Spawn at the HQ desk (or the HQ's way in) so nobody walks in from the grass.
 				Anchor desk = behavior.anchorSource().desk(info.id(), info.groupId());
 				if (desk == null) {
@@ -569,6 +591,7 @@ public final class NpcRegistry {
 				Vec3 pos = desk == null ? a : new Vec3(desk.pos().x(), desk.pos().y(), desk.pos().z());
 				Spawned s = spawned.get(info.id());
 				if (s == null || s.avatar().isRemoved()) {
+					spawnedNow++;
 					s = spawn(lvl, info, pos, desk == null ? 0f : desk.yaw());
 					spawned.put(info.id(), s);
 					npcByEntityId.put(s.avatar().getId(), info.id());
@@ -582,6 +605,9 @@ public final class NpcRegistry {
 			}
 		}
 		updatePanels(null);
+		if (more) {
+			dirty = true;
+		}
 	}
 
 	/**

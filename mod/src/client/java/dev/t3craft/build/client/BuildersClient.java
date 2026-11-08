@@ -194,7 +194,10 @@ public final class BuildersClient implements ClientModInitializer, BuildService 
 		if (mc.level != level) {
 			resetLevel(mc.level);
 		}
+		long t0 = System.nanoTime();
+		boolean any = false;
 		for (Event e; (e = events.poll()) != null; ) {
+			any = true;
 			BuildCrew crew = crewFor(e.jobId());
 			if (crew == null) {
 				continue;
@@ -205,6 +208,9 @@ public final class BuildersClient implements ClientModInitializer, BuildService 
 				case Finished f -> crew.finished();
 				case Materials m -> notifyMaterials(mc, m);
 			}
+		}
+		if (any) {
+			dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_CREW_EVENTS, t0);
 		}
 		Iterator<BuildCrew> it = crews.iterator();
 		while (it.hasNext()) {

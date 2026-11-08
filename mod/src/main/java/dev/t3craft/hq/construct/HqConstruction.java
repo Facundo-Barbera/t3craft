@@ -153,11 +153,21 @@ public final class HqConstruction {
 	private Phase phase = Phase.NO_SITE;
 	private @Nullable String anchorsKey;
 	private volatile BuildPlan design;
+	/**
+	 * fix/hq-build-stutter: the target being computed off-thread ({@link HqTarget#compute} generates the
+	 * whole HQ plan: layout, lighting, packs) and the inputs it was asked with. Server thread.
+	 */
+	private java.util.concurrent.@Nullable CompletableFuture<HqTarget> computing;
+	private @Nullable HqInput computingInput;
+	private @Nullable HqLayout computingBase;
+	private int computingPacks = -1;
 
 	public HqConstruction(Ports ports, Saved saved) {
 		this.ports = ports;
 		this.saved = saved;
+		long t0 = System.nanoTime();
 		this.appliedPlan = dev.t3craft.hq.HqPlans.generate(saved.layout(), HqSiteFrame.style());
+		dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_HQ_LOAD, t0);
 		this.design = appliedPlan;
 	}
 
@@ -263,6 +273,40 @@ public final class HqConstruction {
 	// ---- the loop ------------------------------------------------------------------------------
 
 	public void tick() {
+		long t0 = System.nanoTime();
+		try {
+			reconcile();
+		} finally {
+			dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_HQ_TICK, t0);
+		}
+	}
+
+	/**
+	 * fix/hq-build-stutter: the target for {@code in} on {@code base}, computed off-thread; null while it
+	 * is being computed (the caller waits a tick). Same inputs give the same target, so the result does
+	 * not depend on when it arrives.
+	 */
+	private @Nullable HqTarget targetFor(HqInput in, HqLayout base, int packs) {
+		java.util.concurrent.CompletableFuture<HqTarget> f = computing;
+		if (f == null || !in.equals(computingInput) || computingBase != base || computingPacks != packs) {
+			if (f != null) {
+				f.cancel(false);
+			}
+			computingInput = in;
+			computingBase = base;
+			computingPacks = packs;
+			f = dev.t3craft.build.Offload.supply(dev.t3craft.debug.PerfStats.STEP_HQ_TARGET,
+					() -> HqTarget.compute(in, base, HqSiteFrame.MAX_MODULES));
+			computing = f;
+		}
+		if (!f.isDone()) {
+			return null;
+		}
+		computing = null;
+		return f.join(); // a failure propagates to the runtime, which pauses the construction (as before)
+	}
+
+	private void reconcile() {
 		long now = ports.now();
 		SiteView site = ports.site();
 		if (busy != null) {
@@ -324,9 +368,14 @@ public final class HqConstruction {
 		int packs = dev.t3craft.hq.pack.HqLayoutPacks.generation();
 		if (t == null || !t.input().equals(in) || targetBase != saved.layout() || targetPacks != packs) {
 			// feat/hq-layout-packs: a reloaded layout pack re-plans too; the in-place pass below applies the difference
-			t = HqTarget.compute(in, saved.layout(), HqSiteFrame.MAX_MODULES);
+			HqLayout base = saved.layout();
+			t = targetFor(in, base, packs);
+			if (t == null) {
+				phase = Phase.SETTLING; // fix/hq-build-stutter: planned off-thread, picked up on a later tick
+				return;
+			}
 			target = t;
-			targetBase = saved.layout();
+			targetBase = base;
 			targetPacks = packs;
 		}
 		design = t.plan();
@@ -365,6 +414,7 @@ public final class HqConstruction {
 			phase = Phase.IDLE;
 			return;
 		}
+		long d0 = System.nanoTime();
 		Set<String> built = Set.copyOf(site.modules());
 		List<Cell> cells = new ArrayList<>();
 		List<Cell> signs = new ArrayList<>();
@@ -389,7 +439,10 @@ public final class HqConstruction {
 				cells.add(new Cell(hqSite.cell(p.rel()), null, null));
 			}
 		}
+		dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_HQ_DIFF, d0);
+		long u0 = System.nanoTime();
 		Update u = ports.update("HQ update", cells, signs);
+		dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_HQ_UPDATE, u0);
 		if (u.refused() != null) {
 			blockAt(key, u.refused());
 			return;
