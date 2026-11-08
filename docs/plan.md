@@ -29,9 +29,12 @@
 >                                                                                   ├─ HTTPS/WSS → my-vps T3 (token propio)
 >                                                                                   └─ HTTP/WS  → my-acmesite T3 :3773 (token propio)
 > ```
-> Decisión sobre `status=="waiting"`: T3 lo muestra como "running" en su UI de awareness. t3craft
-> lo muestra como *needs_attention*, tal como pide el pedido original (§1.4). Se puede cambiar en
-> `bridge/src/state/mapper.ts` sin tocar el mod.
+> Decisión sobre `status=="waiting"` (revisada el 8 nov 2026): es un estado vivo de la corrida
+> (espera una herramienta, un `thread_wait`, subagentes o tareas de fondo; está en
+> `LIVE_SHELL_STATUSES`), así que t3craft lo muestra como *working*, igual que T3 Code. Solo un
+> `pendingRuntimeRequest` bloqueante, un plan accionable o mensajes de invitado pasan a
+> *needs_attention* (§1.4). Antes cada hilo pasaba por "needs your attention" antes de terminar.
+> Regla en `bridge/src/state/mapper.ts` y `mod/.../t3/ThreadState.java`.
 
 ---
 
@@ -86,9 +89,9 @@ t3code y agentcraft: licencia MIT. pixel-agents: MIT (solo se leyó el README).
 
 ### 1.4 Mapeo de estados → color del aldeano
 `status` = `"idle"` | RunStatus (`preparing, queued, starting, running, waiting, completed, interrupted, failed, cancelled, rolled_back`, :590). Prioridad de evaluación:
-1. **Necesita atención (amarillo/naranja, "!")**: `pendingRuntimeRequest != null && blocking !== false`. También `status=="waiting"`, `hasActionableProposedPlan` y `pendingGuestMessageCount>0`.
+1. **Necesita atención (amarillo/naranja, "!")**: `pendingRuntimeRequest != null && blocking !== false` (cualquier `kind`: aprobación, `user_input`, `dynamic_tool_call`, `auth_refresh`; `blocking: false` = pregunta asíncrona que la corrida sigue de largo). También `hasActionableProposedPlan` y `pendingGuestMessageCount>0`. `status=="waiting"` **no**: es trabajando (ver punto 3).
 2. **Error (rojo)**: `status ∈ {failed}` o `lastError != null` sin run activo.
-3. **Trabajando (azul/verde parpadeante)**: `activityRunStatus != null`, `status ∈ {queued, preparing, starting, running}` o `pendingBackgroundTasks.length>0`. Es la misma regla que `isLiveShell` (LIVE_SHELL_STATUSES, :2165).
+3. **Trabajando (azul/verde parpadeante)**: `activityRunStatus != null`, `status ∈ {queued, preparing, starting, running, waiting}` o `pendingBackgroundTasks.length>0`. Es la misma regla que `isLiveShell` (LIVE_SHELL_STATUSES, :2165).
 4. **Terminado (verde)**: `status ∈ {completed}` o (`idle` con `latestRunCompletedAt`). Si además `settledAt != null`, se muestra gris o "dormido". `interrupted/cancelled` → gris.
 5. Ocultar los threads con `archivedAt` o `deletedAt`, y los subagentes (`lineage` no listado) salvo que se active una opción.
 
