@@ -64,6 +64,10 @@ public final class HqGenerator {
 	}
 
 	public BuildPlan generate(HqLayout layout) {
+		if (style instanceof VerticalStyle v) {
+			// layout/vertical: its own geometry (towers, bridges, podium), see TowerLayout
+			return TowerGenerator.generate(v, layout);
+		}
 		PlanBuilder b = new PlanBuilder();
 		int rows = layout.rows();
 		hub(b, rows > 0, hubBinding(layout));

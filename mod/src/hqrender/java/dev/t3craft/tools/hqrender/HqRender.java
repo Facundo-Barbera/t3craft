@@ -85,6 +85,14 @@ public final class HqRender {
 		Files.createDirectories(out);
 		BlockModels models = new BlockModels();
 		String sid = style.id();
+		if (sid.equals("vertical")) {
+			// layout/vertical: towers, bridges and podium for 4, 10 and 20 projects (VerticalRender)
+			VerticalRender.run(models, style, out, only, scaleMul, ss, npcs);
+			for (String p : models.problems) {
+				System.out.println("note: " + p);
+			}
+			return;
+		}
 
 		Map<String, HqInput> rosters = new LinkedHashMap<>();
 		rosters.put("1p", roster(new int[] {4}, 0));
@@ -170,7 +178,7 @@ public final class HqRender {
 	}
 
 	/** The plan in a grid, on flat ground (grass at y=0, dirt below) where the plan has nothing, plus NPC stand-ins. */
-	private static Scene scene(BlockModels models, BuildPlan plan, Renderer.Clip clip, boolean npcs) {
+	static Scene scene(BlockModels models, BuildPlan plan, Renderer.Clip clip, boolean npcs) {
 		Scene sc = new Scene(models, clip.minX(), Math.min(clip.minY(), -6), clip.minZ(), clip.maxX(), Math.max(clip.maxY(), 11), clip.maxZ());
 		BlockState grass = Blocks.GRASS_BLOCK.defaultBlockState();
 		BlockState dirt = Blocks.DIRT.defaultBlockState();
@@ -232,7 +240,7 @@ public final class HqRender {
 		sc.overlay(c.getX(), c.getY() + 1, c.getZ(), "npc-high-" + i, high);
 	}
 
-	private static void caption(BufferedImage img, String text) {
+	static void caption(BufferedImage img, String text) {
 		try {
 			Graphics2D g = img.createGraphics();
 			g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
