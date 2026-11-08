@@ -159,7 +159,7 @@ public final class ThreadListCache {
 	 */
 	static final Comparator<ThreadRow> SAVE_ORDER = Comparator.comparing((ThreadRow r) -> !r.pinned())
 			.thenComparing(ThreadRow::settled)
-			.thenComparing(r -> r.activityMs() == null ? Long.MIN_VALUE : r.activityMs(), Comparator.reverseOrder())
+			.<Long>thenComparing(r -> r.activityMs() == null ? Long.MIN_VALUE : r.activityMs(), Comparator.reverseOrder())
 			.thenComparing(ThreadRow::key);
 
 	/**
