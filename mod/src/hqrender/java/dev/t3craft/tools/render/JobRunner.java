@@ -328,11 +328,12 @@ final class JobRunner {
 			finish(st, "error", "render failed: " + run.error());
 			return;
 		}
-		if (pngs.isEmpty() && r.kind().equals("hq")) {
+		boolean reportOnly = r.args().contains("--report-only") && Files.exists(out.resolve("report.json"));
+		if (pngs.isEmpty() && r.kind().equals("hq") && !reportOnly) {
 			finish(st, "error", "the renderer finished but wrote no images (a --only filter that matches nothing?); see report.txt");
 			return;
 		}
-		finish(st, "done", pngs.size() + " image(s) in " + String.format(Locale.ROOT, "%.0f", (System.nanoTime() - t0) / 1e9) + " s");
+		finish(st, "done", (reportOnly && pngs.isEmpty() ? "report only" : pngs.size() + " image(s)") + " in " + String.format(Locale.ROOT, "%.0f", (System.nanoTime() - t0) / 1e9) + " s");
 		if (key != null) {
 			remember(key, r);
 		}
