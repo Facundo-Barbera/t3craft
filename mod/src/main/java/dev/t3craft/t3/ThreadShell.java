@@ -10,7 +10,10 @@ import org.jspecify.annotations.Nullable;
  * Timestamps are epoch millis or null. {@code parentThreadId} (from {@code lineage}) is the parent
  * thread of a subagent or fork, null for top-level threads; it is the last component so other
  * branches adding fields do not collide. {@code pinnedAt} (fix/chat-direct-connect) is when the
- * thread was pinned in T3, null when it is not pinned.
+ * thread was pinned in T3, null when it is not pinned. {@code creationSource} (feat/thread-lineage)
+ * is T3's {@code creationSource} ("web", "mobile", "mcp", "provider", "server"; null when the server
+ * omits it) and {@code delegatedFrom} the parent of a thread delegated from another linked
+ * environment (null otherwise). See {@link #isDelegated()} and {@link Lineage}.
  */
 public record ThreadShell(
 		String id,
@@ -40,10 +43,57 @@ public record ThreadShell(
 		@Nullable String settledOverride,
 		ThreadMeta meta,
 		@Nullable String parentThreadId,
-		@Nullable Long pinnedAt) {
+		@Nullable Long pinnedAt,
+		@Nullable String creationSource,
+		@Nullable DelegatedFrom delegatedFrom) {
 
 	public ThreadShell {
 		meta = meta == null ? ThreadMeta.EMPTY : meta;
+	}
+
+	/** T3's {@code delegatedFrom}: the thread in another linked environment that delegated this one. */
+	public record DelegatedFrom(String environmentId, String threadId, String title) {
+		static @Nullable DelegatedFrom fromJson(@Nullable JsonObject o) {
+			String thread = Json.str(o, "threadId");
+			if (o == null || thread == null || thread.isBlank()) {
+				return null;
+			}
+			return new DelegatedFrom(orEmpty(Json.str(o, "environmentId")), thread, orEmpty(Json.str(o, "title")));
+		}
+	}
+
+	/** Shape before {@code creationSource} / {@code delegatedFrom} (feat/thread-lineage), kept so existing callers still compile. */
+	public ThreadShell(String id, String projectId, String title, String status, @Nullable String activityRunStatus,
+			@Nullable PendingRequest pendingRuntimeRequest, boolean hasActionableProposedPlan, long pendingGuestMessageCount,
+			int pendingBackgroundTasks, @Nullable String lastError, @Nullable String latestMessageText, @Nullable Long latestMessageAt,
+			@Nullable String activeRunId, @Nullable String relationshipToParent, boolean sideChat, @Nullable Long createdAt,
+			@Nullable Long latestUserMessageAt, @Nullable Long latestRunRequestedAt, @Nullable Long latestRunStartedAt,
+			@Nullable Long latestRunCompletedAt, @Nullable Long activityRunStartedAt, @Nullable Long archivedAt, @Nullable Long deletedAt,
+			@Nullable Long settledAt, @Nullable String settledOverride, ThreadMeta meta, @Nullable String parentThreadId,
+			@Nullable Long pinnedAt) {
+		this(id, projectId, title, status, activityRunStatus, pendingRuntimeRequest, hasActionableProposedPlan, pendingGuestMessageCount,
+				pendingBackgroundTasks, lastError, latestMessageText, latestMessageAt, activeRunId, relationshipToParent, sideChat, createdAt,
+				latestUserMessageAt, latestRunRequestedAt, latestRunStartedAt, latestRunCompletedAt, activityRunStartedAt, archivedAt,
+				deletedAt, settledAt, settledOverride, meta, parentThreadId, pinnedAt, null, null);
+	}
+
+	/** {@code lineage.relationshipToParent == "subagent"} (provider-native or delegated). */
+	public boolean isSubagent() {
+		return "subagent".equals(relationshipToParent);
+	}
+
+	/**
+	 * feat/thread-lineage: a T3 {@code delegate_task} child: a subagent whose {@code creationSource}
+	 * is not {@code "provider"} (T3's {@code isProviderNativeSubagentThread} negated). Long, real work
+	 * in its own worktree: listed nested under its parent and given a full NPC and desk.
+	 */
+	public boolean isDelegated() {
+		return isSubagent() && !"provider".equals(creationSource);
+	}
+
+	/** A provider-native subagent (Claude's Agent tool, …): short, shown inside its parent only. */
+	public boolean isProviderSubagent() {
+		return isSubagent() && "provider".equals(creationSource);
 	}
 
 	/** Shape before {@code pinnedAt}, kept so existing callers still compile. */
@@ -57,7 +107,7 @@ public record ThreadShell(
 		this(id, projectId, title, status, activityRunStatus, pendingRuntimeRequest, hasActionableProposedPlan, pendingGuestMessageCount,
 				pendingBackgroundTasks, lastError, latestMessageText, latestMessageAt, activeRunId, relationshipToParent, sideChat, createdAt,
 				latestUserMessageAt, latestRunRequestedAt, latestRunStartedAt, latestRunCompletedAt, activityRunStartedAt, archivedAt,
-				deletedAt, settledAt, settledOverride, meta, parentThreadId, null);
+				deletedAt, settledAt, settledOverride, meta, parentThreadId, null, null, null);
 	}
 
 	/** Pinned in T3 (shows first in every thread list). */
@@ -95,7 +145,7 @@ public record ThreadShell(
 		this(id, projectId, title, status, activityRunStatus, pendingRuntimeRequest, hasActionableProposedPlan, pendingGuestMessageCount,
 				pendingBackgroundTasks, lastError, latestMessageText, latestMessageAt, activeRunId, relationshipToParent, sideChat, createdAt,
 				latestUserMessageAt, latestRunRequestedAt, latestRunStartedAt, latestRunCompletedAt, activityRunStartedAt, archivedAt,
-				deletedAt, settledAt, settledOverride, ThreadMeta.EMPTY, null, null);
+				deletedAt, settledAt, settledOverride, ThreadMeta.EMPTY, null, null, null, null);
 	}
 
 	/** Shape before {@code parentThreadId} (feat/npc-helpers), kept so existing callers still compile. */
@@ -109,7 +159,7 @@ public record ThreadShell(
 		this(id, projectId, title, status, activityRunStatus, pendingRuntimeRequest, hasActionableProposedPlan, pendingGuestMessageCount,
 				pendingBackgroundTasks, lastError, latestMessageText, latestMessageAt, activeRunId, relationshipToParent, sideChat, createdAt,
 				latestUserMessageAt, latestRunRequestedAt, latestRunStartedAt, latestRunCompletedAt, activityRunStartedAt, archivedAt,
-				deletedAt, settledAt, settledOverride, meta, null, null);
+				deletedAt, settledAt, settledOverride, meta, null, null, null, null);
 	}
 
 	/** {@code pendingRuntimeRequest}: {@code blocking} is null when an older server omits it. */
@@ -156,7 +206,9 @@ public record ThreadShell(
 				ThreadMeta.fromJson(o),
 				// lineage.parentThreadId (feat/npc-helpers); some servers also put it at the top level.
 				Json.str(lineage, "parentThreadId") != null ? Json.str(lineage, "parentThreadId") : Json.str(o, "parentThreadId"),
-				pinnedAt(o));
+				pinnedAt(o),
+				Json.str(o, "creationSource"),
+				DelegatedFrom.fromJson(Json.obj(o, "delegatedFrom")));
 	}
 
 	private static String orEmpty(@Nullable String s) {

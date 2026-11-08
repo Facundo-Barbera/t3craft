@@ -46,12 +46,24 @@ export const mapThreadState = (t: ShellForMapping): ThreadState => {
   return "idle";
 };
 
-/** Threads that never get an NPC: archived, deleted, and (unless enabled) subagents / side chats. */
+/**
+ * feat/thread-lineage: a T3 `delegate_task` child (subagent whose `creationSource` is not
+ * "provider"): long, real work in its own worktree, so it gets an NPC and a desk like any thread.
+ * Provider-native subagents (Claude's Agent tool) stay hidden (the mod shows them as helpers).
+ */
+export const isDelegatedThread = (
+  t: Pick<OrchestrationV2ThreadShell, "lineage"> & { readonly creationSource?: string | undefined },
+): boolean => t.lineage.relationshipToParent === "subagent" && t.creationSource !== "provider";
+
+/** Threads that never get an NPC: archived, deleted, and (unless enabled) provider subagents / side chats. */
 export const isVisibleThread = (
-  t: Pick<OrchestrationV2ThreadShell, "archivedAt" | "deletedAt" | "lineage">,
+  t: Pick<OrchestrationV2ThreadShell, "archivedAt" | "deletedAt" | "lineage"> & {
+    readonly creationSource?: string | undefined;
+  },
   includeSubagents: boolean,
 ): boolean => {
   if (t.archivedAt !== null || t.deletedAt !== null) return false;
   if (includeSubagents) return true;
-  return t.lineage.relationshipToParent !== "subagent" && t.lineage.sideChat !== true;
+  if (t.lineage.sideChat === true) return false;
+  return t.lineage.relationshipToParent !== "subagent" || isDelegatedThread(t);
 };

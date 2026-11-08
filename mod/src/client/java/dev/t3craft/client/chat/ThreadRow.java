@@ -19,6 +19,8 @@ import org.jspecify.annotations.Nullable;
  * @param pinned         pinned in T3 (listed first)
  * @param details        branch, PR, diff, model, unread, run start, snooze (feat/t3-sidebar-rows);
  *                       never null, {@link ThreadDetails#EMPTY} when unknown
+ * @param lineage        parent link of a delegated task (feat/thread-lineage); never null,
+ *                       {@link RowLineage#NONE} for top-level threads
  */
 public record ThreadRow(
 		String key,
@@ -33,10 +35,18 @@ public record ThreadRow(
 		boolean settled,
 		@Nullable Long activityMs,
 		boolean pinned,
-		ThreadDetails details) {
+		ThreadDetails details,
+		RowLineage lineage) {
 
 	public ThreadRow {
 		details = details == null ? ThreadDetails.EMPTY : details;
+		lineage = lineage == null ? RowLineage.NONE : lineage;
+	}
+
+	/** Shape before {@code lineage} (feat/thread-lineage). */
+	public ThreadRow(String key, String env, String envLabel, @Nullable String threadId, String title, String project, ThreadState state,
+			boolean pendingRequest, @Nullable String activity, boolean settled, @Nullable Long activityMs, boolean pinned, ThreadDetails details) {
+		this(key, env, envLabel, threadId, title, project, state, pendingRequest, activity, settled, activityMs, pinned, details, RowLineage.NONE);
 	}
 
 	/** Shape before {@code details}. */

@@ -1,6 +1,6 @@
 import type { OrchestrationV2ThreadShell } from "../t3/contracts.ts";
 import type { NpcView } from "../protocol.ts";
-import { mapThreadState, type ThreadState } from "./mapper.ts";
+import { isDelegatedThread, mapThreadState, type ThreadState } from "./mapper.ts";
 
 /**
  * Everything visual lives here (colours, glyphs, nameplate text, priority) so it can change by
@@ -60,14 +60,25 @@ const activityFor = (t: OrchestrationV2ThreadShell, state: ThreadState): string 
   return msg ? clip(msg.text, MAX_ACTIVITY) : null;
 };
 
+/**
+ * `parentTitle` (feat/thread-lineage): title of the parent of a delegated task; the second
+ * nameplate line then reads `↳ <parent>` instead of `env · project`.
+ */
 export const presentThread = (
   env: EnvironmentInfo,
   t: OrchestrationV2ThreadShell,
   projectTitle: string | null,
+  parentTitle: string | null = null,
 ): NpcView => {
   const state = mapThreadState(t);
   const style = STATE_STYLES[state];
   const title = clip(t.title || "(untitled)", MAX_TITLE);
+  const delegated = isDelegatedThread(t);
+  const parentId = t.lineage.parentThreadId;
+  const sublabel =
+    delegated && parentId !== null
+      ? `↳ ${clip(parentTitle || "(untitled)", MAX_TITLE)}`
+      : `${env.label}${projectTitle ? ` · ${projectTitle}` : ""}`;
   return {
     id: npcId(env.id, t.id),
     env: env.id,
@@ -79,7 +90,7 @@ export const presentThread = (
     color: style.color,
     glyph: style.glyph,
     label: `${style.glyph} ${title}`,
-    sublabel: `${env.label}${projectTitle ? ` · ${projectTitle}` : ""}`,
+    sublabel,
     activity: activityFor(t, state),
     priority: style.priority,
     settled: t.settledAt !== null,
@@ -88,5 +99,8 @@ export const presentThread = (
     groupSublabel: env.label,
     skin: skinSeed(env.id, state),
     particle: style.particle,
+    ...(parentId !== null && t.lineage.relationshipToParent === "subagent"
+      ? { parentThreadId: parentId, delegated }
+      : {}),
   };
 };

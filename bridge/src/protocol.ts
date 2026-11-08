@@ -47,6 +47,10 @@ export interface NpcView {
   readonly skin: string;
   /** Particle shown over the head, or null: `working | attention | error | done`. */
   readonly particle: "working" | "attention" | "error" | "done" | null;
+  /** feat/thread-lineage (optional, additive): parent thread id of a subagent (same environment). */
+  readonly parentThreadId?: string;
+  /** feat/thread-lineage: a T3 delegate_task child (subagent not created by the provider). */
+  readonly delegated?: boolean;
 }
 
 /** A chat line, resolved for display. */

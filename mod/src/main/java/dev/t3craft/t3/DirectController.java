@@ -135,8 +135,11 @@ public final class DirectController implements T3Connection.Listener {
 			if (v == null) {
 				return;
 			}
+			Lineage lineage = Lineage.of(id, v);
 			for (ThreadShell t : Visibility.select(v.threads(), nowMs, options)) {
-				out.add(Presentation.present(id, label, t, v.projectTitle(t.projectId())));
+				// feat/thread-lineage: a delegated task's nameplate reads "↳ <parent>"
+				ThreadShell parent = t.isDelegated() ? lineage.parent(t.id()) : null;
+				out.add(Presentation.present(id, label, t, v.projectTitle(t.projectId()), parent));
 			}
 		});
 		out.sort(Comparator.comparingInt(NpcView::priority).thenComparing(NpcView::envLabel).thenComparing(NpcView::title));

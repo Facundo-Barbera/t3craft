@@ -158,6 +158,16 @@ public final class ThreadDiskCache {
 			o.addProperty("activityMs", r.activityMs());
 		}
 		o.addProperty("pinned", r.pinned());
+		// feat/thread-lineage (additive): a delegated task's parent link, so cached rows nest too
+		if (r.lineage().delegated()) {
+			o.addProperty("delegated", true);
+			if (r.lineage().parentKey() != null) {
+				o.addProperty("parentKey", r.lineage().parentKey());
+			}
+			if (!r.lineage().parentTitle().isEmpty()) {
+				o.addProperty("parentTitle", r.lineage().parentTitle());
+			}
+		}
 		return o;
 	}
 
@@ -235,7 +245,8 @@ public final class ThreadDiskCache {
 		Long at = o.has("activityMs") ? Json.num(o, "activityMs", 0) : null;
 		return new ThreadRow(key, env, orEmpty(Json.str(o, "envLabel")), Json.str(o, "threadId"), orEmpty(Json.str(o, "title")),
 				orEmpty(Json.str(o, "project")), state, Json.bool(o, "pending"), Json.str(o, "activity"), Json.bool(o, "settled"), at,
-				Json.bool(o, "pinned"));
+				Json.bool(o, "pinned"), ThreadDetails.EMPTY,
+				Json.bool(o, "delegated") ? new RowLineage(Json.str(o, "parentKey"), orEmpty(Json.str(o, "parentTitle")), true) : RowLineage.NONE);
 	}
 
 	private static @Nullable ChatEntry decodeEntry(JsonObject o) {

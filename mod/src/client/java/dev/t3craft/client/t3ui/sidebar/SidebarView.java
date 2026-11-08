@@ -52,6 +52,9 @@ public final class SidebarView {
 	static final int MAIN_MIN = 34;
 	static final int WHEEL_PX = 24;
 	static final int SCROLLBAR_W = 7;
+	/** feat/thread-lineage: indent per nesting level of a delegated child, and the deepest drawn level. */
+	static final int INDENT = 8;
+	static final int MAX_INDENT = 4;
 
 	/** What the screen does for the sidebar. */
 	public interface Host {
@@ -494,16 +497,32 @@ public final class SidebarView {
 			drawDraft(g, font, t, rr, hitR, r, selected, hover, multi, mouseX, mouseY);
 			return;
 		}
+		// feat/thread-lineage: a nested delegated child is indented behind a guide line
+		SidebarModel.Nest nest = it.nest();
+		if (nest.depth() > 0) {
+			int ind = Math.min(nest.depth(), MAX_INDENT) * INDENT;
+			drawGuides(g, t, rr, nest);
+			rr = new Rect(rr.x() + ind, rr.y(), Math.max(1, rr.w() - ind), rr.h());
+			hitR = hitR.h() <= 0 ? hitR : new Rect(rr.x(), hitR.y(), rr.w(), hitR.h());
+		}
 		if (hover) {
 			host.hover(r, selected);
 		}
 		T3Slots.Target target = host.target(r);
 		boolean quick = hover && target != null;
-		SidebarRow.draw(g, font, t, clips, rr, r, selected, hover, multi, quick, now);
+		Rect chip = SidebarRow.draw(g, font, t, clips, rr, r, selected, hover, multi, quick, now, nest);
 		if (hitR.h() <= 0) {
 			return;
 		}
 		hits.add(new Hit(hitR, () -> host.open(r), target == null ? null : () -> host.context(r, target), SidebarRow.tooltip(r, now, target != null)));
+		Rect chipHit = clip(chip, hitR);
+		if (chip.h() > 0 && chipHit.h() > 0) {
+			String k = r.key();
+			hits.add(new Hit(chipHit, () -> model.toggleChildren(k), null, List.of(
+					nest.children() + (nest.children() == 1 ? " delegated agent" : " delegated agents")
+							+ (nest.working() > 0 ? " · " + nest.working() + " working" : ""),
+					"Click: " + (nest.collapsed() ? "show" : "hide"))));
+		}
 		if (quick) {
 			// T3's hover actions where the state sits: settle, pin (feat/t3-ui-clean)
 			boolean can = host.canOperate(target);
@@ -527,6 +546,22 @@ public final class SidebarView {
 				}, () -> host.context(r, target), List.of((pinned ? "Unpin" : "Pin") + ro)));
 			}
 		}
+	}
+
+	/** Guide lines of a nested row: ancestors' lines that run on, and its own elbow into the row. */
+	private static void drawGuides(GuiGraphicsExtractor g, ChatTheme t, Rect rr, SidebarModel.Nest n) {
+		int color = ChatTheme.withAlpha(t.edge(), 220);
+		int d = Math.min(n.depth(), MAX_INDENT);
+		for (int level = 1; level < d; level++) {
+			if (n.guide(level)) {
+				int gx = rr.x() + (level - 1) * INDENT + 4;
+				g.fill(gx, rr.y(), gx + 1, rr.bottom(), color);
+			}
+		}
+		int gx = rr.x() + (d - 1) * INDENT + 4;
+		int mid = rr.y() + 7;
+		g.fill(gx, rr.y(), gx + 1, n.last() ? mid + 1 : rr.bottom(), color);
+		g.fill(gx + 1, mid, rr.x() + d * INDENT, mid + 1, color);
 	}
 
 	/** The draft thread's row (feat/t3-composer): project line, "✎ New thread", a ✕ on hover discards it. */
