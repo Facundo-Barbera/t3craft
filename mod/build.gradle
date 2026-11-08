@@ -85,6 +85,24 @@ tasks.register("hqRender", JavaExec) {
 	javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(25) }
 }
 
+// Shared render service (docs/tools/render-service.md): the coordinator starts ONE long-lived JVM,
+// dev.t3craft.tools.render.RenderDaemon, with tools/render/start-daemon.sh. This task only writes what
+// that script needs (the daemon's classpath and the Java 25 binary); it does not run anything.
+tasks.register("renderDaemonClasspath") {
+	group = "t3craft"
+	description = "Writes build/render-daemon/{classpath.txt,java.txt} for tools/render/start-daemon.sh"
+	dependsOn "classes", "clientClasses", "hqrenderClasses"
+	def outDir = layout.buildDirectory.dir("render-daemon")
+	def cp = sourceSets.hqrender.runtimeClasspath
+	def launcher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(25) }
+	doLast {
+		def dir = outDir.get().asFile
+		dir.mkdirs()
+		new File(dir, "classpath.txt").text = cp.files.collect { it.absolutePath }.join(File.pathSeparator)
+		new File(dir, "java.txt").text = launcher.get().executablePath.asFile.absolutePath
+	}
+}
+
 // This repo does not use unit tests: adding or running them is forbidden; verification = compiling.
 // Tests are blocked outright, so `test`, `check` and `build` never run any even if someone adds them back:
 // no test sources, every Test task disabled, test compilation off, and `check` only compiles.

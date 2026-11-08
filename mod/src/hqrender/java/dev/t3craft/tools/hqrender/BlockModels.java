@@ -143,13 +143,20 @@ final class BlockModels {
 		if (json.containsKey(path)) {
 			return json.get(path);
 		}
-		JsonObject o = null;
-		try (InputStream in = loader.getResourceAsStream(path)) {
-			if (in != null) {
-				o = JsonParser.parseReader(new InputStreamReader(in, StandardCharsets.UTF_8)).getAsJsonObject();
+		// vanilla resources are decoded once per JVM (render daemon), see ModelCache
+		boolean vanilla = path.startsWith("assets/minecraft/");
+		JsonObject o = vanilla ? dev.t3craft.tools.render.ModelCache.json(path) : null;
+		if (o == null) {
+			try (InputStream in = loader.getResourceAsStream(path)) {
+				if (in != null) {
+					o = JsonParser.parseReader(new InputStreamReader(in, StandardCharsets.UTF_8)).getAsJsonObject();
+				}
+			} catch (IOException | RuntimeException e) {
+				o = null;
 			}
-		} catch (IOException | RuntimeException e) {
-			o = null;
+			if (o != null && vanilla) {
+				dev.t3craft.tools.render.ModelCache.putJson(path, o);
+			}
 		}
 		json.put(path, o);
 		return o;
@@ -166,6 +173,14 @@ final class BlockModels {
 			return t;
 		}
 		String[] p = split(id);
+		// vanilla textures are decoded once per JVM (render daemon), see ModelCache
+		boolean vanilla = "minecraft".equals(p[0]);
+		dev.t3craft.tools.render.ModelCache.Pixels shared = vanilla ? dev.t3craft.tools.render.ModelCache.texture(id) : null;
+		if (shared != null) {
+			t = new Texture(shared.w(), shared.h(), shared.px());
+			textures.put(id, t);
+			return t;
+		}
 		t = MISSING;
 		try (InputStream in = loader.getResourceAsStream("assets/" + p[0] + "/textures/" + p[1] + ".png")) {
 			if (in != null) {
@@ -175,6 +190,9 @@ final class BlockModels {
 				int[] px = new int[w * h];
 				img.getRGB(0, 0, w, h, px, 0, w);
 				t = new Texture(w, h, px);
+				if (vanilla) {
+					dev.t3craft.tools.render.ModelCache.putTexture(id, new dev.t3craft.tools.render.ModelCache.Pixels(w, h, px));
+				}
 			}
 		} catch (IOException e) {
 			t = MISSING;

@@ -23,9 +23,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import javax.imageio.ImageIO;
-import net.minecraft.SharedConstants;
 import net.minecraft.core.BlockPos;
-import net.minecraft.server.Bootstrap;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -63,6 +61,17 @@ public final class HqRender {
 	}
 
 	public static void main(String[] args) throws Exception {
+		// vanilla registries + the mod's blocks, once per JVM (the render daemon boots once and then calls run)
+		dev.t3craft.tools.render.Boot.boot();
+		run(args);
+	}
+
+	/**
+	 * One render, with the options documented above, on an already booted JVM ({@code dev.t3craft.tools.render.Boot.boot()}). Leaves no
+	 * state behind except {@code --vanilla}'s fixtures switch, which the caller restores
+	 * ({@link HqFixtures#active()} before, {@link HqFixtures#use} after).
+	 */
+	public static void run(String[] args) throws Exception {
 		Path out = Path.of("build/hq-render");
 		String styleId = null;
 		List<String> only = new ArrayList<>();
@@ -92,11 +101,7 @@ public final class HqRender {
 				default -> throw new IllegalArgumentException("unknown option " + args[i]);
 			}
 		}
-		SharedConstants.tryDetectVersion();
-		Bootstrap.bootStrap();
-		if (!vanilla) {
-			dev.t3craft.blocks.RenderBlocks.install();
-		} else {
+		if (vanilla) {
 			HqFixtures.use(null);
 		}
 		if (packs != null) {
