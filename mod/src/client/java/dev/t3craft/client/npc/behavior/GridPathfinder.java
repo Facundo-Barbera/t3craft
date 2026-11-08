@@ -45,6 +45,10 @@ public final class GridPathfinder {
 	private final Walkable ground;
 	private final LongPredicate blocked;
 	private final Long2DoubleOpenHashMap floorCache = new Long2DoubleOpenHashMap();
+	/** fix/crew-route-stutter: search limits of this finder (the NPC defaults, or tighter for the builders). */
+	private final int startPad;
+	private final int maxPad;
+	private final int maxNodes;
 
 	public GridPathfinder(Walkable ground) {
 		this(ground, k -> false);
@@ -52,8 +56,20 @@ public final class GridPathfinder {
 
 	/** {@code blocked}: packed cells ({@link #pack}) not to enter (besides start and goal). */
 	public GridPathfinder(Walkable ground, LongPredicate blocked) {
+		this(ground, blocked, PAD, MAX_PAD, MAX_NODES);
+	}
+
+	/**
+	 * fix/crew-route-stutter: a finder with its own limits: box of {@code pad} blocks around both ends,
+	 * grown up to {@code maxPad} ({@code maxPad == pad}: never grows), at most {@code maxNodes}
+	 * expanded nodes per search.
+	 */
+	public GridPathfinder(Walkable ground, LongPredicate blocked, int pad, int maxPad, int maxNodes) {
 		this.ground = ground;
 		this.blocked = blocked;
+		this.startPad = pad;
+		this.maxPad = Math.max(pad, maxPad);
+		this.maxNodes = maxNodes;
 	}
 
 	record Cell(int x, int y, int z) {
@@ -150,7 +166,7 @@ public final class GridPathfinder {
 	 */
 	public @Nullable List<Pos> find(Pos from, Pos to, @Nullable Pos avoid) {
 		Search s = search(from, to, avoid);
-		s.run(MAX_NODES);
+		s.run(maxNodes);
 		return s.status() == Status.FOUND ? s.path() : null;
 	}
 
@@ -171,7 +187,7 @@ public final class GridPathfinder {
 		private int maxX;
 		private int minZ;
 		private int maxZ;
-		private int pad = PAD;
+		private int pad = startPad;
 		/** Expanded nodes with a neighbour outside the box: searched on when the box grows. */
 		private final List<Node> edge = new ArrayList<>();
 		private int expanded;
@@ -191,10 +207,10 @@ public final class GridPathfinder {
 				minX = maxX = minZ = maxZ = 0;
 				return;
 			}
-			minX = Math.min(start.x, goal.x) - PAD;
-			maxX = Math.max(start.x, goal.x) + PAD;
-			minZ = Math.min(start.z, goal.z) - PAD;
-			maxZ = Math.max(start.z, goal.z) + PAD;
+			minX = Math.min(start.x, goal.x) - startPad;
+			maxX = Math.max(start.x, goal.x) + startPad;
+			minZ = Math.min(start.z, goal.z) - startPad;
+			maxZ = Math.max(start.z, goal.z) + startPad;
 			if (start.equals(goal)) {
 				status = Status.FOUND;
 				cells = List.of(start);
@@ -236,14 +252,14 @@ public final class GridPathfinder {
 			int used = 0;
 			Cell g = goal;
 			while (status == Status.RUNNING && used < budget) {
-				if (open.isEmpty() && !edge.isEmpty() && pad < MAX_PAD && expanded < MAX_NODES) {
+				if (open.isEmpty() && !edge.isEmpty() && pad < maxPad && expanded < maxNodes) {
 					grow();
 				}
-				if (open.isEmpty() || expanded >= MAX_NODES) {
+				if (open.isEmpty() || expanded >= maxNodes) {
 					status = Status.NONE;
 					reason = open.isEmpty()
 							? "unreachable within x " + minX + ".." + maxX + ", z " + minZ + ".." + maxZ + " (" + expanded + " cells searched)"
-							: "gave up after " + MAX_NODES + " cells";
+							: "gave up after " + maxNodes + " cells";
 					break;
 				}
 				Node n = open.poll();
@@ -271,7 +287,7 @@ public final class GridPathfinder {
 		private void grow() {
 			Cell s = Objects.requireNonNull(start);
 			Cell g = Objects.requireNonNull(goal);
-			pad = Math.min(MAX_PAD, pad * 3);
+			pad = Math.min(maxPad, pad * 3);
 			minX = Math.min(s.x, g.x) - pad;
 			maxX = Math.max(s.x, g.x) + pad;
 			minZ = Math.min(s.z, g.z) - pad;

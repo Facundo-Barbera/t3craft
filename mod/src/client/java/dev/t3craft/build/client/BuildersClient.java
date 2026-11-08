@@ -77,6 +77,8 @@ public final class BuildersClient implements ClientModInitializer, BuildService 
 	private int nextEntityId = -2_000_000;
 
 	private final BuildManager manager = new BuildManager();
+	/** fix/crew-route-stutter: builder walk routes (snapshot + background A*, per-tick budget). */
+	private final CrewRoutes routes = new CrewRoutes();
 	private final Queue<Event> events = new ConcurrentLinkedQueue<>();
 	private final List<BuildCrew> crews = new ArrayList<>();
 	private volatile @Nullable MinecraftServer server;
@@ -167,7 +169,7 @@ public final class BuildersClient implements ClientModInitializer, BuildService 
 			resetLevel(lvl);
 		}
 		Vec3 viewer = mc.player.position();
-		BuildCrew crew = new BuildCrew(label, lvl, BuildJob.boundsOf(plan, origin, rotation), crewSize, viewer, () -> nextEntityId--,
+		BuildCrew crew = new BuildCrew(label, lvl, BuildJob.boundsOf(plan, origin, rotation), crewSize, viewer, () -> nextEntityId--, routes,
 				() -> manager.submit(label, dimension, origin, rotation, plan, blocksPerTick, jobCost, wrap,
 						BuildBudget.global().tuning().frontsFor(crewSize), BuildPlanner.CREW));
 		crews.add(crew);
@@ -212,6 +214,7 @@ public final class BuildersClient implements ClientModInitializer, BuildService 
 		if (any) {
 			dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_CREW_EVENTS, t0);
 		}
+		routes.tick(); // timed as crew.route (fix/crew-route-stutter)
 		Iterator<BuildCrew> it = crews.iterator();
 		while (it.hasNext()) {
 			BuildCrew crew = it.next();
@@ -260,6 +263,7 @@ public final class BuildersClient implements ClientModInitializer, BuildService 
 		}
 		crews.clear();
 		events.clear();
+		routes.clear();
 		level = lvl;
 	}
 

@@ -273,6 +273,10 @@ public final class PerfStats {
 	public static final String STEP_CREW_DESPAWN = "step.crew.despawn.ns";
 	/** Client: build events of the tick applied to the crews (walk routes included). */
 	public static final String STEP_CREW_EVENTS = "step.crew.events.ns";
+	/** Client (fix/crew-route-stutter): builder routes of the tick (results applied, stretch snapshots copied). */
+	public static final String STEP_CREW_ROUTE = "step.crew.route.ns";
+	/** Async (fix/crew-route-stutter): one builder A* over a snapshot, on the route worker. */
+	public static final String STEP_CREW_ROUTE_ASYNC = "step.crew.route_async.ns";
 	/** Client: HQ presence installed (NPC anchors, stations, fixture bindings). */
 	public static final String STEP_PRESENCE = "step.hq.presence.ns";
 	/** Async: HQ presence sources built ({@code HqWorldAnchors}, {@code HqStations}, {@code HqBindings}). */

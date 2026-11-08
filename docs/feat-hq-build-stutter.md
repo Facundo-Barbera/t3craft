@@ -79,10 +79,49 @@ Steps (`step.<name>`):
 | `hq.load` | server | HQ construction created (world load) |
 | `site.expand`, `site.claim` | server | site expansion start; cell claims |
 | `site.plan_async` | worker | site module / writes → crew plan |
-| `crew.spawn`, `crew.despawn`, `crew.events` | client | builders appearing / leaving; build events (walk routes) |
+| `crew.spawn`, `crew.despawn`, `crew.events` | client | builders appearing / leaving; build events (cheap checks only since fix/crew-route-stutter) |
+| `crew.route` | client | builder routes of the tick: results applied, stretch snapshots copied (budgeted) |
+| `crew.route_async` | worker | one builder A* over a snapshot |
 | `hq.presence`, `hq.presence_async` | client / worker | HQ presence installed / prepared |
 | `npc.reconcile`, `stations.tick` | client | NPC spawns; workstation tick |
 
 How to check in game: `/t3dev perf reset`, let the builders start and finish a part (or `/t3craft hq
 build`), then run `/t3dev perf steps`. Nothing should be red. If something is red, the log line names
 the step and the thread.
+
+## Builder walk routes off the render thread (fix/crew-route-stutter)
+
+Measured in game with `/t3dev perf steps`: `crew.events` on the Render thread took 180–375 ms, often
+~900 ms and once 3.6 s while the builders worked. Cause: `BuildCrew.walking()` built a
+`GridPathfinder(Collision.of(level))` and ran a full A* over the live `ClientLevel` for every walk
+event. Since fix/hq-builders-independent (`CrewCursor` picks targets at run time, bursts, steals) there
+are many walk events per tick, and an unreachable goal (a virtual scaffold spot, a cell not built yet)
+made the A* search its whole box (grown to 144 blocks, 48k nodes by fix/hq-npc-spawn) before it fell
+back to a straight line.
+
+What changed (client animation only; `CrewCursor` and the server build logic are untouched):
+
+1. **No A* when it cannot help** (`BuildCrew.walking`, cheap checks on the client thread):
+   - a walk faster than the leap pace even in a straight line (`LEAP_SPEED`, the "too long for the
+     walk ticks" case): the builder leaps, no route;
+   - goal within 3 blocks (`DIRECT_RANGE`) with a clear straight line for the body: walk straight;
+   - goal or start without built ground in its column (scaffold spot, cell not built yet): straight
+     line, as the old no-route fallback.
+2. **Bounded A***: `GridPathfinder` takes its own limits (new constructor; the NPC defaults are
+   unchanged). Builders search a box of 3 blocks around the stretch, growing to 6 at most, and expand
+   at most 1,500 nodes (`CrewRoutes.MAX_NODES`); past that, straight line (or a leap if it is too far).
+3. **Budget per tick** (`CrewRoutes.tick`, called once per client tick from `BuildersClient`): at most 3
+   snapshots and 9,000 copied cells per tick for every crew together, at most 6 searches on the worker.
+   Orders are coalesced per builder: a new walk event replaces the pending one, and a result that comes
+   back for an older order is dropped. While waiting the builder keeps its current walk.
+4. **Background A***: the collision of the stretch box (the ends ± 6 blocks, 2 below / 3 above) is
+   copied on the client thread into `SnapshotBlocks` (immutable arrays), and the A* runs on one daemon
+   worker (`t3craft-crew-route`) over that copy. The `ClientLevel` is never read off the client thread.
+   Results are applied on a later tick, with the walk ticks left (`ticks - elapsed`); a stretch bigger
+   than 9,000 cells is not searched (straight line).
+5. **Cache**: the same start and goal cells reuse the route found within the last 20 ticks (LRU of 64).
+
+Metrics: `crew.events` (should stay ≪ 2 ms), `crew.route` (client side of the routes: snapshots +
+applying), `crew.route_async` (worker). Counters: `crew.route.searches`, `crew.route.nodes`,
+`crew.route.failed`, `crew.route.skipped` (stretch too big), `crew.route.cache_hits`,
+`crew.route.replaced` (orders coalesced).
