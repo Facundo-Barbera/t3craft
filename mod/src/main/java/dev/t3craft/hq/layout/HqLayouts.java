@@ -21,7 +21,8 @@ import org.jspecify.annotations.Nullable;
  *   <li>{@code vertical}: towers with an atrium and skybridges;</li>
  *   <li>{@code ensanche}: blocks with patios on a street grid;</li>
  *   <li>{@code village}: a hill village on terraces;</li>
- *   <li>{@code hybrid-ringcampus}: a ringed citadel whose sectors are campus barrios.</li>
+ *   <li>{@code hybrid-ringcampus}: a ringed citadel whose sectors are campus barrios;</li>
+ *   <li>{@code hybrid-towncenter}: town centre with towers (ensanche blocks, civic plaza, towers and skybridges).</li>
  * </ul>
  *
  * <p>The choice lives in {@code config/t3craft.json} as the top-level key {@value #CONFIG_KEY}
@@ -41,6 +42,7 @@ public final class HqLayouts {
 	public static final String ENSANCHE = "ensanche";
 	public static final String VILLAGE = "village";
 	public static final String HYBRID_RINGCAMPUS = "hybrid-ringcampus";
+	public static final String HYBRID_TOWNCENTER = "hybrid-towncenter";
 
 	private static final List<HqLayoutInfo> ALL = List.of(
 			info(CLASSIC, false),
@@ -49,7 +51,8 @@ public final class HqLayouts {
 			info(VERTICAL, false),
 			info(ENSANCHE, false),
 			info(VILLAGE, false),
-			info(HYBRID_RINGCAMPUS, false));
+			info(HYBRID_RINGCAMPUS, false),
+			info(HYBRID_TOWNCENTER, false));
 
 	private HqLayouts() {
 	}
@@ -58,7 +61,7 @@ public final class HqLayouts {
 		return new HqLayoutInfo(id, "t3craft.hq.layout." + id + ".name", "t3craft.hq.layout." + id + ".desc", large);
 	}
 
-	/** Every layout, in menu order: classic, campus, ring, vertical, ensanche, village, hybrid-ringcampus. */
+	/** Every layout, in menu order: classic, campus, ring, vertical, ensanche, village, hybrid-ringcampus, hybrid-towncenter. */
 	public static List<HqLayoutInfo> all() {
 		return ALL;
 	}

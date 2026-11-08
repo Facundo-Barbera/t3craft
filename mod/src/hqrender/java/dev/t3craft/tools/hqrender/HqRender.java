@@ -47,6 +47,7 @@ import net.minecraft.world.level.block.state.BlockState;
  * with their own layout, e.g. {@code --style campus}, which also renders a 4 → 10 → 20 comparison).
  * PNGs over 480 KB are written again with a 256-colour palette.
  * {@code --style village} renders the village layout (layout/village, {@link VillageRender}).
+ * {@code --style hybrid-towncenter} renders the town centre with towers ({@link TowncenterRender}).
  * {@code --layout ID} (feat/hq-layouts: classic, campus, ring, vertical, ensanche, village or all) renders a
  * registered layout through the game's pipeline with {@code --projects} (default 4), see {@link LayoutViews};
  * {@code --layout hybrid-ringcampus} renders that hybrid's own gallery ({@link RingCampusViews}, default 4,10,20).
@@ -116,6 +117,14 @@ public final class HqRender {
 		Files.createDirectories(out);
 		BlockModels models = new BlockModels();
 		String sid = style.id();
+		if (sid.equals(dev.t3craft.hq.TowncenterGrid.ID)) {
+			// design/hybrid-towncenter: town centre with towers (TowncenterRender)
+			TowncenterRender.render(models, style, out, only, ss, npcs);
+			for (String p : models.problems) {
+				System.out.println("note: " + p);
+			}
+			return;
+		}
 		if (HqStyles.towns().contains(style)) {
 			TownRender.render(models, style, out, only, ss, npcs);
 			for (String p : models.problems) {

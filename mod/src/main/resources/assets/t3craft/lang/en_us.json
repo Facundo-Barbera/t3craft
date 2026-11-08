@@ -253,5 +253,7 @@
 	"t3craft.actions.field.name": "Name (optional)",
 	"t3craft.actions.field.create_missing": "Create the folder if missing: %s",
 	"t3craft.hq.layout.hybrid-ringcampus.name": "Ringed citadel",
-	"t3craft.hq.layout.hybrid-ringcampus.desc": "A ringed citadel: a vaulted hub over a sunken patio, rings of barrios round their courtyards, special rooms on the nodes."
+	"t3craft.hq.layout.hybrid-ringcampus.desc": "A ringed citadel: a vaulted hub over a sunken patio, rings of barrios round their courtyards, special rooms on the nodes.",
+	"t3craft.hq.layout.hybrid-towncenter.name": "Town centre with towers",
+	"t3craft.hq.layout.hybrid-towncenter.desc": "Ensanche blocks round a civic plaza; busy projects grow up as corner towers joined by skybridges."
 }

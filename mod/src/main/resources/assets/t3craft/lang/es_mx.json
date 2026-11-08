@@ -253,5 +253,7 @@
 	"t3craft.actions.field.name": "Nombre (opcional)",
 	"t3craft.actions.field.create_missing": "Crear la carpeta si no existe: %s",
 	"t3craft.hq.layout.hybrid-ringcampus.name": "Ciudadela en anillos",
-	"t3craft.hq.layout.hybrid-ringcampus.desc": "Ciudadela en anillos: hub abovedado sobre un patio hundido, anillos de barrios con patio y salas especiales en los nodos."
+	"t3craft.hq.layout.hybrid-ringcampus.desc": "Ciudadela en anillos: hub abovedado sobre un patio hundido, anillos de barrios con patio y salas especiales en los nodos.",
+	"t3craft.hq.layout.hybrid-towncenter.name": "Centro urbano con torres",
+	"t3craft.hq.layout.hybrid-towncenter.desc": "Manzanas con patio alrededor de una plaza cívica; los proyectos grandes crecen en torres de esquina unidas por puentes."
 }

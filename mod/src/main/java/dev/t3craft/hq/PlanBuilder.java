@@ -233,6 +233,15 @@ final class PlanBuilder {
 			return module.owns(x, y, z);
 		}
 
+		/**
+		 * The state this module wrote at a cell so far, or null when this module has not written it
+		 * (read-only; hybrid-towncenter's light pass uses it before {@link #close()}).
+		 */
+		@Nullable BlockState get(int x, int y, int z) {
+			Cell c = cells.get(BlockPos.asLong(x, y, z));
+			return c != null && c.module == index ? c.placement.state() : null;
+		}
+
 		/** True when some module already wrote this cell (sparse grounds use it to skip taken cells). */
 		boolean taken(int x, int y, int z) {
 			return cells.containsKey(BlockPos.asLong(x, y, z));

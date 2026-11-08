@@ -33,10 +33,11 @@ public final class HqStyles {
 	 * Styles with their own layout ({@link HqStyle#ownLayout()}): selectable by id like the others,
 	 * but not in {@link #all()}, which lists the styles that paint the shared spine geometry.
 	 * layout/campus: {@link CampusStyle}; layout/ring: {@link RingStyle}; layout/vertical: {@link VerticalStyle};
-	 * layout/blocks: {@link EnsancheStyle}; design/hybrid-ringcampus: {@link RingCampusStyle}.
+	 * layout/blocks: {@link EnsancheStyle}; design/hybrid-ringcampus: {@link RingCampusStyle};
+	 * design/hybrid-towncenter: {@link TowncenterStyle}.
 	 */
 	private static final List<HqStyle> LAYOUTS = List.of(new CampusStyle(), new RingStyle(), new VerticalStyle(), new EnsancheStyle(),
-			new VillageStyle(), new RingCampusStyle());
+			new VillageStyle(), new RingCampusStyle(), new TowncenterStyle());
 	private static volatile @Nullable HqStyle active;
 
 	private HqStyles() {

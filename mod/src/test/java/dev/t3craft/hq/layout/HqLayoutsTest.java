@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 class HqLayoutsTest {
 	@Test
 	void orderAndIds() {
-		assertEquals(List.of("classic", "campus", "ring", "vertical", "ensanche", "village", "hybrid-ringcampus"),
+		assertEquals(List.of("classic", "campus", "ring", "vertical", "ensanche", "village", "hybrid-ringcampus", "hybrid-towncenter"),
 				HqLayouts.all().stream().map(HqLayoutInfo::id).toList());
 		assertEquals("classic", HqLayouts.DEFAULT_ID);
 		for (HqLayoutInfo i : HqLayouts.all()) {
