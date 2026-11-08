@@ -10,6 +10,7 @@ import dev.t3craft.hq.citadel.CitadelBarrios;
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.CitadelCanvas.Mats;
 import dev.t3craft.hq.citadel.CitadelHub;
+import dev.t3craft.hq.citadel.CitadelGrounds;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -110,7 +111,7 @@ final class RingCampusGenerator {
 		}
 		canvas.zones = zs;
 		for (Map.Entry<Long, Zone> e : zs.entrySet()) {
-			ground(colX(e.getKey()), colZ(e.getKey()), e.getValue());
+			CitadelGrounds.ground(canvas, colX(e.getKey()), colZ(e.getKey()), e.getValue());
 		}
 		CitadelHub.hub(canvas);
 		CitadelHub.core(canvas);
@@ -121,7 +122,7 @@ final class RingCampusGenerator {
 		for (int lot = 0; lot < lotCount; lot++) {
 			TreeMap<Integer, HqLayout.Module> mods = canvas.lots.get(lot);
 			if (mods == null) {
-				emptyLot(lot);
+				CitadelGrounds.emptyLot(canvas, lot);
 			} else {
 				CitadelBarrios.barrio(canvas, lot, mods);
 			}
@@ -133,157 +134,19 @@ final class RingCampusGenerator {
 	/** Where NPCs appear: the inner street, south, in front of the main ramp. */
 	static final BlockPos SPAWN = new BlockPos(0, 1, 38);
 
-	// ------------------------------------------------------------------ ground
-
-	private static int rampHalves(double r) {
-		return (int) Math.max(0, Math.min(2 * Y0, Math.round(RingCampusGeometry.RAMP_R - r)));
-	}
-
-	private void stepped(int x, int z, int halves, BlockState full, BlockState half) {
-		int solidTop = halves / 2;
-		canvas.fill(x, 0, solidTop, z, full);
-		if (halves % 2 == 1) {
-			canvas.set(x, solidTop + 1, z, half);
-		}
-	}
-
-	private void ground(int x, int z, Zone zn) {
-		double r = RingCampusGeometry.r(x, z);
-		switch (zn.kind()) {
-			case HUB, HUB_WALL, GALLERY -> canvas.set(x, 0, z, FOOT);
-			case BRIDGE, PATIO -> patioGround(x, z, r);
-			case RAMP -> stepped(x, z, rampHalves(r), BAMBOO, slab(Blocks.BAMBOO_MOSAIC_SLAB));
-			case TERRACE -> {
-				int h = rampHalves(r);
-				stepped(x, z, h - h % 2, FOOT, FOOT);
-				int top = h / 2;
-				canvas.set(x, top, z, (x * 7 + z * 13 & 7) == 0 ? MOSS : GRASS);
-				if (Math.floorMod(x * 31 + z * 17, dev.t3craft.hq.pack.LayoutParams.RINGCAMPUS_TERRACE_BUSH.get()) == 0 && top + 1 < 6) {
-					canvas.set(x, top + 1, z, leaves(Blocks.FLOWERING_AZALEA_LEAVES));
-				}
-			}
-			case INNER_STREET, STREET -> canvas.set(x, 0, z, lattice(x, z) ? LIGHT : ((int) Math.floor(r) % 3 == 0 ? FOOT : canvas.accent()));
-			case AVENUE -> canvas.set(x, 0, z, lattice(x, z) ? LIGHT
-					: RingCampusGeometry.radialDistance(x, z, RingCampusGeometry.lotsIn(zn.ring())) > 2.4 ? FOOT : canvas.accent());
-			case LOT -> canvas.set(x, 0, z, lattice(x, z) ? LIGHT : GRASS);
-			case NODE -> canvas.set(x, 0, z, canvas.floor());
-			case LAWN -> canvas.set(x, 0, z, GRASS);
-			default -> {
 			}
 		}
 	}
 
-	private void patioGround(int x, int z, double r) {
-		if (r > 17.5) {
-			canvas.set(x, 0, z, lattice(x, z) ? LIGHT : canvas.accent());
-		} else if (r > 15.5 && RingCampusGeometry.radialDistance(x, z, 8) > 1.2) {
-			canvas.set(x, -1, z, FOOT);
-			canvas.set(x, 0, z, WATER);
-		} else if (r > 15.5) {
-			canvas.set(x, 0, z, FOOT);
-		} else {
-			canvas.set(x, 0, z, lattice(x, z) ? LIGHT : (x + z & 3) == 0 ? MOSS : GRASS);
-		}
-	}
-
-	// ------------------------------------------------------------------ core: bridges, promenade, patio
-
-	private void bridge(int x, int z) {
-		if (canvas.at(x, Y0, z) != null) {
-			return; // patio stairs
-		}
-		canvas.set(x, Y0, z, Math.abs(x) <= 2 ? (lattice(x, z) ? LIGHT : canvas.accent()) : FOOT);
-		if (Math.abs(x) == 3) {
-			canvas.set(x, Y0 + 1, z, canvas.kit.railing(x > 0 ? Direction.EAST : Direction.WEST));
-		}
-		// arches under the deck: a lintel course and piers
-		canvas.set(x, Y0 - 1, z, Math.abs(z) % 4 == 1 || Math.abs(x) == 3 ? FOOT : AIR);
-		if (Math.abs(z) % 4 == 1 && Math.abs(x) == 3) {
-			canvas.fill(x, 1, Y0 - 2, z, FOOT);
 		}
 	}
 
 	/**
-	 * The elevated ring: a deck at the podium level over a solid plinth, a railing on the patio side,
-	 * light posts (log and a light block) round the outer edge between the ramps.
-	 */
-	private void promenade(int x, int z, double r, boolean stairHead) {
-		if (canvas.at(x, Y0, z) != null) {
-			return; // the top step of a patio stair
-		}
-		canvas.fill(x, 1, Y0 - 1, z, r <= RingCampusGeometry.PATIO_R + 1.2 && Math.floorMod(x * 3 + z * 7, 9) == 0 ? canvas.kit.wallPanel(true) : FOOT);
-		canvas.set(x, Y0, z, lattice(x, z) ? LIGHT : (r > RingCampusGeometry.GALLERY_R - 1 ? FOOT : canvas.floor()));
-		boolean inner = r <= RingCampusGeometry.PATIO_R + 1.2;
-		if (inner && Math.abs(x) > 3 && !stairHead) {
-			Direction edge = RingCampusGeometry.cardinal(RingCampusGeometry.theta(x, z)).getOpposite();
-			canvas.set(x, Y0 + 1, z, canvas.kit.railing(edge));
-		}
-		if (r > RingCampusGeometry.GALLERY_R - 1 && RingCampusGeometry.radialDistance(x, z, 16) < 0.5
-				&& RingCampusGeometry.radialDistance(x, z, 8) > 5) {
-			canvas.fill(x, Y0 + 1, Y0 + 2, z, LOG);
-			canvas.set(x, Y0 + 3, z, LIGHT);
-		}
-	}
-
-	private void patio(int x, int z, double r) {
-		if (canvas.at(x, 1, z) != null) {
-			return; // stairs
-		}
-		for (int k = 0; k < 8; k++) {
-			double a = (k + 0.5) * Math.PI / 4;
-			BlockPos t = RingCampusGeometry.polar(19.3, a, 0);
-			int dx = x - t.getX();
-			int dz = z - t.getZ();
-			if (dx == 0 && dz == 0) {
-				canvas.fill(x, 1, 4, z, LOG);
-				canvas.set(x, 5, z, leaves(Blocks.CHERRY_LEAVES));
-				canvas.set(x, 6, z, leaves(Blocks.CHERRY_LEAVES));
-			} else if (Math.abs(dx) <= 2 && Math.abs(dz) <= 2 && Math.abs(dx) + Math.abs(dz) <= 3) {
-				canvas.set(x, 5, z, leaves(Blocks.CHERRY_LEAVES));
-				if (Math.abs(dx) + Math.abs(dz) <= 1) {
-					canvas.set(x, 6, z, leaves(Blocks.CHERRY_LEAVES));
-				}
-			}
-		}
-		if (r <= 15.5 && Math.floorMod(x * 5 + z * 3, 11) == 0 && canvas.at(x, 0, z) != LIGHT) {
-			canvas.set(x, 1, z, Math.floorMod(x + z, 2) == 0 ? b(Blocks.FLOWERING_AZALEA) : canvas.kit.gardenPlanter());
 		}
 	}
 
 	// ------------------------------------------------------------------ barrios
 
-	private void emptyLot(int lot) {
-		Lot l = RingCampusGeometry.lot(lot);
-		for (long c : canvas.lotCols.getOrDefault(lot, List.of())) {
-			int x = colX(c);
-			int z = colZ(c);
-			if (Math.floorMod(x * 7 + z * 11, 29) == 0 && !lattice(x, z)) {
-				canvas.set(x, 1, z, leaves(Blocks.FLOWERING_AZALEA_LEAVES));
-			}
-		}
-		tree(l.centre().getX(), l.centre().getZ());
-	}
-
-	/** A cherry tree (trunk 4, canopy from y = 4) on a ground cell. */
-	private void tree(int x, int z) {
-		canvas.fill(x, 1, 4, z, LOG);
-		for (int dx = -2; dx <= 2; dx++) {
-			for (int dz = -2; dz <= 2; dz++) {
-				int m = Math.abs(dx) + Math.abs(dz);
-				if (m == 0 || m > 2) {
-					continue;
-				}
-				if (canvas.at(x + dx, 1, z + dz) != null && canvas.at(x + dx, 1, z + dz) != AIR) {
-					continue; // a bush underneath: keep the canopy off it
-				}
-				canvas.set(x + dx, 4, z + dz, leaves(Blocks.CHERRY_LEAVES));
-				if (m == 1) {
-					canvas.set(x + dx, 5, z + dz, leaves(Blocks.CHERRY_LEAVES));
-				}
-			}
-		}
-		canvas.set(x, 5, z, leaves(Blocks.CHERRY_LEAVES));
-		canvas.set(x, 6, z, leaves(Blocks.CHERRY_LEAVES));
 	}
 
 	// ------------------------------------------------------------------ groups
