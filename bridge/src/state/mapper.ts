@@ -14,25 +14,26 @@ export type ShellForMapping = Pick<
   | "pendingBackgroundTasks"
 >;
 
-const WORKING_STATUSES: ReadonlySet<string> = new Set(["queued", "preparing", "starting", "running"]);
+/** T3's LIVE_SHELL_STATUSES: `waiting` is a live run (tool, thread_wait, subagents, background work). */
+const WORKING_STATUSES: ReadonlySet<string> = new Set(["queued", "preparing", "starting", "running", "waiting"]);
 
 /**
  * ThreadShell → state, first match wins:
- * 1. needs_attention: a blocking `pendingRuntimeRequest` (`blocking !== false`), `status === "waiting"`,
- *    an actionable proposed plan, or guest messages waiting for the owner.
- * 2. working: `activityRunStatus` set, `status` in queued/preparing/starting/running, or pending
- *    background tasks.
+ * 1. needs_attention: a blocking `pendingRuntimeRequest` (`blocking !== false`, any kind: approval,
+ *    `user_input`, `dynamic_tool_call`, `auth_refresh`), an actionable proposed plan, or guest messages
+ *    waiting for the owner.
+ * 2. working: `activityRunStatus` set, `status` in queued/preparing/starting/running/waiting, or
+ *    pending background tasks.
  * 3. error: `status === "failed"`.
  * 4. done: `status === "completed"`.
  * 5. idle: everything else (`idle`, `interrupted`, `cancelled`, `rolled_back`).
  *
- * Note: T3's own awareness UI treats `waiting` as running; t3craft deliberately surfaces it as
- * needs_attention (decision in docs/plan.md §1.4).
+ * `waiting` alone is working, as in T3 Code: the run waits on a tool, a thread_wait, subagents or
+ * background tasks, not on the user. Only the blocking request needs them (docs/plan.md §1.4).
  */
 export const mapThreadState = (t: ShellForMapping): ThreadState => {
   const pending = t.pendingRuntimeRequest;
   if (pending !== null && pending.blocking !== false) return "needs_attention";
-  if (t.status === "waiting") return "needs_attention";
   if (t.hasActionableProposedPlan) return "needs_attention";
   if ((t.pendingGuestMessageCount ?? 0) > 0) return "needs_attention";
 
