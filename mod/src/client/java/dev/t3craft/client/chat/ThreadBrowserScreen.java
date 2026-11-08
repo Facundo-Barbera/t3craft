@@ -99,6 +99,7 @@ public final class ThreadBrowserScreen extends Screen {
 
 	@Override
 	public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+		// event.button() is MouseButtons.LEFT/RIGHT (1/3 in Minecraft 26.x), passed through as is
 		if (browser != null && browser.mouseClicked(event.x(), event.y(), event.button())) {
 			return true;
 		}
