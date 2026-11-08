@@ -246,12 +246,29 @@ public final class NpcRegistry {
 	@SuppressWarnings({"rawtypes", "unchecked"})
 	private void validate(@Nullable ClientLevel lvl) {
 		boolean purged = false;
+		// fix/npc-position-reset: a bad entry costs only its own NPC. Resetting the whole behaviour
+		// director here put every NPC back on its spot (fresh brains snap) whenever one entry was off.
+		boolean corrupt = false;
+		List<String> lost = new ArrayList<>();
 		for (java.util.Iterator<Map.Entry> it = ((Map) spawned).entrySet().iterator(); it.hasNext(); ) {
 			Map.Entry e = it.next();
 			Object v = e.getValue();
 			if (e.getKey() instanceof String && v instanceof Spawned s && s.avatar() != null && s.panel() != null
 					&& !s.avatar().isRemoved() && !s.panel().isRemoved()) {
 				continue;
+			}
+			if (e.getKey() instanceof String id) {
+				lost.add(id);
+			} else {
+				corrupt = true;
+			}
+			if (v instanceof Spawned s) {
+				if (s.avatar() != null) {
+					npcByEntityId.remove(s.avatar().getId());
+				}
+				if (s.panel() != null) {
+					npcByEntityId.remove(s.panel().getId());
+				}
 			}
 			discard(lvl, v);
 			it.remove();
@@ -271,6 +288,7 @@ public final class NpcRegistry {
 			if (!(e.getKey() instanceof Integer) || !(e.getValue() instanceof String)) {
 				it.remove();
 				purged = true;
+				corrupt = true;
 			}
 		}
 		for (java.util.Iterator<Map.Entry> it = ((Map) wanted).entrySet().iterator(); it.hasNext(); ) {
@@ -278,13 +296,43 @@ public final class NpcRegistry {
 			if (!(e.getKey() instanceof String) || !(e.getValue() instanceof NpcInfo)) {
 				it.remove();
 				purged = true;
+				corrupt = true;
 			}
 		}
 		if (purged) {
-			// Behaviour overlays share our id range; drop them first so the sweep does not orphan them.
-			behavior.reset(lvl);
+			if (corrupt) {
+				// Stale objects from older code (hot-swap): nothing can be trusted, rebuild everything.
+				// Behaviour overlays share our id range; drop them first so the sweep does not orphan them.
+				behavior.reset(lvl);
+			} else {
+				// Only the lost NPCs respawn (with a fresh brain); the others keep brain, route and state.
+				lost.forEach(id -> behavior.forget(id, lvl));
+			}
 			sweep(lvl);
 			dirty = true;
+		}
+	}
+
+	/**
+	 * fix/npc-position-reset: what one reconcile does. Only {@code added} get a new entity and brain,
+	 * only {@code removed} lose theirs; {@code kept} keep entity, brain, route and overlays untouched.
+	 */
+	record RosterDiff(List<String> added, List<String> removed, List<String> kept) {
+		static RosterDiff of(java.util.Collection<String> spawnedIds, java.util.Collection<String> wantedIds) {
+			java.util.Set<String> want = new java.util.LinkedHashSet<>(wantedIds);
+			java.util.Set<String> have = new java.util.LinkedHashSet<>(spawnedIds);
+			List<String> added = new ArrayList<>();
+			List<String> kept = new ArrayList<>();
+			for (String id : want) {
+				(have.contains(id) ? kept : added).add(id);
+			}
+			List<String> removed = new ArrayList<>();
+			for (String id : have) {
+				if (!want.contains(id)) {
+					removed.add(id);
+				}
+			}
+			return new RosterDiff(List.copyOf(added), List.copyOf(removed), List.copyOf(kept));
 		}
 	}
 
@@ -439,18 +487,18 @@ public final class NpcRegistry {
 	}
 
 	private void reconcile(ClientLevel lvl, Vec3 a) {
-		// Remove NPCs no longer wanted.
-		for (String id : new ArrayList<>(spawned.keySet())) {
-			if (!wanted.containsKey(id)) {
-				Spawned s = spawned.remove(id);
-				behavior.forget(id, lvl);
-				npcByEntityId.remove(s.avatar().getId());
-				npcByEntityId.remove(s.panel().getId());
-				panelText.remove(id);
-				detail.remove(id);
-				lvl.removeEntity(s.avatar().getId(), Entity.RemovalReason.DISCARDED);
-				lvl.removeEntity(s.panel().getId(), Entity.RemovalReason.DISCARDED);
-			}
+		// Incremental (fix/npc-position-reset): only NPCs no longer wanted go, only new ones spawn below;
+		// the others keep their entity (where it stands), brain and overlays.
+		RosterDiff diff = RosterDiff.of(spawned.keySet(), wanted.keySet());
+		for (String id : diff.removed()) {
+			Spawned s = spawned.remove(id);
+			behavior.forget(id, lvl);
+			npcByEntityId.remove(s.avatar().getId());
+			npcByEntityId.remove(s.panel().getId());
+			panelText.remove(id);
+			detail.remove(id);
+			lvl.removeEntity(s.avatar().getId(), Entity.RemovalReason.DISCARDED);
+			lvl.removeEntity(s.panel().getId(), Entity.RemovalReason.DISCARDED);
 		}
 
 		// Provisional desks: stable grid cells, one block of desks per neighbourhood.

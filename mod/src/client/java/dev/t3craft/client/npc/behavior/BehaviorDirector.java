@@ -16,6 +16,7 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Display;
 import net.minecraft.world.entity.Entity;
@@ -64,6 +65,8 @@ public final class BehaviorDirector {
 	private final Map<String, NpcBrain> brains = new HashMap<>();
 	private final Map<String, Overlay> overlays = new HashMap<>();
 	private AnchorSource anchors = AnchorSource.NONE;
+	/** The source before the last {@link #setAnchorSource}, until the next tick diffs it; null = no change pending. */
+	private @Nullable AnchorSource anchorsBefore;
 	private SummarySource summaries = SummarySource.ACTIVITY;
 	/** Client-only entity ids for bubbles and icons, far from the registry's range. */
 	private int nextClientId = -3_000_000;
@@ -78,17 +81,59 @@ public final class BehaviorDirector {
 	/** Settled NPCs going home (item 22); null value = requested, starts next tick. Lazy: hot-swap safe. */
 	private @Nullable Map<String, @Nullable Departure> departures;
 
-	/** Plug in a physical base (null = none, grid layout only). See {@link AnchorSource}. */
+	/**
+	 * Plug in a physical base (null = none, grid layout only). See {@link AnchorSource}.
+	 *
+	 * <p>fix/npc-position-reset: a new source (a thread joined, the HQ grew a desk, the base moved)
+	 * never resets the NPCs. Learnt routes are dropped (the world changed), but on the next tick only
+	 * the NPCs whose own spots moved, or that were waiting out a "no route", re-plan; they walk from
+	 * where they stand. Everyone else keeps brain, route and state untouched.
+	 */
 	public void setAnchorSource(@Nullable AnchorSource source) {
-		this.anchors = source == null ? AnchorSource.NONE : source;
-		// The base was built, grew, moved or went away: routes, misses and blocked spots learnt in the
-		// old world are wrong now, and an NPC waiting out a "no route" must try again right away.
+		AnchorSource now = source == null ? AnchorSource.NONE : source;
+		if (now == anchors) {
+			return;
+		}
+		if (anchorsBefore == null) {
+			anchorsBefore = anchors; // compared against the new one on the next tick
+		}
+		this.anchors = now;
 		if (navigation != null) {
 			navigation.invalidate();
 		}
-		for (NpcBrain b : brains.values()) {
-			b.replan();
+	}
+
+	/**
+	 * Re-plans only the NPCs a change of anchors affects: their desk, home or rest spot moved (or
+	 * appeared/vanished), or they were waiting out a failed route (the world changed: try again now).
+	 * Returns the ids told to re-plan. Pure over the brains; package-private for tests.
+	 */
+	static Set<String> replanAffected(Map<String, NpcBrain> brains, Map<String, String> groupOf, AnchorSource before, AnchorSource after) {
+		Set<String> out = new HashSet<>();
+		for (Map.Entry<String, NpcBrain> e : brains.entrySet()) {
+			String id = e.getKey();
+			String group = groupOf.get(id);
+			if (group == null) {
+				continue;
+			}
+			if (spotsMoved(before, after, id, group) || e.getValue().waitingForRoute()) {
+				e.getValue().replan();
+				out.add(id);
+			}
 		}
+		return out;
+	}
+
+	static boolean spotsMoved(AnchorSource before, AnchorSource after, String id, String group) {
+		return moved(before.desk(id, group), after.desk(id, group)) || moved(before.home(group), after.home(group))
+				|| moved(before.rest(id, group), after.rest(id, group));
+	}
+
+	private static boolean moved(@Nullable Anchor a, @Nullable Anchor b) {
+		if (a == null || b == null) {
+			return a != b;
+		}
+		return a.pos().distSqr(b.pos()) > 0.25 || Math.abs(Mth.wrapDegrees(a.yaw() - b.yaw())) > 1f;
 	}
 
 	/** Plug in the speech-bubble text (null = {@link SummarySource#ACTIVITY}). */
@@ -162,6 +207,7 @@ public final class BehaviorDirector {
 		brains.clear();
 		departures().clear();
 		approaches.reset();
+		anchorsBefore = null;
 		navigation = null;
 		navigationLevel = null;
 	}
@@ -182,6 +228,15 @@ public final class BehaviorDirector {
 		Anchor entrance = layout.exit();
 		nav.setVia(entrance == null ? null : entrance.pos());
 		Pos playerPos = pos(player.position());
+		AnchorSource before = anchorsBefore;
+		if (before != null) {
+			anchorsBefore = null;
+			Map<String, String> groupOf = new HashMap<>();
+			for (Body b : bodies) {
+				groupOf.put(b.id(), b.info().groupId());
+			}
+			replanAffected(brains, groupOf, new LayeredAnchors(before, fallback), layout);
+		}
 
 		// Board slots: NPCs needing attention, most urgent first.
 		Map<String, Integer> slotOf = new HashMap<>();
