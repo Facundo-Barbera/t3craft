@@ -120,13 +120,36 @@ Declared for the chat history (`chat.history` page, `chat.message` upsert, `chat
 | `hello` | `client`, `version`, `protocol: 1`, `key?` | handshake |
 | `chat.open` *(phase 2)* | `npcId` | `orchestration.subscribeThread` for that thread |
 | `chat.close` *(phase 2)* | `npcId` | drop that subscription |
-| `chat.send` *(phase 2)* | `npcId`, `text` | `dispatchCommand` `message.dispatch` |
+| `chat.send` *(phase 2)* | `npcId`, `text`, `attachments?: ChatSendImage[]` | `dispatchCommand` `message.dispatch` (images first through `assets.persistChatAttachments`) |
 | `run.interrupt` *(phase 2)* | `npcId` | `dispatchCommand` `run.interrupt` (runId = shell.activeRunId) |
 | `permission.respond` *(phase 3)* | `npcId`, `requestId`, `decision: accept\|acceptForSession\|acceptAlways\|decline\|cancel`, `feedback?` | `dispatchCommand` `runtime-request.respond` |
 | `thread.create` *(phase 4)* | `env`, `projectId`, `title`, `text` | `thread.create` / `launchThread` |
 
 Until a phase is implemented the bridge acks its messages with `ok:false, error:"not implemented"`.
 Phase 2+ write commands need an `orchestration:operate` token for that environment.
+
+### Image attachments (`chat.send.attachments`)
+
+`ChatSendImage` is T3's `UploadChatImageAttachment` (`bridge/vendor/t3-contracts/src/chatAttachment.ts`):
+
+```json
+{"type":"image","name":"shot.png","mimeType":"image/png","sizeBytes":48213,"dataUrl":"data:image/png;base64,iVBOR..."}
+```
+
+Limits (the contract's): `image/png|jpeg|gif|webp` only; `sizeBytes` ≤ 10 MiB and equal to the decoded
+data; `dataUrl` ≤ 14 000 000 characters and of type `mimeType`; `name` 1–255 characters; at most
+100 attachments and 80 MiB of images per message. T3 stores them with
+`assets.persistChatAttachments {threadId, messageId, attachments}` (scope `orchestration:operate`),
+which answers the stored `ChatAttachment`s (`{type:"image", id, name, mimeType, sizeBytes}`); those
+go into `message.dispatch.attachments` with the same `messageId`.
+
+**Who does it.** The mod, over its direct operate connection (`ChatSender`, docs/feat-t3-ui-clean.md):
+upload, then dispatch. The bridge is read-only (it holds an `orchestration:read` token) and its mod
+socket takes frames up to 256 KiB, so images never travel through it. It still validates a
+`chat.send` that carries `attachments` and acks `ok:false` with the reason: `invalid attachments: …`
+(which limit failed) or `not implemented: the bridge is read-only and cannot send messages or attach
+images …`. Without a direct connection the mod shows "Images go straight to T3 … pair it directly"
+in the composer instead of sending the text alone.
 
 ## Example session
 

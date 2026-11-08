@@ -3,6 +3,7 @@ import * as Fiber from "effect/Fiber";
 import { defaultConfigPath, loadConfig, loadDotEnv, readSecretFile } from "./config.ts";
 import { Bridge, BRIDGE_VERSION } from "./bridge.ts";
 import { startModSocket } from "./server/modSocket.ts";
+import { chatSendReply } from "./state/attachments.ts";
 
 const log = (m: string) => console.log(`${new Date().toISOString()} ${m}`);
 
@@ -23,7 +24,8 @@ const main = async () => {
     log,
     onReady: (send) => bridge.initialFrames().forEach(send),
     // TODO(phase 2): chat.open/close/send, run.interrupt. TODO(phase 3): permission.respond. TODO(phase 4): thread.create.
-    onMessage: () => "not implemented",
+    // chat.send: read-only bridge, but its attachments are validated so the mod gets a precise error.
+    onMessage: (msg) => (msg.type === "chat.send" ? chatSendReply(msg) : "not implemented"),
   });
   bridge.setBroadcast((m) => server.broadcast(m));
   log(`mod socket listening on ws://${config.listen.host.includes(":") ? `[${config.listen.host}]` : config.listen.host}:${server.port()}`);

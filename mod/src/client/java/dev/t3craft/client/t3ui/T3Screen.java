@@ -16,6 +16,7 @@ import dev.t3craft.client.chat.compose.ComposerInput;
 import dev.t3craft.client.chat.compose.ComposerView;
 import dev.t3craft.client.portable.NotificationLog;
 import dev.t3craft.client.portable.PortableClient;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -38,9 +39,16 @@ import org.jspecify.annotations.Nullable;
  * The one screen of the T3 key (Y), the T3 Terminal item and every block click (desks, monitors,
  * thread wall, NPCs): T3 Code's layout ({@code apps/web/src/components/AppSidebarLayout.tsx}) with
  * the sidebar on the left (search, project filter, "New thread", threads grouped by project with
- * state, relative time and needs-attention, archive and settings at the bottom) and the thread on the
- * right (header with title, project, state chip and actions; the conversation; the composer at the
- * bottom). Replaces the old selector ({@code PortableScreen}) + chat ({@code ThreadBrowserScreen}).
+ * state, relative time and needs-attention, settings / environments / archive icons at the bottom)
+ * and the thread on the right (header with the project › thread breadcrumb and the state chip; the
+ * conversation; the composer at the bottom). Replaces the old selector ({@code PortableScreen}) +
+ * chat ({@code ThreadBrowserScreen}).
+ *
+ * <p>feat/t3-ui-clean: thread actions live where T3 Code has them: right-click on a sidebar thread
+ * opens its menu (Settle, Snooze…, Pin/Unpin, Mark as read, Archive, Interrupt/Stop while it runs),
+ * hovering a row shows settle and pin icons, and while the thread runs the header shows a small
+ * Stop next to the state (the composer's send button turns into interrupt). No key-cap hint bar
+ * and no time separators; the keys keep working.
  *
  * <p>Pure logic lives in {@link SidebarModel} (search/filter/grouping/order), {@link T3UiLayout}
  * (geometry and hit-testing) and {@link T3UiKeys} (keyboard); the slots for the self-contained
@@ -79,13 +87,18 @@ public final class T3Screen extends Screen {
 	private boolean notifications;
 	private boolean autoSelected;
 	private int ticks;
-	private @Nullable String flash;
+	/** Right-click menu of a sidebar thread: its rows and where it opened; null = closed. */
+	private @Nullable List<T3Slots.MenuItem> contextItems;
+	private int contextX;
+	private int contextY;
+	/** Where the last click was (the context menu opens there). */
+	private double clickX;
+	private double clickY;
 
 	private T3UiLayout layout = T3UiLayout.compute(0, 0, true);
 	private T3UiLayout.SidebarRects sr = T3UiLayout.sidebar(Rect.EMPTY);
 	private T3UiLayout.MainRects mr = T3UiLayout.main(Rect.EMPTY, 0);
 	private @Nullable EditBox search;
-	private @Nullable T3HeaderActions headerActions;
 	private final List<Hit> hits = new ArrayList<>();
 	/** Composer controls with a popup (the model picker): input goes to them first while open. */
 	private final List<T3Slots.Popup> popups = new ArrayList<>();
@@ -177,7 +190,9 @@ public final class T3Screen extends Screen {
 			ConversationPanel c = new ConversationPanel(source, theme);
 			c.setShowHeader(false);
 			c.setActions(actions);
-			c.setHints("↑↓", "thread", "PgUp", "scroll", "Ctrl+F", "search", "Esc", "close");
+			// T3 Code shows neither a key-cap bar nor minute separators: the keys still work
+			c.setShowHints(false);
+			c.setShowSeparators(false);
 			if (composer != null) {
 				ChatComposer.attach(c, composer);
 			}
@@ -211,10 +226,6 @@ public final class T3Screen extends Screen {
 			}
 		} else if (focus == T3UiKeys.Focus.SEARCH) {
 			focus = T3UiKeys.Focus.LIST;
-		}
-		headerActions = null;
-		if (actions != null && mr.actions().w() > 0) {
-			headerActions = T3HeaderActions.add(this, this::selectedTarget, mr.actions(), slots, this::addRenderableWidget);
 		}
 	}
 
@@ -252,9 +263,7 @@ public final class T3Screen extends Screen {
 		if (conversation != null) {
 			conversation.tick();
 		}
-		if (++ticks % 10 == 0 && headerActions != null) {
-			headerActions.update(!notifications);
-		}
+		ticks++;
 	}
 
 	private void refresh() {
@@ -311,9 +320,6 @@ public final class T3Screen extends Screen {
 			c.showNothing(I18n.get("t3craft.chat.history.bridge"), ChatSource.Unavailable.Action.PAIR);
 		} else {
 			c.show(r.env(), r.envLabel(), r.threadId(), r.title());
-		}
-		if (headerActions != null) {
-			headerActions.update(!notifications);
 		}
 	}
 
@@ -380,7 +386,10 @@ public final class T3Screen extends Screen {
 		if (menuOpen) {
 			drawMenu(g, mouseX, mouseY);
 		}
-		if (!menuOpen && !projectMenuOpen) {
+		if (contextItems != null) {
+			drawItems(g, contextItems, contextX, contextY, mouseX, mouseY, () -> contextItems = null);
+		}
+		if (!anyMenuOpen()) {
 			for (int i = hits.size() - 1; i >= 0; i--) {
 				Hit h = hits.get(i);
 				if (h.tooltip() != null && h.r().contains(mouseX, mouseY)) {
@@ -427,17 +436,32 @@ public final class T3Screen extends Screen {
 
 		drawList(g, mouseX, mouseY);
 
-		// footer: archive · environments · settings
+		// footer: discreet icons, as T3 Code's sidebar bottom row (settings · environments · archive)
 		Rect f = sr.footer();
-		String[][] cells = {{"Archive", "Arch"}, {"Environments", "Envs"}, {"Settings", "Set"}};
-		Runnable[] acts = {this::openArchive, () -> slots.openEnvironments(this), () -> slots.openSettings(this)};
-		int cw = (f.w() - 4) / 3;
-		for (int i = 0; i < 3; i++) {
-			Rect c = new Rect(f.x() + i * (cw + 2), f.y(), cw, f.h());
-			String s = font.width(cells[i][0]) + 8 <= cw ? cells[i][0] : cells[i][1];
-			pill(g, c, s, false, mouseX, mouseY);
-			hits.add(new Hit(c, acts[i], null, List.of(cells[i][0])));
+		String[] glyphs = {"⚙", "☁", "▤"};
+		String[] tips = {"Settings", "Environments", "Archive"};
+		Runnable[] acts = {() -> slots.openSettings(this), () -> slots.openEnvironments(this), this::openArchive};
+		int ix = f.x();
+		for (int i = 0; i < glyphs.length; i++) {
+			Rect c = new Rect(ix, f.y(), 14, f.h());
+			iconButton(g, c, glyphs[i], mouseX, mouseY);
+			hits.add(new Hit(c, acts[i], null, List.of(tips[i])));
+			ix += 16;
 		}
+	}
+
+	/** A borderless icon that lights up on hover (T3's ghost icon buttons). */
+	private void iconButton(GuiGraphicsExtractor g, Rect r, String glyph, int mouseX, int mouseY) {
+		ChatTheme t = theme;
+		boolean hover = r.contains(mouseX, mouseY) && !anyMenuOpen();
+		if (hover) {
+			ChatDraw.round(g, r.x(), r.y(), r.w(), r.h(), t.hover());
+		}
+		g.text(font, glyph, r.x() + (r.w() - font.width(glyph)) / 2, r.y() + (r.h() - 8) / 2, hover ? t.accent() : t.muted(), false);
+	}
+
+	private boolean anyMenuOpen() {
+		return menuOpen || projectMenuOpen || contextItems != null;
 	}
 
 	private void drawList(GuiGraphicsExtractor g, int mouseX, int mouseY) {
@@ -472,7 +496,7 @@ public final class T3Screen extends Screen {
 			SidebarModel.Item it = items.get(i);
 			int ry = list.y() + (i - first) * T3UiLayout.ROW_H;
 			Rect rr = new Rect(rx0, ry, rx1 - rx0, T3UiLayout.ROW_H);
-			boolean hover = rr.contains(mouseX, mouseY) && !menuOpen && !projectMenuOpen;
+			boolean hover = rr.contains(mouseX, mouseY) && !anyMenuOpen();
 			int ty = ry + 2;
 			switch (it.kind()) {
 				case SECTION, PROJECT -> {
@@ -524,9 +548,14 @@ public final class T3Screen extends Screen {
 						ChatDraw.envIcon(g, font, EnvBadge.of(r.env(), r.envLabel()), x, ry + 2, 8);
 						x += 11;
 					}
+					// T3's row: the age at the right, replaced on hover by the quick actions (settle, pin)
+					T3Slots.Target rowTarget = actions == null ? null : T3ThreadActions.target(r);
+					boolean quick = hover && rowTarget != null;
 					String age = Ago.format(now, r.activityMs());
 					int ageW = age.isEmpty() ? 0 : font.width(age) + 4;
-					if (!age.isEmpty()) {
+					if (quick) {
+						ageW = 2 * 11 + 2;
+					} else if (!age.isEmpty()) {
 						g.text(font, age, rr.right() - 2 - font.width(age), ty, t.muted(), t.shadow());
 					}
 					g.text(font, ChatDraw.clip(font, r.title(), rr.right() - 2 - ageW - x), x, ty, r.settled() ? t.muted() : t.text(), t.shadow());
@@ -538,6 +567,9 @@ public final class T3Screen extends Screen {
 					if (r.activity() != null && !r.activity().isBlank()) {
 						tip.add(r.activity());
 					}
+					if (rowTarget != null) {
+						tip.add("Right-click: thread actions");
+					}
 					String k = r.key();
 					hits.add(new Hit(rr, () -> {
 						model.select(k);
@@ -546,7 +578,26 @@ public final class T3Screen extends Screen {
 						if (layout.compact()) {
 							setSidebarVisible(false);
 						}
-					}, null, tip));
+					}, rowTarget == null ? null : () -> openContextMenu(r, rowTarget), tip));
+					if (quick) {
+						boolean can = T3ThreadActions.canOperate(rowTarget);
+						Rect pinR = new Rect(rr.right() - 12, ry, 11, T3UiLayout.ROW_H);
+						Rect settleR = new Rect(pinR.x() - 11, ry, 11, T3UiLayout.ROW_H);
+						boolean pinned = r.pinned();
+						quickIcon(g, settleR, "✓", can, mouseX, mouseY);
+						quickIcon(g, pinR, pinned ? "★" : "☆", can, mouseX, mouseY);
+						String ro = can ? "" : " (needs control)";
+						hits.add(new Hit(settleR, () -> {
+							if (can) {
+								T3ThreadActions.settle(this, rowTarget);
+							}
+						}, () -> openContextMenu(r, rowTarget), List.of("Settle" + ro)));
+						hits.add(new Hit(pinR, () -> {
+							if (can) {
+								T3ThreadActions.pin(this, rowTarget, !pinned);
+							}
+						}, () -> openContextMenu(r, rowTarget), List.of((pinned ? "Unpin" : "Pin") + ro)));
+					}
 				}
 			}
 		}
@@ -558,8 +609,8 @@ public final class T3Screen extends Screen {
 
 	private void drawMain(GuiGraphicsExtractor g, int mouseX, int mouseY) {
 		ChatTheme t = theme;
-		// header panel behind title + actions (T3's ChatHeader)
-		Rect head = new Rect(layout.main().x(), layout.main().y(), layout.main().w(), mr.actions().bottom() + 2 - layout.main().y());
+		// header panel behind the breadcrumb (T3's ChatHeader: project › thread, state)
+		Rect head = new Rect(layout.main().x(), layout.main().y(), layout.main().w(), mr.title().bottom() + 2 - layout.main().y());
 		ChatDraw.panel(g, t, head);
 		Rect tr = mr.title();
 		int x = tr.x();
@@ -581,6 +632,24 @@ public final class T3Screen extends Screen {
 		// state chip (feat/t3-actions ThreadStatusChip when merged, else a pill with the attention word)
 		if (row != null) {
 			right -= slots.drawStatusChip(g, font, t, row, right, tr.y() + 1, mouseX, mouseY) + 4;
+			// while it runs: a small Stop next to the state (interrupt is the composer's ■)
+			if (actions != null && target != null && T3ThreadActions.running(row, target)) {
+				String stop = "■ Stop";
+				int sw = font.width(stop) + 8;
+				Rect sr0 = new Rect(right - sw, tr.y() + 1, sw, 12);
+				boolean can = T3ThreadActions.canOperate(target);
+				boolean hov = can && sr0.contains(mouseX, mouseY) && !anyMenuOpen();
+				ChatDraw.round(g, sr0.x(), sr0.y(), sr0.w(), sr0.h(), hov ? ChatTheme.withAlpha(t.errorText(), 70) : t.panelHi());
+				ChatDraw.outline(g, sr0.x(), sr0.y(), sr0.w(), sr0.h(), can ? ChatTheme.withAlpha(t.errorText(), 160) : t.edge());
+				g.text(font, stop, sr0.x() + 4, sr0.y() + 2, can ? t.errorText() : t.disabled(), false);
+				T3Slots.Target st = target;
+				hits.add(new Hit(sr0, () -> {
+					if (can) {
+						T3ThreadActions.stop(this, st);
+					}
+				}, null, List.of(can ? "Stop the thread (asks first)" : "Stop · needs control (operate)")));
+				right -= sw + 4;
+			}
 		} else if (readOnly() && target != null) {
 			String ro = "archived · read-only";
 			int w = font.width(ro) + 10;
@@ -603,12 +672,6 @@ public final class T3Screen extends Screen {
 			g.text(font, ChatDraw.clip(font, title, right - x), x, tr.y() + 3, t.text(), t.shadow());
 		} else {
 			g.text(font, notifications ? "Notifications" : "No thread selected", x, tr.y() + 3, t.muted(), t.shadow());
-		}
-		if (flash != null) {
-			g.text(font, ChatDraw.clip(font, flash, mr.actions().w()), mr.actions().x(), mr.actions().y() + 3, t.pending(), t.shadow());
-		} else if (actions == null) {
-			g.text(font, ChatDraw.clip(font, "Archived thread: read-only, no actions.", mr.actions().w()), mr.actions().x(), mr.actions().y() + 3,
-					t.muted(), t.shadow());
 		}
 
 		if (notifications) {
@@ -659,7 +722,7 @@ public final class T3Screen extends Screen {
 				if (npc != null && model.find(npc) != null) {
 					open(npc);
 				} else {
-					flash = "That thread is not listed any more (settled or filtered out).";
+					T3ThreadActions.notice("That thread is not listed any more (settled or filtered out).");
 				}
 			}, null, null));
 			y += rowH;
@@ -718,31 +781,64 @@ public final class T3Screen extends Screen {
 				() -> setSidebarVisible(layout.compact() ? false : !wideSidebar)));
 		items.add(new T3Slots.MenuItem("Close", true, this::onClose));
 		Rect anchor = sr.brand().w() > 0 ? sr.brand() : mr.title();
+		int w = menuWidth(items, Math.max(80, width - anchor.x() - 4));
+		drawItems(g, items, Math.max(2, Math.min(anchor.right() - w, width - w - 2)), anchor.bottom() + 1, mouseX, mouseY, () -> menuOpen = false);
+	}
+
+	private int menuWidth(List<T3Slots.MenuItem> items, int max) {
 		int w = 10;
 		for (T3Slots.MenuItem it : items) {
 			w = Math.max(w, font.width(it.label()) + 12);
 		}
-		w = Math.min(w, Math.max(80, width - anchor.x() - 4));
-		int maxRows = Math.max(1, (height - anchor.bottom() - 6) / T3UiLayout.ROW_H);
+		return Math.min(w, max);
+	}
+
+	/** A popup menu at ({@code x}, {@code y}), kept on screen; {@code close} runs before the chosen row. */
+	private void drawItems(GuiGraphicsExtractor g, List<T3Slots.MenuItem> items, int x, int y, int mouseX, int mouseY, Runnable close) {
+		ChatTheme t = theme;
+		int w = menuWidth(items, Math.max(80, width - 4));
+		int maxRows = Math.max(1, (height - 6) / T3UiLayout.ROW_H);
 		int shown = Math.min(items.size(), maxRows);
-		Rect box = new Rect(Math.max(2, Math.min(anchor.right() - w, width - w - 2)), anchor.bottom() + 1, w, shown * T3UiLayout.ROW_H + 4);
+		int h = shown * T3UiLayout.ROW_H + 4;
+		int bx = Math.max(2, Math.min(x, width - w - 2));
+		int by = Math.max(2, Math.min(y, height - h - 2));
+		Rect box = new Rect(bx, by, w, h);
 		ChatDraw.panel(g, t, box);
-		int y = box.y() + 2;
+		int ry = box.y() + 2;
 		for (int i = 0; i < shown; i++) {
 			T3Slots.MenuItem it = items.get(i);
-			Rect rr = new Rect(box.x() + 2, y, box.w() - 4, T3UiLayout.ROW_H);
+			Rect rr = new Rect(box.x() + 2, ry, box.w() - 4, T3UiLayout.ROW_H);
 			if (it.enabled() && rr.contains(mouseX, mouseY)) {
 				g.fill(rr.x(), rr.y(), rr.right(), rr.bottom(), t.hover());
 			}
-			g.text(font, ChatDraw.clip(font, it.label(), rr.w() - 6), rr.x() + 3, y + 2, it.enabled() ? t.text() : t.disabled(), t.shadow());
+			g.text(font, ChatDraw.clip(font, it.label(), rr.w() - 6), rr.x() + 3, ry + 2, it.enabled() ? t.text() : t.disabled(), t.shadow());
 			if (it.enabled()) {
 				menuHits.add(new Hit(rr, () -> {
-					menuOpen = false;
+					close.run();
 					it.action().run();
 				}, null, null));
 			}
-			y += T3UiLayout.ROW_H;
+			ry += T3UiLayout.ROW_H;
 		}
+	}
+
+	/** Right-click on a sidebar thread: its actions menu at the pointer. */
+	private void openContextMenu(ThreadRow r, T3Slots.Target target) {
+		menuOpen = false;
+		projectMenuOpen = false;
+		contextItems = T3ThreadActions.menu(this, r, target);
+		contextX = (int) clickX;
+		contextY = (int) clickY;
+	}
+
+	/** A small hover icon of a sidebar row. */
+	private void quickIcon(GuiGraphicsExtractor g, Rect r, String glyph, boolean enabled, int mouseX, int mouseY) {
+		ChatTheme t = theme;
+		boolean hover = r.contains(mouseX, mouseY);
+		if (hover && enabled) {
+			ChatDraw.round(g, r.x(), r.y() + 1, r.w(), r.h() - 2, t.panelHi());
+		}
+		g.text(font, glyph, r.x() + (r.w() - font.width(glyph)) / 2, r.y() + 2, !enabled ? t.disabled() : hover ? t.accent() : t.muted(), false);
 	}
 
 	private void pill(GuiGraphicsExtractor g, Rect r, String label, boolean on, int mouseX, int mouseY) {
@@ -763,7 +859,7 @@ public final class T3Screen extends Screen {
 
 	private void openArchive() {
 		if (!slots.openArchive(this)) {
-			flash = "The archive is not available right now.";
+			T3ThreadActions.notice("The archive is not available right now.");
 		}
 	}
 
@@ -774,13 +870,14 @@ public final class T3Screen extends Screen {
 		double mx = event.x();
 		double my = event.y();
 		int button = event.button();
-		flash = null;
+		clickX = mx;
+		clickY = my;
 		for (T3Slots.Popup p : popups) {
 			if (p.isOpen() && p.mouseClicked(mx, my, button)) {
 				return true;
 			}
 		}
-		if (menuOpen || projectMenuOpen) {
+		if (anyMenuOpen()) {
 			// the open menu's rows are the last hits; anything else closes it
 			for (Hit h : List.copyOf(menuHits)) {
 				if (h.r().contains(mx, my)) {
@@ -790,6 +887,7 @@ public final class T3Screen extends Screen {
 			}
 			menuOpen = false;
 			projectMenuOpen = false;
+			contextItems = null;
 			return true;
 		}
 		if (composer != null && !composer.contains(mx, my)) {
@@ -858,7 +956,7 @@ public final class T3Screen extends Screen {
 				return true;
 			}
 		}
-		if (menuOpen || projectMenuOpen) {
+		if (anyMenuOpen()) {
 			return true;
 		}
 		if (sr.list().contains(x, y) && scrollY != 0) {
@@ -873,7 +971,6 @@ public final class T3Screen extends Screen {
 
 	@Override
 	public boolean keyPressed(KeyEvent e) {
-		flash = null;
 		for (T3Slots.Popup p : popups) {
 			if (p.isOpen() && p.keyPressed(e)) {
 				return true;
@@ -885,11 +982,11 @@ public final class T3Screen extends Screen {
 		}
 		boolean compactSidebar = layout.compact() && layout.sidebar().w() > 0;
 		boolean compactThread = layout.compact() && layout.main().w() > 0;
-		if (notifications && e.isEscape() && !menuOpen && !projectMenuOpen) {
+		if (notifications && e.isEscape() && !anyMenuOpen()) {
 			notifications = false;
 			return true;
 		}
-		T3UiKeys.Action a = T3UiKeys.decide(e.key(), e.hasControlDown(), e.hasShiftDown(), focus, menuOpen || projectMenuOpen,
+		T3UiKeys.Action a = T3UiKeys.decide(e.key(), e.hasControlDown(), e.hasShiftDown(), focus, anyMenuOpen(),
 				model.query().isEmpty(), compactSidebar, compactThread);
 		if (focus == T3UiKeys.Focus.LIST && a == T3UiKeys.Action.PASS && PortableClient.key() != null && PortableClient.key().matches(e)) {
 			onClose(); // the T3 key closes the screen it opened
@@ -956,10 +1053,19 @@ public final class T3Screen extends Screen {
 			case CLOSE_MENU -> {
 				menuOpen = false;
 				projectMenuOpen = false;
+				contextItems = null;
 			}
 			case CLOSE -> onClose();
 		}
 		return true;
+	}
+
+	/** Image files dropped on the window go to the composer (T3 Code takes dropped images too). */
+	@Override
+	public void onFilesDrop(List<Path> paths) {
+		if (composer != null && !readOnly()) {
+			composer.addFiles(paths);
+		}
 	}
 
 	@Override

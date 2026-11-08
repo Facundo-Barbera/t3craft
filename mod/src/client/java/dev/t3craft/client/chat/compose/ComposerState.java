@@ -43,10 +43,20 @@ public final class ComposerState {
 	}
 
 	/** A message sent from here and not yet seen in the thread's stream. */
-	public record Pending(String threadKey, String messageId, String text, long at) {
-		/** The optimistic "You" row shown at the end of the conversation. */
+	public record Pending(String threadKey, String messageId, String text, long at, List<ImageAttachment> images) {
+		public Pending(String threadKey, String messageId, String text, long at) {
+			this(threadKey, messageId, text, at, List.of());
+		}
+
+		public Pending {
+			images = List.copyOf(images);
+		}
+
+		/** The optimistic "You" row shown at the end of the conversation (attachments as the feed shows them). */
 		public ChatEntry entry() {
-			return new ChatEntry("pending:" + messageId, messageId, messageId, ChatEntry.Kind.USER, "", text, null, false, "pending", at,
+			int n = images.size();
+			String body = n == 0 ? text : text + (text.isEmpty() ? "" : "\n\n") + "_(" + n + " attachment" + (n == 1 ? "" : "s") + ")_";
+			return new ChatEntry("pending:" + messageId, messageId, messageId, ChatEntry.Kind.USER, "", body, null, false, "pending", at,
 					Long.MAX_VALUE, false);
 		}
 	}
@@ -58,6 +68,8 @@ public final class ComposerState {
 	private final List<Pending> pending = new ArrayList<>();
 	private final Set<String> sending = new HashSet<>();
 	private final Map<String, String> errors = new HashMap<>();
+	/** Images waiting in the composer, per thread (kept like drafts when switching threads). */
+	private final Map<String, List<ImageAttachment>> images = new HashMap<>();
 	private @Nullable String key;
 	private String envId = "";
 	private String threadId = "";
@@ -226,10 +238,11 @@ public final class ComposerState {
 		if (sending.contains(key)) {
 			return Button.SENDING;
 		}
-		if (running && editor.isBlank()) {
+		boolean empty = editor.isBlank() && images().isEmpty();
+		if (running && empty) {
 			return stopping ? Button.STOPPING : Button.STOP;
 		}
-		return editor.isBlank() ? Button.SEND_DISABLED : Button.SEND;
+		return empty ? Button.SEND_DISABLED : Button.SEND;
 	}
 
 	/** The primary button's click: send, or stop while a turn runs with an empty input. */
@@ -248,7 +261,8 @@ public final class ComposerState {
 	 * when something was sent.
 	 */
 	public boolean submit() {
-		if (key == null || !canOperate || sending.contains(key) || editor.isBlank()) {
+		List<ImageAttachment> imgs = images();
+		if (key == null || !canOperate || sending.contains(key) || editor.isBlank() && imgs.isEmpty()) {
 			return false;
 		}
 		String k = key;
@@ -256,12 +270,17 @@ public final class ComposerState {
 		editor.clear();
 		drafts.remove(k);
 		errors.remove(k);
+		images.remove(k);
 		sending.add(k);
 		ChatSender.Ids ids = sender.newIds();
-		Pending p = new Pending(k, ids.messageId(), text, clock.getAsLong());
+		Pending p = new Pending(k, ids.messageId(), text, clock.getAsLong(), imgs);
 		pending.add(p);
 		version++;
-		sender.send(envId, threadId, title, text, ids, r -> sent(k, p, text, r));
+		if (imgs.isEmpty()) {
+			sender.send(envId, threadId, title, text, ids, r -> sent(k, p, text, r));
+		} else {
+			sender.send(envId, threadId, title, text, imgs, ids, r -> sent(k, p, text, r));
+		}
 		return true;
 	}
 
@@ -274,7 +293,75 @@ public final class ComposerState {
 			version++;
 		}
 		restore(k, text);
+		if (!p.images().isEmpty()) {
+			List<ImageAttachment> back = new ArrayList<>(p.images());
+			back.addAll(images.getOrDefault(k, List.of()));
+			images.put(k, back);
+		}
 		errors.put(k, ThreadControl.feedback(r).text());
+	}
+
+	// ---- images -------------------------------------------------------------------------------
+
+	/** Images waiting in the composer of the current thread, in order. */
+	public List<ImageAttachment> images() {
+		return key == null ? List.of() : images.getOrDefault(key, List.of());
+	}
+
+	/** Every image held (all threads and in-flight messages): the thumbnails still needed. */
+	public Set<String> liveImageIds() {
+		Set<String> out = new HashSet<>();
+		images.values().forEach(l -> l.forEach(i -> out.add(i.localId())));
+		pending.forEach(p -> p.images().forEach(i -> out.add(i.localId())));
+		return out;
+	}
+
+	/**
+	 * Adds an image to the current thread's composer. Returns why it was refused (no thread,
+	 * read-only, a T3 limit), or null; the refusal is also the composer's error.
+	 */
+	public @Nullable String addImage(String localId, @Nullable String name, byte[] bytes) {
+		if (key == null) {
+			return "Select a thread first.";
+		}
+		if (!canOperate) {
+			return setError("Read-only: enable control to send images.");
+		}
+		String mime = ImageAttachment.sniff(bytes);
+		List<ImageAttachment> cur = images();
+		String why = ImageAttachment.rejection(bytes, mime, cur);
+		if (why != null) {
+			return setError(why);
+		}
+		List<ImageAttachment> next = new ArrayList<>(cur);
+		next.add(new ImageAttachment(localId, ImageAttachment.cleanName(name, mime), mime, bytes));
+		images.put(key, next);
+		errors.remove(key);
+		return null;
+	}
+
+	public boolean removeImage(String localId) {
+		if (key == null) {
+			return false;
+		}
+		List<ImageAttachment> cur = new ArrayList<>(images());
+		boolean changed = cur.removeIf(i -> i.localId().equals(localId));
+		if (changed) {
+			if (cur.isEmpty()) {
+				images.remove(key);
+			} else {
+				images.put(key, cur);
+			}
+		}
+		return changed;
+	}
+
+	/** Shows {@code message} as the current thread's error (a failed pick or paste); returns it. */
+	public @Nullable String setError(@Nullable String message) {
+		if (key != null && message != null) {
+			errors.put(key, message);
+		}
+		return message;
 	}
 
 	/** Puts unsent text back in front of whatever was typed meanwhile. */
