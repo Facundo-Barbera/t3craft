@@ -76,7 +76,7 @@ public final class DemoHq {
 			if (islandPart != null && !islandPart.isEmpty()) {
 				out.add(islandPart);
 			}
-			out.addAll(full(plan, lift));
+			out.addAll(DemoHq.full(plan, lift)); // qualified: the record component full() hides the outer method
 			return out;
 		}
 	}
