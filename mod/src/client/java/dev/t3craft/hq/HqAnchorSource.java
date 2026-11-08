@@ -99,4 +99,10 @@ public final class HqAnchorSource implements AnchorSource {
 	public dev.t3craft.client.npc.behavior.@Nullable Anchor exit() {
 		return byName.get(AnchorNames.ENTRANCE);
 	}
+
+	/** The plan's {@code spawn} anchor: the layout's way in, reachable to every desk (plan validators). */
+	@Override
+	public dev.t3craft.client.npc.behavior.@Nullable Anchor spawn() {
+		return byName.get(AnchorNames.SPAWN);
+	}
 }

@@ -98,6 +98,13 @@ public final class NpcBrain {
 	 * (off an edge, out of a corner) before trying again. Never a teleport.
 	 */
 	static final int NO_ROUTE_NUDGE = 5;
+	/**
+	 * fix/hq-npc-spawn: "no route" answers in a row (nudges do not break the run) after which the NPC
+	 * counts as {@link #stranded}: about 12 s with no way to its spot from where it stands.
+	 */
+	static final int STRANDED_NO_ROUTES = 6;
+	/** Unreachable wander points in a row (IDLE) after which the NPC counts as {@link #stranded}. */
+	static final int STRANDED_WANDERS = 8;
 	static final int EMBED_CHECK_TICKS = 20;
 	static final double SNAP_DISTANCE = 48;
 	static final double PLAYER_NEAR = 6;
@@ -123,6 +130,10 @@ public final class NpcBrain {
 	private int stuckEpisodes;
 	/** "No route" answers in a row for the current goal. */
 	private int noRoute;
+	/** "No route" answers in a row, kept across nudges and re-plans; reset by a found route. */
+	private int noRouteRun;
+	/** Unreachable wander points in a row; reset by a found route. */
+	private int wanderMissRun;
 	/** The world or the spots changed under us ({@link #replan}): route again from here next tick. */
 	private boolean replan;
 	private int phaseTicks;
@@ -202,6 +213,36 @@ public final class NpcBrain {
 
 	public boolean walking() {
 		return motion.walking();
+	}
+
+	/**
+	 * fix/hq-npc-spawn: no way anywhere from where it stands for long ({@link #STRANDED_NO_ROUTES} "no
+	 * route" answers in a row, or {@link #STRANDED_WANDERS} unreachable wander points): it stood where
+	 * the base was then built around it, or sits in a sealed spot. The director then {@link #relocate}s it.
+	 */
+	public boolean stranded() {
+		return noRouteRun >= STRANDED_NO_ROUTES || wanderMissRun >= STRANDED_WANDERS;
+	}
+
+	/**
+	 * Puts a {@link #stranded} NPC on {@code p} (the base's way in) in one jump ({@link #teleported}
+	 * on this tick) and routes again from there on the next tick.
+	 */
+	public void relocate(Pos p) {
+		pos = p;
+		teleported = true;
+		motion.stand(motion.yaw());
+		goal = null;
+		stand = null;
+		pendingTo = null;
+		noRoute = 0;
+		noRouteRun = 0;
+		wanderMissRun = 0;
+		stuckEpisodes = 0;
+		retryAt = 0;
+		replan = true;
+		phase = restingPhase();
+		phaseTicks = 0;
 	}
 
 	/** True on the tick the NPC jumped to its position (first placement, far away): snap, don't lerp. */
@@ -444,6 +485,7 @@ public final class NpcBrain {
 		if (p == null && mode == Mode.IDLE) {
 			// Unreachable wander point: try another one shortly.
 			wanderFailures++;
+			wanderMissRun++;
 			goal = pos;
 			phase = Phase.WANDER_PAUSE;
 			phaseTicks = 0;
@@ -455,6 +497,7 @@ public final class NpcBrain {
 			retryAt = tick + RETRY_TICKS;
 			phase = restingPhase();
 			phaseTicks = 0;
+			noRouteRun++;
 			if (++noRoute >= NO_ROUTE_NUDGE) {
 				noRoute = 0;
 				nav.forgetBlocked();
@@ -467,6 +510,8 @@ public final class NpcBrain {
 			return;
 		}
 		noRoute = 0;
+		noRouteRun = 0;
+		wanderMissRun = 0;
 		stand = p.getLast();
 		motion.walk(p, yaw);
 		phase = Phase.WALKING;

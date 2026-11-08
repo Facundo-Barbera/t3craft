@@ -45,4 +45,10 @@ record LayeredAnchors(AnchorSource primary, AnchorSource fallback) implements An
 		Anchor a = primary.exit();
 		return a != null ? a : fallback.exit();
 	}
+
+	@Override
+	public @Nullable Anchor spawn() {
+		Anchor a = primary.spawn();
+		return a != null ? a : fallback.spawn();
+	}
 }
