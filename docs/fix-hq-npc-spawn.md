@@ -41,6 +41,16 @@ búsqueda la amplía (×3: 16 → 48 → 144) y sigue desde los nodos recortados
 las parcelas de campus a más de 150 bloques. El presupuesto por tick de `Navigation` (2500 nodos y
 2 ms) no cambia: una búsqueda larga se reparte entre más ticks.
 
+**`HopViaReplanTest.longRoutesGoThroughTheEntrance`.** Este test daba por hecho que una abertura a
+40 bloques quedaba fuera de "una búsqueda acotada" y exigía NONE en la ruta directa antes de probar
+la vía. Esa premisa era un detalle del fixture (el tamaño de la caja de entonces), no el
+comportamiento que se quiere proteger, que es este: cuando ninguna búsqueda acotada alcanza el
+destino, la ruta entra por la vía (la entrada de la base). Con la caja creciente, la búsqueda
+directa ya encuentra una abertura a 40 bloques, y eso es justo el arreglo. El test conserva su
+intención con la abertura más allá de la caja máxima (`MAX_PAD + 16`): ahí la ruta directa sigue
+siendo NONE y la vía mete al NPC. Un test nuevo, `theSearchBoxGrowsToAnOpeningPastThePad`, fija el
+caso de los 40 bloques como ruta directa.
+
 ## Red de seguridad: recolocación
 
 `NpcBrain.stranded()` se activa tras 6 respuestas "sin ruta" seguidas (unos 12 s; los empujoncitos no

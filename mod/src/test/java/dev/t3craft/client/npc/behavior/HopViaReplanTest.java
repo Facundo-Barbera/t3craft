@@ -59,24 +59,46 @@ class HopViaReplanTest {
 		}
 	}
 
-	@Test
-	void longRoutesGoThroughTheEntrance() {
-		// A walled yard whose only opening is far away (z = 40): out of reach of one bounded search.
-		CellWorld w = new CellWorld().floor(-4, -8, 14, 44, Y);
-		for (int z = -8; z <= 44; z++) {
-			if (z != 40) {
+	/** A walled yard (x 4..14) whose only opening is at {@code z = opening}, on the west wall. */
+	static CellWorld yard(int opening) {
+		int far = opening + 4;
+		CellWorld w = new CellWorld().floor(-4, -8, 14, far, Y);
+		for (int z = -8; z <= far; z++) {
+			if (z != opening) {
 				w.wall(4, Y, z);
 			}
 		}
 		for (int x = 4; x <= 14; x++) {
-			w.wall(x, Y, -8).wall(x, Y, 44);
+			w.wall(x, Y, -8).wall(x, Y, far);
 		}
+		return w;
+	}
+
+	@Test
+	void longRoutesGoThroughTheEntrance() {
+		// fix/hq-npc-spawn: the search box now grows up to MAX_PAD when it cut a move off, so the
+		// opening has to lie beyond even the widest box for one bounded search to miss it; the via
+		// (the base's entrance) still gets the NPC in.
+		int opening = GridPathfinder.MAX_PAD + 16;
+		CellWorld w = yard(opening);
 		Navigation nav = Navigation.over(w);
 		Pos from = new Pos(1.5, Y, 0.5);
 		Pos to = new Pos(8.5, Y, 0.5);
-		assertEquals(Route.Status.NONE, nav.route(from, to, null).status(), "no direct route within the search box");
-		nav.setVia(new Pos(4.5, Y, 40.5));
+		assertEquals(Route.Status.NONE, HqEntryTest.routeOverTicks(nav, from, to).status(), "no direct route within the widest search box");
+		nav.setVia(new Pos(4.5, Y, opening + 0.5));
 		Route r = HqEntryTest.routeOverTicks(nav, from, to);
+		assertEquals(Route.Status.FOUND, r.status());
+		Pos end = walk(new Collision(w), r.points());
+		assertEquals(8.5, end.x(), 1e-6);
+		assertEquals(0.5, end.z(), 1e-6);
+	}
+
+	@Test
+	void theSearchBoxGrowsToAnOpeningPastThePad() {
+		// fix/hq-npc-spawn: an opening 40 blocks away (beyond PAD = 16) is found directly, with no via:
+		// upper-floor desks whose stairs are at the far end of the building, unreachable before.
+		CellWorld w = yard(40);
+		Route r = HqEntryTest.routeOverTicks(Navigation.over(w), new Pos(1.5, Y, 0.5), new Pos(8.5, Y, 0.5));
 		assertEquals(Route.Status.FOUND, r.status());
 		Pos end = walk(new Collision(w), r.points());
 		assertEquals(8.5, end.x(), 1e-6);
