@@ -131,10 +131,12 @@ public final class HqGenerator {
 				}
 			}
 			bigScreen(b, c, HqGeometry.hubScreen(), "hub", hubBinding);
-			// the thread kanban wall (P3): reserved surface and anchor; feat/thread-wall fills it
+			// the thread kanban wall (P3, t3craft:thread_board): bottom-left and top-right anchors, solid stand-in cells
 			HqGeometry.Surface wall = HqGeometry.threadWall();
 			fill(c, wall);
-			b.anchor(Anchor.face(AnchorNames.THREAD_WALL, wall.anchorCell(), wall.facing()));
+			b.anchor(Anchor.face(AnchorNames.THREAD_WALL, wall.origin(), wall.facing()));
+			b.anchor(Anchor.face(AnchorNames.THREAD_WALL_END, wall.origin().relative(wall.along(), wall.width() - 1).above(wall.height() - 1),
+					wall.facing()));
 			b.anchor(Anchor.at(AnchorNames.THREAD_WALL_FRONT, wall.anchorCell().relative(wall.facing(), 3).atY(1), wall.facing().getOpposite()));
 			// the hologram's column stays open; the beacon crowns the roof lantern over it
 			for (int y = 1; y <= HqGeometry.HOLOGRAM_TOP; y++) {

@@ -118,19 +118,23 @@ class HqBigScreenTest {
 		BuildPlan base = plan();
 		BlockPos topLeft = findWall(base, Direction.NORTH, 3, 2);
 		assertNotNull(topLeft, "the generated HQ has some 3×2 wall to reserve");
-		String name = AnchorNames.bigScreen("hub", 3, 2, Binding.project("vps:api").wire());
+		String name = AnchorNames.bigScreen("test", 3, 2, Binding.project("vps:api").wire());
 		BuildPlan p = base.withAnchors(List.of(new Anchor(name, topLeft.getX(), topLeft.getY(), topLeft.getZ(), Direction.NORTH, topLeft)));
 
+		// the plan already reserves its own (hub and one per module); the added one comes on top
 		List<HqBindings.Screen> screens = HqBindings.screens(p);
-		assertEquals(1, screens.size());
-		assertEquals(new ScreenRect(topLeft, Direction.NORTH, 3, 2), screens.get(0).extent());
-		assertEquals(Binding.project("vps:api"), screens.get(0).binding());
+		assertEquals(HqBindings.screens(base).size() + 1, screens.size());
+		HqBindings.Screen added = screens.stream().filter(sc -> sc.extent().equals(new ScreenRect(topLeft, Direction.NORTH, 3, 2))).findFirst()
+				.orElseThrow();
+		assertEquals(Binding.project("vps:api"), added.binding());
 
 		List<HqBindings.Fixture> cells = HqBindings.ofRole(p, HqBindings.Role.SCREEN);
-		assertEquals(6, cells.size());
+		assertEquals(HqBindings.ofRole(base, HqBindings.Role.SCREEN).size() + 6, cells.size());
 		for (HqBindings.Fixture f : cells) {
-			assertEquals(Binding.project("vps:api"), f.binding(), "every cell carries the screen's binding");
-			assertEquals(Direction.NORTH, f.facing());
+			if (added.extent().cells().contains(f.rel())) {
+				assertEquals(Binding.project("vps:api"), f.binding(), "every cell carries the screen's binding");
+				assertEquals(Direction.NORTH, f.facing());
+			}
 		}
 
 		Recording rec = new Recording();
@@ -139,19 +143,26 @@ class HqBigScreenTest {
 		ScreenRect merged = walls.get(topLeft);
 		assertEquals(new ScreenRect(topLeft, Direction.NORTH, 3, 2), merged, "the plan's cells merge by the world's rule");
 		long connected = rec.sides.stream().filter(s -> !s.equals(ScreenRect.Sides.NONE)).count();
-		assertEquals(6, connected, "the six screen cells get connection flags");
+		assertTrue(connected >= 6, "the six screen cells get connection flags");
 		for (BlockPos c : merged.cells()) {
 			assertEquals(Binding.project("vps:api").wire(), modded.at(c).be().getStringOr(BoundBlockEntity.KEY, ""));
 		}
 	}
 
 	@Test
-	void desksAndArchiveMonitorsStayLoneScreens() {
+	void deskMonitorsStayLoneScreensAndThePlansScreensMerge() {
 		BuildPlan p = plan();
-		Map<BlockPos, ScreenRect> walls = HqBlockFixtures.screens(fixtureMap(p));
+		Map<BlockPos, HqBindings.Fixture> fixtures = fixtureMap(p);
+		Map<BlockPos, ScreenRect> walls = HqBlockFixtures.screens(fixtures);
 		assertFalse(walls.isEmpty());
-		for (Map.Entry<BlockPos, ScreenRect> e : walls.entrySet()) {
-			assertFalse(e.getValue().isMulti(), "desk / archive monitor at " + e.getKey() + " merged into " + e.getValue());
+		for (HqBindings.Fixture f : fixtures.values()) {
+			ScreenRect r = walls.get(f.rel());
+			if (f.role() == HqBindings.Role.MONITOR && r != null) {
+				assertFalse(r.isMulti(), "desk monitor at " + f.rel() + " merged into " + r);
+			}
+		}
+		for (HqBindings.Screen sc : HqBindings.screens(p)) {
+			assertTrue(sc.extent().isMulti(), "the plan's big screens are multiblock: " + sc);
 		}
 	}
 

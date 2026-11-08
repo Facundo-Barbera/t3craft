@@ -111,9 +111,8 @@ class HqBindingsTest {
 		for (int i = 0; i < bulbs.size(); i++) {
 			assertTrue(idx.contains(i), "bulbs 0..n-1");
 		}
-		// closed threads live only in the archive terminal: the shelf cell is no fixture
-		BlockPos archived = p.anchor(AnchorNames.archive("vps:t4")).block();
-		assertTrue(HqBindings.of(p).stream().noneMatch(f -> f.rel().equals(archived)), "no thread shown on the shelf");
+		// closed threads live only in the archive terminal: no per-thread cell in the plan
+		assertNull(p.anchor(AnchorNames.archive("vps:t4")), "no shelf cell for the settled thread");
 		assertTrue(HqBindings.of(p).stream().noneMatch(f -> f.binding().equals(Binding.thread("vps:t4"))));
 		assertNull(p.workstation("vps:t4"), "no desk for the settled thread");
 		// the terminal follows the plan's archiveTerminal anchor, unbound, screen facing the anchor's way

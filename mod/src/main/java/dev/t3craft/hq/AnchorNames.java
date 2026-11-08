@@ -77,11 +77,6 @@ public final class AnchorNames {
 	 */
 	public static final String ARCHIVE_TERMINAL = "archiveTerminal";
 
-	/**
-	 * The thread kanban wall (P3): face centre of the bottom-middle cell of a 9 x 4 cell surface on the
-	 * hub's west interior wall, looking east. Cells: {@code block} ± 4 along z, up 3.
-	 */
-	public static final String THREAD_WALL = "threadWall";
 	/** Where viewers of the kanban wall stand (open floor three cells in front of its middle). */
 	public static final String THREAD_WALL_FRONT = "thread_wall_front";
 	/**
@@ -150,7 +145,7 @@ public final class AnchorNames {
 	public static boolean standing(String name) {
 		if (name.equals(BOARD) || name.startsWith(BOARD_LAMP) || name.startsWith("monitor_") || name.startsWith("lamp_")
 				|| name.startsWith("screen@") || name.startsWith("archive_") || name.startsWith(SHELF_SLOT) || name.equals(SHELF_MORE)
-				|| name.equals(SHELF_HEADER) || name.equals(BEACON) || name.startsWith(BIG_SCREEN) || name.equals(THREAD_WALL)
+				|| name.equals(SHELF_HEADER) || name.equals(BEACON) || name.startsWith(BIG_SCREEN) || name.equals(THREAD_WALL) || name.equals(THREAD_WALL_END)
 				|| name.equals(HOLOGRAM)) {
 			return false;
 		}

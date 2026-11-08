@@ -112,10 +112,10 @@ class HqGeneratorTest {
 	// ------------------------------------------------------------------ footprint
 
 	@Test
-	void emptyHqIsHubShelfAndPorticoWithNoBasement() {
+	void emptyHqIsHubTerminalNookAndPorticoWithNoBasement() {
 		BuildPlan p = plan(HqInput.EMPTY);
 		assertEquals(new Box(-8, 0, -8, 8, 10, 13), p.footprint(), "nothing below the floor layer");
-		assertEquals(List.of("hub", "archive_shelf_east", "archive_shelf_west", "portico"), p.modules().stream().map(BuildPlan.Module::id).toList());
+		assertEquals(List.of("hub", "archive", "portico"), p.modules().stream().map(BuildPlan.Module::id).toList());
 		assertEquals(17 * 11 * 17 + 9 * 11 * 5, p.size(), "every cell of the volume is listed, air included");
 		assertTrue(p.placements().stream().allMatch(pl -> pl.rel().getY() >= 0), "no basement by default");
 		for (int z = -7; z <= 7; z++) {
@@ -123,7 +123,7 @@ class HqGeneratorTest {
 				assertFalse(p.at(new BlockPos(x, 0, z)).state().isAir(), "hole in the hub floor at " + x + "," + z);
 			}
 		}
-		assertTrue(p.at(new BlockPos(0, 2, -8)).state().is(Blocks.GLASS_PANE), "no spine: the hub's north wall is a window");
+		assertFalse(p.at(new BlockPos(0, 2, -8)).state().isAir(), "no spine: the hub's north wall is closed");
 	}
 
 	@ParameterizedTest(name = "{0} projects x {1} threads")
@@ -175,8 +175,8 @@ class HqGeneratorTest {
 			String id = m.id();
 			int[] size = {b.sizeX(), b.sizeY(), b.sizeZ()};
 			int[] want;
-			if (id.startsWith("archive_shelf_")) {
-				want = new int[] {4, 4, 1};
+			if (id.equals("archive")) {
+				want = new int[] {3, 4, 1}; // the archive terminal's nook
 			} else if (id.equals("hub")) {
 				want = new int[] {17, 11, 17};
 			} else if (id.equals("portico")) {
@@ -380,91 +380,40 @@ class HqGeneratorTest {
 	}
 
 	@Test
-	void settledThreadFreesItsDeskAndArchivesItsComputer() {
+	void settledThreadFreesItsDeskAndLeavesNoTrace() {
 		HqInput in = input(2, 4);
 		HqGenerator.Result r1 = HqGenerator.plan(in, null);
 		HqGenerator.Result r2 = HqGenerator.plan(settle(in, "env:p0-t1"), r1.layout());
 		assertNull(r2.plan().anchor(AnchorNames.desk("env:p0-t1")));
-		Anchor arch = r2.plan().anchor(AnchorNames.archive("env:p0-t1"));
-		assertNotNull(arch);
-		HqGeometry.ArchiveSlot slot0 = HqGeometry.archiveSlots().get(0);
-		assertEquals(slot0.cell(), arch.block());
-		assertEquals(slot0.facing(), arch.facing());
+		assertNull(r2.plan().anchor(AnchorNames.archive("env:p0-t1")), "closed threads live in the archive terminal, not in the plan");
 		List<Placement> d = BuildPlan.diff(r1.plan(), r2.plan(), rel -> AIR);
-		assertTrue(d.stream().filter(pl -> HqGeometry.desk(0, 1).contains(pl.rel())).allMatch(pl -> pl.state().isAir()),
+		assertTrue(d.stream().filter(pl -> HqGeometry.desk(0, 1).contains(pl.rel())).allMatch(pl -> pl.state().isAir() || pl.rel().getY() == 0),
 				"the released desk leaves the world: " + d);
-		assertTrue(d.stream().allMatch(pl -> HqGeometry.desk(0, 1).contains(pl.rel()) || pl.rel().equals(slot0.cell())), "nothing else: " + d);
-		assertTrue(d.stream().anyMatch(pl -> pl.rel().equals(slot0.cell())
-				&& pl.state().is(Blocks.CONCRETE.pick(net.minecraft.world.item.DyeColor.BLACK))));
-		assertEquals(Set.of(HqGenerator.group(0), HqGenerator.GROUP_ARCHIVE), HqPlans.expansion(r1.plan(), r2.plan(), rel -> AIR).keySet());
-		// the shelf faces the hub: the cell in front of every slot is free
-		for (HqGeometry.ArchiveSlot s : HqGeometry.archiveSlots()) {
-			BlockPos front = s.cell().relative(s.facing());
-			assertTrue(r2.plan().at(front).state().isAir(), "slot " + s + " faces a blocked cell");
-		}
-		assertEquals(r2.plan().anchor(AnchorNames.archiveShelfSlot(0)).block(), arch.block(), "named slot anchor = the computer's anchor");
+		assertTrue(d.stream().allMatch(pl -> HqGeometry.desk(0, 1).contains(pl.rel())), "nothing else: " + d);
+		assertEquals(Set.of(HqGenerator.group(0)), HqPlans.expansion(r1.plan(), r2.plan(), rel -> AIR).keySet());
 		// a new thread reuses the freed desk
 		HqGenerator.Result r3 = HqGenerator.plan(plus(settle(in, "env:p0-t1"), "env:p0", "env:p0-new"), r2.layout());
 		assertEquals(r1.plan().anchor(AnchorNames.desk("env:p0-t1")).block(), r3.plan().anchor(AnchorNames.desk("env:p0-new")).block());
+		// idempotent
+		assertEquals(r2.plan().fingerprint(), HqGenerator.plan(settle(in, "env:p0-t1"), r2.layout()).plan().fingerprint());
 	}
 
 	@Test
-	void shelfSlotsAreFixedNamedAndInsideTheHub() {
-		List<HqGeometry.ArchiveSlot> slots = HqGeometry.archiveSlots();
-		assertEquals(HqLayout.ARCHIVE_CAPACITY, slots.size());
-		assertEquals(24, slots.size());
-		assertEquals(slots, HqGeometry.archiveSlots(), "fixed order");
-		assertEquals(new BlockPos(3, 2, 7), slots.get(0).cell(), "eye level, next to the entrance, east first");
-		assertEquals(new BlockPos(-3, 2, 7), slots.get(1).cell());
-		assertEquals(Set.copyOf(slots.stream().map(HqGeometry.ArchiveSlot::cell).toList()).size(), slots.size(), "distinct cells");
-		Box hubInside = new Box(-7, 1, -7, 7, 5, 7);
+	void archiveTerminalNookIsReachableAndTheEntranceOpen() {
 		for (HqInput in : List.of(HqInput.EMPTY, input(3, 4), settle(input(2, 6), "env:p0-t2"))) {
 			BuildPlan p = plan(in);
-			for (int i = 0; i < slots.size(); i++) {
-				Anchor a = p.anchor(AnchorNames.archiveShelfSlot(i));
-				assertNotNull(a, "slot " + i);
-				assertEquals(slots.get(i).cell(), a.block());
-				assertEquals(Direction.NORTH, a.facing(), "into the hub");
-				assertTrue(hubInside.contains(a.block()), "inside the hub: " + a);
-				assertEquals(HqGenerator.GROUP_ARCHIVE, p.groupAt(a.block()));
-			}
-			assertNull(p.anchor(AnchorNames.archiveShelfSlot(slots.size())));
-			// the "older" sign and the standing spot
-			Placement more = p.at(p.anchor(AnchorNames.SHELF_MORE).block());
-			assertTrue(more.state().getBlock() instanceof WallSignBlock);
-			assertTrue(more.be().toString().contains("Older"), more.be().toString());
-			assertTrue(p.at(p.anchor(AnchorNames.SHELF_HEADER).block()).be().toString().contains("Archived"));
-			assertTrue(walkable(p, p.anchor(AnchorNames.ARCHIVE).block()), "standing spot in front of the shelf");
+			Anchor t = p.anchor(AnchorNames.ARCHIVE_TERMINAL);
+			assertNotNull(t);
+			assertEquals(HqGeometry.ARCHIVE_TERMINAL, t.block());
+			assertEquals(Direction.NORTH, t.facing(), "into the hub");
+			assertTrue(HqGeometry.archiveNook().contains(t.block()));
+			assertTrue(walkable(p, p.anchor(AnchorNames.ARCHIVE).block()), "standing spot in front of the terminal");
+			assertEquals(t.block().relative(t.facing()), p.anchor(AnchorNames.ARCHIVE).block());
 		}
-		// the entrance stays open
 		BuildPlan p = plan(HqInput.EMPTY);
 		for (int x = -1; x <= 1; x++) {
 			assertTrue(walkable(p, new BlockPos(x, 1, 7)) && walkable(p, new BlockPos(x, 1, 8)), "entrance at x=" + x);
 		}
-	}
-
-	@Test
-	void shelfShowsTheNewestAndCountsTheOlderOnTheSign() {
-		HqInput in = HqInput.EMPTY;
-		for (int t = 0; t < HqLayout.ARCHIVE_CAPACITY + 2; t++) {
-			in = settle(plus(in, "env:p0", String.format("env:p0-t%02d", t)), String.format("env:p0-t%02d", t));
-		}
-		HqGenerator.Result r = HqGenerator.plan(in, null);
-		assertEquals(HqLayout.ARCHIVE_CAPACITY, r.layout().archive().size());
-		assertEquals(2, r.layout().overflow().size());
-		assertTrue(r.plan().at(r.plan().anchor(AnchorNames.SHELF_MORE).block()).be().toString().contains("+2"));
-		for (HqLayout.Archived a : r.layout().archive()) {
-			Anchor x = r.plan().anchor(AnchorNames.archive(a.threadId()));
-			assertEquals(r.plan().anchor(AnchorNames.archiveShelfSlot(a.slot())).block(), x.block());
-			assertTrue(r.plan().at(x.block()).state().is(Blocks.CONCRETE.pick(net.minecraft.world.item.DyeColor.BLACK)));
-		}
-		for (String t : r.layout().overflow()) {
-			assertNull(r.plan().anchor(AnchorNames.archive(t)), "older threads are only listed");
-		}
-		// idempotent
-		HqGenerator.Result again = HqGenerator.plan(in, r.layout());
-		assertEquals(r.layout(), again.layout());
-		assertEquals(r.plan().fingerprint(), again.plan().fingerprint());
 	}
 
 	@Test
@@ -487,7 +436,7 @@ class HqGeneratorTest {
 	@Test
 	void shapesAreBakedIntoThePlan() {
 		BuildPlan p = plan(HqInput.EMPTY);
-		BlockState pane = p.at(new BlockPos(0, 2, -8)).state();
+		BlockState pane = p.at(new BlockPos(0, 3, -8)).state();
 		assertTrue(pane.getValue(net.minecraft.world.level.block.CrossCollisionBlock.EAST)
 				&& pane.getValue(net.minecraft.world.level.block.CrossCollisionBlock.WEST), "hub window panes connect: " + pane);
 		BlockState corner = p.at(new BlockPos(8, 6, 8)).state();
