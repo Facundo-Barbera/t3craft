@@ -273,3 +273,24 @@ sub.close();                                               // la última vista h
 - `ThreadBrowserScreen` construye su navegador en `init()` y lo cierra en `removed()`. Así puede ser
   el padre de las pantallas de emparejar y de control y volver al mismo hilo sin dejar feeds
   abiertos. `ThreadBrowserScreen.of(...)` se sustituyó por `new ThreadBrowserScreen(Supplier, key)`.
+
+## fix/ui-chat-sidebar: cambiar de conversación desde la lista
+
+- **Causa raíz**: en Minecraft 26.x `MouseButtonEvent.button()` usa `InputConstants.MOUSE_BUTTON_LEFT = 1`
+  y `MOUSE_BUTTON_RIGHT = 3`, ya no los 0/1/2 de GLFW. `ThreadListView` abría una fila solo con
+  `button == 0` y `ConversationPanel` ignoraba todo clic con `button != 0`, así que un clic izquierdo
+  nunca abría un hilo. Además, un clic izquierdo en un chip de entorno hacía el "solo" del clic
+  derecho, porque se comparaba con `button == 1`. No es una regresión: el bug está desde feat/chat.
+  fix/chat-direct-connect cambió la geometría del hit-test, pero mantuvo `button == 0`.
+- `MouseButtons.LEFT/RIGHT` (constantes de MC) son la única comparación de botones del chat.
+- `ThreadListView.layoutRows(Rect)` coloca las filas y guarda `DrawnRows`: área, scroll y claves en
+  el orden en que se dibujaron. `render` lo llama en cada frame y los tests en lugar de un frame. El
+  clic se resuelve por clave contra lo dibujado, así que funciona con scroll y aunque la lista se
+  reordene entre el frame y el clic.
+- Al cambiar de hilo, `ConversationPanel.show` cierra el feed anterior, lo que libera su
+  suscripción con refcount e interrumpe el stream si no quedan vistas, y abre el nuevo sobre la
+  misma conexión. El scroll se coloca en la línea más nueva. La barra de respuesta y "Enable
+  control" usan el entorno del hilo mostrado.
+- Tests: `ThreadSwitchTest` cubre la fila N → hilo N, el scroll, la reordenación, los botones que
+  no son el izquierdo, la suscripción, que no se mezclen mensajes del hilo anterior y el operate o
+  la respuesta del hilo nuevo.

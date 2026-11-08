@@ -46,9 +46,8 @@ public final class ThreadListView {
 	private @Nullable String emptyText;
 	private @Nullable Consumer<Set<String>> onFilterChanged;
 	private final List<Hit> hits = new ArrayList<>();
-	/** Where the rows were last drawn (x0..x1 × rowsTop..rowsBottom) and the first one drawn. */
-	private Rect rowsArea = Rect.EMPTY;
-	private int drawnFirst;
+	/** The rows as last drawn: what a click resolves against (fix/ui-chat-sidebar). */
+	private DrawnRows drawn = DrawnRows.NONE;
 	private int rowsTop;
 	private int rowsBottom;
 
@@ -125,7 +124,7 @@ public final class ThreadListView {
 	public void render(GuiGraphicsExtractor g, Font font, int mouseX, int mouseY) {
 		ChatTheme t = theme;
 		hits.clear();
-		rowsArea = Rect.EMPTY;
+		drawn = DrawnRows.NONE;
 		if (bounds.w() < 40 || bounds.h() < 40) {
 			return;
 		}
@@ -155,8 +154,7 @@ public final class ThreadListView {
 		cy += 4;
 		Rect list = new Rect(x, cy, w, bounds.bottom() - pad - cy);
 		ChatDraw.inset(g, t, list);
-		rowsTop = list.y() + 3;
-		rowsBottom = list.bottom() - 3;
+		DrawnRows d = layoutRows(list);
 
 		List<ThreadRow> rows = model.visible();
 		if (rows.isEmpty()) {
@@ -174,18 +172,13 @@ public final class ThreadListView {
 			return;
 		}
 		int rh = t.listRow();
-		int cap = capacity();
-		first = Math.max(0, Math.min(first, Math.max(0, rows.size() - cap)));
+		int cap = d.capacity();
 		String sel = model.selectedKey();
 		long now = System.currentTimeMillis();
-		int ry = rowsTop;
-		int rx0 = list.x() + 2;
-		int rx1 = list.right() - (rows.size() > cap ? 10 : 3);
-		rowsArea = new Rect(rx0, rowsTop, rx1 - rx0, cap * rh);
-		drawnFirst = first;
-		for (int i = first; i < rows.size() && i < first + cap; i++) {
+		for (int i = first; i < first + d.keys().size(); i++) {
 			ThreadRow r = rows.get(i);
-			Rect rr = new Rect(rx0, ry, rx1 - rx0, rh);
+			Rect rr = d.rowRect(i);
+			int ry = rr.y();
 			boolean selected = r.key().equals(sel);
 			if (selected) {
 				// AgentCraft popup selection: clay wash + 2 px clay bar
@@ -213,12 +206,38 @@ public final class ThreadListView {
 			int tx = rr.x() + 28;
 			g.text(font, ChatDraw.clip(font, r.title(), rr.right() - 3 - ageW - tx), tx, ty, titleColor, t.shadow());
 			hits.add(new Hit(rr, r, null, false));
-			ry += rh;
 		}
 		if (rows.size() > cap) {
 			double frac = (double) first / Math.max(1, rows.size() - cap);
 			ChatDraw.scrollbar(g, t, list.right() - 8, list.y() + 2, list.h() - 4, rows.size(), cap, frac, false);
 		}
+	}
+
+	/**
+	 * Places the rows inside the inset list rectangle {@code list}: clamps the scroll to the rows
+	 * that exist and records which rows go where ({@link DrawnRows}). {@link #render} calls it every
+	 * frame; tests call it to stand in for a frame (no Font or GUI needed).
+	 */
+	DrawnRows layoutRows(Rect list) {
+		rowsTop = list.y() + 3;
+		rowsBottom = list.bottom() - 3;
+		List<ThreadRow> rows = model.visible();
+		int rh = theme.listRow();
+		int cap = capacity();
+		first = Math.max(0, Math.min(first, Math.max(0, rows.size() - cap)));
+		int rx0 = list.x() + 2;
+		int rx1 = list.right() - (rows.size() > cap ? 10 : 3);
+		List<String> keys = new ArrayList<>();
+		for (int i = first; i < rows.size() && i < first + cap; i++) {
+			keys.add(rows.get(i).key());
+		}
+		drawn = new DrawnRows(new Rect(rx0, rowsTop, rx1 - rx0, cap * rh), rh, first, keys, cap);
+		return drawn;
+	}
+
+	/** The rows as last drawn. */
+	public DrawnRows drawn() {
+		return drawn;
 	}
 
 	/** Lays out and draws the chips (AgentCraft pills with a dot); returns the y below them. */
@@ -306,7 +325,8 @@ public final class ThreadListView {
 	}
 
 	/**
-	 * Handles a click: returns the clicked row (now selected; the host opens it), or handles a chip
+	 * Handles a click ({@code button}: {@code MouseButtonEvent.button()}, see {@link MouseButtons}):
+	 * returns the clicked row (now selected; the host opens it), or handles a chip
 	 * (left: toggle, right: solo, "All": show all) and returns null.
 	 */
 	public @Nullable ThreadRow mouseClicked(double mx, double my, int button) {
@@ -318,7 +338,7 @@ public final class ThreadListView {
 				Set<String> before = model.hidden();
 				if (hit.all()) {
 					model.showAll();
-				} else if (button == 1) {
+				} else if (MouseButtons.isRight(button)) {
 					model.solo(hit.chipEnv());
 				} else {
 					model.toggle(hit.chipEnv());
@@ -330,15 +350,22 @@ public final class ThreadListView {
 				return null;
 			}
 		}
-		// rows: pure geometry against where they were drawn (never depends on a per-frame hit list)
-		List<ThreadRow> rows = model.visible();
-		int i = BrowserLayout.rowAt(mx, my, rowsArea, theme.listRow(), drawnFirst, rows.size());
-		if (i >= 0 && button == 0) {
-			ThreadRow r = rows.get(i);
-			model.select(r.key());
-			return r;
+		// rows: the row drawn under the cursor, by key (a re-sort since the frame cannot swap it).
+		// Left button is MouseButtons.LEFT (1 in Minecraft 26.x, not GLFW's 0).
+		if (!MouseButtons.isLeft(button)) {
+			return null;
 		}
-		return null;
+		String key = drawn.keyAt(mx, my);
+		if (key == null) {
+			return null;
+		}
+		for (ThreadRow r : model.visible()) {
+			if (r.key().equals(key)) {
+				model.select(key);
+				return r;
+			}
+		}
+		return null; // gone or filtered out since the frame
 	}
 
 	public boolean contains(double mx, double my) {
