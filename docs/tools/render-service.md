@@ -96,6 +96,7 @@ The daemon also keeps `daemon.json` (heartbeat every 2 s: state, pid, queue leng
   diff + untracked files + the contents of the `--packs` folder. A repeated request returns the stored
   result immediately (`cached: true`).
 - **Outbox older than 24 h is deleted** (and its cache entries).
+- **The queue survives restarts** (see "Restarts" below).
 - Request files with bad JSON, a missing or foreign worktree, or a `--packs` folder that does not exist are
   rejected before they queue.
 
@@ -117,6 +118,33 @@ The daemon also keeps `daemon.json` (heartbeat every 2 s: state, pid, queue leng
    that has your change (or to run the full gradle `hqRender` once). Rebasing on `main` fixes the other
    cause: a worktree older than the daemon's baseline looks like "changed kernel".
 
+## Restarts: the queue is kept
+
+The queue lives on disk, in the outbox. When the daemon starts it **recovers** what the previous one left
+unfinished, before reading the inbox:
+
+- Every `outbox/<id>/status.json` in `queued`, `compiling` or `rendering` is queued again **with the same
+  id**, in its original arrival order (`queuedAt`; previews first, finals after 10 min as usual), with
+  `message: "requeued after daemon restart"` (later `queued: position n of m; requeued after daemon restart`).
+  A `submit.sh` waiting on that id simply sees the state move on; nothing to do. A job that was compiling or
+  rendering starts again from the beginning (`restarts` in `status.json` counts the interruptions).
+- No valid `request.json` in the folder (missing, bad JSON, bad fields) → `error`: *the render daemon restarted
+  and could not resume this request: … Send it again (a new number in the file name)*. The same happens to a
+  request older than 24 h, to one whose worktree no longer passes the checks (`rejected: …`), and to one
+  interrupted mid-job by more than 2 restarts (it may be what brings the daemon down). A job whose render thread
+  got stuck (the daemon restarts itself, exit 75) ends in `error` at once and is not resumed.
+- **One pending request per agent** still holds: if an agent had two unfinished requests, the newest stays
+  queued and the older ones end in `error` with `superseded by <id>`.
+- Writing the same `inbox/<id>.json` again while that id is queued or running is ignored (the inbox copy is
+  deleted; the request already in the queue answers). Once it is finished, the same id is rejected as
+  "already handled" as before: use a new number.
+
+**Orderly stop** (`start-daemon.sh --stop`, the `STOP` file): the daemon stops reading the inbox, the job in
+progress finishes, and the requests still waiting stay in the outbox as `queued` (*the render daemon stopped and
+resumes this request when it starts again*); the next start takes them up. New inbox files wait in the inbox.
+While it finishes, `daemon.json` says `stopping`. A kill (or a crash) loses nothing either: the running job is
+`compiling`/`rendering` on disk and is started again.
+
 ## Plug for the UI renderer (`tools/ui-render`)
 
 `kind: "ui"` calls, in the job's class loader,
@@ -136,7 +164,7 @@ it) or change `JobRunner.entryOf` / `compile`; one place each.
 ```bash
 tools/render/start-daemon.sh            # background; from a CLEAN checkout (its HEAD is the baseline)
 tools/render/start-daemon.sh --status   # heartbeat
-tools/render/start-daemon.sh --stop     # exits after the current job
+tools/render/start-daemon.sh --stop     # exits after the current job; the queue resumes on the next start
 ```
 
 - It runs `./gradlew --offline renderDaemonClasspath` (writes `mod/build/render-daemon/{classpath,java}.txt`,
