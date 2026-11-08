@@ -367,7 +367,7 @@ public final class TerraceGenerator {
 		PlanShapes.resolve(vox);
 		PlanNav nav = new PlanNav(vox::get);
 		List<BlockPos> targets = new ArrayList<>(nav.reachable(spawn));
-		targets.sort(Comparator.comparingInt(BlockPos::getY).thenComparingInt(BlockPos::getZ).thenComparingInt(BlockPos::getX));
+		targets.sort(Comparator.<BlockPos>comparingInt(BlockPos::getY).thenComparingInt(BlockPos::getZ).thenComparingInt(BlockPos::getX));
 		PlanLight pl = new PlanLight(vox::get);
 		pl.addAll(vox);
 		for (BlockPos t : targets) {
