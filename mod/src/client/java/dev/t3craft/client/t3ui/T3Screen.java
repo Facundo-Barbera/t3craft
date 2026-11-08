@@ -12,6 +12,7 @@ import dev.t3craft.client.chat.Rect;
 import dev.t3craft.client.chat.ThreadDirectory;
 import dev.t3craft.client.chat.ThreadRow;
 import dev.t3craft.client.chat.compose.ChatComposer;
+import dev.t3craft.client.chat.compose.ComposerInput;
 import dev.t3craft.client.chat.compose.ComposerView;
 import dev.t3craft.client.portable.NotificationLog;
 import dev.t3craft.client.portable.PortableClient;
@@ -879,7 +880,7 @@ public final class T3Screen extends Screen {
 			}
 		}
 		// while the composer has focus every key is its own (Esc leaves it): no screen shortcut fires
-		if (composer != null && composer.focused() && composer.keyPressed(e)) {
+		if (ComposerInput.keyPressed(composer, e.key(), e.hasShiftDown(), e.hasControlDownWithQuirk())) {
 			return true;
 		}
 		boolean compactSidebar = layout.compact() && layout.sidebar().w() > 0;
@@ -963,8 +964,8 @@ public final class T3Screen extends Screen {
 
 	@Override
 	public boolean charTyped(CharacterEvent event) {
-		if (composer != null && composer.focused()) {
-			return composer.charTyped(event);
+		if (ComposerInput.owns(composer)) {
+			return ComposerInput.charTyped(composer, event.codepoint());
 		}
 		if (focus == T3UiKeys.Focus.SEARCH) {
 			return super.charTyped(event);
