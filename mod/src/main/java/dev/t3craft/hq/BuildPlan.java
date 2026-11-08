@@ -82,7 +82,7 @@ public final class BuildPlan {
 	/** Group of every placement, when the generator gives it (plans with many small modules: layout/ring). */
 	private final @Nullable Map<BlockPos, String> groupIndex;
 
-	BuildPlan(List<Placement> placements, SortedMap<String, Anchor> anchors, List<Module> modules, List<Workstation> workstations) {
+	public BuildPlan(List<Placement> placements, SortedMap<String, Anchor> anchors, List<Module> modules, List<Workstation> workstations) {
 		this(placements, anchors, modules, workstations, null);
 	}
 
@@ -91,7 +91,7 @@ public final class BuildPlan {
 		this(placements, anchors, modules, workstations, groupIndex, "");
 	}
 
-	BuildPlan(List<Placement> placements, SortedMap<String, Anchor> anchors, List<Module> modules, List<Workstation> workstations,
+	public BuildPlan(List<Placement> placements, SortedMap<String, Anchor> anchors, List<Module> modules, List<Workstation> workstations,
 			@Nullable Map<BlockPos, String> groupIndex, String packHash) {
 		this.packHash = packHash;
 		this.groupIndex = groupIndex; // the generator hands an unmodifiable map; replacing() keeps positions, so it is shared
@@ -170,7 +170,7 @@ public final class BuildPlan {
 	 * The group of every placement in one pass (the same answer {@link #groupAt} gives for each, without
 	 * scanning the module list per cell). Placements no module owns are left out.
 	 */
-	Map<BlockPos, String> groupsByPos() {
+	public Map<BlockPos, String> groupsByPos() {
 		Map<BlockPos, String> out = new java.util.HashMap<>(placements.size() * 2);
 		if (groupIndex != null) {
 			for (Map.Entry<BlockPos, String> e : groupIndex.entrySet()) {
@@ -338,7 +338,7 @@ public final class BuildPlan {
 	}
 
 	/** This plan marked as generated with the layout pack {@code hash} (goes into {@link #fingerprint()}). */
-	BuildPlan withPackHash(String hash) {
+	public BuildPlan withPackHash(String hash) {
 		return hash.equals(packHash) ? this : new BuildPlan(placements, anchors, modules, workstations, groupIndex, hash);
 	}
 
@@ -347,7 +347,7 @@ public final class BuildPlan {
 	 * {@code extraAnchors} added or replacing anchors of the same name, and the group of every new
 	 * position in {@code extraGroups} (kept when the plan has a group index).
 	 */
-	BuildPlan rebuilt(List<Placement> newPlacements, java.util.Collection<Anchor> extraAnchors, Map<BlockPos, String> extraGroups) {
+	public BuildPlan rebuilt(List<Placement> newPlacements, java.util.Collection<Anchor> extraAnchors, Map<BlockPos, String> extraGroups) {
 		TreeMap<String, Anchor> a = new TreeMap<>(anchors);
 		for (Anchor x : extraAnchors) {
 			a.put(x.name(), x);

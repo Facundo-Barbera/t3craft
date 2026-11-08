@@ -16,7 +16,7 @@ public final class SignTags {
 	private SignTags() {
 	}
 
-	static CompoundTag sign(DyeColor color, boolean glowing, String... lines) {
+	public static CompoundTag sign(DyeColor color, boolean glowing, String... lines) {
 		List<Component> msgs = new ArrayList<>(SignText.LINES);
 		for (int i = 0; i < SignText.LINES; i++) {
 			msgs.add(Component.literal(i < lines.length ? clip(lines[i]) : ""));
@@ -31,7 +31,7 @@ public final class SignTags {
 		return t;
 	}
 
-	static String clip(String s) {
+	public static String clip(String s) {
 		String t = s.strip();
 		return t.length() <= LINE ? t : t.substring(0, LINE - 1) + "…";
 	}
