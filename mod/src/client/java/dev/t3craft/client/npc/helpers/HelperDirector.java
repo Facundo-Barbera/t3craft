@@ -21,7 +21,7 @@ import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Subagents as "helpers": small client-only villagers ({@link HelperAvatar}) that follow their
+ * Subagents as "helpers": small client-only players in the apprentice variant of the parent's skin ({@link HelperAvatar}) that follow their
  * parent's NPC and stand on an arc behind it ({@link HelperFormation}), so they gather round the
  * parent's desk without taking one. Fed once per refresh with the grouping from
  * {@link HelperRoster}; spawns, despawns (with particles) and re-slots through
@@ -29,7 +29,7 @@ import org.jspecify.annotations.Nullable;
  *
  * <p><b>Entity ids</b> count down from {@link #ID_BASE} = −4,000,000 (NpcRegistry −1,000,000…,
  * builders −2,000,000…, BehaviorDirector −3,000,000…, workstations −5,000,000…). NpcRegistry's
- * orphan sweep treats every id ≤ −1,000,000 as its own and may discard our villagers after one of
+ * orphan sweep treats every id ≤ −1,000,000 as its own and may discard our helpers after one of
  * its rare recoveries: each tick checks {@link Entity#isRemoved()} and respawns them. Entities are
  * kept by reference, never looked up by id and cast (hot-swap safe); no static state.
  *
@@ -40,8 +40,8 @@ public final class HelperDirector {
 	static final int ID_BASE = -4_000_000;
 	private static final int PARTICLE_EVERY_TICKS = 20;
 	private static final long ERROR_LOG_INTERVAL_MS = 30_000;
-	/** Top of a baby villager's head, for the status-colour particles. */
-	private static final double HEAD_Y = 1.0;
+	/** Top of a helper's head (player height × HelperAvatar.SCALE), for the status-colour particles. */
+	private static final double HEAD_Y = 1.1;
 
 	private static final class Body {
 		HelperLifecycle.Placed placed;

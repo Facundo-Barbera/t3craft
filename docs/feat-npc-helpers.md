@@ -8,12 +8,12 @@ Tests: `mod/src/test/java/dev/t3craft/client/npc/helpers/` (JUnit, lógica pura)
 
 ## Qué se ve
 
-- Cada subagente **en marcha** aparece como un **aldeano bebé** solo de cliente, detrás de su padre,
+- Cada subagente **en marcha** aparece como un **aprendiz** solo de cliente (jugador pequeño, escala 0,6), detrás de su padre,
   en abanico (hasta 240°, radio 1,4 bloques). Cuando el padre está en su escritorio, los ayudantes
   rodean la silla; cuando camina, lo siguen (paso máximo 0,22 bloques/tick, zona muerta 0,2, salto
   directo si quedan a más de 8 bloques). Parados, giran despacio para mirar al padre.
-- **Variante visual**: tipo de aldeano (bioma) y profesión elegidos por hash del id; el mismo
-  subagente siempre se ve igual.
+- **Variante visual**: la variante «aprendiz» de la skin del padre (`AgentSkins.forHelper`: misma
+  cara y camisa, más delantal y gorra); ver «Skins de agentes» en `docs/api.md`.
 - **Color de estado propio**: nametag `glifo título` en el color del `ThreadState` del subagente
   (⚙ cian trabajando, ! naranja si pide algo) y partículas de polvo de ese color sobre la cabeza.
 - **Límite por padre** (`maxPerParent`, 3 por defecto): primero los que esperan al usuario, luego los
@@ -94,5 +94,5 @@ El barrido de huérfanos de `NpcRegistry` trata todo id ≤ −1,000,000 como su
 | `HelperFormation` | Puro: abanico detrás del padre, paso de seguimiento, yaw. |
 | `HelperLifecycle` | Puro: diff spawn / update / despawn con motivo (`FINISHED`, `PARENT_GONE`, `HIDDEN`). |
 | `HelperConfig` | Bloque `helpers` de la config. |
-| `HelperAvatar` | Aldeano bebé solo de cliente (variante y nametag). |
+| `HelperAvatar` | `RemotePlayer` pequeño solo de cliente (skin aprendiz del padre y nametag). |
 | `HelperDirector` | Entidades, seguimiento, partículas, línea del panel, clic derecho. |
