@@ -8,7 +8,8 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Small, tolerant Markdown subset for the chat screen: ATX headings, paragraphs, bullet and
- * numbered lists (nested by indent), fenced code blocks, block quotes, horizontal rules, and inline
+ * numbered lists (nested by indent), fenced code blocks, block quotes, horizontal rules, GFM tables
+ * (header, delimiter row with {@code :} alignment, optional outer pipes, {@code \|}), and inline
  * {@code **bold**}, {@code *italic*}/{@code _italic_}, {@code `code`}, {@code [text](url)} and bare
  * {@code http(s)://} links. Anything else is kept as plain text. Never throws.
  *
@@ -54,6 +55,21 @@ public final class Markdown {
 	}
 
 	public record Rule() implements Block {
+	}
+
+	/** Column alignment from the delimiter row ({@code ---} / {@code :--} left, {@code :-:} centre, {@code --:} right). */
+	public enum Align {
+		LEFT, CENTER, RIGHT
+	}
+
+	/**
+	 * GFM table. {@code header} and every row have exactly {@code aligns.size()} cells (short rows
+	 * padded with empty cells, long rows cut).
+	 */
+	public record Table(List<Align> aligns, List<List<Span>> header, List<List<List<Span>>> rows) implements Block {
+		public int columns() {
+			return aligns.size();
+		}
 	}
 
 	private static final Pattern HEADING = Pattern.compile("^ {0,3}(#{1,6})\\s+(.*?)\\s*#*\\s*$");
@@ -134,6 +150,24 @@ public final class Markdown {
 				out.add(new ListItem(depth(m.group(1)), m.group(2), inline(m.group(3))));
 				continue;
 			}
+			// GFM table: a row with a pipe followed by a valid delimiter row. While a reply streams, a
+			// delimiter row still arriving (last line) already counts, so the table appears at once.
+			if (quote.isEmpty() && hasPipe(line) && i + 1 < lines.length) {
+				List<String> head = cells(line);
+				List<Align> aligns = delimiter(lines[i + 1], head.size(), i + 1 == lines.length - 1);
+				if (aligns != null) {
+					flush(out, para, quote);
+					int n = head.size();
+					List<List<List<Span>>> rows = new ArrayList<>();
+					int j = i + 2;
+					for (; j < lines.length && isTableRow(lines[j]); j++) {
+						rows.add(rowSpans(cells(lines[j]), n));
+					}
+					out.add(new Table(List.copyOf(aligns), rowSpans(head, n), List.copyOf(rows)));
+					i = j - 1;
+					continue;
+				}
+			}
 			// Lazy continuation of a list item: indented text right after one.
 			if (para.isEmpty() && quote.isEmpty() && !out.isEmpty() && out.getLast() instanceof ListItem li
 					&& line.startsWith("  ") && i > 0 && !lines[i - 1].isBlank()) {
@@ -153,6 +187,120 @@ public final class Markdown {
 		}
 		flush(out, para, quote);
 		return out;
+	}
+
+	private static final Pattern DELIM_CELL = Pattern.compile(":?-+:?");
+	private static final Pattern DELIM_PARTIAL_CELL = Pattern.compile(":?-*:?");
+
+	/** True when {@code line} has a pipe that is not escaped with a backslash. */
+	private static boolean hasPipe(String line) {
+		for (int k = 0; k < line.length(); k++) {
+			char c = line.charAt(k);
+			if (c == '\\') {
+				k++;
+			} else if (c == '|') {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** A body row continues the table: not blank, has a pipe, does not start another block. */
+	private static boolean isTableRow(String line) {
+		return !line.isBlank() && hasPipe(line) && !FENCE.matcher(line).matches() && !HEADING.matcher(line).matches()
+				&& !QUOTE.matcher(line).matches();
+	}
+
+	/**
+	 * Cells of a table row: outer pipes optional, split at unescaped pipes, {@code \|} kept as a
+	 * literal pipe (also inside code), each cell trimmed.
+	 */
+	static List<String> cells(String line) {
+		String t = line.strip();
+		int start = t.startsWith("|") ? 1 : 0;
+		List<String> out = new ArrayList<>();
+		StringBuilder b = new StringBuilder();
+		boolean endedWithPipe = false;
+		for (int k = start; k < t.length(); k++) {
+			char c = t.charAt(k);
+			endedWithPipe = false;
+			if (c == '\\' && k + 1 < t.length()) {
+				char next = t.charAt(k + 1);
+				if (next == '|') {
+					b.append('|');
+				} else {
+					b.append(c).append(next);
+				}
+				k++;
+				continue;
+			}
+			if (c == '|') {
+				out.add(b.toString().strip());
+				b.setLength(0);
+				endedWithPipe = true;
+				continue;
+			}
+			b.append(c);
+		}
+		if (!endedWithPipe || out.isEmpty()) {
+			out.add(b.toString().strip());
+		}
+		return out;
+	}
+
+	/**
+	 * Alignments of a delimiter row with {@code n} cells, or null when {@code line} is not one. With
+	 * {@code partial} (the last line of a reply still streaming) a delimiter row cut short counts:
+	 * fewer cells, a last cell still empty or without its dash; missing columns align left.
+	 */
+	private static @Nullable List<Align> delimiter(String line, int n, boolean partial) {
+		String t = line.strip();
+		if (t.isEmpty() || n < 1) {
+			return null;
+		}
+		for (int k = 0; k < t.length(); k++) {
+			if ("|:- ".indexOf(t.charAt(k)) < 0) {
+				return null;
+			}
+		}
+		if (t.indexOf('-') < 0 && !partial) {
+			return null;
+		}
+		if (!hasPipe(t)) { // "---" alone is a rule (or a setext underline), never a delimiter row
+			return null;
+		}
+		List<String> cs = cells(t);
+		if (partial && t.equals("|")) {
+			cs = List.of();
+		}
+		if (partial ? cs.size() > n : cs.size() != n) {
+			return null;
+		}
+		List<Align> out = new ArrayList<>();
+		for (int k = 0; k < cs.size(); k++) {
+			String c = cs.get(k);
+			boolean last = k == cs.size() - 1;
+			boolean ok = DELIM_CELL.matcher(c).matches() || partial && last && DELIM_PARTIAL_CELL.matcher(c).matches();
+			if (!ok) {
+				return null;
+			}
+			boolean l = c.startsWith(":");
+			boolean r = c.length() > 1 && c.endsWith(":");
+			out.add(l && r ? Align.CENTER : r ? Align.RIGHT : Align.LEFT);
+		}
+		while (out.size() < n) {
+			out.add(Align.LEFT);
+		}
+		return out;
+	}
+
+	/** Inline spans of each cell, padded with empty cells or cut to {@code n}. */
+	private static List<List<Span>> rowSpans(List<String> cells, int n) {
+		List<List<Span>> out = new ArrayList<>(n);
+		for (int k = 0; k < n; k++) {
+			out.add(k < cells.size() ? List.copyOf(inline(cells.get(k))) : List.of());
+		}
+		return List.copyOf(out);
 	}
 
 	/** Same fence character, at least as long as the opener, nothing else on the line. */
