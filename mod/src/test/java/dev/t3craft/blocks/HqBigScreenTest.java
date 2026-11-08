@@ -150,15 +150,15 @@ class HqBigScreenTest {
 	}
 
 	@Test
-	void deskMonitorsStayLoneScreensAndThePlansScreensMerge() {
+	void eachDeskMergesIntoOne3x2ScreenAndThePlansScreensMerge() {
 		BuildPlan p = plan();
 		Map<BlockPos, HqBindings.Fixture> fixtures = fixtureMap(p);
 		Map<BlockPos, ScreenRect> walls = HqBlockFixtures.screens(fixtures);
 		assertFalse(walls.isEmpty());
-		for (HqBindings.Fixture f : fixtures.values()) {
-			ScreenRect r = walls.get(f.rel());
-			if (f.role() == HqBindings.Role.MONITOR && r != null) {
-				assertFalse(r.isMulti(), "desk monitor at " + f.rel() + " merged into " + r);
+		for (dev.t3craft.hq.Workstation w : p.workstations()) {
+			ScreenRect want = HqBindings.deskScreen(w);
+			for (BlockPos cell : w.screenCells()) {
+				assertEquals(want, walls.get(cell), "desk " + w.threadId() + ": one 3x2 screen, never merged with a neighbour");
 			}
 		}
 		for (HqBindings.Screen sc : HqBindings.screens(p)) {

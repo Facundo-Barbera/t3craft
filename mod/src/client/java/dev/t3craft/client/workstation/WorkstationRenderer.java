@@ -49,8 +49,6 @@ import org.jspecify.annotations.Nullable;
  */
 final class WorkstationRenderer {
 	static final int ID_BASE = -5_000_000;
-	/** Scale of the screen text: 28 characters ≈ 1.9 blocks wide. */
-	private static final float SCREEN_SCALE = 0.45f;
 	private static final int LINE_WIDTH_PX = 170;
 	private static final float HITBOX_HEIGHT = 1.75f;
 	/** Re-check whether the computer block is air this often (ticks). */
@@ -226,7 +224,7 @@ final class WorkstationRenderer {
 		d.setBillboardConstraints(Display.BillboardConstraints.FIXED);
 		d.setLineWidth(LINE_WIDTH_PX);
 		d.setBrightnessOverride(Brightness.FULL_BRIGHT);
-		d.setTransformation(new Transformation(null, null, new Vector3f(SCREEN_SCALE), null));
+		d.setTransformation(new Transformation(null, null, new Vector3f(p.scale()), null));
 		d.snapTo(p.screenX(), p.screenY(), p.screenZ(), p.screenYaw(), 0f);
 		lvl.addEntity(d);
 		dev.t3craft.debug.PerfStats.count(dev.t3craft.debug.PerfStats.DISPLAY_SPAWNED);

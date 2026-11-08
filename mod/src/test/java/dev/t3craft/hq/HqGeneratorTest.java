@@ -295,7 +295,7 @@ class HqGeneratorTest {
 	}
 
 	@Test
-	void everyThreadHasADeskMonitorAndLamp() {
+	void everyThreadHasADesk3x2ScreenAndNoLamp() {
 		HqInput in = input(3, 5);
 		BuildPlan p = plan(in);
 		int desks = 0;
@@ -306,17 +306,19 @@ class HqGeneratorTest {
 			for (String t : pr.threads()) {
 				Anchor seat = p.anchor(AnchorNames.desk(t));
 				Anchor mon = p.anchor(AnchorNames.monitor(t));
-				Anchor lamp = p.anchor(AnchorNames.lamp(t));
+				assertNull(p.anchor(AnchorNames.lamp(t)), "no desk lamp anchor");
 				assertNotNull(seat, t);
 				assertNotNull(mon, t);
-				assertNotNull(lamp, t);
 				assertTrue(p.at(seat.block()).state().isAir(), "no chair: the NPC stands at its desk");
 				assertTrue(walkable(p, seat.block()), "the standing cell is free");
 				assertTrue(p.at(seat.block().above()).state().isAir(), "headroom over the seat");
 				assertEquals(seat.block().relative(seat.facing()).above(), mon.block(), "monitor in front of the seat at eye level");
 				assertTrue(p.at(mon.block()).state().is(Blocks.CONCRETE.pick(net.minecraft.world.item.DyeColor.BLACK)));
 				assertEquals(mon.facing(), seat.facing().getOpposite(), "monitor faces the seat");
-				assertTrue(p.at(lamp.block()).state().is(Blocks.COPPER_BULB.waxed().unaffected()));
+				Workstation ws = p.workstation(t);
+				for (net.minecraft.core.BlockPos cell : ws.screenCells()) {
+					assertTrue(p.at(cell).state().is(Blocks.CONCRETE.pick(net.minecraft.world.item.DyeColor.BLACK)), "screen cell " + cell);
+				}
 				desks++;
 			}
 		}

@@ -128,10 +128,12 @@ class HqAnchorPlacementTest {
 			assertTrue(p.at(stand.block().above()).state().isAir(), "head " + p.at(stand.block().above()).state());
 			assertFalse(p.at(stand.block().below()).state().isAir(), "floor below");
 			assertEquals(stand.block().getY(), stand.y(), 1e-9, "feet on the floor");
-			// never the desk, computer, lamp or a wall
-			assertNotEquals(w.computerPos(), stand.block());
-			assertNotEquals(w.lampPos(), stand.block());
+			// never the desk, the screen or a wall; the 3×2 screen keeps clear of the NPC's feet and head
 			assertNotEquals(w.computerPos().below(), stand.block());
+			for (net.minecraft.core.BlockPos cell : w.screenCells()) {
+				assertNotEquals(cell, stand.block(), "screen cell at the feet");
+				assertNotEquals(cell, stand.block().above(), "screen cell at the head");
+			}
 		}
 		assertEquals(Set.of(Direction.NORTH, Direction.SOUTH), seen, "north and south desks");
 	}

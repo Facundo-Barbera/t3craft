@@ -12,7 +12,7 @@ import org.jspecify.annotations.Nullable;
  * each module's cells (hub shell, board frame, portico, spine, wing walls and roofs, desk furniture,
  * gardens, lights). A style only decides <em>which block goes in each cell</em> of a module:
  * {@link HqGenerator} owns the geometry (the same {@link HqGeometry} boxes for every style), every
- * {@link Anchor} and {@link Workstation}, and writes the fixture cells (computers, status lamps,
+ * {@link Anchor} and {@link Workstation}, and writes the fixture cells (desk screens,
  * board bulbs, beacon, archive terminal, reserved screens) itself after the piece, so NPCs, {@link HqFixtures}, site
  * envelopes and builders see the same plan shape whatever the style.
  *
@@ -62,11 +62,11 @@ public abstract class HqStyle {
 		BENCH,
 		/** The attention board's face. */
 		BOARD,
-		/** Occupied desk computer (replaced by a monitor when the blocks module is on). */
+		/** Cells of an occupied desk's 3×2 screen (replaced by monitors when the blocks module is on). */
 		COMPUTER_ON,
 		/** Vacant desk computer. */
 		COMPUTER_OFF,
-		/** Status lamp (replaced by the blocks module's lamp when it is on). */
+		/** The board's bulbs (replaced by the blocks module's board lamps when it is on); never on desks. */
 		STATUS_LAMP,
 		/** Stand-in for the reserved big screens and the kanban wall (until P1/P3 blocks replace it). */
 		SCREEN,
@@ -102,7 +102,7 @@ public abstract class HqStyle {
 		return palette().get(on ? Role.COMPUTER_ON : Role.COMPUTER_OFF);
 	}
 
-	/** Status lamp of a desk and bulb of the board (off; other modules toggle {@code lit}). */
+	/** Bulb of the board (off; other modules toggle {@code lit}). Desks have no lamp: their screen shows the state. */
 	BlockState statusLamp() {
 		return palette().get(Role.STATUS_LAMP);
 	}
@@ -164,14 +164,25 @@ public abstract class HqStyle {
 
 	/**
 	 * One desk slot. Vacant ({@code !occupied}): only the floor (vacant desks are not built). Occupied:
-	 * a standing desk; {@code computer} and {@code lamp} are written by the generator after this, and
-	 * {@code stand} (where the agent works, standing) and the cell above it are cleared to air.
+	 * a standing desk along the row ({@code drawer}, the cell under {@code computer}, {@code right}); the
+	 * generator writes the desk's 3×2 screen after this ({@link DeskCells#screen}, the two rows above the
+	 * desk top, so leave them alone) and clears {@code stand} (where the agent works, standing) and the
+	 * cell above it to air.
 	 */
 	abstract void desk(PlanBuilder.Canvas c, DeskCells cells);
 
-	/** The cells of one desk, all inside its {@link HqGeometry#desk} box. {@code facing}: from the agent to the desk. */
-	record DeskCells(int module, int slot, BlockPos computer, BlockPos lamp, BlockPos drawer, BlockPos stand,
+	/**
+	 * The cells of one desk, all inside its {@link HqGeometry#desk} box. {@code computer}: the screen's
+	 * bottom-middle cell (over the middle desk top); {@code right}/{@code drawer}: the desk tops to the
+	 * agent's right and left; {@code facing}: from the agent to the desk.
+	 */
+	record DeskCells(int module, int slot, BlockPos computer, BlockPos right, BlockPos drawer, BlockPos stand,
 			net.minecraft.core.Direction facing, boolean occupied) {
+		/** The screen's cells ({@link Workstation#SCREEN_WIDTH} × {@link Workstation#SCREEN_HEIGHT} over the desk). */
+		java.util.List<BlockPos> screen() {
+			net.minecraft.core.Direction screenFacing = facing.getOpposite();
+			return Workstation.screenCells(Workstation.screenOriginFor(computer, screenFacing), screenFacing.getCounterClockWise());
+		}
 	}
 
 	/**

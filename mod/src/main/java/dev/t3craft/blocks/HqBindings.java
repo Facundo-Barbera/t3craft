@@ -21,8 +21,10 @@ import org.jspecify.annotations.Nullable;
  * {@code HqLayout}, and the same roster in any order gives the same list.
  *
  * <ul>
- *   <li>each desk: {@code computerPos} → monitor facing the chair, {@code lampPos} → status lamp; both
- *       bound to {@code thread:<threadId>} (the HQ's thread id is the NPC key) or unbound when vacant;</li>
+ *   <li>each desk: the six cells of its 3×2 screen ({@link Workstation#screenCells}) → monitors facing
+ *       the agent, all bound to {@code thread:<threadId>} (the HQ's thread id is the NPC key), so they
+ *       merge into one screen whose origin carries the thread ({@link MonitorWall}); unbound when
+ *       vacant. Desks have no status lamp (fix/desk-screens-3x2);</li>
  *   <li>{@code board_lamp_<i>} anchors → board bulb {@code board:<i>};</li>
  *   <li>each module: the lintel over its doorway (the inner wall's beam, one block in from the
  *       {@code module@<i>} anchor, three up) → board bulb {@code module:<threads at its desks>}, the
@@ -50,7 +52,9 @@ import org.jspecify.annotations.Nullable;
  */
 public final class HqBindings {
 	public enum Role {
-		MONITOR, LAMP, BOARD_LAMP, BEACON,
+		/** One cell of a desk's 3×2 screen. */
+		MONITOR,
+		BOARD_LAMP, BEACON,
 		/** The archive terminal ({@code archiveTerminal} anchor): unbound, it always shows the whole archive. */
 		ARCHIVE_TERMINAL,
 		/** One cell of a large screen reserved by the plan ({@link AnchorNames#bigScreen}). */
@@ -71,6 +75,11 @@ public final class HqBindings {
 	private HqBindings() {
 	}
 
+	/** The 3×2 screen of a desk as a {@link ScreenRect} (plan-relative; origin = top-left cell). */
+	public static ScreenRect deskScreen(Workstation w) {
+		return new ScreenRect(w.screenOrigin(), w.screenFacing(), Workstation.SCREEN_WIDTH, Workstation.SCREEN_HEIGHT);
+	}
+
 	/** A large screen reserved by the plan: its plan-relative extent and what it shows. */
 	public record Screen(String key, ScreenRect extent, Binding binding) {
 	}
@@ -80,8 +89,9 @@ public final class HqBindings {
 		Map<BlockPos, Fixture> out = new LinkedHashMap<>();
 		for (Workstation w : plan.workstations()) {
 			Binding b = w.threadId() == null ? Binding.NONE : Binding.thread(w.threadId());
-			out.putIfAbsent(w.computerPos(), new Fixture(w.computerPos(), Role.MONITOR, b, w.screenFacing()));
-			out.putIfAbsent(w.lampPos(), new Fixture(w.lampPos(), Role.LAMP, b, w.screenFacing()));
+			for (BlockPos cell : w.screenCells()) {
+				out.putIfAbsent(cell, new Fixture(cell, Role.MONITOR, b, w.screenFacing()));
+			}
 		}
 		for (Anchor a : plan.anchors().values()) {
 			String n = a.name();

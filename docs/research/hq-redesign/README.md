@@ -8,8 +8,9 @@ Los PNG son renders generados; **no** se commitea ninguna textura de Minecraft.
 | Archivo | Qué muestra |
 |---|---|
 | `cherry_module.png` | Un módulo (ala de 6 escritorios) desde fuera: tejado cóncavo de tejas de deepslate, cumbrera de blackstone, paneles shoji iluminados, jardín con cerezo, bambú y faroles de piedra. |
-| `cherry_module_cutaway.png` | El mismo módulo cortado en y=4: escritorios de pie (`standing_desk`) con monitor y lámpara, agentes **de pie** (sin sillas), pasillo con la alfombra del color del entorno, pantalla grande (3×2) al fondo del pasillo, puerta abierta de 3 sin escalón. |
-| `cherry_section_wing.png` | Corte transversal del ala: perfil del tejado (dentro de y ≤ 10), escritorio de pie contra el muro y monitor a la altura de los ojos. |
+| `cherry_module_cutaway.png` | El mismo módulo cortado en y=4: escritorios de pie (`standing_desk`) con **una pantalla de 3×2** (6 monitores fusionados, sin lámpara), agentes **de pie** (sin sillas), pasillo con la alfombra del color del entorno, pantalla grande (3×2) al fondo del pasillo, puerta abierta de 3 sin escalón. |
+| `cherry_section_wing.png` | Corte transversal del ala: perfil del tejado (dentro de y ≤ 10), escritorio de pie contra el muro y su pantalla de 3×2 (2 de alto) a la altura de los ojos. |
+| `desk_screens_before.png`, `desk_screens_after.png` | fix/desk-screens-3x2: el módulo cortado antes (monitor de 1×1 y lámpara por escritorio) y después (una pantalla de 3×2 por escritorio con estado y log integrados, sin lámparas). |
 | `cherry_hub.png` | Hub y entrada: tejado de dos niveles con clerestorio de shoji, cúpula con el faro (P5), torii, deck (engawa), sendero de grava y dos cerezos. |
 | `cherry_hub_cutaway.png` | Hub cortado en y=5: pared kanban de hilos al oeste (P3, `thread_board`), pantalla grande del hub al este (P1), bancos mirando a ambas, tablero "Needs attention" con su tejadillo, columna libre en el centro para el holograma (P4) y nicho de la terminal de archivo junto a la entrada. |
 | `cherry_plan.png` | Planta cortada en y=2 (1 proyecto). |
@@ -32,7 +33,7 @@ bancos, terminal y pared kanban); no son bloques del plan.
   del hub, al este de la entrada, con su sitio de pie (`archive`). No hay estantes por hilo.
 - **Pantallas**: `bigscreen_hub@5x3=env:<entorno>` en el muro este del hub y `bigscreen_module@<i>@3x2=project:<proyecto>`
   al fondo del pasillo de cada módulo; `thread_wall` y `thread_wall_end` (9×4) en el muro oeste del hub;
-  `hologram` y la columna libre sobre el centro del hub; `beacon` en la cúpula; monitor y lámpara por escritorio.
+  `hologram` y la columna libre sobre el centro del hub; `beacon` en la cúpula; una pantalla de 3×2 por escritorio (sin lámpara).
 - Puertas abiertas de 3 de ancho y 3 de alto sin escalones; pasillos de al menos 2 de ancho.
 
 ## Herramienta: `hq-render` (propia, MIT)

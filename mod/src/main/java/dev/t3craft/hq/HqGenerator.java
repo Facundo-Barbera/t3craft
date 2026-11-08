@@ -27,7 +27,7 @@ import org.jspecify.annotations.Nullable;
  * the beacon in the roof lantern, the archive terminal's nook by the entrance), the entrance portico,
  * the spine (one row per pair of wings, a sign over each wing's doorway), one wing per project
  * (inner wall with an open doorway, desk segments, end cap with the module's big screen) and one
- * standing desk per taken slot (monitor, status lamp, a free standing cell in front; vacant slots
+ * standing desk per taken slot (a 3×2 screen on it, a free standing cell in front; vacant slots
  * are bare floor). What fills each piece's cells comes from an {@link HqStyle}; the boxes, anchors,
  * workstations, fixture cells and reserved surfaces are the generator's and the same in every style.
  */
@@ -290,9 +290,11 @@ public final class HqGenerator {
 	}
 
 	/**
-	 * One desk slot: the style's standing desk, then the computer, the status lamp, the free standing
-	 * cell and the anchors. A vacant slot is bare floor (fix/hq-stale-stations: no desk, computer, lamp
-	 * or workstation until a thread takes it again).
+	 * One desk slot: the style's standing desk, then the desk's 3×2 screen on the desk top (the
+	 * style's computer blocks; the blocks module turns them into monitors that merge into one screen),
+	 * the free standing cell and the anchors. No status lamp (fix/desk-screens-3x2): the screen shows
+	 * the thread's state. A vacant slot is bare floor (fix/hq-stale-stations: no desk, screen or
+	 * workstation until a thread takes it again).
 	 */
 	private void desk(PlanBuilder b, int i, int slot, @Nullable String threadId) {
 		Box box = HqGeometry.desk(i, slot);
@@ -304,22 +306,22 @@ public final class HqGenerator {
 			BlockPos left = desk.relative(right.getOpposite());
 			BlockPos rightPos = desk.relative(right);
 			BlockPos monitor = desk.above();
-			BlockPos lamp = rightPos.above();
 			BlockPos stand = new BlockPos(cx, 1, HqGeometry.wz(i, HqGeometry.chairV(slot)));
-			style.desk(c, new HqStyle.DeskCells(i, slot, monitor, lamp, left, stand, f, threadId != null));
+			HqStyle.DeskCells cells = new HqStyle.DeskCells(i, slot, monitor, rightPos, left, stand, f, threadId != null);
+			style.desk(c, cells);
 			if (threadId == null) {
 				return;
 			}
-			c.set(monitor, style.computer(true));
-			c.set(lamp, style.statusLamp());
+			for (BlockPos p : cells.screen()) {
+				c.set(p, style.computer(true));
+			}
 			c.set(stand, AIR);
 			c.set(stand.above(), AIR);
 			Anchor deskA = Anchor.at(AnchorNames.deskSlot(i, slot), stand, f);
 			Anchor screen = Anchor.face(AnchorNames.screenSlot(i, slot), monitor, f.getOpposite());
-			b.workstation(new Workstation(i, slot, threadId, deskA, monitor, screen, lamp));
+			b.workstation(new Workstation(i, slot, threadId, deskA, monitor, screen, Workstation.screenOriginFor(monitor, f.getOpposite())));
 			b.anchor(deskA.renamed(AnchorNames.desk(threadId)));
 			b.anchor(screen.renamed(AnchorNames.monitor(threadId)));
-			b.anchor(Anchor.face(AnchorNames.lamp(threadId), lamp, f.getOpposite()));
 		}
 	}
 }

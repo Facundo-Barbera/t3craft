@@ -16,8 +16,8 @@ import net.minecraft.core.BlockPos;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Workstation screens on the HQ's own computers: a seated thread's screen sits on its desk's
- * {@code computerPos} (when its wing stands), a released thread's on its computer on the hub's
+ * Workstation screens on the HQ's own computers: a seated thread's screen is laid on the face of its
+ * desk's 3×2 screen ({@link StationPlacement#onFace}, when its wing stands), a released thread's on its computer on the hub's
  * "Archived" shelf (when the base stands; the HQ has no basement). Threads without a computer in the building get no station (null), never one on the
  * grass. Precomputed once per plan; lookups are map reads.
  */
@@ -31,7 +31,10 @@ public final class HqStations implements WorkstationPlacementSource {
 			}
 			BlockPos c = site.cell(w.computerPos());
 			Anchor screen = site.anchor(w.screen());
-			byThread.put(w.threadId(), StationPlacement.on(c.getX(), c.getY(), c.getZ(), screen.yaw()));
+			// fix/desk-screens-3x2: the display covers the desk's whole 3×2 screen face (blocks module off;
+			// with it on, the merged monitor draws itself and the display stays blank)
+			byThread.put(w.threadId(), StationPlacement.onFace(c.getX(), c.getY(), c.getZ(), c.getX(), c.getY(), c.getZ(),
+					Workstation.SCREEN_WIDTH, screen.yaw()));
 		}
 		{
 			for (Anchor a : plan.anchors().values()) {

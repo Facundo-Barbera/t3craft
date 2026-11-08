@@ -83,6 +83,8 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 		float zStep = MonitorLod.MIN_Z_STEP;
 		boolean caretOn;
 		float pulse;
+		/** {@link MonitorLod#breath}: the "needs you" breathing of the header / far face. */
+		float breath;
 	}
 
 	/** One tool / text row, ready to draw. */
@@ -92,7 +94,8 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 	/** Everything a screen draws, built once per content version. */
 	record Glyphs(String cacheKey, long version, int background, int accent,
 			@Nullable FormattedCharSequence title, @Nullable FormattedCharSequence status, int statusColor,
-			List<RowGlyph> rows, @Nullable FormattedCharSequence footer, int footerColor, boolean caret, float statusScale) {
+			List<RowGlyph> rows, @Nullable FormattedCharSequence footer, int footerColor, boolean caret, float statusScale,
+			float titleScale, boolean attention) {
 	}
 
 	private final BlocksClient client;
@@ -168,6 +171,7 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 		state.caretOn = (ms / CARET_MS) % 2 == 0;
 		double ph = (ms % PULSE_MS) / (double) PULSE_MS;
 		state.pulse = (float) (0.5 - 0.5 * Math.cos(ph * Math.PI * 2));
+		state.breath = MonitorLod.breath(ms);
 		try {
 			state.glyphs = glyphsFor(be, layout);
 		} catch (RuntimeException e) {
@@ -213,11 +217,13 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 		StationStatus st = screen.status();
 		int w = (int) (l.x1() - l.x0());
 		String word = st.glyph + " " + st.word;
-		float scale = Math.max(1f, Math.min(2.5f, w / (float) Math.max(1, font.width(word))));
 		String title = t != null && !t.title().isBlank() ? t.title() : screen.lines().isEmpty() ? "" : screen.lines().getFirst().text();
+		MonitorLod.FarText ft = MonitorLod.farText(l, font.width(word), title.isEmpty() ? 0 : font.width(title));
+		String shown = title.isEmpty() ? "" : ellipsize(font, title, (int) (w / Math.max(1f, ft.titleScale())));
+		// status word uncoloured: the draw colours it (and breathes it when the thread needs the user)
 		return new Glyphs(key, version, ScreenDraw.shade(st.color, 0.22f), 0xFF000000 | st.color,
-				seq(ellipsize(font, title, w), TEXT), seq(word, 0xFF000000 | st.color), 0xFF000000 | st.color,
-				List.of(), null, 0, false, scale);
+				shown.isEmpty() ? null : seq(shown, TEXT), plain(word), 0xFF000000 | st.color,
+				List.of(), null, 0, false, ft.statusScale(), ft.titleScale(), st == StationStatus.ATTENTION);
 	}
 
 	private static Glyphs near(Font font, String key, long version, MonitorLog.Model m, MonitorLod.Layout l) {
@@ -231,8 +237,8 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 		}
 		FormattedCharSequence footer = m.needsYou() == null ? null : seq(ellipsize(font, "! " + m.needsYou(), w), 0xFF000000 | StationStatus.ATTENTION.color);
 		return new Glyphs(key, version, 0xFF0B0D0F, 0xFF000000 | st.color,
-				seq(ellipsize(font, m.title(), w - wordW - 14), TEXT), seq(word, 0xFF000000 | st.color), 0xFF000000 | st.color,
-				List.copyOf(rows), footer, 0xFF000000 | StationStatus.ATTENTION.color, m.cursor(), 1f);
+				seq(ellipsize(font, m.title(), w - wordW - 14), TEXT), plain(word), 0xFF000000 | st.color,
+				List.copyOf(rows), footer, 0xFF000000 | StationStatus.ATTENTION.color, m.cursor(), 1f, 1f, st == StationStatus.ATTENTION);
 	}
 
 	/** NEAR without a stream: the status lines the client already has, header style. */
@@ -248,7 +254,7 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 		}
 		int wordW = font.width(st.word);
 		return new Glyphs(key, version, 0xFF0B0D0F, 0xFF000000 | st.color, seq(ellipsize(font, title, w - wordW - 14), TEXT),
-				seq(st.word, 0xFF000000 | st.color), 0xFF000000 | st.color, List.copyOf(rows), null, 0, false, 1f);
+				plain(st.word), 0xFF000000 | st.color, List.copyOf(rows), null, 0, false, 1f, 1f, st == StationStatus.ATTENTION);
 	}
 
 	private static RowGlyph row(Font font, MonitorLog.Row r, int width) {
@@ -290,6 +296,9 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 		}
 		int light = LightCoordsUtil.FULL_BRIGHT;
 		float z = s.zStep;
+		// a thread that needs the user breathes: header band, status word and the far face's bands
+		int accent = g.attention() ? MonitorLod.breathe(g.accent(), g.background(), s.breath) : g.accent();
+		int statusColor = g.attention() ? MonitorLod.breathe(g.statusColor(), g.background(), s.breath) : g.statusColor();
 		poseStack.pushPose();
 		toFace(poseStack, s.facing, -z, l.ppb());
 		// a panel taller than one block extends upwards from its origin (bottom) block
@@ -301,8 +310,8 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 			if (near) {
 				float hy = l.bezel() + MonitorLod.HEADER;
 				ScreenDraw.rect(pose, vc, l.bezel(), l.bezel(), l.width() - l.bezel(), hy, -z, HEADER_BG, light);
-				ScreenDraw.rect(pose, vc, l.bezel(), hy - 1, l.width() - l.bezel(), hy, -z, g.accent(), light);
-				ScreenDraw.rect(pose, vc, l.x0(), l.bezel() + 4, l.x0() + 5, l.bezel() + 9, -2 * z, g.accent(), light);
+				ScreenDraw.rect(pose, vc, l.bezel(), hy - 1, l.width() - l.bezel(), hy, -z, accent, light);
+				ScreenDraw.rect(pose, vc, l.x0(), l.bezel() + 4, l.x0() + 5, l.bezel() + 9, -2 * z, accent, light);
 				float y = rowsTop(l, g);
 				for (RowGlyph r : g.rows()) {
 					if (r.tint() != 0) {
@@ -315,16 +324,16 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 					ScreenDraw.rect(pose, vc, l.x0(), fy, l.x0() + 5, fy + 8, -z, 0xFF000000 | StationStatus.WORKING.color, light);
 				}
 			} else {
-				ScreenDraw.rect(pose, vc, l.bezel(), l.bezel(), l.width() - l.bezel(), l.bezel() + 3, -z, g.accent(), light);
-				ScreenDraw.rect(pose, vc, l.bezel(), l.height() - l.bezel() - 3, l.width() - l.bezel(), l.height() - l.bezel(), -z, g.accent(), light);
+				ScreenDraw.rect(pose, vc, l.bezel(), l.bezel(), l.width() - l.bezel(), l.bezel() + 3, -z, accent, light);
+				ScreenDraw.rect(pose, vc, l.bezel(), l.height() - l.bezel() - 3, l.width() - l.bezel(), l.height() - l.bezel(), -z, accent, light);
 			}
 		});
 		// layer 2: icons and text
 		poseStack.translate(0, 0, -2 * z);
 		if (near) {
-			drawNear(s, g, l, poseStack, collector, light);
+			drawNear(s, g, l, poseStack, collector, light, statusColor);
 		} else {
-			drawFar(g, l, poseStack, collector, light);
+			drawFar(g, l, poseStack, collector, light, statusColor);
 		}
 		poseStack.popPose();
 	}
@@ -339,14 +348,14 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 		return l.y1() - MonitorLod.FOOTER + 2;
 	}
 
-	private static void drawNear(State s, Glyphs g, MonitorLod.Layout l, PoseStack ps, SubmitNodeCollector c, int light) {
+	private static void drawNear(State s, Glyphs g, MonitorLod.Layout l, PoseStack ps, SubmitNodeCollector c, int light, int statusColor) {
 		float hy = l.bezel() + 3;
 		Font font = Minecraft.getInstance().font;
 		if (g.title() != null) {
 			text(ps, c, g.title(), l.x0() + 8, hy, TEXT, light);
 		}
 		if (g.status() != null) {
-			text(ps, c, g.status(), l.x1() - font.width(g.status()), hy, g.statusColor(), light);
+			text(ps, c, g.status(), l.x1() - font.width(g.status()), hy, statusColor, light);
 		}
 		float y = rowsTop(l, g);
 		for (RowGlyph r : g.rows()) {
@@ -370,22 +379,27 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 		}
 	}
 
-	private static void drawFar(Glyphs g, MonitorLod.Layout l, PoseStack ps, SubmitNodeCollector c, int light) {
+	private static void drawFar(Glyphs g, MonitorLod.Layout l, PoseStack ps, SubmitNodeCollector c, int light, int statusColor) {
 		Font font = Minecraft.getInstance().font;
 		float cx = (l.x0() + l.x1()) / 2f;
 		float sc = g.statusScale();
+		float ts = Math.max(1f, g.titleScale());
 		float wordH = 8 * sc;
-		float block = wordH + (g.title() == null ? 0 : 4 + 8);
+		float block = wordH + (g.title() == null ? 0 : MonitorLod.FAR_GAP + 8 * ts);
 		float top = (l.height() - block) / 2f;
 		if (g.status() != null) {
 			ps.pushPose();
 			ps.translate(cx - font.width(g.status()) * sc / 2f, top, 0);
 			ps.scale(sc, sc, 1f);
-			text(ps, c, g.status(), 0, 0, g.statusColor(), light);
+			text(ps, c, g.status(), 0, 0, statusColor, light);
 			ps.popPose();
 		}
 		if (g.title() != null) {
-			text(ps, c, g.title(), cx - font.width(g.title()) / 2f, top + wordH + 4, TEXT, light);
+			ps.pushPose();
+			ps.translate(cx - font.width(g.title()) * ts / 2f, top + wordH + MonitorLod.FAR_GAP, 0);
+			ps.scale(ts, ts, 1f);
+			text(ps, c, g.title(), 0, 0, TEXT, light);
+			ps.popPose();
 		}
 	}
 
@@ -394,6 +408,11 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 	}
 
 	// ---- helpers ------------------------------------------------------------------------------
+
+	/** Uncoloured text: takes the colour passed at draw time. */
+	static FormattedCharSequence plain(String s) {
+		return Component.literal(s).getVisualOrderText();
+	}
 
 	static FormattedCharSequence seq(String s, int argb) {
 		return Component.literal(s).withColor(argb & 0xFFFFFF).getVisualOrderText();

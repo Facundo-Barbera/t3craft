@@ -111,6 +111,65 @@ public final class MonitorLod {
 		return e.minSide() <= 1 ? 128f : 96f;
 	}
 
+	/** FAR: the status word's largest scale (a 3-wide desk screen gets ≈ 3×, readable across a hall). */
+	static final float FAR_STATUS_MAX = 4f;
+	/** FAR: the title's largest scale (never above the status word's). */
+	static final float FAR_TITLE_MAX = 2.5f;
+	/** Gap between the status word and the title (face pixels). */
+	static final float FAR_GAP = 4f;
+	/** Breathing period of a screen that needs the user (ms). */
+	public static final long BREATH_MS = 1600;
+
+	/** Scales of the FAR level's two lines: the status word on top and the title under it. */
+	public record FarText(float statusScale, float titleScale) {
+		/** Height of both lines with the gap (face pixels). */
+		public float height(boolean withTitle) {
+			return 8 * statusScale + (withTitle ? FAR_GAP + 8 * titleScale : 0);
+		}
+	}
+
+	/**
+	 * The largest scales that fit the FAR layout's text area: the status word ({@code statusW} font
+	 * pixels wide at scale 1) up to {@link #FAR_STATUS_MAX}, the title ({@code titleW}, 0 = none) up to
+	 * {@link #FAR_TITLE_MAX} and never larger than the status word, both lines together within the
+	 * height. At least 1 each (the renderer ellipsizes a title that does not fit at 1).
+	 */
+	public static FarText farText(Layout l, int statusW, int titleW) {
+		float w = l.x1() - l.x0();
+		float h = l.y1() - l.y0();
+		float ss = Math.min(FAR_STATUS_MAX, w / Math.max(1, statusW));
+		float ts = titleW <= 0 ? 0 : Math.min(Math.min(FAR_TITLE_MAX, ss), w / titleW);
+		float need = 8 * ss + (titleW <= 0 ? 0 : FAR_GAP + 8 * ts);
+		if (need > h) {
+			float k = h / need;
+			ss *= k;
+			ts *= k;
+		}
+		return new FarText(Math.max(1f, ss), titleW <= 0 ? 0 : Math.max(1f, ts));
+	}
+
+	/** Breathing phase at {@code ms}: 0 (dim) … 1 (bright), a smooth cosine over {@link #BREATH_MS}. */
+	public static float breath(long ms) {
+		double ph = Math.floorMod(ms, BREATH_MS) / (double) BREATH_MS;
+		return (float) (0.5 - 0.5 * Math.cos(ph * Math.PI * 2));
+	}
+
+	/**
+	 * {@code argb} breathing over {@code bg} (both opaque): at {@code phase} 0 it is 45% of the way from
+	 * the background, at 1 the full colour, so it never vanishes into the background.
+	 */
+	public static int breathe(int argb, int bg, float phase) {
+		float t = 0.45f + 0.55f * Math.max(0f, Math.min(1f, phase));
+		int r = mix((bg >> 16) & 0xFF, (argb >> 16) & 0xFF, t);
+		int g = mix((bg >> 8) & 0xFF, (argb >> 8) & 0xFF, t);
+		int b = mix(bg & 0xFF, argb & 0xFF, t);
+		return 0xFF000000 | r << 16 | g << 8 | b;
+	}
+
+	private static int mix(int a, int b, float t) {
+		return Math.round(a + (b - a) * t);
+	}
+
 	public static Layout layout(Level level, ScreenExtent e) {
 		float ppb = level == Level.NEAR ? nearPpb(e) : FAR_PPB;
 		float bezel = ppb / 16f; // one model pixel of frame

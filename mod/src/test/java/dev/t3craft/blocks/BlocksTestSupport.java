@@ -86,6 +86,17 @@ final class BlocksTestSupport {
 				return registered("monitor").defaultBlockState().setValue(MonitorBlock.FACING, facing);
 			}
 
+			// same as T3Blocks.Content, so test order never changes what the fixtures place
+			@Override
+			public BlockState monitor(Direction facing, ScreenRect.Sides sides) {
+				return MonitorBlock.connected(monitor(facing), sides);
+			}
+
+			@Override
+			public BlockState threadBoard(Direction facing) {
+				return registered("thread_board").defaultBlockState().setValue(ThreadBoardBlock.FACING, facing);
+			}
+
 			@Override
 			public BlockState lamp() {
 				return registered("status_lamp").defaultBlockState();

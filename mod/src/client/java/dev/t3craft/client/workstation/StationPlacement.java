@@ -8,9 +8,22 @@ package dev.t3craft.client.workstation;
  * <p>Yaw follows Minecraft: 0 = facing south (+z), 90 = west (−x). A FIXED TextDisplay with this yaw
  * is readable from the side it faces, so {@code screenYaw} should point at whoever sits at the desk.
  */
-public record StationPlacement(int computerX, int computerY, int computerZ, double screenX, double screenY, double screenZ, float screenYaw) {
+public record StationPlacement(int computerX, int computerY, int computerZ, double screenX, double screenY, double screenZ, float screenYaw,
+		float scale) {
 	/** Height of the screen's baseline above the computer block's bottom. */
 	public static final double SCREEN_HEIGHT = 1.15;
+	/** Text scale of a floating screen over one computer: 28 characters ≈ 1.9 blocks wide. */
+	public static final float DEFAULT_SCALE = 0.45f;
+	/** Text scale per block of screen width when the text is laid on a wall of computers ({@link #onFace}). */
+	public static final float SCALE_PER_BLOCK = 0.215f;
+	/** Gap between a wall's face and the text laid on it (blocks). */
+	static final double FACE_GAP = 0.03;
+	/** Margin from the wall's bottom edge to the text's bottom line (blocks). */
+	static final double FACE_MARGIN = 0.12;
+
+	public StationPlacement(int computerX, int computerY, int computerZ, double screenX, double screenY, double screenZ, float screenYaw) {
+		this(computerX, computerY, computerZ, screenX, screenY, screenZ, screenYaw, DEFAULT_SCALE);
+	}
 
 	/**
 	 * A computer {@code distance} blocks in front of someone standing at ({@code x, y, z}) and looking
@@ -32,6 +45,26 @@ public record StationPlacement(int computerX, int computerY, int computerZ, doub
 		double nx = -Math.sin(rad) * 0.1;
 		double nz = Math.cos(rad) * 0.1;
 		return new StationPlacement(cx, cy, cz, cx + 0.5 + nx, cy + SCREEN_HEIGHT, cz + 0.5 + nz, wrap(screenYaw));
+	}
+
+	/**
+	 * The screen laid flat on the front face of a {@code width}-wide wall of computer blocks (e.g. an HQ
+	 * desk's 3×2 screen with the blocks module off): centred across the face, its bottom line just above
+	 * the wall's bottom edge, a hair in front of the face, scaled to the wall's width. {@code (cx, cy, cz)}
+	 * is the clicked block (any cell of the wall); {@code (bx, by, bz)} its bottom-middle cell (for an
+	 * even width, the cell right of the centre line) and {@code screenYaw} the way the face looks.
+	 */
+	public static StationPlacement onFace(int cx, int cy, int cz, int bx, int by, int bz, int width, float screenYaw) {
+		double rad = Math.toRadians(screenYaw);
+		double nx = -Math.sin(rad);
+		double nz = Math.cos(rad);
+		// the viewer's right is the facing turned counter-clockwise: (nz, -nx) in x/z
+		double shift = width % 2 == 0 ? -0.5 : 0;
+		double rx = nz;
+		double rz = -nx;
+		double out = 0.5 + FACE_GAP;
+		return new StationPlacement(cx, cy, cz, bx + 0.5 + nx * out + rx * shift, by + FACE_MARGIN, bz + 0.5 + nz * out + rz * shift,
+				wrap(screenYaw), SCALE_PER_BLOCK * Math.max(1, width));
 	}
 
 	/** Key of the computer block (for click lookup). */
