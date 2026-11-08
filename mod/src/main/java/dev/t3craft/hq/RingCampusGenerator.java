@@ -8,6 +8,7 @@ import dev.t3craft.hq.RingCampusGeometry.Room;
 import dev.t3craft.hq.RingCampusGeometry.Zone;
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.CitadelCanvas.Mats;
+import dev.t3craft.hq.citadel.CitadelHub;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -110,8 +111,8 @@ final class RingCampusGenerator {
 		for (Map.Entry<Long, Zone> e : zs.entrySet()) {
 			ground(colX(e.getKey()), colZ(e.getKey()), e.getValue());
 		}
-		hub();
-		core();
+		CitadelHub.hub(canvas);
+		CitadelHub.core(canvas);
 		for (int k = 0; k < 8; k++) {
 			node(RingCampusGeometry.node(k));
 		}
@@ -184,233 +185,7 @@ final class RingCampusGenerator {
 		}
 	}
 
-	// ------------------------------------------------------------------ hub: a basilica on the podium
-
-	/** Aisle ceiling (and outer walls' top). */
-	private static final int AISLE_TOP = 12;
-	/** Nave vault: springs at y = 16 (12 above the floor), crown at y = 21 (17 above). */
-	private static final int SPRING = 16;
-
-	private static int vaultY(int ax) {
-		if (ax >= 6) {
-			return SPRING;
-		}
-		return SPRING + (int) Math.round(5 * Math.sqrt(1 - (ax / 6.0) * (ax / 6.0)));
-	}
-
-	private void hub() {
-		for (int x = -14; x <= 14; x++) {
-			for (int z = -14; z <= 14; z++) {
-				Kind k = canvas.zoneAt(x, z).kind();
-				if (k == Kind.HUB) {
-					double o = RingCampusGeometry.octagon(x, z);
-					canvas.set(x, Y0, z, lattice(x, z) ? LIGHT : (o <= 3 || (int) o % 4 == 0 ? canvas.accent() : canvas.floor()));
-					nave(x, z);
-				} else if (k == Kind.HUB_WALL) {
-					canvas.fill(x, 1, Y0, z, FOOT);
-					hubWall(x, z);
-				}
-			}
-		}
-		board();
-		// benches facing the screens: the kanban wall (west) and the big screen (east)
-		for (int sx = -1; sx <= 1; sx += 2) {
-			Direction look = sx > 0 ? Direction.EAST : Direction.WEST;
-			for (int z = -3; z <= 3; z++) {
-				BlockPos p = new BlockPos(7 * sx, Y0 + 1, z);
-				canvas.set(p, canvas.style.bench(look.getOpposite()));
-				canvas.anchor(Anchor.at(AnchorNames.bench(canvas.nextBench()), p.relative(look), look));
-			}
-		}
-		HqGeometry.Surface screen = new HqGeometry.Surface(new BlockPos(12, Y0 + 2, -3), Direction.SOUTH, Direction.WEST, 7, 4);
-		bigScreen(screen, "hub", HqGenerator.hubBinding(canvas.layout), true);
-		HqGeometry.Surface wall = new HqGeometry.Surface(new BlockPos(-12, Y0 + 2, 4), Direction.NORTH, Direction.EAST, 9, 4);
-		for (BlockPos p : wall.cells()) {
-			canvas.fixture(p, canvas.style.screen());
-		}
-		for (int i = 0; i < wall.width(); i++) {
-			canvas.fixture(wall.origin().relative(wall.along(), i).below(), canvas.style.screenBase());
-		}
-		canvas.anchor(Anchor.face(AnchorNames.THREAD_WALL, wall.origin(), wall.facing()));
-		canvas.anchor(Anchor.face(AnchorNames.THREAD_WALL_END, wall.origin().relative(wall.along(), wall.width() - 1).above(wall.height() - 1), wall.facing()));
-		canvas.anchor(Anchor.at(AnchorNames.THREAD_WALL_FRONT, new BlockPos(-9, Y0 + 1, 0), Direction.WEST));
-		// hologram column free over the centre; the beacon crowns the vault
-		for (int y = Y0 + 1; y <= Y0 + 1 + HqGeometry.HOLOGRAM_TOP; y++) {
-			canvas.set(0, y, 0, AIR);
-		}
-		canvas.anchor(Anchor.at(AnchorNames.HUB, new BlockPos(0, Y0 + 1, 0), Direction.SOUTH));
-		canvas.anchor(new Anchor(AnchorNames.HOLOGRAM, 0.5, Y0 + 5.0, 0.5, Direction.SOUTH, new BlockPos(0, Y0 + 5, 0)));
-		canvas.anchor(Anchor.at(AnchorNames.ENTRANCE, new BlockPos(0, Y0 + 1, 11), Direction.SOUTH));
-		BlockPos beacon = new BlockPos(0, vaultY(0) + 1, 0);
-		canvas.set(beacon, canvas.style.beacon());
-		canvas.fixtures.add(beacon.asLong());
-		canvas.anchor(Anchor.at(AnchorNames.BEACON, beacon, Direction.SOUTH));
-		for (int wz : new int[] {-4, 4}) {
-			for (int sx = -1; sx <= 1; sx += 2) {
-				canvas.walkSpot(new BlockPos(4 * sx, Y0 + 1, wz), Direction.SOUTH);
-			}
-		}
-	}
-
-	private static boolean arcadeZ(int z) {
-		return Math.floorMod(z + 2, 4) == 0 && Math.abs(z) <= 10;
-	}
-
-	/** One interior column of the hub: the nave's vault, the arcades, clerestory and the aisles' ceiling. */
-	private void nave(int x, int z) {
-		int ax = Math.abs(x);
-		if (ax == 6) {
-			if (arcadeZ(z)) {
-				canvas.fill(x, Y0 + 1, AISLE_TOP - 1, z, LOG);
-			}
-			canvas.set(x, AISLE_TOP, z, canvas.kit.beam(Direction.Axis.Z));
-			for (int y = AISLE_TOP + 1; y < SPRING; y++) {
-				canvas.set(x, y, z, arcadeZ(z) ? LOG : (y == AISLE_TOP + 2 ? canvas.kit.wallPanel(true) : GLASS));
-			}
-			canvas.set(x, SPRING, z, PLANKS);
-		} else if (ax > 6) {
-			canvas.set(x, AISLE_TOP, z, Math.floorMod(x * 3 + z * 5, 7) == 0 ? LIGHT : FOOT);
-		} else {
-			int top = vaultY(ax);
-			int lo = Math.min(top, vaultY(ax + 1) + 1);
-			for (int y = lo; y <= top; y++) {
-				BlockState s;
-				if (ax == 0 && Math.abs(z) > 1 && Math.floorMod(z, 4) != 0) {
-					s = GLASS;
-				} else if (Math.floorMod(z, 4) == 0) {
-					s = RIB;
-				} else {
-					s = PLANKS;
-				}
-				canvas.set(x, y, z, s);
-			}
-		}
-	}
-
-	private void hubWall(int x, int z) {
-		boolean naveEnd = Math.abs(x) <= 6 && Math.abs(z) >= 12;
-		for (int y = Y0 + 1; y <= AISLE_TOP; y++) {
-			BlockState s;
-			if (y <= Y0 + 1) {
-				s = FOOT;
-			} else if (y == AISLE_TOP) {
-				s = CALCITE;
-			} else if (!naveEnd && y >= Y0 + 3 && y <= Y0 + 6 && Math.floorMod(x + z, 3) != 0) {
-				s = GLASS;
-			} else if (y == Y0 + 2 && Math.floorMod(x * 5 + z * 3, 6) == 0) {
-				s = canvas.kit.wallPanel(true);
-			} else {
-				s = canvas.kit.wallPanel(false);
-			}
-			canvas.set(x, y, z, s);
-		}
-		if (naveEnd) {
-			// gable of the nave up to the vault, a rose window in it
-			int top = vaultY(Math.abs(x));
-			for (int y = AISLE_TOP + 1; y <= top; y++) {
-				canvas.set(x, y, z, Math.hypot(x, y - SPRING) <= 3.2 ? GLASS : CALCITE);
-			}
-		} else {
-			canvas.set(x, AISLE_TOP + 1, z, slab(Blocks.DEEPSLATE_TILE_SLAB));
-		}
-		// main portal (south, 5 wide x 5 tall) and the north door under the board (3 x 3)
-		if (z > 0 && Math.abs(x) <= 2) {
-			canvas.fill(x, Y0 + 1, Y0 + 5, z, AIR);
-		}
-		if (z < 0 && Math.abs(x) <= 1) {
-			canvas.fill(x, Y0 + 1, Y0 + 3, z, AIR);
-		}
-	}
-
-	/** The "needs attention" board at the nave's north end, facing the entrance, with its bulbs and standing rows. */
-	private void board() {
-		int z = -12;
-		for (int x = -5; x <= 5; x++) {
-			for (int y = Y0 + 4; y <= Y0 + 10; y++) {
-				boolean edge = Math.abs(x) == 5 || y == Y0 + 4 || y == Y0 + 10 || y == Y0 + 9;
-				canvas.fixture(new BlockPos(x, y, z), edge ? canvas.kit.beam(Direction.Axis.X) : canvas.style.palette().get(HqStyle.Role.BOARD));
-			}
-		}
-		int lamp = 0;
-		for (int x = -4; x <= 4; x += 2) {
-			canvas.fixture(new BlockPos(x, Y0 + 9, z), canvas.style.statusLamp());
-			canvas.anchor(Anchor.face(AnchorNames.boardLamp(lamp++), new BlockPos(x, Y0 + 9, z), Direction.SOUTH));
-		}
-		BlockPos sign = new BlockPos(0, Y0 + 10, z + 1);
-		canvas.put(sign.getX(), sign.getY(), sign.getZ(), canvas.style.palette().get(HqStyle.Role.PLAQUE).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.SOUTH), DECOR);
-		canvas.data.put(sign.asLong(), new HqStyle.SignText(DyeColor.ORANGE, "", "Needs", "attention", "").signTag());
-		canvas.fixtures.add(sign.asLong());
-		canvas.anchor(Anchor.face(AnchorNames.BOARD, new BlockPos(0, Y0 + 6, z), Direction.SOUTH));
-		canvas.anchor(Anchor.at(AnchorNames.BOARD_FRONT, new BlockPos(0, Y0 + 1, z + 1), Direction.NORTH));
-		int slot = 0;
-		for (int row = 2; row <= 3; row++) {
-			for (int i = 0; i <= 8; i++) {
-				int x = i == 0 ? 0 : (i % 2 == 1 ? (i + 1) / 2 : -(i / 2));
-				canvas.anchor(Anchor.at(AnchorNames.boardSlot(slot++), new BlockPos(x, Y0 + 1, z + row), Direction.NORTH));
-			}
-		}
-	}
-
-	/** A big screen and its anchor; {@code base}: a beam under its bottom row (free-standing screens). */
-	private void bigScreen(HqGeometry.Surface s, String key, String binding, boolean base) {
-		for (BlockPos p : s.cells()) {
-			canvas.fixture(p, canvas.style.screen());
-		}
-		if (base) {
-			for (int i = 0; i < s.width(); i++) {
-				canvas.fixture(s.origin().relative(s.along(), i).below(), canvas.style.screenBase());
-			}
-		}
-		canvas.anchor(Anchor.face(AnchorNames.bigScreen(key, s.width(), s.height(), binding), s.origin().above(s.height() - 1), s.facing()));
-	}
-
 	// ------------------------------------------------------------------ core: bridges, promenade, patio
-
-	private void core() {
-		Set<Long> stairHeads = new HashSet<>();
-		// patio stairs: from the promenade down into the patio on the four diagonals
-		for (int d = 0; d < 4; d++) {
-			double a = Math.PI / 4 + d * Math.PI / 2;
-			BlockPos p = RingCampusGeometry.polar(21.2, a, 0);
-			int dx = p.getX() > 0 ? -1 : 1;
-			Direction up = dx < 0 ? Direction.EAST : Direction.WEST;
-			for (int w = -1; w <= 1; w++) {
-				for (int i = 0; i < 4; i++) {
-					int x = p.getX() + dx * i;
-					int z = p.getZ() + w;
-					for (int y = 1; y < Y0 - i; y++) {
-						canvas.set(x, y, z, FOOT);
-					}
-					canvas.set(x, Y0 - i, z, stairs(Blocks.BAMBOO_MOSAIC_STAIRS, up));
-					for (int y = Y0 - i + 1; y <= Y0 + 3; y++) {
-						canvas.set(x, y, z, AIR);
-					}
-				}
-				for (int i = 0; i <= 3; i++) {
-					stairHeads.add(col(p.getX() - dx * i, p.getZ() + w));
-				}
-			}
-		}
-		List<Long> keys = new ArrayList<>(canvas.zones.keySet());
-		Collections.sort(keys);
-		for (long key : keys) {
-			Kind k = canvas.zones.get(key).kind();
-			int x = colX(key);
-			int z = colZ(key);
-			double r = RingCampusGeometry.r(x, z);
-			if (k == Kind.BRIDGE) {
-				bridge(x, z);
-			} else if (k == Kind.GALLERY) {
-				promenade(x, z, r, stairHeads.contains(key));
-			} else if (k == Kind.PATIO) {
-				patio(x, z, r);
-			}
-		}
-		canvas.walkSpot(new BlockPos(19, 1, 0), Direction.WEST);
-		canvas.walkSpot(new BlockPos(-19, 1, 0), Direction.EAST);
-		canvas.walkSpot(new BlockPos(0, Y0 + 1, -24), Direction.NORTH);
-		canvas.walkSpot(new BlockPos(24, Y0 + 1, 0), Direction.EAST);
-	}
 
 	private void bridge(int x, int z) {
 		if (canvas.at(x, Y0, z) != null) {
@@ -490,11 +265,11 @@ final class RingCampusGenerator {
 		int cz = nd.cz();
 		switch (nd.kind()) {
 			case REVIEW_TOWER -> {
-				bigScreen(new HqGeometry.Surface(new BlockPos(cx - 3, 5, cz - 5), Direction.EAST, Direction.SOUTH, 7, 4), "review", "", false);
+				CitadelHub.bigScreen(canvas, new HqGeometry.Surface(new BlockPos(cx - 3, 5, cz - 5), Direction.EAST, Direction.SOUTH, 7, 4), "review", "", false);
 				canvas.walkSpot(new BlockPos(cx, 1, cz - 2), Direction.NORTH);
 			}
 			case SCHEDULE_ROTUNDA -> {
-				bigScreen(new HqGeometry.Surface(new BlockPos(cx + 4, 2, cz - 2), Direction.SOUTH, Direction.WEST, 5, 3), "schedule", "", true);
+				CitadelHub.bigScreen(canvas, new HqGeometry.Surface(new BlockPos(cx + 4, 2, cz - 2), Direction.SOUTH, Direction.WEST, 5, 3), "schedule", "", true);
 				canvas.walkSpot(new BlockPos(cx - 1, 1, cz), Direction.EAST);
 			}
 			case ARCHIVE_CLOISTER -> {
