@@ -215,5 +215,7 @@
 	"t3craft.hq.layout.ensanche.name": "Ensanche (blocks)",
 	"t3craft.hq.layout.ensanche.desc": "Blocks with inner patios on a street grid round a main square.",
 	"t3craft.hq.layout.village.name": "Village",
-	"t3craft.hq.layout.village.desc": "An organic hill village on terraces."
+	"t3craft.hq.layout.village.desc": "An organic hill village on terraces.",
+	"t3craft.hq.layout.hybrid-ringcampus.name": "Ringed citadel",
+	"t3craft.hq.layout.hybrid-ringcampus.desc": "A ringed citadel: a vaulted hub over a sunken patio, rings of barrios round their courtyards, special rooms on the nodes."
 }

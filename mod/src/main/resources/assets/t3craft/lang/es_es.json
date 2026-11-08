@@ -215,5 +215,7 @@
 	"t3craft.hq.layout.ensanche.name": "Ensanche (manzanas)",
 	"t3craft.hq.layout.ensanche.desc": "Manzanas con patio en una cuadrícula de calles alrededor de una plaza mayor.",
 	"t3craft.hq.layout.village.name": "Aldea",
-	"t3craft.hq.layout.village.desc": "Una aldea orgánica en terrazas sobre una colina."
+	"t3craft.hq.layout.village.desc": "Una aldea orgánica en terrazas sobre una colina.",
+	"t3craft.hq.layout.hybrid-ringcampus.name": "Ciudadela en anillos",
+	"t3craft.hq.layout.hybrid-ringcampus.desc": "Ciudadela en anillos: hub abovedado sobre un patio hundido, anillos de barrios con patio y salas especiales en los nodos."
 }

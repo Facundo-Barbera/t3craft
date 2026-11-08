@@ -34,6 +34,11 @@ final class LayoutViews {
 			layouts = List.of(HqLayouts.find(layoutArg).orElseThrow(() -> new IllegalArgumentException(
 					"unknown layout " + layoutArg + "; known: " + HqLayouts.all().stream().map(HqLayoutInfo::id).toList())));
 		}
+		if (layouts.size() == 1 && layouts.get(0).id().equals(dev.t3craft.hq.RingCampusGeometry.ID)) {
+			// design/hybrid-ringcampus: its own gallery (RingCampusViews), 4 → 10 → 20 by default
+			RingCampusViews.render(models, out, sizes.equals(List.of(4)) ? List.of(4, 10, 20) : sizes, only, scaleMul, ss, npcs);
+			return;
+		}
 		double mul = scaleMul / 1.6;
 		for (HqLayoutInfo info : layouts) {
 			HqLayouts.use(info.id());

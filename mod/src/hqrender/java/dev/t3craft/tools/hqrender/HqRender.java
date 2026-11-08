@@ -48,7 +48,8 @@ import net.minecraft.world.level.block.state.BlockState;
  * PNGs over 480 KB are written again with a 256-colour palette.
  * {@code --style village} renders the village layout (layout/village, {@link VillageRender}).
  * {@code --layout ID} (feat/hq-layouts: classic, campus, ring, vertical, ensanche, village or all) renders a
- * registered layout through the game's pipeline with {@code --projects} (default 4), see {@link LayoutViews}.
+ * registered layout through the game's pipeline with {@code --projects} (default 4), see {@link LayoutViews};
+ * {@code --layout hybrid-ringcampus} renders that hybrid's own gallery ({@link RingCampusViews}, default 4,10,20).
  */
 public final class HqRender {
 	private HqRender() {
