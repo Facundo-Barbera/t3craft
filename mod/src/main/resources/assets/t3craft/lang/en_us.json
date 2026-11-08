@@ -215,5 +215,7 @@
 	"t3craft.hq.layout.ensanche.name": "Ensanche (blocks)",
 	"t3craft.hq.layout.ensanche.desc": "Blocks with inner patios on a street grid round a main square.",
 	"t3craft.hq.layout.village.name": "Village",
-	"t3craft.hq.layout.village.desc": "An organic hill village on terraces."
+	"t3craft.hq.layout.village.desc": "An organic hill village on terraces.",
+	"t3craft.hq.layout.hybrid-towncenter.name": "Town centre with towers",
+	"t3craft.hq.layout.hybrid-towncenter.desc": "Ensanche blocks round a civic plaza; busy projects grow up as corner towers joined by skybridges."
 }

@@ -215,5 +215,7 @@
 	"t3craft.hq.layout.ensanche.name": "Ensanche (manzanas)",
 	"t3craft.hq.layout.ensanche.desc": "Manzanas con patio en una cuadrícula de calles alrededor de una plaza mayor.",
 	"t3craft.hq.layout.village.name": "Aldea",
-	"t3craft.hq.layout.village.desc": "Una aldea orgánica en terrazas sobre una colina."
+	"t3craft.hq.layout.village.desc": "Una aldea orgánica en terrazas sobre una colina.",
+	"t3craft.hq.layout.hybrid-towncenter.name": "Centro urbano con torres",
+	"t3craft.hq.layout.hybrid-towncenter.desc": "Manzanas de ensanche alrededor de una plaza cívica; los proyectos grandes crecen en torres de esquina unidas por pasarelas."
 }
