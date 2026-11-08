@@ -91,7 +91,7 @@ public final class BuildJob {
 		this.rotation = Objects.requireNonNull(rotation, "rotation");
 		this.plan = Objects.requireNonNull(plan, "plan");
 		this.blocksPerTick = blocksPerTick;
-		this.cursor = new FrontCursor(Fronts.of(plan, Math.max(1, fronts)));
+		this.cursor = new FrontCursor(PlacementOrders.current().create(plan, Math.max(1, fronts)));
 		this.cost = cost;
 		if (cost == null) {
 			this.meter = null;
@@ -322,12 +322,12 @@ public final class BuildJob {
 
 	/** Parallel fronts of this job. */
 	public int fronts() {
-		return cursor.fronts().fronts();
+		return cursor.order().fronts();
 	}
 
 	/** The front that places plan entry {@code index} (for the crew: one builder per front). */
 	public int frontOf(int index) {
-		return cursor.fronts().frontOf(index);
+		return cursor.order().frontOf(index);
 	}
 
 	/** Blocks per tick this job wants: {@code blocksPerTick × fronts}. */
