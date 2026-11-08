@@ -82,6 +82,7 @@
 	"t3craft.blocks.linked": "Bloque vinculado a %s.",
 	"t3craft.demo.reset.button": "Reiniciar mundo HQ",
 	"t3craft.demo.reset.button.tooltip": "Borra el mundo demo T3Craft HQ y lo crea de nuevo (antes guarda un zip en backups/, salvo que demo.resetBackup sea false). Solo funciona dentro del mundo HQ o desde el menú; nunca toca otros mundos.",
+	"t3craft.demo.void.rescued": "De vuelta en tierra firme: el vacío no es parte del HQ.",
 	"t3craft.demo.reset.title": "¿Reiniciar el mundo T3Craft HQ?",
 	"t3craft.demo.reset.body": "¿Seguro? Se pierde todo lo construido en el HQ.",
 	"t3craft.demo.reset.confirm": "Confirmar reinicio",

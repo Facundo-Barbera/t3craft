@@ -54,11 +54,44 @@ public final class DemoHq {
 	public record Roster(HqInput input, boolean sample) {
 	}
 
-	/** What to build for a roster against what the marker says is already there. */
-	public record Step(HqLayout layout, dev.t3craft.hq.BuildPlan plan, String hash, int lift, List<BuildPlan> parts, boolean full, String fixtures) {
+	/**
+	 * What to build for a roster against what the marker says is already there.
+	 *
+	 * @param island     feat/hq-void-world: the HQ island's core area after this step (void worlds), else null
+	 * @param islandPart that island as a builders' part (already the first of {@code parts} when it changed), else null
+	 */
+	public record Step(HqLayout layout, dev.t3craft.hq.BuildPlan plan, String hash, int lift, List<BuildPlan> parts, boolean full, String fixtures,
+			VoidIsland.@Nullable Area island, @Nullable BuildPlan islandPart) {
 		public Step {
 			parts = List.copyOf(parts);
 		}
+
+		public Step(HqLayout layout, dev.t3craft.hq.BuildPlan plan, String hash, int lift, List<BuildPlan> parts, boolean full, String fixtures) {
+			this(layout, plan, hash, lift, parts, full, fixtures, null, null);
+		}
+
+		/** Everything this step's HQ is made of, from scratch: the island (void worlds), then {@link DemoHq#full}. */
+		public List<BuildPlan> everything() {
+			List<BuildPlan> out = new ArrayList<>();
+			if (islandPart != null && !islandPart.isEmpty()) {
+				out.add(islandPart);
+			}
+			out.addAll(full(plan, lift));
+			return out;
+		}
+	}
+
+	/**
+	 * feat/hq-void-world: the HQ stands on a floating island (void world).
+	 *
+	 * @param previous the island's core area already built (marker state), or null
+	 * @param starter  the starter island (demo-relative), or null when none was placed
+	 */
+	public record Island(VoidIsland.@Nullable Area previous, VoidIsland.@Nullable Starter starter) {
+	}
+
+	/** Marker key of the island's core area (void worlds). */
+	public static final String ISLAND = "island";
 
 		/** Nothing to build: this exact layout is already in the world. */
 		public boolean upToDate() {
@@ -150,7 +183,67 @@ public final class DemoHq {
 		// feat/hq-layout-packs: the pack this HQ was built with, to regenerate the old plan for the next diff
 		o.addProperty(PACK, step.plan().packHash());
 		o.add("layout", step.layout().toJson());
+		VoidIsland.Area a = step.island();
+		if (a != null) {
+			com.google.gson.JsonArray arr = new com.google.gson.JsonArray();
+			for (int v : a.toArray()) {
+				arr.add(v);
+			}
+			o.add(ISLAND, arr);
+		}
 		return o;
+	}
+
+	/** The island area stored in a marker state, or null (flat world, older marker, unreadable). */
+	public static VoidIsland.@Nullable Area island(@Nullable JsonObject state) {
+		try {
+			if (state == null || !state.has(ISLAND) || !state.get(ISLAND).isJsonArray()) {
+				return null;
+			}
+			com.google.gson.JsonArray arr = state.getAsJsonArray(ISLAND);
+			int[] v = new int[arr.size()];
+			for (int i = 0; i < v.length; i++) {
+				v[i] = arr.get(i).getAsInt();
+			}
+			return VoidIsland.Area.fromArray(v);
+		} catch (RuntimeException e) {
+			return null;
+		}
+	}
+
+	// ---- void island ----------------------------------------------------------------------------
+
+	/** The plan's footprint in demo-relative columns (baked with {@link #bakeSite}). */
+	public static VoidIsland.Area demoArea(dev.t3craft.hq.BuildPlan plan, int lift) {
+		Box f = plan.footprint();
+		HqSite site = bakeSite(lift);
+		BlockPos a = site.cell(new BlockPos(f.minX(), f.minY(), f.minZ()));
+		BlockPos b = site.cell(new BlockPos(f.maxX(), f.maxY(), f.maxZ()));
+		return new VoidIsland.Area(Math.min(a.getX(), b.getX()), Math.min(a.getZ(), b.getZ()), Math.max(a.getX(), b.getX()),
+				Math.max(a.getZ(), b.getZ()));
+	}
+
+	/** Every cell the plan (and its plinth) takes, demo-relative. */
+	static VoidIsland.Taken taken(dev.t3craft.hq.BuildPlan plan, int lift) {
+		HqSite site = bakeSite(lift);
+		List<BlockPos> cells = new ArrayList<>(plan.size());
+		for (dev.t3craft.hq.Placement p : plan.placements()) {
+			cells.add(site.cell(p.rel()));
+		}
+		return VoidIsland.Taken.of(cells);
+	}
+
+	/** The island under {@code plan} grown from {@code island.previous()}: its new area and the part that builds it. */
+	static Step withIsland(Step step, Island island) {
+		VoidIsland.Area area = demoArea(step.plan(), step.lift()).union(island.previous());
+		BuildPlan part = VoidIsland.island(area, taken(step.plan(), step.lift()), island.starter(), island.previous());
+		List<BuildPlan> parts = new ArrayList<>();
+		boolean grows = island.previous() == null || !island.previous().equals(area);
+		if (!step.parts().isEmpty() && (grows || step.full()) && !part.isEmpty()) {
+			parts.add(part); // the ground first: nothing of the HQ is ever placed over the void
+		}
+		parts.addAll(step.parts());
+		return new Step(step.layout(), step.plan(), step.hash(), step.lift(), parts, step.full(), step.fixtures(), area, part);
 	}
 
 	/** Blocks to raise the HQ so its lowest cell ({@code planMinY}, the floor layer) sits above the bedrock layer. */
@@ -199,9 +292,26 @@ public final class DemoHq {
 	 */
 	public static Step step(HqInput input, @Nullable HqLayout previous, @Nullable String previousHash, int lift, boolean diffable,
 			String previousFixtures, boolean clearPrevious, @Nullable String previousPack) {
+		return step(input, previous, previousHash, lift, diffable, previousFixtures, clearPrevious, previousPack, null);
+	}
+
+	/**
+	 * feat/hq-void-world: {@link #step(HqInput, HqLayout, String, int, boolean, String, boolean, String)} in a
+	 * void world ({@code island} non-null): the island under the footprint goes first whenever it grows
+	 * (and with every full build), so the builders lay the ground before anything stands on it. Void
+	 * hashes carry a {@code -void} suffix, so a void HQ is never mistaken for a flat one.
+	 */
+	public static Step step(HqInput input, @Nullable HqLayout previous, @Nullable String previousHash, int lift, boolean diffable,
+			String previousFixtures, boolean clearPrevious, @Nullable String previousPack, @Nullable Island island) {
+		Step s = stepFlat(input, previous, previousHash, lift, diffable, previousFixtures, clearPrevious, previousPack, island != null);
+		return island == null ? s : withIsland(s, island);
+	}
+
+	private static Step stepFlat(HqInput input, @Nullable HqLayout previous, @Nullable String previousHash, int lift, boolean diffable,
+			String previousFixtures, boolean clearPrevious, @Nullable String previousPack, boolean voidWorld) {
 		String fixtures = dev.t3craft.hq.HqPlans.buildKey();
 		HqGenerator.Result r = HqPlans.plan(input, previous);
-		String h = hash(r.layout(), lift, fixtures);
+		String h = hash(r.layout(), lift, fixtures) + (voidWorld ? "-void" : "");
 		if (diffable && previous != null && h.equals(previousHash)) {
 			return new Step(r.layout(), r.plan(), h, lift, List.of(), false, fixtures);
 		}

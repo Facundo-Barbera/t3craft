@@ -24,6 +24,7 @@ import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallba
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.AlertScreen;
@@ -100,21 +101,37 @@ public final class DemoClient implements ClientModInitializer {
 		instance = this;
 
 		ServerLifecycleEvents.SERVER_STARTED.register(server -> {
-			DemoConfig cfg = loadConfig();
-			if (!VanillaDemoWorld.isDemoServer(server, cfg.spec().folderId())) {
+			DemoConfig loaded = loadConfig();
+			if (!VanillaDemoWorld.isDemoServer(server, loaded.spec().folderId())) {
 				demoRoot = null;
+				VoidGuard.stop();
 				return;
 			}
 			Path root = VanillaDemoWorld.worldRoot(server);
+			// feat/hq-void-world: void or flat is what the save is (old HQ worlds stay flat), never what the config says now
+			boolean voidWorld = VanillaDemoWorld.isVoid(server);
+			DemoConfig cfg = loaded.forWorld(voidWorld);
 			activeConfig = cfg;
 			demoRoot = root;
+			BlockPos spawn = voidWorld ? voidStart(server, root, cfg.spec()) : null;
 			if (DemoMarkerFile.read(root).needsSetup()) {
-				VanillaDemoWorld.applySetup(server, cfg.spec());
+				VanillaDemoWorld.applySetup(server, cfg.spec(), spawn);
 				DemoMarkerFile.update(root, DemoMarker::withSetup);
-				T3Craft.LOGGER.info("[demo] world setup applied in {}", root.getFileName());
+				T3Craft.LOGGER.info("[demo] world setup applied in {} ({} world)", root.getFileName(), voidWorld ? "void" : "flat");
 			}
 		});
-		ServerLifecycleEvents.SERVER_STOPPING.register(server -> demoRoot = null);
+		ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
+			demoRoot = null;
+			VoidGuard.stop();
+		});
+		ServerTickEvents.END_SERVER_TICK.register(server -> {
+			try {
+				VoidGuard.tick(server);
+			} catch (RuntimeException e) {
+				T3Craft.LOGGER.error("[demo] void guard failed, turned off for this session", e);
+				VoidGuard.stop();
+			}
+		});
 		ClientTickEvents.END_CLIENT_TICK.register(GuardedEvents.endClientTick("demo", this::tick));
 		ClientLifecycleEvents.CLIENT_STOPPING.register(mc -> {
 			if (run != null) {
@@ -137,6 +154,46 @@ public final class DemoClient implements ClientModInitializer {
 				.then(literal("debug").then(literal("reset-hq")
 						.executes(c -> queue(Pending.RESET))
 						.then(literal("confirm").executes(c -> queue(Pending.RESET_CONFIRMED)))))));
+	}
+
+	/**
+	 * feat/hq-void-world, server thread: in a void HQ world, places the starter island the first time
+	 * (before the player joins: nothing has been built yet), records it in the marker and starts the
+	 * {@link VoidGuard}. Returns the player's spawn cell on the starter island (null if there is none).
+	 */
+	private static @Nullable BlockPos voidStart(net.minecraft.server.MinecraftServer server, Path root, DemoWorldSpec spec) {
+		int minY = server.overworld().getMinY();
+		DemoMarker marker = DemoMarkerFile.read(root);
+		DemoMarker.Cell c = marker.starter();
+		if (c == null && marker.structure() == null) {
+			try {
+				DemoMarker.Cell placed = VanillaDemoWorld.placeStarter(server, spec, starterFor(spec, minY));
+				DemoMarkerFile.update(root, m -> m.withStarter(placed));
+				c = placed;
+				T3Craft.LOGGER.info("[demo] starter island placed at {} {} {}", placed.x(), placed.y(), placed.z());
+			} catch (RuntimeException e) {
+				T3Craft.LOGGER.error("[demo] could not place the starter island", e);
+			}
+		}
+		int[] v = DemoPlacement.viewpoint(spec, minY);
+		BlockPos hqSpawn = new BlockPos(v[0], v[1], v[2]);
+		BlockPos spawn = c == null ? null : new VoidIsland.Starter(c.x(), c.y(), c.z()).spawn();
+		VoidGuard.start(spec.originY(), minY, spawn != null ? spawn : hqSpawn, hqSpawn);
+		return spawn;
+	}
+
+	/** In front of the empty HQ of the configured layout (north of its door), outside anything the builders place. */
+	private static VoidIsland.Starter starterFor(DemoWorldSpec spec, int worldMinY) {
+		try {
+			String layout = dev.t3craft.hq.layout.HqLayouts.resolve(dev.t3craft.client.hq.layout.HqLayoutConfig.selectedId()).id();
+			dev.t3craft.hq.BuildPlan empty = dev.t3craft.hq.HqPlans.generate(dev.t3craft.hq.HqLayout.EMPTY,
+					dev.t3craft.hq.HqStyles.forLayout(layout));
+			int lift = DemoHq.lift(spec.originY(), worldMinY, empty.footprint().minY());
+			return VoidIsland.starterFor(0, DemoHq.demoArea(empty, lift).minZ());
+		} catch (RuntimeException e) {
+			T3Craft.LOGGER.warn("[demo] HQ footprint unknown, starter island at the default spot ({})", e.getClass().getSimpleName());
+			return VoidIsland.starterFor(0, 0);
+		}
 	}
 
 	private int queue(Pending p) {
@@ -165,7 +222,7 @@ public final class DemoClient implements ClientModInitializer {
 			}, Component.translatable("t3craft.demo.confirm.title", cfg.spec().displayName()),
 					Component.translatable("t3craft.demo.confirm.body")));
 			case OPEN -> VanillaDemoWorld.open(mc, folder, back);
-			case CREATE -> VanillaDemoWorld.create(mc, cfg.spec(), back);
+			case CREATE -> VanillaDemoWorld.create(mc, cfg.newWorldSpec(), back);
 		}
 	}
 
@@ -321,7 +378,14 @@ public final class DemoClient implements ClientModInitializer {
 		IntegratedServer server = mc.getSingleplayerServer();
 		if (marker.structure() == null && server != null && mc.player != null) {
 			String name = mc.player.getGameProfile().name();
-			server.execute(() -> VanillaDemoWorld.teleportToViewpoint(server, name, cfg.spec()));
+			DemoMarker.Cell starter = marker.starter();
+			if (cfg.spec().voidWorld() && starter != null) {
+				// feat/hq-void-world: the HQ island is not there yet: wait on the starter island, the crew sets off from there
+				BlockPos feet = new VoidIsland.Starter(starter.x(), starter.y(), starter.z()).spawn();
+				server.execute(() -> VanillaDemoWorld.teleportTo(server, name, feet));
+			} else {
+				server.execute(() -> VanillaDemoWorld.teleportToViewpoint(server, name, cfg.spec()));
+			}
 			delay = TELEPORT_DELAY;
 		}
 		if (clearsAnchorsBeforeBuild(quiet)) {
@@ -363,7 +427,8 @@ public final class DemoClient implements ClientModInitializer {
 		DemoStructures s = structures;
 		String chosen = s == null ? "-" : s.choose(cfg.structure()).map(x -> x.id() + " v" + x.version()).orElse("none");
 		say("world '" + cfg.spec().folderId() + "' " + (VanillaDemoWorld.exists(mc, cfg.spec().folderId()) ? "exists" : "not created")
-				+ (root != null ? ", you are in it" : "") + "; structure " + cfg.structure() + " -> " + chosen);
+				+ (root != null ? ", you are in it (" + (activeConfig.spec().voidWorld() ? "void" : "flat") + ")" : "")
+				+ "; new worlds: " + cfg.world() + "; structure " + cfg.structure() + " -> " + chosen);
 		if (root != null) {
 			DemoMarker m = DemoMarkerFile.read(root);
 			say("built: " + (m.structure() == null ? "nothing yet" : m.structure() + " v" + m.version()));
@@ -489,7 +554,7 @@ public final class DemoClient implements ClientModInitializer {
 		}
 		T3Craft.LOGGER.info("[demo] reset-hq deleted saves/{} ({})", folder, backup);
 		notice = cfg.spec().displayName() + " reset; " + backup;
-		VanillaDemoWorld.create(mc, cfg.spec(), new TitleScreen());
+		VanillaDemoWorld.create(mc, cfg.newWorldSpec(), new TitleScreen()); // feat/hq-void-world: void unless demo.world = "flat"
 	}
 
 	private void fail(Minecraft mc, String msg) {

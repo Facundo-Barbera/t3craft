@@ -15,6 +15,7 @@
 	"t3craft.demo.confirm.body": "This world will be saved and closed, then the T3Craft HQ demo world opens.",
 	"t3craft.demo.reset.button": "Reset HQ world",
 	"t3craft.demo.reset.button.tooltip": "Deletes the T3Craft HQ demo world and creates it fresh (zip backup in backups/ first, unless demo.resetBackup is false). Only works inside the HQ world or from the menu; never touches other worlds.",
+	"t3craft.demo.void.rescued": "Back on solid ground: the void is not part of the HQ.",
 	"t3craft.demo.reset.title": "Reset the T3Craft HQ world?",
 	"t3craft.demo.reset.body": "Are you sure? Everything built in the HQ is lost.",
 	"t3craft.demo.reset.confirm": "Confirm reset",

@@ -16,9 +16,11 @@ import java.util.Objects;
  * @param originZ     plan origin z
  * @param rules       game rules forced once, when the world is first set up
  * @param dayTime     time of day set once on setup (6000 = noon); time does not advance afterwards
+ * @param voidWorld   feat/hq-void-world: the world is (or will be created as) a void world: the HQ
+ *                    stands on a floating island, the player starts on a starter island
  */
 public record DemoWorldSpec(String folderId, String displayName, long seed, int originX, int originY, int originZ,
-		Map<Rule, Boolean> rules, long dayTime) {
+		Map<Rule, Boolean> rules, long dayTime, boolean voidWorld) {
 
 	/** Game rules the demo forces. Names mirror the vanilla 26.x rules they map to. */
 	public enum Rule {
@@ -38,14 +40,25 @@ public record DemoWorldSpec(String folderId, String displayName, long seed, int 
 	public static final int DEFAULT_ORIGIN_X = 0;
 	public static final int DEFAULT_ORIGIN_Y = -60;
 	public static final int DEFAULT_ORIGIN_Z = 8;
+	/** feat/hq-void-world: default origin height in a void world (the island's grass at 63, the void below). */
+	public static final int VOID_ORIGIN_Y = 64;
 	public static final long NOON = 6000L;
 
-	/** Always creative, cheats on, peaceful, superflat (not configurable: that is what "demo" means). */
+	/**
+	 * Always creative, cheats on, peaceful, superflat (not configurable: that is what "demo" means).
+	 * feat/hq-void-world: new worlds use the superflat "void" layers (one air layer, biome the_void, no
+	 * structures, no decoration) unless {@code demo.world} is {@code "flat"}; see {@link #voidWorld}.
+	 */
 	public static final boolean CREATIVE = true;
 	public static final boolean CHEATS = true;
 	public static final boolean PEACEFUL = true;
 	public static final boolean SUPERFLAT = true;
 	public static final boolean STRUCTURES = false;
+
+	public DemoWorldSpec(String folderId, String displayName, long seed, int originX, int originY, int originZ,
+			Map<Rule, Boolean> rules, long dayTime) {
+		this(folderId, displayName, seed, originX, originY, originZ, rules, dayTime, false);
+	}
 
 	public DemoWorldSpec {
 		Objects.requireNonNull(folderId, "folderId");
@@ -68,11 +81,15 @@ public record DemoWorldSpec(String folderId, String displayName, long seed, int 
 	}
 
 	public DemoWorldSpec withFolder(String folder, String name) {
-		return new DemoWorldSpec(folder, name, seed, originX, originY, originZ, rules, dayTime);
+		return new DemoWorldSpec(folder, name, seed, originX, originY, originZ, rules, dayTime, voidWorld);
 	}
 
 	public DemoWorldSpec withOrigin(int x, int y, int z) {
-		return new DemoWorldSpec(folderId, displayName, seed, x, y, z, rules, dayTime);
+		return new DemoWorldSpec(folderId, displayName, seed, x, y, z, rules, dayTime, voidWorld);
+	}
+
+	public DemoWorldSpec withVoid(boolean v) {
+		return new DemoWorldSpec(folderId, displayName, seed, originX, originY, originZ, rules, dayTime, v);
 	}
 
 	/**
