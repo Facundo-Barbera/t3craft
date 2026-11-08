@@ -251,5 +251,7 @@
 	"t3craft.actions.field.path": "Ruta del workspace",
 	"t3craft.actions.field.path.hint": "/home/yo/proyecto",
 	"t3craft.actions.field.name": "Nombre (opcional)",
-	"t3craft.actions.field.create_missing": "Crear la carpeta si no existe: %s"
+	"t3craft.actions.field.create_missing": "Crear la carpeta si no existe: %s",
+	"t3craft.hq.layout.hybrid-ringcampus.name": "Ciudadela en anillos",
+	"t3craft.hq.layout.hybrid-ringcampus.desc": "Ciudadela en anillos: hub abovedado sobre un patio hundido, anillos de barrios con patio y salas especiales en los nodos."
 }

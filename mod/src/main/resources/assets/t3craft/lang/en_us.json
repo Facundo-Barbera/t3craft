@@ -251,5 +251,7 @@
 	"t3craft.actions.field.path": "Workspace path",
 	"t3craft.actions.field.path.hint": "/home/me/project",
 	"t3craft.actions.field.name": "Name (optional)",
-	"t3craft.actions.field.create_missing": "Create the folder if missing: %s"
+	"t3craft.actions.field.create_missing": "Create the folder if missing: %s",
+	"t3craft.hq.layout.hybrid-ringcampus.name": "Ringed citadel",
+	"t3craft.hq.layout.hybrid-ringcampus.desc": "A ringed citadel: a vaulted hub over a sunken patio, rings of barrios round their courtyards, special rooms on the nodes."
 }
