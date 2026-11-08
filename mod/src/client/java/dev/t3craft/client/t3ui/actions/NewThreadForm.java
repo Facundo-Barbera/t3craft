@@ -12,7 +12,8 @@ import java.util.regex.Pattern;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The "new thread" dialog's data, validation and payload, without drawing ({@link NewThreadDialog}).
+ * A new thread's data, validation and payload, without drawing (feat/t3-composer: the T3 screen's
+ * draft thread, {@code DraftLauncher}; the old dialog is gone).
  * One {@code orchestration.launchThread} call ({@code OrchestrationV2ThreadLaunchInput} in
  * {@code packages/contracts/src/orchestrationV2.ts}): {@code commandId, threadId, projectId, title,
  * generateTitle, modelSelection, runtimeMode, interactionMode, workspaceStrategy,

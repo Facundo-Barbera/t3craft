@@ -57,14 +57,13 @@ public final class NewThreadScreen extends Screen {
 	}
 
 	/**
-	 * Opens the screen with {@code env} and {@code projectId} preselected (either may be null).
+	 * "New thread" with {@code env} and {@code projectId} preselected (either may be null).
 	 * Hook for blocks (feat/blocks-core): {@code NewThreadScreen.open(env, projectId)}. Client thread.
-	 * Since feat/t3-actions it opens {@link dev.t3craft.client.t3ui.actions.NewThreadDialog}.
+	 * feat/t3-composer: as in T3 Code there is no dialog: the T3 screen opens on a draft thread of
+	 * that project (composer with model, project and workspace chips); the first message launches it.
 	 */
 	public static void open(@Nullable String env, @Nullable String projectId) {
-		// feat/t3-actions: the T3-style dialog (model/effort/access/plan, worktree) replaces this screen;
-		// the created thread is selected in the chat.
-		dev.t3craft.client.t3ui.actions.NewThreadDialog.open(env, projectId);
+		Minecraft.getInstance().gui.setScreen(dev.t3craft.client.chat.ChatScreens.create(null).withDraft(env, projectId));
 	}
 
 	// ---- choices --------------------------------------------------------------------------------
