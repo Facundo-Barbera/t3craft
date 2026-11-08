@@ -117,7 +117,7 @@ final class Palette {
 	 * keeps its colour across runs, machines and versions. Distinct keys may share a colour.
 	 */
 	DyeColor envColor(String envKey) {
-		return DyeColor.byId((envKey.hashCode() * 0x9E3779B9) >>> 28);
+		return HqStyle.envColor(envKey);
 	}
 
 	DyeColor envColor(HqLayout.Module m) {

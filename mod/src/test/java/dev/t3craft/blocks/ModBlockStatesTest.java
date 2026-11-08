@@ -73,8 +73,12 @@ class ModBlockStatesTest {
 				modIds.add(key.substring(0, key.indexOf('[') < 0 ? key.length() : key.indexOf('[')));
 			}
 		}
-		assertEquals(Set.of("t3craft:archive_terminal", "t3craft:board_lamp", "t3craft:monitor", "t3craft:room_plaque", "t3craft:status_lamp"), modIds,
-				"the modded HQ uses every fixture block, the archive terminal and plaques for its signs");
+		assertTrue(modIds.containsAll(Set.of("t3craft:archive_terminal", "t3craft:board_lamp", "t3craft:monitor", "t3craft:room_plaque",
+				"t3craft:status_lamp", "t3craft:thread_board")), "the modded HQ uses every fixture block, the archive terminal, the thread "
+				+ "wall and plaques for its signs: " + modIds);
+		// the cherry style is built on the kit (feat/hq-blocks-kit) when the module is on
+		assertTrue(modIds.containsAll(Set.of("t3craft:standing_desk", "t3craft:shoji_panel", "t3craft:cherry_beam", "t3craft:cherry_floor_tile",
+				"t3craft:stone_lantern", "t3craft:cherry_planter")), "kit blocks in the cherry HQ: " + modIds);
 		assertTrue(LevelBlockWorld.parse(BuiltInRegistries.BLOCK, "t3craft:monitor").getBlock() instanceof MonitorBlock);
 	}
 

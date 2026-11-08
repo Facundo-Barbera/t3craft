@@ -64,7 +64,7 @@ public final class DemoHqSource implements DemoStructureSource {
 			boolean ours = ID.equals(built.structure());
 			HqLayout previous = null;
 			int previousLift = -1;
-			String previousFixtures = HqFixtures.fingerprint(HqFixtures.VANILLA);
+			String previousFixtures = dev.t3craft.hq.HqPlans.buildKey(HqFixtures.VANILLA);
 			JsonObject st = built.state();
 			if (ours && st != null && st.has("layout")) {
 				HqLayout l = HqLayout.fromJson(st.get("layout"));

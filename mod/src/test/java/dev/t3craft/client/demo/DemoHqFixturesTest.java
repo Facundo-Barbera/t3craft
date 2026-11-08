@@ -128,7 +128,7 @@ class DemoHqFixturesTest {
 			assertEquals(want, binding(s.plan(), w.computerPos()));
 			assertEquals(want, binding(s.plan(), w.lampPos()));
 		}
-		assertEquals(HqBlockFixtures.ID, s.fixtures());
+		assertEquals(dev.t3craft.hq.HqPlans.buildKey(), s.fixtures());
 		// and they are really in what the demo builds (baked into demo coordinates)
 		List<BuildPlan> built = DemoHq.full(s.plan(), LIFT);
 		assertTrue(count(built, Blocks.OBSERVER) >= s.plan().workstations().size());
@@ -159,7 +159,7 @@ class DemoHqFixturesTest {
 	@Test
 	void blocksOffTheDemoStaysVanilla() {
 		DemoHq.Step s = DemoHq.step(DemoHq.sample(), null, null, LIFT, true);
-		assertEquals("vanilla", s.fixtures());
+		assertEquals(dev.t3craft.hq.HqPlans.buildKey(dev.t3craft.hq.HqFixtures.VANILLA), s.fixtures());
 		List<BuildPlan> built = DemoHq.full(s.plan(), LIFT);
 		assertEquals(0, count(built, Blocks.OBSERVER));
 		assertEquals(0, count(built, Blocks.REDSTONE_LAMP));
@@ -175,8 +175,9 @@ class DemoHqFixturesTest {
 	void worldBuiltVanillaGetsOnlyTheFixturesAsADiff() {
 		HqInput in = DemoHq.sample();
 		DemoHq.Step vanilla = DemoHq.step(in, null, null, LIFT, true);
+		String vanillaKey = vanilla.fixtures();
 		blocksOn();
-		DemoHq.Step upgrade = DemoHq.step(in, vanilla.layout(), vanilla.hash(), LIFT, true, "vanilla");
+		DemoHq.Step upgrade = DemoHq.step(in, vanilla.layout(), vanilla.hash(), LIFT, true, vanillaKey);
 		assertNotEquals(vanilla.hash(), upgrade.hash(), "turning the module on changes the hash");
 		assertFalse(upgrade.full());
 		assertFalse(upgrade.upToDate());
@@ -185,8 +186,9 @@ class DemoHqFixturesTest {
 		assertEquals(fixtures, placed, "only the fixture cells are placed");
 
 		JsonObject st = DemoHq.state(upgrade);
-		assertEquals(HqBlockFixtures.ID, st.get(DemoHq.FIXTURES).getAsString());
-		DemoHq.Step again = DemoHq.step(in, upgrade.layout(), upgrade.hash(), LIFT, true, HqBlockFixtures.ID);
+		assertEquals(dev.t3craft.hq.HqPlans.buildKey(), st.get(DemoHq.FIXTURES).getAsString());
+		assertTrue(st.get(DemoHq.FIXTURES).getAsString().startsWith(HqBlockFixtures.ID + "+"));
+		DemoHq.Step again = DemoHq.step(in, upgrade.layout(), upgrade.hash(), LIFT, true, dev.t3craft.hq.HqPlans.buildKey());
 		assertTrue(again.upToDate());
 	}
 

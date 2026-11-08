@@ -51,15 +51,9 @@ class HqWorldAnchorsTest {
 				}
 			}
 			for (String id : p.settled()) {
-				// a released thread stands on the hub floor in front of its computer on the "Archived" shelf
-				Anchor d = a.desk(id, p.key());
-				assertNotNull(d);
-				assertNotEquals(raw.named(AnchorNames.archive(id)), d, "not on the screen face itself");
-				assertEquals(site.origin().getY() + 1.0, d.pos().y(), "foot level on the hub floor");
-				Anchor face = raw.named(AnchorNames.archive(id));
-				double dist = Math.hypot(face.pos().x() - d.pos().x(), face.pos().z() - d.pos().z());
-				assertEquals(0.5, dist, 1e-9, "right in front of its shelf slot");
-				assertNotEquals(face.yaw(), d.yaw(), "looking at the shelf, not away from it");
+				// closed threads live in the archive terminal: no spot of their own, they wait in the hub (if shown at all)
+				assertNull(raw.named(AnchorNames.archive(id)));
+				assertNotNull(a.desk(id, p.key()));
 			}
 		}
 		assertNotNull(a.board());
@@ -77,11 +71,7 @@ class HqWorldAnchorsTest {
 		assertNotNull(p);
 		BlockPos c = site.cell(w.computerPos());
 		assertEquals(c, new BlockPos(p.computerX(), p.computerY(), p.computerZ()));
-		StationPlacement shelf = s.placement(thread("vps:p0-s0"));
-		assertNotNull(shelf, "a released thread's station is its computer on the hub's shelf");
-		BlockPos sc = site.cell(t.plan().anchor(AnchorNames.archive("vps:p0-s0")).block());
-		assertEquals(sc, new BlockPos(shelf.computerX(), shelf.computerY(), shelf.computerZ()));
-		assertNull(new HqStations(t.plan(), site, Set.of("wing-0")).placement(thread("vps:p0-s0")), "not before the base stands");
+		assertNull(s.placement(thread("vps:p0-s0")), "a released thread has no station: it is listed in the archive terminal");
 		assertNull(new HqStations(t.plan(), site, Set.of("base")).placement(thread("vps:p0-a0")), "no station before its wing stands");
 	}
 

@@ -30,12 +30,13 @@ class HqArchiveTerminalTest {
 			Anchor a = p.anchor(AnchorNames.ARCHIVE_TERMINAL);
 			assertNotNull(a, projects + " projects");
 			BlockPos cell = a.block();
-			assertEquals(Direction.WEST, a.facing(), "screen faces into the hub");
-			assertEquals("hub", p.groupAt(cell));
+			assertEquals(Direction.NORTH, a.facing(), "screen faces into the hub");
+			assertEquals(HqGenerator.GROUP_ARCHIVE, p.groupAt(cell), "its nook in the hub's south wall");
+			assertTrue(HqGeometry.hub().contains(cell));
 			var placed = p.at(cell);
 			assertNotNull(placed);
 			assertEquals(Blocks.LECTERN, placed.state().getBlock(), "vanilla stand-in");
-			assertEquals(Direction.WEST, placed.state().getValue(BlockStateProperties.HORIZONTAL_FACING));
+			assertEquals(Direction.NORTH, placed.state().getValue(BlockStateProperties.HORIZONTAL_FACING));
 			// where the player stands to use it: free, on the hub floor, not the shelf or a bench
 			BlockPos stand = cell.relative(a.facing());
 			assertTrue(air(p, stand), "free in front of the terminal");

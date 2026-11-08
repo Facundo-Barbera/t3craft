@@ -60,6 +60,20 @@ public final class HqPlans {
 		return forRoster(roster, demoSite());
 	}
 
+	/**
+	 * What decides the blocks of a plan besides the layout: the fixtures, the {@link HqKit} and the
+	 * {@link HqStyle} ({@code <fixtures>+<kit>@<style>}). Goes into build hashes and markers, so a
+	 * world built with other fixtures, kit or style is detected and rebuilt.
+	 */
+	public static String buildKey() {
+		return buildKey(HqFixtures.active());
+	}
+
+	/** {@link #buildKey()} with the given fixtures (and the active kit and style). */
+	public static String buildKey(HqFixtures fixtures) {
+		return HqFixtures.fingerprint(fixtures) + "+" + HqKit.fingerprint() + "@" + HqStyles.active().id();
+	}
+
 	/** The HQ plan of a layout, with the active {@link HqFixtures} (vanilla unless the blocks module is on). */
 	public static BuildPlan generate(HqLayout layout) {
 		return generate(layout, HqFixtures.active());

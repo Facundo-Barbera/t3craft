@@ -55,7 +55,7 @@ public final class AnchorNames {
 	/** Prefix of the hub's stroll points ({@code walk_hub_0..}), open floor away from furniture. */
 	public static final String WALK_HUB = "walk_hub_";
 
-	/** A standing spot in front of the hub's "Archived" shelf (south wall, east of the entrance), facing it. */
+	/** The standing spot in front of the archive terminal ({@link #ARCHIVE_TERMINAL}), facing it. */
 	public static final String ARCHIVE = "archive";
 	/** Prefix of the "Archived" shelf's slots ({@code shelf@0..}); see {@link #archiveShelfSlot}. */
 	public static final String SHELF_SLOT = "shelf@";
@@ -68,13 +68,22 @@ public final class AnchorNames {
 	public static final String SHELF_HEADER = "shelf_header";
 	/**
 	 * Front face of the archive terminal (feat/archive-terminal): the one place in the HQ where closed
-	 * threads are browsed. Against the hub's east wall, south of the benches, screen facing west into
-	 * the hub ({@code facing} = the face's normal; a player uses it standing one block west). Vanilla
+	 * threads are browsed. In the nook in the hub's south wall, east of the entrance, screen facing
+	 * north into the hub ({@code facing} = the face's normal; {@link #ARCHIVE} is the standing spot in
+	 * front of it). Vanilla
 	 * HQ: a lectern stands there; with the blocks module, {@code t3craft:archive_terminal}. A redesign
 	 * of the hub only has to publish this anchor (any free floor cell, facing where the player stands)
 	 * and keep that cell for the terminal; the fixtures follow the anchor.
 	 */
 	public static final String ARCHIVE_TERMINAL = "archiveTerminal";
+
+	/** Where viewers of the kanban wall stand (open floor three cells in front of its middle). */
+	public static final String THREAD_WALL_FRONT = "thread_wall_front";
+	/**
+	 * Point in the air over the hub centre where the hologram (P4) floats; the column from the hub floor
+	 * up to it is kept free of blocks in every style.
+	 */
+	public static final String HOLOGRAM = "hologram";
 
 	/**
 	 * Prefix of the large screens the plan reserves ({@link #bigScreen}). With the blocks module on,
@@ -136,11 +145,12 @@ public final class AnchorNames {
 	public static boolean standing(String name) {
 		if (name.equals(BOARD) || name.startsWith(BOARD_LAMP) || name.startsWith("monitor_") || name.startsWith("lamp_")
 				|| name.startsWith("screen@") || name.startsWith("archive_") || name.startsWith(SHELF_SLOT) || name.equals(SHELF_MORE)
-				|| name.equals(SHELF_HEADER) || name.equals(BEACON) || name.startsWith(BIG_SCREEN)) {
+				|| name.equals(SHELF_HEADER) || name.equals(BEACON) || name.startsWith(BIG_SCREEN) || name.equals(THREAD_WALL) || name.equals(THREAD_WALL_END)
+				|| name.equals(HOLOGRAM)) {
 			return false;
 		}
 		return name.equals(SPAWN) || name.equals(ENTRANCE) || name.equals(HUB) || name.equals(BOARD_FRONT) || name.equals(ARCHIVE)
-				|| name.startsWith(BOARD_SLOT) || name.startsWith(BENCH) || name.startsWith("walk") || name.startsWith("desk")
+				|| name.equals(THREAD_WALL_FRONT) || name.startsWith(BOARD_SLOT) || name.startsWith(BENCH) || name.startsWith("walk") || name.startsWith("desk")
 				|| name.startsWith("wing_") || name.startsWith("module@");
 	}
 
