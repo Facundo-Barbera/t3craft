@@ -59,11 +59,15 @@ public final class HqGenerator {
 	}
 
 	public static Result plan(HqInput input, @Nullable HqLayout previous, HqStyle style) {
-		HqLayout layout = HqLayout.allocate(input, previous);
+		HqLayout layout = HqLayout.allocate(input, previous, style);
 		return new Result(layout, new HqGenerator(style).generate(layout));
 	}
 
 	public BuildPlan generate(HqLayout layout) {
+		TownLayout town = style.town();
+		if (town != null) {
+			return town.generate(layout, style);
+		}
 		PlanBuilder b = new PlanBuilder();
 		int rows = layout.rows();
 		hub(b, rows > 0, hubBinding(layout));

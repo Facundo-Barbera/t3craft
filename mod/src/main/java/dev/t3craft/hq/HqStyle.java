@@ -92,6 +92,15 @@ public abstract class HqStyle {
 	/** Stable id used by the config ({@code hq.style}) and the preview. */
 	public abstract String id();
 
+	/**
+	 * The style's own ground plan (layout/blocks), or null for the shared spine of {@link HqGeometry}
+	 * that cherry and classic use. With a town, {@link HqLayout#allocate(HqInput, HqLayout, HqStyle)} and
+	 * {@link HqGenerator#generate} hand over to it and the pieces below are not used.
+	 */
+	@Nullable TownLayout town() {
+		return null;
+	}
+
 	/** Representative block of every {@link Role} (all roles present; default orientations). */
 	public abstract Map<Role, BlockState> palette();
 

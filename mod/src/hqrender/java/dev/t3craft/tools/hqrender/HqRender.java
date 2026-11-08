@@ -85,6 +85,13 @@ public final class HqRender {
 		Files.createDirectories(out);
 		BlockModels models = new BlockModels();
 		String sid = style.id();
+		if (HqStyles.towns().contains(style)) {
+			TownRender.render(models, style, out, only, ss, npcs);
+			for (String p : models.problems) {
+				System.out.println("note: " + p);
+			}
+			return;
+		}
 
 		Map<String, HqInput> rosters = new LinkedHashMap<>();
 		rosters.put("1p", roster(new int[] {4}, 0));
@@ -170,7 +177,7 @@ public final class HqRender {
 	}
 
 	/** The plan in a grid, on flat ground (grass at y=0, dirt below) where the plan has nothing, plus NPC stand-ins. */
-	private static Scene scene(BlockModels models, BuildPlan plan, Renderer.Clip clip, boolean npcs) {
+	static Scene scene(BlockModels models, BuildPlan plan, Renderer.Clip clip, boolean npcs) {
 		Scene sc = new Scene(models, clip.minX(), Math.min(clip.minY(), -6), clip.minZ(), clip.maxX(), Math.max(clip.maxY(), 11), clip.maxZ());
 		BlockState grass = Blocks.GRASS_BLOCK.defaultBlockState();
 		BlockState dirt = Blocks.DIRT.defaultBlockState();
@@ -194,7 +201,8 @@ public final class HqRender {
 			for (Map.Entry<String, Anchor> e : plan.anchors().entrySet()) {
 				String k = e.getKey();
 				if (k.equals("board_slot_0") || k.equals("board_slot_3") || k.equals("bench_1") || k.equals("bench_7") || k.equals("walk_hub_0")
-						|| k.equals("archive") || k.equals("thread_wall_front")) {
+						|| k.equals("archive") || k.equals("thread_wall_front") || k.startsWith("walk_lounge_") || k.equals("walk_clock")
+						|| k.equals("walk_review") || k.startsWith("walk_plazuela_")) {
 					npc(sc, e.getValue(), k.startsWith("bench"), n++);
 				}
 			}
@@ -232,7 +240,7 @@ public final class HqRender {
 		sc.overlay(c.getX(), c.getY() + 1, c.getZ(), "npc-high-" + i, high);
 	}
 
-	private static void caption(BufferedImage img, String text) {
+	static void caption(BufferedImage img, String text) {
 		try {
 			Graphics2D g = img.createGraphics();
 			g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);

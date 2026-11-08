@@ -218,8 +218,24 @@ public record HqLayout(List<Module> modules, List<Archived> archive, List<String
 		return allocate(input, null);
 	}
 
-	/** Allocates modules, desks and archive slots for {@code input}, keeping what {@code previous} had (see class doc). */
+	/**
+	 * Allocates modules, desks and archive slots for {@code input}, keeping what {@code previous} had
+	 * (see class doc), for the active style ({@link HqStyles#active()}).
+	 */
 	public static HqLayout allocate(HqInput input, @Nullable HqLayout previous) {
+		return allocate(input, previous, HqStyles.active());
+	}
+
+	/**
+	 * {@link #allocate(HqInput, HqLayout)} for {@code style}: the rules of the class doc for the shared
+	 * spine (cherry, classic), or the style's own {@link TownLayout} (layout/blocks).
+	 */
+	public static HqLayout allocate(HqInput input, @Nullable HqLayout previous, HqStyle style) {
+		TownLayout town = style.town();
+		return town == null ? allocateSpine(input, previous) : town.allocate(input, previous);
+	}
+
+	private static HqLayout allocateSpine(HqInput input, @Nullable HqLayout previous) {
 		HqLayout prev = previous == null ? EMPTY : previous;
 		Map<String, Seat> oldSeats = prev.seats();
 		// 1-2. kept desks, grouped by old module (only modules of the same project)
@@ -271,6 +287,16 @@ public record HqLayout(List<Module> modules, List<Archived> archive, List<String
 			e.getValue().forEach((s, t) -> ds.add(new Desk(s, t)));
 			mods.add(new Module(e.getKey(), p.key(), p.label(), p.envKey(), p.envLabel(), ds));
 		}
+		Shelf shelf = shelve(input, prev);
+		return new HqLayout(mods, shelf.archive(), shelf.overflow());
+	}
+
+	/** The "Archived" shelf and the older list of a roster (rule 5), whatever the module layout. */
+	record Shelf(List<Archived> archive, List<String> overflow) {
+	}
+
+	/** Rule 5 of the class doc: who is on the "Archived" shelf, in which slot, and who is in the overflow. */
+	static Shelf shelve(HqInput input, HqLayout prev) {
 		// 5. the "Archived" shelf
 		List<Archived> kept = new ArrayList<>();
 		List<String[]> newcomers = new ArrayList<>();
@@ -332,7 +358,7 @@ public record HqLayout(List<Module> modules, List<Archived> archive, List<String
 			arch.add(new Archived(s, n[1], n[0], n[2], --low));
 			over.remove(n[1]);
 		}
-		return new HqLayout(mods, arch, over);
+		return new Shelf(arch, over);
 	}
 
 	private static int lowestFree(TreeSet<Integer> used) {

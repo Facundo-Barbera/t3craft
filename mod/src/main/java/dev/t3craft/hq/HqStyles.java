@@ -17,7 +17,7 @@ import org.jspecify.annotations.Nullable;
  * section of {@code config/t3craft.json} (read-only here; the client's ConfigStore keeps unknown
  * sections on save, so this key survives without this class ever writing):
  * <pre>{@code
- * "hq": { "style": "cherry" }     // cherry (default) | classic
+ * "hq": { "style": "cherry" }     // cherry (default) | classic | ensanche
  * }</pre>
  * Absent file, section or key: {@link #DEFAULT_ID}. Unknown id: the default plus a warning.
  */
@@ -29,19 +29,29 @@ public final class HqStyles {
 	public static final String DEFAULT_ID = CherryStyle.ID;
 
 	private static final List<HqStyle> ALL = List.of(new CherryStyle(), new ClassicStyle());
+	/** Styles with their own ground plan ({@link HqStyle#town()}), selectable like the others but not in {@link #all()}. */
+	private static final List<HqStyle> TOWNS = List.of(new EnsancheStyle());
 	private static volatile @Nullable HqStyle active;
 
 	private HqStyles() {
 	}
 
-	/** Every style, default first. */
+	/** Every style on the shared spine geometry, default first (the town styles are in {@link #towns()}). */
 	public static List<HqStyle> all() {
 		return ALL;
+	}
+
+	/** Styles with their own ground plan (layout/blocks: {@code ensanche}). */
+	public static List<HqStyle> towns() {
+		return TOWNS;
 	}
 
 	public static List<String> ids() {
 		List<String> out = new ArrayList<>();
 		for (HqStyle s : ALL) {
+			out.add(s.id());
+		}
+		for (HqStyle s : TOWNS) {
 			out.add(s.id());
 		}
 		return out;
@@ -54,6 +64,11 @@ public final class HqStyles {
 		}
 		String k = id.trim().toLowerCase(Locale.ROOT);
 		for (HqStyle s : ALL) {
+			if (s.id().equals(k)) {
+				return s;
+			}
+		}
+		for (HqStyle s : TOWNS) {
 			if (s.id().equals(k)) {
 				return s;
 			}
