@@ -265,7 +265,7 @@ final class ClassicStyle extends HqStyle {
 				boolean wing = (x > 0 ? eastSign : westSign) != null;
 				boolean door = ax == SPINE && wing && v >= DOOR_V1 && v <= DOOR_V2;
 				BlockState floor = ax == SPINE ? (door ? k.woodFloor : k.plinth) : ax == 2 ? k.darkPlanks
-						: x == 0 && v % 4 == 2 ? k.copperInlay : k.woodFloor;
+						: x == 0 && v % dev.t3craft.hq.pack.LayoutParams.CLASSIC_INLAY.get() == 2 ? k.copperInlay : k.woodFloor;
 				c.set(x, 0, z, floor);
 				if (ax == SPINE) {
 					for (int y = 1; y <= 4; y++) {

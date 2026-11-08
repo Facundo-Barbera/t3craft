@@ -710,7 +710,7 @@ final class TowerGenerator {
 				for (int y = 1; y < h; y++) {
 					v.set(w + 1, y, lz, facade(t, lz, y, h, m));
 					boolean door = f == 0 ? Math.abs(lz) <= 3 && y <= 4 : Math.abs(lz) <= 1 && y <= 3;
-					BlockState p = door ? AIR : y == h - 1 || y == 1 ? wall() : Math.floorMod(lz, 4) == 2 ? lit() : (y >= 2 && y <= 3) ? m.pane() : wall();
+					BlockState p = door ? AIR : y == h - 1 || y == 1 ? wall() : Math.floorMod(lz, dev.t3craft.hq.pack.LayoutParams.VERTICAL_FACADE_LIGHT.get()) == 2 ? lit() : (y >= 2 && y <= 3) ? m.pane() : wall();
 					v.set(0, y, lz, p);
 				}
 			}

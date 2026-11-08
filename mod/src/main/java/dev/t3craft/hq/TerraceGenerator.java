@@ -708,7 +708,8 @@ public final class TerraceGenerator {
 		// ceiling and the stepped roof with a shrine on top
 		for (int v = -INNER; v <= INNER; v++) {
 			for (int u = -INNER; u <= INNER; u++) {
-				p.set(u, f + TEMPLE_WALL + 1, v, Math.floorMod(u, 4) == 2 && Math.floorMod(v, 4) == 2 ? kit().wallPanel(true) : SMOOTH_QUARTZ);
+				int lightEvery = dev.t3craft.hq.pack.LayoutParams.TERRACES_TEMPLE_LIGHT.get();
+				p.set(u, f + TEMPLE_WALL + 1, v, Math.floorMod(u, lightEvery) == 2 && Math.floorMod(v, lightEvery) == 2 ? kit().wallPanel(true) : SMOOTH_QUARTZ);
 			}
 		}
 		int y0 = f + TEMPLE_WALL + 2;

@@ -255,7 +255,7 @@ final class RingGenerator {
 				stepped(x, z, h - h % 2, b(Blocks.DEEPSLATE_TILES), b(Blocks.DEEPSLATE_TILES));
 				int top = h / 2;
 				set(x, top, z, (x * 7 + z * 13 & 7) == 0 ? MOSS : GRASS);
-				if (Math.floorMod(x * 31 + z * 17, 23) == 0 && top + 1 < 6) {
+				if (Math.floorMod(x * 31 + z * 17, dev.t3craft.hq.pack.LayoutParams.RING_TERRACE_BUSH.get()) == 0 && top + 1 < 6) {
 					set(x, top + 1, z, leaves(Blocks.FLOWERING_AZALEA_LEAVES));
 				}
 			}
@@ -596,7 +596,7 @@ final class RingGenerator {
 			}
 		}
 		// planters on the inner patio only: past r = 14.5 the way along the drum is too narrow (fix/hq-lanterns)
-		if (r <= 14.5 && Math.floorMod(x * 5 + z * 3, 11) == 0) {
+		if (r <= 14.5 && Math.floorMod(x * 5 + z * 3, dev.t3craft.hq.pack.LayoutParams.RING_PATIO_PLANTER.get()) == 0) {
 			set(x, 1, z, Math.floorMod(x + z, 2) == 0 ? b(Blocks.FLOWERING_AZALEA) : kit.gardenPlanter());
 		}
 	}

@@ -216,6 +216,9 @@ public final class DemoClient implements ClientModInitializer {
 			}
 			checked = true;
 			start(mc, root, false);
+		} else if (run == null && ticksIn % 20 == 0 && hq != null && hq.packsChanged()) {
+			// feat/hq-layout-packs: a layout pack was reloaded: diff the HQ (within a second, no reload of the game)
+			start(mc, root, false, true);
 		} else if (run == null && ticksIn % RECONCILE_TICKS == 0) {
 			DemoHqSource h = hq;
 			if (h != null && h.rosterChanged() && rosterReady(true)) {

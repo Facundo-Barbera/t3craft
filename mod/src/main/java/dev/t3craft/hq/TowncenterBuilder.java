@@ -554,7 +554,8 @@ final class TowncenterBuilder {
 			return y == CAP && m <= 2 ? COPPER : null;
 		}
 		if (y == CEIL) {
-			return !wall && Math.floorMod(x, 6) == 0 && Math.floorMod(z - HC, 6) == 3 ? LAMP : TRIM;
+			int lampEvery = dev.t3craft.hq.pack.LayoutParams.TOWNCENTER_CEILING_LAMP.get();
+			return !wall && Math.floorMod(x, lampEvery) == 0 && Math.floorMod(z - HC, lampEvery) == 3 ? LAMP : TRIM;
 		}
 		if (y == CEIL + 1 && wall) {
 			return EnsancheStyle.slab(Blocks.SMOOTH_QUARTZ_SLAB);

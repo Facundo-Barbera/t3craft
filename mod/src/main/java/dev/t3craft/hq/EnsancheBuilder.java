@@ -397,7 +397,8 @@ final class EnsancheBuilder {
 						c.set(x, 0, z, ring <= 3 ? accent() : Math.abs(x) == HALL_X - 1 || z == HALL_N + 1 || z == HALL_S - 1 ? plinth
 								: Math.floorMod(x + z, 2) == 0 ? s(Blocks.POLISHED_ANDESITE) : s(Blocks.SMOOTH_STONE));
 						boolean well = Math.abs(x) <= 2 && Math.abs(z - HALL_CZ) <= 2;
-						c.set(x, CEILING, z, well ? AIR : Math.floorMod(x, 6) == 0 && Math.floorMod(z, 6) == 0 ? lightPanel() : trim);
+						int lightEvery = dev.t3craft.hq.pack.LayoutParams.ENSANCHE_CEILING_LIGHT.get();
+						c.set(x, CEILING, z, well ? AIR : Math.floorMod(x, lightEvery) == 0 && Math.floorMod(z, lightEvery) == 0 ? lightPanel() : trim);
 						continue;
 					}
 					c.set(x, 0, z, plinth);

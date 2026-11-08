@@ -114,6 +114,9 @@ public final class DemoHq {
 
 	// ---- hash / state -------------------------------------------------------------------------
 
+	/** Marker key of the layout pack hash the HQ was built with (feat/hq-layout-packs; absent or "" = none). */
+	public static final String PACK = "pack";
+
 	/** Marker key of the fixtures the HQ was built with ({@link HqFixtures#fingerprint()}). */
 	public static final String FIXTURES = "fixtures";
 
@@ -126,7 +129,9 @@ public final class DemoHq {
 	}
 
 	static String hash(HqLayout layout, int lift, String fixtures) {
-		String text = PLAN_VERSION + "|" + lift + "|" + fixtures + "|" + layout.toJson();
+		// feat/hq-layout-packs: the active layout's pack is part of what is built (absent without a pack: old hashes stay valid)
+		String pack = dev.t3craft.hq.pack.HqLayoutPacks.hash(dev.t3craft.hq.layout.HqLayouts.active().id());
+		String text = PLAN_VERSION + "|" + lift + "|" + fixtures + "|" + layout.toJson() + (pack.isEmpty() ? "" : "|pack=" + pack);
 		try {
 			byte[] d = MessageDigest.getInstance("SHA-256").digest(text.getBytes(StandardCharsets.UTF_8));
 			return HexFormat.of().formatHex(d, 0, 12);
@@ -142,6 +147,8 @@ public final class DemoHq {
 		o.addProperty(FIXTURES, step.fixtures());
 		// feat/hq-layouts: the layout this HQ is built with (HqLayoutState); never mixed with another one
 		o.addProperty(dev.t3craft.client.hq.layout.HqLayoutState.KEY, dev.t3craft.hq.layout.HqLayouts.active().id());
+		// feat/hq-layout-packs: the pack this HQ was built with, to regenerate the old plan for the next diff
+		o.addProperty(PACK, step.plan().packHash());
 		o.add("layout", step.layout().toJson());
 		return o;
 	}
@@ -181,6 +188,17 @@ public final class DemoHq {
 	 */
 	public static Step step(HqInput input, @Nullable HqLayout previous, @Nullable String previousHash, int lift, boolean diffable,
 			String previousFixtures, boolean clearPrevious) {
+		return step(input, previous, previousHash, lift, diffable, previousFixtures, clearPrevious, null);
+	}
+
+	/**
+	 * {@link #step(HqInput, HqLayout, String, int, boolean, String, boolean)} for a world built with layout
+	 * pack {@code previousPack} (feat/hq-layout-packs; null = the active one): the old plan is regenerated
+	 * with that pack so the diff holds exactly what the pack change moved; a pack not seen this session
+	 * cannot be regenerated, so the HQ is rebuilt whole.
+	 */
+	public static Step step(HqInput input, @Nullable HqLayout previous, @Nullable String previousHash, int lift, boolean diffable,
+			String previousFixtures, boolean clearPrevious, @Nullable String previousPack) {
 		String fixtures = dev.t3craft.hq.HqPlans.buildKey();
 		HqGenerator.Result r = HqPlans.plan(input, previous);
 		String h = hash(r.layout(), lift, fixtures);
@@ -189,10 +207,13 @@ public final class DemoHq {
 		}
 		dev.t3craft.hq.BuildPlan before = null;
 		if (diffable && previous != null) {
+			String layoutId = dev.t3craft.hq.layout.HqLayouts.active().id();
+			String pack = previousPack == null ? dev.t3craft.hq.pack.HqLayoutPacks.hash(layoutId) : previousPack;
+			HqLayout prev = previous;
 			if (previousFixtures.equals(fixtures)) {
-				before = HqPlans.generate(previous);
+				before = dev.t3craft.hq.pack.HqLayoutPacks.withPack(layoutId, pack, () -> HqPlans.generate(prev));
 			} else if (previousFixtures.equals(dev.t3craft.hq.HqPlans.buildKey(HqFixtures.VANILLA))) {
-				before = HqPlans.generate(previous, HqFixtures.VANILLA);
+				before = dev.t3craft.hq.pack.HqLayoutPacks.withPack(layoutId, pack, () -> HqPlans.generate(prev, HqFixtures.VANILLA));
 			}
 			// else: built with fixtures that are not installed now, so the old plan is unknown: rebuild all
 		}

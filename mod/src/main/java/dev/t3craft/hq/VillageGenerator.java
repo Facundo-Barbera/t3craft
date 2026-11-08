@@ -502,7 +502,8 @@ public final class VillageGenerator {
 			// ceiling with lights, the beacon in the middle (over the hologram column)
 			for (int v = -HALL + 1; v <= HALL - 1; v++) {
 				for (int u = -HALL + 1; u <= HALL - 1; u++) {
-					boolean light = Math.floorMod(u, 4) == 2 && Math.floorMod(v, 4) == 2;
+					int lightEvery = dev.t3craft.hq.pack.LayoutParams.VILLAGE_CEILING_LIGHT.get();
+					boolean light = Math.floorMod(u, lightEvery) == 2 && Math.floorMod(v, lightEvery) == 2;
 					p.set(u, H + HALL_WALL + 1, v, light ? kit().wallPanel(true) : m.gable());
 				}
 			}
@@ -1148,7 +1149,7 @@ public final class VillageGenerator {
 			// lanterns along the lanes, then trees, bushes and flowers away from them
 			for (int v = -HALF + 2; v <= HALF - 2; v++) {
 				for (int u = -HALF + 2; u <= HALF - 2; u++) {
-					if (!lane[u + HALF][v + HALF] && Math.floorMod(u * 3 + v * 5 + s.i + s.j, 11) == 0 && nextToLane(lane, u, v)) {
+					if (!lane[u + HALF][v + HALF] && Math.floorMod(u * 3 + v * 5 + s.i + s.j, dev.t3craft.hq.pack.LayoutParams.VILLAGE_LANE_LANTERN.get()) == 0 && nextToLane(lane, u, v)) {
 						p.decor(u, f + 1, v, kit().gardenLantern());
 						lane[u + HALF][v + HALF] = true;
 					}

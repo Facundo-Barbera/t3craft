@@ -196,7 +196,7 @@ final class RingCampusGenerator {
 
 	/** A light every 41 cells in a lattice that leaves no open floor cell more than 4 steps from one. */
 	private static boolean lattice(int x, int z) {
-		return Math.floorMod(4 * x + 5 * z, 41) == 0;
+		return Math.floorMod(4 * x + 5 * z, dev.t3craft.hq.pack.LayoutParams.RINGCAMPUS_STREET_LIGHT.get()) == 0;
 	}
 
 	// ------------------------------------------------------------------ materials (cherry palette)
@@ -279,7 +279,7 @@ final class RingCampusGenerator {
 				stepped(x, z, h - h % 2, FOOT, FOOT);
 				int top = h / 2;
 				set(x, top, z, (x * 7 + z * 13 & 7) == 0 ? MOSS : GRASS);
-				if (Math.floorMod(x * 31 + z * 17, 23) == 0 && top + 1 < 6) {
+				if (Math.floorMod(x * 31 + z * 17, dev.t3craft.hq.pack.LayoutParams.RINGCAMPUS_TERRACE_BUSH.get()) == 0 && top + 1 < 6) {
 					set(x, top + 1, z, leaves(Blocks.FLOWERING_AZALEA_LEAVES));
 				}
 			}

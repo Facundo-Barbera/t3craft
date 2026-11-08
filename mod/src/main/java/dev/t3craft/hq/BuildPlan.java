@@ -77,6 +77,8 @@ public final class BuildPlan {
 	private final Box footprint;
 	private final List<Workstation> workstations;
 	private @Nullable String fingerprint;
+	/** feat/hq-layout-packs: hash of the layout pack the plan was generated with ("" = none); part of {@link #fingerprint()}. */
+	private final String packHash;
 	/** Group of every placement, when the generator gives it (plans with many small modules: layout/ring). */
 	private final @Nullable Map<BlockPos, String> groupIndex;
 
@@ -86,6 +88,12 @@ public final class BuildPlan {
 
 	BuildPlan(List<Placement> placements, SortedMap<String, Anchor> anchors, List<Module> modules, List<Workstation> workstations,
 			@Nullable Map<BlockPos, String> groupIndex) {
+		this(placements, anchors, modules, workstations, groupIndex, "");
+	}
+
+	BuildPlan(List<Placement> placements, SortedMap<String, Anchor> anchors, List<Module> modules, List<Workstation> workstations,
+			@Nullable Map<BlockPos, String> groupIndex, String packHash) {
+		this.packHash = packHash;
 		this.groupIndex = groupIndex; // the generator hands an unmodifiable map; replacing() keeps positions, so it is shared
 		this.placements = List.copyOf(placements);
 		this.workstations = List.copyOf(workstations);
@@ -244,6 +252,9 @@ public final class BuildPlan {
 				for (Anchor a : anchors.values()) {
 					md.update((a + "\n").getBytes(StandardCharsets.UTF_8));
 				}
+				if (!packHash.isEmpty()) {
+					md.update(("pack=" + packHash + "\n").getBytes(StandardCharsets.UTF_8));
+				}
 				f = HexFormat.of().formatHex(md.digest());
 			} catch (NoSuchAlgorithmException e) {
 				throw new IllegalStateException(e);
@@ -302,7 +313,7 @@ public final class BuildPlan {
 			changed |= q != p;
 			out.add(q);
 		}
-		return changed ? new BuildPlan(out, anchors, modules, workstations, groupIndex) : this;
+		return changed ? new BuildPlan(out, anchors, modules, workstations, groupIndex, packHash) : this;
 	}
 
 	/**
@@ -318,7 +329,36 @@ public final class BuildPlan {
 		for (Anchor x : extra) {
 			a.put(x.name(), x);
 		}
-		return new BuildPlan(placements, a, modules, workstations, groupIndex);
+		return new BuildPlan(placements, a, modules, workstations, groupIndex, packHash);
+	}
+
+	/** feat/hq-layout-packs: hash of the layout pack this plan was generated with ("" when none). */
+	public String packHash() {
+		return packHash;
+	}
+
+	/** This plan marked as generated with the layout pack {@code hash} (goes into {@link #fingerprint()}). */
+	BuildPlan withPackHash(String hash) {
+		return hash.equals(packHash) ? this : new BuildPlan(placements, anchors, modules, workstations, groupIndex, hash);
+	}
+
+	/**
+	 * feat/hq-layout-packs (rooms): this plan with {@code placements} instead (new positions allowed),
+	 * {@code extraAnchors} added or replacing anchors of the same name, and the group of every new
+	 * position in {@code extraGroups} (kept when the plan has a group index).
+	 */
+	BuildPlan rebuilt(List<Placement> newPlacements, java.util.Collection<Anchor> extraAnchors, Map<BlockPos, String> extraGroups) {
+		TreeMap<String, Anchor> a = new TreeMap<>(anchors);
+		for (Anchor x : extraAnchors) {
+			a.put(x.name(), x);
+		}
+		Map<BlockPos, String> gi = groupIndex;
+		if (gi != null && !extraGroups.isEmpty()) {
+			Map<BlockPos, String> m = new java.util.HashMap<>(gi);
+			m.putAll(extraGroups);
+			gi = java.util.Collections.unmodifiableMap(m);
+		}
+		return new BuildPlan(newPlacements, a, modules, workstations, gi, packHash);
 	}
 
 	/** The block that fills a cell a newer plan no longer uses. */

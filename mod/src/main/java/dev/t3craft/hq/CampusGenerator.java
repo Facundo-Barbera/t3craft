@@ -597,7 +597,8 @@ final class CampusGenerator {
 				}
 				boolean ring = d == HUB + 1 || d == a || (ax <= 1 || az <= 1);
 				g.set(x, 0, z, ring ? CAMPUS.accent() : (x + z) % 2 == 0 ? CAMPUS.path() : Blocks.ANDESITE.defaultBlockState());
-				if (d == HUB + 3 && (ax == HUB + 3 && az % 6 == 3 || az == HUB + 3 && ax % 6 == 3) && ax > 3 && az > 3) {
+				int lampEvery = dev.t3craft.hq.pack.LayoutParams.CAMPUS_PLAZA_LAMPS.get();
+				if (d == HUB + 3 && (ax == HUB + 3 && az % lampEvery == 3 || az == HUB + 3 && ax % lampEvery == 3) && ax > 3 && az > 3) {
 					lampPost(g, x, z);
 				}
 			}
@@ -1152,9 +1153,9 @@ final class CampusGenerator {
 							p.set(u, yb, v, edge ? pal.ridge() : moss());
 							if (edge) {
 								p.set(u, yb + 1, v, pal.roofSlab());
-							} else if (hash(u, v) % 7 == 0) {
+							} else if (hash(u, v) % dev.t3craft.hq.pack.LayoutParams.CAMPUS_ROOF_AZALEA.get() == 0) {
 								p.decor(u, yb + 1, v, Blocks.FLOWERING_AZALEA.defaultBlockState());
-							} else if (hash(v, u) % 3 == 0) {
+							} else if (hash(v, u) % dev.t3craft.hq.pack.LayoutParams.CAMPUS_ROOF_MOSS.get() == 0) {
 								p.decor(u, yb + 1, v, Blocks.MOSS_CARPET.defaultBlockState());
 							}
 						}

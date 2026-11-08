@@ -349,7 +349,7 @@ final class CherryStyle extends HqStyle {
 				boolean deck = ax <= 3 && z < gate;
 				c.set(x, 0, z, deck ? (custom() ? kit().floor() : planks) : ax <= 1 ? role(Role.PATH) : role(Role.GARDEN));
 				if (!deck && ax >= 2 && !(ax == 2 && z == gate)) {
-					c.decor(x, 1, z, (x + z) % 3 == 0 ? petals(1 + Math.floorMod(x * 7 + z, 4), Direction.from2DDataValue(Math.floorMod(x + z, 4)))
+					c.decor(x, 1, z, (x + z) % dev.t3craft.hq.pack.LayoutParams.CLASSIC_PETALS.get() == 0 ? petals(1 + Math.floorMod(x * 7 + z, 4), Direction.from2DDataValue(Math.floorMod(x + z, 4)))
 							: moss);
 				}
 			}
