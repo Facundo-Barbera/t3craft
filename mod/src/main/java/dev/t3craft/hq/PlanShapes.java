@@ -29,7 +29,7 @@ import net.minecraft.util.RandomSource;
  * the cell keeps its original state. Only the three block families above are touched, so blocks
  * whose update would check survival (lanterns, signs, plants) are never changed here.
  */
-final class PlanShapes {
+public final class PlanShapes {
 	private PlanShapes() {
 	}
 
@@ -42,7 +42,7 @@ final class PlanShapes {
 	 * Updates, in place, every shaped cell of {@code cells} from its neighbours. Two passes, because a
 	 * wall's post depends on the resolved wall above it.
 	 */
-	static void resolve(Map<Long, BlockState> cells) {
+	public static void resolve(Map<Long, BlockState> cells) {
 		LevelAccessor view = view(cells);
 		for (int pass = 0; pass < 2; pass++) {
 			boolean changed = false;

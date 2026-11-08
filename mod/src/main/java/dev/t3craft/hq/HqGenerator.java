@@ -97,7 +97,7 @@ public final class HqGenerator {
 	 * What the hub's big screen shows: the environment with the most modules (ties: the first key), or
 	 * nothing while the HQ has no modules. Wire format of the blocks module's bindings ({@code env:<id>}).
 	 */
-	static String hubBinding(HqLayout layout) {
+	public static String hubBinding(HqLayout layout) {
 		java.util.Map<String, Integer> count = new java.util.TreeMap<>();
 		for (HqLayout.Module m : layout.modules()) {
 			if (!m.envKey().isEmpty()) {

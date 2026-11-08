@@ -9,9 +9,9 @@ import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.block.entity.SignText;
 
 /** Block entity data for the HQ's signs (front text, blank back, waxed so players cannot edit them). */
-final class SignTags {
+public final class SignTags {
 	/** Characters that fit on one sign line at the default font. */
-	static final int LINE = 15;
+	public static final int LINE = 15;
 
 	private SignTags() {
 	}
