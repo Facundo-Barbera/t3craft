@@ -23,8 +23,8 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * The HQ adapter (an {@link HqFixtures}): swaps the vanilla fixtures of a generated plan for the
- * module's blocks, cell for cell, as listed by {@link HqBindings}: computers → monitors (facing the
- * chair or the aisle), desk bulbs → status lamps, board bulbs → board lamps, the hub lantern's cap
+ * module's blocks, cell for cell, as listed by {@link HqBindings}: each desk's 3×2 screen → six
+ * monitors facing the agent that merge into one screen (no desk lamps), board bulbs → board lamps, the hub lantern's cap
  * → the beacon (a status lamp bound {@code beacon}), the archive terminal's lectern → the archive
  * terminal, the plan's large-screen cells → monitors, the plan's {@code thread_wall} anchor cell (if
  * any) → the thread wall anchor with its size as data, and wall signs with text (module signs, the
@@ -78,7 +78,7 @@ public final class HqBlockFixtures implements HqFixtures {
 	}
 
 	/** Bump when the substitution changes (cells, blocks or binding format): demo worlds then update. */
-	public static final String ID = "blocks-4";
+	public static final String ID = "blocks-5";
 
 	@Override
 	public String id() {
@@ -112,7 +112,7 @@ public final class HqBlockFixtures implements HqFixtures {
 					ScreenRect e = screens.get(f.rel());
 					yield e == null ? states.monitor(f.facing()) : states.monitor(f.facing(), e.sides(f.rel()));
 				}
-				case LAMP, BEACON -> states.lamp();
+				case BEACON -> states.lamp();
 				case BOARD_LAMP -> states.boardLamp();
 				case ARCHIVE_TERMINAL -> states.archiveTerminal(f.facing());
 			};

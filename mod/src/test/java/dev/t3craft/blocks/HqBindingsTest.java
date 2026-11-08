@@ -72,16 +72,18 @@ class HqBindingsTest {
 		int taken = 0;
 		for (Workstation w : p.workstations()) {
 			HqBindings.Fixture mon = find(fx, w.computerPos());
-			HqBindings.Fixture lamp = find(fx, w.lampPos());
 			assertEquals(HqBindings.Role.MONITOR, mon.role());
-			assertEquals(HqBindings.Role.LAMP, lamp.role());
+			for (net.minecraft.core.BlockPos cell : w.screenCells()) {
+				HqBindings.Fixture c = find(fx, cell);
+				assertEquals(HqBindings.Role.MONITOR, c.role(), "every screen cell is a monitor");
+				assertEquals(mon.binding(), c.binding(), "one binding for the whole screen");
+			}
 			assertEquals(w.screenFacing(), mon.facing(), "the screen faces the chair");
 			if (w.threadId() == null) {
 				assertTrue(mon.binding().isNone(), "vacant desk stays unbound");
 			} else {
 				taken++;
 				assertEquals(Binding.thread(w.threadId()), mon.binding());
-				assertEquals(mon.binding(), lamp.binding());
 			}
 		}
 		assertEquals(7, taken, "7 active threads, 1 settled");
@@ -155,7 +157,7 @@ class HqBindingsTest {
 			assertEquals(f.binding().wire(), be.getStringOr(BoundBlockEntity.KEY, ""));
 			switch (f.role()) {
 				case MONITOR -> assertEquals(STANDIN.monitor(f.facing()), s.state());
-				case LAMP -> assertEquals(STANDIN.lamp(), s.state());
+				case BEACON -> assertEquals(STANDIN.lamp(), s.state());
 				case BOARD_LAMP -> assertEquals(STANDIN.boardLamp(), s.state());
 				case ARCHIVE_TERMINAL -> assertEquals(STANDIN.archiveTerminal(f.facing()), s.state());
 				default -> {

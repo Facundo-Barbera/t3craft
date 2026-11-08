@@ -37,7 +37,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 /**
- * The demo HQ with the blocks module on: every desk gets its monitor and lamp, every module its bulb,
+ * The demo HQ with the blocks module on: every desk gets its 3×2 screen of monitors (no lamp), every module its bulb,
  * all bound to the layout's threads; worlds built vanilla get them as a diff; and the live binding
  * follows the roster changing only the blocks that must.
  */
@@ -117,22 +117,22 @@ class DemoHqFixturesTest {
 	// ---- the plan ------------------------------------------------------------------------------
 
 	@Test
-	void blocksOnEveryDeskHasMonitorAndLampBoundToItsThread() {
+	void blocksOnEveryDeskHasA3x2ScreenBoundToItsThreadAndNoLamp() {
 		blocksOn();
 		DemoHq.Step s = DemoHq.step(DemoHq.sample(), null, null, LIFT, true);
 		assertFalse(s.plan().workstations().isEmpty());
 		for (Workstation w : s.plan().workstations()) {
-			assertEquals(Blocks.OBSERVER, block(s.plan(), w.computerPos()), "monitor at desk " + w.module() + "/" + w.slot());
-			assertEquals(Blocks.REDSTONE_LAMP, block(s.plan(), w.lampPos()), "lamp at desk " + w.module() + "/" + w.slot());
 			String want = w.threadId() == null ? "" : Binding.thread(w.threadId()).wire();
-			assertEquals(want, binding(s.plan(), w.computerPos()));
-			assertEquals(want, binding(s.plan(), w.lampPos()));
+			for (net.minecraft.core.BlockPos cell : w.screenCells()) {
+				assertEquals(Blocks.OBSERVER, block(s.plan(), cell), "monitor at desk " + w.module() + "/" + w.slot() + " " + cell);
+				assertEquals(want, binding(s.plan(), cell));
+			}
 		}
 		assertEquals(dev.t3craft.hq.HqPlans.buildKey(), s.fixtures());
 		// and they are really in what the demo builds (baked into demo coordinates)
 		List<BuildPlan> built = DemoHq.full(s.plan(), LIFT);
-		assertTrue(count(built, Blocks.OBSERVER) >= s.plan().workstations().size());
-		assertTrue(count(built, Blocks.REDSTONE_LAMP) >= s.plan().workstations().size());
+		assertTrue(count(built, Blocks.OBSERVER) >= 6 * s.plan().workstations().size());
+		assertTrue(count(built, Blocks.REDSTONE_LAMP) <= 1, "status lamps only for the hub beacon, none on desks");
 	}
 
 	@Test
@@ -254,14 +254,15 @@ class DemoHqFixturesTest {
 			settled.add(n.id().equals(gone) ? npc(gone, "p0", true) : n);
 		}
 		Map<Long, Binding> ch = changesFor(b, before, settled);
-		long mon = site.cell(desk.computerPos()).asLong();
-		long lamp = site.cell(desk.lampPos()).asLong();
-		assertEquals(Binding.NONE, ch.get(mon), "freed desk: monitor unbound");
-		assertEquals(Binding.NONE, ch.get(lamp), "freed desk: lamp off");
+		java.util.Set<Long> screen = new java.util.HashSet<>();
+		for (net.minecraft.core.BlockPos cell : desk.screenCells()) {
+			screen.add(site.cell(cell).asLong());
+			assertEquals(Binding.NONE, ch.get(site.cell(cell).asLong()), "freed desk: screen cell unbound");
+		}
 		int moduleBulbs = 0;
 		int archive = 0;
 		for (Map.Entry<Long, Binding> e : ch.entrySet()) {
-			if (e.getKey() == mon || e.getKey() == lamp) {
+			if (screen.contains(e.getKey())) {
 				continue;
 			}
 			if (e.getValue().kind() == Binding.Kind.MODULE) {
@@ -298,8 +299,8 @@ class DemoHqFixturesTest {
 				assertEquals(Binding.thread("vps:newcomer"), v, "nobody else is rebound");
 			}
 		}
-		assertEquals(2, kinds.getOrDefault(Binding.Kind.THREAD, 0), "its monitor and lamp");
+		assertEquals(6, kinds.getOrDefault(Binding.Kind.THREAD, 0), "the six monitors of its 3×2 screen (no desk lamp)");
 		assertEquals(1, kinds.getOrDefault(Binding.Kind.MODULE, 0), "its module's bulb");
-		assertEquals(3, ch.size());
+		assertEquals(7, ch.size());
 	}
 }

@@ -75,8 +75,11 @@ de la posición en el plan del HQ; si tampoco, sin vincular. Determinista.
 
 `HqBindings.of(plan)` es la tabla celda → (rol, binding, orientación), función pura del plan:
 
-- cada escritorio: `computerPos` → monitor mirando a la silla, `lampPos` → lámpara; ambos
-  `thread:<threadId>` o sin vincular si el escritorio está libre;
+- cada escritorio: las 6 celdas de su pantalla de 3×2 (`Workstation.screenCells()`, origen arriba a la
+  izquierda en `screenOrigin`) → monitores mirando al agente, todos `thread:<threadId>`, así que se
+  fusionan en una sola pantalla que dibuja desde su celda de abajo a la izquierda (cabecera con título y
+  estado, que respira si "needs you", y debajo el log en vivo). Los escritorios ya no tienen lámpara
+  (fix/desk-screens-3x2); sin vincular si el escritorio está libre;
 - anclas `board_lamp_<i>` → bombilla `board:<i>`;
 - cada módulo: el dintel de su puerta (la viga del muro interior, una celda hacia el pasillo desde el
   ancla `module@<i>` y tres arriba) → bombilla `module:<k1>,<k2>…`, el hilo más urgente de los

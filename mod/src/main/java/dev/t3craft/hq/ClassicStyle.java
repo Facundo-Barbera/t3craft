@@ -356,7 +356,8 @@ final class ClassicStyle extends HqStyle {
 				if (wall) {
 					c.set(x, 0, z, k.plinth);
 					for (int y = 1; y <= 4; y++) {
-						c.set(x, y, z, pillar ? k.post() : y == 1 ? k.plinth : y == 2 ? k.infill : y == 3 ? k.pane : k.beam(Direction.Axis.X));
+						// full glass at y = 3, not panes: a pane would change shape with the desk's 3×2 screen in front of it
+						c.set(x, y, z, pillar ? k.post() : y == 1 ? k.plinth : y == 2 ? k.infill : y == 3 ? k.glass : k.beam(Direction.Axis.X));
 					}
 					c.set(x, 5, z, k.darkPlanks);
 					c.set(x, 6, z, k.copperSlab);
@@ -384,11 +385,11 @@ final class ClassicStyle extends HqStyle {
 		}
 	}
 
-	/** Desk row against the wall (drawer barrel, two desk tops, a fern); the agent stands behind it. */
+	/** Desk row against the wall (drawer barrel, two desk tops; the 3×2 screen goes on top); the agent stands behind it. */
 	@Override
 	void desk(PlanBuilder.Canvas c, DeskCells d) {
 		BlockPos desk = d.computer().below();
-		BlockPos right = d.lamp().below();
+		BlockPos right = d.right();
 		Direction side = d.facing().getClockWise();
 		for (int dx = -1; dx <= 1; dx++) {
 			c.set(desk.below().relative(side, dx), k.woodFloor);
@@ -400,6 +401,5 @@ final class ClassicStyle extends HqStyle {
 		c.set(d.drawer(), k.barrel(d.facing().getOpposite()));
 		c.set(desk, k.deskTop);
 		c.set(right, k.deskTop);
-		c.decor(d.drawer().above(), k.fern);
 	}
 }

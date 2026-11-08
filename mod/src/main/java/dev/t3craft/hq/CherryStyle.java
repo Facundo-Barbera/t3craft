@@ -533,8 +533,8 @@ final class CherryStyle extends HqStyle {
 				if (wall) {
 					c.set(x, 0, z, footing());
 					for (int y = 1; y <= 4; y++) {
-						// the monitor's column (col 1) gets a solid paper panel behind it, the others shoji panes
-						c.set(x, y, z, pillar ? post() : y == 1 ? footing() : y == 4 ? beam(Direction.Axis.X) : y == 3 && col != 1 ? shoji() : wall());
+						// lit paper panels at y = 3 (full blocks even without the kit: a pane would change shape with the desk's 3×2 screen in front of it); col 1 a solid one
+						c.set(x, y, z, pillar ? post() : y == 1 ? footing() : y == 4 ? beam(Direction.Axis.X) : y == 3 && col != 1 ? kit().wallPanel(true) : wall());
 					}
 					wingRoof(c, x, z, v);
 					continue;
@@ -587,11 +587,11 @@ final class CherryStyle extends HqStyle {
 		}
 	}
 
-	/** A standing desk against the wall: a cherry cabinet, a cherry top, the agent's free cell behind. */
+	/** A standing desk against the wall (cabinet and two tops; the 3×2 screen goes on top), the agent's free cell behind. */
 	@Override
 	void desk(PlanBuilder.Canvas c, DeskCells d) {
 		BlockPos top = d.computer().below();
-		BlockPos right = d.lamp().below();
+		BlockPos right = d.right();
 		Direction side = d.facing().getClockWise();
 		for (int dx = -1; dx <= 1; dx++) {
 			c.set(top.below().relative(side, dx), floor());
@@ -611,6 +611,5 @@ final class CherryStyle extends HqStyle {
 			c.set(top, role(Role.DESK));
 			c.set(right, role(Role.DESK));
 		}
-		c.decor(d.drawer().above(), planter());
 	}
 }

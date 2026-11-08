@@ -128,7 +128,7 @@ final class PlanBuilder {
 	private List<Workstation> liftedWorkstations() {
 		List<Workstation> out = new ArrayList<>(workstations.size());
 		for (Workstation w : workstations) {
-			out.add(new Workstation(w.module(), w.slot(), w.threadId(), lift(w.deskAnchor()), w.computerPos(), w.screen(), w.lampPos()));
+			out.add(new Workstation(w.module(), w.slot(), w.threadId(), lift(w.deskAnchor()), w.computerPos(), w.screen(), w.screenOrigin()));
 		}
 		return out;
 	}

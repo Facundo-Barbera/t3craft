@@ -167,7 +167,7 @@ public final class AnchorNames {
 		return "monitor_" + threadId;
 	}
 
-	/** A thread's status lamp (a waxed copper bulb; toggle {@code lit} to show state). */
+	/** Former per-desk status lamp anchor; the plan no longer publishes it (fix/desk-screens-3x2: the desk screen shows the state). */
 	public static String lamp(String threadId) {
 		return "lamp_" + threadId;
 	}
