@@ -33,11 +33,13 @@ public record T3UiLayout(Rect frame, Rect sidebar, Rect main, boolean compact) {
 	public static final int PAD = 4;
 	public static final int BRAND_H = 12;
 	public static final int FIELD_H = 14;
-	public static final int FOOTER_H = 14;
+	/** Footer of discreet icons (settings, environments, archive), as T3 Code's sidebar bottom row. */
+	public static final int FOOTER_H = 12;
 	public static final int ROW_H = 12;
 	// thread header
 	public static final int TITLE_H = 14;
-	public static final int ACTIONS_H = 14;
+	/** No action row any more (feat/t3-ui-clean): kept for callers, 0. */
+	public static final int ACTIONS_H = 0;
 
 	public static T3UiLayout compute(int guiW, int guiH, boolean showSidebar) {
 		int sw = Math.max(0, guiW);
@@ -110,9 +112,10 @@ public record T3UiLayout(Rect frame, Rect sidebar, Rect main, boolean compact) {
 	}
 
 	/**
-	 * Inside the thread panel: the header (title row + actions row), the conversation and, when the
-	 * composer is a separate component, its rectangle at the bottom ({@code composerH} 0 = the
-	 * conversation draws its own command bar).
+	 * Inside the thread panel: the header (one row: breadcrumb and state, like T3 Code's
+	 * {@code ChatHeader}; the action row is gone, {@code actions} is {@link Rect#EMPTY}), the
+	 * conversation and, when the composer is a separate component, its rectangle at the bottom
+	 * ({@code composerH} 0 = the conversation draws its own command bar).
 	 */
 	public record MainRects(Rect title, Rect actions, Rect conversation, Rect composer) {
 	}
@@ -125,9 +128,8 @@ public record T3UiLayout(Rect frame, Rect sidebar, Rect main, boolean compact) {
 		int w = m.w() - 2 * PAD;
 		int y = m.y() + PAD;
 		Rect title = new Rect(x, y, w, TITLE_H);
-		y += TITLE_H + 1;
-		Rect actions = new Rect(x, y, w, ACTIONS_H);
-		y += ACTIONS_H + 3;
+		y += TITLE_H + 3;
+		Rect actions = Rect.EMPTY;
 		int ch = Math.max(0, Math.min(composerH, m.bottom() - y - 40));
 		Rect composer = ch == 0 ? Rect.EMPTY : new Rect(m.x(), m.bottom() - ch, m.w(), ch);
 		Rect conversation = new Rect(m.x(), y, m.w(), Math.max(0, m.bottom() - y - (ch == 0 ? 0 : ch + GAP)));

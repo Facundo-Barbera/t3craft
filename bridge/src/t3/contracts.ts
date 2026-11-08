@@ -27,3 +27,10 @@ export type {
   OrchestrationV2SubscribeShellInput,
 } from "../../vendor/t3-contracts/src/orchestrationV2.ts";
 export { OrchestrationProjectShell } from "../../vendor/t3-contracts/src/orchestrationProject.ts";
+export {
+  PROVIDER_SEND_TURN_MAX_ATTACHMENTS,
+  PROVIDER_SEND_TURN_MAX_IMAGE_BYTES,
+  PROVIDER_SEND_TURN_SUPPORTED_IMAGE_MIME_TYPES,
+  getProviderAttachmentLimitError,
+  isProviderSendTurnSupportedImageMimeType,
+} from "../../vendor/t3-contracts/src/chatAttachment.ts";

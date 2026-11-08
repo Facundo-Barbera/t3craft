@@ -209,9 +209,23 @@ export interface ChatHistoryRequest extends Envelope<"chat.history"> {
 }
 /** Re-read the bridge's `visibility` settings from bridge.json and re-evaluate (read-only op). */
 export interface BridgeReload extends Envelope<"bridge.reload"> {}
+/**
+ * An image for `chat.send`, as T3's `UploadChatImageAttachment` (vendor/t3-contracts/src/chatAttachment.ts):
+ * PNG/JPEG/GIF/WebP, at most 10 MiB, `dataUrl` = `data:<mimeType>;base64,...`. Validated by
+ * `chatSendAttachmentError` (state/attachments.ts).
+ */
+export interface ChatSendImage {
+  readonly type: "image";
+  readonly name: string;
+  readonly mimeType: string;
+  readonly sizeBytes: number;
+  readonly dataUrl: string;
+}
 export interface ChatSend extends Envelope<"chat.send"> {
   readonly npcId: string;
   readonly text: string;
+  /** Optional images (feat/t3-ui-clean). The bridge is read-only: it validates them and refuses. */
+  readonly attachments?: ReadonlyArray<ChatSendImage>;
 }
 export interface RunInterrupt extends Envelope<"run.interrupt"> {
   readonly npcId: string;

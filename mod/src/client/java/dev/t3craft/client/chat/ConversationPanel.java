@@ -124,6 +124,10 @@ public final class ConversationPanel implements AutoCloseable {
 	private @Nullable Extra extra;
 	private long builtExtra = -1;
 	private String[] hints = {"PgUp", "scroll", "End", "newest"};
+	/** Key-cap hints under the feed (off in the unified T3 screen: the keys still work). */
+	private boolean showHints = true;
+	/** Minute separators between turns (off in the unified T3 screen, as in T3 Code). */
+	private boolean showSeparators = true;
 
 	private @Nullable ThreadFeed feed;
 	private @Nullable String key;
@@ -242,6 +246,19 @@ public final class ConversationPanel implements AutoCloseable {
 
 	public void setNavigation(@Nullable Navigation n) {
 		nav = n;
+	}
+
+	/** Shows or hides the key-cap hints under the feed (the keys keep working). */
+	public void setShowHints(boolean v) {
+		showHints = v;
+	}
+
+	/** Shows or hides the time separators between turns. */
+	public void setShowSeparators(boolean v) {
+		if (showSeparators != v) {
+			showSeparators = v;
+			layoutDirty = true;
+		}
 	}
 
 	/** Footer key-cap hints as key/verb pairs (the host's keys). */
@@ -452,7 +469,7 @@ public final class ConversationPanel implements AutoCloseable {
 		}
 		for (Turn turn : ChatTurns.group(all)) {
 			String sep = FeedRules.separator(prevAt, turn.at(), ZoneId.systemDefault(), now);
-			if (sep != null) {
+			if (sep != null && showSeparators) {
 				L.add(t.row() + 2, 0, List.of(), 0, 0, 0, null, 0, null, null, false, sep, false, false);
 			}
 			if (turn.at() != null) {
@@ -949,8 +966,9 @@ public final class ConversationPanel implements AutoCloseable {
 		}
 
 		// ---- feed well
-		int footerH = compact ? 0 : FOOTER_H;
-		well = new Rect(x, y, w, panel.bottom() - pad - footerH - (compact ? 0 : 3) - y);
+		boolean hintsShown = !compact && showHints;
+		int footerH = hintsShown ? FOOTER_H : 0;
+		well = new Rect(x, y, w, panel.bottom() - pad - footerH - (hintsShown ? 3 : 0) - y);
 		ChatDraw.inset(g, t, well);
 		int textW = well.w() - TEXT_X - 12;
 		relayoutIfNeeded(font, textW);
@@ -978,7 +996,7 @@ public final class ConversationPanel implements AutoCloseable {
 		}
 
 		// ---- footer: key-cap hints
-		if (!compact) {
+		if (hintsShown) {
 			int fy = panel.bottom() - pad - footerH + 2;
 			String[] hs = hints;
 			while (hs.length > 2 && ChatDraw.hintsWidth(font, hs) > w) {

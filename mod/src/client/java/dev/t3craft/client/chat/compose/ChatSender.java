@@ -1,12 +1,14 @@
 package dev.t3craft.client.chat.compose;
 
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import dev.t3craft.t3.OperateAction;
 import dev.t3craft.t3.OperateGate;
 import dev.t3craft.t3.OperateKind;
 import dev.t3craft.t3.OperateResult;
 import dev.t3craft.t3.ThreadControl;
+import java.util.List;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -32,6 +34,15 @@ import org.jspecify.annotations.Nullable;
  * </ul>
  * The {@code messageId} is chosen here so the optimistic message can be matched with the
  * {@code user_message} turn item the server echoes ({@link ComposerState}).
+ *
+ * <p><b>Images</b> (feat/t3-ui-clean) take two calls, as T3's web composer
+ * ({@code packages/client-runtime/src/operations/commands.ts persistAttachments}): first
+ * {@code assets.persistChatAttachments {threadId, messageId, attachments: UploadChatImageAttachment[]}}
+ * (operate scope; the bytes as data URLs), whose answer is the stored {@code ChatAttachment}s; then
+ * the {@code message.dispatch} above with those in {@code attachments}. Both go over the direct
+ * operate connection; the legacy bridge is read-only and cannot carry them (see
+ * {@code protocol/protocol.md}, {@code chat.send}), so without a direct connection the composer
+ * says so instead of sending the text alone.
  */
 public final class ChatSender {
 	public static final String CREATED_BY = "user";
@@ -67,6 +78,11 @@ public final class ChatSender {
 
 	/** The {@code message.dispatch} command (the payload of {@code orchestration.dispatchCommand}). */
 	public static JsonObject messageDispatch(String threadId, String text, Ids ids) {
+		return messageDispatch(threadId, text, ids, new JsonArray());
+	}
+
+	/** {@code message.dispatch} with stored {@code ChatAttachment}s (from {@code assets.persistChatAttachments}). */
+	public static JsonObject messageDispatch(String threadId, String text, Ids ids, JsonArray attachments) {
 		if (threadId == null || threadId.isBlank()) {
 			throw new IllegalArgumentException("threadId is required");
 		}
@@ -78,7 +94,7 @@ public final class ChatSender {
 		cmd.addProperty("threadId", threadId);
 		cmd.addProperty("messageId", ids.messageId());
 		cmd.addProperty("text", text);
-		cmd.add("attachments", new JsonArray());
+		cmd.add("attachments", attachments.deepCopy());
 		cmd.addProperty("deliveryIntent", DELIVERY_INTENT);
 		JsonObject mode = new JsonObject();
 		mode.addProperty("type", "start_immediately");
@@ -95,6 +111,55 @@ public final class ChatSender {
 	public void send(String envId, String threadId, @Nullable String title, String text, Ids ids, Consumer<OperateResult> done) {
 		OperateAction a = gate.operate(envId).dispatch(OperateKind.MESSAGE_SEND, threadId, title, messageDispatch(threadId, text, ids));
 		dispatch.run(a, done);
+	}
+
+	/**
+	 * Sends {@code text} with {@code images}: uploads them ({@code assets.persistChatAttachments}),
+	 * then dispatches the message with the stored attachments. {@code done} runs once: with the
+	 * upload's failure (nothing was dispatched) or with the dispatch's result.
+	 */
+	public void send(String envId, String threadId, @Nullable String title, String text, List<ImageAttachment> images, Ids ids,
+			Consumer<OperateResult> done) {
+		if (images.isEmpty()) {
+			send(envId, threadId, title, text, ids, done);
+			return;
+		}
+		OperateAction upload = new OperateAction(OperateKind.MESSAGE_SEND, envId, threadId, title, OperateAction.PERSIST_ATTACHMENTS,
+				ImageAttachment.persistInput(threadId, ids.messageId(), images));
+		dispatch.run(upload, r -> {
+			if (!r.ok()) {
+				done.accept(uploadFailure(r));
+				return;
+			}
+			JsonArray stored = storedAttachments(r.value());
+			if (stored == null || stored.size() != images.size()) {
+				done.accept(OperateResult.of(OperateResult.Outcome.REJECTED, "Image upload failed: T3 did not return the stored images."));
+				return;
+			}
+			OperateAction a = gate.operate(envId).dispatch(OperateKind.MESSAGE_SEND, threadId, title, messageDispatch(threadId, text, ids, stored));
+			dispatch.run(a, done);
+		});
+	}
+
+	/** {@code PersistChatAttachmentsResult.attachments}, or null when the answer is not that shape. */
+	static @Nullable JsonArray storedAttachments(@Nullable JsonElement value) {
+		if (value == null || !value.isJsonObject()) {
+			return null;
+		}
+		JsonElement a = value.getAsJsonObject().get("attachments");
+		return a != null && a.isJsonArray() ? a.getAsJsonArray() : null;
+	}
+
+	/** The upload's failure as the player should read it. */
+	static OperateResult uploadFailure(OperateResult r) {
+		String m = switch (r.outcome()) {
+			case OFFLINE -> "Images go straight to T3 and this environment has no direct connection (the bridge cannot attach images): "
+					+ "pair it directly from ⋯ › Environments.";
+			case READ_ONLY -> r.message();
+			case AUTH_FAILED -> "Image upload refused: enable control again (" + r.message() + ").";
+			default -> "Image upload failed: " + r.message();
+		};
+		return OperateResult.of(r.outcome(), m);
 	}
 
 	/** Interrupts {@code runId} ({@code run.interrupt}, destructive: confirmed in game). */

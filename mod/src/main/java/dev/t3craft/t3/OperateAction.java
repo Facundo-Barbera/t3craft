@@ -27,12 +27,20 @@ public record OperateAction(OperateKind kind, String envId, @Nullable String thr
 	 * the mutation carries no {@code scripts}.
 	 */
 	public static final String PROJECTS_MUTATE = "projects.mutate";
+	/**
+	 * feat/t3-ui-clean: {@code assets.persistChatAttachments} ({@code PersistChatAttachmentsInput}:
+	 * {@code threadId, messageId, attachments: UploadChatImageAttachment[]}), the upload step before a
+	 * {@code message.dispatch} with images. T3 authorizes it with {@code orchestration:operate}
+	 * ({@code apps/server/src/auth/RpcAuthorization.ts}), as the web composer uses it
+	 * ({@code packages/client-runtime/src/operations/commands.ts persistAttachments}).
+	 */
+	public static final String PERSIST_ATTACHMENTS = "assets.persistChatAttachments";
 
 	public OperateAction {
 		if (kind == null || envId == null || rpcTag == null || payload == null) {
 			throw new IllegalArgumentException("kind, envId, rpcTag and payload are required");
 		}
-		if (!rpcTag.startsWith("orchestration.") && !PROJECTS_MUTATE.equals(rpcTag)) {
+		if (!rpcTag.startsWith("orchestration.") && !PROJECTS_MUTATE.equals(rpcTag) && !PERSIST_ATTACHMENTS.equals(rpcTag)) {
 			// orchestration:operate only covers orchestration RPCs; anything else needs other scopes.
 			throw new IllegalArgumentException("not an orchestration RPC: " + rpcTag);
 		}
