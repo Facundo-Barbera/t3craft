@@ -17,7 +17,7 @@ import org.jspecify.annotations.Nullable;
  * section of {@code config/t3craft.json} (read-only here; the client's ConfigStore keeps unknown
  * sections on save, so this key survives without this class ever writing):
  * <pre>{@code
- * "hq": { "style": "cherry" }     // cherry (default) | classic | campus | ring | vertical (own layouts)
+ * "hq": { "style": "cherry" }     // cherry (default) | classic | campus | ring | vertical | ensanche (own layouts)
  * }</pre>
  * Absent file, section or key: {@link #DEFAULT_ID}. Unknown id: the default plus a warning.
  */
@@ -32,9 +32,10 @@ public final class HqStyles {
 	/**
 	 * Styles with their own layout ({@link HqStyle#ownLayout()}): selectable by id like the others,
 	 * but not in {@link #all()}, which lists the styles that paint the shared spine geometry.
-	 * layout/campus: {@link CampusStyle}; layout/ring: {@link RingStyle}; layout/vertical: {@link VerticalStyle}.
+	 * layout/campus: {@link CampusStyle}; layout/ring: {@link RingStyle}; layout/vertical: {@link VerticalStyle};
+	 * layout/blocks: {@link EnsancheStyle}.
 	 */
-	private static final List<HqStyle> LAYOUTS = List.of(new CampusStyle(), new RingStyle(), new VerticalStyle());
+	private static final List<HqStyle> LAYOUTS = List.of(new CampusStyle(), new RingStyle(), new VerticalStyle(), new EnsancheStyle());
 	private static volatile @Nullable HqStyle active;
 
 	private HqStyles() {
@@ -48,6 +49,11 @@ public final class HqStyles {
 	/** The styles with their own layout (campus, ring...); not in {@link #all()}. */
 	public static List<HqStyle> layouts() {
 		return LAYOUTS;
+	}
+
+	/** Styles with their own ground plan as a {@link TownLayout} (layout/blocks: {@code ensanche}). */
+	public static List<HqStyle> towns() {
+		return LAYOUTS.stream().filter(s -> s instanceof EnsancheStyle).toList();
 	}
 
 	/** Ids of every selectable style ({@link #all()} then {@link #layouts()}). */

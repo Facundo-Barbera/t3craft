@@ -94,6 +94,13 @@ public final class HqRender {
 		Files.createDirectories(out);
 		BlockModels models = new BlockModels();
 		String sid = style.id();
+		if (HqStyles.towns().contains(style)) {
+			TownRender.render(models, style, out, only, ss, npcs);
+			for (String p : models.problems) {
+				System.out.println("note: " + p);
+			}
+			return;
+		}
 		if (sid.equals("vertical")) {
 			// layout/vertical: towers, bridges and podium for 4, 10 and 20 projects (VerticalRender)
 			VerticalRender.run(models, style, out, only, scaleMul, ss, npcs);
@@ -226,7 +233,8 @@ public final class HqRender {
 				String k = e.getKey();
 				if (k.equals("board_slot_0") || k.equals("board_slot_3") || k.equals("bench_1") || k.equals("bench_7") || k.equals("walk_hub_0")
 						|| k.equals("archive") || k.equals("thread_wall_front") || k.startsWith("walk_hub_")
-						|| k.startsWith("walk_room_") && (k.endsWith("_0") || k.endsWith("_2"))) {
+						|| k.startsWith("walk_room_") && (k.endsWith("_0") || k.endsWith("_2")) || k.startsWith("walk_lounge_") || k.equals("walk_clock")
+						|| k.equals("walk_review") || k.startsWith("walk_plazuela_")) {
 					npc(sc, e.getValue(), k.startsWith("bench"), n++);
 				}
 			}
