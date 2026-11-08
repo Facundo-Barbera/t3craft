@@ -91,6 +91,11 @@ import net.minecraft.world.level.block.state.BlockState;
  *   {@code --report} alone is piece mode on the whole plan.</li>
  * </ul>
  *
+ * <h2>Citadel catalog (citadel/catalog)</h2>
+ * {@code --catalog FAMILY[:id][,FAMILY2…]} draws variants of {@code dev.t3craft.hq.citadel.catalog} on
+ * their own, a few sizes and seeds each, in one grid ({@link CatalogViews}; {@code --front N|E|S|W|all},
+ * {@code --sizes N}, {@code --seeds N}; see docs/tools/citadel-catalog.md).
+ *
  * From Java (the render service): {@link #bootstrap}, then {@link PlanSource#plan} and
  * {@link PieceViews#open()}{@code .render(plan, request)}; {@link PlanReport#analyze} and {@link ImageCompare#run}
  * are public too.
@@ -163,6 +168,11 @@ public final class HqRender {
 		int radius = 0;
 		String anchorName = null;
 		boolean pieceMode = false;
+		// citadel catalog gallery (citadel/catalog)
+		String catalog = null;
+		String catalogFront = null;
+		int catalogSizes = 3;
+		int catalogSeeds = 2;
 		for (int i = 0; i < args.length; i++) {
 			switch (args[i]) {
 				case "--out" -> out = Path.of(args[++i]);
@@ -195,6 +205,10 @@ public final class HqRender {
 					anchorName = args[++i];
 					pieceMode = true;
 				}
+				case "--catalog" -> catalog = args[++i];
+				case "--front" -> catalogFront = args[++i];
+				case "--sizes" -> catalogSizes = Integer.parseInt(args[++i]);
+				case "--seeds" -> catalogSeeds = Integer.parseInt(args[++i]);
 				case "--radius" -> radius = Integer.parseInt(args[++i]);
 				case "--name" -> piece.name = args[++i];
 				case "--pad" -> piece.pad = Integer.parseInt(args[++i]);
@@ -217,6 +231,11 @@ public final class HqRender {
 		double scaleMul = scaleOpt == null ? 1.6 : scaleOpt;
 		if (vanilla) {
 			HqFixtures.use(null);
+		}
+		if (catalog != null) {
+			// citadel/catalog: variants of the catalog on their own, in a grid (CatalogViews)
+			CatalogViews.run(catalog, catalogFront, catalogSizes, Math.max(1, catalogSeeds), out, scaleOpt == null ? 1.0 : scaleOpt, ss, only);
+			return;
 		}
 		if (pieceMode) {
 			// tools/hq-piece-views: one box of the plan (or all of it) with its report
