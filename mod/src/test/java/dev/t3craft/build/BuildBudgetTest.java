@@ -113,4 +113,45 @@ class BuildBudgetTest {
 		assertEquals(4, BuildTuning.DEFAULTS.frontsFor(8));
 		assertEquals(1, BuildTuning.DEFAULTS.frontsFor(0));
 	}
+
+	@Test
+	void timeBudgetCapsBlocksPerTick() {
+		BuildBudget b = new BuildBudget(BuildTuning.DEFAULTS);
+		b.beginTick(1, 10);
+		assertEquals(48, b.effectiveMax(), "unknown cost: no time cap");
+		// 1 ms per block measured: only MS_PER_TICK blocks fit in a tick
+		b.work(10_000_000L, 10);
+		b.beginTick(2, 10);
+		assertEquals((int) BuildBudget.MS_PER_TICK, b.effectiveMax());
+		assertEquals(BuildBudget.MS_PER_TICK, b.claim("x", 1000), 1e-9, "a runner never gets more than the capped budget");
+		// cheap blocks again: the average comes back down and the cap lifts
+		for (int t = 3; t < 60; t++) {
+			b.work(10_000L, 10);
+			b.beginTick(t, 10);
+		}
+		assertEquals(48, b.effectiveMax());
+		assertEquals(1, BuildBudget.capByTime(48, 1e9, true), "never below one block");
+		assertEquals(48, BuildBudget.capByTime(48, 1e9, false), "auto-throttle off: no cap");
+	}
+
+	@Test
+	void lowFrameRateLowersTheBudgetAndItRecovers() {
+		BuildBudget b = new BuildBudget(BuildTuning.DEFAULTS);
+		b.clientFps(12);
+		for (int t = 1; t <= 60; t++) {
+			b.beginTick(t, 10);
+		}
+		assertTrue(b.effectiveMax() < 48 * 0.5, "12 fps: budget down, was " + b.effectiveMax());
+		b.clientFps(60);
+		for (int t = 61; t <= 400; t++) {
+			b.beginTick(t, 10);
+		}
+		assertEquals(48, b.effectiveMax(), "smooth again: back to full");
+		b.clientFps(35); // between MIN_FPS and RECOVER_FPS: holds
+		int before = b.effectiveMax();
+		for (int t = 401; t <= 500; t++) {
+			b.beginTick(t, 10);
+		}
+		assertEquals(before, b.effectiveMax());
+	}
 }

@@ -115,9 +115,9 @@ public final class BuildJob {
 			java.util.function.Supplier<JobCursor> crew = () -> new CrewCursor(CrewSchedule.of(plan, f), segment, BuildCursor.DEFAULT_MAX_SKIPS_PER_TICK);
 			// Small plans are planned right here; big HQ parts off-thread (the job waits in PENDING meanwhile).
 			this.cursor = plan.size() <= BuildPlanner.SYNC_PLAN_LIMIT ? crew.get()
-					: new DeferredCursor(crew, () -> new FrontCursor(Fronts.of(plan, f)), plan.size(), f);
+					: new DeferredCursor(crew, () -> new FrontCursor(PlacementOrders.current().create(plan, f)), plan.size(), f);
 		} else {
-			this.cursor = new FrontCursor(Fronts.of(plan, f));
+			this.cursor = new FrontCursor(PlacementOrders.current().create(plan, f));
 		}
 		this.cost = cost;
 		if (cost == null) {
@@ -162,7 +162,8 @@ public final class BuildJob {
 		MaterialMeter m = meter;
 		MaterialSupply sup = supply == null ? MaterialSupply.EMPTY : supply;
 		IntPredicate there = j -> sink.matches(worldPos(j), worldState(j));
-		if (crew() instanceof CrewCursor cc) {
+		CrewCursor cc = crew();
+		if (cc != null) {
 			cc.probe(there);
 			cc.walker(onWalk == null ? null : (front, index, step, ticks) -> onWalk.walking(this, front, index, standWorld(front, step), ticks));
 		}

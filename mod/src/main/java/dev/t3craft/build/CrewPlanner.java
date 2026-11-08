@@ -285,23 +285,7 @@ public final class CrewPlanner {
 			double hz = (maxZ - minZ) / 2.0;
 			double[] mx = new double[k];
 			double[] mz = new double[k];
-			for (int b = 0; b < k; b++) {
-				// Front (-z) first, then around: the crew arrives spread over the perimeter.
-				double a = -Math.PI / 2 + 2 * Math.PI * b / k;
-				double ca = Math.cos(a);
-				double sa = Math.sin(a);
-				mx[b] = cx + ca * hx * 0.6;
-				mz[b] = cz + sa * hz * 0.6;
-				startX[b] = (int) Math.round(clampOut(cx + ca * (hx + 2), cx, hx + 2));
-				startZ[b] = (int) Math.round(clampOut(cz + sa * (hz + 2), cz, hz + 2));
-				if (k == 1) {
-					startX[b] = (int) Math.round(cx);
-					startZ[b] = minZ - 2;
-				}
-				bx[b] = startX[b];
-				by[b] = minY;
-				bz[b] = startZ[b];
-			}
+			seeds(cols, mx, mz, cx, minZ);
 			int m = cols.size();
 			int[] colZone = new int[m];
 			if (k > 1 && m > 0) {
@@ -364,6 +348,7 @@ public final class CrewPlanner {
 					}
 				}
 			}
+			starts(mx, mz, cx, cz, hx, hz, minZ);
 			for (int i = 0; i < n; i++) {
 				int ci = colIndex.get(key(x[i], 0, z[i]));
 				if (ci >= 0) {
@@ -385,8 +370,81 @@ public final class CrewPlanner {
 			}
 		}
 
-		private static double clampOut(double v, double c, double h) {
-			return Math.max(c - h, Math.min(c + h, v));
+		/**
+		 * Deterministic farthest-point seeds (k-means++ without randomness): the column nearest the
+		 * front ({@code -z}) first, then each time the column farthest from the seeds so far.
+		 */
+		void seeds(List<int[]> cols, double[] mx, double[] mz, double cx, int minZ) {
+			if (cols.isEmpty()) {
+				for (int b = 0; b < k; b++) {
+					mx[b] = cx;
+					mz[b] = minZ;
+				}
+				return;
+			}
+			int first = 0;
+			for (int c = 1; c < cols.size(); c++) {
+				int[] a = cols.get(c);
+				int[] f = cols.get(first);
+				double da = (a[1] - minZ) * 1000.0 + Math.abs(a[0] - cx);
+				double df = (f[1] - minZ) * 1000.0 + Math.abs(f[0] - cx);
+				if (da < df) {
+					first = c;
+				}
+			}
+			mx[0] = cols.get(first)[0];
+			mz[0] = cols.get(first)[1];
+			for (int b = 1; b < k; b++) {
+				int far = 0;
+				double fd = -1;
+				for (int c = 0; c < cols.size(); c++) {
+					double d = Double.MAX_VALUE;
+					for (int o = 0; o < b; o++) {
+						double dx = cols.get(c)[0] - mx[o];
+						double dz = cols.get(c)[1] - mz[o];
+						d = Math.min(d, dx * dx + dz * dz);
+					}
+					if (d > fd) {
+						fd = d;
+						far = c;
+					}
+				}
+				mx[b] = cols.get(far)[0];
+				mz[b] = cols.get(far)[1];
+			}
+		}
+
+		/** Each builder arrives just outside the footprint, on the side of its zone. */
+		void starts(double[] mx, double[] mz, double cx, double cz, double hx, double hz, int minZ) {
+			for (int b = 0; b < k; b++) {
+				double dx = mx[b] - cx;
+				double dz = mz[b] - cz;
+				double sx;
+				double sz;
+				if (k == 1 || Math.abs(dx) < 1e-6 && Math.abs(dz) < 1e-6) {
+					sx = cx;
+					sz = minZ - 2;
+				} else {
+					double tx = Math.abs(dx) < 1e-9 ? Double.MAX_VALUE : (hx + 2) / Math.abs(dx);
+					double tz = Math.abs(dz) < 1e-9 ? Double.MAX_VALUE : (hz + 2) / Math.abs(dz);
+					double t = Math.min(tx, tz);
+					sx = cx + dx * t;
+					sz = cz + dz * t;
+				}
+				int ix = (int) Math.round(sx);
+				int iz = (int) Math.round(sz);
+				for (int o = 0; o < b; o++) {
+					if (Math.max(Math.abs(startX[o] - ix), Math.abs(startZ[o] - iz)) < SEPARATION) {
+						ix += SEPARATION; // keep arrivals apart
+						o = -1;
+					}
+				}
+				startX[b] = ix;
+				startZ[b] = iz;
+				bx[b] = ix;
+				by[b] = minY;
+				bz[b] = iz;
+			}
 		}
 
 		// ---- eligibility ---------------------------------------------------------------------------
@@ -504,10 +562,16 @@ public final class CrewPlanner {
 			int lowY = Integer.MAX_VALUE;
 			for (int r = 0; r < poolSize[zn]; r++) {
 				int i = p[r];
-				if (!applied[i]) {
-					p[w++] = i;
-					lowY = Math.min(lowY, y[i]);
+				if (applied[i]) {
+					continue;
 				}
+				if (!supported(i)) {
+					// A later clear took its support away: out of the pool until a neighbour changes again.
+					queued[i] = false;
+					continue;
+				}
+				p[w++] = i;
+				lowY = Math.min(lowY, y[i]);
 			}
 			poolSize[zn] = w;
 			int best = -1;

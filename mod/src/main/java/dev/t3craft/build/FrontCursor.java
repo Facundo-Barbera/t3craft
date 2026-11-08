@@ -2,7 +2,9 @@ package dev.t3craft.build;
 
 /**
  * Scheduling core of a {@link BuildJob} with several fronts working at once: like {@link BuildCursor}
- * (budget per tick, pause / resume / cancel, progress, counters) but walking a {@link Fronts}
+ * (budget per tick, pause / resume / cancel, progress, counters) but walking a {@link PlacementOrder}
+ * (fix/hq-build-parallel: which entry each front places next is pluggable; the default
+ * {@link LayeredOrder} is the {@link Fronts} schedule described below). Walking a {@link Fronts}
  * schedule. Plain Java, unit-tested.
  *
  * <p>Each tick the allowance (from the global {@link BuildBudget}) becomes credit, and the fronts that
@@ -25,13 +27,12 @@ public final class FrontCursor implements JobCursor {
 		BuildCursor.Outcome apply(int front, int index);
 	}
 
-	private final Fronts fronts;
+	private final PlacementOrder order;
 	private final int maxSkipsPerTick;
-	private final int[] pos;
 	private final boolean[] frontBlocked;
+	private int blockedStage;
 	private double credit;
 	private int rr;
-	private volatile int segment;
 	private volatile int done;
 	private volatile int placed;
 	private volatile int skipped;
@@ -40,14 +41,23 @@ public final class FrontCursor implements JobCursor {
 	private volatile JobState state = JobState.PENDING;
 
 	public FrontCursor(Fronts fronts) {
-		this(fronts, BuildCursor.DEFAULT_MAX_SKIPS_PER_TICK);
+		this(new LayeredOrder(fronts));
 	}
 
 	public FrontCursor(Fronts fronts, int maxSkipsPerTick) {
-		this.fronts = fronts;
+		this(new LayeredOrder(fronts), maxSkipsPerTick);
+	}
+
+	/** fix/hq-build-parallel: drives any {@link PlacementOrder} (which entry each front places next). */
+	public FrontCursor(PlacementOrder order) {
+		this(order, BuildCursor.DEFAULT_MAX_SKIPS_PER_TICK);
+	}
+
+	public FrontCursor(PlacementOrder order, int maxSkipsPerTick) {
+		this.order = order;
 		this.maxSkipsPerTick = Math.max(0, maxSkipsPerTick);
-		this.pos = new int[fronts.fronts()];
-		this.frontBlocked = new boolean[fronts.fronts()];
+		this.frontBlocked = new boolean[order.fronts()];
+		this.blockedStage = order.stage();
 	}
 
 	/**
@@ -65,8 +75,7 @@ public final class FrontCursor implements JobCursor {
 		if (s != JobState.RUNNING) {
 			return 0;
 		}
-		advanceFinishedSegments();
-		if (segment >= fronts.segments()) {
+		if (order.done()) {
 			finish();
 			return 0;
 		}
@@ -74,32 +83,35 @@ public final class FrontCursor implements JobCursor {
 		credit = Math.min(credit + a, Math.max(1.0, a));
 		int applied = 0;
 		int skipsThisTick = 0;
-		int n = pos.length;
-		while (credit >= 1.0 && state == JobState.RUNNING && segment < fronts.segments()) {
-			int[][] lanes = fronts.lanes(segment);
+		int n = frontBlocked.length;
+		while (credit >= 1.0 && state == JobState.RUNNING && !order.done()) {
+			newStage();
 			int f = -1;
+			boolean anyWork = false;
 			for (int k = 0; k < n; k++) {
 				int c = (rr + k) % n;
-				if (!frontBlocked[c] && pos[c] < lanes[c].length) {
-					f = c;
-					break;
+				if (order.peek(c) >= 0) {
+					anyWork = true;
+					if (!frontBlocked[c]) {
+						f = c;
+						break;
+					}
 				}
 			}
 			if (f < 0) {
-				if (segmentDone(lanes)) {
-					nextSegment();
-					continue;
+				if (anyWork) {
+					block(); // every front with work left is blocked
 				}
-				block();
-				break;
+				break; // else the order has nothing open right now (waiting): next tick
 			}
 			rr = (f + 1) % n;
-			BuildCursor.Outcome o = step.apply(f, lanes[f][pos[f]]);
+			int index = order.peek(f);
+			BuildCursor.Outcome o = step.apply(f, index);
 			if (o == BuildCursor.Outcome.BLOCKED) {
 				frontBlocked[f] = true;
 				continue;
 			}
-			pos[f]++;
+			order.advance(f);
 			done++;
 			applied++;
 			switch (o) {
@@ -120,32 +132,19 @@ public final class FrontCursor implements JobCursor {
 				case BLOCKED -> throw new AssertionError();
 			}
 		}
-		advanceFinishedSegments();
-		if (segment >= fronts.segments()) {
+		if (order.done()) {
 			finish();
 		}
 		return applied;
 	}
 
-	private void advanceFinishedSegments() {
-		while (segment < fronts.segments() && segmentDone(fronts.lanes(segment))) {
-			nextSegment();
+	/** New work opened up (next layer): blocked fronts retry. */
+	private void newStage() {
+		int st = order.stage();
+		if (st != blockedStage) {
+			blockedStage = st;
+			java.util.Arrays.fill(frontBlocked, false);
 		}
-	}
-
-	private boolean segmentDone(int[][] lanes) {
-		for (int k = 0; k < pos.length; k++) {
-			if (pos[k] < lanes[k].length) {
-				return false;
-			}
-		}
-		return true;
-	}
-
-	private void nextSegment() {
-		segment++;
-		java.util.Arrays.fill(pos, 0);
-		java.util.Arrays.fill(frontBlocked, false);
 	}
 
 	private synchronized void block() {
@@ -200,44 +199,29 @@ public final class FrontCursor implements JobCursor {
 		return frontBlocked[f];
 	}
 
-	/** Index of the current segment (layer); {@code segments()} once finished. */
+	/** Current stage of the order (the layer for {@link LayeredOrder}); grows as work opens up. */
 	public int segment() {
-		return segment;
+		return order.stage();
 	}
 
-	/** Plan indices of the current segment not applied yet, in plan order. Server thread. */
+	/** Plan indices open in the current stage not applied yet, sorted. Server thread. */
 	public int[] pendingInSegment() {
-		if (segment >= fronts.segments()) {
-			return new int[0];
-		}
-		int[][] lanes = fronts.lanes(segment);
-		int count = 0;
-		for (int k = 0; k < pos.length; k++) {
-			count += lanes[k].length - pos[k];
-		}
-		int[] out = new int[count];
-		int j = 0;
-		for (int k = 0; k < pos.length; k++) {
-			for (int p = pos[k]; p < lanes[k].length; p++) {
-				out[j++] = lanes[k][p];
-			}
-		}
-		java.util.Arrays.sort(out);
-		return out;
+		return order.pendingInStage();
 	}
 
-	public Fronts fronts() {
-		return fronts;
+	/** Which entry each front places next. */
+	public PlacementOrder order() {
+		return order;
 	}
 
 	@Override
 	public int frontCount() {
-		return fronts.fronts();
+		return order.fronts();
 	}
 
 	@Override
 	public int frontOf(int index) {
-		return fronts.frontOf(index);
+		return order.frontOf(index);
 	}
 
 	public JobState state() {
@@ -245,7 +229,7 @@ public final class FrontCursor implements JobCursor {
 	}
 
 	public int total() {
-		return fronts.total();
+		return order.total();
 	}
 
 	/** Steps already applied (placed + skipped + failed). */
@@ -267,7 +251,7 @@ public final class FrontCursor implements JobCursor {
 
 	/** Fraction of the plan already processed, 0..1 (an empty plan is complete: 1). */
 	public double progress() {
-		int t = fronts.total();
+		int t = order.total();
 		return t == 0 ? 1.0 : (double) done / t;
 	}
 }
