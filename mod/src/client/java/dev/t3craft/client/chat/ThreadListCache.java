@@ -144,13 +144,17 @@ public final class ThreadListCache {
 		return t.archivedAt() == null && t.deletedAt() == null && !"subagent".equals(t.relationshipToParent()) && !t.sideChat();
 	}
 
-	/** One sidebar row from a shell thread (same title/state/activity as its NPC would have). */
+	/**
+	 * One sidebar row from a shell thread (same title/state/activity as its NPC would have), with the
+	 * rich-row details (branch, PR, diff, model, unread, run start, snooze: feat/t3-sidebar-rows).
+	 */
 	static ThreadRow row(String env, String envLabel, ThreadShell t, @Nullable String projectTitle) {
 		NpcView v = Presentation.present(env, envLabel, t, projectTitle);
 		ThreadRow r = ThreadRow.fromNpc(NpcInfo.fromView(v), null, false, false);
 		long at = Visibility.lastActivity(t);
 		return new ThreadRow(r.key(), r.env(), r.envLabel(), r.threadId(), r.title(), r.project(), r.state(),
-				t.pendingRuntimeRequest() != null, r.activity(), Visibility.isSettled(t), at <= 0 ? null : at, t.pinned());
+				t.pendingRuntimeRequest() != null, r.activity(), Visibility.isSettled(t), at <= 0 ? null : at, t.pinned(),
+				ThreadDetails.of(t, r.state()));
 	}
 
 	/**

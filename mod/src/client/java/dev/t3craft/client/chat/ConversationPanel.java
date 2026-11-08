@@ -121,6 +121,9 @@ public final class ConversationPanel implements AutoCloseable {
 	private boolean showHeader = true;
 	private @Nullable Navigation nav;
 	private @Nullable Footer footer;
+	/** Line after the last transcript row (feat/t3-sidebar-rows: "Working… 4m 12s"); null = none. */
+	private @Nullable Trailer trailer;
+	private int trailerY = -1;
 	private @Nullable Extra extra;
 	private long builtExtra = -1;
 	private String[] hints = {"PgUp", "scroll", "End", "newest"};
@@ -252,6 +255,20 @@ public final class ConversationPanel implements AutoCloseable {
 	/** Puts {@code f} (the composer) where the reply bar was; null brings the bar back. */
 	public void setFooter(@Nullable Footer f) {
 		footer = f;
+	}
+
+	/**
+	 * A line drawn after the transcript (and its extra rows), scrolling with it, e.g. the subtle
+	 * "Working… 4m 12s" of a running thread. {@link Trailer#height()} 0 hides it.
+	 */
+	public interface Trailer {
+		int height();
+
+		void draw(GuiGraphicsExtractor g, Font font, ChatTheme t, int x, int y, int w);
+	}
+
+	public void setTrailer(@Nullable Trailer t) {
+		trailer = t;
 	}
 
 	/** Extra rows after the transcript (optimistic messages); null for none. */
@@ -1005,7 +1022,9 @@ public final class ConversationPanel implements AutoCloseable {
 		int textW = well.w() - TEXT_X - 12;
 		relayoutIfNeeded(font, textW);
 		int contentH = lines.isEmpty() ? 0 : lines.getLast().y() + lines.getLast().h();
-		scroll.update(contentH, Math.max(1, well.h() - 8));
+		int trailerH = trailer == null || feed == null || message != null ? 0 : trailer.height();
+		trailerY = trailerH > 0 ? contentH + 3 : -1;
+		scroll.update(contentH + (trailerH > 0 ? trailerH + 3 : 0), Math.max(1, well.h() - 8));
 
 		pairButton = Rect.EMPTY;
 		if (feed == null || message != null) {
@@ -1155,6 +1174,13 @@ public final class ConversationPanel implements AutoCloseable {
 					c = t.text();
 				}
 				g.text(font, component(p.span(), c, t), lx + p.x(), textY, 0xFFFFFFFF, t.shadow());
+			}
+		}
+		Trailer tr = trailer;
+		if (tr != null && trailerY >= 0) {
+			int ty = top + trailerY;
+			if (ty < well.bottom() && ty + tr.height() > well.y()) {
+				tr.draw(g, font, t, tx0, ty, textW);
 			}
 		}
 		g.disableScissor();
