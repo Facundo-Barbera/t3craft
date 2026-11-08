@@ -595,7 +595,8 @@ final class RingGenerator {
 				set(x, 6, z, leaves(Blocks.CHERRY_LEAVES));
 			}
 		}
-		if (r <= 15.5 && Math.floorMod(x * 5 + z * 3, 11) == 0) {
+		// planters on the inner patio only: past r = 14.5 the way along the drum is too narrow (fix/hq-lanterns)
+		if (r <= 14.5 && Math.floorMod(x * 5 + z * 3, 11) == 0) {
 			set(x, 1, z, Math.floorMod(x + z, 2) == 0 ? b(Blocks.FLOWERING_AZALEA) : kit.gardenPlanter());
 		}
 	}
@@ -1061,7 +1062,8 @@ final class RingGenerator {
 				BlockState skin = m == 1 ? (Math.abs(t) <= 1.0 ? GLASS : (Math.floorMod((int) Math.round(t), 6) == 0 ? COPPER_WARM : COPPER)) : DEEPSLATE_TILES;
 				set(x, base + h + 1, z, skin);
 			}
-			if (!wall && Math.abs(t) > 1.0 && Math.floorMod(x * 7 + z * 11, 17) == 0) {
+			// lanterns on a 6-block grid (at most 4 in any 9 × 9), only where the vault is tall enough to hang them in
+			if (!wall && h >= 3 && Math.abs(t) > 1.0 && Math.floorMod(x, 6) == 0 && Math.floorMod(z, 6) == 0) {
 				put(x, base + h, z, hangingLantern(), HANGING);
 			}
 		} else {

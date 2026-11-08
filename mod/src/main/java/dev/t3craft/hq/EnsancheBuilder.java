@@ -373,6 +373,8 @@ final class EnsancheBuilder {
 						c.set(sx * 21, y, z, s(Blocks.QUARTZ_PILLAR));
 					}
 				} else if (Math.floorMod(z + 1, 4) == 2) {
+					// a lantern can't hang from a top slab's underside: a full block of the vault holds it
+					c.set(sx * 19, 5, z, s(Blocks.SMOOTH_STONE));
 					c.hang(sx * 19, 4, z, hanging());
 				}
 			}

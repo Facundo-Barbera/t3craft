@@ -74,6 +74,17 @@ final class ClassicStyle extends HqStyle {
 		return palette;
 	}
 
+	/** Warm timber and copper: shroomlight lamps in floors, walls and ceilings (fix/hq-lanterns). */
+	@Override
+	BlockState floorLight() {
+		return net.minecraft.world.level.block.Blocks.SHROOMLIGHT.defaultBlockState();
+	}
+
+	@Override
+	BlockState wallLight() {
+		return net.minecraft.world.level.block.Blocks.SHROOMLIGHT.defaultBlockState();
+	}
+
 	// ------------------------------------------------------------------ hub
 
 	@Override
@@ -125,11 +136,9 @@ final class ClassicStyle extends HqStyle {
 			// planters at the ends of the bench rows
 			c.decor(5 * sx, 1, -3, k.pottedFloweringAzalea);
 			c.decor(5 * sx, 1, 3, k.pottedFloweringAzalea);
-			// lamp pedestals by both doorways
-			for (int dz = -1; dz <= 1; dz += 2) {
-				c.set(2 * sx, 1, 7 * dz, k.copperGrate);
-				c.decor(2 * sx, 2, 7 * dz, k.copperLantern(false));
-			}
+			// lamp pedestals by the north doorway (the portico's lamp posts already frame the entrance)
+			c.set(2 * sx, 1, -7, k.copperGrate);
+			c.decor(2 * sx, 2, -7, k.copperLantern(false));
 		}
 		// runner from the entrance to the board
 		for (int z = 2; z <= 7; z++) {
@@ -345,8 +354,11 @@ final class ClassicStyle extends HqStyle {
 					// garden strip between rows: grass, a bush mid-segment, a lamp post at the pillar
 					c.set(x, 0, z, k.grass);
 					if (pillar) {
-						c.set(x, 1, z, k.plinthWall);
-						c.decor(x, 2, z, k.copperLantern(false));
+						// a lamp post at every other pillar, between the hall's lanterns
+						if (s % 2 == 1) {
+							c.set(x, 1, z, k.plinthWall);
+							c.decor(x, 2, z, k.copperLantern(false));
+						}
 					} else {
 						c.decor(x, 1, z, col == 1 ? (s % 2 == 0 ? k.floweringAzalea : k.azalea) : k.shortGrass);
 					}
@@ -375,7 +387,8 @@ final class ClassicStyle extends HqStyle {
 					c.set(x, 1, z, k.bookshelf);
 					c.decor(x, 2, z, k.pottedAzalea);
 				}
-				if (pillar && (v == 3 || v == WING_WALL - 3)) {
+				// one lantern down the hall's axis at every pillar (the floor lamps do the lighting)
+				if (pillar && v == WING_WALL / 2) {
 					c.hang(x, 4, z, k.copperLantern(true));
 				}
 				if (v >= DOOR_V1 && v <= DOOR_V2) {

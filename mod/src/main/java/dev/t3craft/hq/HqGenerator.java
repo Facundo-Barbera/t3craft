@@ -63,11 +63,13 @@ public final class HqGenerator {
 		return new Result(layout, new HqGenerator(style).generate(layout));
 	}
 
+	/** The plan of {@code layout}, with its built-in lighting ({@link HqLighting}: no dark walkable cell). */
 	public BuildPlan generate(HqLayout layout) {
 		BuildPlan own = style.layoutPlan(layout);
-		if (own != null) {
-			return own;
-		}
+		return HqLighting.light(own != null ? own : spine(layout), style);
+	}
+
+	private BuildPlan spine(HqLayout layout) {
 		PlanBuilder b = new PlanBuilder();
 		int rows = layout.rows();
 		hub(b, rows > 0, hubBinding(layout));

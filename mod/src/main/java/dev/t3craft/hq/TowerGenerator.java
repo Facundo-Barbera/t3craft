@@ -390,6 +390,24 @@ final class TowerGenerator {
 		return t.cz() + lz;
 	}
 
+	/**
+	 * True when the loggia of floor {@code f} is one cell wide at {@code lx} (the floor behind it is the
+	 * atrium void or the stair hole): a planter there would close the way (fix/hq-lanterns).
+	 */
+	private static boolean narrowLoggia(TowerLayout.Tower t, int f, int lx) {
+		int holeLane = f > 0 ? TowerLayout.lane(f - 1) : -1;
+		int lz = -t.pz() + 2;
+		for (int x = lx - 1; x <= lx + 1; x++) {
+			boolean atrium = Math.max(Math.abs(x), Math.abs(lz)) <= t.atrium();
+			boolean hole = holeLane >= 0 && x >= t.x0() && x < t.x0() + t.run() && lz >= TowerLayout.laneZ(holeLane)
+					&& lz <= TowerLayout.laneZ(holeLane) + 1;
+			if (atrium || hole) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	/** The middle band of floor f (atrium, gallery ring, north loggia, south stair hall). */
 	private void core(TowerLayout.Tower t, int f) {
 		int g = t.gallery();
@@ -445,7 +463,7 @@ final class TowerGenerator {
 					boolean door = t == T1 && f <= 1 && Math.abs(lx) >= 6 && Math.abs(lx) <= 8 && y <= y0 + 3;
 					put(c, wx(t, lx), y, wz(t, pz), door ? AIR : col || y == top ? (col ? m.column() : m.band()) : m.pane());
 				}
-				if (Math.floorMod(lx, 3) == 1 && f > 0) {
+				if (Math.floorMod(lx, 3) == 1 && f > 0 && !narrowLoggia(t, f, lx)) {
 					put(c, wx(t, lx), y0 + 1, wz(t, -pz + 1), kit.gardenPlanter());
 				}
 			}
@@ -840,9 +858,8 @@ final class TowerGenerator {
 						}
 					}
 				}
-				for (int lz : new int[] {-13, 13}) {
-					v.set(w, 1, lz, kit.gardenPlanter());
-				}
+				// a planter at the south end only: at the north end the cell is the way past the first office
+				v.set(w, 1, 13, kit.gardenPlanter());
 			}
 			case MEZZANINE -> {
 				for (int u = 3; u <= w - 1; u++) {

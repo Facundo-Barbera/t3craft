@@ -158,6 +158,16 @@ public abstract class HqStyle {
 		return palette().get(Role.SCREEN);
 	}
 
+	/** Lamp let into a floor where the HQ would be dark ({@link HqLighting}): a full block that glows. */
+	BlockState floorLight() {
+		return net.minecraft.world.level.block.Blocks.PEARLESCENT_FROGLIGHT.defaultBlockState();
+	}
+
+	/** Lamp let into a wall or ceiling ({@link HqLighting}): the kit's lit shoji panel, or its vanilla stand-in. */
+	BlockState wallLight() {
+		return HqKit.active().wallPanel(true);
+	}
+
 	/** The beacon cell's block (the blocks module swaps it for its beacon lamp). */
 	BlockState beacon() {
 		return palette().get(Role.BEACON);
