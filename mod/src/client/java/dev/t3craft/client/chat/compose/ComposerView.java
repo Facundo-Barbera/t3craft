@@ -54,6 +54,34 @@ public final class ComposerView implements ConversationPanel.Footer {
 	}
 
 	/**
+	 * The platform's text input (IME) switch. Minecraft 26.x runs on SDL3, and SDL only delivers
+	 * text events ({@code charTyped}) while text input is started: vanilla {@code EditBox} starts
+	 * it when it gains focus ({@code Minecraft.onTextInputFocusChange}). A custom field that never
+	 * asks receives key presses but no characters, which is the "focuses but cannot type" bug.
+	 */
+	public interface TextInput {
+		/** Start ({@code on}) or stop text input for {@code owner} (stop is a no-op if someone else owns it). */
+		void focusChanged(Object owner, boolean on);
+
+		/** Where the IME candidate window goes, in GUI coordinates ({@code x1, y1, x2, y2}). */
+		default void area(int x1, int y1, int x2, int y2) {
+		}
+
+		/** The real one: Minecraft's {@code TextInputManager}. */
+		TextInput MINECRAFT = new TextInput() {
+			@Override
+			public void focusChanged(Object owner, boolean on) {
+				Minecraft.getInstance().textInputManager().onTextInputFocusChange(owner, on);
+			}
+
+			@Override
+			public void area(int x1, int y1, int x2, int y2) {
+				Minecraft.getInstance().textInputManager().setTextInputArea(x1, y1, x2, y2);
+			}
+		};
+	}
+
+	/**
 	 * A control in the bar's left slot (feat/t3-actions inserts the model/provider/effort selectors
 	 * here). 12 px tall, drawn left to right.
 	 */
@@ -68,6 +96,7 @@ public final class ComposerView implements ConversationPanel.Footer {
 
 	private final ComposerState state;
 	private final Host host;
+	private final TextInput textInput;
 	private ChatTheme theme;
 	private Rect bounds = Rect.EMPTY;
 	private boolean focused;
@@ -91,9 +120,28 @@ public final class ComposerView implements ConversationPanel.Footer {
 	};
 
 	public ComposerView(ComposerState state, ChatTheme theme, Host host) {
+		this(state, theme, host, TextInput.MINECRAFT);
+	}
+
+	public ComposerView(ComposerState state, ChatTheme theme, Host host, TextInput textInput) {
 		this.state = state;
 		this.theme = theme;
 		this.host = host;
+		this.textInput = textInput;
+	}
+
+	/**
+	 * A text color as drawn: {@code drawString} skips colors whose alpha byte is 0 (a bare
+	 * {@code 0xRRGGBB}), so a theme value without alpha is made opaque instead of vanishing.
+	 */
+	public static int ink(int argb) {
+		return (argb >>> 24) == 0 ? argb | 0xFF000000 : argb;
+	}
+
+	/** Every color the composer draws text with (input, placeholder, status, buttons), as drawn. */
+	public static List<Integer> textColors(ChatTheme t) {
+		return List.of(ink(t.text()), ink(t.ghost()), ink(t.muted()), ink(t.working()), ink(t.errorText()), ink(t.disabled()),
+				ink(t.accent()));
 	}
 
 	public ComposerState state() {
@@ -115,14 +163,14 @@ public final class ComposerView implements ConversationPanel.Footer {
 			scrollLine = 0;
 			accessCheckedAt = System.currentTimeMillis();
 			if (!state.canOperate()) {
-				focused = false;
+				setFocused(false);
 			}
 		}
 	}
 
 	public void clearThread() {
 		state.clearThread();
-		focused = false;
+		setFocused(false);
 	}
 
 	/** See {@link ComposerState#observe}. */
@@ -150,8 +198,14 @@ public final class ComposerView implements ConversationPanel.Footer {
 	}
 
 	public void setFocused(boolean f) {
+		boolean was = focused;
 		focused = f && editable();
 		dragging = false;
+		if (focused) {
+			textInput.focusChanged(this, true); // idempotent; also re-arms it after Gui.setScreen stopped it
+		} else if (was) {
+			textInput.focusChanged(this, false);
+		}
 	}
 
 	private boolean editable() {
@@ -211,7 +265,7 @@ public final class ComposerView implements ConversationPanel.Footer {
 			accessCheckedAt = System.currentTimeMillis();
 			state.refreshAccess();
 			if (!state.canOperate()) {
-				focused = false;
+				setFocused(false);
 			}
 		}
 		ComposerText e = state.editor();
@@ -219,12 +273,18 @@ public final class ComposerView implements ConversationPanel.Footer {
 		text = new Rect(r.x() + PAD_X, r.y() + PAD_TOP, r.w() - 2 * PAD_X - 4, visibleLines() * LINE_H);
 		e.layout(text.w(), font::width);
 		keepCaretVisible();
+		if (focused) {
+			// Gui.setScreen stops text input (e.g. back from a confirmation screen): keep it on while focused
+			textInput.focusChanged(this, true);
+			int cy = text.y() + (e.lineOf(e.caret()) - scrollLine) * LINE_H;
+			textInput.area(text.x(), cy, text.right(), cy + LINE_H);
+		}
 
 		// ---- input
 		if (e.isEmpty()) {
 			String ph = state.key() == null ? I18n.get("t3craft.chat.compose.no_thread")
 					: !state.canOperate() ? I18n.get("t3craft.chat.compose.read_only") : I18n.get("t3craft.chat.compose.placeholder");
-			g.text(font, ChatDraw.clip(font, ph, text.w()), text.x(), text.y() + 1, t.ghost(), false);
+			g.text(font, ChatDraw.clip(font, ph, text.w()), text.x(), text.y() + 1, ink(t.ghost()), false);
 			if (focused && ChatDraw.caretOn()) {
 				g.fill(text.x(), text.y(), text.x() + 1, text.y() + 9, t.text());
 			}
@@ -262,7 +322,7 @@ public final class ComposerView implements ConversationPanel.Footer {
 					room -= 9;
 				}
 				String s = ChatDraw.clip(font, status, room);
-				g.text(font, s, cx, cy + 2, color, false);
+				g.text(font, s, cx, cy + 2, ink(color), false);
 				if (state.error() != null && mouseX >= cx && mouseX < cx + font.width(s) && mouseY >= cy && mouseY < cy + 12) {
 					g.setTooltipForNextFrame(font, Component.literal(state.error()), mouseX, mouseY);
 				}
@@ -301,7 +361,7 @@ public final class ComposerView implements ConversationPanel.Footer {
 				int x1 = text.x() + font.width(s.substring(l.start(), Math.max(l.start(), b))) + (selNewline ? 3 : 0);
 				g.fill(x0, y, x1, y + LINE_H - 1, ChatTheme.withAlpha(t.accent(), 90));
 			}
-			g.text(font, row, text.x(), y + 1, t.text(), false);
+			g.text(font, row, text.x(), y + 1, ink(t.text()), false);
 			if (focused && i == caretLine && ChatDraw.caretOn()) {
 				int cx = text.x() + e.caretX();
 				g.fill(cx, y, cx + 1, y + 9, t.text());
@@ -327,7 +387,7 @@ public final class ComposerView implements ConversationPanel.Footer {
 		boolean hover = enabled && r.contains(mouseX, mouseY);
 		ChatDraw.pillBox(g, t, r.x(), r.y(), r.w(), hover);
 		int color = !enabled ? t.disabled() : b == ComposerState.Button.STOP ? t.errorText() : t.accent();
-		g.text(font, label, r.x() + 5, r.y() + 2, color, false);
+		g.text(font, label, r.x() + 5, r.y() + 2, ink(color), false);
 		if (hover && b == ComposerState.Button.ENABLE_CONTROL) {
 			g.setTooltipForNextFrame(font, Component.translatable("t3craft.operate.enable.tooltip"), mouseX, mouseY);
 		} else if (hover && b == ComposerState.Button.STOP) {
@@ -418,15 +478,20 @@ public final class ComposerView implements ConversationPanel.Footer {
 	 * leaves the input (a second Esc reaches the host). Enter sends, Shift+Enter is a newline.
 	 */
 	public boolean keyPressed(KeyEvent event) {
+		return keyPressed(event.key(), event.hasShiftDown(), event.hasControlDownWithQuirk());
+	}
+
+	/** {@link #keyPressed(KeyEvent)} on its parts ({@code ctrl} is Cmd on macOS). */
+	public boolean keyPressed(int key, boolean shift, boolean ctrl) {
 		if (!focused) {
 			return false;
 		}
-		if (event.isEscape()) {
+		if (key == InputConstants.KEY_ESCAPE) {
 			setFocused(false);
 			return true;
 		}
 		String before = state.editor().text();
-		ComposerText.KeyResult r = state.editor().key(event.key(), event.hasShiftDown(), event.hasControlDownWithQuirk(), clipboard);
+		ComposerText.KeyResult r = state.editor().key(key, shift, ctrl, clipboard);
 		if (r == ComposerText.KeyResult.SUBMIT) {
 			if (state.submit()) {
 				host.sent();
@@ -440,14 +505,19 @@ public final class ComposerView implements ConversationPanel.Footer {
 			keepCaretVisible();
 			return true;
 		}
-		return event.key() == InputConstants.KEY_TAB;
+		return key == InputConstants.KEY_TAB;
 	}
 
 	public boolean charTyped(CharacterEvent event) {
+		return charTyped(event.codepoint());
+	}
+
+	/** A typed character; only arrives while text input is started (see {@link TextInput}). */
+	public boolean charTyped(int codepoint) {
 		if (!focused) {
 			return false;
 		}
-		if (state.editor().typed(event.codepoint())) {
+		if (state.editor().typed(codepoint)) {
 			state.clearError();
 			keepCaretVisible();
 		}

@@ -12,6 +12,7 @@ import it.unimi.dsi.fastutil.longs.Long2DoubleOpenHashMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.PriorityQueue;
 import java.util.function.LongPredicate;
 import org.jspecify.annotations.Nullable;
@@ -25,8 +26,15 @@ import org.jspecify.annotations.Nullable;
  * slices ({@link Search#run}) so several NPCs share a per-tick node budget ({@link Navigation}).
  */
 public final class GridPathfinder {
-	static final int MAX_NODES = 16_000;
+	static final int MAX_NODES = 48_000;
 	static final int PAD = 16;
+	/**
+	 * fix/hq-npc-spawn: the widest the search box may grow to (blocks around both ends). When the
+	 * open set runs dry and some move was cut off by the box, the box grows (×3, up to this) and the
+	 * cut-off cells are searched on: the only way to an upper-floor desk often goes past it to the
+	 * stairs at the far end of the building, or round a whole block, further than {@link #PAD}.
+	 */
+	static final int MAX_PAD = 144;
 	/** Cells whose centre is this close (horizontally) to the avoid point are blocked. */
 	static final double AVOID_RADIUS = 1.1;
 	/** How far start/goal may be moved to the nearest walkable cell (blocks, horizontally). */
@@ -159,10 +167,13 @@ public final class GridPathfinder {
 		private final @Nullable Cell goal;
 		private final PriorityQueue<Node> open = new PriorityQueue<>((a, b) -> a.f != b.f ? Double.compare(a.f, b.f) : Double.compare(b.g, a.g));
 		private final Long2DoubleOpenHashMap best = new Long2DoubleOpenHashMap();
-		private final int minX;
-		private final int maxX;
-		private final int minZ;
-		private final int maxZ;
+		private int minX;
+		private int maxX;
+		private int minZ;
+		private int maxZ;
+		private int pad = PAD;
+		/** Expanded nodes with a neighbour outside the box: searched on when the box grows. */
+		private final List<Node> edge = new ArrayList<>();
 		private int expanded;
 		private Status status = Status.RUNNING;
 		private String reason = "";
@@ -225,6 +236,9 @@ public final class GridPathfinder {
 			int used = 0;
 			Cell g = goal;
 			while (status == Status.RUNNING && used < budget) {
+				if (open.isEmpty() && !edge.isEmpty() && pad < MAX_PAD && expanded < MAX_NODES) {
+					grow();
+				}
 				if (open.isEmpty() || expanded >= MAX_NODES) {
 					status = Status.NONE;
 					reason = open.isEmpty()
@@ -253,8 +267,22 @@ public final class GridPathfinder {
 			return used;
 		}
 
+		/** Widens the box around both ends and searches on from the nodes it had cut off. */
+		private void grow() {
+			Cell s = Objects.requireNonNull(start);
+			Cell g = Objects.requireNonNull(goal);
+			pad = Math.min(MAX_PAD, pad * 3);
+			minX = Math.min(s.x, g.x) - pad;
+			maxX = Math.max(s.x, g.x) + pad;
+			minZ = Math.min(s.z, g.z) - pad;
+			maxZ = Math.max(s.z, g.z) + pad;
+			open.addAll(edge);
+			edge.clear();
+		}
+
 		private void expand(Node n, Cell g) {
 			double fa = floor(n.x, n.y, n.z);
+			boolean cut = false;
 			for (int[] d : DIRS) {
 				boolean diagonal = d[0] != 0 && d[1] != 0;
 				for (int dy : DYS) {
@@ -265,6 +293,10 @@ public final class GridPathfinder {
 					int ny = n.y + dy;
 					int nz = n.z + d[1];
 					if (nx < minX || nx > maxX || nz < minZ || nz > maxZ) {
+						if (!cut) {
+							cut = true;
+							edge.add(n);
+						}
 						continue;
 					}
 					double fb = floor(nx, ny, nz);

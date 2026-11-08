@@ -56,4 +56,13 @@ public interface AnchorSource {
 	default @Nullable Anchor exit() {
 		return null;
 	}
+
+	/**
+	 * fix/hq-npc-spawn: the base's way-in point, a free standable cell every desk and stroll point is
+	 * reachable from on foot. An NPC that has no route anywhere for long (it stood where the base was
+	 * then built around it, or was pushed into a sealed spot) is put back here. Null = none.
+	 */
+	default @Nullable Anchor spawn() {
+		return null;
+	}
 }

@@ -43,6 +43,11 @@ public final class Collision implements Walkable, Collider {
 		this.blocks = blocks;
 	}
 
+	/** Collision over the real blocks of a level (for walkers outside this package, e.g. the builders). */
+	public static Collision of(net.minecraft.world.level.BlockGetter level) {
+		return new Collision(new LevelBlocks(level));
+	}
+
 	public void clear() {
 		boxCache.clear();
 	}

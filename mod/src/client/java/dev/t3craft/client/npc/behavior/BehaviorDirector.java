@@ -291,6 +291,7 @@ public final class BehaviorDirector {
 
 			brain.approach(approachSpots.get(b.id()));
 			brain.tick(mode, "error".equals(info.state()), t, playerPos, nav);
+			rescue(brain, layout.spawn());
 			apply(lvl, b, brain, o, summary, playerPos);
 		}
 		for (String id : new ArrayList<>(brains.keySet())) {
@@ -298,6 +299,23 @@ public final class BehaviorDirector {
 				forget(id, lvl);
 			}
 		}
+	}
+
+	/** Farther than this (blocks) from the way in, a stranded NPC is put back there; nearer, it stays. */
+	static final double RESCUE_DISTANCE = 3.0;
+
+	/**
+	 * fix/hq-npc-spawn: an NPC with no way anywhere for long ({@link NpcBrain#stranded}: it stood on
+	 * the provisional grid where the HQ was then built around it, or sank into a sealed spot) is put
+	 * back on the base's way in ({@link AnchorSource#spawn}), from which every desk is reachable. Not
+	 * when it is already there, so an unreachable spot never makes it jump again and again.
+	 */
+	static boolean rescue(NpcBrain brain, @Nullable Anchor spawn) {
+		if (spawn == null || !brain.stranded() || brain.pos().distSqr(spawn.pos()) <= RESCUE_DISTANCE * RESCUE_DISTANCE) {
+			return false;
+		}
+		brain.relocate(spawn.pos());
+		return true;
 	}
 
 	/** Drives a departing NPC; false once it is over (the brain takes over again). */

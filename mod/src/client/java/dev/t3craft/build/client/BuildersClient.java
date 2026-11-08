@@ -6,6 +6,7 @@ import dev.t3craft.build.BuildCost;
 import dev.t3craft.build.BuildDeniedException;
 import dev.t3craft.build.BuildHandle;
 import dev.t3craft.build.BuildJob;
+import dev.t3craft.build.BuildPlanner;
 import dev.t3craft.build.BuildListener;
 import dev.t3craft.build.BuildManager;
 import dev.t3craft.build.BuildPlan;
@@ -63,6 +64,9 @@ public final class BuildersClient implements ClientModInitializer, BuildService 
 	private record Placed(int jobId, BlockPos pos, BlockState state, int front) implements Event {
 	}
 
+	private record Walking(int jobId, int front, BlockPos stand, BlockPos target, int ticks) implements Event {
+	}
+
 	private record Finished(int jobId, JobState state) implements Event {
 	}
 
@@ -84,6 +88,11 @@ public final class BuildersClient implements ClientModInitializer, BuildService 
 			@Override
 			public void placed(BuildJob job, int index, BlockPos worldPos, BlockState worldState) {
 				events.add(new Placed(job.id(), worldPos, worldState, job.frontOf(index)));
+			}
+
+			@Override
+			public void walking(BuildJob job, int front, int index, BlockPos standWorld, int ticks) {
+				events.add(new Walking(job.id(), front, standWorld, job.worldPos(index), ticks));
 			}
 
 			@Override
@@ -160,7 +169,7 @@ public final class BuildersClient implements ClientModInitializer, BuildService 
 		Vec3 viewer = mc.player.position();
 		BuildCrew crew = new BuildCrew(label, lvl, BuildJob.boundsOf(plan, origin, rotation), crewSize, viewer, () -> nextEntityId--,
 				() -> manager.submit(label, dimension, origin, rotation, plan, blocksPerTick, jobCost, wrap,
-						BuildBudget.global().tuning().frontsFor(crewSize)));
+						BuildBudget.global().tuning().frontsFor(crewSize), BuildPlanner.CREW));
 		crews.add(crew);
 		return crew;
 	}
@@ -192,6 +201,7 @@ public final class BuildersClient implements ClientModInitializer, BuildService 
 			}
 			switch (e) {
 				case Placed p -> crew.placed(p.pos(), p.state(), p.front());
+				case Walking w -> crew.walking(w.front(), w.stand(), w.target(), w.ticks());
 				case Finished f -> crew.finished();
 				case Materials m -> notifyMaterials(mc, m);
 			}

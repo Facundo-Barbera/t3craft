@@ -94,9 +94,63 @@ el hueco izquierdo de la barra (modelo, provider, effort). Por ahora está vací
 - `ConversationPanel` no expone el título del hilo al composer: la confirmación de Stop puede salir
   sin título hasta que llega el snapshot.
 
+## Bug: no se podía escribir
+
+**Síntoma** (main 31a7567, probado en el juego): el campo toma foco al hacer clic (marco y caret
+visibles), pero al teclear no aparece nada.
+
+**Causa raíz: el composer nunca activaba la entrada de texto de SDL3.** Minecraft 26.x usa SDL3
+para la ventana. SDL entrega los caracteres como eventos de texto propios, y solo mientras alguien
+haya llamado a `SDL_StartTextInput`. Lo verifiqué con `javap -c` sobre
+`minecraft-clientonly-deobf-26.3.jar`:
+
+- `KeyboardHandler.textInput(long, String)` → `charTyped(long, CharacterEvent)` →
+  `Screen.charTyped`. El carácter es un evento aparte de `keyPress` y no depende de lo que haya
+  devuelto `keyPressed`, de `getFocused()` ni del contenedor.
+- `com.mojang.blaze3d.platform.TextInputManager.startTextInput(owner)` es quien llama a
+  `SDL_StartTextInput`; `stopTextInput(owner)` solo la para si `owner` es el dueño actual.
+- `EditBox.setFocused` y `MultiLineEditBox.setFocused` llaman a
+  `Minecraft.onTextInputFocusChange(this, focused)` y por eso funcionan. Nuestro `ComposerView`
+  no es un EditBox y nunca la pedía: las teclas (flechas, Backspace, Enter) llegaban, pero las
+  letras no generaban ningún `charTyped`.
+- `Gui.setScreen` llama a `TextInputManager.stopTextInput()` sin dueño. Por eso, al volver de una
+  pantalla de confirmación (Stop, Enable control), la entrada de texto quedaba parada aunque el
+  composer siguiera con foco.
+
+**Arreglo** (`ComposerView`):
+- Nueva interfaz `ComposerView.TextInput`; la implementación real (`TextInput.MINECRAFT`) usa
+  `Minecraft.textInputManager()`.
+- `setFocused(true)` la arranca con el composer como dueño y perder el foco la para.
+  `clearThread`, el cambio de hilo a solo lectura y la comprobación periódica de acceso pasan
+  ahora por `setFocused`.
+- Mientras tiene foco, `render` la vuelve a armar cada frame. Es idempotente y cubre el
+  `stopTextInput()` de `Gui.setScreen`. También coloca el área del IME (`setTextInputArea`) en la
+  línea del caret.
+
+**Sospechas descartadas:**
+1. *Color sin alpha:* los temas (`warmStudio`, `terminal`) ya eran ARGB con 0xFF. Aun así, todo
+   el texto del composer pasa ahora por `ComposerView.ink(color)`, que fuerza alpha 0xFF si el
+   byte alto es 0, para que un tema solo RGB no deje el texto invisible.
+2. *Tragarse la tecla en `keyPressed`:* no cancela el carácter, porque son eventos SDL distintos.
+3. *`codepoint()`:* es el accesor correcto de `CharacterEvent`, y `isISOControl` no filtra letras.
+4. *Estado reconstruido:* `ChatComposer.sync` llama a `setThread` cada frame, pero no hace nada
+   si el hilo no cambia, y `init()` reutiliza el composer.
+5. *Keybinds:* `Minecraft.handleGlobalKeyPress` solo atiende pantalla completa, captura y
+   amigos; el resto llega al Screen.
+
+**Despacho testeable:** `ComposerInput.keyPressed/charTyped/owns` son ahora el camino que usa la
+pantalla unificada (`T3Screen.keyPressed` y `T3Screen.charTyped`). `ComposerView` acepta además
+`keyPressed(int key, boolean shift, boolean ctrl)` y `charTyped(int codepoint)` para no depender
+de los records de entrada de MC en los tests.
+
 ## Pruebas
 
 `ComposerTextTest` (edición, selección, portapapeles fake, Enter frente a Shift+Enter, wrap,
 ↑↓/Home/End) y `ComposerStateTest` (payload exacto de `message.dispatch` y `run.interrupt`, fila
 optimista y su reconciliación, error y recuperación, borradores por hilo, solo lectura y Stop).
 Todo con un `OperateTransport` fake, nunca contra un T3 real.
+
+`ComposerTypingTest`: teclea "hola⏎mundo" (Shift+Enter) por `ComposerInput` contra un teclado
+SDL3 fake que solo emite caracteres con la entrada de texto activa. Cubre también Esc, el re-armado
+tras `Gui.setScreen`, el dueño ajeno y el modo solo lectura. `ComposerColorsTest` comprueba que
+todos los colores de texto del composer tienen alpha distinto de 0.

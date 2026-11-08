@@ -17,6 +17,13 @@ public interface BuildListener {
 	}
 
 	/**
+	 * A builder of a {@link BuildPlanner#CREW} job starts walking ({@code ticks}) to {@code standWorld}
+	 * (feet cell) to place plan entry {@code index} ({@link BuildJob#worldPos}).
+	 */
+	default void walking(BuildJob job, int front, int index, BlockPos standWorld, int ticks) {
+	}
+
+	/**
 	 * A charged job started waiting for materials ({@code missing}: item id → count lacking) or got
 	 * them and resumed ({@code missing} empty). Same data as {@link BuildJob#missingMaterials()}.
 	 */

@@ -21,7 +21,7 @@ package dev.t3craft.build;
  * <p>Credit accrues only while running and is capped, so a pause never turns into a burst; skipped
  * entries (already right) are free but bounded per tick. Threading as {@link BuildCursor}.
  */
-public final class FrontCursor {
+public final class FrontCursor implements JobCursor {
 	@FunctionalInterface
 	public interface Step {
 		BuildCursor.Outcome apply(int front, int index);
@@ -212,6 +212,16 @@ public final class FrontCursor {
 	/** Which entry each front places next. */
 	public PlacementOrder order() {
 		return order;
+	}
+
+	@Override
+	public int frontCount() {
+		return order.fronts();
+	}
+
+	@Override
+	public int frontOf(int index) {
+		return order.frontOf(index);
 	}
 
 	public JobState state() {

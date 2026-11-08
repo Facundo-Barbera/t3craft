@@ -91,7 +91,13 @@ public final class BuildManager {
 	 */
 	public BuildJob submit(String label, ResourceKey<Level> dimension, BlockPos origin, Rotation rotation, BuildPlan plan, double blocksPerTick,
 			@Nullable BuildCost cost, @Nullable UnaryOperator<BlockSink> wrap, int fronts) {
-		BuildJob job = new BuildJob(nextId.getAndIncrement(), label, dimension, origin, rotation, plan, blocksPerTick, cost, fronts);
+		return submit(label, dimension, origin, rotation, plan, blocksPerTick, cost, wrap, fronts, BuildPlanner.LAYERS);
+	}
+
+	/** Like {@link #submit(String, ResourceKey, BlockPos, Rotation, BuildPlan, double, BuildCost, UnaryOperator, int)} with a {@link BuildPlanner}. */
+	public BuildJob submit(String label, ResourceKey<Level> dimension, BlockPos origin, Rotation rotation, BuildPlan plan, double blocksPerTick,
+			@Nullable BuildCost cost, @Nullable UnaryOperator<BlockSink> wrap, int fronts, BuildPlanner planner) {
+		BuildJob job = new BuildJob(nextId.getAndIncrement(), label, dimension, origin, rotation, plan, blocksPerTick, cost, fronts, planner);
 		if (wrap != null) {
 			wraps.put(job.id(), wrap);
 		}
@@ -139,6 +145,10 @@ public final class BuildManager {
 						job.tick(allow, sink, (jb, i, pos, state) -> {
 							for (BuildListener l : listeners) {
 								safe(() -> l.placed(jb, i, pos, state));
+							}
+						}, (jb, front, i, stand, ticks) -> {
+							for (BuildListener l : listeners) {
+								safe(() -> l.walking(jb, front, i, stand, ticks));
 							}
 						});
 						if (job.pollMaterialsChanged()) {

@@ -41,7 +41,13 @@ class NavigationTest {
 		m.snapYaw(route.getFirst().yawTo(route.get(1)));
 		m.walk(route, 0f);
 		Pos p = route.getFirst();
-		for (int i = 0; i < 2000 && m.walking(); i++) {
+		// enough ticks for the route's length at walking pace (twice over), at least 2000
+		double length = 0;
+		for (int i = 0; i + 1 < route.size(); i++) {
+			length += Math.sqrt(route.get(i).distSqr(route.get(i + 1)));
+		}
+		int maxTicks = Math.max(2000, (int) Math.ceil(2 * length / Motion.SPEED));
+		for (int i = 0; i < maxTicks && m.walking(); i++) {
 			p = m.step(p, null, c::move);
 			assertFalse(c.embedded(p), "inside a block at " + p);
 		}
