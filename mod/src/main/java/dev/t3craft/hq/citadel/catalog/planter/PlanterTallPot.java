@@ -3,6 +3,7 @@ package dev.t3craft.hq.citadel.catalog.planter;
 import static dev.t3craft.hq.citadel.CitadelCanvas.b;
 import static dev.t3craft.hq.citadel.CitadelCanvas.leaves;
 import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
+import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
 import static dev.t3craft.hq.citadel.CitadelCanvas.terracotta;
 
 import dev.t3craft.hq.citadel.CitadelCanvas;
@@ -77,14 +78,14 @@ public final class PlanterTallPot implements Variant {
 		boolean bamboo = p.hash(0, 0, 0, 2) == 0;
 		int top = p.h() - 1;
 		int lip = p.h() >= 5 ? 2 : 1; // pot body y1 (and a calcite lip at y2 on tall plots)
-		int plantTop = Math.min(top, lip + 4);
+		int plantTop = Math.min(top, lip + (bamboo ? 4 : 3)); // the cherry trunk is short; the crown is bounded by the plot
 
 		// --- the pot
 		p.set(c, cu, 0, cv, p.hash(cu, 0, cv, 3) == 0 ? b(Blocks.CHISELED_DEEPSLATE) : b(Blocks.POLISHED_DEEPSLATE));
 		BlockState body = bamboo ? b(Blocks.BAMBOO_BLOCK) : terracotta(DyeColor.PINK); // bamboo block: axis Y by default
 		p.set(c, cu, 1, cv, body);
 		if (lip == 2) {
-			p.set(c, cu, 2, cv, b(Blocks.CALCITE));
+			p.set(c, cu, 2, cv, body); // a two-high glazed body (no white band: stacked stripes read as a candy cane)
 		}
 
 		// --- the plant
@@ -100,6 +101,11 @@ public final class PlanterTallPot implements Variant {
 			int u = cu + dir.getStepX();
 			int v = cv + dir.getStepZ();
 			if (!p.has(u, 0, v)) {
+				continue;
+			}
+			if (w >= 3 && d >= 3) {
+				// [depth] a stepped plinth: stairs climbing to the pot on the four sides
+				p.set(c, u, 0, v, stairs(Blocks.DEEPSLATE_BRICK_STAIRS, dir.getOpposite()));
 				continue;
 			}
 			int k = p.hash(u, 0, v, 4);
@@ -136,20 +142,36 @@ public final class PlanterTallPot implements Variant {
 	/** A dwarf cherry: a log trunk with a leaf top, and a plus-shaped tier under it on plots wider than 1. */
 	private static void cherry(CitadelCanvas c, Plot p, int u, int v, int y0, int y1) {
 		if (y1 == y0) {
-			p.set(c, u, y0, v, leaves(Blocks.CHERRY_LEAVES)); // no room for a trunk: a leaf ball on the pot
+			// no room for a trunk: a flowering azalea bush (a real shrub shape, not a leaf cube) on the pot
+			p.set(c, u, y0, v, b(Blocks.FLOWERING_AZALEA));
 			return;
 		}
 		for (int y = y0; y < y1; y++) {
 			p.set(c, u, y, v, b(Blocks.CHERRY_LOG));
 		}
-		p.set(c, u, y1, v, leaves(Blocks.CHERRY_LEAVES));
+		// crown: a ring of leaves round the trunk top (corners too, one in four open), a plus above it
+		// and a crown leaf; the trunk is short so the crown sits low and reads as a tree, not a lollipop
 		int tier = y1 - 1;
+		for (int du = -1; du <= 1; du++) {
+			for (int dv = -1; dv <= 1; dv++) {
+				int lu = u + du;
+				int lv = v + dv;
+				if ((du == 0 && dv == 0) || !p.has(lu, tier, lv) || p.hash(lu, tier, lv, 4) == 0) {
+					continue;
+				}
+				p.set(c, lu, tier, lv, leaves(Blocks.CHERRY_LEAVES));
+			}
+		}
 		for (Direction dir : new Direction[] {Direction.WEST, Direction.EAST, Direction.NORTH, Direction.SOUTH}) {
 			int lu = u + dir.getStepX();
 			int lv = v + dir.getStepZ();
-			if (p.has(lu, tier, lv) && p.hash(lu, tier, lv, 4) != 0) { // [depth] one side in four left open
-				p.set(c, lu, tier, lv, leaves(Blocks.CHERRY_LEAVES));
+			if (p.has(lu, y1, lv)) {
+				p.set(c, lu, y1, lv, leaves(Blocks.CHERRY_LEAVES));
 			}
+		}
+		p.set(c, u, y1, v, leaves(Blocks.CHERRY_LEAVES));
+		if (y1 + 1 < p.h()) {
+			p.set(c, u, y1 + 1, v, leaves(Blocks.CHERRY_LEAVES));
 		}
 	}
 

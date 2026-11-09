@@ -103,6 +103,13 @@ public final class GateArchBattlement implements Variant {
 					for (int y = 1; y < towerTop; y++) {
 						p.set(c, u, y, v, wall(p, u, y, v));
 					}
+					// [depth] a shadow line under the parapet: upside-down stairs facing outward leave the lower half
+					// of the outer course open, so the top course reads as a corbelled cornice
+					boolean outerU = sd == 0 ? u == 0 : u == w - 1;
+					if (towerTop - 1 > 3 && (v == 0 || v == d - 1 || outerU)) {
+						Direction out = v == 0 ? Direction.NORTH : v == d - 1 ? Direction.SOUTH : sd == 0 ? Direction.WEST : Direction.EAST;
+						p.set(c, u, towerTop - 1, v, stairs(Blocks.STONE_BRICK_STAIRS, out).setValue(BlockStateProperties.HALF, Half.TOP));
+					}
 					crenellate(c, p, u, v, u0, pl, d, towerTop);
 				}
 			}
@@ -200,7 +207,7 @@ public final class GateArchBattlement implements Variant {
 				p.set(c, u, y, 0, b(Blocks.AIR));
 			}
 		}
-		p.set(c, u, y1 + 1, v, b(Blocks.GOLD_BLOCK));
+		p.set(c, u, y1 + 1, v, b(Blocks.CHISELED_STONE_BRICKS)); // a stone finial: the pink pennant is the only accent colour
 		if (recessed) {
 			p.set(c, u, y1 + 1, 0, b(Blocks.AIR));
 		}

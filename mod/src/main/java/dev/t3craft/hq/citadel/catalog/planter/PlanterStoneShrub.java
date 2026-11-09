@@ -90,9 +90,11 @@ public final class PlanterStoneShrub implements Variant {
 				// --- the planting (y1+): a mound around the core
 				int dist = Math.abs(u - cu) + Math.abs(v - cv);
 				if (dist == 0) {
-					p.set(c, u, 1, v, leaves(Blocks.AZALEA_LEAVES));
 					if (tall) {
+						p.set(c, u, 1, v, leaves(Blocks.AZALEA_LEAVES));
 						p.set(c, u, 2, v, b(Blocks.FLOWERING_AZALEA)); // the crown: a smaller bush on the ball
+					} else {
+						p.set(c, u, 1, v, b(Blocks.FLOWERING_AZALEA)); // low plot: a real bush, not a leaf cube
 					}
 				} else if (dist == 1 && (d >= 2 || w >= 4)) {
 					p.set(c, u, 1, v, p.hash(u, 1, v, 2) == 0 ? leaves(Blocks.FLOWERING_AZALEA_LEAVES) : leaves(Blocks.AZALEA_LEAVES));

@@ -133,10 +133,11 @@ public final class GateToriiCherry implements Variant {
 		// --- hanging lanterns at the edges of the opening (the centre stays clear)
 		for (int side = -1; side <= 1; side += 2) {
 			int u = side < 0 ? lp + 1 : rp - 1;
-			for (int y = nuki - 1; y > 2; y--) {
+			int lamp = nuki >= 4 ? 3 : 2; // light rule: lanterns hang at foot + 3 or higher (a 3-high opening has no room)
+			for (int y = nuki - 1; y > lamp; y--) {
 				p.put(c, u, y, vc, b(Blocks.IRON_CHAIN), CitadelCanvas.HANGING);
 			}
-			p.put(c, u, 2, vc, LANTERN.setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
+			p.put(c, u, lamp, vc, LANTERN.setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
 		}
 
 		// --- kasagi. Lower layer: a pink shimaki beam over the shaft depth, flanked by bevelled eaves of
@@ -170,10 +171,7 @@ public final class GateToriiCherry implements Variant {
 			}
 		}
 		// gold caps on the tips (the "kinzoku") and a cherry slab bridging the tip steps
-		for (int v = v0; v < v0 + pd; v++) {
-			p.set(c, 0, k1, v, GOLD);
-			p.set(c, w - 1, k1, v, GOLD);
-		}
+		// (no gold cubes on the tips: the upswept stairs are the finish; gold stays on the plaque only)
 
 
 		// --- stone lanterns (toro) outside the pillars when there is room
@@ -211,7 +209,7 @@ public final class GateToriiCherry implements Variant {
 
 	private static BlockState plaque(Plot p, int i, int row, int pw) {
 		// glyph strokes in gold, the rest black bricks: a deterministic "calligraphy"
-		boolean gold = (row == 1 && (i % 2 == 0 || p.hash(i, row, 0, 3) == 0)) || (row == 0 && i % 2 == 1);
+		boolean gold = (row == 1 && i % 2 == 0) || (row == 0 && i % 2 == 1 && p.hash(i, row, 0, 3) == 0);
 		if (pw == 1) {
 			gold = row == 1;
 		}
