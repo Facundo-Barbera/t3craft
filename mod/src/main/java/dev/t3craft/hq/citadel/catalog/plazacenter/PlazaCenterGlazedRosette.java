@@ -165,7 +165,13 @@ public final class PlazaCenterGlazedRosette implements Variant {
 			p.set(c, u, 0, v, h == 0 ? b(Blocks.CRACKED_STONE_BRICKS) : h == 1 ? b(Blocks.MOSSY_STONE_BRICKS) : b(Blocks.STONE_BRICKS));
 			if (Math.abs(Math.abs(dx) - Math.abs(dz)) <= 1) {
 				// planter at the diagonal, between two benches
-				p.set(c, u, 1, v, CitadelCanvas.leaves(p.hash(u, 1, v, 2) == 0 ? Blocks.FLOWERING_AZALEA_LEAVES : Blocks.AZALEA_LEAVES));
+				// flowers, not leaves: nobody can stand on them under a canopy
+				if (p.hash(u, 1, v, 2) == 0) {
+					p.set(c, u, 1, v, b(Blocks.PEONY));
+					p.set(c, u, 2, v, Blocks.PEONY.defaultBlockState().setValue(BlockStateProperties.DOUBLE_BLOCK_HALF, DoubleBlockHalf.UPPER));
+				} else {
+					p.set(c, u, 1, v, b(Blocks.PINK_PETALS));
+				}
 			} else if (pa != 2) {
 				p.set(c, u, 1, v, stairs(Blocks.CHERRY_STAIRS, f));
 			}
