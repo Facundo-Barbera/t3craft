@@ -1,6 +1,7 @@
 package dev.t3craft.hq.citadel.catalog.bench;
 
 import static dev.t3craft.hq.citadel.CitadelCanvas.b;
+import static dev.t3craft.hq.citadel.CitadelCanvas.leaves;
 import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
 import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
 
@@ -15,24 +16,25 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 
 /**
- * Concept: a picnic spot in weathered stone: a cherry table top on polished deepslate wall
- * pedestals, with a stone-brick bench on each long side facing it. A long table carries a raised
- * block with a pot of flowers; the table ends get a lantern post and a planted stone block, moss creeps in the corners.
+ * A picnic table in stone under a cherry pergola: dark deepslate benches on both long sides, a pale smooth
+ * quartz top on stone-brick wall legs, a flowering azalea set into the middle of a long table. Wide plots
+ * add the table ends (a lantern post and a planted block); tall wide plots raise a cherry pergola over the
+ * whole set: fence posts on deepslate feet, fence rails, thin slab slats, one clump of blossom and
+ * lanterns hanging over the table.
  *
- * <p>The tricks:
  * <ul>
- * <li><b>Proportion</b>: seats are stairs (half a block), the table top a bottom slab one block up,
- *     so the table reads 1.5 high over 0.5 seats; pedestals only under the ends and the middle leave
- *     leg room.</li>
- * <li><b>Palette</b>: deepslate (pedestals, end posts) → stone bricks mixed with mossy ones by hash
- *     (benches) → light smooth stone (top), gold lantern and green as accents.</li>
- * <li><b>Silhouette</b>: low and wide, the lantern post the only vertical, unlike the cherry bench.</li>
+ * <li><b>Gradient</b>: deepslate benches (the base) → stone-brick legs → the pale quartz top → the pink
+ *     pergola and blossom over it.</li>
+ * <li><b>Depth</b>: seats are stairs (half a block), the top a bottom slab one block up, legs only under
+ *     the ends (and the middle of a long table) to leave leg room; the pergola rails and slats cross at
+ *     two levels.</li>
+ * <li><b>Silhouette</b>: low and wide when small; a framed room with a light in it when it has a pergola.</li>
  * </ul>
- * Size: 2–5 × 3 × 2+ (it needs the three rows: bench, table, bench). Width 4–5 adds the end pieces.
+ * Size: 2–5 × 3 × 2+ (bench, table, bench). Width 4–5 adds the ends; width 4–5 with height 5+ the pergola.
  */
 public final class BenchStoneTable implements Variant {
-	private static final BlockState PEDESTAL = b(Blocks.POLISHED_DEEPSLATE_WALL); // no sides set: a round post
-	private static final BlockState TOP = slab(Blocks.CHERRY_SLAB);
+	private static final BlockState LEG = b(Blocks.STONE_BRICK_WALL);
+	private static final BlockState TOP = slab(Blocks.SMOOTH_QUARTZ_SLAB);
 
 	@Override
 	public String id() {
@@ -73,36 +75,36 @@ public final class BenchStoneTable implements Variant {
 	public void build(CitadelCanvas c, Plot p) {
 		int w = p.w();
 		boolean ends = w >= 4;
+		boolean pergola = ends && p.h() >= 5;
 		int a = ends ? 1 : 0;
 		int z = ends ? w - 2 : w - 1;
 		int mid = (a + z) / 2;
-
 		for (int u = a; u <= z; u++) {
 			// benches: the front one faces back (towards the table), the back one faces the front
-			p.set(c, u, 0, 0, stairs(benchBlock(p, u, 0), Direction.NORTH));
-			p.set(c, u, 0, 2, stairs(benchBlock(p, u, 2), Direction.SOUTH));
-			// table: pedestals under the ends and the middle, slab top over all
+			p.set(c, u, 0, 0, stairs(seat(p, u, 0), Direction.NORTH));
+			p.set(c, u, 0, 2, stairs(seat(p, u, 2), Direction.SOUTH));
+			// table: wall legs under the ends and the middle of a long table, a pale slab top over all
 			boolean leg = u == a || u == z || (z - a >= 3 && u == mid);
 			if (leg) {
-				p.set(c, u, 0, 1, PEDESTAL);
+				p.set(c, u, 0, 1, LEG);
 			}
 			p.set(c, u, 1, 1, TOP);
 		}
-
-		// [finish] a long table gets a raised stone block in the middle with a pot of flowers on it
-		// (a pot straight on the bottom slab would float half a block)
-		if (z - a >= 2 && p.h() >= 3) {
-			p.set(c, mid, 1, 1, b(Blocks.CHISELED_STONE_BRICKS));
-			p.set(c, mid, 2, 1, pot(p));
+		// [finish] a long table carries a flowering azalea set into its middle (no pot floating on a slab)
+		if (z - a >= 2) {
+			p.set(c, mid, 1, 1, b(Blocks.FLOWERING_AZALEA));
 		}
-
 		if (!ends) {
 			return;
 		}
-		// --- table ends: a lantern post on one side, a planted block on the other
+		// --- table ends: a lantern post on one side (unless the pergola carries the light), a planted block on the other
 		boolean lanternLeft = p.hash(0, 0, 1, 2) == 0;
-		end(c, p, 0, lanternLeft);
-		end(c, p, w - 1, !lanternLeft);
+		end(c, p, 0, lanternLeft && !pergola);
+		end(c, p, w - 1, !lanternLeft && !pergola);
+		if (pergola) {
+			pergola(c, p, w);
+			return;
+		}
 		// [finish] moss and petals soften the four corners where stone meets the grass
 		for (int u : new int[] {0, w - 1}) {
 			for (int v : new int[] {0, 2}) {
@@ -113,6 +115,42 @@ public final class BenchStoneTable implements Variant {
 				p.set(c, u, 0, v, k == 1 ? b(Blocks.MOSS_CARPET)
 						: b(Blocks.PINK_PETALS).setValue(BlockStateProperties.FLOWER_AMOUNT, k + 1)
 								.setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.EAST));
+			}
+		}
+	}
+
+	/** A cherry pergola over the set: four posts, fence rails (y 3), slab slats (y 4), one blossom clump, lanterns. */
+	private static void pergola(CitadelCanvas c, Plot p, int w) {
+		for (int u : new int[] {0, w - 1}) {
+			for (int v : new int[] {0, 2}) {
+				p.set(c, u, 0, v, b(Blocks.POLISHED_DEEPSLATE));
+				p.set(c, u, 1, v, b(Blocks.CHERRY_FENCE));
+				p.set(c, u, 2, v, b(Blocks.CHERRY_FENCE));
+			}
+		}
+		BlockState rail = b(Blocks.CHERRY_FENCE); // light rails along the long sides (they connect to each other)
+		BlockState slat = slab(Blocks.CHERRY_SLAB); // thin slats lying across the rails
+		for (int u = 0; u < w; u++) {
+			p.set(c, u, 3, 0, rail);
+			p.set(c, u, 3, 2, rail);
+			if (u % 2 == 0 || u == w - 1) {
+				for (int v = 0; v < 3; v++) {
+					p.set(c, u, 4, v, slat);
+				}
+			}
+		}
+		// one clump of blossom over a back corner, the rest open to the sky
+		int cu = p.hash(0, 4, 0, 2) == 0 ? 0 : w - 1;
+		int nu = cu == 0 ? 1 : w - 2;
+		p.set(c, nu, 4, 2, leaves(Blocks.CHERRY_LEAVES));
+		p.set(c, nu, 4, 1, leaves(Blocks.CHERRY_LEAVES));
+		if (p.h() >= 6) {
+			p.set(c, cu, 5, 2, leaves(Blocks.CHERRY_LEAVES));
+		}
+		// lanterns hang from the slats over the table
+		for (int u = 1; u < w - 1; u++) {
+			if (u % 2 == 0 && (u == 2 || w >= 5)) {
+				p.put(c, u, 3, 1, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
 			}
 		}
 	}
@@ -128,20 +166,12 @@ public final class BenchStoneTable implements Variant {
 			}
 		} else {
 			p.set(c, u, 0, 1, b(Blocks.CHISELED_STONE_BRICKS));
-			p.set(c, u, 1, 1, b(Blocks.FLOWERING_AZALEA));
+			p.set(c, u, 1, 1, p.hash(u, 1, 1, 2) == 0 ? b(Blocks.FLOWERING_AZALEA) : b(Blocks.POTTED_FERN));
 		}
 	}
 
-	/** [palette] stone brick benches, one block in three mossy: weathered, never uniform. */
-	private static Block benchBlock(Plot p, int u, int v) {
-		return p.hash(u, 0, v, 3) == 0 ? Blocks.MOSSY_STONE_BRICK_STAIRS : Blocks.STONE_BRICK_STAIRS;
-	}
-
-	private static BlockState pot(Plot p) {
-		return switch (p.hash(0, 2, 1, 3)) {
-			case 0 -> b(Blocks.POTTED_PINK_TULIP);
-			case 1 -> b(Blocks.POTTED_AZALEA);
-			default -> b(Blocks.POTTED_CORNFLOWER);
-		};
+	/** [palette] dark deepslate seats, polished with one in three bricks: weathered, never uniform. */
+	private static Block seat(Plot p, int u, int v) {
+		return p.hash(u, 0, v, 3) == 0 ? Blocks.DEEPSLATE_BRICK_STAIRS : Blocks.POLISHED_DEEPSLATE_STAIRS;
 	}
 }

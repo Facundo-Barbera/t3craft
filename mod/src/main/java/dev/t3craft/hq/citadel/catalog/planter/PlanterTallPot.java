@@ -31,7 +31,8 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
  * <li><b>Dwarf cherry</b>: a log trunk with a leaf crown, wider and two-tiered when the plot allows,
  *     pink petals fallen at the foot.</li>
  * </ul>
- * Size: 1–3 × 1–3 × 3+ (the plant grows up to 4 blocks over the pot when there is height).
+ * Size: 1–3 × 1–3 × 3+ (the plant grows up to 4 blocks over the pot when there is height). A 1 × 1 plot
+ * gets its own design: an urn on a stand (see {@code single}).
  */
 public final class PlanterTallPot implements Variant {
 	@Override
@@ -73,6 +74,10 @@ public final class PlanterTallPot implements Variant {
 	public void build(CitadelCanvas c, Plot p) {
 		int w = p.w();
 		int d = p.d();
+		if (w == 1 && d == 1) {
+			single(c, p);
+			return;
+		}
 		int cu = w / 2;
 		int cv = d / 2;
 		boolean bamboo = p.hash(0, 0, 0, 2) == 0;
@@ -130,6 +135,22 @@ public final class PlanterTallPot implements Variant {
 				p.set(c, u, 0, v, s);
 			}
 		}
+	}
+
+	/**
+	 * The 1 × 1 design: a blossom topiary in a pale pot on a dark stand. A deepslate wall stem (or a polished
+	 * foot and a slim fence stem when there is height), a calcite pot and a ball of cherry blossom on it:
+	 * dark → white → pink, the citadel palette in three blocks.
+	 */
+	private static void single(CitadelCanvas c, Plot p) {
+		int y = 0;
+		if (p.h() >= 4) {
+			p.set(c, 0, y++, 0, p.hash(0, 0, 0, 3) == 0 ? b(Blocks.CHISELED_DEEPSLATE) : b(Blocks.POLISHED_DEEPSLATE));
+		}
+		p.set(c, 0, y, 0, y == 0 ? b(Blocks.POLISHED_DEEPSLATE_WALL).setValue(BlockStateProperties.UP, true) : b(Blocks.NETHER_BRICK_FENCE));
+		y++;
+		p.set(c, 0, y++, 0, b(Blocks.CALCITE)); // a pale glazed pot body against the dark stand
+		p.set(c, 0, y, 0, leaves(Blocks.CHERRY_LEAVES));
 	}
 
 	/** A thick bamboo stalk from y0 to y1 with the right leaves, and a shorter one beside it if there is room. */
