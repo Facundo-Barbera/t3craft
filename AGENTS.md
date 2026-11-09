@@ -5,8 +5,9 @@ These rules come from Facundo and override any other instruction, brief or habit
 ## Execution on the VPS (Facundo, 2026-11-09; replaces the earlier run-nothing moratorium)
 
 - **Only the coordinator compiles on the VPS,** one gradle at a time, always through `tools/heavy.sh`. No tests.
-- **Child threads, delegated tasks and subagents only write code and commit:** no gradle, java, compiling or tests. They
-  run at most a few at a time, and none are started while the load is above 6.
+- **Child threads, delegated tasks and subagents only write code and commit:** no gradle, java, compiling or tests.
+  At most **8** run at once (T3 itself slows down with more), all on the latest **Sonnet** with effort medium or high,
+  never xhigh. Only the coordinator runs at xhigh.
 - **Renders run only on Facundo's PC,** through the relay (rule 8). Never renders, a render daemon or Citadel Studio on
   the VPS.
 - Work that still needs running is tracked in `docs/pending-execution.md`.
@@ -47,8 +48,10 @@ gradle/gradlew, a render (`tools/render/*`, `hqRender`, `uiRender`) or Minecraft
    worktree, the coordinator checks `ps` for processes whose arguments or cwd mention that worktree or agent: java,
    gradle, `submit.sh` loops, `sleep`. It kills them, then runs `./gradlew --stop` in that worktree's `mod/`.
    `submit.sh` also stops waiting by itself when the process that launched it is gone.
-7. **Agent count.** Keep at most **8 child agents running at once**. Each one is a process that costs CPU while it
-   thinks. Launch more only in waves, after the previous wave finishes, and never while the load is above 6.
+7. **Agent count and model (Facundo, 2026-11-09).** At most **8 child agents at once**; launch a new one only when
+   fewer than 8 are running, and close idle or looping ones. Children run on the latest Sonnet (effort medium or high,
+   never xhigh); only the coordinator runs at xhigh. Heavy processes stay limited as above: one gradle at a time on the
+   VPS (coordinator only, `tools/heavy.sh`), renders only on the PC, no servers on the VPS.
 8. **Renders run on Facundo's PC, never on the VPS. This is a fixed rule (Facundo, 2026-11-09).**
    - **The VPS never again runs renders, the render daemon or Citadel Studio,** moratorium or not. The render
      server, its spool (`~/.cache/t3craft-render`) and the viewer Facundo watches live all live on the PC

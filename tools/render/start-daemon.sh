@@ -52,7 +52,7 @@ launch_loop() {
 	cd "$REPO/mod"
 	local cp java rc
 	while :; do
-		"${NICE[@]}" ./gradlew --offline --console=plain -q renderDaemonClasspath
+		"${NICE[@]}" ./gradlew --offline --console=plain -q renderDaemonClasspath 9>&- # gradle's daemon must not inherit the heavy lock
 		cp="$(cat build/render-daemon/classpath.txt)"
 		java="$(cat build/render-daemon/java.txt)"
 		rm -f "$RENDER_HOME/STOP"
@@ -71,7 +71,7 @@ launch_loop() {
 		sleep 5
 	done
 	# leave no gradle daemon behind (the per-job compiles start one)
-	timeout 60 ./gradlew --stop >/dev/null 2>&1 || true
+	timeout 60 ./gradlew --stop >/dev/null 2>&1 9>&- || true
 }
 
 if [ "$mode" = supervise ] || [ "$mode" = foreground ]; then

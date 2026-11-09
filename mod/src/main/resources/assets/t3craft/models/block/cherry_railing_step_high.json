@@ -1,0 +1,215 @@
+{
+  "parent": "minecraft:block/block",
+  "ambientocclusion": false,
+  "textures": {
+    "rail": "t3craft:block/kit_railing",
+    "post": "t3craft:block/kit_railing_post",
+    "particle": "t3craft:block/kit_railing"
+  },
+  "elements": [
+    {
+      "from": [
+        16,
+        13,
+        0
+      ],
+      "to": [
+        20,
+        16,
+        3
+      ],
+      "faces": {
+        "north": {
+          "texture": "#rail",
+          "uv": [
+            0,
+            0,
+            4,
+            3
+          ]
+        },
+        "south": {
+          "texture": "#rail",
+          "uv": [
+            0,
+            0,
+            4,
+            3
+          ]
+        },
+        "up": {
+          "texture": "#rail",
+          "uv": [
+            0,
+            4,
+            4,
+            7
+          ]
+        },
+        "down": {
+          "texture": "#rail",
+          "uv": [
+            0,
+            11,
+            4,
+            14
+          ]
+        },
+        "east": {
+          "texture": "#rail",
+          "uv": [
+            0,
+            11,
+            3,
+            14
+          ]
+        },
+        "west": {
+          "texture": "#rail",
+          "uv": [
+            0,
+            11,
+            3,
+            14
+          ]
+        }
+      }
+    },
+    {
+      "from": [
+        16,
+        11,
+        1
+      ],
+      "to": [
+        20,
+        12,
+        3
+      ],
+      "faces": {
+        "north": {
+          "texture": "#rail",
+          "uv": [
+            0,
+            8,
+            4,
+            9
+          ]
+        },
+        "south": {
+          "texture": "#rail",
+          "uv": [
+            0,
+            8,
+            4,
+            9
+          ]
+        },
+        "up": {
+          "texture": "#rail",
+          "uv": [
+            0,
+            5,
+            4,
+            7
+          ]
+        },
+        "down": {
+          "texture": "#rail",
+          "uv": [
+            0,
+            10,
+            4,
+            12
+          ]
+        },
+        "east": {
+          "texture": "#rail",
+          "uv": [
+            0,
+            12,
+            2,
+            13
+          ]
+        },
+        "west": {
+          "texture": "#rail",
+          "uv": [
+            0,
+            12,
+            2,
+            13
+          ]
+        }
+      }
+    },
+    {
+      "from": [
+        16,
+        1,
+        1
+      ],
+      "to": [
+        20,
+        3,
+        3
+      ],
+      "faces": {
+        "north": {
+          "texture": "#rail",
+          "uv": [
+            0,
+            8,
+            4,
+            10
+          ]
+        },
+        "south": {
+          "texture": "#rail",
+          "uv": [
+            0,
+            8,
+            4,
+            10
+          ]
+        },
+        "up": {
+          "texture": "#rail",
+          "uv": [
+            0,
+            5,
+            4,
+            7
+          ]
+        },
+        "down": {
+          "texture": "#rail",
+          "uv": [
+            0,
+            14,
+            4,
+            16
+          ]
+        },
+        "east": {
+          "texture": "#rail",
+          "uv": [
+            0,
+            12,
+            2,
+            14
+          ]
+        },
+        "west": {
+          "texture": "#rail",
+          "uv": [
+            0,
+            12,
+            2,
+            14
+          ]
+        }
+      }
+    }
+  ]
+}

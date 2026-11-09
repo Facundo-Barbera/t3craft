@@ -123,7 +123,9 @@ public final class WellRoofedStone implements Variant {
 				boolean edge = u == uL || u == uR || v == v0 || v == v1;
 				boolean corner = (u == uL || u == uR) && (v == v0 || v == v1);
 				if (!edge) {
-					p.set(c, u, 0, v, b(Blocks.WATER)); // the shaft: water one block under the lip
+					// [finish] the shaft is full to the lip, so the water shows between the posts
+					p.set(c, u, 0, v, b(Blocks.WATER));
+					p.set(c, u, 1, v, b(Blocks.WATER));
 					continue;
 				}
 				p.set(c, u, 0, v, footing(p, u, v));
@@ -181,9 +183,16 @@ public final class WellRoofedStone implements Variant {
 			}
 		}
 		// the beam across the shaft, right under the roof over the middle row; its ends close the gables
-		int beamY = roofY(cv, d) - 1;
+		// [finish] the pulley beam sits just under the eaves, in full view between the posts, on two
+		// short uprights standing on the lip in the middle of the sides
+		int beamY = ROOF - 1;
 		for (int u = uL; u <= uR; u++) {
 			p.set(c, u, beamY, cv, BEAM_X);
+		}
+		for (int u : new int[] {uL, uR}) {
+			for (int y = 2; y < beamY; y++) {
+				p.set(c, u, y, cv, POST);
+			}
 		}
 		// [finish] the pulley: a grindstone wheel in the beam (axle along the beam), chain, cauldron bucket
 		p.set(c, cu, beamY, cv, b(Blocks.GRINDSTONE)
@@ -201,8 +210,6 @@ public final class WellRoofedStone implements Variant {
 			int ly = roofY(cv, d) - (d % 2 == 0 && cv != 0 ? 2 : 1);
 			p.put(c, 0, ly, cv, lantern, CitadelCanvas.HANGING);
 			p.put(c, p.w() - 1, ly, cv, lantern, CitadelCanvas.HANGING);
-		} else if (cv > v0 && beamY - 1 >= 2) {
-			p.put(c, uR, beamY - 1, cv, lantern, CitadelCanvas.HANGING);
 		}
 	}
 
@@ -222,7 +229,7 @@ public final class WellRoofedStone implements Variant {
 			boolean middle = v == d - 1 - v;
 			boolean eave = v == 0 || v == d - 1;
 			for (int u = 0; u < w; u++) {
-				BlockState st = middle ? b(Blocks.POLISHED_DEEPSLATE)
+				BlockState st = middle ? b(Blocks.STRIPPED_CHERRY_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.X)
 						: stairs(eave ? Blocks.CHERRY_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS, front ? Direction.SOUTH : Direction.NORTH);
 				p.set(c, u, y, v, st);
 				if (w >= 5 && (u == 0 || u == w - 1) && !middle && !eave && y - 1 >= ROOF) {

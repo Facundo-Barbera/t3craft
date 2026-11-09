@@ -46,6 +46,35 @@ Written, in `--out` (default `build/hq-render`): `NAME_iso_se.png`, `NAME_iso_ne
 ./gradlew hqRender -PhqArgs="--report-only --projects 4,10"
 ```
 
+## Look: lighting, shadows, AO, filter
+
+`Renderer` is a CPU ray caster (no GPU): one ray per sub-pixel walks the block grid and hits the textured quads
+of each cell. `BlockModels` builds those quads from the **real vanilla models and textures** in the client jar
+(blockstate variants and multipart, parents, element from/to, per-face uv, uv rotation, element rotations with
+rescale, variant x/y rotations, `uvlock`, tint indices). Textures are sampled **nearest** (texel-exact, the
+Minecraft look); smoothness comes from supersampling. Grass and foliage use the plains colours (no biome map,
+the render has no world).
+
+All of the following are flags of every mode (galleries, `--layout`, piece mode, `--catalog`). **They are on by
+default (`--final`) and off in `--preview`.** Without either flag, `--ss 1` (what the render service adds to its
+previews) counts as a preview. The service passes `--preview` to `hq` previews itself.
+
+| Flag | On (final) | Off (preview) |
+| --- | --- | --- |
+| `--sky` / `--no-sky` | Linear-light shading: a warm sun from the south-west at about 45°, a cool sky hemisphere plus a warm ground bounce, a soft shoulder tonemap (linear up to 0.6, then eases into white; no toe, so shadows stay readable), and a light sky-gradient background. Faces the model marks `"shade": false` (plants, torches) are lit evenly. | The old flat look: Minecraft-like face factors (top 1, south/north 0.82, east/west 0.68, bottom 0.55) times a sun term, on a flat light-grey background. |
+| `--shadows` / `--hard-shadows` / `--no-shadows` | Soft sun shadows: `--shadow-rays N` (default 2) rays per sub-sample toward a sun disc of 3° radius, stratified and jittered by sample, so a 3×3 supersampled pixel averages 18 rays and the penumbra widens with the distance to the occluder. Leaves cast dappled shadows (cutout texels are tested); glass and water do not. | One hard shadow ray (as before). `--no-shadows`: none. |
+| `--ao` / `--no-ao` | Ambient occlusion in the spirit of smooth lighting, per pixel: the cells in front of the face are read at **half-block** resolution (contact shadows in joints, under slabs and stairs) and at **block** resolution (the broad gradient at wall bases and inner corners). Each corner of the cell holding the pixel gets Minecraft's vertex rule (two sides plus the diagonal); the four corners are interpolated bilinearly. A cell counts as solid from its opaque model elements (`BlockModels.occupancy`: which of its 8 half-block sub-cells are covered); glass, plants and fences do not occlude. In sky mode AO darkens the sky light fully and the sun only a little. | None. |
+| `--bloom` / `--no-bloom` | A faint halo around emissive blocks (lanterns, froglights, glowstone…): their colour, gaussian-blurred (sigma about half a block), screen-blended at 15 %. | None. |
+| `--filter mitchell\|tent\|box` | `mitchell`: Mitchell–Netravali (B = C = 1/3) over a 1.25 px radius, resolved in linear light. Edges are cleaner than the box average and stay crisp. | `box`: the plain average of the sub-samples. |
+
+Cost (render PC, 11 threads, `--ss 3`): the hub of `--layout hybrid-ringcampus --projects 4 --only hub`
+(6 images) took 13.0 s before and 15.1 s after; the catalog gallery
+`--catalog HOUSE:house_timber_cottage,LAMP:lamp_cherry_post` took 2.2 s before and 4.7 s after. The extra cost
+is the shadow rays. `--shadow-rays 1` or `--hard-shadows` halves it.
+
+`Renderer.look` is a static that `HqRender` sets at the start of every run. A JVM therefore renders with one
+look at a time, which suits the render service (1 worker on the PC).
+
 ## The report
 
 Information for the designer, not a test: nothing fails. With a target, counts and lists cover that box;

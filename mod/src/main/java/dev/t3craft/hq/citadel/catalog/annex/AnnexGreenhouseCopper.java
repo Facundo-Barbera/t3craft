@@ -18,7 +18,7 @@ import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 
 /**
  * Glasshouse: a deepslate plinth carrying walls of glass panes framed by weathered copper posts,
- * under a stepped glass roof whose gable ends and ribs (every third row) are oxidized copper
+ * under a stepped glass roof whose gable ends (and a middle rib on long houses) are clean copper
  * stairs, with a chiseled copper emblem and a copper finial on the gables. Inside, raised beds of
  * wheat, carrots, potatoes and beetroot flank a mud-brick path lit by hanging copper lanterns.
  *
@@ -38,9 +38,8 @@ public final class AnnexGreenhouseCopper implements Variant {
 	/** Plate / eaves level; glass walls are y1..y2 below it. */
 	private static final int PLATE = 3;
 
-	private static final BlockState POST = Blocks.CUT_COPPER.waxed().weathered().defaultBlockState();
-	private static final BlockState RIB_TOP = Blocks.CUT_COPPER.waxed().oxidized().defaultBlockState();
-	private static final Block RIB = Blocks.CUT_COPPER_STAIRS.waxed().oxidized();
+	private static final BlockState POST = Blocks.CUT_COPPER.waxed().unaffected().defaultBlockState();
+	private static final Block RIB = Blocks.CUT_COPPER_STAIRS.waxed().unaffected();
 
 	@Override
 	public String id() {
@@ -117,9 +116,9 @@ public final class AnnexGreenhouseCopper implements Variant {
 		return PLATE + Math.min(Math.min(u, w - 1 - u), 2);
 	}
 
-	/** Ribs: both gable rows and every third row between them. */
+	/** Ribs: both gable rows and, on long houses, one in the middle; everything between is glass. */
 	private static boolean rib(int v, int vf, int vb) {
-		return v == vf || v == vb || (v - vf) % 3 == 0;
+		return v == vf || v == vb || (vb - vf >= 6 && v == (vf + vb) / 2);
 	}
 
 	private static BlockState pane(BlockState g, boolean alongU, boolean sideA, boolean sideB) {
@@ -172,7 +171,7 @@ public final class AnnexGreenhouseCopper implements Variant {
 					st = b(Blocks.CHERRY_DOOR)
 							.setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH)
 							.setValue(BlockStateProperties.DOUBLE_BLOCK_HALF, y == 1 ? DoubleBlockHalf.LOWER : DoubleBlockHalf.UPPER);
-				} else if (u == 0 || u == w - 1 || (w >= 7 && Math.abs(u - cu) == 1)) {
+				} else if (u == 0 || u == w - 1) {
 					st = POST;
 				} else {
 					// panes do not join a door; [palette] the upper panes beside the door are tinted pink
@@ -183,7 +182,7 @@ public final class AnnexGreenhouseCopper implements Variant {
 			}
 			// back wall: corner posts and one in the middle on wide plots
 			for (int u = 0; u < w; u++) {
-				boolean post = u == 0 || u == w - 1 || (w >= 7 && u == cu);
+				boolean post = u == 0 || u == w - 1;
 				p.set(c, u, y, vb, post ? POST : pane(clear, true, true, true));
 			}
 		}
@@ -200,8 +199,10 @@ public final class AnnexGreenhouseCopper implements Variant {
 		int w = p.w();
 		for (int v = vf; v <= vb; v++) {
 			boolean ribRow = rib(v, vf, vb);
-			p.set(c, 0, PLATE, v, stairs(RIB, Direction.EAST));
-			p.set(c, w - 1, PLATE, v, stairs(RIB, Direction.WEST));
+			// [palette] copper only where a rib meets the eave; the gutter between ribs is glass, so the
+			// roof reads as a glass skin on a thin copper frame, not a copper box
+			p.set(c, 0, PLATE, v, ribRow ? stairs(RIB, Direction.EAST) : b(Blocks.GLASS));
+			p.set(c, w - 1, PLATE, v, ribRow ? stairs(RIB, Direction.WEST) : b(Blocks.GLASS));
 			for (int u = 1; u < w - 1; u++) {
 				int y = roofY(u, w);
 				boolean flat = Math.min(u, w - 1 - u) >= 2;
@@ -209,7 +210,7 @@ public final class AnnexGreenhouseCopper implements Variant {
 				if (!ribRow) {
 					st = b(Blocks.GLASS);
 				} else if (flat) {
-					st = RIB_TOP;
+					st = v == vf || v == vb ? Blocks.CUT_COPPER_SLAB.waxed().unaffected().defaultBlockState() : b(Blocks.GLASS); // a slim copper slab on the gables, glass between
 				} else {
 					st = stairs(RIB, u < w - 1 - u ? Direction.EAST : Direction.WEST);
 				}
@@ -222,7 +223,9 @@ public final class AnnexGreenhouseCopper implements Variant {
 		boolean odd = w % 2 == 1;
 		for (int v : new int[] {vf, vb}) {
 			for (int u = 1; u < w - 1; u++) {
-				p.set(c, u, PLATE, v, POST);
+				boolean centreCol = odd ? u == cu : u == cu || u == cu - 1;
+				// [depth] the gable plate is glass between the copper corners; a copper lintel only over the door
+				p.set(c, u, PLATE, v, v == vf && centreCol ? POST : pane(clear, true, true, true));
 				boolean centre = odd ? u == cu : u == cu || u == cu - 1;
 				for (int y = PLATE + 1; y < roofY(u, w); y++) {
 					BlockState st;

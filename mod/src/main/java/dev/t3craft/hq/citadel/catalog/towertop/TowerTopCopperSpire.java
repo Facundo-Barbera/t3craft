@@ -14,9 +14,11 @@ import net.minecraft.core.Direction;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.StairBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.Half;
+import net.minecraft.world.level.block.state.properties.StairsShape;
 import net.minecraft.world.level.block.state.properties.WallSide;
 
 /**
@@ -98,7 +100,8 @@ public final class TowerTopCopperSpire implements Variant {
 	public void build(CitadelCanvas c, Plot p) {
 		int w = p.w();
 		int d = p.d();
-		int in0 = Math.min(w, d) >= 7 ? 2 : 1; // a walk between parapet and spire on big tops
+		// the spire starts one block in from the parapet: an inset of 2 on big tops left a small spire in a wide yard
+		int in0 = 1;
 
 		cornice(c, p, in0);
 		parapet(c, p);
@@ -128,17 +131,26 @@ public final class TowerTopCopperSpire implements Variant {
 		boolean point = top[0] == top[1] && top[2] == top[3];
 
 		// height budget: rings need n layers at least (one stair course each), the finial 1..3
-		int fin = Math.min(point ? 3 : 2, p.h() - 1 - n); // ≥ 1 because h ≥ 6 and n ≤ 4
+		int fin = Math.min(2, p.h() - 1 - n); // ≥ 1 because h ≥ 6 and n ≤ 4
 		int extra = p.h() - 1 - fin - n;
 		int[] rise = new int[n];
 		java.util.Arrays.fill(rise, 1);
-		for (int i = n - 1; i >= 0 && extra > 0; i--) {
-			rise[i]++; // steeper from the top down: the broach flare stays at the bottom
-			extra--;
+		// spare height goes to the tiled body (ring n-2 down to 0, up to 3 courses each), so the spire tapers
+		// in tall tiers; the copper needle gets at most 2 courses. Giving it to the needle first made a short
+		// tiled stub with a tall copper stick on it.
+		boolean grew = true;
+		while (extra > 0 && grew) {
+			grew = false;
+			for (int i = n - 2; i >= 0 && extra > 0; i--) {
+				if (rise[i] < 2) { // 2 courses (blocks, then stairs) is the steep profile; 3 made vertical walls
+					rise[i]++;
+					extra--;
+					grew = true;
+				}
+			}
 		}
-		while (extra > 0 && rise[n - 1] < 4) {
-			rise[n - 1]++; // a longer needle
-			extra--;
+		if (extra > 0 && n >= 2 && point && rise[n - 1] < 2) { // a 2 × 2 top already gets its copper pyramid
+			rise[n - 1]++;
 		}
 
 		int y = 1;
@@ -224,7 +236,7 @@ public final class TowerTopCopperSpire implements Variant {
 				if (merlon) {
 					int k = p.hash(u, 1, v, 5);
 					p.set(c, u, 1, v, k == 0 ? b(Blocks.MOSSY_STONE_BRICKS) : k == 1 ? b(Blocks.CRACKED_STONE_BRICKS) : b(Blocks.STONE_BRICKS));
-					p.set(c, u, 2, v, slab(Blocks.SMOOTH_STONE_SLAB));
+					p.set(c, u, 2, v, slab(Blocks.STONE_BRICK_SLAB)); // same tone as the merlon: light caps read as loose cubes
 				} else {
 					p.set(c, u, 1, v, slab(Blocks.STONE_BRICK_SLAB));
 				}
@@ -242,19 +254,23 @@ public final class TowerTopCopperSpire implements Variant {
 		int a = r[1] - r[0] + 1;
 		int bd = r[3] - r[2] + 1;
 		boolean needle = i == n - 1 && n >= 2;
+		// the upper rings (from 3 wide down) are copper, so the point is a copper cone and not a 1 × 1 post
+		boolean cone = n >= 3 && i >= n - 2;
 		for (int v = r[2]; v <= r[3]; v++) {
 			for (int u = r[0]; u <= r[1]; u++) {
 				boolean onU = stairCourse && a > 2 && (u == r[0] || u == r[1]);
 				boolean onV = stairCourse && bd > 2 && (v == r[2] || v == r[3]);
 				BlockState st;
 				if (onU && onV) {
-					st = slab(i == 0 ? Blocks.CHERRY_SLAB : Blocks.DEEPSLATE_TILE_SLAB); // hip
+					st = slab(i == 0 ? Blocks.CHERRY_SLAB : cone ? Blocks.CUT_COPPER_SLAB.waxed().unaffected() : Blocks.DEEPSLATE_TILE_SLAB); // hip
 				} else if (onU || onV) {
 					Direction up = onU ? (u == r[0] ? Direction.EAST : Direction.WEST) : (v == r[2] ? Direction.SOUTH : Direction.NORTH);
 					Block blk = i == 0 ? Blocks.CHERRY_STAIRS
+							: cone ? copper(p, u, y, v, Blocks.CUT_COPPER_STAIRS.waxed().unaffected(), Blocks.CUT_COPPER_STAIRS.waxed().exposed(),
+									Blocks.CUT_COPPER_STAIRS.waxed().weathered())
 							: p.hash(u, y, v, 5) == 0 ? Blocks.POLISHED_DEEPSLATE_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS;
 					st = stairs(blk, up);
-				} else if (needle) {
+				} else if (needle || cone) {
 					st = b(copper(p, u, y, v, Blocks.CUT_COPPER.waxed().unaffected(), Blocks.CUT_COPPER.waxed().exposed(),
 							Blocks.CUT_COPPER.waxed().weathered()));
 				} else {
@@ -265,16 +281,30 @@ public final class TowerTopCopperSpire implements Variant {
 		}
 	}
 
-	/** [palette] waxed copper with a little patina: mostly fresh, some exposed, a few weathered. */
+	/**
+	 * [palette] waxed copper with a hint of patina: mostly fresh, one cell in eight exposed. (A third of the
+	 * cells in exposed/weathered read as a green checkerboard, like missing textures, in the first render.)
+	 */
 	private static Block copper(Plot p, int u, int y, int v, Block fresh, Block exposed, Block weathered) {
-		int k = p.hash(u, y, v, 6);
-		return k == 0 ? weathered : k <= 2 ? exposed : fresh;
+		return p.hash(u, y, v, 8) == 0 ? exposed : fresh;
 	}
 
 	/** The finial on the top ring's cells, from {@code y} up, {@code fin} layers. */
 	private static void finial(CitadelCanvas c, Plot p, int[] top, int y, int fin) {
 		boolean point = top[0] == top[1] && top[2] == top[3];
 		BlockState rod = Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState();
+		if (top[1] - top[0] == 1 && top[3] - top[2] == 1) {
+			// a 2 × 2 top: a little copper pyramid (outer-corner stairs rising to the middle), not four rods
+			for (int v = top[2]; v <= top[3]; v++) {
+				for (int u = top[0]; u <= top[1]; u++) {
+					Direction inU = u == top[0] ? Direction.EAST : Direction.WEST;
+					Direction inV = v == top[2] ? Direction.SOUTH : Direction.NORTH;
+					StairsShape shape = inV == inU.getClockWise() ? StairsShape.OUTER_RIGHT : StairsShape.OUTER_LEFT;
+					p.set(c, u, y, v, stairs(Blocks.CUT_COPPER_STAIRS.waxed().unaffected(), inU).setValue(StairBlock.SHAPE, shape));
+				}
+			}
+			return;
+		}
 		for (int v = top[2]; v <= top[3]; v++) {
 			for (int u = top[0]; u <= top[1]; u++) {
 				int yy = y;

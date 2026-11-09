@@ -71,6 +71,15 @@ Estado de la ola 1:
   - `design/trees2`, `design/street3` y `design/citadel-terraces`.
   
   Casas A ronda 2: las 7 casas con nota ≥7, ya en `citadel/next`.
+- **Más integrado en main:**
+  - la ciudadela early (`d35e01d`);
+  - los árboles de la ronda 2 (`cb12f2a`);
+  - Ctrl+V en Windows sin imágenes de portapapeles por SDL (`31265a3`), porque crasheaba de forma nativa sin dejar reporte.
+- **En curso:**
+  - `fix/demo-reconcile-offthread`: el log del juego mostró 4,3 s congelado en `demo.reconcile` al arrancar la obra;
+  - `design/walkability-audit`: escaleras que hay que saltar, decoraciones absurdas como la fogata rodeada de agua, y escala 150 vs 100;
+  - `feat/kit-blocks-art`: railing con esquinas, T y extremos, retoque de las 42 texturas y variantes. Es kernel del daemon del PC, así que hay que reiniciarlo al integrarlo.
+- **En cola:** tercera ronda de árboles, cuando haya cupo de agentes.
 - **Pendiente del OK de Facundo:** instalar Chunky en el PC para los renders "bonitos" (requiere su aprobación).
 - **Calidad de render (2026-11-09):** los jobs al PC salen por defecto en final con `--ss 3`; preview solo si se pide. El daemon del PC corre con 11 hilos y `-Xmx10g`. La GPU está pendiente de que Facundo decida (plan en la respuesta del coordinador): AO y sombras en CPU, o Chunky con GPU desde un export `.schem`.
 - **Citadel Studio en el PC** se actualizó a `79be0f6`: ahora lista todos los agentes con jobs, del más reciente al más viejo.

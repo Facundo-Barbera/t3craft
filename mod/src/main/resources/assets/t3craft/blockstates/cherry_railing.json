@@ -1,19 +1,277 @@
 {
-  "variants": {
-    "facing=north": {
-      "model": "t3craft:block/cherry_railing"
+  "multipart": [
+    {
+      "when": {
+        "facing": "north",
+        "front": "true"
+      },
+      "apply": {
+        "model": "t3craft:block/cherry_railing_rail"
+      }
     },
-    "facing=east": {
-      "model": "t3craft:block/cherry_railing",
-      "y": 90
+    {
+      "when": {
+        "facing": "north",
+        "left": "post|turn|step"
+      },
+      "apply": {
+        "model": "t3craft:block/cherry_railing_post_left"
+      }
     },
-    "facing=south": {
-      "model": "t3craft:block/cherry_railing",
-      "y": 180
+    {
+      "when": {
+        "facing": "north",
+        "left": "turn|step"
+      },
+      "apply": {
+        "model": "t3craft:block/cherry_railing_rail",
+        "y": 270
+      }
     },
-    "facing=west": {
-      "model": "t3craft:block/cherry_railing",
-      "y": 270
+    {
+      "when": {
+        "facing": "north",
+        "left": "step"
+      },
+      "apply": {
+        "model": "t3craft:block/cherry_railing_step_low",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "facing": "north",
+        "right": "post|turn|step"
+      },
+      "apply": {
+        "model": "t3craft:block/cherry_railing_post_right"
+      }
+    },
+    {
+      "when": {
+        "facing": "north",
+        "right": "turn|step"
+      },
+      "apply": {
+        "model": "t3craft:block/cherry_railing_rail",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "facing": "north",
+        "right": "step"
+      },
+      "apply": {
+        "model": "t3craft:block/cherry_railing_step_high",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "facing": "east",
+        "front": "true"
+      },
+      "apply": {
+        "model": "t3craft:block/cherry_railing_rail",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "facing": "east",
+        "left": "post|turn|step"
+      },
+      "apply": {
+        "model": "t3craft:block/cherry_railing_post_left",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "facing": "east",
+        "left": "turn|step"
+      },
+      "apply": {
+        "model": "t3craft:block/cherry_railing_rail"
+      }
+    },
+    {
+      "when": {
+        "facing": "east",
+        "left": "step"
+      },
+      "apply": {
+        "model": "t3craft:block/cherry_railing_step_low"
+      }
+    },
+    {
+      "when": {
+        "facing": "east",
+        "right": "post|turn|step"
+      },
+      "apply": {
+        "model": "t3craft:block/cherry_railing_post_right",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "facing": "east",
+        "right": "turn|step"
+      },
+      "apply": {
+        "model": "t3craft:block/cherry_railing_rail",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "facing": "east",
+        "right": "step"
+      },
+      "apply": {
+        "model": "t3craft:block/cherry_railing_step_high",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "facing": "south",
+        "front": "true"
+      },
+      "apply": {
+        "model": "t3craft:block/cherry_railing_rail",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "facing": "south",
+        "left": "post|turn|step"
+      },
+      "apply": {
+        "model": "t3craft:block/cherry_railing_post_left",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "facing": "south",
+        "left": "turn|step"
+      },
+      "apply": {
+        "model": "t3craft:block/cherry_railing_rail",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "facing": "south",
+        "left": "step"
+      },
+      "apply": {
+        "model": "t3craft:block/cherry_railing_step_low",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "facing": "south",
+        "right": "post|turn|step"
+      },
+      "apply": {
+        "model": "t3craft:block/cherry_railing_post_right",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "facing": "south",
+        "right": "turn|step"
+      },
+      "apply": {
+        "model": "t3craft:block/cherry_railing_rail",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "facing": "south",
+        "right": "step"
+      },
+      "apply": {
+        "model": "t3craft:block/cherry_railing_step_high",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "facing": "west",
+        "front": "true"
+      },
+      "apply": {
+        "model": "t3craft:block/cherry_railing_rail",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "facing": "west",
+        "left": "post|turn|step"
+      },
+      "apply": {
+        "model": "t3craft:block/cherry_railing_post_left",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "facing": "west",
+        "left": "turn|step"
+      },
+      "apply": {
+        "model": "t3craft:block/cherry_railing_rail",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "facing": "west",
+        "left": "step"
+      },
+      "apply": {
+        "model": "t3craft:block/cherry_railing_step_low",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "facing": "west",
+        "right": "post|turn|step"
+      },
+      "apply": {
+        "model": "t3craft:block/cherry_railing_post_right",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "facing": "west",
+        "right": "turn|step"
+      },
+      "apply": {
+        "model": "t3craft:block/cherry_railing_rail"
+      }
+    },
+    {
+      "when": {
+        "facing": "west",
+        "right": "step"
+      },
+      "apply": {
+        "model": "t3craft:block/cherry_railing_step_high"
+      }
     }
-  }
+  ]
 }
