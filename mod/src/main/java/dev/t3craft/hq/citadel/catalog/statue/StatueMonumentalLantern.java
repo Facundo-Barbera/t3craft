@@ -215,9 +215,9 @@ public final class StatueMonumentalLantern implements Variant {
 		int vl = (d - 1) / 2;
 		int vr = d / 2;
 		boolean even = ul != ur || vl != vr;
-		boolean dbl = p.h() >= 11 && p.hash(3, 3, 3, 2) == 0;
+		boolean dbl = p.hash(3, 3, 3, 2) == 0; // a second, higher eave
 		boolean chamfer = p.hash(5, 5, 5, 2) == 1;
-		int r = dbl ? 3 : 2;
+		int r = 2;
 		int top = Math.min(p.h(), 12) - 1;
 		int roofBase = top - r; // roofTop = top - 1; the apex (rod or pyramid) is at top
 		int ch0 = roofBase - 2;
@@ -325,25 +325,10 @@ public final class StatueMonumentalLantern implements Variant {
 				if (corner) {
 					Direction oa = ew.getOpposite();
 					Direction ob = ns.getOpposite();
-					for (int k = 0; k < r; k++) {
-						int y = roofBase + k;
-						boolean last = k == r - 1;
-						BlockState s = null;
-						if (chamfer) {
-							// the hip: the corner cell falls away on both sides
-							if (k == 0) {
-								s = hip(pal.cuStairs(), ew, ns, false);
-							} else if (k == 1 && dbl) {
-								s = pal.cuSlab();
-							}
-						} else if (last) {
-							s = hip(pal.cuStairs(), oa, ob, false); // the curled-up tip
-						} else {
-							s = pal.cuBlock();
-						}
-						if (s != null) {
-							p.set(c, u, y, v, s);
-						}
+					// the corner cell is the eave's tip: curled up at the very corner (square) or cut away as a hip (chamfered)
+					p.set(c, u, roofBase, v, chamfer ? hip(pal.cuStairs(), ew, ns, false) : hip(pal.cuStairs(), oa, ob, false));
+					if (dbl && chamfer) {
+						p.set(c, u, roofBase + 1, v, pal.cuSlab());
 					}
 				} else {
 					Direction in = v < vl || v > vr ? ns : ew;
@@ -385,7 +370,7 @@ public final class StatueMonumentalLantern implements Variant {
 		int u0 = (p.w() - 2) / 2;
 		int v0 = (p.d() - 2) / 2;
 		int top = Math.min(p.h(), 9) - 1;
-		int roof = top - 1;
+		int roof = top; // the pyramid roof is the top layer
 		int lamp = roof - 1;
 		int plat = lamp - 1;
 		int shaftTop = plat - 1;
@@ -402,8 +387,7 @@ public final class StatueMonumentalLantern implements Variant {
 				// [depth] the platform flares (a top-half hip), the roof is a hip, the apex a second one
 				p.set(c, u, plat, v, hip(pal.platStairs, a, bb, true));
 				p.set(c, u, lamp, v, b(pal.light));
-				p.set(c, u, roof, v, pal.cuBlock());
-				p.set(c, u, top, v, hip(pal.cuStairs(), a, bb, false));
+				p.set(c, u, roof, v, hip(pal.cuStairs(), a, bb, false));
 			}
 		}
 	}
