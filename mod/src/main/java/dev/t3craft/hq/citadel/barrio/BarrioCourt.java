@@ -4,6 +4,7 @@ import dev.t3craft.hq.RingCampusGeometry.Lot;
 import dev.t3craft.hq.RingCampusGeometry.Room;
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.CitadelGrounds;
+import dev.t3craft.hq.citadel.CitadelPlacement;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.Blocks;
@@ -229,6 +230,9 @@ public final class BarrioCourt {
 				}
 			}
 		}
+		if (CitadelPlacement.isDense() && slotHouse(c, r)) {
+			return;
+		}
 		int d = r.d();
 		int mid = r.c();
 		int variant = BarrioKit.hash(r.origin().getX(), r.origin().getZ(), 5) % 3;
@@ -240,6 +244,39 @@ public final class BarrioCourt {
 			case 1 -> pond(c, r, d, mid);
 			default -> twoTrees(c, r, d, mid);
 		}
+	}
+
+	/**
+	 * struct/hq-density: an unused hall slot of a big citadel is a dwelling, not a lawn. The biggest catalog house that
+	 * fits the slot (centred on its axis, its yard in the front rows, which face the courtyard), with its yard of hedge,
+	 * gate, terrace and flower beds ({@link CitadelPlacement#slotHouse}). False when no house fits: the slot keeps its garden.
+	 */
+	private static boolean slotHouse(CitadelCanvas c, Room r) {
+		int w = r.w();
+		int d = r.d();
+		for (int u = 0; u < d; u++) {
+			for (int v = 0; v < w; v++) {
+				BlockPos p = r.cell(u, v, 1);
+				c.set(p, dev.t3craft.hq.citadel.CitadelCanvas.AIR);
+			}
+		}
+		Direction front = r.back().getOpposite();
+		long seed = BarrioKit.hash(r.origin().getX(), r.origin().getZ(), 100000);
+		for (int yw = w; yw >= 13; yw -= 2) {
+			int v0 = (w - yw) / 2;
+			for (int yd = d; yd >= 13; yd--) {
+				BlockPos p1 = r.cell(0, v0, 1);
+				BlockPos p2 = r.cell(yd - 1, v0 + yw - 1, 1);
+				int x0 = Math.min(p1.getX(), p2.getX());
+				int z0 = Math.min(p1.getZ(), p2.getZ());
+				int sx = Math.abs(p1.getX() - p2.getX()) + 1;
+				int sz = Math.abs(p1.getZ() - p2.getZ()) + 1;
+				if (CitadelPlacement.slotHouse(c, x0, z0, sx, sz, front, seed)) {
+					return true;
+				}
+			}
+		}
+		return false;
 	}
 
 	private static void tree(CitadelCanvas c, BlockPos t) {
