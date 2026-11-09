@@ -44,6 +44,7 @@ public final class AnnexGreenhouseCopper implements Variant {
 	private static final Block RIB_W = Blocks.CUT_COPPER_STAIRS.waxed().oxidized();
 	private static final Block RIB_O = Blocks.CUT_COPPER_STAIRS.waxed().oxidized();
 	private static final Block SLAB_O = Blocks.CUT_COPPER_SLAB.waxed().oxidized();
+	private static final Block RIDGE_SL = Blocks.CUT_COPPER_SLAB.waxed().unaffected();
 	private static final BlockState RIDGE = Blocks.CUT_COPPER.waxed().unaffected().defaultBlockState();
 	private static final Block RIDGE_ST = Blocks.CUT_COPPER_STAIRS.waxed().unaffected();
 	private static final BlockState EMBLEM = Blocks.CHISELED_COPPER.waxed().exposed().defaultBlockState();
@@ -129,7 +130,7 @@ public final class AnnexGreenhouseCopper implements Variant {
 			int want = p.hash(2, 0, 0, 2) == 0 ? half : Math.max(1, half - 1);
 			int byW = lant ? (w - 3) / 2 : half;
 			int byD = hip ? (lant ? (span - 2) / 2 : span / 2) : 99;
-			int byH = p.h() - 1 - PLATE - (lant ? 3 : 1);
+			int byH = p.h() - 1 - PLATE - (lant ? 3 : 2);
 			r = Math.max(1, Math.min(Math.min(want, byW), Math.min(byD, byH)));
 			rh = PLATE + r;
 			mu0 = lant ? (w % 2 == 1 ? cu - 1 : cu - 2) : r;
@@ -200,10 +201,10 @@ public final class AnnexGreenhouseCopper implements Variant {
 		}
 	}
 
-	/** Rib marks over n cells: both ends and a rib about every fourth cell. */
+	/** Rib marks over n cells: both ends and a rib about every fifth cell. */
 	private static boolean[] ribs(int n) {
 		boolean[] out = new boolean[n];
-		int count = Math.max(1, (int) Math.round((n - 1) / 4.0));
+		int count = Math.max(1, (int) Math.round((n - 1) / 5.0));
 		for (int i = 0; i <= count; i++) {
 			out[(int) Math.round(i * (n - 1) / (double) count)] = true;
 		}
@@ -233,7 +234,7 @@ public final class AnnexGreenhouseCopper implements Variant {
 	}
 
 	private static BlockState door(boolean lower, DoorHingeSide hinge) {
-		return b(Blocks.CHERRY_DOOR).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH)
+		return b(Blocks.WARPED_DOOR).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH)
 				.setValue(BlockStateProperties.DOUBLE_BLOCK_HALF, lower ? DoubleBlockHalf.LOWER : DoubleBlockHalf.UPPER)
 				.setValue(BlockStateProperties.DOOR_HINGE, hinge);
 	}
@@ -270,7 +271,7 @@ public final class AnnexGreenhouseCopper implements Variant {
 	private static void walls(CitadelCanvas c, Plot p, G g) {
 		int w = g.w;
 		BlockState clear = b(Blocks.GLASS_PANE);
-		BlockState pink = Blocks.STAINED_GLASS_PANE.pick(DyeColor.PINK).defaultBlockState();
+		BlockState pink = Blocks.STAINED_GLASS_PANE.pick(DyeColor.LIGHT_BLUE).defaultBlockState();
 		for (int y = 1; y <= 3; y++) {
 			// side walls: a post on every rib row, panes between (joined front to back)
 			for (int v = g.vf + 1; v < g.vb; v++) {
@@ -337,9 +338,7 @@ public final class AnnexGreenhouseCopper implements Variant {
 					boolean corner = du == 0 && dv == 0;
 					st = corner || rib ? stairs(RIB_O, in) : slab(SLAB_O);
 				} else if (du >= g.r && dv >= g.r) {
-					if (g.ridgeCol(u)) {
-						st = RIDGE;
-					} else if (rib) {
+					if (rib) {
 						st = POST_W;
 					} else {
 						st = glass;
@@ -354,16 +353,23 @@ public final class AnnexGreenhouseCopper implements Variant {
 				p.set(c, u, y, v, st);
 			}
 		}
-		if (g.hip) {
-			// the ends are sloped glass: only the ridge needs a finial
-			if (!g.lant) {
-				rod(c, p, g.cu, g.rh + 1, g.mv0);
-				rod(c, p, g.cu, g.rh + 1, g.mv1);
+		// [finish] a thin bare-copper ridge line on top of the glass, with a finial at each end
+		int vlo = g.hip ? g.mv0 : g.vf;
+		int vhi = g.hip ? g.mv1 : g.vb;
+		for (int v = vlo; v <= vhi; v++) {
+			if (g.lant && v >= g.mv0 && v <= g.mv1) {
+				continue;
 			}
-		} else {
+			for (int u = 0; u < w; u++) {
+				if (g.ridgeCol(u)) {
+					p.set(c, u, g.rh + 1, v, slab(RIDGE_SL));
+				}
+			}
+		}
+		rod(c, p, g.cu, g.rh + 2, vlo);
+		rod(c, p, g.cu, g.rh + 2, vhi);
+		if (!g.hip) {
 			gables(c, p, g);
-			rod(c, p, g.cu, g.rh + 1, g.vf);
-			rod(c, p, g.cu, g.rh + 1, g.vb);
 		}
 		if (g.lant) {
 			monitor(c, p, g);
@@ -377,7 +383,7 @@ public final class AnnexGreenhouseCopper implements Variant {
 	private static void gables(CitadelCanvas c, Plot p, G g) {
 		int w = g.w;
 		BlockState clear = b(Blocks.GLASS_PANE);
-		BlockState pink = Blocks.STAINED_GLASS_PANE.pick(DyeColor.PINK).defaultBlockState();
+		BlockState pink = Blocks.STAINED_GLASS_PANE.pick(DyeColor.LIGHT_BLUE).defaultBlockState();
 		for (int v : new int[] {g.vf, g.vb}) {
 			for (int u = 1; u < w - 1; u++) {
 				for (int y = PLATE; y < g.roofY(u, v); y++) {
@@ -564,8 +570,14 @@ public final class AnnexGreenhouseCopper implements Variant {
 		int w = g.w;
 		for (int u = 0; u < w; u++) {
 			BlockState st;
+			boolean porchPost = w >= 7 && (u == g.dl - 2 || u == g.dl + g.dw + 1);
 			if (u >= g.dl - 1 && u <= g.dl + g.dw) {
 				st = stairs(Blocks.DEEPSLATE_BRICK_STAIRS, Direction.SOUTH);
+			} else if (porchPost) {
+				st = b(Blocks.POLISHED_DEEPSLATE);
+				for (int y = 1; y <= 3; y++) {
+					p.set(c, u, y, 0, post(p, u, 0, false));
+				}
 			} else if (u == g.dl - 2 || u == g.dl + g.dw + 1) {
 				st = pot(p.hash(u, 0, 0, 5));
 			} else if (u == 0) {
@@ -576,6 +588,9 @@ public final class AnnexGreenhouseCopper implements Variant {
 				st = p.hash(u, 0, 0, 3) == 0 ? b(Blocks.MOSS_CARPET) : slab(Blocks.POLISHED_DEEPSLATE_SLAB);
 			}
 			p.set(c, u, 0, 0, st);
+			if (w >= 7 && u >= g.dl - 2 && u <= g.dl + g.dw + 1) {
+				p.set(c, u, PLATE, 0, slab(SLAB_O)); // [depth] a small copper hood over the steps
+			}
 		}
 	}
 }
