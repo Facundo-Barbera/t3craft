@@ -4,6 +4,7 @@ package dev.t3craft.client.blocks;
 
 import dev.t3craft.client.chat.Attention;
 import dev.t3craft.client.chat.ChatTheme;
+import dev.t3craft.t3.ThreadState;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -49,6 +50,20 @@ public final class WallColumns {
 	private WallColumns() {
 	}
 
+	/**
+	 * RGB of an attention level: the colour of its {@link ThreadState} (the same as the lamps, the desk screens and the NPC
+	 * nametags), so a state reads the same everywhere in the HQ. Approval-pending rows count as "needs you".
+	 */
+	public static int color(Attention a) {
+		return switch (a) {
+			case NEEDS_YOU, PENDING -> ThreadState.NEEDS_ATTENTION.color;
+			case ERROR -> ThreadState.ERROR.color;
+			case WORKING -> ThreadState.WORKING.color;
+			case DONE -> ThreadState.DONE.color;
+			case IDLE -> ThreadState.IDLE.color;
+		};
+	}
+
 	/** Status column id of an attention level. */
 	public static String statusColumn(Attention a) {
 		return switch (a) {
@@ -76,10 +91,10 @@ public final class WallColumns {
 			by.get(statusColumn(c.attention())).add(c);
 		}
 		return List.of(
-				column(WORKING, "Working", theme.working(), by.get(WORKING)),
-				column(NEEDS_YOU, "Needs you", theme.needsYou(), by.get(NEEDS_YOU)),
-				column(ERROR, "Error", theme.error(), by.get(ERROR)),
-				column(DONE, "Done", theme.done(), by.get(DONE)));
+				column(WORKING, "Working", color(Attention.WORKING), by.get(WORKING)),
+				column(NEEDS_YOU, "Needs you", color(Attention.NEEDS_YOU), by.get(NEEDS_YOU)),
+				column(ERROR, "Error", color(Attention.ERROR), by.get(ERROR)),
+				column(DONE, "Done", color(Attention.DONE), by.get(DONE)));
 	}
 
 	private record Bucket(String id, String label, List<WallCard> cards) {
@@ -103,11 +118,11 @@ public final class WallColumns {
 				rest.addAll(b.cards());
 				continue;
 			}
-			int color = project ? theme.color(mostUrgent(b.cards())) : b.cards().get(0).badge().background();
+			int color = project ? color(mostUrgent(b.cards())) : b.cards().get(0).badge().background();
 			out.add(column(b.id(), b.label(), color, b.cards()));
 		}
 		if (!rest.isEmpty()) {
-			out.add(column(OTHER, "Other", theme.idle(), rest));
+			out.add(column(OTHER, "Other", color(Attention.IDLE), rest));
 		}
 		return List.copyOf(out);
 	}
