@@ -58,6 +58,8 @@ public final class HqBindings {
 		BOARD_LAMP, BEACON,
 		/** The archive terminal ({@code archiveTerminal} anchor): unbound, it always shows the whole archive. */
 		ARCHIVE_TERMINAL,
+		/** A merge station ({@link AnchorNames#mergeStation} anchor): bound to the binding in the anchor's name. */
+		MERGE_STATION,
 		/** One cell of a large screen reserved by the plan ({@link AnchorNames#bigScreen}). */
 		SCREEN,
 		/** A decision podium ({@code decision_podium_<i>} anchor): bound {@code board:<i>}, it shows the i-th most urgent thread. */
@@ -126,6 +128,12 @@ public final class HqBindings {
 		Anchor terminal = plan.anchors().get(AnchorNames.ARCHIVE_TERMINAL);
 		if (terminal != null) {
 			out.putIfAbsent(terminal.block(), new Fixture(terminal.block(), Role.ARCHIVE_TERMINAL, Binding.NONE, terminal.facing()));
+		}
+		for (Anchor a : plan.anchors().values()) {
+			AnchorNames.MergeStation ms = AnchorNames.parseMergeStation(a.name());
+			if (ms != null) {
+				out.putIfAbsent(a.block(), new Fixture(a.block(), Role.MERGE_STATION, Binding.parse(ms.binding()), a.facing()));
+			}
 		}
 		Anchor beacon = plan.anchors().get(AnchorNames.BEACON);
 		if (beacon != null) {

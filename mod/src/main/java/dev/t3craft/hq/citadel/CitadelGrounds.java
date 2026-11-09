@@ -139,12 +139,18 @@ public final class CitadelGrounds {
 
 	/** A ramp column: half-block steps down from the podium, with a bamboo runner and kerbs ({@link CitadelPaving#rampBand}). */
 	private static void ramp(CitadelCanvas c, int x, int z, double r) {
+		if (CitadelPodium.ramp(c, x, z, r)) {
+			return; // design/citadel-terraces2: the stair of the podium (two flights and a landing)
+		}
 		int band = CitadelPaving.rampBand(x, z);
 		stepped(c, x, z, rampHalves(r), CitadelPaving.rampFull(band), CitadelPaving.rampHalf(band));
 	}
 
 	/** A terrace column: a stone step with grass (one in eight moss), a bush every so often and the vegetation of {@link Gardens#terrace}. */
 	private static void terrace(CitadelCanvas c, int x, int z, double r) {
+		if (CitadelPodium.terrace(c, x, z, r)) {
+			return; // design/citadel-terraces2: the two tiers of the podium
+		}
 		int h = rampHalves(r);
 		stepped(c, x, z, h - h % 2, FOOT, FOOT);
 		int top = h / 2;
@@ -267,7 +273,17 @@ public final class CitadelGrounds {
 
 	/** The solid plinth under the deck, with a wall panel every so often on the inner edge. */
 	private static void promenadePlinth(CitadelCanvas c, int x, int z, double r) {
-		c.fill(x, 1, y0() - 1, z, r <= CitadelPaving.promenadeInner() && Math.floorMod(x * 3 + z * 7, 9) == 0 ? c.kit.wallPanel(true) : FOOT);
+		boolean inner = r <= CitadelPaving.promenadeInner();
+		boolean panel = inner && Math.floorMod(x * 3 + z * 7, 9) == 0;
+		c.fill(x, 1, y0() - 1, z, panel ? c.kit.wallPanel(true) : FOOT);
+		// design/citadel-terraces2: the hub's own pedestal, on both faces of the gallery: dark plinth, a band of
+		// chiseled deepslate two courses under the deck and (towards the patio) a light quartz course under it
+		if (!panel && y0() >= 4 && (inner || r > CitadelCanvas.dims().galleryR - 1.5)) {
+			c.set(x, y0() - 2, z, CitadelCanvas.b(Blocks.CHISELED_DEEPSLATE));
+			if (inner) {
+				c.set(x, y0() - 1, z, CitadelCanvas.b(Blocks.SMOOTH_QUARTZ));
+			}
+		}
 	}
 
 	/** The deck: rim, tile stripes and the kit's floor with joints ({@link CitadelPaving#promenade}). */

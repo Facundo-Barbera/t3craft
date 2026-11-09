@@ -1,0 +1,64 @@
+{
+  "variants": {
+    "facing=north,pr=none": {
+      "model": "t3craft:block/merge_station_none"
+    },
+    "facing=north,pr=open": {
+      "model": "t3craft:block/merge_station_open"
+    },
+    "facing=north,pr=draft": {
+      "model": "t3craft:block/merge_station_draft"
+    },
+    "facing=north,pr=merged": {
+      "model": "t3craft:block/merge_station_merged"
+    },
+    "facing=east,pr=none": {
+      "model": "t3craft:block/merge_station_none",
+      "y": 90
+    },
+    "facing=east,pr=open": {
+      "model": "t3craft:block/merge_station_open",
+      "y": 90
+    },
+    "facing=east,pr=draft": {
+      "model": "t3craft:block/merge_station_draft",
+      "y": 90
+    },
+    "facing=east,pr=merged": {
+      "model": "t3craft:block/merge_station_merged",
+      "y": 90
+    },
+    "facing=south,pr=none": {
+      "model": "t3craft:block/merge_station_none",
+      "y": 180
+    },
+    "facing=south,pr=open": {
+      "model": "t3craft:block/merge_station_open",
+      "y": 180
+    },
+    "facing=south,pr=draft": {
+      "model": "t3craft:block/merge_station_draft",
+      "y": 180
+    },
+    "facing=south,pr=merged": {
+      "model": "t3craft:block/merge_station_merged",
+      "y": 180
+    },
+    "facing=west,pr=none": {
+      "model": "t3craft:block/merge_station_none",
+      "y": 270
+    },
+    "facing=west,pr=open": {
+      "model": "t3craft:block/merge_station_open",
+      "y": 270
+    },
+    "facing=west,pr=draft": {
+      "model": "t3craft:block/merge_station_draft",
+      "y": 270
+    },
+    "facing=west,pr=merged": {
+      "model": "t3craft:block/merge_station_merged",
+      "y": 270
+    }
+  }
+}
