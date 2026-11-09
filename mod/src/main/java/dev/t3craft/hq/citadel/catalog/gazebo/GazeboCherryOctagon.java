@@ -201,7 +201,7 @@ public final class GazeboCherryOctagon implements Variant {
 
 		// roof profile
 		int layers = p.h() - ROOF_Y; // free layers for roof and finial
-		boolean twoTier = r >= 4 && layers >= 7 && p.hash(1, 1, 1, 3) != 0;
+		boolean twoTier = r >= 4 && layers >= 7 && p.hash(1, 1, 1, 2) == 1;
 		double[] rho;
 		int drum = -1;
 		if (twoTier) {
@@ -286,6 +286,9 @@ public final class GazeboCherryOctagon implements Variant {
 			p.set(c, u, 4, v, upside(Blocks.CHERRY_STAIRS, in(dx, dz)));
 		} else if (lamp) {
 			p.put(c, u, 4, v, HANGING_LANTERN, CitadelCanvas.HANGING);
+		} else if (!geo.aisle(dx, dz)) {
+			// [palette] a dark deepslate-tile fascia under the pink eave (the doorways stay clear)
+			p.set(c, u, 4, v, upside(p.hash(u, 4, v, 4) == 0 ? Blocks.POLISHED_DEEPSLATE_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS, out(dx, dz)));
 		}
 	}
 
@@ -409,17 +412,7 @@ public final class GazeboCherryOctagon implements Variant {
 				p.set(c, u, y, v, b(Blocks.CHERRY_PLANKS));
 				continue;
 			}
-			boolean brim = j == 0 || (drum >= 0 && j == drum + 1);
-			Block mat;
-			if (brim && m > rho[j] - 1.0) {
-				// [palette] the eave edge: dark polished deepslate, a few tiles mixed in
-				mat = p.hash(u, y, v, 4) == 0 ? Blocks.DEEPSLATE_TILE_STAIRS : Blocks.POLISHED_DEEPSLATE_STAIRS;
-			} else if (ribs && (j == 1 || (drum >= 0 && j == drum + 2)) && (dx == 0 || dz == 0)) {
-				mat = Blocks.BAMBOO_MOSAIC_STAIRS; // [depth] a bamboo accent on the four axes, one course up from each eave
-			} else {
-				mat = Blocks.CHERRY_STAIRS;
-			}
-			p.set(c, u, y, v, stairs(mat, in(dx, dz)));
+			p.set(c, u, y, v, stairs(Blocks.CHERRY_STAIRS, in(dx, dz)));
 		}
 	}
 
