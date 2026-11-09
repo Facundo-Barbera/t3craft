@@ -35,8 +35,8 @@ import net.minecraft.world.level.block.state.properties.WallSide;
  * </pre>
  *
  * <ul>
- * <li>Mosaic: bands from the outside in: stone rim (seats), polished andesite frame, a dentil band (n ≥ 8),
- *     then rings of petals; every 4 blocks of radius a new ring of the opposite colours, so a 21-wide plaza
+ * <li>Mosaic: bands from the outside in: stone rim (seats), polished andesite frame,
+ *     then rings of petals; every 3 blocks of radius a new ring of the opposite colours, so a 21-wide plaza
  *     has more rings, not bigger tiles. Four 3-wide white paths lead from the street to the centre, up a stair
  *     and a half step (no jumps).</li>
  * <li>Glaze palette by seed: blue and white, ocre (orange) and white, green and white.</li>
@@ -179,17 +179,11 @@ public final class PlazaCenterGlazedRosette implements Variant {
 			p.set(c, u, 0, v, path ? gl(DyeColor.WHITE, f) : b(Blocks.POLISHED_ANDESITE));
 			return;
 		}
-		int fe = n >= 8 ? 3 : 2;
-		if (e < fe) {
-			// dentil band: glaze and white wedges
-			int k = (int) Math.floor((Math.atan2(dz, dx) + Math.PI) / (2 * Math.PI) * Math.max(16, (int) (2 * Math.PI * (radius - 2.5))));
-			p.set(c, u, 0, v, path ? gl(DyeColor.WHITE, f) : (k & 1) == 0 ? gl(glaze, f) : gl(DyeColor.WHITE, f));
-			return;
-		}
-		// field: rings of eight petals; each ring (about 4 blocks of radius) swaps the colours
+		int fe = 2;
+		// field: rings of eight petals; each ring (about 3 blocks of radius) swaps the colours
 		double r0 = cr + 0.5;
 		double r1 = radius - fe;
-		int nz = Math.max(1, (int) Math.round((r1 - r0) / 4.0));
+		int nz = Math.max(1, (int) Math.round((r1 - r0) / 3.0));
 		double zw = (r1 - r0) / nz;
 		double rr = Math.max(0, r - r0);
 		int zi = Math.min(nz - 1, (int) Math.floor(rr / zw));
@@ -252,7 +246,12 @@ public final class PlazaCenterGlazedRosette implements Variant {
 		for (int y = 1; y <= 5; y++) {
 			safe(c, p, tu, y, tv, b(Blocks.CHERRY_LOG));
 		}
-		double[] rad = br == 1 ? new double[] {1.6, 1.6, 0.9} : new double[] {2.4, 2.4, 1.5};
+		// a few leaves hug the trunk below the canopy so it does not read as a lollipop
+		safe(c, p, tu + 1, 4, tv, CitadelCanvas.leaves(Blocks.CHERRY_LEAVES));
+		safe(c, p, tu - 1, 4, tv, CitadelCanvas.leaves(Blocks.CHERRY_LEAVES));
+		safe(c, p, tu, 4, tv + 1, CitadelCanvas.leaves(Blocks.CHERRY_LEAVES));
+		safe(c, p, tu, 4, tv - 1, CitadelCanvas.leaves(Blocks.CHERRY_LEAVES));
+		double[] rad = br == 1 ? new double[] {1.9, 1.9, 1.5, 0.9} : new double[] {2.6, 2.6, 2.0, 1.2};
 		for (int layer = 0; layer < rad.length; layer++) {
 			int y = 5 + layer;
 			int reach = (int) Math.ceil(rad[layer]);
