@@ -17,24 +17,28 @@ import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.Half;
 import net.minecraft.world.level.material.MapColor;
 
 /**
- * The HQ blocks kit (cherry campus, style C): eleven decorative blocks of t3craft's own, with their
+ * The HQ blocks kit (cherry campus, style C): sixteen decorative blocks of t3craft's own, with their
  * own models and textures, and their {@link HqKit} by role. Registered only from {@link T3Blocks#init}
  * (so the module switch turns it off with everything else).
  *
  * <p>Blocks ({@link #IDS}): standing desk, shoji panel (lit/unlit), cherry and stone floor tiles,
- * cherry beam, column cap, paper lantern (a status lamp in disguise), room plaque (text BER),
- * cherry railing, potted cherry and stone lantern.
+ * cherry beam, column cap, paper lantern (a status lamp in disguise; with a hanging, a wall and a 2-block tall
+ * sibling, {@link KitLanterns}), room plaque (text BER), cherry railing, potted cherry, stone lantern, and the emissive
+ * glow strip and glow panel (kit/glow-panel).
  */
 public final class KitBlocks implements HqKit {
 	/** Bump when a role's state changes (build hashes). */
-	public static final String ID = "kit-2"; // kit-2: connected cherry railing (KitRailingBlock)
+	// kit-2: connected cherry railing (KitRailingBlock); kit-3: the paper-lantern family (KitLanterns); kit-4: glow_strip, glow_panel
+	public static final String ID = "kit-4";
 
 	/** Block ids of the kit, in creative-tab order. */
 	public static final List<String> IDS = List.of("standing_desk", "shoji_panel", "cherry_floor_tile", "stone_floor_tile",
-			"cherry_beam", "beam_cap", "paper_lantern", "room_plaque", "cherry_railing", "cherry_planter", "stone_lantern");
+			"cherry_beam", "beam_cap", "paper_lantern", "paper_lantern_hanging", "paper_lantern_wall", "paper_lantern_tall",
+			"room_plaque", "cherry_railing", "cherry_planter", "stone_lantern", "glow_strip", "glow_panel");
 
 	/** Which kit block plays each role. */
 	public static final Map<Role, String> ROLE_BLOCKS = roleBlocks();
@@ -61,7 +65,13 @@ public final class KitBlocks implements HqKit {
 		m.put(Role.RAILING, "cherry_railing");
 		m.put(Role.GARDEN_PLANTER, "cherry_planter");
 		m.put(Role.GARDEN_LANTERN, "stone_lantern");
+		for (Role r : new Role[] {Role.GLOW_STRIP, Role.GLOW_STRIP_COOL, Role.GLOW_STRIP_HIGH, Role.GLOW_STRIP_HIGH_COOL}) {
+			m.put(r, "glow_strip");
+		}
+		m.put(Role.GLOW_PANEL, "glow_panel");
+		m.put(Role.GLOW_PANEL_COOL, "glow_panel");
 		m.put(Role.CONSOLE, "console_terminal"); // not in IDS: T3Blocks registers it with its own block entity and adds it to the map
+		m.put(Role.MERGE_STATION, "merge_station"); // not in IDS: T3Blocks registers it with its own block entity and adds it to the map
 		return Collections.unmodifiableMap(m);
 	}
 
@@ -91,6 +101,14 @@ public final class KitBlocks implements HqKit {
 		out.put("paper_lantern", r.block("paper_lantern", p -> new KitLanternBlock(p, lampType),
 				BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_WHITE).strength(0.5f).sound(SoundType.BAMBOO_WOOD)
 						.noOcclusion().lightLevel(KitLanternBlock::light)));
+		out.put("paper_lantern_hanging", r.block("paper_lantern_hanging", KitLanterns.Hanging::new,
+				BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_WHITE).strength(0.5f).sound(SoundType.BAMBOO_WOOD)
+						.noOcclusion().lightLevel(s -> KitLanterns.HANGING_LIGHT)));
+		out.put("paper_lantern_wall", r.block("paper_lantern_wall", KitLanterns.Wall::new,
+				BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_WHITE).strength(0.5f).sound(SoundType.BAMBOO_WOOD)
+						.noOcclusion().noCollision().lightLevel(s -> KitLanterns.WALL_LIGHT)));
+		out.put("paper_lantern_tall", r.block("paper_lantern_tall", KitLanterns.Tall::new,
+				wood().noOcclusion().lightLevel(s -> KitLanterns.TALL_LIGHT)));
 		out.put("room_plaque", r.block("room_plaque", p -> new KitPlaqueBlock(p, plaqueType),
 				wood().noCollision().noOcclusion()));
 		out.put("cherry_railing", r.block("cherry_railing", KitRailingBlock::new,
@@ -101,6 +119,12 @@ public final class KitBlocks implements HqKit {
 		out.put("stone_lantern", r.block("stone_lantern", p -> new KitShapedBlock(p, KitShapedBlock.stoneLanternShape()),
 				BlockBehaviour.Properties.of().mapColor(MapColor.STONE).strength(1.5f, 6f).sound(SoundType.STONE)
 						.noOcclusion().lightLevel(s -> 13)));
+		out.put("glow_strip", r.block("glow_strip", KitGlowStripBlock::new,
+				BlockBehaviour.Properties.of().mapColor(MapColor.DEEPSLATE).strength(0.8f).sound(SoundType.DEEPSLATE_TILES)
+						.noCollision().noOcclusion().lightLevel(KitGlow::light)));
+		out.put("glow_panel", r.block("glow_panel", KitGlowPanelBlock::new,
+				BlockBehaviour.Properties.of().mapColor(MapColor.DEEPSLATE).strength(1.5f, 6f).sound(SoundType.DEEPSLATE_TILES)
+						.lightLevel(KitGlow::light)));
 		if (!out.keySet().equals(new java.util.LinkedHashSet<>(IDS))) {
 			throw new IllegalStateException("kit ids out of sync: " + out.keySet());
 		}
@@ -152,9 +176,17 @@ public final class KitBlocks implements HqKit {
 			case RAILING -> s.setValue(KitRailingBlock.FACING, h);
 			case PLAQUE -> s.setValue(KitPlaqueBlock.FACING, h);
 			case CONSOLE -> s.setValue(ConsoleTerminalBlock.FACING, h);
+			case MERGE_STATION -> s.setValue(MergeStationBlock.FACING, h);
 			case BEAM -> s.setValue(RotatedPillarBlock.AXIS, facing.getAxis());
 			case WALL_PANEL -> s.setValue(KitPanelBlock.LIT, false);
 			case WALL_PANEL_LIT -> s.setValue(KitPanelBlock.LIT, true);
+			// strips: facing = where it looks (the horizontal facing; the edge it hugs is behind it); HIGH = top of the cell
+			case GLOW_STRIP, GLOW_STRIP_COOL, GLOW_STRIP_HIGH, GLOW_STRIP_HIGH_COOL -> s.setValue(KitGlowStripBlock.FACING, h)
+					.setValue(KitGlowStripBlock.HALF, role.high() ? Half.TOP : Half.BOTTOM)
+					.setValue(KitGlow.TONE, role.cool() ? KitGlow.Tone.COOL : KitGlow.Tone.WARM);
+			// panels: facing = the glowing face, any of the six
+			case GLOW_PANEL, GLOW_PANEL_COOL -> s.setValue(KitGlowPanelBlock.FACING, facing)
+					.setValue(KitGlow.TONE, role.cool() ? KitGlow.Tone.COOL : KitGlow.Tone.WARM);
 			default -> s;
 		};
 	}
