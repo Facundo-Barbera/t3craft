@@ -64,10 +64,10 @@ public final class TreeCherryGrand implements Variant {
 			TreeKit.CHERRY.rootTip());
 
 	/**
-	 * The lowest y a leaf or a limb may occupy. The trunk's shoulder (three cells at y = 1) is standable (feet at y = 2),
-	 * so with 5 there is a 3-block headroom over every walkable cell near the trunk.
+	 * The lowest y a leaf or a limb may occupy. The trunk's shoulder is only the root level (three cells at y = 0, feet at
+	 * y = 1), so with 4 there are 3 blocks of headroom over every walkable cell near the trunk.
 	 */
-	private static final int CLEAR = 5;
+	private static final int CLEAR = 4;
 
 	@Override
 	public void build(CitadelCanvas c, Plot p) {
@@ -81,18 +81,15 @@ public final class TreeCherryGrand implements Variant {
 		boolean big = mn >= 10;
 
 		int cy = CLEAR + 1; // the dome's centre layer
-		double ryUp = TreeKit.clamp(1.9 + (mn - 7) * 0.22 + r.nextDouble() * 0.5, 2.0, 3.4);
-		int nUp = (int) Math.floor(ryUp - 0.2);
-		if (cy + nUp > p.h() - 1) {
-			nUp = Math.max(1, p.h() - 1 - cy);
-		}
+		int nUp = Math.min(p.h() - 1 - cy, 3 + (mn >= 9 ? 1 : 0));
+		double ryUp = nUp + 0.6 + r.nextDouble() * 0.3;
 		int ou = r.nextInt(2);
 		int ov = r.nextInt(2);
 		int bu = TreeKit.base(p.w(), ou);
 		int bv = TreeKit.base(p.d(), ov);
 		double lean = r.nextDouble() * Math.PI * 2;
 		double amp = 0.5 + r.nextDouble() * 0.9;
-		int[][] lead = TreeKit.trunk(t, TreeKit.CHERRY, bu, bv, 1, Math.min(cy + 1, p.h() - 1), ou, ov,
+		int[][] lead = TreeKit.trunk(t, TreeKit.CHERRY, bu, bv, 0, Math.min(cy + 1, p.h() - 1), ou, ov,
 				Math.cos(lean) * amp, Math.sin(lean) * amp);
 
 		// ---- roots: 4–5, short; one or two reach further
