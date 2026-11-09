@@ -91,7 +91,7 @@ public final class TreeMapleRed implements Variant {
 		double bias = (r.nextInt(5) - 2) * 0.08; // some trees lean redder, some more orange
 		double sun = r.nextDouble() * Math.PI * 2;
 		double a0 = r.nextDouble() * Math.PI * 2;
-		int topY = H - 2; // main layer of the crown pad over the leader
+		int topY = H >= 13 ? H - 2 : Math.min(H - 2, 8); // main layer of the crown pad over the leader (a broad, low crown)
 
 		// ---- foot: a 2×2 flare of bark, short roots
 		for (int a = 0; a < 2; a++) {
