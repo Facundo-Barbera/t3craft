@@ -122,12 +122,19 @@ public final class HouseScriptorium implements Variant {
 		if (y <= 1) {
 			return base(p, u, y, v);
 		}
-		return switch (p.hash(u, y, v, 6)) {
-			case 0 -> b(Blocks.CRACKED_STONE_BRICKS);
-			case 1 -> b(Blocks.MOSSY_STONE_BRICKS);
-			case 2 -> b(Blocks.CALCITE);
-			default -> b(Blocks.STONE_BRICKS);
-		};
+		// [palette] a clear gradient up the pier: deepslate plinth, grey-green tuff, stone brick, then calcite and quartz at the eaves
+		int h = p.hash(u, y, v, 6);
+		if (y <= 3) {
+			return h == 0 ? b(Blocks.POLISHED_TUFF) : b(Blocks.TUFF_BRICKS);
+		}
+		if (y <= 5) {
+			return switch (h) {
+				case 0 -> b(Blocks.CRACKED_STONE_BRICKS);
+				case 1 -> b(Blocks.MOSSY_STONE_BRICKS);
+				default -> b(Blocks.STONE_BRICKS);
+			};
+		}
+		return h <= 1 ? b(Blocks.SMOOTH_QUARTZ) : b(Blocks.CALCITE);
 	}
 
 	/** [palette] the heavy plinth: deepslate bricks, cobbled and cracked, never uniform. */
@@ -188,7 +195,7 @@ public final class HouseScriptorium implements Variant {
 			for (int y = 1; y <= 8; y++) {
 				BlockState st;
 				if (pier) {
-					st = y == 8 ? b(Blocks.CHISELED_STONE_BRICKS) : pier(p, u, y, 1);
+					st = y == 8 ? b(Blocks.CHISELED_QUARTZ_BLOCK) : pier(p, u, y, 1);
 				} else if (bay) {
 					if (u == cu && y <= 2) {
 						st = door(Blocks.CHERRY_DOOR, Direction.NORTH, y == 2); // [depth] the door sits at the back of the bay
@@ -248,7 +255,7 @@ public final class HouseScriptorium implements Variant {
 				for (int y = 1; y <= 8; y++) {
 					BlockState st;
 					if (pier) {
-						st = y == 8 ? b(Blocks.CHISELED_STONE_BRICKS) : pier(p, u, y, v);
+						st = y == 8 ? b(Blocks.CHISELED_QUARTZ_BLOCK) : pier(p, u, y, v);
 					} else if (y == 1) {
 						st = base(p, u, y, v);
 					} else if (y >= WIN0 && y <= 7) {
@@ -281,7 +288,7 @@ public final class HouseScriptorium implements Variant {
 			for (int y = 1; y <= 8; y++) {
 				BlockState st;
 				if (pier) {
-					st = y == 8 ? b(Blocks.CHISELED_STONE_BRICKS) : pier(p, u, y, vb);
+					st = y == 8 ? b(Blocks.CHISELED_QUARTZ_BLOCK) : pier(p, u, y, vb);
 				} else if (y == 1) {
 					st = base(p, u, y, vb);
 				} else if (y >= 3 && y <= 7 && Math.abs(u - cu) <= 1) {

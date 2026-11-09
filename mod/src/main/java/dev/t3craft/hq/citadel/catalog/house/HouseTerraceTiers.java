@@ -514,6 +514,18 @@ public final class HouseTerraceTiers implements Variant {
 				}
 			}
 		}
+		// the back overhang is closed too: a cherry gable board under the roof's last row, and a soffit over the wall top
+		for (int vv : new int[] {vTop, VC - 1}) {
+			for (int u = ru0; u <= ru1; u++) {
+				int top = PLATE + Math.min(u - ru0, ru1 - u);
+				for (int y = PLATE; y < top; y++) {
+					p.set(c, u, y, vv, u == cu && y == PLATE + 1 ? pane(Blocks.STAINED_GLASS_PANE.pick(DyeColor.PINK), true) : b(Blocks.CHERRY_PLANKS));
+				}
+			}
+		}
+		for (int u = ru0 + 1; u < ru1; u++) {
+			p.set(c, u, PLATE, g.ve(), log(Blocks.CHERRY_LOG, Direction.Axis.X));
+		}
 		// finial on the ridge
 		p.set(c, cu, PLATE + 4, (VC + g.ve()) / 2, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState());
 	}

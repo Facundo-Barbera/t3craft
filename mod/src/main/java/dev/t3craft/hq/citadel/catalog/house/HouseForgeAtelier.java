@@ -100,6 +100,7 @@ public final class HouseForgeAtelier implements Variant {
 		chimney(c, p, uc, vc);
 		porch(c, p, r, cu);
 		yard(c, p, r, cu, vb, uc, vc);
+		buttresses(c, p, cu, vb, uc);
 	}
 
 	// ------------------------------------------------------------------ materials
@@ -446,6 +447,32 @@ public final class HouseForgeAtelier implements Variant {
 				p.set(c, u, 3, 2, trap(Blocks.DARK_OAK_TRAPDOOR, Direction.NORTH, true, false));
 			}
 		}
+	}
+
+	/**
+	 * [depth] stone buttresses on the west flank (at every wall post) and on the back wall (at its posts): a dark foot, a
+	 * tuff shoulder and a sloped cap against the wall, so both faces have a rhythm of piers and shadows.
+	 */
+	private static void buttresses(CitadelCanvas c, Plot p, int cu, int vb, int uc) {
+		int w = p.w();
+		int d = p.d();
+		for (int v = VF + 1; v <= vb; v++) {
+			if (sidePost(v, vb)) {
+				buttress(c, p, 0, v, Direction.EAST);
+			}
+		}
+		for (int u : new int[] {cu, 4, w - 5}) {
+			if (Math.abs(u - uc) > 2 && u >= 1 && u <= w - 2) {
+				buttress(c, p, u, d - 1, Direction.NORTH);
+			}
+		}
+	}
+
+	private static void buttress(CitadelCanvas c, Plot p, int u, int v, Direction towardWall) {
+		for (int y = 0; y <= 4; y++) {
+			p.set(c, u, y, v, y <= 1 ? base(p, u, y, v) : mid(p, u, y, v));
+		}
+		p.set(c, u, 5, v, stair(Blocks.TUFF_BRICK_STAIRS, towardWall, false));
 	}
 
 	// ------------------------------------------------------------------ yard (behind and beside the hall)

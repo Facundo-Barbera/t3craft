@@ -109,7 +109,7 @@ public final class HouseTowerStair implements Variant {
 		Scheme s = SCHEMES[r.nextInt(SCHEMES.length)];
 		int w = p.w();
 		int d = p.d();
-		int bw = w - 4;
+		int bw = Math.min(5, w - 4); // always a slim 5-wide body
 		if (bw % 2 == 0) {
 			bw--;
 		}
@@ -117,7 +117,7 @@ public final class HouseTowerStair implements Variant {
 		int u2 = u1 + bw - 1;
 		int vf = 2;
 		int vb = d - 2;
-		L l = new L(p, s, w, d, u1, u2, u2 + 1, u2 + 2, w - 1, vf, vb, (u1 + u2) / 2, (vf + vb) / 2, vf + 4);
+		L l = new L(p, s, w, d, u1, u2, u2 + 1, u2 + 2, u2 + 3, vf, vb, (u1 + u2) / 2, (vf + vb) / 2, vf + 4);
 
 		plinth(c, l);
 		for (int k = 1; k <= 4; k++) {
@@ -303,7 +303,14 @@ public final class HouseTowerStair implements Variant {
 					boolean edge = u == l.u1 || u == l.u2 || v == l.vf || v == l.vb;
 					if (edge) {
 						boolean alongU = v == l.vf || v == l.vb;
-						set(c, p, u, by, v, log(l.s.trim(), alongU ? Direction.Axis.X : Direction.Axis.Z));
+						if (by == PLATE) {
+							set(c, p, u, by, v, log(l.s.trim(), alongU ? Direction.Axis.X : Direction.Axis.Z));
+						} else {
+							// [finish] thin bands: the floor edge is wall material (one shade lighter than the course below) and
+							// only a half-block ledge of stairs marks the storey; posts run through
+							boolean post = alongU ? frontPost(l, u) : sidePost(l, v);
+							set(c, p, u, by, v, post ? frameY(l) : infill(l, by == B1 ? 2 : by == B2 ? 3 : 4, u, by, v));
+						}
 					} else {
 						set(c, p, u, by, v, b(Blocks.SPRUCE_PLANKS));
 					}
@@ -569,6 +576,15 @@ public final class HouseTowerStair implements Variant {
 		set(c, p, mid, top + 1, 0, fence(l.s.fence(), false, false, false, false));
 		set(c, p, mid, top + 2, 0, lantern());
 		set(c, p, mid, top + 1, l.d - 1, fence(l.s.fence(), false, false, false, false));
+		// the front overhang is carried: two cherry posts rise from the terrace rail to a beam under the roof
+		for (int u : new int[] {l.u1, l.iu}) {
+			for (int y = B2 + 1; y < PLATE; y++) {
+				set(c, p, u, y, 0, log(l.s.frame(), Direction.Axis.Y));
+			}
+		}
+		for (int u = l.u1; u <= l.iu; u++) {
+			set(c, p, u, PLATE, 0, log(l.s.trim(), Direction.Axis.X));
+		}
 		// bracket under the front gable overhang
 		set(c, p, mid, roofY(l, mid) - 1, 0, stair(l.s.eave(), Direction.SOUTH, true));
 		set(c, p, mid, roofY(l, mid) - 1, 1, b(l.s.planks()));
