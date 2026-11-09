@@ -17,6 +17,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.level.block.state.properties.Half;
+import net.minecraft.world.level.block.state.properties.SlabType;
 
 /**
  * Cherry street lamp: a stone foot, a slim cherry mast with stripped-log collars, one or two arms and a light at
@@ -47,7 +48,9 @@ import net.minecraft.world.level.block.state.properties.Half;
  */
 public final class LampCherryPost implements Variant {
 	private static final BlockState FENCE = b(Blocks.CHERRY_FENCE);
-	private static final BlockState COLLAR = b(Blocks.STRIPPED_CHERRY_LOG);
+	private static final BlockState LOG = b(Blocks.STRIPPED_CHERRY_LOG);
+	/** The collar: an upper-half cherry slab, a ring wider than the post just under the arm joint or the light box. */
+	private static final BlockState COLLAR = slab(Blocks.CHERRY_SLAB).setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP);
 	private static final BlockState LANTERN = b(Blocks.LANTERN);
 
 	@Override
@@ -193,7 +196,9 @@ public final class LampCherryPost implements Variant {
 		for (int y = 1; y < collarY; y++) {
 			BlockState s = FENCE;
 			if (y == 1 && hh >= 5) {
-				s = plinthWall(p, u, v); // stone first (two high on the tall masts), wood above
+				s = plinthWall(p, u, v); // stone first, wood above
+			} else if (y == 2 && collarY >= 4) {
+				s = LOG; // the debarked lower mast: one stripped log between the stone and the slim fence
 			}
 			p.set(c, u, y, v, s);
 		}
@@ -218,7 +223,7 @@ public final class LampCherryPost implements Variant {
 
 	/** A thin cherry plate: a roof that reads as a canopy, not a block. */
 	private static BlockState roof() {
-		return b(Blocks.CHERRY_TRAPDOOR).setValue(BlockStateProperties.HALF, Half.TOP);
+		return b(Blocks.CHERRY_TRAPDOOR).setValue(BlockStateProperties.HALF, Half.BOTTOM); // bottom half: it sits on whatever is under it
 	}
 
 	private static BlockState standingLight(CitadelCanvas c, Plot p, int kind) {
@@ -231,7 +236,12 @@ public final class LampCherryPost implements Variant {
 	private static void mast(CitadelCanvas c, Plot p, int u, int v, int hh, int style, List<Arm> arms, int kind, String tone, boolean glow) {
 		int top = hh - 1;
 		int armY = style == 2 ? 3 : top;
-		shaft(c, p, u, v, hh, armY);
+		shaft(c, p, u, v, hh, armY - 1);
+		BlockState tee = FENCE;
+		for (Arm a : arms) {
+			tee = tee.setValue(prop(a.dir()), true);
+		}
+		p.set(c, u, armY, v, tee);
 		if (style == 2) {
 			p.set(c, u, armY + 1, v, FENCE);
 			p.set(c, u, top, v, roof()); // the mast's own cap, matching the tip roofs
