@@ -672,13 +672,15 @@ public final class CitadelRelief {
 		}
 		// [palette] design/citadel-terraces3: dark footing, a mixed middle and a lighter course under the parapet (no more
 		// black body under a white stripe); a pilaster line of stone bricks every 7 cells of arc
+		if (height - course == 1) {
+			// the course under the parapet: lighter; a wall of 2 has only this one, so it keeps some deepslate
+			int dark = height <= 2 ? 8 : 4;
+			return h < dark ? b(Blocks.DEEPSLATE_BRICKS) : h < dark + 7 ? b(Blocks.TUFF_BRICKS) : h < dark + 13 ? b(Blocks.STONE_BRICKS) : b(Blocks.MOSSY_STONE_BRICKS);
+		}
 		if (course <= 1) {
 			return h < 12 ? b(Blocks.POLISHED_DEEPSLATE) : h < 18 ? b(Blocks.DEEPSLATE_BRICKS) : b(Blocks.CRACKED_DEEPSLATE_BRICKS);
 		}
 		double arc = RingCampusGeometry.theta(x, z) * RingCampusGeometry.r(x, z);
-		if (height - course == 1) {
-			return h < 9 ? b(Blocks.TUFF_BRICKS) : h < 15 ? b(Blocks.STONE_BRICKS) : h < 19 ? b(Blocks.MOSSY_STONE_BRICKS) : b(Blocks.DEEPSLATE_BRICKS);
-		}
 		if (Math.floorMod(Math.round(arc), 7) == 0) {
 			return b(Blocks.STONE_BRICKS);
 		}
