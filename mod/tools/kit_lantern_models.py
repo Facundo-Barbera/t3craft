@@ -192,8 +192,8 @@ def tall_lower():
 def tall_upper():
     """
     Upper half: the head of a plaza lantern, much bigger than the standing andon. A full-width lacquer tray, a 12 x 10 px
-    paper box (cherry corner posts, dark head rail) that glows, and a pyramid roof of its own (eaves across the whole
-    cell, two steps, brass-vented crown) whose corners rise in four dark tips, like the andon's but at plaza scale.
+    paper box (cherry corner posts, dark head rail) that glows, and a pyramid roof of its own (eaves 2 px past the cell on every side,
+    two steps, brass-vented crown and a spire) whose corners rise in four dark tips, like the andon's but at plaza scale.
     """
     side_uv = {s: [2, 3, 14, 13] for s in SIDES}
     roof = lambda a: {**{s: "dark" for s in SIDES}, "up": "roof", "down": "dark"}
@@ -202,15 +202,16 @@ def tall_upper():
         el((2, 1, 2), (14, 11, 14), "paper", faces=SIDES, uv=side_uv, name="paper", glow=True),
         el((2.5, 1, 2.5), (13.5, 11, 13.5), "paper", faces=("up", "down"), name="paper ends", glow=True),
         el((1, 11, 1), (15, 12, 15), "dark", faces=SIDES + ("down",), name="head rail"),
-        el((0, 12, 0), (16, 13, 16), roof(0), name="roof eaves"),
-        el((3, 13, 3), (13, 14, 13), roof(0), name="roof mid"),
-        el((5, 14, 5), (11, 15, 11), roof(0), name="roof upper"),
-        el((6, 15, 6), (10, 16, 10), {**{s: "brass" for s in SIDES}, "up": "finial", "down": "dark"}, name="roof crown"),
+        el((-2, 12, -2), (18, 13, 18), roof(0), name="roof eaves"),
+        el((1, 13, 1), (15, 14, 15), roof(0), name="roof step"),
+        el((4, 14, 4), (12, 15, 12), roof(0), name="roof upper"),
+        el((6, 15, 6), (10, 17, 10), {**{s: "brass" for s in SIDES}, "up": "finial", "down": "dark"}, name="roof crown"),
+        el((7, 17, 7), (9, 20, 9), "dark", faces=SIDES + ("up",), name="spire"),
     ]
     els += posts((1, 13), (1, 13), 1, 11, "cherry")
-    for x in (0, 14):
-        for z in (0, 14):
-            els.append(el((x, 13, z), (x + 2, 14, z + 2), roof(0), name="roof tip"))
+    for x in (-2, 15):
+        for z in (-2, 15):
+            els.append(el((x, 13, z), (x + 3, 14, z + 3), roof(0), name="roof tip"))
     return model(TALL_TEXTURES, els)
 
 
