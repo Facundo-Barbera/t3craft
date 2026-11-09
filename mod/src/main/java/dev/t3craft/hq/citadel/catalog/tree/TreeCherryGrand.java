@@ -151,7 +151,7 @@ public final class TreeCherryGrand implements Variant {
 						double sx = Math.max(1.2, fit(fu, wu0, wu1, sr));
 						double sz = Math.max(1.2, fit(fv, wv0, wv1, sr));
 						TreeKit.branch(t, LIMB, new int[] {mid[0], mid[1], mid[2]}, new int[] {fu, sat - 1, fv}, false);
-						lobe(t, fu, sat, fv, sx, sz, sat + 1 <= H - 1 ? 1 : 0, 1, TreeKit.SAKURA.swap(), 0.45, 40 + i, 10 + i, null);
+						lobe(t, fu, sat, fv, sx, sz, sat + 1 <= H - 1 ? 1 : 0, 1, TreeKit.SAKURA.swap(), 0.45, 40 + i, 1 + (i * 2) / n, null); // the parent's group: it always grows
 					}
 				}
 			}
