@@ -365,24 +365,34 @@ public final class CloisterRoom {
 		q.fill(0, 2, 3, 0, b(Blocks.STONE_BRICK_WALL));
 		q.put(0, 4, 0, Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, false), DECOR);
 		BlockState pink = leaves(Blocks.CHERRY_LEAVES);
+		BlockState azalea = leaves(Blocks.FLOWERING_AZALEA_LEAVES);
 		for (int sx : new int[] {-1, 1}) {
 			for (int sz : new int[] {-1, 1}) {
 				int tx = 4 * sx;
 				int tz = 4 * sz;
-				q.fill(tx, 1, 4, tz, LOG);
-				for (int ax = -1; ax <= 1; ax++) {
-					for (int az = -1; az <= 1; az++) {
-						if (ax != 0 || az != 0) {
-							q.set(tx + ax, 4, tz + az, pink);
+				if (sx == sz) {
+					// a cherry tree in two opposite lawns
+					q.fill(tx, 1, 4, tz, LOG);
+					for (int ax = -1; ax <= 1; ax++) {
+						for (int az = -1; az <= 1; az++) {
+							if (Math.abs(ax) + Math.abs(az) <= 1 && (ax != 0 || az != 0)) {
+								q.set(tx + ax, 4, tz + az, pink);
+							}
+							q.set(tx + ax, 5, tz + az, pink);
+							if (Math.abs(ax) + Math.abs(az) <= 1) {
+								q.set(tx + ax, 6, tz + az, pink);
+							}
 						}
-						q.set(tx + ax, 5, tz + az, pink);
-						if (Math.abs(ax) + Math.abs(az) <= 1) {
-							q.set(tx + ax, 6, tz + az, pink);
+					}
+				} else {
+					// a flowering hedge bed in the other two
+					for (int ax = 0; ax <= 1; ax++) {
+						for (int az = 0; az <= 1; az++) {
+							q.set(tx + ax * sx, 1, tz + az * sz, azalea);
 						}
 					}
 				}
-				q.set(tx, 7, tz, pink);
-				// two benches facing the ring path, the tree behind them: one along each axis side of the lawn
+				// two benches facing the ring path: one along each axis side of the lawn
 				q.set(4 * sx, 1, 2 * sz, stairs(Blocks.CHERRY_STAIRS, sx > 0 ? Direction.EAST : Direction.WEST));
 				q.set(4 * sx, 1, 3 * sz, stairs(Blocks.CHERRY_STAIRS, sx > 0 ? Direction.EAST : Direction.WEST));
 				q.set(2 * sx, 1, 4 * sz, stairs(Blocks.CHERRY_STAIRS, sz > 0 ? Direction.SOUTH : Direction.NORTH));
@@ -405,7 +415,7 @@ public final class CloisterRoom {
 	 */
 	private static void hall(Q q, int dx, int dz, int r, boolean ns, int a, int aa) {
 		CitadelCanvas c = q.c;
-		q.set(dx, 0, dz, r == 6 ? FOOT : (r <= 9 ? c.floor() : FOOT));
+		q.set(dx, 0, dz, r == 6 ? FOOT : (r <= 10 ? c.floor() : FOOT));
 		Direction out = NodeDecor.outward(dx, dz);
 		if (r >= 7) {
 			q.set(dx, r + 2, dz, PLANKS);
@@ -631,6 +641,7 @@ public final class CloisterRoom {
 			for (int half : new int[] {-1, 1}) {
 				if (!(side == 0 && half > 0)) {
 					shelfBay(q, side, half, in, (side + (half > 0 ? 1 : 0)) % 2 == 0);
+					spur(q, side, half);
 				}
 				deskBay(q, side, half, in);
 			}
@@ -661,6 +672,15 @@ public final class CloisterRoom {
 			int[] f = pos(side, a, 11);
 			boolean end = i != 1;
 			q.set(f[0], 1, f[1], end == chestsAtEnds ? chest(in) : lectern(in));
+		}
+	}
+
+	/** A shelf spur at the pilaster line between a shelf bay and a desk bay: 2 deep, 3 high, books on all sides. */
+	private static void spur(Q q, int side, int half) {
+		for (int r = 10; r <= 11; r++) {
+			int[] w = pos(side, 7 * half, r);
+			q.fill(w[0], 1, 3, w[1], b(Blocks.BOOKSHELF));
+			q.set(w[0], 4, w[1], slab(Blocks.CHERRY_SLAB));
 		}
 	}
 
