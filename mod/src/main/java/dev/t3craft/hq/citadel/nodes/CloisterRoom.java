@@ -404,6 +404,8 @@ public final class CloisterRoom {
 							q.set(tx + ax * sx, 1, tz + az * sz, azalea);
 						}
 					}
+					q.set(tx, 2, tz, azalea);
+					q.set(tx + sx, 2, tz, azalea);
 				}
 				// two benches facing the ring path: one along each axis side of the lawn
 				q.set(4 * sx, 1, 2 * sz, stairs(Blocks.CHERRY_STAIRS, sx > 0 ? Direction.EAST : Direction.WEST));
@@ -435,8 +437,8 @@ public final class CloisterRoom {
 						continue;
 					}
 					double noise = Math.floorMod(x * 7 + y * 13 + z * 17 + tx * 5, 5) * 0.55;
-					double d = ax * ax + az * az + ay * ay * 1.2;
-					if (d <= 8.0 + noise) {
+					double d = ax * ax + az * az + ay * ay * 1.1;
+					if (d <= 9.6 + noise) {
 						q.putIfFree(x, y, z, pink, CitadelCanvas.SOLID);
 					}
 				}
