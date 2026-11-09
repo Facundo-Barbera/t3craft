@@ -40,6 +40,8 @@ final class CatalogEntries {
 			new dev.t3craft.hq.citadel.catalog.house.HouseTerraceTiers(), // house_terrace_tiers
 			new dev.t3craft.hq.citadel.catalog.house.HouseTimberArcade(), // house_timber_arcade
 			new dev.t3craft.hq.citadel.catalog.house.HouseTimberCorner(), // house_timber_corner
+			new dev.t3craft.hq.citadel.catalog.bench.BenchCherryPlanters(), // bench_cherry_planters
+			new dev.t3craft.hq.citadel.catalog.bench.BenchStoneTable(), // bench_stone_table
 			new dev.t3craft.hq.citadel.catalog.house.HouseTimberCottage(), // house_timber_cottage
 			new dev.t3craft.hq.citadel.catalog.house.HouseTimberOverhang(), // house_timber_overhang
 			new dev.t3craft.hq.citadel.catalog.house.HouseTowerBridge(), // house_tower_bridge
@@ -64,6 +66,10 @@ final class CatalogEntries {
 			new dev.t3craft.hq.citadel.catalog.tree.TreeMapleRed(), // tree_maple_red
 			new dev.t3craft.hq.citadel.catalog.tree.TreePineTiered(), // tree_pine_tiered
 			new dev.t3craft.hq.citadel.catalog.tree.TreeWillowPond(), // tree_willow_pond
+			new dev.t3craft.hq.citadel.catalog.planter.PlanterStoneShrub(), // planter_stone_shrub
+			new dev.t3craft.hq.citadel.catalog.planter.PlanterTallPot(), // planter_tall_pot
+			new dev.t3craft.hq.citadel.catalog.signpost.SignpostArrows(), // signpost_arrows
+			new dev.t3craft.hq.citadel.catalog.signpost.SignpostNoticeBoard(), // signpost_notice_board
 	};
 
 	static final List<Variant> ALL = List.of(ENTRIES);

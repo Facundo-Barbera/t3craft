@@ -1,0 +1,160 @@
+package dev.t3craft.hq.citadel.catalog.planter;
+
+import static dev.t3craft.hq.citadel.CitadelCanvas.b;
+import static dev.t3craft.hq.citadel.CitadelCanvas.leaves;
+import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
+import static dev.t3craft.hq.citadel.CitadelCanvas.terracotta;
+
+import dev.t3craft.hq.citadel.CitadelCanvas;
+import dev.t3craft.hq.citadel.catalog.Family;
+import dev.t3craft.hq.citadel.catalog.Plot;
+import dev.t3craft.hq.citadel.catalog.Variant;
+import net.minecraft.core.Direction;
+import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BambooLeaves;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+
+/**
+ * Concept: a tall glazed pot on a dark foot, planted (by seed) with a clump of bamboo or a dwarf
+ * cherry tree. Pink terracotta and calcite banding for the cherry, bamboo blocks for the bamboo, so
+ * the pot matches what grows in it; small flower pots and petals round its foot on wider plots.
+ *
+ * <p>The tricks:
+ * <ul>
+ * <li><b>Gradient</b>: polished deepslate foot → coloured body → light calcite lip (on tall plots),
+ *     then the plant: the vertical, slender opposite of the low stone planter.</li>
+ * <li><b>Bamboo done right</b>: thick stalks, no leaves low, small leaves under the top, large on top;
+ *     a second shorter stalk on wider plots so the clump is not a single stick.</li>
+ * <li><b>Dwarf cherry</b>: a log trunk with a leaf crown, wider and two-tiered when the plot allows,
+ *     pink petals fallen at the foot.</li>
+ * </ul>
+ * Size: 1–3 × 1–3 × 3+ (the plant grows up to 4 blocks over the pot when there is height).
+ */
+public final class PlanterTallPot implements Variant {
+	@Override
+	public String id() {
+		return "planter_tall_pot";
+	}
+
+	@Override
+	public Family family() {
+		return Family.PLANTER;
+	}
+
+	@Override
+	public int minW() {
+		return 1;
+	}
+
+	@Override
+	public int minD() {
+		return 1;
+	}
+
+	@Override
+	public int minH() {
+		return 3;
+	}
+
+	@Override
+	public int maxW() {
+		return 3;
+	}
+
+	@Override
+	public int maxD() {
+		return 3;
+	}
+
+	@Override
+	public void build(CitadelCanvas c, Plot p) {
+		int w = p.w();
+		int d = p.d();
+		int cu = w / 2;
+		int cv = d / 2;
+		boolean bamboo = p.hash(0, 0, 0, 2) == 0;
+		int top = p.h() - 1;
+		int lip = p.h() >= 5 ? 2 : 1; // pot body y1 (and a calcite lip at y2 on tall plots)
+		int plantTop = Math.min(top, lip + 4);
+
+		// --- the pot
+		p.set(c, cu, 0, cv, p.hash(cu, 0, cv, 3) == 0 ? b(Blocks.CHISELED_DEEPSLATE) : b(Blocks.POLISHED_DEEPSLATE));
+		BlockState body = bamboo ? b(Blocks.BAMBOO_BLOCK) : terracotta(DyeColor.PINK); // bamboo block: axis Y by default
+		p.set(c, cu, 1, cv, body);
+		if (lip == 2) {
+			p.set(c, cu, 2, cv, b(Blocks.CALCITE));
+		}
+
+		// --- the plant
+		if (bamboo) {
+			bamboo(c, p, cu, cv, lip + 1, plantTop);
+		} else {
+			cherry(c, p, cu, cv, lip + 1, plantTop);
+		}
+
+		// --- round the foot: small pots, petals, a slab step (only where the plot leaves room)
+		Direction[] around = {Direction.WEST, Direction.EAST, Direction.NORTH, Direction.SOUTH};
+		for (Direction dir : around) {
+			int u = cu + dir.getStepX();
+			int v = cv + dir.getStepZ();
+			if (!p.has(u, 0, v)) {
+				continue;
+			}
+			int k = p.hash(u, 0, v, 4);
+			BlockState s = switch (k) {
+				case 0 -> b(Blocks.POTTED_PINK_TULIP);
+				case 1 -> slab(Blocks.POLISHED_DEEPSLATE_SLAB);
+				case 2 -> bamboo ? b(Blocks.MOSS_CARPET) : petals(p, u, v);
+				default -> bamboo ? b(Blocks.POTTED_BAMBOO) : b(Blocks.POTTED_CHERRY_SAPLING);
+			};
+			if (p.at(c, u, 0, v) == null) {
+				p.set(c, u, 0, v, s);
+			}
+		}
+	}
+
+	/** A thick bamboo stalk from y0 to y1 with the right leaves, and a shorter one beside it if there is room. */
+	private static void bamboo(CitadelCanvas c, Plot p, int u, int v, int y0, int y1) {
+		stalk(c, p, u, v, y0, y1);
+		int su = p.has(u + 1, 0, v) ? u + 1 : p.has(u - 1, 0, v) ? u - 1 : -1;
+		if (su >= 0 && y1 - 1 > y0) {
+			// [silhouette] the second stalk grows from a small bamboo-mosaic pot of its own, two shorter
+			p.set(c, su, 0, v, b(Blocks.BAMBOO_MOSAIC));
+			stalk(c, p, su, v, 1, y1 - 2);
+		}
+	}
+
+	private static void stalk(CitadelCanvas c, Plot p, int u, int v, int y0, int y1) {
+		for (int y = y0; y <= y1; y++) {
+			BambooLeaves l = y == y1 ? BambooLeaves.LARGE : y == y1 - 1 ? BambooLeaves.SMALL : BambooLeaves.NONE;
+			p.set(c, u, y, v, b(Blocks.BAMBOO).setValue(BlockStateProperties.AGE_1, 1).setValue(BlockStateProperties.BAMBOO_LEAVES, l));
+		}
+	}
+
+	/** A dwarf cherry: a log trunk with a leaf top, and a plus-shaped tier under it on plots wider than 1. */
+	private static void cherry(CitadelCanvas c, Plot p, int u, int v, int y0, int y1) {
+		if (y1 == y0) {
+			p.set(c, u, y0, v, leaves(Blocks.CHERRY_LEAVES)); // no room for a trunk: a leaf ball on the pot
+			return;
+		}
+		for (int y = y0; y < y1; y++) {
+			p.set(c, u, y, v, b(Blocks.CHERRY_LOG));
+		}
+		p.set(c, u, y1, v, leaves(Blocks.CHERRY_LEAVES));
+		int tier = y1 - 1;
+		for (Direction dir : new Direction[] {Direction.WEST, Direction.EAST, Direction.NORTH, Direction.SOUTH}) {
+			int lu = u + dir.getStepX();
+			int lv = v + dir.getStepZ();
+			if (p.has(lu, tier, lv) && p.hash(lu, tier, lv, 4) != 0) { // [depth] one side in four left open
+				p.set(c, lu, tier, lv, leaves(Blocks.CHERRY_LEAVES));
+			}
+		}
+	}
+
+	private static BlockState petals(Plot p, int u, int v) {
+		return b(Blocks.PINK_PETALS).setValue(BlockStateProperties.FLOWER_AMOUNT, 1 + p.hash(u, 1, v, 4))
+				.setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH);
+	}
+}
