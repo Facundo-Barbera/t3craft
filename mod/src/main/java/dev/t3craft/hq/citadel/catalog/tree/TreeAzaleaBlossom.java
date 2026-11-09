@@ -131,7 +131,7 @@ public final class TreeAzaleaBlossom implements Variant {
 		int fz1 = big ? bv + 1 : v;
 		int maxOff = big ? 2 : 1;
 		int[] lead0 = {u, v};
-		int[] stepAt = {3, 5 + r.nextInt(2), 7 + r.nextInt(2)};
+		int[] stepAt = {CLEAR, 6 + r.nextInt(2), 8 + r.nextInt(2)};
 		int nSteps = big ? 3 : 2;
 		int stepsDone = 0;
 		boolean alongU = r.nextBoolean();
@@ -222,17 +222,17 @@ public final class TreeAzaleaBlossom implements Variant {
 		double sa = r.nextInt(4) * Math.PI / 2 + (r.nextDouble() - 0.5) * 0.6;
 		double sx = Math.cos(sa);
 		double sz = Math.sin(sa);
-		double fb = 0.34 + 0.2 * r.nextDouble();
-		int nHoles = 2 + Math.min(4, (int) (rc / 2.0));
+		double fb = 0.48 + 0.2 * r.nextDouble();
+		int nHoles = rc < 3.5 ? 1 : 2 + Math.min(4, (int) (rc / 2.0));
 		double[][] holes = new double[nHoles][4];
 		for (int i = 0; i < nHoles; i++) {
 			double ang = r.nextDouble() * Math.PI * 2;
-			double el = -0.1 + r.nextDouble() * 0.95;
+			double el = (rc < 3.5 ? 0.4 : -0.1) + r.nextDouble() * 0.55;
 			double horiz = Math.sqrt(1 - el * el);
 			holes[i][0] = cuM + Math.cos(ang) * horiz * rxM * 0.9;
 			holes[i][1] = cyM + el * ryM * 0.9;
 			holes[i][2] = cvM + Math.sin(ang) * horiz * rzM * 0.9;
-			holes[i][3] = 1.0 + r.nextDouble() * Math.min(1.8, rc * 0.25);
+			holes[i][3] = rc < 3.5 ? 0.8 : 1.0 + r.nextDouble() * Math.min(1.8, rc * 0.22);
 		}
 		for (int y = CLEAR; y < p.h(); y++) {
 			for (int vv = 0; vv < d; vv++) {
@@ -316,8 +316,8 @@ public final class TreeAzaleaBlossom implements Variant {
 		double gv = (fz0 + fz1) / 2.0;
 		TreeKit.ground(t, gu, gv, rc * 1.05 + 1.0, (uu, vv, k) -> {
 			int hsh = t.hash(uu, 0, vv, 100);
-			int pet = k < 0.5 ? 38 : k < 0.8 ? 24 : 12;
-			int moss = k < 0.5 ? 30 : k < 0.8 ? 26 : 20;
+			int pet = k < 0.5 ? 50 : k < 0.8 ? 34 : 18;
+			int moss = k < 0.5 ? 24 : k < 0.8 ? 24 : 20;
 			if (hsh < pet) {
 				return TreeKit.petals(1 + t.hash(uu, 1, vv, k < 0.5 ? 4 : 2), t.hash(uu, 2, vv, 4));
 			}
@@ -364,6 +364,10 @@ public final class TreeAzaleaBlossom implements Variant {
 
 	/** A one-block mound of moss block or rooted dirt with an azalea bush on top (flowering most of the time). */
 	private static void mound(Vox t, Random r, int u, int v) {
+		// the bush stands two blocks up: nothing hangs on y 4 over it, so a walker on top keeps 3 free blocks
+		if (t.kind(u, CLEAR, v) == TreeKit.LEAF) {
+			t.clear(u, CLEAR, v);
+		}
 		t.fixed(u, 0, v, b(r.nextBoolean() ? Blocks.MOSS_BLOCK : Blocks.ROOTED_DIRT));
 		t.cover(u, 1, v, b(r.nextInt(5) < 3 ? Blocks.FLOWERING_AZALEA : Blocks.AZALEA));
 	}
