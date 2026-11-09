@@ -60,14 +60,13 @@ import net.minecraft.world.level.block.state.properties.StairsShape;
  *  g+4..   zashiki, kitchen | bed | store
  * </pre>
  *
- * Size: 15–22 × 15–22 × 13+ (the interior is the plot minus 8 each way, the garden takes 3-5 rows). An L-shaped
+ * Size: 16–22 × 16–22 × 13+ (the interior is the plot minus 8 each way, the garden takes 3-5 rows). An L-shaped
  * house (a wing towards the garden) appears from 22 × 20.
  */
 public final class HouseJapaneseEngawa implements Variant {
 	private static final int FL = 1; // the floor blocks (deck, tatami); people stand on y2
 	private static final int ST = 2; // the layer people stand in
 	private static final int BEAM = 6; // beam on posts and walls; 4 clear blocks y2..y5 under it
-	private static final boolean CUTAWAY = true; // TEMP
 	private static final int BASE = 6; // roof height of ring 0 (the eave tip)
 
 	@Override
@@ -82,12 +81,12 @@ public final class HouseJapaneseEngawa implements Variant {
 
 	@Override
 	public int minW() {
-		return 15;
+		return 16;
 	}
 
 	@Override
 	public int minD() {
-		return 15;
+		return 16;
 	}
 
 	@Override
@@ -236,9 +235,7 @@ public final class HouseJapaneseEngawa implements Variant {
 			garden();
 			program();
 			walls();
-			if (!CUTAWAY) {
-				roof();
-			}
+			roof();
 		}
 
 		// ------------------------------------------------------------------ layout: footprint, rings, rooms
@@ -490,8 +487,10 @@ public final class HouseJapaneseEngawa implements Variant {
 								st = log(s.post(), Direction.Axis.Y);
 							} else if (y == ST) {
 								st = trapdoor(Blocks.BIRCH_TRAPDOOR, alongA ? Direction.NORTH : Direction.WEST, true, Half.BOTTOM);
-							} else if (y == BEAM - 1) {
+							} else if (y == BEAM - 1 || ((alongA ? a : bb) % 3 == 2 && y == ST + 1)) {
 								st = plaster(a, y, bb);
+							} else if (((alongA ? a : bb) % 3 == 2) && y == BEAM - 2) {
+								st = b(Blocks.BIRCH_PLANKS);
 							} else {
 								st = alongA ? paneU(glassPane(DyeColor.WHITE)) : paneV(glassPane(DyeColor.WHITE));
 							}
