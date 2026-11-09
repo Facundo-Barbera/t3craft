@@ -15,7 +15,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 
 /**
- * Concept: a picnic spot in weathered stone: a smooth-stone table top on polished deepslate wall
+ * Concept: a picnic spot in weathered stone: a cherry table top on polished deepslate wall
  * pedestals, with a stone-brick bench on each long side facing it. A long table carries a raised
  * block with a pot of flowers; the table ends get a lantern post and a planted stone block, moss creeps in the corners.
  *
@@ -32,7 +32,7 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
  */
 public final class BenchStoneTable implements Variant {
 	private static final BlockState PEDESTAL = b(Blocks.POLISHED_DEEPSLATE_WALL); // no sides set: a round post
-	private static final BlockState TOP = slab(Blocks.SMOOTH_STONE_SLAB);
+	private static final BlockState TOP = slab(Blocks.CHERRY_SLAB);
 
 	@Override
 	public String id() {
