@@ -37,7 +37,7 @@ import net.minecraft.world.level.block.state.properties.Half;
  *   ▄▄▟▛▔▔▔▔▔▜▙▄▄ platform + steps          │ ▒▒ ▒▒  ◆
  * </pre>
  *
- * Size: 13–21 × 13–21 × 10+ (grows with the scale like every plaza centre).
+ * Size: 13–21 × 13–21 × 12+ (grows with the scale like every plaza centre).
  */
 public final class PlazaCenterOctagonBandstand implements Variant {
 	@Override
@@ -62,7 +62,7 @@ public final class PlazaCenterOctagonBandstand implements Variant {
 
 	@Override
 	public int minH() {
-		return 14;
+		return 12;
 	}
 
 	@Override
