@@ -99,7 +99,7 @@ def lens_frame(name, f):
         for y in range(y0, y1):
             for x in range(x0, x1):
                 if x in (x0, x1 - 1) or y in (y0, y1 - 1):
-                    img[y][x] = px(rgb(0x8A97A4))
+                    img[y][x] = px(rgb(0xB4C0CC))
         # ... and the same 1 px vertical reflection every lens has, just dead
         for y in range(y0 + 1, y1 - 1):
             img[y][x0 + 1] = px(rgb(0x4E5B67))
@@ -116,13 +116,13 @@ def lens_frame(name, f):
             for x in range(x0, x1):
                 img[y][x] = px(edge if x in (x0, x1 - 1) else darken(fill, k))
         for y in range(y0 + 1, y0 + 7):
-            img[y][x0 + 1] = px(lighten(fill, 0.80))
+            img[y][x0 + 1] = px(lighten(fill, 0.92 if name == "error" else 0.80))
     # rows 14-15: the claws' darker shade
     for y in (14, 15):
         for x in range(16):
             img[y][x] = px(darken(fill, 0.55))
     # glyph
-    glyph_col = darken(c, 0.30 if name != "attention" else 0.16) if lit else lighten(c, 0.15)
+    glyph_col = darken(c, {"attention": 0.16, "error": 0.12}.get(name, 0.30)) if lit else lighten(c, 0.15)
     gname = {"idle": "pause", "attention": "bang", "error": "x", "done": "check"}.get(name)
     cx = (x0 + x1) / 2.0
     cy = (y0 + y1) / 2.0
@@ -250,8 +250,8 @@ def model(name):
             for pz_ in (4, 11):
                 els.append(element([px_, 3, pz_], [px_ + 1, 13, pz_ + 1], "steel"))
     elif name == "working":
-        # a steel hoop, wider than the 10 px lens: an opaque belt, not a glowing halo
-        els.append(element([2, 7, 2], [14, 9, 14], "steel"))
+        # a 1 px steel hoop under the spinner (rows 5-10), wider than the 10 px lens: it must not cover the glyph
+        els.append(element([2, 11, 2], [14, 12, 14], "steel"))
     elif name == "attention":
         # two straight steel T-brackets, east and west only: nothing stands in front of the lens, so the "!" is clean
         for (arm, plate) in (((13, 15), (15, 16)), ((1, 3), (0, 1))):
@@ -265,12 +265,12 @@ def model(name):
                 els.append(element([cx + 0.5, 15, cz + 0.5], [cx + 1.5, 16, cz + 1.5], "claw", emit=emit))
                 els.append(element([cx, 1, cz], [cx + 2, 3, cz + 2], "claw", emit=emit))
                 els.append(element([cx + 0.5, 0, cz + 0.5], [cx + 1.5, 1, cz + 1.5], "claw", emit=emit))
-        # four vertical corner spikes (a 2 px shaft with a 1 px tip above and below), not mid-height nubs that read as ears
+        # four vertical corner spikes in steel (a 2 px shaft with a 1 px tip above and below), not mid-height nubs that read as ears
         for nx in (1, 13):
             for nz in (1, 13):
-                els.append(element([nx, 5, nz], [nx + 2, 11, nz + 2], "claw", emit=emit))
-                els.append(element([nx + 0.5, 11, nz + 0.5], [nx + 1.5, 13, nz + 1.5], "claw", emit=emit))
-                els.append(element([nx + 0.5, 3, nz + 0.5], [nx + 1.5, 5, nz + 1.5], "claw", emit=emit))
+                els.append(element([nx, 5, nz], [nx + 2, 11, nz + 2], "steel"))
+                els.append(element([nx + 0.5, 11, nz + 0.5], [nx + 1.5, 13, nz + 1.5], "steel"))
+                els.append(element([nx + 0.5, 3, nz + 0.5], [nx + 1.5, 5, nz + 1.5], "steel"))
     return {
         "parent": "minecraft:block/block",
         "textures": {"base": "t3craft:block/status_lamp_base", "lens": "t3craft:block/status_lamp_%s" % name, "particle": "t3craft:block/status_lamp_base"},
