@@ -221,11 +221,13 @@ public final class HqRender {
 		// kit/paper-lantern: the paper-lantern gallery
 		boolean lanterns = false;
 		boolean officeBlocks = false; // kit/office-blocks-review: console, podium, merge station, glow blocks (OfficeBlockViews)
+		boolean gpuProbe = false; // tools/render-gpu: which GPU routes this machine offers (gpu.GpuProbe)
 		// tools/render-quality: look switches, on in final and off in preview (see Renderer.Look)
 		Boolean previewOpt = null;
 		java.util.Map<String, String> lookOpts = new java.util.LinkedHashMap<>();
 		for (int i = 0; i < args.length; i++) {
 			switch (args[i]) {
+				case "--gpu-probe" -> gpuProbe = true;
 				case "--preview" -> previewOpt = true;
 				case "--final" -> previewOpt = false;
 				case "--ao", "--shadows", "--hard-shadows", "--sky", "--bloom", "--no-ao", "--no-shadows", "--no-sky", "--no-bloom" -> lookOpts.put(args[i], "");
@@ -290,6 +292,10 @@ public final class HqRender {
 				case "--low-light" -> piece.reportOptions.lowLight = Integer.parseInt(args[++i]);
 				default -> throw new IllegalArgumentException("unknown option " + args[i]);
 			}
+		}
+		if (gpuProbe) {
+			dev.t3craft.tools.hqrender.gpu.GpuProbe.run(out);
+			return;
 		}
 		// no --preview/--final: --ss 1 (what the render service adds to previews) counts as a preview
 		Renderer.look = look(previewOpt != null ? previewOpt : ss <= 1, lookOpts);
