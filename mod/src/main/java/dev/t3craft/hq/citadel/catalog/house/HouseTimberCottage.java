@@ -94,7 +94,7 @@ public final class HouseTimberCottage implements Variant {
 	private static final Scheme[] SCHEMES = {
 			new Scheme(Blocks.STRIPPED_SPRUCE_LOG, b(Blocks.CALCITE), Blocks.DEEPSLATE_TILE_STAIRS, Blocks.CHERRY_STAIRS, Blocks.DEEPSLATE_BRICK_STAIRS,
 					Blocks.DEEPSLATE_TILES, Blocks.DEEPSLATE_TILE_SLAB, Blocks.CHERRY_DOOR, Blocks.CHERRY_TRAPDOOR, Blocks.SPRUCE_STAIRS),
-			new Scheme(Blocks.STRIPPED_SPRUCE_LOG, b(Blocks.CALCITE), Blocks.CHERRY_STAIRS, Blocks.DEEPSLATE_TILE_STAIRS, null,
+			new Scheme(Blocks.STRIPPED_SPRUCE_LOG, b(Blocks.CALCITE), Blocks.CHERRY_STAIRS, Blocks.DEEPSLATE_TILE_STAIRS, Blocks.MANGROVE_STAIRS,
 					Blocks.POLISHED_DEEPSLATE, Blocks.DEEPSLATE_TILE_SLAB, Blocks.DARK_OAK_DOOR, Blocks.DARK_OAK_TRAPDOOR, Blocks.SPRUCE_STAIRS),
 	};
 
@@ -357,7 +357,9 @@ public final class HouseTimberCottage implements Variant {
 							st = beam(axis); // [depth] lintel
 						}
 					} else if (isPost) {
-						st = frame();
+						// [depth] on the side and back walls the post stands proud outside; the wall behind it stays white
+						boolean corner = alongU && (i == a || i == bEnd);
+						st = dress && !corner ? s.plaster() : frame();
 					} else if (win && (k == 1 || k == 2)) {
 						st = TimberKit.pane(alongU, null);
 					} else if (win && k == 3) {
@@ -466,6 +468,10 @@ public final class HouseTimberCottage implements Variant {
 						} else if (y == plate + 3) {
 							st = beam(Direction.Axis.Z);
 						}
+						if (y == top - 1 && v != mid0 && v != mid1 && st == s.plaster()) {
+							// [depth] a spruce rafter band under the barge board: the gable looks framed, not flat
+							st = stairs(Blocks.SPRUCE_STAIRS, v < mid0 ? Direction.SOUTH : Direction.NORTH);
+						}
 						set(u, y, v, st);
 					}
 				}
@@ -497,7 +503,7 @@ public final class HouseTimberCottage implements Variant {
 					}
 				}
 				set(dc, base + 2, r, s.plaster());
-				TimberKit.gable(c, p, false, r, r + 2, dc - 1, dc + 1, base + 2, s.roof(), s.eave(), s.ridge(), s.ridgeSlab(), true, false);
+				TimberKit.gable(c, p, false, r, r + 2, dc - 1, dc + 1, base + 2, s.roof(), s.roof(), s.ridge(), s.ridgeSlab(), true, false);
 				for (int v = r; v <= r + 2; v++) {
 					set(dc, base + 3, v, TimberKit.slab(s.ridgeSlab(), false)); // a thin cap, not a full block and a slab
 					set(dc, base + 4, v, AIR);
@@ -527,9 +533,15 @@ public final class HouseTimberCottage implements Variant {
 			for (int u = ua; u <= ub; u++) {
 				if (rail(u)) {
 					set(u, 1, fy, railState(u, false));
+					if (!two && p.hash(u, 2, fy, 3) != 0) {
+						set(u, 2, fy, TimberKit.planter(p, u, 2, fy)); // [finish] flower boxes on the rail
+					}
 				}
 				if (two && !porchP[u - ua]) {
 					set(u, 6, fy, railState(u, true));
+					if (p.hash(u, 7, fy, 3) != 0) {
+						set(u, 7, fy, TimberKit.planter(p, u, 7, fy));
+					}
 				}
 			}
 			// steps down to the path, as wide as the bay
@@ -848,8 +860,36 @@ public final class HouseTimberCottage implements Variant {
 				beds(ox + bw, w - 1, fy, fy + bd - 1);
 			}
 			if (rear > 0) {
+				if (rear >= 4 && w >= 14) {
+					shed();
+				}
 				rearYard();
 			}
+		}
+
+		/** A woodshed in the back corner: four posts, a slab roof 4 high and a pile of logs (one block high), open on every side. */
+		void shed() {
+			int u0 = 2;
+			int u1 = 5;
+			int v0 = d - 4;
+			int v1 = d - 2;
+			for (int v = v0; v <= v1; v++) {
+				for (int u = u0; u <= u1; u++) {
+					set(u, 0, v, slab(Blocks.COBBLESTONE_SLAB));
+					set(u, 4, v, slab(Blocks.SPRUCE_SLAB));
+				}
+			}
+			for (int u : new int[] {u0, u1}) {
+				for (int v : new int[] {v0, v1}) {
+					for (int y = 0; y <= 3; y++) {
+						set(u, y, v, frame());
+					}
+				}
+			}
+			for (int u = u0 + 1; u < u1; u++) {
+				set(u, 0, v1, b(Blocks.STRIPPED_SPRUCE_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.X));
+			}
+			set(u0 + 1, 0, v0, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
 		}
 
 		/** Barrels, a woodpile and a composter against the pilasters of the back wall and the sides, one block high. */
@@ -942,6 +982,9 @@ public final class HouseTimberCottage implements Variant {
 			int v0 = fy + bd;
 			for (int v = v0; v <= d - 2; v++) {
 				for (int u = 0; u < w; u++) {
+					if (!free(u, 0, v) || !free(u, 1, v)) {
+						continue;
+					}
 					if ((v - v0) % 3 == 2) {
 						set(u, 0, v, slab(Blocks.STONE_BRICK_SLAB));
 					} else {
