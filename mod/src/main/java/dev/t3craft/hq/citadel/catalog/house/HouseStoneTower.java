@@ -180,14 +180,16 @@ public final class HouseStoneTower implements Variant {
 			towerWalls();
 			deck();
 			annex();
-			stairs();
+			flights();
 			windows();
 			porch();
+			buttresses();
 			rings();
 			if (battle) {
 				battlements();
 			} else {
 				hipRoof();
+				chimney();
 			}
 			furnish();
 			exterior();
@@ -423,8 +425,9 @@ public final class HouseStoneTower implements Variant {
 					wl.set(tt, y + 2, 0, stUp(Blocks.STONE_BRICK_STAIRS, along(wl, sign)));
 				}
 			}
-			setFreeWall(wl, t, y - 1, 1, wl.stairIn(Blocks.STONE_BRICK_STAIRS, false));
-			if (shutters) {
+			// the sill sits in the wall plane, slanting down and out, so there is no ledge to stand on under the eave
+			wl.set(t, y - 1, 0, wl.stairIn(Blocks.STONE_BRICK_STAIRS, false));
+			if (shutters && p.hash(wl.u(t, 0), y, wl.v(t, 0), 3) != 0) {
 				for (int sign : new int[] {-1, 1}) {
 					if (!solidCorner(wl, t + sign)) {
 						setFreeWall(wl, t + sign, y, 1, wl.shutter(Blocks.CHERRY_TRAPDOOR));
@@ -570,11 +573,45 @@ public final class HouseStoneTower implements Variant {
 			return onAnnex(u, v);
 		}
 
+		/**
+		 * [depth] an L-shaped buttress on each corner of the tower, three cells a corner, running up to the cornice so
+		 * there is no ledge to stand on under it. Deepslate at the foot, ashlar above.
+		 */
+		void buttresses() {
+			int[][] corners = {{cu0, cv0, -1, -1}, {cu1, cv0, 1, -1}, {cu0, cv1, -1, 1}, {cu1, cv1, 1, 1}};
+			for (int[] k : corners) {
+				int[][] cells = {{k[0] + k[2], k[1]}, {k[0] + k[2], k[1] + k[3]}, {k[0], k[1] + k[3]}};
+				for (int[] cell : cells) {
+					if (onAnnex(cell[0], cell[1])) {
+						continue;
+					}
+					for (int y = 0; y <= 13; y++) {
+						BlockState s = y <= 1 ? b(Blocks.POLISHED_DEEPSLATE) : y == 13 ? b(Blocks.DEEPSLATE_BRICKS)
+								: y % 2 == 0 ? b(Blocks.POLISHED_ANDESITE) : b(Blocks.CALCITE);
+						if (y == 5 || y == 10) {
+							s = b(Blocks.STONE_BRICKS);
+						}
+						set(cell[0], y, cell[1], s);
+					}
+				}
+			}
+		}
+
+		/** A stone chimney through the back of the hip roof, with a deepslate stack. */
+		void chimney() {
+			int u0 = annexRight ? cu0 + 2 : cu1 - 3;
+			for (int u = u0; u <= u0 + 1; u++) {
+				for (int v = cv1 - 2; v <= cv1 - 1; v++) {
+					for (int y = DECK + 1; y <= 19; y++) {
+						set(u, y, v, y >= 18 ? b(Blocks.DEEPSLATE_BRICKS) : light(p, u, y, v));
+					}
+				}
+			}
+		}
+
 		void rings() {
 			ring(0, Blocks.DEEPSLATE_BRICK_STAIRS, Blocks.DEEPSLATE_BRICKS, false, true); // plinth ledge
 			ring(1, Blocks.DEEPSLATE_BRICK_STAIRS, Blocks.DEEPSLATE_BRICK_SLAB, false, true);
-			ring(F1, Blocks.POLISHED_ANDESITE_STAIRS, Blocks.POLISHED_ANDESITE, true, false);
-			ring(F2, Blocks.POLISHED_ANDESITE_STAIRS, Blocks.POLISHED_ANDESITE, true, false);
 			ring(14, Blocks.DEEPSLATE_BRICK_STAIRS, Blocks.DEEPSLATE_BRICKS, true, false); // the cornice corbel
 		}
 
@@ -624,7 +661,7 @@ public final class HouseStoneTower implements Variant {
 			}
 		}
 
-		void stairs() {
+		void flights() {
 			flight(aCols, aInner, iv0, 1, 0, 0);
 			flight(bCols, bInner, ivN, -1, F1, 0);
 			if (battle) {
