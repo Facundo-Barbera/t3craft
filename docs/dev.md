@@ -25,6 +25,37 @@ There is no hosted build service: GitHub Actions is off for this repo and must s
 minutes and storage). A jar comes from a build on the PC (`mod/build/libs/`) or from your own
 `./gradlew build`.
 
+## Code conventions (Facundo, 2026-11-09; cleanup plan `docs/plans/code-cleanup.md`)
+
+- **Source sets:**
+  - `main`: common code; it never imports `net.minecraft.client`.
+  - `client`: client-only code.
+  - `hqrender` and `uirender`: tools, never in the jar.
+  - A package never spans two source sets.
+- **Packages by feature.** No flat package over ~40 files: split it into subpackages by responsibility.
+  `hq.citadel.catalog.*` keeps its paths (the design rounds live there).
+- **Suffixes:**
+  - `*Init` is a `ModInitializer`; `*Client` is a `ClientModInitializer` only.
+  - `*Screen`, `*Renderer` and `*Service` mean what they say.
+  - `*Kit` is a block-state palette or helper set.
+  - No `Manager`, `Helper` or `Util`.
+- **Names:**
+  - The primary HQ layout is the **Citadel** in code. Config and layout ids (`hybrid-ringcampus`) are never renamed;
+    a new id gets an alias.
+  - Inside `hq.*`, new classes do not repeat the `Hq` prefix.
+- **Language:** code, identifiers and comments in English; Spanish only in `docs/` and `lang/`.
+- **Shapes:**
+  - Immutable data is a `record`.
+  - Static helpers are `final class X { private X() {} }`.
+  - No commented-out code and no `System.out` outside the tools source sets.
+- **Class names in strings:** prefer class literals (`X.class.getName()`) so the compiler catches renames. Where a
+  string is unavoidable (the render daemon's class loader), it is one constant with a comment that says who reads it.
+- **Moves:** every package move or class rename adds `old.FQN<TAB>new.FQN` lines to `tools/refactor/moves.tsv`, in
+  the same commit. `tools/refactor/apply-moves.sh` replays them on an older branch (plain sed, no java).
+- **Doc references** in code use `docs/features/<name>.md`.
+- **Changelog:** every branch adds its line to `docs/CHANGELOG-dev.md`. Touching `fabric.mod.json`, registries or
+  entrypoints is `RESTART`.
+
 ## Hot-swap
 
 ### Method bodies (any JDK)
