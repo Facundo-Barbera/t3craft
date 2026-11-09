@@ -25,8 +25,7 @@ public final class HqMenuModel {
 	private int selected;
 
 	/**
-	 * @param layouts    the registry in menu order ({@code HqLayouts.menuOrder()}: primary first, then
-	 *                   legacy); not empty
+	 * @param layouts    the registry in menu order ({@code HqLayouts.menuOrder()}: primary first); not empty
 	 * @param selectedId the configured {@code hqLayout}; unknown ids fall back to the first layout
 	 *                   (without persisting: the config is only written on a real choice)
 	 * @param builtId    layout of the HQ standing in the world, or null if none is built
@@ -89,25 +88,9 @@ public final class HqMenuModel {
 		return builtId != null && layouts.get(index).id().equals(builtId);
 	}
 
-	/** Campus and any other layout flagged {@code large}: shown with a warning tag. */
+	/** Any layout flagged {@code large}: shown with a warning tag. */
 	public boolean warnLarge(int index) {
 		return layouts.get(index).large();
-	}
-
-	/**
-	 * Index of the first legacy layout when the list starts with primary ones and has legacy ones
-	 * after them (the menu draws a "Legacy" header row before it); -1 when there is no such split.
-	 */
-	public int legacyStart() {
-		if (layouts.isEmpty() || !layouts.get(0).primary()) {
-			return -1;
-		}
-		for (int i = 1; i < layouts.size(); i++) {
-			if (!layouts.get(i).primary()) {
-				return i;
-			}
-		}
-		return -1;
 	}
 
 	/** Chooses {@code index} (out of range is ignored); persists only if it changed. Returns whether it did. */

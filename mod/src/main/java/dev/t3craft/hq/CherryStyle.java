@@ -231,7 +231,7 @@ final class CherryStyle extends HqStyle {
 				if (m == HUB) {
 					hubWall(c, x, z, door);
 				}
-				Direction in = ClassicStyle.inward(x, z);
+				Direction in = inward(x, z);
 				// lower roof: eave on the wall, a second course on the inner beam ring
 				if (m == HUB) {
 					c.set(x, 6, z, roof(in));
@@ -615,5 +615,16 @@ final class CherryStyle extends HqStyle {
 			c.set(top, role(Role.DESK));
 			c.set(right, role(Role.DESK));
 		}
+	}
+
+	/** Direction from an edge cell towards the centre (the tall side of a roof step). */
+	static Direction inward(int x, int z) {
+		if (z == -Math.max(Math.abs(x), Math.abs(z))) {
+			return Direction.SOUTH;
+		}
+		if (z == Math.max(Math.abs(x), Math.abs(z))) {
+			return Direction.NORTH;
+		}
+		return x < 0 ? Direction.EAST : Direction.WEST;
 	}
 }

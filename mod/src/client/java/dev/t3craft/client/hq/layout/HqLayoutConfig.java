@@ -7,7 +7,7 @@ import dev.t3craft.hq.layout.HqLayoutInfo;
 import dev.t3craft.hq.layout.HqLayouts;
 
 /**
- * The {@code hqLayout} key of {@code config/t3craft.json} (top-level, default {@code "classic"};
+ * The {@code hqLayout} key of {@code config/t3craft.json} (top-level, default {@code "hybrid-ringcampus"}, the citadel;
  * additive: the config codec keeps it like any unknown key). Choosing a layout here does not touch
  * an HQ that is already built: it applies to the next build of an empty HQ world, or to
  * {@link HqRebuild#resetAndRebuild}.
@@ -22,7 +22,7 @@ public final class HqLayoutConfig {
 		return HqLayouts.resolve(e != null && e.isJsonPrimitive() ? e.getAsString() : null);
 	}
 
-	/** {@link #selected()}'s id; {@code classic} when the config cannot be read (never throws). */
+	/** {@link #selected()}'s id; the default layout when the config cannot be read (never throws). */
 	public static String selectedId() {
 		try {
 			return selected().id();

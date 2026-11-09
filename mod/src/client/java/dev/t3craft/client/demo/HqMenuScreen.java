@@ -20,8 +20,8 @@ import org.jspecify.annotations.Nullable;
  * <ul>
  *   <li><b>Open HQ</b>: what the button used to do (create or open the HQ world and enter).</li>
  *   <li><b>Layout</b>: the {@code HqLayouts} registry as a scrolling list (name, one line of
- *       description, "very large" tag on campus, which one is chosen and which one is built). The
- *       main design ({@code HqLayouts.PRIMARY_ID}) comes first; the rest follow a "Legacy" header. A
+ *       description, "very large" tag on a big layout, which one is chosen and which one is built). The
+ *       main design ({@code HqLayouts.PRIMARY_ID}) comes first. A
  *       left click or the arrow keys choose; the choice is saved to {@code hqLayout} at once.</li>
  *   <li><b>Rebuild with &lt;layout&gt;</b> (only when the HQ is built with another layout) and
  *       <b>Reset HQ</b>: both ask first, then run the existing reset (zip backup, delete only
@@ -163,12 +163,7 @@ public final class HqMenuScreen extends Screen {
 			if (!list.visible(r)) {
 				continue;
 			}
-			int i = layoutAt(r);
-			if (i < 0) {
-				legacyHeader(g, list.rowY(r));
-			} else {
-				row(g, i, list.rowY(r), r == hover);
-			}
+			row(g, r, list.rowY(r), r == hover);
 		}
 		g.disableScissor();
 		int[] thumb = list.thumb();
@@ -181,49 +176,15 @@ public final class HqMenuScreen extends Screen {
 		super.extractRenderState(g, mouseX, mouseY, a); // widgets last: on a very short window they win over the list
 	}
 
-	// ---- list rows: primary layouts, a "Legacy" header row, then the legacy layouts --------------
+	// ---- list rows: one per layout, the primary one first -------------------------------------
 
-	/** Rows of the list: one per layout, plus the "Legacy" header when the model splits. */
+	/** Rows of the list: one per layout. */
 	private int rowCount() {
-		return model.size() + (model.legacyStart() >= 0 ? 1 : 0);
-	}
-
-	/** Layout index shown on list row {@code r}; -1 for the "Legacy" header (or out of range). */
-	private int layoutAt(int r) {
-		int sep = model.legacyStart();
-		if (r < 0 || r >= rowCount()) {
-			return -1;
-		}
-		if (sep < 0 || r < sep) {
-			return r;
-		}
-		return r == sep ? -1 : r - 1;
-	}
-
-	/** List row of layout {@code i}. */
-	private int rowOf(int i) {
-		int sep = model.legacyStart();
-		return sep < 0 || i < sep ? i : i + 1;
+		return model.size();
 	}
 
 	private void ensureSelectedVisible() {
-		int i = model.selectedIndex();
-		if (i == model.legacyStart()) {
-			list.ensureVisible(i); // the header row sits right above the first legacy layout
-		}
-		list.ensureVisible(rowOf(i));
-	}
-
-	private void legacyHeader(GuiGraphicsExtractor g, int y) {
-		int x0 = list.x();
-		int x1 = list.x() + list.width() - (list.scrollable() ? 5 : 0);
-		int ty = y + ROW_H - font.lineHeight - 3;
-		String label = Component.translatable("t3craft.hqmenu.legacy").getString();
-		g.text(font, label, x0 + 4, ty, MUTED);
-		int hx = x0 + 4 + font.width(label) + 6;
-		String hint = Component.translatable("t3craft.hqmenu.legacy.hint").getString();
-		g.text(font, ChatDraw.clip(font, hint, Math.max(0, x1 - hx - 4)), hx, ty, 0xFF777777);
-		g.fill(x0 + 2, y + ROW_H - 1, x1 - 2, y + ROW_H, BORDER);
+		list.ensureVisible(model.selectedIndex());
 	}
 
 	private void row(GuiGraphicsExtractor g, int i, int y, boolean hovered) {
@@ -296,11 +257,10 @@ public final class HqMenuScreen extends Screen {
 		if (r < 0) {
 			return false;
 		}
-		int i = layoutAt(r);
-		if (i < 0 || !HqMenuKeys.choosesRow(e.button())) {
-			return true; // the "Legacy" header, or not a left click (26.x: left = 1): only a left click on a layout chooses
+		if (r >= model.size() || !HqMenuKeys.choosesRow(e.button())) {
+			return true; // not a left click (26.x: left = 1): only a left click on a layout chooses
 		}
-		choose(i);
+		choose(r);
 		return true;
 	}
 

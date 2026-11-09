@@ -96,45 +96,10 @@ public final class LayoutParams {
 	public static final Spec LIGHT_LATTICE = spec(ANY, "lighting.lattice", 9, 5, 9,
 			"legacy: period of the old floor-lamp lattice on outdoor grounds; ignored since the built-in fill became invisible minecraft:light");
 
-	// ------------------------------------------------------------------ classic (CherryStyle / ClassicStyle)
+	// ------------------------------------------------------------------ classic (CherryStyle)
 
 	public static final Spec CLASSIC_PETALS = spec("classic", "portico.petalsEvery", 3, 2, 9,
 			"pink petals on every Nth garden cell of the portico (rest moss)");
-	public static final Spec CLASSIC_INLAY = spec("classic", "spine.inlayEvery", 4, 3, 12,
-			"classic style: a copper inlay every N blocks down the spine's centre line");
-
-	// ------------------------------------------------------------------ campus
-
-	public static final Spec CAMPUS_ROOF_AZALEA = spec("campus", "roof.azaleaEvery", 7, 3, 31,
-			"flat roof gardens: a flowering azalea on 1 cell in N");
-	public static final Spec CAMPUS_ROOF_MOSS = spec("campus", "roof.mossEvery", 3, 2, 15,
-			"flat roof gardens: moss carpet on 1 cell in N (of the rest)");
-	public static final Spec CAMPUS_PLAZA_LAMPS = spec("campus", "plaza.lampPostEvery", 6, 4, 12,
-			"hub plaza: a lamp post every N blocks along its outer ring");
-
-	// ------------------------------------------------------------------ ring
-
-	public static final Spec RING_TERRACE_BUSH = spec("ring", "terrace.bushEvery", 23, 11, 97,
-			"terraces: an azalea bush on 1 cell in N");
-	public static final Spec RING_PATIO_PLANTER = spec("ring", "patio.planterEvery", 11, 7, 47,
-			"inner patio: a planter / azalea on 1 cell in N");
-
-	// ------------------------------------------------------------------ vertical
-
-	public static final Spec VERTICAL_FACADE_LIGHT = spec("vertical", "facade.lightEvery", 4, 3, 9,
-			"lit panels in the tower facades every N blocks");
-
-	// ------------------------------------------------------------------ ensanche
-
-	public static final Spec ENSANCHE_CEILING_LIGHT = spec("ensanche", "hall.ceilingLightEvery", 6, 3, 9,
-			"hall ceiling light panels on an N×N grid");
-
-	// ------------------------------------------------------------------ village
-
-	public static final Spec VILLAGE_CEILING_LIGHT = spec("village", "hall.ceilingLightEvery", 4, 3, 8,
-			"hall ceiling light panels on an N×N grid");
-	public static final Spec VILLAGE_LANE_LANTERN = spec("village", "lanes.lanternEvery", 11, 5, 41,
-			"garden lanterns beside the lanes: 1 cell in N");
 
 	// ------------------------------------------------------------------ hybrid-ringcampus
 
@@ -160,16 +125,6 @@ public final class LayoutParams {
 	 */
 	public static final Spec RINGCAMPUS_RELIEF = spec("hybrid-ringcampus", "terrain.relief", 2, 0, 3,
 			"campus terraces: 0 flat, 1 gentle (steps of 1, 3 in all), 2 default (steps of 2, 6 in all), 3 acropolis (steps 3/2/1, 6 in all)");
-
-	// ------------------------------------------------------------------ hybrid-towncenter
-
-	public static final Spec TOWNCENTER_CEILING_LAMP = spec("hybrid-towncenter", "hall.ceilingLampEvery", 6, 4, 9,
-			"civic hall ceiling lamps on an N×N grid");
-
-	// ------------------------------------------------------------------ hybrid-terraces
-
-	public static final Spec TERRACES_TEMPLE_LIGHT = spec("hybrid-terraces", "temple.ceilingLightEvery", 4, 3, 8,
-			"temple ceiling light panels on an N×N grid");
 
 	/** Every parameter, in declaration order. */
 	public static List<Spec> all() {

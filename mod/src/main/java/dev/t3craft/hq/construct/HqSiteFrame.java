@@ -49,8 +49,8 @@ public final class HqSiteFrame {
 
 	/**
 	 * The style the survival site builds (feat/hq-layouts): it asks the active layout
-	 * ({@link dev.t3craft.hq.HqStyles#current()}); a layout with its own ground plan (campus, ring,
-	 * vertical, ensanche, village) is far beyond the site's {@link SiteRequest#MAX_ENVELOPE} and its
+	 * ({@link dev.t3craft.hq.HqStyles#current()}); a layout with its own ground plan (the citadel)
+	 * is far beyond the site's {@link SiteRequest#MAX_ENVELOPE} and its
 	 * one-slot-per-wing frame, so the site keeps the classic spine layout for those. The HQ world
 	 * (demo) builds every layout.
 	 */

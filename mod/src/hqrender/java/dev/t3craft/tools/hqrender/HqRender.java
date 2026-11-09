@@ -35,18 +35,14 @@ import net.minecraft.world.level.block.state.BlockState;
  *
  * <pre>
  * ./gradlew hqRender                                  # every view, default style, into build/hq-render
- * ./gradlew hqRender -PhqArgs="--style classic --only full"
+ * ./gradlew hqRender -PhqArgs="--style cherry --only full"
  * </pre>
  *
  * Options: {@code --out DIR}, {@code --style ID}, {@code --only SUBSTR} (comma-separated view-name
  * filters), {@code --scale F} (multiplies every view's pixels per block), {@code --ss N}
  * (supersampling), {@code --vanilla} (no mod blocks), {@code --no-npcs}, {@code --projects 4,10,20} (rosters of N
- * projects with varied thread counts, three environments and settled threads; the default for styles
- * with their own layout, e.g. {@code --style campus}, which also renders a 4 → 10 → 20 comparison).
- * {@code --style village} renders the village layout (layout/village, {@link VillageRender}).
- * {@code --style hybrid-towncenter} renders the town centre with towers ({@link TowncenterRender}).
- * {@code --style hybrid-terraces} renders the terraced acropolis (design/hybrid-terraces, {@link TerracesRender}).
- * {@code --layout ID} (feat/hq-layouts: classic, campus, ring, vertical, ensanche, village or all) renders a
+ * projects with varied thread counts, three environments and settled threads; used with {@code --layout}).
+ * {@code --layout ID} (feat/hq-layouts: classic, hybrid-ringcampus or all) renders a
  * registered layout through the game's pipeline with {@code --projects} (default 4), see {@link LayoutViews};
  * {@code --layout hybrid-ringcampus} renders that hybrid's own gallery ({@link RingCampusViews}, default 4,10,20).
  * {@code --packs DIR} (feat/hq-layout-packs) generates with the layout packs in {@code DIR} (the game's
@@ -400,18 +396,6 @@ public final class HqRender {
 			}
 			return;
 		}
-		if (dev.t3craft.hq.TerraceGenerator.ID.equals(styleId)) {
-			// design/hybrid-terraces: the terraced acropolis grown 4 -> 10 -> 20 (see TerracesRender)
-			Files.createDirectories(out);
-			TerracesRender.run(out, only, scaleMul, ss, npcs, new BlockModels());
-			return;
-		}
-		if (dev.t3craft.hq.VillageGenerator.ID.equals(styleId)) {
-			// layout/village: its own generator and views (see VillageRender)
-			Files.createDirectories(out);
-			VillageRender.run(out, only, scaleMul, ss, npcs, new BlockModels());
-			return;
-		}
 		HqStyle style = styleId == null ? HqStyles.byId(HqStyles.DEFAULT_ID) : HqStyles.byId(styleId);
 		if (style == null) {
 			throw new IllegalArgumentException("unknown style " + styleId + "; known: " + HqStyles.ids());
@@ -419,51 +403,8 @@ public final class HqRender {
 		Files.createDirectories(out);
 		BlockModels models = new BlockModels();
 		String sid = style.id();
-		if (sid.equals(dev.t3craft.hq.TowncenterGrid.ID)) {
-			// design/hybrid-towncenter: town centre with towers (TowncenterRender)
-			TowncenterRender.render(models, style, out, only, ss, npcs);
-			for (String p : models.problems) {
-				System.out.println("note: " + p);
-			}
-			return;
-		}
-		if (HqStyles.towns().contains(style)) {
-			TownRender.render(models, style, out, only, ss, npcs);
-			for (String p : models.problems) {
-				System.out.println("note: " + p);
-			}
-			return;
-		}
-		if (sid.equals("vertical")) {
-			// layout/vertical: towers, bridges and podium for 4, 10 and 20 projects (VerticalRender)
-			VerticalRender.run(models, style, out, only, scaleMul, ss, npcs);
-			for (String p : models.problems) {
-				System.out.println("note: " + p);
-			}
-			return;
-		}
-		if (sid.equals("ring")) {
-			// layout/ring: growth through 4, 10 and 20 projects (Growth)
-			Growth.render(style, models, out, projects.isEmpty() ? List.of(4, 10, 20) : projects, only, scaleMul, ss, npcs);
-			for (String p : models.problems) {
-				System.out.println("note: " + p);
-			}
-			return;
-		}
 		if (style.ownLayout() || !projects.isEmpty()) {
-			CampusViews.render(models, style, out, projects.isEmpty() ? List.of(4, 10, 20) : projects, only, scaleMul, ss, npcs);
-			for (String p : models.problems) {
-				System.out.println("note: " + p);
-			}
-			return;
-		}
-
-		if (!projects.isEmpty()) {
-			Growth.render(style, models, out, projects, only, scaleMul, ss, npcs);
-			for (String p : models.problems) {
-				System.out.println("note: " + p);
-			}
-			return;
+			throw new IllegalArgumentException("--style " + sid + " / --projects have no gallery of their own; render a registered layout with --layout ID (--projects N)");
 		}
 		Map<String, HqInput> rosters = new LinkedHashMap<>();
 		rosters.put("1p", roster(new int[] {4}, 0));

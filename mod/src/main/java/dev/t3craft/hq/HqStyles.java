@@ -17,9 +17,9 @@ import org.jspecify.annotations.Nullable;
  * section of {@code config/t3craft.json} (read-only here; the client's ConfigStore keeps unknown
  * sections on save, so this key survives without this class ever writing):
  * <pre>{@code
- * "hq": { "style": "cherry" }     // cherry (default) | classic | campus | ring | vertical | ensanche (own layouts)
+ * "hq": { "style": "cherry" }     // cherry (the only spine style)
  * }</pre>
- * Absent file, section or key: {@link #DEFAULT_ID}. Unknown id: the default plus a warning.
+ * Absent file, section or key: {@link #DEFAULT_ID}. Unknown or removed id (classic, campus, ring, vertical...): the default plus one warning naming it.
  */
 public final class HqStyles {
 	/** Config section and key. */
@@ -28,17 +28,13 @@ public final class HqStyles {
 	/** The default style: "Campus de cerezo" (docs/research/hq-styles.md §C). */
 	public static final String DEFAULT_ID = CherryStyle.ID;
 
-	private static final List<HqStyle> ALL = List.of(new CherryStyle(), new ClassicStyle());
+	private static final List<HqStyle> ALL = List.of(new CherryStyle());
 	/**
 	 * Styles with their own layout ({@link HqStyle#ownLayout()}): selectable by id like the others,
 	 * but not in {@link #all()}, which lists the styles that paint the shared spine geometry.
-	 * layout/campus: {@link CampusStyle}; layout/ring: {@link RingStyle}; layout/vertical: {@link VerticalStyle};
-	 * layout/blocks: {@link EnsancheStyle}; design/hybrid-ringcampus: {@link RingCampusStyle};
-	 * design/hybrid-towncenter: {@link TowncenterStyle};
-	 * design/hybrid-terraces: {@link TerraceStyle}.
+	 * design/hybrid-ringcampus: {@link RingCampusStyle} (the citadel).
 	 */
-	private static final List<HqStyle> LAYOUTS = List.of(new CampusStyle(), new RingStyle(), new VerticalStyle(), new EnsancheStyle(),
-			new VillageStyle(), new RingCampusStyle(), new TowncenterStyle(), new TerraceStyle());
+	private static final List<HqStyle> LAYOUTS = List.of(new RingCampusStyle());
 	private static volatile @Nullable HqStyle active;
 
 	private HqStyles() {
@@ -49,14 +45,9 @@ public final class HqStyles {
 		return ALL;
 	}
 
-	/** The styles with their own layout (campus, ring...); not in {@link #all()}. */
+	/** The styles with their own layout (the citadel); not in {@link #all()}. */
 	public static List<HqStyle> layouts() {
 		return LAYOUTS;
-	}
-
-	/** Styles with their own ground plan as a {@link TownLayout} (layout/blocks: {@code ensanche}). */
-	public static List<HqStyle> towns() {
-		return LAYOUTS.stream().filter(s -> s instanceof EnsancheStyle).toList();
 	}
 
 	/** Ids of every selectable style ({@link #all()} then {@link #layouts()}). */
@@ -92,10 +83,6 @@ public final class HqStyles {
 
 	public static HqStyle defaultStyle() {
 		return byId(DEFAULT_ID);
-	}
-
-	public static HqStyle classic() {
-		return byId(ClassicStyle.ID);
 	}
 
 	/** The style plans are generated with ({@link #DEFAULT_ID} until the config says otherwise). */
@@ -151,7 +138,12 @@ public final class HqStyles {
 		}
 		JsonElement e = s.get(KEY);
 		HqStyle style = e.isJsonPrimitive() && e.getAsJsonPrimitive().isString() ? byId(e.getAsString()) : null;
-		return style == null ? new Selection(defaultStyle(), List.of(SECTION + "." + KEY)) : new Selection(style, List.of());
+		if (style != null) {
+			return new Selection(style, List.of());
+		}
+		// a removed or unknown style: the warning names the old id so reload() logs exactly one line with it
+		String old = e.isJsonPrimitive() ? e.getAsString() : e.toString();
+		return new Selection(defaultStyle(), List.of(SECTION + "." + KEY + " '" + old + "'"));
 	}
 
 	public static Selection load(@Nullable Path file) {
@@ -171,7 +163,7 @@ public final class HqStyles {
 		Selection sel = load(net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir().resolve("t3craft.json"));
 		use(sel.style());
 		if (!sel.warnings().isEmpty()) {
-			T3Craft.LOGGER.warn("[hq] invalid config keys, using defaults for: {} (known styles: {})", sel.warnings(), ids());
+			T3Craft.LOGGER.warn("[hq] invalid or removed config values, using defaults for: {} (known styles: {})", sel.warnings(), ids());
 		}
 		T3Craft.LOGGER.info("[hq] style {}", sel.style().id());
 		return sel.warnings();
