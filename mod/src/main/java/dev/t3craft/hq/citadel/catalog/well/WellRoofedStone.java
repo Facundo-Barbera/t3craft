@@ -39,7 +39,7 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
  */
 public final class WellRoofedStone implements Variant {
 	/** The roof's lowest row (the eaves). */
-	private static final int ROOF = 6;
+	private static final int ROOF = 5;
 	/** The crossbars and the axle: the layer right under the roof. */
 	private static final int BAR = ROOF - 1;
 
@@ -72,7 +72,7 @@ public final class WellRoofedStone implements Variant {
 		static Geo of(Plot p) {
 			int w = p.w();
 			int d = p.d();
-			int cs = Math.min(w, d) >= 7 ? 4 : 3;
+			int cs = Math.min(w, d) >= 6 ? 4 : 3;
 			int uL = (w - cs) / 2;
 			int uR = uL + cs - 1;
 			int v0 = (d - cs) / 2;
@@ -119,7 +119,7 @@ public final class WellRoofedStone implements Variant {
 
 	@Override
 	public int minH() {
-		return 9;
+		return 8;
 	}
 
 	@Override
@@ -182,11 +182,11 @@ public final class WellRoofedStone implements Variant {
 			// [depth] corner pedestals; a lantern on a short chain hangs from the crossbar end over each of them
 			for (int v : new int[] {g.v0(), g.v1()}) {
 				p.set(c, u, 1, v, b(st.chiseled()));
-				p.set(c, u, 2, v, slab(st.slabA())); // the pedestal's cap, the lantern hangs over it
-				for (int y = BAR - 1; y >= 4; y--) {
-					p.put(c, u, y, v, b(Blocks.IRON_CHAIN).setValue(BlockStateProperties.AXIS, Direction.Axis.Y), CitadelCanvas.HANGING);
+				p.set(c, u, 2, v, slab(st.slabA())); // the pedestal's cap
+				if (v == g.v1()) {
+					// the lanterns hang at the back, so the front stays clear for the windlass
+					p.put(c, u, BAR - 1, v, lantern, CitadelCanvas.HANGING);
 				}
-				p.put(c, u, 3, v, lantern, CitadelCanvas.HANGING);
 			}
 			// the fence posts stand on stone bases under the crossbar
 			for (int v : postV) {
@@ -204,24 +204,23 @@ public final class WellRoofedStone implements Variant {
 		int va = g.va();
 		int cu = g.cs() == 4 ? g.uL() + 1 + p.hash(3, 0, 0, 2) : g.uL() + 1;
 		for (int u = g.uL() + 1; u <= g.uR() - 1; u++) {
-			p.set(c, u, BAR, va, log(roof.stripped(), Direction.Axis.X));
+			p.set(c, u, BAR - 1, va, log(roof.stripped(), Direction.Axis.X));
 		}
-		p.put(c, cu, BAR, va - 1, b(Blocks.LEVER)
+		p.put(c, cu, BAR - 1, va - 1, b(Blocks.LEVER)
 				.setValue(BlockStateProperties.ATTACH_FACE, AttachFace.WALL)
 				.setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH), CitadelCanvas.DECOR);
 		// the bucket (a water cauldron) hangs on an iron chain from the axle, just over the water
-		for (int y = BAR - 1; y >= 3; y--) {
+		for (int y = BAR - 2; y >= 2; y--) {
 			p.put(c, cu, y, va, b(Blocks.IRON_CHAIN).setValue(BlockStateProperties.AXIS, Direction.Axis.Y), CitadelCanvas.HANGING);
 		}
-		p.put(c, cu, 2, va, b(Blocks.WATER_CAULDRON).setValue(BlockStateProperties.LEVEL_CAULDRON, 3), CitadelCanvas.HANGING);
+		p.put(c, cu, 1, va, b(Blocks.WATER_CAULDRON).setValue(BlockStateProperties.LEVEL_CAULDRON, 3), CitadelCanvas.HANGING);
 	}
 
 	// ------------------------------------------------------------------ roof (y4+)
 
 	/**
 	 * [depth] gable roof, ridge along v (front to back, so the visitor looks into the open gable and sees the
-	 * windlass), pitch 1:1 in stairs: the eave rows and the gable edges in the trim timber, the slope in the
-	 * roof material, a block ridge (or two stairs meeting). Under every row from the second a timber block
+	 * windlass), pitch 1:1 in stairs of one material from the eave to a block ridge (or two stairs meeting). Under every row from the second a timber block
 	 * closes the soffit, so the whole roof is one face-connected mass resting on the crossbars: no loose
 	 * overhang. The gable ends stay open.
 	 */
@@ -242,7 +241,7 @@ public final class WellRoofedStone implements Variant {
 				if (ridgeBlock) {
 					st = b(roof.ridge());
 				} else {
-					st = stairs(t == 0 ? roof.eave() : roof.stairs(), leftSide ? Direction.EAST : Direction.WEST);
+					st = stairs(roof.stairs(), leftSide ? Direction.EAST : Direction.WEST);
 				}
 				p.set(c, u, y, v, st);
 				if (t >= 1) {
