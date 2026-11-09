@@ -169,7 +169,7 @@ def wrap(s, max_w):
         return clip(s, max_w), ""
     brk = s.rfind(" ", 0, end + 1)
     if brk <= 0 or brk < end // 2:
-        brk = end
+        return clip(s, max_w), ""
     return s[:brk].rstrip(), clip(s[brk:].lstrip(), max_w)
 
 

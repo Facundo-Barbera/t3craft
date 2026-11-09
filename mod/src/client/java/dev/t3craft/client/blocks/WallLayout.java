@@ -212,9 +212,9 @@ public final class WallLayout {
 	}
 
 	/**
-	 * A title on at most two lines of {@code maxW} px: the first breaks at the last space that fits (or in the
-	 * middle of a word that is longer than the line), the second is clipped with an ellipsis. {"title", ""} when
-	 * it fits on one.
+	 * A title on at most two lines of {@code maxW} px: the first breaks at the last space that fits (when there is
+	 * none near the end, the title stays on one line, clipped with an ellipsis), the second is clipped with an ellipsis.
+	 * {"title", ""} when it fits on one.
 	 */
 	static String[] wrap(String text, int maxW, Measure m) {
 		if (text == null || text.isEmpty() || maxW <= 0) {
@@ -231,8 +231,8 @@ public final class WallLayout {
 			return new String[] {clip(text, maxW, m), ""};
 		}
 		int brk = text.lastIndexOf(' ', end);
-		if (brk <= 0 || brk < end / 2 && end < text.length()) {
-			brk = end; // no good space: break inside the word
+		if (brk <= 0 || brk < end / 2) {
+			return new String[] {clip(text, maxW, m), ""}; // no good space: one line with an ellipsis, never a word split in two
 		}
 		String first = text.substring(0, brk).stripTrailing();
 		String rest = text.substring(brk).stripLeading();
