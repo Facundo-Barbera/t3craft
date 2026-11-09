@@ -656,19 +656,21 @@ public final class GardenZenKaresansui implements Variant {
 		void rockGroup(int tries) {
 			int maxPeak = Math.min(6, 2 * (h - 2));
 			boolean five = rnd.nextInt(3) == 0 && Math.min(sa - 2, sb - 6) >= 8;
-			for (int attempt = 0; attempt < 2; attempt++) {
+			for (int attempt = 0; attempt < 3; attempt++) {
 				int n = attempt == 0 && five ? 5 : 3;
-				if (attempt == 1 && !five) {
-					return;
+				if (attempt == 0 && !five) {
+					continue;
 				}
+				// the last attempt packs the three stones closer and smaller, for the tightest plots
+				double cs = attempt == 2 ? 0.8 : 1.0;
 				for (int t = 0; t < tries; t++) {
 					int gx = 2 + rnd.nextInt(Math.max(1, w - 4));
 					int gz = 2 + rnd.nextInt(Math.max(1, d - 4));
 					double th = rnd.nextDouble() * Math.PI * 2;
 					List<double[]> rocks = new ArrayList<>();
-					rocks.add(new double[] {gx, gz, 1.9, maxPeak});
-					rocks.add(new double[] {gx + Math.round(3.0 * Math.cos(th)), gz + Math.round(3.0 * Math.sin(th)), 1.5, Math.max(2, maxPeak * 2 / 3)});
-					rocks.add(new double[] {gx + Math.round(2.7 * Math.cos(th + 2.3)), gz + Math.round(2.7 * Math.sin(th + 2.3)), 1.15, Math.max(1, maxPeak / 3)});
+					rocks.add(new double[] {gx, gz, 1.9 * cs, maxPeak});
+					rocks.add(new double[] {gx + Math.round(3.0 * cs * Math.cos(th)), gz + Math.round(3.0 * cs * Math.sin(th)), 1.5 * cs, Math.max(2, maxPeak * 2 / 3)});
+					rocks.add(new double[] {gx + Math.round(2.7 * cs * Math.cos(th + 2.3)), gz + Math.round(2.7 * cs * Math.sin(th + 2.3)), 1.15, Math.max(1, maxPeak / 3)});
 					if (n == 5) {
 						rocks.add(new double[] {gx + Math.round(3.6 * Math.cos(th + 4.2)), gz + Math.round(3.6 * Math.sin(th + 4.2)), 1.3, Math.max(2, maxPeak / 2)});
 						rocks.add(new double[] {gx + Math.round(2.2 * Math.cos(th + 1.2)), gz + Math.round(2.2 * Math.sin(th + 1.2)), 0.8, 1});
