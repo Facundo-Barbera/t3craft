@@ -621,6 +621,8 @@ public final class GateArchBattlement implements Variant {
 					for (int y = s[i]; y < DECK - 1; y++) {
 						if (face && y <= ringTop) {
 							set(u, y, v, keyCol && y == C ? b(m.key) : (i + y) % 2 == 0 ? b(m.trim) : b(m.wall));
+						} else if (face && y == ringTop + 1) {
+							set(u, y, v, m.trim); // a hood mould of pale stone follows the stepped ring
 						} else {
 							set(u, y, v, wall(u, y, v));
 						}
