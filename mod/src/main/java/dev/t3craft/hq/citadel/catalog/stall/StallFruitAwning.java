@@ -179,15 +179,21 @@ public final class StallFruitAwning implements Variant {
 	}
 
 	/**
-	 * [depth] goods come in runs of two cells so each kind reads from the street; melons and pumpkins
-	 * dominate and the red fruit is the accent (one run in five), so the stall never turns into a rainbow.
+	 * [depth] goods come in runs of two cells so each kind reads from the street. Melons and pumpkins
+	 * alternate run by run (the {@code salt} shifts which one starts, so the crate row and the counter behind
+	 * it never match) and the red fruit is the accent, one run in five, so the stall never turns into a rainbow
+	 * or a wall of one colour.
 	 */
 	private static int kindAt(Plot p, int u, int salt) {
-		return new int[] {0, 1, 0, 1, 2}[p.hash(u / 2, salt, 1, 5)];
+		int run = u / 2;
+		if (p.hash(run, salt, 1, 5) == 0) {
+			return 2;
+		}
+		return (run + salt + p.hash(0, 9, 9, 2)) % 2; // 0 melon, 1 pumpkin
 	}
 
 	/**
-	 * The oak counter carries produce two blocks high (kinds alternate between the tiers), up to the cloth:
+	 * The cherry counter carries produce two blocks high (kinds alternate between the tiers), up to the cloth:
 	 * the goods read from the street and no air pocket is left under the awning. A gap in a wide counter
 	 * lets the vendor through; long counters hang a lantern at each end.
 	 */
@@ -231,7 +237,7 @@ public final class StallFruitAwning implements Variant {
 				continue;
 			}
 			p.set(c, u, 0, 0, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
-			int k = kindAt(p, u, 7);
+			int k = kindAt(p, u, 8);
 			for (int y = 1; y <= g.fy - 2; y++) {
 				p.set(c, u, y, 0, goods(k)); // one fruit per crate, however high it is heaped
 			}
