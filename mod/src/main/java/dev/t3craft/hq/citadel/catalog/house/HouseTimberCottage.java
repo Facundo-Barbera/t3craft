@@ -92,7 +92,7 @@ public final class HouseTimberCottage implements Variant {
 	}
 
 	private static final Scheme[] SCHEMES = {
-			new Scheme(Blocks.DARK_OAK_LOG, b(Blocks.CALCITE), Blocks.DEEPSLATE_TILE_STAIRS, Blocks.CHERRY_STAIRS, Blocks.DEEPSLATE_BRICK_STAIRS,
+			new Scheme(Blocks.SPRUCE_LOG, b(Blocks.CALCITE), Blocks.DEEPSLATE_TILE_STAIRS, Blocks.CHERRY_STAIRS, Blocks.DEEPSLATE_BRICK_STAIRS,
 					Blocks.DEEPSLATE_TILES, Blocks.DEEPSLATE_TILE_SLAB, Blocks.CHERRY_DOOR, Blocks.CHERRY_TRAPDOOR, Blocks.SPRUCE_STAIRS),
 			new Scheme(Blocks.DARK_OAK_LOG, b(Blocks.CALCITE), Blocks.CHERRY_STAIRS, Blocks.DEEPSLATE_TILE_STAIRS, null,
 					Blocks.POLISHED_DEEPSLATE, Blocks.DEEPSLATE_TILE_SLAB, Blocks.DARK_OAK_DOOR, Blocks.DARK_OAK_TRAPDOOR, Blocks.SPRUCE_STAIRS),
@@ -218,11 +218,11 @@ public final class HouseTimberCottage implements Variant {
 			d0 = ua + (len - doorW) / 2;
 			int id = iv1 - iv0 + 1;
 			hv = iv0 + Math.max(0, (id - 4) / 2) + 1;
-			hoodOk = !two && d0 - 2 - ua >= 2;
+			hoodOk = !two;
 			frontP = posts(ua, ub, ua, ub, d0 - 1, d0 + doorW);
 			backP = posts(ua, ub, ua, ub);
 			sideP = posts(vfU, vb, vfU, vb);
-			boolean[] pp = hoodOk ? posts(ua, ub, ua, ub, d0 - 2, d0 + doorW + 1) : posts(ua, ub, ua, ub);
+			boolean[] pp = hoodOk ? posts(ua, ub, d0 - 2, d0 + doorW + 1, ua + 1 == d0 - 2 ? -1 : ua, ub - 1 == d0 + doorW + 1 ? -1 : ub) : posts(ua, ub, ua, ub);
 			for (int u = d0 - 1; u <= d0 + doorW; u++) {
 				if (u >= ua && u <= ub) {
 					pp[u - ua] = false;
@@ -352,7 +352,7 @@ public final class HouseTimberCottage implements Variant {
 							st = TimberKit.door(s.door(), Direction.NORTH, k == 1).setValue(BlockStateProperties.DOOR_HINGE,
 									i == doorLo ? DoorHingeSide.LEFT : DoorHingeSide.RIGHT);
 						} else if (k == 2) {
-							st = TimberKit.pane(true, DyeColor.PINK); // [palette] tinted transom over the door
+							st = AIR; // 3 free blocks in the doorway: the lintel is the layer above
 						} else {
 							st = beam(axis); // [depth] lintel
 						}
@@ -374,7 +374,7 @@ public final class HouseTimberCottage implements Variant {
 			if (!dress || ground) {
 				return;
 			}
-			// [depth] upper storey: sills, flower boxes and open shutters. (On the ground floor nothing hangs over a place to walk.)
+			// [depth] upper storey: open shutters beside every window run. (No ledge, sill or box: a ledge under the eave is a floor nobody reaches.)
 			Direction outD = TimberKit.out(alongU, outward);
 			int outer = line + outward;
 			int i = a;
@@ -386,12 +386,6 @@ public final class HouseTimberCottage implements Variant {
 				int j = i;
 				while (j + 1 <= bEnd && winCell[j + 1 - a]) {
 					j++;
-				}
-				for (int x = i; x <= j; x++) {
-					line(alongU, outer, x, fb, TimberKit.stair(s.sill(), outD.getOpposite(), true));
-					int pu = alongU ? x : outer;
-					int pv = alongU ? outer : x;
-					line(alongU, outer, x, fb + 1, TimberKit.planter(p, pu, fb + 1, pv));
 				}
 				int lm = i - 1;
 				int rm = j + 1;
@@ -521,7 +515,7 @@ public final class HouseTimberCottage implements Variant {
 				set(u, beamY, fy, beam(Direction.Axis.X)); // [depth] fascia beam on the posts
 			}
 			// rails between the posts, open in front of the door
-			for (int u = ua + 1; u < ub; u++) {
+			for (int u = ua; u <= ub; u++) {
 				if (rail(u)) {
 					set(u, 1, fy, railState(u, false));
 				}
@@ -577,7 +571,7 @@ public final class HouseTimberCottage implements Variant {
 		}
 
 		boolean rail(int u) {
-			return u > ua && u < ub && !porchP[u - ua] && !inBay(u);
+			return u >= ua && u <= ub && !porchP[u - ua] && !inBay(u);
 		}
 
 		BlockState railState(int u, boolean upper) {
@@ -659,7 +653,7 @@ public final class HouseTimberCottage implements Variant {
 				case 2 -> b(Blocks.SMOKER).setValue(BlockStateProperties.HORIZONTAL_FACING, f);
 				case 3 -> b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP);
 				case 4 -> b(Blocks.CHEST).setValue(BlockStateProperties.HORIZONTAL_FACING, f);
-				case 5 -> b(Blocks.COMPOSTER);
+				case 5 -> b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP);
 				case 6 -> b(Blocks.LECTERN).setValue(BlockStateProperties.HORIZONTAL_FACING, f);
 				default -> b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP);
 			};
