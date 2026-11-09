@@ -271,8 +271,10 @@ public final class GardenZenKaresansui implements Variant {
 			mode = p.hash(2, 0, 0, 3);
 			phase = p.hash(2, 1, 0, 2);
 			int span = sa - 2;
-			int deckLen = Math.min(span, 9 + Math.max(0, span - 9) / 3);
-			a0 = 1 + rnd.nextInt(span - deckLen + 1);
+			// a shorter veranda on small plots leaves a back corner of the sea beside it, for the tree
+			int deckLen = Math.max(7, Math.min(span - 4, 9 + Math.max(0, span - 9) / 3));
+			int spare = span - deckLen;
+			a0 = spare <= 8 ? (rnd.nextBoolean() ? 1 : 1 + spare) : 1 + rnd.nextInt(spare + 1);
 			a1 = a0 + deckLen - 1;
 			for (int u = 0; u < w; u++) {
 				for (int v = 0; v < d; v++) {
@@ -541,6 +543,10 @@ public final class GardenZenKaresansui implements Variant {
 		// ------------------------------------------------------------------ islands
 
 		boolean siteOk(Collection<Long> foot, boolean allowReserved) {
+			return siteOk(foot, allowReserved, 2);
+		}
+
+		boolean siteOk(Collection<Long> foot, boolean allowReserved, int margin) {
 			for (long k : foot) {
 				int u = ku(k);
 				int v = kv(k);
@@ -551,8 +557,8 @@ public final class GardenZenKaresansui implements Variant {
 						}
 					}
 				}
-				for (int du = -2; du <= 2; du++) {
-					for (int dv = -2; dv <= 2; dv++) {
+				for (int du = -margin; du <= margin; du++) {
+					for (int dv = -margin; dv <= margin; dv++) {
 						if (blocked(u + du, v + dv)) {
 							return false;
 						}
@@ -777,7 +783,7 @@ public final class GardenZenKaresansui implements Variant {
 				}
 				Set<Long> foot = new HashSet<>();
 				foot.add(key(cx, cz));
-				if (!siteOk(foot, false)) {
+				if (!siteOk(foot, false, 1)) {
 					continue;
 				}
 				Set<Long> isl = commit(foot);
