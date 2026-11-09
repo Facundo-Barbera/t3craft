@@ -83,7 +83,7 @@ final class BarrioGateBig {
 	/** Height of the sign board (plaques). */
 	private static final int PLAQUE_Y = 8;
 	/** Temporary: walk spots inside the guard rooms and on the stair tops, to read their reachability in the report. */
-	private static final boolean TEST_SPOTS = false;
+	private static final boolean TEST_SPOTS = true;
 
 	private static final BlockState STONE = b(Blocks.STONE_BRICKS);
 	private static final BlockState POST = b(Blocks.POLISHED_DEEPSLATE);
