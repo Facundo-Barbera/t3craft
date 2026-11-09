@@ -336,9 +336,9 @@ public final class HouseTimberArcade implements Variant {
 			return log(Blocks.STRIPPED_CHERRY_LOG, Direction.Axis.Y);
 		}
 
-		/** [palette] the timber frame of the walls: spruce, lighter than the dark oak of the eave beam, so the plaster reads. */
+		/** [palette] the timber frame of the walls: cherry, lighter than the dark oak of the eave beam, so the plaster reads. */
 		static BlockState dark() {
-			return log(Blocks.SPRUCE_LOG, Direction.Axis.Y);
+			return log(Blocks.CHERRY_LOG, Direction.Axis.Y);
 		}
 
 		/** A window cell: in every bay the cells at odd distance from the nearest pier, so slim windows alternate with plaster. */
@@ -437,7 +437,7 @@ public final class HouseTimberArcade implements Variant {
 			IntPredicate winFU = i -> (i < pa || i > pb) && winBay(i);
 			IntPredicate winBU = this::winBay;
 			IntPredicate winSU = i -> gapWin(postS, i, 1, vb);
-			Block shut = Blocks.SPRUCE_TRAPDOOR;
+			Block shut = Blocks.CHERRY_TRAPDOOR;
 			int y1 = FL + 1;
 			int y2 = PLATE - 1;
 			int w1 = FL + 2;
@@ -680,7 +680,7 @@ public final class HouseTimberArcade implements Variant {
 					continue;
 				}
 				set(u, PLATE - 1, 0, stair(Blocks.DARK_OAK_STAIRS, Direction.SOUTH, true));
-				set(u, FL + 1, 0, fence(Blocks.DARK_OAK_FENCE, false, true, false, true)); // a window rail, not a ledge
+				set(u, FL + 1, 0, fence(Blocks.CHERRY_FENCE, false, true, false, true)); // a window rail, not a ledge
 			}
 		}
 
