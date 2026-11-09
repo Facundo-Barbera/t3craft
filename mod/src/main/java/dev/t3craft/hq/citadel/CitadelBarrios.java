@@ -203,7 +203,7 @@ public final class CitadelBarrios {
 		dev.t3craft.hq.citadel.barrio.HallFacade.dress(c, r, F, mats, style, env, seed);
 		roof(c, r, top, Math.floorMod(h + l.id(), 3), mats);
 		if (leadHall) {
-			CitadelLeadOffice.stairs(c, r, style);
+			CitadelLeadOffice.flight(c, r, style);
 		} else {
 			if (F == 2) {
 				hallStairs(c, r, style);

@@ -33,7 +33,7 @@ import org.jspecify.annotations.Nullable;
  * feat/lead-office: a lead's office in a citadel hall, built on <b>both floors</b> of the hall (twice the
  * floor area of an ordinary desk hall; a lead never shares its barrio, so the upper floor is free). The hall
  * is a {@link HqLayout.Type#LEAD_OFFICE} module on the ground floor ({@link #isLead}); {@code CitadelBarrios.hall}
- * builds it with two floors, skips the generic furniture and the centre stairs, and calls {@link #stairs} and
+ * builds it with two floors, skips the generic furniture and the centre stairs, and calls {@link #flight} and
  * {@link #place} instead. All cells below are {@code (u, v)} of the hall's {@link Room} ({@code u} along the
  * depth towards the back wall, {@code v} along the width, {@code mid} the centre line).
  *
@@ -73,7 +73,7 @@ public final class CitadelLeadOffice {
 	 * centre of the briefing room stays free. Replaces {@code CitadelBarrios.hallStairs} and moves the hall's
 	 * stair hole from the centre line to this flight.
 	 */
-	public static void stairs(CitadelCanvas c, Room r, HallStyle style) {
+	public static void flight(CitadelCanvas c, Room r, HallStyle style) {
 		int h = fh();
 		int mid = r.c();
 		for (int u = h - 4; u <= h - 1; u++) {
