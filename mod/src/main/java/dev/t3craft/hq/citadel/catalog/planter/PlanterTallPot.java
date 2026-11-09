@@ -304,7 +304,7 @@ public final class PlanterTallPot implements Variant {
 		int h = p.h();
 		int body = h >= 6 ? 2 : 1;
 		int sy = body + 1;
-		int room = Math.min(h - sy - 1, 3);
+		int room = Math.min(h - sy - 1, kind == 2 ? 3 : 2); // only the slim bamboo may stand three high
 		int y1 = sy + 1;
 		for (int du = 0; du < 2; du++) {
 			for (int dv = 0; dv < 2; dv++) {
@@ -357,9 +357,6 @@ public final class PlanterTallPot implements Variant {
 					p.set(c, u, y1, v, b(Blocks.FLOWERING_AZALEA));
 					if (room >= 2 && (lead || p.hash(u, 5, v, 2) == 0)) {
 						p.set(c, u, y1 + 1, v, leaves(lead ? Blocks.FLOWERING_AZALEA_LEAVES : Blocks.AZALEA_LEAVES));
-					}
-					if (room >= 3 && lead) {
-						p.set(c, u, y1 + 2, v, leaves(Blocks.FLOWERING_AZALEA_LEAVES));
 					}
 				}
 			}
