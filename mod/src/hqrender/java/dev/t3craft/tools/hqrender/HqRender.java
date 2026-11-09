@@ -235,6 +235,7 @@ public final class HqRender {
 		boolean gpuProbe = false; // tools/render-gpu: which GPU routes this machine offers (gpu.GpuProbe)
 		Boolean gpuOpt = null; // --gpu / --no-gpu (null: the default for the look)
 		boolean gpuCompare = false; // --gpu-compare: GPU and CPU for every image, timings and differences
+		boolean gpuFailTest = false; // --gpu-fail-test: the GPU child fails on purpose (checks the fallback)
 		boolean gpuNoResolve = false; // --gpu-no-resolve: only the ray tracing on the GPU, filter and bloom on the CPU
 		boolean gpuNvrtc = false; // --gpu-nvrtc (dev): compile cuda/trace.cu with NVRTC instead of the committed PTX
 		// tools/render-quality: look switches, on in final and off in preview (see Renderer.Look)
@@ -248,6 +249,7 @@ public final class HqRender {
 				case "--gpu-compare" -> gpuCompare = true;
 				case "--gpu-nvrtc" -> gpuNvrtc = true;
 				case "--gpu-no-resolve" -> gpuNoResolve = true;
+				case "--gpu-fail-test" -> gpuFailTest = true;
 				case "--preview" -> previewOpt = true;
 				case "--final" -> previewOpt = false;
 				case "--ao", "--shadows", "--hard-shadows", "--sky", "--bloom", "--no-ao", "--no-shadows", "--no-sky", "--no-bloom" -> lookOpts.put(args[i], "");
@@ -324,6 +326,7 @@ public final class HqRender {
 		Gpu.outDir = out;
 		Gpu.nvrtc = gpuNvrtc;
 		Gpu.resolve = !gpuNoResolve;
+		Gpu.failTest = gpuFailTest;
 		Gpu.mode = gpuCompare ? Gpu.Mode.COMPARE : gpuOpt != null ? (gpuOpt ? Gpu.Mode.AUTO : Gpu.Mode.OFF) : GPU_DEFAULT_FINAL && !isPreview ? Gpu.Mode.AUTO : Gpu.Mode.OFF;
 		System.out.println("gpu: " + Gpu.mode.name().toLowerCase(Locale.ROOT));
 		System.out.println("look: " + Renderer.look);

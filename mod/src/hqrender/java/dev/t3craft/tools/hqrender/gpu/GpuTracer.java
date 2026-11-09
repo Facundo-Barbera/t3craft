@@ -30,6 +30,13 @@ final class GpuTracer {
 	/** Target time of one kernel launch, ms: short enough that the desktop on the same GPU keeps drawing. */
 	private static final double TARGET_MS = 100;
 
+	/** The image needs more device memory than is free: not an error of the GPU, the next (smaller) image may still go. */
+	private static final class NoMemory extends IllegalStateException {
+		NoMemory(String m) {
+			super(m);
+		}
+	}
+
 	/** The kernels of trace.cu. */
 	private record Kernels(MemorySegment trace, MemorySegment filter, MemorySegment glow, MemorySegment blurH, MemorySegment fin) {
 	}
@@ -84,6 +91,9 @@ final class GpuTracer {
 				t.printStackTrace(out);
 				String m = String.valueOf(t.getMessage()).replace('\n', ' ').replace('\t', ' ');
 				reply(out, "FAIL " + t.getClass().getSimpleName() + ": " + (m.length() > 400 ? m.substring(0, 400) : m));
+				if (t instanceof NoMemory) {
+					continue; // this image does not fit; the context is fine and the next one may
+				}
 				return 1; // after a CUDA error the context cannot be trusted: the parent uses the CPU
 			}
 		}
@@ -93,6 +103,15 @@ final class GpuTracer {
 	private static void reply(PrintStream out, String text) {
 		out.println("@@" + text);
 		out.flush();
+	}
+
+	/** Sum of the byte lengths of header slots [from, to) of the input file. */
+	private static long ch0(MemorySegment f, int from, int to) {
+		long s = 0;
+		for (int i = from; i < to; i++) {
+			s += f.get(Ffi.I, 4L * i) & 0xFFFFFFFFL;
+		}
+		return s;
 	}
 
 	/** Launches a kernel whose last two parameters are the band of pixel rows, in bands of about 2 million pixels. */
@@ -142,6 +161,12 @@ final class GpuTracer {
 			int outputs = f.get(Ffi.I, 4 * 25);
 			int pw = w / ss;
 			int ph = h / ss;
+			// device memory this image needs: the sections, the sub-sample buffers, and with the resolve three float images plus the pixels
+			long need = ch0(f, 8, 17) + 4L * w * h + (glow ? (long) w * h : 0) + (resolve ? 40L * pw * ph : 0);
+			long free = cu.memInfo()[0];
+			if (need > free - (256L << 20)) {
+				throw new NoMemory("not enough GPU memory: this image needs " + (need >> 20) + " MB, " + (free >> 20) + " MB are free");
+			}
 			long off = 128;
 			try {
 				for (int i = 0; i < 9; i++) {

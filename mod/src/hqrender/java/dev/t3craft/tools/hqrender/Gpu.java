@@ -32,6 +32,8 @@ final class Gpu {
 	static volatile Mode mode = Mode.OFF;
 	/** Dev: compile {@code mod/src/hqrender/cuda/trace.cu} with NVRTC instead of using the committed PTX, and write {@code trace.ptx}. */
 	static volatile boolean nvrtc;
+	/** {@code --gpu-fail-test}: the GPU child is made to fail at start, to check the automatic fallback to the CPU. */
+	static volatile boolean failTest;
 	/** The filter, bloom and sRGB conversion also run on the GPU ({@code --gpu-no-resolve}: only the ray tracing does). */
 	static volatile boolean resolve = true;
 	static volatile Path outDir;
@@ -59,7 +61,9 @@ final class Gpu {
 			// the driver caches the JIT-compiled kernel; the default cache (256 MB) is plenty, but make sure it stays on
 			GpuSession s = GpuSession.start(Map.of("CUDA_CACHE_DISABLE", "0", "CUDA_CACHE_MAXSIZE", "1073741824"));
 			String cmd;
-			if (nvrtc) {
+			if (failTest) {
+				cmd = "init\tnvrtc\t/nonexistent/trace.cu\t"; // makes the child fail to start: the CPU fallback is the thing under test
+			} else if (nvrtc) {
 				Path cu = Launcher.classesRoot().resolve("../../../../src/hqrender/cuda/trace.cu").normalize();
 				Path ptx = outDir == null ? null : outDir.resolve("trace.ptx");
 				if (outDir != null) {

@@ -45,8 +45,11 @@ final class GpuTrace {
 		if (s == null) {
 			return null;
 		}
-		if ((long) w * h * 5 >= Integer.MAX_VALUE) {
-			System.out.println("gpu: image of " + w + "x" + h + " sub-samples is too big for one buffer; using the CPU for it");
+		boolean resolveOnGpu = Gpu.resolve;
+		// what comes back through the file must fit one mapped buffer; the sub-sample index is an int on the GPU
+		long back = (resolveOnGpu ? 4L * (w / ss) * (h / ss) : 0) + (!resolveOnGpu || wantSub ? (glow ? 5L : 4L) * w * h : 0);
+		if ((long) w * h >= Integer.MAX_VALUE || back >= Integer.MAX_VALUE) {
+			System.out.println("gpu: image of " + w + "x" + h + " sub-samples is too big for the GPU path; using the CPU for it");
 			return null;
 		}
 		Path dir = null;
@@ -57,7 +60,7 @@ final class GpuTrace {
 			dir = Files.createTempDirectory("t3craft-gpu-");
 			in = dir.resolve("in.bin");
 			out = dir.resolve("out.bin");
-			boolean resolve = Gpu.resolve;
+			boolean resolve = resolveOnGpu;
 			int outputs = (resolve ? 2 : 0) | (!resolve || wantSub ? 1 : 0);
 			writeInput(in, r, w, h, pxScale, s0, t1, glow, ss, scale, resolve, outputs);
 			double exportMs = (System.nanoTime() - t0) / 1e6;
