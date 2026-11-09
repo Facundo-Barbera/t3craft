@@ -193,20 +193,49 @@ public final class FountainStreamStones implements Variant {
 			int lo = 2;
 			int hi = m - 4;
 			sc = new int[n];
-			// the centre line swings across the plot in an S (about one and a quarter waves), up to two cells a column
-			int len = pa0 - 1 - hd;
-			double phase = p.hash(3, 0, 0, 628) / 100.0;
-			double freq = (p.hash(7, 0, 0, 2) == 0 ? 1.15 : 0.8) * Math.PI / Math.max(1, len - 1);
-			int prev = -1;
-			for (int a = hd + 1; a <= pa0 - 1; a++) {
-				double t = (lo + hi) / 2.0 + (hi - lo) / 2.0 * 1.15 * Math.sin(phase + (a - hd) * freq);
-				int val = (int) Math.round(t);
-				if (prev >= 0) {
-					val = Math.max(prev - 1, Math.min(prev + 1, val));
+			int a0 = hd + 1; // first column of channel
+			int aLast = pa0 - 2; // last top-left of a 2x2 brush that still ends before the pool
+			boolean lateral = hi - lo >= 3 && aLast - a0 >= 2;
+			if (lateral) {
+				// an S across the plot: forward, one long run sideways to the far bank, forward again
+				int f = Math.max(1, (aLast - a0) / 2);
+				int sA = p.hash(13, 0, 0, 2) == 0 ? lo : hi;
+				int sB = lo + hi - sA;
+				for (int a = a0; a <= a0 + f; a++) {
+					brush(a, sA);
 				}
-				val = Math.max(lo, Math.min(hi, val));
-				sc[a] = val;
-				prev = val;
+				for (int s = Math.min(sA, sB); s <= Math.max(sA, sB); s++) {
+					brush(a0 + f, s);
+				}
+				for (int a = a0 + f; a <= aLast; a++) {
+					brush(a, sB);
+				}
+				for (int a = a0; a <= pa0 - 1; a++) {
+					for (int s = 0; s < m; s++) {
+						if (k[a][s] == WATER) {
+							sc[a] = s;
+							break;
+						}
+					}
+				}
+			} else {
+				// a ribbon that swings across the plot one cell a column
+				int len = pa0 - 1 - hd;
+				double phase = p.hash(3, 0, 0, 628) / 100.0;
+				double freq = (p.hash(7, 0, 0, 2) == 0 ? 1.15 : 0.8) * Math.PI / Math.max(1, len - 1);
+				int prev = -1;
+				for (int a = a0; a <= pa0 - 1; a++) {
+					double t = (lo + hi) / 2.0 + (hi - lo) / 2.0 * 1.15 * Math.sin(phase + (a - hd) * freq);
+					int val = (int) Math.round(t);
+					if (prev >= 0) {
+						val = Math.max(prev - 1, Math.min(prev + 1, val));
+					}
+					val = Math.max(lo, Math.min(hi, val));
+					sc[a] = val;
+					prev = val;
+					k[a][val] = WATER;
+					k[a][val + 1] = WATER;
+				}
 			}
 			s0 = sc[hd + 1];
 			pw = Math.max(2, Math.min(m >= 11 ? 4 : 3, m - 4));
@@ -218,19 +247,7 @@ public final class FountainStreamStones implements Variant {
 			while (ps0 > scL + 1) {
 				ps0--;
 			}
-			// water
 			k[hd][s0] = WATER;
-			for (int a = hd + 1; a <= pa0 - 1; a++) {
-				int from = sc[a];
-				int to = sc[a] + 1;
-				if (a > hd + 1 && Math.abs(sc[a] - sc[a - 1]) >= 2) { // a sharp bend: the column joins both ends
-					from = Math.min(sc[a], sc[a - 1]);
-					to = Math.max(sc[a], sc[a - 1]) + 1;
-				}
-				for (int s = from; s <= to; s++) {
-					k[a][s] = WATER;
-				}
-			}
 			for (int a = pa0; a <= pa1; a++) {
 				for (int s = ps0; s < ps0 + pw; s++) {
 					boolean cut = pl >= 3 && pw >= 4 && (a == pa0 || a == pa1) && (s == ps0 || s == ps0 + pw - 1);
@@ -260,6 +277,15 @@ public final class FountainStreamStones implements Variant {
 					if (k[a][s] == OUT && touchesWater(a, s)) {
 						k[a][s] = RIM;
 					}
+				}
+			}
+		}
+
+		/** Paints a 2 x 2 square of water with its low corner at {@code (a, s)}: a brush that keeps the channel two wide. */
+		void brush(int a, int s) {
+			for (int da = 0; da <= 1; da++) {
+				for (int ds = 0; ds <= 1; ds++) {
+					k[a + da][s + ds] = WATER;
 				}
 			}
 		}
