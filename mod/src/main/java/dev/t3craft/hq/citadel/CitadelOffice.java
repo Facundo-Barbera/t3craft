@@ -1385,17 +1385,17 @@ public final class CitadelOffice {
 				} else if (m >= 4) {
 					int ys = base + (R - m);
 					boolean hip = Math.abs(dx) == m && Math.abs(dz) == m;
-					// courses: tile and cherry in turn (cherry on the odd rings), a solid cherry hip line on every corner
+					// courses: dark tile with one cherry course (ring 7), a solid cherry hip line on every corner
 					BlockState s = hip && m >= 5 ? PLANKS
-							: stairs(m % 2 == 1 ? Blocks.CHERRY_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS, in);
+							: stairs(m == 7 ? Blocks.CHERRY_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS, in);
 					set(c, dx, ys, dz, s);
 					for (int y = WALL_TOP() + 1; y < ys; y++) {
 						set(c, dx, y, dz, FOOT);
 					}
 					// battens: a second stair on the slope above each mullion's axis, so the planes have seams
 					int idx = Math.abs(dz) == m ? dx : dz;
-					if (!hip && m >= 5 && post(idx)) {
-						set(c, dx, ys + 1, dz, stairs(Blocks.CHERRY_STAIRS, in));
+					if (!hip && m >= 6 && post(idx)) {
+						set(c, dx, ys + 1, dz, stairs(Blocks.POLISHED_BLACKSTONE_BRICK_STAIRS, in));
 					}
 				} else {
 					// the drum: floor, glass ring (m = 3, five high), cap, stepped top and the copper spire
@@ -1471,9 +1471,9 @@ public final class CitadelOffice {
 				BlockState face = i == 0 ? c.kit.wallPanel(true) : PLANKS;
 				set(c, x7, ys7 + 1, z7, face);
 				set(c, x7, ys7 + 2, z7, face);
-				set(c, x7, ys7 + 3, z7, stairs(Blocks.CHERRY_STAIRS, in));
+				set(c, x7, ys7 + 3, z7, stairs(Blocks.DEEPSLATE_TILE_STAIRS, in));
 				set(c, x6, ys7 + 2, z6, PLANKS);
-				set(c, x6, ys7 + 3, z6, PLANKS);
+				set(c, x6, ys7 + 3, z6, FOOT);
 			}
 		}
 	}
