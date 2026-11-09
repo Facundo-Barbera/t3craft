@@ -1,0 +1,400 @@
+# Interfaces del juego e integraciones externas: mapa inicial
+
+Rama `research/game-ui-integrations`, fecha 2026-11-09. Solo investigación: no se tocó código, no se compiló nada y no se
+abrió ninguna imagen. Las rutas de código pueden cambiar por la limpieza en curso (issues #3 a #8).
+
+**Fuentes**
+- Repo: `README.md`, `docs/features/*.md` (portable, chat, chat-compose, t3-ui, t3-actions, t3-composer, op-launch,
+  op-queue, schedule-board, archive-view, hub-hologram, panel-chips, blocks, workstation, config, lead-office),
+  `docs/research/inventario.md`, `docs/research/agentcraft-world-elements.md`, `docs/research/compat.md` y el código en
+  `mod/src/client/java/dev/t3craft/client/` y `mod/src/main/java/dev/t3craft/t3/`.
+- Web (texto): docs de Fabric (HUD), GLFW, ntfy, Discord, VS Code y el repo `pingdotgg/t3code`. Las URLs están al final.
+- Marca **(verificar)**: no pude confirmar el nombre exacto de la API en Minecraft 26.3 sin compilar. Antes de implementar
+  hay que mirar las firmas reales (el repo ya usa `javap` sobre el jar para eso, ver `docs/research/ui-audit.md`).
+
+**Fuera de alcance:** el issue #1 (T3 Connect o una CLI de T3 Code como backend del mod) lo investiga otro hilo. Aquí solo se
+cita donde cambia la respuesta (ver "Dependencia con el issue #1").
+
+---
+
+## 1. Estado actual
+
+### 1.1 Interfaces dentro del juego
+
+| Categoría | Qué hay hoy | Dónde |
+|---|---|---|
+| Pantalla principal | Pantalla única "T3" (tecla `Y`): sidebar de hilos por proyecto, búsqueda (Ctrl+F), nuevo hilo (Ctrl+N), conversación con markdown, tool calls plegables, composer con imágenes, undo/redo, steer/cola, selector de modelo | `docs/features/t3-ui.md`, `t3-composer.md`, `chat.md`, `chat-compose.md`; `client/t3ui/`, `client/chat/` |
+| Terminal portátil | Ítem `t3craft:t3_terminal` (receta barata), pantalla con entornos, hilos y notificaciones; pantalla "en la mano" dibujada en una textura propia | `docs/features/portable.md`; `client/portable/` (`held/`) |
+| HUD | `StatusBar` (conteos working / needs you / error + badge "n waiting · tecla"), `PeekHud` (banner de entornos) vía `HudElementRegistry` | `client/hud/` |
+| Avisos | `Notifier`: línea de chat con botón `[Answer]`, `SystemToast` (un id por tipo), 3 sonidos vanilla (campana, bajo, level-up), registro de notificaciones. Se pueden apagar por tipo | `client/hud/Notifier.java`, `Toasts.java`; `docs/features/config.md` |
+| Acciones de T3 (operate) | Interrumpir, stop, settle, snooze, pin, archivar, responder aprobaciones y preguntas, nuevo hilo (`launchThread`), cola de runs (ver, reordenar, cancelar), cambiar modelo, acceso y plan mode. Confirmaciones en el juego para lo destructivo y `audit.log` | `docs/features/operate.md`, `t3-actions.md`, `op-launch.md`, `op-queue.md`; `client/operate/`, `client/queue/` |
+| Config | `SettingsScreen`, `EnvironmentsScreen`, Mod Menu (`ModMenuIntegration`), `t3craft.json` con migraciones | `docs/features/config.md`; `client/config/` |
+| Teclas | Categoría "T3Craft": `J` ajustes (por defecto), `Y` terminal, `G` iniciar demo/HQ; sin asignar: entornos, pair, reconnect, reload, toggle notificaciones | `client/config/T3CraftKeys.java`, `portable/PortableClient.java`, `demo/DemoClient.java` |
+| Comandos | `/t3craft status \| reconnect \| reload \| pair \| unpair \| envs \| answer \| search \| snooze \| queue \| schedule \| archive \| operate …` y comandos de HQ, site, builders, survival | `client/T3CraftCommands.java` y vecinos |
+
+### 1.2 Elementos en el mundo
+
+| Elemento | Qué hay hoy | Dónde |
+|---|---|---|
+| NPC por hilo | `RemotePlayer` de cliente con skin por entorno/estado, nameplate con modelo, panel (entorno · proyecto, rama), partículas vanilla, bocadillo con el último resumen, comportamiento (escritorio, tablero, deambular, festejo), helpers para subagentes | `docs/features/npc-behavior.md`, `panel-chips.md`, `npc-helpers.md`; `client/npc/` |
+| Text/Item/Block displays | Etiquetas, tablero de tareas programadas (`TextDisplay`, rota de página), holograma del hub (cabecera, detalle y haz con `BlockDisplay`), props de la estación de trabajo | `hub-hologram.md`, `schedule-board.md`, `workstation.md` |
+| Bloques propios | `monitor` (multibloque, log en vivo), `status_lamp`/`board_lamp`, `decision_podium`, `thread_board` (pared kanban), `archive_terminal`, `merge_station` (PRs), pantalla de estado, kit decorativo y faroles de papel | `docs/features/blocks.md`, `thread-wall.md`, `archive-terminal.md` |
+| HQ | Ciudadela generada, oficina del líder, constructores animados, mundo demo | `docs/features/hq-*.md`, `lead-office.md`, `builders.md` |
+| Enlaces | `Blaze3D.openUri` para URLs web y PR (con confirmación vanilla). Los archivos se **copian** al portapapeles, nunca se abren | `client/chat/Links.java`, `ConversationPanel.java`, `MergeStationScreen.java` |
+
+### 1.3 Integraciones externas
+
+**Hoy no hay ninguna.** Lo único que sale del juego es el WebSocket a cada entorno de T3 (`t3/T3Connection`, `PairingClient`,
+`OperateConnection`) o al bridge legacy. No hay webhooks, notificaciones del sistema, Discord, GitHub directo, voz ni MCP.
+Tampoco hay sonidos propios (no existe `assets/t3craft/sounds*`), ni resource packs integrados, ni mapas, libros, boss bars,
+scoreboard, action bar o título (`grep` sin resultados).
+
+### 1.4 Huecos que se ven en el código (T3 ya los expone)
+
+Del inventario (`docs/research/inventario.md`) y de un `grep` en `mod/src`:
+- **Diff / revisión de cambios:** no hay pantalla. `getTurnDiff` y `getFullThreadDiff` no aparecen en el código.
+- **Costo y tokens:** `usageLimitResetAt` y `serverGetUsageSummary` no se usan.
+- **Salida de comandos en vivo:** `subscribeCommandOutput` no se usa.
+- **Teclas para la cola de atención:** hay aviso con `[Answer]`, pero ninguna tecla de "saltar al siguiente hilo que me necesita".
+- **P11 (partículas teñidas) y P15 (toasts con retrato)** de `agentcraft-world-elements.md` siguen sin hacerse.
+
+---
+
+## 2. Catálogo: interfaces del juego
+
+Esfuerzo: S ≈ ½ a 1 día, M ≈ 2 a 4 días, L ≈ una semana o más. Todo es **client-side** salvo que se diga otra cosa, así que
+funciona en servidores remotos (modo GUI-only, `compat.md`).
+
+### G1. Sonido propio y espacial
+- **Qué es:** `sounds.json` + OGG en el jar. Un cue distinto por estado, un timbre/tono por entorno, y sonidos posicionales:
+  tecleo suave cerca de un escritorio con hilo `working`, un "ding" en el podio cuando algo necesita al jugador.
+- **Aporta:** hoy los 3 avisos usan notas vanilla y suenan en la UI. Un sonido por estado se oye aunque no mires el HUD, y
+  el tecleo ambiente hace que el HQ se sienta vivo sin leer nada.
+- **Viabilidad:** `SoundEvent` con id propio y `SimpleSoundInstance` posicional (`forUI` se usa hoy). Un `SoundEvent` creado por
+  id no necesita registro de servidor para reproducirse en el cliente. **(verificar)** el constructor en 26.3.
+- **Esfuerzo:** S (cues) / M (ambiente posicional con límite de voces).
+- **Riesgos:** los OGG hay que generarlos (el pipeline `tools/art` es Python sin ffmpeg garantizado) o usar sonidos con licencia
+  libre; ruido en el HQ si hay muchos hilos (necesita tope y atenuación).
+
+### G2. Avisos discretos: action bar y título
+- **Qué es:** mensaje en la barra de acción (`setOverlayMessage`) o título/subtítulo para "tu hilo X necesita respuesta", sin
+  toast ni chat.
+- **Aporta:** una capa intermedia entre el chat (se pierde) y el toast (tapa). Útil en combate o con el chat oculto.
+- **Viabilidad:** API de cliente de `Gui`, sin servidor. **(verificar)** el nombre en 26.3 (el mod ya usa `mc.gui.hud.getChat()`,
+  así que hubo reorganización).
+- **Esfuerzo:** S.
+- **Riesgos:** otros mods lo usan. Hay que respetar `notifications.*` y no apilar.
+
+### G3. Indicador direccional al hilo que te necesita
+- **Qué es:** flecha en el borde del HUD (o marcador flotante) hacia el NPC / escritorio / podio del hilo en `needs_attention`.
+- **Aporta:** la ciudadela es grande y los NPC están en sus escritorios; hoy hay que abrir la pantalla `Y` para saber cuál es.
+- **Viabilidad:** proyección de coordenadas del NPC a pantalla en un `HudElement`. Cliente puro.
+- **Esfuerzo:** S a M.
+- **Riesgos:** declutter con la `StatusBar` y con nameplates (ver P13).
+
+### G4. Teclas para la cola de atención
+- **Qué es:** teclas sin asignar por defecto: "siguiente hilo que me necesita" (cicla y abre la tarjeta de respuesta), "último
+  chat abierto", "aprobar / negar" con confirmación.
+- **Aporta:** el flujo principal del mod es atender lo que bloquea a los agentes. Hoy es `Y` + buscar, o el botón del chat.
+- **Viabilidad:** `KeyMappingHelper` ya se usa y `Notifier.takeRecentAsk` ya sabe "el hilo que preguntó hace poco".
+- **Esfuerzo:** S.
+- **Riesgos:** choques de teclas (por eso quedan sin asignar). Aprobar con una tecla es riesgoso: debe pasar por la confirmación
+  que ya existe.
+
+### G5. Menú radial de acciones sobre el NPC
+- **Qué es:** clic derecho largo sobre un NPC, monitor o podio abre un menú radial: Chat, Interrumpir, Settle, Snooze, Abrir PR.
+- **Aporta:** las acciones de operate están en el header del chat; en el mundo solo se abre el chat. Esto cierra el círculo
+  diegético sin pasar por la pantalla.
+- **Viabilidad:** `Screen` propia con el hook de clic que ya existe (`UseEntityCallback`). Las acciones ya pasan por `OperateGate`.
+- **Esfuerzo:** M.
+- **Riesgos:** duplica UI (header + radial); mantener un solo catálogo de acciones. Existe un radial de construcción
+  (`docs/features/build-radial.md`) cuya implementación conviene mirar antes de duplicar.
+
+### G6. Toasts propios (retrato, barra, estado)
+- **Qué es:** una clase `Toast` propia (retrato de la skin del NPC, franja del color del estado, contador "×3") en lugar de
+  `SystemToast`. Es la P15 pendiente de AgentCraft.
+- **Aporta:** se reconoce de un vistazo qué hilo y qué estado sin leer. Los toasts del mismo hilo se fusionan.
+- **Viabilidad:** la interfaz `Toast` de vanilla es pública; se añade con `toastManager().addToast`. **(verificar)** firma en 26.3.
+- **Esfuerzo:** S a M.
+- **Riesgos:** los toasts de vanilla no son clicables; el "Y to answer" se mantiene como hoy.
+
+### G7. El ítem Terminal con estado
+- **Qué es:** el tooltip del `t3_terminal` muestra los conteos (3 working · 1 needs you) y el ítem cambia de textura o muestra una
+  insignia cuando hay algo pendiente.
+- **Aporta:** el inventario es el lugar donde el jugador ya mira; avisa sin HUD.
+- **Viabilidad:** `ItemTooltipCallback` (cliente) para el tooltip. Para el cambio de modelo, las definiciones de ítem de 26.x
+  admiten propiedades condicionales, pero una propiedad propia necesita registro **(verificar)** y toca el módulo de ítems (main).
+- **Esfuerzo:** S (tooltip) / M (modelo dinámico).
+- **Riesgos:** el modelo dinámico entra en la zona "RESTART" y en el módulo que se puede apagar.
+
+### G8. Modo observador / cámara del agente
+- **Qué es:** "ver lo que hace" un hilo: la cámara se pone en su escritorio (o en la del NPC) y el monitor se ve grande, con el
+  log en vivo.
+- **Aporta:** convierte el HQ en una sala de control; combina con el monitor de log en vivo (P2) que ya existe.
+- **Viabilidad:** `Minecraft.setCameraEntity` con una entidad de cliente, o simplemente un teletransporte suave del jugador al
+  ancla del monitor. **(verificar)** que una `RemotePlayer` sin servidor sea aceptada como cámara.
+- **Esfuerzo:** M.
+- **Riesgos:** mareo, interacción con el control del jugador, y en servidores remotos puede chocar con la posición real.
+
+### G9. Pantalla de diff y revisión
+- **Qué es:** `DiffScreen`: lista de archivos A/M/D, unified diff con colores, enlace al PR. Es lo que AgentCraft llama
+  `DiffScreen` y lo que la `merge_station` hoy solo enlaza.
+- **Aporta:** revisar un cambio sin salir del juego. Es el hueco más grande del inventario (T3 lo expone con `orchestration:read`).
+- **Viabilidad:** `getTurnDiff` / `getFullThreadDiff` por RPC de solo lectura. El renderizado de texto con colores ya existe
+  (`Markdown`, `TextWrap`, `ChatDraw`).
+- **Esfuerzo:** M a L (diffs grandes: paginación y límites).
+- **Riesgos:** diffs enormes (memoria, scroll); leer código en una GUI de Minecraft es incómodo, así que debe ser un resumen +
+  "abrir en el editor" (ver I6).
+
+### G10. Costo, tokens y límites
+- **Qué es:** línea de uso en el panel y en el holograma ("$1.20 hoy", "límite en 2 h").
+- **Aporta:** visibilidad de gasto, que AgentCraft ya muestra en `/status`.
+- **Viabilidad:** `usageLimitResetAt` en el shell (read). `serverGetUsageSummary` pide `diagnostics:read`, que el pairing actual
+  rechaza (solo `read` + `operate`), así que el costo exacto no sale sin ampliar scopes.
+- **Esfuerzo:** S (solo lo que ya viene en el shell) / M (con otro scope).
+- **Riesgos:** el scope extra choca con la política "el mod rechaza todo scope de más".
+
+### G11. Salida de comandos en vivo en el monitor
+- **Qué es:** el monitor muestra el tail del comando que corre el agente (`subscribeCommandOutput`).
+- **Aporta:** se ve "qué corre" además de "qué dice".
+- **Viabilidad:** read; un stream acotado por comando.
+- **Esfuerzo:** M.
+- **Riesgos:** volumen de streams (solo los monitores cercanos), secretos impresos por comandos en pantalla.
+
+### G12. Resource packs integrados (temas y accesibilidad)
+- **Qué es:** packs opcionales dentro del jar: tema alto contraste, tema oscuro del papel, sonidos alternativos.
+- **Aporta:** personalización sin tocar código; accesibilidad.
+- **Viabilidad:** Fabric permite packs integrados activables por el jugador (`ResourceManagerHelper.registerBuiltinResourcePack`
+  y su reemplazo de la 1.21.9, con carpeta `resourcepacks/<id>/` en el jar). **(verificar)** la API de 26.x.
+- **Esfuerzo:** S.
+- **Riesgos:** hay que mantener los assets sincronizados con los cambios de GUI; casi nada de la UI depende de texturas (se
+  dibuja con `fill`).
+
+### G13. Boss bar / scoreboard / tab list
+- **Qué es:** barra de jefe cliente con el progreso del plan de un hilo; lista de la tecla Tab con los hilos como "jugadores".
+- **Aporta:** poco: la `StatusBar` custom ya cubre el resumen y lo hace mejor.
+- **Viabilidad:** boss bar: `BossHealthOverlay` guarda un mapa de `LerpingBossEvent`; sin servidor hay que usar un mixin o access
+  widener. Scoreboard: el cliente lo reemplaza al unirse, no vale la pena. Tab: posible con entradas de `PlayerInfo` falsas.
+- **Esfuerzo:** S a M.
+- **Riesgos:** mixins, choques con otros mods. **No recomendado.**
+
+### G14. Libros y mapas
+- **Qué es:** un libro (`BookViewScreen`) para leer el plan de un hilo; un mapa (ítem) como minimapa del HQ con puntos por estado.
+- **Aporta:** estética diegética; el libro como "plan para revisar" en la oficina del líder. El minimapa sirve en ciudadelas grandes.
+- **Viabilidad:** `BookViewScreen` abre libros arbitrarios en el cliente. Un mapa propio requiere mixin o textura propia.
+  Ya existe una pantalla en mano con textura dinámica (`held/HeldScreenTexture`), así que el mapa no hace falta.
+- **Esfuerzo:** S (libro) / M (minimapa).
+- **Riesgos:** valor bajo frente al chat con markdown que ya existe. **Solo si Facundo quiere el efecto "diegético".**
+
+### G15. Narrador (accesibilidad)
+- **Qué es:** leer en voz alta los avisos ("el hilo X necesita tu respuesta") con el narrador del juego.
+- **Aporta:** accesibilidad, y avisos en manos libres.
+- **Viabilidad:** `GameNarrator` es público. En Windows y macOS funciona; en Linux depende de la librería `flite` instalada, y si no
+  está falla con errores de librería.
+- **Esfuerzo:** S.
+- **Riesgos:** el narrador de Minecraft se activa por opción global del jugador. Depende del SO del jugador.
+
+### G16. Shaders y post-efectos
+- **Qué es:** viñeta roja en error, brillo en `needs you`.
+- **Aporta:** casi nada que ya no den los colores y partículas. **No recomendado.** Los shaders además chocan con Iris/Sodium.
+- **Esfuerzo:** L.
+
+### G17. Lo que falta de la lista de Facundo
+- **Carteles (sign):** son bloques con entidad de servidor; el cliente no puede crear uno que se vea. El HQ ya los usa en la
+  construcción (`CitadelHub`, `BarrioGateBig`). Los `TextDisplay` de cliente los reemplazan. Nada que proponer.
+- **Mod Menu:** ya integrado (`ModMenuIntegration`). Nada nuevo.
+- **Partículas y fuegos artificiales:** ya hay festejo con `FIREWORK`. Pendiente solo P11 (partículas teñidas), S.
+- **Interaction entities / botones clicables en hologramas:** hoy los displays no tienen hitbox. Un `raycast` propio sobre
+  anclas daría botones Allow/Deny en el podio (P7). M. Va junto con G5.
+
+---
+
+## 3. Catálogo: integraciones externas
+
+**Premisa a confirmar con Facundo:** el mod solo corre mientras Minecraft está abierto. Todo lo que sale del mod (webhooks,
+notificaciones) deja de funcionar con el juego cerrado. Ver pregunta 1.
+
+### I1. Señal del sistema sin procesos: título de ventana y parpadeo de la barra de tareas
+- **Qué es:** cuando el juego no tiene el foco y un hilo pasa a `needs_attention`: cambiar el título de la ventana
+  ("T3Craft · 2 te necesitan") y pedir atención al SO (`glfwRequestWindowAttention`).
+- **Aporta:** la forma más barata de avisar con el juego en segundo plano. Sin procesos ni red ni permisos.
+- **Viabilidad:** GLFW ≥ 3.3 expone `glfwRequestWindowAttention`; en Windows hace parpadear la barra, en macOS rebota el Dock
+  (atención a la aplicación) y el SO la cancela al enfocar. LWJGL lo trae. Hay que llamarla desde el hilo principal (el tick
+  del cliente lo es). Título: `glfwSetWindowTitle`. Cliente puro.
+- **Esfuerzo:** S.
+- **Riesgos:** comportamiento por SO (en algunos Linux/Wayland no hace nada visible). Respetar `notifications.*`.
+
+### I2. Notificaciones nativas del SO
+- **Qué es:** toast del escritorio con título, texto y el nombre del hilo.
+- **Aporta:** avisa con el juego minimizado, sin depender de la barra de tareas.
+- **Viabilidad:** `java.awt.SystemTray` **no sirve** dentro de Minecraft en macOS: AWT y GLFW compiten por el run loop de Cocoa.
+  Alternativa segura: lanzar un proceso del SO: `notify-send` (Linux), `osascript -e 'display notification …'` (macOS), PowerShell
+  con el toast de Windows. Cliente puro.
+- **Esfuerzo:** S a M (tres plataformas, escapado de argumentos).
+- **Riesgos:** inyección por título/texto del hilo en los argumentos (escapar siempre y no pasar por shell); lanzar procesos desde
+  un mod puede alarmar a antivirus; hay que mostrarlo solo sin foco.
+
+### I3. Push al teléfono: ntfy (o Pushover, Telegram)
+- **Qué es:** un `POST` a un tema de ntfy con `Title`, `Priority`, `Tags` y `Click` (por ejemplo `t3code://threads/<env>/<hilo>`
+  para abrir la app). ntfy admite hasta 3 botones de acción en la notificación.
+- **Aporta:** aviso en el móvil cuando el jugador está lejos, con un toque abre T3 en el hilo. Es la integración más barata
+  de "te necesito" fuera del juego.
+- **Viabilidad:** HTTP simple. `java.net.http.HttpClient` ya se usa en `t3/`. Cliente puro.
+- **Esfuerzo:** S.
+- **Riesgos:** el tema de ntfy.sh es la única "contraseña" (usar tema largo o token); no poner títulos de hilos sensibles en un
+  servidor público (se puede autohospedar); sale del juego, así que debe ser opt-in con aviso claro.
+
+### I4. Webhooks genéricos de eventos (Discord, Slack, Home Assistant, luces)
+- **Qué es:** un solo módulo: `config.integrations.webhooks[]` con una URL y un filtro de eventos (needs you, error, done,
+  hilo nuevo, run terminado). Cubre Discord, Slack, Home Assistant (luz que cambia de color), IFTTT y n8n.
+- **Aporta:** una pieza, muchos destinos. Discord permite `content` hasta 2000 caracteres, hasta 10 `embeds`, `username` y
+  `avatar_url`; los webhooks que no son de una aplicación no admiten botones.
+- **Viabilidad:** HTTP `POST`. Se reutiliza el punto de decisión de `Notifier.transition` para disparar eventos. Cliente puro.
+- **Esfuerzo:** S (Discord) / M (plantillas, reintentos, límites).
+- **Riesgos:** la URL del webhook es un secreto (guardar como credencial, no en `t3craft.json`; nunca en logs); los límites de
+  Discord no están en esa página (el servidor responde 429, hay que respetar `Retry-After`); un hilo que oscila de estado puede
+  inundar el canal (debounce y agrupar).
+
+### I5. Abrir T3 (app o web) en el hilo
+- **Qué es:** botón "Open in T3" que abre el hilo en la app de escritorio, la app móvil o la web.
+- **Aporta:** pasar del juego a la herramienta real sin buscar el hilo.
+- **Viabilidad:** hoy el mod conoce `t3-thread://v2/<env>/<hilo>`, que según T3 es solo un formato de enlace de markdown, no un
+  esquema registrado del SO. La app de iOS reconoce `t3code://threads/<env>/<hilo>` y hay un pedido para el escritorio
+  (issue `pingdotgg/t3code#26915`). La web usa una URL de relay (`https://<relay>.t3coderelay.com/<env>/<hilo>`). `Blaze3D.openUri`
+  ya abre URLs. **(verificar)** qué esquema acepta hoy el escritorio.
+- **Esfuerzo:** S.
+- **Riesgos:** depende de que T3 registre el esquema; el entorno en el esquema es el id de T3, no el que el mod muestra.
+
+### I6. Abrir archivos en el editor
+- **Qué es:** en el chat, un archivo mencionado (`/ruta/archivo.ts:42`) se abre en VS Code, Cursor o Zed.
+- **Aporta:** hoy la ruta solo se copia (`Links.Kind.FILE`) porque el juego corre en otra máquina que los archivos.
+- **Viabilidad:** `vscode://file/{ruta}:línea:columna` y, para archivos remotos, `vscode://vscode-remote/ssh-remote+host/ruta`
+  (documentado). El host sale de la URL del entorno de T3. Cursor y Zed tienen esquemas parecidos **(verificar)**.
+- **Esfuerzo:** S a M (mapa entorno → host SSH configurable).
+- **Riesgos:** el esquema debe estar registrado en la máquina del jugador; la ruta del agente puede no existir donde corre el
+  editor; confirmar siempre antes de abrir.
+
+### I7. GitHub: issues y PRs
+- **Qué es:** (a) ya mostrado: PR vinculado, estado, +N/−N, `merge_station`; (b) añadir enlaces a checks y a la lista de PRs;
+  (c) crear un issue o PR desde el juego.
+- **Aporta:** (a) existe. (b) y (c) cerrarían el ciclo, pero T3 tiene su propio flujo de PR y expone
+  `source-control:write` (fuera de alcance, inventario ítem 25).
+- **Viabilidad:** lo correcto es usar a T3 como intermediario (sus RPC de PR) antes que una API de GitHub con un token en el mod.
+  Un token de GitHub en la config sería un secreto más y duplica lo que T3 ya hace.
+- **Esfuerzo:** S (enlaces) / L (escritura vía `source-control:write`, necesita otro scope).
+- **Riesgos:** ampliar scopes del pairing; no se recomienda guardar un PAT en el mod.
+
+### I8. Voz: dictado y lectura
+- **Qué es:** (a) mantener una tecla para dictar al composer; (b) leer la respuesta en voz alta.
+- **Aporta:** hablar con el agente sin teclear, útil en VR o con las manos ocupadas.
+- **Viabilidad:** el micrófono se captura con OpenAL (`ALC11.alcCaptureOpenDevice`, ya incluido en LWJGL) o `javax.sound`. La
+  transcripción exige un motor: local (whisper.cpp en la máquina del jugador, por proceso externo) o una API. Lectura:
+  `GameNarrator` (ver G15) o TTS externo. Cliente puro, pero el mic pide permiso del SO en macOS.
+- **Esfuerzo:** M (dictado con un motor local) / L (embebido).
+- **Riesgos:** privacidad (audio fuera de la máquina), latencia, dependencias nativas, coste de la API. **Alto esfuerzo, valor
+  incierto.**
+
+### I9. MCP: lo que ya existe y lo que se podría ofrecer
+- **Qué es:** T3 ya corre su propio servidor MCP (`https://<entorno>/mcp`, OAuth, HTTP) para que agentes externos lean
+  proyectos y hilos, lancen y manden mensajes a hilos y consulten proveedores y modelos. Dos direcciones posibles para el mod:
+  1. **El mod como cliente MCP de T3** (otro transporte a T3, además del WebSocket). Eso es del issue #1, no se desarrolla aquí.
+  2. **El mod como servidor MCP local**: expone al agente herramientas del jugador (`notify_player`, `show_on_hologram`,
+     `ask_player_in_game`, `player_location`), para que un agente "llame" al jugador dentro del juego.
+- **Aporta:** (2) es la única idea que da algo **nuevo** a los agentes en vez de solo mostrar lo que ya hacen.
+- **Viabilidad:** (2) un servidor HTTP/stdio en el cliente. Los agentes corren en otras máquinas (VPS), así que hace falta red
+  (Tailscale) y autenticación. Los clientes MCP de Claude Code y Codex admiten HTTP remoto con OAuth. Es la idea más especulativa.
+- **Esfuerzo:** L.
+- **Riesgos:** superficie de ataque (un agente controla el juego del jugador), autenticación, y el modelo de seguridad actual
+  (el mod no escucha puertos; `compat.md`) cambia. **Explorar solo si Facundo ve valor.**
+
+### I10. API local de estado (Stream Deck, barra de menú, OBS)
+- **Qué es:** el mod sirve `http://127.0.0.1:<puerto>/status.json` y un stream con los conteos y los hilos visibles.
+- **Aporta:** integración con Stream Deck, Raycast/Alfred, waybar, un overlay de OBS. AgentCraft tiene algo parecido
+  (DevBridge en `:7879`).
+- **Viabilidad:** `com.sun.net.httpserver` en loopback. Cliente puro.
+- **Esfuerzo:** S a M.
+- **Riesgos:** abre un puerto (solo loopback, con token); casi todo lo que muestra ya lo ofrece T3 directamente a esas
+  herramientas. El valor propio del mod sería "la vista filtrada por mi configuración", que es poco.
+
+### I11. Discord Rich Presence
+- **Qué es:** el estado de Discord del jugador dice "3 agentes trabajando en t3craft".
+- **Aporta:** vistoso, nada funcional.
+- **Viabilidad:** IPC local con el cliente de Discord (socket unix o pipe). Existen mods y bibliotecas. **(verificar)** si hay
+  un cliente Java mantenido.
+- **Esfuerzo:** M.
+- **Riesgos:** expone títulos de hilos a terceros. **No recomendado.**
+
+### I12. Calendario y tareas programadas
+- **Qué es:** exportar el tablero de tareas programadas (`scheduledTasks.subscribe`) como feed `.ics`, o crear tareas desde el juego.
+- **Aporta:** bajo. T3 ya tiene su UI de tareas programadas. Escribir es el ítem 26 del inventario (no aprobado).
+- **Esfuerzo:** S (ics) / M (escritura).
+- **Riesgos:** escritura sin aprobación. **No recomendado ahora.**
+
+---
+
+## 4. Dependencia con el issue #1
+
+Si el issue #1 termina en "el mod habla con T3 Connect o con una CLI/daemon de T3", cambian tres cosas aquí:
+- **Notificaciones con el juego cerrado (I2, I3, I4):** las dos opciones del mod siguen exigiendo el juego abierto. Si Facundo
+  quiere avisos sin el juego, necesita un proceso aparte que escuche a T3 (el bridge actual, congelado como legacy en el issue #7,
+  o el daemon/CLI que salga del #1) y dispare los webhooks. El módulo de eventos (I4) conviene escribirlo como una pieza pura,
+  independiente del cliente, para poder moverlo.
+- **Autenticación (I9):** el servidor MCP de T3 usa OAuth con sesiones de 30 días, igual que el pairing. Lo que decida el #1
+  sobre cuentas de T3 Connect afecta cómo un servidor MCP del mod se autenticaría hacia el exterior.
+- **Scopes (G10, I7):** costo exacto y escritura de PR piden scopes que el mod hoy rechaza.
+
+---
+
+## 5. Top recomendado
+
+Criterio: valor para el flujo "agentes trabajando, el humano atiende lo que bloquea", esfuerzo, riesgo y que no choque con la
+limpieza en curso. Todo es cliente puro.
+
+| # | Idea | Esfuerzo | Por qué primero |
+|---|---|---|---|
+| 1 | **I1 + G2: señales discretas** (título de ventana, parpadeo de barra, action bar) | S | Resuelve "juego en segundo plano" y "no me di cuenta" casi gratis, sin procesos ni red. Se apoya en `Notifier`. |
+| 2 | **G4 + G3: cola de atención** (teclas "siguiente que me necesita" y flecha hacia su NPC) | S a M | El flujo principal del mod. Hoy hay aviso, pero llegar al hilo cuesta varios pasos. |
+| 3 | **I4 con I3: eventos salientes** (webhook genérico con ntfy y Discord como primeras plantillas) | S a M | Una pieza que cubre móvil, Discord y domótica. Define el contrato de eventos que también vale para un daemon futuro. |
+| 4 | **G1: sonido propio** (cue por estado + tecleo ambiente) | S a M | Los 3 avisos actuales son notas vanilla. El audio da presencia al HQ y avisa sin mirar. |
+| 5 | **I5 + I6: saltar a T3 y al editor** (`t3code://`, `vscode://`) | S a M | Cierra el círculo juego a herramienta real. Depende de qué esquemas registre T3 en el escritorio. |
+| 6 | **G9: pantalla de diff y revisión** | M a L | El mayor hueco funcional del inventario y es solo lectura. Se arma sobre `merge_station` y el chat. |
+| 7 | **G6: toasts propios con retrato** | S a M | La P15 que quedó pendiente, y refuerza 1 y 2. |
+| 8 | **I9 (2): servidor MCP local** | L | Lo más nuevo (el agente llama al jugador), pero es lo más especulativo y cambia el modelo de seguridad. Explorar en frío, sin implementar. |
+
+No recomendados por ahora: G13 (boss bar, scoreboard, tab), G16 (shaders), I11 (Rich Presence), I12 (calendario), G14 (libros y
+mapas, salvo que se quiera el efecto diegético) y I10 (API local).
+
+---
+
+## 6. Preguntas para Facundo
+
+1. **¿Dónde corre el juego y cuánto está abierto?** Si Minecraft está abierto solo a ratos, las integraciones salientes del mod
+   (I2, I3, I4) tienen poco alcance y conviene un daemon aparte (ligado al #1). ¿Qué máquina y qué SO (Windows, macOS, Linux)?
+   Cambia G15, I1, I2 y I8.
+2. **¿Qué tanto "diegético" quieres?** ¿Prefieres que todo ocurra en el mundo (libros, mapas, podio, cámara), o priorizas rapidez
+   de atención (teclas, flecha, pantalla)? Decide si G14, G8 y G5 suben o bajan.
+3. **¿Aceptas que el mod envíe datos fuera de la máquina?** (títulos de hilos a ntfy.sh o Discord). ¿Autohospedado, o público
+   con tema aleatorio? ¿Solo "hay algo pendiente" sin títulos?
+4. **¿Qué hace falta para revisar cambios en el juego?** (G9) ¿Diff completo, solo lista de archivos y +N/−N, o solo el enlace
+   al PR y al editor? Esto define si el diff es M o L.
+5. **¿Scopes extra?** Costo y tokens (`diagnostics:read`) y escritura de PR (`source-control:write`) piden ampliar el pairing.
+   ¿Se mantiene la regla "solo read + operate"?
+6. **¿Servidor MCP del mod (I9)?** ¿Te interesa que un agente pueda llamar al jugador dentro del juego, o es demasiado?
+7. **Audio:** ¿hay preferencia por sonidos sintetizados (generados en `tools/art`) o por un pack con licencia libre? (G1)
+8. **Editor y esquemas:** ¿qué editor usas (VS Code, Cursor, Zed) y qué esquema abre la app de escritorio de T3 hoy? (I5, I6)
+9. **¿Qué ideas convierto en issue?** El backlog vive en GitHub issues y `gh` está autenticado en esta máquina. No creo
+   ninguno hasta que apruebes.
+
+---
+
+## Fuentes web
+
+- GLFW, `glfwRequestWindowAttention`: https://www.glfw.org/docs/latest/group__window.html
+- Fabric, HUD en 26.x: https://docs.fabricmc.net/develop/rendering/hud
+- ntfy, publicar: https://docs.ntfy.sh/publish/
+- Discord, ejecutar webhook: https://docs.discord.com/developers/resources/webhook
+- VS Code, esquemas de URL: https://code.visualstudio.com/docs/editor/command-line
+- T3 Code, agentes externos y MCP: https://github.com/pingdotgg/t3code/blob/main/docs/user/outside-agents.md
+- T3 Code, enlaces profundos: https://github.com/pingdotgg/t3code/issues/26915
+- Narrador de Minecraft en Linux (flite): https://github.com/flathub/com.mojang.Minecraft/issues/14
+- AWT y GLFW en macOS: https://github.com/libgdx/libgdx/pull/6673
