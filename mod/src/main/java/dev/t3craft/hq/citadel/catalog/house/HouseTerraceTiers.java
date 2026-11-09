@@ -689,7 +689,12 @@ public final class HouseTerraceTiers implements Variant {
 			for (int u = ia; u <= ib; u++) {
 				for (int v = ja; v <= jb; v++) {
 					int r = Math.min(Math.min(u - ia, ib - u), Math.min(v - ja, jb - v));
-					if (r >= 2) {
+					if (r == 0) {
+						// the base of the small eave: solid, so nothing is left to stand on under it
+						for (int y = y1; y < pb; y++) {
+							x.set(u, y, v, roofStone(x.p, u, y, v));
+						}
+					} else if (r >= 2) {
 						for (int y = y1; y <= pb; y++) {
 							x.set(u, y, v, b(Blocks.OCHRE_FROGLIGHT));
 						}
