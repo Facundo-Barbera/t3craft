@@ -440,7 +440,7 @@ public final class HouseTowerLookout implements Variant {
 		// finial: cherry fence, a lantern and a lightning rod
 		set(c, g.p, g.cx, topY + 1, g.cz, fence(g.s.fence(), false, false, false, false));
 		set(c, g.p, g.cx, topY + 2, g.cz, lantern());
-		set(c, g.p, g.cx, topY + 3, g.cz, b(Blocks.END_ROD));
+		set(c, g.p, g.cx, topY + 3, g.cz, b(Blocks.LIGHTNING_ROD.waxed().unaffected()));
 	}
 
 	// ------------------------------------------------------------------ porch, buttresses, yard

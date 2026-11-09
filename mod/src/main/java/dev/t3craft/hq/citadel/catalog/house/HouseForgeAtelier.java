@@ -418,7 +418,7 @@ public final class HouseForgeAtelier implements Variant {
 		for (int v = 0; v <= 2; v++) {
 			int lvl = 3 - v;
 			for (int u = 0; u < w; u++) {
-				int level = Math.max(1, Math.min(3, lvl - (p.hash(u, v, 0, 7) == 0 ? 1 : 0)));
+				int level = Math.max(1, Math.min(3, lvl)); // clean bands, no random orange patches
 				p.set(c, u, 5 + v, v, stair(copperStairs(level), Direction.SOUTH, false));
 				if ((u == 0 || u == w - 1) && v <= 1) {
 					p.set(c, u, 4 + v, v, stair(Blocks.DEEPSLATE_BRICK_STAIRS, Direction.SOUTH, true)); // [depth] eave brackets

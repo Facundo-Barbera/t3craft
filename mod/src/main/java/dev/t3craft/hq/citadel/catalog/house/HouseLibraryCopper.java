@@ -269,14 +269,15 @@ public final class HouseLibraryCopper implements Variant {
 					if (dist > rk[k] + 0.15 || (!top && dist <= Math.min(rk[k + 1] - 0.3, rk[k] - 1.25))) {
 						continue;
 					}
-					int level = p.hash(u, y, v, 12) == 0 ? (base == 3 ? 2 : 3) : base; // rare patches of the other tone
+					// one patina stage per ring: weathered skirt, oxidized (verdigris) above; no per-block noise
+					int level = base;
 					double sec = g.sector(u, v);
 					boolean rib = (sec < 0.07 || sec > 0.93) && k > 0;
 					BlockState st;
 					if (k == 1 && sec > 0.4 && sec < 0.6 && (Math.abs(u - g.cu()) < 0.6 || Math.abs(v - g.cv()) < 0.6)) {
 						st = tintBlock(JEWELS[p.hash(u, 0, v, JEWELS.length)]); // oculi at the four compass points
 					} else if (rib) {
-						st = b(chiseled(k <= 2 ? 0 : 1)); // orange ribs on the green dome
+						st = b(chiseled(2)); // chiselled ribs in the weathered tone: relief without colour noise
 					} else {
 						st = b(copper(level));
 					}
