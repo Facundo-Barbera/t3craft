@@ -42,6 +42,10 @@ adapted from AgentCraft must keep this header and be listed here:
 // Copyright (c) 2026 AgentCraft contributors. MIT License.
 ```
 
+Idea only, nothing copied: `t3craft:decision_podium` (`DecisionPodiumBlock`, its models and textures, `tools/art/decision_podium_art.py`)
+takes the idea of AgentCraft's `decision_podium` (a podium with a bell and a `!` where the agent that needs a decision waits, and a click that
+opens it). The code, the models and every pixel are t3craft's own, so those files carry no AgentCraft header.
+
 Files adapted from AgentCraft (MIT; the `npc/behavior` files come from AgentCraft `mod/src/client/java/dev/agentcraft/client/agents/`):
 
 - `mod/src/client/java/dev/t3craft/client/npc/behavior/GridPathfinder.java` ← `GridPathfinder.java`

@@ -81,6 +81,8 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
  * <li><b>Projects</b>: two 3 x 3 screens on the west wall (keys {@code office_w0}, {@code office_w1}), each bound to
  *     {@code project:<key>} of the two projects with most desks taken ({@link #projectBindings}); unbound while the
  *     HQ has fewer. Chests under them.</li>
+ * <li><b>Decision podiums</b>: five along the south wall under the threads screen, bound {@code board:0..4} (the five most
+ *     urgent threads that need the player); a click opens the thread to answer it. See {@link #podiums}.</li>
  * <li><b>Attention board</b>: on the east wall, five status lamps anchored {@code board_lamp_5..9}, so they show the
  *     6th to 10th most urgent thread: the hub board keeps ranks 1 to 5. They are plain additive anchors.</li>
  * <li><b>Archive terminal</b>: {@code AnchorNames.ARCHIVE_TERMINAL} is unique in a plan, so the archive level has
@@ -105,8 +107,10 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
  * <h2>Anchors, fixtures and groups</h2>
  *
  * Anchors: {@code OFFICE} (in front of the consoles, facing the main screen), {@code OFFICE_BALCONY}, three big screens,
- * five board lamps ({@code board_lamp_5..9}). Fixtures (never replaced by the light pass): the screens and their bases, the
- * board, its lamps, the signs. No kernel class is touched.
+ * five board lamps ({@code board_lamp_5..9}) and five decision podiums ({@code decision_podium_0..4}, bound {@code board:0..4},
+ * under the threads screen: a click opens the thread that needs the player). Fixtures (never replaced by the light pass): the
+ * screens and their bases, the board, its lamps, the podiums, the signs. The podium anchors use the kernel's
+ * {@code AnchorNames.podium} (kit/decision-podium).
  */
 public final class CitadelOffice {
 	/**
@@ -702,8 +706,9 @@ public final class CitadelOffice {
 		set(c, 0, y, 1, topSlab(Blocks.CHERRY_SLAB));
 		set(c, -2, y + 1, 1, lantern(false));
 		set(c, 0, y + 1, 1, Blocks.POTTED_BAMBOO.defaultBlockState());
-		// storage under the main screen
-		for (int dx = -3; dx <= 3; dx++) {
+		// under the main screen: the decision podiums (five, west to east) and two barrels of storage
+		podiums(c, y);
+		for (int dx = 2; dx <= 3; dx++) {
 			set(c, dx, y, 4, barrel());
 		}
 		set(c, -4, y, 4, Blocks.POTTED_FLOWERING_AZALEA.defaultBlockState());
@@ -759,6 +764,26 @@ public final class CitadelOffice {
 			lamp++;
 		}
 		sign(c, x - 1, bottom + 3, CZ(), Direction.WEST, DyeColor.ORANGE, "", "Atencion", "6 a 10", "");
+	}
+
+	/** Number of decision podiums in the control room (anchors {@code decision_podium_0..4}). */
+	private static final int PODIUMS = 5;
+
+	/**
+	 * The decision podiums: a row of {@link #PODIUMS} along the south wall under the threads screen, fronts to the north
+	 * (to the player who comes from the consoles), at {@code dx = -3..1}. Podium {@code i} is bound {@code board:<i>} (anchor
+	 * {@link AnchorNames#podium}): the i-th most urgent thread that needs the player, lit and with a bell and a {@code !} when
+	 * it waits; a click opens it to answer the pending question or permission. So the office is where the player decides, and the
+	 * lamps of {@link #attentionBoard} keep ranks 6 to 10 on the wall. A lectern in the plan: the blocks module swaps each one for
+	 * {@code t3craft:decision_podium} (see {@code HqBlockFixtures}), without the module it stays a vanilla lectern. Each stands
+	 * with at least three free blocks in front of it (the rug and the aisle behind the consoles).
+	 */
+	private static void podiums(CitadelCanvas c, int y) {
+		for (int i = 0; i < PODIUMS; i++) {
+			BlockPos p = new BlockPos(CX() - 3 + i, y, CZ() + 4);
+			c.fixture(p, facing(Blocks.LECTERN, Direction.NORTH));
+			c.anchor(Anchor.face(AnchorNames.podium(i), p, Direction.NORTH));
+		}
 	}
 
 	/** {@code project:<key>} of the {@code n} projects with most desks taken (ties: the lowest module); {@code ""} for the rest. */
