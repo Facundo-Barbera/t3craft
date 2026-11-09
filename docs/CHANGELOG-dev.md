@@ -9,6 +9,7 @@ One line per structural commit on `main`, newest first:
 - `RELOAD`: no structural change; code/behaviour, resources/lang or config only (hot-reload / rebuild is enough).
 
 ## Entries
+- 2026-11-09 docs/ui-dev-client-rule RELOAD — docs only (`AGENTS.md`, "Where things run"): Windows-native UI dev client on the PC is Facundo's interactive use (outside `heavy.sh`'s WSL lock, never launched by agents); WSL keeps agent builds and renders; default UI loop is T4 (compile on the PC, play on the Mac); no PC builds or renders during Facundo's UI sessions. Nothing to refresh in the game.
 - 2026-11-09 docs/notices-gradle-wrapper RELOAD — docs only (#10): `THIRD_PARTY_NOTICES.md` now has a complete "Gradle Wrapper (Apache-2.0)" entry (files, Gradle 9.9.0, copyright, license). Nothing to refresh in the game.
 - 2026-11-09 docs/child-launch-rule RELOAD — docs only (`AGENTS.md`, "Where things run"): small tasks go through `delegate_task` in the shared VPS checkout, one implementation at a time; denser or parallel tasks go through `t3_thread_launch` with a worktree from `origin/main`, waited with `t3_thread_wait` and archived after merge; at most 6 children while Facundo's own threads are open. Nothing to refresh in the game.
 - 2026-11-09 cleanup/neutral-names RELOAD — neutral example names: the second example environment is now `laptop` (host `my-laptop`) in docs, the bridge example config, demo/preview rosters, hqrender scenes and uirender fixtures; demo environment dye colours change (preview/render output only). No registries or entrypoints touched.
