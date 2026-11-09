@@ -29,9 +29,10 @@ import net.minecraft.world.level.block.state.properties.SlabType;
  *
  * <p>The tricks:
  * <ul>
- * <li><b>Pot</b>: on a plot of 3 × 3 or more it is a vase (see {@code vase}): a stepped foot, a body
- *     pinched into a plus shape and a lip that flares out over the pinched corners (upper slabs) round the
- *     soil. On a single cell it is a column foot, body, lip band, soil (see {@code unit}).</li>
+ * <li><b>Pot</b>: on a plot of 3 × 3 or more (and 4 high) it is a vase (see {@code vase}): a slim plus-shaped
+ *     foot, a body that swells to the full 3 × 3, and a rim of full blocks with lower corners round the soil.
+ *     On a plot 2 deep and 5 high the tall piece is a 2 × 2 jar (see {@code jar}), never a one-cell tower.
+ *     On a single cell it is a column foot, body, lip band, soil (see {@code unit}).</li>
  * <li><b>Plants with presence</b>: an azalea mound (bush, leaves, moss carpet on the rim), a large fern,
  *     a dwarf cherry with a leaf crown, or a clump of bamboo of different heights. Always on moss or
  *     podzol that the pot itself carries, never on the ground of the plot.</li>
@@ -39,8 +40,8 @@ import net.minecraft.world.level.block.state.properties.SlabType;
  *     pedestal with a potted plant in front), a lantern post, and from 9 wide two vases flanking a
  *     stone bench with an azalea hedge as its back.</li>
  * </ul>
- * Size: 1–11 × 1–5 × 3+ (the leader asks for 1–2 × 1 × 3; at height 3 a pot is foot, body and a potted
- * plant or a leaf ball, from height 4 it carries real soil). Everything stays inside its plot, and the
+ * Size: 1–11 × 1–5 × 3+ (the leader asks for 1–2 × 1 × 3; at height 3 a pot is foot, body and a ball of
+ * blossom or azalea, the low one a potted plant; from height 4 it carries real soil). Everything stays inside its plot, and the
  * pots are blocks of their own, so nothing narrows a path.
  */
 public final class PlanterTallPot implements Variant {
