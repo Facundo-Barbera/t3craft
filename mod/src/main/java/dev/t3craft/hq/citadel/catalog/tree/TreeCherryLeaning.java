@@ -37,9 +37,9 @@ public final class TreeCherryLeaning implements Variant {
 	/** The lean starts here: y = 0..2 stay free under the trunk and under the canopy. */
 	private static final int YS = 3;
 
-	/** Lean directions {du, dv}: sideways and diagonals more often than straight to the front or back. */
-	private static final int[][] DIRS = {{1, 0}, {1, 0}, {-1, 0}, {-1, 0}, {1, 1}, {1, 1}, {-1, 1}, {-1, 1}, {1, -1}, {1, -1}, {-1, -1},
-			{-1, -1}, {0, 1}, {0, -1}};
+	/** Lean directions {du, dv}: axis leans more often than diagonals (a diagonal can point straight at the viewer). */
+	private static final int[][] DIRS = {{1, 0}, {1, 0}, {1, 0}, {-1, 0}, {-1, 0}, {-1, 0}, {0, 1}, {0, 1}, {0, 1}, {0, -1}, {0, -1}, {0, -1},
+			{1, -1}, {1, -1}, {-1, 1}, {-1, 1}, {1, 1}, {-1, -1}};
 
 	@Override
 	public String id() {
@@ -128,8 +128,8 @@ public final class TreeCherryLeaning implements Variant {
 		double m = 0.3 + 0.55 * r.nextDouble(); // rise per cell of the lean, 20°..45° plus the plan staircase of a diagonal
 		double fe = 0.5 + 0.22 * r.nextDouble(); // where the elbow is
 		int ke = TreeKit.clamp((int) Math.round(fe * k), 1, k);
-		int ytip = TreeKit.clamp(YS + (int) Math.round(m * k * (diag ? 1.3 : 1.0)) + 1, YS + 2, hh - 4);
-		int yElbow = TreeKit.clamp(YS + (int) Math.round(m * 0.5 * ke * (diag ? 1.3 : 1.0)), YS, ytip - 1);
+		int ytip = TreeKit.clamp(YS + (int) Math.round(m * k * (diag ? 1.3 : 1.0)) + 1, YS + 1, hh - 4);
+		int yElbow = TreeKit.clamp(YS + (int) Math.round(m * 0.7 * ke * (diag ? 1.3 : 1.0)), YS, ytip - 1);
 		int tu = lu + k * du;
 		int tv = lv + k * dv;
 
@@ -159,7 +159,7 @@ public final class TreeCherryLeaning implements Variant {
 		// rising limb 1: from the first half of the lean, up and a little outwards
 		int i1 = TreeKit.clamp((int) Math.round(segA.size() * (0.3 + 0.3 * r.nextDouble())), 1, Math.max(1, segA.size() - 1));
 		int[] s1 = segA.get(Math.min(i1, segA.size() - 1));
-		int rb1 = 3 + r.nextInt(2);
+		int rb1 = 2 + r.nextInt(2);
 		int kickU = diag ? (r.nextBoolean() ? du : 0) : du;
 		int kickV = diag ? (kickU == 0 ? dv : 0) : dv;
 		double r1 = Math.max(1.6, ra * (0.74 + 0.1 * r.nextDouble()));
@@ -185,9 +185,13 @@ public final class TreeCherryLeaning implements Variant {
 			}
 		}
 
+		for (Pad q : pads) {
+			t.wood(q.u, q.y, q.v, TreeKit.CHERRY.bark()); // the end of a limb inside its cloud: no pale log end showing through a gap
+		}
+		t.wood(tu, ytip, tv, TreeKit.CHERRY.bark());
 		int salt = 1;
 		for (Pad q : pads) {
-			TreeKit.lobe(t, q.u, q.y, q.v, q.rx, q.rz, 2.0, 1.0, PINK, 0.45, salt++);
+			TreeKit.lobe(t, q.u, q.y, q.v, q.rx, q.rz, Math.max(q.rx, q.rz) >= 2.3 ? 2.0 : 1.0, 1.0, PINK, 0.45, salt++);
 		}
 		// a little hem under each pad's rim, never below y = 3
 		for (Pad q : pads) {
