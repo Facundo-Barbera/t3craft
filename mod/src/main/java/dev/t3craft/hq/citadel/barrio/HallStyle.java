@@ -53,7 +53,7 @@ public enum HallStyle {
 			case TIMBER -> Blocks.CHERRY_STAIRS;
 			case STONE -> Blocks.STONE_BRICK_STAIRS;
 			case SHUTTERED -> Blocks.DARK_OAK_STAIRS;
-			case BALCONY -> Blocks.BAMBOO_MOSAIC_STAIRS;
+			case BALCONY -> Blocks.SMOOTH_QUARTZ_STAIRS;
 		};
 	}
 
@@ -63,7 +63,7 @@ public enum HallStyle {
 			case TIMBER -> Blocks.CHERRY_PLANKS.defaultBlockState();
 			case STONE -> Blocks.STONE_BRICKS.defaultBlockState();
 			case SHUTTERED -> Blocks.DARK_OAK_PLANKS.defaultBlockState();
-			case BALCONY -> Blocks.BAMBOO_MOSAIC.defaultBlockState();
+			case BALCONY -> Blocks.SMOOTH_QUARTZ.defaultBlockState();
 		};
 	}
 
@@ -82,7 +82,7 @@ public enum HallStyle {
 			case TIMBER -> Blocks.CHERRY_SLAB;
 			case STONE -> Blocks.STONE_BRICK_SLAB;
 			case SHUTTERED -> Blocks.DARK_OAK_SLAB;
-			case BALCONY -> Blocks.BAMBOO_MOSAIC_SLAB;
+			case BALCONY -> Blocks.SMOOTH_QUARTZ_SLAB;
 		};
 	}
 
