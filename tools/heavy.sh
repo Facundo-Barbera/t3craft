@@ -68,8 +68,14 @@ cleanup() {
 		sleep 5
 		kill -KILL -- -"$child" 2>/dev/null
 	fi
-	if [ -n "$GRADLE_DIR" ] && [ -x "$GRADLE_DIR/gradlew" ]; then
-		(cd "$GRADLE_DIR" && timeout 60 ./gradlew --stop >/dev/null 2>&1)
+	if [ -n "$GRADLE_DIR" ]; then
+		# the wrapper lives in mod/ in this repo; stop the daemon from wherever gradlew is
+		for g in "$GRADLE_DIR" "$GRADLE_DIR/mod"; do
+			if [ -x "$g/gradlew" ]; then
+				(cd "$g" && timeout 60 ./gradlew --stop >/dev/null 2>&1)
+				break
+			fi
+		done
 	fi
 	rm -f "$LOCK.owner"
 }

@@ -13,7 +13,7 @@
 #   --no-wait         only leave the request, print its id and outbox folder
 #
 # Examples:
-#   tools/render/submit.sh --layout hybrid-ringcampus --projects 4 --only citadel
+#   tools/render/submit.sh --layout hybrid-ringcampus --projects 4 --only hub,aerial
 #   tools/render/submit.sh --final --layout hybrid-ringcampus --projects 4,10,20
 #   tools/render/submit.sh --layout hybrid-ringcampus --projects 4 --packs "$HOME/.config/t3craft/hq-layouts"
 #

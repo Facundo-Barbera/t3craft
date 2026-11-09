@@ -25,7 +25,7 @@ screens through the plug below) while the VPS (12 cores, 47 GB, shared) stays re
 
 ```bash
 # preview (default): low resolution, fast. Use it while you iterate.
-tools/render/submit.sh --layout hybrid-ringcampus --projects 4 --only citadel
+tools/render/submit.sh --layout hybrid-ringcampus --projects 4 --only hub,aerial   # views: hub, aerial, plan, barrio, …
 
 # final: full resolution (HqRender's own defaults). Only when the design is settled.
 tools/render/submit.sh --final --layout hybrid-ringcampus --projects 4,10,20
@@ -70,7 +70,7 @@ Spool: `~/.cache/t3craft-render/` (`$T3CRAFT_RENDER_HOME` to move it).
 { "worktree": "/abs/path/of/your/worktree",
   "kind": "hq",
   "priority": "preview",
-  "args": ["--layout", "hybrid-ringcampus", "--projects", "4,10", "--only", "citadel"] }
+  "args": ["--layout", "hybrid-ringcampus", "--projects", "4,10", "--only", "hub,aerial"] }
 ```
 
 Besides raw `args`, these fields are accepted and turned into the same flags (in this order, `args` last):
