@@ -7,6 +7,9 @@
     "t3craft:cherry_beam",
     "t3craft:beam_cap",
     "t3craft:room_plaque",
-    "t3craft:cherry_railing"
+    "t3craft:cherry_railing",
+    "t3craft:paper_lantern_hanging",
+    "t3craft:paper_lantern_wall",
+    "t3craft:paper_lantern_tall"
   ]
 }

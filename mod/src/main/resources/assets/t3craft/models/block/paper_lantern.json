@@ -3,7 +3,8 @@
   "ambientocclusion": false,
   "textures": {
     "paper": "t3craft:block/kit_lantern_andon",
-    "wood": "t3craft:block/kit_lantern_lacquer",
+    "dark": "t3craft:block/kit_lantern_lacquer",
+    "cherry": "t3craft:block/kit_lantern_cherry",
     "roof": "t3craft:block/kit_lantern_roof",
     "finial": "t3craft:block/kit_lantern_finial",
     "brass": "t3craft:block/kit_lantern_brass",
@@ -23,22 +24,22 @@
       ],
       "faces": {
         "north": {
-          "texture": "#wood"
+          "texture": "#dark"
         },
         "south": {
-          "texture": "#wood"
+          "texture": "#dark"
         },
         "east": {
-          "texture": "#wood"
+          "texture": "#dark"
         },
         "west": {
-          "texture": "#wood"
+          "texture": "#dark"
         },
         "up": {
-          "texture": "#wood"
+          "texture": "#dark"
         },
         "down": {
-          "texture": "#wood"
+          "texture": "#dark"
         }
       },
       "name": "plinth"
@@ -56,16 +57,16 @@
       ],
       "faces": {
         "north": {
-          "texture": "#wood"
+          "texture": "#dark"
         },
         "south": {
-          "texture": "#wood"
+          "texture": "#dark"
         },
         "east": {
-          "texture": "#wood"
+          "texture": "#dark"
         },
         "west": {
-          "texture": "#wood"
+          "texture": "#dark"
         }
       },
       "name": "foot rail"
@@ -119,7 +120,8 @@
           ]
         }
       },
-      "name": "paper"
+      "name": "paper",
+      "light_emission": 15
     },
     {
       "from": [
@@ -140,7 +142,8 @@
           "texture": "#paper"
         }
       },
-      "name": "paper ends"
+      "name": "paper ends",
+      "light_emission": 15
     },
     {
       "from": [
@@ -155,19 +158,19 @@
       ],
       "faces": {
         "north": {
-          "texture": "#wood"
+          "texture": "#dark"
         },
         "south": {
-          "texture": "#wood"
+          "texture": "#dark"
         },
         "east": {
-          "texture": "#wood"
+          "texture": "#dark"
         },
         "west": {
-          "texture": "#wood"
+          "texture": "#dark"
         },
         "down": {
-          "texture": "#wood"
+          "texture": "#dark"
         }
       },
       "name": "head rail"
@@ -185,22 +188,22 @@
       ],
       "faces": {
         "north": {
-          "texture": "#wood"
+          "texture": "#dark"
         },
         "south": {
-          "texture": "#wood"
+          "texture": "#dark"
         },
         "east": {
-          "texture": "#wood"
+          "texture": "#dark"
         },
         "west": {
-          "texture": "#wood"
+          "texture": "#dark"
         },
         "up": {
           "texture": "#roof"
         },
         "down": {
-          "texture": "#wood"
+          "texture": "#dark"
         }
       },
       "name": "roof"
@@ -233,7 +236,7 @@
           "texture": "#finial"
         },
         "down": {
-          "texture": "#wood"
+          "texture": "#dark"
         }
       },
       "name": "finial"
@@ -251,19 +254,19 @@
       ],
       "faces": {
         "north": {
-          "texture": "#wood"
+          "texture": "#cherry"
         },
         "south": {
-          "texture": "#wood"
+          "texture": "#cherry"
         },
         "east": {
-          "texture": "#wood"
+          "texture": "#cherry"
         },
         "west": {
-          "texture": "#wood"
+          "texture": "#cherry"
         },
         "down": {
-          "texture": "#wood"
+          "texture": "#cherry"
         }
       },
       "name": "post"
@@ -281,19 +284,19 @@
       ],
       "faces": {
         "north": {
-          "texture": "#wood"
+          "texture": "#cherry"
         },
         "south": {
-          "texture": "#wood"
+          "texture": "#cherry"
         },
         "east": {
-          "texture": "#wood"
+          "texture": "#cherry"
         },
         "west": {
-          "texture": "#wood"
+          "texture": "#cherry"
         },
         "down": {
-          "texture": "#wood"
+          "texture": "#cherry"
         }
       },
       "name": "post"
@@ -311,19 +314,19 @@
       ],
       "faces": {
         "north": {
-          "texture": "#wood"
+          "texture": "#cherry"
         },
         "south": {
-          "texture": "#wood"
+          "texture": "#cherry"
         },
         "east": {
-          "texture": "#wood"
+          "texture": "#cherry"
         },
         "west": {
-          "texture": "#wood"
+          "texture": "#cherry"
         },
         "down": {
-          "texture": "#wood"
+          "texture": "#cherry"
         }
       },
       "name": "post"
@@ -341,19 +344,19 @@
       ],
       "faces": {
         "north": {
-          "texture": "#wood"
+          "texture": "#cherry"
         },
         "south": {
-          "texture": "#wood"
+          "texture": "#cherry"
         },
         "east": {
-          "texture": "#wood"
+          "texture": "#cherry"
         },
         "west": {
-          "texture": "#wood"
+          "texture": "#cherry"
         },
         "down": {
-          "texture": "#wood"
+          "texture": "#cherry"
         }
       },
       "name": "post"

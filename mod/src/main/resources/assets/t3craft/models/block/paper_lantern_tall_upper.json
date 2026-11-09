@@ -1,0 +1,369 @@
+{
+  "parent": "minecraft:block/block",
+  "ambientocclusion": false,
+  "textures": {
+    "paper": "t3craft:block/kit_lantern_tall",
+    "dark": "t3craft:block/kit_lantern_lacquer",
+    "cherry": "t3craft:block/kit_lantern_cherry",
+    "stone": "t3craft:block/kit_lantern_stone",
+    "roof": "t3craft:block/kit_lantern_roof",
+    "finial": "t3craft:block/kit_lantern_finial",
+    "brass": "t3craft:block/kit_lantern_brass",
+    "particle": "t3craft:block/kit_lantern_tall"
+  },
+  "elements": [
+    {
+      "from": [
+        6,
+        0,
+        6
+      ],
+      "to": [
+        10,
+        3,
+        10
+      ],
+      "faces": {
+        "north": {
+          "texture": "#cherry"
+        },
+        "south": {
+          "texture": "#cherry"
+        },
+        "east": {
+          "texture": "#cherry"
+        },
+        "west": {
+          "texture": "#cherry"
+        },
+        "down": {
+          "texture": "#cherry"
+        }
+      },
+      "name": "post"
+    },
+    {
+      "from": [
+        2,
+        3,
+        2
+      ],
+      "to": [
+        14,
+        4,
+        14
+      ],
+      "faces": {
+        "north": {
+          "texture": "#dark"
+        },
+        "south": {
+          "texture": "#dark"
+        },
+        "east": {
+          "texture": "#dark"
+        },
+        "west": {
+          "texture": "#dark"
+        },
+        "up": {
+          "texture": "#dark"
+        },
+        "down": {
+          "texture": "#dark"
+        }
+      },
+      "name": "tray"
+    },
+    {
+      "from": [
+        3,
+        4,
+        3
+      ],
+      "to": [
+        13,
+        13,
+        13
+      ],
+      "faces": {
+        "north": {
+          "texture": "#paper",
+          "uv": [
+            3,
+            3,
+            13,
+            12
+          ]
+        },
+        "south": {
+          "texture": "#paper",
+          "uv": [
+            3,
+            3,
+            13,
+            12
+          ]
+        },
+        "east": {
+          "texture": "#paper",
+          "uv": [
+            3,
+            3,
+            13,
+            12
+          ]
+        },
+        "west": {
+          "texture": "#paper",
+          "uv": [
+            3,
+            3,
+            13,
+            12
+          ]
+        }
+      },
+      "name": "paper",
+      "light_emission": 15
+    },
+    {
+      "from": [
+        3.5,
+        4,
+        3.5
+      ],
+      "to": [
+        12.5,
+        13,
+        12.5
+      ],
+      "faces": {
+        "up": {
+          "texture": "#paper"
+        },
+        "down": {
+          "texture": "#paper"
+        }
+      },
+      "name": "paper ends",
+      "light_emission": 15
+    },
+    {
+      "from": [
+        2,
+        13,
+        2
+      ],
+      "to": [
+        14,
+        14,
+        14
+      ],
+      "faces": {
+        "north": {
+          "texture": "#dark"
+        },
+        "south": {
+          "texture": "#dark"
+        },
+        "east": {
+          "texture": "#dark"
+        },
+        "west": {
+          "texture": "#dark"
+        },
+        "down": {
+          "texture": "#dark"
+        }
+      },
+      "name": "head rail"
+    },
+    {
+      "from": [
+        1,
+        14,
+        1
+      ],
+      "to": [
+        15,
+        15,
+        15
+      ],
+      "faces": {
+        "north": {
+          "texture": "#dark"
+        },
+        "south": {
+          "texture": "#dark"
+        },
+        "east": {
+          "texture": "#dark"
+        },
+        "west": {
+          "texture": "#dark"
+        },
+        "up": {
+          "texture": "#roof"
+        },
+        "down": {
+          "texture": "#dark"
+        }
+      },
+      "name": "roof eaves"
+    },
+    {
+      "from": [
+        4,
+        15,
+        4
+      ],
+      "to": [
+        12,
+        16,
+        12
+      ],
+      "faces": {
+        "north": {
+          "texture": "#brass"
+        },
+        "south": {
+          "texture": "#brass"
+        },
+        "east": {
+          "texture": "#brass"
+        },
+        "west": {
+          "texture": "#brass"
+        },
+        "up": {
+          "texture": "#finial"
+        },
+        "down": {
+          "texture": "#dark"
+        }
+      },
+      "name": "roof cap"
+    },
+    {
+      "from": [
+        2,
+        4,
+        2
+      ],
+      "to": [
+        4,
+        14,
+        4
+      ],
+      "faces": {
+        "north": {
+          "texture": "#cherry"
+        },
+        "south": {
+          "texture": "#cherry"
+        },
+        "east": {
+          "texture": "#cherry"
+        },
+        "west": {
+          "texture": "#cherry"
+        },
+        "down": {
+          "texture": "#cherry"
+        }
+      },
+      "name": "post"
+    },
+    {
+      "from": [
+        2,
+        4,
+        12
+      ],
+      "to": [
+        4,
+        14,
+        14
+      ],
+      "faces": {
+        "north": {
+          "texture": "#cherry"
+        },
+        "south": {
+          "texture": "#cherry"
+        },
+        "east": {
+          "texture": "#cherry"
+        },
+        "west": {
+          "texture": "#cherry"
+        },
+        "down": {
+          "texture": "#cherry"
+        }
+      },
+      "name": "post"
+    },
+    {
+      "from": [
+        12,
+        4,
+        2
+      ],
+      "to": [
+        14,
+        14,
+        4
+      ],
+      "faces": {
+        "north": {
+          "texture": "#cherry"
+        },
+        "south": {
+          "texture": "#cherry"
+        },
+        "east": {
+          "texture": "#cherry"
+        },
+        "west": {
+          "texture": "#cherry"
+        },
+        "down": {
+          "texture": "#cherry"
+        }
+      },
+      "name": "post"
+    },
+    {
+      "from": [
+        12,
+        4,
+        12
+      ],
+      "to": [
+        14,
+        14,
+        14
+      ],
+      "faces": {
+        "north": {
+          "texture": "#cherry"
+        },
+        "south": {
+          "texture": "#cherry"
+        },
+        "east": {
+          "texture": "#cherry"
+        },
+        "west": {
+          "texture": "#cherry"
+        },
+        "down": {
+          "texture": "#cherry"
+        }
+      },
+      "name": "post"
+    }
+  ]
+}
