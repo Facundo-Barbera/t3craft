@@ -28,6 +28,8 @@ public final class MonitorLod {
 	public static final int LINE = 10;
 	public static final int GLYPH_W = 6;
 	static final int HEADER = 13;
+	/** The status band under the title row (a thread screen): the state's colour with dark text. */
+	static final int STATUS_BAND = 11;
 	static final int FOOTER = 11;
 	static final int PAD = 4;
 	/** FAR density: 9 characters across one block, ≈ 0.125 block per text line. */
@@ -38,7 +40,7 @@ public final class MonitorLod {
 	 *
 	 * @param ppb   pixels per block
 	 * @param bezel margin to the screen's left, right and top edges (the model's 2 px frame)
-	 * @param chin  margin at the bottom (the model's 3 px chin: LED, T3 mark and the foot ledge)
+	 * @param chin  margin at the bottom (the model's 4 px chin: its upper 2 px carry the LED and the T3 mark, the lower 2 px are the foot ledge)
 	 * @param cols  characters per row inside the padding
 	 * @param rows  log rows (0 for FAR)
 	 */
@@ -113,17 +115,17 @@ public final class MonitorLod {
 	}
 
 	/**
-	 * Pixel density of the NEAR level: about 30 characters across whatever the width, so the 8 px font stays
+	 * Pixel density of the NEAR level: about 25 characters across whatever the width, so the 8 px font stays
 	 * 1/8 block tall on a 3-wide desk screen (60 px/block: readable at 4-6 blocks) and a lone block gets 96
 	 * (a character is 1/12 block). Very wide walls bottom out at 32 (a character is 1/4 block).
 	 */
 	public static float nearPpb(ScreenExtent e) {
-		return Math.max(32f, Math.min(96f, 180f / e.width()));
+		return Math.max(32f, Math.min(96f, 150f / e.width()));
 	}
 
 	/** The model's frame, in model pixels: top / left / right bezel and the bottom chin (incl. the foot's pixel). */
 	static final int BEZEL_PX = 2;
-	static final int CHIN_PX = 3;
+	static final int CHIN_PX = 4;
 
 	/** FAR: the status word's largest scale (a 3-wide desk screen gets ≈ 3×, readable across a hall). */
 	static final float FAR_STATUS_MAX = 4f;
@@ -192,7 +194,7 @@ public final class MonitorLod {
 		int cols = Math.max(1, (int) Math.floor(innerW / GLYPH_W));
 		int rows = 0;
 		if (level == Level.NEAR) {
-			float innerH = e.height() * ppb - bezel - chin - PAD - HEADER - FOOTER;
+			float innerH = e.height() * ppb - bezel - chin - PAD - HEADER - STATUS_BAND - FOOTER;
 			rows = Math.max(1, (int) Math.floor(innerH / LINE));
 		}
 		return new Layout(level, e, ppb, bezel, chin, cols, rows);

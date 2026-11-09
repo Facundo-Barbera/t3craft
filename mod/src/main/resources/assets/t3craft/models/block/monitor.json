@@ -1,5 +1,6 @@
 {
   "parent": "minecraft:block/block",
+  "ambientocclusion": false,
   "textures": {
     "particle": "t3craft:block/monitor_side",
     "frame": "t3craft:block/monitor_front",
@@ -103,21 +104,12 @@
           "texture": "#trim",
           "uv": [
             0,
-            13,
+            15,
             16,
-            14
+            16
           ]
         },
         "west": {
-          "texture": "#trim",
-          "uv": [
-            0,
-            9,
-            16,
-            10
-          ]
-        },
-        "up": {
           "texture": "#trim",
           "uv": [
             0,
@@ -126,13 +118,22 @@
             12
           ]
         },
+        "up": {
+          "texture": "#trim",
+          "uv": [
+            0,
+            13,
+            16,
+            14
+          ]
+        },
         "down": {
           "texture": "#trim",
           "uv": [
             0,
-            9,
+            11,
             16,
-            10
+            12
           ]
         }
       }
@@ -162,21 +163,12 @@
           "texture": "#trim",
           "uv": [
             0,
-            13,
+            15,
             16,
-            14
+            16
           ]
         },
         "east": {
-          "texture": "#trim",
-          "uv": [
-            0,
-            9,
-            16,
-            10
-          ]
-        },
-        "up": {
           "texture": "#trim",
           "uv": [
             0,
@@ -185,13 +177,22 @@
             12
           ]
         },
+        "up": {
+          "texture": "#trim",
+          "uv": [
+            0,
+            13,
+            16,
+            14
+          ]
+        },
         "down": {
           "texture": "#trim",
           "uv": [
             0,
-            9,
+            11,
             16,
-            10
+            12
           ]
         }
       }
@@ -221,18 +222,18 @@
           "texture": "#trim",
           "uv": [
             0,
-            11,
+            13,
             16,
-            12
+            14
           ]
         },
         "down": {
           "texture": "#trim",
           "uv": [
             0,
-            9,
+            11,
             16,
-            10
+            12
           ]
         }
       }
@@ -240,12 +241,12 @@
     {
       "from": [
         2,
-        1,
+        2,
         -1
       ],
       "to": [
         14,
-        3,
+        4,
         0
       ],
       "faces": {
@@ -253,18 +254,18 @@
           "texture": "#frame",
           "uv": [
             2,
-            13,
+            12,
             14,
-            15
+            14
           ]
         },
         "up": {
           "texture": "#trim",
           "uv": [
             0,
-            9,
+            11,
             16,
-            10
+            12
           ]
         }
       }
@@ -273,11 +274,11 @@
       "from": [
         0,
         0,
-        -4
+        -5
       ],
       "to": [
         16,
-        1,
+        2,
         0
       ],
       "faces": {
@@ -285,9 +286,9 @@
           "texture": "#trim",
           "uv": [
             0,
-            5,
+            6,
             16,
-            6
+            8
           ]
         },
         "up": {
@@ -296,34 +297,34 @@
             0,
             0,
             16,
-            4
+            5
           ]
         },
         "down": {
           "texture": "#trim",
           "uv": [
             0,
-            9,
+            11,
             16,
-            10
+            12
           ]
         },
         "east": {
           "texture": "#trim",
           "uv": [
             0,
-            7,
-            4,
-            8
+            9,
+            5,
+            10
           ]
         },
         "west": {
           "texture": "#trim",
           "uv": [
             0,
-            7,
-            4,
-            8
+            9,
+            5,
+            10
           ]
         }
       }

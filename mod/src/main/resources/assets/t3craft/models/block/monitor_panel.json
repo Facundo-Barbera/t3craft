@@ -1,5 +1,6 @@
 {
   "parent": "minecraft:block/block",
+  "ambientocclusion": false,
   "textures": {
     "particle": "t3craft:block/monitor_side",
     "frame": "t3craft:block/monitor_front",

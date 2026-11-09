@@ -269,8 +269,8 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 	 */
 	private static Glyphs standby(Font font, String key, long version, Mode mode, StationScreen screen, MonitorLod.Layout l) {
 		String word = mode == Mode.NO_THREAD ? "NO THREAD" : mode == Mode.OFFLINE ? "OFFLINE" : "ARCHIVED";
-		int wordColor = mode == Mode.NO_THREAD ? STANDBY_TEXT : mode == Mode.OFFLINE ? 0xFFC9857A : 0xFF8A8A8A;
-		int logoColor = mode == Mode.NO_THREAD ? 0xFF2F7F8A : mode == Mode.OFFLINE ? 0xFF74504B : 0xFF59606A;
+		int wordColor = mode == Mode.NO_THREAD ? STANDBY_TEXT : mode == Mode.OFFLINE ? 0xFF8FA3BA : 0xFF8A8A8A;
+		int logoColor = mode == Mode.NO_THREAD ? 0xFF2F7F8A : mode == Mode.OFFLINE ? 0xFF4A5A70 : 0xFF59606A;
 		String title = mode == Mode.NO_THREAD || screen.lines().isEmpty() ? "" : screen.lines().getFirst().text();
 		float w = l.x1() - l.x0();
 		float h = l.y1() - l.y0();
@@ -311,7 +311,7 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 		}
 		FormattedCharSequence footer = m.needsYou() == null ? null : seq(ellipsize(font, "! " + m.needsYou(), w), 0xFF000000 | StationStatus.ATTENTION.color);
 		return new Glyphs(key, version, 0xFF0B0D0F, 0xFF000000 | st.color,
-				seq(ellipsize(font, m.title(), w - chipW - 14), TEXT), plain(word), 0xFF000000 | st.color,
+				seq(ellipsize(font, m.title(), w), TEXT), plain(word), 0xFF000000 | st.color,
 				List.copyOf(rows), footer, 0xFF000000 | StationStatus.ATTENTION.color, m.cursor(), 1f, 1f, st == StationStatus.ATTENTION,
 				Mode.LIVE, plain(word), chipW, false, 0f);
 	}
@@ -333,7 +333,7 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 		}
 		String chip = feed ? null : chipText(st, s);
 		int chipW = chip == null ? 0 : font.width(chip) + 6;
-		return new Glyphs(key, version, 0xFF0B0D0F, 0xFF000000 | st.color, seq(ellipsize(font, title, w - (chip == null ? font.width(st.word) : chipW) - 14), TEXT),
+		return new Glyphs(key, version, 0xFF0B0D0F, 0xFF000000 | st.color, seq(ellipsize(font, title, chip == null ? w - font.width(st.word) - 14 : w), TEXT),
 				plain(st.word), 0xFF000000 | st.color, List.copyOf(rows), null, 0, false, 1f, 1f, st == StationStatus.ATTENTION,
 				Mode.LIVE, chip == null ? null : plain(chip), chipW, true, 0f);
 	}
@@ -386,7 +386,7 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 		poseStack.translate(0, -(l.extent().height() - 1) * l.ppb(), 0);
 		if (g.mode() != Mode.LIVE) {
 			drawStandby(s, g, l, poseStack, collector, light, z);
-			drawChin(s, g, l, poseStack, collector, light, z, g.mode() == Mode.NO_THREAD ? MonitorLod.breathe(0xFF3A4048, STANDBY_BG, s.breath) : g.mode() == Mode.OFFLINE ? 0xFF7A3F3A : 0xFF23262B);
+			drawChin(s, g, l, poseStack, collector, light, z, g.mode() == Mode.NO_THREAD ? MonitorLod.breathe(0xFF3A4048, STANDBY_BG, s.breath) : g.mode() == Mode.OFFLINE ? 0xFF4A5A70 : 0xFF23262B);
 			poseStack.popPose();
 			return;
 		}
@@ -398,11 +398,12 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 			if (near) {
 				float hy = l.bezel() + MonitorLod.HEADER;
 				ScreenDraw.rect(pose, vc, l.bezel(), l.bezel(), l.width() - l.bezel(), hy, -z, HEADER_BG, light);
-				ScreenDraw.rect(pose, vc, l.bezel(), hy - 2, l.width() - l.bezel(), hy, -z, accent, light);
-				ScreenDraw.rect(pose, vc, l.x0(), l.bezel() + 4, l.x0() + 5, l.bezel() + 9, -2 * z, accent, light);
 				if (g.chip() != null) {
-					// the status chip: the state's colour as a solid tab with dark text, readable from further than coloured text
-					ScreenDraw.rect(pose, vc, l.x1() - g.chipW(), l.bezel() + 2, l.x1(), hy - 2, -2 * z, accent, light);
+					// the status band under the title: the state's colour, full width, dark text (reads from further than coloured text)
+					ScreenDraw.rect(pose, vc, l.bezel(), hy, l.width() - l.bezel(), hy + MonitorLod.STATUS_BAND, -z, accent, light);
+				} else {
+					ScreenDraw.rect(pose, vc, l.bezel(), hy - 2, l.width() - l.bezel(), hy, -z, accent, light);
+					ScreenDraw.rect(pose, vc, l.x0(), l.bezel() + 4, l.x0() + 5, l.bezel() + 9, -2 * z, accent, light);
 				}
 				float y = rowsTop(l, g);
 				for (RowGlyph r : g.rows()) {
@@ -441,8 +442,9 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 		float depth = -(LIP + z);
 		float x1 = l.width() - 3 * mp;
 		float x0 = x1 - 2 * mp;
-		float y0 = l.height() - 2 * mp;
-		float y1 = l.height() - mp;
+		// the visible chin band is the 2 model px above the foot: y from height - 4 mp to height - 2 mp
+		float y0 = l.height() - 3.5f * mp;
+		float y1 = l.height() - 2.5f * mp;
 		ps.pushPose();
 		ps.translate(0, 0, depth);
 		c.order(0).submitCustomGeometry(ps, ScreenDraw.fill(), (pose, vc) -> {
@@ -450,10 +452,10 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 			ScreenDraw.rect(pose, vc, x0 - mp * 0.5f, y0 - mp * 0.25f, x1 + mp * 0.5f, y1 + mp * 0.25f, 0, 0xFF111316, light);
 			ScreenDraw.rect(pose, vc, x0, y0, x1, y1, -z, 0xFF000000 | led, light);
 		});
-		float bs = Math.min(1f, 1.8f * mp / 8f);
+		float bs = Math.min(1f, 1.7f * mp / 7f);
 		if (bs >= 0.6f) {
 			ps.pushPose();
-			ps.translate(3 * mp, l.height() - 2 * mp - 4 * bs, -z);
+			ps.translate(3 * mp, l.height() - 3 * mp - 3.5f * bs, -z);
 			ps.scale(bs, bs, 1f);
 			text(ps, c, plain("T3CRAFT"), 0, 0, 0xFF8A919B, light);
 			ps.popPose();
@@ -524,7 +526,7 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 	private static float rowsTop(MonitorLod.Layout l, Glyphs g) {
 		if (g.topAlign()) {
 			// static status screens read top-down, right under the header
-			return l.bezel() + MonitorLod.HEADER + 3;
+			return l.bezel() + MonitorLod.HEADER + (g.chip() != null ? MonitorLod.STATUS_BAND : 0) + 3;
 		}
 		// newest row sits just above the footer; fewer rows than room leave the gap at the top
 		float bottom = footerY(l) - 1;
@@ -539,10 +541,10 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 		float hy = l.bezel() + 3;
 		Font font = Minecraft.getInstance().font;
 		if (g.title() != null) {
-			text(ps, c, g.title(), l.x0() + 8, hy, TEXT, light);
+			text(ps, c, g.title(), g.chip() != null ? l.x0() : l.x0() + 8, hy, TEXT, light);
 		}
 		if (g.chip() != null) {
-			text(ps, c, g.chip(), l.x1() - g.chipW() + 3, hy, 0xFF0B0D0F, light);
+			text(ps, c, g.chip(), l.x0(), l.bezel() + MonitorLod.HEADER + 2, 0xFF0B0D0F, light);
 		} else if (g.status() != null) {
 			text(ps, c, g.status(), l.x1() - font.width(g.status()), hy, statusColor, light);
 		}

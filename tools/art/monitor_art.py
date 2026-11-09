@@ -63,7 +63,8 @@ STEEL = rgb(0x646A74)
 BODY = rgb(0x4B4F58)     # flat casing
 SHADE = rgb(0x363942)
 DEEP = rgb(0x23252B)
-LIP = rgb(0x0F1012)      # inner lip (towards the glass)
+LIP = rgb(0x0F1012)      # darkest casing detail (vent slits)
+INNER = rgb(0x7C828C)    # inner lip faces: a bright edge round the glass
 GLASS = rgb(0x0B0D0F)
 GLASS2 = rgb(0x0E1114)
 ACCENT = rgb(0x3FB7C2)   # T3 teal
@@ -71,9 +72,9 @@ ACCENT = rgb(0x3FB7C2)   # T3 teal
 
 # ---------------------------------------------------------------- textures
 def frame_pixel(x, y):
-    """The frame seen from the front: bezel 2 px (top / sides), chin 3 px, glass inside."""
-    if y > 12:  # chin: inner shadow, flat, outer edge
-        return SHADE if y == 13 else (BODY if y == 14 else DEEP)
+    """The frame seen from the front: bezel 2 px (top / sides), chin 4 px, glass inside."""
+    if y > 11:  # chin (visible band rows 12-13, then the foot's two rows)
+        return SHADE if y == 12 else (BODY if y == 13 else DEEP)
     if y < 2:
         if x == 15:
             return BODY
@@ -141,21 +142,22 @@ def make_back():
 
 
 def make_trim():
-    """Swatches. rows 0-3 foot top (brushed steel, front edge brightest), row 5 foot front, row 7 foot end,
-    row 9 lip inner faces (dark), row 11 lip top (bright), row 13 lip outer side."""
+    """Swatches. rows 0-4 foot top (brushed steel, front edge brightest), rows 6-7 foot front, row 9 foot end,
+    row 11 lip inner faces (bright edge round the glass), row 13 lip top, row 15 lip outer side."""
     g = grid(rgb(0x000000))
-    top = [rgb(0x5C616A), rgb(0x6F747E), rgb(0x868C96), rgb(0xA9B0BA)]
-    for y in range(4):
+    top = [rgb(0x5C616A), rgb(0x6F747E), rgb(0x868C96), rgb(0x9AA1AB), rgb(0xC4CAD3)]
+    for y in range(5):
         for x in range(16):
             c = top[y]
             if y == 1 and x % 4 == 0:
                 c = rgb(0x757A84)
             g[y][x] = c
-    g[5] = [rgb(0x41444C)] * 16
+    g[6] = [rgb(0x5A5E67)] * 16
     g[7] = [rgb(0x30323A)] * 16
-    g[9] = [LIP] * 16
-    g[11] = [rgb(0xA0A6B0)] * 16
-    g[13] = [rgb(0x565B64)] * 16
+    g[9] = [rgb(0x30323A)] * 16
+    g[11] = [INNER] * 16
+    g[13] = [rgb(0xA0A6B0)] * 16
+    g[15] = [rgb(0x565B64)] * 16
     return g
 
 
@@ -164,12 +166,12 @@ def north_uv(xa, xb, ya, yb):
     return [16 - xb, 16 - yb, 16 - xa, 16 - ya]
 
 
-TRIM_FOOT_TOP = "#trim", [0, 0, 16, 4]
-TRIM_FOOT_FRONT = "#trim", [0, 5, 16, 6]
-TRIM_FOOT_END = "#trim", [0, 7, 4, 8]
-TRIM_LIP_INNER = "#trim", [0, 9, 16, 10]
-TRIM_LIP_TOP = "#trim", [0, 11, 16, 12]
-TRIM_LIP_SIDE = "#trim", [0, 13, 16, 14]
+TRIM_FOOT_TOP = "#trim", [0, 0, 16, 5]
+TRIM_FOOT_FRONT = "#trim", [0, 6, 16, 8]
+TRIM_FOOT_END = "#trim", [0, 9, 5, 10]
+TRIM_LIP_INNER = "#trim", [0, 11, 16, 12]
+TRIM_LIP_TOP = "#trim", [0, 13, 16, 14]
+TRIM_LIP_SIDE = "#trim", [0, 15, 16, 16]
 
 
 def face(spec):
@@ -209,12 +211,12 @@ def strip_up(l, r):
 
 
 def strip_down(l, r):
-    """Chin (y 1..3) and the foot under it (y 0..1, 4 px deep)."""
+    """Chin (y 2..4) and the foot under it (y 0..2, 5 px deep)."""
     xa, xb = span(l, r)
-    chin = element([xa, 1, -1], [xb, 3, 0], {
-        "north": {"texture": "#frame", "uv": north_uv(xa, xb, 1, 3)},
+    chin = element([xa, 2, -1], [xb, 4, 0], {
+        "north": {"texture": "#frame", "uv": north_uv(xa, xb, 2, 4)},
         "up": face(TRIM_LIP_INNER)})
-    foot = element([0, 0, -4], [16, 1, 0], {
+    foot = element([0, 0, -5], [16, 2, 0], {
         "north": face(TRIM_FOOT_FRONT), "up": face(TRIM_FOOT_TOP), "down": face(TRIM_LIP_INNER),
         "east": face(TRIM_FOOT_END), "west": face(TRIM_FOOT_END)})
     return [chin, foot]
@@ -224,7 +226,7 @@ def model(elements, extra_textures=None):
     t = {"particle": "t3craft:block/monitor_side", "frame": "t3craft:block/monitor_front", "trim": "t3craft:block/monitor_trim"}
     if extra_textures:
         t.update(extra_textures)
-    return {"parent": "minecraft:block/block", "textures": t, "elements": elements}
+    return {"parent": "minecraft:block/block", "ambientocclusion": False, "textures": t, "elements": elements}
 
 
 def body():
