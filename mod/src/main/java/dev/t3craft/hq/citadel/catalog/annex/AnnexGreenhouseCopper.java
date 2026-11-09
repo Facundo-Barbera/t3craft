@@ -38,9 +38,9 @@ public final class AnnexGreenhouseCopper implements Variant {
 	/** Plate / eaves level; glass walls are y1..y2 below it. */
 	private static final int PLATE = 3;
 
-	private static final BlockState POST = Blocks.CUT_COPPER.waxed().weathered().defaultBlockState();
-	private static final BlockState RIB_TOP = Blocks.CUT_COPPER.waxed().oxidized().defaultBlockState();
-	private static final Block RIB = Blocks.CUT_COPPER_STAIRS.waxed().oxidized();
+	private static final BlockState POST = Blocks.CUT_COPPER.waxed().unaffected().defaultBlockState();
+	private static final BlockState RIB_TOP = Blocks.CUT_COPPER.waxed().unaffected().defaultBlockState();
+	private static final Block RIB = Blocks.CUT_COPPER_STAIRS.waxed().unaffected();
 
 	@Override
 	public String id() {
