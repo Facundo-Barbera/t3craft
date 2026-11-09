@@ -51,9 +51,6 @@ final class StatusScreen {
 	/** Height of a tile's colour stripe. */
 	private static final float STRIPE = 5f;
 
-	private StatusScreen() {
-	}
-
 	// ---- the data -----------------------------------------------------------------------------
 
 	/**
