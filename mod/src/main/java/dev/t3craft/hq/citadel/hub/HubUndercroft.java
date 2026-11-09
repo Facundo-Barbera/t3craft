@@ -316,6 +316,14 @@ public final class HubUndercroft {
 			Direction away = sx > 0 ? Direction.EAST : Direction.WEST;
 			Direction toCentre = away.getOpposite();
 			for (int v0 : new int[] {c.s(4), c.s(8)}) {
+				// a red rug under each reading table (the nave's own rug colour), one cell wider than the table and its chairs
+				for (int dz = -1; dz <= 5; dz++) {
+					for (int u = n + 3; u <= n + 6; u++) {
+						if (inside(c, sx * u, -(v0 + dz))) {
+							c.set(sx * u, fy(), -(v0 + dz), CitadelCanvas.terracotta(DyeColor.RED));
+						}
+					}
+				}
 				for (int dz = 0; dz < 5; dz++) {
 					int z = -(v0 + dz);
 					for (int u : new int[] {n + 4, n + 5}) {

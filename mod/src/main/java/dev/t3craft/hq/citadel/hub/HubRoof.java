@@ -62,7 +62,7 @@ public final class HubRoof {
 
 	/**
 	 * A cell of a drum's ring: calcite corners, base and cornice, clear glass between (rows above {@code glassFrom}) split by
-	 * a cherry mullion every third cell. (struct/hub3: it was pink on two sides and light blue on the other two, which read as a
+	 * a stripped cherry mullion every third cell. (struct/hub3: it was pink on two sides and light blue on the other two, which read as a
 	 * grey-blue patch from outside and did not match the rest of the roof; clear glass lets the light in and shows the
 	 * frame, the palette of the roof.)
 	 */
@@ -73,7 +73,7 @@ public final class HubRoof {
 		boolean mullion = Math.floorMod(along, 3) == 0;
 		for (int y = bottom; y <= topY; y++) {
 			boolean solid = corner || y <= glassFrom || y == topY;
-			c.set(x, y, z, solid ? CALCITE : mullion ? HubBlocks.log(Direction.Axis.Y) : Blocks.GLASS.defaultBlockState());
+			c.set(x, y, z, solid ? CALCITE : mullion ? HubBlocks.strippedLog(Direction.Axis.Y) : Blocks.GLASS.defaultBlockState());
 		}
 	}
 
