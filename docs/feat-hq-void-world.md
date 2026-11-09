@@ -1,9 +1,11 @@
 # feat/hq-void-world — the official HQ floats in the void
 
 The official HQ world (demo mode, "T3Craft HQ") is now created as a **void world** (the classic
-superflat "The Void" preset). The HQ stands on a floating skyblock-style island that grows with it,
-and the player starts on a small starter island with a tree and a chest. The survival site mode
-(random terrain) does not change.
+superflat "The Void" preset). The HQ stands on a floating skyblock-style island that grows with it.
+Since feat/hq-spawn-start the player spawns in the **centre of the HQ, on a single block**, and the
+build waits until they walk or press **[Start building]** (see below). Older worlds keep the small
+starter island (tree, chest, bridge) they already have. The survival site mode (random terrain) does
+not change.
 
 Code: `mod/src/client/java/dev/t3craft/client/demo/` — `VoidIsland` (shapes, pure data),
 `VoidGuard` (keeps players out of the void), plus small changes in `VanillaDemoWorld`,
@@ -69,7 +71,72 @@ Code: `mod/src/client/java/dev/t3craft/client/demo/` — `VoidIsland` (shapes, p
   ground under it (and froglights on the rim). Mob spawning is off in the HQ world anyway.
 - The hash of a void HQ carries a `-void` suffix, so a void HQ is never taken for a flat one.
 
-## Starter island
+## Spawn in the centre of the HQ (feat/hq-spawn-start)
+
+Code: `HqCentre` (where the centre is, which block goes under it), `DemoClient.spawnAtCentre`,
+`VanillaDemoWorld.placeCentreBlock` / `setWorldSpawn`.
+
+- **The centre** is the hub of the HQ: the `hub` anchor (centre of the hub floor) of the layout's
+  empty plan, baked to world coordinates exactly like the NPC anchors (`DemoHq.worldSite`); if a
+  layout has no hub, or the plan keeps something solid in the feet or head cell, its `spawn` anchor.
+  The layout is the one built in that world (`HqLayoutState` in the marker), else the configured one
+  (`hqLayout`). Applies to void **and** flat HQ worlds.
+- **One block under the feet**, placed by the integrated server on `SERVER_STARTED` (before the
+  player joins) only when that cell is empty: the plan's own block for that floor cell (rotated to the
+  world) when it is a plain full block without block entity data, so the builders find it already in
+  place and skip it; otherwise a neutral smooth stone block, which the plan's floor replaces when the
+  builders get there. If the spawn is still the centre and that block went missing before the floor
+  was built, it is put back on the next start.
+- **World spawn** on that cell (`ServerLevel.setRespawnData`, the 26.3 equivalent of
+  `setDefaultSpawnPos`), facing into the HQ, `respawn_radius` 0: first join, respawn and reconnects go
+  there.
+- **Existing HQ worlds:** nobody is teleported. The world spawn moves to the centre only if it still
+  is where the mod put it before (the starter island's spawn, or the old viewpoint in front of the
+  site); a spawn set by hand with `/setworldspawn` is left alone. The decision is taken once per world
+  and recorded in the marker (`t3craft-demo.json`, `"centre": [x, y, z]`).
+- **Starter island: dropped for new worlds.** It existed to give the player ground away from the
+  build site; now the player stands where the build starts and the island grows from under their
+  feet (the radial build is centred on the player), so a second island off to the side, with a bridge
+  into a site that is not there yet, only got in the way. Old worlds that have one keep it (marker
+  `starter`), it still gets swallowed by a growing HQ island as before, and it stays the void guard's
+  fallback. In new worlds the void guard falls back to the centre block.
+- The first-build teleport (to the starter island / viewpoint) now only happens with
+  `hq.startBuild: "immediate"`; with the default the player already stands at the centre, and pulling
+  them back after they walked would be wrong.
+
+## Build start: wait for the player (feat/hq-spawn-start)
+
+Code: `HqStartGate` (state + config), `DemoClient.armGate` / `pollGate` / `confirmStart`.
+
+- The build due when the player enters the HQ world (first build, a build left half done, or a diff
+  that piled up while they were away) no longer starts by itself. First the world has to finish
+  loading (the existing settle ticks and the roster gate), then the mod waits for **either** signal:
+  - **(a) confirm**: the chat message has a clickable **[Start building]** button
+    (`ClickEvent.RunCommand` → client command `/t3craft build start`), or the key **Start the HQ
+    build** (Options › Controls › T3Craft, default **G**, rebindable);
+  - **(b) walk**: more than 3 blocks (horizontal) from where the player stood when the wait began,
+    or a movement key (W/A/S/D as bound) held for 10 ticks with no screen open.
+- While waiting a discreet hint is shown on the action bar and in chat: "The build will start when
+  you walk or press [Start]" / "La construcción comenzará cuando camines o pulses [Comenzar]".
+  `/t3craft demo status` says the build is waiting.
+- Leaving before the build starts (or in the middle of it) keeps it pending: the marker is only
+  written when the build completes, and the wait is armed again on the next visit.
+- Later builds (a thread took or released a station, a layout pack changed) start on their own as
+  before, but only while the player is in the HQ world (the reconcile runs on the client tick with
+  the HQ world loaded) and never while the entry build is still waiting for the player.
+  `/t3craft demo rebuild` is an explicit request and starts at once.
+- Config, additive (`config/t3craft.json`, section `hq`):
+
+  ```json
+  "hq": {
+    "startBuild": "on_walk_or_confirm"   // default; "immediate" = start as soon as the world is loaded (old behaviour)
+  }
+  ```
+
+  An invalid value falls back to the default and logs the key once. Read every time a build is due,
+  so a change applies on the next entry without a restart.
+
+## Starter island (worlds created before feat/hq-spawn-start)
 
 - Placed by the **integrated server** as soon as a new void HQ world starts (`SERVER_STARTED`, before
   the player joins) — not by the builders, so there is ground under the player from the first tick.
@@ -116,11 +183,16 @@ the plan has.
 
 ## How to try it
 
-1. Restart the game (new server tick hook, record shapes changed).
-2. HQ menu → Reset HQ (or delete `saves/t3craft-hq`), then Open HQ: you appear on the starter
-   island (tree, chest, bridge) over the void; the builders lay the island and then the HQ.
-3. `/t3craft demo status` shows `(void)` and the island area in the hq line.
-4. Walk off the edge (not flying): a moment later you are back on solid ground, no damage. Fly
+1. Restart the game (new command `/t3craft build start`, new key, record shapes changed).
+2. HQ menu → Reset HQ (or delete `saves/t3craft-hq`), then Open HQ: you appear in the centre of
+   the (not yet built) HQ, on one block over the void; chat offers **[Start building]**. Walk a few
+   steps, click the button or press G: the builders lay the island from under your feet and then
+   the HQ.
+3. Leave before starting, come back: you are on the same block and the build waits again. With
+   `"hq": {"startBuild": "immediate"}` it starts as soon as the world has loaded.
+4. `/t3craft demo status` shows `(void)` and the island area in the hq line.
+5. Walk off the edge (not flying): a moment later you are back on solid ground, no damage. Fly
    below the island in creative: nothing happens.
-5. Grow the HQ (new threads): the island grows first, then the new modules.
-6. An existing flat HQ world opens exactly as before; `"world": "flat"` keeps new worlds flat.
+6. Grow the HQ (new threads): the island grows first, then the new modules (on their own, no wait).
+7. An existing HQ world keeps its build; its world spawn moves to the hub only if it was still the
+   old one (starter island / viewpoint); `"world": "flat"` keeps new worlds flat.
