@@ -40,12 +40,12 @@ public final class AnnexGreenhouseCopper implements Variant {
 	private static final int PLATE = 4;
 
 	private static final BlockState POST_W = Blocks.CUT_COPPER.waxed().weathered().defaultBlockState();
-	private static final BlockState POST_O = Blocks.CUT_COPPER.waxed().oxidized().defaultBlockState();
-	private static final Block RIB_W = Blocks.CUT_COPPER_STAIRS.waxed().exposed();
-	private static final Block RIB_O = Blocks.CUT_COPPER_STAIRS.waxed().weathered();
-	private static final Block SLAB_O = Blocks.CUT_COPPER_SLAB.waxed().weathered();
-	private static final BlockState RIDGE = Blocks.CUT_COPPER.waxed().exposed().defaultBlockState();
-	private static final Block RIDGE_ST = Blocks.CUT_COPPER_STAIRS.waxed().exposed();
+	private static final BlockState POST_E = Blocks.CUT_COPPER.waxed().exposed().defaultBlockState();
+	private static final Block RIB_W = Blocks.CUT_COPPER_STAIRS.waxed().oxidized();
+	private static final Block RIB_O = Blocks.CUT_COPPER_STAIRS.waxed().oxidized();
+	private static final Block SLAB_O = Blocks.CUT_COPPER_SLAB.waxed().oxidized();
+	private static final BlockState RIDGE = Blocks.CUT_COPPER.waxed().unaffected().defaultBlockState();
+	private static final Block RIDGE_ST = Blocks.CUT_COPPER_STAIRS.waxed().unaffected();
 	private static final BlockState EMBLEM = Blocks.CHISELED_COPPER.waxed().exposed().defaultBlockState();
 
 	private static final int AISLE = 1;
@@ -123,17 +123,17 @@ public final class AnnexGreenhouseCopper implements Variant {
 			int span = vb - vf;
 			int half = (w - 1) / 2;
 			boolean hipWant = w >= 9 && span >= 6 && p.hash(0, 0, 0, 3) == 0;
-			boolean lantWant = w >= 9 && span >= (hipWant ? 4 : 6) && p.hash(1, 0, 0, 2) == 0 && p.h() - 1 - PLATE - 2 >= 1;
+			boolean lantWant = w >= 9 && span >= (hipWant ? 4 : 6) && p.hash(1, 0, 0, 2) == 0 && p.h() - 1 - PLATE - 3 >= 1;
 			hip = hipWant;
 			lant = lantWant;
 			int want = p.hash(2, 0, 0, 2) == 0 ? half : Math.max(1, half - 1);
 			int byW = lant ? (w - 3) / 2 : half;
 			int byD = hip ? (lant ? (span - 2) / 2 : span / 2) : 99;
-			int byH = p.h() - 1 - PLATE - (lant ? 2 : 1);
+			int byH = p.h() - 1 - PLATE - (lant ? 3 : 1);
 			r = Math.max(1, Math.min(Math.min(want, byW), Math.min(byD, byH)));
 			rh = PLATE + r;
-			mu0 = r;
-			mu1 = w - 1 - r;
+			mu0 = lant ? (w % 2 == 1 ? cu - 1 : cu - 2) : r;
+			mu1 = lant ? cu + 1 : w - 1 - r;
 			mv0 = hip ? vf + r : vf + 2;
 			mv1 = hip ? vb - r : vb - 2;
 			ribU = ribs(w);
@@ -148,6 +148,9 @@ public final class AnnexGreenhouseCopper implements Variant {
 				int rem = iw - 2 - island;
 				wd = new int[] {1, rem / 2, island, rem - rem / 2, 1};
 				kd = new int[] {STRIP, AISLE, BED, AISLE, STRIP};
+			} else if (iw == 3) {
+				wd = new int[] {1, 2};
+				kd = new int[] {BED, AISLE};
 			} else if (iw == 5) {
 				wd = new int[] {2, 2, 1};
 				kd = new int[] {BED, AISLE, BED};
@@ -226,7 +229,7 @@ public final class AnnexGreenhouseCopper implements Variant {
 	}
 
 	private static BlockState post(Plot p, int u, int v, boolean corner) {
-		return corner || p.hash(u, 0, v, 6) == 0 ? POST_O : POST_W;
+		return corner || p.hash(u, 0, v, 3) == 0 ? POST_W : POST_E;
 	}
 
 	private static BlockState door(boolean lower, DoorHingeSide hinge) {
@@ -285,8 +288,7 @@ public final class AnnexGreenhouseCopper implements Variant {
 		int doorBase = g.vf == 0 ? 0 : 1;
 		int top = doorBase + 2;
 		for (int u = 0; u < w; u++) {
-			boolean jamb = u == g.dl - 1 || u == g.dl + g.dw;
-			for (int y = 1; y <= 3; y++) {
+						for (int y = 1; y <= 3; y++) {
 				BlockState st;
 				if (g.doorCol(u)) {
 					if (y == doorBase || y == doorBase + 1) {
@@ -296,10 +298,10 @@ public final class AnnexGreenhouseCopper implements Variant {
 					} else {
 						st = POST_W; // lintel
 					}
-				} else if (u == 0 || u == w - 1 || jamb || g.ribU[u]) {
+				} else if (u == 0 || u == w - 1 || g.ribU[u]) {
 					st = post(p, u, g.vf, u == 0 || u == w - 1);
 				} else {
-					st = pane(y == 3 ? pink : clear, true, true, true);
+					st = pane(y == 3 ? pink : clear, true, !g.doorCol(u - 1), !g.doorCol(u + 1));
 				}
 				if (g.vf == 0 && y < doorBase) {
 					continue;
@@ -403,6 +405,7 @@ public final class AnnexGreenhouseCopper implements Variant {
 				if (edgeU || edgeV) {
 					BlockState wall = edgeU && edgeV ? POST_W : b(Blocks.GLASS);
 					p.set(c, u, g.rh + 1, v, wall);
+					p.set(c, u, g.rh + 2, v, wall);
 				}
 				BlockState cap;
 				if (edgeU || edgeV) {
@@ -411,7 +414,7 @@ public final class AnnexGreenhouseCopper implements Variant {
 				} else {
 					cap = RIDGE;
 				}
-				p.set(c, u, g.rh + 2, v, cap);
+				p.set(c, u, g.rh + 3, v, cap);
 			}
 		}
 	}
@@ -522,14 +525,14 @@ public final class AnnexGreenhouseCopper implements Variant {
 		return table;
 	}
 
-	/** Bench cells beside the aisle: seed chest by the left wall, a composter by the right wall, barrels between. */
+	/** Bench cells beside the aisle: seed chests by the walls, barrels between. */
 	private static BlockState zoneItem(boolean left, boolean centre, int outer, int len) {
 		BlockState barrel = b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP);
 		if (centre) {
 			return barrel;
 		}
 		if (outer == 0) {
-			return left ? b(Blocks.CHEST).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH) : b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP);
+			return b(Blocks.CHEST).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH);
 		}
 		return barrel;
 	}
@@ -539,7 +542,7 @@ public final class AnnexGreenhouseCopper implements Variant {
 	/** [finish] copper lanterns hanging over the aisle, from the ridge (or from the monitor cap). */
 	private static void lanterns(CitadelCanvas c, Plot p, G g) {
 		BlockState lantern = Blocks.COPPER_LANTERN.waxed().unaffected().defaultBlockState().setValue(BlockStateProperties.HANGING, true);
-		int y = g.lant ? g.rh + 1 : g.rh - 1;
+		int y = g.lant ? g.rh + 2 : g.rh - 1;
 		int vmin = g.lant ? g.mv0 + 1 : g.hip ? g.mv0 : g.vf + 1;
 		int vmax = g.lant ? g.mv1 - 1 : g.hip ? g.mv1 : g.vb - 1;
 		int len = vmax - vmin + 1;
