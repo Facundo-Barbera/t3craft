@@ -3,14 +3,18 @@ package dev.t3craft.hq.citadel.catalog;
 import static dev.t3craft.hq.citadel.CitadelCanvas.AIR;
 import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
 
+import dev.t3craft.hq.PlanProbe;
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.function.LongFunction;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.EmptyBlockGetter;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.DoorBlock;
+import net.minecraft.world.level.block.FenceGateBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 
@@ -61,7 +65,7 @@ public final class InteriorStair {
 	}
 
 	/** Score of a flight starting at {@code (u, v)} in direction {@code d}, or -1 when it is not valid. */
-	private static int score(CitadelCanvas c, Plot p, int lower, int upper, int u, int v, int d) {
+	private static int score(CitadelCanvas c, Plot p, int lower, int upper, int u, int v, int d, Set<BlockPos> reach) {
 		int rise = upper - lower;
 		int du = DIRS[d][0];
 		int dv = DIRS[d][1];
@@ -95,6 +99,10 @@ public final class InteriorStair {
 		if (!room(c, p, u - du, lower, v - dv) || !room(c, p, u + rise * du, upper, v + rise * dv)) {
 			return -1;
 		}
+		// and the approach must be somewhere a person can really get to from outside (a sealed shaft is no site)
+		if (!reach.contains(p.world(u - du, lower, v - dv))) {
+			return -1;
+		}
 		// best: one side free all along (a wall on the other), so the flight hugs a wall and leaves room to pass
 		return 1 + 2 * rise - Math.abs(side - rise);
 	}
@@ -110,6 +118,7 @@ public final class InteriorStair {
 		if (rise < 3) {
 			return false;
 		}
+		Set<BlockPos> reach = reachFromOutside(c, p);
 		int best = -1;
 		int bu = 0;
 		int bv = 0;
@@ -117,7 +126,7 @@ public final class InteriorStair {
 		for (int d = 0; d < 4; d++) {
 			for (int v = 0; v < p.d(); v++) {
 				for (int u = 0; u < p.w(); u++) {
-					int sc = score(c, p, lower, upper, u, v, d);
+					int sc = score(c, p, lower, upper, u, v, d, reach);
 					if (sc > best) {
 						best = sc;
 						bu = u;
@@ -163,6 +172,33 @@ public final class InteriorStair {
 					.setValue(BlockStateProperties.WEST, rail.contains((ru - 1) << 8 | rv)));
 		}
 		return true;
+	}
+
+	/**
+	 * Feet cells reachable on foot from outside the plot, through the build as it stands (doors and gates read as
+	 * open), on a synthetic grass ring 2 cells wide round the plot so the walk never spills into the city.
+	 */
+	private static Set<BlockPos> reachFromOutside(CitadelCanvas c, Plot p) {
+		BlockState grass = Blocks.GRASS_BLOCK.defaultBlockState();
+		int gy = p.y0() - 1;
+		LongFunction<BlockState> view = k -> {
+			BlockPos q = BlockPos.of(k);
+			int x = q.getX();
+			int y = q.getY();
+			int z = q.getZ();
+			if (x < p.x0() - 2 || x >= p.x0() + p.sizeX() + 2 || z < p.z0() - 2 || z >= p.z0() + p.sizeZ() + 2 || y < gy) {
+				return null;
+			}
+			BlockState s = c.at(x, y, z);
+			if (y == gy) {
+				return s != null && !s.isAir() ? s : grass;
+			}
+			if (s == null || s.isAir() || s.getBlock() instanceof DoorBlock || s.getBlock() instanceof FenceGateBlock) {
+				return null;
+			}
+			return s;
+		};
+		return PlanProbe.walk(view).reachable(new BlockPos(p.x0() - 1, p.y0(), p.z0() - 1));
 	}
 
 	/** A timber flight (spruce) for the timber-framed houses. */
