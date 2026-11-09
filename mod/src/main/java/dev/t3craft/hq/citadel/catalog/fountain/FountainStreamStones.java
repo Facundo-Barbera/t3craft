@@ -184,7 +184,7 @@ public final class FountainStreamStones implements Variant {
 		}
 
 		void plan() {
-			hd = n >= 11 ? 2 : 1;
+			hd = n >= 13 ? 2 : 1;
 			pl = n >= 12 ? 3 : 2;
 			pa1 = n - 3;
 			pa0 = pa1 - pl + 1;
@@ -196,20 +196,20 @@ public final class FountainStreamStones implements Variant {
 			// the centre line swings across the plot in an S (about one and a quarter waves), up to two cells a column
 			int len = pa0 - 1 - hd;
 			double phase = p.hash(3, 0, 0, 628) / 100.0;
-			double freq = (len >= 5 ? 7.9 : 3.8) / len;
+			double freq = (p.hash(7, 0, 0, 2) == 0 ? 1.15 : 0.8) * Math.PI / Math.max(1, len - 1);
 			int prev = -1;
 			for (int a = hd + 1; a <= pa0 - 1; a++) {
 				double t = (lo + hi) / 2.0 + (hi - lo) / 2.0 * 1.15 * Math.sin(phase + (a - hd) * freq);
 				int val = (int) Math.round(t);
 				if (prev >= 0) {
-					val = Math.max(prev - 2, Math.min(prev + 2, val));
+					val = Math.max(prev - 1, Math.min(prev + 1, val));
 				}
 				val = Math.max(lo, Math.min(hi, val));
 				sc[a] = val;
 				prev = val;
 			}
 			s0 = sc[hd + 1];
-			pw = Math.max(2, Math.min(m >= 11 ? 5 : m >= 9 ? 4 : 3, m - 4));
+			pw = Math.max(2, Math.min(m >= 11 ? 4 : 3, m - 4));
 			int scL = sc[pa0 - 1];
 			ps0 = Math.max(2, Math.min(m - 2 - pw, scL - (pw - 2) / 2));
 			while (ps0 + pw - 1 < scL) {
