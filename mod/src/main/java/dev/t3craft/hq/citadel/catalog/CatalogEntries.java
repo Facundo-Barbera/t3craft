@@ -15,6 +15,9 @@ final class CatalogEntries {
 	}
 
 	private static final Variant[] ENTRIES = {
+			new dev.t3craft.hq.citadel.catalog.fountain.FountainOctagonStatue(), // fountain_octagon_statue
+			new dev.t3craft.hq.citadel.catalog.fountain.FountainTieredBasins(), // fountain_tiered_basins
+			new dev.t3craft.hq.citadel.catalog.fountain.FountainWallMascaron(), // fountain_wall_mascaron
 			new dev.t3craft.hq.citadel.catalog.house.HouseTimberCottage(), // house_timber_cottage
 			new dev.t3craft.hq.citadel.catalog.lamp.LampCherryPost(), // lamp_cherry_post
 	};
