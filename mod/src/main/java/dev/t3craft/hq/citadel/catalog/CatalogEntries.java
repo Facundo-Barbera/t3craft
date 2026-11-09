@@ -47,6 +47,9 @@ final class CatalogEntries {
 			new dev.t3craft.hq.citadel.catalog.tree.TreeCherryGrand(), // tree_cherry_grand
 			new dev.t3craft.hq.citadel.catalog.tree.TreeCherryLeaning(), // tree_cherry_leaning
 			new dev.t3craft.hq.citadel.catalog.tree.TreeCherryWeeping(), // tree_cherry_weeping
+			new dev.t3craft.hq.citadel.catalog.tree.TreeBirchGrove(), // tree_birch_grove
+			new dev.t3craft.hq.citadel.catalog.tree.TreeMapleRed(), // tree_maple_red
+			new dev.t3craft.hq.citadel.catalog.tree.TreePineTiered(), // tree_pine_tiered
 	};
 
 	static final List<Variant> ALL = List.of(ENTRIES);
