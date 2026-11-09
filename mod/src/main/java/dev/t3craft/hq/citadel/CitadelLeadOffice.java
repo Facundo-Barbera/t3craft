@@ -129,12 +129,22 @@ public final class CitadelLeadOffice {
 	 * hall from its neighbours at a distance. Call after the roof.
 	 */
 	private static void flag(CitadelCanvas c, Room r, HallStyle style, DyeColor env, int ceiling) {
+		// the first column along the ridge whose highest block is not a chimney (bricks)
 		BlockPos at = r.cell(r.d() / 2, r.c(), 0);
 		int top = ceiling;
-		for (int y = ceiling + fh() + 12; y >= ceiling; y--) {
-			BlockState s = c.at(at.getX(), y, at.getZ());
-			if (s != null && !s.isAir()) {
-				top = y;
+		for (int u : new int[] {r.d() / 2, r.d() / 4, 3 * r.d() / 4, r.d() / 3, 2 * r.d() / 3, 2}) {
+			BlockPos p = r.cell(u, r.c(), 0);
+			for (int y = ceiling + fh() + 12; y >= ceiling; y--) {
+				BlockState s = c.at(p.getX(), y, p.getZ());
+				if (s != null && !s.isAir()) {
+					if (!s.is(Blocks.BRICKS)) {
+						at = p;
+						top = y;
+					}
+					break;
+				}
+			}
+			if (top > ceiling && at.equals(p)) {
 				break;
 			}
 		}
@@ -237,15 +247,61 @@ public final class CitadelLeadOffice {
 		tub(c, r.cell(0, w - 1, 1));
 		if (big) {
 			tub(c, r.cell(0, mid - ah - 1, 1));
+			tub(c, r.cell(0, mid + ah + 1, 1));
+			tub(c, r.cell(d - 2, 1, 1));
+			tub(c, r.cell(d - 2, w - 2, 1));
+			lounge(c, mod, r, env, style);
 		}
 		BlockState lantern = Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, true);
-		int[] lu = big ? new int[] {2, d / 2, d - 4} : new int[] {2, d - 4};
+		int[] lu = big ? new int[] {1, d / 2, d - 4} : new int[] {2, d - 4};
 		int[] lv = big ? new int[] {2, mid, w - 3} : new int[] {2, w - 3};
 		for (int u : lu) {
 			for (int v : lv) {
 				BlockPos p = r.cell(u, v, h - 1);
 				c.put(p.getX(), p.getY(), p.getZ(), lantern, HANGING);
 			}
+		}
+	}
+
+	/**
+	 * Large hall: a lounge on the west side of the lobby (between the shelves and the aisle): a low table with eight
+	 * seats round it on a rug, for whoever waits for the lead. Seats leave a one-cell lane to the aisle side.
+	 */
+	private static void lounge(CitadelCanvas c, HqLayout.Module mod, Room r, DyeColor env, HallStyle style) {
+		int w = r.w();
+		int mid = r.c();
+		Direction fwd = r.back();
+		Direction side = r.side();
+		int v0 = mid + 3;
+		int v1 = w - 2;
+		int u0 = 3;
+		int u1 = 9;
+		BlockState rug = b(Blocks.CARPET.pick(env));
+		BlockState rugTrim = b(Blocks.CARPET.pick(style.alt(env)));
+		for (int u = u0; u <= u1; u++) {
+			for (int v = v0; v <= v1; v++) {
+				c.set(r.cell(u, v, 1), u == u0 || u == u1 || v == v0 || v == v1 ? rugTrim : rug);
+			}
+		}
+		int tu0 = u0 + 2;
+		int tu1 = u1 - 2;
+		int tv0 = v0 + 2;
+		int tv1 = v1 - 2;
+		BlockState top = slab(Blocks.CHERRY_SLAB);
+		for (int u = tu0; u <= tu1; u++) {
+			for (int v = tv0; v <= tv1; v++) {
+				c.set(r.cell(u, v, 1), top);
+			}
+		}
+		BlockPos pot = r.cell((tu0 + tu1) / 2, tv0, 2);
+		c.put(pot.getX(), pot.getY(), pot.getZ(), HallStyle.pot(HallStyle.hash(mod.index(), 11)), DECOR);
+		for (int u = tu0; u <= tu1; u++) {
+			c.set(r.cell(u, v0 + 1, 1), stairs(Blocks.CHERRY_STAIRS, side.getOpposite()));
+			c.set(r.cell(u, v1 - 1, 1), stairs(Blocks.CHERRY_STAIRS, side));
+		}
+		for (int v = tv0; v <= tv1; v++) {
+			c.set(r.cell(u0 + 1, v, 1), stairs(Blocks.CHERRY_STAIRS, fwd.getOpposite()));
+			c.set(r.cell(u1 - 1, v, 1), stairs(Blocks.CHERRY_STAIRS, fwd));
 		}
 	}
 
