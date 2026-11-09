@@ -57,7 +57,7 @@ public final class FountainOctagonStatue implements Variant {
 		// guardian: skirt, belt with a shield on the left and a spear on the right, head, helmet crest
 		{{".D.", "DBD", ".D."}, {"...", "DAW", "..."}, {"...", "DBW", "..."}, {"...", "AHW", "..."}, {"...", ".AR", "..."}},
 		// crane: one leg, body with wings and tail, wings up beside the neck, gold tips, head with a beak
-		{{"...", ".W.", "..."}, {"...", "BBB", ".B."}, {"...", "BWB", "..."}, {"...", "AWA", "..."}, {".A.", ".H.", "..."}},
+		{{"...", ".W.", "..."}, {"...", "BBB", "..."},{"...", "BWB", "..."}, {"...", "AWA", "..."}, {".A.", ".H.", "..."}},
 		// pillar: wide foot, shaft, capital with four arms, orb
 		{{"DDD", "DBD", "DDD"}, {"...", ".B.", "..."}, {"...", ".B.", "..."}, {".B.", "BAB", ".B."}, {"...", ".A.", "..."}},
 	};
@@ -116,7 +116,7 @@ public final class FountainOctagonStatue implements Variant {
 		int rpRaw = outerWalk - walk;
 		int gw = rpRaw >= 9 ? 3 : rpRaw >= 6 ? 2 : 1;
 		int g = Math.max(1, Math.min(gw, (h - 1) / 6));
-		int rp = Math.min(rpRaw, 3 + 3 * g); // a bigger plot gets a wider plaza, not a bigger pool round a small figure
+		int rp = Math.min(rpRaw, 2 + 3 * g); // a bigger plot gets a wider plaza, not a bigger pool round a small figure
 		int figHalf = g == 1 ? 1 : g == 2 ? 3 : 4;
 		int rs = Math.min(Math.max(figHalf, (rp - 2) / 3), rp - 2); // radius of the dais
 
@@ -209,15 +209,13 @@ public final class FountainOctagonStatue implements Variant {
 			k.set(dx, 1, dz, stair(pick(k, dx, 1, dz, pal.rimStair), toward(dx, dz)));
 			return;
 		}
-		// [finish] gargoyle post: base, shaft, a carved head that pours into the pool, a lantern on the compass ones
-		k.set(dx, 1, dz, pick(k, dx, 1, dz, pal.rimBase));
-		k.set(dx, 2, dz, pal.garg);
-		k.set(dx, 3, dz, pal.garg);
+		// [finish] gargoyle: a carved head on the rim that pours into the pool, a lantern over the compass ones
+		k.set(dx, 1, dz, pal.garg);
+		k.set(dx, 2, dz, stair(pal.pedStair, away(dx, dz)));
 		if (ax == 0 || az == 0) {
-			k.set(dx, 4, dz, b(Blocks.LANTERN));
+			k.set(dx, 3, dz, b(Blocks.LANTERN));
 		}
 		k.set(sx, 2, sz, FALL);
-		k.set(sx, 3, sz, FALL);
 	}
 
 	// ------------------------------------------------------------------ plaza
@@ -410,10 +408,10 @@ public final class FountainOctagonStatue implements Variant {
 						b(Blocks.CRACKED_DEEPSLATE_BRICKS)};
 				p.rimStair = new Block[] {Blocks.SMOOTH_QUARTZ_STAIRS, Blocks.SMOOTH_QUARTZ_STAIRS, Blocks.POLISHED_DIORITE_STAIRS};
 				p.garg = b(Blocks.CHISELED_STONE_BRICKS);
-				p.inner = new BlockState[] {b(Blocks.POLISHED_DEEPSLATE), b(Blocks.POLISHED_DEEPSLATE), b(Blocks.DEEPSLATE_TILES)};
+				p.inner = new BlockState[] {b(Blocks.POLISHED_ANDESITE), b(Blocks.SMOOTH_STONE), b(Blocks.POLISHED_ANDESITE)};
 				p.bandA = new BlockState[] {b(Blocks.STONE_BRICKS), b(Blocks.STONE_BRICKS), b(Blocks.MOSSY_STONE_BRICKS),
 						b(Blocks.CRACKED_STONE_BRICKS)};
-				p.bandB = new BlockState[] {b(Blocks.POLISHED_ANDESITE), b(Blocks.POLISHED_ANDESITE), b(Blocks.ANDESITE)};
+				p.bandB = new BlockState[] {b(Blocks.POLISHED_ANDESITE), b(Blocks.POLISHED_DIORITE), b(Blocks.ANDESITE)};
 				p.edge = new Block[] {Blocks.STONE_BRICK_STAIRS, Blocks.STONE_BRICK_STAIRS, Blocks.POLISHED_ANDESITE_STAIRS,
 						Blocks.MOSSY_STONE_BRICK_STAIRS};
 				p.ped = new BlockState[] {b(Blocks.DEEPSLATE_BRICKS), b(Blocks.POLISHED_DEEPSLATE)};
