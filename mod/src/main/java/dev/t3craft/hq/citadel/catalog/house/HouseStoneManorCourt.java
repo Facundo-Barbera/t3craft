@@ -932,14 +932,17 @@ public final class HouseStoneManorCourt implements Variant {
 					}
 					if (high == null) {
 						w.set(u, y, v, b(sch.solid()));
-						// [finish] a gold finial where a ridge ends in the air, a slab cap along it
+						// [finish] a copper rod where a ridge ends in the air, a slab cap along it
 						boolean tip = false;
 						for (Direction d : ds) {
 							if (lvl(u + d.getStepX(), v + d.getStepZ()) < 0) {
 								tip = true;
 							}
 						}
-						w.set(u, y + 1, v, tip && l >= 3 ? b(Blocks.GOLD_BLOCK) : slab(sch.slab()));
+						w.set(u, y + 1, v, slab(sch.slab()));
+						if (tip && l >= 3) {
+							w.set(u, y + 2, v, Blocks.LIGHTNING_ROD.waxed().oxidized().defaultBlockState());
+						}
 					} else {
 						// [palette] tile courses: every third row of the slope in the alternate tile
 						Block blk = l == 0 ? Blocks.STONE_BRICK_STAIRS : l % 3 == 2 ? sch.alt() : sch.stair();
