@@ -496,61 +496,60 @@
       ],
       "faces": {
         "north": {
-          "texture": "#lens",
+          "texture": "#base",
           "uv": [
             0,
-            0,
-            2,
-            2
+            7,
+            8,
+            9
           ]
         },
         "south": {
-          "texture": "#lens",
+          "texture": "#base",
           "uv": [
             0,
-            0,
-            2,
-            2
+            7,
+            8,
+            9
           ]
         },
         "east": {
-          "texture": "#lens",
+          "texture": "#base",
           "uv": [
             0,
-            0,
-            2,
-            2
+            7,
+            8,
+            9
           ]
         },
         "west": {
-          "texture": "#lens",
+          "texture": "#base",
           "uv": [
             0,
-            0,
-            2,
-            2
+            7,
+            8,
+            9
           ]
         },
         "up": {
-          "texture": "#lens",
+          "texture": "#base",
           "uv": [
             0,
-            0,
-            2,
-            2
+            7,
+            8,
+            15
           ]
         },
         "down": {
-          "texture": "#lens",
+          "texture": "#base",
           "uv": [
             0,
-            0,
-            2,
-            2
+            7,
+            8,
+            15
           ]
         }
-      },
-      "light_emission": 13
+      }
     }
   ]
 }

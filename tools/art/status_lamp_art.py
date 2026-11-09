@@ -63,8 +63,8 @@ def px(c):
 # ---------------------------------------------------------------- glyphs (rows of '#', '.')
 GLYPHS = {
     "check": ["....##", "...##.", "##.##.", ".###..", "..#..."],
-    # an unmistakable exclamation mark: a bar that tapers to a point, 2 empty rows, then a separate 2x2 dot
-    "bang": ["####", "####", ".##.", ".##.", "....", "....", ".##.", ".##."],
+    # an unmistakable exclamation mark: a plain 2 px bar (no flared top: that read as a T), 2 empty rows, a separate 2x2 dot
+    "bang": ["##", "##", "##", "##", "##", "..", "..", "##", "##"],
     "x": ["##..##", ".####.", "..##..", "..##..", ".####.", "##..##"],
     # 5 wide: the lens' left interior column is the 1 px reflection, so the bars sit right of it
     "pause": ["##.##", "##.##", "##.##", "##.##", "##.##"],
@@ -110,13 +110,13 @@ def lens_frame(name, f):
     if name != "off":
         # lens as glass: 1 px darker vertical edges, rows fade to 80 % at the top and bottom, and a 1 px vertical
         # reflection just inside the left edge (glyphs are drawn after it and stay clear of that column)
-        edge = darken(fill, 0.70)
+        edge = darken(fill, 0.50)
         for y in range(y0, y1):
             k = 0.80 if y in (y0, y0 + 1, y1 - 1, y1 - 2) else 1.0
             for x in range(x0, x1):
                 img[y][x] = px(edge if x in (x0, x1 - 1) else darken(fill, k))
-        for y in range(y0 + 1, y1 - 1):
-            img[y][x0 + 1] = px(lighten(fill, 0.55))
+        for y in range(y0 + 1, y0 + 7):
+            img[y][x0 + 1] = px(lighten(fill, 0.80))
     # rows 14-15: the claws' darker shade
     for y in (14, 15):
         for x in range(16):
@@ -134,7 +134,7 @@ def lens_frame(name, f):
         if gname == "pause":
             ox = x0 + 2  # right of the reflection column
         elif gname == "bang":
-            oy = y0 + 1  # 8 rows in a 10 row lens: one row of margin above and below
+            oy = y0  # 9 rows in a 10 row lens: one row of margin below
         for j, row in enumerate(g):
             for i, ch in enumerate(row):
                 if ch == "#":
@@ -191,8 +191,9 @@ def write_textures():
 FACES = ("north", "south", "east", "west", "up", "down")
 
 
-def element(frm, to, kind, crop=None, emit=0, skip=()):
-    """kind: steel | gold | lens (glyph crop on the sides) | plain (lens colour) | bright (lens bright strip)."""
+def element(frm, to, kind, crop=None, emit=0, skip=(), plain_sides=()):
+    """kind: steel | gold | lens (glyph crop on the sides) | plain (lens colour) | bright (lens bright strip).
+    skip: faces left out; plain_sides: lens faces drawn plain (no glyph), for sides a bracket covers."""
     faces = {}
     for fc in FACES:
         if fc in skip:
@@ -204,7 +205,7 @@ def element(frm, to, kind, crop=None, emit=0, skip=()):
         elif kind == "gold":
             faces[fc] = {"texture": "#base", "uv": [0, 1, 2, 4]}
         elif kind == "lens":
-            if fc in ("up", "down"):
+            if fc in ("up", "down") or fc in plain_sides:
                 faces[fc] = {"texture": "#lens", "uv": [0, 2, 2, 3]}
             else:
                 faces[fc] = {"texture": "#lens", "uv": list(crop)}
@@ -220,17 +221,17 @@ def element(frm, to, kind, crop=None, emit=0, skip=()):
     return e
 
 
-def body(small=False):
+def body(small=False, accent=True):
     """Caps and rings, symmetric about y = 8; plates are lens + 2 px (10 px; 8 px for the small idle/off candle).
     One metal: steel everywhere, with a single 1 px brass collar under each cap as the only accent."""
     a = 4 if small else 3
     b = 16 - a
     return [
         element([a, 0, a], [b, 1, b], "steel"),
-        element([a + 0.5, 1, a + 0.5], [b - 0.5, 2, b - 0.5], "gold"),
+        element([a + 0.5, 1, a + 0.5], [b - 0.5, 2, b - 0.5], "gold" if accent else "steel"),
         element([a + 0.5, 2, a + 0.5], [b - 0.5, 3, b - 0.5], "steel"),
         element([a + 0.5, 13, a + 0.5], [b - 0.5, 14, b - 0.5], "steel"),
-        element([a + 0.5, 14, a + 0.5], [b - 0.5, 15, b - 0.5], "gold"),
+        element([a + 0.5, 14, a + 0.5], [b - 0.5, 15, b - 0.5], "gold" if accent else "steel"),
         element([a, 15, a], [b, 16, b], "steel"),
     ]
 
@@ -238,23 +239,24 @@ def body(small=False):
 def model(name):
     col, crop, n, ft = STATES[name]
     emit = {"off": 0, "idle": 7, "working": 13, "attention": 15, "error": 15, "done": 13}[name]
-    els = body(small=name in ("idle", "off"))
+    els = body(small=name in ("idle", "off"), accent=name != "off")  # off: dead, so no brass accent either
     x0, y0, x1, y1 = crop
     # lens: square in plan, y 3..13; the rings are wider than the lens, so up/down faces stay hidden except on 10 px lenses
-    els.append(element([x0, 3, x0], [x1, 13, x1], "lens", crop=crop, emit=emit, skip=("up", "down") if x1 - x0 <= 8 else ()))
+    els.append(element([x0, 3, x0], [x1, 13, x1], "lens", crop=crop, emit=emit, skip=("up", "down") if x1 - x0 <= 8 else (),
+                       plain_sides=("east", "west") if name == "attention" else ()))
     if name == "off":
         # a steel cage round the dead glass: four corner posts give it an outline on any background
         for px_ in (4, 11):
             for pz_ in (4, 11):
                 els.append(element([px_, 3, pz_], [px_ + 1, 13, pz_ + 1], "steel"))
     elif name == "working":
-        # the band is wider than the 10 px lens, so it reads as a ring round it
-        els.append(element([2, 7, 2], [14, 9, 14], "bright", emit=emit))
+        # a steel hoop, wider than the 10 px lens: an opaque belt, not a glowing halo
+        els.append(element([2, 7, 2], [14, 9, 14], "steel"))
     elif name == "attention":
         # two straight steel T-brackets, east and west only: nothing stands in front of the lens, so the "!" is clean
         for (arm, plate) in (((13, 15), (15, 16)), ((1, 3), (0, 1))):
             els.append(element([arm[0], 7, 7], [arm[1], 9, 9], "steel"))
-            els.append(element([plate[0], 4, 6], [plate[1], 12, 10], "steel"))
+            els.append(element([plate[0], 4, 7], [plate[1], 12, 9], "steel"))
     elif name == "error":
         # eight claws (up and down, darker red) and four corner nubs sticking out at mid height: a jagged outline
         for cx in (3, 11):
@@ -263,9 +265,12 @@ def model(name):
                 els.append(element([cx + 0.5, 15, cz + 0.5], [cx + 1.5, 16, cz + 1.5], "claw", emit=emit))
                 els.append(element([cx, 1, cz], [cx + 2, 3, cz + 2], "claw", emit=emit))
                 els.append(element([cx + 0.5, 0, cz + 0.5], [cx + 1.5, 1, cz + 1.5], "claw", emit=emit))
+        # four vertical corner spikes (a 2 px shaft with a 1 px tip above and below), not mid-height nubs that read as ears
         for nx in (1, 13):
             for nz in (1, 13):
-                els.append(element([nx, 6.5, nz], [nx + 2, 9.5, nz + 2], "claw", emit=emit))
+                els.append(element([nx, 5, nz], [nx + 2, 11, nz + 2], "claw", emit=emit))
+                els.append(element([nx + 0.5, 11, nz + 0.5], [nx + 1.5, 13, nz + 1.5], "claw", emit=emit))
+                els.append(element([nx + 0.5, 3, nz + 0.5], [nx + 1.5, 5, nz + 1.5], "claw", emit=emit))
     return {
         "parent": "minecraft:block/block",
         "textures": {"base": "t3craft:block/status_lamp_base", "lens": "t3craft:block/status_lamp_%s" % name, "particle": "t3craft:block/status_lamp_base"},
