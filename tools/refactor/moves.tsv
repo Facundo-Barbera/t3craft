@@ -10,3 +10,4 @@
 dev.t3craft.blocks.RenderBlocks	dev.t3craft.tools.hqrender.RenderBlocks	#5 3a
 dev.t3craft.hq.HqAnchorSource	dev.t3craft.client.hq.HqAnchorSource	#5 3a
 dev.t3craft.hq.HqPreviewCommand	dev.t3craft.client.hq.HqPreviewCommand	#5 3a
+dev.t3craft.portable.PortableItems	dev.t3craft.survival.PortableItems	#5 3b

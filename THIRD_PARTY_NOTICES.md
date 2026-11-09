@@ -231,7 +231,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-Portable terminal (`mod/src/client/java/dev/t3craft/client/portable/`, `mod/src/main/java/dev/t3craft/portable/`):
+Portable terminal (`mod/src/client/java/dev/t3craft/client/portable/`, `mod/src/main/java/dev/t3craft/survival/PortableItems.java`):
 no AgentCraft file is copied. The portable key category used to follow the approach of AgentCraft's
 `mod/src/client/java/dev/agentcraft/client/hud/Keys.java` (register the key category, reuse the
 equal-by-id record if another feature registered it first); it now uses the shared

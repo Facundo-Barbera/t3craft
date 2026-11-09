@@ -1,6 +1,6 @@
 package dev.t3craft;
 
-import dev.t3craft.portable.PortableItems;
+import dev.t3craft.survival.PortableItems;
 import java.util.List;
 import java.util.function.Supplier;
 import net.fabricmc.fabric.api.creativetab.v1.FabricCreativeModeTab;

@@ -1,7 +1,6 @@
 package dev.t3craft.survival;
 
 import dev.t3craft.T3Craft;
-import dev.t3craft.portable.PortableItems;
 import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.minecraft.advancements.AdvancementHolder;
 import net.minecraft.resources.Identifier;

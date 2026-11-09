@@ -1,6 +1,5 @@
 package dev.t3craft.survival;
 
-import dev.t3craft.portable.PortableItems;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.permissions.Permissions;
 import net.minecraft.world.entity.player.Player;

@@ -1,4 +1,4 @@
-package dev.t3craft.portable;
+package dev.t3craft.survival;
 
 import dev.t3craft.T3Craft;
 import dev.t3craft.T3CraftTab;

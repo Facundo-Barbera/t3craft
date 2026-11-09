@@ -1,6 +1,6 @@
 package dev.t3craft;
 
-import dev.t3craft.portable.PortableItems;
+import dev.t3craft.survival.PortableItems;
 import dev.t3craft.survival.SurvivalHooks;
 import net.fabricmc.api.ModInitializer;
 import org.slf4j.Logger;
