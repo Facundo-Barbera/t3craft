@@ -2,6 +2,8 @@ package dev.t3craft.hq.citadel;
 
 import static dev.t3craft.hq.citadel.CitadelCanvas.FH;
 
+import dev.t3craft.hq.Anchor;
+import dev.t3craft.hq.AnchorNames;
 import dev.t3craft.hq.HqGeometry;
 import dev.t3craft.hq.HqLayout;
 import dev.t3craft.hq.HqStyle;
@@ -76,11 +78,19 @@ public final class CitadelLeadOffice {
 		row(c, RingCampusGeometry.desk(r, f, 3), Blocks.CONCRETE.pick(DyeColor.WHITE).defaultBlockState(), 2);
 		// slots 4 and 5: chairs facing the back wall (the big screen and the lead)
 		BlockState chair = CitadelCanvas.stairs(Blocks.CHERRY_STAIRS, r.back().getOpposite());
+		String lead = mod.leadNpcId();
+		int seat = 0;
 		for (int slot = 4; slot <= 5; slot++) {
 			DeskSpot d = RingCampusGeometry.desk(r, f, slot);
 			Direction right = d.facing().getClockWise();
 			for (int k = -1; k <= 1; k += 2) {
-				c.set(d.desk().relative(right, k), chair);
+				BlockPos cell = d.desk().relative(right, k);
+				c.set(cell, chair);
+				if (lead != null) {
+					// feat/lead-review-walk: children awaiting the lead's review sit here, facing it
+					// (like the hub benches' anchors: the free cell in front of the chair)
+					c.anchor(Anchor.at(AnchorNames.leadSeat(lead, seat++), cell.relative(r.back()), r.back()));
+				}
 			}
 		}
 		return true;

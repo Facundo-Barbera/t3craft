@@ -326,6 +326,8 @@ public final class PerfStats {
 	public static final String STEP_NPC_LABELS_ASYNC = "step.npc.labels_async.ns";
 	/** Client (feat/npc-idle-wander): idle strollers of the tick (spots picked, route results applied, stretch snapshots copied). */
 	public static final String STEP_NPC_WANDER = "step.npc.wander.ns";
+	/** Client (feat/lead-review-walk): children awaiting their lead's review (queues, spot assignment, per-NPC plan). */
+	public static final String STEP_NPC_REVIEW = "step.npc.review.ns";
 	/** Async (feat/npc-idle-wander): one stroller A* over a snapshot, on an {@code Offload} worker. */
 	public static final String STEP_NPC_WANDER_ASYNC = "step.npc.wander_async.ns";
 	/** Client: workstation stations tick (spawns included). */
