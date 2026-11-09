@@ -321,6 +321,9 @@ public final class HouseTowerLookout implements Variant {
 		if (y == 9) {
 			return b(Blocks.POLISHED_DEEPSLATE);
 		}
+		if (y >= 6 && y <= 8) {
+			return g.p.hash(u, y, v, 9) == 0 ? b(Blocks.SMOOTH_QUARTZ) : b(Blocks.CALCITE); // [palette] the watch room is plastered: light over the stone below
+		}
 		return stone(g.p, u, y, v);
 	}
 
@@ -339,7 +342,7 @@ public final class HouseTowerLookout implements Variant {
 			return b(s.planks());
 		}
 		if (y == 11) {
-			return b(Blocks.STONE_BRICKS);
+			return b(Blocks.CALCITE);
 		}
 		return pane(g.p.hash(u, y, v, 4) == 0 ? pinkPane() : Blocks.GLASS_PANE, alongU);
 	}
@@ -418,9 +421,13 @@ public final class HouseTowerLookout implements Variant {
 				} else {
 					set(c, g.p, u, 9, v, slab(Blocks.POLISHED_DEEPSLATE_SLAB, true));
 				}
+				if (d == 1 && !corner && Math.abs(Math.abs(t - g.m) % 2) == 1 && !entry && !(to == Direction.SOUTH && Math.abs(t - g.m) <= 1)) {
+					// [depth] a bracket under the deck: a step of timber, one every second cell
+					set(c, g.p, u, 8, v, stair(g.s.eaveStair(), to, true));
+				}
 				if (d == 2) {
 					Direction.Axis ax = to == Direction.NORTH || to == Direction.SOUTH ? Direction.Axis.X : Direction.Axis.Z;
-					set(c, g.p, u, F2, v, log(Blocks.STRIPPED_SPRUCE_LOG, ax));
+					set(c, g.p, u, F2, v, log(Blocks.STRIPPED_BAMBOO_BLOCK, ax));
 					set(c, g.p, u, 11, v, fence(g.s.fence(), g.outer(u, v - 1), g.outer(u + 1, v), g.outer(u, v + 1), g.outer(u - 1, v)));
 					if (corner) {
 						// a lamp post on each corner of the rail
@@ -428,7 +435,7 @@ public final class HouseTowerLookout implements Variant {
 						set(c, g.p, u, 13, v, lantern());
 					}
 				} else {
-					set(c, g.p, u, F2, v, b(g.s.planks()));
+					set(c, g.p, u, F2, v, b(Blocks.BAMBOO_MOSAIC));
 				}
 			}
 		}
@@ -457,7 +464,7 @@ public final class HouseTowerLookout implements Variant {
 			int vmax = g.v1 + 1 - l;
 			boolean crown = size <= 5;
 			if (size == 1) {
-				set(c, g.p, umin, y, vmin, b(g.s.crownBlock()));
+				set(c, g.p, umin, y, vmin, b(Blocks.GOLD_BLOCK));
 				set(c, g.p, umin, y + 1, vmin, b(Blocks.LIGHTNING_ROD.waxed().unaffected()));
 				break;
 			}
@@ -559,6 +566,10 @@ public final class HouseTowerLookout implements Variant {
 		for (int dx = -1; dx <= 1; dx++) {
 			set(c, g.p, eu + dx, 0, 0, slab(Blocks.POLISHED_DEEPSLATE_SLAB, false));
 			set(c, g.p, eu + dx, 0, 1, stair(Blocks.DEEPSLATE_BRICK_STAIRS, Direction.SOUTH, false));
+		}
+		// [depth] a hood over the door: three upside-down stairs of the eave timber, high enough to walk under
+		for (int dx = -1; dx <= 1; dx++) {
+			set(c, g.p, eu + dx, 4, 1, stair(g.s.eaveStair(), Direction.SOUTH, true));
 		}
 		// planters either side of the steps and shrubs at the four corners
 		for (int side = -1; side <= 1; side += 2) {
