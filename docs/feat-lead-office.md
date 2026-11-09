@@ -93,6 +93,23 @@ barrio): abajo la sala de briefing (mismo programa con pantalla 7×3, pizarra 4�
 una escalera a lo largo del muro este (`flight`: primer escalón de frente, 2 libres encima); arriba la sala
 de planificación (mesa de 4×2 con 8 sillas, pizarra de presentación, mostrador y estantes).
 
+### Ciudadela: el aspecto (struct/lead-office2)
+
+Capa de acabado que corre al final de `CitadelLeadOffice.place` (`dress`) y solo toma celdas libres, así que no toca
+anclas, escritorio ni rutas:
+- **Muros:** pilastras de deepslate en los pilares del muro (base, fuste pulido, banda cincelada, capitel, ménsula bajo
+  el techo y escalón de pie) y un zócalo oscuro de escaleras entre ellas. En escala 100 la pared de la escalera (v = 0)
+  se queda sin ellas.
+- **Franja alta:** vitrales (amarillo, rosa, color del entorno y celeste) en las tres filas superiores de las
+  columnas de ventana (dos en escala 100) donde no hay nada pegado al muro por dentro.
+- **Pantalla:** marco de oro con esquinas de piedra negra cincelada alrededor de la pantalla de los hijos.
+- **Suelo por zonas** (todo en el plano del suelo): vestíbulo de piedra, alas de espera en damero (suelo/bambú),
+  tarima de mando de deepslate frente al escritorio (borde de tejas, campo pulido, medallón del color del entorno
+  con centro de oro donde está el líder) con dos faroles de poste en las esquinas; alfombras para salón y reuniones.
+- **Techo:** retícula de vigas oscuras (travesaños de 2 de alto cada 6 filas, apoyados en las pilastras, y tres vigas a
+  lo largo) con linternas en los cruces y casetones oscuros en los paneles. El pasillo lleva borde negro y línea amarilla.
+- **Bandera:** mástil de 10 con remate de oro y banderola de 8×6 con franjas amarillas.
+
 Esa clave `lead@<i>` desactiva el fallback para ese módulo.
 
 ## "Dirigir"

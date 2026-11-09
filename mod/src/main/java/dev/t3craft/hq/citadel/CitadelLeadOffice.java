@@ -25,9 +25,12 @@ import java.util.function.BiFunction;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.StairBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.Half;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -119,6 +122,7 @@ public final class CitadelLeadOffice {
 		} else {
 			meeting(c, mod, r, style, mats, env);
 		}
+		dress(c, r, style, env, two);
 		flag(c, r, style, env, two ? 2 * fh() : fh());
 		return true;
 	}
@@ -148,18 +152,27 @@ public final class CitadelLeadOffice {
 				break;
 			}
 		}
-		BlockState pole = b(style.fence());
-		for (int y = top + 1; y <= top + 4; y++) {
-			c.set(at.getX(), y, at.getZ(), pole);
+		// a tall pole of dark wall blocks with a gold finial, and a swallow-tailed banner 8 long and 6 high in the
+		// environment's colour with a stripe of its second colour (concrete: it also reads in the plan renders)
+		int pole = 10;
+		BlockState mast = b(Blocks.DEEPSLATE_BRICK_WALL);
+		for (int y = top + 1; y <= top + pole; y++) {
+			c.set(at.getX(), y, at.getZ(), mast);
 		}
-		// a tapering pennant: 3 long at the top, 2 under it
+		c.set(at.getX(), top + pole + 1, at.getZ(), b(Blocks.GOLD_BLOCK));
 		BlockState cloth = b(Blocks.CONCRETE.pick(env));
-		for (int k = 1; k <= 3; k++) {
-			BlockPos p = at.relative(r.side(), k);
-			c.set(p.getX(), top + 4, p.getZ(), cloth);
-			if (k <= 2) {
-				c.set(p.getX(), top + 3, p.getZ(), cloth);
+		BlockState stripe = b(Blocks.CONCRETE.pick(DyeColor.YELLOW));
+		int[] length = {8, 8, 8, 7, 5, 3};
+		for (int row = 0; row < length.length; row++) {
+			for (int k = 1; k <= length[row]; k++) {
+				BlockPos p = at.relative(r.side(), k);
+				c.set(p.getX(), top + pole - row, p.getZ(), row == 1 || row == 4 ? stripe : cloth);
 			}
+		}
+		// a yard arm: the banner hangs from a bar along its top edge
+		for (int k = 1; k <= 8; k++) {
+			BlockPos p = at.relative(r.side(), k);
+			c.set(p.getX(), top + pole + 1, p.getZ(), b(Blocks.DEEPSLATE_BRICK_WALL));
 		}
 	}
 
@@ -179,10 +192,11 @@ public final class CitadelLeadOffice {
 
 		// the runner of the aisle (door to the lead's desk): the edges in the second colour
 		BlockState runner = b(Blocks.CARPET.pick(env));
-		BlockState trim = b(Blocks.CARPET.pick(style.alt(env)));
-		for (int u = 0; u <= d - 4; u++) {
+		BlockState trim = b(Blocks.CARPET.pick(DyeColor.BLACK));
+		BlockState line = b(Blocks.CARPET.pick(DyeColor.YELLOW));
+		for (int u = 0; u < dais0(r); u++) {
 			for (int dv = -ah; dv <= ah; dv++) {
-				c.set(r.cell(u, mid + dv, 1), Math.abs(dv) == ah ? trim : runner);
+				c.set(r.cell(u, mid + dv, 1), Math.abs(dv) == ah ? trim : big && Math.abs(dv) == ah - 1 ? line : runner);
 			}
 		}
 
@@ -256,39 +270,296 @@ public final class CitadelLeadOffice {
 			tub(c, r.cell(d - 2, w - 2, 1));
 			lounge(c, mod, r, env, style);
 		}
+		ceiling(c, r, big);
+		floors(c, r, big, ah, env);
+	}
+
+	// ------------------------------------------------------------------ look: ceiling, floors, walls, screen frame
+
+	private static boolean big(Room r) {
+		return !twoFloors(r);
+	}
+
+	/** First row ({@code u}) of the command dais in front of the lead's desk (it ends at {@code d - 2}). */
+	private static int dais0(Room r) {
+		return big(r) ? r.d() - 5 : r.d() - 4;
+	}
+
+	/** Half width of the command dais (centre line plus/minus this). */
+	private static int daisHalf(Room r) {
+		return big(r) ? 5 : 3;
+	}
+
+	/** Half width of the big screen (same figure as {@code ground}). */
+	private static int screenHalf(Room r) {
+		return (big(r) ? Math.min(11, r.w() - 4) : Math.min(7, r.w() - 2)) / 2;
+	}
+
+	private static boolean free(CitadelCanvas c, BlockPos p) {
+		BlockState s = c.at(p.getX(), p.getY(), p.getZ());
+		return s == null || s.isAir();
+	}
+
+	private static void putFree(CitadelCanvas c, BlockPos p, BlockState s) {
+		if (free(c, p)) {
+			c.set(p, s);
+		}
+	}
+
+	private static BlockState log(Direction.Axis axis) {
+		return Blocks.STRIPPED_DARK_OAK_LOG.defaultBlockState().setValue(BlockStateProperties.AXIS, axis);
+	}
+
+	private static BlockState upsideDown(Block block, Direction facing) {
+		return stairs(block, facing).setValue(StairBlock.HALF, Half.TOP);
+	}
+
+	/**
+	 * The coffered ceiling: a lattice of dark beams just under the ceiling plane (large hall: crossbeams every 6 rows
+	 * that rest on the wall pilasters, three beams along the depth; small hall: two crossbeams), with a lantern hanging
+	 * from every crossing.
+	 */
+	private static void ceiling(CitadelCanvas c, Room r, boolean big) {
+		int w = r.w();
+		int d = r.d();
+		int mid = r.c();
+		int h = fh();
 		BlockState lantern = Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, true);
+		BlockState across = log(r.side().getAxis());
+		BlockState along = log(r.back().getAxis());
 		if (big) {
-			// ceiling beams every 5 rows across the width, a lantern hanging from each at three heights' worth of
-			// positions (the beams are what the lanterns hang from); the floor changes material at the door and
-			// round the lead's desk
-			BlockState beam = c.kit.beam(side.getAxis());
-			for (int u = 2; u < d - 1; u += 5) {
-				for (int v = 0; v < w; v++) {
-					c.set(r.cell(u, v, h - 1), beam);
+			int[] vs = {3, mid, w - 4};
+			for (int v : vs) {
+				for (int u = 0; u <= d - 2; u++) {
+					c.set(r.cell(u, v, h - 1), along);
 				}
-				for (int v : new int[] {2, mid - ah - 1, mid + ah + 1, w - 3}) {
-					BlockPos p = r.cell(u, v, h - 2);
+			}
+			for (int u = 3; u < d - 2; u += 6) {
+				for (int v = 0; v < w; v++) {
+					c.set(r.cell(u, v, h - 1), across);
+					c.set(r.cell(u, v, h - 2), across);
+				}
+				for (int v : vs) {
+					BlockPos p = r.cell(u, v, h - 3);
 					c.put(p.getX(), p.getY(), p.getZ(), lantern, HANGING);
 				}
 			}
+			// the coffers: a dark inlay in the ceiling plane at the middle of every panel between the beams
+			BlockState inlay = b(Blocks.DARK_OAK_PLANKS);
+			for (int u = 3; u + 6 < d - 1; u += 6) {
+				for (int a = 0; a < vs.length - 1; a++) {
+					for (int uu = u + 2; uu <= u + 4; uu++) {
+						for (int v = vs[a] + 2; v <= vs[a + 1] - 2; v++) {
+							c.set(r.cell(uu, v, h), inlay);
+						}
+					}
+				}
+			}
+			return;
+		}
+		for (int u : new int[] {2, d - 4}) {
+			for (int v = 1; v < w; v++) {
+				c.set(r.cell(u, v, h - 1), across);
+			}
+			for (int v : new int[] {2, w - 3}) {
+				BlockPos p = r.cell(u, v, h - 2);
+				c.put(p.getX(), p.getY(), p.getZ(), lantern, HANGING);
+			}
+		}
+	}
+
+	/**
+	 * Floors by zone: the lobby row stays stone; the waiting wings (either side of the aisle) are a 2x2 checker of the
+	 * hall's floor and bamboo mosaic; the command dais in front of the lead's desk is deepslate (tile border, polished
+	 * field) with a medallion of the environment's colour where the lead stands. Rugs of the lounge and the meeting
+	 * corner are their own zones. All of it is the floor plane (y = 0): nothing changes height or walkability.
+	 */
+	private static void floors(CitadelCanvas c, Room r, boolean big, int ah, DyeColor env) {
+		int w = r.w();
+		int d = r.d();
+		int mid = r.c();
+		int d0 = dais0(r);
+		int dh = daisHalf(r);
+		if (big) {
 			for (int v = 0; v < w; v++) {
 				for (int u = 0; u <= 1; u++) {
 					BlockPos p = r.cell(u, v, 0);
 					c.set(p.getX(), 0, p.getZ(), c.accent());
 				}
 			}
-			for (int v = mid - 5; v <= mid + 5; v++) {
-				for (int u = d - 4; u <= d - 2; u++) {
-					BlockPos p = r.cell(u, v, 0);
-					c.set(p.getX(), 0, p.getZ(), c.accent());
+		}
+		for (int u = big ? 2 : 1; u < d0; u++) {
+			for (int v = 0; v < w; v++) {
+				if (Math.abs(v - mid) <= ah) {
+					continue;
 				}
+				BlockPos p = r.cell(u, v, 0);
+				boolean alt = (Math.floorMod(u / 2, 2) + Math.floorMod(v / 2, 2)) % 2 == 0;
+				c.set(p.getX(), 0, p.getZ(), alt ? CitadelCanvas.CALCITE : c.floor());
 			}
+		}
+		BlockState border = b(Blocks.DEEPSLATE_TILES);
+		BlockState field = b(Blocks.POLISHED_DEEPSLATE);
+		BlockState medal = b(Blocks.CONCRETE.pick(env));
+		for (int u = d0; u <= d - 2; u++) {
+			for (int v = mid - dh; v <= mid + dh; v++) {
+				boolean edge = u == d0 || u == d - 2 || Math.abs(v - mid) == dh;
+				BlockPos p = r.cell(u, v, 0);
+				BlockState s = edge ? border : field;
+				if (u == d - 4 && Math.abs(v - mid) <= 1) {
+					s = v == mid ? b(Blocks.GOLD_BLOCK) : medal;
+				}
+				c.set(p.getX(), 0, p.getZ(), s);
+			}
+		}
+	}
+
+	/**
+	 * What dresses the room once the furniture stands (so it only ever takes cells that are still air): gilded frame
+	 * round the big screen, lamp posts at the dais corners, stained clerestory in the top band of the walls, and on
+	 * every floor of the office the deepslate pilasters (base, polished shaft, chiselled band, flared capital, bracket
+	 * under the ceiling, a foot step) on the wall piers with a dark skirting of stairs between them.
+	 */
+	private static void dress(CitadelCanvas c, Room r, HallStyle style, DyeColor env, boolean two) {
+		int w = r.w();
+		int d = r.d();
+		int mid = r.c();
+		int h = fh();
+		int ah = two ? 1 : 2;
+		Direction fwd = r.back();
+		Direction side = r.side();
+		int sh = h >= 8 ? 4 : 3;
+		int half = screenHalf(r);
+
+		// the frame round the big screen (it is drawn on y = 3 .. 2 + sh at u = d - 1): gold on a dark corner
+		BlockState gold = b(Blocks.GOLD_BLOCK);
+		BlockState corner = b(Blocks.CHISELED_POLISHED_BLACKSTONE);
+		int yTop = 3 + sh;
+		for (int v = mid - half - 1; v <= mid + half + 1; v++) {
+			boolean end = v == mid - half - 1 || v == mid + half + 1;
+			BlockPos rail = r.cell(d - 1, v, 2);
+			if (end) {
+				putFree(c, rail, corner);
+			} else {
+				c.set(rail, gold);
+			}
+			BlockPos top = r.cell(d - 1, v, yTop);
+			if (yTop <= h) {
+				c.set(top, end ? corner : gold);
+			}
+		}
+		for (int y = 3; y < yTop; y++) {
+			putFree(c, r.cell(d - 1, mid - half - 1, y), gold);
+			putFree(c, r.cell(d - 1, mid + half + 1, y), gold);
+		}
+
+		// lamp posts on the dais, either side of the desk
+		int lp = two ? 3 : 4;
+		BlockState post = b(Blocks.DEEPSLATE_BRICK_WALL);
+		for (int sgn = -1; sgn <= 1; sgn += 2) {
+			BlockPos p = r.cell(d - 2, mid + sgn * lp, 1);
+			if (free(c, p) && free(c, p.above()) && free(c, p.above(2))) {
+				c.set(p, post);
+				c.set(p.above(), post);
+				c.put(p.getX(), p.getY() + 2, p.getZ(), Blocks.LANTERN.defaultBlockState(), DECOR);
+			}
+		}
+
+		BlockState base = b(Blocks.DEEPSLATE_BRICKS);
+		BlockState shaft = b(Blocks.POLISHED_DEEPSLATE);
+		BlockState band = b(Blocks.CHISELED_DEEPSLATE);
+		BlockState cap = b(Blocks.DEEPSLATE_TILES);
+		for (int f = 0; f < (two ? 2 : 1); f++) {
+			int yb = f * h;
+			clerestory(c, r, style, env, yb);
+			if (!two) {
+				wallBay(c, r, d - 2 - 8, w - 1, side, true, yb, base, shaft, band, cap);
+			}
+			for (int v = 0; v < w; v++) {
+				if (Math.abs(v - mid) > ah + 1) {
+					wallBay(c, r, 0, v, fwd.getOpposite(), v % 3 == 0 && v > 0 && v < w - 1 && Math.abs(v - mid) > ah + 2, yb, base, shaft, band, cap);
+				}
+				wallBay(c, r, d - 1, v, fwd, v % 3 == 0 && v > 0 && v < w - 1 && Math.abs(v - mid) > half + 2, yb, base, shaft, band, cap);
+			}
+			for (int u = 1; u < d - 1; u++) {
+				boolean pier = u % 3 == 0 && u >= 3 && u <= d - 4;
+				if (!two) {
+					wallBay(c, r, u, 0, side.getOpposite(), pier, yb, base, shaft, band, cap);
+				}
+				wallBay(c, r, u, w - 1, side, pier, yb, base, shaft, band, cap);
+			}
+		}
+	}
+
+	/** One interior cell against a wall: a pilaster when {@code pier}, else a dark skirting stair. {@code toWall} points at the wall. */
+	private static void wallBay(CitadelCanvas c, Room r, int u, int v, Direction toWall, boolean pier, int yb, BlockState base, BlockState shaft,
+			BlockState band, BlockState cap) {
+		int h = fh();
+		BlockPos foot = r.cell(u, v, yb + 1);
+		if (!free(c, foot)) {
 			return;
 		}
-		for (int u : new int[] {2, d - 4}) {
-			for (int v : new int[] {2, w - 3}) {
-				BlockPos p = r.cell(u, v, h - 1);
-				c.put(p.getX(), p.getY(), p.getZ(), lantern, HANGING);
+		if (!pier) {
+			c.set(foot, stairs(Blocks.DEEPSLATE_TILE_STAIRS, toWall));
+			return;
+		}
+		Direction in = toWall.getOpposite();
+		for (int ly = 1; ly <= h - 1; ly++) {
+			BlockPos p = r.cell(u, v, yb + ly);
+			if (!free(c, p)) {
+				continue;
+			}
+			BlockState s;
+			if (ly == 1) {
+				s = base;
+			} else if (ly <= h - 4) {
+				s = shaft;
+			} else if (ly == h - 3) {
+				s = band;
+			} else if (ly == h - 2) {
+				s = upsideDown(Blocks.DEEPSLATE_TILE_STAIRS, toWall);
+			} else {
+				s = cap;
+			}
+			c.set(p, s);
+		}
+		// a foot step in front of the base and a bracket under the ceiling, only if the cells are free
+		putFree(c, foot.relative(in), stairs(Blocks.DEEPSLATE_BRICK_STAIRS, toWall));
+		putFree(c, r.cell(u, v, yb + h - 1).relative(in), upsideDown(Blocks.DEEPSLATE_BRICK_STAIRS, toWall));
+	}
+
+	/**
+	 * The top band of the walls as stained glass: in every window column (the piers stay stone) the rows
+	 * {@code h - 2 .. h - 1} of the floor become panes of the environment's colour, its second colour and yellow in turn,
+	 * where there is room inside (nothing built against the wall at that height).
+	 */
+	private static void clerestory(CitadelCanvas c, Room r, HallStyle style, DyeColor env, int yb) {
+		int w = r.w();
+		int d = r.d();
+		int h = fh();
+		DyeColor[] colours = {DyeColor.YELLOW, DyeColor.PINK, env, DyeColor.LIGHT_BLUE};
+		for (int u = -1; u <= d; u++) {
+			for (int v = -1; v <= w; v++) {
+				if (!r.wall(u, v) || r.corner(u, v)) {
+					continue;
+				}
+				int t = u == -1 || u == d ? v : u;
+				if (Math.floorMod(t, 3) == 0) {
+					continue;
+				}
+				int iu = Math.max(0, Math.min(d - 1, u));
+				int iv = Math.max(0, Math.min(w - 1, v));
+				BlockState pane = b(Blocks.STAINED_GLASS_PANE.pick(colours[Math.floorMod(t / 3, colours.length)]));
+				for (int ly = h >= 7 ? h - 3 : h - 2; ly <= h - 1; ly++) {
+					BlockPos p = r.cell(u, v, yb + ly);
+					BlockState cur = c.at(p.getX(), p.getY(), p.getZ());
+					if (cur == null || cur.isAir() || !(ly >= 4 || cur.getBlock().toString().contains("glass_pane"))) {
+						continue;
+					}
+					if (free(c, r.cell(iu, iv, yb + ly))) {
+						c.set(p, pane);
+					}
+				}
 			}
 		}
 	}
