@@ -160,6 +160,9 @@ public final class BridgeCoveredTimber implements Variant {
 						st = stairs(Blocks.DEEPSLATE_BRICK_STAIRS, inward);
 					} else if (k == 0) {
 						st = h == 0 ? b(Blocks.DEEPSLATE_BRICKS) : b(Blocks.COBBLED_DEEPSLATE);
+					} else if (Math.abs(u - (w - 1) / 2.0) <= 1.5) {
+						// [palette] a lighter stone road down the middle of the landing
+						st = h == 0 ? b(Blocks.STONE_BRICKS) : h == 1 ? b(Blocks.MOSSY_STONE_BRICKS) : b(Blocks.STONE_BRICKS);
 					} else {
 						st = h == 0 ? b(Blocks.CRACKED_DEEPSLATE_BRICKS) : h == 1 ? b(Blocks.POLISHED_DEEPSLATE) : b(Blocks.DEEPSLATE_BRICKS);
 					}
@@ -339,10 +342,11 @@ public final class BridgeCoveredTimber implements Variant {
 					}
 				} else if (rc % 2 == 1) {
 					// odd columns are slabs, even ones stairs: half a block of rise per column
-					Block sb = rc == 1 || edge ? Blocks.CHERRY_SLAB : p.hash(u, y, v, 4) == 0 ? Blocks.DEEPSLATE_BRICK_SLAB : Blocks.DEEPSLATE_TILE_SLAB;
+					// [palette] tiles for the field, lighter polished stone on the gable edges
+					Block sb = edge ? Blocks.POLISHED_DEEPSLATE_SLAB : p.hash(u, y, v, 4) == 0 ? Blocks.DEEPSLATE_BRICK_SLAB : Blocks.DEEPSLATE_TILE_SLAB;
 					p.set(c, u, y, v, slab(sb));
 				} else {
-					Block sb = edge ? Blocks.CHERRY_STAIRS : p.hash(u, y, v, 4) == 0 ? Blocks.DEEPSLATE_BRICK_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS;
+					Block sb = edge ? Blocks.POLISHED_DEEPSLATE_STAIRS : p.hash(u, y, v, 4) == 0 ? Blocks.DEEPSLATE_BRICK_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS;
 					p.set(c, u, y, v, stairs(sb, in));
 				}
 			}
