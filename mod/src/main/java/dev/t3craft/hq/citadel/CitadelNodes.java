@@ -96,6 +96,11 @@ public final class CitadelNodes {
 			RotundaRoom.fixtures(c, nd);
 			return;
 		}
+		if (nd.kind() == RingCampusGeometry.NodeKind.ARCHIVE_CLOISTER && CloisterRoom.grand(k)) {
+			// the grand cloister is painted at its real size (not magnified): see CloisterRoom
+			cloisterGrand(c, nd);
+			return;
+		}
 		if (k <= 1.0) {
 			int R = Math.max(8, (int) Math.ceil(nd.size()) + 1);
 			for (int x = nd.cx() - R; x <= nd.cx() + R; x++) {
@@ -294,6 +299,19 @@ public final class CitadelNodes {
 	/** Archive cloister: see {@link CloisterRoom}. */
 	public static void cloister(CitadelCanvas c, int x, int z, int dx, int dz) {
 		CloisterRoom.cell(c, x, z, dx, dz);
+	}
+
+	/** The grand cloister (default scale): shell and furniture in real offsets, the terminal in the north shelf line east of the gate. */
+	private static void cloisterGrand(CitadelCanvas c, Node nd) {
+		int cx = nd.cx();
+		int cz = nd.cz();
+		CloisterRoom.build(c, nd);
+		ArchiveBay.buildGrand(c, nd);
+		BlockPos gt = new BlockPos(cx + CloisterRoom.TERMINAL_X, 1, cz + CloisterRoom.TERMINAL_Z);
+		c.fixture(gt, c.style.archiveTerminal(Direction.SOUTH));
+		c.anchor(Anchor.face(AnchorNames.ARCHIVE_TERMINAL, gt, Direction.SOUTH));
+		c.anchor(Anchor.at(AnchorNames.ARCHIVE, gt.south(), Direction.NORTH));
+		c.walkSpot(new BlockPos(cx - 8, 1, cz), Direction.EAST);
 	}
 
 	/**
