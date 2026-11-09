@@ -23,7 +23,7 @@ import net.minecraft.world.level.block.state.properties.DoorHingeSide;
 
 /**
  * A timber-framed cottage you can live in. Stone plinth, calcite plaster between dark oak posts, a steep gable roof with
- * deep eaves, a covered porch with a bench, a hood gable over the door and a brick chimney that leans on the right
+ * deep eaves, a covered porch with a bench, gabled dormers and a brick chimney that leans on the right
  * gable. Inside: a hearth you can stand in front of, a kitchen row (crafting table, furnace, smoker, barrels, chests),
  * a dining table with chairs and a bed. Every size has a way to every floor:
  * <ul>
@@ -94,7 +94,7 @@ public final class HouseTimberCottage implements Variant {
 	private static final Scheme[] SCHEMES = {
 			new Scheme(Blocks.SPRUCE_LOG, b(Blocks.CALCITE), Blocks.DEEPSLATE_TILE_STAIRS, Blocks.CHERRY_STAIRS, Blocks.DEEPSLATE_BRICK_STAIRS,
 					Blocks.DEEPSLATE_TILES, Blocks.DEEPSLATE_TILE_SLAB, Blocks.CHERRY_DOOR, Blocks.CHERRY_TRAPDOOR, Blocks.SPRUCE_STAIRS),
-			new Scheme(Blocks.DARK_OAK_LOG, b(Blocks.CALCITE), Blocks.CHERRY_STAIRS, Blocks.DEEPSLATE_TILE_STAIRS, null,
+			new Scheme(Blocks.SPRUCE_LOG, b(Blocks.CALCITE), Blocks.CHERRY_STAIRS, Blocks.DEEPSLATE_TILE_STAIRS, null,
 					Blocks.POLISHED_DEEPSLATE, Blocks.DEEPSLATE_TILE_SLAB, Blocks.DARK_OAK_DOOR, Blocks.DARK_OAK_TRAPDOOR, Blocks.SPRUCE_STAIRS),
 	};
 
@@ -179,7 +179,7 @@ public final class HouseTimberCottage implements Variant {
 		final int iv1;
 		final int doorW;
 		final int d0;
-		/** First row of the hearth (two cells wide) and whether the porch has posts at the bay and a hood gable. */
+		/** First row of the hearth (two cells wide) and whether the porch has posts at the flanks of the door bay. */
 		final int hv;
 		final boolean hoodOk;
 		final boolean two;
@@ -218,7 +218,7 @@ public final class HouseTimberCottage implements Variant {
 			d0 = ua + (len - doorW) / 2;
 			int id = iv1 - iv0 + 1;
 			hv = iv0 + Math.max(0, (id - 4) / 2) + 1;
-			hoodOk = !two;
+			hoodOk = true; // posts at the flanks of the door bay
 			frontP = posts(ua, ub, ua, ub, d0 - 1, d0 + doorW);
 			backP = posts(ua, ub, ua, ub);
 			sideP = posts(vfU, vb, vfU, vb);
@@ -282,7 +282,7 @@ public final class HouseTimberCottage implements Variant {
 			proud();
 			roof();
 			gables();
-			hood();
+			dormers();
 			porch();
 			hearth();
 			furnishGround();
@@ -472,27 +472,32 @@ public final class HouseTimberCottage implements Variant {
 			}
 		}
 
-		/** A small gable over the door bay, crossing the front slope (one-storey houses with room for it). */
-		void hood() {
-			if (!hoodOk) {
-				return;
+		/**
+		 * [finish] gabled dormers on the front slope, one over the door or two on wide houses: a framed window in the slope under a
+		 * small cross gable that runs back into the main slope. The cavity behind them is never taller than one block (the main roof
+		 * stairs stay in place under the dormer roof), so there is no floor up there for the audit to count.
+		 */
+		void dormers() {
+			int r = fy + 1;
+			int base = plate + 1;
+			int[] cols;
+			if (bw >= 16) {
+				int q = (ub - ua) / 4;
+				cols = new int[] {ua + q + 1, ub - q - 1};
+			} else {
+				cols = new int[] {d0 + (doorW - 1) / 2};
 			}
-			int t0 = d0 - 2;
-			int t1 = d0 + doorW + 1;
-			for (int u = t0; u <= t1; u++) {
-				for (int v = fy; v <= fy + 1; v++) {
-					for (int y = plate; y <= plate + 3; y++) {
-						set(u, y, v, AIR);
+			for (int dc : cols) {
+				if (dc - 1 <= ua || dc + 1 >= ub) {
+					continue;
+				}
+				for (int u = dc - 1; u <= dc + 1; u++) {
+					for (int y = base; y <= base + 1; y++) {
+						set(u, y, r, u == dc ? TimberKit.pane(true, y == base + 1 ? DyeColor.PINK : null) : frame());
 					}
 				}
-			}
-			TimberKit.gable(c, p, false, fy, fy + 1, t0, t1, plate, s.roof(), s.eave(), s.ridge(), s.ridgeSlab(), true, false);
-			int n = t1 - t0 + 1;
-			int m0 = t0 + (n - 1) / 2;
-			int m1 = t0 + n / 2;
-			for (int u = m0; u <= m1; u++) {
-				set(u, plate, fy, frame()); // [depth] king post(s) under the hood ridge
-				set(u, plate + 1, fy, m0 == m1 ? frame() : TimberKit.pane(true, DyeColor.PINK));
+				set(dc, base + 2, r, s.plaster());
+				TimberKit.gable(c, p, false, r, r + 2, dc - 1, dc + 1, base + 2, s.roof(), s.eave(), s.ridge(), s.ridgeSlab(), true, false);
 			}
 		}
 
