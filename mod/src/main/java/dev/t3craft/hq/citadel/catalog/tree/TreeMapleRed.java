@@ -216,7 +216,7 @@ public final class TreeMapleRed implements Variant {
 		if (reach > 0) {
 			double half = m / 2.0;
 			double rr = reach * half + 0.6;
-			double room = TreeKit.room(t, cu, cv, ex, ez, 0) - Math.max(rx, rz) * 0.8;
+			double room = TreeKit.room(t, cu, cv, ex, ez, 0) - Math.max(rx, rz) * 0.62;
 			rr = TreeKit.clamp(Math.min(rr, room), 1.2, 6.0);
 			fu = cu + ex * rr;
 			fv = cv + ez * rr;
