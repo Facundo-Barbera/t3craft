@@ -39,9 +39,9 @@ import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 public final class TreeBirchGrove implements Variant {
 	private static final Wood BIRCH = new Wood(Blocks.BIRCH_LOG, Blocks.BIRCH_WOOD, b(Blocks.BIRCH_WOOD));
 	private static final Leaves[] TONES = {
-			Leaves.of(Blocks.BIRCH_LEAVES, Blocks.OAK_LEAVES).clumps(5),
-			Leaves.of(Blocks.BIRCH_LEAVES, Blocks.AZALEA_LEAVES).clumps(4),
-			Leaves.of(Blocks.BIRCH_LEAVES, Blocks.OAK_LEAVES).clumps(6),
+			Leaves.of(Blocks.BIRCH_LEAVES, Blocks.OAK_LEAVES).clumps(8),
+			Leaves.of(Blocks.BIRCH_LEAVES, Blocks.AZALEA_LEAVES).clumps(6),
+			Leaves.of(Blocks.BIRCH_LEAVES, Blocks.OAK_LEAVES).clumps(9),
 	};
 	/** The lowest layer of any leaf: 4 blocks of free air over the ground. */
 	private static final int MIN_Y = 4;
@@ -153,7 +153,7 @@ public final class TreeBirchGrove implements Variant {
 		// ---- heights, clearly different (shuffled between the trunks), and each crown's vertical extent
 		double[] fr = new double[n];
 		for (int i = 0; i < n; i++) {
-			fr[i] = 1.0 - 0.38 * i / (n - 1.0);
+			fr[i] = 1.0 - 0.46 * i / (n - 1.0);
 		}
 		for (int i = n - 1; i > 0; i--) {
 			int j = r.nextInt(i + 1);
@@ -204,6 +204,16 @@ public final class TreeBirchGrove implements Variant {
 
 		// ---- the wood of every trunk (bare below the crown), then the crown of each
 		int[][][] lead = new int[n][][];
+		// the bare layers of each crown (one free cell high: nobody can stand in them)
+		int[][] skipAll = new int[n][];
+		for (int i = 0; i < n; i++) {
+			double cy0 = top[i] + 1 - ry[i];
+			int ng = ry[i] >= 3.6 ? 2 : ry[i] >= 2.4 ? 1 : 0;
+			skipAll[i] = new int[ng];
+			for (int g = 0; g < ng; g++) {
+				skipAll[i][g] = (int) Math.round(cy0 + (ng == 1 ? -0.3 : g == 0 ? -0.35 : 0.5) * ry[i]);
+			}
+		}
 		for (int i = 0; i < n; i++) {
 			int u0 = pts.get(i)[0];
 			int v0 = pts.get(i)[1];
@@ -212,10 +222,14 @@ public final class TreeBirchGrove implements Variant {
 			int sv = Integer.signum(offV[i]);
 			int au = Math.abs(offU[i]);
 			int av = Math.abs(offV[i]);
-			int yS = Math.max(cb[i] - 1, MIN_Y);
+			// the jogs sit in the bare layers, where the white trunk shows (else just under the crown)
+			int ng0 = skipAll[i].length;
+			int j = 0;
 			while (au > 0 || av > 0) {
 				boolean useU = au >= av && au > 0;
-				if (yS < top[i] - 1) {
+				int yS = ng0 > 0 ? skipAll[i][Math.min(j, ng0 - 1)] + (j >= ng0 ? 3 * (j - ng0 + 1) : 0)
+						: Math.max(cb[i] - 1, MIN_Y) + 3 * j;
+				if (yS < top[i] - 1 && yS >= MIN_Y) {
 					steps.add(new int[] {yS, useU ? su : 0, useU ? 0 : sv});
 				}
 				if (useU) {
@@ -223,7 +237,7 @@ public final class TreeBirchGrove implements Variant {
 				} else {
 					av--;
 				}
-				yS += 3;
+				j++;
 			}
 			lead[i] = column(t, u0, v0, top[i], steps);
 		}
@@ -246,11 +260,7 @@ public final class TreeBirchGrove implements Variant {
 			double rz = rr * (0.9 + r.nextDouble() * 0.2);
 			// one or two bare layers across the crown (a ring of sky with the white trunk showing): one free cell high, so
 			// nobody can stand in it, and the tiers stay joined to the trunk
-			int ng = ry[i] >= 3.6 ? 2 : ry[i] >= 2.4 ? 1 : 0;
-			int[] skip = new int[ng];
-			for (int g = 0; g < ng; g++) {
-				skip[g] = (int) Math.round(cy + (ng == 1 ? -0.3 : g == 0 ? -0.35 : 0.5) * ry[i]);
-			}
+			int[] skip = skipAll[i];
 			oval(t, lead[i][0][cyi], cy, lead[i][1][cyi], rr, ry[i], rz, lv, id, 3 + 10 * i, skip);
 			// the cap: leaves over the leader's last log and round it, so no pale log end shows
 			int tu0 = lead[i][0][top[i]];
