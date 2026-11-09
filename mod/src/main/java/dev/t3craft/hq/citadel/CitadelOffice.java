@@ -1267,30 +1267,33 @@ public final class CitadelOffice {
 	 * lanterns, stone paving under it. Nothing is built when the field has no such place.
 	 */
 	private static void arbor(CitadelCanvas c) {
-		for (int dx0 = E + 2; dx0 <= 14; dx0++) {
-			for (int dz0 = -4; dz0 >= -14; dz0--) {
-				boolean ok = true;
-				for (int dx = dx0 - 1; dx <= dx0 + 3 && ok; dx++) {
-					for (int dz = dz0 - 1; dz <= dz0 + 7 && ok; dz++) {
-						ok = bed(c, CX() + dx, CZ() + dz);
+		for (int len : new int[] {7, 4}) {
+			for (int dx0 = E + 1; dx0 <= 16; dx0++) {
+				for (int dz0 = -2; dz0 >= -16; dz0--) {
+					boolean ok = true;
+					for (int dx = dx0; dx <= dx0 + 2 && ok; dx++) {
+						for (int dz = dz0; dz < dz0 + len && ok; dz++) {
+							ok = bed(c, CX() + dx, CZ() + dz);
+						}
 					}
-				}
-				if (ok) {
-					arborAt(c, dx0, dz0, 3);
-					return;
+					if (ok) {
+						arborAt(c, dx0, dz0, len, 3);
+						return;
+					}
 				}
 			}
 		}
 	}
 
-	private static void arborAt(CitadelCanvas c, int dx0, int dz0, int g) {
+	private static void arborAt(CitadelCanvas c, int dx0, int dz0, int len, int g) {
 		int b = g + 1; // standing level
 		int mid = dx0 + 1;
-		// the paving under it, clear above (and a margin of path round it, so it reads as a place)
+		int last = dz0 + len - 1;
+		// the paving under it, clear above (and a margin of path round it where there is grass, so it reads as a place)
 		for (int dx = dx0 - 1; dx <= dx0 + 3; dx++) {
-			for (int dz = dz0 - 1; dz <= dz0 + 7; dz++) {
-				boolean inside = dx >= dx0 && dx <= dx0 + 2 && dz >= dz0 && dz <= dz0 + 6;
-				if (inside || Math.floorMod(dx + dz, 2) == 0) {
+			for (int dz = dz0 - 1; dz <= last + 1; dz++) {
+				boolean inside = dx >= dx0 && dx <= dx0 + 2 && dz >= dz0 && dz <= last;
+				if (inside || (Math.floorMod(dx + dz, 2) == 0 && bed(c, CX() + dx, CZ() + dz))) {
 					set(c, dx, g, dz, gardenPath(CX() + dx, CZ() + dz));
 					for (int y = b; y <= b + 4; y++) {
 						set(c, dx, y, dz, AIR);
@@ -1299,27 +1302,28 @@ public final class CitadelOffice {
 			}
 		}
 		for (int dx : new int[] {dx0, dx0 + 2}) {
-			for (int dz : new int[] {dz0, dz0 + 3, dz0 + 6}) {
+			for (int dz : len == 7 ? new int[] {dz0, dz0 + 3, last} : new int[] {dz0, last}) {
 				for (int y = b; y < b + 3; y++) {
 					set(c, dx, y, dz, LOG);
 				}
 			}
-			for (int dz = dz0; dz <= dz0 + 6; dz++) {
+			for (int dz = dz0; dz <= last; dz++) {
 				set(c, dx, b + 3, dz, c.kit.beam(Direction.Axis.Z));
 			}
 		}
-		for (int dz = dz0; dz <= dz0 + 6; dz += 2) {
+		for (int dz = dz0; dz <= last; dz += 2) {
 			for (int dx = dx0; dx <= dx0 + 2; dx++) {
 				set(c, dx, b + 4, dz, c.kit.beam(Direction.Axis.X));
 			}
 		}
-		hang(c, mid, b + 3, dz0 + 2);
-		hang(c, mid, b + 3, dz0 + 4);
-		// two benches facing each other with the map table between them, and a second pair
 		set(c, mid, b, dz0 + 1, CitadelCanvas.b(Blocks.CARTOGRAPHY_TABLE));
-		for (int dz : new int[] {dz0 + 1, dz0 + 5}) {
+		hang(c, mid, b + 3, dz0 + 2);
+		for (int dz : len == 7 ? new int[] {dz0 + 1, dz0 + 5} : new int[] {dz0 + 1}) {
 			set(c, dx0, b, dz, cherryStairs(Direction.WEST, false));
 			set(c, dx0 + 2, b, dz, cherryStairs(Direction.EAST, false));
+		}
+		if (len == 7) {
+			hang(c, mid, b + 3, dz0 + 4);
 		}
 	}
 }
