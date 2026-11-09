@@ -735,9 +735,6 @@ public final class HouseStoneTower implements Variant {
 						set(u, y, v, eave(Blocks.DEEPSLATE_TILE_STAIRS, u, v, ru0 + k, ru1 - k, rv0 + k, rv1 - k));
 					} else {
 						set(u, y, v, p.hash(u, k, v, 6) == 0 ? b(Blocks.DEEPSLATE_BRICKS) : b(Blocks.DEEPSLATE_TILES));
-						if (k == 4) {
-							set(u, y + 1, v, slab(Blocks.CHERRY_SLAB));
-						}
 						cx += u;
 						cz += v;
 						cnt++;
