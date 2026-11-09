@@ -150,6 +150,12 @@ final class DeferredCursor implements JobCursor {
 	}
 
 	@Override
+	public boolean fastPhase() {
+		JobCursor r = real;
+		return r != null && r.fastPhase();
+	}
+
+	@Override
 	public int frontOf(int index) {
 		JobCursor r = real;
 		return r == null ? 0 : r.frontOf(index);

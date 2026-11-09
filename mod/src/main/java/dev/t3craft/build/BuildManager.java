@@ -97,7 +97,13 @@ public final class BuildManager {
 	/** Like {@link #submit(String, ResourceKey, BlockPos, Rotation, BuildPlan, double, BuildCost, UnaryOperator, int)} with a {@link BuildPlanner}. */
 	public BuildJob submit(String label, ResourceKey<Level> dimension, BlockPos origin, Rotation rotation, BuildPlan plan, double blocksPerTick,
 			@Nullable BuildCost cost, @Nullable UnaryOperator<BlockSink> wrap, int fronts, BuildPlanner planner) {
-		BuildJob job = new BuildJob(nextId.getAndIncrement(), label, dimension, origin, rotation, plan, blocksPerTick, cost, fronts, planner);
+		return submit(label, dimension, origin, rotation, plan, blocksPerTick, cost, wrap, fronts, planner, null);
+	}
+
+	/** feat/build-near-player: like the overload above; a crew starts by {@code focusWorld} (the player), null = anywhere. */
+	public BuildJob submit(String label, ResourceKey<Level> dimension, BlockPos origin, Rotation rotation, BuildPlan plan, double blocksPerTick,
+			@Nullable BuildCost cost, @Nullable UnaryOperator<BlockSink> wrap, int fronts, BuildPlanner planner, @Nullable BlockPos focusWorld) {
+		BuildJob job = new BuildJob(nextId.getAndIncrement(), label, dimension, origin, rotation, plan, blocksPerTick, cost, fronts, planner, focusWorld);
 		if (wrap != null) {
 			wraps.put(job.id(), wrap);
 		}

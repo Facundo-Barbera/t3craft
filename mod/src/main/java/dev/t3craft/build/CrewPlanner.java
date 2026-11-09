@@ -66,7 +66,23 @@ public final class CrewPlanner {
 	 * @param k     builders (≥ 1)
 	 */
 	public static CrewSchedule plan(int[] x, int[] y, int[] z, boolean[] air, boolean[] decor, int k) {
-		return new Sim(x, y, z, air, decor, Math.max(1, k)).run();
+		return plan(x, y, z, air, decor, k, null, null);
+	}
+
+	/**
+	 * feat/build-near-player: like {@link #plan(int[], int[], int[], boolean[], boolean[], int)}, with
+	 * {@code external} solid cells that stand before the crew starts (the fast foundation layers,
+	 * {@link #key packed}): they support entries and block stand spots like built cells. {@code focus}
+	 * (plan-relative {@code {x, z}}, the player) seeds the first zone at the column nearest it and starts
+	 * every builder at the column of its zone nearest it, so work begins next to the player and spreads
+	 * out from there (still bottom-up: support is unchanged). Same inputs, same schedule.
+	 */
+	public static CrewSchedule plan(int[] x, int[] y, int[] z, boolean[] air, boolean[] decor, int k,
+			it.unimi.dsi.fastutil.longs.@org.jspecify.annotations.Nullable LongSet external, int @org.jspecify.annotations.Nullable [] focus) {
+		Sim sim = new Sim(x, y, z, air, decor, Math.max(1, k));
+		sim.external = external;
+		sim.focus = focus == null || focus.length < 2 ? null : new int[] {focus[0], focus[1]};
+		return sim.run();
 	}
 
 	/** Octile walking distance between two feet cells (climbing costs 1.5 per block). */
@@ -147,6 +163,10 @@ public final class CrewPlanner {
 		final Long2IntOpenHashMap firstAt = new Long2IntOpenHashMap();
 		final int[] nextSame;
 		int minY = Integer.MAX_VALUE;
+		/** feat/build-near-player: solid cells already standing (foundation), or null. */
+		it.unimi.dsi.fastutil.longs.@org.jspecify.annotations.Nullable LongSet external;
+		/** feat/build-near-player: plan-relative {x, z} to start from (the player), or null. */
+		int @org.jspecify.annotations.Nullable [] focus;
 
 		final int[] zone;
 		final boolean[] applied;
@@ -368,6 +388,52 @@ public final class CrewPlanner {
 					zone[i] = best;
 				}
 			}
+			startsNearFocus(cols, colZone);
+		}
+
+		static double sq(double v) {
+			return v * v;
+		}
+
+		/**
+		 * feat/build-near-player: with a {@link #focus}, every builder starts at the column of its zone
+		 * nearest the focus (two cells apart from the others when possible), so the nearest-first order
+		 * of the simulation begins by the player.
+		 */
+		void startsNearFocus(List<int[]> cols, int[] colZone) {
+			int[] fo = focus;
+			if (fo == null || cols.isEmpty()) {
+				return;
+			}
+			for (int b = 0; b < k; b++) {
+				int best = -1;
+				double bd = Double.MAX_VALUE;
+				for (int c = 0; c < cols.size(); c++) {
+					if (colZone.length > c && colZone[c] != b && k > 1) {
+						continue;
+					}
+					int[] col = cols.get(c);
+					boolean clash = false;
+					for (int o = 0; o < b; o++) {
+						if (Math.max(Math.abs(startX[o] - col[0]), Math.abs(startZ[o] - col[1])) < SEPARATION) {
+							clash = true;
+							break;
+						}
+					}
+					double d = sq(col[0] - fo[0]) + sq(col[1] - fo[1]) + (clash ? 1e6 : 0);
+					if (d < bd) {
+						bd = d;
+						best = c;
+					}
+				}
+				if (best >= 0) {
+					startX[b] = cols.get(best)[0];
+					startZ[b] = cols.get(best)[1];
+					bx[b] = startX[b];
+					by[b] = minY;
+					bz[b] = startZ[b];
+				}
+			}
 		}
 
 		/**
@@ -383,11 +449,19 @@ public final class CrewPlanner {
 				return;
 			}
 			int first = 0;
+			int[] fo = focus;
 			for (int c = 1; c < cols.size(); c++) {
 				int[] a = cols.get(c);
 				int[] f = cols.get(first);
-				double da = (a[1] - minZ) * 1000.0 + Math.abs(a[0] - cx);
-				double df = (f[1] - minZ) * 1000.0 + Math.abs(f[0] - cx);
+				double da;
+				double df;
+				if (fo != null) {
+					da = sq(a[0] - fo[0]) + sq(a[1] - fo[1]);
+					df = sq(f[0] - fo[0]) + sq(f[1] - fo[1]);
+				} else {
+					da = (a[1] - minZ) * 1000.0 + Math.abs(a[0] - cx);
+					df = (f[1] - minZ) * 1000.0 + Math.abs(f[0] - cx);
+				}
 				if (da < df) {
 					first = c;
 				}
@@ -451,12 +525,20 @@ public final class CrewPlanner {
 
 		boolean occupied(long p) {
 			int l = last.get(p);
-			return l >= 0 && !air[l];
+			if (l < 0) {
+				var ex = external;
+				return ex != null && finalAt.get(p) < 0 && ex.contains(p);
+			}
+			return !air[l];
 		}
 
 		boolean solidAt(long p) {
 			int l = last.get(p);
-			return l >= 0 && !air[l] && !decor[l];
+			if (l < 0) {
+				var ex = external;
+				return ex != null && finalAt.get(p) < 0 && ex.contains(p);
+			}
+			return !air[l] && !decor[l];
 		}
 
 		/** Final plan state of a cell is solid (and so decoration next to it waits for it). */
