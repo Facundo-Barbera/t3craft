@@ -10,6 +10,7 @@ One line per structural commit on `main`, newest first:
 
 ## Entries
 
+- 2026-11-09 chore/agents-8-sonnet RELOAD — docs only: at most 8 child agents at once, all on Sonnet (medium/high); only the coordinator at xhigh (T3 was slowing down).
 - 2026-11-09 chore/agents-20 RELOAD — docs/scripts: up to 20 code-only child agents (heavy-process limits unchanged); start-daemon.sh keeps gradle from inheriting the heavy lock (a stale gradle daemon was blocking the next start).
 - 2026-11-09 fix/paste-crash2 RELOAD — Ctrl+V on Windows no longer reads image data from the clipboard through SDL (a native crash with no report); text paste unchanged; images via the clip button, or -Dt3craft.clipboardImages=true to opt back in.
 - 2026-11-09 design/houses-b2 RELOAD — second art pass on seven catalog houses: house_library_copper (dome as bulged stepped copper-stair rings over a calcite and stained-glass drum, chiselled bosses), house_tower_lookout and house_tower_stair (slim 5-wide bodies, battered foot or stone buttresses, thin bands, copper crown, eave carried by posts and a beam), house_terrace_podium (hipped copper-and-cherry pavilion roof, sills and hooded lintels on the side and back walls), house_terrace_tiers (closed calcite gables, brick chimney), house_scriptorium (tuff to stone to calcite pier gradient), house_forge_atelier (stone buttresses on the west and back walls). Rendered on the PC, no gradle on the VPS.
