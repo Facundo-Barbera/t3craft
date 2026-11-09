@@ -183,6 +183,8 @@ public final class HouseStoneTower implements Variant {
 			flights();
 			windows();
 			porch();
+			balcony();
+			wingTerrace();
 			buttresses();
 			rings();
 			if (battle) {
@@ -482,7 +484,7 @@ public final class HouseStoneTower implements Variant {
 						arch(front, t, y, true);
 					}
 				}
-				if (y > 2) {
+				if (y > 2 && y != 12) {
 					arch(front, cc, y, true);
 				}
 				// back
@@ -602,7 +604,7 @@ public final class HouseStoneTower implements Variant {
 			int u0 = annexRight ? cu0 + 2 : cu1 - 3;
 			for (int u = u0; u <= u0 + 1; u++) {
 				for (int v = cv1 - 2; v <= cv1 - 1; v++) {
-					for (int y = DECK + 1; y <= 19; y++) {
+					for (int y = DECK + 1; y <= Math.min(p.h() - 1, 21); y++) {
 						set(u, y, v, y >= 18 ? b(Blocks.DEEPSLATE_BRICKS) : light(p, u, y, v));
 					}
 				}
@@ -712,50 +714,51 @@ public final class HouseStoneTower implements Variant {
 			set(cc, 16, cv1 - 1, StoneKit.lantern(false));
 		}
 
-		static int ys(int k) {
-			return DECK + 1 + (k - 1) / 2;
-		}
-
-		/** A hipped roof one block outside the walls: cherry eaves, tile slabs rising half a block a ring, a cherry ridge. */
+		/**
+		 * A truncated hip roof one block outside the walls: four rings of stairs at 45 degrees (cherry on the eave,
+		 * deepslate tile above) round a flat tile top with a cherry cap and a lightning rod.
+		 */
 		void hipRoof() {
 			int ru0 = cu0 - 1;
 			int ru1 = cu1 + 1;
 			int rv0 = cv0 - 1;
 			int rv1 = cv1 + 1;
-			int kmax = (Math.min(ru1 - ru0 + 1, rv1 - rv0 + 1) - 1) / 2;
 			int cx = 0;
 			int cz = 0;
 			int cnt = 0;
 			for (int u = ru0; u <= ru1; u++) {
 				for (int v = rv0; v <= rv1; v++) {
 					int k = Math.min(Math.min(u - ru0, ru1 - u), Math.min(v - rv0, rv1 - v));
-					if (k == 0) {
-						set(u, DECK, v, eave(u, v, ru0, ru1, rv0, rv1));
-						continue;
-					}
-					int y = ys(k);
+					int y = DECK + Math.min(k, 3);
 					for (int fy = DECK + 1; fy < y; fy++) {
 						set(u, fy, v, b(Blocks.DEEPSLATE_TILES));
 					}
-					if (k == kmax) {
-						set(u, y, v, b(Blocks.DEEPSLATE_TILES));
-						set(u, y + 1, v, slab(Blocks.CHERRY_SLAB));
+					if (k == 0) {
+						set(u, y, v, eave(Blocks.CHERRY_STAIRS, u, v, ru0, ru1, rv0, rv1));
+					} else if (k <= 3) {
+						set(u, y, v, eave(Blocks.DEEPSLATE_TILE_STAIRS, u, v, ru0 + k, ru1 - k, rv0 + k, rv1 - k));
+					} else {
+						set(u, y, v, p.hash(u, k, v, 6) == 0 ? b(Blocks.DEEPSLATE_BRICKS) : b(Blocks.DEEPSLATE_TILES));
+						if (k == 4) {
+							set(u, y + 1, v, slab(Blocks.CHERRY_SLAB));
+						}
 						cx += u;
 						cz += v;
 						cnt++;
-					} else if ((k - 1) % 2 == 0) {
-						set(u, y, v, p.hash(u, k, v, 7) == 0 ? slab(Blocks.DEEPSLATE_BRICK_SLAB) : slab(Blocks.DEEPSLATE_TILE_SLAB));
-					} else {
-						set(u, y, v, topSlab(Blocks.DEEPSLATE_TILE_SLAB));
 					}
 				}
 			}
-			if (cnt > 0 && p.has(cx / cnt, ys(kmax) + 2, cz / cnt)) {
-				set(cx / cnt, ys(kmax) + 2, cz / cnt, Blocks.LIGHTNING_ROD.waxed().oxidized().defaultBlockState());
+			if (cnt > 0) {
+				int mu = cx / cnt;
+				int mv = cz / cnt;
+				set(mu, DECK + 4, mv, b(Blocks.CHERRY_PLANKS));
+				if (p.has(mu, DECK + 5, mv)) {
+					set(mu, DECK + 5, mv, Blocks.LIGHTNING_ROD.waxed().oxidized().defaultBlockState());
+				}
 			}
 		}
 
-		BlockState eave(int u, int v, int ru0, int ru1, int rv0, int rv1) {
+		BlockState eave(Block stair, int u, int v, int ru0, int ru1, int rv0, int rv1) {
 			boolean n = v == rv0;
 			boolean s = v == rv1;
 			boolean wst = u == ru0;
@@ -763,11 +766,73 @@ public final class HouseStoneTower implements Variant {
 			if ((n || s) && (wst || e)) {
 				Direction high = n ? Direction.SOUTH : Direction.NORTH;
 				boolean leftOfHigh = n ? wst : e; // looking along 'high', the corner's high quarter is on the left or the right
-				return stairs(Blocks.CHERRY_STAIRS, high).setValue(BlockStateProperties.STAIRS_SHAPE,
+				return stairs(stair, high).setValue(BlockStateProperties.STAIRS_SHAPE,
 						leftOfHigh ? StairsShape.OUTER_LEFT : StairsShape.OUTER_RIGHT);
 			}
 			Direction high = n ? Direction.SOUTH : s ? Direction.NORTH : wst ? Direction.EAST : Direction.WEST;
-			return stairs(Blocks.CHERRY_STAIRS, high);
+			return stairs(stair, high);
+		}
+
+		/** A cherry balcony off the study, over the porch: a floor of planks on stair brackets with a rail. */
+		void balcony() {
+			Wall f = new Wall(c, p, cv0, Direction.NORTH);
+			archDoor(f, cc, F2 + 1, Blocks.CHERRY_DOOR);
+			Set<Long> rail = new HashSet<>();
+			for (int u = cc - 1; u <= cc + 1; u++) {
+				for (int v = 0; v <= 1; v++) {
+					set(u, F2, v, b(Blocks.CHERRY_PLANKS));
+					set(u, F2 - 1, v, stUp(Blocks.CHERRY_STAIRS, Direction.SOUTH));
+					if (v == 0 || u != cc) {
+						rail.add(key(u, v));
+					}
+				}
+			}
+			rail.remove(key(cc, 1));
+			for (long k : rail) {
+				int u = (int) (k >> 16);
+				int v = (int) (k & 0xFFFF);
+				set(u, F2 + 1, v, Blocks.CHERRY_FENCE.defaultBlockState()
+						.setValue(BlockStateProperties.NORTH, rail.contains(key(u, v - 1)))
+						.setValue(BlockStateProperties.EAST, rail.contains(key(u + 1, v)))
+						.setValue(BlockStateProperties.SOUTH, rail.contains(key(u, v + 1)) || v == 1)
+						.setValue(BlockStateProperties.WEST, rail.contains(key(u - 1, v))));
+			}
+		}
+
+		/** The wing's roof terrace: a cherry pergola at the outer edge, a bench against the tower, planters. */
+		void wingTerrace() {
+			int in = annexRight ? -1 : 1; // from the outer wall towards the tower
+			int pu1 = outer + in; // first cell inside the parapet
+			int pu2 = pu1 + 2 * in; // pergola is three cells wide
+			int vA = av0 + 2;
+			int vB = av1 - 2;
+			if (vB - vA < 2) {
+				return;
+			}
+			int lo = Math.min(pu1, pu2);
+			int hi = Math.max(pu1, pu2);
+			for (int u = lo; u <= hi; u++) {
+				for (int v = vA; v <= vB; v++) {
+					set(u, F1 + 4, v, topSlab(Blocks.CHERRY_SLAB));
+				}
+			}
+			for (int u : new int[] {pu1, pu2}) {
+				for (int v : new int[] {vA, vB}) {
+					for (int y = F1 + 1; y <= F1 + 3; y++) {
+						set(u, y, v, Blocks.CHERRY_FENCE.defaultBlockState());
+					}
+				}
+			}
+			int tu = annexRight ? shared + 1 : shared - 1;
+			Direction back = annexRight ? Direction.WEST : Direction.EAST;
+			for (int v = vA + 1; v <= vB - 1; v++) {
+				set(tu, F1 + 1, v, stairs(Blocks.CHERRY_STAIRS, back));
+			}
+			int pv = av1 - 1;
+			if (tu != pu2 + in && free(tu, F1 + 1, pv) && Math.abs(tu - pu2) > 1) {
+				set(tu, F1, pv, b(Blocks.MOSS_BLOCK));
+				set(tu, F1 + 1, pv, b(Blocks.FLOWERING_AZALEA));
+			}
 		}
 
 		// ------------------------------------------------------------------ furniture
