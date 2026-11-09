@@ -66,18 +66,6 @@ final class SidebarRow {
 	 */
 	static void draw(GuiGraphicsExtractor g, Font font, ChatTheme t, ClipCache clips, Rect rr, ThreadRow r, boolean selected, boolean hover,
 			boolean multiEnv, boolean quick, long now) {
-		draw(g, font, t, clips, rr, r, selected, hover, multiEnv, quick, now, SidebarModel.Nest.NONE);
-	}
-
-	/**
-	 * feat/thread-lineage: {@code nest} adds the lineage bits. A delegated child shows a "delegated"
-	 * mark on line 1 (an orphaned one, whose parent is not listed, shows {@code ↳ parent: <title>}
-	 * there instead of the project); a parent shows the {@code ▾ N agents} counter at the right of
-	 * the title. Returns the counter's rectangle (the view makes it fold the children), or
-	 * {@link Rect#EMPTY} when there is none.
-	 */
-	static Rect draw(GuiGraphicsExtractor g, Font font, ChatTheme t, ClipCache clips, Rect rr, ThreadRow r, boolean selected, boolean hover,
-			boolean multiEnv, boolean quick, long now, SidebarModel.Nest nest) {
 		if (selected) {
 			// T3: the selected row is a lighter rounded card
 			roundBox(g, rr, t.panelHi(), ChatTheme.withAlpha(t.edge(), 200));
@@ -106,40 +94,14 @@ final class SidebarRow {
 		} else {
 			right -= drawState(g, font, t, clips, r, x1, y1, Math.max(0, (x1 - x) / 2), now);
 		}
-		if (nest.orphan()) {
-			// feat/thread-lineage: parent not listed here, say whose task it is
-			String p = nest.parentTitle().isBlank() ? "↳ parent" : "↳ parent: " + nest.parentTitle();
-			g.text(font, clips.clip(font, p, right - x - 3), x, y1, t.accent(), false);
-		} else if (nest.delegated()) {
-			String mark = DELEGATED_MARK;
-			int mw = clips.width(font, mark);
-			if (x + mw < right - 3) {
-				g.text(font, mark, x, y1, t.accent(), false);
-				x += mw + 4;
-			}
-			g.text(font, clips.clip(font, projectLabel(r), right - x - 3), x, y1, dim, false);
-		} else {
-			g.text(font, clips.clip(font, projectLabel(r), right - x - 3), x, y1, dim, false);
-		}
+		g.text(font, clips.clip(font, projectLabel(r), right - x - 3), x, y1, dim, false);
 
 		// ---- icons (provider, unread): on line 3 when there is one, else on line 2
 		boolean line3 = d.hasLine3();
 		int iconsW = icons(g, font, t, clips, d, x1, line3 ? y3 : y2);
 
-		// ---- line 2: title (and the children counter of a parent at its right)
+		// ---- line 2: title
 		int titleRight = x1 - (line3 ? 0 : iconsW);
-		Rect chip = Rect.EMPTY;
-		if (nest.children() > 0) {
-			String label = childrenLabel(nest);
-			int cw = clips.width(font, label) + 4;
-			int cx = titleRight - cw;
-			if (cx > x0 + 24) {
-				ChatDraw.round(g, cx, y2 - 1, cw, LINE + 1, ChatTheme.withAlpha(t.edge(), 110));
-				g.text(font, label, cx + 2, y2, nest.working() > 0 ? t.working() : t.muted(), false);
-				chip = new Rect(cx, y2 - 1, cw, LINE + 1);
-				titleRight = cx - 3;
-			}
-		}
 		int titleColor = r.settled() && !selected ? t.muted() : t.text();
 		g.text(font, clips.clip(font, r.title(), titleRight - x0), x0, y2, titleColor, t.shadow());
 
@@ -173,15 +135,6 @@ final class SidebarRow {
 				g.text(font, clips.clip(font, pr, limit - lx), lx, y3, prColor(t, d.prState()), false);
 			}
 		}
-		return chip;
-	}
-
-	/** Line 1 mark of a nested delegated task. */
-	static final String DELEGATED_MARK = "⤷ delegated";
-
-	/** {@code ▾ 2 agents} (open) / {@code › 2 agents} (folded). */
-	static String childrenLabel(SidebarModel.Nest n) {
-		return (n.collapsed() ? "› " : "▾ ") + n.children() + (n.children() == 1 ? " agent" : " agents");
 	}
 
 	/**

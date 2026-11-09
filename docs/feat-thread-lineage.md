@@ -7,7 +7,7 @@ Los hilos que un coordinador abre con `delegate_task` llegan de T3 con
 | Caso | `creationSource` | Dónde se ve |
 |---|---|---|
 | Subagente del proveedor (Agent tool de Claude, …) | `provider` | Dentro del hilo padre; en la ciudad, ayudante bebé (`docs/feat-npc-helpers.md`). Nunca en el sidebar. |
-| Tarea delegada (`delegate_task`) | cualquier otro (`mcp`, `server`, …) | Sidebar anidada bajo el padre, NPC trabajador completo con escritorio. |
+| Tarea delegada (`delegate_task`) | cualquier otro (`mcp`, `server`, …) | Menú de agentes del header del padre (no en el sidebar), NPC trabajador completo con escritorio. |
 
 ## Modelo
 
@@ -23,22 +23,20 @@ Los hilos que un coordinador abre con `delegate_task` llegan de T3 con
 - `chat.RowLineage` en `ThreadRow.lineage()` (`parentKey`, `parentTitle`, `delegated`); se guarda
   en el caché de disco (campos aditivos).
 
-## Sidebar (Y)
+## Sidebar
 
-- Hijo delegado anidado justo debajo de su padre, en el lugar del padre (carpeta, Pinned,
-  Working…): sangría de 8 px por nivel (máx. 4 dibujados), línea guía con codo, marca
-  `⤷ delegated` en la línea 1.
-- Padre: contador `▾ N agents` a la derecha del título (cian si alguno trabaja); clic pliega o
-  despliega. Los contadores de sección cuentan también a los hijos anidados.
-- Hijo a nivel raíz con `↳ parent: <título>` cuando el padre no está listado allí (settled, otro
-  proyecto con filtro, otro entorno, no coincide con la búsqueda) o el hijo está fijado o settled.
-- `focus(key)` de un hijo abre la sección del ancestro raíz y despliega los ancestros.
+feat/ui-hq-menu-lineage (Facundo, 2026-11-09): el sidebar ya no muestra linaje. Sin anidado, sin
+contador `▾ N agents` y sin marca `⤷ delegated`; las tareas delegadas (con padre) no son filas del
+sidebar (`SidebarModel.hiddenDelegated`). Se abren desde el menú de agentes del padre, un bloque o
+un enlace (`SidebarModel.find` las sigue encontrando). Los subagentes del proveedor tampoco son filas.
 
 ## Header del hilo
 
 - Hijo: breadcrumb `↳ padre › hijo`, el padre clicable.
 - Padre: chip `N agents ▾`; tooltip con cada hijo y su estado; clic abre un menú con los hijos
-  (`glifo título · estado`) que abre el elegido.
+  (`glifo título · estado`) que abre el elegido. Solo hijos vivos (`SidebarModel.liveChildrenOf`):
+  idle o activos (working, waiting, needs input), nunca settled, done ni error. Sin hijos vivos no
+  hay chip.
 
 ## Ciudad
 

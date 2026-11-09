@@ -20,7 +20,8 @@ import org.jspecify.annotations.Nullable;
  * <ul>
  *   <li><b>Open HQ</b>: what the button used to do (create or open the HQ world and enter).</li>
  *   <li><b>Layout</b>: the {@code HqLayouts} registry as a scrolling list (name, one line of
- *       description, "very large" tag on campus, which one is chosen and which one is built). A
+ *       description, "very large" tag on campus, which one is chosen and which one is built). The
+ *       main design ({@code HqLayouts.PRIMARY_ID}) comes first; the rest follow a "Legacy" header. A
  *       left click or the arrow keys choose; the choice is saved to {@code hqLayout} at once.</li>
  *   <li><b>Rebuild with &lt;layout&gt;</b> (only when the HQ is built with another layout) and
  *       <b>Reset HQ</b>: both ask first, then run the existing reset (zip backup, delete only
@@ -44,6 +45,7 @@ public final class HqMenuScreen extends Screen {
 	private static final int MUTED = 0xFFAAAAAA;
 	private static final int BUILT = 0xFF55FF55;
 	private static final int LARGE = 0xFFFFAA00;
+	private static final int PRIMARY = 0xFF55FFFF;
 
 	private final @Nullable Screen parent;
 	private final DemoClient demo;
@@ -100,8 +102,8 @@ public final class HqMenuScreen extends Screen {
 
 		int listTop = y + 20 + 6 + font.lineHeight + 3; // under "Open HQ" and the "Layout" header
 		int listBottom = Math.max(listTop + ROW_H, infoY - 3); // at least one row, even at GUI scale 4 on a short window
-		list.layout(x, listTop, w, listBottom - listTop, ROW_H, model.size());
-		list.ensureVisible(model.selectedIndex());
+		list.layout(x, listTop, w, listBottom - listTop, ROW_H, rowCount());
+		ensureSelectedVisible();
 		refreshButtons();
 		setInitialFocus(open);
 	}
@@ -157,9 +159,15 @@ public final class HqMenuScreen extends Screen {
 		g.fill(list.x(), list.top(), list.x() + list.width(), list.bottom(), WELL);
 		g.enableScissor(list.x(), list.top(), list.x() + list.width(), list.bottom());
 		int hover = list.rowAt(mouseX, mouseY);
-		for (int i = 0; i < model.size(); i++) {
-			if (list.visible(i)) {
-				row(g, i, list.rowY(i), i == hover);
+		for (int r = 0; r < rowCount(); r++) {
+			if (!list.visible(r)) {
+				continue;
+			}
+			int i = layoutAt(r);
+			if (i < 0) {
+				legacyHeader(g, list.rowY(r));
+			} else {
+				row(g, i, list.rowY(r), r == hover);
 			}
 		}
 		g.disableScissor();
@@ -171,6 +179,51 @@ public final class HqMenuScreen extends Screen {
 
 		g.text(font, ChatDraw.clip(font, info().getString(), list.width()), list.x(), infoY, MUTED);
 		super.extractRenderState(g, mouseX, mouseY, a); // widgets last: on a very short window they win over the list
+	}
+
+	// ---- list rows: primary layouts, a "Legacy" header row, then the legacy layouts --------------
+
+	/** Rows of the list: one per layout, plus the "Legacy" header when the model splits. */
+	private int rowCount() {
+		return model.size() + (model.legacyStart() >= 0 ? 1 : 0);
+	}
+
+	/** Layout index shown on list row {@code r}; -1 for the "Legacy" header (or out of range). */
+	private int layoutAt(int r) {
+		int sep = model.legacyStart();
+		if (r < 0 || r >= rowCount()) {
+			return -1;
+		}
+		if (sep < 0 || r < sep) {
+			return r;
+		}
+		return r == sep ? -1 : r - 1;
+	}
+
+	/** List row of layout {@code i}. */
+	private int rowOf(int i) {
+		int sep = model.legacyStart();
+		return sep < 0 || i < sep ? i : i + 1;
+	}
+
+	private void ensureSelectedVisible() {
+		int i = model.selectedIndex();
+		if (i == model.legacyStart()) {
+			list.ensureVisible(i); // the header row sits right above the first legacy layout
+		}
+		list.ensureVisible(rowOf(i));
+	}
+
+	private void legacyHeader(GuiGraphicsExtractor g, int y) {
+		int x0 = list.x();
+		int x1 = list.x() + list.width() - (list.scrollable() ? 5 : 0);
+		int ty = y + ROW_H - font.lineHeight - 3;
+		String label = Component.translatable("t3craft.hqmenu.legacy").getString();
+		g.text(font, label, x0 + 4, ty, MUTED);
+		int hx = x0 + 4 + font.width(label) + 6;
+		String hint = Component.translatable("t3craft.hqmenu.legacy.hint").getString();
+		g.text(font, ChatDraw.clip(font, hint, Math.max(0, x1 - hx - 4)), hx, ty, 0xFF777777);
+		g.fill(x0 + 2, y + ROW_H - 1, x1 - 2, y + ROW_H, BORDER);
 	}
 
 	private void row(GuiGraphicsExtractor g, int i, int y, boolean hovered) {
@@ -190,13 +243,14 @@ public final class HqMenuScreen extends Screen {
 		int tx = x0 + 4;
 		int avail = x1 - tx - 4;
 
-		// tags from the right: [built] [very large]
+		// tags from the right: [built] [main] [very large]
 		int tagsW = 0;
 		String builtTag = model.isBuilt(i) ? Component.translatable("t3craft.hqmenu.tag.built").getString() : null;
+		String primaryTag = l.primary() ? Component.translatable("t3craft.hqmenu.tag.primary").getString() : null;
 		String largeTag = model.warnLarge(i) ? Component.translatable("t3craft.hqmenu.tag.large").getString() : null;
 		int right = x1 - 4;
 		int tagY = y + 3;
-		for (String tag : new String[] {builtTag, largeTag}) {
+		for (String tag : new String[] {builtTag, primaryTag, largeTag}) {
 			if (tag == null) {
 				continue;
 			}
@@ -205,7 +259,7 @@ public final class HqMenuScreen extends Screen {
 				continue; // narrow window: keep at least half the row for the name (the line below repeats the warning)
 			}
 			right -= tw;
-			g.text(font, tag, right, tagY, tag.equals(builtTag) ? BUILT : LARGE);
+			g.text(font, tag, right, tagY, tag.equals(builtTag) ? BUILT : tag.equals(primaryTag) ? PRIMARY : LARGE);
 			right -= 6;
 			tagsW += tw + 6;
 		}
@@ -238,12 +292,13 @@ public final class HqMenuScreen extends Screen {
 		if (super.mouseClicked(e, doubleClick)) {
 			return true;
 		}
-		int i = list.rowAt(e.x(), e.y());
-		if (i < 0) {
+		int r = list.rowAt(e.x(), e.y());
+		if (r < 0) {
 			return false;
 		}
-		if (!HqMenuKeys.choosesRow(e.button())) {
-			return true; // over the list, but only a left click chooses (26.x: left = 1)
+		int i = layoutAt(r);
+		if (i < 0 || !HqMenuKeys.choosesRow(e.button())) {
+			return true; // the "Legacy" header, or not a left click (26.x: left = 1): only a left click on a layout chooses
 		}
 		choose(i);
 		return true;
@@ -278,7 +333,7 @@ public final class HqMenuScreen extends Screen {
 	private void choose(int i) {
 		packStatus = null;
 		model.select(i);
-		list.ensureVisible(model.selectedIndex());
+		ensureSelectedVisible();
 		refreshButtons();
 	}
 

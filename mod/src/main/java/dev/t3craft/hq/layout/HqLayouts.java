@@ -45,6 +45,11 @@ public final class HqLayouts {
 	public static final String HYBRID_RINGCAMPUS = "hybrid-ringcampus";
 	public static final String HYBRID_TOWNCENTER = "hybrid-towncenter";
 	public static final String HYBRID_TERRACES = "hybrid-terraces";
+	/**
+	 * The main design, listed first in the HQ menu; every other layout is shown under "Legacy".
+	 * Presentation only: it is not the {@link #DEFAULT_ID} and the registry order does not change.
+	 */
+	public static final String PRIMARY_ID = HYBRID_RINGCAMPUS;
 
 	private static final List<HqLayoutInfo> ALL = List.of(
 			info(CLASSIC, false),
@@ -61,7 +66,27 @@ public final class HqLayouts {
 	}
 
 	private static HqLayoutInfo info(String id, boolean large) {
-		return new HqLayoutInfo(id, "t3craft.hq.layout." + id + ".name", "t3craft.hq.layout." + id + ".desc", large);
+		return new HqLayoutInfo(id, "t3craft.hq.layout." + id + ".name", "t3craft.hq.layout." + id + ".desc", large,
+				id.equals(PRIMARY_ID));
+	}
+
+	/**
+	 * Every layout in HQ-menu order: the primary ones first ({@link #PRIMARY_ID}), then the legacy
+	 * ones in registry order. Only for display; {@link #all()} keeps the stable registry order.
+	 */
+	public static List<HqLayoutInfo> menuOrder() {
+		List<HqLayoutInfo> out = new java.util.ArrayList<>(ALL.size());
+		for (HqLayoutInfo i : ALL) {
+			if (i.primary()) {
+				out.add(i);
+			}
+		}
+		for (HqLayoutInfo i : ALL) {
+			if (!i.primary()) {
+				out.add(i);
+			}
+		}
+		return List.copyOf(out);
 	}
 
 	/** Every layout, in menu order: classic, campus, ring, vertical, ensanche, village, hybrid-ringcampus, hybrid-towncenter, hybrid-terraces. */
