@@ -482,7 +482,7 @@ public final class CitadelRelief {
 			c.set(x, y, z, b(Blocks.CALCITE));
 			long beat = Math.floorMod(Math.round(arc), 14);
 			if (beat == 0) {
-				c.set(x, y + 1, z, b(Blocks.POTTED_FLOWERING_AZALEA_BUSH)); // a planter on the pier
+				c.set(x, y + 1, z, b(Blocks.POTTED_FLOWERING_AZALEA)); // a planter on the pier
 			} else if (beat == 7) {
 				c.set(x, y + 1, z, slab(Blocks.SMOOTH_QUARTZ_SLAB));
 			}
