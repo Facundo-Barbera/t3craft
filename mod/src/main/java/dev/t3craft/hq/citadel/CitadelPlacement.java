@@ -2,13 +2,11 @@ package dev.t3craft.hq.citadel;
 
 import static dev.t3craft.hq.citadel.CitadelCanvas.AIR;
 import static dev.t3craft.hq.citadel.CitadelCanvas.FOOT;
-import static dev.t3craft.hq.citadel.CitadelCanvas.LIGHT;
 import static dev.t3craft.hq.citadel.CitadelCanvas.Y0;
 import static dev.t3craft.hq.citadel.CitadelCanvas.b;
 import static dev.t3craft.hq.citadel.CitadelCanvas.col;
 import static dev.t3craft.hq.citadel.CitadelCanvas.colX;
 import static dev.t3craft.hq.citadel.CitadelCanvas.colZ;
-import static dev.t3craft.hq.citadel.CitadelCanvas.lattice;
 import static dev.t3craft.hq.citadel.CitadelCanvas.leaves;
 
 import dev.t3craft.T3Craft;
@@ -66,7 +64,7 @@ import org.jspecify.annotations.Nullable;
  *
  * <h2>Rules</h2>
  * Every plot is checked free on the canvas before it is built ({@link CitadelCanvas#zoneAt},
- * {@link CitadelCanvas#at}): in the right zone, on soft ground (grass, moss, the lattice light) or the
+ * {@link CitadelCanvas#at}): in the right zone, on soft ground (grass, moss, an old lattice light) or the
  * street's edge, nothing above it up to its height (azalea bushes excepted: they are cleared), not a
  * hall column, an anchor column or the spawn. When {@link Catalog#pick} has nothing for a family the
  * plot is not used, except for trees (the citadel's cherry tree), gardens (a hedge garden) and
@@ -332,7 +330,7 @@ public final class CitadelPlacement {
 					continue;
 				}
 				if (lit) {
-					continue; // keep the lattice light and plant nothing on it
+					continue; // keep a light let into the ground and plant nothing on it
 				}
 				if (path) {
 					c.set(g, b(Blocks.DIRT_PATH));
@@ -636,7 +634,7 @@ public final class CitadelPlacement {
 				if (zn.kind() != Kind.LOT || zn.lot() != l.id() || c.hallCols.containsKey(col(x, z))) {
 					continue;
 				}
-				c.set(x, 0, z, lattice(x, z) ? LIGHT : (Math.abs(bb) <= CORRIDOR_HALF ? c.accent() : FOOT));
+				c.set(x, 0, z, Math.abs(bb) <= CORRIDOR_HALF ? c.accent() : FOOT);
 				for (int y = 1; y <= 3; y++) {
 					if (is(c.at(x, y, z), Blocks.FLOWERING_AZALEA_LEAVES)) {
 						c.set(x, y, z, AIR);
@@ -892,9 +890,7 @@ public final class CitadelPlacement {
 			for (int x = x0; x < x0 + side; x++) {
 				for (int z = z0; z < z0 + side; z++) {
 					int ring = Math.max(Math.abs(x - cx), Math.abs(z - cz));
-					if (!lattice(x, z)) {
-						c.set(x, 0, z, ring % 3 == 0 || ring == side / 2 ? FOOT : c.accent());
-					}
+					c.set(x, 0, z, ring % 3 == 0 || ring == side / 2 ? FOOT : c.accent());
 					for (int y = 1; y <= 3; y++) {
 						if (is(c.at(x, y, z), Blocks.FLOWERING_AZALEA_LEAVES)) {
 							c.set(x, y, z, AIR);
@@ -1165,9 +1161,7 @@ public final class CitadelPlacement {
 						for (int z = z0; z < z0 + all; z++) {
 							if (c.zoneAt(x, z).kind() == Kind.LOT) {
 								boolean rim = x == x0 || z == z0 || x == x0 + all - 1 || z == z0 + all - 1;
-								if (!lattice(x, z)) {
-									c.set(x, 0, z, rim ? FOOT : c.accent());
-								}
+								c.set(x, 0, z, rim ? FOOT : c.accent());
 								for (int y = 1; y <= 3; y++) {
 									if (is(c.at(x, y, z), Blocks.FLOWERING_AZALEA_LEAVES)) {
 										c.set(x, y, z, AIR);

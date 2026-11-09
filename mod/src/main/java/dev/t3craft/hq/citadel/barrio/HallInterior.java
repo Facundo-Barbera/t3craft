@@ -44,7 +44,7 @@ public final class HallInterior {
 			int y = f * FH + 1;
 			rug(c, r, F, f, s, env);
 			furniture(c, r, F, f, y, s, seed, desks);
-			pendants(c, r, F, f, m, seed);
+			pendants(c, r, F, f, m, desks);
 		}
 		if (F == 1) {
 			chandelier(c, r);
@@ -227,17 +227,33 @@ public final class HallInterior {
 
 	// ------------------------------------------------------------------ light
 
+	/** Spacing of the pendant lanterns of a hall ceiling (cells, both ways). */
+	private static final int PENDANT_STEP = 4;
+
 	/**
-	 * Pendant lanterns on a chain where the shell has its ceiling lights (every 4th cell), instead of the
-	 * ceiling froglights; on a lower floor only where its ceiling is a plain slab.
+	 * Pendant lanterns on a chain, on a grid centred on the room (citadel/light-aesthetic): one row on the
+	 * hall's centre line and rows every {@value #PENDANT_STEP} cells either side of it, columns every
+	 * {@value #PENDANT_STEP} cells either side of the middle of its depth, so the ceiling is symmetric about
+	 * the door's axis. Never over a desk or its standing cell ({@code desks}), never over the stair hole, and
+	 * not in the centre of a one-floor hall, where the chandelier hangs. The ceiling lights of the shell are
+	 * gone: the light of a hall is these lanterns, the chandelier and the table lamps.
 	 */
-	private static void pendants(CitadelCanvas c, Room r, int F, int f, Mats m, int seed) {
+	private static void pendants(CitadelCanvas c, Room r, int F, int f, Mats m, Set<Long> desks) {
 		int W = r.w();
 		int D = r.d();
+		int mid = r.c();
+		int cu = D / 2;
 		int ceil = (f + 1) * FH;
-		for (int u = 1; u < D; u += 4) {
-			for (int v = 1; v < W; v += 4) {
+		for (int u = cu - PENDANT_STEP * (cu / PENDANT_STEP); u < D - 1; u += PENDANT_STEP) {
+			for (int v = mid - PENDANT_STEP * (mid / PENDANT_STEP); v < W; v += PENDANT_STEP) {
+				if (u < 1 || v < 1 || v > W - 2 || F == 1 && u == cu && v == mid) {
+					continue;
+				}
 				BlockPos p = r.cell(u, v, ceil);
+				// never over a desk, and only into open air (not the stairs' core under the top step)
+				if (desks.contains(col(p.getX(), p.getZ())) || !free(c, p.below()) || !free(c, p.below(2))) {
+					continue;
+				}
 				BlockState now = c.at(p.getX(), p.getY(), p.getZ());
 				if (now == null || now.isAir() || (f < F - 1 && now.getLightEmission() > 0)) {
 					continue;

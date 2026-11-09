@@ -19,34 +19,46 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
 /**
- * fix/hq-lanterns: built-in lighting of every HQ plan. After a layout is generated, every cell people
- * can walk to from the spawn should read at least {@link HqLightMap#MIN_LEVEL} of block light at
- * night. Where it does not, lamps are let into the building itself, never added as loose decoration:
+ * fix/hq-lanterns, citadel/light-aesthetic: the built-in <b>fill</b> lighting of every HQ plan. After a layout
+ * is generated, every cell people can walk to from the spawn should read at least {@link HqLightMap#MIN_LEVEL}
+ * of block light at night. The light one <i>sees</i> is the layout's own design (lanterns on posts, under
+ * eaves and porches, pendants, braziers, lit stained glass: see {@code docs/feat-hq-lighting.md}); this pass
+ * only covers what that design leaves dark, and only with the invisible vanilla block {@code minecraft:light}
+ * at moderate levels (10 to {@value #FILL_MAX}), so the visible lamps (14, 15) still dominate the scene. It
+ * never lets a visible lamp (froglight, shoji panel) into a floor, wall or ceiling.
  * <ol>
- *   <li>a grid of floor lamps every {@value #GRID} blocks (plan coordinates, so it is symmetric about
- *   the hub), only where some walkable cell nearby is dark;</li>
- *   <li>then, for each cell still dark, the floor, wall or ceiling block nearby that lights it and the
- *   most other dark cells (exact flood fill).</li>
+ *   <li>a lattice {@code (x + 5z) mod }{@value #LATTICE13} of invisible lights in the walking cells (plan
+ *   coordinates), only where some walkable cell nearby is dark;</li>
+ *   <li>then, for each cell still dark, the free air cell nearby (the cell itself, its head, the air around)
+ *   that lights it and the most other dark cells (exact flood fill), at the weakest level that does.</li>
  * </ol>
  *
  * <p><b>Local to each part.</b> The HQ grows and shrinks by groups ({@link BuildPlan#groups()}) and its
  * diffs must touch only the parts that changed, so every group is lit <b>on its own</b>: it only counts
- * its own lamps, cells of other groups read as opaque (their light never helps, so the real HQ is at
- * least as bright as the estimate), and lamps only go into the group's own blocks. Desk cells (the
+ * its own lights, cells of other groups read as opaque (their light never helps, so the real HQ is at
+ * least as bright as the estimate), and lights only go into the group's own air. Desk cells (the
  * desk modules above their floor, every screen and desk top) read as air whether the desk is taken or
- * vacant, so taking or freeing a desk never moves a lamp.
+ * vacant, so taking or freeing a desk never moves a light; no light ever goes into a desk cell, a
+ * screen, an anchor's cell or the head room over it.
  *
- * <p>Only plain opaque full blocks are swapped (plus glass floor tiles and leaves of canopies people
- * can climb onto), never screens, desks, the board, signs or anything an anchor names, so walkability,
- * anchors and module ownership stay exactly as generated. Pure and deterministic.
+ * <p>A light takes a plain air placement of the group, or a cell nobody placed that a module of the group
+ * owns (it is then added as a placement of that group). {@code minecraft:light} has no collision and is
+ * replaceable, so walkability, anchors and module ownership stay exactly as generated. Pure and
+ * deterministic.
  */
 final class HqLighting {
-	/** Spacing of the floor-lamp grid: every cell of a grid square is within 4 steps of a lamp. */
+	/** Legacy spacing of the old floor-lamp grid (the {@code lighting.grid} pack parameter); no longer drives placement. */
 	static final int GRID = 5;
-	/** Farthest a fallback lamp may be from the dark cell it is for (blocks, each axis). */
-	private static final int REACH = 4;
-	/** Period of the sparse groups' floor-lamp lattice. */
+	/** Farthest a fallback light may be from the dark cell it is for (blocks, each axis). */
+	private static final int REACH = 3;
+	/** Legacy period of the old floor-lamp lattice (the {@code lighting.lattice} pack parameter); no longer drives placement. */
 	static final int LATTICE = 9;
+	/** Strongest invisible fill: moderate, under the design lamps (lanterns 15, torches 14). */
+	static final int FILL_MAX = 12;
+	/** Levels of the invisible fill, weakest first. */
+	private static final int[] LEVELS = {HqLightMap.MIN_LEVEL, HqLightMap.MIN_LEVEL + 1, FILL_MAX};
+	/** Period of the fill lattice {@code (x + 5z) mod 13}: radius-2 diamonds tile the plane (a level-12 light reaches 10 two steps away). */
+	static final int LATTICE13 = 13;
 	/** How far above a group's own blocks its light sees air (feet, head and one more). */
 	private static final int AIRSPACE = 3;
 	/** What a cell of another group is to a group's light: opaque. */
@@ -54,9 +66,6 @@ final class HqLighting {
 
 	private final BuildPlan plan;
 	private final HqStyle style;
-	/** feat/hq-layout-packs: {@link #GRID} and {@link #LATTICE} as the layout's pack sets them (clamped, never sparser than the code's). */
-	private final int grid;
-	private final int lattice;
 	private final Map<BlockPos, String> groups;
 	/** Cells of the classic desk modules above their floor: air to the walk estimate (taken or vacant alike). */
 	private final Set<BlockPos> desks = new HashSet<>();
@@ -73,11 +82,10 @@ final class HqLighting {
 	private final BlockState[] cur;
 	private final List<String> groupNames = new ArrayList<>();
 	private final Set<BlockPos> keep = new HashSet<>();
-	private final Set<BlockState> fixtures = new HashSet<>();
-	/** The board's face block and centre: the same block elsewhere (plain walls) may become a lamp. */
-	private final BlockState boardState;
-	private final BlockPos board;
+	/** The invisible lights placed, by position (a new one where nobody had placed anything is also in {@link #added}). */
 	private final Map<BlockPos, BlockState> lamps = new HashMap<>();
+	/** Lights in cells the plan had no placement for, with the group that owns them. */
+	private final Map<BlockPos, String> added = new HashMap<>();
 	private final Map<BlockPos, Double> floors = new HashMap<>();
 	/** Walkable cells that need more than {@link HqLightMap#MIN_LEVEL} (standing rows in front of free desks). */
 	private final Map<BlockPos, Integer> need = new HashMap<>();
@@ -85,9 +93,6 @@ final class HqLighting {
 	private HqLighting(BuildPlan plan, HqStyle style) {
 		this.plan = plan;
 		this.style = style;
-		String layoutId = PackApply.layoutOf(style);
-		this.grid = dev.t3craft.hq.pack.LayoutParams.LIGHT_GRID.get(layoutId);
-		this.lattice = dev.t3craft.hq.pack.LayoutParams.LIGHT_LATTICE.get(layoutId);
 		this.groups = plan.groupsByPos();
 		Box fp = plan.footprint();
 		for (Placement p : plan.placements()) {
@@ -148,6 +153,7 @@ final class HqLighting {
 		}
 		for (Anchor a : plan.anchors().values()) {
 			keep.add(a.block());
+			keep.add(a.block().above());
 		}
 		Anchor wall = plan.anchor(AnchorNames.THREAD_WALL);
 		Anchor end = plan.anchor(AnchorNames.THREAD_WALL_END);
@@ -159,16 +165,6 @@ final class HqLighting {
 						keep.add(new BlockPos(x, y, z));
 					}
 				}
-			}
-		}
-		boardState = style.palette().get(HqStyle.Role.BOARD);
-		Anchor boardAnchor = plan.anchor(AnchorNames.BOARD);
-		board = boardAnchor == null ? null : boardAnchor.block();
-		for (HqStyle.Role r : List.of(HqStyle.Role.SCREEN, HqStyle.Role.COMPUTER_ON, HqStyle.Role.COMPUTER_OFF,
-				HqStyle.Role.STATUS_LAMP, HqStyle.Role.BEACON, HqStyle.Role.DESK, HqStyle.Role.TERMINAL)) {
-			BlockState s = style.palette().get(r);
-			if (s != null) {
-				fixtures.add(s);
 			}
 		}
 		for (Placement p : plan.placements()) {
@@ -193,7 +189,7 @@ final class HqLighting {
 		return (iy * sz + iz) * sx + ix;
 	}
 
-	/** {@code plan} with its dark walkable cells lit by lamps let into floors, walls and ceilings. */
+	/** {@code plan} with its dark walkable cells lit by invisible {@code minecraft:light} blocks in their air. */
 	static BuildPlan light(BuildPlan plan, HqStyle style) {
 		Anchor spawn = plan.anchor(AnchorNames.SPAWN);
 		if (spawn == null) {
@@ -204,10 +200,24 @@ final class HqLighting {
 		if (l.lamps.isEmpty()) {
 			return plan;
 		}
-		return plan.replacing(p -> {
+		if (l.added.isEmpty()) {
+			return plan.replacing(p -> {
+				BlockState s = l.lamps.get(p.rel());
+				return s == null ? p : new Placement(p.rel(), s);
+			});
+		}
+		List<Placement> out = new ArrayList<>(plan.placements().size() + l.added.size());
+		for (Placement p : plan.placements()) {
 			BlockState s = l.lamps.get(p.rel());
-			return s == null ? p : new Placement(p.rel(), s);
-		});
+			out.add(s == null ? p : new Placement(p.rel(), s));
+		}
+		// new cells in a fixed order (y, z, x), so the plan stays deterministic
+		List<BlockPos> extra = new ArrayList<>(l.added.keySet());
+		extra.sort(Comparator.<BlockPos>comparingInt(BlockPos::getY).thenComparingInt(BlockPos::getZ).thenComparingInt(BlockPos::getX));
+		for (BlockPos p : extra) {
+			out.add(new Placement(p, l.lamps.get(p)));
+		}
+		return plan.rebuilt(out, List.of(), l.added);
 	}
 
 	/** The walkable cells as the lighting pass estimates them (diagnostics and tests). */
@@ -284,21 +294,21 @@ final class HqLighting {
 	}
 
 	/**
-	 * Lamps of a sparse group, purely by position: every open floor block of the group on the lattice
-	 * {@code (x - 2z) mod }{@value #LATTICE}{@code  == 0} (one every {@value #LATTICE} blocks in every row
-	 * and every column, so any straight path is within 4 steps of one). Nothing else is looked at, so a
-	 * path tile keeps its lamp, or its lack of one, however the grounds around it grow.
+	 * Lights of a sparse group, purely by position: an invisible light (level {@value #FILL_MAX}) in the air over
+	 * every open floor block of the group on the lattice {@code (x + 5z) mod }{@value #LATTICE13}{@code  == 0}.
+	 * Nothing else is looked at, so a path tile keeps its light, or its lack of one, however the grounds around
+	 * it grow.
 	 */
 	private void latticeGroup(String g) {
-		BlockState floorLamp = style.floorLight();
+		BlockState top = invisible(FILL_MAX);
 		for (Map.Entry<BlockPos, String> e : groups.entrySet()) {
 			BlockPos f = e.getKey();
-			if (!g.equals(e.getValue()) || Math.floorMod(f.getX() - 2 * f.getZ(), lattice) != 0) {
+			if (!g.equals(e.getValue()) || Math.floorMod(f.getX() + 5 * f.getZ(), LATTICE13) != 0 || view(f).isAir()) {
 				continue;
 			}
-			if (view(f.above()).isAir() && view(f.above(2)).isAir() && swappable(g, f, true)) {
-				lamps.put(f, floorLamp);
-				cur[index(f)] = floorLamp;
+			BlockPos k = f.above();
+			if (view(k).isAir() && view(k.above()).isAir() && freeAir(g, k)) {
+				put(k, top);
 			}
 		}
 	}
@@ -323,8 +333,8 @@ final class HqLighting {
 		return out;
 	}
 
-	/** Lights the walkable cells {@code walk} of group {@code g} with its own lamps only. */
-	private void lightGroup(String g, Box bounds, List<BlockPos> walk, boolean grid) {
+	/** Lights the walkable cells {@code walk} of group {@code g} with invisible lights in its own air only. */
+	private void lightGroup(String g, Box bounds, List<BlockPos> walk, boolean lattice) {
 		int me = groupNames.indexOf(g);
 		HqLightMap light = HqLightMap.ofView(bounds, 1, (x, y, z) -> lightView(me, x, y, z));
 		walk.sort(Comparator.<BlockPos>comparingInt(BlockPos::getY).thenComparingInt(BlockPos::getZ).thenComparingInt(BlockPos::getX));
@@ -333,50 +343,74 @@ final class HqLighting {
 		for (BlockPos c : walk) {
 			walkKeys.add(c.asLong());
 		}
-		BlockState floorLamp = style.floorLight();
-		BlockState wallLamp = style.wallLight();
-		// 1. the floor grid
-		for (BlockPos c : walk) {
-			if (grid && Math.floorMod(c.getX(), this.grid) == 0 && Math.floorMod(c.getZ(), this.grid) == 0 && floorSlot(g, c) && darkNear(light, walkSet, c)) {
-				place(light, c.below(), floorLamp);
+		java.util.function.LongPredicate counts = walkKeys::contains;
+		BlockState top = invisible(FILL_MAX);
+		// 1. the fill lattice, in the walking cell (or its head), only where something nearby is dark
+		if (lattice) {
+			for (BlockPos c : walk) {
+				if (Math.floorMod(c.getX() + 5 * c.getZ(), LATTICE13) != 0 || !darkNear(light, walkSet, c)) {
+					continue;
+				}
+				for (int dy = 0; dy <= 1; dy++) {
+					BlockPos k = c.above(dy);
+					if (!freeAir(g, k)) {
+						continue;
+					}
+					int gain = light.gain(k, top, counts, null, 0);
+					if (gain > 0) {
+						place(light, k, weakest(light, k, gain, counts, null, 0));
+					}
+					break;
+				}
 			}
 		}
-		// 2. what the grid misses (stairs, narrow rooms, cells whose grid point is a wall or a desk): the
-		// nearby floor, wall or ceiling block that lights this cell and the most other dark ones
+		// 2. what the lattice misses: the free air nearby that lights this cell and the most other dark ones
 		for (BlockPos c : walk) {
 			int want = need.getOrDefault(c, HqLightMap.MIN_LEVEL);
 			if (light.at(c) >= want) {
 				continue;
 			}
 			BlockPos best = null;
-			BlockState bestState = null;
 			int bestScore = -1;
 			for (BlockPos k : candidates(g, walkSet, c)) {
-				BlockState lamp = k.getY() < c.getY() && walkSet.contains(k.above()) ? floorLamp : wallLamp;
-				int score = light.gain(k, lamp, walkKeys::contains, c, want);
+				int score = light.gain(k, top, counts, c, want);
 				if (score > bestScore) {
 					best = k;
-					bestState = lamp;
 					bestScore = score;
 				}
 			}
 			if (best == null) {
-				// nothing of the group's own reaches it (a stair climbing through another part's floor):
-				// the block of a neighbouring part that lights it best
+				// nothing of the group's own air reaches it (a stair climbing through another part's floor):
+				// the air of a neighbouring part that lights it best
 				for (BlockPos k : candidates(null, walkSet, c)) {
-					BlockState lamp = k.getY() < c.getY() && walkSet.contains(k.above()) ? floorLamp : wallLamp;
-					int score = light.gain(k, lamp, walkKeys::contains, c, want);
+					int score = light.gain(k, top, counts, c, want);
 					if (score > bestScore) {
 						best = k;
-						bestState = lamp;
 						bestScore = score;
 					}
 				}
 			}
 			if (best != null) {
-				place(light, best, bestState);
+				place(light, best, weakest(light, best, bestScore, counts, c, want));
 			}
 		}
+	}
+
+	/** The invisible vanilla light block of {@code level}. */
+	private static BlockState invisible(int level) {
+		return Blocks.LIGHT.defaultBlockState().setValue(net.minecraft.world.level.block.LightBlock.LEVEL, level);
+	}
+
+	/** The weakest level of {@link #LEVELS} that lights at {@code k} what {@link #FILL_MAX} does ({@code must} up to {@code want} when given). */
+	private static BlockState weakest(HqLightMap light, BlockPos k, int gainTop, java.util.function.LongPredicate counts,
+			@org.jspecify.annotations.Nullable BlockPos must, int want) {
+		for (int level : LEVELS) {
+			BlockState s = invisible(level);
+			if (light.gain(k, s, counts, must, want) >= gainTop) {
+				return s;
+			}
+		}
+		return invisible(FILL_MAX);
 	}
 
 	/**
@@ -400,18 +434,25 @@ final class HqLighting {
 	}
 
 	private void place(HqLightMap light, BlockPos p, BlockState lamp) {
-		lamps.put(p, lamp);
-		cur[index(p)] = lamp;
+		put(p, lamp);
 		light.addSource(p, lamp);
 	}
 
-	/** True when {@code c}'s floor is a plain block of group {@code g} the feet cell leaves open to the light. */
-	private boolean floorSlot(String g, BlockPos c) {
-		return view(c).isAir() && swappable(g, c.below(), true);
+	/** Records an invisible light at {@code p} (a new placement, with its owner's group, when nobody had placed anything there). */
+	private void put(BlockPos p, BlockState lamp) {
+		lamps.put(p, lamp);
+		int i = index(p);
+		cur[i] = lamp;
+		if (plan.at(p) == null) {
+			String owner = plan.groupAt(p);
+			added.put(p, owner);
+			gid[i] = groupNames.indexOf(owner);
+		}
 	}
 
+	/** True when a walkable cell within 2 steps of {@code c} is still dark (what one lattice light would reach). */
 	private static boolean darkNear(HqLightMap light, Set<BlockPos> walk, BlockPos c) {
-		int r = GRID - 1;
+		int r = 2;
 		for (int dx = -r; dx <= r; dx++) {
 			for (int dz = -r + Math.abs(dx); dz <= r - Math.abs(dx); dz++) {
 				for (int dy = -1; dy <= 1; dy++) {
@@ -425,52 +466,21 @@ final class HqLighting {
 		return false;
 	}
 
-	/**
-	 * Floors, walls (feet to two above) and ceilings of the group's walkable cells around a dark cell,
-	 * nearest first.
-	 */
+	/** The free air (walking cells and their heads) around a dark cell, within {@value #REACH} blocks, nearest first. */
 	private List<BlockPos> candidates(String g, Set<BlockPos> walk, BlockPos c) {
 		java.util.LinkedHashSet<BlockPos> out = new java.util.LinkedHashSet<>();
 		for (int dx = -REACH; dx <= REACH; dx++) {
 			for (int dz = -REACH; dz <= REACH; dz++) {
-				for (int dy = -4; dy <= 2; dy++) {
+				for (int dy = -2; dy <= 2; dy++) {
 					BlockPos n = c.offset(dx, dy, dz);
 					if (!walk.contains(n)) {
 						continue;
 					}
-					if (floorSlot(g, n)) {
-						out.add(n.below());
-					}
-					for (int h = -1; h <= 2; h++) {
-						for (Direction d : Direction.Plane.HORIZONTAL) {
-							BlockPos w = n.above(h).relative(d);
-							if (swappable(g, w, false)) {
-								out.add(w);
-							}
+					for (int h = 0; h <= 1; h++) {
+						BlockPos k = n.above(h);
+						if (freeAir(g, k)) {
+							out.add(k);
 						}
-					}
-					for (int h = 2; h <= 6; h++) {
-						BlockPos up = n.above(h);
-						if (!view(up).isAir()) {
-							if (swappable(g, up, false)) {
-								out.add(up);
-							}
-							break;
-						}
-					}
-				}
-			}
-		}
-		// ceilings over the dark cell's surroundings (stairwells and voids have no walkable cell under them)
-		for (int dx = -REACH; dx <= REACH; dx++) {
-			for (int dz = -REACH; dz <= REACH; dz++) {
-				for (int h = 2; h <= 6; h++) {
-					BlockPos up = c.offset(dx, h, dz);
-					if (!view(up).isAir()) {
-						if (swappable(g, up, false)) {
-							out.add(up);
-						}
-						break;
 					}
 				}
 			}
@@ -481,29 +491,31 @@ final class HqLighting {
 	}
 
 	/**
-	 * A plain opaque full block of group {@code g} (any group when null) (or a leaf block of a canopy people can climb onto)
-	 * that may become a lamp. Never a desk cell; walls and ceilings never swap a block that looks like a
-	 * fixture (board, screens, desks, lamps), wherever it is.
+	 * A cell an invisible light may take for group {@code g} (any group when null): a plain air placement of
+	 * the group, or a cell nobody placed that a module of the group owns and the view sees as open. Never a
+	 * desk cell, a screen or computer, an anchor's cell or its head room, nor a cell already lit.
 	 */
-	private boolean swappable(String g, BlockPos p, boolean floor) {
-		String owner = groups.get(p);
-		if (keep.contains(p) || desks.contains(p) || lamps.containsKey(p) || owner == null || g != null && !g.equals(owner)) {
+	private boolean freeAir(@org.jspecify.annotations.Nullable String g, BlockPos p) {
+		if (keep.contains(p) || desks.contains(p) || lamps.containsKey(p)) {
+			return false;
+		}
+		int i = index(p);
+		if (i < 0) {
 			return false;
 		}
 		Placement pl = plan.at(p);
-		if (pl == null || pl.be() != null) {
+		if (pl != null) {
+			String owner = groups.get(p);
+			if (owner == null || g != null && !g.equals(owner)) {
+				return false;
+			}
+			return pl.be() == null && pl.state().getBlock() == Blocks.AIR;
+		}
+		String owner = plan.groupAt(p);
+		if (owner == null || g != null && !g.equals(owner) || groupNames.indexOf(owner) < 0) {
 			return false;
 		}
-		BlockState s = pl.state();
-		if (s.isAir() || s.hasBlockEntity() || s.getLightEmission() > 0 || !floor && fixtures.contains(s)) {
-			return false;
-		}
-		if (!floor && s.equals(boardState) && (board == null || p.distManhattan(board) <= 8)) {
-			return false; // the board's face
-		}
-		boolean full = s.isCollisionShapeFullBlock(EmptyBlockGetter.INSTANCE, p);
-		return s.getBlock() instanceof net.minecraft.world.level.block.LeavesBlock
-				|| full && (s.isSolidRender() || floor && s.getBlock() instanceof net.minecraft.world.level.block.TransparentBlock);
+		return cur[i] == null;
 	}
 
 	// ------------------------------------------------------------------ where people walk (estimate)

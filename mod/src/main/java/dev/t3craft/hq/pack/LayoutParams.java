@@ -65,9 +65,9 @@ public final class LayoutParams {
 	// ------------------------------------------------------------------ every layout (HqLighting)
 
 	public static final Spec LIGHT_GRID = spec(ANY, "lighting.grid", 5, 3, 5,
-			"spacing of the built-in floor-lamp grid (smaller: more lamps)");
+			"legacy: spacing of the old floor-lamp grid; ignored since the built-in fill became invisible minecraft:light (docs/feat-hq-lighting.md)");
 	public static final Spec LIGHT_LATTICE = spec(ANY, "lighting.lattice", 9, 5, 9,
-			"period of the floor-lamp lattice on outdoor grounds (campus-style sparse groups)");
+			"legacy: period of the old floor-lamp lattice on outdoor grounds; ignored since the built-in fill became invisible minecraft:light");
 
 	// ------------------------------------------------------------------ classic (CherryStyle / ClassicStyle)
 

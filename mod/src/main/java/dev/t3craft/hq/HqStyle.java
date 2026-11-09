@@ -158,12 +158,18 @@ public abstract class HqStyle {
 		return palette().get(Role.SCREEN);
 	}
 
-	/** Lamp let into a floor where the HQ would be dark ({@link HqLighting}): a full block that glows. */
+	/**
+	 * Lamp let into a floor where the HQ would be dark. Unused by {@link HqLighting} since citadel/light-aesthetic
+	 * (its fill is invisible {@code minecraft:light}); kept for styles that override it.
+	 */
 	BlockState floorLight() {
 		return net.minecraft.world.level.block.Blocks.PEARLESCENT_FROGLIGHT.defaultBlockState();
 	}
 
-	/** Lamp let into a wall or ceiling ({@link HqLighting}): the kit's lit shoji panel, or its vanilla stand-in. */
+	/**
+	 * Lamp let into a wall or ceiling: the kit's lit shoji panel, or its vanilla stand-in. Unused by
+	 * {@link HqLighting} since citadel/light-aesthetic; kept for styles that override it.
+	 */
 	BlockState wallLight() {
 		return HqKit.active().wallPanel(true);
 	}

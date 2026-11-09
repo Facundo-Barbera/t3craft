@@ -54,8 +54,8 @@ final class HubDims {
 	static final int AISLE_LAMP_Z = 8;
 	/** Lights are scanned over this half-extent. */
 	static final int LIGHT_SCAN = 12;
-	/** Covering radius (steps) of the light blocks. */
-	static final int LIGHT_RADIUS = 3;
+	/** Covering radius (steps) of the light blocks: a level-13 light one cell above the floor keeps 10 two steps away. */
+	static final int LIGHT_RADIUS = 2;
 
 	// ---- horizontal: outside
 	/** Buttresses on the east and west faces: x of the two steps and the z of each. */

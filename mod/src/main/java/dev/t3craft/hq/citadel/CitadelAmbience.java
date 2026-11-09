@@ -39,8 +39,9 @@ import org.jspecify.annotations.Nullable;
  * <ul>
  * <li>{@link #posts}: along the <b>edge</b> of the public way (streets, avenues, inner street, patio, terraces,
  *     gallery, bridges: {@link #STREETS}), where the next zone is not public (see {@link #edge}), it raises a
- *     post wherever none stands within {@link #SPACING} blocks (greedy, so the rhythm follows the way and not a
- *     grid). Three kinds follow one another by their number (turn 0 to 3: toro, vitral, toro, brazier):
+ *     post every {@link #SPACING} blocks along the edge, mirrored about the hub's axes ({@link #along}), so both
+ *     sides of a street are paired and the rhythm is regular. Three kinds follow one another by their place on
+ *     that rhythm (turn 0 to 3: toro, vitral, toro, brazier):
  *     the <i>toro</i> ({@link #toro}: polished-blackstone-brick plinth, two stripped cherry logs, a shroomlight
  *     lamp chamber, a pagoda roof of cherry slab and stairs, a fence finial), the <i>vitral</i>
  *     ({@link #vitral}: plinth, log, a lantern, a block of amber or rose stained glass, a hanging lantern, the
@@ -49,7 +50,7 @@ import org.jspecify.annotations.Nullable;
  * <li>{@link #relamp}: the old free-standing white froglight lamps (promenade posts) turn into the same warm
  *     chamber under the same roof.</li>
  * <li>{@link #arcades}: a hanging lantern under every roof ({@link #COVERED}) the public walks beneath,
- *     on the lattice {@code (2x + 5z) mod SPACING}, never next to another lamp.</li>
+ *     on the mirrored lattice {@code (2|x| + 5|z|) mod SPACING}, never next to another lamp.</li>
  * </ul>
  *
  * <h2>Scale</h2>
@@ -191,23 +192,32 @@ final class CitadelAmbience {
 		return runs <= 1;
 	}
 
+	/**
+	 * Where along its edge a cell lies, mirrored about the citadel's axes: {@code |x|} on an edge that runs
+	 * along x (the way ends to the north or south), {@code |z|} on one that runs along z. Posts stand only where
+	 * it is a multiple of {@link #SPACING} (citadel/light-aesthetic): a regular rhythm along every straight edge,
+	 * the two edges of a street paired post for post, and the whole pattern symmetric about the hub's axes.
+	 */
+	private static int along(BlockPos p, Direction edge) {
+		return edge.getAxis() == Direction.Axis.Z ? Math.abs(p.getX()) : Math.abs(p.getZ());
+	}
+
 	private static List<Post> posts(CitadelCanvas c, List<BlockPos> walk, Set<Long> walkSet, Set<Long> reserved) {
 		List<Post> posts = new ArrayList<>();
-		int n = 0;
 		for (BlockPos p : walk) {
 			Kind kind = c.zoneAt(p.getX(), p.getZ()).kind();
 			if (!STREETS.contains(kind)) {
 				continue;
 			}
 			Direction d = edge(c, walkSet, p);
-			if (d == null || !keepsConnected(walkSet, p) || tooClose(posts, p)) {
+			if (d == null || Math.floorMod(along(p, d), SPACING) != 0 || !keepsConnected(walkSet, p) || tooClose(posts, p)) {
 				continue;
 			}
-			int turn = n % 4;
+			// the kind follows the place on the rhythm (toro, vitral, toro, brazier in plazas), not the order of the scan
+			int turn = Math.floorMod(along(p, d) / SPACING, 4);
 			Post post = turn == 3 && PLAZAS.contains(kind) ? brazier(c, p, reserved) : turn == 1 ? vitral(c, p, reserved) : toro(c, p, reserved);
 			if (post != null) {
 				posts.add(post);
-				n++;
 			}
 		}
 		return posts;
@@ -420,12 +430,13 @@ final class CitadelAmbience {
 		return false;
 	}
 
-	/** A hanging lantern under each roof (a full block 3 to 6 cells above the way) on a lattice, never next to another lamp. */
+	/** A hanging lantern under each roof (a full block 3 to 6 cells above the way) on a mirrored lattice, never next to another lamp. */
 	private static void arcades(CitadelCanvas c, List<BlockPos> walk, Set<Long> postFeet, Set<Long> reserved) {
 		List<BlockPos> hung = new ArrayList<>();
 		for (BlockPos p : walk) {
 			Kind kind = c.zoneAt(p.getX(), p.getZ()).kind();
-			if (!COVERED.contains(kind) || postFeet.contains(p.asLong()) || Math.floorMod(2 * p.getX() + 5 * p.getZ(), SPACING) != 0) {
+			// mirrored lattice (|x|, |z|): the lanterns of the four quarters of the citadel answer one another
+			if (!COVERED.contains(kind) || postFeet.contains(p.asLong()) || Math.floorMod(2 * Math.abs(p.getX()) + 5 * Math.abs(p.getZ()), SPACING) != 0) {
 				continue;
 			}
 			int ceiling = 0;

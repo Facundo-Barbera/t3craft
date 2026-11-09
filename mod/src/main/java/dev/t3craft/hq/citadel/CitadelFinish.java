@@ -58,16 +58,19 @@ import org.jspecify.annotations.Nullable;
  * <li>{@link #groupOf}: the construction group of each cell (see below), via {@link #lotGroup} for the
  *     cells of a lot.</li>
  * <li>{@link #light}: the light pass, with the invisible vanilla block {@code minecraft:light}
- *     ({@link CitadelCanvas#invisibleLight}, levels 12 to 15). It walks the cells an NPC can reach
+ *     ({@link CitadelCanvas#invisibleLight}, moderate levels 10 to {@value #FILL_MAX}: the visible design lamps,
+ *     all 14 or 15, stay the light one sees; see docs/feat-hq-lighting.md). It is <b>fill only</b>: it never
+ *     places a visible block. It walks the cells an NPC can reach
  *     ({@link #walkable}, from {@link #SPAWN} in one-block steps, tested by {@link #standable}/{@link #noCollision})
  *     and lights each group <b>on its own</b>: a {@code HqLightMap} sees the group's cells as they are, the
  *     air over its floors as air and everything else opaque (so a neighbour that comes or goes never moves a
  *     light). The lights replace plain air cells of the same group ({@link #freeAir}: never a fixture, an
  *     anchor or a desk's cell), in the walking cell (or at its head), as DECOR (after the solids). Two steps: a regular
- *     lattice ({@code (5x + 6z) mod 61}, a light only where it lights {@value #LATTICE_MIN_GAIN} dark cells or
- *     more; with level 15 in the walking cell every open cell is within 5 steps of one) and then {@link #lightSpot}
- *     for each cell still under {@link #MIN_LIGHT} (the best free air within {@value #REACH} blocks). Each light
- *     takes the weakest level of 12..15 that does what 15 would ({@link #weakest}). Lamps that are design
+ *     lattice ({@code (x + 5z) mod 13}, a light only where it lights {@value #LATTICE_MIN_GAIN} dark cells or
+ *     more; with level {@value #FILL_MAX} in the walking cell every open cell is within 2 steps of one) and then
+ *     {@link #lightSpot} for each cell still under {@link #MIN_LIGHT} (the best free air within {@value #REACH}
+ *     blocks). Each light takes the weakest level of 10..{@value #FILL_MAX} that does what {@value #FILL_MAX} would
+ *     ({@link #weakest}). Lamps that are design
  *     (froglights in posts, lanterns, shoji) stay and count as light. {@code minecraft:light} has no
  *     collision and is replaceable: NPCs and builders walk through it. The survival bill does not charge it
  *     ({@code BlockCosts}, {@code HqCost}) and {@code HqLighting} counts it as a source (no duplicated lamps).</li>
@@ -327,12 +330,17 @@ public final class CitadelFinish {
 	private static final int AIRSPACE = 3;
 	/** What a cell of another group is to a group's light: opaque. */
 	private static final BlockState OPAQUE = Blocks.STONE.defaultBlockState();
-	/** Levels of the invisible lights, weakest first: the weakest that lights what level 15 would is used. */
-	private static final int[] LEVELS = {12, 13, 14, 15};
-	/** Period of the preferred lattice of lights: {@code (5x + 6z) mod 61} leaves no cell of an open floor more than 5 steps from one (a level-15 light in the cell itself reaches 10 at 5). */
-	private static final int LATTICE = 61;
+	/**
+	 * Strongest invisible fill (citadel/light-aesthetic): moderate, under the visible design lamps (lanterns,
+	 * shroomlights, campfires: 15), so the eye still reads where the light comes from.
+	 */
+	static final int FILL_MAX = 12;
+	/** Levels of the invisible lights, weakest first: the weakest that lights what {@link #FILL_MAX} would is used. */
+	private static final int[] LEVELS = {10, 11, FILL_MAX};
+	/** Period of the preferred lattice of lights: {@code (x + 5z) mod 13} tiles the plane with radius-2 diamonds (a level-12 light in the cell itself reaches 10 at 2). */
+	private static final int LATTICE = 13;
 	/** A lattice light is placed only where it lights at least this many dark cells (the stragglers are lit one by one). */
-	private static final int LATTICE_MIN_GAIN = 6;
+	private static final int LATTICE_MIN_GAIN = 4;
 	/** How far from a dark cell (blocks on the plane) a light may stand to light it. */
 	private static final int REACH = 4;
 
@@ -362,7 +370,7 @@ public final class CitadelFinish {
 	private record Spot(BlockPos pos, int level, int gain) {
 	}
 
-	/** The weakest level in {@link #LEVELS} that does what level 15 does at {@code pos} (gain and, when given, the cell {@code must}). */
+	/** The weakest level in {@link #LEVELS} that does what {@link #FILL_MAX} does at {@code pos} (gain and, when given, the cell {@code must}). */
 	private static Spot weakest(HqLightMap map, BlockPos pos, int gain15, java.util.function.LongPredicate counts, @Nullable BlockPos must) {
 		for (int level : LEVELS) {
 			int g = must == null ? map.gainOf(pos, CitadelCanvas.invisibleLight(level), counts)
@@ -371,7 +379,7 @@ public final class CitadelFinish {
 				return new Spot(pos, level, g);
 			}
 		}
-		return new Spot(pos, 15, gain15);
+		return new Spot(pos, FILL_MAX, gain15);
 	}
 
 	/**
@@ -380,7 +388,7 @@ public final class CitadelFinish {
 	 */
 	private static @Nullable Spot lightSpot(CitadelCanvas c, HqLightMap map, BlockPos feet, String group, Map<Long, String> groups,
 			Set<Long> reserved, java.util.function.LongPredicate counts) {
-		BlockState top = CitadelCanvas.invisibleLight(15);
+		BlockState top = CitadelCanvas.invisibleLight(FILL_MAX);
 		for (int r = 0; r <= REACH; r++) {
 			BlockPos best = null;
 			int bestGain = 0;
@@ -420,7 +428,9 @@ public final class CitadelFinish {
 	/**
 	 * Lights every walkable cell (see the class comment) from its own group's lights, with invisible
 	 * {@code minecraft:light} blocks hung in the air of the group: first on a regular lattice (where it
-	 * lights {@value #LATTICE_MIN_GAIN} dark cells or more), then one by one for what is still dark.
+	 * lights {@value #LATTICE_MIN_GAIN} dark cells or more), then one by one for what is still dark. This is
+	 * the fill under the design lamps ({@link CitadelAmbience}, the halls, the hub): it never places a visible
+	 * block and never goes above {@link #FILL_MAX}.
 	 */
 	private static void light(CitadelCanvas c, Map<Long, String> groups) {
 		TreeMap<String, List<BlockPos>> byGroup = new TreeMap<>();
@@ -434,7 +444,7 @@ public final class CitadelFinish {
 		}
 		Dense d = new Dense(c, groups);
 		Set<Long> reserved = reserved(c);
-		BlockState top = CitadelCanvas.invisibleLight(15);
+		BlockState top = CitadelCanvas.invisibleLight(FILL_MAX);
 		for (Map.Entry<String, List<BlockPos>> e : byGroup.entrySet()) {
 			String g = e.getKey();
 			List<BlockPos> walk = e.getValue();
@@ -447,7 +457,7 @@ public final class CitadelFinish {
 			}
 			java.util.function.LongPredicate counts = keys::contains;
 			for (BlockPos p : walk) {
-				if (Math.floorMod(5 * p.getX() + 6 * p.getZ(), LATTICE) != 0) {
+				if (Math.floorMod(p.getX() + 5 * p.getZ(), LATTICE) != 0) {
 					continue;
 				}
 				for (int dy = 0; dy <= 1; dy++) {

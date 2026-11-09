@@ -104,7 +104,11 @@ public final class CitadelCanvas {
 	public static final BlockState MOSS = b(Blocks.MOSS_BLOCK);
 	public static final BlockState WATER = b(Blocks.WATER);
 	public static final BlockState RIB = b(Blocks.POLISHED_BLACKSTONE_BRICKS);
-	/** The light built into floors, walls, ceilings and pillars. */
+	/**
+	 * A froglight for <b>design</b> lamps only (a lit band on a tower, a cupola, the clock marks of the rotunda,
+	 * a promenade post). Never let it into a floor, wall or ceiling to cover a dark spot: that is the job of the
+	 * invisible fill ({@link #invisibleLight}, {@code CitadelFinish#light}). See docs/feat-hq-lighting.md.
+	 */
 	public static final BlockState LIGHT = b(Blocks.PEARLESCENT_FROGLIGHT);
 
 	// ------------------------------------------------------------------ state
@@ -201,7 +205,10 @@ public final class CitadelCanvas {
 		return bench++;
 	}
 
-	/** A light every 41 cells in a lattice that leaves no open floor cell more than 4 steps from one. */
+	/**
+	 * A lattice of positions every 41 cells that leaves no open floor cell more than 4 steps from one. Since
+	 * citadel/light-aesthetic it only seeds the hub's invisible fill: no visible light is put on it.
+	 */
 	public static boolean lattice(int x, int z) {
 		return Math.floorMod(4 * x + 5 * z, dev.t3craft.hq.pack.LayoutParams.RINGCAMPUS_STREET_LIGHT.get()) == 0;
 	}
@@ -215,7 +222,7 @@ public final class CitadelCanvas {
 	/**
 	 * The invisible vanilla light block ({@code minecraft:light}) of {@code level} (1..15): no collision,
 	 * replaceable, drawn by nobody. It is what lights the floor of the citadel (see
-	 * {@code CitadelFinish#light}); decorative lamps stay {@link #LIGHT} froglights.
+	 * {@code CitadelFinish#light}), at moderate levels; the light one sees comes from design lamps.
 	 */
 	public static BlockState invisibleLight(int level) {
 		return Blocks.LIGHT.defaultBlockState().setValue(net.minecraft.world.level.block.LightBlock.LEVEL, level);
