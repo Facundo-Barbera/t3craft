@@ -110,6 +110,7 @@ final class JapaneseKit {
 		p.set(c, u + lean, y + trunk - 1, v, log(Blocks.CHERRY_LOG, Direction.Axis.X));
 		int cr = 1 + size;
 		int top = y + trunk;
+		java.util.List<int[]> crown = new java.util.ArrayList<>();
 		for (int dy = 0; dy <= 2; dy++) {
 			int rad = dy == 2 ? cr - 1 : cr;
 			for (int du = -rad - 1; du <= rad + 1; du++) {
@@ -127,6 +128,27 @@ final class JapaneseKit {
 						continue;
 					}
 					p.set(c, cu, top - 1 + dy, cv, CitadelCanvas.leaves(Blocks.CHERRY_LEAVES));
+					crown.add(new int[] {cu, top - 1 + dy, cv});
+				}
+			}
+		}
+		// fix/settle-sources: the gaps leave some crown leaves touching the rest only on a corner; those go (a leaf alone in the air is
+		// no blossom), twice so a leaf left alone by the first pass goes too
+		for (int pass = 0; pass < 2; pass++) {
+			for (int[] q : crown) {
+				BlockState here = p.at(c, q[0], q[1], q[2]);
+				if (here == null || here.isAir()) {
+					continue;
+				}
+				boolean held = false;
+				for (int[] d : new int[][] {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}}) {
+					if (Support.present(c, p, q[0] + d[0], q[1] + d[1], q[2] + d[2])) {
+						held = true;
+						break;
+					}
+				}
+				if (!held) {
+					p.set(c, q[0], q[1], q[2], CitadelCanvas.AIR);
 				}
 			}
 		}
