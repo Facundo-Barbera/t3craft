@@ -139,7 +139,7 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 		int hf = Math.min(Math.min(k.cu, k.w - 1 - k.cu), Math.min(k.cv, k.d - 1 - k.cv));
 		k.half = hf;
 		Random rng = p.rng(0x5D1E0L);
-		boolean boost = rng.nextInt(2) == 1;
+		rng.nextInt(2); // reserved: keeps the draw order of the seed features below
 		int dk = rng.nextInt(3);
 		int rk = rng.nextInt(2);
 		int mkk = rng.nextInt(2);
@@ -153,10 +153,8 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 		k.oct = hf >= 9 && octBit;
 		k.pb = hf >= 6 ? hf - 1 : -1;
 		k.pl = hf >= 6 ? hf - 2 : hf - 1;
-		int tiers = hf >= 9 ? 2 : 1;
-		if (hf >= 10 && boost) {
-			tiers++;
-		}
+		// more tiers with more room: the platform keeps its mass, the dial keeps a radius of 4 or more
+		int tiers = hf >= 10 ? 3 : hf >= 8 ? 2 : 1;
 		tiers = Math.min(tiers, Math.max(1, p.h() - 6));
 		tiers = Math.min(tiers, Math.max(1, k.pl - 3));
 		k.tiers = tiers;
@@ -166,7 +164,7 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 		k.ringIn = k.rd >= 5 ? k.rd - 1.4 : k.rd - 0.9; // 2-thick bezel, 1-thick on the small dials
 		int surface = k.yd + 1;
 		// a modest blade: about half the dial radius high, never taller than the plot allows
-		k.g = Math.max(1, Math.min(Math.min(k.rd - 1, p.h() - 2 - surface), Math.max(2, (k.rd + 1) / 2)));
+		k.g = Math.max(1, Math.min(Math.min(k.rd - 1, p.h() - 2 - surface), 3));
 
 		k.dial = switch (dk) {
 			case 0 -> Blocks.CALCITE;
@@ -418,7 +416,10 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 		if (t == pt) {
 			planter(c, p, u, v, true);
 		} else if (t < pt) {
-			s(c, p, u, 1, v, stairs(k.bench, out(dx, dz)));
+			// benches of three with a free cell between them, so each one reads as a bench and not as a wall
+			if ((t - 2) % 4 != 3) {
+				s(c, p, u, 1, v, stairs(k.bench, out(dx, dz)));
+			}
 		} else {
 			planter(c, p, u, v, false);
 		}
@@ -472,9 +473,8 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 				s(c, p, cu, base + full, v, slab(k.finSlab));
 			}
 		}
-		// a gold cap on the last column and a fine spire of two rods instead of a ball
+		// the blade ends in a fine spire of two rods (no ball)
 		int top = k.cv + k.g - 1;
-		s(c, p, cu, base + k.g - 1, top, b(Blocks.GOLD_BLOCK));
 		BlockState rod = Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState();
 		s(c, p, cu, base + k.g, top, rod);
 		s(c, p, cu, base + k.g + 1, top, rod);
