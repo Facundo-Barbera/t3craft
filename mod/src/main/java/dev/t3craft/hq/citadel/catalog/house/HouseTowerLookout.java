@@ -3,6 +3,7 @@ package dev.t3craft.hq.citadel.catalog.house;
 import static dev.t3craft.hq.citadel.CitadelCanvas.b;
 import static dev.t3craft.hq.citadel.catalog.house.HouseTowerKit.fence;
 import static dev.t3craft.hq.citadel.catalog.house.HouseTowerKit.hangingLantern;
+import static dev.t3craft.hq.citadel.catalog.house.HouseTowerKit.lantern;
 import static dev.t3craft.hq.citadel.catalog.house.HouseTowerKit.log;
 import static dev.t3craft.hq.citadel.catalog.house.HouseTowerKit.pane;
 import static dev.t3craft.hq.citadel.catalog.house.HouseTowerKit.put;
@@ -271,7 +272,7 @@ public final class HouseTowerLookout implements Variant {
 				for (int y = 1; y <= EAVE; y++) {
 					set(c, g.p, u, y, v, wallCell(g, u, y, v, corner, alongU, t, n, e, w));
 				}
-				if (!corner && windowT(g, t)) {
+				if (!corner && windowT(g, t) && !(n && t == g.m)) {
 					// [depth] a sill sticking out under each slit window
 					Direction out = n ? Direction.NORTH : sh ? Direction.SOUTH : w ? Direction.WEST : Direction.EAST;
 					int su = u + out.getStepX();
@@ -420,13 +421,11 @@ public final class HouseTowerLookout implements Variant {
 				if (d == 2) {
 					Direction.Axis ax = to == Direction.NORTH || to == Direction.SOUTH ? Direction.Axis.X : Direction.Axis.Z;
 					set(c, g.p, u, F2, v, log(g.s.stripped(), ax));
-					boolean post = corner || Math.abs(t - g.m) == 2;
-					if (post) {
-						for (int y = 11; y <= 13; y++) {
-							set(c, g.p, u, y, v, log(g.s.log(), Direction.Axis.Y));
-						}
-					} else {
-						set(c, g.p, u, 11, v, fence(g.s.fence(), g.outer(u, v - 1), g.outer(u + 1, v), g.outer(u, v + 1), g.outer(u - 1, v)));
+					set(c, g.p, u, 11, v, fence(g.s.fence(), g.outer(u, v - 1), g.outer(u + 1, v), g.outer(u, v + 1), g.outer(u - 1, v)));
+					if (corner) {
+						// a lamp post on each corner of the rail
+						set(c, g.p, u, 12, v, fence(g.s.fence(), false, false, false, false));
+						set(c, g.p, u, 13, v, lantern());
 					}
 				} else {
 					set(c, g.p, u, F2, v, b(g.s.planks()));
@@ -440,8 +439,6 @@ public final class HouseTowerLookout implements Variant {
 		int su = g.u0 + g.m;
 		int sv = g.rw - 1;
 		set(c, g.p, su, 12, sv, b(Blocks.LIGHTNING_ROD.waxed().unaffected()).setValue(BlockStateProperties.FACING, Direction.SOUTH));
-		put(c, g.p, g.u0 + g.m, 13, 0, hangingLantern(), CitadelCanvas.HANGING);
-		put(c, g.p, g.ox, 13, g.v0 + g.m, hangingLantern(), CitadelCanvas.HANGING);
 		// portico lanterns under the front beam, either side of the steps
 		put(c, g.p, g.u0 + g.m - 1, 8, 1, hangingLantern(), CitadelCanvas.HANGING);
 		put(c, g.p, g.u0 + g.m + 1, 8, 1, hangingLantern(), CitadelCanvas.HANGING);
@@ -451,14 +448,19 @@ public final class HouseTowerLookout implements Variant {
 
 	/** A hip roof: stair rims round solid layers, one block in per layer; the eave ring rides on the balcony posts. */
 	private void roof(CitadelCanvas c, G g) {
-		int size = g.rw;
-		for (int l = 0; size >= 3; l++, size -= 2) {
+		int size = g.bw + 2; // the roof overhangs the shaft by one block; the balcony's outer row stays open to the sky
+		for (int l = 0; size >= 1; l++, size -= 2) {
 			int y = EAVE + l;
-			int umin = g.ox + l;
-			int umax = g.ox + g.rw - 1 - l;
-			int vmin = l;
-			int vmax = g.rw - 1 - l;
+			int umin = g.u0 - 1 + l;
+			int umax = g.u1 + 1 - l;
+			int vmin = g.v0 - 1 + l;
+			int vmax = g.v1 + 1 - l;
 			boolean crown = size <= 5;
+			if (size == 1) {
+				set(c, g.p, umin, y, vmin, b(g.s.crownBlock()));
+				set(c, g.p, umin, y + 1, vmin, b(Blocks.LIGHTNING_ROD.waxed().unaffected()));
+				break;
+			}
 			for (int u = umin; u <= umax; u++) {
 				for (int v = vmin; v <= vmax; v++) {
 					if (l == 0 && g.dist(u, v) == 0) {
@@ -480,9 +482,6 @@ public final class HouseTowerLookout implements Variant {
 						set(c, g.p, u, y, v, stair(sb, cu ? fx : fz, false));
 					}
 				}
-			}
-			if (size == 3) {
-				set(c, g.p, (umin + umax) / 2, y + 1, (vmin + vmax) / 2, b(Blocks.LIGHTNING_ROD.waxed().unaffected()));
 			}
 		}
 	}
