@@ -193,6 +193,7 @@ public final class HouseStoneTower implements Variant {
 			} else {
 				hipRoof();
 				chimney();
+				dormers();
 			}
 			furnish();
 			exterior();
@@ -294,7 +295,7 @@ public final class HouseStoneTower implements Variant {
 			if (y % 2 == 0) {
 				return b(Blocks.POLISHED_ANDESITE);
 			}
-			return p.hash(u, y, v, 4) == 0 ? b(Blocks.CALCITE) : b(Blocks.STONE_BRICKS);
+			return p.hash(u, y, v, 8) == 0 ? b(Blocks.CALCITE) : b(Blocks.STONE_BRICKS);
 		}
 
 		void towerWalls() {
@@ -645,8 +646,20 @@ public final class HouseStoneTower implements Variant {
 		}
 
 		/** A stone chimney through the back of the hip roof, with a deepslate stack. */
+		/** [depth] a stone dormer with a dark glass window and a cherry cap on the front and back slopes of the hip roof. */
+		void dormers() {
+			for (int v : new int[] {cv0 + 1, cv1 - 1}) {
+				for (int du = -1; du <= 1; du++) {
+					int u = cc + du;
+					set(u, DECK + 2, v, du == 0 ? b(Blocks.TINTED_GLASS) : b(Blocks.STONE_BRICKS));
+					set(u, DECK + 3, v, b(Blocks.STONE_BRICKS));
+					set(u, DECK + 4, v, slab(Blocks.CHERRY_SLAB));
+				}
+			}
+		}
+
 		void chimney() {
-			int u0 = annexRight ? cu0 + 2 : cu1 - 3;
+			int u0 = annexRight ? cu0 + 1 : cu1 - 2;
 			for (int u = u0; u <= u0 + 1; u++) {
 				for (int v = cv1 - 2; v <= cv1 - 1; v++) {
 					for (int y = DECK + 1; y <= Math.min(p.h() - 1, 21); y++) {
@@ -1077,8 +1090,6 @@ public final class HouseStoneTower implements Variant {
 					}
 				}
 			}
-			type[0] = 2;
-			type[w - 1] = 2;
 			for (int u = 0; u < w; u++) {
 				if (type[u] == 2) {
 					set(u, 0, 0, b(Blocks.POLISHED_DEEPSLATE));
