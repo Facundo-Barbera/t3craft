@@ -680,9 +680,9 @@ public final class HouseStoneTower implements Variant {
 			Wall aWall = new Wall(c, p, annexRight ? cu0 : cu1, annexRight ? Direction.WEST : Direction.EAST);
 			int vc = (cv0 + cv1) / 2;
 			for (int sign : new int[] {-2, 2}) {
-				pilaster(front, cc + sign, F1); // below the paired windows of the upper floors only
+				pilaster(front, cc + sign, 3); // plinth-high only: the upper floors have paired windows there
 				pilaster(back, cc + sign, 13);
-				pilaster(aWall, vc + sign, F1);
+				pilaster(aWall, vc + sign, 3);
 			}
 		}
 
