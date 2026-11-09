@@ -117,8 +117,8 @@ public final class LampStreetToro implements Variant {
 		BlockState tip = slab(Blocks.DEEPSLATE_TILE_SLAB).setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP);
 		for (int[] k : corners) {
 			p.set(c, k[0], y, k[1], tip);
-			if (finial) {
-				// the eaves really curl up: a second slab on top of each corner
+			if (finial && p.hash(k[0], 1, k[1], 2) == 0) {
+				// the eaves curl up on the corners the seed picks: a second slab, so the hat is not a block with four identical horns
 				p.set(c, k[0], y + 1, k[1], slab(Blocks.DEEPSLATE_TILE_SLAB));
 			}
 		}

@@ -3,6 +3,7 @@ package dev.t3craft.hq.citadel.catalog.planter;
 import static dev.t3craft.hq.citadel.CitadelCanvas.b;
 import static dev.t3craft.hq.citadel.CitadelCanvas.leaves;
 import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
+import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
 import static dev.t3craft.hq.citadel.CitadelCanvas.terracotta;
 
 import dev.t3craft.hq.citadel.CitadelCanvas;
@@ -84,7 +85,7 @@ public final class PlanterTallPot implements Variant {
 		BlockState body = bamboo ? b(Blocks.BAMBOO_BLOCK) : terracotta(DyeColor.PINK); // bamboo block: axis Y by default
 		p.set(c, cu, 1, cv, body);
 		if (lip == 2) {
-			p.set(c, cu, 2, cv, b(Blocks.CALCITE));
+			p.set(c, cu, 2, cv, body); // a two-high glazed body (no white band: stacked stripes read as a candy cane)
 		}
 
 		// --- the plant
@@ -100,6 +101,11 @@ public final class PlanterTallPot implements Variant {
 			int u = cu + dir.getStepX();
 			int v = cv + dir.getStepZ();
 			if (!p.has(u, 0, v)) {
+				continue;
+			}
+			if (w >= 3 && d >= 3) {
+				// [depth] a stepped plinth: stairs climbing to the pot on the four sides
+				p.set(c, u, 0, v, stairs(Blocks.DEEPSLATE_BRICK_STAIRS, dir.getOpposite()));
 				continue;
 			}
 			int k = p.hash(u, 0, v, 4);

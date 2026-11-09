@@ -171,10 +171,7 @@ public final class GateToriiCherry implements Variant {
 			}
 		}
 		// gold caps on the tips (the "kinzoku") and a cherry slab bridging the tip steps
-		for (int v = v0; v < v0 + pd; v++) {
-			p.set(c, 0, k1, v, GOLD);
-			p.set(c, w - 1, k1, v, GOLD);
-		}
+		// (no gold cubes on the tips: the upswept stairs are the finish; gold stays on the plaque only)
 
 
 		// --- stone lanterns (toro) outside the pillars when there is room
@@ -212,7 +209,7 @@ public final class GateToriiCherry implements Variant {
 
 	private static BlockState plaque(Plot p, int i, int row, int pw) {
 		// glyph strokes in gold, the rest black bricks: a deterministic "calligraphy"
-		boolean gold = (row == 1 && (i % 2 == 0 || p.hash(i, row, 0, 3) == 0)) || (row == 0 && i % 2 == 1);
+		boolean gold = (row == 1 && i % 2 == 0) || (row == 0 && i % 2 == 1 && p.hash(i, row, 0, 3) == 0);
 		if (pw == 1) {
 			gold = row == 1;
 		}
