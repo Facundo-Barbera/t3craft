@@ -90,9 +90,9 @@ public final class HouseMachiya implements Variant {
 	}
 
 	private static final Scheme[] SCHEMES = {
-			new Scheme(Blocks.DARK_OAK_TRAPDOOR, Blocks.DARK_OAK_LOG, Blocks.CHERRY_STAIRS, DyeColor.BLUE, Blocks.DARK_OAK_DOOR),
+			new Scheme(Blocks.DARK_OAK_TRAPDOOR, Blocks.DARK_OAK_LOG, Blocks.DARK_OAK_STAIRS, DyeColor.BLUE, Blocks.DARK_OAK_DOOR),
 			new Scheme(Blocks.SPRUCE_TRAPDOOR, Blocks.SPRUCE_LOG, Blocks.DARK_OAK_STAIRS, DyeColor.RED, Blocks.CHERRY_DOOR),
-			new Scheme(Blocks.SPRUCE_TRAPDOOR, Blocks.DARK_OAK_LOG, Blocks.CHERRY_STAIRS, DyeColor.CYAN, Blocks.DARK_OAK_DOOR),
+			new Scheme(Blocks.SPRUCE_TRAPDOOR, Blocks.DARK_OAK_LOG, Blocks.DARK_OAK_STAIRS, DyeColor.CYAN, Blocks.DARK_OAK_DOOR),
 	};
 
 	/** Fixed lines of the plan. */
@@ -158,7 +158,7 @@ public final class HouseMachiya implements Variant {
 
 	/** [palette] plaster: calcite with the odd tuff-brick patch where the weather got at it. */
 	private static BlockState plaster(Plot p, int u, int y, int v) {
-		return p.hash(u, y, v, 11) == 0 ? b(Blocks.TUFF_BRICKS) : b(Blocks.CALCITE);
+		return p.hash(u, y, v, 5) == 0 ? b(Blocks.CALCITE) : b(Blocks.TUFF_BRICKS);
 	}
 
 	/** [palette] the lowest plaster course, darker: gradient from deepslate through tuff to calcite. */
@@ -417,7 +417,7 @@ public final class HouseMachiya implements Variant {
 				}
 				BlockState st;
 				if (center || k % 2 == 1) {
-					st = p.hash(u, y, v, 4) == 0 ? b(Blocks.POLISHED_DEEPSLATE) : b(Blocks.DEEPSLATE_TILES); // [palette] a few lighter tiles
+					st = b(Blocks.DEEPSLATE_TILES);
 				} else {
 					st = stair(k == 0 ? s.fascia() : p.hash(u, y, v, 6) == 0 ? Blocks.DEEPSLATE_BRICK_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS, up);
 				}

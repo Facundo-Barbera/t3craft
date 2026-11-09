@@ -248,11 +248,11 @@ public final class HouseStoneTower implements Variant {
 				if (r == 0) {
 					p.set(c, u, PLATE, v, stairs(Blocks.DARK_OAK_STAIRS, high));
 				} else if (r == maxRr(d)) {
-					p.set(c, u, ys(r), v, b(Blocks.DEEPSLATE_TILES));
-					p.set(c, u, ys(r) + 1, v, slab(Blocks.DEEPSLATE_BRICK_SLAB));
+					p.set(c, u, ys(r), v, b(Blocks.MUD_BRICKS)); // [palette] a warm clay roof: the hall no longer melts into the dark tower
+					p.set(c, u, ys(r) + 1, v, slab(Blocks.MUD_BRICK_SLAB));
 				} else {
 					boolean lowSlab = (r - 1) % 2 == 0;
-					var blk = p.hash(u, r, v, 6) == 0 ? Blocks.DEEPSLATE_BRICK_SLAB : Blocks.DEEPSLATE_TILE_SLAB;
+					var blk = p.hash(u, r, v, 6) == 0 ? Blocks.BRICK_SLAB : Blocks.MUD_BRICK_SLAB;
 					p.set(c, u, ys(r), v, lowSlab ? slab(blk) : topSlab(blk));
 				}
 			}

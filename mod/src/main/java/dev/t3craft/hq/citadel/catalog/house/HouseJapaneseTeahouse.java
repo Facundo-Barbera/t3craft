@@ -156,6 +156,9 @@ public final class HouseJapaneseTeahouse implements Variant {
 					} else if (y == 2 && (u - bu0) % 2 == 0) {
 						// [depth] a bamboo-lattice window: crossed rails behind the plaster line
 						st = fence(Blocks.BAMBOO_FENCE, true, true, true, true);
+					} else if (y == 3) {
+						// [palette] a shoji band under the eaves: white glass lets the light through
+						st = JapaneseKit.paneU(JapaneseKit.glassPane(net.minecraft.world.item.DyeColor.WHITE));
 					} else if (y == 1) {
 						st = p.hash(u, y, v, 3) == 0 ? b(Blocks.STONE_BRICKS) : b(Blocks.TUFF_BRICKS);
 					} else {
@@ -167,6 +170,7 @@ public final class HouseJapaneseTeahouse implements Variant {
 			for (int v = bv0 + 1; v < bv1; v++) {
 				for (int u : new int[] {bu0, bu1}) {
 					BlockState st = y == 2 && v == (bv0 + bv1) / 2 ? fence(Blocks.BAMBOO_FENCE, true, false, true, false)
+							: y == 3 ? JapaneseKit.paneV(JapaneseKit.glassPane(net.minecraft.world.item.DyeColor.WHITE))
 							: y == 1 ? b(Blocks.TUFF_BRICKS) : p.hash(u, y, v, 8) == 0 ? b(Blocks.MUD_BRICKS) : b(Blocks.PACKED_MUD);
 					p.set(c, u, y, v, st);
 				}
@@ -192,7 +196,7 @@ public final class HouseJapaneseTeahouse implements Variant {
 
 	/** [palette] a few brown courses in the thatch, so it weathers instead of being one saturated yellow. */
 	private static Block thatch(Plot p, Block mat, int u, int k, int v) {
-		boolean brown = k == 1 ? p.hash(u, k, v, 3) == 0 : p.hash(u, k, v, 3) != 0;
+		boolean brown = p.hash(u, k, v, 3) != 0;
 		return brown ? Blocks.SPRUCE_STAIRS : mat;
 	}
 
