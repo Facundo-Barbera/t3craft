@@ -103,6 +103,18 @@ public final class SettingsScreen extends BaseConfigScreen {
 			toggle("Hub hologram", draft.hud().hologram(), x0, y + 144, colW, v -> draft = draft.withHud(draft.hud().withHologram(v)));
 		}
 
+		// feat/18-attention-signals: notifications.attention.*, middle column under the sound toggles (needs a tall window)
+		if (y + 168 <= height - 80) {
+			toggle("Window title", draft.notifications().attention().windowTitle(), x1, y + 96, colW,
+					v -> setAttention(n().attention().withWindowTitle(v)));
+			toggle("Taskbar flash", draft.notifications().attention().taskbarFlash(), x1, y + 120, colW,
+					v -> setAttention(n().attention().withTaskbarFlash(v)));
+			addRenderableWidget(Button.builder(actionBarText(), b -> {
+				setAttention(n().attention().nextActionBar());
+				b.setMessage(actionBarText());
+			}).bounds(x1, y + 144, colW, 20).build());
+		}
+
 		int by = height - 52;
 		int bw = Math.min(120, (width - 40) / 3 - 4);
 		int bx = width / 2 - (bw * 3 + 8) / 2;
@@ -151,12 +163,21 @@ public final class SettingsScreen extends BaseConfigScreen {
 		return Component.literal("Bar: " + draft.hud().position() + " " + draft.hud().align());
 	}
 
+	private Component actionBarText() {
+		return Component.literal("Action bar: " + n().attention().actionBar());
+	}
+
+	private void setAttention(T3CraftSettings.Attention a) {
+		draft = draft.withNotifications(n().withAttention(a));
+	}
+
 	private Notifications n() {
 		return draft.notifications();
 	}
 
 	private void setN(Notifications v) {
-		draft = draft.withNotifications(v);
+		// the toggles above rebuild Notifications from its eight classic fields: keep the attention signals as they were
+		draft = draft.withNotifications(v.withAttention(draft.notifications().attention()));
 	}
 
 	private void save() {

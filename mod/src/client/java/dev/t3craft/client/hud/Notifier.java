@@ -68,7 +68,9 @@ public final class Notifier {
 			}
 			mc.gui.hud.getChat().addClientSystemMessage(line);
 		}
-		if (toast) {
+		// feat/18-attention-signals: action bar / OS attention (AttentionSignals); true = the action bar replaces the toast
+		boolean barInstead = AttentionSignals.onTransition(mc, npcId, title, text, color, sound);
+		if (toast && !barInstead) {
 			Toasts.notify(mc, title, answerable ? text + " · " + answerHint() : text, color);
 		}
 		var instance = switch (sound) {

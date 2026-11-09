@@ -228,9 +228,20 @@ public record T3CraftSettings(
 			boolean soundAttention,
 			boolean soundDone,
 			boolean soundError,
-			boolean connectionToasts) {
+			boolean connectionToasts,
+			Attention attention) {
+		/** Pre-{@code attention} shape (feat/18-attention-signals), kept so existing callers still compile: default signals. */
+		public Notifications(boolean enabled, boolean chat, boolean toast, boolean sound, boolean soundAttention, boolean soundDone,
+				boolean soundError, boolean connectionToasts) {
+			this(enabled, chat, toast, sound, soundAttention, soundDone, soundError, connectionToasts, Attention.defaults());
+		}
+
 		public static Notifications defaults() {
-			return new Notifications(true, true, true, true, true, true, true, true);
+			return new Notifications(true, true, true, true, true, true, true, true, Attention.defaults());
+		}
+
+		public Notifications withAttention(Attention a) {
+			return new Notifications(enabled, chat, toast, sound, soundAttention, soundDone, soundError, connectionToasts, a);
 		}
 
 		public boolean allowChat() {
@@ -259,7 +270,52 @@ public record T3CraftSettings(
 		}
 
 		public Notifications withEnabled(boolean v) {
-			return new Notifications(v, chat, toast, sound, soundAttention, soundDone, soundError, connectionToasts);
+			return new Notifications(v, chat, toast, sound, soundAttention, soundDone, soundError, connectionToasts, attention);
+		}
+	}
+
+	/**
+	 * Silent attention signals for when the game is in the background ({@code notifications.attention}
+	 * in the file, additive: absent reads as the defaults; docs/features/attention-signals.md). Each
+	 * one is gated by {@code notifications.enabled} too. {@code windowTitle}: the window title carries
+	 * the pending summary. {@code taskbarFlash}: ask the OS for attention (taskbar flash / dock bounce)
+	 * when the window is not focused. {@code actionBar}: {@code off} | {@code also} (action bar next
+	 * to the toast) | {@code instead} (action bar replaces the toast). No sound lives here.
+	 */
+	public record Attention(boolean windowTitle, boolean taskbarFlash, String actionBar) {
+		public static final java.util.List<String> BAR_MODES = java.util.List.of("off", "also", "instead");
+
+		public Attention {
+			actionBar = BAR_MODES.contains(actionBar) ? actionBar : "off";
+		}
+
+		public static Attention defaults() {
+			return new Attention(true, true, "off");
+		}
+
+		public boolean barShown() {
+			return !"off".equals(actionBar);
+		}
+
+		public boolean barReplacesToast() {
+			return "instead".equals(actionBar);
+		}
+
+		public Attention withWindowTitle(boolean v) {
+			return new Attention(v, taskbarFlash, actionBar);
+		}
+
+		public Attention withTaskbarFlash(boolean v) {
+			return new Attention(windowTitle, v, actionBar);
+		}
+
+		public Attention withActionBar(String v) {
+			return new Attention(windowTitle, taskbarFlash, v);
+		}
+
+		/** Next action bar mode in the settings cycle: off → also → instead → off. */
+		public Attention nextActionBar() {
+			return withActionBar(BAR_MODES.get((BAR_MODES.indexOf(actionBar) + 1) % BAR_MODES.size()));
 		}
 	}
 

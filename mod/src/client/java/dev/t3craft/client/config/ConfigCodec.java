@@ -189,7 +189,21 @@ public final class ConfigCodec {
 				bool(sounds, "attention", d.soundAttention(), w),
 				bool(sounds, "done", d.soundDone(), w),
 				bool(sounds, "error", d.soundError(), w),
-				bool(o, "connectionToasts", d.connectionToasts(), w));
+				bool(o, "connectionToasts", d.connectionToasts(), w),
+				decodeAttention(obj(o, "attention"), w));
+	}
+
+	private static T3CraftSettings.Attention decodeAttention(@Nullable JsonObject o, List<String> w) {
+		T3CraftSettings.Attention d = T3CraftSettings.Attention.defaults();
+		if (o == null) {
+			return d;
+		}
+		String bar = str(o, "actionBar");
+		if (bar != null && !T3CraftSettings.Attention.BAR_MODES.contains(bar)) {
+			w.add("notifications.attention.actionBar must be off, also or instead");
+		}
+		return new T3CraftSettings.Attention(bool(o, "windowTitle", d.windowTitle(), w), bool(o, "taskbarFlash", d.taskbarFlash(), w),
+				bar == null ? d.actionBar() : bar);
 	}
 
 	private static EnvPrefs decodeEnv(String id, JsonObject o, List<String> w) {
@@ -258,6 +272,11 @@ public final class ConfigCodec {
 		sounds.addProperty("error", n.soundError());
 		no.add("sounds", sounds);
 		no.addProperty("connectionToasts", n.connectionToasts());
+		JsonObject attention = obj(no, "attention") == null ? new JsonObject() : obj(no, "attention");
+		attention.addProperty("windowTitle", n.attention().windowTitle());
+		attention.addProperty("taskbarFlash", n.attention().taskbarFlash());
+		attention.addProperty("actionBar", n.attention().actionBar());
+		no.add("attention", attention);
 		o.add("notifications", no);
 
 		JsonObject envs = new JsonObject();
