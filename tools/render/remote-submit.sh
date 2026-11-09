@@ -44,15 +44,17 @@ mkdir -p "$HOME/.ssh/cm" 2>/dev/null && chmod 700 "$HOME/.ssh/cm" 2>/dev/null
 SSH=(ssh -T -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=15 -o LogLevel=ERROR
 	-o ControlMaster=auto -o "ControlPath=$HOME/.ssh/cm/t3craft-%C" -o ControlPersist=600)
 
-# run a bash script (stdin) on the PC; its stdout comes back. Connection failures (ssh exit 255) are retried
-# with backoff (2, 4, 8, 16 s); the remote script's own exit status is returned as is.
+# run a bash script (stdin) on the PC; its stdout comes back. Connection failures (ssh exit 255) and calls that hang
+# past T3CRAFT_RENDER_CALL_TIMEOUT seconds (default 600; exit 124/137 from timeout) are retried with backoff
+# (2, 4, 8, 16 s); the remote script's own exit status is returned as is. Two agents saw a single ssh call hang for
+# 20+ minutes (2026-11-09), which froze their whole render wait.
 rrun() {
 	local script out rc i
 	script="$(cat)"
 	for i in 1 2 3 4 5; do
-		out="$(printf '%s\n' "$script" | "${SSH[@]}" "$HOST")"
+		out="$(printf '%s\n' "$script" | timeout --kill-after=10 "${T3CRAFT_RENDER_CALL_TIMEOUT:-600}" "${SSH[@]}" "$HOST")"
 		rc=$?
-		if [ "$rc" -ne 255 ]; then
+		if [ "$rc" -ne 255 ] && [ "$rc" -ne 124 ] && [ "$rc" -ne 137 ]; then
 			printf '%s' "$out"
 			return "$rc"
 		fi
