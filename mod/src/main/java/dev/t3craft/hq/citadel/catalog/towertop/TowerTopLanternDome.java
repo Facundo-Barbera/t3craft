@@ -334,10 +334,12 @@ public final class TowerTopLanternDome implements Variant {
 		}
 	}
 
-	/** [palette] waxed copper with a little patina: mostly fresh, some exposed, a few weathered. */
+	/**
+	 * [palette] waxed copper with a hint of patina: mostly fresh, one cell in eight exposed. (A third of the
+	 * cells in exposed/weathered read as a green checkerboard, like missing textures, in the first render.)
+	 */
 	private static Block copper(Plot p, int u, int y, int v, Block fresh, Block exposed, Block weathered) {
-		int k = p.hash(u, y, v, 6);
-		return k == 0 ? weathered : k <= 2 ? exposed : fresh;
+		return p.hash(u, y, v, 8) == 0 ? exposed : fresh;
 	}
 
 	// ------------------------------------------------------------------ lantern, roof, finial
