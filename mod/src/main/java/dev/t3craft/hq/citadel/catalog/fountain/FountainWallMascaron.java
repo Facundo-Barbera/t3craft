@@ -145,7 +145,9 @@ public final class FountainWallMascaron implements Variant {
 		p.set(c, cu - 1, 5, face, stairs(Blocks.CHERRY_STAIRS, Direction.SOUTH));
 		p.set(c, cu + 1, 5, face, stairs(Blocks.CHERRY_STAIRS, Direction.SOUTH));
 		// the mouth: dark opening with the thread of water leaving it
-		p.set(c, cu, 2, wall, b(Blocks.POLISHED_BLACKSTONE));
+		// [water] the source sits in the recessed mouth (walled on every side but the front), so the thread in
+		// front of it is fed and never dries up; it lands on the basin's water and goes no further
+		p.set(c, cu, 2, wall, WATER);
 		p.set(c, cu, 2, face, FALL);
 	}
 

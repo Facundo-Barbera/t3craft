@@ -45,8 +45,8 @@ public final class LampSignals {
 		return s == StationStatus.ATTENTION || s == StationStatus.ERROR;
 	}
 
-	/** The board bulbs, index 0 first. */
-	public static List<LampStatus> board(Collection<WorkstationThread> threads, int bulbs) {
+	/** The threads that need the player, most urgent first (errors, then "needs you"; ties by key): what board bulb and podium {@code i} show. */
+	public static List<WorkstationThread> urgent(Collection<WorkstationThread> threads) {
 		List<WorkstationThread> urgent = new ArrayList<>();
 		for (WorkstationThread t : threads) {
 			if (needsPlayer(t.status())) {
@@ -54,6 +54,18 @@ public final class LampSignals {
 			}
 		}
 		urgent.sort(Comparator.comparingInt((WorkstationThread t) -> -of(t.status()).urgency()).thenComparing(WorkstationThread::key));
+		return urgent;
+	}
+
+	/** The thread key of board bulb / decision podium {@code index} ({@code board:<index>}), or null when fewer threads need the player. */
+	public static @org.jspecify.annotations.Nullable String boardThread(Collection<WorkstationThread> threads, int index) {
+		List<WorkstationThread> urgent = urgent(threads);
+		return index >= 0 && index < urgent.size() ? urgent.get(index).key() : null;
+	}
+
+	/** The board bulbs, index 0 first. */
+	public static List<LampStatus> board(Collection<WorkstationThread> threads, int bulbs) {
+		List<WorkstationThread> urgent = urgent(threads);
 		List<LampStatus> out = new ArrayList<>(bulbs);
 		for (int i = 0; i < bulbs; i++) {
 			out.add(i < urgent.size() ? of(urgent.get(i).status()) : LampStatus.OFF);

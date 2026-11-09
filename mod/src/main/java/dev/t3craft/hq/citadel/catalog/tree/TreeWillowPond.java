@@ -288,7 +288,7 @@ public final class TreeWillowPond implements Variant {
 		t.fixed(w - 1, 2, 0, b(Blocks.LANTERN));
 		t.fixed(w - 1, 3, 0, slab(Blocks.STONE_BRICK_SLAB));
 		// a pebble on the front left corner
-		t.fixed(0, 0, 0, slab(Blocks.MOSSY_COBBLESTONE_SLAB));
+		t.fixed(0, 0, 0, b(Blocks.MOSS_CARPET)); // flat: a slab here was a lone bump at the plot corner
 	}
 
 	private static void rim(Vox t, int u, int v) {

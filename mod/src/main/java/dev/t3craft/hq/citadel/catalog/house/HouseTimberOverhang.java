@@ -135,6 +135,9 @@ public final class HouseTimberOverhang implements Variant {
 		chimney(c, p, g);
 		garden(c, p, g);
 		strips(c, p, g);
+		// walkability audit: a way up to the sealed upper floor
+		dev.t3craft.hq.citadel.catalog.InteriorStair.timber(c, p, 1, 5);
+		dev.t3craft.hq.citadel.catalog.InteriorStair.timber(c, p, 5, 9);
 	}
 
 	// ------------------------------------------------------------------ materials
@@ -394,10 +397,11 @@ public final class HouseTimberOverhang implements Variant {
 		int ul = g.ul();
 		int ur = g.ur();
 		int vb = g.vb();
+		// v 0..2 have no footing step under them: these plants stand on the ground (y0), they used to float at y1
 		for (int v = 0; v <= 2; v++) {
 			BlockState plant = groundPlant(p, ul - 1, 1, v);
 			if (plant != null) {
-				p.set(c, ul - 1, 1, v, plant);
+				p.set(c, ul - 1, 0, v, plant);
 			}
 		}
 		for (int v = 3; v <= vb; v++) {
@@ -424,7 +428,7 @@ public final class HouseTimberOverhang implements Variant {
 		for (int v = 0; v <= 2; v++) {
 			BlockState rr = groundPlant(p, ur + 1, 1, v);
 			if (rr != null) {
-				p.set(c, ur + 1, 1, v, rr);
+				p.set(c, ur + 1, 0, v, rr);
 			}
 		}
 	}

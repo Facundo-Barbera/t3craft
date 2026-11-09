@@ -389,6 +389,17 @@ public final class HouseLibraryCopper implements Variant {
 		if (hi != lo) {
 			p.set(c, hi, 9, 0, tintBlock(DyeColor.ORANGE));
 		}
+		// the way in: behind the door the drum ring is cut open (on even widths the cell behind the door is drum wall),
+		// with a floor and 2 blocks of headroom, until the reading room
+		for (int u = lo; u <= hi; u++) {
+			for (int v = fv + 1; v < g.cv(); v++) {
+				if (g.dist(u, v) > g.r() - 1.0 && g.dist(u, v) <= g.r()) {
+					p.set(c, u, 0, v, b(Blocks.DARK_OAK_PLANKS));
+					p.set(c, u, 1, v, CitadelCanvas.AIR);
+					p.set(c, u, 2, v, CitadelCanvas.AIR);
+				}
+			}
+		}
 		// steps and lanterns
 		for (int u = lo - 1; u <= hi + 1; u++) {
 			p.set(c, u, 0, 0, stair(Blocks.STONE_BRICK_STAIRS, Direction.SOUTH, false));
@@ -405,7 +416,8 @@ public final class HouseLibraryCopper implements Variant {
 		for (int u = 0; u < w; u++) {
 			for (int v = 0; v < d; v++) {
 				double dist = g.dist(u, v);
-				if (dist > g.r() - 2.0 && dist <= g.r() - 1.0) {
+				boolean aisle = u >= g.lo() && u <= g.hi() && v < g.cv(); // the shelves open in front of the door
+				if (dist > g.r() - 2.0 && dist <= g.r() - 1.0 && !aisle) {
 					for (int y = 1; y <= 3; y++) {
 						BlockState st = y == 2 && p.hash(u, y, v, 3) == 0 ? facing(Blocks.CHISELED_BOOKSHELF, opposite(g.out(u, v))) : b(Blocks.BOOKSHELF);
 						p.set(c, u, y, v, st);
