@@ -72,6 +72,11 @@ public final class HqBlockFixtures implements HqFixtures {
 					.setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING, facing);
 		}
 
+		/** The merge station (kit/merge-station), panel towards {@code facing} (default: the vanilla smithing table stand-in). */
+		default BlockState mergeStation(Direction facing) {
+			return net.minecraft.world.level.block.Blocks.SMITHING_TABLE.defaultBlockState();
+		}
+
 		/** Room plaque with its front towards {@code facing} (replaces the HQ's wall signs); null keeps the signs. */
 		default @Nullable BlockState plaque(Direction facing) {
 			return null;
@@ -90,7 +95,7 @@ public final class HqBlockFixtures implements HqFixtures {
 	}
 
 	/** Bump when the substitution changes (cells, blocks or binding format): demo worlds then update. */
-	public static final String ID = "blocks-6";
+	public static final String ID = "blocks-7"; // blocks-7: merge station fixtures (kit/merge-station); blocks-6: decision podium
 
 	@Override
 	public String id() {
@@ -127,6 +132,7 @@ public final class HqBlockFixtures implements HqFixtures {
 				case BEACON -> states.lamp();
 				case BOARD_LAMP -> states.boardLamp();
 				case ARCHIVE_TERMINAL -> states.archiveTerminal(f.facing());
+				case MERGE_STATION -> states.mergeStation(f.facing());
 				case PODIUM -> states.podium(f.facing());
 			};
 			return new Placement(p.rel(), s, data(f.binding()));

@@ -1,0 +1,94 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "t": "t3craft:block/glow_strip_warm",
+    "particle": "t3craft:block/kit_glow_frame"
+  },
+  "elements": [
+    {
+      "from": [
+        0,
+        13,
+        14
+      ],
+      "to": [
+        16,
+        16,
+        16
+      ],
+      "faces": {
+        "south": {
+          "texture": "#t",
+          "uv": [
+            0,
+            12,
+            16,
+            15
+          ],
+          "cullface": "south"
+        },
+        "up": {
+          "texture": "#t",
+          "uv": [
+            0,
+            12,
+            16,
+            14
+          ],
+          "cullface": "up"
+        },
+        "east": {
+          "texture": "#t",
+          "uv": [
+            2,
+            11,
+            0,
+            8
+          ]
+        },
+        "west": {
+          "texture": "#t",
+          "uv": [
+            2,
+            11,
+            0,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "from": [
+        0,
+        13,
+        14
+      ],
+      "to": [
+        16,
+        16,
+        16
+      ],
+      "faces": {
+        "north": {
+          "texture": "#t",
+          "uv": [
+            0,
+            3,
+            16,
+            0
+          ]
+        },
+        "down": {
+          "texture": "#t",
+          "uv": [
+            0,
+            4,
+            16,
+            6
+          ]
+        }
+      },
+      "light_emission": 15
+    }
+  ]
+}

@@ -59,6 +59,19 @@ final class Scene {
 		cells[index(p.getX(), p.getY(), p.getZ())] = id;
 	}
 
+	/** A model file placed as it is, turned {@code yRot} degrees ({@link BlockModels#modelQuads}). */
+	void setModel(BlockPos p, String modelId, int yRot) {
+		if (!inside(p.getX(), p.getY(), p.getZ())) {
+			return;
+		}
+		Object key = List.of("model", modelId, yRot);
+		Integer id = ids.get(key);
+		if (id == null) {
+			id = intern(key, blocks.modelQuads(modelId, yRot), blocks.modelOccupancy(modelId, yRot));
+		}
+		cells[index(p.getX(), p.getY(), p.getZ())] = id;
+	}
+
 	boolean isEmpty(int x, int y, int z) {
 		return !inside(x, y, z) || cells[index(x, y, z)] == 0;
 	}

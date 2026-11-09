@@ -309,17 +309,25 @@ public final class CitadelHub {
 			BlockPos p = RingCampusGeometry.polar(c.g.patioR + 0.2, a, 0);
 			int dx = p.getX() > 0 ? -1 : 1;
 			Direction up = dx < 0 ? Direction.EAST : Direction.WEST;
-			int hw = c.s(1);
+			// design/citadel-terraces2: 7 wide (5 at scale 1) and, from scale 2, two flights with a landing between them
+			int hw = c.s(1) + (c.s(1) > 1 ? 1 : 0);
+			int steps = y0();
+			int land = steps >= 5 ? 2 : 0;
+			int firstFlight = steps / 2;
 			for (int w = -hw; w <= hw; w++) {
-				// one step per block of height: as many steps as the podium is high (4 at scale 1)
-				for (int i = 0; i < y0(); i++) {
-					int x = p.getX() + dx * i;
+				// one step per block of height: as many steps as the podium is high (4 at scale 1); the landing is flat
+				for (int j = 0; j < steps + land - (land > 0 ? 1 : 0); j++) {
+					// the landing is the level of step number firstFlight, stretched over `land` cells
+					int i = j < firstFlight ? j : j < firstFlight + land ? firstFlight : j - land + (land > 0 ? 1 : 0);
+					boolean flat = j >= firstFlight && j < firstFlight + land;
+					int x = p.getX() + dx * j;
 					int z = p.getZ() + w;
-					for (int y = 1; y < y0() - i; y++) {
+					int level = y0() - i;
+					for (int y = 1; y < level; y++) {
 						c.set(x, y, z, FOOT);
 					}
-					c.set(x, y0() - i, z, stairs(Blocks.BAMBOO_MOSAIC_STAIRS, up));
-					for (int y = y0() - i + 1; y <= y0() + 3; y++) {
+					c.set(x, level, z, flat ? c.accent() : stairs(Blocks.BAMBOO_MOSAIC_STAIRS, up));
+					for (int y = level + 1; y <= y0() + 3; y++) {
 						c.set(x, y, z, AIR);
 					}
 				}

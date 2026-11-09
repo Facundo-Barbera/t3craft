@@ -302,11 +302,14 @@ public final class NodeDecor {
 				s.set(tx, 5, tz, pink);
 				s.set(tx - sx, 3, tz, pink);
 				s.set(tx, 3, tz - sz, pink);
-				s.set(tx - sx, 1, tz + sz, leaves(Blocks.FLOWERING_AZALEA_LEAVES));
-				s.set(tx + sx, 1, tz - sz, leaves(Blocks.AZALEA_LEAVES));
+				// (the azalea beds that stood at (sx, 3sz) and (3sx, sz) narrowed the court's four arches to one
+				// block: the arches are 3 wide and stay clear)
 			}
 		}
-		// per side (0 north, 1 east, 2 south, 3 west): bookcases on the wall, two reading lecterns
+		// per side (0 north, 1 east, 2 south, 3 west): bookcases on the wall, a reading lectern in a bay of each
+		// half. The lecterns stand IN the shelf line (ring 6), not in the aisle: the gallery's aisle (rings 4 and
+		// 5) stays clear all the way round. The north wall east of its gate is the consultation bay of the
+		// terminal ({@link ArchiveBay}), so no bookcase there.
 		for (int side = 0; side < 4; side++) {
 			Direction in = switch (side) {
 				case 0 -> Direction.SOUTH;
@@ -315,17 +318,13 @@ public final class NodeDecor {
 				default -> Direction.EAST;
 			};
 			for (int o = -CLOISTER_WALK; o <= CLOISTER_WALK; o++) {
-				if (Math.abs(o) < 2 || (side == 0 && o == 3)) {
+				if (Math.abs(o) < 2 || (side == 0 && o >= ArchiveBay.BAY_FROM && o <= ArchiveBay.BAY_TO)) {
 					continue;
 				}
 				int[] w = onSide(side, o, CLOISTER_SHELF);
-				s.set(w[0], 1, w[1], facing(Blocks.CHISELED_BOOKSHELF, in));
+				s.set(w[0], 1, w[1], Math.abs(o) == 4 ? lectern(in) : facing(Blocks.CHISELED_BOOKSHELF, in));
 				s.set(w[0], 2, w[1], b(Blocks.BOOKSHELF));
 				s.set(w[0], 3, w[1], facing(Blocks.CHISELED_BOOKSHELF, in));
-			}
-			for (int o : new int[] {-4, 4}) {
-				int[] w = onSide(side, o, CLOISTER_WALK);
-				s.set(w[0], 1, w[1], lectern(in));
 			}
 		}
 		// barrels in the corners, a lantern on top
