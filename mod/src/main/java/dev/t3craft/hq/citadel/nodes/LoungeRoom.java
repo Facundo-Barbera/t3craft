@@ -262,7 +262,7 @@ public final class LoungeRoom {
 			int sx = dx < 0 ? -1 : 1;
 			int sz = dz < 0 ? -1 : 1;
 			if (d > 13.0) {
-				return theme(sx, sz) == 3 ? MOSS : NodeDecor.footMix(dx, 0, dz);
+				return theme(sx, sz) == 3 ? GRASS : NodeDecor.footMix(dx, 0, dz);
 			}
 			if (d <= 9.3) {
 				return ((ax + az) & 1) == 0 ? b(Blocks.POLISHED_DEEPSLATE) : NodeDecor.footMix(dx, 0, dz);
@@ -271,7 +271,7 @@ public final class LoungeRoom {
 				case 0 -> ((ax + az) & 1) == 0 ? b(Blocks.SMOOTH_STONE) : b(Blocks.POLISHED_DEEPSLATE);
 				case 1 -> c.floor();
 				case 2 -> ((ax + az) & 1) == 0 ? NodeDecor.footMix(dx, 0, dz) : b(Blocks.POLISHED_DEEPSLATE);
-				default -> Math.floorMod(ax * 3 + az * 7, 5) == 0 ? GRASS : MOSS;
+				default -> GRASS; // plants stand on grass (moss is not accepted by the vegetation support check)
 			};
 		}
 
@@ -547,7 +547,7 @@ public final class LoungeRoom {
 		q.lamp(9, 9);
 	}
 
-	/** Garden: azalea and flower beds along v = 10..11, a cherry tree in the corner, a tea table with benches. */
+	/** Garden: azalea and flower beds on grass along v = 10..11, a cherry tree in the corner, a tea table with benches. */
 	private static void garden(Q q) {
 		for (int u = 4; u <= 9; u++) {
 			q.set(u, 1, 9, slab(Blocks.STONE_BRICK_SLAB));
