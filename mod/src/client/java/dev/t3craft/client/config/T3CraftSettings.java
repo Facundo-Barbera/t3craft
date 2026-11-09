@@ -169,7 +169,7 @@ public record T3CraftSettings(
 		}
 	}
 
-	public record Hud(boolean statusBar, String position, String align, boolean hideWhenIdle, boolean hologram) {
+	public record Hud(boolean statusBar, String position, String align, boolean hideWhenIdle, boolean hologram, boolean attentionArrow) {
 		public static final java.util.List<String> POSITIONS = java.util.List.of("top", "bottom");
 		public static final java.util.List<String> ALIGNS = java.util.List.of("left", "center", "right");
 
@@ -180,11 +180,21 @@ public record T3CraftSettings(
 
 		/** Pre-{@code hologram} shape (feat/hub-hologram), kept so existing callers still compile: hologram on. */
 		public Hud(boolean statusBar, String position, String align, boolean hideWhenIdle) {
-			this(statusBar, position, align, hideWhenIdle, true);
+			this(statusBar, position, align, hideWhenIdle, true, true);
+		}
+
+		/** Pre-{@code attentionArrow} shape (feat/attention-queue), kept so existing callers still compile: arrow on. */
+		public Hud(boolean statusBar, String position, String align, boolean hideWhenIdle, boolean hologram) {
+			this(statusBar, position, align, hideWhenIdle, hologram, true);
 		}
 
 		public static Hud defaults() {
-			return new Hud(true, "top", "center", true, true);
+			return new Hud(true, "top", "center", true, true, true);
+		}
+
+		/** The attention queue's edge arrow toward the most urgent thread's NPC (docs/features/attention-queue.md) on/off. */
+		public Hud withAttentionArrow(boolean v) {
+			return new Hud(statusBar, position, align, hideWhenIdle, hologram, v);
 		}
 
 		public boolean bottom() {
@@ -192,20 +202,20 @@ public record T3CraftSettings(
 		}
 
 		public Hud withStatusBar(boolean v) {
-			return new Hud(v, position, align, hideWhenIdle, hologram);
+			return new Hud(v, position, align, hideWhenIdle, hologram, attentionArrow);
 		}
 
 		public Hud withPlacement(String pos, String al) {
-			return new Hud(statusBar, pos, al, hideWhenIdle, hologram);
+			return new Hud(statusBar, pos, al, hideWhenIdle, hologram, attentionArrow);
 		}
 
 		public Hud withHideWhenIdle(boolean v) {
-			return new Hud(statusBar, position, align, v, hologram);
+			return new Hud(statusBar, position, align, v, hologram, attentionArrow);
 		}
 
 		/** Hub hologram (feat/hub-hologram) on/off. */
 		public Hud withHologram(boolean v) {
-			return new Hud(statusBar, position, align, hideWhenIdle, v);
+			return new Hud(statusBar, position, align, hideWhenIdle, v, attentionArrow);
 		}
 
 		/** Next placement in the settings cycle: top left → top center → … → bottom right → top left. */

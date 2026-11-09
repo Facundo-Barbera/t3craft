@@ -101,6 +101,9 @@ public final class SettingsScreen extends BaseConfigScreen {
 		// feat/hub-hologram: hud.hologram, one more row when it fits (else edit config/t3craft.json).
 		if (y + 168 <= height - 80) {
 			toggle("Hub hologram", draft.hud().hologram(), x0, y + 144, colW, v -> draft = draft.withHud(draft.hud().withHologram(v)));
+			// feat/attention-queue: hud.attentionArrow, next to the hologram on the same row
+			toggle("Attention arrow", draft.hud().attentionArrow(), x2, y + 144, colW,
+					v -> draft = draft.withHud(draft.hud().withAttentionArrow(v)));
 		}
 
 		int by = height - 52;
