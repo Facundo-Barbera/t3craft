@@ -8,7 +8,8 @@ These rules come from Facundo and override any other instruction, brief or habit
 |---|---|
 | **Mac mini** | The **coordinator**, the only Opus thread at xhigh (checkout `/path/to/t3craft`). It plans, briefs, reviews, merges and pushes. It runs nothing heavy itself: it drives the PC over SSH. **Coordination only:** the Mac runs no working subagents or child threads (Facundo and the coordinator only). |
 | **VPS** (my-vps, T3 environment `vps-env`) | **Child threads only**, as many *small, short* threads: one task each, commit, push, end. At most **8** at once (T3 slows down with more), all on the latest **Sonnet** with effort medium or high, never xhigh. **No heavy process of any kind** (no gradle, java, renders, Minecraft), and no long-lived coordinator thread with a huge history. |
-| **PC** (my-pc, WSL, `~/projects/t3craft`) | **All Gradle builds and all renders,** one heavy process at a time, through `tools/heavy.sh` and the render daemon (1 worker). Only the coordinator compiles there; renders arrive through the relay (rule 8). |
+| **PC, WSL** (my-pc, `~/projects/t3craft`) | **Agent-side Gradle builds and all renders,** one heavy process at a time, through `tools/heavy.sh` and the render daemon (1 worker). Only the coordinator compiles there; renders arrive through the relay (rule 8). |
+| **PC, Windows native** | **Facundo's interactive UI dev client** (Minecraft dev client + its Gradle + the IDE on the same side; UI plan D7, `docs/plans/ui-browser-and-integrations.md`). Interactive use only: allowed, outside `heavy.sh`'s lock (which lives in WSL), and **agents never launch it**. |
 | **MBP** | Facundo. |
 
 - **Every child, delegated task or subagent runs on the VPS** (Facundo, 2026-11-09), read-only reviews and surveys
@@ -32,6 +33,12 @@ These rules come from Facundo and override any other instruction, brief or habit
     branches unless he asks.
 - **Child threads, delegated tasks and subagents only write code, commit and push their branch:** no gradle, java,
   compiling or tests. The coordinator compiles pushed branches on the PC.
+- **UI dev loop (Facundo, 2026-11-09, UI plan Q5):**
+  - **Default is T4:** the PC (WSL) compiles, the jar goes to the Mac, and the UI is played natively on the Mac.
+  - The Windows-native dev client is only for Facundo's interactive UI sessions.
+  - While Facundo is in a UI session (he says so), the coordinator **neither compiles nor renders on the PC**.
+    15 GB of RAM cannot hold Minecraft, the IDE and a second Gradle at once, and a Windows Gradle does not take the WSL
+    lock.
 - **PC transport:** the PC's sshd is Windows OpenSSH with `wsl.exe` as shell, so `ssh pc 'cmd'`, scp and rsync do
   not work. Every remote step is a bash script fed on stdin: `ssh -T pc < script.sh` (see `tools/render/remote-submit.sh`).
 - Work that still needs running is tracked in `docs/ops/pending-execution.md`.
