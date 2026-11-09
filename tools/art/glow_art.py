@@ -201,11 +201,12 @@ def panel_model(tone):
 
 
 def strip_model(tone, half):
-    """Strip looking north, hugging the south wall (z 14..16). bottom: y 0..3; top: y 13..16 (uv flipped)."""
+    """Strip looking north, hugging the south wall (z 14..16). bottom: y 0..3; top: y 13..16 (same uv)."""
     y0, y1 = (0, 3) if half == "bottom" else (13, 16)
-    flip = half == "top"
-    front_uv = [0, 3, 16, 0] if flip else [0, 0, 16, 3]
-    end_uv = [2, 11, 0, 8] if flip else [0, 8, 2, 11]
+    # not mirrored for the top half: the dark lip stays on top (against the beam or screen it hangs from), the hot core and the
+    # amber under-glow below it, so a high strip reads as a lit lip under its support and not as a lip hanging under the light
+    front_uv = [0, 0, 16, 3]
+    end_uv = [0, 8, 2, 11]
     # the long face that looks along the run: up for a bottom strip, down for a top one
     lit_side, dark_side = ("up", "down") if half == "bottom" else ("down", "up")
     lit_cull = None

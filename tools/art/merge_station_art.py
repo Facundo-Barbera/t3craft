@@ -13,7 +13,7 @@ Design (a review desk: it has to say "something waits for you" from across the c
   * a big square button on the desk and a lamp post at each front corner. State = colour of the lamps and of the screen frame:
         none    dim grey, nothing glows
         open    green, blinks slowly (2-frame strip), the loudest one: a PR is waiting for review
-        draft   amber, steady, hatched (work in progress)
+        draft   cool steel blue, steady, hatched (work in progress)
         merged  violet, steady, a check on the button
   * the lamps (and only they, plus the screen) glow in game ("light_emission" per element).
 Everything is original pixel art drawn here; nothing is copied from AgentCraft or from Mojang.
@@ -32,7 +32,7 @@ ITEMS = os.path.join(ROOT, "items")
 
 STATES = ["none", "open", "draft", "merged"]
 # state -> (colour, light emission of the lamp elements, 0 = none)
-STATE_COLOR = {"none": 0x8A8F94, "open": 0x55FF55, "draft": 0xFFAA00, "merged": 0xB583FF}
+STATE_COLOR = {"none": 0x8A8F94, "open": 0x55FF55, "draft": 0x7FB0E8, "merged": 0xB583FF}
 EMISSION = {"none": 0, "open": 14, "draft": 10, "merged": 8}
 
 # ---------------------------------------------------------------- palette
