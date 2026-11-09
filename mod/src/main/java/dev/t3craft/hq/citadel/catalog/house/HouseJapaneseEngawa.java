@@ -195,7 +195,10 @@ public final class HouseJapaneseEngawa implements Variant {
 			java.util.List<int[]> out = new java.util.ArrayList<>();
 			for (int hu = 1; hu <= hw - 2; hu++) {
 				if (isPostAlong(hu, 1, hw - 2)) {
-					out.add(new int[] {hu, 1});
+					// the two door columns stay clear at the veranda edge: a post there stood right in the way from the
+					// steps to the door, so it moves one cell aside (the beam spans over the entrance)
+					int fu = hu == cu - 1 ? cu - 2 : hu == cu ? cu + 1 : hu;
+					out.add(new int[] {fu, 1});
 					out.add(new int[] {hu, d - 2});
 				}
 			}

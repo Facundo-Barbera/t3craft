@@ -20,8 +20,6 @@ import net.minecraft.core.Direction;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.BlockStateProperties;
-import net.minecraft.world.level.block.state.properties.Half;
 
 /**
  * Koi pond: an organic basin of mossy rock with a lime-washed bed (mud, clay, gravel), orange and white
@@ -133,6 +131,9 @@ public final class FountainKoiPond implements Variant {
 						p.set(c, u, 1, v, PondKit.water());
 					}
 					case RIM -> {
+						if (bridge && v == vb && (u == rl || u == rr)) {
+							continue; // the bridge foot takes this rim cell (a low stair, open above)
+						}
 						p.set(c, u, 0, v, PondKit.rimBase(p, u, v));
 						p.set(c, u, 1, v, PondKit.rimTop(p, u, 1, v));
 						switch (p.hash(u, 7, v, 10)) { // [depth] slabs and moss break the rim line, a rare boulder
@@ -215,12 +216,13 @@ public final class FountainKoiPond implements Variant {
 						toRim = dir;
 					}
 				}
-				if (rims == 1) {
+				if (bridge && v == vb && (u < rl || u > rr)) {
+					// the path to the bridge feet: flat slabs, no step against the rim
+					p.set(c, u, 0, v, slab(p.hash(u, 2, v, 2) == 0 ? Blocks.MOSSY_STONE_BRICK_SLAB : Blocks.STONE_BRICK_SLAB));
+				} else if (rims == 1) {
 					p.set(c, u, 0, v, PondKit.shoreStep(p, u, v, toRim));
 				} else if (rims > 1) {
 					p.set(c, u, 0, v, slab(Blocks.MOSSY_COBBLESTONE_SLAB));
-				} else if (bridge && v == vb && (u < rl || u > rr)) {
-					p.set(c, u, 0, v, slab(p.hash(u, 2, v, 2) == 0 ? Blocks.MOSSY_STONE_BRICK_SLAB : Blocks.STONE_BRICK_SLAB));
 				} else {
 					BlockState plant = PondKit.shorePlant(p, u, v);
 					if (plant != null) {
@@ -257,9 +259,11 @@ public final class FountainKoiPond implements Variant {
 	}
 
 	/**
-	 * Cherry bridge along u at row {@code vb} from rim cell {@code rl} to {@code rr}: slab landing on the
-	 * rim (y 2), a stair rise over a stone pier (y 2), then a slab crest (y 3). Side rows carry a
-	 * stripped-log post with a lantern at each end, a fence on the rise and a log beam + fence on the crest.
+	 * Cherry bridge along u at row {@code vb} from rim cell {@code rl} to {@code rr}, walkable without a
+	 * jump: a stair on the rim's footing (y 0, top at 1), a stair over a stone pier (y 1, top at 2), then a
+	 * slab crest just above the water (y 2). Every rise is half a block. The rim cell of each foot is open
+	 * above the stair; its neighbours (pier and post plinths) are solid, so no water gets out. Side rows
+	 * carry a stripped-log post with a lantern at each end.
 	 */
 	private static void buildBridge(CitadelCanvas c, Plot p, int[][] k, int vb, int rl, int rr) {
 		int n = rr - rl + 1;
@@ -268,18 +272,16 @@ public final class FountainKoiPond implements Variant {
 			int u = rl + i;
 			int e = Math.min(i, n - 1 - i);
 			Direction in = i < mid ? Direction.EAST : Direction.WEST; // towards the crest
-			Direction out = in.getOpposite();
 			// centre row: the deck
 			if (e == 0) {
-				put(c, p, u, 2, vb, slab(Blocks.CHERRY_SLAB));
+				put(c, p, u, 0, vb, stairs(Blocks.STONE_BRICK_STAIRS, in));
+				put(c, p, u, 1, vb, CitadelCanvas.AIR);
+				put(c, p, u, 2, vb, CitadelCanvas.AIR);
 			} else if (e == 1) {
 				pier(c, p, u, vb);
-				put(c, p, u, 2, vb, stairs(Blocks.CHERRY_STAIRS, in));
+				put(c, p, u, 1, vb, stairs(Blocks.CHERRY_STAIRS, in));
 			} else {
-				put(c, p, u, 3, vb, slab(Blocks.CHERRY_SLAB));
-				if (e == 2 && n >= 7) { // [depth] arch ribs: upside-down stairs under the first crest cells
-					put(c, p, u, 2, vb, stairs(Blocks.CHERRY_STAIRS, out).setValue(BlockStateProperties.HALF, Half.TOP));
-				}
+				put(c, p, u, 2, vb, slab(Blocks.CHERRY_SLAB));
 			}
 			// the posts live only at the ends: a 1-wide bridge leaves the pond open
 			if (e == 0) {
@@ -291,15 +293,11 @@ public final class FountainKoiPond implements Variant {
 				}
 			}
 		}
-		// one lantern hangs under the crest, over the koi
-		int cu = rl + n / 2;
-		PondKit.putLayer(c, p, cu, 2, vb, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
 	}
 
-	/** Masonry pier from the bed up to the water line, under a bridge stair. */
+	/** Masonry pier on the bed, under a bridge stair (which takes the water line). */
 	private static void pier(CitadelCanvas c, Plot p, int u, int v) {
 		put(c, p, u, 0, v, PondKit.rimBase(p, u, v));
-		put(c, p, u, 1, v, PondKit.brick(p, u, 1, v));
 	}
 
 	/** Solid footing for a post, in case the cell is not part of the rim. */

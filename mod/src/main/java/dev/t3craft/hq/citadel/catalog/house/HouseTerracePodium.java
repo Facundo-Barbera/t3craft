@@ -669,8 +669,13 @@ public final class HouseTerracePodium implements Variant {
 		p.set(c, mu, DECK + 2, mv, slab(Blocks.CHERRY_SLAB));
 		p.set(c, u0, DECK + 1, mv, stair(Blocks.CHERRY_STAIRS, Direction.WEST, false));
 		p.set(c, u1, DECK + 1, mv, stair(Blocks.CHERRY_STAIRS, Direction.EAST, false));
-		p.put(c, u0 + 1, top - 1, v0, hanging(Blocks.LANTERN), CitadelCanvas.HANGING);
-		p.put(c, u0 + 1, top - 1, v1, hanging(Blocks.LANTERN), CitadelCanvas.HANGING);
+		// lanterns hang from the eave ring just outside the two openings: under the beams (y top-1) they hung at
+		// head height in the 2-high openings
+		for (int lv : new int[] {v0 - 1, v1 + 1}) {
+			if (p.at(c, u0 + 1, top, lv) == null && !inHut(g, u0 + 1, lv)) {
+				p.put(c, u0 + 1, top, lv, hanging(Blocks.LANTERN), CitadelCanvas.HANGING);
+			}
+		}
 	}
 
 	/** A 2×2 stair hut on the back corner: white walls, a door to the front, a copper lean-to cap. */

@@ -100,14 +100,23 @@ public final class CitadelPlacement {
 		return RingCampusGeometry.sOdd(CitadelCanvas.dims().k, n);
 	}
 
-	/** A count of plots at scale 1, times the scale (a bigger lot asks for more plots; identity at scale 1). */
+	/** A count of plots at scale 1, times {@code k^1.5} (a lot has k² the area and plots grow by √k, so this fills it a little denser than at scale 1; identity at scale 1; a request that finds no room is skipped). */
 	private static int cnt(int n) {
-		return (int) Math.round(n * CitadelCanvas.dims().k);
+		return (int) Math.round(n * Math.pow(CitadelCanvas.dims().k, 1.5));
 	}
 
 	/** A plot request with its sizes at scale 1: frontage and depth grow with {@code s}, the height is given scaled. */
 	private static Req req(Family f, int minW, int maxW, int minD, int maxD, int h, Mode mode) {
-		return new Req(f, sc(minW), sc(maxW), sc(minD), sc(maxD), h, mode);
+		return new Req(f, sp(minW), sp(maxW), sp(minD), sp(maxD), h, mode);
+	}
+
+	/**
+	 * A plot side at scale {@code k}: {@code n · √k}. Catalog variants keep their own proportions and detail, so
+	 * the plots grow by the square root and their <i>count</i> by {@code k} ({@link #cnt}): a lot has {@code k²}
+	 * times the area, plots {@code k} times, so the fill stays what it is at scale 1 (a lot never looks empty).
+	 */
+	static int sp(int n) {
+		return Math.max(1, (int) Math.round(n * Math.sqrt(CitadelCanvas.dims().k)));
 	}
 
 	/** Free cells kept between two plots of a lot. */

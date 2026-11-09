@@ -326,10 +326,10 @@ public final class HouseTerraceCascade implements Variant {
 			}
 		}
 		parapet(c, p, g);
-		// a bench by the path, facing the pond
-		int bu = Math.max(g.eL() + 3, cu - 3);
-		p.set(c, bu, DECK + 1, VW + 1, stair(Blocks.DARK_OAK_STAIRS, Direction.SOUTH, false));
-		p.set(c, bu + 1, DECK + 1, VW + 1, stair(Blocks.DARK_OAK_STAIRS, Direction.SOUTH, false));
+		// a bench facing the pond, one row behind the path (it used to stand on the 1-wide path from the stair)
+		int bu = g.eL() + 2;
+		p.set(c, bu, DECK + 1, VW + 2, stair(Blocks.DARK_OAK_STAIRS, Direction.SOUTH, false));
+		p.set(c, bu + 1, DECK + 1, VW + 2, stair(Blocks.DARK_OAK_STAIRS, Direction.SOUTH, false));
 	}
 
 	/** [depth] a low wall round the platform edge, with an opening at the stair and posts with lanterns. */
@@ -417,9 +417,12 @@ public final class HouseTerraceCascade implements Variant {
 		for (int s : new int[] {-1, 1}) {
 			p.set(c, cu + s * 3, 5, vh - 1, trap(Blocks.DARK_OAK_TRAPDOOR, Direction.NORTH, true, false));
 			p.set(c, cu + s * 3, 6, vh - 1, trap(Blocks.DARK_OAK_TRAPDOOR, Direction.NORTH, true, false));
-			p.put(c, cu + s, 5, vh - 1, hanging(Blocks.LANTERN), CitadelCanvas.HANGING);
+			// hung from the eave (y8) rather than floating two blocks under it; skipped where the cherry's crown is
+			if (p.at(c, cu + s, 7, vh - 1) == null) {
+				p.put(c, cu + s, 7, vh - 1, hanging(Blocks.LANTERN), CitadelCanvas.HANGING);
+			}
 		}
-		p.set(c, cu, DECK + 1, vh - 1, stair(Blocks.STONE_BRICK_STAIRS, Direction.SOUTH, false));
+		// no step in front of the door: the door sill is at deck level, the cell in front stays clear
 		// plate beams
 		for (int u = g.h0(); u <= g.h1(); u++) {
 			p.set(c, u, PLATE, vh, log(Blocks.DARK_OAK_LOG, Direction.Axis.X));

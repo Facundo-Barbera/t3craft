@@ -88,7 +88,9 @@ public final class AnnexCherryPergola implements Variant {
 		floor(c, p);
 		posts(c, p, mid);
 		benches(c, p, mid);
-		table(c, p, cu, tv);
+		if (w >= 7) {
+			table(c, p, cu, tv); // on narrow pergolas a table would leave only 1-wide gaps through the middle
+		}
 		beams(c, p, mid);
 		canopy(c, p, tv);
 		vines(c, p, mid, tv);
@@ -128,9 +130,12 @@ public final class AnnexCherryPergola implements Variant {
 				p.set(c, u, 0, v, st);
 			}
 		}
-		for (int u : new int[] {1, w - 2}) {
-			for (int v : new int[] {0, d - 1}) {
-				p.set(c, u, 0, v, p.hash(u, 0, v, 2) == 0 ? b(Blocks.POTTED_PINK_TULIP) : b(Blocks.POTTED_AZALEA));
+		// pots inside the corners only when the passage between them stays at least 3 wide (u 2..w-3)
+		if (w >= 7) {
+			for (int u : new int[] {1, w - 2}) {
+				for (int v : new int[] {0, d - 1}) {
+					p.set(c, u, 0, v, p.hash(u, 0, v, 2) == 0 ? b(Blocks.POTTED_PINK_TULIP) : b(Blocks.POTTED_AZALEA));
+				}
 			}
 		}
 	}

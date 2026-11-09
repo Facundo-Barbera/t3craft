@@ -3,10 +3,10 @@ package dev.t3craft.hq.citadel.nodes;
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 import static dev.t3craft.hq.citadel.CitadelCanvas.AIR;
 import static dev.t3craft.hq.citadel.CitadelCanvas.FOOT;
 import static dev.t3craft.hq.citadel.CitadelCanvas.MOSS;
-import static dev.t3craft.hq.citadel.CitadelCanvas.WATER;
 import static dev.t3craft.hq.citadel.CitadelCanvas.leaves;
 import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
 
@@ -15,14 +15,15 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
  * go down to {@code y = -3}: moss on the even rings, deepslate tiles with a slab on the odd ones, an accent
  * floor at the bottom. It removes the ground cell the zone painted first.
  *
- * <p>On the second ring from the rim ({@code k = 2}) the four diagonal sectors are shallow pools of water
- * (a footing under each, full blocks or slabs on every side, so the water cannot run); the axes stay moss
- * and are the paths down. Azalea bushes stand on the rim between the paths. The furniture (hearth pavilion,
- * sofas, trees, lamp posts) is {@link NodeDecor}'s.
+ * <p>On the second ring from the rim ({@code k = 2}) the four diagonal sectors are flower beds (moss with ferns,
+ * lilies of the valley and petals, nothing with collision); the axes stay bare moss and are the paths down.
+ * (They were shallow pools of water round the fire: a hearth ringed by water made no sense as a place to sit,
+ * walkability audit.) Azalea bushes stand on the rim between the paths. The furniture (the open hearth, sofas,
+ * trees, lamp posts) is {@link NodeDecor}'s.
  */
 public final class LoungeRoom {
-	/** Ring {@code k} of the pools, and the cells within this of an axis that stay paths. */
-	private static final int POOL_RING = 2;
+	/** Ring {@code k} of the flower beds, and the cells within this of an axis that stay paths. */
+	private static final int BED_RING = 2;
 	private static final int PATH_HALF = 1;
 
 	private LoungeRoom() {
@@ -42,9 +43,15 @@ public final class LoungeRoom {
 		for (int y = solid + (k % 2 == 1 ? 2 : 1); y <= 2; y++) {
 			c.set(x, y, z, AIR);
 		}
-		if (k == POOL_RING && Math.min(Math.abs(dx), Math.abs(dz)) > PATH_HALF) {
-			c.set(x, solid - 1, z, FOOT);
-			c.set(x, solid, z, WATER);
+		if (k == BED_RING && Math.min(Math.abs(dx), Math.abs(dz)) > PATH_HALF) {
+			int pick = Math.floorMod(dx * 7 + dz * 13, 4);
+			BlockState flower = switch (pick) {
+				case 0 -> Blocks.FERN.defaultBlockState();
+				case 1 -> Blocks.LILY_OF_THE_VALLEY.defaultBlockState();
+				case 2 -> Blocks.PINK_PETALS.defaultBlockState();
+				default -> Blocks.SHORT_GRASS.defaultBlockState();
+			};
+			c.set(x, solid + 1, z, flower);
 		}
 		if (Math.abs(dx) == 5 && Math.abs(dz) == 4) {
 			c.set(x, 1, z, leaves(Blocks.FLOWERING_AZALEA_LEAVES));
