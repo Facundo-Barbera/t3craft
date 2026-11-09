@@ -163,6 +163,10 @@ public final class HallInterior {
 		int D = r.d();
 		int mid = r.c();
 		DyeColor alt = s.alt(env);
+		if (r.w() >= 15) {
+			env = softened(env);
+			alt = alt == env ? DyeColor.WHITE : alt;
+		}
 		int y = f * fh() + 1;
 		for (int u = 0; u <= D - 2; u++) {
 			for (int dv = -1; dv <= 1; dv++) {
@@ -180,6 +184,16 @@ public final class HallInterior {
 	 * colour, from the desk's wall out into the hall. Together with the aisle runner they split the big room into
 	 * team areas. Only floor cells are redrawn (never a stair, never the stair hole, never the walls).
 	 */
+	/** A project colour as a rug colour that reads on a floor: dark ones become cyan, saturated magenta pink, pale ones light blue. */
+	private static DyeColor softened(DyeColor env) {
+		return switch (env) {
+			case BLACK, GRAY, BROWN -> DyeColor.CYAN;
+			case MAGENTA -> DyeColor.PINK;
+			case LIGHT_GRAY, WHITE -> DyeColor.LIGHT_BLUE;
+			default -> env;
+		};
+	}
+
 	private static void deskRugs(CitadelCanvas c, Room r, int f, HallStyle s, DyeColor env) {
 		int W = r.w();
 		int D = r.d();
@@ -194,13 +208,7 @@ public final class HallInterior {
 			case STONE -> DyeColor.BLACK;
 			case BALCONY -> DyeColor.GRAY;
 		};
-		DyeColor field = switch (env) {
-			case BLACK, GRAY, BROWN -> DyeColor.CYAN;
-			case MAGENTA -> DyeColor.PINK;
-			case LIGHT_GRAY, WHITE -> DyeColor.LIGHT_BLUE;
-			default -> env;
-		};
-		env = field;
+		env = softened(env);
 		int depth = 5;
 		int half = 2;
 		for (int slot = 0; slot < 6; slot++) {
