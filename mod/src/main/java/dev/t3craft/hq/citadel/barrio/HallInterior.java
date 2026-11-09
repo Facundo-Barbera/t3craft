@@ -144,7 +144,7 @@ public final class HallInterior {
 	/** A calm floor: one field with a sparse second tone, inside a dark frame (all in the hall's own palette). */
 	private static net.minecraft.world.level.block.Block floorBlock(HallStyle s, boolean edge, boolean accent) {
 		return switch (s) {
-			case TIMBER -> edge ? Blocks.DARK_OAK_PLANKS : accent ? Blocks.CHERRY_PLANKS : Blocks.SPRUCE_PLANKS;
+			case TIMBER -> edge || accent ? Blocks.DARK_OAK_PLANKS : Blocks.SPRUCE_PLANKS;
 			case STONE -> edge ? Blocks.POLISHED_DEEPSLATE : accent ? Blocks.MOSSY_STONE_BRICKS : Blocks.STONE_BRICKS;
 			case SHUTTERED -> edge ? Blocks.POLISHED_BLACKSTONE_BRICKS : accent ? Blocks.SPRUCE_PLANKS : Blocks.DARK_OAK_PLANKS;
 			case BALCONY -> edge ? Blocks.POLISHED_DEEPSLATE : accent ? Blocks.BAMBOO_MOSAIC : Blocks.SMOOTH_QUARTZ;
