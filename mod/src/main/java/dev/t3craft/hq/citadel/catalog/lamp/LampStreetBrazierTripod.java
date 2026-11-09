@@ -255,6 +255,10 @@ public final class LampStreetBrazierTripod implements Variant {
 		}
 		bowl(c, p, k, cu, cv, dd);
 		dais(c, p, k, cu, cv, r);
+		if (r == 2) { // a dark ash bed under the bowl and in front of it (the axis cells under the arms keep the ground: headroom)
+			p.set(c, cu, 0, cv, slab(Blocks.POLISHED_BLACKSTONE_BRICK_SLAB));
+			p.set(c, cu, 0, cv - 1, slab(Blocks.POLISHED_BLACKSTONE_BRICK_SLAB));
+		}
 		benches(c, p, k, cu, cv, r);
 	}
 
@@ -273,6 +277,13 @@ public final class LampStreetBrazierTripod implements Variant {
 		for (int i = 0; i < 4; i++) {
 			p.set(c, cu + sides[i][0], y, cv + sides[i][1],
 					k.shape() == 0 ? lipStairs(dirs[i].getOpposite()) : lipSlab());
+		}
+		if (k.shape() == 0) { // cup: low lip slabs close the corners, so the fire sits in a ring that is deeper than it is wide
+			for (int su = -1; su <= 1; su += 2) {
+				for (int sv = -1; sv <= 1; sv += 2) {
+					p.set(c, cu + su, y, cv + sv, lipSlab());
+				}
+			}
 		}
 		p.set(c, cu, y, cv, fire(k));
 	}
@@ -320,10 +331,8 @@ public final class LampStreetBrazierTripod implements Variant {
 				int h = p.hash(u, 0, v, 6);
 				if (dist == 1) {
 					s = slab(Blocks.POLISHED_BLACKSTONE_BRICK_SLAB); // the one dark ring, round the foot
-				} else if (dist == 2) {
-					s = slab(h == 0 ? Blocks.COBBLESTONE_SLAB : h == 1 ? Blocks.POLISHED_ANDESITE_SLAB : Blocks.STONE_BRICK_SLAB);
 				} else {
-					s = slab(h == 0 ? Blocks.MOSSY_STONE_BRICK_SLAB : h <= 2 ? Blocks.STONE_SLAB : Blocks.POLISHED_ANDESITE_SLAB);
+					s = slab(h == 0 ? Blocks.POLISHED_ANDESITE_SLAB : Blocks.STONE_BRICK_SLAB); // two light stones only
 				}
 				p.set(c, u, 0, v, s);
 			}
@@ -333,7 +342,7 @@ public final class LampStreetBrazierTripod implements Variant {
 	// ------------------------------------------------------------------ benches
 
 	private static BlockState seat(Plot p, int u, int v, Direction toFire) {
-		return stairs(p.hash(u, 0, v, 4) == 0 ? Blocks.MOSSY_STONE_BRICK_STAIRS : Blocks.STONE_BRICK_STAIRS, toFire);
+		return stairs(Blocks.DEEPSLATE_BRICK_STAIRS, toFire); // dark seats read against the light dais
 	}
 
 	/** A bench of {@code len} seats along an axis, starting at {@code (u0, v0)}; they face the fire. */
