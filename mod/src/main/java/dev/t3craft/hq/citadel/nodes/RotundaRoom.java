@@ -182,7 +182,7 @@ public final class RotundaRoom {
 	//   tambour   a dark clerestory drum of 4 courses on the cornice: string course, deepslate frieze with a
 	//             blackstone strip over every pilaster and one lit oculus over every window, upper cornice
 	//   plinth    d in (R - 1, R]: a slab ring with a buttress at every pilaster
-	//   dome      uniform pink glass on 8 cherry ribs, a cherry belt at the springing, a
+	//   dome      uniform frosted glass on 8 cherry ribs, a cherry belt at the springing, a
 	//             bamboo cap; an open oculus under the lantern (a round glass lantern drum with a roof, a gold
 	//             ball and a rod)
 	//   display   the east side of the hall is cut flat at x = xw: a wall of archive shelves with the
@@ -197,7 +197,7 @@ public final class RotundaRoom {
 	/** Dimensions of the scaled rotunda, all from the zone's radius. */
 	private static final BlockState SLOG = b(Blocks.STRIPPED_CHERRY_LOG);
 	/** The dome's skin: frosted, so the room under it does not show through. */
-	private static final BlockState DOME_GLASS = Blocks.STAINED_GLASS.pick(net.minecraft.world.item.DyeColor.PINK).defaultBlockState();
+	private static final BlockState DOME_GLASS = Blocks.STAINED_GLASS.pick(net.minecraft.world.item.DyeColor.WHITE).defaultBlockState();
 	/** Courses of the dark tambour between the colonnade and the dome. */
 	private static final int TAMBOUR = 4;
 	/** A lit oculus of the tambour: warm, so it glows like a lamp and does not burn out. */
