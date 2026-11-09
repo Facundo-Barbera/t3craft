@@ -286,7 +286,10 @@ public final class HouseStoneTower implements Variant {
 		BlockState wallMat(int idx, int len, int u, int y, int v, boolean alongU) {
 			boolean corner = idx == 0 || idx == len - 1;
 			if (y == F1 || y == F2) {
-				return corner ? b(Blocks.POLISHED_DEEPSLATE) : b(Blocks.DEEPSLATE_BRICKS); // dark belt courses
+				if (corner) {
+					return b(Blocks.POLISHED_DEEPSLATE);
+				}
+				return y == F1 ? b(Blocks.DEEPSLATE_BRICKS) : b(Blocks.POLISHED_ANDESITE); // a dark belt course, then a pale one
 			}
 			if (corner) {
 				return y <= 1 ? b(Blocks.POLISHED_DEEPSLATE) : quoin(u, y, v);
@@ -479,10 +482,9 @@ public final class HouseStoneTower implements Variant {
 					wl.set(tt, y + 2, 0, stUp(Blocks.POLISHED_ANDESITE_STAIRS, along(wl, sign)));
 				}
 			}
-			// [depth] a pale diorite stair sill in the wall plane, slanting down and out (no ledge to stand on), and a dark
-			// upside-down stair hood jutting over the lintel band
+			// [depth] a pale diorite stair sill in the wall plane, slanting down and out (no ledge to stand on); the dark
+			// belt course over the window is its lintel
 			wl.set(t, y - 1, 0, wl.stairIn(Blocks.POLISHED_DIORITE_STAIRS, false));
-			setFreeWall(wl, t, y + 3, 1, wl.stairIn(Blocks.DEEPSLATE_BRICK_STAIRS, true));
 			if (shutters && p.hash(wl.u(t, 0), y, wl.v(t, 0), 3) == 0) {
 				for (int sign : new int[] {-1, 1}) {
 					if (!solidCorner(wl, t + sign)) {
@@ -657,7 +659,9 @@ public final class HouseStoneTower implements Variant {
 				BlockState s;
 				if (y <= 1) {
 					s = deep(p, u, y, v);
-				} else if (y == F1 || y == F2 || y == 13) {
+				} else if (y == F2) {
+					s = b(Blocks.POLISHED_ANDESITE);
+				} else if (y == F1 || y == 13) {
 					s = b(Blocks.DEEPSLATE_BRICKS);
 				} else {
 					s = body(u, y, v);
@@ -680,7 +684,7 @@ public final class HouseStoneTower implements Variant {
 						BlockState s = y <= 1 ? b(Blocks.POLISHED_DEEPSLATE) : y == 13 ? b(Blocks.DEEPSLATE_BRICKS)
 								: ci == 1 ? quoin(cell[0], y, cell[1]) : body(cell[0], y, cell[1]);
 						if (y == F1 || y == F2) {
-							s = b(Blocks.DEEPSLATE_BRICKS);
+							s = y == F1 ? b(Blocks.DEEPSLATE_BRICKS) : b(Blocks.POLISHED_ANDESITE);
 						}
 						set(cell[0], y, cell[1], s);
 					}
