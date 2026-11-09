@@ -93,7 +93,7 @@ public final class TreePineTiered implements Variant {
 
 		// ---- tiers: 3..5 clouds, at least 3 layers apart, the last one on the leader
 		int bLast = H - 1;
-		int nMax = Math.min(5, (int) ((bLast - FIRST) / 2.6) + 1);
+		int nMax = Math.min(5, (int) ((bLast - FIRST) / 3.0) + 1);
 		int n = nMax <= 3 ? 3 : 3 + r.nextInt(nMax - 2);
 		int[] yb = new int[n];
 		int[] th = new int[n];
