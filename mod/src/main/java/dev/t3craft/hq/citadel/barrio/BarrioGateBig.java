@@ -179,7 +179,7 @@ final class BarrioGateBig {
 		BlockState passageFloor(int u, int dv) {
 			int a = Math.abs(dv);
 			if (a <= 1) {
-				return a == 0 && u % 4 == 0 ? b(Blocks.DYED_TERRACOTTA.pick(col)) : c.accent();
+				return a == 0 && u % 4 == 0 ? b(Blocks.DYED_TERRACOTTA.pick(col)) : c.floor();
 			}
 			return u % 2 == 0 ? CALCITE : FOOT;
 		}
@@ -546,11 +546,11 @@ final class BarrioGateBig {
 		return zn.kind() == Kind.LOT && zn.lot() == l.id();
 	}
 
-	/** Three tones: the accent runner in the middle, deepslate tile either side of it, calcite and tile outside, a dashed line of the project's colour. */
+	/** Three tones: the courtyard's own floor (pink) as the runner in the middle, deepslate tile either side of it, calcite and tile outside, a dashed line of the project's colour. */
 	private static BlockState armFloor(CitadelCanvas c, int n, int bb, DyeColor col) {
 		int a = Math.abs(bb);
 		if (a <= 1) {
-			return a == 0 && n % 4 == 0 ? b(Blocks.DYED_TERRACOTTA.pick(col)) : c.accent();
+			return a == 0 && n % 4 == 0 ? b(Blocks.DYED_TERRACOTTA.pick(col)) : c.floor();
 		}
 		if (a == 2) {
 			return FOOT;
