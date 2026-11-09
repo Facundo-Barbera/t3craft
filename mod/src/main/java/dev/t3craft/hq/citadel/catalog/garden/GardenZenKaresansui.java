@@ -25,6 +25,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.AttachFace;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.SlabType;
 
 /**
  * A dry rock garden (karesansui) to sit and look at: a raised sea of raked gravel with a cherry-wood
@@ -63,8 +64,8 @@ public final class GardenZenKaresansui implements Variant {
 			Blocks.STONE_SLAB, Blocks.COBBLED_DEEPSLATE_SLAB};
 	private static final Block[] ROCK_STAIRS = {Blocks.STONE_STAIRS, Blocks.ANDESITE_STAIRS, Blocks.COBBLESTONE_STAIRS, Blocks.MOSSY_COBBLESTONE_STAIRS,
 			Blocks.STONE_STAIRS, Blocks.COBBLED_DEEPSLATE_STAIRS};
-	private static final Block[] STEP = {Blocks.ANDESITE, Blocks.POLISHED_ANDESITE, Blocks.STONE, Blocks.SMOOTH_STONE, Blocks.COBBLESTONE,
-			Blocks.MOSSY_COBBLESTONE, Blocks.ANDESITE, Blocks.STONE};
+	private static final Block[] STEP = {Blocks.ANDESITE, Blocks.POLISHED_ANDESITE, Blocks.TUFF, Blocks.COBBLED_DEEPSLATE, Blocks.SMOOTH_BASALT,
+			Blocks.POLISHED_DEEPSLATE, Blocks.ANDESITE, Blocks.TUFF};
 
 	private static final Direction[] LOCAL = {Direction.NORTH, Direction.EAST, Direction.SOUTH, Direction.WEST};
 
@@ -402,13 +403,17 @@ public final class GardenZenKaresansui implements Variant {
 				}
 			}
 			BlockState beam = log.setValue(BlockStateProperties.AXIS, Direction.Axis.X);
-			for (int u = Math.max(0, cu - 3); u <= Math.min(w - 1, cu + 3); u++) {
+			for (int u = cu - 2; u <= cu + 2; u++) {
 				set(u, 4, 0, beam);
 			}
+			// the lintel's ends overhang as top slabs, 3 blocks over the wall below (no headroom flag)
+			BlockState tip = slab(Blocks.CHERRY_SLAB).setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP);
+			set(cu - 3, 4, 0, tip);
+			set(cu + 3, 4, 0, tip);
 			if (h >= 6) {
-				set(cu, 5, 0, slab(Blocks.DEEPSLATE_TILE_SLAB));
-				set(cu - 1, 5, 0, slab(Blocks.DEEPSLATE_TILE_SLAB));
-				set(cu + 1, 5, 0, slab(Blocks.DEEPSLATE_TILE_SLAB));
+				for (int u = cu - 1; u <= cu + 1; u++) {
+					set(u, 5, 0, slab(Blocks.DEEPSLATE_TILE_SLAB));
+				}
 			}
 		}
 
@@ -814,16 +819,16 @@ public final class GardenZenKaresansui implements Variant {
 			BlockState groove;
 			switch (pal) {
 				case 0 -> {
-					ridge = b(Blocks.GRAVEL);
-					groove = slab(Blocks.SMOOTH_STONE_SLAB);
+					ridge = b(Blocks.CALCITE);
+					groove = slab(Blocks.ANDESITE_SLAB);
 				}
 				case 1 -> {
 					ridge = b(Blocks.SAND);
-					groove = slab(Blocks.SMOOTH_SANDSTONE_SLAB);
+					groove = slab(Blocks.STONE_SLAB);
 				}
 				default -> {
-					ridge = b(Blocks.CALCITE);
-					groove = slab(Blocks.POLISHED_ANDESITE_SLAB);
+					ridge = b(Blocks.GRAVEL);
+					groove = slab(Blocks.POLISHED_DIORITE_SLAB);
 				}
 			}
 			for (int u = 1; u < w - 1; u++) {
@@ -836,7 +841,7 @@ public final class GardenZenKaresansui implements Variant {
 					int bb = bOf(u, v);
 					float dd = dist[u][v];
 					boolean isRidge;
-					if (dd <= 4.4f) {
+					if (dd <= 3.4f) {
 						isRidge = Math.round(dd) % 2 == 1; // ripples round the islands
 					} else if (mode == 0) {
 						isRidge = Math.floorMod(bb + phase, 2) == 0; // lines along the veranda
