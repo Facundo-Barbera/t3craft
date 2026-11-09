@@ -113,7 +113,12 @@ public final class StallTeaBar implements Variant {
 		for (int i = 0; i <= k; i++) {
 			cols[i] = px0 + (span * i + k / 2) / k;
 		}
-		boolean flip = p.hash(3, 3, 3, 2) == 1;
+		java.util.Random r = p.rng(0x7EAB);
+		boolean flip = r.nextBoolean();
+		boolean hip = r.nextBoolean();
+		int mat = r.nextInt(3);
+		boolean cloth = r.nextBoolean();
+		int accent = r.nextInt(3);
 		int a = px0 + 1;
 		int z = px1 - 1;
 		int gap;
@@ -129,8 +134,7 @@ public final class StallTeaBar implements Variant {
 		if (gap > z) {
 			gap = a;
 		}
-		return new Geo(w, d, h, ox, px0, px1, cd, hd, bar, back, Math.max(0, h - 1 - EAVE), gap, cols, p.hash(1, 1, 1, 2) == 1, p.hash(2, 2, 2, 3), flip,
-				p.hash(4, 4, 4, 2) == 1, p.hash(5, 5, 5, 3));
+		return new Geo(w, d, h, ox, px0, px1, cd, hd, bar, back, Math.max(0, h - 1 - EAVE), gap, cols, hip, mat, flip, cloth, accent);
 	}
 
 	@Override
@@ -333,6 +337,7 @@ public final class StallTeaBar implements Variant {
 			case STONE -> {
 				p.set(c, u, 0, v, b(Blocks.POLISHED_DEEPSLATE)); // a fireproof flank
 				p.set(c, u, 1, v, b(Blocks.LANTERN));
+				p.set(c, u, 2, v, top(Blocks.CHERRY_SLAB)); // a board over the lantern: nobody stands on it
 			}
 			case HEARTH -> {
 				p.set(c, u, 0, v, b(Blocks.CAMPFIRE).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH).setValue(BlockStateProperties.LIT, true));
@@ -508,17 +513,12 @@ public final class StallTeaBar implements Variant {
 			boolean rafter = v == g.cd - 1 || g.cd >= 5 && v == g.cd / 2;
 			for (int u = a; u <= z; u++) {
 				if (g.cloth) {
-					p.set(c, u, 4, v, terracotta(((u + v) & 1) == 0 ? DyeColor.WHITE : DyeColor.LIGHT_GRAY));
+					p.set(c, u, 4, v, terracotta((u & 1) == 0 ? DyeColor.WHITE : DyeColor.LIGHT_GRAY));
 				} else if (rafter) {
 					p.set(c, u, 4, v, log(Blocks.CHERRY_LOG, Direction.Axis.X));
 				} else if (((u - g.px0) & 1) == 1) {
 					p.set(c, u, 4, v, slab(Blocks.CHERRY_SLAB)); // a slat
 				}
-			}
-		}
-		for (int u = a + 1; u <= z; u += 4) {
-			if (!g.isCol(u)) {
-				p.put(c, u, 3, 0, hanging(), CitadelCanvas.HANGING);
 			}
 		}
 		// tables
@@ -531,11 +531,13 @@ public final class StallTeaBar implements Variant {
 		} else if (m >= 4) {
 			tables.add(g.flip ? z - 2 : a + 1);
 		}
-		boolean cushionsFirst = p.hash(6, 6, 6, 2) == 0;
+		boolean[] seat = new boolean[g.w];
+		boolean cushionsFirst = p.rng(0x51).nextBoolean();
 		for (int i = 0; i < tables.size(); i++) {
 			int u0 = tables.get(i);
 			boolean cushions = (i == 0) == cushionsFirst;
 			for (int u = u0; u < u0 + 2; u++) {
+				seat[u] = true;
 				p.set(c, u, 0, vt, slab(Blocks.CHERRY_SLAB)); // the low table
 				if (cushions) {
 					p.set(c, u, 0, vt - 1, carpet(accent(g)));
@@ -544,6 +546,11 @@ public final class StallTeaBar implements Variant {
 					p.set(c, u, 0, vt - 1, stairs(Blocks.CHERRY_STAIRS, Direction.NORTH));
 					p.set(c, u, 0, vt + 1, stairs(Blocks.CHERRY_STAIRS, Direction.SOUTH));
 				}
+			}
+		}
+		for (int u = a + 1; u <= z; u += 3) { // lanterns on the front beam, never over a seat
+			if (!g.isCol(u) && !seat[u]) {
+				p.put(c, u, 3, 0, hanging(), CitadelCanvas.HANGING);
 			}
 		}
 	}
