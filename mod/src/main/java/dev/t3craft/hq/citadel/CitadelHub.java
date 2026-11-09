@@ -22,8 +22,10 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.StairBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.Half;
 import static dev.t3craft.hq.citadel.CitadelCanvas.AIR;
 import static dev.t3craft.hq.citadel.CitadelCanvas.DECOR;
 import static dev.t3craft.hq.citadel.CitadelCanvas.FOOT;
@@ -198,13 +200,52 @@ public final class CitadelHub {
 		for (BlockPos p : wall.cells()) {
 			c.fixture(p, c.style.screen());
 		}
-		for (int i = 0; i < wall.width(); i++) {
-			c.fixture(wall.origin().relative(wall.along(), i).below(), c.style.screenBase());
-		}
-		HubScreens.frame(c, -hx, -4, 4, 4);
+		threadWallFrame(c, wall);
 		c.anchor(Anchor.face(AnchorNames.THREAD_WALL, wall.origin(), wall.facing()));
 		c.anchor(Anchor.face(AnchorNames.THREAD_WALL_END, wall.origin().relative(wall.along(), wall.width() - 1).above(wall.height() - 1), wall.facing()));
 		c.anchor(Anchor.at(AnchorNames.THREAD_WALL_FRONT, new BlockPos(-(hx - 3), y0() + 1, 0), Direction.WEST));
+	}
+
+	/**
+	 * The kanban wall's frame (kit/thread-board): so the wall neither floats in the aisle nor sits borderless on the
+	 * outer wall. All in the wall's own plane except the cornice, which steps one cell out over the heads:
+	 * <ul>
+	 * <li>a sill of dark oak planks under the board (it replaces the old beam base);</li>
+	 * <li>a post of stripped dark oak (vertical log, on a polished blackstone foot) at each end, from the sill to the lintel, one cell outside the board;</li>
+	 * <li>a lintel of stripped dark oak along the top;</li>
+	 * <li>a cornice: upside-down dark oak stairs one cell in front of the lintel, with the back on the wall, notched at the three lit copper bulbs set flush in the lintel (the board's warning lights, lit faces to the aisle);</li>
+	 * </ul>
+	 * Nothing is lower than the sill, nor sticks out below head height: the aisle stays clear ({@code x = -hubX + 1} and up are free).
+	 */
+	static void threadWallFrame(CitadelCanvas c, HqGeometry.Surface wall) {
+		Direction along = wall.along();
+		Direction out = wall.facing();
+		int below = wall.origin().getY() - 1;
+		int top = wall.origin().getY() + wall.height();
+		BlockState planks = Blocks.DARK_OAK_PLANKS.defaultBlockState();
+		BlockState lamp = Blocks.COPPER_BULB.waxed().unaffected().defaultBlockState().setValue(BlockStateProperties.LIT, true);
+		BlockState cornice = Blocks.DARK_OAK_STAIRS.defaultBlockState()
+				.setValue(StairBlock.FACING, out.getOpposite()).setValue(StairBlock.HALF, Half.TOP);
+		for (int i = -1; i <= wall.width(); i++) {
+			BlockPos base = wall.origin().relative(along, i);
+			c.set(base.atY(below), planks);
+			if (i < 0 || i == wall.width()) {
+				c.set(base.atY(below + 1), CitadelCanvas.RIB); // polished blackstone foot: the post's steel-dark base
+				for (int y = below + 2; y < top; y++) {
+					c.set(base.atY(y), darkLog(Direction.Axis.Y));
+				}
+			}
+			boolean bulb = i == 1 || i == wall.width() / 2 || i == wall.width() - 2;
+			// the bulbs sit flush in the lintel, in a notch of the cornice, so their lit face shows to the aisle
+			c.set(base.atY(top), bulb ? lamp : darkLog(along.getAxis()));
+			if (!bulb) {
+				c.set(base.atY(top).relative(out), cornice);
+			}
+		}
+	}
+
+	private static BlockState darkLog(Direction.Axis axis) {
+		return Blocks.STRIPPED_DARK_OAK_LOG.defaultBlockState().setValue(BlockStateProperties.AXIS, axis);
 	}
 
 	/** Hologram column free over the centre; the beacon crowns the vault. */

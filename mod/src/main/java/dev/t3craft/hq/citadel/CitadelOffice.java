@@ -696,29 +696,27 @@ public final class CitadelOffice {
 		for (int dx = 2; dx <= 4; dx++) {
 			set(c, dx, y, 2, fence());
 		}
-		// rug in front of the consoles
+		// rug in front of the consoles (the player stands on it, facing south)
 		for (int dx = -3; dx <= 1; dx++) {
-			for (int dz = -2; dz <= 0; dz++) {
-				boolean edge = dx == -3 || dx == 1 || dz == -2;
+			for (int dz = -3; dz <= -1; dz++) {
+				boolean edge = dx == -3 || dx == 1 || dz == -3;
 				set(c, dx, y, dz, carpet(edge ? RUG_EDGE : RUG));
 			}
 		}
-		// the consoles: three console terminals (kit role CONSOLE; a lectern with the blocks module off) facing the
-		// player, who stands north of them; slabs between them with a lantern and a plant
-		for (int dx : new int[] {-3, -1, 1}) {
-			set(c, dx, y, 1, c.kit.console(Direction.NORTH));
+		// the consoles: a bank of three console terminals (kit role CONSOLE; a lectern with the blocks module off), side by side
+		// at dz = 0 so their screens read as one command desk, facing the player, who stands on the rug to the north. That leaves a
+		// 3-wide aisle (dz = 1..3) between the bank and the podiums, and dx = -3 free so the merge station can be reached. A slab with a
+		// lantern closes the bank on its east end.
+		for (int dx = -2; dx <= 0; dx++) {
+			set(c, dx, y, 0, c.kit.console(Direction.NORTH));
 		}
-		set(c, -2, y, 1, topSlab(Blocks.CHERRY_SLAB));
-		set(c, 0, y, 1, topSlab(Blocks.CHERRY_SLAB));
-		set(c, -2, y + 1, 1, lantern(false));
-		set(c, 0, y + 1, 1, Blocks.POTTED_BAMBOO.defaultBlockState());
-		// under the main screen: the decision podiums (five, west to east) and two barrels of storage
+		set(c, 1, y, 0, topSlab(Blocks.CHERRY_SLAB));
+		set(c, 1, y + 1, 0, lantern(false));
+		// under the main screen: the decision podiums (five, every other cell from west to east, so each one has a free cell beside
+		// it and its own display reads); plants in the gaps at the ends
 		podiums(c, y);
-		for (int dx = 2; dx <= 3; dx++) {
-			set(c, dx, y, 4, barrel());
-		}
-		set(c, -4, y, 4, Blocks.POTTED_FLOWERING_AZALEA.defaultBlockState());
-		set(c, 4, y, 4, Blocks.POTTED_BAMBOO.defaultBlockState());
+		set(c, -3, y, 4, Blocks.POTTED_FLOWERING_AZALEA.defaultBlockState());
+		set(c, 3, y, 4, Blocks.POTTED_BAMBOO.defaultBlockState());
 		// threads screen: 7 x 4 on the south wall, bound to the hub's feed
 		HqGeometry.Surface main = new HqGeometry.Surface(new BlockPos(CX() + 3, F2() + 3, CZ() + 4), Direction.WEST, Direction.NORTH, 7, 4);
 		CitadelHub.bigScreen(c, main, OFFICE, HqGenerator.hubBinding(c.layout), true);
@@ -730,7 +728,8 @@ public final class CitadelOffice {
 		CitadelHub.bigScreen(c, new HqGeometry.Surface(new BlockPos(CX() - 4, F2() + 3, CZ() - 1), Direction.NORTH, Direction.EAST, 3, 3),
 				"office_w1", projects.get(1), false);
 		for (int dz = -3; dz <= 3; dz++) {
-			if (dz != 0) {
+			// a free cell either side of the merge station (dz = 0), so it is not boxed in
+			if (Math.abs(dz) >= 2) {
 				set(c, -4, y, dz, chest(Direction.EAST, ChestType.SINGLE));
 			}
 		}
@@ -774,9 +773,10 @@ public final class CitadelOffice {
 		for (int dx = -3; dx <= 3; dx++) {
 			glowStrip(c, dx, y + 1, 3, c.kit.glowStrip(Direction.NORTH, true, true));
 		}
-		// under the project screens (west wall): the cell below each screen's bottom row, over the chests
+		// under the project screens (west wall): the wall row's cell below the screens holds their base beam, so the strip hugs its
+		// front, one cell into the room (dx = -3), like the main screen's
 		for (int dz = -3; dz <= 3; dz++) {
-			glowStrip(c, -4, y + 1, dz, c.kit.glowStrip(Direction.EAST, true, true));
+			glowStrip(c, -3, y + 1, dz, c.kit.glowStrip(Direction.EAST, true, true));
 		}
 		// the flights, along the wall: A rises south on the west wall (dx = -4), B rises north on the east wall (dx = 4)
 		for (int i = 0; i < FH - 1; i++) {
@@ -830,7 +830,7 @@ public final class CitadelOffice {
 
 	/**
 	 * The decision podiums: a row of {@link #PODIUMS} along the south wall under the threads screen, fronts to the north
-	 * (to the player who comes from the consoles), at {@code dx = -3..1}. Podium {@code i} is bound {@code board:<i>} (anchor
+	 * (to the player who comes from the consoles), at {@code dx = -4, -2, 0, 2, 4}. Podium {@code i} is bound {@code board:<i>} (anchor
 	 * {@link AnchorNames#podium}): the i-th most urgent thread that needs the player, lit and with a bell and a {@code !} when
 	 * it waits; a click opens it to answer the pending question or permission. So the office is where the player decides, and the
 	 * lamps of {@link #attentionBoard} keep ranks 6 to 10 on the wall. A lectern in the plan: the blocks module swaps each one for
@@ -839,7 +839,7 @@ public final class CitadelOffice {
 	 */
 	private static void podiums(CitadelCanvas c, int y) {
 		for (int i = 0; i < PODIUMS; i++) {
-			BlockPos p = new BlockPos(CX() - 3 + i, y, CZ() + 4);
+			BlockPos p = new BlockPos(CX() - 4 + 2 * i, y, CZ() + 4);
 			c.fixture(p, facing(Blocks.LECTERN, Direction.NORTH));
 			c.anchor(Anchor.face(AnchorNames.podium(i), p, Direction.NORTH));
 		}
@@ -973,7 +973,7 @@ public final class CitadelOffice {
 
 	/** {@code office}: in front of the consoles, facing the threads screen. {@code office_balcony}: the balcony, facing the hub. */
 	public static void anchors(CitadelCanvas c) {
-		c.anchor(Anchor.at(OFFICE, new BlockPos(CX(), F2() + 1, CZ()), Direction.SOUTH));
+		c.anchor(Anchor.at(OFFICE, new BlockPos(CX() - 1, F2() + 1, CZ() - 1), Direction.SOUTH));
 		c.anchor(Anchor.at(OFFICE_BALCONY, new BlockPos(CX(), F2() + 1, CZ() - 7), Direction.NORTH));
 	}
 }
