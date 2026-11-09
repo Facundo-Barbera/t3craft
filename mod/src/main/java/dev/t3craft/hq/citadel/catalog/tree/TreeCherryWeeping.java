@@ -33,6 +33,9 @@ public final class TreeCherryWeeping implements Variant {
 	/** The lowest y a limb may take: 3 blocks of headroom under the rim wherever you can stand. */
 	private static final int CLEAR = 4;
 
+	/** A strand that steps outwards needs a 3-tall leaf beside it (no ledge to stand on): that reads as a 2-wide column, so it is off. */
+	private static final boolean DRIFT = false;
+
 	@Override
 	public String id() {
 		return "tree_cherry_weeping";
@@ -237,7 +240,7 @@ public final class TreeCherryWeeping implements Variant {
 		}
 
 		// ---- curtains: single strands (a checker, never face to face) from the sheet, none under the crown
-		int par = r.nextInt(3);
+		int par = r.nextInt(4); // lattice (u + 2v) mod 4: strands never touch, not even on a diagonal
 		boolean[] strand = new boolean[w * d];
 		for (int v = 0; v < d; v++) {
 			for (int u = 0; u < w; u++) {
@@ -257,7 +260,7 @@ public final class TreeCherryWeeping implements Variant {
 						break;
 					}
 				}
-				if (Math.floorMod(u + 2 * v, 3) != par) {
+				if (Math.floorMod(u + 2 * v, 4) != par) {
 					// between the strands the hem only has short drips, so its edge is ragged (3+ blocks stay free under it)
 					if (f > 0.45 && y0c > CLEAR + 1 && t.empty(u, y0c - 1, v) && t.hash(u, 9, v, 100) < 38) {
 						t.leaf(u, y0c - 1, v, TreeKit.SAKURA.a());
@@ -295,7 +298,7 @@ public final class TreeCherryWeeping implements Variant {
 						break;
 					}
 					t.leaf(su, y, sv, y == bottom && t.hash(su, y, sv, 100) < 40 ? TreeKit.SAKURA.b() : TreeKit.SAKURA.a());
-					if (k == kAt && y >= CLEAR && y > bottom + 1 && t.empty(su + ku, y, sv + kv) && t.empty(su + ku, y - 1, sv + kv)
+					if (DRIFT && k == kAt && y >= CLEAR && y > bottom + 1 && t.empty(su + ku, y, sv + kv) && t.empty(su + ku, y - 1, sv + kv)
 							&& (ku != 0 || kv != 0)) {
 						su += ku; // the step is a leaf beside the last one, face-connected
 						sv += kv;
