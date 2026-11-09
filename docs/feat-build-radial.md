@@ -262,3 +262,136 @@ fill ≤ `foundationBlocksPerTick`).
   share a span. A span crossing a ring boundary only works its columns within the builder limit.
 - `buildNearPlayer.radius` (48) still decides whether a player counts as in the build; the gating holds the
   build to the ring of the nearest pending column anyway, so a far centre no longer spreads the work.
+
+---
+
+# fix/build-walkable: the floor outruns the player
+
+## What Facundo saw and asked for (2026-11-09)
+"Al entrar al HQ siguen construyendo de abajo hacia arriba." The test: enter the freshly created HQ (void
+world) and cross the map from one side to the other in a straight line **without ever falling into the
+void**. Before this branch that failed.
+
+## Which path the HQ world takes
+- **The void HQ world is the demo world.** `DemoClient` → `DemoBuildRun` → `BuildersClient.build` →
+  `BuildManager.submit(…, BuildPlanner.CREW, focus)` → `BuildJob` → `RadialCursor`. With `build.order: "radial"`
+  (default) and more than one part, `DemoBuildRun` already merges every part (void island included) into one
+  plan, built by one crew and one `RadialCursor`. Updates of the layout (roster change, layout pack reload)
+  go the same way (`startQuietAsync` → `DemoBuildRun`): several parts are merged, a single part above 256
+  entries is a radial job by itself (`BuildJob`).
+- **`HqConstruction` / `HqRuntime` is not involved there.** It builds the HQ on a *site* (`/t3craft site pick`
+  in a normal world, real terrain under it): one site expansion per wing (the site journal keeps one
+  snapshot per expansion, and `site undo` / `resume` work on the top one), plus in-place updates. Its crew
+  jobs (`CrewBridge`) are radial inside each wing in creative and get the corridor and the primer below.
+  Merging the expansions into one job would need the site journal to build several expansions as one
+  (snapshots, resume, undo); that is **not done here** (see Pending).
+
+So the old order was not what made the player fall. Two things did:
+1. **The floor was held to the builders.** The ground stream may go at most `foundationRingsAhead` (1) ring
+   beyond the front ring, which is the ring of the nearest column with unfinished work. Where buildings
+   stand, that front moves at the builders' pace. The floor then reached ≈ 10 blocks around the centre, and
+   the centre was re-ordered (off-thread) only after the player had moved 4 blocks, at most every 0.75 s.
+   A player walking at 4.3 b/s, or running at 5.6, reached the edge.
+2. **Nothing was placed while the plan was analysed.** For the whole HQ with its island (≈ 400 000 entries),
+   the `RadialCursor` analysis runs off-thread and takes about a second or more. Until it finished, the job
+   placed nothing.
+
+## What changed
+### The corridor (`RadialCursor.tickCorridor`, the first stream of every radial tick)
+- **Velocity.** `BuildManager.focusOf` now hands over the player's exact position, not its block
+  (`BuildJob.focusAt`, rotated back into plan coordinates). `RadialCursor.track` smooths the velocity from
+  that position every tick (time constant 150 ms, about 3 ticks). A teleport (> 30 b/s), a gap of more than
+  1 s, or nobody in the build resets it.
+- **Shape.**
+  - Every tick it covers the ground of the columns within 2 blocks of the player's feet.
+  - While the player moves (> 1 b/s) it also covers a corridor `corridorWidth` wide (7) reaching
+    `corridorLength` (20) blocks ahead along the velocity.
+  - The scan samples every half block along the way and outwards from the middle line, so nearest goes
+    first and a diagonal leaves no holes.
+  - Turning re-aims it within a few ticks, because it is recomputed every tick from the current velocity.
+- **What it places.** Only *ground*: the walkable surface and the support layer under it, exactly the
+  entries the ground stream would place. It never places artificial floors, builder blocks or fill.
+- **Priority.**
+  - There is no ring limit.
+  - The corridor runs before the ground, builder and fill streams.
+  - Its budget is `corridorBlocksPerTick` (64) within `corridorMsPerTick` (3 ms). The MSPT / FPS throttle
+    does not lower it, because it is the one thing that must keep up.
+  - What it places is taken from the shared foundation budget, so ground and fill get that much less in
+    the same tick.
+- **Cost.** About 650 hash lookups per tick with the defaults, plus the placements. No world reads: the sink
+  skips cells that are already right. Timer: `build.radial_corridor`.
+- **Outside the corridor, nothing changes.** Rings, the front ring, builders and fill work exactly as in
+  fix/build-radial-tune.
+
+### The start-up primer (`GroundPrimer`, `BuildJob.tickPrimer`)
+- **When.** A radial job that still plans (`DeferredCursor`) also starts a tiny plan on another worker
+  (`Offload`). Timer: `build.radial_primer_async`.
+- **What it plans.**
+  - One pass over the plan.
+  - The columns within 24 blocks of where the player stood when the job was submitted; with no player,
+    the hub or the middle of the footprint.
+  - Each column's ground: the top two entries of its bottom stack of plain cubes that are terrain,
+    hidden, or a surface. A wall stops the stack.
+  - Nearest column first.
+- **While the radial cursor is not ready.**
+  - It places at `corridorBlocksPerTick + groundBlocksPerTick` (96) per tick within `corridorMsPerTick`.
+    Timer: `build.radial_primer`.
+  - No builder animates it (`frontOf` −1).
+- **When the cursor arrives.** It takes over: its streams find those cells already right and skip them.
+
+### Every path is ground-first (checked)
+| path | order of the base |
+|---|---|
+| demo / HQ void world, first build | `RadialCursor` (merged plan): corridor + primer, then ground rings, builders, fill behind |
+| demo updates (diff) | merged (several parts) or one radial job (> 256 entries); ≤ 256: `CrewCursor` (a desk or a sign) |
+| site HQ wings (`HqConstruction` → `CrewBridge.siteBuilder`), creative | one radial job per wing (corridor + primer) |
+| site HQ updates (`CrewBridge.writer`) | one radial job (> 256 entries) |
+| site HQ updates with no crew (`PacedHqWriter`) | **changed**: rings of 5 blocks around the nearest player, bottom-up inside a ring (was bottom layer first over the whole update) |
+| `build.order: "parts"` (explicit fallback) | part by part (`CrewCursor` / `FoundationCursor`), unchanged on purpose |
+| survival (charged jobs) | crew path, as documented in feat/build-radial |
+| `DeferredCursor` planning failure | layer order (`LayeredOrder`), only after an exception, logged |
+| site builder with no crew (`SiteRuntime.paced`, player in another dimension) | layers, unchanged (nobody walks there) |
+
+## Pace (estimates, not measured in game)
+| | value |
+|---|---|
+| player | walk 4.3 b/s, sprint 5.6 b/s (sprint-jump ≈ 7) |
+| needed to keep up, 7 wide | 5.6 b/s × 7 columns × 2 entries ≈ 78 entries/s ≈ **4 entries/tick** |
+| corridor budget | 64 entries/tick = 32 columns/tick ≈ **4.5 blocks of 7-wide corridor per tick ≈ 90 b/s** |
+| corridor from scratch (20 × 7 + feet) | ≈ 180 columns ≈ 360 entries ≈ **6 ticks ≈ 0.3 s** |
+| after a turn | velocity re-aimed in ≈ 3–6 ticks, then the first blocks of the new corridor in the same tick; the whole new corridor in ≈ 5 ticks; the player has moved ≈ 2–3 blocks meanwhile, inside the 2-block feet disk plus the ring-0/1 ground |
+| start-up primer | ≈ 1 800 columns ≈ 3 600 entries at 96/tick: under the feet in the **first tick** after the primer is planned (a few ms after the job is submitted), radius 10 in ≈ 0.3 s, radius 24 in ≈ 2 s |
+
+Speed ratio: the corridor can lay the floor **≈ 15–20×** faster than a running player advances (90 b/s
+against 5.6 b/s), and it always stays 20 blocks ahead while the player moves. With every throttle at its
+worst, the time cap of 3 ms still fits ≈ 150+ placements at the measured 10–20 µs each.
+
+## Config (additive)
+```json
+"build": { "corridorLength": 20, "corridorWidth": 7, "corridorBlocksPerTick": 64, "corridorMsPerTick": 3 }
+```
+- `corridorLength`: 0–64 blocks ahead. 0 keeps only the 2-block disk under the feet.
+- `corridorWidth`: 1–15 blocks.
+- `corridorBlocksPerTick`: 0–4096; 0 turns off both the corridor and the primer's share.
+- `corridorMsPerTick`: 0.1–20 ms.
+
+All four are read every tick (`/t3craft debug build-tuning reload`). The ring settings are unchanged.
+
+## PerfStats steps (new)
+| step | thread |
+|---|---|
+| `build.radial_corridor` | server, the corridor of one radial tick |
+| `build.radial_primer` | server, the start-up primer of a radial job still planning |
+| `build.radial_primer_async` | async, the primer's plan |
+
+## Pending / not done
+- **Not compiled or tried in game:** the coordinator compiles.
+- **Site HQ (`HqConstruction`): the wings are still one site expansion and one job each.** Each wing is
+  radial inside itself and has the corridor and the primer, but the wings are not merged into one plan.
+  Merging them needs the site to build several expansions as one: a journal with several BUILDING
+  expansions, `resume` and `undo` over all of them, and the snapshots of overlapping aprons. On a site
+  there is real terrain under the player, so the walk test does not apply there.
+- The primer is centred where the player stood when the job was submitted; it does not follow the player.
+  The corridor takes over as soon as the radial plan is ready.
+- The corridor does not look at heights: a player flying above the build still gets the ground ahead of
+  them.
