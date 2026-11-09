@@ -16,6 +16,9 @@ final class CatalogEntries {
 
 	private static final Variant[] ENTRIES = {
 			new dev.t3craft.hq.citadel.catalog.house.HouseTimberCottage(), // house_timber_cottage
+			new dev.t3craft.hq.citadel.catalog.house.HouseTowerBridge(), // house_tower_bridge
+			new dev.t3craft.hq.citadel.catalog.house.HouseTowerLookout(), // house_tower_lookout
+			new dev.t3craft.hq.citadel.catalog.house.HouseTowerStair(), // house_tower_stair
 			new dev.t3craft.hq.citadel.catalog.lamp.LampCherryPost(), // lamp_cherry_post
 	};
 
