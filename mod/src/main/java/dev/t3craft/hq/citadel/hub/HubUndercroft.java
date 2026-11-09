@@ -358,6 +358,57 @@ public final class HubUndercroft {
 				}
 			}
 			frontDesk(c, sx);
+			islandChests(c, sx, lay);
+			carrels(c, sx);
+		}
+	}
+
+	/**
+	 * The archive chests (struct/hub4): a row of chests along the foot of every shelf island, on the aisle side, facing away from the
+	 * shelves, so the islands are not only walls of books: the chest is where the file lives. The middle cell of each segment stays
+	 * free, it is where the lectern stands (one cell further out).
+	 */
+	private static void islandChests(CitadelCanvas c, int sx, int[] lay) {
+		Direction away = sx > 0 ? Direction.EAST : Direction.WEST;
+		for (int sz = -1; sz <= 1; sz += 2) {
+			for (int start = lay[2]; start <= HubDims.INNER() - lay[1]; start += lay[3]) {
+				for (int k = 0; k < lay[1]; k++) {
+					if (k != lay[1] / 2) {
+						put(c, sx * (lay[0] + 2), sy(), sz * (start + k),
+								Blocks.CHEST.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, away));
+					}
+				}
+			}
+		}
+	}
+
+	/**
+	 * The reading corners (struct/hub4): in the open space between the index table and the first islands, on both sides of the
+	 * cross lane, four carrels: a red rug, a table of three (a lantern on the middle), a chair on each long side, a lectern at the end
+	 * facing the table. The lane {@code |z| <= 1} (three wide) stays free.
+	 */
+	private static void carrels(CitadelCanvas c, int sx) {
+		int sy = sy();
+		Direction toCentre = sx > 0 ? Direction.WEST : Direction.EAST;
+		for (int sz = -1; sz <= 1; sz += 2) {
+			Direction out = sz > 0 ? Direction.SOUTH : Direction.NORTH;
+			for (int x = 6; x <= 10; x++) {
+				for (int dz = 2; dz <= 4; dz++) {
+					int xx = sx * x;
+					int zz = sz * dz;
+					if (inside(c, xx, zz) && !edge(c, xx, zz)) {
+						c.set(xx, fy(), zz, CitadelCanvas.terracotta(DyeColor.RED));
+					}
+				}
+			}
+			for (int x = 7; x <= 9; x++) {
+				put(c, sx * x, sy, sz * 3, HubBlocks.slabTop(Blocks.DARK_OAK_SLAB));
+			}
+			put(c, sx * 8, sy + 1, sz * 3, Blocks.LANTERN.defaultBlockState());
+			put(c, sx * 7, sy, sz * 4, stairs(Blocks.DARK_OAK_STAIRS, out));
+			put(c, sx * 9, sy, sz * 4, stairs(Blocks.DARK_OAK_STAIRS, out));
+			put(c, sx * 8, sy, sz * 2, stairs(Blocks.DARK_OAK_STAIRS, out.getOpposite()));
+			put(c, sx * 10, sy, sz * 3, Blocks.LECTERN.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, toCentre));
 		}
 	}
 

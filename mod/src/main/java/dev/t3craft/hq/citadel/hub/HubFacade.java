@@ -10,6 +10,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import static dev.t3craft.hq.citadel.CitadelCanvas.CALCITE;
 import static dev.t3craft.hq.citadel.CitadelCanvas.FOOT;
+import static dev.t3craft.hq.citadel.CitadelCanvas.PLANKS;
 import static dev.t3craft.hq.citadel.CitadelCanvas.RIB;
 import static dev.t3craft.hq.citadel.CitadelCanvas.y0;
 import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
@@ -61,10 +62,215 @@ public final class HubFacade {
 		}
 	}
 
-	/** Whether the wall column has a window (outer neighbours get a sill and a lintel course). */
+	/**
+	 * Whether the wall column has a window of the original wall (outer neighbours get a sill and a lintel course from
+	 * {@code HubExterior}). From scale 2 the tall facade draws its own sills and hoods ({@link #paintOuter}), so this is false.
+	 */
 	static boolean hasWindow(int x, int z) {
+		if (HubDims.TALL()) {
+			return false;
+		}
 		boolean naveEnd = Math.abs(x) <= HubDims.NAVE_HALF() && Math.abs(z) >= HubDims.INNER();
 		return !naveEnd && !pier(x, z) && windowAllowed(x, z);
+	}
+
+	// ------------------------------------------------------------------ the tall facade (struct/hub4)
+
+	/** Axis the face runs along: z on the east and west faces, x elsewhere. */
+	private static Direction.Axis faceAxis(int x, int z) {
+		return Math.abs(x) >= Math.abs(z) ? Direction.Axis.Z : Direction.Axis.X;
+	}
+
+	private static boolean naveEnd(int x, int z) {
+		return Math.abs(x) <= HubDims.NAVE_HALF() && Math.abs(z) >= HubDims.INNER();
+	}
+
+	/** Whether the column is inside the span of a window of its bay (any row). */
+	private static boolean winSpan(int x, int z, boolean naveEnd) {
+		if (naveEnd) {
+			int ax = Math.abs(x);
+			return ax >= HubDims.END_WIN_LO() && ax <= HubDims.END_WIN_HI();
+		}
+		int u = bay(x, z);
+		return windowAllowed(x, z) && u >= 2 && u <= HubDims.PIER_PERIOD() - 2;
+	}
+
+	/** Half the window's width: 2 (5 wide) in a bay of 8; 1 (3 wide) beside the portal. */
+	private static int winHalf(boolean naveEnd) {
+		return naveEnd ? (HubDims.END_WIN_HI() - HubDims.END_WIN_LO()) / 2 : (HubDims.PIER_PERIOD() - 4) / 2;
+	}
+
+	/** Distance of the column from the middle of its window (0 = the mullion's column). */
+	private static int winOff(int x, int z, boolean naveEnd) {
+		if (naveEnd) {
+			return Math.abs(Math.abs(x) - (HubDims.END_WIN_LO() + HubDims.END_WIN_HI()) / 2);
+		}
+		return Math.abs(bay(x, z) - HubDims.PIER_PERIOD() / 2);
+	}
+
+	/** Whether the cell is open (glass or mullion): a window with a stepped head, narrower in its top row. */
+	private static boolean winOpen(int x, int z, int r, boolean naveEnd) {
+		if (r < HubDims.WIN_SILL() || r > HubDims.WIN_TOP() || !winSpan(x, z, naveEnd)) {
+			return false;
+		}
+		int half = winHalf(naveEnd);
+		int inset = Math.max(0, (half + 1) / 2 - (HubDims.WIN_TOP() - r));
+		return winOff(x, z, naveEnd) <= half - inset;
+	}
+
+	/** A bay with no window to hang a tapestry in: the blind bays of the east and west faces and the middle of the north end. */
+	private static boolean blindBay(int x, int z, boolean naveEnd) {
+		if (naveEnd) {
+			return z < 0 && Math.abs(x) <= HubDims.PIER_PERIOD() / 2 - 1;
+		}
+		int u = bay(x, z);
+		return !windowAllowed(x, z) && u >= 2 && u <= HubDims.PIER_PERIOD() - 2;
+	}
+
+	/** One cell of the tall wall: row {@code r} above the podium of the column {@code (x, z)}. */
+	private static BlockState tallCell(int x, int y, int z, int r, boolean naveEnd) {
+		int h = HubDims.WALL_H();
+		int pl = HubDims.PLINTH();
+		int p = HubDims.PIER_PERIOD();
+		Direction.Axis along = faceAxis(x, z);
+		if (r < pl) {
+			return HubBlocks.darkBase(x, y, z); // the dark plinth: deepslate variants
+		}
+		if (r == pl) {
+			return RIB; // its polished cap course, the sill line of the windows
+		}
+		if (r == h) {
+			return naveEnd ? RIB : CALCITE;
+		}
+		if (pier(x, z)) {
+			return r == pl + 1 ? RIB : r == h - 1 ? CALCITE : HubBlocks.strippedLog(Direction.Axis.Y);
+		}
+		if (winOpen(x, z, r, naveEnd)) {
+			int top = HubDims.WIN_TOP();
+			if (!naveEnd && winOff(x, z, naveEnd) == 0) {
+				return HubBlocks.strippedLog(Direction.Axis.Y); // the mullion
+			}
+			if (r == top - 2) {
+				return HubBlocks.strippedLog(along); // the transom
+			}
+			return r > top - 2 ? HubBlocks.pane(bayColor(x, z)) : Blocks.GLASS_PANE.defaultBlockState();
+		}
+		if (r == h - 2) {
+			// the impost band over the heads of the windows, with a keystone in the middle of each one
+			boolean key = winSpan(x, z, naveEnd) && winOff(x, z, naveEnd) == 0;
+			return key ? Blocks.CHISELED_STONE_BRICKS.defaultBlockState() : HubBlocks.strippedLog(along);
+		}
+		if (blindBay(x, z, naveEnd) && r >= HubDims.WIN_SILL() && r <= HubDims.WIN_TOP()) {
+			return tapestry(naveEnd ? Math.abs(x) : Math.abs(bay(x, z) - p / 2), naveEnd ? p / 2 - 1 : (p - 4) / 2, r, along);
+		}
+		return PLANKS;
+	}
+
+	/**
+	 * A tapestry hung in a blind bay: a frame of stripped cherry, a red field with a gold stripe down the middle and a gold hem,
+	 * so the long walls behind the screens read as bays and not as a blank field.
+	 */
+	private static BlockState tapestry(int off, int half, int r, Direction.Axis along) {
+		if (r == HubDims.WIN_SILL() || r == HubDims.WIN_TOP()) {
+			return HubBlocks.strippedLog(along);
+		}
+		if (off == half) {
+			return HubBlocks.strippedLog(Direction.Axis.Y);
+		}
+		boolean gold = off == 0 || r == HubDims.WIN_SILL() + 1;
+		return Blocks.WOOL.pick(gold ? DyeColor.YELLOW : DyeColor.RED).defaultBlockState();
+	}
+
+	/**
+	 * What the tall facade adds on the cells outside the wall, after {@code HubExterior.paint} (it paints on top of the patio and
+	 * the bridges' sides): a stepped cornice (a cherry corbel course under the dark one), a sill and a stone hood over each window,
+	 * and a calcite pilaster with a capital on the piers of the flat faces and the end walls. Nothing is put where a cell is
+	 * already taken (buttresses, towers) or beside a bridge.
+	 */
+	public static void paintOuter(CitadelCanvas c) {
+		if (!HubDims.TALL()) {
+			return;
+		}
+		int y0 = y0();
+		int h = HubDims.WALL_H();
+		int pl = HubDims.PLINTH();
+		for (int x = -HubDims.SCAN(); x <= HubDims.SCAN(); x++) {
+			for (int z = -HubDims.SCAN(); z <= HubDims.SCAN(); z++) {
+				if (c.zoneAt(x, z).kind() != Kind.HUB_WALL) {
+					continue;
+				}
+				boolean end = naveEnd(x, z);
+				boolean flat = Math.abs(x) == HubDims.FACE() || Math.abs(z) == HubDims.FACE();
+				for (Direction d : Direction.Plane.HORIZONTAL) {
+					int nx = x + d.getStepX();
+					int nz = z + d.getStepZ();
+					Kind k = c.zoneAt(nx, nz).kind();
+					if (k == Kind.HUB || k == Kind.HUB_WALL || k == Kind.NONE || k == Kind.BRIDGE) {
+						continue;
+					}
+					Direction back = d.getOpposite();
+					boolean pier = pier(x, z);
+					if (pier && flat && !corner(x, z) && c.at(nx, y0 + 1, nz) == null && !(end && Math.abs(x) < HubDims.NAVE_HALF())) {
+						outerPilaster(c, nx, nz, back);
+						continue;
+					}
+					if (winSpan(x, z, end) && winOpen(x, z, HubDims.WIN_SILL(), end)) {
+						// sill under the window, hood of stone brick stairs over its head
+						if (c.at(nx, y0 + pl, nz) == null) {
+							c.set(nx, y0 + pl, nz, HubBlocks.stoneSlab(true));
+						}
+						if (c.at(nx, y0 + h - 2, nz) == null) {
+							c.set(nx, y0 + h - 2, nz, HubBlocks.stoneStairs(back, true));
+						}
+					}
+					if (!pier) {
+						// the corbel course under the cornice: cherry stairs upside down (the dark course over it is HubExterior's)
+						if (c.at(nx, y0 + h - 1, nz) == null) {
+							c.set(nx, y0 + h - 1, nz, HubBlocks.stairsTop(Blocks.CHERRY_STAIRS, back));
+						}
+						if (end && c.at(nx, y0 + h, nz) == null) {
+							c.set(nx, y0 + h, nz, HubBlocks.stairsTop(Blocks.DEEPSLATE_TILE_STAIRS, back));
+						}
+					}
+				}
+			}
+		}
+	}
+
+	/** A calcite pilaster one cell out from a pier: dark foot to the podium, a polished course, calcite shaft, chiselled capital, corbel. */
+	private static void outerPilaster(CitadelCanvas c, int nx, int nz, Direction back) {
+		int y0 = y0();
+		int h = HubDims.WALL_H();
+		int pl = HubDims.PLINTH();
+		for (int y = 1; y < y0 + pl; y++) {
+			c.set(nx, y, nz, HubBlocks.darkBase(nx, y, nz));
+		}
+		c.set(nx, y0 + pl, nz, RIB);
+		c.set(nx, y0 + pl + 1, nz, RIB);
+		for (int r = pl + 2; r <= h - 2; r++) {
+			c.set(nx, y0 + r, nz, CALCITE);
+		}
+		c.set(nx, y0 + h - 1, nz, Blocks.CHISELED_STONE_BRICKS.defaultBlockState());
+		c.set(nx, y0 + h, nz, HubBlocks.stairsTop(Blocks.DEEPSLATE_TILE_STAIRS, back));
+	}
+
+	/**
+	 * Dresses the inside of the walls (before the furniture): a pilaster against the wall at each corner of the nave's end walls, where the
+	 * colonnade meets them, so the bays between piers read inside as they do outside. Only free cells.
+	 */
+	public static void dress(CitadelCanvas c) {
+		if (!HubDims.TALL()) {
+			return;
+		}
+		int z = HubDims.INNER();
+		for (int sx = -1; sx <= 1; sx += 2) {
+			for (int sz = -1; sz <= 1; sz += 2) {
+				int x = sx * HubDims.NAVE_HALF();
+				if (c.zoneAt(x, sz * z).kind() == Kind.HUB && c.at(x, y0() + 1, sz * z) == null) {
+					HubInterior.pier(c, x, sz * z);
+				}
+			}
+		}
 	}
 
 	/** One column of the outer wall (the zone map says this column is {@code HUB_WALL}). */
@@ -81,6 +287,12 @@ public final class HubFacade {
 
 	/** Footing (stone-brick course), panels, windows and piers up to the cornice. */
 	static void column(CitadelCanvas c, int x, int z, boolean naveEnd) {
+		if (HubDims.TALL()) {
+			for (int r = 1; r <= HubDims.WALL_H(); r++) {
+				c.set(x, y0() + r, z, tallCell(x, y0() + r, z, r, naveEnd));
+			}
+			return;
+		}
 		boolean pier = !naveEnd && pier(x, z);
 		int u = bay(x, z);
 		boolean win = !naveEnd && !pier && windowAllowed(x, z);
@@ -187,6 +399,9 @@ public final class HubFacade {
 		double dy = y - CitadelHub.spring();
 		double r = Math.hypot(x, dy);
 		RingCampusGeometry.Dims d = CitadelCanvas.dims();
+		if (HubDims.TALL()) {
+			return traceryRose(x, dy, r, d.sd(1) / 2.0);
+		}
 		if (r > d.sd(3.7)) {
 			return CALCITE;
 		}
@@ -207,13 +422,47 @@ public final class HubFacade {
 		return HubBlocks.glass(Math.floorMod((int) Math.floor(sector), 2) == 0 ? DyeColor.LIGHT_BLUE : DyeColor.MAGENTA);
 	}
 
-	/** The rim of the rose window stands out one block from the gable (outside the wall). */
+	/**
+	 * The rose of the tall facade (struct/hub4), with tracery: a yellow eye, a calcite ring, eight petals (pink and orange) split by
+	 * calcite spokes, a second ring and sixteen outer lights (blue and magenta) split by finer bars, inside the stone-brick rim.
+	 * {@code f} is the scale of the original (1 at 200); the bars are one block thick whatever the radius.
+	 */
+	private static BlockState traceryRose(int x, double dy, double r, double f) {
+		if (r > 7.4 * f) {
+			return CALCITE;
+		}
+		if (r > 5.6 * f) {
+			return Blocks.CHISELED_STONE_BRICKS.defaultBlockState();
+		}
+		if (r <= 1.5 * f) {
+			return HubBlocks.glass(DyeColor.YELLOW);
+		}
+		if (r <= 2.2 * f || (r > 3.6 * f && r <= 4.3 * f)) {
+			return CALCITE;
+		}
+		boolean inner = r <= 3.6 * f;
+		int n = inner ? 8 : 16;
+		double sector = Math.atan2(dy, x) / (2 * Math.PI / n);
+		double bar = r * Math.abs(sector - Math.rint(sector)) * (2 * Math.PI / n);
+		if (bar < (inner ? 0.62 : 0.55)) {
+			return CALCITE;
+		}
+		boolean even = Math.floorMod((int) Math.floor(sector), 2) == 0;
+		return HubBlocks.glass(inner ? (even ? DyeColor.PINK : DyeColor.ORANGE) : (even ? DyeColor.LIGHT_BLUE : DyeColor.MAGENTA));
+	}
+
+	/**
+	 * The rim of the rose window stands out one block from the gable (outside the wall). In the tall facade the tracery stands out too
+	 * (the calcite rings and bars one block proud of the glass), so the rose has depth and not only colour.
+	 */
 	static void roseRim(CitadelCanvas c, int x, int z) {
 		int sz = z > 0 ? 1 : -1;
 		for (int y = CitadelHub.aisleTop() + 1; y <= CitadelHub.vaultY(Math.abs(x)); y++) {
 			double r = Math.hypot(x, y - CitadelHub.spring());
 			if (r > c.sd(2.8) && r <= c.sd(3.7)) {
 				c.set(x, y, z + sz, Blocks.CHISELED_STONE_BRICKS.defaultBlockState());
+			} else if (HubDims.TALL() && r <= c.sd(2.8) && rose(x, y) == CALCITE) {
+				c.set(x, y, z + sz, CALCITE);
 			}
 		}
 	}

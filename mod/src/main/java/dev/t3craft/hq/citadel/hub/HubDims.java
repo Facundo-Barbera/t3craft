@@ -66,6 +66,43 @@ final class HubDims {
 		return s(5);
 	}
 
+	// ---- the facade (struct/hub4): from scale 2 the outer wall is a flat cherry plank field with tall windows
+	/** Whether the tall facade is drawn (from scale 2; at scale 1 the wall is the original one, block by block). */
+	static boolean TALL() {
+		return d().s(1) > 1;
+	}
+
+	/** Rows of the outer wall above the podium: y0 + 1 to the aisle top (8 at scale 1, 13 at 200). */
+	static int WALL_H() {
+		return CitadelHub.aisleTop() - CitadelCanvas.y0();
+	}
+
+	/** Rows of the dark plinth (zocalo) of the wall, the last one a polished course (3 at 200). */
+	static int PLINTH() {
+		return CitadelHub.hy(2);
+	}
+
+	/** First and last row of the tall windows: just over the plinth (4 at 200) up to three under the cornice (10). */
+	static int WIN_SILL() {
+		return PLINTH() + 1;
+	}
+
+	static int WIN_TOP() {
+		return WALL_H() - 3;
+	}
+
+	/**
+	 * The windows of the nave's end walls (gables) are beside the portal, at {@code |x|} from END_WIN_LO (8, the middle of the
+	 * bay next to the first pier) to END_WIN_HI (10): the portal's outer pilasters take everything under 8.
+	 */
+	static int END_WIN_LO() {
+		return PIER_PHASE() + PIER_PERIOD() / 2;
+	}
+
+	static int END_WIN_HI() {
+		return END_WIN_LO() + Math.max(2, PIER_PERIOD() / 4);
+	}
+
 	// ---- horizontal: inside
 	/** Rug: first and last z (-9, 10), border at |x| = RUG_HALF + 1 (1). */
 	static int RUG_Z0() {
