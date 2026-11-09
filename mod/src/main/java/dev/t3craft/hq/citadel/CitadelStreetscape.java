@@ -83,6 +83,13 @@ final class CitadelStreetscape {
 	static int STEP() {
 		return CitadelPlacement.LAMP_STEP();
 	}
+	/**
+	 * Where an avenue's gate stood (the catalog's gate now): this many cells inside the ring, an avenue half width.
+	 * {@code CitadelRelief} starts the avenue's ramp just past it, so the value is kept.
+	 */
+	static int GATE_IN() {
+		return (int) Math.round(CitadelPaving.AVENUE_HALF());
+	}
 	/** The boulevard stops this many cells short of the street (the plazoleta's room). */
 	static int END_ROOM() {
 		return CitadelCanvas.dims().s(6);
