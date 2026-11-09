@@ -24,13 +24,13 @@ import net.minecraft.world.level.block.state.properties.SlabType;
  *     and <i>yukimi</i> (low, on four short legs, with a domed hat). Moss by seed: clean, speckled or mossy.</li>
  * <li><b>Sizes</b>: 1 × 1 / 2-wide plots get a one-block column (wall shaft, a standing lantern, a hat block);
  *     3–4 wide the full 3 × 3 tōrō; 5 × 5 and more (height 5) the tōrō on a raised gravel plinth edged with
- *     stairs, with moss and potted plants; 7+ wide a flanking pair (by seed) with the path left free between.</li>
- * <li><b>Light</b>: the froglight (level 15) or the lantern lights the street; the cells under the platform
+ *     stairs, with moss and potted plants; 9+ wide a flanking pair (by seed) with the path left free between.</li>
+ * <li><b>Light</b>: the shroomlight (level 15) or the lantern lights the street; the cells under the platform
  *     cannot be walked, so nothing under the hat is a dark corner or a trap.</li>
  * <li><b>Support</b>: every slab touches the full block at the centre of its layer; the hat corners curl up on
  *     slabs that rest on the eave. Nothing hangs, so the settle pass has nothing to fix.</li>
  * </ul>
- * Size: 1–7 × 1–7 × 3–5 (taller plots keep the extra height empty).
+ * Size: 1–9 × 1–9 × 3–5 (taller plots keep the extra height empty).
  */
 public final class LampStreetToro implements Variant {
 	private static final int[][] SIDES = {{1, 0}, {1, 2}, {0, 1}, {2, 1}};
@@ -65,12 +65,12 @@ public final class LampStreetToro implements Variant {
 
 	@Override
 	public int maxW() {
-		return 7;
+		return 9;
 	}
 
 	@Override
 	public int maxD() {
-		return 7;
+		return 9;
 	}
 
 	@Override
@@ -81,7 +81,7 @@ public final class LampStreetToro implements Variant {
 		boolean low = p.hash(3, 3, 3, 2) == 1; // yukimi
 		if (w < 3 || d < 3) {
 			column(c, p, w / 2, d / 2, cap, low);
-		} else if (w >= 7 && (d < 5 || p.hash(5, 5, 5, 2) == 0)) {
+		} else if (w >= 9 && (d < 5 || p.hash(5, 5, 5, 2) == 0)) {
 			// a pair that flanks the way through; the middle of the plot stays free
 			toro(c, p, 0, (d - 3) / 2, 0, cap, low, false);
 			toro(c, p, w - 3, (d - 3) / 2, 0, cap, low, false);
@@ -120,6 +120,19 @@ public final class LampStreetToro implements Variant {
 		return b(mossy(p, u, y, v) ? Blocks.MOSSY_STONE_BRICK_WALL : Blocks.STONE_BRICK_WALL);
 	}
 
+	/** The dark foot (deepslate brick, cracked here and there): the darkest part of the gradient. */
+	private static BlockState darkBlock(Plot p, int u, int y, int v) {
+		return b(p.hash(u, y, v, 3) == 0 ? Blocks.CRACKED_DEEPSLATE_BRICKS : Blocks.DEEPSLATE_BRICKS);
+	}
+
+	private static BlockState darkSlab() {
+		return slab(Blocks.DEEPSLATE_BRICK_SLAB);
+	}
+
+	private static BlockState darkStairs(Direction facing) {
+		return stairs(Blocks.DEEPSLATE_BRICK_STAIRS, facing);
+	}
+
 	private static BlockState topSlab(BlockState bottom) {
 		return bottom.setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP);
 	}
@@ -131,7 +144,7 @@ public final class LampStreetToro implements Variant {
 		int y = 0;
 		if (low) {
 			// yukimi: one short leg, the lantern on it, a wide hat and a dome
-			p.set(c, u, y++, v, brickWall(p, u, 0, v));
+			p.set(c, u, y++, v, b(Blocks.DEEPSLATE_BRICK_WALL));
 			p.set(c, u, y++, v, b(Blocks.LANTERN));
 			p.set(c, u, y++, v, b(Blocks.POLISHED_ANDESITE));
 			if (hh >= 4) {
@@ -139,13 +152,13 @@ public final class LampStreetToro implements Variant {
 			}
 			return;
 		}
-		if (hh >= 4) {
-			p.set(c, u, y++, v, brick(p, u, 0, v)); // kiso
-		}
+		p.set(c, u, y++, v, darkBlock(p, u, 0, v)); // kiso
 		if (hh >= 5) {
 			p.set(c, u, y++, v, brickWall(p, u, 1, v)); // sao
 		}
-		p.set(c, u, y++, v, b(Blocks.CHISELED_STONE_BRICKS)); // chūdai
+		if (hh >= 4) {
+			p.set(c, u, y++, v, b(Blocks.CHISELED_STONE_BRICKS)); // chūdai
+		}
 		p.set(c, u, y++, v, b(Blocks.LANTERN)); // hibukuro
 		p.set(c, u, y, v, b(Blocks.POLISHED_ANDESITE)); // kasa
 	}
@@ -188,7 +201,7 @@ public final class LampStreetToro implements Variant {
 		}
 
 		// --- hibukuro: the light
-		p.set(c, cu, yC, cv, b(Blocks.OCHRE_FROGLIGHT));
+		p.set(c, cu, yC, cv, b(Blocks.SHROOMLIGHT));
 
 		// --- kasa: a block over the light, an eave of top slabs round it
 		// (top slabs: the light stays visible under them and nobody can stand on the platform below)
@@ -208,7 +221,7 @@ public final class LampStreetToro implements Variant {
 				}
 			}
 			// hōju: a jewel on kasuga, a dome slab on yukimi
-			p.set(c, cu, yH + 1, cv, low ? slab(Blocks.POLISHED_ANDESITE_SLAB) : b(Blocks.ANDESITE_WALL));
+			p.set(c, cu, yH + 1, cv, low ? slab(Blocks.POLISHED_ANDESITE_SLAB) : b(Blocks.DIORITE_WALL));
 			if (level == 2 && !low) {
 				for (int[] k : SIDES) {
 					if (p.hash(u0 + k[0], yH, v0 + k[1], 2) == 0) {
@@ -230,9 +243,9 @@ public final class LampStreetToro implements Variant {
 		int cv = v0 + 1;
 		int level = mossLevel(p);
 		if (low) {
-			p.set(c, cu, y, cv, brick(p, cu, y, cv));
+			p.set(c, cu, y, cv, darkBlock(p, cu, y, cv));
 			for (int[] k : CORNERS) {
-				p.set(c, u0 + k[0], y, v0 + k[1], brickWall(p, u0 + k[0], y, v0 + k[1]));
+				p.set(c, u0 + k[0], y, v0 + k[1], b(Blocks.DEEPSLATE_BRICK_WALL));
 			}
 			if (garden) {
 				for (int[] k : SIDES) {
@@ -248,7 +261,7 @@ public final class LampStreetToro implements Variant {
 			if (garden) {
 				p.set(c, u, y, v, p.hash(u, y, v, 3) == 0 ? b(Blocks.POTTED_FERN) : b(Blocks.MOSS_CARPET));
 			} else {
-				p.set(c, u, y, v, brickStairs(p, u, y, v, IN[i]));
+				p.set(c, u, y, v, darkStairs(IN[i]));
 			}
 		}
 		int potted = p.hash(u0, y, v0, 4);
@@ -260,7 +273,7 @@ public final class LampStreetToro implements Variant {
 			} else if (level > 0 && p.hash(u, y, v, 2) == 0) {
 				p.set(c, u, y, v, b(Blocks.MOSS_CARPET)); // moss on the ground at the foot
 			} else {
-				p.set(c, u, y, v, brickSlab(p, u, y, v));
+				p.set(c, u, y, v, darkSlab());
 			}
 		}
 	}
@@ -283,15 +296,15 @@ public final class LampStreetToro implements Variant {
 				boolean north = v == zv;
 				boolean south = v == zv + zd - 1;
 				if ((west || east) && (north || south)) {
-					p.set(c, u, 0, v, brickSlab(p, u, 0, v)); // corner: a low slab
+					p.set(c, u, 0, v, darkSlab()); // corner: a low slab
 				} else if (north) {
-					p.set(c, u, 0, v, brickStairs(p, u, 0, v, Direction.SOUTH));
+					p.set(c, u, 0, v, darkStairs(Direction.SOUTH));
 				} else if (south) {
-					p.set(c, u, 0, v, brickStairs(p, u, 0, v, Direction.NORTH));
+					p.set(c, u, 0, v, darkStairs(Direction.NORTH));
 				} else if (west) {
-					p.set(c, u, 0, v, brickStairs(p, u, 0, v, Direction.EAST));
+					p.set(c, u, 0, v, darkStairs(Direction.EAST));
 				} else if (east) {
-					p.set(c, u, 0, v, brickStairs(p, u, 0, v, Direction.WEST));
+					p.set(c, u, 0, v, darkStairs(Direction.WEST));
 				} else {
 					p.set(c, u, 0, v, b(Blocks.GRAVEL));
 				}
@@ -308,7 +321,7 @@ public final class LampStreetToro implements Variant {
 				boolean corner = (u == zu + 1 || u == zu + zw - 2) && (v == zv + 1 || v == zv + zd - 2);
 				if (corner) {
 					p.set(c, u, 1, v, b(p.hash(u, 1, v, 3) == 0 ? Blocks.POTTED_FERN : Blocks.POTTED_FLOWERING_AZALEA));
-				} else if (p.hash(u, 1, v, 3) != 0) {
+				} else if (p.hash(u, 1, v, 3) == 0) {
 					p.set(c, u, 1, v, b(Blocks.MOSS_CARPET));
 				}
 			}
