@@ -34,8 +34,8 @@ import org.jspecify.annotations.Nullable;
  * Concentric octagonal rings, one material each, measured with an octagonal metric rounded to whole rings
  * ({@link Plaza#band}: ring {@code k} is every cell whose metric rounds to {@code k}, so every ring is 1 cell
  * thick and its diagonals are closed staircases, never loose dots): 3x3 core of chiselled brick (the focal
- * point's base), two rings of calcite, one thin dark ring of polished deepslate, one of stone brick, one
- * continuous ring of cherry planks (the accent), an outer band of two tones in a chequer (the only variation;
+ * point's base), two rings of calcite, one thin dark ring of polished deepslate, one continuous ring of cherry
+ * planks (the accent), one of stone brick, an outer band of two tones in a chequer (the only variation;
  * the avenue's runner flows through it to the accent ring), and the kerb: a ring of deepslate tile with a tile
  * slab on it, half a block over the floor, which a walker steps over. In the four quadrants between the roads
  * the outer band is a planter ({@code k = 8..10}: a low wall, then two rows of azalea) with a bench
@@ -55,8 +55,11 @@ final class CitadelPlaza {
 
 	/** The kerb ring: the octagon's metric is scaled so that it is 11 here, whatever the scale of the citadel. */
 	static final int KERB_K = 11;
-	/** Ring of the accent (cherry planks). */
-	static final int ACCENT_K = 6;
+	/**
+	 * Ring of the accent (cherry planks). An odd ring: with the octagonal metric an odd ring is two cells thick on its
+	 * diagonals (an even one is one cell, corner to corner), so the accent is a closed line, never loose dots.
+	 */
+	static final int ACCENT_K = 5;
 	/** Ring of the benches; the planters are the three rings outside it, then the kerb. */
 	static final int BENCH_K = 7;
 	static final int BED_K = 8;
@@ -234,11 +237,11 @@ final class CitadelPlaza {
 		if (k == 4) {
 			return DARK;
 		}
-		if (k == 5) {
-			return BODY;
-		}
 		if (k == ACCENT_K) {
 			return ACCENT;
+		}
+		if (k == ACCENT_K + 1) {
+			return BODY;
 		}
 		if (k >= KERB_K) {
 			return KERB;
