@@ -236,10 +236,10 @@ public final class BridgeStoneArch implements Variant {
 		}
 	}
 
-	/** [finish] end lamp: deepslate plinth, a cherry log base, a two-high cherry fence, a lantern on top. */
+	/** [finish] end lamp: deepslate plinth, a cherry planks base, a two-high cherry fence, a lantern on top. */
 	private static void lamp(CitadelCanvas c, Plot p, int u, int v) {
 		p.set(c, u, 0, v, b(Blocks.POLISHED_DEEPSLATE));
-		p.set(c, u, 1, v, b(Blocks.CHERRY_LOG));
+		p.set(c, u, 1, v, b(Blocks.CHERRY_PLANKS));
 		p.set(c, u, 2, v, b(Blocks.CHERRY_FENCE));
 		p.set(c, u, 3, v, b(Blocks.CHERRY_FENCE));
 		p.set(c, u, 4, v, b(Blocks.LANTERN));
