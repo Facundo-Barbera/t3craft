@@ -89,7 +89,7 @@ public final class TreeCherryWeeping implements Variant {
 		int bu = TreeKit.base(w, ou); // the foot is in the middle of the plot; the bow at the top moves the crown at most one cell
 		int bv = TreeKit.base(d, ov);
 		TreeKit.trunk(t, TreeKit.CHERRY, bu, bv, 0, 3, ou, ov, 0, 0); // straight: the shoulder is only the root level
-		TreeKit.roots(t, TreeKit.CHERRY, bu, bv, 4, 1, -1, 13); // four short roots: a flare, not a lying trunk
+		TreeKit.roots(t, TreeKit.CHERRY, bu, bv, 4, 2, -1, 17); // four short roots of one or two cells: a flare, not a lying trunk
 		int cu = bu + ou;
 		int cv = bv + ov;
 		int tU = TreeKit.clamp(bu + ou + (int) Math.round(leanU), 0, w - 1);
@@ -140,7 +140,7 @@ public final class TreeCherryWeeping implements Variant {
 		}
 
 		// ---- limbs: rise out of the cap, curve over, run out almost level; the first one continues the bow of the trunk
-		int n = 4 + (mn >= 8 ? 1 : 0) + r.nextInt(2); // 4–6 limbs
+		int n = 4 + (mn >= 9 ? 1 : 0) + r.nextInt(2); // 4–6 limbs
 		double[] ang = new double[n];
 		double a0 = leanAng + (r.nextDouble() - 0.5) * 0.5;
 		for (int i = 0; i < n; i++) {
@@ -163,7 +163,7 @@ public final class TreeCherryWeeping implements Variant {
 			double ez = Math.sin(ang[i]);
 			double reach = reach(t, lu, lv, ex, ez, mn, i == 0 ? 1.0 : 0.82 + 0.18 * r.nextDouble());
 			int ay = Math.min(H - 2, yTop + 1 + r.nextInt(2));
-			int ty = TreeKit.clamp(ay - 1 - r.nextInt(2), CLEAR, ay - 1); // a long, low arch: the curtains do the falling
+			int ty = TreeKit.clamp(ay - 2 - r.nextInt(2), CLEAR, ay - 1); // a long arch that droops at the tip, then the curtains fall
 			int au = (int) Math.round(lu + ex * reach * 0.45);
 			int av = (int) Math.round(lv + ez * reach * 0.45);
 			int tu = (int) Math.round(lu + ex * reach);
@@ -214,15 +214,18 @@ public final class TreeCherryWeeping implements Variant {
 					continue;
 				}
 				int cls = t.hash(u, 5, v, 100);
+				// a fountain: the outer strands are the long ones, the inner ones mostly stubs
+				double f = TreeKit.clamp((Math.hypot(u - lu, v - lv) - 1.5) / Math.max(1.0, mn * 0.5 - 1.5), 0.0, 1.0);
+				int stubs = (int) (68 - 50 * f);
 				int bottom;
 				if (cls < 15) {
 					continue; // no strand here: a window
-				} else if (cls < 50) {
+				} else if (cls < 15 + stubs) {
 					if (y0 - 1 < CLEAR) {
 						continue;
 					}
 					bottom = Math.max(CLEAR, y0 - 2 - t.hash(u, 6, v, 5)); // a stub: 3 blocks of headroom under it, even over a root
-				} else if (cls < 56) {
+				} else if (cls < 20 + stubs) {
 					bottom = 0; // touches the grass
 				} else {
 					bottom = 1; // stops a block above the grass
