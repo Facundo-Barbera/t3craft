@@ -479,10 +479,9 @@ public final class HouseStoneTower implements Variant {
 					wl.set(tt, y + 2, 0, stUp(Blocks.POLISHED_ANDESITE_STAIRS, along(wl, sign)));
 				}
 			}
-			// [depth] a pale sill block with an upside-down diorite stair jutting out under it (nothing to stand on), and a
-			// dark upside-down stair hood over the lintel band
-			wl.set(t, y - 1, 0, b(Blocks.POLISHED_DIORITE));
-			setFreeWall(wl, t, y - 1, 1, wl.stairIn(Blocks.POLISHED_DIORITE_STAIRS, true));
+			// [depth] a pale diorite stair sill in the wall plane, slanting down and out (no ledge to stand on), and a dark
+			// upside-down stair hood jutting over the lintel band
+			wl.set(t, y - 1, 0, wl.stairIn(Blocks.POLISHED_DIORITE_STAIRS, false));
 			setFreeWall(wl, t, y + 3, 1, wl.stairIn(Blocks.DEEPSLATE_BRICK_STAIRS, true));
 			if (shutters && p.hash(wl.u(t, 0), y, wl.v(t, 0), 3) == 0) {
 				for (int sign : new int[] {-1, 1}) {
