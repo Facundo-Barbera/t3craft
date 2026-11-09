@@ -484,7 +484,7 @@ public final class CloisterRoom {
 		if (aa <= 2) {
 			q.fill(dx, 1, 4, dz, AIR);
 			q.set(dx, 5, dz, RIB);
-			q.set(dx, 6, dz, aa <= 1 ? b(Blocks.GOLD_BLOCK) : RIB);
+			q.set(dx, 6, dz, RIB);
 		} else {
 			q.set(dx, 1, dz, NodeDecor.footMix(x, 1, z));
 			q.set(dx, 2, dz, NodeDecor.footMix(x, 2, z));
