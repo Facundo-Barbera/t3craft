@@ -1,0 +1,13 @@
+{
+  "variants": {
+    "tone=paper": {
+      "model": "t3craft:block/paper_lantern_hanging_paper"
+    },
+    "tone=rose": {
+      "model": "t3craft:block/paper_lantern_hanging_rose"
+    },
+    "tone=vermilion": {
+      "model": "t3craft:block/paper_lantern_hanging_vermilion"
+    }
+  }
+}

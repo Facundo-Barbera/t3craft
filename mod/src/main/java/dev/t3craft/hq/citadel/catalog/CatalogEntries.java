@@ -57,6 +57,9 @@ final class CatalogEntries {
 			new dev.t3craft.hq.citadel.catalog.house.HouseTowerLookout(), // house_tower_lookout
 			new dev.t3craft.hq.citadel.catalog.house.HouseTowerStair(), // house_tower_stair
 			new dev.t3craft.hq.citadel.catalog.lamp.LampCherryPost(), // lamp_cherry_post
+			new dev.t3craft.hq.citadel.catalog.lamp.LampPaperGate(), // lamp_paper_gate
+			new dev.t3craft.hq.citadel.catalog.lamp.LampPaperPlaza(), // lamp_paper_plaza
+			new dev.t3craft.hq.citadel.catalog.lamp.LampPaperPost(), // lamp_paper_post
 			new dev.t3craft.hq.citadel.catalog.lamp.LampStreetAvenueDouble(), // lamp_street_avenue_double
 			new dev.t3craft.hq.citadel.catalog.lamp.LampStreetBrazierTripod(), // lamp_street_brazier_tripod
 			new dev.t3craft.hq.citadel.catalog.lamp.LampStreetToro(), // lamp_street_toro

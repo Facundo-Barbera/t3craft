@@ -1,0 +1,64 @@
+{
+  "variants": {
+    "facing=east,half=bottom,tone=cool": {
+      "model": "t3craft:block/glow_strip_bottom_cool",
+      "y": 90
+    },
+    "facing=east,half=bottom,tone=warm": {
+      "model": "t3craft:block/glow_strip_bottom_warm",
+      "y": 90
+    },
+    "facing=east,half=top,tone=cool": {
+      "model": "t3craft:block/glow_strip_top_cool",
+      "y": 90
+    },
+    "facing=east,half=top,tone=warm": {
+      "model": "t3craft:block/glow_strip_top_warm",
+      "y": 90
+    },
+    "facing=north,half=bottom,tone=cool": {
+      "model": "t3craft:block/glow_strip_bottom_cool"
+    },
+    "facing=north,half=bottom,tone=warm": {
+      "model": "t3craft:block/glow_strip_bottom_warm"
+    },
+    "facing=north,half=top,tone=cool": {
+      "model": "t3craft:block/glow_strip_top_cool"
+    },
+    "facing=north,half=top,tone=warm": {
+      "model": "t3craft:block/glow_strip_top_warm"
+    },
+    "facing=south,half=bottom,tone=cool": {
+      "model": "t3craft:block/glow_strip_bottom_cool",
+      "y": 180
+    },
+    "facing=south,half=bottom,tone=warm": {
+      "model": "t3craft:block/glow_strip_bottom_warm",
+      "y": 180
+    },
+    "facing=south,half=top,tone=cool": {
+      "model": "t3craft:block/glow_strip_top_cool",
+      "y": 180
+    },
+    "facing=south,half=top,tone=warm": {
+      "model": "t3craft:block/glow_strip_top_warm",
+      "y": 180
+    },
+    "facing=west,half=bottom,tone=cool": {
+      "model": "t3craft:block/glow_strip_bottom_cool",
+      "y": 270
+    },
+    "facing=west,half=bottom,tone=warm": {
+      "model": "t3craft:block/glow_strip_bottom_warm",
+      "y": 270
+    },
+    "facing=west,half=top,tone=cool": {
+      "model": "t3craft:block/glow_strip_top_cool",
+      "y": 270
+    },
+    "facing=west,half=top,tone=warm": {
+      "model": "t3craft:block/glow_strip_top_warm",
+      "y": 270
+    }
+  }
+}
