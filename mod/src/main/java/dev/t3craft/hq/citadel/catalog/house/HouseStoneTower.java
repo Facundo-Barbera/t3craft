@@ -529,10 +529,7 @@ public final class HouseStoneTower implements Variant {
 				}
 				f.set(t, 4, 1, StoneKit.lantern(false));
 			}
-			// the step stones up to the door sit on the foot ledge: a hood of tile slabs over the door
-			for (int t = cc - 1; t <= cc + 1; t++) {
-				f.set(t, 4, 1, topSlab(Blocks.DEEPSLATE_TILE_SLAB));
-			}
+		}
 		}
 
 		// ------------------------------------------------------------------ rings round the tower
