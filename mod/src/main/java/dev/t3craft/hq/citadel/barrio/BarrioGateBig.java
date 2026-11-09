@@ -79,7 +79,7 @@ final class BarrioGateBig {
 	/** Height of the sign board (plaques). */
 	private static final int PLAQUE_Y = 8;
 	/** Temporary: walk spots inside the guard rooms and on the stair tops, to read their reachability in the report. */
-	private static final boolean TEST_SPOTS = true;
+	private static final boolean TEST_SPOTS = false;
 
 	private static final BlockState STONE = b(Blocks.STONE_BRICKS);
 	private static final BlockState POST = b(Blocks.POLISHED_DEEPSLATE);
@@ -333,8 +333,9 @@ final class BarrioGateBig {
 					s = banner(tv, y);
 				} else if (y == DECK) {
 					s = log(edgeU ? side.getAxis() : back.getAxis());
-				} else if (edgeV && !passSide && a == sw / 2 && (y == 6 || y == 7)) {
-					s = b(Blocks.GLASS_PANE);
+				} else if (!passSide && y >= 5 && y <= 8 && (edgeU ? tv == sw / 2 : a == sw / 2)) {
+					// a lancet window in the middle of the plain faces: a dark frame (sill and head) around two panes
+					s = y == 6 || y == 7 ? b(Blocks.GLASS_PANE) : POST;
 				} else {
 					s = towerStone(u, v, y);
 				}
