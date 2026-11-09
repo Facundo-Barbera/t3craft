@@ -536,7 +536,11 @@ public final class GateArchBattlement implements Variant {
 					}
 				}
 			}
-			p.put(c, col[1], 11, sv, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
+			if (stairTower) {
+				p.put(c, col[1], 11, sv, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
+			} else {
+				set(outer, 10, w0 + 1, Blocks.LANTERN); // the guard's lookout glows through its slit (a hanging one would be under 2.85 clear)
+			}
 
 			// --- roof: a hip of stairs (the lowest course is the ceiling over the chamber) and a weathered-copper cap
 			ringIn(u0, u1, 0, d - 1, 12, roofStairs, roofBlock);
