@@ -6,6 +6,7 @@ import dev.t3craft.hq.RingCampusGeometry.Zone;
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.item.DyeColor;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.block.state.properties.Property;
 import net.minecraft.core.Direction;
@@ -340,22 +341,31 @@ public final class CloisterRoom {
 
 	// ------------------------------------------------------------------ garth
 
+	/** A deepslate-brick path cell, one in six cracked. */
+	private static BlockState pathMix(int x, int z) {
+		return Math.floorMod(x * 3 + z * 7, 6) == 0 ? b(Blocks.CRACKED_DEEPSLATE_BRICKS) : b(Blocks.DEEPSLATE_BRICKS);
+	}
+
+	/**
+	 * The garth's ground: a moat of water 5 x 5 round a solid 3 x 3 pedestal (the fountain), a rim of half slabs at r = 3
+	 * (open on the axes, where the paths cross), the cross paths 3 wide, grass in the four lawns.
+	 */
 	private static void garthFloor(Q q, int dx, int dz, int r) {
 		int mn = Math.min(Math.abs(dx), Math.abs(dz));
 		int x = q.cx + dx;
 		int z = q.cz + dz;
-		if (r <= 1) {
-			// the pool: 3 x 3 of water on a deepslate bed (the middle cell is the fountain's foot)
+		if (r <= 2) {
 			q.set(dx, -1, dz, FOOT);
-			q.set(dx, 0, dz, r == 0 ? b(Blocks.POLISHED_BLACKSTONE_BRICKS) : WATER);
-		} else if (r == 2) {
-			q.set(dx, 0, dz, FOOT);
-			if (Math.abs(dx) != 2 || Math.abs(dz) != 2) {
-				// the rim: a stone-brick slab, a half step you can sit on
-				q.set(dx, 1, dz, slab(Blocks.STONE_BRICK_SLAB));
+			q.set(dx, 0, dz, r == 2 ? WATER : b(Blocks.DEEPSLATE_BRICKS));
+		} else if (r == 3) {
+			if (mn <= 1) {
+				q.set(dx, 0, dz, pathMix(x, z));
+			} else {
+				q.set(dx, 0, dz, FOOT);
+				q.set(dx, 1, dz, slab(Blocks.DEEPSLATE_BRICK_SLAB));
 			}
-		} else if (r == 3 || mn <= 1) {
-			q.set(dx, 0, dz, NodeDecor.stoneMix(x, 0, z));
+		} else if (mn <= 1) {
+			q.set(dx, 0, dz, pathMix(x, z));
 		} else {
 			q.set(dx, 0, dz, GRASS);
 		}
@@ -363,10 +373,16 @@ public final class CloisterRoom {
 
 	/** The garth's furniture: the fountain's post, four cherry trees, two benches under each. */
 	private static void garth(Q q) {
-		// the fountain: a chiseled foot, a post and a lantern in the middle of the pool
-		q.set(0, 1, 0, b(Blocks.CHISELED_STONE_BRICKS));
-		q.fill(0, 2, 3, 0, b(Blocks.STONE_BRICK_WALL));
-		q.put(0, 4, 0, Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, false), DECOR);
+		// the fountain: a pedestal 3 x 3 (y 1..2) in the moat, a bowl on top (a ring of bricks round a cell of water), a
+		// spout post and a lantern
+		for (int ax = -1; ax <= 1; ax++) {
+			for (int az = -1; az <= 1; az++) {
+				q.set(ax, 1, az, b(Blocks.DEEPSLATE_BRICKS));
+				q.set(ax, 2, az, ax == 0 && az == 0 ? WATER : b(Blocks.CHISELED_DEEPSLATE));
+			}
+		}
+		q.fill(0, 3, 4, 0, b(Blocks.DEEPSLATE_BRICK_WALL));
+		q.put(0, 5, 0, Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, false), DECOR);
 		BlockState pink = leaves(Blocks.CHERRY_LEAVES);
 		BlockState azalea = leaves(Blocks.FLOWERING_AZALEA_LEAVES);
 		for (int sx : new int[] {-1, 1}) {
@@ -376,17 +392,22 @@ public final class CloisterRoom {
 				if (sx == sz) {
 					// a cherry tree in two opposite lawns
 					q.fill(tx, 1, 4, tz, LOG);
-					for (int ax = -1; ax <= 1; ax++) {
-						for (int az = -1; az <= 1; az++) {
-							if (Math.abs(ax) + Math.abs(az) <= 1 && (ax != 0 || az != 0)) {
+					for (int ax = -2; ax <= 2; ax++) {
+						for (int az = -2; az <= 2; az++) {
+							int m = Math.abs(ax) + Math.abs(az);
+							if (m <= 1 && m > 0) {
 								q.set(tx + ax, 4, tz + az, pink);
 							}
-							q.set(tx + ax, 5, tz + az, pink);
-							if (Math.abs(ax) + Math.abs(az) <= 1) {
+							if (m <= 2 && !(ax == 2 * sx && az == 0 && sz > 0)) {
+								q.set(tx + ax, 5, tz + az, pink);
+							}
+							if (m <= 1) {
 								q.set(tx + ax, 6, tz + az, pink);
 							}
 						}
 					}
+					q.set(tx, 7, tz, pink);
+					q.set(tx - sx, 7, tz, pink);
 				} else {
 					// a flowering hedge bed in the other two
 					for (int ax = 0; ax <= 1; ax++) {
@@ -418,7 +439,7 @@ public final class CloisterRoom {
 	 */
 	private static void hall(Q q, int dx, int dz, int r, boolean ns, int a, int aa) {
 		CitadelCanvas c = q.c;
-		q.set(dx, 0, dz, r == 6 ? FOOT : (r <= 10 ? c.floor() : FOOT));
+		q.set(dx, 0, dz, r == 6 ? FOOT : (r <= 9 ? c.floor() : (r == 10 ? CALCITE : NodeDecor.footMix(q.cx + dx, 0, q.cz + dz))));
 		Direction out = NodeDecor.outward(dx, dz);
 		if (r >= 7) {
 			q.set(dx, r + 2, dz, PLANKS);
@@ -504,7 +525,9 @@ public final class CloisterRoom {
 			if (pilasterLine(aa)) {
 				q.fill(dx, 3, 14, dz, STRIP);
 			} else {
-				q.set(dx, 3, dz, slab(Blocks.STONE_BRICK_SLAB));
+				// a sill under the recessed window and a cherry hood over it
+				q.set(dx, aa >= 8 && aa <= 10 ? 3 : 5, dz, slab(Blocks.STONE_BRICK_SLAB));
+				q.set(dx, 13, dz, NodeDecor.invStairs(Blocks.CHERRY_STAIRS, NodeDecor.inward(dx, dz)));
 			}
 		}
 		q.set(dx, 15, dz, NodeDecor.invStairs(Blocks.CHERRY_STAIRS, NodeDecor.inward(dx, dz)));
@@ -643,7 +666,8 @@ public final class CloisterRoom {
 			Direction in = into(side);
 			for (int half : new int[] {-1, 1}) {
 				if (!(side == 0 && half > 0)) {
-					shelfBay(q, side, half, in, (side + (half > 0 ? 1 : 0)) % 2 == 0);
+					shelfBay(q, side, half, in);
+					nook(q, side, half, in);
 					spur(q, side, half);
 				}
 				deskBay(q, side, half, in);
@@ -651,6 +675,12 @@ public final class CloisterRoom {
 			// a chochin hung in the gate, under the lintel
 			int[] g = pos(side, 0, 13);
 			q.put(g[0], 4, g[1], chochin(), HANGING);
+			// the plaque of the archive over the gate, on the outer face of the wall
+			int[] pl = pos(side, 0, 14);
+			q.put(pl[0], 7, pl[1], q.c.kit.plaque(in.getOpposite()), DECOR);
+			long key = BlockPos.asLong(q.cx + pl[0], 7, q.cz + pl[1]);
+			q.c.data.put(key, q.c.kit.plaqueData(DyeColor.ORANGE, "", "Archivo", "", ""));
+			q.c.fixtures.add(key);
 		}
 		for (int sx : new int[] {-1, 1}) {
 			for (int sz : new int[] {-1, 1}) {
@@ -659,8 +689,8 @@ public final class CloisterRoom {
 		}
 	}
 
-	/** Shelves 4 high against the wall (r = 12), a lit strip and a ledge over them; in front, chests and a lectern. */
-	private static void shelfBay(Q q, int side, int half, Direction in, boolean chestsAtEnds) {
+	/** Shelves 4 high against the wall (r = 12) with a lit strip and a ledge over them; in front, a consultation table. */
+	private static void shelfBay(Q q, int side, int half, Direction in) {
 		CitadelCanvas c = q.c;
 		for (int i = 0; i < 3; i++) {
 			int a = half * (4 + i);
@@ -671,11 +701,22 @@ public final class CloisterRoom {
 			q.set(w[0], 4, w[1], NodeDecor.facing(Blocks.CHISELED_BOOKSHELF, in));
 			q.putIfFree(w[0], 5, w[1], c.kit.glowStrip(in, true, false), DECOR);
 			q.set(w[0], 6, w[1], slab(Blocks.CHERRY_SLAB));
-			// in front of the shelves: chests at the ends and a lectern in the middle, or the other way round
+			// the consultation table in front: a lectern in the middle, slabs either side, a chair at each end
 			int[] f = pos(side, a, 11);
-			boolean end = i != 1;
-			q.set(f[0], 1, f[1], end == chestsAtEnds ? chest(in) : lectern(in));
+			q.set(f[0], 1, f[1], i == 1 ? lectern(in) : NodeDecor.topSlab(Blocks.CHERRY_SLAB));
+			if (i != 1) {
+				int[] ch = pos(side, a, 10);
+				q.set(ch[0], 1, ch[1], stairs(Blocks.CHERRY_STAIRS, in));
+			}
 		}
+	}
+
+	/** A nook beside a gate (aa = 3, r = 10..11): a chest and a barrel for the keepers of the archive. */
+	private static void nook(Q q, int side, int half, Direction in) {
+		int[] a = pos(side, 3 * half, 11);
+		int[] b2 = pos(side, 3 * half, 10);
+		q.set(a[0], 1, a[1], chest(in));
+		q.set(b2[0], 1, b2[1], b(Blocks.BARREL));
 	}
 
 	/** A shelf spur at the pilaster line between a shelf bay and a desk bay: 2 deep, 3 high, books on all sides. */
