@@ -13,14 +13,14 @@
   "elements": [
     {
       "from": [
-        3,
+        2,
         0,
-        3
+        2
       ],
       "to": [
-        13,
+        14,
         1,
-        13
+        14
       ],
       "faces": {
         "north": {
@@ -42,7 +42,7 @@
           "texture": "#dark"
         }
       },
-      "name": "plinth"
+      "name": "base"
     },
     {
       "from": [
@@ -210,27 +210,27 @@
     },
     {
       "from": [
-        5,
+        4,
         15,
-        5
+        4
       ],
       "to": [
-        11,
+        12,
         16,
-        11
+        12
       ],
       "faces": {
         "north": {
-          "texture": "#brass"
+          "texture": "#dark"
         },
         "south": {
-          "texture": "#brass"
+          "texture": "#dark"
         },
         "east": {
-          "texture": "#brass"
+          "texture": "#dark"
         },
         "west": {
-          "texture": "#brass"
+          "texture": "#dark"
         },
         "up": {
           "texture": "#finial"
@@ -239,12 +239,12 @@
           "texture": "#dark"
         }
       },
-      "name": "finial"
+      "name": "roof cap"
     },
     {
       "from": [
         2,
-        0,
+        1,
         2
       ],
       "to": [
@@ -274,7 +274,7 @@
     {
       "from": [
         2,
-        0,
+        1,
         12
       ],
       "to": [
@@ -304,7 +304,7 @@
     {
       "from": [
         12,
-        0,
+        1,
         2
       ],
       "to": [
@@ -334,7 +334,7 @@
     {
       "from": [
         12,
-        0,
+        1,
         12
       ],
       "to": [
@@ -360,6 +360,138 @@
         }
       },
       "name": "post"
+    },
+    {
+      "from": [
+        2,
+        15,
+        2
+      ],
+      "to": [
+        4,
+        16,
+        4
+      ],
+      "faces": {
+        "north": {
+          "texture": "#dark"
+        },
+        "south": {
+          "texture": "#dark"
+        },
+        "east": {
+          "texture": "#dark"
+        },
+        "west": {
+          "texture": "#dark"
+        },
+        "up": {
+          "texture": "#roof"
+        },
+        "down": {
+          "texture": "#dark"
+        }
+      },
+      "name": "roof tip"
+    },
+    {
+      "from": [
+        2,
+        15,
+        12
+      ],
+      "to": [
+        4,
+        16,
+        14
+      ],
+      "faces": {
+        "north": {
+          "texture": "#dark"
+        },
+        "south": {
+          "texture": "#dark"
+        },
+        "east": {
+          "texture": "#dark"
+        },
+        "west": {
+          "texture": "#dark"
+        },
+        "up": {
+          "texture": "#roof"
+        },
+        "down": {
+          "texture": "#dark"
+        }
+      },
+      "name": "roof tip"
+    },
+    {
+      "from": [
+        12,
+        15,
+        2
+      ],
+      "to": [
+        14,
+        16,
+        4
+      ],
+      "faces": {
+        "north": {
+          "texture": "#dark"
+        },
+        "south": {
+          "texture": "#dark"
+        },
+        "east": {
+          "texture": "#dark"
+        },
+        "west": {
+          "texture": "#dark"
+        },
+        "up": {
+          "texture": "#roof"
+        },
+        "down": {
+          "texture": "#dark"
+        }
+      },
+      "name": "roof tip"
+    },
+    {
+      "from": [
+        12,
+        15,
+        12
+      ],
+      "to": [
+        14,
+        16,
+        14
+      ],
+      "faces": {
+        "north": {
+          "texture": "#dark"
+        },
+        "south": {
+          "texture": "#dark"
+        },
+        "east": {
+          "texture": "#dark"
+        },
+        "west": {
+          "texture": "#dark"
+        },
+        "up": {
+          "texture": "#roof"
+        },
+        "down": {
+          "texture": "#dark"
+        }
+      },
+      "name": "roof tip"
     }
   ]
 }

@@ -14,12 +14,12 @@
   "elements": [
     {
       "from": [
-        6,
-        4,
+        5,
+        2,
         15
       ],
       "to": [
-        10,
+        11,
         15,
         16
       ],
@@ -47,12 +47,78 @@
     },
     {
       "from": [
-        7.5,
-        13,
-        8
+        7,
+        3,
+        15.5
       ],
       "to": [
-        8.5,
+        9,
+        4,
+        16
+      ],
+      "faces": {
+        "north": {
+          "texture": "#brass"
+        },
+        "south": {
+          "texture": "#brass"
+        },
+        "east": {
+          "texture": "#brass"
+        },
+        "west": {
+          "texture": "#brass"
+        },
+        "up": {
+          "texture": "#brass"
+        },
+        "down": {
+          "texture": "#brass"
+        }
+      },
+      "name": "plate nail low"
+    },
+    {
+      "from": [
+        7,
+        13,
+        15.5
+      ],
+      "to": [
+        9,
+        14,
+        16
+      ],
+      "faces": {
+        "north": {
+          "texture": "#brass"
+        },
+        "south": {
+          "texture": "#brass"
+        },
+        "east": {
+          "texture": "#brass"
+        },
+        "west": {
+          "texture": "#brass"
+        },
+        "up": {
+          "texture": "#brass"
+        },
+        "down": {
+          "texture": "#brass"
+        }
+      },
+      "name": "plate nail high"
+    },
+    {
+      "from": [
+        7,
+        13,
+        7
+      ],
+      "to": [
+        9,
         14,
         15
       ],
@@ -82,7 +148,7 @@
       "from": [
         7.5,
         10,
-        14
+        13.5
       ],
       "to": [
         8.5,
@@ -114,13 +180,46 @@
     {
       "from": [
         7.5,
+        11,
+        11
+      ],
+      "to": [
+        8.5,
         12,
-        7.5
+        13.5
+      ],
+      "faces": {
+        "north": {
+          "texture": "#iron"
+        },
+        "south": {
+          "texture": "#iron"
+        },
+        "east": {
+          "texture": "#iron"
+        },
+        "west": {
+          "texture": "#iron"
+        },
+        "up": {
+          "texture": "#iron"
+        },
+        "down": {
+          "texture": "#iron"
+        }
+      },
+      "name": "brace step"
+    },
+    {
+      "from": [
+        7.5,
+        12,
+        6.5
       ],
       "to": [
         8.5,
         13,
-        8.5
+        7.5
       ],
       "faces": {
         "north": {
@@ -146,14 +245,14 @@
     },
     {
       "from": [
-        3,
-        10,
-        3
+        2,
+        11,
+        2
       ],
       "to": [
-        13,
-        11,
-        13
+        14,
+        12,
+        14
       ],
       "faces": {
         "north": {
@@ -175,17 +274,17 @@
           "texture": "#dark"
         }
       },
-      "name": "cap"
+      "name": "roof"
     },
     {
       "from": [
         6,
-        11,
+        12,
         6
       ],
       "to": [
         10,
-        12,
+        13,
         10
       ],
       "faces": {
@@ -212,68 +311,28 @@
     },
     {
       "from": [
-        4,
-        3,
-        4
+        5,
+        9,
+        5
       ],
       "to": [
-        12,
+        11,
         10,
-        12
+        11
       ],
       "faces": {
         "north": {
-          "texture": "#paper",
-          "uv": [
-            4,
-            6,
-            12,
-            13
-          ]
+          "texture": "#paper"
         },
         "south": {
-          "texture": "#paper",
-          "uv": [
-            4,
-            6,
-            12,
-            13
-          ]
+          "texture": "#paper"
         },
         "east": {
-          "texture": "#paper",
-          "uv": [
-            4,
-            6,
-            12,
-            13
-          ]
+          "texture": "#paper"
         },
         "west": {
-          "texture": "#paper",
-          "uv": [
-            4,
-            6,
-            12,
-            13
-          ]
-        }
-      },
-      "name": "shade",
-      "light_emission": 15
-    },
-    {
-      "from": [
-        4,
-        3,
-        4
-      ],
-      "to": [
-        12,
-        10,
-        12
-      ],
-      "faces": {
+          "texture": "#paper"
+        },
         "up": {
           "texture": "#paper"
         },
@@ -281,19 +340,87 @@
           "texture": "#paper"
         }
       },
-      "name": "shade ends",
+      "name": "tier top",
       "light_emission": 15
     },
     {
       "from": [
         3,
-        2,
+        4,
         3
       ],
       "to": [
         13,
-        3,
+        9,
         13
+      ],
+      "faces": {
+        "north": {
+          "texture": "#paper"
+        },
+        "south": {
+          "texture": "#paper"
+        },
+        "east": {
+          "texture": "#paper"
+        },
+        "west": {
+          "texture": "#paper"
+        },
+        "up": {
+          "texture": "#paper"
+        },
+        "down": {
+          "texture": "#paper"
+        }
+      },
+      "name": "barrel",
+      "light_emission": 15
+    },
+    {
+      "from": [
+        5,
+        3,
+        5
+      ],
+      "to": [
+        11,
+        4,
+        11
+      ],
+      "faces": {
+        "north": {
+          "texture": "#paper"
+        },
+        "south": {
+          "texture": "#paper"
+        },
+        "east": {
+          "texture": "#paper"
+        },
+        "west": {
+          "texture": "#paper"
+        },
+        "up": {
+          "texture": "#paper"
+        },
+        "down": {
+          "texture": "#paper"
+        }
+      },
+      "name": "tier bottom",
+      "light_emission": 15
+    },
+    {
+      "from": [
+        4,
+        2,
+        4
+      ],
+      "to": [
+        12,
+        3,
+        12
       ],
       "faces": {
         "north": {
@@ -319,14 +446,14 @@
     },
     {
       "from": [
-        3.5,
         3,
-        3.5
+        4,
+        3
       ],
       "to": [
-        4.5,
-        10,
-        4.5
+        4,
+        9,
+        4
       ],
       "faces": {
         "north": {
@@ -349,14 +476,14 @@
     },
     {
       "from": [
-        3.5,
         3,
-        11.5
+        4,
+        12
       ],
       "to": [
-        4.5,
-        10,
-        12.5
+        4,
+        9,
+        13
       ],
       "faces": {
         "north": {
@@ -379,14 +506,14 @@
     },
     {
       "from": [
-        11.5,
-        3,
-        3.5
+        12,
+        4,
+        3
       ],
       "to": [
-        12.5,
-        10,
-        4.5
+        13,
+        9,
+        4
       ],
       "faces": {
         "north": {
@@ -409,14 +536,14 @@
     },
     {
       "from": [
-        11.5,
-        3,
-        11.5
+        12,
+        4,
+        12
       ],
       "to": [
-        12.5,
-        10,
-        12.5
+        13,
+        9,
+        13
       ],
       "faces": {
         "north": {

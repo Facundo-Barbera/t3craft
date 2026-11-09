@@ -34,8 +34,8 @@ def pal(*cs):
 LACQ = pal("#21141A", "#2E1B22", "#3D242B", "#4F2F33", "#6A3F3E", "#8A5650")
 BRASS = pal("#6E4E1E", "#9C7A31", "#C9A24A", "#E3C46A", "#F7E3A0")
 IRON = pal("#1C1B20", "#2A292F", "#3A3940", "#4E4D55", "#6A6972")
-# cherry wood of the structure (posts, ribs): a warm rose-brown, clearly lighter than the dark finishes
-CHERRY = pal("#5A2E31", "#74393A", "#8F4A47", "#AA5E58", "#C47A6F", "#DB9C90")
+# cherry wood of the structure (posts, ribs): a deep rose-brown, lighter than the black finishes but darker than the paper
+CHERRY = pal("#3E1E23", "#51282D", "#673338", "#7E4144", "#96524F", "#B06A63")
 # dark stone of the tall lantern's plinth (blackstone-like)
 STONE = pal("#1B1A21", "#26252D", "#33323C", "#44434E", "#5A5964")
 # backlit paper per tone: edge (cool, dim) -> hot (near the flame)
@@ -51,6 +51,8 @@ RIB = {
     "vermilion": pal("#5A120E", "#741A13"),
 }
 INK = pal("#1A1216", "#2A1C20")
+# the waist band of the vermilion chochin: dark red-brown, so the stripes still read from afar
+VBAND = pal("#5C1812", "#7A2218")
 
 
 class Img:
@@ -238,28 +240,28 @@ def stone():
 # ---- paper ------------------------------------------------------------------------------------
 def tall():
     """
-    Side of the tall lantern's paper box (body element 2..14 wide, 4..13 high of the upper half,
-    uv [2, 3, 14, 12]): lit paper with a hot core, two kumiko rails and a centre stile in the top panel.
+    Side of the tall lantern's paper box (body element 2..14 wide, 4..12 high of the upper half,
+    uv [2, 4, 14, 12]): lit paper with a hot core, two kumiko rails and a centre stile in the top panel.
     """
     rng = random.Random(312)
     ramp = TONES["paper"]
     rib = RIB["paper"]
     img = Img()
     img.rect(0, 0, 15, 15, ramp[1])
-    for y in range(3, 12):
+    for y in range(4, 12):
         for x in range(2, 14):
-            img.set(x, y, glow(ramp, x, y, 7.5, 7.5, 7.0, 6.0, rng, bias=1.0))
+            img.set(x, y, glow(ramp, x, y, 7.5, 8.0, 7.0, 5.6, rng, bias=1.1))
     for x in range(2, 14):
-        img.set(x, 3, ramp[2])
-        img.set(x, 6, rib[1])
-        img.set(x, 9, rib[1])
-    for y in range(3, 6):
+        img.set(x, 4, ramp[2])
+        img.set(x, 7, rib[1])
+        img.set(x, 10, rib[1])
+    for y in range(4, 7):
         img.set(7, y, rib[0])
         img.set(8, y, rib[1])
-    for y in range(3, 12):
+    for y in range(4, 12):
         img.set(2, y, ramp[1] if y % 3 else ramp[0])
         img.set(13, y, ramp[1] if y % 3 else ramp[0])
-    for x, y in ((7, 7), (8, 7), (7, 8), (8, 8), (6, 7), (9, 8)):
+    for x, y in ((7, 8), (8, 8), (7, 9), (8, 9), (6, 8), (9, 9), (7, 6), (8, 6)):
         img.set(x, y, ramp[5])
     return img
 
@@ -319,8 +321,8 @@ def chochin(tone):
                 img.set(x, y, rib[0] if abs(x - 7.5) > 3.5 else rib[1])
     if tone == "vermilion":
         for x in range(1, 15):
-            img.set(x, 8, INK[1] if x % 3 else INK[0])
-            img.set(x, 9, INK[0] if abs(x - 7.5) > 3.5 else INK[1])
+            img.set(x, 8, VBAND[1] if x % 3 else VBAND[0])
+            img.set(x, 9, VBAND[0] if abs(x - 7.5) > 3.5 else VBAND[1])
     elif tone == "rose":
         cream = hexc("#FFF4EC")
         for x in range(1, 15):
@@ -333,8 +335,8 @@ def chochin(tone):
 
 def box(tone):
     """
-    Wall lantern shade (body element 4..12 wide, 3..10 high, uv rows 6..12, cols 4..11): lit paper
-    with a kumiko rail and a dim lower edge (the base's shadow).
+    Wall lantern body, a round barrel (element 3..13 wide, 4..9 high, between two narrower tiers; uv rows 6..12,
+    cols 3..12): lit paper, a kumiko rail and a dim lower edge.
     """
     rng = random.Random(340 + len(tone))
     ramp = TONES[tone]
@@ -342,19 +344,20 @@ def box(tone):
     img = Img()
     img.rect(0, 0, 15, 15, ramp[1])
     for y in range(6, 13):
-        for x in range(4, 12):
-            img.set(x, y, glow(ramp, x, y, 7.5, 9.5, 4.8, 4.6, rng, bias=0.9))
-    for x in range(4, 12):
+        for x in range(3, 13):
+            img.set(x, y, glow(ramp, x, y, 7.5, 9.0, 5.6, 4.4, rng, bias=1.1))
+    for x in range(3, 13):
         img.set(x, 9, rib[1])
         img.set(x, 12, ramp[1])
-    for y in range(6, 13):
-        img.set(4, y, ramp[1] if y != 9 else rib[0])
-        img.set(11, y, ramp[1] if y != 9 else rib[0])
-    for y in range(6, 9):
+        img.set(x, 6, ramp[2])
+    for y in range(7, 12):
+        img.set(3, y, ramp[1] if y != 9 else rib[0])
+        img.set(12, y, ramp[1] if y != 9 else rib[0])
+    for y in range(7, 9):
         img.set(7, y, rib[0])
-    img.set(7, 10, ramp[5])
-    img.set(8, 10, ramp[5])
-    img.set(7, 11, ramp[5])
+        img.set(8, y, rib[1])
+    for x, y in ((7, 10), (8, 10), (7, 11), (8, 11), (6, 10)):
+        img.set(x, y, ramp[5])
     return img
 
 

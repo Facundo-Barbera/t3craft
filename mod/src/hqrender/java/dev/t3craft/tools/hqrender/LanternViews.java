@@ -15,7 +15,7 @@ import net.minecraft.world.level.block.state.BlockState;
 
 /**
  * kit/paper-lantern: the paper-lantern family in the places the citadel puts it, so its look can be judged without a
- * live game. {@code --lanterns} draws four stations, left to right, each 8 blocks wide on a cherry deck:
+ * live game. {@code --lanterns} draws four stations, left to right, each 9 blocks wide on a cherry deck:
  *
  * <ol>
  *   <li><b>stand</b>: two standing andons (the 1-block lantern) either side of a stone path;</li>
@@ -30,7 +30,7 @@ import net.minecraft.world.level.block.state.BlockState;
  * {@code far_50}, {@code far_100}. Each station view is one variant: ask for it alone with {@code --scale 2}.
  */
 final class LanternViews {
-	private static final int STATION = 8;
+	private static final int STATION = 9;
 	private static final String[] TONES = {"paper", "rose", "vermilion"};
 	private static final String M = "t3craft:block/paper_lantern";
 
@@ -85,19 +85,23 @@ final class LanternViews {
 		int s1 = STATION;
 		for (int y = 1; y <= 6; y++) {
 			scene.set(new BlockPos(s1, y, 0), kit.state(HqKit.Role.BEAM, Direction.UP));
-			scene.set(new BlockPos(s1 + 7, y, 0), kit.state(HqKit.Role.BEAM, Direction.UP));
+			scene.set(new BlockPos(s1 + 8, y, 0), kit.state(HqKit.Role.BEAM, Direction.UP));
 		}
 		scene.set(new BlockPos(s1, 7, 0), kit.state(HqKit.Role.BEAM_CAP, Direction.NORTH));
-		scene.set(new BlockPos(s1 + 7, 7, 0), kit.state(HqKit.Role.BEAM_CAP, Direction.NORTH));
-		for (int x = s1; x <= s1 + 7; x++) {
+		scene.set(new BlockPos(s1 + 8, 7, 0), kit.state(HqKit.Role.BEAM_CAP, Direction.NORTH));
+		for (int x = s1; x <= s1 + 8; x++) {
 			scene.set(new BlockPos(x, 6, 0), kit.state(HqKit.Role.BEAM, Direction.EAST));
 		}
-		// the middle one hangs on a chain, the others straight from the beam (the two ways the citadel hangs them)
+		// the ends hang on a chain, the middle one straight from the beam (the two ways the citadel hangs them)
 		for (int i = 0; i < 3; i++) {
-			int y = i == 1 ? 4 : 5;
-			scene.setModel(new BlockPos(s1 + 1 + i * 2, y, 0), M + "_hanging_" + TONES[i], 0);
+			int x = s1 + 2 + i * 2;
+			if (i == 1) {
+				scene.setModel(new BlockPos(x, 5, 0), M + "_hanging_" + TONES[i], 0);
+			} else {
+				scene.set(new BlockPos(x, 5, 0), Blocks.IRON_CHAIN.defaultBlockState());
+				scene.setModel(new BlockPos(x, 4, 0), M + "_hanging_" + TONES[i], 0);
+			}
 		}
-		scene.set(new BlockPos(s1 + 3, 5, 0), Blocks.IRON_CHAIN.defaultBlockState());
 
 		// 3. wall: three cherry pillars with panels between, a bracket lantern on the front of each, at head height + 1
 		int s2 = 2 * STATION;
@@ -166,7 +170,7 @@ final class LanternViews {
 		Files.writeString(out.resolve("report.txt"), rep.toString());
 	}
 
-	/** The box of station {@code s}: its 8 columns, from {@code zMin} (back) to {@code zMax} (front, towards the viewer), up to {@code maxY}. */
+	/** The box of station {@code s}: its 9 columns, from {@code zMin} (back) to {@code zMax} (front, towards the viewer), up to {@code maxY}. */
 	private static Renderer.Clip station(int s, int zMin, int zMax, int maxY) {
 		int x0 = s * STATION;
 		return new Renderer.Clip(x0, -1, zMin, x0 + STATION - 1, maxY, zMax);
