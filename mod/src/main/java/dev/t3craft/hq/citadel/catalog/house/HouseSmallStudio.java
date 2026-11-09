@@ -244,11 +244,11 @@ public final class HouseSmallStudio implements Variant {
 		void run() {
 			floors();
 			IntPredicate none = i -> false;
-			boolean[] winL = wall(false, 1, pd, D - 1, i -> i == pd || i == D - 1 || i == leftMid(), none, -1, -1, 2, 4);
-			boolean[] winR = wall(false, W - 2, pd, D - 1, i -> i == pd || i == D - 1 || i == cv0 || i == cv1, none, -1, -1, 2, 4);
-			wall(true, pd, 1, W - 2, i -> i == 1 || i == W - 2, none, doorLo, doorHi, 2, 4);
+			boolean[] winL = wall(false, 1, pd, D - 1, i -> i == pd || i == D - 1 || i == leftMid(), none, -1, -1, 1, 4);
+			boolean[] winR = wall(false, W - 2, pd, D - 1, i -> i == pd || i == D - 1 || i == cv0 || i == cv1, none, -1, -1, 1, 4);
+			wall(true, pd, 1, W - 2, i -> i == 1 || i == W - 2, none, doorLo, doorHi, 1, 4);
 			// the back: shelves stand against the plain ends, the middle is a big window over the desk
-			wall(true, D - 1, 1, W - 2, i -> i == 1 || i == W - 2, i -> i < iu0 + shelfN() || i > iu1 - shelfN(), -1, -1, 2, 4);
+			wall(true, D - 1, 1, W - 2, i -> i == 1 || i == W - 2, i -> i < iu0 + shelfN() || i > iu1 - shelfN(), -1, -1, 1, 4);
 			doors();
 			gables();
 			roof();
@@ -378,7 +378,7 @@ public final class HouseSmallStudio implements Variant {
 				}
 				for (int e : new int[] {v - 1, v + 1}) {
 					if (e > pd && e < D - 1 && !win[e] && !post.test(e) && free(outer, 3, e)) {
-						for (int y = 2; y <= 4; y++) {
+						for (int y = 1; y <= 4; y++) {
 							set(outer, y, e, TimberKit.trap(s.shutter(), shut, true, false));
 						}
 					}
