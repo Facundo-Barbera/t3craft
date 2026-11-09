@@ -30,7 +30,7 @@ import net.minecraft.world.level.block.state.properties.SlabType;
  * <li><b>3 × 3 up to 4 deep, or height 5</b>: a compact tripod, three legs in a triangle (back left, back right, front
  *     centre) under a bowl as wide as the plot; from 5 × 5 a dais with 2 or 3 stone benches.</li>
  * <li><b>5 × 5 and up with height 7+</b>: the legs splay out two cells (left, right, back; the front stays open) and
- *     carry the bowl through short arms of upside-down slabs 3 blocks up, so a walker passes under them. 5–6 wide: a
+ *     carry the bowl through short arms of upside-down slabs 4 blocks up, so a walker passes under them. 5–6 wide: a
  *     pale dais with 4 stools between the legs. 7 wide: the dais grows to radius 3 with 2 to 4 benches and lanterns on
  *     stone posts at the front ends.</li>
  * </ul>
@@ -87,7 +87,11 @@ public final class LampStreetBrazierTripod implements Variant {
 	}
 
 	/** The seeded look of one plot. */
-	private record Look(int legs, int shape, boolean soul) {
+	private record Look(int legs, int shape, boolean soul, boolean tealSeed) {
+		/** The rim is teal copper under a soul fire and on half of the others, tan on the rest. */
+		boolean teal() {
+			return tealSeed || soul;
+		}
 	}
 
 	/** A seeded choice in 0..n-1, one stream per salt. */
@@ -100,7 +104,7 @@ public final class LampStreetBrazierTripod implements Variant {
 
 	@Override
 	public void build(CitadelCanvas c, Plot p) {
-		Look look = new Look(pick(p, 1, 3), pick(p, 3, 2) * 2, pick(p, 4, 3) == 0);
+		Look look = new Look(pick(p, 1, 3), pick(p, 3, 2) * 2, pick(p, 4, 3) == 0, pick(p, 6, 2) == 0);
 		int w = p.w();
 		int d = p.d();
 		int cu = (w - 1) / 2;
@@ -163,11 +167,15 @@ public final class LampStreetBrazierTripod implements Variant {
 
 	/** The bright copper rim round the fire: tan, or teal under a soul fire, so the flame always has a glowing frame. */
 	private static BlockState rimBlock(Look k) {
-		return b(k.soul() ? Blocks.CUT_COPPER.waxed().weathered() : Blocks.CUT_COPPER.waxed().exposed());
+		return b(k.teal() ? Blocks.CUT_COPPER.waxed().weathered() : Blocks.CUT_COPPER.waxed().exposed());
+	}
+
+	private static BlockState rimStairs(Look k, Direction facing) {
+		return stairs(k.teal() ? Blocks.CUT_COPPER_STAIRS.waxed().weathered() : Blocks.CUT_COPPER_STAIRS.waxed().exposed(), facing);
 	}
 
 	private static BlockState lipSlab(Look k) {
-		return slab(k.soul() ? Blocks.CUT_COPPER_SLAB.waxed().weathered() : Blocks.CUT_COPPER_SLAB.waxed().exposed());
+		return slab(k.teal() ? Blocks.CUT_COPPER_SLAB.waxed().weathered() : Blocks.CUT_COPPER_SLAB.waxed().exposed());
 	}
 
 	private static BlockState fire(Look k) {
@@ -202,7 +210,7 @@ public final class LampStreetBrazierTripod implements Variant {
 	 * The bowl is {@code dd} up, the fire above it.
 	 */
 	private static void tripod(CitadelCanvas c, Plot p, Look k, int cu, int cv, int r) {
-		int dd = Math.min(p.h() - 2, 4);
+		int dd = Math.min(p.h() - 2, 5);
 		int[][] legs = legs(r);
 		Direction[] out = {Direction.WEST, Direction.EAST, Direction.SOUTH};
 		for (int i = 0; i < 3; i++) {
@@ -233,8 +241,8 @@ public final class LampStreetBrazierTripod implements Variant {
 
 	/**
 	 * The bowl, a cup: a dark iron base that tapers (centre block, upside-down stairs, no corners) under a ring of bright
-	 * copper that is wider than the base, and the fire sunk in the ring. On a tall plot the ring is one block of copper
-	 * and a lip of slabs, the fire stands inside it; on a short one the ring is the lip.
+	 * copper that is wider than the base: full blocks at the corners and stairs on the sides that slope in to the fire,
+	 * so from outside it is a solid rim and from above a bowl with the flame in it.
 	 */
 	private static void bowl(CitadelCanvas c, Plot p, Look k, int cu, int cv, int dd) {
 		p.set(c, cu, dd, cv, bowlBlock());
@@ -243,27 +251,15 @@ public final class LampStreetBrazierTripod implements Variant {
 		for (int i = 0; i < 4; i++) {
 			// facing outwards, upside down: the low half is towards the centre, so the base steps in to the knot
 			p.set(c, cu + sides[i][0], dd, cv + sides[i][1], bowlStairs(dirs[i], Half.TOP));
+			// the rim on the side: a stair whose low step is towards the fire
+			p.set(c, cu + sides[i][0], dd + 1, cv + sides[i][1], rimStairs(k, dirs[i].getOpposite()));
 		}
-		int y = dd + 1;
-		boolean tall = p.h() >= dd + 3;
-		for (int dz = -1; dz <= 1; dz++) {
-			for (int dx = -1; dx <= 1; dx++) {
-				if (dx != 0 || dz != 0) {
-					p.set(c, cu + dx, y, cv + dz, rimBlock(k));
-				}
+		for (int su = -1; su <= 1; su += 2) {
+			for (int sv = -1; sv <= 1; sv += 2) {
+				p.set(c, cu + su, dd + 1, cv + sv, k.shape() == 0 ? rimBlock(k) : lipSlab(k));
 			}
 		}
-		if (tall) { // a half-block lip: all round (shape 0) or on the four sides only, with the corners notched (shape 2)
-			for (int dz = -1; dz <= 1; dz++) {
-				for (int dx = -1; dx <= 1; dx++) {
-					boolean corner = dx != 0 && dz != 0;
-					if ((dx != 0 || dz != 0) && !(k.shape() == 2 && corner)) {
-						p.set(c, cu + dx, y + 1, cv + dz, lipSlab(k));
-					}
-				}
-			}
-		}
-		p.set(c, cu, y, cv, fire(k));
+		p.set(c, cu, dd + 1, cv, fire(k));
 	}
 
 	// ------------------------------------------------------------------ ground
