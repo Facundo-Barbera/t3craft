@@ -31,7 +31,7 @@ import net.minecraft.world.level.material.MapColor;
  */
 public final class KitBlocks implements HqKit {
 	/** Bump when a role's state changes (build hashes). */
-	public static final String ID = "kit-3"; // kit-2: connected cherry railing (KitRailingBlock); kit-3: glow_strip, glow_panel
+	public static final String ID = "kit-4"; // kit-2: connected cherry railing (KitRailingBlock); kit-3: paper lanterns (kit/paper-lantern); kit-4: glow_strip, glow_panel
 
 	/** Block ids of the kit, in creative-tab order. */
 	public static final List<String> IDS = List.of("standing_desk", "shoji_panel", "cherry_floor_tile", "stone_floor_tile",
