@@ -159,7 +159,7 @@ public final class TreeBirchGrove implements Variant {
 		int minCheb = !big ? (m >= 10 ? 5 : 3) : 6;
 		for (int i = 0; i < n; i++) {
 			int[] best = null;
-			boolean join = big && i > 0 && r.nextInt(10) < 7;
+			boolean join = big && i > 0 && r.nextInt(10) < 5;
 			if (join) {
 				for (int k = 0; k < 80 && best == null; k++) {
 					int[] a = pts.get(r.nextInt(pts.size()));
@@ -429,7 +429,7 @@ public final class TreeBirchGrove implements Variant {
 					if (q > 1.0 + jit) {
 						continue;
 					}
-					if (q > 0.5 && t.hash(u + salt * 5, y, v + salt, 100) < 16) {
+					if (q > 0.5 && t.hash(u + salt * 5, y, v + salt, 100) < 22) {
 						continue; // thinned skin
 					}
 					if (q > 0.18 && q < 0.97 && t.kind(u, y - 1, v) == TreeKit.LEAF && t.hash(u + salt, y, v + salt * 5, 4) < 1) {
@@ -619,11 +619,11 @@ public final class TreeBirchGrove implements Variant {
 			double ang = a0 + k * 0.52;
 			int u = (int) Math.round(cl[0] + Math.cos(ang) * (cl[2] - 0.6));
 			int v = (int) Math.round(cl[1] + Math.sin(ang) * (cl[2] - 0.6));
-			if (!t.in(u, 4, v) || sd[v * t.w + u]) {
+			if (!t.in(u, 5, v) || sd[v * t.w + u]) {
 				continue;
 			}
 			boolean free = true;
-			for (int y = 0; y <= 4; y++) {
+			for (int y = 0; y <= 5; y++) {
 				byte kk = t.kind(u, y, v);
 				if (kk != TreeKit.EMPTY && !(y == 0 && kk == TreeKit.COVER)) {
 					free = false;
@@ -653,18 +653,18 @@ public final class TreeBirchGrove implements Variant {
 			if (!armFree(t, u + au, v + av)) {
 				continue;
 			}
-			for (int y = 0; y <= 3; y++) {
+			for (int y = 0; y <= 4; y++) {
 				t.fixed(u, y, v, b(Blocks.BIRCH_FENCE));
 			}
-			t.fixed(u, 4, v, side(b(Blocks.BIRCH_FENCE), au, av, true));
-			t.fixed(u + au, 4, v + av, side(b(Blocks.BIRCH_FENCE), -au, -av, true));
-			t.fixed(u + au, 3, v + av, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true));
+			t.fixed(u, 5, v, side(b(Blocks.BIRCH_FENCE), au, av, true));
+			t.fixed(u + au, 5, v + av, side(b(Blocks.BIRCH_FENCE), -au, -av, true));
+			t.fixed(u + au, 4, v + av, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true));
 			return;
 		}
 	}
 
 	private static boolean armFree(Vox t, int u, int v) {
-		return t.in(u, 4, v) && t.kind(u, 3, v) == TreeKit.EMPTY && t.kind(u, 4, v) == TreeKit.EMPTY && t.kind(u, 5, v) == TreeKit.EMPTY;
+		return t.in(u, 6, v) && t.kind(u, 4, v) == TreeKit.EMPTY && t.kind(u, 5, v) == TreeKit.EMPTY && t.kind(u, 6, v) == TreeKit.EMPTY;
 	}
 
 	/** A few fallen birch logs (two or three long, a little moss on them) well away from the senda, the clearing and the trunks. */
