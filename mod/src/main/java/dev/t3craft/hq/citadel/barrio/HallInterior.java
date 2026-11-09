@@ -151,7 +151,7 @@ public final class HallInterior {
 			case TIMBER -> edge || accent ? Blocks.DARK_OAK_PLANKS : Blocks.SPRUCE_PLANKS;
 			case STONE -> edge ? Blocks.POLISHED_DEEPSLATE : accent ? Blocks.MOSSY_STONE_BRICKS : Blocks.STONE_BRICKS;
 			case SHUTTERED -> edge ? Blocks.POLISHED_BLACKSTONE_BRICKS : accent ? Blocks.SPRUCE_PLANKS : Blocks.DARK_OAK_PLANKS;
-			case BALCONY -> edge ? Blocks.POLISHED_DEEPSLATE : accent ? Blocks.BAMBOO_MOSAIC : Blocks.SMOOTH_QUARTZ;
+			case BALCONY -> edge ? Blocks.POLISHED_DEEPSLATE : accent ? Blocks.POLISHED_ANDESITE : Blocks.SMOOTH_QUARTZ;
 		};
 	}
 

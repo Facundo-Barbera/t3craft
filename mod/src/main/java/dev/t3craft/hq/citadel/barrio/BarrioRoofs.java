@@ -74,6 +74,13 @@ public final class BarrioRoofs {
 				}
 				if (u == -1 || u == D) {
 					for (int yy = top + 1; yy < y; yy++) {
+						if (grand(r)) {
+							// struct/barrio-hall2: the gable end is glazed between posts on the walls' pier rhythm, not a smooth triangle
+							boolean pier = Math.floorMod(v, 3) == 0;
+							boolean glass = !pier && v >= 1 && v <= W - 2 && yy >= top + 2 && yy <= y - 3;
+							c.set(p.atY(yy), pier ? mats.post() : glass ? GLASS : mats.wall());
+							continue;
+						}
 						boolean round = v == mid && (yy == top + 2 || yy == top + 3);
 						c.set(p.atY(yy), round ? GLASS : mats.wall());
 					}
@@ -167,8 +174,8 @@ public final class BarrioRoofs {
 				}
 				if (n == 0) {
 					for (int y = top + 1; y < yc; y++) {
-						boolean window = dt == 0 && (y == top + 3 || y == top + 4);
-						c.set(p.atY(y), window ? GLASS : mats.wall());
+						boolean window = Math.abs(dt) < half && y >= top + 2 && y <= yc - 2;
+						c.set(p.atY(y), Math.abs(dt) == half ? mats.post() : window ? GLASS : mats.wall());
 					}
 				}
 			}

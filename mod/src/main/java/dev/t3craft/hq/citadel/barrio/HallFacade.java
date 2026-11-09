@@ -80,7 +80,9 @@ public final class HallFacade {
 			return footing(s, seed, t, ly);
 		}
 		if (pier) {
-			return s == HallStyle.STONE ? plinth(seed, t, ly) : m.post();
+			// timber keeps its posts in the wall; the other styles show the wall's own material between the glass, so the
+			// protruding pilasters (posts) stand out against it
+			return s == HallStyle.STONE ? plinth(seed, t, ly) : s == HallStyle.TIMBER ? m.post() : m.wall();
 		}
 		if (ly == lintel) {
 			return switch (s) {
@@ -491,11 +493,8 @@ public final class HallFacade {
 			return;
 		}
 		BlockPos ledge = outside(r, side, t, yb + 1);
-		if (f == 0) {
-			c.set(ledge, stairs(Blocks.DEEPSLATE_BRICK_STAIRS, out.getOpposite()));
-		} else {
-			c.set(ledge, topSlab(s.slab()));
-		}
+		// dark sills on every floor (a light or yellow ledge reads as a band across the facade)
+		c.set(ledge, stairs(Blocks.DEEPSLATE_BRICK_STAIRS, out.getOpposite()));
 		if (boxes) {
 			put(c, outside(r, side, t, yb + 2), HallStyle.pot(hsh / 7 + t));
 		}
