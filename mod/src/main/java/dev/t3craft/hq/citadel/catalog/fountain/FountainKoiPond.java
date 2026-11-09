@@ -480,10 +480,9 @@ public final class FountainKoiPond implements Variant {
 			for (int i = 0; i < top; i++) {
 				put(c, p, u, 2 + i, v, i == 0 ? rimTop(u, v + 31) : rimTop(u + 17, v));
 			}
-			BlockState cap = switch (p.hash(u, 11, v, 5)) {
+			BlockState cap = switch (p.hash(u, 11, v, 4)) {
 				case 0 -> b(Blocks.MOSS_CARPET);
 				case 1 -> slab(Blocks.POLISHED_DIORITE_SLAB);
-				case 2 -> b(Blocks.CALCITE);
 				default -> slab(Blocks.MOSSY_COBBLESTONE_SLAB);
 			};
 			put(c, p, u, 2 + top, v, cap);
@@ -1050,11 +1049,18 @@ public final class FountainKoiPond implements Variant {
 			int lu = su == 0 ? 1 : su;
 			int lv = sv == 0 ? 1 : sv;
 			double cy = Math.max(3.6, top - 1.2);
-			double[][] lumps = {
-				{bu + 1.0 * lu, cy, bv + 1.0 * lv, 2.6, 1.2},
-				{bu - 0.2 * lu - 1.4 * ps * lv, cy + 0.9, bv - 0.2 * lv + 1.4 * ps * lu, 1.8, 0.95},
-				{bu + 2.0 * lu + 1.3 * ps * lv, cy - 0.7, bv + 2.0 * lv - 1.3 * ps * lu, 1.7, 0.85},
-			};
+			boolean small = w <= 8 || d <= 8; // the crown must leave water showing on a small pond
+			double reach = small ? 0.4 : 1.0;
+			double[][] lumps = small
+					? new double[][] {
+						{bu + reach * lu, cy, bv + reach * lv, 2.1, 1.0},
+						{bu - 0.3 * lu - 1.2 * ps * lv, cy + 0.8, bv - 0.3 * lv + 1.2 * ps * lu, 1.5, 0.85},
+					}
+					: new double[][] {
+						{bu + reach * lu, cy, bv + reach * lv, 2.5, 1.2},
+						{bu - 0.2 * lu - 1.4 * ps * lv, cy + 0.9, bv - 0.2 * lv + 1.4 * ps * lu, 1.8, 0.95},
+						{bu + 1.8 * lu + 1.3 * ps * lv, cy - 0.7, bv + 1.8 * lv - 1.3 * ps * lu, 1.6, 0.8},
+					};
 			boolean[][][] leaf = new boolean[w][h][d];
 			for (int u = 0; u < w; u++) {
 				for (int y = 0; y < h; y++) {
