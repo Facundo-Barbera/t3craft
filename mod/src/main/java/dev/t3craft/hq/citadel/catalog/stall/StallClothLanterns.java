@@ -265,7 +265,7 @@ public final class StallClothLanterns implements Variant {
 		} else if (k == 6) {
 			p.set(c, u, 1, v, b(Blocks.LOOM).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH));
 		} else if (k == 7) {
-			p.set(c, u, 1, v, b(Blocks.CHERRY_SLAB)); // a bare board
+			p.set(c, u, 1, v, b(Blocks.CHERRY_SLAB).setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP)); // a bare board
 		} else {
 			p.set(c, u, 1, v, cloth(p, g, u, 1, v));
 		}
@@ -301,7 +301,7 @@ public final class StallClothLanterns implements Variant {
 				p.set(c, u, 0, v, p.hash(u, 0, v, 3) == 0 ? b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.NORTH) : b(Blocks.CHERRY_PLANKS));
 				// the shelf: goods in piles of bolts, a cherry board over some of them
 				if (p.hash(u, 1, v, 3) == 0) {
-					p.set(c, u, 1, v, b(Blocks.CHERRY_SLAB));
+					p.set(c, u, 1, v, b(Blocks.CHERRY_SLAB).setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP));
 				} else {
 					p.set(c, u, 1, v, cloth(p, g, u, 1, v));
 				}
