@@ -150,7 +150,8 @@ public final class GateToriiCherry implements Variant {
 					p.set(c, u, k0, v, b(Blocks.STRIPPED_CHERRY_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.X));
 				} else if (!shaft) {
 					Direction in = v < v0 ? Direction.SOUTH : Direction.NORTH;
-					p.set(c, u, k0, v, stairs(Blocks.DEEPSLATE_TILE_STAIRS, in).setValue(BlockStateProperties.HALF, Half.TOP));
+					// a pink soffit under the dark roof: the kasagi stays slim and warm instead of a black slab
+					p.set(c, u, k0, v, stairs(Blocks.CHERRY_STAIRS, in).setValue(BlockStateProperties.HALF, Half.TOP));
 				} else {
 					p.set(c, u, k0, v, b(Blocks.DEEPSLATE_TILES));
 				}
@@ -209,10 +210,8 @@ public final class GateToriiCherry implements Variant {
 
 	private static BlockState plaque(Plot p, int i, int row, int pw) {
 		// glyph strokes in gold, the rest black bricks: a deterministic "calligraphy"
-		boolean gold = (row == 1 && i % 2 == 0) || (row == 0 && i % 2 == 1 && p.hash(i, row, 0, 3) == 0);
-		if (pw == 1) {
-			gold = row == 1;
-		}
+		// a single crest in the middle of the top row (two blocks on an even plaque), not a pair of "eyes"
+		boolean gold = row == 1 && (i == pw / 2 || (pw % 2 == 0 && i == pw / 2 - 1));
 		return gold ? GOLD : PLAQUE;
 	}
 
