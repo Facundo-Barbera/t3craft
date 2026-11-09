@@ -51,8 +51,14 @@ Incluye el catálogo (60 variantes, con la ola B: bancas, jardineras, postes, po
 - `feat/build-near-player`: **integrado en main** (rama `82597e6`), compilado y sin probar en juego. Base por capas (estimación: de ~7–9 min a ~10–20 s), arranque inmediato junto al jugador, prioridad por cercanía, 96 bloques por tick y hasta 8 builders. Pendiente: en supervivencia, las alas se siguen construyendo en orden de índice.
 
 ## En curso (solo código, 2026-11-09)
-- `feat/build-radial`: según el feedback de Facundo, construir alrededor del jugador en anillos de 5 bloques. Un anillo queda bien terminado antes de pasar al siguiente, y el centro se mueve con el jugador. La base va a un ritmo intermedio (configurable) y el modo por partes queda como fallback.
-- `citadel/scale-port`: la escala configurable portada sobre `citadel/next`, por defecto 1.0, con el plan idéntico al actual.
+- `feat/build-radial`: **integrado en main** (`f436217`) y compilado. Construye en anillos de 5 bloques alrededor del jugador; la base tarda ~1,7 min estimados. Quedan pendientes tres cosas:
+  - en supervivencia no hay orden radial;
+  - `HqConstruction` sigue mandando un trabajo por parte;
+  - con 8 builders algunos adelantan el anillo siguiente.
+- `citadel/scale-port`: **dentro de `citadel/next`** (`3d03dd0`), que compila. La escala por defecto es 1.0. Con 1.5 los nodos y algunos detalles mantienen tamaño fijo, y hay que verlo en render.
+- `fix/chat-send-agents-menu` (en curso):
+  - arreglar el segundo mensaje que se pierde;
+  - menú de agentes con los activos arriba y filtro, y los terminados abajo.
 - `cat/wave-c`: estatuas, gazebos, mástiles, puentes y remates de torre.
 - `citadel/light-aesthetic`: luz visible solo como diseño (faroles con ritmo, linternas en aleros, apliques junto a puertas, candelabros centrados) y relleno invisible. Nada de bloques luminosos visibles "donde caigan".
 - `feat/ui-hq-menu-lineage`:
