@@ -137,6 +137,8 @@ final class CatalogViews {
 		// walkability audit (docs/tools/citadel-catalog.md): on by default for the gallery's report, -Dt3craft.walkAudit=false skips it
 		boolean walkAudit = !"false".equalsIgnoreCase(System.getProperty("t3craft.walkAudit"));
 		StringBuilder walkFlags = new StringBuilder();
+		StringBuilder walkDump = new StringBuilder();
+		StringBuilder walkBlocks = new StringBuilder();
 		for (Cell c : cells) {
 			Plot p = c.plot();
 			int x1 = p.x0();
@@ -181,7 +183,16 @@ final class CatalogViews {
 			rep.append(String.format(Locale.ROOT, "%-44s %6d %8d %8d  %s%n", c.label(), blocks, p.clipped(), outside, note));
 			if (walkAudit) {
 				try {
-					List<String> w = WalkAudit.run(p, canvas, gap);
+					walkBlocks.append("# ").append(c.label()).append('\n');
+					walkDump.append("# ").append(c.label()).append(" box ").append(p.sizeX()).append('x').append(p.sizeZ()).append('x').append(p.h()).append(" front ").append(p.front()).append('\n');
+					for (Map.Entry<Long, BlockState> be : canvas.cells.entrySet()) {
+						if (!be.getValue().isAir()) {
+							BlockPos bp = BlockPos.of(be.getKey());
+							walkBlocks.append("B ").append(bp.getX() - p.x0()).append(' ').append(bp.getY() - 1).append(' ').append(bp.getZ() - p.z0()).append(' ')
+									.append(be.getValue().toString().replace("Block{minecraft:", "").replace("}[", " ").replace("}", "")).append('\n');
+						}
+					}
+					List<String> w = WalkAudit.run(p, canvas, gap, walkDump);
 					for (String line : w) {
 						rep.append("    walk: ").append(line).append('\n');
 						if (line.startsWith("FLAG")) {
@@ -202,6 +213,10 @@ final class CatalogViews {
 		rep.append(problems == 0 ? "OK: every build stayed inside its plot.\n"
 				: "WARNING: " + problems + " build(s) clipped, wrote outside the plot or failed (clipped = writes dropped by Plot; outside = blocks set on the canvas directly, outside the box).\n");
 
+		if (walkDump.length() > 0) {
+			Files.writeString(out.resolve("walk_cells.txt"), walkDump.toString());
+			Files.writeString(out.resolve("walk_blocks.txt"), walkBlocks.toString());
+		}
 		if (walkFlags.length() > 0) {
 			rep.append("WALK FLAGS (builds with something to look at):\n").append(walkFlags);
 		}

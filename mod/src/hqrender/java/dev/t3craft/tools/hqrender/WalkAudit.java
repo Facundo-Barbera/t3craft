@@ -49,7 +49,7 @@ final class WalkAudit {
 		return s.getBlock() == Blocks.WATER || s.hasProperty(BlockStateProperties.WATERLOGGED) && s.getValue(BlockStateProperties.WATERLOGGED);
 	}
 
-	static List<String> run(Plot p, CitadelCanvas canvas, int gap) {
+	static List<String> run(Plot p, CitadelCanvas canvas, int gap, StringBuilder dump) {
 		int x1 = p.x0();
 		int z1 = p.z0();
 		int x2 = x1 + p.sizeX() - 1;
@@ -88,6 +88,8 @@ final class WalkAudit {
 				continue;
 			}
 			int rel = q.getY() - 1;
+			dump.append(String.format(Locale.ROOT, "R %d %d %d %.1f %.1f%n", q.getX() - x1, rel, q.getZ() - z1, walk.floor(q.getX(), q.getY(), q.getZ()) - 1.0,
+					Math.min(99.0, walk.clearance(q.getX(), q.getY(), q.getZ(), 8))));
 			maxY = Math.max(maxY, rel);
 			levels.merge((int) Math.round(walk.floor(q.getX(), q.getY(), q.getZ()) - 1.0), 1, Integer::sum);
 			double clear = walk.clearance(q.getX(), q.getY(), q.getZ(), 8);
@@ -121,6 +123,8 @@ final class WalkAudit {
 			}
 			BlockPos q = BlockPos.of(e.getKey());
 			stairs++;
+			dump.append(String.format(Locale.ROOT, "S %d %d %d %s %d %s%n", q.getX() - x1, q.getY() - 1, q.getZ() - z1, s.getValue(StairBlock.FACING).getSerializedName().charAt(0),
+					reach.contains(q.above()) ? 1 : 0, Double.isNaN(walk.floor(q.getX(), q.getY() + 1, q.getZ())) ? "blocked" : "standable"));
 			if (reach.contains(q.above())) {
 				stairsReached++;
 			} else if (!Double.isNaN(walk.floor(q.getX(), q.getY() + 1, q.getZ()))) {
@@ -156,6 +160,7 @@ final class WalkAudit {
 					if (Double.isNaN(f) || Double.isInfinite(walk.clearance(x, y, z, 8))) {
 						continue;
 					}
+					dump.append(String.format(Locale.ROOT, "U %d %d %d %.1f %.1f%n", x - x1, y - 1, z - z1, f - 1.0, Math.min(99.0, walk.clearance(x, y, z, 8))));
 					if (sealed.merge(y - 1, 1, Integer::sum) == 1 && sealedAt.isEmpty()) {
 						sealedAt = String.format(Locale.ROOT, "(%d,%d,%d)", x - x1, y - 1, z - z1);
 					}
@@ -169,6 +174,13 @@ final class WalkAudit {
 		}
 		if (low > 0) {
 			out.add("FLAG low: " + low + " reached cells under a roof with under 2.85 blocks of headroom, doorways aside, first " + lowAt);
+		}
+
+		for (Map.Entry<Long, BlockState> e : canvas.cells.entrySet()) {
+			if (e.getValue().getBlock() instanceof DoorBlock && e.getValue().getValue(DoorBlock.HALF) == net.minecraft.world.level.block.state.properties.DoubleBlockHalf.LOWER) {
+				BlockPos q = BlockPos.of(e.getKey());
+				dump.append(String.format(Locale.ROOT, "D %d %d %d%n", q.getX() - x1, q.getY() - 1, q.getZ() - z1));
+			}
 		}
 
 		// ---- fire next to water
