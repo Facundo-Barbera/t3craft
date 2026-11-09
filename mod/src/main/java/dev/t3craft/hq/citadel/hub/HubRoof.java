@@ -59,8 +59,8 @@ public final class HubRoof {
 		if (ax >= HubDims.NAVE_HALF() - 1) {
 			return HubBlocks.darkStairs(in, false);
 		}
-		if (HubDims.TALL() && ax >= CitadelCanvas.dims().s(2) && (rib || ax % 4 == 0)) {
-			return HubBlocks.darkStairs(in, false);
+		if (HubDims.TALL() && ax >= CitadelCanvas.dims().s(2) && (rib || ax == CitadelHub.naveHalf() - 4)) {
+			return CitadelCanvas.stairs(Blocks.DARK_OAK_STAIRS, in);
 		}
 		if (ax >= CitadelCanvas.dims().s(2)) {
 			return HubBlocks.roofStairs(in);

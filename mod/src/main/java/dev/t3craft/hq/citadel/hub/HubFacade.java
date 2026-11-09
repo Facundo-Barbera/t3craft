@@ -424,7 +424,7 @@ public final class HubFacade {
 
 	/**
 	 * The rose of the tall facade (struct/hub4), with tracery: a yellow eye, a calcite ring, eight petals (pink and orange) split by
-	 * calcite spokes, a second ring and sixteen outer lights (blue and magenta) split by finer bars, inside the stone-brick rim.
+	 * calcite spokes, a second ring and eight outer lights (blue and magenta) on the same spokes, inside the stone-brick rim.
 	 * {@code f} is the scale of the original (1 at 200); the bars are one block thick whatever the radius.
 	 */
 	private static BlockState traceryRose(int x, double dy, double r, double f) {
@@ -437,14 +437,13 @@ public final class HubFacade {
 		if (r <= 1.5 * f) {
 			return HubBlocks.glass(DyeColor.YELLOW);
 		}
-		if (r <= 2.2 * f || (r > 3.6 * f && r <= 4.3 * f)) {
+		if (r <= 2.1 * f || (r > 3.5 * f && r <= 4.1 * f)) {
 			return CALCITE;
 		}
-		boolean inner = r <= 3.6 * f;
-		int n = inner ? 8 : 16;
-		double sector = Math.atan2(dy, x) / (2 * Math.PI / n);
-		double bar = r * Math.abs(sector - Math.rint(sector)) * (2 * Math.PI / n);
-		if (bar < (inner ? 0.62 : 0.55)) {
+		boolean inner = r <= 3.5 * f;
+		double sector = Math.atan2(dy, x) / (Math.PI / 4);
+		double bar = r * Math.abs(sector - Math.rint(sector)) * (Math.PI / 4);
+		if (bar < 0.5) {
 			return CALCITE;
 		}
 		boolean even = Math.floorMod((int) Math.floor(sector), 2) == 0;
