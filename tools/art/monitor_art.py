@@ -216,9 +216,13 @@ def strip_down(l, r):
     chin = element([xa, 2, -1], [xb, 4, 0], {
         "north": {"texture": "#frame", "uv": north_uv(xa, xb, 2, 4)},
         "up": face(TRIM_LIP_INNER)})
-    foot = element([0, 0, -5], [16, 2, 0], {
-        "north": face(TRIM_FOOT_FRONT), "up": face(TRIM_FOOT_TOP), "down": face(TRIM_LIP_INNER),
-        "east": face(TRIM_FOOT_END), "west": face(TRIM_FOOT_END)})
+    faces = {"north": face(TRIM_FOOT_FRONT), "up": face(TRIM_FOOT_TOP), "down": face(TRIM_FOOT_END)}
+    # end faces only where the foot really ends (a side with its own strip); inside a wall they are hidden anyway
+    if l:
+        faces["east"] = face(TRIM_FOOT_END)
+    if r:
+        faces["west"] = face(TRIM_FOOT_END)
+    foot = element([0, 0, -5], [16, 2, 0], faces)
     return [chin, foot]
 
 
