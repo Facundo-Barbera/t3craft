@@ -270,6 +270,8 @@ public final class HouseTimberCottage implements Variant {
 		for (int u = u1 + 1; u < u2; u++) {
 			if (!(isPost(u, u1, u2, -1) || u == cu)) {
 				p.set(c, u, 5, vj - 1, stairs(Blocks.SPRUCE_STAIRS, Direction.SOUTH).setValue(BlockStateProperties.HALF, Half.TOP));
+				// [finish] a flowering window box on every sill
+				p.set(c, u, 6, vj - 1, TimberKit.planter(p, u, 6, vj - 1));
 			}
 		}
 		// [depth] a top plate: a horizontal beam over every wall at y8, under the roof

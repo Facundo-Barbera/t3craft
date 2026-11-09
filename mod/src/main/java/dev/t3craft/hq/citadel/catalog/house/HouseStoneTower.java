@@ -394,17 +394,6 @@ public final class HouseStoneTower implements Variant {
 		for (int[] o : diagonal) {
 			towerWindow(c, p, o[0], o[1], 6, false);
 		}
-		// belt courses
-		for (int y : new int[] {4, 9}) {
-			for (int dv = -4; dv <= 4; dv++) {
-				for (int du = -4; du <= 4; du++) {
-					if (StoneKit.rim(du, dv, 13) && !in(du, dv, R_OUT) && !(TC + du >= HALL_U0 && TC + dv >= 3)) {
-						BlockState s = stairs(Blocks.POLISHED_ANDESITE_STAIRS, StoneKit.outward(du, dv, 13).getOpposite());
-						p.set(c, TC + du, y, TC + dv, up(s));
-					}
-				}
-			}
-		}
 		// crown: corbel (inverted stairs, deepslate), then the cone
 		StoneKit.discLayer(c, p, TC, TC, 12, R_CROWN, Blocks.DEEPSLATE_BRICK_STAIRS, b(Blocks.DEEPSLATE_BRICKS), true);
 		int[] radii = {8, 5, 2, 1};
