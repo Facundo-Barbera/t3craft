@@ -68,7 +68,7 @@ public final class CitadelSettle {
 	 * fix/settle-sources (render diagnostics): one floating group the last pass handled, where it was (before falling),
 	 * who owned the column (the canvas group and zone kind), what it was made of, what happened and how far it fell.
 	 */
-	public record Source(String group, String zone, String outcome, int drop, int blocks, int x, int y, int z, String blocksOf) {
+	public record Source(String group, String zone, String piece, String outcome, int drop, int blocks, int x, int y, int z, String blocksOf) {
 	}
 
 	/** The groups of the last pass, in the order they were settled (render diagnostics only). */
@@ -86,7 +86,7 @@ public final class CitadelSettle {
 	public static Map<String, int[]> lastByOrigin() {
 		Map<String, int[]> by = new TreeMap<>();
 		for (Source s : lastSources) {
-			int[] a = by.computeIfAbsent(s.group() + " / " + s.zone(), k -> new int[7]);
+			int[] a = by.computeIfAbsent(s.piece().isEmpty() ? s.group() + " / " + s.zone() : s.piece(), k -> new int[7]);
 			a[0]++;
 			a[2] += s.blocks();
 			switch (s.outcome()) {
@@ -134,9 +134,15 @@ public final class CitadelSettle {
 				kinds.merge(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(s.getBlock()).getPath(), 1, Integer::sum);
 			}
 		}
+		String piece = "";
+		for (CitadelCanvas.Piece pc : c.pieces) {
+			if (x >= pc.x() && x < pc.x() + pc.sx() && z >= pc.z() && z < pc.z() + pc.sz()) {
+				piece = pc.id();
+			}
+		}
 		StringBuilder sb = new StringBuilder();
 		kinds.entrySet().stream().sorted((p, q) -> q.getValue() - p.getValue()).limit(3).forEach(e -> sb.append(sb.length() == 0 ? "" : ",").append(e.getKey()));
-		return new Source(group, zone, outcome, drop, g.size(), x, y, z, sb.toString());
+		return new Source(group, zone, piece, outcome, drop, g.size(), x, y, z, sb.toString());
 	}
 
 	/** One line about the last pass (render diagnostics, {@code PlanReport}'s split pieces). */
@@ -150,8 +156,13 @@ public final class CitadelSettle {
 		return new int[] {r.fell(), r.fellBlocks(), r.propped(), r.proppedBlocks(), r.removed(), r.removedBlocks(), r.left(), r.leftBlocks()};
 	}
 
+	/**
+	 * A cell that is something. The invisible light block ({@code minecraft:light}) is not: like {@code PlanReport}'s
+	 * FLOATING test, the settling ignores it. It hangs in the air by design (one cell above the walking cell), so before
+	 * this the hub's ~390 lights fell a block each, into the walking cells.
+	 */
 	private static boolean present(@Nullable BlockState s) {
-		return s != null && !s.isAir();
+		return s != null && !s.isAir() && !s.is(Blocks.LIGHT);
 	}
 
 	private static boolean solid(@Nullable BlockState s) {

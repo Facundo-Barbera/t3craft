@@ -170,6 +170,12 @@ public final class CitadelCanvas {
 	public final Map<Long, Integer> layers = new HashMap<>();
 	/** Fixture cells the light pass never replaces (desks, screens, terminal, board). */
 	public final Set<Long> fixtures = new HashSet<>();
+	/** fix/settle-sources (diagnostics): a catalog piece painted on its plot, {@code id} = {@code FAMILY:variant}. */
+	public record Piece(String id, int x, int z, int sx, int sz) {
+	}
+
+	/** The catalog pieces painted on this canvas, in order (diagnostics: who owns a floating group). */
+	public final List<Piece> pieces = new ArrayList<>();
 	public final TreeMap<String, Anchor> anchors = new TreeMap<>();
 	public final List<Workstation> workstations = new ArrayList<>();
 	private int walk;
