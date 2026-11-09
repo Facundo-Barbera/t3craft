@@ -311,12 +311,24 @@ public final class CitadelOffice {
 					}
 				} else if (Math.hypot(CX() + dx, CZ() + dz) > deck) {
 					for (int y = 1; y <= F0(); y++) {
-						set(c, dx, y, dz, FOOT);
+						set(c, dx, y, dz, plinthBlock(CX() + dx, y, CZ() + dz));
 					}
 					set(c, dx, F0() + 1, dz, slab(Blocks.DEEPSLATE_TILE_SLAB));
 				}
 			}
 		}
+	}
+
+	/** The skirt's materials: polished course under the cap, bricks and cracked tiles scattered in the tiles (never one flat colour). */
+	private static BlockState plinthBlock(int x, int y, int z) {
+		if (y == F0()) {
+			return CitadelCanvas.b(Blocks.POLISHED_DEEPSLATE);
+		}
+		int h = Math.floorMod(x * 31 + y * 17 + z * 7, 11);
+		if (h < 2) {
+			return CitadelCanvas.b(Blocks.CRACKED_DEEPSLATE_TILES);
+		}
+		return h < 4 ? CitadelCanvas.b(Blocks.DEEPSLATE_BRICKS) : FOOT;
 	}
 
 	// ------------------------------------------------------------------ floors
