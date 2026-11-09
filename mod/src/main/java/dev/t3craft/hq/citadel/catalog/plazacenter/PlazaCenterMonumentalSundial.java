@@ -269,7 +269,7 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 					if (num) {
 						continue;
 					}
-					if (t >= k.rd - (k.rd >= 7 ? (card ? 3.5 : 2.5) : (card ? 2.6 : 1.8))) {
+					if (k.rd >= 6 ? t >= k.rd - (card ? 3.5 : 2.5) : card && t >= k.rd - 2.2) {
 						k.mark[u][v] = 1;
 						break;
 					}
@@ -357,7 +357,7 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 			// [depth] the single step up to the podium, low side out: stairs ascend towards the plaza
 			Direction in = eu <= ev ? (u < k.cu ? Direction.EAST : Direction.WEST) : (v < k.cv ? Direction.SOUTH : Direction.NORTH);
 			boolean axis = a <= 1 || bb <= 1;
-			Block sb = axis ? Blocks.POLISHED_DIORITE_STAIRS : p.hash(u, 0, v, 5) == 0 ? Blocks.DEEPSLATE_TILE_STAIRS : Blocks.DEEPSLATE_BRICK_STAIRS;
+			Block sb = axis ? Blocks.POLISHED_DIORITE_STAIRS : p.hash(u, 0, v, 5) == 0 ? Blocks.MOSSY_STONE_BRICK_STAIRS : Blocks.STONE_BRICK_STAIRS;
 			s(c, p, u, 0, v, stairs(sb, in));
 			return;
 		}
@@ -374,8 +374,10 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 			s(c, p, u, 4, v, b(Blocks.LANTERN));
 			return;
 		}
-		if (r > k.rt + 0.5 && r <= k.rt + 1.5 && a >= 2 && bb >= 2 && Math.abs(a - bb) >= 2) {
-			// benches on arcs round the platform, the seat towards the dial, the back outwards; the axes stay free
+		int lim = k.half - k.pw - 1;
+		int row = k.half - 1;
+		if ((a == row && bb >= 2 && bb <= lim) || (bb == row && a >= 2 && a <= lim)) {
+			// straight benches along the four sides, seat towards the dial, back outwards; the 3-wide axes stay free
 			s(c, p, u, 1, v, stairs(Blocks.CHERRY_STAIRS, out(dx, dz)));
 		}
 	}
@@ -442,7 +444,7 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 				s(c, p, cu, k.yd + hi, v, stairs(k.gStair, Direction.SOUTH));
 			} else {
 				s(c, p, cu, k.yd + hi, v, b(k.gBlock));
-				int ex = Math.max(0, Math.min(2, p.h() - 3 - k.yd - hi));
+				int ex = 0;
 				for (int y = 1; y <= ex; y++) {
 					s(c, p, cu, k.yd + hi + y, v, b(k.gBlock));
 				}
