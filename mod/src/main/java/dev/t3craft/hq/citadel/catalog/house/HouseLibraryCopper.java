@@ -339,15 +339,24 @@ public final class HouseLibraryCopper implements Variant {
 				st = jewelPane(p, u, y, v, alongU);
 			} else if (pier) {
 				st = y == 10 ? b(Blocks.CHISELED_STONE_BRICKS) : (y > 10 ? wallStone(p, u, y, v) : pierStone(p, u, y, v));
-			} else if (y == 6 || y == 10) {
+			} else if (y == 6) {
+				st = b(Blocks.POLISHED_DEEPSLATE); // a dark string course between the two tiers of windows
+			} else if (y == 10) {
 				st = b(Blocks.POLISHED_ANDESITE);
 			} else if (y > 10) {
 				st = wallStone(p, u, y, v);
 			} else if (y <= 5) {
 				if (win) {
 					st = mull ? b(Blocks.CALCITE) : clearPane(alongU);
+				} else if (y == 5 && !mull && wl.width[i] >= 5 && (wl.off[i] == 1 || wl.off[i] == wl.width[i] - 2)) {
+					// a blind arch: inverted stairs spring from the sides towards a chiselled keystone
+					boolean towardsEnd = wl.off[i] < wl.width[i] / 2;
+					Direction along = alongU ? (towardsEnd ? Direction.EAST : Direction.WEST) : (towardsEnd ? Direction.SOUTH : Direction.NORTH);
+					st = stair(Blocks.STONE_BRICK_STAIRS, along, true);
+				} else if (mull && y >= 4) {
+					st = b(Blocks.CHISELED_STONE_BRICKS); // keystone and boss
 				} else {
-					st = mull && y == 4 ? b(Blocks.CHISELED_STONE_BRICKS) : wallStone(p, u, y, v);
+					st = wallStone(p, u, y, v);
 				}
 			} else if (win && mull) {
 				st = b(Blocks.CALCITE);
@@ -356,7 +365,7 @@ public final class HouseLibraryCopper implements Variant {
 			} else if (win) {
 				st = clearPane(alongU);
 			} else {
-				st = wallStone(p, u, y, v);
+				st = pierStone(p, u, y, v); // blind upper course: light stone, lighter than the tier below
 			}
 			p.set(c, u, y, v, st);
 		}
@@ -686,7 +695,7 @@ public final class HouseLibraryCopper implements Variant {
 			}
 		}
 		int pw = mid / 2 + 1;
-		for (int k = -pw; k <= pw; k++) {
+		for (int k = -(pw - 1); k <= pw - 1; k++) {
 			int u = g.cu() + k;
 			int h = Math.min(pw - Math.abs(k), 3);
 			for (int v = 0; v <= 2; v++) {
