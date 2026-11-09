@@ -6,9 +6,11 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.b;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
@@ -62,6 +64,81 @@ public final class CitadelSettle {
 	/** Last result of {@link #apply} (render diagnostics). */
 	static volatile Result last = Result.NONE;
 
+	/**
+	 * fix/settle-sources (render diagnostics): one floating group the last pass handled, where it was (before falling),
+	 * who owned the column (the canvas group and zone kind), what it was made of, what happened and how far it fell.
+	 */
+	public record Source(String group, String zone, String outcome, int drop, int blocks, int x, int y, int z, String blocksOf) {
+	}
+
+	/** The groups of the last pass, in the order they were settled (render diagnostics only). */
+	static volatile List<Source> lastSources = List.of();
+
+	/** The groups the last pass handled (render diagnostics). */
+	public static List<Source> lastSources() {
+		return lastSources;
+	}
+
+	/**
+	 * The last pass grouped by origin (canvas group + zone kind): {@code [origin] → {groups, fell, blocks, drop sum, propped,
+	 * removed, left}}, most groups first (ties by name so the order is stable).
+	 */
+	public static Map<String, int[]> lastByOrigin() {
+		Map<String, int[]> by = new TreeMap<>();
+		for (Source s : lastSources) {
+			int[] a = by.computeIfAbsent(s.group() + " / " + s.zone(), k -> new int[7]);
+			a[0]++;
+			a[2] += s.blocks();
+			switch (s.outcome()) {
+				case "fell" -> {
+					a[1]++;
+					a[3] += s.drop();
+				}
+				case "post" -> a[4]++;
+				case "removed" -> a[5]++;
+				default -> a[6]++;
+			}
+		}
+		List<Map.Entry<String, int[]>> es = new ArrayList<>(by.entrySet());
+		es.sort((p, q) -> p.getValue()[0] != q.getValue()[0] ? Integer.compare(q.getValue()[0], p.getValue()[0]) : p.getKey().compareTo(q.getKey()));
+		Map<String, int[]> out = new LinkedHashMap<>();
+		for (var e : es) {
+			out.put(e.getKey(), e.getValue());
+		}
+		return out;
+	}
+
+	private static Source source(CitadelCanvas c, List<Long> g, String outcome, int drop) {
+		long low = g.get(0);
+		for (long k : g) {
+			if (BlockPos.getY(k) < BlockPos.getY(low)) {
+				low = k;
+			}
+		}
+		int x = BlockPos.getX(low);
+		int y = BlockPos.getY(low);
+		int z = BlockPos.getZ(low);
+		String group;
+		String zone;
+		try {
+			group = CitadelFinish.groupOf(c, x, y, z);
+			zone = c.zoneAt(x, z).kind().name();
+		} catch (RuntimeException e) {
+			group = "?";
+			zone = "?";
+		}
+		Map<String, Integer> kinds = new TreeMap<>();
+		for (long k : g) {
+			BlockState s = c.cells.get(k);
+			if (s != null) {
+				kinds.merge(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(s.getBlock()).getPath(), 1, Integer::sum);
+			}
+		}
+		StringBuilder sb = new StringBuilder();
+		kinds.entrySet().stream().sorted((p, q) -> q.getValue() - p.getValue()).limit(3).forEach(e -> sb.append(sb.length() == 0 ? "" : ",").append(e.getKey()));
+		return new Source(group, zone, outcome, drop, g.size(), x, y, z, sb.toString());
+	}
+
 	/** One line about the last pass (render diagnostics, {@code PlanReport}'s split pieces). */
 	public static String lastSummary() {
 		return last.toString();
@@ -90,6 +167,7 @@ public final class CitadelSettle {
 	/** Settles every floating group of the canvas (see the class comment). */
 	static void apply(CitadelCanvas c) {
 		last = Result.NONE;
+		lastSources = List.of();
 		Map<Long, BlockState> cells = c.cells;
 		Set<Long> seen = new HashSet<>(cells.size() * 2);
 		List<List<Long>> floating = new ArrayList<>();
@@ -133,24 +211,30 @@ public final class CitadelSettle {
 			loose.addAll(g);
 		}
 		int[] n = new int[8];
+		List<Source> sources = new ArrayList<>();
 		for (List<Long> g : floating) {
 			if (touchesFixture(c, g)) {
+				sources.add(source(c, g, "left", 0));
 				count(n, 6, g.size());
 				continue;
 			}
 			int drop = fall(c, g, loose);
 			if (drop > 0) {
+				sources.add(source(c, g, "fell", drop));
 				move(c, g, drop);
 				loose.removeAll(g);
 				count(n, 0, g.size());
 				continue;
 			}
+			Source before = source(c, g, "post", 0);
 			if (g.size() <= POST_GROUP && prop(c, g, loose)) {
+				sources.add(before);
 				loose.removeAll(g);
 				count(n, 2, g.size());
 				continue;
 			}
 			if (allTrivial(c, g)) {
+				sources.add(source(c, g, "removed", 0));
 				for (long k : g) {
 					remove(c, k);
 				}
@@ -158,8 +242,10 @@ public final class CitadelSettle {
 				count(n, 4, g.size());
 				continue;
 			}
+			sources.add(source(c, g, "left", 0));
 			count(n, 6, g.size());
 		}
+		lastSources = List.copyOf(sources);
 		last = new Result(n[0], n[1], n[2], n[3], n[4], n[5], n[6], n[7]);
 	}
 
