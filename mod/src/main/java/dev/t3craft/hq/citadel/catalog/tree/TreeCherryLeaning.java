@@ -94,7 +94,7 @@ public final class TreeCherryLeaning implements Variant {
 		int du = dir[0];
 		int dv = dir[1];
 		boolean diag = du != 0 && dv != 0;
-		int inset = mn <= 6 ? 1 : 2; // how far from the edge the tip of the trunk stays, so its cloud fits
+		int inset = 1; // how far from the edge the tip of the trunk stays (its cloud shrinks to fit)
 		int in0 = mn >= 7 ? 1 : 0; // room behind the foot for the roots
 		int lu;
 		int lv;
@@ -148,7 +148,7 @@ public final class TreeCherryLeaning implements Variant {
 			t.wood(lu, y, lv, TreeKit.CHERRY.log(net.minecraft.core.Direction.Axis.Y));
 		}
 		int bias = octant(-du, -dv);
-		TreeKit.roots(t, TreeKit.CHERRY, bu, bv, 4, 2, bias, 11);
+		TreeKit.roots(t, TreeKit.CHERRY, bu, bv, 3, 2, bias, 11);
 
 		// ---- trunk: out along the lean, the elbow, then up to the tip (every cell shares a face with the next)
 		int eu = lu + ke * du;
@@ -157,7 +157,7 @@ public final class TreeCherryLeaning implements Variant {
 		List<int[]> segB = TreeKit.branch(t, TreeKit.CHERRY, new int[] {eu, yElbow, ev}, new int[] {tu, ytip, tv}, false);
 
 		// ---- clouds
-		double ra = TreeKit.clamp(0.28 * mn + 0.5, 1.9, 2.9);
+		double ra = TreeKit.clamp(0.25 * mn + 0.55, 1.9, 2.8);
 		List<Pad> pads = new ArrayList<>();
 		pads.add(pad(tu, ytip + 1, tv, ra, du, dv, w, d));
 
@@ -211,6 +211,17 @@ public final class TreeCherryLeaning implements Variant {
 				for (int u = 0; u < w; u++) {
 					if (t.kind(u, y, v) == TreeKit.LEAF && t.hash(u + 3, y + 5, v + 9, 100) < 6 && !nextToWood(t, u, y, v)) {
 						t.clear(u, y, v);
+					}
+				}
+			}
+		}
+		// foliage hugs the wood: a cell on top of a log with a cloud close above it is a leaf, not a ledge nobody can reach
+		for (int y = YS; y < hh - 1; y++) {
+			for (int v = 0; v < d; v++) {
+				for (int u = 0; u < w; u++) {
+					if (t.kind(u, y, v) == TreeKit.WOOD && t.empty(u, y + 1, v)
+							&& (t.kind(u, y + 2, v) == TreeKit.LEAF || t.kind(u, y + 3, v) == TreeKit.LEAF)) {
+						t.leaf(u, y + 1, v, PINK.a());
 					}
 				}
 			}
