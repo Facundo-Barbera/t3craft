@@ -242,6 +242,8 @@ public final class TowerRoom {
 	private static final BlockState LANTERN_UP = Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, false);
 	private static final BlockState LANTERN_DOWN = Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, true);
 	private static final BlockState RAIL = b(Blocks.STONE_BRICK_WALL);
+	/** Rosy stripped cherry log: pilasters and posts (the plain log reads almost black from afar). */
+	private static final BlockState STRIP = b(Blocks.STRIPPED_CHERRY_LOG);
 
 	/** Whether the node is big enough (half side 12 or more) for the grand tower; below that the old tower is built. */
 	public static boolean grand(double k) {
@@ -399,11 +401,11 @@ public final class TowerRoom {
 					s = CALCITE;
 				}
 			} else if (aa >= 10) {
-				s = y <= 2 ? NodeDecor.footMix(x, y, z) : RIB;
+				s = y <= 2 ? NodeDecor.footMix(x, y, z) : (y <= 5 ? RIB : NodeDecor.stoneMix(x, y, z));
 			} else if (y <= 2) {
 				s = NodeDecor.footMix(x, y, z);
 			} else if (aa <= 4 || aa >= 8) {
-				s = r == 12 ? (y == 11 ? CALCITE : LOG) : (y == 11 ? c.kit.wallPanel(true) : CALCITE);
+				s = r == 12 ? (y == 11 ? CALCITE : STRIP) : (y == 11 ? c.kit.wallPanel(true) : CALCITE);
 			} else if (r == 12) {
 				s = AIR;
 			} else if (y == 11) {
@@ -451,7 +453,7 @@ public final class TowerRoom {
 			} else if (ns && aa <= 1 && y == 16) {
 				s = RIB;
 			} else if (aa >= 7) {
-				s = y == 33 ? RIB : LOG;
+				s = y == 33 ? RIB : STRIP;
 			} else if (y <= 14) {
 				s = NodeDecor.footMix(x, y, z);
 			} else if (y == 23) {
@@ -461,7 +463,7 @@ public final class TowerRoom {
 			} else if (win) {
 				s = r == 8 ? AIR : GLASS;
 			} else if (aa == 2 || aa == 3) {
-				s = r == 8 ? LOG : CALCITE;
+				s = r == 8 ? STRIP : CALCITE;
 			} else {
 				s = CALCITE;
 			}
@@ -475,9 +477,9 @@ public final class TowerRoom {
 		for (int y = 35; y <= 43; y++) {
 			BlockState s;
 			if (aa >= 4) {
-				s = RIB;
+				s = y <= 37 ? RIB : NodeDecor.stoneMix(q.cx + dx, y, q.cz + dz);
 			} else if (aa == 3) {
-				s = y <= 40 ? LOG : (y == 41 ? RIB : CALCITE);
+				s = y <= 40 ? STRIP : (y == 41 ? RIB : CALCITE);
 			} else if (y <= 40) {
 				s = AIR;
 			} else if (y == 41) {
