@@ -92,7 +92,7 @@ public final class TreePineTiered implements Variant {
 			int nT = Math.max(1, (top - 1 - yBase) / 3 + 1);
 			int k = (y - yBase) / 3;
 			int ph3 = (y - yBase) % 3;
-			double rt = Math.max(1.0, margin * (1.0 - k / (nT + 0.4)));
+			double rt = Math.max(1.0, margin - k * (margin - 1.0) / Math.max(1, nT - 1)); // each tier clearly narrower
 			boolean whorl = ph3 == 0 && y < top - 1;
 			double ph = phase + k * GOLDEN;
 			int span = (int) Math.ceil(margin) + 1;
@@ -125,7 +125,7 @@ public final class TreePineTiered implements Variant {
 					BlockState s = edge && t.hash(u >> 1, y, v >> 1, 3) == 0 && y > yBase + 1 ? TIP : NEEDLE;
 					t.leaf(u, y, v, s);
 					// the whorl's arm tips droop one block, a few two
-					if (whorl && edge && dist > 1.6 && dist > lim - 0.7 && t.hash(u, y + 9, v, 3) == 0) {
+					if (whorl && edge && dist > 1.3 && dist > lim - 0.9 && t.hash(u, y + 9, v, 3) != 0) { // the tier's rim hangs below its body
 						t.leaf(u, y - 1, v, NEEDLE);
 						if (dist > 2.2 && t.hash(u, y + 4, v, 4) == 0) {
 							t.leaf(u, y - 2, v, TIP);

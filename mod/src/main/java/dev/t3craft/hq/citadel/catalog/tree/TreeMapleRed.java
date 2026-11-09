@@ -16,8 +16,8 @@ import net.minecraft.world.level.block.Blocks;
 /**
  * Red maple in autumn: a stout dark 2×2 trunk on spreading roots that thins and forks low into four
  * diagonal limbs, carrying a broad umbrella of six rounded lobes of different sizes with sky between them.
- * The colour runs by lobe, from scarlet low and inside (nether wart and red wool) through red-orange to
- * orange at the sunny top (orange wool with honeycomb), each lobe two-toned. Leaf litter, a mushroom and
+ * The colour runs lobe by lobe across the crown, from orange (orange wool with honeycomb) on the sunny side
+ * through red-orange and red to scarlet (nether wart and red wool) on the other, each lobe two-toned. Leaf litter, a mushroom and
  * moss below.
  *
  * <p>The maple uses untinted blocks for its foliage: every vanilla leaf that could be red is biome-tinted
@@ -100,27 +100,22 @@ public final class TreeMapleRed implements Variant {
 			double reach = TreeKit.clamp(TreeKit.room(t, su, sv, ex, ez, 0) - Math.max(rx, rz) + 0.7, 1.2, 3.0 * sc);
 			int tu = (int) Math.round(su + ex * reach);
 			int tv = (int) Math.round(sv + ez * reach);
-			TreeKit.branch(t, WOOD, new int[] {su, fork, sv}, new int[] {tu, ly, tv}, i % 2 == 0);
-			int tone = ly <= fork + 2 ? 0 : ly <= fork + 3 ? 1 : 2;
-			TreeKit.lobe(t, tu, ly + 0.2, tv, rx, rz, 2.3, 1.3, RAMP[tone], 0.45, i);
-			// a low scarlet skirt lobe under the first limb, hanging off its elbow
-			if (i == 0) {
-				int mu = (su + tu * 2) / 3;
-				int mv = (sv + tv * 2) / 3;
-				TreeKit.lobe(t, mu + ex * 0.6, ly - 1.4, mv + ez * 0.6, 1.4 * sc, 1.3 * sc, 1.4, 1.0, RAMP[0], 0.35, 20 + i);
-			}
+			TreeKit.branch(t, WOOD, new int[] {su, fork, sv}, new int[] {tu, ly - 1, tv}, false);
+			// the colour runs by lobe across the crown: orange on the sunny side, scarlet on the other
+			int tone = TreeKit.clamp((int) Math.round((Math.cos(ang - a0 - Math.PI / 4) + 1) / 2 * 3), 0, 3);
+			TreeKit.lobe(t, tu, ly + 0.2, tv, rx, rz, 2.3, 1.3, RAMP[tone], 0.7, i);
 		}
 		// the high centre: an orange crown on the leader and a smaller red-orange cap beside it
 		int top = H - 3;
 		int cu = lead[0][top];
 		int cv = lead[1][top];
 		double cr = 2.5 * sc;
-		TreeKit.lobe(t, cu, top + 0.4, cv, cr, cr * 0.9, 2.5, 1.3, RAMP[3], 0.45, 9);
+		TreeKit.lobe(t, cu, top + 0.4, cv, cr, cr * 0.9, 2.5, 1.3, RAMP[2], 0.6, 9);
 		double ca = a0 + Math.PI / 4;
 		int ku = (int) Math.round(lead[0][top - 2] + Math.cos(ca) * 1.6 * sc);
 		int kv = (int) Math.round(lead[1][top - 2] + Math.sin(ca) * 1.6 * sc);
 		TreeKit.branch(t, WOOD, new int[] {lead[0][top - 3], top - 3, lead[1][top - 3]}, new int[] {ku, top - 1, kv}, false);
-		TreeKit.lobe(t, ku, top - 0.8, kv, 1.6 * sc, 1.5 * sc, 1.7, 1.1, RAMP[2], 0.4, 11);
+		TreeKit.lobe(t, ku, top - 0.8, kv, 1.6 * sc, 1.5 * sc, 1.7, 1.1, RAMP[3], 0.5, 11); // on the sunny side: orange
 
 		// leaf litter, thick under the dome, a mushroom and moss among the roots
 		TreeKit.ground(t, bu + 0.5, bv + 0.5, Math.min(p.w(), p.d()) / 2.0 + 0.7, (u, v, k) -> {

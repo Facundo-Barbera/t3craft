@@ -71,7 +71,7 @@ public final class TreeCherryGrand implements Variant {
 		int ov = r.nextInt(2);
 		int bu = TreeKit.base(p.w(), ou);
 		int bv = TreeKit.base(p.d(), ov);
-		int y2 = Math.max(2, (int) Math.round(3 * ys));
+		int y2 = 2; // 2×2 for two blocks, then three cells, then the 1×1 leader
 		int crownY = H - 3;
 		double lean = r.nextDouble() * Math.PI * 2;
 		int[][] lead = TreeKit.trunk(t, TreeKit.CHERRY, bu, bv, y2, crownY, ou, ov,
@@ -86,14 +86,14 @@ public final class TreeCherryGrand implements Variant {
 			int ly = (int) Math.round(LOBES[i][1] * (H - 1));
 			double rx = (2.0 + r.nextDouble() * 0.4) * LOBES[i][2] * sc;
 			double rz = rx * (0.8 + r.nextDouble() * 0.25);
-			int sy = TreeKit.clamp(ly - 3, y2, crownY - 1);
+			int sy = TreeKit.clamp(ly - 4, y2 + 1, crownY - 1);
 			int su = lead[0][sy];
 			int sv = lead[1][sy];
 			double room = TreeKit.room(t, su, sv, ex, ez, 0);
 			double reach = TreeKit.clamp(room - Math.max(rx, rz) + 1.0, 1.0, 3.2 * sc);
 			int tu = (int) Math.round(su + ex * reach);
 			int tv = (int) Math.round(sv + ez * reach);
-			TreeKit.branch(t, TreeKit.CHERRY, new int[] {su, sy, sv}, new int[] {tu, ly, tv}, i < 2);
+			TreeKit.branch(t, TreeKit.CHERRY, new int[] {su, sy, sv}, new int[] {tu, ly - 1, tv}, false); // into the lobe's underside: the limb shows up to the leaves
 			// a twig off the limb towards the side, with a small satellite lobe (two tones swapped)
 			if (i < 3) {
 				double fa = ang + (i % 2 == 0 ? 1.1 : -1.1);

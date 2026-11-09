@@ -81,8 +81,8 @@ public final class TreeCherryLeaning implements Variant {
 		int tu = lead[0][top];
 		int tv = lead[1][top];
 		double ra = 2.4 * sc;
-		TreeKit.lobe(t, tu + su * 0.4, top, tv + sv * 0.4, ra, ra * 0.85, 2.0, 1.2, TreeKit.SAKURA, 0.4, 1);
-		TreeKit.drips(t, tu, top, tv, ra, ra * 0.85, 1);
+		TreeKit.lobe(t, tu + su * 1.1, top, tv + sv * 0.8, ra, ra * 0.9, 1.6, 1.0, TreeKit.SAKURA, 0.4, 1); // the widest part, overhanging the lean
+		TreeKit.drips(t, (int) Math.round(tu + su * 1.1), top, (int) Math.round(tv + sv * 0.8), ra, ra * 0.9, 1);
 
 		// the counter-limb, thrown back from the elbow over the roots, with a smaller, higher lobe
 		int ey = TreeKit.clamp(top - 3, 3, top - 1);
@@ -92,7 +92,7 @@ public final class TreeCherryLeaning implements Variant {
 		int cv = TreeKit.clamp(ev - sv * 1, 1, p.d() - 2);
 		int cy = Math.min(top + 1, H - 2);
 		TreeKit.branch(t, TreeKit.CHERRY, new int[] {eu, ey, ev}, new int[] {cu, cy, cv}, false);
-		TreeKit.lobe(t, cu, cy, cv, 1.9 * sc, 1.8 * sc, 1.9, 1.1, TreeKit.SAKURA.swap(), 0.35, 2);
+		TreeKit.lobe(t, cu, cy, cv, 1.6 * sc, 1.5 * sc, 1.6, 0.9, TreeKit.SAKURA.swap(), 0.35, 2);
 
 		// a short twig on the outside of the bend, low, with a small lobe
 		int my = TreeKit.clamp(top - 4, 3, top - 2);
