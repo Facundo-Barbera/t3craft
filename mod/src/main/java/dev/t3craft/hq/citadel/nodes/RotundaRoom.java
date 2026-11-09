@@ -186,13 +186,15 @@ public final class RotundaRoom {
 	// =====================================================================================================
 
 	/** Dimensions of the scaled rotunda, all from the zone's radius. */
+	private static final BlockState SLOG = b(Blocks.STRIPPED_CHERRY_LOG);
+
 	private record Geo(double size, double ri, double rw, int h, int dh, int xw, double lr, double dial) {
 		static Geo of(CitadelCanvas c, Node nd) {
 			double size = nd.size();
 			double ri = size - 2.5;
 			double rw = size - 1.0;
 			int h = c.sy(10);
-			int dh = (int) Math.round(0.75 * rw);
+			int dh = (int) Math.round(1.0 * rw);
 			int xw = (int) Math.floor(ri) - 2;
 			double lr = size >= 12 ? 2.5 : 1.5;
 			return new Geo(size, ri, rw, h, dh, xw, lr, Math.round(ri * 0.62));
@@ -344,7 +346,7 @@ public final class RotundaRoom {
 			if (y == g.h) {
 				s = c.kit.wallPanel(true);
 			} else if (jamb || pil < 0.55) {
-				s = y <= 2 ? RIB : LOG;
+				s = y <= 2 ? RIB : SLOG;
 			} else if (y <= 3) {
 				s = NodeDecor.footMix(x, y, z);
 			} else if (y == 4) {
@@ -381,7 +383,7 @@ public final class RotundaRoom {
 			} else if (y == g.h - 1) {
 				s = CALCITE;
 			} else if (Math.floorMod(dz, 3) == 0) {
-				s = LOG;
+				s = SLOG;
 			} else if (y % 2 == 1) {
 				s = CitadelCanvas.b(Blocks.BOOKSHELF);
 			} else {
@@ -407,10 +409,10 @@ public final class RotundaRoom {
 				BlockState s;
 				if (rel <= 2) {
 					s = CitadelCanvas.FOOT;
-				} else if (rel >= g.dh - 2) {
+				} else if (rel >= g.dh - 1) {
 					s = BAMBOO;
 				} else if (rib < 0.6 && d >= g.lr + 1.5) {
-					s = LOG;
+					s = SLOG;
 				} else if (rel == g.dh / 2) {
 					s = CitadelCanvas.PLANKS;
 				} else {
@@ -423,7 +425,7 @@ public final class RotundaRoom {
 			int base = g.top(g.lr);
 			if (d > g.lr - 1.0) {
 				for (int y = base + 1; y <= base + 5; y++) {
-					c.set(x, y, z, arc(dx, dz, 8, 0) < 0.6 ? LOG : GLASS);
+					c.set(x, y, z, arc(dx, dz, 8, 0) < 0.6 ? SLOG : GLASS);
 				}
 			}
 			if (dx == 0 && dz == 0) {
@@ -496,9 +498,9 @@ public final class RotundaRoom {
 				} else if (y == 1) {
 					s = CitadelCanvas.FOOT;
 				} else if (y == 5) {
-					s = az <= 3 ? CitadelCanvas.PLANKS : az == 4 ? LOG : RIB;
+					s = az <= 3 ? CitadelCanvas.PLANKS : az == 4 ? SLOG : RIB;
 				} else {
-					s = az == 4 ? LOG : RIB;
+					s = az == 4 ? SLOG : RIB;
 				}
 				put(c, nd, xs, y, dz, s, CitadelCanvas.SOLID);
 			}
