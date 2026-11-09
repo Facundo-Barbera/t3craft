@@ -59,8 +59,8 @@ public final class TreeCherryGrand implements Variant {
 		return 9;
 	}
 
-	/** Dark cherry wood for the limbs too: they read against the pink blossom and the sky in the iso view. */
-	private static final TreeKit.Wood LIMB = TreeKit.CHERRY;
+	/** Dark cherry wood on all sides (no pale log ends) for the limbs too: they read against the pink blossom and the sky in the iso view. */
+	private static final TreeKit.Wood LIMB = new TreeKit.Wood(Blocks.CHERRY_WOOD, Blocks.CHERRY_WOOD, TreeKit.CHERRY.rootTip());
 
 	/**
 	 * The lowest y a leaf or a limb may occupy. The trunk's shoulder is only the root level (three cells at y = 0, feet at
