@@ -215,7 +215,7 @@ final class CitadelPaving {
 	static BlockState avenue(CitadelCanvas c, int x, int z, Zone zn) {
 		CitadelPlaza.Plaza plaza = CitadelPlaza.at(c, x, z); // the plaza of a crossing swallows sidewalk and gutter
 		if (plaza != null) {
-			return CitadelPlaza.ground(plaza, x, z);
+			return CitadelPlaza.ground(c, plaza, x, z);
 		}
 		int n = RingCampusGeometry.lotsIn(zn.ring());
 		double d = RingCampusGeometry.radialDistance(x, z, n);
@@ -267,7 +267,7 @@ final class CitadelPaving {
 	static BlockState street(CitadelCanvas c, int x, int z, double r, Zone zn) {
 		CitadelPlaza.Plaza plaza0 = CitadelPlaza.at(c, x, z); // the octagonal plaza of a crossing: its own floor, edge to edge
 		if (plaza0 != null) {
-			return CitadelPlaza.ground(plaza0, x, z);
+			return CitadelPlaza.ground(c, plaza0, x, z);
 		}
 		boolean inner = zn.kind() == Kind.INNER_STREET;
 		int m = zn.ring();
@@ -368,7 +368,7 @@ final class CitadelPaving {
 	static BlockState lotGround(CitadelCanvas c, int x, int z, Zone zn) {
 		CitadelPlaza.Plaza plaza = CitadelPlaza.at(c, x, z);
 		if (plaza != null) {
-			return CitadelPlaza.ground(plaza, x, z); // the corner of a crossing's plaza
+			return CitadelPlaza.ground(c, plaza, x, z); // the corner of a crossing's plaza
 		}
 		int m = zn.ring();
 		double r = RingCampusGeometry.r(x, z);

@@ -34,11 +34,12 @@ import org.jspecify.annotations.Nullable;
  * Concentric octagonal rings, one material each, measured with an octagonal metric rounded to whole rings
  * ({@link Plaza#band}: ring {@code k} is every cell whose metric rounds to {@code k}, so every ring is 1 cell
  * thick and its diagonals are closed staircases, never loose dots): 3x3 core of chiselled brick (the focal
- * point's base), two rings of calcite, one thin dark ring of polished deepslate, two rings of stone brick, one
- * continuous ring of cherry planks (the accent), an outer band of two tones in a chequer (the only variation),
- * and the kerb: a ring of deepslate tile with a tile slab on it, half a block over the floor, which a walker
- * steps over. In the four quadrants between the roads the outer band is a planter ({@code k = 9, 10}) with a bench
- * ({@code k = 8}) facing the focal point.
+ * point's base), two rings of calcite, one thin dark ring of polished deepslate, one of stone brick, one
+ * continuous ring of cherry planks (the accent), an outer band of two tones in a chequer (the only variation;
+ * the avenue's runner flows through it to the accent ring), and the kerb: a ring of deepslate tile with a tile
+ * slab on it, half a block over the floor, which a walker steps over. In the four quadrants between the roads
+ * the outer band is a planter ({@code k = 8..10}: a low wall, then two rows of azalea) with a bench
+ * ({@code k = 7}) in front of it facing the focal point.
  */
 final class CitadelPlaza {
 	static final BlockState CORE = CitadelPaving.CHISELED;
@@ -55,10 +56,10 @@ final class CitadelPlaza {
 	/** The kerb ring: the octagon's metric is scaled so that it is 11 here, whatever the scale of the citadel. */
 	static final int KERB_K = 11;
 	/** Ring of the accent (cherry planks). */
-	static final int ACCENT_K = 7;
-	/** Ring of the benches; the planters are the two rings outside it, then the kerb. */
-	static final int BENCH_K = 8;
-	static final int BED_K = 9;
+	static final int ACCENT_K = 6;
+	/** Ring of the benches; the planters are the three rings outside it, then the kerb. */
+	static final int BENCH_K = 7;
+	static final int BED_K = 8;
 	/** A cell is in a quadrant (not on the arm of a road) when both its distances to the axes are at least this many units. */
 	static final double QUAD_MIN = 4.5;
 	/** The diagonal side of the octagon: {@code |u| + |v| <= DIAG * metric}. */
@@ -95,6 +96,11 @@ final class CitadelPlaza {
 		}
 
 		/** Whether the cell is in a quadrant between the roads (where the benches and planters go). */
+		/** Whether the avenue's runner reaches in (the ring plazas, not the inner street's). */
+		boolean runner() {
+			return planters;
+		}
+
 		boolean quadrant(int x, int z) {
 			return planters && Math.abs(v(x, z)) * kv >= QUAD_MIN && Math.abs(u(x, z)) * ku >= QUAD_MIN;
 		}
@@ -138,8 +144,8 @@ final class CitadelPlaza {
 		}
 		double w = d.street;
 		double h = w * 11.0 / 12.0;
-		double rc = RingCampusGeometry.ringOuter(m) + w / 2.0;
-		return new Spec(rc - (h - w / 2.0), h + 2, KERB_K / h, KERB_K / h, true, 2 * RingCampusGeometry.level(m));
+		// the kerb's outer cell is the last cell of the street (half a cell in, so the rounded ring stays in the street's zone)
+		return new Spec(RingCampusGeometry.streetOuter(m) - h - 0.5, h + 2, KERB_K / h, KERB_K / h, true, 2 * RingCampusGeometry.level(m));
 	}
 
 	/** The radials a street has plazas at: the inner street's eight (but the spawn's, which has its own plaza), a ring street's two sets. */
@@ -217,7 +223,7 @@ final class CitadelPlaza {
 	}
 
 	/** The block at {@code y = 0} of a cell of plaza {@code p}. */
-	static BlockState ground(Plaza p, int x, int z) {
+	static BlockState ground(@Nullable CitadelCanvas c, Plaza p, int x, int z) {
 		int k = p.band(x, z);
 		if (k <= 1) {
 			return CORE;
@@ -228,7 +234,7 @@ final class CitadelPlaza {
 		if (k == 4) {
 			return DARK;
 		}
-		if (k <= 6) {
+		if (k == 5) {
 			return BODY;
 		}
 		if (k == ACCENT_K) {
@@ -236,6 +242,9 @@ final class CitadelPlaza {
 		}
 		if (k >= KERB_K) {
 			return KERB;
+		}
+		if (c != null && p.runner() && k > ACCENT_K && Math.abs(p.v(x, z)) <= CitadelPaving.RUNNER_D() && p.u(x, z) < 0) {
+			return c.floor(); // the avenue's runner flows into the plaza, up to the accent ring
 		}
 		if (k >= BED_K && p.quadrant(x, z)) {
 			return BED;

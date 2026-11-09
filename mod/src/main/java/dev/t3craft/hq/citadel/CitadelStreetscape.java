@@ -52,7 +52,7 @@ import net.minecraft.world.level.block.state.properties.Property;
  *     high with buttresses, four lantern arms and the kit's tall paper lantern, {@code paper_lantern_tall},
  *     light 15: 12 high, a landmark from the avenue), the kerb (a tile slab half a block over the floor, walked
  *     over), and in each of the four quadrants between the roads a planter (low brick wall, flowering azalea,
- *     a cherry tree at one flank, a lantern post at the other, a bin in the wall) with three cherry benches in
+ *     a cherry tree at one flank (in two opposite quadrants), a lantern post at the other, a bin in the wall) with three cherry benches in
  *     front of it facing the focal point; one quadrant per plaza holds the signpost (a log stele with a plaque:
  *     ring and compass heading of the avenue). It runs after the catalog's placement and only on free cells:
  *     where the catalog built a plaza centre of its own, the crossing is left to it.</li>
@@ -400,7 +400,7 @@ final class CitadelStreetscape {
 						bench(c, x, z, nearest(x - cx, z - cz)); // back to the planter, facing the focal point
 					} else if (k == CitadelPlaza.BED_K) {
 						c.set(x, 1, z, BASE); // the planter's low wall
-					} else if (k == CitadelPlaza.BED_K + 1) {
+					} else if (k > CitadelPlaza.BED_K) {
 						c.set(x, 1, z, leaves(CitadelPaving.hash(x, z) % 3 == 0 ? Blocks.AZALEA_LEAVES : Blocks.FLOWERING_AZALEA_LEAVES));
 					}
 				}
@@ -416,18 +416,18 @@ final class CitadelStreetscape {
 		c.unrigid();
 	}
 
-	/** The planter of one quadrant: a cherry tree at one flank, a lantern post at the other, a bin in the wall, and (one quadrant per plaza) the signpost. */
+	/** The planter of one quadrant: a cherry tree at one flank (in two opposite quadrants), a lantern post at the other, a bin in the wall, and (one quadrant per plaza) the signpost. */
 	private static void quadrantPieces(CitadelCanvas c, CitadelPlaza.Plaza p, int sl, int sa) {
 		BlockPos tree = p.cell(sl * 5, sa * 10);
 		BlockPos lamp = p.cell(sl * 10, sa * 5);
 		BlockPos bin = p.cell(sl * 5, sa * 8);
-		if (plantable(c, p, tree.getX(), tree.getZ()) && freeColumn(c, tree.getX(), tree.getZ(), 2, TRUNK() + 2)) {
+		if (sl * sa < 0 && plantable(c, p, tree.getX(), tree.getZ()) && freeColumn(c, tree.getX(), tree.getZ(), 2, TRUNK() + 2)) {
 			tree(c, tree.getX(), tree.getZ());
 		}
 		if (plantable(c, p, lamp.getX(), lamp.getZ()) && freeColumn(c, lamp.getX(), lamp.getZ(), 2, 4)) {
 			lanternPost(c, lamp.getX(), lamp.getZ(), 3);
 		}
-		if (CitadelPlaza.BED_K == p.band(bin.getX(), bin.getZ()) && p.quadrant(bin.getX(), bin.getZ())) {
+		if (p.band(bin.getX(), bin.getZ()) > CitadelPlaza.BED_K && p.quadrant(bin.getX(), bin.getZ())) {
 			bin(c, bin.getX(), bin.getZ());
 		}
 		if (sl > 0 && sa > 0) {
