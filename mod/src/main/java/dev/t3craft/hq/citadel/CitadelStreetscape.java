@@ -451,15 +451,20 @@ final class CitadelStreetscape {
 		BlockPos pl = p.cell(8, 5);
 		int sx = st.getX();
 		int sz = st.getZ();
-		int px = pl.getX();
-		int pz = pl.getZ();
-		if (!plantable(c, p, sx, sz) || !plantable(c, p, px, pz) || sx == px && sz == pz || !freeColumn(c, sx, sz, 2, 4)
+		if (sx == pl.getX() && sz == pl.getZ()) {
+			return;
+		}
+		// fix/floating-fixtures: the plaza's cells are rounded rotated coordinates, so (8, 5) can land diagonally from (8, 6) and
+		// the plaque then touched nothing (a floating fixture): it always goes on the face of the stele that looks at it
+		Direction face = nearest(pl.getX() - sx, pl.getZ() - sz);
+		int px = sx + face.getStepX();
+		int pz = sz + face.getStepZ();
+		if (!plantable(c, p, sx, sz) || !plantable(c, p, px, pz) || !freeColumn(c, sx, sz, 2, 4)
 				|| !freeColumn(c, px, pz, 2, 3)) {
 			return;
 		}
 		c.fill(sx, 1, 3, sz, STELE);
 		c.set(sx, 4, sz, AWNING);
-		Direction face = nearest(px - sx, pz - sz);
 		long k = BlockPos.asLong(px, 3, pz);
 		c.put(px, 3, pz, c.kit.plaque(face), CitadelCanvas.DECOR);
 		double ang = Math.atan2(p.ux(), -p.uz());

@@ -153,6 +153,11 @@ public final class HubUndercroft {
 	/** Dark tiled floor with a cross of light stone brick lanes along the axes (the walking lines to the stairs and the index table). */
 	private static BlockState floorBlock(int x, int z) {
 		boolean lane = Math.abs(x) <= 1 || Math.abs(z) <= 1;
+		// struct/hub4: a red runner down the middle of each lane (from scale 2), so the lanes read as the way to the stairs and the table
+		boolean runner = HubDims.TALL() && ((x == 0 && Math.abs(z) >= 4) || (z == 0 && Math.abs(x) >= 4));
+		if (runner) {
+			return CitadelCanvas.terracotta(DyeColor.RED);
+		}
 		return lane ? HubBlocks.stoneBrick(x, fy(), z) : HubBlocks.darkBase(x, fy(), z);
 	}
 
@@ -358,6 +363,78 @@ public final class HubUndercroft {
 				}
 			}
 			frontDesk(c, sx);
+			islandChests(c, sx, lay);
+			carrels(c, sx);
+			wallCabinets(c, sx);
+		}
+	}
+
+	/**
+	 * The archive chests (struct/hub4): a row of chests along the foot of every shelf island, on the aisle side, facing away from the
+	 * shelves, so the islands are not only walls of books: the chest is where the file lives. The middle cell of each segment stays
+	 * free, it is where the lectern stands (one cell further out).
+	 */
+	private static void islandChests(CitadelCanvas c, int sx, int[] lay) {
+		Direction away = sx > 0 ? Direction.EAST : Direction.WEST;
+		for (int sz = -1; sz <= 1; sz += 2) {
+			for (int start = lay[2]; start <= HubDims.INNER() - lay[1]; start += lay[3]) {
+				for (int k = 0; k < lay[1]; k++) {
+					if (k != lay[1] / 2) {
+						put(c, sx * (lay[0] + 2), sy(), sz * (start + k),
+								Blocks.CHEST.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, away));
+					}
+				}
+			}
+		}
+	}
+
+	/**
+	 * The filing cabinets of the south corridors (struct/hub4): along the east and west walls, between the stairwell and the stack
+	 * of the wall, a run of chests and barrels (alternating) facing the corridor, with a lantern on every third one. The two cells
+	 * beside them stay free.
+	 */
+	private static void wallCabinets(CitadelCanvas c, int sx) {
+		Direction toCentre = sx > 0 ? Direction.WEST : Direction.EAST;
+		int x = sx * (HubDims.INNER() - 1);
+		int z0 = HubDims.ARCH_Z0() + 2;
+		for (int z = z0; z <= z0 + 10; z++) {
+			boolean chest = (z - z0) % 2 == 0;
+			put(c, x, sy(), z, chest
+					? Blocks.CHEST.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, toCentre)
+					: Blocks.BARREL.defaultBlockState().setValue(BlockStateProperties.FACING, Direction.UP));
+			if (!chest && (z - z0) % 3 == 1) { // a lantern needs a full block under it: barrels only
+				put(c, x, sy() + 1, z, Blocks.LANTERN.defaultBlockState());
+			}
+		}
+	}
+
+	/**
+	 * The reading corners (struct/hub4): in the open space between the index table and the first islands, on both sides of the
+	 * cross lane, four carrels: a red rug, a table of three (a lantern on the middle), a chair on each long side, a lectern at the end
+	 * facing the table. The lane {@code |z| <= 1} (three wide) stays free.
+	 */
+	private static void carrels(CitadelCanvas c, int sx) {
+		int sy = sy();
+		Direction toCentre = sx > 0 ? Direction.WEST : Direction.EAST;
+		for (int sz = -1; sz <= 1; sz += 2) {
+			Direction out = sz > 0 ? Direction.SOUTH : Direction.NORTH;
+			for (int x = 6; x <= 10; x++) {
+				for (int dz = 2; dz <= 4; dz++) {
+					int xx = sx * x;
+					int zz = sz * dz;
+					if (inside(c, xx, zz) && !edge(c, xx, zz)) {
+						c.set(xx, fy(), zz, CitadelCanvas.terracotta(DyeColor.RED));
+					}
+				}
+			}
+			for (int x = 7; x <= 9; x++) {
+				put(c, sx * x, sy, sz * 3, HubBlocks.slabTop(Blocks.DARK_OAK_SLAB));
+			}
+			put(c, sx * 8, sy + 1, sz * 3, Blocks.LANTERN.defaultBlockState());
+			put(c, sx * 7, sy, sz * 4, stairs(Blocks.DARK_OAK_STAIRS, out));
+			put(c, sx * 9, sy, sz * 4, stairs(Blocks.DARK_OAK_STAIRS, out));
+			put(c, sx * 8, sy, sz * 2, stairs(Blocks.DARK_OAK_STAIRS, out.getOpposite()));
+			put(c, sx * 10, sy, sz * 3, Blocks.LECTERN.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, toCentre));
 		}
 	}
 
