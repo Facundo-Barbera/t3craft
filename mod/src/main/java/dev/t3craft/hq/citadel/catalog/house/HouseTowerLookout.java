@@ -99,7 +99,7 @@ public final class HouseTowerLookout implements Variant {
 			new Scheme(Blocks.DARK_OAK_LOG, Blocks.STRIPPED_DARK_OAK_LOG, Blocks.DARK_OAK_PLANKS, Blocks.DARK_OAK_FENCE, Blocks.DARK_OAK_DOOR,
 					Blocks.CUT_COPPER_STAIRS.waxed().oxidized(), Blocks.CUT_COPPER.waxed().oxidized(), Blocks.CHERRY_STAIRS,
 					Blocks.CUT_COPPER_STAIRS.waxed().unaffected(), Blocks.CUT_COPPER.waxed().unaffected()),
-			new Scheme(Blocks.CHERRY_LOG, Blocks.STRIPPED_CHERRY_LOG, Blocks.CHERRY_PLANKS, Blocks.CHERRY_FENCE, Blocks.CHERRY_DOOR,
+			new Scheme(Blocks.CHERRY_LOG, Blocks.STRIPPED_CHERRY_LOG, Blocks.DARK_OAK_PLANKS, Blocks.CHERRY_FENCE, Blocks.CHERRY_DOOR,
 					Blocks.CUT_COPPER_STAIRS.waxed().oxidized(), Blocks.CUT_COPPER.waxed().oxidized(), Blocks.DARK_OAK_STAIRS,
 					Blocks.CUT_COPPER_STAIRS.waxed().unaffected(), Blocks.CUT_COPPER.waxed().unaffected()),
 	};
@@ -277,7 +277,7 @@ public final class HouseTowerLookout implements Variant {
 					Direction out = n ? Direction.NORTH : sh ? Direction.SOUTH : w ? Direction.WEST : Direction.EAST;
 					int su = u + out.getStepX();
 					int sv = v + out.getStepZ();
-					for (int wy : new int[] {2, 7}) {
+					for (int wy : new int[] {2}) {
 						set(c, g.p, su, wy - 1, sv, slab(Blocks.POLISHED_DEEPSLATE_SLAB, true));
 					}
 				}
@@ -567,7 +567,7 @@ public final class HouseTowerLookout implements Variant {
 		int[][] corners = {{g.ox, 0}, {g.ox + g.rw - 1, 0}, {g.ox, g.rw - 1}, {g.ox + g.rw - 1, g.rw - 1}};
 		for (int[] q : corners) {
 			set(c, g.p, q[0], 0, q[1], b(Blocks.MOSS_BLOCK));
-			set(c, g.p, q[0], 1, q[1], g.p.hash(q[0], 1, q[1], 2) == 0 ? b(Blocks.FLOWERING_AZALEA) : b(Blocks.FERN));
+			set(c, g.p, q[0], 1, q[1], b(Blocks.FERN));
 		}
 		// a barrel and a woodpile by the back wall
 		set(c, g.p, g.u0 + 1, 0, g.v1 + 2, barrel());
