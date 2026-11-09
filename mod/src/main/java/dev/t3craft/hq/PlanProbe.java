@@ -7,7 +7,6 @@ import java.util.Map;
 import java.util.Set;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.LevelAccessor;
-import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
@@ -60,28 +59,25 @@ public final class PlanProbe {
 	}
 
 	/**
-	 * Every shaped block whose connection state does not match its real neighbours: runs vanilla's own
-	 * {@link Block#updateFromNeighbourShapes} on each against the plan (as {@link PlanShapes#resolve}
-	 * does when it bakes the shapes) and lists the cells where the answer differs from what the plan holds.
+	 * Every shaped block whose connection state does not match its real neighbours: what
+	 * {@link PlanConnect#apply} gives it on the plan's final cells against what the plan holds
+	 * (fix/plan-connect: explicit rules, nothing caught; the old check ran vanilla's
+	 * {@code updateShape} through a proxy and, with block tags unbound headless, wanted fences and walls
+	 * disconnected).
 	 */
 	public static List<ShapeMismatch> shapeMismatches(BuildPlan plan) {
-		LevelAccessor view = PlanShapes.view(cells(plan));
+		Map<Long, BlockState> cells = cells(plan);
+		Map<Long, BlockState> expected = new HashMap<>(cells);
+		PlanConnect.apply(expected);
 		List<ShapeMismatch> out = new ArrayList<>();
-		for (Placement p : plan.placements()) {
-			BlockState s = p.state();
-			if (!PlanShapes.shaped(s)) {
-				continue;
-			}
-			BlockState u;
-			try {
-				u = Block.updateFromNeighbourShapes(s, view, p.rel());
-			} catch (RuntimeException e) {
-				continue;
-			}
-			if (u != s && u.getBlock() == s.getBlock() && !u.equals(s)) {
-				out.add(new ShapeMismatch(p.rel(), s, u));
+		for (Map.Entry<Long, BlockState> e : cells.entrySet()) {
+			BlockState s = e.getValue();
+			BlockState u = expected.get(e.getKey());
+			if (PlanConnect.shaped(s) && !u.equals(s)) {
+				out.add(new ShapeMismatch(BlockPos.of(e.getKey()), s, u));
 			}
 		}
+		out.sort(java.util.Comparator.comparingLong(m -> m.pos().asLong()));
 		return out;
 	}
 

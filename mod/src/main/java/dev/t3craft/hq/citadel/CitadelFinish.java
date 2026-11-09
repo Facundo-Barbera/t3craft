@@ -14,6 +14,7 @@ import dev.t3craft.hq.BuildPlan;
 import dev.t3craft.hq.HqGenerator;
 import dev.t3craft.hq.HqLayout;
 import dev.t3craft.hq.Placement;
+import dev.t3craft.hq.PlanConnect;
 import dev.t3craft.hq.PlanLight;
 import dev.t3craft.hq.PlanShapes;
 import dev.t3craft.hq.RingCampusGeometry;
@@ -49,7 +50,8 @@ import org.jspecify.annotations.Nullable;
  *     (and at least 5 cells above the ground, 3 on the lawn). Parameters: the canvas. Reads
  *     {@code cells}, {@code zones}; writes {@code cells}/{@code layers} with {@code AIR} on layer
  *     {@code SOLID}.</li>
- * <li>{@code PlanShapes.resolve}: connects stairs, fences, walls and panes (shared, not edited here).</li>
+ * <li>{@code PlanShapes.resolve}, then {@code PlanConnect.apply} (fix/plan-connect): connects stairs, fences,
+ *     walls and panes from the final cells, with explicit rules.</li>
  * <li>{@link #groupOf}: the construction group of each cell (see below), via {@link #lotGroup} for the
  *     cells of a lot.</li>
  * <li>{@link #light}: the light pass. It walks the cells an NPC can reach ({@link #walkable}, from
@@ -378,6 +380,8 @@ public final class CitadelFinish {
 	public static BuildPlan build(CitadelCanvas c) {
 		fillAir(c);
 		PlanShapes.resolve(c.cells);
+		// fix/plan-connect: the explicit, world-free connection pass on the final cells (what resolve misses)
+		PlanConnect.apply(c.cells);
 		Map<Long, String> groups = new HashMap<>(c.cells.size() * 2);
 		for (long k : c.cells.keySet()) {
 			BlockPos p = BlockPos.of(k);
