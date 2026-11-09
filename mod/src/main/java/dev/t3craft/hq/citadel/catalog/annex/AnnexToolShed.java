@@ -21,8 +21,9 @@ import net.minecraft.world.level.block.state.properties.SlabType;
 /**
  * Tool shed: a real workshop you walk into. A two-block cobble plinth, board-and-batten walls between
  * posts, a double door (2 wide, reached by two stone steps under a porch hood on two posts), a shuttered
- * window in the side wall and potted plants under the front windows. The roof is a gable (stairs, ridge
- * running front to back) or a single pitch, by seed, with a trim fascia and an eave all round.
+ * window in the side wall and potted plants under the front windows. The roof is a gable of stairs, by seed with the
+ * gable end on the front (ridge front to back, eave strips on both sides) or the ridge across (front eave over the stoop),
+ * always with a trim fascia and a slab ridge.
  *
  * <p>Inside (4 free blocks at the walls, 5 or more under the roof): a workbench in the middle of the back
  * wall (crafting table, smithing table or grindstone, by seed) between chests and barrels, tool hooks on
@@ -31,7 +32,7 @@ import net.minecraft.world.level.block.state.properties.SlabType;
  * composter and hay under the left eave, and the firewood stacked under the right eave. From 10 wide, a
  * three-wide open wood lean-to with a stack two deep, a chopping stump and a lantern post.
  *
- * <p>Seed: mirror (door and bench side, woodpile side), roof (gable / single pitch), wood set (dark oak and
+ * <p>Seed: mirror (door and bench side, woodpile side), roof (gable end in front / ridge across), wood set (dark oak and
  * spruce under cherry; spruce and oak under dark oak; dark oak and birch under deepslate tile), workstation.
  *
  * <pre>
@@ -59,16 +60,16 @@ public final class AnnexToolShed implements Variant {
 	private static final Pal[] PALS = {
 			// dark oak frame, spruce boards, pink cherry roof
 			new Pal(Blocks.CHERRY_STAIRS, Blocks.CHERRY_SLAB, null, Blocks.DARK_OAK_STAIRS, Blocks.DARK_OAK_SLAB, Blocks.DARK_OAK_LOG,
-					Blocks.STRIPPED_DARK_OAK_LOG, Blocks.SPRUCE_PLANKS, Blocks.STRIPPED_SPRUCE_LOG, Blocks.SPRUCE_DOOR, Blocks.SPRUCE_TRAPDOOR),
-			// spruce frame, oak boards, dark oak roof
-			new Pal(Blocks.DARK_OAK_STAIRS, Blocks.DARK_OAK_SLAB, Blocks.SPRUCE_STAIRS, Blocks.SPRUCE_STAIRS, Blocks.SPRUCE_SLAB, Blocks.SPRUCE_LOG,
-					Blocks.STRIPPED_SPRUCE_LOG, Blocks.OAK_PLANKS, Blocks.STRIPPED_OAK_LOG, Blocks.OAK_DOOR, Blocks.OAK_TRAPDOOR),
+					Blocks.STRIPPED_DARK_OAK_LOG, Blocks.SPRUCE_PLANKS, Blocks.STRIPPED_SPRUCE_LOG, Blocks.DARK_OAK_DOOR, Blocks.SPRUCE_TRAPDOOR),
+			// spruce frame, oak boards, dark oak roof with a stone brick fascia
+			new Pal(Blocks.DARK_OAK_STAIRS, Blocks.DARK_OAK_SLAB, Blocks.SPRUCE_STAIRS, Blocks.STONE_BRICK_STAIRS, Blocks.STONE_BRICK_SLAB, Blocks.SPRUCE_LOG,
+					Blocks.STRIPPED_SPRUCE_LOG, Blocks.OAK_PLANKS, Blocks.STRIPPED_OAK_LOG, Blocks.SPRUCE_DOOR, Blocks.OAK_TRAPDOOR),
 			// dark oak frame, birch boards, deepslate tile roof with cherry fascia
 			new Pal(Blocks.DEEPSLATE_TILE_STAIRS, Blocks.DEEPSLATE_TILE_SLAB, Blocks.COBBLED_DEEPSLATE_STAIRS, Blocks.CHERRY_STAIRS, Blocks.CHERRY_SLAB,
-					Blocks.DARK_OAK_LOG, Blocks.STRIPPED_DARK_OAK_LOG, Blocks.BIRCH_PLANKS, Blocks.STRIPPED_BIRCH_LOG, Blocks.CHERRY_DOOR, Blocks.CHERRY_TRAPDOOR),
+					Blocks.DARK_OAK_LOG, Blocks.STRIPPED_DARK_OAK_LOG, Blocks.BIRCH_PLANKS, Blocks.STRIPPED_BIRCH_LOG, Blocks.DARK_OAK_DOOR, Blocks.CHERRY_TRAPDOOR),
 	};
 
-	private static final Block[] FIREWOOD = {Blocks.OAK_LOG, Blocks.SPRUCE_LOG, Blocks.OAK_LOG, Blocks.SPRUCE_LOG, Blocks.OAK_LOG, Blocks.BIRCH_LOG};
+	private static final Block[] FIREWOOD = {Blocks.OAK_LOG, Blocks.OAK_LOG, Blocks.OAK_LOG, Blocks.SPRUCE_LOG};
 	private static final Block[] POTS = {Blocks.POTTED_FERN, Blocks.POTTED_AZALEA, Blocks.POTTED_CORNFLOWER};
 
 	@Override
@@ -117,7 +118,10 @@ public final class AnnexToolShed implements Variant {
 		final Plot p;
 		final Pal pal;
 		final boolean flip;
-		final boolean gable;
+		final boolean gable; // ridge front to back, gable end on the front (else the ridge runs across)
+		final int dd; // rows of the body
+		final int riseV;
+		final boolean evenV;
 		final int ws;
 		final int w;
 		final int d;
@@ -154,8 +158,11 @@ public final class AnnexToolShed implements Variant {
 			this.dl = u0 + (bw - 2) / 2;
 			this.even = bw % 2 == 0;
 			this.rise = (bw - 1) / 2;
-			boolean room = h - 1 >= ROOF + rise;
-			this.gable = room && p.hash(0, 0, 0, 2) == 0;
+			this.dd = vb - vf + 1;
+			this.riseV = (dd - 1) / 2;
+			this.evenV = dd % 2 == 0;
+			boolean roomAcross = h - 1 >= ROOF + riseV;
+			this.gable = !(roomAcross && p.hash(0, 0, 0, 2) == 1);
 		}
 
 		// ------------------------------------------------------------------ mirrored writes
@@ -319,13 +326,14 @@ public final class AnnexToolShed implements Variant {
 					.setValue(BlockStateProperties.HALF, Half.BOTTOM);
 		}
 
-		/** Height of the roof over a wall column. */
+		/** Height of the roof over a wall cell. */
 		int roofAt(int u, int v) {
-			if (gable) {
-				return ROOF + e(u);
-			}
-			int j = Math.min(v - vf, 2 * (h - 6));
-			return ROOF + j / 2;
+			return ROOF + (gable ? e(u) : eV(v));
+		}
+
+		/** Distance of body row v from the nearest of the front and back walls (0 at the walls). */
+		int eV(int v) {
+			return Math.min(v - vf, vb - v);
 		}
 
 		/** Distance of body column u from the nearest side wall (0 at the walls). */
@@ -333,7 +341,7 @@ public final class AnnexToolShed implements Variant {
 			return Math.min(u - u0, u1 - u);
 		}
 
-		/** [depth] the triangle (gable) or staircase (single pitch) of boards between the plate and the roof, with a vent pane. */
+		/** [depth] the triangle of boards between the plate and the roof on the gable ends, with a vent pane. */
 		void gableFill() {
 			for (int u = u0; u <= u1; u++) {
 				for (int v = vf; v <= vb; v++) {
@@ -341,21 +349,23 @@ public final class AnnexToolShed implements Variant {
 						continue;
 					}
 					boolean side = u == u0 || u == u1;
+					if (gable == side) {
+						continue; // the eave walls end at the plate: the stairs sit on them
+					}
 					boolean corner = side && (v == vf || v == vb);
 					int top = roofAt(u, v);
-					boolean gableEnd = gable && !side;
-					boolean pitchWall = !gable;
-					if (!gableEnd && !pitchWall) {
-						continue; // gable: the side walls end at the plate, the stairs sit on them
-					}
+					int along = gable ? u - u0 : v - vf;
+					int mid = gable ? rise : riseV;
+					boolean odd = gable ? !even : !evenV;
+					boolean frontEnd = gable ? v == vf : u == u1;
 					for (int y = PLATE + 1; y < top; y++) {
 						BlockState st;
-						boolean center = !even && u - u0 == rise;
-						if (corner || (u - u0) % 3 == 0 && !side) {
+						boolean center = odd && along == mid;
+						if (corner || along % 3 == 0) {
 							st = log(pal.frame(), Direction.Axis.Y);
-						} else if (gable && center && y == PLATE + 2 && v == vf) {
-							st = b(Blocks.GLASS_PANE); // a vent pane at the heart of the front gable
-						} else if (center && gable) {
+						} else if (center && y == PLATE + 2 && frontEnd) {
+							st = b(Blocks.GLASS_PANE); // a vent pane at the heart of the gable
+						} else if (center) {
 							st = log(pal.frame(), Direction.Axis.Y);
 						} else {
 							st = p.hash(u, y, v, 5) == 0 ? b(pal.panelAlt()) : b(pal.panel());
@@ -368,71 +378,82 @@ public final class AnnexToolShed implements Variant {
 
 		// ------------------------------------------------------------------ the roof
 
-		BlockState roofStair(Block normal, Direction facing, int u, int y, int v) {
+		/** The roof stair of a course (course = rows of stairs from the eave): a stripe of the alternative stair every third course. */
+		BlockState roofStair(Block normal, Direction facing, int course) {
 			Block blk = normal;
-			if (normal == pal.roofStairs() && pal.altStairs() != null && p.hash(u, y, v, 6) == 0) {
+			if (normal == pal.roofStairs() && pal.altStairs() != null && course % 3 == 1) {
 				blk = pal.altStairs();
 			}
 			return stair(blk, facing);
 		}
 
 		/**
-		 * [finish] the roof, seen from above. Gable: stairs climb from the eave strip on each side to a
-		 * slab ridge (two facing stairs on an even width), the eave row at the front and the side strips in trim
-		 * stairs. Single pitch: slabs climb half a block a row from a stair eave at the front, the side strips
-		 * stay flat at the plate level as a trim ledge.
+		 * [finish] the roof. Gable: stairs climb from the eave strip on each side to a slab ridge (two facing
+		 * stairs on an even width); the ridge runs front to back, the eave row at the front and the side strips are
+		 * trim stairs. Across: the same, with the ridge running left to right: the front eave hangs one block over the
+		 * stoop and the gable ends are the side walls (no strips: the woodpile and the left yard stay in the open).
 		 */
 		void roof() {
-			int cu0 = u0 - ov;
-			int cu1 = u1 + ov;
 			if (gable) {
+				int cu0 = u0 - ov;
+				int cu1 = u1 + ov;
 				for (int v = vf - 1; v <= vb; v++) {
 					for (int u = cu0; u <= cu1; u++) {
 						boolean left;
 						int y;
 						boolean center = false;
+						int course;
 						if (u < u0) {
 							y = PLATE;
 							left = true;
+							course = -1;
 						} else if (u > u1) {
 							y = PLATE;
 							left = false;
+							course = -1;
 						} else {
 							y = ROOF + e(u);
 							left = even ? u - u0 < bw / 2 : u - u0 < rise;
 							center = !even && u - u0 == rise;
+							course = e(u);
 						}
 						boolean fascia = v == vf - 1 || u < u0 || u > u1;
+						Direction face = left ? Direction.EAST : Direction.WEST;
 						if (center) {
 							set(u, y, v, slab(pal.trimSlab(), SlabType.BOTTOM));
+						} else if (fascia) {
+							set(u, y, v, stair(pal.trimStairs(), face));
 						} else {
-							Block mat = fascia ? pal.trimStairs() : pal.roofStairs();
-							set(u, y, v, fascia ? stair(mat, left ? Direction.EAST : Direction.WEST) : roofStair(mat, left ? Direction.EAST : Direction.WEST, u, y, v));
+							set(u, y, v, roofStair(pal.roofStairs(), face, course));
 						}
 					}
 				}
 			} else {
-				for (int u = cu0; u <= cu1; u++) {
-					set(u, PLATE, vf - 1, stair(pal.trimStairs(), Direction.SOUTH));
-				}
-				for (int v = vf; v <= vb; v++) {
-					int j = Math.min(v - vf, 2 * (h - 6));
-					int y = ROOF + j / 2;
-					boolean top = j % 2 == 1;
-					for (int u = cu0; u <= cu1; u++) {
-						if (u < u0 || u > u1) {
-							set(u, PLATE, v, slab(pal.trimSlab(), SlabType.BOTTOM)); // flat ledge at the plate level
-							continue;
+				for (int v = vf - 1; v <= vb; v++) {
+					for (int u = u0; u <= u1; u++) {
+						boolean frontHalf;
+						int y;
+						boolean center = false;
+						int course;
+						if (v < vf) {
+							y = PLATE;
+							frontHalf = true;
+							course = -1;
+						} else {
+							y = ROOF + eV(v);
+							frontHalf = evenV ? v - vf < dd / 2 : v - vf < riseV;
+							center = !evenV && v - vf == riseV;
+							course = eV(v);
 						}
-						SlabType t = !top ? SlabType.BOTTOM : wall(u, v) ? SlabType.DOUBLE : SlabType.TOP;
-						boolean edge = v == vb || u == u0 || u == u1;
-						Block mat = edge ? pal.trimSlab() : pal.roofSlab();
-						set(u, y, v, slab(mat, t));
-					}
-				}
-				for (int u = cu0; u <= cu1; u++) {
-					if (u < u0 || u > u1) {
-						set(u, PLATE, vf - 1, slab(pal.trimSlab(), SlabType.BOTTOM));
+						boolean fascia = v < vf || u == u0 || u == u1;
+						Direction face = frontHalf ? Direction.SOUTH : Direction.NORTH;
+						if (center) {
+							set(u, y, v, slab(pal.trimSlab(), SlabType.BOTTOM));
+						} else if (fascia) {
+							set(u, y, v, stair(pal.trimStairs(), face));
+						} else {
+							set(u, y, v, roofStair(pal.roofStairs(), face, course));
+						}
 					}
 				}
 			}
@@ -512,6 +533,10 @@ public final class AnnexToolShed implements Variant {
 				// tool hooks on the back wall above them (no collision)
 				set(u, 3, bv, b(Blocks.TRIPWIRE_HOOK).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH));
 			}
+			// an anvil on the right when the shed is wide enough to leave a 2-wide aisle
+			if (iw >= 4 && bv - 1 > vf + 1) {
+				set(iu1, 1, bv - 1, b(Blocks.ANVIL).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH));
+			}
 			// storage along the left wall, starting past the door row
 			for (int v = vf + 2; v <= vb - 2; v++) {
 				set(iu0, 1, v, (v - vf) % 2 == 0 ? barrel() : chest(Direction.EAST));
@@ -522,9 +547,6 @@ public final class AnnexToolShed implements Variant {
 				lu = iu1;
 			}
 			int lv = Math.max(vf + 1, Math.min(vf + 2, vb - 2));
-			if (!gable && Math.min(lv - vf, 2 * (h - 6)) % 2 == 1) {
-				lv--; // under a top slab the chain would not reach: take the row before it
-			}
 			if (lv > vf) {
 				int top = roofAt(lu, lv);
 				for (int y = PLATE + 1; y < top; y++) {
@@ -544,7 +566,7 @@ public final class AnnexToolShed implements Variant {
 
 		// ------------------------------------------------------------------ the eaves
 
-		/** Under the left eave: barrels, hay, a chopping block and ferns along the side wall, by seed (nothing hollow: a cauldron or composter under a roof reads as a sealed floor). */
+		/** The left side strip, by seed: barrels, hay, a chopping block and ferns; in the open (ridge across) also the rain cauldron and a composter. Under an eave nothing hollow: a cauldron or composter there reads as a sealed floor. */
 		void leftEave() {
 			if (ov == 0) {
 				return;
@@ -554,13 +576,20 @@ public final class AnnexToolShed implements Variant {
 				if (v == midV()) {
 					continue; // under the window
 				}
-				BlockState st = switch ((v - vf - 1 + off) % 5) {
-					case 0 -> b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP);
-					case 1 -> b(Blocks.HAY_BLOCK);
-					case 2 -> b(Blocks.FERN);
-					case 3 -> log(Blocks.OAK_LOG, Direction.Axis.Y); // an upright chopping block
-					default -> b(Blocks.MOSS_CARPET);
-				};
+				int k = (v - vf - 1 + off) % 5;
+				BlockState st;
+				if (!gable && k == 0) {
+					st = rainBarrel(); // in the open: a water cauldron and a composter are fine here
+				} else if (!gable && k == 1) {
+					st = b(Blocks.COMPOSTER).setValue(BlockStateProperties.LEVEL_COMPOSTER, 4);
+				} else {
+					st = switch (k) {
+						case 0, 1 -> b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP);
+						case 2 -> b(Blocks.HAY_BLOCK);
+						case 3 -> log(Blocks.OAK_LOG, Direction.Axis.Y); // an upright chopping block
+						default -> b(Blocks.FERN);
+					};
+				}
 				set(u0 - 1, 0, v, st);
 			}
 		}
@@ -571,9 +600,11 @@ public final class AnnexToolShed implements Variant {
 				return;
 			}
 			int cols = lean > 0 ? 2 : 1;
+			boolean covered = gable || lean > 0;
 			for (int u = u1 + 1; u < u1 + 1 + cols; u++) {
 				for (int v = vf; v <= vb - 1; v++) {
-					for (int y = 0; y <= PLATE - 1; y++) {
+					int high = covered ? PLATE : 2 + p.hash(u, 0, v, 3); // in the open the top is ragged
+					for (int y = 0; y < high; y++) {
 						Block lg = FIREWOOD[p.hash(u, y, v, FIREWOOD.length)];
 						set(u, y, v, log(lg, Direction.Axis.X)); // ring ends face the open side
 					}
@@ -583,7 +614,7 @@ public final class AnnexToolShed implements Variant {
 
 		/** The open lean-to: a flat roof at the plate level on posts, a closed back, the stack two deep and a chopping stump. */
 		void leanTo() {
-			int ua = u1 + 2;
+			int ua = gable ? u1 + 2 : u1 + 1;
 			int ub = u1 + lean;
 			for (int v = vf - 1; v <= vb; v++) {
 				for (int u = ua; u <= ub; u++) {
@@ -623,6 +654,10 @@ public final class AnnexToolShed implements Variant {
 				return;
 			}
 			set(u0, 0, 0, b(Blocks.COMPOSTER).setValue(BlockStateProperties.LEVEL_COMPOSTER, 3));
+			if (u0 + 1 < dl) {
+				set(u0 + 1, 0, 0, b(Blocks.GRINDSTONE).setValue(BlockStateProperties.ATTACH_FACE, AttachFace.FLOOR)
+						.setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH));
+			}
 			set(u1, 0, 0, b(Blocks.HAY_BLOCK));
 			if (u1 - 1 > dl + 1) {
 				set(u1 - 1, 0, 0, rainBarrel());
