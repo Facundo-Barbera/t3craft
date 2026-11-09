@@ -165,10 +165,10 @@ public final class LoungeRoom {
 	private static BlockState pot(int h) {
 		return switch (Math.floorMod(h, 5)) {
 			case 0 -> b(Blocks.POTTED_FERN);
-			case 1 -> b(Blocks.POTTED_AZALEA_BUSH);
+			case 1 -> b(Blocks.POTTED_AZALEA);
 			case 2 -> b(Blocks.POTTED_BAMBOO);
 			case 3 -> b(Blocks.POTTED_PINK_TULIP);
-			default -> b(Blocks.POTTED_FLOWERING_AZALEA_BUSH);
+			default -> b(Blocks.POTTED_FLOWERING_AZALEA);
 		};
 	}
 
@@ -463,7 +463,7 @@ public final class LoungeRoom {
 		}
 		q.tea(8, 5, 2);
 		q.set(8, 2, 5, pot(1));
-		q.set(9, 1, 9, b(Blocks.POTTED_FLOWERING_AZALEA_BUSH));
+		q.set(9, 1, 9, b(Blocks.POTTED_FLOWERING_AZALEA));
 		q.set(9, 6, 10, q.r.c.kit.glowPanel(Direction.DOWN, false));
 	}
 
@@ -573,7 +573,7 @@ public final class LoungeRoom {
 		q.tea(8, 5, 2);
 		q.set(8, 2, 5, pot(2));
 		q.put(9, 2, 5, lanternUp(), DECOR);
-		q.set(11, 1, 4, b(Blocks.POTTED_FLOWERING_AZALEA_BUSH));
+		q.set(11, 1, 4, b(Blocks.POTTED_FLOWERING_AZALEA));
 		q.set(11, 1, 6, b(Blocks.POTTED_BAMBOO));
 		q.set(11, 1, 8, q.r.c.kit.gardenPlanter());
 		q.set(9, 6, 7, q.r.c.kit.glowPanel(Direction.DOWN, false));
