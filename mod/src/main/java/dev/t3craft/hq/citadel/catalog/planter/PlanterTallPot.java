@@ -45,8 +45,8 @@ import net.minecraft.world.level.block.state.properties.SlabType;
  */
 public final class PlanterTallPot implements Variant {
 	/** The material of one pot scheme: dark foot, coloured body, light lip. */
-	private record Mat(BlockState foot, BlockState footAlt, Block footSlab, BlockState body, BlockState bodyAlt, BlockState lip,
-			Block lipStairs, Block lipSlab) {
+	private record Mat(BlockState foot, BlockState footAlt, Block footSlab, BlockState body, BlockState bodyAlt, BlockState urn,
+			BlockState lip, Block lipStairs, Block lipSlab) {
 	}
 
 	@Override
@@ -146,16 +146,18 @@ public final class PlanterTallPot implements Variant {
 	private static Mat mat(Plot p) {
 		return switch (p.hash(0, 0, 0, 4)) {
 			case 0 -> new Mat(b(Blocks.POLISHED_DEEPSLATE), b(Blocks.DEEPSLATE_BRICKS), Blocks.POLISHED_DEEPSLATE_SLAB,
-					terracotta(DyeColor.ORANGE), b(Blocks.TERRACOTTA), b(Blocks.SMOOTH_QUARTZ), Blocks.SMOOTH_QUARTZ_STAIRS,
+					terracotta(DyeColor.ORANGE), b(Blocks.TERRACOTTA), terracotta(DyeColor.ORANGE), b(Blocks.SMOOTH_QUARTZ),
+					Blocks.SMOOTH_QUARTZ_STAIRS,
 					Blocks.SMOOTH_QUARTZ_SLAB);
 			case 1 -> new Mat(b(Blocks.DEEPSLATE_TILES), b(Blocks.CRACKED_DEEPSLATE_TILES), Blocks.DEEPSLATE_TILE_SLAB,
-					b(Blocks.POLISHED_DEEPSLATE), b(Blocks.DEEPSLATE_BRICKS), b(Blocks.POLISHED_ANDESITE),
+					b(Blocks.POLISHED_DEEPSLATE), b(Blocks.DEEPSLATE_BRICKS), b(Blocks.POLISHED_ANDESITE), b(Blocks.POLISHED_ANDESITE),
 					Blocks.POLISHED_ANDESITE_STAIRS, Blocks.POLISHED_ANDESITE_SLAB);
 			case 2 -> new Mat(b(Blocks.POLISHED_DEEPSLATE), b(Blocks.DEEPSLATE_BRICKS), Blocks.POLISHED_DEEPSLATE_SLAB,
-					b(Blocks.CALCITE), b(Blocks.POLISHED_DIORITE), b(Blocks.CHERRY_PLANKS), Blocks.CHERRY_STAIRS,
+					b(Blocks.CALCITE), b(Blocks.POLISHED_DIORITE), b(Blocks.CALCITE), b(Blocks.CHERRY_PLANKS), Blocks.CHERRY_STAIRS,
 					Blocks.CHERRY_SLAB);
 			default -> new Mat(b(Blocks.POLISHED_DEEPSLATE), b(Blocks.DEEPSLATE_BRICKS), Blocks.POLISHED_DEEPSLATE_SLAB,
-					b(Blocks.CHERRY_PLANKS), b(Blocks.STRIPPED_CHERRY_LOG), b(Blocks.SMOOTH_QUARTZ), Blocks.SMOOTH_QUARTZ_STAIRS,
+					b(Blocks.CHERRY_PLANKS), b(Blocks.STRIPPED_CHERRY_LOG), b(Blocks.CHERRY_PLANKS), b(Blocks.SMOOTH_QUARTZ),
+					Blocks.SMOOTH_QUARTZ_STAIRS,
 					Blocks.SMOOTH_QUARTZ_SLAB);
 		};
 	}
@@ -223,8 +225,9 @@ public final class PlanterTallPot implements Variant {
 		}
 		p.set(c, u, 0, v, foot(m, p, u, v));
 		if (h == 3) {
-			p.set(c, u, 1, v, body(m, p, u, 1, v));
-			p.set(c, u, 2, v, kind == 3 ? leaves(Blocks.CHERRY_LEAVES) : potted(kind));
+			p.set(c, u, 1, v, m.urn());
+			// a ball of blossom or azalea (a shrub with presence) or a potted fern / bamboo
+			p.set(c, u, 2, v, kind == 3 ? leaves(Blocks.CHERRY_LEAVES) : kind == 0 ? leaves(Blocks.FLOWERING_AZALEA_LEAVES) : potted(kind));
 			return;
 		}
 		int body = Math.max(1, Math.min(tier == 2 ? 3 : 2, h - 4));
@@ -289,10 +292,9 @@ public final class PlanterTallPot implements Variant {
 				boolean corner = du != 1 && dv != 1;
 				boolean centre = du == 1 && dv == 1;
 				p.set(c, u, 0, v, corner ? slab(m.footSlab()) : foot(m, p, u, v));
-				if (!corner) {
-					for (int y = 1; y <= body; y++) {
-						p.set(c, u, y, v, body(m, p, u, y, v));
-					}
+				for (int y = 1; y <= body; y++) {
+					// the corners are thin dark legs under the flare: nobody can stand in the pinch
+					p.set(c, u, y, v, corner ? b(Blocks.POLISHED_DEEPSLATE_WALL).setValue(BlockStateProperties.UP, true) : body(m, p, u, y, v));
 				}
 				p.set(c, u, ly, v, centre ? soil(p, u, v) : corner ? upperSlab(m.lipSlab()) : m.lip());
 			}
@@ -305,7 +307,7 @@ public final class PlanterTallPot implements Variant {
 		int[][] edge = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
 		if (kind == 2 && room >= 2) {
 			// dwarf cherry: a short trunk, a ring of blossom at its top and a plus on it
-			int tr = Math.max(1, Math.min(room - 1, 3));
+			int tr = Math.max(1, Math.min(room - 1, 2)); // two at most: a taller trunk leaves a standable gap under the crown
 			for (int y = y1; y < y1 + tr; y++) {
 				p.set(c, cu, y, cv, b(Blocks.CHERRY_LOG));
 			}
@@ -322,6 +324,9 @@ public final class PlanterTallPot implements Variant {
 			p.set(c, cu, ry + 1, cv, leaves(Blocks.CHERRY_LEAVES));
 			for (int[] e : edge) {
 				p.set(c, cu + e[0], ry + 1, cv + e[1], leaves(Blocks.CHERRY_LEAVES));
+			}
+			if (ry + 2 < p.h()) {
+				p.set(c, cu, ry + 2, cv, leaves(Blocks.FLOWERING_AZALEA_LEAVES));
 			}
 		} else if (kind == 1) {
 			// a large fern over a rim of moss carpet
