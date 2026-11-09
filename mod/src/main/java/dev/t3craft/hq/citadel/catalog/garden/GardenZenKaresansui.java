@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import net.minecraft.core.Direction;
+import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -335,7 +336,7 @@ public final class GardenZenKaresansui implements Variant {
 		void walls() {
 			BlockState log = b(Blocks.STRIPPED_CHERRY_LOG);
 			BlockState beam = log.setValue(BlockStateProperties.AXIS, alongA());
-			BlockState pane = b(Blocks.WHITE_STAINED_GLASS_PANE);
+			BlockState pane = b(Blocks.STAINED_GLASS_PANE.pick(DyeColor.WHITE));
 			if (side == 0) {
 				pane = pane.setValue(BlockStateProperties.EAST, true).setValue(BlockStateProperties.WEST, true);
 			} else {
@@ -414,7 +415,7 @@ public final class GardenZenKaresansui implements Variant {
 		// ------------------------------------------------------------------ engawa
 
 		BlockState cushion(int a) {
-			return b(p.hash(a, 7, side, 2) == 0 ? Blocks.PINK_CARPET : Blocks.RED_CARPET);
+			return b(Blocks.CARPET.pick(p.hash(a, 7, side, 2) == 0 ? DyeColor.PINK : DyeColor.RED));
 		}
 
 		void deck() {
