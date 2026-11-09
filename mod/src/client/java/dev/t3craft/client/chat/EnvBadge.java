@@ -94,7 +94,7 @@ public record EnvBadge(String initial, String text, int background, int foregrou
 	}
 
 	/** FNV-1a: stable across runs and JVMs (unlike identity hashes), spreads short ids well. */
-	static int stableHash(String s) {
+	public static int stableHash(String s) {
 		int h = 0x811C9DC5;
 		for (int i = 0; i < s.length(); i++) {
 			h ^= s.charAt(i);

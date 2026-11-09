@@ -1,5 +1,7 @@
 package dev.t3craft.client.workstation;
 
+import dev.t3craft.client.npc.behavior.Motion;
+
 /**
  * Where one workstation is: the computer block (what the player right-clicks) and the screen (a
  * TextDisplay) with the yaw its text faces. Plain numbers, no Minecraft classes, so placement
@@ -36,7 +38,7 @@ public record StationPlacement(int computerX, int computerY, int computerZ, doub
 		int cx = (int) Math.floor(x + fx * distance);
 		int cy = (int) Math.floor(y + 0.01);
 		int cz = (int) Math.floor(z + fz * distance);
-		return on(cx, cy, cz, wrap(yaw + 180f));
+		return on(cx, cy, cz, Motion.wrapDegrees(yaw + 180f));
 	}
 
 	/** Screen centred over the computer block, nudged 0.1 towards the side it faces. */
@@ -44,7 +46,7 @@ public record StationPlacement(int computerX, int computerY, int computerZ, doub
 		double rad = Math.toRadians(screenYaw);
 		double nx = -Math.sin(rad) * 0.1;
 		double nz = Math.cos(rad) * 0.1;
-		return new StationPlacement(cx, cy, cz, cx + 0.5 + nx, cy + SCREEN_HEIGHT, cz + 0.5 + nz, wrap(screenYaw));
+		return new StationPlacement(cx, cy, cz, cx + 0.5 + nx, cy + SCREEN_HEIGHT, cz + 0.5 + nz, Motion.wrapDegrees(screenYaw));
 	}
 
 	/**
@@ -64,7 +66,7 @@ public record StationPlacement(int computerX, int computerY, int computerZ, doub
 		double rz = -nx;
 		double out = 0.5 + FACE_GAP;
 		return new StationPlacement(cx, cy, cz, bx + 0.5 + nx * out + rx * shift, by + FACE_MARGIN, bz + 0.5 + nz * out + rz * shift,
-				wrap(screenYaw), SCALE_PER_BLOCK * Math.max(1, width));
+				Motion.wrapDegrees(screenYaw), SCALE_PER_BLOCK * Math.max(1, width));
 	}
 
 	/** Key of the computer block (for click lookup). */
@@ -75,16 +77,5 @@ public record StationPlacement(int computerX, int computerY, int computerZ, doub
 	/** Packs a block position into a long (same bit layout idea as {@code BlockPos.asLong}, but self-contained). */
 	public static long blockKey(int x, int y, int z) {
 		return ((long) (x & 0x3FFFFFF) << 38) | ((long) (z & 0x3FFFFFF) << 12) | (y & 0xFFF);
-	}
-
-	static float wrap(float yaw) {
-		float w = yaw % 360f;
-		if (w >= 180f) {
-			w -= 360f;
-		}
-		if (w < -180f) {
-			w += 360f;
-		}
-		return w;
 	}
 }
