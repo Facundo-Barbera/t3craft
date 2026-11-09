@@ -473,7 +473,7 @@ public final class AnnexToolShed implements Variant {
 			if (gable) {
 				int top = ROOF + e(dl);
 				for (int y = PLATE + 1; y < top; y++) {
-					put(dl, y, vs, b(Blocks.CHAIN), CitadelCanvas.HANGING);
+					put(dl, y, vs, b(Blocks.IRON_CHAIN), CitadelCanvas.HANGING);
 				}
 				put(dl, PLATE, vs, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
 			}
@@ -531,7 +531,7 @@ public final class AnnexToolShed implements Variant {
 			if (lv > vf) {
 				int top = roofAt(lu, lv);
 				for (int y = PLATE + 1; y < top; y++) {
-					put(lu, y, lv, b(Blocks.CHAIN), CitadelCanvas.HANGING);
+					put(lu, y, lv, b(Blocks.IRON_CHAIN), CitadelCanvas.HANGING);
 				}
 				put(lu, PLATE, lv, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
 			}
