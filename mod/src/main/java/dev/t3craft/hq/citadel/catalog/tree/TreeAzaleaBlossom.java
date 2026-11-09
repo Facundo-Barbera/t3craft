@@ -35,7 +35,7 @@ import net.minecraft.world.level.block.state.BlockState;
  * <p>Size 5–17 × 5–17 × 9+. The city asks 7–10 × 7–10 × 20 at scale 200.
  */
 public final class TreeAzaleaBlossom implements Variant {
-	private static final Wood WOOD = new Wood(Blocks.OAK_LOG, Blocks.OAK_WOOD, b(Blocks.OAK_WOOD));
+	private static final Wood WOOD = new Wood(Blocks.MANGROVE_LOG, Blocks.MANGROVE_WOOD, b(Blocks.MANGROVE_WOOD));
 	private static final BlockState GREEN = leaves(Blocks.AZALEA_LEAVES);
 	private static final BlockState BLOOM = leaves(Blocks.FLOWERING_AZALEA_LEAVES);
 	/** A few small islands of real pink on the sunny top (a tenth of the shell at most). */
@@ -265,7 +265,7 @@ public final class TreeAzaleaBlossom implements Variant {
 		x.sx = Math.cos(sa);
 		x.sz = Math.sin(sa);
 		x.fb = 0.5 + 0.18 * r.nextDouble();
-		int nHoles = rc < 2.6 ? 0 : rc < 3.5 ? 1 : 2 + (int) (rc * 0.4);
+		int nHoles = rc < 2.6 ? 0 : rc < 3.5 ? 1 : 3 + (int) (rc * 0.7);
 		double[][] holes = new double[nHoles][4];
 		for (int i = 0; i < nHoles; i++) {
 			double ang = r.nextDouble() * Math.PI * 2;
@@ -350,15 +350,15 @@ public final class TreeAzaleaBlossom implements Variant {
 			double c2 = t.hash(Math.floorDiv(s[0], 2) + 7, Math.floorDiv(s[1], 2), Math.floorDiv(s[2], 2) - 3, 100) / 100.0;
 			double noise = t.hash(s[0] + 5, s[1] + 9, s[2] + 13, 100) < 22 ? c2 : big4;
 			boolean flower = noise < pf;
-			double isle = t.hash(Math.floorDiv(s[0] + 1, 3) + 31, Math.floorDiv(s[1], 3) + 2, Math.floorDiv(s[2] + 2, 3) - 17, 100) / 100.0;
-			boolean pink = flower && top > 0.15 && sun > -0.2 && isle < 0.2;
+			double isle = t.hash(Math.floorDiv(s[0] + (s[1] & 1), 2) + 31, Math.floorDiv(s[1], 2) + 2, Math.floorDiv(s[2], 2) - 17, 100) / 100.0;
+			boolean pink = flower && top > -0.35 && sun > -0.7 && isle < 0.16 && t.hash(s[0] + 9, s[1], s[2] + 4, 100) < 85;
 			t.clear(s[0], s[1], s[2]);
 			int flank = 0; // no cap on a lone spike: it needs two leaf neighbours on its own level
 			for (int[] o : n6) {
 				flank += o[1] == 0 && t.kind(s[0] + o[0], s[1], s[2] + o[2]) == TreeKit.LEAF ? 1 : 0;
 			}
 			boolean freeTop = flank >= 2 && s[1] + 1 < x.p.h() && t.empty(s[0], s[1] + 1, s[2]);
-			boolean capPatch = t.hash(Math.floorDiv(s[0], 2) + 13, Math.floorDiv(s[1], 2), Math.floorDiv(s[2], 2) + 4, 100) < 62;
+			boolean capPatch = t.hash(Math.floorDiv(s[0] + (s[1] & 1), 2) + 13, Math.floorDiv(s[1], 2), Math.floorDiv(s[2] + (s[0] & 1), 2) + 4, 100) < 52;
 			if (flower && freeTop && capPatch && t.hash(s[0] + 1, s[1] + 4, s[2] + 2, 100) < 90) {
 				t.fixed(s[0], s[1], s[2], b(Blocks.MOSS_BLOCK));
 				boolean bush = t.hash(s[0], s[1] + 8, s[2], 5) != 0 && (s[1] + 2 >= x.p.h() || t.empty(s[0], s[1] + 2, s[2]));
