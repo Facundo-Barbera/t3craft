@@ -55,6 +55,8 @@ public final class BuildJob {
 	private final BuildPlan plan;
 	private final JobCursor cursor;
 	private final BuildPlanner planner;
+	/** feat/build-radial: built around a moving centre ({@link RadialCursor}); {@link BuildManager} feeds {@link #focus}. */
+	private final boolean radial;
 	private final double blocksPerTick;
 	private final @Nullable BuildCost cost;
 	/**
@@ -140,8 +142,13 @@ public final class BuildJob {
 				}
 			};
 			// feat/build-near-player: free jobs lay ground, fill and floors in fast layers, the crew does the rest
-			boolean fast = cost == null && BuildBudget.global().tuning().fastFoundation() && plan.size() > BuildPlanner.SYNC_PLAN_LIMIT;
-			java.util.function.Supplier<JobCursor> planned = !fast ? crew : () -> {
+			BuildTuning tuning = BuildBudget.global().tuning();
+			boolean fast = cost == null && tuning.fastFoundation() && plan.size() > BuildPlanner.SYNC_PLAN_LIMIT;
+			// feat/build-radial: free jobs build around the player, column by column, ring by ring
+			this.radial = cost == null && tuning.radial() && plan.size() > BuildPlanner.SYNC_PLAN_LIMIT;
+			java.util.function.Supplier<JobCursor> planned = radial
+					? () -> RadialCursor.plan(plan, f, blocksPerTick, tuning.radialRing(), focus, tuning.fastFoundation())
+					: !fast ? crew : () -> {
 				long s0 = System.nanoTime();
 				try {
 					return FoundationCursor.plan(plan, f, focus);
@@ -154,6 +161,7 @@ public final class BuildJob {
 			// schedule is deterministic for a plan, so where it is computed does not change the build.
 			this.cursor = plan.size() <= BuildPlanner.SYNC_PLAN_LIMIT ? crew.get() : new DeferredCursor(planned, layered, plan.size(), f);
 		} else {
+			this.radial = false;
 			this.cursor = plan.size() <= BuildPlanner.SYNC_PLAN_LIMIT ? layered.get() : new DeferredCursor(layered, layered, plan.size(), f);
 		}
 		this.cost = cost;
@@ -246,7 +254,10 @@ public final class BuildJob {
 		IntPredicate there = j -> sink.matches(worldPos(j), worldState(j));
 		CrewCursor.Walker walk = onWalk == null ? null : (front, index, stand, ticks) -> onWalk.walking(this, front, index, toWorld(stand), ticks);
 		JobCursor live = cursor instanceof DeferredCursor d ? d.ready() : cursor;
-		if (live instanceof FoundationCursor fc) {
+		if (live instanceof RadialCursor rc) {
+			rc.probe(there);
+			rc.walker(onWalk == null ? null : (front, index, stand, ticks) -> onWalk.walking(this, front, index, toWorld(stand), ticks));
+		} else if (live instanceof FoundationCursor fc) {
 			fc.probe(there);
 			fc.walker(walk);
 		} else if (live instanceof CrewCursor cc) {
@@ -473,6 +484,34 @@ public final class BuildJob {
 			return fc.crew(); // feat/build-near-player: the crew of the visible rest (its schedule's indices are sub-plan indices)
 		}
 		return c instanceof CrewCursor cc ? cc : null;
+	}
+
+	/** feat/build-radial: whether this job builds around a moving centre (fed by {@link #focus}). */
+	public boolean radial() {
+		return radial;
+	}
+
+	/**
+	 * feat/build-radial: where the build centres now: {@code playerWorld} (a player standing in or near the
+	 * build), or null for the hub / spawn fallback. Cheap (the re-order runs off-thread). Server thread,
+	 * before {@link #tick}; no-op for other jobs and while the job still plans.
+	 */
+	public void focus(@Nullable BlockPos playerWorld) {
+		JobCursor live = cursor instanceof DeferredCursor d ? d.ready() : cursor;
+		if (live instanceof RadialCursor rc) {
+			double[] rel = null;
+			if (playerWorld != null) {
+				int[] f = planFocus(playerWorld, origin, rotation);
+				rel = new double[] {f[0], f[1]};
+			}
+			rc.focus(rel, System.currentTimeMillis());
+		}
+	}
+
+	/** feat/build-radial: radial progress line (columns, centre), or null for other jobs. */
+	public @Nullable String radialStatus() {
+		JobCursor live = cursor instanceof DeferredCursor d ? d.ready() : cursor;
+		return live instanceof RadialCursor rc ? rc.describe() : null;
 	}
 
 	/** feat/build-near-player: laying fast foundation layers right now (no builder takes part). */

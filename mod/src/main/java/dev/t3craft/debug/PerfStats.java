@@ -253,6 +253,14 @@ public final class PerfStats {
 	public static final String STEP_FOUNDATION_SPLIT = "step.build.foundation_split_async.ns";
 	/** feat/build-near-player: async, part priority by distance to the player ({@code NearPriority}). */
 	public static final String STEP_PRIORITY_ASYNC = "step.build.priority_async.ns";
+	/** feat/build-radial: server, one tick of a radial job (both streams: foundation and builders). */
+	public static final String STEP_RADIAL_TICK = "step.build.radial.ns";
+	/** feat/build-radial: async, plan analysis of a radial job (foundation split, columns, first order). */
+	public static final String STEP_RADIAL_PLAN = "step.build.radial_plan_async.ns";
+	/** feat/build-radial: async, column re-order around the moved centre. */
+	public static final String STEP_RADIAL_ORDER = "step.build.radial_order_async.ns";
+	/** feat/build-radial: client, merging the demo's parts into one plan (async). */
+	public static final String STEP_RADIAL_MERGE = "step.build.radial_merge_async.ns";
 	/** Server: listeners of jobs that started / finished, per tick. */
 	public static final String STEP_STARTED = "step.build.started.ns";
 	public static final String STEP_FINISHED = "step.build.finished.ns";
