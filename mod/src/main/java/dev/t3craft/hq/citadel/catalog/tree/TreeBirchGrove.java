@@ -612,18 +612,18 @@ public final class TreeBirchGrove implements Variant {
 		}
 	}
 
-	/** A birch fence post with a lantern on it at the edge of the clearing, so the rest corner has light. */
+	/** A birch fence post with an arm and a hanging lantern at the edge of the clearing, so the rest corner has light. */
 	private static void lamp(Vox t, Random r, double[] cl, boolean[] sd) {
 		double a0 = r.nextDouble() * Math.PI * 2;
 		for (int k = 0; k < 24; k++) {
 			double ang = a0 + k * 0.52;
 			int u = (int) Math.round(cl[0] + Math.cos(ang) * (cl[2] - 0.6));
 			int v = (int) Math.round(cl[1] + Math.sin(ang) * (cl[2] - 0.6));
-			if (!t.in(u, 3, v) || sd[v * t.w + u]) {
+			if (!t.in(u, 4, v) || sd[v * t.w + u]) {
 				continue;
 			}
 			boolean free = true;
-			for (int y = 0; y <= 3; y++) {
+			for (int y = 0; y <= 4; y++) {
 				byte kk = t.kind(u, y, v);
 				if (kk != TreeKit.EMPTY && !(y == 0 && kk == TreeKit.COVER)) {
 					free = false;
@@ -646,21 +646,25 @@ public final class TreeBirchGrove implements Variant {
 			if (au == 0 && av == 0) {
 				au = 1;
 			}
-			if (!t.in(u + au, 3, v + av) || t.kind(u + au, 2, v + av) != TreeKit.EMPTY || t.kind(u + au, 3, v + av) != TreeKit.EMPTY) {
+			if (!armFree(t, u + au, v + av)) {
 				au = -au;
 				av = -av;
 			}
-			if (!t.in(u + au, 3, v + av) || t.kind(u + au, 2, v + av) != TreeKit.EMPTY || t.kind(u + au, 3, v + av) != TreeKit.EMPTY) {
+			if (!armFree(t, u + au, v + av)) {
 				continue;
 			}
-			t.fixed(u, 0, v, b(Blocks.BIRCH_FENCE));
-			t.fixed(u, 1, v, b(Blocks.BIRCH_FENCE));
-			t.fixed(u, 2, v, b(Blocks.BIRCH_FENCE));
-			t.fixed(u, 3, v, side(b(Blocks.BIRCH_FENCE), au, av, true));
-			t.fixed(u + au, 3, v + av, side(b(Blocks.BIRCH_FENCE), -au, -av, true));
-			t.fixed(u + au, 2, v + av, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true));
+			for (int y = 0; y <= 3; y++) {
+				t.fixed(u, y, v, b(Blocks.BIRCH_FENCE));
+			}
+			t.fixed(u, 4, v, side(b(Blocks.BIRCH_FENCE), au, av, true));
+			t.fixed(u + au, 4, v + av, side(b(Blocks.BIRCH_FENCE), -au, -av, true));
+			t.fixed(u + au, 3, v + av, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true));
 			return;
 		}
+	}
+
+	private static boolean armFree(Vox t, int u, int v) {
+		return t.in(u, 4, v) && t.kind(u, 3, v) == TreeKit.EMPTY && t.kind(u, 4, v) == TreeKit.EMPTY && t.kind(u, 5, v) == TreeKit.EMPTY;
 	}
 
 	/** A few fallen birch logs (two or three long, a little moss on them) well away from the senda, the clearing and the trunks. */
@@ -710,7 +714,7 @@ public final class TreeBirchGrove implements Variant {
 		}
 	}
 
-	/** Azalea-leaf bushes of one or two blocks in the understory: some with a flowering top. Never on the senda or the clearing. */
+	/** Azalea-leaf bushes of one block in the understory: some with a flowering top. Never on the senda or the clearing. */
 	private static void bushes(Vox t, Random r, List<int[]> trunks, double[] cl, boolean[] sd, Leaves lv, int count) {
 		for (int k = 0; k < count; k++) {
 			int u = 1 + r.nextInt(t.w - 2);
@@ -720,9 +724,6 @@ public final class TreeBirchGrove implements Variant {
 			}
 			boolean flowering = r.nextInt(4) == 0;
 			t.fixed(u, 0, v, flowering ? b(Blocks.FLOWERING_AZALEA_LEAVES) : lv.b());
-			if (r.nextInt(3) == 0) {
-				t.fixed(u, 1, v, lv.a());
-			}
 		}
 	}
 
