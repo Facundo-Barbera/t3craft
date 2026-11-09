@@ -7,13 +7,13 @@ Standard library only (zlib/struct), light enough for the VPS. Run from the repo
 
 Design (a thread's state has to read at a glance and from afar: colour + silhouette + blink, in that order):
   * body: a lantern capsule, symmetric top/bottom, so it works standing on a screen AND hanging from a chain
-    (the hub beacon); steel caps with gold rings.
+    (the hub beacon); steel caps and rings, brass only as a 1 px collar under each cap.
   * lens colours are LampStatus' (docs/feat-blocks.md); only the lens (and its flares) glow, in-game too
     ("light_emission" on those elements only).
   * silhouette per state:  off  dark thin glass (no glow)        idle  thin dim gray candle, pause bars
-                           working  band around the lens, cyan spinner that turns (4 frames)
+                           working  12 px band around the 10 px lens, cyan spinner that turns (4 frames)
                            done  plain green lens with a check mark, steady
-                           attention  8-wide lens + 4 horns (a siren star), orange "!" that blinks slowly
+                           attention  10-wide lens + two straight steel T-brackets (east/west), orange "!" that blinks slowly
                            error  wide squat lens + 8 claws (crown of spikes), red X that blinks fast
   * texture layout (16 px wide; frame = 16x16): rows 0-1 bright strip (band), row 2 plain lens colour (flares,
     spikes, top faces), rows 3-13 the glyph crop each model face points at. Frame 0 is the "lit" one (renders show it).
@@ -63,9 +63,11 @@ def px(c):
 # ---------------------------------------------------------------- glyphs (rows of '#', '.')
 GLYPHS = {
     "check": ["....##", "...##.", "##.##.", ".###..", "..#..."],
-    "bang": ["##", "##", "##", "##", "##", "..", "##", "##"],
+    # an unmistakable exclamation mark: a plain 2 px bar (no flared top: that read as a T), 2 empty rows, a separate 2x2 dot
+    "bang": ["##", "##", "##", "##", "##", "..", "..", "##", "##"],
     "x": ["##..##", ".####.", "..##..", "..##..", ".####.", "##..##"],
-    "pause": ["##..##", "##..##", "##..##", "##..##", "##..##"],
+    # 5 wide: the lens' left interior column is the 1 px reflection, so the bars sit right of it
+    "pause": ["##.##", "##.##", "##.##", "##.##", "##.##"],
 }
 # 6x6 ring, clockwise from the top-left corner (20 px)
 RING = [(i, 0) for i in range(6)] + [(5, j) for j in range(1, 6)] + [(i, 5) for i in range(4, -1, -1)] + [(0, j) for j in range(4, 0, -1)]
@@ -74,8 +76,8 @@ RING = [(i, 0) for i in range(6)] + [(5, j) for j in range(1, 6)] + [(i, 5) for 
 # name: (colour, crop, frames, frametime)
 STATES = {
     "off": (0x2A2A2A, (5, 3, 11, 13), 1, 0),
-    "idle": (0xAAAAAA, (5, 3, 11, 13), 1, 0),
-    "working": (0x55FFFF, (4, 3, 12, 13), 4, 3),
+    "idle": (0xAAAAAA, (4, 3, 12, 13), 1, 0),
+    "working": (0x55FFFF, (3, 3, 13, 13), 4, 3),
     "attention": (0xFFAA00, (3, 3, 13, 13), 2, 10),
     "error": (0xFF5555, (3, 3, 13, 13), 2, 4),
     "done": (0x55FF55, (4, 3, 12, 13), 1, 0),
@@ -93,30 +95,34 @@ def lens_frame(name, f):
     if name == "off":
         fill = rgb(0x1B2026)
         img = [[px(fill)] * 16 for _ in range(16)]
-        for i in range(0, 5):  # dead glass: a faint diagonal reflection
-            for (x, y) in ((x0 + 1 + i, y0 + 1 + i), (x0 + 2 + i, y0 + 1 + i)):
-                # (reflection pixels below are lighter than the glass so the lamp reads as dead glass, not a hole)
-                if x0 <= x < x1 and y0 <= y < y1:
-                    img[y][x] = px(rgb(0x4A4A4A))
+        # dead glass with a clear 1 px light-steel outline (it has to survive on a black monitor) ...
+        for y in range(y0, y1):
+            for x in range(x0, x1):
+                if x in (x0, x1 - 1) or y in (y0, y1 - 1):
+                    img[y][x] = px(rgb(0xB4C0CC))
+        # ... and the same 1 px vertical reflection every lens has, just dead
+        for y in range(y0 + 1, y1 - 1):
+            img[y][x0 + 1] = px(rgb(0x4E5B67))
     # rows 0-1: bright strip (the band), 2-3 already plain
     for y in range(2):
         for x in range(16):
             img[y][x] = px(lighten(fill, 0.38) if name != "off" else rgb(0x2A333B))
     if name != "off":
-        # lens as glass: 1 px darker vertical edges, rows fade to 80 % at the top and bottom, a 2x2 core highlight
-        edge = darken(fill, 0.70)
+        # lens as glass: 1 px darker vertical edges, rows fade to 80 % at the top and bottom, and a 1 px vertical
+        # reflection just inside the left edge (glyphs are drawn after it and stay clear of that column)
+        edge = darken(fill, 0.50)
         for y in range(y0, y1):
             k = 0.80 if y in (y0, y0 + 1, y1 - 1, y1 - 2) else 1.0
             for x in range(x0, x1):
                 img[y][x] = px(edge if x in (x0, x1 - 1) else darken(fill, k))
-        for (x, y) in ((x0 + 1, y0 + 2), (x0 + 2, y0 + 2), (x0 + 1, y0 + 3), (x0 + 2, y0 + 3)):
-            img[y][x] = px(lighten(fill, 0.40))
+        for y in range(y0 + 1, y0 + 7):
+            img[y][x0 + 1] = px(lighten(fill, 0.92 if name == "error" else 0.80))
     # rows 14-15: the claws' darker shade
     for y in (14, 15):
         for x in range(16):
             img[y][x] = px(darken(fill, 0.55))
     # glyph
-    glyph_col = darken(c, 0.30 if name != "attention" else 0.16) if lit else lighten(c, 0.15)
+    glyph_col = darken(c, {"attention": 0.16, "error": 0.12}.get(name, 0.30)) if lit else lighten(c, 0.15)
     gname = {"idle": "pause", "attention": "bang", "error": "x", "done": "check"}.get(name)
     cx = (x0 + x1) / 2.0
     cy = (y0 + y1) / 2.0
@@ -125,6 +131,10 @@ def lens_frame(name, f):
         gw, gh = len(g[0]), len(g)
         ox = int(round(cx - gw / 2.0))
         oy = int(round(cy - gh / 2.0))
+        if gname == "pause":
+            ox = x0 + 2  # right of the reflection column
+        elif gname == "bang":
+            oy = y0  # 9 rows in a 10 row lens: one row of margin below
         for j, row in enumerate(g):
             for i, ch in enumerate(row):
                 if ch == "#":
@@ -181,8 +191,9 @@ def write_textures():
 FACES = ("north", "south", "east", "west", "up", "down")
 
 
-def element(frm, to, kind, crop=None, emit=0, skip=()):
-    """kind: steel | gold | lens (glyph crop on the sides) | plain (lens colour) | bright (lens bright strip)."""
+def element(frm, to, kind, crop=None, emit=0, skip=(), plain_sides=()):
+    """kind: steel | gold | lens (glyph crop on the sides) | plain (lens colour) | bright (lens bright strip).
+    skip: faces left out; plain_sides: lens faces drawn plain (no glyph), for sides a bracket covers."""
     faces = {}
     for fc in FACES:
         if fc in skip:
@@ -194,7 +205,7 @@ def element(frm, to, kind, crop=None, emit=0, skip=()):
         elif kind == "gold":
             faces[fc] = {"texture": "#base", "uv": [0, 1, 2, 4]}
         elif kind == "lens":
-            if fc in ("up", "down"):
+            if fc in ("up", "down") or fc in plain_sides:
                 faces[fc] = {"texture": "#lens", "uv": [0, 2, 2, 3]}
             else:
                 faces[fc] = {"texture": "#lens", "uv": list(crop)}
@@ -210,16 +221,17 @@ def element(frm, to, kind, crop=None, emit=0, skip=()):
     return e
 
 
-def body(ring, small=False):
-    """Caps and rings, symmetric about y = 8; plates are lens + 2 px (10 px; 8 px for the small idle/off candle)."""
+def body(small=False, accent=True):
+    """Caps and rings, symmetric about y = 8; plates are lens + 2 px (10 px; 8 px for the small idle/off candle).
+    One metal: steel everywhere, with a single 1 px brass collar under each cap as the only accent."""
     a = 4 if small else 3
     b = 16 - a
     return [
         element([a, 0, a], [b, 1, b], "steel"),
-        element([a + 1, 1, a + 1], [b - 1, 2, b - 1], "steel"),
-        element([a + 0.5, 2, a + 0.5], [b - 0.5, 3, b - 0.5], ring),
-        element([a + 0.5, 13, a + 0.5], [b - 0.5, 14, b - 0.5], ring),
-        element([a + 1, 14, a + 1], [b - 1, 15, b - 1], "steel"),
+        element([a + 0.5, 1, a + 0.5], [b - 0.5, 2, b - 0.5], "gold" if accent else "steel"),
+        element([a + 0.5, 2, a + 0.5], [b - 0.5, 3, b - 0.5], "steel"),
+        element([a + 0.5, 13, a + 0.5], [b - 0.5, 14, b - 0.5], "steel"),
+        element([a + 0.5, 14, a + 0.5], [b - 0.5, 15, b - 0.5], "gold" if accent else "steel"),
         element([a, 15, a], [b, 16, b], "steel"),
     ]
 
@@ -227,25 +239,24 @@ def body(ring, small=False):
 def model(name):
     col, crop, n, ft = STATES[name]
     emit = {"off": 0, "idle": 7, "working": 13, "attention": 15, "error": 15, "done": 13}[name]
-    # attention: steel rings, so the orange does not read as brass
-    els = body("steel" if name in ("attention", "off") else "gold", small=name in ("idle", "off"))
+    els = body(small=name in ("idle", "off"), accent=name != "off")  # off: dead, so no brass accent either
     x0, y0, x1, y1 = crop
     # lens: square in plan, y 3..13; the rings are wider than the lens, so up/down faces stay hidden except on 10 px lenses
-    els.append(element([x0, 3, x0], [x1, 13, x1], "lens", crop=crop, emit=emit, skip=("up", "down") if x1 - x0 <= 8 else ()))
-    if name == "working":
-        els.append(element([3, 7, 3], [13, 9, 13], "bright", emit=emit))
+    els.append(element([x0, 3, x0], [x1, 13, x1], "lens", crop=crop, emit=emit, skip=("up", "down") if x1 - x0 <= 8 else (),
+                       plain_sides=("east", "west") if name == "attention" else ()))
+    if name == "off":
+        # a steel cage round the dead glass: four corner posts give it an outline on any background
+        for px_ in (4, 11):
+            for pz_ in (4, 11):
+                els.append(element([px_, 3, pz_], [px_ + 1, 13, pz_ + 1], "steel"))
+    elif name == "working":
+        # a 1 px steel hoop under the spinner (rows 5-10), wider than the 10 px lens: it must not cover the glyph
+        els.append(element([2, 11, 2], [14, 12, 14], "steel"))
     elif name == "attention":
-        # four horns (3 x 5 px base tapering to a 2 x 3 tip): a siren star 16 px across
-        for (fx, fz) in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-            def horn(a0, a1, b0, b1, y0_, y1_):
-                # a = axis of the horn, b = across; swap for the z horns
-                if fx != 0:
-                    lo, hi = sorted((8 + fx * a0, 8 + fx * a1))
-                    return element([lo, y0_, b0], [hi, y1_, b1], "plain", emit=emit)
-                lo, hi = sorted((8 + fz * a0, 8 + fz * a1))
-                return element([b0, y0_, lo], [b1, y1_, hi], "plain", emit=emit)
-            els.append(horn(5, 7, 6.5, 9.5, 5.5, 10.5))
-            els.append(horn(7, 8, 7, 9, 6.5, 9.5))
+        # two straight steel T-brackets, east and west only: nothing stands in front of the lens, so the "!" is clean
+        for (arm, plate) in (((13, 15), (15, 16)), ((1, 3), (0, 1))):
+            els.append(element([arm[0], 7, 7], [arm[1], 9, 9], "steel"))
+            els.append(element([plate[0], 4, 7], [plate[1], 12, 9], "steel"))
     elif name == "error":
         # eight claws (up and down, darker red) and four corner nubs sticking out at mid height: a jagged outline
         for cx in (3, 11):
@@ -254,9 +265,12 @@ def model(name):
                 els.append(element([cx + 0.5, 15, cz + 0.5], [cx + 1.5, 16, cz + 1.5], "claw", emit=emit))
                 els.append(element([cx, 1, cz], [cx + 2, 3, cz + 2], "claw", emit=emit))
                 els.append(element([cx + 0.5, 0, cz + 0.5], [cx + 1.5, 1, cz + 1.5], "claw", emit=emit))
+        # four vertical corner spikes in steel (a 2 px shaft with a 1 px tip above and below), not mid-height nubs that read as ears
         for nx in (1, 13):
             for nz in (1, 13):
-                els.append(element([nx, 6.5, nz], [nx + 2, 9.5, nz + 2], "claw", emit=emit))
+                els.append(element([nx, 5, nz], [nx + 2, 11, nz + 2], "steel"))
+                els.append(element([nx + 0.5, 11, nz + 0.5], [nx + 1.5, 13, nz + 1.5], "steel"))
+                els.append(element([nx + 0.5, 3, nz + 0.5], [nx + 1.5, 5, nz + 1.5], "steel"))
     return {
         "parent": "minecraft:block/block",
         "textures": {"base": "t3craft:block/status_lamp_base", "lens": "t3craft:block/status_lamp_%s" % name, "particle": "t3craft:block/status_lamp_base"},
