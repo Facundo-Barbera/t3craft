@@ -415,7 +415,7 @@ public final class LoungeRoom {
 		/**
 		 * The pergola: a regular-ish octagon ring beam (straight sides on the axes, clean 45 degree diagonals) on twelve
 		 * dark oak posts with knee-brace brackets, and outside it an awning of cherry slabs flat under the beam out to an
-		 * octagonal dark oak edge (so the bars, shelves and the rack are under a roof). The entrances stay open between
+		 * octagonal edge (so the bars, shelves and the rack are under a roof). The entrances stay open between
 		 * their posts. The diagonal posts rise into lantern finials.
 		 */
 		void pergola() {
@@ -447,8 +447,7 @@ public final class LoungeRoom {
 						continue;
 					}
 					if (a >= 3) {
-						boolean edge = ax == AWN_R || az == AWN_R;
-						set(dx, ROOF_Y - 1, dz, NodeDecor.topSlab(edge ? Blocks.DARK_OAK_SLAB : Blocks.CHERRY_SLAB));
+												set(dx, ROOF_Y - 1, dz, NodeDecor.topSlab(Blocks.CHERRY_SLAB));
 						int sx = dx < 0 ? -1 : 1;
 						int sz = dz < 0 ? -1 : 1;
 						if (theme(sx, sz) == 3 && Math.hypot(dx, dz) > 12.2 && Math.floorMod(ax + az * 2, 3) != 0) {
@@ -482,7 +481,7 @@ public final class LoungeRoom {
 				}
 				if (Math.abs(p[0]) == 8) {
 					// finial: the post climbs through the beam to a lantern
-					set(p[0], ROOF_Y + 1, p[1], b(Blocks.STRIPPED_DARK_OAK_LOG));
+					set(p[0], ROOF_Y + 1, p[1], b(Blocks.DARK_OAK_FENCE));
 					set(p[0], ROOF_Y + 2, p[1], lanternUp());
 				}
 			}
