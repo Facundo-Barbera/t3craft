@@ -231,10 +231,10 @@ final class PondKit {
 
 	/**
 	 * A young cherry tree beside the water. The trunk is a face-connected chain of logs (no diagonal
-	 * steps): a straight foot up to y2, a short horizontal log at y3 that shifts the trunk by one cell
+	 * steps): a straight foot, a short horizontal log (y3, lower in short plots) that shifts the trunk by one cell
 	 * towards {@code lean} (+1 / -1 in u, the way into the plot), then the stem and a branch over the
 	 * water. Nothing but the trunk stands below y3, so the ground round the foot stays walkable. The
-	 * canopy is a rounded, irregular blob from y3 up with holes; every leaf is kept only if it joins the
+	 * canopy is a rounded, irregular blob from the bend up with holes; every leaf is kept only if it joins the
 	 * logs through a chain of faces, so the whole tree is one solid group (CitadelSettle never sees it as
 	 * floating). Pink petals lie round the foot. Everything is clipped by the plot.
 	 */
@@ -247,21 +247,21 @@ final class PondKit {
 		BlockState upright = b(Blocks.CHERRY_LOG);
 		BlockState sideways = upright.setValue(BlockStateProperties.AXIS, Direction.Axis.X);
 		int stem = u + lean;
-		// trunk: foot, then a bend through one horizontal log, then the stem
-		for (int y = 0; y <= 3; y++) {
+		// trunk: foot, then a bend through one horizontal log, then the stem (the bend sits lower in short plots)
+		int bend = Math.min(3, h - 2);
+		for (int y = 0; y <= bend; y++) {
 			treeLog(c, p, log, u, y, v, upright);
 		}
-		treeLog(c, p, log, stem, 3, v, sideways);
-		treeLog(c, p, log, stem, 4, v, upright);
-		if (h >= 7) {
-			treeLog(c, p, log, stem, 5, v, upright);
+		treeLog(c, p, log, stem, bend, v, sideways);
+		for (int y = bend + 1; y <= Math.min(bend + 2, h - 2); y++) {
+			treeLog(c, p, log, stem, y, v, upright);
 		}
-		treeLog(c, p, log, stem + lean, 4, v, sideways); // a branch over the water, face-joined to the stem
+		treeLog(c, p, log, stem + lean, bend + 1, v, sideways); // a branch over the water, face-joined to the stem
 		// canopy candidates: rounded layers, corners cut, ~1 in 4 cells missing
 		int[] radius = {1, 2, 2, 1};
-		int top = Math.min(h - 1, 6);
-		for (int y = 3; y <= top; y++) {
-			int r = radius[y - 3];
+		int top = Math.min(h - 1, bend + 3);
+		for (int y = bend; y <= top; y++) {
+			int r = radius[y - bend];
 			for (int du = -r; du <= r; du++) {
 				for (int dv = -r; dv <= r; dv++) {
 					boolean corner = Math.abs(du) == r && Math.abs(dv) == r && r > 1;
@@ -272,14 +272,6 @@ final class PondKit {
 					}
 					leaf[lu][y][lv] = true;
 				}
-			}
-		}
-		// a few leaves hanging at y3 under the rim of the canopy (face-joined to the layer above)
-		for (int[] o : new int[][] {{2, 0}, {-2, 0}, {0, 2}, {0, -2}}) {
-			int lu = stem + o[0];
-			int lv = v + o[1];
-			if (p.has(lu, 3, lv) && !log[lu][3][lv] && p.hash(lu, 3, lv, 3) == 0 && p.at(c, lu, 3, lv) == null) {
-				leaf[lu][3][lv] = true;
 			}
 		}
 		// keep only leaves joined to the logs through faces (flood fill from every log)
