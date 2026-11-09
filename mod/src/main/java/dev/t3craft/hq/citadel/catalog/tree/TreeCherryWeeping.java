@@ -287,7 +287,7 @@ public final class TreeCherryWeeping implements Variant {
 				// the strand drifts one cell outwards after 3 or 4 blocks, so it falls in an arc and not as a post
 				int ku = Math.abs(u - lu) >= Math.abs(v - lv) ? Integer.signum(u - lu) : 0;
 				int kv = ku == 0 ? Integer.signum(v - lv) : 0;
-				int kAt = 3 + t.hash(u, 8, v, 2);
+				int kAt = 1 + t.hash(u, 8, v, 2); // high up: the cell left behind must stay at y >= 4 (3+ blocks under it)
 				int su = u;
 				int sv = v;
 				for (int y = y0c - 1, k = 0; y >= bottom; y--, k++) {
@@ -295,7 +295,7 @@ public final class TreeCherryWeeping implements Variant {
 						break;
 					}
 					t.leaf(su, y, sv, y == bottom && t.hash(su, y, sv, 100) < 40 ? TreeKit.SAKURA.b() : TreeKit.SAKURA.a());
-					if (k == kAt && y > bottom + 1 && t.empty(su + ku, y, sv + kv) && t.empty(su + ku, y - 1, sv + kv)
+					if (k == kAt && y >= CLEAR && y > bottom + 1 && t.empty(su + ku, y, sv + kv) && t.empty(su + ku, y - 1, sv + kv)
 							&& (ku != 0 || kv != 0)) {
 						su += ku; // the step is a leaf beside the last one, face-connected
 						sv += kv;
