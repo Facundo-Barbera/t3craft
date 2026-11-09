@@ -125,6 +125,9 @@ public final class GazeboCherryOctagon implements Variant {
 		boolean post(int dx, int dz) {
 			int ax = Math.abs(dx);
 			int az = Math.abs(dz);
+			if (r == 3) {
+				return ax == 2 && az == 2; // the smallest plot: four corner posts, so the doorways are 3 wide
+			}
 			return (ax == lf && az == r - 1) || (ax == r - 1 && az == lf);
 		}
 
@@ -196,26 +199,31 @@ public final class GazeboCherryOctagon implements Variant {
 		int s = (int) Math.floor(a0 * Math.sqrt(2) + 1e-9);
 		int lf = s - r;
 		boolean sideEntry = r >= 5 && p.hash(2, 2, 2, 2) == 1;
-		Geo geo = new Geo(r, s, lf, lf - 1, sideEntry);
+		Geo geo = new Geo(r, s, lf, r == 3 ? 1 : lf - 1, sideEntry);
 		int use = p.hash(0, 0, 0, 3); // 0 tea, 1 music, 2 reading
 
 		// roof profile
 		int layers = p.h() - ROOF_Y; // free layers for roof and finial
 		boolean twoTier = r >= 4 && layers >= 7 && p.hash(1, 1, 1, 2) == 1;
 		double[] rho;
-		int drum = -1;
+		int drumLo = -1;
+		int drumHi = -1;
 		if (twoTier) {
 			double rd = Math.max(1.5, Math.min(3.0, a0 * 0.42));
-			int nLow = layers >= 8 ? 3 : 2;
-			int nUp = Math.min(4, layers - 2 - nLow);
-			rho = new double[nLow + 1 + nUp];
+			int nLow = 2;
+			int drumH = layers >= 8 ? 2 : 1; // a two-course glazed drum when there is room, so it shows under the upper eave
+			int nUp = Math.min(4, layers - 1 - nLow - drumH);
+			rho = new double[nLow + drumH + nUp];
 			for (int j = 0; j < nLow; j++) {
 				rho[j] = rd + (a0 - rd) * Math.pow(1.0 - (double) j / nLow, 1.4);
 			}
-			drum = nLow;
-			rho[drum] = rd;
+			drumLo = nLow;
+			drumHi = nLow + drumH - 1;
+			for (int j = drumLo; j <= drumHi; j++) {
+				rho[j] = rd;
+			}
 			for (int k = 0; k < nUp; k++) {
-				rho[nLow + 1 + k] = 1.0 + (rd + 0.2) * Math.pow(1.0 - (double) k / (nUp - 1), 1.4);
+				rho[drumHi + 1 + k] = 1.0 + (rd + 0.2) * Math.pow(1.0 - (double) k / (nUp - 1), 1.4);
 			}
 		} else {
 			int n = Math.min(layers - 1, Math.max(3, (int) Math.ceil(a0 - 0.5)));
@@ -235,12 +243,16 @@ public final class GazeboCherryOctagon implements Variant {
 					outside(c, p, u, v, dx, dz, geo);
 					continue;
 				}
-				switch (ring) {
-					case 1 -> stepRing(c, p, u, v, dx, dz, geo);
-					case 2 -> postRing(c, p, u, v, dx, dz, geo, use);
-					default -> inner(c, p, u, v, dx, dz, geo, use, ring);
+				if (geo.post(dx, dz)) {
+					postRing(c, p, u, v, dx, dz, geo, use);
+				} else {
+					switch (ring) {
+						case 1 -> stepRing(c, p, u, v, dx, dz, geo);
+						case 2 -> postRing(c, p, u, v, dx, dz, geo, use);
+						default -> inner(c, p, u, v, dx, dz, geo, use, ring);
+					}
 				}
-				roof(c, p, u, v, dx, dz, oct(dx, dz), rho, drum, r >= 4);
+				roof(c, p, u, v, dx, dz, oct(dx, dz), rho, drumLo, drumHi);
 			}
 		}
 
@@ -287,8 +299,8 @@ public final class GazeboCherryOctagon implements Variant {
 		} else if (lamp) {
 			p.put(c, u, 4, v, HANGING_LANTERN, CitadelCanvas.HANGING);
 		} else if (!geo.aisle(dx, dz)) {
-			// [palette] a dark deepslate-tile fascia under the pink eave (the doorways stay clear)
-			p.set(c, u, 4, v, upside(p.hash(u, 4, v, 4) == 0 ? Blocks.POLISHED_DEEPSLATE_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS, out(dx, dz)));
+			// [palette] a bamboo fascia under the pink eave (the doorways stay clear)
+			p.set(c, u, 4, v, upside(Blocks.BAMBOO_MOSAIC_STAIRS, out(dx, dz)));
 		}
 	}
 
@@ -299,9 +311,9 @@ public final class GazeboCherryOctagon implements Variant {
 			// [palette] dark base, bark-dark cherry shaft, light capital
 			p.set(c, u, 0, v, b(Blocks.CHISELED_DEEPSLATE));
 			p.set(c, u, 1, v, b(Blocks.POLISHED_DEEPSLATE));
-			p.set(c, u, 2, v, log(Blocks.STRIPPED_CHERRY_LOG, Direction.Axis.Y));
-			p.set(c, u, 3, v, log(Blocks.STRIPPED_CHERRY_LOG, Direction.Axis.Y));
-			p.set(c, u, 4, v, b(Blocks.CHERRY_WOOD));
+			p.set(c, u, 2, v, log(Blocks.CHERRY_LOG, Direction.Axis.Y));
+			p.set(c, u, 3, v, log(Blocks.CHERRY_LOG, Direction.Axis.Y));
+			p.set(c, u, 4, v, b(Blocks.STRIPPED_CHERRY_WOOD));
 			return;
 		}
 		int h = p.hash(u, 0, v, 6);
@@ -320,6 +332,8 @@ public final class GazeboCherryOctagon implements Variant {
 			}
 		} else if (geo.benchOnPostRing(dx, dz)) {
 			p.set(c, u, 1, v, stairs(Blocks.CHERRY_STAIRS, out(dx, dz)));
+		} else if (geo.r() == 3 && geo.aisle(dx, dz) && Math.abs(dx) == 1) {
+			p.put(c, u, 4, v, HANGING_LANTERN, CitadelCanvas.HANGING); // flank the doorway
 		}
 	}
 
@@ -340,6 +354,8 @@ public final class GazeboCherryOctagon implements Variant {
 			f = log(Blocks.STRIPPED_CHERRY_LOG, dz == 0 ? Direction.Axis.X : Direction.Axis.Z);
 		} else if (ax == az) {
 			f = b(Blocks.BAMBOO_MOSAIC);
+		} else if (ring == 4 && !Geo.inside(ax, az, geo.r() - 4, geo.s() - 4)) {
+			f = b(Blocks.CALCITE); // [palette] a pale medallion round the table
 		} else {
 			f = b(Blocks.CHERRY_PLANKS);
 		}
@@ -389,11 +405,11 @@ public final class GazeboCherryOctagon implements Variant {
 	 * stays hollow inside. The outer ring of a brim is dark deepslate tile. Layer {@code drum} (if any) is a
 	 * glazed wall of one ring, the tier break of a two-tier roof.
 	 */
-	private static void roof(CitadelCanvas c, Plot p, int u, int v, int dx, int dz, double m, double[] rho, int drum, boolean ribs) {
+	private static void roof(CitadelCanvas c, Plot p, int u, int v, int dx, int dz, double m, double[] rho, int drumLo, int drumHi) {
 		int n = rho.length;
 		for (int j = 0; j < n; j++) {
 			int y = ROOF_Y + j;
-			if (j == drum) {
+			if (drumLo >= 0 && j >= drumLo && j <= drumHi) {
 				if (m <= rho[j] && m > rho[j] - 1.0) {
 					p.set(c, u, y, v, dx == 0 || dz == 0 ? PINK_GLASS : b(Blocks.STRIPPED_CHERRY_WOOD));
 				}
@@ -401,8 +417,8 @@ public final class GazeboCherryOctagon implements Variant {
 			}
 			boolean last = j == n - 1;
 			double inner = last ? -1.0 : rho[j + 1] - 1.0;
-			if (drum >= 0 && j == drum + 1) {
-				inner = Math.min(inner, rho[drum] - 1.0); // the upper brim closes over the whole drum
+			if (drumHi >= 0 && j == drumHi + 1) {
+				inner = Math.min(inner, rho[drumHi] - 1.0); // the upper brim closes over the whole drum
 			}
 			if (m > rho[j] || (!last && m <= inner)) {
 				continue;
