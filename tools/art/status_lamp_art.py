@@ -62,10 +62,10 @@ def px(c):
 
 # ---------------------------------------------------------------- glyphs (rows of '#', '.')
 GLYPHS = {
-    "check": ["......", ".....#", "#...##", "##.##.", ".###..", "..#..."],
-    "bang": ["##", "##", "##", "##", "..", "##"],
+    "check": ["....##", "...##.", "##.##.", ".###..", "..#..."],
+    "bang": ["##", "##", "##", "##", "##", "..", "##", "##"],
     "x": ["##..##", ".####.", "..##..", "..##..", ".####.", "##..##"],
-    "pause": ["#..#", "#..#", "#..#", "#..#"],
+    "pause": ["##..##", "##..##", "##..##", "##..##", "##..##"],
 }
 # 6x6 ring, clockwise from the top-left corner (20 px)
 RING = [(i, 0) for i in range(6)] + [(5, j) for j in range(1, 6)] + [(i, 5) for i in range(4, -1, -1)] + [(0, j) for j in range(4, 0, -1)]
@@ -73,11 +73,11 @@ RING = [(i, 0) for i in range(6)] + [(5, j) for j in range(1, 6)] + [(i, 5) for 
 # state -> lens crop (x0, y0, x1, y1) in texture px = lens face size in model px (1:1 texel density)
 # name: (colour, crop, frames, frametime)
 STATES = {
-    "off": (0x2A2A2A, (5, 3, 11, 13), 1, 0),
-    "idle": (0xAAAAAA, (6, 3, 10, 13), 1, 0),
+    "off": (0x2A2A2A, (4, 3, 12, 13), 1, 0),
+    "idle": (0xAAAAAA, (5, 3, 11, 13), 1, 0),
     "working": (0x55FFFF, (4, 3, 12, 13), 4, 3),
-    "attention": (0xFFAA00, (3, 3, 13, 13), 2, 12),
-    "error": (0xFF5555, (2, 3, 14, 13), 2, 5),
+    "attention": (0xFFAA00, (3, 3, 13, 13), 2, 10),
+    "error": (0xFF5555, (3, 3, 13, 13), 2, 4),
     "done": (0x55FF55, (4, 3, 12, 13), 1, 0),
 }
 
@@ -88,26 +88,31 @@ def lens_frame(name, f):
     lit = True
     if name in ("attention", "error") and f == 1:
         lit = False  # the dim half of the blink
-    fill = c if lit else darken(c, 0.42)
+    fill = c if lit else darken(c, 0.30)
     img = [[px(fill)] * 16 for _ in range(16)]
     if name == "off":
         fill = rgb(0x1B2026)
         img = [[px(fill)] * 16 for _ in range(16)]
         for i in range(0, 5):  # dead glass: a faint diagonal reflection
             for (x, y) in ((x0 + 1 + i, y0 + 1 + i), (x0 + 2 + i, y0 + 1 + i)):
+                # (reflection pixels below are lighter than the glass so the lamp reads as dead glass, not a hole)
                 if x0 <= x < x1 and y0 <= y < y1:
-                    img[y][x] = px(rgb(0x2A333B))
+                    img[y][x] = px(rgb(0x4A4A4A))
     # rows 0-1: bright strip (the band), 2-3 already plain
     for y in range(2):
         for x in range(16):
             img[y][x] = px(lighten(fill, 0.38) if name != "off" else rgb(0x2A333B))
-    # cylinder shading inside the crop: lighter left column, darker right column
-    for y in range(y0, y1):
-        if name != "off":
-            img[y][x0] = px(lighten(fill, 0.22))
-            img[y][x1 - 1] = px(darken(fill, 0.78))
+    if name != "off":
+        # lens shading: 1 px darker border, a 2x2 warm core highlight at the top-left (the glyph paints over it)
+        edge = darken(fill, 0.70)
+        for y in range(y0, y1):
+            for x in range(x0, x1):
+                if x in (x0, x1 - 1) or y in (y0, y1 - 1):
+                    img[y][x] = px(edge)
+        for (x, y) in ((x0 + 1, y0 + 1), (x0 + 2, y0 + 1), (x0 + 1, y0 + 2), (x0 + 2, y0 + 2)):
+            img[y][x] = px(lighten(fill, 0.40))
     # glyph
-    glyph_col = darken(c, 0.16) if lit else lighten(c, 0.15)
+    glyph_col = darken(c, 0.30) if lit else lighten(c, 0.15)
     gname = {"idle": "pause", "attention": "bang", "error": "x", "done": "check"}.get(name)
     cx = (x0 + x1) / 2.0
     cy = (y0 + y1) / 2.0
@@ -144,7 +149,7 @@ def write_textures():
             os.remove(meta)
     # base: rows 0-5 gold, 6-15 steel
     gold = rgb(0xC9A24A)
-    steel = rgb(0x34383F)
+    steel = rgb(0x5A6068)
     rows = []
     for y in range(16):
         row = []
@@ -158,7 +163,7 @@ def write_textures():
             else:
                 c = steel
                 if y == 6:
-                    c = lighten(steel, 0.3)
+                    c = lighten(steel, 0.45)
                 elif y == 15:
                     c = darken(steel, 0.7)
                 elif (x + y) % 7 == 0:
@@ -199,43 +204,48 @@ def element(frm, to, kind, crop=None, emit=0, skip=()):
     return e
 
 
-def body():
-    """Caps and gold rings, symmetric about y = 8."""
+def body(ring):
+    """Caps and rings, symmetric about y = 8; 10 px plates so the cap is never narrower than the lens."""
     return [
-        element([4, 0, 4], [12, 1, 12], "steel"),
-        element([5, 1, 5], [11, 2, 11], "steel"),
-        element([4.5, 2, 4.5], [11.5, 3, 11.5], "gold"),
-        element([4.5, 13, 4.5], [11.5, 14, 11.5], "gold"),
-        element([5, 14, 5], [11, 15, 11], "steel"),
-        element([4, 15, 4], [12, 16, 12], "steel"),
+        element([3, 0, 3], [13, 1, 13], "steel"),
+        element([4, 1, 4], [12, 2, 12], "steel"),
+        element([3.5, 2, 3.5], [12.5, 3, 12.5], ring),
+        element([3.5, 13, 3.5], [12.5, 14, 12.5], ring),
+        element([4, 14, 4], [12, 15, 12], "steel"),
+        element([3, 15, 3], [13, 16, 13], "steel"),
     ]
 
 
 def model(name):
     col, crop, n, ft = STATES[name]
-    emit = {"off": 0, "idle": 7, "working": 13, "attention": 15, "error": 15, "done": 11}[name]
-    els = body()
+    emit = {"off": 0, "idle": 7, "working": 13, "attention": 15, "error": 15, "done": 13}[name]
+    # attention: steel rings, so the orange does not read as brass
+    els = body("steel" if name == "attention" else "gold")
     x0, y0, x1, y1 = crop
-    # lens: square in plan, y 3..13; the rings are as wide as the narrow lenses, so those hide their up/down faces
-    els.append(element([x0, 3, x0], [x1, 13, x1], "lens", crop=crop, emit=emit, skip=("up", "down") if x1 - x0 <= 7 else ()))
+    # lens: square in plan, y 3..13; the rings are wider than the lens, so up/down faces stay hidden except on 10 px lenses
+    els.append(element([x0, 3, x0], [x1, 13, x1], "lens", crop=crop, emit=emit, skip=("up", "down") if x1 - x0 <= 8 else ()))
     if name == "working":
-        els.append(element([x0 - 1, 7, x0 - 1], [x1 + 1, 9, x1 + 1], "bright", emit=emit))
+        els.append(element([3, 7, 3], [13, 9, 13], "bright", emit=emit))
     elif name == "attention":
-        # four horns with a tip: a siren star
-        els += [
-            element([13, 6, 7], [15, 10, 9], "plain", emit=emit), element([15, 7, 7.5], [16, 9, 8.5], "bright", emit=emit),
-            element([1, 6, 7], [3, 10, 9], "plain", emit=emit), element([0, 7, 7.5], [1, 9, 8.5], "bright", emit=emit),
-            element([7, 6, 1], [9, 10, 3], "plain", emit=emit), element([7.5, 7, 0], [8.5, 9, 1], "bright", emit=emit),
-            element([7, 6, 13], [9, 10, 15], "plain", emit=emit), element([7.5, 7, 15], [8.5, 9, 16], "bright", emit=emit),
-        ]
+        # four horns (3 x 5 px base tapering to a 2 x 3 tip): a siren star 16 px across
+        for (fx, fz) in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            def horn(a0, a1, b0, b1, y0_, y1_):
+                # a = axis of the horn, b = across; swap for the z horns
+                if fx != 0:
+                    lo, hi = sorted((8 + fx * a0, 8 + fx * a1))
+                    return element([lo, y0_, b0], [hi, y1_, b1], "plain", emit=emit)
+                lo, hi = sorted((8 + fz * a0, 8 + fz * a1))
+                return element([b0, y0_, lo], [b1, y1_, hi], "plain", emit=emit)
+            els.append(horn(5, 7, 6.5, 9.5, 5.5, 10.5))
+            els.append(horn(7, 8, 7, 9, 6.5, 9.5))
     elif name == "error":
-        # eight claws, four up and four down, at the corners of the wide squat lens
-        for cx in (2, 12):
-            for cz in (2, 12):
+        # eight claws, four up and four down, at the corners of the 10 px lens
+        for cx in (3, 11):
+            for cz in (3, 11):
                 els.append(element([cx, 13, cz], [cx + 2, 15, cz + 2], "plain", emit=emit))
-                els.append(element([cx + 0.5, 15, cz + 0.5], [cx + 1.5, 16, cz + 1.5], "bright", emit=emit))
+                els.append(element([cx + 0.5, 15, cz + 0.5], [cx + 1.5, 16, cz + 1.5], "plain", emit=emit))
                 els.append(element([cx, 1, cz], [cx + 2, 3, cz + 2], "plain", emit=emit))
-                els.append(element([cx + 0.5, 0, cz + 0.5], [cx + 1.5, 1, cz + 1.5], "bright", emit=emit))
+                els.append(element([cx + 0.5, 0, cz + 0.5], [cx + 1.5, 1, cz + 1.5], "plain", emit=emit))
     return {
         "parent": "minecraft:block/block",
         "textures": {"base": "t3craft:block/status_lamp_base", "lens": "t3craft:block/status_lamp_%s" % name, "particle": "t3craft:block/status_lamp_base"},
