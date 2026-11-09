@@ -19,7 +19,7 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
  * A picnic table in stone under a cherry pergola: dark deepslate benches on both long sides, a pale smooth
  * quartz top on stone-brick wall legs, a flowering azalea set into the middle of a long table. Wide plots
  * add the table ends (a lantern post and a planted block); tall wide plots raise a cherry pergola over the
- * whole set: fence posts on deepslate feet, two long beams, thin slab slats, blossom along the edges and
+ * whole set: fence posts on deepslate feet, fence rails, thin slab slats, one clump of blossom and
  * lanterns hanging over the table.
  *
  * <ul>
@@ -119,7 +119,7 @@ public final class BenchStoneTable implements Variant {
 		}
 	}
 
-	/** A cherry pergola over the set: four posts, two long beams (y 3), slab slats (y 4), blossom on the edges, lanterns. */
+	/** A cherry pergola over the set: four posts, fence rails (y 3), slab slats (y 4), one blossom clump, lanterns. */
 	private static void pergola(CitadelCanvas c, Plot p, int w) {
 		for (int u : new int[] {0, w - 1}) {
 			for (int v : new int[] {0, 2}) {
@@ -128,26 +128,24 @@ public final class BenchStoneTable implements Variant {
 				p.set(c, u, 2, v, b(Blocks.CHERRY_FENCE));
 			}
 		}
-		BlockState beam = b(Blocks.STRIPPED_CHERRY_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.X);
-		BlockState rafter = slab(Blocks.CHERRY_SLAB); // thin slats lying across the beams
+		BlockState rail = b(Blocks.CHERRY_FENCE); // light rails along the long sides (they connect to each other)
+		BlockState slat = slab(Blocks.CHERRY_SLAB); // thin slats lying across the rails
 		for (int u = 0; u < w; u++) {
-			p.set(c, u, 3, 0, beam);
-			p.set(c, u, 3, 2, beam);
-			boolean isRafter = u % 2 == 0 || u == w - 1;
-			for (int v = 0; v < 3; v++) {
-				if (isRafter) {
-					p.set(c, u, 4, v, rafter);
-				} else if (v != 1 && p.hash(u, 4, v, 3) != 0) {
-					p.set(c, u, 4, v, leaves(Blocks.CHERRY_LEAVES)); // blossom along the edges between the slats; the middle row stays open to the sky
+			p.set(c, u, 3, 0, rail);
+			p.set(c, u, 3, 2, rail);
+			if (u % 2 == 0 || u == w - 1) {
+				for (int v = 0; v < 3; v++) {
+					p.set(c, u, 4, v, slat);
 				}
 			}
 		}
-		// a clump of blossom spilling over one rafter on taller plots
+		// one clump of blossom over a back corner, the rest open to the sky
+		int cu = p.hash(0, 4, 0, 2) == 0 ? 0 : w - 1;
+		int nu = cu == 0 ? 1 : w - 2;
+		p.set(c, nu, 4, 2, leaves(Blocks.CHERRY_LEAVES));
+		p.set(c, nu, 4, 1, leaves(Blocks.CHERRY_LEAVES));
 		if (p.h() >= 6) {
-			int cu = p.hash(0, 5, 0, 2) == 0 ? 0 : w - 1;
-			p.set(c, cu, 5, 0, leaves(Blocks.CHERRY_LEAVES));
-			p.set(c, cu, 5, 1, leaves(Blocks.CHERRY_LEAVES));
-			p.set(c, w - 1 - cu, 5, 2, leaves(Blocks.CHERRY_LEAVES));
+			p.set(c, cu, 5, 2, leaves(Blocks.CHERRY_LEAVES));
 		}
 		// lanterns hang from the slats over the table
 		for (int u = 1; u < w - 1; u++) {

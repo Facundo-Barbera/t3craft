@@ -14,17 +14,17 @@ import net.minecraft.world.level.block.StairBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.Half;
+import net.minecraft.world.level.block.state.properties.SlabType;
 
 /**
- * Brazier on a tripod: a round shallow bowl of polished deepslate (open corners) with a thin copper rim and an open fire,
- * carried by three dark legs that splay out to the left, the right and the back and lean in to a gold
+ * Brazier on a tripod: a shallow bowl of polished deepslate with a thin copper lip and an open fire,
+ * carried by three dark legs that splay out to the left, the right and the back and lean in to a dark
  * collar under the bowl. The front stays open, so the fire and the empty space under the bowl read.
  *
  * <ul>
- * <li><b>Silhouette</b>: thin legs leaning in → a gold knot → a bowl that tapers to the knot and widens to
+ * <li><b>Silhouette</b>: thin legs leaning in → a dark knot → a bowl that tapers to the knot and widens to
  *     the rim. The legs lean with a stair at their top (the high step towards the knot).</li>
- * <li><b>Contrast</b>: near-black nether-brick legs with blackstone knees, dark polished deepslate bowl, a thin copper rim and a
- *     gold collar; the flame is the brightest thing on it.</li>
+ * <li><b>Contrast</b>: near-black nether-brick legs with blackstone knees, dark polished deepslate bowl, a thin copper lip; the flame is the brightest thing on it.</li>
  * <li><b>Safe fire</b>: a campfire (it never spreads) with nothing flammable round it.</li>
  * </ul>
  * Size: 3 × 3 × 4–6. The legs are one to three blocks before they lean in.
@@ -89,8 +89,8 @@ public final class LampStreetBrazierTripod implements Variant {
 			// the knee: a stair leaning in to the knot (on the lowest plots the leg is just a thin post)
 			p.set(c, u, lean, v, lean == 0 ? b(Blocks.NETHER_BRICK_FENCE) : stairs(Blocks.POLISHED_BLACKSTONE_STAIRS, LEAN[i]));
 		}
-		// --- the knot: a gold collar where the three legs meet, ash on the ground under it
-		p.set(c, 1, knot, 1, b(Blocks.GOLD_BLOCK));
+		// --- the knot: a slim dark collar where the three legs meet, ash on the ground under it
+		p.set(c, 1, knot, 1, b(Blocks.POLISHED_BLACKSTONE_WALL));
 		if (knot >= 2) {
 			p.set(c, 1, 0, 1, slab(Blocks.BLACKSTONE_SLAB));
 		}
@@ -101,12 +101,19 @@ public final class LampStreetBrazierTripod implements Variant {
 			int[] s = SIDES[i];
 			p.set(c, s[0], dish, s[1], stairs(Blocks.POLISHED_DEEPSLATE_STAIRS, IN[i]).setValue(StairBlock.HALF, Half.TOP));
 		}
-		// the corners stay open: the bowl reads round, not as a square box
+		BlockState corner = slab(Blocks.POLISHED_DEEPSLATE_SLAB).setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP);
+		for (int[] k : CORNERS) {
+			p.set(c, k[0], dish, k[1], corner);
+		}
 
-		// --- rim: one ring of bright copper slabs on the four sides of the bowl, the fire standing above it
-		BlockState rim = slab(Blocks.CUT_COPPER_SLAB.waxed().unaffected());
-		for (int[] s : SIDES) {
-			p.set(c, s[0], dish + 1, s[1], rim);
+		// --- rim: a thin copper lip, open trapdoors standing on the outer edge of every rim cell (an open
+		// trapdoor's panel sits on the side opposite its facing), so the bowl stays dark round the fire
+		BlockState lip = b(Blocks.COPPER_TRAPDOOR.waxed().unaffected()).setValue(BlockStateProperties.OPEN, true);
+		for (int i = 0; i < 4; i++) {
+			p.set(c, SIDES[i][0], dish + 1, SIDES[i][1], lip.setValue(BlockStateProperties.HORIZONTAL_FACING, IN[i]));
+		}
+		for (int[] k : CORNERS) {
+			p.set(c, k[0], dish + 1, k[1], lip.setValue(BlockStateProperties.HORIZONTAL_FACING, k[0] == 0 ? Direction.EAST : Direction.WEST));
 		}
 
 		// --- the fire, in the open

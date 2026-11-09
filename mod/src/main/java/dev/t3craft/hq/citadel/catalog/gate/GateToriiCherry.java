@@ -27,9 +27,9 @@ import net.minecraft.world.level.block.state.properties.Half;
  *     stairs turned outward (the upturned tips) over upside-down stairs that taper the shimaki ends, so
  *     each end curves up. The nuki is shorter than the kasagi and longer than the pillar span.</li>
  * <li><b>Palette</b>: black deepslate and blackstone feet → stripped mangrove red (pillars, nuki, shimaki)
- *     → a dark kasagi line; a dark chiselled plaque (gold-faced on tall gates), stone lanterns outside on wide plots.</li>
+ *     → a dark kasagi line; a dark chiselled plaque, stone lanterns outside on wide plots.</li>
  * </ul>
- * Size: 5–11 × 2–4 × 8+ (uses up to 10 blocks of height).
+ * Size: 7–11 × 2–4 × 8+ (uses up to 10 blocks of height).
  */
 public final class GateToriiCherry implements Variant {
 	private static final BlockState RED = b(Blocks.STRIPPED_MANGROVE_LOG);
@@ -48,7 +48,7 @@ public final class GateToriiCherry implements Variant {
 
 	@Override
 	public int minW() {
-		return 5;
+		return 7; // narrower, the kasagi cannot overhang the pillars and the nuki cannot pass through: a goalpost
 	}
 
 	@Override
@@ -75,7 +75,7 @@ public final class GateToriiCherry implements Variant {
 	public void build(CitadelCanvas c, Plot p) {
 		int w = p.w();
 		int d = p.d();
-		int ov = w >= 9 ? 2 : w >= 7 ? 1 : 0; // kasagi overhang past the pillars, in u
+		int ov = w >= 9 ? 2 : 1; // kasagi overhang past the pillars, in u
 		int lp = ov; // left pillar column
 		int rp = w - 1 - ov; // right pillar column
 		int vc = (d - 1) / 2; // the plane of the gate
@@ -109,11 +109,11 @@ public final class GateToriiCherry implements Variant {
 			}
 		}
 
-		// --- gakuzuka: a dark plaque in the middle, between nuki and shimaki, with a gold face on tall gates
+		// --- gakuzuka: a dark chiselled plaque in the middle, between nuki and shimaki
 		int ow = rp - lp - 1;
 		int pc = lp + 1 + (ow - 1) / 2;
 		for (int y = nuki + 1; y < shimaki; y++) {
-			BlockState face = gap >= 2 && y == nuki + 1 ? b(Blocks.GOLD_BLOCK) : b(Blocks.CHISELED_POLISHED_BLACKSTONE);
+			BlockState face = b(Blocks.CHISELED_POLISHED_BLACKSTONE);
 			p.set(c, pc, y, vc, face);
 			if (ow % 2 == 0) {
 				p.set(c, pc + 1, y, vc, face);

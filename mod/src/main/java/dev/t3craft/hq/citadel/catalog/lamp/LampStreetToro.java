@@ -11,22 +11,19 @@ import dev.t3craft.hq.citadel.catalog.Variant;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.StairBlock;
-import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.Half;
-import net.minecraft.world.level.block.state.properties.SlabType;
 
 /**
- * Kasuga-style stone lantern (tōrō), all in stone: a low dark plinth (kiso), a slim shaft (sao), a flared
- * platform (chūdai), a light chamber (hibukuro) of four corner posts round a glowing heart, open on every
- * face, a thin wide hat (kasa) of slabs round a raised crown, and a jewel finial (hōju).
+ * Kasuga-style stone lantern (tōrō), all in stone: a low dark plinth (kiso), a slim shaft (sao), a
+ * cross-shaped flared platform (chūdai), a single glowing light box (hibukuro) open to the air on every side,
+ * a thin wide hat (kasa) of slabs round a raised crown with curled-up corner tips, and a jewel finial (hōju).
  *
  * <ul>
- * <li><b>Silhouette</b>: low plinth → slim shaft → flared platform → open lit chamber → thin hat → crown →
- *     point. Heavy pieces are half blocks (plinth, hat), so the lantern reads light, not as a stack of cubes.</li>
- * <li><b>Gradient</b>: deepslate plinth, stone-brick shaft and platform, stone-brick posts round a warm light,
+ * <li><b>Silhouette</b>: low plinth → slim shaft → cross platform → lit waist → thin hat → crown → point. Heavy pieces are half blocks (plinth, hat), so the lantern reads light, not as a stack of cubes.</li>
+ * <li><b>Gradient</b>: deepslate plinth, stone-brick shaft and platform, a warm light,
  *     a polished andesite hat, a pale diorite-wall jewel.</li>
- * <li><b>Depth</b>: the platform flares on upside-down stairs; the chamber is open between its posts; the
- *     crown stands half a block above the hat's slab eave.</li>
+ * <li><b>Depth</b>: the platform flares on upside-down stairs; the hat overhangs the light by a block on
+ *     every side; the crown stands half a block above the slab eave, the corner tips curl up on stairs.</li>
  * </ul>
  * Size: 3 × 3 × 4–6. Height 6 is the full tōrō; 5 drops the finial; 4 also drops the shaft.
  */
@@ -94,30 +91,25 @@ public final class LampStreetToro implements Variant {
 			p.set(c, 1, y++, 1, b(p.hash(1, 1, 1, 3) == 0 ? Blocks.MOSSY_STONE_BRICK_WALL : Blocks.STONE_BRICK_WALL));
 		}
 
-		// --- chūdai: a square platform flaring on upside-down stairs, upper slabs at the corners
+		// --- chūdai: a cross-shaped platform flaring on upside-down stairs, its corners left open
 		p.set(c, 1, y, 1, b(Blocks.CHISELED_STONE_BRICKS));
 		for (int i = 0; i < 4; i++) {
 			p.set(c, SIDES[i][0], y, SIDES[i][1], stairs(Blocks.STONE_BRICK_STAIRS, IN[i]).setValue(StairBlock.HALF, Half.TOP));
 		}
-		for (int[] k : CORNERS) {
-			p.set(c, k[0], y, k[1], slab(Blocks.STONE_BRICK_SLAB).setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP));
-		}
 		y++;
 
-		// --- hibukuro: a chamber of four stone corner posts round a glowing heart, open on all four faces
-		for (int[] k : CORNERS) {
-			p.set(c, k[0], y, k[1], b(Blocks.STONE_BRICK_WALL));
-		}
+		// --- hibukuro: the glowing box alone, open to the air on all sides, under a hat that overhangs it by one
 		p.set(c, 1, y, 1, b(Blocks.OCHRE_FROGLIGHT));
 		y++;
 
-		// --- kasa: a thin square hat of slabs (a wide, light eave) round a raised crown block
+		// --- kasa: a thin eave of slabs round a raised crown block; the corners are stairs turned outward, so
+		// their high step curls the four tips up (warabi-te)
 		p.set(c, 1, y, 1, b(Blocks.POLISHED_ANDESITE));
 		for (int[] k : SIDES) {
 			p.set(c, k[0], y, k[1], slab(Blocks.POLISHED_ANDESITE_SLAB));
 		}
 		for (int[] k : CORNERS) {
-			p.set(c, k[0], y, k[1], slab(Blocks.POLISHED_ANDESITE_SLAB));
+			p.set(c, k[0], y, k[1], stairs(Blocks.POLISHED_ANDESITE_STAIRS, k[0] == 0 ? Direction.WEST : Direction.EAST));
 		}
 		y++;
 

@@ -152,13 +152,23 @@ public final class GateArchBattlement implements Variant {
 						p.set(c, u, y, 0, AIR);
 						p.set(c, u, y, 1, y == panelTop ? b(Blocks.CHISELED_STONE_BRICKS) : b(Blocks.CHERRY_PLANKS));
 					}
-					p.set(c, u, 1, 0, stairs(Blocks.STONE_BRICK_STAIRS, Direction.SOUTH)); // a sill at the foot of the recess
+					p.set(c, u, 1, 0, stairs(Blocks.CHERRY_STAIRS, Direction.SOUTH)); // a cherry sill at the foot of the recess
+					p.set(c, u, panelTop, 0, stairs(Blocks.CHERRY_STAIRS, Direction.SOUTH).setValue(BlockStateProperties.HALF, Half.TOP)); // and a lintel
 					if (d >= 3) {
 						for (int y = 2; y <= panelTop; y++) {
 							p.set(c, u, y, d - 1, AIR);
 						}
 					}
 				}
+			}
+			if (pl == 2) {
+				// a two-wide tower: a slit recessed in its outer column above the string course, cherry behind it,
+				// under a cherry lintel on the face
+				for (int y = side + 1; y <= panelTop; y++) {
+					p.set(c, outer, y, 0, AIR);
+					p.set(c, outer, y, 1, b(Blocks.CHERRY_PLANKS));
+				}
+				p.set(c, outer, panelTop + 1, 0, stairs(Blocks.CHERRY_STAIRS, Direction.SOUTH).setValue(BlockStateProperties.HALF, Half.TOP));
 			}
 			if (d >= 3) {
 				// the outer side: recessed between the front and back pilasters (through the tower when it is one block wide)
