@@ -65,12 +65,9 @@ final class WalkAudit {
 			m.put(e.getKey(), s);
 		}
 		BlockState grass = Blocks.GRASS_BLOCK.defaultBlockState();
-		BlockState path = Blocks.DIRT_PATH.defaultBlockState();
 		for (int x = x1 - gap; x <= x2 + gap; x++) {
 			for (int z = z1 - gap; z <= z2 + gap; z++) {
-				boolean in = x >= x1 && x <= x2 && z >= z1 && z <= z2;
-				boolean ring = !in && x >= x1 - 1 && x <= x2 + 1 && z >= z1 - 1 && z <= z2 + 1;
-				m.putIfAbsent(BlockPos.asLong(x, 0, z), ring ? path : grass);
+				m.putIfAbsent(BlockPos.asLong(x, 0, z), grass); // a full block even on the path ring: PlanNav models a stair only by its high half, so a 15/16 path under the first step reads as a 1.06 jump
 			}
 		}
 		PlanProbe.Walk walk = PlanProbe.walk(m::get);
