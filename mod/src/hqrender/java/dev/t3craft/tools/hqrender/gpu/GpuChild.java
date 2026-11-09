@@ -8,7 +8,7 @@ package dev.t3craft.tools.hqrender.gpu;
  * <pre>
  *   GpuChild probe-cuda
  *   GpuChild probe-egl surfaceless|device:N|default
- *   GpuChild render INPUT_FILE OUTPUT_FILE        (see GpuTracer)
+ *   GpuChild serve                                 (commands on stdin, see GpuTracer)
  * </pre>
  */
 public final class GpuChild {
@@ -21,7 +21,7 @@ public final class GpuChild {
 			switch (args[0]) {
 				case "probe-cuda" -> Probes.cuda(System.out);
 				case "probe-egl" -> Probes.egl(args[1], System.out);
-				case "render" -> rc = GpuTracer.run(args[1], args[2], System.out);
+				case "serve" -> rc = GpuTracer.serve(System.out);
 				default -> {
 					System.out.println("unknown mode " + args[0]);
 					rc = 2;

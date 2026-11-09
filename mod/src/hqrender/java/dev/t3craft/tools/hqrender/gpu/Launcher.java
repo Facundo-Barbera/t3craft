@@ -15,12 +15,13 @@ public final class Launcher {
 	public record Result(int exit, String output, boolean timedOut) {
 	}
 
-	/** The folder or jar the gpu classes were loaded from. */
-	static Path classesRoot() throws Exception {
+	/** The folder or jar the gpu classes were loaded from (the child's class path). */
+	public static Path classesRoot() throws Exception {
 		return Path.of(GpuChild.class.getProtectionDomain().getCodeSource().getLocation().toURI());
 	}
 
-	public static Result run(List<String> childArgs, Map<String, String> env, long timeoutSec) throws Exception {
+	/** The command line of a child: java, the native access flag, this package's classes, then {@code childArgs}. */
+	static ProcessBuilder command(List<String> childArgs, Map<String, String> env) throws Exception {
 		List<String> cmd = new ArrayList<>();
 		cmd.add(Path.of(System.getProperty("java.home"), "bin", "java").toString());
 		cmd.add("--enable-native-access=ALL-UNNAMED");
@@ -33,7 +34,12 @@ public final class Launcher {
 		ProcessBuilder pb = new ProcessBuilder(cmd);
 		pb.redirectErrorStream(true);
 		pb.environment().putAll(env);
-		Process p = pb.start();
+		return pb;
+	}
+
+	/** One-shot child: waits for it (at most {@code timeoutSec}) and returns everything it printed. */
+	public static Result run(List<String> childArgs, Map<String, String> env, long timeoutSec) throws Exception {
+		Process p = command(childArgs, env).start();
 		p.getOutputStream().close();
 		byte[][] out = new byte[1][];
 		Thread reader = new Thread(() -> {

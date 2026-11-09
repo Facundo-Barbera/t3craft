@@ -172,6 +172,17 @@ public final class HqRender {
 	 * ({@link HqFixtures#active()} before, {@link HqFixtures#use} after).
 	 */
 	public static void run(String[] args) throws Exception {
+		try {
+			runJob(args);
+		} finally {
+			Gpu.closeSession(); // the GPU child process lives as long as the job
+		}
+	}
+
+	/** Whether final-look renders use the GPU unless {@code --no-gpu} (tools/render-gpu). */
+	private static final boolean GPU_DEFAULT_FINAL = false;
+
+	private static void runJob(String[] args) throws Exception {
 		long started = System.currentTimeMillis() - 2000;
 		Path compare = null;
 		Path outDir = Path.of("build/hq-render");
@@ -222,12 +233,19 @@ public final class HqRender {
 		boolean lanterns = false;
 		boolean officeBlocks = false; // kit/office-blocks-review: console, podium, merge station, glow blocks (OfficeBlockViews)
 		boolean gpuProbe = false; // tools/render-gpu: which GPU routes this machine offers (gpu.GpuProbe)
+		Boolean gpuOpt = null; // --gpu / --no-gpu (null: the default for the look)
+		boolean gpuCompare = false; // --gpu-compare: GPU and CPU for every image, timings and differences
+		boolean gpuNvrtc = false; // --gpu-nvrtc (dev): compile cuda/trace.cu with NVRTC instead of the committed PTX
 		// tools/render-quality: look switches, on in final and off in preview (see Renderer.Look)
 		Boolean previewOpt = null;
 		java.util.Map<String, String> lookOpts = new java.util.LinkedHashMap<>();
 		for (int i = 0; i < args.length; i++) {
 			switch (args[i]) {
 				case "--gpu-probe" -> gpuProbe = true;
+				case "--gpu" -> gpuOpt = Boolean.TRUE;
+				case "--no-gpu" -> gpuOpt = Boolean.FALSE;
+				case "--gpu-compare" -> gpuCompare = true;
+				case "--gpu-nvrtc" -> gpuNvrtc = true;
 				case "--preview" -> previewOpt = true;
 				case "--final" -> previewOpt = false;
 				case "--ao", "--shadows", "--hard-shadows", "--sky", "--bloom", "--no-ao", "--no-shadows", "--no-sky", "--no-bloom" -> lookOpts.put(args[i], "");
@@ -298,7 +316,13 @@ public final class HqRender {
 			return;
 		}
 		// no --preview/--final: --ss 1 (what the render service adds to previews) counts as a preview
-		Renderer.look = look(previewOpt != null ? previewOpt : ss <= 1, lookOpts);
+		boolean isPreview = previewOpt != null ? previewOpt : ss <= 1;
+		Renderer.look = look(isPreview, lookOpts);
+		// tools/render-gpu: the ray tracing runs on the GPU when asked (or, once validated, by default in final looks)
+		Gpu.outDir = out;
+		Gpu.nvrtc = gpuNvrtc;
+		Gpu.mode = gpuCompare ? Gpu.Mode.COMPARE : gpuOpt != null ? (gpuOpt ? Gpu.Mode.AUTO : Gpu.Mode.OFF) : GPU_DEFAULT_FINAL && !isPreview ? Gpu.Mode.AUTO : Gpu.Mode.OFF;
+		System.out.println("gpu: " + Gpu.mode.name().toLowerCase(Locale.ROOT));
 		System.out.println("look: " + Renderer.look);
 		double scaleMul = scaleOpt == null ? 1.6 : scaleOpt;
 		if (vanilla) {
