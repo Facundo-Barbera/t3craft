@@ -11,6 +11,7 @@ import dev.t3craft.hq.citadel.hub.HubExterior;
 import dev.t3craft.hq.citadel.hub.HubFacade;
 import dev.t3craft.hq.citadel.hub.HubInterior;
 import dev.t3craft.hq.citadel.hub.HubRoof;
+import dev.t3craft.hq.citadel.hub.HubScreens;
 import dev.t3craft.hq.citadel.hub.HubUndercroft;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -106,14 +107,23 @@ public final class CitadelHub {
 	private CitadelHub() {
 	}
 
-	/** Aisle ceiling (and outer walls' top): y = 12 at scale 1, 8 above the podium ({@code y0() + sy(8)}; was {@code AISLE_TOP}). */
-	public static int aisleTop() {
-		return y0() + dims().sy(8);
+	/**
+	 * A height of the hub's own volume (nave, aisles, towers, drum): {@code n} at scale 1, growing by {@code k^0.75}
+	 * instead of {@code sqrt(k)} (struct/hub2: at scale 2 the hub looked low in front of the rings: x1.68 instead
+	 * of x1.41). The podium ({@link CitadelCanvas#y0()}) is shared with the gallery and the bridges and keeps {@code sqrt(k)}.
+	 */
+	public static int hy(int n) {
+		return n < 0 ? -hy(-n) : (int) Math.round(n * Math.pow(dims().k, 0.75));
 	}
 
-	/** Nave vault springs: y = 16 at scale 1, 12 above the podium ({@code y0() + sy(12)}; was {@code SPRING}); crown {@code s(5)} higher. */
+	/** Aisle ceiling (and outer walls' top): y = 12 at scale 1, 8 above the podium ({@code y0() + hy(8)}; was {@code AISLE_TOP}). */
+	public static int aisleTop() {
+		return y0() + hy(8);
+	}
+
+	/** Nave vault springs: y = 16 at scale 1, 12 above the podium ({@code y0() + hy(12)}; was {@code SPRING}); crown {@code s(5)} higher. */
 	public static int spring() {
-		return y0() + dims().sy(12);
+		return y0() + hy(12);
 	}
 
 	/** Half width of the nave: the colonnade stands on {@code |x| == naveHalf()} (6 at scale 1). */
@@ -185,6 +195,7 @@ public final class CitadelHub {
 		int hx = c.g.hubX();
 		HqGeometry.Surface screen = new HqGeometry.Surface(new BlockPos(hx, y0() + 2, -3), Direction.SOUTH, Direction.WEST, 7, 4);
 		bigScreen(c, screen, "hub", HqGenerator.hubBinding(c.layout), true);
+		HubScreens.frame(c, hx, -3, 3, 4);
 		HqGeometry.Surface wall = new HqGeometry.Surface(new BlockPos(-hx, y0() + 2, 4), Direction.NORTH, Direction.EAST, 9, 4);
 		for (BlockPos p : wall.cells()) {
 			c.fixture(p, c.style.screen());
@@ -318,6 +329,7 @@ public final class CitadelHub {
 		c.data.put(sign.asLong(), new HqStyle.SignText(DyeColor.ORANGE, "", "Needs", "attention", "").signTag());
 		c.fixtures.add(sign.asLong());
 		c.anchor(Anchor.face(AnchorNames.BOARD, new BlockPos(0, y0() + 6, z), Direction.SOUTH));
+		HubScreens.boardCornice(c, z, 0);
 		c.anchor(Anchor.at(AnchorNames.BOARD_FRONT, new BlockPos(0, y0() + 1, z + 1), Direction.NORTH));
 		int slot = 0;
 		for (int row = 2; row <= 3; row++) {

@@ -286,6 +286,9 @@ public final class NodeDecor {
 	// ------------------------------------------------------------------ archive cloister
 
 	private static void cloister(Site s) {
+		if (CloisterRoom.grand(s.c().k)) {
+			return; // the grand cloister paints its own furniture, in real offsets
+		}
 		// the fountain: a post and a lantern in the middle of the pool
 		s.fill(0, 1, 2, 0, b(Blocks.STONE_BRICK_WALL));
 		s.put(0, 3, 0, LANTERN_UP, DECOR);

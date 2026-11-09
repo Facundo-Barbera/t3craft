@@ -13,6 +13,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.Half;
 import net.minecraft.world.level.block.state.properties.StairsShape;
 import static dev.t3craft.hq.citadel.CitadelCanvas.GLASS;
+import static dev.t3craft.hq.citadel.CitadelCanvas.fh;
 import static dev.t3craft.hq.citadel.CitadelCanvas.b;
 import static dev.t3craft.hq.citadel.CitadelCanvas.leaves;
 import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
@@ -55,12 +56,19 @@ public final class BarrioRoofs {
 		int mid = r.c();
 		Block roof = mats.roof();
 		Lot lot = BarrioKit.lotOf(c, r);
+		// struct/barrio-hall2: a grand hall's gable is cut at ring kcap into a flat deck along the ridge that carries a long
+		// clerestory lantern, so the roof is not twice as tall as the wall
+		boolean cap = grand(r);
+		int kcap = cap ? Math.max(3, mid - 3) : Integer.MAX_VALUE;
 		for (int u = -1; u <= D; u++) {
 			for (int v = -1; v <= W; v++) {
 				BlockPos p = r.cell(u, v, 0);
 				int k = Math.min(v + 1, W - v);
 				int y = top + Math.max(1, k);
-				if (v == mid) {
+				if (cap && k > kcap) {
+					y = top + kcap + 1;
+					c.set(p.atY(y), mats.ridge());
+				} else if (v == mid) {
 					c.set(p.atY(y), mats.ridge());
 					if (u == -1 || u == D) {
 						c.set(p.atY(y + 1), BarrioKit.finial(roof));
@@ -73,6 +81,13 @@ public final class BarrioRoofs {
 				}
 				if (u == -1 || u == D) {
 					for (int yy = top + 1; yy < y; yy++) {
+						if (grand(r)) {
+							// struct/barrio-hall2: the gable end is glazed between posts on the walls' pier rhythm, not a smooth triangle
+							boolean pier = Math.floorMod(v, 3) == 0;
+							boolean glass = !pier && v >= 1 && v <= W - 2 && yy >= top + 2 && yy <= y - 3;
+							c.set(p.atY(yy), pier ? mats.post() : glass ? GLASS : mats.wall());
+							continue;
+						}
 						boolean round = v == mid && (yy == top + 2 || yy == top + 3);
 						c.set(p.atY(yy), round ? GLASS : mats.wall());
 					}
@@ -91,11 +106,184 @@ public final class BarrioRoofs {
 			}
 		}
 		int seed = BarrioKit.hash(r.origin().getX(), r.origin().getZ(), top);
+		if (cap) {
+			// a break in the long slopes instead of two small dormers: a cross gable on each side, staggered, and the clerestory
+			IntBinaryOperator mainY = (u, v) -> top + Math.max(1, Math.min(Math.min(v + 1, W - v), kcap + 1));
+			crossGable(c, r, top, mats, 2, D / 4, 3, Math.min(6, kcap), mainY);
+			crossGable(c, r, top, mats, 3, D - 1 - D / 4, 3, Math.min(6, kcap), mainY);
+			clerestory(c, r, top + kcap + 1, mats);
+			return;
+		}
 		dormers(c, r, top, mats, seed);
 		if (hasChimney(seed)) {
 			IntBinaryOperator kAt = (u, v) -> Math.min(v + 1, W - v);
 			chimney(c, r, top, mats, chimneySide(seed), D / 2 - 1, kAt);
 		}
+	}
+
+	/** Halls big enough (scale 1.5 and up) for cross gables and a cupola; the scale-1 roofs stay as they were. */
+	private static boolean grand(Room r) {
+		return r.w() >= 15 && r.d() >= 16 && fh() >= 8;
+	}
+
+	/**
+	 * A cross gable (a "break" of the slope): a gable roof of its own, {@code 2*half+1} cells wide, that comes out of a
+	 * slope and meets it. {@code side} is the wall it faces (0 door wall, 1 back wall, 2 the {@code v = -1} wall, 3 the
+	 * {@code v = W} wall), {@code tc} the cell along that wall where its ridge runs (the ridge is perpendicular to the
+	 * wall), {@code mainY} the height of the main roof's surface at a cell. Its face stands flush with the wall plane as
+	 * a gable end with a window, its two slopes are stairs towards the ridge (a slab ridge with a finial at the front),
+	 * and the cheeks that stand clear of the main slope are closed in the ridge material. It ends where it dives into the
+	 * main slope. Hollow underneath, like the roof it grows from.
+	 */
+	private static void crossGable(CitadelCanvas c, Room r, int top, Mats mats, int side, int tc, int half, int rise, IntBinaryOperator mainY) {
+		int W = r.w();
+		int D = r.d();
+		Block roof = mats.roof();
+		int yr = top + rise;
+		boolean alongV = side < 2;
+		Direction plus = alongV ? r.side() : r.back();
+		for (int n = 0; n < Math.max(W, D); n++) {
+			boolean any = false;
+			for (int dt = -half; dt <= half; dt++) {
+				int t = tc + dt;
+				int u;
+				int v;
+				if (side == 0) {
+					u = -1 + n;
+					v = t;
+				} else if (side == 1) {
+					u = D - n;
+					v = t;
+				} else if (side == 2) {
+					u = t;
+					v = -1 + n;
+				} else {
+					u = t;
+					v = W - n;
+				}
+				int yc = yr - Math.abs(dt);
+				int ym = mainY.applyAsInt(u, v);
+				if (yc <= ym) {
+					continue;
+				}
+				any = true;
+				BlockPos p = r.cell(u, v, 0);
+				if (dt == 0) {
+					// a low ridge of slabs (a full block under a slab read as a wall); a finial on the face
+					c.set(p.atY(yc), BarrioKit.slabOf(roof));
+					if (n == 0) {
+						c.set(p.atY(yc + 1), BarrioKit.finial(roof));
+					}
+				} else {
+					Direction f = dt < 0 ? plus : plus.getOpposite();
+					c.set(p.atY(yc), BarrioKit.stair(BarrioKit.tone(roof, Math.abs(dt), p.getX(), yc, p.getZ()), f));
+				}
+				if (Math.abs(dt) == half) {
+					for (int y = ym + 1; y < yc; y++) {
+						c.set(p.atY(y), mats.ridge());
+					}
+				}
+				if (n == 0) {
+					for (int y = top + 1; y < yc; y++) {
+						boolean window = Math.abs(dt) < half && y >= top + 2 && y <= yc - 2;
+						c.set(p.atY(y), Math.abs(dt) == half ? mats.post() : window ? GLASS : mats.wall());
+					}
+				}
+			}
+			if (!any) {
+				break;
+			}
+		}
+	}
+
+	/**
+	 * The cupola of a grand hipped roof, the focal point of the roof: five by five on the flat deck whose blocks are at
+	 * {@code yDeck}, centred on {@code (uc, vc)}: corner posts, glass on the four faces
+	 * three high, a hanging lantern inside, a two-step hip roof of the hall's own stairs (slabs on the corners) and a rod on
+	 * top.
+	 */
+	private static void cupola(CitadelCanvas c, Room r, int yDeck, Mats mats, int uc, int vc) {
+		Block roof = mats.roof();
+		int y0 = yDeck;
+		for (int du = -2; du <= 2; du++) {
+			for (int dv = -2; dv <= 2; dv++) {
+				BlockPos p = r.cell(uc + du, vc + dv, 0);
+				boolean edge = Math.abs(du) == 2 || Math.abs(dv) == 2;
+				boolean corner = Math.abs(du) == 2 && Math.abs(dv) == 2;
+				if (edge) {
+					BlockState wall = corner ? mats.post() : GLASS;
+					for (int y = y0 + 1; y <= y0 + 3; y++) {
+						c.set(p.atY(y), wall);
+					}
+					Direction in = Math.abs(dv) == 2 ? (dv < 0 ? r.side() : r.side().getOpposite()) : (du < 0 ? r.back() : r.back().getOpposite());
+					c.set(p.atY(y0 + 4), corner ? BarrioKit.slabOf(roof) : BarrioKit.stair(roof, in));
+				} else {
+					for (int y = y0 + 1; y <= y0 + 3; y++) {
+						c.set(p.atY(y), CitadelCanvas.AIR);
+					}
+					boolean inner = Math.abs(du) == 1 || Math.abs(dv) == 1;
+					boolean icorner = Math.abs(du) == 1 && Math.abs(dv) == 1;
+					if (inner) {
+						Direction in = Math.abs(dv) == 1 && !icorner ? (dv < 0 ? r.side() : r.side().getOpposite())
+								: (du < 0 ? r.back() : r.back().getOpposite());
+						c.set(p.atY(y0 + 4), mats.ridge());
+						c.set(p.atY(y0 + 5), icorner ? BarrioKit.slabOf(roof) : BarrioKit.stair(roof, in));
+					} else {
+						c.set(p.atY(y0 + 4), mats.ridge());
+						c.set(p.atY(y0 + 5), mats.ridge());
+					}
+				}
+			}
+		}
+		BlockPos lamp = r.cell(uc, vc, y0 + 3);
+		c.put(lamp.getX(), lamp.getY(), lamp.getZ(), BarrioKit.lantern(true), CitadelCanvas.HANGING);
+		c.set(r.cell(uc, vc, y0 + 6), BarrioKit.rod());
+	}
+
+	/**
+	 * The clerestory lantern along the flat ridge deck of a grand gable roof (deck blocks at {@code yDeck}): five wide, from
+	 * four cells in from each gable end, two courses of glass between posts on the deck's edge (a post every third cell and at
+	 * both ends), a ceiling row and a small gable of stairs over it with a slab ridge, hanging lanterns inside every four cells.
+	 */
+	private static void clerestory(CitadelCanvas c, Room r, int yDeck, Mats mats) {
+		int mid = r.c();
+		int D = r.d();
+		Block roof = mats.roof();
+		int u0 = 4;
+		int u1 = D - 5;
+		for (int u = u0; u <= u1; u++) {
+			boolean endU = u == u0 || u == u1;
+			for (int dv = -2; dv <= 2; dv++) {
+				BlockPos p = r.cell(u, mid + dv, 0);
+				boolean edge = Math.abs(dv) == 2 || endU;
+				if (edge) {
+					boolean post = endU && Math.abs(dv) == 2 || (Math.abs(dv) == 2 && (u - u0) % 3 == 0) || (endU && dv == 0);
+					BlockState wall = post ? mats.post() : GLASS;
+					c.set(p.atY(yDeck + 1), wall);
+					c.set(p.atY(yDeck + 2), wall);
+				} else {
+					c.set(p.atY(yDeck + 1), CitadelCanvas.AIR);
+					c.set(p.atY(yDeck + 2), CitadelCanvas.AIR);
+				}
+				if (Math.abs(dv) == 2) {
+					c.set(p.atY(yDeck + 3), BarrioKit.stair(roof, dv < 0 ? r.side() : r.side().getOpposite()));
+				} else {
+					c.set(p.atY(yDeck + 3), mats.ridge());
+					if (dv == 0) {
+						c.set(p.atY(yDeck + 4), mats.ridge());
+						c.set(p.atY(yDeck + 5), BarrioKit.slabOf(roof));
+					} else {
+						c.set(p.atY(yDeck + 4), BarrioKit.stair(roof, dv < 0 ? r.side() : r.side().getOpposite()));
+					}
+				}
+			}
+		}
+		for (int u = u0 + 2; u < u1; u += 4) {
+			BlockPos p = r.cell(u, mid, yDeck + 2);
+			c.put(p.getX(), p.getY(), p.getZ(), BarrioKit.lantern(true), CitadelCanvas.HANGING);
+		}
+		c.set(r.cell(u0, mid, yDeck + 5), BarrioKit.finial(roof));
+		c.set(r.cell(u1, mid, yDeck + 5), BarrioKit.finial(roof));
 	}
 
 	private static boolean hasChimney(int seed) {
@@ -168,11 +356,19 @@ public final class BarrioRoofs {
 		Lot lot = BarrioKit.lotOf(c, r);
 		int ridgeA = mid;
 		int ridgeB = D - mid - 1;
+		// struct/barrio-hall2: a grand hall's pyramid is cut at ring kcap into a flat deck that carries a big cupola, so the
+		// roof is about as tall as the wall instead of twice as tall
+		boolean cap = grand(r);
+		int kcap = cap ? Math.max(3, mid - 4) : Integer.MAX_VALUE;
 		for (int u = -1; u <= D; u++) {
 			for (int v = -1; v <= W; v++) {
 				BlockPos p = r.cell(u, v, 0);
 				int k = Math.min(Math.min(v + 1, W - v), Math.min(u + 1, D - u));
 				int y = top + Math.max(1, k);
+				if (cap && k > kcap) {
+					c.set(p.atY(top + kcap + 1), mats.ridge());
+					continue;
+				}
 				if (v == mid && k == mid + 1) {
 					c.set(p.atY(y), mats.ridge());
 					c.set(p.atY(y + 1), u == ridgeA || u == ridgeB ? BarrioKit.rod() : BarrioKit.slabOf(roof));
@@ -183,11 +379,23 @@ public final class BarrioRoofs {
 		}
 		eaveRing(c, r, lot, -2, top, roof);
 		// each slope ring rests on the one below it: one block under a stair of every ring from the second
-		for (int k = 2; k <= mid + 1; k++) {
+		for (int k = 2; k <= Math.min(mid + 1, cap ? kcap + 1 : mid + 1); k++) {
 			c.set(r.cell(k - 1, mid, top + k - 1), mats.ridge());
 		}
 		int seed = BarrioKit.hash(r.origin().getX(), r.origin().getZ(), top);
-		if (hasChimney(seed)) {
+		if (cap) {
+			// a gablet on each of the four slopes (a pediment over the door) and a glazed cupola on the deck
+			IntBinaryOperator mainY = (u, v) -> {
+				int k = Math.min(Math.min(v + 1, W - v), Math.min(u + 1, D - u));
+				return k > kcap ? top + kcap + 1 : top + Math.max(1, k);
+			};
+			int rise = Math.min(3 + 3, kcap);
+			crossGable(c, r, top, mats, 0, mid, 3, rise, mainY);
+			crossGable(c, r, top, mats, 1, mid, 3, rise, mainY);
+			crossGable(c, r, top, mats, 2, D / 2, 3, rise, mainY);
+			crossGable(c, r, top, mats, 3, D / 2, 3, rise, mainY);
+			cupola(c, r, top + kcap + 1, mats, (D - 1) / 2, mid);
+		} else if (hasChimney(seed)) {
 			IntBinaryOperator kAt = (u, v) -> Math.min(Math.min(v + 1, W - v), Math.min(u + 1, D - u));
 			chimney(c, r, top, mats, chimneySide(seed), D / 2 - 1, kAt);
 		}

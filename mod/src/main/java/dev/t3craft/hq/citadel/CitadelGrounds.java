@@ -278,7 +278,14 @@ public final class CitadelGrounds {
 		c.fill(x, 1, y0() - 1, z, panel ? c.kit.wallPanel(true) : FOOT);
 		// design/citadel-terraces2: the hub's own pedestal, on both faces of the gallery: dark plinth, a band of
 		// chiseled deepslate two courses under the deck and (towards the patio) a light quartz course under it
-		if (!panel && y0() >= 4 && (inner || r > CitadelCanvas.dims().galleryR - 1.5)) {
+		boolean outer = r > CitadelCanvas.dims().galleryR - 1.5;
+		if (!panel && y0() >= 4 && outer && CitadelPodium.profile() != null) {
+			// design/citadel-terraces3: the outer face is wall B of the podium: the same graded face as walls A (dark footing, mixed
+			// middle, a lighter course under the calcite rim) instead of a black band under a white stripe
+			for (int y = Math.max(1, y0() - 3); y < y0(); y++) {
+				c.set(x, y, z, CitadelPodium.plinthFace(x, y, z, y0() - y));
+			}
+		} else if (!panel && y0() >= 4 && (inner || outer)) {
 			c.set(x, y0() - 2, z, CitadelCanvas.b(Blocks.CHISELED_DEEPSLATE));
 			if (inner) {
 				c.set(x, y0() - 1, z, CitadelCanvas.b(Blocks.SMOOTH_QUARTZ));

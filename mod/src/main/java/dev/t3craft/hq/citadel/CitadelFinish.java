@@ -646,6 +646,7 @@ public final class CitadelFinish {
 			CitadelRelief.baseline(c, walkable(c));
 		}
 		CitadelRelief.apply(c);
+		CitadelSettle.apply(c); // fix/relief-floating: no floating group survives the relief (it falls, gets a post or goes)
 		fillAir(c);
 		CitadelAmbience.lights(c);
 		PlanShapes.resolve(c.cells);
