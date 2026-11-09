@@ -2,6 +2,7 @@ package dev.t3craft.hq.citadel.catalog.stall;
 
 import static dev.t3craft.hq.citadel.CitadelCanvas.b;
 import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
+import static dev.t3craft.hq.citadel.CitadelCanvas.terracotta;
 
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.catalog.Family;
@@ -177,10 +178,10 @@ public final class StallClothLanterns implements Variant {
 		lights(c, p, g);
 	}
 
-	/** One cloth block: mostly neutrals, the seed's accent one time in four. */
+	/** One cloth block: mostly neutrals, the seed's accent (a muted terracotta) two times in nine. */
 	private static BlockState cloth(Plot p, Geo g, int u, int y, int v) {
 		int k = p.hash(u, y, v, 9);
-		return wool(k < 2 ? g.accent : NEUTRAL[(k - 2) % NEUTRAL.length]);
+		return k < 2 ? terracotta(g.accent) : wool(NEUTRAL[(k - 2) % NEUTRAL.length]);
 	}
 
 	// ------------------------------------------------------------------ roof
@@ -196,7 +197,7 @@ public final class StallClothLanterns implements Variant {
 				continue; // the pole passes here
 			}
 			// [palette] cream with an accent stripe every third block: the valance is the stall's one patch of colour
-			p.set(c, u, 3, 1, wool(u % 3 == 0 ? g.accent : (u % 3 == 1 ? DyeColor.WHITE : DyeColor.LIGHT_GRAY)));
+			p.set(c, u, 3, 1, u % 3 == 0 ? terracotta(g.accent) : wool(u % 3 == 1 ? DyeColor.WHITE : DyeColor.LIGHT_GRAY));
 			if ((u & 1) == 0 && u >= g.lo() && u <= g.hi()) {
 				p.set(c, u, 2, 1, wool(DyeColor.WHITE)); // [depth] a fringe of cream cloth under the valance
 			}
@@ -263,7 +264,7 @@ public final class StallClothLanterns implements Variant {
 			}
 			case 6 -> {
 				p.set(c, u, 1, v, wool(DyeColor.WHITE));
-				p.set(c, u, 2, v, carpet(g.accent));
+				p.set(c, u, 2, v, carpet(DyeColor.LIGHT_GRAY));
 			}
 			default -> p.set(c, u, 1, v, b(Blocks.LOOM).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH));
 		}
@@ -280,7 +281,7 @@ public final class StallClothLanterns implements Variant {
 			int beam = g.ry(v) - 1;
 			p.set(c, su, beam, v, b(Blocks.STRIPPED_CHERRY_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.Z));
 			for (int y = 3; y < beam; y++) {
-				p.set(c, su, y, v, wool(y == 3 && v % 2 == 0 ? g.accent : DyeColor.WHITE));
+				p.set(c, su, y, v, y == 3 && v % 2 == 0 ? terracotta(g.accent) : wool(DyeColor.WHITE));
 			}
 		}
 	}
@@ -294,7 +295,7 @@ public final class StallClothLanterns implements Variant {
 		for (int u = g.lo(); u <= g.hi(); u++) {
 			if (u == cu) {
 				p.set(c, u, 0, v, b(Blocks.CHEST).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH));
-				p.set(c, u, 1, v, carpet(g.accent));
+				p.set(c, u, 1, v, b(Blocks.LANTERN)); // a lantern on the chest: nobody can stand there
 			} else {
 				p.set(c, u, 0, v, p.hash(u, 0, v, 3) == 0 ? b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.NORTH) : b(Blocks.CHERRY_PLANKS));
 				// the shelf: goods in piles of bolts, a cherry board over some of them
@@ -307,7 +308,7 @@ public final class StallClothLanterns implements Variant {
 			// [depth] the rail: a cherry fence between the posts; lengths of cloth hang from it, alternate ones longer
 			p.set(c, u, rod, v, fence(Direction.EAST, Direction.WEST));
 			if (rod >= 4) {
-				p.set(c, u, rod - 1, v, wool(u % 3 == 0 ? g.accent : DyeColor.WHITE)); // a full row at y3: a ceiling over the shelf
+				p.set(c, u, rod - 1, v, u % 3 == 0 ? terracotta(g.accent) : wool(DyeColor.WHITE)); // a full row at y3: a ceiling over the shelf
 			}
 			if (((u + p.hash(4, 4, 4, 2)) & 1) == 0) {
 				int low = rod >= 4 ? rod - 2 : rod - 1;
