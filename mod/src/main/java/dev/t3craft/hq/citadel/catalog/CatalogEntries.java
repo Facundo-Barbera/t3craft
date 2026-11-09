@@ -15,8 +15,14 @@ final class CatalogEntries {
 	}
 
 	private static final Variant[] ENTRIES = {
+			new dev.t3craft.hq.citadel.catalog.bench.BenchCherryPlanters(), // bench_cherry_planters
+			new dev.t3craft.hq.citadel.catalog.bench.BenchStoneTable(), // bench_stone_table
 			new dev.t3craft.hq.citadel.catalog.house.HouseTimberCottage(), // house_timber_cottage
 			new dev.t3craft.hq.citadel.catalog.lamp.LampCherryPost(), // lamp_cherry_post
+			new dev.t3craft.hq.citadel.catalog.planter.PlanterStoneShrub(), // planter_stone_shrub
+			new dev.t3craft.hq.citadel.catalog.planter.PlanterTallPot(), // planter_tall_pot
+			new dev.t3craft.hq.citadel.catalog.signpost.SignpostArrows(), // signpost_arrows
+			new dev.t3craft.hq.citadel.catalog.signpost.SignpostNoticeBoard(), // signpost_notice_board
 	};
 
 	static final List<Variant> ALL = List.of(ENTRIES);
