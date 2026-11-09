@@ -126,5 +126,4 @@ public final class LampStreetToro implements Variant {
 			p.set(c, 1, y, 1, b(Blocks.DIORITE_WALL));
 		}
 	}
-
 }
