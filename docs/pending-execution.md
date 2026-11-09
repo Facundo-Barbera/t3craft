@@ -50,11 +50,35 @@ Incluye el catálogo (60 variantes, con la ola B: bancas, jardineras, postes, po
 ## En curso (solo código)
 - `feat/build-near-player`: **integrado en main** (rama `82597e6`), compilado y sin probar en juego. Base por capas (estimación: de ~7–9 min a ~10–20 s), arranque inmediato junto al jugador, prioridad por cercanía, 96 bloques por tick y hasta 8 builders. Pendiente: en supervivencia, las alas se siguen construyendo en orden de índice.
 
+## Swarm de diseño con renders en el PC (ola 1, 2026-11-09)
+Son 4 agentes Sonnet high, cada uno con un director de arte Opus. Trabajan sobre `citadel/next`, con renders solo en el PC (por el relay), y como mucho un render a la vez por agente. Reglas en `~/.cache/t3craft-coord/swarm3-common.md`.
+- `design/houses-a`: casas de entramado, de piedra y japonesas.
+- `design/houses-b`: casas en terraza, talleres y casas-torre.
+- `design/nature-water`: árboles, jardines y fuentes.
+- `design/street`: faroles, bancas, jardineras, postes, arcos, centros de plaza y mástiles.
+
+Estado de la ola 1:
+- houses-a, houses-b y street están integradas en `citadel/next`. Las tres agotaron su cupo de renders con varias variantes por debajo de 7, así que tienen segunda ronda (`design/houses-a2`, `design/houses-b2`, `design/street2`) con más renders: hasta 10 por familia y 12 para casas.
+- nature-water también está integrada. Su segunda ronda va en dos partes: `design/trees2` (Opus, las 9 especies con copas en lóbulos) está en curso, y la de fuentes y jardines queda para cuando baje el número de agentes.
+- **Calidad de render (2026-11-09):** los jobs al PC salen por defecto en final con `--ss 3`; preview solo si se pide. El daemon del PC corre con 11 hilos y `-Xmx10g`. La GPU está pendiente de que Facundo decida (plan en la respuesta del coordinador): AO y sombras en CPU, o Chunky con GPU desde un export `.schem`.
+- **Citadel Studio en el PC** se actualizó a `79be0f6`: ahora lista todos los agentes con jobs, del más reciente al más viejo.
+- **Construcción:** `fix/build-walkable` **integrado en main**, compilado y pendiente de que Facundo haga la prueba de cruzar el mapa. Hace que el HQ real use el mismo plan radial único que el demo (hoy `HqConstruction` lanza un trabajo por parte, de abajo hacia arriba) y agrega un corredor de suelo por delante del jugador en su dirección de avance. Criterio de aceptación: cruzar el mapa en línea recta sin caerse.
+- **Hueco del renderer:** hqRender dibuja los banners (`*_banner` y `*_wall_banner`) como cajas de madera. Por eso no se pueden juzgar en imagen. Pendiente: un modelo de banner en `BlockModels`.
+
+Ola 2, pendiente:
+- puestos, pozos, anexos, estatuas, gazebos, puentes y remates de torre;
+- la ciudad completa antes y después, a escala 1.0 y 1.5.
+
 ## En curso (solo código, 2026-11-09)
 - `feat/build-radial`: **integrado en main** (`f436217`) y compilado. Construye en anillos de 5 bloques alrededor del jugador; la base tarda ~1,7 min estimados. Quedan pendientes tres cosas:
   - en supervivencia no hay orden radial;
   - `HqConstruction` sigue mandando un trabajo por parte;
   - con 8 builders algunos adelantan el anillo siguiente.
+- `fix/build-radial-tune` (solo código, sin compilar): el suelo crece desde los pies del jugador.
+  - Primero la superficie (y una capa de soporte), como mucho 1 anillo por delante; el relleno oculto va 2 anillos por detrás.
+  - Builders por tramos de muro: suben por hiladas y trepan sin caminar, a 10 bloques/tick, y ayudan en su anillo en vez de saltar al siguiente.
+  - `fastFoundation` ahora está apagado por defecto.
+  - Falta: compilar y probarlo en juego, sobre todo el anillo 0 cerrado, los muros y que el suelo siga al jugador en el void.
 - `citadel/scale-port`: **dentro de `citadel/next`** (`3d03dd0`), que compila. La escala por defecto es 1.0. Con 1.5 los nodos y algunos detalles mantienen tamaño fijo, y hay que verlo en render.
 - `fix/chat-send-agents-menu`: código listo, **sin compilar ni probar**.
   - el segundo mensaje ya no se pierde: se encola detrás del que está en vuelo (`ComposerState` outbox, "⏱ Queued");

@@ -15,7 +15,7 @@ final class Png {
 
 	static void write(BufferedImage img, Path f) throws Exception {
 		ImageIO.write(img, "png", f.toFile());
-		if (Files.size(f) > MAX_BYTES) {
+		if (Boolean.getBoolean("t3craft.render.palette") && Files.size(f) > MAX_BYTES) {
 			ImageIO.write(quantize(img), "png", f.toFile());
 		}
 	}

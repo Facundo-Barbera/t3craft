@@ -5,8 +5,8 @@
 #
 # Options (before the renderer args):
 #   --kind hq|ui      what to render (default hq)
-#   --preview         low resolution, fast (default)
-#   --final           full resolution (heavier: only when the design is settled)
+#   --final           full resolution, supersampled 3x (default: renders run on the PC, which has room)
+#   --preview         low resolution, fast (only for a quick check)
 #   --worktree DIR    the worktree whose code to render (default: the one this script is in)
 #   --agent NAME      your name, for the one-request-at-a-time rule (default: $T3CRAFT_AGENT or the worktree's folder name)
 #   --timeout SEC     give up waiting after SEC seconds (default 3600; the request keeps going)

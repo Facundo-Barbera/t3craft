@@ -20,16 +20,25 @@ import org.jspecify.annotations.Nullable;
  *   "holdMinutes": 45,         // hysteresis: a lead keeps the office this long after it stops qualifying
  *   "minHoldMinutes": 10,      // and never loses it sooner than this after getting it
  *   "maxOffices": 3,           // at most this many offices (the most active leads), 0..4
- *   "briefing": true           // new children stop by the lead's office before going to their desk
+ *   "briefing": true,          // new children stop by the lead's office before going to their desk
+ *   "childrenWaitForReview": true, // feat/lead-review-walk: finished children wait in their lead's office
+ *                                  // ("awaiting review"), not for the player (no "thread finished" notice)
+ *   "childrenNearLead": true   // feat/lead-review-walk: a lead's new children take the free desk nearest its office
  * }
  * }</pre>
  */
 public record LeadPolicy(boolean enabled, long minAgeMs, int recentChildren, long recentWindowMs, int workingChildren, long holdMs,
-		long minHoldMs, int maxOffices, boolean briefing) {
+		long minHoldMs, int maxOffices, boolean briefing, boolean childrenWaitForReview, boolean childrenNearLead) {
 	public static final String KEY = "leadOffice";
 	/** Hard cap on offices whatever the config says (each one is a module of the HQ). */
 	public static final int MAX_OFFICES = 4;
-	public static final LeadPolicy DEFAULTS = new LeadPolicy(true, hours(6), 3, hours(24), 2, minutes(45), minutes(10), 3, true);
+	public static final LeadPolicy DEFAULTS = new LeadPolicy(true, hours(6), 3, hours(24), 2, minutes(45), minutes(10), 3, true, true, true);
+
+	/** Shape before feat/lead-review-walk (both new switches on), kept so existing callers still compile. */
+	public LeadPolicy(boolean enabled, long minAgeMs, int recentChildren, long recentWindowMs, int workingChildren, long holdMs, long minHoldMs,
+			int maxOffices, boolean briefing) {
+		this(enabled, minAgeMs, recentChildren, recentWindowMs, workingChildren, holdMs, minHoldMs, maxOffices, briefing, true, true);
+	}
 
 	public LeadPolicy {
 		minAgeMs = Math.max(0, minAgeMs);
@@ -80,7 +89,9 @@ public record LeadPolicy(boolean enabled, long minAgeMs, int recentChildren, lon
 				minutes(num(o, "holdMinutes", d.holdMs / 60_000d, 0, 7 * 24 * 60)),
 				minutes(num(o, "minHoldMinutes", d.minHoldMs / 60_000d, 0, 7 * 24 * 60)),
 				(int) num(o, "maxOffices", d.maxOffices, 0, MAX_OFFICES),
-				bool(o, "briefing", d.briefing));
+				bool(o, "briefing", d.briefing),
+				bool(o, "childrenWaitForReview", d.childrenWaitForReview),
+				bool(o, "childrenNearLead", d.childrenNearLead));
 	}
 
 	/** Reads {@code file} (config/t3craft.json); missing or unreadable gives the defaults, never throws. */

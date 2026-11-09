@@ -71,6 +71,7 @@
 	"t3craft.queue.title": "Run queue",
 	"t3craft.queue.badge": "⏳ %s queued",
 	"t3craft.lead.coordinating": "★ Coordinating %s agents",
+	"t3craft.lead.awaitingReview": "⌛ Awaiting review from %s",
 	"t3craft.queue.empty": "Nothing queued.",
 	"t3craft.queue.none": "No queued runs in the working threads.",
 	"t3craft.queue.none_working": "No thread is working right now, so nothing is queued.",

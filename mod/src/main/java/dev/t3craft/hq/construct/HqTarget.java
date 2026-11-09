@@ -34,7 +34,27 @@ public record HqTarget(HqInput input, HqLayout layout, BuildPlan plan, List<Stri
 			in = without(input, dropped);
 			layout = style.allocate(in, previous);
 		}
-		return new HqTarget(input, layout, dev.t3craft.hq.HqPlans.generate(layout, style), List.copyOf(dropped));
+		BuildPlan plan = dev.t3craft.hq.HqPlans.generate(layout, style);
+		// feat/lead-review-walk: a lead's new children take the free desk nearest its office (any layout);
+		// only seats new in this allocation move, so the plan is generated twice only when one does
+		java.util.Map<String, String> team = leadTeam();
+		if (!team.isEmpty()) {
+			HqLayout near = dev.t3craft.hq.lead.LeadTeamSeats.arrange(layout, previous, team, plan.anchors());
+			if (near != layout) {
+				layout = near;
+				plan = dev.t3craft.hq.HqPlans.generate(layout, style);
+			}
+		}
+		return new HqTarget(input, layout, plan, List.copyOf(dropped));
+	}
+
+	/** A lead's live delegated children to the lead (NPC ids), empty when {@code leadOffice.childrenNearLead} is off. */
+	private static java.util.Map<String, String> leadTeam() {
+		dev.t3craft.hq.lead.LeadPolicy p = dev.t3craft.hq.lead.LeadPolicy.active();
+		if (!p.enabled() || !p.childrenNearLead()) {
+			return java.util.Map.of();
+		}
+		return dev.t3craft.hq.lead.LeadOffices.current().childrenOfLeads();
 	}
 
 	private static boolean over(HqLayout layout, int max) {

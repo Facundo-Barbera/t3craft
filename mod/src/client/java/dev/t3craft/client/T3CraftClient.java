@@ -316,6 +316,9 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 		npcs.replaceAll(list, lastActivity(d, views));
 
 		for (dev.t3craft.t3.Transitions.Transition t : dev.t3craft.t3.Transitions.between(lastViews, views, syncedEnvs)) {
+			if (t.to() == dev.t3craft.t3.ThreadState.DONE && dev.t3craft.client.hq.lead.LeadOfficeClient.reportsToParent(t.npcId())) {
+				continue; // feat/lead-review-walk: its parent reviews it (the NPC waits by the parent), not the player
+			}
 			Notifier.transition(mc, t.npcId(), t.title(), t.text(), t.color(), t.sound().name().toLowerCase(), true);
 		}
 		if (dev.t3craft.debug.HitchWatch.get().enabled() && !lastViews.isEmpty()) {

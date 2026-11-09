@@ -65,6 +65,12 @@ record LayeredAnchors(AnchorSource primary, AnchorSource fallback) implements An
 	}
 
 	@Override
+	public List<ReviewSeat> reviewSeats(String leadNpcId) {
+		List<ReviewSeat> a = primary.reviewSeats(leadNpcId);
+		return a.isEmpty() ? fallback.reviewSeats(leadNpcId) : a;
+	}
+
+	@Override
 	public List<Pos> sights() {
 		List<Pos> a = primary.sights();
 		return a.isEmpty() ? fallback.sights() : a;
