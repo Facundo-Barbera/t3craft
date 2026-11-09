@@ -1,6 +1,7 @@
 package dev.t3craft.hq.citadel.catalog.lamp;
 
 import static dev.t3craft.hq.citadel.CitadelCanvas.b;
+import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
 import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
 
 import dev.t3craft.hq.citadel.CitadelCanvas;
@@ -11,12 +12,14 @@ import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.StairBlock;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.Half;
+import net.minecraft.world.level.block.state.properties.SlabType;
 
 /**
  * Kasuga-style stone lantern (tōrō), all in stone: a stepped dark foot (kiso), a slim shaft (sao), a
  * cross-shaped flared platform (chūdai), a single glowing light box (hibukuro) open to the air on every
- * side, a hipped hat (kasa) sloping down from a crown, and a jewel finial (hōju).
+ * side, a hat (kasa) sloping down from a crown to tips that lift at the corners, and a jewel finial (hōju).
  *
  * <ul>
  * <li><b>Silhouette</b>: wide → slim → wide → open cage → wide hat → point. Every level has a different
@@ -99,9 +102,15 @@ public final class LampStreetToro implements Variant {
 		p.set(c, 1, y, 1, b(Blocks.OCHRE_FROGLIGHT));
 		y++;
 
-		// --- kasa: a hipped stone hat sloping down from a crown block (the corner stairs take outer shapes)
+		// --- kasa: stairs slope down from a crown block to the eave; the corners are upper slabs, so the eave
+		// line drops along each side and lifts again at the four tips (warabi-te)
 		p.set(c, 1, y, 1, b(Blocks.POLISHED_ANDESITE));
-		ring(c, p, y, Blocks.POLISHED_ANDESITE_STAIRS, Half.BOTTOM);
+		for (int i = 0; i < 4; i++) {
+			p.set(c, SIDES[i][0], y, SIDES[i][1], stairs(Blocks.POLISHED_ANDESITE_STAIRS, IN[i]));
+		}
+		for (int[] k : CORNERS) {
+			p.set(c, k[0], y, k[1], slab(Blocks.POLISHED_ANDESITE_SLAB).setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP));
+		}
 		y++;
 
 		// --- hōju: the jewel on the crown
