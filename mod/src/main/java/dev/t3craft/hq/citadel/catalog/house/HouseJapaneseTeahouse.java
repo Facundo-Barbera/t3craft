@@ -156,13 +156,11 @@ public final class HouseJapaneseTeahouse implements Variant {
 					} else if (y == 2 && (u - bu0) % 2 == 0) {
 						// [depth] a bamboo-lattice window: crossed rails behind the plaster line
 						st = fence(Blocks.SPRUCE_FENCE, true, true, true, true);
-					} else if ((y == 2 || y == 3) && u != cu) {
-						// [palette] shoji panels beside the crawl door: white glass lets the light through
-						st = JapaneseKit.paneU(JapaneseKit.glassPane(net.minecraft.world.item.DyeColor.WHITE));
 					} else if (y == 1) {
 						st = p.hash(u, y, v, 3) == 0 ? b(Blocks.STONE_BRICKS) : b(Blocks.TUFF_BRICKS);
 					} else {
-						st = p.hash(u, y, v, 8) == 0 ? b(Blocks.MUD_BRICKS) : b(Blocks.PACKED_MUD);
+						// [palette] light plaster panels framed by the dark posts and beams
+						st = p.hash(u, y, v, 8) == 0 ? b(Blocks.TUFF_BRICKS) : b(Blocks.CALCITE);
 					}
 					p.set(c, u, y, v, st);
 				}
@@ -170,8 +168,7 @@ public final class HouseJapaneseTeahouse implements Variant {
 			for (int v = bv0 + 1; v < bv1; v++) {
 				for (int u : new int[] {bu0, bu1}) {
 					BlockState st = y == 2 && v == (bv0 + bv1) / 2 ? fence(Blocks.SPRUCE_FENCE, true, false, true, false)
-							: (y == 2 || y == 3) ? JapaneseKit.paneV(JapaneseKit.glassPane(net.minecraft.world.item.DyeColor.WHITE))
-							: y == 1 ? b(Blocks.TUFF_BRICKS) : p.hash(u, y, v, 8) == 0 ? b(Blocks.MUD_BRICKS) : b(Blocks.PACKED_MUD);
+							: y == 1 ? b(Blocks.TUFF_BRICKS) : p.hash(u, y, v, 8) == 0 ? b(Blocks.TUFF_BRICKS) : b(Blocks.CALCITE);
 					p.set(c, u, y, v, st);
 				}
 			}
@@ -199,7 +196,9 @@ public final class HouseJapaneseTeahouse implements Variant {
 		if (k == 0) {
 			return Blocks.DARK_OAK_STAIRS; // a dark fascia line: the overhanging eave reads as one clean edge
 		}
-		return p.hash(u, k, v, 4) == 0 ? Blocks.MANGROVE_STAIRS : Blocks.SPRUCE_STAIRS;
+		// the upper courses go lighter towards the top, a golden thatch over the dark fascia
+		boolean golden = k == 2 ? p.hash(u, k, v, 4) != 0 : p.hash(u, k, v, 2) == 0;
+		return golden ? Blocks.BAMBOO_MOSAIC_STAIRS : Blocks.SPRUCE_STAIRS;
 	}
 
 	/**
