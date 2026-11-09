@@ -60,7 +60,7 @@ public final class HouseStoneTower implements Variant {
 	/** Roof palettes by seed: slate with a cherry eave, red brick under a dark eave, mud brick under a slate eave. */
 	private static final Block[] ROOF_STAIR = {Blocks.DEEPSLATE_TILE_STAIRS, Blocks.BRICK_STAIRS, Blocks.MUD_BRICK_STAIRS};
 	private static final Block[] ROOF_FILL = {Blocks.DEEPSLATE_TILES, Blocks.BRICKS, Blocks.MUD_BRICKS};
-	private static final Block[] EAVE_STAIR = {Blocks.CHERRY_STAIRS, Blocks.DEEPSLATE_BRICK_STAIRS, Blocks.DEEPSLATE_TILE_STAIRS};
+	private static final Block[] EAVE_STAIR = {Blocks.SPRUCE_STAIRS, Blocks.DEEPSLATE_BRICK_STAIRS, Blocks.DEEPSLATE_TILE_STAIRS};
 	private static final Block[] CAP_STAIR = ROOF_STAIR; // dormer gables roof in the main roof's own material
 	private static final Block[] CAP_FILL = ROOF_FILL;
 	private static final Block[] ROOF_SLAB = {Blocks.DEEPSLATE_TILE_SLAB, Blocks.BRICK_SLAB, Blocks.MUD_BRICK_SLAB};
@@ -289,7 +289,7 @@ public final class HouseStoneTower implements Variant {
 				if (corner) {
 					return b(Blocks.POLISHED_DEEPSLATE);
 				}
-				return y == F1 ? b(Blocks.DEEPSLATE_BRICKS) : b(Blocks.POLISHED_ANDESITE); // a dark belt course, then a pale one
+				return y == F1 ? b(Blocks.DEEPSLATE_BRICKS) : b(Blocks.MUD_BRICKS); // a dark belt course, then a warm one
 			}
 			if (corner) {
 				return y <= 1 ? b(Blocks.POLISHED_DEEPSLATE) : quoin(u, y, v);
@@ -316,7 +316,7 @@ public final class HouseStoneTower implements Variant {
 
 		/** [palette] the wall body: patches of mossy or cracked stone bricks (3-block zones, mossier low down) in clean brick. */
 		BlockState body(int u, int y, int v) {
-			int zone = p.hash(u / 3, y / 3, v / 3, 7);
+			int zone = p.hash(u / 4, y / 3, v / 4, 7);
 			boolean fleck = p.hash(u, y, v, 3) != 0;
 			int mossy = y <= 4 ? 3 : y <= 9 ? 2 : 1;
 			if (zone < mossy) {
@@ -476,10 +476,10 @@ public final class HouseStoneTower implements Variant {
 			for (int sign : new int[] {-1, 1}) {
 				int tt = t + sign * 1;
 				if (!solidCorner(wl, tt)) {
-					// [depth] pale jambs (proud of the glass) and inverted stairs on the top corners frame the blue glass
-					wl.set(tt, y, 0, b(Blocks.POLISHED_ANDESITE));
-					wl.set(tt, y + 1, 0, b(Blocks.POLISHED_ANDESITE));
-					wl.set(tt, y + 2, 0, stUp(Blocks.POLISHED_ANDESITE_STAIRS, along(wl, sign)));
+					// [depth] dark jambs and inverted stairs on the top corners frame the pale blue glass
+					wl.set(tt, y, 0, b(Blocks.POLISHED_DEEPSLATE));
+					wl.set(tt, y + 1, 0, b(Blocks.POLISHED_DEEPSLATE));
+					wl.set(tt, y + 2, 0, stUp(Blocks.DEEPSLATE_BRICK_STAIRS, along(wl, sign)));
 				}
 			}
 			// [depth] a pale diorite stair sill in the wall plane, slanting down and out (no ledge to stand on); the dark
@@ -492,6 +492,20 @@ public final class HouseStoneTower implements Variant {
 						setFreeWall(wl, t + sign, y + 1, 1, wl.shutter(Blocks.CHERRY_TRAPDOOR));
 					}
 				}
+			}
+		}
+
+		/** A two-wide window on cells t and t + 1: glass on both, a sill under both and dark jambs outside both. */
+		void archPair(Wall wl, int t, int y) {
+			arch(wl, t, y, false);
+			for (int yy = y; yy <= y + 2; yy++) {
+				wl.set(t + 1, yy, 0, glass());
+			}
+			wl.set(t + 1, y - 1, 0, wl.stairIn(Blocks.POLISHED_DIORITE_STAIRS, false));
+			if (!solidCorner(wl, t + 2)) {
+				wl.set(t + 2, y, 0, b(Blocks.POLISHED_DEEPSLATE));
+				wl.set(t + 2, y + 1, 0, b(Blocks.POLISHED_DEEPSLATE));
+				wl.set(t + 2, y + 2, 0, stUp(Blocks.DEEPSLATE_BRICK_STAIRS, along(wl, 1)));
 			}
 		}
 
@@ -534,10 +548,19 @@ public final class HouseStoneTower implements Variant {
 			int vc = (cv0 + cv1) / 2;
 			for (int y : ys) {
 				// front: both sides of the door, and above it on the upper floors
-				for (int sign : new int[] {-3, 3}) {
-					int t = cc + sign;
-					if (t >= cu0 + 1 && t <= cu1 - 1) {
-						arch(front, t, y, true);
+				if (y == 2) {
+					for (int sign : new int[] {-3, 3}) {
+						int t = cc + sign;
+						if (t >= cu0 + 1 && t <= cu1 - 1) {
+							arch(front, t, y, true);
+						}
+					}
+				} else {
+					// upper floors: a pair of windows each side of the middle, two wide so they read from the street
+					for (int t : new int[] {cc - 3, cc + 2}) {
+						if (t >= cu0 + 1 && t + 1 <= cu1 - 1) {
+							archPair(front, t, y);
+						}
 					}
 				}
 				if (y > 2 && y != 12) {
@@ -552,11 +575,25 @@ public final class HouseStoneTower implements Variant {
 					}
 				}
 				// the stair wall
-				for (int sign : new int[] {-3, 0, 3}) {
-					int t = vc + sign;
-					if (t >= cv0 + 1 && t <= cv1 - 1) {
-						arch(aWall, t, y, true);
-						sideWin.add(t);
+				if (y == 2) {
+					for (int sign : new int[] {-3, 0, 3}) {
+						int t = vc + sign;
+						if (t >= cv0 + 1 && t <= cv1 - 1) {
+							arch(aWall, t, y, true);
+							sideWin.add(t);
+						}
+					}
+				} else {
+					if (vc >= cv0 + 1 && vc <= cv1 - 1) {
+						arch(aWall, vc, y, true);
+						sideWin.add(vc);
+					}
+					for (int t : new int[] {vc - 3, vc + 2}) {
+						if (t >= cv0 + 1 && t + 1 <= cv1 - 1) {
+							archPair(aWall, t, y);
+							sideWin.add(t);
+							sideWin.add(t + 1);
+						}
 					}
 				}
 				// the wing's wall: only above the wing's roof, and not beside the door onto it
@@ -643,24 +680,24 @@ public final class HouseStoneTower implements Variant {
 			Wall aWall = new Wall(c, p, annexRight ? cu0 : cu1, annexRight ? Direction.WEST : Direction.EAST);
 			int vc = (cv0 + cv1) / 2;
 			for (int sign : new int[] {-2, 2}) {
-				pilaster(front, cc + sign);
-				pilaster(back, cc + sign);
-				pilaster(aWall, vc + sign);
+				pilaster(front, cc + sign, F1); // below the paired windows of the upper floors only
+				pilaster(back, cc + sign, 13);
+				pilaster(aWall, vc + sign, F1);
 			}
 		}
 
-		void pilaster(Wall wl, int t) {
+		void pilaster(Wall wl, int t, int top) {
 			int u = wl.u(t, 1);
 			int v = wl.v(t, 1);
 			if (onAnnex(u, v)) {
 				return;
 			}
-			for (int y = 0; y <= 13; y++) {
+			for (int y = 0; y <= top; y++) {
 				BlockState s;
 				if (y <= 1) {
 					s = deep(p, u, y, v);
 				} else if (y == F2) {
-					s = b(Blocks.POLISHED_ANDESITE);
+					s = b(Blocks.MUD_BRICKS);
 				} else if (y == F1 || y == 13) {
 					s = b(Blocks.DEEPSLATE_BRICKS);
 				} else {
@@ -684,7 +721,7 @@ public final class HouseStoneTower implements Variant {
 						BlockState s = y <= 1 ? b(Blocks.POLISHED_DEEPSLATE) : y == 13 ? b(Blocks.DEEPSLATE_BRICKS)
 								: ci == 1 ? quoin(cell[0], y, cell[1]) : body(cell[0], y, cell[1]);
 						if (y == F1 || y == F2) {
-							s = y == F1 ? b(Blocks.DEEPSLATE_BRICKS) : b(Blocks.POLISHED_ANDESITE);
+							s = y == F1 ? b(Blocks.DEEPSLATE_BRICKS) : b(Blocks.MUD_BRICKS);
 						}
 						set(cell[0], y, cell[1], s);
 					}
@@ -769,7 +806,7 @@ public final class HouseStoneTower implements Variant {
 			ring(0, Blocks.DEEPSLATE_BRICK_STAIRS, Blocks.DEEPSLATE_BRICKS, false, true); // plinth ledge
 			ring(1, Blocks.DEEPSLATE_BRICK_STAIRS, Blocks.DEEPSLATE_BRICK_SLAB, false, true);
 			if (battle) {
-				ring(14, Blocks.CHERRY_STAIRS, Blocks.CHERRY_PLANKS, true, false); // the cornice corbel: a thin cherry line under the parapet
+				ring(14, Blocks.SPRUCE_STAIRS, Blocks.SPRUCE_PLANKS, true, false); // the cornice corbel: a thin dark-timber line under the parapet
 			} else {
 				// pale stone corbel, so the roof eave above it (a different colour) reads as its own step
 				ring(14, Blocks.STONE_BRICK_STAIRS, Blocks.STONE_BRICKS, true, false);
@@ -865,7 +902,7 @@ public final class HouseStoneTower implements Variant {
 						for (int y = 16; y <= 18; y++) {
 							set(u, y, v, y == 16 ? b(Blocks.DEEPSLATE_BRICKS) : y == 17 && du == 0 && dv == 0 ? glass() : b(Blocks.STONE_BRICKS));
 						}
-						set(u, 19, v, slab(ROOF_SLAB[roofKind]));
+						set(u, 19, v, slab(ROOF_SLAB[0])); // slate caps on every seed: brick or mud caps read as wooden crates
 					}
 				}
 				if (p.has(k[0], 20, k[1])) {
@@ -1226,7 +1263,12 @@ public final class HouseStoneTower implements Variant {
 					continue;
 				}
 				if (u >= cu0 && u <= cu1) {
-					bed(u, 1);
+					int off = Math.abs(u - cc);
+					if ((off == 3 || off == 4) && free(u, 0, 1) && free(u, 1, 1)) {
+						set(u, 0, 1, stairs(Blocks.CHERRY_STAIRS, Direction.SOUTH)); // a bench by the door, facing the street
+					} else {
+						bed(u, 1);
+					}
 				} else if (onAnnexCols(u)) {
 					bed(u, 1);
 					bed(u, cv0);
