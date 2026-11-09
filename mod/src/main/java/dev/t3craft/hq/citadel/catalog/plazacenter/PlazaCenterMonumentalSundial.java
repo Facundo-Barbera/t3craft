@@ -27,11 +27,11 @@ import net.minecraft.world.level.block.state.BlockState;
  * <li><b>Gnomon:</b> a thin dark blade, one block wide, that climbs half a block per column (slab, block, slab,
  * block...) towards 12 o'clock and ends in a vertical edge with a gold ball and a rod: a right triangle seen in profile.
  * Its height follows the plot height (10 in the gallery, 14 in the city).</li>
- * <li><b>Platform:</b> square or octagonal ziggurat by seed (octagon from 19 wide), 1 to 3 tiers by size and seed. Each tier is
- * a full-block wall (dark at the foot, stone above), the top tier carries a ring of light slabs as a cornice and the four
+ * <li><b>Platform:</b> square or octagonal ziggurat by seed (octagon from 19 wide), 1 tier up to 15 wide, 2 from 17, 3 from 21. Each tier is
+ * a full-block wall (dark at the foot, stone above, a light cornice flush with the dial on the top tier) and the four
  * 3-wide stairs are light. Nothing floats: every wall stands on a solid core.</li>
- * <li><b>Use:</b> a ring of benches (cherry, spruce or dark oak) at the foot of the platform facing the dial, a planter at
- * the end of each run, a lamp post on each corner of the plot, the four axes free; octagon variants get a hedge on
+ * <li><b>Use:</b> a ring of benches (cherry, spruce or dark oak, in runs of three) at the foot of the platform facing the
+ * dial, a planter at the end of each run, a lamp post on each corner of the plot, the four axes free; octagon variants get a hedge on
  * the diagonals and a flower bed in each corner.</li>
  * </ul>
  *
