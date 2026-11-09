@@ -284,9 +284,6 @@ public final class HouseForgeAtelier implements Variant {
 					}
 					s(bu, y, VF, st);
 				}
-				if (win) {
-					s(bu, 2, VF - 1, slab(Blocks.STONE_BRICK_SLAB, true)); // [depth] sill
-				}
 			}
 		}
 
@@ -390,7 +387,7 @@ public final class HouseForgeAtelier implements Variant {
 				int y = PLATE + Math.min(rs, rc);
 				boolean left = bu < bw - 1 - bu;
 				for (int v = 1; v <= d - 1; v++) {
-					boolean edge = v == 1 || v == d - 1 || bu == 0 || bu == bw - 1;
+					boolean edge = v == 1 || v == d - 1 || bu == 0 || bu == bw - 1 || (v - VF) % 4 == 0; // [depth] a lighter rafter course over every wall post
 					BlockState st;
 					if (rs < rc || (bw % 2 == 0 && rc == rc0 && rs == rc)) {
 						st = stair(edge ? Blocks.POLISHED_BLACKSTONE_BRICK_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS, left ? Direction.EAST : Direction.WEST, false);
@@ -424,9 +421,9 @@ public final class HouseForgeAtelier implements Variant {
 					}
 				}
 			}
-			for (int bu = ma - 1; bu <= mb + 1; bu++) {
-				for (int v = mv0 - 1; v <= mv1 + 1; v++) {
-					boolean rim = bu == ma - 1 || bu == mb + 1 || v == mv0 - 1 || v == mv1 + 1;
+			for (int bu = ma; bu <= mb; bu++) {
+				for (int v = mv0; v <= mv1; v++) {
+					boolean rim = bu == ma || bu == mb || v == mv0 || v == mv1; // flush: nothing hangs over a roof you could stand on
 					s(bu, yb + 2, v, slab(rim ? Blocks.POLISHED_BLACKSTONE_BRICK_SLAB : Blocks.DEEPSLATE_TILE_SLAB, false));
 				}
 			}
@@ -460,8 +457,12 @@ public final class HouseForgeAtelier implements Variant {
 					}
 					s(uu, 5, vv, st);
 				}
-				s(uu, 6, vh - 2, stair(Blocks.BRICK_STAIRS, Direction.SOUTH, false));
-				s(uu, 6, vh + 2, stair(Blocks.BRICK_STAIRS, Direction.NORTH, false));
+				// the hood corners rise as a chimney breast to the roof, so no ledge is left to stand on
+				for (int vv : new int[] {vh - 2, vh + 2}) {
+					for (int y = 6; y < roofY(uu); y++) {
+						s(uu, y, vv, brick(uu, y, vv));
+					}
+				}
 			}
 		}
 
@@ -478,16 +479,12 @@ public final class HouseForgeAtelier implements Variant {
 					}
 				}
 			}
-			// [finish] corbel ring one block out, then a slab cap round the open flue
-			for (int k = -1; k <= 1; k++) {
-				s(hu - 2, top, vh + k, stair(Blocks.BRICK_STAIRS, Direction.EAST, true));
-				s(hu + 2, top, vh + k, stair(Blocks.BRICK_STAIRS, Direction.WEST, true));
-				s(hu + k, top, vh - 2, stair(Blocks.BRICK_STAIRS, Direction.SOUTH, true));
-				s(hu + k, top, vh + 2, stair(Blocks.BRICK_STAIRS, Direction.NORTH, true));
-			}
+			// [finish] a dark band under the crown and a slab cap round the open flue, all inside the 3x3 footprint
 			for (int du = -1; du <= 1; du++) {
 				for (int dz = -1; dz <= 1; dz++) {
 					if (du != 0 || dz != 0) {
+						s(hu + du, top - 1, vh + dz, b(Blocks.DEEPSLATE_BRICKS));
+						s(hu + du, top, vh + dz, b(Blocks.POLISHED_BLACKSTONE_BRICKS));
 						s(hu + du, top + 1, vh + dz, slab(Blocks.DEEPSLATE_BRICK_SLAB, false));
 					}
 				}
@@ -585,10 +582,7 @@ public final class HouseForgeAtelier implements Variant {
 			for (int bu = 3; bu <= bw - 4; bu++) {
 				switch ((bu - 3) % 4) {
 					case 0, 1 -> s(bu, 1, vb - 1, facing(Blocks.CHEST, Direction.NORTH));
-					case 2 -> {
-						s(bu, 1, vb - 1, barrel());
-						s(bu, 2, vb - 1, b(Blocks.COAL_BLOCK));
-					}
+					case 2 -> s(bu, 1, vb - 1, b(Blocks.COAL_BLOCK)); // one high only: the loft is 4 over the floor
 					default -> s(bu, 1, vb - 1, barrel());
 				}
 			}
@@ -634,12 +628,9 @@ public final class HouseForgeAtelier implements Variant {
 					s(bu, 0, 0, barrel());
 				}
 			}
-			// the hoist: a beam out of the gable over the gate, a chain and a lantern
-			s(cu, PLATE + 1, 1, trim(Direction.Axis.Z));
-			s(cu, PLATE + 1, 0, trim(Direction.Axis.Z));
-			put(cu, PLATE - 1, 0, Blocks.IRON_CHAIN.defaultBlockState(), CitadelCanvas.HANGING);
-			put(cu, PLATE, 0, Blocks.IRON_CHAIN.defaultBlockState(), CitadelCanvas.HANGING);
-			put(cu, PLATE - 2, 0, lantern(true), CitadelCanvas.HANGING);
+			// two lanterns hang from the gate lintel, either side of the way in
+			put(cu - half, 4, VF, lantern(true), CitadelCanvas.HANGING);
+			put(cu + half, 4, VF, lantern(true), CitadelCanvas.HANGING);
 		}
 
 		/** [depth] stone piers at the posts, with a sloped cap under the eave; the yard door gets its step. */
@@ -669,10 +660,11 @@ public final class HouseForgeAtelier implements Variant {
 
 		void pier(int bu, int v, Direction toWall) {
 			int y0 = v == 1 ? 1 : 0; // on the apron the pier stands on its paving
-			for (int y = y0; y <= 6; y++) {
+			int top = roofY(bu) - 2; // up to just under the roof, so there is no ledge under the eave
+			for (int y = y0; y < top; y++) {
 				s(bu, y, v, y <= y0 + 1 ? base(bu, y, v) : body(bu, y, v));
 			}
-			s(bu, 7, v, stair(Blocks.STONE_BRICK_STAIRS, toWall, false));
+			s(bu, top, v, stair(Blocks.STONE_BRICK_STAIRS, toWall, false));
 		}
 
 		// ------------------------------------------------------------------ the side yard
