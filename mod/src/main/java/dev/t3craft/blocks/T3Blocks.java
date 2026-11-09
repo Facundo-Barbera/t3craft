@@ -55,10 +55,18 @@ public final class T3Blocks {
 			BlockEntityType<ArchiveTerminalBlockEntity> archiveTerminalType,
 			// kit/console-terminal
 			ConsoleTerminalBlock consoleTerminalBlock,
-			BlockEntityType<ConsoleTerminalBlockEntity> consoleTerminalType) implements HqBlockFixtures.States {
+			BlockEntityType<ConsoleTerminalBlockEntity> consoleTerminalType,
+			// kit/decision-podium
+			DecisionPodiumBlock decisionPodiumBlock,
+			BlockEntityType<LampBlockEntity> decisionPodiumType) implements HqBlockFixtures.States {
 		@Override
 		public BlockState consoleTerminal(Direction facing) {
 			return consoleTerminalBlock.defaultBlockState().setValue(ConsoleTerminalBlock.FACING, facing);
+		}
+
+		@Override
+		public BlockState podium(Direction facing) {
+			return decisionPodiumBlock.defaultBlockState().setValue(DecisionPodiumBlock.FACING, facing);
 		}
 
 		@Override
@@ -148,6 +156,8 @@ public final class T3Blocks {
 		BlockEntityType<ArchiveTerminalBlockEntity>[] terminalType = new BlockEntityType[1];
 		@SuppressWarnings("unchecked")
 		BlockEntityType<PlaqueBlockEntity>[] plaqueType = new BlockEntityType[1];
+		@SuppressWarnings("unchecked")
+		BlockEntityType<LampBlockEntity>[] podiumType = new BlockEntityType[1];
 
 		MonitorBlock monitor = (MonitorBlock) block(r, "monitor", p -> new MonitorBlock(p, () -> monitorType[0]),
 				BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLACK).strength(1.5f).sound(SoundType.METAL));
@@ -158,6 +168,9 @@ public final class T3Blocks {
 		ArchiveTerminalBlock terminal = (ArchiveTerminalBlock) block(r, "archive_terminal", p -> new ArchiveTerminalBlock(p, () -> terminalType[0]),
 				BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GRAY).strength(1.5f).sound(SoundType.METAL).noOcclusion()
 						.lightLevel(s -> 5));
+		DecisionPodiumBlock podium = (DecisionPodiumBlock) block(r, "decision_podium", p -> new DecisionPodiumBlock(p, () -> podiumType[0]),
+				BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).strength(1.5f).sound(SoundType.WOOD).noOcclusion()
+						.lightLevel(DecisionPodiumBlock::light));
 		Map<String, Block> kitBlocks = KitBlocks.register((name, factory, props) -> block(r, name, factory, props),
 				() -> lampType[0], () -> plaqueType[0]);
 		// kit/console-terminal: its own block + block entity (bound like a monitor); the kit plays it as Role.CONSOLE
@@ -181,11 +194,14 @@ public final class T3Blocks {
 				(pos, state) -> new ArchiveTerminalBlockEntity(terminalType[0], pos, state), Set.of(terminal)));
 		consoleType[0] = r.blockEntity(id("console_terminal"), new BlockEntityType<>(
 				(pos, state) -> new ConsoleTerminalBlockEntity(consoleType[0], pos, state), Set.of(console)));
+		podiumType[0] = r.blockEntity(id("decision_podium"), new BlockEntityType<>(
+				(pos, state) -> new LampBlockEntity(podiumType[0], pos, state), Set.of(podium)));
 		KitBlocks kit = KitBlocks.of(kitWithConsole, plaqueType[0]);
 
 		List<Item> items = new ArrayList<>(List.of(item(r, "monitor", monitor), item(r, "status_lamp", lamp), item(r, "board_lamp", board),
 				item(r, "archive_terminal", terminal),
 				item(r, "thread_board", wall)));
+		items.add(item(r, "decision_podium", podium));
 		for (String name : KitBlocks.IDS) {
 			items.add(item(r, name, kit.block(name)));
 		}
@@ -194,7 +210,7 @@ public final class T3Blocks {
 		r.creativeTab(items);
 
 		Content c = new Content(monitor, lamp, board, wall, items, monitorType[0], lampType[0], wallType[0], kit, terminal, terminalType[0],
-				console, consoleType[0]);
+				console, consoleType[0], podium, podiumType[0]);
 		HqFixtures.use(new HqBlockFixtures(c));
 		HqKit.use(kit);
 		content = c;

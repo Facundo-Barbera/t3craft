@@ -26,6 +26,7 @@ import org.jspecify.annotations.Nullable;
  *       merge into one screen whose origin carries the thread ({@link MonitorWall}); unbound when
  *       vacant. Desks have no status lamp (fix/desk-screens-3x2);</li>
  *   <li>{@code board_lamp_<i>} anchors → board bulb {@code board:<i>};</li>
+ *   <li>{@code decision_podium_<i>} anchors → decision podium {@code board:<i>} (the same thread as board bulb {@code i}; a click opens it);</li>
  *   <li>each module: the lintel over its doorway (the inner wall's beam, one block in from the
  *       {@code module@<i>} anchor, three up) → board bulb {@code module:<threads at its desks>}, the
  *       module's most urgent thread; unbound (off) while the module has nobody;</li>
@@ -58,7 +59,9 @@ public final class HqBindings {
 		/** The archive terminal ({@code archiveTerminal} anchor): unbound, it always shows the whole archive. */
 		ARCHIVE_TERMINAL,
 		/** One cell of a large screen reserved by the plan ({@link AnchorNames#bigScreen}). */
-		SCREEN
+		SCREEN,
+		/** A decision podium ({@code decision_podium_<i>} anchor): bound {@code board:<i>}, it shows the i-th most urgent thread. */
+		PODIUM
 	}
 
 	/**
@@ -99,6 +102,14 @@ public final class HqBindings {
 				int i = parseIndex(n.substring(AnchorNames.BOARD_LAMP.length()));
 				if (i >= 0) {
 					out.putIfAbsent(a.block(), new Fixture(a.block(), Role.BOARD_LAMP, Binding.board(i), a.facing()));
+				}
+			}
+		}
+		for (Anchor a : plan.anchors().values()) {
+			if (a.name().startsWith(AnchorNames.PODIUM)) {
+				int i = parseIndex(a.name().substring(AnchorNames.PODIUM.length()));
+				if (i >= 0) {
+					out.putIfAbsent(a.block(), new Fixture(a.block(), Role.PODIUM, Binding.board(i), a.facing()));
 				}
 			}
 		}
