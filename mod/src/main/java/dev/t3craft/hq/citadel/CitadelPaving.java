@@ -388,8 +388,8 @@ final class CitadelPaving {
 		if (!Double.isNaN(zebra) && md >= PLAZA_R_FRAC * width - 4.0 && md <= PLAZA_R_FRAC * width - 1.5 && Math.floorMod((int) Math.round(zebra), 2) == 0) {
 			return CALCITE;
 		}
-		// concentric rings of polished deepslate over polished andesite
-		return Math.floorMod((int) Math.round(md), 3) == 0 ? POLISHED : JOINT;
+		// concentric rings of stone brick over polished andesite: calm, light, and the zebra shows on it
+		return Math.floorMod((int) Math.round(md), 3) == 0 ? BRICKS : JOINT;
 	}
 
 	/** The plaza at the foot of the main ramp: the avenue's tile, with arcs of joints round the rosette. */
