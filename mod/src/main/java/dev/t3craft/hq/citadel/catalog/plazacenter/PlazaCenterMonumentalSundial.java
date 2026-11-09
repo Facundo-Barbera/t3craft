@@ -256,8 +256,8 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 					}
 					double perp = Math.abs(du * ov - dv * ou);
 					boolean card = h % 3 == 0;
-					if (!card && k.rd < 4) {
-						continue; // on a tiny dial only the four quarters are marked
+					if (!card && k.rd < 5) {
+						continue; // on a small dial only the four quarters are marked (twelve dots would be a checker)
 					}
 					if (inRing) {
 						// gold only on the outer layer of the bezel (the inner one stays dark, so the ring is continuous);
