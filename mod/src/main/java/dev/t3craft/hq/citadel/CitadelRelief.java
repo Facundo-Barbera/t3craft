@@ -118,7 +118,8 @@ public final class CitadelRelief {
 		double a = RingCampusGeometry.theta(x, z);
 		double swell = 0.5 * Math.sin(3 * a + 0.7) + 0.3 * Math.sin(5 * a + 2.1) + 0.2 * Math.sin(8 * a + 4.0);
 		double ripple = 0.5 * Math.sin(13 * a + 1.3 + 0.35 * RingCampusGeometry.r(x, z));
-		double foot = to - w * (0.30 + 0.25 * swell + 0.08 * ripple); // where the bank reaches the natural ground
+		double mid = Math.sin(23 * a + 2.2) * Math.sin(7 * a + 0.4); // lobes of some 60 cells of arc, in and out
+		double foot = to - w * (0.32 + 0.22 * swell + 0.14 * mid + 0.06 * ripple); // where the bank reaches the natural ground
 		double f = (foot - RingCampusGeometry.r(x, z)) / Math.max(1.0, foot - from);
 		return (int) Math.max(0, Math.min(top, Math.round(top * f)));
 	}
@@ -164,8 +165,20 @@ public final class CitadelRelief {
 				}
 			}
 			BlockState s = c.at(x, g, z);
-			if (edge && s != null && s.getBlock() == Blocks.GRASS_BLOCK) {
+			// design/citadel-terraces2: the kerb is broken now and then (a plain grass bank) and rocks lie on the bank
+			double a = RingCampusGeometry.theta(x, z);
+			boolean gap = Math.sin(17 * a + 0.9) + 0.6 * Math.sin(41 * a + 2.6) > 0.9;
+			if (edge && !gap && s != null && s.getBlock() == Blocks.GRASS_BLOCK) {
 				c.set(x, g, z, Math.floorMod(x * 31 + z * 7, 5) == 0 ? b(Blocks.MOSSY_STONE_BRICKS) : b(Blocks.STONE_BRICKS));
+			} else if (s != null && s.getBlock() == Blocks.GRASS_BLOCK && Math.floorMod(x * 73856093 ^ z * 19349663, 190) == 0 && c.at(x, g + 1, z) == null) {
+				c.set(x, g + 1, z, b(Blocks.MOSSY_COBBLESTONE));
+				for (Direction dir : DIRS) {
+					BlockState n = c.at(x + dir.getStepX(), g, z + dir.getStepZ());
+					int hh = Math.floorMod((x + dir.getStepX()) * 31 + (z + dir.getStepZ()) * 17, 4);
+					if (hh < 2 && n != null && n.getBlock() == Blocks.GRASS_BLOCK && c.at(x + dir.getStepX(), g + 1, z + dir.getStepZ()) == null) {
+						c.set(x + dir.getStepX(), g + 1, z + dir.getStepZ(), hh == 0 ? slab(Blocks.MOSSY_COBBLESTONE_SLAB) : b(Blocks.FERN));
+					}
+				}
 			}
 		}
 	}
