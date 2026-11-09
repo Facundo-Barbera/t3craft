@@ -337,6 +337,8 @@ public final class AnnexGreenhouseCopper implements Variant {
 					Direction in = du == 0 ? (u == 0 ? Direction.EAST : Direction.WEST) : (v == g.vf ? Direction.SOUTH : Direction.NORTH);
 					boolean corner = du == 0 && dv == 0;
 					st = corner || rib ? stairs(RIB_O, in) : slab(SLAB_O);
+				} else if (g.hip && du == dv && du < g.r) {
+					st = slab(SLAB_O); // [depth] the hip arris: a copper spine down each corner of the slope
 				} else if (du >= g.r && dv >= g.r) {
 					if (rib) {
 						st = POST_W;
@@ -354,13 +356,12 @@ public final class AnnexGreenhouseCopper implements Variant {
 				if (g.hip) {
 					// a hip's rings step up one block each, touching only at the corners: a block on top of every ring
 					// below the plateau makes the steps meet face to face, so the roof is one piece from the gutter to
-					// the ridge whatever the height (a gable gets that from its end walls). It is the tread of the step:
-					// a copper slab (a stair facing uphill on the ribs), so every step has a solid copper nose and the
-					// glass is the fill between them
+					// the ridge whatever the height (a gable gets that from its end walls). It is glass, a copper stair
+					// facing uphill on the ribs, and a copper slab on the diagonal so the four hip arrises are solid
 					int m = Math.min(du, dv);
 					if (m < g.r) {
 						Direction up = du <= dv ? (u < w - 1 - u ? Direction.EAST : Direction.WEST) : (v - g.vf < g.vb - v ? Direction.SOUTH : Direction.NORTH);
-						p.set(c, u, PLATE + m + 1, v, rib ? stairs(RIB_W, up) : slab(SLAB_O));
+						p.set(c, u, PLATE + m + 1, v, du == dv ? slab(SLAB_O) : rib ? stairs(RIB_W, up) : glass);
 					}
 				}
 			}
