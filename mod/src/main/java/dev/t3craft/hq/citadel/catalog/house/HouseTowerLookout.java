@@ -289,7 +289,7 @@ public final class HouseTowerLookout implements Variant {
 			int pu = g.cx + dir.getStepX() * (g.rr + 1);
 			int pv = g.cz + dir.getStepZ() * (g.rr + 1);
 			for (int y = 1; y <= 8; y++) {
-				set(c, g.p, pu, y, pv, y <= 2 ? b(Blocks.DEEPSLATE_BRICKS) : log(g.s.log(), Direction.Axis.Y));
+				set(c, g.p, pu, y, pv, y <= 2 ? b(Blocks.DEEPSLATE_BRICKS) : y <= 5 ? b(Blocks.STONE_BRICKS) : b(Blocks.CALCITE)); // pilasters follow the palette gradient
 			}
 		}
 	}
@@ -425,13 +425,14 @@ public final class HouseTowerLookout implements Variant {
 					if (!g.in(u, v, r)) {
 						continue;
 					}
-					Block stairBlock = k == 0 ? g.s.eaveStair() : g.s.roofStair();
+					boolean crown = r < 1.8; // the top rings are oxidised copper, to match the library's dome
+					Block stairBlock = crown ? Blocks.CUT_COPPER_STAIRS.waxed().oxidized() : k == 0 ? g.s.eaveStair() : g.s.roofStair();
 					if (single) {
-						set(c, g.p, u, y, v, slab(g.s.roofSlab(), false));
+						set(c, g.p, u, y, v, slab(Blocks.CUT_COPPER_SLAB.waxed().oxidized(), false));
 					} else if (g.rim4(u, v, r)) {
 						set(c, g.p, u, y, v, stair(stairBlock, g.inward(u, v), false));
 					} else {
-						set(c, g.p, u, y, v, b(g.s.roof()));
+						set(c, g.p, u, y, v, b(crown ? Blocks.CUT_COPPER.waxed().oxidized() : g.s.roof()));
 					}
 				}
 			}

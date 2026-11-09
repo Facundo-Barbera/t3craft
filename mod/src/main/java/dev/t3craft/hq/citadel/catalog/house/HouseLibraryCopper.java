@@ -255,7 +255,8 @@ public final class HouseLibraryCopper implements Variant {
 		int w = p.w();
 		int d = p.d();
 		double r0 = g.r() + 0.35;
-		double drop = 0.9;
+		// a bulged profile: the first courses climb almost straight (a copper drum), then the rings close faster and faster
+		double[] drops = {0.3, 0.6, 0.9, 1.1, 1.2, 1.3};
 		// skirt: a ring of copper slabs sitting on the cornice, one block of overhang
 		for (int u = 0; u < w; u++) {
 			for (int v = 0; v < d; v++) {
@@ -269,8 +270,8 @@ public final class HouseLibraryCopper implements Variant {
 		double rk = r0;
 		while (rk >= 1.0) {
 			int y = 9 + k;
-			double rn = rk - drop;
-			int level = Math.min(3, k * 4 / Math.max(1, (int) Math.round(r0 / drop)));
+			double rn = rk - drops[Math.min(k, drops.length - 1)];
+			int level = Math.min(3, k * 4 / 5);
 			for (int u = 0; u < w; u++) {
 				for (int v = 0; v < d; v++) {
 					double dist = g.dist(u, v);
@@ -282,7 +283,7 @@ public final class HouseLibraryCopper implements Variant {
 					if (!exposed) {
 						st = b(copper(level)); // core under the next ring
 					} else if (k == 0 && (Math.abs(u - g.cu()) < 0.6 || Math.abs(v - g.cv()) < 0.6)) {
-						st = tintBlock(JEWELS[p.hash(u, 0, v, JEWELS.length)]); // oculi at the four compass points
+						st = b(chiseled(level)); // a chiselled copper boss at the four compass points
 					} else {
 						st = stair(copperStair(level), opposite(g.out(u, v)), false);
 					}

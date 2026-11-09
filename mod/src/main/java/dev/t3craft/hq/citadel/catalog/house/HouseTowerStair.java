@@ -124,6 +124,7 @@ public final class HouseTowerStair implements Variant {
 			storey(c, l, k);
 		}
 		floors(c, l);
+		buttresses(c, l);
 		porch(c, l);
 		terrace(c, l);
 		stairs(c, l);
@@ -343,6 +344,28 @@ public final class HouseTowerStair implements Variant {
 		set(c, p, l.u1 + 1, 5, l.vb - 1, b(Blocks.BOOKSHELF));
 		set(c, p, l.u1 + 1, 7, l.vb - 1, b(Blocks.CHEST).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.EAST));
 		set(c, p, l.u1 + 1, 10, l.vb - 1, b(Blocks.CRAFTING_TABLE));
+	}
+
+	/**
+	 * [depth] stone buttresses up the west and back walls: dark at the foot, stone in the middle, calcite at the top, a
+	 * block proud of the wall, between the windows. They break the long flat faces and make the body read as tapering.
+	 */
+	private static void buttresses(CitadelCanvas c, L l) {
+		Plot p = l.p;
+		for (int v = l.vf + 1; v < l.vb; v++) {
+			if ((v - l.vf) % 2 == 0 && !winS(l, v) && !sidePost(l, v)) {
+				for (int y = 1; y <= 8; y++) {
+					set(c, p, l.u1 - 1, y, v, infill(l, y <= 2 ? 1 : y <= 5 ? 2 : 4, l.u1 - 1, y, v));
+				}
+			}
+		}
+		for (int u = l.u1 + 1; u < l.u2; u++) {
+			if (!winF(l, u)) {
+				for (int y = 1; y <= 8; y++) {
+					set(c, p, u, y, l.vb + 1, infill(l, y <= 2 ? 1 : y <= 5 ? 2 : 4, u, y, l.vb + 1));
+				}
+			}
+		}
 	}
 
 	// ------------------------------------------------------------------ front: porch, balcony
@@ -584,6 +607,9 @@ public final class HouseTowerStair implements Variant {
 		}
 		for (int u = l.u1; u <= l.iu; u++) {
 			set(c, p, u, PLATE, 0, log(l.s.frame(), Direction.Axis.X));
+			if (u > l.u1 && u < l.iu) {
+				set(c, p, u, PLATE - 1, 0, stair(l.s.eave(), Direction.SOUTH, true)); // a cove under the beam
+			}
 		}
 		// bracket under the front gable overhang
 		set(c, p, mid, roofY(l, mid) - 1, 0, stair(l.s.eave(), Direction.SOUTH, true));
