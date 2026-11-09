@@ -39,6 +39,8 @@ final class DemoBuildRun {
 	private final DemoStructureSource source;
 	private final List<BuildPlan> plans;
 	private final PartSchedule schedule;
+	/** feat/build-near-player: ready parts nearest the player first (ranked off-thread, with hysteresis). */
+	private final dev.t3craft.build.NearPriority near;
 	private final boolean[] finished;
 	private final boolean[] running;
 	private final Map<Integer, BuildHandle> current = new LinkedHashMap<>();
@@ -56,6 +58,14 @@ final class DemoBuildRun {
 		this.source = source;
 		this.plans = List.copyOf(plans);
 		this.schedule = PartSchedule.ofPlans(this.plans);
+		DemoWorldSpec sp = config.spec();
+		java.util.List<int[]> boxes = new java.util.ArrayList<>(this.plans.size());
+		for (BuildPlan p : this.plans) {
+			boxes.add(p.isEmpty() ? new int[] {1, 0, 1, 0, -1, 0}
+					: new int[] {sp.originX() + p.min().getX(), sp.originY() + p.min().getY(), sp.originZ() + p.min().getZ(),
+							sp.originX() + p.max().getX(), sp.originY() + p.max().getY(), sp.originZ() + p.max().getZ()});
+		}
+		this.near = new dev.t3craft.build.NearPriority(boxes, BuildBudget.global().tuning().nearPlayerRadius());
 		this.finished = new boolean[this.plans.size()];
 		this.running = new boolean[this.plans.size()];
 		this.total = plans.size();
@@ -148,8 +158,11 @@ final class DemoBuildRun {
 		BuildTuning tuning = BuildBudget.global().tuning();
 		int crews = crews(tuning);
 		DemoWorldSpec spec = config.spec();
+		// feat/build-near-player: cheap here (a future at most every few seconds); the ranking runs off-thread
+		boolean steer = tuning.nearPlayer() && mc.player != null;
+		near.update(steer ? mc.player.getX() : null, steer ? mc.player.getZ() : null, System.currentTimeMillis());
 		while (current.size() < crews) {
-			int j = schedule.next(finished, running);
+			int j = near.next(schedule, finished, running);
 			if (j < 0) {
 				return;
 			}

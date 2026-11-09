@@ -247,6 +247,12 @@ public final class PerfStats {
 	public static final String STEP_SCHEDULE = "step.build.schedule_async.ns";
 	/** Async: material costs and meter of a charged job ({@code BlockCosts}, {@code MaterialMeter}). */
 	public static final String STEP_METER = "step.build.meter_async.ns";
+	/** feat/build-near-player: server, one tick of fast foundation layers ({@code FoundationCursor}). */
+	public static final String STEP_FOUNDATION = "step.build.foundation.ns";
+	/** feat/build-near-player: async, foundation/visible split + crew plan of the visible rest. */
+	public static final String STEP_FOUNDATION_SPLIT = "step.build.foundation_split_async.ns";
+	/** feat/build-near-player: async, part priority by distance to the player ({@code NearPriority}). */
+	public static final String STEP_PRIORITY_ASYNC = "step.build.priority_async.ns";
 	/** Server: listeners of jobs that started / finished, per tick. */
 	public static final String STEP_STARTED = "step.build.started.ns";
 	public static final String STEP_FINISHED = "step.build.finished.ns";

@@ -105,6 +105,16 @@ public final class PartSchedule {
 	 * may go first), which is what lets far-apart buildings rise together.
 	 */
 	public int next(boolean[] finished, boolean[] running) {
+		return next(finished, running, null);
+	}
+
+	/**
+	 * feat/build-near-player: like {@link #next(boolean[], boolean[])}, but among the ready parts the one
+	 * with the lowest {@code rank} (e.g. nearest the player, {@link NearPriority}); null rank = lowest index.
+	 * Dependencies are the same, so the world still ends as with the parts one after another.
+	 */
+	public int next(boolean[] finished, boolean[] running, int @org.jspecify.annotations.Nullable [] rank) {
+		int best = -1;
 		for (int j = 0; j < boxes.length; j++) {
 			if (finished[j] || running[j]) {
 				continue;
@@ -116,10 +126,16 @@ public final class PartSchedule {
 					break;
 				}
 			}
-			if (ok) {
+			if (!ok) {
+				continue;
+			}
+			if (rank == null || j >= rank.length) {
 				return j;
 			}
+			if (best < 0 || rank[j] < rank[best]) {
+				best = j;
+			}
 		}
-		return -1;
+		return best;
 	}
 }

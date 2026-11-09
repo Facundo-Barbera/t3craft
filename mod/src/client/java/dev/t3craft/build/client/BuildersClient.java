@@ -89,7 +89,11 @@ public final class BuildersClient implements ClientModInitializer, BuildService 
 		manager.addListener(new BuildListener() {
 			@Override
 			public void placed(BuildJob job, int index, BlockPos worldPos, BlockState worldState) {
-				events.add(new Placed(job.id(), worldPos, worldState, job.frontOf(index)));
+				int front = job.frontOf(index);
+				if (front < 0) {
+					return; // feat/build-near-player: fast foundation, no builder animates it (thousands per tick)
+				}
+				events.add(new Placed(job.id(), worldPos, worldState, front));
 			}
 
 			@Override
@@ -169,11 +173,19 @@ public final class BuildersClient implements ClientModInitializer, BuildService 
 			resetLevel(lvl);
 		}
 		Vec3 viewer = mc.player.position();
-		BuildCrew crew = new BuildCrew(label, lvl, BuildJob.boundsOf(plan, origin, rotation), crewSize, viewer, () -> nextEntityId--, routes,
-				() -> manager.submit(label, dimension, origin, rotation, plan, blocksPerTick, jobCost, wrap,
-						BuildBudget.global().tuning().frontsFor(crewSize), BuildPlanner.CREW));
-		crews.add(crew);
-		return crew;
+		// feat/build-near-player: crews grow with the plan (an estimate of its visible share: the foundation
+		// is split off later, off-thread), every builder works at least build.blocksPerTick, and a player
+		// near the site is where the crew appears and starts working.
+		dev.t3craft.build.BuildTuning tuning = BuildBudget.global().tuning();
+		int crew = tuning.crewFor(crewSize, plan.size() / 4);
+		double pace = Math.max(blocksPerTick, tuning.blocksPerTick());
+		net.minecraft.world.level.levelgen.structure.BoundingBox box = BuildJob.boundsOf(plan, origin, rotation);
+		boolean near = tuning.nearPlayer() && BuildCrew.near(box, viewer, tuning.nearPlayerRadius());
+		BlockPos focus = near ? BlockPos.containing(viewer) : null;
+		BuildCrew built = new BuildCrew(label, lvl, box, crew, viewer, near, () -> nextEntityId--, routes,
+				() -> manager.submit(label, dimension, origin, rotation, plan, pace, jobCost, wrap, tuning.frontsFor(crew), BuildPlanner.CREW, focus));
+		crews.add(built);
+		return built;
 	}
 
 	@Override

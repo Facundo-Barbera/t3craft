@@ -103,6 +103,17 @@ public final class BuildJob {
 	 */
 	public BuildJob(int id, String label, ResourceKey<Level> dimension, BlockPos origin, Rotation rotation, BuildPlan plan, double blocksPerTick,
 			@Nullable BuildCost cost, int fronts, BuildPlanner planner) {
+		this(id, label, dimension, origin, rotation, plan, blocksPerTick, cost, fronts, planner, null);
+	}
+
+	/**
+	 * feat/build-near-player: like {@link #BuildJob(int, String, ResourceKey, BlockPos, Rotation, BuildPlan, double, BuildCost, int, BuildPlanner)};
+	 * {@code focusWorld} (the player, or null) is where a {@link BuildPlanner#CREW} crew starts working
+	 * (the columns nearest it first). A free crew job whose plan is large enough lays its foundation in
+	 * fast layers first ({@link FoundationCursor}, {@code build.fastFoundation}).
+	 */
+	public BuildJob(int id, String label, ResourceKey<Level> dimension, BlockPos origin, Rotation rotation, BuildPlan plan, double blocksPerTick,
+			@Nullable BuildCost cost, int fronts, BuildPlanner planner, @Nullable BlockPos focusWorld) {
 		if (!(blocksPerTick > 0) || Double.isInfinite(blocksPerTick)) {
 			throw new IllegalArgumentException("blocksPerTick must be > 0 and finite: " + blocksPerTick);
 		}
@@ -119,18 +130,29 @@ public final class BuildJob {
 		java.util.function.Supplier<JobCursor> layered = () -> new FrontCursor(PlacementOrders.current().create(plan, f));
 		if (planner == BuildPlanner.CREW) {
 			int segment = cost == null ? 0 : BuildPlanner.CREW_SEGMENT;
+			int[] focus = focusWorld == null ? null : planFocus(focusWorld, this.origin, rotation);
 			java.util.function.Supplier<JobCursor> crew = () -> {
 				long s0 = System.nanoTime();
 				try {
-					return new CrewCursor(CrewSchedule.of(plan, f), segment, BuildCursor.DEFAULT_MAX_SKIPS_PER_TICK);
+					return new CrewCursor(CrewSchedule.of(plan, f, null, focus), segment, BuildCursor.DEFAULT_MAX_SKIPS_PER_TICK);
 				} finally {
 					dev.t3craft.debug.PerfStats.stepAsync(dev.t3craft.debug.PerfStats.STEP_SCHEDULE, s0);
+				}
+			};
+			// feat/build-near-player: free jobs lay ground, fill and floors in fast layers, the crew does the rest
+			boolean fast = cost == null && BuildBudget.global().tuning().fastFoundation() && plan.size() > BuildPlanner.SYNC_PLAN_LIMIT;
+			java.util.function.Supplier<JobCursor> planned = !fast ? crew : () -> {
+				long s0 = System.nanoTime();
+				try {
+					return FoundationCursor.plan(plan, f, focus);
+				} finally {
+					dev.t3craft.debug.PerfStats.stepAsync(dev.t3craft.debug.PerfStats.STEP_FOUNDATION_SPLIT, s0);
 				}
 			};
 			// fix/hq-build-stutter: only tiny plans are planned right here (this runs on the client thread
 			// when a crew submits); everything else off-thread (the job waits in PENDING meanwhile). The
 			// schedule is deterministic for a plan, so where it is computed does not change the build.
-			this.cursor = plan.size() <= BuildPlanner.SYNC_PLAN_LIMIT ? crew.get() : new DeferredCursor(crew, layered, plan.size(), f);
+			this.cursor = plan.size() <= BuildPlanner.SYNC_PLAN_LIMIT ? crew.get() : new DeferredCursor(planned, layered, plan.size(), f);
 		} else {
 			this.cursor = plan.size() <= BuildPlanner.SYNC_PLAN_LIMIT ? layered.get() : new DeferredCursor(layered, layered, plan.size(), f);
 		}
@@ -148,6 +170,17 @@ public final class BuildJob {
 			});
 		}
 		dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_JOB_NEW, t0);
+	}
+
+	/** Plan-relative {@code {x, z}} of a world cell for a plan at {@code origin} turned by {@code rotation}. */
+	static int[] planFocus(BlockPos world, BlockPos origin, Rotation rotation) {
+		Rotation back = switch (rotation) {
+			case CLOCKWISE_90 -> Rotation.COUNTERCLOCKWISE_90;
+			case COUNTERCLOCKWISE_90 -> Rotation.CLOCKWISE_90;
+			default -> rotation;
+		};
+		BlockPos rel = world.subtract(origin).rotate(back);
+		return new int[] {rel.getX(), rel.getZ()};
 	}
 
 	/**
@@ -211,10 +244,14 @@ public final class BuildJob {
 		}
 		MaterialSupply sup = supply == null ? MaterialSupply.EMPTY : supply;
 		IntPredicate there = j -> sink.matches(worldPos(j), worldState(j));
-		CrewCursor cc = crew();
-		if (cc != null) {
+		CrewCursor.Walker walk = onWalk == null ? null : (front, index, stand, ticks) -> onWalk.walking(this, front, index, toWorld(stand), ticks);
+		JobCursor live = cursor instanceof DeferredCursor d ? d.ready() : cursor;
+		if (live instanceof FoundationCursor fc) {
+			fc.probe(there);
+			fc.walker(walk);
+		} else if (live instanceof CrewCursor cc) {
 			cc.probe(there);
-			cc.walker(onWalk == null ? null : (front, index, stand, ticks) -> onWalk.walking(this, front, index, toWorld(stand), ticks));
+			cc.walker(walk);
 		}
 		if (m != null && waitingForMaterials) {
 			if (cursor.state() != JobState.PAUSED || userPaused) {
@@ -432,7 +469,15 @@ public final class BuildJob {
 	/** The crew cursor, once planned; null for layer jobs and while planning. */
 	private @Nullable CrewCursor crew() {
 		JobCursor c = cursor instanceof DeferredCursor d ? d.ready() : cursor;
+		if (c instanceof FoundationCursor fc) {
+			return fc.crew(); // feat/build-near-player: the crew of the visible rest (its schedule's indices are sub-plan indices)
+		}
 		return c instanceof CrewCursor cc ? cc : null;
+	}
+
+	/** feat/build-near-player: laying fast foundation layers right now (no builder takes part). */
+	public boolean fastPhase() {
+		return cursor.fastPhase();
 	}
 
 	/** Waits until a {@link BuildPlanner#CREW} job finished planning (tests; never on the server thread). */
@@ -462,7 +507,8 @@ public final class BuildJob {
 
 	/** Blocks per tick this job wants: {@code blocksPerTick × fronts}. */
 	public double rate() {
-		return blocksPerTick * fronts();
+		// feat/build-near-player: the foundation has its own budget; one block keeps the job's slot ticking
+		return cursor.fastPhase() ? Math.min(1.0, blocksPerTick) : blocksPerTick * fronts();
 	}
 
 	/** Whether front {@code f} is waiting for materials while others go on. Server thread. */
