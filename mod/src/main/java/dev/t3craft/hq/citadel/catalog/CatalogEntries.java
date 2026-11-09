@@ -15,6 +15,11 @@ final class CatalogEntries {
 	}
 
 	private static final Variant[] ENTRIES = {
+			new dev.t3craft.hq.citadel.catalog.annex.AnnexCherryPergola(), // annex_cherry_pergola
+			new dev.t3craft.hq.citadel.catalog.annex.AnnexGreenhouseCopper(), // annex_greenhouse_copper
+			new dev.t3craft.hq.citadel.catalog.annex.AnnexToolShed(), // annex_tool_shed
+			new dev.t3craft.hq.citadel.catalog.bench.BenchCherryPlanters(), // bench_cherry_planters
+			new dev.t3craft.hq.citadel.catalog.bench.BenchStoneTable(), // bench_stone_table
 			new dev.t3craft.hq.citadel.catalog.fountain.FountainKoiPond(), // fountain_koi_pond
 			new dev.t3craft.hq.citadel.catalog.fountain.FountainMossyCascade(), // fountain_mossy_cascade
 			new dev.t3craft.hq.citadel.catalog.fountain.FountainOctagonStatue(), // fountain_octagon_statue
@@ -40,11 +45,6 @@ final class CatalogEntries {
 			new dev.t3craft.hq.citadel.catalog.house.HouseTerraceTiers(), // house_terrace_tiers
 			new dev.t3craft.hq.citadel.catalog.house.HouseTimberArcade(), // house_timber_arcade
 			new dev.t3craft.hq.citadel.catalog.house.HouseTimberCorner(), // house_timber_corner
-			new dev.t3craft.hq.citadel.catalog.bench.BenchCherryPlanters(), // bench_cherry_planters
-			new dev.t3craft.hq.citadel.catalog.bench.BenchStoneTable(), // bench_stone_table
-			new dev.t3craft.hq.citadel.catalog.annex.AnnexCherryPergola(), // annex_cherry_pergola
-			new dev.t3craft.hq.citadel.catalog.annex.AnnexGreenhouseCopper(), // annex_greenhouse_copper
-			new dev.t3craft.hq.citadel.catalog.annex.AnnexToolShed(), // annex_tool_shed
 			new dev.t3craft.hq.citadel.catalog.house.HouseTimberCottage(), // house_timber_cottage
 			new dev.t3craft.hq.citadel.catalog.house.HouseTimberOverhang(), // house_timber_overhang
 			new dev.t3craft.hq.citadel.catalog.house.HouseTowerBridge(), // house_tower_bridge
@@ -54,9 +54,13 @@ final class CatalogEntries {
 			new dev.t3craft.hq.citadel.catalog.lamp.LampStreetAvenueDouble(), // lamp_street_avenue_double
 			new dev.t3craft.hq.citadel.catalog.lamp.LampStreetBrazierTripod(), // lamp_street_brazier_tripod
 			new dev.t3craft.hq.citadel.catalog.lamp.LampStreetToro(), // lamp_street_toro
+			new dev.t3craft.hq.citadel.catalog.planter.PlanterStoneShrub(), // planter_stone_shrub
+			new dev.t3craft.hq.citadel.catalog.planter.PlanterTallPot(), // planter_tall_pot
 			new dev.t3craft.hq.citadel.catalog.plazacenter.PlazaCenterGlazedRosette(), // plaza_center_glazed_rosette
 			new dev.t3craft.hq.citadel.catalog.plazacenter.PlazaCenterMonumentalSundial(), // plaza_center_monumental_sundial
 			new dev.t3craft.hq.citadel.catalog.plazacenter.PlazaCenterOctagonBandstand(), // plaza_center_octagon_bandstand
+			new dev.t3craft.hq.citadel.catalog.signpost.SignpostArrows(), // signpost_arrows
+			new dev.t3craft.hq.citadel.catalog.signpost.SignpostNoticeBoard(), // signpost_notice_board
 			new dev.t3craft.hq.citadel.catalog.stall.StallClothLanterns(), // stall_cloth_lanterns
 			new dev.t3craft.hq.citadel.catalog.stall.StallFruitAwning(), // stall_fruit_awning
 			new dev.t3craft.hq.citadel.catalog.stall.StallTeaBar(), // stall_tea_bar
@@ -69,10 +73,6 @@ final class CatalogEntries {
 			new dev.t3craft.hq.citadel.catalog.tree.TreeMapleRed(), // tree_maple_red
 			new dev.t3craft.hq.citadel.catalog.tree.TreePineTiered(), // tree_pine_tiered
 			new dev.t3craft.hq.citadel.catalog.tree.TreeWillowPond(), // tree_willow_pond
-			new dev.t3craft.hq.citadel.catalog.planter.PlanterStoneShrub(), // planter_stone_shrub
-			new dev.t3craft.hq.citadel.catalog.planter.PlanterTallPot(), // planter_tall_pot
-			new dev.t3craft.hq.citadel.catalog.signpost.SignpostArrows(), // signpost_arrows
-			new dev.t3craft.hq.citadel.catalog.signpost.SignpostNoticeBoard(), // signpost_notice_board
 			new dev.t3craft.hq.citadel.catalog.well.WellRoofedStone(), // well_roofed_stone
 			new dev.t3craft.hq.citadel.catalog.well.WellTroughPump(), // well_trough_pump
 	};
