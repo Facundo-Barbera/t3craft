@@ -100,15 +100,15 @@ anclas, escritorio ni rutas:
 - **Muros:** pilastras de deepslate en los pilares del muro (base, fuste pulido, banda cincelada, capitel, ménsula bajo
   el techo y escalón de pie) y un zócalo oscuro de escaleras entre ellas. En escala 100 la pared de la escalera (v = 0)
   se queda sin ellas.
-- **Franja alta:** vitrales (color del entorno, su segundo color y amarillo) en las dos filas superiores de las
-  columnas de ventana (una en escala 100) donde no hay nada pegado al muro por dentro.
+- **Franja alta:** vitrales (amarillo, rosa, color del entorno y celeste) en las tres filas superiores de las
+  columnas de ventana (dos en escala 100) donde no hay nada pegado al muro por dentro.
 - **Pantalla:** marco de oro con esquinas de piedra negra cincelada alrededor de la pantalla de los hijos.
 - **Suelo por zonas** (todo en el plano del suelo): vestíbulo de piedra, alas de espera en damero (suelo/bambú),
   tarima de mando de deepslate frente al escritorio (borde de tejas, campo pulido, medallón del color del entorno
   con centro de oro donde está el líder) con dos faroles de poste en las esquinas; alfombras para salón y reuniones.
-- **Techo:** retícula de vigas oscuras (travesaños cada 6 filas apoyados en las pilastras y tres vigas a lo largo) con
-  linternas en los cruces.
-- **Bandera:** mástil de 8 con remate de oro y banderola de 6×4 con franja blanca.
+- **Techo:** retícula de vigas oscuras (travesaños de 2 de alto cada 6 filas, apoyados en las pilastras, y tres vigas a
+  lo largo) con linternas en los cruces y casetones oscuros en los paneles. El pasillo lleva borde negro y línea amarilla.
+- **Bandera:** mástil de 10 con remate de oro y banderola de 8×6 con franjas amarillas.
 
 Esa clave `lead@<i>` desactiva el fallback para ese módulo.
 
