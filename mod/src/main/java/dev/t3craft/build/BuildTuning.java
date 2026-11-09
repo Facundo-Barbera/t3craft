@@ -24,18 +24,21 @@ import java.util.List;
  *   "autoThrottle": true,      // lower the budget while the server tick is slow
  *   "targetMspt": 40,          // ...above this many ms per tick (smoothed)
  *   "fastFoundation": true,    // ground, fill and floors go in fast layers, no builder animation
- *   "foundationBlocksPerTick": 4096, // most foundation blocks per server tick (all jobs together)
+ *   "foundationBlocksPerTick": 192, // most foundation blocks per server tick (all jobs together)
  *   "foundationMsPerTick": 10, // ...and most wall-clock ms per server tick for them
- *   "blocksPerTick": 12,       // pace of one builder (floor), blocks per tick
- *   "crew": 8                  // most builders per crew; crews grow with the visible part of the plan
+ *   "blocksPerTick": 6,        // pace of one builder (floor), blocks per tick
+ *   "crew": 8,                 // most builders per crew; crews grow with the visible part of the plan
+ *   "order": "radial",         // feat/build-radial: "radial" (around the player, ring by ring) or "parts" (part by part)
+ *   "radialRing": 5            // width of a ring, blocks
  * },
  * "buildNearPlayer": { "enabled": true, "radius": 48 }
  * }</pre>
- * Defaults and their reasons: docs/feat-parallel-build.md, docs/feat-build-near-player.md.
+ * Defaults and their reasons: docs/feat-parallel-build.md, docs/feat-build-near-player.md, docs/feat-build-radial.md
+ * (feat/build-radial lowered foundationBlocksPerTick 4096 → 192 and blocksPerTick 12 → 6: a visible pace).
  */
 public record BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int frontsPerJob, int maxEffectsPerTick, boolean autoThrottle,
 		double targetMspt, boolean fastFoundation, int foundationBlocksPerTick, double foundationMsPerTick, double blocksPerTick, int crew,
-		boolean nearPlayer, int nearPlayerRadius) {
+		boolean nearPlayer, int nearPlayerRadius, boolean radial, int radialRing) {
 	public static final String SECTION = "build";
 	/** feat/build-near-player: top-level object {@code {enabled, radius}}. */
 	public static final String NEAR_SECTION = "buildNearPlayer";
@@ -43,7 +46,10 @@ public record BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int front
 	public static final int BASE_CREW = 4;
 	/** Visible (non-foundation) entries per extra builder. */
 	public static final int ENTRIES_PER_BUILDER = 3000;
-	public static final BuildTuning DEFAULTS = new BuildTuning(96, 3, 8, 8, true, 40.0, true, 4096, 10.0, 12.0, 8, true, 48);
+	/** feat/build-radial: {@code build.order} values. */
+	public static final String ORDER_RADIAL = "radial";
+	public static final String ORDER_PARTS = "parts";
+	public static final BuildTuning DEFAULTS = new BuildTuning(96, 3, 8, 8, true, 40.0, true, 192, 10.0, 6.0, 8, true, 48, true, 5);
 
 	public BuildTuning {
 		maxBlocksPerTick = clamp(maxBlocksPerTick, 1, 4096);
@@ -62,11 +68,20 @@ public record BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int front
 		}
 		crew = clamp(crew, 1, 16);
 		nearPlayerRadius = clamp(nearPlayerRadius, 8, 512);
+		radialRing = clamp(radialRing, 1, 64);
+	}
+
+	/** feat/build-near-player constructor: the feat/build-radial settings at their defaults. */
+	public BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int frontsPerJob, int maxEffectsPerTick, boolean autoThrottle, double targetMspt,
+			boolean fastFoundation, int foundationBlocksPerTick, double foundationMsPerTick, double blocksPerTick, int crew, boolean nearPlayer,
+			int nearPlayerRadius) {
+		this(maxBlocksPerTick, maxConcurrentJobs, frontsPerJob, maxEffectsPerTick, autoThrottle, targetMspt, fastFoundation, foundationBlocksPerTick,
+				foundationMsPerTick, blocksPerTick, crew, nearPlayer, nearPlayerRadius, true, 5);
 	}
 
 	/** Pre-feat/build-near-player constructor: the new settings at their defaults. */
 	public BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int frontsPerJob, int maxEffectsPerTick, boolean autoThrottle, double targetMspt) {
-		this(maxBlocksPerTick, maxConcurrentJobs, frontsPerJob, maxEffectsPerTick, autoThrottle, targetMspt, true, 4096, 10.0, 12.0, 8, true, 48);
+		this(maxBlocksPerTick, maxConcurrentJobs, frontsPerJob, maxEffectsPerTick, autoThrottle, targetMspt, true, 192, 10.0, 6.0, 8, true, 48, true, 5);
 	}
 
 	private static int clamp(int v, int lo, int hi) {
@@ -130,6 +145,19 @@ public record BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int front
 		double fMs = number(SECTION, s, "foundationMsPerTick", d.foundationMsPerTick(), 1, 40, false, warn);
 		double pace = number(SECTION, s, "blocksPerTick", d.blocksPerTick(), 0.5, 64, false, warn);
 		int crew = (int) number(SECTION, s, "crew", d.crew(), 1, 16, true, warn);
+		boolean radial = d.radial();
+		if (s.has("order")) {
+			JsonElement e = s.get("order");
+			String v = e.isJsonPrimitive() && e.getAsJsonPrimitive().isString() ? e.getAsString().trim().toLowerCase(java.util.Locale.ROOT) : "";
+			if (ORDER_RADIAL.equals(v)) {
+				radial = true;
+			} else if (ORDER_PARTS.equals(v)) {
+				radial = false;
+			} else {
+				warn.add(SECTION + ".order");
+			}
+		}
+		int ring = (int) number(SECTION, s, "radialRing", d.radialRing(), 1, 64, true, warn);
 		boolean near = d.nearPlayer();
 		int radius = d.nearPlayerRadius();
 		if (root.has(NEAR_SECTION)) {
@@ -141,7 +169,7 @@ public record BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int front
 				warn.add(NEAR_SECTION);
 			}
 		}
-		return new Result(new BuildTuning(blocks, jobs, fronts, effects, auto, mspt, fast, fBlocks, fMs, pace, crew, near, radius), List.copyOf(warn));
+		return new Result(new BuildTuning(blocks, jobs, fronts, effects, auto, mspt, fast, fBlocks, fMs, pace, crew, near, radius, radial, ring), List.copyOf(warn));
 	}
 
 	private static boolean bool(String section, JsonObject s, String key, boolean def, List<String> warn) {
