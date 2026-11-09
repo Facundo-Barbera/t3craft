@@ -1,0 +1,27 @@
+{
+  "type": "minecraft:block",
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "t3craft:paper_lantern_tall"
+        }
+      ],
+      "conditions": [
+        {
+          "condition": "minecraft:block_state_property",
+          "block": "t3craft:paper_lantern_tall",
+          "properties": {
+            "half": "lower"
+          }
+        },
+        {
+          "condition": "minecraft:survives_explosion"
+        }
+      ]
+    }
+  ],
+  "random_sequence": "t3craft:blocks/paper_lantern_tall"
+}

@@ -37,9 +37,17 @@ public record ThreadDetails(
 		@Nullable String provider,
 		boolean unread,
 		@Nullable Long runStartedMs,
-		@Nullable Long snoozedUntilMs) {
+		@Nullable Long snoozedUntilMs,
+		@Nullable String prUrl) {
 
 	public static final ThreadDetails EMPTY = new ThreadDetails(null, false, 0, null, null, -1, -1, null, null, false, null, null);
+
+	/** Shape before {@code prUrl} (kit/merge-station). */
+	public ThreadDetails(@Nullable String branch, boolean worktree, int prNumber, @Nullable String prState, @Nullable String prRepository,
+			int additions, int deletions, @Nullable String model, @Nullable String provider, boolean unread, @Nullable Long runStartedMs,
+			@Nullable Long snoozedUntilMs) {
+		this(branch, worktree, prNumber, prState, prRepository, additions, deletions, model, provider, unread, runStartedMs, snoozedUntilMs, null);
+	}
 
 	/** Whether the third row line has anything to show (branch, diff or PR). */
 	public boolean hasLine3() {
@@ -59,7 +67,7 @@ public record ThreadDetails(
 		String model = Chips.model(t.meta());
 		String provider = Chips.providerLabel(t.meta().providerKey());
 		ThreadDetails d = new ThreadDetails(t.meta().branch(), t.meta().worktreePath() != null, x.prNumber(), x.prState(), x.prRepository(),
-				x.additions(), x.deletions(), model, provider, unread, started, x.snoozedUntil());
+				x.additions(), x.deletions(), model, provider, unread, started, x.snoozedUntil(), x.prUrl());
 		return d.equals(EMPTY) ? EMPTY : d;
 	}
 }

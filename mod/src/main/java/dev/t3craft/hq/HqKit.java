@@ -48,8 +48,28 @@ public interface HqKit {
 		GARDEN_PLANTER,
 		/** Garden: stone lantern (emits light). */
 		GARDEN_LANTERN,
+		/**
+		 * Glow strip (kit/glow-panel): a thin bar of light along a skirting, a step edge or the foot of a beam. Oriented:
+		 * the way it looks (horizontal; the edge it hugs is behind it). The bottom of the cell, warm (paper/amber).
+		 */
+		GLOW_STRIP,
+		/** Glow strip, bottom of the cell, cool (T3 cyan). */
+		GLOW_STRIP_COOL,
+		/** Glow strip, top of the cell (under a screen, a beam or a ledge), warm. */
+		GLOW_STRIP_HIGH,
+		/** Glow strip, top of the cell, cool. */
+		GLOW_STRIP_HIGH_COOL,
+		/**
+		 * Glow panel (kit/glow-panel): a full block that is a light, flush in a ceiling or wall, warm. Oriented: the
+		 * face that glows ({@code DOWN} for a ceiling panel, towards the room for a wall one). Fallback: a froglight.
+		 */
+		GLOW_PANEL,
+		/** Glow panel, cool (T3 cyan). */
+		GLOW_PANEL_COOL,
 		/** Console terminal (kit/console-terminal): opens the T3 composer, or the chat of its bound thread. Oriented: front. Vanilla: lectern. */
-		CONSOLE;
+		CONSOLE,
+		/** Merge station (kit/merge-station): lists the pending pull requests of its project and opens one. Oriented: panel. Vanilla: smithing table. */
+		MERGE_STATION;
 
 		public String id() {
 			return name().toLowerCase(Locale.ROOT);
@@ -57,7 +77,23 @@ public interface HqKit {
 
 		/** Whether {@link #state(Role, Direction)} looks at {@code facing}. */
 		public boolean oriented() {
-			return this == DESK || this == BEAM || this == PLAQUE || this == RAILING || this == CONSOLE;
+			return this == DESK || this == BEAM || this == PLAQUE || this == RAILING || this == CONSOLE || this == MERGE_STATION || this == GLOW_PANEL || this == GLOW_PANEL_COOL
+					|| strip();
+		}
+
+		/** One of the four glow strip roles. */
+		public boolean strip() {
+			return this == GLOW_STRIP || this == GLOW_STRIP_COOL || this == GLOW_STRIP_HIGH || this == GLOW_STRIP_HIGH_COOL;
+		}
+
+		/** A glow strip role at the top of its cell. */
+		public boolean high() {
+			return this == GLOW_STRIP_HIGH || this == GLOW_STRIP_HIGH_COOL;
+		}
+
+		/** A glow role in the cool (cyan) tone. */
+		public boolean cool() {
+			return this == GLOW_STRIP_COOL || this == GLOW_STRIP_HIGH_COOL || this == GLOW_PANEL_COOL;
 		}
 	}
 
@@ -138,9 +174,32 @@ public interface HqKit {
 		return state(Role.GARDEN_LANTERN);
 	}
 
+	/**
+	 * A glow strip (light 12, no collision) looking {@code facing} (horizontal; the wall or edge it hugs is behind it),
+	 * at the bottom ({@code high = false}: skirting, step edge) or the top (under a screen or a beam) of its cell, warm
+	 * or {@code cool}. Strips in a line join into one continuous bar. Without the blocks module: the invisible
+	 * {@code minecraft:light} of the same level, so the cell still lights and still walks.
+	 */
+	default BlockState glowStrip(Direction facing, boolean high, boolean cool) {
+		return state(high ? (cool ? Role.GLOW_STRIP_HIGH_COOL : Role.GLOW_STRIP_HIGH) : (cool ? Role.GLOW_STRIP_COOL : Role.GLOW_STRIP), facing);
+	}
+
+	/**
+	 * A glow panel (light 12, a full block) whose lit face looks {@code facing}: {@code DOWN} in a ceiling, the room's
+	 * direction in a wall. Warm or {@code cool}. Without the blocks module: a froglight (warm) or a sea lantern (cool).
+	 */
+	default BlockState glowPanel(Direction facing, boolean cool) {
+		return state(cool ? Role.GLOW_PANEL_COOL : Role.GLOW_PANEL, facing);
+	}
+
 	/** The console terminal, front (keyboard side, where the player stands) towards {@code front}. */
 	default BlockState console(Direction front) {
 		return state(Role.CONSOLE, front);
+	}
+
+	/** The merge station, panel (where the player stands) towards {@code front}. */
+	default BlockState mergeStation(Direction front) {
+		return state(Role.MERGE_STATION, front);
 	}
 
 	/** {@link #id()} of the active kit, {@code "vanilla"} for {@link #VANILLA}. */

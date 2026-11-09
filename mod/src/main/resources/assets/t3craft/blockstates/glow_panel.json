@@ -1,0 +1,50 @@
+{
+  "variants": {
+    "facing=down,tone=cool": {
+      "model": "t3craft:block/glow_panel_cool",
+      "x": 90
+    },
+    "facing=down,tone=warm": {
+      "model": "t3craft:block/glow_panel_warm",
+      "x": 90
+    },
+    "facing=east,tone=cool": {
+      "model": "t3craft:block/glow_panel_cool",
+      "y": 90
+    },
+    "facing=east,tone=warm": {
+      "model": "t3craft:block/glow_panel_warm",
+      "y": 90
+    },
+    "facing=north,tone=cool": {
+      "model": "t3craft:block/glow_panel_cool"
+    },
+    "facing=north,tone=warm": {
+      "model": "t3craft:block/glow_panel_warm"
+    },
+    "facing=south,tone=cool": {
+      "model": "t3craft:block/glow_panel_cool",
+      "y": 180
+    },
+    "facing=south,tone=warm": {
+      "model": "t3craft:block/glow_panel_warm",
+      "y": 180
+    },
+    "facing=up,tone=cool": {
+      "model": "t3craft:block/glow_panel_cool",
+      "x": 270
+    },
+    "facing=up,tone=warm": {
+      "model": "t3craft:block/glow_panel_warm",
+      "x": 270
+    },
+    "facing=west,tone=cool": {
+      "model": "t3craft:block/glow_panel_cool",
+      "y": 270
+    },
+    "facing=west,tone=warm": {
+      "model": "t3craft:block/glow_panel_warm",
+      "y": 270
+    }
+  }
+}

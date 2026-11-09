@@ -89,6 +89,8 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
  * <li><b>Archive terminal</b>: {@code AnchorNames.ARCHIVE_TERMINAL} is unique in a plan, so the archive level has
  *     lecterns as stand-ins (see {@code docs/proposals/leader-office-blocks.md}: a second terminal needs a kernel
  *     change). Same for the kanban {@code THREAD_WALL} and the board itself.</li>
+ * <li><b>Glow light</b> (kit/glow-panel, {@link #glow}): cool strips under the screens, three cool ceiling panels over the
+ *     screen's side and a warm strip along each flight, one per step. They replace the invisible lights of the screen's side.</li>
  * <li><b>Work and storage</b>: lobby workbenches and double chests, archive chests and bed, control-room chests.</li>
  * <li><b>Model</b>: a 3 x 3 model of the HQ on the archive table: hub, four ramps, four barrios; the red carpet is this
  *     tower.</li>
@@ -108,10 +110,12 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
  * <h2>Anchors, fixtures and groups</h2>
  *
  * Anchors: {@code OFFICE} (in front of the consoles, facing the main screen), {@code OFFICE_BALCONY}, three big screens,
- * five board lamps ({@code board_lamp_5..9}) and five decision podiums ({@code decision_podium_0..4}, bound {@code board:0..4},
- * under the threads screen: a click opens the thread that needs the player). Fixtures (never replaced by the light pass): the
- * screens and their bases, the board, its lamps, the podiums, the signs. The consoles come from {@code HqKit.Role.CONSOLE}; the
- * podium anchors use the kernel's {@code AnchorNames.podium} (kit/decision-podium).
+ * five board lamps ({@code board_lamp_5..9}), five decision podiums ({@code decision_podium_0..4}, bound {@code board:0..4},
+ * under the threads screen: a click opens the thread that needs the player) and the merge station
+ * ({@code mergestation_office=<binding>}, between the two project screens, bound to the first one's project). Fixtures
+ * (never replaced by the light pass): the screens and their bases, the board, its lamps, the podiums, the merge station, the
+ * signs. The consoles come from {@code HqKit.Role.CONSOLE}, the station from {@code HqKit.Role.MERGE_STATION}; the podium
+ * anchors use the kernel's {@code AnchorNames.podium} (kit/decision-podium).
  */
 public final class CitadelOffice {
 	/**
@@ -732,13 +736,66 @@ public final class CitadelOffice {
 		}
 		set(c, -4, F2() + 3, 0, wallBanner(Direction.EAST));
 		set(c, -4, F2() + 4, 0, wallBanner(Direction.EAST));
+		// merge station (kit role MERGE_STATION; a smithing table without the blocks module) in the gap between the two project
+		// screens, facing the room: its list opens the pending PRs of the first screen's project
+		BlockPos station = new BlockPos(CX() - 4, y, CZ());
+		c.fixture(station, c.kit.mergeStation(Direction.EAST));
+		c.anchor(Anchor.face(AnchorNames.mergeStation("office", projects.get(0)), station, Direction.EAST));
 		attentionBoard(c);
 		// light: lanterns only over the middle and the north half; the screen's side gets invisible light, so nothing hangs in front of it
 		for (int[] p : new int[][] {{-3, -3}, {0, -3}, {3, -3}, {-3, 0}, {0, 0}}) {
 			hang(c, p[0], CEIL() - 1, p[1]);
 		}
+		glow(c);
+	}
+
+	/**
+	 * kit/glow-panel: integrated light for the control room and the two flights, with the kit's glow blocks (vanilla
+	 * fallback: the invisible light block, or a froglight in the panels). It replaces the three invisible lights that
+	 * used to light the screen's side and hangs nothing in front of the screen:
+	 * <ul>
+	 * <li>three cool ceiling panels over the screen's side ({@code dx = -3, 0, 3}), on the room's axis;</li>
+	 * <li>cool strips under the screens, hugging their wall: in front of the main screen's base (7 cells), and under the
+	 *     two project screens and the banner between them (7 cells), at the top of the cell that is just below the
+	 *     screen, so the light falls on the console, the barrels and the chests;</li>
+	 * <li>warm strips along the wall side of each flight, one per step in the cell above it, so the climb is lit step by
+	 *     step (the last step of each flight is left alone: the next floor's furniture stands there).</li>
+	 * </ul>
+	 * Everything is placed only into air, and no strip blocks anybody (no collision).
+	 */
+	private static void glow(CitadelCanvas c) {
+		int y = F2() + 1;
 		for (int dx : new int[] {-3, 0, 3}) {
-			set(c, dx, CEIL() - 1, 3, CitadelCanvas.invisibleLight(14));
+			if (solid(c, dx, CEIL(), 3)) {
+				set(c, dx, CEIL(), 3, c.kit.glowPanel(Direction.DOWN, true));
+			}
+		}
+		// under the main screen: its base beam is on the wall row (dz = 4), the strip hugs its front, at the top of the cell
+		for (int dx = -3; dx <= 3; dx++) {
+			glowStrip(c, dx, y + 1, 3, c.kit.glowStrip(Direction.NORTH, true, true));
+		}
+		// under the project screens (west wall): the cell below each screen's bottom row, over the chests
+		for (int dz = -3; dz <= 3; dz++) {
+			glowStrip(c, -4, y + 1, dz, c.kit.glowStrip(Direction.EAST, true, true));
+		}
+		// the flights, along the wall: A rises south on the west wall (dx = -4), B rises north on the east wall (dx = 4)
+		for (int i = 0; i < FH - 1; i++) {
+			glowStrip(c, -4, F0() + 2 + i, -3 + i, c.kit.glowStrip(Direction.EAST, false, false));
+			glowStrip(c, 4, F1() + 2 + i, 3 - i, c.kit.glowStrip(Direction.WEST, false, false));
+		}
+	}
+
+	/** The cell at local {@code (dx, dz)} holds a block (the ceiling to set a panel in). */
+	private static boolean solid(CitadelCanvas c, int dx, int y, int dz) {
+		BlockState s = c.at(CX() + dx, y, CZ() + dz);
+		return s != null && !s.isAir();
+	}
+
+	/** Sets {@code s} at local {@code (dx, dz)} only if the cell is still air (a strip never replaces anything). */
+	private static void glowStrip(CitadelCanvas c, int dx, int y, int dz, BlockState s) {
+		BlockState now = c.at(CX() + dx, y, CZ() + dz);
+		if (now == null || now.isAir()) {
+			c.put(CX() + dx, y, CZ() + dz, s, CitadelCanvas.DECOR);
 		}
 	}
 

@@ -42,6 +42,9 @@ adapted from AgentCraft must keep this header and be listed here:
 // Copyright (c) 2026 AgentCraft contributors. MIT License.
 ```
 
+The kit blocks `t3craft:glow_strip` and `t3craft:glow_panel` (emissive strip and panel lighting) take only the idea from
+AgentCraft's blocks of the same names: their models, textures (drawn by `tools/art/glow_art.py`) and code are our own, nothing is copied.
+
 Idea only, nothing copied: `t3craft:decision_podium` (`DecisionPodiumBlock`, its models and textures, `tools/art/decision_podium_art.py`)
 takes the idea of AgentCraft's `decision_podium` (a podium with a bell and a `!` where the agent that needs a decision waits, and a click that
 opens it). The code, the models and every pixel are t3craft's own, so those files carry no AgentCraft header.

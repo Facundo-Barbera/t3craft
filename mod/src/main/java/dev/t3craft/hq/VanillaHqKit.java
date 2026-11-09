@@ -4,6 +4,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.LightBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.SlabType;
@@ -30,7 +31,14 @@ final class VanillaHqKit implements HqKit {
 			case RAILING -> Blocks.COPPER_BARS.waxed().unaffected().defaultBlockState();
 			case GARDEN_PLANTER -> Blocks.POTTED_CHERRY_SAPLING.defaultBlockState();
 			case GARDEN_LANTERN -> Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, false);
+			// a strip is a thin light with no collision: the invisible light block is the one vanilla stand-in that
+			// lights the same and never gets in the way of a walker or an NPC path
+			case GLOW_STRIP, GLOW_STRIP_COOL, GLOW_STRIP_HIGH, GLOW_STRIP_HIGH_COOL -> Blocks.LIGHT.defaultBlockState()
+					.setValue(LightBlock.LEVEL, 12);
+			case GLOW_PANEL -> Blocks.OCHRE_FROGLIGHT.defaultBlockState();
+			case GLOW_PANEL_COOL -> Blocks.SEA_LANTERN.defaultBlockState();
 			case CONSOLE -> Blocks.LECTERN.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, h);
+			case MERGE_STATION -> Blocks.SMITHING_TABLE.defaultBlockState();
 		};
 	}
 

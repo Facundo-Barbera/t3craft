@@ -1,0 +1,49 @@
+{
+  "variants": {
+    "facing=north,tone=paper": {
+      "model": "t3craft:block/paper_lantern_wall_paper"
+    },
+    "facing=east,tone=paper": {
+      "model": "t3craft:block/paper_lantern_wall_paper",
+      "y": 90
+    },
+    "facing=south,tone=paper": {
+      "model": "t3craft:block/paper_lantern_wall_paper",
+      "y": 180
+    },
+    "facing=west,tone=paper": {
+      "model": "t3craft:block/paper_lantern_wall_paper",
+      "y": 270
+    },
+    "facing=north,tone=rose": {
+      "model": "t3craft:block/paper_lantern_wall_rose"
+    },
+    "facing=east,tone=rose": {
+      "model": "t3craft:block/paper_lantern_wall_rose",
+      "y": 90
+    },
+    "facing=south,tone=rose": {
+      "model": "t3craft:block/paper_lantern_wall_rose",
+      "y": 180
+    },
+    "facing=west,tone=rose": {
+      "model": "t3craft:block/paper_lantern_wall_rose",
+      "y": 270
+    },
+    "facing=north,tone=vermilion": {
+      "model": "t3craft:block/paper_lantern_wall_vermilion"
+    },
+    "facing=east,tone=vermilion": {
+      "model": "t3craft:block/paper_lantern_wall_vermilion",
+      "y": 90
+    },
+    "facing=south,tone=vermilion": {
+      "model": "t3craft:block/paper_lantern_wall_vermilion",
+      "y": 180
+    },
+    "facing=west,tone=vermilion": {
+      "model": "t3craft:block/paper_lantern_wall_vermilion",
+      "y": 270
+    }
+  }
+}
