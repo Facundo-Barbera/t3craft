@@ -97,6 +97,9 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 		float pulse;
 		/** {@link MonitorLod#breath}: the "needs you" breathing of the header / far face. */
 		float breath;
+		/** feat/status-screen: the layout of a screen bound {@code beacon} (then {@link #glyphs} is null). */
+		StatusScreen.@Nullable Panel status;
+		StationStatus statusTop = StationStatus.IDLE;
 	}
 
 	/** One tool / text row, ready to draw. */
@@ -119,6 +122,7 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 	private final BlocksClient client;
 	private final Map<String, Glyphs> glyphs = new HashMap<>();
 	private final Map<Long, MonitorLod.Level> lods = new HashMap<>();
+	private final StatusScreen statusScreen = new StatusScreen();
 
 	MonitorRenderer(BlocksClient client) {
 		this.client = client;
@@ -169,6 +173,7 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 		BlockEntityRenderState.extractBase(be, state, breakProgress);
 		state.glyphs = null;
 		state.layout = null;
+		state.status = null;
 		BlockState bs = be.getBlockState();
 		state.facing = bs.hasProperty(MonitorBlock.FACING) ? bs.getValue(MonitorBlock.FACING) : Direction.NORTH;
 		ScreenExtent extent = extent(be);
@@ -190,6 +195,18 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 		double ph = (ms % PULSE_MS) / (double) PULSE_MS;
 		state.pulse = (float) (0.5 - 0.5 * Math.cos(ph * Math.PI * 2));
 		state.breath = MonitorLod.breath(ms);
+		if (client.screenBinding(be).kind() == Binding.Kind.BEACON) {
+			// feat/status-screen: a screen bound to the HQ's aggregate shows the workspace summary, the same at every distance
+			try {
+				StatusScreen.Summary summary = client.statusSummary();
+				state.layout = MonitorLod.layout(MonitorLod.Level.FAR, extent);
+				state.status = statusScreen.panel(Minecraft.getInstance().font, summary, state.layout);
+				state.statusTop = summary.top();
+			} catch (RuntimeException e) {
+				T3Craft.LOGGER.debug("T3Craft: status screen layout failed", e);
+			}
+			return;
+		}
 		try {
 			state.glyphs = glyphsFor(be, layout);
 		} catch (RuntimeException e) {
@@ -374,11 +391,15 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 	public void submit(State s, PoseStack poseStack, SubmitNodeCollector collector, CameraRenderState camera) {
 		Glyphs g = s.glyphs;
 		MonitorLod.Layout l = s.layout;
+		int light = LightCoordsUtil.FULL_BRIGHT;
+		float z = s.zStep;
+		if (l != null && s.status != null) {
+			submitStatus(s, s.status, l, poseStack, collector, light, z);
+			return;
+		}
 		if (g == null || l == null) {
 			return;
 		}
-		int light = LightCoordsUtil.FULL_BRIGHT;
-		float z = s.zStep;
 		// a thread that needs the user breathes: header band, status word and the far face's bands
 		int accent = g.attention() ? MonitorLod.breathe(g.accent(), g.background(), s.breath) : g.accent();
 		int statusColor = g.attention() ? MonitorLod.breathe(g.statusColor(), g.background(), s.breath) : g.statusColor();
@@ -433,6 +454,17 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 		poseStack.translate(0, 0, 3 * z);
 		drawChin(s, g, l, poseStack, collector, light, z, statusColor);
 		poseStack.popPose();
+	}
+
+	/** The status screen ({@link StatusScreen}): its panel, then the frame's LED in the most urgent state's colour. */
+	private static void submitStatus(State s, StatusScreen.Panel panel, MonitorLod.Layout l, PoseStack ps, SubmitNodeCollector c, int light, float z) {
+		ps.pushPose();
+		toFace(ps, s.facing, GLASS_DEPTH - z, l.ppb());
+		ps.translate(0, -(l.extent().height() - 1) * l.ppb(), 0);
+		StatusScreen.draw(panel, ps, c, light, z, s.breath);
+		int led = 0xFF000000 | s.statusTop.color;
+		drawChin(s, null, l, ps, c, light, z, s.statusTop == StationStatus.ATTENTION ? MonitorLod.breathe(led, STANDBY_BG, s.breath) : led);
+		ps.popPose();
 	}
 
 	/**
@@ -584,7 +616,7 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 		}
 	}
 
-	private static void text(PoseStack ps, SubmitNodeCollector c, FormattedCharSequence t, float x, float y, int argb, int light) {
+	static void text(PoseStack ps, SubmitNodeCollector c, FormattedCharSequence t, float x, float y, int argb, int light) {
 		c.order(1).submitText(ps, x, y, t, false, Font.DisplayMode.POLYGON_OFFSET, light, argb, 0, 0);
 	}
 
@@ -659,6 +691,7 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 	void clear() {
 		glyphs.clear();
 		lods.clear();
+		statusScreen.clear();
 	}
 
 	/**

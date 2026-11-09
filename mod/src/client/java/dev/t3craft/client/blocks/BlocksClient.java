@@ -153,6 +153,10 @@ public final class BlocksClient implements ClientModInitializer {
 	static final int MERGE_REFRESH_TICKS = 10;
 	/** A station drawn or used in the last this-many ticks keeps the PR scan running on a remote server. */
 	static final int MERGE_IDLE_TICKS = 100;
+	/** How often the status screen's summary is recomputed (the age of the oldest waiting thread moves by the second at most). */
+	static final int STATUS_REFRESH_TICKS = 20;
+	private StatusScreen.Summary status = StatusScreen.Summary.EMPTY;
+	private int statusAt = -STATUS_REFRESH_TICKS - 1;
 	private @Nullable MergeStationRenderer mergeRenderer;
 	private List<MergeFeed.Entry> mergeEntries = List.of();
 	private final Map<String, MergeFeed.Summary> mergeSummaries = new HashMap<>();
@@ -467,6 +471,28 @@ public final class BlocksClient implements ClientModInitializer {
 		server.execute(() -> MergeStationApplier.apply(wanted, pos));
 	}
 
+	/**
+	 * feat/status-screen: what a screen bound {@code beacon} shows ({@link StatusScreen}), recomputed once a second from the
+	 * threads of this tick, the directory's rows (time of last activity) and the pending PRs of {@link #tickMerge} (which
+	 * this keeps refreshing while such a screen is drawn). The same instance until something in it changes.
+	 */
+	StatusScreen.Summary statusSummary() {
+		mergeSeen = ticks;
+		if (ticks - statusAt >= STATUS_REFRESH_TICKS || ticks < statusAt) {
+			statusAt = ticks;
+			try {
+				StatusScreen.Summary now = StatusScreen.summarize(threads.values(), ChatScreens.defaultDirectory().rows(), mergeEntries,
+						System.currentTimeMillis());
+				if (!now.equals(status)) {
+					status = now;
+				}
+			} catch (RuntimeException e) {
+				T3Craft.LOGGER.debug("T3Craft: status summary failed", e);
+			}
+		}
+		return status;
+	}
+
 	/** What the merge station bound to {@code b} shows now. The same instance until the next refresh changes the PRs. */
 	MergeFeed.Summary mergeSummary(Binding b) {
 		mergeSeen = ticks;
@@ -631,6 +657,8 @@ public final class BlocksClient implements ClientModInitializer {
 		}
 		mergeEntries = List.of();
 		mergeSummaries.clear();
+		status = StatusScreen.Summary.EMPTY;
+		statusAt = -STATUS_REFRESH_TICKS - 1;
 		lastMergeWanted = null;
 		mergeRefreshed = -MERGE_REFRESH_TICKS - 1;
 		MergeStationRenderer mr = mergeRenderer;
@@ -658,6 +686,9 @@ public final class BlocksClient implements ClientModInitializer {
 	/** {@code project:<key>}, {@code env:<id>} or {@code thread:<key>} as typed; anything else is a thread key. */
 	static Binding linkTarget(String arg) {
 		String a = arg.trim();
+		if (a.equals("status")) {
+			return Binding.BEACON; // feat/status-screen: the workspace summary screen is a screen bound beacon
+		}
 		Binding b = Binding.parse(a);
 		return b.isNone() || b.kind() == Binding.Kind.BOARD || b.kind() == Binding.Kind.MODULE ? Binding.thread(a) : b;
 	}
