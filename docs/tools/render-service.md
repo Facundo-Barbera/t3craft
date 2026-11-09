@@ -13,7 +13,7 @@
 > 3. It drops the request into the PC inbox, with the paths rewritten. `--packs` folders are synced too.
 > 4. While the job runs, it mirrors `status.json` and `daemon.json` into the local spool, so Citadel Studio still works. When the job ends, it copies back **only** `status.json` and the text reports (`report*.txt`, `report*.json`); the PNGs stay on the PC (`AGENTS.md` rule 9).
 >
-> **Quality:** jobs sent to the PC default to `final` with `--ss 3` (`T3CRAFT_RENDER_SS`). `--preview` is ignored unless `T3CRAFT_RENDER_ALLOW_PREVIEW=1`. PNGs are truecolour; the old 256-colour palette for big images is opt-in (`-Dt3craft.render.palette=true`, for images committed to docs).
+> **Quality:** jobs sent to the PC default to `final` with `--ss 3` (`T3CRAFT_RENDER_SS`). `--preview` is ignored unless `T3CRAFT_RENDER_ALLOW_PREVIEW=1`. PNGs are always truecolour (the old 256-colour palette option was removed).
 >
 > Settings: `T3CRAFT_RENDER_HOST` (default `user@100.64.0.20`: Windows user `winuser`, WSL user `wsluser`), `T3CRAFT_RENDER_REMOTE_REPO`, `T3CRAFT_RENDER_REMOTE_JOBS`. `T3CRAFT_RENDER_MODE=local` is only for running ON the PC.
 
@@ -86,7 +86,7 @@ and the booleans `vanilla`, `no-npcs`. `kind` is `hq` (default) or `ui`; `priori
 | file | what |
 | --- | --- |
 | `status.json` | `state`: `queued` → `compiling` → `rendering` → `done` \| `error`; `message`; `log` (short tail: javac errors or the last output lines); `position` while queued; `cached`; `files` (absolute PNG paths); `report`; timestamps |
-| `*.png` | the images (PNGs over 480 KB are re-saved with 256 colours, as `hqRender` does) |
+| `*.png` | the images (truecolour PNGs; they stay on the PC and the relay does not copy them back) |
 | `report.txt` | header (worktree, HEAD, how the code was obtained, final arguments, timings) + the renderer's whole output |
 | `run.log`, `compile.log` | raw logs |
 | `request.json` | the request as received |

@@ -6,8 +6,7 @@ Mojang's textures. Deterministic (fixed seeds), stdlib only, so re-running it gi
 
     python3 tools/art/kit_lantern_textures.py
 
-Writes mod/src/main/resources/assets/t3craft/textures/block/kit_lantern_*.png (new names only: the
-older kit_lantern_side/end of blocks_kit_textures.py are left alone).
+Writes mod/src/main/resources/assets/t3craft/textures/block/kit_lantern_*.png.
 
 Every texture is drawn at the model's texel density (1 texel = 1/16 block), and each paper face is
 drawn for the exact uv window its model element uses, so nothing is stretched.

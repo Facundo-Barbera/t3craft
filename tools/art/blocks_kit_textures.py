@@ -376,28 +376,6 @@ def cap_top():
     return img
 
 
-def lantern_side():
-    """Paper lantern body: warm paper with horizontal ribs."""
-    img = Img()
-    rng = random.Random(61)
-    img.noise(0, 0, 15, 15, PAPER_LIT, rng, weights=[3, 5, 3])
-    for y in (2, 6, 10, 14):
-        img.rect(0, y, 15, y, GLOW[2])
-    img.rect(0, 0, 15, 0, LACQUER[0])
-    img.rect(0, 15, 15, 15, LACQUER[0])
-    img.rect(7, 4, 8, 11, GLOW[1])
-    return img
-
-
-def lantern_end():
-    img = Img()
-    rng = random.Random(62)
-    img.noise(0, 0, 15, 15, LACQUER, rng)
-    img.rect(5, 5, 10, 10, BRASS[1])
-    img.rect(6, 6, 9, 9, BRASS[2])
-    return img
-
-
 def plaque_front():
     """Plaque: cherry frame around a dark ink plate (the BER draws the text on it)."""
     img = Img()
@@ -540,8 +518,6 @@ def main():
         "kit_beam_end": beam_end(),
         "kit_cap_side": cap_side(),
         "kit_cap_top": cap_top(),
-        "kit_lantern_side": lantern_side(),
-        "kit_lantern_end": lantern_end(),
         "kit_plaque_front": plaque_front(),
         "kit_railing": railing(),
         "kit_pot": pot(),

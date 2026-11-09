@@ -43,7 +43,6 @@ import net.minecraft.world.level.block.state.BlockState;
  * (supersampling), {@code --vanilla} (no mod blocks), {@code --no-npcs}, {@code --projects 4,10,20} (rosters of N
  * projects with varied thread counts, three environments and settled threads; the default for styles
  * with their own layout, e.g. {@code --style campus}, which also renders a 4 → 10 → 20 comparison).
- * PNGs over 480 KB are written again with a 256-colour palette.
  * {@code --style village} renders the village layout (layout/village, {@link VillageRender}).
  * {@code --style hybrid-towncenter} renders the town centre with towers ({@link TowncenterRender}).
  * {@code --style hybrid-terraces} renders the terraced acropolis (design/hybrid-terraces, {@link TerracesRender}).
