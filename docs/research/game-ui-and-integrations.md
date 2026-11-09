@@ -761,6 +761,112 @@ Evidencia: `docs/internals/environment-auth.md` y `environmentHttp.ts` de T3.
 5. ¿Qué lanzadores quieres primero: NPC, monitor del escritorio, estación de merge, pantalla de estado, tablero de tareas?
 6. ¿Desde qué máquinas jugarás con esto (Windows, macOS, Linux; arm64 o x86_64)? Condiciona el motor CEF.
 
+## 11. Anexo: ver y desarrollar las interfaces sin abrir el juego (un "dev server" de UI de verdad)
+
+Pregunta de Facundo (2026-11-09): ¿hay una forma real, no un hack, de ver las interfaces sin usar el juego, como un dev server?
+
+### 11.1 Qué hay hoy en el repo
+| Herramienta | Qué hace | Límites (según `docs/tools/ui-render.md`) |
+|---|---|---|
+| `uiRender` (`mod/src/uirender/`, `docs/tools/ui-render.md`) | Renderiza `T3Screen` y sus diálogos con **datos mock** a PNG, sin ventana ni GL, con escenarios en JSON (`fixtures/*.json`) y pasos de entrada (`clickText`, `hoverText`, `scroll`) | Hace `Unsafe.allocateInstance` de `Minecraft` y de `GuiGraphicsExtractor` y dibuja con Java2D: no es el render del juego. Sin Unifont (símbolos como `⚙` salen como cuadro), sin shaders ni blur, sin resource packs, sin IME ni portapapeles, entrada simulada, una captura por vez, solo `T3Screen` |
+| Citadel Studio (`tools/studio`) | Visor web en el PC para ver renders y dejar notas | Muestra PNG ya renderizados; no es interactivo |
+| `DevReload`, `/t3dev`, hot-swap (`docs/features/devx.md`, `docs/dev.md`) | Recarga de clases con JBR (`-Pt3craft.hotswap`) y red de seguridad | Necesita el juego corriendo |
+| Client GameTests (`src/gametest`, API `fabric-client-gametest-api-v1`) | Smoke test que arranca el cliente real | Compila, aún sin correr; la API es experimental |
+
+`uiRender` sirve como comprobación rápida de layout para agentes y como volcado de textos (`.texts.txt`). No es lo que Facundo describe: es
+batch, no es el render real y se apoya en internals de Minecraft.
+
+### 11.2 Opciones reales (de menos a más cambio)
+**O1. Galería de UI dentro del cliente real ("Storybook en el juego")**
+- Un registro de escenarios (`UiScenarios`) con los mismos fixtures que `uiRender`, y `/t3dev ui <escenario>` que abre cualquier pantalla
+  (chat, ajustes, emparejado, confirmaciones, selector de modelo…) con datos falsos, sin red ni T3.
+- Con hot-swap de JBR el ciclo es: editar, compilar, ver el cambio en el juego sin reiniciar. Es el render real (fuentes, sprites, shaders).
+- Es lo que hace AgentCraft con su DevBridge (§12): escenas JSON y `dev.screen {open:…}`.
+- Esfuerzo S a M. Necesita el juego abierto (en el PC).
+
+**O2. Cliente real automatizado con la API oficial de Fabric (GameTests de cliente)**
+- `FabricClientGameTest` + `ClientGameTestContext`: crea un mundo, abre pantallas, simula entradas (`TestInput`) y hace
+  `takeScreenshot(...)`. La documentación oficial indica que puede correr sin pantalla con **Xvfb** (`useXVFB = true`) y Mesa por software.
+  La API es **experimental** y hay bugs abiertos en cierre de mundos (issues #5623 y #5655 de `fabric-api`).
+- Aporta capturas **reales** de una lista de escenarios, repetibles, con las mismas fixtures. Es lo más cercano a "CI visual" que
+  existe de forma oficial.
+- Arranca Minecraft completo: ~1 minuto por corrida y es proceso pesado (solo en el PC, con `tools/heavy.sh`). Esfuerzo M.
+- Choque con las reglas: `AGENTS.md` dice que **este repo no tiene tests y que añadir o correr tests está prohibido**. Esto sería un
+  "runner de escenarios de UI", no tests, pero conviene que Facundo lo apruebe explícitamente.
+
+**O3. Servidor de UI en vivo: el cliente real en el PC, visible y manejable desde un navegador**
+- El cliente corre en el PC (ventana o Xvfb). Un módulo de desarrollo captura el framebuffer de la ventana a ~10 a 20 fps, lo manda por
+  WebSocket y un visor web (como Citadel Studio) lo muestra; el ratón y el teclado vuelven al juego por el mismo canal.
+- Es el mismo patrón que usa T3 para su preview (§8.1: JPEG por WebSocket con `ack` y entrada JSON), así que el formato ya está probado.
+- Real: ves y tocas la UI verdadera desde el Mac o el móvil, con hot-swap. Esfuerzo M a L, con riesgo (captura por frame, foco, IME).
+- Es solo para desarrollo (`-Pt3craft.devserver`), nunca en el jar de usuario.
+
+**O4. Pantallas web (HTML/CSS/JS) dentro del juego: ahí sí hay un dev server verdadero**
+- Patrón existente: el mod **WebGUI** (MIT, Fabric y NeoForge, Minecraft 1.20.1 a 26.x) carga cualquier URL como GUI a pantalla completa o HUD,
+  con `window.webgui` para hablar con Java, y recomienda desarrollar en el navegador con **hot reload** y apuntar el mod a la URL. Usa
+  Chromium (~150 MB, descarga en el primer arranque) vía MCEF/Rinku.
+- Para t3craft significaría: las pantallas ricas (revisión, ajustes de T3, listas, diálogos) se hacen como una pequeña app web (Vite +
+  componentes + Storybook) que se **ve y prueba en cualquier navegador sin el juego**, con datos mock; en el juego se carga con CEF.
+  Se unifican de forma natural (§7): un solo sistema de diseño en CSS, iconos SVG, fuentes web, zoom independiente del GUI scale.
+- Y encaja con §10: la **app web de T3 ya es así**. Con CEF, T3 web *es* la UI de revisión, y sus pantallas se desarrollan con el
+  flujo de siempre en T3.
+- Costes: CEF pasa a ser obligatorio para esas pantallas (descarga, RAM, mantenimiento por fork), la integración de entrada se vuelve
+  un puente propio, el **emparejamiento y el arranque deben seguir siendo nativos** (sin red no hay web), y quedan dos stacks de UI.
+  Esfuerzo L, pero cada pantalla nueva sale más barata.
+
+**O5. Reforzar `uiRender` como respaldo ligero**
+- Conservar para agentes y comprobaciones rápidas (`.texts.txt` es útil). Para dejarlo menos frágil: aislar lo que toca de internals tras una
+  interfaz y avisar en el doc de que es una aproximación (no sustituye a O1 u O2). Esfuerzo S.
+
+### 11.3 Comparación
+| | Render real | Sin abrir el juego | Interactivo | Hot reload | Esfuerzo | Riesgo |
+|---|---|---|---|---|---|---|
+| O1 galería en el juego | Sí | No | Sí | Sí (JBR) | S a M | Bajo |
+| O2 GameTests / runner | Sí | Sí (Xvfb en el PC) | Guiado | No | M | API experimental, regla de tests |
+| O3 visor en vivo desde el navegador | Sí | Sí (el juego en el PC, tú desde cualquier equipo) | Sí | Sí | M a L | Medio |
+| O4 pantallas web | Sí (CEF) y en navegador normal | **Sí, totalmente** | Sí | **Sí (HMR)** | L | CEF, dos stacks |
+| O5 `uiRender` | Aproximado | Sí | Pasos simulados | No | S | Frágil |
+
+### 11.4 Recomendación
+- **Corto plazo, para desarrollar bien las pantallas nativas:** **O1** (galería con `/t3dev ui`) y **O2** (capturas reales y
+  repetibles en el PC, si Facundo aprueba el runner). Dejan `uiRender` como comprobación de layout.
+- **Si la UI de revisión va por web** (§10): ese flujo **ya es un dev server real** (Vite, o el dev server de T3 para la app de T3) y
+  decide más que cualquier otra cosa. O4 queda como camino natural para el resto de las pantallas ricas **después** de decidir §10.
+- **O3** es la respuesta literal a "un dev server para ver el juego desde cualquier lado", pero cuesta más. Mejor decidirlo cuando O1 y O2 existan.
+
+### 11.5 Preguntas para Facundo
+1. ¿Prefieres un ciclo con el juego abierto y hot reload (O1), capturas automáticas reales (O2), o ver la UI en el navegador sin el juego (O3 u O4)?
+2. ¿Apruebas un "runner de escenarios de UI" (O2) a pesar de la regla de "sin tests"? Lo trataría como herramienta, no como suite.
+3. ¿Aceptas hacer parte de las pantallas en web con CEF obligatorio (O4), o la UI propia debe seguir nativa y sin dependencias?
+4. ¿El desarrollo de UI se hace solo en el PC (Windows/WSL con GPU) o también quieres verlo desde el Mac y el móvil?
+
+## 12. Anexo: qué aporta AgentCraft para todo esto
+
+Releído el 2026-11-09. Su último commit sigue siendo `8fe3ad2` (2026-10-08), el mismo del relevamiento anterior, así que no hay cambios
+nuevos; esta lectura mira lo que importa para las preguntas de arriba (README, `docs/console.md`, `docs/protocol.md`, `docs/SPEC.md` y los
+tamaños de archivos).
+
+- **No hay navegador, ni web, ni integraciones externas.** Todo es nativo. Su servidor local (Foreman) escucha solo en localhost y
+  **rechaza cualquier conexión con cabecera `Origin`**, para que una página web no pueda manejar a los agentes. No usa Discord,
+  webhooks ni notificaciones del sistema. Sonidos solo vanilla; toasts con retrato enmarcado; barra de progreso estilo boss bar.
+- **Cómo cubre "revisar todo":** con pantallas nativas hechas a medida, alimentadas por su propio protocolo (`DecisionKind`:
+  `question`, `permission`, `merge`; `DiffFile`/`DiffHunk`/`DiffLine` estructurados):
+  - consola (tecla `` ` ``, historial, `@agente`, `/answer`, `/diff`, Tab para completar, sin pausar el juego);
+  - cola de decisiones (tecla `J`, `1` a `9`, Enter sin opción marcada en merges y permisos para que Enter solo nunca apruebe);
+  - **`DiffScreen`** (revisión con lista de archivos A/M/D, números de línea, hunks con contexto plegado, ajuste de línea, teclas `j k n p ] [`,
+    `Ctrl+Enter` para mergear, "copy path", confirmaciones, estados BROWSE/FEEDBACK/CONFIRM/SENDING/DONE);
+  - biblioteca de memoria, tablero de tareas (`TaskScreen`), tarjeta de agente (`AgentCardScreen`).
+- **Qué cuesta hacerlo nativo, medido en sus fuentes:** `DecisionScreen` ~45 KB, `ConsoleScreen` ~39 KB, `AgentCardScreen` ~33 KB, `DiffScreen`,
+  `DiffDoc` y `DiffFixtures` ~25 KB en total. Cada pantalla rica es del orden de mil líneas. Es la medida honesta de "reescribir en nativo" frente a "abrir T3 web".
+- **Su ciclo de desarrollo (relevante para §11):** no tiene simulador gráfico aparte. Usa el **juego real con una API local de desarrollo**
+  (DevBridge por WebSocket en localhost: `dev.camera`, `dev.screenshot`, `dev.screen {open:"decision"}`, `dev.decision {preview}`),
+  **escenas JSON** (`tools/scenes/*.json`) que dejan al juego en un estado conocido y sacan capturas, un backend `sim` determinista de los
+  agentes y una "barra visual" (`docs/visual-bar.md`) para juzgar las capturas. Eso es O1 + O2 con otro nombre; cada visual de su README sale así.
+- **Qué copiar y qué no:**
+  - Copiar el patrón DevBridge/escenas (O1/O2), el diseño de `DiffScreen` (teclas, hunks, estados, "Enter nunca aprueba por sí solo") y la regla de no pausar el juego con la consola.
+  - No copiar su modelo cerrado: no tiene un navegador ni un camino para pantallas que ya existen en otra herramienta. t3craft sí lo tiene (T3 web).
+  - Licencia MIT: adaptar código exige cabecera y entrada en `THIRD_PARTY_NOTICES.md`, como ya se hace.
+
 ## Fuentes web
 
 - GLFW, `glfwRequestWindowAttention`: https://www.glfw.org/docs/latest/group__window.html
@@ -776,6 +882,9 @@ Evidencia: `docs/internals/environment-auth.md` y `environmentHttp.ts` de T3.
 - MCEF Modern (26.3): https://modrinth.com/mod/mcef-modern y https://github.com/DimasKama/mcef-modern
 - Rinku (26.3): https://www.curseforge.com/minecraft/mc-mods/mcef-keksuccino y https://github.com/Keksuccino/Rinku
 - mcef-codec (H.264/AAC): https://github.com/menntdev/mcef-codec
+- Fabric, pruebas automáticas y client game tests: https://docs.fabricmc.net/develop/automatic-testing
+- WebGUI (GUI y HUD web con hot reload): https://modrinth.com/project/tDw1xQja
+- AgentCraft: https://github.com/blendi-remade/agentcraft (README, `docs/console.md`, `docs/protocol.md`, `docs/SPEC.md`)
 - WebDisplays (Fabric): https://www.curseforge.com/minecraft/mc-mods/webdisplays-unofficial-fabric
 - T3 Code, preview en servidor y streaming: `packages/client-runtime/src/preview/serverBrowserStream.ts` y
   `apps/server/src/preview/ServerBrowserStream.ts` en https://github.com/pingdotgg/t3code
