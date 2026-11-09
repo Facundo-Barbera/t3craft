@@ -50,10 +50,10 @@ baliza del hub): tapas y anillos de acero (el latón es solo un collar de 1 px b
 |---|---|---|---|
 | `off` | lente oscura y delgada con contorno de acero claro y jaula de 4 postes de acero, sin brillo | reflejo apagado | ninguna |
 | `idle` | vela gris de 8 px y tenue | pausa | ninguna |
-| `working` | lente de 10 px con banda brillante de 12 px | anillo que gira | 4 fotogramas (`frametime` 3) |
+| `working` | lente de 10 px con un fleje de acero de 1 px debajo del anillo | anillo que gira | 4 fotogramas (`frametime` 3) |
 | `done` | lente verde lisa y estable | check | ninguna |
 | `attention` | lente de 10 px con dos soportes rectos de acero en T (este y oeste) | `!` (barra que se afina y punto aparte) | parpadeo lento (`frametime` 12) |
-| `error` | lente ancha y baja con 8 garras (corona de púas) | X | parpadeo rápido (`frametime` 5, < 3 Hz) |
+| `error` | lente de 10 px con 4 púas verticales de acero en las esquinas | X | parpadeo rápido (`frametime` 5, < 3 Hz) |
 
 Texturas y modelos se generan con `python3 tools/art/status_lamp_art.py` (solo biblioteca estándar); las tiras
 animadas llevan `.png.mcmeta`. Galería de revisión: `tools/render/submit.sh --final -- --lamps` (`LampViews`),
