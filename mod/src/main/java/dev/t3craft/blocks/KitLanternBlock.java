@@ -26,7 +26,7 @@ public final class KitLanternBlock extends BaseEntityBlock {
 	public static final int OFF_LIGHT = 12;
 	/** The paper body (3..13 px), where the BER draws the glow. */
 	public static final float BODY_INSET = 3f / 16f;
-	private static final VoxelShape SHAPE = Shapes.or(Block.box(4, 0, 4, 12, 2, 12), Block.box(3, 2, 3, 13, 14, 13), Block.box(5, 14, 5, 11, 16, 11));
+	private static final VoxelShape SHAPE = Shapes.or(Block.box(2, 0, 2, 14, 14, 14), Block.box(1, 14, 1, 15, 16, 15));
 
 	private final Supplier<BlockEntityType<LampBlockEntity>> type;
 

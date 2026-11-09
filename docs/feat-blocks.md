@@ -167,6 +167,33 @@ A mano: mirando un monitor o lámpara, `/t3craft blocks link <env:thread>` o `/t
   Sobre un monitor, el `TextDisplay` flotante de la estación queda vacío (una pantalla, no dos).
   Sobre cualquier bloque vanilla, todo sigue igual.
 
+### Aspecto del monitor (kit/monitor)
+
+Monitor de escritorio de oficina en grafito/acero, con el cristal hundido. Todo se genera con
+`python3 tools/art/monitor_art.py` (texturas, modelos y blockstate; solo biblioteca estándar).
+
+- **Marco**: tiras de 1 px de relieve (el labio sobresale del cristal) solo en los lados **sin vecino** (`up/down/left/right`
+  en `false`), así un muro es una sola pantalla con un marco continuo. Bisel de 2 px arriba y a los lados, **barbilla de 4 px**
+  abajo y, en sus 2 px más bajos, el **pie**: un reborde de acero de 5 px de fondo y cara superior clara (el soporte sobre el escritorio, un zócalo
+  en un muro). Las tiras izquierda/derecha son de altura completa y se quedan con las esquinas; las de arriba/abajo paran en
+  una esquina solo si ese lado tiene tira (variantes `monitor_edge_{up,down}`, `_l`, `_r`, `_l_r`), sin solapes.
+- **Carcasa**: `monitor_side`/`monitor_top` lisas con una línea de panel; `monitor_back` con rejilla y placa "T3". El ítem usa
+  `models/block/monitor.json` (todos los lados enmarcados). Texturas: `monitor_front` (el marco visto de frente), `monitor_screen`
+  (el cristal; el renderer lo tapa), `monitor_trim` (muestras para labios y pie).
+- **Renderer** (`MonitorLod.Layout` lleva `bezel` y `chin`; el cristal acaba donde empieza la barbilla):
+  - densidad NEAR `nearPpb = clamp(150 / ancho, 32, 96)`: unos 25 caracteres de ancho, el texto de 8 px mide 1/6 de bloque en
+    una pantalla de escritorio de 3 de ancho (legible a 3–6 bloques);
+  - cabecera en dos filas: el título a ancho completo y debajo una **banda de estado** a ancho completo del color del
+    estado (texto oscuro) con palabra + antigüedad (`WORKING · 3m`, de la línea de estado de `WorkstationModel`); sin stream,
+    el resto (rama, último mensaje) va debajo, de arriba abajo; las pantallas de proyecto/entorno conservan su cabecera de una fila;
+  - **sin hilo** (sin vincular, hilo desconocido o archivado): pantalla de espera de cristal casi negro con dos reflejos
+    inclinados, la marca **T3** y la palabra grande `NO THREAD` / `OFFLINE` / `ARCHIVED` (más el nombre del hilo en las dos
+    últimas); igual a cualquier distancia; el LED de la barbilla respira apenas en `NO THREAD`;
+  - **barbilla**: LED del color del estado a la derecha, sobre la cara del labio (la banda de 2 px sobre el pie).
+- **Revisión**: `tools/render/submit.sh --final -- --monitors` (`MonitorViews`: muro 6×3, tres escritorios de 3×2 con lámpara,
+  un monitor suelto; vistas `iso_se`, `front`, `wall`, `desks`, `desk1`, `far_20`, `far_50`). El renderer headless dibuja solo
+  modelos de bloque: **el texto de la pantalla (el BER) no se ve**, solo el cristal.
+
 ### Log en vivo (feat/monitor-live-log, P2 de `research/agentcraft-world-elements.md`)
 
 Paquete `client.blocks`, todo dentro del módulo (apagado, nada de esto existe). Tests:
@@ -426,6 +453,9 @@ ninguno. Ítems en la pestaña **T3Craft**, loot tables (se sueltan a sí mismos
 | `t3craft:cherry_beam` | Viga/columna de cerezo. | `axis` |
 | `t3craft:beam_cap` | Remate de columna: cuello y corona laqueada con banda de latón. | — |
 | `t3craft:paper_lantern` | Farol de papel. Es un `LampBlockEntity` (mismo tipo que la lámpara de estado): con `{"binding": "thread:<k>"}` o `module:<k1>,…` respira con el hilo (BER de lamps-breathe, con el brillo sobre el cuerpo de papel); sin vincular es un farol cálido. | `status` (luz 12 apagado/sin vincular, ≥ 9 vinculado) |
+| `t3craft:paper_lantern_hanging` | Chochin colgado: barril redondo de papel con aros oscuros, tapa de latón y cuerda hasta arriba de la celda (cuelga de una cadena, viga o alero). Decorativo, sin vincular. | `tone` = `paper`, `rose`, `vermilion`; luz 14 |
+| `t3craft:paper_lantern_wall` | Farol de ménsula, alto y estrecho, sobre brazo de hierro y placa trasera: va en un muro, viga o poste (la celda de atrás es el apoyo). No comprueba apoyo. Sin colisión. Decorativo. | `facing` = hacia donde mira (el muro queda detrás); `tone`; luz 13 |
+| `t3craft:paper_lantern_tall` | Farol de plaza de 2 bloques (`KitLanterns.Tall`): plinto de piedra oscura, poste de cerezo, cabeza grande de papel bajo techo piramidal de 3 niveles. Se coloca como una puerta; el ítem es uno y se suelta desde la mitad baja. | `half` = `lower`/`upper`; luz 15 |
 | `t3craft:room_plaque` | Placa de sala: marco de cerezo con placa de tinta; el texto lo dibuja `PlaqueRenderer`. Sin colisión, como un letrero. | `facing` = frente (cuelga del bloque de detrás) |
 | `t3craft:cherry_railing` | Barandilla en el borde `facing` de la celda que se une con sus vecinas (`KitRailingBlock`): pasamanos continuo, postes solo en extremos y giros, esquinas cerradas (`turn`) y escalones de una celda tendidos con un tramo lateral (`step`); en una esquina interior la celda deja solo el poste (`front=false`). Lo resuelven `getStateForPlacement`/`updateShape` en el mundo y `PlanConnect` en los planos, con la misma regla pura (`KitRailingBlock.resolve`, solo lee el `facing` de las barandillas vecinas). | `facing` = borde; `front`; `left`/`right` = `open`, `post`, `turn`, `step` |
 | `t3craft:cherry_planter` | Maceta de cerezo (tiesto, tronco, copa en flor). Todo opaco: sin capas cutout. | — |
@@ -433,6 +463,38 @@ ninguno. Ítems en la pestaña **T3Craft**, loot tables (se sueltan a sí mismos
 
 Ningún modelo usa transparencia (no hace falta registrar capas de render); los bloques que no son un
 cubo llevan `noOcclusion` y su `VoxelShape`.
+
+### Luz integrada (kit/glow-panel): `glow_strip` y `glow_panel`
+
+Idea de AgentCraft (MIT; solo la idea, ver `THIRD_PARTY_NOTICES.md`): iluminación emisiva integrada en la obra, para que
+los interiores tengan luz sin faroles colgados por todas partes y sin fuentes de luz visibles en suelos. Código, modelos y
+texturas propios (`tools/art/glow_art.py`, solo biblioteca estándar; `--preview DIR` escribe PNG ampliados para revisar).
+Luz 12, sin block entity, sin recetas caras (tiras: 3 losas de deepslate tile + 3 polvo de glowstone → 6; panel: 6 deepslate tiles + 3 polvo → 2).
+Mina con pico. Con la mano vacía, click derecho alterna el tono.
+
+| Bloque | Qué es | Estado |
+|---|---|---|
+| `t3craft:glow_strip` | Tira de luz de 16 de largo, 3 de alto y 2 de fondo, pegada a un borde de la celda (zócalo, borde de escalón, bajo una pantalla o una viga). Sin colisión. Se conecta en línea por geometría: los extremos son caras lisas y las caras donde se tocan dos tiras quedan dentro de la barra, así que una fila se lee como una sola barra y solo los extremos de la fila enseñan tapa. No hay estado de conexión (nada que resolver en `PlanConnect`). | `facing` (horizontal: hacia dónde mira; el borde que abraza queda detrás), `half` (`bottom`/`top`), `tone` (`warm` papel/ámbar, `cool` cian T3) |
+| `t3craft:glow_panel` | Bloque entero que es una luz de oficina moderna: marco de deepslate, ribete de cerezo y difusor con dos líneas de lamas. Va a ras en un techo o una pared. | `facing` (6 direcciones: la cara que brilla; `down` en un techo), `tone` |
+
+Roles de `HqKit` (kit-4): `GLOW_STRIP`, `GLOW_STRIP_COOL` (parte baja de la celda, cálida/fría), `GLOW_STRIP_HIGH`,
+`GLOW_STRIP_HIGH_COOL` (parte alta), `GLOW_PANEL`, `GLOW_PANEL_COOL`; atajos `glowStrip(facing, high, cool)` y
+`glowPanel(facing, cool)`.
+
+| Rol | Con el módulo | Fallback vanilla |
+|---|---|---|
+| tiras (los cuatro) | `glow_strip[facing,half,tone]` | `minecraft:light[level=12]` invisible: ilumina igual, no tiene colisión (mismo tipo de paso que la tira) |
+| `GLOW_PANEL` | `glow_panel[facing,tone=warm]` | `ochre_froglight` |
+| `GLOW_PANEL_COOL` | `glow_panel[facing,tone=cool]` | `sea_lantern` |
+
+Usos en la ciudadela: `CitadelOffice.glow` (sala de control: tiras frías bajo las pantallas y tres paneles fríos en el techo,
+que sustituyen a las luces invisibles de ese lado; tira cálida a lo largo de cada tramo de escalera, una por peldaño) y
+`HallInterior.runway` (halls: zócalo cálido a ambos lados de la alfombra del pasillo, solo en celdas libres que no son de un
+escritorio).
+
+Modelos: `glow_panel_<tone>`, `glow_strip_<half>_<tone>`; el brillo (`light_emission` 15) va por elemento, como en la lámpara
+de estado. **Pendiente de ojo en el juego**: la orientación de la tira (`facing` + `y`), el `uv` de la mitad alta y el aspecto de
+las lamas del difusor; no se renderizó (clases kernel).
 
 ### `HqKit`: el mapeo por roles (para `HqStyle`)
 
@@ -460,7 +522,7 @@ el bloque propio o su sustituto vanilla:
 - `plaqueData(DyeColor, String...)`: datos de block entity de la placa (o del letrero, en vanilla),
   hasta 4 líneas; la primera en el color del entorno.
 - `custom()` (false en vanilla) e `id()`/`HqKit.fingerprint()` (`"vanilla"` o `KitBlocks.ID` =
-  `kit-2` desde kit/cherry-railing) para los hashes de construcción: el estilo que use el kit debe incluirlo en su hash y
+  `kit-3` desde kit/paper-lantern) para los hashes de construcción: el estilo que use el kit debe incluirlo en su hash y
   subir `KitBlocks.ID` si cambia algún estado.
 - Forma: cada rol tiene la misma "clase" que su fallback donde importa al caminar (suelos y paneles
   son cubos enteros; escritorio, barandilla, farol y jardín no son de paso en ninguno de los dos).
@@ -501,7 +563,7 @@ blockstates → modelos → texturas propias `kit_*`, ítems y loot tables).
 
 - Bloques: `t3craft:monitor`, `t3craft:status_lamp`, `t3craft:board_lamp`, `t3craft:decision_podium` y el kit del HQ
   (`standing_desk`, `shoji_panel`, `cherry_floor_tile`, `stone_floor_tile`, `cherry_beam`, `beam_cap`,
-  `paper_lantern`, `room_plaque`, `cherry_railing`, `cherry_planter`, `stone_lantern`).
+  `paper_lantern`, `paper_lantern_hanging`, `paper_lantern_wall`, `paper_lantern_tall`, `room_plaque`, `cherry_railing`, `cherry_planter`, `stone_lantern`).
 - Block entities: `t3craft:monitor`, `t3craft:status_lamp` (lámpara y bombilla).
 - Ítems de bloque: `t3craft:monitor`, `t3craft:status_lamp`, `t3craft:board_lamp` (pestaña Functional
   blocks).
@@ -539,3 +601,18 @@ blockstates → modelos → texturas propias `kit_*`, ítems y loot tables).
 - La edad en el monitor tiene el mismo límite que la workstation (sin timestamp en `NpcInfo`).
 - Nadie llama todavía a `setPositionBindings`; el dueño del HQ en el mundo (site/builders) puede
   hacerlo con `HqBindings.world(plan, site)`.
+
+
+### Familia de faroles de papel (kit/paper-lantern)
+
+Cuatro siluetas que se distinguen de lejos: de pie (caja baja sobre patas, techo abocinado con cuatro puntas), colgado
+(barril redondo), de pared (alto y estrecho sobre ménsula) y el alto de plaza (2 bloques). Papel cálido, estructura de
+cerezo, remates oscuros (laca, hierro, latón). Solo el de pie es un `LampBlockEntity` vinculable; los otros tres son
+decoración con luz propia (14, 13, 15). Texturas y modelos salen de `python3 mod/tools/kit_lantern_textures.py` y
+`kit_lantern_models.py` (biblioteca estándar; el item del alto es un modelo con las dos mitades a media escala).
+
+Uso en la ciudadela: variantes del catálogo `LAMP` (`lamp_paper_post` para caminos, `lamp_paper_plaza` para esquinas y
+centros de plaza, `lamp_paper_gate` para pórticos de camino). Buscan los bloques por id en el registro
+(`PaperLanterns`) y, con el módulo apagado, caen al farol vanilla. Revisión: `tools/render/submit.sh --final -- --lanterns
+--only stand|hang|wall|tall|all --scale 2` (`LanternViews` pone los modelos tal cual, sin pasar por el registro).
+Pendiente: cambiar los faroles colgantes vanilla bajo aleros (`CitadelAmbience`) por `paper_lantern_hanging`.

@@ -46,6 +46,7 @@ public final class HallInterior {
 			rug(c, r, F, f, s, env);
 			furniture(c, r, F, f, y, s, env, seed, desks);
 			workArea(c, r, f, y, s, desks, seed);
+			runway(c, r, F, y, desks);
 			pendants(c, r, F, f, m, desks);
 			beams(c, r, f, m);
 		}
@@ -370,6 +371,34 @@ public final class HallInterior {
 				}
 				c.put(p.getX(), ceil - 1, p.getZ(), Blocks.IRON_CHAIN.defaultBlockState(), HANGING);
 				c.put(p.getX(), ceil - 2, p.getZ(), HallFacade.hangingLantern(), HANGING);
+			}
+		}
+	}
+
+	/**
+	 * kit/glow-panel: a luminous skirting along the aisle. A warm glow strip lines each side of the 3-wide runner, one
+	 * cell off its carpet and hugging the far edge of that cell, looking at the aisle: a continuous line of light at floor
+	 * level from the door to the back wall that leads to the desks and lights the floor without hanging anything lower. It
+	 * is light, not furniture: strips have no collision, so it never narrows the aisle, and it goes only into free,
+	 * floored cells that are not a desk's column or its standing cell, and not along the flight of a two-floor hall
+	 * (the first {@code fh()} cells). With the blocks module off the cells hold the invisible light block, so the light
+	 * stays.
+	 */
+	private static void runway(CitadelCanvas c, Room r, int F, int y, Set<Long> desks) {
+		int mid = r.c();
+		for (int u = 1; u <= r.d() - 2; u++) {
+			if (F == 2 && u <= fh()) {
+				continue;
+			}
+			for (int side = -1; side <= 1; side += 2) {
+				int v = mid + 2 * side;
+				if (v < 1 || v > r.w() - 2) {
+					continue;
+				}
+				BlockPos p = r.cell(u, v, y);
+				if (floored(c, p) && !desks.contains(col(p.getX(), p.getZ()))) {
+					put(c, p, c.kit.glowStrip(side < 0 ? r.side() : r.side().getOpposite(), false, false));
+				}
 			}
 		}
 	}

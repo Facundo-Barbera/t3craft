@@ -216,7 +216,10 @@ public final class HqRender {
 		int catalogSeeds = 2;
 		// kit/status-lamp: the status lamp gallery, and demo lamp states in plan renders
 		boolean lamps = false;
+		boolean monitors = false; // kit/monitor: the monitor gallery (MonitorViews)
 		boolean lampDemo = false;
+		// kit/paper-lantern: the paper-lantern gallery
+		boolean lanterns = false;
 		// tools/render-quality: look switches, on in final and off in preview (see Renderer.Look)
 		Boolean previewOpt = null;
 		java.util.Map<String, String> lookOpts = new java.util.LinkedHashMap<>();
@@ -261,6 +264,8 @@ public final class HqRender {
 				}
 				case "--catalog" -> catalog = args[++i];
 				case "--lamps" -> lamps = true;
+				case "--monitors" -> monitors = true;
+				case "--lanterns" -> lanterns = true;
 				case "--lamp-demo" -> lampDemo = true;
 				case "--front" -> catalogFront = args[++i];
 				case "--sizes" -> catalogSizes = Integer.parseInt(args[++i]);
@@ -290,6 +295,16 @@ public final class HqRender {
 		double scaleMul = scaleOpt == null ? 1.6 : scaleOpt;
 		if (vanilla) {
 			HqFixtures.use(null);
+		}
+		if (monitors) {
+			// kit/monitor: wall, desk screens and a lone monitor (MonitorViews)
+			MonitorViews.run(out, scaleOpt == null ? 1.0 : scaleOpt, ss, only);
+			return;
+		}
+		if (lanterns) {
+			// kit/paper-lantern: the paper-lantern family, one view per variant (LanternViews)
+			LanternViews.run(out, scaleOpt == null ? 1.0 : scaleOpt, ss, only);
+			return;
 		}
 		if (lamps) {
 			// kit/status-lamp: the status lamp in every state, on desks and hanging (LampViews)

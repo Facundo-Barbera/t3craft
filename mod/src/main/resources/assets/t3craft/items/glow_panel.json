@@ -1,0 +1,6 @@
+{
+  "model": {
+    "type": "minecraft:model",
+    "model": "t3craft:block/glow_panel_warm"
+  }
+}
