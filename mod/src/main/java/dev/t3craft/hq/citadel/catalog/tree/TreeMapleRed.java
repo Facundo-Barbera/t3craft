@@ -91,7 +91,7 @@ public final class TreeMapleRed implements Variant {
 		double bias = (r.nextInt(5) - 2) * 0.08; // some trees lean redder, some more orange
 		double sun = r.nextDouble() * Math.PI * 2;
 		double a0 = r.nextDouble() * Math.PI * 2;
-		int topY = H >= 13 ? H - 2 : Math.min(H - 2, 8); // main layer of the crown pad over the leader (a broad, low crown)
+		int topY = H >= 13 ? H - 2 : Math.min(H - 2, H >= 11 ? 9 : 8); // main layer of the crown pad over the leader (a broad, low crown)
 
 		// ---- foot: a 2×2 flare of bark, short roots
 		for (int a = 0; a < 2; a++) {
@@ -159,7 +159,7 @@ public final class TreeMapleRed implements Variant {
 			int py = 4 + ((k & 1) == 1 && H >= 10 ? 1 : 0) + (r.nextInt(5) == 0 ? 1 : 0);
 			double rx = rbase * (0.9 + r.nextDouble() * 0.35);
 			double rz = rx * (0.72 + r.nextDouble() * 0.28);
-			fan(t, r, cu0, cv0, ang, 0.58 + r.nextDouble() * 0.14, rx, rz, py, 2 + (k & 1), tu, tv, id++, sun, bias, 0.0, m);
+			fan(t, r, cu0, cv0, ang, 0.68 + r.nextDouble() * 0.14, rx, rz, py, 2 + (k & 1), tu, tv, id++, sun, bias, 0.0, m);
 		}
 		if (H >= 13) {
 			int nMid = m >= 8 ? 3 : 2;
@@ -174,7 +174,7 @@ public final class TreeMapleRed implements Variant {
 			}
 		}
 		// the crown, over the leader: the brightest
-		double rt = rbase * (0.95 + r.nextDouble() * 0.2);
+		double rt = rbase * (0.78 + r.nextDouble() * 0.2);
 		fan(t, r, ccu, ccv, 0, 0.0, rt, rt * (0.8 + r.nextDouble() * 0.2), topY, topY - 3, tu, tv, id++, sun, bias, 0.2, m);
 
 		// ---- fallen leaves under the crown, thick at the trunk and thinning out
@@ -269,7 +269,7 @@ public final class TreeMapleRed implements Variant {
 				}
 				// the cap: smaller and ragged, brighter
 				if (qq <= 0.58 + jit && (centre || t.hash(u, cy + 1, v + id, 5) != 0)) {
-					t.leafOf(u, cy + 1, v, leaf(t, hue + 0.1, u, cy + 1, v, true), id);
+					t.leafOf(u, cy + 1, v, leaf(t, hue + 0.04, u, cy + 1, v, true), id);
 				}
 				// a few drips under the rim, darker
 				if (qq > 0.7 && qq <= 1.0 + jit && t.hash(u + id, cy - 1, v, 12) == 0 && t.kind(u, cy, v) != TreeKit.EMPTY) {
