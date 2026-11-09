@@ -308,7 +308,11 @@ public final class LoungeRoom {
 			}
 		}
 
-		/** The rail round the pit, with lantern posts and pots. */
+		/**
+		 * The edge of the pit: a ring of cherry benches on the coping looking down into the pit (their backs are the rail),
+		 * a low rail of stone-brick wall on each side of the four flights, four lantern posts on the diagonals and pots on
+		 * the outer ring of the coping.
+		 */
 		void rim() {
 			for (int dx = -9; dx <= 9; dx++) {
 				for (int dz = -9; dz <= 9; dz++) {
@@ -321,15 +325,16 @@ public final class LoungeRoom {
 					if (flight || d <= PIT_R || d > WALL_R || a < 2) {
 						continue;
 					}
-					if (d <= 7.5 || a == 2) {
+					if (a == 2) {
 						set(dx, 1, dz, b(Blocks.STONE_BRICK_WALL));
-						boolean post = a == 5 && along == 5;
-						if (post) {
-							set(dx, 2, dz, b(Blocks.STONE_BRICK_WALL));
-							put(dx, 3, dz, lanternUp(), DECOR);
-						} else if (a >= 3 && Math.floorMod(dx * 5 + dz * 3, 6) == 0) {
-							set(dx, 2, dz, pot(dx * 3 + dz));
-						}
+					} else if (a == 5 && along == 5) {
+						set(dx, 1, dz, b(Blocks.STONE_BRICK_WALL));
+						set(dx, 2, dz, b(Blocks.STONE_BRICK_WALL));
+						put(dx, 3, dz, lanternUp(), DECOR);
+					} else if (d <= 7.5) {
+						set(dx, 1, dz, stairs(Blocks.CHERRY_STAIRS, NodeDecor.outward(dx, dz)));
+					} else if (Math.floorMod(dx * 5 + dz * 3, 3) == 0) {
+						set(dx, 1, dz, pot(dx * 3 + dz));
 					}
 				}
 			}
