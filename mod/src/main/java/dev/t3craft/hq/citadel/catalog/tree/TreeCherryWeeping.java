@@ -70,7 +70,7 @@ public final class TreeCherryWeeping implements Variant {
 
 	/** Height of a limb along its run, in units of its rise: 0 at the fork, up to 1 near x = 1.8, back below 0 at the tip (x = 5). */
 	private static double prof(double x) {
-		double k = x <= 1.8 ? (x - 1.8) / 1.8 : (x - 1.8) / 2.3;
+		double k = x <= 1.8 ? (x - 1.8) / 1.8 : (x - 1.8) / 2.5;
 		return 1 - k * k;
 	}
 
@@ -84,8 +84,8 @@ public final class TreeCherryWeeping implements Variant {
 		int hMax = p.h();
 
 		// ---- proportions: trunk bare to the fork (yF), the arch rises rs more, the cap is centred near the apex
-		int yF = mn >= 9 ? 7 : mn >= 8 ? 6 + r.nextInt(2) : 6;
-		double rs = 2.4 + (mn - 7) * 0.4 + r.nextDouble() * 0.7;
+		int yF = mn >= 9 ? 6 : 5;
+		double rs = 1.7 + (mn - 7) * 0.15 + r.nextDouble() * 0.5;
 		while (yF + (int) Math.round(rs * 0.8) + 3 > hMax && (rs > 2.0 || yF > 5)) { // never over the plot
 			if (rs > 2.0) {
 				rs -= 0.4;
@@ -102,19 +102,8 @@ public final class TreeCherryWeeping implements Variant {
 		int bv = TreeKit.base(d, ov);
 		int lu0 = bu + ou;
 		int lv0 = bv + ov;
-		int du = 0;
-		int dv = 0;
-		if (r.nextInt(3) != 0) {
-			if (r.nextBoolean()) {
-				du = r.nextBoolean() ? 1 : -1;
-			} else {
-				dv = r.nextBoolean() ? 1 : -1;
-			}
-		}
-		int ys = 3 + r.nextInt(2); // the row where the leader steps
-		int lu = TreeKit.clamp(lu0 + du, 0, w - 1);
-		int lv = TreeKit.clamp(lv0 + dv, 0, d - 1);
-		boolean step = lu != lu0 || lv != lv0;
+		int lu = lu0; // straight leader: a lean makes ledges to stand on under the crown
+		int lv = lv0;
 		for (int dy = 0; dy <= 1; dy++) {
 			for (int v = bv; v <= bv + 1; v++) {
 				for (int u = bu; u <= bu + 1; u++) {
@@ -125,17 +114,8 @@ public final class TreeCherryWeeping implements Variant {
 				}
 			}
 		}
-		int cu = lu0;
-		int cv = lv0;
 		for (int y = 2; y <= yc; y++) {
-			if (step && y == ys) {
-				t.wood(cu, y, cv, TreeKit.CHERRY.bark());
-				cu = lu;
-				cv = lv;
-				t.wood(cu, y, cv, TreeKit.CHERRY.bark());
-			} else {
-				t.wood(cu, y, cv, TreeKit.CHERRY.log(Direction.Axis.Y));
-			}
+			t.wood(lu, y, lv, TreeKit.CHERRY.log(Direction.Axis.Y));
 		}
 		// a few short roots at the foot
 		int[][] foot = {{bu - 1, bv}, {bu - 1, bv + 1}, {bu + 2, bv}, {bu + 2, bv + 1}, {bu, bv - 1}, {bu + 1, bv - 1},
@@ -145,7 +125,7 @@ public final class TreeCherryWeeping implements Variant {
 		for (int i = 0; i < roots; i++) {
 			int[] q = foot[(first + i * 3) % 8];
 			if (t.empty(q[0], 0, q[1])) {
-				t.wood(q[0], 0, q[1], i % 2 == 0 ? TreeKit.CHERRY.bark() : TreeKit.CHERRY.rootTip());
+				t.wood(q[0], 0, q[1], TreeKit.CHERRY.bark());
 			}
 		}
 
@@ -164,30 +144,30 @@ public final class TreeCherryWeeping implements Variant {
 			ang[i] = a0 + (i + (r.nextDouble() - 0.5) * 0.4) * Math.PI * 2 / n;
 			double ex = Math.cos(ang[i]);
 			double ez = Math.sin(ang[i]);
-			double room = TreeKit.room(t, lu, lv, ex, ez, 0.6);
-			rb[i] = TreeKit.clamp(Math.min(room, 5.2) * (i == 0 ? 1.0 : 0.82 + 0.18 * r.nextDouble()), 2.0, 5.2);
+			double room = TreeKit.room(t, lu, lv, ex, ez, 0.3);
+			rb[i] = TreeKit.clamp(Math.min(room, 5.2) * (i == 0 ? 1.0 : 0.84 + 0.16 * r.nextDouble()), 2.0, 5.2);
 			rsi[i] = rs * (0.85 + 0.3 * r.nextDouble());
 			y0[i] = yF + (i % 2); // the limbs leave the leader at two heights
 			rAvg += rb[i] / n;
 			List<int[]> pts = new ArrayList<>();
-			for (int k = 0; k <= 5; k++) {
+			for (int k = 0; k <= 4; k++) { // the wood stops at 0.8 of the reach: the fan and the strands carry the fall
 				double x = rb[i] * k / 5.0;
 				int pu = (int) Math.round(lu + ex * x);
 				int pv = (int) Math.round(lv + ez * x);
 				int py = Math.max(CLEAR, (int) Math.round(y0[i] + rsi[i] * prof(k)));
 				pts.add(new int[] {pu, py, pv});
 			}
-			for (int k = 0; k < 5; k++) {
+			for (int k = 0; k < 4; k++) {
 				TreeKit.branch(t, LIMB, pts.get(k), pts.get(k + 1), false);
 			}
 		}
 
 		// ---- the cap: a rounded mass of blossom round the fork, densest on top
-		double rc = 1.7 + 0.22 * rAvg;
+		double rc = 1.9 + 0.2 * rAvg;
 		int capLow = Integer.MAX_VALUE;
 		for (int y = yc - 2; y <= yc + 3; y++) {
 			double dyy = y - yc;
-			double ry = dyy > 0 ? 2.3 : 1.4;
+			double ry = dyy > 0 ? 2.1 : 1.4;
 			for (int v = lv - 4; v <= lv + 4; v++) {
 				for (int u = lu - 4; u <= lu + 4; u++) {
 					double q = (Math.pow(u - lu, 2) + Math.pow(v - lv, 2)) / (rc * rc) + dyy * dyy / (ry * ry);
@@ -224,7 +204,7 @@ public final class TreeCherryWeeping implements Variant {
 				}
 				double arc = rho * bd;
 				double x = rho / rb[best];
-				double half = 0.45 + 0.65 * Math.min(1.0, x);
+				double half = 0.6 + 0.7 * Math.min(1.0, x);
 				if (x > 1.18 || arc > half) {
 					continue;
 				}
