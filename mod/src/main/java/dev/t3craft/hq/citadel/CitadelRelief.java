@@ -6,7 +6,6 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.b;
 import static dev.t3craft.hq.citadel.CitadelCanvas.col;
 import static dev.t3craft.hq.citadel.CitadelCanvas.colX;
 import static dev.t3craft.hq.citadel.CitadelCanvas.colZ;
-import static dev.t3craft.hq.citadel.CitadelCanvas.leaves;
 import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
 
 import dev.t3craft.hq.Anchor;
@@ -113,7 +112,16 @@ public final class CitadelRelief {
 		int top = RingCampusGeometry.level(rings);
 		double from = RingCampusGeometry.streetOuter(rings);
 		double to = RingCampusGeometry.radius(rings);
-		double f = (to - RingCampusGeometry.r(x, z)) / Math.max(1.0, to - from);
+		double w = Math.max(1.0, to - from);
+		// design/citadel-terraces2: the bank is not a ring: its foot comes in by up to 55 % of the lawn's width, with a
+		// slow swell (a few lobes round the circle) and a faster ripple, both periodic in the angle and in the radius
+		double a = RingCampusGeometry.theta(x, z);
+		double swell = 0.5 * Math.sin(3 * a + 0.7) + 0.3 * Math.sin(5 * a + 2.1) + 0.2 * Math.sin(8 * a + 4.0);
+		double ripple = 0.5 * Math.sin(13 * a + 1.3 + 0.35 * RingCampusGeometry.r(x, z));
+		double mid = Math.sin(23 * a + 2.2) * Math.sin(7 * a + 0.4); // lobes of some 60 cells of arc, in and out
+		// where the bank reaches the natural ground: between a tenth of the lawn's width and all of it from the street
+		double foot = Math.min(to, to - w * (0.34 + 0.28 * swell + 0.20 * mid + 0.06 * ripple));
+		double f = (foot - RingCampusGeometry.r(x, z)) / Math.max(1.0, foot - from);
 		return (int) Math.max(0, Math.min(top, Math.round(top * f)));
 	}
 
@@ -121,6 +129,7 @@ public final class CitadelRelief {
 
 	/** Lifts the painted flat citadel onto its terraces (see the class comment). */
 	public static void apply(CitadelCanvas c) {
+		CitadelPodium.buttresses(c); // design/citadel-terraces2: pilasters on the feet of the podium's walls (flat frame)
 		if (RingCampusGeometry.relief() == 0) {
 			return;
 		}
@@ -157,8 +166,20 @@ public final class CitadelRelief {
 				}
 			}
 			BlockState s = c.at(x, g, z);
-			if (edge && s != null && s.getBlock() == Blocks.GRASS_BLOCK) {
+			// design/citadel-terraces2: the kerb is broken now and then (a plain grass bank) and rocks lie on the bank
+			double a = RingCampusGeometry.theta(x, z);
+			boolean gap = Math.sin(17 * a + 0.9) + 0.6 * Math.sin(41 * a + 2.6) > 0.9;
+			if (edge && !gap && s != null && s.getBlock() == Blocks.GRASS_BLOCK) {
 				c.set(x, g, z, Math.floorMod(x * 31 + z * 7, 5) == 0 ? b(Blocks.MOSSY_STONE_BRICKS) : b(Blocks.STONE_BRICKS));
+			} else if (s != null && s.getBlock() == Blocks.GRASS_BLOCK && Math.floorMod(x * 73856093 ^ z * 19349663, 190) == 0 && c.at(x, g + 1, z) == null) {
+				c.set(x, g + 1, z, b(Blocks.MOSSY_COBBLESTONE));
+				for (Direction dir : DIRS) {
+					BlockState n = c.at(x + dir.getStepX(), g, z + dir.getStepZ());
+					int hh = Math.floorMod((x + dir.getStepX()) * 31 + (z + dir.getStepZ()) * 17, 4);
+					if (hh < 2 && n != null && n.getBlock() == Blocks.GRASS_BLOCK && c.at(x + dir.getStepX(), g + 1, z + dir.getStepZ()) == null) {
+						c.set(x + dir.getStepX(), g + 1, z + dir.getStepZ(), hh == 0 ? slab(Blocks.MOSSY_COBBLESTONE_SLAB) : b(Blocks.FERN));
+					}
+				}
 			}
 		}
 	}
@@ -486,6 +507,9 @@ public final class CitadelRelief {
 			} else if (beat == 7) {
 				c.set(x, y + 1, z, slab(Blocks.SMOOTH_QUARTZ_SLAB));
 			}
+			if (beat == 0 || beat == 7) {
+				buttress(c, half, x, z, re.getValue(), g); // design/citadel-terraces2: a pilaster under each pier of the parapet
+			}
 		}
 		for (long cc : foot) {
 			int x = colX(cc);
@@ -499,19 +523,55 @@ public final class CitadelRelief {
 			if (ground == null || ground.getBlock() != Blocks.GRASS_BLOCK && ground.getBlock() != Blocks.MOSS_BLOCK || !open(c, x, g + 1, z)) {
 				continue;
 			}
+			// design/citadel-terraces2: the foot of a wall stays clear (no hedge to hide it): low flowers and grass only
 			int k = Math.floorMod(x * 31 + z * 17 + (x ^ z) * 7, 9);
 			BlockState plant = switch (k) {
-				case 0, 1, 2, 3 -> leaves(Blocks.FLOWERING_AZALEA_LEAVES);
-				case 4, 5 -> leaves(Blocks.AZALEA_LEAVES);
-				case 6 -> b(Blocks.FLOWERING_AZALEA);
-				case 7 -> b(Blocks.PINK_TULIP);
-				default -> b(Blocks.ALLIUM);
+				case 0, 1 -> b(Blocks.PINK_TULIP);
+				case 2 -> b(Blocks.ALLIUM);
+				case 3 -> b(Blocks.AZURE_BLUET);
+				case 4, 5 -> b(Blocks.SHORT_GRASS);
+				default -> null;
 			};
-			if (ground.getBlock() == Blocks.MOSS_BLOCK && (k == 7 || k == 8)) {
-				plant = b(Blocks.AZALEA);
+			if (plant != null) {
+				c.set(x, g + 1, z, plant);
 			}
-			c.set(x, g + 1, z, plant);
 		}
+	}
+
+	/**
+	 * A pilaster on the foot of a wall, under a pier of its parapet: a stair against the wall (a pier of polished
+	 * blackstone bricks under it when the wall is 3 or more high). Only on a lot or the lawn's grass, never within 3
+	 * cells of an avenue, so the foot stays free everywhere else and every crossing is open.
+	 */
+	private static void buttress(CitadelCanvas c, Map<Long, Integer> half, int x, int z, Direction toLow, int g) {
+		int nx = x + toLow.getStepX();
+		int nz = z + toLow.getStepZ();
+		Integer hn = half.get(col(nx, nz));
+		if (hn == null || hn % 2 == 1) {
+			return;
+		}
+		int gl = hn / 2;
+		int drop = g - gl;
+		Kind k = c.zoneAt(nx, nz).kind();
+		if (drop < 2 || k != Kind.LOT && k != Kind.LAWN) {
+			return;
+		}
+		for (int dx = -3; dx <= 3; dx++) {
+			for (int dz = -3; dz <= 3; dz++) {
+				if (c.zoneAt(nx + dx, nz + dz).kind() == Kind.AVENUE) {
+					return;
+				}
+			}
+		}
+		BlockState ground = c.at(nx, gl, nz);
+		if (ground == null || ground.getBlock() != Blocks.GRASS_BLOCK && ground.getBlock() != Blocks.MOSS_BLOCK || !open(c, nx, gl + 1, nz)) {
+			return;
+		}
+		int cap = g - 1;
+		for (int y = gl + 1; y < cap; y++) {
+			c.set(nx, y, nz, b(Blocks.POLISHED_BLACKSTONE_BRICKS));
+		}
+		c.set(nx, cap, nz, CitadelCanvas.stairs(Blocks.POLISHED_BLACKSTONE_BRICK_STAIRS, toLow.getOpposite()));
 	}
 
 	/**
