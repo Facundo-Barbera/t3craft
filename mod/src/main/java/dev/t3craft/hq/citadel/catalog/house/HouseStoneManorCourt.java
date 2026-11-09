@@ -108,7 +108,7 @@ public final class HouseStoneManorCourt implements Variant {
 			new Scheme(Blocks.DEEPSLATE_TILE_STAIRS, Blocks.DEEPSLATE_BRICK_STAIRS, Blocks.DEEPSLATE_TILES, Blocks.DEEPSLATE_TILE_SLAB),
 			new Scheme(Blocks.CUT_COPPER_STAIRS.waxed().oxidized(), Blocks.CUT_COPPER_STAIRS.waxed().weathered(),
 					Blocks.CUT_COPPER.waxed().oxidized(), Blocks.CUT_COPPER_SLAB.waxed().oxidized()),
-			new Scheme(Blocks.BRICK_STAIRS, Blocks.BRICK_STAIRS, Blocks.BRICKS, Blocks.BRICK_SLAB),
+			new Scheme(Blocks.BRICK_STAIRS, Blocks.POLISHED_GRANITE_STAIRS, Blocks.BRICKS, Blocks.BRICK_SLAB),
 	};
 
 	private enum Kind {
@@ -119,7 +119,7 @@ public final class HouseStoneManorCourt implements Variant {
 	private static BlockState mat(Plot p, int u, int y, int v) {
 		return switch (y) {
 			case 0, 1 -> deep(p, u, y, v);
-			case 2 -> p.hash(u, y, v, 6) < 1 ? deep(p, u, y, v) : mid(p, u, y, v);
+			case 2 -> p.hash(u, y, v, 5) < 4 ? deep(p, u, y, v) : mid(p, u, y, v); // a plinth three blocks high
 			case 3, 4 -> mid(p, u, y, v);
 			case BELT -> b(Blocks.CALCITE);
 			case 6 -> p.hash(u, y, v, 6) < 1 ? mid(p, u, y, v) : light(p, u, y, v);
@@ -412,6 +412,10 @@ public final class HouseStoneManorCourt implements Variant {
 				return StoneKit.pane(alongU);
 			}
 
+			BlockState tinted() {
+				return StoneKit.tintedPane(alongU);
+			}
+
 			Direction minus() {
 				return alongU ? Direction.WEST : Direction.NORTH;
 			}
@@ -569,8 +573,9 @@ public final class HouseStoneManorCourt implements Variant {
 			int y = upper ? 7 : 2;
 			for (int i = 0; i < ww; i++) {
 				int t = a + i;
-				r.set(t, y, 0, r.pane());
-				r.set(t, y + 1, 0, r.pane());
+				BlockState gp = upper ? r.tinted() : r.pane(); // [palette] tinted glass upstairs
+				r.set(t, y, 0, gp);
+				r.set(t, y + 1, 0, gp);
 				r.set(t, y + 2, 0, ww == 1 ? b(Blocks.CHISELED_STONE_BRICKS) : stUp(Blocks.STONE_BRICK_STAIRS, i == 0 ? r.minus() : r.plus()));
 				int u = r.u(t, 0);
 				int v = r.v(t, 0);
@@ -713,6 +718,14 @@ public final class HouseStoneManorCourt implements Variant {
 			} else {
 				facade(r4, bv + 2, v1 - 2, new ArrayList<>(), false, new ArrayList<>());
 			}
+			// [depth] pilasters on the cross-wall lines: full height up to the eave, with a capital
+			pilasters(r1, sLines);
+			pilasters(r3, bCols);
+			pilasters(c1, sLines);
+			if (uShape) {
+				pilasters(r4, sLines);
+				pilasters(c3, sLines);
+			}
 			gallery();
 			stairHall();
 			gableFill();
@@ -726,6 +739,27 @@ public final class HouseStoneManorCourt implements Variant {
 			court();
 			yard(r1, r2, r3, r4, r5);
 			chimneys();
+		}
+
+		/** A pilaster one block proud wherever the eave runs right over it (so nothing can be stood on). */
+		private void pilasters(Run r, List<Integer> lines) {
+			for (int t : lines) {
+				if (t <= r.ta + 1 || t >= r.tb - 1) {
+					continue;
+				}
+				int u = r.u(t, 1);
+				int v = r.v(t, 1);
+				if (lvl(u, v) != 0) {
+					continue;
+				}
+				w.set(u, 0, v, deep(p, u, 0, v));
+				w.set(u, 1, v, b(Blocks.DEEPSLATE_BRICKS));
+				for (int y = 2; y <= 7; y++) {
+					w.set(u, y, v, b(Blocks.POLISHED_ANDESITE));
+				}
+				w.set(u, 8, v, b(Blocks.CHISELED_STONE_BRICKS));
+				sillAt[u][v] = true;
+			}
 		}
 
 		private void partitions() {
@@ -872,7 +906,7 @@ public final class HouseStoneManorCourt implements Variant {
 						peak = l >= 4 && a < l && bb < l;
 					}
 					for (int y = PLATE + 1; y <= top; y++) {
-						w.set(u, y, v, peak && y <= PLATE + 2 ? StoneKit.pane(k == 1) : light(p, u, y, v));
+						w.set(u, y, v, peak && y <= PLATE + 2 ? StoneKit.tintedPane(k == 1) : light(p, u, y, v));
 					}
 				}
 			}
@@ -898,9 +932,17 @@ public final class HouseStoneManorCourt implements Variant {
 					}
 					if (high == null) {
 						w.set(u, y, v, b(sch.solid()));
-						w.set(u, y + 1, v, slab(sch.slab()));
+						// [finish] a gold finial where a ridge ends in the air, a slab cap along it
+						boolean tip = false;
+						for (Direction d : ds) {
+							if (lvl(u + d.getStepX(), v + d.getStepZ()) < 0) {
+								tip = true;
+							}
+						}
+						w.set(u, y + 1, v, tip && l >= 3 ? b(Blocks.GOLD_BLOCK) : slab(sch.slab()));
 					} else {
-						Block blk = l == 0 ? Blocks.STONE_BRICK_STAIRS : p.hash(u, y, v, 6) == 0 ? sch.alt() : sch.stair();
+						// [palette] tile courses: every third row of the slope in the alternate tile
+						Block blk = l == 0 ? Blocks.STONE_BRICK_STAIRS : l % 3 == 2 ? sch.alt() : sch.stair();
 						w.set(u, y, v, stairs(blk, high));
 					}
 				}
@@ -1160,7 +1202,7 @@ public final class HouseStoneManorCourt implements Variant {
 			}
 			// the tree in a front corner, a bench on the other side of the gate
 			int tu = treeEast ? cu1 - 1 : cu0 + 1;
-			tree(tu, cv0 + 1);
+			tree(tu, cv0 + 1, cw >= 10 && ch >= 8);
 			int bu = treeEast ? gc - 3 : gc + 3;
 			Direction back = treeEast ? Direction.WEST : Direction.EAST;
 			for (int v = cv0; v <= cv0 + 1; v++) {
@@ -1237,14 +1279,14 @@ public final class HouseStoneManorCourt implements Variant {
 			w.put(ou + 1, 4, ov + 1, StoneKit.lantern(true), CitadelCanvas.HANGING);
 		}
 
-		private void tree(int tu, int tv) {
+		private void tree(int tu, int tv, boolean big) {
 			w.set(tu, 0, tv, b(Blocks.MOSS_BLOCK));
 			for (int y = 1; y <= 6; y++) {
 				w.set(tu, y, tv, StoneKit.log(Blocks.CHERRY_LOG, Direction.Axis.Y));
 			}
-			// the crown starts at head height + 3 and never sits under a roof (nothing to stand on)
+			// the crown starts at head height + 3 and never sits under a roof (nothing to stand on); a small court gets a slim one
 			for (int y = 5; y <= 8; y++) {
-				int r = y <= 6 ? 2 : 1;
+				int r = big && y <= 6 ? 2 : 1;
 				for (int du = -r; du <= r; du++) {
 					for (int dv = -r; dv <= r; dv++) {
 						boolean corner = Math.abs(du) == r && Math.abs(dv) == r;
