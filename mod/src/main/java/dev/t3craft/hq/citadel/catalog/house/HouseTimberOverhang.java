@@ -185,10 +185,11 @@ public final class HouseTimberOverhang implements Variant {
 			s0 = planeA - 1;
 			s1 = planeB + 1;
 			plaster = switch (fillKind) {
-				case 0 -> new BlockState[] {b(Blocks.SMOOTH_SANDSTONE), b(Blocks.SMOOTH_SANDSTONE), b(Blocks.CUT_SANDSTONE)};
-				case 1 -> new BlockState[] {b(Blocks.CALCITE), b(Blocks.CALCITE), b(Blocks.SMOOTH_QUARTZ)};
-				case 2 -> new BlockState[] {b(Blocks.SMOOTH_SANDSTONE), b(Blocks.SMOOTH_SANDSTONE), b(Blocks.SMOOTH_SANDSTONE), b(Blocks.MUD_BRICKS)};
-				default -> new BlockState[] {b(Blocks.CALCITE), b(Blocks.SMOOTH_SANDSTONE), b(Blocks.CALCITE), b(Blocks.CUT_SANDSTONE)};
+				// [palette] one plaster with a rare accent: a calm field for the frame to read against
+				case 0 -> new BlockState[] {b(Blocks.SMOOTH_SANDSTONE), b(Blocks.SMOOTH_SANDSTONE), b(Blocks.SMOOTH_SANDSTONE), b(Blocks.SMOOTH_SANDSTONE), b(Blocks.SMOOTH_SANDSTONE), b(Blocks.CUT_SANDSTONE)};
+				case 1 -> new BlockState[] {b(Blocks.CALCITE), b(Blocks.CALCITE), b(Blocks.CALCITE), b(Blocks.CALCITE), b(Blocks.CALCITE), b(Blocks.SMOOTH_QUARTZ)};
+				case 2 -> new BlockState[] {b(Blocks.SMOOTH_SANDSTONE), b(Blocks.SMOOTH_SANDSTONE), b(Blocks.SMOOTH_SANDSTONE), b(Blocks.SMOOTH_SANDSTONE), b(Blocks.SMOOTH_SANDSTONE), b(Blocks.SMOOTH_SANDSTONE), b(Blocks.SMOOTH_SANDSTONE), b(Blocks.MUD_BRICKS)};
+				default -> new BlockState[] {b(Blocks.CALCITE), b(Blocks.CALCITE), b(Blocks.CALCITE), b(Blocks.CALCITE), b(Blocks.CUT_SANDSTONE)};
 			};
 			if (roofKind == 0) {
 				roof = Blocks.BRICK_STAIRS;
@@ -433,7 +434,8 @@ public final class HouseTimberOverhang implements Variant {
 						s = stair(Blocks.DARK_OAK_STAIRS, inc, false);
 					} else if (kind == 3 && y == y2 - j) {
 						s = stair(Blocks.DARK_OAK_STAIRS, dec, false);
-					} else if (dado && y == y1) {
+					} else if (dado && (y == y1 || (y == y1 + 1 && kind == 0))) {
+						// [palette] the stone footing is two high on a blank bay, one under a window
 						s = stone(g, u, y, v);
 					} else {
 						s = plaster(g, u, y, v);
@@ -626,7 +628,7 @@ public final class HouseTimberOverhang implements Variant {
 		for (int k = 0; k < 3; k++) {
 			rmax = Math.max(rmax, g.front ? g.roofY(cu0 + k) : g.roofY(g.vc + (k % 2)));
 		}
-		int top = Math.min(rmax + 2, g.h - 2);
+		int top = Math.min(rmax + 3, g.h - 2);
 		for (int y = 1; y <= top; y++) {
 			for (int u = cu0; u <= g.a1; u++) {
 				for (int v = g.vc; v <= g.vc + 1; v++) {
@@ -775,7 +777,8 @@ public final class HouseTimberOverhang implements Variant {
 		for (int u = ui0; u <= ui1; u++) {
 			if (u <= g.uc - 3 || u >= g.uc + 4) {
 				// every piece of furniture is one block high: a taller one is a low ceiling for whoever steps on it
-				furnish(g, u, 1, vi0, g.p.hash(u, 1, vi0, 3) == 0 ? barrel() : b(Blocks.DARK_OAK_PLANKS), true);
+				BlockState[] stand = {b(Blocks.DARK_OAK_PLANKS), b(Blocks.DARK_OAK_PLANKS), b(Blocks.CRAFTING_TABLE), barrel(), b(Blocks.SMITHING_TABLE), face(Blocks.LOOM, Direction.NORTH)};
+				furnish(g, u, 1, vi0, stand[g.p.hash(u, 1, vi0, stand.length)], true);
 			}
 		}
 		BlockState[] bench = {b(Blocks.CRAFTING_TABLE), b(Blocks.SMITHING_TABLE), face(Blocks.LOOM, Direction.EAST), b(Blocks.CARTOGRAPHY_TABLE), b(Blocks.FLETCHING_TABLE), barrel()};
@@ -905,6 +908,43 @@ public final class HouseTimberOverhang implements Variant {
 		for (int u = uc - 1; u <= uc + 2; u++) {
 			g.set(u, 0, vStoop, stair(Blocks.STONE_BRICK_STAIRS, Direction.SOUTH, false));
 		}
+		// [finish] the front garden: a low flowering hedge along the street with the path through it, hedges down both
+		// sides, moss beds with plants, and planters and benches either side of the path
+		for (int u = 0; u < g.w; u++) {
+			if (u >= uc - 1 && u <= uc + 2) {
+				continue;
+			}
+			g.set(u, 0, 0, CitadelCanvas.leaves(g.p.hash(u, 0, 0, 3) == 0 ? Blocks.AZALEA_LEAVES : Blocks.FLOWERING_AZALEA_LEAVES));
+		}
+		for (int v = 0; v <= g.b1 + 1 && v < g.d; v++) {
+			for (int u : new int[] {0, g.w - 1}) {
+				g.set(u, 0, v, CitadelCanvas.leaves(g.p.hash(u, 0, v, 3) == 0 ? Blocks.AZALEA_LEAVES : Blocks.FLOWERING_AZALEA_LEAVES));
+				if (g.p.hash(u, 1, v, 4) == 0) {
+					g.set(u, 1, v, CitadelCanvas.leaves(Blocks.FLOWERING_AZALEA_LEAVES));
+				}
+			}
+		}
+		for (int v = 1; v <= vStoop - 1; v++) {
+			for (int u = 1; u < g.w - 1; u++) {
+				if (u >= uc - 3 && u <= uc + 4) {
+					continue;
+				}
+				if (g.p.hash(u, 0, v, 3) != 0) {
+					g.set(u, 0, v, b(Blocks.MOSS_BLOCK));
+					BlockState pl = groundPlant(g.p, u, 1, v);
+					if (pl != null) {
+						g.set(u, 1, v, pl);
+					}
+				}
+			}
+			boolean seat = v % 2 == 1;
+			g.set(uc - 2, 0, v, seat ? stair(Blocks.SPRUCE_STAIRS, Direction.WEST, false) : barrel());
+			g.set(uc + 3, 0, v, seat ? stair(Blocks.SPRUCE_STAIRS, Direction.EAST, false) : barrel());
+			if (!seat) {
+				g.set(uc - 2, 1, v, Blocks.POTTED_FLOWERING_AZALEA.defaultBlockState());
+				g.set(uc + 3, 1, v, Blocks.POTTED_FERN.defaultBlockState());
+			}
+		}
 		// lantern posts out in the open (a lantern top under a roof would be a ledge nobody reaches)
 		int vLamp = Math.max(0, g.b0 - 4);
 		for (int u : new int[] {uc - 3, uc + 4}) {
@@ -913,26 +953,15 @@ public final class HouseTimberOverhang implements Variant {
 			g.set(u, 2, vLamp, fence(Blocks.DARK_OAK_FENCE, false, false, false, false));
 			g.set(u, 3, vLamp, lantern(false));
 		}
-		for (int v = 1; v <= vStoop - 1; v++) {
-			for (int u = g.a0 - 1; u <= g.a1 + 1; u++) {
-				if (u >= uc - 2 && u <= uc + 3) {
-					continue;
-				}
-				BlockState pl = groundPlant(g.p, u, 0, v);
-				if (pl != null && g.p.hash(u, 0, v, 2) == 0) {
-					g.set(u, 0, v, pl);
-				}
-			}
-		}
 		// the side gardens
 		for (int side = 0; side < 2; side++) {
-			int lo = side == 0 ? 0 : g.a1 + 3;
-			int hi = side == 0 ? g.a0 - 3 : g.w - 1;
+			int lo = side == 0 ? 1 : g.a1 + 3;
+			int hi = side == 0 ? g.a0 - 3 : g.w - 2;
 			if (hi - lo < 1) {
 				continue;
 			}
 			for (int u = lo; u <= hi; u++) {
-				for (int v = 0; v < g.d; v++) {
+				for (int v = 1; v < g.d; v++) {
 					BlockState pl = groundPlant(g.p, u, 0, v);
 					if (pl != null) {
 						g.set(u, 0, v, pl);
