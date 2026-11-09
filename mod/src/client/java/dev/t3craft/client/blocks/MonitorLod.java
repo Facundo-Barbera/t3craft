@@ -40,7 +40,7 @@ public final class MonitorLod {
 	 *
 	 * @param ppb   pixels per block
 	 * @param bezel margin to the screen's left, right and top edges (the model's 2 px frame)
-	 * @param chin  margin at the bottom (the model's 4 px chin: its upper 2 px carry the LED and the T3 mark, the lower 2 px are the foot ledge)
+	 * @param chin  margin at the bottom (the model's 5 px chin: its upper 2 px are the lip band that carries the LED, the lower 3 px lift the casing onto the stand)
 	 * @param cols  characters per row inside the padding
 	 * @param rows  log rows (0 for FAR)
 	 */
@@ -123,9 +123,13 @@ public final class MonitorLod {
 		return Math.max(32f, Math.min(96f, 150f / e.width()));
 	}
 
-	/** The model's frame, in model pixels: top / left / right bezel and the bottom chin (incl. the foot's pixel). */
+	/**
+	 * The model's frame, in model pixels: top / left / right bezel and the bottom chin. The chin is the band the casing's
+	 * lifted bottom edge and the status LED sit in (y 3..5 of the block); the glass starts above it. The stand below
+	 * ({@code tools/art/monitor_art.py}) is part of the block, not of the screen.
+	 */
 	static final int BEZEL_PX = 2;
-	static final int CHIN_PX = 4;
+	static final int CHIN_PX = 5;
 
 	/** FAR: the status word's largest scale (a 3-wide desk screen gets ≈ 3×, readable across a hall). */
 	static final float FAR_STATUS_MAX = 4f;

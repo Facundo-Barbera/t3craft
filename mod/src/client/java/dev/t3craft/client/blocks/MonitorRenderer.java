@@ -85,6 +85,8 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 	private static final String[] LOGO_3 = {"####.", "....#", "....#", ".###.", "....#", "....#", "####."};
 	/** A model pixel (1/16 block): how far the frame's lip stands proud of the glass. */
 	private static final float LIP = 1f / 16f;
+	/** Where the glass is, in blocks from the block's front face: the whole model sits inside the cube (the lip fills 3..4 px). */
+	private static final float GLASS_DEPTH = 4f / 16f;
 
 	public static final class State extends BlockEntityRenderState {
 		Direction facing = Direction.NORTH;
@@ -381,7 +383,7 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 		int accent = g.attention() ? MonitorLod.breathe(g.accent(), g.background(), s.breath) : g.accent();
 		int statusColor = g.attention() ? MonitorLod.breathe(g.statusColor(), g.background(), s.breath) : g.statusColor();
 		poseStack.pushPose();
-		toFace(poseStack, s.facing, -z, l.ppb());
+		toFace(poseStack, s.facing, GLASS_DEPTH - z, l.ppb());
 		// a panel taller than one block extends upwards from its origin (bottom) block
 		poseStack.translate(0, -(l.extent().height() - 1) * l.ppb(), 0);
 		if (g.mode() != Mode.LIVE) {
@@ -434,17 +436,17 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 	}
 
 	/**
-	 * The 4 px chin of the screen's frame: a status LED at the right (the state's colour) in the band above the foot.
-	 * It sits on the chin's face, which stands one model pixel proud of the glass.
+	 * The chin of the screen's frame: a status LED at the right (the state's colour) in the 2 px lip band (y 3..5 of the
+	 * block, above the stand). It sits on the band's face, which stands one model pixel proud of the glass.
 	 */
 	private static void drawChin(State s, Glyphs g, MonitorLod.Layout l, PoseStack ps, SubmitNodeCollector c, int light, float z, int led) {
 		float mp = l.modelPx();
 		float depth = -(LIP + z);
 		float x1 = l.width() - 3 * mp;
 		float x0 = x1 - 2 * mp;
-		// the visible chin band is the 2 model px above the foot: y from height - 4 mp to height - 2 mp
-		float y0 = l.height() - 3.5f * mp;
-		float y1 = l.height() - 2.5f * mp;
+		// the lip band is model y 3..5: from height - 5 mp to height - 3 mp; the LED is its middle pixel
+		float y0 = l.height() - 4.5f * mp;
+		float y1 = l.height() - 3.5f * mp;
 		ps.pushPose();
 		ps.translate(0, 0, depth);
 		c.order(0).submitCustomGeometry(ps, ScreenDraw.fill(), (pose, vc) -> {
@@ -552,8 +554,9 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 			y += MonitorLod.LINE;
 		}
 		if (g.footer() != null) {
-			int a = 150 + (int) (105 * s.pulse);
-			text(ps, c, g.footer(), l.x0(), footerY(l), (a << 24) | (g.footerColor() & 0xFFFFFF), light);
+			// the screen pipeline does not blend (ScreenDraw), so an alpha pulse would not show: mix the colour with the glass
+			int pulse = MonitorLod.breathe(g.footerColor(), g.background(), s.pulse);
+			text(ps, c, g.footer(), l.x0(), footerY(l), pulse, light);
 		}
 	}
 
@@ -597,6 +600,7 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 	}
 
 	static String ellipsize(Font font, String s, int px) {
+		s = displayable(s);
 		if (px <= 0) {
 			return "";
 		}
@@ -605,6 +609,35 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 		}
 		int ell = font.width(MonitorLog.ELLIPSIS);
 		return font.plainSubstrByWidth(s, Math.max(0, px - ell)) + MonitorLog.ELLIPSIS;
+	}
+
+	/**
+	 * Text the game's font can draw: control characters become spaces, and the characters it has no glyph for (emoji and
+	 * other astral symbols, joiners, variation selectors, the private-use area) are dropped instead of drawing the
+	 * "missing glyph" box. Everything on a screen goes through {@link #ellipsize}, which calls this first.
+	 */
+	static String displayable(String s) {
+		boolean clean = true;
+		for (int i = 0; i < s.length() && clean; i++) {
+			clean = !skipped(s.codePointAt(i)) && !Character.isSurrogate(s.charAt(i)) && s.charAt(i) >= 0x20 && !(s.charAt(i) >= 0x7F && s.charAt(i) < 0xA0);
+		}
+		if (clean) {
+			return s;
+		}
+		StringBuilder out = new StringBuilder(s.length());
+		s.codePoints().forEach(cp -> {
+			if (cp < 0x20 || (cp >= 0x7F && cp < 0xA0)) {
+				out.append(' ');
+			} else if (!skipped(cp)) {
+				out.appendCodePoint(cp);
+			}
+		});
+		return out.toString();
+	}
+
+	private static boolean skipped(int cp) {
+		return cp >= 0x10000 || cp == 0x200B || cp == 0x200D || cp == 0x2060 || cp == 0xFEFF || (cp >= 0xFE00 && cp <= 0xFE0F)
+				|| (cp >= 0xE000 && cp <= 0xF8FF);
 	}
 
 	/** Centre of the screen face of the block at {@code pos} facing {@code facing} (world space). */

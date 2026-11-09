@@ -25,7 +25,7 @@ import net.minecraft.world.level.block.state.BlockState;
  * brick wall, three 3×2 desk screens (standing desk + status lamp), a lone 1×1 monitor and a 2×1 pair.
  * Views: {@code monitors_iso_se} (everything), {@code monitors_front} (eye level), {@code monitors_wall}
  * (the wall at a low angle from the left: frame depth and continuity), {@code monitors_desks} (closeup of the
- * desks), {@code monitors_far_*} (a few pixels per block, enlarged ×4).
+ * desks), {@code monitors_far_*} (a few pixels per block, enlarged ×4), {@code monitors_lone} / {@code monitors_stand} (the stand up close).
  */
 final class MonitorViews {
 	private MonitorViews() {
@@ -96,6 +96,9 @@ final class MonitorViews {
 		views.add(new Object[] {"wall", "6x3 wall from the left, low: frame depth and continuity", wallClip, new Renderer.Camera(-38, 14, iso * 2.4), 1});
 		views.add(new Object[] {"desks", "desk screens and the lone monitor, close", desks, new Renderer.Camera(28, 20, iso * 1.6), 1});
 		views.add(new Object[] {"desk1", "one desk screen with its lamp, very close", new Renderer.Clip(7, 0, -3, 11, 5, 3), new Renderer.Camera(24, 16, iso * 4.2), 1});
+		Renderer.Clip lone = new Renderer.Clip(22, 0, -3, 26, 4, 3);
+		views.add(new Object[] {"lone", "the lone monitor and its stand, very close", lone, new Renderer.Camera(30, 18, iso * 5.5), 1});
+		views.add(new Object[] {"stand", "the lone monitor from the front, low: neck and base plate", lone, new Renderer.Camera(-22, 6, iso * 5.5), 1});
 		views.add(new Object[] {"far_20", "as seen from ~20 blocks (38 px/block, x2)", all, new Renderer.Camera(20, 14, 38), 2});
 		views.add(new Object[] {"far_50", "as seen from ~50 blocks (15 px/block, x4)", all, new Renderer.Camera(20, 14, 15), 4});
 		for (Object[] v : views) {
