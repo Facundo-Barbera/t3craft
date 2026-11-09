@@ -1,23 +1,46 @@
 package dev.t3craft.hq.citadel.catalog.tree;
 
+import static dev.t3craft.hq.citadel.CitadelCanvas.b;
+import static dev.t3craft.hq.citadel.CitadelCanvas.leaves;
+
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.catalog.Family;
 import dev.t3craft.hq.citadel.catalog.Plot;
 import dev.t3craft.hq.citadel.catalog.Variant;
 import dev.t3craft.hq.citadel.catalog.tree.TreeKit.Vox;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
+import net.minecraft.world.level.block.Blocks;
 
 /**
- * The leaning cherry: a bonsai-garden tree whose 2×2 trunk stands at one side of the plot, thins and bends
- * across it (the seed picks the side), with the roots heaped on the opposite side as if the tree pulled on
- * the ground. The leader ends in a broad, flat lobe that overhangs the plot; a limb thrown back from the
- * elbow carries a smaller counter-lobe high over the roots, and a short twig on the outside of the bend a
- * third, small lobe, so the crown is three rounded masses of different size at three heights. Petals drift
- * in the lee of the overhang.
+ * The leaning cherry, the one that grows out over water or down a slope. A short bare stump at one side of the
+ * plot (a tapered 2×2 foot, then a 1×1 column), then the trunk leaves it <b>face-connected</b> (every log shares a
+ * face with the next, no diagonal steps) at 25–45° or almost flat, reaches an <b>elbow</b>, and from there turns
+ * steeply up to the tip. One or two limbs <b>rise again</b> out of the trunk and each carries its own cloud, so
+ * the crown is two or three flat pads of different size and height with sky between them, all on the leaning side.
+ * The roots are heaped on the side away from the lean, and fallen petals lie under the whole canopy.
  *
- * <p>Size: 5–7 × 5–7 × 8+ (the tree stops at 12 high).
+ * <p><b>The overhang is the point:</b> the lean starts at y = 3, so under the trunk and under every cloud there are
+ * at least 3 free blocks (nothing hangs below y = 3), and you can walk under it. Nothing leaves the plot.
+ *
+ * <p>The seed picks the lean direction (axis or diagonal), the pitch, the reach, where the elbow is, and the number,
+ * place and side of the rising limbs. On a 5×5 plot the lean is short and the two clouds are close: compact.
+ *
+ * <p>Size: 5–9 × 5–9 × 9+ (the tree stops at 13 high).
  */
 public final class TreeCherryLeaning implements Variant {
+	/** Cherry pink, with flowering azalea only as a sprinkle on the upper shell (a few percent of the leaves). */
+	private static final TreeKit.Leaves PINK = new TreeKit.Leaves(leaves(Blocks.CHERRY_LEAVES), leaves(Blocks.CHERRY_LEAVES),
+			leaves(Blocks.FLOWERING_AZALEA_LEAVES), 3, 9);
+
+	/** The lean starts here: y = 0..2 stay free under the trunk and under the canopy. */
+	private static final int YS = 3;
+
+	/** Lean directions {du, dv}: sideways and diagonals more often than straight to the front or back. */
+	private static final int[][] DIRS = {{1, 0}, {1, 0}, {-1, 0}, {-1, 0}, {1, 1}, {1, 1}, {-1, 1}, {-1, 1}, {1, -1}, {1, -1}, {-1, -1},
+			{-1, -1}, {0, 1}, {0, -1}};
+
 	@Override
 	public String id() {
 		return "tree_cherry_leaning";
@@ -40,73 +63,211 @@ public final class TreeCherryLeaning implements Variant {
 
 	@Override
 	public int minH() {
-		return 8;
+		return 9;
 	}
 
 	@Override
 	public int maxW() {
-		return 7;
+		return 9;
 	}
 
 	@Override
 	public int maxD() {
-		return 7;
+		return 9;
+	}
+
+	/** A cloud: centre, semi-axes. */
+	private record Pad(int u, int y, int v, double rx, double rz) {
 	}
 
 	@Override
 	public void build(CitadelCanvas c, Plot p) {
 		Vox t = new Vox(p);
-		Random r = p.rng(0x1EA2);
-		int H = Math.min(p.h(), 12);
-		double sc = Math.min(p.w(), p.d()) / 6.0;
-		// the lean: along a diagonal picked by the seed (never towards the front, so the bend shows in the iso view)
-		int q = r.nextInt(4);
-		int su = q == 0 || q == 3 ? 1 : -1;
-		int sv = q < 2 ? 1 : -1;
-		int bu = su > 0 ? 0 : p.w() - 2;
-		int bv = sv > 0 ? Math.min(1, p.d() - 6 + 1) : p.d() - 2 - Math.min(1, p.d() - 6 + 1);
-		bu = TreeKit.clamp(bu + (p.w() >= 6 ? su : 0), 0, p.w() - 2);
-		bv = TreeKit.clamp(bv, 0, p.d() - 2);
-		int top = H - 3;
-		double leanU = su * Math.max(1.5, (p.w() - 3) * 0.6);
-		double leanV = sv * Math.max(1.0, (p.d() - 3) * 0.4);
-		int ou = su > 0 ? 1 : 0;
-		int ov = sv > 0 ? 1 : 0;
-		int[][] lead = TreeKit.trunk(t, TreeKit.CHERRY, bu, bv, 2, top, ou, ov, leanU, leanV);
-		// roots on the side away from the lean: octant pointing to (-su, -sv)
-		int bias = octant(-su, -sv);
-		TreeKit.roots(t, TreeKit.CHERRY, bu, bv, 5, 2, bias, 11);
+		Random r = p.rng(0x1EA5);
+		int w = p.w();
+		int d = p.d();
+		int mn = Math.min(w, d);
+		int hh = Math.min(p.h(), 13);
 
-		// the overhang: a broad flat lobe on the leader's tip
-		int tu = lead[0][top];
-		int tv = lead[1][top];
-		double ra = 2.4 * sc;
-		TreeKit.lobe(t, tu + su * 1.1, top, tv + sv * 0.8, ra, ra * 0.9, 1.6, 1.0, TreeKit.SAKURA, 0.4, 1); // the widest part, overhanging the lean
-		TreeKit.drips(t, (int) Math.round(tu + su * 1.1), top, (int) Math.round(tv + sv * 0.8), ra, ra * 0.9, 1);
+		// ---- direction and foot
+		int[] dir = DIRS[r.nextInt(DIRS.length)];
+		int du = dir[0];
+		int dv = dir[1];
+		boolean diag = du != 0 && dv != 0;
+		int inset = mn <= 6 ? 1 : 2; // how far from the edge the tip of the trunk stays, so its cloud fits
+		int in0 = mn >= 7 ? 1 : 0; // room behind the foot for the roots
+		int lu;
+		int lv;
+		int bu;
+		int bv;
+		if (du != 0) {
+			bu = du > 0 ? in0 : w - 2 - in0;
+			lu = bu + (du > 0 ? 1 : 0);
+		} else {
+			lu = TreeKit.clamp((w - 1) / 2 + r.nextInt(3) - 1, inset, w - 1 - inset);
+			bu = TreeKit.clamp(lu - r.nextInt(2), 0, w - 2);
+		}
+		if (dv != 0) {
+			bv = dv > 0 ? in0 : d - 2 - in0;
+			lv = bv + (dv > 0 ? 1 : 0);
+		} else {
+			lv = TreeKit.clamp((d - 1) / 2 + r.nextInt(3) - 1, inset, d - 1 - inset);
+			bv = TreeKit.clamp(lv - r.nextInt(2), 0, d - 2);
+		}
 
-		// the counter-limb, thrown back from the elbow over the roots, with a smaller, higher lobe
-		int ey = TreeKit.clamp(top - 3, 3, top - 1);
-		int eu = lead[0][ey];
-		int ev = lead[1][ey];
-		int cu = TreeKit.clamp(eu - su * 2, 1, p.w() - 2);
-		int cv = TreeKit.clamp(ev - sv * 1, 1, p.d() - 2);
-		int cy = Math.min(top + 1, H - 2);
-		TreeKit.branch(t, TreeKit.CHERRY, new int[] {eu, ey, ev}, new int[] {cu, cy, cv}, false);
-		TreeKit.lobe(t, cu, cy, cv, 1.6 * sc, 1.5 * sc, 1.6, 0.9, TreeKit.SAKURA.swap(), 0.35, 2);
+		// ---- reach and pitch: k cells along the direction, the seed picks how much of the room and how steep
+		int kmax = 99;
+		if (du != 0) {
+			kmax = Math.min(kmax, du > 0 ? (w - 1 - inset) - lu : lu - inset);
+		}
+		if (dv != 0) {
+			kmax = Math.min(kmax, dv > 0 ? (d - 1 - inset) - lv : lv - inset);
+		}
+		kmax = Math.max(1, kmax);
+		int k = kmax - (kmax >= 4 && r.nextInt(3) == 0 ? 1 : 0);
+		double m = 0.38 + 0.62 * r.nextDouble(); // rise per cell of the lean, 20°..45° plus the plan staircase of a diagonal
+		double fe = 0.5 + 0.22 * r.nextDouble(); // where the elbow is
+		int ke = TreeKit.clamp((int) Math.round(fe * k), 1, k);
+		int ytip = TreeKit.clamp(YS + (int) Math.round(m * k * (diag ? 1.3 : 1.0)) + 1, YS + 2, hh - 4);
+		int yElbow = TreeKit.clamp(YS + (int) Math.round(m * 0.5 * ke * (diag ? 1.3 : 1.0)), YS, ytip - 1);
+		int tu = lu + k * du;
+		int tv = lv + k * dv;
 
-		// a short twig on the outside of the bend, low, with a small lobe
-		int my = TreeKit.clamp(top - 4, 3, top - 2);
-		int mu = lead[0][my];
-		int mv = lead[1][my];
-		int wu = TreeKit.clamp(mu + sv, 1, p.w() - 2); // across the lean
-		int wv = TreeKit.clamp(mv - su, 1, p.d() - 2);
-		TreeKit.branch(t, TreeKit.CHERRY, new int[] {mu, my, mv}, new int[] {wu, my + 1, wv}, false);
-		TreeKit.lobe(t, wu, my + 1, wv, 1.5 * sc, 1.5 * sc, 1.6, 0.9, TreeKit.SAKURA, 0.3, 3);
+		// ---- foot: tapered 2×2 (4 cells, then 3), then the 1×1 column to the start of the lean
+		int ou = lu - bu;
+		int ov = lv - bv;
+		for (int a = 0; a < 2; a++) {
+			for (int e = 0; e < 2; e++) {
+				t.wood(bu + a, 0, bv + e, TreeKit.CHERRY.bark());
+				if (!(a != ou && e != ov)) {
+					t.wood(bu + a, 1, bv + e, TreeKit.CHERRY.bark());
+				}
+			}
+		}
+		for (int y = 2; y < YS; y++) {
+			t.wood(lu, y, lv, TreeKit.CHERRY.log(net.minecraft.core.Direction.Axis.Y));
+		}
+		int bias = octant(-du, -dv);
+		TreeKit.roots(t, TreeKit.CHERRY, bu, bv, 4, 2, bias, 11);
 
-		// petals in the lee of the overhang
-		TreeKit.petalCarpet(t, tu, tv, Math.min(p.w(), p.d()) / 2.0 + 0.6);
+		// ---- trunk: out along the lean, the elbow, then up to the tip (every cell shares a face with the next)
+		int eu = lu + ke * du;
+		int ev = lv + ke * dv;
+		List<int[]> segA = TreeKit.branch(t, TreeKit.CHERRY, new int[] {lu, YS, lv}, new int[] {eu, yElbow, ev}, false);
+		List<int[]> segB = TreeKit.branch(t, TreeKit.CHERRY, new int[] {eu, yElbow, ev}, new int[] {tu, ytip, tv}, false);
+
+		// ---- clouds
+		double ra = TreeKit.clamp(0.28 * mn + 0.5, 1.9, 2.9);
+		List<Pad> pads = new ArrayList<>();
+		pads.add(pad(tu, ytip + 1, tv, ra, du, dv, w, d));
+
+		// rising limb 1: from the first half of the lean, up and a little outwards
+		int i1 = TreeKit.clamp((int) Math.round(segA.size() * (0.3 + 0.3 * r.nextDouble())), 1, Math.max(1, segA.size() - 1));
+		int[] s1 = segA.get(Math.min(i1, segA.size() - 1));
+		int rb1 = 3 + r.nextInt(2);
+		int kickU = diag ? (r.nextBoolean() ? du : 0) : du;
+		int kickV = diag ? (kickU == 0 ? dv : 0) : dv;
+		double r1 = Math.max(1.6, ra * (0.74 + 0.1 * r.nextDouble()));
+		Pad p1 = padClamped(s1[0] + kickU, Math.min(s1[1] + rb1, hh - 3), s1[2] + kickV, r1, w, d);
+		pads.add(p1);
+		TreeKit.branch(t, TreeKit.CHERRY, s1, new int[] {p1.u, p1.y, p1.v}, false);
+
+		// rising limb 2 (6+ wide): from near the elbow, kicked to one side, lower and smaller
+		if (mn >= 6) {
+			int side = r.nextBoolean() ? 1 : -1;
+			int pu = -dv * side;
+			int pv = du * side;
+			if (pu == 0 && pv == 0) {
+				pu = side;
+			}
+			int[] s2 = segB.size() > 2 ? segB.get(1 + r.nextInt(Math.min(2, segB.size() - 1))) : segA.get(segA.size() - 1);
+			double r2 = Math.max(1.5, ra * (0.55 + 0.12 * r.nextDouble()));
+			int ry = Math.min(s2[1] + 2 + r.nextInt(2), hh - 3);
+			Pad p2 = padClamped(s2[0] + pu * (1 + r.nextInt(2)), ry, s2[2] + pv * (1 + r.nextInt(2)), r2, w, d);
+			if (Math.hypot(p2.u - tu, p2.v - tv) >= 2.2 || Math.abs(p2.y - (ytip + 1)) >= 2) {
+				pads.add(p2);
+				TreeKit.branch(t, TreeKit.CHERRY, s2, new int[] {p2.u, p2.y, p2.v}, false);
+			}
+		}
+
+		int salt = 1;
+		for (Pad q : pads) {
+			TreeKit.lobe(t, q.u, q.y, q.v, q.rx, q.rz, 2.0, 1.0, PINK, 0.45, salt++);
+		}
+		// a little hem under each pad's rim, never below y = 3
+		for (Pad q : pads) {
+			int y = q.y - 1;
+			for (int v = (int) (q.v - q.rz - 1); v <= q.v + q.rz + 1; v++) {
+				for (int u = (int) (q.u - q.rx - 1); u <= q.u + q.rx + 1; u++) {
+					if (y - 1 >= YS && t.kind(u, y, v) == TreeKit.LEAF && t.empty(u, y - 1, v) && t.hash(u, y + 5, v, 100) < 22) {
+						TreeKit.hang(t, u, y - 1, v, 1 + t.hash(u, 3, v, 2), YS, PINK.a(), PINK.a(), 0, 0, false);
+					}
+				}
+			}
+		}
+		// holes: a few leaves are left out so the sky shows through (never next to wood, so nothing is cut off)
+		for (int y = YS; y < hh; y++) {
+			for (int v = 0; v < d; v++) {
+				for (int u = 0; u < w; u++) {
+					if (t.kind(u, y, v) == TreeKit.LEAF && t.hash(u + 3, y + 5, v + 9, 100) < 6 && !nextToWood(t, u, y, v)) {
+						t.clear(u, y, v);
+					}
+				}
+			}
+		}
 		t.prune();
+
+		// ---- fallen petals: thick under the canopy and the trunk, a few round the foot, moss between
+		boolean[] shade = new boolean[w * d];
+		for (int y = YS; y < hh; y++) {
+			for (int v = 0; v < d; v++) {
+				for (int u = 0; u < w; u++) {
+					byte kd = t.kind(u, y, v);
+					if (kd == TreeKit.LEAF || kd == TreeKit.WOOD) {
+						shade[v * w + u] = true;
+					}
+				}
+			}
+		}
+		final int fu = bu;
+		final int fv = bv;
+		TreeKit.ground(t, lu, lv, 99, (u, v, kk) -> {
+			boolean under = shade[v * w + u];
+			boolean near = under || (u > 0 && shade[v * w + u - 1]) || (u < w - 1 && shade[v * w + u + 1])
+					|| (v > 0 && shade[(v - 1) * w + u]) || (v < d - 1 && shade[(v + 1) * w + u]);
+			int hsh = t.hash(u, 0, v, 100);
+			int pet = under ? 72 : near ? 40 : 0;
+			if (Math.hypot(u - fu - 0.5, v - fv - 0.5) < 3.2) {
+				pet = Math.max(pet, 50);
+			}
+			if (hsh < pet) {
+				return TreeKit.petals(1 + t.hash(u, 1, v, under ? 4 : 2), t.hash(u, 2, v, 4));
+			}
+			return near && hsh < pet + 9 ? b(Blocks.MOSS_CARPET) : null;
+		});
 		t.flush(c);
+	}
+
+	/** A cloud centred at the trunk's tip, as wide as the room allows, a little longer along the lean when it is sideways. */
+	private static Pad pad(int cu, int cy, int cv, double ra, int du, int dv, int w, int d) {
+		double rx = Math.min(ra * (du != 0 && dv == 0 ? 1.12 : 1.0), Math.min(cu, w - 1 - cu) + 0.9);
+		double rz = Math.min(ra * (dv != 0 && du == 0 ? 1.12 : 1.0), Math.min(cv, d - 1 - cv) + 0.9);
+		return new Pad(cu, cy, cv, Math.max(1.5, rx), Math.max(1.5, rz));
+	}
+
+	/** A cloud whose centre is moved inside the plot so that it fits. */
+	private static Pad padClamped(int cu, int cy, int cv, double rr, int w, int d) {
+		int in = Math.max(1, (int) Math.floor(rr - 0.5));
+		int u = TreeKit.clamp(cu, Math.min(in, (w - 1) / 2), Math.max(w - 1 - in, (w - 1) / 2));
+		int v = TreeKit.clamp(cv, Math.min(in, (d - 1) / 2), Math.max(d - 1 - in, (d - 1) / 2));
+		double rx = Math.min(rr, Math.min(u, w - 1 - u) + 0.9);
+		double rz = Math.min(rr, Math.min(v, d - 1 - v) + 0.9);
+		return new Pad(u, Math.max(cy, YS + 2), v, Math.max(1.5, rx), Math.max(1.5, rz));
+	}
+
+	private static boolean nextToWood(Vox t, int u, int y, int v) {
+		return t.kind(u + 1, y, v) == TreeKit.WOOD || t.kind(u - 1, y, v) == TreeKit.WOOD || t.kind(u, y + 1, v) == TreeKit.WOOD
+				|| t.kind(u, y - 1, v) == TreeKit.WOOD || t.kind(u, y, v + 1) == TreeKit.WOOD || t.kind(u, y, v - 1) == TreeKit.WOOD;
 	}
 
 	private static int octant(int du, int dv) {
