@@ -94,38 +94,50 @@ public final class ThreadDiskCache {
 		}, IO);
 	}
 
+	/** One recent thread's tail, copied on the caller (fix/new-thread-hitch). */
+	private record Tail(String key, String title, List<ChatEntry> entries) {
+	}
+
 	/**
 	 * Writes {@code rows} and the tails of {@code recent} (most recent first) when they changed.
-	 * Builds the JSON on the caller (cheap, bounded) and writes it on the IO thread (temp + move).
+	 * fix/new-thread-hitch: the caller (client thread) only copies the rows and the tails (records,
+	 * {@code tail} is a synchronized copy); the JSON is built, compared and written on the IO thread.
 	 */
 	public void saveAsync(List<ThreadRow> rows, List<ThreadCache.Entry> recent) {
-		JsonObject root = new JsonObject();
-		root.addProperty("format", FORMAT);
-		JsonArray rs = new JsonArray();
-		for (int i = 0; i < rows.size() && i < MAX_ROWS; i++) {
-			rs.add(encodeRow(rows.get(i)));
-		}
-		root.add("rows", rs);
-		JsonObject tails = new JsonObject();
+		List<ThreadRow> rs = List.copyOf(rows.subList(0, Math.min(rows.size(), MAX_ROWS)));
+		List<Tail> tails = new java.util.ArrayList<>();
 		for (int i = 0; i < recent.size() && i < TAIL_THREADS; i++) {
 			ThreadCache.Entry e = recent.get(i);
-			JsonObject t = new JsonObject();
-			t.addProperty("title", e.transcript().title());
-			JsonArray es = new JsonArray();
-			for (ChatEntry c : e.transcript().tail(TAIL_ROWS)) {
-				es.add(encodeEntry(c));
-			}
-			t.add("entries", es);
-			tails.add(e.key(), t);
+			tails.add(new Tail(e.key(), e.transcript().title(), e.transcript().tail(TAIL_ROWS)));
 		}
-		root.add("tails", tails);
-		String text = root.toString();
-		if (text.equals(lastWritten)) {
-			return;
-		}
-		lastWritten = text;
 		CompletableFuture.runAsync(() -> {
 			try {
+				long t0 = System.nanoTime();
+				JsonObject root = new JsonObject();
+				root.addProperty("format", FORMAT);
+				JsonArray ra = new JsonArray();
+				for (ThreadRow r : rs) {
+					ra.add(encodeRow(r));
+				}
+				root.add("rows", ra);
+				JsonObject to = new JsonObject();
+				for (Tail tail : tails) {
+					JsonObject t = new JsonObject();
+					t.addProperty("title", tail.title());
+					JsonArray es = new JsonArray();
+					for (ChatEntry c : tail.entries()) {
+						es.add(encodeEntry(c));
+					}
+					t.add("entries", es);
+					to.add(tail.key(), t);
+				}
+				root.add("tails", to);
+				String text = root.toString();
+				dev.t3craft.debug.PerfStats.stepAsync(dev.t3craft.debug.PerfStats.STEP_THREAD_CACHE_SAVE, t0);
+				if (text.equals(lastWritten)) {
+					return; // IO thread only: lastWritten is never touched elsewhere
+				}
+				lastWritten = text;
 				Files.createDirectories(file.getParent());
 				Path tmp = file.resolveSibling("threads.json.tmp");
 				Files.writeString(tmp, text, StandardCharsets.UTF_8);

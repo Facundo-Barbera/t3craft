@@ -57,6 +57,18 @@ public final class CrewBridge {
 
 	/** Server thread, every tick. */
 	public static void tick() {
+		if (watches.isEmpty()) {
+			return;
+		}
+		long t0 = System.nanoTime();
+		try {
+			poll();
+		} finally {
+			dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_CREW_WATCH, t0);
+		}
+	}
+
+	private static void poll() {
 		for (Watch w : watches) {
 			try {
 				if (w.poll()) {
