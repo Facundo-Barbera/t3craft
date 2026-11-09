@@ -11,6 +11,7 @@ import static dev.t3craft.hq.citadel.catalog.house.HouseWorkshopKit.log;
 import static dev.t3craft.hq.citadel.catalog.house.HouseWorkshopKit.slab;
 import static dev.t3craft.hq.citadel.catalog.house.HouseWorkshopKit.stair;
 import static dev.t3craft.hq.citadel.catalog.house.HouseWorkshopKit.trap;
+import static dev.t3craft.hq.citadel.catalog.house.HouseWorkshopKit.wall;
 
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.catalog.Family;
@@ -19,35 +20,40 @@ import dev.t3craft.hq.citadel.catalog.Support;
 import dev.t3craft.hq.citadel.catalog.Variant;
 import java.util.Random;
 import net.minecraft.core.Direction;
-import net.minecraft.world.level.block.Block;
+import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.Mirror;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.AttachFace;
+import net.minecraft.world.level.block.state.properties.BedPart;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 
 /**
- * A forge-atelier: a sooty stone hall with a huge corbelled brick chimney that smokes above the ridge,
- * and a deep open work porch under a patinated copper lean-to roof where the anvil, grindstone,
- * smithing table and water trough stand. Wide shop windows show the hearth glowing inside.
+ * A working smithy with a lodging over it. A tall two-storey-high forge nave (blast furnace, furnace and a forge fire
+ * under a brick hood whose flue leaves through the roof), a wide loading gate on the street, a stone stair two wide to
+ * a studio loft that looks down on the forge through a rail, a stock room under the loft, and a side yard with a
+ * wood pile and a loaded cart.
  *
- * <p>Concept: Hanseatic smithies and a Japanese-style engawa porch in the citadel palette: dark
- * deepslate base rising to tuff and plaster, dark-oak frame, deepslate-tile main roof, and a copper
- * porch roof that ages from orange at the wall to verdigris at the eave. Memorable for the chimney
- * (three blocks square, stepped shoulders, a smoking campfire pot) and the warm hearth glow.
+ * <p>Concept: a Hanseatic stone-and-brick workshop with a dark half-timbered frame, deepslate-tile gable roof with a
+ * glazed lantern on the ridge, one tall brick chimney. Palette: deepslate, wall stone (stone / tuff / mud brick by
+ * seed), dark oak, brick, a little calcite in the gables. The seed picks the side of the yard, the side of the hearth
+ * (and so of the chimney) and the wall material.
  *
  * <pre>
- *  section (v →)                      plan
- *   y15   ▓ chimney pot               v0-2  porch: posts, rail, anvil/grindstone/trough
- *  y12/9      /\  main roof           v3    front wall: shop windows, door
- *  y7  porch ╱  ╲  copper lean-to     v4-vb hall: hearth in the back-right corner
- *  y4  ═ beam ═                       vb+1  woodpile, charcoal, barrels
- *  y1-3 posts, rail
+ *  plan (v down = towards the back)               section across the nave
+ *   yard | apron  steps, barrels                     ridge lantern
+ *   yard | gate wall (v2): gate 3+ wide             /            \
+ *   yard | nave: stair (2 wide) . trough . anvils   /   nave      \  hood + flue on the hearth wall
+ *   yard | loft front edge (rail)                  |   9 high      |
+ *   yard | stock room under the studio loft        |__ loft y5 ____|
  * </pre>
  *
- * Size: 11–15 × 10–14 × 16+.
+ * Size: 16–26 × 15–26 × 22+. Everything inside is at least 4 blocks clear; nothing is sealed.
  */
 public final class HouseForgeAtelier implements Variant {
-	private static final int VF = 3; // front wall row (the porch is v 0..2)
-	private static final int PLATE = 7; // main roof starts here; walls y1..y6
+	private static final int VF = 2; // front wall row (rows 0..1 are the apron under the gable overhang)
+	private static final int PLATE = 9; // top plate of the walls; the roof starts here
+	private static final int FL = 5; // layer of the loft floor (one stands at FL + 1)
 
 	@Override
 	public String id() {
@@ -61,466 +67,711 @@ public final class HouseForgeAtelier implements Variant {
 
 	@Override
 	public int minW() {
-		return 11;
-	}
-
-	@Override
-	public int minD() {
-		return 10;
-	}
-
-	@Override
-	public int minH() {
 		return 16;
 	}
 
 	@Override
-	public int maxW() {
+	public int minD() {
 		return 15;
 	}
 
 	@Override
+	public int minH() {
+		return 22;
+	}
+
+	@Override
+	public int maxW() {
+		return 26;
+	}
+
+	@Override
 	public int maxD() {
-		return 14;
+		return 26;
 	}
 
 	@Override
 	public void build(CitadelCanvas c, Plot p) {
-		Random r = p.rng(0xF026_E001L);
-		int w = p.w();
-		int d = p.d();
-		int cu = (w - 1) / 2 - 1; // the door, a little left of centre: the chimney owns the right side
-		int vb = d - 2;
-		int uc = w - 3; // chimney centre (shaft w-4..w-2, ring w-5..w-1)
-		int vc = vb - 1; // chimney centre (shaft vb-2..vb, ring vb-3..d-1)
-
-		hallWalls(c, p, cu, vb, uc, vc);
-		hearth(c, p, uc, vc);
-		mainRoof(c, p, vb);
-		gables(c, p, vb, uc, vc);
-		chimney(c, p, uc, vc);
-		porch(c, p, r, cu);
-		yard(c, p, r, cu, vb, uc, vc);
-		buttresses(c, p, cu, vb, uc);
+		Smithy s = new Smithy(c, p);
+		s.walls();
+		s.gables();
+		s.roof();
+		s.hearth();
+		s.chimney();
+		s.monitor();
+		s.stairAndLoft();
+		s.nave();
+		s.stock();
+		s.loft();
+		s.front();
+		s.buttresses();
+		s.patio();
 	}
 
-	// ------------------------------------------------------------------ materials
+	private static final class Smithy {
+		final CitadelCanvas c;
+		final Plot p;
+		final int w;
+		final int d;
+		final int h;
+		final int bw; // building width (local u 0..bw-1, hearth on the high side)
+		final int pw; // side-yard width
+		final int u0; // plot u of the building's local 0
+		final int vb; // back wall row
+		final int vm; // first row of the loft
+		final int vh; // row of the hearth
+		final int cu; // gate centre
+		final int gw; // gate width (odd, 3 or more)
+		final int hu; // column of the fire bed
+		final int rc; // roof rise cap
+		final int rc0;
+		final int ra; // first ridge column
+		final int rb; // last ridge column
+		final int dv; // row of the yard door (-1 when none)
+		final boolean patioRight;
+		final boolean flipB;
+		final boolean patioLocalRight;
+		final int kind;
 
-	/** [palette] the soot-black base: deepslate bricks, cracked and cobbled patches. */
-	private static BlockState base(Plot p, int u, int y, int v) {
-		return switch (p.hash(u, y, v, 6)) {
-			case 0 -> b(Blocks.COBBLED_DEEPSLATE);
-			case 1 -> b(Blocks.CRACKED_DEEPSLATE_BRICKS);
-			default -> b(Blocks.DEEPSLATE_BRICKS);
-		};
-	}
-
-	/** [palette] the middle band: tuff bricks, a bit of polished tuff. */
-	private static BlockState mid(Plot p, int u, int y, int v) {
-		return p.hash(u, y, v, 4) == 0 ? b(Blocks.POLISHED_TUFF) : b(Blocks.TUFF_BRICKS);
-	}
-
-	/** [palette] the top band: plaster (calcite) with the odd smooth-stone block. */
-	private static BlockState plaster(Plot p, int u, int y, int v) {
-		return p.hash(u, y, v, 6) == 0 ? b(Blocks.SMOOTH_STONE) : b(Blocks.CALCITE);
-	}
-
-	/** The wall by height: dark → light from the ground up. */
-	private static BlockState wallAt(Plot p, int u, int y, int v) {
-		if (y <= 2) {
-			return base(p, u, y, v);
-		}
-		return y <= 4 ? mid(p, u, y, v) : plaster(p, u, y, v);
-	}
-
-	private static BlockState frame(Direction.Axis axis) {
-		return log(Blocks.DARK_OAK_LOG, axis);
-	}
-
-	/** Copper by patina level: 0 orange (new) … 3 verdigris, waxed so it stays as it is. */
-	private static Block copperStairs(int lvl) {
-		return switch (lvl) {
-			case 0 -> Blocks.CUT_COPPER_STAIRS.waxed().unaffected();
-			case 1 -> Blocks.CUT_COPPER_STAIRS.waxed().exposed();
-			case 2 -> Blocks.CUT_COPPER_STAIRS.waxed().weathered();
-			default -> Blocks.CUT_COPPER_STAIRS.waxed().oxidized();
-		};
-	}
-
-	private static Block copperSlab(int lvl) {
-		return switch (lvl) {
-			case 0 -> Blocks.CUT_COPPER_SLAB.waxed().unaffected();
-			case 1 -> Blocks.CUT_COPPER_SLAB.waxed().exposed();
-			case 2 -> Blocks.CUT_COPPER_SLAB.waxed().weathered();
-			default -> Blocks.CUT_COPPER_SLAB.waxed().oxidized();
-		};
-	}
-
-	// ------------------------------------------------------------------ the hall (v 3..vb)
-
-	private static boolean sidePost(int v, int vb) {
-		return v == VF || v == vb || (v - VF) % 4 == 0;
-	}
-
-	private static boolean frontPost(int u, int w, int cu) {
-		return u == 1 || u == w - 2 || Math.abs(u - cu) == 2 || (u - 1) % 5 == 0 && u > cu + 2 && u < w - 3;
-	}
-
-	private static void hallWalls(CitadelCanvas c, Plot p, int cu, int vb, int uc, int vc) {
-		int w = p.w();
-		// floor
-		for (int u = 1; u <= w - 2; u++) {
-			for (int v = VF; v <= vb; v++) {
-				p.set(c, u, 0, v, (u == 1 || u == w - 2 || v == VF || v == vb) ? base(p, u, 0, v) : b(Blocks.SPRUCE_PLANKS));
-			}
-		}
-		// front wall (v = VF): shop windows between posts, door at cu
-		for (int u = 1; u <= w - 2; u++) {
-			boolean post = frontPost(u, w, cu);
-			for (int y = 1; y <= 6; y++) {
-				BlockState st;
-				if (y == 6) {
-					st = frame(Direction.Axis.X); // plate
-				} else if (post) {
-					st = frame(Direction.Axis.Y);
-				} else if (u == cu) {
-					st = y <= 2 ? door(Blocks.DARK_OAK_DOOR, Direction.NORTH, y == 2) : y == 3 ? frame(Direction.Axis.X) : plaster(p, u, y, VF);
-				} else if (y == 1) {
-					st = base(p, u, y, VF);
-				} else if (y >= 2 && y <= 4 && Math.abs(u - cu) <= 1) {
-					st = y == 4 ? plaster(p, u, y, VF) : clearPane(true); // sidelights by the door
-				} else if (y >= 2 && y <= 4) {
-					st = clearPane(true); // the wide shop windows
-				} else {
-					st = plaster(p, u, y, VF);
+		Smithy(CitadelCanvas c, Plot p) {
+			this.c = c;
+			this.p = p;
+			w = p.w();
+			d = p.d();
+			h = p.h();
+			Random r = p.rng(0xF026_E002L);
+			int pw0 = Math.max(3, Math.round(w * 0.22f));
+			bw = Math.min(19, w - pw0);
+			pw = w - bw;
+			patioRight = r.nextBoolean();
+			flipB = r.nextBoolean();
+			kind = r.nextInt(3);
+			patioLocalRight = patioRight != flipB;
+			u0 = patioRight ? 0 : pw;
+			vb = d - 2;
+			int ld = Math.max(4, Math.min(8, Math.round((vb - 3) * 0.4f)));
+			vm = Math.max(9, vb - ld);
+			vh = 3 + (vm - 3) / 2;
+			cu = bw / 2;
+			int iw = bw - 4;
+			gw = iw >= 18 ? 7 : iw >= 12 ? 5 : 3;
+			hu = bw - 3;
+			rc0 = (bw - 1) / 2;
+			rc = Math.min(rc0, 6);
+			ra = rc < rc0 ? rc : (bw - 1) / 2;
+			rb = bw - 1 - ra;
+			int door = -1;
+			for (int v = vm + 1; v <= vb - 1; v++) {
+				if ((v - VF) % 4 == 2) {
+					door = v;
+					break;
 				}
-				p.set(c, u, y, VF, st);
 			}
+			dv = door;
 		}
-		// side walls and back wall
-		for (int side = 0; side < 2; side++) {
-			int u = side == 0 ? 1 : w - 2;
-			for (int v = VF + 1; v <= vb; v++) {
-				boolean chimneyBreast = side == 1 && v >= vc - 1 && v <= vc + 1;
-				for (int y = 1; y <= 6; y++) {
+
+		// ------------------------------------------------------------------ mapping (building-local u, mirrored by seed)
+
+		int mu(int bu) {
+			return u0 + (flipB ? bw - 1 - bu : bu);
+		}
+
+		BlockState mir(BlockState st) {
+			return flipB ? st.mirror(Mirror.FRONT_BACK) : st;
+		}
+
+		void s(int bu, int y, int v, BlockState st) {
+			p.set(c, mu(bu), y, v, mir(st));
+		}
+
+		void put(int bu, int y, int v, BlockState st, int layer) {
+			p.put(c, mu(bu), y, v, mir(st), layer);
+		}
+
+		boolean present(int bu, int y, int v) {
+			return Support.present(c, p, mu(bu), y, v);
+		}
+
+		// ------------------------------------------------------------------ materials
+
+		BlockState base(int bu, int y, int v) {
+			return switch (p.hash(mu(bu), y, v, 6)) {
+				case 0 -> b(Blocks.COBBLED_DEEPSLATE);
+				case 1 -> b(Blocks.CRACKED_DEEPSLATE_BRICKS);
+				default -> b(Blocks.DEEPSLATE_BRICKS);
+			};
+		}
+
+		BlockState body(int bu, int y, int v) {
+			int k = p.hash(mu(bu), y, v, 9);
+			return switch (kind) {
+				case 0 -> k == 0 ? b(Blocks.CRACKED_STONE_BRICKS) : k == 1 ? b(Blocks.MOSSY_STONE_BRICKS) : b(Blocks.STONE_BRICKS);
+				case 1 -> k <= 1 ? b(Blocks.POLISHED_TUFF) : b(Blocks.TUFF_BRICKS);
+				default -> k == 0 ? b(Blocks.PACKED_MUD) : b(Blocks.MUD_BRICKS);
+			};
+		}
+
+		BlockState brick(int bu, int y, int v) {
+			return p.hash(mu(bu), y, v, 4) == 0 ? b(Blocks.DEEPSLATE_BRICKS) : b(Blocks.BRICKS);
+		}
+
+		BlockState plaster(int bu, int y, int v) {
+			return p.hash(mu(bu), y, v, 6) == 0 ? b(Blocks.SMOOTH_STONE) : b(Blocks.CALCITE);
+		}
+
+		BlockState floorAt(int bu, int v) {
+			return switch (p.hash(mu(bu), 0, v, 6)) {
+				case 0 -> b(Blocks.DEEPSLATE_TILES);
+				case 1 -> b(Blocks.COBBLED_DEEPSLATE);
+				default -> b(Blocks.POLISHED_DEEPSLATE);
+			};
+		}
+
+		static BlockState frame(Direction.Axis axis) {
+			return log(Blocks.DARK_OAK_LOG, axis);
+		}
+
+		static BlockState trim(Direction.Axis axis) {
+			return log(Blocks.STRIPPED_DARK_OAK_LOG, axis);
+		}
+
+		boolean patioWall(int bu) {
+			return bu == (patioLocalRight ? bw - 2 : 1);
+		}
+
+		// ------------------------------------------------------------------ walls
+
+		void walls() {
+			for (int bu = 1; bu <= bw - 2; bu++) {
+				for (int v = VF; v <= vb; v++) {
+					boolean edge = bu == 1 || bu == bw - 2 || v == VF || v == vb;
+					s(bu, 0, v, edge ? base(bu, 0, v) : floorAt(bu, v));
+				}
+			}
+			frontWall();
+			sideWall(1);
+			sideWall(bw - 2);
+			backWall();
+		}
+
+		void frontWall() {
+			int half = gw / 2;
+			for (int bu = 1; bu <= bw - 2; bu++) {
+				int dist = Math.abs(bu - cu);
+				boolean gate = dist <= half;
+				boolean jamb = dist == half + 1;
+				boolean post = bu == 1 || bu == bw - 2 || jamb || (!gate && (bu - 1) % 4 == 0);
+				boolean win = !post && !gate && ((bu - 1) % 4 == 1 || (bu - 1) % 4 == 2);
+				for (int y = 1; y <= PLATE; y++) {
 					BlockState st;
-					if (chimneyBreast) {
-						st = base(p, u, y, v);
+					if (y == PLATE) {
+						st = frame(Direction.Axis.X);
+					} else if (gate) {
+						if (y <= 4) {
+							continue;
+						}
+						st = y == 5 ? trim(Direction.Axis.X) : y <= 7 ? clearPane(true) : body(bu, y, VF);
+					} else if (post) {
+						st = jamb ? trim(Direction.Axis.Y) : frame(Direction.Axis.Y);
+					} else if (y <= 2) {
+						st = base(bu, y, VF);
+					} else if (y <= 5) {
+						st = win ? clearPane(true) : body(bu, y, VF);
 					} else if (y == 6) {
-						st = frame(Direction.Axis.Z);
-					} else if (sidePost(v, vb)) {
-						st = frame(Direction.Axis.Y);
-					} else if (y == 3 || y == 4) {
-						st = clearPane(false);
+						st = trim(Direction.Axis.X);
 					} else {
-						st = wallAt(p, u, y, v);
+						st = body(bu, y, VF);
 					}
-					p.set(c, u, y, v, st);
+					s(bu, y, VF, st);
+				}
+				if (win) {
+					s(bu, 2, VF - 1, slab(Blocks.STONE_BRICK_SLAB, true)); // [depth] sill
 				}
 			}
 		}
-		for (int u = 2; u <= w - 3; u++) {
-			for (int y = 1; y <= 6; y++) {
-				boolean post = u == cu || u == 4 || u == w - 5;
-				BlockState st = y == 6 ? frame(Direction.Axis.X) : post ? frame(Direction.Axis.Y) : y == 3 && u % 2 == 0 ? clearPane(true) : wallAt(p, u, y, vb);
-				p.set(c, u, y, vb, st);
-			}
-		}
-		// [depth] stone buttress feet and sills, a rim of dark stone round the hall
-		for (int v = VF + 1; v <= vb; v++) {
-			if (!sidePost(v, vb)) {
-				p.set(c, 0, 0, v, base(p, 0, 0, v)); // on the ground: a half slab at y1 floated over nothing
-			}
-		}
-		// the chimney breast on the east flank
-		for (int v = vc - 1; v <= vc + 1; v++) {
-			for (int y = 1; y <= 5; y++) {
-				p.set(c, w - 1, y, v, base(p, w - 1, y, v));
-			}
-			p.set(c, w - 1, 6, v, stair(Blocks.DEEPSLATE_BRICK_STAIRS, Direction.WEST, false));
-		}
-		p.set(c, w - 1, 0, vc - 2, base(p, w - 1, 0, vc - 2));
-		p.set(c, w - 1, 0, vc + 2, base(p, w - 1, 0, vc + 2));
-	}
 
-	/** The hearth in the back-right corner: lit furnaces under a brick arch, glowing through the shop windows. */
-	private static void hearth(CitadelCanvas c, Plot p, int uc, int vc) {
-		// chimney base (3x3 footprint) as a solid breast of fire-brick, hearth mouth on its west face
-		for (int du = -1; du <= 1; du++) {
-			for (int dv = -1; dv <= 1; dv++) {
-				for (int y = 1; y <= 6; y++) {
-					boolean mouth = du == -1 && dv == 0;
-					BlockState st = p.hash(uc + du, y, vc + dv, 3) == 0 ? b(Blocks.BRICKS) : b(Blocks.DEEPSLATE_BRICKS);
-					if (mouth && y == 1) {
-						st = facing(Blocks.FURNACE, Direction.WEST).setValue(BlockStateProperties.LIT, true);
-					} else if (mouth && y == 2) {
-						st = facing(Blocks.BLAST_FURNACE, Direction.WEST).setValue(BlockStateProperties.LIT, true);
-					} else if (mouth && y == 3) {
-						st = stair(Blocks.BRICK_STAIRS, Direction.WEST, true);
-					} else if (du == -1 && y == 3 && Math.abs(dv) == 1) {
-						st = stair(Blocks.BRICK_STAIRS, dv < 0 ? Direction.NORTH : Direction.SOUTH, true);
+		void sideWall(int bu) {
+			boolean hearth = bu == bw - 2;
+			for (int v = VF + 1; v <= vb - 1; v++) {
+				boolean zone = hearth && Math.abs(v - vh) <= 3;
+				boolean post = (v - VF) % 4 == 0;
+				int m = (v - VF) % 4;
+				boolean isDoor = patioWall(bu) && v == dv;
+				boolean stairSide = bu == 1 && v >= vm - 5 && v <= vm - 1;
+				boolean win = !post && (m == 1 || m == 2) && !zone && !isDoor;
+				for (int y = 1; y <= PLATE; y++) {
+					BlockState st;
+					if (zone) {
+						st = y <= 2 ? base(bu, y, v) : brick(bu, y, v);
+					} else if (isDoor && y <= 2) {
+						st = door(Blocks.DARK_OAK_DOOR, bu == 1 ? Direction.WEST : Direction.EAST, y == 2);
+					} else if (y == PLATE) {
+						st = frame(Direction.Axis.Z);
+					} else if (post) {
+						st = frame(Direction.Axis.Y);
+					} else if (y <= 2) {
+						st = base(bu, y, v);
+					} else if (y <= 5) {
+						st = win && !stairSide ? clearPane(false) : body(bu, y, v);
+					} else if (y == 6) {
+						st = trim(Direction.Axis.Z);
+					} else {
+						st = win ? clearPane(false) : body(bu, y, v);
 					}
-					p.set(c, uc + du, y, vc + dv, st);
+					s(bu, y, v, st);
 				}
 			}
 		}
-		// [finish] anvil and a quench trough in front of the hearth
-		p.set(c, uc - 3, 1, vc, facing(Blocks.ANVIL, Direction.NORTH));
-		p.set(c, uc - 2, 1, vc + 1, b(Blocks.WATER_CAULDRON));
-		// the smith stands in front of the hearth mouth (uc - 2, vc): the coal sits a row further forward so that cell
-		// stays reachable (it used to be boxed in by coal, trough and anvil)
-		p.set(c, uc - 3, 1, vc - 2, b(Blocks.SMITHING_TABLE));
-		p.set(c, uc - 2, 1, vc - 2, b(Blocks.COAL_BLOCK));
-		p.put(c, uc - 3, 5, vc, lantern(true), CitadelCanvas.HANGING);
-		p.put(c, 3, 5, VF + 3, lantern(true), CitadelCanvas.HANGING);
-		// fix/settle-sources: the two hall lanterns hang on a chain from the roof (they hung from the air under it)
-		hangChain(c, p, uc - 3, 5, vc);
-		hangChain(c, p, 3, 5, VF + 3);
-	}
 
-	/** An iron chain from the cell above a hanging lantern at {@code y} up to the underside of the main roof over row {@code v}. */
-	private static void hangChain(CitadelCanvas c, Plot p, int u, int y, int v) {
-		for (int yy = y + 1; yy < roofY(v, p.d()); yy++) {
-			if (!Support.present(c, p, u, yy, v)) {
-				p.put(c, u, yy, v, Blocks.IRON_CHAIN.defaultBlockState(), CitadelCanvas.HANGING);
-			}
-		}
-	}
-
-	// ------------------------------------------------------------------ roofs
-
-	private static int roofY(int v, int d) {
-		return PLATE + Math.min(v - VF, d - 1 - v);
-	}
-
-	/**
-	 * [finish] the main roof: deepslate tiles over the hall, ridge along u, eave rows in blackstone brick, a ridge of
-	 * oxidized copper slabs, rakes one block proud of the gables.
-	 */
-	private static void mainRoof(CitadelCanvas c, Plot p, int vb) {
-		int w = p.w();
-		int d = p.d();
-		int vr = (VF + d - 1) / 2;
-		for (int v = VF; v < d; v++) {
-			int y = roofY(v, d);
-			boolean frontSlope = v < vr || (v == vr && (VF + d - 1) % 2 == 1);
-			boolean ridgeRow = (VF + d - 1) % 2 == 0 && v == vr;
-			boolean eave = v == VF || v == d - 1;
-			for (int u = 0; u < w; u++) {
-				boolean rake = u == 0 || u == w - 1;
-				BlockState st;
-				if (ridgeRow) {
-					st = b(Blocks.DEEPSLATE_TILES);
-				} else {
-					Block m = eave || rake ? Blocks.POLISHED_BLACKSTONE_BRICK_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS;
-					st = stair(m, frontSlope ? Direction.SOUTH : Direction.NORTH, false);
-				}
-				p.set(c, u, y, v, st);
-				// [depth] rake underside and eave underside
-				if (rake && y - 1 >= PLATE && v > VF && v < d - 1) {
-					p.set(c, u, y - 1, v, stair(Blocks.DEEPSLATE_TILE_STAIRS, frontSlope ? Direction.NORTH : Direction.SOUTH, true));
-				}
-			}
-		}
-		// ridge cap of oxidized copper slabs
-		int top = roofY(vr, d);
-		for (int u = 0; u < w; u++) {
-			p.set(c, u, top + 1, vr, slab(copperSlab(3 - p.hash(u, 0, 0, 2)), false));
-			if ((VF + d - 1) % 2 == 1) {
-				p.set(c, u, top + 1, vr + 1, slab(copperSlab(3 - p.hash(u, 1, 0, 2)), false));
-			}
-		}
-	}
-
-	private static void gables(CitadelCanvas c, Plot p, int vb, int uc, int vc) {
-		int w = p.w();
-		int d = p.d();
-		for (int u : new int[] {1, w - 2}) {
-			for (int v = VF + 1; v <= vb; v++) {
-				boolean breast = u == w - 2 && v >= vc - 1 && v <= vc + 1;
-				for (int y = PLATE; y < roofY(v, d); y++) {
-					BlockState st = y == roofY(v, d) - 1 && y > PLATE ? b(Blocks.TUFF_BRICKS) : plaster(p, u, y, v);
-					if (breast) {
-						st = base(p, u, y, v);
-					} else if (y == PLATE + 1 && v == (VF + vb) / 2) {
-						st = clearPane(false);
+		void backWall() {
+			for (int bu = 1; bu <= bw - 2; bu++) {
+				boolean post = bu == 1 || bu == bw - 2 || (bu - 1) % 4 == 0;
+				boolean win = !post && ((bu - 1) % 4 == 1 || (bu - 1) % 4 == 2);
+				for (int y = 1; y <= PLATE; y++) {
+					BlockState st;
+					if (y == PLATE) {
+						st = frame(Direction.Axis.X);
+					} else if (post) {
+						st = frame(Direction.Axis.Y);
+					} else if (y <= 2) {
+						st = base(bu, y, vb);
+					} else if (y <= 4) {
+						st = win ? clearPane(true) : body(bu, y, vb);
+					} else if (y == 5) {
+						st = body(bu, y, vb);
+					} else if (y == 6) {
+						st = trim(Direction.Axis.X);
+					} else {
+						st = win ? clearPane(true) : body(bu, y, vb);
 					}
-					p.set(c, u, y, v, st);
+					s(bu, y, vb, st);
 				}
 			}
 		}
-		// front and back wall tops above the plate, under the roof
-		for (int v : new int[] {VF}) {
-			for (int u = 1; u <= w - 2; u++) {
-				p.set(c, u, PLATE, v, frame(Direction.Axis.X));
-			}
+
+		// ------------------------------------------------------------------ roof
+
+		int roofY(int bu) {
+			return PLATE + Math.min(Math.min(bu, bw - 1 - bu), rc);
 		}
-	}
 
-	// ------------------------------------------------------------------ chimney
-
-	/**
-	 * [finish] the big chimney: a 3x3 brick-and-deepslate shaft rising through the roof, a flared corbel of
-	 * upside-down stairs at the top, a capped pot with a smoking campfire.
-	 */
-	private static void chimney(CitadelCanvas c, Plot p, int uc, int vc) {
-		int d = p.d();
-		int ridge = roofY((VF + d - 1) / 2, d);
-		int top = Math.min(ridge + 4, p.h() - 2);
-		for (int du = -1; du <= 1; du++) {
-			for (int dv = -1; dv <= 1; dv++) {
-				for (int y = 7; y <= top; y++) {
-					BlockState st = p.hash(uc + du, y, vc + dv, 3) == 0 ? b(Blocks.DEEPSLATE_BRICKS) : b(Blocks.BRICKS);
-					p.set(c, uc + du, y, vc + dv, st);
+		/** The gable walls above the plates, timber-framed, with a glazed loft window on the street side. */
+		void gables() {
+			for (int pass = 0; pass < 2; pass++) {
+				int v = pass == 0 ? VF : vb;
+				for (int bu = 2; bu <= bw - 3; bu++) {
+					int top = roofY(bu);
+					for (int y = PLATE + 1; y < top; y++) {
+						BlockState st;
+						if (y == PLATE + 1) {
+							st = trim(Direction.Axis.X); // tie beam
+						} else if ((bu - cu) % 3 == 0) {
+							st = frame(Direction.Axis.Y); // studs
+						} else if (pass == 0 && Math.abs(bu - cu) <= 1 && y >= PLATE + 3 && y <= PLATE + 4) {
+							st = clearPane(true); // lucarne over the gate
+						} else if (pass == 1 && bu == cu && y >= PLATE + 3 && y <= PLATE + 4) {
+							st = clearPane(true);
+						} else {
+							st = plaster(bu, y, v);
+						}
+						s(bu, y, v, st);
+					}
 				}
 			}
 		}
-		// corbel ring: upside-down stairs one block out, facing outwards
-		for (int k = -1; k <= 1; k++) {
-			p.set(c, uc + k, top, vc - 2, stair(Blocks.BRICK_STAIRS, Direction.SOUTH, true));
-			p.set(c, uc + k, top, vc + 2, stair(Blocks.BRICK_STAIRS, Direction.NORTH, true));
-			p.set(c, uc - 2, top, vc + k, stair(Blocks.BRICK_STAIRS, Direction.EAST, true));
-			p.set(c, uc + 2, top, vc + k, stair(Blocks.BRICK_STAIRS, Direction.WEST, true));
-		}
-		// cap: a slab ring round an open pot with the campfire
-		for (int du = -1; du <= 1; du++) {
-			for (int dv = -1; dv <= 1; dv++) {
-				if (du == 0 && dv == 0) {
-					p.set(c, uc, top + 1, vc, b(Blocks.CAMPFIRE).setValue(BlockStateProperties.SIGNAL_FIRE, true));
-				} else {
-					p.set(c, uc + du, top + 1, vc + dv, slab(copperSlab(3), false));
+
+		/**
+		 * [finish] deepslate tiles, blackstone-brick rims, a ridge of tile blocks, the rise capped so a wide hall gets a flat
+		 * crown for the lantern. A full block of the roof's own material under every cell keeps it face-connected.
+		 */
+		void roof() {
+			for (int bu = 0; bu < bw; bu++) {
+				int rs = Math.min(bu, bw - 1 - bu);
+				int y = PLATE + Math.min(rs, rc);
+				boolean left = bu < bw - 1 - bu;
+				for (int v = 1; v <= d - 1; v++) {
+					boolean edge = v == 1 || v == d - 1 || bu == 0 || bu == bw - 1;
+					BlockState st;
+					if (rs < rc || (bw % 2 == 0 && rc == rc0 && rs == rc)) {
+						st = stair(edge ? Blocks.POLISHED_BLACKSTONE_BRICK_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS, left ? Direction.EAST : Direction.WEST, false);
+					} else {
+						st = b(Blocks.DEEPSLATE_TILES);
+					}
+					s(bu, y, v, st);
+					if (rs >= 1) {
+						Support.fillIfFree(c, p, mu(bu), y - 1, v, b(Blocks.DEEPSLATE_TILES));
+					}
 				}
 			}
 		}
-	}
 
-	// ------------------------------------------------------------------ the work porch (v 0..2)
-
-	private static void porch(CitadelCanvas c, Plot p, Random r, int cu) {
-		int w = p.w();
-		// floor: polished blackstone pavers with a brick runner to the door
-		for (int u = 1; u <= w - 2; u++) {
-			for (int v = 0; v <= 2; v++) {
-				BlockState st = u == cu ? b(Blocks.BRICKS) : p.hash(u, 0, v, 3) == 0 ? b(Blocks.CRACKED_STONE_BRICKS) : b(Blocks.STONE_BRICKS);
-				p.set(c, u, 0, v, st);
+		/** A glazed lantern on the ridge over the forge: light in, heat out. */
+		void monitor() {
+			int ma = ra - 1;
+			int mb = rb + 1;
+			int mv0 = vh - 2;
+			int mv1 = vh + 2;
+			int yb = PLATE + rc + 1;
+			for (int v = mv0; v <= mv1; v++) {
+				s(ma, yb - 1, v, b(Blocks.DEEPSLATE_TILES));
+				s(mb, yb - 1, v, b(Blocks.DEEPSLATE_TILES));
 			}
-		}
-		// posts and the beam at the front edge (v 0), side beams to the wall
-		for (int u = 1; u <= w - 2; u++) {
-			boolean post = u == 1 || u == w - 2 || Math.abs(u - cu) == 2 || ((u - cu) % 4 == 0 && u > cu + 2 && u < w - 3);
-			if (post) {
-				for (int y = 1; y <= 3; y++) {
-					p.set(c, u, y, 0, log(Blocks.CHERRY_LOG, Direction.Axis.Y));
+			for (int bu = ma; bu <= mb; bu++) {
+				for (int v = mv0; v <= mv1; v++) {
+					for (int y = yb; y <= yb + 1; y++) {
+						boolean corner = (bu == ma || bu == mb) && (v == mv0 || v == mv1);
+						s(bu, y, v, corner ? frame(Direction.Axis.Y) : b(Blocks.GLASS));
+					}
 				}
-				p.set(c, u, 0, 0, b(Blocks.DEEPSLATE_BRICKS)); // plinth foot
 			}
-			p.set(c, u, 4, 0, log(Blocks.STRIPPED_CHERRY_LOG, Direction.Axis.X));
-			// rail between posts, except at the steps
-			if (!post && Math.abs(u - cu) > 1) {
-				boolean l = u - 1 >= 1;
-				boolean rr = u + 1 <= w - 2;
-				p.set(c, u, 1, 0, fence(Blocks.DARK_OAK_FENCE, false, rr, false, l));
-			}
-		}
-		for (int v = 1; v <= 2; v++) {
-			p.set(c, 1, 4, v, log(Blocks.STRIPPED_CHERRY_LOG, Direction.Axis.Z));
-			p.set(c, w - 2, 4, v, log(Blocks.STRIPPED_CHERRY_LOG, Direction.Axis.Z));
-		}
-		// steps down to the path at the door
-		for (int u = cu - 1; u <= cu + 1; u++) {
-			p.set(c, u, 0, 0, stair(Blocks.BRICK_STAIRS, Direction.SOUTH, false));
-		}
-		// the copper lean-to: orange at the wall, verdigris at the eave (v0 oxidized, v1 weathered, v2 exposed)
-		for (int v = 0; v <= 2; v++) {
-			int lvl = 3 - v;
-			for (int u = 0; u < w; u++) {
-				int level = Math.max(1, Math.min(3, lvl)); // clean bands, no random orange patches
-				p.set(c, u, 5 + v, v, stair(copperStairs(level), Direction.SOUTH, false));
-				if ((u == 0 || u == w - 1) && v <= 1) {
-					p.set(c, u, 4 + v, v, stair(Blocks.DEEPSLATE_BRICK_STAIRS, Direction.SOUTH, true)); // [depth] eave brackets
+			for (int bu = ma - 1; bu <= mb + 1; bu++) {
+				for (int v = mv0 - 1; v <= mv1 + 1; v++) {
+					boolean rim = bu == ma - 1 || bu == mb + 1 || v == mv0 - 1 || v == mv1 + 1;
+					s(bu, yb + 2, v, slab(rim ? Blocks.POLISHED_BLACKSTONE_BRICK_SLAB : Blocks.DEEPSLATE_TILE_SLAB, false));
 				}
 			}
 		}
-		// hanging lanterns beside the door
-		BlockState hanging = lantern(true);
-		p.put(c, cu - 2, 3, 1, hanging, CitadelCanvas.HANGING);
-		p.put(c, cu + 2, 3, 1, hanging, CitadelCanvas.HANGING);
-		// the tools: a seed-shuffled row along the front wall
-		Block[] props = {Blocks.ANVIL, Blocks.GRINDSTONE, Blocks.SMITHING_TABLE, Blocks.WATER_CAULDRON, Blocks.BARREL, Blocks.COAL_BLOCK};
-		int k = r.nextInt(props.length);
-		for (int u = 2; u <= w - 3; u++) {
-			if (Math.abs(u - cu) <= 1) {
-				continue;
-			}
-			Block pr = props[(k + u) % props.length];
-			BlockState st = pr == Blocks.ANVIL ? facing(pr, Direction.EAST) : pr == Blocks.BARREL ? barrel() : b(pr);
-			p.set(c, u, 1, 2, st);
-		}
-		// shutters: open trapdoors on the front wall each side of the windows
-		for (int u = 2; u <= w - 3; u++) {
-			if (Math.abs(u - cu) == 3 || u == w - 3) {
-				p.set(c, u, 3, 2, trap(Blocks.DARK_OAK_TRAPDOOR, Direction.NORTH, true, false));
-			}
-		}
-	}
 
-	/**
-	 * [depth] stone buttresses on the west flank (at every wall post) and on the back wall (at its posts): a dark foot, a
-	 * tuff shoulder and a sloped cap against the wall, so both faces have a rhythm of piers and shadows.
-	 */
-	private static void buttresses(CitadelCanvas c, Plot p, int cu, int vb, int uc) {
-		int w = p.w();
-		int d = p.d();
-		for (int v = VF + 1; v <= vb; v++) {
-			if (sidePost(v, vb)) {
-				buttress(c, p, 0, v, Direction.EAST);
-			}
-		}
-		for (int u : new int[] {cu, 4, w - 5}) {
-			if (Math.abs(u - uc) > 2 && u >= 1 && u <= w - 2) {
-				buttress(c, p, u, d - 1, Direction.NORTH);
-			}
-		}
-	}
+		// ------------------------------------------------------------------ the forge
 
-	private static void buttress(CitadelCanvas c, Plot p, int u, int v, Direction towardWall) {
-		for (int y = 0; y <= 4; y++) {
-			p.set(c, u, y, v, y <= 1 ? base(p, u, y, v) : mid(p, u, y, v));
-		}
-		p.set(c, u, 5, v, stair(Blocks.TUFF_BRICK_STAIRS, towardWall, false));
-	}
-
-	// ------------------------------------------------------------------ yard (behind and beside the hall)
-
-	private static void yard(CitadelCanvas c, Plot p, Random r, int cu, int vb, int uc, int vc) {
-		int w = p.w();
-		int d = p.d();
-		// woodpile along the west flank
-		for (int v = VF + 1; v < vb; v++) {
-			int k = p.hash(0, 0, v, 4);
-			int y0 = p.at(c, 0, 0, v) != null ? 1 : 0; // on the stone rim when there is one
-			if (k <= 1) {
-				p.set(c, 0, y0, v, log(Blocks.STRIPPED_DARK_OAK_LOG, Direction.Axis.Z));
-				if (k == 0) {
-					p.set(c, 0, y0 + 1, v, log(Blocks.STRIPPED_DARK_OAK_LOG, Direction.Axis.Z));
-				}
-			} else if (k == 2) {
-				p.set(c, 0, y0, v, barrel());
+		/** Furnace, forge fire and blast furnace in a brick alcove under a hood; the flue rises from the fire. */
+		void hearth() {
+			for (int dz = -1; dz <= 1; dz++) {
+				s(hu, 0, vh + dz, b(Blocks.BRICKS));
 			}
-		}
-		// back strip: charcoal heap, barrels and a water trough
-		for (int u = 1; u <= w - 6; u++) {
-			switch (p.hash(u, 0, d - 1, 5)) {
-				case 0 -> p.set(c, u, 0, d - 1, b(Blocks.COAL_BLOCK));
-				case 1 -> p.set(c, u, 0, d - 1, barrel());
-				case 2 -> p.set(c, u, 0, d - 1, b(Blocks.WATER_CAULDRON));
-				default -> {
+			s(hu, 1, vh - 1, facing(Blocks.FURNACE, Direction.WEST).setValue(BlockStateProperties.LIT, true));
+			s(hu, 1, vh + 1, facing(Blocks.BLAST_FURNACE, Direction.WEST).setValue(BlockStateProperties.LIT, true));
+			s(hu, 1, vh, b(Blocks.CAMPFIRE));
+			for (int y = 1; y <= 4; y++) {
+				for (int uu = hu - 1; uu <= hu; uu++) {
+					for (int vv : new int[] {vh - 2, vh + 2}) {
+						s(uu, y, vv, brick(uu, y, vv));
+					}
 				}
 			}
+			for (int uu = hu - 1; uu <= hu; uu++) {
+				for (int vv = vh - 2; vv <= vh + 2; vv++) {
+					if (uu == hu && vv == vh) {
+						continue; // the flue
+					}
+					BlockState st = brick(uu, 5, vv);
+					if (uu == hu - 1 && Math.abs(vv - vh) <= 1) {
+						st = stair(Blocks.BRICK_STAIRS, Direction.EAST, true); // [depth] the hood lip
+					}
+					s(uu, 5, vv, st);
+				}
+				s(uu, 6, vh - 2, stair(Blocks.BRICK_STAIRS, Direction.SOUTH, false));
+				s(uu, 6, vh + 2, stair(Blocks.BRICK_STAIRS, Direction.NORTH, false));
+			}
 		}
-		// a lantern post at the corner of the porch
-		int lx = r.nextBoolean() ? 0 : w - 1;
-		p.set(c, lx, 0, 0, b(Blocks.COBBLED_DEEPSLATE_WALL));
-		p.set(c, lx, 1, 0, lantern(false));
+
+		void chimney() {
+			int top = Math.min(PLATE + rc + 4, h - 3);
+			for (int y = 6; y <= top; y++) {
+				for (int uu = hu - 1; uu <= hu + 1; uu++) {
+					for (int vv = vh - 1; vv <= vh + 1; vv++) {
+						if (uu == hu && vv == vh) {
+							s(uu, y, vv, CitadelCanvas.AIR);
+						} else {
+							s(uu, y, vv, brick(uu, y, vv));
+						}
+					}
+				}
+			}
+			// [finish] corbel ring one block out, then a slab cap round the open flue
+			for (int k = -1; k <= 1; k++) {
+				s(hu - 2, top, vh + k, stair(Blocks.BRICK_STAIRS, Direction.EAST, true));
+				s(hu + 2, top, vh + k, stair(Blocks.BRICK_STAIRS, Direction.WEST, true));
+				s(hu + k, top, vh - 2, stair(Blocks.BRICK_STAIRS, Direction.SOUTH, true));
+				s(hu + k, top, vh + 2, stair(Blocks.BRICK_STAIRS, Direction.NORTH, true));
+			}
+			for (int du = -1; du <= 1; du++) {
+				for (int dz = -1; dz <= 1; dz++) {
+					if (du != 0 || dz != 0) {
+						s(hu + du, top + 1, vh + dz, slab(Blocks.DEEPSLATE_BRICK_SLAB, false));
+					}
+				}
+			}
+			s(hu, top + 1, vh, CitadelCanvas.AIR);
+		}
+
+		// ------------------------------------------------------------------ stair, loft, nave, stock
+
+		void stairAndLoft() {
+			for (int bu = 2; bu <= bw - 3; bu++) {
+				for (int v = vm; v <= vb - 1; v++) {
+					BlockState st;
+					if (v == vm) {
+						st = trim(Direction.Axis.X); // front beam
+					} else if ((v - vm) % 3 == 0) {
+						st = frame(Direction.Axis.X); // joist
+					} else {
+						st = p.hash(mu(bu), FL, v, 3) == 0 ? b(Blocks.SPRUCE_PLANKS) : b(Blocks.DARK_OAK_PLANKS);
+					}
+					s(bu, FL, v, st);
+				}
+			}
+			for (int bu = 4; bu <= bw - 3; bu += 4) {
+				if (bw - 3 - bu == 1) {
+					continue; // too close to the post at the hearth wall
+				}
+				for (int y = 1; y <= 4; y++) {
+					s(bu, y, vm, frame(Direction.Axis.Y));
+				}
+			}
+			for (int y = 1; y <= 4; y++) {
+				s(bw - 3, y, vm, frame(Direction.Axis.Y));
+			}
+			for (int bu = 4; bu <= bw - 3; bu++) {
+				s(bu, FL + 1, vm, fence(Blocks.DARK_OAK_FENCE, false, bu + 1 <= bw - 3, false, bu - 1 >= 4));
+			}
+			// the stair: two wide, five masonry steps up along the left wall, first step met head-on from the gate
+			for (int k = 1; k <= 5; k++) {
+				int v = vm - 6 + k;
+				for (int bu = 2; bu <= 3; bu++) {
+					for (int y = 1; y < k; y++) {
+						s(bu, y, v, b(Blocks.STONE_BRICKS));
+					}
+					s(bu, k, v, stair(Blocks.STONE_BRICK_STAIRS, Direction.SOUTH, false));
+				}
+			}
+		}
+
+		void hang(int bu, int y, int v) {
+			put(bu, y, v, lantern(true), CitadelCanvas.HANGING);
+			for (int yy = y + 1; yy <= PLATE + rc + 1; yy++) {
+				if (present(bu, yy, v)) {
+					break;
+				}
+				put(bu, yy, v, Blocks.IRON_CHAIN.defaultBlockState(), CitadelCanvas.HANGING);
+			}
+		}
+
+		void nave() {
+			int tu0 = Math.max(5, bw - 8);
+			// [function] a contained quench trough, well away from the fire
+			for (int t = 0; t < 2; t++) {
+				s(tu0 + t, 0, vh, b(Blocks.WATER));
+				s(tu0 + t, 1, vh - 1, slab(Blocks.STONE_BRICK_SLAB, false));
+				s(tu0 + t, 1, vh + 1, slab(Blocks.STONE_BRICK_SLAB, false));
+			}
+			s(hu - 3, 1, vh - 1, facing(Blocks.ANVIL, Direction.NORTH));
+			s(hu - 3, 1, vh + 1, facing(Blocks.ANVIL, Direction.NORTH));
+			// stations along the gate wall
+			int ul = cu - gw / 2 - 1;
+			int ur = cu + gw / 2 + 1;
+			if (ul >= 4) {
+				s(ul, 1, 3, b(Blocks.SMITHING_TABLE));
+			}
+			s(ur, 1, 3, b(Blocks.CRAFTING_TABLE));
+			if (ur + 1 <= hu - 1) {
+				s(ur + 1, 1, 3, b(Blocks.GRINDSTONE).setValue(BlockStateProperties.ATTACH_FACE, AttachFace.FLOOR));
+			}
+			for (int bu = ur + 2; bu <= hu - 1; bu++) {
+				s(bu, 1, 3, bu % 2 == 0 ? facing(Blocks.CHEST, Direction.SOUTH) : barrel());
+			}
+			s(hu, 1, 3, barrel());
+			s(hu, 2, 3, b(Blocks.COAL_BLOCK));
+			// tool chests on the stair wall ahead of the flight, if the nave is deep enough
+			for (int v = 3; v <= vm - 7; v++) {
+				s(2, 1, v, facing(Blocks.CHEST, Direction.EAST));
+			}
+			hang(cu, 7, 4);
+			hang(hu - 3, 7, vh);
+			hang(tu0, 7, vh + 2);
+		}
+
+		void stock() {
+			for (int bu = 3; bu <= bw - 4; bu++) {
+				switch ((bu - 3) % 4) {
+					case 0, 1 -> s(bu, 1, vb - 1, facing(Blocks.CHEST, Direction.NORTH));
+					case 2 -> {
+						s(bu, 1, vb - 1, barrel());
+						s(bu, 2, vb - 1, b(Blocks.COAL_BLOCK));
+					}
+					default -> s(bu, 1, vb - 1, barrel());
+				}
+			}
+			int nc = patioLocalRight ? 2 : bw - 3;
+			s(nc, 1, vm + 1, b(Blocks.CRAFTING_TABLE));
+			s(nc, 1, vm + 2, facing(Blocks.CHEST, patioLocalRight ? Direction.EAST : Direction.WEST));
+			put(cu - 3, 4, vm + 2, lantern(true), CitadelCanvas.HANGING);
+			put(Math.min(cu + 3, bw - 4), 4, vm + 2, lantern(true), CitadelCanvas.HANGING);
+		}
+
+		/** The smith's studio: bed, desk and shelves, a table with a lamp, windows on three sides. */
+		void loft() {
+			int y = FL + 1;
+			BlockState bed = b(Blocks.BED.pick(DyeColor.RED)).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.SOUTH);
+			s(2, y, vb - 1, bed.setValue(BlockStateProperties.BED_PART, BedPart.HEAD));
+			s(2, y, vb - 2, bed.setValue(BlockStateProperties.BED_PART, BedPart.FOOT));
+			s(bw - 4, y, vb - 1, b(Blocks.BOOKSHELF));
+			s(bw - 4, y + 1, vb - 1, b(Blocks.BOOKSHELF));
+			s(bw - 5, y, vb - 1, b(Blocks.BOOKSHELF));
+			s(bw - 3, y, vb - 1, facing(Blocks.LECTERN, Direction.NORTH));
+			s(bw - 3, y, vm + 1, facing(Blocks.CHEST, Direction.WEST));
+			int tu = Math.min(bw - 6, cu + 1);
+			int tv = vm + 2;
+			s(tu, y, tv, slab(Blocks.DARK_OAK_SLAB, false));
+			s(tu, y + 1, tv, lantern(false));
+			s(tu - 1, y, tv, stair(Blocks.DARK_OAK_STAIRS, Direction.WEST, false));
+			s(tu + 1, y, tv, stair(Blocks.DARK_OAK_STAIRS, Direction.EAST, false));
+		}
+
+		// ------------------------------------------------------------------ the front: apron, steps, loading beam
+
+		void front() {
+			int half = gw / 2;
+			for (int bu = 1; bu <= bw - 2; bu++) {
+				s(bu, 0, 1, p.hash(mu(bu), 0, 1, 3) == 0 ? b(Blocks.CRACKED_STONE_BRICKS) : b(Blocks.STONE_BRICKS));
+				int dist = Math.abs(bu - cu);
+				if (dist <= half + 1) {
+					s(bu, 0, 0, stair(Blocks.STONE_BRICK_STAIRS, Direction.SOUTH, false)); // [function] the loading ramp
+				} else if (bu == 1 || bu == bw - 2) {
+					s(bu, 0, 0, wall(Blocks.COBBLED_DEEPSLATE_WALL, false, false, false, false, true));
+					s(bu, 1, 0, lantern(false));
+				} else if (p.hash(mu(bu), 0, 0, 3) == 0) {
+					s(bu, 0, 0, barrel());
+				}
+			}
+			// the hoist: a beam out of the gable over the gate, a chain and a lantern
+			s(cu, PLATE + 1, 1, trim(Direction.Axis.Z));
+			s(cu, PLATE + 1, 0, trim(Direction.Axis.Z));
+			put(cu, PLATE - 1, 0, Blocks.IRON_CHAIN.defaultBlockState(), CitadelCanvas.HANGING);
+			put(cu, PLATE, 0, Blocks.IRON_CHAIN.defaultBlockState(), CitadelCanvas.HANGING);
+			put(cu, PLATE - 2, 0, lantern(true), CitadelCanvas.HANGING);
+		}
+
+		/** [depth] stone piers at the posts, with a sloped cap under the eave; the yard door gets its step. */
+		void buttresses() {
+			for (int v = VF; v <= vb; v++) {
+				if ((v - VF) % 4 != 0) {
+					continue;
+				}
+				pier(0, v, Direction.EAST);
+				pier(bw - 1, v, Direction.WEST);
+			}
+			for (int bu = 1; bu <= bw - 2; bu++) {
+				boolean post = bu == 1 || bu == bw - 2 || (bu - 1) % 4 == 0;
+				if (post && (bu == 1 || bu == bw - 2 || Math.abs(bu - cu) > gw / 2 + 1)) {
+					pier(bu, d - 1, Direction.NORTH);
+				}
+				boolean jambOrGate = Math.abs(bu - cu) <= gw / 2 + 1;
+				if ((bu == 1 || bu == bw - 2) && !jambOrGate) {
+					pier(bu, 1, Direction.SOUTH);
+				}
+			}
+			if (dv >= 0) {
+				int ext = patioLocalRight ? bw - 1 : 0;
+				s(ext, 0, dv, stair(Blocks.STONE_BRICK_STAIRS, patioLocalRight ? Direction.WEST : Direction.EAST, false));
+			}
+		}
+
+		void pier(int bu, int v, Direction toWall) {
+			int y0 = v == 1 ? 1 : 0; // on the apron the pier stands on its paving
+			for (int y = y0; y <= 6; y++) {
+				s(bu, y, v, y <= y0 + 1 ? base(bu, y, v) : body(bu, y, v));
+			}
+			s(bu, 7, v, stair(Blocks.STONE_BRICK_STAIRS, toWall, false));
+		}
+
+		// ------------------------------------------------------------------ the side yard
+
+		int pl(int pu) {
+			return patioRight ? bw + pu : pw - 1 - pu;
+		}
+
+		void ps(int pu, int y, int v, BlockState st) {
+			p.set(c, pl(pu), y, v, patioRight ? st : st.mirror(Mirror.FRONT_BACK));
+		}
+
+		void patio() {
+			int v0 = 4; // first row of the cart bed
+			int pc = pw / 2; // the cart's column
+			int vmid = v0 + 1;
+			int gapEnd = Math.min(pc + 1, pw - 2);
+			boolean[][] fn = new boolean[pw][d];
+			for (int pu = gapEnd + 1; pu < pw; pu++) {
+				fn[pu][0] = true;
+			}
+			for (int v = 1; v <= v0 + 3; v++) {
+				fn[pw - 1][v] = true;
+			}
+			for (int v = d - 2; v <= d - 1; v++) {
+				fn[pw - 1][v] = true;
+			}
+			for (int pu = 0; pu < pw; pu++) {
+				fn[pu][d - 1] = true;
+			}
+			if (pc - 1 >= 0) {
+				fn[pc - 1][vmid] = false;
+			}
+			if (pc + 1 < pw) {
+				fn[pc + 1][vmid] = false;
+			}
+			for (int pu = 0; pu < pw; pu++) {
+				for (int v = 0; v < d; v++) {
+					if (fn[pu][v]) {
+						boolean n = v > 0 && fn[pu][v - 1];
+						boolean sd = v < d - 1 && fn[pu][v + 1];
+						boolean e = pu < pw - 1 && fn[pu + 1][v];
+						boolean wv = pu > 0 && fn[pu - 1][v];
+						ps(pu, 0, v, fence(Blocks.DARK_OAK_FENCE, n, e, sd, wv));
+					}
+				}
+			}
+			// a lantern post at the corner of the gate
+			ps(pw - 1, 0, 0, wall(Blocks.COBBLED_DEEPSLATE_WALL, false, false, true, false, true));
+			ps(pw - 1, 1, 0, lantern(false));
+			// slab pavers from the gate to the yard door
+			int last = dv >= 0 ? dv - 1 : d - 3;
+			for (int v = 1; v <= last; v++) {
+				if (v == vmid) {
+					continue;
+				}
+				ps(0, 0, v, slab(p.hash(pl(0), 0, v, 2) == 0 ? Blocks.COBBLESTONE_SLAB : Blocks.STONE_BRICK_SLAB, false));
+			}
+			// the cart: bed, axle, two wheels, shafts towards the street, a load of barrels and hay
+			for (int v = v0; v <= v0 + 2; v++) {
+				ps(pc, 1, v, b(Blocks.SPRUCE_PLANKS));
+			}
+			ps(pc, 0, vmid, log(Blocks.DARK_OAK_LOG, Direction.Axis.X));
+			for (int y = 0; y <= 1; y++) {
+				if (pc - 1 >= 0) {
+					ps(pc - 1, y, vmid, trap(Blocks.DARK_OAK_TRAPDOOR, Direction.WEST, true, false));
+				}
+				if (pc + 1 < pw) {
+					ps(pc + 1, y, vmid, trap(Blocks.DARK_OAK_TRAPDOOR, Direction.EAST, true, false));
+				}
+			}
+			ps(pc, 1, v0 - 1, fence(Blocks.DARK_OAK_FENCE, true, false, true, false));
+			ps(pc, 1, v0 - 2, fence(Blocks.DARK_OAK_FENCE, false, false, true, false));
+			ps(pc, 0, v0 - 2, fence(Blocks.DARK_OAK_FENCE, false, false, false, false));
+			ps(pc, 2, v0, barrel());
+			ps(pc, 3, v0, barrel());
+			ps(pc, 2, v0 + 1, barrel());
+			ps(pc, 2, v0 + 2, b(Blocks.HAY_BLOCK));
+			// the wood pile along the outer edge
+			for (int k = 0; k < (pw >= 5 ? 2 : 1); k++) {
+				int pu = pw - 1 - k;
+				for (int v = v0 + 4; v <= d - 3; v++) {
+					if ((v - (v0 + 4)) % 4 == 3) {
+						continue;
+					}
+					int hh = 2 + p.hash(pl(pu), 0, v, 2);
+					for (int y = 0; y < hh; y++) {
+						ps(pu, y, v, log(p.hash(pl(pu), y, v, 3) == 0 ? Blocks.SPRUCE_LOG : Blocks.DARK_OAK_LOG, Direction.Axis.Z));
+					}
+					if (p.hash(pl(pu), hh, v, 2) == 0) {
+						ps(pu, hh, v, trap(Blocks.SPRUCE_TRAPDOOR, Direction.NORTH, false, false));
+					}
+				}
+			}
+			// a chopping block and a hay bale at the back of the yard
+			ps(Math.max(1, pw / 2), 0, d - 3, log(Blocks.STRIPPED_DARK_OAK_LOG, Direction.Axis.Y));
+			if (pw >= 4) {
+				ps(1, 0, d - 2, b(Blocks.HAY_BLOCK));
+			}
+		}
 	}
 }
