@@ -620,9 +620,9 @@ public final class FountainKoiPond implements Variant {
 				int tu = u + t.getStepX();
 				int tv = v + t.getStepZ();
 				boolean white = placed % 3 == 1;
-				p.set(c, u, 0, v, white ? b(Blocks.WHITE_CONCRETE) : b(Blocks.ORANGE_CONCRETE));
+				p.set(c, u, 0, v, white ? b(Blocks.CALCITE) : b(Blocks.RAW_COPPER_BLOCK));
 				if (p.has(tu, 0, tv) && openWater(tu, tv) && k[tu][tv] == WATER) {
-					p.set(c, tu, 0, tv, placed % 3 == 2 ? b(Blocks.ORANGE_CONCRETE) : b(Blocks.WHITE_CONCRETE));
+					p.set(c, tu, 0, tv, placed % 3 == 2 ? b(Blocks.RAW_COPPER_BLOCK) : b(Blocks.CALCITE));
 				}
 				placed++;
 			}
