@@ -102,7 +102,7 @@ public final class TreePineTiered implements Variant {
 			// a pad with a mound over it only where the gap to the next cloud stays open; else a single layer
 			th[k] = gap >= 2.9 && yb[k] + 1 < H ? 2 : 1;
 		}
-		int yTop = yb[n - 1] + th[n - 1] - 1;
+		int yTop = yb[n - 1]; // the trunk ends inside the top pad: no bare log head over the crown
 
 		// ---- lean, sway and the side of the first cloud
 		double ang = r.nextInt(8) * Math.PI / 4;
