@@ -696,22 +696,22 @@ public final class CitadelOffice {
 		for (int dx = 2; dx <= 4; dx++) {
 			set(c, dx, y, 2, fence());
 		}
-		// rug in front of the consoles
+		// rug in front of the consoles (the player stands on it, facing south)
 		for (int dx = -3; dx <= 1; dx++) {
-			for (int dz = -2; dz <= 0; dz++) {
-				boolean edge = dx == -3 || dx == 1 || dz == -2;
+			for (int dz = -3; dz <= -1; dz++) {
+				boolean edge = dx == -3 || dx == 1 || dz == -3;
 				set(c, dx, y, dz, carpet(edge ? RUG_EDGE : RUG));
 			}
 		}
-		// the consoles: three console terminals (kit role CONSOLE; a lectern with the blocks module off) facing the
-		// player, who stands north of them; slabs between them with a lantern and a plant
-		for (int dx : new int[] {-3, -1, 1}) {
-			set(c, dx, y, 1, c.kit.console(Direction.NORTH));
+		// the consoles: a bank of three console terminals (kit role CONSOLE; a lectern with the blocks module off), side by side
+		// at dz = 0 so their screens read as one command desk, facing the player, who stands on the rug to the north. That leaves a
+		// 3-wide aisle (dz = 1..3) between the bank and the podiums, and dx = -3 free so the merge station can be reached. A slab with a
+		// lantern closes the bank on its east end.
+		for (int dx = -2; dx <= 0; dx++) {
+			set(c, dx, y, 0, c.kit.console(Direction.NORTH));
 		}
-		set(c, -2, y, 1, topSlab(Blocks.CHERRY_SLAB));
-		set(c, 0, y, 1, topSlab(Blocks.CHERRY_SLAB));
-		set(c, -2, y + 1, 1, lantern(false));
-		set(c, 0, y + 1, 1, Blocks.POTTED_BAMBOO.defaultBlockState());
+		set(c, 1, y, 0, topSlab(Blocks.CHERRY_SLAB));
+		set(c, 1, y + 1, 0, lantern(false));
 		// under the main screen: the decision podiums (five, west to east) and two barrels of storage
 		podiums(c, y);
 		for (int dx = 2; dx <= 3; dx++) {
@@ -774,9 +774,10 @@ public final class CitadelOffice {
 		for (int dx = -3; dx <= 3; dx++) {
 			glowStrip(c, dx, y + 1, 3, c.kit.glowStrip(Direction.NORTH, true, true));
 		}
-		// under the project screens (west wall): the cell below each screen's bottom row, over the chests
+		// under the project screens (west wall): the wall row's cell below the screens holds their base beam, so the strip hugs its
+		// front, one cell into the room (dx = -3), like the main screen's
 		for (int dz = -3; dz <= 3; dz++) {
-			glowStrip(c, -4, y + 1, dz, c.kit.glowStrip(Direction.EAST, true, true));
+			glowStrip(c, -3, y + 1, dz, c.kit.glowStrip(Direction.EAST, true, true));
 		}
 		// the flights, along the wall: A rises south on the west wall (dx = -4), B rises north on the east wall (dx = 4)
 		for (int i = 0; i < FH - 1; i++) {
@@ -973,7 +974,7 @@ public final class CitadelOffice {
 
 	/** {@code office}: in front of the consoles, facing the threads screen. {@code office_balcony}: the balcony, facing the hub. */
 	public static void anchors(CitadelCanvas c) {
-		c.anchor(Anchor.at(OFFICE, new BlockPos(CX(), F2() + 1, CZ()), Direction.SOUTH));
+		c.anchor(Anchor.at(OFFICE, new BlockPos(CX() - 1, F2() + 1, CZ() - 1), Direction.SOUTH));
 		c.anchor(Anchor.at(OFFICE_BALCONY, new BlockPos(CX(), F2() + 1, CZ() - 7), Direction.NORTH));
 	}
 }
