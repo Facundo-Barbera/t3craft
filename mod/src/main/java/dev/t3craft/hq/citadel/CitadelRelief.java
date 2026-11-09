@@ -253,23 +253,27 @@ public final class CitadelRelief {
 
 	/** A small tree on the tread cell (x, g, z) when it is the centre chosen for its 9 x 9 cell and the 5 x 5 round it is free. */
 	private static void smallTree(CitadelCanvas c, Map<Long, Integer> half, int x, int g, int z) {
-		int i = Math.floorDiv(x, 9);
-		int j = Math.floorDiv(z, 9);
-		int cx = 9 * i + 2 + Math.floorMod((i * 73856093) ^ (j * 19349663), 5);
-		int cz = 9 * j + 2 + Math.floorMod((i * 83492791) ^ (j * 2654435), 5);
-		if (x != cx || z != cz || Math.floorMod((i * 31 + j * 17) ^ (i * j), 10) >= 6) {
+		int i = Math.floorDiv(x, 7);
+		int j = Math.floorDiv(z, 7);
+		int cx = 7 * i + 1 + Math.floorMod((i * 73856093) ^ (j * 19349663), 5);
+		int cz = 7 * j + 1 + Math.floorMod((i * 83492791) ^ (j * 2654435), 5);
+		if (x != cx || z != cz || Math.floorMod((i * 31 + j * 17) ^ (i * j), 10) >= 7) {
 			return;
 		}
-		for (int dx = -2; dx <= 2; dx++) {
-			for (int dz = -2; dz <= 2; dz++) {
+		// the trunk's column is free and the 3 x 3 round it is not higher than the tread; the crown only takes the free cells
+		for (int dx = -1; dx <= 1; dx++) {
+			for (int dz = -1; dz <= 1; dz++) {
 				Integer hn = half.get(col(x + dx, z + dz));
 				if (hn == null || hn / 2 > g || c.zoneAt(x + dx, z + dz).kind() != Kind.LAWN) {
 					return;
 				}
-				for (int y = g + 1; y <= g + 5; y++) {
-					if (!free(c, x + dx, y, z + dz) && !(Math.abs(dx) + Math.abs(dz) > 0 && y == g + 1 && !solid(c.at(x + dx, y, z + dz)))) {
-						return;
-					}
+			}
+		}
+		for (int y = g + 1; y <= g + 5; y++) {
+			if (!free(c, x, y, z)) {
+				BlockState at = c.at(x, y, z);
+				if (y != g + 1 || solid(at)) {
+					return;
 				}
 			}
 		}
