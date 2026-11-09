@@ -721,7 +721,7 @@ public final class GardenZenKaresansui implements Variant {
 						}
 					}
 					set(u, full + 1, v, up != null ? stairs(ROCK_STAIRS[m], up) : slab(ROCK_SLAB[m]));
-				} else if (p.hash(u, 7, v, 3) == 0) {
+				} else if (full + 1 < h && p.hash(u, 7, v, 3) == 0) {
 					set(u, full + 1, v, b(Blocks.MOSS_CARPET)); // moss on top of the full blocks
 				}
 			}
