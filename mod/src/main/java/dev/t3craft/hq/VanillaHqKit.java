@@ -30,6 +30,7 @@ final class VanillaHqKit implements HqKit {
 			case RAILING -> Blocks.COPPER_BARS.waxed().unaffected().defaultBlockState();
 			case GARDEN_PLANTER -> Blocks.POTTED_CHERRY_SAPLING.defaultBlockState();
 			case GARDEN_LANTERN -> Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, false);
+			case MERGE_STATION -> Blocks.SMITHING_TABLE.defaultBlockState();
 		};
 	}
 

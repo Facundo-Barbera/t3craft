@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": [
+    " G ",
+    "PRP",
+    "III"
+  ],
+  "key": {
+    "G": "minecraft:glass_pane",
+    "P": "minecraft:paper",
+    "R": "minecraft:redstone",
+    "I": "minecraft:iron_ingot"
+  },
+  "result": {
+    "id": "t3craft:merge_station"
+  }
+}

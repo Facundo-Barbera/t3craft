@@ -15,6 +15,10 @@ import dev.t3craft.blocks.LampApplier;
 import dev.t3craft.blocks.LampStatus;
 import dev.t3craft.blocks.LiveLamps;
 import dev.t3craft.blocks.ArchiveTerminalBlock;
+import dev.t3craft.blocks.MergeState;
+import dev.t3craft.blocks.MergeStationApplier;
+import dev.t3craft.blocks.MergeStationBlock;
+import dev.t3craft.blocks.MergeStationBlockEntity;
 import dev.t3craft.blocks.MonitorBlock;
 import dev.t3craft.blocks.MonitorBlockEntity;
 import dev.t3craft.blocks.ScreenRect;
@@ -142,6 +146,18 @@ public final class BlocksClient implements ClientModInitializer {
 	private int ticks;
 	private int lastChanged;
 
+	// ---- merge stations (kit/merge-station) ----
+	/** The PRs are re-read this often (ticks) while a station is loaded or in view. */
+	static final int MERGE_REFRESH_TICKS = 10;
+	/** A station drawn or used in the last this-many ticks keeps the PR scan running on a remote server. */
+	static final int MERGE_IDLE_TICKS = 100;
+	private @Nullable MergeStationRenderer mergeRenderer;
+	private List<MergeFeed.Entry> mergeEntries = List.of();
+	private final Map<String, MergeFeed.Summary> mergeSummaries = new HashMap<>();
+	private int mergeSeen = -MERGE_IDLE_TICKS - 1;
+	private int mergeRefreshed = -MERGE_REFRESH_TICKS - 1;
+	private @Nullable Map<String, MergeState> lastMergeWanted;
+
 	public static @Nullable BlocksClient get() {
 		return instance;
 	}
@@ -187,6 +203,12 @@ public final class BlocksClient implements ClientModInitializer {
 			plaqueRenderer = r;
 			return r;
 		});
+		BlockEntityRendererRegistry.register(c.mergeStationType(), ctx -> {
+			MergeStationRenderer r = new MergeStationRenderer(this);
+			mergeRenderer = r;
+			return r;
+		});
+		MergeStationBlock.setClientUse(this::openMergeStation);
 		MonitorBlock.setClientUse(this::use);
 		setScreenExtents(BlocksClient::connectedExtent);
 		ArchiveTerminalBlock.setClientUse(pos -> dev.t3craft.client.archive.ArchiveClient.openIfReady());
@@ -384,6 +406,7 @@ public final class BlocksClient implements ClientModInitializer {
 		screens.tick(list, System.currentTimeMillis());
 		liveLog.tick(mc, this::resolve, this::extentOf);
 		motes(mc);
+		tickMerge(mc, list, false);
 
 		IntegratedServer server = mc.getSingleplayerServer();
 		if (server == null) {
@@ -397,6 +420,77 @@ public final class BlocksClient implements ClientModInitializer {
 		lastWanted = wanted;
 		Map<Long, Binding> pos = positional;
 		server.execute(() -> lastChanged = LampApplier.apply(wanted, pos));
+	}
+
+	// ---- merge stations -----------------------------------------------------------------------
+
+	/**
+	 * Re-reads the threads' pull requests ({@link MergeFeed}) when a merge station is loaded (integrated server) or was
+	 * drawn / used recently, every {@value #MERGE_REFRESH_TICKS} ticks (or now when {@code force}); on the integrated server
+	 * hands the wanted states to {@link MergeStationApplier} when they change, plus a resync every {@value #RESYNC_TICKS}
+	 * ticks for stations just placed or loaded. Reads only what the client already has; no subscription of its own.
+	 */
+	private void tickMerge(Minecraft mc, List<WorkstationThread> list, boolean force) {
+		boolean loaded = MergeStationBlockEntity.liveCount() > 0;
+		if (!force && !loaded && ticks - mergeSeen > MERGE_IDLE_TICKS) {
+			return;
+		}
+		if (!force && ticks - mergeRefreshed < MERGE_REFRESH_TICKS) {
+			return;
+		}
+		mergeRefreshed = ticks;
+		List<MergeFeed.Entry> now;
+		try {
+			now = MergeFeed.collect(list, ChatScreens.defaultDirectory().rows());
+		} catch (RuntimeException e) {
+			T3Craft.LOGGER.debug("T3Craft: merge station refresh failed", e);
+			return;
+		}
+		if (!now.equals(mergeEntries)) {
+			mergeEntries = now;
+			mergeSummaries.clear();
+		}
+		IntegratedServer server = mc.getSingleplayerServer();
+		if (server == null || !loaded) {
+			return; // remote: stations keep their saved state (the server owns block states)
+		}
+		Map<String, MergeState> wanted = MergeFeed.wanted(mergeEntries);
+		if (wanted.equals(lastMergeWanted) && ticks % RESYNC_TICKS >= MERGE_REFRESH_TICKS) {
+			return;
+		}
+		lastMergeWanted = wanted;
+		Map<Long, Binding> pos = positional;
+		server.execute(() -> MergeStationApplier.apply(wanted, pos));
+	}
+
+	/** What the merge station bound to {@code b} shows now. The same instance until the next refresh changes the PRs. */
+	MergeFeed.Summary mergeSummary(Binding b) {
+		mergeSeen = ticks;
+		if (b.isNone()) {
+			return MergeFeed.Summary.EMPTY;
+		}
+		return mergeSummaries.computeIfAbsent(b.wire(), k -> MergeFeed.summarize(b, mergeEntries));
+	}
+
+	/** Click on a merge station: the list of its pending PRs; choosing one opens it in the browser, or the thread's chat. */
+	private void openMergeStation(BlockPos pos, String own) {
+		Binding b = resolve(pos, own);
+		Minecraft mc = Minecraft.getInstance();
+		List<WorkstationThread> list = new ArrayList<>(threads.values());
+		tickMerge(mc, list, true);
+		String label = switch (b.kind()) {
+			case NONE -> "";
+			case THREAD -> {
+				WorkstationThread t = threads.get(b.value());
+				yield t == null ? b.value() : t.title();
+			}
+			default -> ProjectFeed.name(b);
+		};
+		mc.gui.setScreen(new MergeStationScreen(null, label, () -> mergeSummary(b), e -> {
+			if (e.threadId() != null) {
+				openThread(e.key());
+			}
+		}));
 	}
 
 	private void syncHq(Minecraft mc, IntegratedServer server) {
@@ -499,6 +593,14 @@ public final class BlocksClient implements ClientModInitializer {
 		PlaqueRenderer pr = plaqueRenderer;
 		if (pr != null) {
 			pr.clear();
+		}
+		mergeEntries = List.of();
+		mergeSummaries.clear();
+		lastMergeWanted = null;
+		mergeRefreshed = -MERGE_REFRESH_TICKS - 1;
+		MergeStationRenderer mr = mergeRenderer;
+		if (mr != null) {
+			mr.clear();
 		}
 	}
 

@@ -47,7 +47,9 @@ public interface HqKit {
 		/** Garden: potted cherry. */
 		GARDEN_PLANTER,
 		/** Garden: stone lantern (emits light). */
-		GARDEN_LANTERN;
+		GARDEN_LANTERN,
+		/** Merge station (kit/merge-station): lists the pending pull requests of its project and opens one. Oriented: panel. Vanilla: smithing table. */
+		MERGE_STATION;
 
 		public String id() {
 			return name().toLowerCase(Locale.ROOT);
@@ -55,7 +57,7 @@ public interface HqKit {
 
 		/** Whether {@link #state(Role, Direction)} looks at {@code facing}. */
 		public boolean oriented() {
-			return this == DESK || this == BEAM || this == PLAQUE || this == RAILING;
+			return this == DESK || this == BEAM || this == PLAQUE || this == RAILING || this == MERGE_STATION;
 		}
 	}
 
@@ -134,6 +136,11 @@ public interface HqKit {
 
 	default BlockState gardenLantern() {
 		return state(Role.GARDEN_LANTERN);
+	}
+
+	/** The merge station, panel (where the player stands) towards {@code front}. */
+	default BlockState mergeStation(Direction front) {
+		return state(Role.MERGE_STATION, front);
 	}
 
 	/** {@link #id()} of the active kit, {@code "vanilla"} for {@link #VANILLA}. */

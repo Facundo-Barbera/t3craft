@@ -283,5 +283,13 @@
 	"t3craft.hq.layout.hybrid-ringcampus.name": "Ringed citadel",
 	"t3craft.hq.layout.hybrid-ringcampus.desc": "A ringed citadel: a vaulted hub over a sunken patio, rings of barrios round their courtyards, special rooms on the nodes.",
 	"t3craft.hq.layout.hybrid-towncenter.name": "Town centre with towers",
-	"t3craft.hq.layout.hybrid-towncenter.desc": "Ensanche blocks round a civic plaza; busy projects grow up as corner towers joined by skybridges."
+	"t3craft.hq.layout.hybrid-towncenter.desc": "Ensanche blocks round a civic plaza; busy projects grow up as corner towers joined by skybridges.",
+	"block.t3craft.merge_station": "Merge Station",
+	"t3craft.merge.title": "Pull requests waiting",
+	"t3craft.merge.chat": "Chat",
+	"t3craft.merge.draft": "[draft]",
+	"t3craft.merge.none": "No pull requests waiting here.",
+	"t3craft.merge.all_merged": "Everything here is merged.",
+	"t3craft.merge.no_link": "T3 gave no link for this pull request: opens the chat.",
+	"t3craft.merge.link_copied": "Link copied"
 }

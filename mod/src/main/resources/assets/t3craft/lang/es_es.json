@@ -283,5 +283,13 @@
 	"t3craft.hq.layout.hybrid-ringcampus.name": "Ciudadela en anillos",
 	"t3craft.hq.layout.hybrid-ringcampus.desc": "Ciudadela en anillos: hub abovedado sobre un patio hundido, anillos de barrios con patio y salas especiales en los nodos.",
 	"t3craft.hq.layout.hybrid-towncenter.name": "Centro urbano con torres",
-	"t3craft.hq.layout.hybrid-towncenter.desc": "Manzanas de ensanche alrededor de una plaza cívica; los proyectos grandes crecen en torres de esquina unidas por pasarelas."
+	"t3craft.hq.layout.hybrid-towncenter.desc": "Manzanas de ensanche alrededor de una plaza cívica; los proyectos grandes crecen en torres de esquina unidas por pasarelas.",
+	"block.t3craft.merge_station": "Estación de merge",
+	"t3craft.merge.title": "Pull requests pendientes",
+	"t3craft.merge.chat": "Chat",
+	"t3craft.merge.draft": "[borrador]",
+	"t3craft.merge.none": "No hay pull requests pendientes aquí.",
+	"t3craft.merge.all_merged": "Todo lo de aquí ya está fusionado.",
+	"t3craft.merge.no_link": "T3 no dio enlace para este pull request: abre el chat.",
+	"t3craft.merge.link_copied": "Enlace copiado"
 }
