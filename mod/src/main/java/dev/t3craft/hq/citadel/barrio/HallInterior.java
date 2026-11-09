@@ -44,6 +44,7 @@ public final class HallInterior {
 			int y = f * fh() + 1;
 			rug(c, r, F, f, s, env);
 			furniture(c, r, F, f, y, s, seed, desks);
+			workArea(c, r, f, y, s, desks, seed);
 			pendants(c, r, F, f, m, desks);
 		}
 		if (F == 1) {
@@ -216,6 +217,52 @@ public final class HallInterior {
 		}
 		BlockPos back = r.cell(D - 1, mid, y);
 		place(c, desks, back, () -> shelf(c, back, s == HallStyle.SHUTTERED ? 2 : 3, s != HallStyle.TIMBER, h + 5));
+	}
+
+	/** Work blocks of the tables of a scaled hall, in the order a row repeats them. */
+	private static final net.minecraft.world.level.block.Block[] WORK = {
+			Blocks.CRAFTING_TABLE, Blocks.CARTOGRAPHY_TABLE, Blocks.FLETCHING_TABLE, Blocks.SMITHING_TABLE, Blocks.LOOM, Blocks.LECTERN};
+
+	/**
+	 * Scaled halls only ({@code W >= 15}, so scale 1 is untouched): a big hall must not be a carpeted void. Two long
+	 * worktables (crafting, cartography, fletching, smithing tables, looms and lecterns in turn: blocks with a use)
+	 * run along the hall a quarter of its width off the centre line, so a 3-wide aisle stays free to the desks of
+	 * the side walls and to the middle (the stairs, the door); bookcases line the side and back walls in runs of
+	 * two between the desks and chests stand at the end of each table. Nothing on a desk column, the standing cells,
+	 * the centre line or the stair hole; every cell is checked free.
+	 */
+	private static void workArea(CitadelCanvas c, Room r, int f, int y, HallStyle s, Set<Long> desks, int seed) {
+		int W = r.w();
+		int D = r.d();
+		if (W < 15) {
+			return;
+		}
+		int mid = r.c();
+		int off = Math.max(5, W / 4);
+		int u0 = fh() + 1;
+		int u1 = D - 5;
+		for (int side = -1; side <= 1; side += 2) {
+			int v = mid + side * off;
+			int i = 0;
+			for (int u = u0; u <= u1; u++) {
+				BlockPos p = r.cell(u, v, y);
+				if (u == u0 || u == u1) {
+					place(c, desks, p, () -> c.set(p, Blocks.CHEST.defaultBlockState()));
+				} else if (u % 3 != 0) {
+					net.minecraft.world.level.block.Block wb = WORK[Math.floorMod(i++ + HallStyle.hash(seed, side), WORK.length)];
+					place(c, desks, p, () -> c.set(p, b(wb)));
+				}
+			}
+		}
+		// bookcases against the side walls, two cells in every five, two high
+		for (int v : new int[] {0, W - 1}) {
+			for (int u = 3; u < D - 3; u++) {
+				if (u % 5 < 2) {
+					BlockPos p = r.cell(u, v, y);
+					place(c, desks, p, () -> shelf(c, p, 2, false, 0));
+				}
+			}
+		}
 	}
 
 	/** Runs {@code build} when the cell is free, floored and not on a desk column. */
