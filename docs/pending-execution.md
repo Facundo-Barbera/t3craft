@@ -48,10 +48,7 @@ Incluye el catálogo (60 variantes, con la ola B: bancas, jardineras, postes, po
 - Falta: renders en el PC (por el relay, bloqueado por la clave SSH) y la integración a main.
 
 ## En curso (solo código)
-- `feat/build-near-player` (**prioridad máxima**):
-  - los builders construyen primero cerca del jugador;
-  - la construcción es más rápida, con la base (isla, suelo, podio) colocada por capas sin animación bloque a bloque;
-  - hay más bloques por tick para lo visible.
+- `feat/build-near-player`: **integrado en main** (rama `82597e6`), compilado y sin probar en juego. Base por capas (estimación: de ~7–9 min a ~10–20 s), arranque inmediato junto al jugador, prioridad por cercanía, 96 bloques por tick y hasta 8 builders. Pendiente: en supervivencia, las alas se siguen construyendo en orden de índice.
 
 ## Renders en el PC de Facundo (my-pc): probar 1 job
 **BLOQUEADO 2026-11-09:** la VPS no tiene acceso SSH al PC (`Permission denied (publickey…)`). Hay que agregar en `~/.ssh/authorized_keys` del user `wsluser` en WSL esta clave pública de la VPS:
