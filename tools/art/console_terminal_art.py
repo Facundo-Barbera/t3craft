@@ -8,7 +8,7 @@ Standard library only (zlib/struct), light enough for the VPS. Run from the repo
 
 The block is a command desk: a slate steel cabinet (vent slits and a teal LED panel on the front), a slanted keyboard
 (a wedge, -22.5 degrees like the vanilla lectern's top) with a lit space bar and an amber Enter key, two indicator
-LEDs, and a small upright screen in a dark bezel that shows a T3-teal prompt ("> _" with an amber cursor and a status
+LEDs, and an upright teal-lit screen in a dark bezel that shows a T3-teal prompt ("> _" with an amber cursor and a status
 line). The screen and the LEDs are emissive in the model ("light_emission"). Original pixel art: the idea of a console
 terminal comes from AgentCraft (MIT), nothing was copied.
 
@@ -18,7 +18,7 @@ Texture layout (all 16x16):
   console_terminal_top     slate top plate: cabinet top, housing top
   console_terminal_keys    keyboard top: region x 1-15, y 0-8 (14 x 8 px = the wedge's top)
   console_terminal_bezel   dark bezel: housing front
-  console_terminal_screen  screen at x 3-13, y 4-8 (10 x 4 px = the glass), LED swatches at (0,8) amber and (2,8) teal
+  console_terminal_screen  screen at x 2-13, y 3-7 (12 x 5 px = the glass), LED swatches at (0,8) amber and (2,8) teal
 """
 import json
 import os
@@ -72,6 +72,10 @@ AMBER = (255, 176, 64)
 AMBER_DIM = (150, 96, 34)
 SCREEN_BG = (8, 22, 30)
 SCREEN_BG2 = (10, 29, 38)
+FIELD = (14, 70, 78)
+FIELD2 = (18, 84, 92)
+TEAL_HI = (180, 255, 250)
+TEAL_MID2 = (96, 190, 190)
 KEY = (116, 126, 142)
 KEY_ALT = (98, 108, 124)
 DECK = (24, 28, 34)
@@ -188,33 +192,39 @@ def keys():
 
 
 def screen():
-    """Glass: x 3-12, y 4-7 (10 x 4). Chevron prompt, amber cursor, a dim text line, a status line under it."""
+    """Glass: x 2-13, y 3-7 (12 x 5). A teal-lit terminal: lit field, chevron prompt, amber cursor, text lines, status bar.
+    The field is mid-teal (not near black) so the screen reads as a lit rectangle from 6+ blocks."""
     img = new(BEZEL)
-    gx, gy = 3, 4
-    for y in range(4):
-        for x in range(10):
-            img[gy + y][gx + x] = px(SCREEN_BG2 if y % 2 else SCREEN_BG)
+    gx, gy = 2, 3
+    W, H = 12, 5
+    for y in range(H):
+        for x in range(W):
+            img[gy + y][gx + x] = px(FIELD2 if y % 2 else FIELD)
 
     def put(dx, dy, c):
         img[gy + dy][gx + dx] = px(c)
 
-    # row 0: chevron top, dim text
-    put(0, 0, TEAL)
-    for dx in (4, 5, 6, 7):
-        put(dx, 0, TEAL_MID)
+    # row 0: chevron top, bright title text
+    put(0, 0, TEAL_HI)
+    for dx in (3, 4, 5, 6, 7):
+        put(dx, 0, TEAL_HI)
     # row 1: chevron tip, amber cursor
-    put(1, 1, TEAL)
+    put(1, 1, TEAL_HI)
     put(3, 1, AMBER)
     put(4, 1, AMBER)
     # row 2: chevron bottom, dim text
-    put(0, 2, TEAL)
-    for dx in (5, 6):
-        put(dx, 2, TEAL_MID)
-    # row 3: status line (dim) with a bright tick
-    for dx in range(10):
-        put(dx, 3, TEAL_DIM)
-    put(8, 3, TEAL)
-    put(9, 3, TEAL)
+    put(0, 2, TEAL_HI)
+    for dx in (4, 5, 6, 8, 9):
+        put(dx, 2, TEAL)
+    # row 3: more text
+    for dx in (1, 2, 3, 5, 6, 7, 8):
+        put(dx, 3, TEAL_MID2)
+    # row 4: status bar with a bright tick
+    for dx in range(W):
+        put(dx, 4, TEAL_MID)
+    put(9, 4, TEAL_HI)
+    put(10, 4, TEAL_HI)
+    put(11, 4, TEAL_HI)
     # LED swatches for the model's two indicator lights
     for (x, y) in ((0, 8), (1, 8), (0, 9), (1, 9)):
         img[y][x] = px(AMBER)
@@ -258,17 +268,17 @@ def model():
             },
         },
         {   # screen housing
-            "from": [2, 7, 8], "to": [14, 14.5, 13],
+            "from": [1, 7, 8], "to": [15, 15, 13],
             "faces": {
-                "up": face("top", [2, 3, 14, 8]),
-                "north": face("bezel", [2, 1, 14, 8.5]),
-                "south": face("body", [2, 1, 14, 8.5]),
-                "west": face("body", [3, 1, 8, 8.5]),
-                "east": face("body", [8, 1, 13, 8.5]),
+                "up": face("top", [1, 3, 15, 8]),
+                "north": face("bezel", [1, 1, 15, 9]),
+                "south": face("body", [1, 1, 15, 9]),
+                "west": face("body", [3, 1, 8, 9]),
+                "east": face("body", [8, 1, 13, 9]),
             },
         },
         {   # indicator LEDs on top of the housing (emissive): amber and teal
-            "from": [3.5, 14.5, 9.5], "to": [5, 15.3, 11],
+            "from": [2.5, 15, 9.5], "to": [4, 15.8, 11],
             "faces": {
                 "up": face("screen", [0, 8, 2, 10]),
                 "north": face("screen", [0, 8, 2, 10]),
@@ -279,7 +289,7 @@ def model():
             "light_emission": 15,
         },
         {
-            "from": [11, 14.5, 9.5], "to": [12.5, 15.3, 11],
+            "from": [12, 15, 9.5], "to": [13.5, 15.8, 11],
             "faces": {
                 "up": face("screen", [2, 8, 4, 10]),
                 "north": face("screen", [2, 8, 4, 10]),
@@ -289,10 +299,10 @@ def model():
             },
             "light_emission": 15,
         },
-        {   # the glass, 10 x 4, just in front of the bezel (emissive)
-            "from": [3, 9.5, 7.9], "to": [13, 13.5, 8],
+        {   # the glass, 12 x 5, just in front of the bezel (emissive)
+            "from": [2, 9, 7.9], "to": [14, 14, 8],
             "faces": {
-                "north": face("screen", [3, 4, 13, 8]),
+                "north": face("screen", [2, 3, 14, 8]),
             },
             "light_emission": 15,
         },

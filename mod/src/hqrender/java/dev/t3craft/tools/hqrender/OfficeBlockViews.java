@@ -97,7 +97,7 @@ final class OfficeBlockViews {
 		}
 		// high strips under a dark beam (the way the office hangs them under the screens)
 		for (int x = 0; x <= 14; x++) {
-			scene.set(new BlockPos(x, 4, z), dark);
+			scene.set(new BlockPos(x, 4, z - 1), dark);
 		}
 		scene.set(new BlockPos(0, 3, z), kit.glowStrip(Direction.SOUTH, true, false));
 		scene.set(new BlockPos(2, 3, z), kit.glowStrip(Direction.SOUTH, true, true));
@@ -131,6 +131,12 @@ final class OfficeBlockViews {
 				new Renderer.Clip(4 * STRIDE - 1, 0, Z_STATION - 2, 6 * STRIDE + 3, 4, Z_STATION + 2), new Renderer.Camera(30, 24, near * 1.2), 1});
 		views.add(new Object[] {"glow", "glow strips (low/high, warm/cool) and panels",
 				new Renderer.Clip(-1, 0, Z_GLOW - 2, x2, 7, Z_GLOW + 3), new Renderer.Camera(22, 18, near * 0.55), 1});
+		views.add(new Object[] {"profile", "console terminal in profile (keyboard tilt), seen from the east",
+				new Renderer.Clip(4 * STRIDE + 1, 0, Z_STATION, 4 * STRIDE + 1, 3, Z_STATION), new Renderer.Camera(90, 6, near * 4), 1});
+		views.add(new Object[] {"ceiling", "ceiling panels and wall panels seen from below",
+				new Renderer.Clip(14, 2, Z_GLOW - 1, x2, 7, Z_GLOW + 3), new Renderer.Camera(20, -28, near * 0.8), 1});
+		views.add(new Object[] {"close", "podium (needs you), merge station (open) and console at eye level, ~4 blocks",
+				new Renderer.Clip(-1, 0, Z_PODIUM - 1, 5 * STRIDE + 1, 3, Z_PODIUM + 1), new Renderer.Camera(12, 8, near * 1.1), 1});
 		views.add(new Object[] {"far_50", "from ~50 blocks (15 px/block, shown x4)", all, new Renderer.Camera(35, 20, 15), 4});
 		views.add(new Object[] {"far_100", "from ~100 blocks (8 px/block, shown x4)", all, new Renderer.Camera(35, 20, 8), 4});
 		for (Object[] v : views) {
