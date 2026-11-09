@@ -17,40 +17,38 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.Half;
 import net.minecraft.world.level.block.state.properties.SlabType;
-import net.minecraft.world.level.block.state.properties.WallSide;
 
 /**
- * Brazier on a tripod: a meeting point. Three open legs carry a bowl of fire, a dais of stone slabs rings the foot and
- * on a big plot stone benches face the fire. Nothing flammable anywhere: metal and stone, and a campfire in a bowl that
- * holds it, framed by a bright copper lip.
+ * Brazier on a tripod: a meeting point and a street light. A bowl of dark iron with a bright copper rim holds the fire,
+ * on a stone column (1 × 1, the size the city asks for lamps: 1 × 1 × 7) or on three stone legs over a pale dais with
+ * stools or benches. Nothing flammable anywhere: stone, metal and a campfire (or a pot of lava) in a bowl that holds it.
  *
  * <ul>
- * <li><b>1 × 1, 2-wide or 2-deep plots</b> (the street lamp sites): a one-block column brazier (dark foot, wall
- *     stem, slab collar, an iron cauldron for the bowl, the fire on it); a plot 7+ wide and under 3 deep is a pair of
- *     columns that flank the way through.</li>
- * <li><b>3 × 3 up to 4 deep, or height 5</b>: a compact tripod, its three legs a triangle (back left, back right, front
- *     centre) under the bowl; from 5 × 5 a dais with 2 or 3 stone benches; 9+ wide and under 5 deep is a pair of
- *     tripods that flank the entrance with the middle free.</li>
+ * <li><b>1-wide or 1-deep plots</b>, the street lamp sites: a column: dark foot, stem of wall, a chiselled capital that
+ *     is wider than the stem, an iron cauldron for the bowl (full of lava, or empty under a soul fire) and the fire on
+ *     it, the whole thing standing as tall as the plot allows (7 on the street).</li>
+ * <li><b>3 × 3 up to 4 deep, or height 5</b>: a compact tripod, three legs in a triangle (back left, back right, front
+ *     centre) under a bowl as wide as the plot; from 5 × 5 a dais with 2 or 3 stone benches.</li>
  * <li><b>5 × 5 and up with height 6+</b>: the legs splay out two cells (left, right, back; the front stays open) and
- *     carry the bowl through short arms of upside-down slabs 3 blocks up, so a walker passes under them. 5–6 wide: a
- *     dais with 4 stools between the legs. 7+: the dais grows to radius 3 with 2 to 4 benches and lanterns on stone
- *     posts at the front ends; 9+: one more ring and a low stone-brick wall as a backrest behind each bench.</li>
+ *     carry the bowl through short arms of upside-down slabs 4 blocks up, so a walker passes under them. 5–6 wide: a
+ *     pale dais with 4 stools between the legs. 7 wide: the dais grows to radius 3 with 2 to 4 benches and lanterns on
+ *     stone posts at the front ends.</li>
  * </ul>
  *
- * <p>By seed: the metal (iron: polished blackstone; copper; or stone brick; the bowl and the leg heads follow it), the rim
- * (copper lip of stairs that slope in, or of low slabs) and the fire (a campfire, one in three a soul campfire with soul
- * lanterns).
+ * <p>By seed: the stone of the legs (stone brick, tuff brick, andesite), the rim (stairs that slope in, or low slabs)
+ * and the fire (a campfire, one in three a soul campfire in teal copper with soul lanterns).
  *
  * <ul>
- * <li><b>Palette (3–5)</b>: polished blackstone bricks or deepslate bricks at the foot, the metal of the legs and bowl,
- *     the bright copper lip, stone bricks and andesite for the dais and benches.</li>
- * <li><b>Safe</b>: the fire stands 4+ blocks up on a full block with a stone ring round it; the dais, benches and posts
- *     are stone; there is no wood, wool or leaf within the box.</li>
+ * <li><b>Palette (3–5)</b>: pale stone for legs and dais, polished blackstone for the bowl (the dark accent), copper
+ *     (tan, or teal with a soul fire) for the rim, deepslate at the foot and for the seats.</li>
+ * <li><b>Safe</b>: the fire stands in the bowl on a full block, ringed by copper and stone; there is no wood, wool or
+ *     leaf in the box; no water.</li>
  * <li><b>Walkable</b>: the dais is slabs (no jump), the cells under the bowl keep 3+ blocks of headroom, the front lane
  *     is open and every bench is a stair a person can step over.</li>
  * <li><b>Supported</b>: foot → stem → head (→ arm) → bowl is one chain of face contacts.</li>
  * </ul>
- * Size: 1–11 × 1–11 × 5+.
+ * Size: 1–7 × 1–7 × 5+. The city only asks for 1 × 1 × 7 (every street lamp site), so bigger plots exist for
+ * the gallery and for any plaza that wants a meeting point.
  */
 public final class LampStreetBrazierTripod implements Variant {
 	@Override
@@ -80,12 +78,12 @@ public final class LampStreetBrazierTripod implements Variant {
 
 	@Override
 	public int maxW() {
-		return 11;
+		return 7;
 	}
 
 	@Override
 	public int maxD() {
-		return 11;
+		return 7;
 	}
 
 	/** The seeded look of one plot. */
@@ -105,23 +103,12 @@ public final class LampStreetBrazierTripod implements Variant {
 		Look look = new Look(pick(p, 1, 3), pick(p, 3, 2) * 2, pick(p, 4, 3) == 0);
 		int w = p.w();
 		int d = p.d();
-		int cv1 = (d - 1) / 2;
-		if (w < 3 || d < 3) {
-			if (w >= 7 && d < 3) {
-				column(c, p, look, 1, cv1);
-				column(c, p, look, w - 2, cv1);
-			} else {
-				column(c, p, look, (w - 1) / 2, cv1);
-			}
-			return;
-		}
-		if (w >= 9 && d < 5) {
-			tripod(c, p, look, 1, cv1, 1);
-			tripod(c, p, look, w - 2, cv1, 1);
-			return;
-		}
 		int cu = (w - 1) / 2;
-		int cv = cv1;
+		int cv = (d - 1) / 2;
+		if (w < 3 || d < 3) {
+			column(c, p, look, cu, cv);
+			return;
+		}
 		int r = p.h() >= 6 && Math.min(w, d) >= 5 ? 2 : 1;
 		tripod(c, p, look, cu, cv, r);
 	}
@@ -129,72 +116,58 @@ public final class LampStreetBrazierTripod implements Variant {
 	// ------------------------------------------------------------------ materials
 
 	private static BlockState foot(Plot p, Look k, int u, int v) {
-		if (k.legs() == 2) {
-			return b(p.hash(u, 0, v, 3) == 0 ? Blocks.CRACKED_DEEPSLATE_BRICKS : Blocks.DEEPSLATE_BRICKS);
-		}
-		return b(p.hash(u, 0, v, 4) == 0 ? Blocks.CRACKED_POLISHED_BLACKSTONE_BRICKS : Blocks.POLISHED_BLACKSTONE_BRICKS);
+		return b(p.hash(u, 0, v, 3) == 0 ? Blocks.CRACKED_DEEPSLATE_BRICKS : Blocks.DEEPSLATE_BRICKS);
 	}
 
-	/** The thin stem of a leg. */
+	/** The thin stem of a leg: pale stone by seed. */
 	private static BlockState stem(Look k) {
-		return switch (k.legs()) {
-			case 0, 1 -> b(Blocks.POLISHED_BLACKSTONE_WALL); // wrought iron (bars are too thin to read); 1 has copper joints
-			default -> b(Blocks.STONE_BRICK_WALL);
-		};
+		return b(switch (k.legs()) {
+			case 0 -> Blocks.STONE_BRICK_WALL;
+			case 1 -> Blocks.TUFF_BRICK_WALL;
+			default -> Blocks.ANDESITE_WALL;
+		});
 	}
 
 	/** The leaning head: an upside-down stair whose back is towards the bowl (so it faces outwards). */
 	private static BlockState head(Look k, Direction outward) {
 		Block s = switch (k.legs()) {
-			case 0 -> Blocks.POLISHED_BLACKSTONE_BRICK_STAIRS;
-			case 1 -> Blocks.CUT_COPPER_STAIRS.waxed().exposed();
-			default -> Blocks.STONE_BRICK_STAIRS;
+			case 0 -> Blocks.STONE_BRICK_STAIRS;
+			case 1 -> Blocks.TUFF_BRICK_STAIRS;
+			default -> Blocks.ANDESITE_STAIRS;
 		};
 		return stairs(s, outward).setValue(StairBlock.HALF, Half.TOP);
 	}
 
-	/** An arm: an upside-down slab, 3 blocks up, so a walker passes under it. */
+	/** An arm: an upside-down slab, so a walker passes under it. */
 	private static BlockState arm(Look k) {
 		Block s = switch (k.legs()) {
-			case 0 -> Blocks.POLISHED_BLACKSTONE_BRICK_SLAB;
-			case 1 -> Blocks.CUT_COPPER_SLAB.waxed().exposed();
-			default -> Blocks.STONE_BRICK_SLAB;
+			case 0 -> Blocks.STONE_BRICK_SLAB;
+			case 1 -> Blocks.TUFF_BRICK_SLAB;
+			default -> Blocks.ANDESITE_SLAB;
 		};
 		return slab(s).setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP);
 	}
 
-	/** The bowl is the same metal as the heads of the legs (iron: polished blackstone, copper, or stone brick). */
-	private static BlockState bowlBlock(Look k) {
-		return b(switch (k.legs()) {
-			case 0 -> Blocks.POLISHED_BLACKSTONE_BRICKS;
-			case 1 -> Blocks.CUT_COPPER.waxed().exposed();
-			default -> Blocks.STONE_BRICKS;
-		});
+	/** The bowl is dark iron on every tripod: the one dark accent against the pale legs and the bright rim. */
+	private static BlockState bowlBlock() {
+		return b(Blocks.POLISHED_BLACKSTONE_BRICKS);
 	}
 
-	private static BlockState bowlStairs(Look k, Direction facing, Half half) {
-		return stairs(switch (k.legs()) {
-			case 0 -> Blocks.POLISHED_BLACKSTONE_BRICK_STAIRS;
-			case 1 -> Blocks.CUT_COPPER_STAIRS.waxed().exposed();
-			default -> Blocks.STONE_BRICK_STAIRS;
-		}, facing).setValue(StairBlock.HALF, half);
+	private static BlockState bowlStairs(Direction facing, Half half) {
+		return stairs(Blocks.POLISHED_BLACKSTONE_BRICK_STAIRS, facing).setValue(StairBlock.HALF, half);
 	}
 
-	private static BlockState bowlSlab(Look k, SlabType t) {
-		return slab(switch (k.legs()) {
-			case 0 -> Blocks.POLISHED_BLACKSTONE_BRICK_SLAB;
-			case 1 -> Blocks.CUT_COPPER_SLAB.waxed().exposed();
-			default -> Blocks.STONE_BRICK_SLAB;
-		}).setValue(BlockStateProperties.SLAB_TYPE, t);
+	private static BlockState bowlSlab(SlabType t) {
+		return slab(Blocks.POLISHED_BLACKSTONE_BRICK_SLAB).setValue(BlockStateProperties.SLAB_TYPE, t);
 	}
 
-	/** The bright copper lip round the fire: the same on every tripod, so the flame always has a glowing frame. */
-	private static BlockState lipStairs(Direction facing) {
-		return stairs(Blocks.CUT_COPPER_STAIRS.waxed().unaffected(), facing);
+	/** The bright copper rim round the fire: tan, or teal under a soul fire, so the flame always has a glowing frame. */
+	private static BlockState lipStairs(Look k, Direction facing) {
+		return stairs(k.soul() ? Blocks.CUT_COPPER_STAIRS.waxed().weathered() : Blocks.CUT_COPPER_STAIRS.waxed().exposed(), facing);
 	}
 
-	private static BlockState lipSlab() {
-		return slab(Blocks.CUT_COPPER_SLAB.waxed().unaffected());
+	private static BlockState lipSlab(Look k) {
+		return slab(k.soul() ? Blocks.CUT_COPPER_SLAB.waxed().weathered() : Blocks.CUT_COPPER_SLAB.waxed().exposed());
 	}
 
 	private static BlockState fire(Look k) {
@@ -207,15 +180,18 @@ public final class LampStreetBrazierTripod implements Variant {
 
 	// ------------------------------------------------------------------ column (1-wide plots)
 
-	/** A one-block brazier: dark foot, thin stem, a slab collar, an iron cauldron for the bowl and the fire on it. */
+	/**
+	 * A one-block brazier as tall as the plot (7 on the street): dark foot, stem of wall, a chiselled capital, an iron
+	 * cauldron for the bowl (lava in it, or empty under a soul fire) and the fire on it.
+	 */
 	private static void column(CitadelCanvas c, Plot p, Look k, int u, int v) {
-		int top = p.h() >= 6 ? 5 : 4;
+		int top = p.h() - 1;
 		p.set(c, u, 0, v, foot(p, k, u, v));
 		for (int y = 1; y <= top - 3; y++) {
 			p.set(c, u, y, v, stem(k));
 		}
-		p.set(c, u, top - 2, v, arm(k));
-		p.set(c, u, top - 1, v, b(Blocks.CAULDRON)); // an iron pot: wider than the stem, a bowl in any light
+		p.set(c, u, top - 2, v, b(Blocks.CHISELED_STONE_BRICKS)); // the capital: a full block over the thin stem
+		p.set(c, u, top - 1, v, k.soul() ? b(Blocks.CAULDRON) : b(Blocks.LAVA_CAULDRON)); // the bowl
 		p.set(c, u, top, v, fire(k));
 	}
 
@@ -223,13 +199,10 @@ public final class LampStreetBrazierTripod implements Variant {
 
 	/**
 	 * The tripod round the centre {@code (cu, cv)}: legs at distance {@code r} (1 or 2) to the left, right and back.
-	 * The bowl is {@code D} up (3 or 4), the fire above it.
+	 * The bowl is {@code dd} up, the fire above it.
 	 */
 	private static void tripod(CitadelCanvas c, Plot p, Look k, int cu, int cv, int r) {
-		int dd = Math.min(p.h() - 2, 4);
-		if (r == 2) {
-			dd = 4;
-		}
+		int dd = Math.min(p.h() - 2, 5);
 		int[][] legs = legs(r);
 		Direction[] out = {Direction.WEST, Direction.EAST, Direction.SOUTH};
 		for (int i = 0; i < 3; i++) {
@@ -245,7 +218,7 @@ public final class LampStreetBrazierTripod implements Variant {
 				boolean front = legs[i][1] < 0;
 				p.set(c, lu, dd - 1, lv, front ? head(k, Direction.NORTH) : arm(k));
 				if (!front) {
-					p.set(c, lu, dd, lv, bowlSlab(k, SlabType.BOTTOM)); // sits on the cap: a low bowl corner
+					p.set(c, lu, dd, lv, bowlSlab(SlabType.BOTTOM)); // sits on the cap: a low bowl corner
 				}
 			} else {
 				p.set(c, lu, dd - 1, lv, head(k, out[i]));
@@ -255,33 +228,27 @@ public final class LampStreetBrazierTripod implements Variant {
 		}
 		bowl(c, p, k, cu, cv, dd);
 		dais(c, p, k, cu, cv, r);
-		if (r == 2) { // a dark ash bed under the bowl and in front of it (the axis cells under the arms keep the ground: headroom)
-			p.set(c, cu, 0, cv, slab(Blocks.POLISHED_BLACKSTONE_BRICK_SLAB));
-			p.set(c, cu, 0, cv - 1, slab(Blocks.POLISHED_BLACKSTONE_BRICK_SLAB));
-		}
 		benches(c, p, k, cu, cv, r);
 	}
 
-	/** The bowl: a base that tapers (centre block, upside-down stairs, upper corner slabs) and a rim by shape. */
+	/** The bowl: dark iron base that tapers (centre block, upside-down stairs) and a bright copper rim by shape. */
 	private static void bowl(CitadelCanvas c, Plot p, Look k, int cu, int cv, int dd) {
-		p.set(c, cu, dd, cv, bowlBlock(k));
+		p.set(c, cu, dd, cv, bowlBlock());
 		Direction[] dirs = {Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST};
 		int[][] sides = {{0, -1}, {0, 1}, {-1, 0}, {1, 0}};
 		for (int i = 0; i < 4; i++) {
 			// facing outwards, upside down: the low half is towards the centre, so the base steps in to the knot
-			p.set(c, cu + sides[i][0], dd, cv + sides[i][1], bowlStairs(k, dirs[i], Half.TOP));
+			p.set(c, cu + sides[i][0], dd, cv + sides[i][1], bowlStairs(dirs[i], Half.TOP));
 		}
-		// the base is a plus (no corners), so the bowl is narrow at the bottom and wide at the rim; the rim is a bright
-		// copper lip, low enough for the flame to stand clear of it
 		int y = dd + 1;
 		for (int i = 0; i < 4; i++) {
 			p.set(c, cu + sides[i][0], y, cv + sides[i][1],
-					k.shape() == 0 ? lipStairs(dirs[i].getOpposite()) : lipSlab());
+					k.shape() == 0 ? lipStairs(k, dirs[i].getOpposite()) : lipSlab(k));
 		}
-		if (k.shape() == 0) { // cup: low lip slabs close the corners, so the fire sits in a ring that is deeper than it is wide
+		if (k.shape() == 0) { // cup: low rim slabs close the corners, so the fire sits in a ring that is deeper than it is wide
 			for (int su = -1; su <= 1; su += 2) {
 				for (int sv = -1; sv <= 1; sv += 2) {
-					p.set(c, cu + su, y, cv + sv, lipSlab());
+					p.set(c, cu + su, y, cv + sv, lipSlab(k));
 				}
 			}
 		}
@@ -306,10 +273,10 @@ public final class LampStreetBrazierTripod implements Variant {
 
 	private static int dais(Plot p, int cu, int cv, int r) {
 		int avail = Math.min(Math.min(cu, p.w() - 1 - cu), Math.min(cv, p.d() - 1 - cv));
-		return Math.min(r == 2 ? 4 : r + 1, avail); // a big plot gets one more ring: room for a backrest behind each bench
+		return Math.min(r + 1, avail);
 	}
 
-	/** A flat dais of slabs round the legs: dark near the foot, light stone bricks outwards, corners chamfered. */
+	/** A flat dais of pale slabs round the legs: a dark ring round the foot, light stone outwards, corners chamfered. */
 	private static void dais(CitadelCanvas c, Plot p, Look k, int cu, int cv, int r) {
 		int rd = dais(p, cu, cv, r);
 		for (int dz = -rd; dz <= rd; dz++) {
@@ -327,12 +294,12 @@ public final class LampStreetBrazierTripod implements Variant {
 				}
 				int u = cu + dx;
 				int v = cv + dz;
-				BlockState s;
 				int h = p.hash(u, 0, v, 6);
+				BlockState s;
 				if (dist == 1) {
 					s = slab(Blocks.POLISHED_BLACKSTONE_BRICK_SLAB); // the one dark ring, round the foot
 				} else {
-					s = slab(h == 0 ? Blocks.POLISHED_ANDESITE_SLAB : Blocks.STONE_BRICK_SLAB); // two light stones only
+					s = slab(h == 0 ? Blocks.POLISHED_ANDESITE_SLAB : h == 1 ? Blocks.SMOOTH_STONE_SLAB : Blocks.STONE_BRICK_SLAB);
 				}
 				p.set(c, u, 0, v, s);
 			}
@@ -341,8 +308,8 @@ public final class LampStreetBrazierTripod implements Variant {
 
 	// ------------------------------------------------------------------ benches
 
-	private static BlockState seat(Plot p, int u, int v, Direction toFire) {
-		return stairs(Blocks.DEEPSLATE_BRICK_STAIRS, toFire); // dark seats read against the light dais
+	private static BlockState seat(Direction toFire) {
+		return stairs(Blocks.DEEPSLATE_BRICK_STAIRS, toFire); // dark seats read against the pale dais
 	}
 
 	/** A bench of {@code len} seats along an axis, starting at {@code (u0, v0)}; they face the fire. */
@@ -351,27 +318,8 @@ public final class LampStreetBrazierTripod implements Variant {
 			int u = alongU ? u0 + i : u0;
 			int v = alongU ? v0 : v0 + i;
 			if (p.has(u, 0, v)) {
-				p.set(c, u, 0, v, seat(p, u, v, toFire));
+				p.set(c, u, 0, v, seat(toFire));
 			}
-		}
-	}
-
-	/** A low stone-brick wall run behind a bench (its backrest), its posts tied together. */
-	private static void rail(CitadelCanvas c, Plot p, int u0, int v0, boolean alongU, int len) {
-		for (int i = 0; i < len; i++) {
-			int u = alongU ? u0 + i : u0;
-			int v = alongU ? v0 : v0 + i;
-			if (!p.has(u, 0, v)) {
-				continue;
-			}
-			BlockState s = b(Blocks.STONE_BRICK_WALL);
-			if (i > 0) {
-				s = s.setValue(alongU ? BlockStateProperties.WEST_WALL : BlockStateProperties.NORTH_WALL, WallSide.LOW);
-			}
-			if (i < len - 1) {
-				s = s.setValue(alongU ? BlockStateProperties.EAST_WALL : BlockStateProperties.SOUTH_WALL, WallSide.LOW);
-			}
-			p.set(c, u, 0, v, s);
 		}
 	}
 
@@ -385,7 +333,7 @@ public final class LampStreetBrazierTripod implements Variant {
 			Direction[] face = {Direction.NORTH, Direction.EAST, Direction.WEST};
 			for (int[] s : seats) {
 				if (p.has(cu + s[0], 0, cv + s[1])) {
-					p.set(c, cu + s[0], 0, cv + s[1], seat(p, cu + s[0], cv + s[1], face[s[2]]));
+					p.set(c, cu + s[0], 0, cv + s[1], seat(face[s[2]]));
 				}
 			}
 			return;
@@ -393,39 +341,22 @@ public final class LampStreetBrazierTripod implements Variant {
 		if (rd < r + 1) {
 			return; // no room for a ring of benches
 		}
-		boolean backrest = r == 2 && rd >= 4;
 		int q = r + 1; // bench distance
 		int set = pick(p, 5, 3);
 		// 0: left + right; 1: left + right + back; 2: big plot left + right + a back pair (4), small plot right + back
 		boolean left = !(set == 2 && r == 1);
-		boolean right = true;
 		boolean back = set == 1 || set == 2 && r == 1;
 		boolean backPair = set == 2 && r == 2;
 		if (left) {
 			bench(c, p, cu - q, cv - 1, false, 3, Direction.EAST);
-			if (backrest) {
-				rail(c, p, cu - q - 1, cv - 1, false, 3);
-			}
 		}
-		if (right) {
-			bench(c, p, cu + q, cv - 1, false, 3, Direction.WEST);
-			if (backrest) {
-				rail(c, p, cu + q + 1, cv - 1, false, 3);
-			}
-		}
+		bench(c, p, cu + q, cv - 1, false, 3, Direction.WEST);
 		if (back) {
 			bench(c, p, cu - 1, cv + q, true, 3, Direction.NORTH);
-			if (backrest) {
-				rail(c, p, cu - 1, cv + q + 1, true, 3);
-			}
 		}
 		if (backPair) {
 			bench(c, p, cu - 2, cv + q, true, 2, Direction.NORTH);
 			bench(c, p, cu + 1, cv + q, true, 2, Direction.NORTH);
-			if (backrest) {
-				rail(c, p, cu - 2, cv + q + 1, true, 2);
-				rail(c, p, cu + 1, cv + q + 1, true, 2);
-			}
 		}
 		if (r == 2) { // lantern posts at the front ends of the side benches: they light the way in
 			for (int su = -1; su <= 1; su += 2) {
