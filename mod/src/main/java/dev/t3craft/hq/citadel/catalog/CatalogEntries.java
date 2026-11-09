@@ -50,6 +50,9 @@ final class CatalogEntries {
 			new dev.t3craft.hq.citadel.catalog.tree.TreeBirchGrove(), // tree_birch_grove
 			new dev.t3craft.hq.citadel.catalog.tree.TreeMapleRed(), // tree_maple_red
 			new dev.t3craft.hq.citadel.catalog.tree.TreePineTiered(), // tree_pine_tiered
+			new dev.t3craft.hq.citadel.catalog.tree.TreeAzaleaBlossom(), // tree_azalea_blossom
+			new dev.t3craft.hq.citadel.catalog.tree.TreeCloudPinePot(), // tree_cloud_pine_pot
+			new dev.t3craft.hq.citadel.catalog.tree.TreeWillowPond(), // tree_willow_pond
 	};
 
 	static final List<Variant> ALL = List.of(ENTRIES);
