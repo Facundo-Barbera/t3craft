@@ -17,6 +17,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.level.block.state.properties.Property;
+import net.minecraft.world.level.block.state.properties.SlabType;
 
 /**
  * Cloth and lantern stall. A cherry lean-to roof of stairs climbs from a striped cloth valance over the counter up
@@ -196,9 +197,9 @@ public final class StallClothLanterns implements Variant {
 			if (u == g.pole()) {
 				continue; // the pole passes here
 			}
-			// [depth] a dark-oak beam closes the front of the roof, and a cloth valance hangs from it two
+			// [depth] a thin spruce fascia (top slabs) closes the front of the roof, and a cloth valance hangs from it two
 			// blocks in three (the third gap shows the goods): an accent stripe, cream and a light grey
-			p.set(c, u, 3, 1, b(Blocks.DARK_OAK_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.X));
+			p.set(c, u, 3, 1, b(Blocks.SPRUCE_SLAB).setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP));
 			if (u % 3 != 2 && u >= g.lo() && u <= g.hi()) { // never over the side walk outside the posts
 				p.set(c, u, 2, 1, u % 3 == 0 ? terracotta(g.accent) : wool(DyeColor.WHITE));
 			}
@@ -279,7 +280,7 @@ public final class StallClothLanterns implements Variant {
 			// [depth] a beam over the arm (a log along v under the roof) with a length of cloth hanging from it, so
 			// the bolts have a ceiling and nobody can stand on them
 			int beam = g.ry(v) - 1;
-			p.set(c, su, beam, v, b(Blocks.DARK_OAK_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.Z));
+			p.set(c, su, beam, v, b(Blocks.SPRUCE_SLAB).setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP));
 			for (int y = 3; y < beam; y++) {
 				p.set(c, su, y, v, y == 3 && v % 2 == 0 ? terracotta(g.accent) : wool(DyeColor.WHITE));
 			}
