@@ -233,7 +233,7 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 	private static void marks(Cfg k) {
 		k.mk = new boolean[k.w][k.d];
 		double ringIn = k.ringIn;
-		double cardW = k.rd >= 5 ? 1.5 : k.rd >= 3 ? 1.05 : 0.55;
+		double cardW = k.rd >= 6 ? 1.5 : 0.55; // 3-wide quarter plates only where the bezel is long enough for them
 		for (int dv = -k.rd; dv <= k.rd; dv++) {
 			for (int du = -k.rd; du <= k.rd; du++) {
 				int u = k.cu + du;
@@ -256,6 +256,9 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 					}
 					double perp = Math.abs(du * ov - dv * ou);
 					boolean card = h % 3 == 0;
+					if (!card && k.rd < 4) {
+						continue; // on a tiny dial only the four quarters are marked
+					}
 					if (inRing) {
 						// gold only on the outer layer of the bezel (the inner one stays dark, so the ring is continuous);
 						// the quarters are 3 wide there and 1 wide on the inner layer
