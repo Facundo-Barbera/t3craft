@@ -199,17 +199,17 @@ public final class PlazaCenterOctagonBandstand implements Variant {
 		int cu = w / 2;
 		int cv = d / 2;
 		int n = Math.min(Math.min(cu, w - 1 - cu), Math.min(cv, d - 1 - cv));
-		int ph = n >= 8 ? 2 : 1;
+		int ph = n >= 8 && p.h() >= 12 ? 2 : 1;
 		int pl = n - ph;
 		int k = pl - 1;
 		int t = (int) Math.round(0.4142 * k);
 		Geo g = new Geo(cu, cv, n, ph, pl, k, t, n >= 9 ? 2 : 1);
 
 		// roof: as many layers as the height allows, flatter (steps of 2 or 3 cells) when it is short
-		int lmax = p.h() - ph - 5;
-		int s = 3;
+		int lmax = p.h() - ph - 6;
+		int s = 4;
 		int layers = lmax;
-		for (int cand = 1; cand <= 3; cand++) {
+		for (int cand = 1; cand <= 4; cand++) {
 			int need = 1 + (k - 1 + cand - 1) / cand;
 			if (need <= lmax) {
 				s = cand;
@@ -218,15 +218,15 @@ public final class PlazaCenterOctagonBandstand implements Variant {
 			}
 		}
 		layers = Math.max(1, layers);
-		int fs = Math.max(1, Math.min(6, p.h() - 1 - (ph + 3 + layers)));
-		Roof roof = new Roof(p.rng(11).nextInt(3), s, layers, fs, p.rng(12).nextInt(2));
+		int fs = Math.max(1, Math.min(6, p.h() - 1 - (ph + 4 + layers)));
+		Roof roof = new Roof(p.hash(1, 5, 3, 3), s, layers, fs, p.hash(1, 5, 5, 2));
 
 		for (int v = 0; v < d; v++) {
 			for (int u = 0; u < w; u++) {
 				int dx = u - cu;
 				int dz = v - cv;
 				double m = oct(dx, dz);
-				if (m <= pl) {
+				if (m <= pl + 0.5) {
 					platform(c, p, g, u, v, dx, dz, m);
 					frame(c, p, g, u, v, dx, dz, m);
 				} else {
@@ -255,7 +255,7 @@ public final class PlazaCenterOctagonBandstand implements Variant {
 		int hs = p.hash(u, top, v, 6);
 		if (m > g.k() + 0.5) {
 			// the walk outside the balustrade: dark bricks, mixed
-			s = hs == 0 ? b(Blocks.CRACKED_DEEPSLATE_BRICKS) : hs < 3 ? b(Blocks.POLISHED_DEEPSLATE) : b(Blocks.DEEPSLATE_BRICKS);
+			s = hs == 0 ? b(Blocks.MOSSY_STONE_BRICKS) : hs < 2 ? b(Blocks.CRACKED_STONE_BRICKS) : b(Blocks.STONE_BRICKS);
 		} else if (g.ring(m)) {
 			s = b(Blocks.POLISHED_DEEPSLATE);
 		} else if (m <= 1.5) {
@@ -283,7 +283,7 @@ public final class PlazaCenterOctagonBandstand implements Variant {
 			p.set(c, u, y, v, b(Blocks.DEEPSLATE_BRICKS));
 		}
 		// facing = the way up: the tall half is towards the platform
-		Block blk = p.hash(u, ys, v, 3) == 0 ? Blocks.POLISHED_DEEPSLATE_STAIRS : Blocks.DEEPSLATE_BRICK_STAIRS;
+		Block blk = p.hash(u, ys, v, 3) == 0 ? Blocks.POLISHED_ANDESITE_STAIRS : Blocks.STONE_BRICK_STAIRS;
 		p.set(c, u, ys, v, stairs(blk, out(dx, dz).getOpposite()));
 	}
 
@@ -299,7 +299,7 @@ public final class PlazaCenterOctagonBandstand implements Variant {
 
 	private void frame(CitadelCanvas c, Plot p, Geo g, int u, int v, int dx, int dz, double m) {
 		int y0 = g.h();
-		int beam = y0 + 3;
+		int beam = y0 + 4;
 		int ax = Math.abs(dx);
 		int az = Math.abs(dz);
 		if (g.column(dx, dz)) {
@@ -307,6 +307,7 @@ public final class PlazaCenterOctagonBandstand implements Variant {
 			p.set(c, u, y0, v, b(Blocks.POLISHED_DEEPSLATE));
 			p.set(c, u, y0 + 1, v, log(Blocks.STRIPPED_CHERRY_LOG, Direction.Axis.Y));
 			p.set(c, u, y0 + 2, v, log(Blocks.STRIPPED_CHERRY_LOG, Direction.Axis.Y));
+			p.set(c, u, y0 + 3, v, log(Blocks.STRIPPED_CHERRY_LOG, Direction.Axis.Y));
 			p.set(c, u, beam, v, log(Blocks.STRIPPED_CHERRY_WOOD, ax > az ? Direction.Axis.Z : Direction.Axis.X));
 			return;
 		}
@@ -323,7 +324,7 @@ public final class PlazaCenterOctagonBandstand implements Variant {
 					}
 				}
 				if (toCol != null) {
-					p.set(c, u, y0 + 2, v, topStairs(Blocks.CHERRY_STAIRS, toCol));
+					p.set(c, u, y0 + 3, v, topStairs(Blocks.CHERRY_STAIRS, toCol));
 				} else if (((ax + az) & 1) == 0) {
 					// [finish] a standing lantern on every other balustrade post
 					p.set(c, u, y0 + 1, v, Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, false));
@@ -348,11 +349,11 @@ public final class PlazaCenterOctagonBandstand implements Variant {
 		double offs = Math.PI / 8;
 		double rel = (angle - offs) / step;
 		double da = Math.abs(angle - (Math.round(rel) * step + offs));
-		return m * Math.sin(da) < 0.55;
+		return m * Math.sin(da) < 0.42;
 	}
 
 	private void roof(CitadelCanvas c, Plot p, Geo g, Roof r, int u, int v, int dx, int dz, double m) {
-		int base = g.h() + 3;
+		int base = g.h() + 4;
 		boolean rib = isRib(dx, dz, m);
 		Direction in = out(dx, dz).getOpposite();
 		// the eave: one block beyond the beam, low side out
@@ -374,7 +375,7 @@ public final class PlazaCenterOctagonBandstand implements Variant {
 	}
 
 	private void finial(CitadelCanvas c, Plot p, Geo g, Roof r) {
-		int y = g.h() + 3 + r.layers() + 1;
+		int y = g.h() + 4 + r.layers() + 1;
 		int fs = r.fs();
 		BlockState lantern = Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, false);
 		for (int i = 0; i < fs; i++) {
@@ -396,7 +397,7 @@ public final class PlazaCenterOctagonBandstand implements Variant {
 		at(c, p, g, -1, y, 0, b(Blocks.NOTE_BLOCK));
 		at(c, p, g, 1, y, 0, b(Blocks.NOTE_BLOCK));
 		at(c, p, g, 0, y, 1, b(Blocks.NOTE_BLOCK));
-		atLayer(c, p, g, 0, y + 2, 0, Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
+		atLayer(c, p, g, 0, y + 3, 0, Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
 		for (int dz = -g.k(); dz <= g.k(); dz++) {
 			for (int dx = -g.k(); dx <= g.k(); dx++) {
 				if (!g.seat(dx, dz)) {
