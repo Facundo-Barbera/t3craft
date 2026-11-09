@@ -18,7 +18,7 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 /**
  * A notice board for a plaza, at the scale of the city (a 7 wide, 2 deep, 8 high plot): a dark-oak board between two stripped
  * cherry posts on deepslate footings, under a little pink cherry roof that overhangs the front, a gold lantern hanging under
- * the eave at each post and a cherry bench in front to read from. The papers are two big pale sheets (calcite or terracotta,
+ * the eave at each post and a cherry bench in front to read from. The papers are two big pale sheets (calcite, smooth quartz or birch,
  * two blocks by two) set into the dark board at different heights, with birch signs and open trapdoors pinned on them and a
  * banner between them.
  *
@@ -36,7 +36,7 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
  */
 public final class SignpostNoticeBoard implements Variant {
 	private static final DyeColor[] BANNERS = {DyeColor.WHITE, DyeColor.PINK, DyeColor.LIGHT_GRAY};
-	private static final Block[] SHEETS = {Blocks.CALCITE, Blocks.WHITE_TERRACOTTA, Blocks.CALCITE, Blocks.LIGHT_GRAY_TERRACOTTA};
+	private static final Block[] SHEETS = {Blocks.CALCITE, Blocks.SMOOTH_QUARTZ, Blocks.CALCITE, Blocks.BIRCH_PLANKS};
 
 	@Override
 	public String id() {
