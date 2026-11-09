@@ -37,14 +37,17 @@ import org.jspecify.annotations.Nullable;
  * <h2>Pieces</h2>
  *
  * <ul>
- * <li>{@link #posts}: along the <b>edge</b> of the streets, avenues, inner street, patio and terraces
- *     ({@link #STREETS}) it raises a post every {@link #SPACING} blocks, in the cells of the walkway next to a
- *     wall, a hedge or a drop (see {@link #edge}). Three kinds follow one another by their number: the
- *     <i>lantern post</i> (blackstone-brick wall base, two cherry fences, a crossarm over the way with a
- *     lantern hanging from it, deepslate-tile cap), the <i>vitral</i> (the same shaft with a lantern
- *     standing on top inside a cross of amber and pink stained glass) and, in the plazas ({@link #PLAZAS}),
- *     every fourth one the <i>brazier</i> (a two-high blackstone pillar with a lit campfire above head
- *     height: nobody can step in it).</li>
+ * <li>{@link #posts}: along the <b>edge</b> of the public way (streets, avenues, inner street, patio, terraces,
+ *     gallery, bridges: {@link #STREETS}), where the next zone is not public (see {@link #edge}), it raises a
+ *     post wherever none stands within {@link #SPACING} blocks (greedy, so the rhythm follows the way and not a
+ *     grid). Three kinds follow one another by their number (turn 0 to 3: toro, vitral, toro, brazier):
+ *     the <i>toro</i> ({@link #toro}: polished-blackstone-brick plinth, two stripped cherry logs, a shroomlight
+ *     lamp chamber, a pagoda roof of cherry slab and stairs, a fence finial), the <i>vitral</i>
+ *     ({@link #vitral}: plinth, log, a lantern, a block of amber or rose stained glass, a hanging lantern, the
+ *     same roof) and, in the plazas ({@link #PLAZAS}), the <i>brazier</i> ({@link #brazier}: a pedestal with a lit
+ *     campfire in a tray of four slabs above head height: nobody can step in it).</li>
+ * <li>{@link #relamp}: the old free-standing white froglight lamps (promenade posts) turn into the same warm
+ *     chamber under the same roof.</li>
  * <li>{@link #arcades}: a hanging lantern under every roof ({@link #COVERED}) the public walks beneath,
  *     on the lattice {@code (2x + 5z) mod SPACING}, never next to another lamp.</li>
  * </ul>
@@ -64,7 +67,7 @@ import org.jspecify.annotations.Nullable;
  */
 final class CitadelAmbience {
 	/** Public space that gets posts at its edges. */
-	private static final Set<Kind> STREETS = EnumSet.of(Kind.AVENUE, Kind.STREET, Kind.INNER_STREET, Kind.PATIO, Kind.TERRACE);
+	private static final Set<Kind> STREETS = EnumSet.of(Kind.AVENUE, Kind.STREET, Kind.INNER_STREET, Kind.PATIO, Kind.TERRACE, Kind.GALLERY, Kind.BRIDGE);
 	/** Plazas: some of their posts are braziers. */
 	private static final Set<Kind> PLAZAS = EnumSet.of(Kind.PATIO, Kind.TERRACE, Kind.INNER_STREET);
 	/** Public space where the roofs get hanging lanterns. */
@@ -74,15 +77,18 @@ final class CitadelAmbience {
 	static final int REACH = 15 - CitadelFinish.MIN_LIGHT;
 	/** Spacing of the lamps: twice the reach, so two neighbours' light meets between them. */
 	static final int SPACING = 2 * REACH - 1;
-	/** Nearest two posts may be (blocks on the plane, squared). */
-	private static final int GAP2 = (SPACING / 2) * (SPACING / 2);
 	/** The cell above the walkway where the arm of a lantern post and the glass cross of a vitral are (feet + 3). */
 	private static final int HEAD = 3;
 	/** Cells around a lost cell in which posts are taken down. */
 	private static final int UNDO = 3;
 
-	private static final BlockState BASE = b(Blocks.POLISHED_BLACKSTONE_BRICK_WALL);
+	private static final BlockState PLINTH = b(Blocks.POLISHED_BLACKSTONE_BRICKS);
+	private static final BlockState PEDESTAL = b(Blocks.CHISELED_POLISHED_BLACKSTONE);
+	private static final BlockState POST = b(Blocks.STRIPPED_CHERRY_LOG);
 	private static final BlockState SHAFT = b(Blocks.CHERRY_FENCE);
+	private static final BlockState CHAMBER = b(Blocks.SHROOMLIGHT);
+	private static final BlockState ROOF_SLAB = CitadelCanvas.slab(Blocks.CHERRY_SLAB);
+	private static final BlockState TRAY = CitadelCanvas.slab(Blocks.POLISHED_BLACKSTONE_BRICK_SLAB);
 	private static final BlockState LANTERN_UP = Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, false);
 	private static final BlockState LANTERN_DOWN = Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, true);
 	private static final BlockState BRAZIER = Blocks.CAMPFIRE.defaultBlockState();
@@ -106,6 +112,7 @@ final class CitadelAmbience {
 		Set<Long> reserved = CitadelFinish.reserved(c);
 		List<Post> posts = posts(c, walk, before, reserved);
 		verify(c, before, posts);
+		relamp(c, reserved);
 		Set<Long> feet = new HashSet<>();
 		for (Post p : posts) {
 			feet.add(p.feet().asLong());
@@ -189,15 +196,15 @@ final class CitadelAmbience {
 		int n = 0;
 		for (BlockPos p : walk) {
 			Kind kind = c.zoneAt(p.getX(), p.getZ()).kind();
-			if (!STREETS.contains(kind) || Math.floorMod(p.getX() + 4 * p.getZ(), SPACING) != 0) {
+			if (!STREETS.contains(kind)) {
 				continue;
 			}
 			Direction d = edge(c, walkSet, p);
 			if (d == null || !keepsConnected(walkSet, p) || tooClose(posts, p)) {
 				continue;
 			}
-			Post post = PLAZAS.contains(kind) && n % 4 == 0 ? brazier(c, p, reserved)
-					: n % 3 == 2 ? vitral(c, p, reserved) : lanternPost(c, p, d.getOpposite(), reserved);
+			int turn = n % 4;
+			Post post = turn == 3 && PLAZAS.contains(kind) ? brazier(c, p, reserved) : turn == 1 ? vitral(c, p, reserved) : toro(c, p, reserved);
 			if (post != null) {
 				posts.add(post);
 				n++;
@@ -206,11 +213,12 @@ final class CitadelAmbience {
 		return posts;
 	}
 
+	/** Greedy spacing along the way: no two posts nearer than {@link #SPACING} on the plane (about 6 floors apart or more may share a column). */
 	private static boolean tooClose(List<Post> posts, BlockPos p) {
 		for (Post o : posts) {
 			int dx = o.feet().getX() - p.getX();
 			int dz = o.feet().getZ() - p.getZ();
-			if (dx * dx + dz * dz < GAP2 && Math.abs(o.feet().getY() - p.getY()) < 6) {
+			if (dx * dx + dz * dz < SPACING * SPACING && Math.abs(o.feet().getY() - p.getY()) < 6) {
 				return true;
 			}
 		}
@@ -231,56 +239,124 @@ final class CitadelAmbience {
 		took.add(q);
 	}
 
-	/** Base, two fences, a junction with a crossarm over the way, a lantern hanging from its end, a cap. */
-	private static @Nullable Post lanternPost(CitadelCanvas c, BlockPos p, Direction toWay, Set<Long> reserved) {
-		BlockPos arm = p.above(HEAD).relative(toWay);
-		List<BlockPos> need = List.of(p.above(), p.above(2), p.above(HEAD), p.above(HEAD + 1), arm, arm.below());
+	/** The four cells around {@code center} (a roof's eaves, a brazier's tray). */
+	private static List<BlockPos> ring(BlockPos center) {
+		List<BlockPos> out = new ArrayList<>(4);
+		for (Direction d : Direction.Plane.HORIZONTAL) {
+			out.add(center.relative(d));
+		}
+		return out;
+	}
+
+	/** True when a roof (slab, four stairs around it, a finial) fits over {@code top}: its cells are free air. */
+	private static boolean roofFits(CitadelCanvas c, Set<Long> reserved, BlockPos top) {
+		List<BlockPos> need = new ArrayList<>(ring(top));
+		need.add(top);
+		need.add(top.above());
+		return allFree(c, reserved, need);
+	}
+
+	/** A pagoda roof: a cherry slab with four stairs falling away from it and a fence finial. */
+	private static void roof(CitadelCanvas c, List<BlockPos> took, BlockPos top) {
+		put(c, took, top, ROOF_SLAB, SOLID);
+		for (Direction d : Direction.Plane.HORIZONTAL) {
+			put(c, took, top.relative(d), CitadelCanvas.stairs(Blocks.CHERRY_STAIRS, d), SOLID);
+		}
+		put(c, took, top.above(), SHAFT, SOLID);
+	}
+
+	/**
+	 * The stone lantern (toro): a blackstone-brick plinth, two stripped cherry logs, a shroomlight lamp
+	 * chamber and a pagoda roof over it, five blocks tall. A full-block mass, not a pin.
+	 */
+	private static @Nullable Post toro(CitadelCanvas c, BlockPos p, Set<Long> reserved) {
+		BlockPos lamp = p.above(HEAD);
+		if (!free(c, p, reserved) || !allFree(c, reserved, List.of(p.above(), p.above(2), lamp)) || !roofFits(c, reserved, lamp.above())) {
+			return null;
+		}
+		List<BlockPos> took = new ArrayList<>();
+		put(c, took, p, PLINTH, SOLID);
+		put(c, took, p.above(), POST, SOLID);
+		put(c, took, p.above(2), POST, SOLID);
+		put(c, took, lamp, CHAMBER, SOLID);
+		roof(c, took, lamp.above());
+		return new Post(p, took);
+	}
+
+	/**
+	 * The vitral lamp: the same plinth and log, then a lantern, a block of amber or rose stained glass lit
+	 * from below and from above by two lanterns, under the pagoda roof (six blocks tall).
+	 */
+	private static @Nullable Post vitral(CitadelCanvas c, BlockPos p, Set<Long> reserved) {
+		BlockPos glass = p.above(HEAD);
+		if (!free(c, p, reserved) || !allFree(c, reserved, List.of(p.above(), p.above(2), glass, glass.above())) || !roofFits(c, reserved, glass.above(2))) {
+			return null;
+		}
+		int tint = Math.floorMod(p.getX() * 31 + p.getZ() * 17, 2);
+		List<BlockPos> took = new ArrayList<>();
+		put(c, took, p, PLINTH, SOLID);
+		put(c, took, p.above(), POST, SOLID);
+		put(c, took, p.above(2), LANTERN_UP, DECOR);
+		put(c, took, glass, tint == 0 ? AMBER : ROSE, SOLID);
+		put(c, took, glass.above(), LANTERN_DOWN, HANGING);
+		roof(c, took, glass.above(2));
+		return new Post(p, took);
+	}
+
+	/** A pedestal with a lit campfire in a tray of four slabs, above head height: nobody can step in the fire. */
+	private static @Nullable Post brazier(CitadelCanvas c, BlockPos p, Set<Long> reserved) {
+		BlockPos fire = p.above(2);
+		List<BlockPos> need = new ArrayList<>(ring(fire));
+		need.addAll(List.of(p.above(), fire, fire.above()));
 		if (!free(c, p, reserved) || !allFree(c, reserved, need)) {
 			return null;
 		}
 		List<BlockPos> took = new ArrayList<>();
-		put(c, took, p, BASE, SOLID);
-		put(c, took, p.above(), SHAFT, SOLID);
-		put(c, took, p.above(2), SHAFT, SOLID);
-		put(c, took, p.above(HEAD), SHAFT, SOLID);
-		put(c, took, p.above(HEAD + 1), LANTERN_UP, DECOR);
-		put(c, took, arm, SHAFT, SOLID);
-		put(c, took, arm.below(), LANTERN_DOWN, HANGING);
+		put(c, took, p, PLINTH, SOLID);
+		put(c, took, p.above(), PEDESTAL, SOLID);
+		put(c, took, fire, BRAZIER, DECOR);
+		for (BlockPos t : ring(fire)) {
+			put(c, took, t, TRAY, SOLID);
+		}
 		return new Post(p, took);
 	}
 
-	/** The same shaft with a lantern standing on top, inside a cross of stained glass. */
-	private static @Nullable Post vitral(CitadelCanvas c, BlockPos p, Set<Long> reserved) {
-		List<BlockPos> need = new ArrayList<>(List.of(p.above(), p.above(2), p.above(HEAD), p.above(HEAD + 1)));
-		for (Direction d : Direction.Plane.HORIZONTAL) {
-			need.add(p.above(HEAD).relative(d));
+	/**
+	 * The old free-standing froglight lamps (a white block on a pillar, open on all four sides and above:
+	 * the promenade posts) become warm: a shroomlight under the same pagoda roof, when it fits.
+	 */
+	private static void relamp(CitadelCanvas c, Set<Long> reserved) {
+		List<Long> lamps = new ArrayList<>();
+		for (java.util.Map.Entry<Long, BlockState> e : c.cells.entrySet()) {
+			if (e.getValue() == CitadelCanvas.LIGHT) {
+				lamps.add(e.getKey());
+			}
 		}
-		if (!allFree(c, reserved, need) || !free(c, p, reserved)) {
-			return null;
+		java.util.Collections.sort(lamps);
+		for (long k : lamps) {
+			BlockPos p = BlockPos.of(k);
+			BlockState below = c.cells.get(p.below().asLong());
+			if (reserved.contains(k) || below == null || !below.isCollisionShapeFullBlock(EmptyBlockGetter.INSTANCE, p.below()) || !open(c, p.above())) {
+				continue;
+			}
+			boolean sides = true;
+			for (BlockPos q : ring(p)) {
+				sides &= open(c, q);
+			}
+			if (!sides) {
+				continue;
+			}
+			c.put(p.getX(), p.getY(), p.getZ(), CHAMBER, SOLID);
+			if (roofFits(c, reserved, p.above())) {
+				roof(c, new ArrayList<>(), p.above());
+			}
 		}
-		List<BlockPos> took = new ArrayList<>();
-		put(c, took, p, BASE, SOLID);
-		put(c, took, p.above(), SHAFT, SOLID);
-		put(c, took, p.above(2), SHAFT, SOLID);
-		put(c, took, p.above(HEAD), LANTERN_UP, DECOR);
-		int tint = Math.floorMod(p.getX() * 31 + p.getZ() * 17, 2);
-		for (Direction d : Direction.Plane.HORIZONTAL) {
-			put(c, took, p.above(HEAD).relative(d), (d.get2DDataValue() + tint) % 2 == 0 ? AMBER : ROSE, DECOR);
-		}
-		put(c, took, p.above(HEAD + 1), tint == 0 ? ROSE : AMBER, DECOR);
-		return new Post(p, took);
 	}
 
-	/** A two-high blackstone pillar with a lit campfire on top, above the reach of anyone walking by. */
-	private static @Nullable Post brazier(CitadelCanvas c, BlockPos p, Set<Long> reserved) {
-		if (!free(c, p, reserved) || !allFree(c, reserved, List.of(p.above(), p.above(2), p.above(HEAD)))) {
-			return null;
-		}
-		List<BlockPos> took = new ArrayList<>();
-		put(c, took, p, BASE, SOLID);
-		put(c, took, p.above(), BASE, SOLID);
-		put(c, took, p.above(2), BRAZIER, DECOR);
-		return new Post(p, took);
+	/** True for a cell with nothing solid in it (absent, air or a block without collision). */
+	private static boolean open(CitadelCanvas c, BlockPos q) {
+		BlockState s = c.cells.get(q.asLong());
+		return s == null || s.isAir() || s.getCollisionShape(EmptyBlockGetter.INSTANCE, q).isEmpty() && s.getLightEmission() == 0;
 	}
 
 	/**
@@ -381,7 +457,7 @@ final class CitadelAmbience {
 		for (BlockPos o : hung) {
 			int dx = o.getX() - p.getX();
 			int dz = o.getZ() - p.getZ();
-			if (dx * dx + dz * dz < GAP2 && Math.abs(o.getY() - p.getY()) < 6) {
+			if (dx * dx + dz * dz < (SPACING / 2) * (SPACING / 2) && Math.abs(o.getY() - p.getY()) < 6) {
 				return true;
 			}
 		}
