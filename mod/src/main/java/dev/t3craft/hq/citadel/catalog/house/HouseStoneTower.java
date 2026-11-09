@@ -465,28 +465,18 @@ public final class HouseStoneTower implements Variant {
 
 		/** An arched window of two panes and a crown: inverted stairs on the top corners, a sill and cherry shutters. */
 		void arch(Wall wl, int t, int y, boolean shutters) {
-			// [depth] the glass sits one block back from the wall face wherever the room has nothing there
-			boolean back = true;
+			// the glass is flush with the wall plane (a pane set back inside would block the walk along the wall); the
+			// depth comes from the jambs, the sill and the hood standing proud of it
 			for (int yy = y; yy <= y + 2; yy++) {
-				if (!free(wl.u(t, -1), yy, wl.v(t, -1))) {
-					back = false;
-				}
-			}
-			for (int yy = y; yy <= y + 2; yy++) {
-				if (back) {
-					wl.set(t, yy, 0, AIR);
-					wl.set(t, yy, -1, glass());
-				} else {
-					wl.set(t, yy, 0, glass());
-				}
+				wl.set(t, yy, 0, glass());
 			}
 			for (int sign : new int[] {-1, 1}) {
 				int tt = t + sign * 1;
 				if (!solidCorner(wl, tt)) {
-					// [depth] dark deepslate jambs and inverted stairs on the top corners frame the pale glass
-					wl.set(tt, y, 0, b(Blocks.POLISHED_DEEPSLATE));
-					wl.set(tt, y + 1, 0, b(Blocks.POLISHED_DEEPSLATE));
-					wl.set(tt, y + 2, 0, stUp(Blocks.DEEPSLATE_BRICK_STAIRS, along(wl, sign)));
+					// [depth] pale jambs (proud of the glass) and inverted stairs on the top corners frame the blue glass
+					wl.set(tt, y, 0, b(Blocks.POLISHED_ANDESITE));
+					wl.set(tt, y + 1, 0, b(Blocks.POLISHED_ANDESITE));
+					wl.set(tt, y + 2, 0, stUp(Blocks.POLISHED_ANDESITE_STAIRS, along(wl, sign)));
 				}
 			}
 			// [depth] a pale sill block with an upside-down diorite stair jutting out under it (nothing to stand on), and a
