@@ -414,11 +414,11 @@ public final class HubUndercroft {
 			int pa = xa - 1;
 			int pb = xb + 1;
 			for (int x : new int[] {pa, pb}) {
-				c.set(x, y + 1, z, RIB);
-				for (int yy = y + 2; yy <= y + 4; yy++) {
-					c.set(x, yy, z, LOG);
+				// pale posts with a dark capital: the opposite of the nave's piers, so the arch is not taken for one
+				for (int yy = y + 1; yy <= y + 4; yy++) {
+					c.set(x, yy, z, CALCITE);
 				}
-				c.set(x, y + 5, z, CALCITE);
+				c.set(x, y + 5, z, RIB);
 			}
 			for (int x = pa + 1; x <= pb - 1; x++) {
 				c.set(x, y + 5, z, HubBlocks.strippedLog(Direction.Axis.X));
