@@ -131,10 +131,10 @@ final class LanternViews {
 		List<Object[]> views = new ArrayList<>();
 		views.add(new Object[] {"all", "the four lanterns, from the south-east", all, new Renderer.Camera(35, 26, iso), 1});
 		views.add(new Object[] {"front", "from the front, eye level", all, new Renderer.Camera(8, 10, iso), 1});
-		views.add(new Object[] {"stand", "standing andon, two at a path", station(0, -2, 5), new Renderer.Camera(30, 20, near), 1});
-		views.add(new Object[] {"hang", "hanging chochin, three tones", station(1, -2, 3), new Renderer.Camera(25, 14, near), 1});
-		views.add(new Object[] {"wall", "bracket lantern on a pillar, three tones", station(2, -2, 3), new Renderer.Camera(20, 14, near), 1});
-		views.add(new Object[] {"tall", "plaza lantern, 2 blocks", station(3, -2, 5), new Renderer.Camera(30, 16, near * 0.8), 1});
+		views.add(new Object[] {"stand", "standing andon, two at a path", station(0, -2, 5, 3), new Renderer.Camera(30, 20, near), 1});
+		views.add(new Object[] {"hang", "hanging chochin, three tones", station(1, -2, 3, 8), new Renderer.Camera(25, 14, near), 1});
+		views.add(new Object[] {"wall", "bracket lantern on a pillar, three tones", station(2, -2, 3, 8), new Renderer.Camera(20, 14, near), 1});
+		views.add(new Object[] {"tall", "plaza lantern, 2 blocks", station(3, -2, 5, 5), new Renderer.Camera(30, 16, near * 0.8), 1});
 		// far: about 50 and 100 blocks away on a 1080p screen (70° FOV: 1080 / (1.4 d) px per block), enlarged ×4
 		views.add(new Object[] {"far_50", "from ~50 blocks (15 px/block, shown x4)", all, new Renderer.Camera(35, 20, 15), 4});
 		views.add(new Object[] {"far_100", "from ~100 blocks (8 px/block, shown x4)", all, new Renderer.Camera(35, 20, 8), 4});
@@ -166,10 +166,10 @@ final class LanternViews {
 		Files.writeString(out.resolve("report.txt"), rep.toString());
 	}
 
-	/** The box of station {@code s}: its 8 columns, from {@code zMin} (back) to {@code zMax} (front, towards the viewer), 9 blocks high. */
-	private static Renderer.Clip station(int s, int zMin, int zMax) {
+	/** The box of station {@code s}: its 8 columns, from {@code zMin} (back) to {@code zMax} (front, towards the viewer), up to {@code maxY}. */
+	private static Renderer.Clip station(int s, int zMin, int zMax, int maxY) {
 		int x0 = s * STATION;
-		return new Renderer.Clip(x0, -1, zMin, x0 + STATION - 1, 8, zMax);
+		return new Renderer.Clip(x0, -1, zMin, x0 + STATION - 1, maxY, zMax);
 	}
 
 	/** Nearest-neighbour enlargement (each pixel becomes a {@code k × k} square). */
