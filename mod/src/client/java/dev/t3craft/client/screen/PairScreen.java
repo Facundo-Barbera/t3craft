@@ -67,9 +67,9 @@ public final class PairScreen extends Screen {
 		link.setMaxLength(4096);
 		link.setHint(Component.literal("https://host/pair#token=…  or the code").withStyle(ChatFormatting.DARK_GRAY));
 		addRenderableWidget(link);
-		host = new EditBox(font, x, y + 68, w, 20, host, Component.literal("T3 URL (only with a bare code)"));
+		host = new EditBox(font, x, y + 68, w, 20, host, Component.literal("T3 URL or T3 Connect tunnel hostname"));
 		host.setMaxLength(512);
-		host.setHint(Component.literal("Only for a bare code: https://host.ts.net or http://host:3773").withStyle(ChatFormatting.DARK_GRAY));
+		host.setHint(Component.literal("Tunnel hostname, https://host.ts.net or http://host:3773 (optional with a full link)").withStyle(ChatFormatting.DARK_GRAY));
 		addRenderableWidget(host);
 		modeButton = addRenderableWidget(Button.builder(modeLabel(), b -> {
 			readOnly = !readOnly;
@@ -83,6 +83,18 @@ public final class PairScreen extends Screen {
 				.bounds(x + w / 2 + 4, y + 118, w / 2 - 4, 20).build());
 		pairButton.active = !busy;
 		setInitialFocus(link);
+	}
+
+	/** The address typed in the URL box as a base URL, or null while it is empty or not valid yet. */
+	private java.net.@Nullable URI typedBaseUrl() {
+		if (host == null || host.getValue().isBlank()) {
+			return null;
+		}
+		try {
+			return Pairing.parseUrl(host.getValue());
+		} catch (Pairing.PairingException e) {
+			return null;
+		}
 	}
 
 	private Component modeLabel() {
@@ -123,7 +135,7 @@ public final class PairScreen extends Screen {
 		int x = width / 2 - w / 2;
 		int y = top();
 		// Header, bottom-up from the first field: host command (wrapped), "On the T3 host:", title.
-		var cmd = font.split(Component.literal(Pairing.pairingHostCommand(readOnly, null)).withStyle(ChatFormatting.AQUA), w);
+		var cmd = font.split(Component.literal(Pairing.pairingHostCommand(readOnly, typedBaseUrl())).withStyle(ChatFormatting.AQUA), w);
 		int cy = y - 14 - cmd.size() * font.lineHeight;
 		graphics.text(font, Component.translatable("t3craft.pair.host").withStyle(ChatFormatting.GRAY), x, cy - 10, 0xFFFFFFFF);
 		graphics.centeredText(font, title, width / 2, Math.max(4, cy - 24), 0xFFFFFFFF);
@@ -133,7 +145,7 @@ public final class PairScreen extends Screen {
 		}
 		graphics.text(font, "Environment name", x, y - 10, 0xFFA0A0A0);
 		graphics.text(font, "Pairing link or code", x, y + 24, 0xFFA0A0A0);
-		graphics.text(font, "T3 URL (bare code only)", x, y + 58, 0xFFA0A0A0);
+		graphics.text(font, "T3 URL or tunnel hostname", x, y + 58, 0xFFA0A0A0);
 		int my = y + 144;
 		if (!readOnly) {
 			for (FormattedCharSequence s : font.split(Component.translatable("t3craft.pair.warning.control").withStyle(ChatFormatting.GOLD), w)) {

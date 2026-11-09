@@ -94,7 +94,7 @@ public interface EnvironmentActions {
 			if (session != null) {
 				try {
 					// Same id, url and credential; only the label in environments.json changes.
-					envs.save(new Environments.Environment(id, label, env.url()), session);
+					envs.save(env.withLabel(label), session);
 					ConfigManager.get().update(s -> s.withEnv(id, s.env(id).withLabel(null)));
 					reload();
 					return "Renamed " + id + " to " + label;

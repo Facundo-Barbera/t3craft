@@ -1,6 +1,6 @@
 # T3 Connect: seguimiento (issue #1)
 
-Estado: **solo investigación, no se implementa nada**. Hecho el 2026-11-09 (noche), después de `docs/plans/t3-connect.md`.
+Estado: **investigación**; los tres pasos de §6 (hostname del túnel, comprobación del descriptor, varias rutas) se implementaron después en `feat/t3-connect-cplus` (ver `docs/features/operate.md`, "Alcanzar un entorno desde otra red"), sin compilar todavía. Hecho el 2026-11-09 (noche), después de `docs/plans/t3-connect.md`.
 
 Este documento reabre la investigación con dos pistas nuevas (integraciones de WoW y el T3 local como puerta de entrada), **verifica o corrige** la conclusión anterior y confirma C+ con una prueba real.
 
