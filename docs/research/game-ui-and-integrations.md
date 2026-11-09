@@ -660,6 +660,11 @@ Según `docs/features/blocks.md` y el código de `client/blocks/`:
 
 ## 10. Anexo: "revisar todo desde el juego" (el bloque abre el navegador)
 
+> **Corregido el 2026-11-09 por Facundo (ver §13.1): el navegador NO reemplaza nuestras interfaces.** El navegador es para
+> **cosas de fuera** (Gmail, Google Chat, GitHub…), y nuestras pantallas se pulen igual, nativas. Lo que sigue describe la
+> opción "T3 web dentro del juego", que queda **descartada como plan principal**; se conserva porque el inventario de rutas de
+> T3 (10.2), el patrón de lanzadores (10.4) y el análisis de sesión (10.5) siguen siendo válidos y reutilizables.
+
 Aclaración de Facundo (2026-11-09): el objetivo es **poder revisar todo desde el juego**. Las pantallas físicas con navegador serían
 solo decorativas; lo útil es **clic derecho en un bloque (o NPC) → se abre la interfaz, y esa interfaz es el navegador**. Los
 bloques útiles son una idea aparte. Esto cambia las prioridades de §8 y §9.
@@ -867,6 +872,130 @@ tamaños de archivos).
   - No copiar su modelo cerrado: no tiene un navegador ni un camino para pantallas que ya existen en otra herramienta. t3craft sí lo tiene (T3 web).
   - Licencia MIT: adaptar código exige cabecera y entrada en `THIRD_PARTY_NOTICES.md`, como ya se hace.
 
+## 13. Anexo: correcciones y decisiones del 2026-11-09 (tarde)
+
+Tres aclaraciones de Facundo. Esta sección manda sobre lo que digan §8, §10 y §11.
+
+### 13.1 El navegador es para cosas de fuera, no para reemplazar nuestra UI
+**Corrección:** el navegador sirve para **Gmail, Google Chat, GitHub y similares**. Nuestras interfaces se pulen igual, nativas
+(§7). Consecuencias:
+
+- **§10 (T3 web dentro del juego) deja de ser el plan.** Se marca como descartada. Sobreviven su inventario de rutas, el patrón
+  "un lanzador = una ruta" y el análisis de sesión, por si algún día se quiere una pantalla concreta.
+- **La vía A (stream del preview de T3, §8.1) ya no cubre el caso.** Solo muestra pestañas que abre el servidor de T3; no sirve
+  para Gmail. Queda como complemento para ver lo que construyen los agentes.
+- **Hace falta un navegador real: vía B (CEF).** Con **Rinku** o **MCEF Modern** (ambos declaran 26.3, LGPL-2.1, descarga de
+  Chromium de unos 136 a 150 MB en el primer arranque). Confirma lo que ya respondí sobre experiencia y compatibilidad.
+- **El trabajo de UI y el del navegador quedan desacoplados**, lo cual es bueno: el kit nativo (§7) no depende de CEF, y CEF no
+  bloquea el pulido de las pantallas.
+
+**Problema concreto y serio para Gmail y Google Chat: Google bloquea el inicio de sesión en navegadores embebidos.**
+Devuelve "This browser or app may not be secure" y es una política deliberada contra webviews (está reportado una y otra vez en
+apps de Electron y CEF). Opciones, ninguna ideal:
+1. **Aceptar que Gmail y GChat no se logueen dentro del juego.** GitHub y la mayoría de sitios sí funcionan en un webview.
+   El navegador del juego serviría para GitHub, documentación, dashboards y previews, y Gmail se queda fuera.
+2. **Sesión ya iniciada fuera del flujo de Google**: usar un perfil de CEF persistente donde la cookie llegó por otro medio.
+   Frágil y probablemente igual de bloqueado.
+3. **Falsear el user agent** para parecer Chrome de escritorio: a veces funciona, Google lo persigue, y va contra el espíritu de
+   sus términos. **No lo recomiendo.**
+4. **No usar la web para el correo:** cliente nativo contra la API de Gmail o IMAP, mostrado en nuestra propia UI (una pantalla
+   o un bloque "bandeja"). Mucho más trabajo, pero se integra con el HQ (un bloque de correo, avisos) y no depende de CEF.
+   Para Google Chat la API es más limitada.
+- **Pendiente de verificar en el juego:** qué sitios concretos de la lista de Facundo funcionan dentro de Rinku o MCEF Modern.
+  Es la primera cosa que debería medir un spike, antes de construir nada.
+
+### 13.2 Hot reload: por qué no funciona y qué trae Fabric de forma oficial
+Facundo: *"me gustaría el ciclo con hot reload, pero no hemos podido hacerlo funcionar"*, y **sin añadir otro mod**.
+
+**Lo que Fabric y Loom ofrecen de forma oficial (nada de esto es un mod extra):**
+| Mecanismo | Qué recarga | Límite |
+|---|---|---|
+| **HotSwap de la JVM, con el IDE en modo depuración** (`docs.fabricmc.net/develop/debugging`) | Cuerpos de método | Nada estructural (campos, métodos nuevos, records). La propia doc de Fabric cita como caso de uso *"screen element alignment"*, justo lo nuestro |
+| **Mixins** | Hace falta configuración extra en la run configuration | No vale el HotSwap normal |
+| **F3+T** | **Assets: texturas, sprites, `.mcmeta` de nine-slice, modelos, fuentes y lang** | Solo lo que se lee por el **resource manager** |
+| **`/reload`** | Datapacks | Nada de cliente |
+| **`fabric-client-gametest-api-v1`** | Capturas reales y entrada simulada | Experimental; arranca el juego |
+
+**Lo que Fabric no trae:** recarga de código más allá del HotSwap de la JVM. El `-XX:+AllowEnhancedClassRedefinition` que usa
+`-Pt3craft.hotswap` **no es de Fabric**: es de JetBrains Runtime (JBR), un JDK aparte.
+
+**Causas probables de que no haya funcionado nunca** (en orden de probabilidad; `docs/dev.md` ya describe el camino correcto,
+pero es fácil saltárselo):
+1. **Nadie empuja el bytecode.** `DevReloadClient` del mod solo **detecta** cambios de forma y resetea el estado; no redefine
+   clases. Si el juego se lanza con `./gradlew runClient` desde la terminal, no hay depurador atado y **ninguna clase se recarga
+   nunca**. El HotSwap exige lanzar la run configuration de Loom **en modo depuración desde el IDE** y pulsar *Build Project* o
+   *Reload changed classes*.
+2. **IntelliJ compilando con Gradle.** Si *Build and run using* está en Gradle, lo típico es "0 classes reloaded". Hay que
+   ponerlo en **IntelliJ**.
+3. **`-Pt3craft.hotswap` con un JDK normal:** la JVM **se niega a arrancar** con esa bandera si no es JBR. Si se probó así, el
+   síntoma es que el juego no abre, y es fácil leerlo como "el hot reload está roto".
+4. **JBR 25 tiene bugs reales en la redefinición mejorada**: hay crashes abiertos en su repositorio. Uno se dispara solo al
+   combinarla con `-XX:+UseCompactObjectHeaders` (añadir un campo deja instancias en la clase vieja: `ClassCastException` y
+   SIGSEGV); **en JDK 25 esa opción no está activada por defecto**, así que se evita no activándola, pero conviene saberlo.
+5. **El PC es WSL.** Si el IDE está en Windows y Gradle y el juego corren en WSL, el depurador y las rutas cruzan la frontera.
+   Lo más simple es tener el IDE y el juego **del mismo lado**.
+6. **Aunque el HotSwap funcione, la UI no cambiaría:** los colores y las medidas están **en código** (`ChatTheme.warmStudio()`
+   es Java puro, sin recursos). Los valores en campos `static final` y en inicializadores estáticos **no se vuelven a ejecutar**
+   tras un hot-swap, así que un ajuste de paleta o de padding no se vería hasta reiniciar.
+
+**La palanca que no necesita ningún mod, ni JBR, ni depurador: hacer la UI dirigida por datos y usar F3+T.**
+- Mover los tokens de `ChatTheme` (colores, medidas, radios, paddings) a un recurso, por ejemplo
+  `assets/t3craft/gui/ui-style.json`, **leído por el resource manager** con un reload listener. Entonces **F3+T recarga la
+  paleta y las medidas en caliente**, que es el 80 % del trabajo de pulido visual.
+- **Es exactamente lo que hace AgentCraft, pero mejor:** AgentCraft ya tiene sus tokens fuera del código
+  (`assets/agentcraft/gui/ui-style.json`, `palette.json`, `kit.json`) y su `UiStyle` dice *"Never hard-code a colour in a screen
+  or renderer: ask here"*. Su límite es que los carga con `getResourceAsStream` en un **inicializador estático**, o sea por
+  classpath y una sola vez: F3+T no los recarga. Leyéndolos por el resource manager, nosotros sí tendríamos recarga en vivo.
+- Las **sprites, el nine-slice, las fuentes y las traducciones ya se recargan hoy con F3+T** sin tocar nada, porque van por el
+  resource manager.
+- El repo ya usa dos veces este patrón: `HqLayoutPackWatcher` (vigila un archivo de layout) y `ConfigManager` (relee la config
+  cada 2 s). La misma idea aplicada al tema de la UI, y los escenarios de la galería (§11, O1) se vuelven archivos editables.
+- **Qué sigue necesitando reiniciar:** cambios de estructura de las pantallas (widgets nuevos, otra disposición en código). Para
+  eso, O1 (galería `/t3dev ui`) reduce el coste: reinicias y vuelves a la pantalla exacta en un comando, sin navegar el juego.
+
+**Plan sugerido para el ciclo de UI, en orden:**
+1. **Arreglar el camino oficial** (media hora, sin código): run configuration de Loom en **depuración desde el IDE**,
+   *Build and run using: IntelliJ*, IDE y juego del mismo lado, y **sin** `-Pt3craft.hotswap` al principio. Con eso ya hay
+   HotSwap de cuerpos de método, que es lo que Fabric documenta para alinear pantallas.
+2. **Tokens de UI como recurso** (S) → F3+T recarga colores y medidas.
+3. **Galería `/t3dev ui <escenario>`** (S a M) → abrir cualquier pantalla con datos falsos al instante.
+4. **JBR solo si hace falta** cambiar estructura a menudo, sabiendo que es un JDK de terceros y que tiene bugs abiertos.
+5. `uiRender` se queda como comprobación de layout para agentes, no como herramienta de diseño.
+- **Nota:** existe un mod de hot reload para 26.3 (`JHVIW/fabric-hot-reload`, MIT) que vigila el build y recarga código, mixins
+  y recursos. Lo descarto por lo que pidió Facundo (nada de otro mod) y porque es muy inmaduro: una sola jornada de commits,
+  sin estrellas, probado solo en Windows. Se menciona porque su diseño confirma el patrón de los pasos 1 a 3.
+
+### 13.3 Ver la UI en el Mac
+Facundo quiere ver la UI en el Mac. Hay cuatro caminos reales; los dos primeros son los buenos.
+
+| Opción | Qué es | Interactivo | Esfuerzo | Notas |
+|---|---|---|---|---|
+| **M1. El cliente de desarrollo en el propio Mac** | macOS es plataforma de primera para Minecraft; Loom ya pone `-XstartOnFirstThread`. Haría falta JDK 25 (y JBR para macOS si se quiere redefinición mejorada) en el MBP | Sí, total | S | **Lo más simple y el mejor ciclo**: editar, HotSwap y F3+T en la misma máquina, sin red. Choca con una regla: `AGENTS.md` manda Gradle y Minecraft **solo al PC**. Esa regla existe por la saturación de la VPS y por los renders, no por el Mac de Facundo, pero el Mac mini está marcado "solo coordinación", así que **es decisión suya** si el MBP queda habilitado para desarrollo de UI |
+| **M2. Streaming de juego del PC al Mac** | Sunshine en el PC y Moonlight en el Mac (ambos libres), por Tailscale | Sí, con latencia baja | S | Herramienta estándar, no un hack, y no hay que escribir nada. El juego y el IDE se quedan en el PC; el Mac es pantalla y teclado. Lo mejor si el desarrollo debe seguir en el PC |
+| **M3. Visor propio por WebSocket** (O3 de §11) | El mod manda su framebuffer y recibe entrada | Sí | M a L | Solo tiene sentido si se quiere **dentro** de Citadel Studio o desde el móvil. M2 lo cubre mejor y gratis |
+| **M4. PNG de `uiRender` en Citadel Studio** | Ya existe: renders en el PC, vistos desde el Mac | No | — | Útil para revisar, no para desarrollar |
+
+- **Recomendación:** si Facundo acepta desarrollar UI en el MBP, **M1** y se termina el problema (y además el hot reload se
+  vuelve trivial, porque IDE y juego están del mismo lado, punto 5 de 13.2). Si el desarrollo debe quedarse en el PC, **M2**.
+- **Dato a favor de M1:** nada del trabajo de UI necesita la RTX del PC. La GPU solo la usan los renders de HQ (CUDA) y el
+  servicio de renders, que seguirían en el PC.
+- **A verificar para M1:** que exista JBR 25 para macOS arm64, si se quisiera la redefinición mejorada. El HotSwap normal
+  (cuerpos de método) funciona con cualquier JDK 25.
+- **CEF en el Mac** (para el navegador de 13.1): los forks declaran macOS en x86_64 y arm64, pero históricamente AWT y GLFW
+  chocan en macOS. Hay que probarlo en el Mac antes de contar con ello.
+
+### 13.4 Preguntas abiertas
+1. **¿Habilitamos el MBP para desarrollo de UI** (Gradle y `runClient` ahí, M1), o el desarrollo se queda en el PC y usas
+   Moonlight (M2)? Es la decisión que más acelera el ciclo.
+2. **¿Apruebas mover los tokens de UI a un recurso** (`ui-style.json`) para que F3+T recargue colores y medidas? Es un cambio
+   de código en `ChatTheme` y sus consumidores, así que no lo toco sin tu OK.
+3. **Gmail y Google Chat:** ¿aceptas que probablemente **no se puedan loguear** dentro de un navegador embebido y que el
+   navegador del juego sirva para GitHub, docs y dashboards? ¿O te interesa un cliente de correo nativo contra la API?
+4. **¿Hago un spike del navegador** que solo mida qué sitios de tu lista cargan y se loguean en Rinku o MCEF Modern, antes de
+   diseñar nada? Necesita compilar y abrir el juego en el PC, así que lo pediría al coordinador.
+5. ¿Qué pantallas quieres pulir primero con el ciclo nuevo: ajustes, emparejado y confirmaciones (las que usan widgets vanilla),
+   o el chat?
+
 ## Fuentes web
 
 - GLFW, `glfwRequestWindowAttention`: https://www.glfw.org/docs/latest/group__window.html
@@ -884,7 +1013,15 @@ tamaños de archivos).
 - mcef-codec (H.264/AAC): https://github.com/menntdev/mcef-codec
 - Fabric, pruebas automáticas y client game tests: https://docs.fabricmc.net/develop/automatic-testing
 - WebGUI (GUI y HUD web con hot reload): https://modrinth.com/project/tDw1xQja
-- AgentCraft: https://github.com/blendi-remade/agentcraft (README, `docs/console.md`, `docs/protocol.md`, `docs/SPEC.md`)
+- AgentCraft: https://github.com/blendi-remade/agentcraft (README, `docs/console.md`, `docs/protocol.md`, `docs/SPEC.md`,
+  `client/ui/UiStyle.java`)
+- Fabric, depurar y hot-swap: https://docs.fabricmc.net/develop/debugging
+- JetBrains Runtime, redefinición mejorada y sus bugs: https://github.com/JetBrains/JetBrainsRuntime/issues/650 y
+  https://github.com/JetBrains/JetBrainsRuntime/issues/658
+- Compact object headers en JDK 25 (no activados por defecto): https://openjdk.org/jeps/519
+- Google y el inicio de sesión en webviews embebidos: https://github.com/agentify-sh/desktop/issues/11 y
+  https://github.com/tw93/pake/issues/1148
+- fabric-hot-reload (descartado, se cita como referencia de diseño): https://github.com/JHVIW/fabric-hot-reload
 - WebDisplays (Fabric): https://www.curseforge.com/minecraft/mc-mods/webdisplays-unofficial-fabric
 - T3 Code, preview en servidor y streaming: `packages/client-runtime/src/preview/serverBrowserStream.ts` y
   `apps/server/src/preview/ServerBrowserStream.ts` en https://github.com/pingdotgg/t3code
