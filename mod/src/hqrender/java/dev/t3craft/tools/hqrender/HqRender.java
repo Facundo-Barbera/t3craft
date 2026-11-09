@@ -534,7 +534,7 @@ public final class HqRender {
 	 */
 	static HqInput roster(int[] threads, int settled) {
 		String[] names = {"t3craft", "bridge", "website", "infra"};
-		String[] envs = {"vps", "vps", "acmesite", "laptop"};
+		String[] envs = {"vps", "vps", "desktop", "laptop"};
 		HqInput.Builder b = HqInput.builder();
 		for (int p = 0; p < threads.length; p++) {
 			String key = envs[p] + ":" + names[p];

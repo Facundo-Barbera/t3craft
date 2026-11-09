@@ -40,8 +40,8 @@ final class TownRender {
 	static final int[] THREADS = {9, 4, 7, 2, 13, 3, 1, 6, 5, 20, 2, 8, 4, 3, 11, 1, 6, 2, 5, 3};
 	static final String[] NAMES = {"t3craft", "bridge", "website", "infra", "mobile", "docs", "api", "billing", "search", "platform", "auth",
 			"analytics", "design", "cli", "data", "ops", "chat", "payments", "gateway", "scheduler"};
-	static final String[] ENVS = {"vps", "vps", "acmesite", "laptop", "cloud", "vps", "acmesite", "cloud", "laptop", "vps", "cloud", "acmesite",
-			"laptop", "vps", "cloud", "acmesite", "vps", "cloud", "laptop", "acmesite"};
+	static final String[] ENVS = {"vps", "vps", "desktop", "laptop", "cloud", "vps", "desktop", "cloud", "laptop", "vps", "cloud", "desktop",
+			"laptop", "vps", "cloud", "desktop", "vps", "cloud", "laptop", "desktop"};
 
 	/** The first {@code n} projects of the demo roster (keys sort in roster order: {@code pNN-name}). */
 	static HqInput roster(int n) {

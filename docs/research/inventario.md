@@ -181,7 +181,7 @@ Infraestructura común a todos los ítems ⚠️: un segundo pairing **opcional*
 ## 3. Riesgos y preguntas abiertas para Facundo
 
 **Riesgos**
-- **`operate` es casi admin**: arranca agentes `full-access` y aprueba comandos arbitrarios. Si alguien controla la PC con Minecraft, controla el VPS y acmesite. Además, `t3 auth pairing create` sin `--scope` concede **todos** los scopes (`orchestration:operate`, `filesystem:write`, `terminal:operate`…).
+- **`operate` es casi admin**: arranca agentes `full-access` y aprueba comandos arbitrarios. Si alguien controla la PC con Minecraft, controla el VPS y el portátil. Además, `t3 auth pairing create` sin `--scope` concede **todos** los scopes (`orchestration:operate`, `filesystem:write`, `terminal:operate`…).
 - **Superficie de la API**: los métodos y campos citados vienen de `t3code-ref@15fe2832`, mientras que el VPS corre 0.1.8 y la CLI local 0.1.4. Los nombres de campo pueden cambiar entre nightlies, así que la decodificación debe seguir siendo tolerante (como hoy en `ThreadShell`).
 - **Ramas paralelas**: chat (`ChatScreen`, `ThreadListView`, `EnvBadge`) y portable (`EnvBadge`, `Conversation`, `/bounded`) duplican piezas. Conviene consolidarlas antes de sumar features encima. feat/portable tiene WIP sin commitear.
 - **Conexiones**: feat/chat abre su propio socket por pantalla, contra la regla de `api.md` ("agrega un método a `T3Connection`, no abras otra conexión"). Con monitores en vivo (ítem 7) se multiplicarían las suscripciones a `subscribeThread`.

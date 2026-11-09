@@ -134,7 +134,7 @@ public final class DemoHq {
 
 	/** Fixed example: three projects in two environments, four threads each, one of them settled (on the "Archived" shelf). */
 	public static HqInput sample() {
-		String[][] projects = {{"vps", "t3craft"}, {"acmesite", "forja"}, {"vps", "telar"}};
+		String[][] projects = {{"vps", "t3craft"}, {"laptop", "forja"}, {"vps", "telar"}};
 		HqInput.Builder b = HqInput.builder();
 		for (String[] p : projects) {
 			String key = p[0] + ":" + p[1];

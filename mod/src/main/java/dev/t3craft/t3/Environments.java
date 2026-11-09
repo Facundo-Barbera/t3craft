@@ -57,7 +57,7 @@ public final class Environments {
 		return dir.resolve("credentials").resolve(id + ".json");
 	}
 
-	/** Lower-case slug from a label ("my-vps" → "my-vps", "Mini Acmesite" → "mini-acmesite"). */
+	/** Lower-case slug from a label ("my-vps" → "my-vps", "Mini Laptop" → "mini-laptop"). */
 	public static String slug(String label) {
 		String s = label.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-").replaceAll("^-+|-+$", "");
 		if (s.isEmpty()) {

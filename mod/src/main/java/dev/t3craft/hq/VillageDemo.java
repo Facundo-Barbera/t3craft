@@ -13,7 +13,7 @@ import java.util.Map;
 public final class VillageDemo {
 	private static final String[] NAMES = {"t3craft", "bridge", "website", "infra", "mobile", "docs", "billing", "search", "ml-lab",
 			"design", "auth", "data", "chat", "maps", "ops", "shop", "api", "notify", "media", "games", "survey", "wiki", "crm", "edge"};
-	private static final String[] ENVS = {"vps", "laptop", "acmesite", "cloud"};
+	private static final String[] ENVS = {"vps", "laptop", "desktop", "cloud"};
 	/** Active threads per project (more than 6 builds annexes; more than 14 a second hamlet). */
 	private static final int[] THREADS = {9, 3, 6, 2, 12, 4, 1, 7, 5, 15, 3, 8, 2, 6, 10, 1, 4, 11, 5, 3, 7, 2, 6, 4};
 

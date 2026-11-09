@@ -70,7 +70,7 @@ rechaza el token y no lo guarda.
 
 ```
 [PC: Minecraft + mod]  --HTTPS/WSS por Tailscale-->  my-vps T3        (sesión read propia)
-                       --HTTP/WS  por Tailscale-->   my-acmesite :3773 (sesión read propia)
+                       --HTTP/WS  por Tailscale-->   my-laptop :3773 (sesión read propia)
 [bridge/ en homelab]   opcional, legacy (modo "bridge")
 ```
 - **El mod Java es cliente directo de T3**: WebSocket RPC con `java.net.http`, framing Effect RPC
@@ -89,7 +89,7 @@ rechaza el token y no lo guarda.
   campo para pegar el link `https://host/pair#token=…`, o el código más la URL del host. Canjea,
   verifica el scope, guarda y conecta. `/t3craft unpair <env>` borra la credencial local (la
   sesión se revoca en el host).
-- **Multi-entorno**: vps y acmesite a la vez, con ids de NPC `<env>:<threadId>`.
+- **Multi-entorno**: vps y laptop a la vez, con ids de NPC `<env>:<threadId>`.
 - **Modo**: `config/t3craft.json` → `"mode": "direct" | "bridge"`. Las instalaciones que ya
   tienen `bridgeUrl` y no tienen `mode` siguen en `bridge`; las instalaciones nuevas arrancan en
   `direct`.
