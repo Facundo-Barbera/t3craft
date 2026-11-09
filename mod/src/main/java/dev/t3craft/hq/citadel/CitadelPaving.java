@@ -4,12 +4,10 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.BAMBOO;
 import static dev.t3craft.hq.citadel.CitadelCanvas.FOOT;
 import static dev.t3craft.hq.citadel.CitadelCanvas.b;
 import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
-import static dev.t3craft.hq.citadel.CitadelCanvas.terracotta;
 
 import dev.t3craft.hq.RingCampusGeometry;
 import dev.t3craft.hq.RingCampusGeometry.Kind;
 import dev.t3craft.hq.RingCampusGeometry.Zone;
-import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jspecify.annotations.Nullable;
@@ -35,11 +33,11 @@ import org.jspecify.annotations.Nullable;
  *     tone against each gutter and a middle band of another: polished andesite over stone bricks for the
  *     grey inner street and ring 1, mud bricks over packed mud for the warm streets of rings 2 and 3. A
  *     joint across the road every so often; almost no noise.</li>
- * <li><b>Crossings</b>: where an avenue (or a ramp) meets a street the kerb opens and a <i>plazoleta</i>
- *     ({@link #plazoleta}) spreads over the road: a chiselled plinth, a pinwheel of terracotta, a calcite
- *     ring, a polished ring, a field of tile with arcs of joints (the avenue's runner flows through it) and
- *     a polished rim. {@link CitadelStreetscape#crossings} stands its focal point, its benches, its sign
- *     and its stall on it. Ring 1's crossings hold the node rooms, so they keep the plain street.</li>
+ * <li><b>Crossings</b>: where an avenue (or a ramp) meets a street the roads open into an octagonal plaza
+ *     ({@link CitadelPlaza}: 22 cells across at scale 2, a kerb half a block high, rings of one material each,
+ *     one accent ring of cherry planks, planters and benches in the quadrants), with the focal point
+ *     of {@link CitadelStreetscape#crossings} in the middle. Ring 1's crossings hold the node rooms, so they
+ *     keep the plain street.</li>
  * <li><b>Paths</b> of the patio and the garden ({@link #causeway}, {@link #patioRing}): bamboo
  *     runners and the paved ring of the patio. (The lanes of the lots are
  *     {@code CitadelPlacement}'s.)</li>
@@ -105,16 +103,6 @@ final class CitadelPaving {
 	static final double GUTTER_W = 1.0;
 	/** The lane of a street against each gutter: this fraction of the street's width. */
 	static final double LANE_FRAC = 0.12;
-	/**
-	 * A crossing's plazoleta, as fractions of the street's width: radius of the plinth (a 3x3 at the focal
-	 * point), of the terracotta pinwheel, of the calcite ring, of the polished ring, and of the whole plazoleta
-	 * (its last cell is a polished rim).
-	 */
-	static final double HEART_FRAC = 0.12;
-	static final double DISC_FRAC = 0.30;
-	static final double RING_FRAC = 0.40;
-	static final double RIM_FRAC = 0.47;
-	static final double PLAZA_R_FRAC = 1.1;
 	/** The plaza at the foot of the main ramp: half width, in avenue half widths. */
 	static final double PLAZA_FRAC = 2.35;
 	/** Half width of a causeway over the patio's pool (the pool's paths): 1.2 unscaled. */
@@ -208,10 +196,12 @@ final class CitadelPaving {
 		return hash(x, z) % 9 == 0 ? KERB_CRACKED : FOOT;
 	}
 
-	/** The outer column of the outermost street, against the lawn: moss, coarse dirt and grass in patches. */
+	/**
+	 * The outer column of the outermost street, against the lawn: one continuous strip of mossy stone brick (no
+	 * loose pixels of moss and dirt: a kerb the lawn stops at).
+	 */
 	private static BlockState lawnEdge(int x, int z) {
-		int h = hash(x, z);
-		return h < 50 ? CitadelCanvas.MOSS : h < 75 ? b(Blocks.COARSE_DIRT) : CitadelCanvas.GRASS;
+		return MOSSY;
 	}
 
 	/** A sidewalk cell {@code s} along its road: smooth stone with a course of stone brick across it every {@link #ACERA_EVERY} cells. */
@@ -223,45 +213,20 @@ final class CitadelPaving {
 
 	/** An avenue column of ring {@code zn.ring()}. */
 	static BlockState avenue(CitadelCanvas c, int x, int z, Zone zn) {
+		CitadelPlaza.Plaza plaza = CitadelPlaza.at(c, x, z); // the plaza of a crossing swallows sidewalk and gutter
+		if (plaza != null) {
+			return CitadelPlaza.ground(plaza, x, z);
+		}
 		int n = RingCampusGeometry.lotsIn(zn.ring());
 		double d = RingCampusGeometry.radialDistance(x, z, n);
 		double s = along(x, z, n);
 		if (d > ACERA_D()) {
 			return sidewalk(s);
 		}
-		BlockState plaza = avenuePlaza(c, x, z, zn.ring(), n, d, s); // the plazoleta also swallows the gutter
-		if (plaza != null) {
-			return plaza;
-		}
 		if (d > MOUTH_D()) {
 			return kerb(x, z); // the gutter
 		}
 		return avenueField(c, x, z, d, s);
-	}
-
-	/**
-	 * The plazoleta over the end of an avenue, where it meets a street: at its inner end (the street inside, or
-	 * the inner street for ring 1) and at its outer end (ring 2 and 3 only: ring 1's outer end is a node room).
-	 * {@code null} away from the crossings.
-	 */
-	private static @Nullable BlockState avenuePlaza(CitadelCanvas c, int x, int z, int m, int n, double d, double s) {
-		double l = across(x, z, n);
-		double w = m == 1 ? RingCampusGeometry.ringInner(1) - CitadelCanvas.dims().rampR : CitadelCanvas.dims().street;
-		double rc = m == 1 ? (CitadelCanvas.dims().rampR + RingCampusGeometry.ringInner(1)) / 2 : RingCampusGeometry.ringInner(m) - w / 2.0;
-		double zebra = d > RUNNER_D() ? l : Double.NaN; // the crossing over the avenue's mouth: stripes along the avenue, the runner stays
-		double md = Math.hypot(l, s - rc);
-		if (md <= PLAZA_R_FRAC * w) {
-			return plazoleta(c, md, l, s - rc, d, w, zebra);
-		}
-		if (m >= 2) {
-			double wo = CitadelCanvas.dims().street;
-			double rco = RingCampusGeometry.ringOuter(m) + wo / 2.0;
-			double mdo = Math.hypot(l, s - rco);
-			if (mdo <= PLAZA_R_FRAC * wo) {
-				return plazoleta(c, mdo, l, s - rco, d, wo, zebra);
-			}
-		}
-		return null;
 	}
 
 	/**
@@ -300,6 +265,10 @@ final class CitadelPaving {
 
 	/** A column of the inner street or of a ring street. */
 	static BlockState street(CitadelCanvas c, int x, int z, double r, Zone zn) {
+		CitadelPlaza.Plaza plaza0 = CitadelPlaza.at(c, x, z); // the octagonal plaza of a crossing: its own floor, edge to edge
+		if (plaza0 != null) {
+			return CitadelPlaza.ground(plaza0, x, z);
+		}
 		boolean inner = zn.kind() == Kind.INNER_STREET;
 		int m = zn.ring();
 		double lo = inner ? CitadelCanvas.dims().rampR : RingCampusGeometry.ringOuter(m);
@@ -325,39 +294,6 @@ final class CitadelPaving {
 			}
 			return e <= acera ? sidewalk(RingCampusGeometry.theta(x, z) * rc) : kerb(x, z);
 		}
-		// the plazoleta of a crossing, over the road only: ring 1's crossings are node rooms, so it has none
-		if (inner || m >= 2) {
-			double md = 99;
-			double dx = 0;
-			double dz = 0;
-			double lat = 99;
-			if (plaza) {
-				md = Math.hypot(x, z - rc);
-				dx = x;
-				dz = z - rc;
-				lat = Math.abs(x);
-			} else {
-				double ang = radialAngle(x, z, nIn);
-				dx = x - rc * Math.sin(ang);
-				dz = z + rc * Math.cos(ang);
-				md = Math.hypot(dx, dz);
-				lat = dIn;
-				if (nOut > 0) {
-					double ango = radialAngle(x, z, nOut);
-					double ox = x - rc * Math.sin(ango);
-					double oz = z + rc * Math.cos(ango);
-					if (Math.hypot(ox, oz) < md) {
-						md = Math.hypot(ox, oz);
-						dx = ox;
-						dz = oz;
-						lat = dOut;
-					}
-				}
-			}
-			if (md <= PLAZA_R_FRAC * width) {
-				return plazoleta(c, md, dx, dz, lat, width, lat > MOUTH_D() ? r : Double.NaN); // a crossing over the street's arms
-			}
-		}
 		if (mouthIn || mouthOut) {
 			// the avenue flows across the street
 			double d = mouthOut && dOut <= dIn ? dOut : dIn;
@@ -365,41 +301,6 @@ final class CitadelPaving {
 			return plaza ? plazaField(c, x, z, rc, width) : avenueField(c, x, z, d, along(x, z, n));
 		}
 		return m >= 2 ? warmField(x, z, r, lo, hi, band) : streetField(x, z, r, lo, hi, band);
-	}
-
-	/**
-	 * The plazoleta of a crossing, {@code md} from its centre ({@code dx}, {@code dz} the offsets, {@code lat} the
-	 * distance to the avenue's axis, {@code width} the street's): a chiselled-brick plinth (the focal point's
-	 * base), a pinwheel of pink and magenta terracotta, a ring of calcite, a ring of polished deepslate, then a
-	 * field of the kit's tile with an arc of joints every three cells (the avenue's runner flows through it) and
-	 * a polished rim on the last cell. Covers {@code md <= PLAZA_R_FRAC * width}.
-	 */
-	static BlockState plazoleta(CitadelCanvas c, double md, double dx, double dz, double lat, double width, double zebra) {
-		if (md <= HEART_FRAC * width) {
-			return CHISELED;
-		}
-		if (md <= DISC_FRAC * width) {
-			return (dx >= 0) == (dz >= 0) ? CALCITE : POLISHED; // a pinwheel of white and dark
-		}
-		if (md <= RING_FRAC * width) {
-			return terracotta(DyeColor.PINK); // one ring of colour: the citadel's pink
-		}
-		if (md <= RIM_FRAC * width) {
-			return POLISHED;
-		}
-		if (md > PLAZA_R_FRAC * width - 1.0) {
-			return POLISHED;
-		}
-		if (lat <= RUNNER_D()) {
-			return c.floor();
-		}
-		// a zebra crossing near the rim, on the arms: stripes of calcite along the way, every other cell
-		if (!Double.isNaN(zebra) && md >= PLAZA_R_FRAC * width - 4.0 && md <= PLAZA_R_FRAC * width - 1.5 && Math.floorMod((int) Math.round(zebra), 2) == 0) {
-			return CALCITE;
-		}
-		// concentric rings two cells wide: stone brick, polished andesite, calcite
-		int ring = Math.floorMod((int) Math.round(md) / 2, 3);
-		return ring == 0 ? BRICKS : ring == 1 ? JOINT : CALCITE;
 	}
 
 	/** The plaza at the foot of the main ramp: the avenue's tile, with arcs of joints round the rosette. */
@@ -421,7 +322,7 @@ final class CitadelPaving {
 		double edge = Math.min(r - lo, hi - r) - band;
 		double arc = RingCampusGeometry.theta(x, z) * (lo + hi) / 2;
 		if (edge < LANE_FRAC * width) {
-			return hash(x, z) < 5 ? CRACKED : BRICKS;
+			return BRICKS;
 		}
 		if (median(r, lo, hi)) {
 			return POLISHED;
@@ -444,12 +345,12 @@ final class CitadelPaving {
 		double edge = Math.min(r - lo, hi - r) - band;
 		double arc = RingCampusGeometry.theta(x, z) * (lo + hi) / 2;
 		if (edge < LANE_FRAC * width) {
-			return hash(x, z) < 5 ? MOSSY : PACKED_MUD;
+			return PACKED_MUD;
 		}
 		if (median(r, lo, hi)) {
 			return BRICKS;
 		}
-		return joint(arc, width) || hash(x, z) < 9 ? PACKED_MUD : MUD; // patches of packed mud: worn, not flat
+		return joint(arc, width) ? PACKED_MUD : MUD;
 	}
 
 	// ------------------------------------------------------------------ verges
@@ -465,17 +366,17 @@ final class CitadelPaving {
 	 * moss against the kerb, thinning out over {@link #VERGE_W()}.
 	 */
 	static BlockState lotGround(CitadelCanvas c, int x, int z, Zone zn) {
+		CitadelPlaza.Plaza plaza = CitadelPlaza.at(c, x, z);
+		if (plaza != null) {
+			return CitadelPlaza.ground(plaza, x, z); // the corner of a crossing's plaza
+		}
 		int m = zn.ring();
 		double r = RingCampusGeometry.r(x, z);
 		double d = RingCampusGeometry.radialDistance(x, z, RingCampusGeometry.lotsIn(m));
 		double edge = Math.min(d - AVENUE_HALF(),
 				Math.min(r - RingCampusGeometry.ringInner(m), RingCampusGeometry.ringOuter(m) - r));
-		if (edge >= VERGE_W()) {
-			return CitadelCanvas.GRASS;
-		}
-		int h = hash(x, z);
-		int moss = edge < VERGE_W() / 2 ? 70 : 35;
-		return h < moss ? CitadelCanvas.MOSS : h < moss + 12 ? b(Blocks.COARSE_DIRT) : CitadelCanvas.GRASS;
+		// a continuous strip of moss against the kerb (no coarse dirt, no random pixels), then plain grass
+		return edge < VERGE_W() / 2 ? CitadelCanvas.MOSS : CitadelCanvas.GRASS;
 	}
 
 	/**
@@ -484,6 +385,9 @@ final class CitadelPaving {
 	 * lawn, and a flowering bush on the second. Never inside the barrio's own square.
 	 */
 	static @Nullable BlockState vergeCover(CitadelCanvas c, int x, int z, Zone zn) {
+		if (CitadelPlaza.at(c, x, z) != null) {
+			return null; // inside a plaza: its own kerb and planters
+		}
 		int m = zn.ring();
 		double r = RingCampusGeometry.r(x, z);
 		double d = RingCampusGeometry.radialDistance(x, z, RingCampusGeometry.lotsIn(m));
@@ -498,7 +402,7 @@ final class CitadelPaving {
 		}
 		int h = hash(x, z);
 		if (edge < VERGE_W() / 2) {
-			return h % 3 == 0 ? slab(Blocks.MOSSY_STONE_BRICK_SLAB) : slab(Blocks.STONE_BRICK_SLAB);
+			return slab(Blocks.STONE_BRICK_SLAB); // one continuous low kerb, no mossy alternation
 		}
 		return h < 14 ? CitadelCanvas.leaves(Blocks.FLOWERING_AZALEA_LEAVES) : null;
 	}

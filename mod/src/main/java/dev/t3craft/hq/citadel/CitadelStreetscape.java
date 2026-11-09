@@ -9,8 +9,6 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
 import dev.t3craft.hq.RingCampusGeometry;
 import dev.t3craft.hq.RingCampusGeometry.Kind;
 import dev.t3craft.hq.RingCampusGeometry.Zone;
-import java.util.HashSet;
-import java.util.Set;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -33,8 +31,9 @@ import net.minecraft.world.level.block.state.properties.Property;
  * sit in the shade, where do I put my rubbish, where am I, who sells here. Reference: the shaded avenues
  * of a Kyoto neighbourhood, a plaza with one tall paper lantern and a signpost. Palette: cherry wood,
  * pale smooth stone, dark deepslate, the warm paper light of the kit. What makes it memorable: every
- * crossing is a small plaza with the same four things (a lantern you can see from the avenue, benches
- * that face it, a sign, a stall), so the city reads at a glance.
+ * crossing is an octagonal plaza with the same things (a lantern you can see from the avenue, planters
+ * with benches that face it, a sign), so the city reads at a glance. struct/streets-plazas2: the
+ * plazoletas became octagons with a raised kerb and planters; the stall went (its place is the planters).
  *
  * <h2>Pieces</h2>
  *
@@ -48,21 +47,23 @@ import net.minecraft.world.level.block.state.properties.Property;
  * <li><b>Street rows</b> ({@link #street}): on the outer column of the sidewalks of the inner street and
  *     the ring streets: a tree with a bench under it and a bin on the outer row every two steps, a bench
  *     facing the street on the inner row half way between them. None near an avenue mouth or a node.</li>
- * <li><b>Crossings</b> ({@link #crossings}): on every plazoleta ({@link CitadelPaving#plazoleta}) of rings 2
- *     and 3 and of the inner street (not the spawn's plaza): a focal point (a chiselled plinth, two posts
- *     and the kit's tall paper lantern, {@code paper_lantern_tall}, light 15), a bench facing the
- *     centre at each of the four corners, a bin beside each, a signpost (a log stele with a plaque: ring and
- *     compass heading of the avenue) and a small stall (counter, two posts, an awning of cherry slabs and
- *     a hanging lantern). It runs after the catalog's placement and only on free cells: where the
- *     catalog built a plaza centre of its own, the crossing is left to it.</li>
+ * <li><b>Crossings</b> ({@link #crossings}): on every octagonal plaza ({@link CitadelPlaza}) of rings 2 and 3
+ *     and of the inner street (not the spawn's plaza): the focal point (a chiselled plinth, a stone shaft 9
+ *     high with buttresses, four lantern arms and the kit's tall paper lantern, {@code paper_lantern_tall},
+ *     light 15: 12 high, a landmark from the avenue), the kerb (a tile slab half a block over the floor, walked
+ *     over), and in each of the four quadrants between the roads a planter (low brick wall, flowering azalea,
+ *     a cherry tree at one flank, a lantern post at the other, a bin in the wall) with three cherry benches in
+ *     front of it facing the focal point; one quadrant per plaza holds the signpost (a log stele with a plaque:
+ *     ring and compass heading of the avenue). It runs after the catalog's placement and only on free cells:
+ *     where the catalog built a plaza centre of its own, the crossing is left to it.</li>
  * <li><b>Plaza</b> ({@link #plaza}): the plaza at the foot of the main ramp keeps its lanterns, benches and
  *     planters; the axis stays clear (the spawn is there).</li>
  * </ul>
  *
- * Nothing stands on a cell of a node or a lot: canopies skip those cells. Light: the street's lamps are
- * the catalog's lamps and {@link CitadelAmbience}'s posts; what stands here lights only where it is a
- * focal point (the tall lantern, the stall's lantern). Never on the lane of the walkers: everything stands
- * on a sidewalk, or on the plazoleta's own plinth.
+ * Nothing stands on a cell of a node or a lot: canopies skip those cells (except over a plaza). Light: the
+ * street's lamps are the catalog's lamps and {@link CitadelAmbience}'s posts; what stands here lights only where
+ * it is a focal point (the tall lantern, the lantern posts of the planters). Never on the lane of the walkers:
+ * everything stands on a sidewalk, or in the quadrants of a plaza, never on the arms of its roads.
  */
 final class CitadelStreetscape {
 	static final BlockState PLINTH = CitadelPaving.CHISELED;
@@ -93,7 +94,7 @@ final class CitadelStreetscape {
 	}
 	/** The boulevard stops this many cells short of the street (the plazoleta's room). */
 	static int END_ROOM() {
-		return CitadelCanvas.dims().s(6);
+		return CitadelCanvas.dims().s(7);
 	}
 	/** Trees and benches keep this many cells clear of an avenue mouth, beyond its half width. */
 	static double MOUTH_ROOM() {
@@ -106,7 +107,7 @@ final class CitadelStreetscape {
 	/** Height of a lantern post of a plaza (wall blocks under the lantern). */
 	static final int PLAZA_POST = 3;
 	/** Height of the walls (stone-brick posts) under the tall lantern of a focal point. */
-	static final int FOCAL_POSTS = 6;
+	static final int FOCAL_POSTS = 9;
 	/** Lateral distance (cells from the avenue's axis) of the benches of a plazoleta: just past the mouth of the avenue. */
 	static int BENCH_LAT() {
 		return (int) Math.round(CitadelPaving.MOUTH_D() + 1.25);
@@ -154,7 +155,8 @@ final class CitadelStreetscape {
 	/** Whether a canopy leaf may stand over this cell: road-ish cells only (never a lot or a node). */
 	private static boolean canopyOk(CitadelCanvas c, int x, int z) {
 		Kind k = c.zoneAt(x, z).kind();
-		return k == Kind.AVENUE || k == Kind.STREET || k == Kind.INNER_STREET || k == Kind.TERRACE || k == Kind.LAWN;
+		return k == Kind.AVENUE || k == Kind.STREET || k == Kind.INNER_STREET || k == Kind.TERRACE || k == Kind.LAWN
+				|| CitadelPlaza.at(c, x, z) != null;
 	}
 
 	/** A cherry tree in a pit on the ground cell: a trunk and a canopy that stays over roads and keeps every leaf attached. */
@@ -245,8 +247,8 @@ final class CitadelStreetscape {
 			int ax = x + a[0];
 			int az = z + a[1];
 			// a buttress of wall blocks on each face of the shaft, so it is not a pole
-			if (freeColumn(c, ax, az, 2, 4) && c.at(ax, 0, az) != null) {
-				c.fill(ax, 2, 4, az, POST);
+			if (freeColumn(c, ax, az, 2, 5) && c.at(ax, 0, az) != null) {
+				c.fill(ax, 2, 5, az, POST);
 			}
 			// the arm: two cherry slabs at the top of the shaft, a lantern hanging from the far one
 			int bx = x + 2 * a[0];
@@ -267,6 +269,9 @@ final class CitadelStreetscape {
 	 * other side.
 	 */
 	static void avenue(CitadelCanvas c, int x, int z, Zone zn) {
+		if (CitadelPlaza.at(c, x, z) != null) {
+			return; // the plaza of a crossing has its own furniture
+		}
 		int m = zn.ring();
 		int n = RingCampusGeometry.lotsIn(m);
 		double d = RingCampusGeometry.radialDistance(x, z, n);
@@ -313,7 +318,7 @@ final class CitadelStreetscape {
 			plaza(c, x, z, lo, hi);
 		}
 		BlockState ground = c.at(x, 0, z);
-		if (ground == null || !CitadelPaving.isAcera(ground) || Math.min(r - lo, hi - r) > 1.5) {
+		if (ground == null || !CitadelPaving.isAcera(ground) || Math.min(r - lo, hi - r) > 1.5 || CitadelPlaza.at(c, x, z) != null) {
 			return; // the outer column of a sidewalk only
 		}
 		double room = CitadelPaving.AVENUE_HALF() + MOUTH_ROOM();
@@ -345,17 +350,6 @@ final class CitadelStreetscape {
 
 	// ------------------------------------------------------------------ crossings
 
-	/** A crossing's frame: its centre cell, the avenue's outward unit vector (u) and the lateral one (v). */
-	private record Frame(int cx, int cz, double ux, double uz, double vx, double vz) {
-		int x(int lat, int along) {
-			return (int) Math.round(cx + lat * vx + along * ux);
-		}
-
-		int z(int lat, int along) {
-			return (int) Math.round(cz + lat * vz + along * uz);
-		}
-	}
-
 	/** Whether the cells {@code y1..y2} over a column are free air (nothing built there yet). */
 	private static boolean freeColumn(CitadelCanvas c, int x, int z, int y1, int y2) {
 		for (int y = y1; y <= y2; y++) {
@@ -367,126 +361,108 @@ final class CitadelStreetscape {
 		return true;
 	}
 
-	/** A street or inner-street cell with ground and free air over it up to {@code top}. */
-	private static boolean groundFree(CitadelCanvas c, int x, int z, int top) {
-		Kind k = c.zoneAt(x, z).kind();
-		return (k == Kind.STREET || k == Kind.INNER_STREET) && c.at(x, 0, z) != null && freeColumn(c, x, z, 1, top);
-	}
-
-	/** A sidewalk cell of a street with free air over it up to {@code top}. */
-	private static boolean sidewalkFree(CitadelCanvas c, int x, int z, int top) {
-		return groundFree(c, x, z, top) && CitadelPaving.isAcera(c.at(x, 0, z));
-	}
-
 	/**
-	 * The furniture of every plazoleta, in one pass over the open rings (called by {@link CitadelFinish#build}
-	 * after the catalog's placement and before the relief, so it sees what the catalog built and moves with the
-	 * terraces). Rings 2 and 3 and the inner street, not the spawn's plaza; ring 1's crossings are node rooms.
+	 * The furniture of every octagonal plaza ({@link CitadelPlaza}), in one pass over the open rings (called by
+	 * {@link CitadelFinish#build} after the catalog's placement and before the relief, so it sees what the catalog
+	 * built and moves with the terraces). Rings 2 and 3 and the inner street, not the spawn's plaza; ring 1's
+	 * crossings are node rooms.
 	 */
 	static void crossings(CitadelCanvas c) {
-		Set<Long> done = new HashSet<>();
-		for (int m = 0; m <= c.rings; m++) {
-			if (m == 1) {
-				continue;
-			}
-			boolean inner = m == 0;
-			double lo = inner ? CitadelCanvas.dims().rampR : RingCampusGeometry.ringOuter(m);
-			double hi = inner ? RingCampusGeometry.ringInner(1) : RingCampusGeometry.streetOuter(m);
-			double rc = (lo + hi) / 2;
-			int[] counts = inner ? new int[] {8} : m < c.rings ? new int[] {RingCampusGeometry.lotsIn(m), RingCampusGeometry.lotsIn(m + 1)}
-					: new int[] {RingCampusGeometry.lotsIn(m)};
-			for (int n : counts) {
-				for (int k = 0; k < n; k++) {
-					if (inner && k == n / 2) {
-						continue; // the spawn's plaza has its own furniture
-					}
-					double ang = k * 2 * Math.PI / n;
-					BlockPos centre = RingCampusGeometry.polar(rc, ang, 0);
-					if (done.add(CitadelCanvas.col(centre.getX(), centre.getZ()))) {
-						crossing(c, m, ang, centre.getX(), centre.getZ(), hi - lo);
-					}
-				}
-			}
+		for (CitadelPlaza.Plaza p : CitadelPlaza.all(c)) {
+			crossing(c, p);
 		}
 	}
 
-	private static void crossing(CitadelCanvas c, int m, double ang, int cx, int cz, double width) {
-		Kind kind = c.zoneAt(cx, cz).kind();
-		if ((kind != Kind.STREET && kind != Kind.INNER_STREET) || c.at(cx, 0, cz) != PLINTH || !freeColumn(c, cx, cz, 1, 3 + FOCAL_POSTS)) {
-			return; // not a plazoleta, or the catalog built a plaza centre of its own
+	/** A cell of the plaza with ground and free air over it up to {@code top}. */
+	private static boolean plazaFree(CitadelCanvas c, CitadelPlaza.Plaza p, int x, int z, int top) {
+		return c.at(x, 0, z) != null && p.contains(c, x, z) && freeColumn(c, x, z, 1, top);
+	}
+
+	private static void crossing(CitadelCanvas c, CitadelPlaza.Plaza p) {
+		int cx = p.cx();
+		int cz = p.cz();
+		if (c.at(cx, 0, cz) != PLINTH || !freeColumn(c, cx, cz, 1, 3 + FOCAL_POSTS)) {
+			return; // not a plaza of ours, or the catalog built a plaza centre of its own
 		}
-		Frame f = new Frame(cx, cz, Math.sin(ang), -Math.cos(ang), Math.cos(ang), Math.sin(ang));
-		int edge = (int) Math.round(width / 2 - 1);
-		int lat = BENCH_LAT();
+		int reach = (int) Math.ceil(CitadelPlaza.KERB_K / Math.min(p.ku(), p.kv())) + 1;
 		c.rigid(cx, cz);
 		focalLantern(c, cx, cz);
-		for (int sa = -1; sa <= 1; sa += 2) {
-			Direction back = nearest(sa * f.ux(), sa * f.uz());
-			for (int sl = -1; sl <= 1; sl += 2) {
-				// a bench of three cells, back to the lots, facing the focal point; a bin between it and the avenue's mouth
-				for (int i = 0; i < 3; i++) {
-					int bx = f.x(sl * (lat + i), sa * edge);
-					int bz = f.z(sl * (lat + i), sa * edge);
-					if (sidewalkFree(c, bx, bz, 1)) {
-						bench(c, bx, bz, back);
-					}
+		for (int x = cx - reach; x <= cx + reach; x++) {
+			for (int z = cz - reach; z <= cz + reach; z++) {
+				if (p.metric(x, z) >= CitadelPlaza.KERB_K + 0.5 || !plazaFree(c, p, x, z, 1)) {
+					continue;
 				}
-				int nx = f.x(sl * (lat - 1), sa * edge);
-				int nz = f.z(sl * (lat - 1), sa * edge);
-				if (sidewalkFree(c, nx, nz, 1)) {
-					bin(c, nx, nz);
+				int k = p.band(x, z);
+				if (k >= CitadelPlaza.KERB_K) {
+					c.set(x, 1, z, CitadelPlaza.KERB_TOP); // the kerb: half a block over the floor, walked over
+				} else if (p.quadrant(x, z)) {
+					if (k == CitadelPlaza.BENCH_K) {
+						bench(c, x, z, nearest(x - cx, z - cz)); // back to the planter, facing the focal point
+					} else if (k == CitadelPlaza.BED_K) {
+						c.set(x, 1, z, BASE); // the planter's low wall
+					} else if (k == CitadelPlaza.BED_K + 1) {
+						c.set(x, 1, z, leaves(CitadelPaving.hash(x, z) % 3 == 0 ? Blocks.AZALEA_LEAVES : Blocks.FLOWERING_AZALEA_LEAVES));
+					}
 				}
 			}
 		}
-		sign(c, f, m, ang, lat + 4, edge);
-		stall(c, f, -(lat + 8), -edge);
+		if (p.planters()) {
+			for (int sl = -1; sl <= 1; sl += 2) {
+				for (int sa = -1; sa <= 1; sa += 2) {
+					quadrantPieces(c, p, sl, sa);
+				}
+			}
+		}
 		c.unrigid();
 	}
 
-	/** A signpost on the sidewalk at ({@code lat}, {@code along}): a log stele three high with a plaque facing the street (ring and heading of the avenue), and a cap. */
-	private static void sign(CitadelCanvas c, Frame f, int m, double ang, int lat, int along) {
-		int sx = f.x(lat, along);
-		int sz = f.z(lat, along);
-		int px = f.x(lat, along - 1);
-		int pz = f.z(lat, along - 1);
-		if (!sidewalkFree(c, sx, sz, 4) || !groundFree(c, px, pz, 3)) {
+	/** The planter of one quadrant: a cherry tree at one flank, a lantern post at the other, a bin in the wall, and (one quadrant per plaza) the signpost. */
+	private static void quadrantPieces(CitadelCanvas c, CitadelPlaza.Plaza p, int sl, int sa) {
+		BlockPos tree = p.cell(sl * 5, sa * 10);
+		BlockPos lamp = p.cell(sl * 10, sa * 5);
+		BlockPos bin = p.cell(sl * 5, sa * 8);
+		if (plantable(c, p, tree.getX(), tree.getZ()) && freeColumn(c, tree.getX(), tree.getZ(), 2, TRUNK() + 2)) {
+			tree(c, tree.getX(), tree.getZ());
+		}
+		if (plantable(c, p, lamp.getX(), lamp.getZ()) && freeColumn(c, lamp.getX(), lamp.getZ(), 2, 4)) {
+			lanternPost(c, lamp.getX(), lamp.getZ(), 3);
+		}
+		if (CitadelPlaza.BED_K == p.band(bin.getX(), bin.getZ()) && p.quadrant(bin.getX(), bin.getZ())) {
+			bin(c, bin.getX(), bin.getZ());
+		}
+		if (sl > 0 && sa > 0) {
+			sign(c, p);
+		}
+	}
+
+	/** A bed cell of a planter (ring 9 or 10, in a quadrant), whose wall or bush a piece may replace. */
+	private static boolean plantable(CitadelCanvas c, CitadelPlaza.Plaza p, int x, int z) {
+		int k = p.band(x, z);
+		return p.quadrant(x, z) && k >= CitadelPlaza.BED_K && k < CitadelPlaza.KERB_K && p.contains(c, x, z) && c.at(x, 0, z) != null;
+	}
+
+	/** A signpost in the planter at (8, 6): a log stele three high with a plaque facing the centre (ring and heading of the avenue), and a cap. */
+	private static void sign(CitadelCanvas c, CitadelPlaza.Plaza p) {
+		BlockPos st = p.cell(8, 6);
+		BlockPos pl = p.cell(8, 5);
+		int sx = st.getX();
+		int sz = st.getZ();
+		int px = pl.getX();
+		int pz = pl.getZ();
+		if (!plantable(c, p, sx, sz) || !plantable(c, p, px, pz) || sx == px && sz == pz || !freeColumn(c, sx, sz, 2, 4)
+				|| !freeColumn(c, px, pz, 2, 3)) {
 			return;
 		}
 		c.fill(sx, 1, 3, sz, STELE);
 		c.set(sx, 4, sz, AWNING);
-		Direction face = nearest(-f.ux(), -f.uz());
+		Direction face = nearest(px - sx, pz - sz);
 		long k = BlockPos.asLong(px, 3, pz);
 		c.put(px, 3, pz, c.kit.plaque(face), CitadelCanvas.DECOR);
-		String ring = m == 0 ? "INNER STREET" : "RING " + m;
+		double ang = Math.atan2(p.ux(), -p.uz());
+		String ring = p.m() == 0 ? "INNER STREET" : "RING " + p.m();
 		String way = COMPASS[Math.floorMod((int) Math.round(ang / (2 * Math.PI) * 16), 16)] + " AVENUE";
 		c.data.put(k, c.kit.plaqueData(DyeColor.ORANGE, "", ring, way, ""));
 		c.fixtures.add(k);
-	}
-
-	/**
-	 * A small stall on the sidewalk, centred on ({@code lat}, {@code along}) with {@code along} the outer column:
-	 * a barrel counter between two cherry posts, an awning of cherry slabs over that column and the next, and a
-	 * lantern hanging under it. The inner column of the sidewalk stays free: the walkers pass beside it.
-	 */
-	private static void stall(CitadelCanvas c, Frame f, int lat, int along) {
-		int inward = along > 0 ? -1 : 1;
-		for (int dl = -2; dl <= 2; dl++) {
-			if (!sidewalkFree(c, f.x(lat + dl, along), f.z(lat + dl, along), 4)
-					|| !groundFree(c, f.x(lat + dl, along + inward), f.z(lat + dl, along + inward), 4)) {
-				return;
-			}
-		}
-		c.fill(f.x(lat - 2, along), 1, 3, f.z(lat - 2, along), FENCE);
-		c.fill(f.x(lat + 2, along), 1, 3, f.z(lat + 2, along), FENCE);
-		for (int dl = -1; dl <= 1; dl++) {
-			c.set(f.x(lat + dl, along), 1, f.z(lat + dl, along), BARREL);
-		}
-		for (int dl = -2; dl <= 2; dl++) {
-			c.set(f.x(lat + dl, along), 4, f.z(lat + dl, along), AWNING);
-			c.set(f.x(lat + dl, along + inward), 4, f.z(lat + dl, along + inward), AWNING);
-		}
-		c.set(f.x(lat - 1, along + inward), 3, f.z(lat - 1, along + inward), HANGING_LANTERN);
-		c.set(f.x(lat + 1, along + inward), 3, f.z(lat + 1, along + inward), HANGING_LANTERN);
 	}
 
 	// ------------------------------------------------------------------ plaza of the main ramp
