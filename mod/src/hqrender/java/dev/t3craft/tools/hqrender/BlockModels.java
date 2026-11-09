@@ -174,6 +174,38 @@ final class BlockModels {
 		return 1 << (x | (z << 1) | (y << 2));
 	}
 
+	private final Map<String, List<Quad>> byModel = new HashMap<>();
+	private final Map<String, Integer> modelMasks = new HashMap<>();
+
+	/**
+	 * Quads of a model file drawn on its own, turned {@code y} degrees (a block model without its blockstate, so a
+	 * gallery can show blocks the running registry does not have yet, e.g. a new kit block waiting for a daemon restart).
+	 */
+	synchronized List<Quad> modelQuads(String modelId, int y) {
+		String key = modelId + "@" + y;
+		List<Quad> q = byModel.get(key);
+		if (q == null) {
+			JsonObject v = new JsonObject();
+			v.addProperty("model", modelId);
+			if (y != 0) {
+				v.addProperty("y", y);
+			}
+			buildMask = 0;
+			List<Quad> out = new ArrayList<>();
+			addVariant(out, v, 0xFFFFFF, false, "model");
+			q = List.copyOf(out);
+			byModel.put(key, q);
+			modelMasks.put(key, buildMask);
+		}
+		return q;
+	}
+
+	/** {@link #occupancy} of {@link #modelQuads}. */
+	synchronized int modelOccupancy(String modelId, int y) {
+		modelQuads(modelId, y);
+		return modelMasks.getOrDefault(modelId + "@" + y, 0);
+	}
+
 	// ------------------------------------------------------------------ resources
 
 	private JsonObject readJson(String path) {
