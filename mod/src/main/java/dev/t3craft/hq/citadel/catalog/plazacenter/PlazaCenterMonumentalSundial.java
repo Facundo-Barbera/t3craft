@@ -168,7 +168,7 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 			}
 		}
 		k.markT = k.gold ? Blocks.GOLD_BLOCK : Blocks.POLISHED_DEEPSLATE;
-		k.numM = Blocks.POLISHED_DEEPSLATE; // numerals: dark on the pale dial, always readable
+		k.numM = k.gold ? Blocks.POLISHED_DEEPSLATE : Blocks.GOLD_BLOCK;
 		return k;
 	}
 
