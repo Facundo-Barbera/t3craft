@@ -252,6 +252,11 @@ public final class CitadelPodium {
 		return h < 8 ? POLISHED : h < 14 ? BRICK : h < 17 ? TILES : BRICK_CRACKED;
 	}
 
+	/** The face of the gallery's plinth (wall B) at {@code depth} courses under its rim, in the palette of the other walls. */
+	static BlockState plinthFace(int x, int y, int z, int depth) {
+		return wall(x, y, z, depth);
+	}
+
 	/** The coping of a wall: mostly calcite, with stone bricks now and then so the line is not a flat white stripe. */
 	private static BlockState coping(int x, int z) {
 		return hash(x, z, 351) % 5 < 2 ? STONE : CALCITE;
