@@ -596,8 +596,10 @@ public final class HouseJapaneseEngawa implements Variant {
 							// [finish] onigawara: a raised end block and a rod at the ridge ends
 							set(a, h + 1, bb, b(Blocks.DEEPSLATE_BRICKS));
 							// [finish] a hoju: a wall post with a lit lantern on it
-							set(a, h + 2, bb, JapaneseKit.wall(Blocks.DEEPSLATE_BRICK_WALL, true, false, false, false, false));
-							put(a, h + 3, bb, lantern(false), CitadelCanvas.SOLID);
+							if (h + 3 < p.h()) {
+								set(a, h + 2, bb, JapaneseKit.wall(Blocks.DEEPSLATE_BRICK_WALL, true, false, false, false, false));
+								set(a, h + 3, bb, lantern(false));
+							}
 						}
 						continue;
 					}
