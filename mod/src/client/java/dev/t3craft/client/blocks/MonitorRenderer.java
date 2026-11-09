@@ -75,6 +75,16 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 	private static final int HEADER_BG = 0xFF141414;
 	private static final int TEXT = 0xFFE8E8E8;
 	private static final int MUTED = 0xFF9A9A9A;
+	/** The dark glass of a standby screen, its status word, and the glass reflections. */
+	private static final int STANDBY_BG = 0xFF08090B;
+	private static final int STANDBY_TEXT = 0xFF8A929C;
+	private static final int SHEEN_1 = 0xFF0F141A;
+	private static final int SHEEN_2 = 0xFF0C1015;
+	/** The "T3" mark of a standby screen: 5 x 7 units per letter, a unit apart. */
+	private static final String[] LOGO_T = {"#####", "..#..", "..#..", "..#..", "..#..", "..#..", "..#.."};
+	private static final String[] LOGO_3 = {"####.", "....#", "....#", ".###.", "....#", "....#", "####."};
+	/** A model pixel (1/16 block): how far the frame's lip stands proud of the glass. */
+	private static final float LIP = 1f / 16f;
 
 	public static final class State extends BlockEntityRenderState {
 		Direction facing = Direction.NORTH;
@@ -95,7 +105,13 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 	record Glyphs(String cacheKey, long version, int background, int accent,
 			@Nullable FormattedCharSequence title, @Nullable FormattedCharSequence status, int statusColor,
 			List<RowGlyph> rows, @Nullable FormattedCharSequence footer, int footerColor, boolean caret, float statusScale,
-			float titleScale, boolean attention) {
+			float titleScale, boolean attention, Mode mode, @Nullable FormattedCharSequence chip, int chipW, boolean topAlign,
+			float logo) {
+	}
+
+	/** What a screen is: a thread's live screen, or one of the dark "standby" screens (no thread behind it). */
+	enum Mode {
+		LIVE, NO_THREAD, OFFLINE, ARCHIVED
 	}
 
 	private final BlocksClient client;
@@ -196,19 +212,77 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 				glyphs.clear();
 			}
 			Font font = Minecraft.getInstance().font;
-			if (layout.level() == MonitorLod.Level.FAR) {
+			Mode mode = modeOf(b, shown);
+			if (mode != Mode.LIVE) {
+				g = standby(font, cacheKey, version, mode, shown.screen(), layout);
+			} else if (layout.level() == MonitorLod.Level.FAR) {
 				g = far(font, cacheKey, version, shown.screen(), thread, layout);
 			} else if (view != null) {
 				MonitorLog.Model m = MonitorLog.of(view, thread == null ? null : thread.status(), thread == null ? null : thread.title(),
 						layout.rows(), layout.cols());
-				g = near(font, cacheKey, version, m, layout);
+				g = near(font, cacheKey, version, m, shown.screen(), layout);
 			} else {
-				g = nearStatic(font, cacheKey, version, shown.screen(), layout);
+				g = nearStatic(font, cacheKey, version, shown.screen(), b.isFeed(), layout);
 			}
 			glyphs.put(cacheKey, g);
 			PerfStats.count(PerfStats.MONITOR_GLYPHS);
 		}
 		return g;
+	}
+
+	/** No thread behind the screen (unbound, a thread the client does not know, or a settled one): the dark standby screen. */
+	static Mode modeOf(Binding b, MonitorScreens.Shown shown) {
+		if (b.isFeed()) {
+			return Mode.LIVE;
+		}
+		if (b.kind() != Binding.Kind.THREAD) {
+			return Mode.NO_THREAD;
+		}
+		if (shown.id().startsWith("#missing")) {
+			return Mode.OFFLINE;
+		}
+		return shown.screen().status() == StationStatus.ARCHIVED ? Mode.ARCHIVED : Mode.LIVE;
+	}
+
+	/**
+	 * The status chip of the header: the status word and the age the workstation model put on its status line
+	 * ("⚙ WORKING · 3m" gives "WORKING · 3m"); just the word when the age is not known.
+	 */
+	static String chipText(StationStatus st, StationScreen screen) {
+		if (screen.lines().size() > 1) {
+			String line = screen.lines().get(1).text();
+			int i = line.indexOf(" · ");
+			if (i >= 0 && line.startsWith(screen.status().glyph) && screen.status() == st) {
+				String age = line.substring(i + 3).trim();
+				if (!age.isEmpty()) {
+					return st.word + " · " + age;
+				}
+			}
+		}
+		return st.word;
+	}
+
+	/**
+	 * The dark screen of a monitor with no thread behind it: a "T3" mark, a big word ({@code NO THREAD},
+	 * {@code OFFLINE}, {@code ARCHIVED}) and, for the last two, the thread's name. Same at every distance: the
+	 * mark and the word scale with the screen.
+	 */
+	private static Glyphs standby(Font font, String key, long version, Mode mode, StationScreen screen, MonitorLod.Layout l) {
+		String word = mode == Mode.NO_THREAD ? "NO THREAD" : mode == Mode.OFFLINE ? "OFFLINE" : "ARCHIVED";
+		int wordColor = mode == Mode.NO_THREAD ? STANDBY_TEXT : mode == Mode.OFFLINE ? 0xFFC9857A : 0xFF8A8A8A;
+		int logoColor = mode == Mode.NO_THREAD ? 0xFF2F7F8A : mode == Mode.OFFLINE ? 0xFF74504B : 0xFF59606A;
+		String title = mode == Mode.NO_THREAD || screen.lines().isEmpty() ? "" : screen.lines().getFirst().text();
+		float w = l.x1() - l.x0();
+		float h = l.y1() - l.y0();
+		// the mark: 11 x 7 units, at most 40 % of the height and 28 % of the width
+		float u = Math.max(1f, Math.min(h * 0.40f / 7f, w * 0.28f / 11f));
+		float rest = h - 9 * u;
+		int wordW = Math.max(1, font.width(word));
+		float ws = Math.max(1f, Math.min(3f, Math.min(w * 0.8f / wordW, rest * (title.isEmpty() ? 0.9f : 0.55f) / 8f)));
+		float ts = Math.min(1.5f, Math.max(1f, ws * 0.5f));
+		String shownTitle = title.isEmpty() ? "" : ellipsize(font, title, (int) (w / ts));
+		return new Glyphs(key, version, STANDBY_BG, logoColor, shownTitle.isEmpty() ? null : seq(shownTitle, 0xFF6F7680), plain(word), wordColor,
+				List.of(), null, 0, false, ws, ts, false, mode, null, 0, false, u);
 	}
 
 	// ---- layouts ------------------------------------------------------------------------------
@@ -223,38 +297,45 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 		// status word uncoloured: the draw colours it (and breathes it when the thread needs the user)
 		return new Glyphs(key, version, ScreenDraw.shade(st.color, 0.22f), 0xFF000000 | st.color,
 				shown.isEmpty() ? null : seq(shown, TEXT), plain(word), 0xFF000000 | st.color,
-				List.of(), null, 0, false, ft.statusScale(), ft.titleScale(), st == StationStatus.ATTENTION);
+				List.of(), null, 0, false, ft.statusScale(), ft.titleScale(), st == StationStatus.ATTENTION, Mode.LIVE, null, 0, false, 0f);
 	}
 
-	private static Glyphs near(Font font, String key, long version, MonitorLog.Model m, MonitorLod.Layout l) {
+	private static Glyphs near(Font font, String key, long version, MonitorLog.Model m, StationScreen screen, MonitorLod.Layout l) {
 		int w = (int) (l.x1() - l.x0());
 		StationStatus st = m.status();
-		String word = st.word;
-		int wordW = font.width(word);
+		String word = chipText(st, screen);
+		int chipW = font.width(word) + 6;
 		List<RowGlyph> rows = new ArrayList<>(m.rows().size());
 		for (MonitorLog.Row r : m.rows()) {
 			rows.add(row(font, r, w));
 		}
 		FormattedCharSequence footer = m.needsYou() == null ? null : seq(ellipsize(font, "! " + m.needsYou(), w), 0xFF000000 | StationStatus.ATTENTION.color);
 		return new Glyphs(key, version, 0xFF0B0D0F, 0xFF000000 | st.color,
-				seq(ellipsize(font, m.title(), w - wordW - 14), TEXT), plain(word), 0xFF000000 | st.color,
-				List.copyOf(rows), footer, 0xFF000000 | StationStatus.ATTENTION.color, m.cursor(), 1f, 1f, st == StationStatus.ATTENTION);
+				seq(ellipsize(font, m.title(), w - chipW - 14), TEXT), plain(word), 0xFF000000 | st.color,
+				List.copyOf(rows), footer, 0xFF000000 | StationStatus.ATTENTION.color, m.cursor(), 1f, 1f, st == StationStatus.ATTENTION,
+				Mode.LIVE, plain(word), chipW, false, 0f);
 	}
 
-	/** NEAR without a stream: the status lines the client already has, header style. */
-	private static Glyphs nearStatic(Font font, String key, long version, StationScreen s, MonitorLod.Layout l) {
+	/**
+	 * NEAR without a stream: the status lines the client already has, header style. A thread screen puts the
+	 * status line (and the age) in the header's chip and stacks the rest under the header (branch, last message);
+	 * a project / environment feed ({@code feed}) keeps its own first line as the title and all the rest as rows.
+	 */
+	private static Glyphs nearStatic(Font font, String key, long version, StationScreen s, boolean feed, MonitorLod.Layout l) {
 		int w = (int) (l.x1() - l.x0());
 		StationStatus st = s.status();
 		List<RowGlyph> rows = new ArrayList<>();
 		List<StationScreen.Line> lines = s.lines();
 		String title = lines.isEmpty() ? "" : lines.getFirst().text();
-		for (int i = 1; i < lines.size() && rows.size() < l.rows(); i++) {
+		for (int i = feed ? 1 : 2; i < lines.size() && rows.size() < l.rows(); i++) {
 			StationScreen.Line line = lines.get(i);
 			rows.add(new RowGlyph(null, seq(ellipsize(font, line.text(), w), 0xFF000000 | line.color()), 0));
 		}
-		int wordW = font.width(st.word);
-		return new Glyphs(key, version, 0xFF0B0D0F, 0xFF000000 | st.color, seq(ellipsize(font, title, w - wordW - 14), TEXT),
-				plain(st.word), 0xFF000000 | st.color, List.copyOf(rows), null, 0, false, 1f, 1f, st == StationStatus.ATTENTION);
+		String chip = feed ? null : chipText(st, s);
+		int chipW = chip == null ? 0 : font.width(chip) + 6;
+		return new Glyphs(key, version, 0xFF0B0D0F, 0xFF000000 | st.color, seq(ellipsize(font, title, w - (chip == null ? font.width(st.word) : chipW) - 14), TEXT),
+				plain(st.word), 0xFF000000 | st.color, List.copyOf(rows), null, 0, false, 1f, 1f, st == StationStatus.ATTENTION,
+				Mode.LIVE, chip == null ? null : plain(chip), chipW, true, 0f);
 	}
 
 	private static RowGlyph row(Font font, MonitorLog.Row r, int width) {
@@ -303,15 +384,26 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 		toFace(poseStack, s.facing, -z, l.ppb());
 		// a panel taller than one block extends upwards from its origin (bottom) block
 		poseStack.translate(0, -(l.extent().height() - 1) * l.ppb(), 0);
-		// layer 0: background and bands (opaque, solid pass)
+		if (g.mode() != Mode.LIVE) {
+			drawStandby(s, g, l, poseStack, collector, light, z);
+			drawChin(s, g, l, poseStack, collector, light, z, g.mode() == Mode.NO_THREAD ? MonitorLod.breathe(0xFF3A4048, STANDBY_BG, s.breath) : g.mode() == Mode.OFFLINE ? 0xFF7A3F3A : 0xFF23262B);
+			poseStack.popPose();
+			return;
+		}
+		// layer 0: background and bands (opaque, solid pass); the glass ends where the 3 px chin starts
 		boolean near = l.level() == MonitorLod.Level.NEAR;
+		float glassBottom = l.height() - l.chin();
 		collector.order(0).submitCustomGeometry(poseStack, ScreenDraw.fill(), (pose, vc) -> {
-			ScreenDraw.rect(pose, vc, l.bezel(), l.bezel(), l.width() - l.bezel(), l.height() - l.bezel(), 0, g.background(), light);
+			ScreenDraw.rect(pose, vc, l.bezel(), l.bezel(), l.width() - l.bezel(), glassBottom, 0, g.background(), light);
 			if (near) {
 				float hy = l.bezel() + MonitorLod.HEADER;
 				ScreenDraw.rect(pose, vc, l.bezel(), l.bezel(), l.width() - l.bezel(), hy, -z, HEADER_BG, light);
-				ScreenDraw.rect(pose, vc, l.bezel(), hy - 1, l.width() - l.bezel(), hy, -z, accent, light);
+				ScreenDraw.rect(pose, vc, l.bezel(), hy - 2, l.width() - l.bezel(), hy, -z, accent, light);
 				ScreenDraw.rect(pose, vc, l.x0(), l.bezel() + 4, l.x0() + 5, l.bezel() + 9, -2 * z, accent, light);
+				if (g.chip() != null) {
+					// the status chip: the state's colour as a solid tab with dark text, readable from further than coloured text
+					ScreenDraw.rect(pose, vc, l.x1() - g.chipW(), l.bezel() + 2, l.x1(), hy - 2, -2 * z, accent, light);
+				}
 				float y = rowsTop(l, g);
 				for (RowGlyph r : g.rows()) {
 					if (r.tint() != 0) {
@@ -325,20 +417,115 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 				}
 			} else {
 				ScreenDraw.rect(pose, vc, l.bezel(), l.bezel(), l.width() - l.bezel(), l.bezel() + 3, -z, accent, light);
-				ScreenDraw.rect(pose, vc, l.bezel(), l.height() - l.bezel() - 3, l.width() - l.bezel(), l.height() - l.bezel(), -z, accent, light);
+				ScreenDraw.rect(pose, vc, l.bezel(), glassBottom - 3, l.width() - l.bezel(), glassBottom, -z, accent, light);
 			}
 		});
-		// layer 2: icons and text
-		poseStack.translate(0, 0, -2 * z);
+		// layer 3: icons and text, one step above the chip and the bands
+		poseStack.translate(0, 0, -3 * z);
 		if (near) {
 			drawNear(s, g, l, poseStack, collector, light, statusColor);
 		} else {
 			drawFar(g, l, poseStack, collector, light, statusColor);
 		}
+		poseStack.translate(0, 0, 3 * z);
+		drawChin(s, g, l, poseStack, collector, light, z, statusColor);
 		poseStack.popPose();
 	}
 
+	/**
+	 * The 3 px chin of the screen's frame: a status LED at the right (the state's colour) and the "T3CRAFT" mark at
+	 * the left, in muted steel. They sit on the chin's face, which stands one model pixel proud of the glass.
+	 */
+	private static void drawChin(State s, Glyphs g, MonitorLod.Layout l, PoseStack ps, SubmitNodeCollector c, int light, float z, int led) {
+		float mp = l.modelPx();
+		float depth = -(LIP + z);
+		float x1 = l.width() - 3 * mp;
+		float x0 = x1 - 2 * mp;
+		float y0 = l.height() - 2 * mp;
+		float y1 = l.height() - mp;
+		ps.pushPose();
+		ps.translate(0, 0, depth);
+		c.order(0).submitCustomGeometry(ps, ScreenDraw.fill(), (pose, vc) -> {
+			// a dark housing one unit round the LED, then the LED
+			ScreenDraw.rect(pose, vc, x0 - mp * 0.5f, y0 - mp * 0.25f, x1 + mp * 0.5f, y1 + mp * 0.25f, 0, 0xFF111316, light);
+			ScreenDraw.rect(pose, vc, x0, y0, x1, y1, -z, 0xFF000000 | led, light);
+		});
+		float bs = Math.min(1f, 1.8f * mp / 8f);
+		if (bs >= 0.6f) {
+			ps.pushPose();
+			ps.translate(3 * mp, l.height() - 2 * mp - 4 * bs, -z);
+			ps.scale(bs, bs, 1f);
+			text(ps, c, plain("T3CRAFT"), 0, 0, 0xFF8A919B, light);
+			ps.popPose();
+		}
+		ps.popPose();
+	}
+
+	/**
+	 * A standby screen: very dark glass with two slanted reflections, the "T3" mark in the middle and the big word
+	 * under it (and the thread's name, if it has one). Nothing blinks.
+	 */
+	private static void drawStandby(State s, Glyphs g, MonitorLod.Layout l, PoseStack ps, SubmitNodeCollector c, int light, float z) {
+		float x0 = l.bezel();
+		float x1 = l.width() - l.bezel();
+		float y0 = l.bezel();
+		float y1 = l.height() - l.chin();
+		float iw = x1 - x0;
+		float u = g.logo();
+		Font font = Minecraft.getInstance().font;
+		float ws = g.statusScale();
+		float ts = Math.max(1f, g.titleScale());
+		float logoH = 7 * u;
+		float gap = 2 * u;
+		float titleGap = g.title() == null ? 0 : gap * 0.6f;
+		float block = logoH + gap + 8 * ws + titleGap + (g.title() == null ? 0 : 8 * ts);
+		float top = y0 + ((y1 - y0) - block) / 2f;
+		float cx = (x0 + x1) / 2f;
+		float logoX = cx - 11 * u / 2f;
+		// reflections: parallelograms slanted to the left, kept inside the glass
+		float dx = Math.min(0.2f * iw, 0.5f * (y1 - y0));
+		float a = x0 + dx + 0.12f * iw;
+		float b = a + 0.16f * iw;
+		c.order(0).submitCustomGeometry(ps, ScreenDraw.fill(), (pose, vc) -> {
+			ScreenDraw.rect(pose, vc, x0, y0, x1, y1, 0, g.background(), light);
+			ScreenDraw.slant(pose, vc, a, a + 0.10f * iw, a - dx, a + 0.10f * iw - dx, y0, y1, -z, SHEEN_1, light);
+			ScreenDraw.slant(pose, vc, b, b + 0.04f * iw, b - dx, b + 0.04f * iw - dx, y0, y1, -z, SHEEN_2, light);
+			for (int row = 0; row < 7; row++) {
+				for (int col = 0; col < 5; col++) {
+					if (LOGO_T[row].charAt(col) == '#') {
+						ScreenDraw.rect(pose, vc, logoX + col * u, top + row * u, logoX + (col + 1) * u, top + (row + 1) * u, -2 * z, g.accent(), light);
+					}
+					if (LOGO_3[row].charAt(col) == '#') {
+						ScreenDraw.rect(pose, vc, logoX + (6 + col) * u, top + row * u, logoX + (7 + col) * u, top + (row + 1) * u, -2 * z, g.accent(), light);
+					}
+				}
+			}
+		});
+		ps.pushPose();
+		ps.translate(0, 0, -3 * z);
+		float wordTop = top + logoH + gap;
+		if (g.status() != null) {
+			ps.pushPose();
+			ps.translate(cx - font.width(g.status()) * ws / 2f, wordTop, 0);
+			ps.scale(ws, ws, 1f);
+			text(ps, c, g.status(), 0, 0, g.statusColor(), light);
+			ps.popPose();
+		}
+		if (g.title() != null) {
+			ps.pushPose();
+			ps.translate(cx - font.width(g.title()) * ts / 2f, wordTop + 8 * ws + titleGap, 0);
+			ps.scale(ts, ts, 1f);
+			text(ps, c, g.title(), 0, 0, 0xFF6F7680, light);
+			ps.popPose();
+		}
+		ps.popPose();
+	}
+
 	private static float rowsTop(MonitorLod.Layout l, Glyphs g) {
+		if (g.topAlign()) {
+			// static status screens read top-down, right under the header
+			return l.bezel() + MonitorLod.HEADER + 3;
+		}
 		// newest row sits just above the footer; fewer rows than room leave the gap at the top
 		float bottom = footerY(l) - 1;
 		return bottom - g.rows().size() * MonitorLod.LINE;
@@ -354,7 +541,9 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 		if (g.title() != null) {
 			text(ps, c, g.title(), l.x0() + 8, hy, TEXT, light);
 		}
-		if (g.status() != null) {
+		if (g.chip() != null) {
+			text(ps, c, g.chip(), l.x1() - g.chipW() + 3, hy, 0xFF0B0D0F, light);
+		} else if (g.status() != null) {
 			text(ps, c, g.status(), l.x1() - font.width(g.status()), hy, statusColor, light);
 		}
 		float y = rowsTop(l, g);
@@ -386,7 +575,7 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 		float ts = Math.max(1f, g.titleScale());
 		float wordH = 8 * sc;
 		float block = wordH + (g.title() == null ? 0 : MonitorLod.FAR_GAP + 8 * ts);
-		float top = (l.height() - block) / 2f;
+		float top = l.bezel() + ((l.height() - l.bezel() - l.chin()) - block) / 2f;
 		if (g.status() != null) {
 			ps.pushPose();
 			ps.translate(cx - font.width(g.status()) * sc / 2f, top, 0);
