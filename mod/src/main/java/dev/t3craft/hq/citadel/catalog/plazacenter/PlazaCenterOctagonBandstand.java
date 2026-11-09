@@ -201,7 +201,7 @@ public final class PlazaCenterOctagonBandstand implements Variant {
 		int n = Math.min(Math.min(cu, w - 1 - cu), Math.min(cv, d - 1 - cv));
 		int ph = n >= 8 && p.h() >= 12 ? 2 : 1;
 		int pl = n - ph;
-		int k = Math.min(pl - 1, 5 + Math.max(0, p.h() - 10) / 2); // a big platform keeps a wide apron round a pavilion the roof can cover
+		int k = Math.min(pl >= 7 ? pl - 2 : pl - 1, 6 + Math.max(0, p.h() - 10) / 2); // a big platform keeps a wide apron round a pavilion the roof can cover
 		int t = (int) Math.round(0.4142 * k);
 		Geo g = new Geo(cu, cv, n, ph, pl, k, t, n >= 9 ? 2 : 1);
 
