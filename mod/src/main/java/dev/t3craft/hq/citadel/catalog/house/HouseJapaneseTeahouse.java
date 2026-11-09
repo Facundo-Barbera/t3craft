@@ -40,7 +40,7 @@ import net.minecraft.world.level.block.state.properties.StairsShape;
  * Size: 9–12 × 10–12 × 10+.
  */
 public final class HouseJapaneseTeahouse implements Variant {
-	private static final int BEAM = 4;
+	private static final int BEAM = 5;
 
 	@Override
 	public String id() {
@@ -143,7 +143,7 @@ public final class HouseJapaneseTeahouse implements Variant {
 				p.set(c, u, 0, v, edge ? stone(p, u, 0, v) : b(Blocks.BAMBOO_MOSAIC));
 			}
 		}
-		for (int y = 1; y <= 3; y++) {
+		for (int y = 1; y <= 4; y++) {
 			for (int u = bu0; u <= bu1; u++) {
 				for (int v : new int[] {bv0, bv1}) {
 					boolean corner = u == bu0 || u == bu1;
@@ -155,8 +155,8 @@ public final class HouseJapaneseTeahouse implements Variant {
 						st = trapdoor(Blocks.DARK_OAK_TRAPDOOR, Direction.NORTH, true, Half.BOTTOM);
 					} else if (y == 2 && (u - bu0) % 2 == 0) {
 						// [depth] a bamboo-lattice window: crossed rails behind the plaster line
-						st = fence(Blocks.BAMBOO_FENCE, true, true, true, true);
-					} else if (y == 3) {
+						st = fence(Blocks.SPRUCE_FENCE, true, true, true, true);
+					} else if (y == 4) {
 						// [palette] a shoji band under the eaves: white glass lets the light through
 						st = JapaneseKit.paneU(JapaneseKit.glassPane(net.minecraft.world.item.DyeColor.WHITE));
 					} else if (y == 1) {
@@ -169,8 +169,8 @@ public final class HouseJapaneseTeahouse implements Variant {
 			}
 			for (int v = bv0 + 1; v < bv1; v++) {
 				for (int u : new int[] {bu0, bu1}) {
-					BlockState st = y == 2 && v == (bv0 + bv1) / 2 ? fence(Blocks.BAMBOO_FENCE, true, false, true, false)
-							: y == 3 ? JapaneseKit.paneV(JapaneseKit.glassPane(net.minecraft.world.item.DyeColor.WHITE))
+					BlockState st = y == 2 && v == (bv0 + bv1) / 2 ? fence(Blocks.SPRUCE_FENCE, true, false, true, false)
+							: y == 4 ? JapaneseKit.paneV(JapaneseKit.glassPane(net.minecraft.world.item.DyeColor.WHITE))
 							: y == 1 ? b(Blocks.TUFF_BRICKS) : p.hash(u, y, v, 8) == 0 ? b(Blocks.MUD_BRICKS) : b(Blocks.PACKED_MUD);
 					p.set(c, u, y, v, st);
 				}
@@ -196,7 +196,7 @@ public final class HouseJapaneseTeahouse implements Variant {
 
 	/** [palette] a few brown courses in the thatch, so it weathers instead of being one saturated yellow. */
 	private static Block thatch(Plot p, Block mat, int u, int k, int v) {
-		boolean brown = p.hash(u, k, v, 3) != 0;
+		boolean brown = p.hash(u, k, v, 4) != 0;
 		return brown ? Blocks.SPRUCE_STAIRS : mat;
 	}
 
@@ -221,7 +221,7 @@ public final class HouseJapaneseTeahouse implements Variant {
 					if (!(top || bot || left || right)) {
 						continue;
 					}
-					int y = 4 + k;
+					int y = 5 + k;
 					BlockState st;
 					boolean corner = (top || bot) && (left || right);
 					if (corner) {
@@ -238,13 +238,13 @@ public final class HouseJapaneseTeahouse implements Variant {
 					int cd = Math.min(u - u0, u1 - u) + Math.min(v - v0, v1 - v);
 					boolean lifted = k == 0 && cd <= 1;
 					if (lifted) {
-						y = 5;
+						y = 6;
 					}
 					p.set(c, u, y, v, st);
 					if (lifted) {
 						BlockState sup = corner ? stair(Blocks.DARK_OAK_STAIRS, cornerFacing(top, left), Half.TOP, StairsShape.OUTER_LEFT)
 								: stairTop(Blocks.DARK_OAK_STAIRS, top ? Direction.NORTH : bot ? Direction.SOUTH : left ? Direction.WEST : Direction.EAST);
-						p.set(c, u, 4, v, sup);
+						p.set(c, u, 5, v, sup);
 					}
 				}
 			}
@@ -256,12 +256,12 @@ public final class HouseJapaneseTeahouse implements Variant {
 		int v1 = rv1 - 2;
 		for (int u = u0 + 1; u < u1; u++) {
 			for (int v = v0 + 1; v < v1; v++) {
-				p.set(c, u, 6, v, b(Blocks.SPRUCE_PLANKS));
+				p.set(c, u, 7, v, b(Blocks.SPRUCE_PLANKS));
 			}
 		}
 		for (int u = u0; u <= u1; u++) {
 			for (int v = v0; v <= v1; v++) {
-				p.set(c, u, 7, v, slab(Blocks.SPRUCE_SLAB));
+				p.set(c, u, 8, v, slab(Blocks.SPRUCE_SLAB));
 			}
 		}
 		// [depth] a slim post under each lifted corner, the lantern hangs beside it
@@ -269,10 +269,11 @@ public final class HouseJapaneseTeahouse implements Variant {
 			p.set(c, cc[0], 0, cc[1], stone(p, cc[0], 0, cc[1]));
 			p.set(c, cc[0], 1, cc[1], log(Blocks.DARK_OAK_LOG, Direction.Axis.Y));
 			p.set(c, cc[0], 2, cc[1], log(Blocks.DARK_OAK_LOG, Direction.Axis.Y));
+			p.set(c, cc[0], 3, cc[1], log(Blocks.DARK_OAK_LOG, Direction.Axis.Y));
 		}
 		// [finish] a lantern hanging at each lifted corner
 		for (int[] cc : new int[][] {{ru0, rv0}, {ru1, rv0}, {ru0, rv1}, {ru1, rv1}}) {
-			p.put(c, cc[0], 3, cc[1], lantern(true), CitadelCanvas.HANGING);
+			p.put(c, cc[0], 4, cc[1], lantern(true), CitadelCanvas.HANGING);
 		}
 	}
 
@@ -284,12 +285,12 @@ public final class HouseJapaneseTeahouse implements Variant {
 		Block log = Blocks.DARK_OAK_LOG;
 		Block st = Blocks.DARK_OAK_STAIRS;
 		for (int u = bu0; u <= bu1; u += 2) {
-			EaveKit.corbel(c, p, u, 3, bv0 - 1, Direction.SOUTH, log, st);
-			EaveKit.corbel(c, p, u, 3, bv1 + 1, Direction.NORTH, log, st);
+			EaveKit.corbel(c, p, u, 4, bv0 - 1, Direction.SOUTH, log, st);
+			EaveKit.corbel(c, p, u, 4, bv1 + 1, Direction.NORTH, log, st);
 		}
 		for (int v = bv0 + 1; v <= bv1 - 1; v += 2) {
-			EaveKit.corbel(c, p, bu0 - 1, 3, v, Direction.EAST, log, st);
-			EaveKit.corbel(c, p, bu1 + 1, 3, v, Direction.WEST, log, st);
+			EaveKit.corbel(c, p, bu0 - 1, 4, v, Direction.EAST, log, st);
+			EaveKit.corbel(c, p, bu1 + 1, 4, v, Direction.WEST, log, st);
 		}
 	}
 
@@ -304,13 +305,13 @@ public final class HouseJapaneseTeahouse implements Variant {
 			}
 			boolean l = u > 0 && Math.abs(u - 1 - gu) > 1;
 			boolean r = u < w - 1 && Math.abs(u + 1 - gu) > 1;
-			p.set(c, u, 1, 0, fence(Blocks.BAMBOO_FENCE, false, r, false, l));
-			p.set(c, u, 2, 0, fence(Blocks.BAMBOO_FENCE, false, r, false, l));
+			p.set(c, u, 1, 0, fence(Blocks.SPRUCE_FENCE, false, r, false, l));
+			p.set(c, u, 2, 0, fence(Blocks.SPRUCE_FENCE, false, r, false, l));
 		}
 		for (int v = 1; v < d - 6; v++) {
 			for (int u : new int[] {0, w - 1}) {
-				p.set(c, u, 1, v, fence(Blocks.BAMBOO_FENCE, v > 1, false, true, false));
-				p.set(c, u, 2, v, fence(Blocks.BAMBOO_FENCE, false, false, true, false));
+				p.set(c, u, 1, v, fence(Blocks.SPRUCE_FENCE, v > 1, false, true, false));
+				p.set(c, u, 2, v, fence(Blocks.SPRUCE_FENCE, false, false, true, false));
 			}
 		}
 		// gate posts and a small tiled roof
@@ -320,10 +321,10 @@ public final class HouseJapaneseTeahouse implements Variant {
 			}
 		}
 		for (int u = gu - 2; u <= gu + 2; u++) {
-			p.set(c, u, 4, 0, Math.abs(u - gu) == 2 ? stair(Blocks.BAMBOO_MOSAIC_STAIRS, u < gu ? Direction.EAST : Direction.WEST)
-					: slab(Blocks.BAMBOO_MOSAIC_SLAB));
+			p.set(c, u, 4, 0, Math.abs(u - gu) == 2 ? stair(Blocks.SPRUCE_STAIRS, u < gu ? Direction.EAST : Direction.WEST)
+					: slab(Blocks.SPRUCE_SLAB));
 		}
-		p.set(c, gu, 4, 0, b(Blocks.BAMBOO_MOSAIC));
+		p.set(c, gu, 4, 0, b(Blocks.SPRUCE_PLANKS));
 		EaveKit.tail(c, p, gu - 2, 3, 0, Direction.EAST, Blocks.SPRUCE_LOG);
 		EaveKit.tail(c, p, gu + 2, 3, 0, Direction.WEST, Blocks.SPRUCE_LOG);
 		p.put(c, gu, 3, 0, lantern(true), CitadelCanvas.HANGING);

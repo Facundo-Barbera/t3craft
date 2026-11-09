@@ -90,7 +90,7 @@ public final class HouseMachiya implements Variant {
 	}
 
 	private static final Scheme[] SCHEMES = {
-			new Scheme(Blocks.DARK_OAK_TRAPDOOR, Blocks.DARK_OAK_LOG, Blocks.DARK_OAK_STAIRS, DyeColor.BLUE, Blocks.DARK_OAK_DOOR),
+			new Scheme(Blocks.SPRUCE_TRAPDOOR, Blocks.DARK_OAK_LOG, Blocks.DARK_OAK_STAIRS, DyeColor.BLUE, Blocks.DARK_OAK_DOOR),
 			new Scheme(Blocks.SPRUCE_TRAPDOOR, Blocks.SPRUCE_LOG, Blocks.DARK_OAK_STAIRS, DyeColor.RED, Blocks.CHERRY_DOOR),
 			new Scheme(Blocks.SPRUCE_TRAPDOOR, Blocks.DARK_OAK_LOG, Blocks.DARK_OAK_STAIRS, DyeColor.CYAN, Blocks.DARK_OAK_DOOR),
 	};
@@ -149,16 +149,17 @@ public final class HouseMachiya implements Variant {
 
 	/** [palette] the heavy dark band: three deepslate textures mixed by a per-cell hash. */
 	private static BlockState stone(Plot p, int u, int y, int v) {
+		// [palette] a lighter stone footing than the dark timber and plaster above it, so the planes read apart
 		return switch (p.hash(u, y, v, 6)) {
-			case 0 -> b(Blocks.CRACKED_DEEPSLATE_BRICKS);
-			case 1 -> b(Blocks.COBBLED_DEEPSLATE);
-			default -> b(Blocks.DEEPSLATE_BRICKS);
+			case 0 -> b(Blocks.CRACKED_STONE_BRICKS);
+			case 1 -> b(Blocks.POLISHED_ANDESITE);
+			default -> b(Blocks.STONE_BRICKS);
 		};
 	}
 
 	/** [palette] plaster: calcite with the odd tuff-brick patch where the weather got at it. */
 	private static BlockState plaster(Plot p, int u, int y, int v) {
-		return p.hash(u, y, v, 5) == 0 ? b(Blocks.CALCITE) : b(Blocks.TUFF_BRICKS);
+		return p.hash(u, y, v, 12) == 0 ? b(Blocks.CALCITE) : b(Blocks.TUFF_BRICKS);
 	}
 
 	/** [palette] the lowest plaster course, darker: gradient from deepslate through tuff to calcite. */
@@ -458,7 +459,7 @@ public final class HouseMachiya implements Variant {
 			int y = roofY(v, g);
 			for (int u : new int[] {g.u1(), g.u2()}) {
 				for (int yy = PLATE + 1; yy <= y; yy++) {
-					p.set(c, u, yy, v, p.hash(u, yy, v, 3) == 0 ? b(Blocks.CALCITE) : b(Blocks.TUFF_BRICKS));
+					p.set(c, u, yy, v, b(Blocks.TUFF_BRICKS));
 				}
 				p.set(c, u, y + 1, v, slab(Blocks.DEEPSLATE_TILE_SLAB));
 			}
