@@ -70,7 +70,7 @@ public final class HouseLibraryCopper implements Variant {
 
 	@Override
 	public int minH() {
-		return 22;
+		return 23;
 	}
 
 	@Override
@@ -85,7 +85,7 @@ public final class HouseLibraryCopper implements Variant {
 
 	private static final DyeColor[] JEWELS = {DyeColor.ORANGE, DyeColor.YELLOW, DyeColor.LIGHT_BLUE, DyeColor.PINK};
 	/** Rings of sloped roof before the flat top. */
-	private static final int K = 4;
+	private static final int K = 5;
 
 	// ------------------------------------------------------------------ geometry
 
@@ -210,8 +210,9 @@ public final class HouseLibraryCopper implements Variant {
 		};
 	}
 
+	/** Pilasters are one clean material: calcite. */
 	private static BlockState pierStone(Plot p, int u, int y, int v) {
-		return p.hash(u, y, v, 5) == 0 ? b(Blocks.STONE_BRICKS) : b(Blocks.CALCITE);
+		return b(Blocks.CALCITE);
 	}
 
 	private static BlockState wallStone(Plot p, int u, int y, int v) {
@@ -341,7 +342,8 @@ public final class HouseLibraryCopper implements Variant {
 			} else if (pier) {
 				st = y == 10 ? b(Blocks.CHISELED_STONE_BRICKS) : (y > 10 ? wallStone(p, u, y, v) : pierStone(p, u, y, v));
 			} else if (y == 6) {
-				st = b(Blocks.POLISHED_ANDESITE); // a string course between the two tiers of windows
+				// tall windows run through the gallery level; blind bays keep a string course
+				st = win ? (mull ? b(Blocks.CALCITE) : clearPane(alongU)) : b(Blocks.POLISHED_ANDESITE);
 			} else if (y == 10) {
 				st = b(Blocks.POLISHED_ANDESITE);
 			} else if (y > 10) {
@@ -349,13 +351,10 @@ public final class HouseLibraryCopper implements Variant {
 			} else if (y <= 5) {
 				if (win) {
 					st = mull ? b(Blocks.CALCITE) : clearPane(alongU);
-				} else if (y == 5 && !mull && wl.width[i] >= 5 && (wl.off[i] == 1 || wl.off[i] == wl.width[i] - 2)) {
-					// a blind arch: inverted stairs spring from the sides towards a chiselled keystone
-					boolean towardsEnd = wl.off[i] < wl.width[i] / 2;
-					Direction along = alongU ? (towardsEnd ? Direction.EAST : Direction.WEST) : (towardsEnd ? Direction.SOUTH : Direction.NORTH);
-					st = stair(Blocks.STONE_BRICK_STAIRS, along, true);
-				} else if (mull && y >= 4) {
-					st = b(Blocks.CHISELED_STONE_BRICKS); // keystone and boss
+				} else if (doorBay && Math.abs(wl.off[i] - wl.width[i] / 2) == 2) {
+					st = b(Blocks.CALCITE); // pale jambs frame the door
+				} else if (mull && y == 4) {
+					st = b(Blocks.CHISELED_STONE_BRICKS); // a boss in the middle of every blind panel
 				} else {
 					st = wallStone(p, u, y, v);
 				}
@@ -366,7 +365,7 @@ public final class HouseLibraryCopper implements Variant {
 			} else if (win) {
 				st = clearPane(alongU);
 			} else {
-				st = pierStone(p, u, y, v); // blind upper course: light stone, lighter than the tier below
+				st = wallStone(p, u, y, v);
 			}
 			p.set(c, u, y, v, st);
 		}
@@ -418,12 +417,12 @@ public final class HouseLibraryCopper implements Variant {
 			if (col[u - ua]) {
 				column(c, p, u, 0);
 			} else {
-				p.set(c, u, 10, 0, b(Blocks.POLISHED_ANDESITE)); // architrave
+				p.set(c, u, 10, 0, b(Blocks.CHERRY_PLANKS)); // architrave: the citadel's pink
 			}
 		}
 		for (int u : new int[] {ua, ub}) {
 			column(c, p, u, 2);
-			p.set(c, u, 10, 1, b(Blocks.POLISHED_ANDESITE));
+			p.set(c, u, 10, 1, b(Blocks.CHERRY_PLANKS));
 		}
 		for (int i = 0; i < span.len; i++) {
 			if (!span.pier[i] && span.off[i] == span.width[i] / 2) {
@@ -434,9 +433,10 @@ public final class HouseLibraryCopper implements Variant {
 
 	private static void column(CitadelCanvas c, Plot p, int u, int v) {
 		p.set(c, u, 1, v, b(Blocks.POLISHED_DEEPSLATE));
-		for (int y = 2; y <= 9; y++) {
+		for (int y = 2; y <= 8; y++) {
 			p.set(c, u, y, v, b(Blocks.QUARTZ_PILLAR));
 		}
+		p.set(c, u, 9, v, b(Blocks.CHISELED_QUARTZ_BLOCK)); // capital
 		p.set(c, u, 10, v, b(Blocks.CHISELED_STONE_BRICKS));
 	}
 
@@ -677,7 +677,8 @@ public final class HouseLibraryCopper implements Variant {
 					face = north <= south ? Direction.SOUTH : Direction.NORTH;
 					along = u - g.cu();
 				}
-				int level = da == db ? 2 : (Math.floorMod(along, 4) == 0 ? 1 : 0);
+				// the eave weathers first (a pale green-brown gutter line), hips and ribs are a lighter copper
+				int level = k == 0 ? 2 : (Math.abs(da - db) <= 1 || Math.floorMod(along, 4) == 0 ? 1 : 0);
 				p.set(c, u, 11 + k, v, stair(copperStair(level), face, false));
 			}
 		}
@@ -702,7 +703,7 @@ public final class HouseLibraryCopper implements Variant {
 			for (int v = 0; v <= 2; v++) {
 				p.set(c, u, 11 + v, v, CitadelCanvas.AIR); // the hip's cell, replaced
 				if (pw - Math.abs(k) >= 3) {
-					p.set(c, u, 11 + h, v, b(copper(1))); // the ridge
+					p.set(c, u, 11 + h, v, slab(Blocks.CUT_COPPER_SLAB.waxed().exposed(), false)); // the ridge
 				} else {
 					p.set(c, u, 11 + h, v, stair(copperStair(0), k < 0 ? Direction.EAST : Direction.WEST, false));
 				}
@@ -711,33 +712,32 @@ public final class HouseLibraryCopper implements Variant {
 				p.set(c, u, y, 0, p.hash(u, y, 0, 4) == 0 ? b(Blocks.SMOOTH_STONE) : b(Blocks.CALCITE));
 			}
 		}
-		p.set(c, g.cu(), 12, 0, HouseWorkshopKit.tintBlock(DyeColor.ORANGE));
+		p.set(c, g.cu(), 12, 0, b(Blocks.CHERRY_PLANKS)); // roundel
 	}
 
-	/** The lantern on the crown: glass on posts, a copper cap, a gold boss and a rod; open to the nave below. */
+	/**
+	 * The lantern on the crown: 5 wide (7 on big plots), glass on copper posts, a stepped cap in weathered copper with
+	 * a rod, open to the nave, and a chandelier hanging on a chain from its ceiling.
+	 */
 	private static void monitor(CitadelCanvas c, Plot p, G g) {
-		int ml = Math.max(1, g.hw() - 4);
+		int pl = 11 + K; // the crown deck
+		int ml = g.hw() >= 9 ? 3 : 2;
 		int mu0 = g.cu() - ml;
 		int mu1 = g.cu() + ml;
-		int mv0 = 5;
-		int mv1 = g.v1() - 4;
+		int vm = (5 + g.v1() - 4) / 2;
+		int mv0 = vm - (ml + 1);
+		int mv1 = vm + (ml + 1);
 		for (int u = mu0; u <= mu1; u++) {
 			for (int v = mv0; v <= mv1; v++) {
-				p.set(c, u, 11 + K, v, CitadelCanvas.AIR);
+				p.set(c, u, pl, v, CitadelCanvas.AIR);
 				boolean eu = u == mu0 || u == mu1;
 				boolean ev = v == mv0 || v == mv1;
 				if (!eu && !ev) {
 					continue;
 				}
-				for (int y = 16; y <= 18; y++) {
-					BlockState st;
+				for (int y = pl + 1; y <= pl + 3; y++) {
 					boolean post = (eu && ev) || (eu && (v - mv0) % 3 == 0) || (ev && (u - mu0) % 3 == 0);
-					if (post) {
-						st = b(copper(1));
-					} else {
-						st = clearPane(ev);
-					}
-					p.set(c, u, y, v, st);
+					p.set(c, u, y, v, post ? b(copper(1)) : clearPane(ev));
 				}
 			}
 		}
@@ -746,7 +746,7 @@ public final class HouseLibraryCopper implements Variant {
 			for (int v = mv0; v <= mv1; v++) {
 				int ring = Math.min(Math.min(u - mu0, mu1 - u), Math.min(v - mv0, mv1 - v));
 				if (ring >= 2) {
-					p.set(c, u, 20, v, b(copper(0)));
+					p.set(c, u, pl + 5, v, b(copper(2)));
 					continue;
 				}
 				Direction face;
@@ -759,14 +759,14 @@ public final class HouseLibraryCopper implements Variant {
 				} else {
 					face = Direction.NORTH;
 				}
-				p.set(c, u, 19 + ring, v, stair(copperStair(ring == 0 ? 0 : 1), face, false));
-				if (ring == 0) {
-					p.set(c, u, 19, v, stair(copperStair(0), face, false));
-				}
+				p.set(c, u, pl + 4 + ring, v, stair(copperStair(2), face, false));
 			}
 		}
-		int vm = (mv0 + mv1) / 2;
-		p.set(c, g.cu(), 20, vm, b(Blocks.GOLD_BLOCK));
-		p.set(c, g.cu(), 21, vm, b(Blocks.LIGHTNING_ROD.waxed().oxidized()));
+		p.set(c, g.cu(), pl + 6, vm, b(Blocks.LIGHTNING_ROD.waxed().oxidized()));
+		// the chandelier: a chain from the cap ceiling down to the nave, a lantern at its foot
+		for (int y = 13; y <= pl + 4; y++) {
+			p.put(c, g.cu(), y, vm, b(Blocks.IRON_CHAIN), CitadelCanvas.HANGING);
+		}
+		p.put(c, g.cu(), 12, vm, lantern(true), CitadelCanvas.HANGING);
 	}
 }
