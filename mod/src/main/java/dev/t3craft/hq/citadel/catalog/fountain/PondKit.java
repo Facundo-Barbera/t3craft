@@ -230,31 +230,81 @@ final class PondKit {
 	}
 
 	/**
-	 * A young cherry tree: a trunk that bends towards {@code lean} (+1 / -1 in u) and an irregular
-	 * four-layer canopy with holes, some leaves hanging lower on the lean side, pink petals around the
-	 * foot. Everything is clipped by the plot, never written outside.
+	 * A young cherry tree beside the water. The trunk is a face-connected chain of logs (no diagonal
+	 * steps): a straight foot, a short horizontal log (y3, lower in short plots) that shifts the trunk by one cell
+	 * towards {@code lean} (+1 / -1 in u, the way into the plot), then the stem and a branch over the
+	 * water. Nothing but the trunk stands below y3, so the ground round the foot stays walkable. The
+	 * canopy is a rounded, irregular blob from the bend up with holes; every leaf is kept only if it joins the
+	 * logs through a chain of faces, so the whole tree is one solid group (CitadelSettle never sees it as
+	 * floating). Pink petals lie round the foot. Everything is clipped by the plot.
 	 */
 	static void cherry(CitadelCanvas c, Plot p, int u, int v, int lean) {
-		int trunk = Math.max(3, Math.min(5, p.h() - 2));
-		for (int y = 0; y < trunk; y++) {
-			put(c, p, u + (y >= 2 ? lean : 0), y, v, b(Blocks.CHERRY_LOG));
+		int w = p.w();
+		int h = p.h();
+		int d = p.d();
+		boolean[][][] log = new boolean[w][h][d];
+		boolean[][][] leaf = new boolean[w][h][d];
+		BlockState upright = b(Blocks.CHERRY_LOG);
+		BlockState sideways = upright.setValue(BlockStateProperties.AXIS, Direction.Axis.X);
+		int stem = u + lean;
+		// trunk: foot, then a bend through one horizontal log, then the stem (the bend sits lower in short plots)
+		int bend = Math.min(3, h - 2);
+		for (int y = 0; y <= bend; y++) {
+			treeLog(c, p, log, u, y, v, upright);
 		}
-		put(c, p, u + 2 * lean, trunk - 2, v, b(Blocks.CHERRY_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.X)); // a branch over the water
-		int topU = u + lean;
+		treeLog(c, p, log, stem, bend, v, sideways);
+		for (int y = bend + 1; y <= Math.min(bend + 2, h - 2); y++) {
+			treeLog(c, p, log, stem, y, v, upright);
+		}
+		treeLog(c, p, log, stem + lean, bend + 1, v, sideways); // a branch over the water, face-joined to the stem
+		// canopy candidates: rounded layers, corners cut, ~1 in 4 cells missing
 		int[] radius = {1, 2, 2, 1};
-		for (int layer = 0; layer < 4; layer++) {
-			int y = trunk - 2 + layer;
-			int r = radius[layer];
+		int top = Math.min(h - 1, bend + 3);
+		for (int y = bend; y <= top; y++) {
+			int r = radius[y - bend];
 			for (int du = -r; du <= r; du++) {
 				for (int dv = -r; dv <= r; dv++) {
 					boolean corner = Math.abs(du) == r && Math.abs(dv) == r && r > 1;
-					int lu = topU + du + (layer == 0 ? lean : 0);
+					int lu = stem + du;
 					int lv = v + dv;
-					if (!p.has(lu, y, lv) || corner || (du == 0 && dv == 0 && layer < 2) || p.hash(lu, y, lv, 4) == 0
-							|| p.at(c, lu, y, lv) != null) {
+					if (corner || !p.has(lu, y, lv) || log[lu][y][lv] || p.hash(lu, y, lv, 4) == 0 || p.at(c, lu, y, lv) != null) {
 						continue;
 					}
-					put(c, p, lu, y, lv, CitadelCanvas.leaves(Blocks.CHERRY_LEAVES));
+					leaf[lu][y][lv] = true;
+				}
+			}
+		}
+		// keep only leaves joined to the logs through faces (flood fill from every log)
+		boolean[][][] kept = new boolean[w][h][d];
+		java.util.ArrayDeque<int[]> queue = new java.util.ArrayDeque<>();
+		for (int x = 0; x < w; x++) {
+			for (int y = 0; y < h; y++) {
+				for (int z = 0; z < d; z++) {
+					if (log[x][y][z]) {
+						queue.add(new int[] {x, y, z});
+					}
+				}
+			}
+		}
+		int[][] faces = {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}};
+		while (!queue.isEmpty()) {
+			int[] at = queue.poll();
+			for (int[] f : faces) {
+				int x = at[0] + f[0];
+				int y = at[1] + f[1];
+				int z = at[2] + f[2];
+				if (x >= 0 && x < w && y >= 0 && y < h && z >= 0 && z < d && leaf[x][y][z] && !kept[x][y][z]) {
+					kept[x][y][z] = true;
+					queue.add(new int[] {x, y, z});
+				}
+			}
+		}
+		for (int x = 0; x < w; x++) {
+			for (int y = 0; y < h; y++) {
+				for (int z = 0; z < d; z++) {
+					if (kept[x][y][z]) {
+						put(c, p, x, y, z, CitadelCanvas.leaves(Blocks.CHERRY_LEAVES));
+					}
 				}
 			}
 		}
@@ -264,6 +314,13 @@ final class PondKit {
 			if (p.has(pu, 0, pv) && p.at(c, pu, 0, pv) == null && p.hash(pu, 6, pv, 2) == 0) { // only on bare ground
 				put(c, p, pu, 0, pv, b(Blocks.PINK_PETALS));
 			}
+		}
+	}
+
+	private static void treeLog(CitadelCanvas c, Plot p, boolean[][][] log, int u, int y, int v, BlockState s) {
+		if (p.has(u, y, v)) {
+			p.set(c, u, y, v, s);
+			log[u][y][v] = true;
 		}
 	}
 }
