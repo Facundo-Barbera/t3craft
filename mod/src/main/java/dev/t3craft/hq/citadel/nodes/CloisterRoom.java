@@ -420,20 +420,22 @@ public final class CloisterRoom {
 	 * with the arcade's roof. The crown is kept inside the garth (r &le; 5): it never touches the arcade or the roof.
 	 */
 	private static void cherryTree(Q q, int tx, int tz, int sx, int sz, BlockState pink) {
-		q.fill(tx, 1, 6, tz, LOG);
-		q.set(tx - sx, 6, tz, LOG.setValue(BlockStateProperties.AXIS, Direction.Axis.X));
-		q.set(tx, 5, tz - sz, LOG.setValue(BlockStateProperties.AXIS, Direction.Axis.Z));
-		for (int ax = -3; ax <= 3; ax++) {
-			for (int az = -3; az <= 3; az++) {
-				for (int ay = -2; ay <= 3; ay++) {
+		q.fill(tx, 1, 8, tz, LOG);
+		q.set(tx - sx, 7, tz, LOG.setValue(BlockStateProperties.AXIS, Direction.Axis.X));
+		q.set(tx, 6, tz - sz, LOG.setValue(BlockStateProperties.AXIS, Direction.Axis.Z));
+		for (int ax = -4; ax <= 4; ax++) {
+			for (int az = -4; az <= 4; az++) {
+				for (int ay = -3; ay <= 3; ay++) {
 					int x = tx + ax;
 					int z = tz + az;
-					if (Math.max(Math.abs(x), Math.abs(z)) > 5) {
+					int y = 9 + ay;
+					int r = Math.max(Math.abs(x), Math.abs(z));
+					// inside the garth anywhere; over the gallery only above its roof (it hangs over the rim like a real tree)
+					if (r > 5 && (r > 7 || y <= ceil(r))) {
 						continue;
 					}
-					int y = 7 + ay;
 					double noise = Math.floorMod(x * 7 + y * 13 + z * 17 + tx * 5, 5) * 0.55;
-					double d = ax * ax + az * az + ay * ay * 1.5;
+					double d = ax * ax + az * az + ay * ay * 1.2;
 					if (d <= 8.0 + noise) {
 						q.putIfFree(x, y, z, pink, CitadelCanvas.SOLID);
 					}
@@ -460,7 +462,7 @@ public final class CloisterRoom {
 		Direction out = NodeDecor.outward(dx, dz);
 		// the roof is its own ceiling: slabs and stairs alternate, half a block of rise per ring
 		int roofY = ceil(r);
-		q.set(dx, roofY, dz, roofCell(r, out));
+		q.set(dx, roofY, dz, roofCell(r, out, Math.abs(dx) == Math.abs(dz) && r >= 7 && r <= 11));
 		if (r >= 7 && r <= 11 && pilasterLine(aa)) {
 			// a rafter under the ceiling, along the line of each pilaster
 			q.set(dx, roofY - 1, dz, LOG.setValue(BlockStateProperties.AXIS, ns ? Direction.Axis.Z : Direction.Axis.X));
@@ -485,12 +487,12 @@ public final class CloisterRoom {
 	 * The roof cell of ring {@code r}: a slab on the even rings and a stair (high side outward) on the odd ones, so the roof
 	 * climbs one block every two rings. Cherry, with a stone-brick rim at the arcade and a deepslate-tile gutter at the wall.
 	 */
-	private static BlockState roofCell(int r, Direction out) {
+	private static BlockState roofCell(int r, Direction out, boolean hip) {
 		boolean slabCell = (r - 6) % 2 == 0;
 		if (slabCell) {
-			return slab(r == 6 ? Blocks.STONE_BRICK_SLAB : r == 12 ? Blocks.DEEPSLATE_TILE_SLAB : Blocks.CHERRY_SLAB);
+			return slab(r == 6 || r == 12 || hip ? Blocks.STONE_BRICK_SLAB : Blocks.CHERRY_SLAB);
 		}
-		return stairs(Blocks.CHERRY_STAIRS, out);
+		return stairs(hip ? Blocks.STONE_BRICK_STAIRS : Blocks.CHERRY_STAIRS, out);
 	}
 
 	/**
