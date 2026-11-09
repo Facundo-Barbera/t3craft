@@ -10,32 +10,44 @@ import dev.t3craft.hq.citadel.catalog.Plot;
 import dev.t3craft.hq.citadel.catalog.Variant;
 import net.minecraft.core.Direction;
 import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.StairBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.level.block.state.properties.Half;
-import net.minecraft.world.level.block.state.properties.SlabType;
+import net.minecraft.world.level.block.state.properties.WallSide;
 
 /**
- * Plaza centre: a disc of glazed terracotta laid as an eight-pointed rosette (white cardinal rays,
- * golden diagonal rays, pink field), ringed by a black/white dentil band and a deepslate ramp, with a
- * stepped plinth and a quartz obelisk with a golden pyramidion in the middle. The square corners
- * left over by the disc are raised flower beds with a lantern bollard.
+ * Plaza centre with a glazed-terracotta rosette floor that is also a place to be: a raised round dais
+ * whose mosaic grows by rings (never stretches), framed by polished stone, with a working centrepiece
+ * (a low fountain, a tall lamp tower or a map table of the citadel), cherry benches on the stone
+ * rim looking at the middle, lamp posts at the four axes, and shade trees in the corners.
  *
  * <pre>
- *  top view (w = d = 13)                section through the axis
- *    ▓▓▓ . . . . . . ▓▓▓                  y11  ╿ lightning rod
- *    ▓▓  ring: ramp, dentils, rays            y10  ▲ gold
- *     .  ✦ rosette of glazed terracotta   y7-9 │ quartz needle (chiselled bands)
- *     .     ▣ obelisk plinth              y5-6 ▟▙ cornice, step
- *    ▓▓▓ . . . . . . ▓▓▓                  y1-4 ▟█▙ plinth tiers   y0 pavement
+ *  top view (n = 7)                           section through an axis
+ *   T ·  b b L ░ ░ L b b  · T                  y4        L lantern   (axis lamp)
+ *     b  ◦ planter     ◦  b                  y1  ▙ bench ▙  curb ▙▟ ... centre piece
+ *     L ░ ▒ ▒ ▒ ▒ ▒ ▒ ░ L     ░ ramp         y0  ▂▄██████████▄▂   rim curb, frame, mosaic
+ *     ░ ░ ▒ ✦ ▒ C ▒ ✦ ░ ░     ▒ white path   street ▔▔▔
+ *   T = tree on a moss bed, L = lamp, b = bench, C = centre
  * </pre>
  *
- * Size: 13–15 × 13–15 × 10+ (the needle grows with the height up to 13).
+ * <ul>
+ * <li>Mosaic: bands from the outside in: stone rim (seats), polished andesite frame, a dentil band (n ≥ 8),
+ *     then rings of petals; every 4 blocks of radius a new ring of the opposite colours, so a 21-wide plaza
+ *     has more rings, not bigger tiles. Four 3-wide white paths lead from the street to the centre, up a stair
+ *     and a half step (no jumps).</li>
+ * <li>Glaze palette by seed: blue and white, ocre (orange) and white, green and white.</li>
+ * <li>Centre by seed: fountain, lamp tower, map table.</li>
+ * </ul>
+ *
+ * Size: 11–21 × 11–21 × 9+ (the box grows with the plaza: the mosaic adds rings).
  */
 public final class PlazaCenterGlazedRosette implements Variant {
+	private static final DyeColor[] GLAZE = {DyeColor.BLUE, DyeColor.ORANGE, DyeColor.GREEN};
+
 	@Override
 	public String id() {
 		return "plaza_center_glazed_rosette";
@@ -48,27 +60,27 @@ public final class PlazaCenterGlazedRosette implements Variant {
 
 	@Override
 	public int minW() {
-		return 15;
-	}
-
-	@Override
-	public int minD() {
-		return 15;
-	}
-
-	@Override
-	public int minH() {
 		return 11;
 	}
 
 	@Override
+	public int minD() {
+		return 11;
+	}
+
+	@Override
+	public int minH() {
+		return 9;
+	}
+
+	@Override
 	public int maxW() {
-		return 15;
+		return 21;
 	}
 
 	@Override
 	public int maxD() {
-		return 15;
+		return 21;
 	}
 
 	private static BlockState gl(DyeColor color, Direction facing) {
@@ -79,8 +91,12 @@ public final class PlazaCenterGlazedRosette implements Variant {
 		return s.setValue(StairBlock.HALF, Half.TOP);
 	}
 
-	private static BlockState slabTop(net.minecraft.world.level.block.Block b) {
-		return b.defaultBlockState().setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP);
+	private static BlockState wall(Block w, boolean n, boolean e, boolean s, boolean west) {
+		return w.defaultBlockState()
+				.setValue(BlockStateProperties.NORTH_WALL, n ? WallSide.LOW : WallSide.NONE)
+				.setValue(BlockStateProperties.EAST_WALL, e ? WallSide.LOW : WallSide.NONE)
+				.setValue(BlockStateProperties.SOUTH_WALL, s ? WallSide.LOW : WallSide.NONE)
+				.setValue(BlockStateProperties.WEST_WALL, west ? WallSide.LOW : WallSide.NONE);
 	}
 
 	/** Outward direction of a cell relative to the centre (dominant axis). */
@@ -88,14 +104,26 @@ public final class PlazaCenterGlazedRosette implements Variant {
 		return Math.abs(dx) >= Math.abs(dz) ? (dx > 0 ? Direction.EAST : Direction.WEST) : (dz > 0 ? Direction.SOUTH : Direction.NORTH);
 	}
 
+	/** Writes only when the cell is in the box (canopies may reach past the edge without counting as clipped). */
+	private static void safe(CitadelCanvas c, Plot p, int u, int y, int v, BlockState s) {
+		if (p.has(u, y, v)) {
+			p.set(c, u, y, v, s);
+		}
+	}
+
 	@Override
 	public void build(CitadelCanvas c, Plot p) {
 		int w = p.w();
 		int d = p.d();
-		int cu = w / 2;
-		int cv = d / 2;
-		double radius = Math.min(Math.min(cu, w - 1 - cu), Math.min(cv, d - 1 - cv)) + 0.5;
-		int top = Math.min(p.h() - 1, 13);
+		int cu = (w - 1) / 2;
+		int cv = (d - 1) / 2;
+		int n = Math.min(Math.min(cu, w - 1 - cu), Math.min(cv, d - 1 - cv));
+		double radius = n + 0.5;
+		int cr = n >= 9 ? 3 : 2;
+		int top = Math.min(p.h() - 1, 9);
+		int pal = p.hash(11, 0, 3, 3);
+		int type = p.hash(5, 9, 2, 3);
+		DyeColor glaze = GLAZE[pal];
 
 		for (int v = 0; v < d; v++) {
 			for (int u = 0; u < w; u++) {
@@ -103,149 +131,259 @@ public final class PlazaCenterGlazedRosette implements Variant {
 				int dz = v - cv;
 				double r = Math.sqrt(dx * dx + dz * dz);
 				if (r > radius) {
-					corner(c, p, u, v, r - radius, w, d);
+					corner(c, p, u, v, dx, dz, n);
 				} else {
-					disc(c, p, u, v, dx, dz, r, radius);
+					disc(c, p, u, v, dx, dz, r, radius, n, cr, glaze);
 				}
 			}
 		}
-		obelisk(c, p, cu, cv, top);
-		bollards(c, p, w, d, top);
+		int br = n >= 9 ? 2 : 1;
+		for (int sx = -1; sx <= 1; sx += 2) {
+			for (int sz = -1; sz <= 1; sz += 2) {
+				tree(c, p, cu + sx * (n - 1), cv + sz * (n - 1), br);
+			}
+		}
+		centre(c, p, cu, cv, cr, type, top);
+		lamps(c, p, cu, cv, n);
 	}
 
-	// ------------------------------------------------------------------ the rosette
+	// ------------------------------------------------------------------ the dais
 
-	private void disc(CitadelCanvas c, Plot p, int u, int v, int dx, int dz, double r, double radius) {
+	private void disc(CitadelCanvas c, Plot p, int u, int v, int dx, int dz, double r, double radius, int n, int cr, DyeColor glaze) {
 		double e = radius - r;
 		int cheb = Math.max(Math.abs(dx), Math.abs(dz));
+		int pa = Math.min(Math.abs(dx), Math.abs(dz));
 		Direction f = out(dx, dz);
-		double ang = Math.atan2(dz, dx);
 		if (e < 1.0) {
-			// [depth] ramp: deepslate tile stairs low side out, so the disc is a raised dais, never a cut edge (facing inwards: the tall half towards the disc, climbed walking in)
-			p.set(c, u, 0, v, p.hash(u, 0, v, 4) == 0 ? stairs(Blocks.MOSSY_STONE_BRICK_STAIRS, f.getOpposite()) : stairs(Blocks.STONE_BRICK_STAIRS, f.getOpposite()));
+			if (pa <= 1) {
+				// [depth] ramp: stairs rising inwards on the four axes, half a step off the street, then a full block: no jump
+				p.set(c, u, 0, v, stairs(Blocks.STONE_BRICK_STAIRS, f.getOpposite()));
+				return;
+			}
+			// the stone rim is a curb 1 block over the street, and a seat on top: cherry stairs, back to the outside
+			int h = p.hash(u, 0, v, 6);
+			p.set(c, u, 0, v, h == 0 ? b(Blocks.CRACKED_STONE_BRICKS) : h == 1 ? b(Blocks.MOSSY_STONE_BRICKS) : b(Blocks.STONE_BRICKS));
+			if (Math.abs(Math.abs(dx) - Math.abs(dz)) <= 1) {
+				// planter at the diagonal, between two benches
+				p.set(c, u, 1, v, CitadelCanvas.leaves(p.hash(u, 1, v, 2) == 0 ? Blocks.FLOWERING_AZALEA_LEAVES : Blocks.AZALEA_LEAVES));
+			} else if (pa != 2) {
+				p.set(c, u, 1, v, stairs(Blocks.CHERRY_STAIRS, f));
+			}
 			return;
 		}
+		if (cheb <= cr) {
+			return; // the centre piece lays its own base
+		}
+		boolean path = pa <= 1;
 		if (e < 2.0) {
-			// dentil band: black and white wedges
-			int k = (int) Math.floor((ang + Math.PI) / (2 * Math.PI) * 32);
-			p.set(c, u, 0, v, (k & 1) == 0 ? gl(DyeColor.BLACK, f) : gl(DyeColor.WHITE, f));
+			p.set(c, u, 0, v, path ? gl(DyeColor.WHITE, f) : b(Blocks.POLISHED_ANDESITE));
 			return;
 		}
-		if (cheb <= 1) {
-			// apron under the obelisk: dark stone with a sprinkle of gilded blackstone
-			int h = p.hash(u, 0, v, 7);
-			p.set(c, u, 0, v, h == 0 ? b(Blocks.GILDED_BLACKSTONE) : h < 3 ? b(Blocks.POLISHED_DEEPSLATE) : b(Blocks.DEEPSLATE_TILES));
+		int fe = n >= 8 ? 3 : 2;
+		if (e < fe) {
+			// dentil band: glaze and white wedges
+			int k = (int) Math.floor((Math.atan2(dz, dx) + Math.PI) / (2 * Math.PI) * Math.max(16, (int) (2 * Math.PI * (radius - 2.5))));
+			p.set(c, u, 0, v, path ? gl(DyeColor.WHITE, f) : (k & 1) == 0 ? gl(glaze, f) : gl(DyeColor.WHITE, f));
 			return;
 		}
-		// field with eight tapering rays
+		// field: rings of eight petals; each ring (about 4 blocks of radius) swaps the colours
+		double r0 = cr + 0.5;
+		double r1 = radius - fe;
+		int nz = Math.max(1, (int) Math.round((r1 - r0) / 4.0));
+		double zw = (r1 - r0) / nz;
+		double rr = Math.max(0, r - r0);
+		int zi = Math.min(nz - 1, (int) Math.floor(rr / zw));
+		double local = rr - zi * zw;
+		boolean invert = (zi & 1) == 1;
+		BlockState bg = invert ? gl(DyeColor.WHITE, f) : gl(glaze, f);
+		BlockState petal = invert ? gl(glaze, f) : gl(DyeColor.WHITE, f);
+		if (path) {
+			p.set(c, u, 0, v, pa == 1 ? gl(DyeColor.WHITE, f) : invert ? gl(glaze, f) : gl(DyeColor.WHITE, f));
+			return;
+		}
+		if (zi > 0 && local < 1.0) {
+			p.set(c, u, 0, v, b(Blocks.POLISHED_ANDESITE));
+			return;
+		}
 		double sector = Math.PI / 4;
+		double ang = Math.atan2(dz, dx);
 		int ray = (int) Math.round(ang / sector);
-		double da = Math.abs(ang - ray * sector);
-		double perp = r * Math.sin(da);
-		double rmin = 1.6;
-		double rmax = radius - 2.0;
-		double half = 1.5 - 1.0 * Math.max(0, Math.min(1, (r - rmin) / (rmax - rmin)));
-		boolean cardinal = Math.floorMod(ray, 2) == 0;
-		if (perp < half) {
-			p.set(c, u, 0, v, cardinal ? gl(DyeColor.WHITE, f) : gl(DyeColor.YELLOW, f));
-		} else {
-			p.set(c, u, 0, v, gl(DyeColor.PINK, f));
-		}
+		double perp = r * Math.sin(Math.abs(ang - ray * sector));
+		boolean diag = Math.floorMod(ray, 2) == 1;
+		double t = Math.max(0, Math.min(1, local / zw));
+		double half = 0.5 + 1.3 * Math.sin(Math.PI * t);
+		p.set(c, u, 0, v, diag && perp < half ? petal : bg);
 	}
 
-	// ------------------------------------------------------------------ corners: paving + flower beds
+	// ------------------------------------------------------------------ corners: paving, moss beds and trees
 
-	private void corner(CitadelCanvas c, Plot p, int u, int v, double beyond, int w, int d) {
-		boolean edge = u == 0 || v == 0 || u == w - 1 || v == d - 1;
-		if (beyond <= 1.0) {
-			int h = p.hash(u, 0, v, 4);
-			p.set(c, u, 0, v, h == 0 ? slab(Blocks.MOSSY_STONE_BRICK_SLAB) : h == 1 ? slab(Blocks.POLISHED_ANDESITE_SLAB) : slab(Blocks.STONE_BRICK_SLAB));
-			// (no full blocks sprinkled in this paving: it is the walk round the disc, slabs only)
-			return;
-		}
-		// raised bed: deepslate retaining blocks on the rim, moss inside, bushes and flowers above
-		if (edge || beyond <= 1.3) {
-			p.set(c, u, 0, v, p.hash(u, 0, v, 3) == 0 ? b(Blocks.CRACKED_DEEPSLATE_BRICKS) : b(Blocks.DEEPSLATE_BRICKS));
-			if (!edge && p.hash(u, 1, v, 3) == 0) {
-				p.set(c, u, 1, v, slab(Blocks.DEEPSLATE_BRICK_SLAB));
+	private void corner(CitadelCanvas c, Plot p, int u, int v, int dx, int dz, int n) {
+		int br = n >= 9 ? 2 : 1;
+		int tx = (dx < 0 ? -1 : 1) * (n - 1);
+		int tz = (dz < 0 ? -1 : 1) * (n - 1);
+		int ex = Math.abs(dx - tx);
+		int ez = Math.abs(dz - tz);
+		if (Math.max(ex, ez) <= br) {
+			// raised bed: deepslate rim, moss inside, low plants; the middle cell is the trunk's
+			if (Math.max(ex, ez) == br) {
+				p.set(c, u, 0, v, p.hash(u, 0, v, 3) == 0 ? b(Blocks.CRACKED_DEEPSLATE_BRICKS) : b(Blocks.DEEPSLATE_BRICKS));
+			} else {
+				p.set(c, u, 0, v, b(Blocks.MOSS_BLOCK));
+				if (ex + ez > 0) {
+					switch (p.hash(u, 1, v, 5)) {
+						case 0 -> p.set(c, u, 1, v, CitadelCanvas.leaves(Blocks.FLOWERING_AZALEA_LEAVES));
+						case 1 -> p.set(c, u, 1, v, b(Blocks.PINK_PETALS));
+						case 2 -> {
+							p.set(c, u, 1, v, b(Blocks.PEONY));
+							p.set(c, u, 2, v, Blocks.PEONY.defaultBlockState().setValue(BlockStateProperties.DOUBLE_BLOCK_HALF, DoubleBlockHalf.UPPER));
+						}
+						default -> p.set(c, u, 1, v, CitadelCanvas.leaves(Blocks.AZALEA_LEAVES));
+					}
+				}
 			}
 			return;
 		}
-		p.set(c, u, 0, v, b(Blocks.MOSS_BLOCK));
-		switch (p.hash(u, 1, v, 6)) {
-			case 0 -> p.set(c, u, 1, v, CitadelCanvas.leaves(Blocks.FLOWERING_AZALEA_LEAVES));
-			case 1 -> p.set(c, u, 1, v, CitadelCanvas.leaves(Blocks.CHERRY_LEAVES));
-			case 2 -> {
-				p.set(c, u, 1, v, b(Blocks.PEONY));
-				p.set(c, u, 2, v, Blocks.PEONY.defaultBlockState().setValue(BlockStateProperties.DOUBLE_BLOCK_HALF, DoubleBlockHalf.UPPER));
+		int h = p.hash(u, 0, v, 4);
+		p.set(c, u, 0, v, h == 0 ? slab(Blocks.MOSSY_STONE_BRICK_SLAB) : h == 1 ? slab(Blocks.POLISHED_ANDESITE_SLAB) : slab(Blocks.STONE_BRICK_SLAB));
+	}
+
+	/** A small cherry tree: trunk from the moss bed, a rounded canopy at 4 blocks, high enough to walk and sit under. */
+	private void tree(CitadelCanvas c, Plot p, int tu, int tv, int br) {
+		for (int y = 1; y <= 4; y++) {
+			safe(c, p, tu, y, tv, b(Blocks.CHERRY_LOG));
+		}
+		double rc = br + 1.3;
+		for (int layer = 0; layer < 4; layer++) {
+			double rad = layer < 2 ? rc : rc - (layer - 1);
+			int y = 4 + layer;
+			int reach = (int) Math.ceil(rad);
+			for (int dz = -reach; dz <= reach; dz++) {
+				for (int dx = -reach; dx <= reach; dx++) {
+					if (dx * dx + dz * dz <= rad * rad && !(dx == 0 && dz == 0 && y == 4)) {
+						safe(c, p, tu + dx, y, tv + dz, CitadelCanvas.leaves(p.hash(tu + dx, y, tv + dz, 6) == 0 ? Blocks.FLOWERING_AZALEA_LEAVES : Blocks.CHERRY_LEAVES));
+					}
+				}
 			}
-			case 3 -> p.set(c, u, 1, v, b(Blocks.PINK_PETALS));
-			default -> p.set(c, u, 1, v, CitadelCanvas.leaves(Blocks.AZALEA_LEAVES));
 		}
 	}
 
-	/** A lantern bollard on each plot corner. */
-	private void bollards(CitadelCanvas c, Plot p, int w, int d, int top) {
-		int[][] spots = {{0, 0}, {w - 1, 0}, {0, d - 1}, {w - 1, d - 1}};
+	/** Lamp posts on the rim, two at each axis, beside the ramp. */
+	private void lamps(CitadelCanvas c, Plot p, int cu, int cv, int n) {
+		int[][] spots = {{n, 2}, {n, -2}, {-n, 2}, {-n, -2}, {2, n}, {-2, n}, {2, -n}, {-2, -n}};
 		for (int[] s : spots) {
-			p.set(c, s[0], 1, s[1], b(Blocks.POLISHED_DEEPSLATE_WALL));
-			p.set(c, s[0], 2, s[1], b(Blocks.POLISHED_DEEPSLATE_WALL));
-			p.set(c, s[0], 3, s[1], b(Blocks.LANTERN));
+			int u = cu + s[0];
+			int v = cv + s[1];
+			p.set(c, u, 1, v, b(Blocks.POLISHED_DEEPSLATE));
+			p.set(c, u, 2, v, wall(Blocks.POLISHED_DEEPSLATE_WALL, false, false, false, false));
+			p.set(c, u, 3, v, wall(Blocks.POLISHED_DEEPSLATE_WALL, false, false, false, false));
+			p.set(c, u, 4, v, b(Blocks.LANTERN));
 		}
 	}
 
-	// ------------------------------------------------------------------ obelisk
+	// ------------------------------------------------------------------ the centre piece
 
-	private void obelisk(CitadelCanvas c, Plot p, int cu, int cv, int top) {
-		// y1-2: 3×3 pedestal, pale at the top: calcite and chiselled quartz over a dark deepslate course at the foot
-		for (int y = 1; y <= 2; y++) {
-			for (int dz = -1; dz <= 1; dz++) {
-				for (int dx = -1; dx <= 1; dx++) {
-					int h = p.hash(cu + dx, y, cv + dz, 5);
-					boolean face = (dx == 0) != (dz == 0);
-					p.set(c, cu + dx, y, cv + dz, y == 1 ? (h == 0 ? b(Blocks.CRACKED_DEEPSLATE_BRICKS) : h == 1 ? b(Blocks.POLISHED_ANDESITE) : b(Blocks.DEEPSLATE_BRICKS))
-							: face ? b(Blocks.CHISELED_QUARTZ_BLOCK) : h == 0 ? b(Blocks.POLISHED_ANDESITE) : b(Blocks.CALCITE));
-				}
+	private void centre(CitadelCanvas c, Plot p, int cu, int cv, int cr, int type, int top) {
+		for (int dz = -cr; dz <= cr; dz++) {
+			for (int dx = -cr; dx <= cr; dx++) {
+				int h = p.hash(cu + dx, 0, cv + dz, 7);
+				p.set(c, cu + dx, 0, cv + dz, h == 0 ? b(Blocks.GILDED_BLACKSTONE) : h < 3 ? b(Blocks.POLISHED_DEEPSLATE) : b(Blocks.DEEPSLATE_TILES));
 			}
 		}
-		// y3: cornice, inverted stairs overhanging the pedestal on every side (5×5 with the corners cut)
-		for (int dz = -2; dz <= 2; dz++) {
-			for (int dx = -2; dx <= 2; dx++) {
+		switch (type) {
+			case 0 -> fountain(c, p, cu, cv, cr);
+			case 1 -> lampTower(c, p, cu, cv, cr, top);
+			default -> mapTable(c, p, cu, cv, cr);
+		}
+	}
+
+	/** A low fountain: a basin of stone brick with a ledge, water inside, a stone pillar with a lantern. */
+	private void fountain(CitadelCanvas c, Plot p, int cu, int cv, int cr) {
+		for (int dz = -cr; dz <= cr; dz++) {
+			for (int dx = -cr; dx <= cr; dx++) {
 				int cheb = Math.max(Math.abs(dx), Math.abs(dz));
-				boolean corner = Math.abs(dx) == 2 && Math.abs(dz) == 2;
-				if (corner) {
-					continue;
-				}
-				if (cheb == 2) {
-					p.set(c, cu + dx, 3, cv + dz, Math.abs(dx) == 2 && Math.abs(dz) == 1 || Math.abs(dz) == 2 && Math.abs(dx) == 1
-							? slabTop(Blocks.DEEPSLATE_TILE_SLAB) : top(stairs(Blocks.DEEPSLATE_TILE_STAIRS, out(dx, dz))));
-				} else {
-					p.set(c, cu + dx, 3, cv + dz, b(Blocks.POLISHED_DEEPSLATE));
+				int u = cu + dx;
+				int v = cv + dz;
+				if (cheb == cr) {
+					p.set(c, u, 1, v, p.hash(u, 1, v, 4) == 0 ? b(Blocks.MOSSY_STONE_BRICKS) : b(Blocks.STONE_BRICKS));
+					p.set(c, u, 2, v, slab(Blocks.STONE_BRICK_SLAB));
+				} else if (cheb > 0) {
+					p.set(c, u, 1, v, CitadelCanvas.WATER);
 				}
 			}
 		}
-		// y4: quartz cross step climbing to the needle
-		for (int dz = -1; dz <= 1; dz++) {
-			for (int dx = -1; dx <= 1; dx++) {
-				boolean centre = dx == 0 && dz == 0;
-				boolean corner = dx != 0 && dz != 0;
-				if (corner) {
-					p.set(c, cu + dx, 4, cv + dz, slab(Blocks.QUARTZ_SLAB));
-				} else {
-					p.set(c, cu + dx, 4, cv + dz, centre ? b(Blocks.SMOOTH_QUARTZ) : stairs(Blocks.QUARTZ_STAIRS, out(dx, dz)));
+		p.set(c, cu, 1, cv, b(Blocks.CHISELED_STONE_BRICKS));
+		p.set(c, cu, 2, cv, b(Blocks.POLISHED_ANDESITE));
+		p.set(c, cu, 3, cv, wall(Blocks.STONE_BRICK_WALL, false, false, false, false));
+		p.set(c, cu, 4, cv, wall(Blocks.STONE_BRICK_WALL, false, false, false, false));
+		p.set(c, cu, 5, cv, b(Blocks.LANTERN));
+	}
+
+	/** A tall lamp: stepped plinth, a deepslate post, a crossbar with four hanging lanterns and one on top. */
+	private void lampTower(CitadelCanvas c, Plot p, int cu, int cv, int cr, int top) {
+		int yp = cr - 1;
+		for (int lvl = 1; lvl <= yp; lvl++) {
+			int rad = cr - lvl;
+			for (int dz = -rad; dz <= rad; dz++) {
+				for (int dx = -rad; dx <= rad; dx++) {
+					p.set(c, cu + dx, lvl, cv + dz, lvl % 2 == 1 ? b(Blocks.STONE_BRICKS) : b(Blocks.POLISHED_ANDESITE));
 				}
 			}
 		}
-		// needle: smooth quartz with chiselled bands and a gold pyramidion
-		for (int y = 5; y <= top - 3; y++) {
-			p.set(c, cu, y, cv, (y - 5) % 3 == 2 ? b(Blocks.CHISELED_QUARTZ_BLOCK) : (y == 5 ? b(Blocks.QUARTZ_PILLAR) : b(Blocks.SMOOTH_QUARTZ)));
-		}
-		p.set(c, cu, top - 2, cv, b(Blocks.CHISELED_QUARTZ_BLOCK));
-		p.set(c, cu, top - 1, cv, b(Blocks.GOLD_BLOCK));
-		p.set(c, cu, top, cv, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState());
-		// buttress stairs hugging the needle foot
 		for (Direction dir : new Direction[] {Direction.NORTH, Direction.SOUTH, Direction.EAST, Direction.WEST}) {
-			p.set(c, cu + dir.getStepX(), 5, cv + dir.getStepZ(), stairs(Blocks.QUARTZ_STAIRS, dir));
+			for (int k = 1; k <= cr - 1; k++) {
+				// step stairs hugging the plinth on the axes
+				p.set(c, cu + dir.getStepX() * (cr - k + 1), k, cv + dir.getStepZ() * (cr - k + 1), stairs(Blocks.STONE_BRICK_STAIRS, dir.getOpposite()));
+			}
+		}
+		p.set(c, cu, yp + 1, cv, b(Blocks.POLISHED_DEEPSLATE));
+		int cross = top - 1;
+		for (int y = yp + 2; y < cross; y++) {
+			p.set(c, cu, y, cv, wall(Blocks.POLISHED_DEEPSLATE_WALL, false, false, false, false));
+		}
+		p.set(c, cu, cross, cv, wall(Blocks.POLISHED_DEEPSLATE_WALL, true, true, true, true));
+		p.set(c, cu, top, cv, b(Blocks.LANTERN));
+		p.set(c, cu, cross - 1, cv, b(Blocks.POLISHED_DEEPSLATE_WALL));
+		p.set(c, cu + 1, cross, cv, wall(Blocks.POLISHED_DEEPSLATE_WALL, false, false, false, true));
+		p.set(c, cu - 1, cross, cv, wall(Blocks.POLISHED_DEEPSLATE_WALL, false, true, false, false));
+		p.set(c, cu, cross, cv + 1, wall(Blocks.POLISHED_DEEPSLATE_WALL, true, false, false, false));
+		p.set(c, cu, cross, cv - 1, wall(Blocks.POLISHED_DEEPSLATE_WALL, false, false, true, false));
+		BlockState hung = Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, true);
+		p.put(c, cu + 1, cross - 1, cv, hung, CitadelCanvas.HANGING);
+		p.put(c, cu - 1, cross - 1, cv, hung, CitadelCanvas.HANGING);
+		p.put(c, cu, cross - 1, cv + 1, hung, CitadelCanvas.HANGING);
+		p.put(c, cu, cross - 1, cv - 1, hung, CitadelCanvas.HANGING);
+	}
+
+	/**
+	 * A map table of the citadel: a pedestal with a map top (green gardens, pink barrios, grey roads, a gold
+	 * "you are here" in the middle), a corbel of upside-down stairs and a lamp post on each corner.
+	 */
+	private void mapTable(CitadelCanvas c, Plot p, int cu, int cv, int cr) {
+		for (int dz = -cr; dz <= cr; dz++) {
+			for (int dx = -cr; dx <= cr; dx++) {
+				int cheb = Math.max(Math.abs(dx), Math.abs(dz));
+				int u = cu + dx;
+				int v = cv + dz;
+				boolean corner = Math.abs(dx) == cr && Math.abs(dz) == cr;
+				if (cheb < cr || corner) {
+					p.set(c, u, 1, v, p.hash(u, 1, v, 5) == 0 ? b(Blocks.CRACKED_STONE_BRICKS) : b(Blocks.STONE_BRICKS));
+				} else {
+					p.set(c, u, 1, v, top(stairs(Blocks.STONE_BRICK_STAIRS, out(dx, dz).getOpposite())));
+				}
+				if (corner) {
+					p.set(c, u, 2, v, wall(Blocks.POLISHED_DEEPSLATE_WALL, false, false, false, false));
+					p.set(c, u, 3, v, wall(Blocks.POLISHED_DEEPSLATE_WALL, false, false, false, false));
+					p.set(c, u, 4, v, b(Blocks.LANTERN));
+				} else if (dx == 0 && dz == 0) {
+					p.set(c, u, 2, v, b(Blocks.GOLD_BLOCK));
+				} else if (dx == 0 || dz == 0 || cr == 3 && cheb == 2) {
+					p.set(c, u, 2, v, CitadelCanvas.terracotta(DyeColor.LIGHT_GRAY));
+				} else if (cheb == 1) {
+					p.set(c, u, 2, v, CitadelCanvas.terracotta(DyeColor.PINK));
+				} else {
+					p.set(c, u, 2, v, p.hash(u, 2, v, 4) == 0 ? CitadelCanvas.terracotta(DyeColor.LIME) : CitadelCanvas.terracotta(DyeColor.GREEN));
+				}
+			}
 		}
 	}
 }
