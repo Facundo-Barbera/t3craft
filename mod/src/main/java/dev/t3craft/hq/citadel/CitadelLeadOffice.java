@@ -161,7 +161,7 @@ public final class CitadelLeadOffice {
 		}
 		c.set(at.getX(), top + pole + 1, at.getZ(), b(Blocks.GOLD_BLOCK));
 		BlockState cloth = b(Blocks.CONCRETE.pick(env));
-		BlockState stripe = b(Blocks.CONCRETE.pick(DyeColor.WHITE));
+		BlockState stripe = b(Blocks.CONCRETE.pick(DyeColor.YELLOW));
 		int[] length = {8, 8, 8, 7, 5, 3};
 		for (int row = 0; row < length.length; row++) {
 			for (int k = 1; k <= length[row]; k++) {
@@ -192,10 +192,11 @@ public final class CitadelLeadOffice {
 
 		// the runner of the aisle (door to the lead's desk): the edges in the second colour
 		BlockState runner = b(Blocks.CARPET.pick(env));
-		BlockState trim = b(Blocks.CARPET.pick(style.alt(env)));
+		BlockState trim = b(Blocks.CARPET.pick(DyeColor.BLACK));
+		BlockState line = b(Blocks.CARPET.pick(DyeColor.YELLOW));
 		for (int u = 0; u < dais0(r); u++) {
 			for (int dv = -ah; dv <= ah; dv++) {
-				c.set(r.cell(u, mid + dv, 1), Math.abs(dv) == ah ? trim : runner);
+				c.set(r.cell(u, mid + dv, 1), Math.abs(dv) == ah ? trim : big && Math.abs(dv) == ah - 1 ? line : runner);
 			}
 		}
 
@@ -336,10 +337,22 @@ public final class CitadelLeadOffice {
 			for (int u = 3; u < d - 2; u += 6) {
 				for (int v = 0; v < w; v++) {
 					c.set(r.cell(u, v, h - 1), across);
+					c.set(r.cell(u, v, h - 2), across);
 				}
 				for (int v : vs) {
-					BlockPos p = r.cell(u, v, h - 2);
+					BlockPos p = r.cell(u, v, h - 3);
 					c.put(p.getX(), p.getY(), p.getZ(), lantern, HANGING);
+				}
+			}
+			// the coffers: a dark inlay in the ceiling plane at the middle of every panel between the beams
+			BlockState inlay = b(Blocks.DARK_OAK_PLANKS);
+			for (int u = 3; u + 6 < d - 1; u += 6) {
+				for (int a = 0; a < vs.length - 1; a++) {
+					for (int uu = u + 2; uu <= u + 4; uu++) {
+						for (int v = vs[a] + 2; v <= vs[a + 1] - 2; v++) {
+							c.set(r.cell(uu, v, h), inlay);
+						}
+					}
 				}
 			}
 			return;
@@ -424,7 +437,7 @@ public final class CitadelLeadOffice {
 		int yTop = 3 + sh;
 		for (int v = mid - half - 1; v <= mid + half + 1; v++) {
 			boolean end = v == mid - half - 1 || v == mid + half + 1;
-			putFree(c, r.cell(d - 1, v, 2), end ? corner : gold);
+			c.set(r.cell(d - 1, v, 2), end ? corner : gold);
 			BlockPos top = r.cell(d - 1, v, yTop);
 			if (yTop <= h) {
 				c.set(top, end ? corner : gold);
@@ -454,6 +467,9 @@ public final class CitadelLeadOffice {
 		for (int f = 0; f < (two ? 2 : 1); f++) {
 			int yb = f * h;
 			clerestory(c, r, style, env, yb);
+			if (!two) {
+				wallBay(c, r, d - 2 - 8, w - 1, side, true, yb, base, shaft, band, cap);
+			}
 			for (int v = 0; v < w; v++) {
 				if (Math.abs(v - mid) > ah + 1) {
 					wallBay(c, r, 0, v, fwd.getOpposite(), v % 3 == 0 && v > 0 && v < w - 1 && Math.abs(v - mid) > ah + 2, yb, base, shaft, band, cap);
@@ -516,7 +532,7 @@ public final class CitadelLeadOffice {
 		int w = r.w();
 		int d = r.d();
 		int h = fh();
-		DyeColor[] colours = {env, style.alt(env), DyeColor.YELLOW};
+		DyeColor[] colours = {DyeColor.YELLOW, DyeColor.PINK, env, DyeColor.LIGHT_BLUE};
 		for (int u = -1; u <= d; u++) {
 			for (int v = -1; v <= w; v++) {
 				if (!r.wall(u, v) || r.corner(u, v)) {
@@ -529,10 +545,10 @@ public final class CitadelLeadOffice {
 				int iu = Math.max(0, Math.min(d - 1, u));
 				int iv = Math.max(0, Math.min(w - 1, v));
 				BlockState pane = b(Blocks.STAINED_GLASS_PANE.pick(colours[Math.floorMod(t / 3, colours.length)]));
-				for (int ly = h - 2; ly <= h - 1; ly++) {
+				for (int ly = h >= 7 ? h - 3 : h - 2; ly <= h - 1; ly++) {
 					BlockPos p = r.cell(u, v, yb + ly);
 					BlockState cur = c.at(p.getX(), p.getY(), p.getZ());
-					if (cur == null || cur.isAir() || !(ly >= 5 || cur.getBlock().toString().contains("glass_pane"))) {
+					if (cur == null || cur.isAir() || !(ly >= 4 || cur.getBlock().toString().contains("glass_pane"))) {
 						continue;
 					}
 					if (free(c, r.cell(iu, iv, yb + ly))) {
