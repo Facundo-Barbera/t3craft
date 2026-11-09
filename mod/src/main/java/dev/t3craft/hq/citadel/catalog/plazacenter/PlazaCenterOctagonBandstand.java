@@ -326,8 +326,8 @@ public final class PlazaCenterOctagonBandstand implements Variant {
 				if (toCol != null) {
 					p.set(c, u, y0 + 3, v, topStairs(Blocks.CHERRY_STAIRS, toCol));
 				} else if (((ax + az) & 1) == 0) {
-					// [finish] a standing lantern on every other balustrade post
-					p.set(c, u, y0 + 1, v, Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, false));
+					// [finish] a lantern hanging from the beam over every other balustrade post (nobody can stand on it)
+					p.put(c, u, y0 + 3, v, Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
 				}
 			}
 			return;
@@ -369,7 +369,7 @@ public final class PlazaCenterOctagonBandstand implements Variant {
 			if (m > ri - 1 && m > 0.5) {
 				p.set(c, u, y, v, stairs(r.stair(rib, 0), in));
 			} else {
-				p.set(c, u, y, v, r.tread(rib, p.hash(u, y, v, 7)));
+				p.set(c, u, y, v, r.tread(false, p.hash(u, y, v, 7)));
 			}
 		}
 	}
@@ -397,7 +397,12 @@ public final class PlazaCenterOctagonBandstand implements Variant {
 		at(c, p, g, -1, y, 0, b(Blocks.NOTE_BLOCK));
 		at(c, p, g, 1, y, 0, b(Blocks.NOTE_BLOCK));
 		at(c, p, g, 0, y, 1, b(Blocks.NOTE_BLOCK));
-		atLayer(c, p, g, 0, y + 3, 0, Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
+		// four hanging lanterns over the free floor (not over the podium, where one can stand on the jukebox)
+		BlockState hang = Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, true);
+		atLayer(c, p, g, 2, y + 3, 0, hang, CitadelCanvas.HANGING);
+		atLayer(c, p, g, -2, y + 3, 0, hang, CitadelCanvas.HANGING);
+		atLayer(c, p, g, 0, y + 3, -2, hang, CitadelCanvas.HANGING);
+		atLayer(c, p, g, 0, y + 3, 2, hang, CitadelCanvas.HANGING);
 		for (int dz = -g.k(); dz <= g.k(); dz++) {
 			for (int dx = -g.k(); dx <= g.k(); dx++) {
 				if (!g.seat(dx, dz)) {
