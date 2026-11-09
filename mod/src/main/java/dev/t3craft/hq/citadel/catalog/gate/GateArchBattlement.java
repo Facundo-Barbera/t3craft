@@ -290,14 +290,14 @@ public final class GateArchBattlement implements Variant {
 			new Mat(Blocks.STONE_BRICKS, Blocks.CRACKED_STONE_BRICKS, Blocks.MOSSY_STONE_BRICKS, Blocks.STONE_BRICK_STAIRS,
 					Blocks.DEEPSLATE_BRICKS, Blocks.CRACKED_DEEPSLATE_BRICKS, Blocks.DEEPSLATE_BRICK_STAIRS,
 					Blocks.POLISHED_ANDESITE, Blocks.POLISHED_ANDESITE_STAIRS, Blocks.POLISHED_ANDESITE_SLAB, Blocks.CALCITE),
-			// pale tuff brick on a deepslate base, polished diorite trim
-			new Mat(Blocks.TUFF_BRICKS, Blocks.POLISHED_TUFF, Blocks.TUFF_BRICKS, Blocks.TUFF_BRICK_STAIRS,
+			// pale tuff brick on a deepslate base, polished tuff trim
+			new Mat(Blocks.TUFF_BRICKS, Blocks.CHISELED_TUFF_BRICKS, Blocks.MOSSY_STONE_BRICKS, Blocks.TUFF_BRICK_STAIRS,
 					Blocks.DEEPSLATE_BRICKS, Blocks.CRACKED_DEEPSLATE_BRICKS, Blocks.DEEPSLATE_BRICK_STAIRS,
-					Blocks.POLISHED_DIORITE, Blocks.POLISHED_DIORITE_STAIRS, Blocks.POLISHED_DIORITE_SLAB, Blocks.CALCITE),
-			// dark deepslate brick on a blackstone base, pale andesite trim
+					Blocks.POLISHED_TUFF, Blocks.POLISHED_TUFF_STAIRS, Blocks.POLISHED_TUFF_SLAB, Blocks.CALCITE),
+			// dark deepslate brick on a blackstone base, stone-brick trim
 			new Mat(Blocks.DEEPSLATE_BRICKS, Blocks.CRACKED_DEEPSLATE_BRICKS, Blocks.DEEPSLATE_TILES, Blocks.DEEPSLATE_BRICK_STAIRS,
 					Blocks.POLISHED_BLACKSTONE_BRICKS, Blocks.CRACKED_POLISHED_BLACKSTONE_BRICKS, Blocks.POLISHED_BLACKSTONE_BRICK_STAIRS,
-					Blocks.POLISHED_ANDESITE, Blocks.POLISHED_ANDESITE_STAIRS, Blocks.POLISHED_ANDESITE_SLAB, Blocks.CALCITE)};
+					Blocks.STONE_BRICKS, Blocks.STONE_BRICK_STAIRS, Blocks.STONE_BRICK_SLAB, Blocks.CALCITE)};
 
 	/**
 	 * The avenue gatehouse. Local frame, front NORTH: {@code u} across the avenue, {@code v} along it (the passage runs
@@ -514,9 +514,7 @@ public final class GateArchBattlement implements Variant {
 					}
 				}
 			}
-			if (!stairTower) {
-				set(col[1], 9, d - 2, Blocks.BARREL);
-			} else {
+			if (stairTower) {
 				p.put(c, col[1], 11, sv, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
 			}
 
