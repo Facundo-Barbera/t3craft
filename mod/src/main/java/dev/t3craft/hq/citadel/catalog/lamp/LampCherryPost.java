@@ -93,10 +93,7 @@ public final class LampCherryPost implements Variant {
 	public void build(CitadelCanvas c, Plot p) {
 		int hh = Math.min(p.h(), 6);
 		int kind = p.hash(0, 0, 0, 3); // 0 vanilla lantern, 1 kit paper, 2 kit glow strip
-		boolean glow = kind == 2 && glowReal(c);
-		if (kind == 2 && !glow) {
-			kind = 0;
-		}
+		boolean glow = kind == 2 && glowReal(c); // the strip under the arm needs the kit; the lit box has a fallback
 		String tone = p.hash(0, 0, 1, 2) == 0 ? "paper" : "rose";
 		boolean two = p.hash(1, 0, 0, 2) == 0;
 		boolean pair = p.w() >= 5;
@@ -190,10 +187,8 @@ public final class LampCherryPost implements Variant {
 		p.set(c, u, 0, v, foot(p, u, v));
 		for (int y = 1; y < collarY; y++) {
 			BlockState s = FENCE;
-			if (y == 1 && hh >= 5) {
-				s = plinthWall(p, u, v); // stone first, wood above
-			} else if (y == 2 && collarY >= 4) {
-				s = COLLAR; // lower collar: the mast thickens above the stone
+			if (y == 1 && hh >= 5 || y == 2 && collarY >= 4) {
+				s = plinthWall(p, u, v); // stone first (two high on the tall masts), wood above
 			}
 			p.set(c, u, y, v, s);
 		}
@@ -219,7 +214,7 @@ public final class LampCherryPost implements Variant {
 	private static BlockState standingLight(CitadelCanvas c, Plot p, int kind) {
 		return switch (kind) {
 			case 1 -> PaperLanterns.standing();
-			case 2 -> c.kit.glowStrip(Direction.NORTH, false, false);
+			case 2 -> c.kit.glowPanel(Direction.NORTH, false);
 			default -> LANTERN;
 		};
 	}
@@ -247,7 +242,7 @@ public final class LampCherryPost implements Variant {
 				f = f.setValue(prop(d), true);
 			}
 			p.set(c, au, armY, av, f);
-			if (i < a.len()) {
+			if (i < a.len() && style != 2) {
 				// corbel: an upside-down stair hugging the mast under the arm (its tall back towards the mast)
 				p.set(c, au, armY - 1, av, stairs(Blocks.CHERRY_STAIRS, d.getOpposite()).setValue(StairBlock.HALF, Half.TOP));
 			}
@@ -255,22 +250,28 @@ public final class LampCherryPost implements Variant {
 		int tu = u + d.getStepX() * a.len();
 		int tv = v + d.getStepZ() * a.len();
 		if (style == 2) {
+			if (glow) {
+				// the kit's glow strip runs under the whole crossarm (no collision, the arm cells are 3 up)
+				for (int i = 1; i <= a.len(); i++) {
+					p.set(c, u + d.getStepX() * i, armY - 1, v + d.getStepZ() * i, c.kit.glowStrip(d, true, false));
+				}
+			}
 			// light box on the tip: the light stands on the fence, a cherry slab roof one above
 			p.set(c, tu, armY + 1, tv, standingLight(c, p, kind));
 			p.set(c, tu, armY + 2, tv, slab(Blocks.CHERRY_SLAB));
 			return;
 		}
 		// crook: the kit's glow strip hugs the arm's underside; else chain from the tip (height 6) and the light under it
-		if (glow) {
-			p.set(c, tu, armY - 1, tv, c.kit.glowStrip(d, true, false));
-			return;
-		}
 		int ly = armY - 1;
 		if (armY >= 5) {
 			p.put(c, tu, ly, tv, b(Blocks.IRON_CHAIN), CitadelCanvas.HANGING);
 			ly--;
 		}
-		BlockState light = kind == 1 ? PaperLanterns.hanging(tone) : LANTERN.setValue(BlockStateProperties.HANGING, true);
+		BlockState light = switch (kind) {
+			case 1 -> PaperLanterns.hanging(tone);
+			case 2 -> c.kit.glowPanel(Direction.DOWN, false);
+			default -> LANTERN.setValue(BlockStateProperties.HANGING, true);
+		};
 		p.put(c, tu, ly, tv, light, CitadelCanvas.HANGING);
 	}
 
