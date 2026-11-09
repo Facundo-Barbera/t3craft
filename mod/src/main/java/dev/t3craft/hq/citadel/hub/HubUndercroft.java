@@ -159,9 +159,10 @@ public final class HubUndercroft {
 	/** The nave's pier continued down to the floor: blackstone foot and a cherry shaft up to the nave floor. */
 	private static void pillar(CitadelCanvas c, int x, int z) {
 		c.set(x, sy(), z, RIB);
-		for (int y = sy() + 1; y <= y0() - 1; y++) {
+		for (int y = sy() + 1; y <= y0() - 2; y++) {
 			c.set(x, y, z, LOG);
 		}
+		c.set(x, y0() - 1, z, CALCITE); // the capital, as on the nave's piers
 	}
 
 	/**
@@ -275,6 +276,18 @@ public final class HubUndercroft {
 		for (int sx = -1; sx <= 1; sx += 2) {
 			for (int sz = -1; sz <= 1; sz += 2) {
 				for (int start = lay[2]; start <= HubDims.INNER() - seg; start += lay[3]) {
+					if (c.s(1) >= 2) {
+						// a brown rug under and round each island, so the shelves stand on something
+						for (int k = -1; k <= seg; k++) {
+							for (int dx = -1; dx <= 2; dx++) {
+								int x = sx * (x0 + dx);
+								int z = sz * (start + k);
+								if (inside(c, x, z) && !edge(c, x, z) && !stairCell(x, z)) {
+									c.set(x, fy(), z, CitadelCanvas.terracotta(DyeColor.BROWN));
+								}
+							}
+						}
+					}
 					for (int k = 0; k < seg; k++) {
 						int z = sz * (start + k);
 						for (int dx = 0; dx <= 1; dx++) {
@@ -354,6 +367,13 @@ public final class HubUndercroft {
 		int z = HubDims.ARCH_Z0() + HubDims.ARCH_RUN() + 3;
 		int a = HubDims.ARCH_X0();
 		int b = HubDims.ARCH_X1();
+		for (int ax = a - 1; ax <= b + 1; ax++) {
+			for (int zz = z - 1; zz <= z + 2; zz++) {
+				if (inside(c, sx * ax, zz) && !edge(c, sx * ax, zz)) {
+					c.set(sx * ax, fy(), zz, CitadelCanvas.terracotta(DyeColor.RED));
+				}
+			}
+		}
 		for (int ax = a; ax <= b; ax++) {
 			int x = sx * ax;
 			int i = ax - a;
@@ -450,7 +470,7 @@ public final class HubUndercroft {
 						continue;
 					}
 					for (int y = fy() + 1; y < level; y++) {
-						c.set(x, y, z, HubBlocks.darkBase(x, y, z));
+						c.set(x, y, z, j == 0 ? wellFace(ax, x, y, z) : HubBlocks.darkBase(x, y, z));
 					}
 					for (int y = level + 1; y <= y0(); y++) {
 						c.set(x, y, z, AIR);
@@ -467,12 +487,52 @@ public final class HubUndercroft {
 					int x = sx * edgeX;
 					if (inside(c, x, z) && !edge(c, x, z)) {
 						for (int y = fy() + 1; y <= y0() - 1; y++) {
-							c.set(x, y, z, HubBlocks.darkBase(x, y, z));
+							c.set(x, y, z, wellWall(x, y, z));
 						}
 					}
 				}
 			}
 		}
+	}
+
+	/**
+	 * A cell of the side wall of a stairwell, under the nave's floor. Where the hall is tall (scale 2) it is not a blank
+	 * panel: a polished blackstone pilaster every 4 cells, bookshelves between them for the first three rows (they face the
+	 * hall and the stairs alike), a cherry band over them and a cherry beam under the nave's floor.
+	 */
+	private static BlockState wellWall(int x, int y, int z) {
+		if (HubDims.ARCH_FREE() < 5) {
+			return HubBlocks.darkBase(x, y, z);
+		}
+		int rel = y - fy();
+		if (y == y0() - 1) {
+			return HubBlocks.strippedLog(Direction.Axis.Z);
+		}
+		if (Math.floorMod(z, 4) == 0) {
+			return RIB;
+		}
+		if (rel <= 3) {
+			return Blocks.BOOKSHELF.defaultBlockState();
+		}
+		return rel == 4 ? HubBlocks.strippedLog(Direction.Axis.Z) : HubBlocks.darkBase(x, y, z);
+	}
+
+	/**
+	 * The north face of a stair's solid base, the wall that closes the stairwell towards the hall: a pilaster at each edge
+	 * and shelves (four rows) in the three cells between, under a cherry beam.
+	 */
+	private static BlockState wellFace(int ax, int x, int y, int z) {
+		if (HubDims.ARCH_FREE() < 5) {
+			return HubBlocks.darkBase(x, y, z);
+		}
+		int rel = y - fy();
+		if (y == y0() - 1) {
+			return HubBlocks.strippedLog(Direction.Axis.X);
+		}
+		if (ax == HubDims.ARCH_X0() || ax == HubDims.ARCH_X1()) {
+			return RIB;
+		}
+		return rel <= 4 ? Blocks.BOOKSHELF.defaultBlockState() : HubBlocks.darkBase(x, y, z);
 	}
 
 	/** Low deepslate walls on both sides of each stair, with a lantern on the post at the top of each. */
@@ -556,6 +616,10 @@ public final class HubUndercroft {
 				c.set(x, y + 5, z, HubBlocks.strippedLog(Direction.Axis.X));
 				c.set(x, y + 4, z, c.kit.glowStrip(Direction.NORTH, true, false));
 			}
+			// corbels under the lintel, at the posts, and a lantern hanging in the middle
+			c.set(pa + 1, y + 4, z, HubBlocks.stairsTop(Blocks.STONE_BRICK_STAIRS, Direction.WEST));
+			c.set(pb - 1, y + 4, z, HubBlocks.stairsTop(Blocks.STONE_BRICK_STAIRS, Direction.EAST));
+			c.set(Math.floorDiv(pa + pb, 2), y + 3, z, HubBlocks.hangingLantern());
 			for (int x = pa; x <= pb; x++) {
 				c.set(x, y + 6, z, slab(Blocks.DEEPSLATE_TILE_SLAB));
 			}

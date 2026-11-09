@@ -236,12 +236,42 @@ public final class HubFacade {
 	 */
 	static void portals(CitadelCanvas c, int x, int z) {
 		int half = portalHalf();
-		if (z > 0 && Math.abs(x) <= half + 1) {
-			portalFrame(c, x, z, half, portalHeight());
+		boolean layered = half >= 4 && c.zoneAt(x, z + 1).kind() != Kind.HUB_WALL; // the outer course of the wall
+		if (z > 0 && Math.abs(x) <= half + (layered ? 2 : 1)) {
+			if (layered) {
+				portalOuter(c, x, z, half, portalHeight());
+			} else {
+				portalFrame(c, x, z, half, portalHeight());
+			}
 		}
 		if (z < 0 && Math.abs(x) <= 2) {
 			portalFrame(c, x, z, 1, 3);
 		}
+	}
+
+	/**
+	 * The outer course of a wide portal (struct/hub3): a reveal, so the opening reads in layers and not as a hole cut in
+	 * a wall. The opening is one cell narrower here ({@code half - 1}) with its own stepped head; the cells of the inner
+	 * opening's jamb that this narrows are polished blackstone (the dark reveal); two cells of calcite pilaster frame it
+	 * outside, and a chiselled string course runs over the lintel.
+	 */
+	private static void portalOuter(CitadelCanvas c, int x, int z, int half, int h) {
+		int ax = Math.abs(x);
+		int oh = half - 1;
+		if (ax <= oh) {
+			int cut = ax == oh ? 2 : ax == oh - 1 ? 1 : 0;
+			c.fill(x, y0() + 1, y0() + h - cut, z, CitadelCanvas.AIR);
+			if (cut > 0) {
+				c.fill(x, y0() + h - cut + 1, y0() + h, z, CALCITE);
+			}
+			c.set(x, y0() + h + 1, z, CALCITE);
+		} else if (ax == half) {
+			c.fill(x, y0() + 1, y0() + h - 1, z, RIB);
+			c.fill(x, y0() + h, y0() + h + 1, z, CALCITE);
+		} else {
+			c.fill(x, y0() + 1, y0() + h + 1, z, CALCITE);
+		}
+		c.set(x, y0() + h + 2, z, Blocks.CHISELED_STONE_BRICKS.defaultBlockState());
 	}
 
 	/**
