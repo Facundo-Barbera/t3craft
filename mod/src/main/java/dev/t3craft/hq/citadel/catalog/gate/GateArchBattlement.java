@@ -308,13 +308,13 @@ public final class GateArchBattlement implements Variant {
 	 *     and body, the keystone one course taller; a raised portcullis of iron bars under the ring;</li>
 	 * <li>curtain: deck at y 7 (corbel table of stairs under the face), walk at y 8, parapet with merlons and crenels;</li>
 	 * <li>tower A (guard): floor, door, bench, chest, lantern, room y 1..4; tower B (stair): a spiral of cherry stairs
-	 *     (first step head-on from an arched doorway) that rises 8 and comes out through a doorway onto the wall walk;</li>
+	 *     (first step head-on from an arched doorway) that rises 9 and comes out through a doorway onto the wall walk;</li>
 	 * <li>both towers have a lookout chamber at wall-walk level (y 8..10) with arrow slits, and a hip roof (y 11..13).</li>
 	 * </ul>
 	 */
 	private static final class Large {
 		private static final int C = 6; // ring course in the middle of the arch
-		private static final int DECK = 7; // deck floor block; feet at 8
+		private static final int DECK = 8; // wall-walk floor block; feet at 9
 
 		private final CitadelCanvas c;
 		private final Plot p;
@@ -417,7 +417,7 @@ public final class GateArchBattlement implements Variant {
 			for (int t = 0; t < 4; t++) {
 				col[t] = left ? t : w - 1 - t;
 			}
-			int top = 10; // last wall course; the roof starts at 11
+			int top = 11; // last wall course; the roof starts at 12
 
 			// --- body: dark base, talus, stone, string course, corbelled cornice
 			for (int u = u0; u <= u1; u++) {
@@ -441,8 +441,10 @@ public final class GateArchBattlement implements Variant {
 					boolean outerCorner = corner && u == outer;
 					// quoins: long-and-short work in the trim stone up the corners
 					if (corner && !(rounded && outerCorner)) {
-						for (int y = 2; y <= 9; y += 2) {
-							set(u, y, v, m.trim);
+						for (int y = 2; y <= 10; y++) {
+							if ((y + (u == u0 ? 0 : 1) + (v == 0 ? 0 : 1)) % 2 == 0 && y != 7) {
+								set(u, y, v, m.trim);
+							}
 						}
 					}
 					if (!(rounded && outerCorner)) {
@@ -463,7 +465,7 @@ public final class GateArchBattlement implements Variant {
 					boolean north = v == 0;
 					boolean west = outer == 0;
 					Direction f = north ? (west ? Direction.SOUTH : Direction.WEST) : (west ? Direction.EAST : Direction.NORTH);
-					for (int y = 2; y <= 9; y++) {
+					for (int y = 2; y <= 10; y++) {
 						if (y == 7) {
 							continue; // the string course stays a block
 						}
@@ -472,13 +474,17 @@ public final class GateArchBattlement implements Variant {
 				}
 			}
 
-			// --- arrow slits (front and back at the second column, outer face in the middle)
+			// --- arrow slits, one block high (a taller one would be a standable pocket): front and back at the second
+			// column, the outer face in the middle, each under a corbelled lintel
 			int mid = d / 2;
-			for (int y : new int[] {3, 4, 8, 9}) {
+			for (int y : new int[] {4, 10}) {
 				set(col[1], y, 0, AIR);
 				set(col[1], y, d - 1, AIR);
-				if (y == 3 || y == 9) {
-					set(outer, y, mid, AIR);
+				set(outer, y, mid, AIR);
+				if (y == 4) {
+					set(col[1], 5, 0, top(stairs(m.trimStairs, Direction.NORTH)));
+					set(col[1], 5, d - 1, top(stairs(m.trimStairs, Direction.SOUTH)));
+					set(outer, 5, mid, top(stairs(m.trimStairs, out)));
 				}
 			}
 
@@ -488,26 +494,26 @@ public final class GateArchBattlement implements Variant {
 			} else {
 				guardRoom(left, col, in, out, inner);
 			}
-			// the doorway onto the wall walk, at the back row of the stair (v 2), 3 high, over a sill at y 7
-			for (int y = 8; y <= 10; y++) {
-				set(inner, y, 2, AIR);
+			// the doorway onto the wall walk, over a sill at y 8, 3 high
+			for (int y = 9; y <= 11; y++) {
+				set(inner, y, 1, AIR);
 			}
-			// lookout chamber: hollow y 8..10, with a lantern from the ceiling
+			// lookout chamber: hollow y 9..11, with a lantern from the ceiling
 			for (int t = 1; t <= 2; t++) {
 				for (int v = 1; v <= d - 2; v++) {
-					for (int y = 8; y <= 10; y++) {
+					for (int y = 9; y <= 11; y++) {
 						set(col[t], y, v, AIR);
 					}
 				}
 			}
 			if (!stairTower) {
-				set(col[1], 8, d - 2, Blocks.BARREL);
+				set(col[1], 9, d - 2, Blocks.BARREL);
 			}
-			p.put(c, col[stairTower ? 1 : 2], 10, stairTower ? 1 : mid, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
+			p.put(c, col[stairTower ? 1 : 2], 11, stairTower ? 1 : mid, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
 
 			// --- roof: hip of stairs, the lowest course a ceiling over the chamber
-			int y = 11;
-			for (int l = 0; l < 3 && y + l <= 13; l++) {
+			int y = 12;
+			for (int l = 0; l < 2 && y + l <= 13; l++) {
 				int ru0 = u0 + l;
 				int ru1 = u1 - l;
 				int rv0 = l;
@@ -531,10 +537,10 @@ public final class GateArchBattlement implements Variant {
 			for (int j = 0; j < 4; j++) {
 				int u = col[cell[j][0]];
 				int v = cell[j][1];
-				for (int y = j; y <= 7; y++) {
-					boolean step = y == j || y == j + 4;
+				for (int y = j; y <= 8; y++) {
+					boolean step = y == j || y == j + 4 || y == j + 8;
 					if (step) {
-						Direction f = y == 7 ? in : face[j]; // the last step runs out through the doorway
+						Direction f = y == 8 ? in : face[j]; // the last step (y 8, cell 0) runs out through the doorway
 						set(u, y, v, stairs(Blocks.CHERRY_STAIRS, f));
 					} else {
 						set(u, y, v, AIR);
@@ -566,7 +572,7 @@ public final class GateArchBattlement implements Variant {
 				set(col[1], 1, v, stairs(Blocks.CHERRY_STAIRS, out));
 			}
 			set(col[1], 1, d - 2, b(Blocks.CHEST).setValue(BlockStateProperties.HORIZONTAL_FACING, in));
-			set(col[1], 2, d - 2, b(Blocks.LANTERN));
+			p.put(c, col[2], 4, d / 2, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
 			if (d >= 7) {
 				set(col[1], 1, d - 3, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
 			}
@@ -604,45 +610,47 @@ public final class GateArchBattlement implements Variant {
 				for (int v = 0; v < d; v++) {
 					boolean face = v == 0 || v == d - 1;
 					Direction outward = v == 0 ? Direction.NORTH : Direction.SOUTH;
-					// arch ring (voussoirs on the faces, body inside) and the spandrel up to the deck
-					for (int y = s[i]; y < DECK; y++) {
+					// arch ring (voussoirs on the faces, body inside) and the spandrel up to the corbel table
+					for (int y = s[i]; y < DECK - 1; y++) {
 						if (face && y <= ringTop) {
 							set(u, y, v, keyCol && y == C ? b(m.key) : (i + y) % 2 == 0 ? b(m.trim) : b(m.wall));
 						} else {
 							set(u, y, v, wall(u, y, v));
 						}
 					}
-					// deck, with a corbel table on the faces and the keystone one course taller
+					// corbel table on the faces with the keystone one course taller; the walk's floor above it
 					if (face) {
 						if (keyCol) {
-							set(u, DECK, v, m.key);
+							set(u, DECK - 1, v, m.key);
 						} else if (i % 2 == 0) {
-							set(u, DECK, v, top(stairs(m.trimStairs, outward)));
+							set(u, DECK - 1, v, top(stairs(m.trimStairs, outward)));
 						} else {
-							set(u, DECK, v, m.trim);
+							set(u, DECK - 1, v, m.trim);
 						}
+						set(u, DECK, v, wall(u, DECK, v));
 					} else {
+						set(u, DECK - 1, v, wall(u, DECK - 1, v));
 						set(u, DECK, v, m.trim);
 					}
 					// parapet: breast wall, merlons, a raised shield with a banner over the keystone
 					if (face) {
 						boolean plaque = v == 0 || backPlaque;
 						if (plaque && recess) {
-							set(u, 8, v, AIR);
-							p.put(c, u, 9, v, b(Blocks.WALL_BANNER.pick(bannerColor)).setValue(BlockStateProperties.HORIZONTAL_FACING, outward),
+							set(u, 9, v, AIR);
+							p.put(c, u, 10, v, b(Blocks.WALL_BANNER.pick(bannerColor)).setValue(BlockStateProperties.HORIZONTAL_FACING, outward),
 									CitadelCanvas.DECOR);
 							int back = v == 0 ? 1 : d - 2;
-							set(u, 8, back, wall(u, 8, back));
 							set(u, 9, back, wall(u, 9, back));
-							set(u, 10, v, slab(m.trimSlab));
+							set(u, 10, back, wall(u, 10, back));
+							set(u, 11, v, slab(m.trimSlab));
 						} else if (plaque && cap) {
-							set(u, 8, v, wall(u, 8, v));
 							set(u, 9, v, wall(u, 9, v));
-							set(u, 10, v, slab(m.trimSlab));
+							set(u, 10, v, wall(u, 10, v));
+							set(u, 11, v, slab(m.trimSlab));
 						} else {
-							set(u, 8, v, wall(u, 8, v));
+							set(u, 9, v, wall(u, 9, v));
 							if (merlon) {
-								set(u, 9, v, wall(u, 9, v));
+								set(u, 10, v, wall(u, 10, v));
 							}
 						}
 					}
@@ -674,7 +682,7 @@ public final class GateArchBattlement implements Variant {
 			for (int v : new int[] {0, d - 1}) {
 				for (int i : new int[] {0, ow - 1}) {
 					boolean merlon = ((int) Math.floor(Math.abs(i - half))) % 2 == 0;
-					set(a0 + i, merlon ? 10 : 9, v, b(Blocks.LANTERN));
+					set(a0 + i, merlon ? 11 : 10, v, b(Blocks.LANTERN));
 				}
 			}
 		}
