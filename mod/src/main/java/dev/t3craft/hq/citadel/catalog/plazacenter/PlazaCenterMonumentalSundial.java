@@ -164,7 +164,7 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 		k.ringIn = k.rd >= 5 ? k.rd - 1.4 : k.rd - 0.9; // 2-thick bezel, 1-thick on the small dials
 		int surface = k.yd + 1;
 		// a modest blade: about half the dial radius high, never taller than the plot allows
-		k.g = Math.max(1, Math.min(Math.min(k.rd - 1, p.h() - 2 - surface), 3));
+		k.g = Math.max(1, Math.min(Math.min(k.rd - 2, p.h() - 2 - surface), 3));
 
 		k.dial = switch (dk) {
 			case 0 -> Blocks.CALCITE;
