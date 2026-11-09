@@ -56,12 +56,19 @@ public final class BarrioRoofs {
 		int mid = r.c();
 		Block roof = mats.roof();
 		Lot lot = BarrioKit.lotOf(c, r);
+		// struct/barrio-hall2: a grand hall's gable is cut at ring kcap into a flat deck along the ridge that carries a long
+		// clerestory lantern, so the roof is not twice as tall as the wall
+		boolean cap = grand(r);
+		int kcap = cap ? Math.max(3, mid - 3) : Integer.MAX_VALUE;
 		for (int u = -1; u <= D; u++) {
 			for (int v = -1; v <= W; v++) {
 				BlockPos p = r.cell(u, v, 0);
 				int k = Math.min(v + 1, W - v);
 				int y = top + Math.max(1, k);
-				if (v == mid) {
+				if (cap && k > kcap) {
+					y = top + kcap + 1;
+					c.set(p.atY(y), mats.ridge());
+				} else if (v == mid) {
 					c.set(p.atY(y), mats.ridge());
 					if (u == -1 || u == D) {
 						c.set(p.atY(y + 1), BarrioKit.finial(roof));
@@ -99,14 +106,15 @@ public final class BarrioRoofs {
 			}
 		}
 		int seed = BarrioKit.hash(r.origin().getX(), r.origin().getZ(), top);
-		if (grand(r)) {
-			// struct/barrio-hall2: a break in the long slopes instead of two small dormers: a cross gable on each side, staggered
-			IntBinaryOperator mainY = (u, v) -> top + Math.max(1, Math.min(v + 1, W - v));
-			crossGable(c, r, top, mats, 2, D / 4, 3, 6, mainY);
-			crossGable(c, r, top, mats, 3, D - 1 - D / 4, 3, 6, mainY);
-		} else {
-			dormers(c, r, top, mats, seed);
+		if (cap) {
+			// a break in the long slopes instead of two small dormers: a cross gable on each side, staggered, and the clerestory
+			IntBinaryOperator mainY = (u, v) -> top + Math.max(1, Math.min(Math.min(v + 1, W - v), kcap + 1));
+			crossGable(c, r, top, mats, 2, D / 4, 3, Math.min(6, kcap), mainY);
+			crossGable(c, r, top, mats, 3, D - 1 - D / 4, 3, Math.min(6, kcap), mainY);
+			clerestory(c, r, top + kcap + 1, mats);
+			return;
 		}
+		dormers(c, r, top, mats, seed);
 		if (hasChimney(seed)) {
 			IntBinaryOperator kAt = (u, v) -> Math.min(v + 1, W - v);
 			chimney(c, r, top, mats, chimneySide(seed), D / 2 - 1, kAt);
@@ -230,6 +238,52 @@ public final class BarrioRoofs {
 		BlockPos lamp = r.cell(uc, vc, y0 + 3);
 		c.put(lamp.getX(), lamp.getY(), lamp.getZ(), BarrioKit.lantern(true), CitadelCanvas.HANGING);
 		c.set(r.cell(uc, vc, y0 + 6), BarrioKit.rod());
+	}
+
+	/**
+	 * The clerestory lantern along the flat ridge deck of a grand gable roof (deck blocks at {@code yDeck}): five wide, from
+	 * four cells in from each gable end, two courses of glass between posts on the deck's edge (a post every third cell and at
+	 * both ends), a ceiling row and a small gable of stairs over it with a slab ridge, hanging lanterns inside every four cells.
+	 */
+	private static void clerestory(CitadelCanvas c, Room r, int yDeck, Mats mats) {
+		int mid = r.c();
+		int D = r.d();
+		Block roof = mats.roof();
+		int u0 = 4;
+		int u1 = D - 5;
+		for (int u = u0; u <= u1; u++) {
+			boolean endU = u == u0 || u == u1;
+			for (int dv = -2; dv <= 2; dv++) {
+				BlockPos p = r.cell(u, mid + dv, 0);
+				boolean edge = Math.abs(dv) == 2 || endU;
+				if (edge) {
+					boolean post = endU && Math.abs(dv) == 2 || (Math.abs(dv) == 2 && (u - u0) % 3 == 0) || (endU && dv == 0);
+					BlockState wall = post ? mats.post() : GLASS;
+					c.set(p.atY(yDeck + 1), wall);
+					c.set(p.atY(yDeck + 2), wall);
+				} else {
+					c.set(p.atY(yDeck + 1), CitadelCanvas.AIR);
+					c.set(p.atY(yDeck + 2), CitadelCanvas.AIR);
+				}
+				if (Math.abs(dv) == 2) {
+					c.set(p.atY(yDeck + 3), BarrioKit.stair(roof, dv < 0 ? r.side() : r.side().getOpposite()));
+				} else {
+					c.set(p.atY(yDeck + 3), mats.ridge());
+					if (dv == 0) {
+						c.set(p.atY(yDeck + 4), mats.ridge());
+						c.set(p.atY(yDeck + 5), BarrioKit.slabOf(roof));
+					} else {
+						c.set(p.atY(yDeck + 4), BarrioKit.stair(roof, dv < 0 ? r.side() : r.side().getOpposite()));
+					}
+				}
+			}
+		}
+		for (int u = u0 + 2; u < u1; u += 4) {
+			BlockPos p = r.cell(u, mid, yDeck + 2);
+			c.put(p.getX(), p.getY(), p.getZ(), BarrioKit.lantern(true), CitadelCanvas.HANGING);
+		}
+		c.set(r.cell(u0, mid, yDeck + 5), BarrioKit.finial(roof));
+		c.set(r.cell(u1, mid, yDeck + 5), BarrioKit.finial(roof));
 	}
 
 	private static boolean hasChimney(int seed) {
