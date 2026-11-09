@@ -254,11 +254,16 @@ public final class AnnexCherryPergola implements Variant {
 			for (int side = 0; side < 2; side++) {
 				int u = side == 0 ? 1 : w - 2;
 				BlockState cling = vine.setValue(side == 0 ? BlockStateProperties.WEST : BlockStateProperties.EAST, true);
-				if (post && p.hash(side, 1, v, 2) == 0) {
+				if (post) {
+					// [finish] every post is climbed, the vine reaching the beam on most of them
 					p.set(c, u, 1, v, cling);
 					p.set(c, u, 2, v, cling);
-				} else if (!post && p.hash(side, BEAM, v, 3) == 0) {
+					if (p.hash(side, 2, v, 3) != 0) {
+						p.set(c, u, BEAM, v, cling);
+					}
+				} else if (p.hash(side, BEAM, v, 2) == 0) {
 					p.set(c, u, BEAM, v, cling);
+					p.set(c, u, 2, v, cling); // the drape hangs two blocks down the beam's inner face
 				}
 			}
 			// hanging from leaves overhead (only where the cell above really is leaves)
@@ -266,7 +271,7 @@ public final class AnnexCherryPergola implements Variant {
 				continue;
 			}
 			for (int u = 2; u < w - 2; u++) {
-				if (p.hash(u, RAFTER, v, 4) != 0 && p.hash(u, BEAM, v, 3) == 0) {
+				if (p.hash(u, RAFTER, v, 4) != 0 && p.hash(u, BEAM, v, 2) == 0) {
 					p.set(c, u, BEAM, v, vine.setValue(BlockStateProperties.UP, true));
 				}
 			}

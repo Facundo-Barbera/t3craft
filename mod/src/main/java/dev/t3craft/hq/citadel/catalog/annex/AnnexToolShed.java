@@ -160,9 +160,13 @@ public final class AnnexToolShed implements Variant {
 				boolean side = u == s.u0() || u == s.u1();
 				boolean end = v == s.vf() || v == s.vb();
 				boolean corner = side && end;
+				// [depth] intermediate posts every third cell on the side and back walls (not the front:
+				// door and windows), so no plank panel is wider than 2
+				boolean stud = !corner && v != s.vf()
+						&& (side ? (v - s.vf()) % 3 == 0 : (u - s.u0()) % 3 == 0);
 				for (int y = 1; y <= WALL_TOP; y++) {
 					BlockState st;
-					if (corner) {
+					if (corner || stud) {
 						st = POST;
 					} else if (y == WALL_TOP) {
 						st = side ? PLATE_Z : PLATE_X;
@@ -177,7 +181,15 @@ public final class AnnexToolShed implements Variant {
 				}
 				// gable / back wall fill between the plate and the sloping roof
 				for (int y = WALL_TOP + 1; y < roofY(p, v); y++) {
-					p.set(c, u, y, v, WALL);
+					BlockState st = WALL;
+					if (corner || stud) {
+						st = POST;
+					} else if (y == WALL_TOP + 3) {
+						st = side ? PLATE_Z : PLATE_X; // a second rail on tall gables
+					} else if (p.hash(u, y, v, 5) == 0) {
+						st = b(Blocks.STRIPPED_SPRUCE_LOG); // [palette] a weathered plank here and there
+					}
+					p.set(c, u, y, v, st);
 				}
 			}
 		}

@@ -183,8 +183,10 @@ public final class AnnexGreenhouseCopper implements Variant {
 		int w = p.w();
 		for (int v = vf; v <= vb; v++) {
 			boolean ribRow = rib(v, vf, vb);
-			p.set(c, 0, PLATE, v, stairs(RIB, Direction.EAST));
-			p.set(c, w - 1, PLATE, v, stairs(RIB, Direction.WEST));
+			// [palette] copper only where a rib meets the eave; the gutter between ribs is glass, so the
+			// roof reads as a glass skin on a thin copper frame, not a copper box
+			p.set(c, 0, PLATE, v, ribRow ? stairs(RIB, Direction.EAST) : b(Blocks.GLASS));
+			p.set(c, w - 1, PLATE, v, ribRow ? stairs(RIB, Direction.WEST) : b(Blocks.GLASS));
 			for (int u = 1; u < w - 1; u++) {
 				int y = roofY(u, w);
 				boolean flat = Math.min(u, w - 1 - u) >= 2;
@@ -192,7 +194,7 @@ public final class AnnexGreenhouseCopper implements Variant {
 				if (!ribRow) {
 					st = b(Blocks.GLASS);
 				} else if (flat) {
-					st = RIB_TOP;
+					st = v == vf || v == vb ? RIB_TOP : b(Blocks.GLASS); // the flat top is glass except at the gables
 				} else {
 					st = stairs(RIB, u < w - 1 - u ? Direction.EAST : Direction.WEST);
 				}
@@ -205,7 +207,9 @@ public final class AnnexGreenhouseCopper implements Variant {
 		boolean odd = w % 2 == 1;
 		for (int v : new int[] {vf, vb}) {
 			for (int u = 1; u < w - 1; u++) {
-				p.set(c, u, PLATE, v, POST);
+				boolean centreCol = odd ? u == cu : u == cu || u == cu - 1;
+				// [depth] the gable plate is glass between the copper corners; a copper lintel only over the door
+				p.set(c, u, PLATE, v, v == vf && centreCol ? POST : pane(clear, true, true, true));
 				boolean centre = odd ? u == cu : u == cu || u == cu - 1;
 				for (int y = PLATE + 1; y < roofY(u, w); y++) {
 					BlockState st;

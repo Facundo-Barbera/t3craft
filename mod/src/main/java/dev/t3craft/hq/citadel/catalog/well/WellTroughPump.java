@@ -31,7 +31,7 @@ import net.minecraft.world.level.block.state.properties.WallSide;
  *  v4  ▦ ✿ . ▦ ✿ . .   hay, flowers
  * </pre>
  *
- * Size: 5–8 × 3–5 × 4+ (from height 5 a gable canopy on four posts covers the trough; from 6 a ridge cap).
+ * Size: 5–8 × 3–5 × 4+ (from height 5 a pump house roof on four posts over the pump end; ridge cap from 6, finial from 7).
  */
 public final class WellTroughPump implements Variant {
 	private static final BlockState RIM_X = b(Blocks.STRIPPED_SPRUCE_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.X);
@@ -175,13 +175,14 @@ public final class WellTroughPump implements Variant {
 	// ------------------------------------------------------------------ canopy (h >= 5)
 
 	/**
-	 * [finish] a little gable roof over the whole trough: spruce posts on the four rim corners, a
-	 * cherry eave line (stepped one lower over the curb and the hay row when the plot has them),
-	 * deepslate tiles over the water, a cherry ridge cap from height 6. A lantern hangs over the water
-	 * from the ridge, so the trough reads as a covered village well from the street.
+	 * [finish] a little pump house: a gable roof on four spruce posts over the pump end only (u 0..2),
+	 * so the rest of the trough stays open and its water shows. A cherry eave line (stepped one lower
+	 * over the curb and the hay row when the plot has them), deepslate tiles, a cherry ridge cap from
+	 * height 6, closed gables and a lantern hanging beside the spout.
 	 */
 	private static void canopy(CitadelCanvas c, Plot p, int ue, int vf, int vm, int vk) {
-		for (int u : new int[] {0, ue}) {
+		int ur = Math.min(2, ue - 1); // the canopy's right posts; the trough runs on past them in the open
+		for (int u : new int[] {0, ur}) {
 			for (int v : new int[] {vf, vk}) {
 				p.set(c, u, 2, v, b(Blocks.SPRUCE_FENCE));
 				p.set(c, u, 3, v, b(Blocks.SPRUCE_FENCE));
@@ -189,7 +190,7 @@ public final class WellTroughPump implements Variant {
 		}
 		boolean frontOver = vf > 0;
 		boolean backOver = vk + 1 < p.d();
-		for (int u = 0; u <= ue; u++) {
+		for (int u = 0; u <= ur; u++) {
 			if (frontOver) {
 				p.set(c, u, 3, vf - 1, stairs(Blocks.CHERRY_STAIRS, Direction.SOUTH));
 			}
@@ -203,10 +204,13 @@ public final class WellTroughPump implements Variant {
 				p.set(c, u, 5, vm, slab(Blocks.CHERRY_SLAB));
 			}
 		}
-		// [depth] upside-down stairs close the gable ends under the ridge
+		if (p.h() >= 7) {
+			p.set(c, 1, 6, vm, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState()); // [finish] a copper finial
+		}
+		// [depth] the gable ends: a spruce beam over the water side, upside-down stairs at the corners
 		p.set(c, 0, 3, vm, stairs(Blocks.SPRUCE_STAIRS, Direction.EAST).setValue(BlockStateProperties.HALF, Half.TOP));
-		p.set(c, ue, 3, vm, stairs(Blocks.SPRUCE_STAIRS, Direction.WEST).setValue(BlockStateProperties.HALF, Half.TOP));
-		p.put(c, (ue + 1) / 2, 3, vm, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
+		p.set(c, ur, 3, vm, stairs(Blocks.SPRUCE_STAIRS, Direction.WEST).setValue(BlockStateProperties.HALF, Half.TOP));
+		p.put(c, ur, 2, vm, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
 	}
 
 	// ------------------------------------------------------------------ props

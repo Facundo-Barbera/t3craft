@@ -1,7 +1,6 @@
 package dev.t3craft.hq.citadel.catalog.stall;
 
 import static dev.t3craft.hq.citadel.CitadelCanvas.b;
-import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
 import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
 
 import dev.t3craft.hq.citadel.CitadelCanvas;
@@ -119,10 +118,13 @@ public final class StallFruitAwning implements Variant {
 		for (int u = 1; u < w - 1; u += 2) {
 			p.set(c, u, LIP - 1, 1, wool(st[0])); // scalloped tabs under the lip
 		}
-		// [finish] a dark-oak slab edging along the side edges of the back roof
-		for (int v = 3; v < d && p.h() > ROOF + 1; v++) {
-			p.set(c, 0, ROOF + 1, v, slab(Blocks.DARK_OAK_SLAB));
-			p.set(c, w - 1, ROOF + 1, v, slab(Blocks.DARK_OAK_SLAB));
+		// [finish] scalloped valance along both sides of the high roof too: tabs drop under every
+		// coloured stripe, so the awning reads as cloth from the side views
+		for (int v = 3; v < d - 1; v++) { // not on the back row: the back posts reach that height
+			if ((v & 1) == 1) {
+				p.set(c, 0, ROOF - 1, v, wool(st[0]));
+				p.set(c, w - 1, ROOF - 1, v, wool(st[(w - 1) % 2]));
+			}
 		}
 	}
 
