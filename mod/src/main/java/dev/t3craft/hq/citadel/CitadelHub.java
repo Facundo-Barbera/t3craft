@@ -48,10 +48,9 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
  *     {@code PLANKS} spring), {@link #naveAisle} ({@code ax > 6}: aisle ceiling, light blocks on a
  *     7-cell lattice) and {@link #naveVault} ({@code ax < 6}: the barrel vault of planks with ribs
  *     every 4 z and a glass skylight on the axis).</li>
- * <li>{@link #hubWall(CitadelCanvas, int, int)}: one column of the outer wall ({@link #hubWallColumn}:
- *     footing, panels, glass band, calcite cornice), then {@link #naveGable} (the nave's end walls
- *     with a rose window) or {@link #aisleCap}, then {@link #portals} (south portal 5x5, north door
- *     3x3 under the board).</li>
+ * <li>{@link #hubWall(CitadelCanvas, int, int)}: one column of the outer wall, delegated to
+ *     {@link HubFacade#wall} (piers, windows, cornice, parapet or gable, the south portal and the north
+ *     door under the board).</li>
  * <li>{@link #board(CitadelCanvas)}: the "needs attention" board at the nave's north end (z = -12).</li>
  * <li>{@link #bigScreen(CitadelCanvas, HqGeometry.Surface, String, String, boolean)}: a big screen and
  *     its anchor; shared with the nodes (review tower, schedule rotunda).</li>
