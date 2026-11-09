@@ -381,7 +381,7 @@ public final class FountainKoiPond implements Variant {
 
 		/** Lighter top stones: andesite, mossy cobble, plain cobble, brick, a little gravel. */
 		BlockState rimTop(int u, int v) {
-			if (p.hash(u / 3, 21, v / 3, 4) == 0) { // a pale stretch of the rim: calcite and diorite, so the ring is not all grey
+			if (p.hash(u / 3, 21, v / 3, 3) == 0) { // a pale stretch of the rim: calcite and diorite, so the ring is not all grey
 				return switch (p.hash(u, 22, v, 4)) {
 					case 0 -> b(Blocks.DIORITE);
 					case 1 -> b(Blocks.POLISHED_DIORITE);
@@ -432,7 +432,7 @@ public final class FountainKoiPond implements Variant {
 						case 3 -> put(c, p, u, 2, v, slab(Blocks.POLISHED_DIORITE_SLAB));
 						case 4 -> put(c, p, u, 2, v, b(Blocks.COBBLESTONE_WALL)); // a narrow standing stone
 						case 5 -> put(c, p, u, 2, v, b(Blocks.MOSSY_COBBLESTONE_WALL));
-						case 6, 7 -> flowerRim(u, v);
+						case 6, 7, 8, 9 -> flowerRim(u, v);
 						default -> {
 						}
 					}
@@ -465,11 +465,12 @@ public final class FountainKoiPond implements Variant {
 		/** A moss bed on the rim top with a small flower in it. */
 		void flowerRim(int u, int v) {
 			p.set(c, u, 1, v, b(Blocks.MOSS_BLOCK));
-			put(c, p, u, 2, v, switch (p.hash(u, 18, v, 5)) {
+			put(c, p, u, 2, v, switch (p.hash(u, 18, v, 7)) {
 				case 0 -> b(Blocks.AZURE_BLUET);
 				case 1 -> b(Blocks.CORNFLOWER);
-				case 2 -> b(Blocks.PINK_TULIP);
-				case 3 -> b(Blocks.LILY_OF_THE_VALLEY);
+				case 2, 3 -> b(Blocks.FLOWERING_AZALEA);
+				case 4 -> b(Blocks.PINK_TULIP);
+				case 5 -> b(Blocks.LILY_OF_THE_VALLEY);
 				default -> b(Blocks.OXEYE_DAISY);
 			});
 		}
@@ -846,7 +847,7 @@ public final class FountainKoiPond implements Variant {
 					for (int dv = -1; dv <= 1; dv++) {
 						int u = a[0] + du;
 						int v = a[1] + dv;
-						if (free(u, v)) {
+						if (u >= 0 && u < w && v >= 0 && v < d && k[u][v] == OUT && !res[u][v]) {
 							edge.add(new int[] {u, v});
 							res[u][v] = true;
 						}
@@ -1006,8 +1007,9 @@ public final class FountainKoiPond implements Variant {
 				return;
 			}
 			int top = h - 1; // the highest layer a leaf may use
-			int ty = Math.min(3, top - 1); // the trunk stands to ty, then bends one cell towards the pond
-			if (ty < 2) {
+			boolean tall = h >= 6; // low plots: a short straight trunk with the crown right on top of it
+			int ty = tall ? 3 : 2; // the trunk stands to ty, then bends one cell towards the pond
+			if (top < 3) {
 				return;
 			}
 			double du0 = cu - treeU;
@@ -1018,11 +1020,19 @@ public final class FountainKoiPond implements Variant {
 			int bu = treeU;
 			int bv = treeV;
 			boolean bent = false;
-			if (ty >= 3) {
+			if (tall) {
 				for (int[] o : opts) {
-					if ((o[0] != 0 || o[1] != 0) && free(treeU + o[0], treeV + o[1])) {
-						bu = treeU + o[0];
-						bv = treeV + o[1];
+					int nu = treeU + o[0];
+					int nv = treeV + o[1];
+					if ((o[0] == 0 && o[1] == 0) || nu < 0 || nu >= w || nv < 0 || nv >= d || k[nu][nv] != OUT || res[nu][nv]) {
+						continue;
+					}
+					// the bend is a log over a cell somebody may walk: it needs 2.85 blocks of headroom there
+					int level = foot[nu][nv] <= 0.01 ? 3 : (int) Math.ceil(foot[nu][nv] + 2.85);
+					if (level <= top - 1) {
+						bu = nu;
+						bv = nv;
+						ty = level;
 						bent = true;
 						break;
 					}
@@ -1036,7 +1046,7 @@ public final class FountainKoiPond implements Variant {
 			int capU = treeU;
 			int capV = treeV;
 			int capY = ty + 1;
-			if (!bent && ty + 1 < top) {
+			if (!bent && tall) {
 				put(c, p, treeU, ty + 1, treeV, b(Blocks.CHERRY_LOG)); // straight trunk: one more log so the crown has something to hold on to
 				seeds.add(new int[] {treeU, ty + 1, treeV});
 				capY = ty + 2;
@@ -1060,7 +1070,7 @@ public final class FountainKoiPond implements Variant {
 			int lv = sv == 0 ? 1 : sv;
 			double cy = Math.max(3.6, top - 1.2);
 			boolean small = w <= 8 || d <= 8; // the crown must leave water showing on a small pond
-			double reach = small ? 0.4 : 1.0;
+			double reach = tall ? (small ? 0.4 : 1.0) : 0.5;
 			double[][] lumps = small
 					? new double[][] {
 						{bu + reach * lu, cy, bv + reach * lv, 2.1, 1.0},
@@ -1079,11 +1089,11 @@ public final class FountainKoiPond implements Variant {
 						for (double[] l : lumps) {
 							e = Math.min(e, sq((u - l[0]) / l[3]) + sq((y - l[1]) / l[4]) + sq((v - l[2]) / l[3]));
 						}
-						boolean log = (u == treeU && v == treeV && (y <= ty || (!bent && y == ty + 1 && ty + 1 < top))) || (bent && u == bu && v == bv && (y == ty || y == ty + 1));
+						boolean log = (u == treeU && v == treeV && (y <= ty || (!bent && tall && y == ty + 1))) || (bent && u == bu && v == bv && (y == ty || y == ty + 1));
 						boolean cap = u == capU && v == capV && y == capY; // always a leaf on top of the trunk
 						if (cap && !log && capY < h) {
 							leaf[u][y][v] = true;
-						} else if (e <= 1.0 && !log && p.hash(u, y, v, e > 0.6 ? 3 : 9) != 0 && roomFor(u, y, v)) {
+						} else if (e <= 1.0 && !log && p.hash(u, y, v, e > 0.6 ? 4 : 12) != 0 && roomFor(u, y, v)) {
 							leaf[u][y][v] = true;
 						}
 					}
