@@ -1280,6 +1280,7 @@ public final class PlanReport {
 			so.addProperty("at", s2.x() + "," + s2.y() + "," + s2.z());
 			so.addProperty("made", s2.blocksOf());
 			so.addProperty("box", s2.box());
+			so.addProperty("detail", s2.detail());
 			allJ.add(so);
 		}
 		j.add("settleGroups", allJ);

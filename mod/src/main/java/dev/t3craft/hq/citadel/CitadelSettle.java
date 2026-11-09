@@ -68,7 +68,7 @@ public final class CitadelSettle {
 	 * fix/settle-sources (render diagnostics): one floating group the last pass handled, where it was (before falling),
 	 * who owned the column (the canvas group and zone kind), what it was made of, what happened and how far it fell.
 	 */
-	public record Source(String group, String zone, String piece, String outcome, int drop, int blocks, int x, int y, int z, String blocksOf, String box) {
+	public record Source(String group, String zone, String piece, String outcome, int drop, int blocks, int x, int y, int z, String blocksOf, String box, String detail) {
 	}
 
 	/** The groups of the last pass, in the order they were settled (render diagnostics only). */
@@ -153,9 +153,26 @@ public final class CitadelSettle {
 						+ " relY " + (bb[1] - pc.y0()) + ".." + (bb[4] - pc.y0());
 			}
 		}
+		StringBuilder det = new StringBuilder();
+		if (g.size() <= 40 && !piece.isEmpty()) {
+			// the cells of the group and every present cell within one block of its box, as dx,dy,dz:name relative to its lowest cell
+			Set<Long> mine = new HashSet<>(g);
+			for (int yy = bb[1] - 2; yy <= bb[4] + 1; yy++) {
+				for (int xx = bb[0] - 1; xx <= bb[3] + 1; xx++) {
+					for (int zz = bb[2] - 1; zz <= bb[5] + 1; zz++) {
+						long kk = BlockPos.asLong(xx, yy, zz);
+						BlockState st = c.cells.get(kk);
+						if (present(st)) {
+							String nm = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(st.getBlock()).getPath();
+							det.append(mine.contains(kk) ? "G " : "n ").append(xx - x).append(',').append(yy - y).append(',').append(zz - z).append(':').append(nm).append(';');
+						}
+					}
+				}
+			}
+		}
 		StringBuilder sb = new StringBuilder();
 		kinds.entrySet().stream().sorted((p, q) -> q.getValue() - p.getValue()).limit(3).forEach(e -> sb.append(sb.length() == 0 ? "" : ",").append(e.getKey()));
-		return new Source(group, zone, piece, outcome, drop, g.size(), x, y, z, sb.toString(), box);
+		return new Source(group, zone, piece, outcome, drop, g.size(), x, y, z, sb.toString(), box, det.toString());
 	}
 
 	/** One line about the last pass (render diagnostics, {@code PlanReport}'s split pieces). */
