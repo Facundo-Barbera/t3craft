@@ -126,12 +126,12 @@ public final class TreeMapleRed implements Variant {
 		tu[1] = cu;
 		tv[1] = cv;
 		t.wood(cu, 1, cv, WOOD.log(Direction.Axis.Y));
-		int span = Math.max(1, topY - 3);
+		int span = Math.max(1, topY - FLOOR0);
 		for (int y = 2; y <= topY - 1; y++) {
 			int goalU = cu0;
 			int goalV = cv0;
-			if (y >= FLOOR0) {
-				double s = Math.sin((y - 3.0) / span * Math.PI * 2);
+			if (y > FLOOR0) { // the bark that joins a step sits on the layer below: keep it at y 4 or higher
+				double s = Math.sin((y - (double) FLOOR0) / span * Math.PI * 2);
 				goalU = TreeKit.clamp(cu0 + (int) Math.round(amp * Math.cos(phi) * s), 1, w - 2);
 				goalV = TreeKit.clamp(cv0 + (int) Math.round(amp * Math.sin(phi) * s), 1, d - 2);
 			}
@@ -158,8 +158,8 @@ public final class TreeMapleRed implements Variant {
 		tv[topY] = cv;
 
 		// ---- the floors: wide low fans, fewer and smaller going up, each floor over the gaps of the ones below
-		double rbase = TreeKit.clamp(m * 0.34, 1.5, 4.0);
-		int nLow = m <= 5 ? 1 : m <= 8 ? 3 : 4;
+		double rbase = m <= 5 ? 1.9 : TreeKit.clamp(m * 0.34, 1.5, 4.0);
+		int nLow = m <= 5 ? 2 : m <= 8 ? 3 : 4;
 		int nMid = m <= 5 ? 1 : m <= 8 ? 2 : 3;
 		List<Double> used = new ArrayList<>();
 		int id = 1;
@@ -177,7 +177,7 @@ public final class TreeMapleRed implements Variant {
 			}
 		}
 		// the crown, over the leader: the smallest fan and the brightest
-		double rt = m <= 5 ? 1.5 + r.nextDouble() * 0.2 : m <= 8 ? 2.1 + r.nextDouble() * 0.4 : TreeKit.clamp(m * 0.26, 2.4, 3.2);
+		double rt = m <= 5 ? 1.9 + r.nextDouble() * 0.2 : m <= 8 ? 2.1 + r.nextDouble() * 0.4 : TreeKit.clamp(m * 0.26, 2.4, 3.2);
 		fan(t, tu, tv, topY, 0, 0, rt, rt * (0.8 + r.nextDouble() * 0.2), id, sun, bias, nF - 1, true, m);
 
 		// ---- fallen leaves under the crown, thick at the trunk and thinning out
@@ -247,7 +247,7 @@ public final class TreeMapleRed implements Variant {
 			double room = TreeKit.room(t, su, sv, ex, ez, 0);
 			double rad = Math.max(rx, rz);
 			double rr = TreeKit.clamp(reach * m / 2.0 + 0.4, 1.3, Math.max(1.3, room * 0.8));
-			double s = TreeKit.clamp((room - rr + 0.6) / (1.2 * rad), 0.75, 1.0);
+			double s = TreeKit.clamp((room - rr + 0.6) / (1.2 * rad), m <= 5 ? 0.92 : 0.75, 1.0);
 			rx *= s;
 			rz *= s;
 			fu = su + ex * rr;
