@@ -592,18 +592,13 @@ public final class HouseStoneManorCourt implements Variant {
 		// centre: a moss bed with a flowering bush
 		p.set(c, midU, 0, midV, b(Blocks.MOSS_BLOCK));
 		p.set(c, midU, 1, midV, b(Blocks.FLOWERING_AZALEA));
-		// corner lamp posts and benches
-		int[][] corners = {{g.cu0(), g.cv0()}, {g.cu1(), g.cv0()}, {g.cu0(), g.cv1()}, {g.cu1(), g.cv1()}};
-		for (int[] k : corners) {
-			if (k[1] == g.cv0() && Math.abs(k[0] - g.cu()) <= 2) {
-				continue; // the passage mouth
-			}
-			p.set(c, k[0], 1, k[1], StoneKit.wallBlock(Blocks.STONE_BRICK_WALL, false, false, false, false, true));
-			p.set(c, k[0], 2, k[1], StoneKit.wallBlock(Blocks.STONE_BRICK_WALL, false, false, false, false, true));
-			p.set(c, k[0], 3, k[1], StoneKit.lantern(false));
+		// (no corner lamp posts: every court corner is the cell in front of an arcade arch; the arches carry lanterns)
+		// benches against a pillar of the side arcades, never in front of an arch (arches at odd offsets from cv0 - 1)
+		int bv = (midV - (g.cv0() - 1)) % 2 == 1 ? midV + 1 : midV;
+		if (bv < g.cv1()) {
+			p.set(c, g.cu0(), 1, bv, stairs(Blocks.STONE_BRICK_STAIRS, Direction.WEST));
+			p.set(c, g.cu1(), 1, bv, stairs(Blocks.STONE_BRICK_STAIRS, Direction.EAST));
 		}
-		p.set(c, g.cu0(), 1, midV, stairs(Blocks.STONE_BRICK_STAIRS, Direction.WEST));
-		p.set(c, g.cu1(), 1, midV, stairs(Blocks.STONE_BRICK_STAIRS, Direction.EAST));
 	}
 
 	// ------------------------------------------------------------------ yard

@@ -96,9 +96,13 @@ public final class GazeboRaisedLookout implements Variant {
 		return u >= 0 && u < w && v >= 0 && v < d && (u >= 1 || v >= 3);
 	}
 
-	/** The balustrade cells on the deck's outline (the landing entry at (0, 3) stays open). */
+	/**
+	 * The balustrade cells on the deck's outline. Two entries stay open: the landing at (0, 3) and (1, 2),
+	 * beside the top step, so the flight leads straight onto the deck (on d = 5 the post at (2, 3) would
+	 * otherwise shut the landing in).
+	 */
 	private static boolean rail(int u, int v, int w, int d) {
-		if (!deck(u, v, w, d) || (u == 0 && v == 3)) {
+		if (!deck(u, v, w, d) || (u == 0 && v == 3) || (u == 1 && v == 2)) {
 			return false;
 		}
 		return u == 0 || u == w - 1 || v == 0 || v == d - 1 || (u == 1 && v < 3);
@@ -237,7 +241,11 @@ public final class GazeboRaisedLookout implements Variant {
 					// [depth] brackets under the eave on the two outer faces of the post
 					Direction outU = u == 2 ? Direction.WEST : Direction.EAST;
 					Direction outV = v == 1 ? Direction.NORTH : Direction.SOUTH;
-					p.set(c, u + outU.getStepX(), 4, v, upside(Blocks.CHERRY_STAIRS, outU.getOpposite()));
+					// (never over a walkable deck cell: people stand at y 3 and need y 4 free)
+					int bu = u + outU.getStepX();
+					if (!deck(bu, v, w, d) || rail(bu, v, w, d)) {
+						p.set(c, bu, 4, v, upside(Blocks.CHERRY_STAIRS, outU.getOpposite()));
+					}
 					p.set(c, u, 4, v + outV.getStepZ(), upside(Blocks.CHERRY_STAIRS, outV.getOpposite()));
 					continue;
 				}
@@ -308,13 +316,15 @@ public final class GazeboRaisedLookout implements Variant {
 			p.set(c, cu, top + 1, cv, b(Blocks.GOLD_BLOCK));
 			p.set(c, cu, top + 2, cv, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState());
 		}
+		// the lantern hangs at the eave level (y 5), above head height on the deck (people stand at y 3); with
+		// ck = 1 the middle is on the beam ring and the lanterns on the rail posts light the deck instead
 		int ck = ring(cu, cv, w, d);
 		int roofAbove = EAVE + Math.min(ck, kTop);
-		for (int y = EAVE; ck >= 2 && y < roofAbove; y++) { // with ck = 1 the lantern hangs from a beam
-			p.put(c, cu, y, cv, Blocks.IRON_CHAIN.defaultBlockState(), CitadelCanvas.HANGING);
-		}
-		if (!post(cu, cv, w, d)) {
-			p.put(c, cu, 4, cv, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
+		if (ck >= 2 && roofAbove > EAVE) {
+			for (int y = EAVE + 1; y < roofAbove; y++) {
+				p.put(c, cu, y, cv, Blocks.IRON_CHAIN.defaultBlockState(), CitadelCanvas.HANGING);
+			}
+			p.put(c, cu, EAVE, cv, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
 		}
 	}
 }

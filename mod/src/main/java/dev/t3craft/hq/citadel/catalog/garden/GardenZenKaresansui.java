@@ -376,10 +376,9 @@ public final class GardenZenKaresansui implements Variant {
 					case 2 -> Blocks.POLISHED_ANDESITE;
 					default -> Blocks.SMOOTH_STONE;
 				};
+				// every stone is flush at y 0 (top at 1): a slab cap on some made a full-block rise from the entry
+				// slab and a bumpy path
 				p.set(c, uu, 0, v, b(base));
-				if (p.hash(uu, 10, v, 2) == 0) {
-					p.set(c, uu, 1, v, slab(Blocks.STONE_SLAB));
-				}
 			}
 			last = u;
 		}

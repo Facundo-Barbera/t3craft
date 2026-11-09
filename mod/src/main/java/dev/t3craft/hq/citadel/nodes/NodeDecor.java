@@ -45,7 +45,7 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
  *     schedule screen.</li>
  * <li>Cloister: a fountain post in the pool, cherry trees in the court, bookcases along the walls, reading
  *     lecterns, barrels in the corners, lanterns under the gallery roof.</li>
- * <li>Lounge: a campfire in the middle under a small cherry pavilion (the fire cell is not walkable, so it
+ * <li>Lounge: an open campfire in the middle ringed by four stones (the fire cell is not walkable, so it
  *     is safe), carpets, hemicycle sofas round the fire, cherry trees and lamp posts on the rim.</li>
  * <li>Pillars: one of four monuments by node index (stone lantern, bell pavilion, cherry tree, obelisk).</li>
  * </ul>
@@ -358,23 +358,15 @@ public final class NodeDecor {
 	// ------------------------------------------------------------------ lounge
 
 	private static void lounge(Site s) {
-		// the hearth: a campfire in the middle of the bottom; its cell has no standing room, so nobody steps in
+		// the hearth: an open campfire in the middle of the bottom, ringed by four stone blocks on the diagonals
+		// (a fire pit, open to the sky: no wooden roof over it and no rugs touching it; the axes stay free, and
+		// the walk spot east of it looks at the fire). Its cell has no standing room, so nobody steps in.
 		s.set(0, -2, 0, Blocks.CAMPFIRE.defaultBlockState());
-		for (int[] p : new int[][] {{0, 1}, {0, -1}, {-1, 0}}) {
-			s.put(p[0], -2, p[1], carpet(DyeColor.RED), DECOR);
-		}
-		// a small cherry pavilion over the fire: four posts, a stair roof, a gold block and a rod
 		for (int sx : new int[] {-1, 1}) {
 			for (int sz : new int[] {-1, 1}) {
-				s.fill(sx, -2, 1, sz, LOG);
+				s.set(sx, -2, sz, slab(Blocks.COBBLED_DEEPSLATE_SLAB));
 			}
 		}
-		for (int dx = -1; dx <= 1; dx++) {
-			for (int dz = -1; dz <= 1; dz++) {
-				s.set(dx, 2, dz, dx == 0 && dz == 0 ? BAMBOO : stairs(Blocks.CHERRY_STAIRS, inward(dx == 0 ? 0 : dx, dx == 0 ? dz : 0)));
-			}
-		}
-		s.set(0, 3, 0, ROD);
 		// the hemicycle: sofas on the fourth step in the four diagonal sectors (the axes stay open as paths)
 		for (int dx = -4; dx <= 4; dx++) {
 			for (int dz = -4; dz <= 4; dz++) {

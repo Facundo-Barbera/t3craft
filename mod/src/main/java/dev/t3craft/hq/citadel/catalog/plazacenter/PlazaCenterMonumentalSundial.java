@@ -116,8 +116,8 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 		int cheb = Math.max(Math.abs(dx), Math.abs(dz));
 		double alpha = Math.atan2(dx, -dz);
 		if (e < 1.0) {
-			// [depth] the outer ramp, low side out
-			p.set(c, u, 0, v, p.hash(u, 0, v, 4) == 0 ? stairs(Blocks.MOSSY_STONE_BRICK_STAIRS, out(dx, dz)) : stairs(Blocks.STONE_BRICK_STAIRS, out(dx, dz)));
+			// [depth] the outer ramp, low side out (the stairs face inwards: tall half towards the rim, climbed walking in)
+			p.set(c, u, 0, v, p.hash(u, 0, v, 4) == 0 ? stairs(Blocks.MOSSY_STONE_BRICK_STAIRS, out(dx, dz).getOpposite()) : stairs(Blocks.STONE_BRICK_STAIRS, out(dx, dz).getOpposite()));
 			return;
 		}
 		if (e < 2.0) {
