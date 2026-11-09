@@ -28,7 +28,13 @@ public final class DirectController implements T3Connection.Listener {
 	}
 
 	private final Environments environments;
-	private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+	/** HTTP/1.1: the {@code /ws} upgrade through a T3 Connect tunnel (Cloudflare) only works there. */
+	private final HttpClient http = newHttpClient();
+
+	/** The client every T3 request and socket of the mod uses (pairing included): HTTP/1.1, 10 s connect timeout. */
+	public static HttpClient newHttpClient() {
+		return HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).connectTimeout(Duration.ofSeconds(10)).build();
+	}
 	private final Map<String, T3Connection> connections = new LinkedHashMap<>();
 	private final Map<String, ShellState.View> views = new ConcurrentHashMap<>();
 	private final Map<String, OperateConnection> operate = new LinkedHashMap<>();

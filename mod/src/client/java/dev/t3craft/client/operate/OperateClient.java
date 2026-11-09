@@ -84,15 +84,17 @@ public final class OperateClient {
 			done.accept(new Result(false, e.getMessage()));
 			return;
 		}
-		if (!target.baseUrl().equals(env.url())) {
+		// The link may point at any of the environment's routes (LAN, Tailscale, tunnel hostname).
+		if (!env.routes().contains(target.baseUrl())) {
 			done.accept(new Result(false, "That link is for " + target.baseUrl() + ", but " + env.label() + " is " + env.url() + "."));
 			return;
 		}
 		String version = net.fabricmc.loader.api.FabricLoader.getInstance().getModContainer("t3craft")
 				.map(c -> c.getMetadata().getVersion().getFriendlyString()).orElse("dev");
-		new PairingClient(java.net.http.HttpClient.newHttpClient())
-				.exchange(target, "T3Craft operate (Minecraft " + version + ")", System.getProperty("os.name", ""), Pairing.OPERATE_SCOPES)
-				.whenComplete((session, err) -> {
+		new PairingClient(dev.t3craft.t3.DirectController.newHttpClient())
+				.exchangeVerified(target, "T3Craft operate (Minecraft " + version + ")", System.getProperty("os.name", ""), Pairing.OPERATE_SCOPES, env.environmentId())
+				.whenComplete((paired, err) -> {
+					Pairing.Session session = paired == null ? null : paired.session();
 					Result r;
 					if (err != null) {
 						Throwable cause = err instanceof CompletionException && err.getCause() != null ? err.getCause() : err;

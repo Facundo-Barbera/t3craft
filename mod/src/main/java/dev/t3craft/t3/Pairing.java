@@ -54,7 +54,7 @@ public final class Pairing {
 	private Pairing() {
 	}
 
-	public static final class PairingException extends Exception {
+	public static class PairingException extends Exception {
 		public PairingException(String message) {
 			super(message);
 		}
@@ -97,10 +97,45 @@ public final class Pairing {
 			throw new PairingException("A pairing code has no spaces.");
 		}
 		if (hostUrl == null || hostUrl.isBlank()) {
-			throw new PairingException("With a bare code, also enter the T3 URL (e.g. https://host.ts.net).");
+			throw new PairingException("With a bare code, also enter the T3 URL (e.g. https://host.ts.net) or the T3 Connect tunnel hostname.");
+		}
+		return new Target(parseUrl(hostUrl), in);
+	}
+
+	/**
+	 * Like {@link #parse} but a non-blank {@code hostUrl} wins over the host of a full link. For the
+	 * pairing screen: {@code t3 auth pairing create} prints a link for the address the host knows
+	 * (often {@code localhost}), while the player reaches it through a tunnel hostname or Tailscale
+	 * name typed in the URL box. The credential goes only to the host the player typed.
+	 */
+	public static Target parseOverridingHost(String input, @Nullable String hostUrl) throws PairingException {
+		Target t = parse(input, hostUrl);
+		if (hostUrl == null || hostUrl.isBlank()) {
+			return t;
+		}
+		return new Target(parseUrl(hostUrl), t.credential());
+	}
+
+	/**
+	 * Turns what the player typed into an environment base URL (scheme, host, port; no path):
+	 * {@code https://host/mcp} (what "Copy MCP URL" gives), {@code https://host/pair#token=…} and a bare
+	 * hostname such as a T3 Connect tunnel ({@code name.example.com}, taken as {@code https://}; type
+	 * {@code http://} for a plain LAN address). The host is lower-cased. Never contains a secret: a
+	 * fragment or query is dropped.
+	 */
+	public static URI parseUrl(@Nullable String input) throws PairingException {
+		String in = input == null ? "" : input.trim();
+		if (in.isEmpty()) {
+			throw new PairingException("Enter the T3 URL or the T3 Connect tunnel hostname.");
+		}
+		if (in.chars().anyMatch(Character::isWhitespace)) {
+			throw new PairingException("The T3 URL has spaces.");
+		}
+		if (!in.contains("://")) {
+			in = "https://" + in;
 		}
 		try {
-			return new Target(base(URI.create(hostUrl.trim())), in);
+			return base(URI.create(in));
 		} catch (IllegalArgumentException e) {
 			throw new PairingException("The T3 URL is not valid.");
 		}
@@ -114,7 +149,7 @@ public final class Pairing {
 		if (uri.getHost() == null || uri.getRawUserInfo() != null) {
 			throw new PairingException("The T3 URL must be a plain host (no user info).");
 		}
-		return URI.create(scheme + "://" + uri.getHost() + (uri.getPort() == -1 ? "" : ":" + uri.getPort()));
+		return URI.create(scheme + "://" + uri.getHost().toLowerCase(java.util.Locale.ROOT) + (uri.getPort() == -1 ? "" : ":" + uri.getPort()));
 	}
 
 	private static @Nullable String param(@Nullable String raw, String key) {

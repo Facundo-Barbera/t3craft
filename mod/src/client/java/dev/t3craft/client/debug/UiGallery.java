@@ -72,7 +72,7 @@ public final class UiGallery {
 					() -> inbox(true, true).withPage(new EnvironmentsPanel(galleryActions()))),
 			new Scenario("confirm", "Kit dialog: confirmation before a destructive action (stop a thread)", UiGallery::confirm),
 			new Scenario("snooze", "Kit dialog: snooze presets for one thread", () -> new SnoozeScreen(null, new ThreadOps.Target(ENV, "t-run", "fix/hq-builders-independent"))),
-			new Scenario("pair", "Kit dialog: pair an environment (three fields, access switch)", () -> new PairScreen(null)),
+			new Scenario("pair", "Kit dialog: pair an environment (name, link or code, T3 URL or tunnel hostname, access switch)", () -> new PairScreen(null)),
 			new Scenario("pair-readonly", "Kit dialog: pair, read-only access (no control warning)", () -> new PairScreen(null, true)),
 			new Scenario("operate-pair", "Kit dialog: enable control on a paired environment", UiGallery::operatePair),
 			new Scenario("launch", "Main T3 screen with a new-thread draft in the composer (project, model and workspace chips; needs a paired environment with projects)",
