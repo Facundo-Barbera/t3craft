@@ -29,7 +29,7 @@ import net.minecraft.world.level.block.state.properties.Half;
  * <li><b>Depth</b>: the planters stand proud of the seat (a slab lip in front on deep plots), the
  *     hedge steps back and down, cherry leaves alternate with flowering azalea leaves by hash.</li>
  * </ul>
- * Size: 2–5 × 1–3 × 2+. Width 2: just the seat; width 3: one planter (side by seed); 4–5: both.
+ * Size: 2–5 × 1–3 × 2+. Width 2–3: one planter (side by seed); 4–5: both.
  */
 public final class BenchCherryPlanters implements Variant {
 	private static final BlockState SEAT = stairs(Blocks.CHERRY_STAIRS, Direction.SOUTH); // tall part at the back: sitter faces the front
@@ -85,8 +85,9 @@ public final class BenchCherryPlanters implements Variant {
 			left = p.hash(0, 0, 0, 2) == 0;
 			right = !left;
 		} else {
-			left = false;
-			right = false;
+			// width 2: a seat plus one planter box (side by seed), so the little bench has a silhouette
+			left = p.hash(0, 0, 0, 2) == 0;
+			right = !left;
 		}
 		int s0 = left ? 1 : 0;
 		int s1 = right ? w - 2 : w - 1;

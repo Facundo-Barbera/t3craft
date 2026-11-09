@@ -11,7 +11,6 @@ import dev.t3craft.hq.citadel.catalog.Variant;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.core.Direction;
-import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
@@ -86,6 +85,8 @@ public final class SignpostArrows implements Variant {
 		}
 		if (cap > 0) {
 			p.set(c, pu, cap, pv, b(Blocks.LANTERN));
+		} else if (postTop + 1 < p.h()) {
+			p.set(c, pu, postTop + 1, pv, stairs(Blocks.CHERRY_STAIRS, Direction.NORTH)); // a pitched cap over the arms
 		}
 
 		// --- the directions the arms can take, in a fixed order with a seed-chosen start
@@ -103,9 +104,16 @@ public final class SignpostArrows implements Variant {
 			if (i == arms - 1 && arms == 3 && y == 1 && dirs.size() == 1) {
 				break; // three arms stacked on one side crowd the post: keep two
 			}
-			Block sign = (i % 2 == 0) ? Blocks.CHERRY_WALL_HANGING_SIGN : Blocks.BAMBOO_WALL_HANGING_SIGN;
-			p.put(c, pu + dir.getStepX(), y, pv + dir.getStepZ(),
-					b(sign).setValue(BlockStateProperties.HORIZONTAL_FACING, dir.getClockWise()), CitadelCanvas.DECOR);
+			// the arm is a real board: a full plank block next to the post (alternating cherry / bamboo),
+			// with a wall sign on its front face where the plot has room; it reads from far away, unlike a hanging sign
+			boolean cherry = i % 2 == 0;
+			int au = pu + dir.getStepX();
+			int av = pv + dir.getStepZ();
+			p.set(c, au, y, av, b(cherry ? Blocks.CHERRY_PLANKS : Blocks.BAMBOO_PLANKS));
+			if (p.has(au, y, av - 1)) {
+				p.put(c, au, y, av - 1, b(cherry ? Blocks.BAMBOO_WALL_SIGN : Blocks.CHERRY_WALL_SIGN)
+						.setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH), CitadelCanvas.DECOR);
+			}
 		}
 
 		// --- base: stairs leaning on the footing in the free ground cells beside it, one potted flower
