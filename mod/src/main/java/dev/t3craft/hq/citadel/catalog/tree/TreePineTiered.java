@@ -26,7 +26,7 @@ import net.minecraft.world.level.block.state.BlockState;
  * <p>Seed variation: number of tiers (3..5 as the height allows), lean direction, the side the first cloud takes,
  * the trunk's waves, the length of each bough, the shape of each cloud's rim.
  *
- * <p>Size: 5–9 × 5–9 × 11+ (the tree stops at 17 high).
+ * <p>Size: 5–9 × 5–9 × 13+ (the tree stops at 18 high).
  */
 public final class TreePineTiered implements Variant {
 	private static final Wood WOOD = new Wood(Blocks.SPRUCE_LOG, Blocks.SPRUCE_WOOD, b(Blocks.MANGROVE_ROOTS));
@@ -58,7 +58,7 @@ public final class TreePineTiered implements Variant {
 
 	@Override
 	public int minH() {
-		return 11;
+		return 13;
 	}
 
 	@Override
@@ -77,7 +77,7 @@ public final class TreePineTiered implements Variant {
 		Random r = p.rng(0x9177);
 		int w = p.w();
 		int d = p.d();
-		int H = Math.min(p.h(), 17);
+		int H = Math.min(p.h(), 18);
 
 		// ---- base: a 2×2 foot with roots, thinning to one trunk at y = 3
 		int ou = r.nextInt(2);
@@ -91,19 +91,16 @@ public final class TreePineTiered implements Variant {
 		TreeKit.roots(t, WOOD, bu, bv, big ? 5 : 4, big ? 2 : 1, -1, 7);
 
 		// ---- tiers: 3..5 clouds, at least 3 layers apart, the last one on the leader
-		int nMax = Math.min(5, (H - 5) / 3 + 1);
-		int n = nMax <= 3 ? 3 : 3 + r.nextInt(nMax - 2);
 		int bLast = H - 2;
-		if ((bLast - FIRST) / (double) (n - 1) < 3.0) {
-			bLast = H - 1;
-		}
+		int nMax = Math.min(5, (int) ((bLast - FIRST) / 2.6) + 1);
+		int n = nMax <= 3 ? 3 : 3 + r.nextInt(nMax - 2);
 		int[] yb = new int[n];
 		int[] th = new int[n];
 		double gap = (bLast - FIRST) / (double) (n - 1);
 		for (int k = 0; k < n; k++) {
 			yb[k] = FIRST + (int) Math.round(k * gap);
 			// a pad with a mound over it only where the gap to the next cloud stays open; else a single layer
-			th[k] = gap >= 3.9 && yb[k] + 1 < H ? 2 : 1;
+			th[k] = gap >= 2.9 && yb[k] + 1 < H ? 2 : 1;
 		}
 		int yTop = yb[n - 1] + th[n - 1] - 1;
 
@@ -129,7 +126,7 @@ public final class TreePineTiered implements Variant {
 		for (int y = 3; y <= yTop; y++) {
 			double f = (y - 3) / (double) Math.max(1, yTop - 3);
 			double e = f * f * (3 - 2 * f);
-			double sway = Math.sin(phase + (y - 3) * 0.75) * 0.9 * Math.min(1.0, (y - 2) / 3.0);
+			double sway = Math.sin(phase + (y - 3) * 0.5) * 0.7 * Math.min(1.0, (y - 2) / 3.0);
 			int tu = TreeKit.clamp((int) Math.round(cu0 + lu * leanMax * e + pu * sway), 1, w - 2);
 			int tv = TreeKit.clamp((int) Math.round(cv0 + lv * leanMax * e + pv * sway), 1, d - 2);
 			int du = Integer.signum(tu - cu);
@@ -159,11 +156,10 @@ public final class TreePineTiered implements Variant {
 		// ---- clouds and their boughs
 		double half = (Math.min(w, d) - 1) / 2.0;
 		int prevTop = 2;
-		int[] firstDir = {0, 0};
 		for (int k = 0; k < n; k++) {
 			int b = yb[k];
 			double fk = n == 1 ? 0 : k / (double) (n - 1);
-			double rad = half * (0.84 - 0.36 * fk) + 0.25;
+			double rad = half * (0.95 - 0.3 * fk) + 0.45;
 			double sgn = sgn0 * ((k & 1) == 0 ? 1 : -1);
 			boolean top = k == n - 1;
 			double off = top ? 0 : Math.max(1.0, half * (0.42 + 0.26 * r.nextDouble()));
@@ -174,10 +170,6 @@ public final class TreePineTiered implements Variant {
 			double rz = Math.min(rad * (longU ? 0.9 : 1.2), (d - 1) / 2.0 + 0.4);
 			double ccu = TreeKit.clamp(su[b] + bu2 * off, rx - 0.4, w - 1 - (rx - 0.4));
 			double ccv = TreeKit.clamp(sv[b] + bv2 * off, rz - 0.4, d - 1 - (rz - 0.4));
-			if (k == 0) {
-				firstDir = Math.abs(ccu - su[b]) >= Math.abs(ccv - sv[b]) ? new int[] {(int) Math.signum(ccu - su[b]), 0}
-						: new int[] {0, (int) Math.signum(ccv - sv[b])};
-			}
 			int ci = (int) Math.round(ccu);
 			int cj = (int) Math.round(ccv);
 			if (!top) {
@@ -186,13 +178,8 @@ public final class TreePineTiered implements Variant {
 				TreeKit.branch(t, WOOD, new int[] {su[ya], ya, sv[ya]}, new int[] {ci, b - 1, cj}, false);
 				TreeKit.branch(t, WOOD, new int[] {ci, b - 1, cj}, new int[] {ci, b, cj}, false);
 			}
-			cloud(t, ccu, ccv, b, th[k], rx, rz, k + 1, phase + k * 1.7, H);
+			cloud(t, ccu, ccv, b, th[k], rx, rz, k + 1, phase + k * 1.7, H, gap >= 3.9);
 			prevTop = b + th[k] - 1;
-		}
-
-		// ---- a thicker foot of the trunk, on the side away from the first bough
-		for (int y = 3; y <= yb[0] + 1; y++) {
-			t.woodSoft(su[y] - firstDir[0], y, sv[y] - firstDir[1], WOOD.bark());
 		}
 
 		// ---- the foot: ferns, moss, mushrooms, and a mossy boulder away from the lean
@@ -221,13 +208,13 @@ public final class TreePineTiered implements Variant {
 	 * {@code thick == 1}). The rim is scalloped by two sine waves and a per-cell jitter, some rim cells hang one or
 	 * two blocks (never below y = 4, never touching another cloud), and the top gets a few tufts.
 	 */
-	private static void cloud(Vox t, double cu, double cv, int yb, int thick, double rx, double rz, int id, double ph, int H) {
+	private static void cloud(Vox t, double cu, double cv, int yb, int thick, double rx, double rz, int id, double ph, int H, boolean hangOk) {
 		for (int ly = 0; ly < thick; ly++) {
 			int y = yb + ly;
 			if (y >= H) {
 				break;
 			}
-			double scale = thick == 1 ? 0.86 : ly == 0 ? 1.0 : 0.6;
+			double scale = thick == 1 ? 0.95 : ly == 0 ? 1.0 : 0.68;
 			int u0 = (int) Math.floor(cu - rx * 1.5);
 			int u1 = (int) Math.ceil(cu + rx * 1.5);
 			int v0 = (int) Math.floor(cv - rz * 1.5);
@@ -250,13 +237,13 @@ public final class TreePineTiered implements Variant {
 					int pct = topLayer ? 42 : 24;
 					boolean tip = t.hash(u >> 1, y, v >> 1, 100) < pct || (q > lim - 0.3 && t.hash(u, y + 7, v, 4) == 0);
 					t.leafOf(u, y, v, tip ? TIP : NEEDLE, id);
-					if (ly == 0 && q > 0.55 * lim && y - 1 >= 4 && t.hash(u, y + 5, v, 4) == 0) {
+					if (hangOk && ly == 0 && q > 0.55 * lim && y - 1 >= 4 && t.hash(u, y + 5, v, 4) == 0) {
 						t.leafOf(u, y - 1, v, NEEDLE, id); // needles hanging from the pad
 						if (y - 2 >= 4 && t.hash(u, y + 11, v, 4) == 0) {
 							t.leafOf(u, y - 2, v, TIP, id);
 						}
 					}
-					if (topLayer && q < 0.5 * lim && y + 1 < H && t.hash(u, y + 13, v, 7) == 0) {
+					if (topLayer && q < 0.6 * lim && y + 1 < H && t.hash(u, y + 13, v, 4) == 0) {
 						t.leafOf(u, y + 1, v, NEEDLE, id); // a tuft on top: lumpy, not a plate
 					}
 				}
