@@ -146,7 +146,7 @@ public final class LayoutParams {
 	 * {@link Spec#value()}; see {@code CitadelCanvas} for the rule the pieces follow. Unlike the other
 	 * parameters it moves anchors and desks: the next plan of an existing HQ is rebuilt at the new size.
 	 */
-	public static final Spec RINGCAMPUS_SCALE = spec("hybrid-ringcampus", "scale", 100, 100, 250,
+	public static final Spec RINGCAMPUS_SCALE = spec("hybrid-ringcampus", "scale", 100, 100, 300,
 			"size of the whole citadel (1.0 = original; heights grow by its square root)", 100);
 	public static final Spec RINGCAMPUS_TERRACE_BUSH = spec("hybrid-ringcampus", "terrace.bushEvery", 23, 11, 97,
 			"terraces: an azalea bush on 1 cell in N");
