@@ -25,14 +25,15 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import static dev.t3craft.hq.citadel.CitadelCanvas.AIR;
 import static dev.t3craft.hq.citadel.CitadelCanvas.DECOR;
 import static dev.t3craft.hq.citadel.CitadelCanvas.FOOT;
-import static dev.t3craft.hq.citadel.CitadelCanvas.Y0;
+import static dev.t3craft.hq.citadel.CitadelCanvas.dims;
+import static dev.t3craft.hq.citadel.CitadelCanvas.y0;
 import static dev.t3craft.hq.citadel.CitadelCanvas.col;
 import static dev.t3craft.hq.citadel.CitadelCanvas.colX;
 import static dev.t3craft.hq.citadel.CitadelCanvas.colZ;
 import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
 
 /**
- * The hub of the citadel: a basilica on the podium ({@code floor y = Y0}), and the core ring round it.
+ * The hub of the citadel: a basilica on the podium ({@code floor y = y0()}), and the core ring round it.
  * Static pieces taking the {@link CitadelCanvas} first; call order matters (see {@link #hub} and
  * {@link #core}).
  *
@@ -67,15 +68,17 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
  * {@code HubRoof} (pitched roof, lantern drum, aisle terraces), {@code HubInterior} (floor, colonnade, furniture,
  * invisible lights), {@code HubExterior} (plinth, corbels, buttresses, niches, torii, stone lanterns),
  * {@code HubTowers} (corner towers), {@code HubBlocks} and {@code HubDims} (all sizes). The nave's vault is a
- * pointed arch: {@link #vaultY(int)} = min(SPRING + 5, SPRING + 6 - ax).
+ * pointed arch: {@link #vaultY(int)} = min(spring + s(5), spring + naveHalf - ax).
  *
  * <h2>Parameters</h2>
  *
- * Fixed geometry, no inputs beyond the canvas: the hub spans x, z in [-14, 14] (the zone map decides
- * which columns are {@code HUB} / {@code HUB_WALL}); {@link #AISLE_TOP} = 12 (aisle ceiling and outer
- * wall top), {@link #SPRING} = 16 (the vault springs, crown at {@code SPRING + 5}). The big screen of
- * the east side is a 7x4 {@link HqGeometry.Surface} at (12, Y0+2, -3) bound to
- * {@code HqGenerator.hubBinding(layout)}; the thread wall (west) is 9x4 at (-12, Y0+2, 4).
+ * Geometry from the citadel's scale (values at scale 1): the hub spans x, z in [-14, 14] (the zone map
+ * decides which columns are {@code HUB} / {@code HUB_WALL}; {@code g.hubX()} = 12 is the last interior
+ * column); {@link #aisleTop()} = 12 (aisle ceiling and outer wall top), {@link #spring()} = 16 (the vault
+ * springs, crown at {@code spring() + s(5)}), {@link #naveHalf()} = 6. The big screen of the east side is
+ * a 7x4 {@link HqGeometry.Surface} at (hubX, y0()+2, -3) bound to {@code HqGenerator.hubBinding(layout)};
+ * the thread wall (west) is 9x4 at (-hubX, y0()+2, 4). Screens, the board and the 14 benches keep their
+ * size at any scale (they move with their walls).
  *
  * <h2>Blocks and roles</h2>
  *
@@ -97,25 +100,38 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
  * cells, which belong to {@code cloister}.
  */
 public final class CitadelHub {
-	/** Aisle ceiling (and outer walls' top). */
-	public static final int AISLE_TOP = 12;
-	/** Nave vault: springs at y = 16 (12 above the floor), crown at y = 21 (17 above). */
-	public static final int SPRING = 16;
-
 	private CitadelHub() {
 	}
 
-	/** Height of the vault above a column at distance {@code ax} from the nave's axis. */
-	public static int vaultY(int ax) {
-		if (ax >= 6) {
-			return SPRING;
-		}
-		return Math.min(SPRING + 5, SPRING + 6 - ax);
+	/** Aisle ceiling (and outer walls' top): y = 12 at scale 1, 8 above the podium ({@code y0() + sy(8)}; was {@code AISLE_TOP}). */
+	public static int aisleTop() {
+		return y0() + dims().sy(8);
 	}
 
-	/** Whether {@code z} is an arcade line (a pier of the nave's colonnade). */
+	/** Nave vault springs: y = 16 at scale 1, 12 above the podium ({@code y0() + sy(12)}; was {@code SPRING}); crown {@code s(5)} higher. */
+	public static int spring() {
+		return y0() + dims().sy(12);
+	}
+
+	/** Half width of the nave: the colonnade stands on {@code |x| == naveHalf()} (6 at scale 1). */
+	public static int naveHalf() {
+		return dims().s(6);
+	}
+
+	/** Height of the vault above a column at distance {@code ax} from the nave's axis (a pointed arch). */
+	public static int vaultY(int ax) {
+		int n = naveHalf();
+		int spring = spring();
+		if (ax >= n) {
+			return spring;
+		}
+		return Math.min(spring + dims().s(5), spring + n - ax);
+	}
+
+	/** Whether {@code z} is an arcade line (a pier of the nave's colonnade): every {@code s(4)}, phase {@code s(2)}, up to {@code |z| <= s(10)}. */
 	public static boolean arcadeZ(int z) {
-		return Math.floorMod(z + 2, 4) == 0 && Math.abs(z) <= 10;
+		RingCampusGeometry.Dims d = dims();
+		return Math.floorMod(z + d.s(2), d.s(4)) == 0 && Math.abs(z) <= d.s(10);
 	}
 
 	// ------------------------------------------------------------------ hub: a basilica on the podium
@@ -133,11 +149,12 @@ public final class CitadelHub {
 
 	/** Every column of the octagon: floor and nave for the interior, footing and wall for the wall ring. */
 	public static void shell(CitadelCanvas c) {
-		for (int x = -14; x <= 14; x++) {
-			for (int z = -14; z <= 14; z++) {
+		int ext = (int) Math.ceil(c.g.hubOut);
+		for (int x = -ext; x <= ext; x++) {
+			for (int z = -ext; z <= ext; z++) {
 				Kind k = c.zoneAt(x, z).kind();
 				if (k == Kind.HUB) {
-					c.set(x, Y0, z, HubInterior.floor(c, x, z));
+					c.set(x, y0(), z, HubInterior.floor(c, x, z));
 					nave(c, x, z);
 				} else if (k == Kind.HUB_WALL) {
 					HubFacade.base(c, x, z);
@@ -152,7 +169,7 @@ public final class CitadelHub {
 		for (int sx = -1; sx <= 1; sx += 2) {
 			Direction look = sx > 0 ? Direction.EAST : Direction.WEST;
 			for (int z = -3; z <= 3; z++) {
-				BlockPos p = new BlockPos(7 * sx, Y0 + 1, z);
+				BlockPos p = new BlockPos((naveHalf() + 1) * sx, y0() + 1, z);
 				c.set(p, c.style.bench(look.getOpposite()));
 				c.anchor(Anchor.at(AnchorNames.bench(c.nextBench()), p.relative(look), look));
 			}
@@ -161,9 +178,10 @@ public final class CitadelHub {
 
 	/** The big screen (east) with the hub binding, and the thread wall (west) with its anchors. */
 	public static void screens(CitadelCanvas c) {
-		HqGeometry.Surface screen = new HqGeometry.Surface(new BlockPos(12, Y0 + 2, -3), Direction.SOUTH, Direction.WEST, 7, 4);
+		int hx = c.g.hubX();
+		HqGeometry.Surface screen = new HqGeometry.Surface(new BlockPos(hx, y0() + 2, -3), Direction.SOUTH, Direction.WEST, 7, 4);
 		bigScreen(c, screen, "hub", HqGenerator.hubBinding(c.layout), true);
-		HqGeometry.Surface wall = new HqGeometry.Surface(new BlockPos(-12, Y0 + 2, 4), Direction.NORTH, Direction.EAST, 9, 4);
+		HqGeometry.Surface wall = new HqGeometry.Surface(new BlockPos(-hx, y0() + 2, 4), Direction.NORTH, Direction.EAST, 9, 4);
 		for (BlockPos p : wall.cells()) {
 			c.fixture(p, c.style.screen());
 		}
@@ -172,17 +190,17 @@ public final class CitadelHub {
 		}
 		c.anchor(Anchor.face(AnchorNames.THREAD_WALL, wall.origin(), wall.facing()));
 		c.anchor(Anchor.face(AnchorNames.THREAD_WALL_END, wall.origin().relative(wall.along(), wall.width() - 1).above(wall.height() - 1), wall.facing()));
-		c.anchor(Anchor.at(AnchorNames.THREAD_WALL_FRONT, new BlockPos(-9, Y0 + 1, 0), Direction.WEST));
+		c.anchor(Anchor.at(AnchorNames.THREAD_WALL_FRONT, new BlockPos(-(hx - 3), y0() + 1, 0), Direction.WEST));
 	}
 
 	/** Hologram column free over the centre; the beacon crowns the vault. */
 	public static void hologramAndBeacon(CitadelCanvas c) {
-		for (int y = Y0 + 1; y <= Y0 + 1 + HqGeometry.HOLOGRAM_TOP; y++) {
+		for (int y = y0() + 1; y <= y0() + 1 + HqGeometry.HOLOGRAM_TOP; y++) {
 			c.set(0, y, 0, AIR);
 		}
-		c.anchor(Anchor.at(AnchorNames.HUB, new BlockPos(0, Y0 + 1, 0), Direction.SOUTH));
-		c.anchor(new Anchor(AnchorNames.HOLOGRAM, 0.5, Y0 + 5.0, 0.5, Direction.SOUTH, new BlockPos(0, Y0 + 5, 0)));
-		c.anchor(Anchor.at(AnchorNames.ENTRANCE, new BlockPos(0, Y0 + 1, 11), Direction.SOUTH));
+		c.anchor(Anchor.at(AnchorNames.HUB, new BlockPos(0, y0() + 1, 0), Direction.SOUTH));
+		c.anchor(new Anchor(AnchorNames.HOLOGRAM, 0.5, y0() + 5.0, 0.5, Direction.SOUTH, new BlockPos(0, y0() + 5, 0)));
+		c.anchor(Anchor.at(AnchorNames.ENTRANCE, new BlockPos(0, y0() + 1, c.g.hubX() - 1), Direction.SOUTH));
 		BlockPos beacon = new BlockPos(0, vaultY(0) + 1, 0);
 		c.set(beacon, c.style.beacon());
 		c.fixtures.add(beacon.asLong());
@@ -191,9 +209,9 @@ public final class CitadelHub {
 
 	/** Four NPC walk spots in the nave. */
 	public static void walkSpots(CitadelCanvas c) {
-		for (int wz : new int[] {-4, 4}) {
+		for (int wz : new int[] {-c.s(4), c.s(4)}) {
 			for (int sx = -1; sx <= 1; sx += 2) {
-				c.walkSpot(new BlockPos(4 * sx, Y0 + 1, wz), Direction.SOUTH);
+				c.walkSpot(new BlockPos(c.s(4) * sx, y0() + 1, wz), Direction.SOUTH);
 			}
 		}
 	}
@@ -203,26 +221,27 @@ public final class CitadelHub {
 	/** One interior column of the hub: the nave's vault, the arcades, clerestory and the aisles' ceiling. */
 	public static void nave(CitadelCanvas c, int x, int z) {
 		int ax = Math.abs(x);
-		if (ax == 6) {
+		int n = naveHalf();
+		if (ax == n) {
 			naveArcade(c, x, z);
-		} else if (ax > 6) {
+		} else if (ax > n) {
 			naveAisle(c, x, z);
 		} else {
 			naveVault(c, x, z, ax);
 		}
 	}
 
-	/** The colonnade line ({@code |x| == 6}); see {@link HubInterior#arcade}. */
+	/** The colonnade line ({@code |x| == naveHalf()}); see {@link HubInterior#arcade}. */
 	public static void naveArcade(CitadelCanvas c, int x, int z) {
 		HubInterior.arcade(c, x, z);
 	}
 
-	/** The aisles' ceiling ({@code |x| > 6}); see {@link HubInterior#aisle}. */
+	/** The aisles' ceiling ({@code |x| > naveHalf()}); see {@link HubInterior#aisle}. */
 	public static void naveAisle(CitadelCanvas c, int x, int z) {
 		HubInterior.aisle(c, x, z);
 	}
 
-	/** The nave's barrel vault ({@code |x| < 6}); see {@link HubInterior#vault}. */
+	/** The nave's barrel vault ({@code |x| < naveHalf()}); see {@link HubInterior#vault}. */
 	public static void naveVault(CitadelCanvas c, int x, int z, int ax) {
 		HubInterior.vault(c, x, z, ax);
 	}
@@ -238,29 +257,29 @@ public final class CitadelHub {
 
 	/** The "needs attention" board at the nave's north end, facing the entrance, with its bulbs and standing rows. */
 	public static void board(CitadelCanvas c) {
-		int z = -12;
+		int z = -c.g.hubX();
 		for (int x = -5; x <= 5; x++) {
-			for (int y = Y0 + 4; y <= Y0 + 10; y++) {
-				boolean edge = Math.abs(x) == 5 || y == Y0 + 4 || y == Y0 + 10 || y == Y0 + 9;
+			for (int y = y0() + 4; y <= y0() + 10; y++) {
+				boolean edge = Math.abs(x) == 5 || y == y0() + 4 || y == y0() + 10 || y == y0() + 9;
 				c.fixture(new BlockPos(x, y, z), edge ? c.kit.beam(Direction.Axis.X) : c.style.palette().get(HqStyle.Role.BOARD));
 			}
 		}
 		int lamp = 0;
 		for (int x = -4; x <= 4; x += 2) {
-			c.fixture(new BlockPos(x, Y0 + 9, z), c.style.statusLamp());
-			c.anchor(Anchor.face(AnchorNames.boardLamp(lamp++), new BlockPos(x, Y0 + 9, z), Direction.SOUTH));
+			c.fixture(new BlockPos(x, y0() + 9, z), c.style.statusLamp());
+			c.anchor(Anchor.face(AnchorNames.boardLamp(lamp++), new BlockPos(x, y0() + 9, z), Direction.SOUTH));
 		}
-		BlockPos sign = new BlockPos(0, Y0 + 10, z + 1);
+		BlockPos sign = new BlockPos(0, y0() + 10, z + 1);
 		c.put(sign.getX(), sign.getY(), sign.getZ(), c.style.palette().get(HqStyle.Role.PLAQUE).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.SOUTH), DECOR);
 		c.data.put(sign.asLong(), new HqStyle.SignText(DyeColor.ORANGE, "", "Needs", "attention", "").signTag());
 		c.fixtures.add(sign.asLong());
-		c.anchor(Anchor.face(AnchorNames.BOARD, new BlockPos(0, Y0 + 6, z), Direction.SOUTH));
-		c.anchor(Anchor.at(AnchorNames.BOARD_FRONT, new BlockPos(0, Y0 + 1, z + 1), Direction.NORTH));
+		c.anchor(Anchor.face(AnchorNames.BOARD, new BlockPos(0, y0() + 6, z), Direction.SOUTH));
+		c.anchor(Anchor.at(AnchorNames.BOARD_FRONT, new BlockPos(0, y0() + 1, z + 1), Direction.NORTH));
 		int slot = 0;
 		for (int row = 2; row <= 3; row++) {
 			for (int i = 0; i <= 8; i++) {
 				int x = i == 0 ? 0 : (i % 2 == 1 ? (i + 1) / 2 : -(i / 2));
-				c.anchor(Anchor.at(AnchorNames.boardSlot(slot++), new BlockPos(x, Y0 + 1, z + row), Direction.NORTH));
+				c.anchor(Anchor.at(AnchorNames.boardSlot(slot++), new BlockPos(x, y0() + 1, z + row), Direction.NORTH));
 			}
 		}
 	}
@@ -285,22 +304,24 @@ public final class CitadelHub {
 		// patio stairs: from the promenade down into the patio on the four diagonals
 		for (int d = 0; d < 4; d++) {
 			double a = Math.PI / 4 + d * Math.PI / 2;
-			BlockPos p = RingCampusGeometry.polar(21.2, a, 0);
+			BlockPos p = RingCampusGeometry.polar(c.g.patioR + 0.2, a, 0);
 			int dx = p.getX() > 0 ? -1 : 1;
 			Direction up = dx < 0 ? Direction.EAST : Direction.WEST;
-			for (int w = -1; w <= 1; w++) {
-				for (int i = 0; i < 4; i++) {
+			int hw = c.s(1);
+			for (int w = -hw; w <= hw; w++) {
+				// one step per block of height: as many steps as the podium is high (4 at scale 1)
+				for (int i = 0; i < y0(); i++) {
 					int x = p.getX() + dx * i;
 					int z = p.getZ() + w;
-					for (int y = 1; y < Y0 - i; y++) {
+					for (int y = 1; y < y0() - i; y++) {
 						c.set(x, y, z, FOOT);
 					}
-					c.set(x, Y0 - i, z, stairs(Blocks.BAMBOO_MOSAIC_STAIRS, up));
-					for (int y = Y0 - i + 1; y <= Y0 + 3; y++) {
+					c.set(x, y0() - i, z, stairs(Blocks.BAMBOO_MOSAIC_STAIRS, up));
+					for (int y = y0() - i + 1; y <= y0() + 3; y++) {
 						c.set(x, y, z, AIR);
 					}
 				}
-				for (int i = 0; i <= 3; i++) {
+				for (int i = 0; i < y0(); i++) {
 					stairHeads.add(col(p.getX() - dx * i, p.getZ() + w));
 				}
 			}
@@ -321,9 +342,9 @@ public final class CitadelHub {
 			}
 		}
 		HubExterior.paint(c);
-		c.walkSpot(new BlockPos(19, 1, 0), Direction.WEST);
-		c.walkSpot(new BlockPos(-19, 1, 0), Direction.EAST);
-		c.walkSpot(new BlockPos(0, Y0 + 1, -24), Direction.NORTH);
-		c.walkSpot(new BlockPos(24, Y0 + 1, 0), Direction.EAST);
+		c.walkSpot(new BlockPos(c.s(19), 1, 0), Direction.WEST);
+		c.walkSpot(new BlockPos(-c.s(19), 1, 0), Direction.EAST);
+		c.walkSpot(new BlockPos(0, y0() + 1, -c.s(24)), Direction.NORTH);
+		c.walkSpot(new BlockPos(c.s(24), y0() + 1, 0), Direction.EAST);
 	}
 }

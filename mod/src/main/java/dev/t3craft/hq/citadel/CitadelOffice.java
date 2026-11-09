@@ -24,32 +24,32 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.FOOT;
 import static dev.t3craft.hq.citadel.CitadelCanvas.HANGING;
 import static dev.t3craft.hq.citadel.CitadelCanvas.LOG;
 import static dev.t3craft.hq.citadel.CitadelCanvas.PLANKS;
-import static dev.t3craft.hq.citadel.CitadelCanvas.Y0;
+import static dev.t3craft.hq.citadel.CitadelCanvas.y0;
 import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
 import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
 
 /**
  * Facundo's office: a three-level pagoda tower, the "mirador" of the citadel. It stands on the
  * south-south-east garden terrace, flush against the outer rim of the elevated promenade (its door
- * opens straight onto the promenade deck, floor {@code y = Y0}), nine blocks from the main esplanade
- * where the player arrives ({@code CitadelFinish.SPAWN}): spawn, up the south ramp, along the
+ * opens straight onto the promenade deck, floor {@code y = y0()}), nine blocks from the main esplanade
+ * where the player arrives ({@code CitadelFinish.spawn()}): spawn, up the south ramp, along the
  * promenade, in. The balcony looks over the hub's roofline, the patio and the whole ring of barrios.
  * A piece of its own: static methods taking the {@link CitadelCanvas} first, no state. It runs after the
  * ground, the hub, the core and the nodes (see {@code RingCampusGenerator.generate}) and paints over the
  * terrace it stands on; it adds no zone, no group (every cell belongs to {@code cloister} by position,
  * like the terrace) and moves nothing of {@code RingCampusGeometry}.
  *
- * <h2>Plan (local coordinates {@code (dx, dz)} from the tower's centre {@link #CX}, {@link #CZ})</h2>
+ * <h2>Plan (local coordinates {@code (dx, dz)} from the tower's centre {@link #CX()}, {@link #CZ()})</h2>
  *
  * <pre>
  *   m = max(|dx|, |dz|)   m <= 3  interior 7 x 7     m = 4  wall      m = 5  balcony walk
  *                         m = 6   balcony rail        m = 7  roof eave
  *
  *   level   floor y    feet y   what
- *   ground  Y0 (4)     5        lobby and archive: rug, bookcases and lectern, chests and barrels
- *   library Y0 + 5     10       bookcases, cartography table, lectern, bed, rug
- *   office  Y0 + 10    15       the desk, the big screen, rug, sofa, plants, banners, plaque; doors to the balcony
- *   ceiling Y0 + 16    -        exposed rafters; attic under the hip roof (lantern roof, finial)
+ *   ground  y0() (4)     5        lobby and archive: rug, bookcases and lectern, chests and barrels
+ *   library y0() + 5     10       bookcases, cartography table, lectern, bed, rug
+ *   office  y0() + 10    15       the desk, the big screen, rug, sofa, plants, banners, plaque; doors to the balcony
+ *   ceiling y0() + 16    -        exposed rafters; attic under the hip roof (lantern roof, finial)
  * </pre>
  *
  * <h2>Pieces</h2>
@@ -73,7 +73,7 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
  * <h2>Adjusting it</h2>
  *
  * <ul>
- * <li><b>Move the tower</b>: change {@link #CX}/{@link #CZ}; keep the footprint ({@code m <= 7}) inside the
+ * <li><b>Move the tower</b>: change {@link #CX()}/{@link #CZ()}; keep the footprint ({@code m <= 7}) inside the
  *     zone map (it needs {@code r < 40} for every column) and the door ({@code dz = -4}, facing north)
  *     against the promenade. Everything else is relative to it.</li>
  * <li><b>Furniture</b>: each room is one method with its blocks written as {@code (dx, dz)} next to a
@@ -120,20 +120,39 @@ public final class CitadelOffice {
 	public static final double RIM_OFFSET = 3.5;
 	/**
 	 * Centre of the tower (x, z), derived from the geometry: the promenade's outer radius plus
-	 * {@link #RIM_OFFSET} along {@link #ANGLE_DEG}. Its interior spans {@code CX - 3 .. CX + 3} and
-	 * {@code CZ - 3 .. CZ + 3}. The tower itself (footprint, doors, stairs) keeps its size when the
+	 * {@link #RIM_OFFSET} along {@link #ANGLE_DEG} (methods: the radius follows the citadel's scale). Its interior spans {@code CX() - 3 .. CX() + 3} and
+	 * {@code CZ() - 3 .. CZ() + 3}. The tower itself (footprint, doors, stairs) keeps its size when the
 	 * citadel is scaled: only its place follows the zones.
 	 */
-	public static final int CX = RingCampusGeometry.polar(RingCampusGeometry.GALLERY_R + RIM_OFFSET, Math.toRadians(ANGLE_DEG), 0).getX();
-	public static final int CZ = RingCampusGeometry.polar(RingCampusGeometry.GALLERY_R + RIM_OFFSET, Math.toRadians(ANGLE_DEG), 0).getZ();
+	public static int CX() {
+		return RingCampusGeometry.polar(CitadelCanvas.dims().galleryR + RIM_OFFSET, Math.toRadians(ANGLE_DEG), 0).getX();
+	}
 
-	/** Floor rows (the floor block's y): ground, library, office, ceiling of the office. */
-	static final int F0 = Y0;
-	static final int F1 = Y0 + 5;
-	static final int F2 = Y0 + 10;
-	static final int CEIL = Y0 + 16;
+	public static int CZ() {
+		return RingCampusGeometry.polar(CitadelCanvas.dims().galleryR + RIM_OFFSET, Math.toRadians(ANGLE_DEG), 0).getZ();
+	}
+
+	/** Floor rows (the floor block's y): ground, library, office, ceiling of the office (relative to the podium). */
+	static int F0() {
+		return y0();
+	}
+
+	static int F1() {
+		return y0() + 5;
+	}
+
+	static int F2() {
+		return y0() + 10;
+	}
+
+	static int CEIL() {
+		return y0() + 16;
+	}
+
 	/** Top of the wall (the attic's last row; the hip roof starts one row higher at its ring 4). */
-	static final int WALL_TOP = CEIL + 3;
+	static int WALL_TOP() {
+		return CEIL() + 3;
+	}
 
 	public static final DyeColor RUG = DyeColor.RED;
 	public static final DyeColor RUG_EDGE = DyeColor.PINK;
@@ -196,12 +215,12 @@ public final class CitadelOffice {
 
 	/** A lantern under the ceiling at local {@code (dx, dz)}, on the row {@code y} (the cell under the ceiling). */
 	private static void hang(CitadelCanvas c, int dx, int y, int dz) {
-		c.put(CX + dx, y, CZ + dz, lantern(true), HANGING);
+		c.put(CX() + dx, y, CZ() + dz, lantern(true), HANGING);
 	}
 
 	private static void shelves(CitadelCanvas c, int dx, int y, int dz, int height) {
 		for (int i = 0; i < height; i++) {
-			c.set(CX + dx, y + i, CZ + dz, Blocks.BOOKSHELF.defaultBlockState());
+			c.set(CX() + dx, y + i, CZ() + dz, Blocks.BOOKSHELF.defaultBlockState());
 		}
 	}
 
@@ -218,15 +237,15 @@ public final class CitadelOffice {
 	public static void clear(CitadelCanvas c) {
 		for (int dx = -3; dx <= 3; dx++) {
 			for (int dz = -3; dz <= 3; dz++) {
-				for (int y = F0 + 1; y <= WALL_TOP + 3; y++) {
-					c.set(CX + dx, y, CZ + dz, AIR);
+				for (int y = F0() + 1; y <= WALL_TOP() + 3; y++) {
+					c.set(CX() + dx, y, CZ() + dz, AIR);
 				}
 			}
 		}
 		// the door's apron on the promenade: the deck stays, anything standing on it goes
 		for (int dx = -1; dx <= 1; dx++) {
-			for (int y = F0 + 1; y <= F0 + 4; y++) {
-				c.set(CX + dx, y, CZ - 5, AIR);
+			for (int y = F0() + 1; y <= F0() + 4; y++) {
+				c.set(CX() + dx, y, CZ() - 5, AIR);
 			}
 		}
 	}
@@ -235,11 +254,11 @@ public final class CitadelOffice {
 	public static void plinth(CitadelCanvas c) {
 		for (int dx = -4; dx <= 4; dx++) {
 			for (int dz = -4; dz <= 4; dz++) {
-				for (int y = 1; y < F0; y++) {
-					c.set(CX + dx, y, CZ + dz, FOOT);
+				for (int y = 1; y < F0(); y++) {
+					c.set(CX() + dx, y, CZ() + dz, FOOT);
 				}
 				if (m(dx, dz) == 4) {
-					c.set(CX + dx, F0, CZ + dz, FOOT);
+					c.set(CX() + dx, F0(), CZ() + dz, FOOT);
 				}
 			}
 		}
@@ -256,11 +275,11 @@ public final class CitadelOffice {
 			for (int dz = -3; dz <= 3; dz++) {
 				int m = m(dx, dz);
 				Direction.Axis edge = Math.abs(dz) == 3 ? Direction.Axis.X : Direction.Axis.Z;
-				c.set(CX + dx, F0, CZ + dz, m == 3 ? c.accent() : c.floor());
-				for (int f : new int[] {F1, F2}) {
-					c.set(CX + dx, f, CZ + dz, m == 3 ? c.kit.beam(edge) : c.floor());
+				c.set(CX() + dx, F0(), CZ() + dz, m == 3 ? c.accent() : c.floor());
+				for (int f : new int[] {F1(), F2()}) {
+					c.set(CX() + dx, f, CZ() + dz, m == 3 ? c.kit.beam(edge) : c.floor());
 				}
-				c.set(CX + dx, CEIL, CZ + dz, m == 3 || Math.floorMod(dz, 2) == 0 ? c.kit.beam(m == 3 ? edge : Direction.Axis.X) : PLANKS);
+				c.set(CX() + dx, CEIL(), CZ() + dz, m == 3 || Math.floorMod(dz, 2) == 0 ? c.kit.beam(m == 3 ? edge : Direction.Axis.X) : PLANKS);
 			}
 		}
 	}
@@ -289,22 +308,22 @@ public final class CitadelOffice {
 		boolean east = dx == 4 && !corner;
 		int au = Math.abs(ew ? dz : dx);
 		Direction.Axis axis = ew ? Direction.Axis.Z : Direction.Axis.X;
-		for (int y = F0 + 1; y <= WALL_TOP; y++) {
+		for (int y = F0() + 1; y <= WALL_TOP(); y++) {
 			BlockState s;
 			if (corner) {
 				s = LOG;
-			} else if (y == F1 || y == F2 || y == CEIL) {
+			} else if (y == F1() || y == F2() || y == CEIL()) {
 				s = c.kit.beam(axis);
-			} else if (y < F1) {
+			} else if (y < F1()) {
 				s = groundWall(y, au, north, east);
-			} else if (y < F2) {
-				s = au <= 1 && (y == F1 + 2 || y == F1 + 3) ? Blocks.GLASS_PANE.defaultBlockState() : CALCITE;
-			} else if (y < CEIL) {
+			} else if (y < F2()) {
+				s = au <= 1 && (y == F1() + 2 || y == F1() + 3) ? Blocks.GLASS_PANE.defaultBlockState() : CALCITE;
+			} else if (y < CEIL()) {
 				s = officeWall(c, y, au, south, north || west);
 			} else {
-				s = y == CEIL + 2 && au <= 2 ? c.kit.wallPanel(true) : CALCITE;
+				s = y == CEIL() + 2 && au <= 2 ? c.kit.wallPanel(true) : CALCITE;
 			}
-			c.set(CX + dx, y, CZ + dz, s);
+			c.set(CX() + dx, y, CZ() + dz, s);
 		}
 	}
 
@@ -314,17 +333,17 @@ public final class CitadelOffice {
 	 */
 	private static BlockState groundWall(int y, int au, boolean north, boolean east) {
 		if (north) {
-			if (au <= 1 && y <= F0 + 3) {
+			if (au <= 1 && y <= F0() + 3) {
 				return AIR;
 			}
 			if (au == 2) {
 				return LOG;
 			}
 		}
-		if (y == F0 + 1) {
+		if (y == F0() + 1) {
 			return FOOT;
 		}
-		if (east && au == 0 && (y == F0 + 2 || y == F0 + 3)) {
+		if (east && au == 0 && (y == F0() + 2 || y == F0() + 3)) {
 			return Blocks.GLASS_PANE.defaultBlockState();
 		}
 		return CALCITE;
@@ -338,10 +357,10 @@ public final class CitadelOffice {
 		if (south) {
 			return CALCITE;
 		}
-		if (door && au <= 1 && y <= F2 + 3) {
+		if (door && au <= 1 && y <= F2() + 3) {
 			return AIR;
 		}
-		if (y == F2 + 1 || y == CEIL - 1) {
+		if (y == F2() + 1 || y == CEIL() - 1) {
 			return CALCITE;
 		}
 		if (au == 2) {
@@ -360,77 +379,77 @@ public final class CitadelOffice {
 	 */
 	public static void stairways(CitadelCanvas c) {
 		for (int i = 0; i < 5; i++) {
-			// ground to library: step i at dz = -3 + i, y = F0 + 1 + i, rising south
-			int x = CX - 3;
-			int z = CZ - 3 + i;
-			c.set(x, F0 + 1 + i, z, cherryStairs(Direction.SOUTH, false));
-			for (int y = F0 + 1; y < F0 + 1 + i; y++) {
+			// ground to library: step i at dz = -3 + i, y = F0() + 1 + i, rising south
+			int x = CX() - 3;
+			int z = CZ() - 3 + i;
+			c.set(x, F0() + 1 + i, z, cherryStairs(Direction.SOUTH, false));
+			for (int y = F0() + 1; y < F0() + 1 + i; y++) {
 				c.set(x, y, z, PLANKS);
 			}
-			// library to office: step i at dz = 3 - i, y = F1 + 1 + i, rising north
-			int xe = CX + 3;
-			int ze = CZ + 3 - i;
-			c.set(xe, F1 + 1 + i, ze, cherryStairs(Direction.NORTH, false));
-			for (int y = F1 + 1; y < F1 + 1 + i; y++) {
+			// library to office: step i at dz = 3 - i, y = F1() + 1 + i, rising north
+			int xe = CX() + 3;
+			int ze = CZ() + 3 - i;
+			c.set(xe, F1() + 1 + i, ze, cherryStairs(Direction.NORTH, false));
+			for (int y = F1() + 1; y < F1() + 1 + i; y++) {
 				c.set(xe, y, ze, PLANKS);
 			}
 		}
 		// the wells: the headroom of a step through the floor above, from the step before it (the nav sweeps the move)
 		for (int dz = -2; dz <= 0; dz++) {
-			c.set(CX - 3, F1, CZ + dz, AIR);
+			c.set(CX() - 3, F1(), CZ() + dz, AIR);
 		}
 		for (int dz = 0; dz <= 2; dz++) {
-			c.set(CX + 3, F2, CZ + dz, AIR);
+			c.set(CX() + 3, F2(), CZ() + dz, AIR);
 		}
 		// fences round them, on the floor above (the north end of the first well is a bookcase)
 		for (int dz = -2; dz <= 0; dz++) {
-			c.set(CX - 2, F1 + 1, CZ + dz, fence());
+			c.set(CX() - 2, F1() + 1, CZ() + dz, fence());
 		}
 		for (int dz = 0; dz <= 2; dz++) {
-			c.set(CX + 2, F2 + 1, CZ + dz, fence());
+			c.set(CX() + 2, F2() + 1, CZ() + dz, fence());
 		}
-		c.set(CX + 3, F2 + 1, CZ + 3, fence());
+		c.set(CX() + 3, F2() + 1, CZ() + 3, fence());
 	}
 
-	// ------------------------------------------------------------------ lobby (ground level, feet y = F0 + 1)
+	// ------------------------------------------------------------------ lobby (ground level, feet y = F0() + 1)
 
 	/** Lobby and archive: a rug from the door, the archive wall (bookcases round a lectern), chests and barrels. */
 	public static void lobby(CitadelCanvas c) {
-		int y = F0 + 1;
+		int y = F0() + 1;
 		for (int dz = -3; dz <= 1; dz++) {
-			c.set(CX - 1, y, CZ + dz, carpet(RUG_EDGE));
-			c.set(CX, y, CZ + dz, carpet(RUG));
-			c.set(CX + 1, y, CZ + dz, carpet(RUG_EDGE));
+			c.set(CX() - 1, y, CZ() + dz, carpet(RUG_EDGE));
+			c.set(CX(), y, CZ() + dz, carpet(RUG));
+			c.set(CX() + 1, y, CZ() + dz, carpet(RUG_EDGE));
 		}
 		// archive wall (south): bookcases round a lectern, a banner above it
 		for (int dx : new int[] {-2, -1, 1, 2}) {
 			shelves(c, dx, y, 3, 2);
 		}
-		c.set(CX, y, CZ + 3, facing(Blocks.LECTERN, Direction.NORTH));
-		c.set(CX, y + 2, CZ + 3, wallBanner(Direction.NORTH));
+		c.set(CX(), y, CZ() + 3, facing(Blocks.LECTERN, Direction.NORTH));
+		c.set(CX(), y + 2, CZ() + 3, wallBanner(Direction.NORTH));
 		// storage (east): a double chest and barrels
-		c.set(CX + 3, y, CZ - 2, facing(Blocks.CHEST, Direction.WEST).setValue(BlockStateProperties.CHEST_TYPE, ChestType.RIGHT));
-		c.set(CX + 3, y, CZ - 1, facing(Blocks.CHEST, Direction.WEST).setValue(BlockStateProperties.CHEST_TYPE, ChestType.LEFT));
+		c.set(CX() + 3, y, CZ() - 2, facing(Blocks.CHEST, Direction.WEST).setValue(BlockStateProperties.CHEST_TYPE, ChestType.RIGHT));
+		c.set(CX() + 3, y, CZ() - 1, facing(Blocks.CHEST, Direction.WEST).setValue(BlockStateProperties.CHEST_TYPE, ChestType.LEFT));
 		for (int dz = 1; dz <= 3; dz++) {
-			c.set(CX + 3, y, CZ + dz, Blocks.BARREL.defaultBlockState().setValue(BlockStateProperties.FACING, Direction.UP));
+			c.set(CX() + 3, y, CZ() + dz, Blocks.BARREL.defaultBlockState().setValue(BlockStateProperties.FACING, Direction.UP));
 		}
-		c.set(CX + 3, y + 1, CZ + 3, Blocks.BARREL.defaultBlockState().setValue(BlockStateProperties.FACING, Direction.UP));
+		c.set(CX() + 3, y + 1, CZ() + 3, Blocks.BARREL.defaultBlockState().setValue(BlockStateProperties.FACING, Direction.UP));
 		// banners on the jambs, a plaque over the door outside
-		c.set(CX - 2, y + 2, CZ - 3, wallBanner(Direction.SOUTH));
-		c.set(CX + 2, y + 2, CZ - 3, wallBanner(Direction.SOUTH));
-		sign(c, CX, F0 + 4, CZ - 5, Direction.NORTH, DyeColor.ORANGE, "", "Facundo", "Oficina", "");
-		hang(c, 0, F1 - 1, -2);
-		hang(c, 0, F1 - 1, 2);
-		hang(c, 2, F1 - 1, -2);
-		hang(c, -2, F1 - 1, -2);
-		hang(c, -2, F1 - 1, 1);
+		c.set(CX() - 2, y + 2, CZ() - 3, wallBanner(Direction.SOUTH));
+		c.set(CX() + 2, y + 2, CZ() - 3, wallBanner(Direction.SOUTH));
+		sign(c, CX(), F0() + 4, CZ() - 5, Direction.NORTH, DyeColor.ORANGE, "", "Facundo", "Oficina", "");
+		hang(c, 0, F1() - 1, -2);
+		hang(c, 0, F1() - 1, 2);
+		hang(c, 2, F1() - 1, -2);
+		hang(c, -2, F1() - 1, -2);
+		hang(c, -2, F1() - 1, 1);
 	}
 
-	// ------------------------------------------------------------------ library (feet y = F1 + 1)
+	// ------------------------------------------------------------------ library (feet y = F1() + 1)
 
 	/** Library: bookcases round a north window, the cartography table and a lectern, a bed, a rug and plants. */
 	public static void library(CitadelCanvas c) {
-		int y = F1 + 1;
+		int y = F1() + 1;
 		// bookcases: both sides of the north window and the south-west corner
 		for (int dz : new int[] {2, 3}) {
 			shelves(c, -3, y, dz, 3);
@@ -440,65 +459,65 @@ public final class CitadelOffice {
 		shelves(c, -2, y, 3, 3);
 		shelves(c, -1, y, 3, 3);
 		// the map table and a lectern on the south wall, the way to the east stairs stays free at dx = 2
-		c.set(CX, y, CZ + 3, Blocks.CARTOGRAPHY_TABLE.defaultBlockState());
-		c.set(CX + 1, y, CZ + 3, facing(Blocks.LECTERN, Direction.NORTH));
+		c.set(CX(), y, CZ() + 3, Blocks.CARTOGRAPHY_TABLE.defaultBlockState());
+		c.set(CX() + 1, y, CZ() + 3, facing(Blocks.LECTERN, Direction.NORTH));
 		// bed in the north-east corner, head against the north wall
-		c.set(CX + 2, y, CZ - 3, facing(Blocks.BED.pick(BED), Direction.NORTH).setValue(BlockStateProperties.BED_PART, BedPart.HEAD));
-		c.set(CX + 2, y, CZ - 2, facing(Blocks.BED.pick(BED), Direction.NORTH).setValue(BlockStateProperties.BED_PART, BedPart.FOOT));
-		c.set(CX + 2, y, CZ - 1, Blocks.POTTED_FLOWERING_AZALEA.defaultBlockState());
-		c.set(CX, y, CZ - 3, Blocks.POTTED_BAMBOO.defaultBlockState());
+		c.set(CX() + 2, y, CZ() - 3, facing(Blocks.BED.pick(BED), Direction.NORTH).setValue(BlockStateProperties.BED_PART, BedPart.HEAD));
+		c.set(CX() + 2, y, CZ() - 2, facing(Blocks.BED.pick(BED), Direction.NORTH).setValue(BlockStateProperties.BED_PART, BedPart.FOOT));
+		c.set(CX() + 2, y, CZ() - 1, Blocks.POTTED_FLOWERING_AZALEA.defaultBlockState());
+		c.set(CX(), y, CZ() - 3, Blocks.POTTED_BAMBOO.defaultBlockState());
 		// rug
 		for (int dx = -1; dx <= 1; dx++) {
 			for (int dz = -1; dz <= 1; dz++) {
-				c.set(CX + dx, y, CZ + dz, carpet(dx == 0 && dz == 0 ? RUG : RUG_EDGE));
+				c.set(CX() + dx, y, CZ() + dz, carpet(dx == 0 && dz == 0 ? RUG : RUG_EDGE));
 			}
 		}
-		hang(c, 0, F2 - 1, 0);
-		hang(c, -1, F2 - 1, 2);
-		hang(c, 2, F2 - 1, -2);
-		hang(c, -2, F2 - 1, -2);
-		hang(c, -2, F2 - 1, 2);
+		hang(c, 0, F2() - 1, 0);
+		hang(c, -1, F2() - 1, 2);
+		hang(c, 2, F2() - 1, -2);
+		hang(c, -2, F2() - 1, -2);
+		hang(c, -2, F2() - 1, 2);
 	}
 
-	// ------------------------------------------------------------------ office (feet y = F2 + 1)
+	// ------------------------------------------------------------------ office (feet y = F2() + 1)
 
 	/** The study: desk (the screen is {@link #bigScreen}), rug, sofa, bookcases, plants, banners and the plaque. */
 	public static void study(CitadelCanvas c) {
-		int y = F2 + 1;
+		int y = F2() + 1;
 		// the desk: a row of top slabs in front of the screen, a lantern and a pot on it
 		for (int dx = -2; dx <= 1; dx++) {
-			c.set(CX + dx, y, CZ + 2, topSlab(Blocks.CHERRY_SLAB));
+			c.set(CX() + dx, y, CZ() + 2, topSlab(Blocks.CHERRY_SLAB));
 		}
-		c.set(CX + 1, y + 1, CZ + 2, lantern(false));
-		c.set(CX - 2, y + 1, CZ + 2, Blocks.POTTED_BAMBOO.defaultBlockState());
+		c.set(CX() + 1, y + 1, CZ() + 2, lantern(false));
+		c.set(CX() - 2, y + 1, CZ() + 2, Blocks.POTTED_BAMBOO.defaultBlockState());
 		// rug
 		for (int dx = -2; dx <= 1; dx++) {
 			for (int dz = -2; dz <= 0; dz++) {
 				boolean edge = dx == -2 || dx == 1 || dz == -2;
-				c.set(CX + dx, y, CZ + dz, carpet(edge ? RUG_EDGE : RUG));
+				c.set(CX() + dx, y, CZ() + dz, carpet(edge ? RUG_EDGE : RUG));
 			}
 		}
 		// sofa against the east wall (north end), bookcases in the north-west, plants in the south-west
-		c.set(CX + 3, y, CZ - 3, cherryStairs(Direction.EAST, false));
-		c.set(CX + 3, y, CZ - 2, cherryStairs(Direction.EAST, false));
+		c.set(CX() + 3, y, CZ() - 3, cherryStairs(Direction.EAST, false));
+		c.set(CX() + 3, y, CZ() - 2, cherryStairs(Direction.EAST, false));
 		for (int dz : new int[] {-3, -2}) {
 			shelves(c, -3, y, dz, 3);
 		}
-		c.set(CX - 3, y, CZ + 2, Blocks.POTTED_FLOWERING_AZALEA.defaultBlockState());
-		c.set(CX - 3, y, CZ + 3, Blocks.POTTED_FLOWERING_AZALEA.defaultBlockState());
+		c.set(CX() - 3, y, CZ() + 2, Blocks.POTTED_FLOWERING_AZALEA.defaultBlockState());
+		c.set(CX() - 3, y, CZ() + 3, Blocks.POTTED_FLOWERING_AZALEA.defaultBlockState());
 		// banners and the plaque on the solid south wall
-		c.set(CX - 3, y + 1, CZ + 3, wallBanner(Direction.NORTH));
-		c.set(CX + 3, y + 1, CZ + 3, wallBanner(Direction.NORTH));
-		sign(c, CX, CEIL - 1, CZ + 3, Direction.NORTH, DyeColor.ORANGE, "", "Facundo", "", "");
-		hang(c, -2, CEIL - 1, -2);
-		hang(c, 2, CEIL - 1, -2);
-		hang(c, -2, CEIL - 1, 1);
-		hang(c, 2, CEIL - 1, 1);
+		c.set(CX() - 3, y + 1, CZ() + 3, wallBanner(Direction.NORTH));
+		c.set(CX() + 3, y + 1, CZ() + 3, wallBanner(Direction.NORTH));
+		sign(c, CX(), CEIL() - 1, CZ() + 3, Direction.NORTH, DyeColor.ORANGE, "", "Facundo", "", "");
+		hang(c, -2, CEIL() - 1, -2);
+		hang(c, 2, CEIL() - 1, -2);
+		hang(c, -2, CEIL() - 1, 1);
+		hang(c, 2, CEIL() - 1, 1);
 	}
 
 	/** The personal big screen, against the south wall of the office, on a base (see the class comment). */
 	public static void bigScreen(CitadelCanvas c) {
-		HqGeometry.Surface s = new HqGeometry.Surface(new BlockPos(CX + 2, F2 + 2, CZ + 3), Direction.WEST, Direction.NORTH, 5, 3);
+		HqGeometry.Surface s = new HqGeometry.Surface(new BlockPos(CX() + 2, F2() + 2, CZ() + 3), Direction.WEST, Direction.NORTH, 5, 3);
 		CitadelHub.bigScreen(c, s, "office", HqGenerator.hubBinding(c.layout), true);
 	}
 
@@ -516,26 +535,26 @@ public final class CitadelOffice {
 				if (m < 5) {
 					continue;
 				}
-				int x = CX + dx;
-				int z = CZ + dz;
+				int x = CX() + dx;
+				int z = CZ() + dz;
 				boolean corner = Math.abs(dx) == m && Math.abs(dz) == m;
 				Direction in = Math.abs(dz) == m ? (dz < 0 ? Direction.SOUTH : Direction.NORTH) : (dx < 0 ? Direction.EAST : Direction.WEST);
 				Direction.Axis edge = Math.abs(dz) == m ? Direction.Axis.X : Direction.Axis.Z;
 				if (m == 5) {
-					c.set(x, F2, z, c.floor());
-					c.set(x, F2 - 1, z, corner ? FOOT : cherryStairs(in, true));
+					c.set(x, F2(), z, c.floor());
+					c.set(x, F2() - 1, z, corner ? FOOT : cherryStairs(in, true));
 				} else {
-					c.set(x, F2, z, c.kit.beam(edge));
+					c.set(x, F2(), z, c.kit.beam(edge));
 					if (corner) {
-						for (int y = F2 + 1; y <= CEIL + 1; y++) {
+						for (int y = F2() + 1; y <= CEIL() + 1; y++) {
 							c.set(x, y, z, LOG);
 						}
 					} else if (Math.abs(ew(dx, dz)) % 3 == 0) {
-						c.set(x, F2 + 1, z, fence());
-						c.set(x, F2 + 2, z, fence());
-						c.set(x, F2 + 3, z, lantern(false));
+						c.set(x, F2() + 1, z, fence());
+						c.set(x, F2() + 2, z, fence());
+						c.set(x, F2() + 3, z, lantern(false));
 					} else {
-						c.set(x, F2 + 1, z, fence());
+						c.set(x, F2() + 1, z, fence());
 					}
 				}
 			}
@@ -551,34 +570,34 @@ public final class CitadelOffice {
 
 	/**
 	 * The hip roof: deepslate-tile stairs, one ring per row from the eave ({@code m = 7}, cherry stairs, at
-	 * {@code y = CEIL + 1}) up to {@code m = 3}, a flat of tiles over {@code m <= 2}, a second small tier
+	 * {@code y = CEIL() + 1}) up to {@code m = 3}, a flat of tiles over {@code m <= 2}, a second small tier
 	 * ({@code m <= 1}) and a finial: a fence post with a lantern. The attic under it is empty.
 	 */
 	public static void roof(CitadelCanvas c) {
 		for (int dx = -7; dx <= 7; dx++) {
 			for (int dz = -7; dz <= 7; dz++) {
 				int m = m(dx, dz);
-				int x = CX + dx;
-				int z = CZ + dz;
+				int x = CX() + dx;
+				int z = CZ() + dz;
 				Direction in = Math.abs(dz) == m ? (dz < 0 ? Direction.SOUTH : Direction.NORTH) : (dx < 0 ? Direction.EAST : Direction.WEST);
 				if (m >= 3) {
 					Block tile = m == 7 ? Blocks.CHERRY_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS;
-					c.set(x, CEIL + 1 + (7 - m), z, stairs(tile, in));
+					c.set(x, CEIL() + 1 + (7 - m), z, stairs(tile, in));
 					if (m == 3) {
 						// the upper tiers rest on a ring of tiles that touches the wall's roof ring
-						c.set(x, CEIL + 4, z, FOOT);
+						c.set(x, CEIL() + 4, z, FOOT);
 					}
 				} else if (m == 2) {
-					c.set(x, CEIL + 5, z, FOOT);
+					c.set(x, CEIL() + 5, z, FOOT);
 				} else if (m == 1) {
-					c.set(x, CEIL + 5, z, FOOT);
-					c.set(x, CEIL + 6, z, stairs(Blocks.DEEPSLATE_TILE_STAIRS, in));
+					c.set(x, CEIL() + 5, z, FOOT);
+					c.set(x, CEIL() + 6, z, stairs(Blocks.DEEPSLATE_TILE_STAIRS, in));
 				} else {
-					c.set(x, CEIL + 5, z, FOOT);
-					c.set(x, CEIL + 6, z, FOOT);
-					c.set(x, CEIL + 7, z, fence());
-					c.set(x, CEIL + 8, z, fence());
-					c.set(x, CEIL + 9, z, lantern(false));
+					c.set(x, CEIL() + 5, z, FOOT);
+					c.set(x, CEIL() + 6, z, FOOT);
+					c.set(x, CEIL() + 7, z, fence());
+					c.set(x, CEIL() + 8, z, fence());
+					c.set(x, CEIL() + 9, z, lantern(false));
 				}
 			}
 		}
@@ -588,7 +607,7 @@ public final class CitadelOffice {
 
 	/** {@code office}: in front of the desk, facing the screen. {@code office_balcony}: the balcony's north side, facing the hub. */
 	public static void anchors(CitadelCanvas c) {
-		c.anchor(Anchor.at(OFFICE, new BlockPos(CX, F2 + 1, CZ + 1), Direction.SOUTH));
-		c.anchor(Anchor.at(OFFICE_BALCONY, new BlockPos(CX, F2 + 1, CZ - 5), Direction.NORTH));
+		c.anchor(Anchor.at(OFFICE, new BlockPos(CX(), F2() + 1, CZ() + 1), Direction.SOUTH));
+		c.anchor(Anchor.at(OFFICE_BALCONY, new BlockPos(CX(), F2() + 1, CZ() - 5), Direction.NORTH));
 	}
 }

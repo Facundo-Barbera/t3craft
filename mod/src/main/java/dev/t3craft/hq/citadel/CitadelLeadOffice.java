@@ -1,6 +1,6 @@
 package dev.t3craft.hq.citadel;
 
-import static dev.t3craft.hq.citadel.CitadelCanvas.FH;
+import static dev.t3craft.hq.citadel.CitadelCanvas.fh;
 
 import dev.t3craft.hq.HqGeometry;
 import dev.t3craft.hq.HqLayout;
@@ -59,7 +59,7 @@ public final class CitadelLeadOffice {
 			return false;
 		}
 		String thread = mod.desks().get(0).threadId();
-		int y = f * FH + 1;
+		int y = f * fh() + 1;
 		// slot 0: the lead's own desk and workstation (desk anchor desk_<npcId>)
 		CitadelBarrios.desk(c, mod.index(), r, f, 0, thread);
 		// slot 1: the big screen with the lead's children, on a base, facing into the room

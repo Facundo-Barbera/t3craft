@@ -30,7 +30,30 @@ public final class LayoutParams {
 	 * One parameter: {@code layout} ({@link #ANY} for all), its key in the pack, the code default and the
 	 * clamp range, and what it changes.
 	 */
-	public record Spec(String layout, String key, int def, int min, int max, String doc) {
+	public record Spec(String layout, String key, int def, int min, int max, String doc, int unit) {
+		/** An integer parameter ({@code unit} 1). */
+		public Spec(String layout, String key, int def, int min, int max, String doc) {
+			this(layout, key, def, min, max, doc, 1);
+		}
+
+		/**
+		 * A decimal parameter: the pack writes the real value (e.g. {@code 1.5}), it is kept as
+		 * {@code round(value · unit)} and {@link #value} gives it back as a double.
+		 */
+		public double value() {
+			return get() / (double) unit;
+		}
+
+		/** The integer a pack number is stored as: {@code round(n · unit)}. */
+		public int fromPack(double n) {
+			return (int) Math.round(n * unit);
+		}
+
+		/** A stored value as the pack writes it (an integer, or a decimal for {@code unit > 1}). */
+		public Number toPack(int v) {
+			return unit == 1 ? (Number) v : (Number) (v / (double) unit);
+		}
+
 		/** The value for the layout being generated (the spec's own layout; for {@link #ANY}, the active one). */
 		public int get() {
 			return get(layout.equals(ANY) ? HqLayoutPacks.generatingLayout() : layout);
@@ -57,7 +80,11 @@ public final class LayoutParams {
 	}
 
 	private static Spec spec(String layout, String key, int def, int min, int max, String doc) {
-		Spec s = new Spec(layout, key, def, min, max, doc);
+		return spec(layout, key, def, min, max, doc, 1);
+	}
+
+	private static Spec spec(String layout, String key, int def, int min, int max, String doc, int unit) {
+		Spec s = new Spec(layout, key, def, min, max, doc, unit);
 		ALL.add(s);
 		return s;
 	}
@@ -113,6 +140,14 @@ public final class LayoutParams {
 
 	public static final Spec RINGCAMPUS_STREET_LIGHT = spec("hybrid-ringcampus", "streets.lightEvery", 41, 17, 97,
 			"lights let into the streets on a lattice: 1 cell in N");
+	/**
+	 * citadel/scale: size of the whole citadel (radii, streets, lots, buildings, rooms; heights by its
+	 * square root), a decimal in [1.0, 2.5]. {@code 1.0} is the original plan block by block. Read with
+	 * {@link Spec#value()}; see {@code CitadelCanvas} for the rule the pieces follow. Unlike the other
+	 * parameters it moves anchors and desks: the next plan of an existing HQ is rebuilt at the new size.
+	 */
+	public static final Spec RINGCAMPUS_SCALE = spec("hybrid-ringcampus", "scale", 100, 100, 250,
+			"size of the whole citadel (1.0 = original; heights grow by its square root)", 100);
 	public static final Spec RINGCAMPUS_TERRACE_BUSH = spec("hybrid-ringcampus", "terrace.bushEvery", 23, 11, 97,
 			"terraces: an azalea bush on 1 cell in N");
 	public static final Spec RINGCAMPUS_CATALOG = spec("hybrid-ringcampus", "catalog.enabled", 1, 0, 1,

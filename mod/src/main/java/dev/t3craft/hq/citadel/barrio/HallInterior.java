@@ -15,7 +15,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import org.jspecify.annotations.Nullable;
 import static dev.t3craft.hq.citadel.CitadelCanvas.DECOR;
-import static dev.t3craft.hq.citadel.CitadelCanvas.FH;
+import static dev.t3craft.hq.citadel.CitadelCanvas.fh;
 import static dev.t3craft.hq.citadel.CitadelCanvas.HANGING;
 import static dev.t3craft.hq.citadel.CitadelCanvas.b;
 import static dev.t3craft.hq.citadel.CitadelCanvas.col;
@@ -41,7 +41,7 @@ public final class HallInterior {
 	public static void furnish(CitadelCanvas c, Room r, int F, Mats m, HallStyle s, DyeColor env, int seed) {
 		Set<Long> desks = deskColumns(r);
 		for (int f = 0; f < F; f++) {
-			int y = f * FH + 1;
+			int y = f * fh() + 1;
 			rug(c, r, F, f, s, env);
 			furniture(c, r, F, f, y, s, seed, desks);
 			pendants(c, r, F, f, m, seed);
@@ -120,7 +120,7 @@ public final class HallInterior {
 		int mid = r.c();
 		int uMax = D - 3;
 		DyeColor alt = s.alt(env);
-		int y = f * FH + 1;
+		int y = f * fh() + 1;
 		for (int u = 0; u <= uMax; u++) {
 			for (int v = 1; v <= W - 2; v++) {
 				DyeColor col = rugColor(s, u, v, uMax, W, mid, env, alt);
@@ -234,7 +234,7 @@ public final class HallInterior {
 	private static void pendants(CitadelCanvas c, Room r, int F, int f, Mats m, int seed) {
 		int W = r.w();
 		int D = r.d();
-		int ceil = (f + 1) * FH;
+		int ceil = (f + 1) * fh();
 		for (int u = 1; u < D; u += 4) {
 			for (int v = 1; v < W; v += 4) {
 				BlockPos p = r.cell(u, v, ceil);
@@ -255,14 +255,14 @@ public final class HallInterior {
 	private static void chandelier(CitadelCanvas c, Room r) {
 		int mid = r.c();
 		int u = r.d() / 2;
-		BlockPos top = r.cell(u, mid, FH);
+		BlockPos top = r.cell(u, mid, fh());
 		BlockState ceil = c.at(top.getX(), top.getY(), top.getZ());
 		if (ceil == null || ceil.isAir()) {
 			return;
 		}
-		c.put(top.getX(), FH - 1, top.getZ(), Blocks.IRON_CHAIN.defaultBlockState(), HANGING);
-		c.put(top.getX(), FH - 2, top.getZ(), Blocks.IRON_CHAIN.defaultBlockState(), HANGING);
-		c.put(top.getX(), FH - 3, top.getZ(), HallFacade.hangingLantern(), HANGING);
+		c.put(top.getX(), fh() - 1, top.getZ(), Blocks.IRON_CHAIN.defaultBlockState(), HANGING);
+		c.put(top.getX(), fh() - 2, top.getZ(), Blocks.IRON_CHAIN.defaultBlockState(), HANGING);
+		c.put(top.getX(), fh() - 3, top.getZ(), HallFacade.hangingLantern(), HANGING);
 	}
 
 	// ------------------------------------------------------------------ stairs
@@ -270,14 +270,15 @@ public final class HallInterior {
 	/** Cells of the railing round the stair hole on the upper floor: the hole's two long sides and its front end. */
 	private static boolean fenced(Room r, int u, int v) {
 		int mid = r.c();
-		return Math.abs(v - mid) <= 1 && u >= 1 && u <= 5 && !(Math.abs(v - mid) == 0 && u >= 2);
+		// the hole is u = fh - 4 .. fh - 1 on the centre line (2..5 at scale 1, see CitadelBarrios.hallShell)
+		return Math.abs(v - mid) <= 1 && u >= 1 && u <= fh() - 1 && !(Math.abs(v - mid) == 0 && u >= fh() - 4);
 	}
 
 	/** The railing round the hole of the upper floor's stairs. */
 	private static void stairRail(CitadelCanvas c, Room r, HallStyle s) {
 		int mid = r.c();
-		int y = FH + 1;
-		for (int u = 1; u <= 5; u++) {
+		int y = fh() + 1;
+		for (int u = 1; u <= fh() - 1; u++) {
 			for (int dv = -1; dv <= 1; dv++) {
 				if (fenced(r, u, mid + dv)) {
 					BlockPos p = r.cell(u, mid + dv, y);

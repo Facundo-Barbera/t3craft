@@ -7,7 +7,7 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.LIGHT;
 import static dev.t3craft.hq.citadel.CitadelCanvas.LOG;
 import static dev.t3craft.hq.citadel.CitadelCanvas.MOSS;
 import static dev.t3craft.hq.citadel.CitadelCanvas.WATER;
-import static dev.t3craft.hq.citadel.CitadelCanvas.Y0;
+import static dev.t3craft.hq.citadel.CitadelCanvas.y0;
 import static dev.t3craft.hq.citadel.CitadelCanvas.lattice;
 import static dev.t3craft.hq.citadel.CitadelCanvas.leaves;
 
@@ -56,7 +56,7 @@ import net.minecraft.world.level.block.state.BlockState;
  *     the patio stairs already took. Variants: {@link #bridgeDeck}, {@link #bridgeRail},
  *     {@link #bridgeArches}.</li>
  * <li>{@link #promenade(CitadelCanvas, int, int, double, boolean)} ({@code stairHead}: the column is
- *     the head of a patio stair, where there is no railing): the elevated ring at {@code Y0}: a
+ *     the head of a patio stair, where there is no railing): the elevated ring at {@code y0()}: a
  *     {@code FOOT} plinth (with a wall panel every so often on the inner edge), the deck, a railing
  *     facing the patio, and the light posts ({@code LOG} and {@code LIGHT}) round the outer edge,
  *     between the ramps. Skips the top steps of the patio stairs. Variants: {@link #promenadePlinth},
@@ -79,19 +79,30 @@ public final class CitadelGrounds {
 	}
 
 	/** Radius where the patio's paved ring starts (the pool ends): 5/6 of the patio, 17.5 at the unscaled size. */
-	static final double PATIO_RING_IN = RingCampusGeometry.PATIO_R * (17.5 / 21.0);
+	static double PATIO_RING_IN() {
+		return CitadelCanvas.dims().patioR * (17.5 / 21.0);
+	}
+
 	/** Radius where the patio's pool starts (inner lawn inside): 15.5 unscaled. */
-	static final double POOL_IN = RingCampusGeometry.PATIO_R * (15.5 / 21.0);
+	static double POOL_IN() {
+		return CitadelCanvas.dims().patioR * (15.5 / 21.0);
+	}
+
 	/** Radius of the ring of the patio's cherry trees (19.3 unscaled). */
-	static final double PATIO_TREE_R = RingCampusGeometry.PATIO_R * (19.3 / 21.0);
-	/** Radius of the grass pit round a patio tree. */
-	static final double PIT_R = 1.5;
+	static double PATIO_TREE_R() {
+		return CitadelCanvas.dims().patioR * (19.3 / 21.0);
+	}
+
+	/** Radius of the grass pit round a patio tree (1.5 unscaled). */
+	static double PIT_R() {
+		return CitadelCanvas.dims().sd(1.5);
+	}
 
 	// ------------------------------------------------------------------ ground
 
 	/** The half-block height of a ramp column at radius {@code r}: from 0 (outside) up to twice the podium. */
 	private static int rampHalves(double r) {
-		return (int) Math.max(0, Math.min(2 * Y0, Math.round(RingCampusGeometry.RAMP_R - r)));
+		return (int) Math.max(0, Math.min(2 * y0(), Math.round(CitadelCanvas.dims().rampR - r)));
 	}
 
 	/** A column of {@code halves} half blocks: {@code full} up to {@code halves / 2}, then {@code half} if odd. */
@@ -138,7 +149,7 @@ public final class CitadelGrounds {
 		stepped(c, x, z, h - h % 2, FOOT, FOOT);
 		int top = h / 2;
 		c.set(x, top, z, (x * 7 + z * 13 & 7) == 0 ? MOSS : GRASS);
-		if (Math.floorMod(x * 31 + z * 17, dev.t3craft.hq.pack.LayoutParams.RINGCAMPUS_TERRACE_BUSH.get()) == 0 && top + 1 < 6) {
+		if (Math.floorMod(x * 31 + z * 17, dev.t3craft.hq.pack.LayoutParams.RINGCAMPUS_TERRACE_BUSH.get()) == 0 && top + 1 < y0() + 2) {
 			c.set(x, top + 1, z, leaves(Blocks.FLOWERING_AZALEA_LEAVES));
 		} else {
 			Gardens.terrace(c, x, z, top, h);
@@ -178,12 +189,14 @@ public final class CitadelGrounds {
 
 	/** The ground of a patio or bridge column at radius {@code r}: paving, pool, paths and lawn. */
 	public static void patioGround(CitadelCanvas c, int x, int z, double r) {
-		if (r > PATIO_RING_IN) {
-			c.set(x, 0, z, treePit(x, z) ? GRASS : CitadelPaving.patioRing(c, x, z, r, PATIO_RING_IN));
-		} else if (r > POOL_IN && RingCampusGeometry.radialDistance(x, z, 8) > CitadelPaving.CAUSEWAY_D) {
+		double ringIn = PATIO_RING_IN();
+		double poolIn = POOL_IN();
+		if (r > ringIn) {
+			c.set(x, 0, z, treePit(x, z) ? GRASS : CitadelPaving.patioRing(c, x, z, r, ringIn));
+		} else if (r > poolIn && RingCampusGeometry.radialDistance(x, z, 8) > CitadelPaving.CAUSEWAY_D()) {
 			c.set(x, -1, z, FOOT);
 			c.set(x, 0, z, WATER);
-		} else if (r > POOL_IN) {
+		} else if (r > poolIn) {
 			c.set(x, 0, z, CitadelPaving.causeway(x, z));
 		} else {
 			c.set(x, 0, z, (x + z & 3) == 0 ? MOSS : GRASS);
@@ -192,9 +205,11 @@ public final class CitadelGrounds {
 
 	/** A cell of the planting pit round one of the patio's eight cherry trees (see {@link #patioCherries}): grass in the paving. */
 	private static boolean treePit(int x, int z) {
+		double tr = PATIO_TREE_R();
+		double pit = PIT_R();
 		for (int k = 0; k < 8; k++) {
-			BlockPos t = RingCampusGeometry.polar(PATIO_TREE_R, (k + 0.5) * Math.PI / 4, 0);
-			if (Math.hypot(x - t.getX(), z - t.getZ()) <= PIT_R) {
+			BlockPos t = RingCampusGeometry.polar(tr, (k + 0.5) * Math.PI / 4, 0);
+			if (Math.hypot(x - t.getX(), z - t.getZ()) <= pit) {
 				return true;
 			}
 		}
@@ -205,7 +220,7 @@ public final class CitadelGrounds {
 
 	/** A column of a bridge: deck, railings and arches. */
 	public static void bridge(CitadelCanvas c, int x, int z) {
-		if (c.at(x, Y0, z) != null) {
+		if (c.at(x, y0(), z) != null) {
 			return; // patio stairs
 		}
 		bridgeDeck(c, x, z);
@@ -215,21 +230,23 @@ public final class CitadelGrounds {
 
 	/** The deck: a runner, tile and joints in the middle five columns, {@code FOOT} on the edges. */
 	private static void bridgeDeck(CitadelCanvas c, int x, int z) {
-		c.set(x, Y0, z, CitadelPaving.bridgeDeck(c, x, z));
+		c.set(x, y0(), z, CitadelPaving.bridgeDeck(c, x, z));
 	}
 
 	/** The railing on both edges of the deck. */
 	private static void bridgeRail(CitadelCanvas c, int x, int z) {
-		if (Math.abs(x) == 3) {
-			c.set(x, Y0 + 1, z, c.kit.railing(x > 0 ? Direction.EAST : Direction.WEST));
+		if (Math.abs(x) == c.g.bridgeHalf) {
+			c.set(x, y0() + 1, z, c.kit.railing(x > 0 ? Direction.EAST : Direction.WEST));
 		}
 	}
 
 	/** Arches under the deck: a lintel course and piers. */
 	private static void bridgeArches(CitadelCanvas c, int x, int z) {
-		c.set(x, Y0 - 1, z, Math.abs(z) % 4 == 1 || Math.abs(x) == 3 ? FOOT : AIR);
-		if (Math.abs(z) % 4 == 1 && Math.abs(x) == 3) {
-			c.fill(x, 1, Y0 - 2, z, FOOT);
+		boolean pier = Math.abs(z) % c.s(4) == 1;
+		boolean edge = Math.abs(x) == c.g.bridgeHalf;
+		c.set(x, y0() - 1, z, pier || edge ? FOOT : AIR);
+		if (pier && edge) {
+			c.fill(x, 1, y0() - 2, z, FOOT);
 		}
 	}
 
@@ -238,7 +255,7 @@ public final class CitadelGrounds {
 	 * light posts (log and a light block) round the outer edge between the ramps.
 	 */
 	public static void promenade(CitadelCanvas c, int x, int z, double r, boolean stairHead) {
-		if (c.at(x, Y0, z) != null) {
+		if (c.at(x, y0(), z) != null) {
 			return; // the top step of a patio stair
 		}
 		promenadePlinth(c, x, z, r);
@@ -250,28 +267,28 @@ public final class CitadelGrounds {
 
 	/** The solid plinth under the deck, with a wall panel every so often on the inner edge. */
 	private static void promenadePlinth(CitadelCanvas c, int x, int z, double r) {
-		c.fill(x, 1, Y0 - 1, z, r <= CitadelPaving.promenadeInner() && Math.floorMod(x * 3 + z * 7, 9) == 0 ? c.kit.wallPanel(true) : FOOT);
+		c.fill(x, 1, y0() - 1, z, r <= CitadelPaving.promenadeInner() && Math.floorMod(x * 3 + z * 7, 9) == 0 ? c.kit.wallPanel(true) : FOOT);
 	}
 
 	/** The deck: rim, tile stripes and the kit's floor with joints ({@link CitadelPaving#promenade}). */
 	private static void promenadeDeck(CitadelCanvas c, int x, int z, double r) {
-		c.set(x, Y0, z, CitadelPaving.promenade(c, x, z, r));
+		c.set(x, y0(), z, CitadelPaving.promenade(c, x, z, r));
 	}
 
 	/** The railing on the patio side (none on the heads of the patio stairs nor near the axis). */
 	private static void promenadeRail(CitadelCanvas c, int x, int z, boolean inner, boolean stairHead) {
-		if (inner && Math.abs(x) > 3 && !stairHead) {
+		if (inner && Math.abs(x) > c.g.bridgeHalf && !stairHead) {
 			Direction edge = RingCampusGeometry.cardinal(RingCampusGeometry.theta(x, z)).getOpposite();
-			c.set(x, Y0 + 1, z, c.kit.railing(edge));
+			c.set(x, y0() + 1, z, c.kit.railing(edge));
 		}
 	}
 
 	/** The light posts ({@code LOG} twice, then {@code LIGHT}) round the outer edge, between the ramps. */
 	private static void promenadePost(CitadelCanvas c, int x, int z, double r) {
 		if (r > CitadelPaving.promenadeRim() && RingCampusGeometry.radialDistance(x, z, 16) < 0.5
-				&& RingCampusGeometry.radialDistance(x, z, 8) > 5) {
-			c.fill(x, Y0 + 1, Y0 + 2, z, LOG);
-			c.set(x, Y0 + 3, z, LIGHT);
+				&& RingCampusGeometry.radialDistance(x, z, 8) > c.sd(5)) {
+			c.fill(x, y0() + 1, y0() + 2, z, LOG);
+			c.set(x, y0() + 3, z, LIGHT);
 		}
 	}
 

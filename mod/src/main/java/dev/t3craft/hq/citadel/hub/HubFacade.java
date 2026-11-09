@@ -1,5 +1,6 @@
 package dev.t3craft.hq.citadel.hub;
 
+import dev.t3craft.hq.RingCampusGeometry;
 import dev.t3craft.hq.RingCampusGeometry.Kind;
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.CitadelHub;
@@ -10,7 +11,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import static dev.t3craft.hq.citadel.CitadelCanvas.CALCITE;
 import static dev.t3craft.hq.citadel.CitadelCanvas.FOOT;
 import static dev.t3craft.hq.citadel.CitadelCanvas.RIB;
-import static dev.t3craft.hq.citadel.CitadelCanvas.Y0;
+import static dev.t3craft.hq.citadel.CitadelCanvas.y0;
 import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
 
 /**
@@ -20,8 +21,8 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
  * nothing random (colours cycle by bay).
  *
  * <p>Bays: along a wall face the coordinate {@code t} (z on the east and west faces, x on the others)
- * repeats every 4 cells; {@code u = floorMod(t + 2, 4)}: {@code u == 0} is a pier (the same lines as the
- * nave's arcade piers), {@code u == 1..3} a bay, {@code u == 2} its middle.
+ * repeats every 4 cells ({@code s(4)}); {@code u = floorMod(t + 2, 4)}: {@code u == 0} is a pier (the same
+ * lines as the nave's arcade piers), {@code u == 1..3} a bay, {@code u == 2} its middle.
  */
 public final class HubFacade {
 	private HubFacade() {
@@ -34,7 +35,7 @@ public final class HubFacade {
 
 	/** {@code 0}: pier; {@code 1..3}: bay (2 is the middle). */
 	static int bay(int x, int z) {
-		return Math.floorMod(along(x, z) + HubDims.PIER_PHASE, HubDims.PIER_PERIOD);
+		return Math.floorMod(along(x, z) + HubDims.PIER_PHASE(), HubDims.PIER_PERIOD());
 	}
 
 	static boolean pier(int x, int z) {
@@ -43,32 +44,32 @@ public final class HubFacade {
 
 	/** The colour of the window of a bay, cycled by the bay and the quadrant. */
 	static DyeColor bayColor(int x, int z) {
-		int i = Math.floorDiv(along(x, z) + HubDims.PIER_PHASE, HubDims.PIER_PERIOD) + (x > 0 ? 1 : 0) + (z > 0 ? 2 : 0);
+		int i = Math.floorDiv(along(x, z) + HubDims.PIER_PHASE(), HubDims.PIER_PERIOD()) + (x > 0 ? 1 : 0) + (z > 0 ? 2 : 0);
 		return HubBlocks.GLASS_COLORS[Math.floorMod(i, HubBlocks.GLASS_COLORS.length)];
 	}
 
 	/** Whether an outer-wall window may open here: not behind the screens, thread wall nor board. */
 	static boolean windowAllowed(int x, int z) {
 		boolean ew = Math.abs(x) > Math.abs(z);
-		return !(ew && Math.abs(z) <= HubDims.BLIND_HALF);
+		return !(ew && Math.abs(z) <= HubDims.BLIND_HALF());
 	}
 
 	/** The dark base course of a wall column (the podium): y1 to the floor, a scatter of deepslate variants. */
 	public static void base(CitadelCanvas c, int x, int z) {
-		for (int y = 1; y <= Y0; y++) {
+		for (int y = 1; y <= y0(); y++) {
 			c.set(x, y, z, HubBlocks.darkBase(x, y, z));
 		}
 	}
 
 	/** Whether the wall column has a window (outer neighbours get a sill and a lintel course). */
 	static boolean hasWindow(int x, int z) {
-		boolean naveEnd = Math.abs(x) <= HubDims.NAVE_HALF && Math.abs(z) >= HubDims.INNER;
+		boolean naveEnd = Math.abs(x) <= HubDims.NAVE_HALF() && Math.abs(z) >= HubDims.INNER();
 		return !naveEnd && !pier(x, z) && windowAllowed(x, z);
 	}
 
 	/** One column of the outer wall (the zone map says this column is {@code HUB_WALL}). */
 	public static void wall(CitadelCanvas c, int x, int z) {
-		boolean naveEnd = Math.abs(x) <= HubDims.NAVE_HALF && Math.abs(z) >= HubDims.INNER;
+		boolean naveEnd = Math.abs(x) <= HubDims.NAVE_HALF() && Math.abs(z) >= HubDims.INNER();
 		column(c, x, z, naveEnd);
 		if (naveEnd) {
 			gable(c, x, z);
@@ -83,19 +84,19 @@ public final class HubFacade {
 		boolean pier = !naveEnd && pier(x, z);
 		int u = bay(x, z);
 		boolean win = !naveEnd && !pier && windowAllowed(x, z);
-		for (int y = Y0 + 1; y <= CitadelHub.AISLE_TOP; y++) {
+		for (int y = y0() + 1; y <= CitadelHub.aisleTop(); y++) {
 			BlockState s;
-			if (y <= Y0 + 1) {
+			if (y <= y0() + 1) {
 				s = HubBlocks.stoneBrick(x, y, z);
-			} else if (y == CitadelHub.AISLE_TOP) {
+			} else if (y == CitadelHub.aisleTop()) {
 				s = naveEnd ? RIB : CALCITE;
 			} else if (pier) {
-				s = y == Y0 + 2 ? RIB : CALCITE;
-			} else if (win && y >= Y0 + 3 && y <= Y0 + 5) {
+				s = y == y0() + 2 ? RIB : CALCITE;
+			} else if (win && y >= y0() + c.sy(3) && y <= y0() + c.sy(5)) {
 				s = HubBlocks.pane(bayColor(x, z));
-			} else if (win && y == Y0 + 6 && u == 2) {
+			} else if (win && y == y0() + c.sy(6) && u == HubDims.PIER_PERIOD() / 2) {
 				s = HubBlocks.pane(bayColor(x, z));
-			} else if (!naveEnd && y == Y0 + 2 && Math.floorMod(x * 5 + z * 3, 6) == 0) {
+			} else if (!naveEnd && y == y0() + 2 && Math.floorMod(x * 5 + z * 3, 6) == 0) {
 				s = c.kit.wallPanel(true);
 			} else {
 				s = c.kit.wallPanel(false);
@@ -117,7 +118,7 @@ public final class HubFacade {
 
 	/** The cross gables of the transept stand on the east and west faces within the transept's width. */
 	static boolean transept(int x, int z) {
-		return Math.abs(x) == HubDims.FACE && Math.abs(z) <= HubDims.TRANSEPT_HALF;
+		return Math.abs(x) == HubDims.FACE() && Math.abs(z) <= HubDims.TRANSEPT_HALF();
 	}
 
 	/**
@@ -126,7 +127,7 @@ public final class HubFacade {
 	 * the eight vertices. The inner column of a thick chamfer only gets a slab.
 	 */
 	static void parapet(CitadelCanvas c, int x, int z) {
-		int top = CitadelHub.AISLE_TOP + 1;
+		int top = CitadelHub.aisleTop() + 1;
 		if (transept(x, z)) {
 			transeptGable(c, x, z);
 			return;
@@ -148,10 +149,11 @@ public final class HubFacade {
 	/** The end wall of a transept gable: calcite up to the roof line, a small window on the ridge, a dark coping. */
 	static void transeptGable(CitadelCanvas c, int x, int z) {
 		int hz = Math.abs(z);
-		int base = HubDims.TERRACE_Y;
-		int top = base + HubDims.TRANSEPT_HALF - hz;
+		int base = HubDims.TERRACE_Y();
+		int top = base + HubDims.TRANSEPT_HALF() - hz;
 		for (int y = base; y <= top; y++) {
-			boolean window = hz <= 1 && y >= base + 1 && y <= top - 1 && !(hz == 1 && y > base + 2);
+			int w = c.s(1);
+			boolean window = hz <= w && y >= base + 1 && y <= top - 1 && !(hz == w && y > base + 2);
 			c.set(x, y, z, window ? HubBlocks.glass(HubBlocks.GLASS_COLORS[Math.floorMod(x > 0 ? 0 : 1, 2)]) : CALCITE);
 		}
 		c.set(x, top + 1, z, hz == 0 ? slab(Blocks.DEEPSLATE_TILE_SLAB) : HubBlocks.darkStairs(z > 0 ? Direction.NORTH : Direction.SOUTH, false));
@@ -161,13 +163,13 @@ public final class HubFacade {
 	static boolean corner(int x, int z) {
 		int ax = Math.abs(x);
 		int az = Math.abs(z);
-		return (ax == HubDims.FACE && az == HubDims.FACE_HALF) || (az == HubDims.FACE && ax == HubDims.FACE_HALF);
+		return (ax == HubDims.FACE() && az == HubDims.FACE_HALF()) || (az == HubDims.FACE() && ax == HubDims.FACE_HALF());
 	}
 
 	/** Gable of the nave up to the vault: a stained rose window in it, a coping and a finial on top. */
 	static void gable(CitadelCanvas c, int x, int z) {
 		int top = CitadelHub.vaultY(Math.abs(x));
-		for (int y = CitadelHub.AISLE_TOP + 1; y <= top; y++) {
+		for (int y = CitadelHub.aisleTop() + 1; y <= top; y++) {
 			c.set(x, y, z, rose(x, y));
 		}
 		int ax = Math.abs(x);
@@ -182,18 +184,19 @@ public final class HubFacade {
 
 	/** The rose window: a yellow eye, a pink ring, eight calcite spokes with blue and magenta petals, a stone-brick rim. */
 	static BlockState rose(int x, int y) {
-		double dy = y - CitadelHub.SPRING;
+		double dy = y - CitadelHub.spring();
 		double r = Math.hypot(x, dy);
-		if (r > 3.7) {
+		RingCampusGeometry.Dims d = CitadelCanvas.dims();
+		if (r > d.sd(3.7)) {
 			return CALCITE;
 		}
-		if (r > 2.8) {
+		if (r > d.sd(2.8)) {
 			return Blocks.CHISELED_STONE_BRICKS.defaultBlockState();
 		}
-		if (r <= 0.9) {
+		if (r <= d.sd(0.9)) {
 			return HubBlocks.glass(DyeColor.YELLOW);
 		}
-		if (r <= 1.8) {
+		if (r <= d.sd(1.8)) {
 			return HubBlocks.glass(DyeColor.PINK);
 		}
 		double a = Math.atan2(dy, x);
@@ -207,15 +210,15 @@ public final class HubFacade {
 	/** The rim of the rose window stands out one block from the gable (outside the wall). */
 	static void roseRim(CitadelCanvas c, int x, int z) {
 		int sz = z > 0 ? 1 : -1;
-		for (int y = CitadelHub.AISLE_TOP + 1; y <= CitadelHub.vaultY(Math.abs(x)); y++) {
-			double r = Math.hypot(x, y - CitadelHub.SPRING);
-			if (r > 2.8 && r <= 3.7) {
+		for (int y = CitadelHub.aisleTop() + 1; y <= CitadelHub.vaultY(Math.abs(x)); y++) {
+			double r = Math.hypot(x, y - CitadelHub.spring());
+			if (r > c.sd(2.8) && r <= c.sd(3.7)) {
 				c.set(x, y, z + sz, Blocks.CHISELED_STONE_BRICKS.defaultBlockState());
 			}
 		}
 	}
 
-	/** Main portal (south, 5 x 5, stepped arch) and the north door under the board (3 x 3), both framed in calcite. */
+	/** Main portal (south, 5 x 5, stepped arch) and the north door under the board (3 x 3), both framed in calcite; doors never scale. */
 	static void portals(CitadelCanvas c, int x, int z) {
 		if (z > 0 && Math.abs(x) <= 3) {
 			portalFrame(c, x, z, 2, 5);
@@ -230,13 +233,13 @@ public final class HubFacade {
 		int ax = Math.abs(x);
 		if (ax <= half) {
 			boolean arch = ax == half && h >= 5;
-			c.fill(x, Y0 + 1, Y0 + h - (arch ? 1 : 0), z, CitadelCanvas.AIR);
+			c.fill(x, y0() + 1, y0() + h - (arch ? 1 : 0), z, CitadelCanvas.AIR);
 			if (arch) {
-				c.set(x, Y0 + h, z, CALCITE);
+				c.set(x, y0() + h, z, CALCITE);
 			}
-			c.set(x, Y0 + h + 1, z, CALCITE);
+			c.set(x, y0() + h + 1, z, CALCITE);
 		} else {
-			c.fill(x, Y0 + 1, Y0 + h + 1, z, CALCITE);
+			c.fill(x, y0() + 1, y0() + h + 1, z, CALCITE);
 		}
 	}
 }

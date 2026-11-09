@@ -150,14 +150,15 @@ public record LayoutPack(String layoutId, Map<String, Replacement> roles, Map<St
 						if (e.getKey().startsWith("_")) {
 							continue;
 						}
-						if (LayoutParams.find(layoutId, e.getKey()) == null) {
+						LayoutParams.Spec spec = LayoutParams.find(layoutId, e.getKey());
+						if (spec == null) {
 							throw new PackException(at(fileName, json, e.getKey()) + "unknown parameter '" + e.getKey() + "' for layout " + layoutId);
 						}
 						JsonElement n = e.getValue();
 						if (!n.isJsonPrimitive() || !n.getAsJsonPrimitive().isNumber()) {
 							throw new PackException(at(fileName, json, e.getKey()) + "'" + e.getKey() + "' must be a number");
 						}
-						paramMap.put(e.getKey(), (int) Math.round(n.getAsDouble()));
+						paramMap.put(e.getKey(), spec.fromPack(n.getAsDouble()));
 					}
 				}
 				case "rooms" -> {

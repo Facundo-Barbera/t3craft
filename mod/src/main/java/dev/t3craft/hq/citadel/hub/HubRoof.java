@@ -28,20 +28,20 @@ public final class HubRoof {
 		return x > 0 ? Direction.WEST : Direction.EAST;
 	}
 
-	/** One column of the nave's roof ({@code |x| < 6}): shell, ribs, crest; the lantern's ring and opening near the centre. */
+	/** One column of the nave's roof ({@code |x| < naveHalf}, 6 at scale 1): shell, ribs, crest; the lantern's ring and opening near the centre. */
 	public static void vault(CitadelCanvas c, int x, int z, int ax) {
 		int top = CitadelHub.vaultY(ax);
 		int hz = Math.abs(z);
-		int d = HubDims.DRUM_HALF;
+		int d = HubDims.DRUM_HALF();
 		if (ax < d && hz < d) {
 			return; // the opening into the lantern
 		}
 		if (Math.max(ax, hz) == d) {
-			drumWall(c, x, z, ax, hz, top, HubDims.DRUM_TOP - 4, HubDims.DRUM_TOP);
+			drumWall(c, x, z, ax, hz, top, HubDims.DRUM_TOP() - c.sy(4), HubDims.DRUM_TOP());
 			return;
 		}
 		c.set(x, top, z, shell(x, ax));
-		if (Math.floorMod(z, HubDims.PIER_PERIOD) == 0) {
+		if (Math.floorMod(z, HubDims.PIER_PERIOD()) == 0) {
 			c.set(x, top - 1, z, RIB);
 		}
 		if (ax == 0) {
@@ -52,10 +52,10 @@ public final class HubRoof {
 	/** The roof's material by height: dark eave course, cherry body. */
 	private static net.minecraft.world.level.block.state.BlockState shell(int x, int ax) {
 		Direction in = towardAxis(x);
-		if (ax >= 5) {
+		if (ax >= HubDims.NAVE_HALF() - 1) {
 			return HubBlocks.darkStairs(in, false);
 		}
-		if (ax >= 2) {
+		if (ax >= CitadelCanvas.dims().s(2)) {
 			return HubBlocks.roofStairs(in);
 		}
 		return PLANKS;
@@ -77,8 +77,8 @@ public final class HubRoof {
 	 * stepped cherry pyramid and a spire; the beacon hangs on a chain from the lower ceiling.
 	 */
 	public static void cupola(CitadelCanvas c) {
-		int d = HubDims.DRUM_HALF;
-		int eaveY = HubDims.DRUM_TOP + 1;
+		int d = HubDims.DRUM_HALF();
+		int eaveY = HubDims.DRUM_TOP() + 1;
 		for (int hx = -(d + 1); hx <= d + 1; hx++) {
 			for (int hz = -(d + 1); hz <= d + 1; hz++) {
 				int m = Math.max(Math.abs(hx), Math.abs(hz));
@@ -126,11 +126,11 @@ public final class HubRoof {
 
 	/** The eave: a stair overhanging the aisle beyond the clerestory's top, in line with the nave's slope. */
 	public static void eave(CitadelCanvas c, int x, int z) {
-		if (Math.abs(z) <= HubDims.TRANSEPT_HALF) {
+		if (Math.abs(z) <= HubDims.TRANSEPT_HALF()) {
 			return;
 		}
 		int sx = x > 0 ? 1 : -1;
-		c.set(x + sx, CitadelHub.SPRING, z, HubBlocks.darkStairs(towardAxis(x), false));
+		c.set(x + sx, CitadelHub.spring(), z, HubBlocks.darkStairs(towardAxis(x), false));
 	}
 
 	/**
@@ -140,9 +140,9 @@ public final class HubRoof {
 	 */
 	public static void terrace(CitadelCanvas c, int x, int z) {
 		int ax = Math.abs(x);
-		int y = HubDims.TERRACE_Y;
+		int y = HubDims.TERRACE_Y();
 		int hz = Math.abs(z);
-		int t = HubDims.TRANSEPT_HALF;
+		int t = HubDims.TRANSEPT_HALF();
 		if (hz <= t) {
 			if (hz == 0) {
 				c.set(x, y + t, z, HubBlocks.stoneBrick(x, y, z));
@@ -153,10 +153,10 @@ public final class HubRoof {
 			return;
 		}
 		c.set(x, y, z, arcadeZ(z) ? slab(Blocks.CHERRY_SLAB) : HubBlocks.stoneSlab(false));
-		if (ax == HubDims.TERRACE_X0 + 1 && arcadeZ(z)) {
+		if (ax == HubDims.TERRACE_X0() + 1 && arcadeZ(z)) {
 			c.set(x, y + 1, z, HubBlocks.bush());
 		}
-		if (ax == HubDims.TERRACE_X0 + 2 && arcadeZ(z) && Math.floorMod(z + 2, 8) == 0) {
+		if (ax == HubDims.TERRACE_X0() + 2 && arcadeZ(z) && Math.floorMod(z + HubDims.PIER_PHASE(), 2 * HubDims.PIER_PERIOD()) == 0) {
 			c.set(x, y + 1, z, HubBlocks.stoneWall());
 			c.set(x, y + 2, z, Blocks.LANTERN.defaultBlockState());
 		}

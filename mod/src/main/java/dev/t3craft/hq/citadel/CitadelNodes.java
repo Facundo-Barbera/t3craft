@@ -66,7 +66,9 @@ public final class CitadelNodes {
 
 	/** Paints node {@code nd}: all of its columns, then its furniture, then the fixtures of its kind. */
 	public static void node(CitadelCanvas c, Node nd) {
-		int R = 8;
+		// the node's zone grows with the citadel's scale (nd.size()); the rooms keep their designed size in
+		// its centre and the rest of the zone is their apron (floor only): see TowerRoom, RotundaRoom, CloisterRoom
+		int R = Math.max(8, (int) Math.ceil(nd.size()) + 1);
 		for (int x = nd.cx() - R; x <= nd.cx() + R; x++) {
 			for (int z = nd.cz() - R; z <= nd.cz() + R; z++) {
 				Zone zn = c.zoneAt(x, z);

@@ -2,7 +2,7 @@ package dev.t3craft.hq.citadel;
 
 import static dev.t3craft.hq.citadel.CitadelCanvas.AIR;
 import static dev.t3craft.hq.citadel.CitadelCanvas.DECOR;
-import static dev.t3craft.hq.citadel.CitadelCanvas.FH;
+import static dev.t3craft.hq.citadel.CitadelCanvas.fh;
 import static dev.t3craft.hq.citadel.CitadelCanvas.HANGING;
 import static dev.t3craft.hq.citadel.CitadelCanvas.SOLID;
 import static dev.t3craft.hq.citadel.CitadelCanvas.col;
@@ -59,7 +59,7 @@ import org.jspecify.annotations.Nullable;
  *     cells of a lot.</li>
  * <li>{@link #light}: the light pass, with the invisible vanilla block {@code minecraft:light}
  *     ({@link CitadelCanvas#invisibleLight}, levels 12 to 15). It walks the cells an NPC can reach
- *     ({@link #walkable}, from {@link #SPAWN} in one-block steps, tested by {@link #standable}/{@link #noCollision})
+ *     ({@link #walkable}, from {@link #spawn()} in one-block steps, tested by {@link #standable}/{@link #noCollision})
  *     and lights each group <b>on its own</b>: a {@code HqLightMap} sees the group's cells as they are, the
  *     air over its floors as air and everything else opaque (so a neighbour that comes or goes never moves a
  *     light). The lights replace plain air cells of the same group ({@link #freeAir}: never a fixture, an
@@ -93,15 +93,17 @@ import org.jspecify.annotations.Nullable;
  *
  * <h2>Anchors</h2>
  *
- * None are produced here; the {@code spawn} anchor is placed by the generator at {@link #SPAWN} before
+ * None are produced here; the {@code spawn} anchor is placed by the generator at {@link #spawn()} before
  * {@link #build}, and the anchors and sorted workstations of the canvas go into the plan unchanged.
  */
 public final class CitadelFinish {
 	/** Block light every walkable cell must reach (see {@link #light}). */
 	public static final int MIN_LIGHT = 10;
 
-	/** Where NPCs appear: the inner street, south, in front of the main ramp. */
-	public static final BlockPos SPAWN = new BlockPos(0, 1, 38);
+	/** Where NPCs appear: the inner street, south, in front of the main ramp ((0, 1, 38) at scale 1; was {@code SPAWN}). */
+	public static BlockPos spawn() {
+		return RingCampusGeometry.spawn();
+	}
 
 	private CitadelFinish() {
 	}
@@ -136,7 +138,7 @@ public final class CitadelFinish {
 		if (hall == null) {
 			return "lot_" + zn.lot();
 		}
-		int f = y >= FH ? 1 : 0;
+		int f = y >= fh() ? 1 : 0;
 		HqLayout.Module m = mods.get(f * RingCampusGeometry.HALLS + hall[1]);
 		if (m == null) {
 			m = mods.get((1 - f) * RingCampusGeometry.HALLS + hall[1]);
@@ -198,9 +200,10 @@ public final class CitadelFinish {
 	static List<BlockPos> walkable(CitadelCanvas c) {
 		Set<Long> seen = new HashSet<>();
 		ArrayDeque<BlockPos> todo = new ArrayDeque<>();
-		if (standable(c, SPAWN.getX(), SPAWN.getY(), SPAWN.getZ())) {
-			seen.add(SPAWN.asLong());
-			todo.add(SPAWN);
+		BlockPos spawn = spawn();
+		if (standable(c, spawn.getX(), spawn.getY(), spawn.getZ())) {
+			seen.add(spawn.asLong());
+			todo.add(spawn);
 		}
 		while (!todo.isEmpty()) {
 			BlockPos p = todo.poll();

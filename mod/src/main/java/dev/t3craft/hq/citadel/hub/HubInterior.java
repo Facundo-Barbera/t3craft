@@ -14,11 +14,11 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.FOOT;
 import static dev.t3craft.hq.citadel.CitadelCanvas.LOG;
 import static dev.t3craft.hq.citadel.CitadelCanvas.PLANKS;
 import static dev.t3craft.hq.citadel.CitadelCanvas.RIB;
-import static dev.t3craft.hq.citadel.CitadelCanvas.Y0;
+import static dev.t3craft.hq.citadel.CitadelCanvas.y0;
 import static dev.t3craft.hq.citadel.CitadelCanvas.lattice;
 import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
-import static dev.t3craft.hq.citadel.CitadelHub.AISLE_TOP;
-import static dev.t3craft.hq.citadel.CitadelHub.SPRING;
+import static dev.t3craft.hq.citadel.CitadelHub.aisleTop;
+import static dev.t3craft.hq.citadel.CitadelHub.spring;
 import static dev.t3craft.hq.citadel.CitadelHub.arcadeZ;
 
 /**
@@ -41,56 +41,56 @@ public final class HubInterior {
 	/** Floor of an interior column: the octagon rings, a red rug with a dark border along the nave. */
 	public static BlockState floor(CitadelCanvas c, int x, int z) {
 		double o = RingCampusGeometry.octagon(x, z);
-		boolean rug = o > 3 && z >= HubDims.RUG_Z0 && z <= HubDims.RUG_Z1;
-		if (rug && Math.abs(x) <= HubDims.RUG_HALF) {
+		boolean rug = o > c.s(3) && z >= HubDims.RUG_Z0() && z <= HubDims.RUG_Z1();
+		if (rug && Math.abs(x) <= HubDims.RUG_HALF()) {
 			return CitadelCanvas.terracotta(DyeColor.RED);
 		}
-		if (rug && Math.abs(x) == HubDims.RUG_HALF + 1) {
+		if (rug && Math.abs(x) == HubDims.RUG_HALF() + 1) {
 			return RIB;
 		}
-		return o <= 3 || (int) o % 4 == 0 ? c.accent() : c.floor();
+		return o <= c.s(3) || (int) o % c.s(4) == 0 ? c.accent() : c.floor();
 	}
 
 	// ------------------------------------------------------------------ nave columns
 
-	/** The colonnade line ({@code |x| == 6}): piers with base, shaft and capital, then the stained clerestory. */
+	/** The colonnade line ({@code |x| == naveHalf}, 6 at scale 1): piers with base, shaft and capital, then the stained clerestory. */
 	public static void arcade(CitadelCanvas c, int x, int z) {
 		int sx = x > 0 ? 1 : -1;
 		if (arcadeZ(z)) {
 			pier(c, x, z);
 			Direction toPier = sx > 0 ? Direction.EAST : Direction.WEST;
-			int y = HubDims.CAPITAL_Y;
+			int y = HubDims.CAPITAL_Y();
 			c.set(x - sx, y, z, HubBlocks.stairsTop(Blocks.CHERRY_STAIRS, toPier));
 			c.set(x + sx, y, z, HubBlocks.stairsTop(Blocks.CHERRY_STAIRS, toPier.getOpposite()));
 			c.set(x, y, z - 1, HubBlocks.stairsTop(Blocks.CHERRY_STAIRS, Direction.SOUTH));
 			c.set(x, y, z + 1, HubBlocks.stairsTop(Blocks.CHERRY_STAIRS, Direction.NORTH));
 		}
-		c.set(x, AISLE_TOP, z, c.kit.beam(Direction.Axis.Z));
-		DyeColor tint = HubBlocks.GLASS_COLORS[Math.floorMod(Math.floorDiv(z + 2, 4) + (sx > 0 ? 2 : 0), HubBlocks.GLASS_COLORS.length)];
-		for (int y = AISLE_TOP + 1; y < SPRING; y++) {
+		c.set(x, aisleTop(), z, c.kit.beam(Direction.Axis.Z));
+		DyeColor tint = HubBlocks.GLASS_COLORS[Math.floorMod(Math.floorDiv(z + HubDims.PIER_PHASE(), HubDims.PIER_PERIOD()) + (sx > 0 ? 2 : 0), HubBlocks.GLASS_COLORS.length)];
+		for (int y = aisleTop() + 1; y < spring(); y++) {
 			c.set(x, y, z, arcadeZ(z) ? LOG : HubBlocks.glass(tint));
 		}
-		c.set(x, SPRING, z, PLANKS);
+		c.set(x, spring(), z, PLANKS);
 		HubRoof.eave(c, x, z);
 	}
 
-	/** A pier or pilaster: blackstone base, cherry shaft, calcite capital block (y = {@code AISLE_TOP - 1}). */
+	/** A pier or pilaster: blackstone base, cherry shaft, calcite capital block (y = {@code aisleTop() - 1}). */
 	static void pier(CitadelCanvas c, int x, int z) {
-		c.set(x, Y0 + 1, z, RIB);
-		c.fill(x, Y0 + 2, AISLE_TOP - 2, z, LOG);
-		c.set(x, AISLE_TOP - 1, z, CALCITE);
+		c.set(x, y0() + 1, z, RIB);
+		c.fill(x, y0() + 2, aisleTop() - 2, z, LOG);
+		c.set(x, aisleTop() - 1, z, CALCITE);
 	}
 
 	/** The aisles' ceiling ({@code |x| > 6}): deepslate with ribs on the pier lines, rafters, a lantern per bay. */
 	public static void aisle(CitadelCanvas c, int x, int z) {
 		int ax = Math.abs(x);
 		HubRoof.terrace(c, x, z);
-		c.set(x, AISLE_TOP, z, arcadeZ(z) ? RIB : FOOT);
-		if (ax >= HubDims.RAFTER_X && arcadeZ(z)) {
-			c.set(x, AISLE_TOP - 1, z, HubBlocks.strippedLog(Direction.Axis.X));
+		c.set(x, aisleTop(), z, arcadeZ(z) ? RIB : FOOT);
+		if (ax >= HubDims.RAFTER_X() && arcadeZ(z)) {
+			c.set(x, aisleTop() - 1, z, HubBlocks.strippedLog(Direction.Axis.X));
 		}
-		if (ax == HubDims.AISLE_LAMP_X && Math.floorMod(z, HubDims.PIER_PERIOD) == 0 && Math.abs(z) <= HubDims.AISLE_LAMP_Z) {
-			c.set(x, AISLE_TOP - 1, z, HubBlocks.hangingLantern());
+		if (ax == HubDims.AISLE_LAMP_X() && Math.floorMod(z, HubDims.PIER_PERIOD()) == 0 && Math.abs(z) <= HubDims.AISLE_LAMP_Z()) {
+			c.set(x, aisleTop() - 1, z, HubBlocks.hangingLantern());
 		}
 	}
 
@@ -114,10 +114,10 @@ public final class HubInterior {
 	/** Two rows of pews (three seats wide) either side of the rug, south half of the nave, facing the board. */
 	static void pews(CitadelCanvas c) {
 		for (int sx = -1; sx <= 1; sx += 2) {
-			for (int r = 0; r < HubDims.PEW_ROWS; r++) {
-				int z = HubDims.PEW_Z0 + r * HubDims.PEW_STEP;
-				for (int i = HubDims.PEW_X0; i <= HubDims.PEW_X1; i++) {
-					c.set(sx * i, Y0 + 1, z, stairs(Blocks.CHERRY_STAIRS, Direction.SOUTH));
+			for (int r = 0; r < HubDims.PEW_ROWS(); r++) {
+				int z = HubDims.PEW_Z0() + r * HubDims.PEW_STEP();
+				for (int i = HubDims.PEW_X0(); i <= HubDims.PEW_X1(); i++) {
+					c.set(sx * i, y0() + 1, z, stairs(Blocks.CHERRY_STAIRS, Direction.SOUTH));
 				}
 			}
 		}
@@ -128,12 +128,12 @@ public final class HubInterior {
 		for (int sx = -1; sx <= 1; sx += 2) {
 			Direction out = sx > 0 ? Direction.EAST : Direction.WEST;
 			for (int sz = -1; sz <= 1; sz += 2) {
-				int z = HubDims.NOOK_Z * sz;
-				int t = HubDims.NOOK_X;
-				c.set(t * sx, Y0 + 1, z, HubBlocks.slabTop(Blocks.CHERRY_SLAB));
-				c.set((t - 1) * sx, Y0 + 1, z, stairs(Blocks.CHERRY_STAIRS, out.getOpposite()));
-				c.set((t + 1) * sx, Y0 + 1, z, stairs(Blocks.CHERRY_STAIRS, out));
-				c.set((t + 2) * sx, Y0 + 1, z, HubBlocks.pot(true));
+				int z = HubDims.NOOK_Z() * sz;
+				int t = HubDims.NOOK_X();
+				c.set(t * sx, y0() + 1, z, HubBlocks.slabTop(Blocks.CHERRY_SLAB));
+				c.set((t - 1) * sx, y0() + 1, z, stairs(Blocks.CHERRY_STAIRS, out.getOpposite()));
+				c.set((t + 1) * sx, y0() + 1, z, stairs(Blocks.CHERRY_STAIRS, out));
+				c.set((t + 2) * sx, y0() + 1, z, HubBlocks.pot(true));
 			}
 		}
 	}
@@ -142,9 +142,9 @@ public final class HubInterior {
 	static void planters(CitadelCanvas c) {
 		for (int sx = -1; sx <= 1; sx += 2) {
 			for (int sz = -1; sz <= 1; sz += 2) {
-				for (int p : new int[] {HubDims.PLANTER_Z0, HubDims.PLANTER_Z1}) {
-					c.set(HubDims.PLANTER_AISLE_X * sx, Y0 + 1, p * sz, HubBlocks.pot(true));
-					c.set(HubDims.PLANTER_NAVE_X * sx, Y0 + 1, p * sz, HubBlocks.pot(false));
+				for (int p : new int[] {HubDims.PLANTER_Z0(), HubDims.PLANTER_Z1()}) {
+					c.set(HubDims.PLANTER_AISLE_X() * sx, y0() + 1, p * sz, HubBlocks.pot(true));
+					c.set(HubDims.PLANTER_NAVE_X() * sx, y0() + 1, p * sz, HubBlocks.pot(false));
 				}
 			}
 		}
@@ -154,16 +154,16 @@ public final class HubInterior {
 	static void pilasters(CitadelCanvas c) {
 		for (int sx = -1; sx <= 1; sx += 2) {
 			for (int sz = -1; sz <= 1; sz += 2) {
-				pier(c, HubDims.PILASTER_X * sx, HubDims.PILASTER_Z * sz);
+				pier(c, HubDims.PILASTER_X() * sx, HubDims.PILASTER_Z() * sz);
 			}
 		}
 	}
 
 	/** Hanging lanterns on chains under the vault's ribs, away from the hologram column. */
 	static void pendants(CitadelCanvas c) {
-		for (int[] p : HubDims.PENDANTS) {
+		for (int[] p : HubDims.PENDANTS()) {
 			int ceil = CitadelHub.vaultY(Math.abs(p[0]));
-			int len = ceil - HubDims.PENDANT_LANTERN_Y - 1;
+			int len = ceil - HubDims.PENDANT_LANTERN_Y() - 1;
 			for (int i = 1; i <= len; i++) {
 				c.set(p[0], ceil - i, p[1], HubBlocks.chain());
 			}
@@ -179,28 +179,28 @@ public final class HubInterior {
 	 */
 	static void lights(CitadelCanvas c) {
 		List<int[]> placed = new ArrayList<>();
-		for (int x = -HubDims.LIGHT_SCAN; x <= HubDims.LIGHT_SCAN; x++) {
-			for (int z = -HubDims.LIGHT_SCAN; z <= HubDims.LIGHT_SCAN; z++) {
+		for (int x = -HubDims.LIGHT_SCAN(); x <= HubDims.LIGHT_SCAN(); x++) {
+			for (int z = -HubDims.LIGHT_SCAN(); z <= HubDims.LIGHT_SCAN(); z++) {
 				if (lattice(x, z) && lightFree(c, x, z)) {
-					c.set(x, Y0 + 2, z, HubBlocks.light());
+					c.set(x, y0() + 2, z, HubBlocks.light());
 					placed.add(new int[] {x, z});
 				}
 			}
 		}
-		for (int x = -HubDims.LIGHT_SCAN; x <= HubDims.LIGHT_SCAN; x++) {
-			for (int z = -HubDims.LIGHT_SCAN; z <= HubDims.LIGHT_SCAN; z++) {
-				if (!lightFree(c, x, z) || c.at(x, Y0 + 1, z) != null) {
+		for (int x = -HubDims.LIGHT_SCAN(); x <= HubDims.LIGHT_SCAN(); x++) {
+			for (int z = -HubDims.LIGHT_SCAN(); z <= HubDims.LIGHT_SCAN(); z++) {
+				if (!lightFree(c, x, z) || c.at(x, y0() + 1, z) != null) {
 					continue;
 				}
 				boolean covered = false;
 				for (int[] p : placed) {
-					if (Math.abs(p[0] - x) + Math.abs(p[1] - z) <= HubDims.LIGHT_RADIUS) {
+					if (Math.abs(p[0] - x) + Math.abs(p[1] - z) <= HubDims.LIGHT_RADIUS()) {
 						covered = true;
 						break;
 					}
 				}
 				if (!covered) {
-					c.set(x, Y0 + 2, z, HubBlocks.light());
+					c.set(x, y0() + 2, z, HubBlocks.light());
 					placed.add(new int[] {x, z});
 				}
 			}
@@ -208,6 +208,6 @@ public final class HubInterior {
 	}
 
 	private static boolean lightFree(CitadelCanvas c, int x, int z) {
-		return c.zoneAt(x, z).kind() == RingCampusGeometry.Kind.HUB && c.at(x, Y0 + 2, z) == null;
+		return c.zoneAt(x, z).kind() == RingCampusGeometry.Kind.HUB && c.at(x, y0() + 2, z) == null;
 	}
 }

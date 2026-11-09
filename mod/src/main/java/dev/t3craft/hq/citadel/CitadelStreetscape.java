@@ -58,21 +58,37 @@ final class CitadelStreetscape {
 	static final BlockState KASAGI = CitadelPaving.KERB_SLAB;
 
 	/** Cells between two trees of a boulevard: a bit over one avenue width (9 unscaled). */
-	static final int TREE_EVERY = (int) Math.round(2 * CitadelPaving.AVENUE_HALF * 1.3);
+	static int TREE_EVERY() {
+		return (int) Math.round(2 * CitadelPaving.AVENUE_HALF() * 1.3);
+	}
 	/** Where the gate stands: this many cells inside the ring (an avenue half width). */
-	static final int GATE_IN = (int) Math.round(CitadelPaving.AVENUE_HALF);
+	static int GATE_IN() {
+		return (int) Math.round(CitadelPaving.AVENUE_HALF());
+	}
 	/** The boulevard stops this many cells short of the street (the rosette's room). */
-	static final int END_ROOM = 6;
+	static int END_ROOM() {
+		return CitadelCanvas.dims().s(6);
+	}
 	/** Cells of arc between two trees of a street: this many widths of the street. */
 	static final double STREET_EVERY_F = 3.0;
 	/** Trees and posts keep this many cells clear of an avenue mouth, beyond its half width. */
-	static final double MOUTH_ROOM = 1.5;
+	static double MOUTH_ROOM() {
+		return CitadelCanvas.dims().sd(1.5);
+	}
 	/** Height of a gate's pier top, tie beam, kasagi and crest over the floor. */
-	static final int PIER_TOP = 6;
-	static final int BEAM_Y = 4;
-	static final int KASAGI_Y = 7;
+	static int PIER_TOP() {
+		return CitadelCanvas.dims().sy(6);
+	}
+	static int BEAM_Y() {
+		return CitadelCanvas.dims().sy(4);
+	}
+	static int KASAGI_Y() {
+		return CitadelCanvas.dims().sy(7);
+	}
 	/** A tree of the boulevards: trunk height. */
-	static final int TRUNK = 4;
+	static int TRUNK() {
+		return CitadelCanvas.dims().sy(4);
+	}
 	/** Height of a lantern post of a boulevard and of a street (wall blocks under the lantern). */
 	static final int AVENUE_POST = 3;
 	static final int STREET_POST = 2;
@@ -97,7 +113,7 @@ final class CitadelStreetscape {
 	/** A cherry tree in a pit on the ground cell: a trunk and a canopy that stays over roads and keeps every leaf attached. */
 	static void tree(CitadelCanvas c, int x, int z) {
 		c.set(x, 0, z, PIT);
-		c.fill(x, 1, TRUNK, z, LOG);
+		c.fill(x, 1, TRUNK(), z, LOG);
 		for (int dx = -2; dx <= 2; dx++) {
 			for (int dz = -2; dz <= 2; dz++) {
 				int m = Math.abs(dx) + Math.abs(dz);
@@ -113,14 +129,14 @@ final class CitadelStreetscape {
 						continue;
 					}
 				}
-				c.set(x + dx, TRUNK, z + dz, leaves(Blocks.CHERRY_LEAVES));
+				c.set(x + dx, TRUNK(), z + dz, leaves(Blocks.CHERRY_LEAVES));
 				if (m == 1) {
-					c.set(x + dx, TRUNK + 1, z + dz, leaves(Blocks.CHERRY_LEAVES));
+					c.set(x + dx, TRUNK() + 1, z + dz, leaves(Blocks.CHERRY_LEAVES));
 				}
 			}
 		}
-		c.set(x, TRUNK + 1, z, leaves(Blocks.CHERRY_LEAVES));
-		c.set(x, TRUNK + 2, z, leaves(Blocks.CHERRY_LEAVES));
+		c.set(x, TRUNK() + 1, z, leaves(Blocks.CHERRY_LEAVES));
+		c.set(x, TRUNK() + 2, z, leaves(Blocks.CHERRY_LEAVES));
 	}
 
 	/** A bench of one stair whose back is towards {@code back}. */
@@ -171,23 +187,23 @@ final class CitadelStreetscape {
 			return; // one cell per row, also on the diagonals
 		}
 		long row = Math.round(s);
-		long gate = (long) RingCampusGeometry.ringInner(m) + GATE_IN;
+		long gate = (long) RingCampusGeometry.ringInner(m) + GATE_IN();
 		int side = l >= 0 ? 1 : -1;
 		Direction out = nearest(side * Math.cos(ang), side * Math.sin(ang));
 		if (row == gate) {
 			gate(c, x, z, d, l, out, Math.abs(Math.sin(2 * ang)) < 1e-6);
 			return;
 		}
-		if (d <= CitadelPaving.AVENUE_HALF - 1.0 || row < gate + 3 || row > RingCampusGeometry.ringOuter(m) - END_ROOM) {
+		if (d <= CitadelPaving.AVENUE_HALF() - 1.0 || row < gate + 3 || row > RingCampusGeometry.ringOuter(m) - END_ROOM()) {
 			return;
 		}
-		int phase = (int) Math.floorMod(row - gate - 3, (long) TREE_EVERY);
-		int lamp = TREE_EVERY / 3;
+		int phase = (int) Math.floorMod(row - gate - 3, (long) TREE_EVERY());
+		int lamp = TREE_EVERY() / 3;
 		if (phase == 0) {
 			tree(c, x, z);
 		} else if (phase == lamp || phase == 2 * lamp) {
 			lanternPost(c, x, z, AVENUE_POST);
-		} else if (phase == (side > 0 ? 1 : TREE_EVERY - 1)) {
+		} else if (phase == (side > 0 ? 1 : TREE_EVERY() - 1)) {
 			bench(c, x, z, out);
 		}
 	}
@@ -195,7 +211,7 @@ final class CitadelStreetscape {
 	/** The torii of an avenue (or the two lantern posts of a diagonal one) on the gate row. */
 	static void gate(CitadelCanvas c, int x, int z, double d, double l, Direction out, boolean cardinal) {
 		if (!cardinal) {
-			if (d > CitadelPaving.AVENUE_HALF - 1.0) {
+			if (d > CitadelPaving.AVENUE_HALF() - 1.0) {
 				lanternPost(c, x, z, AVENUE_POST);
 			}
 			return;
@@ -203,26 +219,27 @@ final class CitadelStreetscape {
 		int al = (int) Math.round(Math.abs(l));
 		int ox = out.getStepX();
 		int oz = out.getStepZ();
-		if (al == 3) {
+		int pier = c.s(3);
+		if (al == pier) {
 			c.set(x, 1, z, PLINTH);
-			c.fill(x, 2, PIER_TOP, z, PIER);
+			c.fill(x, 2, PIER_TOP(), z, PIER);
 			// the tie beam and the kasagi reach one cell beyond the pier
-			c.set(x + ox, BEAM_Y, z + oz, BEAM);
-			c.set(x + ox, KASAGI_Y, z + oz, stairs(Blocks.DEEPSLATE_TILE_STAIRS, out));
+			c.set(x + ox, BEAM_Y(), z + oz, BEAM);
+			c.set(x + ox, KASAGI_Y(), z + oz, stairs(Blocks.DEEPSLATE_TILE_STAIRS, out));
 		}
-		if (al <= 3) {
-			c.set(x, KASAGI_Y, z, KASAGI);
+		if (al <= pier) {
+			c.set(x, KASAGI_Y(), z, KASAGI);
 		}
-		if (al <= 2) {
-			c.set(x, BEAM_Y, z, BEAM);
+		if (al <= pier - 1) {
+			c.set(x, BEAM_Y(), z, BEAM);
 		}
 		if (al == 0) {
-			c.fill(x, BEAM_Y + 1, KASAGI_Y - 1, z, PLANKS);
-			c.set(x, KASAGI_Y + 1, z, KASAGI);
+			c.fill(x, BEAM_Y() + 1, KASAGI_Y() - 1, z, PLANKS);
+			c.set(x, KASAGI_Y() + 1, z, KASAGI);
 		}
 		if (al == 1) {
-			c.set(x, BEAM_Y - 1, z, HANGING_LANTERN);
-			c.set(x, KASAGI_Y + 1, z, KASAGI);
+			c.set(x, BEAM_Y() - 1, z, HANGING_LANTERN);
+			c.set(x, KASAGI_Y() + 1, z, KASAGI);
 		}
 	}
 
@@ -232,7 +249,7 @@ final class CitadelStreetscape {
 	static void street(CitadelCanvas c, int x, int z, double r, Zone zn) {
 		boolean inner = zn.kind() == Kind.INNER_STREET;
 		int m = zn.ring();
-		double lo = inner ? RingCampusGeometry.RAMP_R : RingCampusGeometry.ringOuter(m);
+		double lo = inner ? CitadelCanvas.dims().rampR : RingCampusGeometry.ringOuter(m);
 		double hi = inner ? RingCampusGeometry.ringInner(1) : RingCampusGeometry.streetOuter(m);
 		double rc = (lo + hi) / 2;
 		double width = hi - lo;
@@ -247,7 +264,7 @@ final class CitadelStreetscape {
 		if (ground == null || !CitadelPaving.isKerb(ground)) {
 			return;
 		}
-		double room = CitadelPaving.AVENUE_HALF + MOUTH_ROOM;
+		double room = CitadelPaving.AVENUE_HALF() + MOUTH_ROOM();
 		if (RingCampusGeometry.radialDistance(x, z, nIn) <= room
 				|| nOut > 0 && RingCampusGeometry.radialDistance(x, z, nOut) <= room) {
 			return;
@@ -298,17 +315,17 @@ final class CitadelStreetscape {
 		if (z <= 0) {
 			return;
 		}
-		int edge = (int) Math.round(CitadelPaving.PLAZA_FRAC * CitadelPaving.AVENUE_HALF);
+		int edge = (int) Math.round(CitadelPaving.PLAZA_FRAC * CitadelPaving.AVENUE_HALF());
 		int mid = (int) Math.round((lo + hi) / 2);
 		int step = (int) Math.max(1, Math.round((hi - lo) / 4)); // the benches stand this far from the middle line
 		int ax = Math.abs(x);
-		if (ax == (int) Math.round(CitadelPaving.AVENUE_HALF) && z == mid) {
+		if (ax == (int) Math.round(CitadelPaving.AVENUE_HALF()) && z == mid) {
 			stoneLantern(c, x, z); // beside the rosette, never on the axis: the spawn stands there
 		} else if (ax == edge && (z == Math.round(lo + 1) || z == Math.round(hi - 1))) {
 			lanternPost(c, x, z, AVENUE_POST);
 		} else if (ax == edge - 2 && (z == mid || z == mid - 1)) {
 			c.set(x, 1, z, c.kit.gardenPlanter());
-		} else if (ax == (int) Math.round(CitadelPaving.AVENUE_HALF) + 1 && Math.abs(z - mid) == step) {
+		} else if (ax == (int) Math.round(CitadelPaving.AVENUE_HALF()) + 1 && Math.abs(z - mid) == step) {
 			bench(c, x, z, nearest(0, z - mid));
 		}
 	}

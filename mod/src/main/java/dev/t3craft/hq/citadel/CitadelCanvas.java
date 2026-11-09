@@ -57,7 +57,7 @@ import org.jspecify.annotations.Nullable;
  * <ul>
  * <li><b>{@code CitadelHub}</b> (the basilica on the podium): {@code hub}, {@code nave},
  *     {@code hubWall}, {@code board}, {@code bigScreen}, {@code core}, {@code vaultY},
- *     {@code arcadeZ}, plus the constants {@code AISLE_TOP} and {@code SPRING}. ({@code core}, which
+ *     {@code arcadeZ}, plus {@code aisleTop()}, {@code spring()} and {@code naveHalf()} (scaled). ({@code core}, which
  *     orders the patio stairs, bridges, promenade and patio, calls into {@code CitadelGrounds}.)
  *     {@code bigScreen} is also used by the nodes: they call {@code CitadelHub.bigScreen}.</li>
  * <li><b>{@code CitadelGrounds}</b> (ring and ground): {@code ground}, {@code patioGround},
@@ -72,12 +72,46 @@ import org.jspecify.annotations.Nullable;
  *     because several families read them.)</li>
  * <li><b>{@code CitadelFinish}</b> (groups, light pass and build): {@code groupOf}, {@code groupRank}
  *     (with the {@code GROUPS} comparator), {@code noCollision}, {@code standable}, {@code walkable}
- *     (with {@code SPAWN}), {@code lightAt}, {@code replaceable}, {@code lightSpot}, {@code light},
+ *     (with {@code spawn()}), {@code lightAt}, {@code replaceable}, {@code lightSpot}, {@code light},
  *     {@code build}.</li>
  * </ul>
  *
  * What stays in {@code RingCampusGenerator} is the orchestration: {@code generate} (zone map, then
  * ground, hub, core, nodes, barrios, spawn anchor, build) and {@code MIN_LIGHT}.
+ *
+ * <h2>Scale (citadel/scale-port)</h2>
+ *
+ * The whole citadel is drawn at a scale {@link #k} ({@code LayoutParams.RINGCAMPUS_SCALE}, pack key
+ * {@code scale}, a decimal from 1.0 to 2.5, <b>default 1.0</b>). At {@code k = 1} every helper below
+ * returns its argument and the plan is the original one block by block (same anchors, desks, spawn;
+ * check with the report's signature). The geometry (radii, streets, lots, halls, nodes, spawn) lives in
+ * {@link RingCampusGeometry.Dims}, here as {@link #g} (statically {@link #dims()}).
+ *
+ * <p>How a piece scales (new pieces must follow it; never write a bare size that should grow):
+ *
+ * <ul>
+ * <li><b>Horizontal lengths</b> (widths, depths, radii, offsets from a centre or a wall, spacing of
+ *     piers, ribs, posts, lamps): {@link #s}{@code (n)} (rounded, {@code s(-n) == -s(n)}).
+ *     {@link #sd} for real thresholds ({@code r > c.sd(17.5)}), {@link #sOdd} for an <i>odd</i> width that
+ *     needs a centre line (only call it on odd bases: an even base is not kept at {@code k = 1}).
+ *     Static code without a canvas uses {@code dims().s(n)} / {@code dims().sd(x)} / {@code dims().sy(n)}.</li>
+ * <li><b>Heights</b> of buildings and rooms: {@link #sy}{@code (n)} ({@code √k}: 1.5 gives ×1.22, so a
+ *     6-high floor becomes 7, not a cavern of 9). An absolute y that sits on the podium is
+ *     {@code y0() + c.sy(y - 4)}, so it stays {@code y} at scale 1. The podium {@link #y0()} and the
+ *     hall floor height {@link #fh()} are already scaled (they replace the old constants {@code Y0} and
+ *     {@code FH}); so are {@code CitadelFinish.spawn()}, {@code CitadelHub.aisleTop()/spring()} and the
+ *     {@code g.*} radii (they replace {@code SPAWN}, {@code AISLE_TOP}, {@code SPRING},
+ *     {@code RingCampusGeometry.PATIO_R/GALLERY_R/RAMP_R/STAIR_STEPS}).</li>
+ * <li><b>Prefer positions from the zone</b> ({@code g.hubX()}, {@code g.patioR}, the {@code Room} of a
+ *     hall, a catalog {@code Plot}'s own size) to a scaled literal: they are already at the right size.</li>
+ * <li><b>Not scaled</b>: one-block steps (ramps, stairs, amphitheatre: one block or half a block a step,
+ *     so the number of steps follows the height), the <i>height</i> of doors and passages (2 to 3;
+ *     widen the opening instead, {@code |v - mid| <= s(1)}), wall thickness, desks and their 3×2
+ *     screens, big screens and the board (fixtures: they move with their wall, they do not grow),
+ *     decorative periods ({@code floorMod(..., 7)} patterns, the light lattice).</li>
+ * <li>Keep {@code static final} sizes out of pieces: the scale can change at a reload, so a size that
+ *     depends on it is a method (or computed inside the method that draws).</li>
+ * </ul>
  */
 public final class CitadelCanvas {
 	/** Layer of a layout cell: placed with the solid blocks. */
@@ -87,10 +121,21 @@ public final class CitadelCanvas {
 	/** Layer of a layout cell: a hanging block, placed top-down. */
 	public static final int HANGING = 2;
 	public static final BlockState AIR = Blocks.AIR.defaultBlockState();
-	/** The podium's height: the hub and the core stand on it. */
-	public static final int Y0 = RingCampusGeometry.PODIUM;
-	/** Height of a hall's floor. */
-	public static final int FH = RingCampusGeometry.FLOOR_H;
+
+	/** The podium's height: the hub and the core stand on it (4 at scale 1, {@code sy(4)}; was {@code Y0}). */
+	public static int y0() {
+		return RingCampusGeometry.podium();
+	}
+
+	/** Height of a hall's floor (6 at scale 1, {@code sy(6)}; was {@code FH}). */
+	public static int fh() {
+		return RingCampusGeometry.floorH();
+	}
+
+	/** The citadel's dimensions at the scale in use (for static code without a canvas). */
+	public static RingCampusGeometry.Dims dims() {
+		return RingCampusGeometry.dims();
+	}
 
 	// ------------------------------------------------------------------ materials (cherry palette)
 
@@ -111,6 +156,10 @@ public final class CitadelCanvas {
 
 	public final RingCampusStyle style;
 	public final HqKit kit;
+	/** The citadel's dimensions at this plan's scale (read once, when the canvas is made). */
+	public final RingCampusGeometry.Dims g;
+	/** The scale of this plan ({@code LayoutParams.RINGCAMPUS_SCALE}, 1.0 = the original citadel). */
+	public final double k;
 
 	public final Map<Long, BlockState> cells = new HashMap<>();
 	public final Map<Long, CompoundTag> data = new HashMap<>();
@@ -135,6 +184,35 @@ public final class CitadelCanvas {
 	public CitadelCanvas(RingCampusStyle style, HqKit kit) {
 		this.style = style;
 		this.kit = kit;
+		this.g = RingCampusGeometry.dims();
+		this.k = g.k;
+	}
+
+	// ------------------------------------------------------------------ scale (see the class comment)
+
+	/** A horizontal length (width, depth, radius, offset, spacing) at this plan's scale, rounded; {@code s(-n) == -s(n)}. */
+	public int s(int base) {
+		return RingCampusGeometry.s(k, base);
+	}
+
+	/** A real horizontal length (radius, threshold) at this plan's scale. */
+	public double sd(double base) {
+		return RingCampusGeometry.sd(k, base);
+	}
+
+	/** A height at this plan's scale: {@code base · √k}, rounded, so floors and ceilings stay playable. */
+	public int sy(int base) {
+		return RingCampusGeometry.sy(k, base);
+	}
+
+	/** An odd width (a room or passage with a centre line) at this plan's scale; call it on odd bases only. */
+	public int sOdd(int base) {
+		return RingCampusGeometry.sOdd(k, base);
+	}
+
+	/** An absolute height on the podium: {@code y} at scale 1, {@code y0() + sy(y - 4)} otherwise. */
+	public int py(int y) {
+		return y0() + sy(y - 4);
 	}
 
 	// ------------------------------------------------------------------ cell helpers

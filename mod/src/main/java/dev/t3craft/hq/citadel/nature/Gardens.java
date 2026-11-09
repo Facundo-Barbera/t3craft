@@ -31,7 +31,9 @@ public final class Gardens {
 	}
 
 	/** Half width of a ramp plus a margin: nothing taller than a flower grows within this of a ramp's axis. */
-	private static final double RAMP_CLEAR = 3.4 + 1.6;
+	private static double RAMP_CLEAR() {
+		return Dims.sd(3.4 + 1.6);
+	}
 
 	/**
 	 * The vegetation of a terrace column whose stone step tops at {@code y = top} (the cell {@code top} of
@@ -41,7 +43,7 @@ public final class Gardens {
 		if (top + 1 >= 6) {
 			return;
 		}
-		boolean nearRamp = RingCampusGeometry.radialDistance(x, z, 8) <= RAMP_CLEAR;
+		boolean nearRamp = RingCampusGeometry.radialDistance(x, z, 8) <= RAMP_CLEAR();
 		int hh = hash(x, z, 401);
 		int pct = hh % 100;
 		int pal = top + hash(Math.floorDiv(x, 5), Math.floorDiv(z, 5), 403) % 3;
@@ -114,7 +116,7 @@ public final class Gardens {
 	public static void patioCherries(CitadelCanvas c, int x, int z) {
 		for (int k = 0; k < 8; k++) {
 			double a = (k + 0.5) * Math.PI / 4;
-			BlockPos t = RingCampusGeometry.polar(19.3, a, 0);
+			BlockPos t = RingCampusGeometry.polar(Dims.sd(19.3), a, 0);
 			int dx = x - t.getX();
 			int dz = z - t.getZ();
 			if (Trees.reaches(dx, dz)) {
@@ -125,8 +127,8 @@ public final class Gardens {
 
 	/** One column of the patio's beds: planters and azaleas, flower macizos on the lawn, lily pads on the pool. */
 	public static void patioBeds(CitadelCanvas c, int x, int z, double r) {
-		if (r > 15.5) {
-			if (r < 17.2 && c.at(x, 0, z) != null && c.at(x, 0, z).is(Blocks.WATER) && hash(x, z, 501) % 100 < 16 && Flora.free(c, x, 1, z)) {
+		if (r > Dims.sd(15.5)) {
+			if (r < Dims.sd(17.2) && c.at(x, 0, z) != null && c.at(x, 0, z).is(Blocks.WATER) && hash(x, z, 501) % 100 < 16 && Flora.free(c, x, 1, z)) {
 				c.set(x, 1, z, b(Blocks.LILY_PAD));
 			}
 			return;

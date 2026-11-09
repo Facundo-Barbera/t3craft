@@ -3,14 +3,18 @@ package dev.t3craft.hq;
 import java.util.SortedSet;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The fixed geometry of the hybrid layout {@value #ID} ("Ciudadela en anillos con barrios") and its
  * growth rule. Pure functions of cell coordinates (HQ frame: origin = hub floor centre at ground
  * level, entrance south {@code +z}; angles from north, clockwise, so east is 90°).
  *
+ * Sizes below are at scale 1.0; the plan uses them times {@link #scale()} ({@link Dims}: lengths ·k,
+ * heights ·√k, default k = 1.0, pack parameter {@code scale}).
+ *
  * <pre>
- *   o ≤ 13      hub: a basilica on a podium (floor y = {@value #PODIUM}), nave vault 12 → 17 high
+ *   o ≤ 13      hub: a basilica on a podium (floor y = 4), nave vault 12 → 17 high
  *   r ≤ 21      sunken garden patio (ground level), crossed by the north and south bridges (y = 4)
  *   r ≤ 27      the elevated ring: an open promenade (floor y = 4) all the way round
  *   r ≤ 35      ramps down the 8 radial avenues (half-block steps), garden terraces between them
@@ -43,36 +47,37 @@ public final class RingCampusGeometry {
 	/** Layout and style id. */
 	public static final String ID = "hybrid-ringcampus";
 
-	/** Podium level: floor block of the hub, the bridges and the elevated ring. */
-	public static final int PODIUM = 4;
-	static final double HUB_IN = 12.0;
-	static final double HUB_OUT = 13.2;
+	// Base values at scale 1.0 (the original citadel). Every size the plan uses comes from {@link Dims}.
+	private static final int PODIUM = 4;
+	private static final double HUB_IN = 12.0;
+	/** Thickness of the hub's wall ring (not scaled: a wall stays one block thick). */
+	private static final double HUB_WALL = 1.2;
 	static final double OCT_K = 0.62;
-	public static final double PATIO_R = 21.0;
-	public static final double GALLERY_R = 27.0;
-	public static final double RAMP_R = 35.0;
-	static final double INNER_STREET_R = 40.0;
-	public static final int STREET = 6;
-	static final double AVENUE_HALF = 3.4;
+	private static final double PATIO_R = 21.0;
+	private static final double GALLERY_R = 27.0;
+	private static final double RAMP_R = 35.0;
+	private static final double INNER_STREET_R = 40.0;
+	private static final int STREET = 6;
+	private static final double AVENUE_HALF = 3.4;
 	/** Lawn round the outermost street (covers the ring-1 node rooms when only ring 1 is open). */
-	static final int LAWN = 8;
+	private static final int LAWN = 8;
 	public static final int MAX_RINGS = 3;
 	public static final int LOT_STRIDE = 8;
 	/** Modules per lot: three halls, each with an upper floor. */
 	public static final int LOT_MODULES = 6;
 	/** Halls of a barrio. */
 	public static final int HALLS = 3;
-	/** Floor-to-floor height of a hall. */
-	public static final int FLOOR_H = 6;
+	/** Floor-to-floor height of a hall at scale 1 ({@link Dims#floorH} is the one in use). */
+	private static final int FLOOR_H = 6;
 
 	/** Lots of ring m (index m; 0 unused). */
 	private static final int[] LOTS = {0, 8, 12, 16};
-	/** Inner radius of ring m's band of lots. */
-	private static final int[] INNER = {0, 40, 85, 135};
+	/** Inner radius of ring 1's band of lots (the next bands start after the previous ring's street). */
+	private static final int INNER_1 = 40;
 	/** Radial depth of ring m's band. */
 	private static final int[] DEPTH = {0, 39, 44, 46};
-	/** Radius of ring m's lot centres. */
-	private static final int[] CENTRE = {0, 59, 107, 158};
+	/** Radius of ring m's lot centres, from the band's inner radius. */
+	private static final int[] CENTRE_OFF = {0, 19, 22, 23};
 	/** Half side of ring m's courtyard. */
 	private static final int[] COURT = {0, 5, 6, 7};
 	/** Interior width and depth of ring m's halls. */
@@ -90,6 +95,141 @@ public final class RingCampusGeometry {
 	public static final int MAX_LOTS = 8 + 12 + 16;
 	/** Order in which a project takes the modules of its barrio (see the class comment). */
 	static final int[] MODULE_ORDER = {0, 1, 3, 2, 4, 5};
+
+	// ------------------------------------------------------------------ scale
+
+	/** A length {@code base} at scale {@code k}, rounded half away from zero (so ±base stay symmetric). */
+	public static int s(double k, int base) {
+		return base < 0 ? -s(k, -base) : (int) Math.round(base * k);
+	}
+
+	/** A real length (radius, threshold) at scale {@code k}. */
+	public static double sd(double k, double base) {
+		return base * k;
+	}
+
+	/** A height at scale {@code k}: heights grow by {@code √k} so floors and ceilings stay playable. */
+	public static int sy(double k, int base) {
+		return base < 0 ? -sy(k, -base) : (int) Math.round(base * Math.sqrt(k));
+	}
+
+	/** An odd width (a room with a centre line) at scale {@code k}: the odd number nearest {@code base · k}. */
+	public static int sOdd(double k, int base) {
+		return 2 * (int) Math.round((base * k - 1) / 2) + 1;
+	}
+
+	/** The scale in use: {@code LayoutParams.RINGCAMPUS_SCALE} (pack-editable, 1.0 to 2.5, default 1.0). */
+	public static double scale() {
+		return dev.t3craft.hq.pack.LayoutParams.RINGCAMPUS_SCALE.value();
+	}
+
+	private static volatile @Nullable Dims cached;
+
+	/** The dimensions at the scale in use (cached per scale value). */
+	public static Dims dims() {
+		double k = scale();
+		Dims d = cached;
+		if (d == null || d.k != k) {
+			d = new Dims(k);
+			cached = d;
+		}
+		return d;
+	}
+
+	/**
+	 * Every size of the citadel at one scale {@code k}. Lengths are {@code base · k} (rounded), heights
+	 * {@code base · √k}; at {@code k = 1} every value is the original one. Not scaled: wall thickness, the
+	 * one-block steps of ramps and stairs, door heights, desks and their 3×2 screens.
+	 */
+	public static final class Dims {
+		public final double k;
+		/** Podium level: floor block of the hub, the bridges and the elevated ring. */
+		public final int podium;
+		public final double hubIn;
+		public final double hubOut;
+		public final double patioR;
+		public final double galleryR;
+		public final double rampR;
+		public final double innerStreetR;
+		public final int street;
+		public final double avenueHalf;
+		public final int lawn;
+		/** Half width of the north and south bridges (railings on {@code |x| = bridgeHalf}). */
+		public final int bridgeHalf;
+		/** Floor-to-floor height of a hall. */
+		public final int floorH;
+		/** Radial half band round the ring-1 street where the node rooms are looked for. */
+		public final int nodeBand;
+		/** Desk slots: offset of slots 0/1 from the centre line, depth of slots 2/3 and 4/5 from the back wall. */
+		public final int deskSide;
+		public final int deskMid;
+		public final int deskFront;
+		final int[] inner = new int[MAX_RINGS + 1];
+		final int[] depth = new int[MAX_RINGS + 1];
+		final int[] centre = new int[MAX_RINGS + 1];
+		final int[] court = new int[MAX_RINGS + 1];
+		final int[] hallW = new int[MAX_RINGS + 1];
+		final int[] hallD = new int[MAX_RINGS + 1];
+		final int[] gateW = new int[MAX_RINGS + 1];
+		final int[] gateD = new int[MAX_RINGS + 1];
+
+		Dims(double k) {
+			this.k = k;
+			podium = RingCampusGeometry.sy(k, PODIUM);
+			hubIn = RingCampusGeometry.sd(k, HUB_IN);
+			hubOut = hubIn + HUB_WALL;
+			patioR = RingCampusGeometry.sd(k, PATIO_R);
+			galleryR = RingCampusGeometry.sd(k, GALLERY_R);
+			rampR = RingCampusGeometry.sd(k, RAMP_R);
+			innerStreetR = RingCampusGeometry.sd(k, INNER_STREET_R);
+			street = RingCampusGeometry.s(k, STREET);
+			avenueHalf = RingCampusGeometry.sd(k, AVENUE_HALF);
+			lawn = RingCampusGeometry.s(k, LAWN);
+			bridgeHalf = RingCampusGeometry.s(k, 3);
+			floorH = RingCampusGeometry.sy(k, FLOOR_H);
+			nodeBand = RingCampusGeometry.s(k, 11);
+			deskSide = RingCampusGeometry.s(k, 2);
+			deskMid = RingCampusGeometry.s(k, 3);
+			deskFront = RingCampusGeometry.s(k, 7);
+			int in = RingCampusGeometry.s(k, INNER_1);
+			for (int m = 1; m <= MAX_RINGS; m++) {
+				inner[m] = in;
+				depth[m] = RingCampusGeometry.s(k, DEPTH[m]);
+				centre[m] = in + RingCampusGeometry.s(k, CENTRE_OFF[m]);
+				court[m] = RingCampusGeometry.s(k, COURT[m]);
+				hallW[m] = RingCampusGeometry.sOdd(k, HALL_W[m]);
+				hallD[m] = RingCampusGeometry.s(k, HALL_D[m]);
+				gateW[m] = RingCampusGeometry.sOdd(k, GATE_W[m]);
+				gateD[m] = RingCampusGeometry.s(k, GATE_D[m]);
+				in += depth[m] + street;
+			}
+		}
+
+		/** A length at this scale ({@link RingCampusGeometry#s}). */
+		public int s(int base) {
+			return RingCampusGeometry.s(k, base);
+		}
+
+		/** A real length at this scale. */
+		public double sd(double base) {
+			return RingCampusGeometry.sd(k, base);
+		}
+
+		/** A height at this scale ({@code √k}). */
+		public int sy(int base) {
+			return RingCampusGeometry.sy(k, base);
+		}
+
+		/** The last interior column of the hub along an axis ({@code x = ±hubX} or {@code z = ±hubX}). */
+		public int hubX() {
+			return (int) Math.floor(hubIn);
+		}
+
+		/** Where NPCs appear: the inner street, south, in front of the main ramp. */
+		public BlockPos spawn() {
+			return new BlockPos(0, 1, (int) Math.round((rampR + innerStreetR) / 2));
+		}
+	}
 
 	private RingCampusGeometry() {
 	}
@@ -114,20 +254,26 @@ public final class RingCampusGeometry {
 	}
 
 	public static int ringInner(int m) {
-		return INNER[m];
+		return dims().inner[m];
 	}
 
 	public static int ringOuter(int m) {
-		return INNER[m] + DEPTH[m];
+		Dims d = dims();
+		return d.inner[m] + d.depth[m];
 	}
 
 	public static int streetOuter(int m) {
-		return ringOuter(m) + STREET;
+		return ringOuter(m) + dims().street;
 	}
 
 	/** Radius of everything a plan with {@code rings} open rings uses (lawn included). */
 	public static int radius(int rings) {
-		return streetOuter(rings) + LAWN;
+		return streetOuter(rings) + dims().lawn;
+	}
+
+	/** Where NPCs appear (see {@link Dims#spawn}). */
+	public static BlockPos spawn() {
+		return dims().spawn();
 	}
 
 	/** Lot of a module index, or -1 when it is outside the citadel. */
@@ -234,18 +380,25 @@ public final class RingCampusGeometry {
 
 	/** Radius of the ring-1 street's centre line, where the node rooms stand. */
 	public static double nodeRadius() {
-		return ringOuter(1) + STREET / 2.0;
+		return ringOuter(1) + dims().street / 2.0;
 	}
 
-	public record Node(int k, NodeKind kind, int cx, int cz) {
+	/**
+	 * A ring-1 node room: centre {@code (cx, cz)} and {@code size}, the half side of a square room
+	 * (tower 6, cloister 7 at scale 1) or the radius of a round one (rotunda and lounge 7, pillar 2.5).
+	 */
+	public record Node(int k, NodeKind kind, int cx, int cz, double size) {
+		/** Half side of a square room, the ring of its wall ({@code size} rounded). */
+		public int half() {
+			return (int) Math.round(size);
+		}
+
 		public boolean contains(int x, int z) {
 			int dx = Math.abs(x - cx);
 			int dz = Math.abs(z - cz);
 			return switch (kind) {
-				case REVIEW_TOWER -> dx <= 6 && dz <= 6;
-				case ARCHIVE_CLOISTER -> dx <= 7 && dz <= 7;
-				case SCHEDULE_ROTUNDA, LOUNGE_SUNKEN -> Math.hypot(dx, dz) <= 7.0;
-				case PILLAR -> Math.hypot(dx, dz) <= 2.5;
+				case REVIEW_TOWER, ARCHIVE_CLOISTER -> dx <= half() && dz <= half();
+				case SCHEDULE_ROTUNDA, LOUNGE_SUNKEN, PILLAR -> Math.hypot(dx, dz) <= size;
 			};
 		}
 	}
@@ -260,7 +413,12 @@ public final class RingCampusGeometry {
 			case 6 -> NodeKind.LOUNGE_SUNKEN;
 			default -> NodeKind.PILLAR;
 		};
-		return new Node(k, kind, (int) Math.round(rc * Math.sin(a)), (int) Math.round(-rc * Math.cos(a)));
+		double base = switch (kind) {
+			case REVIEW_TOWER -> 6;
+			case ARCHIVE_CLOISTER, SCHEDULE_ROTUNDA, LOUNGE_SUNKEN -> 7;
+			case PILLAR -> 2.5;
+		};
+		return new Node(k, kind, (int) Math.round(rc * Math.sin(a)), (int) Math.round(-rc * Math.cos(a)), dims().sd(base));
 	}
 
 	public static double r(int x, int z) {
@@ -290,33 +448,34 @@ public final class RingCampusGeometry {
 	 * ring and the ring-1 nodes, never on how many rings are open.
 	 */
 	public static Zone zone(int x, int z, int rings) {
+		Dims d = dims();
 		double o = octagon(x, z);
-		if (o <= HUB_IN) {
+		if (o <= d.hubIn) {
 			return new Zone(Kind.HUB, 0, -1, -1);
 		}
-		if (o <= HUB_OUT) {
+		if (o <= d.hubOut) {
 			return new Zone(Kind.HUB_WALL, 0, -1, -1);
 		}
 		double r = r(x, z);
-		if (Math.abs(x) <= 3 && r <= PATIO_R + 0.5) {
+		if (Math.abs(x) <= d.bridgeHalf && r <= d.patioR + 0.5) {
 			return new Zone(Kind.BRIDGE, 0, -1, -1);
 		}
-		if (r <= PATIO_R) {
+		if (r <= d.patioR) {
 			return new Zone(Kind.PATIO, 0, -1, -1);
 		}
-		if (r <= GALLERY_R) {
+		if (r <= d.galleryR) {
 			return new Zone(Kind.GALLERY, 0, -1, -1);
 		}
-		if (r <= RAMP_R) {
-			return new Zone(radialDistance(x, z, 8) <= AVENUE_HALF ? Kind.RAMP : Kind.TERRACE, 0, -1, -1);
+		if (r <= d.rampR) {
+			return new Zone(radialDistance(x, z, 8) <= d.avenueHalf ? Kind.RAMP : Kind.TERRACE, 0, -1, -1);
 		}
-		if (r <= INNER_STREET_R) {
+		if (r <= d.innerStreetR) {
 			return new Zone(Kind.INNER_STREET, 0, -1, -1);
 		}
 		if (r > radius(rings)) {
 			return Zone.NONE;
 		}
-		if (Math.abs(r - nodeRadius()) <= 11) {
+		if (Math.abs(r - nodeRadius()) <= d.nodeBand) {
 			int k = (int) Math.round(theta(x, z) * 4 / Math.PI) % 8;
 			if (node(k).contains(x, z)) {
 				return new Zone(Kind.NODE, 1, -1, k);
@@ -325,7 +484,7 @@ public final class RingCampusGeometry {
 		for (int m = 1; m <= rings; m++) {
 			if (r <= ringOuter(m)) {
 				int n = lotsIn(m);
-				if (radialDistance(x, z, n) <= AVENUE_HALF) {
+				if (radialDistance(x, z, n) <= d.avenueHalf) {
 					return new Zone(Kind.AVENUE, m, -1, -1);
 				}
 				int p = (int) Math.floor(theta(x, z) * n / (2 * Math.PI)) % n;
@@ -429,7 +588,8 @@ public final class RingCampusGeometry {
 		int m = ringOfLot(id);
 		double a = centreAngle(id);
 		Direction out = cardinal(a);
-		return new Lot(id, m, polar(CENTRE[m], a, 0), out, out.getClockWise(), COURT[m], HALL_W[m], HALL_D[m], GATE_W[m], GATE_D[m]);
+		Dims d = dims();
+		return new Lot(id, m, polar(d.centre[m], a, 0), out, out.getClockWise(), d.court[m], d.hallW[m], d.hallD[m], d.gateW[m], d.gateD[m]);
 	}
 
 	/**
@@ -444,20 +604,33 @@ public final class RingCampusGeometry {
 	}
 
 	public static DeskSpot desk(Room h, int floor, int slot) {
-		int y = floor * FLOOR_H + 1;
+		Dims d = dims();
+		int y = floor * d.floorH + 1;
 		int c = h.c();
 		return switch (slot) {
-			case 0 -> new DeskSpot(h.cell(h.d() - 1, c - 2, y), h.back());
-			case 1 -> new DeskSpot(h.cell(h.d() - 1, c + 2, y), h.back());
-			case 2 -> new DeskSpot(h.cell(h.d() - 3, 0, y), h.side().getOpposite());
-			case 3 -> new DeskSpot(h.cell(h.d() - 3, h.w() - 1, y), h.side());
-			case 4 -> new DeskSpot(h.cell(h.d() - 7, 0, y), h.side().getOpposite());
-			default -> new DeskSpot(h.cell(h.d() - 7, h.w() - 1, y), h.side());
+			case 0 -> new DeskSpot(h.cell(h.d() - 1, c - d.deskSide, y), h.back());
+			case 1 -> new DeskSpot(h.cell(h.d() - 1, c + d.deskSide, y), h.back());
+			case 2 -> new DeskSpot(h.cell(h.d() - d.deskMid, 0, y), h.side().getOpposite());
+			case 3 -> new DeskSpot(h.cell(h.d() - d.deskMid, h.w() - 1, y), h.side());
+			case 4 -> new DeskSpot(h.cell(h.d() - d.deskFront, 0, y), h.side().getOpposite());
+			default -> new DeskSpot(h.cell(h.d() - d.deskFront, h.w() - 1, y), h.side());
 		};
 	}
 
-	/** Straight stairs of a two-floor hall: steps {@code i = 0..5} at {@code (u = 1 + i, v = c, y = 1 + i)}, climbing towards the back. */
-	public static final int STAIR_STEPS = FLOOR_H;
+	/** Steps of the straight stairs of a two-floor hall: {@code i = 0..floorH-1} at {@code (u = 1 + i, v = c, y = 1 + i)}, climbing towards the back. */
+	public static int stairSteps() {
+		return dims().floorH;
+	}
+
+	/** Floor-to-floor height of a hall at the scale in use. */
+	public static int floorH() {
+		return dims().floorH;
+	}
+
+	/** Podium level at the scale in use. */
+	public static int podium() {
+		return dims().podium;
+	}
 
 	// ------------------------------------------------------------------ public views (renders, docs)
 
@@ -466,7 +639,8 @@ public final class RingCampusGeometry {
 		Lot l = lot(lot);
 		int e = l.reach() + 1;
 		BlockPos c = l.centre();
-		return Box.of(c.getX() - e, 0, c.getZ() - e, c.getX() + e, 2 * FLOOR_H + 9, c.getZ() + e);
+		Dims d = dims();
+		return Box.of(c.getX() - e, 0, c.getZ() - e, c.getX() + e, 2 * d.floorH + d.s(9), c.getZ() + e);
 	}
 
 	/** Centre cell (x, z) of a ring-1 node: 0 review tower (N), 2 scheduled rotunda (E), 4 archive cloister (S), 6 sunken lounge (W). */

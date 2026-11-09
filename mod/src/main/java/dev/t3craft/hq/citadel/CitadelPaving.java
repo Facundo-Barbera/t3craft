@@ -71,10 +71,15 @@ final class CitadelPaving {
 
 	// Sizes: all proportions or mirrors of the geometry.
 
-	/** Half width of an avenue zone: mirror of {@code RingCampusGeometry.AVENUE_HALF} (package-private there). */
-	static final double AVENUE_HALF = 3.4;
-	/** Half width of the bridges' deck: mirror of the {@code |x| <= 3} of {@code RingCampusGeometry.zone}. */
-	static final int BRIDGE_HALF = 3;
+	/** Half width of an avenue zone ({@code Dims.avenueHalf}, 3.4 unscaled). */
+	static double AVENUE_HALF() {
+		return CitadelCanvas.dims().avenueHalf;
+	}
+
+	/** Half width of the bridges' deck ({@code Dims.bridgeHalf}, the {@code |x| <= 3} of {@code RingCampusGeometry.zone} unscaled). */
+	static int BRIDGE_HALF() {
+		return CitadelCanvas.dims().bridgeHalf;
+	}
 	/** A kerb is this fraction of its road's width (never under {@link #KERB_MIN}, which keeps it one line). */
 	static final double KERB_FRAC = 0.18;
 	static final double KERB_MIN = 1.0;
@@ -94,14 +99,24 @@ final class CitadelPaving {
 	/** The plaza at the foot of the main ramp: half width, in avenue half widths. */
 	static final double PLAZA_FRAC = 2.35;
 	/** Half width of a causeway over the patio's pool (the pool's paths): 1.2 unscaled. */
-	static final double CAUSEWAY_D = AVENUE_HALF * 0.35;
+	static double CAUSEWAY_D() {
+		return AVENUE_HALF() * 0.35;
+	}
 
 	/** Perpendicular distance from the axis within which an avenue's field is paved (its kerb is beyond). */
-	static final double KERB_D = AVENUE_HALF - Math.max(KERB_MIN, KERB_FRAC * 2 * AVENUE_HALF);
+	static double KERB_D() {
+		return AVENUE_HALF() - Math.max(KERB_MIN, KERB_FRAC * 2 * AVENUE_HALF());
+	}
+
 	/** Half width of an avenue's runner. */
-	static final double RUNNER_D = AVENUE_HALF * RUNNER_FRAC;
+	static double RUNNER_D() {
+		return AVENUE_HALF() * RUNNER_FRAC;
+	}
+
 	/** Width of an avenue's cenefa. */
-	static final double CENEFA_W = EDGE_FRAC * 2 * AVENUE_HALF;
+	static double CENEFA_W() {
+		return EDGE_FRAC * 2 * AVENUE_HALF();
+	}
 
 	private CitadelPaving() {
 	}
@@ -160,12 +175,12 @@ final class CitadelPaving {
 	static BlockState avenue(CitadelCanvas c, int x, int z, Zone zn) {
 		int n = RingCampusGeometry.lotsIn(zn.ring());
 		double d = RingCampusGeometry.radialDistance(x, z, n);
-		if (d > KERB_D) {
+		if (d > KERB_D()) {
 			return kerb(x, z);
 		}
 		double s = along(x, z, n);
-		long gate = (long) RingCampusGeometry.ringInner(zn.ring()) + CitadelStreetscape.GATE_IN;
-		if (d > RUNNER_D && Math.abs(Math.round(s) - gate) == 1) {
+		long gate = (long) RingCampusGeometry.ringInner(zn.ring()) + CitadelStreetscape.GATE_IN();
+		if (d > RUNNER_D() && Math.abs(Math.round(s) - gate) == 1) {
 			return RIB_BAND; // the threshold on both sides of the gate
 		}
 		return avenueField(c, x, z, d, s);
@@ -173,23 +188,23 @@ final class CitadelPaving {
 
 	/** The paved part of an avenue (or of its mouth into a street): runner, tile, joints and the cenefa. */
 	private static BlockState avenueField(CitadelCanvas c, int x, int z, double d, double s) {
-		if (d <= RUNNER_D) {
+		if (d <= RUNNER_D()) {
 			return c.floor();
 		}
-		if (d > KERB_D - CENEFA_W) {
+		if (d > KERB_D() - CENEFA_W()) {
 			int h = hash(x, z);
 			if (Math.floorMod((int) Math.round(s), 2) == 0) {
 				return CALCITE;
 			}
 			return h < 14 ? MOSSY : h < 22 ? CRACKED : BRICKS;
 		}
-		return joint(s, 2 * AVENUE_HALF) ? JOINT : c.accent();
+		return joint(s, 2 * AVENUE_HALF()) ? JOINT : c.accent();
 	}
 
 	/** Kind of a ramp column: 0 runner, 1 bamboo core, 2 smooth-stone side, 3 kerb. */
 	static int rampBand(int x, int z) {
 		double d = RingCampusGeometry.radialDistance(x, z, 8);
-		return d <= RUNNER_D ? 0 : d <= AVENUE_HALF * 0.5 ? 1 : d <= KERB_D ? 2 : 3;
+		return d <= RUNNER_D() ? 0 : d <= AVENUE_HALF() * 0.5 ? 1 : d <= KERB_D() ? 2 : 3;
 	}
 
 	/** The full block of a ramp step of band {@code band}. */
@@ -208,7 +223,7 @@ final class CitadelPaving {
 	static BlockState street(CitadelCanvas c, int x, int z, double r, Zone zn) {
 		boolean inner = zn.kind() == Kind.INNER_STREET;
 		int m = zn.ring();
-		double lo = inner ? RingCampusGeometry.RAMP_R : RingCampusGeometry.ringOuter(m);
+		double lo = inner ? CitadelCanvas.dims().rampR : RingCampusGeometry.ringOuter(m);
 		double hi = inner ? RingCampusGeometry.ringInner(1) : RingCampusGeometry.streetOuter(m);
 		double rc = (lo + hi) / 2;
 		double width = hi - lo;
@@ -217,9 +232,9 @@ final class CitadelPaving {
 		int nOut = inner ? 8 : m < c.rings ? RingCampusGeometry.lotsIn(m + 1) : 0;
 		double dIn = RingCampusGeometry.radialDistance(x, z, nIn);
 		double dOut = nOut == 0 ? 99 : RingCampusGeometry.radialDistance(x, z, nOut);
-		boolean plaza = inner && z > 0 && Math.abs(x) <= PLAZA_FRAC * AVENUE_HALF;
-		boolean mouthIn = dIn <= KERB_D || plaza;
-		boolean mouthOut = dOut <= KERB_D;
+		boolean plaza = inner && z > 0 && Math.abs(x) <= PLAZA_FRAC * AVENUE_HALF();
+		boolean mouthIn = dIn <= KERB_D() || plaza;
+		boolean mouthOut = dOut <= KERB_D();
 		// rosette at the crossing of the street's middle line and the avenue's axis
 		if (mouthIn || mouthOut) {
 			double md = 99;
@@ -229,13 +244,13 @@ final class CitadelPaving {
 				md = Math.hypot(x, z - rc);
 				dx = x;
 				dz = z - rc;
-			} else if (dIn <= KERB_D) {
+			} else if (dIn <= KERB_D()) {
 				double ang = radialAngle(x, z, nIn);
 				dx = x - rc * Math.sin(ang);
 				dz = z + rc * Math.cos(ang);
 				md = Math.hypot(dx, dz);
 			}
-			if (dOut <= KERB_D) {
+			if (dOut <= KERB_D()) {
 				double ang = radialAngle(x, z, nOut);
 				double ox = x - rc * Math.sin(ang);
 				double oz = z + rc * Math.cos(ang);
@@ -287,7 +302,7 @@ final class CitadelPaving {
 	/** The plaza at the foot of the main ramp: the avenue's tile, with arcs of joints round the rosette. */
 	private static BlockState plazaField(CitadelCanvas c, int x, int z, double rc, double width) {
 		double md = Math.hypot(x, z - rc);
-		if (Math.abs(x) <= RUNNER_D) {
+		if (Math.abs(x) <= RUNNER_D()) {
 			return c.floor();
 		}
 		return Math.floorMod((int) Math.round(md), Math.max(2, jointEvery(width) / 2)) == 0 ? JOINT : c.accent();
@@ -340,24 +355,26 @@ final class CitadelPaving {
 	// ------------------------------------------------------------------ verges
 
 	/** Width of the verge of a lot against a road: 0.45 of an avenue half width (1.5 unscaled). */
-	static final double VERGE_W = AVENUE_HALF * 0.45;
+	static double VERGE_W() {
+		return AVENUE_HALF() * 0.45;
+	}
 
 	/**
 	 * The ground of a lot cell: grass, with a verge of moss against the roads (its avenues, the street
 	 * inside and the street outside) so that the pavement never meets the lawn in a clean cut: mostly
-	 * moss against the kerb, thinning out over {@link #VERGE_W}.
+	 * moss against the kerb, thinning out over {@link #VERGE_W()}.
 	 */
 	static BlockState lotGround(CitadelCanvas c, int x, int z, Zone zn) {
 		int m = zn.ring();
 		double r = RingCampusGeometry.r(x, z);
 		double d = RingCampusGeometry.radialDistance(x, z, RingCampusGeometry.lotsIn(m));
-		double edge = Math.min(d - AVENUE_HALF,
+		double edge = Math.min(d - AVENUE_HALF(),
 				Math.min(r - RingCampusGeometry.ringInner(m), RingCampusGeometry.ringOuter(m) - r));
-		if (edge >= VERGE_W) {
+		if (edge >= VERGE_W()) {
 			return CitadelCanvas.GRASS;
 		}
 		int h = hash(x, z);
-		int moss = edge < VERGE_W / 2 ? 70 : 35;
+		int moss = edge < VERGE_W() / 2 ? 70 : 35;
 		return h < moss ? CitadelCanvas.MOSS : h < moss + 12 ? b(Blocks.COARSE_DIRT) : CitadelCanvas.GRASS;
 	}
 
@@ -370,9 +387,9 @@ final class CitadelPaving {
 		int m = zn.ring();
 		double r = RingCampusGeometry.r(x, z);
 		double d = RingCampusGeometry.radialDistance(x, z, RingCampusGeometry.lotsIn(m));
-		double edge = Math.min(d - AVENUE_HALF,
+		double edge = Math.min(d - AVENUE_HALF(),
 				Math.min(r - RingCampusGeometry.ringInner(m), RingCampusGeometry.ringOuter(m) - r));
-		if (edge >= VERGE_W) {
+		if (edge >= VERGE_W()) {
 			return null;
 		}
 		RingCampusGeometry.Lot l = RingCampusGeometry.lot(zn.lot());
@@ -380,7 +397,7 @@ final class CitadelPaving {
 			return null;
 		}
 		int h = hash(x, z);
-		if (edge < VERGE_W / 2) {
+		if (edge < VERGE_W() / 2) {
 			return h % 3 == 0 ? slab(Blocks.MOSSY_STONE_BRICK_SLAB) : slab(Blocks.STONE_BRICK_SLAB);
 		}
 		return h < 14 ? CitadelCanvas.leaves(Blocks.FLOWERING_AZALEA_LEAVES) : null;
@@ -394,51 +411,51 @@ final class CitadelPaving {
 	 * coping and the rim are each a quarter of the ring's width.
 	 */
 	static BlockState patioRing(CitadelCanvas c, int x, int z, double r, double rIn) {
-		double w = RingCampusGeometry.PATIO_R - rIn;
+		double w = CitadelCanvas.dims().patioR - rIn;
 		if (r <= rIn + 0.28 * w) {
 			return FOOT;
 		}
-		if (RingCampusGeometry.radialDistance(x, z, 8) <= RUNNER_D) {
+		if (RingCampusGeometry.radialDistance(x, z, 8) <= RUNNER_D()) {
 			return BAMBOO;
 		}
-		if (r > RingCampusGeometry.PATIO_R - 0.28 * w) {
+		if (r > CitadelCanvas.dims().patioR - 0.28 * w) {
 			return c.floor();
 		}
-		return joint(RingCampusGeometry.theta(x, z) * (rIn + RingCampusGeometry.PATIO_R) / 2, w) ? JOINT : c.accent();
+		return joint(RingCampusGeometry.theta(x, z) * (rIn + CitadelCanvas.dims().patioR) / 2, w) ? JOINT : c.accent();
 	}
 
 	/** A causeway cell over the patio's pool: a bamboo runner between two deepslate edges. */
 	static BlockState causeway(int x, int z) {
-		return RingCampusGeometry.radialDistance(x, z, 8) <= RUNNER_D ? BAMBOO : FOOT;
+		return RingCampusGeometry.radialDistance(x, z, 8) <= RUNNER_D() ? BAMBOO : FOOT;
 	}
 
 	/** The deck of a bridge: edge, tile, a runner down the axis and a joint every so often. */
 	static BlockState bridgeDeck(CitadelCanvas c, int x, int z) {
 		int ax = Math.abs(x);
-		if (ax >= BRIDGE_HALF) {
+		if (ax >= BRIDGE_HALF()) {
 			return FOOT;
 		}
 		if (ax == 0) {
 			return c.floor();
 		}
-		return joint(z, 2 * BRIDGE_HALF) ? JOINT : c.accent();
+		return joint(z, 2 * BRIDGE_HALF()) ? JOINT : c.accent();
 	}
 
 	// ------------------------------------------------------------------ promenade
 
 	/** Width of the elevated ring. */
 	static double promenadeWidth() {
-		return RingCampusGeometry.GALLERY_R - RingCampusGeometry.PATIO_R;
+		return CitadelCanvas.dims().galleryR - CitadelCanvas.dims().patioR;
 	}
 
 	/** Radius up to which the promenade is the inner edge (where the railing stands). */
 	static double promenadeInner() {
-		return RingCampusGeometry.PATIO_R + 0.2 * promenadeWidth();
+		return CitadelCanvas.dims().patioR + 0.2 * promenadeWidth();
 	}
 
 	/** Radius from which the promenade is the outer rim. */
 	static double promenadeRim() {
-		return RingCampusGeometry.GALLERY_R - promenadeWidth() / 6;
+		return CitadelCanvas.dims().galleryR - promenadeWidth() / 6;
 	}
 
 	/**
@@ -447,13 +464,13 @@ final class CitadelPaving {
 	 */
 	static BlockState promenade(CitadelCanvas c, int x, int z, double r) {
 		double w = promenadeWidth();
-		boolean mouth = RingCampusGeometry.radialDistance(x, z, 8) <= KERB_D;
+		boolean mouth = RingCampusGeometry.radialDistance(x, z, 8) <= KERB_D();
 		if (r > promenadeRim()) {
 			return mouth ? c.accent() : FOOT;
 		}
 		if (r > promenadeRim() - w / 6 || r <= promenadeInner()) {
 			return c.accent();
 		}
-		return joint(RingCampusGeometry.theta(x, z) * (RingCampusGeometry.PATIO_R + RingCampusGeometry.GALLERY_R) / 2, w) ? c.accent() : c.floor();
+		return joint(RingCampusGeometry.theta(x, z) * (CitadelCanvas.dims().patioR + CitadelCanvas.dims().galleryR) / 2, w) ? c.accent() : c.floor();
 	}
 }

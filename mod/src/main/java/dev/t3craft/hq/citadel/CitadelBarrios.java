@@ -26,7 +26,7 @@ import net.minecraft.world.level.block.CeilingHangingSignBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jspecify.annotations.Nullable;
 import static dev.t3craft.hq.citadel.CitadelCanvas.AIR;
-import static dev.t3craft.hq.citadel.CitadelCanvas.FH;
+import static dev.t3craft.hq.citadel.CitadelCanvas.fh;
 import static dev.t3craft.hq.citadel.CitadelCanvas.FOOT;
 import static dev.t3craft.hq.citadel.CitadelCanvas.GLASS;
 import static dev.t3craft.hq.citadel.CitadelCanvas.GRASS;
@@ -76,7 +76,7 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
  * <li>{@link #roof}: one of three roofs by {@code type = (h + lot) mod 3}, each its own piece:
  *     {@link #roofGable} (0, ridge along the depth), {@link #roofHipped} (1) and {@link #roofFlat}
  *     (2, a green roof behind a parapet). Parameters: the hall {@code Room}, {@code top} (y of the
- *     ceiling slab, {@code floors * FH}) and the {@code Mats}.</li>
+ *     ceiling slab, {@code floors * fh()}) and the {@code Mats}.</li>
  * <li>{@link #gatehouse}: the arched passage on the hub side, a pyramid roof over it, the project's
  *     hanging sign under the arch. Parameters: the lot, its lead module (for the sign) and the
  *     {@code Mats}.</li>
@@ -194,7 +194,7 @@ public final class CitadelBarrios {
 		int D = r.d();
 		int mid = r.c();
 		int F = upper != null ? 2 : 1;
-		int top = F * FH;
+		int top = F * fh();
 		var style = dev.t3craft.hq.citadel.barrio.HallStyle.of(l.id(), h);
 		DyeColor env = dev.t3craft.hq.citadel.barrio.HallFacade.env(c, l.id());
 		int seed = dev.t3craft.hq.citadel.barrio.HallStyle.seed(l.id(), h);
@@ -211,7 +211,7 @@ public final class CitadelBarrios {
 				continue;
 			}
 			int f = RingCampusGeometry.floorOf(mod.index());
-			int y = f * FH + 1;
+			int y = f * fh() + 1;
 			// feat/lead-office: a lead's module becomes its office (desk, children big screen, banner,
 			// bookshelves, whiteboard, chairs); every other module keeps its six desks
 			if (!CitadelLeadOffice.place(c, mod, r, f)) {
@@ -222,7 +222,7 @@ public final class CitadelBarrios {
 					}
 				}
 			}
-			BlockPos door = f == 0 ? r.cell(0, mid - 1, y) : r.cell(7, mid, y);
+			BlockPos door = f == 0 ? r.cell(0, mid - 1, y) : r.cell(RingCampusGeometry.stairSteps() + 1, mid, y); // upper: the landing past the top step
 			BlockPos inside = f == 0 ? r.cell(2, mid - 1, y) : r.cell(D - 2, mid, y);
 			c.anchor(Anchor.at(AnchorNames.module(mod.index()), door, r.back()));
 			c.anchor(Anchor.at(AnchorNames.walkModule(mod.index()), inside, r.back()));
@@ -239,8 +239,9 @@ public final class CitadelBarrios {
 		int seed = dev.t3craft.hq.citadel.barrio.HallStyle.seed(l.id(), h);
 		Set<Long> hole = new HashSet<>();
 		if (F == 2) {
-			for (int u = 2; u <= 5; u++) {
-				hole.add(r.cell(u, mid, FH).asLong());
+			// the stair hole over the last four steps, where a climber's head would meet the slab (u = 2..5 at scale 1)
+			for (int u = fh() - 4; u <= fh() - 1; u++) {
+				hole.add(r.cell(u, mid, fh()).asLong());
 			}
 		}
 		for (int u = -1; u <= D; u++) {
@@ -252,10 +253,10 @@ public final class CitadelBarrios {
 				c.set(g0, wall ? FOOT : (lattice(g0.getX(), g0.getZ()) ? LIGHT : c.floor()));
 				Direction.Axis along = (u == -1 || u == D) ? r.side().getAxis() : r.back().getAxis();
 				for (int f = 0; f < F; f++) {
-					int yb = f * FH;
+					int yb = f * fh();
 					if (wall) {
 						int t = (u == -1 || u == D) ? v : u;
-						for (int y = yb + 1; y < yb + FH; y++) {
+						for (int y = yb + 1; y < yb + fh(); y++) {
 							int ly = y - yb;
 							BlockState s = corner ? mats.post()
 									: dev.t3craft.hq.citadel.barrio.HallFacade.wallBlock(c, style, mats, env, seed, t, ly, along);
@@ -264,12 +265,12 @@ public final class CitadelBarrios {
 						if (f == 0 && u == -1 && Math.abs(v - mid) <= 1) {
 							c.fill(g0.getX(), 1, 3, g0.getZ(), AIR);
 						}
-						c.set(g0.atY(yb + FH), corner ? mats.post() : (mats.band() == mats.post() ? c.kit.beam(along) : mats.band()));
+						c.set(g0.atY(yb + fh()), corner ? mats.post() : (mats.band() == mats.post() ? c.kit.beam(along) : mats.band()));
 					} else {
-						for (int y = yb + 1; y < yb + FH; y++) {
+						for (int y = yb + 1; y < yb + fh(); y++) {
 							c.set(g0.atY(y), AIR);
 						}
-						BlockPos ceil = g0.atY(yb + FH);
+						BlockPos ceil = g0.atY(yb + fh());
 						if (f < F - 1) {
 							c.set(ceil, hole.contains(ceil.asLong()) ? AIR : (lattice(g0.getX(), g0.getZ()) ? LIGHT : c.floor()));
 						} else {
@@ -284,7 +285,7 @@ public final class CitadelBarrios {
 	/** Straight stairs up the centre line of a two-floor hall, through the hole of {@link #hallShell}. */
 	public static void hallStairs(CitadelCanvas c, Room r, dev.t3craft.hq.citadel.barrio.HallStyle style) {
 		int mid = r.c();
-		for (int i = 0; i < RingCampusGeometry.STAIR_STEPS; i++) {
+		for (int i = 0; i < RingCampusGeometry.stairSteps(); i++) {
 			BlockPos p = r.cell(1 + i, mid, 1 + i);
 			for (int y = 1; y <= i; y++) {
 				c.set(p.atY(y), style.stairCore());

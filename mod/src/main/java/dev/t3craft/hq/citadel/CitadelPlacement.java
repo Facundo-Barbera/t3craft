@@ -3,7 +3,7 @@ package dev.t3craft.hq.citadel;
 import static dev.t3craft.hq.citadel.CitadelCanvas.AIR;
 import static dev.t3craft.hq.citadel.CitadelCanvas.FOOT;
 import static dev.t3craft.hq.citadel.CitadelCanvas.LIGHT;
-import static dev.t3craft.hq.citadel.CitadelCanvas.Y0;
+import static dev.t3craft.hq.citadel.CitadelCanvas.y0;
 import static dev.t3craft.hq.citadel.CitadelCanvas.b;
 import static dev.t3craft.hq.citadel.CitadelCanvas.col;
 import static dev.t3craft.hq.citadel.CitadelCanvas.colX;
@@ -41,7 +41,7 @@ import org.jspecify.annotations.Nullable;
  * The family leader of the citadel: places the variants of the {@link Catalog} in the city once the
  * barrios, empty lots, streets and hub are painted. It only fills space that is still free (plain lot
  * grass, the edges of streets and avenues, the outer rim of the promenade); it never touches a hall,
- * a desk, a workstation, an anchor, a walk spot, the {@code SPAWN} or the geometry of the zones.
+ * a desk, a workstation, an anchor, a walk spot, the {@code spawn()} or the geometry of the zones.
  * Switched off with the pack parameter {@code catalog.enabled = 0}
  * ({@link LayoutParams#RINGCAMPUS_CATALOG}); then the city is exactly what it was before.
  *
@@ -73,8 +73,10 @@ import org.jspecify.annotations.Nullable;
  * planters (the kit's planter). Everything is deterministic: one seed per lot or street position, a
  * fixed scan order, no shared state outside the canvas.
  *
- * <p>Scale: {@code CitadelCanvas} has no {@code s(...)} helper yet, so every distance is a named
- * constant below. See {@code docs/tools/citadel-catalog.md}, section "Placement", for the plot sizes
+ * <p>Scale: every distance that grows with the citadel is a named size below, a method at the plan's
+ * scale ({@code sc/scy/scd/sOdd}, identity at scale 1). Plot requests ({@code req}) ask for frontages and
+ * depths times the scale, so a bigger lot gets more and bigger plots, and {@code Variant#fits} accepts
+ * plots up to its maximum times the scale; the lamps keep a rhythm of {@code LAMP_STEP()} blocks. See {@code docs/tools/citadel-catalog.md}, section "Placement", for the plot sizes
  * each family is asked for.
  */
 public final class CitadelPlacement {
@@ -83,55 +85,126 @@ public final class CitadelPlacement {
 
 	// ------------------------------------------------------------------ named sizes (scale rule)
 
+	/** This plan's scale helpers (see {@code CitadelCanvas}): identity at scale 1. */
+	private static int sc(int n) {
+		return CitadelCanvas.dims().s(n);
+	}
+
+	private static int scy(int n) {
+		return CitadelCanvas.dims().sy(n);
+	}
+
+	private static double scd(double n) {
+		return CitadelCanvas.dims().sd(n);
+	}
+
+	private static int sOdd(int n) {
+		return RingCampusGeometry.sOdd(CitadelCanvas.dims().k, n);
+	}
+
+	/** A count of plots at scale 1, times the scale (a bigger lot asks for more plots; identity at scale 1). */
+	private static int cnt(int n) {
+		return (int) Math.round(n * CitadelCanvas.dims().k);
+	}
+
+	/** A plot request with its sizes at scale 1: frontage and depth grow with {@code s}, the height is given scaled. */
+	private static Req req(Family f, int minW, int maxW, int minD, int maxD, int h, Mode mode) {
+		return new Req(f, sc(minW), sc(maxW), sc(minD), sc(maxD), h, mode);
+	}
+
 	/** Free cells kept between two plots of a lot. */
 	static final int MARGIN = 1;
 	/** Half width of a barrio's corridor paving: {@code |b| <= 1}, 3 blocks. */
-	static final int CORRIDOR_HALF = 1;
+	static int CORRIDOR_HALF() {
+		return sc(1);
+	}
 	/** The curb of the corridor: {@code |b| == 2}. */
-	static final int CURB = 2;
-	/** Cells round the gate arm and the halls kept clear: free corners start at {@code court + 1 + CLUSTER_KEEP}. */
-	static final int CLUSTER_KEEP = 2;
+	static int CURB() {
+		return CORRIDOR_HALF() + 1;
+	}
+	/** Cells round the gate arm and the halls kept clear: free corners start at {@code court + 1 + CLUSTER_KEEP()}. */
+	static int CLUSTER_KEEP() {
+		return sc(2);
+	}
 	/** Longest corridor (cells), a guard: corridors are a few cells long. */
-	static final int CORRIDOR_MAX = 48;
+	static int CORRIDOR_MAX() {
+		return sc(48);
+	}
 	/** Spacing of the furniture along a corridor or gate arm. */
-	static final int FURNITURE_STEP = 4;
+	static int FURNITURE_STEP() {
+		return sc(4);
+	}
 	/** Height a lot cell must be clear to take a plot. */
-	static final int CLEAR_TOP = 14;
+	static int CLEAR_TOP() {
+		return scy(14);
+	}
 	/** Spacing of the lamps along avenues and ring streets (blocks of arc). */
-	static final int LAMP_STEP = 10;
+	static int LAMP_STEP() {
+		return sc(10);
+	}
 	/** One bench every this many lamp intervals. */
 	static final int BENCH_EVERY = 3;
 	/** The avenue's edge band starts at this distance from its axis (the axis half width is 3.4). */
-	static final double AVENUE_EDGE = 2.5;
+	static double AVENUE_EDGE() {
+		return scd(2.5);
+	}
 	/** Lamp and bench offset from the avenue axis. */
-	static final double AVENUE_SIDE = 3.0;
+	static double AVENUE_SIDE() {
+		return scd(3.0);
+	}
 	/** Keep street objects this far (blocks) from an avenue axis at a crossing. */
-	static final double CROSSING_KEEP = 5.0;
+	static double CROSSING_KEEP() {
+		return scd(5.0);
+	}
 	/** Keep street objects this far (Manhattan) from the spawn. */
-	static final int SPAWN_KEEP = 4;
+	static int SPAWN_KEEP() {
+		return sc(4);
+	}
 	/** A gate stands this many cells into the avenue from the ring's inner edge. */
 	static final int GATE_SETBACK = 1;
 	/** Second try further in, when the first spot is refused (the south gate of ring 1 is next to the spawn). */
-	static final int GATE_RETRY = 4;
-	static final int GATE_H = 10;
+	static int GATE_RETRY() {
+		return sc(4);
+	}
+	static int GATE_H() {
+		return scy(10);
+	}
 	/** Plaza centre sides tried, largest first. */
-	static final int[] PLAZA_SIDES = {11, 9, 7};
+	static int[] PLAZA_SIDES() {
+		return new int[] {sOdd(11), sOdd(9), sOdd(7)};
+	}
 	/** Walkable ring kept round a plaza centre. */
-	static final int PLAZA_RING = 2;
+	static int PLAZA_RING() {
+		return sc(2);
+	}
 	/** How far a plaza may slide inwards from the street along its avenue. */
-	static final int PLAZA_SHIFT = 10;
-	static final int PLAZA_H = 10;
+	static int PLAZA_SHIFT() {
+		return sc(10);
+	}
+	static int PLAZA_H() {
+		return scy(10);
+	}
 	/** Side of the paved square of an empty-lot plaza (ring 1; rings 2 and 3 add 2). */
-	static final int EMPTY_PLAZA = 13;
-	static final int LAMP_H = 5;
+	static int EMPTY_PLAZA() {
+		return sOdd(13);
+	}
+	static int LAMP_H() {
+		return scy(5);
+	}
 	static final int BENCH_H = 3;
 	static final int PLANTER_H = 3;
-	static final int STATUE_H = 8;
+	static int STATUE_H() {
+		return scy(8);
+	}
 	/** Hub statues: distance in from the promenade's outer edge, and angular offset from the light posts. */
-	static final double HUB_STATUE_IN = 1.5;
+	static double HUB_STATUE_IN() {
+		return scd(1.5);
+	}
 	static final double HUB_STATUE_OFFSET = Math.PI / 16;
 	/** Ground texture patches (cells per side). */
-	static final int PATCH = 4;
+	static int PATCH() {
+		return sc(4);
+	}
 	/** Target: plain grass on at most this share of a lot. */
 	static final int PLAIN_MAX_PERCENT = 30;
 
@@ -164,7 +237,7 @@ public final class CitadelPlacement {
 			for (Anchor a : c.anchors.values()) {
 				anchorCols.add(col(a.block().getX(), a.block().getZ()));
 			}
-			anchorCols.add(col(CitadelFinish.SPAWN.getX(), CitadelFinish.SPAWN.getZ()));
+			anchorCols.add(col(CitadelFinish.spawn().getX(), CitadelFinish.spawn().getZ()));
 		}
 	}
 
@@ -558,7 +631,7 @@ public final class CitadelPlacement {
 		for (long k : cols) {
 			int x = colX(k);
 			int z = colZ(k);
-			pk.avail[pk.i(x, z)] = !reserved.test(x, z) && lotFree(city, l.id(), x, z, CLEAR_TOP);
+			pk.avail[pk.i(x, z)] = !reserved.test(x, z) && lotFree(city, l.id(), x, z, CLEAR_TOP());
 		}
 		return pk;
 	}
@@ -619,7 +692,7 @@ public final class CitadelPlacement {
 		CitadelCanvas c = city.c;
 		int start = l.reach() + 1;
 		int len = 0;
-		while (len < CORRIDOR_MAX) {
+		while (len < CORRIDOR_MAX()) {
 			BlockPos p = l.at(-(start + len), 0, 0);
 			Zone zn = c.zoneAt(p.getX(), p.getZ());
 			if (zn.kind() != Kind.LOT || zn.lot() != l.id()) {
@@ -628,7 +701,7 @@ public final class CitadelPlacement {
 			len++;
 		}
 		for (int s = 0; s < len; s++) {
-			for (int bb = -CURB; bb <= CURB; bb++) {
+			for (int bb = -CURB(); bb <= CURB(); bb++) {
 				BlockPos p = l.at(-(start + s), bb, 0);
 				int x = p.getX();
 				int z = p.getZ();
@@ -636,7 +709,7 @@ public final class CitadelPlacement {
 				if (zn.kind() != Kind.LOT || zn.lot() != l.id() || c.hallCols.containsKey(col(x, z))) {
 					continue;
 				}
-				c.set(x, 0, z, lattice(x, z) ? LIGHT : (Math.abs(bb) <= CORRIDOR_HALF ? c.accent() : FOOT));
+				c.set(x, 0, z, lattice(x, z) ? LIGHT : (Math.abs(bb) <= CORRIDOR_HALF() ? c.accent() : FOOT));
 				for (int y = 1; y <= 3; y++) {
 					if (is(c.at(x, y, z), Blocks.FLOWERING_AZALEA_LEAVES)) {
 						c.set(x, y, z, AIR);
@@ -652,15 +725,15 @@ public final class CitadelPlacement {
 	 * A barrio's free space: lamps, benches and planters along its corridor and gate arm, then a
 	 * fountain or well, annexes and gardens near the paths, trees scattered, small gardens and
 	 * furniture in what is left, then ground texture. The courtyard, the halls, the gatehouse, the
-	 * paved arms and a {@value #CLUSTER_KEEP}-cell walk round them, and the corridor stay as they are.
+	 * paved arms and a {@code CLUSTER_KEEP()}-cell walk round them, and the corridor stay as they are.
 	 */
 	private static void barrio(City city, Lot l, int corridorLen) {
 		CitadelCanvas c = city.c;
 		int g = l.court();
 		int reach = l.reach();
 		int box = reach + 1;
-		int corner = g + 1 + CLUSTER_KEEP;
-		int keep = CURB + 1;
+		int corner = g + 1 + CLUSTER_KEEP();
+		int keep = CURB() + 1;
 		long seed = lotSeed(l.id());
 		Packer pk = packer(city, l, (x, z) -> {
 			int a = l.a(x, z);
@@ -706,14 +779,14 @@ public final class CitadelPlacement {
 		};
 		int salt = 0;
 		// furniture along the corridor: lamps alternating with benches and planters, both sides
-		for (int s = 1; s < corridorLen - 1; s += FURNITURE_STEP) {
-			int step = s / FURNITURE_STEP;
+		for (int s = 1; s < corridorLen - 1; s += FURNITURE_STEP()) {
+			int step = s / FURNITURE_STEP();
 			for (int side = -1; side <= 1; side += 2) {
 				int a = -(box + s);
 				int bb = side * keep;
 				Direction face = lotDir(l, 0, -side);
 				if ((step + (side > 0 ? 0 : 1)) % 2 == 0) {
-					furniture(city, pk, l, Family.LAMP, a, a, bb, LAMP_H, face, mix(seed, salt++));
+					furniture(city, pk, l, Family.LAMP, a, a, bb, LAMP_H(), face, mix(seed, salt++));
 				} else if (step % 4 < 2) {
 					if (!furniture(city, pk, l, Family.BENCH, a - 1, a + 1, bb, BENCH_H, face, mix(seed, salt++))) {
 						furniture(city, pk, l, Family.PLANTER, a, a, bb, PLANTER_H, face, mix(seed, salt++));
@@ -724,34 +797,34 @@ public final class CitadelPlacement {
 			}
 		}
 		// lamps along the gate arm, between the gatehouse and the end of the arm
-		for (int a = -(g + l.gateD() + 2); a >= -(reach - 1); a -= FURNITURE_STEP) {
+		for (int a = -(g + l.gateD() + 2); a >= -(reach - 1); a -= FURNITURE_STEP()) {
 			for (int side = -1; side <= 1; side += 2) {
-				furniture(city, pk, l, Family.LAMP, a, a, side * (g + 2), LAMP_H, lotDir(l, 0, -side), mix(seed, salt++));
+				furniture(city, pk, l, Family.LAMP, a, a, side * (g + 2), LAMP_H(), lotDir(l, 0, -side), mix(seed, salt++));
 			}
 		}
 		int ring = l.ring();
 		List<Req> reqs = new ArrayList<>();
 		if (hash(seed, 1, 0, 2) == 0) {
-			reqs.add(new Req(Family.FOUNTAIN, 5, 7, 5, 7, 7, Mode.NEAR));
+			reqs.add(req(Family.FOUNTAIN, 5, 7, 5, 7, scy(7), Mode.NEAR));
 		} else {
-			reqs.add(new Req(Family.WELL, 3, 5, 3, 5, 8, Mode.NEAR));
+			reqs.add(req(Family.WELL, 3, 5, 3, 5, scy(8), Mode.NEAR));
 		}
-		for (int i = 0; i < (ring == 1 ? 2 : 3); i++) {
-			reqs.add(new Req(Family.ANNEX, 5, 8, 5, 7, 10, Mode.NEAR));
+		for (int i = 0; i < cnt((ring == 1 ? 2 : 3)); i++) {
+			reqs.add(req(Family.ANNEX, 5, 8, 5, 7, scy(10), Mode.NEAR));
 		}
-		for (int i = 0; i < (ring == 1 ? 2 : 3); i++) {
-			reqs.add(new Req(Family.GARDEN, 6, 11, 5, 9, 5, Mode.NEAR));
+		for (int i = 0; i < cnt((ring == 1 ? 2 : 3)); i++) {
+			reqs.add(req(Family.GARDEN, 6, 11, 5, 9, scy(5), Mode.NEAR));
 		}
-		for (int i = 0; i < 4 + 2 * ring; i++) {
-			reqs.add(new Req(Family.TREE, 5, 7, 5, 7, CLEAR_TOP, Mode.SCATTER));
+		for (int i = 0; i < cnt(4 + 2 * ring); i++) {
+			reqs.add(req(Family.TREE, 5, 7, 5, 7, CLEAR_TOP(), Mode.SCATTER));
 		}
-		for (int i = 0; i < 2; i++) {
-			reqs.add(new Req(Family.GARDEN, 5, 7, 5, 7, 5, Mode.SCATTER));
+		for (int i = 0; i < cnt(2); i++) {
+			reqs.add(req(Family.GARDEN, 5, 7, 5, 7, scy(5), Mode.SCATTER));
 		}
-		for (int i = 0; i < 3; i++) {
+		for (int i = 0; i < cnt(3); i++) {
 			reqs.add(new Req(Family.BENCH, 2, 3, 1, 1, BENCH_H, Mode.NEAR));
 		}
-		for (int i = 0; i < 6; i++) {
+		for (int i = 0; i < cnt(6); i++) {
 			reqs.add(new Req(Family.PLANTER, 1, 2, 1, 1, PLANTER_H, Mode.NEAR));
 		}
 		for (Req r : reqs) {
@@ -823,40 +896,40 @@ public final class CitadelPlacement {
 		int salt = 100;
 		List<Req> reqs = new ArrayList<>();
 		if (kind == 1 && plaza(city, pk, l, seed)) {
-			for (int i = 0; i < 4; i++) {
+			for (int i = 0; i < cnt(4); i++) {
 				reqs.add(new Req(Family.BENCH, 2, 3, 1, 1, BENCH_H, Mode.NEAR));
 			}
-			for (int i = 0; i < 2; i++) {
-				reqs.add(new Req(Family.GARDEN, 6, 10, 5, 8, 5, Mode.NEAR));
+			for (int i = 0; i < cnt(2); i++) {
+				reqs.add(req(Family.GARDEN, 6, 10, 5, 8, scy(5), Mode.NEAR));
 			}
-			for (int i = 0; i < 6 + ring; i++) {
-				reqs.add(new Req(Family.TREE, 5, 7, 5, 7, CLEAR_TOP, Mode.NEAR));
+			for (int i = 0; i < cnt(6 + ring); i++) {
+				reqs.add(req(Family.TREE, 5, 7, 5, 7, CLEAR_TOP(), Mode.NEAR));
 			}
 		} else if (kind == 2) {
-			reqs.add(new Req(Family.WELL, 3, 5, 3, 5, 8, Mode.NEAR));
-			for (int i = 0; i < 10 + 2 * ring; i++) {
-				reqs.add(new Req(Family.TREE, 5, 6, 5, 6, CLEAR_TOP, Mode.NEAR));
+			reqs.add(req(Family.WELL, 3, 5, 3, 5, scy(8), Mode.NEAR));
+			for (int i = 0; i < cnt(10 + 2 * ring); i++) {
+				reqs.add(req(Family.TREE, 5, 6, 5, 6, CLEAR_TOP(), Mode.NEAR));
 			}
-			for (int i = 0; i < 2; i++) {
-				reqs.add(new Req(Family.GARDEN, 6, 10, 5, 8, 5, Mode.SCATTER));
+			for (int i = 0; i < cnt(2); i++) {
+				reqs.add(req(Family.GARDEN, 6, 10, 5, 8, scy(5), Mode.SCATTER));
 			}
-			for (int i = 0; i < 2; i++) {
+			for (int i = 0; i < cnt(2); i++) {
 				reqs.add(new Req(Family.BENCH, 2, 3, 1, 1, BENCH_H, Mode.NEAR));
 			}
 		} else {
-			reqs.add(new Req(Family.FOUNTAIN, 5, 9, 5, 9, 7, Mode.NEAR));
-			reqs.add(new Req(Family.GARDEN, 8, 12, 7, 12, 5, Mode.NEAR));
-			for (int i = 0; i < 3; i++) {
+			reqs.add(req(Family.FOUNTAIN, 5, 9, 5, 9, scy(7), Mode.NEAR));
+			reqs.add(req(Family.GARDEN, 8, 12, 7, 12, scy(5), Mode.NEAR));
+			for (int i = 0; i < cnt(3); i++) {
 				reqs.add(new Req(Family.BENCH, 2, 3, 1, 1, BENCH_H, Mode.NEAR));
 			}
-			for (int i = 0; i < 6 + 2 * ring; i++) {
-				reqs.add(new Req(Family.TREE, 5, 7, 5, 7, CLEAR_TOP, Mode.SCATTER));
+			for (int i = 0; i < cnt(6 + 2 * ring); i++) {
+				reqs.add(req(Family.TREE, 5, 7, 5, 7, CLEAR_TOP(), Mode.SCATTER));
 			}
-			for (int i = 0; i < 2; i++) {
-				reqs.add(new Req(Family.GARDEN, 5, 8, 5, 8, 5, Mode.SCATTER));
+			for (int i = 0; i < cnt(2); i++) {
+				reqs.add(req(Family.GARDEN, 5, 8, 5, 8, scy(5), Mode.SCATTER));
 			}
 		}
-		for (int i = 0; i < 4; i++) {
+		for (int i = 0; i < cnt(4); i++) {
 			reqs.add(new Req(Family.PLANTER, 1, 2, 1, 1, PLANTER_H, Mode.SCATTER));
 		}
 		for (Req r : reqs) {
@@ -867,7 +940,7 @@ public final class CitadelPlacement {
 
 	/**
 	 * The paved square of an empty-lot plaza, centred on the lot: a centrepiece in the middle with a
-	 * {@value #PLAZA_RING}-cell walk round it, lamps on the corners. False (nothing written) when no
+	 * {@code PLAZA_RING()}-cell walk round it, lamps on the corners. False (nothing written) when no
 	 * square is free or nothing fits the middle.
 	 */
 	private static boolean plaza(City city, Packer pk, Lot l, long seed) {
@@ -875,18 +948,18 @@ public final class CitadelPlacement {
 		int cx = l.centre().getX();
 		int cz = l.centre().getZ();
 		Direction front = l.out().getOpposite();
-		for (int side = EMPTY_PLAZA + (l.ring() > 1 ? 2 : 0); side >= PLAZA_SIDES[PLAZA_SIDES.length - 1] + 2 * PLAZA_RING; side -= 2) {
+		for (int side = EMPTY_PLAZA() + (l.ring() > 1 ? 2 : 0); side >= PLAZA_SIDES()[PLAZA_SIDES().length - 1] + 2 * PLAZA_RING(); side -= 2) {
 			int x0 = cx - side / 2;
 			int z0 = cz - side / 2;
 			if (!pk.fits(x0, z0, side, side)) {
 				continue;
 			}
-			int inner = side - 2 * PLAZA_RING;
-			int ix = x0 + PLAZA_RING;
-			int iz = z0 + PLAZA_RING;
-			Family f = fitsAny(Family.PLAZA_CENTER, inner, inner, PLAZA_H) ? Family.PLAZA_CENTER
-					: fitsAny(Family.FOUNTAIN, inner, inner, PLAZA_H) ? Family.FOUNTAIN : Family.TREE;
-			if (!placeable(f, inner, inner, PLAZA_H)) {
+			int inner = side - 2 * PLAZA_RING();
+			int ix = x0 + PLAZA_RING();
+			int iz = z0 + PLAZA_RING();
+			Family f = fitsAny(Family.PLAZA_CENTER, inner, inner, PLAZA_H()) ? Family.PLAZA_CENTER
+					: fitsAny(Family.FOUNTAIN, inner, inner, PLAZA_H()) ? Family.FOUNTAIN : Family.TREE;
+			if (!placeable(f, inner, inner, PLAZA_H())) {
 				continue;
 			}
 			for (int x = x0; x < x0 + side; x++) {
@@ -903,12 +976,12 @@ public final class CitadelPlacement {
 					city.paved.add(col(x, z));
 				}
 			}
-			build(c, f, ix, 1, iz, inner, inner, PLAZA_H, front, mix(seed, 7));
+			build(c, f, ix, 1, iz, inner, inner, PLAZA_H(), front, mix(seed, 7));
 			int[][] corners = {{x0, z0}, {x0 + side - 1, z0}, {x0, z0 + side - 1}, {x0 + side - 1, z0 + side - 1}};
 			for (int[] k : corners) {
 				Direction in = cardinalOf(cx - k[0], cz - k[1]);
-				if (fitsAny(Family.LAMP, 1, 1, LAMP_H)) {
-					build(c, Family.LAMP, k[0], 1, k[1], 1, 1, LAMP_H, in, mix(seed, k[0] * 31L + k[1]));
+				if (fitsAny(Family.LAMP, 1, 1, LAMP_H())) {
+					build(c, Family.LAMP, k[0], 1, k[1], 1, 1, LAMP_H(), in, mix(seed, k[0] * 31L + k[1]));
 				}
 			}
 			pk.take(x0, z0, side, side);
@@ -921,7 +994,7 @@ public final class CitadelPlacement {
 
 	/**
 	 * Ground texture on the free grass of a lot, then a top-up so that plain grass (grass with nothing
-	 * on it) covers at most {@value #PLAIN_MAX_PERCENT}% of the lot. Patches of {@value #PATCH} cells
+	 * on it) covers at most {@value #PLAIN_MAX_PERCENT}% of the lot. Patches of {@code PATCH()} cells
 	 * pick a mood (meadow, flowers, moss, bare earth, quiet grass); only plants without collision, so
 	 * nothing here blocks a path.
 	 */
@@ -939,7 +1012,7 @@ public final class CitadelPlacement {
 				if (!is(c.at(x, 0, z), Blocks.GRASS_BLOCK) || !clear(c.at(x, 1, z))) {
 					continue;
 				}
-				int mood = hash(ts, Math.floorDiv(x, PATCH), Math.floorDiv(z, PATCH), 10);
+				int mood = hash(ts, Math.floorDiv(x, PATCH()), Math.floorDiv(z, PATCH()), 10);
 				int roll = hash(ts, x, z, 100);
 				switch (mood) {
 					case 0, 1, 2 -> {
@@ -1038,8 +1111,8 @@ public final class CitadelPlacement {
 		if (city.taken.contains(k) || city.anchorCols.contains(k)) {
 			return false;
 		}
-		BlockPos sp = CitadelFinish.SPAWN;
-		if (Math.abs(x - sp.getX()) + Math.abs(z - sp.getZ()) <= SPAWN_KEEP) {
+		BlockPos sp = CitadelFinish.spawn();
+		if (Math.abs(x - sp.getX()) + Math.abs(z - sp.getZ()) <= SPAWN_KEEP()) {
 			return false;
 		}
 		if (clear(c.at(x, 0, z))) {
@@ -1081,10 +1154,10 @@ public final class CitadelPlacement {
 			Direction perp = dir.getClockWise();
 			int inner = RingCampusGeometry.ringInner(m);
 			gate:
-			for (int t0 : new int[] {inner + GATE_SETBACK, inner + GATE_SETBACK + GATE_RETRY}) {
-				for (int w : new int[] {7, 9, 5}) {
-					for (int d : new int[] {3, 2, 4}) {
-						if (!fitsAny(Family.GATE, w, d, GATE_H)) {
+			for (int t0 : new int[] {inner + GATE_SETBACK, inner + GATE_SETBACK + GATE_RETRY()}) {
+				for (int w : new int[] {sOdd(7), sOdd(9), sOdd(5)}) {
+					for (int d : new int[] {sc(3), sc(2), sc(4)}) {
+						if (!fitsAny(Family.GATE, w, d, GATE_H())) {
 							continue;
 						}
 						int x0 = Integer.MAX_VALUE;
@@ -1098,9 +1171,9 @@ public final class CitadelPlacement {
 								int x = p.getX();
 								int z = p.getZ();
 								Zone zn = c.zoneAt(x, z);
-								boolean road = zn.kind() == Kind.AVENUE && zn.ring() == m && streetFree(city, x, z, GATE_H);
+								boolean road = zn.kind() == Kind.AVENUE && zn.ring() == m && streetFree(city, x, z, GATE_H());
 								boolean edge = zn.kind() == Kind.LOT && zn.ring() == m && softGround(c.at(x, 0, z))
-										&& !city.paved.contains(col(x, z)) && !city.taken.contains(col(x, z)) && clearAbove(c, x, z, GATE_H);
+										&& !city.paved.contains(col(x, z)) && !city.taken.contains(col(x, z)) && clearAbove(c, x, z, GATE_H());
 								ok = road || edge;
 								x0 = Math.min(x0, x);
 								z0 = Math.min(z0, z);
@@ -1113,7 +1186,7 @@ public final class CitadelPlacement {
 						}
 						int sx = x1 - x0 + 1;
 						int sz = z1 - z0 + 1;
-						if (build(c, Family.GATE, x0, 1, z0, sx, sz, GATE_H, dir.getOpposite(), mix(0x6A7EL, m * 64L + k))) {
+						if (build(c, Family.GATE, x0, 1, z0, sx, sz, GATE_H(), dir.getOpposite(), mix(0x6A7EL, m * 64L + k))) {
 							takeBox(city, x0, z0, sx, sz);
 							break gate;
 						}
@@ -1134,8 +1207,8 @@ public final class CitadelPlacement {
 
 	/**
 	 * A plaza centre at each crossing of ring {@code m}'s street with its avenues, when a square (plus a
-	 * {@value #PLAZA_RING}-cell walk ring) fits on cells of ring {@code m} only: its street and avenue,
-	 * or free lot grass, which gets paved. Slides inwards along the avenue up to {@value #PLAZA_SHIFT}
+	 * {@code PLAZA_RING()}-cell walk ring) fits on cells of ring {@code m} only: its street and avenue,
+	 * or free lot grass, which gets paved. Slides inwards along the avenue up to {@code PLAZA_SHIFT()}
 	 * cells to find room. Ring 1's crossings hold the node rooms, so none there.
 	 */
 	private static void plazas(City city, int m) {
@@ -1146,14 +1219,14 @@ public final class CitadelPlacement {
 			double ang = k * 2 * Math.PI / n;
 			Direction front = RingCampusGeometry.cardinal(ang).getOpposite();
 			plaza:
-			for (int side : PLAZA_SIDES) {
-				Family f = fitsAny(Family.PLAZA_CENTER, side, side, PLAZA_H) ? Family.PLAZA_CENTER
-						: fitsAny(Family.FOUNTAIN, side, side, PLAZA_H) ? Family.FOUNTAIN : null;
+			for (int side : PLAZA_SIDES()) {
+				Family f = fitsAny(Family.PLAZA_CENTER, side, side, PLAZA_H()) ? Family.PLAZA_CENTER
+						: fitsAny(Family.FOUNTAIN, side, side, PLAZA_H()) ? Family.FOUNTAIN : null;
 				if (f == null) {
 					continue;
 				}
-				int all = side + 2 * PLAZA_RING;
-				for (int shift = 0; shift <= PLAZA_SHIFT; shift++) {
+				int all = side + 2 * PLAZA_RING();
+				for (int shift = 0; shift <= PLAZA_SHIFT(); shift++) {
 					double rr = edge - all / 2.0 - shift;
 					BlockPos ctr = RingCampusGeometry.polar(rr, ang, 0);
 					int x0 = ctr.getX() - all / 2;
@@ -1177,7 +1250,7 @@ public final class CitadelPlacement {
 							}
 						}
 					}
-					build(c, f, x0 + PLAZA_RING, 1, z0 + PLAZA_RING, side, side, PLAZA_H, front, mix(0x91A2AL, m * 64L + k));
+					build(c, f, x0 + PLAZA_RING(), 1, z0 + PLAZA_RING(), side, side, PLAZA_H(), front, mix(0x91A2AL, m * 64L + k));
 					takeBox(city, x0, z0, all, all);
 					break plaza;
 				}
@@ -1197,13 +1270,13 @@ public final class CitadelPlacement {
 				long k = col(x, z);
 				switch (zn.kind()) {
 					case STREET, AVENUE -> {
-						if (!streetFree(city, x, z, PLAZA_H)) {
+						if (!streetFree(city, x, z, PLAZA_H())) {
 							return false;
 						}
 					}
 					case LOT -> {
 						if (c.hallCols.containsKey(k) || city.paved.contains(k) || city.taken.contains(k) || city.anchorCols.contains(k)
-								|| !softGround(c.at(x, 0, z)) || !clearAbove(c, x, z, PLAZA_H)) {
+								|| !softGround(c.at(x, 0, z)) || !clearAbove(c, x, z, PLAZA_H())) {
 							return false;
 						}
 					}
@@ -1216,13 +1289,13 @@ public final class CitadelPlacement {
 		return true;
 	}
 
-	/** Lamps on both edges of ring {@code m}'s avenues every {@value #LAMP_STEP} blocks, a bench every {@value #BENCH_EVERY} intervals. */
+	/** Lamps on both edges of ring {@code m}'s avenues every {@code LAMP_STEP()} blocks, a bench every {@value #BENCH_EVERY} intervals. */
 	private static void avenueFurniture(City city, int m) {
 		CitadelCanvas c = city.c;
 		int n = RingCampusGeometry.lotsIn(m);
-		int from = RingCampusGeometry.ringInner(m) + LAMP_STEP / 2;
+		int from = RingCampusGeometry.ringInner(m) + LAMP_STEP() / 2;
 		int to = RingCampusGeometry.ringOuter(m) - 2;
-		boolean lamps = fitsAny(Family.LAMP, 1, 1, LAMP_H);
+		boolean lamps = fitsAny(Family.LAMP, 1, 1, LAMP_H());
 		for (int k = 0; k < n; k++) {
 			double ang = k * 2 * Math.PI / n;
 			double dx = Math.sin(ang);
@@ -1230,22 +1303,22 @@ public final class CitadelPlacement {
 			double px = Math.cos(ang);
 			double pz = Math.sin(ang);
 			int step = 0;
-			for (int t = from; t <= to; t += LAMP_STEP, step++) {
+			for (int t = from; t <= to; t += LAMP_STEP(), step++) {
 				for (int side = -1; side <= 1; side += 2) {
 					if (lamps) {
-						int x = (int) Math.round(t * dx + side * AVENUE_SIDE * px);
-						int z = (int) Math.round(t * dz + side * AVENUE_SIDE * pz);
-						if (avenueEdge(city, m, n, x, z, LAMP_H)) {
+						int x = (int) Math.round(t * dx + side * AVENUE_SIDE() * px);
+						int z = (int) Math.round(t * dz + side * AVENUE_SIDE() * pz);
+						if (avenueEdge(city, m, n, x, z, LAMP_H())) {
 							Direction face = cardinalOf(-side * px, -side * pz);
-							if (build(c, Family.LAMP, x, 1, z, 1, 1, LAMP_H, face, mix(0x1A4DL, x * 31L + z))) {
+							if (build(c, Family.LAMP, x, 1, z, 1, 1, LAMP_H(), face, mix(0x1A4DL, x * 31L + z))) {
 								city.taken.add(col(x, z));
 							}
 						}
 					}
-					if ((step + (side > 0 ? 0 : 1)) % BENCH_EVERY == 0 && t + LAMP_STEP / 2 <= to) {
-						double tm = t + LAMP_STEP / 2.0;
-						int x = (int) Math.round(tm * dx + side * AVENUE_SIDE * px);
-						int z = (int) Math.round(tm * dz + side * AVENUE_SIDE * pz);
+					if ((step + (side > 0 ? 0 : 1)) % BENCH_EVERY == 0 && t + LAMP_STEP() / 2 <= to) {
+						double tm = t + LAMP_STEP() / 2.0;
+						int x = (int) Math.round(tm * dx + side * AVENUE_SIDE() * px);
+						int z = (int) Math.round(tm * dz + side * AVENUE_SIDE() * pz);
 						Direction face = cardinalOf(-side * px, -side * pz);
 						bench(city, x, z, face, (bx, bz) -> avenueEdge(city, m, n, bx, bz, BENCH_H));
 					}
@@ -1257,7 +1330,7 @@ public final class CitadelPlacement {
 	/** An avenue column of ring {@code m} on the edge band (the middle stays clear), free. */
 	private static boolean avenueEdge(City city, int m, int n, int x, int z, int top) {
 		Zone zn = city.c.zoneAt(x, z);
-		return zn.kind() == Kind.AVENUE && zn.ring() == m && RingCampusGeometry.radialDistance(x, z, n) >= AVENUE_EDGE
+		return zn.kind() == Kind.AVENUE && zn.ring() == m && RingCampusGeometry.radialDistance(x, z, n) >= AVENUE_EDGE()
 				&& streetFree(city, x, z, top);
 	}
 
@@ -1290,30 +1363,30 @@ public final class CitadelPlacement {
 
 	/**
 	 * Lamps round a ring street (m = 0: the inner street, its outer edge only; else both edges of ring
-	 * {@code m}'s street) every {@value #LAMP_STEP} blocks of arc, away from the crossings, and benches
+	 * {@code m}'s street) every {@code LAMP_STEP()} blocks of arc, away from the crossings, and benches
 	 * on the outer edge every {@value #BENCH_EVERY} intervals, facing in.
 	 */
 	private static void ringFurniture(City city, int m) {
 		CitadelCanvas c = city.c;
-		double inner = m == 0 ? RingCampusGeometry.RAMP_R : RingCampusGeometry.ringOuter(m);
+		double inner = m == 0 ? c.g.rampR : RingCampusGeometry.ringOuter(m);
 		double outer = m == 0 ? RingCampusGeometry.ringInner(1) : RingCampusGeometry.streetOuter(m);
 		double centre = (inner + outer) / 2;
 		double band = (outer - inner) / 2 - 1;
 		Kind kind = m == 0 ? Kind.INNER_STREET : Kind.STREET;
 		int nA = m == 0 ? 8 : RingCampusGeometry.lotsIn(m);
 		int nB = m < RingCampusGeometry.MAX_RINGS ? RingCampusGeometry.lotsIn(m + 1) : nA;
-		boolean lamps = fitsAny(Family.LAMP, 1, 1, LAMP_H);
+		boolean lamps = fitsAny(Family.LAMP, 1, 1, LAMP_H());
 		double[] edges = m == 0 ? new double[] {outer - 0.5} : new double[] {inner + 0.5, outer - 0.5};
 		for (double radius : edges) {
-			int count = Math.max(8, (int) Math.round(2 * Math.PI * radius / LAMP_STEP));
+			int count = Math.max(8, (int) Math.round(2 * Math.PI * radius / LAMP_STEP()));
 			boolean outerEdge = radius > centre;
 			for (int i = 0; i < count; i++) {
 				double ang = (i + 0.5) * 2 * Math.PI / count;
 				if (lamps) {
 					BlockPos p = RingCampusGeometry.polar(radius, ang, 0);
-					if (ringEdge(city, kind, m, centre, band, nA, nB, p.getX(), p.getZ(), LAMP_H)) {
+					if (ringEdge(city, kind, m, centre, band, nA, nB, p.getX(), p.getZ(), LAMP_H())) {
 						Direction face = outerEdge ? RingCampusGeometry.cardinal(ang).getOpposite() : RingCampusGeometry.cardinal(ang);
-						if (build(c, Family.LAMP, p.getX(), 1, p.getZ(), 1, 1, LAMP_H, face, mix(0x1A4DL, p.getX() * 31L + p.getZ()))) {
+						if (build(c, Family.LAMP, p.getX(), 1, p.getZ(), 1, 1, LAMP_H(), face, mix(0x1A4DL, p.getX() * 31L + p.getZ()))) {
 							city.taken.add(col(p.getX(), p.getZ()));
 						}
 					}
@@ -1337,7 +1410,7 @@ public final class CitadelPlacement {
 		if (Math.abs(RingCampusGeometry.r(x, z) - centre) < band) {
 			return false;
 		}
-		if (RingCampusGeometry.radialDistance(x, z, nA) <= CROSSING_KEEP || RingCampusGeometry.radialDistance(x, z, nB) <= CROSSING_KEEP) {
+		if (RingCampusGeometry.radialDistance(x, z, nA) <= CROSSING_KEEP() || RingCampusGeometry.radialDistance(x, z, nB) <= CROSSING_KEEP()) {
 			return false;
 		}
 		return streetFree(city, x, z, top);
@@ -1354,11 +1427,11 @@ public final class CitadelPlacement {
 		CitadelCanvas c = city.c;
 		for (int k = 0; k < 8; k++) {
 			double ang = (k + 0.5) * Math.PI / 4 + HUB_STATUE_OFFSET;
-			BlockPos ctr = RingCampusGeometry.polar(RingCampusGeometry.GALLERY_R - HUB_STATUE_IN, ang, 0);
+			BlockPos ctr = RingCampusGeometry.polar(c.g.galleryR - HUB_STATUE_IN(), ang, 0);
 			Direction face = RingCampusGeometry.cardinal(ang).getOpposite();
-			for (int size = 2; size >= 1; size--) {
-				Family f = size == 2 ? Family.STATUE : Family.LAMP;
-				int h = size == 2 ? STATUE_H : LAMP_H;
+			for (int size = sc(2); size >= 1; size--) {
+				Family f = size > 1 ? Family.STATUE : Family.LAMP;
+				int h = size == 2 ? STATUE_H() : LAMP_H();
 				if (!fitsAny(f, size, size, h)) {
 					continue;
 				}
@@ -1367,7 +1440,7 @@ public final class CitadelPlacement {
 				if (!galleryFree(city, x0, z0, size, h)) {
 					continue;
 				}
-				if (build(c, f, x0, Y0 + 1, z0, size, size, h, face, mix(0x57A7L, k))) {
+				if (build(c, f, x0, y0() + 1, z0, size, size, h, face, mix(0x57A7L, k))) {
 					break;
 				}
 			}
@@ -1388,16 +1461,16 @@ public final class CitadelPlacement {
 				if (!inside && !deck) {
 					continue;
 				}
-				if (!deck || clear(c.at(x, Y0, z)) || city.anchorCols.contains(col(x, z))) {
+				if (!deck || clear(c.at(x, y0(), z)) || city.anchorCols.contains(col(x, z))) {
 					return false;
 				}
 				int top = inside ? h : 2;
-				for (int y = Y0 + 1; y <= Y0 + top; y++) {
+				for (int y = y0() + 1; y <= y0() + top; y++) {
 					if (!clear(c.at(x, y, z))) {
 						return false;
 					}
 				}
-				if (inside && RingCampusGeometry.r(x, z) < RingCampusGeometry.GALLERY_R - 3) {
+				if (inside && RingCampusGeometry.r(x, z) < c.g.galleryR - c.sd(3)) {
 					return false;
 				}
 			}

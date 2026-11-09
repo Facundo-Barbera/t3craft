@@ -14,7 +14,7 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.Half;
 import net.minecraft.world.level.block.state.properties.SlabType;
 import static dev.t3craft.hq.citadel.CitadelCanvas.DECOR;
-import static dev.t3craft.hq.citadel.CitadelCanvas.FH;
+import static dev.t3craft.hq.citadel.CitadelCanvas.fh;
 import static dev.t3craft.hq.citadel.CitadelCanvas.HANGING;
 import static dev.t3craft.hq.citadel.CitadelCanvas.PLANKS;
 import static dev.t3craft.hq.citadel.CitadelCanvas.b;
@@ -177,15 +177,15 @@ public final class HallFacade {
 					// a balcony over the door: planks on two posts, a fence and flower pots on top, lanterns underneath
 					posts(c, r, mid, 5, m.post());
 					for (int dv = -2; dv <= 2; dv++) {
-						c.set(r.cell(-2, mid + dv, FH), PLANKS);
+						c.set(r.cell(-2, mid + dv, fh()), PLANKS);
 						if (Math.abs(dv) == 1) {
-							BlockPos p = r.cell(-2, mid + dv, FH + 1);
+							BlockPos p = r.cell(-2, mid + dv, fh() + 1);
 							c.put(p.getX(), p.getY(), p.getZ(), HallStyle.pot(HallStyle.hash(seed, dv)), DECOR);
 						} else {
-							c.set(r.cell(-2, mid + dv, FH + 1), b(s.fence()));
+							c.set(r.cell(-2, mid + dv, fh() + 1), b(s.fence()));
 						}
 					}
-					hangLanterns(c, r, mid, FH - 1);
+					hangLanterns(c, r, mid, fh() - 1);
 				} else {
 					posts(c, r, mid, 4, m.post());
 					for (int dv = -2; dv <= 2; dv++) {
@@ -234,7 +234,7 @@ public final class HallFacade {
 				boolean pier = Math.floorMod(t, 3) == 0;
 				boolean nearDoor = side == 0 && Math.abs(t - mid) <= 2;
 				for (int f = 0; f < F; f++) {
-					int yb = f * FH;
+					int yb = f * fh();
 					if (nearDoor && (f == 0 || s == HallStyle.BALCONY)) {
 						continue;
 					}

@@ -81,8 +81,8 @@ public final class RotundaRoom {
 
 	/** The drum. */
 	public static void wall(CitadelCanvas c, int x, int z, int dx, int dz, double d) {
-		if (d <= WALL_R) {
-			return;
+		if (d <= WALL_R || d > WALL_R + 1.0) {
+			return; // inside the hall, or the apron round the drum when the citadel is scaled (the zone grows, the room does not)
 		}
 		double off = NodeDecor.rayOffset(dx, dz);
 		for (int y = 1; y <= WALL_TOP; y++) {
