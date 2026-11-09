@@ -254,6 +254,10 @@ public final class HouseStoneWeathered implements Variant {
 		/** [palette] one gradient: mossy cobble plinth, mossy and cracked bricks low, clean bricks above. */
 		BlockState mat(int u, int y, int v) {
 			int h = p.hash(u, y, v, 20);
+			// [palette] rain streaks: whole columns that stay damp, mossy and cracked from the eave down to the plinth
+			if (y >= 2 && y <= 9 && y != F2 && p.hash(u, 77, v, 6 - moss) == 0) {
+				return h < (y <= 6 ? 12 : 7) ? b(Blocks.MOSSY_STONE_BRICKS) : h < 17 ? b(Blocks.CRACKED_STONE_BRICKS) : b(Blocks.STONE_BRICKS);
+			}
 			return switch (y) {
 				case 0 -> h < 4 + 5 * moss ? b(Blocks.MOSSY_COBBLESTONE) : b(Blocks.COBBLESTONE);
 				case 1 -> h < 1 + 5 * moss ? b(Blocks.MOSSY_COBBLESTONE) : h < 5 + 5 * moss ? b(Blocks.MOSSY_STONE_BRICKS) : h < 10 + 4 * moss ? b(Blocks.CRACKED_STONE_BRICKS) : b(Blocks.STONE_BRICKS);
@@ -834,9 +838,10 @@ public final class HouseStoneWeathered implements Variant {
 			for (int i = 0; i < 4; i++) {
 				set(iwk(i), 0, bk, logAxis(Blocks.SPRUCE_LOG, Direction.Axis.X));
 			}
-			set(ik(0), 0, bk, Blocks.WATER_CAULDRON.defaultBlockState().setValue(LayeredCauldronBlock.LEVEL, 3));
-			set(ik(1), 0, bk, Blocks.WATER_CAULDRON.defaultBlockState().setValue(LayeredCauldronBlock.LEVEL, 3));
-			set(ik(2), 0, bk, StoneKit.barrel());
+			// (no cauldrons here: a hollow cauldron under the eave reads as a standable cell nobody reaches)
+			set(ik(0), 0, bk, StoneKit.barrel());
+			set(ik(1), 0, bk, StoneKit.barrel());
+			set(ik(2), 0, bk, b(Blocks.HAY_BLOCK));
 			// dress what is left: ferns, flowers, azalea, moss
 			for (int u = 0; u < w; u++) {
 				for (int v = 0; v < d; v++) {
