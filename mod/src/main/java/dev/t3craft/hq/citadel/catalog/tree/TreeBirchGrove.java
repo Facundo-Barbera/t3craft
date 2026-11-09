@@ -20,33 +20,40 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 
 /**
- * A grove of two to four slender white birches of clearly different heights. The trunks are bare, 1×1 birch logs
- * with nothing on them below y 5 (no roots, no stubs: you walk between them and under them); they stand at least
- * three cells apart (two blocks of air) and a few lean a block or two inside their crown. Each crown is a light,
- * tall <em>vertical oval</em> of birch leaves (with clumps of oak or azalea), a ragged edge and small holes of sky
- * so the white bark shows through; on the taller trees a second, smaller oval hangs on a one-block twig lower down.
- * The crowns of different trunks never touch each other. The first leaf is always at y 5 or higher.
+ * A grove of slender white birches. The trunks are bare, 1×1 birch logs with nothing on them below y 4 (no roots, no
+ * stubs: you walk between them and under them); they stand at least three cells apart (two blocks of air), most of
+ * them in small groups, and some jog a block sideways in their bare part.
  *
- * <p>The floor is a mossy forest floor in patches: moss carpet, ferns and large ferns, tall grass, wild flowers
- * (lily of the valley, oxeye daisy, cornflower, azure bluet, white tulip), a few mushrooms at the trunks. When the
- * plot has room (and clear sky over the spot) it also gets a birch bench between stripped-log ends or a mossy
- * boulder: one from 7 wide, two from 14 and three from 24.
+ * <p>The crown is <em>not</em> a mass: a slim spire of leaves round the tip, and below it a few small, airy puffs of
+ * light birch leaves, each on its own thin twig (one or two logs), turning from layer to layer, so the white trunk shows
+ * almost all the way up. Leaves are birch (light, no biome tint) with a per-seed second tone (azalea, flowering azalea
+ * or a little spruce); there is no oak. Nothing below y 4: you walk under it with four blocks of air.
  *
- * <p>Size: 6–48 × 6–48 × 10+. The grove itself stays within about {@code 8 + 0.8 (m − 9)} cells of the centre
- * and never has more than four trunks; a bigger plot makes the trees taller (up to 22), their crowns wider (up to
- * 2.3 radius), the spacing wider, and it gets more floor and more seats.
+ * <p>The ground is a mossy forest floor in patches (moss, ferns, large ferns, tall grass, wild flowers, saplings,
+ * mushrooms at the trunks). From 10 wide there is a <b>clearing</b> with a lantern post and one to three birch benches
+ * (or a mossy boulder) facing it; from 12 wide a winding <b>senda</b> of stepping slabs leads in from the front; from
+ * 12 wide there is an understory too (azalea bushes, from 14 fallen logs).
+ *
+ * <p>Size: 6–48 × 6–48 × 10+. Small plots hold two to four trunks; from 14 wide the count grows with the area (5 up to
+ * 16), in two to four clumps with meadow between them, and the whole plot gets filled without closing it (the senda and
+ * the clearing stay free of trunks).
  */
 public final class TreeBirchGrove implements Variant {
 	private static final Wood BIRCH = new Wood(Blocks.BIRCH_LOG, Blocks.BIRCH_WOOD, b(Blocks.BIRCH_WOOD));
-	private static final Leaves[] TONES = {
-			Leaves.of(Blocks.BIRCH_LEAVES, Blocks.OAK_LEAVES).clumps(8),
-			Leaves.of(Blocks.BIRCH_LEAVES, Blocks.AZALEA_LEAVES).clumps(6),
-			Leaves.of(Blocks.BIRCH_LEAVES, Blocks.OAK_LEAVES).clumps(9),
+	/** One palette per seed: light birch leaves plus a second, small tone. No oak (biome tint makes it dark). */
+	private static final Leaves[] PAL = {
+			Leaves.of(Blocks.BIRCH_LEAVES, Blocks.AZALEA_LEAVES).clumps(9),
+			Leaves.of(Blocks.BIRCH_LEAVES, Blocks.SPRUCE_LEAVES).clumps(14),
+			Leaves.of(Blocks.BIRCH_LEAVES, Blocks.FLOWERING_AZALEA_LEAVES).clumps(7),
+			Leaves.of(Blocks.BIRCH_LEAVES, Blocks.AZALEA_LEAVES).clumps(4),
 	};
 	/** The lowest layer of any leaf: 4 blocks of free air over the ground. */
 	private static final int MIN_Y = 4;
-	/** The lowest layer of a crown on a tree of the grove (bark shows below it). */
-	private static final int CROWN_Y = 4;
+	private static final int[][] DIRS = {{1, 0}, {0, 1}, {-1, 0}, {0, -1}};
+
+	private interface Valid {
+		boolean test(int u, int v, int minCheb);
+	}
 
 	@Override
 	public String id() {
@@ -87,55 +94,110 @@ public final class TreeBirchGrove implements Variant {
 	public void build(CitadelCanvas c, Plot p) {
 		Vox t = new Vox(p);
 		Random r = p.rng(0xB12C_6A0BL);
-		int w = p.w();
-		int d = p.d();
+		final int w = p.w();
+		final int d = p.d();
 		int m = Math.min(w, d);
+		boolean big = m >= 14;
 		int maxTop = TreeKit.clamp(Math.min(p.h() - 2, 10 + (m - 6)), 8, 28);
+		int pal = r.nextInt(PAL.length);
 
-		// ---- where the trunks stand: best-candidate sampling in a window round the centre, at least minCheb apart
-		int maxN = m >= 11 ? 4 : m >= 8 ? 3 : 2;
-		int n = 2 + r.nextInt(maxN - 1);
-		if (m >= 10) {
-			n = Math.max(n, 3);
-		}
-		int minCheb = m >= 14 ? 6 : m >= 10 ? 5 : 3;
-		double half = Math.min((m - 1) / 2.0, 4.0 + Math.max(0, m - 9) * 0.35);
+		// ---- the clearing (a rest corner) and the senda that leads to it
 		double cu0 = (w - 1) / 2.0;
 		double cv0 = (d - 1) / 2.0;
-		int uLo = Math.max(1, (int) Math.ceil(cu0 - half));
-		int uHi = Math.min(w - 2, (int) Math.floor(cu0 + half));
-		int vLo = Math.max(1, (int) Math.ceil(cv0 - half));
-		int vHi = Math.min(d - 2, (int) Math.floor(cv0 + half));
-		List<int[]> pts = new ArrayList<>();
+		final double[] cl = {cu0, cv0, 2.5};
+		if (m >= 10) {
+			cl[0] = cu0 + (r.nextDouble() - 0.5) * 0.3 * w;
+			cl[1] = cv0 + (r.nextDouble() - 0.35) * 0.28 * d;
+			cl[2] = TreeKit.clamp(2.8 + (m - 10) * 0.1, 2.8, 5.2);
+		}
+		final boolean[] sd = new boolean[w * d];
+		if (m >= 12) {
+			senda(sd, r, w, d, cl, m);
+		}
+
+		// ---- where the trunks stand
+		int mg = big ? 2 : 1;
+		final int uLo = mg;
+		final int uHi = w - 1 - mg;
+		final int vLo = mg;
+		final int vHi = d - 1 - mg;
+		final List<int[]> pts = new ArrayList<>();
+		int n;
+		if (!big) {
+			int maxN = m >= 11 ? 4 : m >= 8 ? 3 : 2;
+			n = 2 + r.nextInt(maxN - 1);
+			if (m >= 10) {
+				n = Math.max(n, 3);
+			}
+		} else {
+			n = TreeKit.clamp((int) Math.round((w - 4) * (d - 4) / (double) (36 + r.nextInt(24))), 5, 16);
+		}
+		final boolean hasClear = m >= 10;
+		Valid valid = (u, v, minCheb) -> {
+			if (u < uLo || u > uHi || v < vLo || v > vHi) {
+				return false;
+			}
+			if (hasClear && Math.hypot(u - cl[0], v - cl[1]) < cl[2] + 0.6) {
+				return false;
+			}
+			for (int dv = -2; dv <= 2; dv++) {
+				for (int du = -2; du <= 2; du++) {
+					int a = u + du;
+					int bb = v + dv;
+					if (a >= 0 && a < w && bb >= 0 && bb < d && sd[bb * w + a]) {
+						return false;
+					}
+				}
+			}
+			for (int[] q : pts) {
+				if (Math.max(Math.abs(q[0] - u), Math.abs(q[1] - v)) < minCheb) {
+					return false;
+				}
+			}
+			return true;
+		};
+		int minCheb = !big ? (m >= 10 ? 5 : 3) : 6;
 		for (int i = 0; i < n; i++) {
 			int[] best = null;
-			double bestScore = -1;
-			for (int k = 0; k < 90; k++) {
-				int u = uLo + r.nextInt(uHi - uLo + 1);
-				int v = vLo + r.nextInt(vHi - vLo + 1);
-				double dmin = 99;
-				boolean ok = true;
-				for (int[] q : pts) {
-					int cheb = Math.max(Math.abs(q[0] - u), Math.abs(q[1] - v));
-					if (cheb < minCheb) {
-						ok = false;
-						break;
+			boolean join = big && i > 0 && r.nextInt(10) < 7;
+			if (join) {
+				for (int k = 0; k < 80 && best == null; k++) {
+					int[] a = pts.get(r.nextInt(pts.size()));
+					double ang = r.nextDouble() * Math.PI * 2;
+					double rad = 3.0 + r.nextDouble() * 1.8;
+					int u = (int) Math.round(a[0] + Math.cos(ang) * rad);
+					int v = (int) Math.round(a[1] + Math.sin(ang) * rad);
+					if (valid.test(u, v, 3)) {
+						best = new int[] {u, v};
 					}
-					dmin = Math.min(dmin, Math.hypot(q[0] - u, q[1] - v));
-				}
-				if (!ok) {
-					continue;
-				}
-				double score = (pts.isEmpty() ? 5 : dmin) + r.nextDouble() * 1.6;
-				if (score > bestScore) {
-					bestScore = score;
-					best = new int[] {u, v};
 				}
 			}
-			if (best == null) {
-				break;
+			for (int pass = 0; pass < 2 && best == null; pass++) {
+				double bestScore = -1;
+				int mc = pass == 0 ? minCheb : 3;
+				if (pass == 1 && !big) {
+					break;
+				}
+				for (int k = 0; k < 90; k++) {
+					int u = uLo + r.nextInt(uHi - uLo + 1);
+					int v = vLo + r.nextInt(vHi - vLo + 1);
+					if (!valid.test(u, v, mc)) {
+						continue;
+					}
+					double dmin = 99;
+					for (int[] q : pts) {
+						dmin = Math.min(dmin, Math.hypot(q[0] - u, q[1] - v));
+					}
+					double score = (pts.isEmpty() ? 5 : dmin) + r.nextDouble() * 1.6;
+					if (score > bestScore) {
+						bestScore = score;
+						best = new int[] {u, v};
+					}
+				}
 			}
-			pts.add(best);
+			if (best != null) {
+				pts.add(best);
+			}
 		}
 		if (pts.size() < 2) {
 			pts.clear();
@@ -143,17 +205,11 @@ public final class TreeBirchGrove implements Variant {
 			pts.add(new int[] {w - 2, d - 2});
 		}
 		n = pts.size();
-		double mu = 0;
-		double mv = 0;
-		for (int[] q : pts) {
-			mu += q[0] / (double) n;
-			mv += q[1] / (double) n;
-		}
 
-		// ---- heights, clearly different (shuffled between the trunks), and each crown's vertical extent
+		// ---- heights (clearly different, shuffled), the crown base of each, and a jog on most trunks
 		double[] fr = new double[n];
 		for (int i = 0; i < n; i++) {
-			fr[i] = 1.0 - 0.46 * i / (n - 1.0);
+			fr[i] = 1.0 - 0.5 * i / (n - 1.0);
 		}
 		for (int i = n - 1; i > 0; i--) {
 			int j = r.nextInt(i + 1);
@@ -162,167 +218,177 @@ public final class TreeBirchGrove implements Variant {
 			fr[j] = tmp;
 		}
 		int[] top = new int[n];
-		double[] ry = new double[n];
 		int[] cb = new int[n];
-		int[] offU = new int[n];
-		int[] offV = new int[n];
+		int[] fu = new int[n];
+		int[] fv = new int[n];
 		for (int i = 0; i < n; i++) {
-			top[i] = TreeKit.clamp((int) Math.round(maxTop * fr[i]) + r.nextInt(2) - (fr[i] > 0.99 ? 1 : 0), 8, maxTop);
-			double want = TreeKit.clamp(0.4 * top[i], 2.4, 6.5);
-			ry[i] = Math.min(want, (top[i] + 1 - CROWN_Y) / 2.0);
-			cb[i] = (int) Math.ceil(top[i] + 1 - 2 * ry[i]);
-			// a lean of one or two blocks inside the crown, away from the middle of the grove
-			double ou = pts.get(i)[0] - mu;
-			double ov = pts.get(i)[1] - mv;
-			double ang = Math.hypot(ou, ov) < 1e-6 ? r.nextDouble() * Math.PI * 2 : Math.atan2(ov, ou) + (r.nextDouble() - 0.5) * 0.9;
-			int amount = (m >= 10 && top[i] >= 12 && r.nextBoolean()) ? 2 : (r.nextInt(3) == 0 ? 0 : 1);
-			offU[i] = (int) Math.round(Math.cos(ang) * amount * 1.2);
-			offV[i] = (int) Math.round(Math.sin(ang) * amount * 1.2);
-			int fu = pts.get(i)[0] + offU[i];
-			int fv = pts.get(i)[1] + offV[i];
-			if (fu < 1 || fu > w - 2 || fv < 1 || fv > d - 2) {
-				offU[i] = 0;
-				offV[i] = 0;
-			}
+			top[i] = TreeKit.clamp((int) Math.round(maxTop * fr[i]) + r.nextInt(2) - (fr[i] > 0.99 ? 1 : 0), 7, maxTop);
+			cb[i] = TreeKit.clamp((int) Math.round(top[i] * 0.48), MIN_Y, Math.max(MIN_Y, top[i] - 3));
+			fu[i] = pts.get(i)[0];
+			fv[i] = pts.get(i)[1];
 		}
-		// the tops keep the spacing too (a lean never closes the gap)
+		int[][] jog = new int[n][];
 		for (int i = 0; i < n; i++) {
-			for (int j = 0; j < n; j++) {
-				if (i == j) {
+			if (r.nextInt(100) >= 60) {
+				continue;
+			}
+			int o = r.nextInt(4);
+			for (int k = 0; k < 4 && jog[i] == null; k++) {
+				int[] dr = DIRS[(o + k) % 4];
+				int nu = fu[i] + dr[0];
+				int nv = fv[i] + dr[1];
+				if (nu < 1 || nu > w - 2 || nv < 1 || nv > d - 2) {
 					continue;
 				}
-				int cheb = Math.max(Math.abs(pts.get(i)[0] + offU[i] - pts.get(j)[0] - offU[j]),
-						Math.abs(pts.get(i)[1] + offV[i] - pts.get(j)[1] - offV[j]));
-				if (cheb < 3) {
-					offU[i] = 0;
-					offV[i] = 0;
-					offU[j] = 0;
-					offV[j] = 0;
-				}
-			}
-		}
-
-		// ---- the wood of every trunk (bare below the crown), then the crown of each
-		int[][][] lead = new int[n][][];
-		// the bare layers of each crown (one free cell high: nobody can stand in them)
-		int[][] skipAll = new int[n][];
-		for (int i = 0; i < n; i++) {
-			double cy0 = top[i] + 1 - ry[i];
-			int ng = ry[i] >= 3.6 ? 2 : ry[i] >= 2.4 ? 1 : 0;
-			skipAll[i] = new int[ng];
-			for (int g = 0; g < ng; g++) {
-				skipAll[i][g] = (int) Math.round(cy0 + (ng == 1 ? -0.3 : g == 0 ? -0.35 : 0.5) * ry[i]);
-			}
-		}
-		for (int i = 0; i < n; i++) {
-			int u0 = pts.get(i)[0];
-			int v0 = pts.get(i)[1];
-			List<int[]> steps = new ArrayList<>();
-			int su = Integer.signum(offU[i]);
-			int sv = Integer.signum(offV[i]);
-			int au = Math.abs(offU[i]);
-			int av = Math.abs(offV[i]);
-			// the jogs sit in the bare layers, where the white trunk shows (else just under the crown)
-			int ng0 = skipAll[i].length;
-			int j = 0;
-			while (au > 0 || av > 0) {
-				boolean useU = au >= av && au > 0;
-				int yS = ng0 > 0 ? skipAll[i][Math.min(j, ng0 - 1)] + (j >= ng0 ? 3 * (j - ng0 + 1) : 0)
-						: Math.max(cb[i] - 1, MIN_Y) + 3 * j;
-				if (yS < top[i] - 1 && yS >= MIN_Y) {
-					steps.add(new int[] {yS, useU ? su : 0, useU ? 0 : sv});
-				}
-				if (useU) {
-					au--;
-				} else {
-					av--;
-				}
-				j++;
-			}
-			lead[i] = column(t, u0, v0, top[i], steps);
-		}
-		int[] own = new int[w * d * t.h];
-		for (int i = 0; i < n; i++) {
-			// the gap to the nearest other trunk sets how wide this crown may be
-			double nd = 99;
-			for (int j = 0; j < n; j++) {
-				if (j != i) {
-					nd = Math.min(nd, Math.hypot(pts.get(i)[0] + offU[i] - pts.get(j)[0] - offU[j],
-							pts.get(i)[1] + offV[i] - pts.get(j)[1] - offV[j]));
-				}
-			}
-			double rMax = TreeKit.clamp(1.3 + (m - 6) * 0.09, 1.3, 2.2);
-			double rr = TreeKit.clamp(Math.min(rMax * (0.88 + r.nextDouble() * 0.2), nd / 2.0 - 0.45), 1.15, 2.6);
-			double cy = top[i] + 1 - ry[i];
-			int cyi = (int) Math.round(cy);
-			Leaves lv = TONES[i % TONES.length];
-			int id = i + 1;
-			double rz = rr * (0.9 + r.nextDouble() * 0.2);
-			// one or two bare layers across the crown (a ring of sky with the white trunk showing): one free cell high, so
-			// nobody can stand in it, and the tiers stay joined to the trunk
-			int[] skip = skipAll[i];
-			oval(t, lead[i][0][cyi], cy, lead[i][1][cyi], rr, ry[i], rz, lv, id, 3 + 10 * i, skip);
-			// the cap: leaves over the leader's last log and round it, so no pale log end shows
-			int tu0 = lead[i][0][top[i]];
-			int tv0 = lead[i][1][top[i]];
-			BlockState cap = lv.a();
-			t.leafOf(tu0, top[i] + 1, tv0, cap, id);
-			int[][] nb4 = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
-			for (int[] o : nb4) {
-				t.leafOf(tu0 + o[0], top[i], tv0 + o[1], cap, id);
-			}
-			// a smaller oval on a one-block twig, lower down, on the taller trees (two on the tallest)
-			int extra = top[i] >= 14 ? 2 : top[i] >= 10 ? 1 : 0;
-			double side = r.nextDouble() * Math.PI * 2;
-			for (int k = 0; k < extra; k++) {
-				double ryL = ry[i] * (k == 0 ? 0.62 : 0.5);
-				double cyL = cy - ry[i] * (k == 0 ? 1.0 : 1.5) - 0.2;
-				if (cyL - ryL < CROWN_Y + 0.4) {
-					continue;
-				}
-				int cL = (int) Math.round(cyL);
-				int su = lead[i][0][cL];
-				int sv = lead[i][1][cL];
-				double ang = side + k * Math.PI + (r.nextDouble() - 0.5) * 0.5;
-				int du = Math.abs(Math.cos(ang)) >= Math.abs(Math.sin(ang)) ? (Math.cos(ang) >= 0 ? 1 : -1) : 0;
-				int dv = du == 0 ? (Math.sin(ang) >= 0 ? 1 : -1) : 0;
-				int tu = su + du;
-				int tv = sv + dv;
-				if (tu < 1 || tu > w - 2 || tv < 1 || tv > d - 2) {
-					tu = su - du;
-					tv = sv - dv;
-					if (tu < 1 || tu > w - 2 || tv < 1 || tv > d - 2) {
-						continue;
+				boolean ok = true;
+				for (int j = 0; j < n; j++) {
+					if (j != i && Math.max(Math.abs(nu - fu[j]), Math.abs(nv - fv[j])) < 3) {
+						ok = false;
 					}
 				}
-				t.wood(tu, cL, tv, BIRCH.log(tu != su ? Direction.Axis.X : Direction.Axis.Z));
-				oval(t, tu, cyL, tv, rr * 0.78, ryL, rz * 0.78, k % 2 == 0 ? lv.swap() : lv, id, 5 + 10 * i + k, skip);
+				int yS = Math.max(MIN_Y, cb[i] - 1);
+				if (ok && yS < top[i] - 2) {
+					jog[i] = new int[] {yS, dr[0], dr[1]};
+					fu[i] = nu;
+					fv[i] = nv;
+				}
 			}
-			claim(t, own, id);
 		}
-		gaps(t);
+
+		// ---- the wood of every trunk (bare below the crown), then the crowns
+		int[][][] lead = new int[n][][];
+		for (int i = 0; i < n; i++) {
+			List<int[]> steps = new ArrayList<>();
+			if (jog[i] != null) {
+				steps.add(jog[i]);
+			}
+			lead[i] = column(t, pts.get(i)[0], pts.get(i)[1], top[i], steps);
+		}
+		int[] ids = {1};
+		for (int i = 0; i < n; i++) {
+			Leaves lv = r.nextInt(6) == 0 ? PAL[(pal + 1) % PAL.length] : PAL[pal];
+			crown(t, r, i, lead[i], top[i], cb[i], lv, ids, fu, fv, w, d);
+		}
+		gaps(t, PAL[pal].a());
 		t.prune();
 
-		// ---- seats: a bench or a boulder where the plot gives room and clear sky
-		int seats = (m >= 7 ? 1 : 0) + (m >= 18 ? 1 : 0);
+		// ---- the rest corner: seats and a lantern post at the clearing, a few fallen logs, bushes, then the floor
+		List<int[]> seated = new ArrayList<>();
+		int seats = (m >= 7 ? 1 : 0) + (m >= 14 ? 1 : 0) + (m >= 26 ? 1 : 0);
 		for (int k = 0; k < seats; k++) {
-			seat(t, r, pts, mu, mv);
+			seat(t, r, pts, cl[0], cl[1], sd, seated);
 		}
-		floor(t, pts, mu, mv, half);
+		if (m >= 10) {
+			lamp(t, r, cl, sd);
+		}
+		if (big) {
+			fallenLogs(t, r, pts, cl, sd, w * d / 150);
+		}
+		if (m >= 12) {
+			bushes(t, r, pts, cl, sd, PAL[pal], w * d / 36);
+		}
+		floor(t, pts, cl, sd);
 		t.flush(c);
 	}
 
-	/** Marks every filled, still unowned cell as belonging to trunk {@code id}. */
-	private static void claim(Vox t, int[] own, int id) {
-		for (int y = 0; y < t.h; y++) {
-			for (int v = 0; v < t.d; v++) {
-				for (int u = 0; u < t.w; u++) {
-					int ix = (y * t.d + v) * t.w + u;
-					if (own[ix] == 0 && t.kind(u, y, v) != TreeKit.EMPTY) {
-						own[ix] = id;
+	/** The senda: a winding strip (one or two cells wide) from the front edge to the clearing; marks {@code sd}. */
+	private static void senda(boolean[] sd, Random r, int w, int d, double[] cl, int m) {
+		double us = TreeKit.clamp(w / 2.0 + (r.nextDouble() - 0.5) * w * 0.5, 2, w - 3);
+		double vs = 0;
+		double ue = cl[0];
+		double ve = cl[1];
+		double len = Math.hypot(ue - us, ve - vs);
+		double amp = TreeKit.clamp(1.0 + m * 0.07, 1.2, 3.2);
+		double phase = r.nextDouble() * Math.PI * 2;
+		double freq = r.nextBoolean() ? 1.0 : 1.5;
+		double nu = -(ve - vs) / len;
+		double nv = (ue - us) / len;
+		int steps = (int) Math.ceil(len * 2);
+		for (int s = 0; s <= steps; s++) {
+			double q = s / (double) steps;
+			double off = Math.sin(q * Math.PI * 2 * freq + phase) * amp * Math.sin(Math.PI * q);
+			double pu = us + (ue - us) * q + nu * off;
+			double pv = vs + (ve - vs) * q + nv * off;
+			int iu = (int) Math.round(pu);
+			int iv = (int) Math.round(pv);
+			mark(sd, w, d, iu, iv);
+			if (Math.abs(ue - us) < Math.abs(ve - vs)) {
+				mark(sd, w, d, iu + 1, iv);
+			} else {
+				mark(sd, w, d, iu, iv + 1);
+			}
+		}
+	}
+
+	private static void mark(boolean[] sd, int w, int d, int u, int v) {
+		if (u >= 1 && u < w - 1 && v >= 0 && v < d - 1) {
+			sd[v * w + u] = true;
+		}
+	}
+
+	/**
+	 * A slim spire of leaves round the tip and, lower in the crown, small airy puffs of leaves each on its own thin
+	 * twig (one or two logs), turning from layer to layer and away from the other trunks. The trunk shows between.
+	 */
+	private static void crown(Vox t, Random r, int i, int[][] lead, int top, int cb, Leaves lv, int[] ids, int[] fu, int[] fv,
+			int w, int d) {
+		int[] lu = lead[0];
+		int[] lvv = lead[1];
+		// the spire: a narrow oval over the tip, capped with leaves over the last log
+		int idS = ids[0]++;
+		double ryS = TreeKit.clamp(0.28 * top + 0.4, 2.2, 3.6);
+		oval(t, lu[top], top + 0.6 - ryS * 0.5, lvv[top], 1.15 + r.nextDouble() * 0.3, ryS, 1.15 + r.nextDouble() * 0.3, lv, idS,
+				3 + 10 * i);
+		BlockState cap = lv.a();
+		t.leafOf(lu[top], top + 1, lvv[top], cap, idS);
+		for (int[] o : DIRS) {
+			t.leafOf(lu[top] + o[0], top, lvv[top] + o[1], cap, idS);
+		}
+		// the puffs on twigs
+		int y = cb + r.nextInt(2);
+		int prev = -1;
+		int k = 0;
+		while (y <= top - 3) {
+			int len = 1 + (t.hash(i, y, k, 2) == 0 ? 1 : 0) + (top >= 11 && r.nextInt(3) == 0 ? 1 : 0);
+			len = Math.min(len, 2);
+			int bestDir = -1;
+			double bestScore = -1e9;
+			for (int dr = 0; dr < 4; dr++) {
+				int cu = lu[y] + DIRS[dr][0] * (len + 1);
+				int cv = lvv[y] + DIRS[dr][1] * (len + 1);
+				double near = 6;
+				for (int j = 0; j < fu.length; j++) {
+					if (j != i) {
+						near = Math.min(near, Math.hypot(cu - fu[j], cv - fv[j]));
 					}
 				}
+				double score = near + r.nextDouble() * 1.5 - (dr == prev ? 1.4 : 0);
+				if (cu < 1 || cu > w - 2 || cv < 1 || cv > d - 2) {
+					score -= 5;
+				}
+				if (score > bestScore) {
+					bestScore = score;
+					bestDir = dr;
+				}
 			}
+			int du = DIRS[bestDir][0];
+			int dv = DIRS[bestDir][1];
+			Direction.Axis ax = du != 0 ? Direction.Axis.X : Direction.Axis.Z;
+			for (int s = 1; s <= len; s++) {
+				t.wood(lu[y] + du * s, y, lvv[y] + dv * s, BIRCH.log(ax));
+			}
+			double rx = 1.15 + r.nextDouble() * 0.35;
+			double ry = 1.0 + r.nextDouble() * 0.7;
+			oval(t, lu[y] + du * (len + 1), y + r.nextInt(2) * 0.5, lvv[y] + dv * (len + 1), rx, ry, rx * (0.9 + r.nextDouble() * 0.2),
+					lv, ids[0]++, 5 + 10 * i + k);
+			// now and then a tiny tuft right against the trunk on another side
+			if (r.nextInt(3) == 0 && y + 1 <= top - 3) {
+				int o2 = (bestDir + 1 + r.nextInt(3)) % 4;
+				oval(t, lu[y + 1] + DIRS[o2][0], y + 1, lvv[y + 1] + DIRS[o2][1], 0.8, 0.9, 0.8, lv, ids[0]++, 7 + 10 * i + k);
+			}
+			prev = bestDir;
+			y += 2 + (r.nextInt(3) == 0 ? 1 : 0);
+			k++;
 		}
 	}
 
@@ -354,24 +420,19 @@ public final class TreeBirchGrove implements Variant {
 		return new int[][] {lu, lv};
 	}
 
-	private static boolean contains(int[] a, int y) {
-		for (int v : a) {
-			if (v == y) {
-				return true;
-			}
-		}
-		return false;
+	/** The leaf of a cell: the dominant light birch, with the second tone in pairs here and there. */
+	private static BlockState leafAt(Vox t, Leaves lv, int u, int y, int v, int salt) {
+		int pct = 100 / Math.max(2, lv.clumpOneIn());
+		return t.hash(u + salt, y, Math.floorDiv(v, 2), 100) < pct ? lv.b() : lv.a();
 	}
 
 	/**
-	 * A vertical oval of leaves: an ellipsoid {@code rx × ry × rz} with a ragged skin and small single-cell holes (on
-	 * every other layer, so two holes are never stacked) that let the trunk and the sky show. Never a ball and never
-	 * a cube; nothing under {@link #MIN_Y}.
+	 * A small airy oval of leaves: an ellipsoid {@code rx × ry × rz} with a ragged skin, thinned on the outside and with
+	 * single-cell holes (never over another hole) that let the trunk and the sky show. Nothing under {@link #MIN_Y}.
 	 */
-	private static void oval(Vox t, double cu, double cy, double cv, double rx, double ry, double rz, Leaves lv, int id,
-			int salt, int[] skip) {
+	private static void oval(Vox t, double cu, double cy, double cv, double rx, double ry, double rz, Leaves lv, int id, int salt) {
 		for (int y = (int) Math.floor(cy - ry - 1); y <= (int) Math.ceil(cy + ry + 1); y++) {
-			if (y < MIN_Y || y >= t.h || contains(skip, y)) {
+			if (y < MIN_Y || y >= t.h) {
 				continue;
 			}
 			double dy = (y - cy) / ry;
@@ -380,14 +441,17 @@ public final class TreeBirchGrove implements Variant {
 					double du = (u - cu) / rx;
 					double dv = (v - cv) / rz;
 					double q = du * du + dy * dy + dv * dv;
-					double jit = (t.hash(u + salt * 13, y + salt * 7, v + salt * 3, 9) - 4) / 4.0 * 0.42;
+					double jit = (t.hash(u + salt * 13, y + salt * 7, v + salt * 3, 9) - 4) / 4.0 * 0.5;
 					if (q > 1.0 + jit) {
 						continue;
+					}
+					if (q > 0.5 && t.hash(u + salt * 5, y, v + salt, 100) < 16) {
+						continue; // thinned skin
 					}
 					if (q > 0.18 && q < 0.97 && t.kind(u, y - 1, v) == TreeKit.LEAF && t.hash(u + salt, y, v + salt * 5, 4) < 1) {
 						continue; // a hole of sky (never over another hole, so nobody can stand in it)
 					}
-					t.leafOf(u, y, v, TreeKit.tone(t, lv, u, y, v, dy, q, salt), id);
+					t.leafOf(u, y, v, leafAt(t, lv, u, y, v, salt), id);
 				}
 			}
 		}
@@ -397,8 +461,7 @@ public final class TreeBirchGrove implements Variant {
 	 * Closes the small ledges: an empty cell with a solid cell under it, room to stand (two free cells) and a roof of
 	 * leaves a block or two over it would be a shut-in pocket for the walking audit. It becomes a leaf.
 	 */
-	private static void gaps(Vox t) {
-		BlockState lf = TONES[0].a();
+	private static void gaps(Vox t, BlockState lf) {
 		for (int pass = 0; pass < 2; pass++) {
 			for (int y = MIN_Y; y < t.h - 2; y++) {
 				for (int v = 0; v < t.d; v++) {
@@ -421,18 +484,35 @@ public final class TreeBirchGrove implements Variant {
 		}
 	}
 
+	/** True when the cell is free ground (nothing, or a plant) with no trunk within {@code clear} and not on the senda. */
+	private static boolean freeGround(Vox t, int u, int v, List<int[]> trunks, double clear, boolean[] sd) {
+		if (!t.in(u, 0, v) || sd[v * t.w + u]) {
+			return false;
+		}
+		byte k = t.kind(u, 0, v);
+		if (k != TreeKit.EMPTY && k != TreeKit.COVER) {
+			return false;
+		}
+		for (int[] q : trunks) {
+			if (Math.hypot(q[0] - u, q[1] - v) < clear) {
+				return false;
+			}
+		}
+		return true;
+	}
+
 	/**
 	 * A birch bench (stripped-log ends, slab seat) or a mossy boulder on a free, open spot of the floor, the one
-	 * nearest the middle of the grove (so the clearing there has a use).
+	 * nearest the clearing (so it has a use), at least 4 from the seats already there.
 	 */
-	private static void seat(Vox t, Random r, List<int[]> trunks, double mu, double mv) {
-		boolean bench = r.nextInt(3) != 0;
+	private static void seat(Vox t, Random r, List<int[]> trunks, double mu, double mv, boolean[] sd, List<int[]> placed) {
+		boolean bench = r.nextInt(4) != 0;
 		int len = bench ? 3 : 2;
 		int bu = -1;
 		int bv = -1;
 		boolean bAlong = true;
 		double bd = 1e9;
-		for (int tries = 0; tries < 80; tries++) {
+		for (int tries = 0; tries < 120; tries++) {
 			boolean alongU = r.nextBoolean();
 			int u = 1 + r.nextInt(Math.max(1, t.w - 2 - (alongU ? len : 1)));
 			int v = 1 + r.nextInt(Math.max(1, t.d - 2 - (alongU ? 1 : len)));
@@ -447,6 +527,9 @@ public final class TreeBirchGrove implements Variant {
 						continue;
 					}
 					if (t.kind(cu, 0, cv) != TreeKit.EMPTY && t.kind(cu, 0, cv) != TreeKit.COVER) {
+						ok = false;
+					}
+					if (sd[cv * t.w + cu] && du >= 0 && du < su && dv >= 0 && dv < sv) {
 						ok = false;
 					}
 					for (int[] q : trunks) {
@@ -465,7 +548,17 @@ public final class TreeBirchGrove implements Variant {
 			if (!ok) {
 				continue;
 			}
-			double dist = Math.hypot(u + su / 2.0 - mu, v + sv / 2.0 - mv);
+			double ccu = u + su / 2.0;
+			double ccv = v + sv / 2.0;
+			for (int[] q : placed) {
+				if (Math.hypot(q[0] - ccu, q[1] - ccv) < 5) {
+					ok = false;
+				}
+			}
+			if (!ok) {
+				continue;
+			}
+			double dist = Math.hypot(ccu - mu, ccv - mv);
 			if (dist < bd) {
 				bd = dist;
 				bu = u;
@@ -479,6 +572,7 @@ public final class TreeBirchGrove implements Variant {
 		int u = bu;
 		int v = bv;
 		boolean alongU = bAlong;
+		placed.add(new int[] {u, v});
 		if (bench) {
 			// birch stairs facing the clearing, a row of slabs for the back
 			Direction face;
@@ -509,6 +603,105 @@ public final class TreeBirchGrove implements Variant {
 		}
 	}
 
+	/** A birch fence post with a lantern on it at the edge of the clearing, so the rest corner has light. */
+	private static void lamp(Vox t, Random r, double[] cl, boolean[] sd) {
+		double a0 = r.nextDouble() * Math.PI * 2;
+		for (int k = 0; k < 24; k++) {
+			double ang = a0 + k * 0.52;
+			int u = (int) Math.round(cl[0] + Math.cos(ang) * (cl[2] - 0.6));
+			int v = (int) Math.round(cl[1] + Math.sin(ang) * (cl[2] - 0.6));
+			if (!t.in(u, 3, v) || sd[v * t.w + u]) {
+				continue;
+			}
+			boolean free = true;
+			for (int y = 0; y <= 3; y++) {
+				byte kk = t.kind(u, y, v);
+				if (kk != TreeKit.EMPTY && !(y == 0 && kk == TreeKit.COVER)) {
+					free = false;
+				}
+			}
+			// not hard against a seat
+			for (int dv = -1; dv <= 1 && free; dv++) {
+				for (int du = -1; du <= 1; du++) {
+					if (t.kind(u + du, 0, v + dv) == TreeKit.FIXED) {
+						free = false;
+					}
+				}
+			}
+			if (!free) {
+				continue;
+			}
+			t.fixed(u, 0, v, b(Blocks.BIRCH_FENCE));
+			t.fixed(u, 1, v, b(Blocks.BIRCH_FENCE));
+			t.fixed(u, 2, v, b(Blocks.BIRCH_FENCE));
+			t.fixed(u, 3, v, b(Blocks.LANTERN));
+			return;
+		}
+	}
+
+	/** A few fallen birch logs (two or three long, a little moss on them) well away from the senda, the clearing and the trunks. */
+	private static void fallenLogs(Vox t, Random r, List<int[]> trunks, double[] cl, boolean[] sd, int count) {
+		int placed = 0;
+		for (int tries = 0; tries < 160 && placed < count; tries++) {
+			int len = 2 + r.nextInt(2);
+			boolean alongU = r.nextBoolean();
+			int u = 1 + r.nextInt(Math.max(1, t.w - 2 - (alongU ? len : 1)));
+			int v = 1 + r.nextInt(Math.max(1, t.d - 2 - (alongU ? 1 : len)));
+			boolean ok = true;
+			for (int i = -1; i <= len && ok; i++) {
+				for (int j = -1; j <= 1 && ok; j++) {
+					int cu = alongU ? u + i : u + j;
+					int cv = alongU ? v + j : v + i;
+					if (!t.in(cu, 0, cv)) {
+						continue;
+					}
+					if (sd[cv * t.w + cu] || (t.kind(cu, 0, cv) != TreeKit.EMPTY && t.kind(cu, 0, cv) != TreeKit.COVER)) {
+						ok = false;
+					}
+					if (Math.hypot(cu - cl[0], cv - cl[1]) < cl[2] + 1) {
+						ok = false;
+					}
+					for (int[] q : trunks) {
+						if (Math.hypot(q[0] - cu, q[1] - cv) < 2.2) {
+							ok = false;
+						}
+					}
+				}
+			}
+			if (!ok) {
+				continue;
+			}
+			Direction.Axis ax = alongU ? Direction.Axis.X : Direction.Axis.Z;
+			for (int i = 0; i < len; i++) {
+				int cu = alongU ? u + i : u;
+				int cv = alongU ? v : v + i;
+				t.fixed(cu, 0, cv, BIRCH.log(ax));
+				if (t.hash(cu, 1, cv, 3) == 0) {
+					t.fixed(cu, 1, cv, b(Blocks.MOSS_CARPET));
+				} else if (t.hash(cu, 2, cv, 6) == 0) {
+					t.fixed(cu, 1, cv, b(Blocks.BROWN_MUSHROOM));
+				}
+			}
+			placed++;
+		}
+	}
+
+	/** Azalea-leaf bushes of one or two blocks in the understory: some with a flowering top. Never on the senda or the clearing. */
+	private static void bushes(Vox t, Random r, List<int[]> trunks, double[] cl, boolean[] sd, Leaves lv, int count) {
+		for (int k = 0; k < count; k++) {
+			int u = 1 + r.nextInt(t.w - 2);
+			int v = 1 + r.nextInt(t.d - 2);
+			if (!freeGround(t, u, v, trunks, 2.4, sd) || Math.hypot(u - cl[0], v - cl[1]) < cl[2] + 0.8) {
+				continue;
+			}
+			boolean flowering = r.nextInt(4) == 0;
+			t.fixed(u, 0, v, flowering ? b(Blocks.FLOWERING_AZALEA_LEAVES) : lv.b());
+			if (r.nextInt(3) == 0) {
+				t.fixed(u, 1, v, lv.a());
+			}
+		}
+	}
+
 	private static BlockState tall(Block blk, boolean lower) {
 		return blk.defaultBlockState().setValue(BlockStateProperties.DOUBLE_BLOCK_HALF, lower ? DoubleBlockHalf.LOWER : DoubleBlockHalf.UPPER);
 	}
@@ -524,12 +717,45 @@ public final class TreeBirchGrove implements Variant {
 		};
 	}
 
-	/** A mossy forest floor in patches (moss and ferns, meadow, wild flowers, large ferns, quiet), mushrooms at the trunks. */
-	private static void floor(Vox t, List<int[]> trunks, double mu, double mv, double half) {
+	/** A stepping slab of the senda: mostly mossy cobble and stone, a cell now and then left to grass. */
+	private static BlockState stepping(Vox t, int u, int v) {
+		int h = t.hash(u, 0, v, 8);
+		return switch (h) {
+			case 0, 1, 2 -> b(Blocks.MOSSY_COBBLESTONE_SLAB);
+			case 3, 4 -> b(Blocks.STONE_SLAB);
+			case 5 -> b(Blocks.ANDESITE_SLAB);
+			case 6 -> b(Blocks.COBBLESTONE_SLAB);
+			default -> null;
+		};
+	}
+
+	/**
+	 * A mossy forest floor in patches (moss and ferns, meadow, wild flowers, large ferns, quiet), mushrooms at the
+	 * trunks, a quiet clearing and the stepping-stone senda.
+	 */
+	private static void floor(Vox t, List<int[]> trunks, double[] cl, boolean[] sd) {
 		for (int v = 0; v < t.d; v++) {
 			for (int u = 0; u < t.w; u++) {
 				if (!t.empty(u, 0, v)) {
 					continue;
+				}
+				if (sd[v * t.w + u]) {
+					BlockState st = stepping(t, u, v);
+					if (st != null) {
+						t.fixed(u, 0, v, st);
+					}
+					continue;
+				}
+				boolean besideSenda = false;
+				for (int dv = -1; dv <= 1 && !besideSenda; dv++) {
+					for (int du = -1; du <= 1; du++) {
+						int a = u + du;
+						int bb = v + dv;
+						if (a >= 0 && a < t.w && bb >= 0 && bb < t.d && sd[bb * t.w + a]) {
+							besideSenda = true;
+							break;
+						}
+					}
 				}
 				double near = 99;
 				for (int[] q : trunks) {
@@ -538,17 +764,19 @@ public final class TreeBirchGrove implements Variant {
 				int roll = t.hash(u, 0, v, 100);
 				// patches 3 across, shifted row by row so they do not form a grid
 				int patch = t.hash(Math.floorDiv(u + t.hash(0, 1, Math.floorDiv(v, 3), 3), 3), 3, Math.floorDiv(v, 3), 5);
-				// the middle of the grove is a quiet clearing, the edge is wilder
-				if (Math.hypot(u - mu, v - mv) < Math.max(2.5, half * 0.6) && t.hash(u, 5, v, 3) != 0) {
+				// the clearing is quiet, the edge is wilder
+				if (Math.hypot(u - cl[0], v - cl[1]) < cl[2] && t.hash(u, 5, v, 3) != 0) {
 					patch = 4;
 				}
 				BlockState s = null;
 				boolean dbl = false;
-				if (near <= 1.6) {
+				if (besideSenda) {
+					s = roll < 30 ? b(Blocks.MOSS_CARPET) : roll < 40 ? b(Blocks.SHORT_GRASS) : null;
+				} else if (near <= 1.6) {
 					s = roll < 52 ? b(Blocks.MOSS_CARPET) : roll < 66 ? b(Blocks.FERN) : roll < 82 ? b(Blocks.BROWN_MUSHROOM) : null;
 				} else {
 					switch (patch) {
-						case 0 -> { // moss and ferns
+						case 0 -> { // moss and ferns, a young birch now and then
 							if (roll < 40) {
 								s = b(Blocks.MOSS_CARPET);
 							} else if (roll < 50) {
@@ -556,6 +784,8 @@ public final class TreeBirchGrove implements Variant {
 							} else if (roll < 54) {
 								s = tall(Blocks.LARGE_FERN, true);
 								dbl = true;
+							} else if (roll < 56) {
+								s = b(Blocks.BIRCH_SAPLING);
 							}
 						}
 						case 1 -> { // meadow: tall grass, short grass, a few flowers
