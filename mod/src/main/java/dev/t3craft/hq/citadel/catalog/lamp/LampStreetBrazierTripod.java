@@ -8,7 +8,9 @@ import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.catalog.Family;
 import dev.t3craft.hq.citadel.catalog.Plot;
 import dev.t3craft.hq.citadel.catalog.Variant;
+import java.util.Random;
 import net.minecraft.core.Direction;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.StairBlock;
 import net.minecraft.world.level.block.state.BlockState;
@@ -17,26 +19,37 @@ import net.minecraft.world.level.block.state.properties.Half;
 import net.minecraft.world.level.block.state.properties.SlabType;
 
 /**
- * Brazier on a tripod: a shallow bowl of polished deepslate with a thin copper rim and an open fire,
- * carried by three dark legs that splay out to the left, the right and the back and lean in to a dark
- * collar under the bowl. The front stays open, so the fire and the empty space under the bowl read.
+ * Brazier on a tripod: a meeting point. Three open legs (left, right and back; the front stays open) splay out
+ * from a bowl of fire, a flat dais of stone slabs rings the foot, and on a big plot stone benches face the
+ * fire. Nothing flammable anywhere: metal, stone and a campfire in a bowl that holds it.
  *
  * <ul>
- * <li><b>Silhouette</b>: thin legs leaning in → a dark knot → a bowl that tapers to the knot and widens to
- *     the rim. The legs lean with a stair at their top (the high step towards the knot).</li>
- * <li><b>Contrast</b>: near-black nether-brick legs with blackstone knees, dark polished deepslate bowl, a thin copper rim; the flame is the brightest thing on it.</li>
- * <li><b>Safe fire</b>: a campfire (it never spreads) with nothing flammable round it.</li>
+ * <li><b>1 × 1, 2-wide or 2-deep plots</b>: a one-block column brazier (foot, thin stem, collar, bowl, fire); a
+ *     plot 7+ wide and under 3 deep is a pair of columns that flank the way through.</li>
+ * <li><b>3 × 3 and up</b>: the tripod. The legs stand under the bowl and lean in with a stair; from 5 × 5 the dais
+ *     (dark slabs near the legs, light stone brick outwards) and 2 or 3 stone benches face the fire; 9+ wide
+ *     and under 5 deep is a pair of tripods that flank the entrance with the middle free.</li>
+ * <li><b>7 × 7 with height 6+</b>: the legs splay out two cells, each carrying the bowl through a short arm of
+ *     upside-down slabs 3 blocks up (a walker passes under it), the dais grows to radius 3 and 2 to 4 benches
+ *     sit round it, with lanterns on stone posts at the front ends.</li>
  * </ul>
- * Size: 3 × 3 × 4–6. The legs are one to three blocks before they lean in.
+ *
+ * <p>By seed: leg material (iron / waxed copper / stone brick), bowl material (polished deepslate / copper), bowl
+ * shape (plate with a copper lip / cup with an inward-sloping rim / cage of thin bars) and the fire (a campfire,
+ * one in three a soul campfire with soul lanterns).
+ *
+ * <ul>
+ * <li><b>Palette (3–5)</b>: polished blackstone bricks or deepslate bricks at the foot, iron / copper / stone legs,
+ *     a polished deepslate or copper bowl, stone bricks for the dais and the benches.</li>
+ * <li><b>Safe</b>: the fire stands 4+ blocks up on a full block, with a ring of stone round it; the dais, benches
+ *     and posts are stone; there is no wood, wool or leaf within the box.</li>
+ * <li><b>Walkable</b>: the dais is slabs (no jump), the cells under the bowl keep 3+ blocks of headroom, the front
+ *     lane is open and every bench is a stair a person can step over.</li>
+ * <li><b>Supported</b>: foot → stem → head stair → (arm) → bowl is one chain of face contacts.</li>
+ * </ul>
+ * Size: 1–11 × 1–11 × 5+.
  */
 public final class LampStreetBrazierTripod implements Variant {
-	/** The three leg feet (left, right, back) and the direction each one leans in, towards the centre. */
-	private static final int[][] LEGS = {{0, 1}, {2, 1}, {1, 2}};
-	private static final Direction[] LEAN = {Direction.EAST, Direction.WEST, Direction.NORTH};
-	private static final int[][] SIDES = {{1, 0}, {1, 2}, {0, 1}, {2, 1}};
-	private static final Direction[] IN = {Direction.SOUTH, Direction.NORTH, Direction.EAST, Direction.WEST};
-	private static final int[][] CORNERS = {{0, 0}, {2, 0}, {0, 2}, {2, 2}};
-
 	@Override
 	public String id() {
 		return "lamp_street_brazier_tripod";
@@ -49,74 +62,310 @@ public final class LampStreetBrazierTripod implements Variant {
 
 	@Override
 	public int minW() {
-		return 3;
+		return 1;
 	}
 
 	@Override
 	public int minD() {
-		return 3;
+		return 1;
 	}
 
 	@Override
 	public int minH() {
-		return 4;
+		return 5;
 	}
 
 	@Override
 	public int maxW() {
-		return 3;
+		return 11;
 	}
 
 	@Override
 	public int maxD() {
-		return 3;
+		return 11;
+	}
+
+	/** The seeded look of one plot. */
+	private record Look(int legs, boolean copperBowl, int shape, boolean soul) {
+	}
+
+	/** A seeded choice in 0..n-1, one stream per salt. */
+	private static int pick(Plot p, int salt, int n) {
+		Random r = p.rng(0xB2A71E5L * salt);
+		r.nextInt();
+		r.nextInt();
+		return r.nextInt(n);
 	}
 
 	@Override
 	public void build(CitadelCanvas c, Plot p) {
-		int dish = Math.min(p.h() - 2, 4); // the bowl; the fire and the rim sit on it
-		int knot = dish - 1; // where the legs meet, under the bowl
-		int lean = knot - 1; // the leaning top of each leg
-		boolean soul = p.hash(0, 0, 0, 4) == 0;
-
-		// --- legs: thin dark fence posts, then a stair whose high step leans in to the knot
-		for (int i = 0; i < 3; i++) {
-			int u = LEGS[i][0];
-			int v = LEGS[i][1];
-			for (int y = 0; y < lean; y++) {
-				p.set(c, u, y, v, b(Blocks.NETHER_BRICK_FENCE)); // thin dark iron-like legs
+		Look look = new Look(pick(p, 1, 3), pick(p, 2, 2) == 1, pick(p, 3, 3), pick(p, 4, 3) == 0);
+		int w = p.w();
+		int d = p.d();
+		int cv1 = (d - 1) / 2;
+		if (w < 3 || d < 3) {
+			if (w >= 7 && d < 3) {
+				column(c, p, look, 1, cv1);
+				column(c, p, look, w - 2, cv1);
+			} else {
+				column(c, p, look, (w - 1) / 2, cv1);
 			}
-			// the knee: a stair leaning in to the knot (on the lowest plots the leg is just a thin post)
-			p.set(c, u, lean, v, lean == 0 ? b(Blocks.NETHER_BRICK_FENCE) : stairs(Blocks.POLISHED_BLACKSTONE_STAIRS, LEAN[i]));
+			return;
 		}
-		// --- the knot: a slim dark collar where the three legs meet, ash on the ground under it
-		p.set(c, 1, knot, 1, b(Blocks.POLISHED_BLACKSTONE_WALL));
-		if (knot >= 2) {
-			p.set(c, 1, 0, 1, slab(Blocks.BLACKSTONE_SLAB));
+		if (w >= 9 && d < 5) {
+			tripod(c, p, look, 1, cv1, 1);
+			tripod(c, p, look, w - 2, cv1, 1);
+			return;
 		}
+		int cu = (w - 1) / 2;
+		int cv = cv1;
+		int r = p.h() >= 6 && Math.min(w, d) >= 7 ? 2 : 1;
+		tripod(c, p, look, cu, cv, r);
+	}
 
-		// --- bowl: upside-down stairs taper from the rim down to the knot; upper slabs close the corners
-		p.set(c, 1, dish, 1, b(Blocks.POLISHED_DEEPSLATE));
+	// ------------------------------------------------------------------ materials
+
+	private static BlockState foot(Plot p, Look k, int u, int v) {
+		if (k.legs() == 2) {
+			return b(p.hash(u, 0, v, 3) == 0 ? Blocks.CRACKED_DEEPSLATE_BRICKS : Blocks.DEEPSLATE_BRICKS);
+		}
+		return b(p.hash(u, 0, v, 4) == 0 ? Blocks.CRACKED_POLISHED_BLACKSTONE_BRICKS : Blocks.POLISHED_BLACKSTONE_BRICKS);
+	}
+
+	/** The thin stem of a leg. */
+	private static BlockState stem(Look k) {
+		return switch (k.legs()) {
+			case 0 -> b(Blocks.IRON_BARS);
+			case 1 -> b(Blocks.COPPER_BARS.waxed().exposed());
+			default -> b(Blocks.STONE_BRICK_WALL);
+		};
+	}
+
+	/** The leaning head: an upside-down stair whose back is towards the bowl (so it faces outwards). */
+	private static BlockState head(Look k, Direction outward) {
+		Block s = switch (k.legs()) {
+			case 0 -> Blocks.POLISHED_BLACKSTONE_BRICK_STAIRS;
+			case 1 -> Blocks.CUT_COPPER_STAIRS.waxed().exposed();
+			default -> Blocks.STONE_BRICK_STAIRS;
+		};
+		return stairs(s, outward).setValue(StairBlock.HALF, Half.TOP);
+	}
+
+	/** An arm: an upside-down slab, 3 blocks up, so a walker passes under it. */
+	private static BlockState arm(Look k) {
+		Block s = switch (k.legs()) {
+			case 0 -> Blocks.POLISHED_BLACKSTONE_BRICK_SLAB;
+			case 1 -> Blocks.CUT_COPPER_SLAB.waxed().exposed();
+			default -> Blocks.STONE_BRICK_SLAB;
+		};
+		return slab(s).setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP);
+	}
+
+	private static BlockState bowlBlock(Look k) {
+		return b(k.copperBowl() ? Blocks.CUT_COPPER.waxed().exposed() : Blocks.POLISHED_DEEPSLATE);
+	}
+
+	private static BlockState bowlStairs(Look k, Direction facing, Half half) {
+		return stairs(k.copperBowl() ? Blocks.CUT_COPPER_STAIRS.waxed().exposed() : Blocks.POLISHED_DEEPSLATE_STAIRS, facing).setValue(StairBlock.HALF, half);
+	}
+
+	private static BlockState bowlSlab(Look k, SlabType t) {
+		return slab(k.copperBowl() ? Blocks.CUT_COPPER_SLAB.waxed().exposed() : Blocks.POLISHED_DEEPSLATE_SLAB).setValue(BlockStateProperties.SLAB_TYPE, t);
+	}
+
+	private static BlockState fire(Look k) {
+		return b(k.soul() ? Blocks.SOUL_CAMPFIRE : Blocks.CAMPFIRE).setValue(BlockStateProperties.LIT, true);
+	}
+
+	private static BlockState lantern(Look k) {
+		return b(k.soul() ? Blocks.SOUL_LANTERN : Blocks.LANTERN);
+	}
+
+	// ------------------------------------------------------------------ column (1-wide plots)
+
+	/** A one-block brazier: dark foot, thin stem, a slab collar, the bowl block and the fire on it. */
+	private static void column(CitadelCanvas c, Plot p, Look k, int u, int v) {
+		int top = p.h() >= 6 ? 5 : 4;
+		p.set(c, u, 0, v, foot(p, k, u, v));
+		for (int y = 1; y <= top - 3; y++) {
+			p.set(c, u, y, v, stem(k));
+		}
+		p.set(c, u, top - 2, v, arm(k));
+		p.set(c, u, top - 1, v, bowlBlock(k));
+		p.set(c, u, top, v, fire(k));
+	}
+
+	// ------------------------------------------------------------------ tripod
+
+	/**
+	 * The tripod round the centre {@code (cu, cv)}: legs at distance {@code r} (1 or 2) to the left, right and back.
+	 * The bowl is {@code D} up (3 or 4), the fire above it.
+	 */
+	private static void tripod(CitadelCanvas c, Plot p, Look k, int cu, int cv, int r) {
+		int dd = Math.min(p.h() - 2, 4);
+		if (r == 2) {
+			dd = 4;
+		}
+		int[][] legs = {{-r, 0, 0}, {r, 0, 1}, {0, r, 2}};
+		Direction[] out = {Direction.WEST, Direction.EAST, Direction.SOUTH};
+		for (int i = 0; i < 3; i++) {
+			int lu = cu + legs[i][0];
+			int lv = cv + legs[i][1];
+			p.set(c, lu, 0, lv, foot(p, k, lu, lv));
+			for (int y = 1; y < dd - 1; y++) {
+				p.set(c, lu, y, lv, stem(k));
+			}
+			p.set(c, lu, dd - 1, lv, head(k, out[i]));
+			if (r == 2) { // the arm: one upside-down slab between the head and the bowl
+				p.set(c, cu + legs[i][0] / 2, dd - 1, cv + legs[i][1] / 2, arm(k));
+			}
+		}
+		bowl(c, p, k, cu, cv, dd);
+		dais(c, p, k, cu, cv, r);
+		benches(c, p, k, cu, cv, r);
+	}
+
+	/** The bowl: a base that tapers (centre block, upside-down stairs, upper corner slabs) and a rim by shape. */
+	private static void bowl(CitadelCanvas c, Plot p, Look k, int cu, int cv, int dd) {
+		p.set(c, cu, dd, cv, bowlBlock(k));
+		Direction[] dirs = {Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST};
+		int[][] sides = {{0, -1}, {0, 1}, {-1, 0}, {1, 0}};
 		for (int i = 0; i < 4; i++) {
-			int[] s = SIDES[i];
-			p.set(c, s[0], dish, s[1], stairs(Blocks.POLISHED_DEEPSLATE_STAIRS, IN[i]).setValue(StairBlock.HALF, Half.TOP));
+			// facing outwards, upside down: the low half is towards the centre, so the base steps in to the knot
+			p.set(c, cu + sides[i][0], dd, cv + sides[i][1], bowlStairs(k, dirs[i], Half.TOP));
 		}
-		BlockState corner = slab(Blocks.POLISHED_DEEPSLATE_SLAB).setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP);
-		for (int[] k : CORNERS) {
-			p.set(c, k[0], dish, k[1], corner);
+		for (int su = -1; su <= 1; su += 2) {
+			for (int sv = -1; sv <= 1; sv += 2) {
+				p.set(c, cu + su, dd, cv + sv, bowlSlab(k, SlabType.TOP));
+			}
 		}
+		int y = dd + 1;
+		switch (k.shape()) {
+			case 0 -> { // plate with a copper lip: closed trapdoors, a bright thin edge
+				BlockState lip = b(Blocks.COPPER_TRAPDOOR.waxed().unaffected());
+				for (int su = -1; su <= 1; su++) {
+					for (int sv = -1; sv <= 1; sv++) {
+						if (su != 0 || sv != 0) {
+							p.set(c, cu + su, y, cv + sv, lip);
+						}
+					}
+				}
+			}
+			case 1 -> { // cup: the rim slopes in (low step towards the fire), corners are low slabs
+				for (int i = 0; i < 4; i++) {
+					p.set(c, cu + sides[i][0], y, cv + sides[i][1], bowlStairs(k, dirs[i].getOpposite(), Half.BOTTOM));
+				}
+				for (int su = -1; su <= 1; su += 2) {
+					for (int sv = -1; sv <= 1; sv += 2) {
+						p.set(c, cu + su, y, cv + sv, bowlSlab(k, SlabType.BOTTOM));
+					}
+				}
+			}
+			default -> { // cage: a ring of thin bars round the fire
+				BlockState bar = k.legs() == 1 ? b(Blocks.COPPER_BARS.waxed().exposed()) : b(Blocks.IRON_BARS);
+				for (int su = -1; su <= 1; su++) {
+					for (int sv = -1; sv <= 1; sv++) {
+						if (su != 0 || sv != 0) {
+							p.set(c, cu + su, y, cv + sv, bar);
+						}
+					}
+				}
+			}
+		}
+		p.set(c, cu, y, cv, fire(k));
+	}
 
-		// --- rim: a thin ring of closed copper trapdoors (a 3-pixel plate) on all eight rim cells: a bright edge
-		// on the dark bowl, with the fire standing well above it
-		BlockState rim = b(Blocks.COPPER_TRAPDOOR.waxed().unaffected());
-		for (int[] s : SIDES) {
-			p.set(c, s[0], dish + 1, s[1], rim);
-		}
-		for (int[] k : CORNERS) {
-			p.set(c, k[0], dish + 1, k[1], rim);
-		}
+	// ------------------------------------------------------------------ ground
 
-		// --- the fire, in the open
-		p.set(c, 1, dish + 1, 1, b(soul ? Blocks.SOUL_CAMPFIRE : Blocks.CAMPFIRE).setValue(BlockStateProperties.LIT, true));
+	private static boolean isLeg(int dx, int dz, int r) {
+		return dx == -r && dz == 0 || dx == r && dz == 0 || dx == 0 && dz == r;
+	}
+
+	private static int dais(Plot p, int cu, int cv, int r) {
+		int avail = Math.min(Math.min(cu, p.w() - 1 - cu), Math.min(cv, p.d() - 1 - cv));
+		return Math.min(r + 1, avail);
+	}
+
+	/** A flat dais of slabs round the legs: dark near the foot, light stone bricks outwards, corners chamfered. */
+	private static void dais(CitadelCanvas c, Plot p, Look k, int cu, int cv, int r) {
+		int rd = dais(p, cu, cv, r);
+		for (int dz = -rd; dz <= rd; dz++) {
+			for (int dx = -rd; dx <= rd; dx++) {
+				int dist = Math.max(Math.abs(dx), Math.abs(dz));
+				if (dist == 0 || isLeg(dx, dz, r)) {
+					continue;
+				}
+				boolean corner = Math.abs(dx) == Math.abs(dz);
+				if (dist == 1 && !corner) {
+					continue; // under the bowl, on the axes: keep the ground, headroom and the way in
+				}
+				if (rd >= 2 && corner && dist == rd) {
+					continue; // chamfered corner: the dais reads round
+				}
+				int u = cu + dx;
+				int v = cv + dz;
+				BlockState s;
+				if (dist <= r) {
+					s = slab(p.hash(u, 0, v, 5) == 0 ? Blocks.POLISHED_BLACKSTONE_SLAB : Blocks.POLISHED_BLACKSTONE_BRICK_SLAB);
+				} else {
+					int h = p.hash(u, 0, v, 6);
+					s = slab(h == 0 ? Blocks.MOSSY_STONE_BRICK_SLAB : h == 1 ? Blocks.COBBLESTONE_SLAB : Blocks.STONE_BRICK_SLAB);
+				}
+				p.set(c, u, 0, v, s);
+			}
+		}
+	}
+
+	// ------------------------------------------------------------------ benches
+
+	private static BlockState seat(Plot p, int u, int v, Direction toFire) {
+		return stairs(p.hash(u, 0, v, 4) == 0 ? Blocks.MOSSY_STONE_BRICK_STAIRS : Blocks.STONE_BRICK_STAIRS, toFire);
+	}
+
+	/** A bench of {@code len} seats along an axis, starting at {@code (u0, v0)}; they face the fire. */
+	private static void bench(CitadelCanvas c, Plot p, int u0, int v0, boolean alongU, int len, Direction toFire) {
+		for (int i = 0; i < len; i++) {
+			int u = alongU ? u0 + i : u0;
+			int v = alongU ? v0 : v0 + i;
+			if (p.has(u, 0, v)) {
+				p.set(c, u, 0, v, seat(p, u, v, toFire));
+			}
+		}
+	}
+
+	private static void benches(CitadelCanvas c, Plot p, Look k, int cu, int cv, int r) {
+		int rd = dais(p, cu, cv, r);
+		if (rd < r + 1) {
+			return; // no room for a ring of benches
+		}
+		int q = r + 1; // bench distance
+		int set = pick(p, 5, 3);
+		// 0: left + right; 1: left + right + back; 2: big plot left + right + a back pair (4), small plot right + back
+		boolean left = !(set == 2 && r == 1);
+		boolean right = true;
+		boolean back = set == 1 || set == 2 && r == 1;
+		boolean backPair = set == 2 && r == 2;
+		if (left) {
+			bench(c, p, cu - q, cv - 1, false, 3, Direction.EAST);
+		}
+		if (right) {
+			bench(c, p, cu + q, cv - 1, false, 3, Direction.WEST);
+		}
+		if (back) {
+			bench(c, p, cu - 1, cv + q, true, 3, Direction.NORTH);
+		}
+		if (backPair) {
+			bench(c, p, cu - 2, cv + q, true, 2, Direction.NORTH);
+			bench(c, p, cu + 1, cv + q, true, 2, Direction.NORTH);
+		}
+		if (r == 2) { // lantern posts at the front ends of the side benches: they light the way in
+			for (int su = -1; su <= 1; su += 2) {
+				int u = cu + su * q;
+				int v = cv - 2;
+				p.set(c, u, 0, v, b(Blocks.STONE_BRICK_WALL));
+				p.set(c, u, 1, v, b(Blocks.STONE_BRICK_WALL));
+				p.set(c, u, 2, v, lantern(k));
+			}
+		}
 	}
 }
