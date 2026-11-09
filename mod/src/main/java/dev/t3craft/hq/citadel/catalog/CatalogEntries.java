@@ -17,6 +17,9 @@ final class CatalogEntries {
 	private static final Variant[] ENTRIES = {
 			new dev.t3craft.hq.citadel.catalog.house.HouseTimberCottage(), // house_timber_cottage
 			new dev.t3craft.hq.citadel.catalog.lamp.LampCherryPost(), // lamp_cherry_post
+			new dev.t3craft.hq.citadel.catalog.tree.TreeAzaleaBlossom(), // tree_azalea_blossom
+			new dev.t3craft.hq.citadel.catalog.tree.TreeCloudPinePot(), // tree_cloud_pine_pot
+			new dev.t3craft.hq.citadel.catalog.tree.TreeWillowPond(), // tree_willow_pond
 	};
 
 	static final List<Variant> ALL = List.of(ENTRIES);
