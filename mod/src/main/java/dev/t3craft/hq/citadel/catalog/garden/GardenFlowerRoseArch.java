@@ -511,7 +511,9 @@ public final class GardenFlowerRoseArch implements Variant {
 							at(alongV, s, t, 3, climb(uu, 3, vv));
 						}
 					}
-					at(alongV, s, t, 4, rail);
+					if (dist <= 1) {
+						at(alongV, s, t, 4, rail); // none over a window: a hedge top under it would be a sealed floor
+					}
 				}
 				for (int t = tc0; t <= tc0 + 2; t++) {
 					int uu = alongV ? t : s;
@@ -529,23 +531,12 @@ public final class GardenFlowerRoseArch implements Variant {
 						at(alongV, s, t, 4, slab(Blocks.CHERRY_SLAB));
 					}
 				}
-				if (dist >= 2) {
-					for (int side = 0; side < 2; side++) {
-						int out = side == 0 ? tl - 1 : tr + 1;
-						int uu = alongV ? out : s;
-						int vv = alongV ? s : out;
-						if (p.hash(uu, 7, vv, 3) == 0) {
-							BlockState vn = vine(side == 0 ? faceL : faceR);
-							at(alongV, s, out, 4, vn);
-							at(alongV, s, out, 3, vn);
-						}
-					}
-				}
 			}
 			for (int f : fr) {
 				for (int side = 0; side < 2; side++) {
 					int out = side == 0 ? tl - 1 : tr + 1;
-					tallAt(alongV, f, out, pal.arch); // nothing above it: a roofed bed cell would count as a sealed floor
+					tallAt(alongV, f, out, pal.arch); // nothing roofed above it: a roofed bed cell would count as a sealed floor
+					at(alongV, f, out, 3, vine(side == 0 ? faceL : faceR)); // hangs on the post's outer face
 				}
 			}
 			for (int i = 0; i + 1 < fr.length; i++) {
