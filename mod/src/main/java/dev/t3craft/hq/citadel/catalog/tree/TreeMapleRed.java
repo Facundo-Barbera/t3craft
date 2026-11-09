@@ -76,12 +76,14 @@ public final class TreeMapleRed implements Variant {
 		Random r = p.rng(0x3A91);
 		int H = Math.min(p.h(), 12);
 		double sc = Math.min(p.w(), p.d()) / 7.0;
-		int bu = (p.w() - 2) / 2;
-		int bv = (p.d() - 2) / 2;
+		int ou = r.nextInt(2);
+		int ov = r.nextInt(2);
+		int bu = TreeKit.base(p.w(), ou);
+		int bv = TreeKit.base(p.d(), ov);
 		int y2 = 2;
 		int fork = H >= 11 ? 4 : 3;
-		int[][] lead = TreeKit.trunk(t, WOOD, bu, bv, y2, H - 3, r.nextInt(2), r.nextInt(2), 0, 0);
-		TreeKit.roots(t, WOOD, bu, bv, 7, 2 + (sc > 1.1 ? 1 : 0), -1, 5);
+		int[][] lead = TreeKit.trunk(t, WOOD, bu, bv, y2, H - 3, ou, ov, 0, 0);
+		TreeKit.roots(t, WOOD, bu, bv, 6, 2, -1, 5);
 
 		// four limbs, low and diagonal, to the four side lobes; each lobe's tone follows its height
 		double a0 = r.nextDouble() * Math.PI * 2;
@@ -91,16 +93,16 @@ public final class TreeMapleRed implements Variant {
 			double ex = Math.cos(ang);
 			double ez = Math.sin(ang);
 			int ly = Math.min(lobeY[(i + r.nextInt(2)) % 4], H - 4);
-			double rx = (1.8 + r.nextDouble() * 0.5) * sc;
+			double rx = (2.0 + r.nextDouble() * 0.5) * sc;
 			double rz = rx * (0.8 + r.nextDouble() * 0.2);
 			int su = lead[0][fork];
 			int sv = lead[1][fork];
 			double reach = TreeKit.clamp(TreeKit.room(t, su, sv, ex, ez, 0) - Math.max(rx, rz) + 0.7, 1.2, 3.0 * sc);
 			int tu = (int) Math.round(su + ex * reach);
 			int tv = (int) Math.round(sv + ez * reach);
-			TreeKit.branch(t, WOOD, new int[] {su, fork, sv}, new int[] {tu, ly, tv}, true);
+			TreeKit.branch(t, WOOD, new int[] {su, fork, sv}, new int[] {tu, ly, tv}, i % 2 == 0);
 			int tone = ly <= fork + 2 ? 1 : 2;
-			TreeKit.lobe(t, tu, ly + 0.2, tv, rx, rz, 1.9, 1.2, RAMP[tone], 0.45, i);
+			TreeKit.lobe(t, tu, ly + 0.2, tv, rx, rz, 2.1, 1.2, RAMP[tone], 0.45, i);
 			// a low scarlet skirt lobe under every other limb, hanging off its elbow
 			if (i % 2 == 0) {
 				int mu = (su + tu * 2) / 3;
@@ -112,8 +114,8 @@ public final class TreeMapleRed implements Variant {
 		int top = H - 3;
 		int cu = lead[0][top];
 		int cv = lead[1][top];
-		double cr = 2.3 * sc;
-		TreeKit.lobe(t, cu, top + 0.4, cv, cr, cr * 0.9, 1.9, 1.3, RAMP[3], 0.45, 9);
+		double cr = 2.5 * sc;
+		TreeKit.lobe(t, cu, top + 0.4, cv, cr, cr * 0.9, 2.2, 1.3, RAMP[3], 0.45, 9);
 		double ca = a0 + Math.PI / 4;
 		int ku = (int) Math.round(lead[0][top - 2] + Math.cos(ca) * 1.6 * sc);
 		int kv = (int) Math.round(lead[1][top - 2] + Math.sin(ca) * 1.6 * sc);

@@ -60,17 +60,19 @@ public final class TreeCherryWeeping implements Variant {
 		Random r = p.rng(0x3E3E);
 		int H = Math.min(p.h(), 13);
 		double sc = Math.min(p.w(), p.d()) / 7.0;
-		int bu = (p.w() - 2) / 2;
-		int bv = (p.d() - 2) / 2;
+		int ou = r.nextInt(2);
+		int ov = r.nextInt(2);
+		int bu = TreeKit.base(p.w(), ou);
+		int bv = TreeKit.base(p.d(), ov);
 		int yTop = H - 3;
-		int[][] lead = TreeKit.trunk(t, TreeKit.CHERRY, bu, bv, 3, yTop, r.nextInt(2), r.nextInt(2),
+		int[][] lead = TreeKit.trunk(t, TreeKit.CHERRY, bu, bv, 3, yTop, ou, ov,
 				r.nextInt(3) - 1, r.nextInt(3) - 1);
 		TreeKit.roots(t, TreeKit.CHERRY, bu, bv, 5, 2, -1, 13);
 
 		// the crown dome on the leader
 		int lu = lead[0][yTop];
 		int lv = lead[1][yTop];
-		TreeKit.lobe(t, lu, yTop + 1, lv, 1.6 * sc, 1.5 * sc, 1.7, 1.0, TreeKit.SAKURA, 0.3, 0);
+		TreeKit.lobe(t, lu, yTop + 1, lv, 2.1 * sc, 1.9 * sc, 2.0, 1.2, TreeKit.SAKURA, 0.3, 0);
 
 		// limbs: out and up, each to a small lobe
 		int n = sc > 1.1 ? 5 : 4;
@@ -89,7 +91,7 @@ public final class TreeCherryWeeping implements Variant {
 			int ty = Math.min(sy + 1 + (i & 1), H - 2);
 			List<int[]> cells = TreeKit.branch(t, TreeKit.CHERRY, new int[] {su, sy, sv}, new int[] {tu, ty, tv}, false);
 			limbCells.addAll(cells.subList(cells.size() / 2, cells.size()));
-			TreeKit.lobe(t, tu, ty, tv, 1.2 * sc, 1.1 * sc, 1.2, 0.6, i % 2 == 0 ? TreeKit.SAKURA : TreeKit.SAKURA.swap(), 0.3, i + 1);
+			TreeKit.lobe(t, tu, ty, tv, 1.6 * sc, 1.5 * sc, 1.5, 0.9, i % 2 == 0 ? TreeKit.SAKURA : TreeKit.SAKURA.swap(), 0.3, i + 1);
 		}
 
 		// strands: from every leaf with air below that lies away from the trunk, and from the outer limbs
@@ -112,12 +114,12 @@ public final class TreeCherryWeeping implements Variant {
 			int y = s[1];
 			int v = s[2];
 			int pick = t.hash(u, y, v, 20);
-			if (pick >= 11) {
-				continue; // gaps: about half the rim hangs
+			if (pick >= 8) {
+				continue; // gaps: about two strands in five
 			}
 			// very uneven lengths: stubs, mid strands and a few long ones that nearly reach the grass
 			int room = y - 1;
-			int len = pick < 4 ? 1 + t.hash(u, 1, v, 2) : pick < 9 ? 2 + t.hash(u, 2, v, 3) : room - t.hash(u, 3, v, 2);
+			int len = pick < 3 ? 1 + t.hash(u, 1, v, 2) : pick < 6 ? 2 + t.hash(u, 2, v, 3) : room - 1 - t.hash(u, 3, v, 3);
 			len = Math.max(1, Math.min(len, room));
 			int ku = (int) Math.signum(Math.round(u - ccu));
 			int kv = (int) Math.signum(Math.round(v - ccv));

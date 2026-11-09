@@ -73,10 +73,12 @@ public final class TreePineTiered implements Variant {
 		Random r = p.rng(0x9177);
 		int H = Math.min(p.h(), 15);
 		int top = H - 1;
-		int bu = (p.w() - 2) / 2;
-		int bv = (p.d() - 2) / 2;
+		int ou = r.nextInt(2);
+		int ov = r.nextInt(2);
+		int bu = TreeKit.base(p.w(), ou);
+		int bv = TreeKit.base(p.d(), ov);
 		int y2 = 2;
-		int[][] lead = TreeKit.trunk(t, WOOD, bu, bv, y2, top - 2, r.nextInt(2), r.nextInt(2), 0, 0);
+		int[][] lead = TreeKit.trunk(t, WOOD, bu, bv, y2, top - 2, ou, ov, 0, 0);
 		TreeKit.roots(t, WOOD, bu, bv, 6, Math.min(p.w(), p.d()) >= 7 ? 2 : 1, -1, 7);
 
 		int yBase = 3; // the lowest whorl: a little trunk shows at the foot, never between floors

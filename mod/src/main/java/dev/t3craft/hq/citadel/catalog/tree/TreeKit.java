@@ -266,7 +266,7 @@ final class TreeKit {
 						if (y == y2 && far) {
 							continue;
 						}
-						t.wood(u0 + a, y, v0 + c, y < y2 ? wd.bark() : wd.log(Direction.Axis.Y));
+						t.wood(u0 + a, y, v0 + c, wd.bark()); // bark: no pale log ends on the shoulders
 					}
 				}
 				continue;
@@ -466,8 +466,8 @@ final class TreeKit {
 					double dyr = y - cy;
 					double dy = dyr >= 0 ? dyr / Math.max(0.5, up) : dyr / Math.max(0.5, down);
 					double q = du * du + dv * dv + dy * dy;
-					// mostly inwards: bites out of the edge, rarely a bump (outward jitter squares the outline)
-					double jit = (t.hash(u + salt * 13, y + salt * 7, v + salt * 3, 9) - 6) / 6.0 * rough;
+					// a jittered edge: small bites and bumps (kept small: big outward bumps square the outline)
+					double jit = (t.hash(u + salt * 13, y + salt * 7, v + salt * 3, 9) - 4.5) / 4.0 * rough * 0.7;
 					if (q > 1.0 + jit) {
 						continue;
 					}
@@ -597,6 +597,11 @@ final class TreeKit {
 			s = Math.min(s, (v - margin) / -ez);
 		}
 		return Math.max(0, s);
+	}
+
+	/** The 2×2 base's low index on an axis of {@code n} cells so that its cell {@code o} (the leader) is the middle one. */
+	static int base(int n, int o) {
+		return clamp((n - 1) / 2 - o, 0, n - 2);
 	}
 
 	static int clamp(int x, int lo, int hi) {

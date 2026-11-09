@@ -67,12 +67,14 @@ public final class TreeCherryGrand implements Variant {
 		int H = Math.min(p.h(), 14);
 		double ys = (H - 1) / 13.0;
 		double sc = Math.min(p.w(), p.d()) / 7.0;
-		int bu = (p.w() - 2) / 2;
-		int bv = (p.d() - 2) / 2;
+		int ou = r.nextInt(2);
+		int ov = r.nextInt(2);
+		int bu = TreeKit.base(p.w(), ou);
+		int bv = TreeKit.base(p.d(), ov);
 		int y2 = Math.max(2, (int) Math.round(3 * ys));
 		int crownY = H - 3;
 		double lean = r.nextDouble() * Math.PI * 2;
-		int[][] lead = TreeKit.trunk(t, TreeKit.CHERRY, bu, bv, y2, crownY, r.nextInt(2), r.nextInt(2),
+		int[][] lead = TreeKit.trunk(t, TreeKit.CHERRY, bu, bv, y2, crownY, ou, ov,
 				Math.cos(lean) * 0.9, Math.sin(lean) * 0.9);
 		TreeKit.roots(t, TreeKit.CHERRY, bu, bv, 6, 2 + (sc > 1.1 ? 1 : 0), -1, 3);
 
@@ -82,13 +84,13 @@ public final class TreeCherryGrand implements Variant {
 			double ex = Math.cos(ang);
 			double ez = Math.sin(ang);
 			int ly = (int) Math.round(LOBES[i][1] * (H - 1));
-			double rx = (1.75 + r.nextDouble() * 0.5) * LOBES[i][2] * sc;
+			double rx = (2.0 + r.nextDouble() * 0.4) * LOBES[i][2] * sc;
 			double rz = rx * (0.8 + r.nextDouble() * 0.25);
 			int sy = TreeKit.clamp(ly - 3, y2, crownY - 1);
 			int su = lead[0][sy];
 			int sv = lead[1][sy];
 			double room = TreeKit.room(t, su, sv, ex, ez, 0);
-			double reach = TreeKit.clamp(room - Math.max(rx, rz) + 0.6, 1.0, 3.2 * sc);
+			double reach = TreeKit.clamp(room - Math.max(rx, rz) + 1.0, 1.0, 3.2 * sc);
 			int tu = (int) Math.round(su + ex * reach);
 			int tv = (int) Math.round(sv + ez * reach);
 			TreeKit.branch(t, TreeKit.CHERRY, new int[] {su, sy, sv}, new int[] {tu, ly, tv}, i < 2);
@@ -105,17 +107,17 @@ public final class TreeCherryGrand implements Variant {
 					int fu = (int) Math.round(mu + fx * fr);
 					int fv = (int) Math.round(mv + fz * fr);
 					TreeKit.branch(t, TreeKit.CHERRY, new int[] {mu, my, mv}, new int[] {fu, my + 1, fv}, false);
-					TreeKit.lobe(t, fu, my + 1, fv, 1.4 * sc, 1.3 * sc, 1.6, 1.0, TreeKit.SAKURA.swap(), 0.35, 40 + i);
+					TreeKit.lobe(t, fu, my + 1, fv, 1.6 * sc, 1.5 * sc, 1.7, 1.0, TreeKit.SAKURA.swap(), 0.35, 40 + i);
 				}
 			}
-			TreeKit.lobe(t, tu, ly, tv, rx, rz, 1.9, 1.2, TreeKit.SAKURA, 0.4, i);
+			TreeKit.lobe(t, tu, ly, tv, rx, rz, 2.1, 1.2, TreeKit.SAKURA, 0.4, i);
 			TreeKit.drips(t, tu, ly, tv, rx, rz, i);
 		}
 		// the crown on the leader
 		int cu = lead[0][crownY];
 		int cv = lead[1][crownY];
-		double cr = TreeKit.clamp(Math.min(Math.min(cu, p.w() - 1 - cu), Math.min(cv, p.d() - 1 - cv)) + 0.6, 1.6, 2.4 * sc);
-		TreeKit.lobe(t, cu, crownY + 1, cv, cr, cr * 0.9, 1.9, 1.3, TreeKit.SAKURA, 0.4, 9);
+		double cr = TreeKit.clamp(Math.min(Math.min(cu, p.w() - 1 - cu), Math.min(cv, p.d() - 1 - cv)) + 1.0, 2.0, 2.6 * sc);
+		TreeKit.lobe(t, cu, crownY + 1, cv, cr, cr * 0.9, 2.2, 1.3, TreeKit.SAKURA, 0.4, 9);
 
 		TreeKit.petalCarpet(t, bu + 0.5, bv + 0.5, Math.min(p.w(), p.d()) / 2.0 + 0.8);
 		t.prune();

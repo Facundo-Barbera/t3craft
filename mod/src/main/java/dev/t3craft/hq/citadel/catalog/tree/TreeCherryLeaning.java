@@ -80,8 +80,8 @@ public final class TreeCherryLeaning implements Variant {
 		// the overhang: a broad flat lobe on the leader's tip
 		int tu = lead[0][top];
 		int tv = lead[1][top];
-		double ra = 2.1 * sc;
-		TreeKit.lobe(t, tu + su * 0.4, top, tv + sv * 0.4, ra, ra * 0.85, 1.8, 1.1, TreeKit.SAKURA, 0.4, 1);
+		double ra = 2.4 * sc;
+		TreeKit.lobe(t, tu + su * 0.4, top, tv + sv * 0.4, ra, ra * 0.85, 2.0, 1.2, TreeKit.SAKURA, 0.4, 1);
 		TreeKit.drips(t, tu, top, tv, ra, ra * 0.85, 1);
 
 		// the counter-limb, thrown back from the elbow over the roots, with a smaller, higher lobe
@@ -92,7 +92,7 @@ public final class TreeCherryLeaning implements Variant {
 		int cv = TreeKit.clamp(ev - sv * 1, 1, p.d() - 2);
 		int cy = Math.min(top + 1, H - 2);
 		TreeKit.branch(t, TreeKit.CHERRY, new int[] {eu, ey, ev}, new int[] {cu, cy, cv}, false);
-		TreeKit.lobe(t, cu, cy, cv, 1.5 * sc, 1.4 * sc, 1.7, 1.0, TreeKit.SAKURA.swap(), 0.35, 2);
+		TreeKit.lobe(t, cu, cy, cv, 1.9 * sc, 1.8 * sc, 1.9, 1.1, TreeKit.SAKURA.swap(), 0.35, 2);
 
 		// a short twig on the outside of the bend, low, with a small lobe
 		int my = TreeKit.clamp(top - 4, 3, top - 2);
@@ -101,7 +101,7 @@ public final class TreeCherryLeaning implements Variant {
 		int wu = TreeKit.clamp(mu + sv, 1, p.w() - 2); // across the lean
 		int wv = TreeKit.clamp(mv - su, 1, p.d() - 2);
 		TreeKit.branch(t, TreeKit.CHERRY, new int[] {mu, my, mv}, new int[] {wu, my + 1, wv}, false);
-		TreeKit.lobe(t, wu, my + 1, wv, 1.2 * sc, 1.2 * sc, 1.5, 0.8, TreeKit.SAKURA, 0.3, 3);
+		TreeKit.lobe(t, wu, my + 1, wv, 1.5 * sc, 1.5 * sc, 1.6, 0.9, TreeKit.SAKURA, 0.3, 3);
 
 		// petals in the lee of the overhang
 		TreeKit.petalCarpet(t, tu, tv, Math.min(p.w(), p.d()) / 2.0 + 0.6);
