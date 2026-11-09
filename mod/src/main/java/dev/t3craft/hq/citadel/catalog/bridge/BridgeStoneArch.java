@@ -151,14 +151,15 @@ public final class BridgeStoneArch implements Variant {
 			BlockState st;
 			if (y == o && spring) {
 				// [depth] intrados: upside-down stair, its full side on the abutment side, the cut towards the void
-				st = stairs(edge || p.hash(u, y, v, 3) != 0 ? Blocks.STONE_BRICK_STAIRS : Blocks.MOSSY_STONE_BRICK_STAIRS,
+				st = stairs(edge ? Blocks.DEEPSLATE_BRICK_STAIRS : p.hash(u, y, v, 3) != 0 ? Blocks.STONE_BRICK_STAIRS : Blocks.MOSSY_STONE_BRICK_STAIRS,
 						v < cm ? Direction.NORTH : Direction.SOUTH).setValue(BlockStateProperties.HALF, Half.TOP);
 			} else if (y == o && o > 0) {
-				// voussoirs over the void: keystone on the faces at the crown, polished ring elsewhere on the faces
-				st = edge ? (isCrown ? b(Blocks.CHISELED_STONE_BRICKS) : b(Blocks.POLISHED_ANDESITE)) : body(p, u, y, v);
+				// [depth] voussoirs over the void: a dark ring on both faces so the arch reads against the light body,
+				// a chiseled keystone at the crown
+				st = edge ? (isCrown ? b(Blocks.CHISELED_DEEPSLATE) : b(Blocks.DEEPSLATE_BRICKS)) : body(p, u, y, v);
 			} else if (y == top && edge) {
-				// [palette] light coping on the kerb
-				st = p.hash(u, y, v, 3) == 0 ? b(Blocks.SMOOTH_STONE) : b(Blocks.CALCITE);
+				// [palette] one clean light coping line that follows the hump (no random mix: it read as rubble)
+				st = b(Blocks.CALCITE);
 			} else if (y == top) {
 				// walkway paving
 				st = p.hash(u, y, v, 4) == 0 ? b(Blocks.POLISHED_ANDESITE) : b(Blocks.STONE_BRICKS);
@@ -189,17 +190,16 @@ public final class BridgeStoneArch implements Variant {
 		}
 
 		int k = Math.min(v, d - 1 - v);
-		if (k % 3 == 0) {
-			// [depth] balustrade post with a smooth-stone cap
-			p.set(c, u, ry, v, b(Blocks.STONE_BRICKS));
-			p.set(c, u, ry + 1, v, slab(Blocks.SMOOTH_STONE_SLAB));
-			return;
-		}
-		// walls between posts, joined to a neighbour at the same height or to a higher kerb
+		// [depth] slim dark posts in a symmetric rhythm (every 4 from the newels, and at the crown), the rest a
+		// continuous balustrade: the old full-block posts with slab caps read as loose cubes
+		boolean post = isCrown || (k % 4 == 0 && k > 0 && Math.abs(v - crown) > 1);
 		boolean n = railY(lv, v - 1) >= ry;
 		boolean s = railY(lv, v + 1) >= ry;
-		BlockState wall = b(p.hash(u, ry, v, 4) == 0 ? Blocks.MOSSY_STONE_BRICK_WALL : Blocks.STONE_BRICK_WALL)
-				.setValue(BlockStateProperties.UP, !(n && s))
+		if (post && isCrown && ry + 1 < p.h() && (d % 2 == 1 || v == crown)) {
+			p.set(c, u, ry + 1, v, b(Blocks.LANTERN)); // [finish] a lantern on the crown post, both sides
+		}
+		BlockState wall = b(post ? Blocks.POLISHED_DEEPSLATE_WALL : p.hash(u, ry, v, 4) == 0 ? Blocks.MOSSY_STONE_BRICK_WALL : Blocks.STONE_BRICK_WALL)
+				.setValue(BlockStateProperties.UP, post || !(n && s))
 				.setValue(BlockStateProperties.NORTH_WALL, n ? WallSide.LOW : WallSide.NONE)
 				.setValue(BlockStateProperties.SOUTH_WALL, s ? WallSide.LOW : WallSide.NONE)
 				.setValue(BlockStateProperties.EAST_WALL, WallSide.NONE)
