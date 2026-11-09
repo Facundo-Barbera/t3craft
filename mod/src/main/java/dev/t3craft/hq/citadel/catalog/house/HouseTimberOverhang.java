@@ -448,6 +448,12 @@ public final class HouseTimberOverhang implements Variant {
 				if (y1 > 1) {
 					// [depth] a bracket under every proud post of a jettied floor
 					TimberKit.put(g.c, g.p, alongU, line + out, i, y1 - 1, stair(Blocks.DARK_OAK_STAIRS, toWall, true));
+					// [finish] a fence finial on a post that ends in the open: its top is a post, not a ledge to stand on
+					int pu = alongU ? i : line + out;
+					int pv = alongU ? line + out : i;
+					if (air(g, pu, y2 + 1, pv)) {
+						g.set(pu, y2 + 1, pv, fence(Blocks.DARK_OAK_FENCE, false, false, false, false));
+					}
 				}
 			}
 		}
