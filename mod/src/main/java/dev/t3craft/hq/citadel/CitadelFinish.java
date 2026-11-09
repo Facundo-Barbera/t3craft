@@ -575,6 +575,10 @@ public final class CitadelFinish {
 	/** Turns the painted canvas into the plan: air, shapes, groups, light pass, placements, modules. */
 	public static BuildPlan build(CitadelCanvas c) {
 		// design/citadel-terraces: the flat citadel goes onto its terraces before anything reads the final cells
+		boolean report = Boolean.getBoolean("t3craft.citadel.reliefReport");
+		if (report) {
+			CitadelRelief.baseline(c, walkable(c));
+		}
 		CitadelRelief.apply(c);
 		fillAir(c);
 		CitadelAmbience.lights(c);
@@ -587,7 +591,7 @@ public final class CitadelFinish {
 			groups.put(k, groupOf(c, p.getX(), p.getY(), p.getZ()));
 		}
 		light(c, groups);
-		if (Boolean.getBoolean("t3craft.citadel.reliefReport")) {
+		if (report) {
 			CitadelRelief.check(c, walkable(c));
 		}
 		Map<BlockPos, String> index = new HashMap<>(c.cells.size() * 2);

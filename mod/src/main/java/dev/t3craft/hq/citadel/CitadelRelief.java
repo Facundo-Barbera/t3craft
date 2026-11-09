@@ -42,7 +42,7 @@ import org.jspecify.annotations.Nullable;
  * highest terrace, and each ring of barrios stands one low step below the one inside it (relief 2: core +6, ring 1
  * +3, ring 2 +1, ring 3 on the ground; the lawn round the last street banks down to the natural ground). Steps are
  * 1 to 3 blocks, never more than 6 in all, so the differences read as design: low retaining walls of stone brick with
- * a light balustrade on top (calcite piers every 7 cells, diorite rails), hedges and flowers at their foot, the avenues turned into
+ * a light calcite parapet on top (a chiseled-quartz pier every 7 cells), hedges and flowers at their foot, the avenues turned into
  * wide slab ramps that start just past their torii, and stairs wherever a path meets a step.
  *
  * <h2>How</h2>
@@ -419,7 +419,7 @@ public final class CitadelRelief {
 	 * grass. Steps of one block on the lawn are left as the natural bank they are.
 	 */
 	private static void edges(CitadelCanvas c, Map<Long, Integer> half, Set<Long> keep) {
-		Set<Long> rail = new HashSet<>();
+		Map<Long, Direction> rail = new HashMap<>();
 		Set<Long> foot = new HashSet<>();
 		for (Map.Entry<Long, Integer> e : half.entrySet()) {
 			int x = colX(e.getKey());
@@ -433,11 +433,12 @@ public final class CitadelRelief {
 				if (hn == null || drop < 4) {
 					continue;
 				}
-				rail.add(e.getKey());
+				rail.putIfAbsent(e.getKey(), dir);
 				foot.add(col(nx, nz));
 			}
 		}
-		for (long cc : rail) {
+		for (Map.Entry<Long, Direction> re : rail.entrySet()) {
+			long cc = re.getKey();
 			int x = colX(cc);
 			int z = colZ(cc);
 			int h = half.get(cc);
@@ -449,13 +450,15 @@ public final class CitadelRelief {
 			if (nearKeep(keep, x, y, z)) {
 				continue;
 			}
+			lookout(c, x, y, z, re.getValue(), keep);
 			double arc = RingCampusGeometry.theta(x, z) * RingCampusGeometry.r(x, z);
-			// [palette] a light balustrade over the dark kerb: calcite piers with a quartz cap, diorite rails between
+			// [palette] a light parapet over the dark kerb, the line that draws each terrace from above: calcite with a
+			// little polished diorite, and a pier of chiseled quartz with a quartz cap every 7 cells
 			if (Math.floorMod(Math.round(arc), 7) == 0) {
-				c.set(x, y, z, b(Blocks.CALCITE));
+				c.set(x, y, z, b(Blocks.CHISELED_QUARTZ_BLOCK));
 				c.set(x, y + 1, z, slab(Blocks.SMOOTH_QUARTZ_SLAB));
 			} else {
-				c.set(x, y, z, b(Blocks.DIORITE_WALL));
+				c.set(x, y, z, Math.floorMod(x * 7 + z * 13, 5) == 0 ? b(Blocks.POLISHED_DIORITE) : b(Blocks.CALCITE));
 			}
 		}
 		for (long cc : foot) {
@@ -483,6 +486,34 @@ public final class CitadelRelief {
 			}
 			c.set(x, g + 1, z, plant);
 		}
+	}
+
+	/**
+	 * A lookout on the street side of a parapet that faces the middle of a lot of the ring below: a long stone bench
+	 * one cell in from the parapet, its back to the street, looking out over the barrio.
+	 */
+	private static void lookout(CitadelCanvas c, int x, int y, int z, Direction toLow, Set<Long> keep) {
+		Kind k = c.zoneAt(x, z).kind();
+		if (k != Kind.INNER_STREET && k != Kind.STREET) {
+			return;
+		}
+		int ring = k == Kind.INNER_STREET ? 1 : c.zoneAt(x, z).ring() + 1;
+		if (ring > RingCampusGeometry.MAX_RINGS) {
+			return;
+		}
+		int n = RingCampusGeometry.lotsIn(ring);
+		double r = RingCampusGeometry.r(x, z);
+		double a = RingCampusGeometry.theta(x, z) * n / (2 * Math.PI);
+		double off = Math.abs(a - Math.floor(a) - 0.5) * 2 * Math.PI / n * r; // cells of arc from the lot's middle
+		if (off > 1.6) {
+			return;
+		}
+		int bx = x - toLow.getStepX();
+		int bz = z - toLow.getStepZ();
+		if (c.zoneAt(bx, bz).kind() != k || !paved(c.at(bx, y - 1, bz)) || !open(c, bx, y, bz) || keep.contains(BlockPos.asLong(bx, y, bz))) {
+			return;
+		}
+		c.set(bx, y, bz, CitadelCanvas.stairs(Blocks.POLISHED_DEEPSLATE_STAIRS, toLow.getOpposite()));
 	}
 
 	private static boolean nearKeep(Set<Long> keep, int x, int y, int z) {
@@ -650,42 +681,53 @@ public final class CitadelRelief {
 
 	// ------------------------------------------------------------------ diagnostics (renders)
 
-	/** Counts the desks and anchors an NPC reaches from the spawn ({@code walk}: the walkable feet cells). */
-	static void check(CitadelCanvas c, List<BlockPos> walk) {
+	/** What was already out of reach on the flat plan ({@link #baseline}), so {@link #check} reports only what the relief cut. */
+	private static volatile Set<String> flatLost = Set.of();
+
+	/** The desks and walk anchors not in {@code walk} (names, with the blocks at the feet and under them). */
+	private static Map<String, String> lost(CitadelCanvas c, List<BlockPos> walk) {
 		Set<Long> w = new HashSet<>();
 		for (BlockPos p : walk) {
 			w.add(p.asLong());
 		}
-		int desks = 0;
-		int ok = 0;
-		List<String> lost = new ArrayList<>();
+		Map<String, String> out = new java.util.TreeMap<>();
 		for (Workstation ws : c.workstations) {
-			desks++;
 			BlockPos p = ws.deskAnchor().block();
-			if (w.contains(p.asLong())) {
-				ok++;
-			} else if (lost.size() < 8) {
-				lost.add("desk m" + ws.module() + "/" + ws.slot() + "@" + p.toShortString() + "[" + name(c.at(p.getX(), p.getY(), p.getZ())) + "/"
-						+ name(c.at(p.getX(), p.getY() - 1, p.getZ())) + "]");
+			if (!w.contains(p.asLong())) {
+				out.put("desk m" + ws.module() + "/" + ws.slot(), where(c, p));
 			}
 		}
-		int an = 0;
-		int aok = 0;
 		for (Anchor a : c.anchors.values()) {
 			String nm = a.name();
-			if (!nm.startsWith("walk") && !nm.equals("spawn") && !nm.startsWith("wing_") && !nm.startsWith("stroll")) {
-				continue;
-			}
-			an++;
-			if (w.contains(a.block().asLong())) {
-				aok++;
-			} else if (lost.size() < 14) {
-				BlockPos p = a.block();
-				lost.add(a.name() + "@" + p.toShortString() + "[" + name(c.at(p.getX(), p.getY(), p.getZ())) + "/" + name(c.at(p.getX(), p.getY() - 1, p.getZ())) + "]");
+			if ((nm.startsWith("walk") || nm.equals("spawn") || nm.startsWith("wing_") || nm.startsWith("stroll")) && !w.contains(a.block().asLong())) {
+				out.put(nm, where(c, a.block()));
 			}
 		}
-		lastReport = "relief " + RingCampusGeometry.relief() + ": desks reachable " + ok + "/" + desks + ", walk anchors " + aok + "/" + an
-				+ (lost.isEmpty() ? "" : "; unreachable: " + String.join(", ", lost));
+		return out;
+	}
+
+	private static String where(CitadelCanvas c, BlockPos p) {
+		return p.toShortString() + "[" + name(c.at(p.getX(), p.getY(), p.getZ())) + "/" + name(c.at(p.getX(), p.getY() - 1, p.getZ())) + "]";
+	}
+
+	/** Records what the flat plan already leaves out of reach (render diagnostics; call before {@link #apply}). */
+	static void baseline(CitadelCanvas c, List<BlockPos> walk) {
+		flatLost = Set.copyOf(lost(c, walk).keySet());
+	}
+
+	/** Counts the desks and anchors an NPC reaches from the spawn ({@code walk}: the walkable feet cells). */
+	static void check(CitadelCanvas c, List<BlockPos> walk) {
+		Map<String, String> now = lost(c, walk);
+		int desks = c.workstations.size();
+		long deskLost = now.keySet().stream().filter(k -> k.startsWith("desk")).count();
+		List<String> fresh = new ArrayList<>();
+		for (Map.Entry<String, String> e : now.entrySet()) {
+			if (!flatLost.contains(e.getKey())) {
+				fresh.add(e.getKey() + "@" + e.getValue());
+			}
+		}
+		lastReport = "relief " + RingCampusGeometry.relief() + ": desks reachable " + (desks - deskLost) + "/" + desks + "; out of reach on the flat plan already: "
+				+ flatLost.size() + "; cut by the relief: " + (fresh.isEmpty() ? "none" : fresh.size() + " " + String.join(", ", fresh.subList(0, Math.min(12, fresh.size()))));
 	}
 
 	private static String name(@Nullable BlockState s) {
