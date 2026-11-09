@@ -179,10 +179,10 @@ public final class RotundaRoom {
 	//   drum      d in (R - 2.5, R - 1], height h = sy(10) (14): deepslate base, calcite string course, 16 cherry
 	//             pilasters, tall windows with blackstone mullions, a dark blackstone cornice; doors 5 wide, 5 high
 	//             on N, S and W (the street runs N-S through the node; the east side is the display wall)
-	//   tambour   a dark clerestory drum of 5 courses on the cornice: string course, deepslate frieze with a
+	//   tambour   a dark clerestory drum of 4 courses on the cornice: string course, deepslate frieze with a
 	//             blackstone strip over every pilaster and one lit oculus over every window, upper cornice
 	//   plinth    d in (R - 1, R]: a slab ring with a buttress at every pilaster
-	//   dome      uniform frosted glass on 8 cherry ribs, a cherry belt at the springing, a
+	//   dome      uniform pink glass on 8 cherry ribs, a cherry belt at the springing, a
 	//             bamboo cap; an open oculus under the lantern (a round glass lantern drum with a roof, a gold
 	//             ball and a rod)
 	//   display   the east side of the hall is cut flat at x = xw: a wall of archive shelves with the
@@ -197,9 +197,11 @@ public final class RotundaRoom {
 	/** Dimensions of the scaled rotunda, all from the zone's radius. */
 	private static final BlockState SLOG = b(Blocks.STRIPPED_CHERRY_LOG);
 	/** The dome's skin: frosted, so the room under it does not show through. */
-	private static final BlockState DOME_GLASS = Blocks.STAINED_GLASS.pick(net.minecraft.world.item.DyeColor.WHITE).defaultBlockState();
+	private static final BlockState DOME_GLASS = Blocks.STAINED_GLASS.pick(net.minecraft.world.item.DyeColor.PINK).defaultBlockState();
 	/** Courses of the dark tambour between the colonnade and the dome. */
-	private static final int TAMBOUR = 5;
+	private static final int TAMBOUR = 4;
+	/** A lit oculus of the tambour: warm, so it glows like a lamp and does not burn out. */
+	private static final BlockState OCULUS = b(Blocks.OCHRE_FROGLIGHT);
 	/** The months of the archive chests. */
 	private static final String[] MONTHS = {"ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"};
 
@@ -327,14 +329,11 @@ public final class RotundaRoom {
 				int mx = (int) Math.round(mr * Math.sin(a));
 				int mz = (int) Math.round(-mr * Math.cos(a));
 				if (u == mx && dz == mz) {
-					s = hr % 3 == 0 ? b(Blocks.GOLD_BLOCK) : BAMBOO;
+					s = b(Blocks.GOLD_BLOCK);
 				}
 			}
-			if (hand(u, dz, 5 * Math.PI / 3, mr - 0.9, 0.5) || hand(u, dz, Math.PI / 3, mr - 0.1, 0.5)) {
+			if (hand(u, dz, 5 * Math.PI / 3, mr - 0.4, 0.6) || hand(u, dz, Math.PI / 3, mr + 0.7, 0.6)) {
 				s = RIB;
-			}
-			if (r < 1.5 && !(u == 0 && dz == 0)) {
-				s = BAMBOO;
 			}
 		} else if (r <= face + 1.0) {
 			s = BAMBOO;
@@ -350,7 +349,7 @@ public final class RotundaRoom {
 		double uz = -Math.cos(a);
 		double t = dx * ux + dz * uz;
 		double perp = Math.abs(dx * uz - dz * ux);
-		return t >= 1.0 && t <= len && perp <= thick;
+		return t >= 0.9 && t <= len && perp <= thick;
 	}
 
 	// ------------------------------------------------------------------ the drum and its plinth
@@ -390,7 +389,7 @@ public final class RotundaRoom {
 			}
 			if (y == g.h) {
 				// the cornice of the colonnade: dark, with an upside-down stair lip all round
-				s = d > g.rd - 0.5 ? NodeDecor.invStairs(Blocks.POLISHED_BLACKSTONE_BRICK_STAIRS, NodeDecor.inward(dx, dz)) : RIB;
+				s = d > g.rd - 0.5 ? NodeDecor.topSlab(Blocks.POLISHED_BLACKSTONE_BRICK_SLAB) : RIB;
 			} else if (jamb || pil < 0.55) {
 				s = y <= 2 ? RIB : SLOG;
 			} else if (y <= 3) {
@@ -429,11 +428,11 @@ public final class RotundaRoom {
 			if (i == 1) {
 				s = wall ? RIB : slab(Blocks.POLISHED_BLACKSTONE_BRICK_SLAB);
 			} else if (i == TAMBOUR) {
-				s = wall ? RIB : NodeDecor.invStairs(Blocks.POLISHED_BLACKSTONE_BRICK_STAIRS, in);
+				s = wall ? RIB : NodeDecor.topSlab(Blocks.POLISHED_BLACKSTONE_BRICK_SLAB);
 			} else if (strip) {
 				s = RIB;
 			} else if (wall) {
-				s = oculus && i == 3 ? LIGHT : (oculus && i == 4 ? RIB : NodeDecor.footMix(x, y, z));
+				s = oculus && i == 2 ? OCULUS : NodeDecor.footMix(x, y, z);
 			}
 			if (s != null) {
 				c.set(x, y, z, s);
@@ -490,10 +489,10 @@ public final class RotundaRoom {
 				int rel = y - base;
 				boolean ramp = y == top && d >= 1 && topIn == top + 1;
 				BlockState s;
-				if (rel <= 1) {
+				if (rel <= 2) {
 					s = CitadelCanvas.PLANKS; // the cherry belt at the springing
 				} else if (rel >= g.dh - 1 && d < g.lr + 2.0) {
-					s = y == top && d > g.lr + 0.5 ? stairs(Blocks.BAMBOO_MOSAIC_STAIRS, in) : BAMBOO;
+					s = y == top && d > g.lr + 0.5 ? stairs(Blocks.CHERRY_STAIRS, in) : CitadelCanvas.PLANKS;
 				} else if (rib < 0.6 && d >= g.lr + 1.5) {
 					s = ramp ? stairs(Blocks.CHERRY_STAIRS, in) : SLOG;
 				} else {
@@ -542,6 +541,12 @@ public final class RotundaRoom {
 				put(c, nd, row, 1, -dz, stairs(Blocks.CHERRY_STAIRS, west), CitadelCanvas.SOLID);
 			}
 		}
+		// a red runner down the aisle, from the dial to the stage, so the room leads to the screen
+		for (int rx = 4; rx <= 8; rx++) {
+			for (int rz = -1; rz <= 1; rz++) {
+				put(c, nd, rx, 1, rz, Blocks.CARPET.pick(DyeColor.RED).defaultBlockState(), CitadelCanvas.DECOR);
+			}
+		}
 		// the archive: twelve month chests and, after every third, a register atril, each with a plaque on the wall
 		archive(c, g, nd);
 		// the frame of the screen (plane xs): piers, a lintel, a cornice, lanterns on top
@@ -579,9 +584,9 @@ public final class RotundaRoom {
 		put(c, nd, xs, 7, -5, lanternUp, CitadelCanvas.DECOR);
 		put(c, nd, xs, 7, 5, lanternUp, CitadelCanvas.DECOR);
 		// door plaques over the pilasters above the three doors
-		sign(c, nd, -11, 7, 0, net.minecraft.core.Direction.EAST, DyeColor.ORANGE, "Rotonda", "Tareas", "programadas");
-		sign(c, nd, 0, 7, -11, net.minecraft.core.Direction.SOUTH, DyeColor.ORANGE, "Rotonda", "Tareas", "programadas");
-		sign(c, nd, 0, 7, 11, net.minecraft.core.Direction.NORTH, DyeColor.ORANGE, "Rotonda", "Tareas", "programadas");
+		sign(c, nd, -11, 7, 0, net.minecraft.core.Direction.EAST, DyeColor.ORANGE, false, "Rotonda", "Tareas", "programadas");
+		sign(c, nd, 0, 7, -11, net.minecraft.core.Direction.SOUTH, DyeColor.ORANGE, false, "Rotonda", "Tareas", "programadas");
+		sign(c, nd, 0, 7, 11, net.minecraft.core.Direction.NORTH, DyeColor.ORANGE, false, "Rotonda", "Tareas", "programadas");
 		// eight chandeliers on the ribs: a chain from the dome and a lantern above head height
 		for (int j = 0; j < 8; j++) {
 			double a = j * Math.PI / 4;
@@ -639,11 +644,18 @@ public final class RotundaRoom {
 
 	/** A plaque (a fixture, never replaced by the light pass) at the node offset {@code (dx, y, dz)}, its front towards {@code face}. */
 	private static void sign(CitadelCanvas c, Node nd, int dx, int y, int dz, net.minecraft.core.Direction face, DyeColor color, String... lines) {
+		sign(c, nd, dx, y, dz, face, color, true, lines);
+	}
+
+	private static void sign(CitadelCanvas c, Node nd, int dx, int y, int dz, net.minecraft.core.Direction face, DyeColor color, boolean backing, String... lines) {
 		if (!in(c, nd, dx, dz)) {
 			return;
 		}
 		int x = nd.cx() + dx;
 		int z = nd.cz() + dz;
+		if (backing && in(c, nd, dx - face.getStepX(), dz - face.getStepZ())) {
+			c.set(x - face.getStepX(), y, z - face.getStepZ(), CALCITE); // a pale ground, so the text reads
+		}
 		c.put(x, y, z, c.kit.plaque(face), CitadelCanvas.DECOR);
 		long k = BlockPos.asLong(x, y, z);
 		c.data.put(k, c.kit.plaqueData(color, lines));
