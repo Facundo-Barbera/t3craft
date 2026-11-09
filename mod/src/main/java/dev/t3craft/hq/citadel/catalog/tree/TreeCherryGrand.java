@@ -80,12 +80,12 @@ public final class TreeCherryGrand implements Variant {
 		boolean big = mn >= 10;
 
 		int cy = CLEAR + (p.h() >= 13 ? 2 : 1); // the dome's centre layer: taller plots get a thicker crown on the same clear trunk
-		int nUp = Math.min(p.h() - 1 - cy, mn >= 8 ? 3 : 2); // a wide, flat dome: a few layers on a big spread
+		int nUp = Math.min(p.h() - 1 - cy, mn >= 12 ? 3 : 2); // a wide, flat dome: a few layers on a big spread
 		double ryUp = nUp + 0.6 + r.nextDouble() * 0.3;
 		int ou = r.nextInt(2);
 		int ov = r.nextInt(2);
 		double lean = r.nextDouble() * Math.PI * 2;
-		double amp = mn < 9 ? 0.3 + r.nextDouble() * 0.4 : 0.4 + r.nextDouble() * 1.0;
+		double amp = 0.4 * r.nextDouble(); // under half a cell: the leader stays straight, no lean step to hang over a root
 		double lu = Math.cos(lean) * amp;
 		double lv = Math.sin(lean) * amp;
 		// the base shifts against the lean, so the crown's centre stays in the middle of the plot
@@ -199,12 +199,12 @@ public final class TreeCherryGrand implements Variant {
 			}
 			int tu = (int) Math.round(su + ex * reach);
 			int tv = (int) Math.round(sv + ez * reach);
-			int ty = Math.min(cy + 1 + (p.h() >= 13 ? 1 : 0), p.h() - 3); // the limb climbs out of the dome
+			int ty = cy; // the limb climbs out of the dome (and stays under its top)
 			List<int[]> limb = TreeKit.branch(t, LIMB, new int[] {su, sy, sv}, new int[] {tu, ty, tv}, false);
 			darkBase(t, limb);
 			// a blossom tuft rests on the tip and hides the end of the wood from above
-			for (int dy = 0; dy <= 2; dy++) {
-				double tr = dy == 2 ? 0.9 : 1.6;
+			for (int dy = 0; dy <= 1; dy++) {
+				double tr = dy == 1 ? 1.1 : 1.5;
 				for (int dv = -2; dv <= 2; dv++) {
 					for (int du = -2; du <= 2; du++) {
 						int u = tu + du;
