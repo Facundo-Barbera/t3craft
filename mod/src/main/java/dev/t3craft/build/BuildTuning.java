@@ -45,7 +45,7 @@ import java.util.List;
  * },
  * "buildNearPlayer": { "enabled": true, "radius": 48 }
  * }</pre>
- * Defaults and their reasons: docs/feat-parallel-build.md, docs/feat-build-near-player.md, docs/feat-build-radial.md
+ * Defaults and their reasons: docs/features/parallel-build.md, docs/features/build-near-player.md, docs/features/build-radial.md
  * (feat/build-radial lowered foundationBlocksPerTick 4096 → 192 and blocksPerTick 12 → 6: a visible pace;
  * fix/build-radial-tune turned fastFoundation off and added the ground / fill / ring / climb settings;
  * fix/build-walkable added the corridor settings).

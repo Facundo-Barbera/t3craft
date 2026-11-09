@@ -9,7 +9,7 @@ Tests: `mod/src/test/java/dev/t3craft/client/npc/helpers/` (JUnit, lógica pura)
 > **feat/thread-lineage**: solo los subagentes **del proveedor** (`creationSource == "provider"`,
 > p. ej. el Agent tool de Claude) son ayudantes. Las tareas delegadas de T3 (`delegate_task`,
 > cualquier otro `creationSource`) son hilos completos con NPC, escritorio y nameplate `↳ <padre>`;
-> ver `docs/feat-thread-lineage.md`.
+> ver `docs/features/thread-lineage.md`.
 
 ## Qué se ve
 

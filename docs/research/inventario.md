@@ -5,7 +5,7 @@ Rama `research/inventario`, fecha 2026-11-07. Solo investigación: no se tocó c
 **Fuentes**
 - **t3craft**: `main` @ `f6364f7` y ramas en curso, revisadas con `git log`/`git show` y sus docs. `feat/workstation` y `feat/demo-world` todavía no tienen commits propios (están en `f6364f7`, con el worktree limpio). `feat/portable` tiene WIP sin commitear en su worktree; solo cuento lo commiteado (`8b6d516`).
 - **AgentCraft**: `github.com/blendi-remade/agentcraft` @ `8fe3ad2`, MIT. Se clonó en `/tmp/agentcraft-inv` y se leyó sin ejecutar nada. Abreviaturas de rutas: `M/` = `mod/src/main/java/dev/agentcraft`, `C/` = `mod/src/client/java/dev/agentcraft/client` y `F/` = `foreman/src`.
-- **T3 Code**: contratos en `~/projects/t3code-ref` @ `15fe2832`, sobre todo `packages/contracts/src/orchestrationV2.ts` y `rpc.ts`. Los scopes salen de `apps/server/src/auth/RpcAuthorization.ts` (`RPC_REQUIRED_SCOPES`). También usé la CLI local `t3 v0.1.4-nightly` (solo `--help`) y `docs/api.md` y `docs/plan-v2.md` de t3craft. El VPS corre `0.1.8-nightly`, así que puede haber diferencias menores.
+- **T3 Code**: contratos en `~/projects/t3code-ref` @ `15fe2832`, sobre todo `packages/contracts/src/orchestrationV2.ts` y `rpc.ts`. Los scopes salen de `apps/server/src/auth/RpcAuthorization.ts` (`RPC_REQUIRED_SCOPES`). También usé la CLI local `t3 v0.1.4-nightly` (solo `--help`) y `docs/api.md` y `docs/plans/plan-v2.md` de t3craft. El VPS corre `0.1.8-nightly`, así que puede haber diferencias menores.
 
 Leyenda: **R** = `orchestration:read` (lo que ya tiene el pairing). **W** = `orchestration:operate`. Los demás scopes van con su nombre.
 
@@ -174,7 +174,7 @@ Orden: valor alto con esfuerzo bajo primero. Los ítems marcados **⚠️ ESCRIT
 | 25 | **Acciones de PR**: merge, review o comentario | Bajo | L | ítem 10 | **⚠️ ESCRITURA** (`source-control:write`) |
 | 26 | **Tareas programadas**: ejecutar ahora o activar/desactivar | Bajo | S | ítem 15 | **⚠️ ESCRITURA** |
 
-Infraestructura común a todos los ítems ⚠️: un segundo pairing **opcional** por entorno con `orchestration:operate`, guardado aparte y revocable, con confirmación en el juego y log local de auditoría. Es lo que pide `plan-v2.md` §1 (puntos a–d).
+Infraestructura común a todos los ítems ⚠️: un segundo pairing **opcional** por entorno con `orchestration:operate`, guardado aparte y revocable, con confirmación en el juego y log local de auditoría. Es lo que pide `docs/plans/plan-v2.md` §1 (puntos a–d).
 
 ---
 

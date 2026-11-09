@@ -89,7 +89,7 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
  *
  * Fixed blocks of the canvas: {@code FOOT} (hall walls' base, gatehouse body and floor, pool bottom),
  * {@code GLASS} (windows), {@code PLANKS} (stairs' core), {@code GRASS}/{@code MOSS}/{@code WATER}/
- * (gardens, pool; no light is let into floors or ceilings: see docs/feat-hq-lighting.md), azalea leaves, moss carpet, deepslate tile slabs (flat
+ * (gardens, pool; no light is let into floors or ceilings: see docs/features/hq-lighting.md), azalea leaves, moss carpet, deepslate tile slabs (flat
  * roof), cherry stairs and a cherry hanging sign. From the kit: {@code floor()}, {@code accent()},
  * {@code wallPanel(true)} (the plaque course of the gatehouse), {@code beam(axis)} (the wall band and the
  * arch lintel when the barrio's band equals its post), {@code gardenPlanter()} and {@code desk(facing)}.

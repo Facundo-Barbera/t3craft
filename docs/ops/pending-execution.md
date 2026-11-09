@@ -14,12 +14,12 @@ Ya no hay moratoria. Dónde corre cada cosa está en `AGENTS.md`, "Where things 
   - Para renderizar hace falta una aprobación nueva de Facundo.
 - **Handoff:** `docs/handoff-2026-11-09.md` no existe, ni en el árbol ni en ninguna rama.
   - La cola del coordinador anterior está en la VPS, en `~/.cache/t3craft-coord/night-queue.md` (brief común: `swarm4-common.md`).
-  - El resumen está en `docs/night-2026-11-09.md`.
+  - El resumen está en `docs/ops/night-2026-11-09.md`.
 
 ### Rescate (todo subido a origin; no se borró nada)
 | rama | qué había | qué se hizo |
 |---|---|---|
-| `feat/kit-blocks-art` | 21 texturas de dispositivos retocadas y `mod/tools/device_textures.py`, todo sin commitear | Commit WIP `7e49837c` y push. Falta el railing (esquinas, T, extremos). Sin compilar. |
+| `feat/kit-blocks-art` | 21 texturas de dispositivos retocadas y `mod/tools/device_textures.py` (al integrarla, moverlo a `tools/art/` y ajustar su ruta de salida), todo sin commitear | Commit WIP `7e49837c` y push. Falta el railing (esquinas, T, extremos). Sin compilar. |
 | `t3/paper-lantern-kit-1` | un merge local y 2 generadores de faroles sin seguimiento: borradores, porque main ya tiene las versiones de `kit/paper-lantern2` | Commit WIP `cb152d4e` y push. Probablemente se descarte. |
 | `rescue/barrio-hall3-before-settle-dbg` | un print de depuración `SETTLE-DBG` en `CitadelSettle`, dentro del worktree base `/tmp/barrio-hall3-before` | Commit `066e04a2` y push. Es solo depuración: **no integrar**. |
 | `struct/signposts` | 5 commits que solo estaban en local | Push. Seguía en curso al cortar. |
@@ -40,7 +40,7 @@ Quedan como estaban:
   - `struct/leader-office5`, porque lo útil está en `leader-office6`;
   - `citadel/1-connect`, reemplazada por `fix/plan-connect`;
   - `citadel/scale`, reemplazada por `citadel/scale-port` y `struct/hq-scale`.
-- **Descartadas a propósito** (ver "Sin integrar" en `docs/night-2026-11-09.md`): `cat/bridge-stone-arch`, `cat/bridge-covered-timber`, `struct/avenue-lamps` 1–3 y `cat/planter-tall-pot`, que espera la decisión sobre `PLANTER_H`.
+- **Descartadas a propósito** (ver "Sin integrar" en `docs/ops/night-2026-11-09.md`): `cat/bridge-stone-arch`, `cat/bridge-covered-timber`, `struct/avenue-lamps` 1–3 y `cat/planter-tall-pot`, que espera la decisión sobre `PLANTER_H`.
 - **Exploraciones de estilo del 2026-11-08:** `design/{steampunk,gothic,skyislands,mesoamerican,dwarven,undersea,cyberpunk,nordic,arctic,treehouse,solarpunk,pirate,mediterranean,brutalist,orbital}` y `feat/hq-spacious-rooms`.
 
 ### Siguiente, en orden
@@ -51,10 +51,10 @@ Quedan como estaban:
 2. **Previews chicas en el relay:** que el PC genere copias de ≤ 768 px de cada PNG y que el relay traiga solo esas a la VPS (regla 9). Hasta entonces, los hilos no abren ningún PNG.
 3. **Sesión de renders nueva**, solo si Facundo la aprueba.
 4. **Cerrar las rondas en curso** con un hilo hijo por rama y seguir con `night-queue.md`.
-5. **Decisiones de Facundo:** siguen abiertas las de `docs/night-2026-11-09.md` ("Decisiones que te tocan": `PLANTER_H`, puentes, iluminación de avenidas, musgo).
+5. **Decisiones de Facundo:** siguen abiertas las de `docs/ops/night-2026-11-09.md` ("Decisiones que te tocan": `PLANTER_H`, puentes, iluminación de avenidas, musgo).
 
 ## Historial (antes del 2026-11-09 17:30; puede estar desactualizado)
-Esto se escribió durante la moratoria y a lo largo del día, y buena parte ya está integrada: ver `docs/night-2026-11-09.md`.
+Esto se escribió durante la moratoria y a lo largo del día, y buena parte ya está integrada: ver `docs/ops/night-2026-11-09.md`.
 
 ## 0. Atajo: `citadel/next` (todo el catálogo junto, listo para una sola compilación)
 La rama `citadel/next` ya junta, con los conflictos resueltos (unión de `CatalogEntries`, ordenada por id, y del changelog):
@@ -173,8 +173,8 @@ Ola 2, pendiente:
 - **Transporte:** scripts por stdin (`ssh -T user@100.64.0.20 < script`) y archivos en tar+base64. No se usa rsync ni scp.
 - **Aprobación de la sesión:** `~/.cache/t3craft-coord/renders-approved` en la VPS. Alcance: el swarm de diseño de la ciudadela.
 ## Revisiones a mano en curso (solo código)
-- `review/wip-catalog`: terminada. Las 16 ramas `cat/*` parecen listas para compilar; informe en `docs/reviews/wip-catalog.md`, ya en main.
-- `review/wip-citadel`: revisa `citadel/*`, `citadel/scale`, `fix/plan-connect` y `fix/new-thread-hitch`, y propone el orden de integración. Informe en `docs/reviews/wip-citadel.md`.
+- `review/wip-catalog`: terminada. Las 16 ramas `cat/*` parecen listas para compilar; informe en `docs/ops/reviews/wip-catalog.md`, ya en main.
+- `review/wip-citadel`: revisa `citadel/*`, `citadel/scale`, `fix/plan-connect` y `fix/new-thread-hitch`, y propone el orden de integración. Informe en `docs/ops/reviews/wip-citadel.md`.
 
 ## 3b. Ola B (solo código, en curso)
 - `cat/street-furniture`: bancas, jardineras y postes indicadores.

@@ -137,7 +137,7 @@ puente, sin reiniciar Minecraft. El mod no guarda credenciales de T3.
 > emparejamiento opcional (`feat/operate-core`) y luego, en `fix/pair-default-operate`, como
 > **emparejamiento por defecto** `read + operate` en una sola sesión, con `--read-only` como
 > opción explícita. Se mantienen (b) revocación por entorno, (c) confirmaciones y (d) audit log,
-> ahora en el mod. Ver `docs/feat-operate.md`.
+> ahora en el mod. Ver `docs/features/operate.md`.
 
 | | **SOLO LECTURA** (`orchestration:read`) | **REQUIERE `orchestration:operate`** |
 |---|---|---|

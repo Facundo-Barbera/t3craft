@@ -16,7 +16,7 @@ Reglas para todos:
   threads) pasan **únicamente** por `OperateGate` (§5). Desde 2026-11-07 el emparejamiento por
   defecto pide `orchestration:read` + `orchestration:operate` en una sola sesión;
   `/t3craft pair --read-only` (o el toggle de la pantalla) pide solo lectura. Sin token operate,
-  todo sigue en solo lectura. Ver `docs/feat-operate.md`.
+  todo sigue en solo lectura. Ver `docs/features/operate.md`.
 - **Secretos**: los tokens y tickets nunca van a logs, al chat ni a `toString()`. Usa
   `T3Connection.sanitize(...)` para cualquier texto de error que pueda llevarlos.
 - **Hilos**: lo marcado *client thread* solo se llama desde el hilo de Minecraft
@@ -35,7 +35,7 @@ Reglas para todos:
 | `NpcView` (record) | Un NPC ya resuelto: `id, env, envLabel, threadId, title, project, state, color, glyph, label, sublabel, activity, priority, settled, groupId, groupLabel, skin, particle`. `groupId` = `"<env>:<projectId>"` (barrio). `skin` = semilla `"<env>/<state>"`. `particle` ∈ `working|attention|error|done|null`. |
 | `Transitions` | `of(before, after)` y `between(beforeById, after, syncedEnvs)` dan los `Transition(npcId, from, to, title, text, color, Sound)` que merecen aviso. El estado inicial nunca avisa. `peek(npcs)` da `Peek(text, color, npcId)` para el HUD. |
 | `ThreadSearch` | Búsqueda de solo lectura (`orchestration.searchThreads`). `decode(value) → Decoded(matches, threads)` tolerante (campos faltantes con defaults, `quality`/`hits`/`threads` opcionales); `enrich(env, label, query, decoded, view) → List<Hit>` (título, proyecto y estado desde el shell, más coincidencias locales de título); `merge(perEnv, limit)` con orden estable `ORDER` (relevancia, actividad, entorno, título, id). `Outcome(query, hits, searched, paired, errors)`; `SearchException` con mensaje ya saneado. |
-| `ArchiveWire` | Lecturas de archivo de solo lectura, **solo payloads y decodificación** (no envía nada; las peticiones las hace `T3Connection` con `streams.call`): `GET_OLDER_SETTLED_THREADS`, `GET_ARCHIVED_SHELL_SNAPSHOT`, `olderSettledRequest(Cursor, limit≤50, projectIds?)`, `archivedRequest()`, `decodeOlderSettled/decodeArchived(JsonElement)` y `…Values(List<JsonElement>)` (lo que devuelve `StreamRegistry.call`). `Cursor(settledAtMs, threadId?)`, `OlderSettledPage(seq, threads, counts)`, `ArchivedSnapshot(seq, threads, projectTitles)`. Tolerante: nunca lanza. La usa `client.archive` (ver `docs/feat-archive-view.md`). |
+| `ArchiveWire` | Lecturas de archivo de solo lectura, **solo payloads y decodificación** (no envía nada; las peticiones las hace `T3Connection` con `streams.call`): `GET_OLDER_SETTLED_THREADS`, `GET_ARCHIVED_SHELL_SNAPSHOT`, `olderSettledRequest(Cursor, limit≤50, projectIds?)`, `archivedRequest()`, `decodeOlderSettled/decodeArchived(JsonElement)` y `…Values(List<JsonElement>)` (lo que devuelve `StreamRegistry.call`). `Cursor(settledAtMs, threadId?)`, `OlderSettledPage(seq, threads, counts)`, `ArchivedSnapshot(seq, threads, projectTitles)`. Tolerante: nunca lanza. La usa `client.archive` (ver `docs/features/archive-view.md`). |
 | `ShellState` | Reducer de `subscribeShell`: los snapshots autoritativos reemplazan el estado y los de enriquecimiento solo actualizan proyectos. `view()` → `View(threads, projectTitles, synced)`: copia inmutable, segura entre hilos. No es thread-safe: lo usa un solo hilo de conexión. |
 
 ## 2. Cliente T3 (`dev.t3craft.t3`)
@@ -58,9 +58,9 @@ Reglas para todos:
 |---|---|
 | `NpcInfo` (record) | Lo que dibuja el mod: `id, title, label, envLabel, sublabel, color, activity, priority, settled, state, groupId, groupLabel, skin, particle`. Fábricas `fromView(NpcView)` (modo directo) y `fromJson(JsonObject)` (modo bridge, tolerante). Helper `parseColor("#RRGGBB")`. |
 | `NpcRegistry` | *Client thread.* Fuente única de los NPCs en el mundo. Se alimenta con `replaceAll(List<NpcInfo>)`, `upsert`, `remove(npcId)`. Se consulta con `info(npcId)`, `all()`, `size()`, `position(npcId)` y `threadFor(Entity) → npcId | null` (sirve para el avatar y para su panel), `avatar(npcId)` y `setPanelExtra(Function<npcId, Component>)` (línea extra del panel; la usa feat/npc-helpers). `tick(Minecraft)` **nunca lanza**: valida las entradas, purga lo que no corresponde, barre huérfanos y se reconstruye ante errores (también tras un hot-swap). `clear(Minecraft)`. Los ids de entidad son ≤ `-1_000_000`: ese rango es nuestro y no lo uses para otras entidades. |
-| `HelperDirector` (`client.npc.helpers`) | *Client thread.* Subagentes como aldeanos bebé que siguen al NPC padre (ver `docs/feat-npc-helpers.md`). `update(HelperRoster.Collected, visibleParents, maxPerParent)`, `tick(Minecraft, npcId → avatar)` (nunca lanza), `panelExtra(npcId)`, `parentFor(Entity)`, `clear(level)`. Ids de entidad desde `-4_000_000`. |
+| `HelperDirector` (`client.npc.helpers`) | *Client thread.* Subagentes como aldeanos bebé que siguen al NPC padre (ver `docs/features/npc-helpers.md`). `update(HelperRoster.Collected, visibleParents, maxPerParent)`, `tick(Minecraft, npcId → avatar)` (nunca lanza), `panelExtra(npcId)`, `parentFor(Entity)`, `clear(level)`. Ids de entidad desde `-4_000_000`. |
 | `ThreadAvatar` | `RemotePlayer` solo de cliente: skin propia del mod (`AgentSkins`), nametag = `Nameplate.of`. No es un tipo de entidad registrado. El comportamiento (caminar, estaciones) corresponde a `feat/npc-behavior`: extiéndelo con hooks y coordina antes de cambiar la construcción en `NpcRegistry`. |
-| `AgentSkins` / `AgentSkinTextures` | Skins de agentes, propias del mod (PNG 64×64 en `assets/t3craft/textures/entity/agent/`, dibujadas por `mod/tools/AgentSkinGen.java`; nada se descarga). Personaje (12) = hash estable del id del NPC; camisa = color de `environments.<id>.color` ajustado a la paleta de `EnvBadge` (8), o la misma elección estable del badge. Ayudantes: `apprentice/<personaje>_<camisa>` del padre. `AgentSkinTextures.get(pick)` cachea por pick y, si falta el PNG, usa `entity/agent/default` (nunca la textura morada). Los avatares solo recalculan cuando cambia el pick. `NpcInfo.skin` ya no decide la skin. |
+| `AgentSkins` / `AgentSkinTextures` | Skins de agentes, propias del mod (PNG 64×64 en `assets/t3craft/textures/entity/agent/`, dibujadas por `tools/art/AgentSkinGen.java`; nada se descarga). Personaje (12) = hash estable del id del NPC; camisa = color de `environments.<id>.color` ajustado a la paleta de `EnvBadge` (8), o la misma elección estable del badge. Ayudantes: `apprentice/<personaje>_<camisa>` del padre. `AgentSkinTextures.get(pick)` cachea por pick y, si falta el PNG, usa `entity/agent/default` (nunca la textura morada). Los avatares solo recalculan cuando cambia el pick. `NpcInfo.skin` ya no decide la skin. |
 | `Nameplate` | Textos: `of(info)` (nametag), `info(info)` (panel), `sign(groupLabel, envLabel, count)` (letrero del barrio). |
 
 ## 4. Fachada de cliente (`dev.t3craft.client`)
@@ -78,7 +78,7 @@ Reglas para todos:
 
 ## 5. Escritura: `orchestration:operate` (`feat/operate-core`)
 
-Detalle y receta para añadir acciones: `docs/feat-operate.md`.
+Detalle y receta para añadir acciones: `docs/features/operate.md`.
 
 | Clase | Qué es |
 |---|---|
@@ -98,4 +98,4 @@ Detalle y receta para añadir acciones: `docs/feat-operate.md`.
 
 ## Tablero de tareas programadas (`dev.t3craft.client.schedule`)
 
-Ver `docs/feat-schedule-board.md`. `ScheduleClient.get()`: `setSource(ScheduleSource)` (por defecto `ConnectionScheduleSource`, sobre `T3Connection.subscribeScheduledTasks`), `setPlacementSource(SchedulePlacementSource)` (anchor `board` del HQ), `setBoardHook(ScheduleBoardHook)` (bloque de feat/blocks-core) y `entries()`. Ids de entidad desde `-7_000_000`. Comando `/t3craft schedule`. Sin acciones de escritura.
+Ver `docs/features/schedule-board.md`. `ScheduleClient.get()`: `setSource(ScheduleSource)` (por defecto `ConnectionScheduleSource`, sobre `T3Connection.subscribeScheduledTasks`), `setPlacementSource(SchedulePlacementSource)` (anchor `board` del HQ), `setBoardHook(ScheduleBoardHook)` (bloque de feat/blocks-core) y `entries()`. Ids de entidad desde `-7_000_000`. Comando `/t3craft schedule`. Sin acciones de escritura.

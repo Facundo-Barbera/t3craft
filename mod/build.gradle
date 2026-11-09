@@ -58,7 +58,7 @@ dependencies {
 	clientCompileOnly("com.terraformersmc:modmenu:${project.modmenu_version}") { transitive = false }
 }
 
-// hq-render (docs/research/hq-style-c/README.md): headless PNG renders of the HQ BuildPlan for
+// hq-render (docs/tools/hq-render.md): headless PNG renders of the HQ BuildPlan for
 // design review. Its own source set, so nothing of it ends up in the mod jar; it reads block models
 // and textures from the Minecraft jar already on the classpath (in memory, nothing is copied).
 // Not part of build: `./gradlew hqRender [-PhqArgs="--style classic --only full"]`.

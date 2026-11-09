@@ -59,7 +59,7 @@ public final class PackDefaults {
 	public static String exportJson(String layoutId) {
 		JsonObject o = new JsonObject();
 		o.addProperty("layout", layoutId);
-		o.addProperty("_doc", "docs/feat-hq-layout-packs.md. Blocks are written without properties: each replaced block keeps its own "
+		o.addProperty("_doc", "docs/features/hq-layout-packs.md. Blocks are written without properties: each replaced block keeps its own "
 				+ "facing/half/axis; properties you add here are forced on every block replaced. Remove a key to use the code's value.");
 		JsonObject roles = new JsonObject();
 		for (Map.Entry<HqStyle.Role, BlockState> e : roleDefaults(layoutId).entrySet()) {

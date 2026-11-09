@@ -1,7 +1,7 @@
 # feat/operate-core: infraestructura de escritura (`orchestration:operate`)
 
 Decisión de Facundo (2026-11-07): **sí a la escritura** mediante un **segundo emparejamiento
-opcional por entorno**. Esta rama solo trae la infraestructura (`plan-v2.md` §1, puntos b–d):
+opcional por entorno**. Esta rama solo trae la infraestructura (`docs/plans/plan-v2.md` §1, puntos b–d):
 las acciones concretas (inventario §2, ítems 19–24) las implementan otros hilos sobre esta API.
 Los ítems 25 (PR, `source-control:write`) y 26 (tareas programadas) quedan fuera.
 

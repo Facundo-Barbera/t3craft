@@ -1,6 +1,6 @@
 # feat/t3-actions: acciones y configuración como en T3 Code (⚠️ escritura)
 
-> feat/t3-composer-fidelity: `NewThreadDialog` was removed; "New thread" is now a draft thread in the T3 screen (docs/feat-t3-composer.md). The model picker is the composer's model chip (`ModelPicker.composerChip()`).
+> feat/t3-composer-fidelity: `NewThreadDialog` was removed; "New thread" is now a draft thread in the T3 screen (docs/features/t3-composer.md). The model picker is the composer's model chip (`ModelPicker.composerChip()`).
 
 Paquete `dev.t3craft.client.t3ui.actions` (source set `client`). Contiene servicios puros y widgets
 autocontenidos que montan **feat/t3-ui-unified** (sidebar y pantalla única) y **feat/chat-compose**
@@ -22,7 +22,7 @@ Contrato: `~/projects/t3code-ref` @ 15fe2832.
 | Nuevo hilo | `orchestration.launchThread` (`OrchestrationV2ThreadLaunchInput`, `workspaceStrategy` root/worktree) | operate | `orchestrationV2.ts` (`OrchestrationV2ThreadLaunchWorkspaceStrategy`) |
 | Registrar proyecto | `projects.mutate` `project.create {commandId, projectId, title, workspaceRoot, createWorkspaceRootIfMissing, defaultModelSelection: null}` → `Project` | operate (sin `scripts`) | `packages/contracts/src/project.ts` (`ProjectMutation`), `apps/server/src/auth/RpcAuthorization.ts`, `packages/client-runtime/src/operations/projects.ts` (`buildProjectCreateCommand`) |
 | Archivar | `thread.archive {commandId, threadId}` (destructiva) | operate | `orchestrationV2.ts` |
-| Interrumpir / detener / settle | existentes: `ThreadControl` (`run.interrupt`, `thread.stop`) y `ThreadOps.settle` | operate | `docs/feat-operate.md` |
+| Interrumpir / detener / settle | existentes: `ThreadControl` (`run.interrupt`, `thread.stop`) y `ThreadOps.settle` | operate | `docs/features/operate.md` |
 
 Componentes web que se copian (estructura y comportamiento, no código): `apps/web/src/components/chat/`
 `ComposerModelEffort`, `ProviderModelPicker`, `ModelPickerContent`, `TraitsPicker` (el effort es el

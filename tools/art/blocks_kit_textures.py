@@ -5,7 +5,7 @@ Original pixel art for t3craft (MIT), drawn procedurally: nothing is copied or d
 Mojang's textures. Deterministic (fixed seeds), stdlib only (zlib + struct), so re-running it gives
 byte-identical PNGs:
 
-    python3 mod/tools/blocks_kit_textures.py
+    python3 tools/art/blocks_kit_textures.py
 
 Writes into mod/src/main/resources/assets/t3craft/textures/block/kit_*.png.
 """
@@ -16,7 +16,7 @@ import struct
 import sys
 import zlib
 
-OUT = os.path.join(os.path.dirname(__file__), "..", "src", "main", "resources", "assets", "t3craft", "textures", "block")
+OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "mod", "src", "main", "resources", "assets", "t3craft", "textures", "block")
 
 
 def hexc(s):

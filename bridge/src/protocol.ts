@@ -153,7 +153,7 @@ export interface ChatStatus extends Envelope<"chat.status"> {
   readonly detail?: string;
 }
 
-// Stubs (operate phase, see docs/plan-v2.md). TODO: fill payloads when implemented.
+// Stubs (operate phase, see docs/plans/plan-v2.md). TODO: fill payloads when implemented.
 export interface PermissionOpen extends Envelope<"permission.open"> {
   readonly npcId: string;
   readonly requestId: string;

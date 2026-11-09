@@ -4,7 +4,7 @@
 Original pixel art for t3craft (MIT), drawn by hand-written rules: nothing is copied or derived from
 Mojang's textures. Deterministic (fixed seeds), stdlib only, so re-running it gives byte-identical PNGs:
 
-    python3 mod/tools/kit_lantern_textures.py
+    python3 tools/art/kit_lantern_textures.py
 
 Writes mod/src/main/resources/assets/t3craft/textures/block/kit_lantern_*.png (new names only: the
 older kit_lantern_side/end of blocks_kit_textures.py are left alone).
@@ -18,7 +18,7 @@ import random
 import struct
 import zlib
 
-OUT = os.path.join(os.path.dirname(__file__), "..", "src", "main", "resources", "assets", "t3craft", "textures", "block")
+OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "mod", "src", "main", "resources", "assets", "t3craft", "textures", "block")
 
 
 def hexc(s):

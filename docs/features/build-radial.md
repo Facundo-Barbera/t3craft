@@ -96,7 +96,7 @@ Timer `build.radial` covers both streams, every tick.
 
 ## Pace (estimates, not measured in game)
 Citadel with 4 projects: base ≈ 395 000 entries, of which the void island is ≈ 360 000
-(docs/feat-build-near-player.md).
+(docs/features/build-near-player.md).
 
 | | feat/build-near-player | feat/build-radial |
 |---|---|---|

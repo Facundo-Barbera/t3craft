@@ -41,7 +41,7 @@ import org.jspecify.annotations.Nullable;
  * never touched: T3Craft is a client-only mod and the client refuses site commands without an
  * integrated server.
  *
- * <p>Integration points (see docs/feat-site.md):
+ * <p>Integration points (see docs/features/site.md):
  * <ul>
  *   <li>{@link #setRequest}: base module + growth envelope ({@code feat/hq-design}); default
  *   {@link SiteRequest#GROWABLE}.</li>

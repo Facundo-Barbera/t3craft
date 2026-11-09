@@ -1,5 +1,7 @@
 # Layout vertical: torres con atrio y puentes (`layout/vertical`)
 
+> Las imágenes de esta investigación (PNG de renders) se quitaron del árbol el 2026-11-09 para aligerar los worktrees. Siguen en el tag `archive/research-renders-2026-11-09`: `git show archive/research-renders-2026-11-09:<ruta>.png > /tmp/x.png`.
+
 Estilo `vertical` (`"hq": {"style": "vertical"}` en `config/t3craft.json`). No es una piel sobre la
 espina de alas: tiene su propia geometría (`TowerLayout`) y su propio generador (`TowerGenerator`).
 `HqGenerator.generate` delega en él solo cuando el estilo activo es `vertical`. Cherry y classic no

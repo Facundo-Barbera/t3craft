@@ -86,7 +86,7 @@ snapshots de site.
 - **Ids de entidad**: rango propio desde **−5.000.000** hacia abajo (`WorkstationRenderer.ID_BASE`).
   NpcRegistry usa −1.000.000…, builders −2.000.000… y BehaviorDirector −3.000.000…. El contador es
   de instancia, no estático.
-- Barrido de huérfanas (fix/hq-stale-stations, ver `docs/fix-hq-stale-stations.md`): cada dueño
+- Barrido de huérfanas (fix/hq-stale-stations, ver `docs/features/fix-hq-stale-stations.md`): cada dueño
   barre solo su rango (`ClientEntityIds`). El renderer descarta en el primer tick y cada 10 s toda
   entidad de su rango que no sea de una estación viva, y sigue revisando `isRemoved()` cada tick para
   reconstruir una estación si desaparecieron sus entidades. Las entidades se guardan por referencia

@@ -42,7 +42,7 @@ una lista de colocaciones de bloques, y se van al terminar. Funciona en singlepl
 ## Construcción en paralelo (feat/parallel-build)
 Los jobs se reparten en frentes por capa (un constructor por frente) y comparten un presupuesto global por
 tick (`build.maxBlocksPerTick`, `maxConcurrentJobs`, `frontsPerJob`, `maxEffectsPerTick`, autoajuste por
-MSPT). Detalle en `docs/feat-parallel-build.md`.
+MSPT). Detalle en `docs/features/parallel-build.md`.
 
 ## Hot-swap / estado
 - Sin estado estático salvo `Builders.service` (tipado a la interfaz `BuildService`, se pone en init y se limpia en

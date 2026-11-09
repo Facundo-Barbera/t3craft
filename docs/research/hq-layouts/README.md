@@ -1,5 +1,7 @@
 # HQ layouts (feat/hq-layouts)
 
+> Las imágenes de esta investigación (PNG de renders) se quitaron del árbol el 2026-11-09 para aligerar los worktrees. Siguen en el tag `archive/research-renders-2026-11-09`: `git show archive/research-renders-2026-11-09:<ruta>.png > /tmp/x.png`.
+
 The HQ can be built with six ground plans. Each one has its own README and renders in this folder
 (`campus/`, `ring/`, `vertical/`, `blocks/` for ensanche, `village/`).
 

@@ -1,6 +1,6 @@
 # feat/archive-view: estante "Archivados" con datos reales
 
-> **Reemplazado en parte por feat/archive-terminal** (`docs/feat-archive-terminal.md`): el archivo ya
+> **Reemplazado en parte por feat/archive-terminal** (`docs/features/archive-terminal.md`): el archivo ya
 > no se muestra en slots ni estantes del mundo. `ArchiveRenderer`, `ArchiveShelf`, `ArchiveSlots` y
 > `CatalogScreen` se borraron; la lista vive en `ArchiveScreen` (terminal `t3craft:archive_terminal`,
 > `/t3craft archive` o el portátil). Siguen vigentes los datos: `ArchiveStore`, `ArchiveSource`,

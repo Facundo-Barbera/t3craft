@@ -192,4 +192,4 @@ calidad visual. Es lo que tiene que cubrir el primer `./gradlew build` y el prim
 - Arreglé un choque de clases entre ramas (`FountainKit` → `PondKit`) y unas hojas que se pudrirían.
 - Añadí 10 líneas al CHANGELOG.
 - Todo está pendiente del primer `build` y del primer render del coordinador, cuando Facundo levante la moratoria
-  (`docs/pending-execution.md`).
+  (`docs/ops/pending-execution.md`).

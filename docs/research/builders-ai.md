@@ -164,7 +164,7 @@ cliente anima a cada builder hacia su punto con el A* de los NPC.
   la última de cada posición es la del plan.
 
 ### Métrica de recorrido
-Ver `docs/feat-hq-builders-ai.md`: recorrido total de los builders con 20 proyectos, por layout, comparado con el
+Ver `docs/features/hq-builders-ai.md`: recorrido total de los builders con 20 proyectos, por layout, comparado con el
 orden por capa más franjas de antes, con el mismo evaluador de alcance.
 
 ## Builders independientes y rápidos (fix/hq-builders-independent)
@@ -213,7 +213,7 @@ seguir. Al reanudar, lo que ya está bien en el mundo se salta sin caminar. El r
 entradas de una misma posición siguen encadenadas por dependencias.
 
 **Antes y después (estimación a mano, classic con 20 proyectos, 4 grupos en paralelo × 4 builders, presupuesto
-48/tick por grupo).** Son 73 821 entradas y 6 876 bloques de recorrido (tabla de `docs/feat-hq-builders-ai.md`).
+48/tick por grupo).** Son 73 821 entradas y 6 876 bloques de recorrido (tabla de `docs/features/hq-builders-ai.md`).
 - *Frentes por capa (a8d23dd):* no caminan y les limita el presupuesto: 73 821 / (4 × 48) ≈ **385 ticks**.
 - *Crew antes:* 6 876 / 0,3 ≈ 22 900 ticks-builder caminando ÷ 16 builders ≈ 1 430 ticks por builder, sin
   solaparse con colocar (el crédito se perdía). A eso se suman las esperas entre carriles: unos **1 500–1 800 ticks,

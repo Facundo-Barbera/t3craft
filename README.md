@@ -13,11 +13,15 @@ attention, done, error, idle) and tagged with the machine it runs on.
   A dumb view: it draws what the bridge sends. It stores no T3 credentials.
 - `bridge/`: Node 22+ / TypeScript / effect 4.1.2. Talks to every configured T3 environment over
   authenticated WebSocket RPC and serves the mod on the homelab's Tailscale IP only.
-- `protocol/protocol.md`: the mod⇄bridge protocol v1. `docs/plan.md`: technical plan and the
+- `protocol/protocol.md`: the mod⇄bridge protocol v1. `docs/plans/plan.md`: technical plan and the
   architecture decision.
+- `tools/`: dev tooling. `heavy.sh` runs one heavy process at a time (render PC only), `render/` holds the
+  render relay and the PC daemon scripts, `studio/` is Citadel Studio, and `art/` has the texture and model
+  generators that write into `mod/src/main/resources`.
+- `docs/`: see `docs/README.md` for what lives where.
 
 Status: scaffolding plus phase 0/1 (list threads with colour). Chat, permissions and thread
-creation are stubs (see TODOs and `docs/plan.md` §6).
+creation are stubs (see TODOs and `docs/plans/plan.md` §6).
 
 ## Direct mode (default): pair the mod with each T3
 
@@ -34,7 +38,7 @@ server. The bridge below is optional (legacy `"mode": "bridge"`).
    (or the "Access" toggle on the pairing screen). Always pass explicit `--scope`s: without them
    the credential carries every scope. The mod refuses a session that grants anything beyond
    `orchestration:read` + `orchestration:operate`. Destructive actions ask for an in-game
-   confirmation and every action lands in `config/t3craft/audit.log`. Details: `docs/feat-operate.md`.
+   confirmation and every action lands in `config/t3craft/audit.log`. Details: `docs/features/operate.md`.
 2. In Minecraft run `/t3craft pair`, enter a name (shown on the villagers, e.g. `my-vps`) and
    paste the link (`https://host/pair#token=…`), or the bare code plus the T3 URL
    (e.g. `http://my-acmesite.<tailnet>.ts.net:3773`). Repeat for each environment. An

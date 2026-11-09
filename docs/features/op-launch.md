@@ -1,6 +1,6 @@
 # feat/op-launch: crear o lanzar un hilo (ítem 23, ⚠️ escritura)
 
-Usa la infraestructura de `docs/feat-operate.md`. Una sola llamada, `orchestration.launchThread`
+Usa la infraestructura de `docs/features/operate.md`. Una sola llamada, `orchestration.launchThread`
 (`OperateKind.THREAD_LAUNCH`, **no destructiva**): crea el hilo y manda el primer mensaje a la vez.
 `thread.create` (vía `dispatchCommand`) no se usa: obligaría a un segundo envío para el prompt.
 

@@ -35,7 +35,7 @@ import org.jspecify.annotations.Nullable;
  *   <li>the workstations keep drawing their own client-side screens and props.</li>
  * </ul>
  *
- * <p>Adding a block: see {@code docs/feat-blocks.md}.
+ * <p>Adding a block: see {@code docs/features/blocks.md}.
  */
 public final class T3Blocks {
 	public static final String NS = T3Craft.MOD_ID;

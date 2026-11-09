@@ -29,7 +29,7 @@ const WORKING_STATUSES: ReadonlySet<string> = new Set(["queued", "preparing", "s
  * 5. idle: everything else (`idle`, `interrupted`, `cancelled`, `rolled_back`).
  *
  * `waiting` alone is working, as in T3 Code: the run waits on a tool, a thread_wait, subagents or
- * background tasks, not on the user. Only the blocking request needs them (docs/plan.md §1.4).
+ * background tasks, not on the user. Only the blocking request needs them (docs/plans/plan.md §1.4).
  */
 export const mapThreadState = (t: ShellForMapping): ThreadState => {
   const pending = t.pendingRuntimeRequest;

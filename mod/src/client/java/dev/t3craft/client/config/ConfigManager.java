@@ -10,7 +10,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Current {@link T3CraftSettings} plus load/save and change listeners. This is the read side other
- * features use (integration points in {@code docs/feat-config.md}):
+ * features use (integration points in {@code docs/features/config.md}):
  * <pre>{@code
  * T3CraftSettings s = ConfigManager.get().settings();
  * if (s.notifications().allowSound("attention")) { ... }

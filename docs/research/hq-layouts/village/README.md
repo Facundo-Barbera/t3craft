@@ -1,5 +1,7 @@
 # Layout «village»: aldea orgánica en terrazas
 
+> Las imágenes de esta investigación (PNG de renders) se quitaron del árbol el 2026-11-09 para aligerar los worktrees. Siguen en el tag `archive/research-renders-2026-11-09`: `git show archive/research-renders-2026-11-09:<ruta>.png > /tmp/x.png`.
+
 Rama `layout/village`. El HQ crece como un pueblo de colina. En lo alto está la plaza mayor con el
 ayuntamiento (el hub). Desde ella bajan calles que se ramifican y se vuelven a cerrar en bucles, hay
 terrazas a distintas alturas unidas por escalinatas, y cada proyecto ocupa un caserío en su propio

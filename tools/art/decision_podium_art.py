@@ -13,7 +13,7 @@ podium (MIT); nothing is copied: the model, the pixels and this generator are ou
 Design (a thread's state has to read at a glance and from afar: colour + glyph + blink, like status_lamp_art.py):
   * body: a lectern. Stone plinth, dark bark shaft, cherry desk, an upright display panel at the back. The body reuses
     the kit textures (kit_stone, kit_bark, kit_cherry_wood), so it matches the rest of the HQ.
-  * display: 14 x 6 px, the colours are LampStatus' (docs/feat-blocks.md). Only the display and the ring marks glow.
+  * display: 14 x 6 px, the colours are LampStatus' (docs/features/blocks.md). Only the display and the ring marks glow.
       off        dark glass (no glow)                      idle     dim gray, pause bars
       working    cyan bar that runs across (4 frames)      done     green, check mark
       attention  orange, three "!" that blink slowly       error    red, X that blinks fast

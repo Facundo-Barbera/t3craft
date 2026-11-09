@@ -22,7 +22,7 @@ import net.minecraft.world.phys.shapes.VoxelShape;
  * fix/hq-lanterns, citadel/light-aesthetic: the built-in <b>fill</b> lighting of every HQ plan. After a layout
  * is generated, every cell people can walk to from the spawn should read at least {@link HqLightMap#MIN_LEVEL}
  * of block light at night. The light one <i>sees</i> is the layout's own design (lanterns on posts, under
- * eaves and porches, pendants, braziers, lit stained glass: see {@code docs/feat-hq-lighting.md}); this pass
+ * eaves and porches, pendants, braziers, lit stained glass: see {@code docs/features/hq-lighting.md}); this pass
  * only covers what that design leaves dark, and only with the invisible vanilla block {@code minecraft:light}
  * at moderate levels (10 to {@value #FILL_MAX}), so the visible lamps (14, 15) still dominate the scene. It
  * never lets a visible lamp (froglight, shoji panel) into a floor, wall or ceiling.

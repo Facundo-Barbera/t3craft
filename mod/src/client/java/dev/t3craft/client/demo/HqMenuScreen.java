@@ -26,7 +26,7 @@ import org.jspecify.annotations.Nullable;
  *   <li><b>Rebuild with &lt;layout&gt;</b> (only when the HQ is built with another layout) and
  *       <b>Reset HQ</b>: both ask first, then run the existing reset (zip backup, delete only
  *       {@code saves/<demo folder>}, create it again) with the chosen layout. See
- *       {@code docs/feat-hq-menu.md} for why this runs from the menu with no world open.</li>
+ *       {@code docs/features/hq-menu.md} for why this runs from the menu with no world open.</li>
  * </ul>
  * Escape or Back returns to {@code parent}. All logic worth testing lives in {@link HqMenuModel},
  * {@link HqMenuList} and {@link HqMenuKeys}.

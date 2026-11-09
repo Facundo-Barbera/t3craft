@@ -13,7 +13,7 @@ import java.util.List;
  * Lighting is recomputed after every plan ({@code HqLighting}), so fewer decorative lamps still leave
  * every walkable cell lit.
  *
- * <p>The full list (also written by the export and documented in docs/feat-hq-layout-packs.md) is
+ * <p>The full list (also written by the export and documented in docs/features/hq-layout-packs.md) is
  * {@link #all()}. Geometry that NPC anchors, footprints, survival sites and validators share (hall
  * widths, storeys, lot depths) stays in code: changing it needs a code change and a restart.
  */
@@ -92,7 +92,7 @@ public final class LayoutParams {
 	// ------------------------------------------------------------------ every layout (HqLighting)
 
 	public static final Spec LIGHT_GRID = spec(ANY, "lighting.grid", 5, 3, 5,
-			"legacy: spacing of the old floor-lamp grid; ignored since the built-in fill became invisible minecraft:light (docs/feat-hq-lighting.md)");
+			"legacy: spacing of the old floor-lamp grid; ignored since the built-in fill became invisible minecraft:light (docs/features/hq-lighting.md)");
 	public static final Spec LIGHT_LATTICE = spec(ANY, "lighting.lattice", 9, 5, 9,
 			"legacy: period of the old floor-lamp lattice on outdoor grounds; ignored since the built-in fill became invisible minecraft:light");
 

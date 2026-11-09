@@ -16,7 +16,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * In-memory cache of thread transcripts and their stream subscriptions (feat/t3-thread-cache, see
- * {@code docs/feat-t3-thread-cache.md}). Every {@link ThreadFeed} is a view over one {@link Entry}
+ * {@code docs/features/t3-thread-cache.md}). Every {@link ThreadFeed} is a view over one {@link Entry}
  * here, keyed by {@code env:threadId}:
  *
  * <ul>

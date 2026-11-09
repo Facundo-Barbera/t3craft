@@ -25,7 +25,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * feat/hq-layout-packs: what one {@code <layoutId>.json} (plus its {@code rooms/<layoutId>/*.nbt})
- * changes in a layout. Immutable; an empty pack changes nothing. See docs/feat-hq-layout-packs.md.
+ * changes in a layout. Immutable; an empty pack changes nothing. See docs/features/hq-layout-packs.md.
  *
  * @param roles   {@code HqStyle.Role} name (upper case) → replacement
  * @param palette field of {@code dev.t3craft.hq.Palette} → replacement
