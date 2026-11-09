@@ -50,9 +50,14 @@ public interface Variant {
 		return 1;
 	}
 
-	/** Whether {@code p} is within this variant's size range. */
+	/**
+	 * Whether {@code p} is within this variant's size range. The largest frontage and depth grow with the
+	 * citadel's scale ({@code CitadelCanvas.dims().s(maxW())}; identity at scale 1), so that the bigger plots
+	 * of a scaled citadel still find variants: a variant builds to its plot's size, see the contract.
+	 */
 	default boolean fits(Plot p) {
-		return p.w() >= minW() && p.w() <= maxW() && p.d() >= minD() && p.d() <= maxD() && p.h() >= minH();
+		dev.t3craft.hq.RingCampusGeometry.Dims g = dev.t3craft.hq.citadel.CitadelCanvas.dims();
+		return p.w() >= minW() && p.w() <= Math.max(maxW(), g.s(maxW())) && p.d() >= minD() && p.d() <= Math.max(maxD(), g.s(maxD())) && p.h() >= minH();
 	}
 
 	/** Builds the variant into {@code p} on {@code c}. See the contract above. */

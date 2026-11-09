@@ -56,14 +56,14 @@ public final class RingCampusStyle extends HqStyle {
 
 	@Override
 	public int bottom() {
-		// the sunken lounge's amphitheatre steps down to y = -3
-		return -3;
+		// the sunken lounge's amphitheatre steps down to y = -3 (at scale 1; its depth is sy(3))
+		return -RingCampusGeometry.dims().sy(3);
 	}
 
 	@Override
 	public int top() {
-		// two-floor halls with their roofs, the hub vault and beacon, the review tower's spire
-		return 40;
+		// two-floor halls with their roofs, the hub vault and beacon, the review tower's spire (40 at scale 1)
+		return Math.max(40, RingCampusGeometry.dims().sy(40));
 	}
 
 	@Override

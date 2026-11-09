@@ -62,9 +62,11 @@ reachability and the shape/floating checks look at the whole plan, so a piece is
   (`HqLightMap`) under `--low-light`: histogram, clusters (cells, box, first cell) and coordinates.
 * **Anchors**: every standing anchor and every desk reachable from the spawn (`direct`, or `adjacent` for
   seats and benches); the unreachable ones are listed.
-* **Shapes**: fences, walls, panes, bars and stairs whose state differs from what vanilla gives them among
-  their real neighbours (`Block.updateFromNeighbourShapes` against the plan). `cornersMissing` counts those
+* **Shapes**: fences, walls, panes, bars and stairs whose state differs from what `PlanConnect` (fix/plan-connect,
+  see `docs/feat-plan-connect.md`) gives them among their real neighbours. `cornersMissing` counts those
   that should connect on 2 or 3 sides and do not: the round fences without corners.
+* **Connect**: fences, walls and panes connected on no side although a neighbour they connect to is beside
+  them (`connect:` line on stdout too). Must be 0; nothing is caught per cell.
 * **Floating**: groups of blocks connected to nothing that reaches the ground (y <= 0); **unsupported**:
   blocks vanilla's `canSurvive` refuses where they stand (grouped by type, with a coordinate).
 * **Build**: ticks the crew (`CrewSchedule` + `CrewCursor`, no world) needs for the scope, with `--crew`

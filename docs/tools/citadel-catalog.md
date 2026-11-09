@@ -110,3 +110,84 @@ if (v != null) v.build(canvas, p);
   family's variants and `Catalog.byId(id)` picks one by id.
 - **Coordinates:** `new Plot(x0, y0, z0, w, d, h, front, seed)` takes local `w` (frontage) and `d` (depth). `y0` is the
   canvas y of local `y = 0`, the first layer above the ground.
+
+## Placement
+
+`citadel/CitadelPlacement` is the family leader: after the barrios and empty lots are painted, `RingCampusGenerator` calls
+`CitadelPlacement.city(canvas)`, which places catalog variants in the space that is still free. You can switch it off with
+the pack param `catalog.enabled = 0` (`LayoutParams.RINGCAMPUS_CATALOG`, hybrid-ringcampus). The city is then exactly as it
+was before the catalog.
+
+**What the leader asks for.** The tables below list the plot sizes it requests, as local `w × d × h` (frontage × depth ×
+height; `h` is the room it leaves). A plot only gets a variant whose `minW..maxW`, `minD..maxD` and `minH` cover it. Sizes
+the family does not cover are simply skipped. **If you design a variant, cover these ranges.** A wide range gets used
+far more than a narrow one. When a family has nothing that fits, the leader places nothing, with three exceptions that
+have fallbacks: `TREE` gets the citadel's cherry tree (needs ≥ 5 × 5 × 7), `GARDEN` gets a hedge garden (≥ 5 × 5), and
+`PLANTER` gets the kit's planter.
+
+### Barrio lots (a project's lot)
+
+The halls, desks, workstations, anchors and walk spots stay as they are, and so do the courtyard, the gatehouse and the
+paved arms. A strip of 2 grass cells round the arms also stays clear. The leader works on the four corner squares between
+the arms and on the belt between the cluster and the lot's edge. It keeps 1 cell from the streets and 1 cell between plots.
+
+1. **Corridor.** A paved path, 3 wide with a 1-block curb on each side. It runs from the end of the gate arm straight to
+   the street, so every hall door has a path at least 2 wide to the street: courtyard, gatehouse, arm, corridor.
+2. **Furniture along the corridor** (every 4 cells, both sides, facing the path). Lamps alternate with benches or
+   planters. More lamps line the gate arm between the gatehouse and the cluster's edge.
+3. **Plots**, in this order. Each one goes as close to the paths as it can, except trees and the small gardens, which are
+   scattered by seed:
+
+| family | asked size (w × d × h) | how many |
+| --- | --- | --- |
+| `FOUNTAIN` (or `WELL`, chosen by the lot's seed) | 5–7 × 5–7 × 7 (well: 3–5 × 3–5 × 8) | 1 |
+| `ANNEX` | 5–8 × 5–7 × 10 | 2 (ring 1), 3 (rings 2–3) |
+| `GARDEN` | 6–11 × 5–9 × 5 | 2 (ring 1), 3 (rings 2–3) |
+| `TREE` | 5–7 × 5–7 × 14 | 4 + 2 × ring |
+| `GARDEN` (small) | 5–7 × 5–7 × 5 | 2 |
+| `BENCH` | 2–3 × 1 × 3 | 3, plus the corridor ones |
+| `PLANTER` | 1–2 × 1 × 3 | 6, plus the corridor ones |
+| `LAMP` (corridor, gate arm) | 1 × 1 × 5 | every 4 cells |
+
+4. **Ground texture.** The grass left over gets patches 4 cells across: meadow, flowers, moss, bare earth or quiet grass,
+   using plants with no collision only. A last pass then thins plain grass until it covers at most 30% of the lot.
+
+The front of a plot faces the nearest path. In the corner squares that means the gate arm or the nearer arm; beside the
+corridor it means the corridor; on the belt it means the cluster.
+
+### Empty lots
+
+The lot's seed picks one of three compositions. Each is packed from the lot's centre outwards:
+
+| composition | plots |
+| --- | --- |
+| park | `FOUNTAIN` 5–9 × 5–9 × 7, `GARDEN` 8–12 × 7–12 × 5, 3 `BENCH`, 6 + 2 × ring `TREE` (scattered), 2 small `GARDEN` 5–8 |
+| small plaza | a paved square of 13 (ring 1) or 15 (rings 2–3), down to 11, with a 2-cell walk ring. In the middle goes a `PLAZA_CENTER` (7–11 square × 10), else a `FOUNTAIN` of that size, else a tree. Each corner gets a `LAMP` 1 × 1 × 5. Round it go 4 `BENCH`, 2 `GARDEN` 6–10 × 5–8 and 6 + ring `TREE` |
+| orchard | `WELL` 3–5 × 3–5 × 8, 10 + 2 × ring `TREE` 5–6 × 5–6, 2 `GARDEN` 6–10 × 5–8, 2 `BENCH` |
+
+Every composition also gets 4 `PLANTER` and the same ground texture.
+
+### Streets and avenues
+
+All of these sit on the edge band. The middle of every street stays clear.
+
+| family | where | asked size |
+| --- | --- | --- |
+| `GATE` | where each **cardinal** avenue enters its ring of barrios. It sits 1 cell in from the ring's inner edge, or 5 when that spot is refused (ring 1 south, by the spawn). The path runs front → back through its middle; the front faces the hub | 7, 9 or 5 wide × 3, 2 or 4 deep × 10 |
+| `PLAZA_CENTER` (else `FOUNTAIN`) | at each crossing of a ring street with its avenues, when the square plus a 2-cell walk ring fits on that ring's street, avenue and free lot grass (lot grass gets paved). It may slide up to 10 cells inwards along the avenue. Ring 1's crossings hold the node rooms, so none go there | 11, 9 or 7 square × 10 |
+| `LAMP` | on both edges of every avenue and ring street, every 10 blocks, and on the inner street's outer edge. None within 5 blocks of a crossing or a ramp, 2 of a node room or 4 of the spawn | 1 × 1 × 5 |
+| `BENCH` | between lamps, every 3rd interval, facing the street. Benches only go where the whole box stays on the edge band, which in practice means straight stretches near the cardinals | 3 (else 2) × 1 × 3 |
+
+### Hub
+
+On the outer rim of the promenade, one spot between each pair of ramps (slightly off the light posts) gets a `STATUE`
+2 × 2 × 8. A spot that cannot take a statue gets a `LAMP` 1 × 1 × 5 (a brazier) instead. The inner part of the
+promenade stays a free walk. The nodes are not touched.
+
+### Rules the leader follows
+
+Before building a plot, it checks on the canvas (`zoneAt`, `at`) that the plot is in the right zone, on unpaved ground
+(grass, moss or a lattice light) or on a street's edge, and that nothing stands above it up to its height. Azalea bushes
+of the lot ground are the exception: they are cleared. A plot is never placed on a hall column, an anchor column or the
+spawn. Everything is deterministic: one seed per lot or street position and a fixed scan order. A variant that throws is
+logged and skipped, and the city still builds.

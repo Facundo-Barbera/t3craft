@@ -21,8 +21,8 @@ public final class BlockCosts {
 	 * {@code asItem()}.
 	 */
 	public static @Nullable String itemId(BlockState state) {
-		if (state.isAir()) {
-			return null;
+		if (state.isAir() || state.is(net.minecraft.world.level.block.Blocks.LIGHT)) {
+			return null; // the invisible light block has no survival item: free
 		}
 		if (state.hasProperty(BlockStateProperties.DOUBLE_BLOCK_HALF) && state.getValue(BlockStateProperties.DOUBLE_BLOCK_HALF) == DoubleBlockHalf.UPPER) {
 			return null;

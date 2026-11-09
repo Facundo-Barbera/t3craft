@@ -61,9 +61,11 @@ import net.minecraft.world.level.block.state.properties.Property;
  *   <li><b>light</b>: walkable cells ({@link PlanProbe#reachable} from the spawn) whose block light
  *   ({@link HqLightMap}) is under {@link Options#lowLight}, with coordinates and clusters.</li>
  *   <li><b>anchors</b>: whether every standing anchor and every desk is reachable on foot from the spawn.</li>
- *   <li><b>shapes</b>: fences, walls, panes, bars and stairs whose state differs from what vanilla
- *   gives them among their real neighbours (a fence that should make a 2- or 3-sided corner and does
+ *   <li><b>shapes</b>: fences, walls, panes, bars and stairs whose state differs from what
+ *   {@code PlanConnect} gives them among their real neighbours (a fence that should make a 2- or 3-sided corner and does
  *   not shows as {@code cornersMissing}).</li>
+ *   <li><b>connect</b>: fences, walls and panes with no connection although a connectable neighbour is
+ *   beside them (must be 0).</li>
  *   <li><b>floating</b>: groups of blocks touching nothing that touches the ground (y &lt;= 0), and
  *   <b>unsupported</b>: blocks vanilla's {@code canSurvive} refuses where they stand.</li>
  *   <li><b>build</b>: ticks the crew would take, simulated with {@link CrewCursor} (no world).</li>
@@ -221,6 +223,7 @@ public final class PlanReport {
 		guarded("anchors", () -> anchors(plan, reach[0], o));
 		guarded("lamps", () -> lamps(plan, reach[0]));
 		guarded("shapes", () -> shapes(plan, o));
+		guarded("connect", () -> connect(plan, o));
 		guarded("floating", () -> floating(plan, o));
 		guarded("unsupported", () -> unsupported(plan, o));
 		if (o.ticks) {
@@ -619,14 +622,16 @@ public final class PlanReport {
 				continue;
 			}
 			BlockPos pos = p.rel();
+			// minecraft:light is invisible: counted as an emitter, never as a seen lamp or a lamp in the floor
+			boolean invisible = p.state().is(net.minecraft.world.level.block.Blocks.LIGHT);
 			boolean visible = false;
 			for (Direction d : Direction.values()) {
-				if (open(plan, pos.relative(d))) {
+				if (!invisible && open(plan, pos.relative(d))) {
 					visible = true;
 					break;
 				}
 			}
-			boolean inFloor = open(plan, pos.above()) && reach.contains(pos.above());
+			boolean inFloor = !invisible && open(plan, pos.above()) && reach.contains(pos.above());
 			int[] t = byType.computeIfAbsent(id(p.state()), k -> new int[3]);
 			t[0]++;
 			total++;
@@ -733,7 +738,7 @@ public final class PlanReport {
 		Map<String, Integer> byKind = new TreeMap<>();
 		int corners = 0;
 		JsonArray lj = new JsonArray();
-		StringBuilder sb = new StringBuilder("SHAPES (fences, walls, panes, bars, stairs whose state differs from their real neighbours)\n");
+		StringBuilder sb = new StringBuilder("SHAPES (fences, walls, panes, bars, stairs whose state differs from PlanConnect's among their real neighbours)\n");
 		for (PlanProbe.ShapeMismatch m : all) {
 			byKind.merge(kind(m.actual()), 1, Integer::sum);
 			boolean cornerMissing = kind(m.actual()).equals("stairs") ? false : sides(m.expected()) >= 2 && sides(m.actual()) < sides(m.expected());
@@ -776,6 +781,59 @@ public final class PlanReport {
 		json.add("shapes", j);
 		sections.add(sb.toString());
 		summary.put("shape mismatches", all.size() + " (" + corners + " missing corners)");
+		System.out.println("shapes: " + all.size() + " mismatches, " + corners + " missing corners");
+	}
+
+	// ------------------------------------------------------------------ connect (fix/plan-connect)
+
+	/**
+	 * Fences, walls and panes connected on no side although a neighbour they connect to
+	 * ({@link dev.t3craft.hq.PlanConnect#connectsTo}) stands beside them. Must be 0. No per-cell catch:
+	 * an exception fails the whole section, visibly.
+	 */
+	private void connect(BuildPlan plan, Options o) {
+		List<dev.t3craft.hq.PlanConnect.Isolated> all = new ArrayList<>();
+		for (dev.t3craft.hq.PlanConnect.Isolated i : dev.t3craft.hq.PlanConnect.isolated(plan)) {
+			if (in(i.pos())) {
+				all.add(i);
+			}
+		}
+		int connecting = 0;
+		for (Placement p : plan.placements()) {
+			if (in(p.rel()) && dev.t3craft.hq.PlanConnect.connecting(p.state())) {
+				connecting++;
+			}
+		}
+		StringBuilder sb = new StringBuilder("CONNECT (fences/walls/panes with no connection although a connectable neighbour is beside them)\n");
+		sb.append("  ").append(all.size()).append(" unconnected of ").append(connecting).append(" fences/walls/panes\n");
+		JsonArray lj = new JsonArray();
+		int n = 0;
+		for (dev.t3craft.hq.PlanConnect.Isolated i : all) {
+			if (n++ < o.maxList) {
+				sb.append("    ").append(c(i.pos())).append(' ').append(id(i.state())).append(" -> ").append(i.towards().getName()).append(' ')
+						.append(id(i.neighbour())).append('\n');
+			}
+			if (lj.size() < JSON_LIST) {
+				JsonObject e = new JsonObject();
+				e.add("pos", arr(i.pos().getX(), i.pos().getY(), i.pos().getZ()));
+				e.addProperty("block", id(i.state()));
+				e.addProperty("towards", i.towards().getName());
+				e.addProperty("neighbour", id(i.neighbour()));
+				lj.add(e);
+			}
+		}
+		if (all.size() > o.maxList) {
+			sb.append("    … ").append(all.size() - o.maxList).append(" more (report.json)\n");
+		}
+		JsonObject j = new JsonObject();
+		j.addProperty("unconnected", all.size());
+		j.addProperty("connecting", connecting);
+		j.add("list", lj);
+		json.add("connect", j);
+		sections.add(sb.toString());
+		summary.put("unconnected fences/walls/panes", Integer.toString(all.size()));
+		// also on stdout, so the render service's report.txt (which wraps the run output) shows it
+		System.out.println("connect: " + all.size() + " unconnected fences/walls/panes beside a connectable neighbour (of " + connecting + ")");
 	}
 
 	// ------------------------------------------------------------------ floating
@@ -783,7 +841,8 @@ public final class PlanReport {
 	private void floating(BuildPlan plan, Options o) {
 		Map<Long, BlockState> cells = new HashMap<>(plan.size() * 2);
 		for (Placement p : plan.placements()) {
-			if (!p.state().isAir()) {
+			// minecraft:light is an invisible, weightless marker that hangs in the air by design: never "floating"
+			if (!p.state().isAir() && !p.state().is(net.minecraft.world.level.block.Blocks.LIGHT)) {
 				cells.put(p.rel().asLong(), p.state());
 			}
 		}

@@ -72,7 +72,9 @@ public final class HqGenerator {
 		}
 		// feat/hq-layout-packs: the layout's pack (config/t3craft/hq-layouts) adds rooms, materials and its hash; none: as before
 		dev.t3craft.hq.pack.LayoutPack pack = dev.t3craft.hq.pack.HqLayoutPacks.pack(PackApply.layoutOf(style));
-		return PackApply.withPack(own != null ? own : spine(layout), style, pack);
+		BuildPlan plan = PackApply.withPack(own != null ? own : spine(layout), style, pack);
+		// fix/plan-connect: every layout, pack rooms included, gets its fences, walls, panes and stairs joined
+		return PlanConnect.apply(plan);
 	}
 
 	private BuildPlan spine(HqLayout layout) {

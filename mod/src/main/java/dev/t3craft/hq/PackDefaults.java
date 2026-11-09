@@ -77,8 +77,8 @@ public final class PackDefaults {
 		JsonObject params = new JsonObject();
 		JsonObject docs = new JsonObject();
 		for (LayoutParams.Spec s : LayoutParams.of(layoutId)) {
-			params.addProperty(s.key(), s.def());
-			docs.addProperty(s.key(), String.format(Locale.ROOT, "%s [%d..%d, default %d]", s.doc(), s.min(), s.max(), s.def()));
+			params.addProperty(s.key(), s.toPack(s.def()));
+			docs.addProperty(s.key(), String.format(Locale.ROOT, "%s [%s..%s, default %s]", s.doc(), s.toPack(s.min()), s.toPack(s.max()), s.toPack(s.def())));
 		}
 		o.add("params", params);
 		o.add("_params", docs);

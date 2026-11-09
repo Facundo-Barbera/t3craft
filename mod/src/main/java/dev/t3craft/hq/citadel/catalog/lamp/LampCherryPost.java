@@ -34,7 +34,6 @@ import net.minecraft.world.level.block.state.properties.BooleanProperty;
  */
 public final class LampCherryPost implements Variant {
 	private static final BlockState FENCE = b(Blocks.CHERRY_FENCE);
-	private static final BlockState COLLAR = b(Blocks.STRIPPED_CHERRY_WOOD);
 	private static final BlockState PLINTH = b(Blocks.POLISHED_DEEPSLATE_WALL);
 	private static final BlockState LANTERN = b(Blocks.LANTERN);
 
@@ -107,16 +106,20 @@ public final class LampCherryPost implements Variant {
 		}
 
 		if (!arm) {
-			// no depth for an arm: collar + standing lantern on top
+			// no depth for an arm: the fence post carries a standing lantern on top (a slim post, not a box)
 			if (top >= 2) {
-				p.set(c, cu, top - 1, cv, COLLAR);
+				p.set(c, cu, top - 1, cv, FENCE);
 			}
 			p.set(c, cu, top, cv, LANTERN);
 			return;
 		}
 
-		// --- head: collar block, arm(s) of fence, lanterns hanging under the arm tips
-		p.set(c, cu, armY, cv, COLLAR);
+		// --- head: a fence bracket whose arms connect sideways (no cube collar), arms with lanterns under their tips
+		BlockState head = FENCE.setValue(BlockStateProperties.NORTH, true);
+		if (twin) {
+			head = head.setValue(BlockStateProperties.WEST, true).setValue(BlockStateProperties.EAST, true);
+		}
+		p.set(c, cu, armY, cv, head);
 		if (armY < top) {
 			p.set(c, cu, top, cv, slab(Blocks.CHERRY_SLAB)); // light cap: the top of the gradient
 		}

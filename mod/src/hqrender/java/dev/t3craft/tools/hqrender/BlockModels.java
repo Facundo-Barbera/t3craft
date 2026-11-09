@@ -207,8 +207,8 @@ final class BlockModels {
 	// ------------------------------------------------------------------ blockstates
 
 	private List<Quad> build(BlockState state) {
-		if (state.isAir()) {
-			return List.of();
+		if (state.isAir() || state.is(net.minecraft.world.level.block.Blocks.LIGHT)) {
+			return List.of(); // minecraft:light is invisible in the game (only shown to a player holding it)
 		}
 		String id = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
 		String[] p = split(id);

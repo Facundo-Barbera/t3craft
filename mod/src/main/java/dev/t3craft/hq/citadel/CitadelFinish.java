@@ -1,20 +1,22 @@
 package dev.t3craft.hq.citadel;
 
 import static dev.t3craft.hq.citadel.CitadelCanvas.AIR;
-import static dev.t3craft.hq.citadel.CitadelCanvas.FH;
+import static dev.t3craft.hq.citadel.CitadelCanvas.DECOR;
+import static dev.t3craft.hq.citadel.CitadelCanvas.fh;
 import static dev.t3craft.hq.citadel.CitadelCanvas.HANGING;
-import static dev.t3craft.hq.citadel.CitadelCanvas.LIGHT;
 import static dev.t3craft.hq.citadel.CitadelCanvas.SOLID;
 import static dev.t3craft.hq.citadel.CitadelCanvas.col;
 import static dev.t3craft.hq.citadel.CitadelCanvas.colX;
 import static dev.t3craft.hq.citadel.CitadelCanvas.colZ;
 
+import dev.t3craft.hq.Anchor;
 import dev.t3craft.hq.Box;
 import dev.t3craft.hq.BuildPlan;
 import dev.t3craft.hq.HqGenerator;
 import dev.t3craft.hq.HqLayout;
+import dev.t3craft.hq.HqLightMap;
 import dev.t3craft.hq.Placement;
-import dev.t3craft.hq.PlanLight;
+import dev.t3craft.hq.PlanConnect;
 import dev.t3craft.hq.PlanShapes;
 import dev.t3craft.hq.RingCampusGeometry;
 import dev.t3craft.hq.RingCampusGeometry.Kind;
@@ -22,6 +24,7 @@ import dev.t3craft.hq.RingCampusGeometry.Zone;
 import dev.t3craft.hq.Workstation;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -34,12 +37,13 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.EmptyBlockGetter;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jspecify.annotations.Nullable;
 
 /**
  * The finish of the citadel: the last steps that turn the painted {@link CitadelCanvas} into a
- * {@code BuildPlan}. It paints nothing of its own design except the embedded lights; every other part
+ * {@code BuildPlan}. It paints nothing of its own design except the invisible lights; every other part
  * only reads the canvas. Pure and deterministic: same canvas in, same plan out, in the same order.
  *
  * <h2>Pieces (called by {@code RingCampusGenerator.generate} as {@link #build}, in this order)</h2>
@@ -49,16 +53,27 @@ import org.jspecify.annotations.Nullable;
  *     (and at least 5 cells above the ground, 3 on the lawn). Parameters: the canvas. Reads
  *     {@code cells}, {@code zones}; writes {@code cells}/{@code layers} with {@code AIR} on layer
  *     {@code SOLID}.</li>
- * <li>{@code PlanShapes.resolve}: connects stairs, fences, walls and panes (shared, not edited here).</li>
+ * <li>{@code PlanShapes.resolve}, then {@code PlanConnect.apply} (fix/plan-connect): connects stairs, fences,
+ *     walls and panes from the final cells, with explicit rules.</li>
  * <li>{@link #groupOf}: the construction group of each cell (see below), via {@link #lotGroup} for the
  *     cells of a lot.</li>
- * <li>{@link #light}: the light pass. It walks the cells an NPC can reach ({@link #walkable}, from
- *     {@link #SPAWN} in one-block steps, tested by {@link #standable}/{@link #noCollision}), measures
- *     each with {@link #lightAt} against {@link #MIN_LIGHT}, and where it is dark embeds a
- *     {@link CitadelCanvas#LIGHT} block ({@code PEARLESCENT_FROGLIGHT}) found by {@link #lightSpot}:
- *     the floor, under a slab, the floor beside it, then the ceiling. A cell is {@link #replaceable}
- *     only when it is a full, opaque, non-emitting block of the same group that is not a fixture and
- *     has no block-entity data.</li>
+ * <li>{@link #light}: the light pass, with the invisible vanilla block {@code minecraft:light}
+ *     ({@link CitadelCanvas#invisibleLight}, moderate levels 10 to {@value #FILL_MAX}: the visible design lamps,
+ *     all 14 or 15, stay the light one sees; see docs/feat-hq-lighting.md). It is <b>fill only</b>: it never
+ *     places a visible block. It walks the cells an NPC can reach
+ *     ({@link #walkable}, from {@link #spawn()} in one-block steps, tested by {@link #standable}/{@link #noCollision})
+ *     and lights each group <b>on its own</b>: a {@code HqLightMap} sees the group's cells as they are, the
+ *     air over its floors as air and everything else opaque (so a neighbour that comes or goes never moves a
+ *     light). The lights replace plain air cells of the same group ({@link #freeAir}: never a fixture, an
+ *     anchor or a desk's cell), in the walking cell (or at its head), as DECOR (after the solids). Two steps: a regular
+ *     lattice ({@code (x + 5z) mod 13}, a light only where it lights {@value #LATTICE_MIN_GAIN} dark cells or
+ *     more; with level {@value #FILL_MAX} in the walking cell every open cell is within 2 steps of one) and then
+ *     {@link #lightSpot} for each cell still under {@link #MIN_LIGHT} (the best free air within {@value #REACH}
+ *     blocks). Each light takes the weakest level of 10..{@value #FILL_MAX} that does what {@value #FILL_MAX} would
+ *     ({@link #weakest}). Lamps that are design
+ *     (froglights in posts, lanterns, shoji) stay and count as light. {@code minecraft:light} has no
+ *     collision and is replaceable: NPCs and builders walk through it. The survival bill does not charge it
+ *     ({@code BlockCosts}, {@code HqCost}) and {@code HqLighting} counts it as a source (no duplicated lamps).</li>
  * <li>{@link #placementOrder}: the placement order (group by {@link #GROUPS}, then layer, then y, z, x;
  *     hanging cells top-down) with copies of the block-entity data.</li>
  * <li>{@link #modules(List)}: per group, per x, the runs of consecutive z as {@code BuildPlan.Module}s.</li>
@@ -67,7 +82,7 @@ import org.jspecify.annotations.Nullable;
  * <h2>Roles and blocks</h2>
  *
  * Layers: {@code SOLID} (0), {@code DECOR} (1, after the solids), {@code HANGING} (2, top-down).
- * Blocks: {@code AIR} to clear, {@code LIGHT} (froglight) for the embedded lights. Zone kinds decide the
+ * Blocks: {@code AIR} to clear, {@code minecraft:light} (invisible) for the floor lights. Zone kinds decide the
  * group; a lot's hall column (from {@code hallCols}) and floor decide the module.
  *
  * <h2>Groups produced (the construction units)</h2>
@@ -81,15 +96,17 @@ import org.jspecify.annotations.Nullable;
  *
  * <h2>Anchors</h2>
  *
- * None are produced here; the {@code spawn} anchor is placed by the generator at {@link #SPAWN} before
+ * None are produced here; the {@code spawn} anchor is placed by the generator at {@link #spawn()} before
  * {@link #build}, and the anchors and sorted workstations of the canvas go into the plan unchanged.
  */
 public final class CitadelFinish {
 	/** Block light every walkable cell must reach (see {@link #light}). */
 	public static final int MIN_LIGHT = 10;
 
-	/** Where NPCs appear: the inner street, south, in front of the main ramp. */
-	public static final BlockPos SPAWN = new BlockPos(0, 1, 38);
+	/** Where NPCs appear: the inner street, south, in front of the main ramp ((0, 1, 38) at scale 1; was {@code SPAWN}). */
+	public static BlockPos spawn() {
+		return RingCampusGeometry.spawn();
+	}
 
 	private CitadelFinish() {
 	}
@@ -124,7 +141,7 @@ public final class CitadelFinish {
 		if (hall == null) {
 			return "lot_" + zn.lot();
 		}
-		int f = y >= FH ? 1 : 0;
+		int f = y >= fh() ? 1 : 0;
 		HqLayout.Module m = mods.get(f * RingCampusGeometry.HALLS + hall[1]);
 		if (m == null) {
 			m = mods.get((1 - f) * RingCampusGeometry.HALLS + hall[1]);
@@ -183,12 +200,13 @@ public final class CitadelFinish {
 	 * what the client's navigation reaches (it also lets an NPC "stand" on railings), so lighting
 	 * these lights every cell it really walks.
 	 */
-	private static List<BlockPos> walkable(CitadelCanvas c) {
+	static List<BlockPos> walkable(CitadelCanvas c) {
 		Set<Long> seen = new HashSet<>();
 		ArrayDeque<BlockPos> todo = new ArrayDeque<>();
-		if (standable(c, SPAWN.getX(), SPAWN.getY(), SPAWN.getZ())) {
-			seen.add(SPAWN.asLong());
-			todo.add(SPAWN);
+		BlockPos spawn = spawn();
+		if (standable(c, spawn.getX(), spawn.getY(), spawn.getZ())) {
+			seen.add(spawn.asLong());
+			todo.add(spawn);
 		}
 		while (!todo.isEmpty()) {
 			BlockPos p = todo.poll();
@@ -213,46 +231,210 @@ public final class CitadelFinish {
 		return out;
 	}
 
-	private static int lightAt(CitadelCanvas c, PlanLight l, BlockPos feet) {
-		int v = l.get(feet);
-		BlockState below = c.cells.get(feet.below().asLong());
-		if (below != null && below.getLightDampening() < 15) {
-			v = Math.min(v, l.get(feet.below()));
-		}
-		return v;
+	/** Block light the map gives a walkable cell (its feet cell: what the report measures). */
+	private static int lightAt(HqLightMap map, BlockPos feet) {
+		return map.at(feet);
 	}
 
-	private static boolean replaceable(CitadelCanvas c, long k, String group, Map<Long, String> groups) {
-		BlockState s = c.cells.get(k);
-		return s != null && !s.isAir() && s.isCollisionShapeFullBlock(EmptyBlockGetter.INSTANCE, BlockPos.of(k)) && s.getLightDampening() >= 15
-				&& s.getLightEmission() == 0 && !c.fixtures.contains(k) && !c.data.containsKey(k)
-				&& group.equals(groups.get(k));
-	}
+	/** The plan as one dense block: state and group id of every cell, so each group can be seen on its own. */
+	private static final class Dense {
+		final int minX;
+		final int minY;
+		final int minZ;
+		final int sx;
+		final int sy;
+		final int sz;
+		final BlockState[] st;
+		final int[] gid;
+		final List<String> names = new ArrayList<>();
+		/** Per group id: minX, minY, minZ, maxX, maxY, maxZ of its cells. */
+		final List<int[]> boxes = new ArrayList<>();
 
-	/** Where to embed a light for a dark walkable cell: the floor, under a slab, the floor beside it, the ceiling. */
-	private static @Nullable Long lightSpot(CitadelCanvas c, BlockPos feet, String group, Map<Long, String> groups) {
-		List<BlockPos> tries = new ArrayList<>();
-		tries.add(feet.below());
-		tries.add(feet.below(2));
-		for (Direction d : Direction.Plane.HORIZONTAL) {
-			tries.add(feet.below().relative(d));
-		}
-		for (BlockPos t : tries) {
-			if (replaceable(c, t.asLong(), group, groups)) {
-				return t.asLong();
+		Dense(CitadelCanvas c, Map<Long, String> groups) {
+			int[] b = {Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MIN_VALUE, Integer.MIN_VALUE, Integer.MIN_VALUE};
+			for (long k : c.cells.keySet()) {
+				b[0] = Math.min(b[0], BlockPos.getX(k));
+				b[1] = Math.min(b[1], BlockPos.getY(k));
+				b[2] = Math.min(b[2], BlockPos.getZ(k));
+				b[3] = Math.max(b[3], BlockPos.getX(k));
+				b[4] = Math.max(b[4], BlockPos.getY(k));
+				b[5] = Math.max(b[5], BlockPos.getZ(k));
+			}
+			minX = b[0] - 1;
+			minY = b[1] - 1;
+			minZ = b[2] - 1;
+			sx = b[3] - b[0] + 3;
+			sy = b[4] - b[1] + 3;
+			sz = b[5] - b[2] + 3;
+			st = new BlockState[sx * sy * sz];
+			gid = new int[st.length];
+			Arrays.fill(gid, -1);
+			Map<String, Integer> ids = new HashMap<>();
+			for (Map.Entry<Long, BlockState> e : c.cells.entrySet()) {
+				long k = e.getKey();
+				int x = BlockPos.getX(k);
+				int y = BlockPos.getY(k);
+				int z = BlockPos.getZ(k);
+				String g = groups.get(k);
+				Integer id = ids.get(g);
+				if (id == null) {
+					id = names.size();
+					ids.put(g, id);
+					names.add(g);
+					boxes.add(new int[] {x, y, z, x, y, z});
+				}
+				int[] bx = boxes.get(id);
+				bx[0] = Math.min(bx[0], x);
+				bx[1] = Math.min(bx[1], y);
+				bx[2] = Math.min(bx[2], z);
+				bx[3] = Math.max(bx[3], x);
+				bx[4] = Math.max(bx[4], y);
+				bx[5] = Math.max(bx[5], z);
+				int i = index(x, y, z);
+				st[i] = e.getValue();
+				gid[i] = id;
 			}
 		}
-		for (int y = feet.getY() + 2; y <= feet.getY() + 7; y++) {
-			long k = BlockPos.asLong(feet.getX(), y, feet.getZ());
-			BlockState s = c.cells.get(k);
-			if (s != null && !s.isAir()) {
-				return replaceable(c, k, group, groups) ? k : null;
+
+		int index(int x, int y, int z) {
+			int ix = x - minX;
+			int iy = y - minY;
+			int iz = z - minZ;
+			if (ix < 0 || iy < 0 || iz < 0 || ix >= sx || iy >= sy || iz >= sz) {
+				return -1;
+			}
+			return (iy * sz + iz) * sx + ix;
+		}
+
+		/**
+		 * A cell as group {@code me}'s light sees it, from the group alone (so a neighbour that comes or goes
+		 * changes nothing): its own cells as they are; the air over its own floors (up to 3
+		 * cells above it: where its people walk) as air; every other cell opaque.
+		 */
+		@Nullable BlockState view(int me, int x, int y, int z) {
+			int i = index(x, y, z);
+			if (i >= 0 && gid[i] == me) {
+				return st[i];
+			}
+			BlockState s = i < 0 ? null : st[i];
+			if (s == null || s.isAir() && s.getLightEmission() == 0) {
+				for (int h = 1; h <= AIRSPACE; h++) {
+					int b = index(x, y - h, z);
+					if (b >= 0 && gid[b] == me && st[b] != null && !st[b].isAir()) {
+						return null;
+					}
+				}
+			}
+			return OPAQUE;
+		}
+	}
+
+	/** How far above a group's own blocks its light sees air (feet, head and one more). */
+	private static final int AIRSPACE = 3;
+	/** What a cell of another group is to a group's light: opaque. */
+	private static final BlockState OPAQUE = Blocks.STONE.defaultBlockState();
+	/**
+	 * Strongest invisible fill (citadel/light-aesthetic): moderate, under the visible design lamps (lanterns,
+	 * shroomlights, campfires: 15), so the eye still reads where the light comes from.
+	 */
+	static final int FILL_MAX = 12;
+	/** Levels of the invisible lights, weakest first: the weakest that lights what {@link #FILL_MAX} would is used. */
+	private static final int[] LEVELS = {10, 11, FILL_MAX};
+	/** Period of the preferred lattice of lights: {@code (x + 5z) mod 13} tiles the plane with radius-2 diamonds (a level-12 light in the cell itself reaches 10 at 2). */
+	private static final int LATTICE = 13;
+	/** A lattice light is placed only where it lights at least this many dark cells (the stragglers are lit one by one). */
+	private static final int LATTICE_MIN_GAIN = 4;
+	/** How far from a dark cell (blocks on the plane) a light may stand to light it. */
+	private static final int REACH = 4;
+
+	/** The reserved cells no light may take: fixtures, and the cells an NPC works or waits in. */
+	static Set<Long> reserved(CitadelCanvas c) {
+		Set<Long> out = new HashSet<>(c.fixtures);
+		for (Anchor a : c.anchors.values()) {
+			for (int h = 0; h <= 2; h++) {
+				out.add(a.block().above(h).asLong());
+			}
+		}
+		for (Workstation w : c.workstations) {
+			for (int h = 0; h <= 2; h++) {
+				out.add(w.deskAnchor().block().above(h).asLong());
+			}
+		}
+		return out;
+	}
+
+	/** A cell a light may take: plain air of the group itself, not reserved. */
+	private static boolean freeAir(CitadelCanvas c, long k, String group, Map<Long, String> groups, Set<Long> reserved) {
+		BlockState s = c.cells.get(k);
+		return s != null && s.getBlock() == Blocks.AIR && group.equals(groups.get(k)) && !reserved.contains(k);
+	}
+
+	/** The chosen place and level of one light. */
+	private record Spot(BlockPos pos, int level, int gain) {
+	}
+
+	/** The weakest level in {@link #LEVELS} that does what {@link #FILL_MAX} does at {@code pos} (gain and, when given, the cell {@code must}). */
+	private static Spot weakest(HqLightMap map, BlockPos pos, int gain15, java.util.function.LongPredicate counts, @Nullable BlockPos must) {
+		for (int level : LEVELS) {
+			int g = must == null ? map.gainOf(pos, CitadelCanvas.invisibleLight(level), counts)
+					: map.gainOf(pos, CitadelCanvas.invisibleLight(level), counts, must, MIN_LIGHT);
+			if (g >= gain15) {
+				return new Spot(pos, level, g);
+			}
+		}
+		return new Spot(pos, FILL_MAX, gain15);
+	}
+
+	/**
+	 * Where to hang a light for a dark walkable cell {@code feet}: the air of the cell itself first, then its head, then the other
+	 * air within {@value #REACH} blocks that lights it and the most other dark cells. Null when no free air does.
+	 */
+	private static @Nullable Spot lightSpot(CitadelCanvas c, HqLightMap map, BlockPos feet, String group, Map<Long, String> groups,
+			Set<Long> reserved, java.util.function.LongPredicate counts) {
+		BlockState top = CitadelCanvas.invisibleLight(FILL_MAX);
+		for (int r = 0; r <= REACH; r++) {
+			BlockPos best = null;
+			int bestGain = 0;
+			for (int dy : new int[] {0, 1, 2}) {
+				for (int dz = -r; dz <= r; dz++) {
+					int dx = r - Math.abs(dz);
+					for (int sgn = -1; sgn <= 1; sgn += 2) {
+						if (dx == 0 && sgn == 1) {
+							continue;
+						}
+						BlockPos k = feet.offset(sgn * dx, dy, dz);
+						if (!freeAir(c, k.asLong(), group, groups, reserved)) {
+							continue;
+						}
+						int g = map.gainOf(k, top, counts, feet, MIN_LIGHT);
+						if (g > bestGain) {
+							best = k;
+							bestGain = g;
+						}
+					}
+				}
+			}
+			if (best != null) {
+				return weakest(map, best, bestGain, counts, feet);
 			}
 		}
 		return null;
 	}
 
-	/** Lights every walkable cell (see the class comment) from its own group's lights. */
+	private static void hang(CitadelCanvas c, HqLightMap map, Dense d, Spot s) {
+		BlockState light = CitadelCanvas.invisibleLight(s.level());
+		c.put(s.pos().getX(), s.pos().getY(), s.pos().getZ(), light, DECOR);
+		d.st[d.index(s.pos().getX(), s.pos().getY(), s.pos().getZ())] = light;
+		map.addLamp(s.pos(), light);
+	}
+
+	/**
+	 * Lights every walkable cell (see the class comment) from its own group's lights, with invisible
+	 * {@code minecraft:light} blocks hung in the air of the group: first on a regular lattice (where it
+	 * lights {@value #LATTICE_MIN_GAIN} dark cells or more), then one by one for what is still dark. This is
+	 * the fill under the design lamps ({@link CitadelAmbience}, the halls, the hub): it never places a visible
+	 * block and never goes above {@link #FILL_MAX}.
+	 */
 	private static void light(CitadelCanvas c, Map<Long, String> groups) {
 		TreeMap<String, List<BlockPos>> byGroup = new TreeMap<>();
 		for (BlockPos p : walkable(c)) {
@@ -263,28 +445,43 @@ public final class CitadelFinish {
 			}
 			byGroup.computeIfAbsent(g, x -> new ArrayList<>()).add(p);
 		}
-		Map<String, List<Long>> emitters = new HashMap<>();
-		for (Map.Entry<Long, BlockState> e : c.cells.entrySet()) {
-			if (e.getValue().getLightEmission() > 0) {
-				emitters.computeIfAbsent(groups.get(e.getKey()), x -> new ArrayList<>()).add(e.getKey());
-			}
-		}
+		Dense d = new Dense(c, groups);
+		Set<Long> reserved = reserved(c);
+		BlockState top = CitadelCanvas.invisibleLight(FILL_MAX);
 		for (Map.Entry<String, List<BlockPos>> e : byGroup.entrySet()) {
 			String g = e.getKey();
-			PlanLight l = new PlanLight(c.cells::get);
-			for (long k : emitters.getOrDefault(g, List.of())) {
-				l.add(k, c.cells.get(k).getLightEmission());
+			List<BlockPos> walk = e.getValue();
+			int me = d.names.indexOf(g);
+			int[] b = d.boxes.get(me);
+			HqLightMap map = HqLightMap.ofCells(new Box(b[0], b[1], b[2], b[3], b[4] + AIRSPACE, b[5]), 1, (x, y, z) -> d.view(me, x, y, z));
+			Set<Long> keys = new HashSet<>();
+			for (BlockPos p : walk) {
+				keys.add(p.asLong());
 			}
-			l.run();
-			for (BlockPos p : e.getValue()) {
-				if (lightAt(c, l, p) >= MIN_LIGHT) {
+			java.util.function.LongPredicate counts = keys::contains;
+			for (BlockPos p : walk) {
+				if (Math.floorMod(p.getX() + 5 * p.getZ(), LATTICE) != 0) {
 					continue;
 				}
-				Long spot = lightSpot(c, p, g, groups);
-				if (spot != null) {
-					c.cells.put(spot, LIGHT);
-					l.add(spot, LIGHT.getLightEmission());
-					l.run();
+				for (int dy = 0; dy <= 1; dy++) {
+					BlockPos k = p.above(dy);
+					if (!freeAir(c, k.asLong(), g, groups, reserved)) {
+						continue;
+					}
+					int gain = map.gainOf(k, top, counts);
+					if (gain >= LATTICE_MIN_GAIN) {
+						hang(c, map, d, weakest(map, k, gain, counts, null));
+					}
+					break;
+				}
+			}
+			for (BlockPos p : walk) {
+				if (lightAt(map, p) >= MIN_LIGHT) {
+					continue;
+				}
+				Spot s = lightSpot(c, map, p, g, groups, reserved, counts);
+				if (s != null) {
+					hang(c, map, d, s);
 				}
 			}
 		}
@@ -377,7 +574,10 @@ public final class CitadelFinish {
 	/** Turns the painted canvas into the plan: air, shapes, groups, light pass, placements, modules. */
 	public static BuildPlan build(CitadelCanvas c) {
 		fillAir(c);
+		CitadelAmbience.lights(c);
 		PlanShapes.resolve(c.cells);
+		// fix/plan-connect: the explicit, world-free connection pass on the final cells (what resolve misses)
+		PlanConnect.apply(c.cells);
 		Map<Long, String> groups = new HashMap<>(c.cells.size() * 2);
 		for (long k : c.cells.keySet()) {
 			BlockPos p = BlockPos.of(k);

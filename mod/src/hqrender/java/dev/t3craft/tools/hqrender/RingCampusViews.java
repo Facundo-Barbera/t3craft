@@ -51,6 +51,9 @@ final class RingCampusViews {
 					r.plan().workstations().size(), r.plan().size(), r.plan().footprint());
 		}
 		double mul = scaleMul / 1.6;
+		// citadel/scale: the close-up clips follow the plan's scale (the zoom shrinks so they keep their size on the page)
+		RingCampusGeometry.Dims gd = RingCampusGeometry.dims();
+		double zk = mul / gd.k;
 		for (int i = 0; i < sizes.size(); i++) {
 			int n = sizes.get(i);
 			BuildPlan plan = plans.get(i);
@@ -66,9 +69,10 @@ final class RingCampusViews {
 					new Renderer.Clip(all.minX(), -4, all.minZ(), all.maxX(), 7, all.maxZ()), new Renderer.Camera(0, 90, Math.min(3.6, 1500.0 / w) * mul), ss,
 					npcs, only);
 			view(models, plan, out, tag + "_hub", "Hub: basilica nave, board, kanban wall, big screen (cut at y=13), " + n + " projects",
-					new Renderer.Clip(-15, -1, -15, 15, 13, 15), new Renderer.Camera(25, 52, 16 * mul), ss, npcs, only);
+					new Renderer.Clip(-gd.s(15), -1, -gd.s(15), gd.s(15), gd.sy(13), gd.s(15)), new Renderer.Camera(25, 52, 16 * zk), ss, npcs, only);
 			view(models, plan, out, tag + "_hub_section", "Hub section at z=0 looking north: nave vault 12 to 17, aisles, sunken patio",
-					new Renderer.Clip(-30, -2, -30, 30, 24, 0), new Renderer.Camera(0, 8, 11 * mul), ss, npcs, only);
+					new Renderer.Clip(-gd.s(30), -2, -gd.s(30), gd.s(30), Math.max(24, gd.s(5) + gd.podium + gd.sy(12) + 3), 0), new Renderer.Camera(0, 8, 11 * zk), ss,
+					npcs, only);
 			// the barrio with the most modules (ties: the lowest lot)
 			int best = -1;
 			int most = 0;
@@ -84,14 +88,14 @@ final class RingCampusViews {
 				Box b = RingCampusGeometry.lotBounds(best);
 				Renderer.Clip lotClip = new Renderer.Clip(b.minX() - 2, -1, b.minZ() - 2, b.maxX() + 2, b.maxY(), b.maxZ() + 2);
 				view(models, plan, out, tag + "_barrio", "Barrio " + best + " (" + most + " modules: gatehouse, halls, courtyard), " + n + " projects", lotClip,
-						new Renderer.Camera(210, 34, 12 * mul), ss, npcs, only);
+						new Renderer.Camera(210, 34, 12 * zk), ss, npcs, only);
 				view(models, plan, out, tag + "_barrio_cut", "Barrio " + best + " cut at y=5, " + n + " projects",
-						new Renderer.Clip(lotClip.minX(), -1, lotClip.minZ(), lotClip.maxX(), 5, lotClip.maxZ()), new Renderer.Camera(200, 58, 12 * mul), ss, npcs,
+						new Renderer.Clip(lotClip.minX(), -1, lotClip.minZ(), lotClip.maxX(), 5, lotClip.maxZ()), new Renderer.Camera(200, 58, 12 * zk), ss, npcs,
 						only);
 				Box h = hallBox(plan, best * RingCampusGeometry.LOT_STRIDE);
 				if (h != null) {
 					view(models, plan, out, tag + "_hall", "Work hall: 6 standing desks with 3x2 screens (cut at y=5), " + n + " projects",
-							new Renderer.Clip(h.minX() - 1, -1, h.minZ() - 1, h.maxX() + 1, 5, h.maxZ() + 1), new Renderer.Camera(160, 55, 24 * mul), ss, npcs, only);
+							new Renderer.Clip(h.minX() - 1, -1, h.minZ() - 1, h.maxX() + 1, 5, h.maxZ() + 1), new Renderer.Camera(160, 55, 24 * zk), ss, npcs, only);
 				}
 				if (i == sizes.size() - 1) {
 					for (HqLayout.Module m : l.modules()) {
@@ -99,7 +103,7 @@ final class RingCampusViews {
 							Box u = hallBox(plan, m.index());
 							if (u != null) {
 								view(models, plan, out, tag + "_upper", "Upper floor of a hall, stairs up the centre line (cut at y=11)",
-										new Renderer.Clip(u.minX() - 1, -1, u.minZ() - 1, u.maxX() + 1, 11, u.maxZ() + 1), new Renderer.Camera(160, 50, 22 * mul), ss,
+										new Renderer.Clip(u.minX() - 1, -1, u.minZ() - 1, u.maxX() + 1, gd.floorH + 5, u.maxZ() + 1), new Renderer.Camera(160, 50, 22 * zk), ss,
 										npcs, only);
 							}
 							break;
@@ -118,13 +122,15 @@ final class RingCampusViews {
 				case 2 -> "Scheduled-tasks rotunda (cut at y=7)";
 				default -> "Archive cloister with the terminal (cut at y=5)";
 			};
-			int cut = k == 0 ? 9 : k == 2 ? 7 : 5;
-			view(models, plan, out, tag + "_special", what + ", " + n + " projects", new Renderer.Clip(c[0] - 10, -4, c[1] - 10, c[0] + 10, cut, c[1] + 10),
-					new Renderer.Camera(35, 52, 16 * mul), ss, npcs, only);
+			int cut = gd.sy(k == 0 ? 9 : k == 2 ? 7 : 5);
+			int rc = gd.s(10);
+			view(models, plan, out, tag + "_special", what + ", " + n + " projects", new Renderer.Clip(c[0] - rc, -1 - gd.sy(3), c[1] - rc, c[0] + rc, cut, c[1] + rc),
+					new Renderer.Camera(35, 52, 16 * zk), ss, npcs, only);
 			if (i == sizes.size() - 1) {
 				int[] lo = RingCampusGeometry.nodeCentre(6);
-				view(models, plan, out, tag + "_lounge", "Lounge: sunken patio on the west node", new Renderer.Clip(lo[0] - 10, -4, lo[1] - 10, lo[0] + 10, 6, lo[1] + 10),
-						new Renderer.Camera(60, 45, 16 * mul), ss, npcs, only);
+				int rl = gd.s(10);
+				view(models, plan, out, tag + "_lounge", "Lounge: sunken patio on the west node", new Renderer.Clip(lo[0] - rl, -1 - gd.sy(3), lo[1] - rl, lo[0] + rl, 6, lo[1] + rl),
+						new Renderer.Camera(60, 45, 16 * zk), ss, npcs, only);
 			}
 			if (only.isEmpty() || only.stream().anyMatch((tag + "_light")::contains)) {
 				BufferedImage heat = heatmap(plan, fp, 3);

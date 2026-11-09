@@ -36,8 +36,6 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.AIR;
 import static dev.t3craft.hq.citadel.CitadelCanvas.SOLID;
 import static dev.t3craft.hq.citadel.CitadelCanvas.DECOR;
 import static dev.t3craft.hq.citadel.CitadelCanvas.HANGING;
-import static dev.t3craft.hq.citadel.CitadelCanvas.Y0;
-import static dev.t3craft.hq.citadel.CitadelCanvas.FH;
 import static dev.t3craft.hq.citadel.CitadelCanvas.FOOT;
 import static dev.t3craft.hq.citadel.CitadelCanvas.BAMBOO;
 import static dev.t3craft.hq.citadel.CitadelCanvas.CALCITE;
@@ -119,6 +117,7 @@ final class RingCampusGenerator {
 		for (int k = 0; k < 8; k++) {
 			dev.t3craft.hq.citadel.CitadelNodes.node(canvas, RingCampusGeometry.node(k));
 		}
+		dev.t3craft.hq.citadel.CitadelOffice.office(canvas);
 		int lotCount = RingCampusGeometry.base(canvas.rings + 1);
 		for (int lot = 0; lot < lotCount; lot++) {
 			TreeMap<Integer, HqLayout.Module> mods = canvas.lots.get(lot);
@@ -128,7 +127,10 @@ final class RingCampusGenerator {
 				CitadelBarrios.barrio(canvas, lot, mods);
 			}
 		}
-		canvas.anchor(Anchor.at(AnchorNames.SPAWN, CitadelFinish.SPAWN, Direction.NORTH));
+		if (dev.t3craft.hq.citadel.CitadelPlacement.enabled()) {
+			dev.t3craft.hq.citadel.CitadelPlacement.city(canvas);
+		}
+		canvas.anchor(Anchor.at(AnchorNames.SPAWN, CitadelFinish.spawn(), Direction.NORTH));
 		return CitadelFinish.build(canvas);
 	}
 }
