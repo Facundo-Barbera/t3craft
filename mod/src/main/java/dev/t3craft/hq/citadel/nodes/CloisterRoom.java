@@ -614,7 +614,7 @@ public final class CloisterRoom {
 				q.set(dx, base + 3, dz, b(Blocks.STONE_BRICKS));
 				if (Math.max(Math.abs(dx), Math.abs(dz)) == H) {
 					// only the outer layer carries the lantern
-					q.put(dx, base + 4, dz, Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, false), DECOR);
+					q.put(dx, base + 4, dz, copperLantern(), DECOR);
 				}
 			}
 		}
@@ -644,7 +644,12 @@ public final class CloisterRoom {
 		gateTop(q, dx, dz, ns, aa);
 	}
 
-	/** A corner tower, 3 x 3 (|dx|, |dz| in 12..14): calcite on a dark base, a stripped-cherry corner, slits, a stair cap, a gold finial. */
+	/** A standing copper lantern, for the finials. */
+	private static BlockState copperLantern() {
+		return Blocks.COPPER_LANTERN.waxed().unaffected().defaultBlockState().setValue(BlockStateProperties.HANGING, false);
+	}
+
+	/** A corner tower, 3 x 3 (|dx|, |dz| in 12..14): calcite on a dark base, a stripped-cherry corner, slits, a stair cap, a copper finial with a lantern. */
 	private static void turret(Q q, int dx, int dz) {
 		int sx = dx < 0 ? -1 : 1;
 		int sz = dz < 0 ? -1 : 1;
@@ -674,8 +679,8 @@ public final class CloisterRoom {
 		if (du == 0 && dv == 0) {
 			// the finial: a calcite drum, a verdigris copper cap, a standing lantern and a rod
 			q.set(dx, body + 1, dz, CALCITE);
-			q.set(dx, body + 2, dz, b(Blocks.OXIDIZED_CUT_COPPER));
-			q.put(dx, body + 3, dz, Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, false), DECOR);
+			q.set(dx, body + 2, dz, Blocks.CUT_COPPER.waxed().unaffected().defaultBlockState());
+			q.put(dx, body + 3, dz, copperLantern(), DECOR);
 			q.set(dx, body + 4, dz, NodeDecor.ROD);
 		} else {
 			Direction toCentre = du != 0 ? (du > 0 ? Direction.WEST : Direction.EAST) : (dv > 0 ? Direction.NORTH : Direction.SOUTH);
