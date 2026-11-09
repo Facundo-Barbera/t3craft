@@ -923,7 +923,7 @@ public final class CitadelOffice {
 		// pink border; the player stands on the frame's south edge (the OFFICE anchor) facing south
 		for (int dx = -2; dx <= 2; dx++) {
 			for (int dz = -2; dz <= 0; dz++) {
-				boolean edge = Math.abs(dx) == 2 || dz == -2 || dz == 0;
+				boolean edge = Math.abs(dx) == 2 || dz == -2;
 				set(c, dx, y, dz, carpet(edge ? RUG_EDGE : RUG));
 			}
 		}
