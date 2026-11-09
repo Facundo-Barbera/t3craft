@@ -10,6 +10,7 @@ One line per structural commit on `main`, newest first:
 
 ## Entries
 
+- 2026-11-09 kit/status-lamp RESTART — status_lamp: nuevo modelo de farol por estado (silueta + glifo + lente emisiva por elemento), texturas animadas (.mcmeta) para working/attention/error, textura base `status_lamp_base`; `T3Blocks.lampProps` con `noOcclusion` (clase kernel `dev.t3craft.blocks`); herramientas `--lamps`/`--lamp-demo` en hqrender y `tools/art/status_lamp_art.py`.
 - 2026-11-09 chore/agents-8-sonnet RELOAD — docs only: at most 8 child agents at once, all on Sonnet (medium/high); only the coordinator at xhigh (T3 was slowing down).
 - 2026-11-09 kit/cherry-railing RESTART — cherry_railing becomes a connected railing (new KitRailingBlock; new block states front/left/right on top of facing): continuous handrail, posts only at run ends and turns, closed corners and bridged one-cell steps, resolved in the world (placement, neighbour updates, diagonals) and in plans (PlanConnect); placed on the edge the player looks at; new multipart models and kit_railing_post texture, darker stained-cherry kit_railing; kit id kit-1 → kit-2 (build hashes change). Touches the render daemon kernel (dev.t3craft.blocks): restart the PC daemon before rendering it.
 - 2026-11-09 chore/agents-20 RELOAD — docs/scripts: up to 20 code-only child agents (heavy-process limits unchanged); start-daemon.sh keeps gradle from inheriting the heavy lock (a stale gradle daemon was blocking the next start).
