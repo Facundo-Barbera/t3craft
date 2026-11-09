@@ -18,6 +18,13 @@ public final class AnchorNames {
 	/** Prefix of the board's header lamps ({@code board_lamp_0..}) left to right as seen from the front. */
 	public static final String BOARD_LAMP = "board_lamp_";
 	/**
+	 * Prefix of the decision podiums ({@code decision_podium_0..}; not {@code podium_*}, the tower plan names modules that): a surface anchor on the podium block, facing = where its front
+	 * looks (where the player stands). Podium {@code i} is bound {@code board:<i>} (the i-th most urgent thread that needs
+	 * the player, like {@link #BOARD_LAMP} {@code i}); a click opens that thread. The plan puts a lectern in the cell: the
+	 * blocks module swaps it for {@code t3craft:decision_podium}, without the module it stays a lectern.
+	 */
+	public static final String PODIUM = "decision_podium_";
+	/**
 	 * Optional: the thread wall (kanban of threads, {@code t3craft:thread_board} of the blocks
 	 * module). {@code block} = the wall's <b>bottom-left cell as seen from the front</b>; {@code facing}
 	 * = the outward normal of the wall face (where the viewer stands). The plan must put a solid block
@@ -143,7 +150,7 @@ public final class AnchorNames {
 	 * slots and signs, the beacon) that only mark a block face.
 	 */
 	public static boolean standing(String name) {
-		if (name.equals(BOARD) || name.startsWith(BOARD_LAMP) || name.startsWith("monitor_") || name.startsWith("lamp_")
+		if (name.equals(BOARD) || name.startsWith(BOARD_LAMP) || name.startsWith(PODIUM) || name.startsWith("monitor_") || name.startsWith("lamp_")
 				|| name.startsWith("screen@") || name.startsWith("archive_") || name.startsWith(SHELF_SLOT) || name.equals(SHELF_MORE)
 				|| name.equals(SHELF_HEADER) || name.equals(BEACON) || name.startsWith(BIG_SCREEN) || name.equals(THREAD_WALL) || name.equals(THREAD_WALL_END)
 				|| name.equals(HOLOGRAM)) {
@@ -191,6 +198,11 @@ public final class AnchorNames {
 
 	public static String boardLamp(int i) {
 		return BOARD_LAMP + i;
+	}
+
+	/** Decision podium {@code i} ({@link #PODIUM}). */
+	public static String podium(int i) {
+		return PODIUM + i;
 	}
 
 	public static String boardSlot(int i) {

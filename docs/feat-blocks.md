@@ -16,6 +16,7 @@ queda exactamente como sin él.
 | `t3craft:status_lamp` | `t3craft:status_lamp` (`LampBlockEntity`) | Lámpara del escritorio: color y luz según el estado del hilo. |
 | `t3craft:archive_terminal` | `t3craft:archive_terminal` (`ArchiveTerminalBlockEntity`) | Consola de archivo (feat/archive-terminal): la pantalla muestra "ARCHIVE · N hilos" y los últimos 3; click → pantalla de archivo. En el HQ, en el anchor `archiveTerminal`. Ver `docs/feat-archive-terminal.md`. |
 | `t3craft:board_lamp` | el mismo tipo `t3craft:status_lamp` | Variante "bombilla del tablero": la i-ésima bombilla muestra el i-ésimo hilo que necesita al jugador (errores primero, luego "needs you"). |
+| `t3craft:decision_podium` | `t3craft:decision_podium` (`LampBlockEntity`, sin renderer) | Podio de decisiones (kit/decision-podium): atril con campana y pantalla, vinculado `board:<i>` como una bombilla del tablero. Muestra el i-ésimo hilo que necesita al jugador (errores primero, luego "needs you"); modelo y luz por `status`; click → abre ese hilo. Ver sección "Podio de decisiones". |
 | `t3craft:thread_board` | `t3craft:thread_board` (`ThreadBoardBlockEntity`) | Ancla de la pared kanban de hilos (P3): el BER dibuja una pared de `width × height` bloques desde la celda inferior izquierda. Click en una tarjeta → chat del hilo. Ver `docs/feat-thread-wall.md`. |
 
 Ítems de bloque con el mismo id, en la pestaña propia **T3Craft** (`dev.t3craft.T3CraftTab`, única
@@ -316,6 +317,32 @@ aplica en:
 celdas no cambian, así que NPCs, workstations y diffs del HQ ven el mismo plan. Con los bloques el
 fingerprint del plan cambia (si alguien versiona el plan del demo, sube la versión).
 
+## Terminal de consola (kit/console-terminal)
+
+`t3craft:console_terminal`: escritorio de mando con teclado inclinado (una cuña a -22,5° como la tapa del
+atril) y una pantalla pequeña emisiva con un prompt `> _` en turquesa T3 (cursor ámbar, línea de estado),
+más dos LED encima. Pizarra de acero con luz propia (6) y pantalla/LED con `light_emission` 15.
+La idea (una consola que abre la línea de comandos) es de AgentCraft (MIT); código, modelo y texturas son
+nuestros (`tools/art/console_terminal_art.py` genera las seis texturas y el modelo, solo biblioteca estándar).
+
+- **Click** (consumido en ambos lados, como el monitor; agáchate para colocar bloques contra él):
+  abre el compositor de T3 sobre un **borrador de hilo nuevo** (`ChatScreens.create(null).withDraft(null, null)`,
+  lo mismo que el "+" de `NewThreadScreen`); si está vinculado a un hilo (`thread:<env>:<id>`), abre el chat de ese
+  hilo (`openThread`, igual que el monitor). Cualquier otro vínculo se trata como sin vincular.
+- **Vínculo**: `ConsoleTerminalBlockEntity extends BoundBlockEntity`, así que `/t3craft blocks link <hilo>` y
+  `unlink` funcionan mirando el bloque, y `binding` se guarda con el mundo. Sin renderer propio.
+- **Código**: patrón de `ArchiveTerminalBlock` (`facing`, formas por orientación, hook estático `clientUse` que fija
+  `BlocksClient` con `ConsoleTerminalBlock.setClientUse(this::useConsole)`), con el binding del monitor.
+- **HQ**: rol `HqKit.Role.CONSOLE` (orientado: frente = donde se para el jugador), `HqKit#console(Direction)`;
+  fallback vanilla: atril. `HqBlockFixtures.States#consoleTerminal(Direction)` para quien coloque por fixtures
+  (por defecto atril). `KitBlocks` lo mapea (`ROLE_BLOCKS`) sin añadirlo a `IDS`: lo registra `T3Blocks.init`
+  con su propio block entity y lo suma al mapa del kit. La oficina de mando (`CitadelOffice`) pone tres en la sala
+  de control, donde estaban los atriles.
+- **Datos**: blockstate (4 `facing`), modelo, 6 texturas, ítem, loot table, receta barata
+  (panel de vidrio, 2 botones de piedra, redstone, 3 lingotes de hierro), tag `mineable/pickaxe`, lang en `en_us`,
+  `es_es` y `es_mx`.
+- **RESTART** (registro nuevo, clases kernel `dev.t3craft.blocks.*` y `HqKit`).
+
 ## Cómo añadir un bloque nuevo
 
 1. **Bloque** en `dev.t3craft.blocks` (si muestra estado: `extends BaseEntityBlock`, recibe un
@@ -337,13 +364,33 @@ fingerprint del plan cambia (si alguien versiona el plan del demo, sube la versi
 7. **Tests**: lógica pura + que con el módulo apagado siga sin registrarse nada.
 8. **CHANGELOG-dev**: es **RESTART** (registros).
 
+## Podio de decisiones (kit/decision-podium)
+
+Idea de AgentCraft (`decision_podium`: un podio donde espera el agente que necesita una decisión, con campana y `!`), implementada
+desde cero: modelo, texturas (`tools/art/decision_podium_art.py`) y código son nuestros; no se copió nada (ver `THIRD_PARTY_NOTICES.md`).
+
+- **Bloque** `t3craft:decision_podium` (`DecisionPodiumBlock`): `facing` + `status` (la **misma** propiedad que `StatusLampBlock.STATUS`, así
+  `LampApplier` lo maneja sin código nuevo). Luz = `LampStatus.light`. Block entity: `LampBlockEntity` con tipo propio
+  `t3craft:decision_podium` (entra en `LiveLamps`; sin `LampRenderer`, que dibuja un halo sobre un cubo entero).
+- **Vinculación:** `board:<i>`, como `board_lamp`. En el HQ, el ancla `decision_podium_<i>` (`AnchorNames.podium(i)`, ancla de superficie: no
+  se para nadie en ella) da `HqBindings.Role.PODIUM` con `Binding.board(i)`; `HqBlockFixtures` cambia la celda del plan por el podio
+  (`States.podium(facing)`; sin el módulo queda lo que puso el plan: un atril vanilla).
+- **Qué muestra** (`LampSignals`): el i-ésimo de `LampSignals.urgent` (errores primero, luego "needs you"; empates por clave): el mismo hilo que
+  la bombilla `board:<i>`. Pantalla de 14×6 px por estado: `off` vidrio oscuro; `idle` pausa gris; `working` barra cian que corre (animada);
+  `done` palomita verde; `attention` tres `!` naranjas que parpadean lento; `error` X roja que parpadea rápido. En `attention` y `error`
+  además dos marcas luminosas flanquean la campana ("está sonando") para que se lea de lejos aunque no se vea la pantalla.
+- **Click** (cliente, `BlocksClient.usePodium`): abre el hilo (`openThread`, el mismo `ThreadOpener` de los monitores) para responder su pregunta o
+  permiso pendiente; si nadie espera, una línea de chat (`t3craft.podium.nobody`). Consumido en ambos lados; agachado se pueden poner bloques.
+- **Receta:** 1 lingote de oro + 1 atril + 1 redstone (en vertical). Se rompe con hacha y se suelta a sí mismo.
+- **Oficina** (`CitadelOffice.control`): cinco podios (`decision_podium_0..4`, `board:0..4`) bajo la pantalla de hilos, de cara al norte; las
+  bombillas de la pared del este siguen mostrando los rangos 6 a 10.
+- **Qué no hace:** los NPC que esperan siguen juntándose en el tablero del hub (`board_slot_*`, que `HqAnchorSource` lee de 0 en adelante y que
+  son del hub); la oficina no suma `board_slot_*` propios. Allow/Deny directos (sin abrir el chat) quedan para cuando el mod deje de ser solo lectura.
+- **Sin módulo:** el atril vanilla del plan (sin campana). El ancla sigue en el plan, inocua.
+
 ## Esqueleto para después (no está en esta rama)
 
-- **Podio de decisiones** (`t3craft:decision_podium`): depende de la pantalla "Needs you" (inventario
-  ítem 4). Bloque con `facing` + `BoundBlockEntity` con binding nuevo `decisions` (o
-  `decisions:<env>`); `HqBindings` lo pondría frente al tablero del hub (ancla nueva en hq-design,
-  p. ej. `podium`). Click → abre "Needs you". Luz: `attention` si hay pending requests. Botones
-  Allow/Deny deshabilitados mientras el mod sea solo lectura.
+- ~~Podio de decisiones~~: hecho en kit/decision-podium (sección de arriba, versión `board:<i>`). La variante con un binding `decisions` y botones Allow/Deny queda pendiente de la pantalla "Needs you".
 - **Tablero de tareas** (`t3craft:task_board`): depende de las tareas programadas (ítem 15,
   `scheduledTasks.subscribe`, que debe ir por `T3Connection`, no por un socket propio). Panel con
   renderer como el monitor, binding `tasks` o `tasks:<env>`; layout puro (lista de próximas
@@ -452,7 +499,7 @@ blockstates → modelos → texturas propias `kit_*`, ítems y loot tables).
 
 ## Cambios estructurales → **RESTART**
 
-- Bloques: `t3craft:monitor`, `t3craft:status_lamp`, `t3craft:board_lamp` y el kit del HQ
+- Bloques: `t3craft:monitor`, `t3craft:status_lamp`, `t3craft:board_lamp`, `t3craft:decision_podium` y el kit del HQ
   (`standing_desk`, `shoji_panel`, `cherry_floor_tile`, `stone_floor_tile`, `cherry_beam`, `beam_cap`,
   `paper_lantern`, `room_plaque`, `cherry_railing`, `cherry_planter`, `stone_lantern`).
 - Block entities: `t3craft:monitor`, `t3craft:status_lamp` (lámpara y bombilla).

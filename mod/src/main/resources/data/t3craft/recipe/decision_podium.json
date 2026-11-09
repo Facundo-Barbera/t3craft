@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": [
+    "G",
+    "L",
+    "R"
+  ],
+  "key": {
+    "G": "minecraft:gold_ingot",
+    "L": "minecraft:lectern",
+    "R": "minecraft:redstone"
+  },
+  "result": {
+    "id": "t3craft:decision_podium"
+  }
+}
