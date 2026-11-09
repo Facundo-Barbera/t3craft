@@ -451,11 +451,17 @@ public final class GateArchBattlement implements Variant {
 						continue;
 					}
 					boolean corner = eu && ev;
-					boolean beside = !corner && ((ev && tw >= 4 && (u == u0 + 1 || u == u1 - 1)) || (eu && (v == 1 || v == d - 2)));
+					// long and short: the corner column is trim all the way up, the cells beside it alternate between the faces by course
+					int bs = 0; // 0 none, 1 trim on even courses, 2 trim on odd courses
+					if (!corner && ev && tw >= 4 && (u == u0 + 1 || u == u1 - 1)) {
+						bs = 1;
+					} else if (!corner && eu && v == 1) {
+						bs = 2;
+					} else if (!corner && eu && v == d - 2) {
+						bs = 1;
+					}
 					for (int y = 2; y <= 10; y++) {
-						if (y == 5 || y == 8) {
-							set(u, y, v, m.trim);
-						} else if (corner ? y % 2 == 0 : beside && y % 2 == 1) {
+						if (y == 5 || y == 8 || corner || (bs == 1 && y % 2 == 0) || (bs == 2 && y % 2 == 1)) {
 							set(u, y, v, m.trim);
 						}
 					}
