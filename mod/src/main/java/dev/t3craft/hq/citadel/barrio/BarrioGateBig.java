@@ -11,6 +11,8 @@ import dev.t3craft.hq.SignTags;
 import dev.t3craft.hq.citadel.CitadelBarrios;
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.CitadelCanvas.Mats;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.TreeMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -24,38 +26,43 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.Half;
 import net.minecraft.world.level.block.state.properties.StairsShape;
 import static dev.t3craft.hq.citadel.CitadelCanvas.AIR;
-import static dev.t3craft.hq.citadel.CitadelCanvas.BAMBOO;
-import static dev.t3craft.hq.citadel.CitadelCanvas.CALCITE;
 import static dev.t3craft.hq.citadel.CitadelCanvas.DECOR;
 import static dev.t3craft.hq.citadel.CitadelCanvas.FOOT;
 import static dev.t3craft.hq.citadel.CitadelCanvas.HANGING;
+import static dev.t3craft.hq.citadel.CitadelCanvas.PLANKS;
 import static dev.t3craft.hq.citadel.CitadelCanvas.b;
 
 /**
- * The gatehouse of a barrio at scale 2 and up (struct/barrio-gatehouse), and the arm of the gate in front of it.
+ * The gatehouse of a barrio at scale 2 and up (struct/barrio-gatehouse, round 2 struct/barrio-gatehouse2), and the arm of
+ * the gate in front of it.
  *
  * <p><b>The building.</b> The gate room (15 x 10 at ring 1, 19 x 14 at rings 2 and 3) is split across its width into
- * three: a 5-wide passage down the middle, and on each side a block of {@code sw = (W - 5) / 2} cells. Each side
- * block is a flag tower at the hub end (solid, 10 high, pyramid roof, a pole with a flag in the project's colour on
- * top) and a guard room at the courtyard end (lower, hipped roof, a doorway on the passage). The passage has a
- * stepped arch (3, 4, 5 high across), a ridge beam, hanging lanterns and banners; over it the central block rises
- * into a gable with the sign board: three name plaques on a band of the project's colour.
+ * three: a 5-wide passage down the middle, and on each side a block of {@code sw = (W - 5) / 2} cells. Each side block is
+ * a tower at the hub end (square, 13 high, pyramid roof, a pole with a flag in the project's colour on top) and a guard
+ * room at the courtyard end (5 high inside, hipped roof, a doorway on the passage).
  *
- * <p><b>Identification.</b> Seen from the hub: the gable's colour band and plaques, the initial of the project in
- * 3 x 5 blocks of its colour on each tower, a banner pole on each tower. The colour is the project's environment colour
- * ({@link HqStyle#envColor(HqLayout.Module)}). The plaques and signs are fixtures (the light pass never replaces them).
+ * <p><b>The wall-walk.</b> Over the passage, at the depth of the towers, a 5-deep block joins the two towers: the
+ * stepped arch below (3, 4, 5 high across), at y = 9 a deck with a parapet and merlons on both edges (the hub edge carries a corbel course and
+ * three name plaques on a dark board, the courtyard edge looks over the lane). Each tower is hollow in a 3 x 3 shaft
+ * beside the passage: a spiral stair of stone-brick stairs and landings (one step per cell, a landing at each corner,
+ * 4 blocks between laps) climbs from a doorway on the passage to a doorway onto the deck, so the whole thing is walkable.
+ * Between the guard rooms the passage is an open lane that ends on a screen wall (arch ring, plaque towards the courtyard).
+ *
+ * <p><b>Identification.</b> From the hub: on each tower a flat banner of the project's wool (the colour is
+ * {@link HqStyle#envColor(HqLayout.Module)}) 3 x 8 (5 x 8 at ring 2+) hung from a cherry beam between two dark pilasters,
+ * with the project's initial in 3 x 5 blocks of white or black wool on it (whichever contrasts), and the plaques on the board.
  *
  * <p><b>Uses.</b> The left guard room is the gate post (chests, barrels, a counter with the register); the right one is
- * the map room (a cartography table at its centre, shelves, a lectern).
+ * the map room (a cartography table, shelves, a lectern). Both keep a free aisle from the door to the far wall.
  *
  * <p><b>The arm</b> (from the hub face of the gate to the end of the barrio's lot cluster, 7 wide: the width of the
- * corridor plus a lamp lane each side): a three-tone pavement (accent, deepslate tile, calcite) with a dashed centre
- * line in the project's colour, lamp posts every 4 rows, benches and planters in between, and a signpost with one
- * board per hall (an arrow, the hall's name and, for the lead's, "Lead office"). The bays beside the arm are
- * {@code CitadelPlacement#forecourt}'s; nothing here depends on them except the 7-wide walk they leave.
+ * corridor plus a lamp lane each side): a three-tone pavement (the courtyard's pink floor, deepslate tile, stone bricks)
+ * with a dashed centre line in the project's colour that fades into stone at the end (the corridor of
+ * {@code CitadelPlacement} takes over from there), lamp posts every 4 rows, benches and planters in between, and a
+ * signpost with one board per hall. The bays beside the arm are {@code CitadelPlacement#forecourt}'s.
  *
- * <p>Palette: deepslate tile (plinth, floor), the barrio's own wall, post, band, roof and ridge ({@link Mats}, the
- * same ones the halls use), calcite and the project's wool.
+ * <p>Palette, four materials: deepslate (plinth, posts, roofs, floor), stone bricks (walls, merlons), cherry (beams,
+ * eaves, fences, benches) and the project's wool. The gate no longer uses the barrio's {@link Mats}.
  */
 final class BarrioGateBig {
 	private BarrioGateBig() {
@@ -64,13 +71,21 @@ final class BarrioGateBig {
 	/** Half width of the passage: 5 wide. */
 	private static final int HALF = 2;
 	/** Height of the walls of a guard room (the roof layer, which is also its ceiling, sits above). */
-	private static final int ANNEX_TOP = 4;
+	private static final int ANNEX_TOP = 5;
 	/** Height of the walls of a tower. */
 	private static final int TOWER_TOP = 13;
-	/** Height of the walls over the passage at the middle, one block less at {@code |dv| = 1}, two at {@code |dv| = 2}. */
-	private static final int GABLE_WALL = 11;
+	/** The deck of the wall-walk (block level; one stands at DECK + 1). */
+	private static final int DECK = 9;
 	/** Height of the sign board (plaques). */
 	private static final int PLAQUE_Y = 8;
+	/** Temporary: walk spots inside the guard rooms and on the stair tops, to read their reachability in the report. */
+	private static final boolean TEST_SPOTS = true;
+
+	private static final BlockState STONE = b(Blocks.STONE_BRICKS);
+	private static final BlockState POST = b(Blocks.POLISHED_DEEPSLATE);
+	private static final Block ROOF = Blocks.DEEPSLATE_TILE_STAIRS;
+	/** The shaft's ring in the order a climber walks it, as {@code {a, b}} (a along the depth, b towards the passage): entry first. */
+	private static final int[][] RING = {{0, 2}, {1, 2}, {2, 2}, {2, 1}, {2, 0}, {1, 0}, {0, 0}, {0, 1}};
 
 	/** Whether the gate room is big enough for this design. */
 	static boolean fits(Room r) {
@@ -78,8 +93,12 @@ final class BarrioGateBig {
 	}
 
 	static void build(CitadelCanvas c, Lot l, HqLayout.Module lead, Mats mats) {
-		new Gate(c, l, lead, mats).build();
+		new Gate(c, l, lead).build();
 		arm(c, l, lead);
+	}
+
+	private static BlockState log(Direction.Axis ax) {
+		return b(Blocks.STRIPPED_CHERRY_LOG).setValue(BlockStateProperties.AXIS, ax);
 	}
 
 	// ------------------------------------------------------------------ the building
@@ -88,39 +107,41 @@ final class BarrioGateBig {
 		final CitadelCanvas c;
 		final Lot l;
 		final HqLayout.Module lead;
-		final Mats mats;
 		final Room r;
 		final int W;
 		final int D;
 		final int mid;
-		/** Width of a side block, depth of a guard room, first row of the towers. */
+		/** Width of a side block (a tower is {@code sw x sw}), first row of the towers, rows between the tower wall and the shaft. */
 		final int sw;
 		final int tu;
+		final int rowsOff;
 		final Direction back;
 		final Direction side;
 		final DyeColor col;
 		final BlockState wool;
-		final BlockState panelBg;
 		final BlockState letter;
+		final Map<Integer, BlockState> stepsL;
+		final Map<Integer, BlockState> stepsR;
 
-		Gate(CitadelCanvas c, Lot l, HqLayout.Module lead, Mats mats) {
+		Gate(CitadelCanvas c, Lot l, HqLayout.Module lead) {
 			this.c = c;
 			this.l = l;
 			this.lead = lead;
-			this.mats = mats;
 			this.r = l.gate();
 			this.W = r.w();
 			this.D = r.d();
 			this.mid = r.c();
 			this.sw = (W - (2 * HALF + 1)) / 2;
 			this.tu = D - sw;
+			this.rowsOff = (sw - 5) / 2;
 			this.back = r.back();
 			this.side = r.side();
 			this.col = HqStyle.envColor(lead);
 			this.wool = b(Blocks.WOOL.pick(col));
-			this.panelBg = b(Blocks.POLISHED_BLACKSTONE_BRICKS);
-			// the initial: the project's wool, or white when the colour is too dark to read on the black panel
-			this.letter = dark(col) ? b(Blocks.WOOL.pick(DyeColor.WHITE)) : wool;
+			// the initial: white wool on the dark colours, black on the light ones
+			this.letter = b(Blocks.WOOL.pick(dark(col) ? DyeColor.WHITE : DyeColor.BLACK));
+			this.stepsL = buildSteps(true);
+			this.stepsR = buildSteps(false);
 		}
 
 		void build() {
@@ -128,7 +149,13 @@ final class BarrioGateBig {
 				for (int v = 0; v < W; v++) {
 					int dv = v - mid;
 					if (Math.abs(dv) <= HALF) {
-						passageCol(u, v, dv);
+						if (u >= tu) {
+							bridgeCol(u, v, dv);
+						} else if (u == 0) {
+							screenCol(u, v, dv);
+						} else {
+							laneCol(u, v, dv);
+						}
 					} else if (u >= tu) {
 						towerCol(u, v);
 					} else {
@@ -143,35 +170,17 @@ final class BarrioGateBig {
 				pyramid(tower, TOWER_TOP + 1, true, s);
 				cornice(tower, TOWER_TOP - 1);
 			}
-			gableVerge();
+			corbel();
 			passageDressing();
 			boards();
-			guardPost(0);
-			mapRoom(W - sw);
+			guardPost();
+			mapRoom();
+			if (TEST_SPOTS) {
+				testSpots();
+			}
 		}
 
 		// -------------------------------------------------------------- blocks
-
-		BlockState band(boolean alongSide) {
-			Direction.Axis ax = alongSide ? side.getAxis() : back.getAxis();
-			return mats.band() == mats.post() ? c.kit.beam(ax) : mats.band();
-		}
-
-		BlockState keystone(boolean face) {
-			return face ? b(Blocks.CHISELED_STONE_BRICKS) : HallFacade.beamLike(c, mats.post(), back.getAxis());
-		}
-
-		/** The stepped arch: the barrio's roof stairs inside, a light stone-brick ring on the two faces so the opening reads from afar. */
-		BlockState archStair(int dv, boolean face) {
-			Direction away = dv < 0 ? side.getOpposite() : side;
-			return BarrioKit.stair(face ? Blocks.STONE_BRICK_STAIRS : mats.roof(), away, StairsShape.STRAIGHT, Half.TOP);
-		}
-
-		/** The roof stair on a slope that rises towards the centre line of the passage. */
-		BlockState slopeStair(int dv, Block m) {
-			Direction up = dv < 0 ? side : side.getOpposite();
-			return BarrioKit.stair(m, up, StairsShape.STRAIGHT, Half.BOTTOM);
-		}
 
 		boolean insideGate(BlockPos p) {
 			int dx = p.getX() - r.origin().getX();
@@ -181,6 +190,22 @@ final class BarrioGateBig {
 			return gu >= 0 && gu < D && gv >= 0 && gv < W;
 		}
 
+		/** The stepped arch: deepslate-tile stairs inside, a light stone-brick ring on the faces so the opening reads from afar. */
+		BlockState archStair(int dv, boolean face) {
+			Direction away = dv < 0 ? side.getOpposite() : side;
+			return BarrioKit.stair(face ? Blocks.STONE_BRICK_STAIRS : ROOF, away, StairsShape.STRAIGHT, Half.TOP);
+		}
+
+		BlockState keystone(boolean face) {
+			return face ? b(Blocks.CHISELED_STONE_BRICKS) : log(back.getAxis());
+		}
+
+		/** The light stone of the towers: bricks, a few cracked ones. */
+		BlockState towerStone(int u, int v, int y) {
+			int h = Math.floorMod(u * 7 + v * 13 + y * 5, 11);
+			return h == 0 ? b(Blocks.CRACKED_STONE_BRICKS) : STONE;
+		}
+
 		// -------------------------------------------------------------- passage
 
 		BlockState passageFloor(int u, int dv) {
@@ -188,58 +213,74 @@ final class BarrioGateBig {
 			if (a <= 1) {
 				return a == 0 && u % 4 == 0 ? b(Blocks.DYED_TERRACOTTA.pick(col)) : c.floor();
 			}
-			return u % 2 == 0 ? CALCITE : FOOT;
+			return u % 2 == 0 ? STONE : FOOT;
 		}
 
-		void passageCol(int u, int v, int dv) {
+		/** The open lane between the guard rooms. */
+		void laneCol(int u, int v, int dv) {
+			c.set(r.cell(u, v, 0), passageFloor(u, dv));
+			for (int y = 1; y <= TOWER_TOP; y++) {
+				c.set(r.cell(u, v, y), AIR);
+			}
+		}
+
+		/** The screen wall on the courtyard end of the lane: the arch ring, a wall to y = 8, a cherry fascia and merlons. */
+		void screenCol(int u, int v, int dv) {
 			int a = Math.abs(dv);
 			c.set(r.cell(u, v, 0), passageFloor(u, dv));
-			// clear height: 4 at the sides, 5 next to the middle, 6 in the middle; the arch piece sits just above it
 			int clear = 6 - a;
-			int top = GABLE_WALL - a;
 			for (int y = 1; y <= clear; y++) {
 				c.set(r.cell(u, v, y), AIR);
 			}
-			boolean face = u == 0 || u == D - 1;
-			if (a == 0) {
-				c.set(r.cell(u, v, clear + 1), keystone(face));
-			} else {
-				c.set(r.cell(u, v, clear + 1), archStair(dv, face));
+			c.set(r.cell(u, v, clear + 1), a == 0 ? keystone(true) : archStair(dv, true));
+			for (int y = clear + 2; y < DECK; y++) {
+				c.set(r.cell(u, v, y), STONE);
 			}
-			for (int y = clear + 2; y <= top; y++) {
-				c.set(r.cell(u, v, y), wallFace(u, y, dv));
+			c.set(r.cell(u, v, DECK), log(side.getAxis()));
+			c.set(r.cell(u, v, DECK + 1), dv % 2 == 0 ? STONE : AIR);
+			for (int y = DECK + 2; y <= TOWER_TOP; y++) {
+				c.set(r.cell(u, v, y), AIR);
 			}
-			// the gable's slope: stairs up to the ridge (the verge, gableVerge, carries it one row past each face)
-			c.set(r.cell(u, v, top + 1), a == 0 ? mats.ridge() : slopeStair(dv, mats.roof()));
 		}
 
-		/** The wall over the arch. On the two faces the board: a dark ground and a band of the project's colour. */
-		BlockState wallFace(int u, int y, int dv) {
-			boolean face = u == 0 || u == D - 1;
-			if (face && y == PLAQUE_Y + 1) {
-				return wool;
+		/** The bridge over the passage at the depth of the towers: arch, mass, deck, parapet with merlons on both edges. */
+		void bridgeCol(int u, int v, int dv) {
+			int a = Math.abs(dv);
+			int row = u - tu;
+			boolean hub = row == sw - 1;
+			boolean edge = row == 0 || hub;
+			c.set(r.cell(u, v, 0), passageFloor(u, dv));
+			int clear = 6 - a;
+			for (int y = 1; y <= clear; y++) {
+				c.set(r.cell(u, v, y), AIR);
 			}
-			if (face && y == PLAQUE_Y) {
-				return Math.abs(dv) == 2 ? wool : FOOT;
-			}
-			return mats.wall();
-		}
-
-		/** The gable's end overhang: one row of roof beyond each face, ridge included. */
-		void gableVerge() {
-			for (int dv = -HALF; dv <= HALF; dv++) {
-				int a = Math.abs(dv);
-				int ry = GABLE_WALL - a + 1;
-				for (int u : new int[] {-1, D}) {
-					BlockState s = a == 0 ? BarrioKit.slabOf(mats.roof()) : slopeStair(dv, BarrioKit.altStairs(mats.roof()));
-					c.set(r.cell(u, mid + dv, ry), s);
+			c.set(r.cell(u, v, clear + 1), a == 0 ? keystone(edge) : archStair(dv, edge));
+			for (int y = clear + 2; y < DECK; y++) {
+				BlockState s = STONE;
+				if (hub && y == PLAQUE_Y) {
+					s = a == 2 ? wool : FOOT;
 				}
+				c.set(r.cell(u, v, y), s);
+			}
+			c.set(r.cell(u, v, DECK), edge ? log(side.getAxis()) : dv == 0 ? PLANKS : FOOT);
+			c.set(r.cell(u, v, DECK + 1), edge ? STONE : AIR);
+			c.set(r.cell(u, v, DECK + 2), edge && dv % 2 == 0 ? STONE : AIR);
+			for (int y = DECK + 3; y <= TOWER_TOP; y++) {
+				c.set(r.cell(u, v, y), AIR);
 			}
 		}
 
-		/** Lanterns under the vault, banners on the passage walls, the hanging sign of the project at the hub end. */
+		/** A course of upside-down stairs under the parapet, one block out on the hub face and on the lane side of the bridge. */
+		void corbel() {
+			for (int dv = -HALF; dv <= HALF; dv++) {
+				c.set(r.cell(D, mid + dv, DECK), BarrioKit.stair(Blocks.STONE_BRICK_STAIRS, back.getOpposite(), StairsShape.STRAIGHT, Half.TOP));
+				c.set(r.cell(tu - 1, mid + dv, DECK), BarrioKit.stair(Blocks.STONE_BRICK_STAIRS, back, StairsShape.STRAIGHT, Half.TOP));
+			}
+		}
+
+		/** Lanterns under the vault and on the merlons, banners on the tower walls, the hanging sign of the project at the hub end. */
 		void passageDressing() {
-			for (int u = 1; u < D - 2; u += 3) {
+			for (int u : new int[] {tu + 1, D - 2}) {
 				c.set(r.cell(u, mid, 6), BarrioKit.lantern(true));
 			}
 			BlockPos sign = r.cell(D - 1, mid, 6);
@@ -248,11 +289,13 @@ final class BarrioGateBig {
 			c.put(sign.getX(), sign.getY(), sign.getZ(), hs, HANGING);
 			c.data.put(sign.asLong(), BarrioGate.barrioSign(c, lead).signTag());
 			c.fixtures.add(sign.asLong());
-			// banners in the project's colour on the tower walls beside the passage
-			for (int u : new int[] {tu + 1, D - 2}) {
+			c.set(r.cell(D - 1, mid, DECK + 3), BarrioKit.lantern(false));
+			c.set(r.cell(tu, mid, DECK + 3), BarrioKit.lantern(false));
+			// banners in the project's colour on the tower walls beside the passage (the doorway row is left clear)
+			for (int a : new int[] {2 + rowsOff, 3 + rowsOff}) {
 				for (int dv = -HALF; dv <= HALF; dv += 2 * HALF) {
 					Direction f = dv < 0 ? side : side.getOpposite();
-					BlockPos p = r.cell(u, mid + dv, 3);
+					BlockPos p = r.cell(tu + a, mid + dv, 3);
 					c.put(p.getX(), p.getY(), p.getZ(), b(Blocks.WALL_BANNER.pick(col)).setValue(BlockStateProperties.HORIZONTAL_FACING, f), DECOR);
 				}
 			}
@@ -263,32 +306,34 @@ final class BarrioGateBig {
 		void towerCol(int u, int v) {
 			boolean left = v < mid;
 			int tv = left ? v : v - (W - sw);
-			int tu_ = u - tu;
-			boolean edgeU = tu_ == 0 || tu_ == D - tu - 1;
+			int a = u - tu;
+			boolean edgeU = a == 0 || a == sw - 1;
 			boolean edgeV = tv == 0 || tv == sw - 1;
 			boolean corner = edgeU && edgeV;
 			boolean perimeter = edgeU || edgeV;
-			boolean hubFace = u == D - 1;
-			boolean uFace = edgeU && !edgeV;
+			boolean hubFace = a == sw - 1;
+			boolean passSide = left ? tv == sw - 1 : tv == 0;
+			int sa = a - (1 + rowsOff);
+			int sb = left ? tv - (sw - 4) : 3 - tv;
+			boolean shaft = !perimeter && sa >= 0 && sa <= 2 && sb >= 0 && sb <= 2;
 			c.set(r.cell(u, v, 0), FOOT);
 			for (int y = 1; y <= TOWER_TOP; y++) {
 				BlockState s;
-				if (!perimeter) {
-					// the letter sits one block into the tower, behind the recess on the face
-					s = u == D - 2 && y >= 5 && y <= 9 ? letterCell(tv, y, left) : mats.wall();
+				if (shaft) {
+					s = shaftBlock(sa, sb, y, left);
+				} else if (!perimeter) {
+					s = STONE;
 				} else if (corner) {
-					s = mats.post();
-				} else if (y <= 2) {
-					s = FOOT;
-				} else if (y == 3) {
-					s = towerStone(u, v, y);
-				} else if (hubFace && !edgeV && (y == 4 || y == 10)) {
-					s = BAMBOO;
-				} else if (y == 4 || y == TOWER_TOP) {
-					s = band(uFace);
-				} else if (hubFace && !edgeV && y >= 5 && y <= 9) {
+					s = POST;
+				} else if (passSide && ((a == 1 + rowsOff && y <= 3) || (a == 2 + rowsOff && (y == DECK + 1 || y == DECK + 2)))) {
 					s = AIR;
-				} else if (!edgeU && edgeV && (y == 6 || y == 7) && tu_ == (D - tu) / 2 && (v == 0 || v == W - 1)) {
+				} else if (y <= 3) {
+					s = FOOT;
+				} else if (hubFace) {
+					s = banner(tv, y);
+				} else if (y == DECK) {
+					s = log(edgeU ? side.getAxis() : back.getAxis());
+				} else if (edgeV && !passSide && a == sw / 2 && (y == 6 || y == 7)) {
 					s = b(Blocks.GLASS_PANE);
 				} else {
 					s = towerStone(u, v, y);
@@ -297,10 +342,45 @@ final class BarrioGateBig {
 			}
 		}
 
-		/** The light stone of the towers (the hall behind is the barrio's own colour; the gate is told apart by it): bricks, a few mossy and cracked. */
-		BlockState towerStone(int u, int v, int y) {
-			int h = Math.floorMod(u * 7 + v * 13 + y * 5, 11);
-			return b(h == 0 ? Blocks.MOSSY_STONE_BRICKS : h == 1 ? Blocks.CRACKED_STONE_BRICKS : Blocks.STONE_BRICKS);
+		/** A cell of the banner on the hub face of a tower (tv 1..sw-2, y 4..11), the beam it hangs from at y = 12. */
+		BlockState banner(int tv, int y) {
+			if (y == TOWER_TOP - 1) {
+				return log(side.getAxis());
+			}
+			if (y == TOWER_TOP) {
+				return STONE;
+			}
+			if (y >= 10) {
+				return wool;
+			}
+			if (y >= 5) {
+				return letterCell(tv, y);
+			}
+			// the swallow-tail at the foot of the banner
+			return tv == (sw - 1) / 2 ? STONE : wool;
+		}
+
+		/** A cell of the initial (y 5..9) in 3 x 5 on the banner: the project's letter, or the banner's wool. */
+		BlockState letterCell(int tv, int y) {
+			int start = 1 + ((sw - 2) - 3) / 2;
+			int cx = tv - start;
+			int cy = 9 - y;
+			if (cx < 0 || cx > 2) {
+				return wool;
+			}
+			// the viewer comes from the hub looking along -back: his left is +side, so columns run towards -v
+			String[] g = glyph(initial());
+			return g[cy].charAt(2 - cx) == '1' ? letter : wool;
+		}
+
+		String initial() {
+			String t = lead.label();
+			for (int i = 0; i < t.length(); i++) {
+				if (Character.isLetterOrDigit(t.charAt(i))) {
+					return String.valueOf(Character.toUpperCase(t.charAt(i)));
+				}
+			}
+			return "#";
 		}
 
 		/** A row of upside-down stone-brick stairs one block out under the top of a tower: a shadow line (not at the corners). */
@@ -324,32 +404,59 @@ final class BarrioGateBig {
 			}
 		}
 
-		/** A cell of the letter panel on the hub face of a tower (y 5..9, tv 1..sw-2): the project's initial in 3 x 5. */
-		BlockState letterCell(int tv, int y, boolean left) {
-			if (y < 5 || y > 9) {
-				return mats.wall();
-			}
-			int inner = sw - 2;
-			int start = 1 + (inner - 3) / 2;
-			int cx = tv - start;
-			int cy = 9 - y;
-			if (cx < 0 || cx > 2) {
-				return panelBg;
-			}
-			// the viewer comes from the hub looking along -back: his left is +side, so columns run towards -v
-			int col3 = 2 - cx;
-			String[] g = glyph(initial());
-			return g[cy].charAt(col3) == '1' ? letter : panelBg;
+		// -------------------------------------------------------------- the stair of a tower
+
+		static int key(int sa, int sb, int y) {
+			return (sa * 3 + sb) * 64 + y;
 		}
 
-		String initial() {
-			String t = lead.label();
-			for (int i = 0; i < t.length(); i++) {
-				if (Character.isLetterOrDigit(t.charAt(i))) {
-					return String.valueOf(Character.toUpperCase(t.charAt(i)));
+		Direction dir(int da, int db, boolean left) {
+			if (da != 0) {
+				return da > 0 ? back : back.getOpposite();
+			}
+			Direction towardsPassage = left ? side : side.getOpposite();
+			return db > 0 ? towardsPassage : towardsPassage.getOpposite();
+		}
+
+		/**
+		 * The spiral of a tower, as {@code key -> block}. It walks {@link #RING} from the entry cell (flat, the floor): a stair
+		 * (facing the way one climbs) on every cell that is not a corner, a landing flush with the top of the stair before it on
+		 * every corner, so that a climber always steps up half a block in front of a stair. Four blocks separate two laps; the
+		 * last stair is at {@code DECK}, beside the doorway on the deck.
+		 */
+		Map<Integer, BlockState> buildSteps(boolean left) {
+			Map<Integer, BlockState> m = new HashMap<>();
+			int s = 0;
+			for (int k = 1; k < 200; k++) {
+				int idx = k % RING.length;
+				int[] cell = RING[idx];
+				int[] next = RING[(k + 1) % RING.length];
+				if (idx % 2 == 0) {
+					m.put(key(cell[0], cell[1], s), STONE);
+				} else {
+					s++;
+					m.put(key(cell[0], cell[1], s), BarrioKit.stair(Blocks.STONE_BRICK_STAIRS, dir(next[0] - cell[0], next[1] - cell[1], left)));
+					if (s == DECK) {
+						break;
+					}
 				}
 			}
-			return "#";
+			return m;
+		}
+
+		BlockState shaftBlock(int sa, int sb, int y, boolean left) {
+			if (sa == 1 && sb == 1) {
+				return y <= DECK ? STONE : y == DECK + 1 ? BarrioKit.lantern(false) : AIR;
+			}
+			BlockState s = (left ? stepsL : stepsR).get(key(sa, sb, y));
+			return s != null ? s : AIR;
+		}
+
+		/** A cell of the shaft of a tower in world coordinates. */
+		BlockPos shaftCell(boolean left, int sa, int sb, int y) {
+			int u = tu + 1 + rowsOff + sa;
+			int v = left ? (sw - 4) + sb : (W - sw) + (3 - sb);
+			return r.cell(u, v, y);
 		}
 
 		// -------------------------------------------------------------- guard rooms
@@ -371,15 +478,15 @@ final class BarrioGateBig {
 				} else if (door && y <= 3) {
 					s = AIR;
 				} else if (corner) {
-					s = mats.post();
+					s = POST;
 				} else if (y == 1) {
 					s = FOOT;
 				} else if (y == ANNEX_TOP) {
-					s = band(edgeU && !edgeV);
-				} else if (y <= 3 && !passageSide && ((u == 0 && av == sw / 2) || (edgeV && u == (tu - 1) / 2))) {
+					s = log(edgeU && !edgeV ? side.getAxis() : back.getAxis());
+				} else if ((y == 2 || y == 3) && !passageSide && ((u == 0 && av == sw / 2) || (edgeV && u == (tu - 1) / 2))) {
 					s = b(Blocks.GLASS_PANE);
 				} else {
-					s = mats.wall();
+					s = towerStone(u, v, y);
 				}
 				c.set(r.cell(u, v, y), s);
 			}
@@ -389,38 +496,41 @@ final class BarrioGateBig {
 			c.set(r.cell(u, v, y), s);
 		}
 
-		/** The left guard room: chests and barrels along the outer wall, a counter with the register across the court wall. */
-		void guardPost(int v0) {
-			int iu0 = 1;
-			int iu1 = tu - 2;
-			int iv0 = v0 + 1;
-			int iv1 = v0 + sw - 2;
-			for (int u = iu0; u <= iu1; u++) {
-				put(u, iv0, 1, (u - iu0) % 2 == 0 ? chest(side) : b(Blocks.BARREL));
-			}
-			// the counter: planks with the register (a lectern) on it, along the court wall
-			for (int v = iv0 + 1; v <= iv1; v++) {
-				put(iu0, v, 1, v == iv1 ? lectern(back) : b(Blocks.CHERRY_PLANKS));
-			}
-			// a bed of straw for the night watch? no: a second counter piece and a barrel by the far wall
-			put(iu1, iv1, 1, b(Blocks.BARREL));
-			hang((iu0 + iu1) / 2, (iv0 + iv1) / 2);
+		/** The column {@code v} of the interior cell {@code col} of a guard room (0 beside the passage, {@code sw - 3} on the outer wall). */
+		int vOf(boolean left, int col) {
+			return left ? sw - 2 - col : (W - sw) + 1 + col;
 		}
 
-		/** The right guard room, the map room: shelves on the outer wall, a cartography table at the centre, lecterns. */
-		void mapRoom(int v0) {
-			int iu0 = 1;
-			int iu1 = tu - 2;
-			int iv0 = v0 + 1;
-			int iv1 = v0 + sw - 2;
-			for (int u = iu0; u <= iu1; u++) {
-				put(u, iv1, 1, b(Blocks.BOOKSHELF));
-				put(u, iv1, 2, b(Blocks.BOOKSHELF));
+		/** The left guard room: chests and barrels on the outer wall, a counter with the register on the court wall; the row of the door stays free. */
+		void guardPost() {
+			int rows = tu - 2;
+			int cols = sw - 2;
+			int aisle = (tu - 1) / 2 - 1;
+			Direction in = side;
+			for (int i = 0; i < rows; i++) {
+				if (i != aisle) {
+					put(1 + i, vOf(true, cols - 1), 1, i % 2 == 0 ? chest(in) : b(Blocks.BARREL));
+				}
 			}
-			put((iu0 + iu1) / 2, (iv0 + iv1) / 2, 1, b(Blocks.CARTOGRAPHY_TABLE));
-			put(iu0, iv0, 1, lectern(side));
-			put(iu1, iv0, 1, lectern(side));
-			hang((iu0 + iu1) / 2, (iv0 + iv1) / 2);
+			for (int k = 0; k <= cols - 2; k++) {
+				put(1, vOf(true, k), 1, k == cols - 2 ? lectern(back) : b(Blocks.CHERRY_PLANKS));
+			}
+			hang(1 + aisle, vOf(true, (cols - 1) / 2));
+		}
+
+		/** The right guard room, the map room: shelves on the outer wall, a cartography table and a lectern, the aisle free. */
+		void mapRoom() {
+			int rows = tu - 2;
+			int cols = sw - 2;
+			int aisle = (tu - 1) / 2 - 1;
+			for (int i = 0; i < rows; i++) {
+				put(1 + i, vOf(false, cols - 1), 1, b(Blocks.BOOKSHELF));
+				put(1 + i, vOf(false, cols - 1), 2, b(Blocks.BOOKSHELF));
+			}
+			int cm = (cols - 1) / 2;
+			put(1, vOf(false, cm), 1, b(Blocks.CARTOGRAPHY_TABLE));
+			put(rows, vOf(false, cm), 1, lectern(side.getOpposite()));
+			hang(1 + aisle, vOf(false, cm));
 		}
 
 		/** A lantern hanging from the ceiling of a guard room. */
@@ -437,7 +547,35 @@ final class BarrioGateBig {
 			return b(Blocks.LECTERN).setValue(BlockStateProperties.HORIZONTAL_FACING, facing);
 		}
 
+		/** Temporary: standing spots (anchors) in both guard rooms, at the top stair of both towers and on the deck. */
+		void testSpots() {
+			int aisle = (tu - 1) / 2;
+			int cm = (sw - 3) / 2;
+			c.walkSpot(r.cell(aisle, vOf(true, cm), 1), back);
+			c.walkSpot(r.cell(aisle, vOf(false, cm), 1), back);
+			c.walkSpot(shaftCell(true, 1, 2, DECK + 1), back);
+			c.walkSpot(shaftCell(false, 1, 2, DECK + 1), back);
+			c.walkSpot(r.cell(tu + sw / 2, mid, DECK + 1), back);
+		}
+
 		// -------------------------------------------------------------- roofs
+
+		/** The stair of a hip roof at a cell whose distance to the edge is {@code k}: straight on the slopes, outer corners on the hips. */
+		BlockState hip(Room s, Block mat, int u, int v, int k) {
+			int w = s.w();
+			int d = s.d();
+			boolean nv1 = v + 1 == k;
+			boolean nv2 = w - v == k;
+			boolean nu1 = u + 1 == k;
+			boolean nu2 = d - u == k;
+			if ((nv1 || nv2) && (nu1 || nu2) && !(nv1 && nv2) && !(nu1 && nu2)) {
+				Direction f = nu1 ? s.back() : s.back().getOpposite();
+				StairsShape shape = nv1 == nu1 ? StairsShape.OUTER_RIGHT : StairsShape.OUTER_LEFT;
+				return BarrioKit.stair(mat, f, shape, Half.BOTTOM);
+			}
+			Direction f = nv1 ? s.side() : nv2 ? s.side().getOpposite() : nu1 ? s.back() : s.back().getOpposite();
+			return BarrioKit.stair(mat, f);
+		}
 
 		/**
 		 * A pyramid roof over {@code s}: the layer at {@code roofY} (ceiling and cornice), the slopes above, and on top
@@ -450,30 +588,30 @@ final class BarrioGateBig {
 			for (int u = 0; u < d; u++) {
 				for (int v = 0; v < w; v++) {
 					BlockPos p = s.cell(u, v, 0);
-					c.set(p.atY(roofY), mats.ridge());
+					c.set(p.atY(roofY), FOOT);
 					int k = Math.min(Math.min(u + 1, d - u), Math.min(v + 1, w - v));
 					int y = roofY + k;
 					if (k == kmax) {
-						c.set(p.atY(y), mats.ridge());
+						c.set(p.atY(y), FOOT);
 						boolean centre = d == w && u == (d - 1) / 2 && v == (w - 1) / 2;
 						if (tower && centre) {
 							flag(p.atY(y), sideIdx);
 						} else {
-							c.set(p.atY(y + 1), centre ? BarrioKit.finial(mats.roof()) : BarrioKit.slabOf(mats.roof()));
+							c.set(p.atY(y + 1), centre ? BarrioKit.finial(Blocks.CHERRY_STAIRS) : BarrioKit.slabOf(ROOF));
 						}
 					} else {
-						c.set(p.atY(y), BarrioRoofs.hipStair(s, mats.roof(), u, v, k, false, p.atY(y)));
+						c.set(p.atY(y), hip(s, ROOF, u, v, k));
 					}
 				}
 			}
 			int midv = (w - 1) / 2;
 			for (int k = 2; k <= kmax; k++) {
-				c.set(s.cell(k - 1, midv, roofY + k - 1), mats.ridge());
+				c.set(s.cell(k - 1, midv, roofY + k - 1), FOOT);
 			}
 			eave(s, roofY);
 		}
 
-		/** The eave ring outside {@code s}, except where it would run into the rest of the gate. */
+		/** The cherry eave ring outside {@code s}, except where it would run into the rest of the gate. */
 		void eave(Room s, int y) {
 			int w = s.w();
 			int d = s.d();
@@ -486,7 +624,7 @@ final class BarrioGateBig {
 					if (insideGate(p)) {
 						continue;
 					}
-					c.set(p, BarrioRoofs.hipStair(s, mats.roof(), u, v, 0, true, p.atY(y)));
+					c.set(p, hip(s, Blocks.CHERRY_STAIRS, u, v, 0));
 				}
 			}
 		}
@@ -506,7 +644,7 @@ final class BarrioGateBig {
 					c.set(top.above(3).relative(out, i), wool);
 				}
 			}
-			c.set(top.above(6), BarrioKit.finial(mats.roof()));
+			c.set(top.above(6), BarrioKit.finial(Blocks.CHERRY_STAIRS));
 		}
 
 		// -------------------------------------------------------------- the board
@@ -562,7 +700,7 @@ final class BarrioGateBig {
 				if (!inLot(c, l, p)) {
 					continue;
 				}
-				c.set(p, armFloor(c, n, bb, col));
+				c.set(p, armFloor(c, n, bb, col, a1 - a));
 			}
 		}
 		apron(c, l, a0, walk);
@@ -593,7 +731,7 @@ final class BarrioGateBig {
 			if (!inLot(c, l, p) || (above != null && !above.isAir())) {
 				continue;
 			}
-			c.set(p, Math.floorMod(bb, 2) == 0 ? c.floor() : CALCITE);
+			c.set(p, Math.floorMod(bb, 2) == 0 ? c.floor() : STONE);
 		}
 	}
 
@@ -614,7 +752,7 @@ final class BarrioGateBig {
 						continue;
 					}
 					int h = Math.floorMod(a * 5 + k * 3, 7);
-					c.set(p, b(h == 0 ? Blocks.MOSSY_STONE_BRICKS : h == 1 ? Blocks.CRACKED_STONE_BRICKS : Blocks.STONE_BRICKS));
+					c.set(p, h <= 1 ? b(Blocks.CRACKED_STONE_BRICKS) : STONE);
 				}
 			}
 		}
@@ -626,15 +764,22 @@ final class BarrioGateBig {
 	}
 
 	/** Three tones: the courtyard's own floor (pink) as the runner in the middle, deepslate tile either side of it, calcite and tile outside, a dashed line of the project's colour. */
-	private static BlockState armFloor(CitadelCanvas c, int n, int bb, DyeColor col) {
+	private static BlockState armFloor(CitadelCanvas c, int n, int bb, DyeColor col, int rowsLeft) {
 		int a = Math.abs(bb);
 		if (a <= 1) {
+			// the last two rows fade the pink runner into stone, towards the grey corridor of CitadelPlacement that takes over
+			if (rowsLeft == 0) {
+				return STONE;
+			}
+			if (rowsLeft == 1) {
+				return a == 1 ? STONE : c.floor();
+			}
 			return a == 0 && n % 4 == 0 ? b(Blocks.DYED_TERRACOTTA.pick(col)) : c.floor();
 		}
 		if (a == 2) {
 			return FOOT;
 		}
-		return n % 2 == 0 ? CALCITE : b(Blocks.STONE_BRICKS);
+		return n % 2 == 0 ? STONE : POST;
 	}
 
 	private static Direction outward(Lot l, int bb) {
