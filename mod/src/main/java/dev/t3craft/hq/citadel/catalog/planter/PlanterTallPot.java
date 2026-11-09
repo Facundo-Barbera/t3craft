@@ -227,7 +227,11 @@ public final class PlanterTallPot implements Variant {
 		if (h == 3) {
 			p.set(c, u, 1, v, m.urn());
 			// a ball of blossom or azalea: a shrub with presence on a one-cell pot
-			p.set(c, u, 2, v, kind >= 2 ? leaves(Blocks.CHERRY_LEAVES) : kind == 0 ? leaves(Blocks.FLOWERING_AZALEA_LEAVES) : leaves(Blocks.AZALEA_LEAVES));
+			p.set(c, u, 2, v, switch (p.hash(u, 4, v, 3)) {
+				case 0 -> leaves(Blocks.CHERRY_LEAVES);
+				case 1 -> leaves(Blocks.FLOWERING_AZALEA_LEAVES);
+				default -> leaves(Blocks.AZALEA_LEAVES);
+			});
 			return;
 		}
 		int body = Math.max(1, Math.min(tier == 2 ? 3 : 2, h - 4));
