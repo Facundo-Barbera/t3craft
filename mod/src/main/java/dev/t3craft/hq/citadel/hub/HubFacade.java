@@ -549,21 +549,20 @@ public final class HubFacade {
 	}
 
 	/**
-	 * The plain gable stone (struct/hub5, from scale 2): calcite mixed by a fixed pattern with polished diorite, stone bricks
-	 * and cracked ones, and a stone-brick course every sixth row, so the pediments are masonry and not one white sheet.
+	 * The plain gable stone (struct/hub5, from scale 2): calcite courses laid as ashlar with polished diorite, a stone-brick
+	 * string course every sixth row (a few cracked) and a polished one halfway between, by a fixed pattern, so the pediments are
+	 * masonry and not one white sheet.
 	 */
 	static BlockState gableStone(int x, int y) {
-		if (Math.floorMod(y, 6) == 0) {
-			return Blocks.STONE_BRICKS.defaultBlockState();
+		int m = Math.floorMod(y, 6);
+		if (m == 0) {
+			return Math.floorMod(x, 5) == 0 ? Blocks.CRACKED_STONE_BRICKS.defaultBlockState() : Blocks.STONE_BRICKS.defaultBlockState();
 		}
-		int h = Math.floorMod(x * 5 + y * 7 + x * y * 3, 10);
-		if (h < 5) {
-			return CALCITE;
-		}
-		if (h < 7) {
+		if (m == 3) {
 			return Blocks.POLISHED_DIORITE.defaultBlockState();
 		}
-		return (h < 9 ? Blocks.STONE_BRICKS : Blocks.CRACKED_STONE_BRICKS).defaultBlockState();
+		// ashlar: calcite courses with a polished diorite block every fourth cell, the joints staggered from one course to the next
+		return Math.floorMod(x + (m < 3 ? 0 : 2), 4) == 0 ? Blocks.POLISHED_DIORITE.defaultBlockState() : CALCITE;
 	}
 
 	/**
