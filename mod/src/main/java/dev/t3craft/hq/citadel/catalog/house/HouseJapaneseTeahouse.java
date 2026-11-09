@@ -142,7 +142,7 @@ public final class HouseJapaneseTeahouse implements Variant {
 			int iw = w - 4;
 			int idd = wv1 - wv0 - 1;
 			double[] frac = {0.58, 0.66, 0.74};
-			int sw = (int) Math.round(iw * frac[r.nextInt(3)]);
+			int sw = (int) Math.round(iw * frac[p.hash(2, 0, 0, 3)]);
 			sw = Math.max(5, Math.min(iw - 3, sw));
 			su0 = wu0 + 1;
 			su1 = su0 + sw - 1;
@@ -158,14 +158,15 @@ public final class HouseJapaneseTeahouse implements Variant {
 			dv = sv0 + (idd - 2) / 2;
 			bk = (d - gd) % 2 == 0 ? 1 : 0;
 			sx = dc;
-			hip = r.nextBoolean();
-			boolean thatch = r.nextBoolean();
-			mirror = r.nextBoolean();
-			boolean rj = r.nextBoolean();
+			// [variation] by seed, through the hash (java.util.Random of nearby seeds gives correlated first draws)
+			hip = p.hash(3, 0, 0, 2) == 0;
+			boolean thatch = p.hash(4, 0, 0, 2) == 0;
+			mirror = p.hash(5, 0, 0, 2) == 0;
+			boolean rj = p.hash(6, 0, 0, 2) == 0;
 			DyeColor[] norens = {DyeColor.BLUE, DyeColor.RED, DyeColor.CYAN, DyeColor.PURPLE};
-			noren = norens[r.nextInt(norens.length)];
+			noren = norens[p.hash(7, 0, 0, norens.length)];
 			DyeColor[] cush = {DyeColor.RED, DyeColor.ORANGE, DyeColor.PURPLE, DyeColor.GREEN};
-			cushion = cush[r.nextInt(cush.length)];
+			cushion = cush[p.hash(8, 0, 0, cush.length)];
 			int maxGx = w >= 14 ? w - 10 : w - 8;
 			gx = Math.max(3, Math.min(maxGx, sx + (rj ? -2 : 1)));
 			bu = w - 4;
@@ -387,10 +388,9 @@ public final class HouseJapaneseTeahouse implements Variant {
 				}
 				if (gg % 2 == 0) {
 					g.set(u, y, v, gg == 0 ? slab(Blocks.DARK_OAK_SLAB) : slab(m.slab()));
-				} else if (d2 != null) {
-					g.set(u, y, v, cornerStair(m.stair(), d1, d2));
 				} else {
-					g.set(u, y, v, stair(m.stair(), d1));
+					Block sb = gg == 1 ? Blocks.DARK_OAK_STAIRS : m.stair(); // the second course is dark too: a deep fascia
+					g.set(u, y, v, d2 != null ? cornerStair(sb, d1, d2) : stair(sb, d1));
 				}
 			}
 		}
@@ -405,7 +405,6 @@ public final class HouseJapaneseTeahouse implements Variant {
 	}
 
 	private static void ridge(Pen g, G q, int u, int v, int gg, int y) {
-		g.set(u, y, v, q.roof.ridge());
 		int same = 0;
 		Direction toRidge = null;
 		Direction[] dirs = {Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST};
@@ -416,13 +415,14 @@ public final class HouseJapaneseTeahouse implements Variant {
 				toRidge = dirs[i];
 			}
 		}
-		if (same == 1) {
-			// [finish] the ridge ends in a dark oak stair that rises towards the ridge: a low kerabu, not a chimney
-			g.set(u, y + 1, v, stair(Blocks.DARK_OAK_STAIRS, toRidge));
-		} else if (same == 0) {
-			g.set(u, y + 1, v, slab(Blocks.DARK_OAK_SLAB));
+		if (same <= 1) {
+			// [finish] the ridge ends in a full block with a dark oak stair that rises towards the ridge: a low kerabu
+			g.set(u, y, v, q.roof.ridge());
+			g.set(u, y + 1, v, same == 1 ? stair(Blocks.DARK_OAK_STAIRS, toRidge) : slab(Blocks.DARK_OAK_SLAB));
+		} else if (gg % 2 == 1) {
+			g.set(u, y, v, q.roof.ridge());
 		} else {
-			g.set(u, y + 1, v, q.roof.cap());
+			g.set(u, y, v, q.roof.cap());
 		}
 	}
 
