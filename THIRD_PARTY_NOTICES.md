@@ -245,3 +245,5 @@ Apache License 2.0, Copyright © 2015 the original authors (Gradle). Generated b
 ## Not used
 
 Cheggin/minecraft-use (GPL-3.0) and minecraft-agent-ide (no license) were not read or used.
+
+The leader office tower (`citadel/CitadelOffice.java`, branch `struct/leader-office`) takes its control-room *flow* from AgentCraft's studio (threads on screens, a wall of attention lamps, an archive, a console desk); it copies no code, model or texture. The blocks AgentCraft has and t3craft lacks are only proposed, as new code, in `docs/proposals/leader-office-blocks.md`.
