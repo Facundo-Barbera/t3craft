@@ -216,6 +216,7 @@ public final class HouseTerraceCascade implements Variant {
 		pond(x, g);
 		terrace(x, g);
 		house(x, g);
+		spring(x, g);
 		floors(x, g);
 		partition(x, g);
 		stairs(x, g);
@@ -434,7 +435,8 @@ public final class HouseTerraceCascade implements Variant {
 			}
 		}
 		// the channel, from the spout down to the lip, kerbed in stone; a slab bridge where the terrace is deep enough
-		int spout = g.hv0 - 2;
+		int vc = g.hv0 - 1;
+		int spout = vc;
 		boolean bridge = g.t >= 4;
 		int vb = g.gd + 1;
 		for (int v = g.gd; v <= spout; v++) {
@@ -448,18 +450,10 @@ public final class HouseTerraceCascade implements Variant {
 				}
 			}
 		}
-		// the cistern against the house: a stone tank, fed by the rain chain from the eave, spilling through a spout
-		int vc = g.hv0 - 1;
-		for (int u = cu - 1; u <= cu + 1; u++) {
-			x.set(u, G1, vc, wallStone(x, u, G1, vc));
-		}
-		x.set(cu - 1, G1 + 1, vc, wallStone(x, cu - 1, G1 + 1, vc));
-		x.set(cu + 1, G1 + 1, vc, wallStone(x, cu + 1, G1 + 1, vc));
+		// the spring: a stone mask on the house wall (see spring()) pours into the channel; a rain chain from the
+		// eave feeds it. The water falls two blocks from the mask into the head of the channel.
 		x.set(cu, G1 + 1, vc, b(Blocks.WATER));
-		x.set(cu - 1, G1 + 2, vc, b(Blocks.LANTERN));
-		x.set(cu + 1, G1 + 2, vc, b(Blocks.LANTERN));
-		x.set(cu, G1 + 1, spout, falling());
-		x.set(cu, G1, spout, falling());
+		x.set(cu, G1, vc, falling());
 		for (int y = G1 + 2; y <= PLATE - 1; y++) {
 			x.put(cu, y, vc, b(Blocks.IRON_CHAIN), CitadelCanvas.HANGING);
 		}
@@ -477,11 +471,7 @@ public final class HouseTerraceCascade implements Variant {
 					case 1 -> Blocks.CARROTS;
 					default -> Blocks.POTATOES;
 				};
-				if (u == g.w - 3 && v == vEnd) {
-					x.set(u, G1, v, b(Blocks.COMPOSTER));
-				} else {
-					x.set(u, G1, v, b(crop).setValue(BlockStateProperties.AGE_7, 3 + x.hash(u, 1, v, 5)));
-				}
+				x.set(u, G1, v, b(crop).setValue(BlockStateProperties.AGE_7, 3 + x.hash(u, 1, v, 5)));
 			}
 		}
 		// lamps either side of the door and a bench against the wall where there is room
@@ -643,6 +633,16 @@ public final class HouseTerraceCascade implements Variant {
 		}
 	}
 
+	/** [depth] the spring: a carved mask in the wall, a keystone over it; the water leaves its mouth into the channel. */
+	private static void spring(X x, G g) {
+		int u = g.cu;
+		x.set(u, G1 + 1, g.hv0, b(Blocks.CHISELED_STONE_BRICKS));
+		x.set(u, G1 + 2, g.hv0, b(Blocks.POLISHED_ANDESITE));
+		x.set(u - 1, G1 + 1, g.hv0, wallStone(x, u - 1, G1 + 1, g.hv0));
+		x.set(u + 1, G1 + 1, g.hv0, wallStone(x, u + 1, G1 + 1, g.hv0));
+		x.set(u, G1, g.hv0, b(Blocks.POLISHED_ANDESITE));
+	}
+
 	/** The floors: planks on the deck, and the slab that is the ceiling below and the floor above. */
 	private static void floors(X x, G g) {
 		for (int u = g.iu0; u <= g.iu1; u++) {
@@ -670,6 +670,12 @@ public final class HouseTerraceCascade implements Variant {
 		}
 		x.set(g.pw, G1, g.iv0 + 3, log(Blocks.DARK_OAK_LOG, Direction.Axis.Y));
 		x.set(g.pw, G2, g.iv0 + 3, log(Blocks.DARK_OAK_LOG, Direction.Axis.Y));
+		// closed up to the roof, so there is no ledge on top of it
+		for (int v = g.iv0; v <= g.iv1; v++) {
+			for (int y = PLATE; y < g.roofY(v); y++) {
+				x.set(g.pw, y, v, plaster(x, g.pw, y, v));
+			}
+		}
 	}
 
 	/**
@@ -717,6 +723,12 @@ public final class HouseTerraceCascade implements Variant {
 			x.set(lw, G1, v, st);
 		}
 		x.set(lw + 1, G1, g.iv1, facing(Blocks.CHEST, Direction.NORTH));
+		// the living room's library: shelves from floor to ceiling along the right wall
+		for (int v = g.iv0; v <= g.iv1 - 2; v++) {
+			for (int y = G1; y <= G1 + 3; y++) {
+				x.set(g.iu1, y, v, b(Blocks.BOOKSHELF));
+			}
+		}
 		int su0 = g.part ? g.pw + 1 : g.iu0 + 1;
 		int tu = su0 + 2;
 		int tv = g.iv0 + 2;
@@ -748,15 +760,12 @@ public final class HouseTerraceCascade implements Variant {
 			x.set(u0 + 3, G2, g.iv1 - 1, bed2.setValue(BlockStateProperties.BED_PART, BedPart.FOOT));
 			x.set(u0 + 3, G2, g.iv1, bed2.setValue(BlockStateProperties.BED_PART, BedPart.HEAD));
 		}
-		// the study on the right: bookshelves along the wall, a lectern and a desk under the window
+		// the study on the right, in furniture no taller than a step: a bookcase and a desk with a lectern and a map table
 		int ru = g.iu1;
 		for (int v = g.iv0; v <= g.iv1 - 1; v++) {
-			x.set(ru, G2, v, b(Blocks.BOOKSHELF));
-			x.set(ru, G2 + 1, v, b(Blocks.BOOKSHELF));
-			x.set(ru, G2 + 2, v, b(Blocks.BOOKSHELF));
+			x.set(ru, G2, v, v % 2 == 0 ? b(Blocks.BOOKSHELF) : facing(Blocks.CHISELED_BOOKSHELF, Direction.WEST));
 		}
-		x.set(ru, G2 + 3, g.iv0 + 1, b(Blocks.LANTERN));
-		x.set(ru, G2 + 3, g.iv1 - 2, b(Blocks.LANTERN));
+		x.set(ru, G2 + 1, g.iv0 + 1, b(Blocks.LANTERN));
 		x.set(ru - 1, G2, g.iv0, facing(Blocks.LECTERN, Direction.SOUTH).setValue(BlockStateProperties.HAS_BOOK, true));
 		x.set(ru - 2, G2, g.iv0, b(Blocks.CARTOGRAPHY_TABLE));
 		x.set(ru - 3, G2, g.iv0, slab(Blocks.SPRUCE_SLAB));
@@ -840,15 +849,10 @@ public final class HouseTerraceCascade implements Variant {
 		int u = g.hu0 - 1;
 		int ctop = Math.min(g.top() + 1, g.h - 2);
 		for (int y = G1; y <= ctop; y++) {
-			boolean base = y <= G2 - 1;
-			int v0 = base ? g.cv - 1 : g.cv;
-			int v1 = base ? g.cv + 2 : g.cv + 1;
-			for (int v = v0; v <= v1; v++) {
+			for (int v = g.cv; v <= g.cv + 1; v++) {
 				x.set(u, y, v, x.hash(u, y, v, 3) == 0 ? b(Blocks.COBBLESTONE) : b(Blocks.STONE_BRICKS));
 			}
 		}
-		x.set(u, G2, g.cv - 1, stair(Blocks.STONE_BRICK_STAIRS, Direction.SOUTH, false));
-		x.set(u, G2, g.cv + 2, stair(Blocks.STONE_BRICK_STAIRS, Direction.NORTH, false));
 		x.set(u, ctop + 1, g.cv, slab(Blocks.STONE_BRICK_SLAB));
 		x.set(u, ctop + 1, g.cv + 1, slab(Blocks.STONE_BRICK_SLAB));
 	}
