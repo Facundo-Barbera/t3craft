@@ -923,6 +923,12 @@ public final class CitadelOffice {
 				c.fixture(new BlockPos(x, bottom + row, CZ() + dz), s);
 			}
 		}
+		// a dark backing behind the board (the cabin has no inner wall): deepslate tiles on the old wall's line, one beyond the frame
+		for (int dz = -3; dz <= 3; dz++) {
+			for (int row = 0; row < 4; row++) {
+				c.set(x + 1, bottom + row, CZ() + dz, FOOT);
+			}
+		}
 		int lamp = 5;
 		for (int dz = -2; dz <= 2; dz++) {
 			BlockPos p = new BlockPos(x, bottom + 2, CZ() + dz);
@@ -1170,24 +1176,6 @@ public final class CitadelOffice {
 	 * plan with the map. Only lawn columns of the terrace zone are touched, in the flat frame the relief lifts afterwards.
 	 */
 	public static void garden(CitadelCanvas c) {
-		int zoneOk = 0;
-		int soilOk = 0;
-		int tiers = 0;
-		for (int dx = E + 1; dx <= 20; dx++) {
-			for (int dz = -6; dz <= 15; dz++) {
-				if (c.zoneAt(CX() + dx, CZ() + dz).kind() == RingCampusGeometry.Kind.TERRACE) {
-					zoneOk++;
-				}
-				if (lawn(c, CX() + dx, CZ() + dz)) {
-					soilOk++;
-				}
-				if (tier(c, dx, dz) > 0) {
-					tiers++;
-				}
-			}
-		}
-		System.out.println("office garden: centre " + CX() + "," + CZ() + " terrace " + zoneOk + " lawn " + soilOk + " tiers " + tiers + " at(33,0,61)="
-				+ c.at(33, 0, 61) + " zone=" + c.zoneAt(33, 61).kind());
 		for (int dx = E + 1; dx <= 20; dx++) {
 			for (int dz = -6; dz <= 15; dz++) {
 				gardenColumn(c, dx, dz);
@@ -1220,10 +1208,10 @@ public final class CitadelOffice {
 			// the path goes on over the lawn past the lower tier: a stair at the foot, then flat stones
 			if (path && o >= 10 && lawn(c, x, z)) {
 				if (o == 10) {
-					set(c, x, 1, z, stairs(Blocks.STONE_BRICK_STAIRS, Direction.WEST));
+					c.set(x, 1, z, stairs(Blocks.STONE_BRICK_STAIRS, Direction.WEST));
 				} else {
-					set(c, x, 0, z, gardenPath(x, z));
-					set(c, x, 1, z, AIR);
+					c.set(x, 0, z, gardenPath(x, z));
+					c.set(x, 1, z, AIR);
 				}
 			}
 			return;
@@ -1231,33 +1219,33 @@ public final class CitadelOffice {
 		// a column is a retaining wall where a neighbour is lower (the tower's skirt is never lower)
 		boolean edge = lower(c, dx - 1, dz, t) || lower(c, dx + 1, dz, t) || lower(c, dx, dz - 1, t) || lower(c, dx, dz + 1, t);
 		for (int y = 1; y < t; y++) {
-			set(c, x, y, z, edge ? gardenWall(x, y, z) : CitadelCanvas.b(Blocks.DIRT));
+			c.set(x, y, z, edge ? gardenWall(x, y, z) : CitadelCanvas.b(Blocks.DIRT));
 		}
 		if (path && o <= 9) {
 			boolean last = o == 5 || o == 9;
 			if (last) {
 				// the stair that climbs onto the tier: the column below it is wall, the stair stands on top of it
-				set(c, x, t, z, stairs(Blocks.STONE_BRICK_STAIRS, Direction.WEST));
+				c.set(x, t, z, stairs(Blocks.STONE_BRICK_STAIRS, Direction.WEST));
 				return;
 			}
-			set(c, x, t, z, gardenPath(x, z));
+			c.set(x, t, z, gardenPath(x, z));
 			if (o == 6) {
 				// the upper stair's first step stands on the lower tier's path
-				set(c, x, t + 1, z, stairs(Blocks.STONE_BRICK_STAIRS, Direction.WEST));
+				c.set(x, t + 1, z, stairs(Blocks.STONE_BRICK_STAIRS, Direction.WEST));
 			}
 			return;
 		}
 		if (edge) {
-			set(c, x, t, z, CALCITE);
+			c.set(x, t, z, CALCITE);
 			return;
 		}
-		set(c, x, t, z, Flora.turf(x, z));
+		c.set(x, t, z, Flora.turf(x, z));
 		int h = Flora.hash(x, z, 41) % 100;
 		boolean besidePath = dx > E && dz >= 2 && dz <= 5;
 		if (h < 30) {
 			Flora.plantOn(c, x, t, z, Flora.bloom(1 + Math.floorDiv(x + z, 5), h >> 1));
 		} else if (h < 42 && !besidePath) {
-			set(c, x, t + 1, z, Flora.bush(h));
+			c.set(x, t + 1, z, Flora.bush(h));
 		} else if (h < 60) {
 			Flora.plantOn(c, x, t, z, CitadelCanvas.b(Blocks.SHORT_GRASS));
 		}
