@@ -35,6 +35,9 @@ final class CatalogEntries {
 			new dev.t3craft.hq.citadel.catalog.house.HouseTowerLookout(), // house_tower_lookout
 			new dev.t3craft.hq.citadel.catalog.house.HouseTowerStair(), // house_tower_stair
 			new dev.t3craft.hq.citadel.catalog.lamp.LampCherryPost(), // lamp_cherry_post
+			new dev.t3craft.hq.citadel.catalog.stall.StallClothLanterns(), // stall_cloth_lanterns
+			new dev.t3craft.hq.citadel.catalog.stall.StallFruitAwning(), // stall_fruit_awning
+			new dev.t3craft.hq.citadel.catalog.stall.StallTeaBar(), // stall_tea_bar
 	};
 
 	static final List<Variant> ALL = List.of(ENTRIES);
