@@ -122,8 +122,8 @@ public final class AnnexGreenhouseCopper implements Variant {
 			dl = w % 2 == 0 ? cu - 1 : cu;
 			int span = vb - vf;
 			int half = (w - 1) / 2;
-			boolean hipWant = w >= 7 && span >= 4 && p.hash(0, 0, 0, 4) == 0;
-			boolean lantWant = w >= 8 && span >= (hipWant ? 4 : 6) && p.hash(1, 0, 0, 2) == 0 && p.h() - 1 - PLATE - 2 >= 1;
+			boolean hipWant = w >= 9 && span >= 6 && p.hash(0, 0, 0, 3) == 0;
+			boolean lantWant = w >= 9 && span >= (hipWant ? 4 : 6) && p.hash(1, 0, 0, 2) == 0 && p.h() - 1 - PLATE - 2 >= 1;
 			hip = hipWant;
 			lant = lantWant;
 			int want = p.hash(2, 0, 0, 2) == 0 ? half : Math.max(1, half - 1);
