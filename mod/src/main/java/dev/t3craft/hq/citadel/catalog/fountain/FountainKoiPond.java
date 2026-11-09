@@ -369,7 +369,14 @@ public final class FountainKoiPond implements Variant {
 			return n < 5 ? b(Blocks.SAND) : n < 7 ? b(Blocks.GRAVEL) : n == 7 ? b(Blocks.CLAY) : b(Blocks.SAND);
 		}
 
+		boolean pale(int u, int v) {
+			return p.hash(u / 3, 21, v / 3, 3) == 0;
+		}
+
 		BlockState rimBase(int u, int v) {
+			if (pale(u, v)) {
+				return p.hash(u, 0, v, 3) == 0 ? b(Blocks.ANDESITE) : b(Blocks.STONE_BRICKS);
+			}
 			return switch (p.hash(u, 0, v, 6)) {
 				case 0 -> b(Blocks.COBBLED_DEEPSLATE);
 				case 1 -> b(Blocks.TUFF);
@@ -381,7 +388,7 @@ public final class FountainKoiPond implements Variant {
 
 		/** Lighter top stones: andesite, mossy cobble, plain cobble, brick, a little gravel. */
 		BlockState rimTop(int u, int v) {
-			if (p.hash(u / 3, 21, v / 3, 3) == 0) { // a pale stretch of the rim: calcite and diorite, so the ring is not all grey
+			if (pale(u, v)) { // a pale stretch of the rim: calcite and diorite, so the ring is not all grey
 				return switch (p.hash(u, 22, v, 4)) {
 					case 0 -> b(Blocks.DIORITE);
 					case 1 -> b(Blocks.POLISHED_DIORITE);
@@ -670,7 +677,7 @@ public final class FountainKoiPond implements Variant {
 				placed++;
 			}
 			// the water is opaque from above, so a few sea lanterns glow in the bed where the fish are
-			int glow = 1 + area / 45;
+			int glow = 1 + area / 90;
 			for (int i = wet.size() - 1; i >= 0 && glow > 0; i--) {
 				int u = wet.get(i)[0];
 				int v = wet.get(i)[1];
@@ -1039,8 +1046,7 @@ public final class FountainKoiPond implements Variant {
 				}
 			}
 			for (int y = 0; y <= ty; y++) {
-				// bark and stripped bark mixed, so the trunk is neither a black post nor a pink one
-				put(c, p, treeU, y, treeV, b(y == 0 || p.hash(treeU, y + 40, treeV, 2) == 0 ? Blocks.CHERRY_LOG : Blocks.STRIPPED_CHERRY_LOG));
+				put(c, p, treeU, y, treeV, b(Blocks.SPRUCE_LOG)); // brown bark under the pink crown
 			}
 			List<int[]> seeds = new ArrayList<>();
 			seeds.add(new int[] {treeU, ty, treeV});
@@ -1048,16 +1054,16 @@ public final class FountainKoiPond implements Variant {
 			int capV = treeV;
 			int capY = ty + 1;
 			if (!bent && tall) {
-				put(c, p, treeU, ty + 1, treeV, b(Blocks.CHERRY_LOG)); // straight trunk: one more log so the crown has something to hold on to
+				put(c, p, treeU, ty + 1, treeV, b(Blocks.SPRUCE_LOG)); // straight trunk: one more log so the crown has something to hold on to
 				seeds.add(new int[] {treeU, ty + 1, treeV});
 				capY = ty + 2;
 			}
 			if (bent) {
 				Direction.Axis axis = bu != treeU ? Direction.Axis.X : Direction.Axis.Z;
-				put(c, p, bu, ty, bv, b(Blocks.CHERRY_LOG).setValue(BlockStateProperties.AXIS, axis));
+				put(c, p, bu, ty, bv, b(Blocks.SPRUCE_LOG).setValue(BlockStateProperties.AXIS, axis));
 				seeds.add(new int[] {bu, ty, bv});
 				if (ty + 1 <= top) {
-					put(c, p, bu, ty + 1, bv, b(Blocks.CHERRY_LOG));
+					put(c, p, bu, ty + 1, bv, b(Blocks.SPRUCE_LOG));
 					seeds.add(new int[] {bu, ty + 1, bv});
 				}
 				capU = bu;
@@ -1071,7 +1077,7 @@ public final class FountainKoiPond implements Variant {
 			int lv = sv == 0 ? 1 : sv;
 			double cy = Math.max(3.6, top - 1.2);
 			boolean small = w <= 8 || d <= 8; // the crown must leave water showing on a small pond
-			double reach = tall ? (small ? 0.4 : 1.0) : 0.5;
+			double reach = tall ? (small ? 0.2 : 1.0) : 0.0; // small ponds: the crown sits over the trunk, not over the water
 			double[][] lumps = small
 					? new double[][] {
 						{bu + reach * lu, cy, bv + reach * lv, 2.1, 1.0},
