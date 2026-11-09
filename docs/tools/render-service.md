@@ -13,6 +13,8 @@
 > 3. It drops the request into the PC inbox, with the paths rewritten. `--packs` folders are synced too.
 > 4. While the job runs, it mirrors `status.json` and `daemon.json` into the local spool, so Citadel Studio still works. When the job ends, it copies the whole outbox folder back.
 >
+> **Quality:** jobs sent to the PC default to `final` with `--ss 3` (`T3CRAFT_RENDER_SS`). `--preview` (scale 0.8, `--ss 1`) is only for an explicitly quick look.
+>
 > Settings: `T3CRAFT_RENDER_HOST` (default `user@100.64.0.20`: Windows user `winuser`, WSL user `wsluser`), `T3CRAFT_RENDER_REMOTE_REPO`, `T3CRAFT_RENDER_REMOTE_JOBS`. `T3CRAFT_RENDER_MODE=local` is only for running ON the PC.
 
 One long-lived JVM renders for every agent. Dozens of agents see their designs (HQ plans, and UI

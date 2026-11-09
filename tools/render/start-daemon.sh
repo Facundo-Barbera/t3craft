@@ -10,9 +10,9 @@
 # daemon decides "does this worktree need compiling?" by diffing against this checkout's HEAD).
 # One JVM, nice 19 / ionice idle. Settings (environment, read at start):
 #   RENDER_WORKERS      jobs at once (default 1, AGENTS.md "VPS: heavy processes"; compiles go one at a time)
-#   RENDER_PARALLELISM  render threads in total, split between the workers (default 6 -> 2 per job)
+#   RENDER_PARALLELISM  render threads in total, split between the workers (default: cores - 1)
 #   RENDER_LOAD_MAX     above this 1-min load no job starts while another runs (default 6)
-#   RENDER_XMX          max heap (default 2g + 1.5g per worker: 3584m with 1 worker)
+#   RENDER_XMX          max heap (default 8g)
 # Runs ONLY on the render PC (my-pc, WSL), never on the VPS (AGENTS.md). One daemon, 1 worker. On the PC it
 # holds the PC's own /tmp/t3craft-heavy.lock while alive. Approval of render sessions is enforced on the VPS
 # side, in tools/render/submit.sh (~/.cache/t3craft-coord/renders-approved there).
@@ -36,8 +36,9 @@ esac
 
 int_or() { case "$1" in ''|*[!0-9]*) echo "$2" ;; *) if [ "$1" -ge 1 ]; then echo "$1"; else echo "$2"; fi ;; esac; }
 WORKERS="$(int_or "${RENDER_WORKERS:-}" 1)"
-PARALLELISM="$(int_or "${RENDER_PARALLELISM:-}" 6)"
-XMX="${RENDER_XMX:-$((2048 + 1536 * WORKERS))m}"
+# the daemon only runs on the render PC: use its cores (all but one) and a roomy heap
+PARALLELISM="$(int_or "${RENDER_PARALLELISM:-}" $(( $(nproc) > 2 ? $(nproc) - 1 : 1 )))"
+XMX="${RENDER_XMX:-8g}"
 export RENDER_WORKERS="$WORKERS" RENDER_PARALLELISM="$PARALLELISM"
 export RENDER_LOAD_MAX="${RENDER_LOAD_MAX:-6}"
 HEAVY_LOCK=/tmp/t3craft-heavy.lock

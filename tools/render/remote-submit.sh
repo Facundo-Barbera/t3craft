@@ -30,7 +30,8 @@ R_REPO="${T3CRAFT_RENDER_REMOTE_REPO:-projects/t3craft}"
 R_JOBS="${T3CRAFT_RENDER_REMOTE_JOBS:-t3craft-jobs}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 kind=hq
-priority=preview
+# the render PC has room: high quality by default (final, supersampled); --preview only when asked for
+priority=final
 agent="${T3CRAFT_AGENT:-}"
 worktree=""
 wait_for=1
@@ -120,6 +121,10 @@ payload="$(cd "$worktree" && tar cz mod/src mod/build.gradle mod/gradle.properti
 packs_local=""
 packs_payload=""
 args=("$@")
+# default supersampling on the PC: 3x3 per pixel (clean edges); the agent's own --ss wins
+if [ "$priority" = final ] && [[ " ${args[*]} " != *" --ss "* ]]; then
+	args+=(--ss "${T3CRAFT_RENDER_SS:-3}")
+fi
 for i in "${!args[@]}"; do
 	if [ "${args[$i]}" = "--packs" ] && [ $((i + 1)) -lt ${#args[@]} ]; then
 		packs_local="${args[$((i + 1))]}"
