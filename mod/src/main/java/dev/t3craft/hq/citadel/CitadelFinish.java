@@ -638,8 +638,17 @@ public final class CitadelFinish {
 		return modules;
 	}
 
+	/** The catalog pieces of the last plan built (render diagnostics: {@code PlanReport} names the piece of a stair flight). */
+	private static volatile List<CitadelCanvas.Piece> lastPieces = List.of();
+
+	/** The catalog pieces painted on the canvas of the last {@link #build} (x/z are plan coordinates; render diagnostics only). */
+	public static List<CitadelCanvas.Piece> lastPieces() {
+		return lastPieces;
+	}
+
 	/** Turns the painted canvas into the plan: air, shapes, groups, light pass, placements, modules. */
 	public static BuildPlan build(CitadelCanvas c) {
+		lastPieces = List.copyOf(c.pieces);
 		// struct/streets-plazas: the furniture of the crossings, after the catalog's placement (it only takes free cells) and before the relief
 		CitadelStreetscape.crossings(c);
 		// design/citadel-terraces: the flat citadel goes onto its terraces before anything reads the final cells
