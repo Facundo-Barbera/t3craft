@@ -7,7 +7,6 @@ import dev.t3craft.hq.citadel.catalog.Variant;
 import dev.t3craft.hq.citadel.catalog.tree.TreeKit.Vox;
 import java.util.List;
 import java.util.Random;
-import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -78,8 +77,7 @@ public final class TreeCherryGrand implements Variant {
 		int wv1 = wv0 + mn - 1;
 		boolean big = mn >= 10;
 
-		int H = Math.min(p.h(), 9 + mn / 2); // a wide dome: the crown is about as wide as it is tall
-		H = Math.max(Math.min(p.h(), 10), H - r.nextInt(2)); // another height per seed
+		int H = Math.min(p.h(), CLEAR + 1 + (int) Math.round(mn * 0.75) + r.nextInt(2)); // a wide dome, another height per seed
 		int y2 = H >= 16 ? 4 : H >= 13 ? 3 : 2; // 2×2 up to y2 - 1, three cells at y2, then the leader
 		int crownY = H - 3;
 		int ou = r.nextInt(2);
@@ -92,7 +90,7 @@ public final class TreeCherryGrand implements Variant {
 				Math.cos(lean) * amp, Math.sin(lean) * amp);
 
 		// ---- roots spread out, a flare one block high against the trunk, a collar on the big ones
-		roots(t, bu, bv, 6 + (big ? 2 : 0), 2 + (big ? 1 : 0) + (mn >= 13 ? 1 : 0));
+		roots(t, bu, bv, 6 + (big ? 2 : 0), 3 + (big ? 1 : 0));
 		if (big) {
 			int lu = lead[0][y2 + 1];
 			int lv = lead[1][y2 + 1];
@@ -167,24 +165,40 @@ public final class TreeCherryGrand implements Variant {
 			drips(t, tu, ly - nDown, tv, rx, rz, i);
 		}
 
+		// ---- one seed in three: a low limb that sweeps far out to a lobe of its own
+		if (r.nextInt(3) == 0) {
+			double sa = r.nextDouble() * Math.PI * 2;
+			double sx = Math.cos(sa);
+			double sz = Math.sin(sa);
+			int su = lead[0][sy0];
+			int sv = lead[1][sy0];
+			double sroom = room(su, sv, sx, sz, wu0, wu1, wv0, wv1);
+			if (sroom >= 3.5) {
+				double sr = Math.min(1.8 * ls, sroom - 1.5);
+				double reach = sroom - sr * 0.9;
+				int tu = (int) Math.round(su + sx * reach);
+				int tv = (int) Math.round(sv + sz * reach);
+				List<int[]> sweep = TreeKit.branch(t, LIMB, new int[] {su, sy0, sv}, new int[] {tu, sy0, tv}, false);
+				darkBase(t, sweep);
+				lobe(t, tu, sy0 + 1, tv, Math.max(1.3, fit(tu, wu0, wu1, sr)), Math.max(1.3, fit(tv, wv0, wv1, sr)), 1, 1,
+						TreeKit.SAKURA, 0.5, 60, 3, null);
+			}
+		}
+
 		// ---- the crown on the leader
 		int cu = lead[0][crownY];
 		int cv = lead[1][crownY];
 		double cr = TreeKit.clamp(Math.min(Math.min(cu - wu0, wu1 - cu), Math.min(cv - wv0, wv1 - cv)) + 1.0, 2.0, 2.4 * ls);
 		lobe(t, cu, crownY + 1, cv, cr, cr * (0.85 + r.nextDouble() * 0.2), 1, 1, TreeKit.SAKURA, 0.5, 9, 1, null);
 
-		// ---- flares one block high against the trunk, only where there is room to stand above them
-		for (int v = bv - 1; v <= bv + 2; v++) {
-			for (int u = bu - 1; u <= bu + 2; u++) {
-				boolean outU = u < bu || u > bu + 1;
-				boolean outV = v < bv || v > bv + 1;
-				if (outU != outV && t.kind(u, 0, v) == TreeKit.WOOD && clear(t, u, v) && t.hash(u, 1, v, 3) < (big ? 2 : 1)) {
-					t.woodSoft(u, 1, v, TreeKit.CHERRY.bark());
-				}
+		// ---- fallen petals: thick under the whole crown, thinning out towards the corners, a little moss between
+		TreeKit.ground(t, bu + 0.5, bv + 0.5, mn * 0.75, (u, v, k) -> {
+			int hsh = t.hash(u, 0, v, 100);
+			if (hsh < (int) (88 - 40 * k)) {
+				return TreeKit.petals(1 + t.hash(u, 1, v, k < 0.5 ? 4 : 3), t.hash(u, 2, v, 4));
 			}
-		}
-
-		TreeKit.petalCarpet(t, bu + 0.5, bv + 0.5, mn / 2.0 + 2.0);
+			return hsh < (int) (94 - 40 * k) ? Blocks.MOSS_CARPET.defaultBlockState() : null;
+		});
 		trimBareTips(t);
 		t.prune();
 		t.flush(c);
@@ -226,11 +240,8 @@ public final class TreeCherryGrand implements Variant {
 					if (lead != null && y <= iy && Math.abs(u - lead[0][y]) <= 1 && Math.abs(v - lead[1][y]) <= 1) {
 						continue;
 					}
-					if (ly != 0 && q > 0.5 * rem && t.hash(u + salt, y * 3, v, 6) < 2) {
-						continue; // the rim of the top and bottom layers comes and goes
-					}
-					if (q > 0.65 * rem && t.hash(u + salt * 5, y + 11, v, 8) == 0) {
-						continue; // a few holes in the shell
+					if (q > 0.55 * rem && t.hash(u + salt * 5, y + 11, v, 9) < 2) {
+						continue; // the shell is eroded by noise (about a fifth of it), not by stamped steps
 					}
 					t.leafOf(u, y, v, tone(t, lv, u, y, v, dyTone, salt), 1000 + id);
 				}
@@ -258,14 +269,13 @@ public final class TreeCherryGrand implements Variant {
 			boolean diag = du != 0 && dv != 0;
 			int u = du < 0 ? bu - 1 : du > 0 ? bu + 2 : bu + t.hash(k, 1, 3, 2);
 			int v = dv < 0 ? bv - 1 : dv > 0 ? bv + 2 : bv + t.hash(k, 2, 3, 2);
-			int len = 1 + t.hash(k, 3, 3, maxLen);
-			Direction.Axis ax = du != 0 && !diag ? Direction.Axis.X : Direction.Axis.Z;
+			int len = 1 + t.hash(k, 3, 3, maxLen); // 1..maxLen long
 			if (diag) {
 				t.woodSoft(u - du, 0, v, TreeKit.CHERRY.bark()); // the corner touches the trunk only by an edge
 			}
 			for (int i = 0; i < len; i++) {
 				boolean tip = i == len - 1 && len > 1;
-				BlockState s = i == 0 || diag ? TreeKit.CHERRY.bark() : TreeKit.CHERRY.log(ax);
+				BlockState s = TreeKit.CHERRY.bark(); // bark on all sides: a log end facing the camera shows pale rings
 				t.wood(u, 0, v, s);
 				if (tip) {
 					t.cover(u, 1, v, Blocks.MOSS_CARPET.defaultBlockState()); // a moss cap on the root's end
@@ -279,11 +289,6 @@ public final class TreeCherryGrand implements Variant {
 		}
 	}
 
-	/** Nothing solid within the 3 cells above a flare (y = 2..4): you could stand on it and hit your head. */
-	private static boolean clear(Vox t, int u, int v) {
-		return t.kind(u, 2, v) == TreeKit.EMPTY && t.kind(u, 3, v) == TreeKit.EMPTY && t.kind(u, 4, v) == TreeKit.EMPTY;
-	}
-
 	/** The dark first two cells of a limb are the trunk's own bark, so the pale wood starts clear of the leader. */
 	private static void darkBase(Vox t, List<int[]> limb) {
 		for (int k = 0; k < Math.min(2, limb.size()); k++) {
@@ -294,7 +299,7 @@ public final class TreeCherryGrand implements Variant {
 
 	/** Cherry leaves, with the flowering azalea in pairs: a little on top, some on the flanks, a third below. */
 	private static BlockState tone(Vox t, TreeKit.Leaves lv, int u, int y, int v, double dy, int salt) {
-		int pct = dy < -0.2 ? 28 : dy < 0.35 ? 10 : 2;
+		int pct = dy < -0.2 ? 20 : dy < 0.35 ? 6 : 0;
 		return t.hash(u + salt, y, Math.floorDiv(v, 2), 100) < pct ? lv.b() : lv.a();
 	}
 
