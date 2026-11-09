@@ -996,6 +996,71 @@ Facundo quiere ver la UI en el Mac. Hay cuatro caminos reales; los dos primeros 
 5. ¿Qué pantallas quieres pulir primero con el ciclo nuevo: ajustes, emparejado y confirmaciones (las que usan widgets vanilla),
    o el chat?
 
+## 14. Anexo: correr el juego en el PC y verlo en el Mac (por Tailscale)
+
+Pregunta de Facundo (2026-11-09): ¿se puede correr en el PC y verlo en el Mac, que están conectados por Tailscale? **Sí.** Pero
+antes hay un detalle del PC que decide todo lo demás.
+
+### 14.1 Primero: ¿dónde corre el juego en el PC, en WSL o en Windows?
+El checkout del PC vive en WSL (`AGENTS.md`: my-pc, WSL, `~/projects/t3craft`). **Correr Minecraft dentro de WSL con WSLg no
+es un buen camino:**
+- La aceleración de OpenGL por hardware en WSL2 suele quedar marcada como no soportada y cae al render por software
+  (`llvmpipe`).
+- Con el camino de hardware (D3D12/Mesa) hay que copiar cada cuadro entre la VRAM y la memoria del sistema para pasarlo a
+  Windows; se reporta un techo de unos 72 a 75 fps y hasta un 50 % de sobrecoste a altas tasas.
+- Hay incidencias abiertas de inestabilidad, incluidos cuelgues del propio Windows en algunas configuraciones.
+
+Conclusión: para el **cliente de desarrollo**, el juego debería correr **en Windows nativo** (y con el IDE también en Windows,
+que además arregla la causa 5 del hot reload, §13.2). Los renders y el demonio de renders se quedan en WSL, donde ya funcionan
+con CUDA. Coste honesto: el PC tendría un checkout de Windows para el cliente de desarrollo, además del de WSL para renders.
+- *Matiz:* para trabajar **solo pantallas** sobre un mundo vacío (el mundo demo superflat o void del mod), incluso el render por
+  software podría alcanzar, porque no hace falta fps. Pero por la inestabilidad reportada no lo recomiendo como camino principal.
+
+### 14.2 Las opciones PC → Mac
+| Opción | Qué es | Interactivo | Fidelidad de imagen | Esfuerzo | Para qué sirve |
+|---|---|---|---|---|---|
+| **T1. Sunshine (PC) + Moonlight (Mac)** | Streaming de juego, los dos libres y de código abierto. Codifica con NVENC en la RTX | Sí, latencia baja | Muy buena, con compresión (ver 14.4) | S, solo instalar y emparejar | **La mejor opción.** Jugar y revisar la UI desde el Mac como si fuera local |
+| **T2. Parsec, Steam Link o NoMachine** | Lo mismo, productos alternativos | Sí | Buena | S | Respaldo si Sunshine da problemas. Steam Link exige añadir el juego como "non-Steam game" |
+| **T3. "Windows App" (RDP) de Microsoft** | Escritorio remoto estándar, ya existe en el Mac | Sí, pero pobre para 3D | Nítida en texto, fps bajos | S | Ver menús y config; no para mirar animaciones ni el mundo |
+| **T4. Jar al Mac: compilar en el PC, jugar en el Mac** | El PC compila (`./gradlew build`), el jar viaja por Tailscale al Mac y ahí corre una instancia normal de Minecraft con el mod | Sí, nativo y fluido | **Perfecta, sin compresión** | S | Respeta "Gradle solo en el PC" y da imagen pixel-exacta. **Sin HotSwap** (no es el cliente de Loom); F3+T sí sirve para recursos. El relay de renders ya mueve archivos así por SSH |
+| **T5. Visor propio por WebSocket** (O3 de §11) | El mod manda su framebuffer y recibe la entrada | Sí | Media | M a L | Solo si se quiere **dentro** de Citadel Studio o en el móvil. T1 lo cubre mejor y gratis |
+| **T6. PNG de `uiRender` o de los gametests en Citadel Studio** | Ya existe: se renderiza en el PC y se mira desde el Mac | No | Pixel-exacta | — | Revisar y comparar, no desarrollar |
+
+### 14.3 Detalles de Tailscale que importan
+- **Direct contra relay.** Comprobar con `tailscale status`: dice `direct`, `relay` (un DERP) o `peer-relay`. Para streaming, una
+  conexión **directa** es imprescindible; un relay añade un salto y la latencia sube mucho (en un caso reportado, de 12 ms a
+  40 ms). Si el PC y el Mac están en la misma red, Tailscale va directo y la calidad es la de la LAN. `tailscale ping` muestra la
+  latencia y qué camino usa.
+- **Nada de abrir puertos al exterior.** Con Tailscale se puede dejar Sunshine solo en el tailnet, sin port forwarding: el
+  firewall del host abre esos puertos únicamente en la interfaz de Tailscale.
+- **Puertos de Sunshine:** TCP 47984, 47989 y 48010, y UDP 47998 a 48010 (más 5353 para descubrimiento).
+- **Gotcha clásico en Windows:** el firewall suele clasificar la interfaz de Tailscale como red "pública" y bloquea esos
+  puertos. Hay que añadir la regla explícitamente para esa interfaz.
+- **Moonlight no descubre el host por el tailnet** (el mDNS no cruza): hay que **añadir el PC a mano** por su IP de Tailscale o
+  su nombre de MagicDNS.
+
+### 14.4 Advertencia específica para trabajo de UI
+El streaming comprime con H.264 o HEVC, y la fuente de Minecraft es un bitmap de 8 px: el texto chico y las líneas de 1 px son
+justo lo que peor sobrevive a la compresión. Recomendaciones:
+- Subir el bitrate (con conexión directa, del orden de 40 a 80 Mbps) y que la resolución del stream **coincida** con la del Mac,
+  sin reescalado.
+- Usar el stream para **disposición, flujo y sensación**, y juzgar lo pixel-exacto (kerning, bordes, alineación de 1 px) con
+  **capturas**: `F2` en el juego escribe un PNG, y el relay de renders y Citadel Studio ya saben traerlas al Mac. O T4, que no
+  comprime nada.
+
+### 14.5 Recomendación
+1. **T1 (Sunshine + Moonlight) como camino principal**, con el cliente de desarrollo en **Windows nativo** en el PC y el IDE
+   también en Windows. Con eso tienes el ciclo completo en el PC (HotSwap y F3+T) y lo ves y manejas desde el Mac.
+2. **T4 como complemento** cuando necesites imagen pixel-exacta o el Mac sin latencia: el PC compila, el jar viaja, juegas nativo.
+3. **T6 para revisar** y comparar, que ya está construido.
+4. Si más adelante quieres el ciclo entero en el Mac, eso es M1 de §13.3 y requiere habilitar Gradle ahí.
+
+### 14.6 Preguntas
+1. ¿Puedo asumir que el cliente de desarrollo del PC pasa a **Windows nativo** (checkout propio ahí), y que WSL se queda con los
+   renders? Es la decisión que desbloquea T1 y el hot reload.
+2. ¿Prefieres **T1** (fluido, con compresión) o **T4** (nítido, sin HotSwap) como camino por defecto para mirar la UI?
+3. ¿Quieres que esto quede documentado en `docs/dev.md` como el ciclo de UI recomendado? Sería un cambio de docs, no de código.
+
 ## Fuentes web
 
 - GLFW, `glfwRequestWindowAttention`: https://www.glfw.org/docs/latest/group__window.html
@@ -1022,6 +1087,11 @@ Facundo quiere ver la UI en el Mac. Hay cuatro caminos reales; los dos primeros 
 - Google y el inicio de sesión en webviews embebidos: https://github.com/agentify-sh/desktop/issues/11 y
   https://github.com/tw93/pake/issues/1148
 - fabric-hot-reload (descartado, se cita como referencia de diseño): https://github.com/JHVIW/fabric-hot-reload
+- Moonlight, guía de instalación y puertos: https://github.com/moonlight-stream/moonlight-docs/wiki/Setup-Guide
+- Sunshine y Moonlight sobre Tailscale: https://zeroicey.me/en/posts/tailscale-sunshine-moonlight-remote-desktop/
+- Tailscale, tipos de conexión (direct, relay, peer-relay): https://tailscale.com/docs/reference/connection-types
+- OpenGL acelerado en WSL2, problemas: https://github.com/microsoft/WSL/issues/14033 y
+  https://github.com/microsoft/wslg/issues/469
 - WebDisplays (Fabric): https://www.curseforge.com/minecraft/mc-mods/webdisplays-unofficial-fabric
 - T3 Code, preview en servidor y streaming: `packages/client-runtime/src/preview/serverBrowserStream.ts` y
   `apps/server/src/preview/ServerBrowserStream.ts` en https://github.com/pingdotgg/t3code
