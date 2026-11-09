@@ -1,5 +1,6 @@
 package dev.t3craft.hq.citadel.hub;
 
+import dev.t3craft.hq.citadel.CitadelCanvas;
 import net.minecraft.core.Direction;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.block.Block;
@@ -22,10 +23,16 @@ final class HubBlocks {
 	private HubBlocks() {
 	}
 
-	/** The invisible vanilla light block (level 15): where a lamp must not be seen. */
+	/**
+	 * The invisible vanilla light block where a lamp must not be seen: level {@value #FILL_LEVEL}, moderate,
+	 * so the nave's visible pendants and lanterns (15) stay the light one sees (citadel/light-aesthetic).
+	 */
 	static BlockState light() {
-		return Blocks.LIGHT.defaultBlockState();
+		return CitadelCanvas.invisibleLight(FILL_LEVEL);
 	}
+
+	/** Level of the hub's invisible fill: hung one cell above the walking cell, it reads 12 at the feet under it. */
+	static final int FILL_LEVEL = 13;
 
 	static BlockState stairsTop(Block b, Direction back) {
 		return b.defaultBlockState().setValue(StairBlock.FACING, back).setValue(StairBlock.HALF, Half.TOP);

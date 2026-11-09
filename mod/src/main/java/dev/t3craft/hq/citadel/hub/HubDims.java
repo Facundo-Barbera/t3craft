@@ -164,9 +164,9 @@ final class HubDims {
 		return INNER();
 	}
 
-	/** Covering radius (steps) of the light blocks (3; not scaled: it is how far light reaches). */
+	/** Covering radius (steps) of the light blocks: a level-13 light one cell above the floor keeps 10 two steps away (not scaled). */
 	static int LIGHT_RADIUS() {
-		return 3;
+		return 2;
 	}
 
 	// ---- horizontal: outside

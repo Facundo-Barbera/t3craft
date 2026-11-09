@@ -172,10 +172,10 @@ public final class HubInterior {
 	}
 
 	/**
-	 * Invisible light blocks one cell above the walking cell: first the lattice of street lights (a
-	 * perfect tiling of radius-4 diamonds, so no open cell is more than 4 steps from one), then one more
-	 * wherever a free floor cell is more than 3 steps from every light placed (the wall's edge, where the
-	 * lattice point falls inside a wall or a block of furniture).
+	 * Invisible light blocks (moderate level, {@code HubBlocks.light}) one cell above the walking cell:
+	 * first the lattice of street lights as seeds, then one more wherever a free floor cell is more than
+	 * {@code HubDims.LIGHT_RADIUS} steps from every light placed. Only fill: the light one sees in the hub
+	 * comes from its pendants and lanterns (docs/feat-hq-lighting.md).
 	 */
 	static void lights(CitadelCanvas c) {
 		List<int[]> placed = new ArrayList<>();

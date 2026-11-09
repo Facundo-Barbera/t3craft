@@ -31,7 +31,6 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.FOOT;
 import static dev.t3craft.hq.citadel.CitadelCanvas.GLASS;
 import static dev.t3craft.hq.citadel.CitadelCanvas.GRASS;
 import static dev.t3craft.hq.citadel.CitadelCanvas.HANGING;
-import static dev.t3craft.hq.citadel.CitadelCanvas.LIGHT;
 import static dev.t3craft.hq.citadel.CitadelCanvas.MOSS;
 import static dev.t3craft.hq.citadel.CitadelCanvas.PLANKS;
 import static dev.t3craft.hq.citadel.CitadelCanvas.WATER;
@@ -39,7 +38,6 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.b;
 import static dev.t3craft.hq.citadel.CitadelCanvas.col;
 import static dev.t3craft.hq.citadel.CitadelCanvas.colX;
 import static dev.t3craft.hq.citadel.CitadelCanvas.colZ;
-import static dev.t3craft.hq.citadel.CitadelCanvas.lattice;
 import static dev.t3craft.hq.citadel.CitadelCanvas.leaves;
 import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
 import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
@@ -60,7 +58,7 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
  *     picks the {@link Mats} of the barrio, see {@link CitadelCanvas#mats}) and {@code mods} (module
  *     slot 0..5 of the lot → module; slot {@code h} is the ground floor of hall {@code h}, slot
  *     {@code h + 3} its upper floor; the first entry is the project's lead module).</li>
- * <li>{@link #lotGround}: the courtyard floor (lit accent/floor squares), the paved cross of paths and
+ * <li>{@link #lotGround}: the courtyard floor (accent/floor squares), the paved cross of paths and
  *     the azalea bushes of the garden belt and the verge. Parameters: the lot id and its {@code Lot}
  *     geometry.</li>
  * <li>{@link #courtyardCentre}: the middle of the courtyard, a variant by the lot id's parity: even
@@ -91,7 +89,7 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
  *
  * Fixed blocks of the canvas: {@code FOOT} (hall walls' base, gatehouse body and floor, pool bottom),
  * {@code GLASS} (windows), {@code PLANKS} (stairs' core), {@code GRASS}/{@code MOSS}/{@code WATER}/
- * {@code LIGHT} (gardens, pool, lit floor), azalea leaves, moss carpet, deepslate tile slabs (flat
+ * (gardens, pool; no light is let into floors or ceilings: see docs/feat-hq-lighting.md), azalea leaves, moss carpet, deepslate tile slabs (flat
  * roof), cherry stairs and a cherry hanging sign. From the kit: {@code floor()}, {@code accent()},
  * {@code wallPanel(true)} (the plaque course of the gatehouse), {@code beam(axis)} (the wall band and the
  * arch lintel when the barrio's band equals its post), {@code gardenPlanter()} and {@code desk(facing)}.
@@ -150,14 +148,14 @@ public final class CitadelBarrios {
 			int a = Math.abs(l.a(x, z));
 			int bb = Math.abs(l.b(x, z));
 			if (a <= g && bb <= g) {
-				c.set(x, 0, z, lattice(x, z) ? LIGHT : (a == g || bb == g ? c.accent() : c.floor()));
+				c.set(x, 0, z, a == g || bb == g ? c.accent() : c.floor());
 			} else if (a <= reach && bb <= reach && (a <= g + 1 || bb <= g + 1)) {
-				c.set(x, 0, z, lattice(x, z) ? LIGHT : c.accent());
+				c.set(x, 0, z, c.accent());
 			} else if (a <= reach && bb <= reach) {
-				if (Math.floorMod(a * 3 + bb * 5, 7) == 0 && !lattice(x, z)) {
+				if (Math.floorMod(a * 3 + bb * 5, 7) == 0) {
 					c.set(x, 1, z, BarrioCourt.bush(x, z));
 				}
-			} else if (Math.floorMod(x * 7 + z * 11, 29) == 0 && !lattice(x, z)) {
+			} else if (Math.floorMod(x * 7 + z * 11, 29) == 0) {
 				c.set(x, 1, z, BarrioCourt.bush(x, z));
 			}
 		}
@@ -250,7 +248,7 @@ public final class CitadelBarrios {
 				c.hallCols.put(col(g0.getX(), g0.getZ()), new int[] {l.id(), h});
 				boolean wall = r.wall(u, v);
 				boolean corner = r.corner(u, v);
-				c.set(g0, wall ? FOOT : (lattice(g0.getX(), g0.getZ()) ? LIGHT : c.floor()));
+				c.set(g0, wall ? FOOT : c.floor());
 				Direction.Axis along = (u == -1 || u == D) ? r.side().getAxis() : r.back().getAxis();
 				for (int f = 0; f < F; f++) {
 					int yb = f * fh();
@@ -272,9 +270,9 @@ public final class CitadelBarrios {
 						}
 						BlockPos ceil = g0.atY(yb + fh());
 						if (f < F - 1) {
-							c.set(ceil, hole.contains(ceil.asLong()) ? AIR : (lattice(g0.getX(), g0.getZ()) ? LIGHT : c.floor()));
+							c.set(ceil, hole.contains(ceil.asLong()) ? AIR : c.floor());
 						} else {
-							c.set(ceil, (u % 4 == 1 && v % 4 == 1) ? LIGHT : mats.ceiling());
+							c.set(ceil, mats.ceiling());
 						}
 					}
 				}

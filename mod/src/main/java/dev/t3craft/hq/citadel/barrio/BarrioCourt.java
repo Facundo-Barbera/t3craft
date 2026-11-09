@@ -10,11 +10,9 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import static dev.t3craft.hq.citadel.CitadelCanvas.FOOT;
 import static dev.t3craft.hq.citadel.CitadelCanvas.GRASS;
-import static dev.t3craft.hq.citadel.CitadelCanvas.LIGHT;
 import static dev.t3craft.hq.citadel.CitadelCanvas.MOSS;
 import static dev.t3craft.hq.citadel.CitadelCanvas.WATER;
 import static dev.t3craft.hq.citadel.CitadelCanvas.b;
-import static dev.t3craft.hq.citadel.CitadelCanvas.lattice;
 import static dev.t3craft.hq.citadel.CitadelCanvas.leaves;
 import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
 
@@ -107,10 +105,8 @@ public final class BarrioCourt {
 		for (int sa = -1; sa <= 1; sa += 2) {
 			for (int sb = -1; sb <= 1; sb += 2) {
 				BlockPos p = l.at(sa * CENTRE_R, sb * CENTRE_R, 0);
-				if (!lattice(p.getX(), p.getZ())) {
-					c.set(p.getX(), -1, p.getZ(), FOOT);
-					c.set(p, WATER);
-				}
+				c.set(p.getX(), -1, p.getZ(), FOOT);
+				c.set(p, WATER);
 			}
 		}
 	}
@@ -165,9 +161,6 @@ public final class BarrioCourt {
 		for (int i = 1; i <= 2; i++) {
 			for (int j = 1; j <= 2; j++) {
 				BlockPos p = l.at(sa * (g - i), sb * (g - j), 0);
-				if (lattice(p.getX(), p.getZ())) {
-					continue;
-				}
 				c.set(p, MOSS);
 				c.set(p.above(), i == 1 && j == 2 ? c.kit.gardenPlanter() : leaves(Blocks.FLOWERING_AZALEA_LEAVES));
 			}
@@ -209,8 +202,8 @@ public final class BarrioCourt {
 		for (int u = -1; u <= r.d(); u++) {
 			for (int v = -1; v <= r.w(); v++) {
 				BlockPos p = r.cell(u, v, 0);
-				c.set(p, lattice(p.getX(), p.getZ()) ? LIGHT : ((u + v) % 5 == 0 ? MOSS : GRASS));
-				if (r.corner(u, v) && !lattice(p.getX(), p.getZ())) {
+				c.set(p, (u + v) % 5 == 0 ? MOSS : GRASS);
+				if (r.corner(u, v)) {
 					c.set(p.above(), bush(p.getX(), p.getZ()));
 				}
 			}
@@ -247,15 +240,8 @@ public final class BarrioCourt {
 		}
 	}
 
+	/** Always true since citadel/light-aesthetic: no lattice lights in the ground any more to keep the pond off. */
 	private static boolean pondFree(Room r) {
-		for (int du = -1; du <= 1; du++) {
-			for (int dv = -1; dv <= 1; dv++) {
-				BlockPos p = r.cell(r.d() / 2 + du, r.c() + dv, 0);
-				if (lattice(p.getX(), p.getZ())) {
-					return false;
-				}
-			}
-		}
 		return true;
 	}
 
@@ -277,9 +263,7 @@ public final class BarrioCourt {
 		tree(c, r.cell(2 * d / 3, mid + 2, 0));
 		for (int v = mid - 1; v <= mid + 1; v++) {
 			BlockPos p = r.cell(d / 2, v, 0);
-			if (!lattice(p.getX(), p.getZ())) {
-				c.set(p.above(), bush(p.getX(), p.getZ()));
-			}
+			c.set(p.above(), bush(p.getX(), p.getZ()));
 		}
 	}
 }
