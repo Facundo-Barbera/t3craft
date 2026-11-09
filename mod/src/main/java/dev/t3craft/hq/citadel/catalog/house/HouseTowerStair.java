@@ -202,7 +202,7 @@ public final class HouseTowerStair implements Variant {
 			} else if (y <= 3) {
 				st = deepslate(l.p, u, y, v);
 			} else {
-				st = stone(l.p, u, y, v);
+				st = l.p.hash(u, y, v, 6) == 0 ? b(Blocks.CRACKED_DEEPSLATE_BRICKS) : b(Blocks.DEEPSLATE_BRICKS);
 			}
 			set(c, l.p, u, y, v, st);
 		}
@@ -387,7 +387,7 @@ public final class HouseTowerStair implements Variant {
 			} else if (y == F1) {
 				st = log(l.s.frame(), Direction.Axis.Y);
 			} else if (y < F2) {
-				st = stone(p, u, y, v);
+				st = deepslate(p, u, y, v);
 			} else if (y == F2) {
 				st = log(l.s.frame(), Direction.Axis.Y);
 			} else {
@@ -438,7 +438,7 @@ public final class HouseTowerStair implements Variant {
 				if (!open) {
 					set(c, p, u, F2 + 1, v, rail(l, u, v));
 				}
-				set(c, p, u, PLATE - 1, v, log(l.s.frame(), alongU ? Direction.Axis.X : Direction.Axis.Z));
+				set(c, p, u, PLATE - 1, v, b(Blocks.CALCITE));
 				int du = alongU ? 1 : 0;
 				int dv = alongU ? 0 : 1;
 				boolean before = pillar(l, u - du, v - dv);
@@ -446,7 +446,7 @@ public final class HouseTowerStair implements Variant {
 				// spandrel: an upside-down stair under the lintel, next to a pillar, in bays at least two wide (never over the open bay)
 				if (!open && before != after) {
 					Direction toward = before ? (alongU ? Direction.WEST : Direction.NORTH) : (alongU ? Direction.EAST : Direction.SOUTH);
-					set(c, p, u, PLATE - 2, v, stair(Blocks.DEEPSLATE_BRICK_STAIRS, toward, true));
+					set(c, p, u, PLATE - 2, v, stair(Blocks.CHERRY_STAIRS, toward, true));
 				}
 				if (!open && !before && !after) {
 					put(c, p, u, PLATE - 2, v, hangingLantern(), CitadelCanvas.HANGING);
@@ -474,6 +474,9 @@ public final class HouseTowerStair implements Variant {
 			set(c, p, u, 4, 0, log(l.s.frame(), Direction.Axis.X));
 			set(c, p, u, 5, 0, stair(l.s.eave(), Direction.NORTH, false));
 			set(c, p, u, 5, 1, slab(l.s.roofSlab(), false));
+		}
+		for (int u = cu - 1; u <= cu + 1; u++) {
+			set(c, p, u, 6, 0, fence(Blocks.BAMBOO_FENCE, false, u < cu + 1, false, u > cu - 1));
 		}
 		// the lanterns on the canopy edge
 		set(c, p, cu - 2, 6, 0, lantern());
@@ -503,9 +506,6 @@ public final class HouseTowerStair implements Variant {
 			set(c, p, ou, i, v, step);
 			mass(c, l, ou, v, 0, i - 1);
 			set(c, p, ou, i + 1, v, post);
-			if (i == 3) {
-				set(c, p, ou, i + 2, v, lantern());
-			}
 		}
 		// --- landing 1 at y5, both lanes, down to the stringer row
 		for (int v = l.vb - 1; v <= l.vs; v++) {
@@ -529,9 +529,6 @@ public final class HouseTowerStair implements Variant {
 			set(c, p, u, y, l.vs, west);
 			mass(c, l, u, l.vs, 0, y - 1);
 			set(c, p, u, y + 1, l.vs, post);
-			if (j == 2) {
-				set(c, p, u, y + 2, l.vs, lantern());
-			}
 		}
 		// --- landing 2 at y10, three cells, with the root-cellar alcove open to the back under it
 		for (int u = u2 - 7; u <= u2 - 5; u++) {
@@ -585,9 +582,6 @@ public final class HouseTowerStair implements Variant {
 				if (i >= m) {
 					boolean apex = u == l.cu && v == mid;
 					set(c, p, u, y, v, apex ? b(Blocks.GOLD_BLOCK) : b(Blocks.DEEPSLATE_TILES));
-					if (!apex) {
-						set(c, p, u, y + 1, v, slab(l.s.roofSlab(), false));
-					}
 					continue;
 				}
 				Block blk = i == 0 ? l.s.eave() : l.s.roof();
