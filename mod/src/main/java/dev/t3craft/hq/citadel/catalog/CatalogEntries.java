@@ -35,6 +35,9 @@ final class CatalogEntries {
 			new dev.t3craft.hq.citadel.catalog.fountain.FountainKoiPond(), // fountain_koi_pond
 			new dev.t3craft.hq.citadel.catalog.fountain.FountainMossyCascade(), // fountain_mossy_cascade
 			new dev.t3craft.hq.citadel.catalog.fountain.FountainStreamStones(), // fountain_stream_stones
+			new dev.t3craft.hq.citadel.catalog.garden.GardenFlowerRoseArch(), // garden_flower_rose_arch
+			new dev.t3craft.hq.citadel.catalog.garden.GardenVegRaisedBeds(), // garden_veg_raised_beds
+			new dev.t3craft.hq.citadel.catalog.garden.GardenZenKaresansui(), // garden_zen_karesansui
 			new dev.t3craft.hq.citadel.catalog.house.HouseTimberCottage(), // house_timber_cottage
 			new dev.t3craft.hq.citadel.catalog.house.HouseTimberOverhang(), // house_timber_overhang
 			new dev.t3craft.hq.citadel.catalog.house.HouseTowerBridge(), // house_tower_bridge
