@@ -31,7 +31,7 @@ import net.minecraft.world.level.block.state.BlockState;
  * children feed; that key also tells the generic fallback ({@code LeadOfficeDecor}) that this module
  * already has its office.
  *
- * <h2>Hook (for the coordinator; this branch does not touch the citadel files)</h2>
+ * <h2>Hook (wired: {@code CitadelBarrios.hall} calls {@link #place} before its desk loop)</h2>
  * In {@code CitadelBarrios.hall}, inside {@code for (HqLayout.Module mod : ...)}, replace the desk loop
  * <pre>{@code
  *   for (int slot = 0; slot < mod.capacity(); slot++) { ... desk(c, mod.index(), r, f, slot, thread); }

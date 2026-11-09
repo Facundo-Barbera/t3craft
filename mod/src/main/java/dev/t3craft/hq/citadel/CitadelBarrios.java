@@ -225,10 +225,14 @@ public final class CitadelBarrios {
 			}
 			int f = RingCampusGeometry.floorOf(mod.index());
 			int y = f * FH + 1;
-			for (int slot = 0; slot < mod.capacity(); slot++) {
-				String thread = mod.threadAt(slot);
-				if (thread != null) {
-					desk(c, mod.index(), r, f, slot, thread);
+			// feat/lead-office: a lead's module becomes its office (desk, children big screen, banner,
+			// bookshelves, whiteboard, chairs); every other module keeps its six desks
+			if (!CitadelLeadOffice.place(c, mod, r, f)) {
+				for (int slot = 0; slot < mod.capacity(); slot++) {
+					String thread = mod.threadAt(slot);
+					if (thread != null) {
+						desk(c, mod.index(), r, f, slot, thread);
+					}
 				}
 			}
 			BlockPos door = f == 0 ? r.cell(0, mid - 1, y) : r.cell(7, mid, y);
