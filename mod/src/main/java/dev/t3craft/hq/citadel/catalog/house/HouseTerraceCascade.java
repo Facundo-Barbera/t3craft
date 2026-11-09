@@ -499,8 +499,8 @@ public final class HouseTerraceCascade implements Variant {
 		// on a deep terrace: a cherry on the left lawn, and room to sit under it
 		if (g.t >= 6 && g.ud >= 9) {
 			cherry(x, 5, g.gd + 3);
-			if (g.t >= 8) {
-				cherry(x, g.ud - 4, g.gd + g.t - 3);
+			if (g.t >= 8 && g.ud >= 12) {
+				cherry(x, g.ud - 4, g.gd + g.t - 5); // its crown stays clear of the eave's row
 			}
 			x.set(7, G1, g.gd + 3, stair(Blocks.DARK_OAK_STAIRS, Direction.WEST, false));
 		}
