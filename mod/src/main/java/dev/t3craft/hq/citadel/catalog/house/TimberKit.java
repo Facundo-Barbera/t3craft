@@ -247,6 +247,12 @@ final class TimberKit {
 		}
 	}
 
+	/** {@link #gable} with a single roof material (no {@code alt} scatter). */
+	static void gable(CitadelCanvas c, Plot p, boolean ridgeU, int s0, int s1, int t0, int t1, int y,
+			Block roof, Block eave, Block ridge, Block ridgeSlab, boolean rakeStart, boolean rakeEnd) {
+		gable(c, p, ridgeU, s0, s1, t0, t1, y, roof, eave, ridge, ridgeSlab, null, rakeStart, rakeEnd);
+	}
+
 	static void putS(CitadelCanvas c, Plot p, boolean ridgeU, int s, int t, int y, BlockState st) {
 		if (ridgeU) {
 			p.set(c, s, y, t, st);
