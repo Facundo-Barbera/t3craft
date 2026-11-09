@@ -606,7 +606,7 @@ public final class HouseTerracePodium implements Variant {
 		int u1 = u0 + 2;
 		int v0 = pv0();
 		int v1 = v0 + 2;
-		int top = DECK + 4;
+		int top = DECK + 3; // low enough for the roof to stay inside the plot's minimum height
 		for (int u : new int[] {u0, u1}) {
 			for (int v : new int[] {v0, v1}) {
 				for (int y = DECK + 1; y < top; y++) {
@@ -656,8 +656,12 @@ public final class HouseTerracePodium implements Variant {
 				}
 			}
 		}
-		p.set(c, u0 + 1, top + 3, v0 + 1, slab(Blocks.CUT_COPPER_SLAB.waxed().oxidized()));
-		p.set(c, u0 + 1, top + 4, v0 + 1, b(Blocks.LANTERN));
+		if (p.has(u0 + 1, top + 3, v0 + 1)) {
+			p.set(c, u0 + 1, top + 3, v0 + 1, slab(Blocks.CUT_COPPER_SLAB.waxed().oxidized()));
+		}
+		if (p.has(u0 + 1, top + 4, v0 + 1)) {
+			p.set(c, u0 + 1, top + 4, v0 + 1, b(Blocks.LANTERN));
+		}
 		// under the pergola: table, benches facing it, lanterns
 		int mu = u0 + 1;
 		int mv = v0 + 1;
