@@ -16,6 +16,7 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.GRASS;
 import static dev.t3craft.hq.citadel.CitadelCanvas.HANGING;
 import static dev.t3craft.hq.citadel.CitadelCanvas.LOG;
 import static dev.t3craft.hq.citadel.CitadelCanvas.MOSS;
+import static dev.t3craft.hq.citadel.CitadelCanvas.RIB;
 import static dev.t3craft.hq.citadel.CitadelCanvas.b;
 import static dev.t3craft.hq.citadel.CitadelCanvas.leaves;
 import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
@@ -334,7 +335,11 @@ public final class LoungeRoom {
 			}
 		}
 
-		/** The pergola: a ring beam on twelve posts, a lattice of slabs and warm glow panels. */
+		/**
+		 * The pergola: a ring beam on twelve dark posts, and outside it an awning of cherry stairs that slopes down
+		 * to the rim (so the bars, shelves and the rack are under a roof) with warm glow panels under it. The
+		 * entrances stay open between their posts.
+		 */
 		void pergola() {
 			for (int dx = -15; dx <= 15; dx++) {
 				for (int dz = -15; dz <= 15; dz++) {
@@ -348,25 +353,19 @@ public final class LoungeRoom {
 					if (d <= 10.6 || d > 13.95) {
 						continue;
 					}
-					boolean ring = d > 10.6 && d <= 11.9;
+					boolean ring = d <= 11.9;
 					if (ring) {
 						set(dx, ROOF_Y, dz, beam(ax >= az ? Direction.Axis.Z : Direction.Axis.X));
 					} else if (a >= 3) {
-						int par = ax >= az ? az : ax;
-						if (par % 2 == 0) {
-							set(dx, ROOF_Y, dz, slab(Blocks.CHERRY_SLAB));
-							if (Math.floorMod(dx * 3 + dz * 5, 9) == 0) {
-								// the panel hangs under its slab: its lit face is the bottom, its frame never shows from above
-								set(dx, ROOF_Y - 1, dz, c.kit.glowPanel(Direction.DOWN, false));
-							}
-							int sx = dx < 0 ? -1 : 1;
-							int sz = dz < 0 ? -1 : 1;
-							if (theme(sx, sz) == 3) {
-								set(dx, ROOF_Y + 1, dz, leaves(Blocks.CHERRY_LEAVES));
-								if (Math.floorMod(ax * 2 + az, 5) == 0) {
-									set(dx, ROOF_Y - 1, dz, leaves(Blocks.CHERRY_LEAVES));
-								}
-							}
+						set(dx, ROOF_Y - 1, dz, stairs(Blocks.CHERRY_STAIRS, NodeDecor.inward(dx, dz)));
+						if (Math.floorMod(dx * 3 + dz * 5, 7) == 0) {
+							// the panel hangs under its stair: its lit face is the bottom, its frame never shows from above
+							set(dx, ROOF_Y - 2, dz, c.kit.glowPanel(Direction.DOWN, false));
+						}
+						int sx = dx < 0 ? -1 : 1;
+						int sz = dz < 0 ? -1 : 1;
+						if (theme(sx, sz) == 3 && d > 12.2 && Math.floorMod(ax + az * 2, 3) != 0) {
+							set(dx, ROOF_Y, dz, leaves(Blocks.CHERRY_LEAVES));
 						}
 					}
 				}
@@ -375,7 +374,7 @@ public final class LoungeRoom {
 			for (int[] p : posts) {
 				set(p[0], 1, p[1], b(Blocks.STONE_BRICKS));
 				for (int y = 2; y < ROOF_Y; y++) {
-					set(p[0], y, p[1], beam(Direction.Axis.Y));
+					set(p[0], y, p[1], RIB);
 				}
 			}
 			// the four gates: a lantern under the beam over each entrance
@@ -423,10 +422,10 @@ public final class LoungeRoom {
 			}
 		}
 
-		/** A warm glow panel under a cherry slab of the pergola at {@code (u, v)}. */
+		/** A warm glow panel under a stair of the awning at {@code (u, v)}. */
 		void lamp(int u, int v) {
-			set(u, ROOF_Y, v, slab(Blocks.CHERRY_SLAB));
-			set(u, ROOF_Y - 1, v, r.c.kit.glowPanel(Direction.DOWN, false));
+			set(u, ROOF_Y - 1, v, stairs(Blocks.CHERRY_STAIRS, NodeDecor.inward(sx * u, sz * v)));
+			set(u, ROOF_Y - 2, v, r.c.kit.glowPanel(Direction.DOWN, false));
 		}
 
 		/** A glow strip along the foot of a counter or shelf, in the cell where people stand. */
