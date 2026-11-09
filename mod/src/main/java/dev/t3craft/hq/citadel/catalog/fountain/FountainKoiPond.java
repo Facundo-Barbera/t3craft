@@ -153,8 +153,8 @@ public final class FountainKoiPond implements Variant {
 
 		/** Two overlapping lobes with a wobbling edge; water stays inside {@code 1..w-2 × 1..d-2} so a rim always fits. */
 		void mask() {
-			double ru = Math.max(1.7, cu - 1.25);
-			double rv = Math.max(1.7, cv - 1.25);
+			double ru = Math.max(1.7, cu - (w <= 8 ? 1.0 : 1.25));
+			double rv = Math.max(1.7, cv - (d <= 8 ? 1.0 : 1.25));
 			double ph1 = rng.nextDouble() * Math.PI * 2;
 			double ph2 = rng.nextDouble() * Math.PI * 2;
 			double a2 = 0.10 + rng.nextDouble() * 0.08;
@@ -302,7 +302,7 @@ public final class FountainKoiPond implements Variant {
 				rl = wl - 1;
 				rr = wr + 1;
 				int run = wr - wl + 1;
-				if (run >= 6) {
+				if (run >= 5) {
 					island = true;
 					iu = wl + 2 + rng.nextInt(run - 4); // which side of the pond the islet sits on
 					toroSide = rng.nextBoolean() ? 1 : -1;
@@ -405,6 +405,9 @@ public final class FountainKoiPond implements Variant {
 					if (k[u][v] != RIM || nearBridge(u, v)) {
 						continue;
 					}
+					if (v < cv - 1) {
+						continue; // the front stays low so the water shows from the street
+					}
 					switch (p.hash(u, 7, v, 14)) {
 						case 0 -> put(c, p, u, 2, v, slab(Blocks.MOSSY_COBBLESTONE_SLAB));
 						case 1 -> put(c, p, u, 2, v, b(Blocks.MOSS_CARPET));
@@ -417,7 +420,7 @@ public final class FountainKoiPond implements Variant {
 			List<int[]> rim = new ArrayList<>();
 			for (int u = 0; u < w; u++) {
 				for (int v = 0; v < d; v++) {
-					if (k[u][v] == RIM && !nearBridge(u, v)) {
+					if (k[u][v] == RIM && !nearBridge(u, v) && v >= cv - 1) {
 						rim.add(new int[] {u, v});
 					}
 				}
@@ -895,7 +898,7 @@ public final class FountainKoiPond implements Variant {
 					for (int v = 0; v < d; v++) {
 						double e = sq((u - ccu) / 2.6) + sq((y - ccy) / 1.9) + sq((v - ccv) / 2.6);
 						boolean trunk = u == treeU && v == treeV && y < t;
-						if (e <= 1.0 && !trunk && p.hash(u, y, v, 8) != 0 && roomFor(u, y, v)) {
+						if (e <= 1.0 && !trunk && p.hash(u, y, v, e > 0.6 ? 3 : 9) != 0 && roomFor(u, y, v)) {
 							leaf[u][y][v] = true;
 						}
 					}
