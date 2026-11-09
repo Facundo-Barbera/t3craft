@@ -561,7 +561,7 @@ public final class HouseJapaneseEngawa implements Variant {
 							firstUp = i;
 						}
 					}
-					Block mat = r == 0 ? s.fascia() : (r % 3 == 1 || p.hash(a, h, bb, 6) == 0) ? Blocks.DEEPSLATE_BRICK_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS;
+					Block mat = r == 0 ? s.fascia() : r == 1 ? Blocks.STONE_BRICK_STAIRS : (r % 3 == 2 || p.hash(a, h, bb, 6) == 0) ? Blocks.DEEPSLATE_BRICK_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS;
 					boolean ridge = isRidge(a, bb);
 					int y = h;
 					if (ridge) {
