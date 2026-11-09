@@ -154,13 +154,14 @@ final class BarrioGateBig {
 			return mats.band() == mats.post() ? c.kit.beam(ax) : mats.band();
 		}
 
-		BlockState keystone() {
-			return HallFacade.beamLike(c, mats.post(), back.getAxis());
+		BlockState keystone(boolean face) {
+			return face ? b(Blocks.CHISELED_STONE_BRICKS) : HallFacade.beamLike(c, mats.post(), back.getAxis());
 		}
 
-		BlockState archStair(int dv) {
+		/** The stepped arch: the barrio's roof stairs inside, a light stone-brick ring on the two faces so the opening reads from afar. */
+		BlockState archStair(int dv, boolean face) {
 			Direction away = dv < 0 ? side.getOpposite() : side;
-			return BarrioKit.stair(mats.roof(), away, StairsShape.STRAIGHT, Half.TOP);
+			return BarrioKit.stair(face ? Blocks.STONE_BRICK_STAIRS : mats.roof(), away, StairsShape.STRAIGHT, Half.TOP);
 		}
 
 		/** The roof stair on a slope that rises towards the centre line of the passage. */
@@ -196,10 +197,11 @@ final class BarrioGateBig {
 			for (int y = 1; y <= clear; y++) {
 				c.set(r.cell(u, v, y), AIR);
 			}
+			boolean face = u == 0 || u == D - 1;
 			if (a == 0) {
-				c.set(r.cell(u, v, clear + 1), keystone());
+				c.set(r.cell(u, v, clear + 1), keystone(face));
 			} else {
-				c.set(r.cell(u, v, clear + 1), archStair(dv));
+				c.set(r.cell(u, v, clear + 1), archStair(dv, face));
 			}
 			for (int y = clear + 2; y <= top; y++) {
 				c.set(r.cell(u, v, y), wallFace(u, y, dv));
