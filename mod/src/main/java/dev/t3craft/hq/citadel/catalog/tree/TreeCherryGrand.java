@@ -111,7 +111,7 @@ public final class TreeCherryGrand implements Variant {
 		double spread = r.nextBoolean() ? 0.5 : 0.9; // umbrella of low lobes, or a layered crown
 		int sy0 = Math.max(CLEAR, y2 + 1);
 		for (int i = 0; i < n; i++) {
-			if (i > 0 && r.nextInt(4) == 0) {
+			if (i > 0 && r.nextInt(6) == 0) {
 				continue; // a gap in the ring: the silhouette is not even
 			}
 			double ang = (a0 + (i + (r.nextDouble() - 0.5) * 0.4) / n) * Math.PI * 2;
@@ -122,7 +122,7 @@ public final class TreeCherryGrand implements Variant {
 			int sy = TreeKit.clamp(ly - 3 - r.nextInt(2), sy0, crownY - 1);
 			int su = lead[0][sy];
 			int sv = lead[1][sy];
-			double rx = (1.7 + r.nextDouble() * 0.6) * ls;
+			double rx = (1.95 + r.nextDouble() * 0.6) * ls;
 			double rz = rx * (0.8 + r.nextDouble() * 0.3);
 			double room = room(su, sv, ex, ez, wu0, wu1, wv0, wv1);
 			double reach = TreeKit.clamp(room - rx * 0.95 + 0.3 - r.nextDouble() * 0.7, 1.5, 5.0 * ls); // out towards the rim: bare limb in between
@@ -239,8 +239,8 @@ public final class TreeCherryGrand implements Variant {
 	}
 
 	/**
-	 * Roots over the grass, tapering: a bark cell against the trunk, then a log along the root, a moss tip on the
-	 * longer ones (never the muddy brown boxes). Face roots run straight out, corner roots diagonally with a cell
+	 * Roots over the grass, tapering: a bark cell against the trunk, then a log along the root, a moss carpet on the
+	 * tip of the longer ones (never the muddy brown boxes). Face roots run straight out, corner roots diagonally with a cell
 	 * tying each step. One block high.
 	 */
 	private static void roots(Vox t, int bu, int bv, int count, int maxLen) {
@@ -265,9 +265,11 @@ public final class TreeCherryGrand implements Variant {
 			}
 			for (int i = 0; i < len; i++) {
 				boolean tip = i == len - 1 && len > 1;
-				BlockState s = tip ? Blocks.MOSS_BLOCK.defaultBlockState()
-						: i == 0 || diag ? TreeKit.CHERRY.bark() : TreeKit.CHERRY.log(ax);
+				BlockState s = i == 0 || diag ? TreeKit.CHERRY.bark() : TreeKit.CHERRY.log(ax);
 				t.wood(u, 0, v, s);
+				if (tip) {
+					t.cover(u, 1, v, Blocks.MOSS_CARPET.defaultBlockState()); // a moss cap on the root's end
+				}
 				if (diag && i < len - 1) {
 					t.woodSoft(u + du, 0, v, TreeKit.CHERRY.bark());
 				}
