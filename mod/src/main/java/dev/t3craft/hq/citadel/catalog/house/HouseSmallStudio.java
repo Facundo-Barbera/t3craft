@@ -6,6 +6,8 @@ import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.catalog.Family;
 import dev.t3craft.hq.citadel.catalog.Plot;
 import dev.t3craft.hq.citadel.catalog.Variant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 import java.util.function.IntPredicate;
 import net.minecraft.core.Direction;
@@ -23,15 +25,27 @@ import net.minecraft.world.level.block.state.properties.DoorHingeSide;
  * One storey with the roof as the ceiling: 5 free blocks at the walls and up to 9 under the ridge, so it never feels
  * low even on 9×9. Nothing is sealed and there is no ladder.
  * <ul>
- * <li><b>Outside:</b> a covered porch (posts, beam, rails, hanging lanterns, a king post under the front gable), a
- *     gable roof with eaves, a rake and a capped ridge, big three-high windows with sills, flower boxes and open
- *     shutters, a brick or stone chimney that stands against the right gable.</li>
+ * <li><b>Outside:</b> a covered porch (stout stone-based columns with corbel brackets, a wide step, hanging lanterns, a
+ *     king post under the front gable), a gable roof with eaves, a rake and a capped ridge, big three-high windows
+ *     with sills, flower boxes and open shutters, a brick or stone chimney with a body of its own (stone base, a
+ *     stack three deep through the slope, a corbelled crown with two pots).</li>
  * <li><b>Inside:</b> a library wall under a clerestory strip along the back, a lectern, a bed with a chest at its
  *     foot, a workshop row (crafting, cartography, fletching and smithing tables) and a hearth you can stand in front
  *     of, a hanging lantern on a chain and tie beams. From 10×12 on a study table with two chairs.</li>
  * </ul>
  * The door is a doorway 3 free blocks high. The house stops at 12 × 12; the rest of a bigger plot (plots grow with the
  * scale) is left to the leader's yard, with a few plants.
+ *
+ * <p>[silhouette] By seed one of three shapes, so a barrio does not repeat one outline:
+ * <ul>
+ * <li><b>dormer</b>: small gabled dormers on the long roof slope (two on deep plots);</li>
+ * <li><b>cross gable</b>: a lateral gable wing flush with the side wall that climbs to the ridge;</li>
+ * <li><b>lean-to</b>: an open shed (one-pitch roof, a log pile, a bench, a lantern) against the side wall, for firewood
+ *     and an outdoor workshop; the body gets narrower to make room for it.</li>
+ * </ul>
+ * On the big plots (11 and up) the roof breaks: a tall transverse bay (a gable that crosses the ridge two blocks
+ * higher, with clerestory windows) and, for the dormer and cross shapes, a timber terrace with a pergola, a table and
+ * a side door; the lean-to shape keeps its shed as the annex.
  *
  * <p>[palette] Two schemes by seed (cherry roof over calcite and dark oak, or slate roof over stone brick and spruce) and
  * a mirror flip (the chimney on either side) so a barrio does not repeat one house.
@@ -87,6 +101,10 @@ public final class HouseSmallStudio implements Variant {
 			Block step, BlockState[] chimney, Block chimneyStair, Block chimneySlab, DyeColor bed, DyeColor glass, Block lintel) {
 	}
 
+	/** A gabled wing whose ridge runs along u: centre row, half width, ridge height, the sides it shows on, tall = through bay. */
+	private record Wing(int dv, int hw, int r, boolean left, boolean right, boolean tall) {
+	}
+
 	private static BlockState[] mix(Block... bl) {
 		BlockState[] r = new BlockState[bl.length];
 		for (int i = 0; i < bl.length; i++) {
@@ -123,9 +141,9 @@ public final class HouseSmallStudio implements Variant {
 	/** Height of the roof's first row (the eave) and of the plate beam on the walls. */
 	private static final int ROOF = 5;
 
-	/** The height a house of frontage {@code w} needs: the chimney cap stands above the ridge. */
-	private static int need(int w) {
-		return ROOF + (w - 1) / 2 + 3;
+	/** The height a house of frontage {@code w} needs: the chimney cap stands above the ridge (two more under a tall bay). */
+	private static int need(int w, boolean tall) {
+		return ROOF + (w - 1) / 2 + 3 + (tall ? 2 : 0);
 	}
 
 	@Override
@@ -133,12 +151,19 @@ public final class HouseSmallStudio implements Variant {
 		Random r = p.rng(0x57D10E5L);
 		Scheme s = SCHEMES[r.nextInt(SCHEMES.length)];
 		boolean flip = r.nextBoolean();
-		int w = Math.min(p.w(), 12);
-		while (w > 9 && need(w) > p.h()) {
+		// 0 dormers, 1 cross gable, 2 lean-to: by seed mod 3, so neighbouring seeds always differ in outline
+		int shape = (int) Math.floorMod(p.seed(), 3L);
+		int pw = Math.min(p.w(), 12);
+		int d = Math.min(p.d(), 12);
+		// the side strip: a lean-to shed (1 wide on 9, else 2) or, on the big plots, a terrace
+		int lt = shape == 2 ? (pw >= 10 ? 2 : 1) : (pw >= 11 ? 2 : 0);
+		int w = pw - lt;
+		while (w > 8 && need(w, false) > p.h()) {
 			w--;
 		}
-		int d = Math.min(p.d(), 12);
-		new Build(c, p, s, w, d, (p.w() - w) / 2, flip).run();
+		boolean big = pw >= 11 || d >= 11;
+		boolean tall = big && need(w, true) <= p.h();
+		new Build(c, p, s, w, d, lt, shape, tall, flip).run();
 	}
 
 	private static final class Build {
@@ -147,6 +172,9 @@ public final class HouseSmallStudio implements Variant {
 		final Scheme s;
 		final int W;
 		final int D;
+		/** Width of the side strip (shed or terrace) at u -lt..-1, and which shape this house has. */
+		final int lt;
+		final int shape;
 		final int ox;
 		final boolean flip;
 		final int H;
@@ -164,15 +192,21 @@ public final class HouseSmallStudio implements Variant {
 		/** Door columns (one or two) and the step bay. */
 		final int doorLo;
 		final int doorHi;
+		/** Row of the side door onto the strip, or -1. */
+		final int sdv;
+		final List<Wing> wings = new ArrayList<>();
 		final BlockState[][][] g;
 
-		Build(CitadelCanvas c, Plot p, Scheme s, int w, int d, int ox, boolean flip) {
+		Build(CitadelCanvas c, Plot p, Scheme s, int w, int d, int lt, int shape, boolean tall, boolean flip) {
 			this.c = c;
 			this.p = p;
 			this.s = s;
 			this.W = w;
 			this.D = d;
-			this.ox = ox;
+			this.lt = lt;
+			this.shape = shape;
+			int slack = (p.w() - (w + lt)) / 2;
+			this.ox = flip ? slack : slack + lt;
 			this.flip = flip;
 			this.H = p.h();
 			this.pd = d >= 11 ? 3 : 2;
@@ -185,7 +219,40 @@ public final class HouseSmallStudio implements Variant {
 			this.ridgeY = ROOF + (w - 1) / 2;
 			this.doorLo = (w - 1) / 2;
 			this.doorHi = w / 2;
-			this.g = new BlockState[w][H][d];
+			int mid = (pd + d - 1) / 2;
+			int lm = (d - pd - 2) >= 6 ? pd + 1 + (d - pd - 2) / 2 : -99;
+			this.sdv = lt > 0 ? (lm > 0 ? lm : mid) : -1;
+			this.g = new BlockState[w + lt][H][d];
+			planWings(tall);
+		}
+
+		/** [silhouette] The roof wings of this shape: dormers, a cross gable, and on the big plots a tall transverse bay. */
+		void planWings(boolean tall) {
+			int rLo = pd + 1;
+			int rHi = D - 2;
+			int n = rHi - rLo + 1;
+			int centre = (rLo + rHi) / 2;
+			if (tall) {
+				if (shape == 1) {
+					wings.add(new Wing(centre, 2, ridgeY + 2, true, true, true));
+				} else {
+					wings.add(new Wing(shape == 0 ? rLo + 1 : centre, 1, ridgeY + 2, true, true, true));
+					if (shape == 0 && D >= 12) {
+						wings.add(new Wing(rHi - 1, 1, ridgeY - 1, true, false, false));
+					}
+				}
+				return;
+			}
+			if (shape == 0) {
+				if (n >= 7) {
+					wings.add(new Wing(rLo + 1, 1, ridgeY - 1, true, false, false));
+					wings.add(new Wing(rHi - 1, 1, ridgeY - 1, true, false, false));
+				} else {
+					wings.add(new Wing(centre, 1, ridgeY - 1, true, false, false));
+				}
+			} else if (shape == 1) {
+				wings.add(new Wing(centre, 2, ridgeY, true, false, false));
+			}
 		}
 
 		// -------------------------------------------------------------- writes (design coordinates, flipped on the way out)
@@ -195,19 +262,19 @@ public final class HouseSmallStudio implements Variant {
 		}
 
 		void put(int u, int y, int v, BlockState st, int layer) {
-			if (u < 0 || u >= W || v < 0 || v >= D || y < 0 || y >= H) {
+			if (u < -lt || u >= W || v < 0 || v >= D || y < 0 || y >= H) {
 				return;
 			}
-			g[u][y][v] = st;
+			g[u + lt][y][v] = st;
 			int pu = ox + (flip ? W - 1 - u : u);
 			p.put(c, pu, y, v, flip ? st.mirror(Mirror.FRONT_BACK) : st, layer);
 		}
 
 		boolean free(int u, int y, int v) {
-			if (u < 0 || u >= W || v < 0 || v >= D || y < 0 || y >= H) {
+			if (u < -lt || u >= W || v < 0 || v >= D || y < 0 || y >= H) {
 				return false;
 			}
-			BlockState st = g[u][y][v];
+			BlockState st = g[u + lt][y][v];
 			return st == null || st.isAir();
 		}
 
@@ -239,12 +306,57 @@ public final class HouseSmallStudio implements Variant {
 			return b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP);
 		}
 
+		// -------------------------------------------------------------- roof geometry
+
+		/** Height of the main gable's surface at column {@code u}. */
+		int hMain(int u) {
+			return ROOF + Math.min(u, W - 1 - u);
+		}
+
+		/** The wing whose roof is above the main one at {@code (u, v)}, or null. The eave columns never take a wing. */
+		Wing wingAt(int u, int v) {
+			if (u <= 0 || u >= W - 1) {
+				return null;
+			}
+			Wing best = null;
+			int bt = hMain(u);
+			for (Wing w : wings) {
+				int t = Math.abs(v - w.dv());
+				if (t > w.hw()) {
+					continue;
+				}
+				boolean side = (w.left() && w.right()) || (w.left() && u <= (W - 1) / 2) || (w.right() && u >= W / 2);
+				if (side && w.r() - t > bt) {
+					best = w;
+					bt = w.r() - t;
+				}
+			}
+			return best;
+		}
+
+		/** The roof surface height at {@code (u, v)}. */
+		int topRoof(int u, int v) {
+			Wing w = wingAt(u, v);
+			return w == null ? hMain(u) : w.r() - Math.abs(v - w.dv());
+		}
+
+		/** The highest roof line over row {@code v}. */
+		int ridgeAt(int v) {
+			int r = ridgeY;
+			for (Wing w : wings) {
+				if (Math.abs(v - w.dv()) <= w.hw()) {
+					r = Math.max(r, w.r() - Math.abs(v - w.dv()));
+				}
+			}
+			return r;
+		}
+
 		// -------------------------------------------------------------- run
 
 		void run() {
 			floors();
 			IntPredicate none = i -> false;
-			boolean[] winL = wall(false, 1, pd, D - 1, i -> i == pd || i == D - 1 || i == leftMid(), none, -1, -1, 1, 4);
+			boolean[] winL = wall(false, 1, pd, D - 1, i -> i == pd || i == D - 1 || i == leftMid(), none, sdv, sdv, 1, 4);
 			boolean[] winR = wall(false, W - 2, pd, D - 1, i -> i == pd || i == D - 1 || i == cv0 || i == cv1, none, -1, -1, 1, 4);
 			wall(true, pd, 1, W - 2, i -> i == 1 || i == W - 2, none, doorLo, doorHi, 1, 4);
 			// the back: shelves stand against the plain ends, the middle is a big window over the desk
@@ -254,7 +366,13 @@ public final class HouseSmallStudio implements Variant {
 			roof();
 			porch();
 			chimney();
-			dressSide(false, winL, i -> i == pd || i == D - 1 || i == leftMid());
+			if (lt == 0) {
+				dressSide(false, winL, i -> i == pd || i == D - 1 || i == leftMid());
+			} else if (shape == 2) {
+				leanTo();
+			} else {
+				terrace();
+			}
 			dressSide(true, winR, i -> i == pd || i == D - 1 || i == cv0 || i == cv1);
 			interior();
 			yard();
@@ -351,7 +469,7 @@ public final class HouseSmallStudio implements Variant {
 				}
 			}
 			// [depth] a proud post on the middle of a long side wall
-			if (!alongU && ln == 1 && leftMid() > 0) {
+			if (!alongU && ln == 1 && leftMid() > 0 && lt == 0) {
 				for (int y = 1; y <= 4; y++) {
 					set(0, y, leftMid(), post());
 				}
@@ -364,6 +482,11 @@ public final class HouseSmallStudio implements Variant {
 				DoorHingeSide hinge = doorLo == doorHi || u == doorLo ? DoorHingeSide.LEFT : DoorHingeSide.RIGHT;
 				for (int k = 0; k < 2; k++) {
 					set(u, 1 + k, pd, TimberKit.door(s.door(), Direction.NORTH, k == 1).setValue(BlockStateProperties.DOOR_HINGE, hinge));
+				}
+			}
+			if (sdv > 0) { // the side door onto the shed or the terrace
+				for (int k = 0; k < 2; k++) {
+					set(1, 1 + k, sdv, TimberKit.door(s.door(), Direction.WEST, k == 1).setValue(BlockStateProperties.DOOR_HINGE, DoorHingeSide.LEFT));
 				}
 			}
 		}
@@ -409,16 +532,24 @@ public final class HouseSmallStudio implements Variant {
 			}
 		}
 
-		/** [finish] A gable roof ridge along v: eaves a block out, a rake under the porch end, a capped ridge. */
+		/**
+		 * [finish] A gable roof ridge along v: eaves a block out, a rake under the porch end, a capped ridge. [silhouette]
+		 * The wings (dormers, the cross gable, the tall bay) replace the main roof where theirs is higher.
+		 */
 		void roof() {
 			int mid0 = (W - 1) / 2;
 			int mid1 = W / 2;
 			for (int u = 0; u < W; u++) {
-				int h = ROOF + Math.min(u, W - 1 - u);
+				int h = hMain(u);
 				boolean ridge = u >= mid0 && u <= mid1;
 				boolean edge = u == 0 || u == W - 1;
 				Direction face = u < mid0 ? Direction.EAST : Direction.WEST;
 				for (int v = 0; v < D; v++) {
+					Wing w = wingAt(u, v);
+					if (w != null) {
+						wingCell(u, v, w, h);
+						continue;
+					}
 					Block m = edge ? s.eave() : (s.alt() != null && p.hash(u, h, v, 5) == 0 ? s.alt() : s.roof());
 					if (ridge) {
 						set(u, h, v, b(s.ridge()));
@@ -433,39 +564,65 @@ public final class HouseSmallStudio implements Variant {
 			}
 		}
 
+		/** One cell of a wing's roof, with its gable face (at the side wall) or its cheek (at the wing's edge row). */
+		void wingCell(int u, int v, Wing w, int h) {
+			int t = Math.abs(v - w.dv());
+			int top = w.r() - t;
+			if (t == 0) {
+				set(u, top, v, b(s.ridge()));
+				set(u, top + 1, v, TimberKit.slab(s.ridgeSlab(), false));
+			} else {
+				set(u, top, v, TimberKit.stair(s.roof(), v < w.dv() ? Direction.SOUTH : Direction.NORTH, false));
+			}
+			if (t == w.hw()) {
+				// the cheek: a wall from the main roof up to the wing's eave, glazed under the eave on a tall bay
+				for (int y = h; y < top; y++) {
+					boolean glass = w.tall() && u >= 2 && u <= W - 3 && y > h;
+					set(u, y, v, glass ? TimberKit.pane(true, s.glass()) : pick(s.wall(), u, y, v));
+				}
+			} else if ((u == 1 && w.left()) || (u == W - 2 && w.right())) {
+				// the gable face on the wall plane: glass up the middle, the top row stays plaster when it is tall
+				int rows = top - h;
+				for (int y = h; y < top; y++) {
+					boolean glass = rows <= 2 || y <= top - 2;
+					set(u, y, v, glass ? TimberKit.pane(false, s.glass()) : pick(s.wall(), u, y, v));
+				}
+			}
+		}
+
 		// -------------------------------------------------------------- porch
 
 		void porch() {
-			int bayLo = doorLo - 1;
-			int bayHi = doorHi + 1;
-			// steps down to the path
+			// [finish] a wide step: it spans the door and two blocks each side, between the corner columns
+			int bayLo = Math.max(2, doorLo - 2);
+			int bayHi = Math.min(W - 3, doorHi + 2);
 			for (int u = bayLo; u <= bayHi; u++) {
 				set(u, 0, 0, TimberKit.stair(s.step(), Direction.SOUTH, false));
 			}
 			boolean[] isPost = new boolean[W];
 			isPost[1] = true;
 			isPost[W - 2] = true;
-			if (bayLo - 1 >= 3) {
-				isPost[bayLo - 1] = true;
-				isPost[bayHi + 1] = true;
-			}
 			for (int u = 1; u <= W - 2; u++) {
 				if (isPost[u]) {
+					// [depth] a column with a base: two courses of stone under the shaft, a bracket under the beam
 					set(u, 1, 0, pick(s.foot(), u, 1, 0));
-					for (int y = 2; y <= ROOF; y++) {
+					set(u, 2, 0, pick(s.foot(), u, 2, 0));
+					for (int y = 3; y <= ROOF; y++) {
 						set(u, y, 0, post());
 					}
 				} else {
 					set(u, ROOF, 0, beam(Direction.Axis.X)); // [depth] the front beam
 				}
 			}
+			set(2, 4, 0, TimberKit.stair(s.sill(), Direction.WEST, true));
+			set(W - 3, 4, 0, TimberKit.stair(s.sill(), Direction.EAST, true));
 			// rails between the posts, except across the steps
 			for (int u = 2; u <= W - 3; u++) {
-				if (isPost[u] || (u >= bayLo && u <= bayHi)) {
+				if (u >= bayLo && u <= bayHi) {
 					continue;
 				}
-				boolean e = isPost[u + 1] || (u + 1 <= W - 3 && !(u + 1 >= bayLo && u + 1 <= bayHi));
-				boolean wst = isPost[u - 1] || (u - 1 >= 2 && !(u - 1 >= bayLo && u - 1 <= bayHi));
+				boolean e = u + 1 <= W - 3 ? !(u + 1 >= bayLo && u + 1 <= bayHi) : true;
+				boolean wst = u - 1 >= 2 ? !(u - 1 >= bayLo && u - 1 <= bayHi) : true;
 				set(u, 1, 0, TimberKit.fence(s.fence(), false, e, false, wst));
 			}
 			for (int v = 1; v < pd; v++) {
@@ -497,29 +654,146 @@ public final class HouseSmallStudio implements Variant {
 			for (int v : new int[] {0, D - 1}) {
 				set(doorLo, ridgeY + 2, v, b(Blocks.LIGHTNING_ROD.waxed().unaffected()));
 			}
-			// [finish] lanterns hang from the beam beside the steps, flower pots on the rail
-			for (int u : new int[] {2, W - 3}) {
-				if (free(u, 4, 0) && !isPost[u]) {
+			// [finish] lanterns hang from the beam over the steps, planters stand at the foot of the columns
+			for (int u : new int[] {bayLo + 1, bayHi - 1}) {
+				if (free(u, 4, 0) && !isPost[u] && u != doorLo && u != doorHi) {
 					put(u, 4, 0, TimberKit.lantern(true), CitadelCanvas.HANGING);
 				}
-				if (free(u, 2, 0) && !isPost[u] && !(u >= bayLo && u <= bayHi)) {
-					set(u, 2, 0, TimberKit.planter(p, u, 2, 0));
+			}
+			for (int u : new int[] {2, W - 3}) {
+				if (free(u, 1, 1)) {
+					set(u, 1, 1, TimberKit.planter(p, u, 1, 1));
 				}
 			}
 		}
 
 		// -------------------------------------------------------------- chimney and hearth
 
+		/** [depth] A chimney with a body: a stone base, a stack three deep through the slope, a corbelled crown with two pots. */
 		void chimney() {
-			int top = ridgeY + 1;
+			int top = 0;
+			for (int v = cv0; v <= cv1; v++) {
+				top = Math.max(top, ridgeAt(v) + 1);
+			}
 			for (int v = cv0; v <= cv1; v++) {
 				for (int u = W - 2; u <= W - 1; u++) {
 					for (int y = 1; y <= top; y++) {
-						set(u, y, v, pick(s.chimney(), u, y, v));
+						set(u, y, v, y <= 2 && u == W - 1 ? pick(s.foot(), u, y, v) : pick(s.chimney(), u, y, v));
 					}
-					set(u, top + 1, v, TimberKit.slab(s.chimneySlab(), false));
+				}
+				// the stack climbs through the slope one column further in
+				for (int y = hMain(W - 3); y <= top; y++) {
+					set(W - 3, y, v, pick(s.chimney(), W - 3, y, v));
 				}
 				set(W - 2, 1, v, b(Blocks.CAMPFIRE)); // the fireplace opens on the room
+			}
+			// the crown: a dark collar course, then a slab cap on exactly the stack (a wider cap would roof the slope below)
+			for (int u = W - 3; u <= W - 1; u++) {
+				for (int v = cv0; v <= cv1; v++) {
+					set(u, top, v, pick(s.foot(), u, top, v));
+					set(u, top + 1, v, TimberKit.slab(s.chimneySlab(), false));
+				}
+			}
+			Block potWall = s.chimneyStair() == Blocks.BRICK_STAIRS ? Blocks.BRICK_WALL : Blocks.STONE_BRICK_WALL;
+			for (int v = cv0; v <= cv1; v++) {
+				set(W - 2, top + 2, v, TimberKit.lowWall(potWall, false, false, false, false));
+			}
+		}
+
+		// -------------------------------------------------------------- the side strip
+
+		/** [silhouette] An open lean-to against the left wall: one-pitch roof, posts, a log pile, a bench and a lantern. */
+		void leanTo() {
+			int vA = pd + 1;
+			int vm = (pd + D - 1) / 2;
+			for (int u = -lt; u <= 0; u++) {
+				for (int v = pd; v <= D - 1; v++) {
+					set(u, 0, v, pick(s.porch(), u, 0, v));
+				}
+			}
+			for (int v = pd; v <= D - 1; v++) {
+				if (lt == 1) {
+					set(-1, 4, v, TimberKit.stair(s.eave(), Direction.EAST, false));
+				} else {
+					set(-2, 4, v, TimberKit.stair(s.eave(), Direction.EAST, false));
+					set(-1, 5, v, TimberKit.slab(s.ridgeSlab(), false));
+				}
+			}
+			for (int v : new int[] {pd, vm, D - 1}) {
+				for (int y = 1; y <= 3; y++) {
+					set(-lt, y, v, post());
+				}
+			}
+			// the log pile at the back of the outer row, two high (the roof is too close above it to stand on)
+			for (int v = D - 3; v <= D - 2; v++) {
+				for (int y = 1; y <= 2; y++) {
+					set(-lt, y, v, TimberKit.log(Blocks.SPRUCE_LOG, Direction.Axis.X));
+				}
+			}
+			// the bench against the wall, clear of the side door. A block you can climb needs 2.85 free above it, and only
+			// the inner row of a 2-wide shed (roof y5) and the row under the eave (u 0) have that.
+			int bu = lt == 2 ? -1 : 0;
+			int[] bv = {vA, vA + 1, vA + 2};
+			Block[] work = {Blocks.CRAFTING_TABLE, Blocks.STONECUTTER, Blocks.GRINDSTONE};
+			for (int k = 0; k < bv.length; k++) {
+				int v = bv[k];
+				if (Math.abs(v - sdv) >= 2 && v < vm && free(bu, 1, v)) {
+					set(bu, 1, v, b(work[k]));
+				}
+			}
+			if (lt == 2 && Math.abs(D - 2 - sdv) >= 2) {
+				set(-1, 1, D - 2, barrel());
+			}
+			// a lantern stands on the log pile (one hung under this low roof would cut the headroom)
+			set(-lt, 3, D - 3, TimberKit.lantern(false));
+		}
+
+		/** [silhouette] A timber terrace along the left wall: deck, steps, rail, a pergola, a table and a side door. */
+		void terrace() {
+			int vA = pd + 1;
+			int vB = D - 1;
+			for (int u = -lt; u <= 0; u++) {
+				for (int v = vA; v <= vB; v++) {
+					set(u, 0, v, pick(s.floor(), u, 0, v));
+				}
+				set(u, 0, pd, TimberKit.stair(s.step(), Direction.SOUTH, false)); // steps up from the front
+			}
+			// the rail round the outer edge and the back
+			for (int v = vA + 1; v <= vB; v++) {
+				set(-lt, 1, v, TimberKit.fence(s.fence(), true, v == vB, v < vB, false));
+			}
+			for (int u = -lt + 1; u <= 0; u++) {
+				set(u, 1, vB, TimberKit.fence(s.fence(), false, true, false, true));
+			}
+			// the pergola: two posts, a beam along the edge, cross rafters over the deck
+			int v1 = vA + 1;
+			int v2 = D - 3;
+			if (v2 - v1 >= 2) {
+				for (int v : new int[] {v1, v2}) {
+					for (int y = 1; y <= 4; y++) {
+						set(-lt, y, v, post());
+					}
+				}
+				for (int v = v1; v <= v2; v++) {
+					set(-lt, 5, v, beam(Direction.Axis.Z));
+				}
+				// rafters reach in one block (the eave stairs hold the other end), high enough to stand under
+				for (int v : new int[] {v1, v2}) {
+					for (int u = -lt + 1; u <= -1; u++) {
+						set(u, 5, v, beam(Direction.Axis.X));
+					}
+				}
+				// lanterns hang over the outer row, where nobody stands on a chair under them
+				put(-lt, 4, (v1 + v2) / 2, TimberKit.lantern(true), CitadelCanvas.HANGING);
+				// a table with two chairs
+				int tv = (v1 + v2) / 2;
+				for (int v = tv; v <= tv + 1; v++) {
+					set(-1, 1, v, TimberKit.slab(Blocks.DARK_OAK_SLAB, false));
+				}
+				set(-1, 1, tv - 1, TimberKit.stair(Blocks.SPRUCE_STAIRS, Direction.NORTH, false));
+				if (tv + 2 <= D - 2) {
+					set(-1, 1, tv + 2, TimberKit.stair(Blocks.SPRUCE_STAIRS, Direction.SOUTH, false));
+				}
 			}
 		}
 
@@ -539,7 +813,7 @@ public final class HouseSmallStudio implements Variant {
 					continue;
 				}
 				// the stack runs up to the roof underside, so there is no shelf top to stand on
-				for (int y = 1; y < ROOF + Math.min(u, W - 1 - u); y++) {
+				for (int y = 1; y < topRoof(u, iv1); y++) {
 					set(u, y, iv1, y % 2 == 0 && p.hash(u, y, iv1, 3) == 0 ? face(Blocks.CHISELED_BOOKSHELF, Direction.NORTH) : b(Blocks.BOOKSHELF));
 				}
 			}
@@ -550,6 +824,9 @@ public final class HouseSmallStudio implements Variant {
 			set(iu0, 1, iv1 - 2, bed.setValue(BlockStateProperties.BED_PART, BedPart.FOOT));
 			furn(iu0, iv1 - 3, face(Blocks.CHEST, Direction.EAST));
 			for (int v = iv0, k = 0; v <= iv1 - 4; v++, k++) {
+				if (v == sdv) {
+					continue; // keep the way to the side door clear
+				}
 				furn(iu0, v, k % 2 == 0 ? barrel() : b(Blocks.POTTED_FERN));
 			}
 			// the workshop row on the right, in front of the hearth
@@ -578,14 +855,15 @@ public final class HouseSmallStudio implements Variant {
 			for (int v : new int[] {cvm - 2, cvm + 2}) {
 				if (v >= iv0 && v <= iv1 && v != cvm) {
 					for (int u = iu0; u <= iu1; u++) {
-						int ry = ROOF + Math.min(u, W - 1 - u) - 1;
-						if (free(u, ry, v)) {
+						int ry = hMain(u) - 1;
+						if (free(u, ry, v) && !free(u, ry + 1, v)) {
 							set(u, ry, v, beam(Direction.Axis.X));
 						}
 					}
 				}
 			}
-			for (int y = 6; y < ridgeY; y++) {
+			int ceil = topRoof(cu, cvm);
+			for (int y = 6; y < ceil; y++) {
 				put(cu, y, cvm, b(Blocks.IRON_CHAIN).setValue(BlockStateProperties.AXIS, Direction.Axis.Y), CitadelCanvas.HANGING);
 			}
 			put(cu, 5, cvm, TimberKit.lantern(true), CitadelCanvas.HANGING);
@@ -594,9 +872,11 @@ public final class HouseSmallStudio implements Variant {
 		// -------------------------------------------------------------- the rest of a bigger plot
 
 		void yard() {
+			int lo = flip ? ox : ox - lt;
+			int hi = flip ? ox + W - 1 + lt : ox + W - 1;
 			for (int pu = 0; pu < p.w(); pu++) {
 				for (int v = 0; v < p.d(); v++) {
-					boolean house = pu >= ox && pu < ox + W && v < D;
+					boolean house = pu >= lo && pu <= hi && v < D;
 					if (house || p.hash(pu, 0, v, 3) != 0) {
 						continue;
 					}
