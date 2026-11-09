@@ -6,7 +6,6 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.b;
 import static dev.t3craft.hq.citadel.CitadelCanvas.col;
 import static dev.t3craft.hq.citadel.CitadelCanvas.colX;
 import static dev.t3craft.hq.citadel.CitadelCanvas.colZ;
-import static dev.t3craft.hq.citadel.CitadelCanvas.leaves;
 import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
 
 import dev.t3craft.hq.Anchor;
