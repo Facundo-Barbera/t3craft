@@ -99,7 +99,43 @@ public final class AnchorNames {
 	 */
 	public static final String BIG_SCREEN = "bigscreen_";
 
+	/**
+	 * Prefix of the merge stations the plan reserves ({@link #mergeStation}; kit/merge-station). With the blocks
+	 * module on, the anchor's block becomes a {@code t3craft:merge_station} bound to the binding in the name.
+	 */
+	public static final String MERGE_STATION = "mergestation_";
+
 	private AnchorNames() {
+	}
+
+	/**
+	 * A merge station (review desk for the pull requests of a project or thread) at the anchor's block, its panel
+	 * towards the anchor's facing. {@code binding} is a blocks-module binding ({@code project:<key>}, {@code env:<id>},
+	 * {@code thread:<key>}; empty = unbound). {@code key} (no {@code =}) must be unique in the plan. The generator places
+	 * the station's kit block ({@code HqKit.mergeStation}) in that cell; the blocks module only binds it.
+	 * Name format: {@code mergestation_<key>=<binding>}. Not a standing anchor.
+	 */
+	public static String mergeStation(String key, String binding) {
+		if (key.isEmpty() || key.indexOf('=') >= 0) {
+			throw new IllegalArgumentException("bad merge station key: " + key);
+		}
+		return MERGE_STATION + key + "=" + (binding == null ? "" : binding);
+	}
+
+	/** A parsed {@link #mergeStation} anchor name. */
+	public record MergeStation(String key, String binding) {
+	}
+
+	/** Parses a {@link #mergeStation} name; null when {@code name} is not one. */
+	public static @org.jspecify.annotations.Nullable MergeStation parseMergeStation(String name) {
+		if (name == null || !name.startsWith(MERGE_STATION)) {
+			return null;
+		}
+		int eq = name.indexOf('=', MERGE_STATION.length());
+		if (eq <= MERGE_STATION.length()) {
+			return null;
+		}
+		return new MergeStation(name.substring(MERGE_STATION.length(), eq), name.substring(eq + 1));
 	}
 
 	/**

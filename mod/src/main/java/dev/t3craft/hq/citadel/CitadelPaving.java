@@ -466,7 +466,7 @@ final class CitadelPaving {
 		double w = promenadeWidth();
 		boolean mouth = RingCampusGeometry.radialDistance(x, z, 8) <= KERB_D();
 		if (r > promenadeRim()) {
-			return mouth ? c.accent() : FOOT;
+			return mouth ? c.accent() : CitadelPodium.rim(r); // design/citadel-terraces2: a light coping on the outer edge
 		}
 		if (r > promenadeRim() - w / 6 || r <= promenadeInner()) {
 			return c.accent();

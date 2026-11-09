@@ -38,6 +38,7 @@ final class VanillaHqKit implements HqKit {
 			case GLOW_PANEL -> Blocks.OCHRE_FROGLIGHT.defaultBlockState();
 			case GLOW_PANEL_COOL -> Blocks.SEA_LANTERN.defaultBlockState();
 			case CONSOLE -> Blocks.LECTERN.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, h);
+			case MERGE_STATION -> Blocks.SMITHING_TABLE.defaultBlockState();
 		};
 	}
 
