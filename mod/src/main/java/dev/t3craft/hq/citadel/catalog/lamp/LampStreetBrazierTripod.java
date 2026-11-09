@@ -99,7 +99,7 @@ public final class LampStreetBrazierTripod implements Variant {
 
 	@Override
 	public void build(CitadelCanvas c, Plot p) {
-		Look look = new Look(pick(p, 1, 3), pick(p, 2, 3) != 0, pick(p, 3, 3), pick(p, 4, 3) == 0);
+		Look look = new Look(pick(p, 1, 3), pick(p, 2, 2) == 1, pick(p, 3, 3), pick(p, 4, 3) == 0);
 		int w = p.w();
 		int d = p.d();
 		int cv1 = (d - 1) / 2;
@@ -135,8 +135,7 @@ public final class LampStreetBrazierTripod implements Variant {
 	/** The thin stem of a leg. */
 	private static BlockState stem(Look k) {
 		return switch (k.legs()) {
-			case 0 -> b(Blocks.POLISHED_BLACKSTONE_WALL); // wrought iron
-			case 1 -> b(Blocks.CUT_COPPER.waxed().exposed()); // a copper post: bars are too thin to read
+			case 0, 1 -> b(Blocks.POLISHED_BLACKSTONE_WALL); // wrought iron (bars are too thin to read); 1 has copper joints
 			default -> b(Blocks.STONE_BRICK_WALL);
 		};
 	}
@@ -237,18 +236,19 @@ public final class LampStreetBrazierTripod implements Variant {
 		// the base is a plus (no corners), so the bowl is narrow at the bottom and wide at the rim
 		int y = dd + 1;
 		for (int i = 0; i < 4; i++) {
-			// the rim slopes in: low step towards the fire, tall half outside
-			p.set(c, cu + sides[i][0], y, cv + sides[i][1], bowlStairs(k, dirs[i].getOpposite(), Half.BOTTOM));
+			// the rim slopes in: low step towards the fire, tall half outside (a low slab ring for the plate)
+			p.set(c, cu + sides[i][0], y, cv + sides[i][1],
+					k.shape() == 2 ? bowlSlab(k, SlabType.BOTTOM) : bowlStairs(k, dirs[i].getOpposite(), Half.BOTTOM));
 		}
 		switch (k.shape()) {
-			case 0 -> { // cup: low slabs close the corners
+			case 2 -> { // plate: low slabs close the corners, the fire stands clear above the rim
 				for (int su = -1; su <= 1; su += 2) {
 					for (int sv = -1; sv <= 1; sv += 2) {
 						p.set(c, cu + su, y, cv + sv, bowlSlab(k, SlabType.BOTTOM));
 					}
 				}
 			}
-			case 1 -> { // firepit: the corners are stone-brick posts that the rim is tied to with a low wall
+			case 1 -> { // firepit: dark posts at the corners, like horns
 				for (int su = -1; su <= 1; su += 2) {
 					for (int sv = -1; sv <= 1; sv += 2) {
 						p.set(c, cu + su, y, cv + sv, b(Blocks.POLISHED_BLACKSTONE_WALL));
