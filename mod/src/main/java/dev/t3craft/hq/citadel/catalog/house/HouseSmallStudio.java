@@ -243,10 +243,12 @@ public final class HouseSmallStudio implements Variant {
 
 		void run() {
 			floors();
-			boolean[] winL = wall(false, 1, pd, D - 1, i -> i == pd || i == D - 1 || i == leftMid(), -1, -1, 2, 4);
-			boolean[] winR = wall(false, W - 2, pd, D - 1, i -> i == pd || i == D - 1 || i == cv0 || i == cv1, -1, -1, 2, 4);
-			wall(true, pd, 1, W - 2, i -> i == 1 || i == W - 2, doorLo, doorHi, 2, 4);
-			wall(true, D - 1, 1, W - 2, i -> i == 1 || i == W - 2 || i == backMid(), -1, -1, 4, 4);
+			IntPredicate none = i -> false;
+			boolean[] winL = wall(false, 1, pd, D - 1, i -> i == pd || i == D - 1 || i == leftMid(), none, -1, -1, 2, 4);
+			boolean[] winR = wall(false, W - 2, pd, D - 1, i -> i == pd || i == D - 1 || i == cv0 || i == cv1, none, -1, -1, 2, 4);
+			wall(true, pd, 1, W - 2, i -> i == 1 || i == W - 2, none, doorLo, doorHi, 2, 4);
+			// the back: shelves stand against the plain ends, the middle is a big window over the desk
+			wall(true, D - 1, 1, W - 2, i -> i == 1 || i == W - 2, i -> i < iu0 + shelfN() || i > iu1 - shelfN(), -1, -1, 2, 4);
 			doors();
 			gables();
 			roof();
@@ -263,9 +265,9 @@ public final class HouseSmallStudio implements Variant {
 			return span >= 6 ? pd + 1 + span / 2 : -99;
 		}
 
-		int backMid() {
-			int span = W - 4;
-			return span >= 6 ? 2 + span / 2 : -99;
+		/** Columns of bookshelves at each end of the back wall. */
+		int shelfN() {
+			return W - 4 >= 7 ? 2 : 1;
 		}
 
 		// -------------------------------------------------------------- floor
@@ -319,8 +321,8 @@ public final class HouseSmallStudio implements Variant {
 		 * plate beam on top. A doorway ({@code doorLo..doorHi}) is 3 free blocks high under a lintel beam.
 		 * Returns which cells are windows.
 		 */
-		boolean[] wall(boolean alongU, int ln, int a, int bEnd, IntPredicate post, int dLo, int dHi, int wy1, int wy2) {
-			IntPredicate solid = i -> post.test(i) || (i >= dLo && i <= dHi);
+		boolean[] wall(boolean alongU, int ln, int a, int bEnd, IntPredicate post, IntPredicate plain, int dLo, int dHi, int wy1, int wy2) {
+			IntPredicate solid = i -> post.test(i) || plain.test(i) || (i >= dLo && i <= dHi);
 			boolean[] win = windows(a, bEnd, solid);
 			Direction.Axis ax = alongU ? Direction.Axis.X : Direction.Axis.Z;
 			for (int i = a; i <= bEnd; i++) {
@@ -364,20 +366,13 @@ public final class HouseSmallStudio implements Variant {
 			}
 		}
 
-		/** [depth] Sills, flower boxes and open shutters on a side wall. */
+		/** [depth] Open shutters flank every run of windows on a side wall (no ledges in the eave zone: nobody can reach them). */
 		void dressSide(boolean right, boolean[] win, IntPredicate post) {
 			int outer = right ? W - 1 : 0;
-			Direction wallDir = right ? Direction.WEST : Direction.EAST;
 			Direction shut = right ? Direction.EAST : Direction.WEST;
 			for (int v = pd + 1; v <= D - 2; v++) {
 				if (!win[v]) {
 					continue;
-				}
-				if (free(outer, 1, v)) {
-					set(outer, 1, v, TimberKit.stair(s.sill(), wallDir, true));
-				}
-				if (free(outer, 2, v)) {
-					set(outer, 2, v, TimberKit.planter(p, outer, 2, v));
 				}
 				for (int e : new int[] {v - 1, v + 1}) {
 					if (e > pd && e < D - 1 && !win[e] && !post.test(e) && free(outer, 3, e)) {
@@ -497,13 +492,6 @@ public final class HouseSmallStudio implements Variant {
 					set(u, top + 1, v, TimberKit.slab(s.chimneySlab(), false));
 				}
 				set(W - 2, 1, v, b(Blocks.CAMPFIRE)); // the fireplace opens on the room
-				set(iu1, 4, v, TimberKit.stair(s.chimneyStair(), Direction.EAST, true)); // [depth] a mantel over the hearth
-			}
-			// a shoulder at the foot of the stack
-			for (int v : new int[] {cv0 - 1, cv1 + 1}) {
-				if (free(W - 1, 1, v)) {
-					set(W - 1, 1, v, TimberKit.stair(s.chimneyStair(), v < cv0 ? Direction.SOUTH : Direction.NORTH, false));
-				}
 			}
 		}
 
@@ -517,10 +505,14 @@ public final class HouseSmallStudio implements Variant {
 
 		void interior() {
 			int cu = (W - 1) / 2;
-			// the library wall along the back, a clerestory strip over it (see wall())
+			// the library: shelves to the roof at both ends of the back wall, a window over the desk between them
 			for (int u = iu0; u <= iu1; u++) {
-				for (int y = 1; y <= 3; y++) {
-					set(u, y, iv1, y == 2 && p.hash(u, y, iv1, 3) == 0 ? face(Blocks.CHISELED_BOOKSHELF, Direction.NORTH) : b(Blocks.BOOKSHELF));
+				if (u >= iu0 + shelfN() && u <= iu1 - shelfN()) {
+					continue;
+				}
+				// the stack runs up to the roof underside, so there is no shelf top to stand on
+				for (int y = 1; y < ROOF + Math.min(u, W - 1 - u); y++) {
+					set(u, y, iv1, y % 2 == 0 && p.hash(u, y, iv1, 3) == 0 ? face(Blocks.CHISELED_BOOKSHELF, Direction.NORTH) : b(Blocks.BOOKSHELF));
 				}
 			}
 			set(cu, 1, iv1 - 1, face(Blocks.LECTERN, Direction.NORTH).setValue(BlockStateProperties.HAS_BOOK, true));
@@ -539,9 +531,6 @@ public final class HouseSmallStudio implements Variant {
 			}
 			if (cv0 > iv0) {
 				furn(iu1, iv0, b(Blocks.CRAFTING_TABLE));
-				if (free(iu1, 2, iv0)) {
-					set(iu1, 2, iv0, TimberKit.lantern(false)); // a lantern on the bench
-				}
 			}
 			for (int v = cv1 + 1; v < iv1; v++) {
 				furn(iu1, v, (v - cv1) % 2 == 1 ? face(Blocks.CHEST, Direction.WEST) : barrel());
@@ -557,12 +546,13 @@ public final class HouseSmallStudio implements Variant {
 				furn(cu, tv - 1, TimberKit.stair(Blocks.SPRUCE_STAIRS, Direction.NORTH, false));
 				furn(cu + 1, tv + 1, TimberKit.stair(Blocks.SPRUCE_STAIRS, Direction.SOUTH, false));
 			}
-			// tie beams across the room, then a lantern on a chain over its middle
+			// [depth] exposed rafter ribs hug the roof underside (no beam top to stand on), then a lantern on a chain
 			for (int v : new int[] {cvm - 2, cvm + 2}) {
 				if (v >= iv0 && v <= iv1 && v != cvm) {
 					for (int u = iu0; u <= iu1; u++) {
-						if (free(u, 6, v)) {
-							set(u, 6, v, beam(Direction.Axis.X));
+						int ry = ROOF + Math.min(u, W - 1 - u) - 1;
+						if (free(u, ry, v)) {
+							set(u, ry, v, beam(Direction.Axis.X));
 						}
 					}
 				}
