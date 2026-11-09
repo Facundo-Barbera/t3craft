@@ -88,6 +88,9 @@ import net.minecraft.world.level.block.state.BlockState;
  *   {@code --ss 1} without {@code --final}) keeps the old flat look. Override one by one with {@code --ao/--no-ao},
  *   {@code --shadows/--hard-shadows/--no-shadows}, {@code --sky/--no-sky}, {@code --bloom/--no-bloom},
  *   {@code --filter box|tent|mitchell}, {@code --shadow-rays N}. See docs/tools/hq-render.md.</li>
+ *   <li>GPU (tools/render-gpu): final looks trace on the RTX through CUDA by default and fall back to the CPU on their own;
+ *   {@code --gpu}, {@code --no-gpu}, {@code --gpu-compare}, {@code --gpu-probe}, {@code --gpu-no-resolve}, {@code --gpu-nvrtc},
+ *   {@code --gpu-fail-test}. See "GPU" in docs/tools/hq-render.md.</li>
  *   <li>{@code --compare DIR}: after the run, for every PNG written here, the image of the same name in DIR
  *   (before) next to the new one (after) as {@code compare_NAME.png}, and {@code compare.txt} with the
  *   pixel difference and whether both {@code report.json} have the same plan signature. Works with any
@@ -172,6 +175,17 @@ public final class HqRender {
 	 * ({@link HqFixtures#active()} before, {@link HqFixtures#use} after).
 	 */
 	public static void run(String[] args) throws Exception {
+		try {
+			runJob(args);
+		} finally {
+			Gpu.closeSession(); // the GPU child process lives as long as the job
+		}
+	}
+
+	/** Whether final-look renders use the GPU unless {@code --no-gpu} (tools/render-gpu). */
+	private static final boolean GPU_DEFAULT_FINAL = true;
+
+	private static void runJob(String[] args) throws Exception {
 		long started = System.currentTimeMillis() - 2000;
 		Path compare = null;
 		Path outDir = Path.of("build/hq-render");
@@ -221,11 +235,24 @@ public final class HqRender {
 		// kit/paper-lantern: the paper-lantern gallery
 		boolean lanterns = false;
 		boolean officeBlocks = false; // kit/office-blocks-review: console, podium, merge station, glow blocks (OfficeBlockViews)
+		boolean gpuProbe = false; // tools/render-gpu: which GPU routes this machine offers (gpu.GpuProbe)
+		Boolean gpuOpt = null; // --gpu / --no-gpu (null: the default for the look)
+		boolean gpuCompare = false; // --gpu-compare: GPU and CPU for every image, timings and differences
+		boolean gpuFailTest = false; // --gpu-fail-test: the GPU child fails on purpose (checks the fallback)
+		boolean gpuNoResolve = false; // --gpu-no-resolve: only the ray tracing on the GPU, filter and bloom on the CPU
+		boolean gpuNvrtc = false; // --gpu-nvrtc (dev): compile cuda/trace.cu with NVRTC instead of the committed PTX
 		// tools/render-quality: look switches, on in final and off in preview (see Renderer.Look)
 		Boolean previewOpt = null;
 		java.util.Map<String, String> lookOpts = new java.util.LinkedHashMap<>();
 		for (int i = 0; i < args.length; i++) {
 			switch (args[i]) {
+				case "--gpu-probe" -> gpuProbe = true;
+				case "--gpu" -> gpuOpt = Boolean.TRUE;
+				case "--no-gpu" -> gpuOpt = Boolean.FALSE;
+				case "--gpu-compare" -> gpuCompare = true;
+				case "--gpu-nvrtc" -> gpuNvrtc = true;
+				case "--gpu-no-resolve" -> gpuNoResolve = true;
+				case "--gpu-fail-test" -> gpuFailTest = true;
 				case "--preview" -> previewOpt = true;
 				case "--final" -> previewOpt = false;
 				case "--ao", "--shadows", "--hard-shadows", "--sky", "--bloom", "--no-ao", "--no-shadows", "--no-sky", "--no-bloom" -> lookOpts.put(args[i], "");
@@ -291,8 +318,20 @@ public final class HqRender {
 				default -> throw new IllegalArgumentException("unknown option " + args[i]);
 			}
 		}
+		if (gpuProbe) {
+			dev.t3craft.tools.hqrender.gpu.GpuProbe.run(out);
+			return;
+		}
 		// no --preview/--final: --ss 1 (what the render service adds to previews) counts as a preview
-		Renderer.look = look(previewOpt != null ? previewOpt : ss <= 1, lookOpts);
+		boolean isPreview = previewOpt != null ? previewOpt : ss <= 1;
+		Renderer.look = look(isPreview, lookOpts);
+		// tools/render-gpu: the ray tracing runs on the GPU when asked (or, once validated, by default in final looks)
+		Gpu.outDir = out;
+		Gpu.nvrtc = gpuNvrtc;
+		Gpu.resolve = !gpuNoResolve;
+		Gpu.failTest = gpuFailTest;
+		Gpu.mode = gpuCompare ? Gpu.Mode.COMPARE : gpuOpt != null ? (gpuOpt ? Gpu.Mode.AUTO : Gpu.Mode.OFF) : GPU_DEFAULT_FINAL && !isPreview ? Gpu.Mode.AUTO : Gpu.Mode.OFF;
+		System.out.println("gpu: " + Gpu.mode.name().toLowerCase(Locale.ROOT));
 		System.out.println("look: " + Renderer.look);
 		double scaleMul = scaleOpt == null ? 1.6 : scaleOpt;
 		if (vanilla) {

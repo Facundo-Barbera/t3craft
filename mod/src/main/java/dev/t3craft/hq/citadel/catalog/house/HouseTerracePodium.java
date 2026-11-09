@@ -8,7 +8,6 @@ import static dev.t3craft.hq.citadel.catalog.house.TerraceKit.hanging;
 import static dev.t3craft.hq.citadel.catalog.house.TerraceKit.log;
 import static dev.t3craft.hq.citadel.catalog.house.TerraceKit.mix;
 import static dev.t3craft.hq.citadel.catalog.house.TerraceKit.pane;
-import static dev.t3craft.hq.citadel.catalog.house.TerraceKit.slabTop;
 import static dev.t3craft.hq.citadel.catalog.house.TerraceKit.stair;
 
 import dev.t3craft.hq.citadel.CitadelCanvas;
@@ -22,34 +21,36 @@ import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BedPart;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.StairsShape;
 
 /**
- * A white villa on a tall stone podium. A broad stair with sloping cheeks climbs the front to a
- * promenade; behind it a two-storey block of quartz and calcite stands on a colonnade, under a
- * flat roof with an overhanging, copper-trimmed cornice. The roof is a garden: planter beds along the
- * parapet, a bamboo-mosaic floor, and a cherry pergola with a bench, a table and hanging lanterns,
- * next to a small stair hut.
+ * A villa on a podium. A dark deepslate basement 2 to 4 blocks high, crowned by a light quartz cornice and a
+ * balustrade, carries a two-storey house of calcite and quartz pilasters under a hipped roof with an eave, a ridge,
+ * finials and two chimneys. A broad stair (3, 5 or 7 wide) climbs the front to the podium terrace, where the benches,
+ * the planters and the tables are; the door opens straight onto it.
  *
  * <pre>
- *  front section (door column)
- *                 ┌ pergola ┐ ┌hut┐
- *          ───────┴─────────┴─┴───┴─── roof garden + parapet (y10..y11)
- *          │ upper storey, windows y7..y8                    │
- *          ╞═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═╡ architrave y6
- *   ▁▂▃   │ colonnade (v5) + recessed ground floor (v6)     │
- *  ▁▂▃▅▆▇██ podium y0..y2 (deepslate, tuff, polished tuff) ██
+ *  front section (door column)                       side view
+ *            ____/\____  hipped roof, eave, ridge
+ *       ____|  upper    |____  balcony over the portico (seed)
+ *      |  portico columns / pilasters  |
+ *   ...|  ground floor: salon + kitchen |...  terrace: benches, planters, tables
+ *  ▁▂▃▅▆▇█████ podium (deepslate, light cornice)  ██████
  * </pre>
  *
- * Size: 11–15 × 12–15 × 16+. Symmetric about the door column.
+ * Inside, every storey is 4 blocks free: ground floor with salon (sofa, shelves, rug), kitchen (smoker, furnace,
+ * crafting table, cauldron) and storage (chests, barrels); upper floor with a bedroom (two beds, chests) and a study
+ * (bookshelves, enchanting table, lectern). A straight timber stair along the back wall joins them, with a fence round
+ * the hole. By seed: the podium is 2, 3 or 4 high (as far as the plot allows), the roof is slate, oxidised copper or
+ * red brick, and the front is either a row of free-standing columns carrying a balcony (portico) or engaged pilasters.
+ *
+ * <p>Size: 14–26 × 14–26 × 17+. The villa is symmetric about the door column. Plots larger than 27 are built in the
+ * middle. A podium with a cellar was left out: 3 blocks is all the 4-high podium could spare, below the 4 free the
+ * storeys have, so the storage is the almacén of the ground floor.
  */
 public final class HouseTerracePodium implements Variant {
-	private static final int TOP = 2; // last podium layer; the promenade is the top of this layer
-	private static final int VF = 3; // podium front face
-	private static final int VCOL = 5; // colonnade and upper front wall
-	private static final int VWALL = 6; // recessed ground-floor front wall
-	private static final int ARCH = 6; // architrave layer (floor between the storeys)
-	private static final int DECK = 10;
-
 	@Override
 	public String id() {
 		return "house_terrace_podium";
@@ -62,669 +63,794 @@ public final class HouseTerracePodium implements Variant {
 
 	@Override
 	public int minW() {
-		return 11;
+		return 14;
 	}
 
 	@Override
 	public int minD() {
-		return 12;
+		return 14;
 	}
 
 	@Override
 	public int minH() {
-		return 16;
+		return 17;
 	}
 
 	@Override
 	public int maxW() {
-		return 15;
+		return 26;
 	}
 
 	@Override
 	public int maxD() {
-		return 15;
+		return 26;
 	}
 
-	private record G(int w, int d, int cu, int ha, int hb, int ve, int sh) {
-		int p0() {
-			return cu - ha;
+	// ------------------------------------------------------------------ geometry
+
+	/** The roof materials of a seed. */
+	private record Roof(Block stairs, Block solid, Block solidAlt, Block slab, Block ridge, Block eave) {
+	}
+
+	private static Roof roofKind(int kind) {
+		return switch (kind) {
+			case 0 -> new Roof(Blocks.DEEPSLATE_TILE_STAIRS, Blocks.DEEPSLATE_TILES, Blocks.CRACKED_DEEPSLATE_TILES, Blocks.DEEPSLATE_TILE_SLAB, Blocks.POLISHED_DEEPSLATE, Blocks.CHERRY_STAIRS);
+			case 1 -> new Roof(Blocks.CUT_COPPER_STAIRS.waxed().oxidized(), Blocks.CUT_COPPER.waxed().oxidized(), Blocks.CUT_COPPER.waxed().weathered(), Blocks.CUT_COPPER_SLAB.waxed().oxidized(),
+					Blocks.CUT_COPPER.waxed().oxidized(), Blocks.CHERRY_STAIRS);
+			default -> new Roof(Blocks.BRICK_STAIRS, Blocks.BRICKS, Blocks.BRICKS, Blocks.BRICK_SLAB, Blocks.DEEPSLATE_BRICKS, Blocks.DEEPSLATE_TILE_STAIRS);
+		};
+	}
+
+	/**
+	 * The layout in the sub-box: the podium covers {@code u 0..wc-1, v P..dc-1}; the stair climbs in front of it ({@code v 0..P-1}); the
+	 * house stands on it at {@code ha..hb × hv0..hv1} with a terrace around (front {@code tf}, sides {@code ha-1}, back the rest).
+	 */
+	private static final class G {
+		int wc;
+		int dc;
+		int ou;
+		int ov;
+		int h;
+		int pod; // podium height; the terrace is walked at y = pod
+		int cu;
+		int sw;
+		int sh;
+		int ha;
+		int hb;
+		int hw;
+		int hv0;
+		int hv1;
+		int hd;
+		int tf;
+		boolean portico;
+		Roof roof;
+	}
+
+	private static G plan(Plot p, Random r) {
+		G g = new G();
+		int wc = Math.min(p.w(), 27);
+		if ((wc & 1) == 0) {
+			wc--;
+		}
+		int dc = Math.min(p.d(), 27);
+		// p.hash mixes the seed well; java.util.Random with nearby seeds gives the same first draws
+		int pod = Math.max(2, Math.min(2 + p.hash(11, 3, 5, 3), p.h() - 15));
+		boolean portico = p.hash(7, 1, 13, 2) == 0;
+		int roofKind = p.hash(3, 9, 17, 3);
+		int wi = wc - 2;
+		int bt0 = dc >= 18 ? 2 : dc >= 15 ? 1 : 0;
+		// the front terrace is as deep as the plot allows (a portico needs 3, a table row wants 1 more), then the podium gets lower
+		int tf = portico ? 3 : 2;
+		search:
+		while (true) {
+			for (int t = portico ? 4 : 3; t >= (portico ? 3 : 2); t--) {
+				if (dc - pod - 2 - t - bt0 >= 7) {
+					tf = t;
+					break search;
+				}
+			}
+			if (pod > 2) {
+				pod--;
+			} else if (portico) {
+				portico = false;
+			} else {
+				break;
+			}
+		}
+		int sidet = wi >= 21 ? 3 : wi >= 15 ? 2 : 1;
+		g.wc = wc;
+		g.dc = dc;
+		g.ou = (p.w() - wc) / 2;
+		g.ov = (p.d() - dc) / 2;
+		g.h = p.h();
+		g.pod = pod;
+		g.cu = (wc - 1) / 2;
+		g.sw = wi >= 21 ? 7 : wi >= 13 ? 5 : 3;
+		g.sh = g.sw / 2;
+		g.ha = 1 + sidet;
+		g.hw = wi - 2 * sidet;
+		g.hb = g.ha + g.hw - 1;
+		g.tf = tf;
+		g.hd = Math.min(dc - pod - 2 - tf - bt0, 17);
+		g.hv0 = pod + 1 + tf;
+		g.hv1 = g.hv0 + g.hd - 1;
+		g.portico = portico;
+		g.roof = roofKind(roofKind);
+		return g;
+	}
+
+	/** Writes in the sub-box, centred in the plot. */
+	private static final class K {
+		final CitadelCanvas c;
+		final Plot p;
+		final int ou;
+		final int ov;
+
+		K(CitadelCanvas c, Plot p, int ou, int ov) {
+			this.c = c;
+			this.p = p;
+			this.ou = ou;
+			this.ov = ov;
 		}
 
-		int p1() {
-			return cu + ha;
+		void set(int u, int y, int v, BlockState s) {
+			p.set(c, ou + u, y, ov + v, s);
 		}
 
-		int b0() {
-			return cu - hb;
+		void put(int u, int y, int v, BlockState s, int layer) {
+			p.put(c, ou + u, y, ov + v, s, layer);
 		}
 
-		int b1() {
-			return cu + hb;
+		boolean free(int u, int y, int v) {
+			BlockState s = p.at(c, ou + u, y, ov + v);
+			return s == null || s.isAir();
 		}
 
-		int pv1() {
-			return d - 2; // back row of the podium
+		int hash(int u, int y, int v, int n) {
+			return p.hash(u, y, v, n);
+		}
+
+		/** Link sets work in plot coordinates, so the sub-box offset is added. */
+		void member(Links l, int u, int v) {
+			l.add(ou + u, ov + v);
+		}
+
+		void partner(Links l, int u, int v) {
+			l.partner(ou + u, ov + v);
 		}
 	}
 
 	@Override
 	public void build(CitadelCanvas c, Plot p) {
 		Random r = p.rng(0x90D1_0A11L);
-		int w = p.w();
-		int d = p.d();
-		int cu = (w - 1) / 2;
-		int ha = Math.min(cu - 1, w - 2 - cu);
-		G g = new G(w, d, cu, ha, ha - 1, d - 3, ha >= 5 ? 2 : 1);
-		podium(c, p, g);
-		stairs(c, p, g);
-		balustrade(c, p, g);
-		ground(c, p, g);
-		upper(c, p, g);
-		relief(c, p, g);
-		deck(c, p, g, r);
-		pergola(c, p, g, r);
-		hut(c, p, g);
-		forecourt(c, p, g, r);
+		G g = plan(p, r);
+		K k = new K(c, p, g.ou, g.ov);
+		podium(k, g);
+		frontStair(k, g);
+		parapet(k, g);
+		house(k, g);
+		portico(k, g);
+		roof(k, g);
+		interior(k, g);
+		terrace(k, g);
+		forecourt(k, g);
 	}
 
 	// ------------------------------------------------------------------ materials
 
-	private static BlockState foot(Plot p, int u, int y, int v) {
-		return mix(p, u, y, v, Blocks.DEEPSLATE_BRICKS, Blocks.DEEPSLATE_BRICKS, Blocks.CRACKED_DEEPSLATE_BRICKS, Blocks.POLISHED_DEEPSLATE);
+	private static BlockState dark(Plot p, int u, int y, int v) {
+		return mix(p, u, y, v, Blocks.DEEPSLATE_BRICKS, Blocks.DEEPSLATE_BRICKS, Blocks.DEEPSLATE_BRICKS, Blocks.CRACKED_DEEPSLATE_BRICKS, Blocks.POLISHED_DEEPSLATE);
 	}
 
-	private static BlockState tuff(Plot p, int u, int y, int v) {
-		return mix(p, u, y, v, Blocks.TUFF_BRICKS, Blocks.TUFF_BRICKS, Blocks.POLISHED_TUFF, Blocks.TUFF_BRICKS, Blocks.CHISELED_TUFF);
+	private static BlockState cornice(Plot p, int u, int y, int v) {
+		return mix(p, u, y, v, Blocks.SMOOTH_QUARTZ, Blocks.SMOOTH_QUARTZ, Blocks.SMOOTH_QUARTZ, Blocks.QUARTZ_BRICKS);
 	}
 
 	private static BlockState pave(Plot p, int u, int y, int v) {
-		return mix(p, u, y, v, Blocks.POLISHED_TUFF, Blocks.POLISHED_TUFF, Blocks.TUFF_BRICKS, Blocks.SMOOTH_STONE);
+		return mix(p, u, y, v, Blocks.POLISHED_TUFF, Blocks.POLISHED_TUFF, Blocks.TUFF_BRICKS, Blocks.POLISHED_ANDESITE);
 	}
 
 	private static BlockState white(Plot p, int u, int y, int v) {
-		return mix(p, u, y, v, Blocks.CALCITE, Blocks.CALCITE, Blocks.SMOOTH_QUARTZ, Blocks.CALCITE, Blocks.QUARTZ_BRICKS);
+		return mix(p, u, y, v, Blocks.CALCITE, Blocks.CALCITE, Blocks.CALCITE, Blocks.SMOOTH_QUARTZ);
+	}
+
+	private static BlockState plinth(Plot p, int u, int y, int v) {
+		return mix(p, u, y, v, Blocks.TUFF_BRICKS, Blocks.TUFF_BRICKS, Blocks.POLISHED_TUFF);
 	}
 
 	private static BlockState pillar() {
 		return b(Blocks.QUARTZ_PILLAR);
 	}
 
-	/** The oxidised copper trim: green against white, the one cool accent of this house. */
-	private static Block copperStairs() {
-		return Blocks.CUT_COPPER_STAIRS.waxed().oxidized();
+	private static BlockState face(Block blk, Direction f) {
+		return blk.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, f);
 	}
 
-	private static Block copperSlab() {
-		return Blocks.CUT_COPPER_SLAB.waxed().oxidized();
-	}
-
-	private static BlockState glass(Plot p, int u, int v, boolean alongU) {
-		boolean pink = p.hash(u, 7, v, 3) == 0;
+	private static BlockState glass(Plot p, int u, int y, int v, boolean alongU) {
+		boolean pink = p.hash(u, y, v, 7) == 0;
 		return pane(pink ? Blocks.STAINED_GLASS_PANE.pick(DyeColor.PINK) : Blocks.GLASS_PANE, alongU);
 	}
 
-	/** [depth] a recessed window: the wall cell is left open and the pane stands one block inside. */
-	private static void window(CitadelCanvas c, Plot p, int u, int y, int v, int iu, int iv, boolean alongU) {
-		p.set(c, u, y, v, CitadelCanvas.AIR);
-		p.set(c, iu, y, iv, glass(p, u, v, alongU));
+	/** A stair with an outer corner at a ring corner (the high quarter on the inside diagonal). */
+	private static BlockState ringStair(Block blk, boolean n, boolean s, boolean w, boolean e, boolean top) {
+		Direction f;
+		StairsShape sh = StairsShape.STRAIGHT;
+		if (n && w) {
+			f = Direction.SOUTH;
+			sh = StairsShape.OUTER_LEFT;
+		} else if (n && e) {
+			f = Direction.SOUTH;
+			sh = StairsShape.OUTER_RIGHT;
+		} else if (s && w) {
+			f = Direction.NORTH;
+			sh = StairsShape.OUTER_RIGHT;
+		} else if (s && e) {
+			f = Direction.NORTH;
+			sh = StairsShape.OUTER_LEFT;
+		} else if (n) {
+			f = Direction.SOUTH;
+		} else if (s) {
+			f = Direction.NORTH;
+		} else if (w) {
+			f = Direction.EAST;
+		} else {
+			f = Direction.WEST;
+		}
+		return stair(blk, f, top).setValue(BlockStateProperties.STAIRS_SHAPE, sh);
 	}
 
-	// ------------------------------------------------------------------ podium (y0..y2)
+	// ------------------------------------------------------------------ podium and stair
 
 	/**
-	 * [palette] three courses, dark to light: deepslate bricks, tuff bricks, polished tuff on top.
-	 * [depth] piers jut out of the front face and the sides; between them the face is recessed with a
-	 * lantern niche.
+	 * [palette] dark to light: a polished-deepslate base course, deepslate bricks, a quartz cornice. [depth] chiselled piers
+	 * every fourth cell and lantern niches on the front face.
 	 */
-	private static void podium(CitadelCanvas c, Plot p, G g) {
-		for (int u = g.p0(); u <= g.p1(); u++) {
-			for (int v = VF; v <= g.pv1(); v++) {
-				p.set(c, u, 0, v, foot(p, u, 0, v));
-				p.set(c, u, 1, v, tuff(p, u, 1, v));
-				p.set(c, u, 2, v, pave(p, u, 2, v));
+	private static void podium(K k, G g) {
+		Plot p = k.p;
+		int pod = g.pod;
+		for (int u = 0; u < g.wc; u++) {
+			for (int v = pod; v < g.dc; v++) {
+				boolean ring = u == 0 || u == g.wc - 1 || v == pod || v == g.dc - 1;
+				boolean frontBack = v == pod || v == g.dc - 1;
+				int edge = frontBack ? Math.abs(u - g.cu) : v - pod;
+				boolean pier = ring && edge % 4 == 2;
+				boolean corner = (u == 0 || u == g.wc - 1) && frontBack;
+				boolean bay = ring && !corner && edge % 4 == 0;
+				boolean stairBehind = v == pod && Math.abs(u - g.cu) <= g.sh + 1;
+				for (int y = 0; y < pod; y++) {
+					BlockState st;
+					if (y == pod - 1) {
+						st = ring ? cornice(p, u, y, v) : pave(p, u, y, v);
+					} else if (y == 0) {
+						if (bay && !stairBehind) {
+							st = pane(Blocks.IRON_BARS, frontBack); // a cellar grille in the middle of every bay
+						} else {
+							st = ring ? mix(p, u, y, v, Blocks.POLISHED_DEEPSLATE, Blocks.COBBLED_DEEPSLATE, Blocks.DEEPSLATE_BRICKS, Blocks.POLISHED_DEEPSLATE) : dark(p, u, y, v);
+						}
+					} else if (ring && v == pod && y == 1 && Math.abs(u - g.cu) % 4 == 0 && Math.abs(u - g.cu) > g.sh + 1) {
+						st = b(Blocks.LANTERN);
+					} else if (ring && y == pod - 2 && !stairBehind) {
+						// [depth] a cove under the cornice: inverted stairs whose low half is cut away on the outside
+						st = ringStair(Blocks.DEEPSLATE_BRICK_STAIRS, v == pod, v == g.dc - 1, u == 0, u == g.wc - 1, true);
+					} else if (pier) {
+						st = b(Blocks.CHISELED_DEEPSLATE);
+					} else {
+						st = dark(p, u, y, v);
+					}
+					k.set(u, y, v, st);
+				}
 			}
-		}
-		// front piers (even offset from the corner) and niches (the rest), beside the stair
-		for (int u = g.p0(); u <= g.p1(); u++) {
-			int du = Math.abs(u - g.cu());
-			if (du <= g.sh() + 1) {
-				continue;
-			}
-			boolean pier = (g.ha() - du) % 2 == 0;
-			if (pier) {
-				p.set(c, u, 0, VF - 1, foot(p, u, 0, VF - 1));
-				p.set(c, u, 1, VF - 1, tuff(p, u, 1, VF - 1));
-				p.set(c, u, 2, VF - 1, b(Blocks.CHISELED_TUFF));
-			} else {
-				p.set(c, u, 1, VF, b(Blocks.LANTERN)); // the niche, a lantern on the dark course
-			}
-		}
-		// side and back buttresses in the margin: a pier every fourth cell, with a slab cap
-		for (int v = VF + 1; v <= g.pv1(); v += 3) {
-			for (int u : new int[] {g.p0() - 1, g.p1() + 1}) {
-				p.set(c, u, 0, v, foot(p, u, 0, v));
-				p.set(c, u, 1, v, slabTop(Blocks.TUFF_BRICK_SLAB));
-			}
-		}
-		for (int u = g.p0() + 2; u <= g.p1() - 2; u += 3) {
-			p.set(c, u, 0, g.pv1() + 1, foot(p, u, 0, g.pv1() + 1));
-			p.set(c, u, 1, g.pv1() + 1, slabTop(Blocks.TUFF_BRICK_SLAB));
 		}
 	}
 
-	/** The front stair: three steps with sloping cheeks, a lantern pillar at the top of each cheek. */
-	private static void stairs(CitadelCanvas c, Plot p, G g) {
-		for (int k = 0; k <= TOP; k++) {
-			for (int du = -g.sh(); du <= g.sh(); du++) {
-				int u = g.cu() + du;
-				for (int y = 0; y < k; y++) {
-					p.set(c, u, y, k, tuff(p, u, y, k));
+	/**
+	 * The front stair, {@code sw} wide: a quartz step per block of height, first step met head-on from the ground, a cheek of
+	 * deepslate on each side stepping up with the flight, and a lantern post where each cheek meets the balustrade. The row of the
+	 * podium front is the landing at the top.
+	 */
+	private static void frontStair(K k, G g) {
+		Plot p = k.p;
+		for (int kk = 0; kk < g.pod; kk++) {
+			for (int du = -g.sh; du <= g.sh; du++) {
+				int u = g.cu + du;
+				for (int y = 0; y < kk; y++) {
+					k.set(u, y, kk, b(Blocks.POLISHED_TUFF));
 				}
-				p.set(c, u, k, k, stair(Blocks.TUFF_BRICK_STAIRS, Direction.SOUTH, false));
+				k.set(u, kk, kk, stair(Blocks.SMOOTH_QUARTZ_STAIRS, Direction.SOUTH, false));
 			}
 			for (int s : new int[] {-1, 1}) {
-				int u = g.cu() + s * (g.sh() + 1);
-				for (int y = 0; y <= k; y++) {
-					p.set(c, u, y, k, y == 0 ? foot(p, u, y, k) : tuff(p, u, y, k));
+				int u = g.cu + s * (g.sh + 1);
+				for (int y = 0; y <= kk; y++) {
+					k.set(u, y, kk, y == 0 ? b(Blocks.POLISHED_DEEPSLATE) : dark(p, u, y, kk));
 				}
-				p.set(c, u, k + 1, k, stair(Blocks.TUFF_BRICK_STAIRS, Direction.SOUTH, false));
+				k.set(u, kk + 1, kk, slab(Blocks.POLISHED_DEEPSLATE_SLAB));
 			}
-		}
-		// the cheeks end in a pillar with a lantern
-		for (int s : new int[] {-1, 1}) {
-			int u = g.cu() + s * (g.sh() + 1);
-			p.set(c, u, TOP + 1, VF, b(Blocks.TUFF_BRICK_WALL));
-			p.set(c, u, TOP + 2, VF, b(Blocks.TUFF_BRICK_WALL));
-			p.set(c, u, TOP + 3, VF, b(Blocks.LANTERN));
 		}
 	}
 
-	/** [depth] a tuff-brick balustrade round the promenade, linked by hand, with posts at the ends and corners. */
-	private static void balustrade(CitadelCanvas c, Plot p, G g) {
+	/** [depth] a balustrade of deepslate-brick wall round the terrace, linked by hand, with polished posts and lanterns. */
+	private static void parapet(K k, G g) {
 		Links run = new Links();
 		java.util.List<int[]> posts = new java.util.ArrayList<>();
-		int open = g.sh() + 1;
-		for (int u = g.p0(); u <= g.p1(); u++) {
-			for (int v = VF; v <= g.pv1(); v++) {
-				boolean ring = u == g.p0() || u == g.p1() || v == VF || v == g.pv1();
-				if (!ring || (v == VF && Math.abs(u - g.cu()) <= open)) {
+		int open = g.sh + 1;
+		for (int u = 0; u < g.wc; u++) {
+			for (int v = g.pod; v < g.dc; v++) {
+				boolean ring = u == 0 || u == g.wc - 1 || v == g.pod || v == g.dc - 1;
+				if (!ring) {
 					continue;
 				}
-				boolean corner = (u == g.p0() || u == g.p1()) && (v == VF || v == g.pv1());
-				boolean end = v == VF && Math.abs(u - g.cu()) == open + 1;
+				int du = Math.abs(u - g.cu);
+				if (v == g.pod && du <= g.sh) {
+					continue; // the stair arrives here
+				}
+				boolean corner = (u == 0 || u == g.wc - 1) && (v == g.pod || v == g.dc - 1);
+				boolean end = v == g.pod && du == open;
 				if (corner || end) {
-					posts.add(new int[] {u, v, corner ? 1 : 0});
-					run.partner(u, v);
+					posts.add(new int[] {u, v});
+					k.partner(run, u, v);
 				} else {
-					run.add(u, v);
+					k.member(run, u, v);
 				}
 			}
 		}
-		run.emitWalls(c, p, TOP + 1, Blocks.TUFF_BRICK_WALL);
+		run.emitWalls(k.c, k.p, g.pod, Blocks.DEEPSLATE_BRICK_WALL);
 		for (int[] q : posts) {
-			p.set(c, q[0], TOP + 1, q[1], b(Blocks.POLISHED_TUFF));
-			p.set(c, q[0], TOP + 2, q[1], q[2] == 1 ? b(Blocks.LANTERN) : slab(Blocks.POLISHED_TUFF_SLAB));
+			k.set(q[0], g.pod, q[1], b(Blocks.POLISHED_DEEPSLATE));
+			k.set(q[0], g.pod + 1, q[1], b(Blocks.LANTERN));
 		}
 	}
 
-	// ------------------------------------------------------------------ ground floor (y3..y5)
+	// ------------------------------------------------------------------ the house
 
-	private static boolean colAt(G g, int u) {
-		int du = Math.abs(u - g.cu());
-		return du == g.hb() || (du >= 2 && du % 2 == 0);
+	/** What a ring cell of the house is: 0 pilaster/corner, 1 front door, 2 bay (window). */
+	private static boolean pilAt(int kk, int len) {
+		int dk = Math.abs(kk - (len - 1) / 2);
+		boolean corner = kk == 0 || kk == len - 1;
+		return corner || (dk % 4 == 2 && (len < 9 || (kk != 1 && kk != len - 2)));
 	}
 
-	private static void ground(CitadelCanvas c, Plot p, G g) {
-		int cu = g.cu();
-		for (int u = g.b0(); u <= g.b1(); u++) {
-			// colonnade at v 5: quartz pillars on a base and under a capital
-			if (colAt(g, u)) {
-				for (int y = 3; y <= 5; y++) {
-					p.set(c, u, y, VCOL, pillar());
-				}
-			}
-			// the recessed front wall at v 6
-			for (int y = 3; y <= 5; y++) {
-				int du = Math.abs(u - cu);
-				BlockState st;
-				if (u == cu && y <= 4) {
-					st = door(Blocks.CHERRY_DOOR, Direction.NORTH, y == 3);
-				} else if (u == cu) {
-					st = log(Blocks.STRIPPED_CHERRY_LOG, Direction.Axis.X);
-				} else if (du == 1 && y >= 4) {
-					st = pane(Blocks.STAINED_GLASS_PANE.pick(DyeColor.PINK), true); // sidelights
-				} else if (y == 3) {
-					st = tuff(p, u, y, VWALL);
-				} else if (y == 4 && du >= 2 && du < g.hb() && !colAt(g, u)) {
-					window(c, p, u, y, VWALL, u, VWALL + 1, true);
+	private static int cellKind(G g, int u, int v) {
+		boolean horiz = v == g.hv0 || v == g.hv1;
+		int kk = horiz ? u - g.ha : v - g.hv0;
+		int len = horiz ? g.hw : g.hd;
+		if (pilAt(kk, len)) {
+			return 0;
+		}
+		if (v == g.hv0 && kk == (len - 1) / 2) {
+			return 1;
+		}
+		return 2;
+	}
+
+	/**
+	 * Walls of both storeys on the ring, the string courses at y = pod + 4 and pod + 9, the floors and the ceiling. Each storey is
+	 * 4 free blocks: a dado, two rows of glass, a cherry lintel.
+	 */
+	private static void house(K k, G g) {
+		Plot p = k.p;
+		int pod = g.pod;
+		for (int u = g.ha; u <= g.hb; u++) {
+			for (int v = g.hv0; v <= g.hv1; v++) {
+				boolean ring = u == g.ha || u == g.hb || v == g.hv0 || v == g.hv1;
+				boolean horiz = v == g.hv0 || v == g.hv1;
+				Direction.Axis beam = horiz ? Direction.Axis.X : Direction.Axis.Z;
+				if (!ring) {
+					k.set(u, pod - 1, v, mix(p, u, pod - 1, v, Blocks.DARK_OAK_PLANKS, Blocks.DARK_OAK_PLANKS, Blocks.SPRUCE_PLANKS));
+					k.set(u, pod + 4, v, mix(p, u, pod + 4, v, Blocks.CHERRY_PLANKS, Blocks.CHERRY_PLANKS, Blocks.SPRUCE_PLANKS));
+					k.set(u, pod + 9, v, mix(p, u, pod + 9, v, Blocks.SPRUCE_PLANKS, Blocks.SPRUCE_PLANKS, Blocks.DARK_OAK_PLANKS));
 					continue;
-				} else {
-					st = white(p, u, y, VWALL);
 				}
-				p.set(c, u, y, VWALL, st);
-			}
-			// back wall
-			for (int y = 3; y <= 5; y++) {
-				boolean win = y == 4 && Math.abs(u - cu) % 3 == 1;
-				if (win) {
-					window(c, p, u, y, g.ve(), u, g.ve() - 1, true);
-				} else {
-					p.set(c, u, y, g.ve(), y == 3 ? tuff(p, u, y, g.ve()) : white(p, u, y, g.ve()));
-				}
-			}
-		}
-		// side walls (v 6..ve) with posts every third cell
-		for (int v = VWALL + 1; v < g.ve(); v++) {
-			for (int u : new int[] {g.b0(), g.b1()}) {
-				boolean post = (v - VWALL) % 3 == 0;
-				for (int y = 3; y <= 5; y++) {
-					if (!post && y == 4) {
-						window(c, p, u, y, v, u == g.b0() ? u + 1 : u - 1, v, false);
-						continue;
+				int kind = cellKind(g, u, v);
+				for (int s = 0; s < 2; s++) {
+					int y0 = pod + 5 * s;
+					for (int t = 0; t <= 3; t++) {
+						BlockState st;
+						if (kind == 0) {
+							st = t == 0 ? b(Blocks.SMOOTH_QUARTZ) : t == 3 ? b(Blocks.CHISELED_QUARTZ_BLOCK) : pillar();
+						} else if (kind == 1 && (s == 0 || g.portico)) {
+							st = switch (t) {
+								case 0 -> door(Blocks.CHERRY_DOOR, Direction.NORTH, true);
+								case 1 -> door(Blocks.CHERRY_DOOR, Direction.NORTH, false);
+								case 2 -> CitadelCanvas.AIR; // an open transom: the doorway is 3 free blocks high
+								default -> log(Blocks.STRIPPED_CHERRY_LOG, beam);
+							};
+						} else if (t == 3) {
+							st = log(Blocks.STRIPPED_CHERRY_LOG, beam);
+						} else if (t == 0) {
+							st = s == 0 ? plinth(p, u, y0, v) : white(p, u, y0 + t, v);
+						} else {
+							st = glass(p, u, y0 + t, v, horiz);
+						}
+						k.set(u, y0 + t, v, st);
 					}
-					BlockState st = post ? pillar() : y == 3 ? tuff(p, u, y, v) : white(p, u, y, v);
-					p.set(c, u, y, v, st);
 				}
+				k.set(u, pod + 4, v, log(Blocks.STRIPPED_CHERRY_LOG, beam));
+				k.set(u, pod + 9, v, log(Blocks.STRIPPED_CHERRY_LOG, beam));
 			}
 		}
-		// the corner pillars of the ground floor, and the floor between the storeys
-		for (int u : new int[] {g.b0(), g.b1()}) {
-			for (int y = 3; y <= 5; y++) {
-				p.set(c, u, y, VWALL, pillar());
-				p.set(c, u, y, g.ve(), pillar());
-			}
-		}
-		// [depth] architrave over the colonnade: a cherry beam with a copper-trimmed upper edge
-		for (int u = g.b0(); u <= g.b1(); u++) {
-			p.set(c, u, ARCH, VCOL, log(Blocks.STRIPPED_CHERRY_LOG, Direction.Axis.X));
-			for (int v = VCOL + 1; v <= g.ve(); v++) {
-				boolean side = u == g.b0() || u == g.b1();
-				boolean edge = side || v == g.ve();
-				p.set(c, u, ARCH, v, edge ? log(Blocks.STRIPPED_CHERRY_LOG, side ? Direction.Axis.Z : Direction.Axis.X) : b(Blocks.SPRUCE_PLANKS));
-			}
-		}
-		// [finish] lanterns hanging from the architrave in the bays, planters between the pillars
-		for (int u = g.b0() + 1; u < g.b1(); u++) {
-			if (colAt(g, u)) {
-				continue;
-			}
-			int du = Math.abs(u - cu);
-			if (du == 1) {
-				p.put(c, u, 5, VCOL, hanging(Blocks.LANTERN), CitadelCanvas.HANGING);
-			} else if (du >= 2) {
-				p.set(c, u, 3, VCOL, b(p.hash(u, 3, VCOL, 2) == 0 ? Blocks.POTTED_FLOWERING_AZALEA : Blocks.POTTED_FERN));
+		// [depth] engaged pilasters standing out of the front wall, from the terrace to under the eave (no portico)
+		if (!g.portico) {
+			for (int u = g.ha; u <= g.hb; u++) {
+				if (!pilAt(u - g.ha, g.hw)) {
+					continue;
+				}
+				int v = g.hv0 - 1;
+				k.set(u, pod, v, b(Blocks.SMOOTH_QUARTZ));
+				for (int y = pod + 1; y <= pod + 7; y++) {
+					k.set(u, y, v, pillar());
+				}
+				k.set(u, pod + 8, v, b(Blocks.CHISELED_QUARTZ_BLOCK));
 			}
 		}
 	}
 
-	// ------------------------------------------------------------------ upper storey (y7..y9)
-
-	private static void upper(CitadelCanvas c, Plot p, G g) {
-		int cu = g.cu();
+	/**
+	 * The portico (seed): free-standing columns along the front carry the floor of a balcony, with a cherry front beam and a
+	 * fence; the upper floor opens onto it through the door above the entrance.
+	 */
+	private static void portico(K k, G g) {
+		if (!g.portico) {
+			return;
+		}
+		Plot p = k.p;
+		int pod = g.pod;
+		int vf = g.hv0 - 2;
+		for (int u = g.ha; u <= g.hb; u++) {
+			for (int v = vf; v <= g.hv0 - 1; v++) {
+				boolean edgeF = v == vf;
+				boolean edgeS = u == g.ha || u == g.hb;
+				BlockState st = edgeF ? log(Blocks.STRIPPED_CHERRY_LOG, Direction.Axis.X) : edgeS ? log(Blocks.STRIPPED_CHERRY_LOG, Direction.Axis.Z)
+						: mix(p, u, pod + 4, v, Blocks.SMOOTH_QUARTZ, Blocks.SMOOTH_QUARTZ, Blocks.QUARTZ_BRICKS);
+				k.set(u, pod + 4, v, st);
+			}
+			if (pilAt(u - g.ha, g.hw)) {
+				k.set(u, pod, vf, b(Blocks.SMOOTH_QUARTZ));
+				k.set(u, pod + 1, vf, pillar());
+				k.set(u, pod + 2, vf, pillar());
+				k.set(u, pod + 3, vf, b(Blocks.CHISELED_QUARTZ_BLOCK));
+			}
+		}
 		Links fence = new Links();
-		fence.partner(g.b0() - 1, VCOL).partner(g.b1() + 1, VCOL);
-		for (int u = g.b0(); u <= g.b1(); u++) {
-			int du = Math.abs(u - cu);
-			boolean col = colAt(g, u);
-			boolean centre = du <= 1;
-			for (int y = 7; y <= 9; y++) {
-				if (col) {
-					p.set(c, u, y, VCOL, pillar()); // [depth] the giant order: pillars run both storeys, a block in front of the wall
-				}
-				BlockState st;
-				if (y == 9) {
-					st = mix(p, u, y, VWALL, Blocks.QUARTZ_BRICKS, Blocks.QUARTZ_BRICKS, Blocks.CHISELED_QUARTZ_BLOCK);
-				} else if (!centre && du >= 3 && !col) {
-					window(c, p, u, y, VWALL, u, VWALL + 1, true);
-					continue;
-				} else if (centre) {
-					st = pane(Blocks.STAINED_GLASS_PANE.pick(DyeColor.PINK), true);
-				} else {
-					st = white(p, u, y, VWALL);
-				}
-				p.set(c, u, y, VWALL, st);
-			}
-			if (!col) {
-				fence.add(u, VCOL);
-			} else {
-				fence.partner(u, VCOL);
-			}
-			// back wall
-			for (int y = 7; y <= 9; y++) {
-				boolean win = y == 8 && du % 3 == 1;
-				if (win) {
-					window(c, p, u, y, g.ve(), u, g.ve() - 1, true);
-				} else {
-					p.set(c, u, y, g.ve(), y == 9 ? mix(p, u, y, g.ve(), Blocks.QUARTZ_BRICKS, Blocks.QUARTZ_BRICKS, Blocks.CHISELED_QUARTZ_BLOCK) : white(p, u, y, g.ve()));
+		for (int u = g.ha; u <= g.hb; u++) {
+			k.member(fence, u, vf);
+		}
+		for (int v = vf + 1; v <= g.hv0 - 1; v++) {
+			k.member(fence, g.ha, v);
+			k.member(fence, g.hb, v);
+		}
+		k.partner(fence, g.ha, g.hv0);
+		k.partner(fence, g.hb, g.hv0);
+		fence.emitFences(k.c, k.p, pod + 5, Blocks.CHERRY_FENCE);
+		for (int du : new int[] {-4, 0, 4}) {
+			k.put(g.cu + du, pod + 3, g.hv0 - 1, hanging(Blocks.LANTERN), CitadelCanvas.HANGING);
+		}
+	}
+
+	// ------------------------------------------------------------------ roof
+
+	/**
+	 * [finish] a hipped roof on the house, with a cherry (or deepslate) eave one block out, a quartz cove under it, a ridge capped
+	 * with slabs, a lightning-rod finial at each end of the ridge and two chimneys through the slopes. The mass under the
+	 * stairs is solid: no attic, nothing floating.
+	 */
+	/** Rings of stairs at the full slope before the roof flattens to half a block per ring. */
+	private static final int STEEP = 2;
+
+	/** The y of the top row of ridge blocks (the cap slab sits on it) for a ridge ring {@code rEff}. */
+	private static int ridgeTop(int rEff, int pp) {
+		if (rEff <= STEEP) {
+			return pp + rEff;
+		}
+		int t = rEff - STEEP;
+		return t % 2 == 1 ? pp + STEEP + (t + 1) / 2 : pp + STEEP + t / 2;
+	}
+
+	private static void roof(K k, G g) {
+		Plot p = k.p;
+		Roof rf = g.roof;
+		int pp = g.pod + 9;
+		int a = g.ha - 1;
+		int bb = g.hb + 1;
+		int v0 = g.hv0 - 1;
+		int e = g.hv1 + 1;
+		int minDim = Math.min(bb - a + 1, e - v0 + 1);
+		// the profile: the eave stair, then STEEP rings of stairs (1 in 1) for S rings, then a gentle slope (a slab, a block, a slab...,
+		// one half block per ring) up to the ridge, a row of ridge blocks under a slab cap. rEff keeps the crest inside the plot's height
+		// and the whole roof at most 6 blocks over the eaves.
+		int rEff = (minDim - 1) / 2;
+		while (rEff > 2 && (ridgeTop(rEff, pp) > pp + 6 || ridgeTop(rEff, pp) + 1 > g.h - 1)) {
+			rEff--;
+		}
+		if (rEff < 2 || ridgeTop(rEff, pp) + 1 > g.h - 1) {
+			return;
+		}
+		int rt = ridgeTop(rEff, pp);
+		for (int u = a; u <= bb; u++) {
+			for (int v = v0; v <= e; v++) {
+				int rr = Math.min(Math.min(u - a, bb - u), Math.min(v - v0, e - v));
+				if (rr == 0) {
+					k.set(u, pp, v, ringStair(rf.eave(), v == v0, v == e, u == a, u == bb, false));
+				} else if (rr < rEff && rr <= STEEP) {
+					boolean n = v == v0 + rr;
+					boolean s = v == e - rr;
+					boolean w = u == a + rr;
+					boolean ee = u == bb - rr;
+					k.set(u, pp + rr, v, ringStair(rf.stairs(), n, s, w, ee, false));
+					for (int y = pp + 1; y < pp + rr; y++) {
+						k.set(u, y, v, mix(p, u, y, v, rf.solid(), rf.solid(), rf.solidAlt()));
 					}
-				}
-			}
-		for (int v = VCOL + 1; v < g.ve(); v++) {
-			for (int u : new int[] {g.b0(), g.b1()}) {
-				boolean post = (v - VCOL) % 3 == 0;
-				for (int y = 7; y <= 9; y++) {
-					if (!post && y == 8) {
-						window(c, p, u, y, v, u == g.b0() ? u + 1 : u - 1, v, false);
-						continue;
+				} else if (rr < rEff) {
+					int t = rr - STEEP;
+					int slabY = pp + STEEP + (t + 1) / 2;
+					int solidTop = t % 2 == 1 ? slabY - 1 : pp + STEEP + t / 2;
+					for (int y = pp + 1; y <= solidTop; y++) {
+						k.set(u, y, v, mix(p, u, y, v, rf.solid(), rf.solid(), rf.solidAlt()));
 					}
-					BlockState st = post ? pillar() : y == 9 ? mix(p, u, y, v, Blocks.QUARTZ_BRICKS, Blocks.QUARTZ_BRICKS, Blocks.CHISELED_QUARTZ_BLOCK) : white(p, u, y, v);
-					p.set(c, u, y, v, st);
+					if (t % 2 == 1) {
+						k.set(u, slabY, v, slab(rf.slab()));
+					}
+				} else {
+					for (int y = pp + 1; y < rt; y++) {
+						k.set(u, y, v, mix(p, u, y, v, rf.solid(), rf.solid(), rf.solidAlt()));
+					}
+					k.set(u, rt, v, b(rf.ridge()));
+					k.set(u, rt + 1, v, slab(rf.slab()));
 				}
 			}
 		}
-		for (int u : new int[] {g.b0(), g.b1()}) {
-			for (int y = 7; y <= 9; y++) {
-				p.set(c, u, y, g.ve(), pillar());
-			}
+		// finials at both ends of the ridge
+		int fu = bb - a + 1 - 2 * rEff;
+		int fv = e - v0 + 1 - 2 * rEff;
+		BlockState rod = b(Blocks.LIGHTNING_ROD.waxed().unaffected());
+		int mu = (a + bb) / 2;
+		int mv = (v0 + e) / 2;
+		if (fu >= fv) {
+			k.set(a + rEff, rt + 1, mv, rod);
+			k.set(bb - rEff, rt + 1, mv, rod);
+		} else {
+			k.set(mu, rt + 1, v0 + rEff, rod);
+			k.set(mu, rt + 1, e - rEff, rod);
 		}
-		// the loggia's balcony: cherry fences between the pillars, linked to them by hand
-		fence.emitFences(c, p, 7, Blocks.CHERRY_FENCE);
-		// [depth] a peristyle on the sides and the back: pillars on the podium edge, under the cornice
-		for (int v = VWALL + 2; v <= g.ve(); v++) {
-			if ((v - VWALL) % 3 == 0) {
-				for (int y = 3; y <= 9; y++) {
-					p.set(c, g.b0() - 1, y, v, pillar());
-					p.set(c, g.b1() + 1, y, v, pillar());
+		// two chimneys through the slopes, either side
+		if (rEff >= 3) {
+			int cv = (v0 + e) / 2;
+			int top = Math.min(rt + 2, g.h - 2);
+			for (int cu : new int[] {a + 2, bb - 2}) {
+				for (int y = pp + 1; y <= top; y++) {
+					k.set(cu, y, cv, k.hash(cu, y, cv, 3) == 0 ? b(Blocks.DEEPSLATE_BRICKS) : b(Blocks.BRICKS));
 				}
+				k.set(cu, top + 1, cv, slab(Blocks.DEEPSLATE_BRICK_SLAB));
 			}
 		}
-		for (int u = g.b0() + 1; u < g.b1(); u++) {
-			if (Math.abs(u - cu) % 3 == 0) {
-				for (int y = 3; y <= 9; y++) {
-					p.set(c, u, y, g.ve() + 1, pillar());
+		// [depth] the cove: inverted stairs one block out under the eave, wherever nothing stands
+		int y = pp - 1;
+		for (int u = a; u <= bb; u++) {
+			for (int v = v0; v <= e; v++) {
+				boolean ring = u == a || u == bb || v == v0 || v == e;
+				if (ring && k.free(u, y, v)) {
+					k.set(u, y, v, ringStair(Blocks.SMOOTH_QUARTZ_STAIRS, v == v0, v == e, u == a, u == bb, true));
 				}
-			}
-		}
-		// pilaster capitals: the pillars of the colonnade end in a chiselled block at y6
-		for (int u = g.b0(); u <= g.b1(); u++) {
-			if (colAt(g, u)) {
-				p.set(c, u, ARCH, VCOL, b(Blocks.CHISELED_QUARTZ_BLOCK));
 			}
 		}
 	}
 
+	// ------------------------------------------------------------------ interior
+
+	private static void place(K k, int u, int y, int v, BlockState st) {
+		if (k.free(u, y, v)) {
+			k.set(u, y, v, st);
+		}
+	}
+
+	private static void bed(K k, int u, int y, int v, DyeColor col) {
+		BlockState base = Blocks.BED.pick(col).defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.SOUTH);
+		place(k, u, y, v, base.setValue(BlockStateProperties.BED_PART, BedPart.FOOT));
+		place(k, u, y, v + 1, base.setValue(BlockStateProperties.BED_PART, BedPart.HEAD));
+	}
+
+	private static void shelf(K k, int u, int y, int v) {
+		for (int dy = 0; dy < 3; dy++) {
+			place(k, u, y + dy, v, b(Blocks.BOOKSHELF));
+		}
+	}
+
 	/**
-	 * [depth] relief for the side and back walls: a stone sill with a flower pot under every recessed window and a
-	 * hooded lintel (an upside-down stair) over it, on both storeys, between the peristyle pillars.
+	 * The stair, then the two storeys. The flight runs along the back wall from the left corner: an approach cell, five steps, a
+	 * landing on the upper floor, the floor cut over the first four, a fence on the room side. The centre of every room is free
+	 * (3 wide from the door) and the furniture hugs the walls.
 	 */
-	private static void relief(CitadelCanvas c, Plot p, G g) {
-		for (int s = 0; s < 2; s++) {
-			int u = s == 0 ? g.b0() - 1 : g.b1() + 1;
-			Direction in = s == 0 ? Direction.EAST : Direction.WEST;
-			for (int v = VWALL + 1; v < g.ve(); v++) {
-				if ((v - VWALL) % 3 == 0) {
-					continue; // a pillar stands here
-				}
-				for (int wy : new int[] {4, 8}) {
-					p.set(c, u, wy - 1, v, stair(Blocks.TUFF_BRICK_STAIRS, in, true)); // sill
-					p.set(c, u, wy, v, b(p.hash(u, wy, v, 2) == 0 ? Blocks.POTTED_FLOWERING_AZALEA : Blocks.POTTED_FERN));
-					p.set(c, u, wy + 1, v, stair(copperStairs(), in, true)); // hooded lintel
+	private static void interior(K k, G g) {
+		int pod = g.pod;
+		int iu0 = g.ha + 1;
+		int iu1 = g.hb - 1;
+		int iv0 = g.hv0 + 1;
+		int iv1 = g.hv1 - 1;
+		int cu = g.cu;
+		int id = iv1 - iv0 + 1;
+		int last = iv1 - 1;
+		// ---- the stair
+		for (int j = 0; j < 5; j++) {
+			int u = iu0 + 1 + j;
+			for (int y = pod; y < pod + j; y++) {
+				k.set(u, y, iv1, b(Blocks.SPRUCE_PLANKS));
+			}
+			k.set(u, pod + j, iv1, stair(Blocks.SPRUCE_STAIRS, Direction.EAST, false));
+			if (j < 4) {
+				k.set(u, pod + 4, iv1, CitadelCanvas.AIR);
+			}
+		}
+		// the post that carries the landing: it also fills the corner under it, which the kitchen counter would seal off
+		for (int y = pod; y <= pod + 3; y++) {
+			k.set(iu0 + 6, y, iv1, log(Blocks.STRIPPED_CHERRY_LOG, Direction.Axis.Y));
+		}
+		Links rail = new Links();
+		for (int u = iu0; u <= iu0 + 4; u++) {
+			k.member(rail, u, iv1 - 1);
+		}
+		k.member(rail, iu0, iv1);
+		k.partner(rail, g.ha, iv1);
+		k.partner(rail, g.ha, iv1 - 1);
+		k.partner(rail, iu0, g.hv1);
+		rail.emitFences(k.c, k.p, pod + 5, Blocks.SPRUCE_FENCE);
+		// ---- ground floor: salon (front left), kitchen (right), storage (left back)
+		shelf(k, iu0, pod, iv0);
+		for (int v = iv0 + 1; v <= iv0 + 2; v++) {
+			place(k, iu0, pod, v, stair(Blocks.CHERRY_STAIRS, Direction.WEST, false)); // the sofa, back to the wall
+		}
+		place(k, iu0 + 1, pod, iv0 + 1, slab(Blocks.CHERRY_SLAB)); // low table
+		for (int v = iv0 + 3; v <= last; v++) {
+			place(k, iu0, pod, v, (v - iv0) % 2 == 1 ? face(Blocks.CHEST, Direction.EAST) : b(Blocks.BARREL));
+			place(k, iu0 + 1, pod, v, (v - iv0) % 2 == 1 ? b(Blocks.BARREL) : face(Blocks.CHEST, Direction.EAST)); // one block high: nothing to climb
+		}
+		place(k, iu1, pod, iv0, b(Blocks.POTTED_FLOWERING_AZALEA));
+		BlockState[] kit = {
+				face(Blocks.SMOKER, Direction.WEST),
+				b(Blocks.CRAFTING_TABLE),
+				face(Blocks.FURNACE, Direction.WEST),
+				b(Blocks.CAULDRON),
+				b(Blocks.BARREL),
+				face(Blocks.CHEST, Direction.WEST),
+		};
+		for (int v = iv0 + 1; v <= last; v++) {
+			place(k, iu1, pod, v, kit[(v - iv0 - 1) % kit.length]);
+		}
+		int m = iv0 + 2;
+		place(k, iu1 - 1, pod, m, b(Blocks.CHERRY_FENCE)); // dining table and two stools
+		place(k, iu1 - 1, pod + 1, m, b(Blocks.CHERRY_PRESSURE_PLATE));
+		place(k, iu1 - 1, pod, m - 1, stair(Blocks.CHERRY_STAIRS, Direction.NORTH, false));
+		place(k, iu1 - 1, pod, m + 1, stair(Blocks.CHERRY_STAIRS, Direction.SOUTH, false));
+		for (int u = cu - 1; u <= cu + 1; u++) {
+			for (int v = iv0 + 1; v <= Math.min(iv0 + 3, last); v++) {
+				place(k, u, pod, v, Blocks.CARPET.pick(DyeColor.PINK).defaultBlockState());
+			}
+		}
+		for (int u = iu0 + 7; u <= iu1; u++) {
+			place(k, u, pod, iv1, (u - iu0) % 2 == 1 ? face(Blocks.CHEST, Direction.NORTH) : b(Blocks.BARREL));
+		}
+		// ---- upper floor: bedroom (left), study (right)
+		int yu = pod + 5;
+		bed(k, iu0, yu, iv0, DyeColor.PINK);
+		bed(k, iu0 + 1, yu, iv0, DyeColor.WHITE);
+		place(k, iu0, yu, iv0 + 2, face(Blocks.CHEST, Direction.NORTH));
+		place(k, iu0 + 1, yu, iv0 + 2, b(Blocks.BARREL));
+		for (int v = iv0 + 3; v <= iv1 - 2; v++) {
+			place(k, iu0, yu, v, v % 2 == 0 ? face(Blocks.CHEST, Direction.EAST) : b(Blocks.POTTED_FERN));
+		}
+		shelf(k, iu1, yu, iv0);
+		shelf(k, iu1, yu, iv0 + 1);
+		place(k, iu1, yu, iv0 + 2, b(Blocks.ENCHANTING_TABLE));
+		place(k, iu1 - 1, yu, iv0 + 2, stair(Blocks.CHERRY_STAIRS, Direction.WEST, false));
+		if (iv0 + 3 <= iv1 - 2) {
+			place(k, iu1, yu, iv0 + 3, face(Blocks.LECTERN, Direction.WEST).setValue(BlockStateProperties.HAS_BOOK, true));
+		}
+		if (iv0 + 4 <= iv1 - 2) {
+			place(k, iu1, yu, iv0 + 4, b(Blocks.CARTOGRAPHY_TABLE));
+		}
+		for (int u = iu0 + 8; u <= iu1; u++) {
+			shelf(k, u, yu, iv1);
+		}
+		for (int u = cu - 1; u <= cu + 1; u++) {
+			for (int v = iv0 + 1; v <= Math.min(iv0 + 3, last); v++) {
+				place(k, u, yu, v, Blocks.CARPET.pick(DyeColor.WHITE).defaultBlockState());
+			}
+		}
+		// ---- lanterns hung from the ceilings over the middle of the room: the floor there is flat (carpet), so nothing
+		// stands under them and the headroom stays above 3
+		for (int storey = 0; storey < 2; storey++) {
+			int y = pod + 3 + 5 * storey;
+			k.put(cu, y, iv0 + 2, hanging(Blocks.LANTERN), CitadelCanvas.HANGING);
+			k.put(cu, y, last, hanging(Blocks.LANTERN), CitadelCanvas.HANGING);
+			if (id >= 8) {
+				k.put(cu, y, (iv0 + last) / 2 + 1, hanging(Blocks.LANTERN), CitadelCanvas.HANGING);
+			}
+		}
+	}
+
+	// ------------------------------------------------------------------ terrace and forecourt
+
+	private static void planter(K k, int u, int y, int v) {
+		Plot p = k.p;
+		k.set(u, y, v, mix(p, u, y, v, Blocks.MOSS_BLOCK, Blocks.MOSS_BLOCK, Blocks.GRASS_BLOCK));
+		BlockState plant = switch (k.hash(u, y, v, 9)) {
+			case 0, 1 -> b(Blocks.AZALEA);
+			case 2, 3 -> b(Blocks.FLOWERING_AZALEA);
+			case 4 -> b(Blocks.PINK_PETALS);
+			case 5 -> b(Blocks.ALLIUM);
+			case 6 -> b(Blocks.CORNFLOWER);
+			case 7 -> b(Blocks.FERN);
+			default -> b(Blocks.PINK_TULIP);
+		};
+		k.set(u, y + 1, v, plant);
+	}
+
+	/**
+	 * The podium terrace: in front, a table with two stools on each side of the way to the door, planters beyond them and
+	 * pots under the pilasters; on the sides and the back a lane next to the walls stays free, and the outer cell has benches and
+	 * planters where the terrace is wide enough.
+	 */
+	private static void terrace(K k, G g) {
+		int pod = g.pod;
+		int cu = g.cu;
+		int vf = pod + 1;
+		for (int u = 1; u <= g.wc - 2; u++) {
+			int du = Math.abs(u - cu);
+			boolean left = u < cu;
+			if (du == 4) {
+				k.set(u, pod, vf, b(Blocks.CHERRY_FENCE));
+				k.set(u, pod + 1, vf, slab(Blocks.CHERRY_SLAB));
+			} else if (du == 3) {
+				k.set(u, pod, vf, stair(Blocks.CHERRY_STAIRS, left ? Direction.EAST : Direction.WEST, false));
+			} else if (du == 5) {
+				k.set(u, pod, vf, stair(Blocks.CHERRY_STAIRS, left ? Direction.WEST : Direction.EAST, false));
+			} else if (du >= 6) {
+				planter(k, u, pod, vf);
+			}
+			if (du == 3 && !g.portico) { // under the portico a pot would be a step under a low ceiling
+				k.set(u, pod, g.hv0 - 1, b(k.hash(u, pod, g.hv0, 2) == 0 ? Blocks.POTTED_FLOWERING_AZALEA : Blocks.POTTED_FERN));
+			}
+		}
+		int sidet = g.ha - 1;
+		if (sidet >= 2) {
+			for (int v = pod + 1; v <= g.dc - 2; v++) {
+				boolean bench = (v - pod - 1) % 6 < 3;
+				if (bench) {
+					k.set(1, pod, v, stair(Blocks.CHERRY_STAIRS, Direction.WEST, false));
+					k.set(g.wc - 2, pod, v, stair(Blocks.CHERRY_STAIRS, Direction.EAST, false));
+				} else {
+					planter(k, 1, pod, v);
+					planter(k, g.wc - 2, pod, v);
 				}
 			}
 		}
-		for (int u = g.b0() + 1; u < g.b1(); u++) {
-			if (Math.abs(u - g.cu()) % 3 == 0) {
+		int nb = g.dc - 2 - g.hv1;
+		if (nb >= 2) {
+			int v = g.dc - 2;
+			int from = sidet >= 2 ? 2 : 1;
+			int to = sidet >= 2 ? g.wc - 3 : g.wc - 2;
+			for (int u = from; u <= to; u++) {
+				if (Math.abs(u - cu) % 6 <= 2) {
+					k.set(u, pod, v, stair(Blocks.CHERRY_STAIRS, Direction.SOUTH, false));
+				} else {
+					planter(k, u, pod, v);
+				}
+			}
+		}
+	}
+
+	/** [finish] hedges and pots against the podium face beside the stair, so it rises out of a garden. */
+	private static void forecourt(K k, G g) {
+		int v = g.pod - 1;
+		for (int u = 0; u < g.wc; u++) {
+			int du = Math.abs(u - g.cu);
+			if (du <= g.sh + 1) {
 				continue;
 			}
-			int v = g.ve() + 1;
-			for (int wy : new int[] {4, 8}) {
-				if (Math.abs(u - g.cu()) % 3 != 1) {
-					continue; // only the cells in front of a back window
-				}
-				p.set(c, u, wy - 1, v, stair(Blocks.TUFF_BRICK_STAIRS, Direction.NORTH, true));
-				p.set(c, u, wy, v, b(p.hash(u, wy, v, 2) == 0 ? Blocks.POTTED_FLOWERING_AZALEA : Blocks.POTTED_FERN));
-				p.set(c, u, wy + 1, v, stair(copperStairs(), Direction.NORTH, true));
+			k.set(u, 0, v, leaves(Blocks.AZALEA_LEAVES));
+			if (g.pod >= 3) {
+				k.set(u, 1, v, leaves(k.hash(u, 1, v, 3) == 0 ? Blocks.FLOWERING_AZALEA_LEAVES : Blocks.AZALEA_LEAVES));
 			}
-		}
-	}
-
-	// ------------------------------------------------------------------ roof deck and garden (y10 / y11)
-
-	private static boolean ringCell(G g, int u, int v) {
-		int u0 = g.b0() - 1;
-		int u1 = g.b1() + 1;
-		return u == u0 || u == u1 || v == VCOL - 1 || v == g.ve() + 1;
-	}
-
-	/**
-	 * [finish] the cornice: a ring of quartz slab with an oxidised-copper stair on the outer lip and a
-	 * cove under it; inside, a parapet of tuff wall linked by hand, planter beds along it, a bamboo
-	 * mosaic floor with a quartz path.
-	 */
-	private static void deck(CitadelCanvas c, Plot p, G g, Random r) {
-		int u0 = g.b0() - 1;
-		int u1 = g.b1() + 1;
-		int v0 = VCOL - 1;
-		int v1 = g.ve() + 1;
-		Links parapet = new Links();
-		for (int u = u0; u <= u1; u++) {
-			for (int v = v0; v <= v1; v++) {
-				boolean ring = ringCell(g, u, v);
-				BlockState st;
-				if (ring) {
-					st = white(p, u, DECK, v);
-					Direction out = v == v0 ? Direction.NORTH : v == v1 ? Direction.SOUTH : u == u0 ? Direction.WEST : Direction.EAST;
-					// the cove under the lip, facing the wall
-					Direction in = out.getOpposite();
-					if (!(u == u0 || u == u1) || !(v == v0 || v == v1)) {
-						p.set(c, u, DECK - 1, v, stair(copperStairs(), in, true));
-					}
-				} else if (u == g.cu() || p.hash(u, DECK, v, 5) == 0) {
-					st = b(Blocks.BAMBOO_MOSAIC);
-				} else {
-					st = mix(p, u, DECK, v, Blocks.BAMBOO_PLANKS, Blocks.BAMBOO_MOSAIC, Blocks.BAMBOO_PLANKS);
-				}
-				p.set(c, u, DECK, v, st);
-				if (ring) {
-					parapet.add(u, v);
-				}
-			}
-		}
-		// the parapet: tuff wall on the lip, cherry posts at corners and every fourth cell
-		java.util.List<int[]> posts = new java.util.ArrayList<>();
-		Links walls = new Links();
-		for (int u = u0; u <= u1; u++) {
-			for (int v = v0; v <= v1; v++) {
-				if (!ringCell(g, u, v)) {
-					continue;
-				}
-				boolean corner = (u == u0 || u == u1) && (v == v0 || v == v1);
-				boolean edgeU = v == v0 || v == v1;
-				boolean post = corner;
-				if (post) {
-					posts.add(new int[] {u, v, corner ? 1 : 0});
-					walls.partner(u, v);
-				} else {
-					walls.add(u, v);
-				}
-			}
-		}
-		walls.emitWalls(c, p, DECK + 1, Blocks.TUFF_BRICK_WALL);
-		for (int[] q : posts) {
-			p.set(c, q[0], DECK + 1, q[1], b(Blocks.POLISHED_TUFF));
-			p.set(c, q[0], DECK + 2, q[1], q[2] == 1 ? b(Blocks.LANTERN) : slab(Blocks.POLISHED_TUFF_SLAB));
-		}
-		// planter beds along the inside of the parapet (the pergola and the hut keep their own corners)
-		for (int u = u0 + 1; u < u1; u++) {
-			for (int v = v0 + 1; v < v1; v++) {
-				boolean border = u == u0 + 1 || u == u1 - 1 || v == v0 + 1 || v == v1 - 1;
-				if (!border || inPergola(g, u, v) || inHut(g, u, v) || (u == g.cu() && v == v0 + 1)) {
-					continue;
-				}
-				p.set(c, u, DECK, v, mix(p, u, DECK, v, Blocks.MOSS_BLOCK, Blocks.GRASS_BLOCK, Blocks.MOSS_BLOCK, Blocks.COARSE_DIRT));
-				int k = p.hash(u, DECK, v, 12);
-				BlockState plant = switch (k) {
-					case 0, 1 -> b(Blocks.AZALEA);
-					case 2, 3 -> b(Blocks.FLOWERING_AZALEA);
-					case 4 -> b(Blocks.PINK_PETALS);
-					case 5 -> b(Blocks.ALLIUM);
-					case 6 -> b(Blocks.CORNFLOWER);
-					case 7 -> b(Blocks.SHORT_GRASS);
-					case 8 -> b(Blocks.FERN);
-					case 9 -> b(Blocks.PINK_TULIP);
-					default -> null;
-				};
-				if (plant != null) {
-					p.set(c, u, DECK + 1, v, plant);
-				}
-			}
-		}
-	}
-
-	// ------------------------------------------------------------------ pergola and hut
-
-	private static int pu0(G g) {
-		return g.cu() - 1;
-	}
-
-	private static int pv0() {
-		return VCOL + 1;
-	}
-
-	private static boolean inPergola(G g, int u, int v) {
-		return u >= pu0(g) - 1 && u <= pu0(g) + 3 && v >= pv0() - 1 && v <= pv0() + 3;
-	}
-
-	private static int hu0(G g) {
-		return g.b1() - 2;
-	}
-
-	private static int hv0(G g) {
-		return g.ve() - 2;
-	}
-
-	private static boolean inHut(G g, int u, int v) {
-		return u >= hu0(g) - 1 && u <= hu0(g) + 2 && v >= hv0(g) - 1 && v <= g.ve() + 1;
-	}
-
-	/**
-	 * [depth] a 3×3 pergola: cherry posts, two long beams, cross-slats of cherry slab, hanging
-	 * lanterns and a few flowering leaves draped on top; under it a table and two benches.
-	 */
-	private static void pergola(CitadelCanvas c, Plot p, G g, Random r) {
-		int u0 = pu0(g);
-		int u1 = u0 + 2;
-		int v0 = pv0();
-		int v1 = v0 + 2;
-		int top = DECK + 3; // low enough for the roof to stay inside the plot's minimum height
-		for (int u : new int[] {u0, u1}) {
-			for (int v : new int[] {v0, v1}) {
-				for (int y = DECK + 1; y < top; y++) {
-					p.set(c, u, y, v, log(Blocks.STRIPPED_CHERRY_LOG, Direction.Axis.Y));
-				}
-			}
-		}
-		for (int u = u0 - 1; u <= u1 + 1; u++) {
-			for (int v : new int[] {v0, v1}) {
-				p.set(c, u, top, v, log(Blocks.STRIPPED_CHERRY_LOG, Direction.Axis.X));
-			}
-		}
-		for (int u = u0; u <= u1; u++) {
-			p.set(c, u, top, v0 + 1, u == u0 + 1 ? slabTop(Blocks.CHERRY_SLAB) : slab(Blocks.CHERRY_SLAB));
-		}
-		// [finish] a real hipped roof on the pavilion: an oxidised-copper eave ring over the beams, a cherry ring above
-		// it, a cherry core, a copper cap and a lantern finial. Corners are slabs so the hips read cleanly.
-		int mu0 = u0 - 1;
-		int mu1 = u1 + 1;
-		int mv0 = v0 - 1;
-		int mv1 = v1 + 1;
-		for (int u = mu0; u <= mu1; u++) {
-			for (int v = mv0; v <= mv1; v++) {
-				boolean edgeU = u == mu0 || u == mu1;
-				boolean edgeV = v == mv0 || v == mv1;
-				if (edgeU && edgeV) {
-					p.set(c, u, top + 1, v, slab(Blocks.CUT_COPPER_SLAB.waxed().oxidized()));
-				} else if (edgeU || edgeV) {
-					Direction in = edgeV ? (v == mv0 ? Direction.SOUTH : Direction.NORTH) : (u == mu0 ? Direction.EAST : Direction.WEST);
-					p.set(c, u, top + 1, v, stair(copperStairs(), in, false));
-				} else {
-					p.set(c, u, top + 1, v, b(Blocks.CHERRY_PLANKS));
-				}
-			}
-		}
-		for (int u = u0; u <= u1; u++) {
-			for (int v = v0; v <= v1; v++) {
-				boolean edgeU = u == u0 || u == u1;
-				boolean edgeV = v == v0 || v == v1;
-				if (edgeU && edgeV) {
-					p.set(c, u, top + 2, v, slab(Blocks.CHERRY_SLAB));
-				} else if (edgeU || edgeV) {
-					Direction in = edgeV ? (v == v0 ? Direction.SOUTH : Direction.NORTH) : (u == u0 ? Direction.EAST : Direction.WEST);
-					p.set(c, u, top + 2, v, stair(Blocks.CHERRY_STAIRS, in, false));
-				} else {
-					p.set(c, u, top + 2, v, b(Blocks.CHERRY_PLANKS));
-				}
-			}
-		}
-		if (p.has(u0 + 1, top + 3, v0 + 1)) {
-			p.set(c, u0 + 1, top + 3, v0 + 1, slab(Blocks.CUT_COPPER_SLAB.waxed().oxidized()));
-		}
-		if (p.has(u0 + 1, top + 4, v0 + 1)) {
-			p.set(c, u0 + 1, top + 4, v0 + 1, b(Blocks.LANTERN));
-		}
-		// under the pergola: table, benches facing it, lanterns
-		int mu = u0 + 1;
-		int mv = v0 + 1;
-		p.set(c, mu, DECK + 1, mv, b(Blocks.CHERRY_FENCE));
-		p.set(c, mu, DECK + 2, mv, slab(Blocks.CHERRY_SLAB));
-		p.set(c, u0, DECK + 1, mv, stair(Blocks.CHERRY_STAIRS, Direction.WEST, false));
-		p.set(c, u1, DECK + 1, mv, stair(Blocks.CHERRY_STAIRS, Direction.EAST, false));
-		// lanterns hang from the eave ring just outside the two openings: under the beams (y top-1) they hung at
-		// head height in the 2-high openings
-		for (int lv : new int[] {v0 - 1, v1 + 1}) {
-			if (p.at(c, u0 + 1, top, lv) == null && !inHut(g, u0 + 1, lv)) {
-				p.put(c, u0 + 1, top, lv, hanging(Blocks.LANTERN), CitadelCanvas.HANGING);
-			}
-		}
-	}
-
-	/** A 2×2 stair hut on the back corner: white walls, a door to the front, a copper lean-to cap. */
-	private static void hut(CitadelCanvas c, Plot p, G g) {
-		int u0 = hu0(g);
-		int v0 = hv0(g);
-		int u1 = u0 + 1;
-		int v1 = v0 + 1;
-		for (int u = u0; u <= u1; u++) {
-			for (int v = v0; v <= v1; v++) {
-				for (int y = DECK + 1; y <= DECK + 2; y++) {
-					p.set(c, u, y, v, white(p, u, y, v));
-				}
-			}
-		}
-		p.set(c, u0, DECK + 1, v0, door(Blocks.CHERRY_DOOR, Direction.NORTH, true));
-		p.set(c, u0, DECK + 2, v0, door(Blocks.CHERRY_DOOR, Direction.NORTH, false));
-		p.set(c, u1, DECK + 2, v0, glass(p, u1, v0, true));
-		for (int u = u0 - 1; u <= u1 + 1; u++) {
-			p.set(c, u, DECK + 3, v0 - 1, stair(Blocks.QUARTZ_STAIRS, Direction.SOUTH, false));
-			p.set(c, u, DECK + 3, v0, stair(Blocks.QUARTZ_STAIRS, Direction.SOUTH, false));
-			p.set(c, u, DECK + 4, v1, slab(Blocks.QUARTZ_SLAB));
-			p.set(c, u, DECK + 3, v1, stair(Blocks.QUARTZ_STAIRS, Direction.SOUTH, false));
-		}
-	}
-
-	// ------------------------------------------------------------------ forecourt (v 0..2 beside the stair)
-
-	/** [finish] hedges and slender bamboo against the podium, so it rises out of a garden. */
-	private static void forecourt(CitadelCanvas c, Plot p, G g, Random r) {
-		for (int u = g.p0() - 1; u <= g.p1() + 1; u++) {
-			int du = Math.abs(u - g.cu());
-			if (du <= g.sh() + 1) {
-				continue; // the stair and its cheeks
-			}
-			boolean pier = (g.ha() - du) % 2 == 0 && du <= g.ha();
-			int v = pier ? 1 : 2;
-			int k = p.hash(u, 0, v, 5);
-			if (k <= 1) {
-				p.set(c, u, 0, v, leaves(Blocks.AZALEA_LEAVES));
-				p.set(c, u, 1, v, leaves(Blocks.FLOWERING_AZALEA_LEAVES));
-			} else if (k == 2) {
-				for (int y = 0; y <= 3; y++) {
-					p.set(c, u, y, v, b(Blocks.BAMBOO));
-				}
-			} else if (k == 3) {
-				p.set(c, u, 0, v, b(Blocks.DECORATED_POT));
-			} else {
-				p.set(c, u, 0, v, leaves(Blocks.AZALEA_LEAVES));
+			if (g.pod >= 3 && v - 1 >= 0 && du % 3 == 0) {
+				k.set(u, 0, v - 1, b(k.hash(u, 0, v - 1, 2) == 0 ? Blocks.POTTED_AZALEA : Blocks.POTTED_FERN));
 			}
 		}
 	}
