@@ -163,7 +163,7 @@ public final class HouseTowerBridge implements Variant {
 		int n = 7;
 		if (w >= 29 && d >= 16) {
 			n = 11;
-		} else if (w >= 23 && d >= 14) { // TEMP test (restore 25)
+		} else if (w >= 25 && d >= 14) {
 			n = 9;
 		}
 		int nb = n - 2;
@@ -190,8 +190,8 @@ public final class HouseTowerBridge implements Variant {
 		tower(c, l, l.b);
 		stairs(c, l);
 		furnish(c, l);
-		hip(c, l, l.a, (hmode & 2) != 0 ? 3 : 1, 0);
-		hip(c, l, l.b, 1, (hmode & 1) != 0 ? 1 : 0);
+		hip(c, l, l.a, (hmode & 2) != 0 ? 3 : 1, 0, true);
+		hip(c, l, l.b, 1, (hmode & 1) != 0 ? 1 : 0, false);
 		gallery(c, l);
 		yard(c, l);
 	}
@@ -628,7 +628,7 @@ public final class HouseTowerBridge implements Variant {
 	 * fence-and-lantern finial. {@code lessRings} lowers the top of the roof (a flat crown); {@code spire} is the finial
 	 * height in blocks.
 	 */
-	private void hip(CitadelCanvas c, L l, Tw t, int spire, int lessRings) {
+	private void hip(CitadelCanvas c, L l, Tw t, int spire, int lessRings, boolean chimney) {
 		Plot p = l.p;
 		int plate = t.plate();
 		int h0 = (t.size() - 1) / 2 + 1;
@@ -686,6 +686,15 @@ public final class HouseTowerBridge implements Variant {
 					}
 				}
 			}
+		}
+		if (chimney && kmax >= 2) {
+			// [finish] a stone chimney on the back corner away from the bridge, standing on the corner of the third ring
+			int half2 = h0 - 2;
+			int cuu = cu + (t.west() == Direction.WEST ? -half2 : half2);
+			int cvv = cv + half2;
+			set(c, p, cuu, plate + 3, cvv, stone(p, cuu, plate + 3, cvv));
+			set(c, p, cuu, plate + 4, cvv, b(Blocks.STONE_BRICKS));
+			set(c, p, cuu, plate + 5, cvv, slab(Blocks.STONE_BRICK_SLAB, false));
 		}
 		int top = plate + kmax + 1;
 		for (int i = 0; i < spire; i++) {
