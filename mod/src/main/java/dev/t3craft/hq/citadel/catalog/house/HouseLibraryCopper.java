@@ -196,6 +196,7 @@ public final class HouseLibraryCopper implements Variant {
 		rails(c, p, g);
 		beams(c, p, g);
 		roof(c, p, g);
+		pediment(c, p, g, span);
 		monitor(c, p, g);
 	}
 
@@ -369,16 +370,9 @@ public final class HouseLibraryCopper implements Variant {
 			return;
 		}
 		Direction in = out.getOpposite();
-		p.set(c, ou, 6, ov, stair(Blocks.STONE_BRICK_STAIRS, in, true)); // string course
-		p.set(c, ou, 10, ov, stair(Blocks.STONE_BRICK_STAIRS, in, true)); // cornice
-		if (win) {
-			// a solid hedge under every window, with a stone sill on it (nothing low to walk under)
-			p.set(c, ou, 0, ov, CitadelCanvas.leaves(Blocks.FLOWERING_AZALEA_LEAVES));
-			p.set(c, ou, 1, ov, p.hash(u, 1, v, 3) == 0 ? b(Blocks.MOSS_BLOCK) : CitadelCanvas.leaves(Blocks.AZALEA_LEAVES));
-			p.set(c, ou, 2, ov, slab(Blocks.POLISHED_ANDESITE_SLAB, true));
-		} else {
-			p.set(c, ou, 0, ov, slab(Blocks.POLISHED_DEEPSLATE_SLAB, false)); // kerb
-		}
+		// the cornice carries the roof directly (no ledge under it nobody can reach) and a kerb runs along the foot
+		p.set(c, ou, 10, ov, stair(Blocks.STONE_BRICK_STAIRS, in, true));
+		p.set(c, ou, 0, ov, slab(Blocks.POLISHED_DEEPSLATE_SLAB, false));
 	}
 
 	// ------------------------------------------------------------------ loggia
@@ -531,9 +525,10 @@ public final class HouseLibraryCopper implements Variant {
 				p.set(c, u, y, v, st);
 			}
 		} else {
-			p.set(c, u, 1, v, foyer ? facing(Blocks.CHEST, in) : stair(Blocks.DARK_OAK_STAIRS, in, false));
+			// window seats are low benches (slabs), easy to step on from any side
+			p.set(c, u, 1, v, foyer ? facing(Blocks.CHEST, in) : slab(Blocks.DARK_OAK_SLAB, false));
 			if (!foyer && g.gal(u, v)) {
-				p.set(c, u, 7, v, stair(Blocks.DARK_OAK_STAIRS, in, false));
+				p.set(c, u, 7, v, slab(Blocks.DARK_OAK_SLAB, false));
 			}
 		}
 	}
@@ -588,8 +583,8 @@ public final class HouseLibraryCopper implements Variant {
 			for (int s = -1; s <= 1; s += 2) {
 				int u = cu + s * (half + 1);
 				Direction away = s < 0 ? Direction.WEST : Direction.EAST;
-				p.set(c, u, 1, ts, stair(Blocks.DARK_OAK_STAIRS, away, false));
-				p.set(c, u, 1, ts + 2, stair(Blocks.DARK_OAK_STAIRS, away, false));
+				p.set(c, u, 1, ts, slab(Blocks.DARK_OAK_SLAB, false)); // stools
+				p.set(c, u, 1, ts + 2, slab(Blocks.DARK_OAK_SLAB, false));
 				p.set(c, u, 1, ts + 1, lectern(away));
 			}
 		}
@@ -601,7 +596,8 @@ public final class HouseLibraryCopper implements Variant {
 		Set<Long> rail = new HashSet<>();
 		int rc = g.hw() - 5;
 		for (int s = -1; s <= 1; s += 2) {
-			for (int v = g.vs() + 8; v <= g.iv1(); v++) {
+			// the side rail stops where the back gallery opens, so the two walks join
+			for (int v = g.vs() + 8; v <= g.iv1() - 5; v++) {
 				rail.add(key(g.cu() + s * rc, v));
 			}
 			rail.add(key(g.cu() + s * (g.hw() - 4), g.vs() + 8));
@@ -615,10 +611,10 @@ public final class HouseLibraryCopper implements Variant {
 			p.set(c, u, 7, v, fence(Blocks.DARK_OAK_FENCE, rail.contains(key(u, v - 1)), rail.contains(key(u + 1, v)),
 					rail.contains(key(u, v + 1)), rail.contains(key(u - 1, v))));
 		}
-		// lanterns on the rail posts above each pillar
-		for (int r = g.vs() + 8; r <= g.iv1(); r += 4) {
+		// invisible light for the gallery walks (functional light, nothing to stand on)
+		for (int r = g.vs() + 9; r <= g.iv1(); r += 3) {
 			for (int s = -1; s <= 1; s += 2) {
-				p.set(c, g.cu() + s * rc, 8, r, lantern(false));
+				p.set(c, g.cu() + s * (g.hw() - 3), 11, r, CitadelCanvas.invisibleLight(15));
 			}
 		}
 		// lanterns under the gallery over the walks
@@ -635,13 +631,10 @@ public final class HouseLibraryCopper implements Variant {
 
 	// ------------------------------------------------------------------ beams over the nave
 
+	/** Light for the nave and the foyer: invisible light blocks high over the middle (no beams to stand on). */
 	private static void beams(CitadelCanvas c, Plot p, G g) {
-		int rc = g.hw() - 5;
-		for (int r = g.iv0() + 1; r <= g.iv1() - 5; r += 4) {
-			for (int u = g.cu() - rc; u <= g.cu() + rc; u++) {
-				p.set(c, u, 10, r, log(Blocks.DARK_OAK_LOG, Direction.Axis.X));
-			}
-			p.put(c, g.cu(), 9, r, lantern(true), CitadelCanvas.HANGING);
+		for (int r = g.iv0() + 1; r <= g.iv1() - 5; r += 3) {
+			p.set(c, g.cu(), 9, r, CitadelCanvas.invisibleLight(14));
 		}
 	}
 
@@ -678,6 +671,37 @@ public final class HouseLibraryCopper implements Variant {
 				p.set(c, u, 11 + k, v, stair(copperStair(level), face, false));
 			}
 		}
+	}
+
+	/**
+	 * A gabled pediment over the door bay of the loggia, between its two middle columns: a copper gable running
+	 * front to back that meets the hip behind it, with a calcite tympanum and an amber roundel.
+	 */
+	private static void pediment(CitadelCanvas c, Plot p, G g, Wall span) {
+		int mid = -1;
+		for (int i = 0; i < span.len; i++) {
+			if (!span.pier[i] && span.bay[i] == span.n / 2) {
+				mid = span.width[i];
+				break;
+			}
+		}
+		int pw = mid / 2 + 1;
+		for (int k = -pw; k <= pw; k++) {
+			int u = g.cu() + k;
+			int h = Math.min(pw - Math.abs(k), 3);
+			for (int v = 0; v <= 2; v++) {
+				p.set(c, u, 11 + v, v, CitadelCanvas.AIR); // the hip's cell, replaced
+				if (pw - Math.abs(k) >= 3) {
+					p.set(c, u, 11 + h, v, b(copper(1))); // the ridge
+				} else {
+					p.set(c, u, 11 + h, v, stair(copperStair(0), k < 0 ? Direction.EAST : Direction.WEST, false));
+				}
+			}
+			for (int y = 11; y < 11 + h && Math.abs(k) < pw; y++) {
+				p.set(c, u, y, 0, p.hash(u, y, 0, 4) == 0 ? b(Blocks.SMOOTH_STONE) : b(Blocks.CALCITE));
+			}
+		}
+		p.set(c, g.cu(), 12, 0, HouseWorkshopKit.tintBlock(DyeColor.ORANGE));
 	}
 
 	/** The lantern on the crown: glass on posts, a copper cap, a gold boss and a rod; open to the nave below. */
