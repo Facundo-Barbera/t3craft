@@ -506,6 +506,9 @@ public final class CitadelRelief {
 			} else if (beat == 7) {
 				c.set(x, y + 1, z, slab(Blocks.SMOOTH_QUARTZ_SLAB));
 			}
+			if (beat == 0 || beat == 7) {
+				buttress(c, half, x, z, re.getValue(), g); // design/citadel-terraces2: a pilaster under each pier of the parapet
+			}
 		}
 		for (long cc : foot) {
 			int x = colX(cc);
@@ -532,6 +535,42 @@ public final class CitadelRelief {
 				c.set(x, g + 1, z, plant);
 			}
 		}
+	}
+
+	/**
+	 * A pilaster on the foot of a wall, under a pier of its parapet: a stair against the wall (a pier of polished
+	 * blackstone bricks under it when the wall is 3 or more high). Only on a lot or the lawn's grass, never within 3
+	 * cells of an avenue, so the foot stays free everywhere else and every crossing is open.
+	 */
+	private static void buttress(CitadelCanvas c, Map<Long, Integer> half, int x, int z, Direction toLow, int g) {
+		int nx = x + toLow.getStepX();
+		int nz = z + toLow.getStepZ();
+		Integer hn = half.get(col(nx, nz));
+		if (hn == null || hn % 2 == 1) {
+			return;
+		}
+		int gl = hn / 2;
+		int drop = g - gl;
+		Kind k = c.zoneAt(nx, nz).kind();
+		if (drop < 2 || k != Kind.LOT && k != Kind.LAWN) {
+			return;
+		}
+		for (int dx = -3; dx <= 3; dx++) {
+			for (int dz = -3; dz <= 3; dz++) {
+				if (c.zoneAt(nx + dx, nz + dz).kind() == Kind.AVENUE) {
+					return;
+				}
+			}
+		}
+		BlockState ground = c.at(nx, gl, nz);
+		if (ground == null || ground.getBlock() != Blocks.GRASS_BLOCK && ground.getBlock() != Blocks.MOSS_BLOCK || !open(c, nx, gl + 1, nz)) {
+			return;
+		}
+		int cap = g - 1;
+		for (int y = gl + 1; y < cap; y++) {
+			c.set(nx, y, nz, b(Blocks.POLISHED_BLACKSTONE_BRICKS));
+		}
+		c.set(nx, cap, nz, CitadelCanvas.stairs(Blocks.POLISHED_BLACKSTONE_BRICK_STAIRS, toLow.getOpposite()));
 	}
 
 	/**
