@@ -20,21 +20,23 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.MapColor;
 
 /**
- * The HQ blocks kit (cherry campus, style C): eleven decorative blocks of t3craft's own, with their
+ * The HQ blocks kit (cherry campus, style C): fourteen decorative blocks of t3craft's own, with their
  * own models and textures, and their {@link HqKit} by role. Registered only from {@link T3Blocks#init}
  * (so the module switch turns it off with everything else).
  *
  * <p>Blocks ({@link #IDS}): standing desk, shoji panel (lit/unlit), cherry and stone floor tiles,
- * cherry beam, column cap, paper lantern (a status lamp in disguise), room plaque (text BER),
- * cherry railing, potted cherry and stone lantern.
+ * cherry beam, column cap, paper lantern (a status lamp in disguise; with a hanging, a wall and a 2-block tall
+ * sibling, {@link KitLanterns}), room plaque (text BER), cherry railing, potted cherry and stone lantern.
  */
 public final class KitBlocks implements HqKit {
 	/** Bump when a role's state changes (build hashes). */
-	public static final String ID = "kit-2"; // kit-2: connected cherry railing (KitRailingBlock)
+	// kit-2: connected cherry railing (KitRailingBlock); kit-3: the paper-lantern family (KitLanterns)
+	public static final String ID = "kit-3";
 
 	/** Block ids of the kit, in creative-tab order. */
 	public static final List<String> IDS = List.of("standing_desk", "shoji_panel", "cherry_floor_tile", "stone_floor_tile",
-			"cherry_beam", "beam_cap", "paper_lantern", "room_plaque", "cherry_railing", "cherry_planter", "stone_lantern");
+			"cherry_beam", "beam_cap", "paper_lantern", "paper_lantern_hanging", "paper_lantern_wall", "paper_lantern_tall",
+			"room_plaque", "cherry_railing", "cherry_planter", "stone_lantern");
 
 	/** Which kit block plays each role. */
 	public static final Map<Role, String> ROLE_BLOCKS = roleBlocks();
@@ -91,6 +93,14 @@ public final class KitBlocks implements HqKit {
 		out.put("paper_lantern", r.block("paper_lantern", p -> new KitLanternBlock(p, lampType),
 				BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_WHITE).strength(0.5f).sound(SoundType.BAMBOO_WOOD)
 						.noOcclusion().lightLevel(KitLanternBlock::light)));
+		out.put("paper_lantern_hanging", r.block("paper_lantern_hanging", KitLanterns.Hanging::new,
+				BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_WHITE).strength(0.5f).sound(SoundType.BAMBOO_WOOD)
+						.noOcclusion().lightLevel(s -> KitLanterns.HANGING_LIGHT)));
+		out.put("paper_lantern_wall", r.block("paper_lantern_wall", KitLanterns.Wall::new,
+				BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_WHITE).strength(0.5f).sound(SoundType.BAMBOO_WOOD)
+						.noOcclusion().noCollision().lightLevel(s -> KitLanterns.WALL_LIGHT)));
+		out.put("paper_lantern_tall", r.block("paper_lantern_tall", KitLanterns.Tall::new,
+				wood().noOcclusion().lightLevel(s -> KitLanterns.TALL_LIGHT)));
 		out.put("room_plaque", r.block("room_plaque", p -> new KitPlaqueBlock(p, plaqueType),
 				wood().noCollision().noOcclusion()));
 		out.put("cherry_railing", r.block("cherry_railing", KitRailingBlock::new,
