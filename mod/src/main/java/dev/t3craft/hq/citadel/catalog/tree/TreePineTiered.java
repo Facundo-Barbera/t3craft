@@ -78,7 +78,7 @@ public final class TreePineTiered implements Variant {
 		int bv = TreeKit.base(p.d(), ov);
 		int y2 = 2;
 		int[][] lead = TreeKit.trunk(t, WOOD, bu, bv, y2, top - 3, ou, ov, 0, 0);
-		TreeKit.roots(t, WOOD, bu, bv, 6, Math.min(p.w(), p.d()) >= 7 ? 2 : 1, -1, 7);
+		TreeKit.roots(t, WOOD, bu, bv, Math.min(p.w(), p.d()) >= 7 ? 6 : 4, Math.min(p.w(), p.d()) >= 7 ? 2 : 1, -1, 7);
 
 		int yBase = 3; // the lowest whorl: a little trunk shows at the foot, never between floors
 		double phase = r.nextDouble() * Math.PI * 2;
@@ -112,7 +112,7 @@ public final class TreePineTiered implements Variant {
 					} else if (ph3 == 1) {
 						lim = rt * 0.72 + 0.2;
 					} else {
-						lim = Math.max(0.9, rt * 0.42);
+						lim = Math.max(1.05, rt * 0.42); // at least a plus round the leader: no bare trunk
 					}
 					if (y >= top - 1) {
 						lim = y == top ? 0.2 : 1.0; // the spire

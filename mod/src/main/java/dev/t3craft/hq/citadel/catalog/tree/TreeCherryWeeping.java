@@ -114,7 +114,7 @@ public final class TreeCherryWeeping implements Variant {
 					int ov2 = (int) Math.signum(Math.round(v - ccv));
 					boolean rim = t.kind(u + ou2, y, v + ov2) != TreeKit.LEAF;
 					if ((k == TreeKit.LEAF && rim || k == TreeKit.WOOD && contains(limbCells, u, y, v))
-							&& t.empty(u, y - 1, v) && Math.hypot(u - ccu, v - ccv) > 1.6) {
+							&& t.empty(u, y - 1, v) && Math.hypot(u - ccu, v - ccv) > (k == TreeKit.WOOD ? 2.6 : 2.1)) {
 						seeds.add(new int[] {u, y, v});
 					}
 				}
