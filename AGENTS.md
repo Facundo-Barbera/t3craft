@@ -45,6 +45,8 @@ gradle/gradlew, a render (`tools/render/*`, `hqRender`, `uiRender`) or Minecraft
    worktree, the coordinator checks `ps` for processes whose arguments or cwd mention that worktree or agent: java,
    gradle, `submit.sh` loops, `sleep`. It kills them, then runs `./gradlew --stop` in that worktree's `mod/`.
    `submit.sh` also stops waiting by itself when the process that launched it is gone.
+7. **Agent count.** Keep at most **8 child agents running at once**. Each one is a process that costs CPU while it
+   thinks. Launch more only in waves, after the previous wave finishes, and never while the load is above 6.
 8. **Renders run on Facundo's PC, never on the VPS.**
    - The render daemon runs only on my-pc (WSL Ubuntu, Tailscale 100.64.0.20): one daemon, **1 worker**.
      `start-daemon.sh` refuses to start on the VPS.
@@ -55,8 +57,6 @@ gradle/gradlew, a render (`tools/render/*`, `hqRender`, `uiRender`) or Minecraft
      - the relay polls `status.json`;
      - the PNGs and the report come back to the local outbox.
    - Compiling the worktree happens on the PC. Renders still need Facundo's approval (rule 5).
-7. **Agent count.** Keep at most **8 child agents running at once**. Each one is a process that costs CPU while it
-   thinks. Launch more only in waves, after the previous wave finishes, and never while the load is above 6.
 
 ## Other standing rules
 - **Commits:** no `Co-Authored-By` or any other AI credit in commits.
