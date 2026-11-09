@@ -437,7 +437,12 @@ public final class CitadelLeadOffice {
 		int yTop = 3 + sh;
 		for (int v = mid - half - 1; v <= mid + half + 1; v++) {
 			boolean end = v == mid - half - 1 || v == mid + half + 1;
-			c.set(r.cell(d - 1, v, 2), end ? corner : gold);
+			BlockPos rail = r.cell(d - 1, v, 2);
+			if (end) {
+				putFree(c, rail, corner);
+			} else {
+				c.set(rail, gold);
+			}
 			BlockPos top = r.cell(d - 1, v, yTop);
 			if (yTop <= h) {
 				c.set(top, end ? corner : gold);
