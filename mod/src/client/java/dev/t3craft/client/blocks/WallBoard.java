@@ -55,6 +55,8 @@ public final class WallBoard {
 	private @Nullable WallMode lastMode;
 	private float lastW = -1;
 	private float lastH = -1;
+	/** Minute of the clock the layout was built for: ages are minutes, so the layout rebuilds when it turns. */
+	private long lastMinute = Long.MIN_VALUE;
 	private WallLayout.@Nullable Layout layout;
 	private long version;
 	private int rebuilds;
@@ -65,14 +67,16 @@ public final class WallBoard {
 
 	/**
 	 * Brings the board up to date. Returns true when it rebuilt (new version), false when nothing
-	 * changed (the cached layout stays).
+	 * changed (the cached layout stays). {@code nowMs}: the wall clock, for the cards' ages (which
+	 * only change once a minute, so the layout rebuilds then and not before).
 	 */
-	public boolean sync(List<WallCard> cards, WallMode mode, ChatTheme theme, float width, float height, WallLayout.Measure m) {
-		if (layout != null && mode == lastMode && width == lastW && height == lastH && cards.equals(lastCards)) {
+	public boolean sync(List<WallCard> cards, WallMode mode, ChatTheme theme, float width, float height, WallLayout.Measure m, long nowMs) {
+		long minute = Math.floorDiv(nowMs, 60_000L);
+		if (layout != null && mode == lastMode && width == lastW && height == lastH && minute == lastMinute && cards.equals(lastCards)) {
 			return false;
 		}
 		int max = mode == WallMode.STATUS ? 4 : WallLayout.maxColumns(width);
-		WallLayout.Layout next = WallLayout.build(WallColumns.group(cards, mode, theme, max), mode, width, height, m);
+		WallLayout.Layout next = WallLayout.build(WallColumns.group(cards, mode, theme, max), mode, width, height, m, nowMs);
 		boolean resized = width != lastW || height != lastH || mode != lastMode;
 		Set<String> keep = new HashSet<>();
 		for (WallLayout.Slot s : next.cards()) {
@@ -96,6 +100,7 @@ public final class WallBoard {
 		lastMode = mode;
 		lastW = width;
 		lastH = height;
+		lastMinute = minute;
 		layout = next;
 		version++;
 		rebuilds++;
