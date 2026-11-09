@@ -133,9 +133,10 @@ public final class HouseTerracePodium implements Variant {
 			wc--;
 		}
 		int dc = Math.min(p.d(), 27);
-		int pod = Math.max(2, Math.min(2 + r.nextInt(3), p.h() - 15));
-		boolean portico = r.nextBoolean();
-		int roofKind = r.nextInt(3);
+		// p.hash mixes the seed well; java.util.Random with nearby seeds gives the same first draws
+		int pod = Math.max(2, Math.min(2 + p.hash(11, 3, 5, 3), p.h() - 15));
+		boolean portico = p.hash(7, 1, 13, 2) == 0;
+		int roofKind = p.hash(3, 9, 17, 3);
 		int wi = wc - 2;
 		int bt0 = dc >= 18 ? 2 : dc >= 15 ? 1 : 0;
 		int tf;
@@ -506,9 +507,6 @@ public final class HouseTerracePodium implements Variant {
 		k.partner(fence, g.ha, g.hv0);
 		k.partner(fence, g.hb, g.hv0);
 		fence.emitFences(k.c, k.p, pod + 5, Blocks.CHERRY_FENCE);
-		for (int s : new int[] {-1, 1}) {
-			k.set(g.cu + 3 * s, pod + 5, g.hv0 - 1, b(Blocks.POTTED_FLOWERING_AZALEA));
-		}
 		for (int du : new int[] {-4, 0, 4}) {
 			k.put(g.cu + du, pod + 3, g.hv0 - 1, hanging(Blocks.LANTERN), CitadelCanvas.HANGING);
 		}
@@ -769,7 +767,7 @@ public final class HouseTerracePodium implements Variant {
 			} else if (du >= 6) {
 				planter(k, u, pod, vf);
 			}
-			if (du == 3) {
+			if (du == 3 && !g.portico) { // under the portico a pot would be a step under a low ceiling
 				k.set(u, pod, g.hv0 - 1, b(k.hash(u, pod, g.hv0, 2) == 0 ? Blocks.POTTED_FLOWERING_AZALEA : Blocks.POTTED_FERN));
 			}
 		}
