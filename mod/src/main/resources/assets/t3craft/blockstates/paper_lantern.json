@@ -1,7 +1,1 @@
-{
-  "variants": {
-    "": {
-      "model": "t3craft:block/paper_lantern"
-    }
-  }
-}
+{"variants":{"":{"model":"t3craft:block/paper_lantern_hanging_vermilion"}}}
