@@ -240,29 +240,30 @@ def stone():
 # ---- paper ------------------------------------------------------------------------------------
 def tall():
     """
-    Side of the tall lantern's paper box (body element 2..14 wide, 4..12 high of the upper half,
-    uv [2, 4, 14, 12]): lit paper with a hot core, two kumiko rails and a centre stile in the top panel.
+    Side of the tall lantern's paper box (body element 2..14 wide, 3..12 high of the upper half,
+    uv [2, 4, 14, 13]): lit paper with a hot near-white middle band, two kumiko rails and a stile in the top panel.
     """
     rng = random.Random(312)
     ramp = TONES["paper"]
     rib = RIB["paper"]
     img = Img()
     img.rect(0, 0, 15, 15, ramp[1])
-    for y in range(4, 12):
+    for y in range(4, 13):
         for x in range(2, 14):
-            img.set(x, y, glow(ramp, x, y, 7.5, 8.0, 7.0, 5.6, rng, bias=1.1))
+            img.set(x, y, glow(ramp, x, y, 7.5, 8.5, 7.0, 5.0, rng, bias=1.3))
     for x in range(2, 14):
         img.set(x, 4, ramp[2])
         img.set(x, 7, rib[1])
-        img.set(x, 10, rib[1])
+        img.set(x, 11, rib[1])
     for y in range(4, 7):
         img.set(7, y, rib[0])
         img.set(8, y, rib[1])
-    for y in range(4, 12):
+    for y in range(4, 13):
         img.set(2, y, ramp[1] if y % 3 else ramp[0])
         img.set(13, y, ramp[1] if y % 3 else ramp[0])
-    for x, y in ((7, 8), (8, 8), (7, 9), (8, 9), (6, 8), (9, 9), (7, 6), (8, 6)):
-        img.set(x, y, ramp[5])
+    for y in (8, 9, 10):  # the hot band
+        for x in range(4, 12):
+            img.set(x, y, ramp[5] if rng.random() < 0.8 else ramp[4])
     return img
 
 
@@ -319,6 +320,10 @@ def chochin(tone):
         if y % 2 == 0:  # a rib: darker where the barrel turns away
             for x in range(1, 15):
                 img.set(x, y, rib[0] if abs(x - 7.5) > 3.5 else rib[1])
+    for y in (7, 8, 9):  # a hot band round the belly (the flame), so the paper reads as lit, not as dark stripes
+        for x in range(3, 13):
+            if y % 2 != 0 or abs(x - 7.5) < 3.5:
+                img.set(x, y, ramp[5] if rng.random() < 0.8 else ramp[4])
     if tone == "vermilion":
         for x in range(1, 15):
             img.set(x, 8, VBAND[1] if x % 3 else VBAND[0])
@@ -335,29 +340,29 @@ def chochin(tone):
 
 def box(tone):
     """
-    Wall lantern body, a round barrel (element 3..13 wide, 4..9 high, between two narrower tiers; uv rows 6..12,
-    cols 3..12): lit paper, a kumiko rail and a dim lower edge.
+    Wall lantern shade, tall and narrow (element 4..12 wide, 3..11 high; uv cols 4..11, rows 5..12): lit paper with
+    a hot band across the middle, a kumiko rail near the top and a dim lower edge.
     """
     rng = random.Random(340 + len(tone))
     ramp = TONES[tone]
     rib = RIB[tone]
     img = Img()
     img.rect(0, 0, 15, 15, ramp[1])
-    for y in range(6, 13):
-        for x in range(3, 13):
-            img.set(x, y, glow(ramp, x, y, 7.5, 9.0, 5.6, 4.4, rng, bias=1.1))
-    for x in range(3, 13):
-        img.set(x, 9, rib[1])
+    for y in range(5, 13):
+        for x in range(4, 12):
+            img.set(x, y, glow(ramp, x, y, 7.5, 8.5, 4.8, 5.2, rng, bias=1.2))
+    for x in range(4, 12):
+        img.set(x, 7, rib[1])
         img.set(x, 12, ramp[1])
-        img.set(x, 6, ramp[2])
-    for y in range(7, 12):
-        img.set(3, y, ramp[1] if y != 9 else rib[0])
-        img.set(12, y, ramp[1] if y != 9 else rib[0])
-    for y in range(7, 9):
+        img.set(x, 5, ramp[2])
+    for y in range(5, 7):
         img.set(7, y, rib[0])
-        img.set(8, y, rib[1])
-    for x, y in ((7, 10), (8, 10), (7, 11), (8, 11), (6, 10)):
-        img.set(x, y, ramp[5])
+    for y in range(5, 13):
+        img.set(4, y, ramp[1] if y != 7 else rib[0])
+        img.set(11, y, ramp[1] if y != 7 else rib[0])
+    for y in (8, 9, 10):
+        for x in range(5, 11):
+            img.set(x, y, ramp[5] if rng.random() < 0.8 else ramp[4])
     return img
 
 
