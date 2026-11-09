@@ -21,14 +21,23 @@ No necesita el monitor multibloque: **un bloque ancla** dibuja la pared entera.
 
 ## Qué dibuja
 
-- Tablero de nogal con borde de latón; por columna, cabecera de papel con su nombre, el número de
-  hilos y una línea del color del estado (colores de `ChatTheme.warmStudio()`).
-- Una tarjeta por hilo no archivado: franja del color de su atención, título recortado, `EnvBadge`
-  del entorno (color configurado en `t3craft.json` si lo hay) y una segunda línea: el proyecto (modo
-  estado), la palabra del estado (modo proyecto) o estado · proyecto (modo entorno), y `⏳n` si
-  el hilo tiene `n` ejecuciones en cola.
+Pensada para leerse a 6–10 bloques: una pared de 9×4 son 576×256 px de tablero (64 por bloque), así que
+cabeceras y títulos se dibujan **escalados** (la fuente a 1× mide 1/8 de bloque).
+
+- **Marco del tablero:** línea de latón, banda oscura y fondo casi negro (`BACK`).
+- **Columnas** (carriles oscuros, `LANE`) con cabecera a 1,75×: fondo del color del estado (colores de
+  `ChatTheme.warmStudio()`, que vienen de `ThreadState`), nombre y el número de hilos en una píldora oscura.
+  Texto tinta sobre colores claros, crema sobre oscuros.
+- **Tarjetas** sueltas de papel crema, con 5 px de margen al carril y 6 px de hueco entre ellas, y una sombra
+  de reposo: franja del color de su atención (5 px), título a 1,25× y, en la línea de abajo (1×), `EnvBadge`
+  del entorno (color configurado en `t3craft.json` si lo hay), el proyecto (modo estado), la palabra del
+  estado (modo proyecto) o estado · proyecto (modo entorno), `⏳n` si el hilo tiene `n` ejecuciones en cola,
+  y a la derecha la **antigüedad** (`Ago`: now, 5m, 3h, 2d…, de `ThreadRow.activityMs`). El layout se
+  reconstruye al cambiar el minuto para que las edades avancen.
 - Orden dentro de cada columna: el del chat (`ThreadOrder`: fijados, atención, actividad más
   reciente, título).
+- **Escalas por ancho de carril** (`WallLayout.Metrics`): ≥120 px título 1,25× / cabecera 1,75× (9×4 con 4
+  columnas: 135 px, 6 filas de 30 px); ≥88 px título 1,25× / cabecera 1,5×; menos, todo a 1×.
 - **"+N more"**: si una columna no cabe, la última fila es un chip con los ocultos; clic → el primer
   oculto.
 - **Hover**: borde de latón en la tarjeta bajo la mira. Las tarjetas *needs you* llevan un anillo
@@ -36,6 +45,17 @@ No necesita el monitor multibloque: **un bloque ancla** dibuja la pared entera.
 - **Animación**: al cambiar de columna, la tarjeta vuela (más cerca, con sombra) desde donde estaba
   hasta su nuevo sitio y brilla 1,2 s al llegar. Las demás se deslizan a sus huecos.
 - Sin hilos: "No threads yet".
+
+**Revisión sin el juego:** el render headless (`hqRender`) no ejecuta block entity renderers, así que la
+pared sale como bloques negros. `python3 tools/art/thread_board_mock.py [dir]` dibuja la cara de la pared
+con los mismos números (y una copia a escala "a 8 bloques").
+
+## Marco en el hub
+
+`CitadelHub.threadWallFrame`: zócalo de tablones de roble oscuro bajo el tablero, un poste de tronco
+pelado de roble oscuro en cada extremo, dintel del mismo tronco con tres bombillas de cobre encendidas
+(las luces de aviso del tablero) y una cornisa de escaleras invertidas una celda hacia fuera, por encima de
+la cabeza (y0+6): el pasillo queda libre.
 
 ## Variantes (`columns`)
 
