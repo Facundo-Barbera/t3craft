@@ -109,9 +109,9 @@ public final class HouseJapaneseEngawa implements Variant {
 	}
 
 	private static final Scheme[] SCHEMES = {
-			new Scheme(Blocks.DARK_OAK_LOG, Blocks.CHERRY_STAIRS, Blocks.BAMBOO_MOSAIC, Blocks.SPRUCE_PLANKS),
+			new Scheme(Blocks.STRIPPED_CHERRY_LOG, Blocks.CHERRY_STAIRS, Blocks.BAMBOO_MOSAIC, Blocks.SPRUCE_PLANKS),
 			new Scheme(Blocks.DARK_OAK_LOG, Blocks.CHERRY_STAIRS, Blocks.SPRUCE_PLANKS, Blocks.DARK_OAK_PLANKS),
-			new Scheme(Blocks.SPRUCE_LOG, Blocks.SPRUCE_STAIRS, Blocks.BAMBOO_MOSAIC, Blocks.OAK_PLANKS),
+			new Scheme(Blocks.STRIPPED_CHERRY_LOG, Blocks.SPRUCE_STAIRS, Blocks.BAMBOO_MOSAIC, Blocks.OAK_PLANKS),
 	};
 
 	private record Rect(int a0, int b0, int a1, int b1) {
@@ -236,6 +236,7 @@ public final class HouseJapaneseEngawa implements Variant {
 			program();
 			walls();
 			roof();
+			vent();
 		}
 
 		// ------------------------------------------------------------------ layout: footprint, rings, rooms
@@ -594,10 +595,9 @@ public final class HouseJapaneseEngawa implements Variant {
 						if (rn <= 1 || (rn == 2 && !opp)) {
 							// [finish] onigawara: a raised end block and a rod at the ridge ends
 							set(a, h + 1, bb, b(Blocks.DEEPSLATE_BRICKS));
-							set(a, h + 2, bb, b(Blocks.GOLD_BLOCK));
-							if (h + 3 < p.h()) {
-								set(a, h + 3, bb, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState());
-							}
+							// [finish] a hoju: a wall post with a lit lantern on it
+							set(a, h + 2, bb, JapaneseKit.wall(Blocks.DEEPSLATE_BRICK_WALL, true, false, false, false, false));
+							put(a, h + 3, bb, lantern(false), CitadelCanvas.SOLID);
 						}
 						continue;
 					}
@@ -610,6 +610,9 @@ public final class HouseJapaneseEngawa implements Variant {
 							set(a, h, bb, stairTop(s.fascia(), out)); // [depth] the eave tip curls up, an upside-down stair scoops under it
 						}
 						set(a, y, bb, st);
+						if (r == 0 && !curl && (a + bb) % 2 == 0) {
+							set(a, h - 1, bb, stairTop(s.fascia(), DIRS[firstUp].getOpposite())); // [depth] a rafter end under the eave
+						}
 						continue;
 					}
 					int vi = low[0] ? 0 : low[1] ? 1 : -1;
@@ -627,6 +630,56 @@ public final class HouseJapaneseEngawa implements Variant {
 						set(a, h, bb, r % 3 == 2 ? b(Blocks.DEEPSLATE_BRICKS) : b(Blocks.DEEPSLATE_TILES));
 					}
 				}
+			}
+		}
+
+		/** [finish] a small ventilation lantern (koshiyane) on the ridge: plaster box with log corners, a pane, a tile cap. */
+		void vent() {
+			long sa = 0;
+			long sb = 0;
+			int n = 0;
+			for (int a = 0; a < vw; a++) {
+				for (int bb = 0; bb < vd; bb++) {
+					if (in[a][bb] && isRidge(a, bb)) {
+						sa += a;
+						sb += bb;
+						n++;
+					}
+				}
+			}
+			if (n < 5) {
+				return;
+			}
+			int ba = -1;
+			int bb0 = -1;
+			long bestD = Long.MAX_VALUE;
+			for (int a = 0; a < vw; a++) {
+				for (int bb = 0; bb < vd; bb++) {
+					if (in[a][bb] && isRidge(a, bb)) {
+						long dd = (a * (long) n - sa) * (a * (long) n - sa) + (bb * (long) n - sb) * (bb * (long) n - sb);
+						if (dd < bestD) {
+							bestD = dd;
+							ba = a;
+							bb0 = bb;
+						}
+					}
+				}
+			}
+			boolean alongA = inF(ba - 1, bb0) && isRidge(ba - 1, bb0) && inF(ba + 1, bb0) && isRidge(ba + 1, bb0);
+			boolean alongB = inF(ba, bb0 - 1) && isRidge(ba, bb0 - 1) && inF(ba, bb0 + 1) && isRidge(ba, bb0 + 1);
+			if (!alongA && !alongB) {
+				return;
+			}
+			int h = hc[ba][bb0];
+			if (h + 3 >= p.h()) {
+				return;
+			}
+			for (int t = -1; t <= 1; t++) {
+				int a = alongA ? ba + t : ba;
+				int bb = alongA ? bb0 : bb0 + t;
+				boolean mid = t == 0;
+				set(a, h + 1, bb, mid ? (alongA ? paneU(glassPane(DyeColor.WHITE)) : paneV(glassPane(DyeColor.WHITE))) : log(Blocks.DARK_OAK_LOG, Direction.Axis.Y));
+				set(a, h + 2, bb, mid ? slab(Blocks.CHERRY_SLAB) : slab(Blocks.DEEPSLATE_TILE_SLAB));
 			}
 		}
 
