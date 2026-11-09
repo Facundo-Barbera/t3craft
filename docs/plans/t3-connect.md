@@ -145,6 +145,7 @@ Detalles relevantes:
 Fases:
 1. **Ahora (C+, barato).** Comprobar en un entorno real si el emparejamiento directo funciona contra el hostname del túnel de T3 Connect, p. ej. `t3 auth pairing create --base-url https://<hostname-del-túnel>`. Los túneles exponen el origen HTTP del host, así que `/oauth/token` y `/ws` deberían pasar, pero **no está confirmado**. Si funciona, el punto débil de la «URL alcanzable» desaparece sin login de cuenta. Documentarlo en `docs/features/operate.md`/`config.md` y en `PairScreen`.
 2. **Consultar a upstream** (decisión de Facundo, ver §5): abrir un issue o discusión en `pingdotgg/t3code` preguntando por (a) clientes de terceros para T3 Connect, con un `client_id` propio y scopes por entorno, y (b) un modo cliente headless del CLI con una interfaz local solo de lectura.
+   Borrador (no publicado): `docs/plans/t3-connect-upstream-query.md`.
 3. **Solo si upstream abre la puerta.**
    - Si ofrece un `client_id` propio: prototipo de A, empezando por login, `/v1/environments` y DPoP, con `read` por defecto.
    - Si ofrece el modo cliente en el CLI: reabrir B.
