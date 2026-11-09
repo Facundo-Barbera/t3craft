@@ -17,9 +17,12 @@ import org.jspecify.annotations.Nullable;
  * @param state     opaque data of the source to compute the next diff (e.g. the HQ layout), or null
  * @param starter   feat/hq-void-world: world cell of the starter island's centre (its grass), once
  *                  placed in a void HQ world; null in flat worlds and before it is placed
+ * @param centre    feat/hq-spawn-start: the HQ centre cell (feet) the world spawn was moved to, once that
+ *                  decision was taken for this world (also recorded when an old world's spawn was
+ *                  changed by hand and left alone); null before
  */
 public record DemoMarker(int setup, @Nullable String structure, int version, @Nullable String hash, @Nullable JsonObject state,
-		@Nullable Cell starter) {
+		@Nullable Cell starter, @Nullable Cell centre) {
 	/** A world block cell (kept free of Minecraft types). */
 	public record Cell(int x, int y, int z) {
 	}
@@ -34,6 +37,11 @@ public record DemoMarker(int setup, @Nullable String structure, int version, @Nu
 
 	public DemoMarker(int setup, @Nullable String structure, int version, @Nullable String hash, @Nullable JsonObject state) {
 		this(setup, structure, version, hash, state, null);
+	}
+
+	public DemoMarker(int setup, @Nullable String structure, int version, @Nullable String hash, @Nullable JsonObject state,
+			@Nullable Cell starter) {
+		this(setup, structure, version, hash, state, starter, null);
 	}
 
 	/** Whether this marker records a complete build of {@code source} with its current version. */
@@ -58,15 +66,19 @@ public record DemoMarker(int setup, @Nullable String structure, int version, @Nu
 	}
 
 	public DemoMarker withBuilt(DemoStructureSource source) {
-		return new DemoMarker(setup, source.id(), source.version(), source.revision(), source.state(), starter);
+		return new DemoMarker(setup, source.id(), source.version(), source.revision(), source.state(), starter, centre);
 	}
 
 	public DemoMarker withSetup() {
-		return new DemoMarker(SETUP_VERSION, structure, version, hash, state, starter);
+		return new DemoMarker(SETUP_VERSION, structure, version, hash, state, starter, centre);
 	}
 
 	public DemoMarker withStarter(@Nullable Cell c) {
-		return new DemoMarker(setup, structure, version, hash, state, c);
+		return new DemoMarker(setup, structure, version, hash, state, c, centre);
+	}
+
+	public DemoMarker withCentre(@Nullable Cell c) {
+		return new DemoMarker(setup, structure, version, hash, state, starter, c);
 	}
 
 	public String toJson() {
@@ -89,6 +101,13 @@ public record DemoMarker(int setup, @Nullable String structure, int version, @Nu
 			a.add(starter.z());
 			o.add("starter", a);
 		}
+		if (centre != null) {
+			com.google.gson.JsonArray a = new com.google.gson.JsonArray();
+			a.add(centre.x());
+			a.add(centre.y());
+			a.add(centre.z());
+			o.add("centre", a);
+		}
 		return o.toString();
 	}
 
@@ -107,7 +126,7 @@ public record DemoMarker(int setup, @Nullable String structure, int version, @Nu
 			String structure = o.has("structure") && o.get("structure").isJsonPrimitive() ? o.get("structure").getAsString() : null;
 			String hash = o.has("hash") && o.get("hash").isJsonPrimitive() ? o.get("hash").getAsString() : null;
 			JsonObject state = o.has("state") && o.get("state").isJsonObject() ? o.getAsJsonObject("state") : null;
-			return new DemoMarker(setup, structure, intOr(o, "version", 0), hash, state, cell(o, "starter"));
+			return new DemoMarker(setup, structure, intOr(o, "version", 0), hash, state, cell(o, "starter"), cell(o, "centre"));
 		} catch (RuntimeException ex) {
 			return EMPTY;
 		}

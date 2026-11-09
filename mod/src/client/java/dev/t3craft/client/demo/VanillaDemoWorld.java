@@ -117,6 +117,31 @@ final class VanillaDemoWorld {
 		return new DemoMarker.Cell(origin.getX() + starter.x(), origin.getY() + starter.y(), origin.getZ() + starter.z());
 	}
 
+	/**
+	 * feat/hq-spawn-start: places the single block under the HQ centre (the plan's own floor block, or a
+	 * neutral one the plan replaces) when that cell is still empty. Server thread.
+	 */
+	static boolean placeCentreBlock(MinecraftServer server, HqCentre centre) {
+		ServerLevel level = server.overworld();
+		if (!level.getBlockState(centre.floor()).isAir()) {
+			return false;
+		}
+		level.setBlock(centre.floor(), centre.floorBlock(), Block.UPDATE_ALL);
+		return true;
+	}
+
+	/** The overworld's spawn cell (where {@code /setworldspawn} put it). */
+	static BlockPos worldSpawn(MinecraftServer server) {
+		return server.overworld().getRespawnData().pos();
+	}
+
+	/** feat/hq-spawn-start: world spawn on {@code feet} with {@code yaw}, exactly there (respawn radius 0). Server thread. */
+	static void setWorldSpawn(MinecraftServer server, BlockPos feet, float yaw) {
+		ServerLevel level = server.overworld();
+		level.setRespawnData(net.minecraft.world.level.storage.LevelData.RespawnData.of(level.dimension(), feet, yaw, 0.0F));
+		server.getGameRules().set(GameRules.RESPAWN_RADIUS, 0, server);
+	}
+
 	/** Puts the player on a world cell (feet), looking south (towards the HQ). */
 	static void teleportTo(MinecraftServer server, String playerName, BlockPos feet) {
 		command(server, String.format(Locale.ROOT, "tp %s %d %d %d 0 10", playerName, feet.getX(), feet.getY(), feet.getZ()));
