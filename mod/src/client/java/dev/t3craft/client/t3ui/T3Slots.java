@@ -51,7 +51,10 @@ public class T3Slots {
 	public record Target(String envId, String threadId, @Nullable String title, @Nullable String project) {
 	}
 
-	public record MenuItem(String label, boolean enabled, Runnable action) {
+	public record MenuItem(String label, boolean enabled, Runnable action, boolean dim) {
+		public MenuItem(String label, boolean enabled, Runnable action) {
+			this(label, enabled, action, false);
+		}
 	}
 
 	/** A control whose popup lies outside its rectangle: the host routes input to it while open. */
