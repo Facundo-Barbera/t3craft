@@ -182,10 +182,11 @@ public final class WellRoofedStone implements Variant {
 			// [depth] corner pedestals; a lantern on a short chain hangs from the crossbar end over each of them
 			for (int v : new int[] {g.v0(), g.v1()}) {
 				p.set(c, u, 1, v, b(st.chiseled()));
-				for (int y = BAR - 1; y >= 3; y--) {
+				p.set(c, u, 2, v, slab(st.slabA())); // the pedestal's cap, the lantern hangs over it
+				for (int y = BAR - 1; y >= 4; y--) {
 					p.put(c, u, y, v, b(Blocks.IRON_CHAIN).setValue(BlockStateProperties.AXIS, Direction.Axis.Y), CitadelCanvas.HANGING);
 				}
-				p.put(c, u, 2, v, lantern, CitadelCanvas.HANGING);
+				p.put(c, u, 3, v, lantern, CitadelCanvas.HANGING);
 			}
 			// the fence posts stand on stone bases under the crossbar
 			for (int v : postV) {
