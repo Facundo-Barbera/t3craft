@@ -20,33 +20,35 @@ import net.minecraft.world.level.block.state.properties.SlabType;
 import net.minecraft.world.level.block.state.properties.WallSide;
 
 /**
- * Brazier on a tripod: a meeting point. Three open legs (left, right and back; the front stays open) splay out
- * from a bowl of fire, a flat dais of stone slabs rings the foot, and on a big plot stone benches face the
- * fire. Nothing flammable anywhere: metal, stone and a campfire in a bowl that holds it.
+ * Brazier on a tripod: a meeting point. Three open legs carry a bowl of fire, a dais of stone slabs rings the foot and
+ * on a big plot stone benches face the fire. Nothing flammable anywhere: metal and stone, and a campfire in a bowl that
+ * holds it, framed by a bright copper lip.
  *
  * <ul>
- * <li><b>1 × 1, 2-wide or 2-deep plots</b>: a one-block column brazier (foot, thin stem, collar, bowl, fire); a
- *     plot 7+ wide and under 3 deep is a pair of columns that flank the way through.</li>
- * <li><b>3 × 3 and up</b>: the tripod. The legs stand under the bowl and lean in with a stair; from 5 × 5 the dais
- *     (dark slabs near the legs, light stone brick outwards) and 2 or 3 stone benches face the fire; 9+ wide
- *     and under 5 deep is a pair of tripods that flank the entrance with the middle free.</li>
- * <li><b>7 × 7 with height 6+</b>: the legs splay out two cells, each carrying the bowl through a short arm of
- *     upside-down slabs 3 blocks up (a walker passes under it), the dais grows to radius 3 and 2 to 4 benches
- *     sit round it, with lanterns on stone posts at the front ends.</li>
+ * <li><b>1 × 1, 2-wide or 2-deep plots</b> (the street lamp sites): a one-block column brazier (dark foot, wall
+ *     stem, slab collar, an iron cauldron for the bowl, the fire on it); a plot 7+ wide and under 3 deep is a pair of
+ *     columns that flank the way through.</li>
+ * <li><b>3 × 3 up to 4 deep, or height 5</b>: a compact tripod, its three legs a triangle (back left, back right, front
+ *     centre) under the bowl; from 5 × 5 a dais with 2 or 3 stone benches; 9+ wide and under 5 deep is a pair of
+ *     tripods that flank the entrance with the middle free.</li>
+ * <li><b>5 × 5 and up with height 6+</b>: the legs splay out two cells (left, right, back; the front stays open) and
+ *     carry the bowl through short arms of upside-down slabs 3 blocks up, so a walker passes under them. 5–6 wide: a
+ *     dais with 4 stools between the legs. 7+: the dais grows to radius 3 with 2 to 4 benches and lanterns on stone
+ *     posts at the front ends; 9+: one more ring and a low stone-brick wall as a backrest behind each bench.</li>
  * </ul>
  *
- * <p>By seed: leg material (iron / waxed copper / stone brick), bowl material (polished deepslate / copper), bowl
- * shape (plate with a copper lip / cup with an inward-sloping rim / cage of thin bars) and the fire (a campfire,
- * one in three a soul campfire with soul lanterns).
+ * <p>By seed: the metal (iron: polished blackstone; copper; or stone brick; the bowl and the leg heads follow it), the rim
+ * (copper lip of stairs that slope in, or of low slabs) and the fire (a campfire, one in three a soul campfire with soul
+ * lanterns).
  *
  * <ul>
- * <li><b>Palette (3–5)</b>: polished blackstone bricks or deepslate bricks at the foot, iron / copper / stone legs,
- *     a polished deepslate or copper bowl, stone bricks for the dais and the benches.</li>
- * <li><b>Safe</b>: the fire stands 4+ blocks up on a full block, with a ring of stone round it; the dais, benches
- *     and posts are stone; there is no wood, wool or leaf within the box.</li>
- * <li><b>Walkable</b>: the dais is slabs (no jump), the cells under the bowl keep 3+ blocks of headroom, the front
- *     lane is open and every bench is a stair a person can step over.</li>
- * <li><b>Supported</b>: foot → stem → head stair → (arm) → bowl is one chain of face contacts.</li>
+ * <li><b>Palette (3–5)</b>: polished blackstone bricks or deepslate bricks at the foot, the metal of the legs and bowl,
+ *     the bright copper lip, stone bricks and andesite for the dais and benches.</li>
+ * <li><b>Safe</b>: the fire stands 4+ blocks up on a full block with a stone ring round it; the dais, benches and posts
+ *     are stone; there is no wood, wool or leaf within the box.</li>
+ * <li><b>Walkable</b>: the dais is slabs (no jump), the cells under the bowl keep 3+ blocks of headroom, the front lane
+ *     is open and every bench is a stair a person can step over.</li>
+ * <li><b>Supported</b>: foot → stem → head (→ arm) → bowl is one chain of face contacts.</li>
  * </ul>
  * Size: 1–11 × 1–11 × 5+.
  */
@@ -100,7 +102,7 @@ public final class LampStreetBrazierTripod implements Variant {
 
 	@Override
 	public void build(CitadelCanvas c, Plot p) {
-		Look look = new Look(pick(p, 1, 3), new int[] {0, 0, 1, 1, 2}[pick(p, 3, 5)], pick(p, 4, 3) == 0);
+		Look look = new Look(pick(p, 1, 3), pick(p, 3, 2) * 2, pick(p, 4, 3) == 0);
 		int w = p.w();
 		int d = p.d();
 		int cv1 = (d - 1) / 2;
@@ -271,13 +273,6 @@ public final class LampStreetBrazierTripod implements Variant {
 		for (int i = 0; i < 4; i++) {
 			p.set(c, cu + sides[i][0], y, cv + sides[i][1],
 					k.shape() == 0 ? lipStairs(dirs[i].getOpposite()) : lipSlab());
-		}
-		if (k.shape() == 1) { // plate: the corners are lip slabs too, a closed ring
-			for (int su = -1; su <= 1; su += 2) {
-				for (int sv = -1; sv <= 1; sv += 2) {
-					p.set(c, cu + su, y, cv + sv, lipSlab());
-				}
-			}
 		}
 		p.set(c, cu, y, cv, fire(k));
 	}
