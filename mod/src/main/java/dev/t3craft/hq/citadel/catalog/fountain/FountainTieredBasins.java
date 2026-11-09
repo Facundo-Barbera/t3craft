@@ -97,6 +97,9 @@ public final class FountainTieredBasins implements Variant {
 		boolean gold = k.hash(1, 0, 0, 2) == 0;
 		BlockState accent = gold ? b(Blocks.GOLD_BLOCK) : b(Blocks.CUT_COPPER.waxed().unaffected());
 
+		if (half - 1 <= 2 && shape == 2) {
+			shape = 1; // a square 5x5 pool leaves no corners for lamps and bushes
+		}
 		int pave = half <= 4 ? 0 : half <= 7 ? 1 : half / 3; // paved apron between the pool and the plinth edge
 		int rad = half - 1 - pave; // pool radius
 		boolean three = rad >= 7 && h >= 9 && k.hash(2, 0, 0, 2) == 0;
@@ -116,7 +119,7 @@ public final class FountainTieredBasins implements Variant {
 		int f1 = r1 >= 2 ? 2 + g : 1;
 		int f2 = f1 + 1 + g;
 		int fTop = three ? f2 : f1;
-		int x = r1 >= 2 ? Math.max(0, Math.min(g, h - 4 - fTop)) : 0; // extra stem height under the crown
+		int x = r1 >= 2 ? Math.max(0, Math.min(g, h - 5 - fTop)) : 0; // extra stem height under the crown
 
 		int cu = k.cu;
 		int cv = k.cv;
@@ -146,7 +149,7 @@ public final class FountainTieredBasins implements Variant {
 		int fLast = three ? f2 : f1;
 		int rLast = three ? r2 : r1;
 		int baseWater = rLast >= 2 ? fLast + 1 : 1; // the water level the crown falls into
-		crown(k, fLast, x, baseWater, accent, rLast >= 2);
+		crown(k, fLast, x, baseWater, accent, rLast >= 2, h, gold);
 
 		// bubblers in a big pool: a ring of small copper-topped nozzles between the shore and the first bowl
 		if (rad >= 9) {
@@ -211,6 +214,10 @@ public final class FountainTieredBasins implements Variant {
 	/** [transition] the plinth edge is a ring of stairs rising inwards: the plaza is walked up from every side. */
 	private static void plinthEdge(FountainKit k, int dx, int dz, int u, int v, int w, int d) {
 		Direction f = u == 0 ? Direction.EAST : u == w - 1 ? Direction.WEST : v == 0 ? Direction.SOUTH : Direction.NORTH;
+		if (Math.abs(dx) <= 1 || Math.abs(dz) <= 1) {
+			k.set(dx, 0, dz, stair(Blocks.SMOOTH_QUARTZ_STAIRS, f));
+			return;
+		}
 		k.set(dx, 0, dz, k.pick(dx, 0, dz, stair(Blocks.STONE_BRICK_STAIRS, f), stair(Blocks.STONE_BRICK_STAIRS, f),
 				stair(Blocks.POLISHED_ANDESITE_STAIRS, f), stair(Blocks.DEEPSLATE_BRICK_STAIRS, f), stair(Blocks.MOSSY_STONE_BRICK_STAIRS, f)));
 	}
@@ -236,10 +243,11 @@ public final class FountainTieredBasins implements Variant {
 		int m = ringIdx(shape, dx, dz) - rad;
 		boolean cross = Math.abs(dx) <= 1 || Math.abs(dz) <= 1;
 		BlockState s;
-		if (m == 1) {
-			s = k.pick(dx, 0, dz, b(Blocks.POLISHED_DEEPSLATE), b(Blocks.POLISHED_DEEPSLATE), b(Blocks.DEEPSLATE_TILES));
-		} else if (cross) {
+		if (cross) {
+			// [finish] the walks: a calcite line between polished diorite, from the pool to the plinth edge
 			s = Math.min(Math.abs(dx), Math.abs(dz)) == 0 ? b(Blocks.CALCITE) : b(Blocks.POLISHED_DIORITE);
+		} else if (m == 1) {
+			s = k.pick(dx, 0, dz, b(Blocks.POLISHED_DEEPSLATE), b(Blocks.POLISHED_DEEPSLATE), b(Blocks.DEEPSLATE_TILES));
 		} else {
 			s = switch ((m / 2) % 3) {
 				case 0 -> k.pick(dx, 0, dz, b(Blocks.STONE_BRICKS), b(Blocks.STONE_BRICKS), b(Blocks.MOSSY_STONE_BRICKS), b(Blocks.CRACKED_STONE_BRICKS));
@@ -349,7 +357,8 @@ public final class FountainTieredBasins implements Variant {
 					continue;
 				}
 				// [depth] the underside curves in towards the drum; the rim stair has its back to the water
-				k.set(dx, f, dz, stairTop(gold ? Blocks.DEEPSLATE_BRICK_STAIRS : Blocks.CUT_COPPER_STAIRS.waxed().unaffected(), in));
+				boolean corbel = !gold && k.hash(dx, f, dz, 3) != 0;
+				k.set(dx, f, dz, stairTop(corbel ? Blocks.CUT_COPPER_STAIRS.waxed().unaffected() : Blocks.DEEPSLATE_BRICK_STAIRS, in));
 				k.set(dx, f + 1, dz, light ? k.pick(dx, f + 1, dz, stair(Blocks.SMOOTH_QUARTZ_STAIRS, in), stair(Blocks.SMOOTH_QUARTZ_STAIRS, in),
 						stair(Blocks.POLISHED_DIORITE_STAIRS, in))
 						: k.pick(dx, f + 1, dz, stair(Blocks.POLISHED_DIORITE_STAIRS, in), stair(Blocks.POLISHED_DIORITE_STAIRS, in),
@@ -362,7 +371,7 @@ public final class FountainTieredBasins implements Variant {
 	 * The top: a stem (quartz, capped in copper or gold) rising from the top bowl's floor (or from the pool, when
 	 * the top has no bowl), and water on its cap that falls on four sides into the water below.
 	 */
-	private static void crown(FountainKit k, int f, int x, int baseWater, BlockState accent, boolean bowl) {
+	private static void crown(FountainKit k, int f, int x, int baseWater, BlockState accent, boolean bowl, int h, boolean gold) {
 		int st = f + 2 + x; // y of the cap
 		if (!bowl) {
 			for (int y = 1; y < f; y++) {
@@ -376,6 +385,10 @@ public final class FountainTieredBasins implements Variant {
 		}
 		k.set(0, st, 0, accent);
 		k.set(0, st + 1, 0, WATER);
+		if (st + 2 < h) {
+			// [finish] a slim finial over the water: a copper lightning rod, or an end rod with the gold
+			k.set(0, st + 2, 0, gold ? b(Blocks.END_ROD) : b(Blocks.LIGHTNING_ROD.waxed().unaffected()));
+		}
 		for (Direction dir : DIRS) {
 			for (int y = baseWater + 1; y <= st + 1; y++) {
 				k.set(dir.getStepX(), y, dir.getStepZ(), FALL);
