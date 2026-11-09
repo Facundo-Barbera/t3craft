@@ -273,7 +273,8 @@ public final class HouseTimberOverhang implements Variant {
 	private static void roof(CitadelCanvas c, Plot p, Geo g, Scheme s) {
 		gable(c, p, false, 0, g.d() - 1, g.ul() - 1, g.ur() + 1, PLATE, s.roof(), s.eave(), Blocks.DEEPSLATE_TILES, Blocks.DEEPSLATE_TILE_SLAB, true, true);
 		// gold finial on the back end of the ridge
-		p.set(c, g.uc(), PLATE + 6, g.d() - 1, b(Blocks.GOLD_BLOCK));
+		p.set(c, g.uc(), PLATE + 6, g.d() - 1, b(Blocks.DEEPSLATE_TILE_WALL));
+		p.set(c, g.uc(), PLATE + 7, g.d() - 1, Blocks.LIGHTNING_ROD.waxed().exposed().defaultBlockState());
 	}
 
 	/**

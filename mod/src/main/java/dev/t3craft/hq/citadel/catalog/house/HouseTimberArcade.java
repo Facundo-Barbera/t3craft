@@ -298,12 +298,14 @@ public final class HouseTimberArcade implements Variant {
 	// ------------------------------------------------------------------ roof
 
 	private static void roof(CitadelCanvas c, Plot p, Geo g, Scheme s) {
-		gable(c, p, true, 0, g.w() - 1, 0, g.d() - 1, PLATE, Blocks.BAMBOO_MOSAIC_STAIRS, s.eave(), Blocks.DEEPSLATE_TILES, Blocks.DEEPSLATE_TILE_SLAB, true, true);
+		gable(c, p, true, 0, g.w() - 1, 0, g.d() - 1, PLATE, Blocks.DEEPSLATE_TILE_STAIRS, s.eave(), Blocks.DEEPSLATE_TILES, Blocks.DEEPSLATE_TILE_SLAB, true, true);
 		// [finish] gold finials on both ridge ends
 		int mid = (g.d() - 1) / 2;
 		int top = PLATE + (g.d() - 1) / 2 + 2;
-		p.set(c, 0, top, mid, b(Blocks.GOLD_BLOCK));
-		p.set(c, g.w() - 1, top, mid, b(Blocks.GOLD_BLOCK));
+		for (int u : new int[] {0, g.w() - 1}) {
+			p.set(c, u, top, mid, b(Blocks.DEEPSLATE_TILE_WALL));
+			p.set(c, u, top + 1, mid, Blocks.LIGHTNING_ROD.waxed().exposed().defaultBlockState());
+		}
 	}
 
 	/** [palette] the gable ends: plaster in the triangle, a king post and a pair of pink lights. */
@@ -351,9 +353,9 @@ public final class HouseTimberArcade implements Variant {
 					p.set(c, u, yc + 1, v, slab(Blocks.DEEPSLATE_TILE_SLAB, false));
 				} else {
 					Direction f = u < cd ? Direction.EAST : Direction.WEST;
-					p.set(c, u, yc, v, stair(dist == 3 ? s.eave() : Blocks.BAMBOO_MOSAIC_STAIRS, f, false));
+					p.set(c, u, yc, v, stair(dist == 3 ? s.eave() : Blocks.DEEPSLATE_TILE_STAIRS, f, false));
 					if (v == 0) {
-						p.set(c, u, yc - 1, v, stair(Blocks.BAMBOO_MOSAIC_STAIRS, f.getOpposite(), true));
+						p.set(c, u, yc - 1, v, stair(Blocks.DEEPSLATE_TILE_STAIRS, f.getOpposite(), true));
 					}
 				}
 			}

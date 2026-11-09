@@ -99,7 +99,7 @@ public final class HouseStoneWeathered implements Variant {
 		vines(back, 2, w - 3, 13);
 
 		roofM(c, p, wa, vm, w, d);
-		roofA(c, p, wa, d);
+		roofA(c, p, wa, vm, d);
 		gables(c, p, wa, vm, w, d);
 		chimney(c, p, w, vm);
 		bay(c, p, wa);
@@ -259,9 +259,12 @@ public final class HouseStoneWeathered implements Variant {
 	}
 
 	/** [finish] front wing roof: ridge along v, verge overhang front and back, dark oak edges, slab ridge. */
-	private static void roofA(CitadelCanvas c, Plot p, int wa, int d) {
+	private static void roofA(CitadelCanvas c, Plot p, int wa, int vm, int d) {
 		for (int v = 1; v <= d - 1; v++) {
 			for (int u = 0; u <= wa + 1; u++) {
+				if (u == wa + 1 && v >= vm - 1) {
+					continue; // the back block's roof takes this column: a clean valley
+				}
 				int l = lvA(u, wa);
 				int y = PLATE + l;
 				boolean eave = u == 0 || u == wa + 1;
@@ -270,15 +273,15 @@ public final class HouseStoneWeathered implements Variant {
 				if (middle) {
 					p.set(c, u, y, v, b(Blocks.CHERRY_PLANKS));
 				} else {
-					p.set(c, u, y, v, stairs(eave ? Blocks.DARK_OAK_STAIRS : p.hash(u, y, v, 7) == 0 ? Blocks.MANGROVE_STAIRS : Blocks.CHERRY_STAIRS, leftHalf ? Direction.EAST : Direction.WEST));
+					p.set(c, u, y, v, stairs(eave ? Blocks.DARK_OAK_STAIRS : Blocks.CHERRY_STAIRS, leftHalf ? Direction.EAST : Direction.WEST));
 				}
 			}
 			int top = PLATE + lvA((wa + 1) / 2, wa);
 			if (wa % 2 == 1) {
-				p.set(c, (wa + 1) / 2, top + 1, v, slab(Blocks.DARK_OAK_SLAB));
+				p.set(c, (wa + 1) / 2, top + 1, v, slab(Blocks.DEEPSLATE_TILE_SLAB));
 			} else {
-				p.set(c, wa / 2, top + 1, v, slab(Blocks.DARK_OAK_SLAB));
-				p.set(c, wa / 2 + 1, top + 1, v, slab(Blocks.DARK_OAK_SLAB));
+				p.set(c, wa / 2, top + 1, v, slab(Blocks.DEEPSLATE_TILE_SLAB));
+				p.set(c, wa / 2 + 1, top + 1, v, slab(Blocks.DEEPSLATE_TILE_SLAB));
 			}
 		}
 	}
@@ -296,17 +299,17 @@ public final class HouseStoneWeathered implements Variant {
 				if (middle) {
 					p.set(c, u, y, v, b(Blocks.CHERRY_PLANKS));
 				} else {
-					p.set(c, u, y, v, stairs(eave ? Blocks.DARK_OAK_STAIRS : p.hash(u, y, v, 7) == 0 ? Blocks.MANGROVE_STAIRS : Blocks.CHERRY_STAIRS, front ? Direction.SOUTH : Direction.NORTH));
+					p.set(c, u, y, v, stairs(eave ? Blocks.DARK_OAK_STAIRS : Blocks.CHERRY_STAIRS, front ? Direction.SOUTH : Direction.NORTH));
 				}
 			}
 		}
 		int top = PLATE + lvM(vm - 1 + (rows - 1) / 2, vm, d);
 		for (int u = wa + 1; u <= w - 1; u++) {
 			if (rows % 2 == 1) {
-				p.set(c, u, top + 1, vm - 1 + rows / 2, slab(Blocks.DARK_OAK_SLAB));
+				p.set(c, u, top + 1, vm - 1 + rows / 2, slab(Blocks.DEEPSLATE_TILE_SLAB));
 			} else {
-				p.set(c, u, top + 1, vm - 1 + rows / 2 - 1, slab(Blocks.DARK_OAK_SLAB));
-				p.set(c, u, top + 1, vm - 1 + rows / 2, slab(Blocks.DARK_OAK_SLAB));
+				p.set(c, u, top + 1, vm - 1 + rows / 2 - 1, slab(Blocks.DEEPSLATE_TILE_SLAB));
+				p.set(c, u, top + 1, vm - 1 + rows / 2, slab(Blocks.DEEPSLATE_TILE_SLAB));
 			}
 		}
 	}

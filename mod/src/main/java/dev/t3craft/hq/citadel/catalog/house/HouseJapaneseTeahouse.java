@@ -200,7 +200,7 @@ public final class HouseJapaneseTeahouse implements Variant {
 			int u1 = ru1 - k;
 			int v0 = rv0 + k;
 			int v1 = rv1 - k;
-			Block mat = k == 0 ? Blocks.BAMBOO_STAIRS : Blocks.BAMBOO_MOSAIC_STAIRS;
+			Block mat = k == 0 ? Blocks.SPRUCE_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS;
 			for (int u = u0; u <= u1; u++) {
 				for (int v = v0; v <= v1; v++) {
 					boolean top = v == v0;
@@ -245,12 +245,12 @@ public final class HouseJapaneseTeahouse implements Variant {
 		int v1 = rv1 - 2;
 		for (int u = u0 + 1; u < u1; u++) {
 			for (int v = v0 + 1; v < v1; v++) {
-				p.set(c, u, 6, v, b(Blocks.BAMBOO_MOSAIC));
+				p.set(c, u, 6, v, b(Blocks.DEEPSLATE_TILES));
 			}
 		}
 		for (int u = u0; u <= u1; u++) {
 			for (int v = v0; v <= v1; v++) {
-				p.set(c, u, 7, v, slab(Blocks.BAMBOO_MOSAIC_SLAB));
+				p.set(c, u, 7, v, slab(Blocks.DEEPSLATE_TILE_SLAB));
 			}
 		}
 		p.set(c, (u0 + u1) / 2, 8, (v0 + v1) / 2, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState());
