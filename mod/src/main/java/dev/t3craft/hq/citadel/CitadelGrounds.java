@@ -139,12 +139,18 @@ public final class CitadelGrounds {
 
 	/** A ramp column: half-block steps down from the podium, with a bamboo runner and kerbs ({@link CitadelPaving#rampBand}). */
 	private static void ramp(CitadelCanvas c, int x, int z, double r) {
+		if (CitadelPodium.ramp(c, x, z, r)) {
+			return; // design/citadel-terraces2: the stair of the podium (two flights and a landing)
+		}
 		int band = CitadelPaving.rampBand(x, z);
 		stepped(c, x, z, rampHalves(r), CitadelPaving.rampFull(band), CitadelPaving.rampHalf(band));
 	}
 
 	/** A terrace column: a stone step with grass (one in eight moss), a bush every so often and the vegetation of {@link Gardens#terrace}. */
 	private static void terrace(CitadelCanvas c, int x, int z, double r) {
+		if (CitadelPodium.terrace(c, x, z, r)) {
+			return; // design/citadel-terraces2: the two tiers of the podium
+		}
 		int h = rampHalves(r);
 		stepped(c, x, z, h - h % 2, FOOT, FOOT);
 		int top = h / 2;

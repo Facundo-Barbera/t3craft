@@ -113,7 +113,14 @@ public final class CitadelRelief {
 		int top = RingCampusGeometry.level(rings);
 		double from = RingCampusGeometry.streetOuter(rings);
 		double to = RingCampusGeometry.radius(rings);
-		double f = (to - RingCampusGeometry.r(x, z)) / Math.max(1.0, to - from);
+		double w = Math.max(1.0, to - from);
+		// design/citadel-terraces2: the bank is not a ring: its foot comes in by up to 55 % of the lawn's width, with a
+		// slow swell (a few lobes round the circle) and a faster ripple, both periodic in the angle and in the radius
+		double a = RingCampusGeometry.theta(x, z);
+		double swell = 0.5 * Math.sin(3 * a + 0.7) + 0.3 * Math.sin(5 * a + 2.1) + 0.2 * Math.sin(8 * a + 4.0);
+		double ripple = 0.5 * Math.sin(13 * a + 1.3 + 0.35 * RingCampusGeometry.r(x, z));
+		double foot = to - w * (0.30 + 0.25 * swell + 0.08 * ripple); // where the bank reaches the natural ground
+		double f = (foot - RingCampusGeometry.r(x, z)) / Math.max(1.0, foot - from);
 		return (int) Math.max(0, Math.min(top, Math.round(top * f)));
 	}
 
@@ -121,6 +128,7 @@ public final class CitadelRelief {
 
 	/** Lifts the painted flat citadel onto its terraces (see the class comment). */
 	public static void apply(CitadelCanvas c) {
+		CitadelPodium.buttresses(c); // design/citadel-terraces2: pilasters on the feet of the podium's walls (flat frame)
 		if (RingCampusGeometry.relief() == 0) {
 			return;
 		}
@@ -499,18 +507,18 @@ public final class CitadelRelief {
 			if (ground == null || ground.getBlock() != Blocks.GRASS_BLOCK && ground.getBlock() != Blocks.MOSS_BLOCK || !open(c, x, g + 1, z)) {
 				continue;
 			}
+			// design/citadel-terraces2: the foot of a wall stays clear (no hedge to hide it): low flowers and grass only
 			int k = Math.floorMod(x * 31 + z * 17 + (x ^ z) * 7, 9);
 			BlockState plant = switch (k) {
-				case 0, 1, 2, 3 -> leaves(Blocks.FLOWERING_AZALEA_LEAVES);
-				case 4, 5 -> leaves(Blocks.AZALEA_LEAVES);
-				case 6 -> b(Blocks.FLOWERING_AZALEA);
-				case 7 -> b(Blocks.PINK_TULIP);
-				default -> b(Blocks.ALLIUM);
+				case 0, 1 -> b(Blocks.PINK_TULIP);
+				case 2 -> b(Blocks.ALLIUM);
+				case 3 -> b(Blocks.AZURE_BLUET);
+				case 4, 5 -> b(Blocks.SHORT_GRASS);
+				default -> null;
 			};
-			if (ground.getBlock() == Blocks.MOSS_BLOCK && (k == 7 || k == 8)) {
-				plant = b(Blocks.AZALEA);
+			if (plant != null) {
+				c.set(x, g + 1, z, plant);
 			}
-			c.set(x, g + 1, z, plant);
 		}
 	}
 
