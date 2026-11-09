@@ -183,7 +183,7 @@ public final class WellRoofedStone implements Variant {
 					p.set(c, u, 0, v, slab(st.slabA())); // the low front lip
 				} else {
 					p.set(c, u, 0, v, kerbBlock(p, st, u, v));
-					if (v == g.v1()) {
+					if (v == g.v1() && g.v1() + 1 < g.d()) {
 						p.set(c, u, 1, v, slab(st.slabA())); // the back wall is a half block higher: a backdrop for the bucket
 					}
 				}
@@ -213,6 +213,10 @@ public final class WellRoofedStone implements Variant {
 		// the axle: a pale stripped log across the shaft, resting on the post tops
 		for (int u = g.uL(); u <= g.uR(); u++) {
 			p.set(c, u, AXLE, va, pale);
+		}
+		// a tie beam over the axle closes the gap under the roof, so nobody can stand on the axle
+		for (int u = g.uL() + 1; u <= g.uR() - 1; u++) {
+			p.set(c, u, BAR, va, log(roof.log(), Direction.Axis.X));
 		}
 		int cu = g.cs() == 4 ? g.uL() + 1 + p.hash(3, 0, 0, 2) : g.uc();
 		// the crank: an open trapdoor handle plate on the front of the axle
