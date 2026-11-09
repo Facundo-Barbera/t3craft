@@ -2320,8 +2320,9 @@ public final class CitadelPlacement {
 			Direction face = RingCampusGeometry.cardinal(ang).getOpposite();
 			for (int size = sc(2); size >= 1; size--) {
 				Family f = size > 1 ? Family.STATUE : Family.LAMP;
-				int h = size == 2 ? STATUE_H() : LAMP_H();
-				if (!fitsAny(f, size, size, h)) {
+				// struct/hub-statues3: every statue size (sc(2) = 4, 3, 2) is as tall as a statue, only the 1x1 lamp is lamp-high
+				int h = size > 1 ? STATUE_H() : LAMP_H();
+				if (size > 1 ? !fitsHubStatue(size, h) : !fitsAny(f, size, size, h)) {
 					continue;
 				}
 				int x0 = ctr.getX() - (size - 1) / 2;
@@ -2329,11 +2330,43 @@ public final class CitadelPlacement {
 				if (!galleryFree(city, x0, z0, size, h)) {
 					continue;
 				}
-				if (build(c, f, x0, y0() + 1, z0, size, size, h, face, mix(0x57A7L, k))) {
+				if (build(c, f, x0, y0() + 1, z0, size, size, h, face, mix(0x57A7L, k), size > 1 ? hubStatues() : null)) {
 					break;
 				}
 			}
 		}
+	}
+
+	/**
+	 * struct/hub-statues3: which STATUE designs may stand on the hub promenade, by weight (a design not listed is 0, so it
+	 * never comes out). To bring a design back, raise its weight here; the 1x1 lamp fallback stays when none fits.
+	 * <ul>
+	 * <li>{@code statue_monumental_lantern} 1: redone 2026-11-09, art director 8/7/7.</li>
+	 * <li>{@code statue_guardian_armored} 0: two rounds under 7.</li>
+	 * <li>{@code statue_obelisk_braziers} 0 for now: being redone; once it passes, the coordinator raises this weight.</li>
+	 * </ul>
+	 */
+	private static final Map<String, Integer> HUB_STATUES = Map.of("statue_monumental_lantern", 1, "statue_guardian_armored", 0,
+			"statue_obelisk_braziers", 0);
+
+	private static Map<String, Integer> hubStatues() {
+		Map<String, Integer> w = new HashMap<>();
+		for (Variant v : Catalog.of(Family.STATUE)) {
+			w.put(v.id(), HUB_STATUES.getOrDefault(v.id(), 0));
+		}
+		return w;
+	}
+
+	/** Whether a design with a {@link #hubStatues} weight above 0 fits a local {@code size × size × h} box. */
+	private static boolean fitsHubStatue(int size, int h) {
+		Plot probe = new Plot(0, 0, 0, size, size, h, Direction.NORTH, 0L);
+		Map<String, Integer> w = hubStatues();
+		for (Variant v : Catalog.of(Family.STATUE)) {
+			if (w.getOrDefault(v.id(), 0) > 0 && v.fits(probe)) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**
