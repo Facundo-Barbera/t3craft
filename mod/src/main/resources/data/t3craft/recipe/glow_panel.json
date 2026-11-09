@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "pattern": [
+    "TTT",
+    "GGG",
+    "TTT"
+  ],
+  "key": {
+    "T": "minecraft:deepslate_tiles",
+    "G": "minecraft:glowstone_dust"
+  },
+  "result": {
+    "id": "t3craft:glow_panel",
+    "count": 2
+  }
+}

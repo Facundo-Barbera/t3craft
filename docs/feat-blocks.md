@@ -464,6 +464,38 @@ ninguno. Ítems en la pestaña **T3Craft**, loot tables (se sueltan a sí mismos
 Ningún modelo usa transparencia (no hace falta registrar capas de render); los bloques que no son un
 cubo llevan `noOcclusion` y su `VoxelShape`.
 
+### Luz integrada (kit/glow-panel): `glow_strip` y `glow_panel`
+
+Idea de AgentCraft (MIT; solo la idea, ver `THIRD_PARTY_NOTICES.md`): iluminación emisiva integrada en la obra, para que
+los interiores tengan luz sin faroles colgados por todas partes y sin fuentes de luz visibles en suelos. Código, modelos y
+texturas propios (`tools/art/glow_art.py`, solo biblioteca estándar; `--preview DIR` escribe PNG ampliados para revisar).
+Luz 12, sin block entity, sin recetas caras (tiras: 3 losas de deepslate tile + 3 polvo de glowstone → 6; panel: 6 deepslate tiles + 3 polvo → 2).
+Mina con pico. Con la mano vacía, click derecho alterna el tono.
+
+| Bloque | Qué es | Estado |
+|---|---|---|
+| `t3craft:glow_strip` | Tira de luz de 16 de largo, 3 de alto y 2 de fondo, pegada a un borde de la celda (zócalo, borde de escalón, bajo una pantalla o una viga). Sin colisión. Se conecta en línea por geometría: los extremos son caras lisas y las caras donde se tocan dos tiras quedan dentro de la barra, así que una fila se lee como una sola barra y solo los extremos de la fila enseñan tapa. No hay estado de conexión (nada que resolver en `PlanConnect`). | `facing` (horizontal: hacia dónde mira; el borde que abraza queda detrás), `half` (`bottom`/`top`), `tone` (`warm` papel/ámbar, `cool` cian T3) |
+| `t3craft:glow_panel` | Bloque entero que es una luz de oficina moderna: marco de deepslate, ribete de cerezo y difusor con dos líneas de lamas. Va a ras en un techo o una pared. | `facing` (6 direcciones: la cara que brilla; `down` en un techo), `tone` |
+
+Roles de `HqKit` (kit-4): `GLOW_STRIP`, `GLOW_STRIP_COOL` (parte baja de la celda, cálida/fría), `GLOW_STRIP_HIGH`,
+`GLOW_STRIP_HIGH_COOL` (parte alta), `GLOW_PANEL`, `GLOW_PANEL_COOL`; atajos `glowStrip(facing, high, cool)` y
+`glowPanel(facing, cool)`.
+
+| Rol | Con el módulo | Fallback vanilla |
+|---|---|---|
+| tiras (los cuatro) | `glow_strip[facing,half,tone]` | `minecraft:light[level=12]` invisible: ilumina igual, no tiene colisión (mismo tipo de paso que la tira) |
+| `GLOW_PANEL` | `glow_panel[facing,tone=warm]` | `ochre_froglight` |
+| `GLOW_PANEL_COOL` | `glow_panel[facing,tone=cool]` | `sea_lantern` |
+
+Usos en la ciudadela: `CitadelOffice.glow` (sala de control: tiras frías bajo las pantallas y tres paneles fríos en el techo,
+que sustituyen a las luces invisibles de ese lado; tira cálida a lo largo de cada tramo de escalera, una por peldaño) y
+`HallInterior.runway` (halls: zócalo cálido a ambos lados de la alfombra del pasillo, solo en celdas libres que no son de un
+escritorio).
+
+Modelos: `glow_panel_<tone>`, `glow_strip_<half>_<tone>`; el brillo (`light_emission` 15) va por elemento, como en la lámpara
+de estado. **Pendiente de ojo en el juego**: la orientación de la tira (`facing` + `y`), el `uv` de la mitad alta y el aspecto de
+las lamas del difusor; no se renderizó (clases kernel).
+
 ### `HqKit`: el mapeo por roles (para `HqStyle`)
 
 `dev.t3craft.hq.HqKit` (paquete hq, como `HqFixtures`): `HqKit.active()` es `VANILLA` hasta que
