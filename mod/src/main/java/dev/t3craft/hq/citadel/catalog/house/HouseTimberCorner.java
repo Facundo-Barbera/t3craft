@@ -92,12 +92,12 @@ public final class HouseTimberCorner implements Variant {
 	}
 
 	/** [palette] two roof schemes per seed: warm mud brick or cool deepslate tile, always on a dark-oak fascia. */
-	private record Scheme(Block roof, Block alt, Block eave, Block shutter) {
+	private record Scheme(Block roof, Block alt, Block ridge, Block eave, Block shutter) {
 	}
 
 	private static final Scheme[] SCHEMES = {
-			new Scheme(Blocks.MUD_BRICK_STAIRS, Blocks.BRICK_STAIRS, Blocks.DARK_OAK_STAIRS, Blocks.CHERRY_TRAPDOOR),
-			new Scheme(Blocks.DEEPSLATE_TILE_STAIRS, Blocks.DEEPSLATE_BRICK_STAIRS, Blocks.DARK_OAK_STAIRS, Blocks.BAMBOO_TRAPDOOR),
+			new Scheme(Blocks.DEEPSLATE_TILE_STAIRS, Blocks.CHERRY_STAIRS, Blocks.DEEPSLATE_TILES, Blocks.DARK_OAK_STAIRS, Blocks.CHERRY_TRAPDOOR),
+			new Scheme(Blocks.MUD_BRICK_STAIRS, Blocks.DEEPSLATE_TILE_STAIRS, Blocks.MUD_BRICKS, Blocks.DARK_OAK_STAIRS, Blocks.CHERRY_TRAPDOOR),
 	};
 
 	/**
@@ -163,10 +163,10 @@ public final class HouseTimberCorner implements Variant {
 		partitionU(c, p, 1);
 		partitionV(c, p, 0);
 		partitionV(c, p, 1);
-		gableFill(c, p, true, ue, true, false);
-		gableFill(c, p, false, vb, true, false);
-		gableFill(c, p, true, T, false, true);
-		gableFill(c, p, false, T, false, true);
+		gableFill(c, p, true, ue, true, false, null);
+		gableFill(c, p, false, vb, true, false, null);
+		gableFill(c, p, true, T, false, true, s.ridge());
+		gableFill(c, p, false, T, false, true, s.ridge());
 		lanternBand(c, p);
 
 		// doors: tower hall (street), shop (street), workshop (side street) and workshop to the garden
@@ -366,7 +366,7 @@ public final class HouseTimberCorner implements Variant {
 			}
 			if (w) {
 				// [depth] a dark lintel over every window and, upstairs, a dark sill under it: the frame reads as timber
-				TimberKit.put(c, p, alongU, line, i, w2 + 1, dark(ax));
+				TimberKit.put(c, p, alongU, line, i, w2 + 1, log(Blocks.STRIPPED_CHERRY_LOG, ax));
 			}
 			if (fl == 1) {
 				TimberKit.put(c, p, alongU, line, i, BEAM, dark(ax));
@@ -483,7 +483,7 @@ public final class HouseTimberCorner implements Variant {
 	 * The triangle that closes a gable: plaster under a dark rafter that follows the roof, a small window in the
 	 * middle of an end gable. {@code minWall} keeps at least two rows (the tower's wall behind the lantern band).
 	 */
-	private static void gableFill(CitadelCanvas c, Plot p, boolean planeIsU, int plane, boolean decorate, boolean minWall) {
+	private static void gableFill(CitadelCanvas c, Plot p, boolean planeIsU, int plane, boolean decorate, boolean minWall, Block high) {
 		for (int t = 1; t <= 9; t++) {
 			int top = PLATE + Math.min(t, 10 - t);
 			int last = minWall ? Math.max(top - 1, PLATE + 3) : top - 1;
@@ -495,6 +495,8 @@ public final class HouseTimberCorner implements Variant {
 					st = pane(!planeIsU, DyeColor.PINK);
 				} else if (decorate && t == 5) {
 					st = dark(Direction.Axis.Y); // king post
+				} else if (!decorate && y > PLATE + 3) {
+					st = b(high); // behind the pyramid: the tile of the roof, not a white wedge
 				} else {
 					st = plaster(p, planeIsU ? plane : t, y, planeIsU ? t : plane);
 				}
@@ -525,7 +527,7 @@ public final class HouseTimberCorner implements Variant {
 	// ------------------------------------------------------------------ roofs
 
 	private static void roofs(CitadelCanvas c, Plot p, Geo g, Scheme s) {
-		Block ridge = Blocks.DARK_OAK_PLANKS;
+		Block ridge = s.ridge();
 		Block cap = Blocks.DARK_OAK_SLAB;
 		gable(c, p, true, 10, g.ue() + 1, 0, 10, PLATE, s.roof(), s.eave(), ridge, cap, false, true);
 		gable(c, p, false, 10, g.vb() + 1, 0, 10, PLATE, s.roof(), s.eave(), ridge, cap, false, true);
@@ -629,7 +631,7 @@ public final class HouseTimberCorner implements Variant {
 			if (contains(posts, i)) {
 				continue;
 			}
-			BlockState st = (i & 1) == 0 ? dark(toWall.getAxis()) : stair(Blocks.DARK_OAK_STAIRS, toWall, true);
+			BlockState st = (i & 1) == 0 ? log(Blocks.STRIPPED_CHERRY_LOG, toWall.getAxis()) : stair(Blocks.CHERRY_STAIRS, toWall, true);
 			TimberKit.put(c, p, alongU, proud, i, 9, st);
 		}
 	}
