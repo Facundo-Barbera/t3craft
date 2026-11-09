@@ -1,6 +1,13 @@
-package dev.t3craft.hq;
+package dev.t3craft.client.hq;
 
 import dev.t3craft.client.npc.behavior.AnchorSource;
+import dev.t3craft.hq.Anchor;
+import dev.t3craft.hq.AnchorNames;
+import dev.t3craft.hq.BuildPlan;
+import dev.t3craft.hq.HqGeometry;
+import dev.t3craft.hq.HqInput;
+import dev.t3craft.hq.HqLayout;
+import dev.t3craft.hq.HqSite;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;

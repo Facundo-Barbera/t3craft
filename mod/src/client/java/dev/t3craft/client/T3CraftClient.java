@@ -120,7 +120,7 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 			dev.t3craft.debug.PerfStats.since(HELPER_TICK_TIMER, t0);
 		});
 		T3CraftCommands.register(this);
-		dev.t3craft.hq.HqPreviewCommand.register(npcs::hqRoster); // feat/hq-design: /t3craft debug hq-preview
+		dev.t3craft.client.hq.HqPreviewCommand.register(npcs::hqRoster); // feat/hq-design: /t3craft debug hq-preview
 		PeekHud.register();
 		dev.t3craft.client.hud.StatusBar.register(this); // feat/hud-bar
 		dev.t3craft.client.hud.AttentionSignals.register(this); // feat/18-attention-signals: window title, OS attention

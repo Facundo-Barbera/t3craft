@@ -8,7 +8,7 @@ import dev.t3craft.client.config.EnvironmentsScreen;
 import dev.t3craft.client.config.T3CraftKeys;
 import dev.t3craft.client.npc.NpcInfo;
 import dev.t3craft.client.portable.held.HeldScreen;
-import dev.t3craft.portable.PortableItems;
+import dev.t3craft.survival.PortableItems;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.minecraft.client.KeyMapping;

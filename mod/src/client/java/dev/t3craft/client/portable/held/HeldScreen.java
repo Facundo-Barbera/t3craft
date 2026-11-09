@@ -9,7 +9,7 @@ import dev.t3craft.client.portable.PortableState;
 import dev.t3craft.client.portable.PortableThread;
 import dev.t3craft.client.chat.EnvBadge;
 import dev.t3craft.client.portable.held.HeldScreenModel.Row;
-import dev.t3craft.portable.PortableItems;
+import dev.t3craft.survival.PortableItems;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;

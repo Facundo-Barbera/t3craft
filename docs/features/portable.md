@@ -48,7 +48,7 @@ PortableItems (common) ─ TerminalItem.use() (cliente) ─► PortableClient.op
 
 | Clase | Source set | Rol |
 |---|---|---|
-| `dev.t3craft.portable.PortableItems` | main | Registra el ítem y lo añade a la pestaña creativa. Hook `setClientOpen(Runnable)`. Con `-Dt3craft.portable.item=false` no se registra el ítem. |
+| `dev.t3craft.survival.PortableItems` | main | Registra el ítem y lo añade a la pestaña creativa. Hook `setClientOpen(Runnable)`. Con `-Dt3craft.portable.item=false` no se registra el ítem. |
 | `dev.t3craft.client.portable.PortableClient` | client | Registra la tecla (en `T3CraftKeys.CATEGORY`), el hook del ítem, `HeldScreen` y los *fallbacks*. |
 | `…PortableAdapter` | client | Adaptador mínimo de solo lectura: `NpcInfo` + estados de entorno → `PortableState`. Funciona en modo direct y en modo bridge. |
 | `…PortableState / PortableEnv / PortableThread` | client (Java puro) | Snapshot inmutable: orden, conteos y estado de conexión (`NOT_CONFIGURED`, `DISCONNECTED`, `CONNECTED`). |

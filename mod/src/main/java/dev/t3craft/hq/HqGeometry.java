@@ -37,7 +37,8 @@ public final class HqGeometry {
 	static final int ROW = 14;
 	/** Wing walls at v = 0 and v = WING_WALL, garden at v = ROW - 1. */
 	static final int WING_WALL = 12;
-	static final int SEGMENT = 4;
+	/** Cells per desk segment of a wing; public for the client's NPC anchor adapter. */
+	public static final int SEGMENT = 4;
 	static final int DOOR_V1 = 5;
 	static final int DOOR_V2 = 7;
 	/** Desk modules span y = 0..DESK_TOP (below the ceiling). */

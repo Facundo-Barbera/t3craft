@@ -20,7 +20,7 @@ public final class Boot {
 		}
 		SharedConstants.tryDetectVersion();
 		Bootstrap.bootStrap();
-		dev.t3craft.blocks.RenderBlocks.install();
+		dev.t3craft.tools.hqrender.RenderBlocks.install();
 		booted = true;
 	}
 }
