@@ -9,10 +9,12 @@
 # Run it from the checkout whose code should be the baseline (normally main/integration, CLEAN: the
 # daemon decides "does this worktree need compiling?" by diffing against this checkout's HEAD).
 # One JVM, nice 19 / ionice idle. Settings (environment, read at start):
-#   RENDER_WORKERS      jobs at once (default 3; compiles still go one at a time)
+#   RENDER_WORKERS      jobs at once (default 1, AGENTS.md "VPS: heavy processes"; compiles go one at a time)
 #   RENDER_PARALLELISM  render threads in total, split between the workers (default 6 -> 2 per job)
-#   RENDER_LOAD_MAX     above this 1-min load no job starts while another runs (default 8)
-#   RENDER_XMX          max heap (default 2g + 1.5g per worker: 6656m with 3 workers)
+#   RENDER_LOAD_MAX     above this 1-min load no job starts while another runs (default 6)
+#   RENDER_XMX          max heap (default 2g + 1.5g per worker: 3584m with 1 worker)
+# Needs Facundo's approval: the file ~/.cache/t3craft-coord/renders-approved (see AGENTS.md). While it runs,
+# the daemon holds the global heavy-process lock /tmp/t3craft-heavy.lock, so no other java/gradle runs.
 # It restarts itself on exit code 75 (a render thread that would not stop). Log: $RENDER_HOME/daemon.log.
 # Protocol and limits: docs/tools/render-service.md
 set -euo pipefail
@@ -32,10 +34,13 @@ case "${1:-}" in
 esac
 
 int_or() { case "$1" in ''|*[!0-9]*) echo "$2" ;; *) if [ "$1" -ge 1 ]; then echo "$1"; else echo "$2"; fi ;; esac; }
-WORKERS="$(int_or "${RENDER_WORKERS:-}" 3)"
+WORKERS="$(int_or "${RENDER_WORKERS:-}" 1)"
 PARALLELISM="$(int_or "${RENDER_PARALLELISM:-}" 6)"
 XMX="${RENDER_XMX:-$((2048 + 1536 * WORKERS))m}"
 export RENDER_WORKERS="$WORKERS" RENDER_PARALLELISM="$PARALLELISM"
+export RENDER_LOAD_MAX="${RENDER_LOAD_MAX:-6}"
+APPROVAL="$HOME/.cache/t3craft-coord/renders-approved"
+HEAVY_LOCK=/tmp/t3craft-heavy.lock
 
 NICE=(nice -n 19)
 if ionice -c3 true 2>/dev/null; then
@@ -64,11 +69,27 @@ launch_loop() {
 		[ "$rc" -eq 75 ] || break
 		sleep 5
 	done
+	# leave no gradle daemon behind (the per-job compiles start one)
+	timeout 60 ./gradlew --stop >/dev/null 2>&1 || true
 }
 
 if [ "$mode" = supervise ] || [ "$mode" = foreground ]; then
+	# hold the global heavy-process lock for the daemon's whole life (fd 9 is inherited by the JVM)
+	exec 9>"$HEAVY_LOCK"
+	if ! flock -n 9; then
+		echo "$(date -Is) start-daemon: another heavy process holds $HEAVY_LOCK ($(cat "$HEAVY_LOCK.owner" 2>/dev/null)); not starting" >&2
+		exit 75
+	fi
+	echo "$$ $(date -Is) render daemon" >"$HEAVY_LOCK.owner"
+	trap 'rm -f "$HEAVY_LOCK.owner"' EXIT
 	launch_loop
 	exit 0
+fi
+
+# Facundo must approve a render session (AGENTS.md, "VPS: heavy processes")
+if [ ! -f "$APPROVAL" ]; then
+	echo "start-daemon: renders are not approved ($APPROVAL missing). Ask Facundo first; see AGENTS.md." >&2
+	exit 1
 fi
 
 # refuse a second daemon

@@ -1,5 +1,7 @@
 # Shared render service
 
+> **Since 2026-11-09 (AGENTS.md, "VPS: heavy processes"):** the daemon and `submit.sh` only run inside a render session Facundo approved (`~/.cache/t3craft-coord/renders-approved`). The daemon holds the global heavy-process lock, defaults to 1 worker and load limit 6, and nobody raises those limits without his OK.
+
 One long-lived JVM renders for every agent. Dozens of agents see their designs (HQ plans, and UI
 screens through the plug below) while the VPS (12 cores, 47 GB, shared) stays responsive.
 

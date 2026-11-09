@@ -23,13 +23,19 @@
 set -uo pipefail
 
 RENDER_HOME="${T3CRAFT_RENDER_HOME:-$HOME/.cache/t3craft-render}"
+# AGENTS.md "VPS: heavy processes": renders only in a session Facundo approved
+if [ ! -f "$HOME/.cache/t3craft-coord/renders-approved" ]; then
+	echo "submit: renders are not approved right now (AGENTS.md, VPS rules). Do not retry or loop; finish with code only and say so." >&2
+	exit 2
+fi
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 kind=hq
 priority=preview
 agent="${T3CRAFT_AGENT:-}"
 worktree=""
 wait_for=1
-timeout_s=3600
+timeout_s=1800
+launcher=$PPID
 
 usage() { sed -n '2,22p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
@@ -114,6 +120,11 @@ while :; do
 	fi
 	if [ "$waited" -ge "$timeout_s" ]; then
 		echo "submit: gave up waiting after ${timeout_s}s; the request is still in the service: $outdir/status.json" >&2
+		exit 4
+	fi
+	# orphan guard: if whoever launched us is gone (task cancelled, session restarted), stop waiting
+	if ! kill -0 "$launcher" 2>/dev/null || [ "$(ps -o ppid= -p $$ | tr -d ' ')" = 1 ]; then
+		echo "submit: the launching process is gone; stop waiting (the request stays in the service)" >&2
 		exit 4
 	fi
 	sleep 5
