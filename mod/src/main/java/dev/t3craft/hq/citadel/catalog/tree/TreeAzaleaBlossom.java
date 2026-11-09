@@ -94,8 +94,8 @@ public final class TreeAzaleaBlossom implements Variant {
 		double ryM = Math.max(1.3, Math.min(rc * (small ? 0.95 + 0.1 * r.nextDouble() : 0.62 + 0.18 * r.nextDouble()),
 				(avail - 0.4) / 1.92));
 		double cyM = CLEAR + ryM * 0.92;
-		double rxM = ru * (small ? 0.95 : 0.74 + 0.08 * r.nextDouble());
-		double rzM = rv * (small ? 0.95 : 0.74 + 0.08 * r.nextDouble());
+		double rxM = ru * (small ? 1.12 : 0.6 + 0.2 * r.nextDouble());
+		double rzM = rv * (small ? 1.12 : 0.6 + 0.2 * r.nextDouble());
 		double slack = Math.max(0, Math.min(w / 2.0 - 0.5 - rxM, d / 2.0 - 0.5 - rzM));
 		double la = r.nextDouble() * Math.PI * 2;
 		double lamp = Math.min(slack, 0.3 + 0.7 * r.nextDouble());
@@ -110,13 +110,14 @@ public final class TreeAzaleaBlossom implements Variant {
 			double ex = Math.cos(ang);
 			double ez = Math.sin(ang);
 			double room = TreeKit.room(t, cuM, cvM, ex, ez, 0);
-			double rs = Math.min(rc * (0.36 + 0.14 * r.nextDouble()), Math.max(1.4, (room + 0.5) * 0.5));
-			rs = Math.max(rs, 1.4);
-			double dd = TreeKit.clamp(room + 0.5 - rs, 0, rc * (0.6 + 0.3 * r.nextDouble()));
+			double rs = Math.min(rc * (0.4 + 0.16 * r.nextDouble()), Math.max(1.4, (room + 0.5) * 0.5));
+			rs = Math.max(rs, small ? 1.7 : 1.4);
+			double dd = TreeKit.clamp(room + 0.5 - rs, 0, rc * (0.65 + 0.3 * r.nextDouble()));
 			double rys = rs * (0.7 + 0.2 * r.nextDouble());
 			double lo = CLEAR + 0.9 * rys;
 			double hi = p.h() - 0.6 - rys;
-			double cy = cyM + (r.nextDouble() - 0.4) * ryM * 0.9;
+			// the first satellite is a low side lobe (a long limb that droops), the others sit at varied heights
+			double cy = i == 1 && !small ? lo : cyM + (r.nextDouble() - 0.5) * ryM * 1.1;
 			cy = Math.max(lo, Math.min(Math.max(lo, hi), cy));
 			balls.add(new double[] {cuM + ex * dd, cy, cvM + ez * dd, rs, rys, rs * (0.9 + 0.2 * r.nextDouble())});
 		}
@@ -237,7 +238,7 @@ public final class TreeAzaleaBlossom implements Variant {
 			holes[i][0] = cuM + Math.cos(ang) * horiz * rxM * 0.9;
 			holes[i][1] = cyM + el * ryM * 0.9;
 			holes[i][2] = cvM + Math.sin(ang) * horiz * rzM * 0.9;
-			holes[i][3] = rc < 3.5 ? 0.8 : 1.0 + r.nextDouble() * Math.min(2.4, rc * 0.3);
+			holes[i][3] = rc < 3.5 ? 0.8 : 1.0 + r.nextDouble() * Math.min(2.8, rc * 0.36);
 		}
 		for (int y = CLEAR; y < p.h(); y++) {
 			for (int vv = 0; vv < d; vv++) {
@@ -275,12 +276,12 @@ public final class TreeAzaleaBlossom implements Variant {
 					}
 					double sun = ((uu - cuM) * sx + (vv - cvM) * sz) / rc;
 					// flowers come in patches of 2–4 blocks (coarse noise), a few single ones; the sun face is mostly in bloom
-					double pf = TreeKit.clamp(fb + 0.6 * sun + 0.05 * (y - cyM), 0.06, 0.96);
+					double pf = TreeKit.clamp(fb - 0.05 + 1.0 * sun + 0.06 * (y - cyM), 0.04, 0.98);
 					double fine = t.hash(uu, y + 17, vv, 100) / 100.0;
 					double c2 = t.hash(Math.floorDiv(uu, 2) + 7, Math.floorDiv(y, 2), Math.floorDiv(vv, 2) - 3, 100) / 100.0;
 					double c3 = t.hash(Math.floorDiv(uu + 1, 3) + 3, Math.floorDiv(y, 3), Math.floorDiv(vv + 2, 3) + 9, 100) / 100.0;
 					int pick = t.hash(uu + 1, y + 2, vv + 3, 100);
-					boolean flower = (pick < 12 ? fine : pick < 40 ? c2 : c3) < pf;
+					boolean flower = (pick < 8 ? fine : pick < 25 ? c2 : c3) < pf;
 					t.leaf(uu, y, vv, flower ? BLOOM : GREEN);
 				}
 			}
@@ -365,8 +366,8 @@ public final class TreeAzaleaBlossom implements Variant {
 			int hsh = t.hash(uu, 0, vv, 100);
 			// petals in drifts 2–3 blocks wide (coarse noise) plus single ones, moss between
 			boolean drift = t.hash(Math.floorDiv(uu, 2) + 5, 0, Math.floorDiv(vv, 2) + 1, 100) < (k < 0.6 ? 55 : 32);
-			int pet = drift ? 80 : 14;
-			int moss = k < 0.8 ? 24 : 20;
+			int pet = drift ? 80 : 16;
+			int moss = drift ? 14 : k < 0.8 ? 46 : 38;
 			if (hsh < pet) {
 				return TreeKit.petals(drift ? 2 + t.hash(uu, 1, vv, 3) : 1, t.hash(uu, 2, vv, 4));
 			}
