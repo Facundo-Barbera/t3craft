@@ -214,11 +214,17 @@ public final class CitadelBarrios {
 		int mid = r.c();
 		int F = upper != null ? 2 : 1;
 		int top = F * FH;
+		var style = dev.t3craft.hq.citadel.barrio.HallStyle.of(l.id(), h);
+		DyeColor env = dev.t3craft.hq.citadel.barrio.HallFacade.env(c, l.id());
+		int seed = dev.t3craft.hq.citadel.barrio.HallStyle.seed(l.id(), h);
 		hallShell(c, l, h, r, F, mats);
+		// the facade (door, porch, windows) and the roof; then the inside: stairs, rugs, furniture, light
+		dev.t3craft.hq.citadel.barrio.HallFacade.dress(c, r, F, mats, style, env, seed);
 		roof(c, r, top, Math.floorMod(h + l.id(), 3), mats);
 		if (F == 2) {
-			hallStairs(c, r);
+			hallStairs(c, r, style);
 		}
+		dev.t3craft.hq.citadel.barrio.HallInterior.furnish(c, r, F, mats, style, env, seed);
 		for (HqLayout.Module mod : new HqLayout.Module[] {ground, upper}) {
 			if (mod == null) {
 				continue;
@@ -243,6 +249,9 @@ public final class CitadelBarrios {
 		int W = r.w();
 		int D = r.d();
 		int mid = r.c();
+		var style = dev.t3craft.hq.citadel.barrio.HallStyle.of(l.id(), h);
+		DyeColor env = dev.t3craft.hq.citadel.barrio.HallFacade.env(c, l.id());
+		int seed = dev.t3craft.hq.citadel.barrio.HallStyle.seed(l.id(), h);
 		Set<Long> hole = new HashSet<>();
 		if (F == 2) {
 			for (int u = 2; u <= 5; u++) {
@@ -263,14 +272,8 @@ public final class CitadelBarrios {
 						int t = (u == -1 || u == D) ? v : u;
 						for (int y = yb + 1; y < yb + FH; y++) {
 							int ly = y - yb;
-							BlockState s;
-							if (corner) {
-								s = mats.post();
-							} else if (ly >= 2 && ly <= 4 && Math.floorMod(t, 3) != 0) {
-								s = GLASS;
-							} else {
-								s = mats.wall();
-							}
+							BlockState s = corner ? mats.post()
+									: dev.t3craft.hq.citadel.barrio.HallFacade.wallBlock(c, style, mats, env, seed, t, ly, along);
 							c.set(g0.atY(y), s);
 						}
 						if (f == 0 && u == -1 && Math.abs(v - mid) <= 1) {
@@ -294,14 +297,14 @@ public final class CitadelBarrios {
 	}
 
 	/** Straight stairs up the centre line of a two-floor hall, through the hole of {@link #hallShell}. */
-	public static void hallStairs(CitadelCanvas c, Room r) {
+	public static void hallStairs(CitadelCanvas c, Room r, dev.t3craft.hq.citadel.barrio.HallStyle style) {
 		int mid = r.c();
 		for (int i = 0; i < RingCampusGeometry.STAIR_STEPS; i++) {
 			BlockPos p = r.cell(1 + i, mid, 1 + i);
 			for (int y = 1; y <= i; y++) {
-				c.set(p.atY(y), PLANKS);
+				c.set(p.atY(y), style.stairCore());
 			}
-			c.set(p, stairs(Blocks.CHERRY_STAIRS, r.back()));
+			c.set(p, stairs(style.stairBlock(), r.back()));
 		}
 	}
 
