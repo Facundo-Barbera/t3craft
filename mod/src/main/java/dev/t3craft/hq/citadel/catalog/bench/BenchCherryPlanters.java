@@ -180,6 +180,7 @@ public final class BenchCherryPlanters implements Variant {
 					}
 				}
 			}
+			softUnder(c, p, 0, 0, w - 1, pd - 1);
 			for (int u = s0 + 1; u <= s1; u += 4) { // a lantern over every run
 				p.put(c, u, 4, 0, LANTERN.setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
 			}
@@ -313,6 +314,7 @@ public final class BenchCherryPlanters implements Variant {
 				}
 			}
 		}
+		softUnder(c, p, u0, v0, u1, v1);
 		int uc = (u0 + u1) / 2;
 		int vc = (v0 + v1) / 2;
 		set(c, p, uc, 5, vc, slab(Blocks.CHERRY_SLAB));
@@ -325,6 +327,24 @@ public final class BenchCherryPlanters implements Variant {
 	}
 
 	// ------------------------------------------------------------------ parts
+
+	/**
+	 * Under a roof an azalea would be a place to stand (it has a collision box) with only two blocks of headroom, so
+	 * the roofed cells get soft plants (fern, flowers) instead.
+	 */
+	private static void softUnder(CitadelCanvas c, Plot p, int u0, int v0, int u1, int v1) {
+		for (int v = v0; v <= v1; v++) {
+			for (int u = u0; u <= u1; u++) {
+				for (int y = 0; y <= 3; y++) {
+					BlockState at = p.has(u, y, v) ? p.at(c, u, y, v) : null;
+					if (at != null && (at.is(Blocks.AZALEA) || at.is(Blocks.FLOWERING_AZALEA))) {
+						int k = p.hash(u, y, v, 3);
+						p.set(c, u, y, v, k == 0 ? b(Blocks.FERN) : k == 1 ? b(Blocks.CORNFLOWER) : b(Blocks.LILY_OF_THE_VALLEY));
+					}
+				}
+			}
+		}
+	}
 
 	/** A cherry stair seat; {@code back} is the side of the tall half (local). */
 	private static void seat(CitadelCanvas c, Plot p, int u, int v, Direction back) {
