@@ -349,7 +349,9 @@ public final class TowerRoom {
 				q.set(dx, F1, dz, RIB);
 				q.set(dx, F1 + 1, dz, RIB);
 				q.set(dx, F1 + 2, dz, RAIL);
-				q.put(dx, F1 + 3, dz, LANTERN_UP, DECOR);
+				if (r == 12 && aa == 12) {
+					q.put(dx, F1 + 3, dz, LANTERN_UP, DECOR);
+				}
 			} else {
 				q.set(dx, F1 + 1, dz, RAIL);
 			}
@@ -405,7 +407,7 @@ public final class TowerRoom {
 			} else if (y <= 2) {
 				s = NodeDecor.footMix(x, y, z);
 			} else if (aa <= 4 || aa >= 8) {
-				s = r == 12 ? (y == 11 ? CALCITE : STRIP) : (y == 11 ? c.kit.wallPanel(true) : CALCITE);
+				s = r == 12 ? (y == 11 ? CALCITE : (y == 3 || y == 10 ? RIB : STRIP)) : (y == 11 ? c.kit.wallPanel(true) : CALCITE);
 			} else if (r == 12) {
 				s = AIR;
 			} else if (y == 11) {
@@ -427,7 +429,7 @@ public final class TowerRoom {
 	private static void screenFrame(Q q) {
 		for (int x = -4; x <= 4; x++) {
 			q.set(x, 5, -SCREEN_Z, RIB);
-			q.set(x, 10, -SCREEN_Z, RIB);
+			q.set(x, 10, -SCREEN_Z, b(Blocks.GOLD_BLOCK));
 		}
 		for (int y = SCREEN_Y; y <= SCREEN_Y + 3; y++) {
 			q.set(-4, y, -SCREEN_Z, RIB);
@@ -463,7 +465,7 @@ public final class TowerRoom {
 			} else if (win) {
 				s = r == 8 ? AIR : GLASS;
 			} else if (aa == 2 || aa == 3) {
-				s = r == 8 ? STRIP : CALCITE;
+				s = r == 8 ? (y == 15 || y == 22 || y == 25 || y == 32 ? RIB : STRIP) : CALCITE;
 			} else {
 				s = CALCITE;
 			}
@@ -514,7 +516,7 @@ public final class TowerRoom {
 				q.set(dx, y, dz, RIB);
 			}
 			q.set(dx, y0 + 7, dz, LOG);
-			q.set(dx, y0 + 8, dz, LOG);
+			q.set(dx, y0 + 8, dz, b(Blocks.GOLD_BLOCK));
 			q.set(dx, y0 + 9, dz, LIGHT);
 			q.set(dx, y0 + 10, dz, NodeDecor.ROD);
 			q.set(dx, y0 + 11, dz, NodeDecor.ROD);
@@ -651,7 +653,7 @@ public final class TowerRoom {
 				}
 			}
 			for (int x : new int[] {-8, -4, 0, 4, 8}) {
-				if (!overStairs(x, z)) {
+				if (z != -6 && !overStairs(x, z)) {
 					lantern(q, x, F1 - 2, z);
 				}
 			}
@@ -666,6 +668,8 @@ public final class TowerRoom {
 			// terminals and lecterns at the foot of the screen, either side of the aisle
 			q.set(side * 4, 1, -10, c.kit.console(Direction.SOUTH));
 			q.set(side * 6, 1, -10, lectern(Direction.SOUTH));
+			q.set(side * 3, 1, -7, lectern(Direction.SOUTH));
+			q.set(side * 3, 1, -4, lectern(Direction.SOUTH));
 			// chests along the side walls, facing the hall
 			Direction in = side > 0 ? Direction.WEST : Direction.EAST;
 			q.set(side * 10, 1, -9, chest(in));
@@ -715,6 +719,13 @@ public final class TowerRoom {
 		}
 		q.set(-2, y, -6, chest(Direction.SOUTH));
 		q.set(2, y, -6, chest(Direction.SOUTH));
+		// a second desk: two terminals back to back with a lantern between, chairs either side
+		for (int x : new int[] {-4, -3}) {
+			q.set(x, y, 1, NodeDecor.topSlab(Blocks.CHERRY_SLAB));
+			q.set(x, y, 0, stairs(Blocks.CHERRY_STAIRS, Direction.NORTH));
+		}
+		q.set(-4, y + 1, 1, c.kit.console(Direction.NORTH));
+		q.put(-3, y + 1, 1, LANTERN_UP, DECOR);
 		// reading table (south-east) with chairs on both sides
 		for (int x : new int[] {4, 5}) {
 			q.set(x, y, 4, NodeDecor.topSlab(Blocks.CHERRY_SLAB));
@@ -734,6 +745,16 @@ public final class TowerRoom {
 					lantern(q, x, F2 - 1, z);
 				}
 			}
+		}
+		// terrace east and west: benches facing out and planters
+		for (int sd : new int[] {-1, 1}) {
+			Direction back = sd > 0 ? Direction.WEST : Direction.EAST;
+			for (int z : new int[] {-6, -5, 5, 6}) {
+				q.set(sd * 11, y, z, stairs(Blocks.CHERRY_STAIRS, back));
+			}
+			q.set(sd * 11, y, 0, c.kit.gardenPlanter());
+			q.set(sd * 11, y, -3, c.kit.gardenPlanter());
+			q.set(sd * 11, y, 3, c.kit.gardenPlanter());
 		}
 		// terrace: two benches on each side, facing out, on the walkway beside the railing
 		for (int x : new int[] {-6, -5, 5, 6}) {
@@ -768,6 +789,10 @@ public final class TowerRoom {
 			shelf(q, x, y, -6, Direction.SOUTH);
 		}
 		q.set(6, y, -5, lectern(Direction.WEST));
+		for (int x = 1; x <= 3; x++) {
+			shelf(q, x, y, -2, Direction.SOUTH);
+		}
+		q.set(0, y, -2, lectern(Direction.EAST));
 		for (int x : new int[] {-4, 0, 4}) {
 			for (int z : new int[] {-4, 0, 4}) {
 				boolean east = x >= 4 && z >= -3 && z <= 1;
