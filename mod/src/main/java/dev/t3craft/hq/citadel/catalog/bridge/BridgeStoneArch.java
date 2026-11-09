@@ -102,7 +102,7 @@ public final class BridgeStoneArch implements Variant {
 		// the arch: air for y < open[v]. A round-ish arch (half span 1.5 × its rise) in the middle,
 		// with solid abutments of `a` cells at both ends (they carry the pilasters)
 		int rMax = Math.max(1, deck - 2);
-		double hs = Math.max(3.0, Math.round(rMax * 3.0) / 2.0); // half span in cells
+		double hs = Math.max(3.0, Math.round(rMax * 3.6) / 2.0); // half span in cells
 		int a = Math.max(2, (int) Math.ceil(cm - hs));
 		int[] open = new int[d];
 		for (int v = 0; v < d; v++) {
@@ -194,8 +194,8 @@ public final class BridgeStoneArch implements Variant {
 			} else if (y == 0) {
 				st = footing(p, u, v);
 			} else if (y == t) {
-				// [palette] the cornice: the flight's own stairs on the ramps, a clean calcite line on the flat
-				st = flight[v] ? stairs(Blocks.STONE_BRICK_STAIRS, up) : b(Blocks.CALCITE);
+				// [palette] the cornice: the flight's own stairs on the ramps, a clean light line on the flat
+				st = flight[v] ? stairs(Blocks.STONE_BRICK_STAIRS, up) : b(Blocks.POLISHED_ANDESITE);
 			} else if (pil) {
 				st = y == t - 1 ? b(Blocks.POLISHED_DEEPSLATE) : b(Blocks.DEEPSLATE_BRICKS);
 			} else if (recess) {
@@ -213,9 +213,15 @@ public final class BridgeStoneArch implements Variant {
 			}
 		}
 
-		// parapet: low walls with posts, a lantern on every post
+		// parapet. On the flights: a second line of stairs (a smooth sloped rail, no teeth). On the flat: low walls
+		// with a lantern post where the flight ends, every 4 cells after it, and at the middle
 		int ry = t + 1;
-		boolean post = (k > 0 && k % 4 == 0) || (d % 2 == 1 && v == crown);
+		if (flight[v]) {
+			p.set(c, u, ry, v, stairs(Blocks.POLISHED_ANDESITE_STAIRS, up));
+			return;
+		}
+		boolean post = k == deck || (k > deck && (k - deck) % 4 == 0 && !(d % 2 == 0 && k == d / 2 - 1) && !(d % 2 == 1 && (d - 1) / 2 - k == 1))
+				|| (d % 2 == 1 && v == crown);
 		boolean n = top[v - 1] >= t;
 		boolean s = top[v + 1] >= t;
 		BlockState wall = b(post ? Blocks.POLISHED_DEEPSLATE_WALL : p.hash(u, ry, v, 4) == 0 ? Blocks.MOSSY_STONE_BRICK_WALL : Blocks.STONE_BRICK_WALL)
@@ -230,12 +236,13 @@ public final class BridgeStoneArch implements Variant {
 		}
 	}
 
-	/** [finish] end lamp: deepslate plinth and wall, cherry fence, a lantern on top. */
+	/** [finish] end lamp: deepslate plinth, a cherry log base, a two-high cherry fence, a lantern on top. */
 	private static void lamp(CitadelCanvas c, Plot p, int u, int v) {
 		p.set(c, u, 0, v, b(Blocks.POLISHED_DEEPSLATE));
-		p.set(c, u, 1, v, b(Blocks.DEEPSLATE_BRICK_WALL).setValue(BlockStateProperties.UP, true));
+		p.set(c, u, 1, v, b(Blocks.CHERRY_LOG));
 		p.set(c, u, 2, v, b(Blocks.CHERRY_FENCE));
-		p.set(c, u, 3, v, b(Blocks.LANTERN));
+		p.set(c, u, 3, v, b(Blocks.CHERRY_FENCE));
+		p.set(c, u, 4, v, b(Blocks.LANTERN));
 	}
 
 	/** [palette] flat deck: polished andesite curb along both sides, stone bricks with the odd cracked one between. */
@@ -249,8 +256,8 @@ public final class BridgeStoneArch implements Variant {
 	/** [palette] heavy dark footing at y 0, mixed. */
 	private static BlockState footing(Plot p, int u, int v) {
 		return switch (p.hash(u, 0, v, 6)) {
-			case 0 -> b(Blocks.COBBLED_DEEPSLATE);
-			case 1 -> b(Blocks.MOSSY_COBBLESTONE);
+			case 0 -> b(Blocks.MOSSY_STONE_BRICKS);
+			case 1 -> b(Blocks.CRACKED_DEEPSLATE_BRICKS);
 			case 2 -> b(Blocks.CRACKED_DEEPSLATE_BRICKS);
 			default -> b(Blocks.DEEPSLATE_BRICKS);
 		};
