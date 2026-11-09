@@ -27,9 +27,9 @@ import net.minecraft.world.level.block.state.BlockState;
  * on the quarters and the numerals XII, III, VI, IX spelled in blocks (radial, readable from outside) when the dial is
  * big enough (radius 6 and up).</li>
  * <li><b>Gnomon:</b> a tall fin of stairs that climbs at 45 degrees from the centre to a vertical pier with a gold
- * ball and a lightning rod; copper, blackstone or red sandstone by seed. The dial is calcite, quartz or quartz brick
+ * ball and a lightning rod; quartz, polished diorite or smooth sandstone by seed. The dial is calcite, quartz or quartz brick
  * by seed.</li>
- * <li><b>Use:</b> cherry benches on arcs round the platform facing the dial, a lamp post on each diagonal and a flower
+ * <li><b>Use:</b> cherry benches on arcs round the platform facing the dial, a lamp post on each corner of the top and a flower
  * bed in each corner; the axes stay free.</li>
  * </ul>
  *
@@ -43,8 +43,8 @@ import net.minecraft.world.level.block.state.BlockState;
  *   [bed] . . bench . . . . bench . [bed]
  * </pre>
  *
- * Size: 9–23 × 9–23 × 8+ (the plaza centres of the city are 13–21 wide at scale 2). The platform radius is {@code R - 2},
- * the dial radius {@code R - 2 - tiers}, with 2 tiers from half-width 9.
+ * Size: 9–23 × 9–23 × 8+ (the plaza centres of the city are 13–21 wide at scale 2). The platform is a square ziggurat
+ * (1 step, 2 from half-width 11) whose top square carries the dial.
  */
 public final class PlazaCenterMonumentalSundial implements Variant {
 	@Override
@@ -89,12 +89,12 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 		int cu;
 		int cv;
 		int half;
-		int rt; // platform radius
+		int pl; // platform half-size (square, Chebyshev)
+		int ptop; // half-size of the top square that carries the dial
 		int rd; // dial radius
 		int tiers;
 		int yd; // plot layer of the dial
 		int pw; // flower bed size
-		int lamp; // lamp offset on the diagonal, 0 = none
 		int lg; // half length of the gnomon
 		boolean gold;
 		Block dial;
@@ -123,15 +123,13 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 		k.cu = k.w / 2;
 		k.cv = k.d / 2;
 		k.half = Math.min(Math.min(k.cu, k.w - 1 - k.cu), Math.min(k.cv, k.d - 1 - k.cv));
-		k.rt = Math.max(3, k.half - 2);
-		k.tiers = k.half >= 9 ? 2 : 1;
-		k.rd = Math.max(2, k.rt - k.tiers);
+		k.pw = k.half >= 13 ? 3 : k.half >= 9 ? 2 : 1;
+		k.tiers = k.half >= 11 ? 2 : 1;
+		k.ptop = Math.max(2, k.half - 1 - k.pw - k.tiers);
+		k.pl = k.ptop + k.tiers;
+		k.rd = k.ptop;
 		k.yd = k.tiers;
-		k.pw = k.half >= 13 ? 4 : k.half >= 9 ? 3 : 2;
-		int l = (int) Math.round((k.rt + 0.8) / Math.sqrt(2));
-		l = Math.min(l, k.half - k.pw - 1);
-		k.lamp = l * Math.sqrt(2) > k.rt + 0.1 ? l : 0;
-		int lg = Math.min(4, Math.max(k.rd >= 5 ? 2 : 1, (k.rd + 1) / 3));
+		int lg = Math.min(4, Math.max(k.rd >= 5 ? 2 : 1, (k.rd + 2) / 3));
 		lg = Math.min(lg, k.rd - 1);
 		while (lg > 1 && k.yd + 2 * lg + 4 > p.h() - 1) {
 			lg--;
@@ -157,16 +155,16 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 		}
 		switch (gk) {
 			case 0 -> {
-				k.gStair = Blocks.CUT_COPPER_STAIRS.waxed().unaffected();
-				k.gBlock = Blocks.CUT_COPPER.waxed().unaffected();
+				k.gStair = Blocks.QUARTZ_STAIRS;
+				k.gBlock = Blocks.SMOOTH_QUARTZ;
 			}
 			case 1 -> {
-				k.gStair = Blocks.POLISHED_BLACKSTONE_BRICK_STAIRS;
-				k.gBlock = Blocks.POLISHED_BLACKSTONE_BRICKS;
+				k.gStair = Blocks.POLISHED_DIORITE_STAIRS;
+				k.gBlock = Blocks.POLISHED_DIORITE;
 			}
 			default -> {
-				k.gStair = Blocks.SMOOTH_RED_SANDSTONE_STAIRS;
-				k.gBlock = Blocks.SMOOTH_RED_SANDSTONE;
+				k.gStair = Blocks.SMOOTH_SANDSTONE_STAIRS;
+				k.gBlock = Blocks.SMOOTH_SANDSTONE;
 			}
 		}
 		k.markT = k.gold ? Blocks.GOLD_BLOCK : Blocks.POLISHED_DEEPSLATE;
@@ -258,7 +256,7 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 					double perp = Math.abs(du * ov - dv * ou);
 					boolean card = h % 3 == 0;
 					boolean num = card && hasNum[h / 3];
-					double wide = card && !num ? 0.95 : 0.55;
+					double wide = 0.55;
 					if (perp >= wide) {
 						continue;
 					}
@@ -269,7 +267,7 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 					if (num) {
 						continue;
 					}
-					if (k.rd >= 6 ? t >= k.rd - (card ? 3.5 : 2.5) : card && t >= k.rd - 2.2) {
+					if (t >= k.rd - (card ? 2.9 : 1.9)) {
 						k.mark[u][v] = 1;
 						break;
 					}
@@ -288,13 +286,13 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 			for (int u = 0; u < k.w; u++) {
 				int dx = u - k.cu;
 				int dz = v - k.cv;
-				double r = Math.hypot(dx, dz);
-				if (r <= k.rd) {
-					plate(c, p, k, u, v, dx, dz, r);
-				} else if (r <= k.rt) {
-					step(c, p, k, u, v, dx, dz, r);
+				int m = Math.max(Math.abs(dx), Math.abs(dz));
+				if (m <= k.ptop) {
+					top(c, p, k, u, v, dx, dz);
+				} else if (m <= k.pl) {
+					step(c, p, k, u, v, dx, dz, m);
 				} else {
-					podium(c, p, k, u, v, dx, dz, r);
+					podium(c, p, k, u, v, dx, dz, m);
 				}
 			}
 		}
@@ -308,34 +306,51 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 		}
 	}
 
-	private void plate(CitadelCanvas c, Plot p, Cfg k, int u, int v, int dx, int dz, double r) {
+	/** The top square: a round pale dial with a grey bezel in dark corners; a lamp post on each corner. */
+	private void top(CitadelCanvas c, Plot p, Cfg k, int u, int v, int dx, int dz) {
 		int y = k.yd;
 		core(c, p, u, v, y);
+		double r = Math.hypot(dx, dz);
 		int m = k.mark[u][v];
 		BlockState st;
-		if (m == 2) {
+		if (r > k.rd + 0.5) {
+			// [palette] dark corners round the pale disc, so the dial reads as a circle
+			st = p.hash(u, y, v, 4) == 0 ? b(Blocks.DEEPSLATE_TILES) : b(Blocks.POLISHED_DEEPSLATE);
+		} else if (m == 2) {
 			st = b(k.numM);
 		} else if (m == 1) {
 			st = b(k.markT);
 		} else if (m == 3) {
 			st = k.gold ? b(Blocks.GOLD_BLOCK) : b(k.dial);
 		} else if (r > k.rd - 1.0) {
-			// [palette] a dark bezel round the pale dial
-			st = p.hash(u, y, v, 4) == 0 ? b(Blocks.DEEPSLATE_TILES) : b(Blocks.POLISHED_DEEPSLATE);
+			st = b(Blocks.POLISHED_ANDESITE);
 		} else if (Math.abs(dx) <= 1 && Math.abs(dz) <= 1) {
 			st = b(Blocks.POLISHED_DEEPSLATE);
 		} else {
-			st = p.hash(u, y, v, 7) == 0 ? b(k.dial2) : b(k.dial);
+			st = p.hash(u, y, v, 9) == 0 ? b(k.dial2) : b(k.dial);
 		}
 		s(c, p, u, y, v, st);
+		if (Math.abs(dx) == k.ptop && Math.abs(dz) == k.ptop && k.ptop >= 3 && r > k.rd + 0.9) {
+			// a lamp post on each corner of the top: polished base, two wall posts, a lantern
+			s(c, p, u, y + 1, v, b(Blocks.POLISHED_DEEPSLATE));
+			s(c, p, u, y + 2, v, b(Blocks.POLISHED_DEEPSLATE_WALL));
+			s(c, p, u, y + 3, v, b(Blocks.POLISHED_DEEPSLATE_WALL));
+			s(c, p, u, y + 4, v, b(Blocks.LANTERN));
+		}
 	}
 
-	/** A ring of the platform: stairs that rise towards the dial, light on the four axes. */
-	private void step(CitadelCanvas c, Plot p, Cfg k, int u, int v, int dx, int dz, double r) {
-		int st = Math.max(1, Math.min(k.tiers, (int) Math.ceil(r - k.rd)));
+	/** A square ring of the platform: stairs that rise towards the dial, light on the four axes, blocks on the corners. */
+	private void step(CitadelCanvas c, Plot p, Cfg k, int u, int v, int dx, int dz, int m) {
+		int st = m - k.ptop; // 1 = next to the dial
 		int y = k.yd - st + 1;
 		core(c, p, u, v, y);
-		boolean axis = Math.abs(dx) <= 1 || Math.abs(dz) <= 1;
+		int a = Math.abs(dx);
+		int bb = Math.abs(dz);
+		if (a == bb) {
+			s(c, p, u, y, v, b(Blocks.STONE_BRICKS));
+			return;
+		}
+		boolean axis = a <= 1 || bb <= 1;
 		Block sb;
 		if (axis) {
 			sb = Blocks.SMOOTH_QUARTZ_STAIRS;
@@ -344,10 +359,11 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 		} else {
 			sb = Blocks.POLISHED_ANDESITE_STAIRS;
 		}
-		s(c, p, u, y, v, stairs(sb, out(dx, dz).getOpposite()));
+		Direction in = a > bb ? (dx > 0 ? Direction.WEST : Direction.EAST) : (dz > 0 ? Direction.NORTH : Direction.SOUTH);
+		s(c, p, u, y, v, stairs(sb, in));
 	}
 
-	private void podium(CitadelCanvas c, Plot p, Cfg k, int u, int v, int dx, int dz, double r) {
+	private void podium(CitadelCanvas c, Plot p, Cfg k, int u, int v, int dx, int dz, int m) {
 		int eu = Math.min(u, k.w - 1 - u);
 		int ev = Math.min(v, k.d - 1 - v);
 		int e = Math.min(eu, ev);
@@ -365,15 +381,7 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 			bed(c, p, k, u, v, eu, ev);
 			return;
 		}
-		paving(c, p, k, u, v, a, bb, e, r);
-		if (k.lamp > 0 && a == k.lamp && bb == k.lamp) {
-			// a lamp post on each diagonal: polished base, two wall posts, a lantern
-			s(c, p, u, 1, v, b(Blocks.POLISHED_DEEPSLATE));
-			s(c, p, u, 2, v, b(Blocks.POLISHED_DEEPSLATE_WALL));
-			s(c, p, u, 3, v, b(Blocks.POLISHED_DEEPSLATE_WALL));
-			s(c, p, u, 4, v, b(Blocks.LANTERN));
-			return;
-		}
+		paving(c, p, k, u, v, a, bb, m);
 		int lim = k.half - k.pw - 1;
 		int row = k.half - 1;
 		if ((a == row && bb >= 2 && bb <= lim) || (bb == row && a >= 2 && a <= lim)) {
@@ -382,22 +390,20 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 		}
 	}
 
-	/** Pavement in rings round the dial, a light cross on the axes and a dark frame. */
-	private void paving(CitadelCanvas c, Plot p, Cfg k, int u, int v, int a, int bb, int e, double r) {
+	/** Pavement in square rings round the platform and a light cross on the axes. */
+	private void paving(CitadelCanvas c, Plot p, Cfg k, int u, int v, int a, int bb, int m) {
 		BlockState st;
 		if (a <= 1 || bb <= 1) {
 			st = Math.min(a, bb) == 0 ? b(Blocks.SMOOTH_STONE) : b(Blocks.POLISHED_DIORITE);
-		} else if (e == 1) {
-			st = p.hash(u, 0, v, 5) == 0 ? b(Blocks.CRACKED_DEEPSLATE_TILES) : b(Blocks.DEEPSLATE_TILES);
 		} else {
-			int band = (int) Math.floor(r - k.rt - 0.0001) % 3;
+			int band = (m - k.pl - 1) % 3;
 			int h = p.hash(u, 0, v, 8);
 			if (band == 0) {
 				st = b(Blocks.POLISHED_ANDESITE);
 			} else if (band == 1) {
-				st = h == 0 ? b(Blocks.CALCITE) : b(Blocks.POLISHED_DIORITE);
-			} else {
 				st = h == 0 ? b(Blocks.CRACKED_STONE_BRICKS) : h == 1 ? b(Blocks.MOSSY_STONE_BRICKS) : b(Blocks.STONE_BRICKS);
+			} else {
+				st = h == 0 ? b(Blocks.CALCITE) : b(Blocks.POLISHED_DIORITE);
 			}
 		}
 		s(c, p, u, 0, v, st);
@@ -405,7 +411,7 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 
 	/** A corner flower bed: brick rim on the plaza side, grass, azalea and flowers. */
 	private void bed(CitadelCanvas c, Plot p, Cfg k, int u, int v, int eu, int ev) {
-		if (eu == k.pw || ev == k.pw) {
+		if (k.pw > 1 && (eu == k.pw || ev == k.pw)) {
 			s(c, p, u, 0, v, p.hash(u, 0, v, 4) == 0 ? b(Blocks.MOSSY_STONE_BRICKS) : b(Blocks.STONE_BRICKS));
 			s(c, p, u, 1, v, slab(Blocks.STONE_BRICK_SLAB));
 			return;
