@@ -34,24 +34,24 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
  *  y0  ▒▒▒▓▓≈▓▓▒▒▒  kerb, water, paving               . . . ▒ . . .   (approach, 3 wide)
  * </pre>
  *
- * Roof, timber and stone sets come from the seed. Size: 3–8 × 3–8 × 8+ (the core stays 3 × 3, or 4 × 4
- * on even plots of 8 and up; the rest of the plot becomes paving and furniture).
+ * Roof, timber and stone sets come from the seed. Size: 3–8 × 3–8 × 9+ (the core is 3 × 3, or 4 × 4
+ * from 7 × 7 up; the rest of the plot becomes paving and furniture).
  */
 public final class WellRoofedStone implements Variant {
 	/** The roof's lowest row (the eaves). */
-	private static final int ROOF = 5;
+	private static final int ROOF = 6;
 	/** The crossbars and the axle: the layer right under the roof. */
 	private static final int BAR = ROOF - 1;
 
 	/** A roof set: slope stairs, ridge block, trim stairs (eave row and gable edge), and the timber that goes with it. */
-	private record RoofSet(Block stairs, Block ridge, Block eave, Block planks, Block log, Block stripped) {
+	private record RoofSet(Block stairs, Block ridge, Block eave, Block planks, Block log, Block stripped, Block fence) {
 	}
 
 	private static final RoofSet[] ROOFS = {
-		new RoofSet(Blocks.DEEPSLATE_TILE_STAIRS, Blocks.DEEPSLATE_TILES, Blocks.CHERRY_STAIRS, Blocks.CHERRY_PLANKS, Blocks.CHERRY_LOG, Blocks.STRIPPED_CHERRY_LOG),
-		new RoofSet(Blocks.CHERRY_STAIRS, Blocks.CHERRY_PLANKS, Blocks.DARK_OAK_STAIRS, Blocks.DARK_OAK_PLANKS, Blocks.DARK_OAK_LOG, Blocks.STRIPPED_DARK_OAK_LOG),
-		new RoofSet(Blocks.SPRUCE_STAIRS, Blocks.SPRUCE_PLANKS, Blocks.DARK_OAK_STAIRS, Blocks.DARK_OAK_PLANKS, Blocks.DARK_OAK_LOG, Blocks.STRIPPED_DARK_OAK_LOG),
-		new RoofSet(Blocks.MUD_BRICK_STAIRS, Blocks.MUD_BRICKS, Blocks.SPRUCE_STAIRS, Blocks.SPRUCE_PLANKS, Blocks.SPRUCE_LOG, Blocks.STRIPPED_SPRUCE_LOG),
+		new RoofSet(Blocks.DEEPSLATE_TILE_STAIRS, Blocks.DEEPSLATE_TILES, Blocks.CHERRY_STAIRS, Blocks.CHERRY_PLANKS, Blocks.CHERRY_LOG, Blocks.STRIPPED_CHERRY_LOG, Blocks.CHERRY_FENCE),
+		new RoofSet(Blocks.CHERRY_STAIRS, Blocks.CHERRY_PLANKS, Blocks.DARK_OAK_STAIRS, Blocks.DARK_OAK_PLANKS, Blocks.DARK_OAK_LOG, Blocks.STRIPPED_DARK_OAK_LOG, Blocks.DARK_OAK_FENCE),
+		new RoofSet(Blocks.SPRUCE_STAIRS, Blocks.SPRUCE_PLANKS, Blocks.DARK_OAK_STAIRS, Blocks.DARK_OAK_PLANKS, Blocks.DARK_OAK_LOG, Blocks.STRIPPED_DARK_OAK_LOG, Blocks.DARK_OAK_FENCE),
+		new RoofSet(Blocks.MUD_BRICK_STAIRS, Blocks.MUD_BRICKS, Blocks.SPRUCE_STAIRS, Blocks.SPRUCE_PLANKS, Blocks.SPRUCE_LOG, Blocks.STRIPPED_SPRUCE_LOG, Blocks.SPRUCE_FENCE),
 	};
 
 	/** A stone set: three kerb tones (main, second, third), the chiseled corner, the step stair and three paving slabs. */
@@ -72,7 +72,7 @@ public final class WellRoofedStone implements Variant {
 		static Geo of(Plot p) {
 			int w = p.w();
 			int d = p.d();
-			int cs = w % 2 == 0 && d % 2 == 0 && w >= 8 && d >= 8 ? 4 : 3;
+			int cs = Math.min(w, d) >= 7 ? 4 : 3;
 			int uL = (w - cs) / 2;
 			int uR = uL + cs - 1;
 			int v0 = (d - cs) / 2;
@@ -119,7 +119,7 @@ public final class WellRoofedStone implements Variant {
 
 	@Override
 	public int minH() {
-		return 8;
+		return 9;
 	}
 
 	@Override
@@ -182,14 +182,16 @@ public final class WellRoofedStone implements Variant {
 			// [depth] corner pedestals; a lantern on a short chain hangs from the crossbar end over each of them
 			for (int v : new int[] {g.v0(), g.v1()}) {
 				p.set(c, u, 1, v, b(st.chiseled()));
-				p.put(c, u, BAR - 1, v, b(Blocks.IRON_CHAIN).setValue(BlockStateProperties.AXIS, Direction.Axis.Y), CitadelCanvas.HANGING);
-				p.put(c, u, BAR - 2, v, lantern, CitadelCanvas.HANGING);
+				for (int y = BAR - 1; y >= 3; y--) {
+					p.put(c, u, y, v, b(Blocks.IRON_CHAIN).setValue(BlockStateProperties.AXIS, Direction.Axis.Y), CitadelCanvas.HANGING);
+				}
+				p.put(c, u, 2, v, lantern, CitadelCanvas.HANGING);
 			}
-			// the posts stand on stone bases (the log's bark against the stripped crossbar)
+			// the fence posts stand on stone bases under the crossbar
 			for (int v : postV) {
 				p.set(c, u, 1, v, b(st.a()));
 				for (int y = 2; y < BAR; y++) {
-					p.set(c, u, y, v, log(roof.log(), Direction.Axis.Y));
+					p.set(c, u, y, v, b(roof.fence()));
 				}
 			}
 			// the crossbar over the end of the shaft carries the roof and holds the axle
@@ -207,10 +209,10 @@ public final class WellRoofedStone implements Variant {
 				.setValue(BlockStateProperties.ATTACH_FACE, AttachFace.WALL)
 				.setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH), CitadelCanvas.DECOR);
 		// the bucket (a water cauldron) hangs on an iron chain from the axle, just over the water
-		for (int y = BAR - 1; y >= 2; y--) {
+		for (int y = BAR - 1; y >= 3; y--) {
 			p.put(c, cu, y, va, b(Blocks.IRON_CHAIN).setValue(BlockStateProperties.AXIS, Direction.Axis.Y), CitadelCanvas.HANGING);
 		}
-		p.put(c, cu, 1, va, b(Blocks.WATER_CAULDRON).setValue(BlockStateProperties.LEVEL_CAULDRON, 3), CitadelCanvas.HANGING);
+		p.put(c, cu, 2, va, b(Blocks.WATER_CAULDRON).setValue(BlockStateProperties.LEVEL_CAULDRON, 3), CitadelCanvas.HANGING);
 	}
 
 	// ------------------------------------------------------------------ roof (y4+)
@@ -235,12 +237,11 @@ public final class WellRoofedStone implements Variant {
 			boolean ridgeBlock = cols % 2 == 1 && r == cols / 2;
 			boolean leftSide = r < cols - 1 - r; // rises towards +u
 			for (int v = rv0; v <= rv1; v++) {
-				boolean end = v == rv0 || v == rv1;
 				BlockState st;
 				if (ridgeBlock) {
-					st = end ? planks : b(roof.ridge());
+					st = b(roof.ridge());
 				} else {
-					st = stairs(t == 0 || end ? roof.eave() : roof.stairs(), leftSide ? Direction.EAST : Direction.WEST);
+					st = stairs(t == 0 ? roof.eave() : roof.stairs(), leftSide ? Direction.EAST : Direction.WEST);
 				}
 				p.set(c, u, y, v, st);
 				if (t >= 1) {
@@ -320,7 +321,7 @@ public final class WellRoofedStone implements Variant {
 			Direction away = benchSide < 0 ? Direction.WEST : Direction.EAST;
 			for (int v = vc - 1; v <= vc + 1; v++) {
 				if (v >= 0 && v < d) {
-					p.set(c, u, 0, v, stairs(roof.eave(), away));
+					p.set(c, u, 0, v, stairs(st.stair(), away));
 				}
 			}
 		}
@@ -332,7 +333,7 @@ public final class WellRoofedStone implements Variant {
 			if (benchBack) {
 				for (int u = uc - 1; u <= uc + 1; u++) {
 					if (u >= 0 && u < w) {
-						p.set(c, u, 0, bb, stairs(roof.eave(), Direction.SOUTH));
+						p.set(c, u, 0, bb, stairs(st.stair(), Direction.SOUTH));
 					}
 				}
 			} else if (troughBack) {
