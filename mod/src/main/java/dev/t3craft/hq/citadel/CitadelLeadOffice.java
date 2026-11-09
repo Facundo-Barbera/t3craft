@@ -103,7 +103,36 @@ public final class CitadelLeadOffice {
 		DyeColor env = HqStyle.envColor(mod);
 		ground(c, mod, r, style, mats, env);
 		upper(c, mod, r, style, mats, env);
+		flag(c, r, style, env);
 		return true;
+	}
+
+	/**
+	 * The lead's flag: a pole on the highest block of the roof over the middle of the hall, with a 2x2 pennant of
+	 * the environment's colour (concrete, so it also reads in the plan renders). The only thing that tells a lead's
+	 * hall from its neighbours at a distance. Call after the roof.
+	 */
+	private static void flag(CitadelCanvas c, Room r, HallStyle style, DyeColor env) {
+		int h = fh();
+		BlockPos at = r.cell(r.d() / 2, r.c(), 0);
+		int top = 2 * h;
+		for (int y = 3 * h + 12; y >= 2 * h; y--) {
+			BlockState s = c.at(at.getX(), y, at.getZ());
+			if (s != null && !s.isAir()) {
+				top = y;
+				break;
+			}
+		}
+		BlockState pole = b(style.fence());
+		for (int y = top + 1; y <= top + 6; y++) {
+			c.set(at.getX(), y, at.getZ(), pole);
+		}
+		BlockState cloth = b(Blocks.CONCRETE.pick(env));
+		for (int k = 1; k <= 2; k++) {
+			BlockPos p = at.relative(r.side(), k);
+			c.set(p.getX(), top + 5, p.getZ(), cloth);
+			c.set(p.getX(), top + 6, p.getZ(), cloth);
+		}
 	}
 
 	// ------------------------------------------------------------------ ground floor: the briefing room
