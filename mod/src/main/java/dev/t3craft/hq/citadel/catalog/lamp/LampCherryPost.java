@@ -34,12 +34,12 @@ import net.minecraft.world.level.block.state.properties.SlabType;
  * <p>Plots from 5 wide are a flanking pair of masts with their arms turned inwards (feet dressed with a planted pot);
  * narrower ones are a single mast with one arm or two (front and back, else left and right), by seed. Every choice is
  * a per-plot seeded stream ({@code pick}), so the three seeds of a size differ: the light (vanilla lantern, the kit's
- * paper lantern via {@link PaperLanterns} with its vanilla fallback, or a froglight box), the roof (cherry plate,
- * bamboo plate or cherry slab) and the foot (deepslate, chiseled, bricks or a lighter stone brick).
+ * paper lantern via {@link PaperLanterns} with its vanilla fallback, or a froglight box), the roof (cherry plate
+ * or slab) and the foot (deepslate, chiseled, bricks or a lighter stone brick).
  *
  * <ul>
  * <li><b>Gradient dark → light</b>: deepslate or stone foot, stone-brick wall plinth, cherry fence mast, cherry slab
- *     collars, cherry or bamboo roofs.</li>
+ *     collars, cherry roofs.</li>
  * <li><b>Depth</b>: the collar is a ring wider than the post; arms of two blocks get an upside-down stair corbel; roofs
  *     sit directly on the light; a 3 × 3 plot gets a stepped plinth round the foot.</li>
  * <li><b>Support</b>: every light hangs from a chain or fence, or stands on a fence under its roof. The arms stay
@@ -96,7 +96,7 @@ public final class LampCherryPost implements Variant {
 	public void build(CitadelCanvas c, Plot p) {
 		int hh = Math.min(p.h(), 6);
 		int kind = pick(p, 1, 3); // 0 vanilla lantern, 1 kit paper lantern, 2 froglight box
-		String tone = pick(p, 2, 2) == 0 ? "paper" : "rose";
+		String tone = "paper"; // the warm tone: the rose one read as red wool against the cherry
 		boolean two = pick(p, 3, 2) == 0;
 		boolean pair = p.w() >= 5;
 		int cv = p.d() >= 5 ? 2 : p.d() >= 2 ? 1 : 0;
@@ -222,11 +222,10 @@ public final class LampCherryPost implements Variant {
 		p.set(c, u, top, v, roof(p));
 	}
 
-	/** The roof: a thin plate that reads as a canopy, not a block. Cherry or bamboo plate, or a cherry slab, by seed. */
+	/** The roof: a thin plate that reads as a canopy, not a block. A cherry plate (two in three) or a cherry slab, by seed. */
 	private static BlockState roof(Plot p) {
 		return switch (pick(p, 4, 3)) {
-			case 0 -> b(Blocks.BAMBOO_TRAPDOOR).setValue(BlockStateProperties.HALF, Half.BOTTOM);
-			case 1 -> slab(Blocks.CHERRY_SLAB);
+			case 0 -> slab(Blocks.CHERRY_SLAB);
 			default -> b(Blocks.CHERRY_TRAPDOOR).setValue(BlockStateProperties.HALF, Half.BOTTOM); // bottom half: it sits on what is under it
 		};
 	}
