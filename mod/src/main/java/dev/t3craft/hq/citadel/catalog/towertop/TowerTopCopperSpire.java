@@ -100,7 +100,8 @@ public final class TowerTopCopperSpire implements Variant {
 	public void build(CitadelCanvas c, Plot p) {
 		int w = p.w();
 		int d = p.d();
-		int in0 = Math.min(w, d) >= 7 ? 2 : 1; // a walk between parapet and spire on big tops
+		// the spire starts one block in from the parapet: an inset of 2 on big tops left a small spire in a wide yard
+		int in0 = 1;
 
 		cornice(c, p, in0);
 		parapet(c, p);
@@ -141,14 +142,14 @@ public final class TowerTopCopperSpire implements Variant {
 		while (extra > 0 && grew) {
 			grew = false;
 			for (int i = n - 2; i >= 0 && extra > 0; i--) {
-				if (rise[i] < 3) {
+				if (rise[i] < 2) { // 2 courses (blocks, then stairs) is the steep profile; 3 made vertical walls
 					rise[i]++;
 					extra--;
 					grew = true;
 				}
 			}
 		}
-		if (extra > 0 && n >= 2 && rise[n - 1] < 2) {
+		if (extra > 0 && n >= 2 && point && rise[n - 1] < 2) { // a 2 × 2 top already gets its copper pyramid
 			rise[n - 1]++;
 		}
 
