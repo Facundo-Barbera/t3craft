@@ -99,7 +99,7 @@ public final class LampStreetBrazierTripod implements Variant {
 
 	@Override
 	public void build(CitadelCanvas c, Plot p) {
-		Look look = new Look(pick(p, 1, 3), pick(p, 2, 2) == 1, pick(p, 3, 3), pick(p, 4, 3) == 0);
+		Look look = new Look(pick(p, 1, 3), pick(p, 2, 2) == 1, new int[] {0, 0, 1, 1, 2}[pick(p, 3, 5)], pick(p, 4, 3) == 0);
 		int w = p.w();
 		int d = p.d();
 		int cv1 = (d - 1) / 2;
@@ -119,7 +119,7 @@ public final class LampStreetBrazierTripod implements Variant {
 		}
 		int cu = (w - 1) / 2;
 		int cv = cv1;
-		int r = p.h() >= 6 && Math.min(w, d) >= 7 ? 2 : 1;
+		int r = p.h() >= 6 && Math.min(w, d) >= 5 ? 2 : 1;
 		tripod(c, p, look, cu, cv, r);
 	}
 
@@ -205,7 +205,7 @@ public final class LampStreetBrazierTripod implements Variant {
 		if (r == 2) {
 			dd = 4;
 		}
-		int[][] legs = {{-r, 0, 0}, {r, 0, 1}, {0, r, 2}};
+		int[][] legs = legs(r);
 		Direction[] out = {Direction.WEST, Direction.EAST, Direction.SOUTH};
 		for (int i = 0; i < 3; i++) {
 			int lu = cu + legs[i][0];
@@ -214,8 +214,17 @@ public final class LampStreetBrazierTripod implements Variant {
 			for (int y = 1; y < dd - 1; y++) {
 				p.set(c, lu, y, lv, stem(k));
 			}
-			p.set(c, lu, dd - 1, lv, head(k, out[i]));
-			if (r == 2) { // the arm: one upside-down slab between the head and the bowl
+			if (r == 1) {
+				// a compact tripod (a triangle under the bowl): the back legs end in a cap slab under a bowl corner,
+				// the front leg in a stair that leans in
+				boolean front = legs[i][1] < 0;
+				p.set(c, lu, dd - 1, lv, front ? head(k, Direction.NORTH) : arm(k));
+				if (!front) {
+					p.set(c, lu, dd, lv, bowlSlab(k, SlabType.BOTTOM)); // sits on the cap: a low bowl corner
+				}
+			} else {
+				p.set(c, lu, dd - 1, lv, head(k, out[i]));
+				// the arm: one upside-down slab between the head and the bowl
 				p.set(c, cu + legs[i][0] / 2, dd - 1, cv + legs[i][1] / 2, arm(k));
 			}
 		}
@@ -263,8 +272,18 @@ public final class LampStreetBrazierTripod implements Variant {
 
 	// ------------------------------------------------------------------ ground
 
+	/** Leg offsets from the centre: a triangle under the bowl (r 1) or three legs splayed to the left, right and back (r 2). */
+	private static int[][] legs(int r) {
+		return r == 1 ? new int[][] {{-1, 1}, {1, 1}, {0, -1}} : new int[][] {{-r, 0}, {r, 0}, {0, r}};
+	}
+
 	private static boolean isLeg(int dx, int dz, int r) {
-		return dx == -r && dz == 0 || dx == r && dz == 0 || dx == 0 && dz == r;
+		for (int[] l : legs(r)) {
+			if (l[0] == dx && l[1] == dz) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private static int dais(Plot p, int cu, int cv, int r) {
@@ -323,6 +342,19 @@ public final class LampStreetBrazierTripod implements Variant {
 
 	private static void benches(CitadelCanvas c, Plot p, Look k, int cu, int cv, int r) {
 		int rd = dais(p, cu, cv, r);
+		if (r == 2 && rd == 2) {
+			// a 5–6 wide plot: stools between the legs (a stair each), 4 by seed
+			int set = pick(p, 5, 3);
+			int[][] seats = set == 1 ? new int[][] {{-1, 2, 0}, {1, 2, 0}, {-2, -1, 1}, {2, -1, 2}}
+					: new int[][] {{-2, -1, 1}, {-2, 1, 1}, {2, -1, 2}, {2, 1, 2}};
+			Direction[] face = {Direction.NORTH, Direction.EAST, Direction.WEST};
+			for (int[] s : seats) {
+				if (p.has(cu + s[0], 0, cv + s[1])) {
+					p.set(c, cu + s[0], 0, cv + s[1], seat(p, cu + s[0], cv + s[1], face[s[2]]));
+				}
+			}
+			return;
+		}
 		if (rd < r + 1) {
 			return; // no room for a ring of benches
 		}
