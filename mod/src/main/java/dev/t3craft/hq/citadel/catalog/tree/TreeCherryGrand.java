@@ -59,9 +59,8 @@ public final class TreeCherryGrand implements Variant {
 		return 9;
 	}
 
-	/** Stripped cherry wood (a pillar with no log ends) for the limbs: pale pink that reads against the dark trunk and the blossom. */
-	private static final TreeKit.Wood LIMB = new TreeKit.Wood(Blocks.STRIPPED_CHERRY_WOOD, Blocks.STRIPPED_CHERRY_WOOD,
-			TreeKit.CHERRY.rootTip());
+	/** Dark cherry wood for the limbs too: they read against the pink blossom and the sky in the iso view. */
+	private static final TreeKit.Wood LIMB = TreeKit.CHERRY;
 
 	/**
 	 * The lowest y a leaf or a limb may occupy. The trunk's shoulder is only the root level (three cells at y = 0, feet at
@@ -81,16 +80,18 @@ public final class TreeCherryGrand implements Variant {
 		boolean big = mn >= 10;
 
 		int cy = CLEAR + 1; // the dome's centre layer
-		int nUp = Math.min(p.h() - 1 - cy, 3 + (mn >= 9 ? 1 : 0));
+		int nUp = Math.min(p.h() - 1 - cy, mn >= 9 ? 3 : 2); // a wide, flat dome: a few layers on a big spread
 		double ryUp = nUp + 0.6 + r.nextDouble() * 0.3;
 		int ou = r.nextInt(2);
 		int ov = r.nextInt(2);
-		int bu = TreeKit.base(p.w(), ou);
-		int bv = TreeKit.base(p.d(), ov);
 		double lean = r.nextDouble() * Math.PI * 2;
-		double amp = 0.5 + r.nextDouble() * 0.9;
-		int[][] lead = TreeKit.trunk(t, TreeKit.CHERRY, bu, bv, 0, Math.min(cy + 1, p.h() - 1), ou, ov,
-				Math.cos(lean) * amp, Math.sin(lean) * amp);
+		double amp = 0.4 + r.nextDouble() * 1.0;
+		double lu = Math.cos(lean) * amp;
+		double lv = Math.sin(lean) * amp;
+		// the base shifts against the lean, so the crown's centre stays in the middle of the plot
+		int bu = TreeKit.clamp(TreeKit.base(p.w(), ou) - (int) Math.round(lu), 0, p.w() - 2);
+		int bv = TreeKit.clamp(TreeKit.base(p.d(), ov) - (int) Math.round(lv), 0, p.d() - 2);
+		int[][] lead = TreeKit.trunk(t, TreeKit.CHERRY, bu, bv, 0, Math.min(cy + 1, p.h() - 1), ou, ov, lu, lv);
 
 		// ---- roots: 4–5, short; one or two reach further
 		roots(t, bu, bv, 4 + r.nextInt(2), big ? 4 : 3);
@@ -102,12 +103,12 @@ public final class TreeCherryGrand implements Variant {
 		double phi = r.nextDouble() * Math.PI * 2;
 		double lobeAmp = 0.17 + r.nextDouble() * 0.08;
 		double rRoom = Math.min(Math.min(cu - wu0, wu1 - cu), Math.min(cv - wv0, wv1 - cv)) + 0.9;
-		double rWant = Math.min(mn * 0.5 - 0.2, 7.2);
+		double rWant = Math.min(mn * 0.5 - 0.6, 7.2);
 		double rBase = Math.min(rWant, rRoom / (1 + lobeAmp + 0.04));
 		rBase = Math.max(rBase, 2.3);
-		double ryDown = 1.7;
+		double ryDown = 1.9;
 		// sky windows: a few vertical slits right through the shell
-		int nHoles = big ? 4 : 2 + r.nextInt(2);
+		int nHoles = big ? 3 : 1 + r.nextInt(2);
 		double[][] holes = new double[nHoles][2];
 		for (int i = 0; i < nHoles; i++) {
 			double a = phi + (i + 0.3 + r.nextDouble() * 0.4) / nHoles * Math.PI * 2 + 0.5;
@@ -136,7 +137,7 @@ public final class TreeCherryGrand implements Variant {
 					if (q > rem * (1.0 + jit)) {
 						continue;
 					}
-					if (q > 0.5 * rem && t.hash(u + 5, y + 11, v, 9) < 2) {
+					if (q > 0.55 * rem && t.hash(u + 5, y + 11, v, 12) < 2) {
 						continue; // an eroded shell, not a smooth skin
 					}
 					if (y == CLEAR && t.hash(u, y + 3, v + 7, 10) < 3) {
@@ -176,9 +177,9 @@ public final class TreeCherryGrand implements Variant {
 
 		// ---- side limbs: 2–3 come out of the flank of the dome by at least two cells, ending in a tuft of blossom
 		int side = 2 + (r.nextInt(3) == 0 ? 1 : 0);
-		double s0 = phi + r.nextDouble() * Math.PI;
-		for (int i = 0; i < side; i++) {
-			double ang = s0 + i * Math.PI * 2 / side + (r.nextDouble() - 0.5) * 0.6;
+		int d0 = r.nextInt(4);
+		for (int i = 0; i < side; i++) { // along the diagonals: that is where the plot has the most room beyond the crown
+			double ang = Math.PI / 4 + ((d0 + i * (side == 2 ? 2 : 1)) % 4) * Math.PI / 2 + (r.nextDouble() - 0.5) * 0.3;
 			double ex = Math.cos(ang);
 			double ez = Math.sin(ang);
 			int sy = CLEAR;
