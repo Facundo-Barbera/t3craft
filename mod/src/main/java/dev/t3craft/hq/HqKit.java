@@ -47,7 +47,9 @@ public interface HqKit {
 		/** Garden: potted cherry. */
 		GARDEN_PLANTER,
 		/** Garden: stone lantern (emits light). */
-		GARDEN_LANTERN;
+		GARDEN_LANTERN,
+		/** Console terminal (kit/console-terminal): opens the T3 composer, or the chat of its bound thread. Oriented: front. Vanilla: lectern. */
+		CONSOLE;
 
 		public String id() {
 			return name().toLowerCase(Locale.ROOT);
@@ -55,7 +57,7 @@ public interface HqKit {
 
 		/** Whether {@link #state(Role, Direction)} looks at {@code facing}. */
 		public boolean oriented() {
-			return this == DESK || this == BEAM || this == PLAQUE || this == RAILING;
+			return this == DESK || this == BEAM || this == PLAQUE || this == RAILING || this == CONSOLE;
 		}
 	}
 
@@ -134,6 +136,11 @@ public interface HqKit {
 
 	default BlockState gardenLantern() {
 		return state(Role.GARDEN_LANTERN);
+	}
+
+	/** The console terminal, front (keyboard side, where the player stands) towards {@code front}. */
+	default BlockState console(Direction front) {
+		return state(Role.CONSOLE, front);
 	}
 
 	/** {@link #id()} of the active kit, {@code "vanilla"} for {@link #VANILLA}. */

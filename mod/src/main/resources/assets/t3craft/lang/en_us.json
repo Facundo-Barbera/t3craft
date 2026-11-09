@@ -240,6 +240,7 @@
 	"t3craft.archive.hint.command": "%s or the portable (no blocks module)",
 	"t3craft.archive.portable": "Archive",
 	"block.t3craft.archive_terminal": "Archive Terminal",
+	"block.t3craft.console_terminal": "Console Terminal",
 	"t3craft.hq.layout.classic.name": "Classic",
 	"t3craft.hq.layout.classic.desc": "Hub, central spine and one wing per project (the original HQ).",
 	"t3craft.hq.layout.campus.name": "Campus",

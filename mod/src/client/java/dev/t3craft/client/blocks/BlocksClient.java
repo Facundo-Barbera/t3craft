@@ -15,6 +15,7 @@ import dev.t3craft.blocks.LampApplier;
 import dev.t3craft.blocks.LampStatus;
 import dev.t3craft.blocks.LiveLamps;
 import dev.t3craft.blocks.ArchiveTerminalBlock;
+import dev.t3craft.blocks.ConsoleTerminalBlock;
 import dev.t3craft.blocks.MonitorBlock;
 import dev.t3craft.blocks.MonitorBlockEntity;
 import dev.t3craft.blocks.ScreenRect;
@@ -190,6 +191,7 @@ public final class BlocksClient implements ClientModInitializer {
 		MonitorBlock.setClientUse(this::use);
 		setScreenExtents(BlocksClient::connectedExtent);
 		ArchiveTerminalBlock.setClientUse(pos -> dev.t3craft.client.archive.ArchiveClient.openIfReady());
+		ConsoleTerminalBlock.setClientUse(this::useConsole);
 		ClientTickEvents.END_CLIENT_TICK.register(GuardedEvents.endClientTick(MODULE, this::tick));
 		ClientBlockEntityEvents.BLOCK_ENTITY_LOAD.register((be, level) -> liveLog.onLoad(be));
 		ClientBlockEntityEvents.BLOCK_ENTITY_UNLOAD.register((be, level) -> liveLog.onUnload(be));
@@ -447,6 +449,20 @@ public final class BlocksClient implements ClientModInitializer {
 			return false;
 		}
 		openThread(b.value());
+		return true;
+	}
+
+	/**
+	 * The console terminal (kit/console-terminal): bound to a thread ({@code thread:<key>}, directly or through the
+	 * position fallback) it opens that thread's chat; otherwise it opens T3's composer on a new thread draft (the
+	 * project and environment are the screen's defaults).
+	 */
+	private boolean useConsole(BlockPos pos, String own) {
+		Binding b = resolve(pos, own);
+		if (b.kind() == Binding.Kind.THREAD && openThread(b.value())) {
+			return true;
+		}
+		Minecraft.getInstance().gui.setScreen(ChatScreens.create(null).withDraft(null, null));
 		return true;
 	}
 

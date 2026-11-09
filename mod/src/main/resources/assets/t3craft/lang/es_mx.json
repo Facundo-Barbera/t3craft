@@ -240,6 +240,7 @@
 	"t3craft.archive.hint.command": "%s o el portátil (sin módulo de bloques)",
 	"t3craft.archive.portable": "Archivo",
 	"block.t3craft.archive_terminal": "Terminal de archivo",
+	"block.t3craft.console_terminal": "Terminal de consola",
 	"t3craft.hq.layout.classic.name": "Clásico",
 	"t3craft.hq.layout.classic.desc": "Vestíbulo, espina central y un ala por proyecto (el HQ original).",
 	"t3craft.hq.layout.campus.name": "Campus",

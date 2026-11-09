@@ -52,7 +52,15 @@ public final class T3Blocks {
 			BlockEntityType<ThreadBoardBlockEntity> threadBoardType,
 			KitBlocks kit,
 			ArchiveTerminalBlock archiveTerminalBlock,
-			BlockEntityType<ArchiveTerminalBlockEntity> archiveTerminalType) implements HqBlockFixtures.States {
+			BlockEntityType<ArchiveTerminalBlockEntity> archiveTerminalType,
+			// kit/console-terminal
+			ConsoleTerminalBlock consoleTerminalBlock,
+			BlockEntityType<ConsoleTerminalBlockEntity> consoleTerminalType) implements HqBlockFixtures.States {
+		@Override
+		public BlockState consoleTerminal(Direction facing) {
+			return consoleTerminalBlock.defaultBlockState().setValue(ConsoleTerminalBlock.FACING, facing);
+		}
+
 		@Override
 		public BlockState monitor(Direction facing) {
 			return monitorBlock.defaultBlockState().setValue(MonitorBlock.FACING, facing);
@@ -152,6 +160,14 @@ public final class T3Blocks {
 						.lightLevel(s -> 5));
 		Map<String, Block> kitBlocks = KitBlocks.register((name, factory, props) -> block(r, name, factory, props),
 				() -> lampType[0], () -> plaqueType[0]);
+		// kit/console-terminal: its own block + block entity (bound like a monitor); the kit plays it as Role.CONSOLE
+		@SuppressWarnings("unchecked")
+		BlockEntityType<ConsoleTerminalBlockEntity>[] consoleType = new BlockEntityType[1];
+		ConsoleTerminalBlock console = (ConsoleTerminalBlock) block(r, "console_terminal", p -> new ConsoleTerminalBlock(p, () -> consoleType[0]),
+				BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GRAY).strength(1.5f).sound(SoundType.METAL).noOcclusion()
+						.lightLevel(s -> 6));
+		Map<String, Block> kitWithConsole = new java.util.LinkedHashMap<>(kitBlocks);
+		kitWithConsole.put("console_terminal", console);
 
 		monitorType[0] = r.blockEntity(id("monitor"), new BlockEntityType<>(
 				(pos, state) -> new MonitorBlockEntity(monitorType[0], pos, state), Set.of(monitor)));
@@ -163,7 +179,9 @@ public final class T3Blocks {
 				(pos, state) -> new ThreadBoardBlockEntity(wallType[0], pos, state), Set.of(wall)));
 		terminalType[0] = r.blockEntity(id("archive_terminal"), new BlockEntityType<>(
 				(pos, state) -> new ArchiveTerminalBlockEntity(terminalType[0], pos, state), Set.of(terminal)));
-		KitBlocks kit = KitBlocks.of(kitBlocks, plaqueType[0]);
+		consoleType[0] = r.blockEntity(id("console_terminal"), new BlockEntityType<>(
+				(pos, state) -> new ConsoleTerminalBlockEntity(consoleType[0], pos, state), Set.of(console)));
+		KitBlocks kit = KitBlocks.of(kitWithConsole, plaqueType[0]);
 
 		List<Item> items = new ArrayList<>(List.of(item(r, "monitor", monitor), item(r, "status_lamp", lamp), item(r, "board_lamp", board),
 				item(r, "archive_terminal", terminal),
@@ -171,14 +189,16 @@ public final class T3Blocks {
 		for (String name : KitBlocks.IDS) {
 			items.add(item(r, name, kit.block(name)));
 		}
+		items.add(item(r, "console_terminal", console));
 		items = List.copyOf(items);
 		r.creativeTab(items);
 
-		Content c = new Content(monitor, lamp, board, wall, items, monitorType[0], lampType[0], wallType[0], kit, terminal, terminalType[0]);
+		Content c = new Content(monitor, lamp, board, wall, items, monitorType[0], lampType[0], wallType[0], kit, terminal, terminalType[0],
+				console, consoleType[0]);
 		HqFixtures.use(new HqBlockFixtures(c));
 		HqKit.use(kit);
 		content = c;
-		T3Craft.LOGGER.info("T3Craft blocks module on ({}): monitor, status_lamp, board_lamp, archive_terminal, thread_board + HQ kit ({} blocks)", sw.reason(),
+		T3Craft.LOGGER.info("T3Craft blocks module on ({}): monitor, status_lamp, board_lamp, archive_terminal, console_terminal, thread_board + HQ kit ({} blocks)", sw.reason(),
 				KitBlocks.IDS.size());
 		return c;
 	}
