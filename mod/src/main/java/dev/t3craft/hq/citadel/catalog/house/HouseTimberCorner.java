@@ -282,8 +282,8 @@ public final class HouseTimberCorner implements Variant {
 	// ------------------------------------------------------------------ roofs
 
 	private static void roofs(CitadelCanvas c, Plot p, Geo g, Scheme s) {
-		Block ridge = Blocks.DEEPSLATE_BRICKS;
-		Block cap = Blocks.DEEPSLATE_BRICK_SLAB;
+		Block ridge = Blocks.DARK_OAK_PLANKS;
+		Block cap = Blocks.DARK_OAK_SLAB;
 		gable(c, p, true, 6, g.w() - 1, 1, 7, PLATE, s.roof(), s.eave(), ridge, cap, false, true);
 		gable(c, p, false, 7, g.d() - 1, 0, 6, PLATE, s.roof(), s.eave(), ridge, cap, false, true);
 		// the valley where the two wings meet
@@ -506,6 +506,10 @@ public final class HouseTimberCorner implements Variant {
 		p.set(c, w - 3, 1, d - 2, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
 		p.set(c, w - 2, 2, d - 2, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
 		p.set(c, w - 2, 1, d - 3, b(Blocks.COMPOSTER));
+		// a roofed well as the focal point of the garden (only where the plot is deep enough to leave the path free)
+		if (d >= 14) {
+			StoneKit.well(c, p, 8, 7);
+		}
 	}
 
 	/** Bushes and pots on the footing round the street fronts and the back of the side wing. */

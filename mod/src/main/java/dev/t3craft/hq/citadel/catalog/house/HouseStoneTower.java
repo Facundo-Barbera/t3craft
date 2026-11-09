@@ -299,7 +299,7 @@ public final class HouseStoneTower implements Variant {
 	private static void chimney(CitadelCanvas c, Plot p, int u1, int v0, int v1) {
 		int cv = (v0 + v1) / 2;
 		int cu = u1 + 1;
-		int top = Math.min(ridgeY(p.d()) + 4, p.h() - 2);
+		int top = Math.min(ridgeY(p.d()) + 2, p.h() - 2);
 		for (int y = 0; y <= PLATE - 2; y++) {
 			for (int v = cv; v <= cv + 1; v++) {
 				BlockState s = y <= 2 ? deep(p, cu, y, v) : y <= 4 ? mid(p, cu, y, v) : light(p, cu, y, v);
@@ -398,7 +398,7 @@ public final class HouseStoneTower implements Variant {
 		StoneKit.discLayer(c, p, TC, TC, 12, R_CROWN, Blocks.DEEPSLATE_BRICK_STAIRS, b(Blocks.DEEPSLATE_BRICKS), true);
 		int[] radii = {8, 5, 2, 1};
 		for (int i = 0; i < radii.length; i++) {
-			StoneKit.discLayer(c, p, TC, TC, 13 + i, radii[i], i == 0 ? Blocks.DARK_OAK_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS,
+			StoneKit.discLayer(c, p, TC, TC, 13 + i, radii[i], i == 0 ? Blocks.DEEPSLATE_BRICK_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS,
 					b(Blocks.DEEPSLATE_TILES), false);
 		}
 		p.set(c, TC, 17, TC, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState());

@@ -260,7 +260,9 @@ public final class HouseMachiya implements Variant {
 			p.set(c, u, BEAM1, 0, stair(Blocks.DEEPSLATE_TILE_STAIRS, Direction.SOUTH));
 			p.set(c, u, 5, 1, stair(Blocks.DEEPSLATE_TILE_STAIRS, Direction.SOUTH));
 			if (!noren && (u - u1) % 2 == 0) {
-				p.set(c, u, 3, 0, stairTop(Blocks.DARK_OAK_STAIRS, Direction.NORTH)); // [depth] rafter brackets under the lip
+				// [depth] rafter brackets under the lip: a beam tail with a stair corbel under it, like the upper eave
+				p.set(c, u, 3, 0, log(s.trim(), Direction.Axis.Z));
+				p.set(c, u, 2, 0, stairTop(Blocks.DARK_OAK_STAIRS, Direction.SOUTH));
 			}
 		}
 		// the canopy ends on the side pillars
@@ -289,7 +291,13 @@ public final class HouseMachiya implements Variant {
 				} else {
 					st = plaster(p, u, y, 2);
 				}
-				p.set(c, u, y, g.vf(), st);
+				if (isPost(u, u1, u2)) {
+					p.set(c, u, y, g.vf(), st);
+				} else {
+					// [depth] the plaster and the slatted windows sit one block behind the posts
+					p.set(c, u, y, g.vf(), CitadelCanvas.AIR);
+					p.set(c, u, y, g.vf() + 1, st);
+				}
 			}
 		}
 		// [depth] a sill and a lintel frame every window: upside-down stairs under, a beam over
@@ -459,7 +467,7 @@ public final class HouseMachiya implements Variant {
 			int y = roofY(v, g);
 			for (int u : new int[] {g.u1(), g.u2()}) {
 				for (int yy = PLATE + 1; yy <= y; yy++) {
-					p.set(c, u, yy, v, plaster(p, u, yy, v));
+					p.set(c, u, yy, v, p.hash(u, yy, v, 3) == 0 ? b(Blocks.CALCITE) : b(Blocks.TUFF_BRICKS));
 				}
 				p.set(c, u, y + 1, v, slab(Blocks.DEEPSLATE_TILE_SLAB));
 			}

@@ -190,6 +190,11 @@ public final class HouseJapaneseTeahouse implements Variant {
 
 	// ------------------------------------------------------------------ roof
 
+	/** [palette] a few brown courses in the thatch, so it weathers instead of being one saturated yellow. */
+	private static Block thatch(Plot p, Block mat, int u, int k, int v) {
+		return p.hash(u, k, v, 5) == 0 ? Blocks.SPRUCE_STAIRS : mat;
+	}
+
 	/**
 	 * [finish] a hipped bamboo roof of three stair rings, 1:1. Each ring corner is an outer-corner stair; the
 	 * four corners of the lowest ring sweep up (with an upside-down stair under them), the top is capped
@@ -215,15 +220,15 @@ public final class HouseJapaneseTeahouse implements Variant {
 					BlockState st;
 					boolean corner = (top || bot) && (left || right);
 					if (corner) {
-						st = stair(mat, cornerFacing(top, left), Half.BOTTOM, StairsShape.OUTER_LEFT);
+						st = stair(thatch(p, mat, u, k, v), cornerFacing(top, left), Half.BOTTOM, StairsShape.OUTER_LEFT);
 					} else if (top) {
-						st = stair(mat, Direction.SOUTH);
+						st = stair(thatch(p, mat, u, k, v), Direction.SOUTH);
 					} else if (bot) {
-						st = stair(mat, Direction.NORTH);
+						st = stair(thatch(p, mat, u, k, v), Direction.NORTH);
 					} else if (left) {
-						st = stair(mat, Direction.EAST);
+						st = stair(thatch(p, mat, u, k, v), Direction.EAST);
 					} else {
-						st = stair(mat, Direction.WEST);
+						st = stair(thatch(p, mat, u, k, v), Direction.WEST);
 					}
 					int cd = Math.min(u - u0, u1 - u) + Math.min(v - v0, v1 - v);
 					boolean lifted = k == 0 && cd <= 1;
@@ -256,6 +261,12 @@ public final class HouseJapaneseTeahouse implements Variant {
 		}
 		p.set(c, (u0 + u1) / 2, 8, (v0 + v1) / 2, JapaneseKit.wall(Blocks.DEEPSLATE_BRICK_WALL, true, false, false, false, false));
 		p.set(c, (u0 + u1) / 2, 9, (v0 + v1) / 2, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState());
+		// [depth] a slim post under each lifted corner, the lantern hangs beside it
+		for (int[] cc : new int[][] {{ru0, rv0}, {ru1, rv0}, {ru0, rv1}, {ru1, rv1}}) {
+			p.set(c, cc[0], 0, cc[1], stone(p, cc[0], 0, cc[1]));
+			p.set(c, cc[0], 1, cc[1], log(Blocks.DARK_OAK_LOG, Direction.Axis.Y));
+			p.set(c, cc[0], 2, cc[1], log(Blocks.DARK_OAK_LOG, Direction.Axis.Y));
+		}
 		// [finish] a lantern hanging at each lifted corner
 		for (int[] cc : new int[][] {{ru0, rv0}, {ru1, rv0}, {ru0, rv1}, {ru1, rv1}}) {
 			p.put(c, cc[0], 3, cc[1], lantern(true), CitadelCanvas.HANGING);

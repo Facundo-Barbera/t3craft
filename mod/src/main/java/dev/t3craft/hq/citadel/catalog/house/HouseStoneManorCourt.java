@@ -381,9 +381,8 @@ public final class HouseStoneManorCourt implements Variant {
 				lr.set(t, PLATE + 2, 1, lr.stairIn(Blocks.STONE_BRICK_STAIRS, true));
 			}
 			hipLayer(c, p, u0 - 1, v0 - 1, u0 + 3, v0 + 3, PLATE + 3, Blocks.CUT_COPPER_STAIRS.waxed().exposed(), b(Blocks.CUT_COPPER.waxed().exposed()));
-			hipLayer(c, p, u0, v0, u0 + 2, v0 + 2, PLATE + 4, Blocks.CUT_COPPER_STAIRS.waxed().exposed(), b(Blocks.CUT_COPPER.waxed().exposed()));
-			p.set(c, u0 + 1, PLATE + 5, v0 + 1, slab(Blocks.CUT_COPPER_SLAB.waxed().exposed()));
-			p.set(c, u0 + 1, PLATE + 6, v0 + 1, Blocks.LIGHTNING_ROD.waxed().exposed().defaultBlockState());
+			p.set(c, u0 + 1, PLATE + 4, v0 + 1, slab(Blocks.CUT_COPPER_SLAB.waxed().exposed()));
+			p.set(c, u0 + 1, PLATE + 5, v0 + 1, Blocks.LIGHTNING_ROD.waxed().exposed().defaultBlockState());
 			cornerCornice(c, p, g, u0, v0);
 		}
 	}
@@ -560,6 +559,14 @@ public final class HouseStoneManorCourt implements Variant {
 			p.set(c, cu, top + 3, v, slab(Blocks.CUT_COPPER_SLAB.waxed().exposed()));
 		}
 		p.set(c, cu, top + 4, 3, Blocks.LIGHTNING_ROD.waxed().exposed().defaultBlockState());
+		// [depth] the keep's cornice stands on corbels: beam tails and stair brackets under the front and side runs
+		for (int u : new int[] {cu - 2, cu, cu + 2}) {
+			EaveKit.corbel(c, p, u, top - 1, 0, Direction.SOUTH, Blocks.DARK_OAK_LOG, Blocks.STONE_BRICK_STAIRS);
+		}
+		for (int v : new int[] {2, 4}) {
+			EaveKit.corbel(c, p, cu - 2, top - 1, v, Direction.EAST, Blocks.DARK_OAK_LOG, Blocks.STONE_BRICK_STAIRS);
+			EaveKit.corbel(c, p, cu + 2, top - 1, v, Direction.WEST, Blocks.DARK_OAK_LOG, Blocks.STONE_BRICK_STAIRS);
+		}
 	}
 
 	// ------------------------------------------------------------------ court

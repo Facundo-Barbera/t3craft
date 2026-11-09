@@ -286,7 +286,7 @@ public final class HouseStoneWeathered implements Variant {
 				}
 				int l = lvA(u, wa);
 				int y = PLATE + l;
-				boolean eave = u == 0 || u == wa + 1;
+				boolean eave = u == 0 || u == wa + 1 || v == 1 || v == d - 1; // [depth] dark oak barge boards on the rakes
 				boolean leftHalf = u < wa + 1 - u;
 				boolean middle = u == wa + 1 - u;
 				if (middle) {
@@ -346,7 +346,7 @@ public final class HouseStoneWeathered implements Variant {
 				if (middle) {
 					p.set(c, u, y, v, b(Blocks.CHERRY_PLANKS));
 				} else {
-					p.set(c, u, y, v, stairs(eave ? Blocks.DARK_OAK_STAIRS : Blocks.CHERRY_STAIRS, front ? Direction.SOUTH : Direction.NORTH));
+					p.set(c, u, y, v, stairs(eave || u == w - 1 ? Blocks.DARK_OAK_STAIRS : Blocks.CHERRY_STAIRS, front ? Direction.SOUTH : Direction.NORTH));
 				}
 			}
 		}
@@ -391,7 +391,7 @@ public final class HouseStoneWeathered implements Variant {
 		int u = w - 4;
 		int v = vm + 2;
 		for (int y = PLATE + 2; y <= PLATE + 6; y++) {
-			p.set(c, u, y, v, p.hash(u, y, v, 3) == 0 ? b(Blocks.COBBLESTONE) : b(Blocks.STONE_BRICKS));
+			p.set(c, u, y, v, p.hash(u, y, v, 3) == 0 ? b(Blocks.DEEPSLATE_BRICKS) : b(Blocks.BRICKS));
 		}
 		p.set(c, u, PLATE + 7, v, slab(Blocks.STONE_BRICK_SLAB));
 	}

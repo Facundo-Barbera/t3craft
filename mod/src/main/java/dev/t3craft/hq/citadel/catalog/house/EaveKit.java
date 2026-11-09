@@ -4,6 +4,7 @@ import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.catalog.Plot;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.Half;
@@ -41,5 +42,19 @@ final class EaveKit {
 		}
 		tail(c, p, u, y, v, toWall, log);
 		p.set(c, u, y - 1, v, CitadelCanvas.stairs(stair, toWall).setValue(BlockStateProperties.HALF, Half.TOP));
+		// a pendant: a thin post hanging under the corbel makes the bracket two blocks long, readable from far away
+		if (free(c, p, u, y - 2, v)) {
+			p.set(c, u, y - 2, v, fenceFor(log).defaultBlockState());
+		}
+	}
+
+	private static Block fenceFor(Block log) {
+		if (log == Blocks.CHERRY_LOG) {
+			return Blocks.CHERRY_FENCE;
+		}
+		if (log == Blocks.SPRUCE_LOG) {
+			return Blocks.SPRUCE_FENCE;
+		}
+		return Blocks.DARK_OAK_FENCE;
 	}
 }

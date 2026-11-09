@@ -274,6 +274,13 @@ public final class HouseTimberCottage implements Variant {
 				p.set(c, u, 6, vj - 1, TimberKit.planter(p, u, 6, vj - 1));
 			}
 		}
+		// [finish] the back facade gets the same care as the front: sills and flowering boxes under every window
+		for (int u = u1 + 1; u < u2; u++) {
+			if (isWindow(u, u1, u2, -1)) {
+				p.set(c, u, 5, vb + 1, stairs(Blocks.SPRUCE_STAIRS, Direction.NORTH).setValue(BlockStateProperties.HALF, Half.TOP));
+				p.set(c, u, 6, vb + 1, TimberKit.planter(p, u, 6, vb + 1));
+			}
+		}
 		// [depth] a top plate: a horizontal beam over every wall at y8, under the roof
 		for (int u = u1; u <= u2; u++) {
 			p.set(c, u, PLATE, vj, beam(s, Direction.Axis.X));
@@ -310,7 +317,7 @@ public final class HouseTimberCottage implements Variant {
 				if (middle) {
 					st = b(Blocks.POLISHED_DEEPSLATE); // odd depth: a full ridge row
 				} else {
-					st = stairs(eave ? s.eave() : s.roof(), front ? Direction.SOUTH : Direction.NORTH);
+					st = stairs(eave || u == 0 || u == w - 1 ? s.eave() : s.roof(), front ? Direction.SOUTH : Direction.NORTH); // [depth] the rakes get a barge board in the eave colour
 				}
 				p.set(c, u, y, v, st);
 				// [depth] under the overhanging gable rows, an upside-down stair closes the eave
