@@ -47,7 +47,22 @@ public final class BarrioGate {
 	/** Height of the plates on the hub face. */
 	private static final int PLATE_Y = 3;
 
+	/**
+	 * The gatehouse of a barrio. From scale 2 (gate at least 15 x 10) it is the big one of {@link BarrioGateBig}
+	 * (a 5-wide arched passage, two flag towers, two guard rooms, the project's name and colours, and the gate arm);
+	 * below that, the original small one ({@link #legacy}), so scale 1 stays block by block what it was.
+	 */
 	public static void gatehouse(CitadelCanvas c, Lot l, HqLayout.Module lead, Mats mats) {
+		Room r = l.gate();
+		if (BarrioGateBig.fits(r)) {
+			BarrioGateBig.build(c, l, lead, mats);
+		} else {
+			legacy(c, l, lead, mats);
+		}
+	}
+
+	/** The original gatehouse (3-wide passage, one pyramid roof), kept for small scales. */
+	static void legacy(CitadelCanvas c, Lot l, HqLayout.Module lead, Mats mats) {
 		Room r = l.gate();
 		int W = r.w();
 		int D = r.d();
