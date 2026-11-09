@@ -57,6 +57,10 @@ Son 4 agentes Sonnet high, cada uno con un director de arte Opus. Trabajan sobre
 - `design/nature-water`: árboles, jardines y fuentes.
 - `design/street`: faroles, bancas, jardineras, postes, arcos, centros de plaza y mástiles.
 
+Estado de la ola 1:
+- houses-a, houses-b y street están integradas en `citadel/next`. Las tres agotaron su cupo de renders con varias variantes por debajo de 7, así que tienen segunda ronda (`design/houses-a2`, `design/houses-b2`, `design/street2`) con más renders: hasta 10 por familia y 12 para casas.
+- **Hueco del renderer:** hqRender dibuja los banners (`*_banner` y `*_wall_banner`) como cajas de madera. Por eso no se pueden juzgar en imagen. Pendiente: un modelo de banner en `BlockModels`.
+
 Ola 2, pendiente:
 - puestos, pozos, anexos, estatuas, gazebos, puentes y remates de torre;
 - la ciudad completa antes y después, a escala 1.0 y 1.5.
