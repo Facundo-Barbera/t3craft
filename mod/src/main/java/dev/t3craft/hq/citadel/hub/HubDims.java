@@ -80,13 +80,36 @@ final class HubDims {
 		return s(1);
 	}
 
-	/** Pews: rows at these z (7, 2 rows, step 2: they are benches and keep their count), seats at |x| from PEW_X0 (2) to PEW_X1 (4). */
+	/**
+	 * Pews: rows from this z (3; was 7), PEW_ROWS of them (4, was 2: 2 + 2 s(1)) with PEW_STEP (2) between, seats at |x|
+	 * from PEW_X0 (2) to PEW_X1 (4). The lane z = 4 between the first two rows stays free for the walk spots.
+	 */
 	static int PEW_Z0() {
-		return s(7);
+		return s(3);
 	}
 
 	static int PEW_ROWS() {
-		return 2;
+		return 2 + 2 * s(1);
+	}
+
+	// ---- archive (the hall under the nave) and its two stairs
+	/** First z of the archive stairs (5): the benches of the screens end at |z| = 3 and z = 4 is the mouth. */
+	static int ARCH_Z0() {
+		return 5;
+	}
+
+	/** Cells of the stair run: one per block of drop but the last, so the foot of the stair is the archive floor (3 at scale 1). */
+	static int ARCH_RUN() {
+		return Math.max(1, CitadelCanvas.y0() - 1);
+	}
+
+	/** Stairs span |x| from ARCH_X0 (9, the aisle) to ARCH_X1 (11, a lane of the aisle's width: 3 wide). */
+	static int ARCH_X0() {
+		return NAVE_HALF() + 3;
+	}
+
+	static int ARCH_X1() {
+		return Math.min(INNER() - 1, ARCH_X0() + 2 * s(1));
 	}
 
 	static int PEW_STEP() {

@@ -11,6 +11,7 @@ import dev.t3craft.hq.citadel.hub.HubExterior;
 import dev.t3craft.hq.citadel.hub.HubFacade;
 import dev.t3craft.hq.citadel.hub.HubInterior;
 import dev.t3craft.hq.citadel.hub.HubRoof;
+import dev.t3craft.hq.citadel.hub.HubUndercroft;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -143,6 +144,7 @@ public final class CitadelHub {
 		screens(c);
 		hologramAndBeacon(c);
 		HubInterior.furnish(c);
+		HubUndercroft.build(c);
 		HubRoof.cupola(c);
 		walkSpots(c);
 	}

@@ -142,12 +142,12 @@ public final class LayoutParams {
 			"lights let into the streets on a lattice: 1 cell in N");
 	/**
 	 * citadel/scale: size of the whole citadel (radii, streets, lots, buildings, rooms; heights by its
-	 * square root), a decimal in [1.0, 2.5]. {@code 1.0} is the original plan block by block. Read with
+	 * square root), a decimal in [1.0, 3.0], default 2.0 (struct/hq-scale). {@code 1.0} is the original small plan block by block. Read with
 	 * {@link Spec#value()}; see {@code CitadelCanvas} for the rule the pieces follow. Unlike the other
 	 * parameters it moves anchors and desks: the next plan of an existing HQ is rebuilt at the new size.
 	 */
-	public static final Spec RINGCAMPUS_SCALE = spec("hybrid-ringcampus", "scale", 100, 100, 250,
-			"size of the whole citadel (1.0 = original; heights grow by its square root)", 100);
+	public static final Spec RINGCAMPUS_SCALE = spec("hybrid-ringcampus", "scale", 200, 100, 300,
+			"size of the whole citadel (1.0 = the original small one, 2.0 = default; heights grow by its square root)", 100);
 	public static final Spec RINGCAMPUS_TERRACE_BUSH = spec("hybrid-ringcampus", "terrace.bushEvery", 23, 11, 97,
 			"terraces: an azalea bush on 1 cell in N");
 	public static final Spec RINGCAMPUS_CATALOG = spec("hybrid-ringcampus", "catalog.enabled", 1, 0, 1,
