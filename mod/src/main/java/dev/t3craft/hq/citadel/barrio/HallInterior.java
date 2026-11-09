@@ -46,6 +46,7 @@ public final class HallInterior {
 			rug(c, r, F, f, s, env);
 			furniture(c, r, F, f, y, s, env, seed, desks);
 			pendants(c, r, F, f, m, desks);
+			beams(c, r, f, m);
 		}
 		if (F == 1) {
 			chandelier(c, r);
@@ -298,6 +299,27 @@ public final class HallInterior {
 				}
 				c.put(p.getX(), ceil - 1, p.getZ(), Blocks.IRON_CHAIN.defaultBlockState(), HANGING);
 				c.put(p.getX(), ceil - 2, p.getZ(), HallFacade.hangingLantern(), HANGING);
+			}
+		}
+	}
+
+	/**
+	 * Ceiling beams: a beam across the hall's width under the ceiling every {@value #PENDANT_STEP} cells, halfway
+	 * between two rows of pendant lanterns (so it never meets one) and clear of the stair hole. They give the
+	 * ceiling depth and make the height of the hall readable.
+	 */
+	private static void beams(CitadelCanvas c, Room r, int f, Mats m) {
+		int W = r.w();
+		int D = r.d();
+		int cu = D / 2;
+		int yb = (f + 1) * fh() - 1;
+		BlockState beam = HallFacade.beamLike(c, m.post(), r.side().getAxis());
+		for (int u = cu % PENDANT_STEP + PENDANT_STEP / 2; u < D; u += PENDANT_STEP) {
+			for (int v = 0; v < W; v++) {
+				BlockPos p = r.cell(u, v, yb);
+				if (free(c, p) && !free(c, p.above())) {
+					c.set(p, beam);
+				}
 			}
 		}
 	}
