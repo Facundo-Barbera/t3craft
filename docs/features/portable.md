@@ -31,7 +31,7 @@ Build: `cd mod && ./gradlew build --no-daemon` → OK, 185 tests JUnit (tras mer
 - **No gestiona entornos.** Eso es de **feat/config**. "Environments…" abre su pantalla.
 - **No abre conexiones ni manda RPC.** Todo sale del modelo que el cliente ya tiene, así que no hace falta `getThreadProjection` ni una segunda conexión.
 - **No escribe en T3.** Ningún archivo del paquete referencia `dispatchCommand`, `launchThread`, `operate`, `chat.send` ni `sendText`. Lo comprueba un test.
-  - Excepción acotada (feat/op-launch): el botón "New thread…" solo abre `NewThreadScreen`, que vive fuera del paquete y es la dueña de la escritura protegida (ver `docs/feat-op-launch.md`).
+  - Excepción acotada (feat/op-launch): el botón "New thread…" solo abre `NewThreadScreen`, que vive fuera del paquete y es la dueña de la escritura protegida (ver `docs/features/op-launch.md`).
 
 ## Arquitectura e interfaces
 
@@ -94,7 +94,7 @@ Cuando el jugador sostiene el T3 Terminal (mano **izquierda/offhand** o principa
 sprite muestra un resumen en vivo, como el mapa vanilla o el pocket computer de ComputerCraft.
 Click derecho sigue abriendo `PortableScreen`. Se apaga con `portable.heldScreen` (ver abajo).
 
-![held](held-screen-preview.png)
+(Preview image removed from the tree on 2026-11-09: `git show archive/research-renders-2026-11-09:docs/feat/held-screen-preview.png`.)
 
 *(Vista previa generada por el rasterizador real con el `ascii.png` de vanilla, 4×; datos sintéticos.)*
 
@@ -163,7 +163,7 @@ widget (bounds, tema inyectable, modo compacto). El portable lo incrustará dent
 
 - El WIP de conversación y badges (`dev.t3craft.client.portable.pending`) **se eliminó** en
   feat/chat: la conversación es `chat.ChatTranscript`/`ThreadFeed` (sobre la conexión única,
-  `T3Connection.subscribeThread`) y el badge es `chat.EnvBadge` (ver docs/feat-chat.md).
+  `T3Connection.subscribeThread`) y el badge es `chat.EnvBadge` (ver docs/features/chat.md).
 - `PortableSettings` (con `heldShowsChat`) se eliminó: `heldScreen` vive ahora en `T3CraftSettings`;
   si la ronda 2 quiere que la pantalla en mano muestre la conversación, se añade otra clave en la
   sección `portable`.

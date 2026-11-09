@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Writes the block models, blockstates and item models of the kit's paper lanterns.
 
-    python3 mod/tools/kit_lantern_models.py
+    python3 tools/art/kit_lantern_models.py
 
 Four silhouettes, so each reads on its own from far away (warm paper, cherry structure, dark finishes):
 
@@ -15,7 +15,7 @@ Textures come from kit_lantern_textures.py. Deterministic, stdlib only.
 import json
 import os
 
-RES = os.path.join(os.path.dirname(__file__), "..", "src", "main", "resources", "assets", "t3craft")
+RES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "mod", "src", "main", "resources", "assets", "t3craft")
 TONES = ("paper", "rose", "vermilion")
 FACES = ("north", "south", "east", "west", "up", "down")
 SIDES = ("north", "south", "east", "west")

@@ -6,7 +6,7 @@ import org.jspecify.annotations.Nullable;
 /**
  * Which of the mod's own skins an agent wears (pure Java, no Minecraft classes, so it is unit
  * tested). The PNGs live in {@code assets/t3craft/textures/entity/agent/} and are drawn by
- * {@code mod/tools/AgentSkinGen.java} (nothing downloaded, no Mojang or player skins):
+ * {@code tools/art/AgentSkinGen.java} (nothing downloaded, no Mojang or player skins):
  *
  * <ul>
  *   <li>The <b>character</b> (face, hair, trousers, accessory) comes from a stable hash of the

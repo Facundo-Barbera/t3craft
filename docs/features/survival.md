@@ -150,7 +150,7 @@ if (!v.allowed()) { src.sendError(prefix().append(Component.translatable(v.langK
 ```
 
 **builders / site / HQ**: ✅ **aplicado en feat/builders-survival** dentro de `BuildService.build` (ver
-`docs/feat-builders.md`, «Supervivencia»): HQ y site solo tienen que llamar a `Builders.service().build(...)` y
+`docs/features/builders.md`, «Supervivencia»): HQ y site solo tienen que llamar a `Builders.service().build(...)` y
 capturar `IllegalStateException`. Boceto original: construcciones de verdad, del lado servidor y antes de `submit`:
 ```java
 PlayContext ctx = PlayContexts.of(serverPlayer, PlayContexts.isIntegrated(serverPlayer));

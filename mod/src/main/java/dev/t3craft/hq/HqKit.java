@@ -15,7 +15,7 @@ import org.jspecify.annotations.Nullable;
  * <p>Same pattern as {@link HqFixtures}: the hq package only knows this interface and its
  * {@link #VANILLA} fallback; {@code dev.t3craft.blocks} installs its implementation with
  * {@link #use} from {@code T3Blocks.init}, and only when the module is on. Roles and fallbacks are
- * documented in {@code docs/feat-blocks.md}.
+ * documented in {@code docs/features/blocks.md}.
  *
  * <p>Contract for implementations: pure (same arguments → equal states), no world access, a state
  * for every role (never null), and the same "shape class" as the vanilla fallback (a full block

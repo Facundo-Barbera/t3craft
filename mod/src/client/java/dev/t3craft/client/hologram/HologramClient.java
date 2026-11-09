@@ -27,7 +27,7 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Client entrypoint of the hub hologram (feat/hub-hologram, see {@code docs/feat-hub-hologram.md}).
+ * Client entrypoint of the hub hologram (feat/hub-hologram, see {@code docs/features/hub-hologram.md}).
  * Pure client: no block, no registry, no blocks module, so it also works in GUI-only mode.
  *
  * <p>Each client tick it collects the {@link HologramModel.Inputs} (the NPC roster of every

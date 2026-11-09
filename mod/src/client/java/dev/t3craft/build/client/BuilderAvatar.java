@@ -20,7 +20,7 @@ import org.jspecify.annotations.Nullable;
  * A builder: a client-only {@link RemotePlayer} rendered by the vanilla player renderer, same
  * approach as {@code dev.t3craft.client.npc.ThreadAvatar} (no registered entity type, no network
  * traffic). Not a subclass of it because that class is final and tied to thread NPC data; see
- * docs/feat-builders.md.
+ * docs/features/builders.md.
  *
  * <p>Movement happens inside {@link #tick()}, after the level stored the old position, so the
  * renderer interpolates smoothly and the vanilla walk animation (computed from the position delta)

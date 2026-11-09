@@ -1,5 +1,7 @@
 # layout/blocks — «Ensanche»: manzanas con patio
 
+> Las imágenes de esta investigación (PNG de renders) se quitaron del árbol el 2026-11-09 para aligerar los worktrees. Siguen en el tag `archive/research-renders-2026-11-09`: `git show archive/research-renders-2026-11-09:<ruta>.png > /tmp/x.png`.
+
 Estilo `ensanche` (`"hq": { "style": "ensanche" }` en `config/t3craft.json`). Cherry y classic no cambian: siguen con su espina compartida, y sus tests y su salida son idénticos.
 
 ![Crecimiento 4 → 10 → 20](ensanche_growth.png)

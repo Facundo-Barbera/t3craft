@@ -6,7 +6,7 @@ Los hilos que un coordinador abre con `delegate_task` llegan de T3 con
 
 | Caso | `creationSource` | Dónde se ve |
 |---|---|---|
-| Subagente del proveedor (Agent tool de Claude, …) | `provider` | Dentro del hilo padre; en la ciudad, ayudante bebé (`docs/feat-npc-helpers.md`). Nunca en el sidebar. |
+| Subagente del proveedor (Agent tool de Claude, …) | `provider` | Dentro del hilo padre; en la ciudad, ayudante bebé (`docs/features/npc-helpers.md`). Nunca en el sidebar. |
 | Tarea delegada (`delegate_task`) | cualquier otro (`mcp`, `server`, …) | Menú de agentes del header del padre (no en el sidebar), NPC trabajador completo con escritorio. |
 
 ## Modelo

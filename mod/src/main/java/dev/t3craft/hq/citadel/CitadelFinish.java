@@ -58,7 +58,7 @@ import org.jspecify.annotations.Nullable;
  *     cells of a lot.</li>
  * <li>{@link #light}: the light pass, with the invisible vanilla block {@code minecraft:light}
  *     ({@link CitadelCanvas#invisibleLight}, moderate levels 10 to {@value #FILL_MAX}: the visible design lamps,
- *     all 14 or 15, stay the light one sees; see docs/feat-hq-lighting.md). It is <b>fill only</b>: it never
+ *     all 14 or 15, stay the light one sees; see docs/features/hq-lighting.md). It is <b>fill only</b>: it never
  *     places a visible block. It walks the cells an NPC can reach
  *     ({@link #walkable}, from {@link #spawn()} in one-block steps, tested by {@link #standable}/{@link #noCollision})
  *     and lights each group <b>on its own</b>: a {@code HqLightMap} sees the group's cells as they are, the

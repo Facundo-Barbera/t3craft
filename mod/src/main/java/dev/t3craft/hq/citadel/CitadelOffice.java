@@ -109,7 +109,7 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
  * <li><b>Crown</b>: every screen, the board and the equipment walls behind them top out at {@code F2() + 7}, under one continuous
  *     crown beam ({@code F2() + 8}).</li>
  * <li><b>Archive terminal</b>: {@code AnchorNames.ARCHIVE_TERMINAL} is unique in a plan, so the archive level has
- *     lecterns as stand-ins (see {@code docs/proposals/leader-office-blocks.md}: a second terminal needs a kernel
+ *     lecterns as stand-ins (see {@code docs/plans/leader-office-blocks.md}: a second terminal needs a kernel
  *     change). Same for the kanban {@code THREAD_WALL} and the board itself.</li>
  * <li><b>Glow light</b> (kit/glow-panel, {@link #glow}): cool strips under the screens, cool ceiling panels and a warm strip along
  *     each flight, one per step.</li>

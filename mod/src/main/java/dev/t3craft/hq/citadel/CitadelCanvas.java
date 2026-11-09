@@ -152,7 +152,7 @@ public final class CitadelCanvas {
 	/**
 	 * A froglight for <b>design</b> lamps only (a lit band on a tower, a cupola, the clock marks of the rotunda,
 	 * a promenade post). Never let it into a floor, wall or ceiling to cover a dark spot: that is the job of the
-	 * invisible fill ({@link #invisibleLight}, {@code CitadelFinish#light}). See docs/feat-hq-lighting.md.
+	 * invisible fill ({@link #invisibleLight}, {@code CitadelFinish#light}). See docs/features/hq-lighting.md.
 	 */
 	public static final BlockState LIGHT = b(Blocks.PEARLESCENT_FROGLIGHT);
 

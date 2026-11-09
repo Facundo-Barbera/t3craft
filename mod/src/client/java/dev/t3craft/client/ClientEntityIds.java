@@ -6,8 +6,8 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * The client-only entity id ranges (docs/feat-workstation.md, docs/feat-npc-behavior.md,
- * docs/feat-npc-helpers.md). Each owner counts down from its base and owns one million ids, so an
+ * The client-only entity id ranges (docs/features/workstation.md, docs/features/npc-behavior.md,
+ * docs/features/npc-helpers.md). Each owner counts down from its base and owns one million ids, so an
  * orphan sweep only ever discards entities of <b>its own</b> range (before fix/hq-stale-stations the
  * NPC registry treated every id ≤ −1,000,000 as its own and could wipe the workstations).
  *

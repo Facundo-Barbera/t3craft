@@ -12,7 +12,7 @@ Rama `research/agentcraft-world-elements`, 2026-11-07. Solo investigación: no s
   Abreviaturas: `t/` = `mod/src/main/java/dev/t3craft` y `tc/` = `mod/src/client/java/dev/t3craft/client`.
 
 Leyenda de scope: **R** = `orchestration:read` (lo que ya da el pairing). **W** = `orchestration:operate`
-(infra en main: `OperateGate`, `docs/feat-operate.md`). **SC-W** = `source-control:write` (fuera de alcance).
+(infra en main: `OperateGate`, `docs/features/operate.md`). **SC-W** = `source-control:write` (fuera de alcance).
 
 ---
 
@@ -132,11 +132,11 @@ recetas, ni GUIs de contenedor (todas las pantallas son de cliente).
 | Lámpara que **respira** en espera / marco de nicho | ❌ | Las lámparas son solo block state, sin BER |
 | **Faro agregado** (cúpula) | ❌ | El hub tiene una linterna acristalada (`HqGenerator`), pero no muestra nada |
 | **Holograma del atrio** (progreso, conteos) | ❌ | Lo más parecido es `tc/hud/StatusBar` (HUD) |
-| **Task wall kanban** | 🟡 | Tablero "Needs attention" vanilla (pizarra + cartel + bombillas) en `HqGenerator.board`; las NPC van ahí en ATTENTION (`BoardSlots`). Sin tarjetas ni texto. Esqueleto `task_board` descrito en `feat-blocks.md` §"Esqueleto" |
-| `decision_podium` + bocadillo | ❌ | Esqueleto en `feat-blocks.md`. Hoy, "needs you" se ve en la NPC (Emote `EXCLAIM`), el chat y el HUD |
+| **Task wall kanban** | 🟡 | Tablero "Needs attention" vanilla (pizarra + cartel + bombillas) en `HqGenerator.board`; las NPC van ahí en ATTENTION (`BoardSlots`). Sin tarjetas ni texto. Esqueleto `task_board` descrito en `docs/features/blocks.md` §"Esqueleto" |
+| `decision_podium` + bocadillo | ❌ | Esqueleto en `docs/features/blocks.md`. Hoy, "needs you" se ve en la NPC (Emote `EXCLAIM`), el chat y el HUD |
 | `merge_station` (cola de reviews) | ❌ | — (no hay merge local en T3; el equivalente sería **PRs**) |
 | `console_terminal` | 🟡 | El terminal portátil (`tc/portable`, `held/TerminalScreenRenderer`) cumple esa función en la mano. No hay bloque |
-| `memory_archive` (estante con placas) | 🟡 | Ranuras de archivo `archive_<threadId>` → monitor (`HqBindings`); la estantería está pendiente en fix/hq-archive (`feat-hq-construction.md`) |
+| `memory_archive` (estante con placas) | 🟡 | Ranuras de archivo `archive_<threadId>` → monitor (`HqBindings`); la estantería está pendiente en fix/hq-archive (`docs/features/hq-construction.md`) |
 | Signal bulbs (copper bulb vanilla) | 🟡 | Usamos copper bulbs en escritorios y tablero, pero las movemos con nuestros bloques, no con bulbs vanilla |
 | Partículas ambiente en lámparas | ❌ | — |
 | Bloques decorativos (glow, plaster, walnut…) | ❌ (a propósito) | `hq/Palette` usa vanilla: correcto para compat |
@@ -175,7 +175,7 @@ entrypoints nuevos) y **Módulo** (¿cabe en el módulo de bloques desactivable?
 | P6 | **Lámparas que respiran** + motas clay en las lámparas `attention` y en el tablero | Igual que hoy | S | Sí (BER nuevo para `status_lamp`) | ✅ dentro |
 | P7 | **Podio "Needs you"**: bocadillo flotante con el conteo y la primera pending request (hilo, tipo, resumen); clic → pantalla "Needs you". Responder: botones Allow/Deny con `OperateUi.guard` | Ver: `pendingRuntimeRequest`/`runtimeRequests` (**R**). Responder: `runtime-request.respond` (**W**, `REQUEST_DENY` destructivo) | M | Sí (bloque + BE + BER) | ✅ dentro. Fuera del módulo, el bocadillo puede colgar de un ancla (`podium`) sin bloque |
 | P8 | **Estación de PRs** (equivalente a la merge station): fila de mesas, la k-ésima muestra el k-ésimo PR abierto de los hilos (número, estado, checks, +/-); clic → pantalla de diff | `linkedPullRequest`/`pullRequests` en el shell, `pullRequests*` (**R**); diff: `getFullThreadDiff`/`/api/pull-requests/diff` (**R**). Merge: **SC-W**, fuera de alcance | L | Sí | ✅ dentro |
-| P9 | **Tablero de tareas programadas** (el esqueleto `task_board` de `feat-blocks.md`): próximas ejecuciones y la última con su resultado | `scheduledTasks.subscribe` (**R**, por `T3Connection`); "ejecutar ahora": **W** | M | Sí | ✅ dentro |
+| P9 | **Tablero de tareas programadas** (el esqueleto `task_board` de `docs/features/blocks.md`): próximas ejecuciones y la última con su resultado | `scheduledTasks.subscribe` (**R**, por `T3Connection`); "ejecutar ahora": **W** | M | Sí | ✅ dentro |
 | P10 | **Estante del archivo** con placas (como `memory_archive`): una fila por proyecto, una pestaña por hilo archivado; clic → chat (solo lectura) | `getArchivedShellSnapshot`, `getOlderSettledThreads` (**R**) | M | Sí | ✅ dentro; depende de fix/hq-archive |
 | P11 | **Partículas de estado teñidas y con pool** (pensando = estrellas, trabajando = motas, error = bocanada, done = confeti) en vez de las vanilla actuales | Estado actual | S | No | ✅ fuera del módulo (cliente puro) |
 | P12 | **Sentarse a teclear**: usar `Seats` (escalera o losa en el ancla del escritorio) y bajar al NPC; pose de brazos limitada sin modelo propio (RemotePlayer) | — | M (sentarse) / L (posturas con modelo propio + mixin) | No / Sí con mixin | ✅ fuera del módulo |

@@ -9,7 +9,7 @@ import java.util.Locale;
  * destructive ({@link #isDestructive(String)}).
  *
  * <p>Adding an action: add its kind here (choose {@code destructive} carefully), then see
- * {@code docs/feat-operate.md}.
+ * {@code docs/features/operate.md}.
  */
 public enum OperateKind {
 	/** Reply in the chat ({@code message.dispatch}, queued if the thread is busy). Item 19. */

@@ -99,7 +99,7 @@ Provider subagents stay hidden unless `includeSubagents`.
 | `hud.peek` | `text \| null`, `color`, `npcId \| null` | one-line HUD summary; sent on change and on connect |
 
 Declared for the chat history (`chat.history` page, `chat.message` upsert, `chat.status`) and
-`bridge.reload`; not served yet. The bridge is now the **legacy** path: see `docs/plan-v2.md`
+`bridge.reload`; not served yet. The bridge is now the **legacy** path: see `docs/plans/plan-v2.md`
 (direct mod ⇄ T3 pairing).
 
 ## Bridge → mod
@@ -148,7 +148,7 @@ data; `dataUrl` ≤ 14 000 000 characters and of type `mimeType`; `name` 1–255
 which answers the stored `ChatAttachment`s (`{type:"image", id, name, mimeType, sizeBytes}`); those
 go into `message.dispatch.attachments` with the same `messageId`.
 
-**Who does it.** The mod, over its direct operate connection (`ChatSender`, docs/feat-t3-ui-clean.md):
+**Who does it.** The mod, over its direct operate connection (`ChatSender`, docs/features/t3-ui-clean.md):
 upload, then dispatch. The bridge is read-only (it holds an `orchestration:read` token) and its mod
 socket takes frames up to 256 KiB, so images never travel through it. It still validates a
 `chat.send` that carries `attachments` and acks `ok:false` with the reason: `invalid attachments: …`

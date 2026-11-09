@@ -30,7 +30,7 @@ import org.jspecify.annotations.Nullable;
  * </ul>
  * Control (operate) is enabled only while {@link OperateCredentials} holds a token for the
  * environment ({@code credentials/operate/<id>.json}); {@link #pair} writes both files for a
- * combined session. See {@code docs/feat-operate.md} "Almacenamiento".
+ * combined session. See {@code docs/features/operate.md} "Almacenamiento".
  */
 public final class Environments {
 	public static final Pattern ID = Pattern.compile("[a-z0-9][a-z0-9-]{0,31}");

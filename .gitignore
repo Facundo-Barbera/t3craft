@@ -28,8 +28,16 @@ Thumbs.db
 # Minecraft instance credentials (T3 pairing tokens) — never commit
 **/config/t3craft/credentials/
 
-# Log4j output of the JUnit run (mod/logs/latest.log)
+# Log4j output of local runs (mod/logs/latest.log)
 mod/logs/
+
+# Python caches (tools/art, tools/studio)
+__pycache__/
+*.pyc
+
+# Renders never go into docs: they live on the render PC (Citadel Studio). The old research renders
+# are in the tag archive/research-renders-2026-11-09.
+docs/**/*.png
 
 # Source package dev.t3craft.build is not build output
 !mod/src/**/build/

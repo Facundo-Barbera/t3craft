@@ -212,4 +212,4 @@ Anything the mod adds to a world (client-only entities, displays, NPCs, helpers,
 hologram, beacon, schedule board) must ask `HqPresence.allows(mc)` first and despawn when it turns
 false. It is open only on the integrated server, with this world's HQ built, in the HQ's
 dimension; on a server without the mod it is always shut, and only the T3 screen (key Y), HUD and
-client commands run there. Rules, the per-thing table and the open risks: `docs/feat-hq-gate.md`.
+client commands run there. Rules, the per-thing table and the open risks: `docs/features/hq-gate.md`.

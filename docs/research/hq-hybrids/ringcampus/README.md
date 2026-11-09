@@ -1,5 +1,7 @@
 # Híbrido «Ciudadela en anillos con barrios» (`hybrid-ringcampus`)
 
+> Las imágenes de esta investigación (PNG de renders) se quitaron del árbol el 2026-11-09 para aligerar los worktrees. Siguen en el tag `archive/research-renders-2026-11-09`: `git show archive/research-renders-2026-11-09:<ruta>.png > /tmp/x.png`.
+
 Rama `design/hybrid-ringcampus`. Es un layout **nuevo** del registro (`HqLayouts`, id
 `hybrid-ringcampus`, nombre «Ciudadela en anillos» / «Ringed citadel»), que se elige desde el menú
 HQ como los demás. No modifica ninguno de los layouts que ya existen.

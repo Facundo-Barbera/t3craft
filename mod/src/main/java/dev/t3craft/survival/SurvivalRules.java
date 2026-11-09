@@ -4,7 +4,7 @@ package dev.t3craft.survival;
  * The survival policy, as a small interface other features consult instead of checking game modes
  * themselves. Get the live one with {@link Survival#rules()}; build one for tests with
  * {@link GameModePolicy#GameModePolicy(SurvivalSettings)}.
- * <p>Integration points (see {@code docs/feat-survival.md}):
+ * <p>Integration points (see {@code docs/features/survival.md}):
  * <ul>
  *   <li><b>portable</b> (key that opens the terminal): {@link #openTerminal}.</li>
  *   <li><b>builders / site</b> before submitting a job: {@link #buildInWorld}, then

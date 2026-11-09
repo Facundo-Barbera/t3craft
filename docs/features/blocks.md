@@ -14,10 +14,10 @@ queda exactamente como sin él.
 |---|---|---|
 | `t3craft:monitor` | `t3craft:monitor` (`MonitorBlockEntity`) | Bloque entero con `facing`. La cara frontal es una pantalla: título, estado con color y antigüedad, último mensaje. Click → abre el chat del hilo. |
 | `t3craft:status_lamp` | `t3craft:status_lamp` (`LampBlockEntity`) | Lámpara del escritorio: color y luz según el estado del hilo. |
-| `t3craft:archive_terminal` | `t3craft:archive_terminal` (`ArchiveTerminalBlockEntity`) | Consola de archivo (feat/archive-terminal): la pantalla muestra "ARCHIVE · N hilos" y los últimos 3; click → pantalla de archivo. En el HQ, en el anchor `archiveTerminal`. Ver `docs/feat-archive-terminal.md`. |
+| `t3craft:archive_terminal` | `t3craft:archive_terminal` (`ArchiveTerminalBlockEntity`) | Consola de archivo (feat/archive-terminal): la pantalla muestra "ARCHIVE · N hilos" y los últimos 3; click → pantalla de archivo. En el HQ, en el anchor `archiveTerminal`. Ver `docs/features/archive-terminal.md`. |
 | `t3craft:board_lamp` | el mismo tipo `t3craft:status_lamp` | Variante "bombilla del tablero": la i-ésima bombilla muestra el i-ésimo hilo que necesita al jugador (errores primero, luego "needs you"). |
 | `t3craft:decision_podium` | `t3craft:decision_podium` (`LampBlockEntity`, sin renderer) | Podio de decisiones (kit/decision-podium): atril con campana y pantalla, vinculado `board:<i>` como una bombilla del tablero. Muestra el i-ésimo hilo que necesita al jugador (errores primero, luego "needs you"); modelo y luz por `status`; click → abre ese hilo. Ver sección "Podio de decisiones". |
-| `t3craft:thread_board` | `t3craft:thread_board` (`ThreadBoardBlockEntity`) | Ancla de la pared kanban de hilos (P3): el BER dibuja una pared de `width × height` bloques desde la celda inferior izquierda. Click en una tarjeta → chat del hilo. Ver `docs/feat-thread-wall.md`. |
+| `t3craft:thread_board` | `t3craft:thread_board` (`ThreadBoardBlockEntity`) | Ancla de la pared kanban de hilos (P3): el BER dibuja una pared de `width × height` bloques desde la celda inferior izquierda. Click en una tarjeta → chat del hilo. Ver `docs/features/thread-wall.md`. |
 
 Ítems de bloque con el mismo id, en la pestaña propia **T3Craft** (`dev.t3craft.T3CraftTab`, única
 del mod; el módulo aporta sus ítems con `T3CraftTab.contribute` solo si está prendido). Loot tables: cada bloque se suelta a sí mismo. Recetas
@@ -464,7 +464,7 @@ Ambos siguen los pasos de arriba; `LampStatus` y `MonitorRenderer.toFace` se pue
 
 Once bloques decorativos propios para el estilo **C, campus de cerezo** (`docs/research/hq-styles.md`
 §C) y el oficio "agentes trabajando". Modelos JSON y texturas propias (`textures/block/kit_*.png`,
-pixel art original dibujado por `mod/tools/blocks_kit_textures.py`, determinista, sin nada de Mojang).
+pixel art original dibujado por `tools/art/blocks_kit_textures.py`, determinista, sin nada de Mojang).
 Registro en `KitBlocks.register`, llamado solo desde `T3Blocks.init`: con el módulo apagado no existe
 ninguno. Ítems en la pestaña **T3Craft**, loot tables (se sueltan a sí mismos), tags `mineable/axe` y
 `mineable/pickaxe`, lang en `en_us`, `es_es` y `es_mx`. Sin recetas por ahora.
@@ -671,7 +671,7 @@ lámparas de las esquinas), el parpadeo del estado `open` y la lista.
 Cuatro siluetas que se distinguen de lejos: de pie (caja baja sobre patas, techo abocinado con cuatro puntas), colgado
 (barril redondo), de pared (alto y estrecho sobre ménsula) y el alto de plaza (2 bloques). Papel cálido, estructura de
 cerezo, remates oscuros (laca, hierro, latón). Solo el de pie es un `LampBlockEntity` vinculable; los otros tres son
-decoración con luz propia (14, 13, 15). Texturas y modelos salen de `python3 mod/tools/kit_lantern_textures.py` y
+decoración con luz propia (14, 13, 15). Texturas y modelos salen de `python3 tools/art/kit_lantern_textures.py` y
 `kit_lantern_models.py` (biblioteca estándar; el item del alto es un modelo con las dos mitades a media escala).
 
 Uso en la ciudadela: variantes del catálogo `LAMP` (`lamp_paper_post` para caminos, `lamp_paper_plaza` para esquinas y

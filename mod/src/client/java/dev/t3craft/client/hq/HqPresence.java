@@ -27,7 +27,7 @@ import org.jspecify.annotations.Nullable;
  * beacon, the schedule board) exists unless the HQ of this world stands: the game runs its own
  * (integrated) server, an HQ is standing here with its base built, and the player is in the HQ's
  * dimension. On a server without the mod (or any remote server) the gate is always shut, so the mod
- * puts nothing in the world; the T3 screen (key Y) does not depend on it. See docs/feat-hq-gate.md.
+ * puts nothing in the world; the T3 screen (key Y) does not depend on it. See docs/features/hq-gate.md.
  */
 public final class HqPresence {
 	/** Where the demo HQ and a site HQ without a recorded dimension stand. */

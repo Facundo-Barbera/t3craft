@@ -1,5 +1,7 @@
 # Layout «campus de barrios» (`hq.style = campus`)
 
+> Las imágenes de esta investigación (PNG de renders) se quitaron del árbol el 2026-11-09 para aligerar los worktrees. Siguen en el tag `archive/research-renders-2026-11-09`: `git show archive/research-renders-2026-11-09:<ruta>.png > /tmp/x.png`.
+
 Rama `layout/campus`. Estilo nuevo con **layout propio** (`CampusStyle`, `CampusGeometry`,
 `CampusLayout`, `CampusGenerator`, `CampusFootprints`). Es aditivo: cherry y classic no cambian
 (siguen en `HqStyles.all()` con sus tests intactos; el campus está en `HqStyles.layouts()` y se elige

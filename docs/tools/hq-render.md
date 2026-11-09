@@ -172,7 +172,7 @@ reachability and the shape/floating checks look at the whole plan, so a piece is
 * **Anchors**: every standing anchor and every desk reachable from the spawn (`direct`, or `adjacent` for
   seats and benches); the unreachable ones are listed.
 * **Shapes**: fences, walls, panes, bars and stairs whose state differs from what `PlanConnect` (fix/plan-connect,
-  see `docs/feat-plan-connect.md`) gives them among their real neighbours. `cornersMissing` counts those
+  see `docs/features/plan-connect.md`) gives them among their real neighbours. `cornersMissing` counts those
   that should connect on 2 or 3 sides and do not: the round fences without corners.
 * **Connect**: fences, walls and panes connected on no side although a neighbour they connect to is beside
   them (`connect:` line on stdout too). Must be 0; nothing is caught per cell.

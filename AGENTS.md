@@ -15,9 +15,9 @@ These rules come from Facundo and override any other instruction, brief or habit
   compiling or tests. The coordinator compiles pushed branches on the PC.
 - **PC transport:** the PC's sshd is Windows OpenSSH with `wsl.exe` as shell, so `ssh pc 'cmd'`, scp and rsync do
   not work. Every remote step is a bash script fed on stdin: `ssh -T pc < script.sh` (see `tools/render/remote-submit.sh`).
-- Work that still needs running is tracked in `docs/pending-execution.md`.
+- Work that still needs running is tracked in `docs/ops/pending-execution.md`.
 
-## Heavy processes (incident 2026-11-09, see `docs/incidents/2026-11-09-vps-saturation.md`)
+## Heavy processes (incident 2026-11-09, see `docs/ops/incidents/2026-11-09-vps-saturation.md`)
 
 The VPS is shared: T3 Code runs on it, along with every child thread. A "heavy process" is **anything that runs java,
 gradle/gradlew, a render (`tools/render/*`, `hqRender`, `uiRender`) or Minecraft**. Heavy processes run **only on
@@ -81,7 +81,7 @@ the PC**, never on the VPS or the Mac mini.
    `~/.t3/userdata/backups/statev2-20261109-1037-CST` and T3 restarted empty.
    - Judge a render from its text output first (`report.txt`, `report.json`, the plan report).
    - Never Read a full-resolution render PNG in a thread. Until the relay brings back small previews (pending, see
-     `docs/pending-execution.md`), children and their subagents do not open render PNGs at all.
+     `docs/ops/pending-execution.md`), children and their subagents do not open render PNGs at all.
    - Once previews exist: at most a few per job, only the downscaled copy (≤ 768 px on the long side).
    - Facundo looks at full-size renders in Citadel Studio on the PC.
 

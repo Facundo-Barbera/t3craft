@@ -157,4 +157,4 @@ Usa `HqBuildBenchTest` + `HqBuildSim`.
 - Sin probar en juego (no se lanzó Minecraft): falta ver 4 cuadrillas a la vez y el ajuste por FPS en una
   máquina real.
 - El HQ de supervivencia (site + `CrewBridge`) sigue haciendo una ampliación a la vez, por el journal
-  del site (ver docs/feat-parallel-build.md). Allí solo se construye classic.
+  del site (ver docs/features/parallel-build.md). Allí solo se construye classic.

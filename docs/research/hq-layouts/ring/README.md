@@ -1,5 +1,7 @@
 # layout/ring — Ciudad en anillos
 
+> Las imágenes de esta investigación (PNG de renders) se quitaron del árbol el 2026-11-09 para aligerar los worktrees. Siguen en el tag `archive/research-renders-2026-11-09`: `git show archive/research-renders-2026-11-09:<ruta>.png > /tmp/x.png`.
+
 Estilo `ring` (`hq.style: "ring"` en `config/t3craft.json`). Es un layout propio y no reparte
 la geometría de la espina (`HqGeometry`/`HqFootprints`). Cherry y classic no cambian: siguen en
 `HqStyles.all()` con sus tests y su salida intactos. `ring` se elige por id (`HqStyles.byId`,

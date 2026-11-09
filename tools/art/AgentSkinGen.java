@@ -7,7 +7,7 @@ import javax.imageio.ImageIO;
 /**
  * Draws the mod's own agent skins (64x64, classic player layout) procedurally: no player or Mojang
  * skin is used as a base. Output (relative to the given directory, normally
- * {@code src/main/resources/assets/t3craft/textures/entity/agent}):
+ * {@code mod/src/main/resources/assets/t3craft/textures/entity/agent}):
  *
  * <ul>
  *   <li>{@code <character>_<shirt>.png}: one per character and shirt colour</li>
@@ -17,8 +17,8 @@ import javax.imageio.ImageIO;
  * </ul>
  *
  * Characters, the model (wide/slim) and the shirt palette must match
- * {@code dev.t3craft.client.npc.AgentSkins}. Regenerate with (from {@code mod/}):
- * {@code java tools/AgentSkinGen.java src/main/resources/assets/t3craft/textures/entity/agent}
+ * {@code dev.t3craft.client.npc.AgentSkins}. Regenerate with (from the repo root):
+ * {@code java tools/art/AgentSkinGen.java mod/src/main/resources/assets/t3craft/textures/entity/agent}
  */
 public final class AgentSkinGen {
 	/** Same tones as {@code EnvBadge.PALETTE}, so a shirt matches its environment's badge. */
