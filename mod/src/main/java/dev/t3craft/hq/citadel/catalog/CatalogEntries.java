@@ -20,6 +20,9 @@ final class CatalogEntries {
 			new dev.t3craft.hq.citadel.catalog.house.HouseStoneManorCourt(), // house_stone_manor_court
 			new dev.t3craft.hq.citadel.catalog.house.HouseStoneTower(), // house_stone_tower
 			new dev.t3craft.hq.citadel.catalog.house.HouseStoneWeathered(), // house_stone_weathered
+			new dev.t3craft.hq.citadel.catalog.house.HouseJapaneseEngawa(), // house_japanese_engawa
+			new dev.t3craft.hq.citadel.catalog.house.HouseJapaneseTeahouse(), // house_japanese_teahouse
+			new dev.t3craft.hq.citadel.catalog.house.HouseMachiya(), // house_machiya
 			new dev.t3craft.hq.citadel.catalog.house.HouseTimberCottage(), // house_timber_cottage
 			new dev.t3craft.hq.citadel.catalog.house.HouseTimberOverhang(), // house_timber_overhang
 			new dev.t3craft.hq.citadel.catalog.lamp.LampCherryPost(), // lamp_cherry_post
