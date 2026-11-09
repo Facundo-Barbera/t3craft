@@ -44,73 +44,73 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
  * methods taking the {@link CitadelCanvas} first, no state. It runs after the ground, the hub, the core and the nodes
  * (see {@code RingCampusGenerator.generate}), adds no zone and no group, and moves nothing of {@code RingCampusGeometry}.
  *
- * <h2>Scale (struct/leader-office)</h2>
+ * <h2>Scale (struct/leader-office3)</h2>
  *
- * Facundo found the old tower tight and its stairs a jump. The interior grew from 7 x 7 x 4 per level to
- * <b>9 x 9</b> with <b>5-high rooms</b> (the control room 7 high): 2.1 times the old volume in the lobby and the
- * archive, 2.3 times in the control room, and no stair eats the middle of a room any more. Every route is at least
- * three blocks wide, every stair is a walking stair (see below).
+ * The tower was tight: its 9 x 9 rooms are now <b>13 x 13</b> inside (2.1 times the floor), 6 free blocks high (floor to floor 7),
+ * the control room 8 high and 15 x 15 inside its cabin. Every route is at least three blocks wide, both flights are walking
+ * stairs, and nothing is added to the door's side: the footprint grew by two blocks on every side, and the tower moved out
+ * by the same two ({@link #RIM_OFFSET}) so its door is still on the deck's rim.
  *
  * <h2>Plan (local coordinates {@code (dx, dz)} from the tower's centre {@link #CX()}, {@link #CZ()}; north is -dz, the hub)</h2>
  *
  * <pre>
- *   m = max(|dx|, |dz|)   m <= 4 interior 9 x 9     m = 5 wall (lobby, archive)     m = 6 skirt, lobby pilasters, cabin glass
- *                         m = 7 the roof's eave
+ *   m = max(|dx|, |dz|)   m <= 6 interior 13 x 13   m = 7 wall (lobby, archive), equipment walls (control)
+ *                         m = 8 skirt, lobby pilasters, cabin glass     m = 9 the roof's eave
  *
  *   level    floor y   feet y   what
- *   lobby    y0()        +1     rug from the door, 2 double chests and barrels, 7 workbenches (crafting, smithing, fletching,
- *                               stonecutter, grindstone, loom, blast furnace), anvil, ender chest, stair A (south-west L)
- *   archive  y0() + 6    +1     archive lecterns and shelves, cartography and enchanting tables, jukebox, model of the HQ,
- *                               bed, stair B (east); wall set back (m = 5) under the cabin
- *   control  y0() + 12   +1     the cabin, one block out (m = 6): tinted glass all round over a sill of upside-down stairs;
- *                               big screens, attention board, consoles, podiums, chests; glass door to the balcony (north)
- *   ceiling  y0() + 20   -      rafters; clerestory band, hip roof with turned-up corners, glass drum with a lantern
+ *   lobby    y0()        +1     rug from the door, workbenches (crafting, smithing, fletching, stonecutter, grindstone, loom,
+ *                               blast furnace, furnace, smoker), anvil, ender chest, 4 double chests, barrels, stair A (SW, an L)
+ *   archive  y0() + 7    +1     archive lecterns and shelves, cartography and enchanting tables, jukebox, model of the HQ,
+ *                               bed, stair B (east); wall set back (m = 7) under the cabin
+ *   control  y0() + 14   +1     the cabin, one block out (m = 8): clear glass between cherry mullions every 3 blocks, over a sill of
+ *                               upside-down stairs; big screens, attention board, consoles, podiums, chests; door to the balcony
+ *   ceiling  y0() + 23   -      rafters; clerestory band, hip roof with a curved eave, glass drum with a lantern
  * </pre>
  *
- * <h2>Exterior (struct/leader-office2)</h2>
+ * <h2>Exterior</h2>
  *
- * The control cabin flies one block past the archive's wall on dark tile corbels, with a running band of tinted glass (no wall of
- * its own behind the screens: see {@link #cabin}); the lobby keeps the three pilasters per face; the roof's eave is a block wider
- * than the glass and its four corners turn up with a finial; the cupola is a 5 x 5 glass drum, three high; the lawn on the
- * south-east is a two-tier garden with a path and an arbor ({@link #garden}).
+ * The cabin flies one block past the archive's wall on dark tile corbels. Its glass is <i>clear</i> (tinted only on the transom row)
+ * between cherry mullions at {@code |i| = 2, 5} and the corner posts, and the equipment walls behind the screens are pale plaster
+ * with the same mullions as pilasters, so from every side, the south-east too, the top floor reads as a glazed lantern instead of a
+ * black mass. The eave is a block wider than the glass and swoops up to its four corners in a stepped curve (see {@link #eave});
+ * the cupola is a 7 x 7 glass drum, three high. The south-east lawn is a two-tier garden ({@link #garden}) with an open pergola
+ * whose rafters carry cave vines and flowering azalea ({@link #arborAt}).
  *
  * <h2>Stairs you walk up</h2>
  *
- * Flight A is an L in the lobby's south-west corner (leg along the west wall, a 2 x 2 landing, leg along the south wall); flight B
- * is a straight run of six steps on the east wall. Both are two blocks wide, one step per cell and one block per step (a stair
- * block is a half-block climb, then another half block: no jump). Each is entered <b>head-on</b> from a free landing, has two free
- * blocks above every step (the floor above is opened over the steps whose roof is lower than that, and fenced) and ends flush with
- * the floor above. See {@link #stairways}.
+ * Flight A is an L in the lobby's south-west corner (leg of three along the west wall, a 2 x 3 landing, leg of four along the south
+ * wall); flight B is a straight run of seven steps on the east wall of the archive. Both are two blocks wide, one step per cell and
+ * one block per step (a stair block is a half-block climb, then another half block: no jump). Each is entered <b>head-on</b> from a
+ * free landing, has two free blocks above every step (the floor above is opened over the steps whose roof is lower than that, and
+ * fenced) and ends flush with the floor above. See {@link #stairways}.
  *
  * <h2>Control room</h2>
  *
  * <ul>
- * <li><b>Threads</b>: a 7 x 4 big screen (south wall, key {@code office}) bound to {@code HqGenerator.hubBinding}, the
- *     environment with most modules, as on the hub; three console terminals (kit role {@code CONSOLE}, lecterns without
- *     the blocks module) face it, the standing cell in front of
- *     them is the {@link #OFFICE} anchor.</li>
- * <li><b>Projects</b>: two 3 x 3 screens on the west wall (keys {@code office_w0}, {@code office_w1}), each bound to
+ * <li><b>Threads</b>: an 11 x 5 big screen (south wall, key {@code office}) bound to {@code HqGenerator.hubBinding}, the
+ *     environment with most modules, as on the hub; a bank of five console terminals (kit role {@code CONSOLE}, lecterns without
+ *     the blocks module) faces it from the rug; the standing cell in front of them is the {@link #OFFICE} anchor.</li>
+ * <li><b>Projects</b>: two 5 x 5 screens on the west wall (keys {@code office_w0}, {@code office_w1}), each bound to
  *     {@code project:<key>} of the two projects with most desks taken ({@link #projectBindings}); unbound while the
  *     HQ has fewer. Chests under them.</li>
- * <li><b>Decision podiums</b>: five along the south wall under the threads screen, bound {@code board:0..4} (the five most
- *     urgent threads that need the player); a click opens the thread to answer it. See {@link #podiums}.</li>
+ * <li><b>Decision podiums</b>: five along the south wall under the threads screen, bound {@code board:0..4}. See {@link #podiums}.</li>
  * <li><b>Attention board</b>: on the east wall, five status lamps anchored {@code board_lamp_5..9}, so they show the
  *     6th to 10th most urgent thread: the hub board keeps ranks 1 to 5. They are plain additive anchors.</li>
+ * <li><b>Crown</b>: every screen, the board and the equipment walls behind them top out at {@code F2() + 7}, under one continuous
+ *     crown beam ({@code F2() + 8}).</li>
  * <li><b>Archive terminal</b>: {@code AnchorNames.ARCHIVE_TERMINAL} is unique in a plan, so the archive level has
  *     lecterns as stand-ins (see {@code docs/proposals/leader-office-blocks.md}: a second terminal needs a kernel
  *     change). Same for the kanban {@code THREAD_WALL} and the board itself.</li>
- * <li><b>Glow light</b> (kit/glow-panel, {@link #glow}): cool strips under the screens, three cool ceiling panels over the
- *     screen's side and a warm strip along each flight, one per step. They replace the invisible lights of the screen's side.</li>
- * <li><b>Work and storage</b>: lobby workbenches and double chests, archive chests and bed, control-room chests.</li>
- * <li><b>Model</b>: a 3 x 3 model of the HQ on the archive table: hub, four ramps, four barrios; the red carpet is this
- *     tower.</li>
+ * <li><b>Glow light</b> (kit/glow-panel, {@link #glow}): cool strips under the screens, cool ceiling panels and a warm strip along
+ *     each flight, one per step.</li>
+ * <li><b>Model</b>: a 5 x 5 model of the HQ on the archive floor: hub, four ramps, four barrios, the outer ring; the red block is
+ *     this tower.</li>
  * </ul>
  *
  * <h2>Adjusting it</h2>
  *
  * <ul>
- * <li><b>Move the tower</b>: change {@link #RIM_OFFSET}/{@link #ANGLE_DEG}; keep every column of the walls and the
- *     skirt ({@code m <= 6}) inside the zone map ({@code r < 40}) and the door ({@code dz = -5}, facing north) on the
+ * <li><b>Move the tower</b>: change {@link #RIM_OFFSET}/{@link #ANGLE_DEG}; keep the door ({@code dz = -7}, facing north) on the
  *     promenade deck.</li>
  * <li><b>Furniture</b>: each room is one method with blocks written as {@code (dx, dz)} next to a comment; keep the
  *     landings and the wells' fences as they are.</li>
@@ -140,20 +140,19 @@ public final class CitadelOffice {
 	/** Angle (degrees from north, clockwise) of the terrace the tower stands on: between the south and south-east ramps. */
 	public static final double ANGLE_DEG = 157.5;
 	/**
-	 * Distance from the promenade's outer rim to the tower's centre. With the 11-wide wall ring this puts the door on
-	 * the deck's rim, the north-west corner at r = 25 (the deck stays four blocks wide) and the south-east skirt corner
-	 * at r < 40.
+	 * Distance from the promenade's outer rim to the tower's centre. With the 15-wide wall ring this puts the door on
+	 * the deck's rim (the wall ring's north side at {@code dz = -7}) and the south-east skirt corner on the edge of the
+	 * inner street.
 	 */
-	public static final double RIM_OFFSET = 4.5;
+	public static final double RIM_OFFSET = 6.5;
 
-	/** Half width of the interior, of the wall ring and of the skirt (pilasters, eave). */
-	private static final int H = 4;
-	private static final int W = 5;
-	private static final int E = 6;
-	/** Half width of the roof's eave (one block past the cabin's glass). */
-	private static final int R = 7;
+	/** Half width of the interior, of the wall ring, of the skirt (pilasters, cabin glass) and of the roof's eave. */
+	private static final int H = 6;
+	private static final int W = 7;
+	private static final int E = 8;
+	private static final int R = 9;
 	/** Floor to floor of the lobby and the archive. */
-	private static final int FH = 6;
+	private static final int FH = 7;
 
 	/**
 	 * Centre of the tower (x, z), derived from the geometry: the promenade's outer radius plus {@link #RIM_OFFSET} along
@@ -182,12 +181,17 @@ public final class CitadelOffice {
 	}
 
 	static int CEIL() {
-		return F2() + 8;
+		return F2() + 9;
 	}
 
-	/** Top of the wall (the clerestory band's last row; the hip roof starts one row higher at its ring 5). */
+	/** Top of the wall (the clerestory band's last row; the hip roof starts one row higher at its ring 8). */
 	static int WALL_TOP() {
 		return CEIL() + 2;
+	}
+
+	/** The roof's last ring (m = 4): the drum stands on it. */
+	private static int RT() {
+		return CEIL() + 2 + (R - 4);
 	}
 
 	public static final DyeColor RUG = DyeColor.RED;
@@ -259,6 +263,12 @@ public final class CitadelOffice {
 		return Blocks.BARREL.defaultBlockState().setValue(BlockStateProperties.FACING, Direction.UP);
 	}
 
+	/** A mullion position along a face: at {@code |i| = 2} and {@code 5} (every third block, the corner posts being at 8). */
+	private static boolean post(int i) {
+		int a = Math.abs(i);
+		return a == 2 || a == 5;
+	}
+
 	/** Local {@code (dx, dz)} to the canvas. */
 	private static void set(CitadelCanvas c, int dx, int y, int dz, BlockState s) {
 		c.set(CX() + dx, y, CZ() + dz, s);
@@ -294,31 +304,31 @@ public final class CitadelOffice {
 	public static void clear(CitadelCanvas c) {
 		for (int dx = -E; dx <= E; dx++) {
 			for (int dz = -E; dz <= E; dz++) {
-				for (int y = F0() + 1; y <= CEIL() + 16; y++) {
+				for (int y = F0() + 1; y <= CEIL() + 19; y++) {
 					set(c, dx, y, dz, AIR);
 				}
 			}
 		}
-		// the eave's ring (m = 7) and the balcony's airspace above the promenade (the deck below stays as it is)
+		// the eave's ring (m = 9) and the balcony's airspace above the promenade (the deck below stays as it is)
 		for (int dx = -R; dx <= R; dx++) {
 			for (int dz = -R; dz <= R; dz++) {
 				if (m(dx, dz) == R) {
-					for (int y = F2(); y <= CEIL() + 16; y++) {
+					for (int y = F2(); y <= CEIL() + 19; y++) {
 						set(c, dx, y, dz, AIR);
 					}
 				}
 			}
 		}
 		for (int dx = -E; dx <= E; dx++) {
-			for (int dz = -10; dz <= -E - 1; dz++) {
-				for (int y = F2() - 2; y <= CEIL() + 16; y++) {
+			for (int dz = -14; dz <= -E - 1; dz++) {
+				for (int y = F2() - 2; y <= CEIL() + 19; y++) {
 					set(c, dx, y, dz, AIR);
 				}
 			}
 		}
 		// the door's apron on the promenade: the deck stays, anything standing on it goes
-		for (int dx = -1; dx <= 1; dx++) {
-			for (int dz = -8; dz <= -E - 1; dz++) {
+		for (int dx = -2; dx <= 2; dx++) {
+			for (int dz = -11; dz <= -E - 1; dz++) {
 				for (int y = F0() + 1; y <= F0() + 4; y++) {
 					set(c, dx, y, dz, AIR);
 				}
@@ -377,7 +387,7 @@ public final class CitadelOffice {
 				Direction.Axis edge = Math.abs(dz) == H ? Direction.Axis.X : Direction.Axis.Z;
 				set(c, dx, F0(), dz, m == H ? c.accent() : c.floor());
 				set(c, dx, F1(), dz, m == H ? c.kit.beam(edge) : c.floor());
-				// the control room's floor is dark tile so the screens stand out, with an inlay: see controlFloor
+				// the control room's floor is dark tile so the screens stand out, calm: see controlFloor
 				set(c, dx, F2(), dz, m == H ? c.kit.beam(edge) : controlFloor(dx, dz));
 				set(c, dx, CEIL(), dz, m == H || Math.floorMod(dz, 2) == 0 ? c.kit.beam(m == H ? edge : Direction.Axis.X) : PLANKS);
 			}
@@ -385,19 +395,26 @@ public final class CitadelOffice {
 	}
 
 	/**
-	 * The control room's floor: dark tiles and deepslate bricks in a fixed checker, a stripe of polished blackstone with pink
-	 * terracotta corners one cell inside the beams (so the room has a frame), and the aisle's cross (see {@link #control}).
+	 * The control room's floor, quiet (struct/leader-office3): deep tile with one deepslate brick in nine, a single stripe of polished
+	 * blackstone bricks one cell inside the beams (so the room has a frame) and a short inlay on the aisle's axis in front of the
+	 * middle podium. No checker, no coloured corners.
 	 */
 	private static BlockState controlFloor(int dx, int dz) {
-		if (m(dx, dz) == 3) {
-			return Math.abs(dx) == 3 && Math.abs(dz) == 3 ? CitadelCanvas.terracotta(DyeColor.PINK) : CitadelCanvas.RIB;
+		if (m(dx, dz) == H - 1) {
+			return CitadelCanvas.RIB;
 		}
-		return Math.floorMod(dx + dz, 2) == 0 ? FOOT : CitadelCanvas.b(Blocks.DEEPSLATE_BRICKS);
+		if (dx == 0 && dz == 4) {
+			return CitadelCanvas.b(Blocks.CHISELED_POLISHED_BLACKSTONE);
+		}
+		if (dx == 0 && (dz == 3 || dz == 5)) {
+			return CitadelCanvas.RIB;
+		}
+		return Math.floorMod(dx * 7 + dz * 3, 9) == 0 ? CitadelCanvas.b(Blocks.DEEPSLATE_BRICKS) : FOOT;
 	}
 
 	// ------------------------------------------------------------------ walls
 
-	/** The wall ring ({@code m = 5}): footing, plaster, beam courses at the floors, windows, doors, pilasters. */
+	/** The wall ring ({@code m = 7}): footing, plaster, beam courses at the floors, windows, doors, pilasters. */
 	public static void walls(CitadelCanvas c) {
 		for (int dx = -W; dx <= W; dx++) {
 			for (int dz = -W; dz <= W; dz++) {
@@ -417,7 +434,7 @@ public final class CitadelOffice {
 		Direction.Axis axis = ns ? Direction.Axis.X : Direction.Axis.Z;
 		for (int y = F0() + 1; y <= WALL_TOP(); y++) {
 			if (y > F2() && y != CEIL()) {
-				continue; // the control cabin has no wall at m = 5: its glass is at m = 6 (see cabin)
+				continue; // the control cabin has no wall at m = 7: its glass is at m = 8 (see cabin)
 			}
 			BlockState s;
 			if (corner) {
@@ -448,27 +465,27 @@ public final class CitadelOffice {
 		return h == 0 ? CitadelCanvas.b(Blocks.POLISHED_DIORITE) : h == 1 ? CitadelCanvas.b(Blocks.SMOOTH_STONE) : CALCITE;
 	}
 
-	/** Lobby wall: a footing course, slit windows over the benches and the chests, the door (north) between two logs. */
+	/** Lobby wall: a footing course, a window band over the benches, the door (north, three wide, four high) between two logs. */
 	private static BlockState lobbyWall(CitadelCanvas c, int y, int au, boolean north, Direction.Axis axis) {
 		if (north && au <= 1) {
-			if (y <= F0() + 3) {
+			if (y <= F0() + 4) {
 				return AIR;
 			}
-			if (y == F0() + 4) {
+			if (y == F0() + 5) {
 				return c.kit.beam(axis);
 			}
 			return CALCITE;
 		}
-		if (au == 2) {
+		if (post(au)) {
 			return LOG;
 		}
 		if (y == F0() + 1) {
 			return FOOT;
 		}
-		if (!north && au <= 1 && (y == F0() + 3 || y == F0() + 4)) {
+		if (!north && au <= 1 && y >= F0() + 3 && y <= F0() + 5) {
 			return Blocks.GLASS_PANE.defaultBlockState();
 		}
-		if (au >= 3 && y >= F0() + 2 && y <= F0() + 4) {
+		if (au >= 3 && y >= F0() + 3 && y <= F0() + 5) {
 			return c.kit.wallPanel(false);
 		}
 		return CALCITE;
@@ -476,41 +493,48 @@ public final class CitadelOffice {
 
 	/** Archive wall: a plaster sill, a ribbon of glass over the middle (not on the south, behind the shelves), shoji at the sides. */
 	private static BlockState archiveWall(CitadelCanvas c, int y, int au, boolean south) {
-		if (au == 2) {
+		if (post(au)) {
 			return LOG;
 		}
-		if (!south && au <= 1 && y >= F1() + 2 && y <= F1() + 4) {
+		if (!south && au <= 1 && y >= F1() + 2 && y <= F1() + 5) {
 			return Blocks.GLASS_PANE.defaultBlockState();
 		}
-		if (au >= 3 && y >= F1() + 2 && y <= F1() + 4) {
+		if (au >= 3 && y >= F1() + 2 && y <= F1() + 5) {
 			return c.kit.wallPanel(false);
 		}
 		return CALCITE;
 	}
 
 	/**
-	 * One wall cell of the cabin (m = 6) at height {@code y}: the door to the balcony on the north, a sill of upside-down cherry
-	 * stairs under a running band of tinted glass everywhere else.
+	 * One wall cell of the cabin (m = 8) at height {@code y}: the door to the balcony on the north, a sill of upside-down cherry
+	 * stairs under clear glass between cherry mullions (every third block), a tinted transom under the beam.
+	 *
+	 * @param idx position along the face (dx on the north and south faces, dz on the east and west ones)
 	 */
-	private static BlockState cabinWall(int y, int dx, int dz, boolean north, int au) {
-		boolean door = north && au <= 1;
+	private static BlockState cabinWall(int y, int dx, int dz, boolean north, int idx) {
+		boolean door = north && Math.abs(idx) <= 1;
 		if (door && y <= F2() + 3) {
 			return AIR;
 		}
 		if (y == F2() + 1) {
 			return cherryStairs(inward(dx, dz), true);
 		}
-		return CitadelCanvas.b(Blocks.TINTED_GLASS);
+		if (post(idx)) {
+			return LOG;
+		}
+		if (y == CEIL() - 1) {
+			return CitadelCanvas.b(Blocks.TINTED_GLASS);
+		}
+		return CitadelCanvas.GLASS;
 	}
 
 	/**
-	 * The control cabin (struct/leader-office2): the top level flies one block past the archive's wall. Its fascia (a beam
-	 * ring at the control floor, row {@code F2()}) sits at m = 6 on a ring of dark tile corbels, with the archive's wall
-	 * (m = 5) set back under it; the cabin's own wall is a running band of tinted glass (rows {@code F2() + 2 .. CEIL() - 1})
-	 * over a sill of upside-down cherry stairs, between four cherry corner posts, under a beam at the ceiling and a lit
-	 * clerestory. The old inner wall (m = 5) is gone above the floor, so the cabin is 11 x 11 inside: the screens, the board
-	 * and the consoles stand where they stood, with a one-block walkway behind them (floor: the beam ring), and the door to
-	 * the balcony is now in the glass.
+	 * The control cabin: the top level flies one block past the archive's wall. Its fascia (a beam ring at the control floor, row
+	 * {@code F2()}) sits at m = 8 on a ring of dark tile corbels, with the archive's wall (m = 7) set back under it; the cabin's own
+	 * wall is clear glass (rows {@code F2() + 2 .. CEIL() - 1}) over a sill of upside-down cherry stairs, between cherry mullions
+	 * every third block and four corner posts, under a beam at the ceiling and a lit clerestory. There is no inner wall above the
+	 * floor: the cabin is 15 x 15 inside, the screens, the board and the consoles stand at m = 6 with the equipment walls
+	 * ({@link #backing}) behind them at m = 7, and the door to the balcony is in the glass.
 	 */
 	public static void cabin(CitadelCanvas c) {
 		for (int dx = -E; dx <= E; dx++) {
@@ -521,7 +545,7 @@ public final class CitadelOffice {
 				boolean corner = Math.abs(dx) == E && Math.abs(dz) == E;
 				boolean north = dz == -E && !corner;
 				boolean ns = Math.abs(dz) == E && !corner;
-				int au = Math.abs(ns ? dx : dz);
+				int idx = ns ? dx : dz;
 				Direction.Axis axis = Math.abs(dz) == E ? Direction.Axis.X : Direction.Axis.Z;
 				// fascia and the dark corbels under it
 				set(c, dx, F2(), dz, corner ? LOG : c.kit.beam(axis));
@@ -533,9 +557,9 @@ public final class CitadelOffice {
 					} else if (y == CEIL()) {
 						s = c.kit.beam(axis);
 					} else if (y < CEIL()) {
-						s = cabinWall(y, dx, dz, north, au);
+						s = cabinWall(y, dx, dz, north, idx);
 					} else {
-						s = au == 2 ? LOG : c.kit.wallPanel(true);
+						s = post(idx) ? LOG : c.kit.wallPanel(true);
 					}
 					set(c, dx, y, dz, s);
 				}
@@ -557,8 +581,9 @@ public final class CitadelOffice {
 				boolean corner = Math.abs(dx) == E && Math.abs(dz) == E;
 				boolean north = dz == -E && !corner;
 				boolean ns = Math.abs(dz) == E && !corner;
-				int au = Math.abs(ns ? dx : dz);
-				if (!corner && !north && au == 2) {
+				int idx = ns ? dx : dz;
+				int au = Math.abs(idx);
+				if (!corner && !north && post(idx)) {
 					// pilaster: base, log up to the lobby's cornice
 					set(c, dx, F0() + 1, dz, FOOT);
 					for (int y = F0() + 2; y < F1(); y++) {
@@ -589,16 +614,17 @@ public final class CitadelOffice {
 	// ------------------------------------------------------------------ stairs
 
 	/**
-	 * Two flights of six steps, two blocks wide.
+	 * Two flights, two blocks wide.
 	 *
 	 * <ul>
-	 * <li><b>A</b>, lobby to archive, an L in the south-west corner (struct/leader-office2): leg 1 runs south along the west
-	 *     wall ({@code dx = -4, -3}, steps at {@code dz = 1, 2}, {@code y = F0() + 1, + 2}), a 2 x 2 landing at the corner
-	 *     ({@code dz = 3, 4}, top at {@code F0() + 3}), then leg 2 runs east along the south wall (steps at {@code dx = -2 .. 1},
-	 *     {@code dz = 3, 4}, {@code y = F0() + 3 .. F0() + 6}, the last in the floor row). Entered head-on from
-	 *     {@code (-4..-3, 0)}. The archive's floor is open over {@code dx = -2 .. 0}, fenced.</li>
-	 * <li><b>B</b>, archive to control room, east columns {@code dx = 3, 4}: step {@code i} at {@code dz = 3 - i}
-	 *     (rising north), {@code y = F1() + 1 + i}. Landing {@code (3..4, 4)}. Well over {@code dz = 1..-1}.</li>
+	 * <li><b>A</b>, lobby to archive, an L in the south-west corner: leg 1 runs south along the west wall ({@code dx = -6, -5},
+	 *     steps at {@code dz = 2 .. 4}, {@code y = F0() + 1 .. + 3}), a 2 x 2 landing at the corner ({@code dz = 5, 6}, top at
+	 *     {@code F0() + 4}), then leg 2 runs east along the south wall (steps at {@code dx = -4 .. -1}, {@code dz = 5, 6},
+	 *     {@code y = F0() + 4 .. F0() + 7}, the last in the floor row). Entered head-on from {@code (-6..-5, 0..1)}. The
+	 *     archive's floor is open over {@code dx = -4 .. -2}, fenced.</li>
+	 * <li><b>B</b>, archive to control room, east columns {@code dx = 5, 6}: step {@code i} at {@code dz = 4 - i}
+	 *     (rising north), {@code y = F1() + 1 + i}, seven steps, the last in the floor row. Entered head-on from the landing
+	 *     {@code (5..6, 5..6)}. Well over {@code dz = -1..1}.</li>
 	 * </ul>
 	 *
 	 * Every step has two free blocks above its walking surface (the well over the steps whose roof is lower than that), the
@@ -607,37 +633,37 @@ public final class CitadelOffice {
 	public static void stairways(CitadelCanvas c) {
 		for (int k = 0; k < 2; k++) {
 			// A, leg 1: along the west wall, rising south
-			for (int i = 0; i < 2; i++) {
-				int x = -4 + k;
-				int z = 1 + i;
+			for (int i = 0; i < 3; i++) {
+				int x = -H + k;
+				int z = 2 + i;
 				set(c, x, F0() + 1 + i, z, cherryStairs(Direction.SOUTH, false));
 				for (int y = F0() + 1; y < F0() + 1 + i; y++) {
 					set(c, x, y, z, PLANKS);
 				}
 			}
 			// A, the landing in the corner: its top is the back of the last step of leg 1
-			for (int z = 3; z <= 4; z++) {
-				for (int y = F0() + 1; y <= F0() + 2; y++) {
-					set(c, -4 + k, y, z, PLANKS);
+			for (int z = 5; z <= 6; z++) {
+				for (int y = F0() + 1; y <= F0() + 3; y++) {
+					set(c, -H + k, y, z, PLANKS);
 				}
 			}
 			// A, leg 2: along the south wall, rising east, the last step in the floor row
 			for (int j = 0; j < 4; j++) {
-				int x = -2 + j;
-				int z = 3 + k;
-				set(c, x, F0() + 3 + j, z, cherryStairs(Direction.EAST, false));
-				for (int y = F0() + 1; y < F0() + 3 + j; y++) {
+				int x = -4 + j;
+				int z = 5 + k;
+				set(c, x, F0() + 4 + j, z, cherryStairs(Direction.EAST, false));
+				for (int y = F0() + 1; y < F0() + 4 + j; y++) {
 					set(c, x, y, z, PLANKS);
 				}
 			}
-			// A, the well: the headroom of steps 3 to 5 goes through the floor above
-			for (int x = -2; x <= 0; x++) {
-				set(c, x, F1(), 3 + k, AIR);
+			// A, the well: the headroom of the steps goes through the floor above
+			for (int x = -4; x <= -2; x++) {
+				set(c, x, F1(), 5 + k, AIR);
 			}
 			for (int i = 0; i < FH; i++) {
 				// B: archive to control room, rising north
-				int xb = 3 + k;
-				int zb = 3 - i;
+				int xb = 5 + k;
+				int zb = 4 - i;
 				set(c, xb, F1() + 1 + i, zb, cherryStairs(Direction.NORTH, false));
 				for (int y = F1() + 1; y < F1() + 1 + i; y++) {
 					set(c, xb, y, zb, PLANKS);
@@ -645,7 +671,7 @@ public final class CitadelOffice {
 			}
 			// B, the well
 			for (int dz = -1; dz <= 1; dz++) {
-				set(c, 3 + k, F2(), dz, AIR);
+				set(c, 5 + k, F2(), dz, AIR);
 			}
 		}
 	}
@@ -653,96 +679,128 @@ public final class CitadelOffice {
 	// ------------------------------------------------------------------ lobby (feet y = F0() + 1)
 
 	/**
-	 * Lobby and workshop: a rug from the door, double chests and barrels on the east wall, seven workbenches (four on the west
-	 * wall, one beside the door, two on the south wall next to flight A), an anvil and an ender chest, banners and a plaque. The
-	 * middle of the room stays free from the door to the south wall, and flight A's corner (south-west) keeps the door's side clear.
+	 * Lobby and workshop (13 x 13): a rug from the door; on the north wall the workbenches west of the door (crafting, smithing,
+	 * fletching, stonecutter, an anvil) and the ender chest and two double chests east of it; on the west wall the blast furnace,
+	 * grindstone, loom and barrels (the cells in front of flight A's first step, {@code dz = 0..1}, stay free); on the east wall a
+	 * furnace, a smoker, barrels and two more double chests; on the south wall, east of flight A, a second bench and barrels. The
+	 * middle of the room stays free from the door to the south wall, and every aisle is at least three wide.
 	 */
 	public static void lobby(CitadelCanvas c) {
 		int y = F0() + 1;
-		// rug: three wide from the door to the middle
-		for (int dz = -4; dz <= 1; dz++) {
-			set(c, -1, y, dz, carpet(RUG_EDGE));
-			set(c, 0, y, dz, carpet(RUG));
-			set(c, 1, y, dz, carpet(RUG_EDGE));
+		// rug: five wide from the door to the middle
+		for (int dz = -6; dz <= 2; dz++) {
+			for (int dx = -2; dx <= 2; dx++) {
+				set(c, dx, y, dz, carpet(Math.abs(dx) == 2 || dz == 2 ? RUG_EDGE : RUG));
+			}
 		}
-		// storage (east wall): two double chests, then barrels two high
-		set(c, 4, y, -4, chest(Direction.WEST, ChestType.RIGHT));
-		set(c, 4, y, -3, chest(Direction.WEST, ChestType.LEFT));
-		set(c, 4, y, -2, chest(Direction.WEST, ChestType.RIGHT));
-		set(c, 4, y, -1, chest(Direction.WEST, ChestType.LEFT));
-		for (int dz = 0; dz <= 4; dz++) {
-			set(c, 4, y, dz, barrel());
-			set(c, 4, y + 1, dz, barrel());
+		// north wall: workbenches west of the door, the ender chest and the double chests east of it
+		set(c, -6, y, -6, Blocks.CRAFTING_TABLE.defaultBlockState());
+		set(c, -5, y, -6, Blocks.SMITHING_TABLE.defaultBlockState());
+		set(c, -4, y, -6, Blocks.FLETCHING_TABLE.defaultBlockState());
+		set(c, -3, y, -6, facing(Blocks.STONECUTTER, Direction.SOUTH));
+		set(c, -2, y, -6, facing(Blocks.ANVIL, Direction.EAST));
+		set(c, 2, y, -6, facing(Blocks.ENDER_CHEST, Direction.SOUTH));
+		for (int dx = 3; dx <= 5; dx += 2) {
+			set(c, dx, y, -6, chest(Direction.SOUTH, ChestType.RIGHT));
+			set(c, dx + 1, y, -6, chest(Direction.SOUTH, ChestType.LEFT));
 		}
-		// workbenches, west wall (the player stands east of them; the cells in front of flight A's first step, dz = 0, stay free)
-		set(c, -4, y, -4, Blocks.CRAFTING_TABLE.defaultBlockState());
-		set(c, -4, y, -3, Blocks.SMITHING_TABLE.defaultBlockState());
-		set(c, -4, y, -2, Blocks.FLETCHING_TABLE.defaultBlockState());
-		set(c, -4, y, -1, facing(Blocks.STONECUTTER, Direction.EAST));
-		// south wall, east of flight A
-		set(c, 2, y, 4, Blocks.GRINDSTONE.defaultBlockState());
-		set(c, 3, y, 4, facing(Blocks.LOOM, Direction.NORTH));
-		// beside the door: the blast furnace, an anvil and an ender chest (storage that follows the player)
-		set(c, -3, y, -4, facing(Blocks.BLAST_FURNACE, Direction.SOUTH));
-		set(c, -2, y, -4, facing(Blocks.ANVIL, Direction.EAST));
-		set(c, 2, y, -4, facing(Blocks.ENDER_CHEST, Direction.SOUTH));
+		// west wall: blast furnace, grindstone, loom, a barrel stack; dz = -1..1 stay free in front of flight A
+		set(c, -6, y, -5, facing(Blocks.BLAST_FURNACE, Direction.EAST));
+		set(c, -6, y, -4, Blocks.GRINDSTONE.defaultBlockState());
+		set(c, -6, y, -3, facing(Blocks.LOOM, Direction.EAST));
+		set(c, -6, y, -2, barrel());
+		set(c, -6, y + 1, -2, barrel());
+		// east wall: furnace and smoker, barrels, then two double chests
+		set(c, 6, y, -5, facing(Blocks.FURNACE, Direction.WEST));
+		set(c, 6, y, -4, facing(Blocks.SMOKER, Direction.WEST));
+		for (int dz = -3; dz <= -2; dz++) {
+			set(c, 6, y, dz, barrel());
+			set(c, 6, y + 1, dz, barrel());
+		}
+		for (int dz = 1; dz <= 3; dz += 2) {
+			set(c, 6, y, dz, chest(Direction.WEST, ChestType.RIGHT));
+			set(c, 6, y, dz + 1, chest(Direction.WEST, ChestType.LEFT));
+		}
+		set(c, 6, y, 5, barrel());
+		set(c, 6, y + 1, 5, barrel());
+		set(c, 6, y, 6, barrel());
+		set(c, 6, y + 1, 6, barrel());
+		// south wall, east of flight A: a second bench and a row of barrels
+		set(c, 0, y, 6, Blocks.CRAFTING_TABLE.defaultBlockState());
+		set(c, 1, y, 6, facing(Blocks.LOOM, Direction.NORTH));
+		for (int dx = 2; dx <= 5; dx++) {
+			set(c, dx, y, 6, barrel());
+		}
 		// banners on the door's inner jambs, a plaque over the door outside
-		set(c, -2, y + 2, -4, wallBanner(Direction.SOUTH));
-		set(c, 2, y + 2, -4, wallBanner(Direction.SOUTH));
-		sign(c, CX(), F0() + 4, CZ() - E, Direction.NORTH, DyeColor.ORANGE, "", "Facundo", "Oficina", "");
-		for (int[] p : new int[][] {{-2, -2}, {2, -2}, {-2, 2}, {2, 2}, {0, 2}, {0, -3}}) {
+		set(c, -2, y + 2, -6, wallBanner(Direction.SOUTH));
+		set(c, 2, y + 2, -6, wallBanner(Direction.SOUTH));
+		sign(c, CX(), F0() + 5, CZ() - E, Direction.NORTH, DyeColor.ORANGE, "", "Facundo", "Oficina", "");
+		for (int[] p : new int[][] {{-3, -3}, {3, -3}, {-3, 3}, {3, 3}, {0, 4}, {0, -3}}) {
 			hang(c, p[0], F1() - 1, p[1]);
 		}
-		// canopy over the door, four blocks above the deck so nothing is in the way: stairs against the wall, a slab edge, two lanterns
+		// canopy over the door, five blocks above the deck so nothing is in the way: stairs against the wall, a slab edge, two lanterns
 		for (int dx = -2; dx <= 2; dx++) {
-			set(c, dx, F0() + 5, -E, cherryStairs(Direction.SOUTH, false));
-			set(c, dx, F0() + 5, -E - 1, slab(Blocks.CHERRY_SLAB));
+			set(c, dx, F0() + 6, -E, cherryStairs(Direction.SOUTH, false));
+			set(c, dx, F0() + 6, -E - 1, slab(Blocks.CHERRY_SLAB));
 		}
-		hang(c, -2, F0() + 4, -E - 1);
-		hang(c, 2, F0() + 4, -E - 1);
+		hang(c, -2, F0() + 5, -E - 1);
+		hang(c, 2, F0() + 5, -E - 1);
 	}
 
 	// ------------------------------------------------------------------ archive (feet y = F1() + 1)
 
 	/**
-	 * Archive and cartography: shelves and lecterns under the west windows, the map table and the model of the HQ, a bed
+	 * Archive and cartography (13 x 13): shelves and lecterns under the west windows, the map table and the model of the HQ, a bed
 	 * nook, a reading corner, and flight A's well (south-west, fenced) with its exit on the south wall.
 	 */
 	public static void archive(CitadelCanvas c) {
 		int y = F1() + 1;
-		// the well of flight A (open over dx = -2..0, dz = 3..4), fenced on the floor cells beside it
-		for (int dz = 3; dz <= 4; dz++) {
-			set(c, -3, y, dz, fence());
+		// the well of flight A (open over dx = -4..-2, dz = 5..6), fenced on the floor cells beside it
+		for (int dz = 5; dz <= 6; dz++) {
+			set(c, -5, y, dz, fence());
 		}
-		for (int dx = -2; dx <= 0; dx++) {
-			set(c, dx, y, 2, fence());
+		for (int dx = -4; dx <= -2; dx++) {
+			set(c, dx, y, 4, fence());
 		}
 		// bed nook, north-west: head against the north wall
-		set(c, -4, y, -4, facing(Blocks.BED.pick(BED), Direction.NORTH).setValue(BlockStateProperties.BED_PART, BedPart.HEAD));
-		set(c, -4, y, -3, facing(Blocks.BED.pick(BED), Direction.NORTH).setValue(BlockStateProperties.BED_PART, BedPart.FOOT));
-		set(c, -3, y, -4, chest(Direction.SOUTH, ChestType.SINGLE));
-		set(c, -3, y, -3, Blocks.JUKEBOX.defaultBlockState());
-		// west wall: tall shelves at the ends, lecterns (stand-ins for the archive terminal, see the class comment) and a low
-		// shelf under the window
-		shelves(c, -4, y, -2, 3);
-		set(c, -4, y, -1, facing(Blocks.LECTERN, Direction.EAST));
-		set(c, -4, y, 0, Blocks.BOOKSHELF.defaultBlockState());
-		set(c, -4, y, 1, facing(Blocks.LECTERN, Direction.EAST));
-		shelves(c, -4, y, 2, 3);
-		// south-west corner, over flight A's landing: shelves
-		shelves(c, -4, y, 3, 3);
-		shelves(c, -4, y, 4, 3);
-		set(c, 1, y + 2, 4, wallBanner(Direction.NORTH));
-		sign(c, CX() + 2, y + 2, CZ() + 4, Direction.NORTH, DyeColor.ORANGE, "", "Archivo", "", "");
-		// north wall: map table and a reading stand under the window, a sofa in the north-east corner
-		set(c, -1, y, -4, Blocks.POTTED_BAMBOO.defaultBlockState());
-		set(c, 0, y, -4, Blocks.CARTOGRAPHY_TABLE.defaultBlockState());
-		set(c, 1, y, -4, facing(Blocks.LECTERN, Direction.SOUTH));
-		set(c, 2, y, -4, Blocks.ENCHANTING_TABLE.defaultBlockState());
-		set(c, 3, y, -4, cherryStairs(Direction.SOUTH, false));
-		set(c, 4, y, -4, cherryStairs(Direction.SOUTH, false));
-		set(c, 4, y, -3, cherryStairs(Direction.WEST, false));
-		// the model of the HQ: hub in the middle, the four ramps, four barrios; the red carpet is this tower
+		set(c, -6, y, -6, facing(Blocks.BED.pick(BED), Direction.NORTH).setValue(BlockStateProperties.BED_PART, BedPart.HEAD));
+		set(c, -6, y, -5, facing(Blocks.BED.pick(BED), Direction.NORTH).setValue(BlockStateProperties.BED_PART, BedPart.FOOT));
+		set(c, -5, y, -6, chest(Direction.SOUTH, ChestType.SINGLE));
+		set(c, -5, y, -5, Blocks.JUKEBOX.defaultBlockState());
+		// west wall: tall shelves, lecterns (stand-ins for the archive terminal, see the class comment) and a low shelf under the window
+		shelves(c, -6, y, -4, 3);
+		set(c, -6, y, -1, facing(Blocks.LECTERN, Direction.EAST));
+		set(c, -6, y, 0, Blocks.BOOKSHELF.defaultBlockState());
+		set(c, -6, y, 1, facing(Blocks.LECTERN, Direction.EAST));
+		shelves(c, -6, y, 2, 3);
+		shelves(c, -6, y, 5, 3);
+		shelves(c, -6, y, 6, 3);
+		// south wall, east of the well: shelves under a plaque and two banners
+		for (int dx = 1; dx <= 3; dx++) {
+			shelves(c, dx, y, 6, 3);
+		}
+		set(c, 1, y + 3, 6, wallBanner(Direction.NORTH));
+		set(c, 3, y + 3, 6, wallBanner(Direction.NORTH));
+		sign(c, CX() + 2, y + 3, CZ() + 6, Direction.NORTH, DyeColor.ORANGE, "", "Archivo", "", "");
+		// north wall: enchanting and map tables, reading stands, a sofa in the north-east corner
+		set(c, -2, y, -6, Blocks.ENCHANTING_TABLE.defaultBlockState());
+		set(c, -1, y, -6, facing(Blocks.LECTERN, Direction.SOUTH));
+		set(c, 0, y, -6, Blocks.CARTOGRAPHY_TABLE.defaultBlockState());
+		set(c, 1, y, -6, facing(Blocks.LECTERN, Direction.SOUTH));
+		set(c, 2, y, -6, Blocks.POTTED_BAMBOO.defaultBlockState());
+		for (int dx = 4; dx <= 6; dx++) {
+			set(c, dx, y, -6, cherryStairs(Direction.NORTH, false));
+		}
+		set(c, 6, y, -5, cherryStairs(Direction.EAST, false));
+		set(c, 6, y, -4, cherryStairs(Direction.EAST, false));
+		// the model of the HQ, 5 x 5: hub in the middle, the four ramps, four barrios, the outer ring; the red block is this tower
+		for (int dx = -2; dx <= 2; dx++) {
+			for (int dz = -2; dz <= 2; dz++) {
+				if (m(dx, dz) == 2) {
+					set(c, dx, y, dz, slab(Blocks.POLISHED_ANDESITE_SLAB));
+				}
+			}
+		}
 		set(c, 0, y, 0, CALCITE);
 		set(c, 0, y + 1, 0, lantern(false));
 		// ramps in bamboo mosaic like the real ones, barrios in pink terracotta
@@ -755,18 +813,16 @@ public final class CitadelOffice {
 				set(c, sx, y, sz, CitadelCanvas.terracotta(DyeColor.PINK));
 			}
 		}
-		set(c, 1, y + 1, 1, carpet(DyeColor.RED));
-		// rug round the table
-		for (int dx = 1; dx <= 2; dx++) {
-			set(c, dx, y, 2, carpet(RUG_EDGE));
+		set(c, 1, y, 2, CitadelCanvas.terracotta(DyeColor.RED));
+		// a pink rug round the model
+		for (int dx = -3; dx <= 3; dx++) {
+			for (int dz = -3; dz <= 3; dz++) {
+				if (m(dx, dz) == 3) {
+					set(c, dx, y, dz, carpet(RUG_EDGE));
+				}
+			}
 		}
-		for (int dx = -1; dx <= 2; dx++) {
-			set(c, dx, y, -2, carpet(RUG_EDGE));
-		}
-		for (int dz = -1; dz <= 1; dz++) {
-			set(c, 2, y, dz, carpet(RUG_EDGE));
-		}
-		for (int[] p : new int[][] {{-2, -3}, {2, -3}, {0, 2}, {-2, 3}, {-1, 0}}) {
+		for (int[] p : new int[][] {{-3, -3}, {3, -3}, {-3, 3}, {3, 3}, {0, -5}}) {
 			hang(c, p[0], F2() - 1, p[1]);
 		}
 	}
@@ -774,118 +830,123 @@ public final class CitadelOffice {
 	// ------------------------------------------------------------------ control room (feet y = F2() + 1)
 
 	/**
-	 * Control room: the threads screen with its consoles, two project screens over chests, the attention board, a rug,
-	 * the fences of flight B's well and the plaque.
+	 * Control room (13 x 13 floor, 15 x 15 under the glass): the threads screen with its consoles, two project screens over
+	 * chests, the attention board, a rug centred on the room's axis, the fences of flight B's well and the plaque.
 	 */
 	public static void control(CitadelCanvas c) {
 		int y = F2() + 1;
 		// the well of flight B, fenced on its open sides
 		for (int dz = -1; dz <= 1; dz++) {
-			set(c, 2, y, dz, fence());
+			set(c, 4, y, dz, fence());
 		}
-		for (int dx = 2; dx <= 4; dx++) {
+		for (int dx = 4; dx <= 6; dx++) {
 			set(c, dx, y, 2, fence());
 		}
-		// rug in front of the consoles, centred on the room's axis (the door's, the screen's, the middle console's): five wide and four
-		// deep with a pink border, the player stands on it facing south. The cell of the well's fence is left out (dx = 2, dz = -1).
-		for (int dx = -2; dx <= 2; dx++) {
-			for (int dz = -4; dz <= -1; dz++) {
-				if (dx == 2 && dz == -1) {
-					continue;
-				}
-				boolean edge = Math.abs(dx) == 2 || dz == -4 || dz == -1;
+		// rug in front of the consoles, centred on the room's axis (the door's, the screen's, the middle console's): seven wide and
+		// seven deep with a pink border, filling the space between the walkway (dz = -6) and the console bank (dz = 2); the player
+		// stands on its south edge (the OFFICE anchor) facing south
+		for (int dx = -3; dx <= 3; dx++) {
+			for (int dz = -5; dz <= 1; dz++) {
+				boolean edge = Math.abs(dx) == 3 || dz == -5 || dz == 1;
 				set(c, dx, y, dz, carpet(edge ? RUG_EDGE : RUG));
 			}
 		}
-		// the aisle's cross in the floor, on the axis, in front of the middle podium: pink terracotta round a chiseled centre
-		set(c, 0, F2(), 2, CitadelCanvas.b(Blocks.CHISELED_POLISHED_BLACKSTONE));
-		for (int[] p : new int[][] {{-1, 2}, {1, 2}, {0, 1}, {0, 3}}) {
-			set(c, p[0], F2(), p[1], CitadelCanvas.terracotta(DyeColor.PINK));
+		// the consoles: a bank of five console terminals (kit role CONSOLE; a lectern with the blocks module off), side by side at
+		// dz = 2, centred on the axis, so their screens read as one command desk, facing the player on the rug to the north. That
+		// leaves a 3-wide aisle (dz = 3..5) between the bank and the podiums. A slab with a lantern closes the bank on each end.
+		for (int dx = -2; dx <= 2; dx++) {
+			set(c, dx, y, 2, c.kit.console(Direction.NORTH));
 		}
-		// the consoles: a bank of three console terminals (kit role CONSOLE; a lectern with the blocks module off), side by side
-		// at dz = 0, centred on the axis, so their screens read as one command desk, facing the player, who stands on the rug to the
-		// north. That leaves a 3-wide aisle (dz = 1..3) between the bank and the podiums, and dx = -3 free so the merge station can be
-		// reached. A slab with a lantern closes the bank on its west end; the well's fence closes it on the east.
-		for (int dx = -1; dx <= 1; dx++) {
-			set(c, dx, y, 0, c.kit.console(Direction.NORTH));
+		for (int dx : new int[] {-3, 3}) {
+			set(c, dx, y, 2, topSlab(Blocks.CHERRY_SLAB));
+			set(c, dx, y + 1, 2, lantern(false));
 		}
-		set(c, -2, y, 0, topSlab(Blocks.CHERRY_SLAB));
-		set(c, -2, y + 1, 0, lantern(false));
 		// under the main screen: the decision podiums (five, every other cell from west to east, so each one has a free cell beside
-		// it and its own display reads). Between them no plants (a dead podium looked like a flower pot): a cherry pilaster, with a
-		// dark capital in the screen's base, so the plinth reads as bays
+		// it and its own display reads); between them a cherry pilaster with a dark capital in the screen's base, so the plinth
+		// reads as bays
 		podiums(c, y);
-		for (int dx : new int[] {-3, -1, 1, 3}) {
-			set(c, dx, y, 4, c.kit.beam(Direction.Axis.Y));
+		for (int dx : new int[] {-5, -3, -1, 1, 3, 5}) {
+			set(c, dx, y, H, c.kit.beam(Direction.Axis.Y));
 		}
-		// threads screen: 7 x 4 on the south wall, bound to the hub's feed
-		HqGeometry.Surface main = new HqGeometry.Surface(new BlockPos(CX() + 3, F2() + 3, CZ() + 4), Direction.WEST, Direction.NORTH, 7, 4);
+		// threads screen: 11 x 5 on the south wall, bound to the hub's feed; its top row is the room's crown line (F2() + 7)
+		HqGeometry.Surface main = new HqGeometry.Surface(new BlockPos(CX() + 5, F2() + 3, CZ() + H), Direction.WEST, Direction.NORTH, 11, 5);
 		CitadelHub.bigScreen(c, main, OFFICE, HqGenerator.hubBinding(c.layout), true);
-		for (int dx : new int[] {-3, -1, 1, 3}) {
-			c.fixture(new BlockPos(CX() + dx, F2() + 2, CZ() + 4), CitadelCanvas.RIB);
+		for (int dx : new int[] {-5, -3, -1, 1, 3, 5}) {
+			c.fixture(new BlockPos(CX() + dx, F2() + 2, CZ() + H), CitadelCanvas.RIB);
 		}
-		sign(c, CX(), F2() + 7, CZ() + 4, Direction.NORTH, DyeColor.ORANGE, "", "Facundo", "Hilos", "");
-		// project screens: two 3 x 3 on the west wall, chests under them
+		sign(c, CX(), F2() + 8, CZ() + H, Direction.NORTH, DyeColor.ORANGE, "", "Facundo", "Hilos", "");
+		// project screens: two 5 x 5 on the west wall, same crown line, chests under them
 		List<String> projects = projectBindings(c, 2);
-		CitadelHub.bigScreen(c, new HqGeometry.Surface(new BlockPos(CX() - 4, F2() + 3, CZ() + 3), Direction.NORTH, Direction.EAST, 3, 3),
+		CitadelHub.bigScreen(c, new HqGeometry.Surface(new BlockPos(CX() - H, F2() + 3, CZ() + 5), Direction.NORTH, Direction.EAST, 5, 5),
 				"office_w0", projects.get(0), false);
-		CitadelHub.bigScreen(c, new HqGeometry.Surface(new BlockPos(CX() - 4, F2() + 3, CZ() - 1), Direction.NORTH, Direction.EAST, 3, 3),
+		CitadelHub.bigScreen(c, new HqGeometry.Surface(new BlockPos(CX() - H, F2() + 3, CZ() - 1), Direction.NORTH, Direction.EAST, 5, 5),
 				"office_w1", projects.get(1), false);
-		for (int dz = -3; dz <= 3; dz++) {
-			// a free cell either side of the merge station (dz = 0), so it is not boxed in
+		for (int dz = -5; dz <= 5; dz++) {
 			if (Math.abs(dz) >= 2) {
-				set(c, -4, y, dz, chest(Direction.EAST, ChestType.SINGLE));
+				// a free cell either side of the merge station (dz = 0), so it is not boxed in
+				set(c, -H, y, dz, chest(Direction.EAST, ChestType.SINGLE));
 			}
+			c.fixture(new BlockPos(CX() - H, F2() + 2, CZ() + dz), c.style.screenBase());
 		}
-		set(c, -4, F2() + 3, 0, wallBanner(Direction.EAST));
-		set(c, -4, F2() + 4, 0, wallBanner(Direction.EAST));
-		// a map table in the north-west corner, for planning on the HQ's map
-		set(c, -4, y, -4, Blocks.CARTOGRAPHY_TABLE.defaultBlockState());
+		set(c, -H, F2() + 3, 0, wallBanner(Direction.EAST));
+		set(c, -H, F2() + 4, 0, wallBanner(Direction.EAST));
+		// a map table in the north-west corner, for planning on the HQ's map, and a chest of plans in the north-east one
+		set(c, -H, y, -H, Blocks.CARTOGRAPHY_TABLE.defaultBlockState());
+		set(c, H, y, -H, chest(Direction.WEST, ChestType.SINGLE));
 		// merge station (kit role MERGE_STATION; a smithing table without the blocks module) in the gap between the two project
 		// screens, facing the room: its list opens the pending PRs of the first screen's project
-		BlockPos station = new BlockPos(CX() - 4, y, CZ());
+		BlockPos station = new BlockPos(CX() - H, y, CZ());
 		c.fixture(station, c.kit.mergeStation(Direction.EAST));
 		c.anchor(Anchor.face(AnchorNames.mergeStation("office", projects.get(0)), station, Direction.EAST));
 		attentionBoard(c);
 		backing(c);
-		// light: lanterns only over the middle and the north half; the screen's side gets invisible light, so nothing hangs in front of it
-		for (int[] p : new int[][] {{-3, -3}, {0, -3}, {3, -3}, {-3, 0}, {0, 0}}) {
+		// light: lanterns only over the middle and the north half; the screen's side gets glow panels, so nothing hangs in front of it
+		for (int[] p : new int[][] {{-4, -4}, {0, -4}, {4, -4}, {-4, 0}, {0, 0}}) {
 			hang(c, p[0], CEIL() - 1, p[1]);
 		}
 		glow(c);
 	}
 
 	/**
-	 * The equipment walls behind the screens and the board (the cabin has no inner wall any more): dark deepslate at m = 5, full
-	 * height, as wide as what hangs on them (nine behind the threads screen and the podiums, seven behind the board and the project
-	 * screens), so nothing floats; the corners of the walkway stay open and glazed, and reachable from the room's corners.
+	 * The equipment walls behind the screens and the board (the cabin has no inner wall): at m = 7, full height up to one crown
+	 * beam ({@code F2() + 8}) shared by every wall, as wide as what hangs on them (thirteen behind the threads screen and the
+	 * podiums, eleven behind the board and the project screens), so nothing floats; the corners of the walkway stay open and glazed,
+	 * and reachable from the room's corners. The base is dark (two rows), the body pale plaster so the cabin's glass reads as a lantern
+	 * from outside, with cherry pilasters on the mullions' axes.
 	 */
 	private static void backing(CitadelCanvas c) {
 		for (int y = F2() + 1; y < CEIL(); y++) {
-			for (int i = -4; i <= 4; i++) {
-				set(c, i, y, W, backingBlock(i, y));
+			for (int i = -H; i <= H; i++) {
+				set(c, i, y, W, backingBlock(c, i, y, Direction.Axis.X, CX() + i, CZ() + W));
 			}
-			for (int i = -3; i <= 3; i++) {
-				set(c, W, y, i, backingBlock(i + 11, y));
-				set(c, -W, y, i, backingBlock(i - 11, y));
+			for (int i = -5; i <= 5; i++) {
+				set(c, W, y, i, backingBlock(c, i, y, Direction.Axis.Z, CX() + W, CZ() + i));
+				set(c, -W, y, i, backingBlock(c, i, y, Direction.Axis.Z, CX() - W, CZ() + i));
 			}
 		}
 	}
 
-	private static BlockState backingBlock(int i, int y) {
-		int h = Math.floorMod(i * 5 + y * 3, 7);
-		return h == 0 ? CitadelCanvas.RIB : h < 3 ? CitadelCanvas.b(Blocks.DEEPSLATE_BRICKS) : FOOT;
+	private static BlockState backingBlock(CitadelCanvas c, int i, int y, Direction.Axis axis, int x, int z) {
+		if (y == CEIL() - 1) {
+			return c.kit.beam(axis);
+		}
+		if (post(i)) {
+			return LOG;
+		}
+		if (y <= F2() + 2) {
+			int h = Math.floorMod(i * 5 + y * 3, 7);
+			return h == 0 ? CitadelCanvas.RIB : h < 3 ? CitadelCanvas.b(Blocks.DEEPSLATE_BRICKS) : FOOT;
+		}
+		return plaster(x, y, z);
 	}
 
 	/**
 	 * kit/glow-panel: integrated light for the control room and the two flights, with the kit's glow blocks (vanilla
-	 * fallback: the invisible light block, or a froglight in the panels). It replaces the three invisible lights that
-	 * used to light the screen's side and hangs nothing in front of the screen:
+	 * fallback: the invisible light block, or a froglight in the panels). Nothing hangs in front of the screens:
 	 * <ul>
-	 * <li>three cool ceiling panels over the screen's side ({@code dx = -3, 0, 3}), on the room's axis;</li>
-	 * <li>cool strips under the screens, hugging their wall: in front of the main screen's base (7 cells), and under the
-	 *     two project screens and the banner between them (7 cells), at the top of the cell that is just below the
-	 *     screen, so the light falls on the console, the barrels and the chests;</li>
+	 * <li>three cool ceiling panels over the screen's side ({@code dx = -4, 0, 4}), on the room's axis;</li>
+	 * <li>cool strips under the screens, hugging their wall: in front of the main screen's base (11 cells), and under the
+	 *     two project screens and the banner between them (11 cells), so the light falls on the console, the barrels and the chests;</li>
 	 * <li>warm strips along the wall side of each flight, one per step in the cell above it, so the climb is lit step by
 	 *     step (the last step of each flight is left alone: the next floor's furniture stands there).</li>
 	 * </ul>
@@ -893,28 +954,29 @@ public final class CitadelOffice {
 	 */
 	private static void glow(CitadelCanvas c) {
 		int y = F2() + 1;
-		for (int dx : new int[] {-3, 0, 3}) {
-			if (solid(c, dx, CEIL(), 3)) {
-				set(c, dx, CEIL(), 3, c.kit.glowPanel(Direction.DOWN, true));
+		for (int dx : new int[] {-4, 0, 4}) {
+			if (solid(c, dx, CEIL(), 4)) {
+				set(c, dx, CEIL(), 4, c.kit.glowPanel(Direction.DOWN, true));
 			}
 		}
-		// under the main screen: its base beam is on the wall row (dz = 4), the strip hugs its front, at the top of the cell
-		for (int dx = -3; dx <= 3; dx++) {
-			glowStrip(c, dx, y + 1, 3, c.kit.glowStrip(Direction.NORTH, true, true));
+		// under the main screen: its base beam is on the wall row (dz = 6), the strip hugs its front, at the top of the cell
+		for (int dx = -5; dx <= 5; dx++) {
+			glowStrip(c, dx, y + 1, H - 1, c.kit.glowStrip(Direction.NORTH, true, true));
 		}
-		// under the project screens (west wall): the wall row's cell below the screens holds their base beam, so the strip hugs its
-		// front, one cell into the room (dx = -3), like the main screen's
-		for (int dz = -3; dz <= 3; dz++) {
-			glowStrip(c, -3, y + 1, dz, c.kit.glowStrip(Direction.EAST, true, true));
+		// under the project screens (west wall), one cell into the room (dx = -5), like the main screen's
+		for (int dz = -5; dz <= 5; dz++) {
+			glowStrip(c, -H + 1, y + 1, dz, c.kit.glowStrip(Direction.EAST, true, true));
 		}
-		// the flights, along the wall: A rises south on the west wall (dx = -4), B rises north on the east wall (dx = 4)
+		// the flights, along the wall: B rises north on the east wall (dx = 6)
 		for (int i = 0; i < FH - 1; i++) {
-			glowStrip(c, 4, F1() + 2 + i, 3 - i, c.kit.glowStrip(Direction.WEST, false, false));
+			glowStrip(c, H, F1() + 2 + i, 4 - i, c.kit.glowStrip(Direction.WEST, false, false));
 		}
-		// A is an L now: leg 1 rises south on the west wall (dx = -4), leg 2 rises east on the south wall (dz = 4)
-		for (int i = 0; i < 2; i++) {
-			glowStrip(c, -4, F0() + 2 + i, 1 + i, c.kit.glowStrip(Direction.EAST, false, false));
-			glowStrip(c, -2 + i, F0() + 4 + i, 4, c.kit.glowStrip(Direction.NORTH, false, false));
+		// A is an L: leg 1 rises south on the west wall (dx = -6), leg 2 rises east on the south wall (dz = 6)
+		for (int i = 0; i < 3; i++) {
+			glowStrip(c, -H, F0() + 2 + i, 2 + i, c.kit.glowStrip(Direction.EAST, false, false));
+		}
+		for (int j = 0; j < 2; j++) {
+			glowStrip(c, -4 + j, F0() + 5 + j, H, c.kit.glowStrip(Direction.NORTH, false, false));
 		}
 	}
 
@@ -933,15 +995,16 @@ public final class CitadelOffice {
 	}
 
 	/**
-	 * The attention board on the east wall: a frame, a dark panel and five status lamps anchored {@code board_lamp_5..9}
-	 * (the hub's board owns 0 to 4), so the office shows the next five threads that need the player.
+	 * The attention board on the east wall: a frame (nine wide, four high, its top row on the room's crown line), a dark panel and
+	 * five status lamps anchored {@code board_lamp_5..9} (the hub's board owns 0 to 4), so the office shows the next five threads
+	 * that need the player.
 	 */
 	private static void attentionBoard(CitadelCanvas c) {
 		int x = CX() + H;
 		int bottom = F2() + 4;
-		for (int dz = -3; dz <= 3; dz++) {
+		for (int dz = -4; dz <= 4; dz++) {
 			for (int row = 0; row < 4; row++) {
-				boolean edge = Math.abs(dz) == 3 || row == 0 || row == 3;
+				boolean edge = Math.abs(dz) == 4 || row == 0 || row == 3;
 				BlockState s = edge ? c.kit.beam(row == 0 || row == 3 ? Direction.Axis.Z : Direction.Axis.Y) : c.style.palette().get(HqStyle.Role.BOARD);
 				c.fixture(new BlockPos(x, bottom + row, CZ() + dz), s);
 			}
@@ -968,11 +1031,11 @@ public final class CitadelOffice {
 	 * it waits; a click opens it to answer the pending question or permission. So the office is where the player decides, and the
 	 * lamps of {@link #attentionBoard} keep ranks 6 to 10 on the wall. A lectern in the plan: the blocks module swaps each one for
 	 * {@code t3craft:decision_podium} (see {@code HqBlockFixtures}), without the module it stays a vanilla lectern. Each stands
-	 * with at least three free blocks in front of it (the rug and the aisle behind the consoles).
+	 * with three free blocks in front of it (the aisle behind the consoles).
 	 */
 	private static void podiums(CitadelCanvas c, int y) {
 		for (int i = 0; i < PODIUMS; i++) {
-			BlockPos p = new BlockPos(CX() - 4 + 2 * i, y, CZ() + 4);
+			BlockPos p = new BlockPos(CX() - 4 + 2 * i, y, CZ() + H);
 			c.fixture(p, facing(Blocks.LECTERN, Direction.NORTH));
 			c.anchor(Anchor.face(AnchorNames.podium(i), p, Direction.NORTH));
 		}
@@ -1005,14 +1068,14 @@ public final class CitadelOffice {
 	// ------------------------------------------------------------------ balcony
 
 	/**
-	 * The balcony on the north side of the control room: a deck three deep over the promenade, in front of the glass door, on
-	 * corbels, with a fascia beam, a fence, corner posts and three standing lanterns.
+	 * The balcony on the north side of the control room: a deck five deep over the promenade, in front of the glass door, on
+	 * corbels, with a fascia beam, a fence, corner posts, standing lanterns and two benches facing the citadel.
 	 */
 	public static void balcony(CitadelCanvas c) {
 		int f = F2();
 		for (int dx = -E; dx <= E; dx++) {
-			for (int dz = -9; dz <= -E - 1; dz++) {
-				boolean outer = dz == -9;
+			for (int dz = -13; dz <= -E - 1; dz++) {
+				boolean outer = dz == -13;
 				boolean side = Math.abs(dx) == E;
 				boolean corner = outer && side;
 				set(c, dx, f, dz, outer ? c.kit.beam(Direction.Axis.X) : side ? c.kit.beam(Direction.Axis.Z) : c.floor());
@@ -1038,82 +1101,118 @@ public final class CitadelOffice {
 				}
 			}
 		}
-		set(c, -4, f + 1, -8, Blocks.POTTED_FLOWERING_AZALEA.defaultBlockState());
-		set(c, 4, f + 1, -8, Blocks.POTTED_BAMBOO.defaultBlockState());
+		set(c, -6, f + 1, -12, Blocks.POTTED_FLOWERING_AZALEA.defaultBlockState());
+		set(c, 6, f + 1, -12, Blocks.POTTED_BAMBOO.defaultBlockState());
+		// two benches against the rail, facing the view
+		for (int dx : new int[] {-3, 3}) {
+			set(c, dx, f + 1, -12, cherryStairs(Direction.SOUTH, false));
+		}
 	}
 
 	// ------------------------------------------------------------------ roof
 
 	/**
-	 * The hip roof: an eave at m = 7 (cherry stairs) whose four corners turn up (a cherry plank, a stair, a finial of a fence post
-	 * and a lantern, with a hanging lantern under it, and a slab step on the two cells beside each corner), cherry and
-	 * deepslate-tile stairs for the five rings above it up to {@code m = 3}, solid under them; over {@code m <= 2} a glass drum
-	 * (5 x 5, three high, lit from inside) with a stepped cap of its own, an eave and a finial. The clerestory band under the roof
-	 * (the cabin's wall at m = 6) is lit shoji.
+	 * The curved eave cell at ring {@code m = 9}: the eave swoops up towards each corner in a stepped curve, with {@code along} the
+	 * cell's distance from the face's middle. Heights above the eave's base row ({@code CEIL() + 2}):
+	 * <pre>
+	 *   along <= 5  stair
+	 *   6           stair, slab        (about half a block up)
+	 *   7           stair, planks      (one up)
+	 *   8           stair, planks, stair
+	 *   9 (corner)  planks x3, stair, fence post and lantern (the finial), a hanging lantern under it
+	 * </pre>
+	 */
+	private static void eave(CitadelCanvas c, int dx, int dz, Direction in, boolean corner) {
+		int base = CEIL() + 2;
+		int along = Math.abs(dx) == R ? Math.abs(dz) : Math.abs(dx);
+		if (corner) {
+			set(c, dx, base, dz, PLANKS);
+			set(c, dx, base + 1, dz, PLANKS);
+			set(c, dx, base + 2, dz, PLANKS);
+			set(c, dx, base + 3, dz, stairs(Blocks.CHERRY_STAIRS, in));
+			set(c, dx, base + 4, dz, fence());
+			set(c, dx, base + 5, dz, lantern(false));
+			hang(c, dx, CEIL() + 1, dz);
+			return;
+		}
+		set(c, dx, base, dz, stairs(Blocks.CHERRY_STAIRS, in));
+		if (along == 6) {
+			set(c, dx, base + 1, dz, slab(Blocks.CHERRY_SLAB));
+		} else if (along == 7) {
+			set(c, dx, base + 1, dz, PLANKS);
+		} else if (along == 8) {
+			set(c, dx, base + 1, dz, PLANKS);
+			set(c, dx, base + 2, dz, stairs(Blocks.CHERRY_STAIRS, in));
+		}
+	}
+
+	/**
+	 * The hip roof: an eave at m = 9 (cherry stairs) with a curved sweep to each corner ({@link #eave}), cherry and
+	 * deepslate-tile stairs for the five rings above it up to {@code m = 4}, solid under them; over {@code m <= 3} a glass drum
+	 * (7 x 7, three high, lit from inside) with a stepped cap of its own, an eave and a finial. The clerestory band under the roof
+	 * (the cabin's wall at m = 8) is lit shoji between the mullions.
 	 */
 	public static void roof(CitadelCanvas c) {
+		int rt = RT();
 		for (int dx = -R; dx <= R; dx++) {
 			for (int dz = -R; dz <= R; dz++) {
 				int m = m(dx, dz);
 				Direction in = inward(dx, dz);
 				boolean corner = Math.abs(dx) == R && Math.abs(dz) == R;
 				if (m == R) {
-					if (corner) {
-						set(c, dx, CEIL() + 2, dz, PLANKS);
-						set(c, dx, CEIL() + 3, dz, stairs(Blocks.CHERRY_STAIRS, in));
-						set(c, dx, CEIL() + 4, dz, fence());
-						set(c, dx, CEIL() + 5, dz, lantern(false));
-						hang(c, dx, CEIL() + 1, dz);
-					} else {
-						set(c, dx, CEIL() + 2, dz, stairs(Blocks.CHERRY_STAIRS, in));
-						// the two cells beside a corner rise half a block: the eave turns up
-						int along = Math.abs(dx) == R ? Math.abs(dz) : Math.abs(dx);
-						if (along == R - 1) {
-							set(c, dx, CEIL() + 3, dz, slab(Blocks.CHERRY_SLAB));
-						}
-					}
-				} else if (m >= 3) {
+					eave(c, dx, dz, in, corner);
+				} else if (m >= 4) {
 					int ys = CEIL() + 2 + (R - m);
 					// one cherry ring in the tiles breaks the big slope
-					set(c, dx, ys, dz, stairs(m == 5 ? Blocks.CHERRY_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS, in));
+					set(c, dx, ys, dz, stairs(m == 6 ? Blocks.CHERRY_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS, in));
 					for (int y = WALL_TOP() + 1; y < ys; y++) {
 						set(c, dx, y, dz, FOOT);
 					}
 				} else {
-					// the drum: floor, glass ring (m = 2), cap, stepped top
-					for (int y = WALL_TOP() + 1; y <= CEIL() + 6; y++) {
+					// the drum: floor, glass ring (m = 3), cap, stepped top
+					for (int y = WALL_TOP() + 1; y <= rt; y++) {
 						set(c, dx, y, dz, FOOT);
 					}
-					if (m == 2) {
-						boolean post = Math.abs(dx) == 2 && Math.abs(dz) == 2;
-						for (int y = CEIL() + 7; y <= CEIL() + 9; y++) {
+					if (m == 3) {
+						boolean post = Math.abs(dx) == 3 && Math.abs(dz) == 3;
+						for (int y = rt + 1; y <= rt + 3; y++) {
 							set(c, dx, y, dz, post ? LOG : CitadelCanvas.GLASS);
 						}
 					}
-					set(c, dx, CEIL() + 10, dz, FOOT);
-					if (m == 2) {
-						set(c, dx, CEIL() + 11, dz, stairs(Blocks.DEEPSLATE_TILE_STAIRS, in));
+					set(c, dx, rt + 4, dz, FOOT);
+					if (m == 3) {
+						set(c, dx, rt + 5, dz, stairs(Blocks.DEEPSLATE_TILE_STAIRS, in));
 					} else {
-						set(c, dx, CEIL() + 11, dz, FOOT);
-						if (m == 1) {
-							set(c, dx, CEIL() + 12, dz, stairs(Blocks.DEEPSLATE_TILE_STAIRS, in));
+						set(c, dx, rt + 5, dz, FOOT);
+						if (m == 2) {
+							set(c, dx, rt + 6, dz, stairs(Blocks.DEEPSLATE_TILE_STAIRS, in));
 						} else {
-							set(c, dx, CEIL() + 12, dz, FOOT);
-							set(c, dx, CEIL() + 13, dz, fence());
-							set(c, dx, CEIL() + 14, dz, lantern(false));
-							// inside the drum: a standing lantern and a hanging one
-							set(c, dx, CEIL() + 7, dz, lantern(false));
-							hang(c, dx, CEIL() + 9, dz);
+							set(c, dx, rt + 6, dz, FOOT);
+							if (m == 1) {
+								set(c, dx, rt + 7, dz, stairs(Blocks.DEEPSLATE_TILE_STAIRS, in));
+							} else {
+								set(c, dx, rt + 7, dz, FOOT);
+								set(c, dx, rt + 8, dz, fence());
+								set(c, dx, rt + 9, dz, lantern(false));
+								// inside the drum: a standing lantern
+								set(c, dx, rt + 1, dz, lantern(false));
+							}
 						}
 					}
 				}
 			}
 		}
+		// inside the drum: four hanging lanterns
+		for (int dx : new int[] {-1, 1}) {
+			for (int dz : new int[] {-1, 1}) {
+				hang(c, dx, rt + 3, dz);
+			}
+		}
 		// the drum's eave
-		for (int dx = -3; dx <= 3; dx++) {
-			for (int dz = -3; dz <= 3; dz++) {
-				if (m(dx, dz) == 3) {
-					set(c, dx, CEIL() + 10, dz, stairs(Blocks.CHERRY_STAIRS, inward(dx, dz)));
+		for (int dx = -4; dx <= 4; dx++) {
+			for (int dz = -4; dz <= 4; dz++) {
+				if (m(dx, dz) == 4) {
+					set(c, dx, rt + 4, dz, stairs(Blocks.CHERRY_STAIRS, inward(dx, dz)));
 				}
 			}
 		}
@@ -1123,8 +1222,8 @@ public final class CitadelOffice {
 
 	/** {@code office}: in front of the consoles, facing the threads screen. {@code office_balcony}: the balcony, facing the hub. */
 	public static void anchors(CitadelCanvas c) {
-		c.anchor(Anchor.at(OFFICE, new BlockPos(CX() - 1, F2() + 1, CZ() - 1), Direction.SOUTH));
-		c.anchor(Anchor.at(OFFICE_BALCONY, new BlockPos(CX(), F2() + 1, CZ() - 7), Direction.NORTH));
+		c.anchor(Anchor.at(OFFICE, new BlockPos(CX(), F2() + 1, CZ() + 1), Direction.SOUTH));
+		c.anchor(Anchor.at(OFFICE_BALCONY, new BlockPos(CX(), F2() + 1, CZ() - 11), Direction.NORTH));
 	}
 
 	// ------------------------------------------------------------------ garden on the south-east slope
@@ -1132,19 +1231,22 @@ public final class CitadelOffice {
 	/** Top block (y, flat frame) of the upper and the lower garden terrace over the lawn (whose top block is y = 0). */
 	private static final int T1 = 4;
 	private static final int T2 = 2;
+	/** Cells out from the skirt the upper tier reaches ({@link #T1}); the lower one goes on to {@link #OUT2}. */
+	private static final int OUT1 = 6;
+	private static final int OUT2 = 11;
 
 	/**
 	 * Cells the garden is out from the tower's skirt on its east and south sides ({@code 0}: not part of the garden). East of
-	 * the tower the garden spans {@code dz = -6..9}, south of it {@code dx = -6..9}; round the corner the rings are square.
+	 * the tower the garden spans {@code dz = -8..11}, south of it {@code dx = -8..11}; round the corner the rings are square.
 	 */
 	private static int outward(int dx, int dz) {
 		if (dx > E && dz > E) {
 			return Math.max(dx, dz) - E;
 		}
-		if (dx > E && dz >= -6 && dz <= 9) {
+		if (dx > E && dz >= -8 && dz <= 11) {
 			return dx - E;
 		}
-		if (dz > E && dx >= -6 && dx <= 9) {
+		if (dz > E && dx >= -8 && dx <= 11) {
 			return dz - E;
 		}
 		return 0;
@@ -1162,10 +1264,10 @@ public final class CitadelOffice {
 	/** The garden's top block at local {@code (dx, dz)}: {@link #T1}, {@link #T2} or {@code 0} (no garden here). */
 	private static int tier(CitadelCanvas c, int dx, int dz) {
 		int o = outward(dx, dz);
-		if (o <= 0 || o > 9 || !lawn(c, CX() + dx, CZ() + dz)) {
+		if (o <= 0 || o > OUT2 || !lawn(c, CX() + dx, CZ() + dz)) {
 			return 0;
 		}
-		return o <= 5 ? T1 : T2;
+		return o <= OUT1 ? T1 : T2;
 	}
 
 	/** The garden at {@code (dx, dz)} is lower than {@code t} (the tower itself is not). */
@@ -1185,32 +1287,33 @@ public final class CitadelOffice {
 	}
 
 	/**
-	 * struct/leader-office2: the south-east slope of the terrace, which was bare grass, becomes a terraced garden: two tiers
+	 * The south-east slope of the terrace, which was bare grass, is a terraced garden: two tiers
 	 * (top blocks y = 4 and y = 2 over the lawn at y = 0) against the tower's skirt on its east and south sides, held by
 	 * deepslate walls with a calcite coping, with flowers and azalea bushes on them. A stone path two wide climbs from the lawn
-	 * by two short stairs per tier (two steps each, so every step is half a block) to an arbor on the upper tier (a pergola of
-	 * cherry posts and beams over two benches facing each other, a cartography table and hanging lanterns), a place to sit and
-	 * plan with the map. Only lawn columns of the terrace zone are touched, in the flat frame the relief lifts afterwards.
+	 * by two short stairs per tier (two steps each, so every step is half a block) to the upper tier, and an open pergola
+	 * ({@link #arbor}) stands on the field east of the tower: cherry posts, slatted rafters, cave vines and azalea hanging from them,
+	 * two benches facing each other over a map table. Only lawn columns of the terrace zone are touched, in the flat frame the relief
+	 * lifts afterwards.
 	 */
 	public static void garden(CitadelCanvas c) {
-		for (int dx = E + 1; dx <= 20; dx++) {
-			for (int dz = -6; dz <= 15; dz++) {
+		for (int dx = E + 1; dx <= 24; dx++) {
+			for (int dz = -8; dz <= 17; dz++) {
 				gardenColumn(c, dx, dz);
 			}
 		}
-		for (int dx = -6; dx <= E; dx++) {
-			for (int dz = E + 1; dz <= 15; dz++) {
+		for (int dx = -8; dx <= E; dx++) {
+			for (int dz = E + 1; dz <= 17; dz++) {
 				gardenColumn(c, dx, dz);
 			}
 		}
 		arbor(c);
 		// lamps beside the path on the lower tier
 		for (int dz : new int[] {2, 5}) {
-			if (tier(c, E + 7, dz) == T2) {
+			if (tier(c, E + 9, dz) == T2) {
 				for (int y = T2 + 1; y <= T2 + 2; y++) {
-					set(c, E + 7, y, dz, fence());
+					set(c, E + 9, y, dz, fence());
 				}
-				set(c, E + 7, T2 + 3, dz, lantern(false));
+				set(c, E + 9, T2 + 3, dz, lantern(false));
 			}
 		}
 	}
@@ -1219,12 +1322,12 @@ public final class CitadelOffice {
 		int o = outward(dx, dz);
 		int x = CX() + dx;
 		int z = CZ() + dz;
-		boolean path = dx > E && (dz == 3 || dz == 4) && o > 0 && o <= 14 && dz <= 6;
+		boolean path = dx > E && (dz == 3 || dz == 4) && o > 0 && o <= OUT2 + 6;
 		int t = tier(c, dx, dz);
 		if (t == 0) {
 			// the path goes on over the lawn past the lower tier: a stair at the foot, then flat stones
-			if (path && o >= 10 && lawn(c, x, z)) {
-				if (o == 10) {
+			if (path && o > OUT2 && lawn(c, x, z)) {
+				if (o == OUT2 + 1) {
 					c.set(x, 1, z, stairs(Blocks.STONE_BRICK_STAIRS, Direction.WEST));
 				} else {
 					c.set(x, 0, z, gardenPath(x, z));
@@ -1238,15 +1341,15 @@ public final class CitadelOffice {
 		for (int y = 1; y < t; y++) {
 			c.set(x, y, z, edge ? gardenWall(x, y, z) : CitadelCanvas.b(Blocks.DIRT));
 		}
-		if (path && o <= 9) {
-			boolean last = o == 5 || o == 9;
+		if (path && o <= OUT2) {
+			boolean last = o == OUT1 || o == OUT2;
 			if (last) {
 				// the stair that climbs onto the tier: the column below it is wall, the stair stands on top of it
 				c.set(x, t, z, stairs(Blocks.STONE_BRICK_STAIRS, Direction.WEST));
 				return;
 			}
 			c.set(x, t, z, gardenPath(x, z));
-			if (o == 6) {
+			if (o == OUT1 + 1) {
 				// the upper stair's first step stands on the lower tier's path
 				c.set(x, t + 1, z, stairs(Blocks.STONE_BRICK_STAIRS, Direction.WEST));
 			}
@@ -1278,15 +1381,14 @@ public final class CitadelOffice {
 	}
 
 	/**
-	 * The arbor, found on the grass field east of the tower (the podium's middle tier, top block y = 3): a 3 x 7 footprint,
-	 * {@code dx0 .. dx0 + 2}, {@code dz0 .. dz0 + 6}, nearest the tower that is all bed. Six cherry posts three high, beams along its
-	 * length, rafters across, two benches facing each other with a cartography table between them, a second pair, two hanging
-	 * lanterns, stone paving under it. Nothing is built when the field has no such place.
+	 * The pergola, found on the grass field east of the tower (the podium's middle tier, top block y = 3): a 3 x 9 footprint (or 7, or
+	 * 4 where the field is short), {@code dx0 .. dx0 + 2}, {@code dz0 .. dz0 + len - 1}, nearest the tower that is all bed. Nothing is
+	 * built when the field has no such place.
 	 */
 	private static void arbor(CitadelCanvas c) {
-		for (int len : new int[] {7, 4}) {
-			for (int dx0 = E + 1; dx0 <= 16; dx0++) {
-				for (int dz0 = -2; dz0 >= -16; dz0--) {
+		for (int len : new int[] {9, 7, 4}) {
+			for (int dx0 = E + 1; dx0 <= 20; dx0++) {
+				for (int dz0 = -2; dz0 >= -20; dz0--) {
 					boolean ok = true;
 					for (int dx = dx0; dx <= dx0 + 2 && ok; dx++) {
 						for (int dz = dz0; dz < dz0 + len && ok; dz++) {
@@ -1302,6 +1404,12 @@ public final class CitadelOffice {
 		}
 	}
 
+	/**
+	 * An open pergola (struct/leader-office3): posts of cherry log three high every third cell, a beam along each long side and
+	 * slatted rafters across every second cell (so the sky shows between them), stone paving, two benches facing each other with a
+	 * map table between them at each end, and vegetation hanging from the rafters: cave vines two blocks long down the middle,
+	 * a vine under each side beam between the posts, azalea leaves resting on some rafters, and two hanging lanterns.
+	 */
 	private static void arborAt(CitadelCanvas c, int dx0, int dz0, int len, int g) {
 		int b = g + 1; // standing level
 		int mid = dx0 + 1;
@@ -1312,14 +1420,19 @@ public final class CitadelOffice {
 				boolean inside = dx >= dx0 && dx <= dx0 + 2 && dz >= dz0 && dz <= last;
 				if (inside || (Math.floorMod(dx + dz, 2) == 0 && bed(c, CX() + dx, CZ() + dz))) {
 					set(c, dx, g, dz, gardenPath(CX() + dx, CZ() + dz));
-					for (int y = b; y <= b + 4; y++) {
+					for (int y = b; y <= b + 5; y++) {
 						set(c, dx, y, dz, AIR);
 					}
 				}
 			}
 		}
+		Set<Integer> posts = new HashSet<>();
+		for (int dz = dz0; dz <= last; dz += 3) {
+			posts.add(dz);
+		}
+		posts.add(last);
 		for (int dx : new int[] {dx0, dx0 + 2}) {
-			for (int dz : len == 7 ? new int[] {dz0, dz0 + 3, last} : new int[] {dz0, last}) {
+			for (int dz : posts) {
 				for (int y = b; y < b + 3; y++) {
 					set(c, dx, y, dz, LOG);
 				}
@@ -1327,20 +1440,44 @@ public final class CitadelOffice {
 			for (int dz = dz0; dz <= last; dz++) {
 				set(c, dx, b + 3, dz, c.kit.beam(Direction.Axis.Z));
 			}
+			// a vine under the side beam between the posts
+			for (int dz = dz0; dz <= last; dz++) {
+				if (!posts.contains(dz) && Math.floorMod(dz - dz0, 2) == 1) {
+					c.put(CX() + dx, b + 2, CZ() + dz, vineUp(), HANGING);
+				}
+			}
 		}
 		for (int dz = dz0; dz <= last; dz += 2) {
 			for (int dx = dx0; dx <= dx0 + 2; dx++) {
 				set(c, dx, b + 4, dz, c.kit.beam(Direction.Axis.X));
 			}
+			// azalea resting on some rafters
+			if (Flora.hash(CX() + mid, CZ() + dz, 9) % 3 != 0) {
+				set(c, mid, b + 5, dz, CitadelCanvas.leaves(Flora.hash(CX() + mid, CZ() + dz, 5) % 2 == 0 ? Blocks.FLOWERING_AZALEA_LEAVES
+						: Blocks.AZALEA_LEAVES));
+			}
 		}
-		set(c, mid, b, dz0 + 1, CitadelCanvas.b(Blocks.CARTOGRAPHY_TABLE));
-		hang(c, mid, b + 3, dz0 + 2);
-		for (int dz : len == 7 ? new int[] {dz0 + 1, dz0 + 5} : new int[] {dz0 + 1}) {
+		// the benches' pairs (backs outwards, facing each other), a map table between them at each end
+		int[] pairs = len >= 7 ? new int[] {dz0 + 1, last - 1} : new int[] {dz0 + 1};
+		for (int dz : pairs) {
 			set(c, dx0, b, dz, cherryStairs(Direction.WEST, false));
 			set(c, dx0 + 2, b, dz, cherryStairs(Direction.EAST, false));
+			set(c, mid, b, dz, dz == dz0 + 1 ? CitadelCanvas.b(Blocks.CARTOGRAPHY_TABLE) : Blocks.POTTED_FLOWERING_AZALEA.defaultBlockState());
 		}
-		if (len == 7) {
-			hang(c, mid, b + 3, dz0 + 4);
+		// under the rafters of the middle: cave vines two long (the heads clear the tables and the heads of people), and two lanterns
+		for (int dz = dz0; dz <= last; dz += 2) {
+			if (len >= 7 && (dz == dz0 + 4 || dz == last)) {
+				hang(c, mid, b + 3, dz);
+			} else {
+				c.put(CX() + mid, b + 3, CZ() + dz, Blocks.CAVE_VINES_PLANT.defaultBlockState().setValue(BlockStateProperties.BERRIES,
+						Flora.hash(CX() + mid, CZ() + dz, 3) % 2 == 0), HANGING);
+				c.put(CX() + mid, b + 2, CZ() + dz, Blocks.CAVE_VINES.defaultBlockState().setValue(BlockStateProperties.BERRIES, true), HANGING);
+			}
 		}
+	}
+
+	/** A vine hanging from the block above it. */
+	private static BlockState vineUp() {
+		return Blocks.VINE.defaultBlockState().setValue(BlockStateProperties.UP, true);
 	}
 }
