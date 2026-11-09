@@ -15,17 +15,15 @@ and `check`/`build` only compile.
 | Compile + jar | `./gradlew build` | no |
 | Play / debug locally | `./gradlew runClient` | **yes** |
 
-The shared VPS never runs Minecraft or long-running processes, and runs one Gradle at a time. Use
-`--no-daemon` there so Gradle does not leave a daemon behind (or `./gradlew --stop` afterwards).
-On your own machine the daemon is fine.
+Where these run (see `AGENTS.md`, "Where things run"): Gradle runs **only on the render PC**, one at a
+time, through `tools/heavy.sh`, launched by the coordinator. The VPS runs no Gradle, java or Minecraft at
+all; child threads there only write code and push. On your own machine the daemon is fine.
 
-## CI
+## Builds
 
-`.github/workflows/mod.yml` runs on every push and PR touching `mod/**`: `./gradlew build`
-(compile + jar, no tests). The mod jar is uploaded as the artifact `t3craft-mod-<sha>` (14 days).
-
-To grab a build from CI: Actions → the run → Artifacts → `t3craft-mod-<sha>` → drop the jar into
-your instance's `mods/` with Fabric API.
+There is no hosted build service: GitHub Actions is off for this repo and must stay off (it bills
+minutes and storage). A jar comes from a build on the PC (`mod/build/libs/`) or from your own
+`./gradlew build`.
 
 ## Hot-swap
 

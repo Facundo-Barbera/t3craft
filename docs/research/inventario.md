@@ -137,7 +137,7 @@ Leyenda: **R** = `orchestration:read` (lo que ya tiene el pairing). **W** = `orc
 
 | t3craft hoy | AgentCraft |
 |---|---|
-| main (feat/devx): CI en GitHub Actions, JUnit (~90+ tests), client GameTests (compilan, no se corrieron), hot-swap con `DevReload`/`ModuleGuard`, `/t3dev`, `docs/dev.md`, `CHANGELOG-dev.md` (RESTART/RELOAD) | DevBridge (cámara, screenshots, estado) y `tools/*.mjs` (`shoot`, `qa`, `record`); escenas JSON; ~30 tests vitest en el Foreman; ningún test Java; pipeline de arte (Python + Blender); docs del protocolo generados |
+| main (feat/devx): JUnit (~90+ tests), client GameTests (compilan, no se corrieron), hot-swap con `DevReload`/`ModuleGuard`, `/t3dev`, `docs/dev.md`, `CHANGELOG-dev.md` (RESTART/RELOAD) | DevBridge (cámara, screenshots, estado) y `tools/*.mjs` (`shoot`, `qa`, `record`); escenas JSON; ~30 tests vitest en el Foreman; ningún test Java; pipeline de arte (Python + Blender); docs del protocolo generados |
 
 ---
 

@@ -93,4 +93,7 @@ the PC**, never on the VPS or the Mac mini.
 - **No dev servers or Minecraft on the VPS,** apart from what Facundo explicitly approves (Citadel Studio never runs
   there; it lives on the PC, rule 8).
 - **T3 is read-only** for agents unless the task says otherwise.
+- **No GitHub Actions or other paid GitHub services** (Facundo, 2026-11-09). Actions is disabled for the repo and
+  `.github/` was deleted; never add workflows, Dependabot, code scanning, Pages or anything else that bills minutes
+  or storage. Builds run only on the PC.
 - **Config changes are additive.** Every branch adds a RELOAD or RESTART line to `docs/CHANGELOG-dev.md`.
