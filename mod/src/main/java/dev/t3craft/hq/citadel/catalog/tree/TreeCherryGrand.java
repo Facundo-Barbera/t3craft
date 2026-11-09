@@ -90,17 +90,17 @@ public final class TreeCherryGrand implements Variant {
 		int[][] lead = TreeKit.trunk(t, TreeKit.CHERRY, bu, bv, y2, crownY, ou, ov,
 				Math.cos(lean) * amp, Math.sin(lean) * amp);
 
-		// ---- roots spread out, a flare one block high against the trunk, a collar on the big ones
-		TreeKit.roots(t, TreeKit.CHERRY, bu, bv, 6 + (big ? 2 : 0), 2 + (big ? 1 : 0) + (mn >= 13 ? 1 : 0), -1, 3);
-		for (int v = bv - 1; v <= bv + 2; v++) {
-			for (int u = bu - 1; u <= bu + 2; u++) {
-				boolean outU = u < bu || u > bu + 1;
-				boolean outV = v < bv || v > bv + 1;
-				if (outU != outV && t.kind(u, 0, v) == TreeKit.WOOD && t.hash(u, 1, v, 3) < (big ? 2 : 1)) {
-					t.woodSoft(u, 1, v, TreeKit.CHERRY.bark());
+		for (int y = 1; y <= y2; y++) { // pale patches in the bark
+			for (int v = bv; v <= bv + 1; v++) {
+				for (int u = bu; u <= bu + 1; u++) {
+					if (t.kind(u, y, v) == TreeKit.WOOD && t.hash(u, y, v, 7) == 0) {
+						t.wood(u, y, v, LIMB.bark());
+					}
 				}
 			}
 		}
+		// ---- roots spread out, a flare one block high against the trunk, a collar on the big ones
+		TreeKit.roots(t, TreeKit.CHERRY, bu, bv, 6 + (big ? 2 : 0), 2 + (big ? 1 : 0) + (mn >= 13 ? 1 : 0), -1, 3);
 		if (big) {
 			int lu = lead[0][y2 + 1];
 			int lv = lead[1][y2 + 1];
@@ -177,6 +177,17 @@ public final class TreeCherryGrand implements Variant {
 		double cr = TreeKit.clamp(Math.min(Math.min(cu - wu0, wu1 - cu), Math.min(cv - wv0, wv1 - cv)) + 1.0, 2.0, 2.7 * ls);
 		lobe(t, cu, crownY + 1, cv, cr, cr * (0.85 + r.nextDouble() * 0.2), 1, 1, TreeKit.SAKURA, 0.5, 9, 1);
 
+		// ---- flares one block high against the trunk, only where there is room to stand above them
+		for (int v = bv - 1; v <= bv + 2; v++) {
+			for (int u = bu - 1; u <= bu + 2; u++) {
+				boolean outU = u < bu || u > bu + 1;
+				boolean outV = v < bv || v > bv + 1;
+				if (outU != outV && t.kind(u, 0, v) == TreeKit.WOOD && clear(t, u, v) && t.hash(u, 1, v, 3) < (big ? 2 : 1)) {
+					t.woodSoft(u, 1, v, TreeKit.CHERRY.bark());
+				}
+			}
+		}
+
 		TreeKit.petalCarpet(t, bu + 0.5, bv + 0.5, mn / 2.0 + 1.6);
 		t.prune();
 		t.flush(c);
@@ -219,6 +230,11 @@ public final class TreeCherryGrand implements Variant {
 		}
 	}
 
+	/** Nothing solid within the 3 cells above a flare (y = 2..4): you could stand on it and hit your head. */
+	private static boolean clear(Vox t, int u, int v) {
+		return t.kind(u, 2, v) == TreeKit.EMPTY && t.kind(u, 3, v) == TreeKit.EMPTY && t.kind(u, 4, v) == TreeKit.EMPTY;
+	}
+
 	/** The dark first two cells of a limb are the trunk's own bark, so the pale wood starts clear of the leader. */
 	private static void darkBase(Vox t, List<int[]> limb) {
 		for (int k = 0; k < Math.min(2, limb.size()); k++) {
@@ -238,10 +254,10 @@ public final class TreeCherryGrand implements Variant {
 		for (int v = (int) (cv - rz); v <= cv + rz; v++) {
 			for (int u = (int) (cu - rx); u <= cu + rx; u++) {
 				double q = Math.pow((u - cu) / rx, 2) + Math.pow((v - cv) / rz, 2);
-				if (q < 0.3 || q > 1.0 || t.hash(u, yl + salt, v, 4) != 0 || t.kind(u, yl, v) != TreeKit.LEAF) {
+				if (q < 0.3 || q > 1.0 || t.hash(u, yl + salt, v, 3) != 0 || t.kind(u, yl, v) != TreeKit.LEAF) {
 					continue;
 				}
-				TreeKit.hang(t, u, yl - 1, v, 1 + t.hash(u, 3, v + salt, 2), CLEAR, TreeKit.SAKURA.a(), TreeKit.SAKURA.b(), 0, 0, false);
+				TreeKit.hang(t, u, yl - 1, v, 1 + t.hash(u, 3, v + salt, 3), CLEAR, TreeKit.SAKURA.a(), TreeKit.SAKURA.b(), 0, 0, false);
 			}
 		}
 	}
