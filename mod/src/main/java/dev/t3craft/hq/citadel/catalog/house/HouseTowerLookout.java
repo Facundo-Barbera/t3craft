@@ -307,7 +307,7 @@ public final class HouseTowerLookout implements Variant {
 			return log(s.log(), Direction.Axis.Y); // [depth] timber jambs
 		}
 		if (n && Math.abs(t - g.m) <= 1 && y == 3) {
-			return log(s.stripped(), Direction.Axis.X); // lintel
+			return log(Blocks.STRIPPED_SPRUCE_LOG, Direction.Axis.X); // lintel
 		}
 		if (windowT(g, t) && (y == 2 || y == 3 || y == 7 || y == 8)) {
 			return pane(g.p.hash(u, y, v, 5) == 0 ? pinkPane() : Blocks.GLASS_PANE, alongU);
@@ -412,7 +412,7 @@ public final class HouseTowerLookout implements Variant {
 				boolean entry = !corner && to == Direction.SOUTH && Math.abs(t - g.m) <= 1;
 				// [depth] the corbels under the deck: stairs against the wall, a top slab on the outer edge
 				if (entry) {
-					set(c, g.p, u, 9, v, log(g.s.stripped(), Direction.Axis.X));
+					set(c, g.p, u, 9, v, log(Blocks.STRIPPED_SPRUCE_LOG, Direction.Axis.X));
 				} else if (d == 1) {
 					set(c, g.p, u, 9, v, stair(Blocks.POLISHED_DEEPSLATE_STAIRS, to, true));
 				} else {
@@ -420,7 +420,7 @@ public final class HouseTowerLookout implements Variant {
 				}
 				if (d == 2) {
 					Direction.Axis ax = to == Direction.NORTH || to == Direction.SOUTH ? Direction.Axis.X : Direction.Axis.Z;
-					set(c, g.p, u, F2, v, log(g.s.stripped(), ax));
+					set(c, g.p, u, F2, v, log(Blocks.STRIPPED_SPRUCE_LOG, ax));
 					set(c, g.p, u, 11, v, fence(g.s.fence(), g.outer(u, v - 1), g.outer(u + 1, v), g.outer(u, v + 1), g.outer(u - 1, v)));
 					if (corner) {
 						// a lamp post on each corner of the rail
@@ -476,6 +476,7 @@ public final class HouseTowerLookout implements Variant {
 					Direction fx = u == umin ? Direction.EAST : Direction.WEST;
 					Direction fz = v == vmin ? Direction.SOUTH : Direction.NORTH;
 					if (cu && cv) {
+						sb = g.s.eaveStair(); // [depth] the hips are ribs of the eave timber
 						StairsShape shape = fz == fx.getCounterClockWise() ? StairsShape.OUTER_LEFT : StairsShape.OUTER_RIGHT;
 						set(c, g.p, u, y, v, stair(sb, fx, false).setValue(BlockStateProperties.STAIRS_SHAPE, shape));
 					} else {
