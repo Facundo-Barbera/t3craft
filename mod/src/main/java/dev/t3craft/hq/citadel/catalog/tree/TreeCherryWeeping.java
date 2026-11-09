@@ -110,7 +110,7 @@ public final class TreeCherryWeeping implements Variant {
 					if (dy == 1 && (u != lu0 || v != lv0) && t.hash(u, 1, v, 3) == 0) {
 						continue; // one corner of the flare is missing at y = 1: not a block
 					}
-					t.wood(u, dy, v, dy == 0 ? TreeKit.CHERRY.bark() : TreeKit.CHERRY.log(Direction.Axis.Y));
+					t.wood(u, dy, v, TreeKit.CHERRY.bark()); // bark all round: a pale log end at the flare reads as a lit block
 				}
 			}
 		}
@@ -204,7 +204,7 @@ public final class TreeCherryWeeping implements Variant {
 				}
 				double arc = rho * bd;
 				double x = rho / rb[best];
-				double half = 0.6 + 0.7 * Math.min(1.0, x);
+				double half = 0.75 + 0.95 * Math.min(1.0, x);
 				if (x > 1.18 || arc > half) {
 					continue;
 				}
@@ -250,7 +250,7 @@ public final class TreeCherryWeeping implements Variant {
 		}
 
 		// ---- curtains: single strands (a checker, never face to face) from the sheet, none under the crown
-		int par = r.nextInt(2);
+		int par = r.nextInt(3);
 		boolean[] strand = new boolean[w * d];
 		for (int v = 0; v < d; v++) {
 			for (int u = 0; u < w; u++) {
@@ -263,8 +263,8 @@ public final class TreeCherryWeeping implements Variant {
 					continue; // the centre stays open
 				}
 				boolean limbCol = t.kind(u, sheet[u][v] - 1, v) == TreeKit.WOOD;
-				if (!limbCol && ((u + v) & 1) != par) {
-					continue;
+				if (!limbCol && Math.floorMod(u + 2 * v, 3) != par) {
+					continue; // a lattice of one cell in three: fine hair, never two strands side by side
 				}
 				int y0c = -1;
 				for (int y = CLEAR - 1; y < p.h(); y++) {
@@ -278,17 +278,17 @@ public final class TreeCherryWeeping implements Variant {
 					continue;
 				}
 				int cls = t.hash(u, 5, v, 100);
-				int longOnes = 8 + (int) (56 * f * f);
+				int longOnes = 6 + (int) (52 * f * f);
 				int bottom;
-				if (cls < 12) {
+				if (cls < 10) {
 					continue; // no strand here: a window
-				} else if (cls < 12 + longOnes) {
-					bottom = t.hash(u, 7, v, 3) == 0 ? 1 : 0; // a long one: to the grass (or a block above it)
+				} else if (cls < 10 + longOnes) {
+					bottom = 0; // a long one: to the grass (never a tip at y = 1: that is a step to stand on)
 				} else {
 					if (y0c - 1 < CLEAR) {
 						continue;
 					}
-					bottom = Math.max(CLEAR, y0c - 2 - t.hash(u, 6, v, 4)); // a stub: 3+ blocks of headroom under it
+					bottom = Math.max(CLEAR, y0c - 2 - t.hash(u, 6, v, 5)); // a stub: 3+ blocks of headroom under it
 				}
 				bottom = Math.min(bottom, y0c - 1);
 				for (int y = y0c - 1; y >= bottom; y--) {
