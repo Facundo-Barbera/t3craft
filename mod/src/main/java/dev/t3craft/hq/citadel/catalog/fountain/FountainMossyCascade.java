@@ -446,41 +446,74 @@ public final class FountainMossyCascade implements Variant {
 				wet[u][vb] = false;
 			}
 			int deck = z - a - 1;
+			int um = Math.max(a + 2, Math.min(z - 2, nlo + fn / 2)); // the viewing jetty starts opposite the fall
+			int half = deck >= 7 ? 1 : 0;
+			boolean jetty = vb + 1 <= bn - 2;
 			int benches = 1 + (deck - 3) / 10;
 			boolean[] seat = new boolean[w()];
 			for (int q = 0; q < benches; q++) {
-				int centre = a + 1 + (deck * (2 * q + 1)) / (2 * benches);
+				int centre = benches == 1 ? um : a + 1 + (deck * (2 * q + 1)) / (2 * benches);
 				for (int u = centre - 1; u <= centre + 1; u++) {
 					if (u > a && u < z) {
 						seat[u] = true;
 					}
 				}
 			}
+			boolean[][] rail = new boolean[w()][d];
 			for (int sv = vb - 1; sv <= vb + 1; sv += 2) {
 				for (int u = a; u <= z; u++) {
 					if (top[u][sv] >= 2 || p.at(c, u, 2, sv) != null) {
 						continue; // rock there (the toe of the mound)
 					}
-					boolean end = u == a || u == z;
-					if (end) {
+					if (u == a || u == z) { // a thin stone post with a lantern
 						p.set(c, u, 1, sv, PondKit.brick(p, u, 1, sv));
-						p.set(c, u, 2, sv, b(Blocks.STRIPPED_CHERRY_LOG));
-						PondKit.put(c, p, u, 3, sv, b(Blocks.LANTERN));
+						p.set(c, u, 2, sv, b(Blocks.STONE_BRICK_WALL));
+						p.set(c, u, 3, sv, b(Blocks.STONE_BRICK_WALL));
+						PondKit.put(c, p, u, 4, sv, b(Blocks.LANTERN));
 						wet[u][sv] = false;
 					} else if (sv == vb - 1 && seat[u]) {
-						p.set(c, u, 2, sv, stairs(Blocks.MOSSY_STONE_BRICK_STAIRS, Direction.NORTH));
-					} else {
-						boolean west = u > a + 1 && !(sv == vb - 1 && seat[u - 1]);
-						boolean east = u < z - 1 && !(sv == vb - 1 && seat[u + 1]);
-						p.set(c, u, 2, sv, spruceFence(west || u == a + 1, east || u == z - 1));
+						p.set(c, u, 2, sv, stairs(Blocks.STONE_BRICK_STAIRS, Direction.NORTH));
+					} else if (!(jetty && sv == vb + 1 && Math.abs(u - um) <= half)) {
+						rail[u][sv] = true;
+					}
+				}
+			}
+			if (jetty) { // a jetty of slabs from the deck towards the fall, closed by rails: the place to stand and look
+				for (int v = vb + 1; v <= bn - 2; v++) {
+					for (int u = um - half; u <= um + half; u++) {
+						if (top[u][v] < 2) {
+							p.set(c, u, 2, v, slab(Blocks.SPRUCE_SLAB));
+							wet[u][v] = false;
+						}
+					}
+				}
+				for (int v = vb + 2; v <= bn - 1; v++) {
+					for (int u = um - half - 1; u <= um + half + 1; u += 2 * half + 2) {
+						if (top[u][v] < 2) {
+							rail[u][v] = true;
+							wet[u][v] = false;
+						}
+					}
+				}
+				for (int u = um - half; u <= um + half; u++) {
+					if (top[u][bn - 1] < 2) {
+						rail[u][bn - 1] = true;
+					}
+				}
+			}
+			for (int v = 0; v < d; v++) {
+				for (int u = a; u <= z; u++) {
+					if (rail[u][v]) {
+						p.set(c, u, 2, v, spruceFence(v > 0 && rail[u][v - 1], v < d - 1 && rail[u][v + 1], u > a && rail[u - 1][v], u < z && rail[u + 1][v]));
 					}
 				}
 			}
 		}
 
-		/** A spruce rail with its east/west sides set by hand (the plan keeps states exactly). */
-		static BlockState spruceFence(boolean west, boolean east) {
-			return b(Blocks.SPRUCE_FENCE).setValue(BlockStateProperties.WEST, west).setValue(BlockStateProperties.EAST, east);
+		/** A spruce rail with its sides set by hand (the plan keeps states exactly). */
+		static BlockState spruceFence(boolean north, boolean south, boolean west, boolean east) {
+			return b(Blocks.SPRUCE_FENCE).setValue(BlockStateProperties.NORTH, north).setValue(BlockStateProperties.SOUTH, south)
+					.setValue(BlockStateProperties.WEST, west).setValue(BlockStateProperties.EAST, east);
 		}
 
 		int w() {
@@ -622,3 +655,4 @@ public final class FountainMossyCascade implements Variant {
 		}
 	}
 }
+
