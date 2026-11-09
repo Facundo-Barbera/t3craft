@@ -96,19 +96,19 @@ public final class BridgeStoneArch implements Variant {
 		int crown = (d - 1) / 2;
 		double cm = (d - 1) / 2.0;
 
-		// the arch: air for y < open[v] inside the span; it covers the plateau and a little of each ramp
-		int a = Math.max(2, lvMax - 3);
-		int vs = a;
-		int ve = d - 1 - a;
+		// the arch: air for y < open[v] inside the span. A round-ish arch (half span 1.5 × its rise) in the middle,
+		// with solid abutments of `a` cells on both sides (they carry the pilasters)
 		int lvC = lv[crown];
-		int rMax = Math.max(0, lvC / 2 - 1 - (lvC >= 10 ? 1 : 0));
-		double sm = (vs + ve) / 2.0;
-		double hs = (ve - vs) / 2.0 + 1.0;
+		int rMax = Math.max(0, lvC / 2 - 1);
+		double hs = Math.max(3.0, Math.round(rMax * 3.0) / 2.0); // half span in cells
+		int a = Math.max(2, (int) Math.ceil(cm - hs));
 		int[] open = new int[d];
-		for (int v = vs; v <= ve; v++) {
-			double x = (v - sm) / hs;
-			int arc = (int) Math.round(rMax * Math.sqrt(Math.max(0.0, 1.0 - x * x)));
-			open[v] = Math.max(0, Math.min(arc, lv[v] / 2 - 1)); // always keep a deck block over the void
+		for (int v = 0; v < d; v++) {
+			double x = (v - cm) / hs;
+			if (Math.abs(x) < 1.0) {
+				int arc = (int) Math.round(rMax * Math.sqrt(1.0 - x * x));
+				open[v] = Math.max(0, Math.min(arc, lv[v] / 2 - 1)); // always keep a deck block over the void
+			}
 		}
 
 		for (int v = 0; v < d; v++) {
