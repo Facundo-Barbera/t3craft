@@ -108,6 +108,25 @@ public enum HallStyle {
 		return b.defaultBlockState();
 	}
 
+	/** The project's colour as a glass colour: dark or washed-out colours become tints that still glow (struct/barrio-hall3). */
+	public static DyeColor glassTint(DyeColor env) {
+		return switch (env) {
+			case BLACK, GRAY, BROWN -> DyeColor.CYAN;
+			case WHITE, LIGHT_GRAY -> DyeColor.LIGHT_BLUE;
+			default -> env;
+		};
+	}
+
+	/** Stained glass block in the project's colour: the accent of the cupola, the clerestory and the pediment windows. */
+	public static BlockState stainedGlass(DyeColor env) {
+		return Blocks.STAINED_GLASS.pick(glassTint(env)).defaultBlockState();
+	}
+
+	/** Stained glass pane in the project's colour (the accent of the wall transoms). */
+	public static BlockState stainedPane(DyeColor env) {
+		return Blocks.STAINED_GLASS_PANE.pick(glassTint(env)).defaultBlockState();
+	}
+
 	/** The second colour of the rugs, never equal to {@code env}. */
 	public DyeColor alt(DyeColor env) {
 		DyeColor a = switch (this) {

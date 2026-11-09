@@ -69,6 +69,38 @@ public final class HallFacade {
 	}
 
 	/**
+	 * struct/barrio-hall3: the dark-oak frame of the scaled halls (pilasters, corner posts, lintels, the band, door jambs, portico
+	 * columns). Dark oak on a light infill (plaster, calcite, terracotta, the lot's wall panel) gives the timber halls the contrast
+	 * they lacked when the posts were the same tone as the wall.
+	 */
+	static BlockState frame(Direction.Axis axis) {
+		return Blocks.DARK_OAK_LOG.defaultBlockState().setValue(BlockStateProperties.AXIS, axis);
+	}
+
+	/** A post: the dark-oak frame on a scaled wooden hall, the lot's own post otherwise (stone halls keep their stone). */
+	static BlockState postBlock(HallStyle s, Mats m) {
+		return tall() && s != HallStyle.STONE ? frame(Direction.Axis.Y) : m.post();
+	}
+
+	/** A beam along {@code axis}: the dark-oak frame on a scaled wooden hall, the lot's post turned otherwise. */
+	static BlockState beamBlock(CitadelCanvas c, HallStyle s, Mats m, Direction.Axis axis) {
+		return tall() && s != HallStyle.STONE ? frame(axis) : beamLike(c, m.post(), axis);
+	}
+
+	/** The corner post of a hall shell (all heights). */
+	public static BlockState cornerPost(HallStyle s, Mats m) {
+		return postBlock(s, m);
+	}
+
+	/** The band that closes a floor (under the cornice / the roof), along {@code axis}. */
+	public static BlockState bandBlock(CitadelCanvas c, HallStyle s, Mats m, Direction.Axis axis) {
+		if (tall() && s != HallStyle.STONE) {
+			return frame(axis);
+		}
+		return m.band() == m.post() ? c.kit.beam(axis) : m.band();
+	}
+
+	/**
 	 * The wall of a scaled hall: a dark footing course (deepslate bricks, stone bricks on stone halls) under tall
 	 * windows that run from the second row to one short of the band, with a lintel row over them; the piers between
 	 * the windows keep their material (posts, stone bricks). No smooth stretch of wall: the windows take the
@@ -80,22 +112,22 @@ public final class HallFacade {
 			return footing(s, seed, t, ly);
 		}
 		if (pier) {
-			// timber keeps its posts in the wall; the other styles show the wall's own material between the glass, so the
-			// protruding pilasters (posts) stand out against it
-			return s == HallStyle.STONE ? plinth(seed, t, ly) : s == HallStyle.TIMBER ? m.post() : m.wall();
+			// struct/barrio-hall3: every style shows the wall's own light material in the pier (timber halls used to carry
+			// the post here, the same tone as the pilaster outside), so the dark-oak pilasters that stand proud of it read
+			return s == HallStyle.STONE ? plinth(seed, t, ly) : m.wall();
 		}
 		if (ly == lintel) {
 			return switch (s) {
-				case TIMBER -> beamLike(c, m.post(), along);
+				case TIMBER -> frame(along);
 				case STONE -> HallStyle.hash(seed, t, ly) % 3 == 0 ? b(Blocks.CHISELED_STONE_BRICKS) : STONE_BRICKS;
 				default -> m.wall();
 			};
 		}
 		if (s == HallStyle.TIMBER && ly == (fh() + 1) / 2) {
-			return beamLike(c, m.post(), along);
+			return frame(along);
 		}
 		// the project's colour is an accent: tinted glass in one bay of three, clear glass between
-		return s == HallStyle.BALCONY && Math.floorMod(t / 3, 3) == 0 ? b(Blocks.STAINED_GLASS_PANE.pick(env)) : PANE;
+		return s == HallStyle.BALCONY && Math.floorMod(t / 3, 3) == 0 ? HallStyle.stainedPane(env) : PANE;
 	}
 
 	/** The dark footing course: deepslate bricks with a cracked one now and then; stone bricks (a little moss) on stone halls. */
@@ -212,7 +244,7 @@ public final class HallFacade {
 		int mid = r.c();
 		int top = F * fh();
 		BlockState foot = tall() ? b(Blocks.DEEPSLATE_BRICKS) : STONE_BRICKS;
-		BlockState shaft = tall() && s == HallStyle.STONE ? STONE_BRICKS : m.post();
+		BlockState shaft = tall() && s == HallStyle.STONE ? STONE_BRICKS : postBlock(s, m);
 		for (int side = 0; side < 4; side++) {
 			int len = side < 2 ? r.w() : r.d();
 			Direction out = outward(r, side);
@@ -253,8 +285,8 @@ public final class HallFacade {
 	/** The door: jambs either side and a lintel (a keystone on stone halls). The opening (3 wide, 3 high) stays clear. */
 	private static void door(CitadelCanvas c, Room r, HallStyle s, Mats m) {
 		int mid = r.c();
-		BlockState jamb = s == HallStyle.STONE ? STONE_BRICKS : m.post();
-		BlockState lintel = s == HallStyle.STONE ? STONE_BRICKS : beamLike(c, m.post(), r.side().getAxis());
+		BlockState jamb = s == HallStyle.STONE ? STONE_BRICKS : postBlock(s, m);
+		BlockState lintel = s == HallStyle.STONE ? STONE_BRICKS : beamBlock(c, s, m, r.side().getAxis());
 		for (int dv = -2; dv <= 2; dv += 4) {
 			for (int y = 1; y <= (tall() ? fh() - 2 : 4); y++) {
 				c.set(r.cell(-1, mid + dv, y), jamb);
@@ -354,9 +386,9 @@ public final class HallFacade {
 		Direction in = r.back();
 		Direction.Axis sideAxis = r.side().getAxis();
 		BlockState footing = s == HallStyle.STONE ? STONE_BRICKS : b(Blocks.DEEPSLATE_BRICKS);
-		BlockState shaft = s == HallStyle.STONE ? b(Blocks.POLISHED_ANDESITE) : m.post();
-		BlockState cap = s == HallStyle.STONE ? b(Blocks.CHISELED_STONE_BRICKS) : beamLike(c, m.post(), sideAxis);
-		BlockState beam = beamLike(c, m.post(), sideAxis);
+		BlockState shaft = s == HallStyle.STONE ? b(Blocks.POLISHED_ANDESITE) : postBlock(s, m);
+		BlockState cap = s == HallStyle.STONE ? b(Blocks.CHISELED_STONE_BRICKS) : beamBlock(c, s, m, sideAxis);
+		BlockState beam = beamBlock(c, s, m, sideAxis);
 		for (int dv = -hw; dv <= hw; dv += 2 * hw) {
 			for (int u = uf; u <= -2; u++) {
 				c.set(r.cell(u, mid + dv, 1), footing);

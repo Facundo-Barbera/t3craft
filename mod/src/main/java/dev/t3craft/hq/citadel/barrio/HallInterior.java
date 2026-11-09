@@ -50,7 +50,7 @@ public final class HallInterior {
 			workArea(c, r, f, y, s, desks, seed);
 			runway(c, r, F, y, desks);
 			pendants(c, r, F, f, m, desks);
-			beams(c, r, f, m);
+			beams(c, r, f, m, s);
 		}
 		if (F == 1) {
 			chandelier(c, r);
@@ -357,8 +357,10 @@ public final class HallInterior {
 	private static void kanban(CitadelCanvas c, Room r, int y, DyeColor env, int h, Set<Long> desks, int n) {
 		DyeColor[] cards = {DyeColor.RED, DyeColor.ORANGE, DyeColor.YELLOW, DyeColor.LIME, DyeColor.GREEN};
 		int rows = Math.max(3, fh() - 3);
-		// stages sit on every other column, with a dark column between them: cards never touch sideways
-		int stages = (n - 1) / 2;
+		// struct/barrio-hall3: one lane per stage (up to five), side by side with no dark divider, so the five colours read at a
+		// glance from across the hall; the cards stagger (a lane has them on its odd rows, the next on its even ones), never
+		// stack, and a coloured header strip crowns the lanes under the project's rail
+		int lanes = n - 2;
 		for (int k = 0; k < n; k++) {
 			int v = r.c() - 2 - k;
 			BlockPos base = r.cell(0, v, y);
@@ -371,19 +373,15 @@ public final class HallInterior {
 				}
 				continue;
 			}
-			boolean stageCol = k % 2 == 1;
-			int idx = stages - 1 - (k - 1) / 2;
-			DyeColor stage = cards[stages <= 1 ? 0 : idx * (cards.length - 1) / (stages - 1)];
-			c.set(base, stageCol ? chest(r.back()) : b(Blocks.DARK_OAK_PLANKS));
-			boolean prev = false;
+			int idx = lanes - k;
+			DyeColor stage = cards[lanes <= 1 ? 0 : idx * (cards.length - 1) / (lanes - 1)];
+			c.set(base, chest(r.back()));
 			for (int row = 1; row <= rows - 1; row++) {
-				// a card needs a dark cell above and below it: no two cards stack
-				boolean card = stageCol && !prev && HallStyle.hash(h, v, row) % 100 < 70;
-				boolean blank = card && HallStyle.hash(v, row, h) % 5 == 0;
+				boolean card = (row + k) % 2 == 0 && HallStyle.hash(h, v, row) % 100 < 88;
+				boolean blank = card && HallStyle.hash(v, row, h) % 6 == 0;
 				c.set(base.above(row), card ? concrete(blank ? DyeColor.WHITE : stage) : b(Blocks.BLACKSTONE));
-				prev = card;
 			}
-			c.set(base.above(rows), stageCol ? terracotta(stage) : b(Blocks.BLACKSTONE));
+			c.set(base.above(rows), terracotta(stage));
 			c.set(base.above(rows + 1), k == n / 2 ? concrete(env) : b(Blocks.DARK_OAK_PLANKS));
 		}
 	}
@@ -589,12 +587,13 @@ public final class HallInterior {
 	 * between two rows of pendant lanterns (so it never meets one) and clear of the stair hole. They give the
 	 * ceiling depth and make the height of the hall readable.
 	 */
-	private static void beams(CitadelCanvas c, Room r, int f, Mats m) {
+	private static void beams(CitadelCanvas c, Room r, int f, Mats m, HallStyle s) {
 		int W = r.w();
 		int D = r.d();
 		int cu = D / 2;
 		int yb = (f + 1) * fh() - 1;
-		BlockState beam = HallFacade.beamLike(c, m.post(), r.side().getAxis());
+		// barrio-hall3: dark oak on the scaled wooden halls, like the frame outside
+		BlockState beam = HallFacade.beamBlock(c, s, m, r.side().getAxis());
 		for (int u = cu % PENDANT_STEP + PENDANT_STEP / 2; u < D; u += PENDANT_STEP) {
 			for (int v = 0; v < W; v++) {
 				BlockPos p = r.cell(u, v, yb);
