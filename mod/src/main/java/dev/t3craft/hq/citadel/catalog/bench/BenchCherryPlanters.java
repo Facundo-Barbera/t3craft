@@ -35,7 +35,7 @@ import net.minecraft.world.level.block.state.properties.Half;
  * Nooks may carry a cherry pergola (h ≥ 6) with slats and a hanging lantern.
  *
  * <p>Planters are real: every plant stands on soil (moss, rooted dirt, dirt or coarse dirt by seed, never on bare
- * stone), so {@code CitadelSupport} has nothing to swap. Plant set by seed: blossom, wildflowers or greens.
+ * stone), so {@code CitadelSupport} has nothing to swap. Plant set by seed: blossom, wildflowers or lily-of-the-valley and azalea.
  * Palette: deepslate (base), cherry (seat, posts, roof), moss and soil, plants, a lantern.
  *
  * <p>Size: 2–12 × 1–8 × 2+. Always facing the front: sitters look out through it.
@@ -330,7 +330,7 @@ public final class BenchCherryPlanters implements Variant {
 
 	/**
 	 * Under a roof an azalea would be a place to stand (it has a collision box) with only two blocks of headroom, so
-	 * the roofed cells get soft plants (fern, flowers) instead.
+	 * the roofed cells get soft plants (flowers) instead.
 	 */
 	private static void softUnder(CitadelCanvas c, Plot p, int u0, int v0, int u1, int v1) {
 		for (int v = v0; v <= v1; v++) {
@@ -339,7 +339,7 @@ public final class BenchCherryPlanters implements Variant {
 					BlockState at = p.has(u, y, v) ? p.at(c, u, y, v) : null;
 					if (at != null && (at.is(Blocks.AZALEA) || at.is(Blocks.FLOWERING_AZALEA))) {
 						int k = p.hash(u, y, v, 3);
-						p.set(c, u, y, v, k == 0 ? b(Blocks.FERN) : k == 1 ? b(Blocks.CORNFLOWER) : b(Blocks.LILY_OF_THE_VALLEY));
+						p.set(c, u, y, v, k == 0 ? b(Blocks.AZURE_BLUET) : k == 1 ? b(Blocks.CORNFLOWER) : b(Blocks.LILY_OF_THE_VALLEY));
 					}
 				}
 			}
@@ -363,7 +363,7 @@ public final class BenchCherryPlanters implements Variant {
 	/** Soil a plant may stand on: moss and rooted dirt, or dirt and coarse dirt, by seed. */
 	private static BlockState soil(Plot p, int u, int y, int v) {
 		int k = p.hash(u, y, v, 5);
-		if (p.hash(9, 9, 9, 2) == 0) {
+		if (p.hash(9, 9, 9, 4) != 0) { // three seeds in four are mossy
 			return k == 0 ? b(Blocks.ROOTED_DIRT) : b(Blocks.MOSS_BLOCK);
 		}
 		return k == 0 ? b(Blocks.COARSE_DIRT) : k == 1 ? b(Blocks.ROOTED_DIRT) : b(Blocks.DIRT);
@@ -373,8 +373,7 @@ public final class BenchCherryPlanters implements Variant {
 		int k = p.hash(u, y, v, 6);
 		return switch (p.hash(8, 8, 8, 3)) {
 			case 0 -> switch (k) { // blossom
-				case 2 -> b(Blocks.AZALEA);
-				case 3 -> b(Blocks.CHERRY_SAPLING);
+				case 2, 3 -> b(Blocks.AZALEA);
 				case 4 -> b(Blocks.PINK_PETALS).setValue(BlockStateProperties.FLOWER_AMOUNT, 1 + p.hash(u, y, v, 4))
 						.setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH);
 				default -> b(Blocks.FLOWERING_AZALEA);
@@ -389,9 +388,8 @@ public final class BenchCherryPlanters implements Variant {
 			};
 			default -> switch (k) { // greens
 				case 2 -> b(Blocks.AZALEA);
-				case 3 -> b(Blocks.FLOWERING_AZALEA);
-				case 4 -> b(Blocks.LILY_OF_THE_VALLEY);
-				default -> b(Blocks.FERN);
+				case 3, 4 -> b(Blocks.LILY_OF_THE_VALLEY);
+				default -> b(Blocks.FLOWERING_AZALEA);
 			};
 		};
 	}
