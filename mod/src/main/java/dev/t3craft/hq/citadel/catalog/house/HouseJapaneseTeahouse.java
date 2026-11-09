@@ -196,8 +196,7 @@ public final class HouseJapaneseTeahouse implements Variant {
 
 	/** [palette] a few brown courses in the thatch, so it weathers instead of being one saturated yellow. */
 	private static Block thatch(Plot p, Block mat, int u, int k, int v) {
-		boolean brown = p.hash(u, k, v, 4) != 0;
-		return brown ? Blocks.SPRUCE_STAIRS : mat;
+		return p.hash(u, k, v, 4) == 0 ? Blocks.MANGROVE_STAIRS : Blocks.SPRUCE_STAIRS;
 	}
 
 	/**
@@ -257,11 +256,6 @@ public final class HouseJapaneseTeahouse implements Variant {
 		for (int u = u0 + 1; u < u1; u++) {
 			for (int v = v0 + 1; v < v1; v++) {
 				p.set(c, u, 7, v, b(Blocks.SPRUCE_PLANKS));
-			}
-		}
-		for (int u = u0; u <= u1; u++) {
-			for (int v = v0; v <= v1; v++) {
-				p.set(c, u, 8, v, slab(Blocks.SPRUCE_SLAB));
 			}
 		}
 		// [depth] a slim post under each lifted corner, the lantern hangs beside it

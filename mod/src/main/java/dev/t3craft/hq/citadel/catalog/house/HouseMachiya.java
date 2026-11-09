@@ -159,7 +159,7 @@ public final class HouseMachiya implements Variant {
 
 	/** [palette] plaster: calcite with the odd tuff-brick patch where the weather got at it. */
 	private static BlockState plaster(Plot p, int u, int y, int v) {
-		return p.hash(u, y, v, 12) == 0 ? b(Blocks.CALCITE) : b(Blocks.TUFF_BRICKS);
+		return b(Blocks.CALCITE); // [palette] a clean whitewash: regular light panels between the dark posts
 	}
 
 	/** [palette] the lowest plaster course, darker: gradient from deepslate through tuff to calcite. */
@@ -459,7 +459,7 @@ public final class HouseMachiya implements Variant {
 			int y = roofY(v, g);
 			for (int u : new int[] {g.u1(), g.u2()}) {
 				for (int yy = PLATE + 1; yy <= y; yy++) {
-					p.set(c, u, yy, v, b(Blocks.TUFF_BRICKS));
+					p.set(c, u, yy, v, plaster(p, u, yy, v));
 				}
 				p.set(c, u, y + 1, v, slab(Blocks.DEEPSLATE_TILE_SLAB));
 			}
