@@ -532,6 +532,7 @@ final class BarrioGateBig {
 				c.set(p, armFloor(c, n, bb, col));
 			}
 		}
+		apron(c, l, a0, walk);
 		for (int a = a0 + 1; a < a1; a++) {
 			int n = a - a0;
 			if (n % 4 == 1) {
@@ -544,6 +545,22 @@ final class BarrioGateBig {
 			}
 		}
 		signpost(c, l, lead, a1 - 1, walk);
+	}
+
+	/** The row in front of the gate's hub face, beyond the walk: a checker of the courtyard's pink floor and calcite instead of the plain grey of the cross. */
+	private static void apron(CitadelCanvas c, Lot l, int a0, int walk) {
+		int edge = l.court() + 1;
+		for (int bb = -edge; bb <= edge; bb++) {
+			if (Math.abs(bb) <= walk) {
+				continue;
+			}
+			BlockPos p = l.at(-a0, bb, 0);
+			BlockState above = c.at(p.getX(), 1, p.getZ());
+			if (!inLot(c, l, p) || (above != null && !above.isAir())) {
+				continue;
+			}
+			c.set(p, Math.floorMod(bb, 2) == 0 ? c.floor() : CALCITE);
+		}
 	}
 
 	private static boolean inLot(CitadelCanvas c, Lot l, BlockPos p) {
