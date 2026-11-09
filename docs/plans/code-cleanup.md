@@ -144,7 +144,9 @@ hqrender  dev.t3craft.tools.hqrender  + RenderBlocks (out of dev.t3craft.blocks)
 4. If not, the coordinator fixes small errors himself, or a fix child does it on the same branch.
 5. Afterwards, delete the branch (local and remote) and the child's worktree on the VPS (clean and merged), and run `git pull --ff-only` on the VPS checkout.
 
-**Concurrency:**
+**Linked-environment limit (2026-11-09):** `delegate_task` against `vps-env` cannot isolate a worktree, so the child works in the shared project checkout. Implementation children therefore run one at a time; read-only ones can overlap. Running implementation children in parallel would take `t3_thread_launch` with a worktree strategy, which needs Facundo's OK.
+
+**Concurrency (as planned; see the limit above):**
 - Up to 4 children at once only in phases 1 and 4, which touch disjoint areas.
 - Phases 2, 3 and 5 go **one branch at a time**, because they rewrite imports and registries across the whole repo. During phase 3 no other branch is open (a "move window").
 

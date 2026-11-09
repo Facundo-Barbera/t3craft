@@ -9,6 +9,7 @@ One line per structural commit on `main`, newest first:
 - `RELOAD`: no structural change; code/behaviour, resources/lang or config only (hot-reload / rebuild is enough).
 
 ## Entries
+- 2026-11-09 docs/phase1-done RELOAD — docs only: phase 1 (#3) closed and the execution state recorded in `docs/ops/pending-execution.md`; linked-environment delegation limit noted in `docs/plans/code-cleanup.md`. Nothing to refresh in the game.
 - 2026-11-09 cleanup/1d-literals-debug RELOAD — #3: `DevReloadClient.WATCHED` and `PortableLinks` chat link are compile-checked (class literals / `ChatScreens::open`, reflection removed); render daemon class names are named constants; debug tooling is now off by default outside a dev environment: `PerfStats` counters/steps and its roll are opt-in (`-Dt3craft.perf=true`), `HitchWatch` registers no callbacks when off (`-Dt3craft.hitches`); switches in `docs/dev.md`.
 - 2026-11-09 research/t3-connect RELOAD — docs only (#1): `docs/plans/t3-connect.md`, comparison of a native Java T3 Connect client (A), a T3 CLI sidecar (B) and the current direct mode (C) against pingdotgg/t3code @ 33db45ef; recommends keeping C and asking upstream before A/B. Nothing to refresh in the game.
 - 2026-11-09 chore/changelog-union RELOAD — repo only: `.gitattributes` merges `docs/CHANGELOG-dev.md` with the union driver, so parallel branches that each prepend a line no longer conflict. No mod change.
