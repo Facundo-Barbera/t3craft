@@ -15,8 +15,13 @@ final class CatalogEntries {
 	}
 
 	private static final Variant[] ENTRIES = {
+			new dev.t3craft.hq.citadel.catalog.annex.AnnexCherryPergola(), // annex_cherry_pergola
+			new dev.t3craft.hq.citadel.catalog.annex.AnnexGreenhouseCopper(), // annex_greenhouse_copper
+			new dev.t3craft.hq.citadel.catalog.annex.AnnexToolShed(), // annex_tool_shed
 			new dev.t3craft.hq.citadel.catalog.house.HouseTimberCottage(), // house_timber_cottage
 			new dev.t3craft.hq.citadel.catalog.lamp.LampCherryPost(), // lamp_cherry_post
+			new dev.t3craft.hq.citadel.catalog.well.WellRoofedStone(), // well_roofed_stone
+			new dev.t3craft.hq.citadel.catalog.well.WellTroughPump(), // well_trough_pump
 	};
 
 	static final List<Variant> ALL = List.of(ENTRIES);
