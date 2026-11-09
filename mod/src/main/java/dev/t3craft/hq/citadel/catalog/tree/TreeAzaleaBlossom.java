@@ -110,9 +110,9 @@ public final class TreeAzaleaBlossom implements Variant {
 			double ex = Math.cos(ang);
 			double ez = Math.sin(ang);
 			double room = TreeKit.room(t, cuM, cvM, ex, ez, 0);
-			double rs = Math.min(rc * (0.40 + 0.15 * r.nextDouble()), Math.max(1.4, (room + 0.5) * 0.5));
+			double rs = Math.min(rc * (0.36 + 0.14 * r.nextDouble()), Math.max(1.4, (room + 0.5) * 0.5));
 			rs = Math.max(rs, 1.4);
-			double dd = TreeKit.clamp(room + 0.5 - rs, 0, rc * (0.5 + 0.25 * r.nextDouble()));
+			double dd = TreeKit.clamp(room + 0.5 - rs, 0, rc * (0.6 + 0.3 * r.nextDouble()));
 			double rys = rs * (0.7 + 0.2 * r.nextDouble());
 			double lo = CLEAR + 0.9 * rys;
 			double hi = p.h() - 0.6 - rys;
@@ -210,6 +210,7 @@ public final class TreeAzaleaBlossom implements Variant {
 			}
 		}
 
+		List<int[]> tips = new ArrayList<>(); // where a limb (or the leader) ends: leaves cover it, no bare bark cube
 		// ---- limbs: each satellite hangs from its own oak limb that leaves the trunk at y 4 or higher
 		for (int i = 1; i < balls.size(); i++) {
 			double[] bl = balls.get(i);
@@ -218,13 +219,15 @@ public final class TreeAzaleaBlossom implements Variant {
 			int ev = TreeKit.clamp((int) Math.round(bl[2]), 0, d - 1);
 			int ey = Math.max(CLEAR + 1, (int) Math.round(bl[1]));
 			TreeKit.branch(t, WOOD, new int[] {lu[sy], sy, lv[sy]}, new int[] {eu, ey, ev}, false);
+			tips.add(new int[] {eu, ey, ev});
 		}
+		tips.add(new int[] {lu[yTop], yTop, lv[yTop]});
 
 		// ---- the crown
 		double sa = r.nextInt(4) * Math.PI / 2 + (r.nextDouble() - 0.5) * 0.6;
 		double sx = Math.cos(sa);
 		double sz = Math.sin(sa);
-		double fb = 0.48 + 0.2 * r.nextDouble();
+		double fb = 0.5 + 0.18 * r.nextDouble();
 		int nHoles = rc < 2.6 ? 0 : rc < 3.5 ? 1 : 3 + (int) (rc * 0.6);
 		double[][] holes = new double[nHoles][4];
 		for (int i = 0; i < nHoles; i++) {
@@ -254,7 +257,7 @@ public final class TreeAzaleaBlossom implements Variant {
 					if (dist > 0.74 && t.hash(uu + 3, y + 5, vv + 7, 100) < 28) {
 						continue; // an eroded rim
 					}
-					if (y <= CLEAR + 1 && dist > 0.55 && t.hash(uu + 9, y, vv + 1, 100) < 25) {
+					if (y <= CLEAR + 2 && dist > 0.5 && t.hash(uu + 9, y, vv + 1, 100) < 32) {
 						continue; // a ragged underside
 					}
 					boolean bite = false;
@@ -271,11 +274,24 @@ public final class TreeAzaleaBlossom implements Variant {
 						continue;
 					}
 					double sun = ((uu - cuM) * sx + (vv - cvM) * sz) / rc;
-					double pf = TreeKit.clamp(fb + 0.45 * sun + 0.04 * (y - cyM), 0.1, 0.92);
+					// flowers come in patches of 2–4 blocks (coarse noise), a few single ones; the sun face is mostly in bloom
+					double pf = TreeKit.clamp(fb + 0.6 * sun + 0.05 * (y - cyM), 0.06, 0.96);
 					double fine = t.hash(uu, y + 17, vv, 100) / 100.0;
-					double coarse = t.hash(Math.floorDiv(uu, 2) + 7, Math.floorDiv(y, 2), Math.floorDiv(vv, 2) - 3, 100) / 100.0;
-					boolean flower = (t.hash(uu + 1, y + 2, vv + 3, 100) < 28 ? fine : coarse) < pf;
+					double c2 = t.hash(Math.floorDiv(uu, 2) + 7, Math.floorDiv(y, 2), Math.floorDiv(vv, 2) - 3, 100) / 100.0;
+					double c3 = t.hash(Math.floorDiv(uu + 1, 3) + 3, Math.floorDiv(y, 3), Math.floorDiv(vv + 2, 3) + 9, 100) / 100.0;
+					int pick = t.hash(uu + 1, y + 2, vv + 3, 100);
+					boolean flower = (pick < 12 ? fine : pick < 40 ? c2 : c3) < pf;
 					t.leaf(uu, y, vv, flower ? BLOOM : GREEN);
+				}
+			}
+		}
+
+		// leaves over every tip (after the bites, so a tip is never left bare)
+		for (int[] tp : tips) {
+			int[][] around = {{0, 1, 0}, {1, 0, 0}, {-1, 0, 0}, {0, 0, 1}, {0, 0, -1}, {1, 1, 0}, {-1, 1, 0}, {0, 1, 1}, {0, 1, -1}};
+			for (int[] o : around) {
+				if (tp[1] + o[1] >= CLEAR && t.hash(tp[0] + o[0], tp[1] + o[1], tp[2] + o[2], 3) != 0) {
+					t.leaf(tp[0] + o[0], tp[1] + o[1], tp[2] + o[2], t.hash(tp[0], tp[1] + o[1], tp[2] + o[2], 2) == 0 ? GREEN : BLOOM);
 				}
 			}
 		}
@@ -294,11 +310,40 @@ public final class TreeAzaleaBlossom implements Variant {
 			made++;
 			taken.add(new int[] {mu, mv});
 			mound(t, r, mu, mv);
-			if (r.nextInt(5) < 2) {
+			// a cluster: one to three more mounds beside it
+			for (int k = 0, extra = 1 + r.nextInt(rc >= 4.5 ? 3 : 2); k < 6 && extra > 0; k++) {
 				int[] f = faces[r.nextInt(4)];
 				if (freeSpot(t, List.of(), mu + f[0], mv + f[1], fx0, fx1, fz0, fz1)) {
 					mound(t, r, mu + f[0], mv + f[1]);
+					extra--;
 				}
+			}
+		}
+		// a mossy fallen oak log on the bigger plots, well clear of the trunk
+		if (rc >= 4.5 && r.nextInt(3) != 0) {
+			for (int i = 0; i < 20; i++) {
+				boolean alongX = r.nextBoolean();
+				int len = 3 + r.nextInt(2);
+				double ang = r.nextDouble() * Math.PI * 2;
+				int lu0 = (int) Math.round(lead0[0] + Math.cos(ang) * rc * 0.85) - (alongX ? len / 2 : 0);
+				int lv0 = (int) Math.round(lead0[1] + Math.sin(ang) * rc * 0.85) - (alongX ? 0 : len / 2);
+				boolean ok = true;
+				for (int k = 0; k < len && ok; k++) {
+					ok = freeSpot(t, taken, lu0 + (alongX ? k : 0), lv0 + (alongX ? 0 : k), fx0, fx1, fz0, fz1);
+				}
+				if (!ok) {
+					continue;
+				}
+				for (int k = 0; k < len; k++) {
+					int cu = lu0 + (alongX ? k : 0);
+					int cv = lv0 + (alongX ? 0 : k);
+					t.wood(cu, 0, cv, WOOD.log(alongX ? Direction.Axis.X : Direction.Axis.Z));
+					if (t.hash(cu, 1, cv, 2) == 0) {
+						t.cover(cu, 1, cv, b(Blocks.MOSS_CARPET));
+					}
+					taken.add(new int[] {cu, cv});
+				}
+				break;
 			}
 		}
 		int nP = 1 + (rc >= 4.5 ? 1 : 0) + (rc >= 7 ? 1 : 0);
@@ -316,12 +361,14 @@ public final class TreeAzaleaBlossom implements Variant {
 		}
 		double gu = (fx0 + fx1) / 2.0;
 		double gv = (fz0 + fz1) / 2.0;
-		TreeKit.ground(t, gu, gv, rc * 1.05 + 1.0, (uu, vv, k) -> {
+		TreeKit.ground(t, gu, gv, rc * 1.4 + 1.0, (uu, vv, k) -> {
 			int hsh = t.hash(uu, 0, vv, 100);
-			int pet = k < 0.5 ? 50 : k < 0.8 ? 34 : 18;
-			int moss = k < 0.5 ? 24 : k < 0.8 ? 24 : 20;
+			// petals in drifts 2–3 blocks wide (coarse noise) plus single ones, moss between
+			boolean drift = t.hash(Math.floorDiv(uu, 2) + 5, 0, Math.floorDiv(vv, 2) + 1, 100) < (k < 0.6 ? 55 : 32);
+			int pet = drift ? 80 : 14;
+			int moss = k < 0.8 ? 24 : 20;
 			if (hsh < pet) {
-				return TreeKit.petals(1 + t.hash(uu, 1, vv, k < 0.5 ? 4 : 2), t.hash(uu, 2, vv, 4));
+				return TreeKit.petals(drift ? 2 + t.hash(uu, 1, vv, 3) : 1, t.hash(uu, 2, vv, 4));
 			}
 			if (hsh < pet + moss) {
 				return b(Blocks.MOSS_CARPET);
@@ -334,14 +381,15 @@ public final class TreeAzaleaBlossom implements Variant {
 
 		// ---- hanging roots under the limbs (only from oak, with air below: nothing hangs from leaves)
 		int roots = 0;
-		int maxRoots = 3 + (int) rc;
+		int maxRoots = 5 + (int) (rc * 1.5);
 		for (int y = CLEAR; y < p.h() && roots < maxRoots; y++) {
 			for (int vv = 0; vv < d && roots < maxRoots; vv++) {
 				for (int uu = 0; uu < w && roots < maxRoots; uu++) {
 					if (t.kind(uu, y, vv) != TreeKit.WOOD || !t.empty(uu, y - 1, vv) || t.hash(uu, y + 41, vv, 100) >= 35) {
 						continue;
 					}
-					p.put(c, uu, y - 1, vv, b(Blocks.HANGING_ROOTS), CitadelCanvas.HANGING);
+					p.put(c, uu, y - 1, vv, b(t.hash(uu, y + 2, vv, 2) == 0 ? Blocks.SPORE_BLOSSOM : Blocks.HANGING_ROOTS),
+							CitadelCanvas.HANGING);
 					roots++;
 				}
 			}
