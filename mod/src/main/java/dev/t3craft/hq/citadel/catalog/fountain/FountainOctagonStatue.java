@@ -163,8 +163,8 @@ public final class FountainOctagonStatue implements Variant {
 
 	private static void hedge(FountainKit k, int dx, int dz) {
 		k.set(dx, 0, dz, b(Blocks.MOSSY_STONE_BRICKS));
-		k.set(dx, 1, dz, b(Blocks.FLOWERING_AZALEA_LEAVES));
-		k.set(dx, 2, dz, b(Blocks.FLOWERING_AZALEA_LEAVES));
+		k.set(dx, 1, dz, CitadelCanvas.leaves(Blocks.FLOWERING_AZALEA_LEAVES));
+		k.set(dx, 2, dz, CitadelCanvas.leaves(Blocks.FLOWERING_AZALEA_LEAVES));
 	}
 
 	private static void planter(FountainKit k, int dx, int dz) {
