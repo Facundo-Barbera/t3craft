@@ -20,7 +20,7 @@ import net.minecraft.world.level.block.state.properties.SlabType;
 
 /**
  * Tool shed: a real workshop you walk into. A two-block cobble plinth, board-and-batten walls between
- * posts, a double door (2 wide, reached by two stone steps under a porch hood on two posts), a shuttered
+ * posts, a double door (2 wide, reached by two stone steps under the front eave), a shuttered
  * window in the side wall and potted plants under the front windows. The roof is a gable of stairs, by seed with the
  * gable end on the front (ridge front to back, eave strips on both sides) or the ridge across (front eave over the stoop),
  * always with a trim fascia and a slab ridge.
@@ -28,11 +28,12 @@ import net.minecraft.world.level.block.state.properties.SlabType;
  * <p>Inside (4 free blocks at the walls, 5 or more under the roof): a workbench in the middle of the back
  * wall (crafting table, smithing table or grindstone, by seed) between chests and barrels, tool hooks on
  * the wall above them, a row of barrels and chests along the left wall, an aisle at least 2 wide from the
- * door to the bench and one lantern hung from the roof. Outside: a rain barrel (water cauldron), a
- * composter and hay under the left eave, and the firewood stacked under the right eave. From 10 wide, a
- * three-wide open wood lean-to with a stack two deep, a chopping stump and a lantern post.
+ * door to the bench and one lantern hung from the roof. Outside: a rain barrel (water cauldron),
+ * composter and hay (in the yard of plots 8 deep or more, or in the open left strip when the ridge runs across), barrels and hay
+ * under the left eave, and the firewood stacked on the right. From 10 wide, a
+ * three-wide open wood lean-to with a stack two deep and a chopping stump.
  *
- * <p>Seed: mirror (door and bench side, woodpile side), roof (gable end in front / ridge across), wood set (dark oak and
+ * <p>Seed: mirror (door, bench and woodpile side), roof (gable end in front / ridge across), wood set (dark oak and
  * spruce under cherry; spruce and oak under dark oak; dark oak and birch under deepslate tile), workstation.
  *
  * <pre>
