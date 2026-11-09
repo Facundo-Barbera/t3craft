@@ -88,6 +88,9 @@ import net.minecraft.world.level.block.state.BlockState;
  *   {@code --ss 1} without {@code --final}) keeps the old flat look. Override one by one with {@code --ao/--no-ao},
  *   {@code --shadows/--hard-shadows/--no-shadows}, {@code --sky/--no-sky}, {@code --bloom/--no-bloom},
  *   {@code --filter box|tent|mitchell}, {@code --shadow-rays N}. See docs/tools/hq-render.md.</li>
+ *   <li>GPU (tools/render-gpu): final looks trace on the RTX through CUDA by default and fall back to the CPU on their own;
+ *   {@code --gpu}, {@code --no-gpu}, {@code --gpu-compare}, {@code --gpu-probe}, {@code --gpu-no-resolve}, {@code --gpu-nvrtc},
+ *   {@code --gpu-fail-test}. See "GPU" in docs/tools/hq-render.md.</li>
  *   <li>{@code --compare DIR}: after the run, for every PNG written here, the image of the same name in DIR
  *   (before) next to the new one (after) as {@code compare_NAME.png}, and {@code compare.txt} with the
  *   pixel difference and whether both {@code report.json} have the same plan signature. Works with any
