@@ -290,6 +290,11 @@ public final class FountainStreamStones implements Variant {
 			}
 		}
 
+		boolean touchesRim(int a, int s) {
+			return (in(a - 1, s) && k[a - 1][s] == RIM) || (in(a + 1, s) && k[a + 1][s] == RIM)
+					|| (in(a, s - 1) && k[a][s - 1] == RIM) || (in(a, s + 1) && k[a][s + 1] == RIM);
+		}
+
 		boolean touchesWater(int a, int s) {
 			return (in(a - 1, s) && k[a - 1][s] == WATER) || (in(a + 1, s) && k[a + 1][s] == WATER)
 					|| (in(a, s - 1) && k[a][s - 1] == WATER) || (in(a, s + 1) && k[a][s + 1] == WATER);
@@ -432,7 +437,10 @@ public final class FountainStreamStones implements Variant {
 		}
 
 		BlockState rimBlock(int a, int s) {
-			int r = hs(a, 0, s, 20);
+			if (a > hd + 1 && hs(a / 2, 12, s / 2, 7) == 0) {
+				return b(Blocks.SAND); // 2 x 2 patches, so the cane grows in clumps
+			}
+			int r = hs(a, 0, s, 20) % 18;
 			if (r < 6) {
 				return b(Blocks.MOSSY_COBBLESTONE);
 			}
@@ -445,7 +453,7 @@ public final class FountainStreamStones implements Variant {
 			if (r < 15) {
 				return b(Blocks.TUFF);
 			}
-			return r < 18 ? b(Blocks.MOSS_BLOCK) : b(Blocks.SAND);
+			return b(Blocks.MOSS_BLOCK);
 		}
 
 		void drawRim() {
@@ -549,6 +557,7 @@ public final class FountainStreamStones implements Variant {
 			if (n >= 9) {
 				post(a0 + seats, sSeat);
 			}
+			benchBeside(a0, sSeat);
 			// the spring's cauldron: water to fill buckets, on the ground beside the head
 			int cs = p.hash(11, 0, 0, 2) == 0 ? s0 - 2 : s0 + 2;
 			if (free(hd, cs)) {
@@ -565,6 +574,41 @@ public final class FountainStreamStones implements Variant {
 			}
 		}
 
+		/**
+		 * A second seat in a wider plot: two spruce stairs on the ground facing a stretch of bank (high side away
+		 * from the water), found by scanning from a seeded start, away from the first bench.
+		 */
+		void benchBeside(int fa, int fs) {
+			if (m < 9) {
+				return;
+			}
+			int[][] dirs = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+			int start = p.hash(14, 0, 0, n * m);
+			for (int t = 0; t < n * m; t++) {
+				int idx = (start + t) % (n * m);
+				int a = idx / m;
+				int s = idx % m;
+				if (a < hd + 1 || a >= n - 1 || s < 1 || s >= m - 1 || Math.abs(a - fa) + Math.abs(s - fs) < 5 || !free(a, s)) {
+					continue;
+				}
+				for (int[] d : dirs) {
+					int pa = Math.abs(d[1]);
+					int ps = Math.abs(d[0]);
+					int a1 = a + pa;
+					int s1 = s + ps;
+					if (in(a + d[0], s + d[1]) && k[a + d[0]][s + d[1]] == RIM && !res[a + d[0]][s + d[1]] && free(a1, s1)
+							&& in(a1 + d[0], s1 + d[1]) && k[a1 + d[0]][s1 + d[1]] == RIM && !res[a1 + d[0]][s1 + d[1]]) {
+						Direction away = dir(-d[0], -d[1]);
+						set(a, s, 0, stairs(Blocks.SPRUCE_STAIRS, away));
+						set(a1, s1, 0, stairs(Blocks.SPRUCE_STAIRS, away));
+						res[a][s] = true;
+						res[a1][s1] = true;
+						return;
+					}
+				}
+			}
+		}
+
 		void drawGround() {
 			for (int a = 0; a < n; a++) {
 				for (int s = 0; s < m; s++) {
@@ -572,6 +616,10 @@ public final class FountainStreamStones implements Variant {
 						continue;
 					}
 					boolean inner = a >= 1 && a <= n - 2 && s >= 1 && s <= m - 2;
+					if (touchesRim(a, s) && hs(a, 13, s, 4) == 0) {
+						set(a, s, 0, b(Blocks.MOSS_CARPET));
+						continue;
+					}
 					BlockState plant = switch (hs(a, 3, s, 24)) {
 						case 0, 1, 2, 3, 4 -> b(Blocks.SHORT_GRASS);
 						case 5, 6, 7 -> b(Blocks.FERN);
