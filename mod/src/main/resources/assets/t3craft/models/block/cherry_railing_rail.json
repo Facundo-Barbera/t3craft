@@ -1,0 +1,415 @@
+{
+  "parent": "minecraft:block/block",
+  "ambientocclusion": false,
+  "textures": {
+    "rail": "t3craft:block/kit_railing",
+    "post": "t3craft:block/kit_railing_post",
+    "particle": "t3craft:block/kit_railing"
+  },
+  "elements": [
+    {
+      "from": [
+        0,
+        13,
+        0.5
+      ],
+      "to": [
+        16,
+        16,
+        3.5
+      ],
+      "faces": {
+        "north": {
+          "texture": "#rail",
+          "uv": [
+            0,
+            0,
+            16,
+            3
+          ]
+        },
+        "south": {
+          "texture": "#rail",
+          "uv": [
+            0,
+            0,
+            16,
+            3
+          ]
+        },
+        "up": {
+          "texture": "#rail",
+          "uv": [
+            0,
+            4,
+            16,
+            7
+          ]
+        },
+        "down": {
+          "texture": "#rail",
+          "uv": [
+            0,
+            11,
+            16,
+            14
+          ]
+        },
+        "east": {
+          "texture": "#rail",
+          "uv": [
+            0,
+            11,
+            3,
+            14
+          ]
+        },
+        "west": {
+          "texture": "#rail",
+          "uv": [
+            0,
+            11,
+            3,
+            14
+          ]
+        }
+      }
+    },
+    {
+      "from": [
+        0,
+        11,
+        1.25
+      ],
+      "to": [
+        16,
+        12,
+        2.75
+      ],
+      "faces": {
+        "north": {
+          "texture": "#rail",
+          "uv": [
+            0,
+            8,
+            16,
+            9
+          ]
+        },
+        "south": {
+          "texture": "#rail",
+          "uv": [
+            0,
+            8,
+            16,
+            9
+          ]
+        },
+        "up": {
+          "texture": "#rail",
+          "uv": [
+            0,
+            7,
+            16,
+            8
+          ]
+        },
+        "down": {
+          "texture": "#rail",
+          "uv": [
+            0,
+            10,
+            16,
+            11
+          ]
+        },
+        "east": {
+          "texture": "#rail",
+          "uv": [
+            0,
+            12,
+            2,
+            13
+          ]
+        },
+        "west": {
+          "texture": "#rail",
+          "uv": [
+            0,
+            12,
+            2,
+            13
+          ]
+        }
+      }
+    },
+    {
+      "from": [
+        0,
+        1,
+        1
+      ],
+      "to": [
+        16,
+        3,
+        3
+      ],
+      "faces": {
+        "north": {
+          "texture": "#rail",
+          "uv": [
+            0,
+            8,
+            16,
+            10
+          ]
+        },
+        "south": {
+          "texture": "#rail",
+          "uv": [
+            0,
+            8,
+            16,
+            10
+          ]
+        },
+        "up": {
+          "texture": "#rail",
+          "uv": [
+            0,
+            5,
+            16,
+            7
+          ]
+        },
+        "down": {
+          "texture": "#rail",
+          "uv": [
+            0,
+            14,
+            16,
+            16
+          ]
+        },
+        "east": {
+          "texture": "#rail",
+          "uv": [
+            0,
+            12,
+            2,
+            14
+          ]
+        },
+        "west": {
+          "texture": "#rail",
+          "uv": [
+            0,
+            12,
+            2,
+            14
+          ]
+        }
+      }
+    },
+    {
+      "from": [
+        1.25,
+        3,
+        1.25
+      ],
+      "to": [
+        2.75,
+        11,
+        2.75
+      ],
+      "faces": {
+        "north": {
+          "texture": "#post",
+          "uv": [
+            4,
+            3,
+            5.5,
+            11
+          ]
+        },
+        "south": {
+          "texture": "#post",
+          "uv": [
+            4,
+            3,
+            5.5,
+            11
+          ]
+        },
+        "east": {
+          "texture": "#post",
+          "uv": [
+            4.5,
+            3,
+            6,
+            11
+          ]
+        },
+        "west": {
+          "texture": "#post",
+          "uv": [
+            4.5,
+            3,
+            6,
+            11
+          ]
+        }
+      }
+    },
+    {
+      "from": [
+        5.25,
+        3,
+        1.25
+      ],
+      "to": [
+        6.75,
+        11,
+        2.75
+      ],
+      "faces": {
+        "north": {
+          "texture": "#post",
+          "uv": [
+            4,
+            3,
+            5.5,
+            11
+          ]
+        },
+        "south": {
+          "texture": "#post",
+          "uv": [
+            4,
+            3,
+            5.5,
+            11
+          ]
+        },
+        "east": {
+          "texture": "#post",
+          "uv": [
+            4.5,
+            3,
+            6,
+            11
+          ]
+        },
+        "west": {
+          "texture": "#post",
+          "uv": [
+            4.5,
+            3,
+            6,
+            11
+          ]
+        }
+      }
+    },
+    {
+      "from": [
+        9.25,
+        3,
+        1.25
+      ],
+      "to": [
+        10.75,
+        11,
+        2.75
+      ],
+      "faces": {
+        "north": {
+          "texture": "#post",
+          "uv": [
+            4,
+            3,
+            5.5,
+            11
+          ]
+        },
+        "south": {
+          "texture": "#post",
+          "uv": [
+            4,
+            3,
+            5.5,
+            11
+          ]
+        },
+        "east": {
+          "texture": "#post",
+          "uv": [
+            4.5,
+            3,
+            6,
+            11
+          ]
+        },
+        "west": {
+          "texture": "#post",
+          "uv": [
+            4.5,
+            3,
+            6,
+            11
+          ]
+        }
+      }
+    },
+    {
+      "from": [
+        13.25,
+        3,
+        1.25
+      ],
+      "to": [
+        14.75,
+        11,
+        2.75
+      ],
+      "faces": {
+        "north": {
+          "texture": "#post",
+          "uv": [
+            4,
+            3,
+            5.5,
+            11
+          ]
+        },
+        "south": {
+          "texture": "#post",
+          "uv": [
+            4,
+            3,
+            5.5,
+            11
+          ]
+        },
+        "east": {
+          "texture": "#post",
+          "uv": [
+            4.5,
+            3,
+            6,
+            11
+          ]
+        },
+        "west": {
+          "texture": "#post",
+          "uv": [
+            4.5,
+            3,
+            6,
+            11
+          ]
+        }
+      }
+    }
+  ]
+}
