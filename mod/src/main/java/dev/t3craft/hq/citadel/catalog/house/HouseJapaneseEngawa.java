@@ -110,7 +110,7 @@ public final class HouseJapaneseEngawa implements Variant {
 
 	private static final Scheme[] SCHEMES = {
 			new Scheme(Blocks.STRIPPED_CHERRY_LOG, Blocks.CHERRY_STAIRS, Blocks.BAMBOO_MOSAIC, Blocks.SPRUCE_PLANKS),
-			new Scheme(Blocks.DARK_OAK_LOG, Blocks.CHERRY_STAIRS, Blocks.SPRUCE_PLANKS, Blocks.DARK_OAK_PLANKS),
+			new Scheme(Blocks.STRIPPED_SPRUCE_LOG, Blocks.CHERRY_STAIRS, Blocks.SPRUCE_PLANKS, Blocks.DARK_OAK_PLANKS),
 			new Scheme(Blocks.STRIPPED_CHERRY_LOG, Blocks.SPRUCE_STAIRS, Blocks.BAMBOO_MOSAIC, Blocks.OAK_PLANKS),
 	};
 
@@ -538,9 +538,9 @@ public final class HouseJapaneseEngawa implements Variant {
 		}
 
 		boolean nearCorner(int a, int bb) {
-			for (int i = -1; i <= 1; i++) {
-				for (int j = -1; j <= 1; j++) {
-					if (Math.abs(i) + Math.abs(j) <= 1 && a + i >= 0 && a + i < vw && bb + j >= 0 && bb + j < vd && corner[a + i][bb + j]) {
+			for (int i = -2; i <= 2; i++) {
+				for (int j = -2; j <= 2; j++) {
+					if (Math.abs(i) + Math.abs(j) <= 2 && a + i >= 0 && a + i < vw && bb + j >= 0 && bb + j < vd && corner[a + i][bb + j]) {
 						return true;
 					}
 				}
@@ -629,7 +629,7 @@ public final class HouseJapaneseEngawa implements Variant {
 						}
 						set(a, y, bb, stair(mat, f, Half.BOTTOM, StairsShape.OUTER_LEFT));
 					} else {
-						set(a, h, bb, r % 3 == 2 ? b(Blocks.DEEPSLATE_BRICKS) : b(Blocks.DEEPSLATE_TILES));
+						set(a, h, bb, r % 3 == 2 ? b(Blocks.DEEPSLATE_BRICKS) : p.hash(a, h, bb, 8) == 0 ? b(Blocks.POLISHED_DEEPSLATE) : b(Blocks.DEEPSLATE_TILES));
 					}
 				}
 			}
@@ -676,11 +676,16 @@ public final class HouseJapaneseEngawa implements Variant {
 			if (h + 3 >= p.h()) {
 				return;
 			}
-			for (int t = -1; t <= 1; t++) {
+			int half = 1;
+			if (alongA ? (inF(ba - 2, bb0) && isRidge(ba - 2, bb0) && inF(ba + 2, bb0) && isRidge(ba + 2, bb0))
+					: (inF(ba, bb0 - 2) && isRidge(ba, bb0 - 2) && inF(ba, bb0 + 2) && isRidge(ba, bb0 + 2))) {
+				half = 2;
+			}
+			for (int t = -half; t <= half; t++) {
 				int a = alongA ? ba + t : ba;
 				int bb = alongA ? bb0 : bb0 + t;
-				boolean mid = t == 0;
-				set(a, h + 1, bb, mid ? (alongA ? paneU(glassPane(DyeColor.WHITE)) : paneV(glassPane(DyeColor.WHITE))) : log(Blocks.DARK_OAK_LOG, Direction.Axis.Y));
+				boolean mid = Math.abs(t) != half && (t + half) % 2 == 1 || half == 1 && t == 0;
+				set(a, h + 1, bb, mid ? (alongA ? paneU(glassPane(DyeColor.WHITE)) : paneV(glassPane(DyeColor.WHITE))) : (Math.abs(t) == half ? log(Blocks.DARK_OAK_LOG, Direction.Axis.Y) : b(Blocks.CALCITE)));
 				set(a, h + 2, bb, mid ? slab(Blocks.CHERRY_SLAB) : slab(Blocks.DEEPSLATE_TILE_SLAB));
 			}
 		}
@@ -968,12 +973,20 @@ public final class HouseJapaneseEngawa implements Variant {
 			if (hi - lo >= 3) {
 				int fd2 = nearHigh ? 1 : -1;
 				// a blossoming cherry shrub: low enough to leave no pocket under it
-				set(far, 1, gb, CitadelCanvas.leaves(Blocks.CHERRY_LEAVES));
-				set(far, 2, gb, CitadelCanvas.leaves(Blocks.CHERRY_LEAVES));
-				set(far + fd2, 1, gb, CitadelCanvas.leaves(Blocks.CHERRY_LEAVES));
+				for (int du = 0; du <= 1; du++) {
+					for (int dv = 0; dv <= 1; dv++) {
+						int cu = far + du * fd2;
+						int cv = gb - dv;
+						set(cu, 1, cv, CitadelCanvas.leaves(Blocks.CHERRY_LEAVES));
+						set(cu, 2, cv, CitadelCanvas.leaves(Blocks.CHERRY_LEAVES));
+						if (du == 0) {
+							set(cu, 3, cv, CitadelCanvas.leaves(Blocks.CHERRY_LEAVES));
+						}
+					}
+				}
 				set(far + 2 * fd2, 1, gb, b(Blocks.FLOWERING_AZALEA));
-				if (gb >= 2) {
-					set(far, 1, gb - 1, b(Blocks.PINK_PETALS));
+				if (gb >= 3) {
+					set(far + fd2, 1, gb - 2, b(Blocks.PINK_PETALS));
 				}
 			}
 		}
