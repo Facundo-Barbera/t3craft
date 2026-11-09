@@ -240,7 +240,7 @@ public final class GazeboCherryOctagon implements Variant {
 					case 2 -> postRing(c, p, u, v, dx, dz, geo, use);
 					default -> inner(c, p, u, v, dx, dz, geo, use, ring);
 				}
-				roof(c, p, u, v, dx, dz, oct(dx, dz), rho, drum);
+				roof(c, p, u, v, dx, dz, oct(dx, dz), rho, drum, r >= 4);
 			}
 		}
 
@@ -296,9 +296,9 @@ public final class GazeboCherryOctagon implements Variant {
 			// [palette] dark base, bark-dark cherry shaft, light capital
 			p.set(c, u, 0, v, b(Blocks.CHISELED_DEEPSLATE));
 			p.set(c, u, 1, v, b(Blocks.POLISHED_DEEPSLATE));
-			p.set(c, u, 2, v, log(Blocks.CHERRY_LOG, Direction.Axis.Y));
-			p.set(c, u, 3, v, log(Blocks.CHERRY_LOG, Direction.Axis.Y));
-			p.set(c, u, 4, v, b(Blocks.STRIPPED_CHERRY_WOOD));
+			p.set(c, u, 2, v, log(Blocks.STRIPPED_CHERRY_LOG, Direction.Axis.Y));
+			p.set(c, u, 3, v, log(Blocks.STRIPPED_CHERRY_LOG, Direction.Axis.Y));
+			p.set(c, u, 4, v, b(Blocks.CHERRY_WOOD));
 			return;
 		}
 		int h = p.hash(u, 0, v, 6);
@@ -370,9 +370,7 @@ public final class GazeboCherryOctagon implements Variant {
 				}
 			} else {
 				p.set(c, cu + i, 1, cv, log(Blocks.STRIPPED_CHERRY_LOG, Direction.Axis.X));
-				if (use == 0) {
-					p.set(c, cu + i, 2, cv, pot(p.hash(cu + i, 2, cv, 2)));
-				}
+				p.set(c, cu + i, 2, cv, pot(p.hash(cu + i, 2, cv, 2))); // nobody can stand on the table
 			}
 			if (use == 0) {
 				p.set(c, cu + i, 1, cv - 1, CUSHION); // cushions
@@ -389,7 +387,7 @@ public final class GazeboCherryOctagon implements Variant {
 	 * stays hollow inside. The outer ring of a brim is dark deepslate tile. Layer {@code drum} (if any) is a
 	 * glazed wall of one ring, the tier break of a two-tier roof.
 	 */
-	private static void roof(CitadelCanvas c, Plot p, int u, int v, int dx, int dz, double m, double[] rho, int drum) {
+	private static void roof(CitadelCanvas c, Plot p, int u, int v, int dx, int dz, double m, double[] rho, int drum, boolean ribs) {
 		int n = rho.length;
 		for (int j = 0; j < n; j++) {
 			int y = ROOF_Y + j;
@@ -415,7 +413,9 @@ public final class GazeboCherryOctagon implements Variant {
 			boolean brim = j == 0 || (drum >= 0 && j == drum + 1);
 			Block mat;
 			if (brim && m > rho[j] - 1.0) {
-				mat = p.hash(u, y, v, 7) == 0 ? Blocks.POLISHED_DEEPSLATE_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS;
+				mat = p.hash(u, y, v, 4) == 0 ? Blocks.DEEPSLATE_TILE_STAIRS : Blocks.POLISHED_DEEPSLATE_STAIRS;
+			} else if (ribs && (dx == 0 || dz == 0 || Math.abs(dx) == Math.abs(dz))) {
+				mat = Blocks.BAMBOO_MOSAIC_STAIRS; // [depth] the eight hips read as an octagon from afar
 			} else {
 				mat = Blocks.CHERRY_STAIRS;
 			}
