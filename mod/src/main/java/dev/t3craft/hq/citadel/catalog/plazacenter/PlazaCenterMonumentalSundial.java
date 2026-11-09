@@ -95,6 +95,7 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 		int pl; // outermost wall ring
 		int pb; // bench ring (-1: none)
 		int rd; // dial radius
+		double ringIn; // the bezel is r in (ringIn, rd + 0.5]
 		int yd; // layer of the dial block
 		int g; // half length of the gnomon blade, in blocks of height
 		Block dial;
@@ -105,7 +106,8 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 		Block wallD2;
 		Block wallM;
 		Block wallM2;
-		Block curb;
+		Block light; // top tier of the platform: the light cornice
+		Block light2;
 		Block bench;
 		Block finBlock;
 		Block finSlab;
@@ -152,7 +154,7 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 		k.pb = hf >= 6 ? hf - 1 : -1;
 		k.pl = hf >= 6 ? hf - 2 : hf - 1;
 		int tiers = hf >= 9 ? 2 : 1;
-		if (hf >= 7 && boost) {
+		if (hf >= 10 && boost) {
 			tiers++;
 		}
 		tiers = Math.min(tiers, Math.max(1, p.h() - 6));
@@ -161,6 +163,7 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 		k.ptop = k.pl - tiers;
 		k.rd = k.oct ? k.ptop - 1 : k.ptop;
 		k.yd = tiers;
+		k.ringIn = k.rd >= 4 ? k.rd - 1.4 : k.rd - 0.9; // 2-thick bezel, 1-thick on the small dials
 		int surface = k.yd + 1;
 		// a modest blade: about half the dial radius high, never taller than the plot allows
 		k.g = Math.max(1, Math.min(Math.min(k.rd - 1, p.h() - 2 - surface), Math.max(2, (k.rd + 1) / 2)));
@@ -177,7 +180,7 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 			k.ring = Blocks.POLISHED_BLACKSTONE_BRICKS;
 			k.ringAlt = Blocks.POLISHED_BLACKSTONE;
 		}
-		k.mark = mkk == 0 ? Blocks.GOLD_BLOCK : Blocks.CHISELED_QUARTZ_BLOCK;
+		k.mark = mkk == 0 ? Blocks.GOLD_BLOCK : Blocks.RAW_GOLD_BLOCK; // both read on the dark bezel and on the pale disc
 		if (wk == 0) {
 			k.wallD = Blocks.DEEPSLATE_BRICKS;
 			k.wallD2 = Blocks.DEEPSLATE_TILES;
@@ -192,7 +195,13 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 			k.wallM = Blocks.POLISHED_ANDESITE;
 			k.wallM2 = Blocks.STONE_BRICKS;
 		}
-		k.curb = ck == 0 ? Blocks.SMOOTH_QUARTZ_SLAB : Blocks.POLISHED_DIORITE_SLAB;
+		if (ck == 0) {
+			k.light = Blocks.SMOOTH_QUARTZ;
+			k.light2 = Blocks.QUARTZ_BRICKS;
+		} else {
+			k.light = Blocks.POLISHED_DIORITE;
+			k.light2 = Blocks.CALCITE;
+		}
 		k.bench = switch (bk) {
 			case 0 -> Blocks.CHERRY_STAIRS;
 			case 1 -> Blocks.SPRUCE_STAIRS;
@@ -223,7 +232,7 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 	 */
 	private static void marks(Cfg k) {
 		k.mk = new boolean[k.w][k.d];
-		double ringIn = k.rd - 1.4;
+		double ringIn = k.ringIn;
 		double cardW = k.rd >= 5 ? 1.5 : k.rd >= 3 ? 1.05 : 0.55;
 		for (int dv = -k.rd; dv <= k.rd; dv++) {
 			for (int du = -k.rd; du <= k.rd; du++) {
@@ -256,7 +265,7 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 							k.mk[u][v] = true;
 							break;
 						}
-					} else if (card && r > k.rd - (h == 0 ? 3.6 : 2.6) && perp < 0.55) {
+					} else if (card && k.rd >= 4 && r > k.rd - (h == 0 ? 3.6 : 2.6) && perp < 0.55) {
 						k.mk[u][v] = true;
 						break;
 					}
@@ -316,7 +325,7 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 			st = p.hash(u, y, v, 4) == 0 ? b(Blocks.STONE_BRICKS) : b(Blocks.POLISHED_ANDESITE);
 		} else if (k.mk[u][v]) {
 			st = b(k.mark);
-		} else if (r > k.rd - 1.4) {
+		} else if (r > k.ringIn) {
 			st = p.hash(u, y, v, 5) == 0 ? b(k.ringAlt) : b(k.ring);
 		} else {
 			st = b(k.dial);
@@ -339,17 +348,16 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 			return;
 		}
 		BlockState wall;
-		if (st == k.tiers) {
+		if (st == 1) {
+			// [finish] light cornice: the top tier is flush with the dial, so it never hides it from the plaza
+			wall = p.hash(u, y, v, 5) == 0 ? b(k.light2) : b(k.light);
+		} else if (st == k.tiers) {
 			// [palette] dark plinth
 			wall = p.hash(u, y, v, 4) == 0 ? b(k.wallD2) : b(k.wallD);
 		} else {
 			wall = p.hash(u, y, v, 5) == 0 ? b(k.wallM2) : b(k.wallM);
 		}
 		s(c, p, u, y, v, wall);
-		if (st == 1) {
-			// [finish] light cornice of slabs all round the top, open only where the stairs arrive
-			s(c, p, u, y + 1, v, slab(k.curb));
-		}
 	}
 
 	/** The single step up to the podium on the plot's edge, low side out: stairs ascend towards the plaza. */
@@ -461,8 +469,11 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 				s(c, p, cu, base + full, v, slab(k.finSlab));
 			}
 		}
+		// a gold cap on the last column and a fine spire of two rods instead of a ball
 		int top = k.cv + k.g - 1;
-		s(c, p, cu, base + k.g, top, b(Blocks.GOLD_BLOCK));
-		s(c, p, cu, base + k.g + 1, top, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState());
+		s(c, p, cu, base + k.g - 1, top, b(Blocks.GOLD_BLOCK));
+		BlockState rod = Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState();
+		s(c, p, cu, base + k.g, top, rod);
+		s(c, p, cu, base + k.g + 1, top, rod);
 	}
 }
