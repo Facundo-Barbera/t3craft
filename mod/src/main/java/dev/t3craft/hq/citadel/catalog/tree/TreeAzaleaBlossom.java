@@ -195,7 +195,7 @@ public final class TreeAzaleaBlossom implements Variant {
 				t.fixed(u, 0, v, k < 3 ? b(Blocks.DEEPSLATE_BRICKS) : k < 5 ? b(Blocks.POLISHED_DEEPSLATE)
 						: b(Blocks.CRACKED_DEEPSLATE_BRICKS));
 				if (t.empty(u, 1, v) && t.hash(u, 1, v, 6) != 0) {
-					t.fixed(u, 1, v, t.hash(u, 2, v, 4) == 0 ? slab(Blocks.SMOOTH_QUARTZ_SLAB) : slab(Blocks.POLISHED_DIORITE_SLAB));
+					t.fixed(u, 1, v, t.hash(u, 2, v, 4) == 0 ? slab(Blocks.MOSSY_STONE_BRICK_SLAB) : slab(Blocks.STONE_BRICK_SLAB));
 				}
 			}
 		}

@@ -83,7 +83,7 @@ public final class TreeMapleRed implements Variant {
 		int y2 = 2;
 		int fork = H >= 11 ? 4 : 3;
 		int[][] lead = TreeKit.trunk(t, WOOD, bu, bv, y2, H - 3, ou, ov, 0, 0);
-		TreeKit.roots(t, WOOD, bu, bv, 6, 2, -1, 5);
+		TreeKit.roots(t, WOOD, bu, bv, 6, 1 + (sc > 1.1 ? 1 : 0), -1, 5);
 
 		// four limbs, low and diagonal, to the four side lobes; each lobe's tone follows its height
 		double a0 = r.nextDouble() * Math.PI * 2;

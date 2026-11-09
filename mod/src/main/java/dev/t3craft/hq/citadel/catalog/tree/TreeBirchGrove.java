@@ -145,9 +145,7 @@ public final class TreeBirchGrove implements Variant {
 				t.wood(u0, 0, v0, BIRCH.bark());
 				t.wood(u0 + fu, 0, v0, BIRCH.bark());
 				t.wood(u0, 0, v0 + fv, BIRCH.bark());
-				t.wood(u0 + fu, 0, v0 + fv, BIRCH.bark());
 				t.wood(u0 + fu, 1, v0, BIRCH.log(Direction.Axis.Y));
-				t.wood(u0, 1, v0 + fv, BIRCH.bark());
 			}
 			footRoots(t, u0, v0, i == tallest ? 2 : 1 + t.hash(u0, 5, v0, 2), 31 + i);
 
@@ -348,7 +346,7 @@ public final class TreeBirchGrove implements Variant {
 
 	/** The fallen birch across the front row, with moss and a mushroom on top. */
 	private static void fallenLog(Vox t, boolean flipU) {
-		int len = Math.min(4, t.w - 2);
+		int len = Math.min(3, t.w - 3);
 		int start = flipU ? t.w - 1 - len : 1;
 		for (int i = 0; i < len; i++) {
 			int u = start + i;

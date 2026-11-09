@@ -88,10 +88,16 @@ public final class TreeCherryWeeping implements Variant {
 			double reach = TreeKit.clamp(TreeKit.room(t, su, sv, ex, ez, 0) - 0.6, 1.5, 3.4 * sc);
 			int tu = (int) Math.round(su + ex * reach);
 			int tv = (int) Math.round(sv + ez * reach);
-			int ty = Math.min(sy + 1 + (i & 1), H - 2);
-			List<int[]> cells = TreeKit.branch(t, TreeKit.CHERRY, new int[] {su, sy, sv}, new int[] {tu, ty, tv}, false);
-			limbCells.addAll(cells.subList(cells.size() / 2, cells.size()));
-			TreeKit.lobe(t, tu, ty, tv, 1.6 * sc, 1.5 * sc, 1.5, 0.9, i % 2 == 0 ? TreeKit.SAKURA : TreeKit.SAKURA.swap(), 0.3, i + 1);
+			// an arch: up and out to an apex, then over and down to the tip, where a small lobe hangs
+			int ay = Math.min(sy + 2 + (i & 1), H - 3);
+			int au = (int) Math.round(su + ex * reach * 0.55);
+			int av = (int) Math.round(sv + ez * reach * 0.55);
+			int ty = Math.max(4, ay - 1 - (i % 3 == 0 ? 1 : 0));
+			List<int[]> rise = TreeKit.branch(t, TreeKit.CHERRY, new int[] {su, sy, sv}, new int[] {au, ay, av}, false);
+			List<int[]> fall = TreeKit.branch(t, TreeKit.CHERRY, new int[] {au, ay, av}, new int[] {tu, ty, tv}, false);
+			limbCells.addAll(rise.subList(rise.size() / 2, rise.size()));
+			limbCells.addAll(fall);
+			TreeKit.lobe(t, tu, ty, tv, 1.35 * sc, 1.25 * sc, 1.3, 0.7, i % 2 == 0 ? TreeKit.SAKURA : TreeKit.SAKURA.swap(), 0.3, i + 1);
 		}
 
 		// strands: from every leaf with air below that lies away from the trunk, and from the outer limbs
@@ -114,8 +120,8 @@ public final class TreeCherryWeeping implements Variant {
 			int y = s[1];
 			int v = s[2];
 			int pick = t.hash(u, y, v, 20);
-			if (pick >= 8) {
-				continue; // gaps: about two strands in five
+			if (pick >= 9) {
+				continue; // gaps: a bit less than half the rim hangs
 			}
 			// very uneven lengths: stubs, mid strands and a few long ones that nearly reach the grass
 			int room = y - 1;

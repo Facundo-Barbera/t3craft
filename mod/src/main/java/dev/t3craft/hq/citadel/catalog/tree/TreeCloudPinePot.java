@@ -74,7 +74,7 @@ public final class TreeCloudPinePot implements Variant {
 		Random r = p.rng(0xC10D);
 		int w = p.w();
 		int d = p.d();
-		int H = Math.min(p.h(), 12);
+		int H = Math.min(p.h(), 13);
 		boolean ring = w >= 6 && d >= 6;
 		int pu0 = ring ? 1 : 0;
 		int pu1 = ring ? w - 2 : w - 1;
@@ -94,7 +94,7 @@ public final class TreeCloudPinePot implements Variant {
 		int nMax = small <= 4 ? 2 : 3;
 		int n = TreeKit.clamp((crownY - y0) / 2, 1, nMax);
 		double gap = (crownY - y0) / (double) n;
-		double rBase = small >= 6 ? 2.1 : small >= 5 ? 1.8 : 1.5;
+		double rBase = small >= 7 ? 2.6 : small >= 6 ? 2.3 : small >= 5 ? 2.0 : 1.4;
 		double a0 = r.nextDouble() * Math.PI * 2;
 		int[] py = new int[n];
 		double[] ang = new double[n];
@@ -125,7 +125,7 @@ public final class TreeCloudPinePot implements Variant {
 				for (int e = 0; e < 2; e++) {
 					t.wood(bu + a, 1, bv + e, SPRUCE.bark());
 					if (a == ou || e == ov) {
-						t.wood(bu + a, 2, bv + e, SPRUCE.log(Direction.Axis.Y));
+						t.wood(bu + a, 2, bv + e, SPRUCE.bark());
 					}
 				}
 			}
@@ -180,14 +180,14 @@ public final class TreeCloudPinePot implements Variant {
 			int tv = TreeKit.clamp((int) Math.round(bend[2] + ez * reach), 0, d - 1);
 			TreeKit.branch(t, SPRUCE, bend, new int[] {tu, py[k], tv}, false);
 			double rz = rk * (0.85 + r.nextDouble() * 0.15);
-			TreeKit.lobe(t, tu, py[k], tv, rk, rz, 1.2, 0.6, k % 2 == 0 ? CUSHION : CUSHION.clumps(2), 0.3, 10 + k);
+			TreeKit.lobe(t, tu, py[k], tv, rk, rz, 1.45, 0.5, k % 2 == 0 ? CUSHION : CUSHION.clumps(2), 0.3, 10 + k);
 			prev = bend;
 		}
 		// the crown pad, domed a little more, on the end of the leader
 		int[] crown = {cu, crownY, cv};
 		TreeKit.branch(t, SPRUCE, prev, crown, false);
-		double rc = rBase - 0.3;
-		TreeKit.lobe(t, cu, crownY, cv, rc, rc * 0.9, 1.5, 0.6, CUSHION, 0.3, 40);
+		double rc = Math.max(1.3, rBase - 0.4);
+		TreeKit.lobe(t, cu, crownY, cv, rc, rc * 0.9, 1.7, 0.5, CUSHION, 0.3, 40);
 
 		// moss and ferns on the soil
 		for (int u = lo; u <= uHi; u++) {
