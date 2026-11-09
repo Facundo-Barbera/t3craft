@@ -847,11 +847,34 @@ public final class CitadelOffice {
 		c.fixture(station, c.kit.mergeStation(Direction.EAST));
 		c.anchor(Anchor.face(AnchorNames.mergeStation("office", projects.get(0)), station, Direction.EAST));
 		attentionBoard(c);
+		backing(c);
 		// light: lanterns only over the middle and the north half; the screen's side gets invisible light, so nothing hangs in front of it
 		for (int[] p : new int[][] {{-3, -3}, {0, -3}, {3, -3}, {-3, 0}, {0, 0}, {-5, 0}, {5, 0}, {0, 5}}) {
 			hang(c, p[0], CEIL() - 1, p[1]);
 		}
 		glow(c);
+	}
+
+	/**
+	 * The equipment walls behind the screens and the board (the cabin has no inner wall any more): dark deepslate at m = 5, full
+	 * height, as wide as what hangs on them (nine behind the threads screen and the podiums, seven behind the board and the project
+	 * screens), so nothing floats; the corners of the walkway stay open and glazed, and reachable from the room's corners.
+	 */
+	private static void backing(CitadelCanvas c) {
+		for (int y = F2() + 1; y < CEIL(); y++) {
+			for (int i = -4; i <= 4; i++) {
+				set(c, i, y, W, backingBlock(i, y));
+			}
+			for (int i = -3; i <= 3; i++) {
+				set(c, W, y, i, backingBlock(i + 11, y));
+				set(c, -W, y, i, backingBlock(i - 11, y));
+			}
+		}
+	}
+
+	private static BlockState backingBlock(int i, int y) {
+		int h = Math.floorMod(i * 5 + y * 3, 7);
+		return h == 0 ? CitadelCanvas.RIB : h < 3 ? CitadelCanvas.b(Blocks.DEEPSLATE_BRICKS) : FOOT;
 	}
 
 	/**
@@ -921,12 +944,6 @@ public final class CitadelOffice {
 				boolean edge = Math.abs(dz) == 3 || row == 0 || row == 3;
 				BlockState s = edge ? c.kit.beam(row == 0 || row == 3 ? Direction.Axis.Z : Direction.Axis.Y) : c.style.palette().get(HqStyle.Role.BOARD);
 				c.fixture(new BlockPos(x, bottom + row, CZ() + dz), s);
-			}
-		}
-		// a dark backing behind the board (the cabin has no inner wall): deepslate tiles on the old wall's line, one beyond the frame
-		for (int dz = -3; dz <= 3; dz++) {
-			for (int row = 0; row < 4; row++) {
-				c.set(x + 1, bottom + row, CZ() + dz, FOOT);
 			}
 		}
 		int lamp = 5;
