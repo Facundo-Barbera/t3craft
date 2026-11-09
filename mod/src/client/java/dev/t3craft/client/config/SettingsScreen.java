@@ -125,6 +125,9 @@ public final class SettingsScreen extends BaseConfigScreen {
 				.bounds(width - rw - 6, 6, rw, 20)
 				.tooltip(Tooltip.create(Component.translatable("t3craft.demo.reset.button.tooltip")))
 				.build());
+		// feat/20-outbound-events: webhook destinations (off by default). Top left, mirroring the reset button.
+		addRenderableWidget(Button.builder(Component.literal("Outbound…"), b -> minecraft.gui.setScreen(new OutboundScreen(this)))
+				.bounds(6, 6, rw, 20).build());
 
 		int half = Math.min(150, (width - 40) / 2 - 4);
 		addRenderableWidget(Button.builder(Component.literal("Save"), b -> save()).bounds(width / 2 - half - 4, by + 4, half, 20).build());

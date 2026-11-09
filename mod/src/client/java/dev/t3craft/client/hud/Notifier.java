@@ -49,6 +49,8 @@ public final class Notifier {
 
 	/** Same, with the NPC id so the portable terminal's notification list can jump to the thread. */
 	public static void transition(Minecraft mc, @Nullable String npcId, String title, String text, int color, String sound, boolean toast) {
+		// feat/20-outbound-events: hand the event to the webhook emitter (off by default, own thread, never throws).
+		dev.t3craft.client.outbound.OutboundClient.onTransition(npcId, title, text, sound);
 		NotificationLog.INSTANCE.record(new NotificationLog.Entry(npcId, title, text, color, sound, System.currentTimeMillis()));
 		boolean answerable = "attention".equals(sound) && npcId != null && npcId.indexOf(':') > 0;
 		if (answerable) {
