@@ -65,8 +65,9 @@ public final class TreeCherryWeeping implements Variant {
 		int bu = TreeKit.base(p.w(), ou);
 		int bv = TreeKit.base(p.d(), ov);
 		int yTop = H - 3;
-		int[][] lead = TreeKit.trunk(t, TreeKit.CHERRY, bu, bv, 3, yTop, ou, ov,
-				r.nextInt(3) - 1, r.nextInt(3) - 1);
+		boolean small = Math.min(p.w(), p.d()) < 8;
+		int[][] lead = TreeKit.trunk(t, TreeKit.CHERRY, bu, bv, 2, yTop, ou, ov,
+				small ? 0 : r.nextInt(3) - 1, small ? 0 : r.nextInt(3) - 1);
 		TreeKit.roots(t, TreeKit.CHERRY, bu, bv, 5, 2, -1, 13);
 
 		// the crown dome on the leader
@@ -108,7 +109,11 @@ public final class TreeCherryWeeping implements Variant {
 			for (int v = 0; v < t.d; v++) {
 				for (int u = 0; u < t.w; u++) {
 					byte k = t.kind(u, y, v);
-					if ((k == TreeKit.LEAF || k == TreeKit.WOOD && contains(limbCells, u, y, v))
+					// only the outer rim hangs: the cell beyond (away from the trunk) is not a leaf
+					int ou2 = (int) Math.signum(Math.round(u - ccu));
+					int ov2 = (int) Math.signum(Math.round(v - ccv));
+					boolean rim = t.kind(u + ou2, y, v + ov2) != TreeKit.LEAF;
+					if ((k == TreeKit.LEAF && rim || k == TreeKit.WOOD && contains(limbCells, u, y, v))
 							&& t.empty(u, y - 1, v) && Math.hypot(u - ccu, v - ccv) > 1.6) {
 						seeds.add(new int[] {u, y, v});
 					}
@@ -128,8 +133,8 @@ public final class TreeCherryWeeping implements Variant {
 				continue; // gaps: a bit less than half the rim hangs
 			}
 			// very uneven lengths: stubs, mid strands and a few long ones that nearly reach the grass
-			int room = y - 1;
-			int len = pick < 4 ? 1 + t.hash(u, 1, v, 2) : pick < 10 ? 2 + t.hash(u, 2, v, 3) : room - 1 - t.hash(u, 3, v, 3);
+			int room = y - 2; // strands stop at least two blocks above the grass
+			int len = pick < 4 ? 1 + t.hash(u, 1, v, 2) : 2 + t.hash(u, 2, v, 4); // 1–2 stubs, 2–5 strands
 			len = Math.max(1, Math.min(len, room));
 			int ku = (int) Math.signum(Math.round(u - ccu));
 			int kv = (int) Math.signum(Math.round(v - ccv));
@@ -141,7 +146,7 @@ public final class TreeCherryWeeping implements Variant {
 					kv = 0;
 				}
 			}
-			TreeKit.hang(t, u, y - 1, v, len, 1, TreeKit.SAKURA.a(), TreeKit.SAKURA.b(), ku, kv, kink);
+			TreeKit.hang(t, u, y - 1, v, len, 2, TreeKit.SAKURA.a(), TreeKit.SAKURA.b(), ku, kv, kink);
 			col[v * t.w + u] = true;
 		}
 
