@@ -320,7 +320,7 @@ public final class HouseTimberCorner implements Variant {
 					boolean ev = v == 4 - half || v == 4 + half;
 					BlockState st;
 					if (half == 0) {
-						st = b(Blocks.GOLD_BLOCK);
+						st = b(Blocks.DEEPSLATE_TILE_WALL);
 					} else if (eu && ev) {
 						st = copperBlock(true); // [palette] exposed copper ribs on the hips
 					} else if (eu || ev) {

@@ -302,8 +302,10 @@ public final class HouseTimberArcade implements Variant {
 		// [finish] gold finials on both ridge ends
 		int mid = (g.d() - 1) / 2;
 		int top = PLATE + (g.d() - 1) / 2 + 2;
-		p.set(c, 0, top, mid, b(Blocks.GOLD_BLOCK));
-		p.set(c, g.w() - 1, top, mid, b(Blocks.GOLD_BLOCK));
+		for (int u : new int[] {0, g.w() - 1}) {
+			p.set(c, u, top, mid, b(Blocks.DEEPSLATE_TILE_WALL));
+			p.set(c, u, top + 1, mid, Blocks.LIGHTNING_ROD.waxed().exposed().defaultBlockState());
+		}
 	}
 
 	/** [palette] the gable ends: plaster in the triangle, a king post and a pair of pink lights. */
