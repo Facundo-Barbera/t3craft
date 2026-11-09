@@ -4,16 +4,21 @@ El botón **"T3Craft HQ"** de la pantalla de título y de la de selección de mu
 al mundo HQ: abre un menú propio, que vuelve a la pantalla de origen con **Esc** o **Volver**.
 
 ## Qué hay en el menú
+
+> Un `hqLayout` de la config, o un mundo HQ guardado, con un id eliminado o desconocido cae a la
+> ciudadela y se escribe una línea WARN en el log (una por id). No se borra nada más que la elección
+> de layout.
 - **Abrir HQ**: lo mismo que hacía antes el botón (`DemoClient.open`): crea el mundo HQ la primera vez
   o lo abre, y entra. Si vanilla cancela la carga, se vuelve a este menú.
 - **Tipo de layout del HQ**: la lista de `HqLayouts.all()` (de feat/hq-layouts), cada una con su nombre
   y una línea de descripción (`t3craft.hq.layout.<id>.name` / `.desc`).
   - Orden de presentación (`HqLayouts.menuOrder()`, feat/ui-hq-menu-lineage): primero el diseño
-    principal (`HqLayouts.PRIMARY_ID` = `hybrid-ringcampus`, etiqueta PRINCIPAL), luego una fila de
-    encabezado "Legacy" y los demás en el orden del registro. Los ids, el layout por defecto y
-    `HqLayouts.all()` no cambian.
+    principal (`HqLayouts.PRIMARY_ID` = `hybrid-ringcampus`, la ciudadela, etiqueta PRINCIPAL) y luego
+    los demás en el orden del registro (hoy solo `classic`). No hay sección "Legacy": los 7 layouts
+    antiguos (campus, ring, vertical, ensanche, village, hybrid-towncenter, hybrid-terraces) se
+    eliminaron (cleanup/2-legacy-layouts, #4). La ciudadela es también el layout por defecto.
   - La elegida va con un marco blanco y "▶". La construida (`HqLayoutState.builtLayoutId`), con la
-    etiqueta verde **CONSTRUIDO**. Las de `large = true` (campus), con **MUY GRANDE** y la descripción en
+    etiqueta verde **CONSTRUIDO**. Las de `large = true` (hoy ninguna), con **MUY GRANDE** y la descripción en
     naranja.
   - Se elige con clic izquierdo (`MouseButtons.isLeft`: 1 en 26.x) o con las flechas, RePág/AvPág e
     Inicio/Fin. Se guarda en el momento en la clave `hqLayout` de la config.

@@ -7,18 +7,18 @@ blocks, same plan fingerprints, same demo hashes).
 
 ```
 config/t3craft/hq-layouts/
-  classic.json               one file per layout id (all sections optional)
-  campus.json
-  ...
+  hybrid-ringcampus.json     one file per layout id (all sections optional)
+  classic.json
   rooms/
-    campus/hall_3.nbt        a structure-block room that replaces module "hall_3" of campus
+    hybrid-ringcampus/<module id>.nbt   a structure-block room that replaces that module of the citadel
   _defaults/                 written by "Export layouts": reference copies, never read as packs
-    campus.json              every role / palette field / parameter at the code's value
+    hybrid-ringcampus.json   every role / palette field / parameter at the code's value
     MODULES.txt              module ids and boxes of every layout (sample HQ), for rooms
 ```
 
-Layout ids: `classic`, `campus`, `ring`, `vertical`, `ensanche`, `village`, `hybrid-ringcampus`,
-`hybrid-towncenter`, `hybrid-terraces`. A `.json` with another name is reported and ignored.
+Layout ids: `hybrid-ringcampus` (the citadel, the default) and `classic`. A `.json` with another name
+(for example the removed `campus`, `ring`, `vertical`, `ensanche`, `village`, `hybrid-towncenter`,
+`hybrid-terraces`) is reported and ignored.
 
 ## Workflow
 
@@ -28,15 +28,15 @@ Layout ids: `classic`, `campus`, `ring`, `vertical`, `ensanche`, `village`, `hyb
    so loading them changes nothing.
 2. Edit `<layout>.json` (or drop a `.nbt` in `rooms/<layout>/`) while the game runs.
 3. Within a second the client notices (file sizes and modification times), reloads, shows a toast
-   ("HQ layouts: reloaded campus") and the HQ world re-plans: only the cells that changed are placed.
+   ("HQ layouts: reloaded hybrid-ringcampus") and the HQ world re-plans: only the cells that changed are placed.
    **Reload layouts** in the HQ menu does the same at once.
-4. Preview without the game: `./gradlew hqRender -PhqArgs="--layout campus --packs <path>/config/t3craft/hq-layouts"`.
+4. Preview without the game: `./gradlew hqRender -PhqArgs="--layout hybrid-ringcampus --packs <path>/config/t3craft/hq-layouts"`.
 
 ## File format
 
 ```jsonc
 {
-  "layout": "campus",                       // informative
+  "layout": "hybrid-ringcampus",                       // informative
   "roles":   { "FLOOR": "minecraft:oak_planks", "ROOF": "minecraft:mud_brick_stairs" },
   "palette": { "woodFloor": "minecraft:birch_planks" },
   "blocks":  { "minecraft:calcite": "minecraft:white_concrete" },
@@ -59,10 +59,10 @@ optional). Replacement is **by block**, after generation and lighting:
   block in the style that draws this layout becomes the new block.
 - `palette`: any material field of `dev.t3craft.hq.Palette` (`plinth`, `woodFloor`, `darkPlanks`,
   `copper`, `stairBlock`, `copperStairs`, ...; `air` excluded). Same rule: that field's block is replaced.
-  Palette is the material set of the **classic style** (`hq.style = classic`); the export writes it
-  only in `classic.json`, but the key works in every pack.
+  Palette is the material set of the old classic style (removed); the export writes it only in
+  `classic.json`, but the key still works in every pack as a block-to-block replacement.
 - `blocks`: any block → any block, for materials that are not a role (the per-barrio materials
-  of campus, ring stone, village timber, ...).
+  of the citadel, ...).
 
 Precedence when two entries name the same source block: `blocks` > `palette` > `roles`.
 
@@ -89,24 +89,12 @@ walkable cell at block light ≥ 10.
 | layout | key | default | range | changes |
 |---|---|---|---|---|
 | every layout | `lighting.grid` | 5 | 3..5 | spacing of the floor-lamp grid (smaller: more lamps) |
-| every layout | `lighting.lattice` | 9 | 5..9 | floor-lamp lattice on outdoor grounds (campus-style sparse groups) |
+| every layout | `lighting.lattice` | 9 | 5..9 | floor-lamp lattice on outdoor grounds (sparse groups) |
 | classic | `portico.petalsEvery` | 3 | 2..9 | pink petals on 1 portico garden cell in N (rest moss) |
-| classic | `spine.inlayEvery` | 4 | 3..12 | classic style: copper inlay every N blocks down the spine |
-| campus | `roof.azaleaEvery` | 7 | 3..31 | flat roof gardens: flowering azalea on 1 cell in N |
-| campus | `roof.mossEvery` | 3 | 2..15 | flat roof gardens: moss carpet on 1 cell in N |
-| campus | `plaza.lampPostEvery` | 6 | 4..12 | hub plaza: lamp post every N blocks on its outer ring |
-| ring | `terrace.bushEvery` | 23 | 11..97 | terraces: azalea bush on 1 cell in N |
-| ring | `patio.planterEvery` | 11 | 7..47 | inner patio: planter / azalea on 1 cell in N |
-| vertical | `facade.lightEvery` | 4 | 3..9 | lit panels in the tower facades every N blocks |
-| ensanche | `hall.ceilingLightEvery` | 6 | 3..9 | hall ceiling light panels on an N×N grid |
-| village | `hall.ceilingLightEvery` | 4 | 3..8 | hall ceiling light panels on an N×N grid |
-| village | `lanes.lanternEvery` | 11 | 5..41 | garden lanterns beside the lanes: 1 cell in N |
 | hybrid-ringcampus | `streets.lightEvery` | 41 | 17..97 | lights let into the streets: 1 cell in N |
 | hybrid-ringcampus | `terrace.bushEvery` | 23 | 11..97 | terraces: azalea bush on 1 cell in N |
 | hybrid-ringcampus | `catalog.enabled` | 1 | 0..1 | catalog placement (CitadelPlacement): 1 on, 0 off (the city as before the catalog) |
 | hybrid-ringcampus | `terrain.relief` | 2 | 0..3 | campus terraces (CitadelRelief): core and rings a few blocks apart (≤ 6 in all), ramps, stairs, capped retaining walls; 0 flat |
-| hybrid-towncenter | `hall.ceilingLampEvery` | 6 | 4..9 | civic hall ceiling lamps on an N×N grid |
-| hybrid-terraces | `temple.ceilingLightEvery` | 4 | 3..8 | temple ceiling light panels on an N×N grid |
 
 An unknown key for that layout is an error (reported, last good pack kept).
 
@@ -123,7 +111,7 @@ Design a room in game, save it with a structure block (**Save** mode; the file l
 `config/t3craft/hq-layouts/rooms/<layoutId>/<moduleId>.nbt`. The module ids and their boxes
 (minimum corner and size, plan coordinates, for a sample HQ) are listed in
 `_defaults/MODULES.txt` (e.g. classic: `hub`, `portico`, `spine_0`, `wing_0_seg_1`,
-`wing_0_desk_2`; campus: `hall_<index>`, pavilions, the hub; module ids of grown parts follow the
+`wing_0_desk_2`; the citadel's ids are listed there too; module ids of grown parts follow the
 same pattern).
 
 Placement:
@@ -134,7 +122,7 @@ Placement:
   `counterclockwise_90`) turns the structure inside its own box (and its blocks) first.
 - A file in the folder is used even without a `rooms` entry (no rotation, no offset).
 - Only cells the module owns are written; cells outside the box, cells of another module and
-  sparse grounds (campus paths) are left alone.
+  sparse grounds (paths) are left alone.
 - Cells the structure does not list (**structure void**) keep what the generator put there; air in
   the structure clears the cell.
 - Block entity data is kept (signs, chests, barrels...).
