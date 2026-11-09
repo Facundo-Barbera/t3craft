@@ -22,7 +22,7 @@ import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 /**
  * A grove of slender white birches. The trunks are bare, 1×1 birch logs with nothing on them below y 4 (no roots, no
  * stubs: you walk between them and under them); they stand at least three cells apart (two blocks of air), most of
- * them in small groups, and some jog a block sideways in their bare part.
+ * them in small groups, straight and bare.
  *
  * <p>The crown is <em>not</em> a mass: a slim spire of leaves round the tip, and below it a few small, airy puffs of
  * light birch leaves, each on its own thin twig (one or two logs), turning from layer to layer, so the white trunk shows
@@ -206,7 +206,7 @@ public final class TreeBirchGrove implements Variant {
 		}
 		n = pts.size();
 
-		// ---- heights (clearly different, shuffled), the crown base of each, and a jog on most trunks
+		// ---- heights (clearly different, shuffled) and the crown base of each
 		double[] fr = new double[n];
 		for (int i = 0; i < n; i++) {
 			fr[i] = 1.0 - 0.5 * i / (n - 1.0);
@@ -227,42 +227,10 @@ public final class TreeBirchGrove implements Variant {
 			fu[i] = pts.get(i)[0];
 			fv[i] = pts.get(i)[1];
 		}
-		int[][] jog = new int[n][];
-		for (int i = 0; i < n; i++) {
-			if (r.nextInt(100) >= 60) {
-				continue;
-			}
-			int o = r.nextInt(4);
-			for (int k = 0; k < 4 && jog[i] == null; k++) {
-				int[] dr = DIRS[(o + k) % 4];
-				int nu = fu[i] + dr[0];
-				int nv = fv[i] + dr[1];
-				if (nu < 1 || nu > w - 2 || nv < 1 || nv > d - 2) {
-					continue;
-				}
-				boolean ok = true;
-				for (int j = 0; j < n; j++) {
-					if (j != i && Math.max(Math.abs(nu - fu[j]), Math.abs(nv - fv[j])) < 3) {
-						ok = false;
-					}
-				}
-				int yS = Math.max(MIN_Y, cb[i] - 1);
-				if (ok && yS < top[i] - 2) {
-					jog[i] = new int[] {yS, dr[0], dr[1]};
-					fu[i] = nu;
-					fv[i] = nv;
-				}
-			}
-		}
-
 		// ---- the wood of every trunk (bare below the crown), then the crowns
 		int[][][] lead = new int[n][][];
 		for (int i = 0; i < n; i++) {
-			List<int[]> steps = new ArrayList<>();
-			if (jog[i] != null) {
-				steps.add(jog[i]);
-			}
-			lead[i] = column(t, pts.get(i)[0], pts.get(i)[1], top[i], steps);
+			lead[i] = column(t, pts.get(i)[0], pts.get(i)[1], top[i], new ArrayList<>());
 		}
 		int[] ids = {1};
 		for (int i = 0; i < n; i++) {
@@ -270,6 +238,7 @@ public final class TreeBirchGrove implements Variant {
 			crown(t, r, i, lead[i], top[i], cb[i], lv, ids, fu, fv, w, d);
 		}
 		gaps(t, PAL[pal].a());
+		unperch(t);
 		t.prune();
 
 		// ---- the rest corner: seats and a lantern post at the clearing, a few fallen logs, bushes, then the floor
@@ -373,9 +342,12 @@ public final class TreeBirchGrove implements Variant {
 			}
 			int du = DIRS[bestDir][0];
 			int dv = DIRS[bestDir][1];
-			Direction.Axis ax = du != 0 ? Direction.Axis.X : Direction.Axis.Z;
+			// the twig: thin birch fence posts (a fence cannot be stood on), joined to the trunk and to each other
 			for (int s = 1; s <= len; s++) {
-				t.wood(lu[y] + du * s, y, lvv[y] + dv * s, BIRCH.log(ax));
+				BlockState fe = b(Blocks.BIRCH_FENCE);
+				fe = side(fe, -du, -dv, true);
+				fe = side(fe, du, dv, s < len);
+				t.wood(lu[y] + du * s, y, lvv[y] + dv * s, fe);
 			}
 			double rx = 1.15 + r.nextDouble() * 0.35;
 			double ry = 1.0 + r.nextDouble() * 0.7;
@@ -390,6 +362,18 @@ public final class TreeBirchGrove implements Variant {
 			y += 2 + (r.nextInt(3) == 0 ? 1 : 0);
 			k++;
 		}
+	}
+
+	/** Sets the fence side that faces the local step {@code (du, dv)} (+u east, +v south, the front is north). */
+	private static BlockState side(BlockState st, int du, int dv, boolean on) {
+		if (du > 0) {
+			return st.setValue(BlockStateProperties.EAST, on);
+		} else if (du < 0) {
+			return st.setValue(BlockStateProperties.WEST, on);
+		} else if (dv > 0) {
+			return st.setValue(BlockStateProperties.SOUTH, on);
+		}
+		return st.setValue(BlockStateProperties.NORTH, on);
 	}
 
 	/**
@@ -478,6 +462,31 @@ public final class TreeBirchGrove implements Variant {
 						if (k2 == TreeKit.LEAF || k2 == TreeKit.WOOD || k3 == TreeKit.LEAF || k3 == TreeKit.WOOD) {
 							t.leaf(u, y, v, lf);
 						}
+					}
+				}
+			}
+		}
+	}
+
+	/**
+	 * Nobody can reach a ledge in the crowns, and the walking audit flags a standable, unreached cell with anything
+	 * within 8 blocks over it. So a leaf that is the top of its column, with two free cells over it and something
+	 * higher up in that column, is taken away (and what that exposes below, the same way).
+	 */
+	private static void unperch(Vox t) {
+		for (int y = t.h - 3; y >= MIN_Y; y--) {
+			for (int v = 0; v < t.d; v++) {
+				for (int u = 0; u < t.w; u++) {
+					if (t.kind(u, y - 1, v) != TreeKit.LEAF || !t.empty(u, y, v) || !t.empty(u, y + 1, v)) {
+						continue;
+					}
+					boolean roof = false;
+					for (int k = y + 2; k <= y + 9 && !roof; k++) {
+						byte kk = t.kind(u, k, v);
+						roof = kk == TreeKit.LEAF || kk == TreeKit.WOOD || kk == TreeKit.FIXED;
+					}
+					if (roof) {
+						t.clear(u, y - 1, v);
 					}
 				}
 			}
@@ -631,10 +640,25 @@ public final class TreeBirchGrove implements Variant {
 			if (!free) {
 				continue;
 			}
+			// the post, and an arm towards the clearing with the lantern hanging from it (a fence top cannot be stood on)
+			int au = Math.abs(cl[0] - u) >= Math.abs(cl[1] - v) ? (int) Math.signum(cl[0] - u) : 0;
+			int av = au == 0 ? (int) Math.signum(cl[1] - v) : 0;
+			if (au == 0 && av == 0) {
+				au = 1;
+			}
+			if (!t.in(u + au, 3, v + av) || t.kind(u + au, 2, v + av) != TreeKit.EMPTY || t.kind(u + au, 3, v + av) != TreeKit.EMPTY) {
+				au = -au;
+				av = -av;
+			}
+			if (!t.in(u + au, 3, v + av) || t.kind(u + au, 2, v + av) != TreeKit.EMPTY || t.kind(u + au, 3, v + av) != TreeKit.EMPTY) {
+				continue;
+			}
 			t.fixed(u, 0, v, b(Blocks.BIRCH_FENCE));
 			t.fixed(u, 1, v, b(Blocks.BIRCH_FENCE));
 			t.fixed(u, 2, v, b(Blocks.BIRCH_FENCE));
-			t.fixed(u, 3, v, b(Blocks.LANTERN));
+			t.fixed(u, 3, v, side(b(Blocks.BIRCH_FENCE), au, av, true));
+			t.fixed(u + au, 3, v + av, side(b(Blocks.BIRCH_FENCE), -au, -av, true));
+			t.fixed(u + au, 2, v + av, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true));
 			return;
 		}
 	}
