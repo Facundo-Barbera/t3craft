@@ -97,7 +97,7 @@ public final class HouseSmallStudio implements Variant {
 
 	private static final Scheme[] SCHEMES = {
 			// cherry roof, slate crest and eave, calcite plaster, dark oak frame, deepslate footing
-			new Scheme(Blocks.STRIPPED_CHERRY_LOG, Blocks.DARK_OAK_LOG,
+			new Scheme(Blocks.STRIPPED_SPRUCE_LOG, Blocks.DARK_OAK_LOG,
 					mix(Blocks.CALCITE, Blocks.CALCITE, Blocks.CALCITE, Blocks.CALCITE, Blocks.POLISHED_DIORITE),
 					mix(Blocks.DEEPSLATE_BRICKS, Blocks.DEEPSLATE_BRICKS, Blocks.CRACKED_DEEPSLATE_BRICKS, Blocks.POLISHED_DEEPSLATE, Blocks.DEEPSLATE_TILES),
 					mix(Blocks.POLISHED_DEEPSLATE, Blocks.DEEPSLATE_TILES, Blocks.DEEPSLATE_BRICKS, Blocks.DEEPSLATE_TILES),
@@ -114,7 +114,7 @@ public final class HouseSmallStudio implements Variant {
 					mix(Blocks.STONE_BRICKS, Blocks.COBBLESTONE, Blocks.STONE_BRICKS, Blocks.MOSSY_STONE_BRICKS),
 					mix(Blocks.SPRUCE_PLANKS, Blocks.SPRUCE_PLANKS, Blocks.DARK_OAK_PLANKS), Blocks.BAMBOO_MOSAIC,
 					Blocks.DEEPSLATE_TILE_STAIRS, Blocks.SPRUCE_STAIRS, Blocks.DEEPSLATE_BRICK_STAIRS, Blocks.STONE_BRICKS, Blocks.STONE_BRICK_SLAB,
-					Blocks.SPRUCE_DOOR, Blocks.SPRUCE_TRAPDOOR, Blocks.SPRUCE_FENCE, Blocks.STONE_BRICK_STAIRS,
+					Blocks.CHERRY_DOOR, Blocks.CHERRY_TRAPDOOR, Blocks.SPRUCE_FENCE, Blocks.STONE_BRICK_STAIRS,
 					Blocks.STONE_BRICK_STAIRS,
 					mix(Blocks.STONE_BRICKS, Blocks.COBBLESTONE, Blocks.MOSSY_STONE_BRICKS, Blocks.CRACKED_STONE_BRICKS), Blocks.STONE_BRICK_STAIRS, Blocks.STONE_BRICK_SLAB,
 					DyeColor.RED, DyeColor.LIGHT_BLUE, Blocks.CHISELED_STONE_BRICKS),
@@ -375,6 +375,13 @@ public final class HouseSmallStudio implements Variant {
 			for (int v = pd + 1; v <= D - 2; v++) {
 				if (!win[v]) {
 					continue;
+				}
+				// [finish] a shrub at the foot of the window, where the ground meets the wall
+				if (free(outer, 0, v) && p.hash(outer, 0, v, 2) == 0) {
+					BlockState bush = TimberKit.groundPlant(p, outer, 0, v);
+					if (bush != null) {
+						set(outer, 0, v, bush);
+					}
 				}
 				for (int e : new int[] {v - 1, v + 1}) {
 					if (e > pd && e < D - 1 && !win[e] && !post.test(e) && free(outer, 3, e)) {
