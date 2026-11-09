@@ -29,16 +29,16 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 /**
  * A hillside house with a real waterfall. A mossy retaining wall holds a raised terrace; a two-storey
  * house stands on it (kitchen and living room below, bedroom and study above, 4 free blocks per floor).
- * The water has a visible origin and a use: a rain chain brings the roof's water down into a stone
- * cistern against the house, a spout lets it fall into a stone channel that crosses the terrace (a slab
- * bridge crosses it), the channel irrigates a bed of crops, and the water falls over the lip of the
- * retaining wall (one jump into a pond, or two: through a washing trough) into a lily pond at the foot.
- * A 2-wide stair climbs along the side to the terrace. The pond and the cascade never leave the plot.
+ * The water has a visible origin and a use: a downpipe from the eave feeds a carved stone mask on the house
+ * wall, whose mouth pours into a stone channel that crosses the terrace (a slab bridge crosses it), irrigates
+ * a bed of crops and feeds a lavoir; at the lip of the retaining wall it falls (one jump into a pond, or two:
+ * through a washing trough) into a lily pond at the foot. A 2-wide stair climbs along the side to the
+ * terrace. The pond and the cascade never leave the plot.
  *
  * <pre>
- *  side section, front on the left                      roof (tile, brick or mud brick), ridge, chimney
+ *  side section, front on the left                      roof (tile, brick or tuff brick), ridge, chimney
  *                                          ____/\____
- *   rain chain ┐  cistern ▒ spout            │ upper  │  bedroom, study (y9..12)
+ *   downpipe ┐  mask ▒ pours               │ upper  │  bedroom, study (y9..12)
  *   pond ▒▒ ╲ falls    channel ▒▒▒▒▒ crops   ├────────┤
  *   ▒▒▒▒▒▒▒ ║  retaining wall (y0..3)       │ lower  │  kitchen, living room (y4..7)
  *   stair ▁▂▃▅ ║                             └────────┘
@@ -97,7 +97,7 @@ public final class HouseTerraceCascade implements Variant {
 		final int d;
 		final int h;
 		final int jumps; // 1 or 2
-		final int roof; // 0 deepslate tile, 1 brick, 2 mud brick
+		final int roof; // 0 deepslate tile, 1 brick, 2 tuff brick
 		final int cu; // the column of the channel and the fall
 		final int gd; // v of the retaining wall's front face
 		final int bd; // rows of the washing trough (two jumps)
@@ -138,7 +138,7 @@ public final class HouseTerraceCascade implements Variant {
 			hu1 = w - 3;
 			hu0 = hu1 - wh + 1;
 			ud = hu0 + wh / 2 - 1;
-			cu = w - 6;
+			cu = w - 6 - (w >= 18 ? 2 : 0);
 			pb = cu + 2;
 			pa = Math.max(4, cu - 7);
 			iu0 = hu0 + 1;
@@ -391,7 +391,7 @@ public final class HouseTerraceCascade implements Variant {
 	/**
 	 * [depth] the terrace: paved path from the stair to the door, lawn and flowers, a slab kerb along the edge
 	 * with lantern posts, hedges on the sides, and the water: a channel sunk in the deck from a stone cistern
-	 * (fed by a rain chain from the eave) to the lip of the wall, with kerbs, a slab bridge and a bed of crops
+	 * (fed by a downpipe from the eave) to the lip of the wall, with kerbs, a slab bridge and a bed of crops
 	 * it irrigates.
 	 */
 	private static void terrace(X x, G g) {
@@ -421,7 +421,7 @@ public final class HouseTerraceCascade implements Variant {
 			}
 		}
 		// the edge of the terrace: a low kerb of slabs (walkable), with posts and lanterns
-		int[] posts = {3, cu - 2, cu + 2, g.w - 2};
+		int[] posts = g.w >= 18 ? new int[] {3, cu - 2, cu + 2, g.w - 2} : new int[] {3, g.w - 2};
 		for (int u = 3; u <= g.w - 2; u++) {
 			boolean post = false;
 			for (int pu : posts) {
@@ -450,12 +450,12 @@ public final class HouseTerraceCascade implements Variant {
 				}
 			}
 		}
-		// the spring: a stone mask on the house wall (see spring()) pours into the channel; a rain chain from the
-		// eave feeds it. The water falls two blocks from the mask into the head of the channel.
+		// the spring: a stone mask on the house wall (see spring()) pours into the channel; a downpipe from the
+		// eave (a downpipe) feeds it. The water falls two blocks from the mask into the head of the channel.
 		x.set(cu, G1 + 1, vc, b(Blocks.WATER));
 		x.set(cu, G1, vc, falling());
 		for (int y = G1 + 2; y <= PLATE - 1; y++) {
-			x.put(cu, y, vc, b(Blocks.IRON_CHAIN), CitadelCanvas.HANGING);
+			x.set(cu, y, vc, b(Blocks.DARK_OAK_FENCE));
 		}
 		// a lavoir off the channel: a pocket of water with a sloped washing stone and a barrel beside it
 		if (g.t >= 4) {
@@ -499,6 +499,9 @@ public final class HouseTerraceCascade implements Variant {
 		// on a deep terrace: a cherry on the left lawn, and room to sit under it
 		if (g.t >= 6 && g.ud >= 9) {
 			cherry(x, 5, g.gd + 3);
+			if (g.t >= 8) {
+				cherry(x, g.ud - 4, g.gd + g.t - 3);
+			}
 			x.set(7, G1, g.gd + 3, stair(Blocks.DARK_OAK_STAIRS, Direction.WEST, false));
 		}
 	}
@@ -517,6 +520,9 @@ public final class HouseTerraceCascade implements Variant {
 					}
 					if (du == 0 && dv == 0 && dy <= 1) {
 						continue;
+					}
+					if ((Math.abs(du) == 2 || Math.abs(dv) == 2) && x.hash(tu + du, dy, tv + dv, 4) == 0) {
+						continue; // an uneven crown
 					}
 					x.set(tu + du, G1 + 4 + dy, tv + dv, leaves(Blocks.CHERRY_LEAVES));
 				}
@@ -799,9 +805,9 @@ public final class HouseTerraceCascade implements Variant {
 				cap = Blocks.STONE_BRICK_SLAB;
 			}
 			case 2 -> {
-				main = Blocks.MUD_BRICK_STAIRS;
+				main = Blocks.TUFF_BRICK_STAIRS;
 				eaveBlk = Blocks.DARK_OAK_STAIRS;
-				mid = b(Blocks.MUD_BRICKS);
+				mid = b(Blocks.TUFF_BRICKS);
 				cap = Blocks.DARK_OAK_SLAB;
 			}
 			default -> {
