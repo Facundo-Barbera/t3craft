@@ -82,7 +82,7 @@ import org.jspecify.annotations.Nullable;
  * <h2>Scale (citadel/scale-port)</h2>
  *
  * The whole citadel is drawn at a scale {@link #k} ({@code LayoutParams.RINGCAMPUS_SCALE}, pack key
- * {@code scale}, a decimal from 1.0 to 2.5, <b>default 1.0</b>). At {@code k = 1} every helper below
+ * {@code scale}, a decimal from 1.0 to 3.0, <b>default 2.0</b>). At {@code k = 1} every helper below
  * returns its argument and the plan is the original one block by block (same anchors, desks, spawn;
  * check with the report's signature). The geometry (radii, streets, lots, halls, nodes, spawn) lives in
  * {@link RingCampusGeometry.Dims}, here as {@link #g} (statically {@link #dims()}).

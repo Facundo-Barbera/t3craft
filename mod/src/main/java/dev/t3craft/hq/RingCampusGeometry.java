@@ -118,7 +118,7 @@ public final class RingCampusGeometry {
 		return 2 * (int) Math.round((base * k - 1) / 2) + 1;
 	}
 
-	/** The scale in use: {@code LayoutParams.RINGCAMPUS_SCALE} (pack-editable, 1.0 to 2.5, default 1.0). */
+	/** The scale in use: {@code LayoutParams.RINGCAMPUS_SCALE} (pack-editable, 1.0 to 3.0, default 2.0). */
 	public static double scale() {
 		return dev.t3craft.hq.pack.LayoutParams.RINGCAMPUS_SCALE.value();
 	}

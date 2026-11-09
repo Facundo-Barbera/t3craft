@@ -45,6 +45,7 @@ public final class HallInterior {
 			floor(c, r, f, s);
 			rug(c, r, F, f, s, env);
 			furniture(c, r, F, f, y, s, env, seed, desks);
+			workArea(c, r, f, y, s, desks, seed);
 			pendants(c, r, F, f, m, desks);
 			beams(c, r, f, m);
 		}
@@ -134,18 +135,19 @@ public final class HallInterior {
 					continue;
 				}
 				boolean edge = u == 0 || u == D - 1 || v == 0 || v == W - 1;
-				boolean dark = (((u >> 1) + (v >> 1)) & 1) == 0;
-				c.set(p, b(floorBlock(s, edge, dark, HallStyle.hash(u, v, f))));
+				boolean accent = HallStyle.hash(u, v, f) % 9 == 0;
+				c.set(p, b(floorBlock(s, edge, accent)));
 			}
 		}
 	}
 
-	private static net.minecraft.world.level.block.Block floorBlock(HallStyle s, boolean edge, boolean dark, int hsh) {
+	/** A calm floor: one field with a sparse second tone, inside a dark frame (all in the hall's own palette). */
+	private static net.minecraft.world.level.block.Block floorBlock(HallStyle s, boolean edge, boolean accent) {
 		return switch (s) {
-			case TIMBER -> edge ? Blocks.DARK_OAK_PLANKS : dark ? Blocks.SPRUCE_PLANKS : Blocks.CHERRY_PLANKS;
-			case STONE -> edge ? Blocks.POLISHED_DEEPSLATE : dark ? (hsh % 8 == 0 ? Blocks.MOSSY_STONE_BRICKS : Blocks.STONE_BRICKS) : Blocks.POLISHED_ANDESITE;
-			case SHUTTERED -> edge ? Blocks.POLISHED_BLACKSTONE_BRICKS : dark ? Blocks.DARK_OAK_PLANKS : Blocks.SPRUCE_PLANKS;
-			case BALCONY -> edge ? Blocks.POLISHED_DEEPSLATE : dark ? Blocks.BAMBOO_MOSAIC : Blocks.SMOOTH_QUARTZ;
+			case TIMBER -> edge ? Blocks.DARK_OAK_PLANKS : accent ? Blocks.CHERRY_PLANKS : Blocks.SPRUCE_PLANKS;
+			case STONE -> edge ? Blocks.POLISHED_DEEPSLATE : accent ? Blocks.MOSSY_STONE_BRICKS : Blocks.STONE_BRICKS;
+			case SHUTTERED -> edge ? Blocks.POLISHED_BLACKSTONE_BRICKS : accent ? Blocks.SPRUCE_PLANKS : Blocks.DARK_OAK_PLANKS;
+			case BALCONY -> edge ? Blocks.POLISHED_DEEPSLATE : accent ? Blocks.BAMBOO_MOSAIC : Blocks.SMOOTH_QUARTZ;
 		};
 	}
 
@@ -206,44 +208,114 @@ public final class HallInterior {
 				.setValue(BlockStateProperties.HORIZONTAL_FACING, r.back().getOpposite())));
 	}
 
+	/** Columns of the board and of the archive: three in a one-storey-wide hall, five in a wider one. */
+	private static int zoneWidth(Room r) {
+		return Math.min(5, r.c() - 1);
+	}
+
 	/**
-	 * The project board: a header plate in the project's colour between two dark frame cells, over two rows of
-	 * cards in three columns (to do red, doing yellow, done lime; the empty slots are white), over chests.
+	 * The project board, on the door wall left of the door's jamb: a header plate in the project's colour between
+	 * dark frame cells over rows of cards (to do red, doing orange, review yellow, done lime, shipped green; the
+	 * empty slots are white), over chests.
 	 */
 	private static void board(CitadelCanvas c, Room r, int y, DyeColor env, int h, Set<Long> desks) {
-		DyeColor[] cards = {DyeColor.RED, DyeColor.YELLOW, DyeColor.LIME};
-		for (int v = 0; v <= 2; v++) {
+		DyeColor[] cards = {DyeColor.RED, DyeColor.ORANGE, DyeColor.YELLOW, DyeColor.LIME, DyeColor.GREEN};
+		int n = zoneWidth(r);
+		int rows = fh() >= 8 ? 3 : 2;
+		for (int k = 0; k < n; k++) {
+			int v = r.c() - 2 - k;
 			BlockPos base = r.cell(0, v, y);
 			if (!floored(c, base) || desks.contains(col(base.getX(), base.getZ()))) {
 				continue;
 			}
+			DyeColor card = cards[n == 3 ? k * 2 : n - 1 - k];
 			c.set(base, chest(r.back()));
-			// the columns hold 2, 1 and 1 cards (by the hall's hash the first two rows swap)
-			boolean full = v == 0 || HallStyle.hash(h, v) % 2 == 0;
-			c.set(base.above(1), concrete(cards[v]));
-			c.set(base.above(2), full ? concrete(cards[v]) : concrete(DyeColor.WHITE));
-			c.set(base.above(3), v == 1 ? concrete(env) : b(Blocks.DARK_OAK_PLANKS));
+			for (int row = 1; row <= rows; row++) {
+				boolean on = row == 1 || HallStyle.hash(h, v, row) % 3 != 0;
+				c.set(base.above(row), concrete(on ? card : DyeColor.WHITE));
+			}
+			c.set(base.above(rows + 1), k == n / 2 ? concrete(env) : b(Blocks.DARK_OAK_PLANKS));
 		}
 	}
 
-	/** The archive: a barrel, a chest and a lectern along the door wall, bookshelves over the first two. */
+	/**
+	 * The archive, on the door wall right of the door's jamb: a lectern next to the door, then chests and barrels,
+	 * with bookshelves over the chests and barrels.
+	 */
 	private static void archive(CitadelCanvas c, Room r, int y, int W, int h, Set<Long> desks) {
-		for (int k = 0; k <= 2; k++) {
-			BlockPos base = r.cell(0, W - 1 - k, y);
+		int n = zoneWidth(r);
+		int shelf = Math.min(3, fh() - 4);
+		for (int k = 0; k < n; k++) {
+			BlockPos base = r.cell(0, r.c() + 2 + k, y);
 			if (!floored(c, base) || desks.contains(col(base.getX(), base.getZ()))) {
 				continue;
 			}
-			switch (k) {
-				case 0 -> c.set(base, Blocks.BARREL.defaultBlockState().setValue(BlockStateProperties.FACING, r.back()));
-				case 1 -> c.set(base, chest(r.back()));
-				default -> {
-					c.set(base, Blocks.LECTERN.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, r.back()));
-					continue;
+			if (k == 0) {
+				c.set(base, Blocks.LECTERN.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, r.back()));
+				continue;
+			}
+			c.set(base, k % 2 == 1 ? chest(r.back())
+					: Blocks.BARREL.defaultBlockState().setValue(BlockStateProperties.FACING, r.back()));
+			for (int row = 1; row <= shelf - 1; row++) {
+				c.set(base.above(row), b(Blocks.BOOKSHELF));
+			}
+			put(c, base.above(shelf), HallStyle.pot(h + k));
+		}
+	}
+
+	/** Work blocks of the tables of a scaled hall, in the order a row repeats them. */
+	private static final net.minecraft.world.level.block.Block[] WORK = {
+			Blocks.CRAFTING_TABLE, Blocks.CARTOGRAPHY_TABLE, Blocks.FLETCHING_TABLE, Blocks.SMITHING_TABLE, Blocks.LOOM, Blocks.LECTERN};
+
+	/**
+	 * Scaled halls only ({@code W >= 15}, so scale 1 is untouched): a big hall must not be a carpeted void. Two long
+	 * worktables (crafting, cartography, fletching, smithing tables, looms and lecterns in turn: blocks with a use)
+	 * run along the hall a quarter of its width off the centre line, so a 3-wide aisle stays free to the desks of
+	 * the side walls and to the middle (the stairs, the door); bookcases line the side and back walls in runs of
+	 * two between the desks and chests stand at the end of each table. Nothing on a desk column, the standing cells,
+	 * the centre line or the stair hole; every cell is checked free.
+	 */
+	private static void workArea(CitadelCanvas c, Room r, int f, int y, HallStyle s, Set<Long> desks, int seed) {
+		int W = r.w();
+		int D = r.d();
+		if (W < 15) {
+			return;
+		}
+		int mid = r.c();
+		int off = Math.max(5, W / 4);
+		int u0 = 3;
+		int u1 = D - 6;
+		for (int side = -1; side <= 1; side += 2) {
+			int v = mid + side * off;
+			int i = 0;
+			for (int u = u0; u <= u1; u++) {
+				BlockPos p = r.cell(u, v, y);
+				if (u == u0 || u == u1) {
+					placeOnRug(c, desks, p, () -> c.set(p, Blocks.CHEST.defaultBlockState()));
+				} else if (u % 3 != 0) {
+					net.minecraft.world.level.block.Block wb = WORK[Math.floorMod(i++ + HallStyle.hash(seed, side), WORK.length)];
+					placeOnRug(c, desks, p, () -> c.set(p, b(wb)));
 				}
 			}
-			c.set(base.above(1), b(Blocks.BOOKSHELF));
-			c.set(base.above(2), b(Blocks.BOOKSHELF));
-			put(c, base.above(3), HallStyle.pot(h + k));
+		}
+		// bookcases against the side walls, two cells in every five, two high
+		for (int v : new int[] {0, W - 1}) {
+			for (int u = 3; u < D - 3; u++) {
+				if (u % 5 < 2) {
+					BlockPos p = r.cell(u, v, y);
+					placeOnRug(c, desks, p, () -> shelf(c, p, 2, false, 0));
+				}
+			}
+		}
+	}
+
+	/** Like {@link #place}, but the cell may hold the hall's rug (carpet), which the new block replaces. */
+	private static void placeOnRug(CitadelCanvas c, Set<Long> desks, BlockPos p, Runnable build) {
+		BlockState here = c.at(p.getX(), p.getY(), p.getZ());
+		BlockState below = c.at(p.getX(), p.getY() - 1, p.getZ());
+		boolean rug = here != null && here.getBlock().getDescriptionId().endsWith("_carpet");
+		if ((free(c, p) || rug) && below != null && !below.isAir() && !desks.contains(col(p.getX(), p.getZ()))) {
+			build.run();
 		}
 	}
 

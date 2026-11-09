@@ -127,6 +127,31 @@ public final class HallFacade {
 		porch(c, r, F, m, s, seed);
 		windows(c, r, F, s, seed);
 		pilasters(c, r, F, m, s);
+		cornice(c, r, F, m);
+	}
+
+	/**
+	 * A cornice under every floor band: upside-down stairs in the roof's material along the outside of all four
+	 * walls (not beside the door, not on the piers that carry a cap), so each floor ends in a shadow line.
+	 */
+	private static void cornice(CitadelCanvas c, Room r, int F, Mats m) {
+		int mid = r.c();
+		for (int side = 0; side < 4; side++) {
+			int len = side < 2 ? r.w() : r.d();
+			Direction out = outward(r, side);
+			for (int t = 0; t < len; t++) {
+				if (side == 0 && Math.abs(t - mid) <= 2) {
+					continue;
+				}
+				for (int f = 0; f < F - 1; f++) {
+					BlockPos p = outside(r, side, t, (f + 1) * fh());
+					BlockState there = c.at(p.getX(), p.getY(), p.getZ());
+					if (there == null || there.isAir()) {
+						c.set(p, stairs(m.roof(), out.getOpposite()).setValue(BlockStateProperties.HALF, Half.TOP));
+					}
+				}
+			}
+		}
 	}
 
 	/**
