@@ -152,11 +152,14 @@ public final class CitadelLeadOffice {
 		for (int y = top + 1; y <= top + 4; y++) {
 			c.set(at.getX(), y, at.getZ(), pole);
 		}
+		// a tapering pennant: 3 long at the top, 2 under it
 		BlockState cloth = b(Blocks.CONCRETE.pick(env));
-		for (int k = 1; k <= 2; k++) {
+		for (int k = 1; k <= 3; k++) {
 			BlockPos p = at.relative(r.side(), k);
-			c.set(p.getX(), top + 3, p.getZ(), cloth);
 			c.set(p.getX(), top + 4, p.getZ(), cloth);
+			if (k <= 2) {
+				c.set(p.getX(), top + 3, p.getZ(), cloth);
+			}
 		}
 	}
 
@@ -216,7 +219,8 @@ public final class CitadelLeadOffice {
 		BlockState chair = stairs(Blocks.CHERRY_STAIRS, fwd.getOpposite());
 		int seat = 0;
 		int rows = 0;
-		for (int u = d - 5; u >= 2 && rows < 3; u -= 2, rows++) {
+		int step = big ? 3 : 2;
+		for (int u = big ? d - 6 : d - 5; u >= 2 && rows < 3; u -= step, rows++) {
 			for (int off = ah + 1; off <= Math.min(mid - 1, ah + 3); off++) {
 				for (int sgn = -1; sgn <= 1; sgn += 2) {
 					BlockPos cell = r.cell(u, mid + sgn * off, 1);
@@ -253,10 +257,36 @@ public final class CitadelLeadOffice {
 			lounge(c, mod, r, env, style);
 		}
 		BlockState lantern = Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, true);
-		int[] lu = big ? new int[] {1, d / 2, d - 4} : new int[] {2, d - 4};
-		int[] lv = big ? new int[] {2, mid, w - 3} : new int[] {2, w - 3};
-		for (int u : lu) {
-			for (int v : lv) {
+		if (big) {
+			// ceiling beams every 5 rows across the width, a lantern hanging from each at three heights' worth of
+			// positions (the beams are what the lanterns hang from); the floor changes material at the door and
+			// round the lead's desk
+			BlockState beam = c.kit.beam(side.getAxis());
+			for (int u = 2; u < d - 1; u += 5) {
+				for (int v = 0; v < w; v++) {
+					c.set(r.cell(u, v, h - 1), beam);
+				}
+				for (int v : new int[] {2, mid - ah - 1, mid + ah + 1, w - 3}) {
+					BlockPos p = r.cell(u, v, h - 2);
+					c.put(p.getX(), p.getY(), p.getZ(), lantern, HANGING);
+				}
+			}
+			for (int v = 0; v < w; v++) {
+				for (int u = 0; u <= 1; u++) {
+					BlockPos p = r.cell(u, v, 0);
+					c.set(p.getX(), 0, p.getZ(), c.accent());
+				}
+			}
+			for (int v = mid - 5; v <= mid + 5; v++) {
+				for (int u = d - 4; u <= d - 2; u++) {
+					BlockPos p = r.cell(u, v, 0);
+					c.set(p.getX(), 0, p.getZ(), c.accent());
+				}
+			}
+			return;
+		}
+		for (int u : new int[] {2, d - 4}) {
+			for (int v : new int[] {2, w - 3}) {
 				BlockPos p = r.cell(u, v, h - 1);
 				c.put(p.getX(), p.getY(), p.getZ(), lantern, HANGING);
 			}
@@ -296,12 +326,12 @@ public final class CitadelLeadOffice {
 		BlockPos pot = r.cell((tu0 + tu1) / 2, tv0, 2);
 		c.put(pot.getX(), pot.getY(), pot.getZ(), HallStyle.pot(HallStyle.hash(mod.index(), 11)), DECOR);
 		for (int u = tu0; u <= tu1; u++) {
-			c.set(r.cell(u, v0 + 1, 1), stairs(Blocks.CHERRY_STAIRS, side.getOpposite()));
-			c.set(r.cell(u, v1 - 1, 1), stairs(Blocks.CHERRY_STAIRS, side));
+			c.set(r.cell(u, v0 + 1, 1), stairs(Blocks.BAMBOO_MOSAIC_STAIRS, side.getOpposite()));
+			c.set(r.cell(u, v1 - 1, 1), stairs(Blocks.BAMBOO_MOSAIC_STAIRS, side));
 		}
 		for (int v = tv0; v <= tv1; v++) {
-			c.set(r.cell(u0 + 1, v, 1), stairs(Blocks.CHERRY_STAIRS, fwd.getOpposite()));
-			c.set(r.cell(u1 - 1, v, 1), stairs(Blocks.CHERRY_STAIRS, fwd));
+			c.set(r.cell(u0 + 1, v, 1), stairs(Blocks.BAMBOO_MOSAIC_STAIRS, fwd.getOpposite()));
+			c.set(r.cell(u1 - 1, v, 1), stairs(Blocks.BAMBOO_MOSAIC_STAIRS, fwd));
 		}
 	}
 
@@ -371,8 +401,12 @@ public final class CitadelLeadOffice {
 		BlockPos centre = r.cell((u0 + u1) / 2, 2, 3);
 		c.put(centre.getX(), centre.getY(), centre.getZ(), HallStyle.pot(HallStyle.hash(mod.index(), 9)), DECOR);
 		for (int u = u0; u <= u1; u++) {
-			c.set(r.cell(u, 1, 1), stairs(Blocks.CHERRY_STAIRS, toRoom.getOpposite()));
-			c.set(r.cell(u, 4, 1), stairs(Blocks.CHERRY_STAIRS, toRoom));
+			c.set(r.cell(u, 1, 1), stairs(Blocks.DARK_OAK_STAIRS, toRoom.getOpposite()));
+			c.set(r.cell(u, 4, 1), stairs(Blocks.DARK_OAK_STAIRS, toRoom));
+		}
+		for (int v = 2; v <= 3; v++) {
+			c.set(r.cell(u0 - 1, v, 1), stairs(Blocks.DARK_OAK_STAIRS, r.back().getOpposite()));
+			c.set(r.cell(u1 + 1, v, 1), stairs(Blocks.DARK_OAK_STAIRS, r.back()));
 		}
 		// the presentation board on the front wall (u = 0), 4 wide at the table's head, 3 or 4 high
 		int brows = h >= 8 ? 4 : 3;
