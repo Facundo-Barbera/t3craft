@@ -43,7 +43,7 @@ import net.minecraft.world.level.block.state.properties.WallSide;
  * <li>Centre by seed: fountain, lamp tower, map table.</li>
  * </ul>
  *
- * Size: 11–21 × 11–21 × 9+ (the box grows with the plaza: the mosaic adds rings).
+ * Size: 13–21 × 13–21 × 9+ (the box grows with the plaza: the mosaic adds rings).
  */
 public final class PlazaCenterGlazedRosette implements Variant {
 	private static final DyeColor[] GLAZE = {DyeColor.BLUE, DyeColor.ORANGE, DyeColor.GREEN};
@@ -60,12 +60,12 @@ public final class PlazaCenterGlazedRosette implements Variant {
 
 	@Override
 	public int minW() {
-		return 11;
+		return 13;
 	}
 
 	@Override
 	public int minD() {
-		return 11;
+		return 13;
 	}
 
 	@Override
@@ -231,13 +231,13 @@ public final class PlazaCenterGlazedRosette implements Variant {
 				p.set(c, u, 0, v, b(Blocks.MOSS_BLOCK));
 				if (ex + ez > 0) {
 					switch (p.hash(u, 1, v, 5)) {
-						case 0 -> p.set(c, u, 1, v, CitadelCanvas.leaves(Blocks.FLOWERING_AZALEA_LEAVES));
+						case 0 -> p.set(c, u, 1, v, b(Blocks.ALLIUM));
 						case 1 -> p.set(c, u, 1, v, b(Blocks.PINK_PETALS));
 						case 2 -> {
 							p.set(c, u, 1, v, b(Blocks.PEONY));
 							p.set(c, u, 2, v, Blocks.PEONY.defaultBlockState().setValue(BlockStateProperties.DOUBLE_BLOCK_HALF, DoubleBlockHalf.UPPER));
 						}
-						default -> p.set(c, u, 1, v, CitadelCanvas.leaves(Blocks.AZALEA_LEAVES));
+						default -> p.set(c, u, 1, v, b(Blocks.FERN));
 					}
 				}
 			}
@@ -247,19 +247,18 @@ public final class PlazaCenterGlazedRosette implements Variant {
 		p.set(c, u, 0, v, h == 0 ? slab(Blocks.MOSSY_STONE_BRICK_SLAB) : h == 1 ? slab(Blocks.POLISHED_ANDESITE_SLAB) : slab(Blocks.STONE_BRICK_SLAB));
 	}
 
-	/** A small cherry tree: trunk from the moss bed, a rounded canopy at 4 blocks, high enough to walk and sit under. */
+	/** A small cherry tree: trunk from the moss bed, a compact canopy from 4 blocks up (walk and sit under it). */
 	private void tree(CitadelCanvas c, Plot p, int tu, int tv, int br) {
 		for (int y = 1; y <= 4; y++) {
 			safe(c, p, tu, y, tv, b(Blocks.CHERRY_LOG));
 		}
-		double rc = br + 1.3;
-		for (int layer = 0; layer < 4; layer++) {
-			double rad = layer < 2 ? rc : rc - (layer - 1);
+		double[] rad = br == 1 ? new double[] {1.6, 1.6, 0.9} : new double[] {2.4, 2.4, 1.5};
+		for (int layer = 0; layer < rad.length; layer++) {
 			int y = 4 + layer;
-			int reach = (int) Math.ceil(rad);
+			int reach = (int) Math.ceil(rad[layer]);
 			for (int dz = -reach; dz <= reach; dz++) {
 				for (int dx = -reach; dx <= reach; dx++) {
-					if (dx * dx + dz * dz <= rad * rad && !(dx == 0 && dz == 0 && y == 4)) {
+					if (dx * dx + dz * dz <= rad[layer] * rad[layer] && !(dx == 0 && dz == 0 && y == 4)) {
 						safe(c, p, tu + dx, y, tv + dz, CitadelCanvas.leaves(p.hash(tu + dx, y, tv + dz, 6) == 0 ? Blocks.FLOWERING_AZALEA_LEAVES : Blocks.CHERRY_LEAVES));
 					}
 				}
