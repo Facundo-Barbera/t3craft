@@ -11,8 +11,6 @@ import dev.t3craft.hq.citadel.catalog.Variant;
 import dev.t3craft.hq.citadel.catalog.tree.TreeKit.Leaves;
 import dev.t3craft.hq.citadel.catalog.tree.TreeKit.Vox;
 import dev.t3craft.hq.citadel.catalog.tree.TreeKit.Wood;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Random;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -21,11 +19,12 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 /**
  * Weeping willow beside the water: an oval pool at the front (a mossy stone rim with rounded corners,
  * water, lily pads, submerged stepping stones and a stone lantern on the free corner). Right behind the
- * rim a dark-oak 2×2 trunk on diagonal roots thins to a leader that leans out over the pond; three or four
- * limbs arch out from it to flattish rounded lobes that, with the crown lobe on the leader, make a broad,
- * low, lumpy dome in two greens. From about half the rim of that dome hangs an irregular curtain: stubs,
- * mid strands and a few that nearly reach the water, some stepping outwards, leaves above and vines at the
- * tips. Ferns, moss, a flowering azalea bush and a mossy boulder behind.
+ * rim stands a dark-oak 2×2 trunk on diagonal roots, bare for its first blocks; its leader carries a domed
+ * crown lobe, two limbs run out to lower side lobes, and one limb arches up and over the pond (rise, apex,
+ * fall) to a lobe hanging above the water. Each lobe keeps a notch of air from the next, in two greens.
+ * Only the outer rim of the crown hangs: separate 1-wide strands, 2–5 long, never side by side nor
+ * diagonal neighbours, stopping two blocks above the water, leaves with a vine at the tip. Ferns, moss, a
+ * flowering azalea bush and a mossy boulder behind.
  *
  * <p>Size: 7–9 × 7–9 × 9+ (the tree stops at 12 high).
  */
@@ -81,139 +80,81 @@ public final class TreeWillowPond implements Variant {
 		int pd = d >= 9 ? 4 : 3; // the pool covers v 0..pd
 		int bu = (w - 2) / 2;
 		int bv = pd + 1; // the 2×2 stands right behind the back rim
+		int s = r.nextBoolean() ? -1 : 1; // the side the arching limb reaches out to
 
 		// the fixed pieces first: the tree never overwrites them
 		pond(t, w, pd, bu);
 		garden(t, w, d);
 
-		// trunk: 2×2 on roots (mostly to the back and sides), leaning out over the water
+		// trunk: an upright 2×2 on roots, its leader bare up to the limbs (the trunk shows under the crown)
 		int yTop = H - 3;
-		int[][] lead = TreeKit.trunk(t, WOOD, bu, bv, 2, yTop, r.nextInt(2), 0, r.nextInt(3) - 1, -(pd - 1));
-		TreeKit.roots(t, WOOD, bu, bv, 6, 2, 4, 21);
-
-		// the crown lobe on the leader, over the pond
+		int ou = s < 0 ? 0 : 1;
+		int[][] lead = TreeKit.trunk(t, WOOD, bu, bv, 2, yTop, ou, 0, 0, 0);
+		TreeKit.roots(t, WOOD, bu, bv, 5, 2, 4, 21);
 		int lu = lead[0][yTop];
 		int lv = lead[1][yTop];
-		TreeKit.lobe(t, lu, yTop, lv, 2.2 * sc, 1.9 * sc, 1.6, 1.1, CROWN, 0.4, 0);
 
-		// limbs arching out to the sides and the back, each to a flattish lobe at its own height
-		double[] dirs = w >= 8 || d >= 8
-				? new double[] {Math.PI + 0.35, -0.35, Math.PI / 2 + 0.75, Math.PI / 2 - 0.75}
-				: new double[] {Math.PI + 0.3, -0.3, Math.PI / 2 + (r.nextBoolean() ? 0.45 : -0.45)};
-		int[] drop = {1, 2, 1, 3};
-		int shift = r.nextInt(4);
-		for (int i = 0; i < dirs.length; i++) {
-			double ang = dirs[i] + (r.nextDouble() - 0.5) * 0.4;
-			double ex = Math.cos(ang);
-			double ez = Math.sin(ang);
-			int ty = Math.max(4, yTop - drop[(i + shift) % 4]);
-			int sy = TreeKit.clamp(ty - 2 - (i & 1), 3, yTop - 1);
-			int su = lead[0][sy];
-			int sv = lead[1][sy];
-			double rx = (1.7 + r.nextDouble() * 0.6) * sc;
-			double rz = rx * (0.8 + r.nextDouble() * 0.2);
-			double reach = TreeKit.clamp(TreeKit.room(t, su, sv, ex, ez, 0) - Math.max(rx, rz) * 0.7, 1.2, 3.4 * sc);
-			int tu = (int) Math.round(su + ex * reach);
-			int tv = (int) Math.round(sv + ez * reach);
-			TreeKit.branch(t, WOOD, new int[] {su, sy, sv}, new int[] {tu, ty, tv}, i < 2);
-			TreeKit.lobe(t, tu, ty, tv, rx, rz, 1.5, 1.1, i % 2 == 0 ? GREEN : DEEP, 0.45, i + 1);
-		}
+		// 1. the domed crown lobe on the leader (two cap layers), a little back from the pond
+		double rd = TreeKit.clamp(1.9 * sc, 1.9, 2.4);
+		TreeKit.lobe(t, lu, yTop, lv + 0.3, rd, rd * 0.9, 2.2, 1.0, CROWN, 0.35, 0);
 
-		// the curtain: from the rim of the dome (air below, away from the trunk)
-		double mu = 0;
-		double mv = 0;
-		int nl = 0;
-		for (int y = 0; y < t.h; y++) {
-			for (int v = 0; v < t.d; v++) {
-				for (int u = 0; u < t.w; u++) {
-					if (t.kind(u, y, v) == TreeKit.LEAF) {
-						mu += u;
-						mv += v;
-						nl++;
-					}
-				}
-			}
-		}
-		if (nl > 0) {
-			mu /= nl;
-			mv /= nl;
-		}
-		double tcu = bu + 0.5;
-		double tcv = bv + 0.5;
-		List<int[]> seeds = new ArrayList<>();
-		for (int y = 2; y < t.h; y++) {
+		// 2. the arching limb: up from the bare trunk to an apex, then out and down over the water to a lobe
+		int ay = yTop - 1;
+		int ty = ay - (H >= 11 ? 2 : 1);
+		int sy = Math.max(3, ay - 3);
+		int asu = lead[0][sy];
+		int asv = lead[1][sy];
+		int tv = pd / 2;
+		int tu = TreeKit.clamp(asu + s * (w >= 8 ? 3 : 2), 1, w - 2);
+		int au = (int) Math.round(asu + (tu - asu) * 0.45);
+		int av = (int) Math.round(asv + (tv - asv) * 0.45);
+		TreeKit.branch(t, WOOD, new int[] {asu, sy, asv}, new int[] {au, ay, av}, false);
+		TreeKit.branch(t, WOOD, new int[] {au, ay, av}, new int[] {tu, ty, tv}, false);
+		double ra = TreeKit.clamp(1.6 * sc, 1.6, 2.0);
+		TreeKit.lobe(t, tu, ty + 1, tv, ra, ra * 0.9, 1.0, 0.0, DEEP, 0.35, 3);
+
+		// 3. two lower side lobes on short limbs (crown underside four or more blocks above the ground)
+		int cyS = yTop - 1;
+		int cy2 = yTop >= 7 ? cyS - 1 : cyS;
+		limbLobe(t, lead, Math.max(3, cyS - 2), -s, 0.35, TreeKit.clamp(1.9 * sc, 1.8, 2.3), cyS, GREEN, 1);
+		limbLobe(t, lead, Math.max(3, cy2 - 1), s * 0.6, 0.8, TreeKit.clamp(1.7 * sc, 1.6, 2.1), cy2, DEEP.swap(), 2);
+
+		// the curtain: only the outer rim hangs, separate strands with a free cell all round each
+		double ccu = bu + 0.5;
+		double ccv = bv + 0.5;
+		boolean[] col = new boolean[t.w * t.d];
+		for (int y = 3; y < t.h; y++) {
 			for (int v = 0; v < t.d; v++) {
 				for (int u = 0; u < t.w; u++) {
 					if (t.kind(u, y, v) != TreeKit.LEAF || !t.empty(u, y - 1, v)) {
 						continue;
 					}
-					if (Math.hypot(u - lead[0][y], v - lead[1][y]) < 1.5 || Math.hypot(u - tcu, v - tcv) < 1.8) {
+					if (Math.hypot(u - ccu, v - ccv) < 1.8) {
 						continue;
 					}
-					double ou = u - mu;
-					double ov = v - mv;
-					int su = Math.abs(ou) >= Math.abs(ov) ? (int) Math.signum(ou) : 0;
-					int sv = Math.abs(ov) > Math.abs(ou) ? (int) Math.signum(ov) : 0;
-					boolean rim = (su != 0 || sv != 0) && t.kind(u + su, y, v + sv) != TreeKit.LEAF;
-					seeds.add(new int[] {u, y, v, rim ? 1 : 0});
+					int ou2 = Integer.signum((int) Math.round(u - ccu));
+					int ov2 = Integer.signum((int) Math.round(v - ccv));
+					if (t.kind(u + ou2, y, v + ov2) == TreeKit.LEAF) {
+						continue; // not the outer rim
+					}
+					if (busy(col, t.w, t.d, u, v)) {
+						continue;
+					}
+					if (t.hash(u, y, v, 20) >= 12) {
+						continue; // gaps
+					}
+					int room = y - 2; // cells y - 1 down to 2: the lowest stays two blocks over the water
+					if (room < 2) {
+						continue;
+					}
+					int len = Math.min(2 + t.hash(u, 2, v, 4), room);
+					int vines = len >= 3 ? 1 : 0;
+					boolean ew = Math.abs(u - ccu) > Math.abs(v - ccv);
+					boolean deep = t.hash(u, 7, v, 3) == 0;
+					strand(t, u, y - 1, v, len, vines, deep ? DEEP.a() : GREEN.a(), deep ? GREEN.a() : DEEP.a(), ew);
+					col[v * t.w + u] = true;
 				}
 			}
-		}
-		boolean[] longCol = new boolean[t.w * t.d]; // long strands never side by side: a fringe, not a wall
-		for (int[] s : seeds) {
-			int u = s[0];
-			int y = s[1];
-			int v = s[2];
-			boolean rim = s[3] == 1;
-			int pick = t.hash(u, y, v, 20);
-			if (rim ? pick >= 11 : pick >= 3) {
-				continue; // gaps: about half the rim hangs, a few inner strands
-			}
-			int room = y - 1; // the lowest strand cell is y = 1, just above the water
-			if (room < 1) {
-				continue;
-			}
-			int len;
-			if (!rim || pick < 4) {
-				len = 1 + t.hash(u, 1, v, 2); // stubs
-			} else if (pick < 8) {
-				len = 2 + t.hash(u, 2, v, 3); // mid
-			} else {
-				len = room - t.hash(u, 3, v, 2); // nearly to the water
-			}
-			if (v == 0) {
-				len = Math.min(len, 3); // the front row stays short: the pool shows
-			}
-			len = TreeKit.clamp(len, 1, room);
-			if (len >= 3) {
-				boolean near = false;
-				for (int[] o : new int[][] {{1, 0}, {-1, 0}, {0, 1}, {0, -1}, {0, 0}}) {
-					int a2 = u + o[0];
-					int b2 = v + o[1];
-					near |= a2 >= 0 && a2 < t.w && b2 >= 0 && b2 < t.d && longCol[b2 * t.w + a2];
-				}
-				if (near) {
-					len = Math.min(len, 1 + t.hash(u, 8, v, 2));
-				} else {
-					longCol[v * t.w + u] = true;
-				}
-			}
-			int ku = Integer.signum((int) Math.round(u - mu));
-			int kv = Integer.signum((int) Math.round(v - mv));
-			boolean kink = len >= 3 && t.hash(u, 4, v, 3) == 0;
-			if (kink && ku != 0 && kv != 0) {
-				if (t.hash(u, 5, v, 2) == 0) {
-					ku = 0;
-				} else {
-					kv = 0;
-				}
-			}
-			int vines = len >= 3 ? 1 + t.hash(u, 6, v, 2) : 0;
-			boolean ew = Math.abs(u - mu) > Math.abs(v - mv);
-			boolean deep = t.hash(u, 7, v, 3) == 0;
-			BlockState body = deep ? DEEP.a() : GREEN.a();
-			BlockState tip = deep ? GREEN.a() : DEEP.a();
-			strand(t, u, y - 1, v, len, vines, body, tip, ku, kv, kink, ew);
 		}
 
 		// ferns, grass, moss and a few flowering azaleas on the free ground
@@ -238,31 +179,51 @@ public final class TreeWillowPond implements Variant {
 	}
 
 	/**
-	 * A hanging strand from {@code (u, yTop, v)} down {@code len} cells (never below y = 1): leaves, with the
-	 * last {@code vines} cells as vines (or the {@code tip} leaf when there are none), stepping one cell
-	 * outwards a third of the way down with {@code kink}.
+	 * A limb from the leader at {@code sy} out along {@code (ex, ez)} to a lobe of radius {@code rad} centred
+	 * at height {@code cy}; the limb ends on the lobe's underside (cy - 1).
+	 */
+	private static void limbLobe(Vox t, int[][] lead, int sy, double ex, double ez, double rad, int cy, Leaves lv,
+			int salt) {
+		double n = Math.hypot(ex, ez);
+		double nx = ex / n;
+		double nz = ez / n;
+		int su = lead[0][sy];
+		int sv = lead[1][sy];
+		double reach = TreeKit.clamp(TreeKit.room(t, su, sv, nx, nz, 0) - rad * 0.4, 1.5, 3.2);
+		int tu = (int) Math.round(su + nx * reach);
+		int tv = (int) Math.round(sv + nz * reach);
+		TreeKit.branch(t, WOOD, new int[] {su, sy, sv}, new int[] {tu, cy - 1, tv}, false);
+		TreeKit.lobe(t, tu, cy, tv, rad, rad * 0.9, 1.0, 1.0, lv, 0.4, salt);
+	}
+
+	/** True when a strand already hangs in this column or any of its eight neighbours. */
+	private static boolean busy(boolean[] col, int w, int d, int u, int v) {
+		for (int dv = -1; dv <= 1; dv++) {
+			for (int du = -1; du <= 1; du++) {
+				int a = u + du;
+				int b = v + dv;
+				if (a >= 0 && a < w && b >= 0 && b < d && col[b * w + a]) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * A straight hanging strand from {@code (u, yTop, v)} down {@code len} cells (never below y = 2, and it
+	 * stops at anything already there): leaves, the last {@code vines} cells vines (else the {@code tip} leaf).
 	 */
 	private static void strand(Vox t, int u, int yTop, int v, int len, int vines, BlockState body, BlockState tip,
-			int ku, int kv, boolean kink, boolean ew) {
-		int cu = u;
-		int cv = v;
-		int kAt = Math.max(1, len / 3);
+			boolean ew) {
 		for (int k = 0; k < len; k++) {
 			int y = yTop - k;
-			if (y < 1) {
-				break;
-			}
-			if (kink && k == kAt && (ku != 0 || kv != 0)) {
-				t.leaf(cu + ku, y + 1, cv + kv, body); // the step, face-connected
-				cu += ku;
-				cv += kv;
-			}
-			if (!t.empty(cu, y, cv) && t.kind(cu, y, cv) != TreeKit.LEAF) {
+			if (y < 2 || !t.empty(u, y, v)) {
 				break;
 			}
 			boolean vine = k >= len - vines;
-			BlockState s = vine ? vine(ew, k == len - vines) : k == len - 1 ? tip : body;
-			t.leaf(cu, y, cv, s);
+			BlockState st = vine ? vine(ew, k == len - vines) : k == len - 1 ? tip : body;
+			t.leaf(u, y, v, st);
 		}
 	}
 

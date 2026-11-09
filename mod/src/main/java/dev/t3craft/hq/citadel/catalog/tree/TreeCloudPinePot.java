@@ -17,16 +17,18 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
- * Cloud pine (niwaki) in a low stone pot, for patios. The pot is only two blocks high (a deepslate band
- * and a stone-brick stair lip with calcite corners) with podzol and moss inside, so the tree reads above
- * it. A twisting spruce trunk (2×2 when the soil allows, else 1×1 with a root flare) zig-zags upwards,
- * bending towards each pad; from every bend a visible limb runs out to a flat cloud pad (a two-layer
- * cushion: wide rounded bottom, smaller rounded top, spruce needles with azalea and a little moss), the pads
- * at different heights around the trunk with the limbs showing in the gaps, and a domed crown pad on top.
- * On plots of 6×6 and more a raked gravel bed rings the pot, with a stone lantern on the corner away from
- * the lowest pad and a mossy rock.
+ * Cloud pine (niwaki) in a low stone pot, for patios. On plots of 5×5 and more the pot is two blocks high
+ * (a deepslate band and a stone-brick stair lip with calcite corners), on 3–4 plots a single rim at soil
+ * level, so it never hides the tree. A spruce trunk, 2×2 only on the soil, rises as a 1×1 that zig-zags one
+ * cell every two layers (bark at the joints). Flat cloud pads (two-layer cushions: a cut-corner disc with a
+ * smaller ragged layer on top, spruce needles with azalea and a little moss) sit at up to three heights,
+ * alternating left and right with clear air between them, each reached by a short visible diagonal limb
+ * that ends under its centre; the top pad crowns the leader. On 3–4 plots the tree is a short bent trunk
+ * under one big flat pad as wide as the plot, with at most one small low pad. On plots of 6×6 and more a
+ * raked gravel bed rings the pot, with a stone lantern on the corner away from the lowest pad and a mossy
+ * rock.
  *
- * <p>Size: 3–7 × 3–7 × 8+ (the tree stops at 12 high). Below 6×6 the pot fills the plot.
+ * <p>Size: 3–7 × 3–7 × 8+ (the tree stops at 13 high, 9 on 3–4 plots). Below 6×6 the pot fills the plot.
  */
 public final class TreeCloudPinePot implements Variant {
 	private static final Wood SPRUCE = new Wood(Blocks.SPRUCE_LOG, Blocks.SPRUCE_WOOD, b(Blocks.SPRUCE_WOOD));
@@ -74,68 +76,87 @@ public final class TreeCloudPinePot implements Variant {
 		Random r = p.rng(0xC10D);
 		int w = p.w();
 		int d = p.d();
-		int H = Math.min(p.h(), 13);
+		int small = Math.min(w, d);
+		boolean tiny = small <= 4;
+		int H = Math.min(p.h(), tiny ? 9 : 13);
 		boolean ring = w >= 6 && d >= 6;
 		int pu0 = ring ? 1 : 0;
 		int pu1 = ring ? w - 2 : w - 1;
 		int pv0 = ring ? 1 : 0;
 		int pv1 = ring ? d - 2 : d - 1;
-		int iw = pu1 - pu0 - 1; // the soil inside the lip
-		int id = pv1 - pv0 - 1;
 		int cu = (pu0 + pu1) / 2;
 		int cv = (pv0 + pv1) / 2;
-		int small = Math.min(w, d);
+		int lo = pu0 + 1; // the soil inside the lip
+		int uHi = pu1 - 1;
+		int vLo = pv0 + 1;
+		int vHi = pv1 - 1;
 
-		// --- the plan of the pads: heights, directions, sizes
-		// pads two layers thick, at least two layers apart (consecutive pads sit on opposite sides), the lowest
-		// clear of the lip, the crown pad two layers under the top
-		int crownY = H - 2;
-		int y0 = crownY >= 9 ? 4 : 3;
-		int nMax = small <= 4 ? 2 : 3;
-		int n = TreeKit.clamp((crownY - y0) / 2, 1, nMax);
-		double gap = (crownY - y0) / (double) n;
-		double rBase = small >= 7 ? 2.6 : small >= 6 ? 2.3 : small >= 5 ? 2.0 : 1.4;
-		double a0 = r.nextDouble() * Math.PI * 2;
-		int[] py = new int[n];
-		double[] ang = new double[n];
-		for (int k = 0; k < n; k++) {
-			py[k] = y0 + (int) Math.round(k * gap);
-			ang[k] = a0 + k * (Math.PI * 0.85 + (r.nextDouble() - 0.5) * 0.4);
+		// --- the zig-zag: the 1×1 trunk alternates between A and B = A + e every two layers
+		boolean alongU = w > d || (w == d && r.nextBoolean());
+		int e = r.nextBoolean() ? 1 : -1;
+		int eu = alongU ? e : 0;
+		int ev = alongU ? 0 : e;
+		int la = alongU ? w : d; // the length of the zig-zag axis
+		int lp = alongU ? d : w; // across it
+		double ma = (la - 1) / 2.0;
+		int aA = e > 0 ? (int) Math.floor(ma) : (int) Math.ceil(ma);
+		int aP = (int) Math.floor((lp - 1) / 2.0);
+		double mp = (lp - 1) / 2.0;
+		int au0 = alongU ? aA : aP;
+		int av0 = alongU ? aP : aA;
+		int[] tu = new int[H + 1];
+		int[] tv = new int[H + 1];
+		for (int y = 0; y <= H; y++) {
+			boolean atB = y >= 2 && ((y - 2) / 2) % 2 == 1;
+			tu[y] = au0 + (atB ? eu : 0);
+			tv[y] = av0 + (atB ? ev : 0);
+		}
+
+		// --- the pads: heights and sizes (two layers each, at least one air layer between them)
+		int top = H - 2; // the top pad: layers top and top + 1
+		int n;
+		int[] py;
+		double[] pr;
+		if (tiny) {
+			n = 2;
+			py = new int[] {3, top};
+			pr = new double[] {small >= 4 ? 1.3 : 1.0, 0};
+		} else {
+			n = Math.min(3, (top - 3) / 3 + 1);
+			double[] rr = small >= 7 ? new double[] {2.6, 2.3, 2.0}
+					: small >= 6 ? new double[] {2.3, 2.0, 1.8} : new double[] {1.9, 1.7, 1.6};
+			py = new int[n];
+			pr = new double[n];
+			for (int k = 0; k < n; k++) {
+				py[k] = 3 + (int) Math.round(k * (top - 3) / (double) (n - 1));
+				pr[k] = k == n - 1 ? rr[2] : rr[k];
+			}
 		}
 
 		// --- fixed pieces: gravel, lantern, rock, pot
 		if (ring) {
-			gravel(t, w, d, cu, cv, ang[0]);
+			gravel(t, w, d, cu, cv, Math.atan2(-ev, -eu));
 		}
-		pot(t, pu0, pu1, pv0, pv1);
+		if (tiny) {
+			potLow(t, w, d);
+		} else {
+			pot(t, pu0, pu1, pv0, pv1);
+		}
 
-		// --- the base on the soil (y = 1)
-		int lu;
-		int lv;
-		int lo = pu0 + 1;
-		int uHi = pu1 - 1;
-		int vLo = pv0 + 1;
-		int vHi = pv1 - 1;
-		if (iw >= 3 && id >= 3) {
-			int bu = pu0 + 1 + (iw - 2) / 2;
-			int bv = pv0 + 1 + (id - 2) / 2;
-			int ou = r.nextInt(2);
-			int ov = r.nextInt(2);
+		// --- the base on the soil (y = 1): a 2×2 covering A and B where the soil allows, else 1×1
+		int bu0 = alongU ? Math.min(aA, aA + e) : aP;
+		int bv0 = alongU ? aP : Math.min(aA, aA + e);
+		if (bu0 >= lo && bu0 + 1 <= uHi && bv0 >= vLo && bv0 + 1 <= vHi) {
 			for (int a = 0; a < 2; a++) {
-				for (int e = 0; e < 2; e++) {
-					t.wood(bu + a, 1, bv + e, SPRUCE.bark());
-					if (a == ou || e == ov) {
-						t.wood(bu + a, 2, bv + e, SPRUCE.bark());
-					}
+				for (int a2 = 0; a2 < 2; a2++) {
+					t.wood(bu0 + a, 1, bv0 + a2, SPRUCE.bark());
 				}
 			}
-			lu = bu + ou;
-			lv = bv + ov;
 			// surface roots over the soil from the faces of the 2×2
-			for (int u = bu - 1; u <= bu + 2; u++) {
-				for (int v = bv - 1; v <= bv + 2; v++) {
-					boolean outU = u < bu || u > bu + 1;
-					boolean outV = v < bv || v > bv + 1;
+			for (int u = bu0 - 1; u <= bu0 + 2; u++) {
+				for (int v = bv0 - 1; v <= bv0 + 2; v++) {
+					boolean outU = u < bu0 || u > bu0 + 1;
+					boolean outV = v < bv0 || v > bv0 + 1;
 					if (outU == outV || u < lo || u > uHi || v < vLo || v > vHi) {
 						continue; // inside the 2×2, a corner, or off the soil
 					}
@@ -145,49 +166,62 @@ public final class TreeCloudPinePot implements Variant {
 				}
 			}
 		} else {
-			lu = cu;
-			lv = cv;
-			t.wood(cu, 1, cv, SPRUCE.bark());
-			t.wood(cu, 2, cv, SPRUCE.log(Direction.Axis.Y));
-			// a flare: a root or two on the soil around the foot
-			int[][] n4 = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
-			int made = 0;
-			for (int[] f : n4) {
-				int u = cu + f[0];
-				int v = cv + f[1];
-				if (made < 2 && u >= lo && u <= uHi && v >= vLo && v <= vHi && t.hash(u, 1, v, 3) != 0) {
-					t.woodSoft(u, 1, v, SPRUCE.log(f[0] != 0 ? Direction.Axis.X : Direction.Axis.Z));
-					made++;
-				}
-			}
+			t.wood(au0, 1, av0, SPRUCE.bark());
 		}
 
-		// --- the trunk zig-zags through a bend under every pad, a limb runs from each bend to its pad
-		int uMin = w >= 3 ? 1 : 0;
-		int uMax = w >= 3 ? w - 2 : w - 1;
-		int vMin = d >= 3 ? 1 : 0;
-		int vMax = d >= 3 ? d - 2 : d - 1;
-		int[] prev = {lu, 2, lv};
-		for (int k = 0; k < n; k++) {
-			double ex = Math.cos(ang[k]);
-			double ez = Math.sin(ang[k]);
-			int[] bend = {TreeKit.clamp(cu + (int) Math.round(ex), uMin, uMax), py[k] - 1,
-					TreeKit.clamp(cv + (int) Math.round(ez), vMin, vMax)};
-			TreeKit.branch(t, SPRUCE, prev, bend, false);
-			double rk = rBase - 0.2 * k;
-			double reach = TreeKit.clamp(TreeKit.room(t, bend[0], bend[2], ex, ez, 0) - rk * 0.5, 0.8, 2.4);
-			int tu = TreeKit.clamp((int) Math.round(bend[0] + ex * reach), 0, w - 1);
-			int tv = TreeKit.clamp((int) Math.round(bend[2] + ez * reach), 0, d - 1);
-			TreeKit.branch(t, SPRUCE, bend, new int[] {tu, py[k], tv}, false);
-			double rz = rk * (0.85 + r.nextDouble() * 0.15);
-			TreeKit.lobe(t, tu, py[k], tv, rk, rz, 1.45, 0.5, k % 2 == 0 ? CUSHION : CUSHION.clumps(2), 0.3, 10 + k);
-			prev = bend;
+		// --- the bending 1×1 trunk up to the underside of the top pad, bark at every joint
+		int trunkTop = top - 1;
+		for (int y = 2; y <= trunkTop; y++) {
+			if (tu[y] != tu[y - 1] || tv[y] != tv[y - 1]) {
+				t.wood(tu[y - 1], y - 1, tv[y - 1], SPRUCE.bark());
+				t.wood(tu[y], y - 1, tv[y], SPRUCE.bark());
+			}
+			t.wood(tu[y], y, tv[y], y == trunkTop ? SPRUCE.bark() : SPRUCE.log(Direction.Axis.Y));
 		}
-		// the crown pad, domed a little more, on the end of the leader
-		int[] crown = {cu, crownY, cv};
-		TreeKit.branch(t, SPRUCE, prev, crown, false);
-		double rc = Math.max(1.3, rBase - 0.4);
-		TreeKit.lobe(t, cu, crownY, cv, rc, rc * 0.9, 1.7, 0.5, CUSHION, 0.3, 40);
+
+		// --- the side pads, alternating sides, each on a short diagonal limb ending under its centre
+		for (int k = 0; k < n - 1; k++) {
+			int side = k % 2 == 0 ? -1 : 1;
+			int ys = Math.max(2, py[k] - 2);
+			double rk = pr[k];
+			double rAlong = tiny ? rk : rk * 0.85;
+			int margin = Math.min((la - 1) / 2, Math.max(tiny ? 0 : 1, (int) Math.floor(rAlong * 0.8)));
+			int want = side > 0 ? aA + 2 * e : aA - e; // beyond B, or behind A
+			int ca = TreeKit.clamp(want, margin, la - 1 - margin);
+			int pcu = alongU ? ca : aP;
+			int pcv = alongU ? aP : ca;
+			double pcuD = alongU ? ca : mp;
+			double pcvD = alongU ? mp : ca;
+			TreeKit.branch(t, SPRUCE, new int[] {tu[ys], ys, tv[ys]}, new int[] {pcu, py[k] - 1, pcv}, false);
+			double rx = alongU ? rAlong : rk;
+			double rz = alongU ? rk : rAlong;
+			TreeKit.lobe(t, pcuD, py[k], pcvD, rx, rz, 1.0, 0.0, k % 2 == 0 ? CUSHION : CUSHION.clumps(2), 0.25,
+					10 + k);
+		}
+
+		// --- the top pad on the leader
+		if (tiny) {
+			// one big flat pad: the whole plot minus the corners, a plus (or the core) on top
+			double hw = w / 2.0;
+			double hd = d / 2.0;
+			for (int u = 0; u < w; u++) {
+				for (int v = 0; v < d; v++) {
+					double q = Math.pow((u - (w - 1) / 2.0) / hw, 2) + Math.pow((v - (d - 1) / 2.0) / hd, 2);
+					boolean corner = (u == 0 || u == w - 1) && (v == 0 || v == d - 1);
+					if (!corner) {
+						t.leaf(u, top, v, TreeKit.tone(t, CUSHION, u, top, v, 0.0, q, 40));
+					}
+					boolean inner = u >= 1 && u <= w - 2 && v >= 1 && v <= d - 2;
+					boolean mid = (w % 2 == 1 && u == w / 2) || (d % 2 == 1 && v == d / 2);
+					if (inner || mid) {
+						t.leaf(u, top + 1, v, TreeKit.tone(t, CUSHION, u, top + 1, v, 1.0, q, 40));
+					}
+				}
+			}
+		} else {
+			double rc = pr[n - 1];
+			TreeKit.lobe(t, tu[trunkTop], top, tv[trunkTop], rc, rc * 0.9, 1.0, 0.0, CUSHION, 0.25, 40);
+		}
 
 		// moss and ferns on the soil
 		for (int u = lo; u <= uHi; u++) {
@@ -202,6 +236,24 @@ public final class TreeCloudPinePot implements Variant {
 		}
 		t.prune();
 		t.flush(c);
+	}
+
+	/** The pot of the 3–4 plots: a single rim at soil level (y = 0), soil inside. */
+	private static void potLow(Vox t, int w, int d) {
+		for (int u = 0; u < w; u++) {
+			for (int v = 0; v < d; v++) {
+				boolean eu = u == 0 || u == w - 1;
+				boolean ev = v == 0 || v == d - 1;
+				if (eu && ev) {
+					t.fixed(u, 0, v, b(Blocks.POLISHED_DEEPSLATE));
+				} else if (eu || ev) {
+					t.fixed(u, 0, v, t.hash(u, 0, v, 4) == 0 ? b(Blocks.MOSSY_STONE_BRICKS) : b(Blocks.STONE_BRICKS));
+				} else {
+					int k = t.hash(u, 0, v, 6);
+					t.fixed(u, 0, v, k == 0 ? b(Blocks.MOSS_BLOCK) : k == 1 ? b(Blocks.COARSE_DIRT) : b(Blocks.PODZOL));
+				}
+			}
+		}
 	}
 
 	/** The low pot: a deepslate band, a stone-brick stair lip stepping outwards with calcite corners, soil inside. */
