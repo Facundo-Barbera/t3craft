@@ -568,6 +568,10 @@ public final class PlanReport {
 			if (isl == null || stands == 0) {
 				cls = "roof";
 				why = "no standable step";
+			} else if (isl.sky() >= ROOF_SKY && isl.roofy() >= ROOF_SURFACE) {
+				cls = "roof";
+				why = "the walkable air is a pitched roof: " + Math.round(isl.roofy() * 100) + "% of it rests on stairs or slabs, " + Math.round(isl.sky() * 100) + "% open to the sky, " + isl.cells().size()
+						+ " cells that nothing from the ground leads to";
 			} else if (ct.standable() * 2 < n) {
 				cls = "other";
 				why = "head room on fewer than half of the steps";
@@ -597,6 +601,7 @@ public final class PlanReport {
 				d.addProperty("islandCells", isl.cells().size());
 				d.addProperty("islandBox", box(isl.box()));
 				d.addProperty("skyFraction", Math.round(isl.sky() * 100) / 100.0);
+				d.addProperty("roofSurfaceFraction", Math.round(isl.roofy() * 100) / 100.0);
 				d.addProperty("gap", isl.gap());
 				d.addProperty("gapFrom", isl.gapFrom());
 				d.addProperty("gapTo", isl.gapTo());
@@ -665,6 +670,9 @@ public final class PlanReport {
 
 	/** More walkable cells than the stairs themselves for a flight to count as a stair (a landing at either end). */
 	private static final int LANDING_CELLS = 4;
+	/** An island is a roof slope when this much of it is open to the sky and rests on stairs and slabs. */
+	private static final double ROOF_SKY = 0.7;
+	private static final double ROOF_SURFACE = 0.6;
 	/** An island larger than this is a whole floor, not the surroundings of a stair. */
 	private static final int BIG_ISLAND = 6000;
 
@@ -672,7 +680,7 @@ public final class PlanReport {
 	 * The walkable cells joined to one stand cell, cut off from the spawn's network: their box, the fraction open to the
 	 * sky, and the nearest cell the spawn reaches ({@code gap}, -1 when none within 4 blocks) with what lies between.
 	 */
-	private record Island(Set<BlockPos> cells, int[] box, double sky, int gap, String gapFrom, String gapTo, String between) {
+	private record Island(Set<BlockPos> cells, int[] box, double sky, double roofy, int gap, String gapFrom, String gapTo, String between) {
 	}
 
 	private static Island island(BuildPlan plan, PlanProbe.Walk walk, Set<BlockPos> reach, BlockPos from) {
@@ -689,6 +697,7 @@ public final class PlanReport {
 		int step = Math.max(1, cells.size() / 400);
 		int sampled = 0;
 		int open = 0;
+		int roofy = 0;
 		int i = 0;
 		int bestD = Integer.MAX_VALUE;
 		BlockPos bestA = null;
@@ -697,6 +706,11 @@ public final class PlanReport {
 			boolean sample = i++ % step == 0;
 			if (sample) {
 				sampled++;
+				Placement here = plan.at(p);
+				Placement under = plan.at(p.below());
+				if (here != null && roofSurface(here.state()) || under != null && roofSurface(under.state())) {
+					roofy++;
+				}
 				boolean covered = false;
 				for (int dy = 2; dy <= 16 && !covered; dy++) {
 					covered = solidCell(plan.at(p.above(dy)) == null ? null : plan.at(p.above(dy)).state());
@@ -739,8 +753,13 @@ public final class PlanReport {
 			}
 			between = sb.toString().trim();
 		}
-		return new Island(cells, bb, sampled == 0 ? 0 : (double) open / sampled, bestA == null ? -1 : (int) Math.round(Math.sqrt(bestD)), bestA == null ? "" : c(bestA),
+		return new Island(cells, bb, sampled == 0 ? 0 : (double) open / sampled, sampled == 0 ? 0 : (double) roofy / sampled, bestA == null ? -1 : (int) Math.round(Math.sqrt(bestD)), bestA == null ? "" : c(bestA),
 				bestB == null ? "" : c(bestB), between);
+	}
+
+	/** A stair or a slab: what a pitched roof is made of (the walkable surface of a roof slope). */
+	private static boolean roofSurface(BlockState s) {
+		return (s.getBlock() instanceof StairBlock || s.getBlock() instanceof net.minecraft.world.level.block.SlabBlock) && !s.getCollisionShape(net.minecraft.world.level.EmptyBlockGetter.INSTANCE, BlockPos.ZERO).isEmpty();
 	}
 
 	/** The catalog piece ({@code FAMILY:variant}) whose plot holds the cell, else {@code group:<construction group>}. */
