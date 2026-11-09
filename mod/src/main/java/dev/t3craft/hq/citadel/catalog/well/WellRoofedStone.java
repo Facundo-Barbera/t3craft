@@ -12,7 +12,6 @@ import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.AttachFace;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 
 /**
@@ -40,7 +39,7 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
  */
 public final class WellRoofedStone implements Variant {
 	/** The roof's lowest row (the eaves). */
-	private static final int ROOF = 6;
+	private static final int ROOF = 5;
 	/** The crossbars: the layer right under the roof. */
 	private static final int BAR = ROOF - 1;
 	/** The axle: on the post tops, under the crossbars. */
@@ -75,7 +74,7 @@ public final class WellRoofedStone implements Variant {
 		static Geo of(Plot p) {
 			int w = p.w();
 			int d = p.d();
-			int cs = Math.min(w, d) >= 6 ? 4 : 3;
+			int cs = Math.min(w, d) >= 8 ? 5 : Math.min(w, d) >= 6 ? 4 : 3;
 			int uL = (w - cs) / 2;
 			int uR = uL + cs - 1;
 			int v0 = (d - cs) / 2;
@@ -184,6 +183,9 @@ public final class WellRoofedStone implements Variant {
 					p.set(c, u, 0, v, slab(st.slabA())); // the low front lip
 				} else {
 					p.set(c, u, 0, v, kerbBlock(p, st, u, v));
+					if (v == g.v1()) {
+						p.set(c, u, 1, v, slab(st.slabA())); // the back wall is a half block higher: a backdrop for the bucket
+					}
 				}
 			}
 		}
@@ -197,10 +199,9 @@ public final class WellRoofedStone implements Variant {
 		BlockState pale = log(Blocks.STRIPPED_BIRCH_LOG, Direction.Axis.X);
 		for (int u : new int[] {g.uL(), g.uR()}) {
 			for (int v : postV) {
-				// [depth] a thick log post on a stone base; the axle (or a log) is its capital
-				p.set(c, u, 1, v, b(st.a()));
+				// [depth] a thick log post standing on the kerb; the axle (or a log) is its capital
 				int top = v == va ? AXLE - 1 : AXLE;
-				for (int y = 2; y <= top; y++) {
+				for (int y = 1; y <= top; y++) {
 					p.set(c, u, y, v, log(roof.log(), Direction.Axis.Y));
 				}
 			}
@@ -209,29 +210,21 @@ public final class WellRoofedStone implements Variant {
 				p.set(c, u, BAR, v, log(roof.log(), Direction.Axis.Z));
 			}
 		}
-		// the axle: a pale stripped log across the shaft, resting on the post tops; where the plot has a ring
-		// it sticks out one block past each post, and the crank lever is on its east end
-		int ax0 = g.uL() - (g.uL() >= 1 ? 1 : 0);
-		int ax1 = g.uR() + (g.uR() + 1 < g.w() ? 1 : 0);
-		for (int u = ax0; u <= ax1; u++) {
+		// the axle: a pale stripped log across the shaft, resting on the post tops
+		for (int u = g.uL(); u <= g.uR(); u++) {
 			p.set(c, u, AXLE, va, pale);
 		}
 		int cu = g.cs() == 4 ? g.uL() + 1 + p.hash(3, 0, 0, 2) : g.uc();
-		if (g.uR() + 2 < g.w()) {
-			p.put(c, g.uR() + 2, AXLE, va, b(Blocks.LEVER)
-					.setValue(BlockStateProperties.ATTACH_FACE, AttachFace.WALL)
-					.setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.EAST), CitadelCanvas.DECOR);
-		} else {
-			p.put(c, cu, AXLE, g.v0(), b(Blocks.LEVER)
-					.setValue(BlockStateProperties.ATTACH_FACE, AttachFace.WALL)
-					.setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH), CitadelCanvas.DECOR);
-		}
+		// the crank: an open trapdoor handle plate on the front of the axle
+		p.put(c, cu, AXLE, g.v0(), b(Blocks.DARK_OAK_TRAPDOOR)
+				.setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH)
+				.setValue(BlockStateProperties.OPEN, true), CitadelCanvas.DECOR);
 		// the bucket (a water cauldron) hangs on a short iron chain from the axle in the front gap, over the water
 		p.put(c, cu, AXLE - 1, va, b(Blocks.IRON_CHAIN).setValue(BlockStateProperties.AXIS, Direction.Axis.Y), CitadelCanvas.HANGING);
 		p.put(c, cu, AXLE - 2, va, b(Blocks.WATER_CAULDRON).setValue(BlockStateProperties.LEVEL_CAULDRON, 3), CitadelCanvas.HANGING);
 	}
 
-	// ------------------------------------------------------------------ roof (y6+)
+	// ------------------------------------------------------------------ roof (y5+)
 
 	/**
 	 * [depth] gable roof, ridge along v (front to back, so the visitor looks into the open gable and sees the
