@@ -298,13 +298,14 @@ public final class HouseLibraryCopper implements Variant {
 			wallCell(c, p, g, span, i, u, g.v0(), Direction.NORTH, true);
 			wallCell(c, p, g, span, i, u, g.v1(), Direction.SOUTH, false);
 		}
-		pierStack(c, p, g.bu0() - 1, g.v1() + 1);
-		pierStack(c, p, g.bu1() + 1, g.v1() + 1);
+		pierStack(c, p, g, g.bu0() - 1, g.v1() + 1);
+		pierStack(c, p, g, g.bu1() + 1, g.v1() + 1);
 	}
 
 	/** A pilaster standing a block proud of a wall: dark foot, calcite shaft, chiselled capital. */
-	private static void pierStack(CitadelCanvas c, Plot p, int u, int v) {
-		for (int y = 1; y <= 10; y++) {
+	private static void pierStack(CitadelCanvas c, Plot p, G g, int u, int v) {
+		int top = 10 + Math.max(0, g.ring(u, v)); // up to the roof, so there is no ledge on top
+		for (int y = 1; y <= top; y++) {
 			BlockState st;
 			if (y <= 2) {
 				st = plinth(p, u, y, v);
@@ -340,7 +341,7 @@ public final class HouseLibraryCopper implements Variant {
 			} else if (pier) {
 				st = y == 10 ? b(Blocks.CHISELED_STONE_BRICKS) : (y > 10 ? wallStone(p, u, y, v) : pierStone(p, u, y, v));
 			} else if (y == 6) {
-				st = b(Blocks.POLISHED_DEEPSLATE); // a dark string course between the two tiers of windows
+				st = b(Blocks.POLISHED_ANDESITE); // a string course between the two tiers of windows
 			} else if (y == 10) {
 				st = b(Blocks.POLISHED_ANDESITE);
 			} else if (y > 10) {
@@ -372,7 +373,7 @@ public final class HouseLibraryCopper implements Variant {
 		int ou = u + out.getStepX();
 		int ov = v + out.getStepZ();
 		if (pier) {
-			pierStack(c, p, ou, ov);
+			pierStack(c, p, g, ou, ov);
 			return;
 		}
 		if (front) {
