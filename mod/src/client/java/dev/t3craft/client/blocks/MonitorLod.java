@@ -1,6 +1,6 @@
 // Adapted from AgentCraft (https://github.com/blendi-remade/agentcraft)
 // Copyright (c) 2026 AgentCraft contributors. MIT License.
-// Pixel densities (128 px/block for one-block-high screens, 96 for bigger ones) follow
+// Pixel densities (originally 128 px/block for one-block-high screens, 96 for bigger ones; now ~30 columns across, see nearPpb) follow
 // MonitorRenderer.density in mod/src/client/java/dev/agentcraft/client/monitor/MonitorRenderer.java.
 package dev.t3craft.client.blocks;
 
