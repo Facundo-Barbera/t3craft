@@ -348,7 +348,7 @@ public final class CloisterRoom {
 
 	/** A deepslate-brick path cell, one in six cracked. */
 	private static BlockState pathMix(int x, int z) {
-		return Math.floorMod(x * 3 + z * 7, 6) == 0 ? b(Blocks.CRACKED_DEEPSLATE_BRICKS) : b(Blocks.DEEPSLATE_BRICKS);
+		return NodeDecor.stoneMix(x, 0, z);
 	}
 
 	/**
@@ -427,7 +427,7 @@ public final class CloisterRoom {
 		q.set(tx, 6, tz - sz, LOG.setValue(BlockStateProperties.AXIS, Direction.Axis.Z));
 		// three overlapping lobes: {dx, y, dz, radius squared}: the main ball, one leaning towards the court's centre, one low
 		// and one high on the other side, so the crown is not a single cube
-		int[][] lobes = {{0, 9, 0, 7}, {-2 * sx, 8, 0, 5}, {0, 10, -2 * sz, 5}, {sx * 2, 8, sz, 4}};
+		int[][] lobes = {{0, 9, 0, 5}, {-2 * sx, 8, 0, 3}, {0, 9, -2 * sz, 3}, {sx, 8, sz, 3}};
 		for (int ax = -5; ax <= 5; ax++) {
 			for (int az = -5; az <= 5; az++) {
 				for (int y = 5; y <= 13; y++) {
@@ -440,7 +440,9 @@ public final class CloisterRoom {
 					}
 					double noise = Math.floorMod(x * 7 + y * 13 + z * 17 + tx * 5, 4) * 0.4;
 					for (int[] lb : lobes) {
-						double d = (ax - lb[0]) * (ax - lb[0]) + (az - lb[2]) * (az - lb[2]) + (y - lb[1]) * (y - lb[1]);
+						// the top falls away faster than the underside: a dome
+						int dy = y - lb[1];
+						double d = (ax - lb[0]) * (ax - lb[0]) + (az - lb[2]) * (az - lb[2]) + dy * dy * (dy > 0 ? 1.8 : 0.9);
 						if (d <= lb[3] + noise - 0.6) {
 							q.putIfFree(x, y, z, pink, CitadelCanvas.SOLID);
 							break;
@@ -496,10 +498,12 @@ public final class CloisterRoom {
 	 */
 	private static BlockState roofCell(int r, Direction out, boolean hip) {
 		boolean slabCell = (r - 6) % 2 == 0;
+		// a band of mangrove (rings 10 and 11) among the cherry tiles
+		boolean band = r == 10 || r == 11;
 		if (slabCell) {
-			return slab(r == 6 || r == 12 || hip ? Blocks.STONE_BRICK_SLAB : Blocks.CHERRY_SLAB);
+			return slab(r == 6 || r == 12 || hip ? Blocks.STONE_BRICK_SLAB : band ? Blocks.MANGROVE_SLAB : Blocks.CHERRY_SLAB);
 		}
-		return stairs(hip ? Blocks.STONE_BRICK_STAIRS : Blocks.CHERRY_STAIRS, out);
+		return stairs(hip ? Blocks.STONE_BRICK_STAIRS : band ? Blocks.MANGROVE_STAIRS : Blocks.CHERRY_STAIRS, out);
 	}
 
 	/**
