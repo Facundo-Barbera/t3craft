@@ -14,13 +14,13 @@ import net.minecraft.world.level.block.StairBlock;
 import net.minecraft.world.level.block.state.properties.Half;
 
 /**
- * Kasuga-style stone lantern (tōrō), all in stone: a stepped dark foot (kiso), a slim shaft (sao), a round
- * flared platform (chūdai), a light box (hibukuro) whose four thin iron corner posts frame a glowing heart
- * with open windows on every side, a hipped hat (kasa) sloping down from a crown, and a jewel finial (hōju).
+ * Kasuga-style stone lantern (tōrō), all in stone: a stepped dark foot (kiso), a slim shaft (sao), a
+ * cross-shaped flared platform (chūdai), a single glowing light box (hibukuro) open to the air on every
+ * side, a hipped hat (kasa) sloping down from a crown, and a jewel finial (hōju).
  *
  * <ul>
  * <li><b>Silhouette</b>: wide → slim → wide → open cage → wide hat → point. Every level has a different
- *     width, so it reads as a tōrō from far away, not as a stack of cubes.</li>
+ *     width (3, 1, cross, 1, 3, 1), so it reads as a tōrō from far away, not as a stack of cubes.</li>
  * <li><b>Gradient</b>: deepslate foot, stone-brick shaft and platform, andesite cage, polished andesite hat
  *     with pale diorite tips (the curled-up corners catch the light), a diorite-wall jewel.</li>
  * <li><b>Depth</b>: the platform flares on upside-down stairs; the hat sides are stairs sloping out and the
@@ -88,15 +88,14 @@ public final class LampStreetToro implements Variant {
 			p.set(c, 1, y++, 1, b(p.hash(1, 1, 1, 3) == 0 ? Blocks.MOSSY_STONE_BRICK_WALL : Blocks.STONE_BRICK_WALL));
 		}
 
-		// --- chūdai: a round flared platform: upside-down stairs all round a chiselled heart
+		// --- chūdai: a cross-shaped platform flaring on upside-down stairs, its corners left open
 		p.set(c, 1, y, 1, b(Blocks.CHISELED_STONE_BRICKS));
-		ring(c, p, y, Blocks.STONE_BRICK_STAIRS, Half.TOP);
+		for (int i = 0; i < 4; i++) {
+			p.set(c, SIDES[i][0], y, SIDES[i][1], stairs(Blocks.STONE_BRICK_STAIRS, IN[i]).setValue(StairBlock.HALF, Half.TOP));
+		}
 		y++;
 
-		// --- hibukuro: thin iron posts at the corners frame a glowing heart; every side is an open window
-		for (int[] k : CORNERS) {
-			p.set(c, k[0], y, k[1], b(Blocks.IRON_BARS));
-		}
+		// --- hibukuro: a single glowing box, open air all round it: the waist between platform and hat
 		p.set(c, 1, y, 1, b(Blocks.OCHRE_FROGLIGHT));
 		y++;
 

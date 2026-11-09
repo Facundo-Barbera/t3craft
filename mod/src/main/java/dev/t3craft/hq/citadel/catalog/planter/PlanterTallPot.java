@@ -138,18 +138,19 @@ public final class PlanterTallPot implements Variant {
 	}
 
 	/**
-	 * The 1 × 1 design: an urn on a stand. A slim deepslate wall stem (on a polished foot when there is
-	 * height), an iron cauldron as the bowl with its legs and rim, and a flowering azalea bush spilling over
-	 * it. Three different silhouettes stacked (thin post, open bowl, round bush) instead of three cubes.
+	 * The 1 × 1 design: a blossom topiary in an iron bowl on a stand. A deepslate wall stem (or a polished foot
+	 * and a slim fence stem when there is height), a cauldron as the bowl with its legs and rim, and a ball of
+	 * cherry blossom sitting in it. Three different silhouettes stacked (post, open bowl, pink ball).
 	 */
 	private static void single(CitadelCanvas c, Plot p) {
 		int y = 0;
 		if (p.h() >= 4) {
 			p.set(c, 0, y++, 0, p.hash(0, 0, 0, 3) == 0 ? b(Blocks.CHISELED_DEEPSLATE) : b(Blocks.POLISHED_DEEPSLATE));
 		}
-		p.set(c, 0, y++, 0, b(Blocks.POLISHED_DEEPSLATE_WALL).setValue(BlockStateProperties.UP, true));
+		p.set(c, 0, y, 0, y == 0 ? b(Blocks.POLISHED_DEEPSLATE_WALL).setValue(BlockStateProperties.UP, true) : b(Blocks.NETHER_BRICK_FENCE));
+		y++;
 		p.set(c, 0, y++, 0, b(Blocks.CAULDRON));
-		p.set(c, 0, y, 0, b(Blocks.FLOWERING_AZALEA));
+		p.set(c, 0, y, 0, leaves(Blocks.CHERRY_LEAVES));
 	}
 
 	/** A thick bamboo stalk from y0 to y1 with the right leaves, and a shorter one beside it if there is room. */
