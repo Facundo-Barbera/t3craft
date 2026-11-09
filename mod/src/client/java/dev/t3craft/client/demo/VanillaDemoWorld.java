@@ -95,8 +95,9 @@ final class VanillaDemoWorld {
 		if (!(g instanceof FlatLevelSource flat)) {
 			return false;
 		}
+		// vanilla stores air layers as null in getLayers() (FlatLevelSource skips nulls): a null layer is air
 		for (BlockState s : flat.settings().getLayers()) {
-			if (!s.isAir()) {
+			if (s != null && !s.isAir()) {
 				return false;
 			}
 		}
