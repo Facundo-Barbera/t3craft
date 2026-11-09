@@ -19,7 +19,7 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
  * A picnic table in stone under a cherry pergola: dark deepslate benches on both long sides, a pale smooth
  * quartz top on stone-brick wall legs, a flowering azalea set into the middle of a long table. Wide plots
  * add the table ends (a lantern post and a planted block); tall wide plots raise a cherry pergola over the
- * whole set: fence posts on deepslate feet, two long beams, slim fence slats, blossom along the edges and
+ * whole set: fence posts on deepslate feet, two long beams, thin slab slats, blossom along the edges and
  * lanterns hanging over the table.
  *
  * <ul>
@@ -119,7 +119,7 @@ public final class BenchStoneTable implements Variant {
 		}
 	}
 
-	/** A cherry pergola over the set: four posts, two long beams (y 3), fence slats (y 4), blossom on the edges, lanterns. */
+	/** A cherry pergola over the set: four posts, two long beams (y 3), slab slats (y 4), blossom on the edges, lanterns. */
 	private static void pergola(CitadelCanvas c, Plot p, int w) {
 		for (int u : new int[] {0, w - 1}) {
 			for (int v : new int[] {0, 2}) {
@@ -129,7 +129,7 @@ public final class BenchStoneTable implements Variant {
 			}
 		}
 		BlockState beam = b(Blocks.STRIPPED_CHERRY_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.X);
-		BlockState rafter = b(Blocks.CHERRY_FENCE); // slim slats across the beams (connected front to back)
+		BlockState rafter = slab(Blocks.CHERRY_SLAB); // thin slats lying across the beams
 		for (int u = 0; u < w; u++) {
 			p.set(c, u, 3, 0, beam);
 			p.set(c, u, 3, 2, beam);

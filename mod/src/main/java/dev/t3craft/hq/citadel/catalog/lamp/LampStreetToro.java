@@ -24,7 +24,7 @@ import net.minecraft.world.level.block.state.properties.SlabType;
  * <li><b>Silhouette</b>: low plinth → slim shaft → flared platform → open lit chamber → thin hat → crown →
  *     point. Heavy pieces are half blocks (plinth, hat), so the lantern reads light, not as a stack of cubes.</li>
  * <li><b>Gradient</b>: deepslate plinth, stone-brick shaft and platform, stone-brick posts round a warm light,
- *     polished andesite and smooth stone hat, a pale diorite-wall jewel.</li>
+ *     a polished andesite hat, a pale diorite-wall jewel.</li>
  * <li><b>Depth</b>: the platform flares on upside-down stairs; the chamber is open between its posts; the
  *     crown stands half a block above the hat's slab eave.</li>
  * </ul>
@@ -117,7 +117,7 @@ public final class LampStreetToro implements Variant {
 			p.set(c, k[0], y, k[1], slab(Blocks.POLISHED_ANDESITE_SLAB));
 		}
 		for (int[] k : CORNERS) {
-			p.set(c, k[0], y, k[1], slab(Blocks.SMOOTH_STONE_SLAB));
+			p.set(c, k[0], y, k[1], slab(Blocks.POLISHED_ANDESITE_SLAB));
 		}
 		y++;
 
