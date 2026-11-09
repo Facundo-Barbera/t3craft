@@ -25,7 +25,7 @@ final class HqMenuBridge {
 		DemoConfig cfg = demo.loadConfig();
 		String folder = cfg.spec().folderId();
 		boolean exists = VanillaDemoWorld.exists(mc, folder);
-		return new HqMenuModel(HqLayouts.all(), HqLayoutConfig.selected().id(), exists ? builtLayoutId(mc, folder) : null, exists,
+		return new HqMenuModel(HqLayouts.menuOrder(), HqLayoutConfig.selected().id(), exists ? builtLayoutId(mc, folder) : null, exists,
 				HqMenuBridge::persist);
 	}
 
