@@ -239,13 +239,22 @@ final class CitadelStreetscape {
 				}
 			}
 		}
+		c.set(x, FOCAL_POSTS - 1, z, PLINTH); // a collar of chiselled brick on the shaft
 		int[][] arms = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
 		for (int[] a : arms) {
 			int ax = x + a[0];
 			int az = z + a[1];
-			if (freeColumn(c, ax, az, FOCAL_POSTS - 1, FOCAL_POSTS + 1) && c.at(ax, 0, az) != null) {
+			// a buttress of wall blocks on each face of the shaft, so it is not a pole
+			if (freeColumn(c, ax, az, 2, 4) && c.at(ax, 0, az) != null) {
+				c.fill(ax, 2, 4, az, POST);
+			}
+			// the arm: two cherry slabs at the top of the shaft, a lantern hanging from the far one
+			int bx = x + 2 * a[0];
+			int bz = z + 2 * a[1];
+			if (freeColumn(c, ax, az, FOCAL_POSTS, FOCAL_POSTS + 1) && freeColumn(c, bx, bz, FOCAL_POSTS, FOCAL_POSTS + 1) && c.at(bx, 0, bz) != null) {
 				c.set(ax, FOCAL_POSTS + 1, az, AWNING);
-				c.set(ax, FOCAL_POSTS, az, HANGING_LANTERN);
+				c.set(bx, FOCAL_POSTS + 1, bz, AWNING);
+				c.set(bx, FOCAL_POSTS, bz, HANGING_LANTERN);
 			}
 		}
 	}

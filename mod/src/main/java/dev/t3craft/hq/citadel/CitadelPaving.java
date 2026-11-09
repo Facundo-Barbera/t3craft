@@ -114,7 +114,7 @@ final class CitadelPaving {
 	static final double DISC_FRAC = 0.30;
 	static final double RING_FRAC = 0.40;
 	static final double RIM_FRAC = 0.47;
-	static final double PLAZA_R_FRAC = 0.92;
+	static final double PLAZA_R_FRAC = 1.1;
 	/** The plaza at the foot of the main ramp: half width, in avenue half widths. */
 	static final double PLAZA_FRAC = 2.35;
 	/** Half width of a causeway over the patio's pool (the pool's paths): 1.2 unscaled. */
@@ -206,6 +206,12 @@ final class CitadelPaving {
 	/** A gutter block: deepslate tiles, one in nine cracked. */
 	private static BlockState kerb(int x, int z) {
 		return hash(x, z) % 9 == 0 ? KERB_CRACKED : FOOT;
+	}
+
+	/** The outer column of the outermost street, against the lawn: moss, coarse dirt and grass in patches. */
+	private static BlockState lawnEdge(int x, int z) {
+		int h = hash(x, z);
+		return h < 50 ? CitadelCanvas.MOSS : h < 75 ? b(Blocks.COARSE_DIRT) : CitadelCanvas.GRASS;
 	}
 
 	/** A sidewalk cell {@code s} along its road: smooth stone with a course of stone brick across it every {@link #ACERA_EVERY} cells. */
@@ -314,6 +320,9 @@ final class CitadelPaving {
 		boolean hiEdge = hi - r < band && !mouthOut;
 		if (loEdge || hiEdge) {
 			double e = loEdge ? r - lo : hi - r;
+			if (hiEdge && !inner && m == c.rings && e < 1.0) {
+				return lawnEdge(x, z); // the outermost street meets the lawn: no clean cut
+			}
 			return e <= acera ? sidewalk(RingCampusGeometry.theta(x, z) * rc) : kerb(x, z);
 		}
 		// the plazoleta of a crossing, over the road only: ring 1's crossings are node rooms, so it has none
@@ -370,10 +379,10 @@ final class CitadelPaving {
 			return CHISELED;
 		}
 		if (md <= DISC_FRAC * width) {
-			return terracotta((dx >= 0) == (dz >= 0) ? DyeColor.PINK : DyeColor.MAGENTA);
+			return (dx >= 0) == (dz >= 0) ? CALCITE : POLISHED; // a pinwheel of white and dark
 		}
 		if (md <= RING_FRAC * width) {
-			return CALCITE;
+			return terracotta(DyeColor.PINK); // one ring of colour: the citadel's pink
 		}
 		if (md <= RIM_FRAC * width) {
 			return POLISHED;
@@ -388,8 +397,9 @@ final class CitadelPaving {
 		if (!Double.isNaN(zebra) && md >= PLAZA_R_FRAC * width - 4.0 && md <= PLAZA_R_FRAC * width - 1.5 && Math.floorMod((int) Math.round(zebra), 2) == 0) {
 			return CALCITE;
 		}
-		// concentric rings of stone brick over polished andesite: calm, light, and the zebra shows on it
-		return Math.floorMod((int) Math.round(md), 3) == 0 ? BRICKS : JOINT;
+		// concentric rings two cells wide: stone brick, polished andesite, calcite
+		int ring = Math.floorMod((int) Math.round(md) / 2, 3);
+		return ring == 0 ? BRICKS : ring == 1 ? JOINT : CALCITE;
 	}
 
 	/** The plaza at the foot of the main ramp: the avenue's tile, with arcs of joints round the rosette. */
@@ -439,7 +449,7 @@ final class CitadelPaving {
 		if (median(r, lo, hi)) {
 			return BRICKS;
 		}
-		return joint(arc, width) ? PACKED_MUD : MUD;
+		return joint(arc, width) || hash(x, z) < 9 ? PACKED_MUD : MUD; // patches of packed mud: worn, not flat
 	}
 
 	// ------------------------------------------------------------------ verges
