@@ -462,7 +462,7 @@ public final class PlanterTallPot implements Variant {
 
 	// ------------------------------------------------------------------ furniture
 
-	/** A lantern post: a dark base, a wall shaft of up to three blocks, a lantern and, with room, a slab cap. */
+	/** A lantern post: a dark base, a wall shaft of up to three blocks and a lantern on top. */
 	private static void lantern(CitadelCanvas c, Plot p, Mat m, int u, int v) {
 		int shaft = Math.max(1, Math.min(p.h() - 2, 3));
 		p.set(c, u, 0, v, foot(m, p, u, v));
@@ -470,9 +470,6 @@ public final class PlanterTallPot implements Variant {
 			p.set(c, u, y, v, b(Blocks.POLISHED_DEEPSLATE_WALL).setValue(BlockStateProperties.UP, true));
 		}
 		p.set(c, u, shaft + 1, v, b(Blocks.LANTERN));
-		if (shaft + 2 < p.h()) {
-			p.set(c, u, shaft + 2, v, slab(m.footSlab()));
-		}
 	}
 
 	/** A bench of {@code len} stair seats facing the front, with a low azalea hedge for a back. */
