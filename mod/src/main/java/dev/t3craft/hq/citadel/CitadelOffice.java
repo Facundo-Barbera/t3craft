@@ -562,6 +562,13 @@ public final class CitadelOffice {
 		for (int[] p : new int[][] {{-2, -2}, {2, -2}, {-2, 2}, {2, 2}, {0, 2}, {0, -3}}) {
 			hang(c, p[0], F1() - 1, p[1]);
 		}
+		// canopy over the door, four blocks above the deck so nothing is in the way: stairs against the wall, a slab edge, two lanterns
+		for (int dx = -2; dx <= 2; dx++) {
+			set(c, dx, F0() + 5, -E, cherryStairs(Direction.SOUTH, false));
+			set(c, dx, F0() + 5, -E - 1, slab(Blocks.CHERRY_SLAB));
+		}
+		hang(c, -2, F0() + 4, -E - 1);
+		hang(c, 2, F0() + 4, -E - 1);
 	}
 
 	// ------------------------------------------------------------------ archive (feet y = F1() + 1)
@@ -786,7 +793,8 @@ public final class CitadelOffice {
 					set(c, dx, CEIL() + 2, dz, stairs(Blocks.CHERRY_STAIRS, in));
 				} else if (m >= 2) {
 					int ys = CEIL() + 2 + (E - m);
-					set(c, dx, ys, dz, stairs(Blocks.DEEPSLATE_TILE_STAIRS, in));
+					// one cherry ring in the tiles breaks the big slope
+					set(c, dx, ys, dz, stairs(m == 4 ? Blocks.CHERRY_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS, in));
 					for (int y = WALL_TOP() + 1; y < ys; y++) {
 						set(c, dx, y, dz, FOOT);
 					}
@@ -812,6 +820,13 @@ public final class CitadelOffice {
 				}
 			}
 		}
+		// finials on the four eave corners
+		for (int sx : new int[] {-E, E}) {
+			for (int sz : new int[] {-E, E}) {
+				set(c, sx, CEIL() + 3, sz, fence());
+				set(c, sx, CEIL() + 4, sz, lantern(false));
+			}
+		}
 		// the cupola's eave
 		for (int dx = -2; dx <= 2; dx++) {
 			for (int dz = -2; dz <= 2; dz++) {
@@ -828,5 +843,11 @@ public final class CitadelOffice {
 	public static void anchors(CitadelCanvas c) {
 		c.anchor(Anchor.at(OFFICE, new BlockPos(CX(), F2() + 1, CZ()), Direction.SOUTH));
 		c.anchor(Anchor.at(OFFICE_BALCONY, new BlockPos(CX(), F2() + 1, CZ() - 7), Direction.NORTH));
+		// DEBUG-WALK (temporary, removed before the final commit): standing spots the report checks for reachability
+		int[][] probes = {{0, F0() + 1, -3}, {-3, F0() + 1, -4}, {-4, F1() + 1, 3}, {2, F1() + 1, 0}, {-2, F1() + 1, -4}, {3, F1() + 1, 4},
+				{3, F2() + 1, -3}, {0, F2() + 1, 0}, {0, F2() + 1, -7}};
+		for (int i = 0; i < probes.length; i++) {
+			c.anchor(Anchor.at("walk_zz_office_" + i, new BlockPos(CX() + probes[i][0], probes[i][1], CZ() + probes[i][2]), Direction.NORTH));
+		}
 	}
 }
