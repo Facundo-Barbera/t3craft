@@ -640,6 +640,8 @@ public final class CitadelFinish {
 
 	/** Turns the painted canvas into the plan: air, shapes, groups, light pass, placements, modules. */
 	public static BuildPlan build(CitadelCanvas c) {
+		// struct/streets-plazas: the furniture of the crossings, after the catalog's placement (it only takes free cells) and before the relief
+		CitadelStreetscape.crossings(c);
 		// design/citadel-terraces: the flat citadel goes onto its terraces before anything reads the final cells
 		boolean report = Boolean.getBoolean("t3craft.citadel.reliefReport");
 		if (report) {
