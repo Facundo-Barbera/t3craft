@@ -151,10 +151,10 @@ final class BarrioGateBig {
 			this.eaveMat = l.ring() >= 2 ? ROOF : Blocks.CHERRY_STAIRS;
 			this.stepsL = buildSteps(true);
 			this.stepsR = buildSteps(false);
-			this.stoneWalk = l.ring() >= 2;
+			this.stoneWalk = true;
 		}
 
-		/** Rings 2 and 3: the wall-walk is stone with a dark belt and dark caps, so it does not melt into the cherry roofs. */
+		/** The wall-walk is stone with a dark belt and dark caps (all rings), so it does not melt into the roofs. */
 		final boolean stoneWalk;
 
 		/** The belt course on the edges of the deck. */
@@ -315,15 +315,15 @@ final class BarrioGateBig {
 		}
 
 		/**
-		 * The raised portcullis: iron bars hanging from the vault two rows inside the hub face (two high in the middle, one at the
-		 * sides, following the arch), always above head height (at least 2 free below).
+		 * The raised portcullis: iron bars hanging from the vault two rows inside the hub face (three high in the middle, two at
+		 * one in from the sides and one at the sides, following the arch), always above head height (at least 3 free below).
 		 */
 		void portcullis() {
 			int u = D - 2;
 			for (int dv = -HALF; dv <= HALF; dv++) {
 				int a = Math.abs(dv);
 				int clear = 6 - a;
-				int n = a == HALF ? 1 : 2;
+				int n = a == HALF ? 1 : a == 1 ? 2 : 3;
 				for (int y = clear - n + 1; y <= clear; y++) {
 					c.set(r.cell(u, mid + dv, y), b(Blocks.IRON_BARS));
 				}
@@ -446,8 +446,11 @@ final class BarrioGateBig {
 			for (int s = 0; s < 2; s++) {
 				int v0 = s == 0 ? 0 : W - sw;
 				for (int tv = 0; tv < sw; tv++) {
-					c.set(r.cell(D, v0 + tv, TOWER_TOP - 1), log(side.getAxis()));
+					// ring 1 has a cherry eave right above: its beam is dark so the top does not stack three pink stripes
+					c.set(r.cell(D, v0 + tv, TOWER_TOP - 1), l.ring() >= 2 ? log(side.getAxis()) : POST);
 					if (tv >= 1 && tv <= sw - 2) {
+						// a stone sill under the banner
+						c.set(r.cell(D, v0 + tv, 3), BarrioKit.stair(Blocks.STONE_BRICK_STAIRS, back.getOpposite()));
 						for (int y = 4; y <= TOWER_TOP - 2; y++) {
 							c.set(r.cell(D, v0 + tv, y), banner(tv, y));
 						}
