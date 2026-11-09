@@ -530,7 +530,6 @@ public final class HouseStoneTower implements Variant {
 				f.set(t, 4, 1, StoneKit.lantern(false));
 			}
 		}
-		}
 
 		// ------------------------------------------------------------------ rings round the tower
 
