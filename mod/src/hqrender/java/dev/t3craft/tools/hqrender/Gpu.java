@@ -32,6 +32,8 @@ final class Gpu {
 	static volatile Mode mode = Mode.OFF;
 	/** Dev: compile {@code mod/src/hqrender/cuda/trace.cu} with NVRTC instead of using the committed PTX, and write {@code trace.ptx}. */
 	static volatile boolean nvrtc;
+	/** The filter, bloom and sRGB conversion also run on the GPU ({@code --gpu-no-resolve}: only the ray tracing does). */
+	static volatile boolean resolve = true;
 	static volatile Path outDir;
 
 	private static GpuSession session;
@@ -54,7 +56,8 @@ final class Gpu {
 		}
 		StringBuilder log = new StringBuilder();
 		try {
-			GpuSession s = GpuSession.start(Map.of());
+			// the driver caches the JIT-compiled kernel; the default cache (256 MB) is plenty, but make sure it stays on
+			GpuSession s = GpuSession.start(Map.of("CUDA_CACHE_DISABLE", "0", "CUDA_CACHE_MAXSIZE", "1073741824"));
 			String cmd;
 			if (nvrtc) {
 				Path cu = Launcher.classesRoot().resolve("../../../../src/hqrender/cuda/trace.cu").normalize();
@@ -125,16 +128,20 @@ final class Gpu {
 		}
 		diff.setRGB(0, 0, w, h, dpx, 0, w);
 		long same = 0;
-		for (int i = 0; i < cpuSub.length; i++) {
-			if (cpuSub[i] == gpuSub[i]) {
-				same++;
+		if (gpuSub.length == cpuSub.length) {
+			for (int i = 0; i < cpuSub.length; i++) {
+				if (cpuSub[i] == gpuSub[i]) {
+					same++;
+				}
 			}
+		} else {
+			same = -1; // the sub-samples were not brought back
 		}
 		double n = (double) w * h;
 		System.out.printf(Locale.ROOT,
 				"gpu-compare #%d %dx%d (%d sub-samples): cpu %.2f s, gpu %.2f s (%.1fx) [%s] | image diff: mean %.3f/255 per channel, max %d, >4 on %.4f%% of pixels, >16 on %.4f%% | identical sub-samples %.2f%%%n",
 				id, w, h, cpuSub.length, cpuMs / 1000, gpuMs / 1000, cpuMs / Math.max(1, gpuMs), info, sum / (3 * n), max, 100.0 * over4 / n,
-				100.0 * over16 / n, 100.0 * same / Math.max(1, cpuSub.length));
+				100.0 * over16 / n, same < 0 ? Double.NaN : 100.0 * same / Math.max(1, cpuSub.length));
 		Path dir = outDir == null ? null : outDir.resolve("gpu-compare");
 		if (dir != null) {
 			try {

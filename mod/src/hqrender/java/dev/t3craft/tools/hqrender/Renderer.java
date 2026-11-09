@@ -170,9 +170,9 @@ final class Renderer {
 		double gpuMs = 0;
 		if (gm != Gpu.Mode.OFF) {
 			long g0 = System.nanoTime();
-			gres = GpuTrace.trace(this, W, H, px, s0, t1, lk.bloom);
+			gres = GpuTrace.trace(this, W, H, px, s0, t1, lk.bloom, ss, scale, gm == Gpu.Mode.COMPARE);
 			if (gres != null) {
-				gpuImg = resolve(gres.buf, gres.glow, w, h, ss, scale);
+				gpuImg = gres.rgb != null ? imageOf(gres.rgb, w, h) : resolve(gres.buf, gres.glow, w, h, ss, scale);
 			}
 			gpuMs = (System.nanoTime() - g0) / 1e6;
 			if (gpuImg != null && gm == Gpu.Mode.AUTO) {
@@ -193,7 +193,7 @@ final class Renderer {
 		});
 		BufferedImage cpuImg = resolve(buf, glow, w, h, ss, scale);
 		if (gpuImg != null) {
-			Gpu.compare(cpuImg, gpuImg, buf, gres.buf, (System.nanoTime() - c0) / 1e6, gpuMs, gres.info);
+			Gpu.compare(cpuImg, gpuImg, buf, gres.buf != null ? gres.buf : new int[0], (System.nanoTime() - c0) / 1e6, gpuMs, gres.info);
 			return gpuImg;
 		}
 		return cpuImg;
@@ -224,6 +224,28 @@ final class Renderer {
 				return x < 0.5 ? 1 : 0;
 			}
 		}
+	}
+
+	/** The reconstruction filter's taps over the sub-sample offsets {@code kMin..kMax} (the same for every pixel); the GPU resolve uses them too. */
+	record Taps(int kMin, int kMax, double[] wk) {
+	}
+
+	Taps taps(int ss) {
+		boolean box = ss == 1 || lk.filter == null || lk.filter.equals("box");
+		int kMin = box ? 0 : -2 * ss;
+		int kMax = box ? ss - 1 : 3 * ss - 1;
+		double[] wk = new double[kMax - kMin + 1];
+		for (int k = kMin; k <= kMax; k++) {
+			wk[k - kMin] = box ? 1 : filterWeight((k + 0.5) / ss - 0.5);
+		}
+		return new Taps(kMin, kMax, wk);
+	}
+
+	/** Packed 0xRRGGBB pixels (from the GPU resolve) as an image. */
+	private static BufferedImage imageOf(int[] rgb, int w, int h) {
+		BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
+		img.setRGB(0, 0, w, h, rgb, 0, w);
+		return img;
 	}
 
 	private BufferedImage resolve(int[] buf, byte[] glow, int w, int h, int ss, double scale) {

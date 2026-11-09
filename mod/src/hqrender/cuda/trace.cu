@@ -570,3 +570,141 @@ extern "C" __global__ void trace(const Params* __restrict__ P, const int* __rest
 	}
 	outBuf[sample] = (enc(r) << 20) | (enc(g) << 10) | enc(b);
 }
+
+// ------------------------------------------------------------------ resolve (Renderer.resolve + bloom on the GPU)
+//
+// The sub-samples (packed 10-10-10 sqrt-encoded colours) become pixels: the separable filter taps wk[] over the sub-sample
+// offsets kMin..kMax (the same for every pixel, computed on the host), resolved in linear light; then the bloom (emissive colour,
+// gaussian blur, screen blend 15%); then the sRGB bytes. Every kernel takes a band of pixel rows [rowStart, rowEnd).
+
+__device__ __forceinline__ float dec10(uint c, int shift) {
+	float e = (float)((c >> shift) & 1023u) * (1.0f / 1023.0f);
+	return e * e;
+}
+
+extern "C" __global__ void filterK(const int* __restrict__ buf, const float* __restrict__ wk, int W, int H, int w, int ss, int kMin, int kMax,
+		float* __restrict__ lin, int rowStart, int rowEnd) {
+	int x = blockIdx.x * blockDim.x + threadIdx.x;
+	int y = rowStart + blockIdx.y * blockDim.y + threadIdx.y;
+	if (x >= w || y >= rowEnd) {
+		return;
+	}
+	float r = 0.0f, g = 0.0f, b = 0.0f, wsum = 0.0f;
+	for (int ky = kMin; ky <= kMax; ky++) {
+		int j = y * ss + ky;
+		if (j < 0 || j >= H) {
+			continue;
+		}
+		float wy = wk[ky - kMin];
+		if (wy == 0.0f) {
+			continue;
+		}
+		float rr = 0.0f, gg = 0.0f, bb = 0.0f, ws = 0.0f;
+		for (int kx = kMin; kx <= kMax; kx++) {
+			int i = x * ss + kx;
+			if (i < 0 || i >= W) {
+				continue;
+			}
+			float wx = wk[kx - kMin];
+			uint c = (uint)buf[j * W + i];
+			rr += wx * dec10(c, 20);
+			gg += wx * dec10(c, 10);
+			bb += wx * dec10(c, 0);
+			ws += wx;
+		}
+		r += wy * rr;
+		g += wy * gg;
+		b += wy * bb;
+		wsum += wy * ws;
+	}
+	float inv = 1.0f / (wsum == 0.0f ? 1.0f : wsum);
+	int o = (y * w + x) * 3;
+	lin[o] = fmaxf(0.0f, r * inv);
+	lin[o + 1] = fmaxf(0.0f, g * inv);
+	lin[o + 2] = fmaxf(0.0f, b * inv);
+}
+
+// emissive colour per pixel: the sub-samples' colour weighted by their emissive coverage byte
+extern "C" __global__ void glowK(const int* __restrict__ buf, const unsigned char* __restrict__ glow, int W, int w, int ss, float* __restrict__ e,
+		int rowStart, int rowEnd) {
+	int x = blockIdx.x * blockDim.x + threadIdx.x;
+	int y = rowStart + blockIdx.y * blockDim.y + threadIdx.y;
+	if (x >= w || y >= rowEnd) {
+		return;
+	}
+	float r = 0.0f, g = 0.0f, b = 0.0f;
+	for (int j = 0; j < ss; j++) {
+		for (int i = 0; i < ss; i++) {
+			int k = (y * ss + j) * W + x * ss + i;
+			int gl = glow[k];
+			if (gl == 0) {
+				continue;
+			}
+			uint c = (uint)buf[k];
+			r += (float)gl * dec10(c, 20);
+			g += (float)gl * dec10(c, 10);
+			b += (float)gl * dec10(c, 0);
+		}
+	}
+	float n = (float)(ss * ss) * 255.0f;
+	int o = (y * w + x) * 3;
+	e[o] = r / n;
+	e[o + 1] = g / n;
+	e[o + 2] = b / n;
+}
+
+extern "C" __global__ void blurH(const float* __restrict__ e, const float* __restrict__ k, int w, int rad, float* __restrict__ tmp, int rowStart, int rowEnd) {
+	int x = blockIdx.x * blockDim.x + threadIdx.x;
+	int y = rowStart + blockIdx.y * blockDim.y + threadIdx.y;
+	if (x >= w || y >= rowEnd) {
+		return;
+	}
+	float r = 0.0f, g = 0.0f, b = 0.0f;
+	for (int i = -rad; i <= rad; i++) {
+		int xx = max(0, min(w - 1, x + i));
+		int o = (y * w + xx) * 3;
+		float kk = k[i + rad];
+		r += kk * e[o];
+		g += kk * e[o + 1];
+		b += kk * e[o + 2];
+	}
+	int o = (y * w + x) * 3;
+	tmp[o] = r;
+	tmp[o + 1] = g;
+	tmp[o + 2] = b;
+}
+
+__device__ __forceinline__ uint srgbByte(float v) {
+	v = fminf(1.0f, fmaxf(0.0f, v));
+	float q = floorf(v * 4096.0f + 0.5f) * (1.0f / 4096.0f); // the CPU table has 4097 entries
+	float c = q <= 0.0031308f ? q * 12.92f : 1.055f * powf(q, 1.0f / 2.4f) - 0.055f;
+	return (uint)floorf(fminf(1.0f, fmaxf(0.0f, c)) * 255.0f + 0.5f);
+}
+
+// vertical blur of the bloom, screen blend onto lin, sRGB: one packed 0xRRGGBB per pixel
+extern "C" __global__ void finalK(const float* __restrict__ lin, const float* __restrict__ tmp, const float* __restrict__ k, int w, int h, int rad,
+		int bloom, int* __restrict__ outRgb, int rowStart, int rowEnd) {
+	int x = blockIdx.x * blockDim.x + threadIdx.x;
+	int y = rowStart + blockIdx.y * blockDim.y + threadIdx.y;
+	if (x >= w || y >= rowEnd) {
+		return;
+	}
+	int o = (y * w + x) * 3;
+	float r = lin[o], g = lin[o + 1], b = lin[o + 2];
+	if (bloom) {
+		float br = 0.0f, bg = 0.0f, bb = 0.0f;
+		for (int i = -rad; i <= rad; i++) {
+			int yy = max(0, min(h - 1, y + i));
+			int oo = (yy * w + x) * 3;
+			float kk = k[i + rad];
+			br += kk * tmp[oo];
+			bg += kk * tmp[oo + 1];
+			bb += kk * tmp[oo + 2];
+		}
+		const float strength = 0.15f;
+		r = 1.0f - (1.0f - r) * (1.0f - fminf(1.0f, strength * br));
+		g = 1.0f - (1.0f - g) * (1.0f - fminf(1.0f, strength * bg));
+		b = 1.0f - (1.0f - b) * (1.0f - fminf(1.0f, strength * bb));
+	}
+	outRgb[y * w + x] = (int)((srgbByte(r) << 16) | (srgbByte(g) << 8) | srgbByte(b));
+}

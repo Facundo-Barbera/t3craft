@@ -25,13 +25,22 @@ final class GpuTrace {
 	}
 
 	static final class Result {
+		/** The sub-samples (null when the GPU resolve is on and they were not asked for). */
 		int[] buf;
 		byte[] glow;
+		/** The finished pixels, 0xRRGGBB, when the GPU did the filter, bloom and sRGB too. */
+		int[] rgb;
 		String info;
 	}
 
-	/** Null when the GPU cannot take this image (not available, too big, child failed): the caller renders on the CPU. */
-	static Result trace(Renderer r, int w, int h, double pxScale, double s0, double t1, boolean glow) {
+	/**
+	 * Null when the GPU cannot take this image (not available, too big, child failed): the caller renders on the CPU.
+	 *
+	 * @param w       sub-sample columns ({@code pixels * ss})
+	 * @param h       sub-sample rows
+	 * @param wantSub bring the sub-samples back even if the GPU resolves (for {@code --gpu-compare})
+	 */
+	static Result trace(Renderer r, int w, int h, double pxScale, double s0, double t1, boolean glow, int ss, double scale, boolean wantSub) {
 		GpuSession s = Gpu.session();
 		if (s == null) {
 			return null;
@@ -48,7 +57,9 @@ final class GpuTrace {
 			dir = Files.createTempDirectory("t3craft-gpu-");
 			in = dir.resolve("in.bin");
 			out = dir.resolve("out.bin");
-			writeInput(in, r, w, h, pxScale, s0, t1, glow);
+			boolean resolve = Gpu.resolve;
+			int outputs = (resolve ? 2 : 0) | (!resolve || wantSub ? 1 : 0);
+			writeInput(in, r, w, h, pxScale, s0, t1, glow, ss, scale, resolve, outputs);
 			double exportMs = (System.nanoTime() - t0) / 1e6;
 			StringBuilder log = new StringBuilder();
 			String reply = s.request("render\t" + in + "\t" + out, 900, log);
@@ -58,7 +69,7 @@ final class GpuTrace {
 				return null;
 			}
 			long t2 = System.nanoTime();
-			Result res = readOutput(out, w, h, glow);
+			Result res = readOutput(out, w, h, glow, ss, outputs);
 			res.info = String.format(java.util.Locale.ROOT, "export %.0f ms; %s; read %.0f ms", exportMs, reply.substring(3), (System.nanoTime() - t2) / 1e6);
 			return res;
 		} catch (IOException | RuntimeException e) {
@@ -87,7 +98,8 @@ final class GpuTrace {
 		return b;
 	}
 
-	private static void writeInput(Path file, Renderer r, int w, int h, double pxScale, double s0, double t1, boolean glow) throws IOException {
+	private static void writeInput(Path file, Renderer r, int w, int h, double pxScale, double s0, double t1, boolean glow, int ss, double scale,
+			boolean resolve, int outputs) throws IOException {
 		Scene sc = r.scene;
 		Renderer.Clip clip = r.clip;
 		Renderer.Look lk = r.lk;
@@ -196,13 +208,42 @@ final class GpuTrace {
 		}
 		pb.clear();
 
-		ByteBuffer[] sections = {pb, ints(sc.cellsRaw()), ints(mStart), ints(mQuads), ints(masks), qb, ints(texData), lin};
+		// the filter taps and, with the bloom, the gaussian kernel (what Renderer.resolve and Renderer.bloom compute)
+		Renderer.Taps taps = r.taps(ss);
+		int rad = 0;
+		double[] gk = new double[0];
+		if (glow) {
+			double sigma = Math.max(1.5, Math.min(14, 0.55 * scale));
+			rad = (int) Math.ceil(sigma * 3);
+			gk = new double[2 * rad + 1];
+			double sum = 0;
+			for (int i = -rad; i <= rad; i++) {
+				gk[i + rad] = Math.exp(-i * i / (2 * sigma * sigma));
+				sum += gk[i + rad];
+			}
+			for (int i = 0; i < gk.length; i++) {
+				gk[i] /= sum;
+			}
+		}
+		ByteBuffer rs = ByteBuffer.allocate(4 * (taps.wk().length + gk.length)).order(ByteOrder.LITTLE_ENDIAN);
+		for (double v : taps.wk()) {
+			rs.putFloat((float) v);
+		}
+		for (double v : gk) {
+			rs.putFloat((float) v);
+		}
+		rs.flip();
+
+		ByteBuffer[] sections = {pb, ints(sc.cellsRaw()), ints(mStart), ints(mQuads), ints(masks), qb, ints(texData), lin, rs};
+		// header: [0] magic, [1] W, [2] H (sub-samples), [3] glow, [4] GPU resolve, [5] ss, [6] kMin, [7] kMax, [8 + i] byte length of section i,
+		// [24] bloom radius, [25] outputs (1 sub-samples, 2 finished pixels)
 		ByteBuffer head = ByteBuffer.allocate(128).order(ByteOrder.LITTLE_ENDIAN);
-		head.putInt(0x47505531).putInt(w).putInt(h).putInt(glow ? 1 : 0);
-		head.position(32);
+		head.putInt(0x47505531).putInt(w).putInt(h).putInt(glow ? 1 : 0).putInt(resolve ? 1 : 0).putInt(ss).putInt(taps.kMin()).putInt(taps.kMax());
 		for (ByteBuffer s : sections) {
 			head.putInt(s.remaining());
 		}
+		head.putInt(24 * 4, rad);
+		head.putInt(25 * 4, outputs);
 		head.clear();
 		try (FileChannel ch = FileChannel.open(file, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE)) {
 			writeFully(ch, head);
@@ -223,24 +264,37 @@ final class GpuTrace {
 		}
 	}
 
-	private static Result readOutput(Path file, int w, int h, boolean glow) throws IOException {
-		long bufBytes = 4L * w * h;
-		long glowBytes = glow ? (long) w * h : 0;
+	/** Output file: [sub-samples (4 bytes each) and the glow bytes] when bit 1 of {@code outputs}, then [finished pixels, 4 bytes each] when bit 2. */
+	private static Result readOutput(Path file, int w, int h, boolean glow, int ss, int outputs) throws IOException {
+		boolean sub = (outputs & 1) != 0;
+		boolean rgb = (outputs & 2) != 0;
+		long bufBytes = sub ? 4L * w * h : 0;
+		long glowBytes = sub && glow ? (long) w * h : 0;
+		long rgbBytes = rgb ? 4L * (w / ss) * (h / ss) : 0;
+		long total = bufBytes + glowBytes + rgbBytes;
 		try (FileChannel ch = FileChannel.open(file, StandardOpenOption.READ)) {
-			if (ch.size() < bufBytes + glowBytes) {
-				throw new IOException("the GPU output file is short: " + ch.size() + " bytes, expected " + (bufBytes + glowBytes));
+			if (ch.size() < total) {
+				throw new IOException("the GPU output file is short: " + ch.size() + " bytes, expected " + total);
 			}
-			MappedByteBuffer mb = ch.map(FileChannel.MapMode.READ_ONLY, 0, bufBytes + glowBytes);
+			MappedByteBuffer mb = ch.map(FileChannel.MapMode.READ_ONLY, 0, total);
 			mb.order(ByteOrder.LITTLE_ENDIAN);
 			Result res = new Result();
-			res.buf = new int[w * h];
-			mb.limit((int) bufBytes);
-			mb.asIntBuffer().get(res.buf);
-			if (glow) {
-				res.glow = new byte[w * h];
-				mb.limit((int) (bufBytes + glowBytes));
-				mb.position((int) bufBytes);
-				mb.get(res.glow);
+			if (sub) {
+				res.buf = new int[w * h];
+				mb.limit((int) bufBytes);
+				mb.asIntBuffer().get(res.buf);
+				if (glow) {
+					res.glow = new byte[w * h];
+					mb.limit((int) (bufBytes + glowBytes));
+					mb.position((int) bufBytes);
+					mb.get(res.glow);
+				}
+			}
+			if (rgb) {
+				res.rgb = new int[(w / ss) * (h / ss)];
+				mb.limit((int) total);
+				mb.position((int) (bufBytes + glowBytes));
+				mb.asIntBuffer().get(res.rgb);
 			}
 			return res;
 		}
