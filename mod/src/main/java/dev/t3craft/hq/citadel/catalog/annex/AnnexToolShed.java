@@ -160,9 +160,13 @@ public final class AnnexToolShed implements Variant {
 				boolean side = u == s.u0() || u == s.u1();
 				boolean end = v == s.vf() || v == s.vb();
 				boolean corner = side && end;
+				// [depth] intermediate posts every third cell on the side and back walls (not the front:
+				// door and windows), so no plank panel is wider than 2
+				boolean stud = !corner && v != s.vf()
+						&& (side ? (v - s.vf()) % 3 == 0 : (u - s.u0()) % 3 == 0);
 				for (int y = 1; y <= WALL_TOP; y++) {
 					BlockState st;
-					if (corner) {
+					if (corner || stud) {
 						st = POST;
 					} else if (y == WALL_TOP) {
 						st = side ? PLATE_Z : PLATE_X;
@@ -177,7 +181,15 @@ public final class AnnexToolShed implements Variant {
 				}
 				// gable / back wall fill between the plate and the sloping roof
 				for (int y = WALL_TOP + 1; y < roofY(p, v); y++) {
-					p.set(c, u, y, v, WALL);
+					BlockState st = WALL;
+					if (corner || stud) {
+						st = POST;
+					} else if (y == WALL_TOP + 3) {
+						st = side ? PLATE_Z : PLATE_X; // a second rail on tall gables
+					} else if (p.hash(u, y, v, 5) == 0) {
+						st = b(Blocks.STRIPPED_SPRUCE_LOG); // [palette] a weathered plank here and there
+					}
+					p.set(c, u, y, v, st);
 				}
 			}
 		}
@@ -229,7 +241,9 @@ public final class AnnexToolShed implements Variant {
 			int y = roofY(p, v);
 			boolean top = roofTop(p, v);
 			for (int u = 0; u < w; u++) {
-				Block mat = v == 0 ? Blocks.CHERRY_SLAB : u == 0 || u == w - 1 ? Blocks.DARK_OAK_SLAB : Blocks.SPRUCE_SLAB;
+				// [palette] a cherry fascia on all four edges frames a field of spruce, dark oak mixed in by hash
+				boolean edge = v == 0 || v == p.d() - 1 || u == 0 || u == w - 1;
+				Block mat = edge ? Blocks.CHERRY_SLAB : Blocks.DARK_OAK_SLAB; // one dark shade, so the slope reads as rows
 				SlabType type = !top ? SlabType.BOTTOM : s.wall(u, v) ? SlabType.DOUBLE : SlabType.TOP;
 				p.set(c, u, y, v, b(mat).setValue(BlockStateProperties.SLAB_TYPE, type));
 			}
