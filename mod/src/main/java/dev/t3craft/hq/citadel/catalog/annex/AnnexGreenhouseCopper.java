@@ -123,13 +123,13 @@ public final class AnnexGreenhouseCopper implements Variant {
 			int span = vb - vf;
 			int half = (w - 1) / 2;
 			boolean hipWant = w >= 7 && span >= 4 && p.hash(0, 0, 0, 3) == 0;
-			boolean lantWant = w >= 8 && span >= (hipWant ? 4 : 6) && p.hash(1, 0, 0, 2) == 0 && p.h() - 1 - PLATE - 3 >= 1;
+			boolean lantWant = w >= 8 && span >= (hipWant ? 4 : 6) && p.hash(1, 0, 0, 2) == 0 && p.h() - 1 - PLATE - 2 >= 1;
 			hip = hipWant;
 			lant = lantWant;
 			int want = p.hash(2, 0, 0, 2) == 0 ? half : Math.max(1, half - 1);
 			int byW = lant ? (w - 3) / 2 : half;
 			int byD = hip ? (lant ? (span - 2) / 2 : span / 2) : 99;
-			int byH = p.h() - 1 - PLATE - (lant ? 3 : 1);
+			int byH = p.h() - 1 - PLATE - (lant ? 2 : 1);
 			r = Math.max(1, Math.min(Math.min(want, byW), Math.min(byD, byH)));
 			rh = PLATE + r;
 			mu0 = r;
@@ -197,10 +197,10 @@ public final class AnnexGreenhouseCopper implements Variant {
 		}
 	}
 
-	/** Rib marks over n cells: both ends and a rib about every third cell. */
+	/** Rib marks over n cells: both ends and a rib about every fourth cell. */
 	private static boolean[] ribs(int n) {
 		boolean[] out = new boolean[n];
-		int count = Math.max(1, (int) Math.round((n - 1) / 3.0));
+		int count = Math.max(1, (int) Math.round((n - 1) / 4.0));
 		for (int i = 0; i <= count; i++) {
 			out[(int) Math.round(i * (n - 1) / (double) count)] = true;
 		}
@@ -226,7 +226,7 @@ public final class AnnexGreenhouseCopper implements Variant {
 	}
 
 	private static BlockState post(Plot p, int u, int v, boolean corner) {
-		return corner || p.hash(u, 0, v, 3) == 0 ? POST_O : POST_W;
+		return corner || p.hash(u, 0, v, 6) == 0 ? POST_O : POST_W;
 	}
 
 	private static BlockState door(boolean lower, DoorHingeSide hinge) {
@@ -292,7 +292,7 @@ public final class AnnexGreenhouseCopper implements Variant {
 					if (y == doorBase || y == doorBase + 1) {
 						st = door(y == doorBase, g.dw == 2 && u == g.dl + 1 ? DoorHingeSide.LEFT : DoorHingeSide.RIGHT);
 					} else if (y == top) {
-						st = g.dw == 2 ? pink.setValue(BlockStateProperties.WEST, true).setValue(BlockStateProperties.EAST, true) : CitadelCanvas.AIR;
+						st = CitadelCanvas.AIR; // the opening is 3 high
 					} else {
 						st = POST_W; // lintel
 					}
@@ -403,7 +403,6 @@ public final class AnnexGreenhouseCopper implements Variant {
 				if (edgeU || edgeV) {
 					BlockState wall = edgeU && edgeV ? POST_W : b(Blocks.GLASS);
 					p.set(c, u, g.rh + 1, v, wall);
-					p.set(c, u, g.rh + 2, v, wall);
 				}
 				BlockState cap;
 				if (edgeU || edgeV) {
@@ -412,7 +411,7 @@ public final class AnnexGreenhouseCopper implements Variant {
 				} else {
 					cap = RIDGE;
 				}
-				p.set(c, u, g.rh + 3, v, cap);
+				p.set(c, u, g.rh + 2, v, cap);
 			}
 		}
 	}
@@ -523,14 +522,14 @@ public final class AnnexGreenhouseCopper implements Variant {
 		return table;
 	}
 
-	/** Bench cells beside the aisle: seed chest by the left wall, rain cauldron by the right wall, barrels between. */
+	/** Bench cells beside the aisle: seed chest by the left wall, a composter by the right wall, barrels between. */
 	private static BlockState zoneItem(boolean left, boolean centre, int outer, int len) {
 		BlockState barrel = b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP);
 		if (centre) {
 			return barrel;
 		}
 		if (outer == 0) {
-			return left ? b(Blocks.CHEST).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH) : b(Blocks.WATER_CAULDRON);
+			return left ? b(Blocks.CHEST).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH) : b(Blocks.COMPOSTER).setValue(BlockStateProperties.LEVEL_COMPOSTER, 3);
 		}
 		return barrel;
 	}
@@ -540,7 +539,7 @@ public final class AnnexGreenhouseCopper implements Variant {
 	/** [finish] copper lanterns hanging over the aisle, from the ridge (or from the monitor cap). */
 	private static void lanterns(CitadelCanvas c, Plot p, G g) {
 		BlockState lantern = Blocks.COPPER_LANTERN.waxed().unaffected().defaultBlockState().setValue(BlockStateProperties.HANGING, true);
-		int y = g.lant ? g.rh + 2 : g.rh - 1;
+		int y = g.lant ? g.rh + 1 : g.rh - 1;
 		int vmin = g.lant ? g.mv0 + 1 : g.hip ? g.mv0 : g.vf + 1;
 		int vmax = g.lant ? g.mv1 - 1 : g.hip ? g.mv1 : g.vb - 1;
 		int len = vmax - vmin + 1;
@@ -567,7 +566,7 @@ public final class AnnexGreenhouseCopper implements Variant {
 			} else if (u == g.dl - 2 || u == g.dl + g.dw + 1) {
 				st = pot(p.hash(u, 0, 0, 5));
 			} else if (u == 0) {
-				st = b(Blocks.WATER_CAULDRON);
+				st = b(Blocks.WATER_CAULDRON).setValue(net.minecraft.world.level.block.LayeredCauldronBlock.LEVEL, 3);
 			} else if (u == w - 1) {
 				st = b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP);
 			} else {
