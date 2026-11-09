@@ -11,62 +11,134 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import static dev.t3craft.hq.citadel.CitadelCanvas.DECOR;
 import static dev.t3craft.hq.citadel.CitadelCanvas.HANGING;
 import static dev.t3craft.hq.citadel.CitadelCanvas.LOG;
+import static dev.t3craft.hq.citadel.CitadelCanvas.b;
 
 /**
  * The consultation bay of the archive terminal, in the archive cloister: a niche in the gallery's north wall,
  * east of the gate, where the terminal stands (a fixture, placed by {@code CitadelNodes#cloisterFixtures}).
  *
- * <p>Offsets are from the node's centre; the terminal is at {@code (3, 1, -6)} and its screen faces south, so the
- * player stands at {@code (3, 1, -5)} (the {@code ARCHIVE} anchor). Around it:
+ * <p><b>Design and real coordinates.</b> The cloister is designed at scale 1 (15 × 15, offsets from the node's
+ * centre) and {@code CitadelNodes} magnifies it horizontally by the citadel's scale {@code k} (default 2). The
+ * design bay is the north shelf line (design {@code z = -6}) between {@code x = 2} and {@code 4}, where
+ * {@code NodeDecor} puts no bookcase; the terminal is at design {@code (3, 1, -6)}, screen south, so the player
+ * stands in front of it (the {@code ARCHIVE} anchor). This class paints the bay <b>after</b> the magnification, in
+ * real offsets worked out from {@code k} ({@link #span}, {@link #shelfRows}): the terminal sits in the middle of
+ * the span, and the niche keeps its size (3 wide, never stretched):
  * <ul>
- * <li>two cherry-log posts ({@code x = 2} and {@code 4}, three high) and a log beam over them frame the
- *     terminal as a niche; above it, a plaque ("Archivo") and a hanging lantern that lights the screen;</li>
- * <li>a red rug 3 wide and 2 deep in front of it ({@code z = -5, -4}) with a white cell where the player stands,
- *     so the place to use it reads from the aisle;</li>
- * <li>the aisle in front stays clear (rings 4 and 5, no lecterns: those moved into the shelf line, see
- *     {@code NodeDecor}).</li>
+ * <li>two cherry-log posts three high and a log beam over them frame the terminal; the rest of the span, on both
+ *     sides and behind (the shelf line is {@code k} cells deep), is bookcases like the rest of the wall;</li>
+ * <li>over the terminal, a plaque ("Archivo") on the wall behind and a lantern hung from the beam, which lights
+ *     the screen;</li>
+ * <li>a red rug as wide as the niche in front of it, with a white cell where the player stands, so the place to
+ *     use the terminal reads from the aisle (the aisle in front stays clear: lecterns moved into the shelf line,
+ *     see {@code NodeDecor}).</li>
  * </ul>
- * The cells {@code BAY_FROM..BAY_TO} of the north shelf line are the bay's: {@code NodeDecor} puts no bookcase there.
  */
 public final class ArchiveBay {
-	/** The north shelf-line cells of the bay (offsets along x): post, terminal, post. */
+	/** The north shelf-line cells of the design bay (offsets along x): post, terminal, post. */
 	public static final int BAY_FROM = 2;
 	public static final int BAY_TO = 4;
-	/** Offset of the terminal along x, and the shelf line's z (ring 6, north). */
-	public static final int TERMINAL_X = 3;
-	public static final int SHELF_Z = -6;
 
 	private static final BlockState LANTERN_HUNG = Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, true);
 
 	private ArchiveBay() {
 	}
 
-	/** Paints the bay round the terminal's cell (the terminal itself is the caller's fixture). */
-	public static void build(CitadelCanvas c, Node nd) {
-		int cx = nd.cx();
-		int cz = nd.cz();
-		int wz = cz + SHELF_Z;
-		// the niche: a post on each side, a beam across the top
-		for (int dx : new int[] {BAY_FROM, BAY_TO}) {
-			c.fill(cx + dx, 1, 3, wz, LOG);
-		}
-		for (int dx = BAY_FROM; dx <= BAY_TO; dx++) {
-			c.set(cx + dx, 4, wz, c.kit.beam(Direction.Axis.X));
-		}
-		// over the terminal: the plaque on the wall behind (it faces the player) and a lantern hung from the beam
-		int tx = cx + TERMINAL_X;
-		c.put(tx, 2, wz, c.kit.plaque(Direction.SOUTH), DECOR);
-		long k = BlockPos.asLong(tx, 2, wz);
-		c.data.put(k, c.kit.plaqueData(DyeColor.ORANGE, "", "Archivo", "hilos cerrados", ""));
-		c.fixtures.add(k);
-		c.put(tx, 3, wz, LANTERN_HUNG, HANGING);
-		// the rug in front: the player's cell (the ARCHIVE anchor) is white
-		BlockState red = Blocks.CARPET.pick(DyeColor.RED).defaultBlockState();
-		BlockState white = Blocks.CARPET.pick(DyeColor.WHITE).defaultBlockState();
-		for (int dx = BAY_FROM; dx <= BAY_TO; dx++) {
-			for (int dz = SHELF_Z + 1; dz <= SHELF_Z + 2; dz++) {
-				c.put(cx + dx, 1, cz + dz, dx == TERMINAL_X && dz == SHELF_Z + 1 ? white : red, DECOR);
+	/** The design offset of a real offset {@code n}: {@code round(|n| / k)} with the sign of {@code n}. */
+	private static int design(int n, double k) {
+		int a = (int) Math.floor(Math.abs(n) / k + 0.5);
+		return n < 0 ? -a : a;
+	}
+
+	/** The real x offsets {@code {lo, hi}} of the design bay's span (design x 2..4). */
+	static int[] span(double k) {
+		int lo = Integer.MAX_VALUE;
+		int hi = Integer.MIN_VALUE;
+		for (int n = 0; n <= (int) Math.ceil(8 * k); n++) {
+			int d = design(n, k);
+			if (d >= BAY_FROM && d <= BAY_TO) {
+				lo = Math.min(lo, n);
+				hi = Math.max(hi, n);
 			}
 		}
+		return new int[] {lo, hi};
+	}
+
+	/** The real z offsets of the design north shelf line (design z = -6), from the aisle side outwards (decreasing). */
+	static int[] shelfRows(double k) {
+		int first = Integer.MIN_VALUE;
+		int last = Integer.MAX_VALUE;
+		for (int n = 0; n >= -(int) Math.ceil(8 * k); n--) {
+			if (design(n, k) == -6) {
+				first = Math.max(first, n);
+				last = Math.min(last, n);
+			}
+		}
+		return new int[] {first, last};
+	}
+
+	/** Real x offset of the terminal: the middle of the bay's span (3 at scale 1). */
+	public static int terminalX(double k) {
+		int[] s = span(k);
+		return (s[0] + s[1]) / 2;
+	}
+
+	/** Real z offset of the terminal: the aisle-side row of the north shelf line (-6 at scale 1). */
+	public static int terminalZ(double k) {
+		return shelfRows(k)[0];
+	}
+
+	/** Paints the bay round the terminal's cell (the terminal itself is the caller's fixture). */
+	public static void build(CitadelCanvas c, Node nd) {
+		double k = c.k;
+		int cx = nd.cx();
+		int cz = nd.cz();
+		int[] span = span(k);
+		int[] rows = shelfRows(k);
+		int tdx = terminalX(k);
+		int front = rows[0];
+		// the shelf line: bookcases over the span, three high, except the niche (tdx - 1 .. tdx + 1) which is built below
+		for (int dx = span[0]; dx <= span[1]; dx++) {
+			for (int dz = rows[1]; dz <= rows[0]; dz++) {
+				boolean niche = Math.abs(dx - tdx) <= 1;
+				for (int y = 1; y <= 3; y++) {
+					BlockState s;
+					if (niche) {
+						// posts at the sides of the niche; the middle column is the terminal (front row) and, behind
+						// it, a bookcase the plaque hangs on
+						s = Math.abs(dx - tdx) == 1 ? LOG : (dz == front ? c.at(cx + dx, y, cz + dz) : bookcase(y));
+					} else {
+						s = bookcase(y);
+					}
+					if (s != null) {
+						c.set(cx + dx, y, cz + dz, s);
+					}
+				}
+				if (niche) {
+					c.set(cx + dx, 4, cz + dz, c.kit.beam(Direction.Axis.X));
+				}
+			}
+		}
+		// over the terminal: the plaque on the wall behind (it faces the player) and a lantern hung from the beam
+		int x = cx + tdx;
+		int z = cz + front;
+		c.put(x, 2, z, c.kit.plaque(Direction.SOUTH), DECOR);
+		c.data.put(BlockPos.asLong(x, 2, z), c.kit.plaqueData(DyeColor.ORANGE, "", "Archivo", "hilos cerrados", ""));
+		c.fixtures.add(BlockPos.asLong(x, 2, z));
+		c.put(x, 3, z, LANTERN_HUNG, HANGING);
+		// the rug in front, as wide as the niche; the player's cell (the ARCHIVE anchor) is white
+		BlockState red = Blocks.CARPET.pick(DyeColor.RED).defaultBlockState();
+		BlockState white = Blocks.CARPET.pick(DyeColor.WHITE).defaultBlockState();
+		int depth = Math.max(2, (int) Math.round(2 * k));
+		for (int dx = tdx - 1; dx <= tdx + 1; dx++) {
+			for (int i = 1; i <= depth; i++) {
+				c.put(cx + dx, 1, cz + front + i, dx == tdx && i == 1 ? white : red, DECOR);
+			}
+		}
+	}
+
+	/** One bookcase cell of the bay's shelf line at height {@code y}: chiseled, bookshelf, chiseled. */
+	private static BlockState bookcase(int y) {
+		return y == 2 ? b(Blocks.BOOKSHELF) : NodeDecor.facing(Blocks.CHISELED_BOOKSHELF, Direction.SOUTH);
 	}
 }

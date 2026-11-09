@@ -342,8 +342,6 @@ public final class NodeDecor {
 				s.put(w[0], 4, w[1], LANTERN_DOWN, HANGING);
 			}
 		}
-		// the terminal's consultation bay on the north wall (the terminal itself is a fixture of CitadelNodes)
-		ArchiveBay.build(s.c(), s.nd());
 	}
 
 	/** The cell at offset {@code o} along a side (0 north, 1 east, 2 south, 3 west), {@code ring} out. */
