@@ -103,7 +103,7 @@ public final class HubRoof {
 					net.minecraft.world.level.block.state.BlockState s = null;
 					if (a == 2) {
 						// cheeks and jambs up to the lintel, then the low stair of the gable
-						s = r <= 3 ? HubBlocks.stoneBrick(x, y, z) : r == 4 ? HubBlocks.darkStairs(dz < 0 ? Direction.SOUTH : Direction.NORTH, false) : null;
+						s = r <= 3 ? HubBlocks.stoneBrick(x, y, z) : r == 4 ? HubBlocks.stoneStairs(dz < 0 ? Direction.SOUTH : Direction.NORTH, false) : null;
 					} else if (a == 1) {
 						if (r <= 2) {
 							s = face ? HubBlocks.pane(HubBlocks.GLASS_COLORS[tint]) : null;
@@ -112,7 +112,7 @@ public final class HubRoof {
 						} else if (r == 4) {
 							s = face ? CALCITE : PLANKS;
 						} else if (r == 5) {
-							s = HubBlocks.darkStairs(dz < 0 ? Direction.SOUTH : Direction.NORTH, false);
+							s = HubBlocks.stoneStairs(dz < 0 ? Direction.SOUTH : Direction.NORTH, false);
 						}
 					} else {
 						if (r <= 2) {
