@@ -54,6 +54,13 @@ Incluye el catálogo (60 variantes, con la ola B: bancas, jardineras, postes, po
 - `feat/build-radial`: según el feedback de Facundo, construir alrededor del jugador en anillos de 5 bloques. Un anillo queda bien terminado antes de pasar al siguiente, y el centro se mueve con el jugador. La base va a un ritmo intermedio (configurable) y el modo por partes queda como fallback.
 - `citadel/scale-port`: la escala configurable portada sobre `citadel/next`, por defecto 1.0, con el plan idéntico al actual.
 - `cat/wave-c`: estatuas, gazebos, mástiles, puentes y remates de torre.
+- `citadel/light-aesthetic`: luz visible solo como diseño (faroles con ritmo, linternas en aleros, apliques junto a puertas, candelabros centrados) y relleno invisible. Nada de bloques luminosos visibles "donde caigan".
+- `feat/ui-hq-menu-lineage`:
+  - en el menú de HQ, la ciudadela va arriba y el resto en una sección "Legacy";
+  - el linaje sale del sidebar y queda solo en el menú de agentes del header, mostrando solo hijos idle o activos.
+
+## Arreglo del lag al iniciar un hilo: integrado
+`fix/new-thread-hitch` ya está en main (`a031a79`), compilado. Trae el detector de trabones: `/t3dev perf hitches`, con WARN en latest.log cuando un frame o tick pasa de ~50 ms. Si el lag sigue, ese log dice qué fue.
 
 ## Renders en el PC de Facundo (my-pc): probar 1 job
 **BLOQUEADO 2026-11-09:** la VPS no tiene acceso SSH al PC (`Permission denied (publickey…)`). Hay que agregar en `~/.ssh/authorized_keys` del user `wsluser` en WSL esta clave pública de la VPS:
