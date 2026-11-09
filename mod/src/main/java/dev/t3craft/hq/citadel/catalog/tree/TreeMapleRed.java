@@ -35,7 +35,6 @@ public final class TreeMapleRed implements Variant {
 	private static final BlockState[] RAMP = {
 			b(Blocks.NETHER_WART_BLOCK),
 			b(Blocks.WOOL.pick(DyeColor.RED)),
-			b(Blocks.DYED_TERRACOTTA.pick(DyeColor.ORANGE)),
 			b(Blocks.WOOL.pick(DyeColor.ORANGE)),
 	};
 	private static final BlockState HONEY = b(Blocks.HONEYCOMB_BLOCK);
@@ -103,7 +102,7 @@ public final class TreeMapleRed implements Variant {
 				}
 			}
 		}
-		TreeKit.roots(t, WOOD, bu, bv, 4 + r.nextInt(2), m >= 8 ? 2 : 1, -1, 5);
+		TreeKit.roots(t, WOOD, bu, bv, 3 + r.nextInt(2), 1, -1, 5);
 
 		// ---- the sinuous trunk: an S curve that comes back to the axis under the crown
 		double amp = m >= 8 ? 1.6 : 1.2;
@@ -152,7 +151,7 @@ public final class TreeMapleRed implements Variant {
 
 		// ---- the fans: a low ring, a middle ring on tall plots, the crown over the leader
 		double rbase = TreeKit.clamp(m * 0.31, 1.7, 4.4);
-		int nLow = m <= 7 ? 3 : m <= 10 ? 4 : 5;
+		int nLow = m <= 5 ? 2 : m <= 7 ? 3 : m <= 10 ? 4 : 5;
 		double step = Math.PI * 2 / nLow;
 		int id = 1;
 		for (int k = 0; k < nLow; k++) {
@@ -182,13 +181,13 @@ public final class TreeMapleRed implements Variant {
 		int salt = 100;
 		TreeKit.ground(t, cu0 + 0.5, cv0 + 0.5, m / 2.0 + 0.9, (u, v, k) -> {
 			int hsh = t.hash(u, 0, v, salt);
-			if (hsh < 52 - 28 * k) {
+			if (hsh < 58 - 28 * k) {
 				return b(Blocks.LEAF_LITTER);
 			}
-			if (hsh < 64 - 18 * k) {
+			if (hsh < 65 - 22 * k) {
 				return b(Blocks.CARPET.pick(DyeColor.RED));
 			}
-			if (hsh < 72 - 8 * k) {
+			if (hsh < 70 - 14 * k) {
 				return b(Blocks.CARPET.pick(DyeColor.ORANGE));
 			}
 			if (hsh < 75 && k > 0.4) {
@@ -224,7 +223,7 @@ public final class TreeMapleRed implements Variant {
 		}
 		int fu0 = (int) Math.round(fu);
 		int fv0 = (int) Math.round(fv);
-		double hue = 0.42 + 0.3 * Math.cos(ang - sun) * (reach > 0 ? 1 : 0.4) + 0.045 * (py - 4) + hueUp + bias;
+		double hue = 0.27 + 0.27 * Math.cos(ang - sun) * (reach > 0 ? 1 : 0.5) + 0.03 * (py - 4) + hueUp + bias;
 		if (reach > 0) {
 			// the limb: from the trunk out and then up into the fan
 			int y0 = TreeKit.clamp(ys, 2, py - 1);
@@ -248,6 +247,7 @@ public final class TreeMapleRed implements Variant {
 		int u1 = (int) Math.ceil(cu + R * 1.3) + 1;
 		int v0 = (int) Math.floor(cv - R * 1.3) - 1;
 		int v1 = (int) Math.ceil(cv + R * 1.3) + 1;
+		double notch = rot + id * 2.1;
 		int ci = (int) Math.round(cu);
 		int cj = (int) Math.round(cv);
 		for (int v = v0; v <= v1; v++) {
@@ -260,17 +260,19 @@ public final class TreeMapleRed implements Variant {
 				double jit = (t.hash(u, cy, v, 9) - 4.0) / 4.0 * 0.16;
 				boolean centre = u == ci && v == cj;
 				if (qq <= 1.0 + jit) {
-					boolean hole = R >= 2.2 && !centre && qq > 0.38 && qq < 0.85 && t.hash(u + id, cy + 5, v, 9) == 0;
+					double da = Math.abs(Math.atan2(Math.sin(Math.atan2(dz, dx) - notch), Math.cos(Math.atan2(dz, dx) - notch)));
+					boolean cut = R >= 2.0 && da < 0.3 && qq > 0.55;
+					boolean hole = cut || (R >= 2.2 && !centre && qq > 0.38 && qq < 0.85 && t.hash(u + id, cy + 5, v, 6) == 0);
 					if (!hole) {
 						t.leafOf(u, cy, v, leaf(t, hue + (qq - 0.5) * 0.12, u, cy, v, false), id);
 					}
 				}
 				// the cap: smaller and ragged, brighter
-				if (qq <= 0.62 + jit && (centre || t.hash(u, cy + 1, v + id, 6) != 0)) {
+				if (qq <= 0.5 + jit && (centre || t.hash(u, cy + 1, v + id, 3) != 0)) {
 					t.leafOf(u, cy + 1, v, leaf(t, hue + 0.1, u, cy + 1, v, true), id);
 				}
 				// a few drips under the rim, darker
-				if (qq > 0.5 && qq <= 1.0 + jit && t.hash(u + id, cy - 1, v, 7) == 0 && t.kind(u, cy, v) != TreeKit.EMPTY) {
+				if (qq > 0.7 && qq <= 1.0 + jit && t.hash(u + id, cy - 1, v, 12) == 0 && t.kind(u, cy, v) != TreeKit.EMPTY) {
 					t.leafOf(u, cy - 1, v, leaf(t, hue - 0.14, u, cy - 1, v, false), id);
 				}
 			}
@@ -281,9 +283,9 @@ public final class TreeMapleRed implements Variant {
 	private static BlockState leaf(Vox t, double hue, int u, int y, int v, boolean top) {
 		double coarse = (t.hash(Math.floorDiv(u, 2) + 7, y, Math.floorDiv(v, 2), 16) - 7.5) / 7.5;
 		double fine = (t.hash(u, y, v, 16) - 7.5) / 7.5;
-		double h = TreeKit.clamp(hue + coarse * 0.14 + fine * 0.14, 0.0, 0.999);
-		int i = (int) Math.floor(h * 4);
-		if (i == 3 && top && t.hash(u + 3, y, v, 7) == 0) {
+		double h = TreeKit.clamp(hue + coarse * 0.17 + fine * 0.13, 0.0, 0.999);
+		int i = (int) Math.floor(h * 3);
+		if (i == 2 && top && t.hash(u + 3, y, v, 7) == 0) {
 			return HONEY;
 		}
 		return RAMP[i];
