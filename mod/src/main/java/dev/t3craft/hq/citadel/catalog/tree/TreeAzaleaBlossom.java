@@ -7,33 +7,38 @@ import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.catalog.Family;
 import dev.t3craft.hq.citadel.catalog.Plot;
 import dev.t3craft.hq.citadel.catalog.Variant;
-import dev.t3craft.hq.citadel.catalog.tree.TreeKit.Leaves;
 import dev.t3craft.hq.citadel.catalog.tree.TreeKit.Vox;
 import dev.t3craft.hq.citadel.catalog.tree.TreeKit.Wood;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 
 /**
- * Flowering azalea in a low round planter: a short 1×1 oak trunk on a one-block flare of oak bark (and a
- * diagonal root or two on wider plots) that forks into two or three visible 1-wide diagonal limbs, while the
- * leader climbs on into the crown. The crown is a domed central lobe on the leader with smaller side lobes
- * on the limbs, each a separate lobe (notches of air between them), each mixing azalea and flowering azalea
- * evenly (the dominant tone swapped from lobe to lobe) with a sparse sprinkle of cherry-blossom pink. The
- * planter is a single ring of mossy stone, mossy cobble and deepslate bricks with gaps where moss or grass
- * shows; the bed is moss with petals and azalea bushes.
+ * Flowering azalea, a round but ragged crown on a short, twisted oak trunk with roots.
  *
- * <p>Size: 5–9 × 5–9 × 9+ (the tree stops at 13 high).
+ * <ul>
+ * <li><b>Trunk:</b> oak, 1×1 (a 2×2 foot of bark on big plots) that steps sideways one block at a time (the first step at
+ *     y 3, the others inside the crown), so it zig-zags. Rooted dirt round the foot, two or three oak roots that end in
+ *     rooted dirt, and hanging roots under the limbs.</li>
+ * <li><b>Crown:</b> from y 4 up (4 free blocks under it, never a low leaf). One big ellipsoid plus 2–5 satellite lobes
+ *     overlapping it, a jittered edge, an eroded rim, and open bites (sky and the limbs show through). Azalea and
+ *     flowering azalea leaves mixed evenly, with more flowers on the sun side. Every satellite sits on its own oak limb.</li>
+ * <li><b>Foot:</b> azalea bushes on mounds of moss block or rooted dirt (never on stone, never on leaves), potted
+ *     azaleas, moss carpet and pink petals.</li>
+ * </ul>
+ *
+ * <p>Seed varies: crown proportions, height, number and position of lobes, the sun side, the share of flowers, the
+ * trunk's steps and the roots. Size 5–17 × 5–17 × 9+.
  */
 public final class TreeAzaleaBlossom implements Variant {
 	private static final Wood WOOD = new Wood(Blocks.OAK_LOG, Blocks.OAK_WOOD, b(Blocks.OAK_WOOD));
-	private static final Leaves BLOOM = Leaves.of(Blocks.FLOWERING_AZALEA_LEAVES, Blocks.AZALEA_LEAVES).clumps(2)
-			.withAccent(leaves(Blocks.CHERRY_LEAVES), 6);
-	private static final Leaves GREEN = Leaves.of(Blocks.AZALEA_LEAVES, Blocks.FLOWERING_AZALEA_LEAVES).clumps(2)
-			.withAccent(leaves(Blocks.CHERRY_LEAVES), 6);
+	private static final BlockState GREEN = leaves(Blocks.AZALEA_LEAVES);
+	private static final BlockState BLOOM = leaves(Blocks.FLOWERING_AZALEA_LEAVES);
+	/** The lowest y of any leaf or limb (the trunk and its foot aside): 4 free blocks under the crown. */
+	private static final int CLEAR = 4;
 
 	@Override
 	public String id() {
@@ -62,246 +67,304 @@ public final class TreeAzaleaBlossom implements Variant {
 
 	@Override
 	public int maxW() {
-		return 9;
+		return 17;
 	}
 
 	@Override
 	public int maxD() {
-		return 9;
+		return 17;
 	}
 
 	@Override
 	public void build(CitadelCanvas c, Plot p) {
 		Vox t = new Vox(p);
-		Random r = p.rng(0xA2A1EAL);
+		Random r = p.rng(0xA2A1EA5L);
 		int w = p.w();
 		int d = p.d();
-		int H = Math.min(p.h(), 13);
-		int m = Math.min(w, d);
-		int yC = H - 4; // the centre of the domed crown lobe
-		int yF = TreeKit.clamp((int) Math.round(H * 0.3), 2, yC - 3); // the fork: a short bare trunk below it
-		int lift = (H - 9) / 3;
+		double cu0 = (w - 1) / 2.0;
+		double cv0 = (d - 1) / 2.0;
+		double ru = TreeKit.clamp(w / 2.0 - 0.7, 2.0, 8.5);
+		double rv = TreeKit.clamp(d / 2.0 - 0.7, 2.0, 8.5);
+		double rc = Math.min(ru, rv);
+		boolean big = rc >= 4.5;
+		int avail = p.h() - CLEAR;
 
-		// ---- trunk: 1×1 oak from the ground to the crown, a one-block flare of bark at the foot
-		int tu0 = (w - 1) / 2;
-		int tv0 = (d - 1) / 2;
-		int[][] lead = leader(t, tu0, tv0, yF, yC - 1, r.nextInt(4), r.nextInt(3) == 0);
-		flare(t, tu0, tv0, m >= 7);
-
-		// ---- limbs: two or three diagonals out of the fork, each ending under a side lobe
-		int nL = m >= 7 ? 3 : 2;
+		// ---- the balls of the crown: {cu, cy, cv, rx, ry, rz}
+		double ryM = Math.max(1.3, Math.min(rc * (0.62 + 0.18 * r.nextDouble()), (avail - 0.4) / 1.92));
+		double cyM = CLEAR + ryM * 0.92;
+		double rxM = ru * (0.74 + 0.08 * r.nextDouble());
+		double rzM = rv * (0.74 + 0.08 * r.nextDouble());
+		double slack = Math.max(0, Math.min(w / 2.0 - 0.5 - rxM, d / 2.0 - 0.5 - rzM));
+		double la = r.nextDouble() * Math.PI * 2;
+		double lamp = Math.min(slack, 0.3 + 0.7 * r.nextDouble());
+		double cuM = cu0 + Math.cos(la) * lamp;
+		double cvM = cv0 + Math.sin(la) * lamp;
+		List<double[]> balls = new ArrayList<>();
+		balls.add(new double[] {cuM, cyM, cvM, rxM, ryM, rzM});
+		int nS = 2 + (rc >= 4.5 ? 1 : 0) + (rc >= 6.5 ? 1 : 0) + (rc >= 3.5 ? r.nextInt(2) : 0);
 		double a0 = r.nextDouble() * Math.PI * 2;
-		double step = nL == 3 ? Math.PI * 2 / 3 : Math.PI * 0.9;
-		int front = 0;
-		double minEz = 9;
-		@SuppressWarnings("unchecked")
-		List<int[]>[] limbCells = new List[nL];
-		int[][] ends = new int[nL][];
-		double[] rads = new double[nL];
-		for (int i = 0; i < nL; i++) {
-			double ang = a0 + i * step + (r.nextDouble() - 0.5) * 0.5;
+		for (int i = 0; i < nS; i++) {
+			double ang = a0 + i * Math.PI * 2 / nS + (r.nextDouble() - 0.5) * 0.7;
 			double ex = Math.cos(ang);
 			double ez = Math.sin(ang);
-			int sy = TreeKit.clamp(yF + (i == 1 ? 1 : 0), 2, yC - 2);
-			int su = lead[0][sy];
-			int sv = lead[1][sy];
-			int ly = TreeKit.clamp(yF + 2 + (i % 2) + lift, sy + 1, yC - 1);
-			double rx = TreeKit.clamp(1.3 + (m - 5) * 0.22 + r.nextDouble() * 0.3, 1.3, 2.3);
-			double rz = rx * (0.85 + r.nextDouble() * 0.2);
-			double room = TreeKit.room(t, su, sv, ex, ez, 0);
-			double reach = TreeKit.clamp(room - 0.5, 1.4, 1.2 + m * 0.25);
-			int tu = TreeKit.clamp((int) Math.round(su + ex * reach), 0, w - 1);
-			int tv = TreeKit.clamp((int) Math.round(sv + ez * reach), 0, d - 1);
-			if (tu == su && tv == sv) {
-				tu = TreeKit.clamp(su + (ex >= 0 ? 1 : -1), 0, w - 1);
-			}
-			limbCells[i] = TreeKit.branch(t, WOOD, new int[] {su, sy, sv}, new int[] {tu, ly - 1, tv}, false);
-			ends[i] = new int[] {tu, ly, tv};
-			rads[i] = rx;
-			if (ez < minEz) {
-				minEz = ez;
-				front = i;
-			}
+			double room = TreeKit.room(t, cuM, cvM, ex, ez, 0);
+			double rs = Math.min(rc * (0.40 + 0.15 * r.nextDouble()), Math.max(1.4, (room + 0.5) * 0.5));
+			rs = Math.max(rs, 1.4);
+			double dd = TreeKit.clamp(room + 0.5 - rs, 0, rc * (0.5 + 0.25 * r.nextDouble()));
+			double rys = rs * (0.7 + 0.2 * r.nextDouble());
+			double lo = CLEAR + 0.9 * rys;
+			double hi = p.h() - 0.6 - rys;
+			double cy = cyM + (r.nextDouble() - 0.4) * ryM * 0.9;
+			cy = Math.max(lo, Math.min(Math.max(lo, hi), cy));
+			balls.add(new double[] {cuM + ex * dd, cy, cvM + ez * dd, rs, rys, rs * (0.9 + 0.2 * r.nextDouble())});
 		}
 
-		// ---- the crown: the domed central lobe first, then the side lobes (each its own salt: notches show)
-		int cu = lead[0][yC];
-		int cv = lead[1][yC];
-		double cr = TreeKit.clamp(2.0 + (m - 5) * 0.2, 2.0, 2.8);
-		TreeKit.lobe(t, cu, yC, cv, cr, cr * 0.92, 2.2, 1.0, BLOOM, 0.4, 9);
-		for (int i = 0; i < nL; i++) {
-			int[] e = ends[i];
-			double rx = rads[i];
-			TreeKit.lobe(t, e[0], e[1], e[2], rx, rx * 0.9, 1.2, 0.9, i % 2 == 0 ? GREEN : BLOOM, 0.4, i);
-			if (m >= 7) {
-				TreeKit.drips(t, e[0], e[1], e[2], rx, rx * 0.9, 5 + i);
+		// ---- trunk: 1×1 oak with sideways steps (a 2×2 bark foot on big plots)
+		int yTop = Math.min((int) Math.floor(cyM), p.h() - 1);
+		int bu = (int) Math.floor(cu0) - ((w & 1) == 1 ? r.nextInt(2) : 0);
+		int bv = (int) Math.floor(cv0) - ((d & 1) == 1 ? r.nextInt(2) : 0);
+		int u = big ? bu + r.nextInt(2) : (int) Math.floor(cu0);
+		int v = big ? bv + r.nextInt(2) : (int) Math.floor(cv0);
+		int fx0 = big ? bu : u;
+		int fx1 = big ? bu + 1 : u;
+		int fz0 = big ? bv : v;
+		int fz1 = big ? bv + 1 : v;
+		int maxOff = big ? 2 : 1;
+		int[] lead0 = {u, v};
+		int[] stepAt = {3, 5 + r.nextInt(2), 7 + r.nextInt(2)};
+		int nSteps = big ? 3 : 2;
+		int stepsDone = 0;
+		boolean alongU = r.nextBoolean();
+		int sign = r.nextBoolean() ? 1 : -1;
+		int[] lu = new int[yTop + 2];
+		int[] lv = new int[yTop + 2];
+		for (int y = 0; y <= yTop; y++) {
+			boolean step = stepsDone < nSteps && y == stepAt[stepsDone] && y < yTop;
+			if (big && y <= 2) {
+				for (int a = 0; a < 2; a++) {
+					for (int k = 0; k < 2; k++) {
+						t.wood(bu + a, y, bv + k, WOOD.bark());
+					}
+				}
 			}
-		}
-		// on the widest plots a fifth, small lobe on a twig off the leader, between two limbs
-		if (m >= 9) {
-			double fa = a0 + step * 0.5;
-			int sy = TreeKit.clamp(yC - 3, yF + 1, yC - 2);
-			int su = lead[0][sy];
-			int sv = lead[1][sy];
-			int fu = TreeKit.clamp((int) Math.round(su + Math.cos(fa) * 2.2), 1, w - 2);
-			int fv = TreeKit.clamp((int) Math.round(sv + Math.sin(fa) * 2.2), 1, d - 2);
-			if (fu != su || fv != sv) {
-				TreeKit.branch(t, WOOD, new int[] {su, sy, sv}, new int[] {fu, sy + 1, fv}, false);
-				TreeKit.lobe(t, fu, sy + 2, fv, 1.5, 1.4, 1.0, 0.0, GREEN.swap(), 0.35, 22);
+			if (step) {
+				int nu = u + (alongU ? sign : 0);
+				int nv = v + (alongU ? 0 : sign);
+				int offU = nu - lead0[0];
+				int offV = nv - lead0[1];
+				if (Math.abs(offU) > maxOff || Math.abs(offV) > maxOff || nu < 1 || nu > w - 2 || nv < 1 || nv > d - 2) {
+					sign = -sign;
+					nu = u + (alongU ? sign : 0);
+					nv = v + (alongU ? 0 : sign);
+				}
+				t.wood(u, y, v, WOOD.bark());
+				t.wood(nu, y, nv, WOOD.bark());
+				u = nu;
+				v = nv;
+				alongU = !alongU;
+				stepsDone++;
+			} else {
+				t.wood(u, y, v, WOOD.log(Direction.Axis.Y));
 			}
+			lu[y] = u;
+			lv[y] = v;
 		}
 
-		// ---- the planter: one ring on y = 0 only, mossy stone, mossy cobble and deepslate, with gaps of moss or grass
-		final double ccu = (w - 1) / 2.0;
-		final double ccv = (d - 1) / 2.0;
-		for (int v = 0; v < d; v++) {
-			for (int u = 0; u < w; u++) {
-				if (!inBed(u, v, ccu, ccv) || !rim(u, v, ccu, ccv) || !t.empty(u, 0, v)) {
+		// ---- roots: rooted dirt round the foot, oak roots out of three of the four faces, ending in rooted dirt
+		for (int vv = fz0 - 1; vv <= fz1 + 1; vv++) {
+			for (int uu = fx0 - 1; uu <= fx1 + 1; uu++) {
+				if (uu >= fx0 && uu <= fx1 && vv >= fz0 && vv <= fz1) {
 					continue;
 				}
-				int k = t.hash(u, 0, v, 10);
-				if (k < 3) {
-					t.fixed(u, 0, v, b(Blocks.MOSSY_STONE_BRICKS));
-				} else if (k < 5) {
-					t.fixed(u, 0, v, b(Blocks.MOSSY_COBBLESTONE));
-				} else if (k < 7) {
-					t.fixed(u, 0, v, b(Blocks.DEEPSLATE_BRICKS));
-				} else if (k < 9) {
-					t.cover(u, 0, v, b(Blocks.MOSS_CARPET));
+				if (t.empty(uu, 0, vv) && t.hash(uu, 0, vv, 100) < 38) {
+					t.fixed(uu, 0, vv, b(Blocks.ROOTED_DIRT));
+				}
+			}
+		}
+		int[][] faces = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}};
+		int skip = r.nextInt(4);
+		for (int k = 0; k < 4; k++) {
+			if (k == skip && !big) {
+				continue;
+			}
+			int du = faces[k][0];
+			int dv = faces[k][1];
+			int su = du < 0 ? fx0 - 1 : du > 0 ? fx1 + 1 : fx0 + r.nextInt(fx1 - fx0 + 1);
+			int sv = dv < 0 ? fz0 - 1 : dv > 0 ? fz1 + 1 : fz0 + r.nextInt(fz1 - fz0 + 1);
+			int len = 1 + r.nextInt(big ? 4 : 3);
+			Direction.Axis ax = du != 0 ? Direction.Axis.X : Direction.Axis.Z;
+			for (int i = 0; i < len; i++) {
+				int cu = su + du * i;
+				int cv = sv + dv * i;
+				if (i == 0) {
+					t.woodSoft(cu, 0, cv, WOOD.bark());
+				} else if (i == len - 1) {
+					if (t.empty(cu, 0, cv)) {
+						t.fixed(cu, 0, cv, b(Blocks.ROOTED_DIRT));
+					}
 				} else {
-					t.cover(u, 0, v, b(Blocks.SHORT_GRASS));
+					t.woodSoft(cu, 0, cv, WOOD.log(ax));
 				}
 			}
 		}
 
-		// ---- the bed: moss, petals and azalea bushes inside; a few petals and moss outside
-		final double fcu = tu0;
-		final double fcv = tv0;
-		TreeKit.ground(t, ccu, ccv, 99, (u, v, k) -> {
-			int hsh = t.hash(u, 0, v, 100);
-			if (!inBed(u, v, ccu, ccv)) {
-				if (hsh < 22) {
-					return TreeKit.petals(1 + t.hash(u, 1, v, 2), t.hash(u, 2, v, 4));
-				}
-				return hsh < 32 ? b(Blocks.MOSS_CARPET) : null;
-			}
-			boolean far = Math.hypot(u - fcu, v - fcv) > 1.6;
-			if (hsh < 20) {
-				return TreeKit.petals(1 + t.hash(u, 1, v, 4), t.hash(u, 2, v, 4));
-			}
-			if (far && hsh < 28) {
-				return b(Blocks.FLOWERING_AZALEA);
-			}
-			if (far && hsh < 31) {
-				return b(Blocks.AZALEA);
-			}
-			return hsh < 85 ? b(Blocks.MOSS_CARPET) : null;
-		});
-		// at least one flowering azalea bush on the bed
-		int bu = TreeKit.clamp(tu0 + (r.nextBoolean() ? 2 : -2), 1, w - 2);
-		int bv = TreeKit.clamp(tv0 + (r.nextBoolean() ? 1 : -1), 1, d - 2);
-		if (t.kind(bu, 0, bv) == TreeKit.COVER) {
-			t.clear(bu, 0, bv);
+		// ---- limbs: each satellite hangs from its own oak limb that leaves the trunk at y 4 or higher
+		for (int i = 1; i < balls.size(); i++) {
+			double[] bl = balls.get(i);
+			int sy = TreeKit.clamp(CLEAR + (i & 1), CLEAR, yTop);
+			int eu = TreeKit.clamp((int) Math.round(bl[0]), 0, w - 1);
+			int ev = TreeKit.clamp((int) Math.round(bl[2]), 0, d - 1);
+			int ey = Math.max(CLEAR + 1, (int) Math.round(bl[1]));
+			TreeKit.branch(t, WOOD, new int[] {lu[sy], sy, lv[sy]}, new int[] {eu, ey, ev}, false);
 		}
-		t.cover(bu, 0, bv, b(Blocks.FLOWERING_AZALEA));
+
+		// ---- the crown
+		double sa = r.nextInt(4) * Math.PI / 2 + (r.nextDouble() - 0.5) * 0.6;
+		double sx = Math.cos(sa);
+		double sz = Math.sin(sa);
+		double fb = 0.34 + 0.2 * r.nextDouble();
+		int nHoles = 2 + Math.min(4, (int) (rc / 2.0));
+		double[][] holes = new double[nHoles][4];
+		for (int i = 0; i < nHoles; i++) {
+			double ang = r.nextDouble() * Math.PI * 2;
+			double el = -0.1 + r.nextDouble() * 0.95;
+			double horiz = Math.sqrt(1 - el * el);
+			holes[i][0] = cuM + Math.cos(ang) * horiz * rxM * 0.9;
+			holes[i][1] = cyM + el * ryM * 0.9;
+			holes[i][2] = cvM + Math.sin(ang) * horiz * rzM * 0.9;
+			holes[i][3] = 1.0 + r.nextDouble() * Math.min(1.8, rc * 0.25);
+		}
+		for (int y = CLEAR; y < p.h(); y++) {
+			for (int vv = 0; vv < d; vv++) {
+				for (int uu = 0; uu < w; uu++) {
+					double dist = 99;
+					for (double[] bl : balls) {
+						double du = (uu - bl[0]) / bl[3];
+						double dy = (y - bl[1]) / bl[4];
+						double dv = (vv - bl[2]) / bl[5];
+						dist = Math.min(dist, Math.sqrt(du * du + dy * dy + dv * dv));
+					}
+					double jit = (t.hash(uu, y, vv, 9) - 4.0) / 4.5 * 0.14
+							+ (t.hash(Math.floorDiv(uu, 2) + 11, Math.floorDiv(y, 2), Math.floorDiv(vv, 2) - 5, 7) - 3.0) / 3.5 * 0.1;
+					if (dist > 1.0 + jit) {
+						continue;
+					}
+					if (dist > 0.78 && t.hash(uu + 3, y + 5, vv + 7, 100) < 22) {
+						continue; // an eroded rim
+					}
+					if (y <= CLEAR + 1 && dist > 0.55 && t.hash(uu + 9, y, vv + 1, 100) < 25) {
+						continue; // a ragged underside
+					}
+					boolean bite = false;
+					for (double[] h : holes) {
+						double hx = uu - h[0];
+						double hy = y - h[1];
+						double hz = vv - h[2];
+						if (hx * hx + hy * hy + hz * hz <= h[3] * h[3]) {
+							bite = true;
+							break;
+						}
+					}
+					if (bite) {
+						continue;
+					}
+					double sun = ((uu - cuM) * sx + (vv - cvM) * sz) / rc;
+					double pf = TreeKit.clamp(fb + 0.3 * sun + 0.04 * (y - cyM), 0.12, 0.85);
+					double fine = t.hash(uu, y + 17, vv, 100) / 100.0;
+					double coarse = t.hash(Math.floorDiv(uu, 2) + 7, Math.floorDiv(y, 2), Math.floorDiv(vv, 2) - 3, 100) / 100.0;
+					boolean flower = (t.hash(uu + 1, y + 2, vv + 3, 100) < 28 ? fine : coarse) < pf;
+					t.leaf(uu, y, vv, flower ? BLOOM : GREEN);
+				}
+			}
+		}
+
+		// ---- the foot: bushes on moss or rooted dirt, pots, then the carpet
+		int nB = 1 + (rc >= 3.5 ? 1 : 0) + (rc >= 5.5 ? 1 : 0) + (rc >= 7.5 ? 1 : 0) + r.nextInt(2);
+		List<int[]> taken = new ArrayList<>();
+		for (int i = 0, made = 0; i < 40 && made < nB; i++) {
+			double ang = r.nextDouble() * Math.PI * 2;
+			double dist = rc * (0.5 + 0.45 * r.nextDouble());
+			int mu = (int) Math.round(lead0[0] + Math.cos(ang) * dist);
+			int mv = (int) Math.round(lead0[1] + Math.sin(ang) * dist);
+			if (!freeSpot(t, taken, mu, mv, fx0, fx1, fz0, fz1)) {
+				continue;
+			}
+			made++;
+			taken.add(new int[] {mu, mv});
+			mound(t, r, mu, mv);
+			if (r.nextInt(5) < 2) {
+				int[] f = faces[r.nextInt(4)];
+				if (freeSpot(t, List.of(), mu + f[0], mv + f[1], fx0, fx1, fz0, fz1)) {
+					mound(t, r, mu + f[0], mv + f[1]);
+				}
+			}
+		}
+		int nP = 1 + (rc >= 4.5 ? 1 : 0) + (rc >= 7 ? 1 : 0);
+		for (int i = 0, made = 0; i < 40 && made < nP; i++) {
+			double ang = r.nextDouble() * Math.PI * 2;
+			double dist = rc * (0.35 + 0.35 * r.nextDouble());
+			int mu = (int) Math.round(lead0[0] + Math.cos(ang) * dist);
+			int mv = (int) Math.round(lead0[1] + Math.sin(ang) * dist);
+			if (!freeSpot(t, taken, mu, mv, fx0, fx1, fz0, fz1)) {
+				continue;
+			}
+			made++;
+			taken.add(new int[] {mu, mv});
+			t.fixed(mu, 0, mv, b(r.nextInt(3) == 0 ? Blocks.POTTED_FLOWERING_AZALEA : Blocks.POTTED_AZALEA));
+		}
+		double gu = (fx0 + fx1) / 2.0;
+		double gv = (fz0 + fz1) / 2.0;
+		TreeKit.ground(t, gu, gv, rc * 1.05 + 1.0, (uu, vv, k) -> {
+			int hsh = t.hash(uu, 0, vv, 100);
+			int pet = k < 0.5 ? 38 : k < 0.8 ? 24 : 12;
+			int moss = k < 0.5 ? 30 : k < 0.8 ? 26 : 20;
+			if (hsh < pet) {
+				return TreeKit.petals(1 + t.hash(uu, 1, vv, k < 0.5 ? 4 : 2), t.hash(uu, 2, vv, 4));
+			}
+			if (hsh < pet + moss) {
+				return b(Blocks.MOSS_CARPET);
+			}
+			return k >= 0.8 && hsh < pet + moss + 4 ? b(Blocks.SHORT_GRASS) : null;
+		});
 
 		t.prune();
 		t.flush(c);
 
-		// ---- a lantern hanging under the front limb (only where it hangs from wood, with air below)
-		List<int[]> cells = limbCells[front];
-		int[] best = null;
-		for (int[] cell : cells) {
-			int u = cell[0];
-			int y = cell[1];
-			int v = cell[2];
-			if (y < 3 || Math.abs(u - lead[0][y]) + Math.abs(v - lead[1][y]) < 2) {
-				continue;
-			}
-			if (t.kind(u, y, v) != TreeKit.WOOD || !t.empty(u, y - 1, v) || !t.empty(u, y - 2, v)) {
-				continue;
-			}
-			if (best == null || y < best[1]) {
-				best = cell;
-			}
-		}
-		if (best != null) {
-			p.put(c, best[0], best[1] - 1, best[2], b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true),
-					CitadelCanvas.HANGING);
-		}
-	}
-
-	/**
-	 * The 1×1 oak leader from y = 0 to {@code yTop}: straight up to the fork, then (with {@code lean}) one
-	 * sideways step towards face {@code dir} two blocks above it, the step joined by a bark block.
-	 */
-	private static int[][] leader(Vox t, int cu, int cv, int yF, int yTop, int dir, boolean lean) {
-		int[][] faces = {{1, 0}, {0, 1}, {-1, 0}, {0, -1}};
-		int[] lu = new int[t.h + 1];
-		int[] lv = new int[t.h + 1];
-		int u = cu;
-		int v = cv;
-		int yStep = lean && yTop - yF >= 4 ? yF + 2 : -1;
-		for (int y = 0; y <= t.h; y++) {
-			if (y == yStep) {
-				int nu = TreeKit.clamp(u + faces[dir][0], 1, t.w - 2);
-				int nv = TreeKit.clamp(v + faces[dir][1], 1, t.d - 2);
-				t.wood(nu, y - 1, nv, WOOD.bark());
-				t.wood(u, y - 1, v, WOOD.bark());
-				u = nu;
-				v = nv;
-			}
-			lu[y] = u;
-			lv[y] = v;
-			if (y <= yTop && y < t.h) {
-				t.wood(u, y, v, WOOD.log(Direction.Axis.Y));
-			}
-		}
-		return new int[][] {lu, lv};
-	}
-
-	/** A one-block flare of oak bark on two or three faces of the foot; with {@code roots} a diagonal root or two. */
-	private static void flare(Vox t, int cu, int cv, boolean roots) {
-		int[][] faces = {{1, 0}, {0, 1}, {-1, 0}, {0, -1}};
-		int skip = t.hash(cu, 0, cv, 4);
-		int skip2 = t.hash(cu, 1, cv, 2) == 0 ? (skip + 2) % 4 : -1;
-		for (int k = 0; k < 4; k++) {
-			if (k != skip && k != skip2) {
-				t.woodSoft(cu + faces[k][0], 0, cv + faces[k][1], WOOD.bark());
-			}
-		}
-		if (!roots) {
-			return;
-		}
-		// diagonal roots: from a flare face one log round the corner, then one more step out
-		for (int k = 0; k < 4; k++) {
-			if (k == skip || k == skip2 || t.hash(cu + k, 2, cv, 2) != 0) {
-				continue;
-			}
-			int fu = cu + faces[k][0];
-			int fv = cv + faces[k][1];
-			int[] side = faces[(k + 1) % 4];
-			int ru = fu + side[0];
-			int rv = fv + side[1];
-			if (t.empty(ru, 0, rv)) {
-				t.wood(ru, 0, rv, WOOD.log(side[0] != 0 ? Direction.Axis.X : Direction.Axis.Z));
-				int ou = ru + faces[k][0];
-				int ov = rv + faces[k][1];
-				if (t.empty(ou, 0, ov)) {
-					t.wood(ou, 0, ov, WOOD.log(faces[k][0] != 0 ? Direction.Axis.X : Direction.Axis.Z));
+		// ---- hanging roots under the limbs (only from oak, with air below: nothing hangs from leaves)
+		int roots = 0;
+		int maxRoots = 3 + (int) rc;
+		for (int y = CLEAR; y < p.h() && roots < maxRoots; y++) {
+			for (int vv = 0; vv < d && roots < maxRoots; vv++) {
+				for (int uu = 0; uu < w && roots < maxRoots; uu++) {
+					if (t.kind(uu, y, vv) != TreeKit.WOOD || !t.empty(uu, y - 1, vv) || t.hash(uu, y + 41, vv, 100) >= 35) {
+						continue;
+					}
+					p.put(c, uu, y - 1, vv, b(Blocks.HANGING_ROOTS), CitadelCanvas.HANGING);
+					roots++;
 				}
 			}
 		}
 	}
 
-	private static boolean inBed(int u, int v, double ccu, double ccv) {
-		double du = (u - ccu) / (ccu + 0.5);
-		double dv = (v - ccv) / (ccv + 0.5);
-		return du * du + dv * dv <= 1.0;
+	/** A cell that is free (y 0 and 1), inside the plot with a margin, clear of the foot and not next to a taken one. */
+	private static boolean freeSpot(Vox t, List<int[]> taken, int u, int v, int fx0, int fx1, int fz0, int fz1) {
+		if (u < 1 || u > t.w - 2 || v < 1 || v > t.d - 2 || !t.empty(u, 0, v) || !t.empty(u, 1, v)) {
+			return false;
+		}
+		if (u >= fx0 - 2 && u <= fx1 + 2 && v >= fz0 - 2 && v <= fz1 + 2) {
+			return false;
+		}
+		for (int[] o : taken) {
+			if (Math.abs(o[0] - u) <= 1 && Math.abs(o[1] - v) <= 1) {
+				return false;
+			}
+		}
+		return true;
 	}
 
-	private static boolean rim(int u, int v, double ccu, double ccv) {
-		return !inBed(u + 1, v, ccu, ccv) || !inBed(u - 1, v, ccu, ccv) || !inBed(u, v + 1, ccu, ccv)
-				|| !inBed(u, v - 1, ccu, ccv);
+	/** A one-block mound of moss block or rooted dirt with an azalea bush on top (flowering most of the time). */
+	private static void mound(Vox t, Random r, int u, int v) {
+		t.fixed(u, 0, v, b(r.nextBoolean() ? Blocks.MOSS_BLOCK : Blocks.ROOTED_DIRT));
+		t.cover(u, 1, v, b(r.nextInt(5) < 3 ? Blocks.FLOWERING_AZALEA : Blocks.AZALEA));
 	}
 }
