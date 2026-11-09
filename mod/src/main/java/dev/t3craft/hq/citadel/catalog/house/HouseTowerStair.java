@@ -260,7 +260,7 @@ public final class HouseTowerStair implements Variant {
 					if (stairDoor) {
 						st = doorBlock(l, Direction.EAST, y == y0);
 					} else if (sidePost(l, v)) {
-						st = log(l.s.trim(), Direction.Axis.Y);
+						st = log(l.s.frame(), Direction.Axis.Y);
 					} else if (win && winS(l, v) && !(side == 1 && v == l.vd)) {
 						set(c, p, side == 0 ? u + 1 : u - 1, y, v, pane(glass(l, storey, v), false));
 						st = b(Blocks.AIR);
@@ -352,7 +352,7 @@ public final class HouseTowerStair implements Variant {
 			set(c, p, u, 0, 0, b(Blocks.POLISHED_DEEPSLATE));
 			set(c, p, u, 1, 0, wall(Blocks.POLISHED_DEEPSLATE_WALL, false, false, false, false, true));
 			for (int y = 2; y <= 5; y++) {
-				set(c, p, u, y, 0, log(l.s.trim(), Direction.Axis.Y));
+				set(c, p, u, y, 0, log(l.s.frame(), Direction.Axis.Y));
 			}
 			set(c, p, u, 2, 1, stair(Blocks.STONE_BRICK_STAIRS, side < 0 ? Direction.EAST : Direction.WEST, true));
 			put(c, p, u - side, 2, 0, hangingLantern(), CitadelCanvas.HANGING);
@@ -410,7 +410,7 @@ public final class HouseTowerStair implements Variant {
 		put(c, p, l.cu + 1, B2 - 1, 0, hangingLantern(), CitadelCanvas.HANGING);
 		// a column under the east end of the terrace
 		for (int y = 1; y < B2; y++) {
-			set(c, p, l.iu, y, 0, log(l.s.trim(), Direction.Axis.Y));
+			set(c, p, l.iu, y, 0, log(l.s.frame(), Direction.Axis.Y));
 		}
 		set(c, p, l.iu, 0, 0, b(Blocks.POLISHED_DEEPSLATE));
 	}
@@ -447,7 +447,7 @@ public final class HouseTowerStair implements Variant {
 		for (int lane : new int[] {l.iu, l.ou}) {
 			set(c, p, lane, 0, vl + 1, b(Blocks.POLISHED_DEEPSLATE));
 			for (int y = 1; y <= B3 + 1; y++) {
-				set(c, p, lane, y, vl + 1, y <= B3 ? log(l.s.trim(), Direction.Axis.Y) : fence(l.s.fence(), false, false, false, false));
+				set(c, p, lane, y, vl + 1, y <= B3 ? log(l.s.frame(), Direction.Axis.Y) : fence(l.s.fence(), false, false, false, false));
 			}
 		}
 		for (int y = B1 + 1; y <= B3 + 1; y++) {
@@ -478,7 +478,7 @@ public final class HouseTowerStair implements Variant {
 		set(c, p, l.ou, B2, a, b(l.s.planks()));
 		set(c, p, l.ou, B2 - 1, a, stair(Blocks.DARK_OAK_STAIRS, Direction.SOUTH, true));
 		for (int yy = 1; yy < B2; yy++) {
-			set(c, p, l.iu, yy, a, log(l.s.trim(), Direction.Axis.Y));
+			set(c, p, l.iu, yy, a, log(l.s.frame(), Direction.Axis.Y));
 		}
 		set(c, p, l.iu, 0, a, b(Blocks.POLISHED_DEEPSLATE));
 		set(c, p, l.ou, B2 + 1, a - 1, fence(l.s.fence(), false, false, true, false));
@@ -501,10 +501,10 @@ public final class HouseTowerStair implements Variant {
 		}
 		// two cherry columns carry the flight at its ends
 		for (int yy = 1; yy < B2; yy++) {
-			set(c, p, l.su, yy, a, log(l.s.trim(), Direction.Axis.Y));
+			set(c, p, l.su, yy, a, log(l.s.frame(), Direction.Axis.Y));
 		}
 		for (int yy = B1 + 1; yy <= B3; yy++) {
-			set(c, p, l.su, yy, vl, log(l.s.trim(), Direction.Axis.Y));
+			set(c, p, l.su, yy, vl, log(l.s.frame(), Direction.Axis.Y));
 		}
 		// landing 3 at y9, both lanes, at the attic door
 		for (int lane : new int[] {l.ou, l.iu}) {

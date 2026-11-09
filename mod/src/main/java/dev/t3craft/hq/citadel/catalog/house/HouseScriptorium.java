@@ -387,23 +387,7 @@ public final class HouseScriptorium implements Variant {
 				}
 			}
 		}
-		// [depth] stained skylights (claraboyas): two panels per slope, glass cubes replacing roof stairs
-		for (int step = 0; step < 2; step++) {
-			int ul = left - 2 - step;
-			int ur = right + 2 + step;
-			for (int pass = 0; pass < 2; pass++) {
-				int va = pass == 0 ? v0 + 1 : v1 - 2;
-				for (int v = va; v <= va + 1; v++) {
-					DyeColor col = jewel(p, step, pass, v);
-					if (ul >= 1) {
-						p.set(c, ul, roofY(ul, w), v, tintBlock(col));
-					}
-					if (ur <= w - 2) {
-						p.set(c, ur, roofY(ur, w), v, tintBlock(col));
-					}
-				}
-			}
-		}
+		// (skylight cubes removed: they stuck out of the slope like loose blocks; the glazed ridge lantern lights the nave)
 		// finials: a lightning rod on each gable peak
 		p.set(c, left, top + 2, 0, b(Blocks.LIGHTNING_ROD.waxed().unaffected()));
 		p.set(c, left, top + 2, d - 1, b(Blocks.LIGHTNING_ROD.waxed().unaffected()));

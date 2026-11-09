@@ -454,11 +454,11 @@ public final class HouseTerraceCascade implements Variant {
 				if (middle) {
 					st = b(Blocks.POLISHED_DEEPSLATE);
 				} else {
-					st = stair(eave ? Blocks.CHERRY_STAIRS : Blocks.RESIN_BRICK_STAIRS, frontSlope ? Direction.SOUTH : Direction.NORTH, false);
+					st = stair(eave ? Blocks.CHERRY_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS, frontSlope ? Direction.SOUTH : Direction.NORTH, false);
 				}
 				p.set(c, u, y, v, st);
 				if ((u == u0 || u == u1) && !middle && y - 1 >= PLATE) {
-					p.set(c, u, y - 1, v, stair(Blocks.RESIN_BRICK_STAIRS, frontSlope ? Direction.NORTH : Direction.SOUTH, true));
+					p.set(c, u, y - 1, v, stair(Blocks.DEEPSLATE_TILE_STAIRS, frontSlope ? Direction.NORTH : Direction.SOUTH, true));
 				}
 			}
 		}
