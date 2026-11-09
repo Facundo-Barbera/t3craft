@@ -315,11 +315,11 @@ final class BarrioGateBig {
 		}
 
 		/**
-		 * The raised portcullis: iron bars hanging from the vault two rows inside the hub face (three high in the middle, two at
+		 * The raised portcullis: iron bars hanging from the vault flush with the hub face, so it is read from the street (the name sign hangs behind it) (three high in the middle, two at
 		 * one in from the sides and one at the sides, following the arch), always above head height (at least 3 free below).
 		 */
 		void portcullis() {
-			int u = D - 2;
+			int u = D - 1;
 			for (int dv = -HALF; dv <= HALF; dv++) {
 				int a = Math.abs(dv);
 				int clear = 6 - a;
@@ -371,11 +371,11 @@ final class BarrioGateBig {
 
 		/** Lanterns under the vault and on the merlons, banners on the tower walls, the hanging sign of the project at the hub end. */
 		void passageDressing() {
-			// (the portcullis hangs at D - 2, so the second lantern of the wider gates moves to D - 4)
+			// (the portcullis hangs at D - 1 and the sign at D - 2, so the second lantern of the wider gates is at D - 4)
 			for (int u : sw >= 7 ? new int[] {tu + 1, D - 4} : new int[] {tu + 1}) {
 				c.set(r.cell(u, mid, 6), BarrioKit.lantern(true));
 			}
-			BlockPos sign = r.cell(D - 1, mid, 6);
+			BlockPos sign = r.cell(D - 2, mid, 6);
 			BlockState hs = Blocks.CHERRY_HANGING_SIGN.defaultBlockState().setValue(CeilingHangingSignBlock.ROTATION, CitadelBarrios.rotation(back))
 					.setValue(CeilingHangingSignBlock.ATTACHED, false);
 			c.put(sign.getX(), sign.getY(), sign.getZ(), hs, HANGING);
