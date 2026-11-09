@@ -69,6 +69,7 @@ public final class HubUndercroft {
 		}
 		desks(c);
 		deskRows(c);
+		islands(c);
 		indexTable(c);
 		oculus(c);
 		descents(c);
@@ -213,6 +214,39 @@ public final class HubUndercroft {
 			for (int ax = lane; ax <= xMax; ax++) {
 				for (int sx = -1; sx <= 1; sx += 2) {
 					deskCell(c, sx * ax, sz * dz, ax, out, sx * ax, sz * (dz - 1));
+				}
+			}
+		}
+	}
+
+	/**
+	 * Free-standing shelf islands in the four quadrants: two columns of bookshelves, {@code 3} high, running along z at
+	 * {@code |x| = s(2) + 1} and {@code + 1}, in segments of {@code s(3)} cells with a cross aisle of three between them
+	 * (so every lane round them is at least 3 wide). A lantern stands on the middle of each segment; the cells of the
+	 * stairs and the index patch stay free.
+	 */
+	private static void islands(CitadelCanvas c) {
+		int x0 = c.s(2) + 1;
+		int seg = c.s(3);
+		int top = Math.min(3, Math.max(1, y0() - 3));
+		for (int sx = -1; sx <= 1; sx += 2) {
+			for (int sz = -1; sz <= 1; sz += 2) {
+				for (int start = c.s(2) + 1; start <= HubDims.INNER() - seg; start += seg + 3) {
+					for (int k = 0; k < seg; k++) {
+						int z = sz * (start + k);
+						for (int dx = 0; dx <= 1; dx++) {
+							int x = sx * (x0 + dx);
+							if (!inside(c, x, z) || edge(c, x, z) || stairCell(x, z) || !free(c, x, 1, z)) {
+								continue;
+							}
+							for (int y = 1; y <= top; y++) {
+								c.set(x, y, z, Blocks.BOOKSHELF.defaultBlockState());
+							}
+							if (k == seg / 2 && dx == 0) {
+								c.set(x, top + 1, z, Blocks.LANTERN.defaultBlockState());
+							}
+						}
+					}
 				}
 			}
 		}
