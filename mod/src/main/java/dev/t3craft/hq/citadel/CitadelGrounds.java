@@ -289,8 +289,15 @@ public final class CitadelGrounds {
 
 	// ------------------------------------------------------------------ empty lots and trees
 
-	/** A lot with no project: a flowering azalea bush every so often and a tree at its centre. */
+	/**
+	 * A lot with no project: a flowering azalea bush every so often and a tree at its centre. With the
+	 * catalog placement on ({@code catalog.enabled}, {@link CitadelPlacement#enabled}) it paints nothing:
+	 * {@link CitadelPlacement#city} composes the lot from the catalog later, once the streets are placed.
+	 */
 	public static void emptyLot(CitadelCanvas c, int lot) {
+		if (CitadelPlacement.enabled()) {
+			return;
+		}
 		Lot l = RingCampusGeometry.lot(lot);
 		for (long col : c.lotCols.getOrDefault(lot, List.of())) {
 			int x = colX(col);

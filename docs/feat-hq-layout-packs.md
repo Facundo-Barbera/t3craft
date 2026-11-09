@@ -103,6 +103,7 @@ walkable cell at block light ≥ 10.
 | village | `lanes.lanternEvery` | 11 | 5..41 | garden lanterns beside the lanes: 1 cell in N |
 | hybrid-ringcampus | `streets.lightEvery` | 41 | 17..97 | lights let into the streets: 1 cell in N |
 | hybrid-ringcampus | `terrace.bushEvery` | 23 | 11..97 | terraces: azalea bush on 1 cell in N |
+| hybrid-ringcampus | `catalog.enabled` | 1 | 0..1 | catalog placement (CitadelPlacement): 1 on, 0 off (the city as before the catalog) |
 | hybrid-towncenter | `hall.ceilingLampEvery` | 6 | 4..9 | civic hall ceiling lamps on an N×N grid |
 | hybrid-terraces | `temple.ceilingLightEvery` | 4 | 3..8 | temple ceiling light panels on an N×N grid |
 

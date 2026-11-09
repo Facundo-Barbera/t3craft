@@ -7,6 +7,7 @@ Facundo prohibió ejecutar cualquier cosa (gradle, compilar, renders, java, test
 |---|---|---|
 | `fix/plan-connect` | Conexiones de bardas, muros, paneles y escaleras para todos los layouts (`PlanConnect`) | Terminado por Opus, sin compilar por el coordinador |
 | `fix/new-thread-hitch` | Detector de trabones (`/t3dev perf hitches`) y arreglos del trabón al llegar un hilo nuevo | Terminado, sin compilar |
+| `citadel/place-catalog` | Líder de familias `CitadelPlacement`: coloca el catálogo en lotes, lotes vacíos, calles y explanada; param `catalog.enabled` | Terminado, sin compilar ni renderizar (render de ciudad antes/después pendiente) |
 | `citadel/scale` | Ciudadela a 1.5×, configurable (`RINGCAMPUS_SCALE`) | WIP rescatado; faltaba la revisión independiente |
 
 ## 2. Ramas de diseño del swarm 1 (citadel/*)
@@ -19,5 +20,4 @@ house-timber, house-stone, house-japanese, house-terrace, house-workshop, house-
 
 ## 4. Sin lanzar
 - Ola B del swarm (ver `~/.cache/t3craft-coord/swarm2-plan.md`).
-- Líderes de familia que coloquen el catálogo en la ciudad.
 - Conectar la pieza `CitadelLeadOffice` en `CitadelBarrios`.
