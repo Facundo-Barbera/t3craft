@@ -74,7 +74,7 @@ public final class StallClothLanterns implements Variant {
 	}
 
 	/** [palette] the neutral wools of the cloth: they make most of the stock, the accent comes in on top. */
-	private static final DyeColor[] NEUTRAL = {DyeColor.WHITE, DyeColor.LIGHT_GRAY, DyeColor.GRAY, DyeColor.BROWN, DyeColor.WHITE};
+	private static final DyeColor[] NEUTRAL = {DyeColor.WHITE, DyeColor.LIGHT_GRAY, DyeColor.BROWN, DyeColor.WHITE, DyeColor.LIGHT_GRAY};
 	/** [palette] one muted accent per seed (the city's cherry is the main colour, so the stall's accent stays small). */
 	private static final DyeColor[] ACCENT = {DyeColor.RED, DyeColor.BLUE, DyeColor.GREEN, DyeColor.PURPLE};
 	private static final String[] TONE = {"paper", "rose", "paper", "vermilion"};
@@ -143,9 +143,9 @@ public final class StallClothLanterns implements Variant {
 			return w - 1 - ix;
 		}
 
-		/** Roof height over row {@code v}: the valance at v1, then a stair a row up to {@code roofMax}. */
+		/** Roof height over row {@code v}: the valance at v1, a stair a row up to {@code roofMax}, a ridge, and a drop to the back eave. */
 		int ry(int v) {
-			return v <= 1 ? 3 : Math.min(roofMax, 4 + (v - 2));
+			return v <= 1 ? 3 : Math.min(Math.min(roofMax, 4 + (v - 2)), 4 + (bv - v));
 		}
 
 		/** The pole's column (the other front post stays short unless the plot is wide). */
@@ -179,8 +179,8 @@ public final class StallClothLanterns implements Variant {
 
 	/** One cloth block: mostly neutrals, the seed's accent one time in four. */
 	private static BlockState cloth(Plot p, Geo g, int u, int y, int v) {
-		int k = p.hash(u, y, v, 8);
-		return wool(k < 2 ? g.accent : NEUTRAL[k - 2 < 0 ? 0 : (k - 2) % NEUTRAL.length]);
+		int k = p.hash(u, y, v, 9);
+		return wool(k < 2 ? g.accent : NEUTRAL[(k - 2) % NEUTRAL.length]);
 	}
 
 	// ------------------------------------------------------------------ roof
@@ -195,16 +195,25 @@ public final class StallClothLanterns implements Variant {
 			if (u == g.pole()) {
 				continue; // the pole passes here
 			}
-			p.set(c, u, 3, 1, wool(u % 2 == 0 ? g.accent : DyeColor.WHITE));
+			// [palette] cream with an accent stripe every third block: the valance is the stall's one patch of colour
+			p.set(c, u, 3, 1, wool(u % 3 == 0 ? g.accent : (u % 3 == 1 ? DyeColor.WHITE : DyeColor.LIGHT_GRAY)));
 			if ((u & 1) == 0 && u >= g.lo() && u <= g.hi()) {
 				p.set(c, u, 2, 1, wool(DyeColor.WHITE)); // [depth] a fringe of cream cloth under the valance
 			}
 		}
 		for (int v = 2; v < g.d; v++) {
 			int y = g.ry(v);
-			boolean rising = y > g.ry(v - 1);
+			int prev = g.ry(v - 1);
+			BlockState s;
+			if (y > prev) {
+				s = stairs(Blocks.SPRUCE_STAIRS, Direction.NORTH);
+			} else if (y < prev) {
+				s = stairs(Blocks.SPRUCE_STAIRS, Direction.SOUTH);
+			} else {
+				s = b(Blocks.SPRUCE_PLANKS);
+			}
 			for (int u = 0; u < g.w; u++) {
-				p.set(c, u, y, v, rising ? stairs(Blocks.CHERRY_STAIRS, Direction.NORTH) : b(Blocks.CHERRY_PLANKS));
+				p.set(c, u, y, v, s);
 			}
 		}
 	}
@@ -252,7 +261,10 @@ public final class StallClothLanterns implements Variant {
 				p.set(c, u, 1, v, cloth(p, g, u, 1, v));
 				p.set(c, u, 2, v, cloth(p, g, u, 2, v));
 			}
-			case 6 -> p.set(c, u, 1, v, carpet(g.accent));
+			case 6 -> {
+				p.set(c, u, 1, v, wool(DyeColor.WHITE));
+				p.set(c, u, 2, v, carpet(g.accent));
+			}
 			default -> p.set(c, u, 1, v, b(Blocks.LOOM).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH));
 		}
 	}
@@ -263,6 +275,13 @@ public final class StallClothLanterns implements Variant {
 		for (int v = 2; v <= g.bv - 2; v++) {
 			p.set(c, su, 0, v, p.hash(su, 0, v, 4) == 0 ? b(Blocks.BARREL).setValue(BlockStateProperties.FACING, g.flip ? Direction.EAST : Direction.WEST) : b(Blocks.CHERRY_PLANKS));
 			stock(c, p, g, su, v);
+			// [depth] a beam over the arm (a log along v under the roof) with a length of cloth hanging from it, so
+			// the bolts have a ceiling and nobody can stand on them
+			int beam = g.ry(v) - 1;
+			p.set(c, su, beam, v, b(Blocks.STRIPPED_CHERRY_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.Z));
+			for (int y = 3; y < beam; y++) {
+				p.set(c, su, y, v, wool(y == 3 && v % 2 == 0 ? g.accent : DyeColor.WHITE));
+			}
 		}
 	}
 
@@ -287,11 +306,12 @@ public final class StallClothLanterns implements Variant {
 			}
 			// [depth] the rail: a cherry fence between the posts; lengths of cloth hang from it, alternate ones longer
 			p.set(c, u, rod, v, fence(Direction.EAST, Direction.WEST));
-			if (((u + p.hash(4, 4, 4, 2)) & 1) == 0 || g.hi() - g.lo() < 2) {
-				p.set(c, u, rod - 1, v, cloth(p, g, u, rod - 1, v));
-				if (rod - 2 >= 2 && p.hash(u, 9, v, 2) == 0) {
-					p.set(c, u, rod - 2, v, wool(DyeColor.WHITE));
-				}
+			if (rod >= 4) {
+				p.set(c, u, rod - 1, v, wool(u % 3 == 0 ? g.accent : DyeColor.WHITE)); // a full row at y3: a ceiling over the shelf
+			}
+			if (((u + p.hash(4, 4, 4, 2)) & 1) == 0) {
+				int low = rod >= 4 ? rod - 2 : rod - 1;
+				p.set(c, u, low, v, cloth(p, g, u, low, v));
 			}
 		}
 	}
