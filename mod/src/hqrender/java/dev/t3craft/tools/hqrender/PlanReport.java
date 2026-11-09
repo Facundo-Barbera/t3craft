@@ -1054,14 +1054,21 @@ public final class PlanReport {
 		}
 		Map<String, Integer> byId = new TreeMap<>();
 		Map<String, BlockPos> first = new HashMap<>();
+		Map<BlockPos, String> groups = PlanProbe.groups(plan);
+		Map<String, Integer> byGroup = new TreeMap<>();
+		Map<String, Map<String, Integer>> typesOfGroup = new TreeMap<>();
 		JsonArray lj = new JsonArray();
 		for (PlanProbe.Unsupported u : all) {
 			String id = id(u.state());
+			String g = groups.getOrDefault(u.pos(), "(none)");
 			byId.merge(id, 1, Integer::sum);
+			byGroup.merge(g, 1, Integer::sum);
+			typesOfGroup.computeIfAbsent(g, k -> new TreeMap<>()).merge(id, 1, Integer::sum);
 			first.putIfAbsent(id, u.pos());
 			if (lj.size() < JSON_LIST) {
 				JsonObject e = new JsonObject();
 				e.addProperty("block", id);
+				e.addProperty("group", g);
 				e.add("pos", arr(u.pos().getX(), u.pos().getY(), u.pos().getZ()));
 				lj.add(e);
 			}
@@ -1076,8 +1083,25 @@ public final class PlanReport {
 			}
 			sb.append(String.format(Locale.ROOT, "    %5d  %s  e.g. %s%n", e.getValue(), e.getKey(), c(first.get(e.getKey()))));
 		}
+		sb.append("  by group (top ").append(o.maxList).append("):\n");
+		List<Map.Entry<String, Integer>> groupsSorted = new ArrayList<>(byGroup.entrySet());
+		groupsSorted.sort((a, b) -> b.getValue() - a.getValue());
+		n = 0;
+		for (Map.Entry<String, Integer> e : groupsSorted) {
+			if (n++ >= o.maxList) {
+				sb.append("    … more groups\n");
+				break;
+			}
+			sb.append(String.format(Locale.ROOT, "    %5d  %s  %s%n", e.getValue(), e.getKey(), typesOfGroup.get(e.getKey())));
+		}
 		JsonObject j = new JsonObject();
 		j.addProperty("blocks", all.size());
+		JsonObject jt = new JsonObject();
+		byId.forEach(jt::addProperty);
+		j.add("byBlock", jt);
+		JsonObject jg = new JsonObject();
+		byGroup.forEach(jg::addProperty);
+		j.add("byGroup", jg);
 		j.add("list", lj);
 		json.add("unsupported", j);
 		sections.add(sb.toString());

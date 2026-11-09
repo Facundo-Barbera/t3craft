@@ -144,7 +144,8 @@ public final class PlanProbe {
 	 * out (never reported).
 	 */
 	public static List<Unsupported> unsupported(BuildPlan plan) {
-		LevelAccessor view = PlanShapes.view(cells(plan));
+		Map<Long, BlockState> cells = cells(plan);
+		LevelAccessor view = PlanShapes.view(cells);
 		List<Unsupported> out = new ArrayList<>();
 		for (Placement p : plan.placements()) {
 			BlockState s = p.state();
@@ -157,10 +158,134 @@ public final class PlanProbe {
 			} catch (RuntimeException e) {
 				continue;
 			}
-			if (!ok) {
+			if (!ok && !tagBasedOk(s, cells, p.rel())) {
 				out.add(new Unsupported(p.rel(), s));
 			}
 		}
 		return out;
+	}
+
+	// ------------------------------------------------------------------ tag-based survival
+	//
+	// Headless (no server, no data packs) the block and fluid tags are unbound: every state.is(TAG) is false,
+	// so vanilla's canSurvive refuses every plant ("supports_vegetation"), lily pad, sugar cane, bamboo… and
+	// the report counted tens of thousands of false "unsupported" blocks. For the blocks whose rule is a tag
+	// we redo the rule here with the tag read from the vanilla data (data/minecraft/tags/block/*.json on
+	// the class path). Blocks that need something else (light for crops, the chorus rules…) are never
+	// reported, as before for the checks that cannot be answered with block reads.
+
+	private static final Map<String, Set<Block>> TAG_CACHE = new HashMap<>();
+
+	/** Blocks of the vanilla block tag {@code name} (nested tags resolved), or {@code null} when the tag data is not on the class path. */
+	private static synchronized Set<Block> blocksOfTag(String name) {
+		if (TAG_CACHE.containsKey(name)) {
+			return TAG_CACHE.get(name);
+		}
+		Set<Block> out = new java.util.HashSet<>();
+		boolean found = collectTag(name, out, new java.util.HashSet<>());
+		Set<Block> result = found ? out : null;
+		TAG_CACHE.put(name, result);
+		return result;
+	}
+
+	private static boolean collectTag(String name, Set<Block> out, Set<String> seen) {
+		if (!seen.add(name)) {
+			return true;
+		}
+		String path = "data/minecraft/tags/block/" + name + ".json";
+		ClassLoader cl = PlanProbe.class.getClassLoader();
+		try (java.io.InputStream in = cl.getResourceAsStream(path)) {
+			if (in == null) {
+				return false;
+			}
+			com.google.gson.JsonObject root = com.google.gson.JsonParser
+					.parseReader(new java.io.InputStreamReader(in, java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
+			for (com.google.gson.JsonElement e : root.getAsJsonArray("values")) {
+				String v = e.isJsonObject() ? e.getAsJsonObject().get("id").getAsString() : e.getAsString();
+				if (v.startsWith("#")) {
+					String ref = v.substring(1);
+					collectTag(ref.startsWith("minecraft:") ? ref.substring(10) : ref, out, seen);
+				} else {
+					net.minecraft.resources.Identifier id = net.minecraft.resources.Identifier.tryParse(v);
+					if (id != null && net.minecraft.core.registries.BuiltInRegistries.BLOCK.containsKey(id)) {
+						out.add(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getValue(id));
+					}
+				}
+			}
+			return true;
+		} catch (java.io.IOException | RuntimeException ex) {
+			return false;
+		}
+	}
+
+	private static boolean inTag(String tag, BlockState s) {
+		Set<Block> set = blocksOfTag(tag);
+		return set != null && set.contains(s.getBlock());
+	}
+
+	private static boolean isWater(net.minecraft.world.level.material.FluidState f) {
+		return f.getType() == net.minecraft.world.level.material.Fluids.WATER
+				|| f.getType() == net.minecraft.world.level.material.Fluids.FLOWING_WATER;
+	}
+
+	/**
+	 * True when {@code s} at {@code pos} stands by the rule vanilla gives it once the tags are bound, for
+	 * blocks whose survival depends on a tag; also true for tag-based blocks this probe cannot judge (never
+	 * reported). False means vanilla's refusal stands.
+	 */
+	private static boolean tagBasedOk(BlockState s, Map<Long, BlockState> cells, BlockPos pos) {
+		Block b = s.getBlock();
+		BlockState air = net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
+		BlockPos belowPos = pos.below();
+		BlockState below = cells.getOrDefault(belowPos.asLong(), air);
+		if (b instanceof net.minecraft.world.level.block.SugarCaneBlock) {
+			if (!inTag("supports_sugar_cane", below)) {
+				return blocksOfTag("supports_sugar_cane") == null;
+			}
+			for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+				BlockState n = cells.getOrDefault(belowPos.relative(d).asLong(), air);
+				if (isWater(n.getFluidState()) || n.is(net.minecraft.world.level.block.Blocks.FROSTED_ICE)) {
+					return true;
+				}
+			}
+			return false;
+		}
+		if (b instanceof net.minecraft.world.level.block.BambooStalkBlock || b instanceof net.minecraft.world.level.block.BambooSaplingBlock) {
+			return inTag("supports_bamboo", below) || blocksOfTag("supports_bamboo") == null;
+		}
+		if (b instanceof net.minecraft.world.level.block.CocoaBlock || b instanceof net.minecraft.world.level.block.FrogspawnBlock
+				|| b instanceof net.minecraft.world.level.block.MangrovePropaguleBlock || b instanceof net.minecraft.world.level.block.BigDripleafBlock
+				|| b instanceof net.minecraft.world.level.block.BigDripleafStemBlock || b instanceof net.minecraft.world.level.block.ChorusFlowerBlock
+				|| b instanceof net.minecraft.world.level.block.ChorusPlantBlock) {
+			return true;
+		}
+		if (!(b instanceof net.minecraft.world.level.block.VegetationBlock)) {
+			return false;
+		}
+		if (b instanceof net.minecraft.world.level.block.DoublePlantBlock && s.hasProperty(net.minecraft.world.level.block.DoublePlantBlock.HALF)
+				&& s.getValue(net.minecraft.world.level.block.DoublePlantBlock.HALF) == net.minecraft.world.level.block.state.properties.DoubleBlockHalf.UPPER) {
+			return false; // the upper half only asks for its lower half: no tag involved, vanilla's refusal is real
+		}
+		if (b instanceof net.minecraft.world.level.block.LilyPadBlock) {
+			boolean airAbove = cells.getOrDefault(pos.above().asLong(), air).getFluidState().isEmpty();
+			return airAbove && (isWater(below.getFluidState()) || inTag("supports_lily_pad", below));
+		}
+		if (b instanceof net.minecraft.world.level.block.AzaleaBlock) {
+			return inTag("supports_azalea", below) || blocksOfTag("supports_azalea") == null;
+		}
+		if (b instanceof net.minecraft.world.level.block.DryVegetationBlock) {
+			return inTag("supports_dry_vegetation", below) || blocksOfTag("supports_dry_vegetation") == null;
+		}
+		// any other plant that keeps VegetationBlock's rule (flowers, grass, ferns, bushes, saplings, petals,
+		// berries…); one that overrides mayPlaceOn has its own rule that is not modelled here
+		for (Class<?> c = b.getClass(); c != null && c != net.minecraft.world.level.block.VegetationBlock.class; c = c.getSuperclass()) {
+			try {
+				c.getDeclaredMethod("mayPlaceOn", BlockState.class, net.minecraft.world.level.BlockGetter.class, BlockPos.class);
+				return true;
+			} catch (NoSuchMethodException e) {
+				// keep walking up
+			}
+		}
+		return inTag("supports_vegetation", below) || blocksOfTag("supports_vegetation") == null;
 	}
 }
