@@ -110,6 +110,8 @@ public final class GardenFlowerRoseArch implements Variant {
 		final int d;
 		final Pal pal;
 		final int swap;
+		/** Seed: one more arch per run, benches on the other side. */
+		final int alt;
 		/** Left column of the walk (it is 3 wide: pu .. pu + 2). */
 		final int pu;
 		/** Rows of the centres of the squares (none when the plot is too shallow). */
@@ -125,6 +127,7 @@ public final class GardenFlowerRoseArch implements Variant {
 			this.d = p.d();
 			this.pal = PALS[p.hash(0, 0, 0, PALS.length)];
 			this.swap = p.hash(1, 0, 1, 2);
+			this.alt = p.hash(3, 0, 3, 2);
 			this.pu = (w - 3) / 2;
 		}
 
@@ -307,7 +310,14 @@ public final class GardenFlowerRoseArch implements Variant {
 					int m = Math.min(hi - lo + 1, vhi - vlo + 1);
 					boolean tallCell;
 					boolean groupA;
-					if (m >= 3) {
+					if (m >= 7 && k == 1) { // a flowering boxwood ring between the border flowers and the core
+						set(u, 1, v, p.hash(u, 1, v, 2) == 0 ? leaves(Blocks.FLOWERING_AZALEA_LEAVES) : leaves(Blocks.AZALEA_LEAVES));
+						continue;
+					}
+					if (m >= 7) {
+						tallCell = k >= 3;
+						groupA = (k == 0) == (swap == 0); // border flowers one colour, the ring inside the hedge the other
+					} else if (m >= 3) {
 						int thr = m >= 6 ? 2 : 1;
 						tallCell = k >= thr;
 						groupA = ((k + tid) & 1) == 0;
@@ -354,6 +364,18 @@ public final class GardenFlowerRoseArch implements Variant {
 					set(u, 0, v, kerb(u, v));
 					set(u, 1, v, box(u, 1, v));
 					boolean corner = (u == 0 || u == w - 1) && (v == 0 || v == d - 1);
+					boolean sideRing = u == 0 || u == w - 1;
+					int idx = sideRing ? v : u;
+					if (!corner && v != d - 1 && idx % 4 == 2 && idx > 1 && idx < (sideRing ? d - 2 : w - 2)
+							&& !(v == 0 && Math.abs(u - (pu + 1)) <= 4)) { // a stone pillar in the hedge, a lantern on every other one
+						set(u, 0, v, b(Blocks.POLISHED_ANDESITE));
+						set(u, 1, v, b(Blocks.STONE_BRICK_WALL));
+						set(u, 2, v, b(Blocks.STONE_BRICK_WALL));
+						if ((idx / 4) % 2 == 0) {
+							set(u, 3, v, b(Blocks.LANTERN));
+						}
+						continue;
+					}
 					boolean backWalk = v == d - 1 && u >= pu - 1 && u <= pu + 3;
 					if (corner || v == d - 1) {
 						set(u, 2, v, box(u, 2, v));
@@ -423,11 +445,11 @@ public final class GardenFlowerRoseArch implements Variant {
 		// ------------------------------------------------------------------ arches
 
 		/** Frame positions inside {@code [lo, hi]}: one every ~5, at least 4 apart; a lone one goes at lo, mid or hi. */
-		static int[] frames(int lo, int hi, int mode) {
+		int[] frames(int lo, int hi, int mode) {
 			if (hi < lo) {
 				return new int[0];
 			}
-			int n = 1 + (int) Math.ceil((hi - lo) / 6.0);
+			int n = 1 + (int) Math.round((hi - lo) / 4.5) + (alt == 1 && hi - lo >= 9 ? 1 : 0);
 			while (n > 1 && (hi - lo) / (n - 1) < 3) {
 				n--;
 			}
@@ -553,7 +575,7 @@ public final class GardenFlowerRoseArch implements Variant {
 				}
 				int mid = (fr[i] + fr[i + 1]) / 2;
 				// a bench in the window of one side (its back to the walk, the seat looking at the parterre), the lamp on the other
-				boolean benchLeft = ((i + (alongV ? 0 : 1)) & 1) == 0;
+				boolean benchLeft = ((i + (alongV ? 0 : 1) + alt) & 1) == 0;
 				boolean bench = gap >= 5;
 				for (int side = 0; side < 2; side++) {
 					int t = side == 0 ? tl : tr;
