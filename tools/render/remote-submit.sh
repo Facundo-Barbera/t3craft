@@ -13,8 +13,9 @@
 #   2. ships the agent's code (mod/src + gradle files) into a per-agent git worktree on the PC,
 #      ~/t3craft-jobs/<agent>, created once from the PC repo (the daemon only serves worktrees of its repo);
 #   3. drops the request into the PC daemon's inbox (worktree path rewritten to the PC copy);
-#   4. polls the PC status.json (mirrored locally so Citadel Studio sees progress) and, when final, copies the
-#      whole PC outbox folder (PNGs, report.txt, logs) back to the local outbox.
+#   4. polls the PC status.json (mirrored locally so Citadel Studio sees progress) and, when final, copies back
+#      ONLY status.json and the text reports (report*.txt, report*.json). Images never leave the render PC
+#      (AGENTS.md rule 9: images read by threads bloat T3's database); Facundo views them in Citadel Studio there.
 # Compiling happens on the PC (its daemon, one worker). The VPS only runs ssh, tar and base64.
 #
 # Settings (environment):
@@ -241,8 +242,9 @@ while :; do
 	waited=$((waited + 5))
 done
 
-# results back: tar+base64 of the PC outbox folder
-printf 'cd %s && tar cz %s | base64 -w0\n' "$(q "$R_SPOOL/outbox")" "$(q "$id")" | rrun 2>/dev/null \
+# results back: status.json and the text reports only (tar+base64); PNGs stay on the render PC (AGENTS.md rule 9)
+printf 'cd %s && find %s -maxdepth 1 -type f \\( -name status.json -o -name "report*.txt" -o -name "report*.json" \\) -print0 | tar cz --null -T - | base64 -w0\n' \
+	"$(q "$R_SPOOL/outbox")" "$(q "$id")" | rrun 2>/dev/null \
 	| base64 -d 2>/dev/null | tar xz -C "$RENDER_HOME/outbox" 2>/dev/null \
 	|| echo "submit: warning: could not copy the results back from the render PC" >&2
 # the PC and the VPS both keep the spool at ~/.cache/t3craft-render; rewrite paths if the homes differ
@@ -259,7 +261,7 @@ if s.get("log"):
     print("--- log ---")
     print(s["log"])
 if s["state"] == "done":
-    print("images:")
+    print("images (kept on the render PC, not copied here; do not ask for them, AGENTS.md rule 9):")
     for f in s.get("files", []):
         print("  " + f)
     if s.get("report"):

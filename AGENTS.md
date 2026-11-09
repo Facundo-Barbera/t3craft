@@ -76,7 +76,8 @@ the PC**, never on the VPS or the Mac mini.
        scp do not work against the PC);
      - the job goes into the PC daemon's inbox;
      - the relay polls `status.json`;
-     - the PNGs and the report come back to the local outbox.
+     - only `status.json` and the text reports (`report*.txt`, `report*.json`) come back to the local outbox; the
+       PNGs stay on the PC (rule 9).
    - Compiling the worktree happens on the PC. Renders still need Facundo's approval (rule 5).
 9. **Threads do not open full-size images (incident 2026-11-09 evening).** Every image a thread reads (Read on a PNG,
    a screenshot, an attachment) is stored in T3's database. High-quality renders read by agents bloated the VPS's

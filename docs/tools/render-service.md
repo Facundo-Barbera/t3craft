@@ -11,7 +11,7 @@
 > **Transport:** the PC's sshd is Windows OpenSSH whose default shell is `wsl.exe`. Remote commands, scp and rsync do NOT work there. Every step is a bash script piped on stdin (`ssh -T user@100.64.0.20 < script`), and files travel as tar+base64 inside those scripts.
 > 2. It ships the agent's code (`mod/src` and the gradle files, tar+base64) into a per-agent git worktree on the PC, `~/t3craft-jobs/<agent>`. That worktree is created once from the PC repo `~/projects/t3craft`, which is the daemon's baseline, so the daemon accepts it and its Loom cache survives between jobs.
 > 3. It drops the request into the PC inbox, with the paths rewritten. `--packs` folders are synced too.
-> 4. While the job runs, it mirrors `status.json` and `daemon.json` into the local spool, so Citadel Studio still works. When the job ends, it copies the whole outbox folder back.
+> 4. While the job runs, it mirrors `status.json` and `daemon.json` into the local spool, so Citadel Studio still works. When the job ends, it copies back **only** `status.json` and the text reports (`report*.txt`, `report*.json`); the PNGs stay on the PC (`AGENTS.md` rule 9).
 >
 > **Quality:** jobs sent to the PC default to `final` with `--ss 3` (`T3CRAFT_RENDER_SS`). `--preview` is ignored unless `T3CRAFT_RENDER_ALLOW_PREVIEW=1`. PNGs are truecolour; the old 256-colour palette for big images is opt-in (`-Dt3craft.render.palette=true`, for images committed to docs).
 >
@@ -43,8 +43,8 @@ Everything after the options is passed to the renderer as is (for `--kind hq`, t
 selectors). `--out` is ignored: results always go to the request's outbox folder.
 
 The script writes the request, waits (`sleep 5` on `status.json`, printing each state change) and, when
-the render is done, prints the PNG paths and the report path. Open the PNGs with the image viewer of your
-tool. Exit code: `0` done, `1` render or compile error (the javac errors are printed), `2` rejected,
+the render is done, prints the PNG paths (on the render PC, for Citadel Studio) and the report path. Threads
+never open the PNGs (`AGENTS.md` rule 9): judge from the report. Exit code: `0` done, `1` render or compile error (the javac errors are printed), `2` rejected,
 `3` daemon not running (ask the coordinator), `4` you stopped waiting (`--timeout`, default 1 h; the
 request keeps going).
 
