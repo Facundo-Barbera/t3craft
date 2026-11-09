@@ -348,8 +348,11 @@ public final class FountainMossyCascade implements Variant {
 				return 1;
 			}
 			int hgt = 1 + Math.round(ti * (float) (dmax - delta) / (dmax - 1));
-			if (p.hash(u, 6, v, 4) == 0) {
+			int nz = p.hash(u, 6, v, 5);
+			if (nz == 0) {
 				hgt = Math.max(1, hgt - 1);
+			} else if (nz == 1) {
+				hgt += 1;
 			}
 			return Math.min(hgt, ti + 1);
 		}
@@ -366,6 +369,10 @@ public final class FountainMossyCascade implements Variant {
 				lat = shoulder(0, u, v);
 			}
 			int tp = Math.min(backTop, lat);
+			boolean in = u >= lo[0] && u <= hi[0];
+			if (!in && tp > 2 && p.hash(u, 19, v, 3) == 0) {
+				tp -= 1;
+			}
 			if (dv <= 2 && tp >= T && p.hash(u, 17, v, 3) == 0) {
 				tp = Math.min(T + 2, tp + 1);
 			}
@@ -427,15 +434,15 @@ public final class FountainMossyCascade implements Variant {
 			p.set(c, a - 1, 1, vb, CitadelCanvas.AIR);
 			p.set(c, z + 1, 0, vb, stairs(Blocks.STONE_BRICK_STAIRS, Direction.WEST));
 			p.set(c, z + 1, 1, vb, CitadelCanvas.AIR);
-			p.set(c, a, 1, vb, stairs(Blocks.CHERRY_STAIRS, Direction.EAST));
-			p.set(c, z, 1, vb, stairs(Blocks.CHERRY_STAIRS, Direction.WEST));
+			p.set(c, a, 1, vb, stairs(Blocks.SPRUCE_STAIRS, Direction.EAST));
+			p.set(c, z, 1, vb, stairs(Blocks.SPRUCE_STAIRS, Direction.WEST));
 			wet[a][vb] = false;
 			wet[z][vb] = false;
 			for (int u = a + 1; u <= z - 1; u++) {
 				if ((u - a) % 4 == 0 && u < z - 1) {
 					p.set(c, u, 1, vb, PondKit.brick(p, u, 1, vb)); // a pier under the deck
 				}
-				p.set(c, u, 2, vb, slab(Blocks.CHERRY_SLAB));
+				p.set(c, u, 2, vb, slab(Blocks.SPRUCE_SLAB));
 				wet[u][vb] = false;
 			}
 			int deck = z - a - 1;
@@ -465,10 +472,15 @@ public final class FountainMossyCascade implements Variant {
 					} else {
 						boolean west = u > a + 1 && !(sv == vb - 1 && seat[u - 1]);
 						boolean east = u < z - 1 && !(sv == vb - 1 && seat[u + 1]);
-						p.set(c, u, 2, sv, PondKit.fence(false, false, west || u == a + 1, east || u == z - 1));
+						p.set(c, u, 2, sv, spruceFence(west || u == a + 1, east || u == z - 1));
 					}
 				}
 			}
+		}
+
+		/** A spruce rail with its east/west sides set by hand (the plan keeps states exactly). */
+		static BlockState spruceFence(boolean west, boolean east) {
+			return b(Blocks.SPRUCE_FENCE).setValue(BlockStateProperties.WEST, west).setValue(BlockStateProperties.EAST, east);
 		}
 
 		int w() {
@@ -548,10 +560,14 @@ public final class FountainMossyCascade implements Variant {
 						continue;
 					}
 					int h = p.hash(u, y, v, 24);
+					if (p.hash(u / 3, 99, v / 3, theme == 1 ? 4 : 7) == 0 && h <= 11) {
+						bamboo(u, y, v, 3 + p.hash(u, y, v, 3) + T / 8); // a grove: the bamboo grows in clumps
+						continue;
+					}
 					int kind = switch (theme) {
-						case 0 -> h <= 2 ? 1 : h <= 7 ? 2 : h <= 9 ? 3 : h <= 11 ? 4 : h <= 14 ? 5 : h == 15 ? 6 : 0;
-						case 1 -> h <= 1 ? 1 : h <= 6 ? 2 : h <= 8 ? 4 : h <= 11 ? 5 : h <= 14 ? 6 : 0;
-						default -> h <= 5 ? 1 : h <= 7 ? 4 : h <= 11 ? 2 : h == 12 ? 3 : h == 13 ? 6 : 0;
+						case 0 -> h <= 2 ? 1 : h <= 7 ? 2 : h <= 9 ? 3 : h <= 11 ? 4 : h <= 14 ? 5 : 0;
+						case 1 -> h <= 1 ? 1 : h <= 6 ? 2 : h <= 8 ? 4 : h <= 14 ? 5 : 0;
+						default -> h <= 5 ? 1 : h <= 7 ? 4 : h <= 11 ? 2 : h == 12 ? 3 : 0;
 					};
 					switch (kind) {
 						case 1 -> p.set(c, u, y, v, b(Blocks.FLOWERING_AZALEA));
