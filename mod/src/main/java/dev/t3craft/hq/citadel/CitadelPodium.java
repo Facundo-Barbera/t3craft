@@ -232,7 +232,7 @@ public final class CitadelPodium {
 					c.set(x, top + 1, z, CALCITE);
 					c.set(x, top + 2, z, b(Blocks.LANTERN));
 				} else {
-					c.set(x, top + 1, z, CitadelRelief.slabOf(CALCITE)); // an unlit newel is only a pier with a slab, not a lone white block
+					c.set(x, top + 1, z, CitadelRelief.slabOf(STONE)); // an unlit newel is only a pier with a slab, not a lone white block
 				}
 			} else if (h % 2 == 0) {
 				c.set(x, top, z, CitadelRelief.slabOf(copingBlock(x, z)));

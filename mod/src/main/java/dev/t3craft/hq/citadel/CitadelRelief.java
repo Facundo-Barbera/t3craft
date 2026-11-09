@@ -856,7 +856,7 @@ public final class CitadelRelief {
 			if (toLow != null && Math.floorMod(u, 5) == 0 && free(c, x, y + 1, z) && free(c, x, y + 2, z)) {
 				boolean lantern = Math.floorMod(Math.floorDiv(u, 5), 2) == 0;
 				c.set(x, y, z, b(Blocks.CHISELED_STONE_BRICKS));
-				c.set(x, y + 1, z, b(Blocks.SMOOTH_QUARTZ));
+				c.set(x, y + 1, z, b(Blocks.POLISHED_ANDESITE)); // a mid grey shaft, not a white cube
 				c.set(x, y + 2, z, lantern ? b(Blocks.LANTERN) : b(Blocks.POTTED_FLOWERING_AZALEA));
 				if (lantern) {
 					buttress(c, half, x, z, toLow, g); // design/citadel-terraces2: a pilaster under each lit post
