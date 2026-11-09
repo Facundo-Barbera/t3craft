@@ -175,6 +175,24 @@ The lot's seed picks one of three compositions. Each is packed from the lot's ce
 
 Every composition also gets 4 `PLANTER` and the same ground texture.
 
+### Dense lots (scale 1.5 and up, struct/hq-density)
+
+From scale 1.5 (`CitadelPlacement.dense()`; the default is 2.0) the lots are composed with more use and less mass. At scale 1 none
+of this runs and the plan is unchanged.
+
+- **Barrio lots**: before the annexes, 2 (ring 1) or 3 (rings 2–3) `HOUSE` plots of 9 to 15·√k, with a 2-cell **yard**: an azalea
+  hedge on the outside with a gate (two cherry posts with a lantern, 3-wide opening on the door's axis), the front terrace of stone
+  bricks with a barrel and a planter, flower beds on the sides and back, and a dirt **lead path** from the gate on to the nearest
+  path. The corridor opens out one cell each side where it meets the street.
+- **Empty lots** (7 in 8; the 8th stays a park): a small plaza at the centre, two **lanes** (callejones: 3 wide, cobble / gravel /
+  stone brick, deepslate curb, lamps every `LANE_STEP()` = 6 cells, flared at the ends) crossing it, and **four parcels** (one per
+  quadrant). A parcel's use is `(lot seed + 2 · quadrant) mod 5`, so the four are different: vegetable garden (3 beds, shed, well,
+  stall), workshop (a forge/atelier house, 2 sheds, stall), patio (a timber/machiya/engawa house, gazebo, fountain), sheds
+  (3 annexes, 2 gardens, well, stall), market (4 stalls, shed, benches). Every parcel also gets a house, 2 kitchen gardens, 2 trees
+  and 3 planters, as far as the room goes. Plots face the nearer lane and go as close to it as they can.
+- Tools: `Packer.limit/unlimit` confine the plots to a parcel, `Packer.block` takes a painted cell, `Req.weights` biases the
+  variants a request gets (by id), `placeBox(..., pad)` reserves the yard.
+
 ### Streets and avenues
 
 All of these sit on the edge band. The middle of every street stays clear.
