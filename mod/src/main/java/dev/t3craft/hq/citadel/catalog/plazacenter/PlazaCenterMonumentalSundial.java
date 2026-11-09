@@ -267,7 +267,7 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 					if (num) {
 						continue;
 					}
-					if (t >= k.rd - (card ? 2.9 : 1.9)) {
+					if (card && t >= k.rd - 1.9) {
 						k.mark[u][v] = 1;
 						break;
 					}
@@ -314,8 +314,8 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 		int m = k.mark[u][v];
 		BlockState st;
 		if (r > k.rd + 0.5) {
-			// [palette] dark corners round the pale disc, so the dial reads as a circle
-			st = p.hash(u, y, v, 4) == 0 ? b(Blocks.DEEPSLATE_TILES) : b(Blocks.POLISHED_DEEPSLATE);
+			// [palette] grey corners round the dial, so it reads as a circle: pale disc, dark bezel, grey corners
+			st = p.hash(u, y, v, 4) == 0 ? b(Blocks.STONE_BRICKS) : b(Blocks.POLISHED_ANDESITE);
 		} else if (m == 2) {
 			st = b(k.numM);
 		} else if (m == 1) {
@@ -323,7 +323,7 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 		} else if (m == 3) {
 			st = k.gold ? b(Blocks.GOLD_BLOCK) : b(k.dial);
 		} else if (r > k.rd - 1.0) {
-			st = b(Blocks.POLISHED_ANDESITE);
+			st = p.hash(u, y, v, 4) == 0 ? b(Blocks.DEEPSLATE_TILES) : b(Blocks.POLISHED_DEEPSLATE);
 		} else if (Math.abs(dx) <= 1 && Math.abs(dz) <= 1) {
 			st = b(Blocks.POLISHED_DEEPSLATE);
 		} else {
