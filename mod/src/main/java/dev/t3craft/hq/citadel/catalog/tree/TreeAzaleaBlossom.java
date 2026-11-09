@@ -25,8 +25,9 @@ import net.minecraft.world.level.block.state.BlockState;
  * <li><b>Crown:</b> from y 4 up (4 free blocks under it, never a low leaf), a ragged mass of several overlapping lobes
  *     with bites, sun-side flower patches, caps of moss block carrying {@code flowering_azalea} or {@code pink_petals}
  *     on the top surface, and knots of rooted dirt on the underside with hanging roots or a spore blossom.</li>
- * <li><b>Shape ({@link #MODE}):</b> 0 = round crown on a short twisted oak trunk; 1 = wide low dome of many masses
- *     held up by three to five leaning oak stems with mangrove roots at the foot.</li>
+ * <li><b>Shape:</b> a wide, low dome of many overlapping masses (a big shrub, not a trunk with a crown) held up by
+ *     three to five oak stems that stand on prop roots of mangrove roots and lean in under the masses; the middle of
+ *     the plot is an open clearing.</li>
  * <li><b>Foot:</b> rooted dirt, mangrove roots, azalea bushes on mounds of moss block or rooted dirt, potted azaleas,
  *     moss carpet and pink petals.</li>
  * </ul>
@@ -39,8 +40,6 @@ public final class TreeAzaleaBlossom implements Variant {
 	private static final BlockState BLOOM = leaves(Blocks.FLOWERING_AZALEA_LEAVES);
 	/** The lowest y of any leaf or limb (the trunk and its foot aside): 4 free blocks under the crown. */
 	private static final int CLEAR = 4;
-	/** 0 = tree with a trunk, 1 = wide low dome on leaning stems. */
-	private static final int MODE = 0;
 
 	@Override
 	public String id() {
@@ -92,7 +91,6 @@ public final class TreeAzaleaBlossom implements Variant {
 		boolean big;
 		boolean small;
 		int avail;
-		boolean dome;
 		List<double[]> balls = new ArrayList<>();
 		double cuM;
 		double cyM;
@@ -133,16 +131,10 @@ public final class TreeAzaleaBlossom implements Variant {
 		x.big = x.rc >= 4.5;
 		x.small = x.rc < 3.5;
 		x.avail = p.h() - CLEAR;
-		x.dome = MODE == 1;
 		x.sx = 1;
 
-		if (x.dome) {
-			shapeDome(x);
-			stemsDome(x);
-		} else {
-			shapeTree(x);
-			trunkTree(x);
-		}
+		shapeDome(x);
+		stemsDome(x);
 		crown(x);
 		shell(x);
 		// leaves over every tip (after the bites, so a tip is never left bare)
@@ -164,43 +156,7 @@ public final class TreeAzaleaBlossom implements Variant {
 
 	// ------------------------------------------------------------------ shapes
 
-	/** The round crown: one big ellipsoid plus 2–5 satellite lobes, each on its own limb. */
-	private static void shapeTree(X x) {
-		Random r = x.r;
-		double rc = x.rc;
-		boolean small = x.small;
-		x.ryM = Math.max(1.3, Math.min(rc * (small ? 0.95 + 0.1 * r.nextDouble() : 0.62 + 0.18 * r.nextDouble()),
-				(x.avail - 0.4) / 1.92));
-		x.cyM = CLEAR + x.ryM * 0.92;
-		x.rxM = x.ru * (small ? 1.12 : 0.6 + 0.2 * r.nextDouble());
-		x.rzM = x.rv * (small ? 1.12 : 0.6 + 0.2 * r.nextDouble());
-		double slack = Math.max(0, Math.min(x.w / 2.0 - 0.5 - x.rxM, x.d / 2.0 - 0.5 - x.rzM));
-		double la = r.nextDouble() * Math.PI * 2;
-		double lamp = Math.min(slack, 0.3 + 0.7 * r.nextDouble());
-		x.cuM = x.cu0 + Math.cos(la) * lamp;
-		x.cvM = x.cv0 + Math.sin(la) * lamp;
-		x.balls.add(new double[] {x.cuM, x.cyM, x.cvM, x.rxM, x.ryM, x.rzM});
-		int nS = 2 + (rc >= 4.5 ? 1 : 0) + (rc >= 6.5 ? 1 : 0) + (rc >= 3.5 ? r.nextInt(2) : 0);
-		double a0 = r.nextDouble() * Math.PI * 2;
-		for (int i = 0; i < nS; i++) {
-			double ang = a0 + i * Math.PI * 2 / nS + (r.nextDouble() - 0.5) * 0.7;
-			double ex = Math.cos(ang);
-			double ez = Math.sin(ang);
-			double room = TreeKit.room(x.t, x.cuM, x.cvM, ex, ez, 0);
-			double rs = Math.min(rc * (0.4 + 0.16 * r.nextDouble()), Math.max(1.4, (room + 0.5) * 0.5));
-			rs = Math.max(rs, small ? 1.7 : 1.4);
-			double dd = TreeKit.clamp(room + 0.5 - rs, 0, rc * (0.65 + 0.3 * r.nextDouble()));
-			double rys = rs * (0.7 + 0.2 * r.nextDouble());
-			double lo = CLEAR + 0.9 * rys;
-			double hi = x.p.h() - 0.6 - rys;
-			// the first satellite is a low side lobe (a long limb that droops), the others sit at varied heights
-			double cy = i == 1 && !small ? lo : x.cyM + (r.nextDouble() - 0.5) * x.ryM * 1.1;
-			cy = Math.max(lo, Math.min(Math.max(lo, hi), cy));
-			x.balls.add(new double[] {x.cuM + ex * dd, cy, x.cvM + ez * dd, rs, rys, rs * (0.9 + 0.2 * r.nextDouble())});
-		}
-	}
-
-	/** The dome: a tall middle mass and 4–7 lower ones round it, overlapping, wide and low like a big shrub. */
+	/** The dome: a taller middle mass and 4–7 lower ones round it, overlapping, wide and low like a big shrub. */
 	private static void shapeDome(X x) {
 		Random r = x.r;
 		double rc = x.rc;
@@ -231,114 +187,6 @@ public final class TreeAzaleaBlossom implements Variant {
 	}
 
 	// ------------------------------------------------------------------ trunk and stems
-
-	/** Short twisted oak trunk (1×1, a 2×2 bark foot on big plots), roots ending in rooted dirt, limbs to each lobe. */
-	private static void trunkTree(X x) {
-		Vox t = x.t;
-		Random r = x.r;
-		int w = x.w;
-		int d = x.d;
-		boolean big = x.big;
-		x.yTop = Math.min((int) Math.floor(x.cyM), x.p.h() - 1);
-		int yTop = x.yTop;
-		int bu = (int) Math.floor(x.cu0) - ((w & 1) == 1 ? r.nextInt(2) : 0);
-		int bv = (int) Math.floor(x.cv0) - ((d & 1) == 1 ? r.nextInt(2) : 0);
-		int u = big ? bu + r.nextInt(2) : (int) Math.floor(x.cu0);
-		int v = big ? bv + r.nextInt(2) : (int) Math.floor(x.cv0);
-		x.fx0 = big ? bu : u;
-		x.fx1 = big ? bu + 1 : u;
-		x.fz0 = big ? bv : v;
-		x.fz1 = big ? bv + 1 : v;
-		int maxOff = big ? 2 : 1;
-		x.lead0 = new int[] {u, v};
-		int[] stepAt = {CLEAR, 6 + r.nextInt(2), 8 + r.nextInt(2)};
-		int nSteps = big ? 3 : 2;
-		int stepsDone = 0;
-		boolean alongU = r.nextBoolean();
-		int sign = r.nextBoolean() ? 1 : -1;
-		x.lu = new int[yTop + 2];
-		x.lv = new int[yTop + 2];
-		for (int y = 0; y <= yTop; y++) {
-			boolean step = stepsDone < nSteps && y == stepAt[stepsDone] && y < yTop;
-			if (big && y <= 2) {
-				for (int a = 0; a < 2; a++) {
-					for (int k = 0; k < 2; k++) {
-						t.wood(bu + a, y, bv + k, WOOD.bark());
-					}
-				}
-			}
-			if (step) {
-				int nu = u + (alongU ? sign : 0);
-				int nv = v + (alongU ? 0 : sign);
-				int offU = nu - x.lead0[0];
-				int offV = nv - x.lead0[1];
-				if (Math.abs(offU) > maxOff || Math.abs(offV) > maxOff || nu < 1 || nu > w - 2 || nv < 1 || nv > d - 2) {
-					sign = -sign;
-					nu = u + (alongU ? sign : 0);
-					nv = v + (alongU ? 0 : sign);
-				}
-				t.wood(u, y, v, WOOD.bark());
-				t.wood(nu, y, nv, WOOD.bark());
-				u = nu;
-				v = nv;
-				alongU = !alongU;
-				stepsDone++;
-			} else {
-				t.wood(u, y, v, WOOD.log(Direction.Axis.Y));
-			}
-			x.lu[y] = u;
-			x.lv[y] = v;
-		}
-
-		// roots: rooted dirt round the foot, oak roots out of three of the four faces, ending in rooted dirt
-		for (int vv = x.fz0 - 1; vv <= x.fz1 + 1; vv++) {
-			for (int uu = x.fx0 - 1; uu <= x.fx1 + 1; uu++) {
-				if (uu >= x.fx0 && uu <= x.fx1 && vv >= x.fz0 && vv <= x.fz1) {
-					continue;
-				}
-				if (t.empty(uu, 0, vv) && t.hash(uu, 0, vv, 100) < 38) {
-					t.fixed(uu, 0, vv, b(Blocks.ROOTED_DIRT));
-				}
-			}
-		}
-		int skip = r.nextInt(4);
-		for (int k = 0; k < 4; k++) {
-			if (k == skip && !big) {
-				continue;
-			}
-			int du = X.FACES[k][0];
-			int dv = X.FACES[k][1];
-			int su = du < 0 ? x.fx0 - 1 : du > 0 ? x.fx1 + 1 : x.fx0 + r.nextInt(x.fx1 - x.fx0 + 1);
-			int sv = dv < 0 ? x.fz0 - 1 : dv > 0 ? x.fz1 + 1 : x.fz0 + r.nextInt(x.fz1 - x.fz0 + 1);
-			int len = 1 + r.nextInt(big ? 4 : 3);
-			Direction.Axis ax = du != 0 ? Direction.Axis.X : Direction.Axis.Z;
-			for (int i = 0; i < len; i++) {
-				int cu = su + du * i;
-				int cv = sv + dv * i;
-				if (i == 0) {
-					t.woodSoft(cu, 0, cv, WOOD.bark());
-				} else if (i == len - 1) {
-					if (t.empty(cu, 0, cv)) {
-						t.fixed(cu, 0, cv, b(Blocks.ROOTED_DIRT));
-					}
-				} else {
-					t.woodSoft(cu, 0, cv, WOOD.log(ax));
-				}
-			}
-		}
-
-		// limbs: each satellite hangs from its own oak limb that leaves the trunk at y 4 or higher
-		for (int i = 1; i < x.balls.size(); i++) {
-			double[] bl = x.balls.get(i);
-			int sy = TreeKit.clamp(CLEAR + (i & 1), CLEAR, yTop);
-			int eu = TreeKit.clamp((int) Math.round(bl[0]), 0, w - 1);
-			int ev = TreeKit.clamp((int) Math.round(bl[2]), 0, d - 1);
-			int ey = Math.max(CLEAR + 1, (int) Math.round(bl[1]));
-			TreeKit.branch(t, WOOD, new int[] {x.lu[sy], sy, x.lv[sy]}, new int[] {eu, ey, ev}, false);
-			x.tips.add(new int[] {eu, ey, ev});
-		}
-		x.tips.add(new int[] {x.lu[yTop], yTop, x.lv[yTop]});
-	}
 
 	/**
 	 * Three to five oak stems that lean in under the masses of the dome, each on a foot of mangrove roots with rooted
@@ -415,7 +263,7 @@ public final class TreeAzaleaBlossom implements Variant {
 		x.sx = Math.cos(sa);
 		x.sz = Math.sin(sa);
 		x.fb = 0.5 + 0.18 * r.nextDouble();
-		int nHoles = rc < 2.6 ? 0 : rc < 3.5 ? 1 : (x.dome ? 2 : 3) + (int) (rc * (x.dome ? 0.4 : 0.6));
+		int nHoles = rc < 2.6 ? 0 : rc < 3.5 ? 1 : 2 + (int) (rc * 0.4);
 		double[][] holes = new double[nHoles][4];
 		for (int i = 0; i < nHoles; i++) {
 			double ang = r.nextDouble() * Math.PI * 2;
