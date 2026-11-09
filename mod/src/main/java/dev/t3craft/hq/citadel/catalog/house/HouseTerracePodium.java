@@ -453,25 +453,6 @@ public final class HouseTerracePodium implements Variant {
 				k.set(u, pod + 9, v, log(Blocks.STRIPPED_CHERRY_LOG, beam));
 			}
 		}
-		// [depth] hooded lintels over the ground-floor windows of the sides and the back
-		for (int u = g.ha; u <= g.hb; u++) {
-			for (int v = g.hv0 + 1; v <= g.hv1; v++) {
-				boolean ring = u == g.ha || u == g.hb || v == g.hv1;
-				if (!ring || cellKind(g, u, v) != 2) {
-					continue;
-				}
-				if (v == g.hv1 && (u == g.ha || u == g.hb)) {
-					continue;
-				}
-				if (v == g.hv1) {
-					k.set(u, pod + 3, v + 1, stair(Blocks.QUARTZ_STAIRS, Direction.NORTH, true));
-				} else if (u == g.ha) {
-					k.set(u - 1, pod + 3, v, stair(Blocks.QUARTZ_STAIRS, Direction.EAST, true));
-				} else {
-					k.set(u + 1, pod + 3, v, stair(Blocks.QUARTZ_STAIRS, Direction.WEST, true));
-				}
-			}
-		}
 		// [depth] engaged pilasters standing out of the front wall, from the terrace to under the eave (no portico)
 		if (!g.portico) {
 			for (int u = g.ha; u <= g.hb; u++) {
@@ -677,7 +658,7 @@ public final class HouseTerracePodium implements Variant {
 		place(k, iu0 + 1, pod, iv0 + 1, slab(Blocks.CHERRY_SLAB)); // low table
 		for (int v = iv0 + 3; v <= last; v++) {
 			place(k, iu0, pod, v, (v - iv0) % 2 == 1 ? face(Blocks.CHEST, Direction.EAST) : b(Blocks.BARREL));
-			place(k, iu0, pod + 1, v, (v - iv0) % 2 == 1 ? b(Blocks.BARREL) : face(Blocks.CHEST, Direction.EAST));
+			place(k, iu0 + 1, pod, v, (v - iv0) % 2 == 1 ? b(Blocks.BARREL) : face(Blocks.CHEST, Direction.EAST)); // one block high: nothing to climb
 		}
 		place(k, iu1, pod, iv0, b(Blocks.POTTED_FLOWERING_AZALEA));
 		BlockState[] kit = {
