@@ -64,7 +64,7 @@ public final class HubExterior {
 			}
 			if (HubFacade.hasWindow(x, z) && k != Kind.BRIDGE) {
 				c.set(nx, y0() + 2, nz, HubBlocks.stoneSlab(true));
-				c.set(nx, y0() + c.sy(6) + 1, nz, HubBlocks.stoneStairs(d.getOpposite(), true));
+				c.set(nx, y0() + CitadelHub.hy(6) + 1, nz, HubBlocks.stoneStairs(d.getOpposite(), true));
 			}
 			if (!gable && c.at(nx, CitadelHub.aisleTop(), nz) == null) {
 				c.set(nx, CitadelHub.aisleTop(), nz, HubBlocks.stairsTop(Blocks.DEEPSLATE_TILE_STAIRS, d.getOpposite()));
@@ -90,7 +90,7 @@ public final class HubExterior {
 	private static void torii(CitadelCanvas c, int z) {
 		var red = net.minecraft.world.level.block.Blocks.STRIPPED_CRIMSON_STEM;
 		// heights from the lintel (y0 + 7 at scale 1): tie beam 2 below, kasagi 1 above, lanterns under the lintel
-		int lintel = y0() + c.sy(7);
+		int lintel = y0() + CitadelHub.hy(7);
 		for (int sx = -1; sx <= 1; sx += 2) {
 			for (int y = y0() + 1; y <= lintel - 1; y++) {
 				c.set(HubDims.TORII_PILLAR() * sx, y, z, red.defaultBlockState());
