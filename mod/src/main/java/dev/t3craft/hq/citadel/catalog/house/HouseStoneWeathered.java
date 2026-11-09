@@ -411,12 +411,13 @@ public final class HouseStoneWeathered implements Variant {
 
 		/** [depth] a window: timber lintel three wide, stone sill (ground floor only), open shutters. */
 		void window(Wall wl, int a, int y, boolean sill) {
-			Direction.Axis ax = wl.alongU() ? Direction.Axis.X : Direction.Axis.Z;
 			wl.set(a, y, 0, wl.pane());
 			wl.set(a, y + 1, 0, wl.pane());
+			// stone lintel (the timber stays in the bands): polished stone, with a stair cap one block proud
 			for (int t = a - 1; t <= a + 1; t++) {
-				wl.set(t, y + 2, 0, logAxis(Blocks.STRIPPED_DARK_OAK_LOG, ax));
+				wl.set(t, y + 2, 0, b(Blocks.POLISHED_ANDESITE));
 			}
+			wl.set(a, y + 2, 1, wl.stairIn(Blocks.STONE_BRICK_STAIRS, true));
 			if (sill) {
 				wl.set(a, y - 1, 1, wl.stairIn(Blocks.STONE_BRICK_STAIRS, false));
 			}
@@ -467,7 +468,7 @@ public final class HouseStoneWeathered implements Variant {
 				}
 			}
 			for (int u = du - 1; u <= du + 1; u++) {
-				set(u, 4, n, logAxis(Blocks.STRIPPED_DARK_OAK_LOG, Direction.Axis.X));
+				set(u, 4, n, b(Blocks.POLISHED_ANDESITE));
 				set(u, F2, n, logAxis(Blocks.STRIPPED_DARK_OAK_LOG, Direction.Axis.X));
 				for (int y = F2 + 1; y <= P - 1; y++) {
 					BlockState st = u == du && y == P - 2 ? b(Blocks.CHISELED_STONE_BRICKS) : p.hash(u, y, n, 6) == 0 ? b(Blocks.CRACKED_STONE_BRICKS) : b(Blocks.STONE_BRICKS);
@@ -479,7 +480,7 @@ public final class HouseStoneWeathered implements Variant {
 			front.set(du, 2, 0, front.door(Blocks.DARK_OAK_DOOR, false));
 			front.set(du, 3, 0, front.pane());
 			for (int t = du - 1; t <= du + 1; t++) {
-				front.set(t, 4, 0, logAxis(Blocks.STRIPPED_DARK_OAK_LOG, Direction.Axis.X));
+				front.set(t, 4, 0, b(Blocks.POLISHED_ANDESITE));
 			}
 			// the step, flush with the floor
 			set(du, 0, n, stairs(Blocks.STONE_BRICK_STAIRS, Direction.SOUTH));
@@ -495,7 +496,7 @@ public final class HouseStoneWeathered implements Variant {
 			if (roofKind == 0) {
 				return h == 0 ? Blocks.COBBLED_DEEPSLATE_STAIRS : h == 1 ? Blocks.DEEPSLATE_BRICK_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS;
 			}
-			return h <= 1 ? Blocks.DARK_OAK_STAIRS : Blocks.SPRUCE_STAIRS;
+			return h == 0 && (u + v) % 2 == 0 ? Blocks.DARK_OAK_STAIRS : Blocks.SPRUCE_STAIRS;
 		}
 
 		BlockState roofSolid() {
@@ -581,6 +582,11 @@ public final class HouseStoneWeathered implements Variant {
 				set(col, 0, v0 - 1, b(Blocks.COBBLESTONE));
 				set(col, 0, v0 + 2, b(Blocks.MOSSY_COBBLESTONE));
 			}
+			// [finish] a corbelled cap: upside-down stair brackets under the top, a stone course, then the slab
+			set(col, top - 2, v0 - 1, StoneKit.up(stairs(Blocks.STONE_BRICK_STAIRS, Direction.SOUTH)));
+			set(col, top - 2, v0 + 2, StoneKit.up(stairs(Blocks.STONE_BRICK_STAIRS, Direction.NORTH)));
+			set(col, top - 1, v0, b(Blocks.POLISHED_ANDESITE));
+			set(col, top - 1, v0 + 1, b(Blocks.POLISHED_ANDESITE));
 		}
 
 		void chimneys() {
@@ -662,7 +668,6 @@ public final class HouseStoneWeathered implements Variant {
 			for (int v = iv0 + 1; v <= iv0 + 3; v++) {
 				set(tc, 1, v, slab(Blocks.DARK_OAK_SLAB));
 			}
-			set(tc, 2, iv0 + 2, b(Blocks.POTTED_FLOWERING_AZALEA));
 			set(tc, 1, iv0, stairs(Blocks.SPRUCE_STAIRS, Direction.NORTH));
 			set(tc, 1, iv0 + 4, stairs(Blocks.SPRUCE_STAIRS, Direction.SOUTH));
 			// workshop wall (or the forge opening): crafting and two stations by seed, chest, barrel
