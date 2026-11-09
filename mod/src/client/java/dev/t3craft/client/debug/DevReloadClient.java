@@ -5,12 +5,17 @@ import static net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import dev.t3craft.client.T3CraftClient;
+import dev.t3craft.client.hud.PeekHud;
+import dev.t3craft.client.npc.NpcInfo;
+import dev.t3craft.client.npc.NpcRegistry;
+import dev.t3craft.client.npc.ThreadAvatar;
 import dev.t3craft.debug.DevReload;
 import dev.t3craft.debug.ModuleGuard;
 import dev.t3craft.debug.PerfStats;
 import dev.t3craft.debug.ResetReason;
-import java.util.ArrayList;
-import java.util.List;
+import dev.t3craft.t3.DirectController;
+import dev.t3craft.t3.ShellState;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
@@ -39,19 +44,20 @@ import org.slf4j.LoggerFactory;
 public final class DevReloadClient implements ClientModInitializer {
 	private static final Logger LOG = LoggerFactory.getLogger("t3craft/devreload");
 	static final int POLL_TICKS = 40;
-	/** State holders whose class layout matters after a hot-swap. Detection only; reset is theirs. */
-	private static final String[] WATCHED = {
-			"dev.t3craft.client.T3CraftClient",
-			"dev.t3craft.client.npc.NpcRegistry",
-			"dev.t3craft.client.npc.NpcInfo",
-			"dev.t3craft.client.npc.ThreadAvatar",
-			"dev.t3craft.client.hud.PeekHud",
-			"dev.t3craft.t3.DirectController",
-			"dev.t3craft.t3.ShellState",
+	/** State holders whose class layout matters after a hot-swap. Detection only; reset is theirs. Class literals, so a rename fails the build instead of silently un-watching. */
+	private static final Class<?>[] WATCHED = {
+			T3CraftClient.class,
+			NpcRegistry.class,
+			NpcInfo.class,
+			ThreadAvatar.class,
+			PeekHud.class,
+			DirectController.class,
+			ShellState.class,
 	};
 
 	private int ticks;
 
+	/** Hot-swap polling: {@code -Dt3craft.devreload=true|false}, else on only in a development environment. */
 	public static boolean pollingEnabled() {
 		String prop = System.getProperty("t3craft.devreload");
 		if (prop != null) {
@@ -60,32 +66,37 @@ public final class DevReloadClient implements ClientModInitializer {
 		return FabricLoader.getInstance().isDevelopmentEnvironment();
 	}
 
+	/** {@code /t3dev perf} counters: {@code -Dt3craft.perf=true|false}, else on only in a development environment. */
+	public static boolean perfEnabled() {
+		String prop = System.getProperty("t3craft.perf");
+		if (prop != null && !prop.isBlank()) {
+			return Boolean.parseBoolean(prop.trim());
+		}
+		return FabricLoader.getInstance().isDevelopmentEnvironment();
+	}
+
 	@Override
 	public void onInitializeClient() {
+		// the commands stay registered everywhere; only the background work below is opt-in (docs/dev.md, "Debug tooling switches")
 		ClientCommandRegistrationCallback.EVENT.register((dispatcher, ctx) -> registerCommand(dispatcher));
-		// /t3dev perf: per-second rates over the last full second (one roll per second, a few map reads)
-		ClientTickEvents.END_CLIENT_TICK.register(mc -> PerfStats.get().roll(1_000_000_000L));
-		// fix/new-thread-hitch: frame/tick watchdog with stack samples of slow frames ([hitch] WARN, /t3dev perf hitches)
+		// /t3dev perf: per-second rates over the last full second (one roll per second, a few map reads); counters off by default
+		if (perfEnabled()) {
+			PerfStats.setEnabled(true);
+			ClientTickEvents.END_CLIENT_TICK.register(mc -> PerfStats.get().roll(1_000_000_000L));
+		}
+		// fix/new-thread-hitch: frame/tick watchdog with stack samples of slow frames ([hitch] WARN, /t3dev perf hitches); off by default
 		HitchWatchClient.init();
 		if (!pollingEnabled()) {
 			return;
 		}
-		List<Class<?>> watched = new ArrayList<>();
-		for (String name : WATCHED) {
-			try {
-				watched.add(Class.forName(name, false, DevReloadClient.class.getClassLoader()));
-			} catch (ClassNotFoundException | LinkageError e) {
-				LOG.debug("not watching {} ({})", name, e.toString());
-			}
-		}
 		DevReload.get().register("t3craft.watch", reason -> {
-		}, watched.toArray(Class<?>[]::new));
+		}, WATCHED);
 		ClientTickEvents.END_CLIENT_TICK.register(GuardedEvents.endClientTick("devreload.poll", mc -> {
 			if (++ticks % POLL_TICKS == 0) {
 				DevReload.get().checkForRedefinition();
 			}
 		}));
-		LOG.info("hot-swap safety net on: watching {} class(es), polling every {} ticks", watched.size(), POLL_TICKS);
+		LOG.info("hot-swap safety net on: watching {} class(es), polling every {} ticks", WATCHED.length, POLL_TICKS);
 	}
 
 	private static void registerCommand(CommandDispatcher<FabricClientCommandSource> d) {
@@ -128,6 +139,9 @@ public final class DevReloadClient implements ClientModInitializer {
 
 	/** FPS and every counter with activity in the last second (see docs/dev.md, "Performance"). */
 	private static int perf(FabricClientCommandSource src) {
+		if (!PerfStats.enabled()) {
+			src.sendFeedback(prefix().append("perf counters are off; start the game with -Dt3craft.perf=true (see docs/dev.md)").withStyle(ChatFormatting.GRAY));
+		}
 		src.sendFeedback(prefix().append(Minecraft.getInstance().getFps() + " fps; per second over the last second:"));
 		int shown = 0;
 		for (PerfStats.Rate r : PerfStats.get().rates()) {

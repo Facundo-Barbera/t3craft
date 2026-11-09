@@ -102,7 +102,11 @@ public final class RenderDaemon {
 
 	/** Round-robin window: an agent's job starts in the last 30 min decide its turn. */
 	static final long RR_WINDOW_MS = 30L * 60 * 1000;
-	/** Global layout-pack state a {@code --packs} render switches (shared between jobs only when pinned). */
+	/**
+	 * Global layout-pack state a {@code --packs} render switches (shared between jobs only when pinned).
+	 * A string on purpose: read by {@code pinned.isShared} and {@code JobRunner.exclusive}, to name a class that
+	 * {@code RenderClassLoader} loads per job (this tool's source set cannot reference it).
+	 */
 	static final String PACKS_CLASS = "dev.t3craft.hq.pack.HqLayoutPacks";
 
 	static final long OUTBOX_MAX_AGE_MS = 24L * 60 * 60 * 1000;

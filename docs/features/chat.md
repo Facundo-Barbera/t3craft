@@ -221,8 +221,8 @@ sub.close();                                               // la última vista h
 - **Config**: `T3CraftSettings.chat` / `ChatPrefs` / `withChat`, y la sección `chat` en
   `ConfigCodec`. Todo aditivo.
 - **Recursos**: sprites en `assets/t3craft/textures/gui/sprites/chat/` (atlas GUI vanilla).
-- **Portable**: `PortableLinks` descubre `ChatScreens.open(String, String)` por reflexión, y esa
-  firma se mantiene. En la ronda 2 puede incrustar `ThreadBrowser` con su propio tema.
+- **Portable**: `PortableLinks` enlaza `ChatScreens.open(String, String)` directamente (referencia
+  de método), y esa firma se mantiene. En la ronda 2 puede incrustar `ThreadBrowser` con su propio tema.
 - `PortableClient` todavía abre `client/screen/ThreadChatScreen` (el placeholder de main). Lo dejé
   sin tocar porque no es de esta rama.
 

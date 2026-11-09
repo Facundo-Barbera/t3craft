@@ -67,6 +67,10 @@ public final class HitchWatchClient {
 		w.configure(on, ms);
 		w.context(HitchWatchClient::context);
 		T3Craft.LOGGER.info("[hitch] frame/tick watchdog {} (report over {} ms; config/t3craft.json debug.hitches)", on ? "on" : "off", w.reportMs());
+		if (!on) {
+			// the setting is read once, so when it is off no callback is registered at all (D3: nothing per tick in a normal game)
+			return;
+		}
 
 		try {
 			LevelRenderEvents.END_MAIN.register(ctx -> w.frame());

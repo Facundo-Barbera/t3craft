@@ -123,10 +123,25 @@ Rules of thumb for hot-swap-friendly code:
 
 ## Performance
 
+### Debug tooling switches (decision D3: off in a normal game)
+
+`dev.t3craft.debug` and `dev.t3craft.client.debug` stay in the jar. The `/t3dev` commands are always
+registered; only the background work is opt-in. `ModuleGuard` (try/catch around module ticks) is a safety
+net, not debug tooling, and is always on.
+
+| Switch | Controls | Default |
+|---|---|---|
+| `-Dt3craft.perf=true\|false` | `PerfStats` counters and step timers (`/t3dev perf`, `perf steps`), the once-a-second roll, the `[perf] slow step` WARN | on in a development environment, off otherwise |
+| `-Dt3craft.hitches=true\|false` or `config/t3craft.json` `"debug": {"hitches": …}` | `HitchWatch` frame/tick watchdog, its sampler thread and its tick/render callbacks (the property wins) | on in a development environment, off otherwise |
+| `-Dt3craft.devreload=true\|false` | hot-swap polling every 40 ticks and the watched class list (needs JetBrains Runtime for shape changes) | on in a development environment, off otherwise |
+
+With a switch off, `/t3dev perf` and `/t3dev perf hitches` say so and show nothing; `/t3dev status`, `reset`,
+`check`, `enable` and `disable` keep working.
+
 ### In game: `/t3dev perf`
 
-`/t3dev perf` prints the FPS and every counter that moved during the last second
-(`dev.t3craft.debug.PerfStats`, rolled once a second from the client tick). `/t3dev perf reset`
+`/t3dev perf` (needs `-Dt3craft.perf=true` outside a development environment) prints the FPS and every counter
+that moved during the last second (`dev.t3craft.debug.PerfStats`, rolled once a second from the client tick). `/t3dev perf reset`
 zeroes them. Timers end in `.ns` and print as **ms per second** (red when above 20 ms/s, i.e. more
 than 1 ms per client tick on average):
 
