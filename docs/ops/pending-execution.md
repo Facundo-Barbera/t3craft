@@ -43,15 +43,47 @@ Quedan como estaban:
 - **Descartadas a propósito** (ver "Sin integrar" en `docs/ops/night-2026-11-09.md`): `cat/bridge-stone-arch`, `cat/bridge-covered-timber`, `struct/avenue-lamps` 1–3 y `cat/planter-tall-pot`, que espera la decisión sobre `PLANTER_H`.
 - **Exploraciones de estilo del 2026-11-08:** `design/{steampunk,gothic,skyislands,mesoamerican,dwarven,undersea,cyberpunk,nordic,arctic,treehouse,solarpunk,pirate,mediterranean,brutalist,orbital}` y `feat/hq-spacious-rooms`.
 
+### Preparación del 2026-11-09 por la tarde (tareas 1 y 2)
+- **GitHub Actions apagado del todo:**
+  - permisos en `enabled:false`;
+  - `.github/` borrado de main (`chore/remove-ci`);
+  - 0 workflows, 0 corridas pendientes;
+  - artifacts y caches en 0 (se borraron 264 artifacts y 111 caches, unos 8 GB de caché);
+  - sin Pages, runners propios, Dependabot ni code scanning.
+
+  Regla en `AGENTS.md`.
+- **Layout del repo** (`chore/repo-layout`):
+  - docs en `features/`, `plans/`, `ops/` e índice `docs/README.md`;
+  - `mod/tools` → `tools/art`;
+  - 257 PNG fuera del árbol (tag `archive/research-renders-2026-11-09`).
+- **Ramas:**
+  - se borraron 308 ramas remotas ya integradas; en origin quedan 40 sin integrar más `main`;
+  - en la VPS se quitaron 39 worktrees limpios e integrados y las ramas locales bajaron de 564 a 41;
+  - en la Mac quedó solo `main`.
+- **PC:**
+  - main compila (`2bca8f4b`, `build hqrenderClasses uirenderClasses`, 18 s).
+  - **El daemon de render quedó parado:** tenía el lock pesado global tomado y no hay sesión de renders. Se levanta con `tools/render/start-daemon.sh` y en el arranque recompila el baseline.
+
+### Propuestas pendientes de OK (no se tocaron)
+- **Las 40 ramas sin integrar.** Archivar quiere decir: tag `archive/<rama>` subido, después se borran la rama y su worktree en la VPS.
+  - **Se quedan, en pausa:** `cat/gate-torii-cherry2`, `cat/gate-arch-battlement2`, `cat/lamp-brazier-tripod2`, `cat/tree-azalea-blossom2`, `struct/signposts`, `cat/statue-obelisk-braziers` y `feat/kit-blocks-art`. Sus rondas 1 (`cat/gate-torii-cherry`, `cat/gate-arch-battlement`, `cat/lamp-brazier-tripod`, `cat/tree-azalea-blossom`) se quedan hasta cerrar la ronda 2.
+  - **Se quedan hasta que Facundo decida:** `cat/planter-tall-pot` (`PLANTER_H`) y `cat/bridge-stone-arch` / `cat/bridge-covered-timber` (puentes).
+  - **Se archivan:**
+    - reemplazadas: `struct/hub-statues`, `struct/hub-statues2`, `struct/leader-office5`, `citadel/1-connect`, `citadel/scale`;
+    - descartadas: `struct/avenue-lamps`, `struct/avenue-lamps2`, `struct/avenue-lamps3`;
+    - las 15 exploraciones `design/*` del 2026-11-08 y `feat/hq-spacious-rooms`;
+    - rescates sin valor: `t3/paper-lantern-kit-1`, `rescue/barrio-hall3-before-settle-dbg`.
+- **Worktrees de jobs en el PC** (`~/t3craft-jobs`): son 173 worktrees y ocupan 30 GB. Están todos sucios, porque el relay desempaca encima el `mod/src` de cada agente, y su contenido son copias de ramas que ya están subidas. Propuesta: borrarlos; el relay los vuelve a crear cuando hacen falta.
+- **Relay y regla 9:** que el relay deje de copiar PNG a la VPS y traiga solo reportes, o miniaturas generadas en el PC. Está en pausa junto con los renders.
+
 ### Siguiente, en orden
-1. **Probar la cadena desde la Mac mini:** compilar main en el PC con `tools/heavy.sh`, con un script por stdin.
-   - El checkout del PC está en `df0d483b` y le falta un fetch.
-   - El PC tiene 15 GB y el daemon de render corre con `-Xmx10g`. Con ~9 GB libres, apenas pasa el umbral de 8 GB de `heavy.sh`.
-   - Hay que mirar si el daemon tiene tomado el lock global mientras está inactivo.
-2. **Previews chicas en el relay:** que el PC genere copias de ≤ 768 px de cada PNG y que el relay traiga solo esas a la VPS (regla 9). Hasta entonces, los hilos no abren ningún PNG.
-3. **Sesión de renders nueva**, solo si Facundo la aprueba.
-4. **Cerrar las rondas en curso** con un hilo hijo por rama y seguir con `night-queue.md`.
-5. **Decisiones de Facundo:** siguen abiertas las de `docs/ops/night-2026-11-09.md` ("Decisiones que te tocan": `PLANTER_H`, puentes, iluminación de avenidas, musgo).
+1. **Aprobación de Facundo:**
+   - plan de limpieza de código (`docs/plans/code-cleanup.md`, decisiones D1–D5);
+   - lista de desinstalación de la VPS;
+   - las propuestas de arriba.
+2. **Ejecución de la limpieza:** hijos en la VPS con `delegate_task` contra `vps-env`, en Sonnet, como máximo 8, por fases.
+3. **En pausa hasta nuevo aviso:** las rondas `cat/*` y `struct/*` cortadas, la sesión de renders y las miniaturas del relay.
+4. **Decisiones de diseño abiertas:** las de `docs/ops/night-2026-11-09.md`, en "Decisiones que te tocan" (`PLANTER_H`, puentes, iluminación de avenidas, musgo).
 
 ## Historial (antes del 2026-11-09 17:30; puede estar desactualizado)
 Esto se escribió durante la moratoria y a lo largo del día, y buena parte ya está integrada: ver `docs/ops/night-2026-11-09.md`.
