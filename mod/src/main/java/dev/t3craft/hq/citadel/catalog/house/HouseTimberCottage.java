@@ -92,9 +92,9 @@ public final class HouseTimberCottage implements Variant {
 	}
 
 	private static final Scheme[] SCHEMES = {
-			new Scheme(Blocks.SPRUCE_LOG, b(Blocks.CALCITE), Blocks.DEEPSLATE_TILE_STAIRS, Blocks.CHERRY_STAIRS, Blocks.DEEPSLATE_BRICK_STAIRS,
+			new Scheme(Blocks.STRIPPED_SPRUCE_LOG, b(Blocks.CALCITE), Blocks.DEEPSLATE_TILE_STAIRS, Blocks.CHERRY_STAIRS, Blocks.DEEPSLATE_BRICK_STAIRS,
 					Blocks.DEEPSLATE_TILES, Blocks.DEEPSLATE_TILE_SLAB, Blocks.CHERRY_DOOR, Blocks.CHERRY_TRAPDOOR, Blocks.SPRUCE_STAIRS),
-			new Scheme(Blocks.SPRUCE_LOG, b(Blocks.CALCITE), Blocks.CHERRY_STAIRS, Blocks.DEEPSLATE_TILE_STAIRS, null,
+			new Scheme(Blocks.STRIPPED_SPRUCE_LOG, b(Blocks.CALCITE), Blocks.CHERRY_STAIRS, Blocks.DEEPSLATE_TILE_STAIRS, null,
 					Blocks.POLISHED_DEEPSLATE, Blocks.DEEPSLATE_TILE_SLAB, Blocks.DARK_OAK_DOOR, Blocks.DARK_OAK_TRAPDOOR, Blocks.SPRUCE_STAIRS),
 	};
 
@@ -478,8 +478,8 @@ public final class HouseTimberCottage implements Variant {
 		 * stairs stay in place under the dormer roof), so there is no floor up there for the audit to count.
 		 */
 		void dormers() {
-			int r = fy + 1;
-			int base = plate + 1;
+			int r = Math.max(fy + 1, Math.min(fy + 2, fy + (bd - 1) / 2 - 3));
+			int base = plate + (r - fy);
 			int[] cols;
 			if (bw >= 16) {
 				int q = (ub - ua) / 4;
@@ -498,6 +498,10 @@ public final class HouseTimberCottage implements Variant {
 				}
 				set(dc, base + 2, r, s.plaster());
 				TimberKit.gable(c, p, false, r, r + 2, dc - 1, dc + 1, base + 2, s.roof(), s.eave(), s.ridge(), s.ridgeSlab(), true, false);
+				for (int v = r; v <= r + 2; v++) {
+					set(dc, base + 3, v, TimberKit.slab(s.ridgeSlab(), false)); // a thin cap, not a full block and a slab
+					set(dc, base + 4, v, AIR);
+				}
 			}
 		}
 
@@ -659,6 +663,7 @@ public final class HouseTimberCottage implements Variant {
 				case 3 -> b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP);
 				case 4 -> b(Blocks.CHEST).setValue(BlockStateProperties.HORIZONTAL_FACING, f);
 				case 5 -> b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP);
+				case 9 -> b(Blocks.BOOKSHELF);
 				case 6 -> b(Blocks.LECTERN).setValue(BlockStateProperties.HORIZONTAL_FACING, f);
 				default -> b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP);
 			};
@@ -743,7 +748,7 @@ public final class HouseTimberCottage implements Variant {
 				}
 			}
 			// kitchen along the back wall, then storage
-			fill(r, 0, 1, 2, 3, 4, 5, 4, 3);
+			fill(r, 0, 1, 2, 3, 4, 5, 4, 3, 9, 9, 9, 9);
 		}
 
 		void furnishUpper() {
@@ -763,7 +768,16 @@ public final class HouseTimberCottage implements Variant {
 					}
 				}
 			}
-			fill(r, 4, 6, 4, 3, 4);
+			// a study table with two chairs in the middle of the room
+			int cu = (iu0 + iu1) / 2;
+			int tv = (vfU + 1 + iv1) / 2;
+			if (r.free(cu, tv) && r.free(cu + 1, tv) && r.free(cu, tv - 1) && r.free(cu, tv + 1)) {
+				r.put(cu, tv, TimberKit.slab(Blocks.DARK_OAK_SLAB, true));
+				r.put(cu + 1, tv, TimberKit.slab(Blocks.DARK_OAK_SLAB, true));
+				r.put(cu, tv - 1, TimberKit.stair(Blocks.SPRUCE_STAIRS, Direction.NORTH, false));
+				r.put(cu, tv + 1, TimberKit.stair(Blocks.SPRUCE_STAIRS, Direction.SOUTH, false));
+			}
+			fill(r, 4, 6, 4, 3, 4, 9, 9, 9, 9);
 		}
 
 		/** The walk-up flight along the left wall: five steps from the floor to the upper floor, a fence round the hole. */
