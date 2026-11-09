@@ -35,7 +35,7 @@ import net.minecraft.world.level.block.state.properties.BooleanProperty;
  * clear under an open timber roof) with desks and chiselled shelves along both walls, a binding corner (loom,
  * barrels, ink cauldron) under a loft that holds the archive, a cartography table and the copyist's cell, a
  * switchback stair in one back corner, and, when the lot is wide enough, a small cloister next to it: a hedged
- * garth with a bench, ink vats and beds of ink plants (cornflower, allium, berries).
+ * garth with a bench, ink vats and beds of ink plants (cornflower, allium, berries), reached by a side door from the hall.
  *
  * <p>Concept: Cistercian scriptoria and Sainte-Chapelle glazing in the citadel palette. Deepslate plinth, tuff then
  * stone-brick then calcite piers that stand a block proud as buttresses, tall mullioned windows between them,
@@ -139,6 +139,7 @@ public final class HouseScriptorium implements Variant {
 		final boolean rose;
 		final Mat mat;
 		final int[] kind;
+		final int doorRow; // the side door to the cloister, or -1
 
 		L(Plot p, Random r) {
 			w = p.w();
@@ -162,6 +163,13 @@ public final class HouseScriptorium implements Variant {
 			rose = r.nextInt(3) != 0;
 			mat = mat(r.nextInt(3));
 			kind = rhythm(vb);
+			int dr = -1;
+			for (int v = 3; v < vs && dr < 0; v++) {
+				if (kind[v] == 2) {
+					dr = v;
+				}
+			}
+			doorRow = s >= 3 ? dr : -1;
 		}
 
 		/** The interior column {@code k} steps in from the stair-side wall. */
@@ -225,8 +233,10 @@ public final class HouseScriptorium implements Variant {
 		plate(c, p, g);
 		roof(c, p, g);
 		gables(c, p, g);
+		dormers(c, p, g);
 		trusses(c, p, g);
 		interior(c, p, g);
+		sideDoor(c, p, g);
 		yard(c, p, g);
 	}
 
@@ -632,12 +642,63 @@ public final class HouseScriptorium implements Variant {
 		p.set(c, cu, ry, g.vb, tintBlock(DyeColor.ORANGE));
 	}
 
+	// ------------------------------------------------------------------ dormers
+
+	/**
+	 * [finish] small gabled dormers on both slopes, over the middle of the odd window bays: an opening in the roof, a
+	 * stained pane, stone cheeks and a trim gable. They light the nave and break up the two big roof planes.
+	 */
+	private static void dormers(CitadelCanvas c, Plot p, L g) {
+		Mat m = g.mat;
+		for (int v = 3; v <= g.bd - 5; v++) {
+			if (g.kind.length <= v || g.kind[v] != 2) {
+				continue;
+			}
+			for (int side = 0; side < 2; side++) {
+				int u2 = side == 0 ? g.bu0 + 2 : g.bu0 + g.bw - 3;
+				int u3 = side == 0 ? g.bu0 + 3 : g.bu0 + g.bw - 4;
+				p.set(c, u2, 15, v, tintPane(jewel(p, side, 15, v), false));
+				p.set(c, u2, 15, v - 1, b(Blocks.STONE_BRICKS));
+				p.set(c, u2, 15, v + 1, b(Blocks.STONE_BRICKS));
+				p.set(c, u3, 15, v, CitadelCanvas.AIR); // the opening in the roof
+				for (int u : new int[] {u2, u3}) {
+					p.set(c, u, 16, v - 1, stair(m.trimStairs(), Direction.SOUTH, false));
+					p.set(c, u, 16, v + 1, stair(m.trimStairs(), Direction.NORTH, false));
+					p.set(c, u, 16, v, b(m.trimPlanks()));
+				}
+			}
+		}
+	}
+
+	// ------------------------------------------------------------------ side door to the cloister
+
+	/** A door from the hall into the cloister, in the first odd window bay of the hall, with a step outside. */
+	private static void sideDoor(CitadelCanvas c, Plot p, L g) {
+		if (g.doorRow < 0) {
+			return;
+		}
+		int v = g.doorRow;
+		int wallU = g.courtLeft ? g.wl : g.wr;
+		int out = g.courtLeft ? g.out0() : g.out1();
+		Direction outward = g.courtLeft ? Direction.WEST : Direction.EAST;
+		Direction inward = g.courtLeft ? Direction.EAST : Direction.WEST;
+		p.set(c, wallU, 1, v, door(g.mat.door(), outward, false));
+		p.set(c, wallU, 2, v, door(g.mat.door(), outward, true));
+		p.set(c, wallU, 3, v, b(Blocks.CHISELED_STONE_BRICKS));
+		p.set(c, out, 0, v, stair(Blocks.DEEPSLATE_BRICK_STAIRS, inward, false));
+		p.set(c, out, 1, v, CitadelCanvas.AIR);
+		p.set(c, out, 2, v, CitadelCanvas.AIR);
+	}
+
 	// ------------------------------------------------------------------ trusses (tie beams and collars)
 
+	/** Trusses sit on the piers and on the middle of the odd bays. */
 	private static int[] tieRows(L g) {
 		List<Integer> rows = new ArrayList<>();
-		for (int v = 4; v <= g.vb - 2; v += 4) {
-			rows.add(v);
+		for (int v = 2; v < g.vb; v++) {
+			if (g.kind[v] != 1) {
+				rows.add(v);
+			}
 		}
 		int[] out = new int[rows.size()];
 		for (int i = 0; i < out.length; i++) {
@@ -731,10 +792,18 @@ public final class HouseScriptorium implements Variant {
 		}
 
 		// ---- ground floor: shelves along the walls, desks, the binding corner
+		int courtCol = g.courtLeft ? g.iu0 : g.iu1;
+		int dv = g.doorRow;
 		for (int r = 2; r <= vs - 3; r++) {
+			if (dv >= 0 && c0 == courtCol && Math.abs(r - dv) <= 1) {
+				continue; // the side door
+			}
 			shelfStack(c, p, c0, r, toFar);
 		}
 		for (int r = 2; r <= ivb; r++) {
+			if (dv >= 0 && far == courtCol && Math.abs(r - dv) <= 1) {
+				continue;
+			}
 			if (r < vs) {
 				shelfStack(c, p, far, r, toWell);
 			} else if ((r - vs) % 2 == 1) {
@@ -749,16 +818,22 @@ public final class HouseScriptorium implements Variant {
 		int wd = g.col(1);
 		for (int r = 3; r <= vs - 2; r++) {
 			int idx = (r - 3) % 3;
+			boolean fdOpen = fd == g.col(iw - 2) && Math.abs(fd - courtCol) == 1 && r == dv;
+			boolean wdOpen = Math.abs(wd - courtCol) == 1 && r == dv;
+			if (fdOpen) {
+				idx = 2;
+			}
 			if (idx == 0) {
 				p.set(c, fd, 1, r, lectern(toWell));
 			} else if (idx == 1) {
 				p.set(c, fd, 1, r, b(Blocks.SPRUCE_PLANKS));
 				p.set(c, fd, 2, r, candle(3));
 			}
-			if (r <= vs - 3) {
-				if (idx == 0) {
+			if (r <= vs - 3 && !wdOpen) {
+				int widx = (r - 3) % 3;
+				if (widx == 0) {
 					p.set(c, wd, 1, r, r == 3 ? b(Blocks.CARTOGRAPHY_TABLE) : lectern(toFar));
-				} else if (idx == 1) {
+				} else if (widx == 1) {
 					p.set(c, wd, 1, r, b(Blocks.SPRUCE_PLANKS));
 					p.set(c, wd, 2, r, candle(2));
 				}
@@ -858,7 +933,7 @@ public final class HouseScriptorium implements Variant {
 			hedge(c, p, u, v);
 			return;
 		}
-		int vm = g.d / 2;
+		int vm = g.doorRow >= 0 ? g.doorRow : g.d / 2;
 		boolean pathCol = s >= 3 && ca == gc;
 		boolean pathRow = s >= 3 && v == vm;
 		if (pathCol || pathRow) {
