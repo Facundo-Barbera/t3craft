@@ -239,6 +239,7 @@ public final class HouseStoneWeathered implements Variant {
 			}
 			gables();
 			chimneys();
+			buttresses();
 			eaves();
 			stair();
 			groundFloor();
@@ -492,11 +493,14 @@ public final class HouseStoneWeathered implements Variant {
 			if (edge) {
 				return Blocks.DARK_OAK_STAIRS;
 			}
-			int h = p.hash(u, 31, v, 9);
+			// [palette] a course every third row, the same on both slopes; a few weathered tiles in the field
+			int h = p.hash(u, 31, v, 12);
+			int l = roofL(v);
+			boolean band = l > 0 && l % 3 == 0;
 			if (roofKind == 0) {
-				return h == 0 ? Blocks.COBBLED_DEEPSLATE_STAIRS : h == 1 ? Blocks.DEEPSLATE_BRICK_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS;
+				return band ? Blocks.DEEPSLATE_BRICK_STAIRS : h == 0 ? Blocks.COBBLED_DEEPSLATE_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS;
 			}
-			return h == 0 && (u + v) % 2 == 0 ? Blocks.DARK_OAK_STAIRS : Blocks.SPRUCE_STAIRS;
+			return band ? Blocks.DARK_OAK_STAIRS : h == 0 ? Blocks.OAK_STAIRS : Blocks.SPRUCE_STAIRS;
 		}
 
 		BlockState roofSolid() {
@@ -587,6 +591,25 @@ public final class HouseStoneWeathered implements Variant {
 						set(col, P + lmax - 2, v, b(Blocks.TINTED_GLASS));
 					}
 				}
+			}
+		}
+
+		/**
+		 * [depth] two buttresses on the gable end opposite the kitchen (unless the forge is there): a cobble foot, a brick
+		 * course and a sloped cap. They stay under the gable, high above the roof, so nothing is left to stand on under it.
+		 */
+		void buttresses() {
+			if (ell) {
+				return;
+			}
+			Wall ww = kRight ? wLeft : wRight;
+			for (int t : new int[] {va + 2, vb - 2}) {
+				if (roofL(t) < 3 || t == (va + vb) / 2) {
+					continue;
+				}
+				ww.set(t, 0, 1, b(Blocks.MOSSY_COBBLESTONE));
+				ww.set(t, 1, 1, b(Blocks.STONE_BRICKS));
+				ww.set(t, 2, 1, ww.stairIn(Blocks.STONE_BRICK_STAIRS, false));
 			}
 		}
 
