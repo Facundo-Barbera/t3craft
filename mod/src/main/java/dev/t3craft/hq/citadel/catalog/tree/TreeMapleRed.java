@@ -91,7 +91,8 @@ public final class TreeMapleRed implements Variant {
 		double bias = (r.nextInt(5) - 2) * 0.08; // some trees lean redder, some more orange
 		double sun = r.nextDouble() * Math.PI * 2;
 		double a0 = r.nextDouble() * Math.PI * 2;
-		int topY = H >= 13 ? H - 2 : Math.min(H - 2, H >= 11 ? 9 : 8); // main layer of the crown pad over the leader (a broad, low crown)
+		int lowY = m <= 5 ? 3 : 4;
+		int topY = H >= 13 ? H - 2 : m <= 5 ? 6 : Math.min(H - 2, m <= 7 ? 7 + (H >= 11 ? 1 : 0) : H >= 11 ? 9 : 8); // main layer of the crown pad over the leader (a broad, low crown)
 
 		// ---- foot: a 2×2 flare of bark, short roots
 		for (int a = 0; a < 2; a++) {
@@ -149,16 +150,16 @@ public final class TreeMapleRed implements Variant {
 		double ccv = tv[topY];
 
 		// ---- the fans: a low ring, a middle ring on tall plots, the crown over the leader
-		double rbase = TreeKit.clamp(m * 0.37, 2.0, 5.0);
+		double rbase = TreeKit.clamp(m * 0.34, 1.9, 4.6);
 		int nLow = m <= 5 ? 2 : m <= 7 ? 3 : m <= 10 ? 4 : 5;
 		double step = Math.PI * 2 / nLow;
 		int id = 1;
 		for (int k = 0; k < nLow; k++) {
 			double ang = a0 + k * step + (r.nextDouble() - 0.5) * 0.7;
-			int py = 4 + ((k & 1) == 1 && H >= 10 ? 1 : 0) + (r.nextInt(5) == 0 ? 1 : 0);
+			int py = lowY + ((k & 1) == 1 && H >= 10 ? 1 : 0) + (r.nextInt(5) == 0 ? 1 : 0);
 			double rx = rbase * (0.9 + r.nextDouble() * 0.35);
 			double rz = rx * (0.72 + r.nextDouble() * 0.28);
-			fan(t, r, cu0, cv0, ang, 0.68 + r.nextDouble() * 0.14, rx, rz, py, 2 + (k & 1), tu, tv, id++, sun, bias, 0.0, m);
+			fan(t, r, cu0, cv0, ang, 0.8 + r.nextDouble() * 0.15, rx, rz, py, 2 + (k & 1), tu, tv, id++, sun, bias, 0.0, m);
 		}
 		if (H >= 13) {
 			int nMid = m >= 8 ? 3 : 2;
@@ -222,7 +223,7 @@ public final class TreeMapleRed implements Variant {
 		}
 		int fu0 = (int) Math.round(fu);
 		int fv0 = (int) Math.round(fv);
-		double hue = 0.35 + 0.3 * Math.cos(ang - sun) * (reach > 0 ? 1 : 0.5) + 0.03 * (py - 4) + hueUp + bias;
+		double hue = 0.3 + 0.3 * Math.cos(ang - sun) * (reach > 0 ? 1 : 0.5) + 0.025 * (py - 4) + hueUp + bias;
 		if (reach > 0) {
 			// the limb: from the trunk out and then up into the fan
 			int y0 = TreeKit.clamp(ys, 2, py - 1);
@@ -258,7 +259,7 @@ public final class TreeMapleRed implements Variant {
 				double qq = q / scallop;
 				double jit = (t.hash(u, cy, v, 9) - 4.0) / 4.0 * 0.16;
 				boolean centre = u == ci && v == cj;
-				if (qq <= 1.0 + jit) {
+				if (qq <= 1.0 + jit && !(qq > 0.8 && R >= 2.4 && t.hash(u + id, cy + 9, v, 3) == 0)) {
 					double da = Math.abs(Math.atan2(Math.sin(Math.atan2(dz, dx) - notch), Math.cos(Math.atan2(dz, dx) - notch)));
 					boolean cut = R >= 3.0 && da < 0.3 && qq > 0.6;
 					boolean hole = cut || (R >= 2.9 && !centre && qq > 0.4 && qq < 0.85 && t.hash(u + id, cy + 5, v, 8) == 0);
@@ -267,7 +268,7 @@ public final class TreeMapleRed implements Variant {
 					}
 				}
 				// the cap: smaller and ragged, brighter
-				if (qq <= 0.58 + jit && (centre || t.hash(u, cy + 1, v + id, 5) != 0)) {
+				if (qq <= 0.42 + jit && (centre || t.hash(u, cy + 1, v + id, 4) != 0)) {
 					t.leafOf(u, cy + 1, v, leaf(t, hue + 0.07, u, cy + 1, v, true), id);
 				}
 				// a few drips under the rim, darker
@@ -284,7 +285,7 @@ public final class TreeMapleRed implements Variant {
 		double fine = (t.hash(u, y, v, 16) - 7.5) / 7.5;
 		double h = TreeKit.clamp(hue + coarse * 0.17 + fine * 0.13, 0.0, 0.999);
 		int i = (int) Math.floor(h * 3);
-		if (i == 2 && top && t.hash(u + 3, y, v, 7) == 0) {
+		if (i == 2 && top && t.hash(u + 3, y, v, 14) == 0) {
 			return HONEY;
 		}
 		return RAMP[i];
