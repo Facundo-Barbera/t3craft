@@ -40,9 +40,10 @@ import org.jspecify.annotations.Nullable;
  *
  * An acropolis campus, not a mesa: the core (hub on its podium, patio, promenade, ramps, inner street) is the
  * highest terrace, and each ring of barrios stands one low step below the one inside it (relief 2: core +6, ring 1
- * +3, ring 2 +1, ring 3 on the ground; the lawn round the last street banks down to the natural ground). Steps are
- * 1 to 3 blocks, never more than 6 in all, so the differences read as design: low retaining walls of stone brick with
- * a light calcite parapet on top (a chiseled-quartz pier every 7 cells), hedges and flowers at their foot, the avenues turned into
+ * +4, ring 2 +2, ring 3 on the ground; the lawn round the last street banks down to the natural ground in kerbed
+ * grass beds). Steps are
+ * 1 to 3 blocks, never more than 6 in all, so the differences read as design: low dark retaining walls of deepslate brick with
+ * a light calcite parapet on top (a potted azalea or a quartz cap every 7 cells), hedges and flowers at their foot, the avenues turned into
  * wide slab ramps that start just past their torii, and stairs wherever a path meets a step.
  *
  * <h2>How</h2>
@@ -136,6 +137,30 @@ public final class CitadelRelief {
 		Set<Long> keep = stairs(c, half);
 		edges(c, half, keep);
 		walls(c, half, filled);
+		bancales(c, half);
+	}
+
+	/** The lawn's grass steps get a mossy stone-brick kerb on their edge: terraced garden beds, not contour lines. */
+	private static void bancales(CitadelCanvas c, Map<Long, Integer> half) {
+		for (Map.Entry<Long, Integer> e : half.entrySet()) {
+			int x = colX(e.getKey());
+			int z = colZ(e.getKey());
+			if (c.zoneAt(x, z).kind() != Kind.LAWN || e.getValue() < 2) {
+				continue;
+			}
+			int g = e.getValue() / 2;
+			boolean edge = false;
+			for (Direction dir : DIRS) {
+				Integer hn = half.get(col(x + dir.getStepX(), z + dir.getStepZ()));
+				if ((hn == null ? 0 : hn) / 2 < g) {
+					edge = true;
+				}
+			}
+			BlockState s = c.at(x, g, z);
+			if (edge && s != null && s.getBlock() == Blocks.GRASS_BLOCK) {
+				c.set(x, g, z, Math.floorMod(x * 31 + z * 7, 5) == 0 ? b(Blocks.MOSSY_STONE_BRICKS) : b(Blocks.STONE_BRICKS));
+			}
+		}
 	}
 
 	private static int dy(Map<Long, Integer> half, long cc) {
@@ -454,11 +479,12 @@ public final class CitadelRelief {
 			double arc = RingCampusGeometry.theta(x, z) * RingCampusGeometry.r(x, z);
 			// [palette] a light parapet over the dark kerb, the line that draws each terrace from above: calcite with a
 			// little polished diorite, and a pier of chiseled quartz with a quartz cap every 7 cells
-			if (Math.floorMod(Math.round(arc), 7) == 0) {
-				c.set(x, y, z, b(Blocks.CHISELED_QUARTZ_BLOCK));
+			c.set(x, y, z, b(Blocks.CALCITE));
+			long beat = Math.floorMod(Math.round(arc), 14);
+			if (beat == 0) {
+				c.set(x, y + 1, z, b(Blocks.POTTED_FLOWERING_AZALEA_BUSH)); // a planter on the pier
+			} else if (beat == 7) {
 				c.set(x, y + 1, z, slab(Blocks.SMOOTH_QUARTZ_SLAB));
-			} else {
-				c.set(x, y, z, Math.floorMod(x * 7 + z * 13, 5) == 0 ? b(Blocks.POLISHED_DIORITE) : b(Blocks.CALCITE));
 			}
 		}
 		for (long cc : foot) {
@@ -562,16 +588,17 @@ public final class CitadelRelief {
 	private static BlockState wall(Kind kind, int x, int y, int z, int course, int height) {
 		int h = Math.floorMod(x * 73856093 ^ y * 19349663 ^ z * 83492791, 23);
 		if (kind == Kind.LAWN) {
-			return h < 8 ? b(Blocks.MOSSY_COBBLESTONE) : h < 13 ? b(Blocks.COBBLESTONE) : b(Blocks.STONE);
+			return h < 8 ? b(Blocks.MOSSY_STONE_BRICKS) : h < 12 ? b(Blocks.MOSSY_COBBLESTONE) : b(Blocks.STONE_BRICKS);
 		}
-		if (course <= 1 && height >= 3) {
-			return h < 4 ? b(Blocks.CRACKED_DEEPSLATE_BRICKS) : b(Blocks.DEEPSLATE_BRICKS);
+		// [palette] dark heavy walls under the light parapet, so every terrace reads as a band from above
+		if (course <= 1) {
+			return b(Blocks.POLISHED_DEEPSLATE);
 		}
 		double arc = RingCampusGeometry.theta(x, z) * RingCampusGeometry.r(x, z);
 		if (Math.floorMod(Math.round(arc), 7) == 0) {
-			return b(Blocks.POLISHED_ANDESITE);
+			return b(Blocks.POLISHED_BLACKSTONE_BRICKS);
 		}
-		return h < 5 ? b(Blocks.MOSSY_STONE_BRICKS) : h < 8 ? b(Blocks.CRACKED_STONE_BRICKS) : b(Blocks.STONE_BRICKS);
+		return h < 4 ? b(Blocks.CRACKED_DEEPSLATE_BRICKS) : h < 7 ? b(Blocks.DEEPSLATE_TILES) : b(Blocks.DEEPSLATE_BRICKS);
 	}
 
 	// ------------------------------------------------------------------ materials

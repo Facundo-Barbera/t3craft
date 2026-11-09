@@ -159,7 +159,7 @@ public final class LayoutParams {
 	 * {@code CitadelRelief}. It moves anchors and desks up with their terrace.
 	 */
 	public static final Spec RINGCAMPUS_RELIEF = spec("hybrid-ringcampus", "terrain.relief", 2, 0, 3,
-			"campus terraces: 0 flat, 1 gentle (steps of 1, 3 in all), 2 default (acropolis: steps 3/2/1, 6 in all), 3 even (steps of 2, 6 in all)");
+			"campus terraces: 0 flat, 1 gentle (steps of 1, 3 in all), 2 default (steps of 2, 6 in all), 3 acropolis (steps 3/2/1, 6 in all)");
 
 	// ------------------------------------------------------------------ hybrid-towncenter
 
