@@ -922,7 +922,7 @@ public final class HouseScriptorium implements Variant {
 
 	/**
 	 * [function] the copyist's cell, in the loft's far back corner: a plank screen with a door, a bed with its head to the
-	 * screen, a chest, a writing table with a candle and a lectern, and a hearth (a lit furnace) whose chimney goes out
+	 * screen, a chest and candles, a writing lectern, and a hearth (a lit furnace opening onto a free cell) whose chimney goes out
 	 * through the roof. Interior 3 wide, 3 deep; the door is in the screen on the aisle side.
 	 */
 	private static void cell(CitadelCanvas c, Plot p, L g) {
@@ -956,11 +956,10 @@ public final class HouseScriptorium implements Variant {
 				.setValue(BlockStateProperties.BED_PART, BedPart.FOOT));
 		p.set(c, ac, LOFT + 1, r2, b(Blocks.BED.pick(DyeColor.WHITE)).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH)
 				.setValue(BlockStateProperties.BED_PART, BedPart.HEAD));
-		// chest at the foot of the front screen, writing table with its candle and lectern along the back
+		// chest against the front screen, writing lectern along the back
 		p.set(c, bc, LOFT + 1, r2, facing(Blocks.CHEST, Direction.SOUTH));
-		p.set(c, bc, LOFT + 1, r4, b(Blocks.SPRUCE_PLANKS));
-		p.set(c, bc, LOFT + 2, r4, candle(3));
-		p.set(c, mc, LOFT + 1, r4, lectern(Direction.NORTH));
+		p.set(c, mc, LOFT + 1, r2, candle(3)); // candles on the boards in the corner by the chest (on top of it they would hit the tie rail's headroom)
+		p.set(c, mc, LOFT + 1, r4, lectern(Direction.NORTH)); // (bc, r4) stays free: it is the cell the furnace opens onto
 		// hearth in the back corner, chimney up through the roof
 		p.set(c, ac, LOFT + 1, r4, facing(Blocks.FURNACE, toWell).setValue(BlockStateProperties.LIT, true));
 		int yb = roofY(g, bc); // where the roof slope reaches the second column of the stack
