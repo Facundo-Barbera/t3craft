@@ -26,6 +26,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.AttachFace;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
+import net.minecraft.world.level.block.state.properties.StairsShape;
 
 /**
  * A slim three-storey tower house with an outside stair that wraps its east and back walls, walked from the
@@ -188,19 +189,31 @@ public final class HouseTowerStair implements Variant {
 	 */
 	private static void mass(CitadelCanvas c, L l, int u, int v, int y0, int y1) {
 		boolean rib = (v == l.vs && (u - l.u1) % 3 == 0) || (u == l.ou && (v - l.vb) % 3 == 0);
+		boolean niche = niche(l, u, v);
 		for (int y = y0; y <= y1; y++) {
 			BlockState st;
-			if (rib) {
-				st = y % 5 == 4 ? b(Blocks.POLISHED_DEEPSLATE) : b(Blocks.DEEPSLATE_BRICKS);
+			if (niche && y <= 3) {
+				continue;
+			}
+			if (niche || y == 4) {
+				st = b(Blocks.POLISHED_DEEPSLATE);
+			} else if (rib) {
+				st = b(Blocks.DEEPSLATE_BRICKS);
 			} else if (y <= 3) {
 				st = deepslate(l.p, u, y, v);
-			} else if (y == 4) {
-				st = b(Blocks.POLISHED_DEEPSLATE);
 			} else {
 				st = stone(l.p, u, y, v);
 			}
 			set(c, l.p, u, y, v, st);
 		}
+	}
+
+	/** [depth] blind niches, four clear and one deep, open to the ground, in the bays between the ribs (south and east faces). */
+	private static boolean niche(L l, int u, int v) {
+		if (v == l.vs) {
+			return u >= l.u1 + 4 && u <= l.u2 && (u - l.u1) % 3 != 0;
+		}
+		return u == l.ou && (v == l.vb || v == l.vb + 1);
 	}
 
 	// ------------------------------------------------------------------ layout helpers
@@ -320,14 +333,9 @@ public final class HouseTowerStair implements Variant {
 			}
 			return infill(l, k, u, y, v);
 		}
-		if (window(l, k, u, v)) {
-			boolean alongU = v == l.vf || v == l.vb;
-			if (dy == 1 || dy == 2) {
-				Block g = k == 1 && l.p.hash(u, y, v, 4) == 0 ? pinkPane() : Blocks.GLASS_PANE;
-				return pane(g, alongU);
-			}
-			// [depth] a stone sill under and a dark lintel over every window, flush with the wall (nothing to stand on)
-			return dy == 0 ? stone(l.p, u, y, v) : log(l.s.frame(), alongU ? Direction.Axis.X : Direction.Axis.Z);
+		if ((dy == 1 || dy == 2) && window(l, k, u, v)) {
+			Block g = k == 1 && l.p.hash(u, y, v, 4) == 0 ? pinkPane() : Blocks.GLASS_PANE;
+			return pane(g, v == l.vf || v == l.vb);
 		}
 		return infill(l, k, u, y, v);
 	}
@@ -402,7 +410,7 @@ public final class HouseTowerStair implements Variant {
 
 	private static BlockState rail(L l, int u, int v) {
 		boolean alongU = v == l.vf || v == l.vb;
-		return alongU ? wall(Blocks.STONE_BRICK_WALL, false, true, false, true, false) : wall(Blocks.STONE_BRICK_WALL, true, false, true, false, false);
+		return alongU ? fence(Blocks.BAMBOO_FENCE, false, true, false, true) : fence(Blocks.BAMBOO_FENCE, true, false, true, false);
 	}
 
 	/**
@@ -495,7 +503,7 @@ public final class HouseTowerStair implements Variant {
 			set(c, p, ou, i, v, step);
 			mass(c, l, ou, v, 0, i - 1);
 			set(c, p, ou, i + 1, v, post);
-			if (i % 2 == 1) {
+			if (i == 3) {
 				set(c, p, ou, i + 2, v, lantern());
 			}
 		}
@@ -521,7 +529,7 @@ public final class HouseTowerStair implements Variant {
 			set(c, p, u, y, l.vs, west);
 			mass(c, l, u, l.vs, 0, y - 1);
 			set(c, p, u, y + 1, l.vs, post);
-			if (j % 2 == 1) {
+			if (j == 2) {
 				set(c, p, u, y + 2, l.vs, lantern());
 			}
 		}
@@ -546,58 +554,62 @@ public final class HouseTowerStair implements Variant {
 		set(c, p, u2 - 6, 0, l.vr, barrel());
 		set(c, p, u2 - 5, 0, l.vr, barrel());
 		put(c, p, u2 - 6, 3, l.vs, hangingLantern(), CitadelCanvas.HANGING);
+		for (int u = l.u1 + 4; u <= u2; u++) {
+			if ((u - l.u1) % 3 == 1) {
+				put(c, p, u, 3, l.vs, hangingLantern(), CitadelCanvas.HANGING);
+			}
+		}
+		put(c, p, ou, 3, l.vb, hangingLantern(), CitadelCanvas.HANGING);
 	}
 
 	// ------------------------------------------------------------------ roof
 
-	private static int roofY(L l, int u) {
-		return PLATE + Math.min(u - (l.u1 - 1), (l.u2 + 1) - u);
-	}
-
-	/** Gable roof along v: eaves at u1-1 and u2+1, overhanging front and back by one block. */
+	/**
+	 * Hip roof: every ring one block in and one up, cherry eaves all round (an overhang of one block), outer-corner stairs
+	 * on the hips, a tile ridge on top and a gold-capped finial with a lantern at its middle.
+	 */
 	private static void roof(CitadelCanvas c, L l) {
 		Plot p = l.p;
 		int uw = l.u1 - 1;
 		int ue = l.u2 + 1;
-		int mid = l.cu;
-		for (int v = l.vf - 1; v <= l.vb + 1; v++) {
+		int vn = l.vf - 1;
+		int vsr = l.vb + 1;
+		int m = Math.min((ue - uw) / 2, (vsr - vn) / 2);
+		int mid = (vn + vsr) / 2;
+		for (int v = vn; v <= vsr; v++) {
 			for (int u = uw; u <= ue; u++) {
-				int y = roofY(l, u);
-				boolean eave = u == uw || u == ue;
-				if (u == mid) {
-					set(c, p, u, y, v, b(Blocks.DEEPSLATE_TILES));
-					set(c, p, u, y + 1, v, slab(l.s.roofSlab(), false));
+				int du = Math.min(u - uw, ue - u);
+				int dv = Math.min(v - vn, vsr - v);
+				int i = Math.min(du, dv);
+				int y = PLATE + i;
+				if (i >= m) {
+					boolean apex = u == l.cu && v == mid;
+					set(c, p, u, y, v, apex ? b(Blocks.GOLD_BLOCK) : b(Blocks.DEEPSLATE_TILES));
+					if (!apex) {
+						set(c, p, u, y + 1, v, slab(l.s.roofSlab(), false));
+					}
+					continue;
+				}
+				Block blk = i == 0 ? l.s.eave() : l.s.roof();
+				Direction fu = u - uw < ue - u ? Direction.EAST : Direction.WEST;
+				Direction fv = v - vn < vsr - v ? Direction.SOUTH : Direction.NORTH;
+				if (du < dv) {
+					set(c, p, u, y, v, stair(blk, fu, false));
+				} else if (dv < du) {
+					set(c, p, u, y, v, stair(blk, fv, false));
 				} else {
-					Direction up = u < mid ? Direction.EAST : Direction.WEST;
-					set(c, p, u, y, v, stair(eave ? l.s.eave() : l.s.roof(), up, false));
-					boolean pil = u == uw && isPilV(l, v);
-					if (eave && !pil && v != l.vb + 1) {
-						set(c, p, u, y - 1, v, stair(l.s.roof(), up.getOpposite(), true));
-					}
+					StairsShape shape = fu == fv.getCounterClockWise() ? StairsShape.OUTER_LEFT : StairsShape.OUTER_RIGHT;
+					set(c, p, u, y, v, stair(blk, fv, false).setValue(BlockStateProperties.STAIRS_SHAPE, shape));
 				}
 			}
 		}
-		// gables: calcite triangles at the front and back, outlined in cherry, with a pink round window
-		for (int v : new int[] {l.vf, l.vb}) {
-			for (int u = l.u1; u <= l.u2; u++) {
-				for (int y = PLATE + 1; y < roofY(l, u); y++) {
-					BlockState st = y == roofY(l, u) - 1 ? b(l.s.planks()) : plaster(p, u, y, v);
-					if (u == l.cu) {
-						st = frameY(l);
-					}
-					set(c, p, u, y, v, st);
-				}
-				if (Math.abs(u - l.cu) == 1) {
-					set(c, p, u, PLATE + 2, v, pane(pinkPane(), true));
-				}
-			}
+		// finial: fence rod and a lantern on the gold cap, as high as the plot allows
+		int apexY = PLATE + m;
+		int lanternY = Math.min(apexY + 3, p.h() - 1);
+		for (int y = apexY + 1; y < lanternY; y++) {
+			set(c, p, l.cu, y, mid, fence(l.s.fence(), false, false, false, false));
 		}
-		// finials on the ridge ends
-		int top = roofY(l, mid) + 1;
-		for (int v : new int[] {l.vf - 1, l.vb + 1}) {
-			set(c, p, mid, top + 1, v, fence(l.s.fence(), false, false, false, false));
-			set(c, p, mid, top + 2, v, lantern());
-		}
+		set(c, p, l.cu, lanternY, mid, lantern());
 	}
 
 	// ------------------------------------------------------------------ interiors
@@ -671,7 +683,6 @@ public final class HouseTowerStair implements Variant {
 				set(c, p, u, 6, v, b(Blocks.CARPET.pick(DyeColor.PINK)));
 			}
 		}
-		put(c, p, l.cu, 9, l.vm, hangingLantern(), CitadelCanvas.HANGING);
 		put(c, p, l.cu, 9, l.vf + 2, hangingLantern(), CitadelCanvas.HANGING);
 		put(c, p, l.cu, 9, l.vb - 2, hangingLantern(), CitadelCanvas.HANGING);
 	}
