@@ -87,12 +87,12 @@ public final class TreeMapleRed implements Variant {
 
 		// four limbs, low and diagonal, to the four side lobes; each lobe's tone follows its height
 		double a0 = r.nextDouble() * Math.PI * 2;
-		int[] lobeY = {fork + 2, fork + 3, fork + 2, fork + 4};
+		int[] lobeY = {fork + 2, fork + 4, fork + 3, fork + 5};
 		for (int i = 0; i < 4; i++) {
 			double ang = a0 + i * Math.PI / 2 + (r.nextDouble() - 0.5) * 0.5;
 			double ex = Math.cos(ang);
 			double ez = Math.sin(ang);
-			int ly = Math.min(lobeY[(i + r.nextInt(2)) % 4], H - 4);
+			int ly = Math.min(lobeY[i], H - 4);
 			double rx = (2.0 + r.nextDouble() * 0.5) * sc;
 			double rz = rx * (0.8 + r.nextDouble() * 0.2);
 			int su = lead[0][fork];
@@ -101,10 +101,10 @@ public final class TreeMapleRed implements Variant {
 			int tu = (int) Math.round(su + ex * reach);
 			int tv = (int) Math.round(sv + ez * reach);
 			TreeKit.branch(t, WOOD, new int[] {su, fork, sv}, new int[] {tu, ly, tv}, i % 2 == 0);
-			int tone = ly <= fork + 2 ? 1 : 2;
-			TreeKit.lobe(t, tu, ly + 0.2, tv, rx, rz, 2.1, 1.2, RAMP[tone], 0.45, i);
-			// a low scarlet skirt lobe under every other limb, hanging off its elbow
-			if (i % 2 == 0) {
+			int tone = ly <= fork + 2 ? 0 : ly <= fork + 3 ? 1 : 2;
+			TreeKit.lobe(t, tu, ly + 0.2, tv, rx, rz, 2.3, 1.3, RAMP[tone], 0.45, i);
+			// a low scarlet skirt lobe under the first limb, hanging off its elbow
+			if (i == 0) {
 				int mu = (su + tu * 2) / 3;
 				int mv = (sv + tv * 2) / 3;
 				TreeKit.lobe(t, mu + ex * 0.6, ly - 1.4, mv + ez * 0.6, 1.4 * sc, 1.3 * sc, 1.4, 1.0, RAMP[0], 0.35, 20 + i);
@@ -115,7 +115,7 @@ public final class TreeMapleRed implements Variant {
 		int cu = lead[0][top];
 		int cv = lead[1][top];
 		double cr = 2.5 * sc;
-		TreeKit.lobe(t, cu, top + 0.4, cv, cr, cr * 0.9, 2.2, 1.3, RAMP[3], 0.45, 9);
+		TreeKit.lobe(t, cu, top + 0.4, cv, cr, cr * 0.9, 2.5, 1.3, RAMP[3], 0.45, 9);
 		double ca = a0 + Math.PI / 4;
 		int ku = (int) Math.round(lead[0][top - 2] + Math.cos(ca) * 1.6 * sc);
 		int kv = (int) Math.round(lead[1][top - 2] + Math.sin(ca) * 1.6 * sc);

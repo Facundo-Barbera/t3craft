@@ -78,7 +78,7 @@ public final class TreePineTiered implements Variant {
 		int bu = TreeKit.base(p.w(), ou);
 		int bv = TreeKit.base(p.d(), ov);
 		int y2 = 2;
-		int[][] lead = TreeKit.trunk(t, WOOD, bu, bv, y2, top - 2, ou, ov, 0, 0);
+		int[][] lead = TreeKit.trunk(t, WOOD, bu, bv, y2, top - 3, ou, ov, 0, 0);
 		TreeKit.roots(t, WOOD, bu, bv, 6, Math.min(p.w(), p.d()) >= 7 ? 2 : 1, -1, 7);
 
 		int yBase = 3; // the lowest whorl: a little trunk shows at the foot, never between floors
@@ -89,7 +89,7 @@ public final class TreePineTiered implements Variant {
 			double cv = y <= y2 ? bv + 0.5 : lead[1][Math.min(y, top - 2)];
 			double margin = Math.min(Math.min(cu, p.w() - 1 - cu), Math.min(cv, p.d() - 1 - cv)) + 0.45;
 			double f = (top - y + 0.6) / (double) (top - yBase + 1); // 1 at the foot, 0 at the tip
-			double rCone = margin * Math.pow(f, 0.85);
+			double rCone = Math.max(0.6, margin * f); // straight-sided cone
 			boolean whorl = ((top - y) & 1) == 0 && y < top - 1;
 			double ph = phase + (y / 2) * GOLDEN;
 			int span = (int) Math.ceil(margin) + 1;
@@ -105,9 +105,9 @@ public final class TreePineTiered implements Variant {
 						int arm = (int) Math.floor(((th - ph) / (Math.PI * 2) + 10) * arms) % arms;
 						double armLen = 0.8 + 0.25 * t.hash(arm, y, 3, 3);
 						double wave = Math.pow(Math.max(0, Math.cos(arms * (th - ph) / 2)), 2);
-						lim = rCone * (0.62 + 0.38 * wave) * armLen + 0.35;
+						lim = rCone * (0.7 + 0.4 * wave) * armLen + 0.3;
 					} else {
-						lim = rCone * 0.72 + 0.3;
+						lim = Math.max(1.0, rCone * 0.55); // the collar: a clear step in under each whorl
 					}
 					lim -= t.hash(u, y, v, 4) * 0.12;
 					if (dist > lim) {
@@ -117,7 +117,7 @@ public final class TreePineTiered implements Variant {
 					BlockState s = edge && t.hash(u >> 1, y, v >> 1, 3) == 0 && y > yBase + 1 ? TIP : NEEDLE;
 					t.leaf(u, y, v, s);
 					// the whorl's arm tips droop one block, a few two
-					if (whorl && edge && dist > 1.2 && t.hash(u, y + 9, v, 3) != 0) {
+					if (whorl && edge && dist > 1.6 && dist > lim - 0.7 && t.hash(u, y + 9, v, 3) == 0) {
 						t.leaf(u, y - 1, v, NEEDLE);
 						if (dist > 2.2 && t.hash(u, y + 4, v, 4) == 0) {
 							t.leaf(u, y - 2, v, TIP);
@@ -134,8 +134,9 @@ public final class TreePineTiered implements Variant {
 			}
 		}
 		// spire: the needles close over the leader and a last tuft
-		int lu = lead[0][top - 2];
-		int lv = lead[1][top - 2];
+		int lu = lead[0][top - 3];
+		int lv = lead[1][top - 3];
+		t.leaf(lu, top - 2, lv, NEEDLE);
 		t.leaf(lu, top - 1, lv, NEEDLE);
 		t.leaf(lu, top, lv, NEEDLE);
 
