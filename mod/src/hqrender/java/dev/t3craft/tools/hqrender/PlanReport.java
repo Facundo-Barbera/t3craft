@@ -17,6 +17,7 @@ import dev.t3craft.hq.HqLightMap;
 import dev.t3craft.hq.Placement;
 import dev.t3craft.hq.PlanProbe;
 import dev.t3craft.hq.Workstation;
+import dev.t3craft.hq.citadel.CitadelRelief;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -227,6 +228,7 @@ public final class PlanReport {
 		guarded("connect", () -> connect(plan, o));
 		guarded("floating", () -> floating(plan, o));
 		guarded("unsupported", () -> unsupported(plan, o));
+		guarded("split", () -> split(plan, o));
 		if (o.ticks) {
 			guarded("build", () -> build(plan, o));
 		}
@@ -1080,6 +1082,166 @@ public final class PlanReport {
 		json.add("unsupported", j);
 		sections.add(sb.toString());
 		summary.put("unsupported", all.size() + " blocks");
+	}
+
+	// ------------------------------------------------------------------ split pieces
+
+	private static boolean solidCell(@org.jspecify.annotations.Nullable BlockState s) {
+		return s != null && !s.isAir() && !s.getCollisionShape(net.minecraft.world.level.EmptyBlockGetter.INSTANCE, BlockPos.ZERO).isEmpty();
+	}
+
+	/** The axis of a horizontal log (a beam: log, stripped log, wood), or null for anything else. */
+	private static Direction.@org.jspecify.annotations.Nullable Axis beamAxis(BlockState s) {
+		if (!s.hasProperty(net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS)) {
+			return null;
+		}
+		// no tags in a headless run (they are not bound): go by the id
+		String path = BuiltInRegistries.BLOCK.getKey(s.getBlock()).getPath();
+		if (!(path.endsWith("_log") || path.endsWith("_wood") || path.endsWith("_stem") || path.endsWith("_hyphae") || path.endsWith("bamboo_block"))) {
+			return null;
+		}
+		Direction.Axis a = s.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS);
+		return a == Direction.Axis.Y ? null : a;
+	}
+
+	/**
+	 * fix/relief-floating: pieces torn by a difference of lift. Two views of it. (1) What the citadel's relief found
+	 * while lifting the plan ({@code CitadelRelief.lastSplit}): groups of cells hanging over a step that the column lift
+	 * would have cut in two (now lifted with their support), so a number above 0 there is a piece that needed the fix
+	 * and "ambiguous" ones are held from two terraces. (2) On the final plan, whatever the generator: horizontal
+	 * beams (logs lying on x or z) with nothing solid under any of their blocks and nothing at either end (the pier
+	 * or wall that holds them); a torii whose pillars stand a step lower than its beam shows up here. Beams with
+	 * nothing around them at all are also in FLOATING.
+	 */
+	private void split(BuildPlan plan, Options o) {
+		CitadelRelief.Split rs = CitadelRelief.lastSplit;
+		Map<Long, BlockState> cells = new HashMap<>(plan.size() * 2);
+		for (Placement p : plan.placements()) {
+			if (!p.state().isAir() && !p.state().is(net.minecraft.world.level.block.Blocks.LIGHT)) {
+				cells.put(p.rel().asLong(), p.state());
+			}
+		}
+		List<Object[]> bad = new ArrayList<>(); // length, bbox, start, ids, held (sideways or from above)
+		int runs = 0;
+		for (Map.Entry<Long, BlockState> e : cells.entrySet()) {
+			Direction.Axis axis = beamAxis(e.getValue());
+			if (axis == null) {
+				continue;
+			}
+			Direction fwd = Direction.get(Direction.AxisDirection.POSITIVE, axis);
+			long start = e.getKey();
+			BlockState before = cells.get(BlockPos.offset(start, fwd.getOpposite()));
+			if (before != null && beamAxis(before) == axis) {
+				continue; // not the first block of its run
+			}
+			runs++;
+			List<Long> run = new ArrayList<>();
+			long k = start;
+			while (cells.get(k) != null && beamAxis(cells.get(k)) == axis) {
+				run.add(k);
+				k = BlockPos.offset(k, fwd);
+			}
+			long last = run.get(run.size() - 1);
+			boolean scoped = false;
+			boolean held = false;
+			boolean below = false;
+			Map<String, Integer> ids = new HashMap<>();
+			int[] bb = {Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MIN_VALUE, Integer.MIN_VALUE, Integer.MIN_VALUE};
+			for (long r : run) {
+				scoped |= scope == null || scope.contains(BlockPos.getX(r), BlockPos.getY(r), BlockPos.getZ(r));
+				below |= solidCell(cells.get(BlockPos.offset(r, Direction.DOWN)));
+				held |= solidCell(cells.get(BlockPos.offset(r, Direction.UP)));
+				for (Direction d : Direction.Plane.HORIZONTAL) {
+					if (d.getAxis() != axis) {
+						held |= solidCell(cells.get(BlockPos.offset(r, d)));
+					}
+				}
+				bb[0] = Math.min(bb[0], BlockPos.getX(r));
+				bb[1] = Math.min(bb[1], BlockPos.getY(r));
+				bb[2] = Math.min(bb[2], BlockPos.getZ(r));
+				bb[3] = Math.max(bb[3], BlockPos.getX(r));
+				bb[4] = Math.max(bb[4], BlockPos.getY(r));
+				bb[5] = Math.max(bb[5], BlockPos.getZ(r));
+				ids.merge(id(cells.get(r)), 1, Integer::sum);
+			}
+			if (!scoped || below) {
+				continue;
+			}
+			boolean ends = solidCell(cells.get(BlockPos.offset(start, fwd.getOpposite()))) || solidCell(cells.get(BlockPos.offset(last, fwd)));
+			if (ends) {
+				continue;
+			}
+			bad.add(new Object[] {run.size(), bb, start, ids, held});
+		}
+		bad.sort((a, b) -> Integer.compare((Integer) b[0], (Integer) a[0]));
+		int heldOnly = 0;
+		int lonely = 0;
+		for (Object[] b : bad) {
+			if ((Boolean) b[4]) {
+				heldOnly++;
+			} else {
+				lonely++;
+			}
+		}
+		StringBuilder sb = new StringBuilder("SPLIT PIECES (cells of one piece lifted differently, or held by nothing)\n");
+		sb.append("  relief: ").append(rs.hanging()).append(" groups of hanging cells near a step, ").append(rs.mixed()).append(" of them would have been torn by the column lift (")
+				.append(rs.moved()).append(" cells lifted with their support instead), ").append(rs.ambiguous()).append(" held from two terraces\n");
+		for (String s : rs.samples().subList(0, Math.min(o.maxList, rs.samples().size()))) {
+			sb.append("    ").append(s).append('\n');
+		}
+		sb.append("  settle: ").append(dev.t3craft.hq.citadel.CitadelSettle.lastSummary()).append('\n');
+		sb.append("  beams: ").append(runs).append(" runs of horizontal logs, ").append(bad.size()).append(" with nothing solid under them or at their ends (")
+				.append(lonely).append(" touch nothing, ").append(heldOnly).append(" only hang from a wall or ceiling)\n");
+		JsonArray bj = new JsonArray();
+		int n = 0;
+		for (Object[] b : bad) {
+			@SuppressWarnings("unchecked")
+			Map<String, Integer> ids = (Map<String, Integer>) b[3];
+			int[] bb = (int[]) b[1];
+			BlockPos s = BlockPos.of((Long) b[2]);
+			if (bj.size() < JSON_LIST) {
+				JsonObject je = new JsonObject();
+				je.addProperty("length", (Integer) b[0]);
+				je.add("box", arr(bb));
+				je.addProperty("held", (Boolean) b[4]);
+				je.addProperty("ids", String.join(",", new java.util.TreeSet<>(ids.keySet())));
+				bj.add(je);
+			}
+			if (n++ < o.maxList) {
+				sb.append(String.format(Locale.ROOT, "    %3d long  box %s  e.g. %s %s%s%n", (Integer) b[0], box(bb), c(s), String.join(",", new java.util.TreeSet<>(ids.keySet())),
+						(Boolean) b[4] ? "  (hangs from the side or above)" : ""));
+			}
+		}
+		if (bad.size() > o.maxList) {
+			sb.append("    … ").append(bad.size() - o.maxList).append(" more (report.json)\n");
+		}
+		JsonObject j = new JsonObject();
+		j.addProperty("reliefGroups", rs.hanging());
+		j.addProperty("reliefTorn", rs.mixed());
+		j.addProperty("reliefMovedCells", rs.moved());
+		j.addProperty("reliefAmbiguous", rs.ambiguous());
+		JsonArray sj = new JsonArray();
+		rs.samples().forEach(sj::add);
+		j.add("reliefSamples", sj);
+		j.addProperty("beamRuns", runs);
+		j.addProperty("beamsUnsupported", bad.size());
+		j.addProperty("beamsTouchNothing", lonely);
+		j.addProperty("beamsHeldSideways", heldOnly);
+		j.add("beams", bj);
+		int[] st = dev.t3craft.hq.citadel.CitadelSettle.lastCounts();
+		j.addProperty("settleFell", st[0]);
+		j.addProperty("settleFellBlocks", st[1]);
+		j.addProperty("settlePropped", st[2]);
+		j.addProperty("settleProppedBlocks", st[3]);
+		j.addProperty("settleRemoved", st[4]);
+		j.addProperty("settleRemovedBlocks", st[5]);
+		j.addProperty("settleLeft", st[6]);
+		j.addProperty("settleLeftBlocks", st[7]);
+		json.add("split", j);
+		sections.add(sb.toString());
+		summary.put("settled floating", dev.t3craft.hq.citadel.CitadelSettle.lastSummary());
+		summary.put("split by lift", rs.mixed() + " groups torn by the relief (" + rs.moved() + " cells lifted with their support), " + rs.ambiguous() + " ambiguous");
+		summary.put("beams unsupported", bad.size() + " of " + runs + " (" + lonely + " touch nothing, " + heldOnly + " hang from a wall)");
 	}
 
 	// ------------------------------------------------------------------ build ticks
