@@ -375,6 +375,19 @@ final class HubDims {
 		return TOWER_HALF() + 1;
 	}
 
+	/**
+	 * struct/hub5, from scale 2 ({@link #TALL}): the corner towers carry an open belfry, so the shaft goes up to a deck: 34 (the tall
+	 * pair, a head over the nave's crown at 36 with its roof) and 30 (the low pair) at 200; spring + 8 and spring + 4. At scale 1 they
+	 * are not used (the towers are the original ones).
+	 */
+	static int TOWER_DECK_A() {
+		return CitadelHub.spring() + 8;
+	}
+
+	static int TOWER_DECK_B() {
+		return CitadelHub.spring() + 4;
+	}
+
 	/** Stone lanterns at the bridge heads, on the rail line, this far from the hub's centre (14). */
 	static int TORO_Z() {
 		return s(14);

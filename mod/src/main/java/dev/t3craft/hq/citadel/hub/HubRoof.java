@@ -40,7 +40,7 @@ public final class HubRoof {
 			return;
 		}
 		boolean rib = Math.floorMod(z, HubDims.PIER_PERIOD()) == 0;
-		c.set(x, top, z, shell(x, ax, rib));
+		c.set(x, top, z, shell(x, top, z, ax, rib));
 		if (rib) {
 			c.set(x, top - 1, z, RIB);
 		}
@@ -51,16 +51,86 @@ public final class HubRoof {
 
 	/**
 	 * The roof's material by height: dark eave course, cherry body. (The skirt of struct/hub4 is the stepped eave, see {@link #eave}.)
+	 * From scale 2 (struct/hub5) the columns of the ribs are one thin hip of light stone brick, up the slope and over the ridge: a
+	 * pale line that breaks the pink field every bay (the dark oak ribs of hub4 read as a heavy grill).
 	 */
-	private static net.minecraft.world.level.block.state.BlockState shell(int x, int ax, boolean rib) {
+	private static net.minecraft.world.level.block.state.BlockState shell(int x, int y, int z, int ax, boolean rib) {
 		Direction in = towardAxis(x);
+		boolean hip = rib && HubDims.TALL();
 		if (ax >= HubDims.NAVE_HALF() - 1) {
 			return HubBlocks.darkStairs(in, false);
 		}
 		if (ax >= CitadelCanvas.dims().s(2)) {
-			return HubBlocks.roofStairs(in);
+			return hip ? HubBlocks.stoneStairs(in, false) : HubBlocks.roofStairs(in);
 		}
-		return PLANKS;
+		return hip ? HubBlocks.stoneBrick(x, y, z) : PLANKS;
+	}
+
+	/**
+	 * Gabled dormers (struct/hub5), from scale 2: on each slope of the nave, at the bays between the hips nearest the ends
+	 * (z = +-12 and +-20 at 200), a window with a pediment. Five wide: a front of light stone brick jambs, two rows of stained
+	 * panes, a chiselled lintel and a calcite tympanum, under a deepslate gable (stairs and a slab ridge) that runs back into the
+	 * slope until it meets it. The box is solid above the lintel so no stair of the gable hangs from another; the window rows have
+	 * only a shallow cavity (the slope closes it behind).
+	 */
+	private static void dormers(CitadelCanvas c) {
+		if (!HubDims.TALL()) {
+			return;
+		}
+		int front = HubDims.NAVE_HALF() - 3;
+		int[] zs = {HubDims.PIER_PERIOD() * 3 / 2, HubDims.PIER_PERIOD() * 5 / 2};
+		for (int sx = -1; sx <= 1; sx += 2) {
+			for (int sz = -1; sz <= 1; sz += 2) {
+				for (int z0 : zs) {
+					dormer(c, sx, sz * z0, front);
+				}
+			}
+		}
+	}
+
+	private static void dormer(CitadelCanvas c, int sx, int zc, int front) {
+		int base = CitadelHub.vaultY(front);
+		int tint = Math.floorMod(Math.floorDiv(zc, HubDims.PIER_PERIOD()) + (sx > 0 ? 1 : 0), HubBlocks.GLASS_COLORS.length);
+		for (int ax = front; ax >= 0; ax--) {
+			int surf = CitadelHub.vaultY(ax);
+			int x = sx * ax;
+			boolean face = ax == front;
+			for (int dz = -2; dz <= 2; dz++) {
+				int z = zc + dz;
+				int a = Math.abs(dz);
+				for (int y = Math.max(surf + 1, base + 1); y <= base + 6; y++) {
+					int r = y - base;
+					net.minecraft.world.level.block.state.BlockState s = null;
+					if (a == 2) {
+						// cheeks and jambs up to the lintel, then the low stair of the gable
+						s = r <= 3 ? HubBlocks.stoneBrick(x, y, z) : r == 4 ? HubBlocks.darkStairs(dz < 0 ? Direction.SOUTH : Direction.NORTH, false) : null;
+					} else if (a == 1) {
+						if (r <= 2) {
+							s = face ? HubBlocks.pane(HubBlocks.GLASS_COLORS[tint]) : null;
+						} else if (r == 3) {
+							s = face ? Blocks.CHISELED_STONE_BRICKS.defaultBlockState() : PLANKS;
+						} else if (r == 4) {
+							s = face ? CALCITE : PLANKS;
+						} else if (r == 5) {
+							s = HubBlocks.darkStairs(dz < 0 ? Direction.SOUTH : Direction.NORTH, false);
+						}
+					} else {
+						if (r <= 2) {
+							s = face ? HubBlocks.pane(HubBlocks.GLASS_COLORS[tint]) : null;
+						} else if (r == 3) {
+							s = face ? Blocks.CHISELED_STONE_BRICKS.defaultBlockState() : PLANKS;
+						} else if (r <= 5) {
+							s = face ? CALCITE : PLANKS;
+						} else {
+							s = slab(Blocks.DEEPSLATE_TILE_SLAB);
+						}
+					}
+					if (s != null) {
+						c.set(x, y, z, s);
+					}
+				}
+			}
+		}
 	}
 
 	/**
@@ -87,6 +157,7 @@ public final class HubRoof {
 	 * stepped cherry pyramid and a spire; the beacon hangs on a chain from the lower ceiling.
 	 */
 	public static void cupola(CitadelCanvas c) {
+		dormers(c);
 		int d = HubDims.DRUM_HALF();
 		int eaveY = HubDims.DRUM_TOP() + 1;
 		for (int hx = -(d + 1); hx <= d + 1; hx++) {
@@ -166,6 +237,14 @@ public final class HubRoof {
 			// struct/hub4: a stepped skirt: the eave flares out and down in two more steps (dark, then cherry), over the terrace
 			c.set(x + 2 * sx, CitadelHub.spring() - 1, z, HubBlocks.darkStairs(towardAxis(x), false));
 			c.set(x + 3 * sx, CitadelHub.spring() - 2, z, HubBlocks.roofStairs(towardAxis(x)));
+			// struct/hub5: the skirt is a solid wedge, not three stairs touching on their corners (the settle pass dropped two runs of
+			// 16 of them at the crossing): a dark block under each of the first two steps, so every step rests on a face
+			c.set(x + sx, CitadelHub.spring() - 1, z, HubBlocks.darkBase(x + sx, CitadelHub.spring() - 1, z));
+			c.set(x + 2 * sx, CitadelHub.spring() - 2, z, HubBlocks.darkBase(x + 2 * sx, CitadelHub.spring() - 2, z));
+			// and a dentil course under the lip (every other cell, upside-down stairs): the eave throws a broken shadow on the terrace
+			if (Math.floorMod(z, 2) == 0) {
+				c.set(x + 3 * sx, CitadelHub.spring() - 3, z, HubBlocks.stairsTop(Blocks.DEEPSLATE_TILE_STAIRS, towardAxis(x)));
+			}
 		}
 	}
 
