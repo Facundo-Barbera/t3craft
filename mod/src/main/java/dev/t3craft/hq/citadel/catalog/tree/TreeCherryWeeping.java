@@ -84,7 +84,7 @@ public final class TreeCherryWeeping implements Variant {
 		int hMax = p.h();
 
 		// ---- proportions: trunk bare to the fork (yF), the arch rises rs more, the cap is centred near the apex
-		int yF = mn >= 9 ? 6 : 5;
+		int yF = (mn >= 9 ? 6 : 5) + (hMax >= 13 && mn >= 9 ? 1 : 0); // the taller the plot, the longer the bare trunk and the hem
 		double rs = 1.7 + (mn - 7) * 0.15 + r.nextDouble() * 0.5;
 		while (yF + (int) Math.round(rs * 0.8) + 4 > hMax && (rs > 2.0 || yF > 5)) { // never over the plot
 			if (rs > 2.0) {
@@ -150,7 +150,7 @@ public final class TreeCherryWeeping implements Variant {
 		int capLow = Integer.MAX_VALUE;
 		for (int y = yc - 2; y <= yc + 3; y++) {
 			double dyy = y - yc;
-			double ry = dyy > 0 ? 2.1 : 1.4;
+			double ry = dyy > 0 ? 2.2 : 1.1;
 			for (int v = lv - 4; v <= lv + 4; v++) {
 				for (int u = lu - 4; u <= lu + 4; u++) {
 					double q = (Math.pow(u - lu, 2) + Math.pow(v - lv, 2)) / (rc * rc) + dyy * dyy / (ry * ry);
@@ -192,7 +192,7 @@ public final class TreeCherryWeeping implements Variant {
 					continue;
 				}
 				int keep = 96 - (int) (30 * Math.max(0, x - 0.6) / 0.4) - (arc > half - 0.35 ? 22 : 0);
-				if (t.hash(u, 40, v, 100) >= keep) {
+				if (x >= 0.7 && t.hash(u, 40, v, 100) >= keep) { // no holes in the crown: only the rim is ragged
 					continue;
 				}
 				int ysh = Math.max(CLEAR + 2, (int) Math.round(y0[best] + rsi[best] * prof(5 * Math.min(x, 1.0))) + 1);
@@ -206,25 +206,18 @@ public final class TreeCherryWeeping implements Variant {
 				if (ysh < 0) {
 					continue;
 				}
-				// join to the neighbour nearer the crown, so the sheet is face-connected on a slope
-				int bu2 = -1;
-				int bv2 = -1;
-				double bestRho = Math.hypot(u - lu, v - lv);
+				// join to every neighbour nearer the crown, so the sheet is face-connected on a slope and has no pits
+				int lo = ysh;
+				int hi = ysh;
+				double rho0 = Math.hypot(u - lu, v - lv);
 				int[][] nb = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
 				for (int[] o : nb) {
 					int a = u + o[0];
 					int b = v + o[1];
-					if (a >= 0 && a < w && b >= 0 && b < d && sheet[a][b] >= 0 && Math.hypot(a - lu, b - lv) < bestRho) {
-						bestRho = Math.hypot(a - lu, b - lv);
-						bu2 = a;
-						bv2 = b;
+					if (a >= 0 && a < w && b >= 0 && b < d && sheet[a][b] >= 0 && Math.hypot(a - lu, b - lv) < rho0) {
+						lo = Math.min(lo, sheet[a][b]);
+						hi = Math.max(hi, sheet[a][b]);
 					}
-				}
-				int lo = ysh;
-				int hi = ysh;
-				if (bu2 >= 0) {
-					lo = Math.min(ysh, sheet[bu2][bv2]);
-					hi = Math.max(ysh, sheet[bu2][bv2]);
 				}
 				for (int y = lo; y <= hi; y++) {
 					t.leaf(u, y, v, tone(t, u, y, v));
@@ -278,7 +271,7 @@ public final class TreeCherryWeeping implements Variant {
 					continue;
 				}
 				int cls = t.hash(u, 5, v, 100);
-				int longOnes = 4 + (int) (30 * f * f); // few reach the grass: most of the hem is a ragged line of different lengths
+				int longOnes = 3 + (int) (15 * f * f); // few reach the grass: most of the hem is a ragged line of different lengths
 				int bottom;
 				if (cls < 12) {
 					continue; // no strand here: a window
@@ -288,7 +281,7 @@ public final class TreeCherryWeeping implements Variant {
 					if (y0c - 1 < CLEAR) {
 						continue;
 					}
-					bottom = Math.max(CLEAR, y0c - 2 - t.hash(u, 6, v, 5)); // a stub: 3+ blocks of headroom under it
+					bottom = CLEAR + t.hash(u, 6, v, Math.max(1, y0c - 1 - CLEAR)); // a stub of any length, 4+ blocks of headroom under it
 				}
 				bottom = Math.min(bottom, y0c - 1);
 				// the strand drifts one cell outwards after 3 or 4 blocks, so it falls in an arc and not as a post
