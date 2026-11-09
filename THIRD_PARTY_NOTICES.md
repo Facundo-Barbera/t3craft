@@ -42,6 +42,9 @@ adapted from AgentCraft must keep this header and be listed here:
 // Copyright (c) 2026 AgentCraft contributors. MIT License.
 ```
 
+The kit blocks `t3craft:glow_strip` and `t3craft:glow_panel` (emissive strip and panel lighting) take only the idea from
+AgentCraft's blocks of the same names: their models, textures (drawn by `tools/art/glow_art.py`) and code are our own, nothing is copied.
+
 Files adapted from AgentCraft (MIT; the `npc/behavior` files come from AgentCraft `mod/src/client/java/dev/agentcraft/client/agents/`):
 
 - `mod/src/client/java/dev/t3craft/client/npc/behavior/GridPathfinder.java` ← `GridPathfinder.java`

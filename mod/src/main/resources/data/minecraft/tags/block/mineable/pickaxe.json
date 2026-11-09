@@ -2,6 +2,8 @@
   "replace": false,
   "values": [
     "t3craft:stone_floor_tile",
-    "t3craft:stone_lantern"
+    "t3craft:stone_lantern",
+    "t3craft:glow_strip",
+    "t3craft:glow_panel"
   ]
 }
