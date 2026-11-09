@@ -247,10 +247,10 @@ public final class HallInterior {
 			for (int u = u0; u <= u1; u++) {
 				BlockPos p = r.cell(u, v, y);
 				if (u == u0 || u == u1) {
-					place(c, desks, p, () -> c.set(p, Blocks.CHEST.defaultBlockState()));
+					placeOnRug(c, desks, p, () -> c.set(p, Blocks.CHEST.defaultBlockState()));
 				} else if (u % 3 != 0) {
 					net.minecraft.world.level.block.Block wb = WORK[Math.floorMod(i++ + HallStyle.hash(seed, side), WORK.length)];
-					place(c, desks, p, () -> c.set(p, b(wb)));
+					placeOnRug(c, desks, p, () -> c.set(p, b(wb)));
 				}
 			}
 		}
@@ -259,9 +259,19 @@ public final class HallInterior {
 			for (int u = 3; u < D - 3; u++) {
 				if (u % 5 < 2) {
 					BlockPos p = r.cell(u, v, y);
-					place(c, desks, p, () -> shelf(c, p, 2, false, 0));
+					placeOnRug(c, desks, p, () -> shelf(c, p, 2, false, 0));
 				}
 			}
+		}
+	}
+
+	/** Like {@link #place}, but the cell may hold the hall's rug (carpet), which the new block replaces. */
+	private static void placeOnRug(CitadelCanvas c, Set<Long> desks, BlockPos p, Runnable build) {
+		BlockState here = c.at(p.getX(), p.getY(), p.getZ());
+		BlockState below = c.at(p.getX(), p.getY() - 1, p.getZ());
+		boolean rug = here != null && here.getBlock().getDescriptionId().endsWith("_carpet");
+		if ((free(c, p) || rug) && below != null && !below.isAir() && !desks.contains(col(p.getX(), p.getZ()))) {
+			build.run();
 		}
 	}
 
