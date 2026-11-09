@@ -264,14 +264,15 @@ public final class CitadelBarrios {
 						int t = (u == -1 || u == D) ? v : u;
 						for (int y = yb + 1; y < yb + fh(); y++) {
 							int ly = y - yb;
-							BlockState s = corner ? mats.post()
+							BlockState s = corner ? dev.t3craft.hq.citadel.barrio.HallFacade.cornerPost(style, mats)
 									: dev.t3craft.hq.citadel.barrio.HallFacade.wallBlock(c, style, mats, env, seed, t, ly, along);
 							c.set(g0.atY(y), s);
 						}
 						if (f == 0 && u == -1 && Math.abs(v - mid) <= 1) {
 							c.fill(g0.getX(), 1, 3, g0.getZ(), AIR);
 						}
-						c.set(g0.atY(yb + fh()), corner ? mats.post() : (mats.band() == mats.post() ? c.kit.beam(along) : mats.band()));
+						c.set(g0.atY(yb + fh()), corner ? dev.t3craft.hq.citadel.barrio.HallFacade.cornerPost(style, mats)
+								: dev.t3craft.hq.citadel.barrio.HallFacade.bandBlock(c, style, mats, along));
 					} else {
 						for (int y = yb + 1; y < yb + fh(); y++) {
 							c.set(g0.atY(y), AIR);

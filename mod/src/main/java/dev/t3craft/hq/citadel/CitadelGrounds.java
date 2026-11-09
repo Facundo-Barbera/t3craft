@@ -285,6 +285,12 @@ public final class CitadelGrounds {
 			for (int y = Math.max(1, y0() - 3); y < y0(); y++) {
 				c.set(x, y, z, CitadelPodium.plinthFace(x, y, z, y0() - y));
 			}
+		} else if (!panel && y0() >= 4 && inner && CitadelPodium.profile() != null) {
+			// design/citadel-terraces4: the face towards the patio is graded too (light under the deck, dark at the foot), no more
+			// black / white bands
+			for (int y = Math.max(1, y0() - 4); y < y0(); y++) {
+				c.set(x, y, z, CitadelPodium.plinthFace(x, y, z, y0() - y));
+			}
 		} else if (!panel && y0() >= 4 && (inner || outer)) {
 			c.set(x, y0() - 2, z, CitadelCanvas.b(Blocks.CHISELED_DEEPSLATE));
 			if (inner) {
@@ -295,7 +301,8 @@ public final class CitadelGrounds {
 
 	/** The deck: rim, tile stripes and the kit's floor with joints ({@link CitadelPaving#promenade}). */
 	private static void promenadeDeck(CitadelCanvas c, int x, int z, double r) {
-		c.set(x, y0(), z, CitadelPaving.promenade(c, x, z, r));
+		// design/citadel-terraces4: the outer rim and the stripe inside it come out in the graded wall palette (no black row, no white line)
+		c.set(x, y0(), z, CitadelPodium.deckEdge(c, x, z, r, CitadelPaving.promenade(c, x, z, r)));
 	}
 
 	/** The railing on the patio side (none on the heads of the patio stairs nor near the axis). */

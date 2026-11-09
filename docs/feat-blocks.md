@@ -678,3 +678,32 @@ centros de plaza, `lamp_paper_gate` para pórticos de camino). Buscan los bloque
 (`PaperLanterns`) y, con el módulo apagado, caen al farol vanilla. Revisión: `tools/render/submit.sh --final -- --lanterns
 --only stand|hang|wall|tall|all --scale 2` (`LanternViews` pone los modelos tal cual, sin pasar por el registro).
 Ronda 2 (`kit/paper-lantern2`): el farol alto tiene basa de dos escalones, collarín, fuste de 8 px, capitel y cabeza más grande con techo propio (alero que sobresale 2 px de la celda; los modelos pueden salirse de la celda hasta 32 px). El papel es más cálido (banda caliente, halo ámbar, variación de luz). Los faroles colgantes bajo techos de `CitadelAmbience.arcades` son `paper_lantern_hanging` (búsqueda por id en el registro, tono según la celda de la retícula, farol vanilla si el módulo está apagado), a `SPACING - 1` de distancia como mínimo; las copas de árbol no cuentan como techo. Nota: `HqKit` no tiene rol de farol colgante; se evitó añadirlo (kernel) buscando el bloque por id, como hace `PaperLanterns`.
+
+
+### Pantalla de estado (feat/status-screen)
+
+Resumen de un vistazo de todo el espacio de trabajo, la idea del `/status` de AgentCraft (objetivo, agentes, gasto) hecha
+pantalla. **No hay binding ni kernel nuevos:** una pantalla grande vinculada a `beacon` (el agregado de todo el HQ, el mismo
+binding de la lámpara de la linterna del hub) dibuja este resumen en vez de un log. `MonitorRenderer` detecta
+`Binding.Kind.BEACON` en `extractRenderState` y delega en `StatusScreen`; el resto de pantallas no cambia.
+
+Contenido, a 9 x 3 bloques (se lee a 6-10 bloques; funciona desde unos 5 x 3), igual a cualquier distancia (sin nivel NEAR/FAR):
+- cinco fichas con el número grande y la palabra, en los colores de `ThreadState` y en orden de urgencia: NEEDS YOU, ERROR,
+  WORKING, DONE, IDLE (los archivados no cuentan; una ficha en 0 se apaga; NEEDS YOU respira como el resto de pantallas);
+- PRS TO REVIEW: los PR pendientes (abiertos o borrador) de `ThreadExtras`/`ThreadRow.details()`, los mismos que cuenta la
+  estación de merge (`MergeFeed`); se refrescan mientras se dibuja una pantalla así;
+- ACTIVE PROJECTS `n/m`: proyectos con algún hilo trabajando, esperando o con error, sobre los que tienen algún hilo vivo;
+- OLDEST WAITING: el hilo que lleva más tiempo esperando al jugador, con su título y cuánto (`ThreadRow.activityMs()`;
+  sin hora, solo el título); sin ninguno, "WAITING FOR YOU / NOBODY";
+- el LED del marco toma el color del estado más urgente.
+
+**Gasto o tokens: no se muestran.** El cliente no recibe de T3 ningún dato de coste ni de tokens por hilo, y no se inventa.
+Si T3 lo expone más adelante, es una celda más en `StatusScreen.build`.
+
+Se vincula con `/t3craft blocks link status` (atajo de `beacon`) o `link beacon`. En la oficina (`CitadelOffice`, sala de
+control) está en el muro este: `bigscreen_office_status@9x3=beacon`, su fila superior en la línea de la viga corona como las
+demás, sobre una franja con las cinco lámparas `board_lamp_5..9` (el tablero de 9 x 4 se sustituyó). Sin el módulo, el
+bloque queda como pantalla de relleno. El renderer headless no dibuja el contenido: `python3 tools/art/status_screen_mock.py`
+dibuja la cara (muestras `busy`, `calm`, `empty`) para revisar la composición; las constantes siguen a `StatusScreen.java`.
+Solo se verifica en juego: tamaños de texto reales con la fuente proporcional, respiración, y que el refresco de PR funcione
+con la pantalla sola cargada.

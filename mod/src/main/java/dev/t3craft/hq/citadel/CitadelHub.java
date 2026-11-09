@@ -155,6 +155,7 @@ public final class CitadelHub {
 		benches(c);
 		screens(c);
 		hologramAndBeacon(c);
+		HubFacade.dress(c);
 		HubInterior.furnish(c);
 		HubUndercroft.build(c);
 		HubRoof.cupola(c);
@@ -406,6 +407,7 @@ public final class CitadelHub {
 			}
 		}
 		HubExterior.paint(c);
+		HubFacade.paintOuter(c);
 		c.walkSpot(new BlockPos(c.s(19), 1, 0), Direction.WEST);
 		c.walkSpot(new BlockPos(-c.s(19), 1, 0), Direction.EAST);
 		c.walkSpot(new BlockPos(0, y0() + 1, -c.s(24)), Direction.NORTH);
