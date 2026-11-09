@@ -1075,6 +1075,10 @@ public final class PlanReport {
 				JsonObject e = new JsonObject();
 				e.addProperty("block", id);
 				e.addProperty("group", g);
+				e.addProperty("state", u.state().toString());
+				Placement up = plan.at(u.pos().above());
+				e.addProperty("above", up == null ? "(nothing)" : up.state().toString());
+				e.addProperty("below", under == null ? "(nothing)" : under.state().toString());
 				e.add("pos", arr(u.pos().getX(), u.pos().getY(), u.pos().getZ()));
 				lj.add(e);
 			}
