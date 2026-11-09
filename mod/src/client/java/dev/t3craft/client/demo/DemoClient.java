@@ -82,6 +82,13 @@ public final class DemoClient implements ClientModInitializer {
 	private @Nullable String announcedLayout;
 	/** Whether we installed the HQ's NPC anchors (so we only clear our own). */
 	private boolean anchorsInstalled;
+	/**
+	 * fix/new-thread-hitch: an automatic reconcile (roster or layout pack changed) being planned off the
+	 * client thread, with the marker and world it was asked for. Client thread.
+	 */
+	private java.util.concurrent.@Nullable CompletableFuture<DemoHqSource.Prepared> preparing;
+	private @Nullable DemoMarker preparingMarker;
+	private @Nullable Path preparingRoot;
 
 	/**
 	 * Integration point: register more {@link DemoStructureSource}s (the modular HQ, see
@@ -248,6 +255,7 @@ public final class DemoClient implements ClientModInitializer {
 			builtBefore = null;
 			enteredAtMs = System.currentTimeMillis();
 			run = null; // its crews died with the old level (BuildersClient cancels them)
+			cancelPreparing();
 			dev.t3craft.client.npc.NpcGate.open();
 			clearAnchors();
 		}
@@ -273,15 +281,16 @@ public final class DemoClient implements ClientModInitializer {
 			}
 			checked = true;
 			start(mc, root, false);
-		} else if (run == null && ticksIn % 20 == 0 && hq != null && hq.packsChanged()) {
+		} else if (run == null && preparing == null && ticksIn % 20 == 0 && hq != null && hq.packsChanged()) {
 			// feat/hq-layout-packs: a layout pack was reloaded: diff the HQ (within a second, no reload of the game)
-			start(mc, root, false, true);
-		} else if (run == null && ticksIn % RECONCILE_TICKS == 0) {
+			startQuietAsync(mc, root);
+		} else if (run == null && preparing == null && ticksIn % RECONCILE_TICKS == 0) {
 			DemoHqSource h = hq;
 			if (h != null && h.rosterChanged() && rosterReady(true)) {
-				start(mc, root, false, true); // a thread took or released a station: diff the HQ
+				startQuietAsync(mc, root); // a thread took or released a station: diff the HQ
 			}
 		}
+		pollPreparing(mc, root);
 		DemoBuildRun r = run;
 		if (r != null) {
 			r.tick(mc, Builders.service());
@@ -330,18 +339,101 @@ public final class DemoClient implements ClientModInitializer {
 	 * {@code quiet}: an automatic reconcile (roster change), logged instead of announced in chat.
 	 */
 	private void start(Minecraft mc, Path root, boolean force, boolean quiet) {
-		DemoConfig cfg = activeConfig;
+		cancelPreparing();
+		long t0 = System.nanoTime();
+		try {
+			DemoMarker marker = DemoMarkerFile.read(root);
+			prepareSources(mc, marker, null);
+			proceed(mc, root, force, quiet, marker);
+		} finally {
+			dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_DEMO_RECONCILE, t0);
+		}
+	}
+
+	/** Prepares every structure source except {@code skip} (already prepared) against {@code marker}. */
+	private void prepareSources(Minecraft mc, DemoMarker marker, @Nullable DemoStructureSource skip) {
 		DemoStructures s = structures;
-		DemoMarker marker = DemoMarkerFile.read(root);
 		if (s != null && mc.level != null) {
 			for (DemoStructureSource src : s.all()) {
+				if (src == skip) {
+					continue;
+				}
 				try {
-					src.prepare(marker, cfg.spec(), mc.level.getMinY());
+					src.prepare(marker, activeConfig.spec(), mc.level.getMinY());
 				} catch (RuntimeException e) {
 					T3Craft.LOGGER.error("[demo] structure source {} failed to prepare", src.id(), e);
 				}
 			}
 		}
+	}
+
+	/**
+	 * fix/new-thread-hitch: an automatic reconcile (a thread took or released a station, a layout pack
+	 * changed). The HQ is planned on a background worker ({@link DemoHqSource#prepareLater}: plan of the
+	 * new roster, plan of the old layout, diff, baked parts, fingerprint; that ran on the client thread
+	 * and hitched the frame every time a thread appeared); {@link #pollPreparing} continues exactly like
+	 * {@link #start} once it is ready, a few ticks later.
+	 */
+	private void startQuietAsync(Minecraft mc, Path root) {
+		DemoHqSource h = hq;
+		if (h == null || mc.level == null) {
+			return;
+		}
+		DemoMarker marker = DemoMarkerFile.read(root);
+		java.util.function.Supplier<DemoHqSource.Prepared> work;
+		try {
+			work = h.prepareLater(marker, activeConfig.spec(), mc.level.getMinY());
+		} catch (RuntimeException e) {
+			start(mc, root, false, true); // same path as before (it records the failure and falls back)
+			return;
+		}
+		preparingMarker = marker;
+		preparingRoot = root;
+		preparing = dev.t3craft.build.Offload.supply(dev.t3craft.debug.PerfStats.STEP_DEMO_PREPARE, work);
+	}
+
+	private void pollPreparing(Minecraft mc, Path root) {
+		java.util.concurrent.CompletableFuture<DemoHqSource.Prepared> f = preparing;
+		if (f == null || !f.isDone()) {
+			return;
+		}
+		DemoMarker marker = preparingMarker;
+		Path askedFor = preparingRoot;
+		preparing = null;
+		preparingMarker = null;
+		preparingRoot = null;
+		DemoHqSource h = hq;
+		if (h == null || marker == null || !root.equals(askedFor) || run != null || mc.level == null) {
+			return; // another world, or a build started meanwhile: the next reconcile asks again
+		}
+		long t0 = System.nanoTime();
+		try {
+			try {
+				h.adopt(f.join());
+			} catch (RuntimeException e) {
+				h.fail(e.getCause() != null ? e.getCause() : e);
+			}
+			prepareSources(mc, marker, h);
+			proceed(mc, root, false, true, marker);
+		} finally {
+			dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_DEMO_RECONCILE, t0);
+		}
+	}
+
+	private void cancelPreparing() {
+		java.util.concurrent.CompletableFuture<DemoHqSource.Prepared> f = preparing;
+		if (f != null) {
+			f.cancel(false);
+		}
+		preparing = null;
+		preparingMarker = null;
+		preparingRoot = null;
+	}
+
+	/** The rest of {@link #start} once every source is prepared against {@code marker}. */
+	private void proceed(Minecraft mc, Path root, boolean force, boolean quiet, DemoMarker marker) {
+		DemoConfig cfg = activeConfig;
+		DemoStructures s = structures;
 		DemoHqSource h = hq;
 		if (h != null && h.pendingLayout() != null && !quiet && !Objects.equals(h.pendingLayout(), announcedLayout)) {
 			// feat/hq-layouts: another layout is configured, but the HQ standing here keeps its own until a reset

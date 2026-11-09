@@ -70,6 +70,11 @@ public final class ServerLevelSink implements BlockSink {
 		}
 		// fix/hq-build-parallel: the setBlock (light, section marking, packet) is what the time budget measures.
 		BuildBudget.global().work(System.nanoTime() - t0, 1);
+		if (state.getLightEmission() != current.getLightEmission()) {
+			// fix/new-thread-hitch: the light this changes is not in the measured time (see BuildBudget.LIGHT_FREE)
+			BuildBudget.global().lightChanged();
+			dev.t3craft.debug.PerfStats.count(dev.t3craft.debug.PerfStats.BUILD_LIGHT_BLOCKS);
+		}
 		if (effects && BuildBudget.global().effect()) {
 			if (state.isAir()) {
 				if (!current.isAir()) {

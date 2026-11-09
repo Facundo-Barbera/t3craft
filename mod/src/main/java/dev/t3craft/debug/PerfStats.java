@@ -85,6 +85,7 @@ public final class PerfStats {
 		long ns = System.nanoTime() - startNs;
 		INSTANCE.add(key, ns);
 		INSTANCE.peak(key, ns);
+		HitchWatch.step(key, ns);
 		if (ns > STALL_WARN_NS) {
 			INSTANCE.add(STALLS, 1);
 			String line = String.format(java.util.Locale.ROOT, "%s %.1f ms on %s", stepName(key), ns / 1e6, Thread.currentThread().getName());
@@ -303,6 +304,24 @@ public final class PerfStats {
 	public static final String STEP_NPC_WANDER_ASYNC = "step.npc.wander_async.ns";
 	/** Client: workstation stations tick (spawns included). */
 	public static final String STEP_STATIONS = "step.stations.tick.ns";
+
+	// fix/new-thread-hitch: what a new thread sets off that was not timed before
+	/** Client: the client-thread part of a demo HQ (re)build start (marker, choose source, parts, crews). */
+	public static final String STEP_DEMO_RECONCILE = "step.demo.reconcile.ns";
+	/** Async: demo HQ prepared for a new roster (layout plan, old plan, diff, baked parts, fingerprint). */
+	public static final String STEP_DEMO_PREPARE = "step.demo.prepare_async.ns";
+	/** Async: demo fixture bindings (thread → monitor / lamp) for a new roster. */
+	public static final String STEP_DEMO_BINDINGS = "step.demo.bindings_async.ns";
+	/** Client: HQ fixture bindings diffed and sent to the server ({@code BlocksClient.syncHq}). */
+	public static final String STEP_HQ_SYNC = "step.blocks.hq_sync.ns";
+	/** Server: HQ crew watches polled (completion callbacks: site journal fsync, HQ save). */
+	public static final String STEP_CREW_WATCH = "step.crew.watch.ns";
+	/** Client: NPC list rebuilt from the T3 shells after a change ({@code T3CraftClient.refreshDirect}). */
+	public static final String STEP_SHELL_REFRESH = "step.npc.refresh.ns";
+	/** Async: thread list cache JSON built for disk (IO thread). */
+	public static final String STEP_THREAD_CACHE_SAVE = "step.chat.cache_save_async.ns";
+	/** Light-emitting blocks placed (or removed) by builders; above {@code BuildBudget.LIGHT_FREE} per tick they cost extra budget next tick. */
+	public static final String BUILD_LIGHT_BLOCKS = "build.light_blocks";
 
 	/** Prefix of the per-module client tick timers ({@code tick.<module>.ns}). */
 	public static final String TICK_PREFIX = "tick.";

@@ -141,6 +141,17 @@ public final class HqPresence {
 
 	/** (Re)installs the sources when the standing HQ changed. */
 	public static void apply() {
+		// fix/new-thread-hitch: timed as a whole: the plan fingerprints of prepared()/sameAs() (a SHA-256
+		// over every placement, lazy) ran untimed before the install
+		long t0 = System.nanoTime();
+		try {
+			apply0();
+		} finally {
+			dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_PRESENCE, t0);
+		}
+	}
+
+	private static void apply0() {
 		Standing now = current();
 		Prepared p = null;
 		if (now != null) {
@@ -153,12 +164,7 @@ public final class HqPresence {
 		if (installed && sameAs(now, applied)) {
 			return;
 		}
-		long t0 = System.nanoTime();
-		try {
-			install(now, p);
-		} finally {
-			dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_PRESENCE, t0);
-		}
+		install(now, p);
 	}
 
 	/**

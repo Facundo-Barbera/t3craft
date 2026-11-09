@@ -35,6 +35,9 @@ public final class BuildBudget {
 	private long workNanos;
 	private int workBlocks;
 	private double nanosPerBlock;
+	/** fix/new-thread-hitch: light-changing placements this tick, and the extra budget they still owe. */
+	private int lightBlocks;
+	private double lightDebt;
 
 	/**
 	 * Wall-clock budget for block placement per server tick (ms), out of the 50 ms tick: the
@@ -45,6 +48,15 @@ public final class BuildBudget {
 	/** Below this client frame rate the budget drops (×0.7 per second); it recovers above {@link #RECOVER_FPS}. */
 	public static final double MIN_FPS = 30;
 	public static final double RECOVER_FPS = MIN_FPS / TickGovernor.RECOVER_BELOW;
+	/**
+	 * fix/new-thread-hitch: light-emitting blocks placed or removed per tick that cost nothing extra.
+	 * The server's setBlock only queues their light (the light engine runs elsewhere), so the time cap
+	 * never sees it, but every client relights up to 15 blocks around each one and rebuilds the chunk
+	 * sections it touched. Above this, each one costs {@link #LIGHT_WEIGHT} more blocks of budget in
+	 * the following ticks, so a module full of lanterns is spread over several ticks.
+	 */
+	public static final int LIGHT_FREE = 6;
+	public static final double LIGHT_WEIGHT = 4;
 
 	public BuildBudget(BuildTuning tuning) {
 		this.tuning = tuning;
@@ -105,6 +117,18 @@ public final class BuildBudget {
 		workNanos = 0;
 		workBlocks = 0;
 		effectiveMax = capByTime(TickGovernor.apply(t.maxBlocksPerTick(), factor), nanosPerBlock, t.autoThrottle());
+		if (t.autoThrottle()) {
+			lightDebt += Math.max(0, lightBlocks - LIGHT_FREE) * LIGHT_WEIGHT;
+			lightDebt = Math.min(lightDebt, 4.0 * t.maxBlocksPerTick()); // a long lantern run never stalls the next build
+			double pay = Math.min(lightDebt, effectiveMax - 1);
+			if (pay > 0) {
+				effectiveMax -= (int) pay;
+				lightDebt -= (int) pay;
+			}
+		} else {
+			lightDebt = 0;
+		}
+		lightBlocks = 0;
 		remaining = effectiveMax;
 		effectsLeft = t.maxEffectsPerTick();
 		lastClaimants = Math.max(1, claimants.size());
@@ -141,6 +165,16 @@ public final class BuildBudget {
 			workNanos += nanos;
 			workBlocks += blocks;
 		}
+	}
+
+	/** fix/new-thread-hitch: one placement (server thread) that changed block light (emitter placed or removed). */
+	public synchronized void lightChanged() {
+		lightBlocks++;
+	}
+
+	/** Budget still owed by the light-emitting blocks of the last ticks (blocks). */
+	public synchronized double lightDebt() {
+		return lightDebt;
 	}
 
 	/** The client's current frame rate while a build is watched (client thread); ≤ 0 = unknown. */
