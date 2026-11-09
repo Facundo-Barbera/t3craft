@@ -50,6 +50,17 @@ Incluye el catálogo (60 variantes, con la ola B: bancas, jardineras, postes, po
 ## En curso (solo código)
 - `feat/build-near-player`: **integrado en main** (rama `82597e6`), compilado y sin probar en juego. Base por capas (estimación: de ~7–9 min a ~10–20 s), arranque inmediato junto al jugador, prioridad por cercanía, 96 bloques por tick y hasta 8 builders. Pendiente: en supervivencia, las alas se siguen construyendo en orden de índice.
 
+## Swarm de diseño con renders en el PC (ola 1, 2026-11-09)
+Son 4 agentes Sonnet high, cada uno con un director de arte Opus. Trabajan sobre `citadel/next`, con renders solo en el PC (por el relay), y como mucho un render a la vez por agente. Reglas en `~/.cache/t3craft-coord/swarm3-common.md`.
+- `design/houses-a`: casas de entramado, de piedra y japonesas.
+- `design/houses-b`: casas en terraza, talleres y casas-torre.
+- `design/nature-water`: árboles, jardines y fuentes.
+- `design/street`: faroles, bancas, jardineras, postes, arcos, centros de plaza y mástiles.
+
+Ola 2, pendiente:
+- puestos, pozos, anexos, estatuas, gazebos, puentes y remates de torre;
+- la ciudad completa antes y después, a escala 1.0 y 1.5.
+
 ## En curso (solo código, 2026-11-09)
 - `feat/build-radial`: **integrado en main** (`f436217`) y compilado. Construye en anillos de 5 bloques alrededor del jugador; la base tarda ~1,7 min estimados. Quedan pendientes tres cosas:
   - en supervivencia no hay orden radial;
