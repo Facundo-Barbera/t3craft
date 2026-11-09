@@ -880,7 +880,7 @@ public final class FountainKoiPond implements Variant {
 			if (treeU < 0) {
 				return;
 			}
-			int t = Math.min(4, h - 2);
+			int t = Math.min(h >= 7 ? 5 : 4, h - 2);
 			if (t < 3) {
 				return;
 			}
@@ -939,17 +939,33 @@ public final class FountainKoiPond implements Variant {
 			}
 		}
 
+		/**
+		 * Whether a leaf may hang at {@code (u, y, v)}: over open water from the surface up; elsewhere only when
+		 * everyone who can stand on this cell or on any of its 8 neighbours keeps 2.85 blocks of headroom (the
+		 * audit measures with the body's width, so a leaf beside a rim top counts too).
+		 */
 		boolean roomFor(int u, int y, int v) {
-			if (k[u][v] == WATER) {
-				return y >= 2;
-			}
 			if (u == treeU && v == treeV) {
 				return y >= 3;
 			}
-			BlockState g = p.at(c, u, 0, v);
-			double top = foot[u][v];
-			if (g != null && (g.is(Blocks.AZALEA) || g.is(Blocks.FLOWERING_AZALEA))) {
-				top = Math.max(top, 1.0); // an azalea bush is a step you can stand on
+			double top = -1;
+			for (int du = -1; du <= 1; du++) {
+				for (int dv = -1; dv <= 1; dv++) {
+					int nu = u + du;
+					int nv = v + dv;
+					if (nu < 0 || nu >= w || nv < 0 || nv >= d) {
+						continue;
+					}
+					double f = foot[nu][nv];
+					BlockState g = p.at(c, nu, 0, nv);
+					if (g != null && (g.is(Blocks.AZALEA) || g.is(Blocks.FLOWERING_AZALEA))) {
+						f = Math.max(f, 1.0); // an azalea bush is a step you can stand on
+					}
+					top = Math.max(top, f);
+				}
+			}
+			if (top < 0) {
+				return y >= 2; // only water around
 			}
 			return y >= (int) Math.ceil(top + 2.85);
 		}
