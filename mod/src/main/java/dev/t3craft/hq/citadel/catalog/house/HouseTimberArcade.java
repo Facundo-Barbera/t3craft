@@ -336,9 +336,27 @@ public final class HouseTimberArcade implements Variant {
 			return log(Blocks.STRIPPED_CHERRY_LOG, Direction.Axis.Y);
 		}
 
-		/** [palette] the dark oak timber frame. */
+		/** [palette] the timber frame of the walls: spruce, lighter than the dark oak of the eave beam, so the plaster reads. */
 		static BlockState dark() {
-			return log(Blocks.DARK_OAK_LOG, Direction.Axis.Y);
+			return log(Blocks.SPRUCE_LOG, Direction.Axis.Y);
+		}
+
+		/** A window cell: in every bay the cells at odd distance from the nearest pier, so slim windows alternate with plaster. */
+		boolean winBay(int i) {
+			if (isPier(i)) {
+				return false;
+			}
+			int l = i;
+			while (!isPier(l)) {
+				l--;
+			}
+			int r = i;
+			while (!isPier(r)) {
+				r++;
+			}
+			int m = r - l - 1;
+			int j = i - l - 1;
+			return Math.min(j, m - 1 - j) % 2 == 1;
 		}
 
 		void hang(int u, int y, int v) {
@@ -416,10 +434,10 @@ public final class HouseTimberArcade implements Variant {
 		void walls() {
 			IntPredicate postP = this::isPier;
 			IntPredicate postS = i -> i == 1 || i == 5 || i == vb || ((i - 1) % 4 == 0 && vb - i >= 2);
-			IntPredicate winFU = i -> (i < pa || i > pb) && gapWin(postP, i, 1, w - 2);
-			IntPredicate winBU = i -> gapWin(postP, i, 1, w - 2);
+			IntPredicate winFU = i -> (i < pa || i > pb) && winBay(i);
+			IntPredicate winBU = this::winBay;
 			IntPredicate winSU = i -> gapWin(postS, i, 1, vb);
-			Block shut = Blocks.DARK_OAK_TRAPDOOR;
+			Block shut = Blocks.SPRUCE_TRAPDOOR;
 			int y1 = FL + 1;
 			int y2 = PLATE - 1;
 			int w1 = FL + 2;
@@ -439,7 +457,7 @@ public final class HouseTimberArcade implements Variant {
 			TimberKit.dress(c, p, false, w - 1, 1, 1, vb, postS, winSU, w1, w2, null, shut, false);
 			// ground floor: stone foot, pilasters on the market side, display windows
 			int g2 = FL - 1;
-			IntPredicate winF0 = i -> Math.abs(i - cd) > 1 && gapWin(postP, i, 1, w - 2);
+			IntPredicate winF0 = i -> Math.abs(i - cd) > 1 && winBay(i);
 			TimberKit.wall(c, p, true, 4, -1, 1, w - 2, 1, g2, postP, winF0, 2, 3, null, (i, y) -> pale(),
 					(i, y) -> y == 1 ? baseStone(i, 1, 4) : null, (i, y) -> plaster(i, y, 5));
 			backfill(true, 4, -1, 1, w - 2, 1, g2, postP, (i, y) -> plaster(i, y, 5));
@@ -453,7 +471,7 @@ public final class HouseTimberArcade implements Variant {
 					(i, y) -> y == 1 ? baseStone(w - 1, 1, i) : null, (i, y) -> plaster(w - 2, y, i));
 			backfill(false, w - 1, 1, 1, vb, 1, g2, postS, (i, y) -> plaster(w - 2, y, i));
 			TimberKit.dress(c, p, false, w - 1, 1, 1, vb, postS, winSG, 2, 3, null, shut, false);
-			IntPredicate winBG = i -> Math.abs(i - bd) > 1 && gapWin(postP, i, 1, w - 2);
+			IntPredicate winBG = i -> Math.abs(i - bd) > 1 && winBay(i);
 			TimberKit.wall(c, p, true, vb + 1, 1, 1, w - 2, 1, g2, postP, winBG, 2, 3, null, (i, y) -> dark(),
 					(i, y) -> y == 1 ? baseStone(i, 1, vb + 1) : null, (i, y) -> plaster(i, y, vb));
 			backfill(true, vb + 1, 1, 1, w - 2, 1, g2, postP, (i, y) -> plaster(i, y, vb));
@@ -574,8 +592,8 @@ public final class HouseTimberArcade implements Variant {
 					set(u, y1 + 2, 4, pane(true, DyeColor.PINK));
 				}
 			}
-			set(pa + 1, y1 + 1, 0, lantern(false));
-			set(pb - 1, y1 + 1, 0, lantern(false));
+			p.put(c, pa + 1, y2, 0, lantern(true), CitadelCanvas.HANGING);
+			p.put(c, pb - 1, y2, 0, lantern(true), CitadelCanvas.HANGING);
 			// the cross roof
 			int span = pb - pa;
 			int dmax = span / 2;
@@ -655,13 +673,14 @@ public final class HouseTimberArcade implements Variant {
 			}
 		}
 
-		/** [depth] A dark soffit under the eave: a row of upside-down stairs over the upper windows. */
+		/** [depth] A dark soffit under the eave (upside-down stairs) and a fence rail in front of the upper windows. */
 		void ledge() {
 			for (int u = 1; u <= w - 2; u++) {
 				if (isPier(u) || (u >= pa && u <= pb)) {
 					continue;
 				}
 				set(u, PLATE - 1, 0, stair(Blocks.DARK_OAK_STAIRS, Direction.SOUTH, true));
+				set(u, FL + 1, 0, fence(Blocks.DARK_OAK_FENCE, false, true, false, true)); // a window rail, not a ledge
 			}
 		}
 
@@ -677,16 +696,15 @@ public final class HouseTimberArcade implements Variant {
 						continue;
 					}
 					if (k % 2 == 0 && k != eb) {
-						// a stall: counter with goods on it
-						set(x, 1, 4, b(Blocks.DARK_OAK_PLANKS));
-						BlockState goods = switch (p.hash(x, 2, 4, 6)) {
-							case 0 -> Blocks.POTTED_FLOWERING_AZALEA.defaultBlockState();
-							case 1 -> Blocks.POTTED_FERN.defaultBlockState();
-							default -> null;
+						// a stall: the counter is the goods (planks, melons, pumpkins, hay, a barrel)
+						BlockState goods = switch (p.hash(x, 1, 4, 6)) {
+							case 0 -> b(Blocks.MELON);
+							case 1 -> b(Blocks.PUMPKIN);
+							case 2 -> b(Blocks.HAY_BLOCK);
+							case 3 -> barrel();
+							default -> b(Blocks.DARK_OAK_PLANKS);
 						};
-						if (goods != null) {
-							set(x, 2, 4, goods);
-						}
+						set(x, 1, 4, goods);
 					} else {
 						// barrels, crates and chests
 						BlockState st = switch (p.hash(x, 1, 4, 3)) {
@@ -856,16 +874,9 @@ public final class HouseTimberArcade implements Variant {
 			}
 			int cv = vL - 2;
 			for (int u = s0 + 1; u <= s1 - 1; u++) {
-				set(u, 1, cv, b(Blocks.DARK_OAK_PLANKS));
-				BlockState top = switch (p.hash(u, 2, cv, 4)) {
-					case 0 -> lantern(false);
-					case 1 -> Blocks.POTTED_FLOWERING_AZALEA.defaultBlockState();
-					case 2 -> Blocks.POTTED_FERN.defaultBlockState();
-					default -> null;
-				};
-				if (top != null) {
-					set(u, 2, cv, top);
-				}
+				// the counter: plain boards with a chest or a barrel of stock here and there (nothing on top)
+				int h = p.hash(u, 1, cv, 5);
+				set(u, 1, cv, h == 0 ? barrel() : h == 1 ? face(Blocks.CHEST, Direction.SOUTH) : b(Blocks.DARK_OAK_PLANKS));
 			}
 			// stock by the front wall, clear of the door
 			for (int u : new int[] {s0 + 1, s1 - 1}) {
