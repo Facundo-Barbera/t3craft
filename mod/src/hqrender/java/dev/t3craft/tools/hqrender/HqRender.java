@@ -298,6 +298,7 @@ public final class HqRender {
 				case "--lamp-demo" -> lampDemo = true;
 				case "--front" -> catalogFront = args[++i];
 				case "--sizes" -> catalogSizes = Integer.parseInt(args[++i]);
+				case "--boxes" -> CatalogViews.boxes = args[++i]; // exact WxDxH plots for --catalog, e.g. 8x8x14,11x8x14
 				case "--seeds" -> catalogSeeds = Integer.parseInt(args[++i]);
 				case "--radius" -> radius = Integer.parseInt(args[++i]);
 				case "--name" -> piece.name = args[++i];

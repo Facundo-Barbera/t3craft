@@ -332,8 +332,22 @@ final class CatalogViews {
 		return out;
 	}
 
-	/** {w, d, h} sizes spread over the variant's range: min, middle, max (deduplicated, up to n). */
+	/** {@code --boxes WxDxH[,WxDxH…]}: exact plot sizes for every variant instead of the spread (null: the spread). */
+	static String boxes = null;
+
+	/** {w, d, h} sizes spread over the variant's range: min, middle, max (deduplicated, up to n); {@link #boxes} wins. */
 	private static List<int[]> sizes(Variant v, int n) {
+		if (boxes != null && !boxes.isBlank()) {
+			List<int[]> exact = new ArrayList<>();
+			for (String b : boxes.split(",")) {
+				String[] t = b.trim().toLowerCase(Locale.ROOT).split("x");
+				if (t.length != 3) {
+					throw new IllegalArgumentException("--boxes: '" + b + "' is not WxDxH");
+				}
+				exact.add(new int[] {Integer.parseInt(t[0].trim()), Integer.parseInt(t[1].trim()), Integer.parseInt(t[2].trim())});
+			}
+			return exact;
+		}
 		int w1 = v.minW();
 		int w2 = cap(v.maxW(), w1);
 		int d1 = v.minD();

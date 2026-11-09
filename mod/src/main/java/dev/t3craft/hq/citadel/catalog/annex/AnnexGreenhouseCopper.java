@@ -351,6 +351,15 @@ public final class AnnexGreenhouseCopper implements Variant {
 					st = rib ? stairs(RIB_W, in) : glass;
 				}
 				p.set(c, u, y, v, st);
+				if (g.hip) {
+					// a hip's rings step up one block each, touching only at the corners: a second pane on top of every
+					// ring below the plateau (a copper block on the ribs) makes the stairs meet face to face, so the roof
+					// is one piece from the gutter to the ridge whatever the height (a gable gets that from its end walls)
+					int m = Math.min(du, dv);
+					if (m < g.r) {
+						p.set(c, u, PLATE + m + 1, v, rib ? POST_W : glass);
+					}
+				}
 			}
 		}
 		// [finish] a thin bare-copper ridge line on top of the glass, with a finial at each end

@@ -68,6 +68,7 @@ tools/render/submit.sh --final -- --catalog WELL:well_roofed_stone --scale 1.5 -
   size and seed are written under it.
 - **Options:**
   - `--sizes N` and `--seeds N` change the number of sizes and seeds.
+  - `--boxes 8x8x14,11x8x14` builds exactly those `w×d×h` plots for every selected variant instead of the min/middle/max spread (for the sizes and heights the city asks for).
   - `--front N|E|S|W|all` sets the orientation. The default is `S`, so the facade faces the `iso_se` camera.
   - `--only iso_se` keeps only the views whose name contains that text.
 - **Output:**
