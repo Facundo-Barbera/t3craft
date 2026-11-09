@@ -363,7 +363,7 @@ final class CitadelPaving {
 	/**
 	 * What lies on the verge of a lot at {@code y = 1}, or {@code null}: a low stone-brick slab (one in
 	 * three mossy) on the first row against the kerb, which turns the kerb into a step down to the
-	 * lawn, and a fern on the second. Never inside the barrio's own square.
+	 * lawn, and a flowering bush on the second. Never inside the barrio's own square.
 	 */
 	static BlockState vergeCover(CitadelCanvas c, int x, int z, Zone zn) {
 		int m = zn.ring();
@@ -382,7 +382,7 @@ final class CitadelPaving {
 		if (edge < VERGE_W / 2) {
 			return h % 3 == 0 ? slab(Blocks.MOSSY_STONE_BRICK_SLAB) : slab(Blocks.STONE_BRICK_SLAB);
 		}
-		return h < 20 ? b(Blocks.FERN) : null;
+		return h < 14 ? CitadelCanvas.leaves(Blocks.FLOWERING_AZALEA_LEAVES) : null;
 	}
 
 	// ------------------------------------------------------------------ patio and bridges

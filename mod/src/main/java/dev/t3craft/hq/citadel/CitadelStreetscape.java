@@ -40,8 +40,7 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
  *     the outer one; none near an avenue mouth or a node.</li>
  * <li><b>Landmark</b> ({@link #landmark}): on the middle of every crossing of a ring street, a stone
  *     lantern (chiselled plinth, wall post, lantern, 4 high) in the heart of the rosette.</li>
- * <li><b>Plaza</b> ({@link #plaza}): the plaza at the foot of the main ramp gets a stone lantern at its
- *     middle, a bench facing it at each corner of the rosette, a garden planter on each side and two
+ * <li><b>Plaza</b> ({@link #plaza}): the plaza at the foot of the main ramp gets a stone lantern on each side of the rosette (the axis stays clear: the spawn is there), a bench facing it at each corner of the rosette, a garden planter on each side and two
  *     lantern posts at each end.</li>
  * </ul>
  *
@@ -303,8 +302,8 @@ final class CitadelStreetscape {
 		int mid = (int) Math.round((lo + hi) / 2);
 		int step = (int) Math.max(1, Math.round((hi - lo) / 4)); // the benches stand this far from the middle line
 		int ax = Math.abs(x);
-		if (x == 0 && z == mid) {
-			stoneLantern(c, x, z);
+		if (ax == (int) Math.round(CitadelPaving.AVENUE_HALF) && z == mid) {
+			stoneLantern(c, x, z); // beside the rosette, never on the axis: the spawn stands there
 		} else if (ax == edge && (z == Math.round(lo + 1) || z == Math.round(hi - 1))) {
 			lanternPost(c, x, z, AVENUE_POST);
 		} else if (ax == edge - 2 && (z == mid || z == mid - 1)) {
