@@ -113,8 +113,21 @@ public record ChatTheme(
 
 	public static final String KIT = "t3craft:chat/";
 
-	/** AgentCraft "Warm Studio" paper console (default look). */
+	/**
+	 * AgentCraft "Warm Studio" paper console (default look). Read from {@code gui/ui-style.json} (see
+	 * {@link UiStyle}), so F3+T restyles it; the same instance is returned until the next reload.
+	 */
 	public static ChatTheme warmStudio() {
+		return UiStyle.warmStudio();
+	}
+
+	/** The portable terminal's dark teal palette, flat fills (no kit sprites). Read from {@code gui/ui-style.json} like {@link #warmStudio()}. */
+	public static ChatTheme terminal() {
+		return UiStyle.terminal();
+	}
+
+	/** Built-in Warm Studio: the fallback when {@code ui-style.json} is missing, and the base its keys override. */
+	static ChatTheme builtinWarmStudio() {
 		return new ChatTheme(
 				KIT,
 				0x5C3B2A20, // walnut @ 92 (console veil)
@@ -163,8 +176,8 @@ public record ChatTheme(
 				8);
 	}
 
-	/** The portable terminal's dark teal palette, flat fills (no kit sprites). */
-	public static ChatTheme terminal() {
+	/** Built-in terminal palette: fallback and base of the {@code terminal} theme in {@code ui-style.json}. */
+	static ChatTheme builtinTerminal() {
 		return new ChatTheme(
 				null,
 				0x88000000,

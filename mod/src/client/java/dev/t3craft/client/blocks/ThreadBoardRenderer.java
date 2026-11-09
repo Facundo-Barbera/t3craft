@@ -96,7 +96,8 @@ public final class ThreadBoardRenderer implements BlockEntityRenderer<ThreadBoar
 	}
 
 	private final ThreadWalls walls;
-	private final ChatTheme theme = ChatTheme.warmStudio();
+	/** Re-read on every sync, so an F3+T of {@code gui/ui-style.json} (#12) restyles the walls at once. */
+	private ChatTheme theme = ChatTheme.warmStudio();
 	private final Map<WallBoard, Glyphs> glyphs = new IdentityHashMap<>();
 
 	ThreadBoardRenderer(ThreadWalls walls) {
@@ -141,6 +142,7 @@ public final class ThreadBoardRenderer implements BlockEntityRenderer<ThreadBoar
 		}
 		Font font = Minecraft.getInstance().font;
 		WallBoard b = walls.board(origin, s.facing, w.width(), w.height());
+		theme = ChatTheme.warmStudio();
 		b.sync(walls.cards(), w.mode(), theme, w.width() * PPB, w.height() * PPB, font::width, System.currentTimeMillis());
 		long now = System.nanoTime();
 		b.step(now);

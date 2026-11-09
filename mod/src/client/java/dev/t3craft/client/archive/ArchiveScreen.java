@@ -40,7 +40,8 @@ public final class ArchiveScreen extends Screen {
 	private final ArchiveList list;
 	/** Where Done / Esc go (the portable terminal); null = back to the game. */
 	private final @Nullable Screen parent;
-	private final ChatTheme theme = ChatTheme.warmStudio();
+	/** The UI tokens ({@code gui/ui-style.json}); swapped in {@link #tick} after an F3+T. */
+	private ChatTheme theme = ChatTheme.warmStudio();
 	private final List<Hit> hits = new ArrayList<>();
 	private Rect frame = Rect.EMPTY;
 	private int perPage = 10;
@@ -71,6 +72,16 @@ public final class ArchiveScreen extends Screen {
 	@Override
 	public void onClose() {
 		minecraft.gui.setScreen(parent);
+	}
+
+	@Override
+	public void tick() {
+		super.tick();
+		ChatTheme current = ChatTheme.warmStudio();
+		if (current != theme) { // F3+T reloaded gui/ui-style.json (#12)
+			theme = current;
+			rebuildWidgets();
+		}
 	}
 
 	@Override

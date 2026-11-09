@@ -129,6 +129,7 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 		dev.t3craft.client.search.SearchClient.register(this); // feat/search: /t3craft search
 		dev.t3craft.client.queue.QueueClient.register(this); // feat/op-queue: /t3craft queue, QueueScreen
 		dev.t3craft.client.hq.layout.HqLayoutPackWatcher.register(); // feat/hq-layout-packs: config/t3craft/hq-layouts, live
+		dev.t3craft.client.chat.UiStyleReloader.register(); // #12: gui/ui-style.json, reloaded by F3+T
 
 		// Right-click on one of our client-only NPCs opens its chat screen. The entity is unknown to
 		// the server, so the interaction is consumed client-side.

@@ -84,7 +84,8 @@ public final class T3Screen extends Screen {
 	private final ConversationPanel.@Nullable Actions actions;
 	private final T3Slots slots;
 	private final SidebarModel model = new SidebarModel();
-	private final ChatTheme theme = ChatTheme.warmStudio();
+	/** The UI tokens ({@code gui/ui-style.json}); swapped by {@link #syncTheme} after an F3+T. */
+	private ChatTheme theme = ChatTheme.warmStudio();
 
 	private @Nullable ConversationPanel conversation;
 	/**
@@ -384,11 +385,30 @@ public final class T3Screen extends Screen {
 
 	@Override
 	public void tick() {
+		syncTheme();
 		refresh();
 		if (conversation != null) {
 			conversation.tick();
 		}
 		ticks++;
+	}
+
+	/** F3+T reloaded {@code gui/ui-style.json} (#12): hand the new tokens to the parts that hold one and re-lay the screen. */
+	private void syncTheme() {
+		ChatTheme current = ChatTheme.warmStudio();
+		if (current == theme) {
+			return;
+		}
+		theme = current;
+		if (conversation != null) {
+			conversation.setTheme(current);
+		}
+		if (composer != null) {
+			composer.setTheme(current);
+		}
+		if (minecraft != null) {
+			rebuildWidgets();
+		}
 	}
 
 	private void refresh() {
