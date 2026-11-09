@@ -43,12 +43,15 @@ house-timber, house-stone, house-japanese, house-terrace, house-workshop, house-
 - Si vuelve a crashear, hace falta el crash report (`crash-reports/` o `hs_err_pid*.log` en el directorio `run`).
 
 ## `citadel/next`: compila (2026-11-09)
-Incluye el catálogo (49 variantes), la colocación, el gancho de la oficina y las 10 ramas del swarm 1 (sin `scale` ni `1-connect`).
+Incluye el catálogo (60 variantes, con la ola B: bancas, jardineras, postes, pozos, abrevadero, invernadero, cobertizo y pérgola), la colocación, el gancho de la oficina y las 10 ramas del swarm 1 (sin `scale` ni `1-connect`).
 - Compilado con `tools/heavy.sh`: hubo que renombrar un `record Tail` duplicado que venía de `fix/new-thread-hitch`.
 - Falta: renders en el PC (por el relay, bloqueado por la clave SSH) y la integración a main.
 
 ## En curso (solo código)
-- `feat/build-near-player`: los builders construyen primero cerca del jugador y arrancan cerca en el mundo void.
+- `feat/build-near-player` (**prioridad máxima**):
+  - los builders construyen primero cerca del jugador;
+  - la construcción es más rápida, con la base (isla, suelo, podio) colocada por capas sin animación bloque a bloque;
+  - hay más bloques por tick para lo visible.
 
 ## Renders en el PC de Facundo (my-pc): probar 1 job
 **BLOQUEADO 2026-11-09:** la VPS no tiene acceso SSH al PC (`Permission denied (publickey…)`). Hay que agregar en `~/.ssh/authorized_keys` del user `wsluser` en WSL esta clave pública de la VPS:
