@@ -191,7 +191,9 @@ public final class CitadelBarrios {
 		Room r = l.hall(h);
 		int D = r.d();
 		int mid = r.c();
-		int F = upper != null ? 2 : 1;
+		// feat/lead-office: a lead's office takes both floors of its hall (twice the space), see CitadelLeadOffice
+		boolean leadHall = CitadelLeadOffice.isLead(ground);
+		int F = upper != null || leadHall && CitadelLeadOffice.twoFloors(r) ? 2 : 1;
 		int top = F * fh();
 		var style = dev.t3craft.hq.citadel.barrio.HallStyle.of(l.id(), h);
 		DyeColor env = dev.t3craft.hq.citadel.barrio.HallFacade.env(c, l.id());
@@ -200,10 +202,16 @@ public final class CitadelBarrios {
 		// the facade (door, porch, windows) and the roof; then the inside: stairs, rugs, furniture, light
 		dev.t3craft.hq.citadel.barrio.HallFacade.dress(c, r, F, mats, style, env, seed);
 		roof(c, r, top, Math.floorMod(h + l.id(), 3), mats);
-		if (F == 2) {
-			hallStairs(c, r, style);
+		if (leadHall) {
+			if (F == 2) {
+				CitadelLeadOffice.flight(c, r, style);
+			}
+		} else {
+			if (F == 2) {
+				hallStairs(c, r, style);
+			}
+			dev.t3craft.hq.citadel.barrio.HallInterior.furnish(c, r, F, mats, style, env, seed);
 		}
-		dev.t3craft.hq.citadel.barrio.HallInterior.furnish(c, r, F, mats, style, env, seed);
 		for (HqLayout.Module mod : new HqLayout.Module[] {ground, upper}) {
 			if (mod == null) {
 				continue;
@@ -212,7 +220,7 @@ public final class CitadelBarrios {
 			int y = f * fh() + 1;
 			// feat/lead-office: a lead's module becomes its office (desk, children big screen, banner,
 			// bookshelves, whiteboard, chairs); every other module keeps its six desks
-			if (!CitadelLeadOffice.place(c, mod, r, f)) {
+			if (!CitadelLeadOffice.place(c, mod, r, f, style, mats)) {
 				for (int slot = 0; slot < mod.capacity(); slot++) {
 					String thread = mod.threadAt(slot);
 					if (thread != null) {
@@ -341,7 +349,11 @@ public final class CitadelBarrios {
 	// ------------------------------------------------------------------ desks
 
 	public static void desk(CitadelCanvas c, int module, Room r, int f, int slot, String thread) {
-		DeskSpot d = RingCampusGeometry.desk(r, f, slot);
+		deskAt(c, module, slot, RingCampusGeometry.desk(r, f, slot), thread);
+	}
+
+	/** A desk at an arbitrary spot (feat/lead-office: the lead's desk faces the door); same anchors and workstation as {@link #desk}. */
+	public static void deskAt(CitadelCanvas c, int module, int slot, DeskSpot d, String thread) {
 		Direction face = d.facing();
 		Direction right = face.getClockWise();
 		BlockPos desk = d.desk();
