@@ -150,7 +150,7 @@ public final class TreeMapleRed implements Variant {
 		double ccv = tv[topY];
 
 		// ---- the fans: a low ring, a middle ring on tall plots, the crown over the leader
-		double rbase = TreeKit.clamp(m * 0.34, 1.9, 4.6);
+		double rbase = TreeKit.clamp(m * 0.37, 1.9, 4.8);
 		int nLow = m <= 5 ? 2 : m <= 7 ? 3 : m <= 10 ? 4 : 5;
 		double step = Math.PI * 2 / nLow;
 		int id = 1;
@@ -174,7 +174,7 @@ public final class TreeMapleRed implements Variant {
 			}
 		}
 		// the crown, over the leader: the brightest
-		double rt = rbase * (0.78 + r.nextDouble() * 0.2);
+		double rt = m <= 9 ? 1.35 + r.nextDouble() * 0.35 : rbase * (0.78 + r.nextDouble() * 0.2);
 		fan(t, r, ccu, ccv, 0, 0.0, rt, rt * (0.8 + r.nextDouble() * 0.2), topY, topY - 3, tu, tv, id++, sun, bias, 0.2, m);
 
 		// ---- fallen leaves under the crown, thick at the trunk and thinning out
@@ -216,14 +216,14 @@ public final class TreeMapleRed implements Variant {
 		if (reach > 0) {
 			double half = m / 2.0;
 			double rr = reach * half + 0.6;
-			double room = TreeKit.room(t, cu, cv, ex, ez, 0) - Math.max(rx, rz) * 0.62;
+			double room = TreeKit.room(t, cu, cv, ex, ez, 0) - Math.max(rx, rz) * 0.45;
 			rr = TreeKit.clamp(Math.min(rr, room), 1.2, 6.0);
 			fu = cu + ex * rr;
 			fv = cv + ez * rr;
 		}
 		int fu0 = (int) Math.round(fu);
 		int fv0 = (int) Math.round(fv);
-		double hue = 0.3 + 0.3 * Math.cos(ang - sun) * (reach > 0 ? 1 : 0.5) + 0.025 * (py - 4) + hueUp + bias;
+		double hue = 0.25 + 0.25 * Math.cos(ang - sun) * (reach > 0 ? 1 : 0.5) + 0.025 * (py - 4) + hueUp + bias;
 		if (reach > 0) {
 			// the limb: from the trunk out and then up into the fan
 			int y0 = TreeKit.clamp(ys, 2, py - 1);
@@ -233,6 +233,9 @@ public final class TreeMapleRed implements Variant {
 					(int) Math.round(a[2] + (z[2] - a[2]) * 0.72)};
 			TreeKit.branch(t, WOOD, a, mid, false);
 			TreeKit.branch(t, WOOD, mid, z, false);
+			// a second twig under the rim, sideways, so the fan is held up by more than one limb
+			int[] tw = {(int) Math.round(z[0] - ez * rx * 0.55), py, (int) Math.round(z[2] + ex * rz * 0.55)};
+			TreeKit.branch(t, WOOD, mid, tw, false);
 		}
 		pad(t, fu, py, fv, rx, rz, ang, id, hue);
 	}
@@ -269,7 +272,7 @@ public final class TreeMapleRed implements Variant {
 				}
 				// the cap: smaller and ragged, brighter
 				if (qq <= 0.42 + jit && (centre || t.hash(u, cy + 1, v + id, 4) != 0)) {
-					t.leafOf(u, cy + 1, v, leaf(t, hue + 0.07, u, cy + 1, v, true), id);
+					t.leafOf(u, cy + 1, v, leaf(t, hue + 0.03, u, cy + 1, v, true), id);
 				}
 				// a few drips under the rim, darker
 				if (qq > 0.7 && qq <= 1.0 + jit && t.hash(u + id, cy - 1, v, 12) == 0 && t.kind(u, cy, v) != TreeKit.EMPTY) {
