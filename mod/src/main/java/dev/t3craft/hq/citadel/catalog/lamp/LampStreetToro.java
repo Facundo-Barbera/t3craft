@@ -9,6 +9,7 @@ import dev.t3craft.hq.citadel.catalog.Family;
 import dev.t3craft.hq.citadel.catalog.Plot;
 import dev.t3craft.hq.citadel.catalog.Variant;
 import net.minecraft.core.Direction;
+import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.StairBlock;
 import net.minecraft.world.level.block.state.BlockState;
@@ -126,7 +127,7 @@ public final class LampStreetToro implements Variant {
 
 		// --- finial (hōju): a pale jewel, a candle on the crown
 		if (finial) {
-			p.set(c, cu, y, cv, b(Blocks.WHITE_CANDLE));
+			p.set(c, cu, y, cv, b(Blocks.DYED_CANDLE.pick(DyeColor.WHITE)).setValue(BlockStateProperties.LIT, true));
 		} else if (y < p.h()) {
 			p.set(c, cu, y, cv, slab(Blocks.SMOOTH_STONE_SLAB));
 		}
