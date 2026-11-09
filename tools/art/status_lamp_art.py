@@ -7,13 +7,13 @@ Standard library only (zlib/struct), light enough for the VPS. Run from the repo
 
 Design (a thread's state has to read at a glance and from afar: colour + silhouette + blink, in that order):
   * body: a lantern capsule, symmetric top/bottom, so it works standing on a screen AND hanging from a chain
-    (the hub beacon); steel caps with gold rings.
+    (the hub beacon); steel caps and rings, brass only as a 1 px collar under each cap.
   * lens colours are LampStatus' (docs/feat-blocks.md); only the lens (and its flares) glow, in-game too
     ("light_emission" on those elements only).
   * silhouette per state:  off  dark thin glass (no glow)        idle  thin dim gray candle, pause bars
-                           working  band around the lens, cyan spinner that turns (4 frames)
+                           working  12 px band around the 10 px lens, cyan spinner that turns (4 frames)
                            done  plain green lens with a check mark, steady
-                           attention  8-wide lens + 4 horns (a siren star), orange "!" that blinks slowly
+                           attention  10-wide lens + two straight steel T-brackets (east/west), orange "!" that blinks slowly
                            error  wide squat lens + 8 claws (crown of spikes), red X that blinks fast
   * texture layout (16 px wide; frame = 16x16): rows 0-1 bright strip (band), row 2 plain lens colour (flares,
     spikes, top faces), rows 3-13 the glyph crop each model face points at. Frame 0 is the "lit" one (renders show it).
