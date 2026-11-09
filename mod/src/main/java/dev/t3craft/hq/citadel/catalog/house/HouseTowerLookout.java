@@ -338,8 +338,8 @@ public final class HouseTowerLookout implements Variant {
 					boolean post = Math.abs(u - g.cx) == Math.abs(v - g.cz) && Math.abs(u - g.cx) > 0;
 					boolean door = u > g.cx && v == g.cz;
 					if (post) {
-						set(c, g.p, u, GAL + 1, v, log(g.s.trim(), Direction.Axis.Y));
-						set(c, g.p, u, GAL + 2, v, log(g.s.trim(), Direction.Axis.Y));
+						set(c, g.p, u, GAL + 1, v, log(g.s.log(), Direction.Axis.Y));
+						set(c, g.p, u, GAL + 2, v, log(g.s.log(), Direction.Axis.Y));
 					} else {
 						boolean n = g.in(u, v - 1, rg) && !g.in(u, v - 1, g.wallR());
 						boolean e = g.in(u + 1, v, rg) && !g.in(u + 1, v, g.wallR());
@@ -381,7 +381,7 @@ public final class HouseTowerLookout implements Variant {
 					} else if (eastDoor) {
 						st = y == GAL + 1 ? doorBlock(g, Direction.EAST, true) : doorBlock(g, Direction.EAST, false);
 					} else if (pillarCell(g, u, v)) {
-						st = log(g.s.trim(), Direction.Axis.Y);
+						st = log(g.s.log(), Direction.Axis.Y);
 					} else {
 						boolean n = g.wall(u, v - 1);
 						boolean e = g.wall(u + 1, v);
@@ -463,7 +463,7 @@ public final class HouseTowerLookout implements Variant {
 		// [depth] the doorway frame stands proud: log jambs and a lintel course
 		for (int side = -1; side <= 1; side += 2) {
 			for (int y = 1; y <= 2; y++) {
-				set(c, g.p, cu + side, y, vd - 1, log(g.s.trim(), Direction.Axis.Y));
+				set(c, g.p, cu + side, y, vd - 1, log(g.s.log(), Direction.Axis.Y));
 			}
 			set(c, g.p, cu + side, 3, vd - 1, stair(g.s.eaveStair(), side < 0 ? Direction.EAST : Direction.WEST, true));
 			put(c, g.p, cu + side * 2, 2, vd - 1, hangingLantern(), CitadelCanvas.HANGING);

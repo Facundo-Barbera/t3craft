@@ -583,7 +583,7 @@ public final class HouseTowerStair implements Variant {
 			}
 		}
 		for (int u = l.u1; u <= l.iu; u++) {
-			set(c, p, u, PLATE, 0, log(l.s.trim(), Direction.Axis.X));
+			set(c, p, u, PLATE, 0, log(l.s.frame(), Direction.Axis.X));
 		}
 		// bracket under the front gable overhang
 		set(c, p, mid, roofY(l, mid) - 1, 0, stair(l.s.eave(), Direction.SOUTH, true));
