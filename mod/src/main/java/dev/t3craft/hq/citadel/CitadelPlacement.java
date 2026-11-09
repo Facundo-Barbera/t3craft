@@ -2016,9 +2016,9 @@ public final class CitadelPlacement {
 	/** Depth of a signpost plot: the post's row and one row in front of it. */
 	static final int SIGN_D = 2;
 
-	/** Height of a signpost plot (7 at scale 2, like a lamp). */
+	/** Height of a signpost plot (8 at scale 2: a lamp's 7 plus the lantern or the ridge on top). */
 	static int SIGN_H() {
-		return scy(5);
+		return scy(5) + 1;
 	}
 
 	private static final Map<String, Integer> ARROWS_ONLY = Map.of("signpost_arrows", 1, "signpost_notice_board", 0);

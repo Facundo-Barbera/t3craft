@@ -15,26 +15,27 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.Half;
 
 /**
- * A crossroads fingerpost at the scale of the city (a 7 wide, 2 deep, 7 high plot): a dark stripped-oak post on a two-step
- * deepslate base, a lantern on top, and two arrows at staggered heights pointing opposite ways across the road, so
- * that someone walking along the avenue reads "left / right" face on. Each arrow is a one-block board of planks that runs
- * through the post (one block of tail on the other side) ending in a three-block head: a stair above, a stair below
- * (upside down) and the tip between them, so it narrows to a point.
+ * A crossroads fingerpost at the scale of the city (a 7 wide, 2 deep, 8 high plot): a stout two-block-deep dark stripped-oak
+ * post on a two-step deepslate base, two gold lanterns on top, and a double signboard: two stacked arrows, a pink cherry one
+ * above a bamboo one, pointing opposite ways across the road (so someone walking along the avenue reads "left / right" face on)
+ * and of different lengths. Each arrow is a two-block-tall, two-block-deep board of planks that runs through the post (one
+ * block of tail on the other side) and ends in a tip cut at both corners with stairs, so it narrows to a point.
  *
  * <ul>
- * <li><b>Arrow</b>: planks along the arm, then a head column (stair, plank, upside-down stair) and a one-block tip.</li>
- * <li><b>Contrast</b>: near-black dark oak post, pink cherry and yellow bamboo arrows, gold lantern, grey deepslate base.</li>
- * <li><b>Silhouette</b>: the arrows point opposite ways at different heights, never a symmetric cross.</li>
+ * <li><b>Arrow</b>: planks two rows tall; at the tip an upright stair above and an upside-down stair below, both with their
+ *     tall side to the tail: the end is chamfered into a point.</li>
+ * <li><b>Contrast</b>: near-black dark oak post, pink cherry and yellow bamboo arrows, gold lanterns, grey deepslate base.</li>
+ * <li><b>Silhouette</b>: the arrows point opposite ways and differ in length, never a symmetric cross.</li>
  * </ul>
- * Size: 3–7 × 1–2 × 3+ (it uses up to 8 blocks of height; two arrows from height 6 and a lantern from height 5). The post
- * stands on the back row, in the middle of the frontage; the arms hang over the cells beside it (3 each way at 7 wide),
- * so the only ground it uses is the post cell and the stair in front of it.
+ * Size: 3–7 × 1–2 × 3+ (it uses up to 9 blocks of height; the double board from height 7, a lantern from height 5). The post
+ * stands on the back rows, in the middle of the frontage; the arms hang over the cells beside it (3 each way at 7 wide), so the
+ * only ground it uses is the post's own cells, and the lowest board starts 3 blocks over the road.
  */
 public final class SignpostArrows implements Variant {
+	/** Planks and stairs of the upper (cherry) and the lower (bamboo) arrow. */
 	private static final Block[][] WOODS = {
 			{Blocks.CHERRY_PLANKS, Blocks.CHERRY_STAIRS},
-			{Blocks.BAMBOO_PLANKS, Blocks.BAMBOO_STAIRS},
-			{Blocks.BIRCH_PLANKS, Blocks.BIRCH_STAIRS}};
+			{Blocks.BAMBOO_PLANKS, Blocks.BAMBOO_STAIRS}};
 
 	@Override
 	public String id() {
@@ -76,55 +77,55 @@ public final class SignpostArrows implements Variant {
 		int w = p.w();
 		int d = p.d();
 		int pc = (w - 1) / 2; // the post, in the middle of the frontage
-		int pv = d - 1; // on the back row
-		int top = Math.min(p.h() - 1, 7);
+		int top = Math.min(p.h() - 1, 8);
 		boolean lantern = top >= 4;
 		boolean base = top >= 4; // a two-block base; shorter posts have the footing only
-
-		// --- base and post: polished deepslate footing, deepslate bricks, then a dark stripped oak post
-		put(c, p, pc, 0, pv, p.hash(pc, 0, pv, 3) == 0 ? b(Blocks.CHISELED_DEEPSLATE) : b(Blocks.POLISHED_DEEPSLATE));
-		if (base) {
-			put(c, p, pc, 1, pv, p.hash(pc, 1, pv, 3) == 0 ? b(Blocks.CRACKED_DEEPSLATE_BRICKS) : b(Blocks.DEEPSLATE_BRICKS));
-		}
-		int postTop = lantern ? top - 1 : top;
-		for (int y = base ? 2 : 1; y <= postTop; y++) {
-			put(c, p, pc, y, pv, b(Blocks.STRIPPED_DARK_OAK_LOG));
-		}
-		if (lantern) {
-			put(c, p, pc, top, pv, b(Blocks.LANTERN));
-		}
-		if (d > 1 && base) {
-			put(c, p, pc, 0, pv - 1, stairs(Blocks.DEEPSLATE_BRICK_STAIRS, Direction.SOUTH)); // buttress, tall side to the post
-		}
-
-		// --- the arrows: from just under the lantern down, two rows apart, opposite ways
+		int ah = top >= 6 ? 2 : 1; // arrow board height
 		int lowest = Math.max(1, Math.min(3, top - 1)); // arms hang over the road: at least 3 blocks of headroom under them
+		int postTop = lantern ? top - 1 : top;
+
+		// --- base and post, on the back row and the one in front of it
+		for (int v = d - 1; v >= Math.max(0, d - 2); v--) {
+			put(c, p, pc, 0, v, p.hash(pc, 0, v, 3) == 0 ? b(Blocks.CHISELED_DEEPSLATE) : b(Blocks.POLISHED_DEEPSLATE));
+			if (base) {
+				put(c, p, pc, 1, v, p.hash(pc, 1, v, 3) == 0 ? b(Blocks.CRACKED_DEEPSLATE_BRICKS) : b(Blocks.DEEPSLATE_BRICKS));
+			}
+			for (int y = base ? 2 : 1; y <= postTop; y++) {
+				put(c, p, pc, y, v, b(Blocks.STRIPPED_DARK_OAK_LOG));
+			}
+			if (lantern) {
+				put(c, p, pc, top, v, b(Blocks.LANTERN));
+			}
+		}
+
+		// --- the arrows, stacked from just under the lantern down, opposite ways, the lower one shorter
 		int first = p.hash(1, 0, 0, 2) == 0 ? 1 : -1;
-		int wood = p.hash(2, 0, 0, WOODS.length);
-		int i = 0;
-		for (int y = postTop; y >= lowest && i < 3; y -= 2, i++) {
-			arrow(c, p, pc, y, pv, i % 2 == 0 ? first : -first, WOODS[(wood + i) % WOODS.length]);
+		int y = top - ah;
+		for (int i = 0; i < 2 && y >= lowest; i++, y -= ah + (ah == 1 ? 1 : 0)) {
+			arrow(c, p, pc, y, ah, d, i % 2 == 0 ? first : -first, WOODS[i], i == 0 ? 3 : 2);
 		}
 	}
 
 	/**
-	 * One arrow at height y pointing {@code s} (+1 right, -1 left): planks across the post, one block of tail behind it, a
-	 * head column and the tip. Where the plot is too narrow the arm is shorter (a bare tip with no head at 1).
+	 * One arrow whose bottom row is y, {@code ah} rows tall, pointing {@code s} (+1 right, -1 left), at most {@code len} blocks
+	 * out of the post: planks across the post, one block of tail behind it and the chamfered tip. Where the plot is too
+	 * narrow the arm is shorter. It covers the post's rows (the back row and the one in front of it).
 	 */
-	private static void arrow(CitadelCanvas c, Plot p, int pc, int y, int pv, int s, Block[] m) {
-		BlockState plank = b(m[0]);
-		int reach = Math.min(3, s > 0 ? p.w() - 1 - pc : pc);
+	private static void arrow(CitadelCanvas c, Plot p, int pc, int y, int ah, int d, int s, Block[] m, int len) {
+		int reach = Math.min(len, s > 0 ? p.w() - 1 - pc : pc);
 		Direction tail = s > 0 ? Direction.WEST : Direction.EAST; // local: EAST is right
-		put(c, p, pc - s, y, pv, plank); // tail
-		put(c, p, pc, y, pv, plank); // through the post
-		for (int k = 1; k <= reach; k++) {
-			put(c, p, pc + s * k, y, pv, plank);
-		}
-		if (reach >= 2) {
-			int hc = pc + s * (reach - 1); // head column: tall side towards the tail, so the stairs fall away to the tip
-			put(c, p, hc, y + 1, pv, stairs(m[1], tail));
-			if (y >= 4) { // the lower wedge stays 3 blocks over the road: a walker never meets it
-				put(c, p, hc, y - 1, pv, stairs(m[1], tail).setValue(BlockStateProperties.HALF, Half.TOP));
+		BlockState plank = b(m[0]);
+		for (int v = d - 1; v >= Math.max(0, d - 2); v--) {
+			for (int k = -1; k <= reach; k++) {
+				boolean tip = k == reach && reach >= 2 && ah == 2;
+				for (int r = 0; r < ah; r++) {
+					BlockState st = plank;
+					if (tip) {
+						// tall side towards the tail: the outer corners are cut, the end narrows to a point
+						st = r == 0 ? stairs(m[1], tail).setValue(BlockStateProperties.HALF, Half.TOP) : stairs(m[1], tail);
+					}
+					put(c, p, pc + s * k, y + r, v, st);
+				}
 			}
 		}
 	}
