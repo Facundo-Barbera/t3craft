@@ -469,6 +469,10 @@ public final class GardenVegRaisedBeds implements Variant {
 			return b(Blocks.COMPOSTER).setValue(BlockStateProperties.LEVEL_COMPOSTER, 2 + p.hash(u, 6, v, 7));
 		}
 
+		BlockState topSlab() {
+			return slab(wood.slab()).setValue(BlockStateProperties.SLAB_TYPE, net.minecraft.world.level.block.state.properties.SlabType.TOP);
+		}
+
 		BlockState barrel() {
 			return b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.NORTH);
 		}
@@ -512,8 +516,11 @@ public final class GardenVegRaisedBeds implements Variant {
 			boolean flip = p.hash(su, 8, 0, 2) == 1;
 			set(su + 1, 0, vb, flip ? chest() : composter(su + 1, vb));
 			set(su + 2, 0, vb, barrel());
-			set(su + 2, 1, vb, b(Blocks.LANTERN));
 			set(su + 3, 0, vb, flip ? composter(su + 3, vb) : chest());
+			// a shelf over each unit: nobody can stand inside a composter or behind a chest
+			set(su + 1, 1, vb, topSlab());
+			set(su + 3, 1, vb, topSlab());
+			set(flip ? su : ue, 3, vb, b(Blocks.LANTERN));
 			set(su + 1, 0, vm, b(Blocks.HAY_BLOCK));
 			roof(su, ue, vf);
 		}
@@ -577,6 +584,8 @@ public final class GardenVegRaisedBeds implements Variant {
 			set(bu + 1, 0, v, flip ? chest() : composter(bu + 1, v));
 			set(bu + 2, 0, v, barrel());
 			set(bu + 3, 0, v, flip ? composter(bu + 3, v) : chest());
+			set(bu + 1, 1, v, topSlab());
+			set(bu + 3, 1, v, topSlab());
 			set(flip ? bu : bu + 4, 3, v, b(Blocks.LANTERN));
 			for (int u = bu; u <= bu + 4; u++) {
 				set(u, 4, v, stairs(wood.stairs(), Direction.NORTH));
