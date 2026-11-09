@@ -105,6 +105,7 @@ public final class TreeCherryWeeping implements Variant {
 		double ccu = bu + 0.5;
 		double ccv = bv + 0.5;
 		List<int[]> seeds = new ArrayList<>();
+		double rimMin = Math.max(2.1, 0.3 * Math.min(p.w(), p.d()) + 0.5); // strands only from the outer part of the crown
 		for (int y = 3; y < t.h; y++) {
 			for (int v = 0; v < t.d; v++) {
 				for (int u = 0; u < t.w; u++) {
@@ -114,7 +115,7 @@ public final class TreeCherryWeeping implements Variant {
 					int ov2 = (int) Math.signum(Math.round(v - ccv));
 					boolean rim = t.kind(u + ou2, y, v + ov2) != TreeKit.LEAF;
 					if ((k == TreeKit.LEAF && rim || k == TreeKit.WOOD && contains(limbCells, u, y, v))
-							&& t.empty(u, y - 1, v) && Math.hypot(u - ccu, v - ccv) > (k == TreeKit.WOOD ? 2.6 : 2.1)) {
+							&& t.empty(u, y - 1, v) && Math.hypot(u - ccu, v - ccv) > rimMin + (k == TreeKit.WOOD ? 0.5 : 0)) {
 						seeds.add(new int[] {u, y, v});
 					}
 				}

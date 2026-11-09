@@ -117,7 +117,9 @@ public final class TreePineTiered implements Variant {
 					if (y >= top - 1) {
 						lim = y == top ? 0.2 : 1.0; // the spire
 					}
-					lim -= t.hash(u, y, v, 4) * 0.12;
+					if (lim > 1.4) {
+						lim -= t.hash(u, y, v, 4) * 0.12; // ragged edges, but never eat the plus round the leader
+					}
 					if (dist > lim) {
 						continue;
 					}
