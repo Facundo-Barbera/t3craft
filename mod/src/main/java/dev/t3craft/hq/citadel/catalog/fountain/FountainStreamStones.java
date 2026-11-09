@@ -110,9 +110,9 @@ public final class FountainStreamStones implements Variant {
 		int ys; // y of the spring source
 		int s0; // the cell under the spout
 		int[] sc;
-		boolean bridge;
-		int ac;
-		int wc;
+		/** The crossings: first column, number of columns, bridge (else stepping stones). */
+		final java.util.List<int[]> crosses = new java.util.ArrayList<>();
+		final boolean[][] bridgeStair;
 
 		Build(CitadelCanvas c, Plot p) {
 			this.c = c;
@@ -128,6 +128,7 @@ public final class FountainStreamStones implements Variant {
 			this.moss = new boolean[n][m];
 			this.res = new boolean[n][m];
 			this.deckKind = new int[n][m];
+			this.bridgeStair = new boolean[n][m];
 		}
 
 		// ------------------------------------------------------------------ coordinates
@@ -198,9 +199,12 @@ public final class FountainStreamStones implements Variant {
 			boolean lateral = hi - lo >= 3 && aLast - a0 >= 2;
 			if (lateral) {
 				// an S across the plot: forward, one long run sideways to the far bank, forward again
-				int f = Math.max(1, (aLast - a0) / 2);
+				int f = 1 + p.hash(17, 0, 0, Math.max(1, aLast - a0 - 1));
 				int sA = p.hash(13, 0, 0, 2) == 0 ? lo : hi;
 				int sB = lo + hi - sA;
+				if (hi - lo >= 4 && p.hash(18, 0, 0, 2) == 0) {
+					sB += sA == lo ? -1 : 1; // a shorter swing
+				}
 				for (int a = a0; a <= a0 + f; a++) {
 					brush(a, sA);
 				}
@@ -238,7 +242,7 @@ public final class FountainStreamStones implements Variant {
 				}
 			}
 			s0 = sc[hd + 1];
-			pw = Math.max(2, Math.min(m >= 11 ? 4 : 3, m - 4));
+			pw = Math.max(2, Math.min((m >= 11 ? 4 : 3) + (m >= 9 && p.hash(15, 0, 0, 2) == 0 ? 1 : 0), m - 4));
 			int scL = sc[pa0 - 1];
 			ps0 = Math.max(2, Math.min(m - 2 - pw, scL - (pw - 2) / 2));
 			while (ps0 + pw - 1 < scL) {
@@ -250,14 +254,15 @@ public final class FountainStreamStones implements Variant {
 			k[hd][s0] = WATER;
 			for (int a = pa0; a <= pa1; a++) {
 				for (int s = ps0; s < ps0 + pw; s++) {
-					boolean cut = pl >= 3 && pw >= 4 && (a == pa0 || a == pa1) && (s == ps0 || s == ps0 + pw - 1);
+					boolean cutOn = pl * pw >= 12 || (pl * pw >= 9 && p.hash(16, 0, 0, 2) == 0);
+					boolean cut = cutOn && (a == pa0 || a == pa1) && (s == ps0 || s == ps0 + pw - 1);
 					if (!cut) {
 						k[a][s] = WATER;
 					}
 				}
 			}
 			// the rock head and the two piers that flank the spout
-			int hw = m >= 10 ? 2 : 1;
+			int hw = m >= 10 ? 2 : m >= 8 ? 1 : 0;
 			for (int a = 0; a < hd; a++) {
 				for (int s = s0 - 1 - hw; s <= s0 + 1 + hw; s++) {
 					if (s < 0 || s >= m) {
@@ -308,16 +313,26 @@ public final class FountainStreamStones implements Variant {
 					&& (sw - 3 < 0 || k[a][sw - 3] != WATER) && (sw + 4 >= m || k[a][sw + 4] != WATER);
 		}
 
-		/** Picks where and how the stream is crossed; the deck cells become DECK, the stair cells STAIR. */
+		/** Picks where and how the stream is crossed (a bridge and, on big plots, also a ford); marks deck and stair cells. */
 		void crossing() {
-			// candidate columns: exactly two cells of water, both banks and both stair cells free
-			wc = Math.min(2, pa0 - 1 - hd);
+			boolean first = p.hash(6, 0, 0, 2) == 0;
+			if (!cross(first, -10)) {
+				return;
+			}
+			if (n >= 11 || m >= 11) {
+				cross(!first, crosses.get(0)[0]);
+			}
+		}
+
+		/** One crossing of the given kind away from column {@code avoid}; false when no column fits. */
+		boolean cross(boolean bridge, int avoid) {
+			int wc = Math.min(2, pa0 - 1 - hd);
 			java.util.List<Integer> ok = new java.util.ArrayList<>();
 			while (ok.isEmpty() && wc >= 1) {
 				for (int a = hd + 1; a + wc - 1 <= pa0 - 1; a++) {
 					boolean fits = true;
 					for (int i = 0; i < wc && fits; i++) {
-						fits = straight(a + i);
+						fits = straight(a + i) && Math.abs(a + i - avoid) >= 3;
 					}
 					if (fits) {
 						ok.add(a);
@@ -328,11 +343,10 @@ public final class FountainStreamStones implements Variant {
 				}
 			}
 			if (ok.isEmpty()) {
-				wc = 0;
-				return;
+				return false;
 			}
-			ac = ok.get(p.hash(5, 0, 0, ok.size()));
-			bridge = p.hash(6, 0, 0, 2) == 0;
+			int ac = ok.get(p.hash(5, avoid + 10, 0, ok.size()));
+			crosses.add(new int[] {ac, wc, bridge ? 1 : 0});
 			if (bridge) {
 				int[][] posts = {{ac - 1, sc[ac] - 1}, {ac + wc, sc[ac + wc - 1] + 2}};
 				for (int[] q : posts) {
@@ -370,9 +384,11 @@ public final class FountainStreamStones implements Variant {
 					if (in(a, s) && k[a][s] == OUT) {
 						k[a][s] = STAIR;
 						res[a][s] = true;
+						bridgeStair[a][s] = bridge;
 					}
 				}
 			}
+			return true;
 		}
 
 		// ------------------------------------------------------------------ drawing
@@ -389,21 +405,26 @@ public final class FountainStreamStones implements Variant {
 
 		BlockState rock(int a, int s, int y, int top) {
 			int r = hs(a, y, s, 6);
-			if (y == top - 1) {
-				boolean soft = r < 4;
-				moss[a][s] = soft;
-				return soft ? (r < 3 ? b(Blocks.MOSS_BLOCK) : b(Blocks.GRASS_BLOCK)) : b(Blocks.MOSSY_COBBLESTONE);
+			if (y == top - 1) { // the top: a few soft patches (moss, grass) among bare stone
+				moss[a][s] = r < 2;
+				return switch (r) {
+					case 0 -> b(Blocks.MOSS_BLOCK);
+					case 1 -> b(Blocks.GRASS_BLOCK);
+					case 2 -> b(Blocks.ANDESITE);
+					case 3 -> b(Blocks.MOSSY_COBBLESTONE);
+					case 4 -> b(Blocks.TUFF);
+					default -> b(Blocks.COBBLESTONE);
+				};
 			}
-			if (y == 0) {
-				return r < 3 ? b(Blocks.COBBLESTONE) : b(Blocks.TUFF);
-			}
-			if (y == 1) {
-				return r < 4 ? b(Blocks.ANDESITE) : b(Blocks.TUFF);
-			}
-			if (y == 2) {
-				return r < 3 ? b(Blocks.MOSSY_COBBLESTONE) : r < 5 ? b(Blocks.TUFF) : b(Blocks.ANDESITE);
-			}
-			return r < 3 ? b(Blocks.MOSSY_COBBLESTONE) : b(Blocks.ANDESITE);
+			// strata: bands of different rock, each course wavering a little into its neighbours
+			int band = y + (r == 0 ? 1 : r == 1 && y > 0 ? -1 : 0);
+			return switch (band % 5) {
+				case 0 -> b(Blocks.COBBLESTONE);
+				case 1 -> b(Blocks.TUFF);
+				case 2 -> b(Blocks.ANDESITE);
+				case 3 -> b(Blocks.MOSSY_COBBLESTONE);
+				default -> b(Blocks.POLISHED_ANDESITE);
+			};
 		}
 
 		void drawHead() {
@@ -415,6 +436,11 @@ public final class FountainStreamStones implements Variant {
 					int top = rockH[a][s];
 					for (int y = 0; y < top; y++) {
 						set(a, s, y, rock(a, s, y, top));
+					}
+					int off = s - s0;
+					if (Math.abs(off) >= 2 && top >= 3 && hs(a, 15, s, 3) != 0) { // the flanks slope off in stairs
+						moss[a][s] = false;
+						set(a, s, top - 1, stairs(hs(a, 16, s, 2) == 0 ? Blocks.ANDESITE_STAIRS : Blocks.COBBLESTONE_STAIRS, dir(0, off > 0 ? -1 : 1)));
 					}
 					if (moss[a][s]) {
 						BlockState plant = switch (hs(a, 11, s, 7)) {
@@ -428,6 +454,9 @@ public final class FountainStreamStones implements Variant {
 					}
 				}
 			}
+			for (int ds = -1; ds <= 1; ds += 2) { // the cheeks of the spout are dressed stone
+				set(hd, s0 + ds, ys, b(Blocks.MOSSY_STONE_BRICKS));
+			}
 			// spring: a source in the rock, a lip over the first water cell and the fall to it
 			set(hd - 1, s0, ys, PondKit.water());
 			set(hd, s0, ys, PondKit.water().setValue(LiquidBlock.LEVEL, 1));
@@ -440,20 +469,17 @@ public final class FountainStreamStones implements Variant {
 			if (a > hd + 1 && hs(a / 2, 12, s / 2, 7) == 0) {
 				return b(Blocks.SAND); // 2 x 2 patches, so the cane grows in clumps
 			}
-			int r = hs(a, 0, s, 20) % 18;
-			if (r < 6) {
-				return b(Blocks.MOSSY_COBBLESTONE);
+			int r = hs(a, 0, s, 20);
+			if (hs(a / 3, 14, s / 3, 5) < 2) { // a mossy patch of bank
+				return r < 10 ? b(Blocks.MOSS_BLOCK) : b(Blocks.MOSSY_COBBLESTONE);
 			}
-			if (r < 10) {
+			if (r < 8) {
 				return b(Blocks.COBBLESTONE);
 			}
-			if (r < 13) {
+			if (r < 14) {
 				return b(Blocks.ANDESITE);
 			}
-			if (r < 15) {
-				return b(Blocks.TUFF);
-			}
-			return b(Blocks.MOSS_BLOCK);
+			return r < 18 ? b(Blocks.TUFF) : b(Blocks.MOSSY_COBBLESTONE);
 		}
 
 		void drawRim() {
@@ -487,9 +513,14 @@ public final class FountainStreamStones implements Variant {
 			}
 		}
 
-		/** Whether {@code (a, s)} is one of the two cells reserved for the bridge's lantern posts. */
+		/** Whether {@code (a, s)} is one of the cells reserved for a bridge's lantern posts. */
 		boolean postCell(int a, int s) {
-			return bridge && wc > 0 && ((a == ac - 1 && s == sc[ac] - 1) || (a == ac + wc && s == sc[ac + wc - 1] + 2));
+			for (int[] x : crosses) {
+				if (x[2] == 1 && ((a == x[0] - 1 && s == sc[x[0]] - 1) || (a == x[0] + x[1] && s == sc[x[0] + x[1] - 1] + 2))) {
+					return true;
+				}
+			}
+			return false;
 		}
 
 		void drawCrossing() {
@@ -513,15 +544,26 @@ public final class FountainStreamStones implements Variant {
 					if (st != null) {
 						set(a, s, 0, st);
 					}
-					if (k[a][s] == STAIR) { // the high side faces the bank
+					if (k[a][s] == STAIR) { // the high side faces the bank, and a flagstone trail leads out to the edge
 						boolean left = s < sc[a];
-						set(a, s, 0, stairs(bridge ? Blocks.SPRUCE_STAIRS : Blocks.MOSSY_COBBLESTONE_STAIRS, dir(0, left ? 1 : -1)));
+						set(a, s, 0, stairs(bridgeStair[a][s] ? Blocks.SPRUCE_STAIRS : Blocks.MOSSY_COBBLESTONE_STAIRS, dir(0, left ? 1 : -1)));
+						int step = left ? -1 : 1;
+						for (int t = s + step; in(a, t) && free(a, t); t += step) {
+							set(a, t, 0, switch (hs(a, 18, t, 3)) {
+								case 0 -> slab(Blocks.COBBLESTONE_SLAB);
+								case 1 -> slab(Blocks.MOSSY_COBBLESTONE_SLAB);
+								default -> slab(Blocks.STONE_BRICK_SLAB);
+							});
+							res[a][t] = true;
+						}
 					}
 				}
 			}
-			if (bridge && wc > 0) { // a lantern post on each bank at the ends of the bridge (reserved in crossing())
-				post(ac - 1, sc[ac] - 1);
-				post(ac + wc, sc[ac + wc - 1] + 2);
+			for (int[] x : crosses) {
+				if (x[2] == 1) { // a lantern post on each bank at the ends of the bridge (reserved in cross())
+					post(x[0] - 1, sc[x[0]] - 1);
+					post(x[0] + x[1], sc[x[0] + x[1] - 1] + 2);
+				}
 			}
 		}
 
@@ -551,6 +593,13 @@ public final class FountainStreamStones implements Variant {
 				if (free(a, sSeat)) {
 					set(a, sSeat, 0, stairs(Blocks.SPRUCE_STAIRS, dir(0, sd)));
 					res[a][sSeat] = true;
+				}
+			}
+			for (int i = 0; i < seats; i++) { // a low spruce rail behind the seats
+				int a = a0 + i;
+				if (in(a, sSeat + sd) && free(a, sSeat + sd)) {
+					set(a, sSeat + sd, 0, b(Blocks.SPRUCE_FENCE).setValue(PondKit.side(dir(1, 0)), i < seats - 1).setValue(PondKit.side(dir(-1, 0)), i > 0));
+					res[a][sSeat + sd] = true;
 				}
 			}
 			post(a0 - 1, sSeat);
