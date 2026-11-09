@@ -40,6 +40,8 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.DoorBlock;
+import net.minecraft.world.level.block.FenceGateBlock;
 import net.minecraft.world.level.block.FenceBlock;
 import net.minecraft.world.level.block.IronBarsBlock;
 import net.minecraft.world.level.block.StairBlock;
@@ -405,6 +407,36 @@ public final class PlanReport {
 		if (reach == null || reach.isEmpty()) {
 			return;
 		}
+		// fix/stair-reach: the walk above (PlanNav) has no doors, so a closed door is a wall; an NPC (and the gallery's WalkAudit)
+		// goes through doors and gates, so the flights are judged on a walk with them open. The closed-door numbers stay beside.
+		PlanProbe.Walk walk = PlanProbe.walk(k -> {
+			Placement pl = plan.at(BlockPos.of(k));
+			if (pl == null) {
+				return null;
+			}
+			Block pb = pl.state().getBlock();
+			return pb instanceof DoorBlock || pb instanceof FenceGateBlock ? null : pl.state();
+		});
+		Set<BlockPos> closedReach = reach;
+		if (walkStart != null) {
+			Set<BlockPos> open = walk.reachable(walkStart);
+			if (!open.isEmpty()) {
+				reach = open;
+			}
+		}
+		int extraCells = 0;
+		int extraDark = 0;
+		if (reach != closedReach) {
+			HqLightMap lmap = HqLightMap.of(plan);
+			for (BlockPos p : reach) {
+				if (!closedReach.contains(p) && in(p)) {
+					extraCells++;
+					if (lmap.at(p) < o.lowLight) {
+						extraDark++;
+					}
+				}
+			}
+		}
 		Map<Long, BlockState> stairs = new HashMap<>();
 		for (Placement p : plan.placements()) {
 			BlockState s = p.state();
@@ -415,6 +447,7 @@ public final class PlanReport {
 		Set<Long> seen = new HashSet<>();
 		int total = 0;
 		int climbed = 0;
+		int climbedClosed = 0;
 		List<String> partial = new ArrayList<>();
 		List<String> cut = new ArrayList<>();
 		List<Cut> cuts = new ArrayList<>();
@@ -444,6 +477,7 @@ public final class PlanReport {
 				continue;
 			}
 			int r = 0;
+			int rc = 0;
 			int standable = 0;
 			int covered = 0;
 			for (BlockPos s : chain) {
@@ -451,7 +485,10 @@ public final class PlanReport {
 				if (reach.contains(stand)) {
 					r++;
 				}
-				if (PlanProbe.standable(plan, stand)) {
+				if (closedReach.contains(stand)) {
+					rc++;
+				}
+				if (!Double.isNaN(walk.floor(stand.getX(), stand.getY(), stand.getZ()))) {
 					standable++;
 				}
 				for (int dy = 2; dy <= 8; dy++) {
@@ -467,6 +504,9 @@ public final class PlanReport {
 			if (r == chain.size()) {
 				total++;
 				climbed++;
+				if (rc == chain.size()) {
+					climbedClosed++;
+				}
 			} else if (r > 0) {
 				total++;
 				// what is in the way of the first step not reached: every block over the two stand cells
@@ -503,10 +543,10 @@ public final class PlanReport {
 			int stands = 0;
 			for (BlockPos s : ct.chain()) {
 				BlockPos stand = s.above();
-				if (PlanProbe.standable(plan, stand)) {
+				if (!Double.isNaN(walk.floor(stand.getX(), stand.getY(), stand.getZ()))) {
 					isl = islandOf.get(stand.asLong());
 					if (isl == null) {
-						isl = island(plan, reach, stand);
+						isl = island(plan, walk, reach, stand);
 						for (BlockPos cell : isl.cells()) {
 							islandOf.putIfAbsent(cell.asLong(), isl);
 						}
@@ -573,6 +613,8 @@ public final class PlanReport {
 		}
 		int rawTotal = total + roofs.size();
 		StringBuilder sb = new StringBuilder("STAIR FLIGHTS (3+ steps; roofs left out)\n");
+		sb.append("  doors and gates read as open (as for an NPC): ").append(reach.size()).append(" cells reachable, ").append(extraCells).append(" more than with them closed, ")
+				.append(extraDark).append(" of those under the light limit; ").append(climbedClosed).append(" flights would be climbed with them closed\n");
 		sb.append("  ").append(climbed).append(" of ").append(total).append(" flights climbed on foot from the spawn (").append(roofs.size())
 				.append(" roof slopes made of stairs not counted; ").append(rawTotal).append(" with them)\n");
 		listLines(sb, partial, o.maxList, "partly reached");
@@ -587,6 +629,12 @@ public final class PlanReport {
 		j.addProperty("total", total);
 		j.addProperty("climbed", climbed);
 		j.addProperty("rawTotal", rawTotal);
+		j.addProperty("climbedDoorsClosed", climbedClosed);
+		JsonObject dj = new JsonObject();
+		dj.addProperty("walkableCells", reach.size());
+		dj.addProperty("extraCellsInScope", extraCells);
+		dj.addProperty("extraDarkCellsInScope", extraDark);
+		j.add("doorsOpen", dj);
 		j.addProperty("roofsDiscarded", roofs.size());
 		JsonArray pj = new JsonArray();
 		partial.forEach(pj::add);
@@ -627,8 +675,8 @@ public final class PlanReport {
 	private record Island(Set<BlockPos> cells, int[] box, double sky, int gap, String gapFrom, String gapTo, String between) {
 	}
 
-	private static Island island(BuildPlan plan, Set<BlockPos> reach, BlockPos from) {
-		Set<BlockPos> cells = PlanProbe.reachable(plan, from);
+	private static Island island(BuildPlan plan, PlanProbe.Walk walk, Set<BlockPos> reach, BlockPos from) {
+		Set<BlockPos> cells = walk.reachable(from);
 		int[] bb = {Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MIN_VALUE, Integer.MIN_VALUE, Integer.MIN_VALUE};
 		for (BlockPos p : cells) {
 			bb[0] = Math.min(bb[0], p.getX());
