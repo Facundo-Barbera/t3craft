@@ -174,7 +174,9 @@ public final class CitadelPodium {
 		int low = lowestNeighbour(c, p, x, z);
 		solid(c, x, z, top, low);
 		if (cheek) {
-			c.set(x, top, z, CALCITE);
+			// dark parapet along the flight; only its outermost line is light, so the stair stays the bright thing
+			boolean outer = RingCampusGeometry.radialDistance(x, z, 8) > c.g.avenueHalf - 1.0;
+			c.set(x, top, z, outer ? CALCITE : PIER);
 		} else if (landing) {
 			c.set(x, top, z, CitadelPaving.rampFull(Math.min(band, 2)));
 		} else {
