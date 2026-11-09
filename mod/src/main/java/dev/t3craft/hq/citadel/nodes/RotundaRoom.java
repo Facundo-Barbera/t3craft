@@ -187,6 +187,8 @@ public final class RotundaRoom {
 
 	/** Dimensions of the scaled rotunda, all from the zone's radius. */
 	private static final BlockState SLOG = b(Blocks.STRIPPED_CHERRY_LOG);
+	/** The dome's skin: frosted, so the room under it does not show through. */
+	private static final BlockState DOME_GLASS = b(Blocks.WHITE_STAINED_GLASS);
 
 	private record Geo(double size, double ri, double rw, int h, int dh, int xw, double lr, double dial) {
 		static Geo of(CitadelCanvas c, Node nd) {
@@ -196,7 +198,7 @@ public final class RotundaRoom {
 			int h = c.sy(10);
 			int dh = (int) Math.round(1.15 * rw);
 			int xw = (int) Math.floor(ri) - 2;
-			double lr = size >= 12 ? 2.5 : 1.5;
+			double lr = size >= 12 ? 3.5 : 2.0;
 			return new Geo(size, ri, rw, h, dh, xw, lr, Math.round(ri * 0.62));
 		}
 
@@ -291,12 +293,12 @@ public final class RotundaRoom {
 				int mx = (int) Math.round(mr * Math.sin(a));
 				int mz = (int) Math.round(-mr * Math.cos(a));
 				if (dx == mx && dz == mz) {
-					s = hr % 3 == 0 ? LIGHT : RIB;
+					s = hr % 3 == 0 ? b(Blocks.GOLD_BLOCK) : RIB;
 				} else if (hr % 3 == 0 && Math.abs(dx - mx) + Math.abs(dz - mz) == 1 && d < g.dial - 0.5) {
 					s = BAMBOO;
 				}
 			}
-			if (hand(dx, dz, 0, g.dial - 1, 0.6) || hand(dx, dz, 5 * Math.PI / 3, g.dial - 3, 0.9)) {
+			if (hand(dx, dz, 0, g.dial - 1, 0.9) || hand(dx, dz, 5 * Math.PI / 3, g.dial - 2.5, 1.2)) {
 				s = RIB;
 			}
 		} else if (d <= g.dial + 1.5) {
@@ -325,7 +327,13 @@ public final class RotundaRoom {
 		if (d > g.rw) {
 			// plinth: a slab ring, a buttress where a pilaster meets the ground
 			if (!door) {
-				if (pil < 0.7) {
+				c.set(x, g.h - 1, z, RIB);
+				c.set(x, g.h, z, NodeDecor.topSlab(Blocks.POLISHED_BLACKSTONE_BRICK_SLAB));
+				if (jamb(g, dx, dz)) {
+					c.set(x, 1, z, CitadelCanvas.FOOT);
+					c.set(x, 2, z, CitadelCanvas.FOOT);
+					c.put(x, 3, z, Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, false), CitadelCanvas.DECOR);
+				} else if (pil < 0.7) {
 					c.set(x, 1, z, CitadelCanvas.FOOT);
 					c.set(x, 2, z, CitadelCanvas.FOOT);
 					c.set(x, 3, z, stairs(Blocks.DEEPSLATE_TILE_STAIRS, NodeDecor.inward(dx, dz)));
@@ -402,27 +410,32 @@ public final class RotundaRoom {
 		int top = g.top(d);
 		int low = g.top(Math.min(g.rw, d + 1));
 		int lo = Math.max(g.h + 1, Math.min(low, top));
+		net.minecraft.core.Direction in = NodeDecor.inward(dx, dz);
+		int topIn = g.top(Math.max(0, d - 1));
 		if (d >= g.lr - 0.5) {
 			for (int y = lo; y <= top; y++) {
 				int rel = y - g.h;
+				boolean ramp = y == top && d >= 1 && topIn == top + 1;
 				BlockState s;
 				if (rel <= 2) {
 					s = CitadelCanvas.FOOT;
 				} else if (rel >= g.dh - 1 && d < g.lr + 2.0) {
-					s = BAMBOO;
+					s = y == top && d > g.lr + 0.5 ? stairs(Blocks.BAMBOO_MOSAIC_STAIRS, in) : BAMBOO;
 				} else if (arc(dx, dz, 8, 0) < 0.6 && d >= g.lr + 1.5) {
-					s = SLOG;
+					s = ramp ? stairs(Blocks.CHERRY_STAIRS, in) : SLOG;
 				} else if (rel == g.dh / 2) {
 					s = CitadelCanvas.PLANKS;
 				} else {
-					s = GLASS;
+					s = DOME_GLASS;
 				}
 				c.set(x, y, z, s);
 			}
 		}
-		if (d <= g.lr) {
+		// the lantern: a round drum of glass between 8 posts, a light inside, a tiered roof with an eave,
+		// a gold ball and a rod
+		if (d <= g.lr + 1.0) {
 			int base = g.top(g.lr);
-			if (d > g.lr - 1.0) {
+			if (d <= g.lr && d > g.lr - 1.0) {
 				for (int y = base + 1; y <= base + 5; y++) {
 					c.set(x, y, z, arc(dx, dz, 8, 0) < 0.6 ? SLOG : GLASS);
 				}
@@ -430,13 +443,16 @@ public final class RotundaRoom {
 			if (dx == 0 && dz == 0) {
 				c.set(x, base + 3, z, LIGHT);
 			}
-			net.minecraft.core.Direction in = NodeDecor.inward(dx, dz);
-			c.set(x, base + 6, z, d > 1.5 ? stairs(Blocks.CHERRY_STAIRS, in) : BAMBOO);
-			if (d <= 1.5) {
-				c.set(x, base + 7, z, d > 0.5 ? stairs(Blocks.BAMBOO_MOSAIC_STAIRS, in) : b(Blocks.GOLD_BLOCK));
+			double[] tier = {g.lr + 1.0, g.lr - 0.5, g.lr - 2.0};
+			for (int t = 0; t < tier.length; t++) {
+				if (d <= tier[t]) {
+					boolean edge = d > tier[t] - 1.0;
+					c.set(x, base + 6 + t, z, edge ? stairs(t < 2 ? Blocks.CHERRY_STAIRS : Blocks.BAMBOO_MOSAIC_STAIRS, in) : BAMBOO);
+				}
 			}
 			if (dx == 0 && dz == 0) {
-				c.set(x, base + 8, z, NodeDecor.ROD);
+				c.set(x, base + 9, z, b(Blocks.GOLD_BLOCK));
+				c.set(x, base + 10, z, NodeDecor.ROD);
 			}
 		}
 	}
@@ -458,7 +474,7 @@ public final class RotundaRoom {
 			}
 		}
 		// two rows of benches facing the screen, a 3-wide aisle between them
-		for (int row : new int[] {g.xw - 5, g.xw - 3}) {
+		for (int row : new int[] {g.xw - 6, g.xw - 4}) {
 			for (int dz = 2; dz <= 5; dz++) {
 				put(c, nd, row, 1, dz, stairs(Blocks.CHERRY_STAIRS, net.minecraft.core.Direction.WEST), CitadelCanvas.SOLID);
 				put(c, nd, row, 1, -dz, stairs(Blocks.CHERRY_STAIRS, net.minecraft.core.Direction.WEST), CitadelCanvas.SOLID);
