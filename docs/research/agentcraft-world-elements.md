@@ -139,7 +139,7 @@ recetas, ni GUIs de contenedor (todas las pantallas son de cliente).
 | `memory_archive` (estante con placas) | 🟡 | Ranuras de archivo `archive_<threadId>` → monitor (`HqBindings`); la estantería está pendiente en fix/hq-archive (`docs/features/hq-construction.md`) |
 | Signal bulbs (copper bulb vanilla) | 🟡 | Usamos copper bulbs en escritorios y tablero, pero las movemos con nuestros bloques, no con bulbs vanilla |
 | Partículas ambiente en lámparas | ❌ | — |
-| Bloques decorativos (glow, plaster, walnut…) | ❌ (a propósito) | `hq/Palette` usa vanilla: correcto para compat |
+| Bloques decorativos (glow, plaster, walnut…) | ❌ (a propósito) | `hq/plan/Palette` usa vanilla: correcto para compat |
 | Partículas de estado de NPC | 🟡 | `NpcRegistry` (ENCHANT/NOTE/ANGRY_VILLAGER/HAPPY_VILLAGER), `BehaviorDirector` (festejo con FIREWORK), `HelperDirector` (POOF). Partículas vanilla sin teñir y sin pool |
 | Posturas (sentado, leyendo, pensando) | 🟡 | `NpcBrain`/`BehaviorDirector`: caminar, swing de teclear (`Hand`), deambular, festejo. **No se sientan** ni hay poses de brazos (RemotePlayer sin modelo propio) |
 | Nameplate + declutter + línea guía | 🟡 | `tc/npc/Nameplate`, `NpcLabels` (tag lejano + panel cercano con histéresis), chips. Sin declutter entre NPCs |

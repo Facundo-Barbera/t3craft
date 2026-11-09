@@ -1,13 +1,24 @@
 package dev.t3craft.hq.citadel;
 
-import dev.t3craft.hq.Anchor;
-import dev.t3craft.hq.AnchorNames;
+import static dev.t3craft.hq.citadel.CitadelCanvas.AIR;
+import static dev.t3craft.hq.citadel.CitadelCanvas.CALCITE;
+import static dev.t3craft.hq.citadel.CitadelCanvas.DECOR;
+import static dev.t3craft.hq.citadel.CitadelCanvas.FOOT;
+import static dev.t3craft.hq.citadel.CitadelCanvas.HANGING;
+import static dev.t3craft.hq.citadel.CitadelCanvas.LOG;
+import static dev.t3craft.hq.citadel.CitadelCanvas.PLANKS;
+import static dev.t3craft.hq.citadel.CitadelCanvas.y0;
+import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
+import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
+
 import dev.t3craft.hq.HqGenerator;
 import dev.t3craft.hq.HqGeometry;
 import dev.t3craft.hq.HqLayout;
 import dev.t3craft.hq.HqStyle;
 import dev.t3craft.hq.RingCampusGeometry;
 import dev.t3craft.hq.citadel.nature.Flora;
+import dev.t3craft.hq.plan.Anchor;
+import dev.t3craft.hq.plan.AnchorNames;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -25,16 +36,6 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.ChestType;
 import net.minecraft.world.level.block.state.properties.Half;
 import net.minecraft.world.level.block.state.properties.SlabType;
-import static dev.t3craft.hq.citadel.CitadelCanvas.AIR;
-import static dev.t3craft.hq.citadel.CitadelCanvas.CALCITE;
-import static dev.t3craft.hq.citadel.CitadelCanvas.DECOR;
-import static dev.t3craft.hq.citadel.CitadelCanvas.FOOT;
-import static dev.t3craft.hq.citadel.CitadelCanvas.HANGING;
-import static dev.t3craft.hq.citadel.CitadelCanvas.LOG;
-import static dev.t3craft.hq.citadel.CitadelCanvas.PLANKS;
-import static dev.t3craft.hq.citadel.CitadelCanvas.y0;
-import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
-import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
 
 /**
  * Facundo's office, the control tower of the citadel: three levels (lobby and workshop, archive and cartography,

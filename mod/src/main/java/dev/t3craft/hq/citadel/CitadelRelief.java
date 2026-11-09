@@ -8,11 +8,11 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.colX;
 import static dev.t3craft.hq.citadel.CitadelCanvas.colZ;
 import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
 
-import dev.t3craft.hq.Anchor;
 import dev.t3craft.hq.RingCampusGeometry;
 import dev.t3craft.hq.RingCampusGeometry.Kind;
 import dev.t3craft.hq.RingCampusGeometry.Zone;
-import dev.t3craft.hq.Workstation;
+import dev.t3craft.hq.plan.Anchor;
+import dev.t3craft.hq.plan.Workstation;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;

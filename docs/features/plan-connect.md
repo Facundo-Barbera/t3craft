@@ -9,7 +9,7 @@ not joined, stairs without corner shapes. `PlanShapes.resolve` tried to get the 
 exception is swallowed and the cell keeps its default state, so in practice it did not connect.
 (`origin/citadel/1-connect` tried the same with a `BlockGetter` proxy, with the same result.)
 
-## Fix: `dev.t3craft.hq.PlanConnect`
+## Fix: `dev.t3craft.hq.plan.PlanConnect`
 
 An explicit, deterministic post-pass over the final cell map (position → `BlockState`). No world, no
 proxy, no `updateShape`, nothing caught. The rules are vanilla 26.3's (`FenceBlock.connectsTo`,

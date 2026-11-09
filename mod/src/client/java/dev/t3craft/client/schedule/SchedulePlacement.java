@@ -17,7 +17,7 @@ public record SchedulePlacement(double x, double y, double z, float yaw) {
 
 	/**
 	 * On a board face: {@code (cx, cy, cz)} is the centre of the face, {@code faceYaw} its outward
-	 * normal as a yaw (what {@code dev.t3craft.hq.Anchor} gives for {@code AnchorNames.BOARD}).
+	 * normal as a yaw (what {@code dev.t3craft.hq.plan.Anchor} gives for {@code AnchorNames.BOARD}).
 	 */
 	public static SchedulePlacement onFace(double cx, double cy, double cz, float faceYaw) {
 		double rad = Math.toRadians(faceYaw);
@@ -25,7 +25,7 @@ public record SchedulePlacement(double x, double y, double z, float yaw) {
 	}
 
 	/** The HQ's "board" anchor (centre of the board's front face, facing out). */
-	public static SchedulePlacement onBoard(dev.t3craft.hq.Anchor board) {
+	public static SchedulePlacement onBoard(dev.t3craft.hq.plan.Anchor board) {
 		return onFace(board.x(), board.y(), board.z(), board.yaw());
 	}
 

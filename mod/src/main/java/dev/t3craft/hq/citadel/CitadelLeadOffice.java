@@ -10,8 +10,6 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.leaves;
 import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
 import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
 
-import dev.t3craft.hq.Anchor;
-import dev.t3craft.hq.AnchorNames;
 import dev.t3craft.hq.HqGeometry;
 import dev.t3craft.hq.HqLayout;
 import dev.t3craft.hq.HqStyle;
@@ -21,6 +19,8 @@ import dev.t3craft.hq.RingCampusGeometry.Room;
 import dev.t3craft.hq.citadel.CitadelCanvas.Mats;
 import dev.t3craft.hq.citadel.barrio.HallStyle;
 import dev.t3craft.hq.lead.LeadOffices;
+import dev.t3craft.hq.plan.Anchor;
+import dev.t3craft.hq.plan.AnchorNames;
 import java.util.function.BiFunction;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;

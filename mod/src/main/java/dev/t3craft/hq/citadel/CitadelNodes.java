@@ -1,12 +1,10 @@
 package dev.t3craft.hq.citadel;
 
-import dev.t3craft.hq.Anchor;
-import dev.t3craft.hq.AnchorNames;
+import static dev.t3craft.hq.citadel.CitadelCanvas.FOOT;
+import static dev.t3craft.hq.citadel.CitadelCanvas.GRASS;
+
 import dev.t3craft.hq.HqGeometry;
 import dev.t3craft.hq.RingCampusGeometry;
-import java.util.HashMap;
-import java.util.Map;
-import net.minecraft.nbt.CompoundTag;
 import dev.t3craft.hq.RingCampusGeometry.Kind;
 import dev.t3craft.hq.RingCampusGeometry.Node;
 import dev.t3craft.hq.RingCampusGeometry.Zone;
@@ -16,11 +14,14 @@ import dev.t3craft.hq.citadel.nodes.LoungeRoom;
 import dev.t3craft.hq.citadel.nodes.NodeDecor;
 import dev.t3craft.hq.citadel.nodes.RotundaRoom;
 import dev.t3craft.hq.citadel.nodes.TowerRoom;
+import dev.t3craft.hq.plan.Anchor;
+import dev.t3craft.hq.plan.AnchorNames;
+import java.util.HashMap;
+import java.util.Map;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.block.state.BlockState;
-import static dev.t3craft.hq.citadel.CitadelCanvas.FOOT;
-import static dev.t3craft.hq.citadel.CitadelCanvas.GRASS;
 
 /**
  * The special rooms of the ring-1 street: the eight nodes of the citadel. Each node is a disc or

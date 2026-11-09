@@ -44,7 +44,7 @@ import net.minecraft.world.phys.shapes.VoxelShape;
  * <p>Everything is a pure function of the {@code FACING} of the railings within one cell (and one
  * diagonal) of this one: {@link #resolve(BlockState, Neighbours)}. The world calls it on placement and
  * on every neighbour update (and refreshes the diagonals by hand, which vanilla does not notify);
- * {@code dev.t3craft.hq.PlanConnect} calls it on a plan's cell map, so generated plans bake the same
+ * {@code dev.t3craft.hq.plan.PlanConnect} calls it on a plan's cell map, so generated plans bake the same
  * states the game would.
  */
 public class KitRailingBlock extends HorizontalDirectionalBlock {

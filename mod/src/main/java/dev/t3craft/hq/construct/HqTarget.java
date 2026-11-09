@@ -1,8 +1,8 @@
 package dev.t3craft.hq.construct;
 
-import dev.t3craft.hq.BuildPlan;
 import dev.t3craft.hq.HqInput;
 import dev.t3craft.hq.HqLayout;
+import dev.t3craft.hq.plan.BuildPlan;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;

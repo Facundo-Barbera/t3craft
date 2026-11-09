@@ -28,8 +28,8 @@ public final class DemoPlacement {
 			return viewpoint(spec);
 		}
 		try {
-			dev.t3craft.hq.BuildPlan empty = dev.t3craft.hq.HqPlans.generate(dev.t3craft.hq.HqLayout.EMPTY);
-			dev.t3craft.hq.Anchor spawn = empty.anchor(dev.t3craft.hq.AnchorNames.SPAWN);
+			dev.t3craft.hq.plan.BuildPlan empty = dev.t3craft.hq.HqPlans.generate(dev.t3craft.hq.HqLayout.EMPTY);
+			dev.t3craft.hq.plan.Anchor spawn = empty.anchor(dev.t3craft.hq.plan.AnchorNames.SPAWN);
 			if (spawn == null) {
 				return viewpoint(spec);
 			}

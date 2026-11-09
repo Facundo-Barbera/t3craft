@@ -9,8 +9,8 @@ import dev.t3craft.client.npc.NpcInfo;
 import dev.t3craft.client.npc.behavior.Anchor;
 import dev.t3craft.client.npc.behavior.Pos;
 import dev.t3craft.debug.DevReload;
-import dev.t3craft.hq.AnchorNames;
 import dev.t3craft.hq.construct.HqSiteFrame;
+import dev.t3craft.hq.plan.AnchorNames;
 import dev.t3craft.t3.DirectController;
 import dev.t3craft.t3.ShellState;
 import dev.t3craft.t3.T3Connection;
@@ -174,7 +174,7 @@ public final class HologramClient implements ClientModInitializer {
 	/** The hub anchor once the module holding it stands, else the HQ board, else null. */
 	static @Nullable Pos hqAnchor(HqPresence.Standing s) {
 		HqAnchorSource hq = new HqAnchorSource(s.plan(), s.site());
-		dev.t3craft.hq.Anchor rel = s.plan().anchor(AnchorNames.HUB);
+		dev.t3craft.hq.plan.Anchor rel = s.plan().anchor(AnchorNames.HUB);
 		if (rel != null && standing(s, rel)) {
 			Anchor hub = hq.named(AnchorNames.HUB);
 			if (hub != null) {
@@ -185,7 +185,7 @@ public final class HologramClient implements ClientModInitializer {
 		return board == null ? null : board.pos();
 	}
 
-	private static boolean standing(HqPresence.Standing s, dev.t3craft.hq.Anchor rel) {
+	private static boolean standing(HqPresence.Standing s, dev.t3craft.hq.plan.Anchor rel) {
 		if (s.built() == null) {
 			return true;
 		}

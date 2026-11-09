@@ -1,5 +1,6 @@
 package dev.t3craft.hq;
 
+import dev.t3craft.hq.plan.Palette;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.DyeColor;

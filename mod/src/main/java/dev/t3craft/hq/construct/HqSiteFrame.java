@@ -2,7 +2,7 @@ package dev.t3craft.hq.construct;
 
 import dev.t3craft.hq.HqFootprints;
 import dev.t3craft.hq.HqSite;
-import dev.t3craft.hq.Placement;
+import dev.t3craft.hq.plan.Placement;
 import dev.t3craft.site.CellPlan;
 import dev.t3craft.site.Rect;
 import dev.t3craft.site.SiteFrame;
@@ -129,7 +129,7 @@ public final class HqSiteFrame {
 	 * out: site plans carry states only, and {@link HqConstruction} loads it (monitor and lamp
 	 * bindings, sign text) in place right after the expansion is built.
 	 */
-	public static dev.t3craft.build.BuildPlan sitePlan(dev.t3craft.hq.BuildPlan plan, String moduleId) {
+	public static dev.t3craft.build.BuildPlan sitePlan(dev.t3craft.hq.plan.BuildPlan plan, String moduleId) {
 		List<dev.t3craft.build.Placement> out = new ArrayList<>();
 		for (Placement p : plan.placements()) {
 			if (!builds(p.rel()) || !moduleId.equals(owner(p.rel().getX(), p.rel().getZ()))) {

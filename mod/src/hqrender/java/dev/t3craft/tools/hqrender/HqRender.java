@@ -1,15 +1,15 @@
 package dev.t3craft.tools.hqrender;
 
-import dev.t3craft.hq.Anchor;
-import dev.t3craft.hq.BuildPlan;
 import dev.t3craft.hq.HqFixtures;
 import dev.t3craft.hq.HqGenerator;
 import dev.t3craft.hq.HqInput;
 import dev.t3craft.hq.HqLayout;
 import dev.t3craft.hq.HqStyle;
 import dev.t3craft.hq.HqStyles;
-import dev.t3craft.hq.Placement;
-import dev.t3craft.hq.Workstation;
+import dev.t3craft.hq.plan.Anchor;
+import dev.t3craft.hq.plan.BuildPlan;
+import dev.t3craft.hq.plan.Placement;
+import dev.t3craft.hq.plan.Workstation;
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.Graphics2D;

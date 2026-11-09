@@ -2,11 +2,11 @@ package dev.t3craft.client.hq;
 
 import dev.t3craft.client.npc.behavior.Anchor;
 import dev.t3craft.client.npc.behavior.AnchorSource;
-import dev.t3craft.hq.AnchorNames;
-import dev.t3craft.hq.BuildPlan;
 import dev.t3craft.hq.HqSite;
-import dev.t3craft.hq.Workstation;
 import dev.t3craft.hq.construct.HqSiteFrame;
+import dev.t3craft.hq.plan.AnchorNames;
+import dev.t3craft.hq.plan.BuildPlan;
+import dev.t3craft.hq.plan.Workstation;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -63,7 +63,7 @@ public final class HqWorldAnchors implements AnchorSource {
 		List<Anchor> st = new ArrayList<>();
 		List<Anchor> se = new ArrayList<>();
 		List<dev.t3craft.client.npc.behavior.Pos> si = new ArrayList<>();
-		for (dev.t3craft.hq.Anchor a : plan.anchors().values()) {
+		for (dev.t3craft.hq.plan.Anchor a : plan.anchors().values()) {
 			String n = a.name();
 			if (!HqSiteFrame.builds(a.block()) || !standsAt(a.block())) {
 				continue;
@@ -73,7 +73,7 @@ public final class HqWorldAnchors implements AnchorSource {
 			} else if (strollPoint(n)) {
 				st.add(HqAnchorSource.convert(site.anchor(a)));
 			} else if (n.equals(AnchorNames.BOARD) || n.equals(AnchorNames.THREAD_WALL)) {
-				dev.t3craft.hq.Anchor w = site.anchor(a);
+				dev.t3craft.hq.plan.Anchor w = site.anchor(a);
 				si.add(new dev.t3craft.client.npc.behavior.Pos(w.x(), w.y(), w.z()));
 			} else {
 				AnchorNames.BigScreen bs = AnchorNames.parseBigScreen(n);
@@ -96,12 +96,12 @@ public final class HqWorldAnchors implements AnchorSource {
 	}
 
 	/** Middle of a big screen (its anchor is the top-left cell's face as seen from the front), world coordinates. */
-	private dev.t3craft.client.npc.behavior.Pos screenCentre(dev.t3craft.hq.Anchor a, AnchorNames.BigScreen bs) {
+	private dev.t3craft.client.npc.behavior.Pos screenCentre(dev.t3craft.hq.plan.Anchor a, AnchorNames.BigScreen bs) {
 		net.minecraft.core.Direction right = a.facing().getCounterClockWise();
 		double half = (bs.width() - 1) / 2.0;
-		dev.t3craft.hq.Anchor c = new dev.t3craft.hq.Anchor(a.name(), a.x() + right.getStepX() * half, a.y() - (bs.height() - 1) / 2.0,
+		dev.t3craft.hq.plan.Anchor c = new dev.t3craft.hq.plan.Anchor(a.name(), a.x() + right.getStepX() * half, a.y() - (bs.height() - 1) / 2.0,
 				a.z() + right.getStepZ() * half, a.facing(), a.block());
-		dev.t3craft.hq.Anchor w = site.anchor(c);
+		dev.t3craft.hq.plan.Anchor w = site.anchor(c);
 		return new dev.t3craft.client.npc.behavior.Pos(w.x(), w.y(), w.z());
 	}
 
@@ -151,13 +151,13 @@ public final class HqWorldAnchors implements AnchorSource {
 				return d;
 			}
 		}
-		dev.t3craft.hq.Anchor archived = plan.anchor(AnchorNames.archive(npcId));
+		dev.t3craft.hq.plan.Anchor archived = plan.anchor(AnchorNames.archive(npcId));
 		if (archived != null && HqSiteFrame.builds(archived.block())) {
 			String owner = HqSiteFrame.owner(archived.block().getX(), archived.block().getZ());
 			if (owner != null && standing(owner)) {
 				// the anchor is the screen face on the shelf; stand on the floor in front of it, facing it
 				net.minecraft.core.BlockPos front = archived.block().relative(archived.facing()).atY(1);
-				dev.t3craft.hq.Anchor spot = new dev.t3craft.hq.Anchor(AnchorNames.archive(npcId), front.getX() + 0.5, front.getY(),
+				dev.t3craft.hq.plan.Anchor spot = new dev.t3craft.hq.plan.Anchor(AnchorNames.archive(npcId), front.getX() + 0.5, front.getY(),
 						front.getZ() + 0.5, archived.facing().getOpposite(), front);
 				return HqAnchorSource.convert(site.anchor(spot));
 			}
@@ -185,7 +185,7 @@ public final class HqWorldAnchors implements AnchorSource {
 	}
 
 	private boolean wingOfProjectBuilt(String groupId) {
-		dev.t3craft.hq.Anchor a = plan.anchor(AnchorNames.walk(groupId));
+		dev.t3craft.hq.plan.Anchor a = plan.anchor(AnchorNames.walk(groupId));
 		if (a == null) {
 			return false;
 		}
@@ -234,7 +234,7 @@ public final class HqWorldAnchors implements AnchorSource {
 		}
 		List<ReviewSeat> out = new ArrayList<>();
 		for (int k = 0;; k++) {
-			dev.t3craft.hq.Anchor a = plan.anchor(AnchorNames.leadSeat(lead, k));
+			dev.t3craft.hq.plan.Anchor a = plan.anchor(AnchorNames.leadSeat(lead, k));
 			if (a == null) {
 				break;
 			}
@@ -243,13 +243,13 @@ public final class HqWorldAnchors implements AnchorSource {
 			}
 		}
 		Workstation w = plan.workstation(lead);
-		dev.t3craft.hq.Anchor door = w == null ? null : plan.anchor(AnchorNames.module(w.module()));
+		dev.t3craft.hq.plan.Anchor door = w == null ? null : plan.anchor(AnchorNames.module(w.module()));
 		if (door != null) {
 			net.minecraft.core.Direction in = door.facing();
 			net.minecraft.core.BlockPos outside = door.block().relative(in.getOpposite(), 2);
 			for (net.minecraft.core.BlockPos p : List.of(outside, outside.relative(in.getClockWise()), outside.relative(in.getCounterClockWise()))) {
 				if (HqSiteFrame.builds(p) && standsAt(p)) {
-					out.add(new ReviewSeat(HqAnchorSource.convert(site.anchor(dev.t3craft.hq.Anchor.at(door.name(), p, in))), false));
+					out.add(new ReviewSeat(HqAnchorSource.convert(site.anchor(dev.t3craft.hq.plan.Anchor.at(door.name(), p, in))), false));
 				}
 			}
 		}
