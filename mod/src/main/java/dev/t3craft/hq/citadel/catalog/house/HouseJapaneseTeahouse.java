@@ -257,7 +257,7 @@ public final class HouseJapaneseTeahouse implements Variant {
 		}
 		for (int u = u0; u <= u1; u++) {
 			for (int v = v0; v <= v1; v++) {
-				p.set(c, u, 7, v, slab(Blocks.DARK_OAK_SLAB));
+				p.set(c, u, 7, v, slab(Blocks.SPRUCE_SLAB));
 			}
 		}
 		// [depth] a slim post under each lifted corner, the lantern hangs beside it
