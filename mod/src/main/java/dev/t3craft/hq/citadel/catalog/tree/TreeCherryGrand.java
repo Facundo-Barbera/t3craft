@@ -11,17 +11,19 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
- * The great cherry: a 2×2 trunk with roots that spread over the grass (and a heavier collar on big plots)
- * that thins to a single leader. Five to eight limbs leave the leader at staggered heights (never below
- * y = 4, so you walk under the whole crown) and climb out to rounded lobes of blossom of different sizes,
- * with a sky seam between neighbouring lobes. Short twigs carry smaller satellite lobes, a crown lobe
- * sits on the leader, drips soften the undersides (none below y = 4) and fallen petals thin out from the
- * trunk. Every lobe is fitted inside the plot (no flat cut sides) and hangs from its own limb (nothing
- * floats). The seed varies height, lean, lobe sizes, heights and angles.
+ * The great cherry, as a dome: a 2×2 root flare that thins at once to a single leader, and one broad, flattened
+ * ellipsoid crown with 3–5 lobes on its rim (a lobed rim, not stacked lumps; nothing sits on top). The shell is
+ * eroded and a few sky windows go right through it. The crown never drops below y = 5, so you walk under the whole
+ * thing (the trunk's shoulder keeps 3 blocks of headroom). Two or three limbs leave the trunk under the dome and come
+ * out of its side by at least two cells, ending in a small blossom tuft. Roots are few and short (one or two longer).
+ * At most 8 % of the leaves are flowering azalea (fixed in code); the dominant tone is cherry pink.
  *
  * <p>Size: 7+ × 7+ × 11+. The tree itself spans at most 15 cells and stays centred on bigger plots.
  */
 public final class TreeCherryGrand implements Variant {
+	/** The most azalea leaves, as a share of all leaves (fixed here, not left to hash luck). */
+	private static final double AZALEA_MAX = 0.08;
+
 	@Override
 	public String id() {
 		return "tree_cherry_grand";
@@ -61,135 +63,168 @@ public final class TreeCherryGrand implements Variant {
 	private static final TreeKit.Wood LIMB = new TreeKit.Wood(Blocks.STRIPPED_CHERRY_WOOD, Blocks.STRIPPED_CHERRY_WOOD,
 			TreeKit.CHERRY.rootTip());
 
-	/** The lowest y a leaf or a limb may occupy: 4 blocks of clear walk under the crown. */
-	private static final int CLEAR = 4;
+	/**
+	 * The lowest y a leaf or a limb may occupy. The trunk's shoulder (three cells at y = 1) is standable (feet at y = 2),
+	 * so with 5 there is a 3-block headroom over every walkable cell near the trunk.
+	 */
+	private static final int CLEAR = 5;
 
 	@Override
 	public void build(CitadelCanvas c, Plot p) {
 		Vox t = new Vox(p);
 		Random r = p.rng(0x6A11);
 		int mn = Math.min(Math.min(p.w(), p.d()), 15); // the tree's own span; bigger plots stay centred
-		double sc = mn / 7.0;
-		double ls = Math.min(sc, 1.7); // lobe radius factor
 		int wu0 = (p.w() - mn) / 2;
 		int wu1 = wu0 + mn - 1;
 		int wv0 = (p.d() - mn) / 2;
 		int wv1 = wv0 + mn - 1;
 		boolean big = mn >= 10;
 
-		int H = Math.min(p.h(), CLEAR + 1 + (int) Math.round(mn * 0.75) + r.nextInt(2)); // a wide dome, another height per seed
-		int y2 = H >= 16 ? 4 : H >= 13 ? 3 : 2; // 2×2 up to y2 - 1, three cells at y2, then the leader
-		int crownY = H - 3;
+		int cy = CLEAR + 1; // the dome's centre layer
+		double ryUp = TreeKit.clamp(1.9 + (mn - 7) * 0.22 + r.nextDouble() * 0.5, 2.0, 3.4);
+		int nUp = (int) Math.floor(ryUp - 0.2);
+		if (cy + nUp > p.h() - 1) {
+			nUp = Math.max(1, p.h() - 1 - cy);
+		}
 		int ou = r.nextInt(2);
 		int ov = r.nextInt(2);
 		int bu = TreeKit.base(p.w(), ou);
 		int bv = TreeKit.base(p.d(), ov);
 		double lean = r.nextDouble() * Math.PI * 2;
-		double amp = 0.8 + r.nextDouble() * 1.4;
-		int[][] lead = TreeKit.trunk(t, TreeKit.CHERRY, bu, bv, y2, crownY, ou, ov,
+		double amp = 0.5 + r.nextDouble() * 0.9;
+		int[][] lead = TreeKit.trunk(t, TreeKit.CHERRY, bu, bv, 1, Math.min(cy + 1, p.h() - 1), ou, ov,
 				Math.cos(lean) * amp, Math.sin(lean) * amp);
 
-		// ---- roots spread out, a flare one block high against the trunk, a collar on the big ones
-		roots(t, bu, bv, 4 + (big ? 1 : 0), 2 + (big ? 1 : 0)); // few and short: a flare, not a starfish
-		if (big) {
-			int lu = lead[0][y2 + 1];
-			int lv = lead[1][y2 + 1];
-			int[][] n4 = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
-			for (int[] o : n4) {
-				if (t.hash(lu + o[0], y2 + 1, lv + o[1], 3) != 0) {
-					t.woodSoft(lu + o[0], y2 + 1, lv + o[1], TreeKit.CHERRY.bark());
+		// ---- roots: 4–5, short; one or two reach further
+		roots(t, bu, bv, 4 + r.nextInt(2), big ? 4 : 3);
+
+		// ---- the dome
+		double cu = lead[0][cy];
+		double cv = lead[1][cy];
+		int lobes = 3 + r.nextInt(3); // 3, 4 or 5 lobes on the rim
+		double phi = r.nextDouble() * Math.PI * 2;
+		double lobeAmp = 0.17 + r.nextDouble() * 0.08;
+		double rRoom = Math.min(Math.min(cu - wu0, wu1 - cu), Math.min(cv - wv0, wv1 - cv)) + 0.9;
+		double rWant = Math.min(mn * 0.5 - 0.2, 7.2);
+		double rBase = Math.min(rWant, rRoom / (1 + lobeAmp + 0.04));
+		rBase = Math.max(rBase, 2.3);
+		double ryDown = 1.7;
+		// sky windows: a few vertical slits right through the shell
+		int nHoles = big ? 4 : 2 + r.nextInt(2);
+		double[][] holes = new double[nHoles][2];
+		for (int i = 0; i < nHoles; i++) {
+			double a = phi + (i + 0.3 + r.nextDouble() * 0.4) / nHoles * Math.PI * 2 + 0.5;
+			double d = rBase * (0.42 + r.nextDouble() * 0.3);
+			holes[i][0] = cu + Math.cos(a) * d;
+			holes[i][1] = cv + Math.sin(a) * d;
+		}
+		for (int y = CLEAR; y <= cy + nUp; y++) {
+			int ly = y - cy;
+			double dyn = ly / (ly >= 0 ? ryUp : ryDown);
+			double rem = 1.0 - dyn * dyn;
+			if (rem <= 0.04) {
+				continue;
+			}
+			for (int v = (int) Math.floor(cv - rBase * 1.3 - 1); v <= (int) Math.ceil(cv + rBase * 1.3 + 1); v++) {
+				for (int u = (int) Math.floor(cu - rBase * 1.3 - 1); u <= (int) Math.ceil(cu + rBase * 1.3 + 1); u++) {
+					if (u < wu0 || u > wu1 || v < wv0 || v > wv1) {
+						continue;
+					}
+					double du = u - cu;
+					double dv = v - cv;
+					double th = Math.atan2(dv, du);
+					double rad = rBase * (1 + lobeAmp * Math.cos(lobes * (th - phi)));
+					double q = (du * du + dv * dv) / (rad * rad);
+					double jit = (t.hash(u, y, v, 9) - 4.5) / 4.5 * 0.16;
+					if (q > rem * (1.0 + jit)) {
+						continue;
+					}
+					if (q > 0.5 * rem && t.hash(u + 5, y + 11, v, 9) < 2) {
+						continue; // an eroded shell, not a smooth skin
+					}
+					if (y == CLEAR && t.hash(u, y + 3, v + 7, 10) < 3) {
+						continue; // a ragged underside
+					}
+					if (y <= cy && Math.abs(u - lead[0][y]) <= 1 && Math.abs(v - lead[1][y]) <= 1) {
+						continue; // trunk and limbs show from underneath
+					}
+					boolean hole = false;
+					for (double[] h : holes) {
+						if (Math.abs(u - h[0]) < 0.95 && Math.abs(v - h[1]) < 0.95) {
+							hole = true;
+							break;
+						}
+					}
+					if (hole) {
+						continue;
+					}
+					t.leaf(u, y, v, TreeKit.SAKURA.a());
 				}
 			}
 		}
 
-		// ---- limbs and lobes
-		int n = 5 + (mn >= 9 ? 1 : 0) + (mn >= 11 ? 1 : 0) + (mn >= 14 ? 1 : 0);
-		double a0 = r.nextDouble();
-		double g0 = r.nextDouble();
-		double spread = r.nextBoolean() ? 0.5 : 0.9; // umbrella of low lobes, or a layered crown
-		int sy0 = Math.max(CLEAR, y2 + 1);
-		for (int i = 0; i < n; i++) {
-			if (i > 0 && r.nextInt(6) == 0) {
-				continue; // a gap in the ring: the silhouette is not even
-			}
-			double ang = (a0 + (i + (r.nextDouble() - 0.5) * 0.4) / n) * Math.PI * 2;
+		// ---- ribs: bark limbs under the dome that carry its lobes (they also keep every leaf attached)
+		int ribs = 3 + (mn >= 9 ? 1 : 0);
+		double rib0 = phi + Math.PI / lobes;
+		for (int i = 0; i < ribs; i++) {
+			double ang = rib0 + i * Math.PI * 2 / ribs + (r.nextDouble() - 0.5) * 0.5;
 			double ex = Math.cos(ang);
 			double ez = Math.sin(ang);
-			double frac = (g0 + i * 0.618) % 1.0; // spreads the heights so neighbours differ
-			int ly = TreeKit.clamp(5 + (int) Math.round(Math.pow(frac, 1.5) * (crownY - 5) * spread), 5, crownY);
-			int sy = TreeKit.clamp(ly - 3 - r.nextInt(2), sy0, crownY - 1);
+			double reach = Math.min(rBase * 0.75, room(lead[0][CLEAR], lead[1][CLEAR], ex, ez, wu0, wu1, wv0, wv1));
+			int tu = (int) Math.round(lead[0][CLEAR] + ex * reach);
+			int tv = (int) Math.round(lead[1][CLEAR] + ez * reach);
+			List<int[]> rib = TreeKit.branch(t, LIMB, new int[] {lead[0][CLEAR], CLEAR, lead[1][CLEAR]}, new int[] {tu, cy, tv}, false);
+			darkBase(t, rib);
+		}
+
+		// ---- side limbs: 2–3 come out of the flank of the dome by at least two cells, ending in a tuft of blossom
+		int side = 2 + (r.nextInt(3) == 0 ? 1 : 0);
+		double s0 = phi + r.nextDouble() * Math.PI;
+		for (int i = 0; i < side; i++) {
+			double ang = s0 + i * Math.PI * 2 / side + (r.nextDouble() - 0.5) * 0.6;
+			double ex = Math.cos(ang);
+			double ez = Math.sin(ang);
+			int sy = CLEAR;
 			int su = lead[0][sy];
 			int sv = lead[1][sy];
-			double rx = (1.95 + r.nextDouble() * 0.6) * ls;
-			double rz = rx * (0.8 + r.nextDouble() * 0.3);
-			double room = room(su, sv, ex, ez, wu0, wu1, wv0, wv1);
-			double reach = TreeKit.clamp(room - rx * 0.95 + 0.3 - r.nextDouble() * 0.7, 1.5, 5.0 * ls); // out towards the rim: bare limb in between
+			double edge = 0;
+			for (double s = 1; s < 12; s += 0.5) {
+				int mu = (int) Math.round(su + ex * s);
+				int mv = (int) Math.round(sv + ez * s);
+				if (t.kind(mu, cy, mv) == TreeKit.LEAF || t.kind(mu, cy - 1, mv) == TreeKit.LEAF) {
+					edge = s;
+				}
+			}
+			double reach = Math.min(room(su, sv, ex, ez, wu0, wu1, wv0, wv1) - 0.2, edge + 2.7);
+			if (reach < 3.0) {
+				continue;
+			}
 			int tu = (int) Math.round(su + ex * reach);
 			int tv = (int) Math.round(sv + ez * reach);
-			rx = Math.max(1.3, fit(tu, wu0, wu1, rx));
-			rz = Math.max(1.3, fit(tv, wv0, wv1, rz));
-			List<int[]> limb = TreeKit.branch(t, LIMB, new int[] {su, sy, sv}, new int[] {tu, ly - 1, tv}, false);
+			int ty = cy + (reach >= edge + 2 ? 1 : 0);
+			List<int[]> limb = TreeKit.branch(t, LIMB, new int[] {su, sy, sv}, new int[] {tu, ty, tv}, false);
 			darkBase(t, limb);
-			if (sc >= 1.25) { // the base of a big limb is two logs thick (never below the walk height)
-				for (int k = 0; k < Math.min(2, limb.size()); k++) {
-					int[] cell = limb.get(k);
-					if (cell[1] - 1 >= CLEAR) {
-						t.woodSoft(cell[0], cell[1] - 1, cell[2], k == 0 ? TreeKit.CHERRY.bark() : LIMB.bark());
+			// a small tuft that rests on the tip (never wider than the plot)
+			for (int dy = 0; dy <= 1; dy++) {
+				double tr = dy == 0 ? 1.5 : 1.0;
+				for (int dv = -2; dv <= 2; dv++) {
+					for (int du = -2; du <= 2; du++) {
+						int u = tu + du;
+						int v = tv + dv;
+						if (u < wu0 || u > wu1 || v < wv0 || v > wv1 || du * du + dv * dv > tr * tr + 0.3) {
+							continue;
+						}
+						if (dy == 0 && du == 0 && dv == 0) {
+							continue; // the tip itself
+						}
+						if (t.hash(u, ty + dy, v, 5) < 1) {
+							continue;
+						}
+						t.leaf(u, ty + dy, v, TreeKit.SAKURA.a());
 					}
 				}
 			}
-			// a twig off the limb with a small satellite lobe
-			if (i % 2 == 0 || r.nextInt(3) == 0) {
-				int[] mid = limb.get(limb.size() / 2);
-				double fa = ang + (i % 4 < 2 ? 1.0 : -1.0) * (1.0 + r.nextDouble() * 0.4);
-				double fx = Math.cos(fa);
-				double fz = Math.sin(fa);
-				double fr = TreeKit.clamp(room(mid[0], mid[2], fx, fz, wu0, wu1, wv0, wv1) - 1.7, 0, 2.2 * ls);
-				if (fr >= 1.0) {
-					int fu = (int) Math.round(mid[0] + fx * fr);
-					int fv = (int) Math.round(mid[2] + fz * fr);
-					int sat = Math.max(CLEAR + 1, mid[1] + 1 + r.nextInt(2));
-					if (sat <= crownY) {
-						double sr = (1.5 + r.nextDouble() * 0.4) * ls;
-						double sx = Math.max(1.2, fit(fu, wu0, wu1, sr));
-						double sz = Math.max(1.2, fit(fv, wv0, wv1, sr));
-						TreeKit.branch(t, LIMB, new int[] {mid[0], mid[1], mid[2]}, new int[] {fu, sat - 1, fv}, false);
-						lobe(t, fu, sat, fv, sx, sz, sat + 1 <= H - 1 ? 1 : 0, 1, TreeKit.SAKURA, 0.45, 40 + i, 1 + (i * 2) / n, null); // the parent's group: it always grows
-					}
-				}
-			}
-			int avail = H - 1 - ly;
-			int nUp = avail >= 2 && r.nextInt(3) == 0 ? 2 : avail >= 1 ? 1 : 0;
-			int nDown = ly >= CLEAR + 2 && Math.min(rx, rz) >= 2.0 ? 2 : 1;
-			lobe(t, tu, ly, tv, rx, rz, nUp, nDown, TreeKit.SAKURA, 0.5, i, 1 + (i * 2) / n, lead); // two halves merge: two sky seams
-			drips(t, tu, ly - nDown, tv, rx, rz, i);
 		}
-
-		// ---- one seed in three: a low limb that sweeps far out to a lobe of its own
-		if (r.nextInt(3) == 0) {
-			double sa = r.nextDouble() * Math.PI * 2;
-			double sx = Math.cos(sa);
-			double sz = Math.sin(sa);
-			int su = lead[0][sy0];
-			int sv = lead[1][sy0];
-			double sroom = room(su, sv, sx, sz, wu0, wu1, wv0, wv1);
-			if (sroom >= 3.5) {
-				double sr = Math.min(1.8 * ls, sroom - 1.5);
-				double reach = sroom - sr * 0.9;
-				int tu = (int) Math.round(su + sx * reach);
-				int tv = (int) Math.round(sv + sz * reach);
-				List<int[]> sweep = TreeKit.branch(t, LIMB, new int[] {su, sy0, sv}, new int[] {tu, sy0, tv}, false);
-				darkBase(t, sweep);
-				lobe(t, tu, sy0 + 1, tv, Math.max(1.3, fit(tu, wu0, wu1, sr)), Math.max(1.3, fit(tv, wv0, wv1, sr)), 1, 1,
-						TreeKit.SAKURA, 0.5, 60, 3, null);
-			}
-		}
-
-		// ---- the crown on the leader
-		int cu = lead[0][crownY];
-		int cv = lead[1][crownY];
-		double cr = TreeKit.clamp(Math.min(Math.min(cu - wu0, wu1 - cu), Math.min(cv - wv0, wv1 - cv)) + 1.0, 2.0, 2.4 * ls);
-		lobe(t, cu, crownY + 1, cv, cr, cr * (0.85 + r.nextDouble() * 0.2), 1, 1, TreeKit.SAKURA, 0.5, 9, 1, null);
 
 		// ---- fallen petals: thick under the whole crown, thinning out towards the corners, a little moss between
 		TreeKit.ground(t, bu + 0.5, bv + 0.5, mn * 0.75, (u, v, k) -> {
@@ -199,51 +234,36 @@ public final class TreeCherryGrand implements Variant {
 			}
 			return hsh < (int) (94 - 40 * k) ? Blocks.MOSS_CARPET.defaultBlockState() : null;
 		});
-		trimBareTips(t);
 		t.prune();
+		azalea(t);
 		t.flush(c);
 	}
 
-
 	/**
-	 * A rounded lobe of leaves: {@code nUp} layers above the centre layer and {@code nDown} below, each
-	 * narrower than the middle one (a dome, never a plate), edge jittered, outer rings of the end layers
-	 * ragged. Lobes with the same {@code id} merge; different ids keep a one-cell seam of sky between them.
-	 * Nothing below the walk height. With {@code lead} (the leader's column per y) the lower half of the lobe leaves
-	 * a one-cell gap around the trunk, so the trunk and the limb that carries the lobe show beneath it.
+	 * Swaps a few cherry leaves on the underside of the dome for flowering azalea, never more than {@link #AZALEA_MAX} of
+	 * all leaves (counted here, so the cap holds for every seed and size).
 	 */
-	private static void lobe(Vox t, double cu, double cy, double cv, double rx, double rz, int nUp, int nDown,
-			TreeKit.Leaves lv, double rough, int salt, int id, int[][] lead) {
-		int iy = (int) Math.round(cy);
-		double ryUp = nUp + 0.75;
-		double ryDown = nDown + 0.75;
-		for (int ly = -nDown; ly <= nUp; ly++) {
-			int y = iy + ly;
-			if (y < CLEAR) {
-				continue;
+	private static void azalea(Vox t) {
+		int total = 0;
+		for (int y = CLEAR; y < t.h; y++) {
+			for (int v = 0; v < t.d; v++) {
+				for (int u = 0; u < t.w; u++) {
+					if (t.kind(u, y, v) == TreeKit.LEAF) {
+						total++;
+					}
+				}
 			}
-			double dyn = ly / (ly >= 0 ? ryUp : ryDown);
-			double rem = 1.0 - dyn * dyn; // an ellipsoid: each layer is a circle smaller than the middle one
-			if (rem <= 0.05) {
-				continue;
-			}
-			double dyTone = ly >= 0 ? ly / (double) Math.max(1, nUp) : ly / (double) Math.max(1, nDown);
-			for (int v = (int) Math.floor(cv - rz - 1); v <= (int) Math.ceil(cv + rz + 1); v++) {
-				for (int u = (int) Math.floor(cu - rx - 1); u <= (int) Math.ceil(cu + rx + 1); u++) {
-					double du = (u - cu) / rx;
-					double dv = (v - cv) / rz;
-					double q = du * du + dv * dv;
-					double jit = (t.hash(u + salt * 13, y + salt * 7, v + salt * 3, 9) - 4.5) / 4.5 * rough * 0.5;
-					if (q > rem * (1.0 + jit)) {
-						continue;
+		}
+		int cap = (int) Math.floor(total * AZALEA_MAX);
+		int made = 0;
+		for (int y = CLEAR; y < t.h && made < cap; y++) {
+			for (int v = 0; v < t.d && made < cap; v++) {
+				for (int u = 0; u < t.w && made < cap; u++) {
+					if (t.kind(u, y, v) == TreeKit.LEAF && t.kind(u, y - 1, v) != TreeKit.LEAF && t.hash(u, y, v, 100) < 14) {
+						t.clear(u, y, v);
+						t.leaf(u, y, v, TreeKit.SAKURA.b());
+						made++;
 					}
-					if (lead != null && y <= iy && Math.abs(u - lead[0][y]) <= 1 && Math.abs(v - lead[1][y]) <= 1) {
-						continue;
-					}
-					if (q > 0.55 * rem && t.hash(u + salt * 5, y + 11, v, 9) < 2) {
-						continue; // the shell is eroded by noise (about a fifth of it), not by stamped steps
-					}
-					t.leafOf(u, y, v, tone(t, lv, u, y, v, dyTone, salt), 1000 + id);
 				}
 			}
 		}
@@ -251,8 +271,8 @@ public final class TreeCherryGrand implements Variant {
 
 	/**
 	 * Roots over the grass, tapering: a bark cell against the trunk, then a log along the root, a moss carpet on the
-	 * tip of the longer ones (never the muddy brown boxes). Face roots run straight out, corner roots diagonally with a cell
-	 * tying each step. One block high.
+	 * tip of the longer ones. Face roots run straight out, corner roots diagonally with a cell tying each step. One block
+	 * high. The first two are the long ones ({@code 3..maxLen}); the rest are one or two cells.
 	 */
 	private static void roots(Vox t, int bu, int bv, int count, int maxLen) {
 		boolean[] used = new boolean[8];
@@ -263,20 +283,20 @@ public final class TreeCherryGrand implements Variant {
 				continue;
 			}
 			used[k] = true;
+			boolean longOne = made < 1 + t.hash(7, 7, 7, 2);
 			made++;
 			int du = TreeKit.OCT[k][0];
 			int dv = TreeKit.OCT[k][1];
 			boolean diag = du != 0 && dv != 0;
 			int u = du < 0 ? bu - 1 : du > 0 ? bu + 2 : bu + t.hash(k, 1, 3, 2);
 			int v = dv < 0 ? bv - 1 : dv > 0 ? bv + 2 : bv + t.hash(k, 2, 3, 2);
-			int len = 1 + t.hash(k, 3, 3, maxLen); // 1..maxLen long
+			int len = longOne ? 3 + t.hash(k, 3, 3, Math.max(1, maxLen - 2)) : 1 + t.hash(k, 3, 3, 2);
 			if (diag) {
 				t.woodSoft(u - du, 0, v, TreeKit.CHERRY.bark()); // the corner touches the trunk only by an edge
 			}
 			for (int i = 0; i < len; i++) {
 				boolean tip = i == len - 1 && len > 1;
-				BlockState s = TreeKit.CHERRY.bark(); // bark on all sides: a log end facing the camera shows pale rings
-				t.wood(u, 0, v, s);
+				t.wood(u, 0, v, TreeKit.CHERRY.bark()); // bark on all sides: a log end facing the camera shows pale rings
 				if (tip) {
 					t.cover(u, 1, v, Blocks.MOSS_CARPET.defaultBlockState()); // a moss cap on the root's end
 				}
@@ -295,61 +315,6 @@ public final class TreeCherryGrand implements Variant {
 			int[] cell = limb.get(k);
 			t.wood(cell[0], cell[1], cell[2], TreeKit.CHERRY.bark());
 		}
-	}
-
-	/** Cherry leaves, with the flowering azalea in pairs: a little on top, some on the flanks, a third below. */
-	private static BlockState tone(Vox t, TreeKit.Leaves lv, int u, int y, int v, double dy, int salt) {
-		int pct = dy < -0.2 ? 20 : dy < 0.35 ? 6 : 0;
-		return t.hash(u + salt, y, Math.floorDiv(v, 2), 100) < pct ? lv.b() : lv.a();
-	}
-
-	/** Removes pale limb cells that end in the open: a tip with at most one wood neighbour and no leaf beside it. */
-	private static void trimBareTips(Vox t) {
-		int[][] n6 = {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}};
-		for (int pass = 0; pass < 4; pass++) {
-			boolean any = false;
-			for (int y = CLEAR; y < t.h; y++) {
-				for (int v = 0; v < t.d; v++) {
-					for (int u = 0; u < t.w; u++) {
-						if (t.kind(u, y, v) != TreeKit.WOOD || t.get(u, y, v).getBlock() != Blocks.STRIPPED_CHERRY_WOOD) {
-							continue;
-						}
-						int wood = 0;
-						int leaf = 0;
-						for (int[] o : n6) {
-							byte k = t.kind(u + o[0], y + o[1], v + o[2]);
-							wood += k == TreeKit.WOOD ? 1 : 0;
-							leaf += k == TreeKit.LEAF ? 1 : 0;
-						}
-						if (wood <= 1 && leaf == 0) {
-							t.clear(u, y, v);
-							any = true;
-						}
-					}
-				}
-			}
-			if (!any) {
-				break;
-			}
-		}
-	}
-
-	/** Drips under the rim of the lowest layer {@code yl} of a lobe (never below the walk height). */
-	private static void drips(Vox t, int cu, int yl, int cv, double rx, double rz, int salt) {
-		for (int v = (int) (cv - rz); v <= cv + rz; v++) {
-			for (int u = (int) (cu - rx); u <= cu + rx; u++) {
-				double q = Math.pow((u - cu) / rx, 2) + Math.pow((v - cv) / rz, 2);
-				if (q < 0.3 || q > 1.0 || t.hash(u, yl + salt, v, 3) != 0 || t.kind(u, yl, v) != TreeKit.LEAF) {
-					continue;
-				}
-				TreeKit.hang(t, u, yl - 1, v, 1 + t.hash(u, 3, v + salt, 3), CLEAR, TreeKit.SAKURA.a(), TreeKit.SAKURA.b(), 0, 0, false);
-			}
-		}
-	}
-
-	/** The largest radius a lobe centred on {@code c} may have to stay inside {@code [lo, hi]} (jitter included). */
-	private static double fit(double c, int lo, int hi, double r) {
-		return Math.min(r, (Math.min(c - lo, hi - c) + 1.0) / 1.05);
 	}
 
 	/** How far you can go from {@code (u, v)} along {@code (ex, ez)} before leaving the window. */
