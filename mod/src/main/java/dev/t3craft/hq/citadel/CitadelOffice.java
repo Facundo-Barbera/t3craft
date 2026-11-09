@@ -344,9 +344,9 @@ public final class CitadelOffice {
 				int m = m(dx, dz);
 				Direction.Axis edge = Math.abs(dz) == H ? Direction.Axis.X : Direction.Axis.Z;
 				set(c, dx, F0(), dz, m == H ? c.accent() : c.floor());
-				for (int f : new int[] {F1(), F2()}) {
-					set(c, dx, f, dz, m == H ? c.kit.beam(edge) : c.floor());
-				}
+				set(c, dx, F1(), dz, m == H ? c.kit.beam(edge) : c.floor());
+				// the control room's floor is dark tile so the screens stand out
+				set(c, dx, F2(), dz, m == H ? c.kit.beam(edge) : (Math.floorMod(dx + dz, 2) == 0 ? FOOT : CitadelCanvas.RIB));
 				set(c, dx, CEIL(), dz, m == H || Math.floorMod(dz, 2) == 0 ? c.kit.beam(m == H ? edge : Direction.Axis.X) : PLANKS);
 			}
 		}
@@ -387,8 +387,23 @@ public final class CitadelOffice {
 			} else {
 				s = au == 2 ? LOG : (au <= 1 ? c.kit.wallPanel(true) : CALCITE);
 			}
+			if (s == CALCITE) {
+				s = plaster(CX() + dx, y, CZ() + dz);
+			}
 			set(c, dx, y, dz, s);
 		}
+	}
+
+	/**
+	 * Wall plaster by level: the lobby is stone brick (heavy base: some cracked, some mossy), the rest calcite with polished
+	 * diorite and smooth stone scattered in a fixed pattern, so no wall is one flat colour.
+	 */
+	private static BlockState plaster(int x, int y, int z) {
+		int h = Math.floorMod(x * 13 + y * 7 + z * 5, 9);
+		if (y < F1()) {
+			return CitadelCanvas.b(h == 0 ? Blocks.CRACKED_STONE_BRICKS : h == 1 ? Blocks.MOSSY_STONE_BRICKS : Blocks.STONE_BRICKS);
+		}
+		return h == 0 ? CitadelCanvas.b(Blocks.POLISHED_DIORITE) : h == 1 ? CitadelCanvas.b(Blocks.SMOOTH_STONE) : CALCITE;
 	}
 
 	/** Lobby wall: a footing course, slit windows over the benches and the chests, the door (north) between two logs. */
@@ -479,6 +494,16 @@ public final class CitadelOffice {
 					set(c, dx, F0() + 1, dz, FOOT);
 					for (int y = F0() + 2; y <= CEIL() + 1; y++) {
 						set(c, dx, y, dz, LOG);
+					}
+					// buttress at its foot: a block of the skirt one step further out, capped by a tile stair
+					int ox = Math.abs(dx) == E ? Integer.signum(dx) : 0;
+					int oz = Math.abs(dz) == E ? Integer.signum(dz) : 0;
+					if (Math.hypot(CX() + dx + ox, CZ() + dz + oz) > CitadelCanvas.dims().galleryR - 0.5) {
+						for (int y = 1; y <= F0(); y++) {
+							set(c, dx + ox, y, dz + oz, plinthBlock(CX() + dx + ox, y, CZ() + dz + oz));
+						}
+						Direction toward = ox > 0 ? Direction.WEST : ox < 0 ? Direction.EAST : oz > 0 ? Direction.NORTH : Direction.SOUTH;
+						set(c, dx + ox, F0() + 1, dz + oz, stairs(Blocks.DEEPSLATE_TILE_STAIRS, toward));
 					}
 					continue;
 				}
@@ -623,13 +648,14 @@ public final class CitadelOffice {
 		// the model of the HQ: hub in the middle, the four ramps, four barrios; the red carpet is this tower
 		set(c, 0, y, 0, CALCITE);
 		set(c, 0, y + 1, 0, lantern(false));
-		set(c, 0, y, -1, stairs(Blocks.STONE_BRICK_STAIRS, Direction.SOUTH));
-		set(c, 0, y, 1, stairs(Blocks.STONE_BRICK_STAIRS, Direction.NORTH));
-		set(c, 1, y, 0, stairs(Blocks.STONE_BRICK_STAIRS, Direction.WEST));
-		set(c, -1, y, 0, stairs(Blocks.STONE_BRICK_STAIRS, Direction.EAST));
+		// ramps in bamboo mosaic like the real ones, barrios in pink terracotta
+		set(c, 0, y, -1, stairs(Blocks.BAMBOO_MOSAIC_STAIRS, Direction.SOUTH));
+		set(c, 0, y, 1, stairs(Blocks.BAMBOO_MOSAIC_STAIRS, Direction.NORTH));
+		set(c, 1, y, 0, stairs(Blocks.BAMBOO_MOSAIC_STAIRS, Direction.WEST));
+		set(c, -1, y, 0, stairs(Blocks.BAMBOO_MOSAIC_STAIRS, Direction.EAST));
 		for (int sx : new int[] {-1, 1}) {
 			for (int sz : new int[] {-1, 1}) {
-				set(c, sx, y, sz, slab(Blocks.CHERRY_SLAB));
+				set(c, sx, y, sz, CitadelCanvas.terracotta(DyeColor.PINK));
 			}
 		}
 		set(c, 1, y + 1, 1, carpet(DyeColor.RED));
@@ -700,8 +726,12 @@ public final class CitadelOffice {
 		set(c, -4, F2() + 3, 0, wallBanner(Direction.EAST));
 		set(c, -4, F2() + 4, 0, wallBanner(Direction.EAST));
 		attentionBoard(c);
-		for (int[] p : new int[][] {{-3, -3}, {0, -3}, {3, -3}, {-3, 0}, {0, 0}, {-3, 3}, {0, 3}, {3, 3}}) {
+		// light: lanterns only over the middle and the north half; the screen's side gets invisible light, so nothing hangs in front of it
+		for (int[] p : new int[][] {{-3, -3}, {0, -3}, {3, -3}, {-3, 0}, {0, 0}}) {
 			hang(c, p[0], CEIL() - 1, p[1]);
+		}
+		for (int dx : new int[] {-3, 0, 3}) {
+			set(c, dx, CEIL() - 1, 3, CitadelCanvas.invisibleLight(14));
 		}
 	}
 
@@ -723,7 +753,10 @@ public final class CitadelOffice {
 		for (int dz = -2; dz <= 2; dz++) {
 			BlockPos p = new BlockPos(x, bottom + 2, CZ() + dz);
 			c.fixture(p, c.style.statusLamp());
-			c.anchor(Anchor.face(AnchorNames.boardLamp(lamp++), p, Direction.WEST));
+			c.anchor(Anchor.face(AnchorNames.boardLamp(lamp), p, Direction.WEST));
+			// a plaque under each lamp with its rank in the attention queue (the hub board has 1 to 5)
+			sign(c, x - 1, bottom + 1, CZ() + dz, Direction.WEST, DyeColor.ORANGE, "", "#" + (lamp + 1), "", "");
+			lamp++;
 		}
 		sign(c, x - 1, bottom + 3, CZ(), Direction.WEST, DyeColor.ORANGE, "", "Atencion", "6 a 10", "");
 	}
