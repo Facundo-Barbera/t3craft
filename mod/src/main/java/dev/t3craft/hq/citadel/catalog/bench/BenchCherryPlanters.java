@@ -59,7 +59,7 @@ public final class BenchCherryPlanters implements Variant {
 
 	@Override
 	public int minW() {
-		return 3; // TEMP-RENDER
+		return 2;
 	}
 
 	@Override
@@ -69,7 +69,7 @@ public final class BenchCherryPlanters implements Variant {
 
 	@Override
 	public int minH() {
-		return 3; // TEMP-RENDER
+		return 2;
 	}
 
 	@Override
