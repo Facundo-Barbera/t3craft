@@ -194,8 +194,15 @@ public final class CitadelSupport {
 			n[0]++;
 			return true;
 		}
+		// something rests on this plant (a pot, the leaves of a shrub): a moss block keeps it up instead of leaving a hole
+		BlockState above = at(cells, pos.above());
+		if (!above.isAir() && !(blk instanceof DoublePlantBlock && above.getBlock() == blk) && !c.data.containsKey(k)) {
+			set(c, k, b(Blocks.MOSS_BLOCK));
+			n[0]++;
+			return true;
+		}
 		Block pot = pots().get(blk);
-		if (pot != null && !below.isAir() && below.isFaceSturdy(EmptyBlockGetter.INSTANCE, BlockPos.ZERO, Direction.UP)) {
+		if (pot != null && !below.isAir()) {
 			set(c, k, b(pot));
 			n[1]++;
 			return true;
