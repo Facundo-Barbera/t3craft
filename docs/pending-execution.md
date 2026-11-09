@@ -59,6 +59,9 @@ Son 4 agentes Sonnet high, cada uno con un director de arte Opus. Trabajan sobre
 
 Estado de la ola 1:
 - houses-a, houses-b y street están integradas en `citadel/next`. Las tres agotaron su cupo de renders con varias variantes por debajo de 7, así que tienen segunda ronda (`design/houses-a2`, `design/houses-b2`, `design/street2`) con más renders: hasta 10 por familia y 12 para casas.
+- nature-water también está integrada. Su segunda ronda va en dos partes: `design/trees2` (Opus, las 9 especies con copas en lóbulos) está en curso, y la de fuentes y jardines queda para cuando baje el número de agentes.
+- **Citadel Studio en el PC** se actualizó a `79be0f6`: ahora lista todos los agentes con jobs, del más reciente al más viejo.
+- **Construcción (prioridad máxima):** `fix/build-walkable`, en curso. Hace que el HQ real use el mismo plan radial único que el demo (hoy `HqConstruction` lanza un trabajo por parte, de abajo hacia arriba) y agrega un corredor de suelo por delante del jugador en su dirección de avance. Criterio de aceptación: cruzar el mapa en línea recta sin caerse.
 - **Hueco del renderer:** hqRender dibuja los banners (`*_banner` y `*_wall_banner`) como cajas de madera. Por eso no se pueden juzgar en imagen. Pendiente: un modelo de banner en `BlockModels`.
 
 Ola 2, pendiente:
