@@ -161,7 +161,7 @@ public final class HouseTowerBridge implements Variant {
 		int n = 7;
 		if (w >= 29 && d >= 16) {
 			n = 11;
-		} else if (w >= 25 && d >= 14) {
+		} else if (w >= 23 && d >= 14) { // TEMP test (restore 25)
 			n = 9;
 		}
 		int nb = n - 2;
@@ -343,18 +343,6 @@ public final class HouseTowerBridge implements Variant {
 					}
 				}
 			}
-			// windows: a sill outside under each, from the second storey up
-			for (int u = t.u0(); u <= t.u1(); u++) {
-				for (int v = t.v0(); v <= t.v1(); v++) {
-					if (!perim(t, u, v) || corner(t, u, v)) {
-						continue;
-					}
-					Direction o = out(t, u, v);
-					if (s >= 2 && window(t, s, o, dOf(t, u, v, o), 1)) {
-						set(c, p, u + o.getStepX(), bs, v + o.getStepZ(), stair(Blocks.STONE_BRICK_STAIRS, o.getOpposite(), true));
-					}
-				}
-			}
 			// floor (or the plate) above this storey
 			int fy = bs + 4;
 			for (int u = t.u0(); u <= t.u1(); u++) {
@@ -368,50 +356,41 @@ public final class HouseTowerBridge implements Variant {
 					}
 				}
 			}
-			if (s < t.storeys()) {
-				cornice(c, l, t, bs + 3);
-			}
-			pilasters(c, l, t, s);
+			pilasters(c, l, t);
 		}
+		plinthRing(c, l, t);
 		porch(c, l, t);
 	}
 
-	/** [depth] a dark cornice of upside-down stairs round the foot of the storey above (not where the gallery meets the wall). */
-	private void cornice(CitadelCanvas c, L l, Tw t, int y) {
+	/**
+	 * [depth] a stripped-log pilaster standing out of the middle of each wall, from the foot to the eave without a break (a
+	 * ledge under an eave would be a standable cell nobody can reach). Not on the gallery wall, nor under the door.
+	 */
+	private void pilasters(CitadelCanvas c, L l, Tw t) {
 		Plot p = l.p;
-		for (int u = t.u0(); u <= t.u1(); u++) {
-			set(c, p, u, y, t.v0() - 1, stair(Blocks.POLISHED_DEEPSLATE_STAIRS, Direction.SOUTH, true));
-			set(c, p, u, y, t.v1() + 1, stair(Blocks.POLISHED_DEEPSLATE_STAIRS, Direction.NORTH, true));
-		}
-		for (int v = t.v0(); v <= t.v1(); v++) {
-			boolean bridgeEast = t.east() == Direction.EAST;
-			boolean gal = Math.abs(v - l.vc()) <= 2;
-			if (!(gal && !bridgeEast)) {
-				set(c, p, t.u0() - 1, y, v, stair(Blocks.POLISHED_DEEPSLATE_STAIRS, Direction.EAST, true));
-			}
-			if (!(gal && bridgeEast)) {
-				set(c, p, t.u1() + 1, y, v, stair(Blocks.POLISHED_DEEPSLATE_STAIRS, Direction.WEST, true));
-			}
-		}
-	}
-
-	/** [depth] a stripped-log pilaster standing out of the middle of each wall, storey by storey. */
-	private void pilasters(CitadelCanvas c, L l, Tw t, int s) {
-		Plot p = l.p;
-		int bs = base(s);
-		for (int y = bs; y <= bs + 3; y++) {
-			BlockState lg = log(l.s.trim(), Direction.Axis.Y);
-			if (s >= 2) { // the porch and the passage stay clear below
+		BlockState lg = log(l.s.trim(), Direction.Axis.Y);
+		boolean eastBridge = t.east() == Direction.EAST;
+		for (int y = 1; y < t.plate(); y++) {
+			if (y >= 5) {
 				set(c, p, t.cu(), y, t.v0() - 1, lg);
 			}
 			set(c, p, t.cu(), y, t.v1() + 1, lg);
-			boolean eastBridge = t.east() == Direction.EAST;
-			if (!(eastBridge && s <= 2)) {
-				set(c, p, t.u1() + 1, y, t.cv(), lg);
+			set(c, p, eastBridge ? t.u0() - 1 : t.u1() + 1, y, t.cv(), lg);
+		}
+	}
+
+	/** [depth] a polished-deepslate step round the foot of the tower (a half block of plinth the ground walks up onto). */
+	private void plinthRing(CitadelCanvas c, L l, Tw t) {
+		Plot p = l.p;
+		for (int u = t.u0(); u <= t.u1(); u++) {
+			if (Math.abs(u - t.cu()) > 2) {
+				set(c, p, u, 0, t.v0() - 1, stair(Blocks.POLISHED_DEEPSLATE_STAIRS, Direction.SOUTH, false));
 			}
-			if (!(!eastBridge && s <= 2)) {
-				set(c, p, t.u0() - 1, y, t.cv(), lg);
-			}
+			set(c, p, u, 0, t.v1() + 1, stair(Blocks.POLISHED_DEEPSLATE_STAIRS, Direction.NORTH, false));
+		}
+		for (int v = t.v0(); v <= t.v1(); v++) {
+			set(c, p, t.u0() - 1, 0, v, stair(Blocks.POLISHED_DEEPSLATE_STAIRS, Direction.EAST, false));
+			set(c, p, t.u1() + 1, 0, v, stair(Blocks.POLISHED_DEEPSLATE_STAIRS, Direction.WEST, false));
 		}
 	}
 
@@ -424,7 +403,7 @@ public final class HouseTowerBridge implements Variant {
 			set(c, p, cu + side, 0, vd, b(Blocks.MOSS_BLOCK));
 			set(c, p, cu + side, 1, vd, side < 0 ? b(Blocks.FLOWERING_AZALEA) : b(Blocks.AZALEA));
 			set(c, p, cu + side * 2, 0, vd, slab(Blocks.POLISHED_DEEPSLATE_SLAB, false));
-			put(c, p, cu + side, 3, vd, hangingLantern(), CitadelCanvas.HANGING);
+			set(c, p, cu + side * 2, 1, vd, lantern());
 		}
 	}
 
@@ -562,7 +541,7 @@ public final class HouseTowerBridge implements Variant {
 		fi(c, p, a, 4, 5, 6, b(Blocks.BOOKSHELF));
 		fi(c, p, a, e, bk, 6, facing(Blocks.SMOKER, west));
 		fi(c, p, a, e, bk - 1, 6, barrel());
-		hang(c, p, a, 4, 2, 9);
+		hang(c, p, a, 4, 3, 9);
 		// ---- second floor: the mirador (map table, shelves, benches under the windows)
 		fi(c, p, a, 3, 2, 11, b(Blocks.CARTOGRAPHY_TABLE));
 		for (int x : new int[] {1, 2, 4, 5}) {
@@ -584,21 +563,22 @@ public final class HouseTowerBridge implements Variant {
 		Direction tw = t.west();
 		Direction te = t.east();
 		for (int bb = 1; bb <= 3; bb++) {
-			fi(c, p, t, be, bb, 1, b(Blocks.BOOKSHELF));
-			fi(c, p, t, be, bb, 2, b(Blocks.BOOKSHELF));
+			for (int y = 1; y <= 4; y++) { // to the ceiling: a shelf you could climb but not stand on
+				fi(c, p, t, be, bb, y, b(Blocks.BOOKSHELF));
+			}
 		}
 		fi(c, p, t, be - 1, 2, 1, facing(Blocks.LECTERN, te).setValue(BlockStateProperties.HAS_BOOK, true));
 		fi(c, p, t, be - 2, 2, 1, stair(Blocks.SPRUCE_STAIRS, tw, false));
 		fi(c, p, t, be, be, 1, facing(Blocks.CHEST, Direction.NORTH));
 		fi(c, p, t, be - 1, be, 1, barrel());
-		hang(c, p, t, 2, 2, 4);
+		hang(c, p, t, 2, 3, 4);
 		fi(c, p, t, be - 2, 0, 6, bed(te, false));
 		fi(c, p, t, be - 1, 0, 6, bed(te, true));
 		fi(c, p, t, be, 0, 6, facing(Blocks.CHEST, tw));
 		fi(c, p, t, be, be, 6, barrel());
 		fi(c, p, t, be - 2, 2, 6, slab(Blocks.DARK_OAK_SLAB, false));
 		fi(c, p, t, be - 2, 1, 6, stair(Blocks.SPRUCE_STAIRS, Direction.NORTH, false));
-		hang(c, p, t, be - 2, 2, 9);
+		hang(c, p, t, be - 1, be - 1, 9);
 	}
 
 	// ------------------------------------------------------------------ hip roofs
@@ -636,6 +616,9 @@ public final class HouseTowerBridge implements Variant {
 					boolean south = dv == half;
 					boolean west = du == -half;
 					boolean east = du == half;
+					if (k == 0 && (eastBridge ? east : west) && Math.abs(v - l.vc()) <= 3) {
+						continue; // the gallery's roof meets the wall here: no eave over it (nothing above its roof either)
+					}
 					BlockState st;
 					if (north && west) {
 						st = shaped(sb, Direction.SOUTH, StairsShape.OUTER_LEFT);
@@ -656,12 +639,9 @@ public final class HouseTowerBridge implements Variant {
 					}
 					set(c, p, u, y, v, st);
 					if (k == 0) {
-						// the underside of the eave, except where the gallery meets the tower
-						boolean bridgeCol = eastBridge ? du == half : du == -half;
-						if (!(bridgeCol && Math.abs(v - l.vc()) <= 3)) {
-							Direction face = north ? Direction.NORTH : south ? Direction.SOUTH : west ? Direction.WEST : Direction.EAST;
-							set(c, p, u, y - 1, v, stair(l.s.roofStair(), face, true));
-						}
+						// the underside of the eave: a dark upside-down stair holding it up (wall-attached, one layer)
+						Direction face = north ? Direction.NORTH : south ? Direction.SOUTH : west ? Direction.WEST : Direction.EAST;
+						set(c, p, u, y - 1, v, stair(l.s.roofStair(), face, true));
 					}
 				}
 			}
@@ -802,12 +782,12 @@ public final class HouseTowerBridge implements Variant {
 		Plot p = l.p;
 		int back = p.d() - 1;
 		if (back >= l.a.v1() + 1) {
-			set(c, p, l.a.cu() - 2, 0, back, b(Blocks.COMPOSTER));
+			set(c, p, l.a.cu() - 2, 0, back, barrel());
 			set(c, p, l.a.cu() + 2, 0, back, barrel());
 		}
 		if (back >= l.b.v1() + 1) {
 			set(c, p, l.b.cu() - 1, 0, l.b.v1() + 1, barrel());
-			set(c, p, l.b.cu() + 1, 0, l.b.v1() + 1, b(Blocks.COMPOSTER));
+			set(c, p, l.b.cu() + 1, 0, l.b.v1() + 1, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.NORTH));
 		}
 		// lamp posts at the mouth of the passage under the gallery
 		int g = l.gu1() - l.gu0() + 1;
