@@ -2,24 +2,30 @@
 
 These rules come from Facundo and override any other instruction, brief or habit.
 
-## Execution on the VPS (Facundo, 2026-11-09; replaces the earlier run-nothing moratorium)
+## Where things run (Facundo, 2026-11-09 evening; replaces "Execution on the VPS")
 
-- **Only the coordinator compiles on the VPS,** one gradle at a time, always through `tools/heavy.sh`. No tests.
-- **Child threads, delegated tasks and subagents only write code and commit:** no gradle, java, compiling or tests.
-  At most **8** run at once (T3 itself slows down with more), all on the latest **Sonnet** with effort medium or high,
-  never xhigh. Only the coordinator runs at xhigh.
-- **Renders run only on Facundo's PC,** through the relay (rule 8). Never renders, a render daemon or Citadel Studio on
-  the VPS.
+| machine | what runs there |
+|---|---|
+| **Mac mini** | The **coordinator**, the only Opus thread at xhigh (checkout `/path/to/t3craft`). It plans, briefs, reviews, merges and pushes. It runs nothing heavy itself: it drives the PC over SSH. |
+| **VPS** (my-vps, T3 environment `vps-env`) | **Child threads only**, as many *small, short* threads: one task each, commit, push, end. At most **8** at once (T3 slows down with more), all on the latest **Sonnet** with effort medium or high, never xhigh. **No heavy process of any kind** (no gradle, java, renders, Minecraft), and no long-lived coordinator thread with a huge history. |
+| **PC** (my-pc, WSL, `~/projects/t3craft`) | **All Gradle builds and all renders,** one heavy process at a time, through `tools/heavy.sh` and the render daemon (1 worker). Only the coordinator compiles there; renders arrive through the relay (rule 8). |
+| **MBP** | Facundo. |
+
+- **Child threads, delegated tasks and subagents only write code, commit and push their branch:** no gradle, java,
+  compiling or tests. The coordinator compiles pushed branches on the PC.
+- **PC transport:** the PC's sshd is Windows OpenSSH with `wsl.exe` as shell, so `ssh pc 'cmd'`, scp and rsync do
+  not work. Every remote step is a bash script fed on stdin: `ssh -T pc < script.sh` (see `tools/render/remote-submit.sh`).
 - Work that still needs running is tracked in `docs/pending-execution.md`.
 
-## VPS: heavy processes (incident 2026-11-09, see `docs/incidents/2026-11-09-vps-saturation.md`)
+## Heavy processes (incident 2026-11-09, see `docs/incidents/2026-11-09-vps-saturation.md`)
 
-The VPS is shared: T3 Code runs on it, along with every agent. A "heavy process" is **anything that runs java,
-gradle/gradlew, a render (`tools/render/*`, `hqRender`, `uiRender`) or Minecraft**.
+The VPS is shared: T3 Code runs on it, along with every child thread. A "heavy process" is **anything that runs java,
+gradle/gradlew, a render (`tools/render/*`, `hqRender`, `uiRender`) or Minecraft**. Heavy processes run **only on
+the PC**, never on the VPS or the Mac mini.
 
-1. **One heavy process at a time on the whole VPS.** Every heavy process goes through `tools/heavy.sh`, which takes
-   the global lock `/tmp/t3craft-heavy.lock`. If the lock is held, it exits 75 instead of queueing.
-   On the VPS that lock is only for the coordinator's gradle builds: **renders never run on the VPS** (rule 8).
+1. **One heavy process at a time on the PC.** Every heavy process goes through `tools/heavy.sh`, which takes
+   the global lock `/tmp/t3craft-heavy.lock` on the machine it runs on. If the lock is held, it exits 75 instead of
+   queueing. **Nothing heavy runs on the VPS** (rule 8).
 2. **Only the coordinator launches heavy processes.** Child threads, delegated tasks and subagents only write code
    and commit/push. They never run java, gradle, builds, tests or renders. Renders are the only exception, and only
    inside a render session Facundo approved (rule 5).
@@ -34,11 +40,13 @@ gradle/gradlew, a render (`tools/render/*`, `hqRender`, `uiRender`) or Minecraft
    Gradle daemons exit after 10 idle minutes (`org.gradle.daemon.idletimeout` in `mod/gradle.properties`).
 4. **Check the load before launching.** If the 1-minute load is above **6**, or less than **8 GB** of RAM is
    available, wait and do not queue more work. `tools/heavy.sh` waits up to 10 min and then gives up with code 75.
-   Do not start new agents while the load is above 6 either.
+   Do not start new child threads while the VPS load is above 6 either.
 5. **No batch renders without Facundo's approval.**
-   - `tools/render/submit.sh` refuses to run unless `~/.cache/t3craft-coord/renders-approved` exists on the VPS.
-   - Only the coordinator creates that file, and only after Facundo approves a render session. In the file it writes
-     the scope (which agents, roughly how many jobs, expiry). It deletes the file when the session ends.
+   - `tools/render/submit.sh` refuses to run unless `~/.cache/t3craft-coord/renders-approved` exists on the VPS
+     (where the children call it).
+   - Only the coordinator creates that file (over SSH from the Mac mini), and only after Facundo approves a render
+     session. In the file it writes the scope (which agents, roughly how many jobs, expiry). It deletes the file when
+     the session ends.
    - In a session the daemon runs with its defaults: **1 worker, load limit 6**. Nobody raises `RENDER_WORKERS`,
      `RENDER_LOAD_MAX`, `HEAVY_LOAD_MAX` or similar limits without Facundo's explicit OK.
    - Agents keep **at most one render in flight**. They write no loops or scripts that submit renders in batch, and
@@ -50,8 +58,8 @@ gradle/gradlew, a render (`tools/render/*`, `hqRender`, `uiRender`) or Minecraft
    `submit.sh` also stops waiting by itself when the process that launched it is gone.
 7. **Agent count and model (Facundo, 2026-11-09).** At most **8 child agents at once**; launch a new one only when
    fewer than 8 are running, and close idle or looping ones. Children run on the latest Sonnet (effort medium or high,
-   never xhigh); only the coordinator runs at xhigh. Heavy processes stay limited as above: one gradle at a time on the
-   VPS (coordinator only, `tools/heavy.sh`), renders only on the PC, no servers on the VPS.
+   never xhigh); only the coordinator runs at xhigh. Heavy processes stay limited as above: one at a time, only on the
+   PC (gradle by the coordinator through `tools/heavy.sh`, renders through the daemon), no servers on the VPS.
 8. **Renders run on Facundo's PC, never on the VPS. This is a fixed rule (Facundo, 2026-11-09).**
    - **The VPS never again runs renders, the render daemon or Citadel Studio,** moratorium or not. The render
      server, its spool (`~/.cache/t3craft-render`) and the viewer Facundo watches live all live on the PC
@@ -61,17 +69,28 @@ gradle/gradlew, a render (`tools/render/*`, `hqRender`, `uiRender`) or Minecraft
      `start-daemon.sh` refuses to start on the VPS.
    - Agents still call `tools/render/submit.sh` exactly as before. It relays to the PC through
      `tools/render/remote-submit.sh`:
-     - rsync of the worktree over SSH (`T3CRAFT_RENDER_HOST`);
+     - the worktree's code travels over SSH as tar+base64 inside a stdin script (`T3CRAFT_RENDER_HOST`; rsync and
+       scp do not work against the PC);
      - the job goes into the PC daemon's inbox;
      - the relay polls `status.json`;
      - the PNGs and the report come back to the local outbox.
    - Compiling the worktree happens on the PC. Renders still need Facundo's approval (rule 5).
+9. **Threads do not open full-size images (incident 2026-11-09 evening).** Every image a thread reads (Read on a PNG,
+   a screenshot, an attachment) is stored in T3's database. High-quality renders read by agents bloated the VPS's
+   `statev2.sqlite` to ~6.2 GB and T3 hung; the DB was moved to
+   `~/.t3/userdata/backups/statev2-20261109-1037-CST` and T3 restarted empty.
+   - Judge a render from its text output first (`report.txt`, `report.json`, the plan report).
+   - Never Read a full-resolution render PNG in a thread. Until the relay brings back small previews (pending, see
+     `docs/pending-execution.md`), children and their subagents do not open render PNGs at all.
+   - Once previews exist: at most a few per job, only the downscaled copy (≤ 768 px on the long side).
+   - Facundo looks at full-size renders in Citadel Studio on the PC.
 
 ## Other standing rules
 - **Commits:** no `Co-Authored-By` or any other AI credit in commits.
 - **History:** never rewrite `main` (no force push, no rebase of main); only merges.
 - **Tests:** this repo has no unit tests. Adding or running them is forbidden; verification is compiling (done by the
   coordinator).
-- **No dev servers or Minecraft on the VPS,** apart from what Facundo explicitly approves (e.g. Citadel Studio).
+- **No dev servers or Minecraft on the VPS,** apart from what Facundo explicitly approves (Citadel Studio never runs
+  there; it lives on the PC, rule 8).
 - **T3 is read-only** for agents unless the task says otherwise.
 - **Config changes are additive.** Every branch adds a RELOAD or RESTART line to `docs/CHANGELOG-dev.md`.

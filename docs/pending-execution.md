@@ -1,6 +1,60 @@
-# Pendiente de ejecución (moratoria del 2026-11-09)
+# Pendiente de ejecución
 
-Facundo prohibió ejecutar cualquier cosa (gradle, compilar, renders, java, tests) hasta nuevo aviso. Todo esto está en código, commiteado y subido, pero **sin compilar ni verificar**. Cuando se levante la moratoria, el coordinador lo ejecuta en este orden, de a un proceso pesado por vez con `tools/heavy.sh`.
+## Estado al 2026-11-09, ~17:50 CET: el coordinador arranca en la Mac mini
+Ya no hay moratoria. Dónde corre cada cosa está en `AGENTS.md`, "Where things run": el coordinador en la Mac mini, los hilos hijos en la VPS, y Gradle y los renders solo en el PC.
+
+### Reset de T3 en la VPS
+- **Causa:** `statev2.sqlite` llegó a ~6,2 GB porque los agentes leían PNG de renders.
+  - Se movió a `~/.t3/userdata/backups/statev2-20261109-1037-CST`. **No borrarla.**
+  - T3 arrancó con una base nueva, así que los hilos viejos no aparecen.
+  - Regla nueva: `AGENTS.md`, regla 9.
+- **Agentes:** todos se detuvieron hacia las 17:30 CET. En la VPS no queda ningún proceso java, gradle ni bucle `submit.sh`. La carga es ~0,5.
+- **Aprobación de renders:** la de la sesión anterior quedó cerrada.
+  - Se renombró `~/.cache/t3craft-coord/renders-approved` a `renders-approved.expired-20261109-old-session`.
+  - Para renderizar hace falta una aprobación nueva de Facundo.
+- **Handoff:** `docs/handoff-2026-11-09.md` no existe, ni en el árbol ni en ninguna rama.
+  - La cola del coordinador anterior está en la VPS, en `~/.cache/t3craft-coord/night-queue.md` (brief común: `swarm4-common.md`).
+  - El resumen está en `docs/night-2026-11-09.md`.
+
+### Rescate (todo subido a origin; no se borró nada)
+| rama | qué había | qué se hizo |
+|---|---|---|
+| `feat/kit-blocks-art` | 21 texturas de dispositivos retocadas y `mod/tools/device_textures.py`, todo sin commitear | Commit WIP `7e49837c` y push. Falta el railing (esquinas, T, extremos). Sin compilar. |
+| `t3/paper-lantern-kit-1` | un merge local y 2 generadores de faroles sin seguimiento: borradores, porque main ya tiene las versiones de `kit/paper-lantern2` | Commit WIP `cb152d4e` y push. Probablemente se descarte. |
+| `rescue/barrio-hall3-before-settle-dbg` | un print de depuración `SETTLE-DBG` en `CitadelSettle`, dentro del worktree base `/tmp/barrio-hall3-before` | Commit `066e04a2` y push. Es solo depuración: **no integrar**. |
+| `struct/signposts` | 5 commits que solo estaban en local | Push. Seguía en curso al cortar. |
+| `cat/statue-obelisk-braziers` | 1 commit que solo estaba en local | Push. Seguía en curso al cortar (tanda 1). |
+| `cat/bridge-covered-timber` | 2 commits que solo estaban en local | Push. El coordinador anterior la canceló, porque los puentes no se colocan. |
+
+Quedan como estaban:
+- el `stash@{0}` del checkout de la VPS (su `RingCampusGenerator.java` ya está en el historial, en `6dcec3f3`);
+- los worktrees de `/tmp` (`barrio-hall3-before` y `claude-light-base`), que ya no tienen nada sin subir;
+- la caché `tools/studio/__pycache__`.
+
+### Ramas en origin sin integrar en main
+- **En curso al cortar** (tanda 1 de `night-queue.md`; se retoman desde `origin/<rama>`): `cat/gate-torii-cherry2`, `cat/gate-arch-battlement2`, `cat/lamp-brazier-tripod2`, `cat/tree-azalea-blossom2`, `struct/signposts` y `cat/statue-obelisk-braziers`.
+  - No hay nota final del director registrada para ninguna, así que hay que leer su último commit y su changelog.
+  - Sus rondas 1 (`cat/gate-torii-cherry`, `cat/gate-arch-battlement`, `cat/lamp-brazier-tripod`, `cat/tree-azalea-blossom`) quedan solo como base.
+- **Reemplazadas por una ronda posterior que ya está en main:**
+  - `struct/hub-statues` y `struct/hub-statues2`, porque main tiene `hub-statues3`;
+  - `struct/leader-office5`, porque lo útil está en `leader-office6`;
+  - `citadel/1-connect`, reemplazada por `fix/plan-connect`;
+  - `citadel/scale`, reemplazada por `citadel/scale-port` y `struct/hq-scale`.
+- **Descartadas a propósito** (ver "Sin integrar" en `docs/night-2026-11-09.md`): `cat/bridge-stone-arch`, `cat/bridge-covered-timber`, `struct/avenue-lamps` 1–3 y `cat/planter-tall-pot`, que espera la decisión sobre `PLANTER_H`.
+- **Exploraciones de estilo del 2026-11-08:** `design/{steampunk,gothic,skyislands,mesoamerican,dwarven,undersea,cyberpunk,nordic,arctic,treehouse,solarpunk,pirate,mediterranean,brutalist,orbital}` y `feat/hq-spacious-rooms`.
+
+### Siguiente, en orden
+1. **Probar la cadena desde la Mac mini:** compilar main en el PC con `tools/heavy.sh`, con un script por stdin.
+   - El checkout del PC está en `df0d483b` y le falta un fetch.
+   - El PC tiene 15 GB y el daemon de render corre con `-Xmx10g`. Con ~9 GB libres, apenas pasa el umbral de 8 GB de `heavy.sh`.
+   - Hay que mirar si el daemon tiene tomado el lock global mientras está inactivo.
+2. **Previews chicas en el relay:** que el PC genere copias de ≤ 768 px de cada PNG y que el relay traiga solo esas a la VPS (regla 9). Hasta entonces, los hilos no abren ningún PNG.
+3. **Sesión de renders nueva**, solo si Facundo la aprueba.
+4. **Cerrar las rondas en curso** con un hilo hijo por rama y seguir con `night-queue.md`.
+5. **Decisiones de Facundo:** siguen abiertas las de `docs/night-2026-11-09.md` ("Decisiones que te tocan": `PLANTER_H`, puentes, iluminación de avenidas, musgo).
+
+## Historial (antes del 2026-11-09 17:30; puede estar desactualizado)
+Esto se escribió durante la moratoria y a lo largo del día, y buena parte ya está integrada: ver `docs/night-2026-11-09.md`.
 
 ## 0. Atajo: `citadel/next` (todo el catálogo junto, listo para una sola compilación)
 La rama `citadel/next` ya junta, con los conflictos resueltos (unión de `CatalogEntries`, ordenada por id, y del changelog):
