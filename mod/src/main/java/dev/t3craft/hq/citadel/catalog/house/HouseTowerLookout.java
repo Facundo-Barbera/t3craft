@@ -427,7 +427,7 @@ public final class HouseTowerLookout implements Variant {
 				}
 				if (d == 2) {
 					Direction.Axis ax = to == Direction.NORTH || to == Direction.SOUTH ? Direction.Axis.X : Direction.Axis.Z;
-					set(c, g.p, u, F2, v, log(Blocks.STRIPPED_BAMBOO_BLOCK, ax));
+					set(c, g.p, u, F2, v, log(Blocks.STRIPPED_DARK_OAK_LOG, ax));
 					set(c, g.p, u, 11, v, fence(g.s.fence(), g.outer(u, v - 1), g.outer(u + 1, v), g.outer(u, v + 1), g.outer(u - 1, v)));
 					if (corner) {
 						// a lamp post on each corner of the rail
