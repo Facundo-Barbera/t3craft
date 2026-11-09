@@ -35,6 +35,8 @@ below are proposals.
 
 ### 1. `console_terminal` (kit-2 → new block `t3craft:console_terminal`)
 
+> **Implemented** on branch `kit/console-terminal` (see `docs/feat-blocks.md`, "Terminal de consola"): the block, `HqKit.Role.CONSOLE` and the office's three consoles. The snippet below is the original proposal.
+
 Click opens the thread composer (`T3Screen` draft) or the chat of the nearest bound thread. Unbound, it opens the
 composer for a new thread. The office puts three of them where the lecterns stand now.
 

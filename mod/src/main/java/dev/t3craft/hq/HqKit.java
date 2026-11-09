@@ -48,6 +48,8 @@ public interface HqKit {
 		GARDEN_PLANTER,
 		/** Garden: stone lantern (emits light). */
 		GARDEN_LANTERN,
+		/** Console terminal (kit/console-terminal): opens the T3 composer, or the chat of its bound thread. Oriented: front. Vanilla: lectern. */
+		CONSOLE,
 		/** Merge station (kit/merge-station): lists the pending pull requests of its project and opens one. Oriented: panel. Vanilla: smithing table. */
 		MERGE_STATION;
 
@@ -57,7 +59,7 @@ public interface HqKit {
 
 		/** Whether {@link #state(Role, Direction)} looks at {@code facing}. */
 		public boolean oriented() {
-			return this == DESK || this == BEAM || this == PLAQUE || this == RAILING || this == MERGE_STATION;
+			return this == DESK || this == BEAM || this == PLAQUE || this == RAILING || this == CONSOLE || this == MERGE_STATION;
 		}
 	}
 
@@ -136,6 +138,11 @@ public interface HqKit {
 
 	default BlockState gardenLantern() {
 		return state(Role.GARDEN_LANTERN);
+	}
+
+	/** The console terminal, front (keyboard side, where the player stands) towards {@code front}. */
+	default BlockState console(Direction front) {
+		return state(Role.CONSOLE, front);
 	}
 
 	/** The merge station, panel (where the player stands) towards {@code front}. */

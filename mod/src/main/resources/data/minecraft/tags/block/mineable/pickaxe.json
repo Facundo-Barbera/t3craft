@@ -3,6 +3,7 @@
   "values": [
     "t3craft:stone_floor_tile",
     "t3craft:stone_lantern",
+    "t3craft:console_terminal",
     "t3craft:merge_station"
   ]
 }
