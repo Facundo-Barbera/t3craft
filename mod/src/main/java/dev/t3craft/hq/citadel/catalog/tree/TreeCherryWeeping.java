@@ -146,11 +146,11 @@ public final class TreeCherryWeeping implements Variant {
 		}
 
 		// ---- the cap: a rounded mass of blossom round the fork, densest on top
-		double rc = 2.1 + 0.2 * rAvg;
+		double rc = 1.9 + 0.2 * rAvg; // a little narrower than the plot: the trunk shows at 7×7
 		int capLow = Integer.MAX_VALUE;
 		for (int y = yc - 2; y <= yc + 3; y++) {
 			double dyy = y - yc;
-			double ry = dyy > 0 ? 2.2 : 1.1;
+			double ry = dyy > 0 ? 2.9 : 1.1; // a peak: the crown is highest over the trunk and arches out and down from it
 			for (int v = lv - 4; v <= lv + 4; v++) {
 				for (int u = lu - 4; u <= lu + 4; u++) {
 					double q = (Math.pow(u - lu, 2) + Math.pow(v - lv, 2)) / (rc * rc) + dyy * dyy / (ry * ry);
@@ -228,8 +228,8 @@ public final class TreeCherryWeeping implements Variant {
 		// ---- bury the limbs beyond the cap: leaves over and beside the wood (the dark arcs show under the cap, not as beams)
 		int[][] side = {{0, 1, 0}, {1, 0, 0}, {-1, 0, 0}, {0, 0, 1}, {0, 0, -1}};
 		for (int[] q : limbCells) {
-			if (Math.hypot(q[0] - lu, q[2] - lv) < rc * 0.85) {
-				continue;
+			if (Math.hypot(q[0] - lu, q[2] - lv) < 1.5) {
+				continue; // only the fork shows: a short dark spring of each limb, not a beam
 			}
 			for (int[] o : side) {
 				t.leaf(q[0] + o[0], q[1] + o[1], q[2] + o[2], tone(t, q[0] + o[0], q[1] + o[1], q[2] + o[2]));
@@ -271,7 +271,7 @@ public final class TreeCherryWeeping implements Variant {
 					continue;
 				}
 				int cls = t.hash(u, 5, v, 100);
-				int longOnes = 3 + (int) (15 * f * f); // few reach the grass: most of the hem is a ragged line of different lengths
+				int longOnes = 2 + (int) (8 * f * f); // few reach the grass: most of the hem is a ragged line of different lengths
 				int bottom;
 				if (cls < 12) {
 					continue; // no strand here: a window
@@ -335,6 +335,6 @@ public final class TreeCherryWeeping implements Variant {
 
 	/** Cherry pink with a few azalea leaves (about one in thirteen). */
 	private static BlockState tone(Vox t, int u, int y, int v) {
-		return t.hash(u, y + 17, v, 100) < 7 ? TreeKit.SAKURA.b() : TreeKit.SAKURA.a();
+		return t.hash(u, y + 17, v, 100) < (y >= t.h - 5 ? 12 : 6) ? TreeKit.SAKURA.b() : TreeKit.SAKURA.a(); // more flowering leaves on top
 	}
 }
