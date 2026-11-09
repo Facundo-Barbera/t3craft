@@ -38,10 +38,28 @@ wait_for=1
 timeout_s=1800
 launcher=$PPID
 
-SSH=(ssh -T -o BatchMode=yes -o ConnectTimeout=10 -o ServerAliveInterval=15 -o LogLevel=ERROR)
+# One multiplexed connection, reused by every step and by every agent on the VPS: the PC's Windows sshd drops
+# new connections when many arrive at once (MaxStartups, "Connection closed by remote host" during kex).
+mkdir -p "$HOME/.ssh/cm" 2>/dev/null && chmod 700 "$HOME/.ssh/cm" 2>/dev/null
+SSH=(ssh -T -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=15 -o LogLevel=ERROR
+	-o ControlMaster=auto -o "ControlPath=$HOME/.ssh/cm/t3craft-%C" -o ControlPersist=600)
 
-# run a bash script (stdin) on the PC; its stdout comes back
-rrun() { "${SSH[@]}" "$HOST"; }
+# run a bash script (stdin) on the PC; its stdout comes back. Connection failures (ssh exit 255) are retried
+# with backoff (2, 4, 8, 16 s); the remote script's own exit status is returned as is.
+rrun() {
+	local script out rc i
+	script="$(cat)"
+	for i in 1 2 3 4 5; do
+		out="$(printf '%s\n' "$script" | "${SSH[@]}" "$HOST")"
+		rc=$?
+		if [ "$rc" -ne 255 ]; then
+			printf '%s' "$out"
+			return "$rc"
+		fi
+		[ "$i" -lt 5 ] && sleep $((1 << i))
+	done
+	return 255
+}
 q() { printf '%q' "$1"; }
 
 while [ $# -gt 0 ]; do
