@@ -44,7 +44,8 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
  *
  * Size 7–13 × 7–13 × 5+ (plots grow with the square root of the citadel scale, and everything here is built
  * from the plot size: bigger plots get a bigger pond, more koi, rocks, islets of reeds and extra corners).
- * Walking: ground, a flat slab path, stair, stair, then the deck; every rise is half a block.
+ * Walking: ground, a flat slab path, stair, stair, then the deck; every rise is half a block. A pond with fewer than
+ * 5 open cells on its widest row has no bridge (it would cover all the water).
  */
 public final class FountainKoiPond implements Variant {
 	private static final int ISLAND = 3;
@@ -274,7 +275,7 @@ public final class FountainKoiPond implements Variant {
 			for (int dist = 0; dist < d && vb < 0; dist++) {
 				for (int sg : sign) {
 					int v = target + sg * dist;
-					if (v >= 2 && v <= d - 3 && waterIn(v) >= 3) {
+					if (v >= 2 && v <= d - 3 && waterIn(v) >= 5) {
 						vb = v;
 						break;
 					}
