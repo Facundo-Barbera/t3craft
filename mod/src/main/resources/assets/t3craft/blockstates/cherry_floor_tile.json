@@ -1,7 +1,33 @@
 {
   "variants": {
-    "": {
-      "model": "t3craft:block/cherry_floor_tile"
-    }
+    "": [
+      {
+        "model": "t3craft:block/cherry_floor_tile",
+        "weight": 5
+      },
+      {
+        "model": "t3craft:block/cherry_floor_tile",
+        "weight": 5,
+        "y": 180
+      },
+      {
+        "model": "t3craft:block/cherry_floor_tile_b",
+        "weight": 4
+      },
+      {
+        "model": "t3craft:block/cherry_floor_tile_b",
+        "weight": 4,
+        "y": 180
+      },
+      {
+        "model": "t3craft:block/cherry_floor_tile_c",
+        "weight": 4
+      },
+      {
+        "model": "t3craft:block/cherry_floor_tile_c",
+        "weight": 4,
+        "y": 180
+      }
+    ]
   }
 }

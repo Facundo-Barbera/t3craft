@@ -8,6 +8,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import static dev.t3craft.hq.citadel.CitadelCanvas.CALCITE;
 import static dev.t3craft.hq.citadel.CitadelCanvas.FOOT;
 import static dev.t3craft.hq.citadel.CitadelCanvas.PLANKS;
@@ -179,8 +180,43 @@ public final class HubFacade {
 		if (off == half) {
 			return HubBlocks.strippedLog(Direction.Axis.Y);
 		}
-		boolean gold = off == 0 || r == HubDims.WIN_SILL() + 1;
-		return Blocks.WOOL.pick(gold ? DyeColor.YELLOW : DyeColor.RED).defaultBlockState();
+		// struct/hub5: the tapestry hangs proud of the wall (see hangTapestry); the bay behind it is a dark recess
+		return RIB;
+	}
+
+	/**
+	 * The north tapestry (struct/hub5), hung one block proud of the wall over the bridge, between the two piers of the blind bay:
+	 * a dark oak bar longer than the banner, resting on the piers, with a gold ball and a rod on each end and a slab canopy; two
+	 * dark oak posts framing a red field with a gold stripe and a gold hem; a hanging lantern under each corner and a gold tassel
+	 * in the middle. Before it was wool flush with the wall and read as a flat red door.
+	 */
+	private static void hangTapestry(CitadelCanvas c) {
+		int z = -(HubDims.FACE() + 1);
+		int half = HubDims.PIER_PERIOD() / 2 - 1;
+		int sill = y0() + HubDims.WIN_SILL();
+		int top = y0() + HubDims.WIN_TOP();
+		BlockState bar = Blocks.STRIPPED_DARK_OAK_LOG.defaultBlockState().setValue(BlockStateProperties.AXIS, Direction.Axis.X);
+		for (int x = -(half + 2); x <= half + 2; x++) {
+			c.set(x, top, z, bar);
+			if (Math.abs(x) <= half + 1) {
+				c.set(x, top + 1, z, HubBlocks.stoneSlab(false));
+			}
+		}
+		for (int s = -1; s <= 1; s += 2) {
+			c.set(s * (half + 2), top + 1, z, Blocks.GOLD_BLOCK.defaultBlockState());
+			c.set(s * (half + 2), top + 2, z, HubBlocks.rod());
+			for (int y = sill; y < top; y++) {
+				c.set(s * half, y, z, HubBlocks.darkOakLog());
+			}
+			c.set(s * (half - 1), sill, z, HubBlocks.hangingLantern());
+		}
+		for (int x = -(half - 1); x <= half - 1; x++) {
+			for (int y = sill + 1; y < top; y++) {
+				boolean gold = x == 0 || y == sill + 1 || (y == top - 1 && Math.abs(x) == half - 1);
+				c.set(x, y, z, Blocks.WOOL.pick(gold ? DyeColor.YELLOW : DyeColor.RED).defaultBlockState());
+			}
+		}
+		c.set(0, sill, z, Blocks.GOLD_BLOCK.defaultBlockState());
 	}
 
 	/**
@@ -193,6 +229,8 @@ public final class HubFacade {
 		if (!HubDims.TALL()) {
 			return;
 		}
+		hangTapestry(c);
+		lotDressing(c);
 		int y0 = y0();
 		int h = HubDims.WALL_H();
 		int pl = HubDims.PLINTH();
@@ -237,6 +275,59 @@ public final class HubFacade {
 				}
 			}
 		}
+	}
+
+	/**
+	 * The lawn in front of the east and west faces (struct/hub5), where the lanes from the ring meet the hub: on each side of the
+	 * east-west path (never on it: {@code |z| <= 2}), in line with the buttresses, a stone lantern that lights the path, a planter
+	 * of azalea and a bench facing the wall. Only on cells that are lawn ({@code GRASS} or {@code MOSS}, so never over the pool)
+	 * and free, and every block rests on that ground.
+	 */
+	private static void lotDressing(CitadelCanvas c) {
+		int x = HubDims.FACE() + 4;
+		for (int sx = -1; sx <= 1; sx += 2) {
+			Direction out = sx > 0 ? Direction.EAST : Direction.WEST;
+			for (int sz = -1; sz <= 1; sz += 2) {
+				int zl = sz * HubDims.BUTTRESS_Z()[2];
+				if (lawn(c, sx * x, zl, 5)) {
+					c.set(sx * x, 1, zl, HubBlocks.stoneBrick(sx * x, 1, zl));
+					c.set(sx * x, 2, zl, HubBlocks.stoneWall());
+					c.set(sx * x, 3, zl, HubBlocks.stoneWall());
+					c.set(sx * x, 4, zl, Blocks.LANTERN.defaultBlockState());
+					c.set(sx * x, 5, zl, HubBlocks.stoneSlab(false));
+				}
+				for (int i = 2; i <= 3; i++) {
+					int zp = sz * (HubDims.BUTTRESS_Z()[2] + i);
+					if (lawn(c, sx * x, zp, 2)) {
+						c.set(sx * x, 1, zp, HubBlocks.stoneBrick(sx * x, 1, zp));
+						c.set(sx * x, 2, zp, HubBlocks.bush());
+					}
+				}
+				for (int i = 5; i <= 7; i++) {
+					int zb = sz * (HubDims.BUTTRESS_Z()[2] + i);
+					if (lawn(c, sx * (x - 1), zb, 1)) {
+						c.set(sx * (x - 1), 1, zb, HubBlocks.roofStairs(out));
+					}
+				}
+			}
+		}
+	}
+
+	/** Whether the ground column is free lawn up to {@code rows} cells above it (and off the east-west path). */
+	private static boolean lawn(CitadelCanvas c, int x, int z, int rows) {
+		if (Math.abs(z) <= 2) {
+			return false;
+		}
+		BlockState g = c.at(x, 0, z);
+		if (g == null || !(g.is(Blocks.GRASS_BLOCK) || g.is(Blocks.MOSS_BLOCK))) {
+			return false;
+		}
+		for (int y = 1; y <= rows; y++) {
+			if (c.at(x, y, z) != null) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	/** A calcite pilaster one cell out from a pier: dark foot to the podium, a polished course, calcite shaft, chiselled capital, corbel. */
@@ -368,7 +459,7 @@ public final class HubFacade {
 		for (int y = base; y <= top; y++) {
 			int w = c.s(1);
 			boolean window = hz <= w && y >= base + 1 && y <= top - 1 && !(hz == w && y > base + 2);
-			c.set(x, y, z, window ? HubBlocks.glass(HubBlocks.GLASS_COLORS[Math.floorMod(x > 0 ? 0 : 1, 2)]) : CALCITE);
+			c.set(x, y, z, window ? HubBlocks.glass(HubBlocks.GLASS_COLORS[Math.floorMod(x > 0 ? 0 : 1, 2)]) : HubDims.TALL() ? gableStone(x, y) : CALCITE);
 		}
 		c.set(x, top + 1, z, hz == 0 ? slab(Blocks.DEEPSLATE_TILE_SLAB) : HubBlocks.darkStairs(z > 0 ? Direction.NORTH : Direction.SOUTH, false));
 	}
@@ -402,7 +493,7 @@ public final class HubFacade {
 		double r = Math.hypot(x, dy);
 		RingCampusGeometry.Dims d = CitadelCanvas.dims();
 		if (HubDims.TALL()) {
-			return traceryRose(x, dy, r, d.sd(1) / 2.0);
+			return traceryRose(x, y, dy, r, d.sd(1) / 2.0);
 		}
 		if (r > d.sd(3.7)) {
 			return CALCITE;
@@ -429,27 +520,49 @@ public final class HubFacade {
 	 * calcite spokes, a second ring and eight outer lights (blue and magenta) on the same spokes, inside the stone-brick rim.
 	 * {@code f} is the scale of the original (1 at 200); the bars are one block thick whatever the radius.
 	 */
-	private static BlockState traceryRose(int x, double dy, double r, double f) {
+	private static BlockState traceryRose(int x, int y, double dy, double r, double f) {
 		if (r > 7.4 * f) {
-			return CALCITE;
+			return gableStone(x, y);
 		}
 		if (r > 5.6 * f) {
 			return Blocks.CHISELED_STONE_BRICKS.defaultBlockState();
+		}
+		// struct/hub5: the tracery is dark (polished blackstone) against bright glass and the pale gable, so the rose reads as a
+		// pattern from far away and not as one patch of colour: dark rings and spokes, saturated and pale lights side by side
+		if (r > 5.0 * f) {
+			return RIB;
 		}
 		if (r <= 1.5 * f) {
 			return HubBlocks.glass(DyeColor.YELLOW);
 		}
 		if (r <= 2.1 * f || (r > 3.5 * f && r <= 4.1 * f)) {
-			return CALCITE;
+			return RIB;
 		}
 		boolean inner = r <= 3.5 * f;
 		double sector = Math.atan2(dy, x) / (Math.PI / 4);
 		double bar = r * Math.abs(sector - Math.rint(sector)) * (Math.PI / 4);
-		if (bar < 0.5) {
-			return CALCITE;
+		if (bar < 0.6) {
+			return RIB;
 		}
 		boolean even = Math.floorMod((int) Math.floor(sector), 2) == 0;
-		return HubBlocks.glass(inner ? (even ? DyeColor.PINK : DyeColor.ORANGE) : (even ? DyeColor.LIGHT_BLUE : DyeColor.MAGENTA));
+		return HubBlocks.glass(inner ? (even ? DyeColor.PINK : DyeColor.ORANGE) : (even ? DyeColor.LIGHT_BLUE : DyeColor.BLUE));
+	}
+
+	/**
+	 * The plain gable stone (struct/hub5, from scale 2): calcite courses laid as ashlar with polished diorite, a stone-brick
+	 * string course every sixth row (a few cracked) and a polished one halfway between, by a fixed pattern, so the pediments are
+	 * masonry and not one white sheet.
+	 */
+	static BlockState gableStone(int x, int y) {
+		int m = Math.floorMod(y, 6);
+		if (m == 0) {
+			return Math.floorMod(x, 5) == 0 ? Blocks.CRACKED_STONE_BRICKS.defaultBlockState() : Blocks.STONE_BRICKS.defaultBlockState();
+		}
+		if (m == 3) {
+			return Blocks.POLISHED_DIORITE.defaultBlockState();
+		}
+		// ashlar: calcite courses with a polished diorite block every fourth cell, the joints staggered from one course to the next
+		return Math.floorMod(x + (m < 3 ? 0 : 2), 4) == 0 ? Blocks.POLISHED_DIORITE.defaultBlockState() : CALCITE;
 	}
 
 	/**
