@@ -849,7 +849,7 @@ public final class CitadelOffice {
 		attentionBoard(c);
 		backing(c);
 		// light: lanterns only over the middle and the north half; the screen's side gets invisible light, so nothing hangs in front of it
-		for (int[] p : new int[][] {{-3, -3}, {0, -3}, {3, -3}, {-3, 0}, {0, 0}, {-5, 0}, {5, 0}, {0, 5}}) {
+		for (int[] p : new int[][] {{-3, -3}, {0, -3}, {3, -3}, {-3, 0}, {0, 0}}) {
 			hang(c, p[0], CEIL() - 1, p[1]);
 		}
 		glow(c);
