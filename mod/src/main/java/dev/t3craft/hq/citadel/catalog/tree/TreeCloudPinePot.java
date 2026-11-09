@@ -19,6 +19,7 @@ import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 
 /**
  * A cloud pine (niwaki) in a big planter, the courtyard bonsai: the planter is a real piece of furniture, one
@@ -355,9 +356,13 @@ public final class TreeCloudPinePot implements Variant {
 				return k == 0 ? b(Blocks.TERRACOTTA) : b(Blocks.BRICKS);
 			default:
 				return Math.floorMod(idx, 3) == 1
-						? MixedTreeKit.log(Blocks.STRIPPED_CHERRY_LOG, alongRow ? Direction.Axis.X : Direction.Axis.Z)
+						? log(Blocks.STRIPPED_CHERRY_LOG, alongRow ? Direction.Axis.X : Direction.Axis.Z)
 						: b(Blocks.CHERRY_PLANKS);
 		}
+	}
+
+	private static BlockState log(Block b, Direction.Axis axis) {
+		return b.defaultBlockState().setValue(BlockStateProperties.AXIS, axis);
 	}
 
 	private static BlockState rim(int sch) {
