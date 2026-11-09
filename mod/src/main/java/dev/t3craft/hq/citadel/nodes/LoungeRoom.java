@@ -36,7 +36,7 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
  * <ul>
  * <li><b>The pit</b> ({@code d <= 6.5}): a conversation pit 2 blocks down ({@code y = -2}). Round a stone-ringed
  *     hearth (an open campfire between four stone piers, under a bell hood and a hollow 3 x 3 chimney that climbs to
- *     y = 12: nobody can step in, no water anywhere near) stand four curved sofas (a seat of two cherry slabs against a
+ *     y = 10: nobody can step in, no water anywhere near) stand four curved sofas (a seat of two cherry slabs against a
  *     back of dark oak stairs) and a low table with a pot in front of each. The four 5-wide aisles ({@code |dx| <= 2}
  *     or {@code |dz| <= 2}: cherry centre line, dark oak, polished deepslate edge) stay clear to the hearth.</li>
  * <li><b>Four flights</b> of stairs, 3 wide with a rail on each side, one on each axis: two stone-brick treads with
@@ -331,12 +331,12 @@ public final class LoungeRoom {
 					}
 				}
 			}
-			// the shaft: a hollow 3 x 3 (the campfire's smoke goes up the middle), banded, with a cornice and a cap
-			for (int y = 4; y <= 10; y++) {
+			// the shaft: a hollow 3 x 3 (the campfire's smoke goes up the middle), banded, with a crown and a cap
+			for (int y = 4; y <= 8; y++) {
 				for (int dx = -1; dx <= 1; dx++) {
 					for (int dz = -1; dz <= 1; dz++) {
 						if (dx != 0 || dz != 0) {
-							boolean band = y == 6 || y == 10;
+							boolean band = y == 6 || y == 8;
 							set(dx, y, dz, band ? b(Blocks.POLISHED_DEEPSLATE) : NodeDecor.stoneMix(dx, y, dz));
 						}
 					}
@@ -344,13 +344,14 @@ public final class LoungeRoom {
 			}
 			for (int dx = -2; dx <= 2; dx++) {
 				for (int dz = -2; dz <= 2; dz++) {
-					int ax = Math.abs(dx);
-					int az = Math.abs(dz);
-					if (Math.max(ax, az) == 2 && Math.min(ax, az) <= 1) {
-						set(dx, 11, dz, NodeDecor.invStairs(Blocks.STONE_BRICK_STAIRS, NodeDecor.outward(dx, dz)));
-					} else if (Math.max(ax, az) == 1) {
-						set(dx, 11, dz, b(Blocks.DEEPSLATE_TILES));
-						set(dx, 12, dz, slab(Blocks.DEEPSLATE_TILE_SLAB));
+					if (dx == 0 && dz == 0) {
+						continue;
+					}
+					if (Math.max(Math.abs(dx), Math.abs(dz)) == 2) {
+						set(dx, 9, dz, NodeDecor.topSlab(Blocks.STONE_BRICK_SLAB));
+					} else {
+						set(dx, 9, dz, b(Blocks.DEEPSLATE_TILES));
+						set(dx, 10, dz, slab(Blocks.DEEPSLATE_TILE_SLAB));
 					}
 				}
 			}
@@ -441,12 +442,12 @@ public final class LoungeRoom {
 							}
 						} else if (ax + az == BEAM_T - 1 && Math.max(ax, az) <= BEAM_R - 1) {
 							// fills the step between two diagonal cells: the diagonal reads as one band
-							set(dx, ROOF_Y, dz, slab(Blocks.CHERRY_SLAB));
+							set(dx, ROOF_Y, dz, NodeDecor.topSlab(Blocks.CHERRY_SLAB));
 						}
 						continue;
 					}
 					if (a >= 3) {
-						boolean edge = !oct(ax + 1, az, AWN_R, AWN_T) || !oct(ax, az + 1, AWN_R, AWN_T);
+						boolean edge = ax == AWN_R || az == AWN_R;
 						set(dx, ROOF_Y - 1, dz, NodeDecor.topSlab(edge ? Blocks.DARK_OAK_SLAB : Blocks.CHERRY_SLAB));
 						int sx = dx < 0 ? -1 : 1;
 						int sz = dz < 0 ? -1 : 1;
