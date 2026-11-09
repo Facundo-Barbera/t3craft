@@ -591,7 +591,8 @@ public final class HouseMachiya implements Variant {
 				if (ridge || k % q.step() != 0) {
 					st = b(Blocks.DEEPSLATE_TILES);
 				} else {
-					Block sb = k == 0 ? Blocks.DARK_OAK_STAIRS : p.hash(u, y, v, 6) == 0 ? Blocks.DEEPSLATE_BRICK_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS;
+					// [palette] the eave rows are brick (a lighter line than the dark tiles above it); no heavy brown band on the front
+					Block sb = k == 0 || p.hash(u, y, v, 6) == 0 ? Blocks.DEEPSLATE_BRICK_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS;
 					st = stair(sb, up);
 				}
 				g.set(u, y, v, st);
@@ -620,7 +621,13 @@ public final class HouseMachiya implements Variant {
 				for (int yy = PLATE + 1; yy <= y; yy++) {
 					g.set(u, yy, v, plaster());
 				}
-				g.set(u, y + 1, v, slab(Blocks.DEEPSLATE_TILE_SLAB));
+				if (q.rowK(v) == q.kmax()) {
+					// [finish] onigawara: a raised end block with a slab on top where the ridge meets each gable
+					g.set(u, y + 1, v, b(Blocks.DEEPSLATE_BRICKS));
+					g.set(u, y + 2, v, slab(Blocks.DEEPSLATE_TILE_SLAB));
+				} else {
+					g.set(u, y + 1, v, slab(Blocks.DEEPSLATE_TILE_SLAB));
+				}
 			}
 		}
 	}
