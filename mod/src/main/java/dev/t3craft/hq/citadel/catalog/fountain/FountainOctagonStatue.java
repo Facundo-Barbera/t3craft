@@ -62,6 +62,19 @@ public final class FountainOctagonStatue implements Variant {
 		{{"DDD", "DBD", "DDD"}, {".B.", "BDB", ".B."}, {"...", ".B.", "..."},{".B.", "BAB", ".B."}, {"...", ".A.", "..."}},
 	};
 
+	/** The same figures drawn 5 × 5 wide (still 5 layers high) for the plots whose pool is big enough to carry them. */
+	private static final String[][][] WIDE = {
+		// guardian: wide skirt, a two-block shield on the left, a spear on the right, a cape behind
+		{{".....", ".DDD.", ".DBD.", ".DDD.", "....."}, {".....", ".....", "DDABW", "..D..", "....."},
+			{".....", ".....", "DDBBW", "..D..", "....."}, {".....", ".....", "ADHBW", ".....", "....."}, {".....", ".....", "..A.R", ".....", "....."}},
+		// crane: wings spread five wide, raised to gold tips, head with a beak
+		{{".....", ".....", "..W..", ".....", "....."}, {".....", "..B..", "BBBBB", "..B..", "....."},
+			{".....", ".....", "B.W.B", ".....", "....."}, {".....", ".....", "A.W.A", ".....", "....."}, {".....", "..A..", "..H..", ".....", "....."}},
+		// pillar: wide foot, shaft, capital with four long arms, orb
+		{{".DDD.", "DDBDD", "DBBBD", "DDBDD", ".DDD."}, {".....", "..B..", ".BDB.", "..B..", "....."},
+			{".....", ".....", "..B..", ".....", "....."}, {"..B..", "..B..", "BBABB", "..B..", "..B.."}, {".....", ".....", "..A..", ".....", "....."}},
+	};
+
 	@Override
 	public String id() {
 		return "fountain_octagon_statue";
@@ -116,9 +129,10 @@ public final class FountainOctagonStatue implements Variant {
 		int rpRaw = outerWalk - walk;
 		int gw = rpRaw >= 9 ? 3 : rpRaw >= 6 ? 2 : 1;
 		int g = Math.max(1, Math.min(gw, (h - 1) / 6));
-		int rp = Math.min(rpRaw, 2 + 3 * g); // a bigger plot gets a wider plaza, not a bigger pool round a small figure
+		int rp = Math.min(rpRaw, 3 + 3 * g); // a bigger plot gets a wider plaza, not a bigger pool round a small figure
 		int figHalf = g == 1 ? 1 : g == 2 ? 3 : 4;
-		int rs = Math.min(Math.max(figHalf, (rp - 2) / 3), rp - 2); // radius of the dais
+		int rs = Math.min(Math.max(figHalf, (rp - 1) / 2), rp - 2); // radius of the dais
+		int cols = g == 1 && rp >= 5 ? 5 : 3; // the 5-wide figures need the room of a bigger pool
 		if (fig == 1) {
 			rs = 0; // the crane stands on one leg in the water: wings and beak hang over water, not over a dais
 		}
@@ -144,7 +158,7 @@ public final class FountainOctagonStatue implements Variant {
 			}
 		}
 
-		figure(k, pal, FIGURES[fig], fig, g, rp, rs, h);
+		figure(k, pal, cols == 5 ? WIDE[fig] : FIGURES[fig], cols, fig, g, rp, rs, h);
 	}
 
 	// ------------------------------------------------------------------ geometry helpers
@@ -214,9 +228,14 @@ public final class FountainOctagonStatue implements Variant {
 		}
 		// [finish] gargoyle: a carved head on the rim that pours into the pool, a lantern over the compass ones
 		k.set(dx, 1, dz, pal.garg);
-		k.set(dx, 2, dz, stair(pal.pedStair, away(dx, dz)));
 		if (ax == 0 || az == 0) {
-			k.set(dx, 3, dz, b(Blocks.LANTERN));
+			// the compass ones are taller: a shaft, a head, a longer fall, a lantern on top
+			k.set(dx, 2, dz, pal.garg);
+			k.set(dx, 3, dz, stair(pal.pedStair, away(dx, dz)));
+			k.set(dx, 4, dz, b(Blocks.LANTERN));
+			k.set(sx, 3, sz, FALL);
+		} else {
+			k.set(dx, 2, dz, stair(pal.pedStair, away(dx, dz)));
 		}
 		k.set(sx, 2, sz, FALL);
 	}
@@ -227,6 +246,9 @@ public final class FountainOctagonStatue implements Variant {
 	private static BlockState pave(FountainKit k, Pal pal, int dx, int dz, int m) {
 		if (Math.min(Math.abs(dx), Math.abs(dz)) == 0) {
 			return pal.line;
+		}
+		if (Math.abs(dx) == Math.abs(dz) && m >= 2) {
+			return b(Blocks.POLISHED_DIORITE); // [finish] the diagonals make an eight-point star with the axes
 		}
 		if (m == 1) {
 			return pick(k, dx, 0, dz, pal.inner);
@@ -252,8 +274,7 @@ public final class FountainOctagonStatue implements Variant {
 	private static void lamp(FountainKit k, int dx, int y, int dz) {
 		k.set(dx, y, dz, b(Blocks.POLISHED_DEEPSLATE));
 		k.set(dx, y + 1, dz, b(Blocks.DEEPSLATE_BRICK_WALL));
-		k.set(dx, y + 2, dz, b(Blocks.DEEPSLATE_BRICK_WALL));
-		k.set(dx, y + 3, dz, b(Blocks.LANTERN));
+		k.set(dx, y + 2, dz, b(Blocks.LANTERN));
 	}
 
 	/** The corners of the square outside the octagon: a hedge, with a lamp in the very corner. */
@@ -264,6 +285,7 @@ public final class FountainOctagonStatue implements Variant {
 		}
 		k.set(dx, 0, dz, b(Blocks.MOSSY_STONE_BRICKS));
 		k.set(dx, 1, dz, CitadelCanvas.leaves(Blocks.FLOWERING_AZALEA_LEAVES));
+		k.set(dx, 2, dz, CitadelCanvas.leaves(Blocks.FLOWERING_AZALEA_LEAVES));
 	}
 
 	// ------------------------------------------------------------------ the figure
@@ -273,18 +295,18 @@ public final class FountainOctagonStatue implements Variant {
 	 * {@code g + 1}, to stay centred) and each layer {@code g} high, so it grows without stretching. Thin parts
 	 * (poles, rods) keep one block of width. The lowest layer is only built where the dais carries it.
 	 */
-	private static void figure(FountainKit k, Pal pal, String[][] pat, int fig, int g, int rp, int rs, int h) {
+	private static void figure(FountainKit k, Pal pal, String[][] pat, int cols, int fig, int g, int rp, int rs, int h) {
 		int yb = g + 1;
 		int hc = (g % 2 == 1 ? g : g + 1) / 2;
 		// nothing hangs over a standable dais cell: a base block goes under every part of the figure that overhangs it
 		for (int li = 1; li < 5; li++) {
-			for (int zi = 0; zi < 3; zi++) {
-				for (int xi = 0; xi < 3; xi++) {
+			for (int zi = 0; zi < cols; zi++) {
+				for (int xi = 0; xi < cols; xi++) {
 					if (pat[li][zi].charAt(xi) == '.') {
 						continue;
 					}
-					int[] xr = span(xi, g, hc, false);
-					int[] zr = span(zi, g, hc, false);
+					int[] xr = span(xi, g, hc, false, cols);
+					int[] zr = span(zi, g, hc, false, cols);
 					for (int dz = zr[0]; dz <= zr[1]; dz++) {
 						for (int dx = xr[0]; dx <= xr[1]; dx++) {
 							if (oct(dx, dz, rs)) {
@@ -296,15 +318,15 @@ public final class FountainOctagonStatue implements Variant {
 			}
 		}
 		for (int li = 0; li < 5; li++) {
-			for (int zi = 0; zi < 3; zi++) {
-				for (int xi = 0; xi < 3; xi++) {
+			for (int zi = 0; zi < cols; zi++) {
+				for (int xi = 0; xi < cols; xi++) {
 					char ch = pat[li][zi].charAt(xi);
 					if (ch == '.') {
 						continue;
 					}
 					boolean thin = ch == 'W' || ch == 'R';
-					int[] xr = span(xi, g, hc, thin);
-					int[] zr = span(zi, g, hc, thin);
+					int[] xr = span(xi, g, hc, thin, cols);
+					int[] zr = span(zi, g, hc, thin, cols);
 					for (int y = yb + li * g; y < yb + (li + 1) * g && y < h; y++) {
 						for (int dz = zr[0]; dz <= zr[1]; dz++) {
 							for (int dx = xr[0]; dx <= xr[1]; dx++) {
@@ -319,10 +341,10 @@ public final class FountainOctagonStatue implements Variant {
 			}
 		}
 		// streams from the figure into the pool
-		int reach = hc + g + 1;
 		if (fig == 1) {
-			spout(k, 0, -reach, yb + 4 * g, rp, rs); // from the beak
+			spout(k, 0, -(hc + g + 1), yb + 4 * g, rp, rs); // from the beak
 		} else if (fig == 2) {
+			int reach = hc + (cols / 2) * g + 1;
 			for (Direction d : DIRS) {
 				spout(k, d.getStepX() * reach, d.getStepZ() * reach, yb + 3 * g, rp, rs); // from the capital arms
 			}
@@ -339,11 +361,22 @@ public final class FountainOctagonStatue implements Variant {
 	}
 
 	/** The extent {@code {lo, hi}} of pattern column (or row) {@code i}, in cells from the centre. */
-	private static int[] span(int i, int g, int hc, boolean thin) {
-		int lo = i == 1 ? -hc : i == 2 ? hc + 1 : -(hc + g);
-		int hi = i == 1 ? hc : i == 2 ? hc + g : -(hc + 1);
+	private static int[] span(int i, int g, int hc, boolean thin, int cols) {
+		int o = i - cols / 2; // columns away from the middle one (negative = west / north)
+		int lo;
+		int hi;
+		if (o == 0) {
+			lo = -hc;
+			hi = hc;
+		} else if (o > 0) {
+			lo = hc + (o - 1) * g + 1;
+			hi = hc + o * g;
+		} else {
+			lo = -(hc + (-o) * g);
+			hi = -(hc + (-o - 1) * g + 1);
+		}
 		if (thin) {
-			int m = i == 1 ? 0 : i == 2 ? lo + (hi - lo) / 2 : hi - (hi - lo) / 2;
+			int m = o == 0 ? 0 : o > 0 ? lo + (hi - lo) / 2 : hi - (hi - lo) / 2;
 			return new int[] {m, m};
 		}
 		return new int[] {lo, hi};
