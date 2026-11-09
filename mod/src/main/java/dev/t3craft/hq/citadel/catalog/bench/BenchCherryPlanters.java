@@ -137,7 +137,7 @@ public final class BenchCherryPlanters implements Variant {
 			}
 			seat(c, p, u, 0, Direction.SOUTH);
 			if (d == 1) {
-				set(c, p, u, 1, 0, BACK);
+				set(c, p, u, 1, 0, w == 2 && p.hash(4, 4, 4, 2) == 1 ? b(Blocks.CHERRY_FENCE_GATE) : BACK);
 			}
 		}
 		// --- pillars: planter at both ends and between runs; one end carries the lantern
@@ -221,7 +221,7 @@ public final class BenchCherryPlanters implements Variant {
 		int w = p.w();
 		int d = p.d();
 		int h = p.h();
-		int nw = Math.min(w, lShape ? 7 : 8);
+		int nw = Math.min(w, 7);
 		int nd = Math.min(d, 6);
 		int o = (w - nw) / 2;
 		// the rest of the plot is a garden
@@ -262,7 +262,7 @@ public final class BenchCherryPlanters implements Variant {
 			bed(c, p, o + x, nd - 1, true);
 		}
 		int zw = nw - 4;
-		int tw = Math.min(zw, 2);
+		int tw = zw;
 		int td = Math.min(nd - 2, 3);
 		table(c, p, o + 2 + (zw - tw) / 2, 1 + (nd - 2 - td) / 2, tw, td);
 	}
@@ -304,7 +304,7 @@ public final class BenchCherryPlanters implements Variant {
 				set(c, p, u, 1, v, slab(Blocks.BAMBOO_MOSAIC_SLAB));
 			}
 		}
-		if (tw * td >= 4 || tw * td == 2) {
+		if (p.h() < 6 && (tw * td >= 4 || tw * td == 2)) {
 			set(c, p, u0 + tw / 2, 2, v0 + td / 2, b(Blocks.POTTED_FLOWERING_AZALEA));
 		}
 	}
@@ -344,9 +344,10 @@ public final class BenchCherryPlanters implements Variant {
 
 	/** An armrest: deepslate box, a cherry slab on top, a potted flower on every other one. */
 	private static void arm(CitadelCanvas c, Plot p, int u, int v) {
+		boolean roofed = p.h() >= 6; // a pergola goes over every nook: no pots to stand on under it
 		set(c, p, u, 0, v, box(p, u, 0, v));
 		set(c, p, u, 1, v, slab(Blocks.CHERRY_SLAB));
-		if (p.hash(u, 2, v, 2) == 0) {
+		if (!roofed && p.hash(u, 2, v, 2) == 0) {
 			set(c, p, u, 2, v, switch (p.hash(u, 3, v, 4)) {
 				case 0 -> b(Blocks.POTTED_FLOWERING_AZALEA);
 				case 1 -> b(Blocks.POTTED_ALLIUM);
