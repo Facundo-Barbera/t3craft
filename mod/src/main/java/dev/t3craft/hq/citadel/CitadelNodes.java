@@ -6,6 +6,7 @@ import dev.t3craft.hq.HqGeometry;
 import dev.t3craft.hq.RingCampusGeometry.Kind;
 import dev.t3craft.hq.RingCampusGeometry.Node;
 import dev.t3craft.hq.RingCampusGeometry.Zone;
+import dev.t3craft.hq.citadel.nodes.ArchiveBay;
 import dev.t3craft.hq.citadel.nodes.CloisterRoom;
 import dev.t3craft.hq.citadel.nodes.LoungeRoom;
 import dev.t3craft.hq.citadel.nodes.NodeDecor;
@@ -144,11 +145,15 @@ public final class CitadelNodes {
 		CloisterRoom.cell(c, x, z, dx, dz);
 	}
 
-	/** The fixtures of the cloister: the archive terminal and its anchors, and a walk spot. */
+	/**
+	 * The fixtures of the cloister: the archive terminal in its consultation bay ({@link ArchiveBay}: niche, plaque,
+	 * lantern, rug), its anchors, and a walk spot.
+	 */
 	public static void cloisterFixtures(CitadelCanvas c, Node nd) {
 		int cx = nd.cx();
 		int cz = nd.cz();
-		BlockPos t = new BlockPos(cx + 3, 1, cz - 6);
+		ArchiveBay.build(c, nd);
+		BlockPos t = new BlockPos(cx + ArchiveBay.TERMINAL_X, 1, cz + ArchiveBay.SHELF_Z);
 		c.fixture(t, c.style.archiveTerminal(Direction.SOUTH));
 		c.anchor(Anchor.face(AnchorNames.ARCHIVE_TERMINAL, t, Direction.SOUTH));
 		c.anchor(Anchor.at(AnchorNames.ARCHIVE, t.south(), Direction.NORTH));
