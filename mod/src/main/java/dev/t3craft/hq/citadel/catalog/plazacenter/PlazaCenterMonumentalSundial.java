@@ -8,33 +8,45 @@ import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.catalog.Family;
 import dev.t3craft.hq.citadel.catalog.Plot;
 import dev.t3craft.hq.citadel.catalog.Variant;
+import java.util.Random;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 
 /**
- * A monumental horizontal sundial: a round dial plate of pale stone sunk half a block inside a raised
- * rim, with hour lines computed for a real latitude ({@code tan θ = sin φ · tan 15°h}), a golden tick
- * on the rim for every hour and a boss of chiselled brick in the centre. The gnomon is a long wedge of
- * quartz stairs that climbs towards the back of the plot (so, in the city, towards the north).
- * Plot corners are gravel garden corners with clipped azalea hedges and a lantern post.
+ * A monumental sundial that reads like a clock: one pale disc with a continuous dark bezel, on a stepped platform
+ * with a dark plinth and a light cornice, climbed on foot by a 3-wide stair on each of the four sides, in the middle
+ * of a paved plaza whose benches sit right at the foot of the platform.
+ *
+ * <ul>
+ * <li><b>Dial:</b> a single pale material (calcite, smooth quartz or quartz block by seed) inside a 2-thick bezel of
+ * dark stone that is closed all the way round. The hours are gold (or chiselled quartz) dots in the bezel, the four
+ * quarters are 3-wide plates in the bezel with a short stroke that reaches into the disc; 12 o'clock is the back and
+ * its stroke is longer. No numerals, no checker: nothing inside the disc but the marks at its edge.</li>
+ * <li><b>Gnomon:</b> a thin dark blade, one block wide, that climbs half a block per column (slab, block, slab,
+ * block...) towards 12 o'clock and ends in a vertical edge with a gold ball and a rod: a right triangle seen in profile.
+ * Its height follows the plot height (10 in the gallery, 14 in the city).</li>
+ * <li><b>Platform:</b> square or octagonal ziggurat by seed (octagon from 19 wide), 1 tier up to 15 wide, 2 from 17, 3 from 21. Each tier is
+ * a full-block wall (dark at the foot, stone above, a light cornice flush with the dial on the top tier) and the four
+ * 3-wide stairs are light. Nothing floats: every wall stands on a solid core.</li>
+ * <li><b>Use:</b> a ring of benches (cherry, spruce or dark oak, in runs of three) at the foot of the platform facing the
+ * dial, a planter at the end of each run, a lamp post on each corner of the plot, the four axes free; octagon variants get a hedge on
+ * the diagonals and a flower bed in each corner.</li>
+ * </ul>
  *
  * <pre>
- *  top view                         side view (front on the left)
- *   ▓ hedge        ▓ hedge              ┌─ gold tip + rod
- *      ╲ rim ◯ ╱                       ╱│  quartz stairs, 1 step per row
- *    - - hour lines - -               ╱ │
- *      ╱ boss ▲ gnomon ╲          ___╱__│__ boss y0, plate = slabs, rim = blocks
+ *  top view (front at the bottom, 12 o'clock at the back)
+ *      [lamp] planter bench bench . bench bench planter [lamp]
+ *      bench   ###### cornice, dark plinth ######   bench
+ *      bench   #   (.  .  XII  .  .)  #             bench
+ *      .       #  ( .   gnomon blade  . )  #        .   (3-wide stair on each side)
+ *      bench   #   (.  .  VI   .  .)  #             bench
  * </pre>
  *
- * Size: 9–15 × 9–15 × 8+ (the gnomon is as tall as the depth and the height allow, up to 8).
+ * Size: 9–23 × 9–23 × 8+ (the plaza centres of the city are 13–21 wide at scale 2).
  */
 public final class PlazaCenterMonumentalSundial implements Variant {
-	/** Latitude of the dial: sin φ sets how crowded the hour lines are around noon. */
-	private static final double SIN_LAT = 0.643;
-
 	@Override
 	public String id() {
 		return "plaza_center_monumental_sundial";
@@ -62,172 +74,409 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 
 	@Override
 	public int maxW() {
-		return 15;
+		return 23;
 	}
 
 	@Override
 	public int maxD() {
-		return 15;
+		return 23;
+	}
+
+	/** Everything the cell passes need, computed once from the plot and the seed. */
+	private static final class Cfg {
+		int w;
+		int d;
+		int cu;
+		int cv;
+		int half;
+		boolean oct; // octagonal platform
+		int tiers;
+		int ptop; // top plate: metric distance <= ptop
+		int pl; // outermost wall ring
+		int pb; // bench ring (-1: none)
+		int rd; // dial radius
+		double ringIn; // the bezel is r in (ringIn, rd + 0.5]
+		int yd; // layer of the dial block
+		int g; // half length of the gnomon blade, in blocks of height
+		Block dial;
+		Block ring;
+		Block ringAlt;
+		Block mark;
+		Block wallD;
+		Block wallD2;
+		Block wallM;
+		Block wallM2;
+		Block light; // top tier of the platform: the light cornice
+		Block light2;
+		Block bench;
+		Block finBlock;
+		Block finSlab;
+		boolean[][] mk;
 	}
 
 	private static Direction out(int dx, int dz) {
 		return Math.abs(dx) >= Math.abs(dz) ? (dx > 0 ? Direction.EAST : Direction.WEST) : (dz > 0 ? Direction.SOUTH : Direction.NORTH);
 	}
 
-	/** Angle (from the front axis) of the hour line {@code h}, h = -6..6. */
-	private static double hourAngle(int h) {
-		if (Math.abs(h) == 6) {
-			return Math.signum(h) * Math.PI / 2;
+	private static void s(CitadelCanvas c, Plot p, int u, int y, int v, BlockState st) {
+		if (p.has(u, y, v)) {
+			p.set(c, u, y, v, st);
 		}
-		return Math.atan(SIN_LAT * Math.tan(Math.toRadians(15.0 * h)));
 	}
 
-	/** Perpendicular distance from the cell to the (infinite) hour line {@code h}. */
-	private static double lineDist(double r, double alpha, int h) {
-		return r * Math.abs(Math.sin(alpha - hourAngle(h)));
+	/** Distance in rings from the centre: Chebyshev for the square platform, with the corners cut for the octagon. */
+	private static int metric(Cfg k, int a, int bb) {
+		int cheb = Math.max(a, bb);
+		return k.oct ? Math.max(cheb, (2 * (a + bb) + 2) / 3) : cheb;
 	}
 
-	@Override
-	public void build(CitadelCanvas c, Plot p) {
-		int w = p.w();
-		int d = p.d();
-		int cu = w / 2;
-		int cv = d / 2;
-		double radius = Math.min(Math.min(cu, w - 1 - cu), Math.min(cv, d - 1 - cv)) + 0.5;
-		for (int v = 0; v < d; v++) {
-			for (int u = 0; u < w; u++) {
-				int dx = u - cu;
-				int dz = v - cv;
-				double r = Math.sqrt(dx * dx + dz * dz);
-				if (r > radius) {
-					corner(c, p, u, v, r - radius, w, d);
-				} else {
-					dial(c, p, u, v, dx, dz, r, radius);
+	private static Cfg config(Plot p) {
+		Cfg k = new Cfg();
+		k.w = p.w();
+		k.d = p.d();
+		k.cu = k.w / 2;
+		k.cv = k.d / 2;
+		int hf = Math.min(Math.min(k.cu, k.w - 1 - k.cu), Math.min(k.cv, k.d - 1 - k.cv));
+		k.half = hf;
+		Random rng = p.rng(0x5D1E0L);
+		rng.nextInt(2); // reserved: keeps the draw order of the seed features below
+		int dk = rng.nextInt(3);
+		int rk = rng.nextInt(2);
+		int mkk = rng.nextInt(2);
+		int wk = rng.nextInt(2);
+		int mdk = rng.nextInt(2);
+		int bk = rng.nextInt(3);
+		int fk = rng.nextInt(3);
+		int ck = rng.nextInt(2);
+		boolean octBit = rng.nextInt(2) == 1;
+
+		k.oct = hf >= 9 && octBit;
+		k.pb = hf >= 6 ? hf - 1 : -1;
+		k.pl = hf >= 6 ? hf - 2 : hf - 1;
+		// more tiers with more room: the platform keeps its mass, the dial keeps a radius of 4 or more
+		int tiers = hf >= 10 ? 3 : hf >= 8 ? 2 : 1;
+		tiers = Math.min(tiers, Math.max(1, p.h() - 6));
+		tiers = Math.min(tiers, Math.max(1, k.pl - 3));
+		k.tiers = tiers;
+		k.ptop = k.pl - tiers;
+		k.rd = k.oct ? k.ptop - 1 : k.ptop;
+		k.yd = tiers;
+		k.ringIn = k.rd >= 5 ? k.rd - 1.4 : k.rd - 0.9; // 2-thick bezel, 1-thick on the small dials
+		int surface = k.yd + 1;
+		// a modest blade: about half the dial radius high, never taller than the plot allows
+		k.g = Math.max(1, Math.min(Math.min(k.rd - 2, p.h() - 2 - surface), 3));
+
+		k.dial = switch (dk) {
+			case 0 -> Blocks.CALCITE;
+			case 1 -> Blocks.SMOOTH_QUARTZ;
+			default -> Blocks.QUARTZ_BLOCK;
+		};
+		if (rk == 0) {
+			k.ring = Blocks.POLISHED_DEEPSLATE;
+			k.ringAlt = Blocks.DEEPSLATE_TILES;
+		} else {
+			k.ring = Blocks.POLISHED_BLACKSTONE_BRICKS;
+			k.ringAlt = Blocks.POLISHED_BLACKSTONE;
+		}
+		k.mark = mkk == 0 ? Blocks.GOLD_BLOCK : Blocks.RAW_GOLD_BLOCK; // both read on the dark bezel and on the pale disc
+		if (wk == 0) {
+			k.wallD = Blocks.DEEPSLATE_BRICKS;
+			k.wallD2 = Blocks.DEEPSLATE_TILES;
+		} else {
+			k.wallD = Blocks.POLISHED_BLACKSTONE_BRICKS;
+			k.wallD2 = Blocks.POLISHED_BLACKSTONE;
+		}
+		if (mdk == 0) {
+			k.wallM = Blocks.STONE_BRICKS;
+			k.wallM2 = Blocks.MOSSY_STONE_BRICKS;
+		} else {
+			k.wallM = Blocks.POLISHED_ANDESITE;
+			k.wallM2 = Blocks.STONE_BRICKS;
+		}
+		if (ck == 0) {
+			k.light = Blocks.SMOOTH_QUARTZ;
+			k.light2 = Blocks.QUARTZ_BRICKS;
+		} else {
+			k.light = Blocks.POLISHED_DIORITE;
+			k.light2 = Blocks.CALCITE;
+		}
+		k.bench = switch (bk) {
+			case 0 -> Blocks.CHERRY_STAIRS;
+			case 1 -> Blocks.SPRUCE_STAIRS;
+			default -> Blocks.DARK_OAK_STAIRS;
+		};
+		switch (fk) {
+			case 0 -> {
+				k.finBlock = Blocks.POLISHED_DEEPSLATE;
+				k.finSlab = Blocks.POLISHED_DEEPSLATE_SLAB;
+			}
+			case 1 -> {
+				k.finBlock = Blocks.DEEPSLATE_TILES;
+				k.finSlab = Blocks.DEEPSLATE_TILE_SLAB;
+			}
+			default -> {
+				k.finBlock = Blocks.POLISHED_BLACKSTONE_BRICKS;
+				k.finSlab = Blocks.POLISHED_BLACKSTONE_BRICK_SLAB;
+			}
+		}
+		return k;
+	}
+
+	// ------------------------------------------------------------------ dial marks
+
+	/**
+	 * Fills {@code k.mk}: gold dots for the twelve hours inside the bezel, bigger plates for the four quarters and a short
+	 * stroke from each quarter into the disc (longer at 12 o'clock, which is the back of the plot, +v).
+	 */
+	private static void marks(Cfg k) {
+		k.mk = new boolean[k.w][k.d];
+		double ringIn = k.ringIn;
+		double cardW = k.rd >= 6 ? 1.5 : 0.55; // 3-wide quarter plates only where the bezel is long enough for them
+		for (int dv = -k.rd; dv <= k.rd; dv++) {
+			for (int du = -k.rd; du <= k.rd; du++) {
+				int u = k.cu + du;
+				int v = k.cv + dv;
+				if (u < 0 || u >= k.w || v < 0 || v >= k.d) {
+					continue;
+				}
+				double r = Math.hypot(du, dv);
+				if (r > k.rd + 0.5 || r < 1.0) {
+					continue;
+				}
+				boolean inRing = r > ringIn;
+				for (int h = 0; h < 12; h++) {
+					double th = Math.toRadians(30.0 * h);
+					double ou = Math.sin(th);
+					double ov = Math.cos(th);
+					double t = du * ou + dv * ov;
+					if (t <= 0) {
+						continue;
+					}
+					double perp = Math.abs(du * ov - dv * ou);
+					boolean card = h % 3 == 0;
+					if (!card && k.rd < 5) {
+						continue; // on a small dial only the four quarters are marked (twelve dots would be a checker)
+					}
+					if (inRing) {
+						// gold only on the outer layer of the bezel (the inner one stays dark, so the ring is continuous);
+						// the quarters are 3 wide there and 1 wide on the inner layer
+						boolean outer = r > k.rd - 0.8;
+						double wide = card ? (outer ? cardW : 0.55) : (outer ? 0.55 : -1);
+						if (perp < wide) {
+							k.mk[u][v] = true;
+							break;
+						}
+					} else if (card && k.rd >= 4 && r > k.rd - (h == 0 ? 3.6 : 2.6) && perp < 0.55) {
+						k.mk[u][v] = true;
+						break;
+					}
 				}
 			}
 		}
-		gnomon(c, p, cu, cv);
 	}
 
-	// ------------------------------------------------------------------ dial
+	// ------------------------------------------------------------------ build
 
-	private void dial(CitadelCanvas c, Plot p, int u, int v, int dx, int dz, double r, double radius) {
-		double e = radius - r;
-		int cheb = Math.max(Math.abs(dx), Math.abs(dz));
-		double alpha = Math.atan2(dx, -dz);
-		if (e < 1.0) {
-			// [depth] the outer ramp, low side out (the stairs face inwards: tall half towards the rim, climbed walking in)
-			p.set(c, u, 0, v, p.hash(u, 0, v, 4) == 0 ? stairs(Blocks.MOSSY_STONE_BRICK_STAIRS, out(dx, dz).getOpposite()) : stairs(Blocks.STONE_BRICK_STAIRS, out(dx, dz).getOpposite()));
-			return;
-		}
-		if (e < 2.0) {
-			// raised rim: dark polished stone, a golden tick wherever an hour line meets it
-			boolean tick = false;
-			for (int h = -6; h <= 6 && !tick; h += 3) {
-				tick = lineDist(r, alpha, h) < 0.5;
-			}
-			if (tick) {
-				p.set(c, u, 0, v, b(Blocks.GOLD_BLOCK));
-			} else {
-				int k = p.hash(u, 0, v, 5);
-				p.set(c, u, 0, v, k == 0 ? b(Blocks.CRACKED_DEEPSLATE_BRICKS) : k == 1 ? b(Blocks.POLISHED_DEEPSLATE) : b(Blocks.DEEPSLATE_BRICKS));
-			}
-			return;
-		}
-		if (cheb <= 1) {
-			// boss under the gnomon
-			p.set(c, u, 0, v, b(Blocks.CHISELED_STONE_BRICKS));
-			return;
-		}
-		// [depth] the plate sits half a block below the rim; hour lines of dark slab, pale slabs mixed
-		boolean line = false;
-		if (r >= 2.9 && e >= 2.3) {
-			for (int h = -6; h <= 6 && !line; h += 3) {
-				line = lineDist(r, alpha, h) < 0.5;
+	@Override
+	public void build(CitadelCanvas c, Plot p) {
+		Cfg k = config(p);
+		marks(k);
+		for (int v = 0; v < k.d; v++) {
+			for (int u = 0; u < k.w; u++) {
+				int dx = u - k.cu;
+				int dz = v - k.cv;
+				int a = Math.abs(dx);
+				int bb = Math.abs(dz);
+				int m = metric(k, a, bb);
+				int eu = Math.min(u, k.w - 1 - u);
+				int ev = Math.min(v, k.d - 1 - v);
+				if (m <= k.ptop) {
+					top(c, p, k, u, v, dx, dz);
+				} else if (m <= k.pl) {
+					step(c, p, k, u, v, dx, dz, a, bb, m);
+				} else if (Math.min(eu, ev) == 0) {
+					edge(c, p, k, u, v, a, bb, eu, ev);
+				} else if (k.pb >= 0 && m == k.pb) {
+					ring(c, p, k, u, v, dx, dz, a, bb);
+				} else if (k.oct && k.pb >= 0 && m > k.pb && Math.max(a, bb) <= k.half - 1) {
+					bed(c, p, k, u, v, a, bb);
+				} else {
+					apron(c, p, k, u, v, a, bb);
+				}
 			}
 		}
-		if (line) {
-			p.set(c, u, 0, v, slab(Blocks.DEEPSLATE_TILE_SLAB));
+		gnomon(c, p, k);
+	}
+
+	/** Solid hidden core under a platform cell, up to (not including) layer {@code y}. */
+	private static void core(CitadelCanvas c, Plot p, int u, int y0, int v, int y) {
+		for (int yy = y0; yy < y; yy++) {
+			s(c, p, u, yy, v, yy == 0 ? b(Blocks.DEEPSLATE_BRICKS) : b(Blocks.STONE_BRICKS));
+		}
+	}
+
+	/** The top plate: one pale disc, a continuous dark bezel with the marks in it, grey corners round it. */
+	private void top(CitadelCanvas c, Plot p, Cfg k, int u, int v, int dx, int dz) {
+		int y = k.yd;
+		core(c, p, u, 0, v, y);
+		double r = Math.hypot(dx, dz);
+		BlockState st;
+		if (r > k.rd + 0.5) {
+			// [palette] mid grey corners: the pale disc and its dark bezel stand out from them
+			st = p.hash(u, y, v, 4) == 0 ? b(Blocks.STONE_BRICKS) : b(Blocks.POLISHED_ANDESITE);
+		} else if (k.mk[u][v]) {
+			st = b(k.mark);
+		} else if (r > k.ringIn) {
+			st = p.hash(u, y, v, 5) == 0 ? b(k.ringAlt) : b(k.ring);
+		} else {
+			st = b(k.dial);
+		}
+		s(c, p, u, y, v, st);
+	}
+
+	/**
+	 * A ring of the platform. Axis cells are a light 3-wide stair that rises to the dial; the rest is a full-block wall,
+	 * dark at the foot and stone above, with a light slab cornice on the top tier.
+	 */
+	private void step(CitadelCanvas c, Plot p, Cfg k, int u, int v, int dx, int dz, int a, int bb, int m) {
+		int st = m - k.ptop; // 1 = next to the top plate, tiers = foot
+		int y = k.yd - st + 1;
+		core(c, p, u, 0, v, y);
+		if (Math.min(a, bb) <= 1 && a != bb) {
+			Direction in = a > bb ? (dx > 0 ? Direction.WEST : Direction.EAST) : (dz > 0 ? Direction.NORTH : Direction.SOUTH);
+			Block sb = Math.min(a, bb) == 0 ? Blocks.SMOOTH_QUARTZ_STAIRS : Blocks.POLISHED_DIORITE_STAIRS;
+			s(c, p, u, y, v, stairs(sb, in));
 			return;
 		}
-		boolean ring = cheb == 2 && r < 2.9;
-		int k = p.hash(u, 0, v, 6);
-		Block plate = ring ? Blocks.POLISHED_DIORITE_SLAB : k == 0 ? Blocks.SMOOTH_STONE_SLAB : k < 3 ? Blocks.POLISHED_ANDESITE_SLAB : Blocks.POLISHED_DIORITE_SLAB;
-		p.set(c, u, 0, v, slab(plate));
+		BlockState wall;
+		if (st == 1) {
+			// [finish] light cornice: the top tier is flush with the dial, so it never hides it from the plaza
+			wall = p.hash(u, y, v, 5) == 0 ? b(k.light2) : b(k.light);
+		} else if (st == k.tiers) {
+			// [palette] dark plinth
+			wall = p.hash(u, y, v, 4) == 0 ? b(k.wallD2) : b(k.wallD);
+		} else {
+			wall = p.hash(u, y, v, 5) == 0 ? b(k.wallM2) : b(k.wallM);
+		}
+		s(c, p, u, y, v, wall);
+	}
+
+	/** The single step up to the podium on the plot's edge, low side out: stairs ascend towards the plaza. */
+	private void edge(CitadelCanvas c, Plot p, Cfg k, int u, int v, int a, int bb, int eu, int ev) {
+		Direction in = eu <= ev ? (u < k.cu ? Direction.EAST : Direction.WEST) : (v < k.cv ? Direction.SOUTH : Direction.NORTH);
+		boolean axis = a <= 1 || bb <= 1;
+		Block sb = axis ? Blocks.POLISHED_DIORITE_STAIRS : p.hash(u, 0, v, 5) == 0 ? Blocks.MOSSY_STONE_BRICK_STAIRS : Blocks.STONE_BRICK_STAIRS;
+		s(c, p, u, 0, v, stairs(sb, in));
+	}
+
+	/** Floor of the plaza outside the ring: a light cross on the axes, grey paving elsewhere. */
+	private static BlockState cross(int a, int bb) {
+		return Math.min(a, bb) == 0 ? b(Blocks.SMOOTH_STONE) : b(Blocks.POLISHED_DIORITE);
+	}
+
+	private void apron(CitadelCanvas c, Plot p, Cfg k, int u, int v, int a, int bb) {
+		if (a <= 1 || bb <= 1) {
+			s(c, p, u, 0, v, cross(a, bb));
+			return;
+		}
+		int h = p.hash(u, 0, v, 8);
+		s(c, p, u, 0, v, h == 0 ? b(Blocks.CRACKED_STONE_BRICKS) : h == 1 ? b(Blocks.MOSSY_STONE_BRICKS) : h < 4 ? b(Blocks.POLISHED_ANDESITE) : b(Blocks.STONE_BRICKS));
+	}
+
+	private boolean isCorner(Cfg k, int a, int bb) {
+		return k.pb >= 0 && a == k.half - 1 && bb == k.half - 1;
+	}
+
+	/** A lamp post: polished base, two wall posts, a lantern. */
+	private static void lamp(CitadelCanvas c, Plot p, int u, int v) {
+		s(c, p, u, 1, v, b(Blocks.POLISHED_DEEPSLATE));
+		s(c, p, u, 2, v, b(Blocks.POLISHED_DEEPSLATE_WALL));
+		s(c, p, u, 3, v, b(Blocks.POLISHED_DEEPSLATE_WALL));
+		s(c, p, u, 4, v, b(Blocks.LANTERN));
+	}
+
+	/** The bench ring at the foot of the platform: dark floor, benches facing the dial, planters at the ends of the runs. */
+	private void ring(CitadelCanvas c, Plot p, Cfg k, int u, int v, int dx, int dz, int a, int bb) {
+		int t = Math.min(a, bb);
+		if (t <= 1) {
+			s(c, p, u, 0, v, cross(a, bb));
+			return;
+		}
+		s(c, p, u, 0, v, p.hash(u, 0, v, 3) == 0 ? b(Blocks.POLISHED_DEEPSLATE) : b(Blocks.DEEPSLATE_TILES));
+		boolean straight = Math.max(a, bb) == k.pb;
+		if (!straight) {
+			planter(c, p, u, v, false);
+			return;
+		}
+		if (!k.oct && t == k.pb) {
+			lamp(c, p, u, v);
+			return;
+		}
+		int pt = k.oct ? k.pb / 2 : k.pb - 1; // the planter that ends each run (octagon: last straight cell)
+		if (t == pt) {
+			planter(c, p, u, v, true);
+		} else if (t < pt) {
+			// benches of three with a free cell between them, so each one reads as a bench and not as a wall
+			if ((t - 2) % 4 != 3) {
+				s(c, p, u, 1, v, stairs(k.bench, out(dx, dz)));
+			}
+		} else {
+			planter(c, p, u, v, false);
+		}
+	}
+
+	/** A raised planter: moss under a bush of azalea; the end-of-run ones a block taller. */
+	private void planter(CitadelCanvas c, Plot p, int u, int v, boolean tall) {
+		s(c, p, u, 0, v, b(Blocks.MOSS_BLOCK));
+		s(c, p, u, 1, v, p.hash(u, 1, v, 2) == 0 ? CitadelCanvas.leaves(Blocks.FLOWERING_AZALEA_LEAVES) : CitadelCanvas.leaves(Blocks.AZALEA_LEAVES));
+		if (tall) {
+			s(c, p, u, 2, v, CitadelCanvas.leaves(Blocks.FLOWERING_AZALEA_LEAVES));
+		}
+	}
+
+	/** A corner flower bed outside the diagonal hedge of the octagon variant; the corner cell is a lamp post. */
+	private void bed(CitadelCanvas c, Plot p, Cfg k, int u, int v, int a, int bb) {
+		s(c, p, u, 0, v, b(Blocks.GRASS_BLOCK));
+		if (isCorner(k, a, bb)) {
+			lamp(c, p, u, v);
+			return;
+		}
+		BlockState st = switch (p.hash(u, 1, v, 6)) {
+			case 0 -> CitadelCanvas.leaves(Blocks.FLOWERING_AZALEA_LEAVES);
+			case 1 -> CitadelCanvas.leaves(Blocks.AZALEA_LEAVES);
+			case 2 -> b(Blocks.PINK_PETALS);
+			case 3 -> b(Blocks.ALLIUM);
+			case 4 -> b(Blocks.CORNFLOWER);
+			default -> b(Blocks.OXEYE_DAISY);
+		};
+		s(c, p, u, 1, v, st);
 	}
 
 	// ------------------------------------------------------------------ gnomon
 
-	private void gnomon(CitadelCanvas c, Plot p, int cu, int cv) {
-		int v0 = cv - 1; // low end, on the boss
-		int vb = p.d() - 2;
-		int rise = Math.min(1 + vb - v0, p.h() - 3);
-		int vEnd = v0 + rise - 1;
-		for (int i = 0; i < rise; i++) {
-			int v = v0 + i;
-			int y = 1 + i;
-			// centre ridge: solid smooth quartz up to a stair that faces the front
-			for (int yy = 1; yy < y; yy++) {
-				p.set(c, cu, yy, v, yy % 3 == 0 ? b(Blocks.CHISELED_QUARTZ_BLOCK) : b(Blocks.SMOOTH_QUARTZ));
+	/**
+	 * A thin blade, one block wide, that climbs half a block per column towards 12 o'clock (+v): slab, block, slab,
+	 * block... It ends in a vertical edge with a gold ball and a lightning rod, so it reads as a triangle in profile.
+	 */
+	private void gnomon(CitadelCanvas c, Plot p, Cfg k) {
+		int cu = k.cu;
+		int base = k.yd + 1; // first free layer above the dial
+		int n = 2 * k.g;
+		for (int j = 0; j < n; j++) {
+			int v = k.cv - k.g + j;
+			int halves = j + 1;
+			int full = halves / 2;
+			for (int y = 0; y < full; y++) {
+				s(c, p, cu, base + y, v, b(k.finBlock));
 			}
-			p.set(c, cu, y, v, stairs(Blocks.QUARTZ_STAIRS, Direction.NORTH));
-			// shoulders: one block lower, lighter stone; they make the fin a thick wedge, not a card
-			if (y >= 2) {
-				for (int side = -1; side <= 1; side += 2) {
-					for (int yy = 1; yy < y - 1; yy++) {
-						p.set(c, cu + side, yy, v, b(Blocks.CALCITE));
-					}
-					p.set(c, cu + side, y - 1, v, stairs(Blocks.POLISHED_DIORITE_STAIRS, Direction.NORTH));
-				}
-			} else {
-				for (int side = -1; side <= 1; side += 2) {
-					p.set(c, cu + side, 1, v, slab(Blocks.POLISHED_DIORITE_SLAB));
-				}
+			if (halves % 2 == 1) {
+				s(c, p, cu, base + full, v, slab(k.finSlab));
 			}
 		}
-		// back pier: a vertical face with a gold tip and a rod
-		int yTip = rise + 1;
-		p.set(c, cu, yTip, vEnd, b(Blocks.GOLD_BLOCK));
-		p.set(c, cu, yTip + 1, vEnd, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState());
-		for (int side = -1; side <= 1; side += 2) {
-			p.set(c, cu + side, rise, vEnd, stairs(Blocks.POLISHED_DIORITE_STAIRS, side < 0 ? Direction.WEST : Direction.EAST));
-			p.set(c, cu + side, rise - 1, vEnd, b(Blocks.CALCITE));
-		}
-		// a pair of lanterns on the boss corners, hanging nothing: low bronze-black stands
-		int[][] stands = {{cu - 1, cv + 1}, {cu + 1, cv + 1}};
-		for (int[] s : stands) {
-			if (s[1] < vEnd - 1 && s[1] != v0 + 1) {
-				p.set(c, s[0], 1, s[1], b(Blocks.CANDLE));
-			}
-		}
-	}
-
-	// ------------------------------------------------------------------ corners: gravel gardens
-
-	private void corner(CitadelCanvas c, Plot p, int u, int v, double beyond, int w, int d) {
-		boolean tip = (u == 0 || u == w - 1) && (v == 0 || v == d - 1);
-		int g = p.hash(u, 0, v, 5);
-		if (beyond <= 1.0) {
-			// edging: a half-block stone border between the rim and the gravel
-			p.set(c, u, 0, v, slab(g == 0 ? Blocks.MOSSY_STONE_BRICK_SLAB : Blocks.STONE_BRICK_SLAB));
-			return;
-		}
-		p.set(c, u, 0, v, g == 0 ? b(Blocks.COARSE_DIRT) : g == 1 ? b(Blocks.DIRT_PATH) : b(Blocks.GRAVEL));
-		if (tip) {
-			p.set(c, u, 1, v, b(Blocks.POLISHED_DEEPSLATE_WALL));
-			p.set(c, u, 2, v, b(Blocks.POLISHED_DEEPSLATE_WALL));
-			p.set(c, u, 3, v, b(Blocks.LANTERN));
-			return;
-		}
-		if (beyond <= 2.2) {
-			// clipped hedge hugging the dial
-			int k = p.hash(u, 1, v, 7);
-			p.set(c, u, 1, v, CitadelCanvas.leaves(k == 0 ? Blocks.FLOWERING_AZALEA_LEAVES : Blocks.AZALEA_LEAVES));
-			if (k == 3) {
-				p.set(c, u, 2, v, CitadelCanvas.leaves(Blocks.AZALEA_LEAVES));
-			}
-		} else if (p.hash(u, 1, v, 4) == 0) {
-			p.set(c, u, 1, v, b(Blocks.PINK_PETALS));
-		}
+		// the blade ends in a fine spire of two rods (no ball)
+		int top = k.cv + k.g - 1;
+		BlockState rod = Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState();
+		s(c, p, cu, base + k.g, top, rod);
+		s(c, p, cu, base + k.g + 1, top, rod);
 	}
 }

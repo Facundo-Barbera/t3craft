@@ -48,6 +48,10 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.b;
  * 4 blocks between laps) climbs from a doorway on the passage to a doorway onto the deck, so the whole thing is walkable.
  * Between the guard rooms the passage is an open lane that ends on a screen wall (arch ring, plaque towards the courtyard).
  *
+ * <p><b>Round 3 (struct/barrio-gatehouse3).</b> Dark pilasters back on the hub face of every tower (also at ring 1); the banner
+ * hangs one block in front of the face from a jutting cherry beam; stepped deepslate plinth at the foot of the towers; the
+ * vault has stone-brick ribs and a raised iron-bar portcullis; rings 2 and 3 get a stone wall-walk with a dark belt and caps.
+ *
  * <p><b>Identification.</b> From the hub: on each tower a flat banner of the project's wool (the colour is
  * {@link HqStyle#envColor(HqLayout.Module)}) 3 x 8 (5 x 8 at ring 2+) hung from a cherry beam between two dark pilasters,
  * with the project's initial in 3 x 5 blocks of white or black wool on it (whichever contrasts), and the plaques on the board.
@@ -147,6 +151,25 @@ final class BarrioGateBig {
 			this.eaveMat = l.ring() >= 2 ? ROOF : Blocks.CHERRY_STAIRS;
 			this.stepsL = buildSteps(true);
 			this.stepsR = buildSteps(false);
+			this.stoneWalk = true;
+		}
+
+		/** The wall-walk is stone with a dark belt and dark caps (all rings), so it does not melt into the roofs. */
+		final boolean stoneWalk;
+
+		/** The belt course on the edges of the deck. */
+		BlockState walkBelt() {
+			return stoneWalk ? POST : log(side.getAxis());
+		}
+
+		/** The parapet (one high) on the edges of the deck. */
+		BlockState parapet() {
+			return stoneWalk ? STONE : PLANKS;
+		}
+
+		/** The merlon: two high, the second block is the cap. */
+		BlockState merlon(boolean cap) {
+			return stoneWalk ? (cap ? POST : STONE) : PLANKS;
 		}
 
 		void build() {
@@ -176,6 +199,9 @@ final class BarrioGateBig {
 				cornice(tower, TOWER_TOP - 1);
 			}
 			corbel();
+			bannerFront();
+			plinth();
+			portcullis();
 			buttresses();
 			passageDressing();
 			boards();
@@ -242,8 +268,8 @@ final class BarrioGateBig {
 			for (int y = clear + 2; y < DECK; y++) {
 				c.set(r.cell(u, v, y), STONE);
 			}
-			c.set(r.cell(u, v, DECK), log(side.getAxis()));
-			c.set(r.cell(u, v, DECK + 1), dv % 2 == 0 ? PLANKS : AIR);
+			c.set(r.cell(u, v, DECK), walkBelt());
+			c.set(r.cell(u, v, DECK + 1), dv % 2 == 0 ? parapet() : AIR);
 			for (int y = DECK + 2; y <= TOWER_TOP; y++) {
 				c.set(r.cell(u, v, y), AIR);
 			}
@@ -260,7 +286,9 @@ final class BarrioGateBig {
 			for (int y = 1; y <= clear; y++) {
 				c.set(r.cell(u, v, y), AIR);
 			}
-			c.set(r.cell(u, v, clear + 1), a == 0 ? keystone(edge) : archStair(dv, edge));
+			// the vault is a row of stone-brick ribs (the faces and every other row) between dark rows
+			boolean rib = edge || row % 2 == 0;
+			c.set(r.cell(u, v, clear + 1), a == 0 ? keystone(rib) : archStair(dv, rib));
 			for (int y = clear + 2; y < DECK; y++) {
 				BlockState s = STONE;
 				if (hub && y == PLAQUE_Y) {
@@ -268,11 +296,11 @@ final class BarrioGateBig {
 				}
 				c.set(r.cell(u, v, y), s);
 			}
-			c.set(r.cell(u, v, DECK), edge ? log(side.getAxis()) : dv == 0 ? PLANKS : FOOT);
-			// the battlement is cherry, so the bridge reads against the grey towers: a parapet and merlons two high on every other cell
-			c.set(r.cell(u, v, DECK + 1), edge ? PLANKS : AIR);
-			c.set(r.cell(u, v, DECK + 2), edge && dv % 2 == 0 ? PLANKS : AIR);
-			c.set(r.cell(u, v, DECK + 3), edge && dv % 2 == 0 ? PLANKS : AIR);
+			c.set(r.cell(u, v, DECK), edge ? walkBelt() : dv == 0 ? PLANKS : FOOT);
+			// the battlement: a parapet and merlons two high on every other cell (cherry at ring 1; stone with dark belt and caps at rings 2-3)
+			c.set(r.cell(u, v, DECK + 1), edge ? parapet() : AIR);
+			c.set(r.cell(u, v, DECK + 2), edge && dv % 2 == 0 ? merlon(false) : AIR);
+			c.set(r.cell(u, v, DECK + 3), edge && dv % 2 == 0 ? merlon(true) : AIR);
 			for (int y = DECK + 4; y <= TOWER_TOP; y++) {
 				c.set(r.cell(u, v, y), AIR);
 			}
@@ -283,6 +311,45 @@ final class BarrioGateBig {
 			for (int dv = -HALF; dv <= HALF; dv++) {
 				c.set(r.cell(D, mid + dv, DECK), BarrioKit.stair(Blocks.STONE_BRICK_STAIRS, back.getOpposite(), StairsShape.STRAIGHT, Half.TOP));
 				c.set(r.cell(tu - 1, mid + dv, DECK), BarrioKit.stair(Blocks.STONE_BRICK_STAIRS, back, StairsShape.STRAIGHT, Half.TOP));
+			}
+		}
+
+		/**
+		 * The raised portcullis: iron bars hanging from the vault flush with the hub face, so it is read from the street (the name sign hangs behind it) (three high in the middle, two at
+		 * one in from the sides and one at the sides, following the arch), always above head height (at least 3 free below).
+		 */
+		void portcullis() {
+			int u = D - 1;
+			for (int dv = -HALF; dv <= HALF; dv++) {
+				int a = Math.abs(dv);
+				int clear = 6 - a;
+				int n = a == HALF ? 1 : a == 1 ? 2 : 3;
+				for (int y = clear - n + 1; y <= clear; y++) {
+					c.set(r.cell(u, mid + dv, y), b(Blocks.IRON_BARS));
+				}
+			}
+		}
+
+		/**
+		 * The foot of the towers: a step of deepslate-tile stairs one block out on the hub face and on the outer face (not under the
+		 * buttresses), a slab at the corner, so the base reads as a plinth.
+		 */
+		void plinth() {
+			for (int s = 0; s < 2; s++) {
+				boolean left = s == 0;
+				int v0 = left ? 0 : W - sw;
+				for (int tv = 0; tv < sw; tv++) {
+					c.set(r.cell(D, v0 + tv, 1), BarrioKit.stair(ROOF, back.getOpposite()));
+				}
+				int v = left ? -1 : W;
+				Direction towardsWall = left ? side : side.getOpposite();
+				for (int u = tu; u < D; u++) {
+					if (u == tu + 1 || u == tu + sw - 2) {
+						continue;
+					}
+					c.set(r.cell(u, v, 1), BarrioKit.stair(ROOF, towardsWall));
+				}
+				c.set(r.cell(D, v, 1), b(Blocks.DEEPSLATE_TILE_SLAB));
 			}
 		}
 
@@ -304,10 +371,11 @@ final class BarrioGateBig {
 
 		/** Lanterns under the vault and on the merlons, banners on the tower walls, the hanging sign of the project at the hub end. */
 		void passageDressing() {
-			for (int u : new int[] {tu + 1, D - 2}) {
+			// (the portcullis hangs at D - 1 and the sign at D - 2, so the second lantern of the wider gates is at D - 4)
+			for (int u : sw >= 7 ? new int[] {tu + 1, D - 4} : new int[] {tu + 1}) {
 				c.set(r.cell(u, mid, 6), BarrioKit.lantern(true));
 			}
-			BlockPos sign = r.cell(D - 1, mid, 6);
+			BlockPos sign = r.cell(D - 2, mid, 6);
 			BlockState hs = Blocks.CHERRY_HANGING_SIGN.defaultBlockState().setValue(CeilingHangingSignBlock.ROTATION, CitadelBarrios.rotation(back))
 					.setValue(CeilingHangingSignBlock.ATTACHED, false);
 			c.put(sign.getX(), sign.getY(), sign.getZ(), hs, HANGING);
@@ -351,20 +419,15 @@ final class BarrioGateBig {
 					s = shaftBlock(sa, sb, y, left);
 				} else if (!perimeter) {
 					s = STONE;
-				} else if (corner && hubFace && sw == 5 && y >= 4 && y <= DECK + 2) {
-					// ring 1: the banner takes the whole 5-wide face, so the 3-wide letter keeps a margin of wool all round
-					s = banner(tv, y);
 				} else if (corner) {
 					s = POST;
 				} else if (passSide && ((a == 1 + rowsOff && y <= 3) || (a == 2 + rowsOff && (y == DECK + 1 || y == DECK + 2)))) {
 					s = AIR;
 				} else if (y <= 3) {
 					s = FOOT;
-				} else if (hubFace) {
-					s = banner(tv, y);
 				} else if (y == DECK) {
 					s = log(edgeU ? side.getAxis() : back.getAxis());
-				} else if (!passSide && y >= 5 && y <= 8 && (edgeU ? tv == sw / 2 : a == sw / 2)) {
+				} else if (!passSide && !hubFace && y >= 5 && y <= 8 && (edgeU ? tv == sw / 2 : a == sw / 2)) {
 					// a lancet window in the middle of the plain faces: a dark frame (sill and head) around two panes
 					s = y == 6 || y == 7 ? b(Blocks.GLASS_PANE) : POST;
 				} else {
@@ -374,14 +437,30 @@ final class BarrioGateBig {
 			}
 		}
 
-		/** A cell of the banner on the hub face of a tower (tv 1..sw-2, y 4..11), the beam it hangs from at y = 12. */
+		/**
+		 * The banner of a tower: hung one block in front of the hub face (row {@code D}), between the two dark pilasters of the
+		 * corners, from a cherry beam that juts out over the whole face at y = 12. The face behind it stays stone and the pilasters
+		 * stay flush, so the tower keeps its relief.
+		 */
+		void bannerFront() {
+			for (int s = 0; s < 2; s++) {
+				int v0 = s == 0 ? 0 : W - sw;
+				for (int tv = 0; tv < sw; tv++) {
+					// ring 1 has a cherry eave right above: its beam is dark so the top does not stack three pink stripes
+					c.set(r.cell(D, v0 + tv, TOWER_TOP - 1), l.ring() >= 2 ? log(side.getAxis()) : POST);
+					if (tv >= 1 && tv <= sw - 2) {
+						// a stone sill under the banner
+						c.set(r.cell(D, v0 + tv, 3), BarrioKit.stair(Blocks.STONE_BRICK_STAIRS, back.getOpposite()));
+						for (int y = 4; y <= TOWER_TOP - 2; y++) {
+							c.set(r.cell(D, v0 + tv, y), banner(tv, y));
+						}
+					}
+				}
+			}
+		}
+
+		/** A cell of the banner (tv 1..sw-2, y 4..11). */
 		BlockState banner(int tv, int y) {
-			if (y == TOWER_TOP - 1) {
-				return log(side.getAxis());
-			}
-			if (y == TOWER_TOP) {
-				return STONE;
-			}
 			if (y >= 10) {
 				return wool;
 			}
@@ -389,7 +468,7 @@ final class BarrioGateBig {
 				return letterCell(tv, y);
 			}
 			// the swallow-tail at the foot of the banner
-			return tv == (sw - 1) / 2 ? STONE : wool;
+			return tv == (sw - 1) / 2 ? AIR : wool;
 		}
 
 		/** A cell of the initial (y 5..9) in 3 x 5 on the banner: the project's letter, or the banner's wool. */
