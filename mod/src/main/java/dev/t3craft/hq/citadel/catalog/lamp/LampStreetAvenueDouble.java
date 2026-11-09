@@ -24,8 +24,8 @@ import net.minecraft.world.level.block.state.properties.Half;
  *
  * <ul>
  * <li><b>Three heads by seed</b>: <i>crossbar</i> (a cross arm along the avenue, lanterns hung on chains, two per
- *     side from 9 wide), <i>candelabra</i> (two arms that end in posts with a standing lantern each, and a spike
- *     between) and <i>crossroads</i> (arms also towards the street and the back, from 3 deep).</li>
+ *     side from 9 wide), <i>candelabra</i> (two arms that end in wall posts with a standing lantern each, a third lantern
+ *     on a crown block between them) and <i>crossroads</i> (arms also towards the street and the back, from 3 deep).</li>
  * <li><b>Four materials by seed</b>: light stone brick on a deepslate foot, deepslate with a calcite capital, or a cherry-armed light-stone one, or
  *     deepslate with waxed copper (cut copper at the foot, copper bars, chain and lanterns) and a little weathering.</li>
  * <li><b>Useful</b>: from 2 deep a name plate (wall sign) hangs on the shaft at eye height; from
@@ -66,8 +66,8 @@ public final class LampStreetAvenueDouble implements Variant {
 						b(Blocks.CHISELED_COPPER.waxed().exposed()), b(Blocks.POLISHED_DEEPSLATE_WALL),
 						b(Blocks.DEEPSLATE_TILE_WALL), b(Blocks.DEEPSLATE_TILE_WALL), Blocks.COPPER_BARS.waxed().exposed(),
 						b(Blocks.COPPER_CHAIN.waxed().exposed()).setValue(BlockStateProperties.AXIS, Direction.Axis.Y),
-						Blocks.CUT_COPPER_STAIRS.waxed().exposed(), b(Blocks.CHISELED_COPPER.waxed().weathered()),
-						b(Blocks.COPPER_GRATE.waxed().weathered()),
+						Blocks.CUT_COPPER_STAIRS.waxed().exposed(), b(Blocks.CHISELED_COPPER.waxed().exposed()),
+						b(Blocks.COPPER_GRATE.waxed().exposed()),
 						b(Blocks.COPPER_LANTERN.waxed().unaffected()).setValue(BlockStateProperties.HANGING, true),
 						b(Blocks.COPPER_LANTERN.waxed().unaffected()).setValue(BlockStateProperties.HANGING, false));
 			case 3:
@@ -82,7 +82,7 @@ public final class LampStreetAvenueDouble implements Variant {
 				return new Mat(deepFoot, deepCracked, deepSlab, Blocks.DEEPSLATE_BRICK_STAIRS,
 						b(Blocks.CHISELED_STONE_BRICKS), b(Blocks.STONE_BRICK_WALL), b(Blocks.MOSSY_STONE_BRICK_WALL),
 						b(Blocks.STONE_BRICK_WALL), Blocks.IRON_BARS, b(Blocks.IRON_CHAIN).setValue(BlockStateProperties.AXIS, Direction.Axis.Y),
-						Blocks.STONE_BRICK_STAIRS, b(Blocks.POLISHED_ANDESITE), b(Blocks.COPPER_GRATE.waxed().unaffected()),
+						Blocks.CHERRY_STAIRS, b(Blocks.POLISHED_ANDESITE), b(Blocks.COPPER_GRATE.waxed().unaffected()),
 						b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true),
 						b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, false));
 		}
@@ -292,13 +292,14 @@ public final class LampStreetAvenueDouble implements Variant {
 			}
 			if (chainAt(a, k)) {
 				for (int sgn = -1; sgn <= 1; sgn += 2) {
-					s(c, p, cu + sgn * k, yArm + 1, cv, b(m.bars()));
+					s(c, p, cu + sgn * k, yArm + 1, cv, m.upper());
 					s(c, p, cu + sgn * k, yArm + 2, cv, m.lanternStand());
 				}
 			}
 		}
 		s(c, p, cu, yArm + 1, cv, m.capital());
-		s(c, p, cu, yArm + 2, cv, rod());
+		s(c, p, cu, yArm + 2, cv, m.lanternStand());
+		s(c, p, cu, yArm + 3, cv, rod()); // only when the plot is tall enough
 	}
 
 	private static BlockState rod() {
