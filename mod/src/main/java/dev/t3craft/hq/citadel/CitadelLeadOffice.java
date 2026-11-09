@@ -152,9 +152,9 @@ public final class CitadelLeadOffice {
 				break;
 			}
 		}
-		// a tall pole of dark wall blocks with a gold finial, and a swallow-tailed banner 6 long and 4 high in the
+		// a tall pole of dark wall blocks with a gold finial, and a swallow-tailed banner 8 long and 6 high in the
 		// environment's colour with a stripe of its second colour (concrete: it also reads in the plan renders)
-		int pole = 8;
+		int pole = 10;
 		BlockState mast = b(Blocks.DEEPSLATE_BRICK_WALL);
 		for (int y = top + 1; y <= top + pole; y++) {
 			c.set(at.getX(), y, at.getZ(), mast);
@@ -162,15 +162,15 @@ public final class CitadelLeadOffice {
 		c.set(at.getX(), top + pole + 1, at.getZ(), b(Blocks.GOLD_BLOCK));
 		BlockState cloth = b(Blocks.CONCRETE.pick(env));
 		BlockState stripe = b(Blocks.CONCRETE.pick(DyeColor.WHITE));
-		int[] length = {6, 6, 5, 3};
+		int[] length = {8, 8, 8, 7, 5, 3};
 		for (int row = 0; row < length.length; row++) {
 			for (int k = 1; k <= length[row]; k++) {
 				BlockPos p = at.relative(r.side(), k);
-				c.set(p.getX(), top + pole - row, p.getZ(), row == 1 ? stripe : cloth);
+				c.set(p.getX(), top + pole - row, p.getZ(), row == 1 || row == 4 ? stripe : cloth);
 			}
 		}
 		// a yard arm: the banner hangs from a bar along its top edge
-		for (int k = 1; k <= 6; k++) {
+		for (int k = 1; k <= 8; k++) {
 			BlockPos p = at.relative(r.side(), k);
 			c.set(p.getX(), top + pole + 1, p.getZ(), b(Blocks.DEEPSLATE_BRICK_WALL));
 		}
@@ -382,7 +382,7 @@ public final class CitadelLeadOffice {
 				}
 				BlockPos p = r.cell(u, v, 0);
 				boolean alt = (Math.floorMod(u / 2, 2) + Math.floorMod(v / 2, 2)) % 2 == 0;
-				c.set(p.getX(), 0, p.getZ(), alt ? CitadelCanvas.BAMBOO : c.floor());
+				c.set(p.getX(), 0, p.getZ(), alt ? CitadelCanvas.CALCITE : c.floor());
 			}
 		}
 		BlockState border = b(Blocks.DEEPSLATE_TILES);
