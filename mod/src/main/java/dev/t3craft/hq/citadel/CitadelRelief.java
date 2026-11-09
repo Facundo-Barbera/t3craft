@@ -130,6 +130,7 @@ public final class CitadelRelief {
 	/** Lifts the painted flat citadel onto its terraces (see the class comment). */
 	public static void apply(CitadelCanvas c) {
 		CitadelPodium.buttresses(c); // design/citadel-terraces2: pilasters on the feet of the podium's walls (flat frame)
+		lastSplit = Split.NONE;
 		if (RingCampusGeometry.relief() == 0) {
 			return;
 		}
@@ -195,11 +196,17 @@ public final class CitadelRelief {
 		Map<Long, Integer> layers = new HashMap<>(c.cells.size() * 2);
 		Map<Long, CompoundTag> data = new HashMap<>();
 		List<Long> rigid = new ArrayList<>();
+		// fix/relief-floating: cells that hang in the air (a beam tip, an eave, a porch, a sign) take the lift of what they
+		// hang from, not of the column they happen to overhang (which may be on the next terrace)
+		Map<Long, Integer> hung = hangingLifts(c, half);
 		for (Map.Entry<Long, BlockState> e : c.cells.entrySet()) {
 			long k = e.getKey();
 			if (c.liftFrom.containsKey(k)) {
 				rigid.add(k);
 				continue;
+			}
+			if (hung.containsKey(k)) {
+				continue; // placed below with the lift of its support
 			}
 			int x = BlockPos.getX(k);
 			int z = BlockPos.getZ(k);
@@ -216,6 +223,20 @@ public final class CitadelRelief {
 			BlockState there = cells.get(n);
 			if (there != null && !there.isAir()) {
 				continue; // the ground or a wall of a higher terrace wins over a leaf hanging into it
+			}
+			cells.put(n, c.cells.get(k));
+			layers.put(n, c.layers.getOrDefault(k, SOLID));
+			CompoundTag t = c.data.get(k);
+			if (t != null) {
+				data.put(n, t);
+			}
+		}
+		for (Map.Entry<Long, Integer> e : hung.entrySet()) {
+			long k = e.getKey();
+			long n = BlockPos.offset(k, 0, e.getValue(), 0);
+			BlockState there = cells.get(n);
+			if (there != null && !there.isAir()) {
+				continue; // the ground or a wall of a higher terrace wins
 			}
 			cells.put(n, c.cells.get(k));
 			layers.put(n, c.layers.getOrDefault(k, SOLID));
@@ -246,6 +267,165 @@ public final class CitadelRelief {
 		}
 		c.workstations.clear();
 		c.workstations.addAll(ws);
+	}
+
+	// ------------------------------------------------------------------ pieces that hang over a step
+
+	/**
+	 * What {@link #hangingLifts} found in the last plan (render diagnostics, {@code PlanReport}'s "split pieces"):
+	 * {@code hanging} groups of hanging cells near a step looked at, {@code mixed} of them that the plain column lift
+	 * would have torn (a part over one terrace, a part over the next), {@code moved} cells lifted with their support
+	 * instead, {@code ambiguous} of those groups held up from two terraces at once (they follow the one they touch
+	 * most, so a bridge between two terraces still has a step in it) and some samples.
+	 */
+	public record Split(int hanging, int mixed, int moved, int ambiguous, List<String> samples) {
+		public static final Split NONE = new Split(0, 0, 0, 0, List.of());
+	}
+
+	/** Last result of {@link #hangingLifts}. */
+	public static volatile Split lastSplit = Split.NONE;
+
+	/** A group of hanging cells bigger than this is not looked at (a hollow podium, say): it keeps the column lift. */
+	private static final int HANG_CAP = 200_000;
+
+	private static boolean present(@Nullable BlockState s) {
+		return s != null && !s.isAir();
+	}
+
+	/** True when there is a gap in the column between the ground (y = 0) and the cell: it hangs from its sides. */
+	private static boolean hangs(CitadelCanvas c, Map<Long, Boolean> memo, long k) {
+		int y = BlockPos.getY(k);
+		if (y <= 1) {
+			return false;
+		}
+		Boolean m = memo.get(k);
+		if (m != null) {
+			return m;
+		}
+		int x = BlockPos.getX(k);
+		int z = BlockPos.getZ(k);
+		boolean h = false;
+		for (int yy = y - 1; yy >= 1; yy--) {
+			if (!present(c.cells.get(BlockPos.asLong(x, yy, z)))) {
+				h = true;
+				break;
+			}
+		}
+		memo.put(k, h);
+		return h;
+	}
+
+	/**
+	 * fix/relief-floating: the lift of the cells that hang in the air in the flat frame and would not take the lift of
+	 * what holds them. A piece that is not rigid ({@link CitadelCanvas#rigid}: the torii of the avenues, a porch or an
+	 * eave that reaches over the next lot, a sign on a wall) is lifted column by column; where it overhangs a column of
+	 * another terrace its tip would come out a step above or below the rest, a beam with air between it and its pier.
+	 * Here every connected group of hanging cells (nothing under them down to the ground, touching each other by a
+	 * face) is lifted as one, by the lift of the supported cells it touches (the most touched; the higher on a tie).
+	 * Only the cells whose own column would lift them differently are returned (cell → lift in blocks).
+	 */
+	private static Map<Long, Integer> hangingLifts(CitadelCanvas c, Map<Long, Integer> half) {
+		Map<Long, Integer> over = new HashMap<>();
+		// the columns next to a column of another lift: a group torn by the step has a cell in one of them
+		Set<Long> edge = new HashSet<>();
+		for (Map.Entry<Long, Integer> e : half.entrySet()) {
+			int x = colX(e.getKey());
+			int z = colZ(e.getKey());
+			int g = e.getValue() / 2;
+			for (Direction dir : DIRS) {
+				Integer hn = half.get(col(x + dir.getStepX(), z + dir.getStepZ()));
+				if (hn != null && hn / 2 != g) {
+					edge.add(e.getKey());
+					break;
+				}
+			}
+		}
+		Map<Long, Boolean> memo = new HashMap<>();
+		Set<Long> seen = new HashSet<>();
+		int groups = 0;
+		int mixed = 0;
+		int moved = 0;
+		int ambiguous = 0;
+		List<String> samples = new ArrayList<>();
+		for (long seed : c.cells.keySet()) {
+			if (c.liftFrom.containsKey(seed) || !present(c.cells.get(seed)) || !edge.contains(col(BlockPos.getX(seed), BlockPos.getZ(seed)))
+					|| seen.contains(seed) || !hangs(c, memo, seed)) {
+				continue;
+			}
+			List<Long> comp = new ArrayList<>();
+			Map<Integer, Integer> touch = new HashMap<>();
+			java.util.ArrayDeque<Long> q = new java.util.ArrayDeque<>();
+			q.add(seed);
+			seen.add(seed);
+			boolean capped = false;
+			while (!q.isEmpty()) {
+				long k = q.poll();
+				comp.add(k);
+				if (comp.size() > HANG_CAP) {
+					capped = true;
+					break;
+				}
+				for (Direction d : Direction.values()) {
+					long n = BlockPos.offset(k, d);
+					if (!present(c.cells.get(n)) || c.liftFrom.containsKey(n)) {
+						continue;
+					}
+					if (hangs(c, memo, n)) {
+						if (seen.add(n)) {
+							q.add(n);
+						}
+					} else {
+						touch.merge(dy(half, col(BlockPos.getX(n), BlockPos.getZ(n))), 1, Integer::sum);
+					}
+				}
+			}
+			if (capped || touch.isEmpty()) {
+				continue;
+			}
+			groups++;
+			int best = Integer.MIN_VALUE;
+			int bestN = -1;
+			for (Map.Entry<Integer, Integer> e : touch.entrySet()) {
+				if (e.getValue() > bestN || e.getValue() == bestN && e.getKey() > best) {
+					best = e.getKey();
+					bestN = e.getValue();
+				}
+			}
+			Set<Integer> own = new java.util.TreeSet<>();
+			int n = 0;
+			int[] bb = {Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MIN_VALUE, Integer.MIN_VALUE, Integer.MIN_VALUE};
+			for (long k : comp) {
+				int x = BlockPos.getX(k);
+				int y = BlockPos.getY(k);
+				int z = BlockPos.getZ(k);
+				int l = dy(half, col(x, z));
+				own.add(l);
+				if (l != best) {
+					over.put(k, best);
+					n++;
+					bb[0] = Math.min(bb[0], x);
+					bb[1] = Math.min(bb[1], y);
+					bb[2] = Math.min(bb[2], z);
+					bb[3] = Math.max(bb[3], x);
+					bb[4] = Math.max(bb[4], y);
+					bb[5] = Math.max(bb[5], z);
+				}
+			}
+			if (n == 0) {
+				continue;
+			}
+			mixed++;
+			moved += n;
+			if (touch.size() > 1) {
+				ambiguous++;
+			}
+			if (samples.size() < 60) {
+				samples.add(n + " of " + comp.size() + " cells [" + bb[0] + "," + bb[1] + "," + bb[2] + " .. " + bb[3] + "," + bb[4] + "," + bb[5]
+						+ "] own lifts " + own + " -> " + best + " (held from " + touch + ")");
+			}
+		}
+		lastSplit = new Split(groups, mixed, moved, ambiguous, List.copyOf(samples));
+		return over;
 	}
 
 	private static Anchor up(Anchor a, Map<Long, Integer> half) {
