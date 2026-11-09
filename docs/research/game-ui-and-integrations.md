@@ -575,6 +575,89 @@ Decidir antes si se acepta el scope `preview:operate` (pregunta 3) y cómo le qu
 5. ¿Qué entornos corren los previews hoy (servidor remoto, `localhost` del VPS por Tailscale)? Condiciona si el visor del
    servidor alcanza las apps.
 
+## 9. Anexo: el navegador como bloque (pantalla web en el mundo)
+
+Pregunta de Facundo (2026-11-09): ¿y si el navegador va en bloques y no solo en una interfaz?
+
+### 9.1 Modelo mental: tres capas independientes
+1. **Fuente de página (`PageSource`)**: de dónde salen los píxeles y a dónde van las entradas. Dos implementaciones posibles:
+   - `T3StreamSource` (vía A, §8.1): frames JPEG del navegador del servidor de T3; entrada por JSON.
+   - `CefSource` (vía B, §8.2): Chromium local (Rinku o MCEF Modern), opcional.
+2. **Superficie**: dónde se dibuja. Una `WebScreen` a pantalla completa, un **bloque** en el mundo, o ambas.
+3. **Interacción**: cómo se apunta, se hace clic, se desplaza y se teclea.
+
+Si estas tres capas se separan desde el principio, el bloque, la pantalla y cualquier fuente futura son intercambiables.
+La pantalla completa pasa a ser el "teclado y ratón" del bloque.
+
+### 9.2 Por qué el bloque encaja con lo que ya hay
+Según `docs/features/blocks.md` y el código de `client/blocks/`:
+- **Pared multibloque ya resuelta:** `MonitorWall` y `ScreenExtent` fusionan monitores contiguos del mismo `facing` en una sola
+  pantalla de hasta 12 × 8 bloques, que dibuja el bloque origen (abajo a la izquierda).
+- **Bindings:** el block entity guarda `binding` (`thread:`, `project:`, `env:`, `board:`). Se añadiría `web:<fuente>`:
+  por ejemplo `web:preview:<threadKey>` (el preview del hilo) o `web:url:<…>`. `/t3craft blocks link` y `HqBindings` ya saben
+  vincular una pantalla entera.
+- **Visibilidad con adquirir y soltar:** `MonitorVisibility` decide qué monitores merecen un stream en vivo (radio, visibilidad,
+  histéresis, una suscripción por hilo aunque haya varios monitores). Es exactamente la política que necesita un navegador.
+- **LOD:** `MonitorLod` ya tiene NEAR y FAR. Para web: NEAR = vivo, FAR = último frame congelado o un póster.
+- **Textura dinámica en GPU:** `HeldScreenTexture` (pantalla en mano) ya crea una `DynamicTexture`.
+- **Clic en el bloque:** `BlocksClient` ya resuelve `BlockHitResult` y abre el contenido de la pantalla entera.
+- **Interruptor GUI-only:** el módulo de bloques se apaga entero (`BlocksSwitch`); sin él, solo queda la `WebScreen`.
+- **Archivos nuevos probables:** `WebScreenBlock` o un `Binding.Kind.WEB` sobre `monitor`, un `WebScreenRenderer` (o rama en
+  `MonitorRenderer`) que dibuja un quad texturizado, y `PageSource` con sus dos backends.
+
+### 9.3 Los problemas de verdad
+1. **Apuntar:** el rayo de la mirada da un `BlockHitResult.location`; con `facing` y el `ScreenExtent` se pasa a coordenadas de
+   página (UV a píxeles). Hay que hacerlo cada tick para el hover.
+2. **Clic:** en Minecraft, **clic izquierdo = romper el bloque**. Para que sea clic de página hay que cancelar el ataque cuando
+   se apunta a una pantalla web en modo foco (Fabric tiene `AttackBlockCallback`/`UseBlockCallback` de cliente **(verificar en 26.3)**).
+   La rueda cambia el hotbar: hay que capturarla solo en modo foco (probablemente un mixin sobre el scroll **(verificar)**).
+3. **Teclado:** WASD mueve al jugador, así que escribir en el bloque no puede ser "en vivo" sin capturar teclas. Patrón
+   recomendado:
+   - **Ver y tocar desde lejos** (clic y scroll con el rayo) sin teclado, para botones, pestañas, listas.
+   - **Entrar en foco**: un clic derecho largo o una tecla abre la `WebScreen` a pantalla completa con la misma sesión
+     (la cámara puede acercarse al bloque). Ahí está el teclado, el IME y el portapapeles.
+   Es el mismo patrón que los monitores de ComputerCraft: tocas el monitor, el teclado va por la GUI.
+4. **Coste con muchas pantallas:** una instancia de navegador por **fuente** (no por bloque) y un tope de vivas (por ejemplo 2 o 3);
+   el resto, congeladas. En la vía B cada instancia es un renderer de Chromium; en la A es un JPEG decodificado por frame y el
+   servidor hace el trabajo. Con `maxWidth/maxHeight` pequeños para pantallas lejanas.
+5. **Resolución:** un bloque se ve a ~64 a 128 px por bloque. Una pared de 6 × 4 a 128 px es 768 × 512, suficiente para una app,
+   pequeña para un sitio denso. Las fuentes de página deben reflowear (viewport) en lugar de reducir.
+6. **Seguridad (importante para bloques):** un bloque guarda su URL en el mundo. En un servidor o un mundo compartido, **otro
+   jugador podría poner una URL que tu cliente cargue sin que lo pidas** (rastreo, IP, contenido). Reglas:
+   - nunca cargar una URL de un bloque sin una acción local del jugador ("clic para cargar", o una lista local de dominios);
+   - la vía A no tiene este problema para el contenido, porque la URL la abre el servidor de T3 (el bloque solo lleva el hilo);
+   - preferir bindings a **hilos de T3** antes que URLs libres.
+7. **Audio:** el audio de CEF sale por el sistema, no posicional **(verificar)**. Los bloques empiezan en silencio.
+8. **Multijugador:** los bloques existen solo donde el módulo de bloques está instalado y registrado (integrado o servidor con el
+   mod). En un servidor remoto sin el mod no hay bloques; ahí quedan la `WebScreen` y, si se quiere una pared, un renderer
+   **solo de cliente** en un ancla del HQ (como el holograma). Los `Display` de vanilla no pueden mostrar texturas dinámicas, así
+   que necesitaría un hook de render del nivel **(verificar API de Fabric 26.x)**.
+9. **Mapas e ítems como truco:** un mapa es de 128 × 128 y se actualiza poco. Útil como miniatura, no como navegador.
+
+### 9.4 Qué vía encaja mejor con bloques
+- **A (stream del servidor de T3):** encaja muy bien. Pocos recursos locales, varias pantallas baratas, sin dependencias nativas,
+  y sigue siendo una "vista tonta" como el resto del mod. Limitada al contenido que T3 puede abrir.
+- **B (CEF):** da cualquier sitio, pero cada pared viva cuesta un renderer de Chromium. Mejor para una o dos pantallas
+  generales que para el HQ con una pantalla por hilo.
+- **Conclusión revisada:** para **bloques en el HQ**, A primero (previews por hilo, una pantalla por escritorio o una pared de
+  revisión); B como segundo backend para web general. Para **navegar**, B primero. Por eso la abstracción `PageSource`.
+
+### 9.5 Niveles de entrega y esfuerzo (orientativo)
+| Nivel | Qué se ve y se hace | Esfuerzo |
+|---|---|---|
+| N0 | `PageSource` + `T3StreamSource` + `WebScreen` solo lectura (un hilo) | M |
+| N1 | Bloque `web` (binding `web:preview:<hilo>`) que muestra el preview, solo ver, con LOD y adquirir/soltar | M |
+| N2 | Clic y scroll con el rayo, y foco a pantalla completa con teclado | M a L |
+| N3 | `CefSource` opcional (Rinku/MCEF Modern) y `web:url:` con lista de dominios y confirmación local | M a L |
+| N4 | Paredes grandes, varias fuentes, tope de instancias, póster congelado | M |
+
+### 9.6 Preguntas
+1. ¿Quieres un bloque por hilo (el monitor de cada escritorio muestra el preview) o una pared de revisión compartida?
+2. ¿Tocar desde lejos (clic y scroll) alcanza, o necesitas escribir en el bloque sin abrir la pantalla completa?
+3. ¿Cómo se maneja un bloque que apunta a un sitio general en un mundo compartido: lista de dominios local, clic para cargar, o solo
+   hilos de T3?
+4. ¿El juego va en un servidor remoto con otros jugadores, o es singleplayer o LAN? (condiciona el punto 8 de §9.3)
+
 ## Fuentes web
 
 - GLFW, `glfwRequestWindowAttention`: https://www.glfw.org/docs/latest/group__window.html
