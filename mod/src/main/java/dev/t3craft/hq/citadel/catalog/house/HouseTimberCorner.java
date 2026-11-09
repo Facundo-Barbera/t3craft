@@ -97,7 +97,7 @@ public final class HouseTimberCorner implements Variant {
 
 	private static final Scheme[] SCHEMES = {
 			new Scheme(Blocks.DEEPSLATE_TILE_STAIRS, Blocks.CHERRY_STAIRS, Blocks.DEEPSLATE_TILES, Blocks.DARK_OAK_STAIRS, Blocks.CHERRY_TRAPDOOR),
-			new Scheme(Blocks.MUD_BRICK_STAIRS, Blocks.DEEPSLATE_TILE_STAIRS, Blocks.MUD_BRICKS, Blocks.DARK_OAK_STAIRS, Blocks.CHERRY_TRAPDOOR),
+			new Scheme(Blocks.CHERRY_STAIRS, Blocks.DEEPSLATE_TILE_STAIRS, Blocks.CHERRY_PLANKS, Blocks.DARK_OAK_STAIRS, Blocks.CHERRY_TRAPDOOR),
 	};
 
 	/**
@@ -151,12 +151,12 @@ public final class HouseTimberCorner implements Variant {
 		wallRun(c, p, s, 0, false, T, 1, 10, vb, rt, i -> i != gv, -1, false);
 		wallRun(c, p, s, 0, true, vb, 1, 2, 9, endG, i -> true, -1, false);
 		// ---- upper storey (4 free: y6..y9)
-		wallRun(c, p, s, 1, true, 1, -1, 1, ue, fU, i -> true, 9, true);
-		wallRun(c, p, s, 1, false, 1, -1, 1, vb, lU, i -> true, 9, true);
-		wallRun(c, p, s, 1, true, T, 1, 10, ue, bk, i -> i != ue - 3 && i != ue - 2, -1, true);
-		wallRun(c, p, s, 1, false, ue, 1, 1, 9, endU, i -> true, -1, true);
-		wallRun(c, p, s, 1, false, T, 1, 10, vb, rt, i -> true, -1, true);
-		wallRun(c, p, s, 1, true, vb, 1, 1, 9, endU, i -> true, -1, true);
+		wallRun(c, p, s, 1, true, 1, -1, 1, ue, fU, i -> true, 9, false);
+		wallRun(c, p, s, 1, false, 1, -1, 1, vb, lU, i -> true, 9, false);
+		wallRun(c, p, s, 1, true, T, 1, 10, ue, bk, i -> i != ue - 3 && i != ue - 2, -1, false);
+		wallRun(c, p, s, 1, false, ue, 1, 1, 9, endU, i -> true, -1, false);
+		wallRun(c, p, s, 1, false, T, 1, 10, vb, rt, i -> true, -1, false);
+		wallRun(c, p, s, 1, true, vb, 1, 1, 9, endU, i -> true, -1, false);
 
 		cornerPost(c, p);
 		partitionU(c, p, 0);
@@ -200,9 +200,26 @@ public final class HouseTimberCorner implements Variant {
 		interiors(c, p, g, doorShop, doorSide, gv);
 		yard(c, p, g, gv);
 		strips(c, p, g);
+		// a barrel and a bench beside each street door
+		// (never under a bracket: a person on the bench would have under 2.85 blocks of headroom)
+		p.set(c, clear(fU, doorShop, -2, -3, -4), 1, 0, barrel());
+		p.set(c, clear(fU, doorShop, 2, 3, 4), 1, 0, stair(Blocks.CHERRY_STAIRS, Direction.SOUTH, false));
+		p.set(c, 0, 1, clear(lU, doorSide, -2, -3, -4), barrel());
+		p.set(c, 0, 1, clear(lU, doorSide, 2, 3, 4), stair(Blocks.CHERRY_STAIRS, Direction.EAST, false));
 	}
 
 	// ------------------------------------------------------------------ small helpers
+
+	/** {@code base + k} for the first offset whose cell is not under a bracket (not a post index, nor next to one). */
+	private static int clear(int[] posts, int base, int... offs) {
+		for (int k : offs) {
+			int x = base + k;
+			if (!contains(posts, x)) {
+				return x;
+			}
+		}
+		return base + offs[offs.length - 1];
+	}
 
 	private static boolean contains(int[] a, int x) {
 		for (int q : a) {
@@ -531,6 +548,13 @@ public final class HouseTimberCorner implements Variant {
 		Block cap = Blocks.DARK_OAK_SLAB;
 		gable(c, p, true, 10, g.ue() + 1, 0, 10, PLATE, s.roof(), s.eave(), ridge, cap, false, true);
 		gable(c, p, false, 10, g.vb() + 1, 0, 10, PLATE, s.roof(), s.eave(), ridge, cap, false, true);
+		// [finish] the ridge is one course of tile, one block above the slopes: no cap slab standing on it
+		for (int sv = 10; sv <= g.ue() + 1; sv++) {
+			p.set(c, sv, PLATE + 6, 5, CitadelCanvas.AIR);
+		}
+		for (int sv = 10; sv <= g.vb() + 1; sv++) {
+			p.set(c, 5, PLATE + 6, sv, CitadelCanvas.AIR);
+		}
 		// [palette] two courses of a second tile across each slope, level with the dormer-height of the wing
 		for (int t : new int[] {3, 7}) {
 			int h = PLATE + Math.min(t, 10 - t);
