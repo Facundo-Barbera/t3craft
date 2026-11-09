@@ -327,7 +327,7 @@ public final class RotundaRoom {
 				int mx = (int) Math.round(mr * Math.sin(a));
 				int mz = (int) Math.round(-mr * Math.cos(a));
 				if (u == mx && dz == mz) {
-					s = hr % 3 == 0 ? b(Blocks.GOLD_BLOCK) : RIB;
+					s = hr % 3 == 0 ? b(Blocks.GOLD_BLOCK) : BAMBOO;
 				}
 			}
 			if (hand(u, dz, 5 * Math.PI / 3, mr - 0.9, 0.5) || hand(u, dz, Math.PI / 3, mr - 0.1, 0.5)) {
