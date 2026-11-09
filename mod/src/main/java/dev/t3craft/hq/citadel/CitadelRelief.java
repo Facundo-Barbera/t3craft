@@ -8,7 +8,6 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.colX;
 import static dev.t3craft.hq.citadel.CitadelCanvas.colZ;
 import static dev.t3craft.hq.citadel.CitadelCanvas.leaves;
 import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
-import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
 
 import dev.t3craft.hq.Anchor;
 import dev.t3craft.hq.RingCampusGeometry;
@@ -637,7 +636,7 @@ public final class CitadelRelief {
 		} else {
 			out = Blocks.STONE_BRICK_STAIRS;
 		}
-		return stairs(out, up);
+		return CitadelCanvas.stairs(out, up);
 	}
 
 	/** The full block under a stair tread: the paving itself when it is a plain block, else stone bricks. */
