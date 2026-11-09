@@ -34,12 +34,14 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
  *  y0  ▒▒▒▓▓≈▓▓▒▒▒  kerb, water, paving               . . . ▒ . . .   (approach, 3 wide)
  * </pre>
  *
- * Roof, timber and stone sets come from the seed. Size: 3–8 × 3–8 × 7+ (the core stays 3 × 3, or 4 × 4
+ * Roof, timber and stone sets come from the seed. Size: 3–8 × 3–8 × 8+ (the core stays 3 × 3, or 4 × 4
  * on even plots of 8 and up; the rest of the plot becomes paving and furniture).
  */
 public final class WellRoofedStone implements Variant {
 	/** The roof's lowest row (the eaves). */
-	private static final int ROOF = 4;
+	private static final int ROOF = 5;
+	/** The crossbars and the axle: the layer right under the roof. */
+	private static final int BAR = ROOF - 1;
 
 	/** A roof set: slope stairs, ridge block, trim stairs (eave row and gable edge), and the timber that goes with it. */
 	private record RoofSet(Block stairs, Block ridge, Block eave, Block planks, Block log, Block stripped) {
@@ -117,7 +119,7 @@ public final class WellRoofedStone implements Variant {
 
 	@Override
 	public int minH() {
-		return 7;
+		return 8;
 	}
 
 	@Override
@@ -177,32 +179,37 @@ public final class WellRoofedStone implements Variant {
 		BlockState lantern = b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true);
 		int[] postV = g.cs() == 3 ? new int[] {g.v0() + 1} : new int[] {g.v0() + 1, g.v0() + 2};
 		for (int u : new int[] {g.uL(), g.uR()}) {
-			// [depth] corner pedestals; a lantern hangs from the crossbar end over each of them
+			// [depth] corner pedestals; a lantern on a short chain hangs from the crossbar end over each of them
 			for (int v : new int[] {g.v0(), g.v1()}) {
 				p.set(c, u, 1, v, b(st.chiseled()));
-				p.put(c, u, 2, v, lantern, CitadelCanvas.HANGING);
+				p.put(c, u, BAR - 1, v, b(Blocks.IRON_CHAIN).setValue(BlockStateProperties.AXIS, Direction.Axis.Y), CitadelCanvas.HANGING);
+				p.put(c, u, BAR - 2, v, lantern, CitadelCanvas.HANGING);
 			}
 			// the posts stand on stone bases (the log's bark against the stripped crossbar)
 			for (int v : postV) {
 				p.set(c, u, 1, v, b(st.a()));
-				p.set(c, u, 2, v, log(roof.log(), Direction.Axis.Y));
+				for (int y = 2; y < BAR; y++) {
+					p.set(c, u, y, v, log(roof.log(), Direction.Axis.Y));
+				}
 			}
 			// the crossbar over the end of the shaft carries the roof and holds the axle
 			for (int v = g.v0(); v <= g.v1(); v++) {
-				p.set(c, u, 3, v, log(roof.stripped(), Direction.Axis.Z));
+				p.set(c, u, BAR, v, log(roof.stripped(), Direction.Axis.Z));
 			}
 		}
 		// the axle across the shaft, between the crossbars; the crank lever sticks out of its front
 		int va = g.va();
 		int cu = g.cs() == 4 ? g.uL() + 1 + p.hash(3, 0, 0, 2) : g.uL() + 1;
 		for (int u = g.uL() + 1; u <= g.uR() - 1; u++) {
-			p.set(c, u, 3, va, log(roof.stripped(), Direction.Axis.X));
+			p.set(c, u, BAR, va, log(roof.stripped(), Direction.Axis.X));
 		}
-		p.put(c, cu, 3, va - 1, b(Blocks.LEVER)
+		p.put(c, cu, BAR, va - 1, b(Blocks.LEVER)
 				.setValue(BlockStateProperties.ATTACH_FACE, AttachFace.WALL)
 				.setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH), CitadelCanvas.DECOR);
 		// the bucket (a water cauldron) hangs on an iron chain from the axle, just over the water
-		p.put(c, cu, 2, va, b(Blocks.IRON_CHAIN).setValue(BlockStateProperties.AXIS, Direction.Axis.Y), CitadelCanvas.HANGING);
+		for (int y = BAR - 1; y >= 2; y--) {
+			p.put(c, cu, y, va, b(Blocks.IRON_CHAIN).setValue(BlockStateProperties.AXIS, Direction.Axis.Y), CitadelCanvas.HANGING);
+		}
 		p.put(c, cu, 1, va, b(Blocks.WATER_CAULDRON).setValue(BlockStateProperties.LEVEL_CAULDRON, 3), CitadelCanvas.HANGING);
 	}
 
