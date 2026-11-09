@@ -45,6 +45,6 @@ public final class HqLayoutState {
 		if (state != null && state.has(KEY) && state.get(KEY).isJsonPrimitive()) {
 			return HqLayouts.resolve(state.get(KEY).getAsString()).id();
 		}
-		return HqLayouts.DEFAULT_ID;
+		return HqLayouts.CLASSIC; // built before layouts existed: the original hub + spine + wings, not the current default
 	}
 }

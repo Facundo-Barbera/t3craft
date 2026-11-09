@@ -151,7 +151,12 @@ public final class HqStyles {
 		}
 		JsonElement e = s.get(KEY);
 		HqStyle style = e.isJsonPrimitive() && e.getAsJsonPrimitive().isString() ? byId(e.getAsString()) : null;
-		return style == null ? new Selection(defaultStyle(), List.of(SECTION + "." + KEY)) : new Selection(style, List.of());
+		if (style != null) {
+			return new Selection(style, List.of());
+		}
+		// a removed or unknown style: the warning names the old id so reload() logs exactly one line with it
+		String old = e.isJsonPrimitive() ? e.getAsString() : e.toString();
+		return new Selection(defaultStyle(), List.of(SECTION + "." + KEY + " '" + old + "'"));
 	}
 
 	public static Selection load(@Nullable Path file) {
@@ -171,7 +176,7 @@ public final class HqStyles {
 		Selection sel = load(net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir().resolve("t3craft.json"));
 		use(sel.style());
 		if (!sel.warnings().isEmpty()) {
-			T3Craft.LOGGER.warn("[hq] invalid config keys, using defaults for: {} (known styles: {})", sel.warnings(), ids());
+			T3Craft.LOGGER.warn("[hq] invalid or removed config values, using defaults for: {} (known styles: {})", sel.warnings(), ids());
 		}
 		T3Craft.LOGGER.info("[hq] style {}", sel.style().id());
 		return sel.warnings();

@@ -3,11 +3,14 @@ package dev.t3craft.hq.layout;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import dev.t3craft.T3Craft;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -15,7 +18,7 @@ import org.jspecify.annotations.Nullable;
  * same visual style (cherry), plus the per-barrio / per-tower materials the layout brings.
  *
  * <ul>
- *   <li>{@code classic}: the original hub + spine + wings ({@link #DEFAULT_ID});</li>
+ *   <li>{@code classic}: the original hub + spine + wings (what the survival site builds);</li>
  *   <li>{@code campus}: hexagonal barrios round a plaza (very large);</li>
  *   <li>{@code ring}: rings of sectors with radial avenues;</li>
  *   <li>{@code vertical}: towers with an atrium and skybridges;</li>
@@ -27,12 +30,12 @@ import org.jspecify.annotations.Nullable;
  * </ul>
  *
  * <p>The choice lives in {@code config/t3craft.json} as the top-level key {@value #CONFIG_KEY}
- * (default {@code "classic"}, additive). An HQ that is already built keeps the layout it was built
+ * (default {@code "hybrid-ringcampus"}, additive). An HQ that is already built keeps the layout it was built
  * with until an explicit reset + rebuild ({@code dev.t3craft.client.hq.layout.HqRebuild}).
  */
 public final class HqLayouts {
-	/** The layout of main before layouts existed: hub + spine + wings, cherry style. */
-	public static final String DEFAULT_ID = "classic";
+	/** The default layout: the citadel. Also what any removed or unknown layout id falls back to ({@link #resolve}). */
+	public static final String DEFAULT_ID = "hybrid-ringcampus";
 	/** Top-level key of {@code config/t3craft.json}. */
 	public static final String CONFIG_KEY = "hqLayout";
 
@@ -108,10 +111,24 @@ public final class HqLayouts {
 		return Optional.empty();
 	}
 
-	/** The layout with this id; an unknown id or null gives {@link #DEFAULT_ID}. */
+	/**
+	 * The layout with this id; null or blank gives {@link #DEFAULT_ID} silently. An id that is not
+	 * registered (a layout that was removed, or a typo) also gives {@link #DEFAULT_ID}, with one WARN
+	 * line per distinct old id and session. Nothing else is touched: no crash, no data loss.
+	 */
 	public static HqLayoutInfo resolve(@Nullable String id) {
-		return find(id).orElse(ALL.get(0));
+		Optional<HqLayoutInfo> found = find(id);
+		if (found.isPresent()) {
+			return found.get();
+		}
+		if (id != null && !id.isBlank() && WARNED.add(id.trim().toLowerCase(Locale.ROOT))) {
+			T3Craft.LOGGER.warn("[hq] layout '{}' no longer exists; using the default layout '{}'", id.trim(), DEFAULT_ID);
+		}
+		return find(DEFAULT_ID).orElseThrow(() -> new IllegalStateException("default layout " + DEFAULT_ID + " is not registered"));
 	}
+
+	/** Old ids already reported by {@link #resolve} (lower case), so each is logged once. */
+	private static final Set<String> WARNED = ConcurrentHashMap.newKeySet();
 
 	// ------------------------------------------------------------------ config
 
