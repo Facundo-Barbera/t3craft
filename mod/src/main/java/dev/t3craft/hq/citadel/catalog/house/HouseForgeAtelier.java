@@ -593,8 +593,7 @@ public final class HouseForgeAtelier implements Variant {
 			for (int bu = ur + 2; bu <= hu - 1; bu++) {
 				s(bu, 1, 3, bu % 2 == 0 ? facing(Blocks.CHEST, Direction.SOUTH) : barrel());
 			}
-			s(hu, 1, 3, barrel());
-			s(hu, 2, 3, b(Blocks.COAL_BLOCK));
+			s(hu, 1, 3, b(Blocks.COAL_BLOCK)); // one high: a stacked block was a perch nobody could reach
 			// tool chests on the stair wall ahead of the flight, if the nave is deep enough
 			for (int v = 3; v <= vm - 7; v++) {
 				s(2, 1, v, facing(Blocks.CHEST, Direction.EAST));
