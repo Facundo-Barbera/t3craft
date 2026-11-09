@@ -114,7 +114,13 @@ the PC**, never on the VPS or the Mac mini.
 
 ## Other standing rules
 - **Commits:** no `Co-Authored-By` or any other AI credit in commits.
-- **History:** never rewrite `main` (no force push, no rebase of main); only merges.
+- **History:** never rewrite `main` (no force push, no rebase of main); only merges. The one approved exception was the
+  2026-11-09 publish migration: history rewritten and scrubbed into a new public `Facundo-Barbera/t3craft`; the old repo
+  is `t3craft-private-archive`, private and archived. Every clone has a `pre-push` hook that rejects history not
+  descending from the rewritten root.
+- **Public repo:** nothing personal or internal goes into commits, issues or docs: no host names, IPs, user names,
+  personal paths, emails or third-party company names. Use placeholders (`<pc>`, `vps-env`, `/home/user`). Commits
+  use the GitHub noreply identity.
 - **Tests:** this repo has no unit tests. Adding or running them is forbidden; verification is compiling (done by the
   coordinator).
 - **No dev servers or Minecraft on the VPS,** apart from what Facundo explicitly approves (Citadel Studio never runs
