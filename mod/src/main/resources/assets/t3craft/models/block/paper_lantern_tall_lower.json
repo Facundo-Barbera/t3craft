@@ -43,7 +43,7 @@
           "texture": "#stone"
         }
       },
-      "name": "plinth foot"
+      "name": "base foot"
     },
     {
       "from": [
@@ -76,7 +76,7 @@
           "texture": "#stone"
         }
       },
-      "name": "plinth"
+      "name": "base step"
     },
     {
       "from": [
@@ -109,17 +109,107 @@
           "texture": "#dark"
         }
       },
+      "name": "plinth cap"
+    },
+    {
+      "from": [
+        4,
+        5,
+        4
+      ],
+      "to": [
+        12,
+        10,
+        12
+      ],
+      "faces": {
+        "north": {
+          "texture": "#cherry"
+        },
+        "south": {
+          "texture": "#cherry"
+        },
+        "east": {
+          "texture": "#cherry"
+        },
+        "west": {
+          "texture": "#cherry"
+        },
+        "down": {
+          "texture": "#cherry"
+        }
+      },
+      "name": "shaft"
+    },
+    {
+      "from": [
+        3,
+        10,
+        3
+      ],
+      "to": [
+        13,
+        11,
+        13
+      ],
+      "faces": {
+        "north": {
+          "texture": "#dark"
+        },
+        "south": {
+          "texture": "#dark"
+        },
+        "east": {
+          "texture": "#dark"
+        },
+        "west": {
+          "texture": "#dark"
+        },
+        "up": {
+          "texture": "#dark"
+        },
+        "down": {
+          "texture": "#dark"
+        }
+      },
       "name": "collar"
     },
     {
       "from": [
+        3.5,
+        11,
+        3.5
+      ],
+      "to": [
+        12.5,
+        12,
+        12.5
+      ],
+      "faces": {
+        "north": {
+          "texture": "#brass"
+        },
+        "south": {
+          "texture": "#brass"
+        },
+        "east": {
+          "texture": "#brass"
+        },
+        "west": {
+          "texture": "#brass"
+        }
+      },
+      "name": "collar band"
+    },
+    {
+      "from": [
         5,
-        5,
+        11,
         5
       ],
       "to": [
         11,
-        16,
+        14,
         11
       ],
       "faces": {
@@ -139,17 +229,17 @@
           "texture": "#cherry"
         }
       },
-      "name": "post"
+      "name": "neck"
     },
     {
       "from": [
         4,
-        10,
+        14,
         4
       ],
       "to": [
         12,
-        11,
+        15,
         12
       ],
       "faces": {
@@ -172,7 +262,40 @@
           "texture": "#dark"
         }
       },
-      "name": "post ring"
+      "name": "capital 8"
+    },
+    {
+      "from": [
+        2,
+        15,
+        2
+      ],
+      "to": [
+        14,
+        16,
+        14
+      ],
+      "faces": {
+        "north": {
+          "texture": "#dark"
+        },
+        "south": {
+          "texture": "#dark"
+        },
+        "east": {
+          "texture": "#dark"
+        },
+        "west": {
+          "texture": "#dark"
+        },
+        "up": {
+          "texture": "#dark"
+        },
+        "down": {
+          "texture": "#dark"
+        }
+      },
+      "name": "capital 12"
     }
   ]
 }

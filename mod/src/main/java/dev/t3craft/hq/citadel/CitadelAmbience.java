@@ -14,11 +14,15 @@ import java.util.List;
 import java.util.Set;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.EmptyBlockGetter;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.Property;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -50,7 +54,11 @@ import org.jspecify.annotations.Nullable;
  * <li>{@link #relamp}: the old free-standing white froglight lamps (promenade posts) turn into the same warm
  *     chamber under the same roof.</li>
  * <li>{@link #arcades}: a hanging lantern under every roof ({@link #COVERED}) the public walks beneath,
- *     on the mirrored lattice {@code (2|x| + 5|z|) mod SPACING}, never next to another lamp.</li>
+ *     on the mirrored lattice {@code (2|x| + 5|z|) mod SPACING}, never closer than {@link #SPACING} - 1 to another
+ *     hanging lantern (so a street gets one every {@link #SPACING} cells instead of a clump), never next to another
+ *     lamp. The lantern is the kit's {@code paper_lantern_hanging} (a chochin on a cord; tone paper, rose or
+ *     vermilion by the lattice cell, mirrored like the lattice), or the vanilla hanging lantern when the blocks
+ *     module is off ({@link #hanging}).</li>
  * </ul>
  *
  * <h2>Scale</h2>
@@ -430,7 +438,29 @@ final class CitadelAmbience {
 		return false;
 	}
 
-	/** A hanging lantern under each roof (a full block 3 to 6 cells above the way) on a mirrored lattice, never next to another lamp. */
+	private static final String[] TONES = {"paper", "paper", "rose", "paper", "vermilion", "paper"};
+
+	/**
+	 * The hanging lantern under a roof: the kit's {@code t3craft:paper_lantern_hanging} (looked up by id: the blocks
+	 * module may be off) in the tone of the lattice cell of {@code p}, mirrored about the axes like everything here;
+	 * the vanilla hanging lantern when it is not registered.
+	 */
+	private static BlockState hanging(BlockPos p) {
+		Identifier id = Identifier.fromNamespaceAndPath("t3craft", "paper_lantern_hanging");
+		if (!BuiltInRegistries.BLOCK.containsKey(id)) {
+			return LANTERN_DOWN;
+		}
+		BlockState s = BuiltInRegistries.BLOCK.getValue(id).defaultBlockState();
+		String tone = TONES[Math.floorMod(Math.floorDiv(Math.abs(p.getX()), SPACING) + 2 * Math.floorDiv(Math.abs(p.getZ()), SPACING), TONES.length)];
+		Property<?> prop = s.getBlock().getStateDefinition().getProperty("tone");
+		return prop == null ? s : withValue(s, prop, tone);
+	}
+
+	private static <T extends Comparable<T>> BlockState withValue(BlockState s, Property<T> prop, String value) {
+		return prop.getValue(value).map(v -> s.setValue(prop, v)).orElse(s);
+	}
+
+	/** A hanging lantern under each roof (a full block 3 to 6 cells above the way) on a mirrored lattice, evenly spaced, never next to another lamp. */
 	private static void arcades(CitadelCanvas c, List<BlockPos> walk, Set<Long> postFeet, Set<Long> reserved) {
 		List<BlockPos> hung = new ArrayList<>();
 		for (BlockPos p : walk) {
@@ -444,7 +474,8 @@ final class CitadelAmbience {
 				BlockPos q = p.above(k);
 				BlockState s = c.cells.get(q.asLong());
 				if (s != null && !s.isAir()) {
-					ceiling = s.isCollisionShapeFullBlock(EmptyBlockGetter.INSTANCE, q) && s.getLightEmission() == 0 ? k : -1;
+					// leaves are a full block too, but a tree crown is not an eave: nothing hangs from it
+					ceiling = s.isCollisionShapeFullBlock(EmptyBlockGetter.INSTANCE, q) && s.getLightEmission() == 0 && !(s.getBlock() instanceof LeavesBlock) ? k : -1;
 					break;
 				}
 			}
@@ -459,16 +490,21 @@ final class CitadelAmbience {
 				continue;
 			}
 			BlockPos lamp = p.above(ceiling - 1);
-			c.put(lamp.getX(), lamp.getY(), lamp.getZ(), LANTERN_DOWN, HANGING);
+			c.put(lamp.getX(), lamp.getY(), lamp.getZ(), hanging(lamp), HANGING);
 			hung.add(lamp);
 		}
 	}
 
+	/**
+	 * Whether another hanging lantern is within {@code SPACING - 1} cells (flat, same storey): the lattice has a short
+	 * diagonal vector (2, 1), so without this a three-wide street got a lantern every two cells in a row.
+	 */
 	private static boolean tooCloseLamp(List<BlockPos> hung, BlockPos p) {
+		int min = SPACING - 1;
 		for (BlockPos o : hung) {
 			int dx = o.getX() - p.getX();
 			int dz = o.getZ() - p.getZ();
-			if (dx * dx + dz * dz < (SPACING / 2) * (SPACING / 2) && Math.abs(o.getY() - p.getY()) < 6) {
+			if (dx * dx + dz * dz < min * min && Math.abs(o.getY() - p.getY()) < 6) {
 				return true;
 			}
 		}
