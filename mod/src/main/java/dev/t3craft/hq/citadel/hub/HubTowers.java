@@ -7,8 +7,8 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.PLANKS;
 import static dev.t3craft.hq.citadel.CitadelCanvas.Y0;
 
 /**
- * The eight corner towers of the wall: a hollow 3 x 3 shaft on the vertices of the octagon, set
- * {@link HubDims#TOWER_OUT} outward so it never takes an interior cell. Dark base, stone-brick shaft with
+ * The four corner towers of the wall: a hollow 3 x 3 shaft on each diagonal, against the middle of the
+ * chamfer (it never takes an interior cell nor the patio stairs). Dark base, stone-brick shaft with
  * calcite corner posts and slit windows on the outer faces, a corbelled cornice and a stepped cherry cap
  * with a spire. Paints after the wall, on top of it.
  */
@@ -16,32 +16,19 @@ final class HubTowers {
 	private HubTowers() {
 	}
 
-	/** The eight vertices {x, z} of the octagon. */
-	private static int[][] vertices() {
-		int f = HubDims.FACE;
-		int h = HubDims.FACE_HALF;
-		int[][] v = new int[8][];
-		int i = 0;
+	/** One tower on each diagonal, against the middle of the chamfer; the heights alternate. */
+	static void paint(CitadelCanvas c) {
 		for (int sx = -1; sx <= 1; sx += 2) {
 			for (int sz = -1; sz <= 1; sz += 2) {
-				v[i++] = new int[] {sx * f, sz * h};
-				v[i++] = new int[] {sx * h, sz * f};
+				int top = sx * sz > 0 ? HubDims.TOWER_TOP_A : HubDims.TOWER_TOP_B;
+				tower(c, sx * HubDims.TOWER_CENTER, sz * HubDims.TOWER_CENTER, sx, sz, top);
 			}
 		}
-		return v;
 	}
 
-	static void paint(CitadelCanvas c) {
-		for (int[] v : vertices()) {
-			int sx = Integer.signum(v[0]);
-			int sz = Integer.signum(v[1]);
-			tower(c, v[0] + sx * HubDims.TOWER_OUT, v[1] + sz * HubDims.TOWER_OUT, sx, sz);
-		}
-	}
-
-	private static void tower(CitadelCanvas c, int cx, int cz, int sx, int sz) {
+	private static void tower(CitadelCanvas c, int cx, int cz, int sx, int sz, int topY) {
 		int hw = HubDims.TOWER_HALF;
-		int cornice = HubDims.TOWER_TOP - 1;
+		int cornice = topY - 1;
 		for (int dx = -hw; dx <= hw; dx++) {
 			for (int dz = -hw; dz <= hw; dz++) {
 				if (dx == 0 && dz == 0) {
@@ -66,7 +53,7 @@ final class HubTowers {
 				c.set(x, cornice, z, CALCITE);
 			}
 		}
-		int roof = HubDims.TOWER_TOP;
+		int roof = topY;
 		int eave = HubDims.TOWER_EAVE;
 		for (int dx = -eave; dx <= eave; dx++) {
 			for (int dz = -eave; dz <= eave; dz++) {

@@ -6,8 +6,6 @@ import dev.t3craft.hq.citadel.CitadelHub;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.Blocks;
 import static dev.t3craft.hq.citadel.CitadelCanvas.FOOT;
-import static dev.t3craft.hq.citadel.CitadelCanvas.LOG;
-import static dev.t3craft.hq.citadel.CitadelCanvas.PLANKS;
 import static dev.t3craft.hq.citadel.CitadelCanvas.Y0;
 import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
 import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
@@ -74,28 +72,38 @@ public final class HubExterior {
 		}
 	}
 
-	/** A two-step buttress of deepslate tiles against a flat face, in line with a pier. */
+	/** A two-step buttress against a flat face, in line with a pier: dark base, stone-brick body, a stair on top. */
 	private static void buttress(CitadelCanvas c, int sx, int z) {
 		Direction toWall = sx > 0 ? Direction.WEST : Direction.EAST;
-		c.fill(HubDims.BUTTRESS_X0 * sx, 0, HubDims.BUTTRESS_TOP0 - 1, z, FOOT);
-		c.set(HubDims.BUTTRESS_X0 * sx, HubDims.BUTTRESS_TOP0, z, stairs(Blocks.DEEPSLATE_TILE_STAIRS, toWall));
-		c.fill(HubDims.BUTTRESS_X1 * sx, 0, HubDims.BUTTRESS_TOP1 - 1, z, FOOT);
-		c.set(HubDims.BUTTRESS_X1 * sx, HubDims.BUTTRESS_TOP1, z, stairs(Blocks.DEEPSLATE_TILE_STAIRS, toWall));
+		step(c, HubDims.BUTTRESS_X0 * sx, z, Y0, HubDims.BUTTRESS_TOP0, toWall);
+		step(c, HubDims.BUTTRESS_X1 * sx, z, Y0 - 1, HubDims.BUTTRESS_TOP1, toWall);
 	}
 
-	/** A torii over a bridge: two cherry pillars on the deck's edges, tie beam, lintel, dark roof, three lanterns. */
+	private static void step(CitadelCanvas c, int x, int z, int darkTop, int top, Direction toWall) {
+		for (int y = 0; y < top; y++) {
+			c.set(x, y, z, y <= darkTop ? HubBlocks.darkBase(x, y, z) : HubBlocks.stoneBrick(x, y, z));
+		}
+		c.set(x, top, z, HubBlocks.stoneStairs(toWall, false));
+	}
+
+	/** A torii over a bridge: vermilion pillars, tie beam and lintel, a dark kasagi with raised tips, three lanterns. */
 	private static void torii(CitadelCanvas c, int z) {
+		var red = net.minecraft.world.level.block.Blocks.STRIPPED_CRIMSON_STEM;
 		for (int sx = -1; sx <= 1; sx += 2) {
-			c.fill(HubDims.TORII_PILLAR * sx, Y0 + 1, Y0 + 6, z, LOG);
+			for (int y = Y0 + 1; y <= Y0 + 6; y++) {
+				c.set(HubDims.TORII_PILLAR * sx, y, z, red.defaultBlockState());
+			}
 		}
-		for (int x = -HubDims.TORII_TIE; x <= HubDims.TORII_TIE; x++) {
-			c.set(x, Y0 + 5, z, PLANKS);
-		}
+		var beamX = red.defaultBlockState().setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS, Direction.Axis.X);
 		for (int x = -HubDims.TORII_LINTEL; x <= HubDims.TORII_LINTEL; x++) {
-			c.set(x, Y0 + 7, z, PLANKS);
+			c.set(x, Y0 + 5, z, beamX);
+			c.set(x, Y0 + 7, z, beamX);
 		}
 		for (int x = -HubDims.TORII_ROOF; x <= HubDims.TORII_ROOF; x++) {
 			c.set(x, Y0 + 8, z, slab(Blocks.DEEPSLATE_TILE_SLAB));
+		}
+		for (int sx = -1; sx <= 1; sx += 2) {
+			c.set(sx * (HubDims.TORII_ROOF + 1), Y0 + 8, z, HubBlocks.darkStairs(sx > 0 ? Direction.EAST : Direction.WEST, false));
 		}
 		for (int x : new int[] {-HubDims.TORII_TIE, 0, HubDims.TORII_TIE}) {
 			c.set(x, Y0 + 6, z, HubBlocks.hangingLantern());

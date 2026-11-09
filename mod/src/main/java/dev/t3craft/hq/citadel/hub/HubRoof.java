@@ -37,10 +37,10 @@ public final class HubRoof {
 			return; // the opening into the lantern
 		}
 		if (Math.max(ax, hz) == d) {
-			drumWall(c, x, z, ax, hz, top);
+			drumWall(c, x, z, ax, hz, top, HubDims.DRUM_TOP - 4, HubDims.DRUM_TOP);
 			return;
 		}
-		c.set(x, top, z, ax <= 1 ? PLANKS : HubBlocks.roofStairs(towardAxis(x)));
+		c.set(x, top, z, shell(x, ax));
 		if (Math.floorMod(z, HubDims.PIER_PERIOD) == 0) {
 			c.set(x, top - 1, z, RIB);
 		}
@@ -49,37 +49,73 @@ public final class HubRoof {
 		}
 	}
 
-	/** A cell of the lantern's ring: calcite corners and base, stained glass, calcite cornice. */
-	private static void drumWall(CitadelCanvas c, int x, int z, int ax, int hz, int top) {
-		boolean corner = ax == HubDims.DRUM_HALF && hz == HubDims.DRUM_HALF;
-		DyeColor tint = ax == HubDims.DRUM_HALF ? (x > 0 ? DyeColor.PINK : DyeColor.LIGHT_BLUE) : (z > 0 ? DyeColor.MAGENTA : DyeColor.YELLOW);
-		for (int y = top; y <= HubDims.DRUM_TOP; y++) {
-			boolean solid = corner || y <= HubDims.DRUM_TOP - 4 || y == HubDims.DRUM_TOP;
+	/** The roof's material by height: dark eave course, cherry body, bamboo near the ridge. */
+	private static net.minecraft.world.level.block.state.BlockState shell(int x, int ax) {
+		Direction in = towardAxis(x);
+		if (ax >= 5) {
+			return HubBlocks.darkStairs(in, false);
+		}
+		if (ax >= 3) {
+			return HubBlocks.roofStairs(in);
+		}
+		if (ax == 2) {
+			return Blocks.BAMBOO_MOSAIC_STAIRS.defaultBlockState().setValue(net.minecraft.world.level.block.StairBlock.FACING, in);
+		}
+		return Blocks.BAMBOO_MOSAIC.defaultBlockState();
+	}
+
+	/** A cell of a drum's ring: calcite corners, base and cornice, stained glass between (rows above {@code glassFrom}). */
+	private static void drumWall(CitadelCanvas c, int x, int z, int ax, int hz, int bottom, int glassFrom, int topY) {
+		int half = Math.max(ax, hz);
+		boolean corner = ax == half && hz == half;
+		DyeColor tint = ax == half ? HubBlocks.GLASS_COLORS[0] : HubBlocks.GLASS_COLORS[1];
+		for (int y = bottom; y <= topY; y++) {
+			boolean solid = corner || y <= glassFrom || y == topY;
 			c.set(x, y, z, solid ? CALCITE : HubBlocks.glass(tint));
 		}
 	}
 
-	/** The cap of the lantern (a stepped cherry pyramid with eaves and a spire) and the chain the beacon hangs from. */
+	/**
+	 * The two-body lantern: the lower drum's cap is a ring of eaves with a smaller drum on top, then a
+	 * stepped cherry pyramid and a spire; the beacon hangs on a chain from the lower ceiling.
+	 */
 	public static void cupola(CitadelCanvas c) {
-		int y = HubDims.DRUM_TOP + 1;
-		for (int hx = -3; hx <= 3; hx++) {
-			for (int hz = -3; hz <= 3; hz++) {
+		int d = HubDims.DRUM_HALF;
+		int eaveY = HubDims.DRUM_TOP + 1;
+		for (int hx = -(d + 1); hx <= d + 1; hx++) {
+			for (int hz = -(d + 1); hz <= d + 1; hz++) {
 				int m = Math.max(Math.abs(hx), Math.abs(hz));
-				for (int k = 0; k < 3; k++) {
-					int ring = 3 - k;
+				c.set(hx, eaveY, hz, m == d + 1 ? HubBlocks.roofStairs(inward(hx, hz)) : PLANKS);
+			}
+		}
+		int up = d - 1;
+		for (int hx = -up; hx <= up; hx++) {
+			for (int hz = -up; hz <= up; hz++) {
+				int m = Math.max(Math.abs(hx), Math.abs(hz));
+				if (m == up) {
+					drumWall(c, hx, hz, Math.abs(hx), Math.abs(hz), eaveY + 1, eaveY + 1, eaveY + 4);
+				}
+			}
+		}
+		int capY = eaveY + 5;
+		for (int hx = -d; hx <= d; hx++) {
+			for (int hz = -d; hz <= d; hz++) {
+				int m = Math.max(Math.abs(hx), Math.abs(hz));
+				for (int k = 0; k < d; k++) {
+					int ring = d - k;
 					if (m == ring) {
-						c.set(hx, y + k, hz, HubBlocks.roofStairs(inward(hx, hz)));
+						c.set(hx, capY + k, hz, HubBlocks.roofStairs(inward(hx, hz)));
 					} else if (m < ring) {
-						c.set(hx, y + k, hz, PLANKS);
+						c.set(hx, capY + k, hz, PLANKS);
 					}
 				}
 			}
 		}
-		c.set(0, y + 3, 0, HubBlocks.stoneWall());
-		c.set(0, y + 4, 0, HubBlocks.stoneWall());
-		c.set(0, y + 5, 0, HubBlocks.rod());
+		c.set(0, capY + d, 0, HubBlocks.stoneWall());
+		c.set(0, capY + d + 1, 0, HubBlocks.stoneWall());
+		c.set(0, capY + d + 2, 0, HubBlocks.rod());
 		int beacon = CitadelHub.vaultY(0) + 1;
-		for (int cy = beacon + 1; cy < y; cy++) {
+		for (int cy = beacon + 1; cy < eaveY; cy++) {
 			c.set(0, cy, 0, HubBlocks.chain());
 		}
 	}
@@ -93,16 +129,34 @@ public final class HubRoof {
 
 	/** The eave: a stair overhanging the aisle beyond the clerestory's top, in line with the nave's slope. */
 	public static void eave(CitadelCanvas c, int x, int z) {
+		if (Math.abs(z) <= HubDims.TRANSEPT_HALF) {
+			return;
+		}
 		int sx = x > 0 ? 1 : -1;
-		c.set(x + sx, CitadelHub.SPRING, z, HubBlocks.roofStairs(towardAxis(x)));
+		c.set(x + sx, CitadelHub.SPRING, z, HubBlocks.darkStairs(towardAxis(x), false));
 	}
 
-	/** One column of an aisle's roof terrace: cherry slabs, bamboo along the pier lines, planters and lantern posts. */
+	/**
+	 * One column of an aisle's roof: within {@link HubDims#TRANSEPT_HALF} of the axis the cross gable of the
+	 * transept (stairs up to a ridge along x), elsewhere a terrace of stone-brick slabs with bamboo stripes
+	 * on the pier lines, planters and lantern posts.
+	 */
 	public static void terrace(CitadelCanvas c, int x, int z) {
 		int ax = Math.abs(x);
 		int y = HubDims.TERRACE_Y;
-		c.set(x, y, z, arcadeZ(z) ? slab(Blocks.BAMBOO_MOSAIC_SLAB) : slab(Blocks.CHERRY_SLAB));
-		if (ax == HubDims.TERRACE_X1 - 1 && arcadeZ(z)) {
+		int hz = Math.abs(z);
+		int t = HubDims.TRANSEPT_HALF;
+		if (hz <= t) {
+			if (hz == 0) {
+				c.set(x, y + t, z, HubBlocks.stoneBrick(x, y, z));
+				c.set(x, y + t + 1, z, slab(Blocks.DEEPSLATE_TILE_SLAB));
+			} else {
+				c.set(x, y + t - hz, z, hz == t ? HubBlocks.darkStairs(z > 0 ? Direction.NORTH : Direction.SOUTH, false) : HubBlocks.roofStairs(z > 0 ? Direction.NORTH : Direction.SOUTH));
+			}
+			return;
+		}
+		c.set(x, y, z, arcadeZ(z) ? slab(Blocks.BAMBOO_MOSAIC_SLAB) : HubBlocks.stoneSlab(false));
+		if (ax == HubDims.TERRACE_X0 + 1 && arcadeZ(z)) {
 			c.set(x, y + 1, z, HubBlocks.bush());
 		}
 		if (ax == HubDims.TERRACE_X0 + 2 && arcadeZ(z) && Math.floorMod(z + 2, 8) == 0) {

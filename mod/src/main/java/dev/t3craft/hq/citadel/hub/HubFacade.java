@@ -1,5 +1,6 @@
 package dev.t3craft.hq.citadel.hub;
 
+import dev.t3craft.hq.RingCampusGeometry.Kind;
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.CitadelHub;
 import net.minecraft.core.Direction;
@@ -77,7 +78,7 @@ public final class HubFacade {
 		portals(c, x, z);
 	}
 
-	/** Footing, panels, windows and piers up to the cornice. */
+	/** Footing (stone-brick course), panels, windows and piers up to the cornice. */
 	static void column(CitadelCanvas c, int x, int z, boolean naveEnd) {
 		boolean pier = !naveEnd && pier(x, z);
 		int u = bay(x, z);
@@ -87,7 +88,7 @@ public final class HubFacade {
 			if (y <= Y0 + 1) {
 				s = HubBlocks.stoneBrick(x, y, z);
 			} else if (y == CitadelHub.AISLE_TOP) {
-				s = CALCITE;
+				s = naveEnd ? RIB : CALCITE;
 			} else if (pier) {
 				s = y == Y0 + 2 ? RIB : CALCITE;
 			} else if (win && y >= Y0 + 3 && y <= Y0 + 5) {
@@ -103,27 +104,57 @@ public final class HubFacade {
 		}
 	}
 
+	/** Whether a wall column has an open side (a neighbour outside the hub), i.e. is on the face and not behind it. */
+	static boolean outer(CitadelCanvas c, int x, int z) {
+		for (Direction d : Direction.Plane.HORIZONTAL) {
+			Kind k = c.zoneAt(x + d.getStepX(), z + d.getStepZ()).kind();
+			if (k != Kind.HUB && k != Kind.HUB_WALL && k != Kind.NONE) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** The cross gables of the transept stand on the east and west faces within the transept's width. */
+	static boolean transept(int x, int z) {
+		return Math.abs(x) == HubDims.FACE && Math.abs(z) <= HubDims.TRANSEPT_HALF;
+	}
+
 	/**
-	 * The parapet on the aisle walls: merlons two high on every other cell, slabs between, taller calcite
-	 * merlons on the piers and a pinnacle (calcite, two light posts and a lightning rod) at each of the
-	 * eight corners.
+	 * The parapet on the aisle walls, only on the outer column: merlons (calcite under a tile slab) on every
+	 * other cell with a tile slab between, a taller calcite merlon with a light post on each pier and at
+	 * the eight vertices. The inner column of a thick chamfer only gets a slab.
 	 */
 	static void parapet(CitadelCanvas c, int x, int z) {
 		int top = CitadelHub.AISLE_TOP + 1;
-		if (corner(x, z)) {
-			c.set(x, top, z, CALCITE);
-			c.set(x, top + 1, z, HubBlocks.stoneWall());
-			c.set(x, top + 2, z, HubBlocks.stoneWall());
-			c.set(x, top + 3, z, HubBlocks.rod());
-		} else if (pier(x, z)) {
+		if (transept(x, z)) {
+			transeptGable(c, x, z);
+			return;
+		}
+		if (!outer(c, x, z)) {
+			c.set(x, top, z, slab(Blocks.DEEPSLATE_TILE_SLAB));
+		} else if (corner(x, z) || pier(x, z)) {
 			c.set(x, top, z, CALCITE);
 			c.set(x, top + 1, z, CALCITE);
+			c.set(x, top + 2, z, corner(x, z) ? HubBlocks.stoneWall() : slab(Blocks.DEEPSLATE_TILE_SLAB));
 		} else if (Math.floorMod(along(x, z), 2) == 0) {
-			c.set(x, top, z, FOOT);
-			c.set(x, top + 1, z, FOOT);
+			c.set(x, top, z, CALCITE);
+			c.set(x, top + 1, z, slab(Blocks.DEEPSLATE_TILE_SLAB));
 		} else {
 			c.set(x, top, z, slab(Blocks.DEEPSLATE_TILE_SLAB));
 		}
+	}
+
+	/** The end wall of a transept gable: calcite up to the roof line, a small window on the ridge, a dark coping. */
+	static void transeptGable(CitadelCanvas c, int x, int z) {
+		int hz = Math.abs(z);
+		int base = HubDims.TERRACE_Y;
+		int top = base + HubDims.TRANSEPT_HALF - hz;
+		for (int y = base; y <= top; y++) {
+			boolean window = hz <= 1 && y >= base + 1 && y <= top - 1 && !(hz == 1 && y > base + 2);
+			c.set(x, y, z, window ? HubBlocks.glass(HubBlocks.GLASS_COLORS[Math.floorMod(x > 0 ? 0 : 1, 2)]) : CALCITE);
+		}
+		c.set(x, top + 1, z, hz == 0 ? slab(Blocks.DEEPSLATE_TILE_SLAB) : HubBlocks.darkStairs(z > 0 ? Direction.NORTH : Direction.SOUTH, false));
 	}
 
 	/** The eight vertices of the octagon: where a face meets the chamfer. */
@@ -140,6 +171,7 @@ public final class HubFacade {
 			c.set(x, y, z, rose(x, y));
 		}
 		int ax = Math.abs(x);
+		roseRim(c, x, z);
 		c.set(x, top + 1, z, ax <= 1 ? slab(Blocks.DEEPSLATE_TILE_SLAB) : HubBlocks.darkStairs(x > 0 ? Direction.WEST : Direction.EAST, false));
 		if (x == 0) {
 			c.set(x, top + 1, z, CALCITE);
@@ -148,17 +180,20 @@ public final class HubFacade {
 		}
 	}
 
-	/** The rose window: a yellow eye, a pink ring, eight calcite spokes and alternating blue and magenta petals. */
+	/** The rose window: a yellow eye, a pink ring, eight calcite spokes with blue and magenta petals, a stone-brick rim. */
 	static BlockState rose(int x, int y) {
 		double dy = y - CitadelHub.SPRING;
 		double r = Math.hypot(x, dy);
-		if (r > 3.2) {
+		if (r > 3.7) {
 			return CALCITE;
+		}
+		if (r > 2.8) {
+			return Blocks.CHISELED_STONE_BRICKS.defaultBlockState();
 		}
 		if (r <= 0.9) {
 			return HubBlocks.glass(DyeColor.YELLOW);
 		}
-		if (r <= 2.0) {
+		if (r <= 1.8) {
 			return HubBlocks.glass(DyeColor.PINK);
 		}
 		double a = Math.atan2(dy, x);
@@ -167,6 +202,17 @@ public final class HubFacade {
 			return CALCITE;
 		}
 		return HubBlocks.glass(Math.floorMod((int) Math.floor(sector), 2) == 0 ? DyeColor.LIGHT_BLUE : DyeColor.MAGENTA);
+	}
+
+	/** The rim of the rose window stands out one block from the gable (outside the wall). */
+	static void roseRim(CitadelCanvas c, int x, int z) {
+		int sz = z > 0 ? 1 : -1;
+		for (int y = CitadelHub.AISLE_TOP + 1; y <= CitadelHub.vaultY(Math.abs(x)); y++) {
+			double r = Math.hypot(x, y - CitadelHub.SPRING);
+			if (r > 2.8 && r <= 3.7) {
+				c.set(x, y, z + sz, Blocks.CHISELED_STONE_BRICKS.defaultBlockState());
+			}
+		}
 	}
 
 	/** Main portal (south, 5 x 5, stepped arch) and the north door under the board (3 x 3), both framed in calcite. */

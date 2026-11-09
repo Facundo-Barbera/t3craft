@@ -82,16 +82,19 @@ final class HubDims {
 
 	// ---- roof, lantern and towers
 	/** The lantern drum over the crossing: half-width of its ring (the opening is DRUM_HALF - 1), top of its walls. */
-	static final int DRUM_HALF = 2;
+	static final int DRUM_HALF = 3;
 	static final int DRUM_TOP = 26;
+	/** Transept over the aisles: half-width in z of each cross gable (ridge at TERRACE_Y + TRANSEPT_HALF). */
+	static final int TRANSEPT_HALF = 4;
 	/** Aisle roof terrace: floor y, and the x range of the terrace (aisle side of the clerestory). */
 	static final int TERRACE_Y = 13;
 	static final int TERRACE_X0 = 7;
 	static final int TERRACE_X1 = 12;
 	/** Corner towers: half-width of the shaft (3 x 3 => 1), offset of the centre outward from the vertex, shaft top, eave half-width. */
 	static final int TOWER_HALF = 1;
-	static final int TOWER_OUT = 1;
-	static final int TOWER_TOP = 13;
+	static final int TOWER_CENTER = 12;
+	static final int TOWER_TOP_A = 16;
+	static final int TOWER_TOP_B = 14;
 	static final int TOWER_EAVE = 2;
 	/** Stone lanterns at the bridge heads, on the rail line, this far from the hub's centre. */
 	static final int TORO_Z = 14;

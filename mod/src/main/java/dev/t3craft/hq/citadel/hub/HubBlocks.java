@@ -17,7 +17,7 @@ import net.minecraft.world.level.block.state.properties.SlabType;
  */
 final class HubBlocks {
 	/** Window colours of the nave and the outer wall, cycled by bay. */
-	static final DyeColor[] GLASS_COLORS = {DyeColor.PINK, DyeColor.LIGHT_BLUE, DyeColor.MAGENTA, DyeColor.YELLOW};
+	static final DyeColor[] GLASS_COLORS = {DyeColor.PINK, DyeColor.LIGHT_BLUE};
 
 	private HubBlocks() {
 	}
