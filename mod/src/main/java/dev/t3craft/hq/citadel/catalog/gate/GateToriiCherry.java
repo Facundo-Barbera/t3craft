@@ -247,23 +247,23 @@ public final class GateToriiCherry implements Variant {
 		boolean benches = w >= 15 && tall;
 		for (int u : new int[] {0, w - 1}) {
 			if (frontRoom) {
-				lamp(c, p, u, benches ? v0 - 1 : 0, lampStyle);
+				lamp(c, p, u, 0, lampStyle);
 			}
 			if (backRoom) {
-				lamp(c, p, u, benches ? v1 + 1 : backRow, lampStyle);
+				lamp(c, p, u, backRow, lampStyle);
 			}
 		}
 
-		// --- waiting benches on the sidewalks (outside the roadway), seat of stairs, rail back, in the outer rows
+		// --- waiting benches on the sidewalks (outside the roadway), seat of stairs against a fence rail, between the lamp
+		// post at the plot's edge and the roadway
 		if (benches) {
-			for (int s = 0; s < 2; s++) {
-				int a = s == 0 ? 0 : w - 3; // three seats from the plot's edge
-				if (frontRoom) {
-					bench(c, p, a, 0, Direction.NORTH);
-				}
-				if (backRoom) {
-					bench(c, p, a, backRow, Direction.SOUTH);
-				}
+			if (frontRoom) {
+				bench(c, p, l0, l1, true, 0, Direction.NORTH);
+				bench(c, p, r0, r1, false, 0, Direction.NORTH);
+			}
+			if (backRoom) {
+				bench(c, p, l0, l1, true, backRow, Direction.SOUTH);
+				bench(c, p, r0, r1, false, backRow, Direction.SOUTH);
 			}
 		}
 
@@ -308,7 +308,7 @@ public final class GateToriiCherry implements Variant {
 			double t = Math.abs(2.0 * u - mid) / span; // 0 in the middle, 1 at the tips
 			int r = (int) Math.round(rise * (sharp ? t * t * t : t * t));
 			boolean outside = tips && (u < p0 || u > p1);
-			int rb = outside && r >= 2 ? r - 1 : 0;
+			int rb = outside && r >= 2 ? Math.min(2, r - 1) : 0; // one block of lift at most: nobody can stand under the tip
 			boolean end = u == b0 || u == b1;
 			Direction out = 2 * u < mid ? Direction.WEST : Direction.EAST;
 			int yb = c0 - body + rb / 2;
@@ -357,14 +357,13 @@ public final class GateToriiCherry implements Variant {
 		}
 	}
 
-	/** A bench of three seats along u from {@code a} on row {@code v}: stairs with the tall side to {@code back}, and a fence rail over each. */
-	private static void bench(CitadelCanvas c, Plot p, int a, int v, Direction back) {
-		for (int i = 0; i < 3; i++) {
-			int u = a + i;
+	/** A bench on row {@code v} over {@code a..z}: stairs with the tall side to {@code back}, a fence rail over each seat joined to the lamp post at the plot's edge ({@code lampLeft}: it is on the west side). */
+	private static void bench(CitadelCanvas c, Plot p, int a, int z, boolean lampLeft, int v, Direction back) {
+		for (int u = a; u <= z; u++) {
 			p.set(c, u, 0, v, stairs(Blocks.CHERRY_STAIRS, back));
 			BlockState rail = b(Blocks.CHERRY_FENCE)
-					.setValue(BlockStateProperties.WEST, i > 0)
-					.setValue(BlockStateProperties.EAST, i < 2);
+					.setValue(BlockStateProperties.WEST, u > a || lampLeft)
+					.setValue(BlockStateProperties.EAST, u < z || !lampLeft);
 			p.set(c, u, 1, v, rail);
 		}
 	}
