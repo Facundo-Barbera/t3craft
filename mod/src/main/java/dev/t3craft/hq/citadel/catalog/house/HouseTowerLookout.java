@@ -567,10 +567,6 @@ public final class HouseTowerLookout implements Variant {
 			set(c, g.p, eu + dx, 0, 0, slab(Blocks.POLISHED_DEEPSLATE_SLAB, false));
 			set(c, g.p, eu + dx, 0, 1, stair(Blocks.DEEPSLATE_BRICK_STAIRS, Direction.SOUTH, false));
 		}
-		// [depth] a hood over the door: three upside-down stairs of the eave timber, high enough to walk under
-		for (int dx = -1; dx <= 1; dx++) {
-			set(c, g.p, eu + dx, 4, 1, stair(g.s.eaveStair(), Direction.SOUTH, true));
-		}
 		// planters either side of the steps and shrubs at the four corners
 		for (int side = -1; side <= 1; side += 2) {
 			set(c, g.p, eu + side * 3, 0, 0, b(Blocks.MOSS_BLOCK));
