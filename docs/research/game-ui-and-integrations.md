@@ -658,6 +658,109 @@ Según `docs/features/blocks.md` y el código de `client/blocks/`:
    hilos de T3?
 4. ¿El juego va en un servidor remoto con otros jugadores, o es singleplayer o LAN? (condiciona el punto 8 de §9.3)
 
+## 10. Anexo: "revisar todo desde el juego" (el bloque abre el navegador)
+
+Aclaración de Facundo (2026-11-09): el objetivo es **poder revisar todo desde el juego**. Las pantallas físicas con navegador serían
+solo decorativas; lo útil es **clic derecho en un bloque (o NPC) → se abre la interfaz, y esa interfaz es el navegador**. Los
+bloques útiles son una idea aparte. Esto cambia las prioridades de §8 y §9.
+
+### 10.1 Qué cambia
+- La pieza central deja de ser la pantalla en el mundo y pasa a ser **`T3WebScreen`**: una `Screen` de pantalla completa con un
+  navegador, abierta en una **ruta concreta** de la app web de T3.
+- El bloque (o el NPC) es solo un **lanzador contextual**. El mod ya funciona así: el clic en un monitor, el NPC o la estación de
+  merge abre algo (`ChatScreenOpener`, `MergeStationScreen`). Se cambia el destino, no el mecanismo.
+- La **vía A (stream del servidor)** deja de ser la principal: solo muestra pestañas de preview. Para "revisar todo" se necesita
+  la **vía B (CEF)** cargando el propio **T3 web**.
+- Las pantallas decorativas pasan a N4: se pueden hacer después con la misma `PageSource`.
+
+### 10.2 T3 web ya tiene casi todo lo que hay que revisar (rutas del repo `pingdotgg/t3code`, `apps/web/src/routes/`)
+| Ruta | Para qué sirve | Lanzador natural en el HQ |
+|---|---|---|
+| `/{environmentId}/{threadId}` | El hilo completo: chat, diff, plan, terminal, archivos | NPC, monitor y escritorio del hilo, podio de decisiones |
+| `/pull-requests` | Lista y revisión de PRs (detalle, checks, archivos, guía de revisión, comentarios) | `merge_station` |
+| `/usage` | Uso y costo | pantalla de estado |
+| `/settings/scheduled-tasks` | Tareas programadas | tablero de tareas programadas |
+| `/settings/archived`, `/settings/threads`, `/settings/worktrees` | Archivo, hilos, worktrees | terminal de archivo |
+| `/settings/source-control`, `/settings/providers`, `/settings/diagnostics`, `/settings/access`, `/settings/connections` | Git, proveedores, diagnóstico, accesos | terminal del líder o un bloque de "administración" |
+| `/new`, `/draft/{id}` | Hilo nuevo | tecla Ctrl+N o el portátil |
+| `/pair`, `/connect` | Emparejar, T3 Connect | el flujo de login (ver 10.5) |
+
+Detrás hay RPC de T3 para todo esto (`pullRequests.*` con 30 métodos, `review.getDiffPreview`, `terminal.observe`,
+`filesystem.browse`, `preview.*`), así que reescribirlo nativamente es mucho trabajo. **Qué se ahorra:** G9 (pantalla de diff),
+G10 (costo), G11 (salida de comandos), la revisión de PRs y casi todos los ajustes del lado de T3.
+
+### 10.3 División de trabajo propuesta (nativo contra web)
+- **Nativo (se queda):** el chat y el composer (ya están muy cuidados), avisos, responder aprobaciones con confirmación en el juego
+  y `audit.log`, el HUD, los hologramas, los NPC, los ajustes propios del mod (HUD, avisos, NPC, UI scale) y el emparejamiento.
+- **Web (se abre en la `T3WebScreen`):** revisar diffs y PRs, terminal, archivos, ajustes de T3, uso, tareas programadas, proveedores.
+- Cada pantalla nativa gana un botón "Abrir en el navegador" que lleva a la ruta equivalente.
+
+### 10.4 Los lanzadores como puertas
+Un bloque o NPC lleva un `binding` (el mod ya lo guarda) y el clic derecho calcula la ruta:
+`thread:<envId:threadId>` → `/{envId}/{threadId}`; `merge_station` → `/pull-requests`; `status_screen` → `/usage`; etc. Cuando se
+pensó en "bloques útiles" (idea aparte de Facundo), este patrón los vuelve baratos: **un bloque = una ruta**. Sin el módulo de
+bloques, el mismo destino se abre con una tecla (`Y`, `J`) o con el clic derecho en el NPC (`UseEntityCallback`, que funciona en
+servidores remotos).
+
+### 10.5 El punto delicado: iniciar sesión en T3 web dentro del navegador embebido
+Evidencia: `docs/internals/environment-auth.md` y `environmentHttp.ts` de T3.
+- La web de T3 se autentica con una **cookie de sesión de navegador**: `POST /api/auth/browser-session { credential }` canjea un
+  credencial de bootstrap (el mismo tipo de enlace de emparejamiento, `/pair#token=…`) y deja la cookie. Hoy el mod canjea su
+  credencial en `POST /oauth/token` y guarda un Bearer: **son dos sesiones distintas**, y un credencial es de un solo uso.
+- El Bearer del mod (`read` + `operate`) **no puede crear otro credencial**: `POST /api/auth/pairing-token` exige `access:write`.
+- Las sesiones **no amplían** lo concedido: lo que el credencial delega es el techo. Por defecto T3 delega todo (incluido
+  `terminal:operate`, una shell como el usuario del servidor) si no se pasan `--scope`.
+- **Opciones:**
+  1. **Un segundo emparejamiento "para el navegador"**, opt-in, con los scopes que quieras para la web (por ejemplo
+     `orchestration:read`, `orchestration:operate`, `source-control:write` si quieres comentar y revisar PRs). Más fricción, claro y seguro.
+  2. **Una sola sesión para ambos:** el mod canjea el credencial en `/api/auth/browser-session`, guarda la cookie, la inyecta en el
+     almacén de cookies de CEF y la usa también para su WebSocket (T3 admite cookies en el upgrade). Menos pasos, pero cambia
+     cómo el mod se autentica; **(verificar)** que el RPC lo acepte con cookie y no solo con Bearer.
+  3. **T3 Connect** (`/api/t3-connect/mint-credential`, **issue #1**): resolvería el canje sin pasos manuales. Es la razón para
+     decidir el #1 antes de fijar este flujo.
+- **Avisos de seguridad que cambian respecto al modelo actual:**
+  - Lo que se hace dentro del navegador **no pasa por `OperateGate` ni por las confirmaciones del juego, ni deja registro en
+    `audit.log`**; actúa la propia app web con los scopes de su sesión.
+  - La cookie de sesión vive en el perfil de CEF en disco: tratarla como un secreto (carpeta propia en `config/t3craft/`, no en el repo,
+    permisos del propietario, un perfil por entorno).
+  - Cargar solo el origen del entorno de T3 (lista cerrada de dominios). Los enlaces externos se abren con `openUri`.
+
+### 10.6 Requisitos y riesgos de la `T3WebScreen` (vía B)
+- **Motor:** necesita un Chromium reciente: T3 web es una app moderna. El MCEF original va con Chromium 116; hay que usar
+  **Rinku o MCEF Modern**. **(verificar)** que T3 web carga sin fallos en cada uno.
+- **Texto y escala:** CEF acepta un factor de escala del dispositivo. Eso resuelve "tamaño de texto independiente del GUI scale"
+  (§7) para esta pantalla casi gratis: el ajuste "UI scale" del mod pasa a ser el zoom de la página.
+- **Entrada:** teclado, IME (SDL3), portapapeles, rueda, arrastrar y soltar, selector de archivos (subir imágenes al composer),
+  descargas, menús contextuales y pestañas nuevas. Trabajo propio, pero un `Screen` los captura bien. M a L.
+- **Audio y voz:** T3 web tiene una sección de voz (`/settings/voice`); el micrófono en CEF necesita manejo de permisos
+  **(verificar)**.
+- **Rendimiento y ciclo de vida:** crear el navegador al abrir, suspenderlo al cerrar (o mantener la sesión viva unos minutos), una sola
+  instancia por entorno. Mientras la pantalla está abierta, Chromium compite por la GPU y usa varios cientos de MB.
+- **Pausa del juego:** una `Screen` pausa el mundo en singleplayer; hay que decidir si las `T3WebScreen` no pausan (`isPauseScreen=false`).
+- **Dependencia y mantenimiento:** descarga de Chromium en el primer arranque (~136 MB según `mcef-codec`), librería opcional
+  (`suggests`), atada a la versión de Minecraft y a un mantenedor por fork. El mod sigue funcionando sin ella (vía D).
+- **Compatibilidad con la limpieza y el #1:** no toca el modelo de red del mod; el #1 solo cambia cómo se obtiene la sesión.
+
+### 10.7 Plan por niveles (reordenado)
+| Nivel | Qué se entrega | Esfuerzo |
+|---|---|---|
+| W0 | Spike: dependencia opcional de Rinku/MCEF Modern, `T3WebScreen` carga `https://<entorno>/…` con una cookie de prueba | S a M |
+| W1 | Entrada completa (teclado, ratón, IME, portapapeles), zoom ligado al UI scale, cierre con Esc/tecla | M |
+| W2 | Sesión: segundo emparejamiento "web" (o sesión única) y perfil por entorno; sin T3 web, caer a `openUri` | M |
+| W3 | Lanzadores: clic derecho en NPC y en monitor/estación de merge/pantalla de estado/tablero abre la ruta correcta; botón "Abrir en navegador" en las pantallas nativas | M |
+| W4 | Descargas, subir archivos, permisos de micrófono, varias pestañas | M a L |
+| W5 | Bloques decorativos y paredes con la `PageSource` (§9), vía A para previews | M |
+
+### 10.8 Preguntas para Facundo
+1. ¿La experiencia objetivo es **T3 web tal cual** dentro del juego (fidelidad total, cero reescritura), o prefieres que lo
+   importante (diff, PR) sea nativo y solo lo demás vaya al navegador?
+2. ¿Qué scopes darías a la sesión web? En particular, ¿**comentar y aprobar PRs** (`source-control:write`) y **terminal**
+   (`terminal:operate`, una shell en el servidor)? Esto es una decisión de seguridad.
+3. ¿Aceptas que lo que se hace en el navegador **no pase por las confirmaciones ni el `audit.log` del juego**?
+4. ¿Segundo emparejamiento "web" (más fricción, más claro) o sesión única (menos pasos, cambia la autenticación del mod)? Depende del #1.
+5. ¿Qué lanzadores quieres primero: NPC, monitor del escritorio, estación de merge, pantalla de estado, tablero de tareas?
+6. ¿Desde qué máquinas jugarás con esto (Windows, macOS, Linux; arm64 o x86_64)? Condiciona el motor CEF.
+
 ## Fuentes web
 
 - GLFW, `glfwRequestWindowAttention`: https://www.glfw.org/docs/latest/group__window.html
