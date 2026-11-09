@@ -74,7 +74,7 @@ nunca se recrea ni se sobrescribe. Toda la API vanilla de creación/carga está 
 ## El HQ real (`DemoHq` + `DemoHqSource`)
 - **Roster**: todos los NPC mostrados (`T3CraftClient.get().npcs().all()`, todos los entornos, agrupados por
   `groupId` = entorno:proyecto; los `settled` van al archivo). Si no hay ninguno, `DemoHq.sample()`: 3
-  proyectos fijos en 2 entornos (`vps:t3craft`, `acmesite:forja`, `vps:telar`), 4 hilos cada uno, uno
+  proyectos fijos en 2 entornos (`vps:t3craft`, `laptop:forja`, `vps:telar`), 4 hilos cada uno, uno
   archivado. Se fija en cada comprobación (al entrar y con `rebuild`); `status` dice cuál se usó.
 - **Layout estable**: `HqGenerator.plan(input, layoutAnterior)` con el layout guardado en `state.layout`,
   así los escritorios no se barajan entre visitas.

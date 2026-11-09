@@ -31,7 +31,7 @@ final class Growth {
 
 	private static final String[] NAMES = {"t3craft", "bridge", "website", "infra", "mobile", "docs", "billing", "search", "agentcraft", "ops",
 			"design", "data", "auth", "chat", "metrics", "ml", "cli", "edge", "mail", "admin"};
-	private static final String[] ENVS = {"vps", "laptop", "acmesite", "cloud"};
+	private static final String[] ENVS = {"vps", "laptop", "desktop", "cloud"};
 	/** Active threads per project (7+ adds a floor, 13+ a third). */
 	private static final int[] THREADS = {5, 9, 3, 6, 2, 13, 4, 1, 7, 3, 2, 5, 8, 1, 4, 3, 6, 2, 1, 4};
 

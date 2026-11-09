@@ -1,6 +1,6 @@
 {
   "description": "Paired read-only (no operate session): the composer says Enable control, header actions are disabled.",
-  "environments": [{"id": "mini", "label": "Mini Acmesite", "status": "ok", "control": false}],
+  "environments": [{"id": "mini", "label": "Laptop", "status": "ok", "control": false}],
   "projects": [{"env": "mini", "id": "p-docs", "title": "docs"}],
   "threads": [
     {"env": "mini", "id": "t1", "project": "p-docs", "title": "Write the API reference", "state": "working", "agoMin": 1, "transcript": "ro"},

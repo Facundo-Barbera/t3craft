@@ -8,7 +8,7 @@
 >    `0.0.0.0`, `::` y cualquier IP que no sea loopback, `100.64.0.0/10` o `fd7a:115c:a1e0::/48`, y
 >    el socket lo vuelve a comprobar al hacer bind.
 > 2. **El puente es cliente de varios T3 a la vez**: hoy son my-vps
->    (`https://my-vps.example.ts.net`) y la mini my-acmesite (puerto 3773).
+>    (`https://my-vps.example.ts.net`) y el portátil my-laptop (puerto 3773).
 >    Cada entorno tiene su propia sesión revocable, con el token en un archivo fuera del repo
 >    referenciado por `environments[].tokenFile`. Los threads de todos los entornos se juntan, y cada
 >    NPC lleva `env`/`envLabel`. Ids únicos: `<env>:<threadId>`.
@@ -27,7 +27,7 @@
 > ```
 > [PC Windows: Minecraft + mod]  --ws://<homelab tailscale>:7878 (t3craft v1)-->  [my-homelab: bridge (systemd)]
 >                                                                                   ├─ HTTPS/WSS → my-vps T3 (token propio)
->                                                                                   └─ HTTP/WS  → my-acmesite T3 :3773 (token propio)
+>                                                                                   └─ HTTP/WS  → my-laptop T3 :3773 (token propio)
 > ```
 > Decisión sobre `status=="waiting"` (revisada el 8 nov 2026): es un estado vivo de la corrida
 > (espera una herramienta, un `thread_wait`, subagentes o tareas de fondo; está en
@@ -170,7 +170,7 @@ t3craft/
 - Hay que decidir la versión de Java/MC (26.3+Java 25 frente a 1.21.11+Java 21).
 - El cliente de Minecraft en Windows necesita Tailscale activo para que el puente llegue al VPS.
 - *(Nuevo)* Con el puente en el tailnet, cualquier nodo del tailnet puede conectarse al puerto 7878. Antes de la fase 3 (aprobar permisos) conviene activar `listen.clientKeyFile` y/o una ACL de Tailscale que solo deje pasar la PC.
-- *(Nuevo)* `my-acmesite:3773`: confirmar si se sirve por HTTPS (Tailscale Serve) o por HTTP plano dentro del tailnet. `config.example.json` asume HTTP plano.
+- *(Nuevo)* `my-laptop:3773`: confirmar si se sirve por HTTPS (Tailscale Serve) o por HTTP plano dentro del tailnet. `config.example.json` asume HTTP plano.
 
 ## 8. Prompt para el thread de T3 Code (andamiaje)
 El prompt de andamiaje que se usó para crear este repo es el pedido original (estructura `mod/`,

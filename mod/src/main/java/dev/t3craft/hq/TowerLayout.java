@@ -238,7 +238,7 @@ public final class TowerLayout {
 	public static HqInput sampleRoster(int projects) {
 		String[] names = {"t3craft", "bridge", "website", "infra", "docs", "mobile", "billing", "search", "agentcraft", "notes",
 				"vision", "ledger", "atlas", "pulse", "relay", "orbit", "quartz", "harbor", "spark", "mosaic"};
-		String[] envs = {"vps", "laptop", "acmesite", "cloud"};
+		String[] envs = {"vps", "laptop", "desktop", "cloud"};
 		HqInput.Builder b = HqInput.builder();
 		for (int p = 0; p < projects; p++) {
 			String name = p < names.length ? names[p] : "project" + p;

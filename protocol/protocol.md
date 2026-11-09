@@ -7,7 +7,7 @@ Source of truth for types: `bridge/src/protocol.ts`. This document must match it
 ```
 [PC: Minecraft + T3Craft mod]  --ws://<homelab-tailscale-ip-or-name>:7878-->  [my-homelab: bridge (systemd)]
                                                                                  ├─ wss → my-vps T3 (own token)
-                                                                                 └─ http(s) → my-acmesite T3 :3773 (own token)
+                                                                                 └─ http(s) → my-laptop T3 :3773 (own token)
 ```
 
 - The bridge listens **only** on the homelab's Tailscale IP (or loopback for tests). Wildcard

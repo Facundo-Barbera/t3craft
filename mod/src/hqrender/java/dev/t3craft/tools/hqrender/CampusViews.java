@@ -38,7 +38,7 @@ final class CampusViews {
 	private static final double MAX_SCALE = 3.6;
 
 	static final int[] THREADS = {9, 4, 13, 2, 6, 1, 7, 3, 26, 5, 2, 8, 1, 4, 11, 3, 6, 2, 5, 3};
-	static final String[] ENVS = {"vps", "acmesite", "laptop"};
+	static final String[] ENVS = {"vps", "desktop", "laptop"};
 
 	static HqInput roster(int n) {
 		HqInput.Builder b = HqInput.builder();

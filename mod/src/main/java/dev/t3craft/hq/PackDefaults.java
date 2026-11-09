@@ -126,7 +126,7 @@ public final class PackDefaults {
 	}
 
 	private static HqInput sample() {
-		String[][] projects = {{"vps", "t3craft"}, {"acmesite", "forja"}, {"vps", "telar"}};
+		String[][] projects = {{"vps", "t3craft"}, {"laptop", "forja"}, {"vps", "telar"}};
 		HqInput.Builder b = HqInput.builder();
 		for (String[] p : projects) {
 			String key = p[0] + ":" + p[1];

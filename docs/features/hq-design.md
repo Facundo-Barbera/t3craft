@@ -78,7 +78,7 @@ Environments are told apart by colour and sign, never by separate buildings. The
 module's corridor and the text on its spine sign use the environment's dye colour,
 `DyeColor.byId((envKey.hashCode() * 0x9E3779B9) >>> 28)`. `String.hashCode` is fixed by the Java spec,
 so an environment always keeps its colour. Two environments can share a colour, but `vps` (blue) and
-`acmesite` (black) do not. The sign shows the project name, `#n` on annex modules (n ≥ 2) and the
+`laptop` (magenta) do not. The sign shows the project name, `#n` on annex modules (n ≥ 2) and the
 environment label.
 
 ## Allocation rules (`HqLayout.allocate(input, previous)`)
@@ -215,7 +215,7 @@ Unknown ids return null, so the director's ring fallback is used. Register it wi
 It only works in a singleplayer world where `ServerLevel.isFlat()` is true.
 
 - `hq-preview`: the live NPCs, or a demo when there are none.
-- `hq-preview demo <projects> <threads>`: projects alternate between `vps` and `acmesite`, and every
+- `hq-preview demo <projects> <threads>`: projects alternate between `vps` and `laptop`, and every
   fifth thread is settled.
 - `hq-preview live` and `hq-preview clear`.
 

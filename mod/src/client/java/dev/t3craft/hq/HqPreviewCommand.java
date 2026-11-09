@@ -82,12 +82,12 @@ public final class HqPreviewCommand {
 	}
 
 	/**
-	 * Synthetic roster: projects alternate between two environments ({@code vps}, {@code acmesite}) so
+	 * Synthetic roster: projects alternate between two environments ({@code vps}, {@code laptop}) so
 	 * the per-environment colours show; every fifth thread is settled (archived).
 	 */
 	static HqInput demo(int projects, int threads) {
 		String[] names = {"t3craft", "forja", "chopshop", "orchestrator", "telar", "ozom-trade", "iaware", "pendientes"};
-		String[] envs = {"vps", "acmesite"};
+		String[] envs = {"vps", "laptop"};
 		HqInput.Builder b = HqInput.builder();
 		for (int p = 0; p < projects; p++) {
 			String env = envs[p % envs.length];

@@ -62,8 +62,8 @@ public record EnvBadge(String initial, String text, int background, int foregrou
 	}
 
 	/**
-	 * "my-vps" → "VPS" (a short last word wins: it is usually the host kind), "Mini Acmesite" →
-	 * "MF", "homelab" → "HOM", "pc" → "PC".
+	 * "my-vps" → "VPS" (a short last word wins: it is usually the host kind), "Mini Laptop" →
+	 * "ML", "homelab" → "HOM", "pc" → "PC".
 	 */
 	static String initials(String label) {
 		String[] words = label.trim().split("[^\\p{L}\\p{N}]+");

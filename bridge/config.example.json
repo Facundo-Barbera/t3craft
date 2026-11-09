@@ -20,10 +20,10 @@
       "tokenFile": "/etc/t3craft/tokens/vps.token"
     },
     {
-      "id": "acmesite",
-      "label": "my-acmesite",
-      "url": "http://my-acmesite.example.ts.net:3773",
-      "tokenFile": "/etc/t3craft/tokens/acmesite.token"
+      "id": "laptop",
+      "label": "my-laptop",
+      "url": "http://my-laptop.example.ts.net:3773",
+      "tokenFile": "/etc/t3craft/tokens/laptop.token"
     }
   ]
 }

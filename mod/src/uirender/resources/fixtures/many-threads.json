@@ -3,7 +3,7 @@
   "environments": [
     {"id": "studio", "label": "Studio Mac", "status": "ok", "control": true},
     {"id": "my-vps", "label": "my-vps", "status": "ok", "control": true, "color": "#e0af68"},
-    {"id": "mini", "label": "Mini Acmesite", "status": "ok", "control": false}
+    {"id": "mini", "label": "Laptop", "status": "ok", "control": false}
   ],
   "projects": [
     {"env": "studio", "id": "p-t3craft", "title": "t3craft"},
