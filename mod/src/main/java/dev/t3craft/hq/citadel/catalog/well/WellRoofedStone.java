@@ -19,7 +19,7 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
  * Village well that works and reads as one: a stone kerb at bench height (one block above the ground,
  * half a block over the paving) with the water showing inside, a windlass (axle, crank lever, a bucket
  * on an iron chain) between two or four timber posts on stone bases, under a gable roof of stairs with a
- * real 1:1 pitch, eaves on every side and solid timber gable ends. Round it: a small flagstone paving,
+ * real 1:1 pitch, eaves on every side and open gable ends facing the visitor. Round it: a small flagstone paving,
  * a bench, a water trough (two cauldrons) and barrels where the plot has room, and a free walk all
  * round the kerb.
  *
@@ -216,39 +216,35 @@ public final class WellRoofedStone implements Variant {
 	// ------------------------------------------------------------------ roof (y4+)
 
 	/**
-	 * [depth] gable roof, ridge along u, pitch 1:1 in stairs: the eave row and the gable edges in the trim
-	 * timber, the slope in the roof material, a block ridge (or two stairs meeting). Under every row from
-	 * the second a timber block closes the soffit, and the two gable ends are filled with timber, so the
-	 * whole roof is one face-connected mass resting on the crossbars: no loose overhang.
+	 * [depth] gable roof, ridge along v (front to back, so the visitor looks into the open gable and sees the
+	 * windlass), pitch 1:1 in stairs: the eave rows and the gable edges in the trim timber, the slope in the
+	 * roof material, a block ridge (or two stairs meeting). Under every row from the second a timber block
+	 * closes the soffit, so the whole roof is one face-connected mass resting on the crossbars: no loose
+	 * overhang. The gable ends stay open.
 	 */
 	private static void roof(CitadelCanvas c, Plot p, Geo g, RoofSet roof) {
 		int ru0 = g.uL() - g.ovU();
-		int ru1 = g.uR() + g.ovU();
+		int cols = g.uR() + g.ovU() - ru0 + 1;
 		int rv0 = g.v0() - g.ovV();
-		int rows = g.v1() + g.ovV() - rv0 + 1;
+		int rv1 = g.v1() + g.ovV();
 		BlockState planks = b(roof.planks());
-		for (int r = 0; r < rows; r++) {
-			int v = rv0 + r;
-			int t = Math.min(r, rows - 1 - r);
+		for (int r = 0; r < cols; r++) {
+			int u = ru0 + r;
+			int t = Math.min(r, cols - 1 - r);
 			int y = ROOF + t;
-			boolean ridgeBlock = rows % 2 == 1 && r == rows / 2;
-			boolean frontSide = r < rows - 1 - r;
-			for (int u = ru0; u <= ru1; u++) {
-				boolean end = u == ru0 || u == ru1;
+			boolean ridgeBlock = cols % 2 == 1 && r == cols / 2;
+			boolean leftSide = r < cols - 1 - r; // rises towards +u
+			for (int v = rv0; v <= rv1; v++) {
+				boolean end = v == rv0 || v == rv1;
 				BlockState st;
 				if (ridgeBlock) {
 					st = end ? planks : b(roof.ridge());
 				} else {
-					st = stairs(t == 0 || end ? roof.eave() : roof.stairs(), frontSide ? Direction.SOUTH : Direction.NORTH);
+					st = stairs(t == 0 || end ? roof.eave() : roof.stairs(), leftSide ? Direction.EAST : Direction.WEST);
 				}
 				p.set(c, u, y, v, st);
 				if (t >= 1) {
 					p.set(c, u, y - 1, v, planks); // timber soffit under the slope
-					if (end) {
-						for (int yy = ROOF; yy < y - 1; yy++) {
-							p.set(c, u, yy, v, planks); // gable end filled down to the eave line
-						}
-					}
 				}
 			}
 		}
