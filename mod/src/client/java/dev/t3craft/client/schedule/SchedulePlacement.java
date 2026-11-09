@@ -1,5 +1,7 @@
 package dev.t3craft.client.schedule;
 
+import dev.t3craft.client.npc.behavior.Motion;
+
 /**
  * Where the schedule board's text sits: the TextDisplay's position (bottom centre of the text) and
  * the yaw its text faces. Plain numbers, no Minecraft classes, unit-testable.
@@ -19,7 +21,7 @@ public record SchedulePlacement(double x, double y, double z, float yaw) {
 	 */
 	public static SchedulePlacement onFace(double cx, double cy, double cz, float faceYaw) {
 		double rad = Math.toRadians(faceYaw);
-		return new SchedulePlacement(cx - Math.sin(rad) * FACE_GAP, cy - BOARD_DROP, cz + Math.cos(rad) * FACE_GAP, wrap(faceYaw));
+		return new SchedulePlacement(cx - Math.sin(rad) * FACE_GAP, cy - BOARD_DROP, cz + Math.cos(rad) * FACE_GAP, Motion.wrapDegrees(faceYaw));
 	}
 
 	/** The HQ's "board" anchor (centre of the board's front face, facing out). */
@@ -33,17 +35,6 @@ public record SchedulePlacement(double x, double y, double z, float yaw) {
 	 */
 	public static SchedulePlacement inFrontOf(double x, double y, double z, float yaw, double distance, double height) {
 		double rad = Math.toRadians(yaw);
-		return new SchedulePlacement(x - Math.sin(rad) * distance, y + height, z + Math.cos(rad) * distance, wrap(yaw + 180f));
-	}
-
-	static float wrap(float yaw) {
-		float w = yaw % 360f;
-		if (w >= 180f) {
-			w -= 360f;
-		}
-		if (w < -180f) {
-			w += 360f;
-		}
-		return w;
+		return new SchedulePlacement(x - Math.sin(rad) * distance, y + height, z + Math.cos(rad) * distance, Motion.wrapDegrees(yaw + 180f));
 	}
 }

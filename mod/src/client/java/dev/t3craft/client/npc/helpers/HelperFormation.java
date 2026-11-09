@@ -1,5 +1,7 @@
 package dev.t3craft.client.npc.helpers;
 
+import dev.t3craft.client.npc.behavior.Motion;
+
 /**
  * Pure geometry: where helpers stand around their parent and how they follow it. Uses Minecraft's
  * yaw convention (degrees; facing vector {@code (-sin yaw, cos yaw)} on x/z).
@@ -74,18 +76,7 @@ public final class HelperFormation {
 
 	/** Moves {@code from} towards {@code to} by {@code factor} along the shortest way round (degrees). */
 	public static float lerpYaw(float from, float to, float factor) {
-		float diff = wrap(to - from);
-		return wrap(from + diff * Math.max(0f, Math.min(1f, factor)));
-	}
-
-	static float wrap(float deg) {
-		float d = deg % 360f;
-		if (d >= 180f) {
-			d -= 360f;
-		}
-		if (d < -180f) {
-			d += 360f;
-		}
-		return d;
+		float diff = Motion.wrapDegrees(to - from);
+		return Motion.wrapDegrees(from + diff * Math.max(0f, Math.min(1f, factor)));
 	}
 }

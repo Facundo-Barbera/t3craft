@@ -1,5 +1,6 @@
 package dev.t3craft.client.npc;
 
+import dev.t3craft.client.chat.EnvBadge;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 
@@ -101,7 +102,7 @@ public final class AgentSkins {
 	}
 
 	static Character character(String seed) {
-		return CHARACTERS.get(Math.floorMod(mix(stableHash(seed == null ? "" : seed)), CHARACTERS.size()));
+		return CHARACTERS.get(Math.floorMod(mix(EnvBadge.stableHash(seed == null ? "" : seed)), CHARACTERS.size()));
 	}
 
 	/** Shirt index: the configured colour's nearest palette entry, else the environment badge's pick. */
@@ -109,7 +110,7 @@ public final class AgentSkins {
 		if (envColor != null) {
 			return nearest(envColor);
 		}
-		return Math.floorMod(stableHash(envId), SHIRTS.length);
+		return Math.floorMod(EnvBadge.stableHash(envId), SHIRTS.length);
 	}
 
 	static int nearest(int rgb) {
@@ -140,16 +141,6 @@ public final class AgentSkins {
 		}
 		int i = npcId.indexOf(':');
 		return i < 0 ? npcId : npcId.substring(0, i);
-	}
-
-	/** FNV-1a, same as {@code EnvBadge.stableHash}: stable across runs and JVMs. */
-	static int stableHash(String s) {
-		int h = 0x811C9DC5;
-		for (int i = 0; i < s.length(); i++) {
-			h ^= s.charAt(i);
-			h *= 0x01000193;
-		}
-		return h;
 	}
 
 	/** Final avalanche (murmur3 fmix32) so ids that differ only at the end still spread. */
