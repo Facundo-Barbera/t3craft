@@ -277,9 +277,10 @@ def model(name):
         box([1, 0, 1], [15, 1, 15], "#stone", [0, 0, 14, 1], [1, 1, 15, 15]),
         box([2.5, 1, 2.5], [13.5, 2, 13.5], "#stone", [1, 0, 12, 1], [2, 2, 14, 14]),
         # shaft: slim, with a cherry collar under the desk and a brass plaque on the front
-        box([5, 2, 6], [11, 7, 12], "#bark", [0, 0, 6, 5], [5, 6, 11, 12]),
-        box([4, 7, 5], [12, 8, 13], "#wood", [0, 0, 8, 1], [4, 5, 12, 13]),
-        {"from": [6, 3, 5.7], "to": [10, 6, 6], "faces": {"north": {"texture": "#brass", "uv": [8, 8, 12, 11]}}},
+        box([4.5, 2, 5.5], [11.5, 7, 12.5], "#wood", [0, 0, 7, 5], [4, 5, 12, 13]),
+        box([4, 2, 5], [12, 3, 13], "#bark", [0, 0, 8, 1], [4, 5, 12, 13]),   # dark foot band
+        box([3.6, 6.4, 4.6], [12.4, 8, 13.4], "#bark", [0, 0, 8, 1.6], [4, 5, 12, 13]),   # dark collar under the desk
+        {"from": [5.5, 3.6, 5.2], "to": [10.5, 6.2, 5.5], "faces": {"north": {"texture": "#brass", "uv": [8, 8, 13, 13]}}},
         # under the sloped desk: a filler so there is no daylight between the shaft and the slope
         box([2, 8, 4], [14, 9, 13], "#wood", [0, 0, 12, 1], [2, 4, 14, 13]),
         # the desk: a slab that slopes up toward the display
