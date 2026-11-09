@@ -159,7 +159,7 @@ public final class HouseTowerStair implements Variant {
 
 	/** [palette] upper storeys: calcite plaster with smooth quartz patches. */
 	private static BlockState plaster(Plot p, int u, int y, int v) {
-		return p.hash(u, y, v, 9) == 0 ? b(Blocks.SMOOTH_QUARTZ) : b(Blocks.CALCITE);
+		return b(Blocks.CALCITE);
 	}
 
 	private static BlockState infill(L l, int storey, int u, int y, int v) {
@@ -551,11 +551,7 @@ public final class HouseTowerStair implements Variant {
 		set(c, p, u2 - 6, 0, l.vr, barrel());
 		set(c, p, u2 - 5, 0, l.vr, barrel());
 		put(c, p, u2 - 6, 3, l.vs, hangingLantern(), CitadelCanvas.HANGING);
-		for (int u = l.u1 + 4; u <= u2; u++) {
-			if ((u - l.u1) % 3 == 1) {
-				put(c, p, u, 3, l.vs, hangingLantern(), CitadelCanvas.HANGING);
-			}
-		}
+		put(c, p, l.u1 + 4, 3, l.vs, hangingLantern(), CitadelCanvas.HANGING);
 		put(c, p, ou, 3, l.vb, hangingLantern(), CitadelCanvas.HANGING);
 	}
 
