@@ -82,7 +82,7 @@ public final class CitadelNodes {
 	 */
 	public static void node(CitadelCanvas c, Node nd) {
 		double k = c.k;
-		if (nd.kind() == Kind.SCHEDULE_ROTUNDA && k > 1.0) {
+		if (nd.kind() == RingCampusGeometry.NodeKind.SCHEDULE_ROTUNDA && k > 1.0) {
 			// the scaled rotunda is painted at its real size (not magnified): hall, drum, glass dome, display wall
 			RotundaRoom.build(c, nd);
 			RotundaRoom.fixtures(c, nd);
