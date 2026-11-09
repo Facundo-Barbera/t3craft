@@ -17,14 +17,14 @@ import net.minecraft.world.level.block.state.properties.Half;
 import net.minecraft.world.level.block.state.properties.SlabType;
 
 /**
- * Brazier on a tripod: a shallow bowl of polished deepslate with a thin copper lip and an open fire,
+ * Brazier on a tripod: a shallow bowl of polished deepslate with a thin copper rim and an open fire,
  * carried by three dark legs that splay out to the left, the right and the back and lean in to a dark
  * collar under the bowl. The front stays open, so the fire and the empty space under the bowl read.
  *
  * <ul>
  * <li><b>Silhouette</b>: thin legs leaning in → a dark knot → a bowl that tapers to the knot and widens to
  *     the rim. The legs lean with a stair at their top (the high step towards the knot).</li>
- * <li><b>Contrast</b>: near-black nether-brick legs with blackstone knees, dark polished deepslate bowl, a thin copper lip; the flame is the brightest thing on it.</li>
+ * <li><b>Contrast</b>: near-black nether-brick legs with blackstone knees, dark polished deepslate bowl, a thin copper rim; the flame is the brightest thing on it.</li>
  * <li><b>Safe fire</b>: a campfire (it never spreads) with nothing flammable round it.</li>
  * </ul>
  * Size: 3 × 3 × 4–6. The legs are one to three blocks before they lean in.
@@ -106,14 +106,14 @@ public final class LampStreetBrazierTripod implements Variant {
 			p.set(c, k[0], dish, k[1], corner);
 		}
 
-		// --- rim: a thin copper lip, open trapdoors standing on the outer edge of every rim cell (an open
-		// trapdoor's panel sits on the side opposite its facing), so the bowl stays dark round the fire
-		BlockState lip = b(Blocks.COPPER_TRAPDOOR.waxed().unaffected()).setValue(BlockStateProperties.OPEN, true);
-		for (int i = 0; i < 4; i++) {
-			p.set(c, SIDES[i][0], dish + 1, SIDES[i][1], lip.setValue(BlockStateProperties.HORIZONTAL_FACING, IN[i]));
+		// --- rim: a thin ring of closed copper trapdoors (a 3-pixel plate) on all eight rim cells: a bright edge
+		// on the dark bowl, with the fire standing well above it
+		BlockState rim = b(Blocks.COPPER_TRAPDOOR.waxed().unaffected());
+		for (int[] s : SIDES) {
+			p.set(c, s[0], dish + 1, s[1], rim);
 		}
 		for (int[] k : CORNERS) {
-			p.set(c, k[0], dish + 1, k[1], lip.setValue(BlockStateProperties.HORIZONTAL_FACING, k[0] == 0 ? Direction.EAST : Direction.WEST));
+			p.set(c, k[0], dish + 1, k[1], rim);
 		}
 
 		// --- the fire, in the open

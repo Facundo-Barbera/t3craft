@@ -16,14 +16,14 @@ import net.minecraft.world.level.block.state.properties.Half;
 /**
  * Kasuga-style stone lantern (tōrō), all in stone: a low dark plinth (kiso), a slim shaft (sao), a
  * cross-shaped flared platform (chūdai), a single glowing light box (hibukuro) open to the air on every side,
- * a thin wide hat (kasa) of slabs round a raised crown with curled-up corner tips, and a jewel finial (hōju).
+ * a thin wide hat (kasa) of slabs round a raised crown, and a jewel finial (hōju).
  *
  * <ul>
  * <li><b>Silhouette</b>: low plinth → slim shaft → cross platform → lit waist → thin hat → crown → point. Heavy pieces are half blocks (plinth, hat), so the lantern reads light, not as a stack of cubes.</li>
  * <li><b>Gradient</b>: deepslate plinth, stone-brick shaft and platform, a warm light,
  *     a polished andesite hat, a pale diorite-wall jewel.</li>
  * <li><b>Depth</b>: the platform flares on upside-down stairs; the hat overhangs the light by a block on
- *     every side; the crown stands half a block above the slab eave, the corner tips curl up on stairs.</li>
+ *     every side; the crown stands half a block above the slab eave.</li>
  * </ul>
  * Size: 3 × 3 × 4–6. Height 6 is the full tōrō; 5 drops the finial; 4 also drops the shaft.
  */
@@ -102,14 +102,14 @@ public final class LampStreetToro implements Variant {
 		p.set(c, 1, y, 1, b(Blocks.OCHRE_FROGLIGHT));
 		y++;
 
-		// --- kasa: a thin eave of slabs round a raised crown block; the corners are stairs turned outward, so
-		// their high step curls the four tips up (warabi-te)
+		// --- kasa: a thin square eave of slabs round a raised crown block, one block wider than the light on
+		// every side (stair tips at the corners read as merlons from the street, so the eave stays flat)
 		p.set(c, 1, y, 1, b(Blocks.POLISHED_ANDESITE));
 		for (int[] k : SIDES) {
 			p.set(c, k[0], y, k[1], slab(Blocks.POLISHED_ANDESITE_SLAB));
 		}
 		for (int[] k : CORNERS) {
-			p.set(c, k[0], y, k[1], stairs(Blocks.POLISHED_ANDESITE_STAIRS, k[0] == 0 ? Direction.WEST : Direction.EAST));
+			p.set(c, k[0], y, k[1], slab(Blocks.POLISHED_ANDESITE_SLAB));
 		}
 		y++;
 

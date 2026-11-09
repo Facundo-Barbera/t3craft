@@ -26,7 +26,7 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
  * <li><b>Gradient</b>: deepslate benches (the base) → stone-brick legs → the pale quartz top → the pink
  *     pergola and blossom over it.</li>
  * <li><b>Depth</b>: seats are stairs (half a block), the top a bottom slab one block up, legs only under
- *     the ends (and the middle of a long table) to leave leg room; the pergola beams and rafters cross at
+ *     the ends (and the middle of a long table) to leave leg room; the pergola rails and slats cross at
  *     two levels.</li>
  * <li><b>Silhouette</b>: low and wide when small; a framed room with a light in it when it has a pergola.</li>
  * </ul>
