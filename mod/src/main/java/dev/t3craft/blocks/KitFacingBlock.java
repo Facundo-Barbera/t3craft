@@ -50,7 +50,7 @@ public class KitFacingBlock extends HorizontalDirectionalBlock {
 				Block.box(3, 3, 13, 13, 12, 14));
 	}
 
-	/** Railing on the north edge of the cell: two posts, rails and balusters. */
+	/** Railing on the north edge of the cell (the cherry railing is now {@link KitRailingBlock}; kept for callers). */
 	public static VoxelShape railingShape() {
 		return Block.box(0, 0, 0, 16, 16, 3);
 	}

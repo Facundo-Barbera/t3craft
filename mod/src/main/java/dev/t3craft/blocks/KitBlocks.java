@@ -30,7 +30,7 @@ import net.minecraft.world.level.material.MapColor;
  */
 public final class KitBlocks implements HqKit {
 	/** Bump when a role's state changes (build hashes). */
-	public static final String ID = "kit-1";
+	public static final String ID = "kit-2"; // kit-2: connected cherry railing (KitRailingBlock)
 
 	/** Block ids of the kit, in creative-tab order. */
 	public static final List<String> IDS = List.of("standing_desk", "shoji_panel", "cherry_floor_tile", "stone_floor_tile",
@@ -92,7 +92,7 @@ public final class KitBlocks implements HqKit {
 						.noOcclusion().lightLevel(KitLanternBlock::light)));
 		out.put("room_plaque", r.block("room_plaque", p -> new KitPlaqueBlock(p, plaqueType),
 				wood().noCollision().noOcclusion()));
-		out.put("cherry_railing", r.block("cherry_railing", p -> new KitFacingBlock(p, KitFacingBlock.railingShape()),
+		out.put("cherry_railing", r.block("cherry_railing", KitRailingBlock::new,
 				wood().noOcclusion()));
 		out.put("cherry_planter", r.block("cherry_planter", p -> new KitShapedBlock(p, KitShapedBlock.planterShape()),
 				BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PINK).strength(0.5f).sound(SoundType.CHERRY_LEAVES)
@@ -146,7 +146,9 @@ public final class KitBlocks implements HqKit {
 		Direction h = facing.getAxis().isHorizontal() ? facing : Direction.NORTH;
 		BlockState s = b.defaultBlockState();
 		return switch (role) {
-			case DESK, RAILING -> s.setValue(KitFacingBlock.FACING, h);
+			case DESK -> s.setValue(KitFacingBlock.FACING, h);
+			// the edge only; PlanConnect (or the world) resolves the ends from the neighbours
+			case RAILING -> s.setValue(KitRailingBlock.FACING, h);
 			case PLAQUE -> s.setValue(KitPlaqueBlock.FACING, h);
 			case BEAM -> s.setValue(RotatedPillarBlock.AXIS, facing.getAxis());
 			case WALL_PANEL -> s.setValue(KitPanelBlock.LIT, false);

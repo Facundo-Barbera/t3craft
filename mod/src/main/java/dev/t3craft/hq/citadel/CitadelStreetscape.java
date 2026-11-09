@@ -112,6 +112,12 @@ final class CitadelStreetscape {
 
 	/** A cherry tree in a pit on the ground cell: a trunk and a canopy that stays over roads and keeps every leaf attached. */
 	static void tree(CitadelCanvas c, int x, int z) {
+		c.rigid(x, z);
+		treeCells(c, x, z);
+		c.unrigid();
+	}
+
+	private static void treeCells(CitadelCanvas c, int x, int z) {
 		c.set(x, 0, z, PIT);
 		c.fill(x, 1, TRUNK(), z, LOG);
 		for (int dx = -2; dx <= 2; dx++) {
