@@ -169,11 +169,11 @@ public final class StallTeaBar implements Variant {
 		return Blocks.CARPET.pick(col).defaultBlockState();
 	}
 
-	/** The accent cloth of the noren and the cushions, by seed: a quiet red, indigo or white. */
+	/** The accent cloth of the noren and the cushions, by seed: a quiet red, clay orange or white. */
 	private static DyeColor accent(Geo g) {
 		return switch (g.accent) {
 			case 0 -> DyeColor.RED;
-			case 1 -> DyeColor.BLUE;
+			case 1 -> DyeColor.ORANGE;
 			default -> DyeColor.WHITE;
 		};
 	}
