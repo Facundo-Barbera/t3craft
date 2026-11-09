@@ -73,7 +73,8 @@ public final class HqLightMap {
 			for (int iz = 0; iz < m.sz; iz++) {
 				for (int ix = 0; ix < m.sx; ix++) {
 					BlockState s = view.at(ix + m.minX, iy + m.minY, iz + m.minZ);
-					if (s != null && !s.isAir()) {
+					// an invisible light block counts although a state may call itself air
+					if (s != null && (!s.isAir() || s.getLightEmission() > 0)) {
 						int i = (iy * m.sz + iz) * m.sx + ix;
 						m.states[i] = s;
 						m.seed(i, s.getLightEmission());
@@ -83,6 +84,36 @@ public final class HqLightMap {
 		}
 		m.propagate();
 		return m;
+	}
+
+	/** {@link View} for other packages (the citadel's light pass lights each of its groups on its own). */
+	@FunctionalInterface
+	public interface CellView {
+		@org.jspecify.annotations.Nullable BlockState at(int x, int y, int z);
+	}
+
+	/** {@link #ofView} for other packages: the light of {@code view} over {@code bounds} plus {@code margin}. */
+	public static HqLightMap ofCells(Box bounds, int margin, CellView view) {
+		return ofView(bounds, margin, view::at);
+	}
+
+	/** {@link #addSource} for other packages: a lamp (or an invisible light block) put in a cell. */
+	public void addLamp(net.minecraft.core.BlockPos p, BlockState lamp) {
+		addSource(p, lamp);
+	}
+
+	/**
+	 * What a lamp of {@code lamp} at {@code k} would light, without placing it: how many cells {@code counts}
+	 * accepts would go from under {@link #MIN_LEVEL} to at least it ({@code -1} when {@code lamp} is too weak).
+	 */
+	public int gainOf(net.minecraft.core.BlockPos k, BlockState lamp, java.util.function.LongPredicate counts) {
+		return gain(k, lamp, counts, null, 0);
+	}
+
+	/** {@link #gainOf} that returns -1 unless {@code must} ends at {@code mustLevel} or more. */
+	public int gainOf(net.minecraft.core.BlockPos k, BlockState lamp, java.util.function.LongPredicate counts, net.minecraft.core.BlockPos must,
+			int mustLevel) {
+		return gain(k, lamp, counts, must, mustLevel);
 	}
 
 	private int index(int x, int y, int z) {
@@ -135,7 +166,8 @@ public final class HqLightMap {
 	}
 
 	/** {@link #gain(net.minecraft.core.BlockPos, BlockState, java.util.function.LongPredicate, net.minecraft.core.BlockPos)} with {@code must} needing {@code mustLevel}. */
-	int gain(net.minecraft.core.BlockPos k, BlockState lamp, java.util.function.LongPredicate counts, net.minecraft.core.BlockPos must, int mustLevel) {
+	int gain(net.minecraft.core.BlockPos k, BlockState lamp, java.util.function.LongPredicate counts, net.minecraft.core.@org.jspecify.annotations.Nullable BlockPos must,
+			int mustLevel) {
 		int start = index(k.getX(), k.getY(), k.getZ());
 		int e = lamp.getLightEmission();
 		if (start < 0 || e < MIN_LEVEL) {
@@ -170,9 +202,11 @@ public final class HqLightMap {
 				}
 			}
 		}
-		int mi = index(must.getX(), must.getY(), must.getZ());
-		if (mi < 0 || Math.max(level[mi] & 0xff, lv.getOrDefault(mi, 0)) < mustLevel) {
-			return -1;
+		if (must != null) {
+			int mi = index(must.getX(), must.getY(), must.getZ());
+			if (mi < 0 || Math.max(level[mi] & 0xff, lv.getOrDefault(mi, 0)) < mustLevel) {
+				return -1;
+			}
 		}
 		int gain = 0;
 		for (java.util.Map.Entry<Integer, Integer> en : lv.entrySet()) {

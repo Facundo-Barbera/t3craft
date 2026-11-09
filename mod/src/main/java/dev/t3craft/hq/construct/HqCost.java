@@ -27,7 +27,7 @@ public final class HqCost {
 	public static MaterialBill bill(Iterable<BlockState> states) {
 		MaterialBill bill = new MaterialBill();
 		for (BlockState s : states) {
-			if (s.isAir() || upperHalf(s)) {
+			if (s.isAir() || upperHalf(s) || s.is(net.minecraft.world.level.block.Blocks.LIGHT)) {
 				continue;
 			}
 			bill.add(BuiltInRegistries.ITEM.getKey(s.getBlock().asItem()).toString());

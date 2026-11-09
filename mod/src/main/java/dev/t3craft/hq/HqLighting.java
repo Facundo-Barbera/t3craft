@@ -172,7 +172,8 @@ final class HqLighting {
 			}
 		}
 		for (Placement p : plan.placements()) {
-			if (!desks.contains(p.rel()) && !p.state().isAir()) {
+			// an invisible minecraft:light block (the citadel's own lighting) is a source even if its state calls itself air
+			if (!desks.contains(p.rel()) && (!p.state().isAir() || p.state().getLightEmission() > 0)) {
 				cur[index(p.rel())] = p.state();
 			}
 		}
