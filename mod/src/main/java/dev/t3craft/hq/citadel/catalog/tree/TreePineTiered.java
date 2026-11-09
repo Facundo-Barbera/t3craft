@@ -100,9 +100,9 @@ public final class TreePineTiered implements Variant {
 		for (int k = 0; k < n; k++) {
 			yb[k] = FIRST + (int) Math.round(k * gap);
 			// a pad with a mound over it only where the gap to the next cloud stays open; else a single layer
-			th[k] = gap >= 3.9 && yb[k] + 1 < H ? 2 : 1;
+			th[k] = gap >= 4.9 && yb[k] + 1 < H ? 2 : 1;
 		}
-		int yTop = yb[n - 1]; // the trunk ends inside the top pad: no bare log head over the crown
+		int yTop = yb[n - 1] - 1; // the trunk ends inside the top pad: no bare log head over the crown
 
 		// ---- lean, sway and the side of the first cloud
 		double ang = r.nextInt(8) * Math.PI / 4;
@@ -159,7 +159,7 @@ public final class TreePineTiered implements Variant {
 		for (int k = 0; k < n; k++) {
 			int b = yb[k];
 			double fk = n == 1 ? 0 : k / (double) (n - 1);
-			double rad = half * (0.95 - 0.3 * fk) + 0.45;
+			double rad = half * (0.82 - 0.3 * fk) + 0.3;
 			double sgn = sgn0 * ((k & 1) == 0 ? 1 : -1);
 			boolean top = k == n - 1;
 			double off = top ? 0 : Math.max(1.0, half * (0.42 + 0.26 * r.nextDouble()));
@@ -176,9 +176,8 @@ public final class TreePineTiered implements Variant {
 				// the bough: leaves the trunk a layer or two under the pad, ends under its middle and climbs into it
 				int ya = k >= 1 && b - 2 >= prevTop + 2 ? b - 2 : b - 1;
 				TreeKit.branch(t, WOOD, new int[] {su[ya], ya, sv[ya]}, new int[] {ci, b - 1, cj}, false);
-				TreeKit.branch(t, WOOD, new int[] {ci, b - 1, cj}, new int[] {ci, b, cj}, false);
 			}
-			cloud(t, ccu, ccv, b, th[k], rx, rz, k + 1, phase + k * 1.7, H, gap >= 3.9);
+			cloud(t, ccu, ccv, b, th[k], rx, rz, k + 1, phase + k * 1.7, H, gap >= 4.9, k > 0 && gap >= 3.4);
 			prevTop = b + th[k] - 1;
 		}
 
@@ -208,7 +207,7 @@ public final class TreePineTiered implements Variant {
 	 * {@code thick == 1}). The rim is scalloped by two sine waves and a per-cell jitter, some rim cells hang one or
 	 * two blocks (never below y = 4, never touching another cloud), and the top gets a few tufts.
 	 */
-	private static void cloud(Vox t, double cu, double cv, int yb, int thick, double rx, double rz, int id, double ph, int H, boolean hangOk) {
+	private static void cloud(Vox t, double cu, double cv, int yb, int thick, double rx, double rz, int id, double ph, int H, boolean hangOk, boolean belly) {
 		for (int ly = 0; ly < thick; ly++) {
 			int y = yb + ly;
 			if (y >= H) {
@@ -237,6 +236,9 @@ public final class TreePineTiered implements Variant {
 					int pct = topLayer ? 42 : 24;
 					boolean tip = t.hash(u >> 1, y, v >> 1, 100) < pct || (q > lim - 0.3 && t.hash(u, y + 7, v, 4) == 0);
 					t.leafOf(u, y, v, tip ? TIP : NEEDLE, id);
+					if (belly && ly == 0 && q < 0.55 * lim) {
+						t.leafOf(u, y - 1, v, NEEDLE, id); // a sagging belly under the pad's middle
+					}
 					if (hangOk && ly == 0 && q > 0.55 * lim && y - 1 >= 4 && t.hash(u, y + 5, v, 4) == 0) {
 						t.leafOf(u, y - 1, v, NEEDLE, id); // needles hanging from the pad
 						if (y - 2 >= 4 && t.hash(u, y + 11, v, 4) == 0) {
