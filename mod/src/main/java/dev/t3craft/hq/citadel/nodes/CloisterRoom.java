@@ -47,6 +47,9 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
  *     with a bell window and a hanging lantern, a rod on top) give the silhouette.</li>
  * </ul>
  * The gates are 3 wide and 3 high; the terminal and its stand cell are fixtures of {@code CitadelNodes}.
+ *
+ * <p>At the default scale (node half 14 or more, {@link #grand}) none of this is built: {@link #build} paints the grand
+ * cloister in real offsets (see the section at the end of this class) and this design is the fallback for small scales.
  */
 public final class CloisterRoom {
 	/** Ring of the outer wall. */
