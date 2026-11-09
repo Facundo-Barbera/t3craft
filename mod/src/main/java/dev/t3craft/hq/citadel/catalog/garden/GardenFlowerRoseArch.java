@@ -38,8 +38,7 @@ import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
  * </pre>
  *
  * Function: walkable end to end, every step a slab (half-block steps, no jumps), 3.5 blocks of headroom under
- * the arches, benches facing the beds, lamps along the walk. Every flower stands on grass or podzol (tall ones
- * only on grass), vines hang from the rails (a log), lanterns stand on fence posts, nothing floats.
+ * the arches, benches facing the beds, lamps along the walk. Every flower stands on grass (tall ones included), vines hang from the rails (a log), lanterns stand on fence posts, nothing floats.
  *
  * <p>Size: 9-24 x 9-24 x 5+, and more at scale: the number of arches, squares, cross walks and parterres grows
  * with the plot, the proportions do not stretch. By seed: flower palette (red / pink, white / blue, yellow /
@@ -170,7 +169,7 @@ public final class GardenFlowerRoseArch implements Variant {
 		}
 
 		BlockState soil(int u, int v) {
-			return p.hash(u, 9, v, 6) == 0 ? b(Blocks.PODZOL) : b(Blocks.GRASS_BLOCK);
+			return b(Blocks.GRASS_BLOCK);
 		}
 
 		BlockState pathSlab(int u, int v, boolean rim) {
@@ -428,8 +427,8 @@ public final class GardenFlowerRoseArch implements Variant {
 			if (hi < lo) {
 				return new int[0];
 			}
-			int n = 1 + (int) Math.round((hi - lo) / 5.0);
-			while (n > 1 && (hi - lo) / (n - 1) < 4) {
+			int n = 1 + (int) Math.ceil((hi - lo) / 6.0);
+			while (n > 1 && (hi - lo) / (n - 1) < 3) {
 				n--;
 			}
 			int[] f = new int[n];
@@ -524,7 +523,7 @@ public final class GardenFlowerRoseArch implements Variant {
 						if (p.h() > 5 && p.hash(uu, 5, vv, 3) != 0) {
 							at(alongV, s, t, 5, climb(uu, 5, vv));
 						}
-					} else if (p.hash(uu, 4, vv, 3) == 0) {
+					} else if (p.hash(uu, 4, vv, 5) < 3) {
 						at(alongV, s, t, 4, climb(uu, 4, vv));
 					} else {
 						at(alongV, s, t, 4, slab(Blocks.CHERRY_SLAB));
@@ -546,11 +545,7 @@ public final class GardenFlowerRoseArch implements Variant {
 			for (int f : fr) {
 				for (int side = 0; side < 2; side++) {
 					int out = side == 0 ? tl - 1 : tr + 1;
-					int uu = alongV ? out : f;
-					int vv = alongV ? f : out;
-					at(alongV, f, out, 4, slab(Blocks.CHERRY_SLAB));
-					tallAt(alongV, f, out, pal.arch);
-					at(alongV, f, out, 3, climb(uu, 3, vv));
+					tallAt(alongV, f, out, pal.arch); // nothing above it: a roofed bed cell would count as a sealed floor
 				}
 			}
 			for (int i = 0; i + 1 < fr.length; i++) {
