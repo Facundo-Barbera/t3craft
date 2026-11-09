@@ -15,55 +15,55 @@ final class CatalogEntries {
 	}
 
 	private static final Variant[] ENTRIES = {
-			new dev.t3craft.hq.citadel.catalog.house.HouseTimberArcade(), // house_timber_arcade
-			new dev.t3craft.hq.citadel.catalog.house.HouseTimberCorner(), // house_timber_corner
-			new dev.t3craft.hq.citadel.catalog.house.HouseStoneManorCourt(), // house_stone_manor_court
-			new dev.t3craft.hq.citadel.catalog.house.HouseStoneTower(), // house_stone_tower
-			new dev.t3craft.hq.citadel.catalog.house.HouseStoneWeathered(), // house_stone_weathered
-			new dev.t3craft.hq.citadel.catalog.house.HouseJapaneseEngawa(), // house_japanese_engawa
-			new dev.t3craft.hq.citadel.catalog.house.HouseJapaneseTeahouse(), // house_japanese_teahouse
-			new dev.t3craft.hq.citadel.catalog.house.HouseMachiya(), // house_machiya
-			new dev.t3craft.hq.citadel.catalog.house.HouseTerraceCascade(), // house_terrace_cascade
-			new dev.t3craft.hq.citadel.catalog.house.HouseTerracePodium(), // house_terrace_podium
-			new dev.t3craft.hq.citadel.catalog.house.HouseTerraceTiers(), // house_terrace_tiers
-			new dev.t3craft.hq.citadel.catalog.house.HouseForgeAtelier(), // house_forge_atelier
-			new dev.t3craft.hq.citadel.catalog.house.HouseLibraryCopper(), // house_library_copper
-			new dev.t3craft.hq.citadel.catalog.house.HouseScriptorium(), // house_scriptorium
-			new dev.t3craft.hq.citadel.catalog.fountain.FountainOctagonStatue(), // fountain_octagon_statue
-			new dev.t3craft.hq.citadel.catalog.fountain.FountainTieredBasins(), // fountain_tiered_basins
-			new dev.t3craft.hq.citadel.catalog.fountain.FountainWallMascaron(), // fountain_wall_mascaron
 			new dev.t3craft.hq.citadel.catalog.fountain.FountainKoiPond(), // fountain_koi_pond
 			new dev.t3craft.hq.citadel.catalog.fountain.FountainMossyCascade(), // fountain_mossy_cascade
+			new dev.t3craft.hq.citadel.catalog.fountain.FountainOctagonStatue(), // fountain_octagon_statue
 			new dev.t3craft.hq.citadel.catalog.fountain.FountainStreamStones(), // fountain_stream_stones
+			new dev.t3craft.hq.citadel.catalog.fountain.FountainTieredBasins(), // fountain_tiered_basins
+			new dev.t3craft.hq.citadel.catalog.fountain.FountainWallMascaron(), // fountain_wall_mascaron
 			new dev.t3craft.hq.citadel.catalog.garden.GardenFlowerRoseArch(), // garden_flower_rose_arch
 			new dev.t3craft.hq.citadel.catalog.garden.GardenVegRaisedBeds(), // garden_veg_raised_beds
 			new dev.t3craft.hq.citadel.catalog.garden.GardenZenKaresansui(), // garden_zen_karesansui
 			new dev.t3craft.hq.citadel.catalog.gate.GateArchBattlement(), // gate_arch_battlement
 			new dev.t3craft.hq.citadel.catalog.gate.GateToriiCherry(), // gate_torii_cherry
+			new dev.t3craft.hq.citadel.catalog.house.HouseForgeAtelier(), // house_forge_atelier
+			new dev.t3craft.hq.citadel.catalog.house.HouseJapaneseEngawa(), // house_japanese_engawa
+			new dev.t3craft.hq.citadel.catalog.house.HouseJapaneseTeahouse(), // house_japanese_teahouse
+			new dev.t3craft.hq.citadel.catalog.house.HouseLibraryCopper(), // house_library_copper
+			new dev.t3craft.hq.citadel.catalog.house.HouseMachiya(), // house_machiya
+			new dev.t3craft.hq.citadel.catalog.house.HouseScriptorium(), // house_scriptorium
+			new dev.t3craft.hq.citadel.catalog.house.HouseStoneManorCourt(), // house_stone_manor_court
+			new dev.t3craft.hq.citadel.catalog.house.HouseStoneTower(), // house_stone_tower
+			new dev.t3craft.hq.citadel.catalog.house.HouseStoneWeathered(), // house_stone_weathered
+			new dev.t3craft.hq.citadel.catalog.house.HouseTerraceCascade(), // house_terrace_cascade
+			new dev.t3craft.hq.citadel.catalog.house.HouseTerracePodium(), // house_terrace_podium
+			new dev.t3craft.hq.citadel.catalog.house.HouseTerraceTiers(), // house_terrace_tiers
+			new dev.t3craft.hq.citadel.catalog.house.HouseTimberArcade(), // house_timber_arcade
+			new dev.t3craft.hq.citadel.catalog.house.HouseTimberCorner(), // house_timber_corner
 			new dev.t3craft.hq.citadel.catalog.house.HouseTimberCottage(), // house_timber_cottage
 			new dev.t3craft.hq.citadel.catalog.house.HouseTimberOverhang(), // house_timber_overhang
 			new dev.t3craft.hq.citadel.catalog.house.HouseTowerBridge(), // house_tower_bridge
 			new dev.t3craft.hq.citadel.catalog.house.HouseTowerLookout(), // house_tower_lookout
 			new dev.t3craft.hq.citadel.catalog.house.HouseTowerStair(), // house_tower_stair
 			new dev.t3craft.hq.citadel.catalog.lamp.LampCherryPost(), // lamp_cherry_post
-			new dev.t3craft.hq.citadel.catalog.stall.StallClothLanterns(), // stall_cloth_lanterns
-			new dev.t3craft.hq.citadel.catalog.stall.StallFruitAwning(), // stall_fruit_awning
-			new dev.t3craft.hq.citadel.catalog.stall.StallTeaBar(), // stall_tea_bar
-			new dev.t3craft.hq.citadel.catalog.tree.TreeCherryGrand(), // tree_cherry_grand
-			new dev.t3craft.hq.citadel.catalog.tree.TreeCherryLeaning(), // tree_cherry_leaning
-			new dev.t3craft.hq.citadel.catalog.tree.TreeCherryWeeping(), // tree_cherry_weeping
-			new dev.t3craft.hq.citadel.catalog.tree.TreeBirchGrove(), // tree_birch_grove
-			new dev.t3craft.hq.citadel.catalog.tree.TreeMapleRed(), // tree_maple_red
-			new dev.t3craft.hq.citadel.catalog.tree.TreePineTiered(), // tree_pine_tiered
-			new dev.t3craft.hq.citadel.catalog.tree.TreeAzaleaBlossom(), // tree_azalea_blossom
-			new dev.t3craft.hq.citadel.catalog.tree.TreeCloudPinePot(), // tree_cloud_pine_pot
-			new dev.t3craft.hq.citadel.catalog.tree.TreeWillowPond(), // tree_willow_pond
 			new dev.t3craft.hq.citadel.catalog.lamp.LampStreetAvenueDouble(), // lamp_street_avenue_double
 			new dev.t3craft.hq.citadel.catalog.lamp.LampStreetBrazierTripod(), // lamp_street_brazier_tripod
 			new dev.t3craft.hq.citadel.catalog.lamp.LampStreetToro(), // lamp_street_toro
 			new dev.t3craft.hq.citadel.catalog.plazacenter.PlazaCenterGlazedRosette(), // plaza_center_glazed_rosette
 			new dev.t3craft.hq.citadel.catalog.plazacenter.PlazaCenterMonumentalSundial(), // plaza_center_monumental_sundial
 			new dev.t3craft.hq.citadel.catalog.plazacenter.PlazaCenterOctagonBandstand(), // plaza_center_octagon_bandstand
+			new dev.t3craft.hq.citadel.catalog.stall.StallClothLanterns(), // stall_cloth_lanterns
+			new dev.t3craft.hq.citadel.catalog.stall.StallFruitAwning(), // stall_fruit_awning
+			new dev.t3craft.hq.citadel.catalog.stall.StallTeaBar(), // stall_tea_bar
+			new dev.t3craft.hq.citadel.catalog.tree.TreeAzaleaBlossom(), // tree_azalea_blossom
+			new dev.t3craft.hq.citadel.catalog.tree.TreeBirchGrove(), // tree_birch_grove
+			new dev.t3craft.hq.citadel.catalog.tree.TreeCherryGrand(), // tree_cherry_grand
+			new dev.t3craft.hq.citadel.catalog.tree.TreeCherryLeaning(), // tree_cherry_leaning
+			new dev.t3craft.hq.citadel.catalog.tree.TreeCherryWeeping(), // tree_cherry_weeping
+			new dev.t3craft.hq.citadel.catalog.tree.TreeCloudPinePot(), // tree_cloud_pine_pot
+			new dev.t3craft.hq.citadel.catalog.tree.TreeMapleRed(), // tree_maple_red
+			new dev.t3craft.hq.citadel.catalog.tree.TreePineTiered(), // tree_pine_tiered
+			new dev.t3craft.hq.citadel.catalog.tree.TreeWillowPond(), // tree_willow_pond
 	};
 
 	static final List<Variant> ALL = List.of(ENTRIES);
