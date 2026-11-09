@@ -451,8 +451,7 @@ public final class HubFacade {
 	}
 
 	/**
-	 * The rim of the rose window stands out one block from the gable (outside the wall). In the tall facade the tracery stands out too
-	 * (the calcite rings and bars one block proud of the glass), so the rose has depth and not only colour.
+	 * The rim of the rose window stands out one block from the gable (outside the wall).
 	 */
 	static void roseRim(CitadelCanvas c, int x, int z) {
 		int sz = z > 0 ? 1 : -1;
@@ -460,8 +459,6 @@ public final class HubFacade {
 			double r = Math.hypot(x, y - CitadelHub.spring());
 			if (r > c.sd(2.8) && r <= c.sd(3.7)) {
 				c.set(x, y, z + sz, Blocks.CHISELED_STONE_BRICKS.defaultBlockState());
-			} else if (HubDims.TALL() && r <= c.sd(2.8) && rose(x, y) == CALCITE) {
-				c.set(x, y, z + sz, CALCITE);
 			}
 		}
 	}
