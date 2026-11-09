@@ -75,10 +75,11 @@ public final class HallInterior {
 		return s == null || s.isAir();
 	}
 
-	/** A free cell with a solid floor under it (not the stair hole). */
+	/** A free cell with a solid floor under it (not the stair hole, not a stair). */
 	private static boolean floored(CitadelCanvas c, BlockPos p) {
 		BlockState below = c.at(p.getX(), p.getY() - 1, p.getZ());
-		return free(c, p) && below != null && !below.isAir();
+		// not on a stair either: a rug over the top step of the flight lifts the floor by 1/16 and makes the last step a jump
+		return free(c, p) && below != null && !below.isAir() && !(below.getBlock() instanceof net.minecraft.world.level.block.StairBlock);
 	}
 
 	private static void put(CitadelCanvas c, BlockPos p, BlockState s) {
