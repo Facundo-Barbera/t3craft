@@ -6,11 +6,14 @@ These rules come from Facundo and override any other instruction, brief or habit
 
 | machine | what runs there |
 |---|---|
-| **Mac mini** | The **coordinator**, the only Opus thread at xhigh (checkout `/path/to/t3craft`). It plans, briefs, reviews, merges and pushes. It runs nothing heavy itself: it drives the PC over SSH. |
+| **Mac mini** | The **coordinator**, the only Opus thread at xhigh (checkout `/path/to/t3craft`). It plans, briefs, reviews, merges and pushes. It runs nothing heavy itself: it drives the PC over SSH. **Coordination only:** the Mac runs no working subagents or child threads (Facundo and the coordinator only). |
 | **VPS** (my-vps, T3 environment `vps-env`) | **Child threads only**, as many *small, short* threads: one task each, commit, push, end. At most **8** at once (T3 slows down with more), all on the latest **Sonnet** with effort medium or high, never xhigh. **No heavy process of any kind** (no gradle, java, renders, Minecraft), and no long-lived coordinator thread with a huge history. |
 | **PC** (my-pc, WSL, `~/projects/t3craft`) | **All Gradle builds and all renders,** one heavy process at a time, through `tools/heavy.sh` and the render daemon (1 worker). Only the coordinator compiles there; renders arrive through the relay (rule 8). |
 | **MBP** | Facundo. |
 
+- **Every child, delegated task or subagent runs on the VPS** (Facundo, 2026-11-09), read-only reviews and surveys
+  included: `delegate_task` against T3 environment `vps-env`, latest Sonnet, effort medium or high, at most 8 at
+  once. The coordinator's in-process subagents would run on the Mac, so it does not use them for work.
 - **Child threads, delegated tasks and subagents only write code, commit and push their branch:** no gradle, java,
   compiling or tests. The coordinator compiles pushed branches on the PC.
 - **PC transport:** the PC's sshd is Windows OpenSSH with `wsl.exe` as shell, so `ssh pc 'cmd'`, scp and rsync do
