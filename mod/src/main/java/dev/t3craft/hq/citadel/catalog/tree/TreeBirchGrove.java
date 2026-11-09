@@ -13,26 +13,47 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import net.minecraft.core.Direction;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 
 /**
- * A grove of two or three slender white birches of clearly different heights (100, 80 and 60 % of the
- * plot), each a 1×1 birch log leaning a little away from the others, with one or two short diagonal roots
- * (one block high, ending in moss) at the foot and one or two bare twig stubs on the white trunk. High up,
- * two or three small loose lobes sit on short diagonal twigs on alternating sides, plus a small top tuft:
- * birch leaves with clumps of oak or azalea. The foliage of different trunks keeps two cells of air between
- * them, so the white strokes of the trunks carry the design. Ferns, lilies of the valley and moss fill the floor.
+ * A grove of slender white birches. The trunks are bare, 1×1 birch logs with nothing on them below y 4 (no roots, no
+ * stubs: you walk between them and under them); they stand at least three cells apart (two blocks of air), most of
+ * them in small groups, straight and bare.
  *
- * <p>Size: 6–9 × 6–9 × 9+ (two trunks on 6-wide plots, three from 7 × 7 up; the trees stop at 15 high).
+ * <p>The crown is <em>not</em> a mass: a slim spire of leaves round the tip, and below it a few small, airy puffs of
+ * light birch leaves, each on its own thin twig (one or two logs), turning from layer to layer, so the white trunk shows
+ * almost all the way up. Leaves are birch (light, no biome tint) with a per-seed second tone (azalea, flowering azalea
+ * or a little spruce); there is no oak. Nothing below y 4: you walk under it with four blocks of air.
+ *
+ * <p>The ground is a mossy forest floor in patches (moss, ferns, large ferns, tall grass, wild flowers, saplings,
+ * mushrooms at the trunks). From 10 wide there is a <b>clearing</b> with a lantern post and one to three birch benches
+ * (or a mossy boulder) facing it; from 12 wide a winding <b>senda</b> of stepping slabs leads in from the front; from
+ * 12 wide there is an understory too (azalea bushes, from 14 fallen logs).
+ *
+ * <p>Size: 6–48 × 6–48 × 10+. Small plots hold two to four trunks; from 14 wide the count grows with the area (5 up to
+ * 16), in two to four clumps with meadow between them, and the whole plot gets filled without closing it (the senda and
+ * the clearing stay free of trunks).
  */
 public final class TreeBirchGrove implements Variant {
 	private static final Wood BIRCH = new Wood(Blocks.BIRCH_LOG, Blocks.BIRCH_WOOD, b(Blocks.BIRCH_WOOD));
-	private static final Leaves[] TONES = {
-			Leaves.of(Blocks.BIRCH_LEAVES, Blocks.OAK_LEAVES).clumps(3),
-			Leaves.of(Blocks.BIRCH_LEAVES, Blocks.AZALEA_LEAVES).clumps(3),
-			Leaves.of(Blocks.BIRCH_LEAVES, Blocks.OAK_LEAVES).clumps(4),
+	/** One palette per seed: light birch leaves plus a second, small tone. No oak (biome tint makes it dark). */
+	private static final Leaves[] PAL = {
+			Leaves.of(Blocks.BIRCH_LEAVES, Blocks.AZALEA_LEAVES).clumps(9),
+			Leaves.of(Blocks.BIRCH_LEAVES, Blocks.SPRUCE_LEAVES).clumps(14),
+			Leaves.of(Blocks.BIRCH_LEAVES, Blocks.FLOWERING_AZALEA_LEAVES).clumps(7),
+			Leaves.of(Blocks.BIRCH_LEAVES, Blocks.AZALEA_LEAVES).clumps(4),
 	};
+	/** The lowest layer of any leaf: 4 blocks of free air over the ground. */
+	private static final int MIN_Y = 4;
+	private static final int[][] DIRS = {{1, 0}, {0, 1}, {-1, 0}, {0, -1}};
+
+	private interface Valid {
+		boolean test(int u, int v, int minCheb);
+	}
 
 	@Override
 	public String id() {
@@ -56,262 +77,325 @@ public final class TreeBirchGrove implements Variant {
 
 	@Override
 	public int minH() {
-		return 9;
+		return 10;
 	}
 
 	@Override
 	public int maxW() {
-		return 9;
+		return 48;
 	}
 
 	@Override
 	public int maxD() {
-		return 9;
-	}
-
-	/** A lobe to draw: centre, radii. */
-	private record Lobe(int u, int y, int v, double rx, double rz, double up, double down) {
+		return 48;
 	}
 
 	@Override
 	public void build(CitadelCanvas c, Plot p) {
 		Vox t = new Vox(p);
 		Random r = p.rng(0xB12C_6A0BL);
-		int w = p.w();
-		int d = p.d();
-		int H = Math.min(p.h(), 15);
-		boolean flipU = r.nextBoolean();
-		boolean three = w >= 7 && d >= 7;
+		final int w = p.w();
+		final int d = p.d();
+		int m = Math.min(w, d);
+		boolean big = m >= 14;
+		int maxTop = TreeKit.clamp(Math.min(p.h() - 2, 10 + (m - 6)), 8, 28);
+		int pal = r.nextInt(PAL.length);
 
-		// trunks spread to three corners of the plot (two on 6-wide plots), so the crowns keep apart
-		int[][] base = three
-				? new int[][] {{1, 2}, {w - 2, 1}, {(w - 1) / 2 + (w >= 8 ? 1 : 0), d - 2}}
-				: new int[][] {{1, 1}, {w - 2, d - 2}};
-		int n = base.length;
-		for (int[] bs : base) {
-			if (flipU) {
-				bs[0] = w - 1 - bs[0];
+		// ---- the clearing (a rest corner) and the senda that leads to it
+		double cu0 = (w - 1) / 2.0;
+		double cv0 = (d - 1) / 2.0;
+		final double[] cl = {cu0, cv0, 2.5};
+		if (m >= 10) {
+			cl[0] = cu0 + (r.nextDouble() - 0.5) * 0.3 * w;
+			cl[1] = cv0 + (r.nextDouble() - 0.35) * 0.28 * d;
+			cl[2] = TreeKit.clamp(2.8 + (m - 10) * 0.1, 2.8, 5.2);
+		}
+		final boolean[] sd = new boolean[w * d];
+		if (m >= 12) {
+			senda(sd, r, w, d, cl, m);
+		}
+
+		// ---- where the trunks stand
+		int mg = big ? 2 : 1;
+		final int uLo = mg;
+		final int uHi = w - 1 - mg;
+		final int vLo = mg;
+		final int vHi = d - 1 - mg;
+		final List<int[]> pts = new ArrayList<>();
+		int n;
+		if (!big) {
+			int maxN = m >= 11 ? 4 : m >= 8 ? 3 : 2;
+			n = 2 + r.nextInt(maxN - 1);
+			if (m >= 10) {
+				n = Math.max(n, 3);
+			}
+		} else {
+			n = TreeKit.clamp((int) Math.round((w - 4) * (d - 4) / (double) (36 + r.nextInt(24))), 5, 16);
+		}
+		final boolean hasClear = m >= 10;
+		Valid valid = (u, v, minCheb) -> {
+			if (u < uLo || u > uHi || v < vLo || v > vHi) {
+				return false;
+			}
+			if (hasClear && Math.hypot(u - cl[0], v - cl[1]) < cl[2] + 0.6) {
+				return false;
+			}
+			for (int dv = -2; dv <= 2; dv++) {
+				for (int du = -2; du <= 2; du++) {
+					int a = u + du;
+					int bb = v + dv;
+					if (a >= 0 && a < w && bb >= 0 && bb < d && sd[bb * w + a]) {
+						return false;
+					}
+				}
+			}
+			for (int[] q : pts) {
+				if (Math.max(Math.abs(q[0] - u), Math.abs(q[1] - v)) < minCheb) {
+					return false;
+				}
+			}
+			return true;
+		};
+		int minCheb = !big ? (m >= 10 ? 5 : 3) : 6;
+		for (int i = 0; i < n; i++) {
+			int[] best = null;
+			boolean join = big && i > 0 && r.nextInt(10) < 5;
+			if (join) {
+				for (int k = 0; k < 80 && best == null; k++) {
+					int[] a = pts.get(r.nextInt(pts.size()));
+					double ang = r.nextDouble() * Math.PI * 2;
+					double rad = 3.0 + r.nextDouble() * 1.8;
+					int u = (int) Math.round(a[0] + Math.cos(ang) * rad);
+					int v = (int) Math.round(a[1] + Math.sin(ang) * rad);
+					if (valid.test(u, v, 3)) {
+						best = new int[] {u, v};
+					}
+				}
+			}
+			for (int pass = 0; pass < 2 && best == null; pass++) {
+				double bestScore = -1;
+				int mc = pass == 0 ? minCheb : 3;
+				if (pass == 1 && !big) {
+					break;
+				}
+				for (int k = 0; k < 90; k++) {
+					int u = uLo + r.nextInt(uHi - uLo + 1);
+					int v = vLo + r.nextInt(vHi - vLo + 1);
+					if (!valid.test(u, v, mc)) {
+						continue;
+					}
+					double dmin = 99;
+					for (int[] q : pts) {
+						dmin = Math.min(dmin, Math.hypot(q[0] - u, q[1] - v));
+					}
+					double score = (pts.isEmpty() ? 5 : dmin) + r.nextDouble() * 1.6;
+					if (score > bestScore) {
+						bestScore = score;
+						best = new int[] {u, v};
+					}
+				}
+			}
+			if (best != null) {
+				pts.add(best);
 			}
 		}
-		double mu = 0;
-		double mv = 0;
-		for (int[] bs : base) {
-			mu += bs[0] / (double) n;
-			mv += bs[1] / (double) n;
+		if (pts.size() < 2) {
+			pts.clear();
+			pts.add(new int[] {1, 1});
+			pts.add(new int[] {w - 2, d - 2});
 		}
+		n = pts.size();
 
-		// heights clearly different: 100 %, 80 % and 60 % of the available height (shuffled between the trunks)
-		int maxTop = Math.min(13, H - 2);
-		double[] fr = three ? new double[] {1.0, 0.8, 0.6} : new double[] {1.0, 0.7};
-		for (int i = fr.length - 1; i > 0; i--) {
+		// ---- heights (clearly different, shuffled) and the crown base of each
+		double[] fr = new double[n];
+		for (int i = 0; i < n; i++) {
+			fr[i] = 1.0 - 0.5 * i / (n - 1.0);
+		}
+		for (int i = n - 1; i > 0; i--) {
 			int j = r.nextInt(i + 1);
 			double tmp = fr[i];
 			fr[i] = fr[j];
 			fr[j] = tmp;
 		}
-		int[] tops = new int[n];
+		int[] top = new int[n];
+		int[] cb = new int[n];
+		int[] fu = new int[n];
+		int[] fv = new int[n];
 		for (int i = 0; i < n; i++) {
-			tops[i] = Math.max(4, (int) Math.round(maxTop * fr[i]));
+			top[i] = TreeKit.clamp((int) Math.round(maxTop * fr[i]) + r.nextInt(2) - (fr[i] > 0.99 ? 1 : 0), 7, maxTop);
+			cb[i] = TreeKit.clamp((int) Math.round(top[i] * 0.48), MIN_Y, Math.max(MIN_Y, top[i] - 3));
+			fu[i] = pts.get(i)[0];
+			fv[i] = pts.get(i)[1];
 		}
-
-		int[] own = new int[w * d * t.h];
-		List<List<Lobe>> lobes = new ArrayList<>();
-
-		// ---- wood of every trunk first (so the foliage never hides a limb and ownership is clean)
+		// ---- the wood of every trunk (bare below the crown), then the crowns
+		int[][][] lead = new int[n][][];
 		for (int i = 0; i < n; i++) {
-			int u0 = base[i][0];
-			int v0 = base[i][1];
-			double ou = u0 - mu;
-			double ov = v0 - mv;
-			double ol = Math.hypot(ou, ov);
-			double out = ol < 1e-6 ? r.nextDouble() * Math.PI * 2 : Math.atan2(ov, ou);
-			double ex = Math.cos(out);
-			double ez = Math.sin(out);
-			double lean = Math.min(0.6 + r.nextDouble() * 0.5, TreeKit.room(t, u0, v0, ex, ez, 1.0));
-			int top = tops[i];
-			int[][] lead = column(t, u0, v0, top, ex * lean, ez * lean, 3);
-			footRoots(t, u0, v0, 1 + t.hash(u0, 5, v0, 2), 31 + i);
-
-			// two or three small lobes high up the trunk, each on a short diagonal twig, alternating sides
-			int nl = top >= 10 ? 3 : 2;
-			int lo = Math.max(3, (int) Math.round(top * 0.5));
-			int hi = Math.max(lo, top - 3);
-			List<Lobe> mine = new ArrayList<>();
-			int side = r.nextBoolean() ? 1 : -1;
-			int lowest = top;
-			for (int k = 0; k < nl; k++) {
-				int sy = lo + (nl == 1 ? 0 : (int) Math.round((hi - lo) * k / (double) (nl - 1)));
-				sy = Math.min(sy, top - 2);
-				int su = lead[0][sy];
-				int sv = lead[1][sy];
-				double ang = out + side * (0.6 + r.nextDouble() * 0.6);
-				side = -side;
-				double lx = Math.cos(ang);
-				double lz = Math.sin(ang);
-				double room = TreeKit.room(t, su, sv, lx, lz, 1.0);
-				if (room < 1.0) {
-					ang = out - (ang - out);
-					lx = Math.cos(ang);
-					lz = Math.sin(ang);
-					room = TreeKit.room(t, su, sv, lx, lz, 1.0);
-				}
-				int len = room >= 2.0 && r.nextBoolean() ? 2 : 1;
-				int du = (int) Math.round(lx * len);
-				int dv = (int) Math.round(lz * len);
-				if (du == 0 && dv == 0) {
-					if (Math.abs(lx) >= Math.abs(lz)) {
-						du = lx >= 0 ? 1 : -1;
-					} else {
-						dv = lz >= 0 ? 1 : -1;
-					}
-				}
-				int tu = TreeKit.clamp(su + du, 1, w - 2);
-				int tv = TreeKit.clamp(sv + dv, 1, d - 2);
-				int ly = sy + 2; // the twig ends one under the lobe's centre: it shows right up to the leaves
-				if (ly > H - 2 || tu == su && tv == sv) {
-					continue;
-				}
-				TreeKit.branch(t, BIRCH, new int[] {su, sy, sv}, new int[] {tu, ly - 1, tv}, false);
-				lowest = Math.min(lowest, sy);
-				double rx = 1.25 + r.nextDouble() * 0.45;
-				double rz = TreeKit.clamp(rx * (0.85 + r.nextDouble() * 0.25), 1.2, 1.7);
-				mine.add(new Lobe(tu, ly, tv, rx, rz, 1.0, k == 0 ? 0.0 : 0.9));
-			}
-			// the small top tuft on the leader
-			mine.add(new Lobe(lead[0][top], top, lead[1][top], 1.3, 1.2, 1.0, 0.0));
-
-			// one or two bare twig stubs on the white trunk below the foliage
-			int stubs = 1 + t.hash(u0, 9, v0, 2);
-			int sTop = lowest - 2;
-			int sLo = Math.max(2, (int) Math.round(top * 0.25));
-			int[][] faces = {{1, 0}, {0, 1}, {-1, 0}, {0, -1}};
-			int f0 = t.hash(u0, 11, v0 + i, 4);
-			for (int s = 0; s < stubs; s++) {
-				int y = s == 0 ? sTop : sLo + (sTop - sLo) / 3;
-				if (y < 2 || y > sTop || s == 1 && sTop - y < 2) {
-					continue;
-				}
-				int[] fc = faces[(f0 + s * 2) % 4];
-				int su = lead[0][y] + fc[0];
-				int sv = lead[1][y] + fc[1];
-				if (t.empty(su, y, sv) && t.kind(su, y - 1, sv) == TreeKit.EMPTY) {
-					t.wood(su, y, sv, BIRCH.log(fc[0] != 0 ? Direction.Axis.X : Direction.Axis.Z));
-				}
-			}
-			lobes.add(mine);
-			claim(t, own, i + 1);
+			lead[i] = column(t, pts.get(i)[0], pts.get(i)[1], top[i], new ArrayList<>());
 		}
-
-		// ---- foliage, trunk by trunk, with a few short drips under the lobes
+		int[] ids = {1};
 		for (int i = 0; i < n; i++) {
-			Leaves lv = TONES[i % TONES.length];
-			int k = 0;
-			for (Lobe lb : lobes.get(i)) {
-				TreeKit.lobe(t, lb.u(), lb.y(), lb.v(), lb.rx(), lb.rz(), lb.up(), lb.down(), k % 2 == 0 ? lv : lv.swap(),
-						0.35, 10 * i + k);
-				k++;
-			}
-			drips(t, own, lv);
-			claim(t, own, i + 1);
+			Leaves lv = r.nextInt(6) == 0 ? PAL[(pal + 1) % PAL.length] : PAL[pal];
+			crown(t, r, i, lead[i], top[i], cb[i], lv, ids, fu, fv, w, d);
 		}
-
-		// ---- keep air between the crowns of different trunks: a leaf goes if another trunk's wood touches
-		// it, or if another trunk's leaf lies within two cells of it and that trunk is the taller one
-		List<int[]> gone = new ArrayList<>();
-		for (int y = 1; y < t.h; y++) {
-			for (int v = 0; v < d; v++) {
-				for (int u = 0; u < w; u++) {
-					if (t.kind(u, y, v) != TreeKit.LEAF) {
-						continue;
-					}
-					int me = own[(y * d + v) * w + u];
-					boolean drop = false;
-					for (int oy = -1; oy <= 1 && !drop; oy++) {
-						for (int ov = -2; ov <= 2 && !drop; ov++) {
-							for (int ou = -2; ou <= 2 && !drop; ou++) {
-								int nu = u + ou;
-								int ny = y + oy;
-								int nv = v + ov;
-								if (!t.in(nu, ny, nv) || t.kind(nu, ny, nv) == TreeKit.EMPTY) {
-									continue;
-								}
-								int other = own[(ny * d + nv) * w + nu];
-								if (other == 0 || other == me || me == 0) {
-									continue;
-								}
-								byte kk = t.kind(nu, ny, nv);
-								boolean near = Math.abs(ou) <= 1 && Math.abs(ov) <= 1;
-								if (kk == TreeKit.WOOD && near) {
-									drop = true;
-								} else if (kk == TreeKit.LEAF && tops[other - 1] * 10 + other > tops[me - 1] * 10 + me) {
-									drop = true;
-								}
-							}
-						}
-					}
-					if (drop) {
-						gone.add(new int[] {u, y, v});
-					}
-				}
-			}
-		}
-		for (int[] g : gone) {
-			t.clear(g[0], g[1], g[2]);
-		}
-
-		floor(t, base);
+		gaps(t, PAL[pal].a());
+		unperch(t);
 		t.prune();
+
+		// ---- the rest corner: seats and a lantern post at the clearing, a few fallen logs, bushes, then the floor
+		List<int[]> seated = new ArrayList<>();
+		int seats = (m >= 7 ? 1 : 0) + (m >= 14 ? 1 : 0) + (m >= 26 ? 1 : 0);
+		for (int k = 0; k < seats; k++) {
+			seat(t, r, pts, cl[0], cl[1], sd, seated);
+		}
+		if (m >= 10) {
+			lamp(t, r, cl, sd);
+		}
+		if (big) {
+			fallenLogs(t, r, pts, cl, sd, w * d / 150);
+		}
+		if (m >= 12) {
+			bushes(t, r, pts, cl, sd, PAL[pal], w * d / 36);
+		}
+		floor(t, pts, cl, sd);
 		t.flush(c);
 	}
 
-	/** Marks every filled, still unowned cell as belonging to trunk {@code id}. */
-	private static void claim(Vox t, int[] own, int id) {
-		for (int y = 0; y < t.h; y++) {
-			for (int v = 0; v < t.d; v++) {
-				for (int u = 0; u < t.w; u++) {
-					int ix = (y * t.d + v) * t.w + u;
-					if (own[ix] == 0 && t.kind(u, y, v) != TreeKit.EMPTY) {
-						own[ix] = id;
-					}
-				}
+	/** The senda: a winding strip (one or two cells wide) from the front edge to the clearing; marks {@code sd}. */
+	private static void senda(boolean[] sd, Random r, int w, int d, double[] cl, int m) {
+		double us = TreeKit.clamp(w / 2.0 + (r.nextDouble() - 0.5) * w * 0.5, 2, w - 3);
+		double vs = 0;
+		double ue = cl[0];
+		double ve = cl[1];
+		double len = Math.hypot(ue - us, ve - vs);
+		double amp = TreeKit.clamp(1.0 + m * 0.07, 1.2, 3.2);
+		double phase = r.nextDouble() * Math.PI * 2;
+		double freq = r.nextBoolean() ? 1.0 : 1.5;
+		double nu = -(ve - vs) / len;
+		double nv = (ue - us) / len;
+		int steps = (int) Math.ceil(len * 2);
+		for (int s = 0; s <= steps; s++) {
+			double q = s / (double) steps;
+			double off = Math.sin(q * Math.PI * 2 * freq + phase) * amp * Math.sin(Math.PI * q);
+			double pu = us + (ue - us) * q + nu * off;
+			double pv = vs + (ve - vs) * q + nv * off;
+			int iu = (int) Math.round(pu);
+			int iv = (int) Math.round(pv);
+			mark(sd, w, d, iu, iv);
+			if (Math.abs(ue - us) < Math.abs(ve - vs)) {
+				mark(sd, w, d, iu + 1, iv);
+			} else {
+				mark(sd, w, d, iu, iv + 1);
 			}
+		}
+	}
+
+	private static void mark(boolean[] sd, int w, int d, int u, int v) {
+		if (u >= 1 && u < w - 1 && v >= 0 && v < d - 1) {
+			sd[v * w + u] = true;
 		}
 	}
 
 	/**
-	 * A slender 1×1 birch log from y = 0 to {@code top} that leans towards {@code (u0 + leanU, v0 + leanV)}
-	 * from {@code yStart} up (smoothstep, one axis per layer, a sideways log at each step).
+	 * A slim spire of leaves round the tip and, lower in the crown, small airy puffs of leaves each on its own thin
+	 * twig (one or two logs), turning from layer to layer and away from the other trunks. The trunk shows between.
 	 */
-	private static int[][] column(Vox t, int u0, int v0, int top, double leanU, double leanV, int yStart) {
+	private static void crown(Vox t, Random r, int i, int[][] lead, int top, int cb, Leaves lv, int[] ids, int[] fu, int[] fv,
+			int w, int d) {
+		int[] lu = lead[0];
+		int[] lvv = lead[1];
+		// the spire: a narrow oval over the tip, capped with leaves over the last log
+		int idS = ids[0]++;
+		double ryS = TreeKit.clamp(0.28 * top + 0.4, 2.2, 3.6);
+		oval(t, lu[top], top + 0.6 - ryS * 0.5, lvv[top], 1.15 + r.nextDouble() * 0.3, ryS, 1.15 + r.nextDouble() * 0.3, lv, idS,
+				3 + 10 * i);
+		BlockState cap = lv.a();
+		t.leafOf(lu[top], top + 1, lvv[top], cap, idS);
+		for (int[] o : DIRS) {
+			t.leafOf(lu[top] + o[0], top, lvv[top] + o[1], cap, idS);
+		}
+		// the puffs on twigs
+		int y = cb + r.nextInt(2);
+		int prev = -1;
+		int k = 0;
+		while (y <= top - 3) {
+			int len = 1 + (t.hash(i, y, k, 2) == 0 ? 1 : 0) + (top >= 11 && r.nextInt(3) == 0 ? 1 : 0);
+			len = Math.min(len, 2);
+			int bestDir = -1;
+			double bestScore = -1e9;
+			for (int dr = 0; dr < 4; dr++) {
+				int cu = lu[y] + DIRS[dr][0] * (len + 1);
+				int cv = lvv[y] + DIRS[dr][1] * (len + 1);
+				double near = 6;
+				for (int j = 0; j < fu.length; j++) {
+					if (j != i) {
+						near = Math.min(near, Math.hypot(cu - fu[j], cv - fv[j]));
+					}
+				}
+				double score = near + r.nextDouble() * 1.5 - (dr == prev ? 1.4 : 0);
+				if (cu < 1 || cu > w - 2 || cv < 1 || cv > d - 2) {
+					score -= 5;
+				}
+				if (score > bestScore) {
+					bestScore = score;
+					bestDir = dr;
+				}
+			}
+			int du = DIRS[bestDir][0];
+			int dv = DIRS[bestDir][1];
+			// the twig: thin birch fence posts (a fence cannot be stood on), joined to the trunk and to each other
+			for (int s = 1; s <= len; s++) {
+				BlockState fe = b(Blocks.BIRCH_FENCE);
+				fe = side(fe, -du, -dv, true);
+				fe = side(fe, du, dv, s < len);
+				t.wood(lu[y] + du * s, y, lvv[y] + dv * s, fe);
+			}
+			double rx = 1.15 + r.nextDouble() * 0.35;
+			double ry = 1.0 + r.nextDouble() * 0.7;
+			oval(t, lu[y] + du * (len + 1), y + r.nextInt(2) * 0.5, lvv[y] + dv * (len + 1), rx, ry, rx * (0.9 + r.nextDouble() * 0.2),
+					lv, ids[0]++, 5 + 10 * i + k);
+			// now and then a tiny tuft right against the trunk on another side
+			if (r.nextInt(3) == 0 && y + 1 <= top - 3) {
+				int o2 = (bestDir + 1 + r.nextInt(3)) % 4;
+				oval(t, lu[y + 1] + DIRS[o2][0], y + 1, lvv[y + 1] + DIRS[o2][1], 0.8, 0.9, 0.8, lv, ids[0]++, 7 + 10 * i + k);
+			}
+			prev = bestDir;
+			y += 2 + (r.nextInt(3) == 0 ? 1 : 0);
+			k++;
+		}
+	}
+
+	/** Sets the fence side that faces the local step {@code (du, dv)} (+u east, +v south, the front is north). */
+	private static BlockState side(BlockState st, int du, int dv, boolean on) {
+		if (du > 0) {
+			return st.setValue(BlockStateProperties.EAST, on);
+		} else if (du < 0) {
+			return st.setValue(BlockStateProperties.WEST, on);
+		} else if (dv > 0) {
+			return st.setValue(BlockStateProperties.SOUTH, on);
+		}
+		return st.setValue(BlockStateProperties.NORTH, on);
+	}
+
+	/**
+	 * A slender 1×1 birch log from y = 0 to {@code top}, with a one-block jog at each {@code {y, du, dv}} step (a bark
+	 * joint on the layer below). The last cell is bark, never a pale log end. Nothing but the trunk: no roots, no stubs.
+	 */
+	private static int[][] column(Vox t, int u0, int v0, int top, List<int[]> steps) {
 		int[] lu = new int[t.h + 1];
 		int[] lv = new int[t.h + 1];
 		int cu = u0;
 		int cv = v0;
-		int span = Math.max(1, top - yStart);
 		for (int y = 0; y <= Math.min(top, t.h - 1); y++) {
-			if (y > yStart) {
-				double f = Math.min(1.0, (y - yStart) / (double) span);
-				double e = f * f * (3 - 2 * f);
-				int tu = u0 + (int) Math.round(leanU * e);
-				int tv = v0 + (int) Math.round(leanV * e);
-				int du = Integer.signum(tu - cu);
-				int dv = Integer.signum(tv - cv);
-				if (du != 0 && dv != 0) {
-					if ((y & 1) == 0) {
-						dv = 0;
-					} else {
-						du = 0;
-					}
+			for (int[] st : steps) {
+				if (st[0] == y) {
+					t.wood(cu + st[1], y - 1, cv + st[2], BIRCH.bark());
+					cu += st[1];
+					cv += st[2];
 				}
-				if (du != 0 || dv != 0) {
-					t.wood(cu + du, y - 1, cv + dv, BIRCH.log(du != 0 ? Direction.Axis.X : Direction.Axis.Z));
-				}
-				cu += du;
-				cv += dv;
 			}
 			lu[y] = cu;
 			lv[y] = cv;
-			t.wood(cu, y, cv, BIRCH.log(Direction.Axis.Y));
+			t.wood(cu, y, cv, y == top ? BIRCH.bark() : BIRCH.log(Direction.Axis.Y));
 		}
 		for (int y = Math.min(top, t.h - 1) + 1; y <= t.h; y++) {
 			lu[y] = cu;
@@ -320,82 +404,468 @@ public final class TreeBirchGrove implements Variant {
 		return new int[][] {lu, lv};
 	}
 
+	/** The leaf of a cell: the dominant light birch, with the second tone in pairs here and there. */
+	private static BlockState leafAt(Vox t, Leaves lv, int u, int y, int v, int salt) {
+		int pct = 100 / Math.max(2, lv.clumpOneIn());
+		return t.hash(u + salt, y, Math.floorDiv(v, 2), 100) < pct ? lv.b() : lv.a();
+	}
+
 	/**
-	 * {@code count} (1–2) short diagonal roots at the foot, one block high: a log out of a face, then (on longer
-	 * roots) a log stepping round the corner, ending in a moss carpet. No bark cubes around the foot.
+	 * A small airy oval of leaves: an ellipsoid {@code rx × ry × rz} with a ragged skin, thinned on the outside and with
+	 * single-cell holes (never over another hole) that let the trunk and the sky show. Nothing under {@link #MIN_Y}.
 	 */
-	private static void footRoots(Vox t, int u0, int v0, int count, int salt) {
-		int[][] diag = {{1, 1}, {-1, 1}, {-1, -1}, {1, -1}};
-		int first = t.hash(u0, salt, v0, 4);
-		for (int k = 0; k < Math.min(2, count); k++) {
-			int[] dd = diag[(first + k * 2) % 4];
-			int du = dd[0];
-			int dv = dd[1];
-			boolean uFirst = t.hash(u0 + k, 2, v0, 2) == 0;
-			int len = 1 + t.hash(u0 + k, 1, v0 + salt, 2);
-			// a plan staircase: one step on the first axis, one on the other, then the mossy tip
-			int[][] cells = uFirst
-					? new int[][] {{u0 + du, v0}, {u0 + du, v0 + dv}, {u0 + 2 * du, v0 + dv}}
-					: new int[][] {{u0, v0 + dv}, {u0 + du, v0 + dv}, {u0 + du, v0 + 2 * dv}};
-			boolean ok = true;
-			for (int i = 0; i < len && ok; i++) {
-				int[] prev = i == 0 ? new int[] {u0, v0} : cells[i - 1];
-				boolean stepU = cells[i][0] != prev[0];
-				if (!t.empty(cells[i][0], 0, cells[i][1])) {
-					ok = false;
-					break;
-				}
-				t.wood(cells[i][0], 0, cells[i][1], BIRCH.log(stepU ? Direction.Axis.X : Direction.Axis.Z));
+	private static void oval(Vox t, double cu, double cy, double cv, double rx, double ry, double rz, Leaves lv, int id, int salt) {
+		for (int y = (int) Math.floor(cy - ry - 1); y <= (int) Math.ceil(cy + ry + 1); y++) {
+			if (y < MIN_Y || y >= t.h) {
+				continue;
 			}
-			if (ok) {
-				t.cover(cells[len][0], 0, cells[len][1], b(Blocks.MOSS_CARPET));
+			double dy = (y - cy) / ry;
+			for (int v = (int) Math.floor(cv - rz - 1.5); v <= (int) Math.ceil(cv + rz + 1.5); v++) {
+				for (int u = (int) Math.floor(cu - rx - 1.5); u <= (int) Math.ceil(cu + rx + 1.5); u++) {
+					double du = (u - cu) / rx;
+					double dv = (v - cv) / rz;
+					double q = du * du + dy * dy + dv * dv;
+					double jit = (t.hash(u + salt * 13, y + salt * 7, v + salt * 3, 9) - 4) / 4.0 * 0.5;
+					if (q > 1.0 + jit) {
+						continue;
+					}
+					if (q > 0.5 && t.hash(u + salt * 5, y, v + salt, 100) < 22) {
+						continue; // thinned skin
+					}
+					if (q > 0.18 && q < 0.97 && t.kind(u, y - 1, v) == TreeKit.LEAF && t.hash(u + salt, y, v + salt * 5, 4) < 1) {
+						continue; // a hole of sky (never over another hole, so nobody can stand in it)
+					}
+					t.leafOf(u, y, v, leafAt(t, lv, u, y, v, salt), id);
+				}
 			}
 		}
 	}
 
-	/** One- and two-leaf drips under the lobes just drawn (the leaves not yet owned by a trunk). */
-	private static void drips(Vox t, int[] own, Leaves lv) {
-		List<int[]> seeds = new ArrayList<>();
-		for (int y = 3; y < t.h; y++) {
+	/**
+	 * Closes the small ledges: an empty cell with a solid cell under it, room to stand (two free cells) and a roof of
+	 * leaves a block or two over it would be a shut-in pocket for the walking audit. It becomes a leaf.
+	 */
+	private static void gaps(Vox t, BlockState lf) {
+		for (int pass = 0; pass < 2; pass++) {
+			for (int y = MIN_Y; y < t.h - 2; y++) {
+				for (int v = 0; v < t.d; v++) {
+					for (int u = 0; u < t.w; u++) {
+						if (!t.empty(u, y, v) || !t.empty(u, y + 1, v)) {
+							continue;
+						}
+						byte below = t.kind(u, y - 1, v);
+						if (below != TreeKit.LEAF && below != TreeKit.WOOD) {
+							continue;
+						}
+						byte k2 = t.kind(u, y + 2, v);
+						byte k3 = t.kind(u, y + 3, v);
+						if (k2 == TreeKit.LEAF || k2 == TreeKit.WOOD || k3 == TreeKit.LEAF || k3 == TreeKit.WOOD) {
+							t.leaf(u, y, v, lf);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	/**
+	 * Nobody can reach a ledge in the crowns, and the walking audit flags a standable, unreached cell with anything
+	 * within 8 blocks over it. So a leaf that is the top of its column, with two free cells over it and something
+	 * higher up in that column, is taken away (and what that exposes below, the same way).
+	 */
+	private static void unperch(Vox t) {
+		for (int y = t.h - 3; y >= MIN_Y; y--) {
 			for (int v = 0; v < t.d; v++) {
 				for (int u = 0; u < t.w; u++) {
-					if (t.kind(u, y, v) == TreeKit.LEAF && own[(y * t.d + v) * t.w + u] == 0 && t.empty(u, y - 1, v)
-							&& t.hash(u, y, v, 8) == 0) {
-						seeds.add(new int[] {u, y, v});
+					if (t.kind(u, y - 1, v) != TreeKit.LEAF || !t.empty(u, y, v) || !t.empty(u, y + 1, v)) {
+						continue;
+					}
+					boolean roof = false;
+					for (int k = y + 2; k <= y + 9 && !roof; k++) {
+						byte kk = t.kind(u, k, v);
+						roof = kk == TreeKit.LEAF || kk == TreeKit.WOOD || kk == TreeKit.FIXED;
+					}
+					if (roof) {
+						t.clear(u, y - 1, v);
 					}
 				}
 			}
 		}
-		for (int[] s : seeds) {
-			int len = 1 + t.hash(s[0], 4, s[2], 2);
-			TreeKit.hang(t, s[0], s[1] - 1, s[2], len, 2, lv.a(), lv.b(), 0, 0, false);
+	}
+
+	/** True when the cell is free ground (nothing, or a plant) with no trunk within {@code clear} and not on the senda. */
+	private static boolean freeGround(Vox t, int u, int v, List<int[]> trunks, double clear, boolean[] sd) {
+		if (!t.in(u, 0, v) || sd[v * t.w + u]) {
+			return false;
+		}
+		byte k = t.kind(u, 0, v);
+		if (k != TreeKit.EMPTY && k != TreeKit.COVER) {
+			return false;
+		}
+		for (int[] q : trunks) {
+			if (Math.hypot(q[0] - u, q[1] - v) < clear) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * A birch bench (stripped-log ends, slab seat) or a mossy boulder on a free, open spot of the floor, the one
+	 * nearest the clearing (so it has a use), at least 4 from the seats already there.
+	 */
+	private static void seat(Vox t, Random r, List<int[]> trunks, double mu, double mv, boolean[] sd, List<int[]> placed) {
+		boolean bench = r.nextInt(4) != 0;
+		int len = bench ? 3 : 2;
+		int bu = -1;
+		int bv = -1;
+		boolean bAlong = true;
+		double bd = 1e9;
+		for (int tries = 0; tries < 120; tries++) {
+			boolean alongU = r.nextBoolean();
+			int u = 1 + r.nextInt(Math.max(1, t.w - 2 - (alongU ? len : 1)));
+			int v = 1 + r.nextInt(Math.max(1, t.d - 2 - (alongU ? 1 : len)));
+			int su = alongU ? len : 1;
+			int sv = alongU ? 1 : len;
+			boolean ok = true;
+			for (int dv = -1; dv <= sv && ok; dv++) {
+				for (int du = -1; du <= su && ok; du++) {
+					int cu = u + du;
+					int cv = v + dv;
+					if (!t.in(cu, 0, cv)) {
+						continue;
+					}
+					if (t.kind(cu, 0, cv) != TreeKit.EMPTY && t.kind(cu, 0, cv) != TreeKit.COVER) {
+						ok = false;
+					}
+					if (sd[cv * t.w + cu] && du >= 0 && du < su && dv >= 0 && dv < sv) {
+						ok = false;
+					}
+					for (int[] q : trunks) {
+						if (Math.hypot(q[0] - cu, q[1] - cv) < 2.3) {
+							ok = false;
+						}
+					}
+					for (int y = 1; y < Math.min(t.h, 10) && ok; y++) {
+						byte kk = t.kind(cu, y, cv);
+						if (kk == TreeKit.LEAF || kk == TreeKit.WOOD || kk == TreeKit.FIXED) {
+							ok = false;
+						}
+					}
+				}
+			}
+			if (!ok) {
+				continue;
+			}
+			double ccu = u + su / 2.0;
+			double ccv = v + sv / 2.0;
+			for (int[] q : placed) {
+				if (Math.hypot(q[0] - ccu, q[1] - ccv) < 5) {
+					ok = false;
+				}
+			}
+			if (!ok) {
+				continue;
+			}
+			double dist = Math.hypot(ccu - mu, ccv - mv);
+			if (dist < bd) {
+				bd = dist;
+				bu = u;
+				bv = v;
+				bAlong = alongU;
+			}
+		}
+		if (bu < 0) {
+			return;
+		}
+		int u = bu;
+		int v = bv;
+		boolean alongU = bAlong;
+		placed.add(new int[] {u, v});
+		if (bench) {
+			// birch stairs facing the clearing, a row of slabs for the back
+			Direction face;
+			int bu2;
+			int bv2;
+			if (alongU) {
+				face = mv > v ? Direction.SOUTH : Direction.NORTH;
+				bu2 = 0;
+				bv2 = face == Direction.SOUTH ? -1 : 1;
+			} else {
+				face = mu > u ? Direction.EAST : Direction.WEST;
+				bu2 = face == Direction.EAST ? -1 : 1;
+				bv2 = 0;
+			}
+			BlockState stair = b(Blocks.BIRCH_STAIRS).setValue(BlockStateProperties.HORIZONTAL_FACING, face);
+			for (int i = 0; i < 3; i++) {
+				int cu = alongU ? u + i : u;
+				int cv = alongU ? v : v + i;
+				t.fixed(cu, 0, cv, stair);
+				t.fixed(cu + bu2, 0, cv + bv2, b(Blocks.BIRCH_SLAB));
+			}
+		} else {
+			t.fixed(u, 0, v, b(Blocks.MOSSY_COBBLESTONE));
+			t.fixed(alongU ? u + 1 : u, 0, alongU ? v : v + 1, b(Blocks.MOSSY_COBBLESTONE_SLAB));
+			if (t.hash(u, 1, v, 2) == 0) {
+				t.cover(u, 1, v, b(Blocks.MOSS_CARPET));
+			}
 		}
 	}
 
-	/** Ferns, lilies of the valley, moss and a white tulip now and then; moss and ferns hug the trunks. */
-	private static void floor(Vox t, int[][] base) {
-		for (int v = 0; v < t.d; v++) {
-			for (int u = 0; u < t.w; u++) {
-				boolean near = false;
-				for (int[] bs : base) {
-					if (Math.abs(u - bs[0]) + Math.abs(v - bs[1]) <= 2) {
-						near = true;
+	/** A birch fence post with an arm and a hanging lantern at the edge of the clearing, so the rest corner has light. */
+	private static void lamp(Vox t, Random r, double[] cl, boolean[] sd) {
+		double a0 = r.nextDouble() * Math.PI * 2;
+		for (int k = 0; k < 24; k++) {
+			double ang = a0 + k * 0.52;
+			int u = (int) Math.round(cl[0] + Math.cos(ang) * (cl[2] - 0.6));
+			int v = (int) Math.round(cl[1] + Math.sin(ang) * (cl[2] - 0.6));
+			if (!t.in(u, 5, v) || sd[v * t.w + u]) {
+				continue;
+			}
+			boolean free = true;
+			for (int y = 0; y <= 5; y++) {
+				byte kk = t.kind(u, y, v);
+				if (kk != TreeKit.EMPTY && !(y == 0 && kk == TreeKit.COVER)) {
+					free = false;
+				}
+			}
+			// not hard against a seat
+			for (int dv = -1; dv <= 1 && free; dv++) {
+				for (int du = -1; du <= 1; du++) {
+					if (t.kind(u + du, 0, v + dv) == TreeKit.FIXED) {
+						free = false;
 					}
 				}
-				BlockState s;
-				if (near) {
-					int k = t.hash(u, 0, v, 4);
-					s = k == 0 ? b(Blocks.MOSS_CARPET) : k == 1 ? b(Blocks.FERN) : k == 2 ? b(Blocks.MOSS_CARPET) : null;
-				} else {
-					s = switch (t.hash(u, 0, v, 10)) {
-						case 0, 1 -> b(Blocks.FERN);
-						case 2, 3 -> b(Blocks.LILY_OF_THE_VALLEY);
-						case 4, 5 -> b(Blocks.MOSS_CARPET);
-						case 6 -> b(Blocks.WHITE_TULIP);
-						default -> null;
-					};
+			}
+			if (!free) {
+				continue;
+			}
+			// the post, and an arm towards the clearing with the lantern hanging from it (a fence top cannot be stood on)
+			int au = Math.abs(cl[0] - u) >= Math.abs(cl[1] - v) ? (int) Math.signum(cl[0] - u) : 0;
+			int av = au == 0 ? (int) Math.signum(cl[1] - v) : 0;
+			if (au == 0 && av == 0) {
+				au = 1;
+			}
+			if (!armFree(t, u + au, v + av)) {
+				au = -au;
+				av = -av;
+			}
+			if (!armFree(t, u + au, v + av)) {
+				continue;
+			}
+			for (int y = 0; y <= 4; y++) {
+				t.fixed(u, y, v, b(Blocks.BIRCH_FENCE));
+			}
+			t.fixed(u, 5, v, side(b(Blocks.BIRCH_FENCE), au, av, true));
+			t.fixed(u + au, 5, v + av, side(b(Blocks.BIRCH_FENCE), -au, -av, true));
+			t.fixed(u + au, 4, v + av, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true));
+			return;
+		}
+	}
+
+	private static boolean armFree(Vox t, int u, int v) {
+		return t.in(u, 6, v) && t.kind(u, 4, v) == TreeKit.EMPTY && t.kind(u, 5, v) == TreeKit.EMPTY && t.kind(u, 6, v) == TreeKit.EMPTY;
+	}
+
+	/** A few fallen birch logs (two or three long, a little moss on them) well away from the senda, the clearing and the trunks. */
+	private static void fallenLogs(Vox t, Random r, List<int[]> trunks, double[] cl, boolean[] sd, int count) {
+		int placed = 0;
+		for (int tries = 0; tries < 160 && placed < count; tries++) {
+			int len = 2 + r.nextInt(2);
+			boolean alongU = r.nextBoolean();
+			int u = 1 + r.nextInt(Math.max(1, t.w - 2 - (alongU ? len : 1)));
+			int v = 1 + r.nextInt(Math.max(1, t.d - 2 - (alongU ? 1 : len)));
+			boolean ok = true;
+			for (int i = -1; i <= len && ok; i++) {
+				for (int j = -1; j <= 1 && ok; j++) {
+					int cu = alongU ? u + i : u + j;
+					int cv = alongU ? v + j : v + i;
+					if (!t.in(cu, 0, cv)) {
+						continue;
+					}
+					if (sd[cv * t.w + cu] || (t.kind(cu, 0, cv) != TreeKit.EMPTY && t.kind(cu, 0, cv) != TreeKit.COVER)) {
+						ok = false;
+					}
+					if (Math.hypot(cu - cl[0], cv - cl[1]) < cl[2] + 1) {
+						ok = false;
+					}
+					for (int[] q : trunks) {
+						if (Math.hypot(q[0] - cu, q[1] - cv) < 2.2) {
+							ok = false;
+						}
+					}
 				}
-				if (s != null) {
+			}
+			if (!ok) {
+				continue;
+			}
+			Direction.Axis ax = alongU ? Direction.Axis.X : Direction.Axis.Z;
+			for (int i = 0; i < len; i++) {
+				int cu = alongU ? u + i : u;
+				int cv = alongU ? v : v + i;
+				t.fixed(cu, 0, cv, BIRCH.log(ax));
+				if (t.hash(cu, 1, cv, 3) == 0) {
+					t.fixed(cu, 1, cv, b(Blocks.MOSS_CARPET));
+				} else if (t.hash(cu, 2, cv, 6) == 0) {
+					t.fixed(cu, 1, cv, b(Blocks.BROWN_MUSHROOM));
+				}
+			}
+			placed++;
+		}
+	}
+
+	/** Azalea-leaf bushes of one block in the understory: some with a flowering top. Never on the senda or the clearing. */
+	private static void bushes(Vox t, Random r, List<int[]> trunks, double[] cl, boolean[] sd, Leaves lv, int count) {
+		for (int k = 0; k < count; k++) {
+			int u = 1 + r.nextInt(t.w - 2);
+			int v = 1 + r.nextInt(t.d - 2);
+			if (!freeGround(t, u, v, trunks, 2.4, sd) || Math.hypot(u - cl[0], v - cl[1]) < cl[2] + 0.8) {
+				continue;
+			}
+			boolean flowering = r.nextInt(4) == 0;
+			t.fixed(u, 0, v, flowering ? b(Blocks.FLOWERING_AZALEA_LEAVES) : lv.b());
+		}
+	}
+
+	private static BlockState tall(Block blk, boolean lower) {
+		return blk.defaultBlockState().setValue(BlockStateProperties.DOUBLE_BLOCK_HALF, lower ? DoubleBlockHalf.LOWER : DoubleBlockHalf.UPPER);
+	}
+
+	private static BlockState flower(Vox t, int u, int v) {
+		return switch (t.hash(u, 7, v, 6)) {
+			case 0 -> b(Blocks.LILY_OF_THE_VALLEY);
+			case 1 -> b(Blocks.OXEYE_DAISY);
+			case 2 -> b(Blocks.CORNFLOWER);
+			case 3 -> b(Blocks.AZURE_BLUET);
+			case 4 -> b(Blocks.WHITE_TULIP);
+			default -> b(Blocks.LILY_OF_THE_VALLEY);
+		};
+	}
+
+	/** A stepping slab of the senda: mostly mossy cobble and stone, a cell now and then left to grass. */
+	private static BlockState stepping(Vox t, int u, int v) {
+		int h = t.hash(u, 0, v, 8);
+		return switch (h) {
+			case 0, 1, 2 -> b(Blocks.MOSSY_COBBLESTONE_SLAB);
+			case 3, 4 -> b(Blocks.STONE_SLAB);
+			case 5 -> b(Blocks.ANDESITE_SLAB);
+			case 6 -> b(Blocks.COBBLESTONE_SLAB);
+			default -> null;
+		};
+	}
+
+	/**
+	 * A mossy forest floor in patches (moss and ferns, meadow, wild flowers, large ferns, quiet), mushrooms at the
+	 * trunks, a quiet clearing and the stepping-stone senda.
+	 */
+	private static void floor(Vox t, List<int[]> trunks, double[] cl, boolean[] sd) {
+		for (int v = 0; v < t.d; v++) {
+			for (int u = 0; u < t.w; u++) {
+				if (!t.empty(u, 0, v)) {
+					continue;
+				}
+				if (sd[v * t.w + u]) {
+					BlockState st = stepping(t, u, v);
+					if (st != null) {
+						t.fixed(u, 0, v, st);
+					}
+					continue;
+				}
+				boolean besideSenda = false;
+				for (int dv = -1; dv <= 1 && !besideSenda; dv++) {
+					for (int du = -1; du <= 1; du++) {
+						int a = u + du;
+						int bb = v + dv;
+						if (a >= 0 && a < t.w && bb >= 0 && bb < t.d && sd[bb * t.w + a]) {
+							besideSenda = true;
+							break;
+						}
+					}
+				}
+				double near = 99;
+				for (int[] q : trunks) {
+					near = Math.min(near, Math.hypot(q[0] - u, q[1] - v));
+				}
+				int roll = t.hash(u, 0, v, 100);
+				// patches 3 across, shifted row by row so they do not form a grid
+				int patch = t.hash(Math.floorDiv(u + t.hash(0, 1, Math.floorDiv(v, 3), 3), 3), 3, Math.floorDiv(v, 3), 5);
+				// the clearing is quiet, the edge is wilder
+				if (Math.hypot(u - cl[0], v - cl[1]) < cl[2] && t.hash(u, 5, v, 3) != 0) {
+					patch = 4;
+				}
+				BlockState s = null;
+				boolean dbl = false;
+				if (besideSenda) {
+					s = roll < 30 ? b(Blocks.MOSS_CARPET) : roll < 40 ? b(Blocks.SHORT_GRASS) : null;
+				} else if (near <= 1.6) {
+					s = roll < 52 ? b(Blocks.MOSS_CARPET) : roll < 66 ? b(Blocks.FERN) : roll < 82 ? b(Blocks.BROWN_MUSHROOM) : null;
+				} else {
+					switch (patch) {
+						case 0 -> { // moss and ferns, a young birch now and then
+							if (roll < 40) {
+								s = b(Blocks.MOSS_CARPET);
+							} else if (roll < 50) {
+								s = b(Blocks.FERN);
+							} else if (roll < 54) {
+								s = tall(Blocks.LARGE_FERN, true);
+								dbl = true;
+							} else if (roll < 56) {
+								s = b(Blocks.BIRCH_SAPLING);
+							}
+						}
+						case 1 -> { // meadow: tall grass, short grass, a few flowers
+							if (roll < 12) {
+								s = tall(Blocks.TALL_GRASS, true);
+								dbl = true;
+							} else if (roll < 52) {
+								s = b(Blocks.SHORT_GRASS);
+							} else if (roll < 66) {
+								s = b(Blocks.MOSS_CARPET);
+							} else if (roll < 82) {
+								s = flower(t, u, v);
+							}
+						}
+						case 2 -> { // wild flowers
+							if (roll < 46) {
+								s = flower(t, u, v);
+							} else if (roll < 62) {
+								s = b(Blocks.SHORT_GRASS);
+							} else if (roll < 80) {
+								s = b(Blocks.MOSS_CARPET);
+							}
+						}
+						case 3 -> { // big ferns
+							if (roll < 10) {
+								s = b(Blocks.FERN);
+							} else if (roll < 18) {
+								s = tall(Blocks.LARGE_FERN, true);
+								dbl = true;
+							} else if (roll < 56) {
+								s = b(Blocks.MOSS_CARPET);
+							} else if (roll < 70) {
+								s = b(Blocks.SHORT_GRASS);
+							}
+						}
+						default -> { // quiet: mostly open, for walking
+							if (roll < 24) {
+								s = b(Blocks.MOSS_CARPET);
+							} else if (roll < 40) {
+								s = b(Blocks.SHORT_GRASS);
+							} else if (roll < 54) {
+								s = flower(t, u, v);
+							}
+						}
+					}
+				}
+				if (s == null) {
+					continue;
+				}
+				if (dbl) {
+					if (t.empty(u, 1, v)) {
+						t.fixed(u, 0, v, s);
+						t.fixed(u, 1, v, tall(s.getBlock(), false));
+					}
+				} else {
 					t.cover(u, 0, v, s);
 				}
 			}
