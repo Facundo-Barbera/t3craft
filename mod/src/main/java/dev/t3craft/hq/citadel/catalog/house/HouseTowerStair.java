@@ -477,7 +477,7 @@ public final class HouseTowerStair implements Variant {
 		for (int lane : new int[] {l.iu, l.ou}) {
 			set(c, p, lane, 0, vl + 1, b(Blocks.POLISHED_DEEPSLATE));
 			for (int y = 1; y <= B3 + 1; y++) {
-				set(c, p, lane, y, vl + 1, y <= B3 ? log(l.s.frame(), Direction.Axis.Y) : fence(l.s.fence(), false, false, false, false));
+				set(c, p, lane, y, vl + 1, y <= B3 ? infill(l, y <= 3 ? 1 : y <= 6 ? 2 : 4, lane, y, vl + 1) : fence(l.s.fence(), false, false, false, false));
 			}
 		}
 		for (int y = B1 + 1; y <= B3 + 1; y++) {

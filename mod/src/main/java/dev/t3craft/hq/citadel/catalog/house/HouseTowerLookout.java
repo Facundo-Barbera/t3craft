@@ -338,8 +338,8 @@ public final class HouseTowerLookout implements Variant {
 					boolean post = Math.abs(u - g.cx) == Math.abs(v - g.cz) && Math.abs(u - g.cx) > 0;
 					boolean door = u > g.cx && v == g.cz;
 					if (post) {
-						set(c, g.p, u, GAL + 1, v, log(g.s.log(), Direction.Axis.Y));
-						set(c, g.p, u, GAL + 2, v, log(g.s.log(), Direction.Axis.Y));
+						set(c, g.p, u, GAL + 1, v, log(g.s.trim(), Direction.Axis.Y));
+						set(c, g.p, u, GAL + 2, v, log(g.s.trim(), Direction.Axis.Y));
 					} else {
 						boolean n = g.in(u, v - 1, rg) && !g.in(u, v - 1, g.wallR());
 						boolean e = g.in(u + 1, v, rg) && !g.in(u + 1, v, g.wallR());
@@ -381,7 +381,7 @@ public final class HouseTowerLookout implements Variant {
 					} else if (eastDoor) {
 						st = y == GAL + 1 ? doorBlock(g, Direction.EAST, true) : doorBlock(g, Direction.EAST, false);
 					} else if (pillarCell(g, u, v)) {
-						st = log(g.s.log(), Direction.Axis.Y);
+						st = b(Blocks.QUARTZ_PILLAR); // pale pillars between the glass: clean light band under the crown
 					} else {
 						boolean n = g.wall(u, v - 1);
 						boolean e = g.wall(u + 1, v);

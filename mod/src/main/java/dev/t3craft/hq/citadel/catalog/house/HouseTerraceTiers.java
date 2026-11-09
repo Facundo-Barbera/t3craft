@@ -531,10 +531,10 @@ public final class HouseTerraceTiers implements Variant {
 		// a brick chimney on the east slope breaks the ridge line
 		int chu = cu + 2;
 		int chv = (VC + g.ve()) / 2;
-		for (int y = PLATE + 1; y <= PLATE + 5; y++) {
+		for (int y = PLATE + 1; y <= PLATE + 4; y++) {
 			p.set(c, chu, y, chv, p.hash(chu, y, chv, 3) == 0 ? b(Blocks.DEEPSLATE_BRICKS) : b(Blocks.BRICKS));
 		}
-		p.set(c, chu, PLATE + 6, chv, slab(Blocks.DEEPSLATE_BRICK_SLAB));
+		p.set(c, chu, PLATE + 5, chv, slab(Blocks.DEEPSLATE_BRICK_SLAB));
 		// finial on the ridge
 		p.set(c, cu, PLATE + 4, (VC + g.ve()) / 2, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState());
 	}
