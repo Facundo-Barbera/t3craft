@@ -94,7 +94,9 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
  *     {@code project:<key>} of the two projects with most desks taken ({@link #projectBindings}); unbound while the
  *     HQ has fewer. Chests under them.</li>
  * <li><b>Decision podiums</b>: five along the south wall under the threads screen, bound {@code board:0..4}. See {@link #podiums}.</li>
- * <li><b>Attention board</b>: on the east wall, five status lamps anchored {@code board_lamp_5..9}, so they show the
+ * <li><b>Status screen</b>: on the east wall, a 9 x 3 big screen (key {@link #STATUS_SCREEN}) bound {@code beacon}: threads by
+ *     state, PRs to review, active projects and the oldest thread waiting for the player, in big numbers (client
+ *     {@code StatusScreen}). Under it, a strip with five status lamps anchored {@code board_lamp_5..9}, so they show the
  *     6th to 10th most urgent thread: the hub board keeps ranks 1 to 5. They are plain additive anchors.</li>
  * <li><b>Crown</b>: every screen, the board and the equipment walls behind them top out at {@code F2() + 7}, under one continuous
  *     crown beam ({@code F2() + 8}).</li>
@@ -134,6 +136,13 @@ public final class CitadelOffice {
 	 * moves it to {@code AnchorNames.OFFICE} (and adds it to {@code AnchorNames.standing}) when integrating.
 	 */
 	public static final String OFFICE = "office";
+	/**
+	 * feat/status-screen: key of the status screen (9 x 3, east wall) and its binding, {@code Binding.BEACON.wire()}: a big screen
+	 * bound {@code beacon} draws the workspace summary ({@code StatusScreen}, client). Spelled out here so the plan code does not
+	 * depend on the blocks module (the wire form is the contract).
+	 */
+	public static final String STATUS_SCREEN = "office_status";
+	static final String STATUS_BINDING = "beacon";
 	/** Anchor of the balcony's standing cell, looking out over the citadel (same note as {@link #OFFICE}). */
 	public static final String OFFICE_BALCONY = "office_balcony";
 
@@ -995,30 +1004,35 @@ public final class CitadelOffice {
 	}
 
 	/**
-	 * The attention board on the east wall: a frame (nine wide, four high, its top row on the room's crown line), a dark panel and
-	 * five status lamps anchored {@code board_lamp_5..9} (the hub's board owns 0 to 4), so the office shows the next five threads
-	 * that need the player.
+	 * The east wall: the status screen (nine wide, three high, its top row on the room's crown line) over a strip (a dark plinth
+	 * with plaques, and a beam row) that carries the attention board's five status lamps, anchored {@code board_lamp_5..9} (the
+	 * hub's board owns 0 to 4), so the office shows the next five threads that need the player.
 	 */
 	private static void attentionBoard(CitadelCanvas c) {
 		int x = CX() + H;
 		int bottom = F2() + 4;
+		// feat/status-screen: the board's frame is now a strip of one row (a beam with the five lamps in it) under the status screen:
+		// a 9 x 3 big screen bound `beacon` (the workspace summary: threads by state, PRs, projects, oldest waiting), its top row on
+		// the room's crown line like the others. Viewed from the room the east wall's left end is the north one (dz = -4).
 		for (int dz = -4; dz <= 4; dz++) {
-			for (int row = 0; row < 4; row++) {
-				boolean edge = Math.abs(dz) == 4 || row == 0 || row == 3;
-				BlockState s = edge ? c.kit.beam(row == 0 || row == 3 ? Direction.Axis.Z : Direction.Axis.Y) : c.style.palette().get(HqStyle.Role.BOARD);
-				c.fixture(new BlockPos(x, bottom + row, CZ() + dz), s);
+			c.fixture(new BlockPos(x, bottom - 1, CZ() + dz), c.style.screenBase()); // plinth: the plaques hang on it
+			if (Math.abs(dz) > 2) {
+				c.fixture(new BlockPos(x, bottom, CZ() + dz), c.kit.beam(Direction.Axis.Z));
 			}
 		}
+		CitadelHub.bigScreen(c, new HqGeometry.Surface(new BlockPos(x, bottom + 1, CZ() - 4), Direction.SOUTH, Direction.WEST, 9, 3),
+				STATUS_SCREEN, STATUS_BINDING, false);
 		int lamp = 5;
 		for (int dz = -2; dz <= 2; dz++) {
-			BlockPos p = new BlockPos(x, bottom + 2, CZ() + dz);
+			BlockPos p = new BlockPos(x, bottom, CZ() + dz);
 			c.fixture(p, c.style.statusLamp());
 			c.anchor(Anchor.face(AnchorNames.boardLamp(lamp), p, Direction.WEST));
 			// a plaque under each lamp with its rank in the attention queue (the hub board has 1 to 5)
-			sign(c, x - 1, bottom + 1, CZ() + dz, Direction.WEST, DyeColor.ORANGE, "", "#" + (lamp + 1), "", "");
+			sign(c, x - 1, bottom - 1, CZ() + dz, Direction.WEST, DyeColor.ORANGE, "", "#" + (lamp + 1), "", "");
 			lamp++;
 		}
-		sign(c, x - 1, bottom + 3, CZ(), Direction.WEST, DyeColor.ORANGE, "", "Atencion", "6 a 10", "");
+		sign(c, x - 1, bottom - 1, CZ() - 3, Direction.WEST, DyeColor.ORANGE, "", "Estado", "de un vistazo", "");
+		sign(c, x - 1, bottom - 1, CZ() + 3, Direction.WEST, DyeColor.ORANGE, "", "Atencion", "6 a 10", "");
 	}
 
 	/** Number of decision podiums in the control room (anchors {@code decision_podium_0..4}). */
