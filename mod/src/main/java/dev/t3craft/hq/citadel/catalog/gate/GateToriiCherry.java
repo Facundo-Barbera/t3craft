@@ -85,7 +85,7 @@ public final class GateToriiCherry implements Variant {
 		int w = p.w();
 		int d = p.d();
 		int h = p.h();
-		boolean shinmei = p.hash(0, 0, 0, 3) == 0;
+		boolean shinmei = p.hash(0, 0, 0, 4) == 0; // one in four: the straight style has no horns
 		int lampStyle = p.hash(1, 0, 0, 2);
 		boolean second = d >= 6 && p.hash(2, 0, 0, 3) == 0;
 
@@ -120,7 +120,8 @@ public final class GateToriiCherry implements Variant {
 					p.set(c, u, 0, v, b(p.hash(u, 0, v, 3) == 0 ? Blocks.CHISELED_POLISHED_BLACKSTONE : Blocks.POLISHED_BLACKSTONE));
 					p.set(c, u, 1, v, b(Blocks.POLISHED_BLACKSTONE));
 					for (int y = 2; y <= gapTop; y++) {
-						p.set(c, u, y, v, RED);
+						// a ring of dark red brick above the foot and another under the shimaki break the flat lacquer
+						p.set(c, u, y, v, y == 2 || y == gapTop ? b(Blocks.RED_NETHER_BRICKS) : RED);
 					}
 				}
 				// the stair collar of the foot, front and back
@@ -154,7 +155,7 @@ public final class GateToriiCherry implements Variant {
 		}
 
 		// --- gakuzuka: a dark frame with a lit name panel (both faces), one or two rows tall
-		int plW = ow >= 9 ? 5 : ow >= 7 ? 3 : 1;
+		int plW = ow >= 11 ? 7 : ow >= 9 ? 5 : ow >= 7 ? 3 : 1;
 		if (w % 2 == 0) {
 			plW++;
 		}
