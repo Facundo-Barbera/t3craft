@@ -1109,8 +1109,8 @@ public final class CitadelPlacement {
 			}
 		};
 		int ring = l.ring();
-		if (dense() && hash(seed, 3, 0, 4) != 0) {
-			// struct/hq-density: three lots in four are a block of parcels with a use each, not a park
+		if (dense() && hash(seed, 3, 0, 8) != 0) {
+			// struct/hq-density: seven lots in eight are a block of parcels with a use each; one in eight stays a park
 			compound(city, l, pk, seed);
 			texture(city, l, pk, seed);
 			return;
