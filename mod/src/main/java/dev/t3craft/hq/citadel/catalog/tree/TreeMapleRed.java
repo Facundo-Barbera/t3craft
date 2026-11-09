@@ -81,7 +81,7 @@ public final class TreeMapleRed implements Variant {
 		int w = p.w();
 		int d = p.d();
 		int m = Math.min(w, d);
-		int H = Math.min(p.h(), 9 + r.nextInt(4) + (m >= 9 ? 2 : 0));
+		int H = Math.min(p.h(), 9 + r.nextInt(3) + (m >= 9 ? 1 : 0));
 		int ou = r.nextInt(2);
 		int ov = r.nextInt(2);
 		int bu = TreeKit.base(w, ou);
@@ -150,7 +150,7 @@ public final class TreeMapleRed implements Variant {
 		double ccv = tv[topY];
 
 		// ---- the fans: a low ring, a middle ring on tall plots, the crown over the leader
-		double rbase = TreeKit.clamp(m * 0.31, 1.7, 4.4);
+		double rbase = TreeKit.clamp(m * 0.37, 2.0, 5.0);
 		int nLow = m <= 5 ? 2 : m <= 7 ? 3 : m <= 10 ? 4 : 5;
 		double step = Math.PI * 2 / nLow;
 		int id = 1;
@@ -159,9 +159,9 @@ public final class TreeMapleRed implements Variant {
 			int py = 4 + ((k & 1) == 1 && H >= 10 ? 1 : 0) + (r.nextInt(5) == 0 ? 1 : 0);
 			double rx = rbase * (0.9 + r.nextDouble() * 0.35);
 			double rz = rx * (0.72 + r.nextDouble() * 0.28);
-			fan(t, r, cu0, cv0, ang, 0.52 + r.nextDouble() * 0.12, rx, rz, py, 2 + (k & 1), tu, tv, id++, sun, bias, 0.0, m);
+			fan(t, r, cu0, cv0, ang, 0.58 + r.nextDouble() * 0.14, rx, rz, py, 2 + (k & 1), tu, tv, id++, sun, bias, 0.0, m);
 		}
-		if (H >= 12) {
+		if (H >= 13) {
 			int nMid = m >= 8 ? 3 : 2;
 			double ms = Math.PI * 2 / nMid;
 			for (int k = 0; k < nMid; k++) {
@@ -261,14 +261,14 @@ public final class TreeMapleRed implements Variant {
 				boolean centre = u == ci && v == cj;
 				if (qq <= 1.0 + jit) {
 					double da = Math.abs(Math.atan2(Math.sin(Math.atan2(dz, dx) - notch), Math.cos(Math.atan2(dz, dx) - notch)));
-					boolean cut = R >= 2.0 && da < 0.3 && qq > 0.55;
-					boolean hole = cut || (R >= 2.2 && !centre && qq > 0.38 && qq < 0.85 && t.hash(u + id, cy + 5, v, 6) == 0);
+					boolean cut = R >= 3.0 && da < 0.3 && qq > 0.6;
+					boolean hole = cut || (R >= 2.9 && !centre && qq > 0.4 && qq < 0.85 && t.hash(u + id, cy + 5, v, 8) == 0);
 					if (!hole) {
 						t.leafOf(u, cy, v, leaf(t, hue + (qq - 0.5) * 0.12, u, cy, v, false), id);
 					}
 				}
 				// the cap: smaller and ragged, brighter
-				if (qq <= 0.5 + jit && (centre || t.hash(u, cy + 1, v + id, 3) != 0)) {
+				if (qq <= 0.58 + jit && (centre || t.hash(u, cy + 1, v + id, 5) != 0)) {
 					t.leafOf(u, cy + 1, v, leaf(t, hue + 0.1, u, cy + 1, v, true), id);
 				}
 				// a few drips under the rim, darker
