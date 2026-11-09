@@ -97,13 +97,13 @@ public final class HouseSmallStudio implements Variant {
 
 	private static final Scheme[] SCHEMES = {
 			// cherry roof, slate crest and eave, calcite plaster, dark oak frame, deepslate footing
-			new Scheme(Blocks.STRIPPED_DARK_OAK_LOG, Blocks.DARK_OAK_LOG,
+			new Scheme(Blocks.STRIPPED_BIRCH_LOG, Blocks.DARK_OAK_LOG,
 					mix(Blocks.CALCITE, Blocks.CALCITE, Blocks.CALCITE, Blocks.CALCITE, Blocks.POLISHED_DIORITE),
 					mix(Blocks.DEEPSLATE_BRICKS, Blocks.DEEPSLATE_BRICKS, Blocks.CRACKED_DEEPSLATE_BRICKS, Blocks.POLISHED_DEEPSLATE, Blocks.DEEPSLATE_TILES),
 					mix(Blocks.POLISHED_DEEPSLATE, Blocks.DEEPSLATE_TILES, Blocks.DEEPSLATE_BRICKS, Blocks.DEEPSLATE_TILES),
 					mix(Blocks.DARK_OAK_PLANKS, Blocks.SPRUCE_PLANKS, Blocks.DARK_OAK_PLANKS), Blocks.CHERRY_PLANKS,
-					Blocks.CHERRY_STAIRS, Blocks.DEEPSLATE_TILE_STAIRS, null, Blocks.DEEPSLATE_TILES, Blocks.DEEPSLATE_TILE_SLAB,
-					Blocks.DARK_OAK_DOOR, Blocks.DARK_OAK_TRAPDOOR, Blocks.DARK_OAK_FENCE, Blocks.DEEPSLATE_BRICK_STAIRS,
+					Blocks.CHERRY_STAIRS, Blocks.DEEPSLATE_TILE_STAIRS, null, Blocks.CHERRY_PLANKS, Blocks.DEEPSLATE_TILE_SLAB,
+					Blocks.DARK_OAK_DOOR, Blocks.CHERRY_TRAPDOOR, Blocks.CHERRY_FENCE, Blocks.DEEPSLATE_BRICK_STAIRS,
 					Blocks.DEEPSLATE_BRICK_STAIRS,
 					mix(Blocks.BRICKS, Blocks.BRICKS, Blocks.BRICKS, Blocks.STONE_BRICKS), Blocks.BRICK_STAIRS, Blocks.BRICK_SLAB,
 					DyeColor.PINK, DyeColor.PINK),
