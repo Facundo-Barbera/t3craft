@@ -59,7 +59,7 @@ public final class FountainOctagonStatue implements Variant {
 		// crane: one leg, body with wings and tail, wings up beside the neck, gold tips, head with a beak
 		{{"...", ".W.", "..."}, {"...", "BBB", "..."},{"...", "BWB", "..."}, {"...", "AWA", "..."}, {".A.", ".H.", "..."}},
 		// pillar: wide foot, shaft, capital with four arms, orb
-		{{"DDD", "DBD", "DDD"}, {"...", ".B.", "..."}, {"...", ".B.", "..."}, {".B.", "BAB", ".B."}, {"...", ".A.", "..."}},
+		{{"DDD", "DBD", "DDD"}, {".B.", "BDB", ".B."}, {"...", ".B.", "..."},{".B.", "BAB", ".B."}, {"...", ".A.", "..."}},
 	};
 
 	@Override
@@ -119,6 +119,9 @@ public final class FountainOctagonStatue implements Variant {
 		int rp = Math.min(rpRaw, 2 + 3 * g); // a bigger plot gets a wider plaza, not a bigger pool round a small figure
 		int figHalf = g == 1 ? 1 : g == 2 ? 3 : 4;
 		int rs = Math.min(Math.max(figHalf, (rp - 2) / 3), rp - 2); // radius of the dais
+		if (fig == 1) {
+			rs = 0; // the crane stands on one leg in the water: wings and beak hang over water, not over a dais
+		}
 
 		for (int dz = -half; dz <= half; dz++) {
 			for (int dx = -half; dx <= half; dx++) {
@@ -393,15 +396,15 @@ public final class FountainOctagonStatue implements Variant {
 				p.garg = b(Blocks.CHISELED_POLISHED_BLACKSTONE);
 				p.inner = new BlockState[] {b(Blocks.POLISHED_DEEPSLATE)};
 				p.bandA = new BlockState[] {b(Blocks.DEEPSLATE_TILES), b(Blocks.DEEPSLATE_BRICKS), b(Blocks.CRACKED_DEEPSLATE_TILES)};
-				p.bandB = new BlockState[] {b(Blocks.POLISHED_DEEPSLATE), b(Blocks.POLISHED_DEEPSLATE), b(Blocks.DEEPSLATE_BRICKS)};
+				p.bandB = new BlockState[] {b(Blocks.POLISHED_ANDESITE), b(Blocks.POLISHED_ANDESITE), b(Blocks.ANDESITE), b(Blocks.SMOOTH_STONE)};
 				p.edge = new Block[] {Blocks.DEEPSLATE_BRICK_STAIRS, Blocks.DEEPSLATE_BRICK_STAIRS, Blocks.POLISHED_DEEPSLATE_STAIRS};
 				p.ped = new BlockState[] {b(Blocks.POLISHED_BLACKSTONE_BRICKS)};
 				p.pedTop = b(Blocks.CHISELED_POLISHED_BLACKSTONE);
 				p.pedStair = Blocks.POLISHED_BLACKSTONE_BRICK_STAIRS;
-				p.statB = new BlockState[] {b(Blocks.DEEPSLATE_BRICKS), b(Blocks.POLISHED_DEEPSLATE), b(Blocks.DEEPSLATE_BRICKS)};
-				p.statD = new BlockState[] {b(Blocks.POLISHED_BLACKSTONE_BRICKS)};
+				p.statB = new BlockState[] {b(Blocks.POLISHED_DIORITE), b(Blocks.CALCITE), b(Blocks.POLISHED_DIORITE)};
+				p.statD = new BlockState[] {b(Blocks.DEEPSLATE_BRICKS), b(Blocks.POLISHED_BLACKSTONE_BRICKS)};
 				p.statA = b(Blocks.CUT_COPPER.waxed().unaffected());
-				p.statH = b(Blocks.CALCITE);
+				p.statH = b(Blocks.CHISELED_QUARTZ_BLOCK);
 				p.pole = b(Blocks.DEEPSLATE_BRICK_WALL);
 			} else if (which == 2) { // weathered copper
 				p.rimBase = new BlockState[] {b(Blocks.POLISHED_DEEPSLATE), b(Blocks.DEEPSLATE_BRICKS), b(Blocks.DEEPSLATE_BRICKS)};
@@ -438,7 +441,7 @@ public final class FountainOctagonStatue implements Variant {
 				p.pedStair = Blocks.DEEPSLATE_BRICK_STAIRS;
 				p.statB = new BlockState[] {b(Blocks.POLISHED_DIORITE), b(Blocks.POLISHED_DIORITE), b(Blocks.CALCITE)};
 				p.statD = new BlockState[] {b(Blocks.DEEPSLATE_BRICKS), b(Blocks.POLISHED_DEEPSLATE)};
-				p.statA = b(Blocks.GOLD_BLOCK);
+				p.statA = b(Blocks.CUT_COPPER.waxed().unaffected());
 				p.statH = b(Blocks.CHISELED_QUARTZ_BLOCK);
 				p.pole = b(Blocks.STONE_BRICK_WALL);
 			}
