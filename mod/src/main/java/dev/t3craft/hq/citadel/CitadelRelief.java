@@ -119,7 +119,8 @@ public final class CitadelRelief {
 		double swell = 0.5 * Math.sin(3 * a + 0.7) + 0.3 * Math.sin(5 * a + 2.1) + 0.2 * Math.sin(8 * a + 4.0);
 		double ripple = 0.5 * Math.sin(13 * a + 1.3 + 0.35 * RingCampusGeometry.r(x, z));
 		double mid = Math.sin(23 * a + 2.2) * Math.sin(7 * a + 0.4); // lobes of some 60 cells of arc, in and out
-		double foot = to - w * (0.32 + 0.22 * swell + 0.14 * mid + 0.06 * ripple); // where the bank reaches the natural ground
+		// where the bank reaches the natural ground: between a tenth of the lawn's width and all of it from the street
+		double foot = Math.min(to, to - w * (0.34 + 0.28 * swell + 0.20 * mid + 0.06 * ripple));
 		double f = (foot - RingCampusGeometry.r(x, z)) / Math.max(1.0, foot - from);
 		return (int) Math.max(0, Math.min(top, Math.round(top * f)));
 	}
