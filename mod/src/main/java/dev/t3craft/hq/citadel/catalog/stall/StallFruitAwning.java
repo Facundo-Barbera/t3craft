@@ -1,7 +1,6 @@
 package dev.t3craft.hq.citadel.catalog.stall;
 
 import static dev.t3craft.hq.citadel.CitadelCanvas.b;
-import static dev.t3craft.hq.citadel.CitadelCanvas.leaves;
 import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
 import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
 import static dev.t3craft.hq.citadel.CitadelCanvas.terracotta;
@@ -131,7 +130,7 @@ public final class StallFruitAwning implements Variant {
 
 	/**
 	 * [depth] stripes run front to back across the whole width (past the posts); the cloth is flat over
-	 * the counter and then steps up half a block per row.
+	 * the counter and then steps up half a block per row, a cherry cornice under every riser.
 	 */
 	private static void awning(CitadelCanvas c, Plot p, Geo g, BlockState[] st) {
 		for (int v = 0; v < g.d; v++) {
@@ -139,19 +138,22 @@ public final class StallFruitAwning implements Variant {
 			for (int u = 0; u < g.w; u++) {
 				p.set(c, u, y, v, st[u % 2]);
 			}
+			if (v > 0 && y > g.ay(v - 1) && y - 1 >= 3) { // [finish] a cornice of upside-down stairs closes each riser
+				for (int u = 0; u < g.w; u++) {
+					p.set(c, u, y - 1, v, stairs(Blocks.CHERRY_STAIRS, Direction.SOUTH).setValue(BlockStateProperties.HALF, Half.TOP));
+				}
+			}
 		}
 	}
 
 	// ------------------------------------------------------------------ posts
 
-	/** [palette] a deepslate footing, a dark-oak shaft and a plank cap; the back posts reach the higher cloth. */
+	/** [palette] a deepslate footing, a stripped cherry shaft and a plank cap; the back posts reach the higher cloth. */
 	private static void posts(CitadelCanvas c, Plot p, Geo g) {
-		int mid = (g.pv + g.bv) / 2;
 		for (int u : new int[] {g.ix, g.w - 1 - g.ix}) {
 			post(c, p, g, u, g.pv);
-			post(c, p, g, u, g.bv);
-			if (g.d >= 6) {
-				post(c, p, g, u, mid);
+			if (g.d >= 4) { // a 3-deep stall lets the cloth reach back unsupported: no wall of posts
+				post(c, p, g, u, g.bv);
 			}
 		}
 	}
@@ -160,18 +162,18 @@ public final class StallFruitAwning implements Variant {
 		int top = g.ay(v) - 1;
 		p.set(c, u, 0, v, b(Blocks.POLISHED_DEEPSLATE));
 		for (int y = 1; y < top; y++) {
-			p.set(c, u, y, v, b(Blocks.DARK_OAK_LOG));
+			p.set(c, u, y, v, b(Blocks.STRIPPED_CHERRY_LOG));
 		}
-		p.set(c, u, top, v, b(Blocks.DARK_OAK_PLANKS));
+		p.set(c, u, top, v, b(Blocks.CHERRY_PLANKS));
 	}
 
 	// ------------------------------------------------------------------ the counter and its goods
 
-	/** One produce block by kind. Berries are a flowering bush: a solid block, so nobody climbs it. */
+	/** One produce block by kind. The red fruit (berries, apples) is a solid red block, so nobody climbs it. */
 	private static BlockState goods(int kind) {
 		return switch (kind) {
 			case 1 -> b(Blocks.PUMPKIN);
-			case 2 -> leaves(Blocks.FLOWERING_AZALEA_LEAVES);
+			case 2 -> b(Blocks.NETHER_WART_BLOCK);
 			default -> b(Blocks.MELON);
 		};
 	}
@@ -194,7 +196,7 @@ public final class StallFruitAwning implements Variant {
 				p.set(c, u, 0, g.pv, Blocks.CARPET.pick(DyeColor.BROWN).defaultBlockState());
 				continue;
 			}
-			p.set(c, u, 0, g.pv, p.hash(u, 0, g.pv, 4) == 0 ? b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.NORTH) : b(Blocks.OAK_PLANKS));
+			p.set(c, u, 0, g.pv, p.hash(u, 0, g.pv, 4) == 0 ? b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.NORTH) : b(Blocks.CHERRY_PLANKS));
 			int k = kindAt(p, u, 1);
 			p.set(c, u, 1, g.pv, goods(k));
 			p.set(c, u, 2, g.pv, goods((k + 1 + p.hash(u / 2, 2, 1, 2)) % 3));
@@ -206,30 +208,31 @@ public final class StallFruitAwning implements Variant {
 		}
 	}
 
-	// ------------------------------------------------------------------ the apron: corner crates under the sign
+	// ------------------------------------------------------------------ the front: a stepped display of crates
 
 	/**
-	 * Crates heaped with produce flank the front corners and carry the signboard; the middle stays open so
-	 * customers reach the counter from the street. The heap reaches {@code fy - 2} so the cloth closes it.
+	 * [depth] a row of crates heaped with produce stands in front of the counter, a step lower, so the goods
+	 * rise in tiers from the street (crates, then the counter's two courses). A gap in the middle (1-2 wide)
+	 * leaves the way to the counter open and customers walk the street in front. Every crate hangs an open
+	 * cherry trapdoor from the lip: together they make the awning's fringe. The heap reaches {@code fy - 2}.
 	 */
 	private static void apron(CitadelCanvas c, Plot p, Geo g) {
-		int n = g.w >= 6 ? 2 : 1;
-		for (int i = 0; i < n; i++) {
-			for (int u : new int[] {i, g.w - 1 - i}) {
-				p.set(c, u, 0, 0, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
-				int k = p.hash(u, 7, 0, 3);
-				for (int y = 1; y <= g.fy - 2; y++) {
-					p.set(c, u, y, 0, goods((k + y - 1) % 3));
-				}
-			}
-		}
-		// [finish] the signboard: a plank hung from the lip over the crates on one side (open trapdoors read as a board)
-		BlockState board = b(Blocks.DARK_OAK_TRAPDOOR)
+		int gap = g.w % 2 == 0 ? 2 : 1;
+		int g0 = (g.w - gap) / 2;
+		BlockState fringe = b(Blocks.CHERRY_TRAPDOOR)
 				.setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.SOUTH)
 				.setValue(BlockStateProperties.OPEN, true)
 				.setValue(BlockStateProperties.HALF, Half.BOTTOM);
-		for (int i = 0; i < n; i++) {
-			p.set(c, g.mu(i), g.fy - 1, 0, board);
+		for (int u = 0; u < g.w; u++) {
+			if (u >= g0 && u < g0 + gap) {
+				continue;
+			}
+			p.set(c, u, 0, 0, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
+			int k = kindAt(p, u, 7);
+			for (int y = 1; y <= g.fy - 2; y++) {
+				p.set(c, u, y, 0, goods((k + y - 1) % 3));
+			}
+			p.set(c, u, g.fy - 1, 0, fringe);
 		}
 	}
 
@@ -248,17 +251,24 @@ public final class StallFruitAwning implements Variant {
 				p.set(c, u, 0, g.bv, b(Blocks.CHEST).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH));
 				p.set(c, u, 1, g.bv, b(Blocks.LANTERN));
 			} else if (k >= 2 && k >= n - 2 && n >= 3) {
-				p.set(c, u, 0, g.bv, stairs(Blocks.DARK_OAK_STAIRS, Direction.NORTH)); // the vendor's bench
+				p.set(c, u, 0, g.bv, stairs(Blocks.CHERRY_STAIRS, Direction.NORTH)); // the vendor's bench
 				continue;
 			} else {
 				p.set(c, u, 0, g.bv, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.NORTH));
 				p.set(c, u, 1, g.bv, goods(kindAt(p, u, 5)));
 			}
 			if (beam) {
-				p.set(c, u, 3, g.bv, b(Blocks.DARK_OAK_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.X)); // [depth] header beam
-				for (int y = 4; y <= g.ay(g.bv) - 2; y++) {
-					p.set(c, u, y, g.bv, st[u % 2]); // [depth] a tall plot's cloth drops as a back valance down to the beam, nobody stands on it
-				}
+				p.set(c, u, 3, g.bv, b(Blocks.STRIPPED_CHERRY_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.X)); // [depth] header beam
+			}
+		}
+		// [depth] a tall plot's cloth drops at the back as a plain skirt down to the beam, across the whole width
+		// (posts excepted), so nobody can stand on the beam and the back reads as cloth, not as a wall
+		for (int u = 0; u < g.w; u++) {
+			if (u == g.ix || u == g.w - 1 - g.ix) {
+				continue;
+			}
+			for (int y = 4; y <= g.ay(g.bv) - 2; y++) {
+				p.set(c, u, y, g.bv, st[0]);
 			}
 		}
 	}
@@ -270,13 +280,22 @@ public final class StallFruitAwning implements Variant {
 			}
 		}
 		if (g.bv - g.pv >= 2) {
-			// [finish] hay bales with a pumpkin on top by one side post, as high as the cloth allows (no air pocket above)
-			int su = g.flip ? g.ix : g.w - 1 - g.ix; // the side opposite the chest
+			// [finish] a hay pile with a pumpkin on the flying side of the awning (the side opposite the chest),
+			// as high as the cloth allows so no air pocket is left under it; wide plots add a crate of produce beside it
+			int su = g.flip ? 0 : g.w - 1;
 			int top = g.ay(g.pv + 1) - 2;
 			for (int y = 0; y < top; y++) {
 				p.set(c, su, y, g.pv + 1, b(Blocks.HAY_BLOCK));
 			}
 			p.set(c, su, top, g.pv + 1, b(Blocks.PUMPKIN));
+			int cv = g.pv + 2;
+			if (g.ix == 1 && cv < g.bv) {
+				int ctop = g.ay(cv) - 2;
+				p.set(c, su, 0, cv, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
+				for (int y = 1; y <= ctop; y++) {
+					p.set(c, su, y, cv, goods((p.hash(su, 4, cv, 3) + y) % 3));
+				}
+			}
 		}
 	}
 
