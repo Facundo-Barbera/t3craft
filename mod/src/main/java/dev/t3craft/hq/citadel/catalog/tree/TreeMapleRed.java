@@ -97,9 +97,6 @@ public final class TreeMapleRed implements Variant {
 		for (int a = 0; a < 2; a++) {
 			for (int e = 0; e < 2; e++) {
 				t.wood(bu + a, 0, bv + e, WOOD.bark());
-				if (!(a != ou && e != ov)) {
-					t.wood(bu + a, 1, bv + e, WOOD.bark());
-				}
 			}
 		}
 		TreeKit.roots(t, WOOD, bu, bv, 3 + r.nextInt(2), 1, -1, 5);
@@ -133,7 +130,6 @@ public final class TreeMapleRed implements Variant {
 			}
 			if (du != 0 || dv != 0) {
 				// the step: bark on the layer below joins the old and the new column
-				t.wood(cu, y - 1, cv, WOOD.bark());
 				t.wood(cu + du, y - 1, cv + dv, WOOD.bark());
 			}
 			cu += du;
@@ -141,6 +137,9 @@ public final class TreeMapleRed implements Variant {
 			tu[y] = cu;
 			tv[y] = cv;
 			t.wood(cu, y, cv, WOOD.log(Direction.Axis.Y));
+		}
+		if (tu[1] == cu0 && tv[1] == cv0) {
+			t.wood(cu0, 1, cv0, WOOD.log(Direction.Axis.Y));
 		}
 		for (int y = topY + 1; y <= H; y++) {
 			tu[y] = cu;
