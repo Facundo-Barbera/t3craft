@@ -122,6 +122,9 @@ final class BarrioGateBig {
 		final BlockState letter;
 		final Map<Integer, BlockState> stepsL;
 		final Map<Integer, BlockState> stepsR;
+		/** Ring 1: dark slopes under a cherry eave; rings 2 and 3: cherry slopes under a dark eave (each ring keeps its own look). */
+		final Block roofMat;
+		final Block eaveMat;
 
 		Gate(CitadelCanvas c, Lot l, HqLayout.Module lead) {
 			this.c = c;
@@ -140,6 +143,8 @@ final class BarrioGateBig {
 			this.wool = b(Blocks.WOOL.pick(col));
 			// the initial: white wool on the dark colours, black on the light ones
 			this.letter = b(Blocks.WOOL.pick(dark(col) ? DyeColor.WHITE : DyeColor.BLACK));
+			this.roofMat = l.ring() >= 2 ? Blocks.CHERRY_STAIRS : ROOF;
+			this.eaveMat = l.ring() >= 2 ? ROOF : Blocks.CHERRY_STAIRS;
 			this.stepsL = buildSteps(true);
 			this.stepsR = buildSteps(false);
 		}
@@ -171,6 +176,7 @@ final class BarrioGateBig {
 				cornice(tower, TOWER_TOP - 1);
 			}
 			corbel();
+			buttresses();
 			passageDressing();
 			boards();
 			guardPost();
@@ -237,7 +243,7 @@ final class BarrioGateBig {
 				c.set(r.cell(u, v, y), STONE);
 			}
 			c.set(r.cell(u, v, DECK), log(side.getAxis()));
-			c.set(r.cell(u, v, DECK + 1), dv % 2 == 0 ? STONE : AIR);
+			c.set(r.cell(u, v, DECK + 1), dv % 2 == 0 ? PLANKS : AIR);
 			for (int y = DECK + 2; y <= TOWER_TOP; y++) {
 				c.set(r.cell(u, v, y), AIR);
 			}
@@ -263,9 +269,11 @@ final class BarrioGateBig {
 				c.set(r.cell(u, v, y), s);
 			}
 			c.set(r.cell(u, v, DECK), edge ? log(side.getAxis()) : dv == 0 ? PLANKS : FOOT);
-			c.set(r.cell(u, v, DECK + 1), edge ? STONE : AIR);
-			c.set(r.cell(u, v, DECK + 2), edge && dv % 2 == 0 ? STONE : AIR);
-			for (int y = DECK + 3; y <= TOWER_TOP; y++) {
+			// the battlement is cherry, so the bridge reads against the grey towers: a parapet and merlons two high on every other cell
+			c.set(r.cell(u, v, DECK + 1), edge ? PLANKS : AIR);
+			c.set(r.cell(u, v, DECK + 2), edge && dv % 2 == 0 ? PLANKS : AIR);
+			c.set(r.cell(u, v, DECK + 3), edge && dv % 2 == 0 ? PLANKS : AIR);
+			for (int y = DECK + 4; y <= TOWER_TOP; y++) {
 				c.set(r.cell(u, v, y), AIR);
 			}
 		}
@@ -275,6 +283,22 @@ final class BarrioGateBig {
 			for (int dv = -HALF; dv <= HALF; dv++) {
 				c.set(r.cell(D, mid + dv, DECK), BarrioKit.stair(Blocks.STONE_BRICK_STAIRS, back.getOpposite(), StairsShape.STRAIGHT, Half.TOP));
 				c.set(r.cell(tu - 1, mid + dv, DECK), BarrioKit.stair(Blocks.STONE_BRICK_STAIRS, back, StairsShape.STRAIGHT, Half.TOP));
+			}
+		}
+
+		/** Two piers one block out on the outer face of each tower, either side of its window: 8 high, a sloped cap at the belt. */
+		void buttresses() {
+			for (int s = 0; s < 2; s++) {
+				boolean left = s == 0;
+				int v = left ? -1 : W;
+				Direction towardsWall = left ? side : side.getOpposite();
+				for (int a : new int[] {1, sw - 2}) {
+					int u = tu + a;
+					for (int y = 1; y < DECK; y++) {
+						c.set(r.cell(u, v, y), y <= 2 ? FOOT : STONE);
+					}
+					c.set(r.cell(u, v, DECK), BarrioKit.stair(Blocks.STONE_BRICK_STAIRS, towardsWall));
+				}
 			}
 		}
 
@@ -289,8 +313,12 @@ final class BarrioGateBig {
 			c.put(sign.getX(), sign.getY(), sign.getZ(), hs, HANGING);
 			c.data.put(sign.asLong(), BarrioGate.barrioSign(c, lead).signTag());
 			c.fixtures.add(sign.asLong());
-			c.set(r.cell(D - 1, mid, DECK + 3), BarrioKit.lantern(false));
-			c.set(r.cell(tu, mid, DECK + 3), BarrioKit.lantern(false));
+			c.set(r.cell(D - 1, mid, DECK + 4), BarrioKit.lantern(false));
+			c.set(r.cell(tu, mid, DECK + 4), BarrioKit.lantern(false));
+			// a lantern over the street doorway of each tower, so the door reads from afar
+			for (int dv = -HALF; dv <= HALF; dv += 2 * HALF) {
+				c.set(r.cell(tu + 1 + rowsOff, mid + dv, 4), BarrioKit.lantern(true));
+			}
 			// banners in the project's colour on the tower walls beside the passage (the doorway row is left clear)
 			for (int a : new int[] {2 + rowsOff, 3 + rowsOff}) {
 				for (int dv = -HALF; dv <= HALF; dv += 2 * HALF) {
@@ -323,6 +351,9 @@ final class BarrioGateBig {
 					s = shaftBlock(sa, sb, y, left);
 				} else if (!perimeter) {
 					s = STONE;
+				} else if (corner && hubFace && sw == 5 && y >= 4 && y <= DECK + 2) {
+					// ring 1: the banner takes the whole 5-wide face, so the 3-wide letter keeps a margin of wool all round
+					s = banner(tv, y);
 				} else if (corner) {
 					s = POST;
 				} else if (passSide && ((a == 1 + rowsOff && y <= 3) || (a == 2 + rowsOff && (y == DECK + 1 || y == DECK + 2)))) {
@@ -598,10 +629,10 @@ final class BarrioGateBig {
 						if (tower && centre) {
 							flag(p.atY(y), sideIdx);
 						} else {
-							c.set(p.atY(y + 1), centre ? BarrioKit.finial(Blocks.CHERRY_STAIRS) : BarrioKit.slabOf(ROOF));
+							c.set(p.atY(y + 1), centre ? BarrioKit.finial(Blocks.CHERRY_STAIRS) : BarrioKit.slabOf(roofMat));
 						}
 					} else {
-						c.set(p.atY(y), hip(s, ROOF, u, v, k));
+						c.set(p.atY(y), hip(s, roofMat, u, v, k));
 					}
 				}
 			}
@@ -625,7 +656,7 @@ final class BarrioGateBig {
 					if (insideGate(p)) {
 						continue;
 					}
-					c.set(p, hip(s, Blocks.CHERRY_STAIRS, u, v, 0));
+					c.set(p, hip(s, eaveMat, u, v, 0));
 				}
 			}
 		}
