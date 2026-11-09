@@ -12,6 +12,7 @@ import dev.t3craft.hq.RingCampusGeometry.Zone;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The pavement of the citadel: which block goes on each walkable ground cell. Pure functions of the
@@ -365,7 +366,7 @@ final class CitadelPaving {
 	 * three mossy) on the first row against the kerb, which turns the kerb into a step down to the
 	 * lawn, and a flowering bush on the second. Never inside the barrio's own square.
 	 */
-	static BlockState vergeCover(CitadelCanvas c, int x, int z, Zone zn) {
+	static @Nullable BlockState vergeCover(CitadelCanvas c, int x, int z, Zone zn) {
 		int m = zn.ring();
 		double r = RingCampusGeometry.r(x, z);
 		double d = RingCampusGeometry.radialDistance(x, z, RingCampusGeometry.lotsIn(m));
