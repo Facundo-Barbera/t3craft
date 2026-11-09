@@ -4,6 +4,7 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.util.Arrays;
+import net.minecraft.core.BlockPos;
 
 /**
  * fix/build-walkable: the floor in the first second. A large radial job analyses its whole plan
@@ -20,6 +21,13 @@ import java.util.Arrays;
  * A wall stops the stack (its blocks have a block above and are no terrain), so a primer never puts the
  * top of a wall in the air. Where the two definitions differ the radial cursor sorts it out (it skips
  * what is already there). Pure; any thread.
+ *
+ * <p>fix/build-walkable-level: with the player's level known, a column's ground is its walkable floor
+ * ({@link WalkLevels}: two passable cells over it, in a 2 × 2 of walkable cells at its height) nearest the
+ * player's feet (tie: the higher), when that is nearer than the terrain stack's top: the floor of the hub
+ * over its hidden room, a terrace, a bridge deck. Then the primer lays that floor (and the block under it on
+ * the floor's edges or under a thin floor) instead of the hidden room's floor; the radial cursor makes the
+ * same choice and finds it already there.
  */
 final class GroundPrimer {
 	/** Columns within this many blocks (horizontally) of the starting point. */
@@ -53,10 +61,23 @@ final class GroundPrimer {
 	 * {@code c} spans {@code [c, c + 1)}). One pass over the plan, then only the nearby entries.
 	 */
 	static GroundPrimer plan(BuildPlan plan, double fx, double fz) {
+		return plan(plan, fx, fz, WalkLevels.NO_LEVEL);
+	}
+
+	/**
+	 * Like {@link #plan(BuildPlan, double, double)}; {@code level} is the player's feet cell (plan-relative y),
+	 * {@link WalkLevels#NO_LEVEL} = unknown (the terrain stack's top, as before).
+	 */
+	static GroundPrimer plan(BuildPlan plan, double fx, double fz, int level) {
 		int n = plan.size();
 		double r2 = (RADIUS + 0.5) * (RADIUS + 0.5);
 		Long2ObjectOpenHashMap<IntArrayList> byCol = new Long2ObjectOpenHashMap<>();
 		LongOpenHashSet plainCells = new LongOpenHashSet();
+		// fix/build-walkable-level: the final cells near the start that a body goes through / one stands on
+		LongOpenHashSet solidCells = new LongOpenHashSet();
+		LongOpenHashSet standCells = new LongOpenHashSet();
+		WalkLevels.Shapes shapes = new WalkLevels.Shapes();
+		boolean levelled = level != WalkLevels.NO_LEVEL;
 		for (int i = 0; i < n; i++) {
 			Placement p = plan.get(i);
 			int x = p.pos().getX();
@@ -73,6 +94,18 @@ final class GroundPrimer {
 			} else {
 				plainCells.remove(cell); // a later entry at the same cell wins
 			}
+			if (levelled) {
+				if (shapes.passable(p.state())) {
+					solidCells.remove(cell);
+				} else {
+					solidCells.add(cell);
+				}
+				if (!p.state().isAir() && shapes.standable(p.state())) {
+					standCells.add(cell);
+				} else {
+					standCells.remove(cell);
+				}
+			}
 			if (dx * dx + dz * dz <= r2) {
 				long ck = CrewPlanner.key(x, 0, z);
 				IntArrayList l = byCol.get(ck);
@@ -83,10 +116,9 @@ final class GroundPrimer {
 				l.add(i);
 			}
 		}
-		// per column: its ground (support + surface), keyed by distance for the order
-		long[] keys = new long[byCol.size()];
-		int[][] picks = new int[byCol.size()][];
-		int nk = 0;
+		// per column: its entries bottom-up, one per height
+		int[][] cols = new int[byCol.size()][];
+		int ncols = 0;
 		long[] tmp = new long[16];
 		for (IntArrayList l : byCol.values()) {
 			int m = l.size();
@@ -110,12 +142,60 @@ final class GroundPrimer {
 					col[c++] = i;
 				}
 			}
+			cols[ncols++] = Arrays.copyOf(col, c);
+		}
+		// fix/build-walkable-level: walkable cells (standable, two passable cells over it in the final plan)
+		LongOpenHashSet walkCells = new LongOpenHashSet();
+		if (levelled) {
+			for (int q = 0; q < ncols; q++) {
+				for (int i : cols[q]) {
+					BlockPos b = plan.get(i).pos();
+					long cell = CrewPlanner.key(b.getX(), b.getY(), b.getZ());
+					if (standCells.contains(cell) && !solidCells.contains(CrewPlanner.key(b.getX(), b.getY() + 1, b.getZ()))
+							&& !solidCells.contains(CrewPlanner.key(b.getX(), b.getY() + 2, b.getZ()))) {
+						walkCells.add(cell);
+					}
+				}
+			}
+		}
+		// per column: its ground (support + surface), keyed by distance for the order
+		long[] keys = new long[ncols];
+		int[][] picks = new int[ncols][];
+		int nk = 0;
+		for (int q = 0; q < ncols; q++) {
+			int[] col = cols[q];
+			int c = col.length;
 			int top = stackTop(plan, col, c, plainCells);
-			if (top < 0) {
+			int[] g = null;
+			int surf = -1;
+			if (top >= 0) {
+				g = top >= 1 ? new int[] {col[top - 1], col[top]} : new int[] {col[top]};
+				surf = col[top];
+			}
+			if (levelled) {
+				int bestK = -1;
+				int bestY = top >= 0 && walkCells.contains(cellOf(plan, col[top])) && WalkLevels.nearer(plan.get(col[top]).pos().getY(), WalkLevels.NO_LEVEL, level)
+						? plan.get(col[top]).pos().getY() : WalkLevels.NO_LEVEL;
+				for (int k = Math.max(0, top + 1); k < c; k++) {
+					BlockPos b = plan.get(col[k]).pos();
+					if (walkCells.contains(cellOf(plan, col[k])) && floor(walkCells, b) && WalkLevels.nearer(b.getY(), bestY, level)) {
+						bestK = k;
+						bestY = b.getY();
+					}
+				}
+				if (bestK >= 0) {
+					BlockPos b = plan.get(col[bestK]).pos();
+					boolean thin = !shapes.full(plan.get(col[bestK]).state());
+					boolean sup = bestK >= 1 && plan.get(col[bestK - 1]).pos().getY() == b.getY() - 1
+							&& standCells.contains(cellOf(plan, col[bestK - 1])) && (thin || edge(standCells, b));
+					g = sup ? new int[] {col[bestK - 1], col[bestK]} : new int[] {col[bestK]};
+					surf = col[bestK];
+				}
+			}
+			if (g == null) {
 				continue;
 			}
-			int[] g = top >= 1 ? new int[] {col[top - 1], col[top]} : new int[] {col[top]};
-			Placement s = plan.get(col[top]);
+			Placement s = plan.get(surf);
 			double dx = s.pos().getX() + 0.5 - fx;
 			double dz = s.pos().getZ() + 0.5 - fz;
 			long d = (long) Math.min(1_000_000, Math.floor(Math.sqrt(dx * dx + dz * dz) * 16));
@@ -131,6 +211,33 @@ final class GroundPrimer {
 			}
 		}
 		return new GroundPrimer(out.toIntArray());
+	}
+
+	private static long cellOf(BuildPlan plan, int i) {
+		BlockPos b = plan.get(i).pos();
+		return CrewPlanner.key(b.getX(), b.getY(), b.getZ());
+	}
+
+	/** A walkable cell inside a 2 × 2 of walkable cells at its height (a floor, not a wall top). */
+	private static boolean floor(LongOpenHashSet walk, BlockPos b) {
+		int x = b.getX();
+		int y = b.getY();
+		int z = b.getZ();
+		for (int dx = -1; dx <= 1; dx += 2) {
+			for (int dz = -1; dz <= 1; dz += 2) {
+				if (walk.contains(CrewPlanner.key(x + dx, y, z)) && walk.contains(CrewPlanner.key(x, y, z + dz))
+						&& walk.contains(CrewPlanner.key(x + dx, y, z + dz))) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	/** A side cell of {@code b} at its height holds nothing to stand on (the floor's edge). */
+	private static boolean edge(LongOpenHashSet stand, BlockPos b) {
+		return !stand.contains(CrewPlanner.key(b.getX() + 1, b.getY(), b.getZ())) || !stand.contains(CrewPlanner.key(b.getX() - 1, b.getY(), b.getZ()))
+				|| !stand.contains(CrewPlanner.key(b.getX(), b.getY(), b.getZ() + 1)) || !stand.contains(CrewPlanner.key(b.getX(), b.getY(), b.getZ() - 1));
 	}
 
 	/** Index (into {@code col}) of the top of the column's bottom stack of ground blocks, or -1 when it has none. */

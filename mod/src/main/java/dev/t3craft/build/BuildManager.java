@@ -221,6 +221,7 @@ public final class BuildManager {
 	 * nobody in the build (or {@code buildNearPlayer.enabled} false): the job centres on the hub / spawn.
 	 * A few multiplications per player and tick. fix/build-walkable: the exact position {@code {x, y, z}}
 	 * (not the block), so the radial job can measure the player's velocity for its ground corridor.
+	 * fix/build-walkable-level: {@code {x, y, z, onGround}} (1 or 0): the y sets the level the job builds at.
 	 */
 	static double @Nullable [] focusOf(ServerLevel level, BuildJob job) {
 		BuildTuning t = BuildBudget.global().tuning();
@@ -244,7 +245,7 @@ public final class BuildManager {
 			double d = dx * dx + dz * dz;
 			if (d <= r2 && dy <= 32 && d < best) {
 				best = d;
-				out = new double[] {px, py, pz};
+				out = new double[] {px, py, pz, p.onGround() ? 1 : 0};
 			}
 		}
 		return out;
