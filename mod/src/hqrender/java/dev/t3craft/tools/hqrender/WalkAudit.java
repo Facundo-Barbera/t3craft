@@ -1,8 +1,8 @@
 package dev.t3craft.tools.hqrender;
 
-import dev.t3craft.hq.PlanProbe;
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.catalog.Plot;
+import dev.t3craft.hq.plan.PlanProbe;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;

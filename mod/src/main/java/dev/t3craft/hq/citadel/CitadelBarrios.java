@@ -1,30 +1,5 @@
 package dev.t3craft.hq.citadel;
 
-import dev.t3craft.hq.Anchor;
-import dev.t3craft.hq.AnchorNames;
-import dev.t3craft.hq.HqLayout;
-import dev.t3craft.hq.HqStyle;
-import dev.t3craft.hq.RingCampusGeometry;
-import dev.t3craft.hq.RingCampusGeometry.DeskSpot;
-import dev.t3craft.hq.RingCampusGeometry.Lot;
-import dev.t3craft.hq.RingCampusGeometry.Room;
-import dev.t3craft.hq.SignTags;
-import dev.t3craft.hq.Workstation;
-import dev.t3craft.hq.citadel.CitadelCanvas.Mats;
-import dev.t3craft.hq.citadel.barrio.BarrioCourt;
-import dev.t3craft.hq.citadel.barrio.BarrioGate;
-import dev.t3craft.hq.citadel.barrio.BarrioRoofs;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.TreeMap;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.world.item.DyeColor;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.CeilingHangingSignBlock;
-import net.minecraft.world.level.block.state.BlockState;
-import org.jspecify.annotations.Nullable;
 import static dev.t3craft.hq.citadel.CitadelCanvas.AIR;
 import static dev.t3craft.hq.citadel.CitadelCanvas.fh;
 import static dev.t3craft.hq.citadel.CitadelCanvas.FOOT;
@@ -41,6 +16,32 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.colZ;
 import static dev.t3craft.hq.citadel.CitadelCanvas.leaves;
 import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
 import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
+
+import dev.t3craft.hq.HqLayout;
+import dev.t3craft.hq.RingCampusGeometry;
+import dev.t3craft.hq.RingCampusGeometry.DeskSpot;
+import dev.t3craft.hq.RingCampusGeometry.Lot;
+import dev.t3craft.hq.RingCampusGeometry.Room;
+import dev.t3craft.hq.SignTags;
+import dev.t3craft.hq.citadel.CitadelCanvas.Mats;
+import dev.t3craft.hq.citadel.barrio.BarrioCourt;
+import dev.t3craft.hq.citadel.barrio.BarrioGate;
+import dev.t3craft.hq.citadel.barrio.BarrioRoofs;
+import dev.t3craft.hq.plan.Anchor;
+import dev.t3craft.hq.plan.AnchorNames;
+import dev.t3craft.hq.plan.Workstation;
+import dev.t3craft.hq.style.HqStyle;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.TreeMap;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.CeilingHangingSignBlock;
+import net.minecraft.world.level.block.state.BlockState;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The barrios of the citadel: the lots of the projects, one per project, each with its courtyard, its

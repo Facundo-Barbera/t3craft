@@ -1,5 +1,7 @@
-package dev.t3craft.hq;
+package dev.t3craft.hq.plan;
 
+import dev.t3craft.hq.HqLayout;
+import dev.t3craft.hq.HqSite;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.core.BlockPos;

@@ -4,7 +4,7 @@ import dev.t3craft.blocks.LampStatus;
 import dev.t3craft.blocks.ScreenRect;
 import dev.t3craft.blocks.StatusLampBlock;
 import dev.t3craft.blocks.T3Blocks;
-import dev.t3craft.hq.HqKit;
+import dev.t3craft.hq.style.HqKit;
 import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Path;

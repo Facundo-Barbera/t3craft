@@ -1,5 +1,6 @@
 package dev.t3craft.hq;
 
+import dev.t3craft.hq.plan.Box;
 import java.util.SortedSet;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;

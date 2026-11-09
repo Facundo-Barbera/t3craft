@@ -1,13 +1,13 @@
 package dev.t3craft.hq.construct.mc;
 
 import dev.t3craft.T3Craft;
-import dev.t3craft.hq.BuildPlan;
 import dev.t3craft.hq.HqInput;
 import dev.t3craft.hq.HqSite;
 import dev.t3craft.hq.construct.HqConstruction;
 import dev.t3craft.hq.construct.HqCost;
 import dev.t3craft.hq.construct.HqSiteFrame;
 import dev.t3craft.hq.construct.HqStore;
+import dev.t3craft.hq.plan.BuildPlan;
 import dev.t3craft.site.Expansion;
 import dev.t3craft.site.Restorer;
 import dev.t3craft.site.SiteBuilder;

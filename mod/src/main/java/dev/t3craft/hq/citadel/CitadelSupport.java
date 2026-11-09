@@ -3,7 +3,7 @@ package dev.t3craft.hq.citadel;
 import static dev.t3craft.hq.citadel.CitadelCanvas.SOLID;
 import static dev.t3craft.hq.citadel.CitadelCanvas.b;
 
-import dev.t3craft.hq.PlanProbe;
+import dev.t3craft.hq.plan.PlanProbe;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;

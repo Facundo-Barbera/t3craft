@@ -1,13 +1,19 @@
 package dev.t3craft.hq.citadel.barrio;
 
+import static dev.t3craft.hq.citadel.CitadelCanvas.AIR;
+import static dev.t3craft.hq.citadel.CitadelCanvas.DECOR;
+import static dev.t3craft.hq.citadel.CitadelCanvas.FOOT;
+import static dev.t3craft.hq.citadel.CitadelCanvas.HANGING;
+import static dev.t3craft.hq.citadel.CitadelCanvas.b;
+
 import dev.t3craft.hq.HqLayout;
-import dev.t3craft.hq.HqStyle;
 import dev.t3craft.hq.RingCampusGeometry.Lot;
 import dev.t3craft.hq.RingCampusGeometry.Room;
 import dev.t3craft.hq.SignTags;
 import dev.t3craft.hq.citadel.CitadelBarrios;
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.CitadelCanvas.Mats;
+import dev.t3craft.hq.style.HqStyle;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
@@ -18,11 +24,6 @@ import net.minecraft.world.level.block.CeilingHangingSignBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.Half;
 import net.minecraft.world.level.block.state.properties.StairsShape;
-import static dev.t3craft.hq.citadel.CitadelCanvas.AIR;
-import static dev.t3craft.hq.citadel.CitadelCanvas.DECOR;
-import static dev.t3craft.hq.citadel.CitadelCanvas.FOOT;
-import static dev.t3craft.hq.citadel.CitadelCanvas.HANGING;
-import static dev.t3craft.hq.citadel.CitadelCanvas.b;
 
 /**
  * The gatehouse of a barrio and the text of its signs. Sizes come from the gate {@link Room}

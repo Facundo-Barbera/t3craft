@@ -1,9 +1,10 @@
-package dev.t3craft.hq;
+package dev.t3craft.hq.style;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import dev.t3craft.T3Craft;
+import dev.t3craft.hq.RingCampusStyle;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;

@@ -1,10 +1,10 @@
 package dev.t3craft.client.demo;
 
 import dev.t3craft.T3Craft;
-import dev.t3craft.hq.Anchor;
-import dev.t3craft.hq.AnchorNames;
 import dev.t3craft.hq.HqSite;
-import dev.t3craft.hq.Placement;
+import dev.t3craft.hq.plan.Anchor;
+import dev.t3craft.hq.plan.AnchorNames;
+import dev.t3craft.hq.plan.Placement;
 import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.EmptyBlockGetter;
@@ -45,8 +45,8 @@ record HqCentre(BlockPos feet, BlockPos floor, @Nullable BlockState planFloor, f
 	/** The centre of layout {@code layoutId}'s HQ at the demo site; null when no plan spot fits (callers keep the old spawn). */
 	static @Nullable HqCentre of(DemoWorldSpec spec, int worldMinY, String layoutId) {
 		try {
-			dev.t3craft.hq.BuildPlan empty = dev.t3craft.hq.HqPlans.generate(dev.t3craft.hq.HqLayout.EMPTY,
-					dev.t3craft.hq.HqStyles.forLayout(layoutId));
+			dev.t3craft.hq.plan.BuildPlan empty = dev.t3craft.hq.HqPlans.generate(dev.t3craft.hq.HqLayout.EMPTY,
+					dev.t3craft.hq.style.HqStyles.forLayout(layoutId));
 			int lift = DemoHq.lift(spec.originY(), worldMinY, empty.footprint().minY());
 			HqSite site = DemoHq.worldSite(new BlockPos(spec.originX(), spec.originY(), spec.originZ()), lift);
 			for (String name : List.of(AnchorNames.HUB, AnchorNames.SPAWN)) {
@@ -66,7 +66,7 @@ record HqCentre(BlockPos feet, BlockPos floor, @Nullable BlockState planFloor, f
 	}
 
 	/** No collision in plan cell {@code rel} (nothing there, or something the body passes through). */
-	private static boolean free(dev.t3craft.hq.BuildPlan plan, BlockPos rel) {
+	private static boolean free(dev.t3craft.hq.plan.BuildPlan plan, BlockPos rel) {
 		Placement p = plan.at(rel);
 		return p == null || p.state().getCollisionShape(EmptyBlockGetter.INSTANCE, BlockPos.ZERO).isEmpty();
 	}

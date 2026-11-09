@@ -10,7 +10,6 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.colZ;
 import static dev.t3craft.hq.citadel.CitadelCanvas.leaves;
 
 import dev.t3craft.T3Craft;
-import dev.t3craft.hq.Anchor;
 import dev.t3craft.hq.RingCampusGeometry;
 import dev.t3craft.hq.RingCampusGeometry.Kind;
 import dev.t3craft.hq.RingCampusGeometry.Lot;
@@ -20,6 +19,7 @@ import dev.t3craft.hq.citadel.catalog.Family;
 import dev.t3craft.hq.citadel.catalog.Plot;
 import dev.t3craft.hq.citadel.catalog.Variant;
 import dev.t3craft.hq.pack.LayoutParams;
+import dev.t3craft.hq.plan.Anchor;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;

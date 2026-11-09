@@ -7,6 +7,15 @@ import static dev.t3craft.hq.HqGeometry.DOOR_V2;
 import static dev.t3craft.hq.HqGeometry.HUB;
 import static dev.t3craft.hq.HqGeometry.PORTICO_Z1;
 
+import dev.t3craft.hq.plan.Anchor;
+import dev.t3craft.hq.plan.AnchorNames;
+import dev.t3craft.hq.plan.Box;
+import dev.t3craft.hq.plan.BuildPlan;
+import dev.t3craft.hq.plan.PlanBuilder;
+import dev.t3craft.hq.plan.PlanConnect;
+import dev.t3craft.hq.plan.Workstation;
+import dev.t3craft.hq.style.HqStyle;
+import dev.t3craft.hq.style.HqStyles;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;

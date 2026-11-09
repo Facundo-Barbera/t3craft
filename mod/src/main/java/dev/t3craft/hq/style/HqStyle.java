@@ -1,5 +1,17 @@
-package dev.t3craft.hq;
+package dev.t3craft.hq.style;
 
+import dev.t3craft.hq.HqFixtures;
+import dev.t3craft.hq.HqFootprints;
+import dev.t3craft.hq.HqGenerator;
+import dev.t3craft.hq.HqGeometry;
+import dev.t3craft.hq.HqInput;
+import dev.t3craft.hq.HqLayout;
+import dev.t3craft.hq.SignTags;
+import dev.t3craft.hq.plan.Anchor;
+import dev.t3craft.hq.plan.Box;
+import dev.t3craft.hq.plan.BuildPlan;
+import dev.t3craft.hq.plan.PlanBuilder;
+import dev.t3craft.hq.plan.Workstation;
 import java.util.Map;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -86,7 +98,7 @@ public abstract class HqStyle {
 		}
 	}
 
-	HqStyle() {
+	protected HqStyle() {
 	}
 
 	/** Stable id used by the config ({@code hq.style}) and the preview. */
@@ -112,7 +124,7 @@ public abstract class HqStyle {
 	 * The whole plan of {@code layout} for a style with its own geometry, or null to use the shared
 	 * spine geometry of {@link HqGenerator} (every style but the layout ones).
 	 */
-	@Nullable BuildPlan layoutPlan(HqLayout layout) {
+	public @Nullable BuildPlan layoutPlan(HqLayout layout) {
 		return null;
 	}
 
@@ -159,7 +171,7 @@ public abstract class HqStyle {
 	}
 
 	/**
-	 * Lamp let into a floor where the HQ would be dark. Unused by {@link HqLighting} since citadel/light-aesthetic
+	 * Lamp let into a floor where the HQ would be dark. Unused by {@code HqLighting} since citadel/light-aesthetic
 	 * (its fill is invisible {@code minecraft:light}); kept for styles that override it.
 	 */
 	BlockState floorLight() {
@@ -168,7 +180,7 @@ public abstract class HqStyle {
 
 	/**
 	 * Lamp let into a wall or ceiling: the kit's lit shoji panel, or its vanilla stand-in. Unused by
-	 * {@link HqLighting} since citadel/light-aesthetic; kept for styles that override it.
+	 * {@code HqLighting} since citadel/light-aesthetic; kept for styles that override it.
 	 */
 	BlockState wallLight() {
 		return HqKit.active().wallPanel(true);
@@ -190,7 +202,7 @@ public abstract class HqStyle {
 	}
 
 	/** A hub bench (a seat; NPCs rest here), its backrest on {@code back}. */
-	abstract BlockState bench(net.minecraft.core.Direction back);
+	public abstract BlockState bench(net.minecraft.core.Direction back);
 
 	// ------------------------------------------------------------------ pieces
 
@@ -200,29 +212,29 @@ public abstract class HqStyle {
 	 * hologram column ({@code x = z = 0}, {@code y = 1..HOLOGRAM_TOP}) free and put a block on the
 	 * beacon cell's support.
 	 */
-	abstract void hub(PlanBuilder.Canvas c, boolean northDoor);
+	public abstract void hub(PlanBuilder.Canvas c, boolean northDoor);
 
 	/** The board wall at {@link HqGeometry#BOARD_Z} (frame, face, sign). The generator writes the bulbs after. */
-	abstract void board(PlanBuilder.Canvas c, SignText sign);
+	public abstract void board(PlanBuilder.Canvas c, SignText sign);
 
 	/** The archive nook ({@link HqGeometry#archiveNook()}); the generator writes the terminal after. */
-	abstract void archiveNook(PlanBuilder.Canvas c);
+	public abstract void archiveNook(PlanBuilder.Canvas c);
 
-	abstract void portico(PlanBuilder.Canvas c);
+	public abstract void portico(PlanBuilder.Canvas c);
 
 	/**
 	 * Spine row {@code r}; {@code eastSign}/{@code westSign} are the wing signs' text (null when that
 	 * side has no wing).
 	 */
-	abstract void spineRow(PlanBuilder.Canvas c, int r, @Nullable SignText eastSign, @Nullable SignText westSign);
+	public abstract void spineRow(PlanBuilder.Canvas c, int r, @Nullable SignText eastSign, @Nullable SignText westSign);
 
-	abstract void spineCap(PlanBuilder.Canvas c, Box box);
+	public abstract void spineCap(PlanBuilder.Canvas c, Box box);
 
 	/** The wall across wing {@code i} at column {@code u}: the inner one (doorway) or the end cap. */
-	abstract void wingEndWall(PlanBuilder.Canvas c, int i, int u, boolean inner);
+	public abstract void wingEndWall(PlanBuilder.Canvas c, int i, int u, boolean inner);
 
 	/** Desk segment {@code s} of wing {@code i}: walls, floor, roof, garden strip (desk boxes are holes). */
-	abstract void segment(PlanBuilder.Canvas c, int i, int s, DyeColor accent);
+	public abstract void segment(PlanBuilder.Canvas c, int i, int s, DyeColor accent);
 
 	/**
 	 * One desk slot. Vacant ({@code !occupied}): only the floor (vacant desks are not built). Occupied:
@@ -231,17 +243,17 @@ public abstract class HqStyle {
 	 * desk top, so leave them alone) and clears {@code stand} (where the agent works, standing) and the
 	 * cell above it to air.
 	 */
-	abstract void desk(PlanBuilder.Canvas c, DeskCells cells);
+	public abstract void desk(PlanBuilder.Canvas c, DeskCells cells);
 
 	/**
 	 * The cells of one desk, all inside its {@link HqGeometry#desk} box. {@code computer}: the screen's
 	 * bottom-middle cell (over the middle desk top); {@code right}/{@code drawer}: the desk tops to the
 	 * agent's right and left; {@code facing}: from the agent to the desk.
 	 */
-	record DeskCells(int module, int slot, BlockPos computer, BlockPos right, BlockPos drawer, BlockPos stand,
+	public record DeskCells(int module, int slot, BlockPos computer, BlockPos right, BlockPos drawer, BlockPos stand,
 			net.minecraft.core.Direction facing, boolean occupied) {
 		/** The screen's cells ({@link Workstation#SCREEN_WIDTH} × {@link Workstation#SCREEN_HEIGHT} over the desk). */
-		java.util.List<BlockPos> screen() {
+		public java.util.List<BlockPos> screen() {
 			net.minecraft.core.Direction screenFacing = facing.getOpposite();
 			return Workstation.screenCells(Workstation.screenOriginFor(computer, screenFacing), screenFacing.getCounterClockWise());
 		}

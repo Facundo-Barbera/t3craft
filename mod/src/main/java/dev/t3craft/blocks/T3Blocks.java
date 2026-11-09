@@ -2,7 +2,7 @@ package dev.t3craft.blocks;
 
 import dev.t3craft.T3Craft;
 import dev.t3craft.hq.HqFixtures;
-import dev.t3craft.hq.HqKit;
+import dev.t3craft.hq.style.HqKit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;

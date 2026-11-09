@@ -1,5 +1,12 @@
 package dev.t3craft.hq.citadel.barrio;
 
+import static dev.t3craft.hq.citadel.CitadelCanvas.DECOR;
+import static dev.t3craft.hq.citadel.CitadelCanvas.fh;
+import static dev.t3craft.hq.citadel.CitadelCanvas.HANGING;
+import static dev.t3craft.hq.citadel.CitadelCanvas.PLANKS;
+import static dev.t3craft.hq.citadel.CitadelCanvas.b;
+import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
+
 import dev.t3craft.hq.RingCampusGeometry.Room;
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.CitadelCanvas.Mats;
@@ -13,12 +20,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.Half;
 import net.minecraft.world.level.block.state.properties.SlabType;
-import static dev.t3craft.hq.citadel.CitadelCanvas.DECOR;
-import static dev.t3craft.hq.citadel.CitadelCanvas.fh;
-import static dev.t3craft.hq.citadel.CitadelCanvas.HANGING;
-import static dev.t3craft.hq.citadel.CitadelCanvas.PLANKS;
-import static dev.t3craft.hq.citadel.CitadelCanvas.b;
-import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
 
 /**
  * The outside of a barrio hall, by {@link HallStyle}: which block a wall cell is ({@link #wallBlock}, called by
@@ -172,7 +173,7 @@ public final class HallFacade {
 
 	/** The colour of the project of {@code lot} (its lead module's environment colour). */
 	public static DyeColor env(CitadelCanvas c, int lot) {
-		return dev.t3craft.hq.HqStyle.envColor(c.lots.get(lot).firstEntry().getValue());
+		return dev.t3craft.hq.style.HqStyle.envColor(c.lots.get(lot).firstEntry().getValue());
 	}
 
 	// ------------------------------------------------------------------ outside

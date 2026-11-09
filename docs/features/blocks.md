@@ -523,7 +523,7 @@ las lamas del difusor; no se renderizó (clases kernel).
 
 ### `HqKit`: el mapeo por roles (para `HqStyle`)
 
-`dev.t3craft.hq.HqKit` (paquete hq, como `HqFixtures`): `HqKit.active()` es `VANILLA` hasta que
+`dev.t3craft.hq.style.HqKit` (paquete hq, como `HqFixtures`): `HqKit.active()` es `VANILLA` hasta que
 `T3Blocks.init` instala `KitBlocks` (solo con el módulo encendido). El estilo pide un **rol** y recibe
 el bloque propio o su sustituto vanilla:
 
