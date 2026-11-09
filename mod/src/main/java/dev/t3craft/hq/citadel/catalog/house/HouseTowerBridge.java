@@ -10,6 +10,7 @@ import static dev.t3craft.hq.citadel.catalog.house.HouseTowerKit.put;
 import static dev.t3craft.hq.citadel.catalog.house.HouseTowerKit.set;
 import static dev.t3craft.hq.citadel.catalog.house.HouseTowerKit.slab;
 import static dev.t3craft.hq.citadel.catalog.house.HouseTowerKit.stair;
+import static dev.t3craft.hq.citadel.catalog.house.HouseTowerKit.trapdoor;
 import static dev.t3craft.hq.citadel.catalog.house.HouseTowerKit.wall;
 
 import dev.t3craft.hq.citadel.CitadelCanvas;
@@ -96,14 +97,15 @@ public final class HouseTowerBridge implements Variant {
 		return 22;
 	}
 
-	private record Scheme(Block log, Block trim, Block planks, Block fence, Block door, Block roof, Block roofStair, Block roofSlab, Block eaveStair) {
+	private record Scheme(Block log, Block trim, Block planks, Block fence, Block door, Block roof, Block roofStair, Block roofSlab, Block eaveStair,
+			Block trap) {
 	}
 
 	private static final Scheme[] SCHEMES = {
 			new Scheme(Blocks.CHERRY_LOG, Blocks.STRIPPED_CHERRY_LOG, Blocks.CHERRY_PLANKS, Blocks.CHERRY_FENCE, Blocks.CHERRY_DOOR,
-					Blocks.DEEPSLATE_TILES, Blocks.DEEPSLATE_TILE_STAIRS, Blocks.DEEPSLATE_TILE_SLAB, Blocks.CHERRY_STAIRS),
+					Blocks.DEEPSLATE_TILES, Blocks.DEEPSLATE_TILE_STAIRS, Blocks.DEEPSLATE_TILE_SLAB, Blocks.CHERRY_STAIRS, Blocks.CHERRY_TRAPDOOR),
 			new Scheme(Blocks.DARK_OAK_LOG, Blocks.STRIPPED_DARK_OAK_LOG, Blocks.DARK_OAK_PLANKS, Blocks.DARK_OAK_FENCE, Blocks.DARK_OAK_DOOR,
-					Blocks.CHERRY_PLANKS, Blocks.CHERRY_STAIRS, Blocks.CHERRY_SLAB, Blocks.DEEPSLATE_TILE_STAIRS),
+					Blocks.CHERRY_PLANKS, Blocks.CHERRY_STAIRS, Blocks.CHERRY_SLAB, Blocks.DEEPSLATE_TILE_STAIRS, Blocks.DARK_OAK_TRAPDOOR),
 	};
 
 	/**
@@ -356,10 +358,42 @@ public final class HouseTowerBridge implements Variant {
 					}
 				}
 			}
+			shutters(c, l, t, s);
 			pilasters(c, l, t);
 		}
+		// a hood over the door
+		set(c, p, t.cu(), 4, t.v0() - 1, stair(Blocks.DEEPSLATE_BRICK_STAIRS, Direction.SOUTH, true));
 		plinthRing(c, l, t);
 		porch(c, l, t);
+	}
+
+	/**
+	 * [depth] open trapdoor shutters either side of every window, folded against the wall (thin, so nobody can stand on
+	 * them).
+	 */
+	private void shutters(CitadelCanvas c, L l, Tw t, int s) {
+		Plot p = l.p;
+		int bs = base(s);
+		for (int u = t.u0(); u <= t.u1(); u++) {
+			for (int v = t.v0(); v <= t.v1(); v++) {
+				if (!perim(t, u, v) || corner(t, u, v)) {
+					continue;
+				}
+				Direction o = out(t, u, v);
+				int d = dOf(t, u, v, o);
+				boolean alongU = o.getAxis() == Direction.Axis.Z;
+				for (int dy = 1; dy <= 3; dy++) {
+					if (!window(t, s, o, d, dy)) {
+						continue;
+					}
+					for (int side = -1; side <= 1; side += 2) {
+						int nu = u + (alongU ? side : 0) + o.getStepX();
+						int nv = v + (alongU ? 0 : side) + o.getStepZ();
+						set(c, p, nu, bs + dy, nv, trapdoor(l.s.trap(), o, true, false));
+					}
+				}
+			}
+		}
 	}
 
 	/**
@@ -388,9 +422,15 @@ public final class HouseTowerBridge implements Variant {
 			}
 			set(c, p, u, 0, t.v1() + 1, stair(Blocks.POLISHED_DEEPSLATE_STAIRS, Direction.NORTH, false));
 		}
+		boolean eastBridge = t.east() == Direction.EAST;
 		for (int v = t.v0(); v <= t.v1(); v++) {
-			set(c, p, t.u0() - 1, 0, v, stair(Blocks.POLISHED_DEEPSLATE_STAIRS, Direction.EAST, false));
-			set(c, p, t.u1() + 1, 0, v, stair(Blocks.POLISHED_DEEPSLATE_STAIRS, Direction.WEST, false));
+			boolean under = Math.abs(v - l.vc()) <= 2; // under the gallery's corbels: a step there would be a low cell
+			if (!(under && !eastBridge)) {
+				set(c, p, t.u0() - 1, 0, v, stair(Blocks.POLISHED_DEEPSLATE_STAIRS, Direction.EAST, false));
+			}
+			if (!(under && eastBridge)) {
+				set(c, p, t.u1() + 1, 0, v, stair(Blocks.POLISHED_DEEPSLATE_STAIRS, Direction.WEST, false));
+			}
 		}
 	}
 
@@ -608,7 +648,7 @@ public final class HouseTowerBridge implements Variant {
 					int v = cv + dv;
 					if (!ring) {
 						if (k >= 1) {
-							set(c, p, u, y, v, b(l.s.roof()));
+							set(c, p, u, y, v, du == 0 && dv == 0 && k == kmax ? b(Blocks.GOLD_BLOCK) : b(l.s.roof()));
 						}
 						continue;
 					}
@@ -620,14 +660,15 @@ public final class HouseTowerBridge implements Variant {
 						continue; // the gallery's roof meets the wall here: no eave over it (nothing above its roof either)
 					}
 					BlockState st;
+					Block cb = k == 0 ? sb : l.s.eaveStair(); // the hip ridges in the contrasting material
 					if (north && west) {
-						st = shaped(sb, Direction.SOUTH, StairsShape.OUTER_LEFT);
+						st = shaped(cb, Direction.SOUTH, StairsShape.OUTER_LEFT);
 					} else if (north && east) {
-						st = shaped(sb, Direction.SOUTH, StairsShape.OUTER_RIGHT);
+						st = shaped(cb, Direction.SOUTH, StairsShape.OUTER_RIGHT);
 					} else if (south && west) {
-						st = shaped(sb, Direction.NORTH, StairsShape.OUTER_RIGHT);
+						st = shaped(cb, Direction.NORTH, StairsShape.OUTER_RIGHT);
 					} else if (south && east) {
-						st = shaped(sb, Direction.NORTH, StairsShape.OUTER_LEFT);
+						st = shaped(cb, Direction.NORTH, StairsShape.OUTER_LEFT);
 					} else if (north) {
 						st = stair(sb, Direction.SOUTH, false);
 					} else if (south) {
