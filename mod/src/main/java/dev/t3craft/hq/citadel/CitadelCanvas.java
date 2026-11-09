@@ -212,6 +212,15 @@ public final class CitadelCanvas {
 		return b.defaultBlockState();
 	}
 
+	/**
+	 * The invisible vanilla light block ({@code minecraft:light}) of {@code level} (1..15): no collision,
+	 * replaceable, drawn by nobody. It is what lights the floor of the citadel (see
+	 * {@code CitadelFinish#light}); decorative lamps stay {@link #LIGHT} froglights.
+	 */
+	public static BlockState invisibleLight(int level) {
+		return Blocks.LIGHT.defaultBlockState().setValue(net.minecraft.world.level.block.LightBlock.LEVEL, level);
+	}
+
 	public BlockState floor() {
 		return kit.floor();
 	}

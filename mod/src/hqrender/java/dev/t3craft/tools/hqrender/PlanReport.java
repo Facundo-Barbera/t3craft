@@ -619,14 +619,16 @@ public final class PlanReport {
 				continue;
 			}
 			BlockPos pos = p.rel();
+			// minecraft:light is invisible: counted as an emitter, never as a seen lamp or a lamp in the floor
+			boolean invisible = p.state().is(net.minecraft.world.level.block.Blocks.LIGHT);
 			boolean visible = false;
 			for (Direction d : Direction.values()) {
-				if (open(plan, pos.relative(d))) {
+				if (!invisible && open(plan, pos.relative(d))) {
 					visible = true;
 					break;
 				}
 			}
-			boolean inFloor = open(plan, pos.above()) && reach.contains(pos.above());
+			boolean inFloor = !invisible && open(plan, pos.above()) && reach.contains(pos.above());
 			int[] t = byType.computeIfAbsent(id(p.state()), k -> new int[3]);
 			t[0]++;
 			total++;
@@ -783,7 +785,8 @@ public final class PlanReport {
 	private void floating(BuildPlan plan, Options o) {
 		Map<Long, BlockState> cells = new HashMap<>(plan.size() * 2);
 		for (Placement p : plan.placements()) {
-			if (!p.state().isAir()) {
+			// minecraft:light is an invisible, weightless marker that hangs in the air by design: never "floating"
+			if (!p.state().isAir() && !p.state().is(net.minecraft.world.level.block.Blocks.LIGHT)) {
 				cells.put(p.rel().asLong(), p.state());
 			}
 		}
