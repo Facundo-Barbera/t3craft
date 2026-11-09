@@ -196,10 +196,10 @@ public final class StallClothLanterns implements Variant {
 			if (u == g.pole()) {
 				continue; // the pole passes here
 			}
-			// [depth] a dark-ish cherry beam closes the front of the roof, and a cloth valance hangs from it two
+			// [depth] a dark-oak beam closes the front of the roof, and a cloth valance hangs from it two
 			// blocks in three (the third gap shows the goods): an accent stripe, cream and a light grey
-			p.set(c, u, 3, 1, b(Blocks.STRIPPED_CHERRY_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.X));
-			if (u % 3 != 2) {
+			p.set(c, u, 3, 1, b(Blocks.DARK_OAK_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.X));
+			if (u % 3 != 2 && u >= g.lo() && u <= g.hi()) { // never over the side walk outside the posts
 				p.set(c, u, 2, 1, u % 3 == 0 ? terracotta(g.accent) : wool(DyeColor.WHITE));
 			}
 		}
@@ -279,7 +279,7 @@ public final class StallClothLanterns implements Variant {
 			// [depth] a beam over the arm (a log along v under the roof) with a length of cloth hanging from it, so
 			// the bolts have a ceiling and nobody can stand on them
 			int beam = g.ry(v) - 1;
-			p.set(c, su, beam, v, b(Blocks.STRIPPED_CHERRY_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.Z));
+			p.set(c, su, beam, v, b(Blocks.DARK_OAK_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.Z));
 			for (int y = 3; y < beam; y++) {
 				p.set(c, su, y, v, y == 3 && v % 2 == 0 ? terracotta(g.accent) : wool(DyeColor.WHITE));
 			}
@@ -359,11 +359,11 @@ public final class StallClothLanterns implements Variant {
 		int len = Math.min(g.hi() - g.lo() + 1, main ? 5 : 3);
 		Direction in = dir > 0 ? Direction.EAST : Direction.WEST;
 		Direction out = dir > 0 ? Direction.WEST : Direction.EAST;
-		p.set(c, u, top, 0, b(Blocks.STRIPPED_CHERRY_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.X));
+		p.set(c, u, top, 0, fence(Direction.SOUTH, in));
 		hang(c, p, g, u, top - 1, 0);
 		for (int s = 1; s <= len; s++) {
 			int uu = u + dir * s;
-			p.set(c, uu, top, 0, b(Blocks.STRIPPED_CHERRY_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.X));
+			p.set(c, uu, top, 0, s == len ? fence(out) : fence(out, in));
 			if (s % 2 == 0 || s == len) {
 				hang(c, p, g, uu, top - 1, 0);
 			}
