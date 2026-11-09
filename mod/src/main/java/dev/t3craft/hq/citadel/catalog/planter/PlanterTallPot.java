@@ -83,7 +83,7 @@ public final class PlanterTallPot implements Variant {
 
 		// --- the pot
 		p.set(c, cu, 0, cv, p.hash(cu, 0, cv, 3) == 0 ? b(Blocks.CHISELED_DEEPSLATE) : b(Blocks.POLISHED_DEEPSLATE));
-		BlockState body = bamboo ? b(Blocks.BAMBOO_BLOCK) : wide ? b(Blocks.MUD_BRICKS) : terracotta(DyeColor.PINK); // bamboo block: axis Y by default
+		BlockState body = bamboo ? b(Blocks.BAMBOO_BLOCK) : b(Blocks.MUD_BRICKS); // brown clay body (pink terracotta rendered as a dark red block); bamboo block has axis Y by default
 		p.set(c, cu, 1, cv, body);
 		if (lip == 2) {
 			p.set(c, cu, 2, cv, body); // a two-high glazed body (no white band: stacked stripes read as a candy cane)
