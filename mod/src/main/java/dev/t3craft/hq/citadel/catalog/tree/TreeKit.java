@@ -87,6 +87,7 @@ final class TreeKit {
 		final int h;
 		private final BlockState[] cells;
 		private final byte[] kind;
+		private final int[] owner;
 
 		Vox(Plot p) {
 			this.p = p;
@@ -95,6 +96,7 @@ final class TreeKit {
 			this.h = p.h();
 			this.cells = new BlockState[w * d * h];
 			this.kind = new byte[w * d * h];
+			this.owner = new int[w * d * h];
 		}
 
 		boolean in(int u, int y, int v) {
@@ -139,6 +141,31 @@ final class TreeKit {
 				cells[ix(u, y, v)] = s;
 				kind[ix(u, y, v)] = LEAF;
 			}
+		}
+
+		/**
+		 * A leaf of lobe {@code id}: only into an empty cell, and never touching (by a face) a leaf of another
+		 * lobe, so neighbouring lobes always keep a notch of air between them and the canopy reads as lobes.
+		 */
+		void leafOf(int u, int y, int v, BlockState s, int id) {
+			if (!empty(u, y, v)) {
+				return;
+			}
+			int[][] n6 = {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}};
+			for (int[] o : n6) {
+				int a = u + o[0];
+				int b = y + o[1];
+				int c = v + o[2];
+				if (in(a, b, c)) {
+					int j = ix(a, b, c);
+					if (kind[j] == LEAF && owner[j] != 0 && owner[j] != id) {
+						return;
+					}
+				}
+			}
+			cells[ix(u, y, v)] = s;
+			kind[ix(u, y, v)] = LEAF;
+			owner[ix(u, y, v)] = id;
 		}
 
 		/** Ground cover (flowers, petals, carpets): only into an empty cell with nothing solid assumed below. */
@@ -342,11 +369,9 @@ final class TreeKit {
 			}
 			for (int i = 0; i < len; i++) {
 				boolean tip = i == len - 1 && len > 1;
-				BlockState s = tip || i >= 2 ? wd.rootTip() : i == 0 ? wd.bark() : diag ? wd.rootTip() : wd.log(ax);
+				BlockState s = i == 0 ? wd.bark() : i == 1 && !tip && !diag ? wd.log(ax) : wd.rootTip();
 				t.wood(u, 0, v, s);
-				if (i == 0 && len >= 2 && t.hash(u, 1, v, 3) == 0) {
-					t.woodSoft(u, 1, v, wd.bark()); // the flare up the trunk
-				}
+				// no flare on y = 1: roots stay one block high
 				if (diag) {
 					// a plan staircase: one step along u, then along v
 					int nu = u + du;
@@ -430,9 +455,7 @@ final class TreeKit {
 				}
 			}
 			t.wood(c[0], c[1], c[2], s);
-			if (thick && i > 0 && i < n / 3 + 1) {
-				t.woodSoft(c[0], c[1] - 1, c[2], wd.bark());
-			}
+			// (thick limbs are no longer doubled: on these small plots a 2-high limb reads as a slab)
 		}
 		return cells;
 	}
@@ -452,36 +475,32 @@ final class TreeKit {
 	 */
 	static void lobe(Vox t, double cu, double cy, double cv, double rx, double rz, double up, double down,
 			Leaves lv, double rough, int salt) {
-		cy = Math.round(cy); // whole layers: a domed profile (wide middle, narrower top, small underside)
-		int u1 = (int) Math.floor(cu - rx - 1);
-		int u2 = (int) Math.ceil(cu + rx + 1);
-		int v1 = (int) Math.floor(cv - rz - 1);
-		int v2 = (int) Math.ceil(cv + rz + 1);
-		int y1 = (int) Math.floor(cy - down - 1);
-		int y2 = (int) Math.ceil(cy + up + 1);
-		for (int y = y1; y <= y2; y++) {
-			for (int v = v1; v <= v2; v++) {
-				for (int u = u1; u <= u2; u++) {
-					double du = (u - cu) / rx;
-					double dv = (v - cv) / rz;
-					double dyr = y - cy;
-					double dy = dyr >= 0 ? dyr / Math.max(0.5, up) : dyr / Math.max(0.5, down);
-					double q = du * du + dv * dv + dy * dy;
-					// a jittered edge: small bites and bumps (kept small: big outward bumps square the outline)
-					double jit = (t.hash(u + salt * 13, y + salt * 7, v + salt * 3, 9) - 4.5) / 4.0 * rough * 0.7;
+		// a dome of whole layers: the middle layer full width, the layer above ≈0.62 of it, a cap ≈0.3 on tall
+		// lobes, the underside ≈0.6: circles, never squares, and each layer clearly smaller than the middle
+		int iy = (int) Math.round(cy);
+		int nUp = up >= 2.0 ? 2 : up >= 0.9 ? 1 : 0;
+		int nDown = down >= 1.8 ? 2 : down >= 0.9 ? 1 : 0;
+		int id = 1000 + salt;
+		for (int ly = -nDown; ly <= nUp; ly++) {
+			double f = ly == 0 ? 1.0 : ly == 1 ? (rx >= 2.6 ? 0.7 : 0.62) : ly == 2 ? 0.32 : ly == -1 ? 0.6 : 0.3;
+			double ru = Math.max(0.45, rx * f);
+			double rv = Math.max(0.45, rz * f);
+			int y = iy + ly;
+			double dy = ly >= 0 ? ly / (double) Math.max(1, nUp) : ly / (double) Math.max(1, nDown);
+			for (int v = (int) Math.floor(cv - rv - 1); v <= (int) Math.ceil(cv + rv + 1); v++) {
+				for (int u = (int) Math.floor(cu - ru - 1); u <= (int) Math.ceil(cu + ru + 1); u++) {
+					double du = (u - cu) / ru;
+					double dv = (v - cv) / rv;
+					double q = du * du + dv * dv;
+					double jit = (t.hash(u + salt * 13, y + salt * 7, v + salt * 3, 9) - 4.5) / 4.0 * rough * 0.6;
 					if (q > 1.0 + jit) {
 						continue;
 					}
-					// trimmed corners: never a cube
-					if (Math.abs(du) > 0.62 && Math.abs(dv) > 0.62 && Math.abs(dy) > 0.55) {
+					// the outer ring of the top and bottom layers comes and goes: a ragged crown, no plate edges
+					if (ly != 0 && q > 0.45 && t.hash(u + salt, y * 3, v, 5) < 2) {
 						continue;
 					}
-					// ragged crown and underside: the outer cells of the top and bottom layers come and go
-					double hr = du * du + dv * dv;
-					if ((dy > 0.35 || dy < -0.45) && hr > 0.28 && t.hash(u + salt, y * 3, v, 5) < 2) {
-						continue;
-					}
-					t.leaf(u, y, v, tone(t, lv, u, y, v, dy, q, salt));
+					t.leafOf(u, y, v, tone(t, lv, u, y, v, dy, q, salt), id);
 				}
 			}
 		}
