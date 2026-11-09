@@ -14,32 +14,43 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.DoorHingeSide;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 
 /**
- * Glasshouse: a deepslate plinth carrying walls of glass panes framed by weathered copper posts,
- * under a stepped glass roof whose gable ends (and a middle rib on long houses) are clean copper
- * stairs, with a chiseled copper emblem and a copper finial on the gables. Inside, raised beds of
- * wheat, carrots, potatoes and beetroot flank a mud-brick path lit by hanging copper lanterns.
+ * Glasshouse you can walk through: a deepslate plinth, three-high walls of glass panes between oxidized
+ * copper posts, and a glass roof on copper ribs (gable or hip, with or without a raised lantern monitor),
+ * ridge in bare copper. Inside, a 2 to 4 wide mud-brick aisle runs from the double door to a potting
+ * bench; raised dark-oak beds of crops flank it (or, on wide houses, an island bed between two aisles),
+ * watered by waterlogged-slab troughs set inside the bed; a nursery row of pots by the door.
  *
  * <pre>
- *  front (w = 7)                        plan (w = 7, d = 7)
- *  y6        ▲      finial              v0  ▬ ✿ ▬ ▼ ▬ ✿ ▤   apron: step, pots, barrel
- *  y5     ▄▄███▄▄   ribs / glass top    v1  ▣ ░ ░ ▯ ░ ░ ▣   front wall, door ▯
- *  y4    ▄▀ ░▣░ ▀▄  gable panes, emblem v2  ▓ ⁂ ⁂ ▒ ⁂ ⁂ ▓   beds ⁂, path ▒
- *  y3   ▀▀▀▀▀▀▀▀▀▀  eaves + copper beam …   ▓ ⁂ ⁂ ▒ ⁂ ⁂ ▓
- *  y1-2 ▣░░▯░░▣     posts, panes, door  v5  ▓ ◙ ▤ ⚱ ▤ ◙ ▓   composters, barrels, pot
- *  y0   ▓▓▓▓▓▓▓     deepslate plinth    v6  ▣ ░ ░ ▣ ░ ░ ▣   back wall
+ *  front (w = 10)                          plan (w = 10, d = 9, gable)
+ *  y9          ▲ rod                       v0  ◙ ▬ ▬ ▼ ▼ ▬ ▬ ▬ ▬ ▤   apron: cauldron, steps, barrel
+ *  y6-8    ▄▄▄██▄▄▄   ribs, glass roof     v1  ▣ ░ ░ ▯ ▯ ░ ░ ▣     front wall, double door
+ *  y4     ▀▀▀▀▀▀▀▀▀▀  eave gutter          v2  ▓ ✿ ✿ ▒ ▒ ✿ ✿ ▓     nursery pots
+ *  y1-3   ▣░░▣░░▯▯░░▣ posts, panes, door   v3+ ▓ ⁂ ≈ ▒ ▒ ≈ ⁂ ▓     beds ⁂ with trough ≈, aisle ▒
+ *  y0    ▓▓▓▓▓▓▓▓▓▓    deepslate plinth    v7  ▓ ▤ ▤ ◙ ▦ ⚙ ▤ ▓     potting bench
  * </pre>
  *
- * Size: 5–8 × 5–8 × 6+ (the roof rises two steps at most; the finials need height 7).
+ * Size: 5–11 × 5–10 × 10+ (aisle of 2+ and a double door from 6 wide; at 5 wide the aisle is 1).
  */
 public final class AnnexGreenhouseCopper implements Variant {
-	/** Plate / eaves level; glass walls are y1..y2 below it. */
-	private static final int PLATE = 3;
+	/** Eave level: the walls are y1..y3 below it. */
+	private static final int PLATE = 4;
 
-	private static final BlockState POST = Blocks.CUT_COPPER.waxed().unaffected().defaultBlockState();
-	private static final Block RIB = Blocks.CUT_COPPER_STAIRS.waxed().unaffected();
+	private static final BlockState POST_W = Blocks.CUT_COPPER.waxed().weathered().defaultBlockState();
+	private static final BlockState POST_O = Blocks.CUT_COPPER.waxed().oxidized().defaultBlockState();
+	private static final Block RIB_W = Blocks.CUT_COPPER_STAIRS.waxed().weathered();
+	private static final Block RIB_O = Blocks.CUT_COPPER_STAIRS.waxed().oxidized();
+	private static final Block SLAB_O = Blocks.CUT_COPPER_SLAB.waxed().oxidized();
+	private static final BlockState RIDGE = Blocks.CUT_COPPER.waxed().exposed().defaultBlockState();
+	private static final Block RIDGE_ST = Blocks.CUT_COPPER_STAIRS.waxed().exposed();
+	private static final BlockState EMBLEM = Blocks.CHISELED_COPPER.waxed().exposed().defaultBlockState();
+
+	private static final int AISLE = 1;
+	private static final int BED = 2;
+	private static final int STRIP = 3;
 
 	@Override
 	public String id() {
@@ -63,85 +74,185 @@ public final class AnnexGreenhouseCopper implements Variant {
 
 	@Override
 	public int minH() {
-		return 6;
+		return 10;
 	}
 
 	@Override
 	public int maxW() {
-		return 8;
+		return 11;
 	}
 
 	@Override
 	public int maxD() {
-		return 8;
+		return 10;
+	}
+
+	// ------------------------------------------------------------------ geometry
+
+	/** Everything the seed and the size decide, computed once. */
+	private static final class G {
+		final int w;
+		final int d;
+		final int vf;
+		final int vb;
+		final int cu;
+		final int dw;
+		final int dl;
+		final boolean hip;
+		final boolean lant;
+		final int r;
+		final int rh;
+		final int mu0;
+		final int mu1;
+		final int mv0;
+		final int mv1;
+		final boolean[] ribU;
+		final boolean[] ribV;
+		final int[] kinds;
+		final int[] widths;
+		final int[] u0;
+
+		G(Plot p) {
+			w = p.w();
+			d = p.d();
+			vf = d >= 6 ? 1 : 0;
+			vb = d - 1;
+			cu = w / 2;
+			dw = w % 2 == 0 ? 2 : 1;
+			dl = w % 2 == 0 ? cu - 1 : cu;
+			int span = vb - vf;
+			int half = (w - 1) / 2;
+			boolean hipWant = w >= 7 && span >= 4 && p.hash(0, 0, 0, 3) == 0;
+			boolean lantWant = w >= 8 && span >= (hipWant ? 4 : 6) && p.hash(1, 0, 0, 2) == 0 && p.h() - 1 - PLATE - 3 >= 1;
+			hip = hipWant;
+			lant = lantWant;
+			int want = p.hash(2, 0, 0, 2) == 0 ? half : Math.max(1, half - 1);
+			int byW = lant ? (w - 3) / 2 : half;
+			int byD = hip ? (lant ? (span - 2) / 2 : span / 2) : 99;
+			int byH = p.h() - 1 - PLATE - (lant ? 3 : 1);
+			r = Math.max(1, Math.min(Math.min(want, byW), Math.min(byD, byH)));
+			rh = PLATE + r;
+			mu0 = r;
+			mu1 = w - 1 - r;
+			mv0 = hip ? vf + r : vf + 2;
+			mv1 = hip ? vb - r : vb - 2;
+			ribU = ribs(w);
+			ribV = ribs(span + 1);
+
+			// layout of the interior columns u = 1 .. w-2
+			int iw = w - 2;
+			int[] wd;
+			int[] kd;
+			if (w >= 11 && p.hash(3, 0, 0, 2) == 0) {
+				int island = Math.min(5, iw - 6);
+				int rem = iw - 2 - island;
+				wd = new int[] {1, rem / 2, island, rem - rem / 2, 1};
+				kd = new int[] {STRIP, AISLE, BED, AISLE, STRIP};
+			} else if (iw == 5) {
+				wd = new int[] {2, 2, 1};
+				kd = new int[] {BED, AISLE, BED};
+			} else {
+				int bw = Math.max(1, Math.min(4, (iw - 2) / 2));
+				wd = new int[] {bw, iw - 2 * bw, bw};
+				kd = new int[] {BED, AISLE, BED};
+			}
+			if (p.hash(4, 0, 0, 2) == 0) {
+				for (int i = 0; i < wd.length / 2; i++) {
+					int j = wd.length - 1 - i;
+					int t = wd[i];
+					wd[i] = wd[j];
+					wd[j] = t;
+					t = kd[i];
+					kd[i] = kd[j];
+					kd[j] = t;
+				}
+			}
+			widths = wd;
+			kinds = kd;
+			u0 = new int[wd.length];
+			int u = 1;
+			for (int i = 0; i < wd.length; i++) {
+				u0[i] = u;
+				u += wd[i];
+			}
+		}
+
+		/** Roof height over (u, v). */
+		int roofY(int u, int v) {
+			int du = Math.min(u, w - 1 - u);
+			int dv = hip ? Math.min(v - vf, vb - v) : 99;
+			return PLATE + Math.min(r, Math.min(du, dv));
+		}
+
+		boolean ridgeCol(int u) {
+			return w % 2 == 1 ? u == cu : u == cu - 1 || u == cu;
+		}
+
+		boolean inMonitor(int u, int v) {
+			return lant && u >= mu0 && u <= mu1 && v >= mv0 && v <= mv1;
+		}
+
+		boolean doorCol(int u) {
+			return u >= dl && u < dl + dw;
+		}
+	}
+
+	/** Rib marks over n cells: both ends and a rib about every third cell. */
+	private static boolean[] ribs(int n) {
+		boolean[] out = new boolean[n];
+		int count = Math.max(1, (int) Math.round((n - 1) / 3.0));
+		for (int i = 0; i <= count; i++) {
+			out[(int) Math.round(i * (n - 1) / (double) count)] = true;
+		}
+		return out;
 	}
 
 	@Override
 	public void build(CitadelCanvas c, Plot p) {
-		int w = p.w();
-		int d = p.d();
-		int vf = d >= 6 ? 1 : 0; // front wall row (v 0 is an apron on deeper plots)
-		int vb = d - 1;
-		int cu = w / 2;
-
-		plinth(c, p, vf, vb, cu);
-		walls(c, p, vf, vb, cu);
-		roof(c, p, vf, vb, cu);
-		beds(c, p, vf, vb);
-		lanterns(c, p, vf, vb, cu);
-		if (vf == 1) {
-			apron(c, p, cu);
-		} else {
-			groundDoor(c, p, cu);
+		G g = new G(p);
+		plinth(c, p, g);
+		walls(c, p, g);
+		roof(c, p, g);
+		inside(c, p, g);
+		lanterns(c, p, g);
+		if (g.vf == 1) {
+			apron(c, p, g);
 		}
 	}
 
-	/**
-	 * Without an apron (d = 5) there is no room for a step outside the door, and a door on the plinth would
-	 * leave a full block to jump from the street. So the door stands on the ground (y0..y1) with a copper
-	 * lintel over it, and the step up to the floor (y0, top at 1) is the first path cell inside.
-	 */
-	private static void groundDoor(CitadelCanvas c, Plot p, int cu) {
-		for (int y = 0; y <= 1; y++) {
-			p.set(c, cu, y, 0, b(Blocks.CHERRY_DOOR)
-					.setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH)
-					.setValue(BlockStateProperties.DOUBLE_BLOCK_HALF, y == 0 ? DoubleBlockHalf.LOWER : DoubleBlockHalf.UPPER));
-		}
-		p.set(c, cu, 2, 0, POST);
-		p.set(c, cu, 0, 1, stairs(Blocks.MUD_BRICK_STAIRS, Direction.SOUTH));
+	private static BlockState pane(BlockState glass, boolean alongU, boolean sideA, boolean sideB) {
+		return alongU ? glass.setValue(BlockStateProperties.WEST, sideA).setValue(BlockStateProperties.EAST, sideB)
+				: glass.setValue(BlockStateProperties.NORTH, sideA).setValue(BlockStateProperties.SOUTH, sideB);
 	}
 
-	/** Roof height over column u: the eaves at PLATE, then one step up per column, two steps at most. */
-	private static int roofY(int u, int w) {
-		return PLATE + Math.min(Math.min(u, w - 1 - u), 2);
+	private static BlockState post(Plot p, int u, int v, boolean corner) {
+		return corner || p.hash(u, 0, v, 3) == 0 ? POST_O : POST_W;
 	}
 
-	/** Ribs: both gable rows and, on long houses, one in the middle; everything between is glass. */
-	private static boolean rib(int v, int vf, int vb) {
-		return v == vf || v == vb || (vb - vf >= 6 && v == (vf + vb) / 2);
-	}
-
-	private static BlockState pane(BlockState g, boolean alongU, boolean sideA, boolean sideB) {
-		return alongU ? g.setValue(BlockStateProperties.WEST, sideA).setValue(BlockStateProperties.EAST, sideB)
-				: g.setValue(BlockStateProperties.NORTH, sideA).setValue(BlockStateProperties.SOUTH, sideB);
+	private static BlockState door(boolean lower, DoorHingeSide hinge) {
+		return b(Blocks.CHERRY_DOOR).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH)
+				.setValue(BlockStateProperties.DOUBLE_BLOCK_HALF, lower ? DoubleBlockHalf.LOWER : DoubleBlockHalf.UPPER)
+				.setValue(BlockStateProperties.DOOR_HINGE, hinge);
 	}
 
 	// ------------------------------------------------------------------ plinth (y0)
 
 	/** [palette] the heavy base: deepslate bricks, cracked by hash, chiseled at the corners, a polished threshold. */
-	private static void plinth(CitadelCanvas c, Plot p, int vf, int vb, int cu) {
-		int w = p.w();
-		for (int u = 0; u < w; u++) {
-			for (int v = vf; v <= vb; v++) {
-				boolean side = u == 0 || u == w - 1;
-				boolean end = v == vf || v == vb;
+	private static void plinth(CitadelCanvas c, Plot p, G g) {
+		for (int u = 0; u < g.w; u++) {
+			for (int v = g.vf; v <= g.vb; v++) {
+				boolean side = u == 0 || u == g.w - 1;
+				boolean end = v == g.vf || v == g.vb;
 				if (!side && !end) {
-					continue; // the inside is beds and path
+					continue;
+				}
+				if (g.vf == 0 && v == 0 && g.doorCol(u)) {
+					continue; // ground door: the door stands where the plinth would be
 				}
 				BlockState st;
 				if (side && end) {
 					st = b(Blocks.CHISELED_DEEPSLATE);
-				} else if (u == cu && v == vf) {
+				} else if (v == g.vf && g.doorCol(u)) {
 					st = b(Blocks.POLISHED_DEEPSLATE);
 				} else {
 					st = p.hash(u, 0, v, 4) == 0 ? b(Blocks.CRACKED_DEEPSLATE_BRICKS) : b(Blocks.DEEPSLATE_BRICKS);
@@ -151,135 +262,162 @@ public final class AnnexGreenhouseCopper implements Variant {
 		}
 	}
 
-	// ------------------------------------------------------------------ walls (y1..y2)
+	// ------------------------------------------------------------------ walls (y1..y3)
 
-	private static void walls(CitadelCanvas c, Plot p, int vf, int vb, int cu) {
-		int w = p.w();
+	private static void walls(CitadelCanvas c, Plot p, G g) {
+		int w = g.w;
 		BlockState clear = b(Blocks.GLASS_PANE);
 		BlockState pink = Blocks.STAINED_GLASS_PANE.pick(DyeColor.PINK).defaultBlockState();
-		for (int y = 1; y <= 2; y++) {
-			// side walls: [depth] copper posts on every rib row, panes between (joined front-back)
-			for (int v = vf + 1; v < vb; v++) {
+		for (int y = 1; y <= 3; y++) {
+			// side walls: a post on every rib row, panes between (joined front to back)
+			for (int v = g.vf + 1; v < g.vb; v++) {
 				for (int u : new int[] {0, w - 1}) {
-					p.set(c, u, y, v, rib(v, vf, vb) ? POST : pane(clear, false, true, true));
+					p.set(c, u, y, v, g.ribV[v - g.vf] ? post(p, u, v, false) : pane(clear, false, true, true));
 				}
 			}
-			// front wall: corner posts, a door in the middle, posts beside it on wide fronts
+			// back wall: corner posts, a post on every rib column
 			for (int u = 0; u < w; u++) {
+				boolean post = u == 0 || u == w - 1 || g.ribU[u];
+				p.set(c, u, y, g.vb, post ? post(p, u, g.vb, u == 0 || u == w - 1) : pane(clear, true, true, true));
+			}
+		}
+		// front wall: door in the middle (double from an even width), jambs, posts on the ribs
+		int doorBase = g.vf == 0 ? 0 : 1;
+		int top = doorBase + 2;
+		for (int u = 0; u < w; u++) {
+			boolean jamb = u == g.dl - 1 || u == g.dl + g.dw;
+			for (int y = 1; y <= 3; y++) {
 				BlockState st;
-				if (u == cu) {
-					st = b(Blocks.CHERRY_DOOR)
-							.setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH)
-							.setValue(BlockStateProperties.DOUBLE_BLOCK_HALF, y == 1 ? DoubleBlockHalf.LOWER : DoubleBlockHalf.UPPER);
-				} else if (u == 0 || u == w - 1) {
-					st = POST;
+				if (g.doorCol(u)) {
+					if (y == doorBase || y == doorBase + 1) {
+						st = door(y == doorBase, g.dw == 2 && u == g.dl + 1 ? DoorHingeSide.LEFT : DoorHingeSide.RIGHT);
+					} else if (y == top) {
+						st = g.dw == 2 ? pink.setValue(BlockStateProperties.WEST, true).setValue(BlockStateProperties.EAST, true) : CitadelCanvas.AIR;
+					} else {
+						st = POST_W; // lintel
+					}
+				} else if (u == 0 || u == w - 1 || jamb || g.ribU[u]) {
+					st = post(p, u, g.vf, u == 0 || u == w - 1);
 				} else {
-					// panes do not join a door; [palette] the upper panes beside the door are tinted pink
-					BlockState g = y == 2 && Math.abs(u - cu) == 1 ? pink : clear;
-					st = pane(g, true, u - 1 != cu, u + 1 != cu);
+					st = pane(y == 3 ? pink : clear, true, true, true);
 				}
-				p.set(c, u, y, vf, st);
+				if (g.vf == 0 && y < doorBase) {
+					continue;
+				}
+				p.set(c, u, y, g.vf, st);
 			}
-			// back wall: corner posts and one in the middle on wide plots
-			for (int u = 0; u < w; u++) {
-				boolean post = u == 0 || u == w - 1;
-				p.set(c, u, y, vb, post ? POST : pane(clear, true, true, true));
+			if (g.vf == 0 && g.doorCol(u)) {
+				p.set(c, u, 0, 0, door(true, g.dw == 2 && u == g.dl + 1 ? DoorHingeSide.LEFT : DoorHingeSide.RIGHT));
+				p.set(c, u, 1, 0, door(false, g.dw == 2 && u == g.dl + 1 ? DoorHingeSide.LEFT : DoorHingeSide.RIGHT));
 			}
 		}
 	}
 
-	// ------------------------------------------------------------------ roof (y3+)
+	// ------------------------------------------------------------------ roof
 
 	/**
-	 * [finish] the eaves are a copper gutter line on both sides; above, each column steps up: copper
-	 * stairs on the rib rows (a block on the flat top), glass blocks between the ribs. The gable
-	 * triangles are glass panes on a copper beam, with an emblem and a finial in the middle.
+	 * Gutter of copper slabs round the eaves (stairs on the ribs); above, each column steps up: copper stairs
+	 * on the rib rows, clear glass between, a bare-copper ridge on top. Gable ends are panes between copper
+	 * mullions with an emblem. A lantern monitor (raised glass box with a copper cap) opens the ridge.
 	 */
-	private static void roof(CitadelCanvas c, Plot p, int vf, int vb, int cu) {
-		int w = p.w();
-		for (int v = vf; v <= vb; v++) {
-			boolean ribRow = rib(v, vf, vb);
-			// [palette] copper only where a rib meets the eave; the gutter between ribs is glass, so the
-			// roof reads as a glass skin on a thin copper frame, not a copper box
-			p.set(c, 0, PLATE, v, ribRow ? stairs(RIB, Direction.EAST) : b(Blocks.GLASS));
-			p.set(c, w - 1, PLATE, v, ribRow ? stairs(RIB, Direction.WEST) : b(Blocks.GLASS));
-			for (int u = 1; u < w - 1; u++) {
-				int y = roofY(u, w);
-				boolean flat = Math.min(u, w - 1 - u) >= 2;
+	private static void roof(CitadelCanvas c, Plot p, G g) {
+		int w = g.w;
+		BlockState glass = b(Blocks.GLASS);
+		for (int v = g.vf; v <= g.vb; v++) {
+			for (int u = 0; u < w; u++) {
+				int du = Math.min(u, w - 1 - u);
+				int dv = g.hip ? Math.min(v - g.vf, g.vb - v) : 99;
+				int y = g.roofY(u, v);
+				boolean rib = dv >= du ? g.ribV[v - g.vf] : g.ribU[u];
 				BlockState st;
-				if (!ribRow) {
-					st = b(Blocks.GLASS);
-				} else if (flat) {
-					st = v == vf || v == vb ? Blocks.CUT_COPPER_SLAB.waxed().unaffected().defaultBlockState() : b(Blocks.GLASS); // a slim copper slab on the gables, glass between
+				if (du == 0 || dv == 0) {
+					Direction in = du == 0 ? (u == 0 ? Direction.EAST : Direction.WEST) : (v == g.vf ? Direction.SOUTH : Direction.NORTH);
+					boolean corner = du == 0 && dv == 0;
+					st = corner || rib ? stairs(RIB_O, in) : slab(SLAB_O);
+				} else if (du >= g.r && dv >= g.r) {
+					if (g.ridgeCol(u)) {
+						st = RIDGE;
+					} else if (rib) {
+						st = POST_W;
+					} else {
+						st = glass;
+					}
+					if (g.inMonitor(u, v) && u > g.mu0 && u < g.mu1 && v > g.mv0 && v < g.mv1) {
+						st = CitadelCanvas.AIR;
+					}
 				} else {
-					st = stairs(RIB, u < w - 1 - u ? Direction.EAST : Direction.WEST);
+					Direction in = du <= dv ? (u < w - 1 - u ? Direction.EAST : Direction.WEST) : (v - g.vf < g.vb - v ? Direction.SOUTH : Direction.NORTH);
+					st = rib ? stairs(RIB_W, in) : glass;
 				}
 				p.set(c, u, y, v, st);
 			}
 		}
-		// gables: a copper beam over the walls, panes up to the ribs
+		if (g.hip) {
+			// the ends are sloped glass: only the ridge needs a finial
+			if (!g.lant) {
+				rod(c, p, g.cu, g.rh + 1, g.mv0);
+				rod(c, p, g.cu, g.rh + 1, g.mv1);
+			}
+		} else {
+			gables(c, p, g);
+			rod(c, p, g.cu, g.rh + 1, g.vf);
+			rod(c, p, g.cu, g.rh + 1, g.vb);
+		}
+		if (g.lant) {
+			monitor(c, p, g);
+		}
+	}
+
+	private static void rod(CitadelCanvas c, Plot p, int u, int y, int v) {
+		p.set(c, u, y, v, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState());
+	}
+
+	private static void gables(CitadelCanvas c, Plot p, G g) {
+		int w = g.w;
 		BlockState clear = b(Blocks.GLASS_PANE);
 		BlockState pink = Blocks.STAINED_GLASS_PANE.pick(DyeColor.PINK).defaultBlockState();
-		boolean odd = w % 2 == 1;
-		for (int v : new int[] {vf, vb}) {
+		for (int v : new int[] {g.vf, g.vb}) {
 			for (int u = 1; u < w - 1; u++) {
-				boolean centreCol = odd ? u == cu : u == cu || u == cu - 1;
-				// [depth] the gable plate is glass between the copper corners; a copper lintel only over the door
-				p.set(c, u, PLATE, v, v == vf && centreCol ? POST : pane(clear, true, true, true));
-				boolean centre = odd ? u == cu : u == cu || u == cu - 1;
-				for (int y = PLATE + 1; y < roofY(u, w); y++) {
+				for (int y = PLATE; y < g.roofY(u, v); y++) {
 					BlockState st;
-					if (centre && odd && v == vf) {
-						st = Blocks.CHISELED_COPPER.waxed().unaffected().defaultBlockState(); // [finish] emblem
+					if (v == g.vf && y == PLATE && (g.doorCol(u))) {
+						st = POST_W; // lintel over the door
+					} else if (y == PLATE + 1 && v == g.vf && g.r >= 2 && g.ridgeCol(u) && g.roofY(u, v) > PLATE + 1) {
+						st = EMBLEM;
+					} else if (g.ribU[u]) {
+						st = POST_W; // mullion continues the wall post
 					} else {
-						st = pane(centre ? pink : clear, true, true, true);
+						st = pane(y == PLATE ? pink : clear, true, true, true);
 					}
 					p.set(c, u, y, v, st);
 				}
 			}
-			int top = roofY(cu, w) + 1;
-			if (top < p.h()) {
-				p.set(c, cu, top, v, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState());
+		}
+	}
+
+	private static void monitor(CitadelCanvas c, Plot p, G g) {
+		for (int v = g.mv0; v <= g.mv1; v++) {
+			for (int u = g.mu0; u <= g.mu1; u++) {
+				boolean edgeU = u == g.mu0 || u == g.mu1;
+				boolean edgeV = v == g.mv0 || v == g.mv1;
+				if (edgeU || edgeV) {
+					BlockState wall = edgeU && edgeV ? POST_W : b(Blocks.GLASS);
+					p.set(c, u, g.rh + 1, v, wall);
+					p.set(c, u, g.rh + 2, v, wall);
+				}
+				BlockState cap;
+				if (edgeU || edgeV) {
+					Direction in = u == g.mu0 ? Direction.EAST : u == g.mu1 ? Direction.WEST : v == g.mv0 ? Direction.SOUTH : Direction.NORTH;
+					cap = stairs(RIDGE_ST, in);
+				} else {
+					cap = RIDGE;
+				}
+				p.set(c, u, g.rh + 3, v, cap);
 			}
 		}
 	}
 
-	// ------------------------------------------------------------------ inside (y0..y1)
-
-	/**
-	 * Raised beds along both side walls, a mud-brick path down the middle and, on the back row, a
-	 * potting corner: composters and barrels on the beds, a decorated pot at the end of the path.
-	 * Crops change every two rows, by seed.
-	 */
-	private static void beds(CitadelCanvas c, Plot p, int vf, int vb) {
-		int w = p.w();
-		int pathW = w % 2 == 1 ? 1 : 2;
-		int bedW = (w - 2 - pathW) / 2;
-		BlockState farmland = b(Blocks.FARMLAND).setValue(BlockStateProperties.MOISTURE, 7);
-		for (int v = vf + 1; v < vb; v++) {
-			boolean back = v == vb - 1;
-			for (int u = 1; u < w - 1; u++) {
-				boolean bed = u <= bedW || u >= w - 1 - bedW;
-				if (!bed) {
-					p.set(c, u, 0, v, back ? b(Blocks.PACKED_MUD)
-							: p.hash(u, 0, v, 3) == 0 ? b(Blocks.PACKED_MUD) : b(Blocks.MUD_BRICKS));
-					if (back) {
-						p.set(c, u, 1, v, b(Blocks.DECORATED_POT));
-					}
-					continue;
-				}
-				if (back) {
-					boolean outer = u == 1 || u == w - 2;
-					p.set(c, u, 0, v, outer ? b(Blocks.COMPOSTER).setValue(BlockStateProperties.LEVEL_COMPOSTER, 7)
-							: b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
-					continue;
-				}
-				p.set(c, u, 0, v, farmland);
-				int side = u <= bedW ? 0 : 1;
-				p.set(c, u, 1, v, crop(p.hash(side, 1, v / 2, 4)));
-			}
-		}
-	}
+	// ------------------------------------------------------------------ inside
 
 	private static BlockState crop(int k) {
 		return switch (k) {
@@ -290,30 +428,146 @@ public final class AnnexGreenhouseCopper implements Variant {
 		};
 	}
 
-	/** [finish] copper lanterns hanging under the ridge over the path: one, or two on deep plots. */
-	private static void lanterns(CitadelCanvas c, Plot p, int vf, int vb, int cu) {
+	private static BlockState pot(int k) {
+		return switch (k) {
+			case 0 -> b(Blocks.POTTED_FLOWERING_AZALEA);
+			case 1 -> b(Blocks.POTTED_FERN);
+			case 2 -> b(Blocks.POTTED_PINK_TULIP);
+			case 3 -> b(Blocks.POTTED_CHERRY_SAPLING);
+			default -> b(Blocks.POTTED_AZALEA);
+		};
+	}
+
+	/**
+	 * The aisle (mud brick) from the door to the potting bench; the beds on both sides are raised dark-oak
+	 * planters (farmland at y1, crops at y2) with a waterlogged-slab trough set inside each wide bed; a
+	 * nursery row of pots by the door on houses 8+ wide and 9+ deep; the potting bench along the back.
+	 */
+	private static void inside(CitadelCanvas c, Plot p, G g) {
+		int vi0 = g.vf + 1;
+		int vi1 = g.vb - 1;
+		boolean bench = vi1 - vi0 >= 2;
+		boolean nursery = g.w >= 8 && vi1 - vi0 >= 5 && g.kinds.length == 3;
+		int vs = vi0 + (nursery ? 1 : 0);
+		int ve = bench ? vi1 - 1 : vi1;
+		int nrows = ve - vs + 1;
+		BlockState farmland = b(Blocks.FARMLAND).setValue(BlockStateProperties.MOISTURE, 7);
+		BlockState trough = slab(Blocks.DARK_OAK_SLAB).setValue(BlockStateProperties.WATERLOGGED, true);
+		int aislesSeen = 0;
+		for (int z = 0; z < g.kinds.length; z++) {
+			int kind = g.kinds[z];
+			int len = g.widths[z];
+			boolean left = g.u0[z] + len / 2.0 < g.w / 2.0;
+			boolean centre = g.kinds.length == 5 && z == 2;
+			int aisleNo = kind == AISLE ? aislesSeen++ : 0;
+			for (int j = 0; j < len; j++) {
+				int u = g.u0[z] + j;
+				int outer = left ? j : len - 1 - j; // 0 at the wall side
+				for (int v = vi0; v <= vi1; v++) {
+					if (kind == AISLE) {
+						boolean step = g.vf == 0 && v == vi0 && g.doorCol(u);
+						BlockState floor = p.hash(u, 0, v, 3) == 0 ? b(Blocks.PACKED_MUD) : b(Blocks.MUD_BRICKS);
+						p.set(c, u, 0, v, step ? stairs(Blocks.MUD_BRICK_STAIRS, Direction.SOUTH) : floor);
+						if (bench && v == vi1) {
+							p.set(c, u, 1, v, aisleItem(j, len, aisleNo));
+						}
+						continue;
+					}
+					p.set(c, u, 0, v, p.hash(u, 0, v, 5) == 0 ? b(Blocks.STRIPPED_DARK_OAK_LOG) : b(Blocks.DARK_OAK_PLANKS));
+					if (bench && v == vi1) {
+						p.set(c, u, 1, v, zoneItem(left, centre, outer, len));
+					} else if (nursery && v == vi0) {
+						p.set(c, u, 1, v, pot(p.hash(u, 1, v, 5)));
+					} else {
+						int k = v - vs;
+						boolean wet = kind == BED && nrows >= 3 && k >= 1 && k <= nrows - 2 && k % 3 == 1 && troughCol(g, z, j, len);
+						p.set(c, u, 1, v, wet ? trough : farmland);
+						if (!wet) {
+							p.set(c, u, 2, v, crop(p.hash(z, 1, k / 2, 4)));
+						}
+					}
+				}
+			}
+		}
+		// invisible light so the crops grow at night too (the lanterns are the visible source)
+		int lv = (vi0 + vi1) / 2;
+		p.set(c, g.cu, 3, lv, CitadelCanvas.invisibleLight(12));
+	}
+
+	/** Beds 3+ wide: the middle column is the trough; 2 wide: the wall-side column; 1 wide: none. */
+	private static boolean troughCol(G g, int z, int j, int len) {
+		if (len >= 3) {
+			return j == (len - 1) / 2;
+		}
+		if (len == 2) {
+			return g.u0[z] == 1 ? j == 0 : j == 1;
+		}
+		return false;
+	}
+
+	/** The potting bench in the aisle: transplant table (crafting table, composter, barrel of soil). */
+	private static BlockState aisleItem(int j, int len, int aisleNo) {
+		BlockState composter = b(Blocks.COMPOSTER).setValue(BlockStateProperties.LEVEL_COMPOSTER, 5);
+		BlockState soil = b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP);
+		BlockState table = b(Blocks.CRAFTING_TABLE);
+		if (len == 1) {
+			return table;
+		}
+		boolean first = aisleNo == 0;
+		if (j == 0) {
+			return first ? composter : table;
+		}
+		if (j == len - 1) {
+			return first ? (len >= 3 ? soil : table) : composter;
+		}
+		return table;
+	}
+
+	/** Bench cells beside the aisle: seed chest by the left wall, rain cauldron by the right wall, barrels between. */
+	private static BlockState zoneItem(boolean left, boolean centre, int outer, int len) {
+		BlockState barrel = b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP);
+		if (centre) {
+			return barrel;
+		}
+		if (outer == 0) {
+			return left ? b(Blocks.CHEST).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH) : b(Blocks.WATER_CAULDRON);
+		}
+		return barrel;
+	}
+
+	// ------------------------------------------------------------------ lanterns
+
+	/** [finish] copper lanterns hanging over the aisle, from the ridge (or from the monitor cap). */
+	private static void lanterns(CitadelCanvas c, Plot p, G g) {
 		BlockState lantern = Blocks.COPPER_LANTERN.waxed().unaffected().defaultBlockState().setValue(BlockStateProperties.HANGING, true);
-		int y = roofY(cu, p.w()) - 1;
-		int depth = vb - vf;
-		if (depth >= 6) {
-			p.put(c, cu, y, vf + depth / 3, lantern, CitadelCanvas.HANGING);
-			p.put(c, cu, y, vb - depth / 3, lantern, CitadelCanvas.HANGING);
-		} else {
-			p.put(c, cu, y, (vf + vb) / 2, lantern, CitadelCanvas.HANGING);
+		int y = g.lant ? g.rh + 2 : g.rh - 1;
+		int vmin = g.lant ? g.mv0 + 1 : g.hip ? g.mv0 : g.vf + 1;
+		int vmax = g.lant ? g.mv1 - 1 : g.hip ? g.mv1 : g.vb - 1;
+		int len = vmax - vmin + 1;
+		if (len < 1) {
+			return;
+		}
+		int n = Math.max(1, Math.min(3, len / 3));
+		for (int i = 0; i < n; i++) {
+			int v = vmin + (2 * i + 1) * len / (2 * n);
+			p.put(c, g.cu, y, v, lantern, CitadelCanvas.HANGING);
+			p.set(c, g.cu, y - 1, v, CitadelCanvas.invisibleLight(13));
 		}
 	}
 
 	// ------------------------------------------------------------------ apron (v0)
 
-	/** [finish] the transition to the ground: a step at the door, potted flowers beside it, a barrel and moss. */
-	private static void apron(CitadelCanvas c, Plot p, int cu) {
-		int w = p.w();
+	/** [finish] the transition to the ground: wide steps to the door, potted plants, a rain barrel and a cauldron. */
+	private static void apron(CitadelCanvas c, Plot p, G g) {
+		int w = g.w;
 		for (int u = 0; u < w; u++) {
 			BlockState st;
-			if (u == cu) {
+			if (u >= g.dl - 1 && u <= g.dl + g.dw) {
 				st = stairs(Blocks.DEEPSLATE_BRICK_STAIRS, Direction.SOUTH);
-			} else if (Math.abs(u - cu) == 1) {
-				st = p.hash(u, 0, 0, 2) == 0 ? b(Blocks.POTTED_RED_TULIP) : b(Blocks.POTTED_FERN);
+			} else if (u == g.dl - 2 || u == g.dl + g.dw + 1) {
+				st = pot(p.hash(u, 0, 0, 5));
+			} else if (u == 0) {
+				st = b(Blocks.WATER_CAULDRON);
 			} else if (u == w - 1) {
 				st = b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP);
 			} else {
