@@ -193,7 +193,7 @@ public final class CitadelBarrios {
 		int mid = r.c();
 		// feat/lead-office: a lead's office takes both floors of its hall (twice the space), see CitadelLeadOffice
 		boolean leadHall = CitadelLeadOffice.isLead(ground);
-		int F = upper != null || leadHall ? 2 : 1;
+		int F = upper != null || leadHall && CitadelLeadOffice.twoFloors(r) ? 2 : 1;
 		int top = F * fh();
 		var style = dev.t3craft.hq.citadel.barrio.HallStyle.of(l.id(), h);
 		DyeColor env = dev.t3craft.hq.citadel.barrio.HallFacade.env(c, l.id());
@@ -203,7 +203,9 @@ public final class CitadelBarrios {
 		dev.t3craft.hq.citadel.barrio.HallFacade.dress(c, r, F, mats, style, env, seed);
 		roof(c, r, top, Math.floorMod(h + l.id(), 3), mats);
 		if (leadHall) {
-			CitadelLeadOffice.flight(c, r, style);
+			if (F == 2) {
+				CitadelLeadOffice.flight(c, r, style);
+			}
 		} else {
 			if (F == 2) {
 				hallStairs(c, r, style);
