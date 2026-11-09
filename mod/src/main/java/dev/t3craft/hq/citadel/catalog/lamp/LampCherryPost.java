@@ -116,6 +116,11 @@ public final class LampCherryPost implements Variant {
 		if (!pair && p.w() >= 3 && p.d() >= 3) {
 			plinth(c, p, posts[0], cv);
 		}
+		if (pair) {
+			for (int cu : posts) {
+				dress(c, p, cu, cv);
+			}
+		}
 	}
 
 	private static boolean glowReal(CitadelCanvas c) {
@@ -179,7 +184,7 @@ public final class LampCherryPost implements Variant {
 	}
 
 	private static BlockState plinthWall(Plot p, int u, int v) {
-		return b(p.hash(u, 1, v, 4) == 0 ? Blocks.COBBLED_DEEPSLATE_WALL : Blocks.DEEPSLATE_BRICK_WALL);
+		return b(p.hash(u, 1, v, 4) == 0 ? Blocks.MOSSY_STONE_BRICK_WALL : Blocks.STONE_BRICK_WALL);
 	}
 
 	/** The shaft from the foot up to (not including) {@code collarY}, then the collar itself (when {@code collarY ≥ 1}). */
@@ -187,7 +192,7 @@ public final class LampCherryPost implements Variant {
 		p.set(c, u, 0, v, foot(p, u, v));
 		for (int y = 1; y < collarY; y++) {
 			BlockState s = FENCE;
-			if (y == 1 && hh >= 5 || y == 2 && collarY >= 4) {
+			if (y == 1 && hh >= 5) {
 				s = plinthWall(p, u, v); // stone first (two high on the tall masts), wood above
 			}
 			p.set(c, u, y, v, s);
@@ -208,13 +213,17 @@ public final class LampCherryPost implements Variant {
 			p.set(c, u, 1, v, FENCE);
 		}
 		p.set(c, u, top - 1, v, standingLight(c, p, kind));
-		p.set(c, u, top, v, slab(Blocks.CHERRY_SLAB));
+		p.set(c, u, top, v, roof());
+	}
+
+	/** A thin cherry plate: a roof that reads as a canopy, not a block. */
+	private static BlockState roof() {
+		return b(Blocks.CHERRY_TRAPDOOR).setValue(BlockStateProperties.HALF, Half.TOP);
 	}
 
 	private static BlockState standingLight(CitadelCanvas c, Plot p, int kind) {
 		return switch (kind) {
 			case 1 -> PaperLanterns.standing();
-			case 2 -> c.kit.glowPanel(Direction.NORTH, false);
 			default -> LANTERN;
 		};
 	}
@@ -225,7 +234,7 @@ public final class LampCherryPost implements Variant {
 		shaft(c, p, u, v, hh, armY);
 		if (style == 2) {
 			p.set(c, u, armY + 1, v, FENCE);
-			p.set(c, u, top, v, slab(Blocks.CHERRY_SLAB)); // the mast's own cap, matching the tip roofs
+			p.set(c, u, top, v, roof()); // the mast's own cap, matching the tip roofs
 		}
 		for (Arm a : arms) {
 			arm(c, p, u, v, a, armY, top, style, kind, tone, glow);
@@ -258,10 +267,10 @@ public final class LampCherryPost implements Variant {
 			}
 			// light box on the tip: the light stands on the fence, a cherry slab roof one above
 			p.set(c, tu, armY + 1, tv, standingLight(c, p, kind));
-			p.set(c, tu, armY + 2, tv, slab(Blocks.CHERRY_SLAB));
+			p.set(c, tu, armY + 2, tv, roof());
 			return;
 		}
-		// crook: the kit's glow strip hugs the arm's underside; else chain from the tip (height 6) and the light under it
+		// crook: a chain from the tip (height 6) and the light under it
 		int ly = armY - 1;
 		if (armY >= 5) {
 			p.put(c, tu, ly, tv, b(Blocks.IRON_CHAIN), CitadelCanvas.HANGING);
@@ -284,6 +293,15 @@ public final class LampCherryPost implements Variant {
 		int[][] corners = {{cu - 1, cv - 1}, {cu + 1, cv - 1}, {cu - 1, cv + 1}, {cu + 1, cv + 1}};
 		for (int i = 0; i < 4; i++) {
 			p.set(c, corners[i][0], 0, corners[i][1], i == planted ? b(Blocks.POTTED_FLOWERING_AZALEA) : slab(Blocks.DEEPSLATE_TILE_SLAB));
+		}
+	}
+
+	/** The foot of a flanking mast: a low slab step on the side facing the other mast and a planted pot behind it. */
+	private static void dress(CitadelCanvas c, Plot p, int cu, int cv) {
+		int in = cu == 0 ? 1 : p.w() - 2;
+		p.set(c, in, 0, cv, slab(Blocks.STONE_BRICK_SLAB));
+		if (cv + 1 < p.d()) {
+			p.set(c, cu, 0, cv + 1, p.hash(cu, 0, 7, 2) == 0 ? b(Blocks.POTTED_FLOWERING_AZALEA) : b(Blocks.POTTED_FERN));
 		}
 	}
 
