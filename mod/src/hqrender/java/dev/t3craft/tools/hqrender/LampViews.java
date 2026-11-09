@@ -109,7 +109,7 @@ final class LampViews {
 			scene.set(new BlockPos(x2, y, -4), kit.state(HqKit.Role.BEAM, Direction.UP));
 		}
 
-		Renderer.Clip all = new Renderer.Clip(scene.minX, -1, scene.minZ, scene.minX + scene.sx - 1, 6, scene.minZ + scene.sz - 1);
+		Renderer.Clip all = new Renderer.Clip(scene.minX, -1, scene.minZ, scene.minX + scene.sx - 1, 9, scene.minZ + scene.sz - 1);
 		Renderer.Clip mid = new Renderer.Clip(2 * STRIDE - 1, -1, -2, 4 * STRIDE + 3, 6, 3);
 		Renderer.Clip hang = new Renderer.Clip(-1, 4, -6, x2, 9, -3);
 		double iso = Math.min(48, 1300.0 / ((scene.sx + scene.sz) * 0.75)) * scaleMul;
