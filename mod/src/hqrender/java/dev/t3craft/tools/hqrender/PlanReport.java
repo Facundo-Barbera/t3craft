@@ -222,6 +222,7 @@ public final class PlanReport {
 		guarded("light", () -> light(plan, reach[0], o));
 		guarded("anchors", () -> anchors(plan, reach[0], o));
 		guarded("lamps", () -> lamps(plan, reach[0]));
+		guarded("flights", () -> flights(plan, reach[0], o));
 		guarded("shapes", () -> shapes(plan, o));
 		guarded("connect", () -> connect(plan, o));
 		guarded("floating", () -> floating(plan, o));
@@ -388,6 +389,105 @@ public final class PlanReport {
 
 	private static String c(BlockPos p) {
 		return "(" + p.getX() + "," + p.getY() + "," + p.getZ() + ")";
+	}
+
+	// ------------------------------------------------------------------ stair flights
+
+	/**
+	 * Flights of bottom-half stairs (3 or more steps of one facing, each one up and one along): how many are
+	 * climbed on foot from the spawn, how many are only partly reached (a step that is a jump, or a head that hits
+	 * a slab), and the ones nobody reaches although a roof is over them (an interior flight cut off). Roofs
+	 * are in the open and are not listed. A stair is stood on from the cell above it ({@code PlanNav}).
+	 */
+	private void flights(BuildPlan plan, Set<BlockPos> reach, Options o) {
+		if (reach == null || reach.isEmpty()) {
+			return;
+		}
+		Map<Long, BlockState> stairs = new HashMap<>();
+		for (Placement p : plan.placements()) {
+			BlockState s = p.state();
+			if (s.getBlock() instanceof StairBlock && s.getValue(StairBlock.HALF) == net.minecraft.world.level.block.state.properties.Half.BOTTOM) {
+				stairs.put(p.rel().asLong(), s);
+			}
+		}
+		Set<Long> seen = new HashSet<>();
+		int total = 0;
+		int climbed = 0;
+		List<String> partial = new ArrayList<>();
+		List<String> cut = new ArrayList<>();
+		for (Map.Entry<Long, BlockState> e : stairs.entrySet()) {
+			if (seen.contains(e.getKey())) {
+				continue;
+			}
+			BlockPos start = BlockPos.of(e.getKey());
+			Direction f = e.getValue().getValue(StairBlock.FACING);
+			BlockState back = stairs.get(start.relative(f.getOpposite()).below().asLong());
+			if (back != null && back.getValue(StairBlock.FACING) == f) {
+				continue; // not the foot of the flight
+			}
+			List<BlockPos> chain = new ArrayList<>();
+			BlockPos q = start;
+			while (true) {
+				chain.add(q);
+				seen.add(q.asLong());
+				BlockPos nx = q.relative(f).above();
+				BlockState ns = stairs.get(nx.asLong());
+				if (ns == null || ns.getValue(StairBlock.FACING) != f) {
+					break;
+				}
+				q = nx;
+			}
+			if (chain.size() < 3) {
+				continue;
+			}
+			int r = 0;
+			int standable = 0;
+			int covered = 0;
+			for (BlockPos s : chain) {
+				BlockPos stand = s.above();
+				if (reach.contains(stand)) {
+					r++;
+				}
+				if (PlanProbe.standable(plan, stand)) {
+					standable++;
+				}
+				for (int dy = 2; dy <= 8; dy++) {
+					Placement above = plan.at(stand.above(dy));
+					if (above != null && !above.state().isAir() && !above.state().getCollisionShape(net.minecraft.world.level.EmptyBlockGetter.INSTANCE, BlockPos.ZERO).isEmpty()) {
+						covered++;
+						break;
+					}
+				}
+			}
+			String line = chain.size() + " steps " + f.getSerializedName() + " from " + c(chain.get(0)) + " to " + c(chain.get(chain.size() - 1)) + ", reached " + r + ", standable "
+					+ standable;
+			if (r == chain.size()) {
+				total++;
+				climbed++;
+			} else if (r > 0) {
+				total++;
+				partial.add(line);
+			} else if (covered * 2 >= chain.size() && standable > 0) {
+				total++;
+				cut.add(line);
+			}
+		}
+		StringBuilder sb = new StringBuilder("STAIR FLIGHTS (3+ steps; roofs left out)\n");
+		sb.append("  ").append(climbed).append(" of ").append(total).append(" flights climbed on foot from the spawn\n");
+		listLines(sb, partial, o.maxList, "partly reached");
+		listLines(sb, cut, o.maxList, "under a roof, not reached");
+		sections.add(sb.toString());
+		summary.put("stair flights", climbed + " of " + total + " climbed; " + partial.size() + " partial, " + cut.size() + " cut off");
+		JsonObject j = new JsonObject();
+		j.addProperty("total", total);
+		j.addProperty("climbed", climbed);
+		JsonArray pj = new JsonArray();
+		partial.forEach(pj::add);
+		j.add("partial", pj);
+		JsonArray cj = new JsonArray();
+		cut.forEach(cj::add);
+		j.add("cutOff", cj);
+		json.add("stairFlights", j);
 	}
 
 	private static String box(int[] b) {
