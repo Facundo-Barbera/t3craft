@@ -50,17 +50,12 @@ public final class HubRoof {
 	}
 
 	/**
-	 * The roof's material by height: dark eave course, cherry body. From scale 2 (struct/hub4) the slope is not one pink sheet: a dark
-	 * rib runs down it on every pier line ({@code rib}) and a dark course crosses it every 4 columns, so it reads as panels of
-	 * shingle between ribs.
+	 * The roof's material by height: dark eave course, cherry body. (The skirt of struct/hub4 is the stepped eave, see {@link #eave}.)
 	 */
 	private static net.minecraft.world.level.block.state.BlockState shell(int x, int ax, boolean rib) {
 		Direction in = towardAxis(x);
 		if (ax >= HubDims.NAVE_HALF() - 1) {
 			return HubBlocks.darkStairs(in, false);
-		}
-		if (HubDims.TALL() && ax >= CitadelCanvas.dims().s(2) && (rib || ax == CitadelHub.naveHalf() - 4)) {
-			return CitadelCanvas.stairs(Blocks.DARK_OAK_STAIRS, in);
 		}
 		if (ax >= CitadelCanvas.dims().s(2)) {
 			return HubBlocks.roofStairs(in);

@@ -92,7 +92,7 @@ public final class HubFacade {
 			return ax >= HubDims.END_WIN_LO() && ax <= HubDims.END_WIN_HI();
 		}
 		int u = bay(x, z);
-		return windowAllowed(x, z) && u >= 2 && u <= HubDims.PIER_PERIOD() - 2;
+		return u >= 2 && u <= HubDims.PIER_PERIOD() - 2;
 	}
 
 	/** Half the window's width: 2 (5 wide) in a bay of 8; 1 (3 wide) beside the portal. */
@@ -118,13 +118,12 @@ public final class HubFacade {
 		return winOff(x, z, naveEnd) <= half - inset;
 	}
 
-	/** A bay with no window to hang a tapestry in: the blind bays of the east and west faces and the middle of the north end. */
+	/**
+	 * The one bay that gets a tapestry: the middle of the north end, over the door and behind the board. (The bays of the east and west
+	 * faces behind the screens have the same windows as the others, in grey glass with a coloured head: dark where a screen is behind.)
+	 */
 	private static boolean blindBay(int x, int z, boolean naveEnd) {
-		if (naveEnd) {
-			return z < 0 && Math.abs(x) <= HubDims.PIER_PERIOD() / 2 - 1;
-		}
-		int u = bay(x, z);
-		return !windowAllowed(x, z) && u >= 2 && u <= HubDims.PIER_PERIOD() - 2;
+		return naveEnd && z < 0 && Math.abs(x) <= HubDims.PIER_PERIOD() / 2 - 1;
 	}
 
 	/** One cell of the tall wall: row {@code r} above the podium of the column {@code (x, z)}. */
@@ -153,7 +152,10 @@ public final class HubFacade {
 			if (r == top - 2) {
 				return HubBlocks.strippedLog(along); // the transom
 			}
-			return r > top - 2 ? HubBlocks.pane(bayColor(x, z)) : Blocks.GLASS_PANE.defaultBlockState();
+			if (r > top - 2) {
+				return HubBlocks.pane(bayColor(x, z));
+			}
+			return windowAllowed(x, z) || naveEnd ? Blocks.GLASS_PANE.defaultBlockState() : HubBlocks.pane(DyeColor.GRAY);
 		}
 		if (r == h - 2) {
 			// the impost band over the heads of the windows, with a keystone in the middle of each one
@@ -161,7 +163,7 @@ public final class HubFacade {
 			return key ? Blocks.CHISELED_STONE_BRICKS.defaultBlockState() : HubBlocks.strippedLog(along);
 		}
 		if (blindBay(x, z, naveEnd) && r >= HubDims.WIN_SILL() && r <= HubDims.WIN_TOP()) {
-			return tapestry(naveEnd ? Math.abs(x) : Math.abs(bay(x, z) - p / 2), naveEnd ? p / 2 - 1 : (p - 4) / 2, r, along);
+			return tapestry(Math.abs(x), p / 2 - 1, r, along);
 		}
 		return PLANKS;
 	}
