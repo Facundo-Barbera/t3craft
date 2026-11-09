@@ -7,3 +7,6 @@
 # - Package: dev.t3craft.portable.*<TAB>dev.t3craft.survival.*           (every class directly in that package)
 #
 # Never edit or reorder lines that already landed: older branches replay this file from the top.
+dev.t3craft.blocks.RenderBlocks	dev.t3craft.tools.hqrender.RenderBlocks	#5 3a
+dev.t3craft.hq.HqAnchorSource	dev.t3craft.client.hq.HqAnchorSource	#5 3a
+dev.t3craft.hq.HqPreviewCommand	dev.t3craft.client.hq.HqPreviewCommand	#5 3a

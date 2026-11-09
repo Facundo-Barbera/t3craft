@@ -1,4 +1,4 @@
-package dev.t3craft.hq;
+package dev.t3craft.client.hq;
 
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommands.argument;
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal;
@@ -6,6 +6,15 @@ import static net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import dev.t3craft.T3Craft;
 import dev.t3craft.client.npc.NpcInfo;
+import dev.t3craft.hq.Anchor;
+import dev.t3craft.hq.AnchorNames;
+import dev.t3craft.hq.BuildPlan;
+import dev.t3craft.hq.HqFixtures;
+import dev.t3craft.hq.HqGenerator;
+import dev.t3craft.hq.HqInput;
+import dev.t3craft.hq.HqLayout;
+import dev.t3craft.hq.Placement;
+import dev.t3craft.hq.PlanApplier;
 import java.util.List;
 import java.util.function.Supplier;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;

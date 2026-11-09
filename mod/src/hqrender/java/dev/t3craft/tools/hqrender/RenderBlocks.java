@@ -1,5 +1,8 @@
-package dev.t3craft.blocks;
+package dev.t3craft.tools.hqrender;
 
+import dev.t3craft.blocks.BlockRegistrar;
+import dev.t3craft.blocks.BlocksSwitch;
+import dev.t3craft.blocks.T3Blocks;
 import java.lang.reflect.Field;
 import java.util.IdentityHashMap;
 import java.util.List;

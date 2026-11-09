@@ -256,8 +256,8 @@ public final class T3Blocks {
 		return r.item(id(name), new BlockItem(block, new Item.Properties().setId(key).useBlockDescriptionPrefix()));
 	}
 
-	/** Test/hot-swap only: forget the result (registries cannot be undone; this only resets the flag). */
-	static synchronized void resetForTests() {
+	/** Test/hot-swap/render-boot only (called by the hqrender {@code RenderBlocks}): forget the result (registries cannot be undone; this only resets the flag). */
+	public static synchronized void resetForTests() {
 		content = null;
 		decision = BlocksSwitch.OFF;
 		HqFixtures.use(null);

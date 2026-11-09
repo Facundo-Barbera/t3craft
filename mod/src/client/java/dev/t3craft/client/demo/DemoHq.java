@@ -387,7 +387,7 @@ public final class DemoHq {
 		return new HqSite(d.origin().above(lift), d.rotation());
 	}
 
-	/** HQ-relative cells to world cells, for {@link dev.t3craft.hq.HqAnchorSource}. */
+	/** HQ-relative cells to world cells, for {@link dev.t3craft.client.hq.HqAnchorSource}. */
 	public static HqSite worldSite(BlockPos demoOrigin, int lift) {
 		HqSite b = bakeSite(lift);
 		return new HqSite(demoOrigin.offset(b.origin()), b.rotation());

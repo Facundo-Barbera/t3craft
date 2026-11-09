@@ -4,7 +4,6 @@ import dev.t3craft.client.npc.behavior.Anchor;
 import dev.t3craft.client.npc.behavior.AnchorSource;
 import dev.t3craft.hq.AnchorNames;
 import dev.t3craft.hq.BuildPlan;
-import dev.t3craft.hq.HqAnchorSource;
 import dev.t3craft.hq.HqSite;
 import dev.t3craft.hq.Workstation;
 import dev.t3craft.hq.construct.HqSiteFrame;
