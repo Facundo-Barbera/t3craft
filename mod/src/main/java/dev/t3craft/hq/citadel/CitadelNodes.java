@@ -49,9 +49,11 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.GRASS;
  *     (a fixture, {@code style.archiveTerminal}) at {@code (cx + 3, 1, cz - 6)} facing south, anchors
  *     {@code ARCHIVE_TERMINAL} (face) on it and {@code ARCHIVE} (at) one block south of it, and a walk spot at
  *     {@code (cx - 4, 1, cz)}.</li>
- * <li><b>{@link #sunken} — lounge</b> ({@code Kind.LOUNGE_SUNKEN}) → {@link LoungeRoom}: a sunken amphitheatre
- *     of half steps down to {@code y = -3} with flower beds, an open hearth, sofas and trees. Fixtures
- *     ({@link #loungeFixtures}): a walk spot at {@code (cx + 1, -2, cz)}; no screen.</li>
+ * <li><b>{@link #sunken} — lounge</b> ({@code Kind.LOUNGE_SUNKEN}) → {@link LoungeRoom}: at scale 1.9 and up
+ *     ({@link LoungeRoom#direct}) the whole room is drawn at its real size by {@link LoungeRoom#build} (a conversation
+ *     pit round an open hearth, four terrace quarters: cafe, library, music, garden, under a pergola); below that, the
+ *     legacy sunken amphitheatre of half steps down to {@code y = -3}, magnified. Fixtures ({@link #loungeFixtures}):
+ *     a walk spot at {@code (cx + 3, -1, cz)} in the pit (legacy {@code (cx + 1, -2, cz)}); no screen.</li>
  * <li><b>{@link #pillar} — diagonal nodes</b> ({@code Kind.PILLAR}): a paved round whose monument is chosen by
  *     the index {@code k} of the node ({@link NodeDecor#pillarVariant}); built by {@link NodeDecor}.</li>
  * <li>{@link #door} — the 3-wide door test shared by the tower and the rotunda.</li>
@@ -82,6 +84,12 @@ public final class CitadelNodes {
 	 */
 	public static void node(CitadelCanvas c, Node nd) {
 		double k = c.k;
+		if (nd.kind() == RingCampusGeometry.NodeKind.LOUNGE_SUNKEN && LoungeRoom.direct(c)) {
+			// the lounge is drawn at its real size (no design to magnify): see LoungeRoom
+			LoungeRoom.build(c, nd);
+			loungeFixtures(c, nd);
+			return;
+		}
 		if (k <= 1.0) {
 			int R = Math.max(8, (int) Math.ceil(nd.size()) + 1);
 			for (int x = nd.cx() - R; x <= nd.cx() + R; x++) {
@@ -305,8 +313,12 @@ public final class CitadelNodes {
 		LoungeRoom.cell(c, x, z, dx, dz, d);
 	}
 
-	/** The fixtures of the lounge: a walk spot at the bottom of the amphitheatre. */
+	/** The fixtures of the lounge: a walk spot in the pit, east of the hearth (at the bottom of the amphitheatre below scale 1.9). */
 	public static void loungeFixtures(CitadelCanvas c, Node nd) {
+		if (LoungeRoom.direct(c)) {
+			c.walkSpot(new BlockPos(nd.cx() + LoungeRoom.SPOT_DX, LoungeRoom.SPOT_Y, nd.cz()), Direction.WEST);
+			return;
+		}
 		c.walkSpot(new BlockPos(nd.cx() + real(1, c.k), -2, nd.cz()), Direction.WEST);
 	}
 
