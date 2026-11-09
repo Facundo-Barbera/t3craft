@@ -37,7 +37,7 @@ public final class HubRoof {
 			return; // the opening into the lantern
 		}
 		if (Math.max(ax, hz) == d) {
-			drumWall(c, x, z, ax, hz, top, HubDims.DRUM_TOP() - c.sy(4), HubDims.DRUM_TOP());
+			drumWall(c, x, z, ax, hz, top, HubDims.DRUM_TOP() - CitadelHub.hy(4), HubDims.DRUM_TOP());
 			return;
 		}
 		c.set(x, top, z, shell(x, ax));

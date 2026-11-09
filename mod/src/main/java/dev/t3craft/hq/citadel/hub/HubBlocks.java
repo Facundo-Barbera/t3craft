@@ -76,6 +76,11 @@ final class HubBlocks {
 		return Blocks.CHERRY_LOG.defaultBlockState().setValue(BlockStateProperties.AXIS, axis);
 	}
 
+	/** A dark oak log standing upright (the archive's pilasters). */
+	static BlockState darkOakLog() {
+		return Blocks.STRIPPED_DARK_OAK_LOG.defaultBlockState().setValue(BlockStateProperties.AXIS, Direction.Axis.Y);
+	}
+
 	static BlockState pot(boolean flowering) {
 		return (flowering ? Blocks.POTTED_FLOWERING_AZALEA : Blocks.POTTED_AZALEA).defaultBlockState();
 	}

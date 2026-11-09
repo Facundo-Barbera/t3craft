@@ -1,5 +1,6 @@
 package dev.t3craft.hq.citadel.hub;
 
+import dev.t3craft.hq.HqStyle;
 import dev.t3craft.hq.RingCampusGeometry.Kind;
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.CitadelHub;
@@ -7,12 +8,14 @@ import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.EmptyBlockGetter;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.WallSide;
 import static dev.t3craft.hq.citadel.CitadelCanvas.AIR;
+import static dev.t3craft.hq.citadel.CitadelCanvas.CALCITE;
 import static dev.t3craft.hq.citadel.CitadelCanvas.LOG;
 import static dev.t3craft.hq.citadel.CitadelCanvas.RIB;
 import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
@@ -30,9 +33,11 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.y0;
  *     and a lantern marks the top of each rail. The foot of the stair is the archive floor.</li>
  * <li><b>Structure:</b> the nave's piers continue down (blackstone foot, cherry shaft) and stripped-log beams
  *     join them under the pier lines, so the floor reads as held up, not hovering.</li>
- * <li><b>Use:</b> the walls are stacks (bookshelves two high, with chests, barrels and workstations and a
- *     cherry cornice), the long walls have reading desks with a chair and a lectern, and the centre has an index
- *     table with four chairs on a cross of light stone lanes in the dark tiled floor.</li>
+ * <li><b>Use (struct/hub2):</b> the walls are stacks (bookshelves in panels split by dark oak pilasters, with chests,
+ *     barrels and workstations and a dark oak cornice), the long walls have runs of three reading desks (dark oak slabs, a
+ *     lantern, a chair), and the centre has a map table with four chairs on a pale patch under the oculus. Palette: deepslate,
+ *     dark oak, bookshelves, calcite/quartz, lantern light.</li>
+ * <li><b>Mouths:</b> a dark runner with glow strips on the nave floor and an arch with a plaque over the head of each stair.</li>
  * <li><b>Light:</b> hanging lanterns on a 4-cell lattice under the ceiling plus invisible fill wherever a free
  *     floor cell is more than 4 steps from one.</li>
  * </ul>
@@ -68,6 +73,7 @@ public final class HubUndercroft {
 		oculus(c);
 		descents(c);
 		rails(c);
+		mouths(c);
 		lights(c);
 	}
 
@@ -133,35 +139,58 @@ public final class HubUndercroft {
 	}
 
 	/**
-	 * A column of the wall: bookshelves up to {@code y0() - 2} under a cherry cornice, in bays of 8 along the wall:
-	 * a chest (bay 3), a workstation with a lantern on it (bay 4), a barrel (bay 7), the rest shelves.
+	 * A column of the wall: shelves up to {@code y0() - 2} under a dark oak cornice, in bays of 8 along the wall:
+	 * a dark oak pilaster at 0 and 4 (so the shelves read as panels of two or three), a workstation with a lantern
+	 * at 2, a chest at 5 and a barrel at 7 (shelves above them), plain shelves elsewhere.
 	 */
 	private static void stack(CitadelCanvas c, int x, int z) {
 		Direction in = inward(c, x, z);
 		int u = Math.floorMod(HubFacade.along(x, z), 8);
 		int top = Math.max(1, y0() - 2);
+		boolean pilaster = u == 0 || u == 4;
 		for (int y = 1; y <= top; y++) {
-			c.set(x, y, z, Blocks.BOOKSHELF.defaultBlockState());
+			c.set(x, y, z, pilaster ? HubBlocks.darkOakLog() : Blocks.BOOKSHELF.defaultBlockState());
 		}
-		if (u == 3) {
-			c.set(x, 1, z, Blocks.CHEST.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, in));
-		} else if (u == 4) {
+		if (u == 2) {
 			int h = Math.floorMod(x * 3 + z * 7, 3);
 			c.set(x, 1, z, (h == 0 ? Blocks.CRAFTING_TABLE : h == 1 ? Blocks.CARTOGRAPHY_TABLE : Blocks.SMITHING_TABLE).defaultBlockState());
-			if (top >= 2) {
+			if (top >= 3) {
 				c.set(x, 2, z, Blocks.LANTERN.defaultBlockState());
 			}
+		} else if (u == 5) {
+			c.set(x, 1, z, Blocks.CHEST.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, in));
 		} else if (u == 7) {
 			c.set(x, 1, z, Blocks.BARREL.defaultBlockState().setValue(BlockStateProperties.FACING, Direction.UP));
 		}
 		if (y0() - 1 > top) {
-			c.set(x, y0() - 1, z, HubBlocks.stairsTop(Blocks.CHERRY_STAIRS, in.getOpposite()));
+			c.set(x, y0() - 1, z, HubBlocks.stairsTop(Blocks.DARK_OAK_STAIRS, in.getOpposite()));
 		}
 	}
 
 	// ------------------------------------------------------------------ furniture
 
-	/** Reading desks along the east and west walls: a cherry slab desk with a chair and a lectern, one reader per two cells. */
+	/**
+	 * A reading desk cell: dark oak slab top (a table at the height of a block) or, every fourth, a lantern on it.
+	 * Desks come in runs of three cells with a gap of one between runs; the middle cell of a run has the chair.
+	 */
+	private static void deskCell(CitadelCanvas c, int x, int z, int phase, Direction out, int cx, int cz) {
+		if (!inside(c, x, z) || !free(c, x, 1, z)) {
+			return;
+		}
+		int m = Math.floorMod(phase, 4);
+		if (m == 0) {
+			return; // the gap between runs
+		}
+		c.set(x, 1, z, HubBlocks.slabTop(Blocks.DARK_OAK_SLAB));
+		if (m == 1) {
+			put(c, x, 2, z, Blocks.LANTERN.defaultBlockState());
+		}
+		if (m == 2) {
+			put(c, cx, 1, cz, stairs(Blocks.DARK_OAK_STAIRS, out.getOpposite()));
+		}
+	}
+
+	/** Reading desks along the east and west walls, in runs of three with a chair on the middle one. */
 	private static void desks(CitadelCanvas c) {
 		int dx = HubDims.INNER() - 1;
 		int zFar = HubDims.INNER() - 3;
@@ -169,22 +198,12 @@ public final class HubUndercroft {
 		for (int sx = -1; sx <= 1; sx += 2) {
 			Direction out = sx > 0 ? Direction.EAST : Direction.WEST;
 			for (int z = -zFar; z <= -zNear; z++) {
-				if (!inside(c, sx * dx, z) || !free(c, sx * dx, 1, z)) {
-					continue;
-				}
-				boolean seat = Math.floorMod(z, 2) == 1;
-				boolean lectern = seat && Math.floorMod(Math.floorDiv(z, 2), 2) == 0;
-				c.set(sx * dx, 1, z, lectern
-						? Blocks.LECTERN.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, out.getOpposite())
-						: slab(Blocks.CHERRY_SLAB));
-				if (seat) {
-					put(c, sx * (dx - 1), 1, z, stairs(Blocks.CHERRY_STAIRS, out.getOpposite()));
-				}
+				deskCell(c, sx * dx, z, z, out, sx * (dx - 1), z);
 			}
 		}
 	}
 
-	/** Desks along the north and south walls, either side of the centre lane: the same desk, chair and lectern. */
+	/** Desks along the north and south walls, either side of the centre lane: the same runs. */
 	private static void deskRows(CitadelCanvas c) {
 		int dz = HubDims.INNER() - 1;
 		int lane = c.s(1) + 1;
@@ -193,45 +212,66 @@ public final class HubUndercroft {
 			Direction out = sz > 0 ? Direction.SOUTH : Direction.NORTH;
 			for (int ax = lane; ax <= xMax; ax++) {
 				for (int sx = -1; sx <= 1; sx += 2) {
-					int x = sx * ax;
-					if (!inside(c, x, sz * dz) || !free(c, x, 1, sz * dz)) {
-						continue;
-					}
-					boolean seat = ax % 2 == 1;
-					boolean lectern = seat && (ax / 2) % 2 == 0;
-					c.set(x, 1, sz * dz, lectern
-							? Blocks.LECTERN.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, out.getOpposite())
-							: slab(Blocks.CHERRY_SLAB));
-					if (seat) {
-						put(c, x, 1, sz * (dz - 1), stairs(Blocks.CHERRY_STAIRS, out.getOpposite()));
-					}
+					deskCell(c, sx * ax, sz * dz, ax, out, sx * ax, sz * (dz - 1));
 				}
 			}
 		}
 	}
 
-	/** A glass oculus in the nave's floor under the hologram: the index table and its lantern show through it. */
+	/**
+	 * The oculus: clear glass in the nave's floor under the hologram (the light the lantern drum lets down), a
+	 * calcite frame round it and a warm glow strip along the frame on the nave side, so it reads as a window of
+	 * light and not as a grey-blue patch.
+	 */
 	private static void oculus(CitadelCanvas c) {
-		int h = c.s(1);
-		for (int x = -h; x <= h; x++) {
-			for (int z = -h; z <= h; z++) {
-				if (inside(c, x, z) && !free(c, x, y0(), z)) {
-					c.set(x, y0(), z, HubBlocks.glass(net.minecraft.world.item.DyeColor.LIGHT_BLUE));
+		int h = c.s(1) + 1;
+		for (int x = -h - 1; x <= h + 1; x++) {
+			for (int z = -h - 1; z <= h + 1; z++) {
+				if (!inside(c, x, z)) {
+					continue;
+				}
+				boolean ring = Math.max(Math.abs(x), Math.abs(z)) == h + 1;
+				if (ring) {
+					c.set(x, y0(), z, CALCITE);
+				} else if (!free(c, x, y0(), z)) {
+					c.set(x, y0(), z, Blocks.GLASS.defaultBlockState());
+				}
+			}
+		}
+		for (int x = -h - 1; x <= h + 1; x++) {
+			for (int z = -h - 1; z <= h + 1; z++) {
+				if (inside(c, x, z) && Math.max(Math.abs(x), Math.abs(z)) == h + 1 && free(c, x, y0() + 1, z)) {
+					Direction toward = Math.abs(x) >= Math.abs(z) ? (x > 0 ? Direction.WEST : Direction.EAST) : (z > 0 ? Direction.NORTH : Direction.SOUTH);
+					c.set(x, y0() + 1, z, c.kit.glowStrip(toward, false, false));
 				}
 			}
 		}
 	}
 
-	/** The index table at the centre: a slab table with a chair on each side, under the hanging lantern of the lattice. */
+	/**
+	 * The index table at the centre, on the patch of pale floor the oculus lights: a map table with a ring of dark
+	 * oak slabs round it and a chair on each side. (Dark on pale, so its outline reads.)
+	 */
 	private static void indexTable(CitadelCanvas c) {
-		int h = c.s(1);
+		int h = c.s(1) + 1;
 		for (int x = -h; x <= h; x++) {
 			for (int z = -h; z <= h; z++) {
-				put(c, x, 1, z, slab(Blocks.CHERRY_SLAB));
+				if (inside(c, x, z)) {
+					boolean border = Math.max(Math.abs(x), Math.abs(z)) == h;
+					c.set(x, 0, z, border ? RIB : ((x + z) & 1) == 0 ? Blocks.SMOOTH_QUARTZ.defaultBlockState() : CALCITE);
+				}
+			}
+		}
+		put(c, 0, 1, 0, Blocks.CARTOGRAPHY_TABLE.defaultBlockState());
+		for (int x = -1; x <= 1; x++) {
+			for (int z = -1; z <= 1; z++) {
+				if (x != 0 || z != 0) {
+					put(c, x, 1, z, HubBlocks.slabTop(Blocks.DARK_OAK_SLAB));
+				}
 			}
 		}
 		for (Direction d : Direction.Plane.HORIZONTAL) {
-			put(c, d.getStepX() * (h + 1), 1, d.getStepZ() * (h + 1), stairs(Blocks.CHERRY_STAIRS, d));
+			put(c, d.getStepX() * 2, 1, d.getStepZ() * 2, stairs(Blocks.DARK_OAK_STAIRS, d));
 		}
 	}
 
@@ -305,6 +345,62 @@ public final class HubUndercroft {
 				.setValue(BlockStateProperties.SOUTH_WALL, south ? WallSide.LOW : WallSide.NONE)
 				.setValue(BlockStateProperties.EAST_WALL, WallSide.NONE)
 				.setValue(BlockStateProperties.WEST_WALL, WallSide.NONE);
+	}
+
+	// ------------------------------------------------------------------ the mouths of the stairs
+
+	/**
+	 * Makes the two stair mouths findable from the nave: a dark runner with a calcite edge on the floor in front
+	 * of each (z from {@code ARCH_Z0 - 4} to {@code ARCH_Z0 - 1}, along the aisle) with a warm glow strip down both
+	 * edges, and over the head of the stair an arch (cherry posts on the rails, a stripped-log lintel with a glow
+	 * strip under it, a stepped dark cap) and a plaque saying where it goes.
+	 */
+	private static void mouths(CitadelCanvas c) {
+		int y = y0();
+		int z = HubDims.ARCH_Z0();
+		for (int sx = -1; sx <= 1; sx += 2) {
+			int xa = Math.min(sx * HubDims.ARCH_X0(), sx * HubDims.ARCH_X1());
+			int xb = Math.max(sx * HubDims.ARCH_X0(), sx * HubDims.ARCH_X1());
+			for (int x = xa; x <= xb; x++) {
+				for (int zz = z - 4; zz <= z - 1; zz++) {
+					if (inside(c, x, zz)) {
+						boolean edge = x == xa || x == xb || zz == z - 4;
+						c.set(x, y, zz, edge ? CALCITE : RIB);
+					}
+				}
+			}
+			for (int zz = z - 3; zz <= z - 1; zz++) {
+				if (inside(c, xa, zz) && free(c, xa, y + 1, zz)) {
+					c.set(xa, y + 1, zz, c.kit.glowStrip(Direction.EAST, false, false));
+				}
+				if (inside(c, xb, zz) && free(c, xb, y + 1, zz)) {
+					c.set(xb, y + 1, zz, c.kit.glowStrip(Direction.WEST, false, false));
+				}
+			}
+			int pa = xa - 1;
+			int pb = xb + 1;
+			for (int x : new int[] {pa, pb}) {
+				c.set(x, y + 1, z, RIB);
+				for (int yy = y + 2; yy <= y + 4; yy++) {
+					c.set(x, yy, z, LOG);
+				}
+				c.set(x, y + 5, z, CALCITE);
+			}
+			for (int x = pa + 1; x <= pb - 1; x++) {
+				c.set(x, y + 5, z, HubBlocks.strippedLog(Direction.Axis.X));
+				c.set(x, y + 4, z, c.kit.glowStrip(Direction.NORTH, true, false));
+			}
+			for (int x = pa; x <= pb; x++) {
+				c.set(x, y + 6, z, slab(Blocks.DEEPSLATE_TILE_SLAB));
+			}
+			for (int x = pa + 2; x <= pb - 2; x++) {
+				c.set(x, y + 7, z, slab(Blocks.DEEPSLATE_TILE_SLAB));
+			}
+			BlockPos sign = new BlockPos(Math.floorDiv(pa + pb, 2), y + 5, z - 1);
+			c.put(sign.getX(), sign.getY(), sign.getZ(), c.style.palette().get(HqStyle.Role.PLAQUE).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH), CitadelCanvas.DECOR);
+			c.data.put(sign.asLong(), new HqStyle.SignText(DyeColor.ORANGE, "", "Archive", "stairs down", "").signTag());
+			c.fixtures.add(sign.asLong());
+		}
 	}
 
 	// ------------------------------------------------------------------ light

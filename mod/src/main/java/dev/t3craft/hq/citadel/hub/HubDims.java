@@ -8,7 +8,7 @@ import dev.t3craft.hq.citadel.CitadelHub;
  * Every size and position the hub pieces use, in one place, at the citadel's scale
  * ({@code LayoutParams.RINGCAMPUS_SCALE}, see {@code CitadelCanvas}). Horizontal values are cells from the
  * hub's centre ({@code s(n)}, or derived from the hub's zone: {@code hubX}, the nave's half width);
- * vertical ones are absolute y ({@code y0() + sy(y - 4)}, or derived from {@link CitadelHub#aisleTop()}).
+ * vertical ones are absolute y ({@code y0() + CitadelHub.hy(y - 4)}, k^0.75, or derived from {@link CitadelHub#aisleTop()}).
  * The comment of each one gives its value at scale 1, where every method returns the original constant.
  *
  * <p>They are methods (with the old constant names, so each use only gained {@code ()}) because the scale
@@ -29,7 +29,7 @@ final class HubDims {
 
 	/** An absolute height on the podium: {@code y} at scale 1. */
 	private static int py(int y) {
-		return CitadelCanvas.y0() + d().sy(y - 4);
+		return CitadelCanvas.y0() + CitadelHub.hy(y - 4);
 	}
 
 	// ---- horizontal: the octagon and its wall

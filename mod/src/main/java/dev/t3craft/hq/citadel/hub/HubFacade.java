@@ -92,9 +92,9 @@ public final class HubFacade {
 				s = naveEnd ? RIB : CALCITE;
 			} else if (pier) {
 				s = y == y0() + 2 ? RIB : CALCITE;
-			} else if (win && y >= y0() + c.sy(3) && y <= y0() + c.sy(5)) {
+			} else if (win && y >= y0() + CitadelHub.hy(3) && y <= y0() + CitadelHub.hy(5)) {
 				s = HubBlocks.pane(bayColor(x, z));
-			} else if (win && y == y0() + c.sy(6) && u == HubDims.PIER_PERIOD() / 2) {
+			} else if (win && y == y0() + CitadelHub.hy(6) && u == HubDims.PIER_PERIOD() / 2) {
 				s = HubBlocks.pane(bayColor(x, z));
 			} else if (!naveEnd && y == y0() + 2 && Math.floorMod(x * 5 + z * 3, 6) == 0) {
 				s = c.kit.wallPanel(true);
