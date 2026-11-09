@@ -466,7 +466,25 @@ public final class PlanReport {
 				climbed++;
 			} else if (r > 0) {
 				total++;
-				partial.add(line);
+				// what is in the way of the first step not reached: every block over the two stand cells
+				StringBuilder why = new StringBuilder(" | in the way:");
+				for (int k = 1; k < chain.size(); k++) {
+					if (!reach.contains(chain.get(k).above())) {
+						for (int kk = k - 1; kk <= k; kk++) {
+							BlockPos stand = chain.get(kk).above();
+							for (int dy = -1; dy <= 3; dy++) {
+								Placement pl = plan.at(stand.above(dy));
+								if (pl != null && !pl.state().isAir()
+										&& (dy != -1 || kk == k)) {
+									why.append(' ').append(c(stand.above(dy))).append('=')
+											.append(BuiltInRegistries.BLOCK.getKey(pl.state().getBlock()).getPath());
+								}
+							}
+						}
+						break;
+					}
+				}
+				partial.add(line + why);
 			} else if (covered * 2 >= chain.size() && standable > 0) {
 				total++;
 				cut.add(line);
