@@ -26,6 +26,9 @@ final class CatalogEntries {
 			new dev.t3craft.hq.citadel.catalog.house.HouseTerraceCascade(), // house_terrace_cascade
 			new dev.t3craft.hq.citadel.catalog.house.HouseTerracePodium(), // house_terrace_podium
 			new dev.t3craft.hq.citadel.catalog.house.HouseTerraceTiers(), // house_terrace_tiers
+			new dev.t3craft.hq.citadel.catalog.house.HouseForgeAtelier(), // house_forge_atelier
+			new dev.t3craft.hq.citadel.catalog.house.HouseLibraryCopper(), // house_library_copper
+			new dev.t3craft.hq.citadel.catalog.house.HouseScriptorium(), // house_scriptorium
 			new dev.t3craft.hq.citadel.catalog.house.HouseTimberCottage(), // house_timber_cottage
 			new dev.t3craft.hq.citadel.catalog.house.HouseTimberOverhang(), // house_timber_overhang
 			new dev.t3craft.hq.citadel.catalog.lamp.LampCherryPost(), // lamp_cherry_post
