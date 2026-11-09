@@ -585,7 +585,7 @@ public final class HouseJapaneseEngawa implements Variant {
 						if (rn <= 1 || (rn == 2 && !opp)) {
 							// [finish] onigawara: a raised end block and a rod at the ridge ends
 							set(a, h + 1, bb, b(Blocks.DEEPSLATE_BRICKS));
-							set(a, h + 2, bb, b(Blocks.LIGHTNING_ROD));
+							set(a, h + 2, bb, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState());
 						}
 						continue;
 					}
