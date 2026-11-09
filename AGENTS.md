@@ -12,8 +12,24 @@ These rules come from Facundo and override any other instruction, brief or habit
 | **MBP** | Facundo. |
 
 - **Every child, delegated task or subagent runs on the VPS** (Facundo, 2026-11-09), read-only reviews and surveys
-  included: `delegate_task` against T3 environment `vps-env`, latest Sonnet, effort medium or high, at most 8 at
-  once. The coordinator's in-process subagents would run on the Mac, so it does not use them for work.
+  included: T3 environment `vps-env`, project t3craft, latest Sonnet with effort high (medium for trivial work).
+  The coordinator's in-process subagents would run on the Mac, so it does not use them for work. The coordinator
+  picks the launch tool by the weight of the task:
+  - **Small, direct tasks** (a targeted change, few files): `delegate_task`. In a linked environment it runs in the
+    project's shared checkout and cannot isolate a worktree, so **one implementation task at a time**. The child
+    checks out its own branch from `origin/main`, pushes, and returns the checkout to `main`. Read-only tasks may run
+    alongside if they never switch branches: they read with `git show origin/main:<path>` and write under `/tmp`.
+  - **Denser tasks, or when parallel work is needed:** `t3_thread_launch` on `vps-env`, project t3craft, with:
+    - `workspaceStrategy: {type: "worktree", baseRef: "origin/main", startFromOrigin: true, branch: "cleanup/<phase>-<slug>"}`
+      (or the task's own branch name);
+    - Sonnet high;
+    - `delegatedFrom` set to the coordinator's thread, so the thread stays linked.
+
+    The coordinator waits with `t3_thread_wait` (no polling) and archives the thread (`t3_thread_organize`,
+    `archive`) once its branch is merged.
+  - **Cap:** at most 6 children at once across both kinds while Facundo's own VPS threads are open (8 otherwise).
+    Facundo's threads count toward the VPS load, and the coordinator never archives, merges or deletes their
+    branches unless he asks.
 - **Child threads, delegated tasks and subagents only write code, commit and push their branch:** no gradle, java,
   compiling or tests. The coordinator compiles pushed branches on the PC.
 - **PC transport:** the PC's sshd is Windows OpenSSH with `wsl.exe` as shell, so `ssh pc 'cmd'`, scp and rsync do
