@@ -337,6 +337,13 @@ public final class HouseJapaneseEngawa implements Variant {
 			zoneCols = zone.w() >= 7 ? 3 : 2;
 			int f0 = left ? zone.a0() + zoneCols : zone.a0();
 			int f1 = left ? zone.a1() : zone.a1() - zoneCols;
+			if (zone.w() >= 11) {
+				if (left) {
+					f1--;
+				} else {
+					f0++;
+				}
+			}
 			int fw = f1 - f0 + 1;
 			ow = fw >= 7 ? 5 : 3;
 			ac = (f0 + f1) / 2;
@@ -487,9 +494,9 @@ public final class HouseJapaneseEngawa implements Variant {
 								st = log(s.post(), Direction.Axis.Y);
 							} else if (y == ST) {
 								st = trapdoor(Blocks.BIRCH_TRAPDOOR, alongA ? Direction.NORTH : Direction.WEST, true, Half.BOTTOM);
-							} else if (y == BEAM - 1 || ((alongA ? a : bb) % 3 == 2 && y == ST + 1)) {
+							} else if (y == BEAM - 1 || y == ST + 1) {
 								st = plaster(a, y, bb);
-							} else if (((alongA ? a : bb) % 3 == 2) && y == BEAM - 2) {
+							} else if ((alongA ? a : bb) % 3 == 2) {
 								st = b(Blocks.BIRCH_PLANKS);
 							} else {
 								st = alongA ? paneU(glassPane(DyeColor.WHITE)) : paneV(glassPane(DyeColor.WHITE));
@@ -561,11 +568,11 @@ public final class HouseJapaneseEngawa implements Variant {
 							firstUp = i;
 						}
 					}
-					Block mat = r == 0 ? s.fascia() : r == 1 ? Blocks.STONE_BRICK_STAIRS : (r % 3 == 2 || p.hash(a, h, bb, 6) == 0) ? Blocks.DEEPSLATE_BRICK_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS;
+					Block mat = r == 0 ? s.fascia() : r == 1 ? Blocks.STONE_BRICK_STAIRS : r % 3 == 2 ? Blocks.DEEPSLATE_BRICK_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS;
 					boolean ridge = isRidge(a, bb);
 					int y = h;
 					if (ridge) {
-						set(a, h, bb, b(Blocks.POLISHED_DEEPSLATE));
+						set(a, h, bb, b(Blocks.CHERRY_PLANKS));
 						set(a, h + 1, bb, slab(Blocks.CHERRY_SLAB));
 						int rn = 0;
 						boolean opp = false;
@@ -587,7 +594,10 @@ public final class HouseJapaneseEngawa implements Variant {
 						if (rn <= 1 || (rn == 2 && !opp)) {
 							// [finish] onigawara: a raised end block and a rod at the ridge ends
 							set(a, h + 1, bb, b(Blocks.DEEPSLATE_BRICKS));
-							set(a, h + 2, bb, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState());
+							set(a, h + 2, bb, b(Blocks.GOLD_BLOCK));
+							if (h + 3 < p.h()) {
+								set(a, h + 3, bb, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState());
+							}
 						}
 						continue;
 					}
@@ -614,7 +624,7 @@ public final class HouseJapaneseEngawa implements Variant {
 						}
 						set(a, y, bb, stair(mat, f, Half.BOTTOM, StairsShape.OUTER_LEFT));
 					} else {
-						set(a, h, bb, p.hash(a, h, bb, 4) == 0 ? b(Blocks.POLISHED_DEEPSLATE) : b(Blocks.DEEPSLATE_TILES));
+						set(a, h, bb, r % 3 == 2 ? b(Blocks.DEEPSLATE_BRICKS) : b(Blocks.DEEPSLATE_TILES));
 					}
 				}
 			}
@@ -644,6 +654,24 @@ public final class HouseJapaneseEngawa implements Variant {
 				for (int bb = z.b0(); bb <= z.b1(); bb++) {
 					set(a, FL, bb, ((a + bb) & 1) == 0 ? b(Blocks.SPRUCE_PLANKS) : b(Blocks.BAMBOO_MOSAIC));
 					set(a, ST, bb, b(Blocks.MOSS_CARPET));
+				}
+			}
+			if (z == zone) {
+				// the genkan: a stone-floored entry right inside the doorway
+				int depth = z.d() >= 3 ? 2 : 1;
+				for (int a = ac - ow / 2; a <= ac + ow / 2; a++) {
+					for (int k = 0; k < depth; k++) {
+						set(a, FL, z.b0() + k, stone(a, 1, z.b0() + k));
+						air(a, ST, z.b0() + k);
+					}
+				}
+			}
+			if (z.w() >= 11) {
+				// a study along the far wall: crafting, lectern, books, loom
+				Block[] desk = {Blocks.CRAFTING_TABLE, Blocks.LECTERN, Blocks.CHISELED_BOOKSHELF, Blocks.LOOM};
+				int oside = left ? z.a1() : z.a0();
+				for (int bb = z.b0(); bb <= z.b1(); bb++) {
+					set(oside, ST, bb, faced(desk[(bb - z.b0()) % desk.length], left ? Direction.WEST : Direction.EAST));
 				}
 			}
 			int side = left ? z.a0() : z.a1();
@@ -883,8 +911,15 @@ public final class HouseJapaneseEngawa implements Variant {
 				}
 			}
 			if (hi - lo >= 3) {
-				set(far, 1, gb, b(Blocks.FLOWERING_AZALEA));
-				set(far + (nearHigh ? 1 : -1), 1, gb, b(Blocks.POTTED_CHERRY_SAPLING));
+				int fd2 = nearHigh ? 1 : -1;
+				// a blossoming cherry shrub: low enough to leave no pocket under it
+				set(far, 1, gb, CitadelCanvas.leaves(Blocks.CHERRY_LEAVES));
+				set(far, 2, gb, CitadelCanvas.leaves(Blocks.CHERRY_LEAVES));
+				set(far + fd2, 1, gb, CitadelCanvas.leaves(Blocks.CHERRY_LEAVES));
+				set(far + 2 * fd2, 1, gb, b(Blocks.FLOWERING_AZALEA));
+				if (gb >= 2) {
+					set(far, 1, gb - 1, b(Blocks.PINK_PETALS));
+				}
 			}
 		}
 
