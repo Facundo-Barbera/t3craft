@@ -639,6 +639,10 @@ public final class HouseTerracePodium implements Variant {
 				k.set(u, pod + 4, iv1, CitadelCanvas.AIR);
 			}
 		}
+		// the post that carries the landing: it also fills the corner under it, which the kitchen counter would seal off
+		for (int y = pod; y <= pod + 3; y++) {
+			k.set(iu0 + 6, y, iv1, log(Blocks.STRIPPED_CHERRY_LOG, Direction.Axis.Y));
+		}
 		Links rail = new Links();
 		for (int u = iu0; u <= iu0 + 4; u++) {
 			k.member(rail, u, iv1 - 1);
