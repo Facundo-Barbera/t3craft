@@ -36,7 +36,7 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
  *
  * <p>Concept: a Hanseatic stone-and-brick workshop with a dark half-timbered frame, deepslate-tile gable roof with a
  * glazed lantern on the ridge, one tall brick chimney. Palette: deepslate, wall stone (stone / tuff / mud brick by
- * seed), dark oak, brick, a little calcite in the gables. The seed picks the side of the yard, the side of the hearth
+ * seed), dark oak, brick, and an oxidized copper cap on the ridge and the flue. The seed picks the side of the yard, the side of the hearth
  * (and so of the chimney) and the wall material.
  *
  * <pre>
@@ -99,6 +99,7 @@ public final class HouseForgeAtelier implements Variant {
 		s.hearth();
 		s.chimney();
 		s.monitor();
+		s.ridgeCap();
 		s.stairAndLoft();
 		s.nave();
 		s.stock();
@@ -139,7 +140,7 @@ public final class HouseForgeAtelier implements Variant {
 			w = p.w();
 			d = p.d();
 			h = p.h();
-			int pw0 = Math.max(3, Math.round(w * 0.22f));
+			int pw0 = w <= 17 ? 3 : Math.round(w * 0.25f);
 			bw = Math.min(19, w - pw0);
 			pw = w - bw;
 			// seed choices, mixed through the hash so near seeds do not agree: side of the yard, side of the hearth and chimney, wall stone
@@ -212,11 +213,16 @@ public final class HouseForgeAtelier implements Variant {
 		}
 
 		BlockState brick(int bu, int y, int v) {
-			return p.hash(mu(bu), y, v, 4) == 0 ? b(Blocks.DEEPSLATE_BRICKS) : b(Blocks.BRICKS);
+			return p.hash(mu(bu), y, v, 7) == 0 ? b(Blocks.DEEPSLATE_BRICKS) : b(Blocks.BRICKS);
+		}
+
+		/** The flue: clean brick laid in courses, a dark course every fourth row (no random patches to read as a face). */
+		BlockState stackBrick(int y) {
+			return y % 4 == 3 ? b(Blocks.DEEPSLATE_BRICKS) : b(Blocks.BRICKS);
 		}
 
 		BlockState plaster(int bu, int y, int v) {
-			return p.hash(mu(bu), y, v, 6) == 0 ? b(Blocks.SMOOTH_STONE) : b(Blocks.CALCITE);
+			return body(bu, y, v);
 		}
 
 		BlockState floorAt(int bu, int v) {
@@ -391,7 +397,11 @@ public final class HouseForgeAtelier implements Variant {
 					BlockState st;
 					if (rs < rc || (bw % 2 == 0 && rc == rc0 && rs == rc)) {
 						Block tile = edge ? Blocks.POLISHED_BLACKSTONE_BRICK_STAIRS
-								: p.hash(mu(bu), y, v, 7) == 0 ? Blocks.DEEPSLATE_BRICK_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS; // a few weathered tiles
+								: switch (p.hash(mu(bu), y, v, 6)) {
+									case 0 -> Blocks.DEEPSLATE_BRICK_STAIRS;
+									case 1 -> Blocks.COBBLED_DEEPSLATE_STAIRS;
+									default -> Blocks.DEEPSLATE_TILE_STAIRS;
+								}; // weathered tiles in three tones
 						st = stair(tile, left ? Direction.EAST : Direction.WEST, false);
 					} else {
 						st = b(Blocks.DEEPSLATE_TILES);
@@ -399,6 +409,20 @@ public final class HouseForgeAtelier implements Variant {
 					s(bu, y, v, st);
 					if (rs >= 1) {
 						Support.fillIfFree(c, p, mu(bu), y - 1, v, b(Blocks.DEEPSLATE_TILES));
+					}
+				}
+			}
+		}
+
+		/** [finish] an oxidized copper cap along the ridge, left open where the glazed lantern stands. */
+		void ridgeCap() {
+			int yb = PLATE + rc + 1;
+			int mv0 = vh - 2;
+			int mv1 = vh + 2;
+			for (int bu = ra; bu <= rb; bu++) {
+				for (int v = 1; v <= d - 1; v++) {
+					if (v < mv0 || v > mv1) {
+						s(bu, yb, v, slab(Blocks.CUT_COPPER_SLAB.waxed().oxidized(), false));
 					}
 				}
 			}
@@ -476,7 +500,7 @@ public final class HouseForgeAtelier implements Variant {
 						if (uu == hu && vv == vh) {
 							s(uu, y, vv, CitadelCanvas.AIR);
 						} else {
-							s(uu, y, vv, brick(uu, y, vv));
+							s(uu, y, vv, stackBrick(y));
 						}
 					}
 				}
@@ -487,7 +511,7 @@ public final class HouseForgeAtelier implements Variant {
 					if (du != 0 || dz != 0) {
 						s(hu + du, top - 1, vh + dz, b(Blocks.DEEPSLATE_BRICKS));
 						s(hu + du, top, vh + dz, b(Blocks.POLISHED_BLACKSTONE_BRICKS));
-						s(hu + du, top + 1, vh + dz, slab(Blocks.DEEPSLATE_BRICK_SLAB, false));
+						s(hu + du, top + 1, vh + dz, slab(Blocks.CUT_COPPER_SLAB.waxed().oxidized(), false));
 					}
 				}
 			}
@@ -761,6 +785,9 @@ public final class HouseForgeAtelier implements Variant {
 					}
 				}
 			}
+			// an anvil and a water cauldron at the back of the yard: the smith's outdoor station, nowhere near a fire
+			ps(1, 0, d - 5, facing(Blocks.ANVIL, Direction.EAST));
+			ps(1, 0, d - 6, b(Blocks.WATER_CAULDRON));
 			// a chopping block and a hay bale at the back of the yard
 			ps(Math.max(1, pw / 2), 0, d - 3, log(Blocks.STRIPPED_DARK_OAK_LOG, Direction.Axis.Y));
 			if (pw >= 4) {
