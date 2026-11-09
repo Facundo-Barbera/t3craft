@@ -127,7 +127,7 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 		k.tiers = k.half >= 12 ? 2 : 1;
 		k.rd = Math.max(2, k.rt - k.tiers);
 		k.yd = k.tiers;
-		k.pw = k.half >= 9 ? 3 : 2;
+		k.pw = k.half >= 13 ? 4 : k.half >= 9 ? 3 : 2;
 		int l = (int) Math.round((k.rt + 0.8) / Math.sqrt(2));
 		l = Math.min(l, k.half - k.pw - 1);
 		k.lamp = l * Math.sqrt(2) > k.rt + 0.1 ? l : 0;
@@ -258,7 +258,7 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 					double perp = Math.abs(du * ov - dv * ou);
 					boolean card = h % 3 == 0;
 					boolean num = card && hasNum[h / 3];
-					double wide = card && !num ? 1.2 : 0.55;
+					double wide = card && !num ? 0.95 : 0.55;
 					if (perp >= wide) {
 						continue;
 					}
@@ -269,7 +269,7 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 					if (num) {
 						continue;
 					}
-					if (t >= (card ? k.rd - 3.5 : k.rd - 2.5)) {
+					if (t >= k.rd - (k.rd >= 7 ? (card ? 3.5 : 2.5) : (card ? 2.6 : 1.8))) {
 						k.mark[u][v] = 1;
 						break;
 					}
@@ -338,11 +338,11 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 		boolean axis = Math.abs(dx) <= 1 || Math.abs(dz) <= 1;
 		Block sb;
 		if (axis) {
-			sb = Blocks.POLISHED_DIORITE_STAIRS;
+			sb = Blocks.SMOOTH_QUARTZ_STAIRS;
 		} else if (st == k.tiers) {
-			sb = Blocks.DEEPSLATE_BRICK_STAIRS;
-		} else {
 			sb = p.hash(u, y, v, 6) == 0 ? Blocks.MOSSY_STONE_BRICK_STAIRS : Blocks.STONE_BRICK_STAIRS;
+		} else {
+			sb = Blocks.POLISHED_ANDESITE_STAIRS;
 		}
 		s(c, p, u, y, v, stairs(sb, out(dx, dz).getOpposite()));
 	}
@@ -393,7 +393,7 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 			if (band == 0) {
 				st = b(Blocks.POLISHED_ANDESITE);
 			} else if (band == 1) {
-				st = h == 0 ? b(Blocks.MOSSY_STONE_BRICKS) : b(Blocks.STONE_BRICKS);
+				st = h == 0 ? b(Blocks.CALCITE) : b(Blocks.POLISHED_DIORITE);
 			} else {
 				st = h == 0 ? b(Blocks.CRACKED_STONE_BRICKS) : h == 1 ? b(Blocks.MOSSY_STONE_BRICKS) : b(Blocks.STONE_BRICKS);
 			}
