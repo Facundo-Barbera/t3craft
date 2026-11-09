@@ -124,14 +124,14 @@ public final class CitadelLeadOffice {
 			}
 		}
 		BlockState pole = b(style.fence());
-		for (int y = top + 1; y <= top + 6; y++) {
+		for (int y = top + 1; y <= top + 4; y++) {
 			c.set(at.getX(), y, at.getZ(), pole);
 		}
 		BlockState cloth = b(Blocks.CONCRETE.pick(env));
 		for (int k = 1; k <= 2; k++) {
 			BlockPos p = at.relative(r.side(), k);
-			c.set(p.getX(), top + 5, p.getZ(), cloth);
-			c.set(p.getX(), top + 6, p.getZ(), cloth);
+			c.set(p.getX(), top + 3, p.getZ(), cloth);
+			c.set(p.getX(), top + 4, p.getZ(), cloth);
 		}
 	}
 
@@ -156,15 +156,10 @@ public final class CitadelLeadOffice {
 			c.set(r.cell(u, mid - 1, 1), trim);
 			c.set(r.cell(u, mid + 1, 1), trim);
 		}
-		BlockState dais = b(Blocks.CARPET.pick(DyeColor.GRAY));
-		for (int v = mid - 3; v <= mid + 3; v++) {
-			if (v != mid) {
-				c.set(r.cell(d - 2, v, 1), dais);
-			}
-		}
-
-		// the lead's desk: three blocks across the aisle's end, the lead stands behind it and looks at the door
-		DeskSpot spot = new DeskSpot(r.cell(d - 3, mid, 1), toDoor);
+		// the lead's desk: three blocks across the end of the aisle, the lead stands in the aisle in front of it and
+		// looks at its monitor and, behind, the big screen (LeadBriefing sends a new child to a spot 1.6 blocks behind
+		// the lead, which is the aisle: reachable)
+		DeskSpot spot = new DeskSpot(r.cell(d - 3, mid, 1), fwd);
 		CitadelBarrios.deskAt(c, mod.index(), 0, spot, thread);
 
 		// the big screen behind the lead, above its head, and a low cabinet of chests and barrels under it
@@ -178,12 +173,15 @@ public final class CitadelLeadOffice {
 		for (int v = mid - half, i = 0; v <= mid + half; v++, i++) {
 			c.set(r.cell(d - 1, v, 1), i % 2 == 0 ? chest : barrel);
 		}
-		// the lead's standards in the two back corners
-		BlockState banner = b(Blocks.BANNER.pick(env));
-		BlockPos s1 = r.cell(d - 1, 0, 1);
-		BlockPos s2 = r.cell(d - 1, w - 1, 1);
-		c.put(s1.getX(), 1, s1.getZ(), banner, DECOR);
-		c.put(s2.getX(), 1, s2.getZ(), banner, DECOR);
+		// the lead's standards in the two back corners: a pole topped with a block of the environment's colour
+		BlockState pole = b(style.fence());
+		BlockState finial = b(Blocks.CONCRETE.pick(env));
+		for (int v : new int[] {0, w - 1}) {
+			for (int y = 1; y <= 3; y++) {
+				c.set(r.cell(d - 1, v, y), pole);
+			}
+			c.set(r.cell(d - 1, v, 4), finial);
+		}
 
 		// the waiting area: rows of chairs either side of the aisle, all looking at the lead; the cell in front of
 		// each chair is the leadseat anchor (the nearest seats first)
@@ -292,8 +290,8 @@ public final class CitadelLeadOffice {
 				c.set(r.cell(u, v, yu + 1), top);
 			}
 		}
-		BlockPos lamp = r.cell((u0 + u1) / 2, t1, yu + 2);
-		c.put(lamp.getX(), lamp.getY(), lamp.getZ(), Blocks.LANTERN.defaultBlockState(), DECOR);
+		BlockPos centre = r.cell((u0 + u1) / 2, t1, yu + 2);
+		c.put(centre.getX(), centre.getY(), centre.getZ(), HallStyle.pot(HallStyle.hash(mod.index(), 9)), DECOR);
 		for (int u = u0; u <= u1; u++) {
 			c.set(r.cell(u, mid, yu), stairs(Blocks.CHERRY_STAIRS, side.getOpposite()));
 			c.set(r.cell(u, mid + 3, yu), stairs(Blocks.CHERRY_STAIRS, side));
