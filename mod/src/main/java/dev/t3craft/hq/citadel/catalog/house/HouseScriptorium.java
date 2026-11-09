@@ -60,6 +60,8 @@ public final class HouseScriptorium implements Variant {
 	private static final int PLATE = 12; // top plate; walls y1..y11, roof from y12
 	private static final int LOFT = 7; // the loft floor layer; its walking layer is y8
 	private static final DyeColor[] JEWELS = {DyeColor.LIGHT_BLUE, DyeColor.PINK, DyeColor.CYAN, DyeColor.YELLOW, DyeColor.MAGENTA};
+	/** Light glass for the gable lights: it must read bright from outside, not as a dark slot. */
+	private static final DyeColor[] PALE = {DyeColor.LIGHT_BLUE, DyeColor.PINK, DyeColor.YELLOW, DyeColor.WHITE, DyeColor.LIME};
 	private static final BooleanProperty[] SLOTS = {BlockStateProperties.SLOT_0_OCCUPIED, BlockStateProperties.SLOT_1_OCCUPIED,
 			BlockStateProperties.SLOT_2_OCCUPIED, BlockStateProperties.SLOT_3_OCCUPIED, BlockStateProperties.SLOT_4_OCCUPIED,
 			BlockStateProperties.SLOT_5_OCCUPIED};
@@ -261,6 +263,23 @@ public final class HouseScriptorium implements Variant {
 		return h <= 1 ? b(Blocks.SMOOTH_QUARTZ) : b(Blocks.CALCITE);
 	}
 
+	/** [palette] a pilaster cell of the gable faces: the pier gradient to y6, a dark-ish imposta at y7, fluted quartz above, capital, cap. */
+	private static BlockState pilaster(Plot p, int u, int y, int v, Direction capFacing) {
+		if (y == 12) {
+			return post(); // a finial post: nobody can stand on it
+		}
+		if (y == 11) {
+			return b(Blocks.CHISELED_QUARTZ_BLOCK);
+		}
+		if (y == 7) {
+			return b(Blocks.CHISELED_STONE_BRICKS);
+		}
+		if (y >= 8) {
+			return log(Blocks.QUARTZ_PILLAR, Direction.Axis.Y);
+		}
+		return pier(p, u, y, v);
+	}
+
 	/** [palette] the heavy plinth: deepslate bricks, cobbled and cracked, never uniform. */
 	private static BlockState base(Plot p, int u, int y, int v) {
 		return switch (p.hash(u, y, v, 6)) {
@@ -382,13 +401,14 @@ public final class HouseScriptorium implements Variant {
 			if (pier) {
 				// [depth] piers stand a block proud of the wall, capped with a stair
 				if (Math.abs(u - cu) == 2) {
-					// [depth] the two inner piers rise as pilasters up the gable face to the rake
-					for (int y = 1; y < roofY(g, u); y++) {
-						p.set(c, u, y, 0, y == 11 ? b(Blocks.CHISELED_QUARTZ_BLOCK) : pier(p, u, y, 0));
+					// [depth] the two inner piers rise as pilasters: tuff, stone brick, an imposta course at y7, then fluted
+					// quartz to a chiselled capital and a sloped cap (they no longer run on up the gable to the rake)
+					for (int y = 1; y <= 12; y++) {
+						p.set(c, u, y, 0, pilaster(p, u, y, 0, Direction.SOUTH));
 					}
 				} else {
 					for (int y = 1; y <= 9; y++) {
-						p.set(c, u, y, 0, pier(p, u, y, 0));
+						p.set(c, u, y, 0, y == 7 ? b(Blocks.CHISELED_STONE_BRICKS) : pier(p, u, y, 0));
 					}
 					p.set(c, u, 10, 0, stair(Blocks.STONE_BRICK_STAIRS, Direction.SOUTH, false));
 					p.set(c, u, 12, 0, slab(g.mat.trimSlab(), true)); // a cornice slab: nobody can stand on the cap under the rake
@@ -486,12 +506,12 @@ public final class HouseScriptorium implements Variant {
 				p.set(c, u, y, vb, st);
 			}
 			if (pier && Math.abs(u - cu) == 2) {
-				for (int y = 1; y < roofY(g, u); y++) {
-					p.set(c, u, y, vb + 1, y == 11 ? b(Blocks.CHISELED_QUARTZ_BLOCK) : pier(p, u, y, vb + 1));
+				for (int y = 1; y <= 12; y++) {
+					p.set(c, u, y, vb + 1, pilaster(p, u, y, vb + 1, Direction.NORTH));
 				}
 			} else if (pier) {
 				for (int y = 1; y <= 9; y++) {
-					p.set(c, u, y, vb + 1, pier(p, u, y, vb + 1));
+					p.set(c, u, y, vb + 1, y == 7 ? b(Blocks.CHISELED_STONE_BRICKS) : pier(p, u, y, vb + 1));
 				}
 				p.set(c, u, 10, vb + 1, stair(Blocks.STONE_BRICK_STAIRS, Direction.NORTH, false));
 				p.set(c, u, 12, vb + 1, slab(g.mat.trimSlab(), true));
@@ -617,7 +637,7 @@ public final class HouseScriptorium implements Variant {
 			for (int du = -1; du <= 1; du++) {
 				for (int dy = -1; dy <= 1; dy++) {
 					boolean corner = du != 0 && dy != 0;
-					BlockState st = corner ? frame : tintBlock(du == 0 && dy == 0 ? DyeColor.ORANGE : (du == 0 ? DyeColor.PINK : DyeColor.LIGHT_BLUE));
+					BlockState st = corner ? frame : tintBlock(du == 0 && dy == 0 ? DyeColor.YELLOW : (du == 0 ? DyeColor.PINK : DyeColor.LIGHT_BLUE));
 					p.set(c, cu + du, ry + dy, 1, st);
 				}
 			}
@@ -630,10 +650,18 @@ public final class HouseScriptorium implements Variant {
 			for (int du : new int[] {-2, 0, 2}) {
 				int top = du == 0 ? ry + 1 : ry;
 				for (int y = ry - 1; y <= top; y++) {
-					p.set(c, cu + du, y, 1, tintPane(jewel(p, du + 5, y, 0), true));
+					p.set(c, cu + du, y, 1, tintPane(PALE[p.hash(du + 5, y, 0, PALE.length)], true));
 				}
 				p.set(c, cu + du, ry - 2, 1, b(Blocks.CHISELED_STONE_BRICKS));
 			}
+		}
+		// [finish] light behind the glass so the rose and the lancets glow from outside: a stripped beam across the
+		// gable (hung from the rake where the slope is low) and a lantern under it behind each light
+		for (int du = -1; du <= 1; du++) {
+			p.set(c, cu + du, ry + 1, 2, log(g.mat.strippedLog(), Direction.Axis.X));
+		}
+		for (int du : g.rose ? new int[] {-1, 0, 1} : new int[] {-2, 0, 2}) {
+			p.put(c, cu + du, ry, 2, lantern(true), CitadelCanvas.HANGING);
 		}
 		// back gable: a small round light
 		for (int[] o : new int[][] {{-1, 0}, {1, 0}, {0, 1}, {0, -1}}) {
@@ -727,7 +755,10 @@ public final class HouseScriptorium implements Variant {
 					p.put(c, u, PLATE - 1, v, b(Blocks.IRON_CHAIN).setValue(BlockStateProperties.AXIS, Direction.Axis.Y), CitadelCanvas.HANGING);
 					p.put(c, u, PLATE - 2, v, lantern(true), CitadelCanvas.HANGING);
 				} else {
-					p.put(c, u, PLATE - 1, v, lantern(true), CitadelCanvas.HANGING);
+					boolean overCell = v > g.vs && v <= g.ivb && Math.abs(u - g.col(g.iw - 2)) <= 1;
+					if (!overCell) { // not over the copyist's cell: a chest top there would leave under 2.85 of headroom
+						p.put(c, u, PLATE - 1, v, lantern(true), CitadelCanvas.HANGING);
+					}
 				}
 			}
 		}
@@ -781,14 +812,15 @@ public final class HouseScriptorium implements Variant {
 				p.set(c, g.col(k), LOFT, v, v == vs ? b(m.trimPlanks()) : b(Blocks.DARK_OAK_PLANKS));
 			}
 		}
-		// rail along the loft's open edge, leaving the first three cells free for the arrival
-		for (int k = 4; k < iw; k++) {
+		// [safety] a continuous rail along the whole open edge of the loft, from the stair well to the far wall. The
+		// stair is left by its side: from the top of flight B (row vs+1) one steps straight onto the loft boards.
+		int uLo = Math.min(g.col(1), g.col(iw - 1));
+		int uHi = Math.max(g.col(1), g.col(iw - 1));
+		for (int k = 1; k < iw; k++) {
 			int u = g.col(k);
-			boolean e = u + 1 <= Math.max(g.col(4), g.col(iw - 1)) && u + 1 >= Math.min(g.col(4), g.col(iw - 1));
-			boolean w2 = u - 1 <= Math.max(g.col(4), g.col(iw - 1)) && u - 1 >= Math.min(g.col(4), g.col(iw - 1));
-			boolean wallE = k == iw - 1 && !g.wellRight;
-			boolean wallW = k == iw - 1 && g.wellRight;
-			p.set(c, u, LOFT + 1, vs, fence(Blocks.DARK_OAK_FENCE, false, e || wallE, false, w2 || wallW));
+			boolean e = u + 1 <= uHi || (k == iw - 1 && !g.wellRight);
+			boolean w2 = u - 1 >= uLo || (k == iw - 1 && g.wellRight);
+			p.set(c, u, LOFT + 1, vs, fence(Blocks.DARK_OAK_FENCE, false, e, k == iw - 1, w2));
 		}
 
 		// ---- ground floor: shelves along the walls, desks, the binding corner
@@ -823,19 +855,24 @@ public final class HouseScriptorium implements Variant {
 			if (fdOpen) {
 				idx = 2;
 			}
+			// [function] a stool (a spruce stair, back to the aisle) at every desk, one step from it: the aisle keeps 3 free
 			if (idx == 0) {
 				p.set(c, fd, 1, r, lectern(toWell));
+				p.set(c, g.col(iw - 3), 1, r, stair(Blocks.SPRUCE_STAIRS, toWell, false));
 			} else if (idx == 1) {
 				p.set(c, fd, 1, r, b(Blocks.SPRUCE_PLANKS));
 				p.set(c, fd, 2, r, candle(3));
+				p.set(c, g.col(iw - 3), 1, r, stair(Blocks.SPRUCE_STAIRS, toWell, false));
 			}
 			if (r <= vs - 3 && !wdOpen) {
 				int widx = (r - 3) % 3;
 				if (widx == 0) {
 					p.set(c, wd, 1, r, r == 3 ? b(Blocks.CARTOGRAPHY_TABLE) : lectern(toFar));
+					p.set(c, g.col(2), 1, r, stair(Blocks.SPRUCE_STAIRS, toFar, false));
 				} else if (widx == 1) {
 					p.set(c, wd, 1, r, b(Blocks.SPRUCE_PLANKS));
 					p.set(c, wd, 2, r, candle(2));
+					p.set(c, g.col(2), 1, r, stair(Blocks.SPRUCE_STAIRS, toFar, false));
 				}
 			}
 		}
@@ -861,7 +898,7 @@ public final class HouseScriptorium implements Variant {
 		for (int r = vs + 1; r <= ivb; r++) {
 			p.set(c, far, LOFT + 1, r, shelf(p, far, LOFT + 1, r, toWell));
 		}
-		for (int k = 3; k <= iw - 3; k++) {
+		for (int k = 3; k <= iw - 5; k++) { // the last columns belong to the copyist's cell
 			int u = g.col(k);
 			switch ((k - 3) % 4) {
 				case 0 -> p.set(c, u, LOFT + 1, ivb, lectern(Direction.NORTH));
@@ -873,11 +910,68 @@ public final class HouseScriptorium implements Variant {
 				default -> p.set(c, u, LOFT + 1, ivb, facing(Blocks.CHEST, Direction.NORTH));
 			}
 		}
-		int bedU = g.col(iw - 2);
-		p.set(c, bedU, LOFT + 1, ivb - 1, b(Blocks.BED.pick(DyeColor.WHITE)).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.SOUTH)
+		cell(c, p, g);
+	}
+
+	/** A partition cell: two boards high with a fence lattice over them. */
+	private static void screen(CitadelCanvas c, Plot p, L g, int u, int v, boolean alongU) {
+		p.set(c, u, LOFT + 1, v, b(g.mat.trimPlanks()));
+		p.set(c, u, LOFT + 2, v, b(g.mat.trimPlanks()));
+		p.set(c, u, LOFT + 3, v, fence(Blocks.DARK_OAK_FENCE, !alongU, alongU, !alongU, alongU)); // open lattice: no one can stand on it
+	}
+
+	/**
+	 * [function] the copyist's cell, in the loft's far back corner: a plank screen with a door, a bed with its head to the
+	 * screen, a chest and candles, a writing lectern, and a hearth (a lit furnace opening onto a free cell) whose chimney goes out
+	 * through the roof. Interior 3 wide, 3 deep; the door is in the screen on the aisle side.
+	 */
+	private static void cell(CitadelCanvas c, Plot p, L g) {
+		Mat m = g.mat;
+		int iw = g.iw;
+		int pc = g.col(iw - 4); // the screen
+		int mc = g.col(iw - 3);
+		int bc = g.col(iw - 2);
+		int ac = g.col(iw - 1); // against the far wall
+		int r1 = g.vs + 1;
+		int r2 = g.vs + 2;
+		int r3 = g.vs + 3;
+		int r4 = g.ivb;
+		Direction toWell = g.toWell();
+		// the screen: along the front (v = r1) and along the aisle side (u = pc), with a stripped-log post at the corner
+		for (int u : new int[] {mc, bc, ac}) {
+			screen(c, p, g, u, r1, true);
+		}
+		for (int r : new int[] {r2, r4}) {
+			screen(c, p, g, pc, r, false);
+		}
+		for (int y = LOFT + 1; y <= LOFT + 2; y++) {
+			p.set(c, pc, y, r1, log(m.strippedLog(), Direction.Axis.Y));
+		}
+		p.set(c, pc, LOFT + 3, r1, fence(Blocks.DARK_OAK_FENCE, false, !g.wellRight, true, g.wellRight));
+		p.set(c, pc, LOFT + 1, r3, door(m.door(), g.toFar(), false));
+		p.set(c, pc, LOFT + 2, r3, door(m.door(), g.toFar(), true));
+		p.set(c, pc, LOFT + 3, r3, fence(Blocks.DARK_OAK_FENCE, true, false, true, false));
+		// bed: head to the front screen, foot towards the door row
+		p.set(c, ac, LOFT + 1, r3, b(Blocks.BED.pick(DyeColor.WHITE)).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH)
 				.setValue(BlockStateProperties.BED_PART, BedPart.FOOT));
-		p.set(c, bedU, LOFT + 1, ivb, b(Blocks.BED.pick(DyeColor.WHITE)).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.SOUTH)
+		p.set(c, ac, LOFT + 1, r2, b(Blocks.BED.pick(DyeColor.WHITE)).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH)
 				.setValue(BlockStateProperties.BED_PART, BedPart.HEAD));
+		// chest against the front screen, writing lectern along the back
+		p.set(c, bc, LOFT + 1, r2, facing(Blocks.CHEST, Direction.SOUTH));
+		p.set(c, mc, LOFT + 1, r2, candle(3)); // candles on the boards in the corner by the chest (on top of it they would hit the tie rail's headroom)
+		p.set(c, mc, LOFT + 1, r4, lectern(Direction.NORTH)); // (bc, r4) stays free: it is the cell the furnace opens onto
+		// hearth in the back corner, chimney up through the roof
+		p.set(c, ac, LOFT + 1, r4, facing(Blocks.FURNACE, toWell).setValue(BlockStateProperties.LIT, true));
+		int yb = roofY(g, bc); // where the roof slope reaches the second column of the stack
+		int top = PLATE + g.left + 2;
+		for (int y = LOFT + 2; y <= top; y++) {
+			p.set(c, ac, y, r4, y >= top - 1 ? b(Blocks.DEEPSLATE_BRICKS) : infill(p, ac, y, r4));
+			if (y >= yb) {
+				p.set(c, bc, y, r4, y >= top - 1 ? b(Blocks.DEEPSLATE_BRICKS) : infill(p, bc, y, r4));
+			}
+		}
+		p.set(c, ac, top + 1, r4, slab(Blocks.DEEPSLATE_BRICK_SLAB, false));
+		p.set(c, bc, top + 1, r4, slab(Blocks.DEEPSLATE_BRICK_SLAB, false));
 	}
 
 	// ------------------------------------------------------------------ yard

@@ -2,6 +2,7 @@ package dev.t3craft.hq.citadel.catalog.gazebo;
 
 import static dev.t3craft.hq.citadel.CitadelCanvas.b;
 import static dev.t3craft.hq.citadel.CitadelCanvas.leaves;
+import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
 import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
 
 import dev.t3craft.hq.citadel.CitadelCanvas;
@@ -16,47 +17,46 @@ import net.minecraft.world.level.block.StairBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.Half;
-import net.minecraft.world.level.block.state.properties.SlabType;
 import net.minecraft.world.level.block.state.properties.StairsShape;
 import net.minecraft.world.level.block.state.properties.WallSide;
 
 /**
- * Concept: a raised lookout (mirador) on a stone podium. A two-layer podium of deepslate bricks and
- * stone bricks carries a deck at {@code y = 2}; its faces are set back one block between projecting
- * corner piers, and the recess holds a strip of planters (pots, azalea tufts, petals) under a corbel
- * course of upside-down stone-brick stairs, so the deck seems to float. A flight of stairs climbs
- * from the front along the left side (deepslate brick → stone brick → polished andesite, darker at
- * the foot) to a landing that runs back along the side. A cherry-fence balustrade with polished
- * deepslate wall posts (lanterns on them) rings the deck on a light polished-andesite cornice. Four
- * stripped-cherry posts, set one block in from the rail, carry beams and a hipped roof: a dark
- * deepslate-tile eave that overhangs the rail, upside-down cherry brackets beside the posts, cherry
- * slopes with proper outer-corner stairs on the hips, and a copper rod with a gold knob on top. A
- * lantern hangs on a chain under the roof.
+ * Concept: a real lookout (mirador) you walk up to. A dark-oak pavilion stands on a stone base 2–4 blocks
+ * high; a flight of stairs two wide climbs from the front, in a notch cut into the base between two stone
+ * cheeks, and the cheeks carry the railing, so the flight has a wall on both sides. A hipped copper roof
+ * (a dark deepslate-tile eave, weathered and oxidised copper above, ridge of deepslate tiles, a lightning
+ * rod) sits on four stone-footed dark-oak posts with brackets under the eave, and there are always four
+ * free blocks of headroom on the deck.
  *
- * <p>Palette, dark → light, bottom → top: deepslate bricks / polished deepslate (podium foot) → stone
- * bricks, mossy and cracked mixed, chiselled on the piers (podium) → polished andesite (cornice,
- * stair top) → cherry (deck, rail, posts, roof slopes) with a dark tile eave and gold/copper accents.
+ * <p>On top: a place to sit and look. Benches on the back and the sides, a table with a lectern, a brass
+ * telescope (a copper rod on a post, at the front rail), lanterns on the newels and under the beams. The
+ * seed changes the height of the platform (2, 3 or 4), the position of the stairs (left, right or centre)
+ * and the weathering of the roof. When the platform is 4 high the space under it is a tool shed: a timber
+ * and stone room with open bays, barrels, chests and a workbench, all of it reachable on foot.
+ *
+ * <p>Palette, dark → light, bottom → top: deepslate bricks (foot) → stone bricks, mossy and cracked mixed
+ * → dark oak and spruce (frame, deck, benches) → weathered copper (roof) with a dark tile eave.
  *
  * <pre>
- *  front (w 7)                           plan (w 7, d 6), front at the bottom
- *         ╿ ●      rod, gold knob          ┼ ═ ═ ═ ═ ═ ┼    ┼ wall post   ═ rail
- *      ▄▟███▙▄     hipped cherry roof      ║ ▬ ▬ ▬ ▬ ▬ ║
- *    ▄▀▀▀▀▀▀▀▀▀▄   dark eave               ▬ ▬ ║ ▬ ║ ▬ ║    landing (left), ║ posts
- *    ┼ ◥║ o ║◤ ┼   posts, brackets         ◢ ║ ▬ ▬ ▬ ▬ ║    stairs climb ◢ ◢ ◢
- *    ┼═══════┼     rail on cornice         ◢ ║ ║ ▬ ║ ▬ ║
- *  ◢ ▀▀▀▀▀▀▀▀▀     deck, corbels           ◢ ┼ ═ ═ ═ ═ ┼
- * ◢  █ ✿ ✿ ✿ █     piers, planters
+ *   front (w 9, platform 4)           plan: deck, notch with the flight at the front
+ *        ╿             rod             ┌───────────────┐
+ *     ▄▄████▄▄         copper roof     │ ┼ ═ ═ ═ ═ ═ ┼ │  ┼ post  ═ rail
+ *   ▄▀▀▀▀▀▀▀▀▀▀▄       tile eave       │ ║ ▬ ▬ ▬ ▬ ▬ ║ │  ▬ bench
+ *     ┼ ║ ○ ║ ┼        posts, deck     │ ║  ◢◢   ○   ║ │  ○ table
+ *   ═══╧═══╧═══╧═      rail            │ ┼ ║ ◢◢ ║ ═ ┼ │  ◢ stairs
+ *   █▒█ ▐▌▐▌▐▌ █▒█     base / shed     └───────────────┘
  * </pre>
  *
- * Size: 5–9 × 5–9 × 8+ (the hipped roof rises to a point when the height allows; on low plots with a
- * big deck it stops at a flat cap of tile slabs, with the rod on top).
+ * Size: 5–13 × 5–13 × 8+ (the roof needs {@code platform + 4 + 2} of height; the platform shrinks on low
+ * plots, and on a plot that cannot give the hipped roof its rise the slope flattens to 1:2 with slabs).
  */
 public final class GazeboRaisedLookout implements Variant {
-	private static final int DECK = 2; // the deck layer; people stand at y = 3
-	/** The roof's lowest ring: 5, or 6 from h 9 so people under it get 3 blocks of headroom and the posts read. */
-	private static int eave(Plot p) {
-		return p.h() >= 9 ? 6 : 5;
-	}
+	private static final int MIN_W = 5;
+	private static final int MIN_D = 5;
+	private static final int MIN_H = 8;
+	private static final int MAX_W = 13;
+	private static final int MAX_D = 13;
+	private static final boolean DBG_NO_ROOF = false;
 
 	@Override
 	public String id() {
@@ -70,271 +70,567 @@ public final class GazeboRaisedLookout implements Variant {
 
 	@Override
 	public int minW() {
-		return 5;
+		return MIN_W;
 	}
 
 	@Override
 	public int minD() {
-		return 5;
+		return MIN_D;
 	}
 
 	@Override
 	public int minH() {
-		return 8;
+		return MIN_H;
 	}
 
 	@Override
 	public int maxW() {
-		return 9;
+		return MAX_W;
 	}
 
 	@Override
 	public int maxD() {
-		return 9;
-	}
-
-	// ------------------------------------------------------------------ geometry
-
-	/** The deck: the rectangle u ≥ 1, plus the landing column u = 0 from v = 3 back. */
-	private static boolean deck(int u, int v, int w, int d) {
-		return u >= 0 && u < w && v >= 0 && v < d && (u >= 1 || v >= 3);
-	}
-
-	/**
-	 * The balustrade cells on the deck's outline. Two entries stay open: the landing at (0, 3) and (1, 2),
-	 * beside the top step, so the flight leads straight onto the deck (on d = 5 the post at (2, 3) would
-	 * otherwise shut the landing in).
-	 */
-	private static boolean rail(int u, int v, int w, int d) {
-		if (!deck(u, v, w, d) || (u == 0 && v == 3) || (u == 1 && v == 2)) {
-			return false;
-		}
-		return u == 0 || u == w - 1 || v == 0 || v == d - 1 || (u == 1 && v < 3);
-	}
-
-	/** The podium recess (faces set back between the piers): front and back rows, right side. */
-	private static boolean recess(int u, int v, int w, int d) {
-		boolean frontBack = (v == 0 || v == d - 1) && u >= 2 && u <= w - 2;
-		boolean right = u == w - 1 && v >= 1 && v <= d - 2;
-		return frontBack || right;
-	}
-
-	/** Distance to the edge of the roof rectangle (u 1..w-1, v 0..d-1). */
-	private static int ring(int u, int v, int w, int d) {
-		return Math.min(Math.min(u - 1, w - 1 - u), Math.min(v, d - 1 - v));
-	}
-
-	private static boolean post(int u, int v, int w, int d) {
-		return (u == 2 || u == w - 2) && (v == 1 || v == d - 2);
+		return MAX_D;
 	}
 
 	@Override
 	public void build(CitadelCanvas c, Plot p) {
-		int w = p.w();
-		int d = p.d();
-		podium(c, p, w, d);
-		stair(c, p);
-		deckAndRail(c, p, w, d);
-		posts(c, p, w, d);
-		roof(c, p, w, d);
+		new Site(c, p).build();
 	}
 
-	// ------------------------------------------------------------------ podium (y0..y1)
+	// ------------------------------------------------------------------ the build
 
-	private static void podium(CitadelCanvas c, Plot p, int w, int d) {
-		for (int v = 0; v < d; v++) {
-			for (int u = 0; u < w; u++) {
-				if (!deck(u, v, w, d)) {
-					continue;
-				}
-				if (recess(u, v, w, d)) {
-					// [depth] corbel course under the deck edge, planters at the foot
-					Direction inward = v == 0 ? Direction.SOUTH : v == d - 1 ? Direction.NORTH : Direction.WEST;
-					p.set(c, u, 1, v, stairs(Blocks.STONE_BRICK_STAIRS, inward).setValue(BlockStateProperties.HALF, Half.TOP));
-					planter(c, p, u, v);
-					continue;
-				}
-				boolean pier = (u == 1 || u == w - 1) && (v == 0 || v == d - 1);
-				int h0 = p.hash(u, 0, v, 5);
-				int h1 = p.hash(u, 1, v, 6);
-				p.set(c, u, 0, v, pier ? b(Blocks.POLISHED_DEEPSLATE) : h0 == 0 ? b(Blocks.CRACKED_DEEPSLATE_BRICKS) : b(Blocks.DEEPSLATE_BRICKS));
-				p.set(c, u, 1, v, pier ? b(Blocks.CHISELED_STONE_BRICKS)
-						: h1 == 0 ? b(Blocks.MOSSY_STONE_BRICKS) : h1 == 1 ? b(Blocks.CRACKED_STONE_BRICKS) : b(Blocks.STONE_BRICKS));
+	private static final class Site {
+		private final CitadelCanvas c;
+		private final Plot p;
+		private final int w;
+		private final int d;
+		/** Platform height: people stand at y = H, the deck layer is H - 1. */
+		private final int platform;
+		/** The lowest roof ring: four free blocks above the deck. */
+		private final int eave;
+		/** The flight climbs in the columns nx and nx + 1, at the front (v < platform). */
+		private final int nx;
+		private final int[][] roofTop;
+
+		Site(CitadelCanvas c, Plot p) {
+			this.c = c;
+			this.p = p;
+			this.w = p.w();
+			this.d = p.d();
+			int r = sel(1, 10);
+			int h = r < 6 ? 4 : r < 9 ? 3 : 2;
+			h = Math.min(h, Math.max(2, p.h() - 8)); // leave the hipped roof at least 3 levels of rise when the plot allows
+			h = Math.min(h, d - 2);
+			this.platform = Math.max(h, 1);
+			this.eave = platform + 4;
+			if (w >= 6) {
+				int lo = 2;
+				int hi = w - 4;
+				int side = sel(2, 3);
+				this.nx = side == 0 ? lo : side == 1 ? hi : (lo + hi) / 2;
+			} else {
+				this.nx = 1;
 			}
+			this.roofTop = new int[w][d];
 		}
-	}
 
-	private static void planter(CitadelCanvas c, Plot p, int u, int v) {
-		BlockState s = switch (p.hash(u, 0, v, 6)) {
-			case 0 -> b(Blocks.POTTED_PINK_TULIP);
-			case 1 -> b(Blocks.POTTED_FLOWERING_AZALEA);
-			case 2 -> leaves(Blocks.FLOWERING_AZALEA_LEAVES);
-			case 3 -> leaves(Blocks.AZALEA_LEAVES);
-			case 4 -> b(Blocks.POTTED_FERN);
-			default -> b(Blocks.PINK_PETALS).setValue(BlockStateProperties.FLOWER_AMOUNT, 1 + p.hash(u, 2, v, 4))
-					.setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.from2DDataValue(p.hash(u, 3, v, 4)));
-		};
-		p.set(c, u, 0, v, s);
-	}
-
-	// ------------------------------------------------------------------ the flight of stairs (u = 0, v 0..2)
-
-	/** Three steps climbing towards the back, darker at the foot, on solid supports. */
-	private static void stair(CitadelCanvas c, Plot p) {
-		Block[] steps = {Blocks.DEEPSLATE_BRICK_STAIRS, Blocks.STONE_BRICK_STAIRS, Blocks.POLISHED_ANDESITE_STAIRS};
-		for (int i = 0; i < 3; i++) {
-			for (int y = 0; y < i; y++) {
-				p.set(c, 0, y, i, y == 0 ? b(Blocks.DEEPSLATE_BRICKS) : b(Blocks.STONE_BRICKS));
-			}
-			p.set(c, 0, i, i, stairs(steps[i], Direction.SOUTH));
+		private int sel(int salt, int n) {
+			return p.hash(salt, 0, 77, n);
 		}
-	}
 
-	// ------------------------------------------------------------------ deck, cornice and balustrade (y2..y4)
-
-	private static void deckAndRail(CitadelCanvas c, Plot p, int w, int d) {
-		for (int v = 0; v < d; v++) {
-			for (int u = 0; u < w; u++) {
-				if (!deck(u, v, w, d)) {
-					continue;
-				}
-				boolean edge = rail(u, v, w, d) || (u == 0 && v == 3);
-				// [palette] a light cornice of polished andesite under the rail, a cherry deck inside
-				BlockState top;
-				if (edge) {
-					top = p.hash(u, DECK, v, 5) == 0 ? b(Blocks.CHISELED_STONE_BRICKS) : b(Blocks.POLISHED_ANDESITE);
-				} else {
-					top = p.hash(u, DECK, v, 5) == 0 ? b(Blocks.BAMBOO_MOSAIC) : b(Blocks.CHERRY_PLANKS);
-				}
-				p.set(c, u, DECK, v, top);
-				if (!rail(u, v, w, d)) {
-					continue;
-				}
-				boolean n = rail(u, v - 1, w, d);
-				boolean s = rail(u, v + 1, w, d);
-				boolean we = rail(u - 1, v, w, d);
-				boolean e = rail(u + 1, v, w, d);
-				boolean straight = (n && s && !we && !e) || (we && e && !n && !s);
-				if (straight) {
-					p.set(c, u, DECK + 1, v, b(Blocks.CHERRY_FENCE)
-							.setValue(BlockStateProperties.NORTH, n).setValue(BlockStateProperties.SOUTH, s)
-							.setValue(BlockStateProperties.WEST, we).setValue(BlockStateProperties.EAST, e));
-				} else {
-					// corners and ends: stone wall posts with a lantern on top
-					p.set(c, u, DECK + 1, v, b(Blocks.POLISHED_DEEPSLATE_WALL).setValue(BlockStateProperties.UP, true)
-							.setValue(BlockStateProperties.NORTH_WALL, n ? WallSide.LOW : WallSide.NONE)
-							.setValue(BlockStateProperties.SOUTH_WALL, s ? WallSide.LOW : WallSide.NONE)
-							.setValue(BlockStateProperties.WEST_WALL, we ? WallSide.LOW : WallSide.NONE)
-							.setValue(BlockStateProperties.EAST_WALL, e ? WallSide.LOW : WallSide.NONE));
-					p.set(c, u, DECK + 2, v, b(Blocks.LANTERN));
-				}
-			}
+		private void s(int u, int y, int v, BlockState st) {
+			p.set(c, u, y, v, st);
 		}
-	}
 
-	// ------------------------------------------------------------------ posts, beams, brackets (y3..y5)
-
-	private static void posts(CitadelCanvas c, Plot p, int w, int d) {
-		BlockState postLog = b(Blocks.STRIPPED_CHERRY_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.Y);
-		int eave = eave(p);
-		for (int v = 0; v < d; v++) {
-			for (int u = 1; u < w; u++) {
-				if (post(u, v, w, d)) {
-					for (int y = 3; y < eave; y++) {
-						p.set(c, u, y, v, postLog);
-					}
-					p.set(c, u, eave, v, b(Blocks.STRIPPED_CHERRY_WOOD));
-					// [depth] brackets under the eave on the two outer faces of the post
-					Direction outU = u == 2 ? Direction.WEST : Direction.EAST;
-					Direction outV = v == 1 ? Direction.NORTH : Direction.SOUTH;
-						// (never over a walkable deck cell: people stand at y 3 and need the headroom)
-						int bu = u + outU.getStepX();
-						if (eave - 1 >= 5 || !deck(bu, v, w, d) || rail(bu, v, w, d)) {
-							p.set(c, bu, eave - 1, v, upside(Blocks.CHERRY_STAIRS, outU.getOpposite()));
+		void build() {
+			for (int v = 0; v < d; v++) {
+				for (int u = 0; u < w; u++) {
+					if (thin(u, v)) {
+						for (int y = 0; y < platform; y++) {
+							s(u, y, v, y == platform - 1 ? b(Blocks.POLISHED_DEEPSLATE) : stone(u, v, y));
 						}
-						p.set(c, u, eave - 1, v + outV.getStepZ(), upside(Blocks.CHERRY_STAIRS, outV.getOpposite()));
-					continue;
+						if (v == 0) {
+							s(u, platform, v, b(Blocks.POLISHED_DEEPSLATE_WALL).setValue(BlockStateProperties.SOUTH_WALL, platform > 1 ? WallSide.LOW : WallSide.NONE));
+							s(u, platform + 1, v, b(Blocks.POLISHED_DEEPSLATE_WALL));
+							s(u, platform + 2, v, b(Blocks.LANTERN)); // a tall lamp post at the corner: nobody can stand on it
+						} else {
+							s(u, platform, v, b(Blocks.DARK_OAK_FENCE)
+									.setValue(BlockStateProperties.NORTH, true).setValue(BlockStateProperties.SOUTH, v < platform - 1));
+						}
+						continue;
+					}
+					if (!deck(u, v)) {
+						continue;
+					}
+					if (!open(u, v)) {
+						for (int y = 0; y <= platform - 2; y++) {
+							s(u, y, v, baseState(u, v, y));
+						}
+					}
+					s(u, platform - 1, v, deckState(u, v));
 				}
-				// beams along the post ring, between the posts
-				boolean onRing = ring(u, v, w, d) == 1;
-				boolean betweenU = (v == 1 || v == d - 2) && u > 2 && u < w - 2;
-				boolean betweenV = (u == 2 || u == w - 2) && v > 1 && v < d - 2;
-				if (onRing && (betweenU || betweenV)) {
-					p.set(c, u, eave, v, b(Blocks.STRIPPED_CHERRY_LOG).setValue(BlockStateProperties.AXIS, betweenU ? Direction.Axis.X : Direction.Axis.Z));
+			}
+			flight();
+			rails();
+			posts();
+			furniture();
+			shed();
+			if (!DBG_NO_ROOF) {
+				roof();
+			}
+		}
+
+		// -------------------------------------------------------------- plan
+
+		/** Notch of the flight: the front columns nx, nx + 1 for v below the platform height. */
+		private boolean notch(int u, int v) {
+			return u >= nx && u <= nx + 1 && v >= 0 && v < platform;
+		}
+
+		/**
+		 * A wing of the base that is only two cells wide (cheek + edge) is one solid buttress instead of two
+		 * rails side by side: the edge cell is a stone pier capped with a wall and a lantern.
+		 */
+		private boolean thin(int u, int v) {
+			return v >= 0 && v < platform && ((u == 0 && nx == 2) || (u == w - 1 && nx == w - 4)) && !notch(u, v);
+		}
+
+		private boolean deck(int u, int v) {
+			return u >= 0 && u < w && v >= 0 && v < d && !notch(u, v) && !thin(u, v);
+		}
+
+		/** The stone cheeks that wall the flight in, and carry its rail. */
+		private boolean cheek(int u, int v) {
+			return v >= 0 && v < platform && (u == nx - 1 || u == nx + 2) && deck(u, v);
+		}
+
+		private boolean corridor(int u, int v) {
+			return u >= nx && u <= nx + 1 && v >= platform && v <= platform + 1;
+		}
+
+		private boolean rail(int u, int v) {
+			if (!deck(u, v)) {
+				return false;
+			}
+			if (u >= nx && u <= nx + 1 && v == platform) {
+				return false; // the top of the flight is open
+			}
+			return !deck(u - 1, v) || !deck(u + 1, v) || !deck(u, v - 1) || !deck(u, v + 1);
+		}
+
+		private boolean postU(int u) {
+			return u == 1 || u == w - 2 || (w >= 11 && u == (w - 1) / 2);
+		}
+
+		private boolean postV(int v) {
+			return v == 1 || v == d - 2 || (d >= 11 && v == (d - 1) / 2);
+		}
+
+		private boolean post(int u, int v) {
+			if (!deck(u, v)) {
+				return false;
+			}
+			boolean frontBack = (v == 1 || v == d - 2) && postU(u);
+			boolean sides = (u == 1 || u == w - 2) && postV(v);
+			return frontBack || sides;
+		}
+
+		private boolean free(int u, int v) {
+			return deck(u, v) && !rail(u, v) && !post(u, v);
+		}
+
+		private int ring(int u, int v) {
+			return Math.min(Math.min(u, w - 1 - u), Math.min(v, d - 1 - v));
+		}
+
+		// -------------------------------------------------------------- base and undercroft
+
+		private int bayU() {
+			if (nx + 1 < w / 2) {
+				return w - 1;
+			}
+			if (nx > w / 2 - 1) {
+				return 0;
+			}
+			return sel(5, 2) == 0 ? 0 : w - 1;
+		}
+
+		private boolean bay(int u, int v) {
+			return d >= platform + 4 && u == bayU() && v >= platform && v <= platform + 1;
+		}
+
+		/** Free air under the deck (platform 4: three blocks of headroom), a tool shed with open bays. */
+		private boolean open(int u, int v) {
+			if (platform < 4 || !deck(u, v) || cheek(u, v) || post(u, v)) {
+				return false;
+			}
+			if (u == 0 || u == w - 1 || v == d - 1) {
+				return bay(u, v);
+			}
+			return true;
+		}
+
+		private BlockState stone(int u, int v, int y) {
+			if (y == 0) {
+				return p.hash(u, 0, v, 5) == 0 ? b(Blocks.CRACKED_DEEPSLATE_BRICKS) : b(Blocks.DEEPSLATE_BRICKS);
+			}
+			int h1 = p.hash(u, y, v, 6);
+			return h1 == 0 ? b(Blocks.MOSSY_STONE_BRICKS) : h1 == 1 ? b(Blocks.CRACKED_STONE_BRICKS) : b(Blocks.STONE_BRICKS);
+		}
+
+		private Direction inward(int u, int v) {
+			if (u == 0) {
+				return Direction.EAST;
+			}
+			if (u == w - 1) {
+				return Direction.WEST;
+			}
+			if (v == 0) {
+				return Direction.SOUTH;
+			}
+			return Direction.NORTH;
+		}
+
+		private BlockState baseState(int u, int v, int y) {
+			boolean perimeter = u == 0 || u == w - 1 || v == 0 || v == d - 1;
+			if (platform == 4) {
+				if (post(u, v)) {
+					return y == 0 ? b(Blocks.DEEPSLATE_BRICKS) : y == 1 ? b(Blocks.STONE_BRICKS) : b(Blocks.CHISELED_STONE_BRICKS);
+				}
+				if (cheek(u, v) || !perimeter) {
+					return stone(u, v, y);
+				}
+				// a timber-framed wall on a stone foot: dark-oak studs every third cell, spruce between
+				boolean side = u == 0 || u == w - 1;
+				int coord = side ? v : u;
+				int len = side ? d : w;
+				if (y == 0) {
+					return stone(u, v, 0);
+				}
+				boolean stud = coord % 3 == 0 || coord == len - 1;
+				return stud ? b(Blocks.STRIPPED_DARK_OAK_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.Y) : b(Blocks.SPRUCE_PLANKS);
+			}
+			if (!perimeter) {
+				return stone(u, v, y);
+			}
+			boolean corner = (u == 0 || u == w - 1) && (v == 0 || v == d - 1);
+			if (platform == 2) {
+				return corner ? b(Blocks.POLISHED_DEEPSLATE) : stone(u, v, 0);
+			}
+			// platform 3: a corbel course on top, piers and planters below
+			if (y == platform - 2) {
+				return stairs(Blocks.STONE_BRICK_STAIRS, inward(u, v)).setValue(BlockStateProperties.HALF, Half.TOP);
+			}
+			int coord = v == 0 || v == d - 1 ? u : v;
+			if (corner || coord % 3 == 0) {
+				return p.hash(u, 0, v, 3) == 0 ? b(Blocks.POLISHED_DEEPSLATE) : b(Blocks.DEEPSLATE_BRICKS);
+			}
+			return planter(u, v);
+		}
+
+		private BlockState planter(int u, int v) {
+			return switch (p.hash(u, 0, v, 6)) {
+				case 0 -> b(Blocks.POTTED_PINK_TULIP);
+				case 1 -> b(Blocks.POTTED_FLOWERING_AZALEA);
+				case 2 -> leaves(Blocks.FLOWERING_AZALEA_LEAVES);
+				case 3 -> leaves(Blocks.AZALEA_LEAVES);
+				case 4 -> b(Blocks.POTTED_FERN);
+				default -> b(Blocks.PINK_PETALS).setValue(BlockStateProperties.FLOWER_AMOUNT, 1 + p.hash(u, 2, v, 4))
+						.setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.from2DDataValue(p.hash(u, 3, v, 4)));
+			};
+		}
+
+		private BlockState deckState(int u, int v) {
+			if (rail(u, v)) {
+				return (u + v) % 3 == 0 ? b(Blocks.STRIPPED_DARK_OAK_WOOD) : b(Blocks.DARK_OAK_PLANKS); // not one smooth band
+			}
+			int r = p.hash(u, platform - 1, v, 7);
+			return r == 0 ? b(Blocks.DARK_OAK_PLANKS) : r == 1 ? b(Blocks.BAMBOO_MOSAIC) : b(Blocks.SPRUCE_PLANKS);
+		}
+
+		// -------------------------------------------------------------- the flight
+
+		private void flight() {
+			for (int i = 0; i < platform; i++) {
+				Block mat = i == 0 ? Blocks.DEEPSLATE_BRICK_STAIRS : i == platform - 1 ? Blocks.POLISHED_ANDESITE_STAIRS : Blocks.STONE_BRICK_STAIRS;
+				for (int u = nx; u <= nx + 1; u++) {
+					for (int y = 0; y < i; y++) {
+						s(u, y, i, stone(u, i, y));
+					}
+					s(u, i, i, stairs(mat, Direction.SOUTH));
 				}
 			}
 		}
-	}
 
-	private static BlockState upside(Block blk, Direction facing) {
-		return stairs(blk, facing).setValue(BlockStateProperties.HALF, Half.TOP);
-	}
+		// -------------------------------------------------------------- balustrade
 
-	// ------------------------------------------------------------------ hipped roof (y5..)
+		private void rails() {
+			for (int v = 0; v < d; v++) {
+				for (int u = 0; u < w; u++) {
+					if (!rail(u, v) || post(u, v)) {
+						continue;
+					}
+					boolean n = rail(u, v - 1);
+					boolean so = rail(u, v + 1);
+					boolean we = rail(u - 1, v);
+					boolean e = rail(u + 1, v);
+					boolean straight = (n && so && !we && !e) || (we && e && !n && !so);
+					if (straight) {
+						s(u, platform, v, b(Blocks.DARK_OAK_FENCE)
+								.setValue(BlockStateProperties.NORTH, n).setValue(BlockStateProperties.SOUTH, so)
+								.setValue(BlockStateProperties.WEST, we).setValue(BlockStateProperties.EAST, e));
+					} else if ((u == 0 || u == w - 1) && (v == 0 || v == d - 1)) {
+						// the four corners of the deck: a tall polished-deepslate lamp post (the top is under the ceiling, nobody can stand on it)
+						s(u, platform, v, b(Blocks.POLISHED_DEEPSLATE_WALL).setValue(BlockStateProperties.UP, true)
+								.setValue(BlockStateProperties.NORTH_WALL, n ? WallSide.LOW : WallSide.NONE)
+								.setValue(BlockStateProperties.SOUTH_WALL, so ? WallSide.LOW : WallSide.NONE)
+								.setValue(BlockStateProperties.WEST_WALL, we ? WallSide.LOW : WallSide.NONE)
+								.setValue(BlockStateProperties.EAST_WALL, e ? WallSide.LOW : WallSide.NONE));
+						s(u, platform + 1, v, b(Blocks.POLISHED_DEEPSLATE_WALL).setValue(BlockStateProperties.UP, true));
+						s(u, platform + 2, v, b(Blocks.LANTERN));
+					} else {
+						// inner corners and ends: the same dark-oak fence, with its sides joined
+						s(u, platform, v, b(Blocks.DARK_OAK_FENCE)
+								.setValue(BlockStateProperties.NORTH, n).setValue(BlockStateProperties.SOUTH, so)
+								.setValue(BlockStateProperties.WEST, we).setValue(BlockStateProperties.EAST, e));
+					}
+				}
+			}
+		}
 
-	private static void roof(CitadelCanvas c, Plot p, int w, int d) {
-		int eave = eave(p);
-		int maxK = p.h() - 1 - eave - 1; // leave the top layer for the rod
-		int kTop = Math.min((Math.min(w - 1, d) - 1) / 2, maxK);
-		boolean truncated = (Math.min(w - 1, d) - 1) / 2 > maxK;
-		for (int v = 0; v < d; v++) {
-			for (int u = 1; u < w; u++) {
-				int dl = u - 1;
-				int dr = w - 1 - u;
-				int df = v;
-				int db = d - 1 - v;
-				int k = Math.min(Math.min(dl, dr), Math.min(df, db));
-				if (k > kTop) {
-					// a flat cap flush with the top of the last ring
-					p.set(c, u, eave + kTop, v, b(Blocks.DEEPSLATE_TILE_SLAB).setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP));
+		// -------------------------------------------------------------- posts, beams, brackets
+
+		private void posts() {
+			BlockState log = b(Blocks.STRIPPED_DARK_OAK_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.Y);
+			Direction[] dirs = {Direction.NORTH, Direction.SOUTH, Direction.EAST, Direction.WEST};
+			for (int v = 0; v < d; v++) {
+				for (int u = 0; u < w; u++) {
+					if (post(u, v)) {
+						s(u, platform, v, b(Blocks.STONE_BRICKS)); // [depth] a stone foot under every post
+						for (int y = platform + 1; y < eave; y++) {
+							s(u, y, v, log);
+						}
+						s(u, eave, v, b(Blocks.STRIPPED_DARK_OAK_WOOD));
+						for (Direction dir : dirs) {
+							int bu = u + dir.getStepX();
+							int bv = v + dir.getStepZ();
+							if (bu >= 0 && bu < w && bv >= 0 && bv < d && ring(bu, bv) == 0) {
+								// [depth] a bracket under the eave tip on each outer face of the post
+								s(bu, eave - 1, bv, stairs(Blocks.DARK_OAK_STAIRS, dir.getOpposite()).setValue(BlockStateProperties.HALF, Half.TOP));
+							}
+						}
+					} else if (ring(u, v) == 1) {
+						boolean alongX = v == 1 || v == d - 2;
+						s(u, eave, v, b(Blocks.STRIPPED_DARK_OAK_LOG).setValue(BlockStateProperties.AXIS, alongX ? Direction.Axis.X : Direction.Axis.Z));
+					}
+				}
+			}
+			// lanterns under the beams (never over a bench: people sit there; one over the telescope, so nobody can stand on it) and in the middle of the ceiling
+			int tu = telescopeU();
+			int[][] spots = {{tu >= 0 ? tu : w / 2, 1}, {nx + sel(6, 2), 1}, {1, d / 2}, {w - 2, d / 2}, {w / 2, d / 2}};
+			for (int[] sp : spots) {
+				boolean sideBench = d >= 9 && (sp[0] == 1 || sp[0] == w - 2) && sp[1] != 1;
+				if (post(sp[0], sp[1]) || sideBench) {
 					continue;
 				}
-				int y = eave + k;
-				Block mat = k == 0 ? Blocks.DEEPSLATE_TILE_STAIRS : Blocks.CHERRY_STAIRS;
-				if (k >= 1) {
-					Support.roofUnder(c, p, u, y, v, mat); // fix/settle-sources: each ring rests on the one below, not on its edge
-				}
-				boolean tieU = dl == k && dr == k;
-				boolean tieV = df == k && db == k;
-				if ((tieU || tieV) && k == kTop && !truncated) {
-					// the ridge: stripped cherry along the ridge line
-					p.set(c, u, y, v, b(Blocks.STRIPPED_CHERRY_WOOD));
+				p.put(c, sp[0], eave - 1, sp[1], b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
+			}
+		}
+
+		// -------------------------------------------------------------- what to do up here
+
+		private void furniture() {
+			int y = platform;
+			// benches along the back, a lectern at the end, pots in the gaps
+			for (int u = 2; u <= w - 3; u++) {
+				int v = d - 2;
+				if (!free(u, v) || corridor(u, v)) {
 					continue;
 				}
-				boolean lr = dl == k || dr == k;
-				boolean fb = df == k || db == k;
-				Direction inU = dl == k ? Direction.EAST : Direction.WEST;
-				Direction inV = df == k ? Direction.SOUTH : Direction.NORTH;
-				if (lr && fb && !tieU && !tieV) {
-					// hip corner: the tall quarter points inwards on both axes
-					StairsShape shape = inV == inU.getClockWise() ? StairsShape.OUTER_RIGHT : StairsShape.OUTER_LEFT;
-					p.set(c, u, y, v, stairs(mat, inU).setValue(StairBlock.SHAPE, shape));
-				} else if (lr && !tieU) {
-					p.set(c, u, y, v, stairs(mat, inU));
+				int idx = u - 2;
+				if (u == 2 && w >= 7) {
+					s(u, y, v, b(Blocks.CARTOGRAPHY_TABLE)); // a map table: where the district is planned
+				} else if (u == w - 3 && w >= 7) {
+					s(u, y, v, b(Blocks.LECTERN).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH).setValue(BlockStateProperties.HAS_BOOK, true));
+				} else if (w >= 11 && idx % 5 == 4) {
+					s(u, y, v, b(Blocks.POTTED_FERN));
 				} else {
-					p.set(c, u, y, v, stairs(mat, inV));
+					s(u, y, v, stairs(Blocks.DARK_OAK_STAIRS, Direction.SOUTH));
+				}
+			}
+			// benches along the sides
+			if (d >= 9) {
+				for (int v = platform + 1; v <= d - 3; v++) {
+					if ((v - platform) % 4 == 3) {
+						continue;
+					}
+					if (free(1, v) && !corridor(1, v)) {
+						s(1, y, v, stairs(Blocks.DARK_OAK_STAIRS, Direction.WEST));
+					}
+					if (free(w - 2, v) && !corridor(w - 2, v)) {
+						s(w - 2, y, v, stairs(Blocks.DARK_OAK_STAIRS, Direction.EAST));
+					}
+				}
+			}
+			// the table, against the back bench (not on a one-cell bench: it would shut the seat in)
+			int tw = w >= 9 ? 2 : 1;
+			int tv = d - 3;
+			int c0 = (w - tw) / 2;
+			for (int off = 0; w >= 6 && off <= w; off++) {
+				int[] tries = {c0 + off, c0 - off};
+				boolean placed = false;
+				for (int cx : tries) {
+					boolean ok = cx >= 2 && cx + tw - 1 <= w - 3;
+					for (int k = 0; ok && k < tw; k++) {
+						ok = free(cx + k, tv) && !corridor(cx + k, tv);
+					}
+					if (ok) {
+						for (int k = 0; k < tw; k++) {
+							s(cx + k, y, tv, b(Blocks.DARK_OAK_FENCE));
+							s(cx + k, y + 1, tv, k % 2 == 0 && tw == 2 ? b(Blocks.DARK_OAK_PRESSURE_PLATE)
+									: b(Blocks.CANDLE).setValue(BlockStateProperties.CANDLES, 3).setValue(BlockStateProperties.LIT, true));
+						}
+						placed = true;
+						break;
+					}
+				}
+				if (placed) {
+					break;
+				}
+			}
+			// the telescope: a copper rod on a post at the front rail
+			int tu = telescopeU();
+			if (tu >= 0) {
+				s(tu, y, 1, b(Blocks.DARK_OAK_FENCE));
+				s(tu, y + 1, 1, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState().setValue(BlockStateProperties.FACING, Direction.NORTH));
+			}
+		}
+
+		/** The column of the telescope on the front row, or -1. */
+		private int telescopeU() {
+			for (int u = w - 3; u >= 2; u--) {
+				if (free(u, 1) && !corridor(u, 1)) {
+					return u;
+				}
+			}
+			return -1;
+		}
+
+		// -------------------------------------------------------------- the tool shed (platform 4)
+
+		private void shed() {
+			if (platform < 4) {
+				return;
+			}
+			int v = d - 2;
+			for (int u = 2; u <= w - 3; u += 2) {
+				if (!open(u, v)) {
+					continue;
+				}
+				switch (p.hash(u, 0, v, 4)) {
+					case 0 -> {
+						s(u, 0, v, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
+						s(u, 1, v, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
+						s(u, 2, v, b(Blocks.LANTERN));
+					}
+					case 1 -> {
+						s(u, 0, v, b(Blocks.CHEST).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH));
+						s(u, 1, v, b(Blocks.LANTERN));
+					}
+					case 3 -> {
+						s(u, 0, v, b(Blocks.COMPOSTER));
+						s(u, 1, v, b(Blocks.LANTERN));
+					}
+					default -> {
+						s(u, 0, v, b(Blocks.CRAFTING_TABLE));
+						s(u, 1, v, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
+					}
 				}
 			}
 		}
 
-		// finial and the hanging lantern in the middle of the roof
-		int cu = 1 + (w - 1) / 2;
-		int cv = d / 2;
-		int top = eave + kTop;
-		p.set(c, cu, top + 1, cv, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState());
-		if (!truncated && top + 2 < p.h()) {
-			p.set(c, cu, top + 1, cv, b(Blocks.GOLD_BLOCK));
-			p.set(c, cu, top + 2, cv, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState());
+		// -------------------------------------------------------------- hipped copper roof
+
+		/** Patina by height: oxidised at the eave, weathered in the middle, bright copper near the ridge; a little noise. */
+		private int tier(int k, int kmax, int noise) {
+			int base = kmax <= 0 ? 1 : Math.min(2, k * 3 / (kmax + 1));
+			if (noise == 0) {
+				return Math.min(2, base + 1);
+			}
+			if (noise == 1) {
+				return Math.max(0, base - 1);
+			}
+			return base;
 		}
-		// the lantern hangs at the eave level (y 5), above head height on the deck (people stand at y 3); with
-		// ck = 1 the middle is on the beam ring and the lanterns on the rail posts light the deck instead
-		int ck = ring(cu, cv, w, d);
-		int roofAbove = eave + Math.min(ck, kTop);
-		for (int y = eave; ck >= 2 && y < roofAbove; y++) { // with ck = 1 the lantern hangs from a beam
-			p.put(c, cu, y, cv, Blocks.IRON_CHAIN.defaultBlockState(), CitadelCanvas.HANGING);
+
+		private Block copperStairs(int tier) {
+			return tier == 0 ? Blocks.CUT_COPPER_STAIRS.waxed().oxidized() : tier == 1 ? Blocks.CUT_COPPER_STAIRS.waxed().weathered() : Blocks.CUT_COPPER_STAIRS.waxed().exposed();
 		}
-		if (!post(cu, cv, w, d)) {
-			p.put(c, cu, eave - 1, cv, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
+
+		private Block copperSlab(int tier) {
+			return tier == 0 ? Blocks.CUT_COPPER_SLAB.waxed().oxidized() : tier == 1 ? Blocks.CUT_COPPER_SLAB.waxed().weathered() : Blocks.CUT_COPPER_SLAB.waxed().exposed();
+		}
+
+		private void roofSet(int u, int y, int v, BlockState st) {
+			s(u, y, v, st);
+			roofTop[u][v] = Math.max(roofTop[u][v], y);
+			for (int yy = eave; yy < y; yy++) {
+				Support.fillIfFree(c, p, u, yy, v, b(Blocks.DARK_OAK_PLANKS)); // a plank ceiling under the slope
+			}
+		}
+
+		private void roof() {
+			int kmax = (Math.min(w, d) - 1) / 2;
+			int rise = p.h() - 1 - eave; // levels available: 0 .. rise - 1
+			boolean steep = kmax <= rise - 1;
+			for (int v = 0; v < d; v++) {
+				for (int u = 0; u < w; u++) {
+					int dl = u;
+					int dr = w - 1 - u;
+					int df = v;
+					int db = d - 1 - v;
+					int k = Math.min(Math.min(dl, dr), Math.min(df, db));
+					boolean slabRing = !steep && k % 2 == 1;
+					int lvl = steep ? k : slabRing ? (k + 1) / 2 : k / 2;
+					if (lvl > rise - 1) {
+						lvl = rise - 1;
+						slabRing = true;
+					}
+					int y = eave + lvl;
+					boolean tieU = dl == k && dr == k;
+					boolean tieV = df == k && db == k;
+					if ((tieU || tieV) && k == kmax) {
+						roofSet(u, y, v, slab(Blocks.CUT_COPPER_SLAB.waxed().exposed())); // the ridge cap, bright copper
+						continue;
+					}
+					int t = p.hash(u, y, v, 8); // 0 and 1 shift the tier, the rest keep it
+					if (slabRing) {
+						roofSet(u, y, v, slab(copperSlab(tier(k, kmax, t))));
+						continue;
+					}
+					Block mat = k == 0 ? Blocks.DARK_OAK_STAIRS : copperStairs(tier(k, kmax, t));
+					boolean lr = dl == k || dr == k;
+					boolean fb = df == k || db == k;
+					Direction inU = dl == k ? Direction.EAST : Direction.WEST;
+					Direction inV = df == k ? Direction.SOUTH : Direction.NORTH;
+					if (lr && fb && !tieU && !tieV) {
+						StairsShape shape = inV == inU.getClockWise() ? StairsShape.OUTER_RIGHT : StairsShape.OUTER_LEFT;
+						roofSet(u, y, v, stairs(mat, inU).setValue(StairBlock.SHAPE, shape));
+					} else if (lr && !tieU) {
+						roofSet(u, y, v, stairs(mat, inU));
+					} else {
+						roofSet(u, y, v, stairs(mat, inV));
+					}
+				}
+			}
+			// the finial: a stack of lightning rods
+			int cu = w / 2;
+			int cv = d / 2;
+			int y0 = roofTop[cu][cv] + 1;
+			for (int y = y0; y <= Math.min(y0 + 1, p.h() - 1); y++) {
+				s(cu, y, cv, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState());
+			}
 		}
 	}
 }

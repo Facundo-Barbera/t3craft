@@ -2,34 +2,40 @@ package dev.t3craft.hq.citadel.catalog.fountain;
 
 import static dev.t3craft.hq.citadel.CitadelCanvas.b;
 import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
-import static dev.t3craft.hq.citadel.catalog.fountain.PondKit.OUT;
-import static dev.t3craft.hq.citadel.catalog.fountain.PondKit.RIM;
-import static dev.t3craft.hq.citadel.catalog.fountain.PondKit.WATER;
-import static dev.t3craft.hq.citadel.catalog.fountain.PondKit.put;
+import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
 
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.catalog.Family;
 import dev.t3craft.hq.citadel.catalog.Plot;
 import dev.t3craft.hq.citadel.catalog.Variant;
+import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.LiquidBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 
 /**
- * Meandering stream: a two-wide water channel that winds across the plot from a tall mossy rock head
- * (azalea and cherry bush on top) to a small round pool with lily pads at the other end. Pale
- * stepping stones zigzag across it; the banks are soft, built of moss, grass and coarse dirt over a dark
- * stone footing, and planted with ferns, flowers and petals. A three-bodied stone lantern, a bamboo
- * grove and a young cherry tree complete it.
+ * Meandering brook: a two-wide water channel that is born in a spring (a source tucked into a stratified
+ * rock head that spills out of a stone spout through a little waterfall), winds across the plot and rests in a
+ * still pool at the far end. The stream runs along the longer side of the plot; the seed picks the side of the
+ * spring, the mirror, the curve, where it is crossed and how: a spruce footbridge or a ford of flat stepping
+ * stones, both flush with the banks and reached by stairs, so nobody has to jump.
+ *
+ * <p>Use: a water cauldron at the foot of the spring to fill buckets, a spruce stair bench by the pool with a
+ * lantern post at each end, sugar cane on sand banks, lily pads, ferns and flowers. Palette: cobblestone, mossy
+ * cobblestone, andesite and tuff for the banks and the head, moss for the soft parts, spruce for what people use,
+ * sand for the cane.
  *
  * <pre>
- *  top view (front = bottom)
- *   . . ▓▓ . ~ ~ ~ . . ◯◯ T     ▓ rock head (3-4 high)   ◯ round pool
- *   . ▓▓▓▓ ~ ● ~ ~ ● ~ ◯◯ .     ● stepping stones, T cherry
- *   . ▓▓ . . ~ ~ ● ~ ~ . . L    L stone lantern
+ *  top view (stream runs left to right; the spring may be on either side)
+ *   ▓▓▓▓ . . . . . . . . . .       ▓ rock head (3-5 high, strata)   ~ water (y0, banks 1 high all round)
+ *   ▓▓▓▓ ~ ~ . . = = . . . .       = bridge / stepping stones, with a stair up on each side
+ *   ▓SP▓ ~ ~ ~ ~ = = ~ ~ ◯ ◯       SP spout (source + lip + fall)   ◯ pool, bench B and lantern post beside it
  * </pre>
  *
- * Size 7–9 × 6–7 × 4+. The channel follows a sine curve one cell either way; every water cell is walled
- * by solid rim at y 1 so no source can flow out.
+ * Size 7–13 × 6–13 × 4+ (the stream follows the longer side; every water cell is walled by a full block or a
+ * slab, nothing leans out of the plot, and each block is joined to the ground by faces). Water is at y0 on the plot
+ * ground, banks are one block high, so the whole walkway is flat or stairs.
  */
 public final class FountainStreamStones implements Variant {
 	@Override
@@ -59,124 +65,626 @@ public final class FountainStreamStones implements Variant {
 
 	@Override
 	public int maxW() {
-		return 9;
+		return 13;
 	}
 
 	@Override
 	public int maxD() {
-		return 7;
+		return 13;
 	}
 
 	@Override
 	public void build(CitadelCanvas c, Plot p) {
-		int w = p.w();
-		int d = p.d();
-		boolean flip = p.hash(0, 0, 0, 2) == 1; // which side holds the head
-		int[][] k = new int[w][d];
-		boolean[][] reserved = new boolean[w][d];
-		double phase = p.hash(0, 1, 0, 6);
-		int vc0 = (d - 2) / 2;
+		new Build(c, p).run();
+	}
 
-		// --- 1. mask: channel columns i = 2..w-2 counted from the head; the last two columns are the pool
-		int[] vcs = new int[w + 1];
-		for (int i = 2; i <= w - 2; i++) {
-			int u = flip ? w - 1 - i : i;
-			int vc = vc0 + (int) Math.round(Math.sin(phase + i * 0.8));
-			vcs[u] = vc;
-			boolean pool = i >= w - 3;
-			int lo = pool ? vc - 1 : vc;
-			int hi = pool ? vc + 2 : vc + 1;
-			for (int v = Math.max(1, lo); v <= Math.min(d - 2, hi); v++) {
-				k[u][v] = WATER;
-			}
+	/** One build. Works in stream coordinates: {@code a} runs along the stream (spring at a = 0), {@code s} across it. */
+	private static final class Build {
+		static final int OUT = 0;
+		static final int WATER = 1;
+		static final int RIM = 2;
+		static final int ROCK = 3;
+		static final int DECK = 4;
+		static final int STAIR = 5;
+
+		final CitadelCanvas c;
+		final Plot p;
+		final int h;
+		final boolean alongU;
+		final int n; // length of the stream axis
+		final int m; // width of the plot across the stream
+		final boolean flipA;
+		final boolean flipS;
+		final int[][] k;
+		final int[][] rockH;
+		final boolean[][] moss;
+		final boolean[][] res;
+		final int[][] deckKind; // 0 none, 1 end beam, 2 plank, 3 stone, 4 slab stone
+		int hd; // depth of the head in a
+		int pl; // pool length
+		int pw; // pool width
+		int pa0;
+		int pa1;
+		int ps0;
+		int ht; // height of the head's centre
+		int ys; // y of the spring source
+		int s0; // the cell under the spout
+		int[] sc;
+		/** The crossings: first column, number of columns, bridge (else stepping stones). */
+		final java.util.List<int[]> crosses = new java.util.ArrayList<>();
+		final boolean[][] bridgeStair;
+
+		Build(CitadelCanvas c, Plot p) {
+			this.c = c;
+			this.p = p;
+			this.h = p.h();
+			this.alongU = p.w() > p.d() || (p.w() == p.d() && p.hash(0, 0, 0, 2) == 0);
+			this.n = alongU ? p.w() : p.d();
+			this.m = alongU ? p.d() : p.w();
+			this.flipA = p.hash(1, 0, 0, 2) == 0;
+			this.flipS = p.hash(2, 0, 0, 2) == 0;
+			this.k = new int[n][m];
+			this.rockH = new int[n][m];
+			this.moss = new boolean[n][m];
+			this.res = new boolean[n][m];
+			this.deckKind = new int[n][m];
+			this.bridgeStair = new boolean[n][m];
 		}
-		for (int u = 0; u < w; u++) {
-			for (int v = 0; v < d; v++) {
-				if (k[u][v] == OUT && PondKit.touches(k, u, v, WATER)) {
-					k[u][v] = RIM;
+
+		// ------------------------------------------------------------------ coordinates
+
+		int u(int a, int s) {
+			int aa = flipA ? n - 1 - a : a;
+			int ss = flipS ? m - 1 - s : s;
+			return alongU ? aa : ss;
+		}
+
+		int v(int a, int s) {
+			int aa = flipA ? n - 1 - a : a;
+			int ss = flipS ? m - 1 - s : s;
+			return alongU ? ss : aa;
+		}
+
+		void set(int a, int s, int y, BlockState st) {
+			PondKit.put(c, p, u(a, s), y, v(a, s), st);
+		}
+
+		int hs(int a, int y, int s, int bound) {
+			return p.hash(u(a, s), y, v(a, s), bound);
+		}
+
+		/** The local direction of a step {@code (da, ds)} in stream coordinates. */
+		Direction dir(int da, int ds) {
+			int du = u(da, ds) - u(0, 0);
+			int dv = v(da, ds) - v(0, 0);
+			if (du != 0) {
+				return du > 0 ? Direction.EAST : Direction.WEST;
+			}
+			return dv > 0 ? Direction.SOUTH : Direction.NORTH;
+		}
+
+		boolean in(int a, int s) {
+			return a >= 0 && a < n && s >= 0 && s < m;
+		}
+
+		boolean free(int a, int s) {
+			return in(a, s) && k[a][s] == OUT && !res[a][s];
+		}
+
+		// ------------------------------------------------------------------ plan
+
+		void run() {
+			plan();
+			crossing();
+			drawWater();
+			drawHead();
+			drawRim();
+			drawCrossing();
+			drawUse();
+			drawGround();
+		}
+
+		void plan() {
+			hd = n >= 13 ? 2 : 1;
+			pl = n >= 12 ? 3 : 2;
+			pa1 = n - 3;
+			pa0 = pa1 - pl + 1;
+			ht = Math.max(3, Math.min(5, p.h() - 3));
+			ys = ht - 2;
+			int lo = 2;
+			int hi = m - 4;
+			sc = new int[n];
+			int a0 = hd + 1; // first column of channel
+			int aLast = pa0 - 2; // last top-left of a 2x2 brush that still ends before the pool
+			boolean lateral = hi - lo >= 3 && aLast - a0 >= 2;
+			if (lateral) {
+				// an S across the plot: forward, one long run sideways to the far bank, forward again
+				int f = 1 + p.hash(17, 0, 0, Math.max(1, aLast - a0 - 1));
+				int sA = p.hash(13, 0, 0, 2) == 0 ? lo : hi;
+				int sB = lo + hi - sA;
+				if (hi - lo >= 4 && p.hash(18, 0, 0, 2) == 0) {
+					sB += sA == lo ? -1 : 1; // a shorter swing
+				}
+				for (int a = a0; a <= a0 + f; a++) {
+					brush(a, sA);
+				}
+				for (int s = Math.min(sA, sB); s <= Math.max(sA, sB); s++) {
+					brush(a0 + f, s);
+				}
+				for (int a = a0 + f; a <= aLast; a++) {
+					brush(a, sB);
+				}
+				for (int a = a0; a <= pa0 - 1; a++) {
+					for (int s = 0; s < m; s++) {
+						if (k[a][s] == WATER) {
+							sc[a] = s;
+							break;
+						}
+					}
+				}
+			} else {
+				// a ribbon that swings across the plot one cell a column
+				int len = pa0 - 1 - hd;
+				double phase = p.hash(3, 0, 0, 628) / 100.0;
+				double freq = (p.hash(7, 0, 0, 2) == 0 ? 1.15 : 0.8) * Math.PI / Math.max(1, len - 1);
+				int prev = -1;
+				for (int a = a0; a <= pa0 - 1; a++) {
+					double t = (lo + hi) / 2.0 + (hi - lo) / 2.0 * 1.15 * Math.sin(phase + (a - hd) * freq);
+					int val = (int) Math.round(t);
+					if (prev >= 0) {
+						val = Math.max(prev - 1, Math.min(prev + 1, val));
+					}
+					val = Math.max(lo, Math.min(hi, val));
+					sc[a] = val;
+					prev = val;
+					k[a][val] = WATER;
+					k[a][val + 1] = WATER;
 				}
 			}
-		}
-
-		// --- 2. basin: dark stone footing (gradient), soft earthy top, plants on it; bed of mud, clay, gravel
-		for (int u = 0; u < w; u++) {
-			for (int v = 0; v < d; v++) {
-				if (k[u][v] == WATER) {
-					p.set(c, u, 0, v, PondKit.bed(p, u, v, PondKit.touches(k, u, v, RIM)));
-					p.set(c, u, 1, v, PondKit.water());
-				} else if (k[u][v] == RIM) {
-					p.set(c, u, 0, v, PondKit.rimBase(p, u, v));
-					int r = p.hash(u, 1, v, 10);
-					BlockState top = r < 4 ? b(Blocks.MOSS_BLOCK) : r < 6 ? b(Blocks.GRASS_BLOCK) : r < 7 ? b(Blocks.COARSE_DIRT) : PondKit.rimTop(p, u, 1, v);
-					p.set(c, u, 1, v, top);
-					BlockState plant = r < 7 ? PondKit.shorePlant(p, u, v) : null; // [finish] banks are planted, not paved
-					if (plant != null) {
-						put(c, p, u, 2, v, plant);
+			s0 = sc[hd + 1];
+			pw = Math.max(2, Math.min((m >= 11 ? 4 : 3) + (m >= 9 && p.hash(15, 0, 0, 2) == 0 ? 1 : 0), m - 4));
+			int scL = sc[pa0 - 1];
+			ps0 = Math.max(2, Math.min(m - 2 - pw, scL - (pw - 2) / 2));
+			while (ps0 + pw - 1 < scL) {
+				ps0++;
+			}
+			while (ps0 > scL + 1) {
+				ps0--;
+			}
+			k[hd][s0] = WATER;
+			for (int a = pa0; a <= pa1; a++) {
+				for (int s = ps0; s < ps0 + pw; s++) {
+					boolean cutOn = pl * pw >= 12 || (pl * pw >= 9 && p.hash(16, 0, 0, 2) == 0);
+					boolean cut = cutOn && (a == pa0 || a == pa1) && (s == ps0 || s == ps0 + pw - 1);
+					if (!cut) {
+						k[a][s] = WATER;
+					}
+				}
+			}
+			// the rock head and the two piers that flank the spout
+			int hw = m >= 10 ? 2 : m >= 8 ? 1 : 0;
+			for (int a = 0; a < hd; a++) {
+				for (int s = s0 - 1 - hw; s <= s0 + 1 + hw; s++) {
+					if (s < 0 || s >= m) {
+						continue;
+					}
+					k[a][s] = ROCK;
+					rockH[a][s] = Math.max(2, ht - Math.max(0, Math.abs(s - s0) - 1));
+				}
+			}
+			for (int ds = -1; ds <= 1; ds += 2) {
+				k[hd][s0 + ds] = ROCK;
+				rockH[hd][s0 + ds] = ys + 1;
+			}
+			// banks: every free cell next to water
+			for (int a = 0; a < n; a++) {
+				for (int s = 0; s < m; s++) {
+					if (k[a][s] == OUT && touchesWater(a, s)) {
+						k[a][s] = RIM;
 					}
 				}
 			}
 		}
 
-		// --- 3. the head: a tall mossy mound where the stream begins, azalea and cherry bush on top
-		int hu = flip ? w - 1 : 0;
-		int hi = flip ? -1 : 1;
-		int lowRow = Math.max(0, vcs[flip ? w - 3 : 2] - 1);
-		int highRow = Math.min(d - 1, vcs[flip ? w - 3 : 2] + 2);
-		for (int v = lowRow; v <= highRow; v++) {
-			for (int col = 0; col < 2; col++) {
-				int u = hu + hi * col;
-				int tall = Math.min(p.h() - 2, (col == 0 ? 4 : 3) - (p.hash(u, 3, v, 3) == 0 ? 1 : 0));
-				for (int y = 2; y <= tall; y++) {
-					int below = tall - y;
-					p.set(c, u, y, v, below == 0 ? (p.hash(u, y, v, 3) == 0 ? b(Blocks.MOSSY_COBBLESTONE) : b(Blocks.MOSS_BLOCK))
-							: below == 1 ? b(Blocks.MOSSY_COBBLESTONE) : y == 2 ? b(Blocks.TUFF) : b(Blocks.ANDESITE));
+		/** Paints a 2 x 2 square of water with its low corner at {@code (a, s)}: a brush that keeps the channel two wide. */
+		void brush(int a, int s) {
+			for (int da = 0; da <= 1; da++) {
+				for (int ds = 0; ds <= 1; ds++) {
+					k[a + da][s + ds] = WATER;
 				}
-				if (k[u][v] == OUT) { // footing where the mound stands off the water
-					p.set(c, u, 0, v, PondKit.rimBase(p, u, v));
-					p.set(c, u, 1, v, PondKit.rimTop(p, u, 1, v));
-					reserved[u][v] = true;
+			}
+		}
+
+		boolean touchesRim(int a, int s) {
+			return (in(a - 1, s) && k[a - 1][s] == RIM) || (in(a + 1, s) && k[a + 1][s] == RIM)
+					|| (in(a, s - 1) && k[a][s - 1] == RIM) || (in(a, s + 1) && k[a][s + 1] == RIM);
+		}
+
+		boolean touchesWater(int a, int s) {
+			return (in(a - 1, s) && k[a - 1][s] == WATER) || (in(a + 1, s) && k[a + 1][s] == WATER)
+					|| (in(a, s - 1) && k[a][s - 1] == WATER) || (in(a, s + 1) && k[a][s + 1] == WATER);
+		}
+
+		/** A column that can carry a crossing: two water cells, rims on both sides, free ground for the stairs. */
+		boolean straight(int a) {
+			int sw = sc[a];
+			return k[a][sw] == WATER && k[a][sw + 1] == WATER && k[a][sw - 1] == RIM && k[a][sw + 2] == RIM
+					&& sw - 2 >= 0 && sw + 3 < m && k[a][sw - 2] == OUT && k[a][sw + 3] == OUT
+					&& (sw - 3 < 0 || k[a][sw - 3] != WATER) && (sw + 4 >= m || k[a][sw + 4] != WATER);
+		}
+
+		/** Picks where and how the stream is crossed (a bridge and, on big plots, also a ford); marks deck and stair cells. */
+		void crossing() {
+			boolean first = p.hash(6, 0, 0, 2) == 0;
+			if (!cross(first, -10)) {
+				return;
+			}
+			if (n >= 11 || m >= 11) {
+				cross(!first, crosses.get(0)[0]);
+			}
+		}
+
+		/** One crossing of the given kind away from column {@code avoid}; false when no column fits. */
+		boolean cross(boolean bridge, int avoid) {
+			int wc = Math.min(2, pa0 - 1 - hd);
+			java.util.List<Integer> ok = new java.util.ArrayList<>();
+			while (ok.isEmpty() && wc >= 1) {
+				for (int a = hd + 1; a + wc - 1 <= pa0 - 1; a++) {
+					boolean fits = true;
+					for (int i = 0; i < wc && fits; i++) {
+						fits = straight(a + i) && Math.abs(a + i - avoid) >= 3;
+					}
+					if (fits) {
+						ok.add(a);
+					}
 				}
-				BlockState cap = switch (p.hash(u, 4, v, 4)) {
-					case 0 -> b(Blocks.FLOWERING_AZALEA);
-					case 1 -> CitadelCanvas.leaves(Blocks.CHERRY_LEAVES);
-					case 2 -> b(Blocks.AZALEA);
-					default -> b(Blocks.FERN);
+				if (ok.isEmpty()) {
+					wc--;
+				}
+			}
+			if (ok.isEmpty()) {
+				return false;
+			}
+			int ac = ok.get(p.hash(5, avoid + 10, 0, ok.size()));
+			crosses.add(new int[] {ac, wc, bridge ? 1 : 0});
+			if (bridge) {
+				int[][] posts = {{ac - 1, sc[ac] - 1}, {ac + wc, sc[ac + wc - 1] + 2}};
+				for (int[] q : posts) {
+					if (in(q[0], q[1])) {
+						res[q[0]][q[1]] = true;
+					}
+				}
+			}
+			for (int i = 0; i < wc; i++) {
+				int a = ac + i;
+				int sl = sc[a] - 1;
+				int sr = sc[a] + 2;
+				for (int s = sl; s <= sr; s++) {
+					boolean end = s == sl || s == sr;
+					boolean wet = k[a][s] == WATER;
+					k[a][s] = DECK;
+					res[a][s] = true;
+					if (bridge) {
+						deckKind[a][s] = end ? 1 : 2;
+					} else if (end) {
+						deckKind[a][s] = 0; // bank stays as it is, kept clear
+						k[a][s] = RIM;
+					} else if (wet) {
+						boolean keep = i > 0 && p.hash(a, 7, s, 3) == 0; // a gap of water between the stones
+						if (keep) {
+							k[a][s] = WATER;
+							res[a][s] = true;
+						} else {
+							deckKind[a][s] = p.hash(a, 8, s, 4) == 0 ? 4 : 3;
+						}
+					}
+				}
+				for (int side = -1; side <= 1; side += 2) {
+					int s = side < 0 ? sl - 1 : sr + 1;
+					if (in(a, s) && k[a][s] == OUT) {
+						k[a][s] = STAIR;
+						res[a][s] = true;
+						bridgeStair[a][s] = bridge;
+					}
+				}
+			}
+			return true;
+		}
+
+		// ------------------------------------------------------------------ drawing
+
+		void drawWater() {
+			for (int a = 0; a < n; a++) {
+				for (int s = 0; s < m; s++) {
+					if (k[a][s] == WATER) {
+						set(a, s, 0, PondKit.water());
+					}
+				}
+			}
+		}
+
+		BlockState rock(int a, int s, int y, int top) {
+			int r = hs(a, y, s, 6);
+			if (y == top - 1) { // the top: a few soft patches (moss, grass) among bare stone
+				moss[a][s] = r < 2;
+				return switch (r) {
+					case 0 -> b(Blocks.MOSS_BLOCK);
+					case 1 -> b(Blocks.GRASS_BLOCK);
+					case 2 -> b(Blocks.ANDESITE);
+					case 3 -> b(Blocks.MOSSY_COBBLESTONE);
+					case 4 -> b(Blocks.TUFF);
+					default -> b(Blocks.COBBLESTONE);
 				};
-				put(c, p, u, tall + 1, v, cap);
+			}
+			// strata: bands of different rock, each course wavering a little into its neighbours
+			int band = y + (r == 0 ? 1 : r == 1 && y > 0 ? -1 : 0);
+			return switch (band % 5) {
+				case 0 -> b(Blocks.COBBLESTONE);
+				case 1 -> b(Blocks.TUFF);
+				case 2 -> b(Blocks.ANDESITE);
+				case 3 -> b(Blocks.MOSSY_COBBLESTONE);
+				default -> b(Blocks.POLISHED_ANDESITE);
+			};
+		}
+
+		void drawHead() {
+			for (int a = 0; a < n; a++) {
+				for (int s = 0; s < m; s++) {
+					if (k[a][s] != ROCK) {
+						continue;
+					}
+					int top = rockH[a][s];
+					for (int y = 0; y < top; y++) {
+						set(a, s, y, rock(a, s, y, top));
+					}
+					int off = s - s0;
+					if (Math.abs(off) >= 2 && top >= 3 && hs(a, 15, s, 3) != 0) { // the flanks slope off in stairs
+						moss[a][s] = false;
+						set(a, s, top - 1, stairs(hs(a, 16, s, 2) == 0 ? Blocks.ANDESITE_STAIRS : Blocks.COBBLESTONE_STAIRS, dir(0, off > 0 ? -1 : 1)));
+					}
+					if (moss[a][s]) {
+						BlockState plant = switch (hs(a, 11, s, 7)) {
+							case 0, 1 -> b(Blocks.FLOWERING_AZALEA);
+							case 2 -> b(Blocks.AZALEA);
+							case 3, 4 -> b(Blocks.FERN);
+							case 5 -> b(Blocks.MOSS_CARPET);
+							default -> b(Blocks.SHORT_GRASS);
+						};
+						set(a, s, top, plant);
+					}
+				}
+			}
+			for (int ds = -1; ds <= 1; ds += 2) { // the cheeks of the spout are dressed stone
+				set(hd, s0 + ds, ys, b(Blocks.MOSSY_STONE_BRICKS));
+			}
+			// spring: a source in the rock, a lip over the first water cell and the fall to it
+			set(hd - 1, s0, ys, PondKit.water());
+			set(hd, s0, ys, PondKit.water().setValue(LiquidBlock.LEVEL, 1));
+			for (int y = 1; y < ys; y++) {
+				set(hd, s0, y, PondKit.fallingWater());
 			}
 		}
 
-		// --- 4. stepping stones zigzag across the channel (pale polished andesite, a moss cap now and then)
-		for (int i = 3; i <= Math.min(6, w - 3); i++) {
-			int u = flip ? w - 1 - i : i;
-			int v = vcs[u] + (i % 2);
-			if (p.has(u, 1, v) && k[u][v] == WATER) {
-				p.set(c, u, 1, v, p.hash(u, 1, v, 4) == 0 ? b(Blocks.POLISHED_DIORITE) : b(Blocks.POLISHED_ANDESITE));
-				put(c, p, u, 2, v, p.hash(u, 2, v, 3) == 0 ? b(Blocks.MOSS_CARPET) : slab(Blocks.STONE_BRICK_SLAB));
-				k[u][v] = RIM;
+		BlockState rimBlock(int a, int s) {
+			if (a > hd + 1 && hs(a / 2, 12, s / 2, 7) == 0) {
+				return b(Blocks.SAND); // 2 x 2 patches, so the cane grows in clumps
 			}
+			int r = hs(a, 0, s, 20);
+			if (hs(a / 3, 14, s / 3, 5) < 2) { // a mossy patch of bank
+				return r < 10 ? b(Blocks.MOSS_BLOCK) : b(Blocks.MOSSY_COBBLESTONE);
+			}
+			if (r < 8) {
+				return b(Blocks.COBBLESTONE);
+			}
+			if (r < 14) {
+				return b(Blocks.ANDESITE);
+			}
+			return r < 18 ? b(Blocks.TUFF) : b(Blocks.MOSSY_COBBLESTONE);
 		}
-		for (int u = 0; u < w; u++) {
-			for (int v = 0; v < d; v++) {
-				if (k[u][v] == WATER && p.hash(u, 5, v, 3) == 0) {
-					p.set(c, u, 2, v, b(Blocks.LILY_PAD));
+
+		void drawRim() {
+			for (int a = 0; a < n; a++) {
+				for (int s = 0; s < m; s++) {
+					if (k[a][s] != RIM) {
+						continue;
+					}
+					BlockState top = rimBlock(a, s);
+					set(a, s, 0, top);
+					if (res[a][s]) {
+						continue; // ford end bank: bare
+					}
+					if (top.is(Blocks.SAND)) {
+						int hgt = Math.min(h - 1, 2 + hs(a, 2, s, 2));
+						for (int y = 1; y <= hgt; y++) {
+							set(a, s, y, b(Blocks.SUGAR_CANE));
+						}
+					} else if (top.is(Blocks.MOSS_BLOCK)) {
+						set(a, s, 1, switch (hs(a, 3, s, 6)) {
+							case 0 -> b(Blocks.FERN);
+							case 1 -> b(Blocks.AZURE_BLUET);
+							case 2 -> b(Blocks.PINK_PETALS);
+							case 3 -> b(Blocks.LILY_OF_THE_VALLEY);
+							default -> b(Blocks.MOSS_CARPET);
+						});
+					} else if (hs(a, 8, s, 7) == 0) {
+						set(a, s, 1, p.hash(u(a, s), 9, v(a, s), 2) == 0 ? b(Blocks.MOSSY_COBBLESTONE) : slab(Blocks.MOSSY_COBBLESTONE_SLAB));
+					}
 				}
 			}
 		}
 
-		// --- 5. the lantern on the pool side, a cherry behind it, a bamboo grove behind the stream
-		int lu = flip ? 0 : w - 1;
-		if (k[lu][0] == OUT) {
-			PondKit.toro(c, p, lu, 0);
-			reserved[lu][0] = true;
+		/** Whether {@code (a, s)} is one of the cells reserved for a bridge's lantern posts. */
+		boolean postCell(int a, int s) {
+			for (int[] x : crosses) {
+				if (x[2] == 1 && ((a == x[0] - 1 && s == sc[x[0]] - 1) || (a == x[0] + x[1] && s == sc[x[0] + x[1] - 1] + 2))) {
+					return true;
+				}
+			}
+			return false;
 		}
-		if (k[lu][d - 1] == OUT) {
-			PondKit.cherry(c, p, lu, d - 1, flip ? 1 : -1);
-			reserved[lu][d - 1] = true;
-		}
-		PondKit.grove(c, p, k, reserved, w / 2 - 1, 1, d - 1, -1, 6);
 
-		// --- 6. banks of the margin: steps, ferns, flowers
-		PondKit.shore(c, p, k, reserved);
+		void drawCrossing() {
+			Direction.Axis axis = alongU ? Direction.Axis.Z : Direction.Axis.X;
+			for (int a = 0; a < n; a++) {
+				for (int s = 0; s < m; s++) {
+					BlockState st = null;
+					switch (deckKind[a][s]) {
+						case 1 -> st = b(Blocks.STRIPPED_SPRUCE_LOG).setValue(BlockStateProperties.AXIS, axis);
+						case 2 -> st = b(Blocks.SPRUCE_PLANKS);
+						case 3 -> st = switch (hs(a, 5, s, 4)) {
+							case 0 -> b(Blocks.POLISHED_ANDESITE);
+							case 1 -> b(Blocks.MOSSY_COBBLESTONE);
+							case 2 -> b(Blocks.STONE_BRICKS);
+							default -> b(Blocks.ANDESITE);
+						};
+						case 4 -> st = slab(Blocks.STONE_BRICK_SLAB);
+						default -> {
+						}
+					}
+					if (st != null) {
+						set(a, s, 0, st);
+					}
+					if (k[a][s] == STAIR) { // the high side faces the bank, and a flagstone trail leads out to the edge
+						boolean left = s < sc[a];
+						set(a, s, 0, stairs(bridgeStair[a][s] ? Blocks.SPRUCE_STAIRS : Blocks.MOSSY_COBBLESTONE_STAIRS, dir(0, left ? 1 : -1)));
+						int step = left ? -1 : 1;
+						for (int t = s + step; in(a, t) && free(a, t); t += step) {
+							set(a, t, 0, switch (hs(a, 18, t, 3)) {
+								case 0 -> slab(Blocks.COBBLESTONE_SLAB);
+								case 1 -> slab(Blocks.MOSSY_COBBLESTONE_SLAB);
+								default -> slab(Blocks.STONE_BRICK_SLAB);
+							});
+							res[a][t] = true;
+						}
+					}
+				}
+			}
+			for (int[] x : crosses) {
+				if (x[2] == 1) { // a lantern post on each bank at the ends of the bridge (reserved in cross())
+					post(x[0] - 1, sc[x[0]] - 1);
+					post(x[0] + x[1], sc[x[0] + x[1] - 1] + 2);
+				}
+			}
+		}
+
+		/** A lantern post on a free or bank cell. */
+		void post(int a, int s) {
+			if (!in(a, s) || (k[a][s] != OUT && !(k[a][s] == RIM && postCell(a, s))) || (res[a][s] && !postCell(a, s))) {
+				return;
+			}
+			res[a][s] = true;
+			set(a, s, 0, b(Blocks.POLISHED_ANDESITE));
+			set(a, s, 1, b(Blocks.SPRUCE_FENCE));
+			set(a, s, 2, b(Blocks.LANTERN));
+		}
+
+		void drawUse() {
+			// the pool: a bench of spruce stairs beside it, facing the water, a lantern post at each end
+			int sd = p.hash(10, 0, 0, 2) == 0 ? -1 : 1;
+			int sSeat = sd < 0 ? ps0 - 2 : ps0 + pw + 1;
+			if (!in(0, sSeat) || k[pa0][sSeat] != OUT) {
+				sd = -sd;
+				sSeat = sd < 0 ? ps0 - 2 : ps0 + pw + 1;
+			}
+			int seats = pl >= 3 ? 3 : 2;
+			int a0 = pa0 + (pl - seats) / 2;
+			for (int i = 0; i < seats; i++) {
+				int a = a0 + i;
+				if (free(a, sSeat)) {
+					set(a, sSeat, 0, stairs(Blocks.SPRUCE_STAIRS, dir(0, sd)));
+					res[a][sSeat] = true;
+				}
+			}
+			for (int i = 0; i < seats; i++) { // a low spruce rail behind the seats
+				int a = a0 + i;
+				if (in(a, sSeat + sd) && free(a, sSeat + sd)) {
+					set(a, sSeat + sd, 0, b(Blocks.SPRUCE_FENCE).setValue(PondKit.side(dir(1, 0)), i < seats - 1).setValue(PondKit.side(dir(-1, 0)), i > 0));
+					res[a][sSeat + sd] = true;
+				}
+			}
+			post(a0 - 1, sSeat);
+			if (n >= 9) {
+				post(a0 + seats, sSeat);
+			}
+			benchBeside(a0, sSeat);
+			// the spring's cauldron: water to fill buckets, on the ground beside the head
+			int cs = p.hash(11, 0, 0, 2) == 0 ? s0 - 2 : s0 + 2;
+			if (free(hd, cs)) {
+				set(hd, cs, 0, b(Blocks.WATER_CAULDRON).setValue(net.minecraft.world.level.block.LayeredCauldronBlock.LEVEL, 3));
+				res[hd][cs] = true;
+			}
+			// lily pads
+			for (int a = hd + 1; a < n; a++) {
+				for (int s = 0; s < m; s++) {
+					if (k[a][s] == WATER && !res[a][s] && hs(a, 5, s, a >= pa0 ? 3 : 6) == 0) {
+						set(a, s, 1, b(Blocks.LILY_PAD));
+					}
+				}
+			}
+		}
+
+		/**
+		 * A second seat in a wider plot: two spruce stairs on the ground facing a stretch of bank (high side away
+		 * from the water), found by scanning from a seeded start, away from the first bench.
+		 */
+		void benchBeside(int fa, int fs) {
+			if (m < 9) {
+				return;
+			}
+			int[][] dirs = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+			int start = p.hash(14, 0, 0, n * m);
+			for (int t = 0; t < n * m; t++) {
+				int idx = (start + t) % (n * m);
+				int a = idx / m;
+				int s = idx % m;
+				if (a < hd + 1 || a >= n - 1 || s < 1 || s >= m - 1 || Math.abs(a - fa) + Math.abs(s - fs) < 5 || !free(a, s)) {
+					continue;
+				}
+				for (int[] d : dirs) {
+					int pa = Math.abs(d[1]);
+					int ps = Math.abs(d[0]);
+					int a1 = a + pa;
+					int s1 = s + ps;
+					if (in(a + d[0], s + d[1]) && k[a + d[0]][s + d[1]] == RIM && !res[a + d[0]][s + d[1]] && free(a1, s1)
+							&& in(a1 + d[0], s1 + d[1]) && k[a1 + d[0]][s1 + d[1]] == RIM && !res[a1 + d[0]][s1 + d[1]]) {
+						Direction away = dir(-d[0], -d[1]);
+						set(a, s, 0, stairs(Blocks.SPRUCE_STAIRS, away));
+						set(a1, s1, 0, stairs(Blocks.SPRUCE_STAIRS, away));
+						res[a][s] = true;
+						res[a1][s1] = true;
+						return;
+					}
+				}
+			}
+		}
+
+		void drawGround() {
+			for (int a = 0; a < n; a++) {
+				for (int s = 0; s < m; s++) {
+					if (!free(a, s)) {
+						continue;
+					}
+					boolean inner = a >= 1 && a <= n - 2 && s >= 1 && s <= m - 2;
+					if (touchesRim(a, s) && hs(a, 13, s, 4) == 0) {
+						set(a, s, 0, b(Blocks.MOSS_CARPET));
+						continue;
+					}
+					BlockState plant = switch (hs(a, 3, s, 24)) {
+						case 0, 1, 2, 3, 4 -> b(Blocks.SHORT_GRASS);
+						case 5, 6, 7 -> b(Blocks.FERN);
+						case 8 -> b(Blocks.PINK_PETALS);
+						case 9 -> b(Blocks.AZURE_BLUET);
+						case 10 -> b(Blocks.CORNFLOWER);
+						case 11 -> b(Blocks.LILY_OF_THE_VALLEY);
+						case 12 -> inner ? b(Blocks.FLOWERING_AZALEA) : null;
+						case 13 -> inner ? b(Blocks.AZALEA) : null;
+						default -> null;
+					};
+					if (plant != null) {
+						set(a, s, 0, plant);
+					}
+				}
+			}
+		}
 	}
 }

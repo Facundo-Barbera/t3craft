@@ -40,7 +40,7 @@ import net.minecraft.world.level.block.state.BlockState;
  *
  * Options read here: {@code --front N|E|S|W|all} (default S: the facade looks at the iso_se camera; a
  * row per front with {@code all}), {@code --sizes N} (1–3 sizes per variant, default 3),
- * {@code --seeds N} (default 2), {@code --box WxDxH[,WxDxH...]} (exact sizes), plus the usual {@code --out}, {@code --scale}, {@code --ss} and
+ * {@code --seeds N} (default 2), plus the usual {@code --out}, {@code --scale}, {@code --ss} and
  * {@code --only}. Prints (and writes {@code report.txt}) the block count of every build, the writes the
  * plot clipped (outside its box) and any block found outside its plot.
  */
@@ -52,9 +52,6 @@ final class CatalogViews {
 	private record Cell(Variant v, Plot plot, String label, int row) {
 	}
 
-	/** {@code --box WxDxH[,WxDxH...]}: exact plot sizes instead of the min/middle/max spread (null = spread). */
-	static String boxes;
-
 	/** Upper end of each family's typical height (the gallery's tallest size). */
 	private static int typicalMaxH(Family f) {
 		return switch (f) {
@@ -64,7 +61,8 @@ final class CatalogViews {
 			case FOUNTAIN, WELL -> 7;
 			case TREE -> 14;
 			case GARDEN -> 5;
-			case STATUE, GATE, PLAZA_CENTER, TOWER_TOP, GAZEBO -> 10;
+			case STATUE, GATE, PLAZA_CENTER, TOWER_TOP -> 10;
+			case GAZEBO -> 13; // the patio's gazebo plot at scale 200 is 7–13 × 7–13 × 13
 			case BRIDGE -> 6;
 			case ROOF -> 8;
 		};
@@ -335,15 +333,21 @@ final class CatalogViews {
 		return out;
 	}
 
+	/** {@code --box WxDxH[,WxDxH...]}: exact sizes for every variant (the sizes the city asks for), or null for the spread. */
+	static String boxes;
+
 	/** {w, d, h} sizes spread over the variant's range: min, middle, max (deduplicated, up to n). */
 	private static List<int[]> sizes(Variant v, int n) {
-		if (boxes != null && !boxes.isBlank()) {
-			List<int[]> exact = new ArrayList<>();
+		if (boxes != null) {
+			List<int[]> fixed = new ArrayList<>();
 			for (String b : boxes.split(",")) {
-				String[] t = b.trim().toLowerCase(Locale.ROOT).split("x");
-				exact.add(new int[] {Integer.parseInt(t[0]), Integer.parseInt(t[1]), Integer.parseInt(t[2])});
+				String[] t = b.trim().split("x");
+				if (t.length != 3) {
+					throw new IllegalArgumentException("--box wants WxDxH[,WxDxH...], got " + boxes);
+				}
+				fixed.add(new int[] {Integer.parseInt(t[0]), Integer.parseInt(t[1]), Integer.parseInt(t[2])});
 			}
-			return exact;
+			return fixed;
 		}
 		int w1 = v.minW();
 		int w2 = cap(v.maxW(), w1);
