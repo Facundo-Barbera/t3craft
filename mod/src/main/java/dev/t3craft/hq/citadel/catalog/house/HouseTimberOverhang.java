@@ -77,7 +77,7 @@ public final class HouseTimberOverhang implements Variant {
 
 	@Override
 	public int minH() {
-		return 21;
+		return 23;
 	}
 
 	@Override
@@ -422,7 +422,8 @@ public final class HouseTimberOverhang implements Variant {
 						} else if (y == y1 + 1) {
 							s = door(Blocks.DARK_OAK_DOOR, Direction.NORTH, true).setValue(BlockStateProperties.DOOR_HINGE, i == run.doorLo ? DoorHingeSide.RIGHT : DoorHingeSide.LEFT);
 						} else if (y == y1 + 2) {
-							s = pane(alongU, null);
+							// an open trapdoor on the outer edge closes the transom to the eye but not to the body
+							s = trap(Blocks.DARK_OAK_TRAPDOOR, Direction.SOUTH, true, false);
 						} else {
 							s = oak(alongU ? Direction.Axis.X : Direction.Axis.Z);
 						}
@@ -460,14 +461,17 @@ public final class HouseTimberOverhang implements Variant {
 			int i = a + k;
 			int u = alongU ? i : line + out;
 			int v = alongU ? line + out : i;
-			TimberKit.put(g.c, g.p, alongU, line + out, i, w1 - 1, stair(Blocks.DARK_OAK_STAIRS, toWall, true));
 			if (run.windows[k] == 2) {
+				// shutters flank a two-wide window; no sill (a ledge nobody can reach would be a sealed floor)
 				boolean leftN = k > 0 && run.kind[k - 1] == 1 && !run.post[k - 1];
 				for (int y = w1; y <= w2; y++) {
 					TimberKit.put(g.c, g.p, alongU, line + out, i, y, trap(g.shutter, leftN ? highFace : lowFace, true, false));
 				}
-			} else if (run.windows[k] == 1 || run.windows[k] > 2) {
-				TimberKit.put(g.c, g.p, alongU, line + out, i, w1, planter(g.p, u, w1, v));
+			} else {
+				// a one-wide window: sill, a full-block flower box and a small hood over it, so nothing can be stood on
+				TimberKit.put(g.c, g.p, alongU, line + out, i, w1 - 1, stair(Blocks.DARK_OAK_STAIRS, toWall, true));
+				TimberKit.put(g.c, g.p, alongU, line + out, i, w1, CitadelCanvas.leaves(g.p.hash(u, w1, v, 3) == 0 ? Blocks.AZALEA_LEAVES : Blocks.FLOWERING_AZALEA_LEAVES));
+				TimberKit.put(g.c, g.p, alongU, line + out, i, w2 + 1, stair(Blocks.DARK_OAK_STAIRS, toWall, true));
 			}
 		}
 	}
@@ -617,15 +621,12 @@ public final class HouseTimberOverhang implements Variant {
 		int top = Math.min(rmax + 2, g.h - 2);
 		for (int y = 1; y <= top; y++) {
 			for (int u = cu0; u <= g.a1; u++) {
-				if (y > g.y0 + 1 && u == cu0) {
-					continue;
-				}
 				for (int v = g.vc; v <= g.vc + 1; v++) {
 					g.set(u, y, v, mix(g.p, u, y, v, b(Blocks.BRICKS), b(Blocks.BRICKS), b(Blocks.DEEPSLATE_BRICKS), b(Blocks.STONE_BRICKS)));
 				}
 			}
 		}
-		for (int u = g.a1 - 1; u <= g.a1; u++) {
+		for (int u = cu0; u <= g.a1; u++) {
 			for (int v = g.vc; v <= g.vc + 1; v++) {
 				g.set(u, top + 1, v, slab(Blocks.DEEPSLATE_BRICK_SLAB, false));
 			}
@@ -765,9 +766,8 @@ public final class HouseTimberOverhang implements Variant {
 		int vi1 = g.b1 - 1;
 		for (int u = ui0; u <= ui1; u++) {
 			if (u <= g.uc - 3 || u >= g.uc + 4) {
-				furnish(g, u, 1, vi0, b(Blocks.DARK_OAK_PLANKS), true);
-				int t = g.p.hash(u, 2, vi0, 4);
-				furnish(g, u, 2, vi0, t == 0 ? lantern(false) : t == 1 ? Blocks.POTTED_FERN.defaultBlockState() : t == 2 ? Blocks.POTTED_FLOWERING_AZALEA.defaultBlockState() : CitadelCanvas.AIR, true);
+				// every piece of furniture is one block high: a taller one is a low ceiling for whoever steps on it
+				furnish(g, u, 1, vi0, g.p.hash(u, 1, vi0, 3) == 0 ? barrel() : b(Blocks.DARK_OAK_PLANKS), true);
 			}
 		}
 		BlockState[] bench = {b(Blocks.CRAFTING_TABLE), b(Blocks.SMITHING_TABLE), face(Blocks.LOOM, Direction.EAST), b(Blocks.CARTOGRAPHY_TABLE), b(Blocks.FLETCHING_TABLE), barrel()};
@@ -778,7 +778,6 @@ public final class HouseTimberOverhang implements Variant {
 			int t = g.p.hash(u, 1, vi1, 5);
 			if (t <= 1) {
 				furnish(g, u, 1, vi1, b(Blocks.BOOKSHELF), true);
-				furnish(g, u, 2, vi1, b(Blocks.BOOKSHELF), true);
 			} else if (t == 2) {
 				furnish(g, u, 1, vi1, face(Blocks.CHEST, Direction.NORTH), true);
 			} else if (t == 3) {
@@ -820,7 +819,6 @@ public final class HouseTimberOverhang implements Variant {
 		}
 		for (int v = g.b0 + 1; v <= g.vs - 3; v++) {
 			furnish(g, g.a0, 6, v, b(Blocks.BOOKSHELF), false);
-			furnish(g, g.a0, 7, v, b(Blocks.BOOKSHELF), false);
 		}
 		for (int v = g.b0 + 1; v <= g.vc - 2; v++) {
 			furnish(g, g.a1, 6, v, g.p.hash(g.a1, 6, v, 2) == 0 ? barrel() : face(Blocks.CHEST, Direction.WEST), false);
@@ -843,26 +841,23 @@ public final class HouseTimberOverhang implements Variant {
 		int iu1 = g.front ? g.a1 : g.a1 + 1;
 		int iv0 = g.front ? g.b0 - 1 : g.b0;
 		int iv1 = g.b1 - 1;
+		// shelves one block in from the knee walls, where the roof is high enough over them
 		if (g.front) {
 			for (int v = iv0; v <= iv1; v++) {
 				if (g.p.hash(iu0, 11, v, 3) != 0) {
-					furnish(g, iu0, 11, v, b(Blocks.BOOKSHELF), false);
-					furnish(g, iu0, 12, v, b(Blocks.BOOKSHELF), false);
+					furnish(g, iu0 + 1, 11, v, b(Blocks.BOOKSHELF), false);
 				}
 				if (g.p.hash(iu1, 11, v, 3) != 0) {
-					furnish(g, iu1, 11, v, b(Blocks.BOOKSHELF), false);
-					furnish(g, iu1, 12, v, b(Blocks.BOOKSHELF), false);
+					furnish(g, iu1 - 1, 11, v, b(Blocks.BOOKSHELF), false);
 				}
 			}
 		} else {
 			for (int u = iu0; u <= iu1; u++) {
 				if (g.p.hash(u, 11, iv0, 3) != 0) {
-					furnish(g, u, 11, iv0, b(Blocks.BOOKSHELF), false);
-					furnish(g, u, 12, iv0, b(Blocks.BOOKSHELF), false);
+					furnish(g, u, 11, iv0 + 1, b(Blocks.BOOKSHELF), false);
 				}
 				if (g.p.hash(u, 11, iv1, 3) != 0) {
-					furnish(g, u, 11, iv1, b(Blocks.BOOKSHELF), false);
-					furnish(g, u, 12, iv1, b(Blocks.BOOKSHELF), false);
+					furnish(g, u, 11, iv1 - 1, b(Blocks.BOOKSHELF), false);
 				}
 			}
 		}
@@ -907,6 +902,7 @@ public final class HouseTimberOverhang implements Variant {
 			g.set(u, 1, vStoop, fence(Blocks.DARK_OAK_FENCE, false, false, false, false));
 			g.set(u, 2, vStoop, fence(Blocks.DARK_OAK_FENCE, false, false, false, false));
 			g.set(u, 3, vStoop, lantern(false));
+			g.set(u, 4, vStoop, slab(Blocks.DEEPSLATE_TILE_SLAB, false));
 		}
 		for (int v = 1; v <= vStoop - 1; v++) {
 			for (int u = g.a0 - 1; u <= g.a1 + 1; u++) {
