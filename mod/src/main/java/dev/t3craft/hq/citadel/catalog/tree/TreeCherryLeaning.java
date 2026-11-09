@@ -110,17 +110,6 @@ public final class TreeCherryLeaning implements Variant {
 			CherryKit.cloud(t, fu + sx * 0.3, mid[1] + 2, fv + sz * 0.3, 1.8, 1.4, sx, sz, 0, 1, 7, 2);
 		}
 
-		// prop: a cherry fence post under the limb, on a small stone footing, about two thirds of the way out
-		int[] pr = main.get(Math.min(main.size() - 1, main.size() * 2 / 3));
-		if (pr[1] - 1 >= 2 && t.empty(pr[0], 0, pr[2])) {
-			t.set(pr[0], 0, pr[2], slab(Blocks.MUD_BRICK_SLAB));
-			for (int y = 1; y < pr[1]; y++) {
-				if (t.empty(pr[0], y, pr[2])) {
-					t.set(pr[0], y, pr[2], b(Blocks.CHERRY_FENCE));
-				}
-			}
-		}
-
 		// --- the counter limb on the other side, short, to balance
 		int by = Math.min(yFork, cy - 2);
 		int ku = lead[0][by];

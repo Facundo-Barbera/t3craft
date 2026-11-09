@@ -236,7 +236,7 @@ public final class FountainTieredBasins implements Variant {
 					k.set(dx, a, dz, b(Blocks.POLISHED_DIORITE));
 					k.set(dx, a + 1, dz, WATER);
 					if (dx == 0 && dz == 0) {
-						k.set(0, a + 2, 0, WATER); // the jet
+						k.set(0, a + 2, 0, b(Blocks.END_ROD)); // a pale finial: no free source to spill
 					}
 					continue;
 				}
@@ -261,7 +261,7 @@ public final class FountainTieredBasins implements Variant {
 			k.set(0, y, 0, pillar(Blocks.QUARTZ_PILLAR));
 		}
 		k.set(0, a + 1, 0, b(Blocks.CHISELED_QUARTZ_BLOCK));
-		k.set(0, a + 2, 0, WATER);
+		k.set(0, a + 2, 0, b(Blocks.END_ROD)); // finial, not a free source
 		for (Direction d : new Direction[] {Direction.NORTH, Direction.SOUTH, Direction.EAST, Direction.WEST}) {
 			k.set(d.getStepX(), a, d.getStepZ(), stairTop(Blocks.POLISHED_DIORITE_STAIRS, d.getOpposite()));
 			k.set(d.getStepX(), a + 1, d.getStepZ(), FALL);
