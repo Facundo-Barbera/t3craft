@@ -60,6 +60,18 @@ Son 4 agentes Sonnet high, cada uno con un director de arte Opus. Trabajan sobre
 Estado de la ola 1:
 - houses-a, houses-b y street están integradas en `citadel/next`. Las tres agotaron su cupo de renders con varias variantes por debajo de 7, así que tienen segunda ronda (`design/houses-a2`, `design/houses-b2`, `design/street2`) con más renders: hasta 10 por familia y 12 para casas.
 - nature-water también está integrada. Su segunda ronda va en dos partes: `design/trees2` (Opus, las 9 especies con copas en lóbulos) está en curso, y la de fuentes y jardines queda para cuando baje el número de agentes.
+- **Integrado en main (2026-11-09):**
+  - `fix/build-walkable-level` (`1f7bb12`): el piso se elige según la altura del jugador;
+  - `feat/hq-spawn-start` (`61fe666`): spawn en el centro del HQ sobre un bloque, y la obra espera a que el jugador camine o pulse [Comenzar construcción];
+  - renders en truecolor (`db92976`): la paleta de 256 colores es opcional y el relay ignora `--preview`.
+- **En curso:**
+  - `tools/render-quality`: AO, sombras suaves, texturas reales y filtro AA en el raycaster, con un render antes/después;
+  - `design/wave2-a`: puestos, pozos y anexos;
+  - `design/wave2-b`: estatuas, gazebos, puentes y remates;
+  - `design/trees2`, `design/street3` y `design/citadel-terraces`.
+  
+  Casas A ronda 2: las 7 casas con nota ≥7, ya en `citadel/next`.
+- **Pendiente del OK de Facundo:** instalar Chunky en el PC para los renders "bonitos" (requiere su aprobación).
 - **Calidad de render (2026-11-09):** los jobs al PC salen por defecto en final con `--ss 3`; preview solo si se pide. El daemon del PC corre con 11 hilos y `-Xmx10g`. La GPU está pendiente de que Facundo decida (plan en la respuesta del coordinador): AO y sombras en CPU, o Chunky con GPU desde un export `.schem`.
 - **Citadel Studio en el PC** se actualizó a `79be0f6`: ahora lista todos los agentes con jobs, del más reciente al más viejo.
 - **Construcción:** `fix/build-walkable` **integrado en main**, compilado y pendiente de que Facundo haga la prueba de cruzar el mapa. Hace que el HQ real use el mismo plan radial único que el demo (hoy `HqConstruction` lanza un trabajo por parte, de abajo hacia arriba) y agrega un corredor de suelo por delante del jugador en su dirección de avance. Criterio de aceptación: cruzar el mapa en línea recta sin caerse.
