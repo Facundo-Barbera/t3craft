@@ -15,7 +15,7 @@ import net.minecraft.world.level.block.Blocks;
 
 /**
  * The leaning cherry, the one that grows out over water or down a slope. A short bare stump at one side of the
- * plot (a tapered 2×2 foot, then a 1×1 column), then the trunk leaves it <b>face-connected</b> (every log shares a
+ * plot (a 2×2 foot one block high, then a 1×1 column), then the trunk leaves it <b>face-connected</b> (every log shares a
  * face with the next, no diagonal steps) at 25–45° or almost flat, reaches an <b>elbow</b>, and from there turns
  * steeply up to the tip. One or two limbs <b>rise again</b> out of the trunk and each carries its own cloud, so
  * the crown is two or three flat pads of different size and height with sky between them, all on the leaning side.
@@ -95,7 +95,7 @@ public final class TreeCherryLeaning implements Variant {
 		int dv = dir[1];
 		boolean diag = du != 0 && dv != 0;
 		int inset = 1; // how far from the edge the tip of the trunk stays (its cloud shrinks to fit)
-		int in0 = mn >= 7 ? 1 : 0; // room behind the foot for the roots
+		int in0 = 0; // the foot stands at the edge: all the room goes to the lean (the roots spread sideways)
 		int lu;
 		int lv;
 		int bu;
@@ -125,7 +125,7 @@ public final class TreeCherryLeaning implements Variant {
 		}
 		kmax = Math.max(1, kmax);
 		int k = kmax - (kmax >= 4 && r.nextInt(3) == 0 ? 1 : 0);
-		double m = 0.38 + 0.62 * r.nextDouble(); // rise per cell of the lean, 20°..45° plus the plan staircase of a diagonal
+		double m = 0.3 + 0.55 * r.nextDouble(); // rise per cell of the lean, 20°..45° plus the plan staircase of a diagonal
 		double fe = 0.5 + 0.22 * r.nextDouble(); // where the elbow is
 		int ke = TreeKit.clamp((int) Math.round(fe * k), 1, k);
 		int ytip = TreeKit.clamp(YS + (int) Math.round(m * k * (diag ? 1.3 : 1.0)) + 1, YS + 2, hh - 4);
@@ -134,17 +134,12 @@ public final class TreeCherryLeaning implements Variant {
 		int tv = lv + k * dv;
 
 		// ---- foot: tapered 2×2 (4 cells, then 3), then the 1×1 column to the start of the lean
-		int ou = lu - bu;
-		int ov = lv - bv;
 		for (int a = 0; a < 2; a++) {
 			for (int e = 0; e < 2; e++) {
 				t.wood(bu + a, 0, bv + e, TreeKit.CHERRY.bark());
-				if (!(a != ou && e != ov)) {
-					t.wood(bu + a, 1, bv + e, TreeKit.CHERRY.bark());
-				}
 			}
 		}
-		for (int y = 2; y < YS; y++) {
+		for (int y = 1; y < YS; y++) {
 			t.wood(lu, y, lv, TreeKit.CHERRY.log(net.minecraft.core.Direction.Axis.Y));
 		}
 		int bias = octant(-du, -dv);
@@ -159,7 +154,7 @@ public final class TreeCherryLeaning implements Variant {
 		// ---- clouds
 		double ra = TreeKit.clamp(0.25 * mn + 0.55, 1.9, 2.8);
 		List<Pad> pads = new ArrayList<>();
-		pads.add(pad(tu, ytip + 1, tv, ra, du, dv, w, d));
+		pads.add(padClamped(tu + du, ytip + 1, tv + dv, ra, w, d)); // the cloud sits beyond the tip: the trunk enters it from the side
 
 		// rising limb 1: from the first half of the lean, up and a little outwards
 		int i1 = TreeKit.clamp((int) Math.round(segA.size() * (0.3 + 0.3 * r.nextDouble())), 1, Math.max(1, segA.size() - 1));
@@ -215,13 +210,23 @@ public final class TreeCherryLeaning implements Variant {
 				}
 			}
 		}
-		// foliage hugs the wood: a cell on top of a log with a cloud close above it is a leaf, not a ledge nobody can reach
-		for (int y = YS; y < hh - 1; y++) {
+		// no ledge under a cloud: where a trunk top or a cloud top has a roof of foliage within reach above it (and room to stand),
+		// the gap is filled with leaves, so nothing standable is left that nobody can reach
+		for (int y = YS; y < hh - 3; y++) {
 			for (int v = 0; v < d; v++) {
 				for (int u = 0; u < w; u++) {
-					if (t.kind(u, y, v) == TreeKit.WOOD && t.empty(u, y + 1, v)
-							&& (t.kind(u, y + 2, v) == TreeKit.LEAF || t.kind(u, y + 3, v) == TreeKit.LEAF)) {
-						t.leaf(u, y + 1, v, PINK.a());
+					byte kd = t.kind(u, y, v);
+					if ((kd == TreeKit.WOOD || kd == TreeKit.LEAF) && t.empty(u, y + 1, v) && t.empty(u, y + 2, v)) {
+						int j = -1;
+						for (int yy = y + 3; yy <= Math.min(hh - 1, y + 9) && j < 0; yy++) {
+							byte k2 = t.kind(u, yy, v);
+							if (k2 == TreeKit.WOOD || k2 == TreeKit.LEAF) {
+								j = yy;
+							}
+						}
+						for (int yy = y + 1; j > 0 && yy < j; yy++) {
+							t.leaf(u, yy, v, PINK.a());
+						}
 					}
 				}
 			}
@@ -257,13 +262,6 @@ public final class TreeCherryLeaning implements Variant {
 			return near && hsh < pet + 9 ? b(Blocks.MOSS_CARPET) : null;
 		});
 		t.flush(c);
-	}
-
-	/** A cloud centred at the trunk's tip, as wide as the room allows, a little longer along the lean when it is sideways. */
-	private static Pad pad(int cu, int cy, int cv, double ra, int du, int dv, int w, int d) {
-		double rx = Math.min(ra * (du != 0 && dv == 0 ? 1.12 : 1.0), Math.min(cu, w - 1 - cu) + 0.9);
-		double rz = Math.min(ra * (dv != 0 && du == 0 ? 1.12 : 1.0), Math.min(cv, d - 1 - cv) + 0.9);
-		return new Pad(cu, cy, cv, Math.max(1.5, rx), Math.max(1.5, rz));
 	}
 
 	/** A cloud whose centre is moved inside the plot so that it fits. */
