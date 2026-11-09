@@ -53,7 +53,7 @@ References: `t3craft-ref/ui/t3code-real.png` (T3 Code, composer at the bottom ce
 ## 2. New thread = draft, as in T3 Code
 
 - "New thread" (the sidebar's ✎ next to search, the "+" that appears when hovering a project folder,
-  Ctrl+N, the ⋯ menu, and `NewThreadScreen.open(env, project)` from blocks) **opens no window**. It adds
+  Ctrl+N, the ⋯ menu, and `T3Screen.withDraft(env, project)` from blocks) **opens no window**. It adds
   a draft row ("✎ New thread") under its project, selects it, and the thread panel shows
   "project › New thread" with an empty transcript and the same composer, focused.
 - The draft's composer bar adds, after the clip, the **project chip** (`▣ project`, or

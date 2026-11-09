@@ -6,20 +6,17 @@ Usa la infraestructura de `docs/features/operate.md`. Una sola llamada, `orchest
 
 ## Para el jugador
 
-- **Pantalla `NewThreadScreen`**: botón "New thread…" del terminal portátil. Se elige el entorno
-  (solo los que tienen control/operate), el proyecto (lista del shell, en solo lectura) y el modelo
-  (opcional; si no, el del proyecto), y se escribe el prompt multilínea. "Review…" muestra un
-  resumen (entorno, proyecto, modelo, título, tamaño del prompt y sus primeras líneas) y desde ahí
-  "Launch". Los dos botones pasan por `OperateUi.guard`. No hay pantalla de confirmación porque no
-  es destructiva.
+- **Nuevo hilo**: ya no hay pantalla propia (`NewThreadScreen` se eliminó en feat/ui-native-kit; desde feat/t3-composer
+  nadie la abría). Como en T3 Code, es un borrador en el composer de `T3Screen` con el selector de proyecto
+  (`docs/features/t3-composer.md`); el primer mensaje lo lanza `DraftLauncher` con las mismas reglas de `ThreadLaunch`.
 - **Comando**: `/t3craft operate new <env> <proyecto> <prompt…>` (`Origin.COMMAND`). El proyecto es
   su id o su nombre exacto, entre comillas si tiene espacios. Usa el modelo por defecto.
 - **Resultado**: el `OperateResult` sale en el chat (y en la pantalla). Si T3 devuelve el
   `threadId`, se añade un enlace `[open chat]` que lo abre en el chat (el mismo helper que usa el
   buscador, `/t3craft search-open`). El NPC aparece por el flujo normal del shell: no se spawnea
   a mano.
-- **API para bloques** (feat/blocks-core): `NewThreadScreen.open(env, projectId)` abre la pantalla
-  con el proyecto preseleccionado. Cualquiera de los dos puede ser null.
+- **API para bloques** (feat/blocks-core): `T3Screen.withDraft(env, projectId)` abre el borrador con el proyecto
+  preseleccionado. Cualquiera de los dos puede ser null.
 
 ## Payload (contrato `t3code-ref` @ 15fe2832, `OrchestrationV2ThreadLaunchInput`)
 
@@ -56,4 +53,3 @@ Usa la infraestructura de `docs/features/operate.md`. Una sola llamada, `orchest
 | `ThreadLaunch` (payload, validación, proyectos, modelos, entornos con operate) | `dev.t3craft.t3` (puro, testeado en `ThreadLaunchTest`) |
 | `ShellState.View.projectDefaultModels` (cuarto componente; el constructor de 3 argumentos sigue) | `dev.t3craft.t3` |
 | `LaunchClient` (glue cliente), `LaunchCommand` (`operate new`) | `dev.t3craft.client.operate` |
-| `NewThreadScreen` | `dev.t3craft.client.screen` |

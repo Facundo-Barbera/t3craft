@@ -227,7 +227,7 @@ public final class T3Screen extends Screen {
 
 	/**
 	 * Opens on a new draft thread of {@code projectId} in {@code envId} (either may be null: the
-	 * selection or the first project), as T3's "new thread" (a block's {@code NewThreadScreen.open}).
+	 * selection or the first project), as T3's "new thread" (a block's "new thread here").
 	 */
 	public T3Screen withDraft(@Nullable String envId, @Nullable String projectId) {
 		pendingDraft = new String[] {envId, projectId};

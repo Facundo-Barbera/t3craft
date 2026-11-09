@@ -57,6 +57,11 @@ public final class T3PanelHost implements T3Panel.Host {
 		return modal != null;
 	}
 
+	/** True while the current page has a popup open (a select's list): it takes the pointer even outside the page's frame. */
+	public boolean overlayOpen() {
+		return current != null && current.overlayOpen();
+	}
+
 	/** Starts the stack with {@code root}. */
 	public void open(T3Panel root) {
 		stack.clear();

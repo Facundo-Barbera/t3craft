@@ -50,11 +50,14 @@ receta que el buscador de `T3Screen`).
 | **OperatePair** | `OperatePairScreen` (`T3DialogScreen`) | Aviso de riesgo, comando del host, campo, estado. |
 | **Confirm** | `ConfirmActionScreen` (`T3DialogScreen`) | Acción / hilo / entorno / aviso. Enter equivale a Cancelar, como antes (el foco estaba en Cancelar). |
 | **Snooze** | `SnoozeScreen` (`T3DialogScreen`) | Tres presets y Cancelar. |
-| **NewThread** | `NewThreadScreen` (`T3DialogScreen`) | Tres `T3Select` (entorno, proyecto, modelo) y la página de resumen. El prompt sigue siendo el `MultiLineEditBox` vanilla: el kit aún no tiene campo multilínea. Nota: desde feat/t3-composer nadie construye esta pantalla (`open` abre un borrador en `T3Screen`); se migró igualmente porque estaba en el alcance. |
 
 Los puntos de entrada no cambian: `new SettingsScreen(parent, actions)`, `new EnvironmentsScreen(...)`, `new PairScreen(parent[, readOnly])`,
-`new OperatePairScreen(...)`, `new ConfirmActionScreen(...)`, `new SnoozeScreen(...)` y `NewThreadScreen.open(...)` siguen siendo
+`new OperatePairScreen(...)`, `new ConfirmActionScreen(...)` y `new SnoozeScreen(...)` siguen siendo
 válidos (Mod Menu, la tecla J, `/t3craft config`, `/t3craft pair`, `OperateUi.run`, el menú contextual del sidebar).
+
+**Crear un hilo no es un diálogo del kit.** Como en T3 Code, "New thread" es el composer de la pantalla principal más el selector de
+proyecto: `T3Screen.withDraft(env, project)` abre un borrador (fila bajo su proyecto, chips de proyecto, modelo y espacio de trabajo) y el
+primer mensaje lo lanza (`DraftLauncher`). `NewThreadScreen` se eliminó en feat/ui-native-kit: nadie la construía desde feat/t3-composer.
 
 ### Páginas dentro de `T3Screen`
 
@@ -86,7 +89,7 @@ sidebar cierra la página. En el layout compacto la página ocupa la pantalla. L
 * `EnvironmentEditScreen`, `OutboundScreen`, `OutboundDestinationScreen`, `RegisterProjectDialog`, `QueueScreen`, `ArchiveScreen`,
   `HqMenuScreen` y `MergeStationScreen` siguen con widgets vanilla. Las tres de `config` (`BaseConfigScreen`) ya usan el fondo del
   kit, así que no desentonan al abrirse desde Settings; migrarlas es mecánico con el kit actual.
-* Falta un campo multilínea del kit (para el prompt de `NewThreadScreen`) y una casilla de verificación; el interruptor cubre el uso actual.
+* Falta un campo multilínea del kit y una casilla de verificación; el interruptor cubre el uso actual.
 * El scroll de `T3Panel` es por rueda (sin arrastrar la barra); los campos de texto salen de la vista entera, no se recortan.
 * `uiRender` no tiene fixtures de estas pantallas: la galería (`/t3dev ui`) es el camino. Pendiente: un tipo de pantalla
   `settings`/`environments`/`pair` en `Mock` (requiere sembrar `ConfigManager` en modo headless).

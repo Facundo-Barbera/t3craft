@@ -13,7 +13,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * A screen that is one {@link T3Dialog} over the kit's backdrop: what {@code Pair}, {@code OperatePair},
- * {@code Confirm}, {@code Snooze} and {@code NewThread} are. The subclass builds the dialog in
+ * {@code Confirm} and {@code Snooze} are. The subclass builds the dialog in
  * {@link #buildDialog()} (called on every {@code init()}, so it can read its own state) and decides what
  * Esc does in {@link #onClose()}. Follows F3+T like {@code T3Screen}: a changed style rebuilds the dialog.
  */

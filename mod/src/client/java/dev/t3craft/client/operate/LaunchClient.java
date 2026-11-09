@@ -21,7 +21,7 @@ import net.minecraft.network.chat.MutableComponent;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Client glue for item 23 (launch a thread), shared by {@code NewThreadScreen} and
+ * Client glue for item 23 (launch a thread), shared by the T3 screen's draft launcher and
  * {@code /t3craft operate new}. Reads the shell read-only from {@link DirectController#shellViews()};
  * the only write goes through {@link OperateUi#run}. <i>Client thread only.</i>
  */

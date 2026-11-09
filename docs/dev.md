@@ -165,7 +165,8 @@ tuning; combined with F3+T it is the fast loop for visual work.
 | `inbox`, `inbox-readonly`, `inbox-empty` | The main T3 screen: every thread state and a running conversation / read-only / no threads |
 | `inbox-settings`, `inbox-environments` | The main T3 screen with the settings / environment-list page in the thread's place (what the sidebar's gear and cloud open) |
 | `settings`, `settings-notifications`, `settings-connections`, `environments` | The same pages as screens of their own (a tab each; fake environments) |
-| `confirm`, `snooze`, `launch` | Kit dialogs: the destructive-action confirmation, the snooze presets, the new-thread form |
+| `launch` | The main T3 screen with a new-thread draft open in the composer (what "New thread" does; needs a paired environment with projects, otherwise it shows the plain inbox) |
+| `confirm`, `snooze` | Kit dialogs: the destructive-action confirmation and the snooze presets |
 | `pair`, `pair-readonly`, `operate-pair` | Kit dialogs: pairing (control by default / read-only) and enable-control |
 | `queue` | The queued-runs screen (reads the live queue) |
 
@@ -177,7 +178,7 @@ remains the headless layout check for agents (it has no fixtures for the kit's p
 
 ### 8. The UI kit (#14)
 
-Settings, Environments, Pair, OperatePair, Confirm, NewThread and Snooze are built on a small kit
+Settings, Environments, Pair, OperatePair, Confirm and Snooze are built on a small kit
 (`client/t3ui/kit`: button, toggle, field, select, list, tabs, dialog, panel) drawn with the `ChatTheme`
 tokens, so a colour or metric change in `ui-style.json` restyles them with F3+T. Settings and Environments
 are pages that open inside `T3Screen` (and as screens of their own); the others are modal dialogs. How it is

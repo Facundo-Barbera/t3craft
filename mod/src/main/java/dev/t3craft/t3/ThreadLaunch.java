@@ -18,7 +18,7 @@ import org.jspecify.annotations.Nullable;
  * Item 23 (feat/op-launch): create a thread in a project and send its first message, in one
  * {@code orchestration.launchThread} call ({@link OperateKind#THREAD_LAUNCH}, not destructive).
  * Pure logic, no Minecraft: payload, prompt validation, project/model choices read from the
- * read-only shell, and which environments can launch. The screen ({@code NewThreadScreen}) and the
+ * read-only shell, and which environments can launch. The draft launcher of the T3 screen and the
  * command ({@code /t3craft operate new}) only call this and {@code OperateUi}.
  *
  * <p>Contract ({@code t3code-ref} @ 15fe2832, {@code OrchestrationV2ThreadLaunchInput}):
