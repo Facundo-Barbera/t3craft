@@ -62,7 +62,7 @@ Estado de la ola 1:
 - nature-water también está integrada. Su segunda ronda va en dos partes: `design/trees2` (Opus, las 9 especies con copas en lóbulos) está en curso, y la de fuentes y jardines queda para cuando baje el número de agentes.
 - **Calidad de render (2026-11-09):** los jobs al PC salen por defecto en final con `--ss 3`; preview solo si se pide. El daemon del PC corre con 11 hilos y `-Xmx10g`. La GPU está pendiente de que Facundo decida (plan en la respuesta del coordinador): AO y sombras en CPU, o Chunky con GPU desde un export `.schem`.
 - **Citadel Studio en el PC** se actualizó a `79be0f6`: ahora lista todos los agentes con jobs, del más reciente al más viejo.
-- **Construcción (prioridad máxima):** `fix/build-walkable`, en curso. Hace que el HQ real use el mismo plan radial único que el demo (hoy `HqConstruction` lanza un trabajo por parte, de abajo hacia arriba) y agrega un corredor de suelo por delante del jugador en su dirección de avance. Criterio de aceptación: cruzar el mapa en línea recta sin caerse.
+- **Construcción:** `fix/build-walkable` **integrado en main**, compilado y pendiente de que Facundo haga la prueba de cruzar el mapa. Hace que el HQ real use el mismo plan radial único que el demo (hoy `HqConstruction` lanza un trabajo por parte, de abajo hacia arriba) y agrega un corredor de suelo por delante del jugador en su dirección de avance. Criterio de aceptación: cruzar el mapa en línea recta sin caerse.
 - **Hueco del renderer:** hqRender dibuja los banners (`*_banner` y `*_wall_banner`) como cajas de madera. Por eso no se pueden juzgar en imagen. Pendiente: un modelo de banner en `BlockModels`.
 
 Ola 2, pendiente:
