@@ -28,6 +28,9 @@ public final class T3CraftKeys {
 	private final KeyMapping reconnect = key("reconnect", UNBOUND);
 	private final KeyMapping reload = key("reload", UNBOUND);
 	private final KeyMapping toggleNotifications = key("toggle_notifications", UNBOUND);
+	/** Attention queue (docs/features/attention-queue.md): both unbound by default. */
+	private final KeyMapping attentionNext = key("attention_next", UNBOUND);
+	private final KeyMapping attentionLast = key("attention_last", UNBOUND);
 
 	/**
 	 * Vanilla throws when a category id is registered twice (a hot-swapped class re-running its
@@ -47,7 +50,7 @@ public final class T3CraftKeys {
 	}
 
 	public List<KeyMapping> all() {
-		return List.of(openSettings, openEnvironments, pair, reconnect, reload, toggleNotifications);
+		return List.of(openSettings, openEnvironments, pair, reconnect, reload, toggleNotifications, attentionNext, attentionLast);
 	}
 
 	/** Registers with Fabric. Call once from the client initializer. */
@@ -82,6 +85,21 @@ public final class T3CraftKeys {
 			ConfigManager.SaveResult r = ConfigManager.get().update(s -> s.withNotifications(s.notifications().withEnabled(!s.notifications().enabled())));
 			boolean on = ConfigManager.get().settings().notifications().enabled();
 			overlay(mc, "T3Craft notifications " + (on ? "on" : "muted") + (r.ok() ? "" : " (" + r.message() + ")"));
+		}
+		tickAttention(mc);
+	}
+
+	/** Split from {@link #tick} so the attention keys stay one delimited block. */
+	private void tickAttention(Minecraft mc) {
+		while (attentionNext.consumeClick()) {
+			if (mc.gui.screen() == null) {
+				dev.t3craft.client.attention.AttentionClient.openNext(mc);
+			}
+		}
+		while (attentionLast.consumeClick()) {
+			if (mc.gui.screen() == null) {
+				dev.t3craft.client.attention.AttentionClient.openLast(mc);
+			}
 		}
 	}
 
