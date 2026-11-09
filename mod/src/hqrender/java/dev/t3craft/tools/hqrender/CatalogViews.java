@@ -52,6 +52,22 @@ final class CatalogViews {
 	private record Cell(Variant v, Plot plot, String label, int row) {
 	}
 
+	/** Explicit gallery sizes {w, d, h} from {@code --boxes}, or null for the min/middle/max spread. */
+	static List<int[]> boxes;
+
+	/** Parses {@code 1x1x7,3x3x7}. */
+	static List<int[]> parseBoxes(String s) {
+		List<int[]> out = new ArrayList<>();
+		for (String part : s.split(",")) {
+			String[] t = part.trim().toLowerCase(Locale.ROOT).split("x");
+			if (t.length != 3) {
+				throw new IllegalArgumentException("--boxes wants WxDxH[,WxDxH...], got " + s);
+			}
+			out.add(new int[] {Integer.parseInt(t[0]), Integer.parseInt(t[1]), Integer.parseInt(t[2])});
+		}
+		return out;
+	}
+
 	/** Upper end of each family's typical height (the gallery's tallest size). */
 	private static int typicalMaxH(Family f) {
 		return switch (f) {
@@ -335,6 +351,9 @@ final class CatalogViews {
 
 	/** {w, d, h} sizes spread over the variant's range: min, middle, max (deduplicated, up to n). */
 	private static List<int[]> sizes(Variant v, int n) {
+		if (boxes != null) {
+			return boxes; // --boxes WxDxH,...: exactly these sizes (what the city asks for)
+		}
 		int w1 = v.minW();
 		int w2 = cap(v.maxW(), w1);
 		int d1 = v.minD();
