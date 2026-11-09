@@ -87,7 +87,7 @@ public final class StallTeaBar implements Variant {
 		for (int u : new int[] {0, w - 1}) {
 			for (int v : new int[] {0, d - 1}) {
 				p.set(c, u, 0, v, b(Blocks.POLISHED_DEEPSLATE)); // [palette] dark footing...
-				p.set(c, u, 1, v, b(Blocks.CHERRY_LOG)); // ...pink shaft...
+				p.set(c, u, 1, v, b(Blocks.CHERRY_FENCE)); // ...a slim pink shaft, so the front stays open...
 				p.set(c, u, 2, v, b(Blocks.STRIPPED_CHERRY_LOG)); // ...pale bracket under the eave
 			}
 		}
@@ -109,7 +109,7 @@ public final class StallTeaBar implements Variant {
 
 	private static void bar(CitadelCanvas c, Plot p) {
 		int w = p.w();
-		for (int u = 0; u < w; u++) {
+		for (int u = 1; u < w - 1; u++) { // the bar stops short of the pillars: open sides
 			p.set(c, u, 0, 1, barBody(p, u));
 			switch (p.hash(u, 1, 1, 5)) {
 				case 0 -> p.set(c, u, 1, 1, b(Blocks.WATER_CAULDRON).setValue(BlockStateProperties.LEVEL_CAULDRON, 3)); // a kettle
@@ -118,9 +118,7 @@ public final class StallTeaBar implements Variant {
 				default -> p.set(c, u, 1, 1, b(Blocks.POTTED_PINK_TULIP));
 			}
 		}
-		// [finish] the ends of the bar carry a standing lantern; the middle always has a kettle and a teapot
-		p.set(c, 0, 1, 1, b(Blocks.LANTERN));
-		p.set(c, w - 1, 1, 1, b(Blocks.LANTERN));
+		// [finish] the middle always has a kettle and a teapot (lanterns hang from the roof above the bar ends)
 		int mid = w / 2;
 		p.set(c, mid, 1, 1, b(Blocks.WATER_CAULDRON).setValue(BlockStateProperties.LEVEL_CAULDRON, 3));
 		p.set(c, mid - 1, 1, 1, b(Blocks.FLOWER_POT));

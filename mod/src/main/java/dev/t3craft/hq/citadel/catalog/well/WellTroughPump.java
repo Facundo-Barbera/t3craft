@@ -31,7 +31,7 @@ import net.minecraft.world.level.block.state.properties.WallSide;
  *  v4  ▦ ✿ . ▦ ✿ . .   hay, flowers
  * </pre>
  *
- * Size: 5–8 × 3–5 × 4+ (the pump house roof sits at y3 on 4-high plots, y4 from 5; ridge cap and finial when there is room).
+ * Size: 5–8 × 3–5 × 4+ (the pump house from height 5, with its ridge cap and finial when there is room; on 4-high plots a lantern post instead).
  */
 public final class WellTroughPump implements Variant {
 	private static final BlockState CORNER = b(Blocks.CHISELED_STONE_BRICKS);
@@ -84,7 +84,11 @@ public final class WellTroughPump implements Variant {
 
 		trough(c, p, ue, vf, vm, vk);
 		pump(c, p, pu, vm, vk);
-		canopy(c, p, ue, vf, vm, vk);
+		if (p.h() >= 5) {
+			canopy(c, p, ue, vf, vm, vk);
+		} else {
+			lanternPost(c, p, vk); // too low for a pump house: the pump and its lantern post stand in the open
+		}
 		barrels(c, p, w - 1, vf, vm, vk);
 		if (vf == 1) {
 			curb(c, p);
@@ -152,6 +156,12 @@ public final class WellTroughPump implements Variant {
 				.setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.EAST), CitadelCanvas.DECOR);
 	}
 
+	/** A cherry fence post on the back-left corner, joined to the pump head, with a lantern on top. */
+	private static void lanternPost(CitadelCanvas c, Plot p, int vk) {
+		p.set(c, 0, 2, vk, b(Blocks.CHERRY_FENCE).setValue(BlockStateProperties.EAST, true)); // the pump head is beside it
+		p.set(c, 0, 3, vk, b(Blocks.LANTERN));
+	}
+
 	// ------------------------------------------------------------------ canopy (h >= 5)
 
 	/**
@@ -161,12 +171,12 @@ public final class WellTroughPump implements Variant {
 	 * height 6, closed gables and a lantern hanging beside the spout.
 	 */
 	private static void canopy(CitadelCanvas c, Plot p, int ue, int vf, int vm, int vk) {
-		int r = p.h() >= 5 ? 4 : 3; // the roof row; a lower pump house on 4-high plots (over the pump cap)
+		int r = 4; // the roof row
 		int ur = Math.min(2, ue - 1); // the canopy's right posts; the trough runs on past them in the open
 		for (int u : new int[] {0, ur}) {
 			for (int v : new int[] {vf, vk}) {
 				for (int y = 2; y < r; y++) {
-					p.set(c, u, y, v, y == r - 1 && r == 4 ? b(Blocks.STRIPPED_CHERRY_LOG) : b(Blocks.CHERRY_FENCE));
+					p.set(c, u, y, v, y == r - 1 ? b(Blocks.STRIPPED_CHERRY_LOG) : b(Blocks.CHERRY_FENCE));
 				}
 			}
 		}
@@ -189,14 +199,10 @@ public final class WellTroughPump implements Variant {
 		if (p.h() > r + 2) {
 			p.set(c, 1, r + 2, vm, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState()); // [finish] a copper finial
 		}
-		if (r == 4) {
-			// [depth] the gable ends: upside-down stairs under the ridge; a lantern hangs beside the spout
-			p.set(c, 0, 3, vm, stairs(Blocks.SPRUCE_STAIRS, Direction.EAST).setValue(BlockStateProperties.HALF, Half.TOP));
-			p.set(c, ur, 3, vm, stairs(Blocks.SPRUCE_STAIRS, Direction.WEST).setValue(BlockStateProperties.HALF, Half.TOP));
-			p.put(c, ur, 2, vm, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
-		} else {
-			p.set(c, p.w() - 1, 2, vk, b(Blocks.LANTERN)); // no headroom under the low roof: the lantern stands on the barrels
-		}
+		// [depth] the gable ends: upside-down stairs under the ridge; a lantern hangs beside the spout
+		p.set(c, 0, 3, vm, stairs(Blocks.SPRUCE_STAIRS, Direction.EAST).setValue(BlockStateProperties.HALF, Half.TOP));
+		p.set(c, ur, 3, vm, stairs(Blocks.SPRUCE_STAIRS, Direction.WEST).setValue(BlockStateProperties.HALF, Half.TOP));
+		p.put(c, ur, 2, vm, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
 	}
 
 	// ------------------------------------------------------------------ props
