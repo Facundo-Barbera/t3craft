@@ -199,6 +199,17 @@ public final class PlanterTallPot implements Variant {
 	 * low one), with a low pedestal pot in front of some of them when the plot is deep enough.
 	 */
 	private static void cluster(CitadelCanvas c, Plot p, Mat m, int u0, int n, int vb, boolean mir) {
+		if (p.d() >= 2 && p.h() >= 5 && n >= 2) {
+			// the tall one is a 2 x 2 jar (wide, not a stretched tower), with a mid pot beside it and a low one in front
+			int ju = mx(p, mir, u0, 2);
+			jar(c, p, m, ju, vb - 1, kindOf(p, ju, vb));
+			if (n >= 3) {
+				int u = mx(p, mir, u0 + 2, 1);
+				unit(c, p, m, u, vb, 1, kindOf(p, u, vb));
+				unit(c, p, m, u, vb - 1, 0, kindOf(p, u, vb - 1));
+			}
+			return;
+		}
 		int[] tiers = n == 1 ? new int[] {2} : n == 2 ? new int[] {2, 1} : new int[] {1, 2, 0};
 		for (int i = 0; i < n; i++) {
 			int u = mx(p, mir, u0 + i, 1);
@@ -279,6 +290,79 @@ public final class PlanterTallPot implements Variant {
 		for (int y = y0; y <= y1; y++) {
 			BambooLeaves l = y == y1 ? BambooLeaves.LARGE : y == y1 - 1 && y1 > y0 ? BambooLeaves.SMALL : BambooLeaves.NONE;
 			p.set(c, u, y, v, b(Blocks.BAMBOO).setValue(BlockStateProperties.AGE_1, 1).setValue(BlockStateProperties.BAMBOO_LEAVES, l));
+		}
+	}
+
+	// ------------------------------------------------------------------ the jar
+
+	/**
+	 * A 2 x 2 jar at ({@code u0}, {@code v0}): a dark foot, a coloured body (two blocks with a light lip band from
+	 * height 6) and moss or podzol on all four cells, planted as a clump: four azaleas with a leafy crown, large
+	 * ferns, bamboo of three heights, or a dwarf cherry with the trunk on one cell and the crown over all four.
+	 */
+	private static void jar(CitadelCanvas c, Plot p, Mat m, int u0, int v0, int kind) {
+		int h = p.h();
+		int body = h >= 6 ? 2 : 1;
+		int sy = body + 1;
+		int room = Math.min(h - sy - 1, 3);
+		int y1 = sy + 1;
+		for (int du = 0; du < 2; du++) {
+			for (int dv = 0; dv < 2; dv++) {
+				int u = u0 + du;
+				int v = v0 + dv;
+				p.set(c, u, 0, v, foot(m, p, u, v));
+				for (int y = 1; y <= body; y++) {
+					p.set(c, u, y, v, y == body && body >= 2 ? m.lip() : body(m, p, u, y, v));
+				}
+				p.set(c, u, sy, v, soil(p, u, v));
+			}
+		}
+		int tu = u0 + p.hash(u0, 8, v0, 2); // the cell of the trunk, the tallest stalk
+		int tv = v0 + p.hash(u0, 9, v0, 2);
+		if (kind == 3 && room >= 2) {
+			int tr = Math.max(1, Math.min(room - 1, 2));
+			for (int y = y1; y < y1 + tr; y++) {
+				p.set(c, tu, y, tv, b(Blocks.STRIPPED_CHERRY_LOG));
+			}
+			int ry = y1 + tr - 1;
+			for (int du = 0; du < 2; du++) {
+				for (int dv = 0; dv < 2; dv++) {
+					int u = u0 + du;
+					int v = v0 + dv;
+					if (u != tu || v != tv) {
+						p.set(c, u, ry, v, leaves(p.hash(u, ry, v, 4) == 0 ? Blocks.FLOWERING_AZALEA_LEAVES : Blocks.CHERRY_LEAVES));
+					}
+					p.set(c, u, ry + 1, v, leaves(Blocks.CHERRY_LEAVES));
+				}
+			}
+			return;
+		}
+		for (int du = 0; du < 2; du++) {
+			for (int dv = 0; dv < 2; dv++) {
+				int u = u0 + du;
+				int v = v0 + dv;
+				boolean lead = u == tu && v == tv;
+				if (kind == 2 && room >= 2) {
+					if (p.hash(u, 7, v, 4) != 0 || lead) {
+						stalk(c, p, u, v, y1, y1 + (lead ? room : Math.max(1, room - 1 - p.hash(u, 6, v, 2))) - 1);
+					}
+				} else if (kind == 1) {
+					if (lead && room >= 2) {
+						p.set(c, u, y1, v, b(Blocks.LARGE_FERN).setValue(BlockStateProperties.DOUBLE_BLOCK_HALF, DoubleBlockHalf.LOWER));
+						p.set(c, u, y1 + 1, v, b(Blocks.LARGE_FERN).setValue(BlockStateProperties.DOUBLE_BLOCK_HALF, DoubleBlockHalf.UPPER));
+					} else {
+						p.set(c, u, y1, v, b(Blocks.FERN));
+					}
+				} else {
+					p.set(c, u, y1, v, b(Blocks.FLOWERING_AZALEA));
+					if (room >= 2 && (lead || p.hash(u, 5, v, 2) == 0)) {
+						p.set(c, u, y1 + 1, v, leaves(lead ? Blocks.FLOWERING_AZALEA_LEAVES : Blocks.AZALEA_LEAVES));
+					}
+					if (room >= 3 && lead) {
+						p.set(c, u, y1 + 2, v, leaves(Blocks.FLOWERING_AZALEA_LEAVES));
+					}
+				}
+			}
 		}
 	}
 
