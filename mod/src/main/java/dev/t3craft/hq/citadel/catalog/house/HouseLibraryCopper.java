@@ -280,7 +280,11 @@ public final class HouseLibraryCopper implements Variant {
 					}
 					boolean exposed = dist > rn;
 					BlockState st;
-					if (!exposed) {
+					if (!exposed && k <= 1 && dist > rk - 1.0) {
+						// [depth] the first two courses are a drum: calcite piers between stained-glass lights
+						double sec = g.sector(u, v);
+						st = (sec < 0.2 || sec > 0.8) ? b(Blocks.CALCITE) : tintBlock(JEWELS[p.hash(u, k, v, JEWELS.length)]);
+					} else if (!exposed) {
 						st = b(copper(level)); // core under the next ring
 					} else if (k == 0 && (Math.abs(u - g.cu()) < 0.6 || Math.abs(v - g.cv()) < 0.6)) {
 						st = b(chiseled(level)); // a chiselled copper boss at the four compass points

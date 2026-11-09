@@ -168,16 +168,15 @@ public final class HouseTowerLookout implements Variant {
 	// ------------------------------------------------------------------ materials
 
 	private static BlockState deepslate(Plot p, int u, int y, int v) {
-		return switch (p.hash(u, y, v, 7)) {
+		return switch (p.hash(u, y, v, 10)) {
 			case 0 -> b(Blocks.CRACKED_DEEPSLATE_BRICKS);
 			case 1 -> b(Blocks.COBBLED_DEEPSLATE);
-			case 2 -> b(Blocks.POLISHED_DEEPSLATE);
 			default -> b(Blocks.DEEPSLATE_BRICKS);
 		};
 	}
 
 	private static BlockState stone(Plot p, int u, int y, int v) {
-		return switch (p.hash(u, y, v, 8)) {
+		return switch (p.hash(u, y, v, 14)) {
 			case 0 -> b(Blocks.MOSSY_STONE_BRICKS);
 			case 1 -> b(Blocks.CRACKED_STONE_BRICKS);
 			default -> b(Blocks.STONE_BRICKS);
@@ -425,7 +424,7 @@ public final class HouseTowerLookout implements Variant {
 					if (!g.in(u, v, r)) {
 						continue;
 					}
-					boolean crown = r < 1.8; // the top rings are oxidised copper, to match the library's dome
+					boolean crown = r < 2.7; // the top rings are oxidised copper, to match the library's dome
 					Block stairBlock = crown ? Blocks.CUT_COPPER_STAIRS.waxed().oxidized() : k == 0 ? g.s.eaveStair() : g.s.roofStair();
 					if (single) {
 						set(c, g.p, u, y, v, slab(Blocks.CUT_COPPER_SLAB.waxed().oxidized(), false));
