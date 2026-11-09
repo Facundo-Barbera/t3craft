@@ -57,11 +57,15 @@ public final class HubUndercroft {
 					pillar(c, x, z);
 				} else if (CitadelHub.arcadeZ(z) && !stairCell(x, z)) {
 					c.set(x, y0() - 1, z, HubBlocks.strippedLog(Direction.Axis.X));
+				} else if (Math.abs(x) == HubDims.NAVE_HALF() && Math.abs(z) <= HubDims.PILASTER_Z() + c.s(4)) {
+					c.set(x, y0() - 1, z, HubBlocks.strippedLog(Direction.Axis.Z));
 				}
 			}
 		}
 		desks(c);
+		deskRows(c);
 		indexTable(c);
+		oculus(c);
 		descents(c);
 		rails(c);
 		lights(c);
@@ -175,6 +179,44 @@ public final class HubUndercroft {
 						: slab(Blocks.CHERRY_SLAB));
 				if (seat) {
 					put(c, sx * (dx - 1), 1, z, stairs(Blocks.CHERRY_STAIRS, out.getOpposite()));
+				}
+			}
+		}
+	}
+
+	/** Desks along the north and south walls, either side of the centre lane: the same desk, chair and lectern. */
+	private static void deskRows(CitadelCanvas c) {
+		int dz = HubDims.INNER() - 1;
+		int lane = c.s(1) + 1;
+		int xMax = HubDims.NAVE_HALF() - 1;
+		for (int sz = -1; sz <= 1; sz += 2) {
+			Direction out = sz > 0 ? Direction.SOUTH : Direction.NORTH;
+			for (int ax = lane; ax <= xMax; ax++) {
+				for (int sx = -1; sx <= 1; sx += 2) {
+					int x = sx * ax;
+					if (!inside(c, x, sz * dz) || !free(c, x, 1, sz * dz)) {
+						continue;
+					}
+					boolean seat = ax % 2 == 1;
+					boolean lectern = seat && (ax / 2) % 2 == 0;
+					c.set(x, 1, sz * dz, lectern
+							? Blocks.LECTERN.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, out.getOpposite())
+							: slab(Blocks.CHERRY_SLAB));
+					if (seat) {
+						put(c, x, 1, sz * (dz - 1), stairs(Blocks.CHERRY_STAIRS, out.getOpposite()));
+					}
+				}
+			}
+		}
+	}
+
+	/** A glass oculus in the nave's floor under the hologram: the index table and its lantern show through it. */
+	private static void oculus(CitadelCanvas c) {
+		int h = c.s(1);
+		for (int x = -h; x <= h; x++) {
+			for (int z = -h; z <= h; z++) {
+				if (inside(c, x, z) && !free(c, x, y0(), z)) {
+					c.set(x, y0(), z, HubBlocks.glass(net.minecraft.world.item.DyeColor.LIGHT_BLUE));
 				}
 			}
 		}
