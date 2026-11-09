@@ -55,6 +55,12 @@ import org.jspecify.annotations.Nullable;
  *   left of the foundation budget, only {@code build.fillRingsBehind} rings behind the front ring (or
  *   anywhere once nothing above or ground is left).</li>
  * </ol>
+ * <p><b>The corridor</b> (fix/build-walkable) runs before all of them: while a player is in the build, the
+ * ground (surface + support) of the columns under its feet and of a corridor {@code build.corridorWidth}
+ * wide and {@code build.corridorLength} long ahead of it, along the way it moves (velocity smoothed from
+ * its position every tick, so turning re-aims it within a few ticks), goes first, with no ring limit, at
+ * {@code build.corridorBlocksPerTick} (and {@code build.corridorMsPerTick}, not lowered by the throttle).
+ * The floor always runs ahead of a walking or running player; outside the corridor the rings rule as before.
  * With {@code build.fastFoundation} (off by default) the old fast base comes back: every foundation entry
  * goes in the streams, with no ring limit, at the whole foundation budget.
  *
@@ -96,6 +102,16 @@ public final class RadialCursor implements JobCursor {
 	static final int FILL_SKIPS = 1024;
 	/** No front ring (nothing above or ground left that is not stalled). */
 	static final int NO_RING = Integer.MAX_VALUE / 4;
+	/** fix/build-walkable: the corridor always covers this radius around the player's feet (blocks). */
+	static final double FEET_RADIUS = 2.0;
+	/** Sample step of the corridor scan (blocks): half a block, so a diagonal corridor has no holes. */
+	static final double SAMPLE = 0.5;
+	/** The player counts as moving above this smoothed speed (blocks/s): the corridor reaches ahead. */
+	static final double MOVING_SPEED = 1.0;
+	/** Time constant of the velocity smoothing (ms): ~3 ticks, so a turn re-aims the corridor quickly. */
+	static final double VELOCITY_TAU_MS = 150.0;
+	/** A jump faster than this (blocks/s) is a teleport: the velocity starts again from zero. */
+	static final double TELEPORT_SPEED = 30.0;
 
 	/** Builder {@code front} starts walking to plan-relative feet cell {@code stand} to apply {@code index}, arriving in {@code ticks}. */
 	@FunctionalInterface
@@ -181,6 +197,15 @@ public final class RadialCursor implements JobCursor {
 	private double sortedZ;
 	private long sortedAt = Long.MIN_VALUE / 2;
 	private @Nullable CompletableFuture<int[][]> pendingOrder;
+	/** fix/build-walkable: a player is in the build (the centre is a player, not the fallback). Server thread. */
+	private boolean hasPlayer;
+	/** Smoothed player velocity, plan-relative blocks/s, and the last sample it was measured from. */
+	private double vx;
+	private double vz;
+	private double trackX;
+	private double trackZ;
+	private long trackAt;
+	private boolean trackValid;
 
 	private volatile int done;
 	private volatile int placed;
@@ -469,6 +494,7 @@ public final class RadialCursor implements JobCursor {
 	 * built brings the ground on that side first. Server thread.
 	 */
 	void focus(double @Nullable [] rel, long nowMs) {
+		track(rel, nowMs);
 		double fx = rel == null ? fallback[0] : rel[0];
 		double fz = rel == null ? fallback[1] : rel[1];
 		cx = fx;
@@ -492,6 +518,41 @@ public final class RadialCursor implements JobCursor {
 		int[] zs = colZ;
 		int r = ring;
 		pendingOrder = Offload.supply(dev.t3craft.debug.PerfStats.STEP_RADIAL_ORDER, () -> order(xs, zs, ox, oz, r));
+	}
+
+	/**
+	 * fix/build-walkable: the player's velocity (plan-relative, blocks/s), smoothed over ~{@link #VELOCITY_TAU_MS}
+	 * from its position every tick; reset by a teleport, a gap of more than a second, or nobody in the build.
+	 */
+	private void track(double @Nullable [] rel, long nowMs) {
+		if (rel == null) {
+			hasPlayer = false;
+			trackValid = false;
+			vx = 0;
+			vz = 0;
+			return;
+		}
+		hasPlayer = true;
+		if (trackValid) {
+			long dt = nowMs - trackAt;
+			if (dt <= 0) {
+				return; // same millisecond: wait for a measurable step
+			}
+			double ix = (rel[0] - trackX) * 1000.0 / dt;
+			double iz = (rel[1] - trackZ) * 1000.0 / dt;
+			if (dt > 1000 || ix * ix + iz * iz > TELEPORT_SPEED * TELEPORT_SPEED) {
+				vx = 0;
+				vz = 0;
+			} else {
+				double a = Math.min(1.0, dt / VELOCITY_TAU_MS);
+				vx += (ix - vx) * a;
+				vz += (iz - vz) * a;
+			}
+		}
+		trackX = rel[0];
+		trackZ = rel[1];
+		trackAt = nowMs;
+		trackValid = true;
 	}
 
 	/** Installs a finished re-order (the scans start again from the new nearest ring). */
@@ -646,8 +707,9 @@ public final class RadialCursor implements JobCursor {
 			bWake = Integer.MAX_VALUE;
 			vWake = Integer.MAX_VALUE;
 			BuildTuning t = BuildBudget.global().tuning();
+			int corridor = tickCorridor(step, t); // fix/build-walkable: the floor ahead of the player first
 			visRing = frontRing();
-			int groundDone = tickGround(step, t);
+			int groundDone = tickGround(step, t) + corridor;
 			int built = tickBuilders(allowance, step, t);
 			tickFill(step, t);
 			// the hidden fill never holds a stuck piece back: only ground and builders count here
@@ -675,6 +737,87 @@ public final class RadialCursor implements JobCursor {
 			scanned++;
 		}
 		return vPtr < cols ? ringAt[vPtr] : NO_RING;
+	}
+
+	/**
+	 * fix/build-walkable: the corridor stream. The ground (surface + its support layer) of every column under
+	 * the player's feet ({@link #FEET_RADIUS}) and, while it moves, of a corridor {@code build.corridorWidth}
+	 * wide reaching {@code build.corridorLength} blocks ahead along its smoothed velocity, nearest first
+	 * (along the way, then outwards from the middle line). No ring limit: it runs before every other stream,
+	 * at {@code build.corridorBlocksPerTick} and {@code build.corridorMsPerTick} (not lowered by the MSPT / FPS
+	 * throttle, it is the one thing that must keep up), and what it places is taken from the foundation budget
+	 * the ground and fill streams share. Cost: about {@code (length + 2) × 2 × (width × 2 + 1)} hash lookups per
+	 * tick (≈ 650 with the defaults) plus the placements; no world reads (the sink skips cells already right).
+	 */
+	private int tickCorridor(FrontCursor.Step step, BuildTuning t) {
+		int max = t.corridorBlocksPerTick();
+		if (!hasPlayer || max <= 0 || cols == 0) {
+			return 0;
+		}
+		long nanos = (long) (t.corridorMsPerTick() * 1_000_000.0);
+		long t0 = System.nanoTime();
+		int count = 0;
+		int skips = 0;
+		try {
+			double speed = Math.hypot(vx, vz);
+			boolean moving = speed >= MOVING_SPEED;
+			double hx = moving ? vx / speed : 1.0;
+			double hz = moving ? vz / speed : 0.0;
+			double len = moving ? Math.max(FEET_RADIUS, t.corridorLength()) : FEET_RADIUS;
+			double half = moving ? t.corridorWidth() / 2.0 : FEET_RADIUS + SAMPLE;
+			double px0 = cx;
+			double pz0 = cz;
+			int last = -1;
+			outer:
+			for (double s = -FEET_RADIUS; s <= len; s += SAMPLE) {
+				double w = s <= FEET_RADIUS ? Math.max(half, FEET_RADIUS + SAMPLE) : half;
+				for (int k = 0; ; k++) {
+					double o = ((k + 1) / 2) * SAMPLE * (k % 2 == 0 ? 1 : -1); // 0, -0.5, +0.5, -1, +1, ...
+					if (Math.abs(o) > w) {
+						break;
+					}
+					int bx = (int) Math.floor(px0 + hx * s - hz * o);
+					int bz = (int) Math.floor(pz0 + hz * s + hx * o);
+					int c = colAt.get(CrewPlanner.key(bx, 0, bz));
+					if (c < 0 || c == last) {
+						continue;
+					}
+					last = c;
+					boolean worked = false;
+					while (true) {
+						int i = head(c);
+						if (i < 0 || !ground[i]) {
+							break;
+						}
+						BuildCursor.Outcome out = step.apply(-1, i);
+						if (out == BuildCursor.Outcome.BLOCKED) {
+							break outer; // free jobs never block; look again next tick
+						}
+						applied(i, out, false);
+						worked = true;
+						if (out == BuildCursor.Outcome.SKIPPED) {
+							skips++;
+						} else {
+							count++;
+						}
+						if (count >= max || skips >= BuildCursor.DEFAULT_MAX_SKIPS_PER_TICK) {
+							touched(c);
+							break outer;
+						}
+					}
+					if (worked) {
+						touched(c); // its head is a builder's (or nothing) now: let the other scans look back at it
+						if (System.nanoTime() - t0 > nanos) {
+							break outer;
+						}
+					}
+				}
+			}
+		} finally {
+			BuildBudget.global().spendFoundation(count, System.nanoTime() - t0);
+			dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_RADIAL_CORRIDOR, t0);
+		}
+		return count + skips;
 	}
 
 	/** Ground stream: ground and air entries (and entries already right) of the columns in ring order, ring-limited. */
@@ -1260,6 +1403,6 @@ public final class RadialCursor implements JobCursor {
 	/** Columns / columns done / current centre / front ring (status, debug). */
 	public String describe() {
 		return "radial cols " + colsDone + "/" + cols + " centre " + Math.round(cx) + "," + Math.round(cz) + " ring " + ring + " front "
-				+ (visRing >= NO_RING ? "-" : String.valueOf(visRing));
+				+ (visRing >= NO_RING ? "-" : String.valueOf(visRing)) + (hasPlayer ? String.format(java.util.Locale.ROOT, " speed %.1f", Math.hypot(vx, vz)) : "");
 	}
 }

@@ -36,18 +36,25 @@ import java.util.List;
  *   "foundationRingsAhead": 1, // the surface goes at most this many rings ahead of the ring being finished
  *   "builderRingsAhead": 1,    // builders work at most this many rings ahead of it
  *   "fillRingsBehind": 2,      // the hidden fill trails the ring being finished by this many rings
- *   "climbBlocksPerTick": 10   // pace of a builder raising a tall wall span (floor: blocksPerTick)
+ *   "climbBlocksPerTick": 10,  // pace of a builder raising a tall wall span (floor: blocksPerTick)
+ *   // fix/build-walkable (radial jobs): a ground corridor ahead of the walking player, absolute priority
+ *   "corridorLength": 20,      // blocks ahead of the player (while it moves); 0 = only the cells under its feet
+ *   "corridorWidth": 7,        // width of the corridor, blocks
+ *   "corridorBlocksPerTick": 64, // ground entries per tick for the corridor (and the start-up primer), before any other stream
+ *   "corridorMsPerTick": 3     // ...and most wall-clock ms per tick for them (not lowered by the MSPT / FPS throttle)
  * },
  * "buildNearPlayer": { "enabled": true, "radius": 48 }
  * }</pre>
  * Defaults and their reasons: docs/feat-parallel-build.md, docs/feat-build-near-player.md, docs/feat-build-radial.md
  * (feat/build-radial lowered foundationBlocksPerTick 4096 → 192 and blocksPerTick 12 → 6: a visible pace;
- * fix/build-radial-tune turned fastFoundation off and added the ground / fill / ring / climb settings).
+ * fix/build-radial-tune turned fastFoundation off and added the ground / fill / ring / climb settings;
+ * fix/build-walkable added the corridor settings).
  */
 public record BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int frontsPerJob, int maxEffectsPerTick, boolean autoThrottle,
 		double targetMspt, boolean fastFoundation, int foundationBlocksPerTick, double foundationMsPerTick, double blocksPerTick, int crew,
 		boolean nearPlayer, int nearPlayerRadius, boolean radial, int radialRing, int groundBlocksPerTick, int fillBlocksPerTick,
-		int foundationRingsAhead, int builderRingsAhead, int fillRingsBehind, double climbBlocksPerTick) {
+		int foundationRingsAhead, int builderRingsAhead, int fillRingsBehind, double climbBlocksPerTick, int corridorLength, int corridorWidth,
+		int corridorBlocksPerTick, double corridorMsPerTick) {
 	public static final String SECTION = "build";
 	/** feat/build-near-player: top-level object {@code {enabled, radius}}. */
 	public static final String NEAR_SECTION = "buildNearPlayer";
@@ -60,7 +67,7 @@ public record BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int front
 	public static final String ORDER_PARTS = "parts";
 	/** fix/build-radial-tune: fastFoundation off; ground 32, fill 128, rings ahead 1 / 1, fill 2 rings behind, climb 10. */
 	public static final BuildTuning DEFAULTS = new BuildTuning(96, 3, 8, 8, true, 40.0, false, 192, 10.0, 6.0, 8, true, 48, true, 5, 32, 128, 1, 1, 2,
-			10.0);
+			10.0, 20, 7, 64, 3.0);
 
 	public BuildTuning {
 		maxBlocksPerTick = clamp(maxBlocksPerTick, 1, 4096);
@@ -88,6 +95,22 @@ public record BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int front
 		if (!(climbBlocksPerTick >= 0.5 && climbBlocksPerTick <= 64)) {
 			climbBlocksPerTick = 10.0;
 		}
+		corridorLength = clamp(corridorLength, 0, 64);
+		corridorWidth = clamp(corridorWidth, 1, 15);
+		corridorBlocksPerTick = clamp(corridorBlocksPerTick, 0, 4096);
+		if (!(corridorMsPerTick >= 0.1 && corridorMsPerTick <= 20)) {
+			corridorMsPerTick = 3.0;
+		}
+	}
+
+	/** fix/build-radial-tune constructor: the fix/build-walkable corridor settings at their defaults. */
+	public BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int frontsPerJob, int maxEffectsPerTick, boolean autoThrottle, double targetMspt,
+			boolean fastFoundation, int foundationBlocksPerTick, double foundationMsPerTick, double blocksPerTick, int crew, boolean nearPlayer,
+			int nearPlayerRadius, boolean radial, int radialRing, int groundBlocksPerTick, int fillBlocksPerTick, int foundationRingsAhead,
+			int builderRingsAhead, int fillRingsBehind, double climbBlocksPerTick) {
+		this(maxBlocksPerTick, maxConcurrentJobs, frontsPerJob, maxEffectsPerTick, autoThrottle, targetMspt, fastFoundation, foundationBlocksPerTick,
+				foundationMsPerTick, blocksPerTick, crew, nearPlayer, nearPlayerRadius, radial, radialRing, groundBlocksPerTick, fillBlocksPerTick,
+				foundationRingsAhead, builderRingsAhead, fillRingsBehind, climbBlocksPerTick, 20, 7, 64, 3.0);
 	}
 
 	/** feat/build-radial constructor: the fix/build-radial-tune settings at their defaults. */
@@ -191,6 +214,10 @@ public record BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int front
 		int bAhead = (int) number(SECTION, s, "builderRingsAhead", d.builderRingsAhead(), 0, 16, true, warn);
 		int behind = (int) number(SECTION, s, "fillRingsBehind", d.fillRingsBehind(), 0, 64, true, warn);
 		double climb = number(SECTION, s, "climbBlocksPerTick", d.climbBlocksPerTick(), 0.5, 64, false, warn);
+		int cLen = (int) number(SECTION, s, "corridorLength", d.corridorLength(), 0, 64, true, warn);
+		int cWidth = (int) number(SECTION, s, "corridorWidth", d.corridorWidth(), 1, 15, true, warn);
+		int cBlocks = (int) number(SECTION, s, "corridorBlocksPerTick", d.corridorBlocksPerTick(), 0, 4096, true, warn);
+		double cMs = number(SECTION, s, "corridorMsPerTick", d.corridorMsPerTick(), 0.1, 20, false, warn);
 		boolean near = d.nearPlayer();
 		int radius = d.nearPlayerRadius();
 		if (root.has(NEAR_SECTION)) {
@@ -203,7 +230,7 @@ public record BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int front
 			}
 		}
 		return new Result(new BuildTuning(blocks, jobs, fronts, effects, auto, mspt, fast, fBlocks, fMs, pace, crew, near, radius, radial, ring, ground, fill, gAhead,
-				bAhead, behind, climb), List.copyOf(warn));
+				bAhead, behind, climb, cLen, cWidth, cBlocks, cMs), List.copyOf(warn));
 	}
 
 	private static boolean bool(String section, JsonObject s, String key, boolean def, List<String> warn) {
