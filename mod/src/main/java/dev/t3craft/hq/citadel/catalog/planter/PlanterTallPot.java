@@ -226,8 +226,8 @@ public final class PlanterTallPot implements Variant {
 		p.set(c, u, 0, v, foot(m, p, u, v));
 		if (h == 3) {
 			p.set(c, u, 1, v, m.urn());
-			// a ball of blossom or azalea (a shrub with presence) or a potted fern / bamboo
-			p.set(c, u, 2, v, kind == 3 ? leaves(Blocks.CHERRY_LEAVES) : kind == 0 ? leaves(Blocks.FLOWERING_AZALEA_LEAVES) : potted(kind));
+			// a ball of blossom or azalea: a shrub with presence on a one-cell pot
+			p.set(c, u, 2, v, kind >= 2 ? leaves(Blocks.CHERRY_LEAVES) : kind == 0 ? leaves(Blocks.FLOWERING_AZALEA_LEAVES) : leaves(Blocks.AZALEA_LEAVES));
 			return;
 		}
 		int body = Math.max(1, Math.min(tier == 2 ? 3 : 2, h - 4));
@@ -250,7 +250,7 @@ public final class PlanterTallPot implements Variant {
 		} else if (kind == 3 && room >= 3) {
 			int tr = room - 2;
 			for (int y = y1; y < y1 + tr; y++) {
-				p.set(c, u, y, v, b(Blocks.CHERRY_LOG));
+				p.set(c, u, y, v, b(Blocks.STRIPPED_CHERRY_LOG));
 			}
 			p.set(c, u, y1 + tr, v, leaves(Blocks.CHERRY_LEAVES));
 			p.set(c, u, y1 + tr + 1, v, leaves(Blocks.CHERRY_LEAVES));
@@ -291,10 +291,11 @@ public final class PlanterTallPot implements Variant {
 				int v = v0 + dv;
 				boolean corner = du != 1 && dv != 1;
 				boolean centre = du == 1 && dv == 1;
-				p.set(c, u, 0, v, corner ? slab(m.footSlab()) : foot(m, p, u, v));
+				if (!corner) {
+					p.set(c, u, 0, v, foot(m, p, u, v)); // a narrow plus-shaped foot: the pot is slim at the bottom
+				}
 				for (int y = 1; y <= body; y++) {
-					// the corners are thin dark legs under the flare: nobody can stand in the pinch
-					p.set(c, u, y, v, corner ? b(Blocks.POLISHED_DEEPSLATE_WALL).setValue(BlockStateProperties.UP, true) : body(m, p, u, y, v));
+					p.set(c, u, y, v, body(m, p, u, y, v)); // and swells to the full 3 x 3 over the empty foot corners
 				}
 				p.set(c, u, ly, v, centre ? soil(p, u, v) : corner ? upperSlab(m.lipSlab()) : m.lip());
 			}
@@ -309,7 +310,7 @@ public final class PlanterTallPot implements Variant {
 			// dwarf cherry: a short trunk, a ring of blossom at its top and a plus on it
 			int tr = Math.max(1, Math.min(room - 1, 2)); // two at most: a taller trunk leaves a standable gap under the crown
 			for (int y = y1; y < y1 + tr; y++) {
-				p.set(c, cu, y, cv, b(Blocks.CHERRY_LOG));
+				p.set(c, cu, y, cv, b(Blocks.STRIPPED_CHERRY_LOG));
 			}
 			int ry = y1 + tr - 1;
 			for (int du = -1; du <= 1; du++) {
