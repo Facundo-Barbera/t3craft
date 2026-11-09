@@ -488,7 +488,7 @@ public final class HouseSmallStudio implements Variant {
 			put(doorLo, ROOF, pd - 1, TimberKit.lantern(true), CitadelCanvas.HANGING);
 			// [finish] a lightning rod at each end of the ridge
 			for (int v : new int[] {0, D - 1}) {
-				set(doorLo, ridgeY + 2, v, b(Blocks.LIGHTNING_ROD));
+				set(doorLo, ridgeY + 2, v, b(Blocks.LIGHTNING_ROD.waxed().unaffected()));
 			}
 			// [finish] lanterns hang from the beam beside the steps, flower pots on the rail
 			for (int u : new int[] {2, W - 3}) {
