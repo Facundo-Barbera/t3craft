@@ -215,7 +215,7 @@ public final class BridgeStoneArch implements Variant {
 
 		// parapet: low walls with posts, a lantern on every post
 		int ry = t + 1;
-		boolean post = (k > 0 && (k % 4 == 0 || k == deck)) || (d % 2 == 1 && v == crown);
+		boolean post = (k > 0 && k % 4 == 0) || (d % 2 == 1 && v == crown);
 		boolean n = top[v - 1] >= t;
 		boolean s = top[v + 1] >= t;
 		BlockState wall = b(post ? Blocks.POLISHED_DEEPSLATE_WALL : p.hash(u, ry, v, 4) == 0 ? Blocks.MOSSY_STONE_BRICK_WALL : Blocks.STONE_BRICK_WALL)
