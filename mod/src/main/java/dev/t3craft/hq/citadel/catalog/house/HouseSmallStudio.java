@@ -336,7 +336,7 @@ public final class HouseSmallStudio implements Variant {
 						st = y == 5 ? beam(ax) : y == 4 ? b(s.lintel()) : null; // y1-2 door (see doors()), y3 free, a light lintel over it
 					} else if (isPost) {
 						st = post();
-					} else if (y == 1) {
+					} else if (y == 1 && !(win[i] && wy1 <= 1)) {
 						st = alongU ? pick(s.foot(), i, y, ln) : pick(s.foot(), ln, y, i);
 					} else if (y == ROOF) {
 						st = beam(ax);
