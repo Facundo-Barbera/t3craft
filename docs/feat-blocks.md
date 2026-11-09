@@ -167,6 +167,33 @@ A mano: mirando un monitor o lámpara, `/t3craft blocks link <env:thread>` o `/t
   Sobre un monitor, el `TextDisplay` flotante de la estación queda vacío (una pantalla, no dos).
   Sobre cualquier bloque vanilla, todo sigue igual.
 
+### Aspecto del monitor (kit/monitor)
+
+Monitor de escritorio de oficina en grafito/acero, con el cristal hundido. Todo se genera con
+`python3 tools/art/monitor_art.py` (texturas, modelos y blockstate; solo biblioteca estándar).
+
+- **Marco**: tiras de 1 px de relieve (el labio sobresale del cristal) solo en los lados **sin vecino** (`up/down/left/right`
+  en `false`), así un muro es una sola pantalla con un marco continuo. Bisel de 2 px arriba y a los lados, **barbilla de 4 px**
+  abajo y, en sus 2 px más bajos, el **pie**: un reborde de acero de 5 px de fondo y cara superior clara (el soporte sobre el escritorio, un zócalo
+  en un muro). Las tiras izquierda/derecha son de altura completa y se quedan con las esquinas; las de arriba/abajo paran en
+  una esquina solo si ese lado tiene tira (variantes `monitor_edge_{up,down}`, `_l`, `_r`, `_l_r`), sin solapes.
+- **Carcasa**: `monitor_side`/`monitor_top` lisas con una línea de panel; `monitor_back` con rejilla y placa "T3". El ítem usa
+  `models/block/monitor.json` (todos los lados enmarcados). Texturas: `monitor_front` (el marco visto de frente), `monitor_screen`
+  (el cristal; el renderer lo tapa), `monitor_trim` (muestras para labios y pie).
+- **Renderer** (`MonitorLod.Layout` lleva `bezel` y `chin`; el cristal acaba donde empieza la barbilla):
+  - densidad NEAR `nearPpb = clamp(150 / ancho, 32, 96)`: unos 25 caracteres de ancho, el texto de 8 px mide 1/6 de bloque en
+    una pantalla de escritorio de 3 de ancho (legible a 3–6 bloques);
+  - cabecera en dos filas: el título a ancho completo y debajo una **banda de estado** a ancho completo del color del
+    estado (texto oscuro) con palabra + antigüedad (`WORKING · 3m`, de la línea de estado de `WorkstationModel`); sin stream,
+    el resto (rama, último mensaje) va debajo, de arriba abajo; las pantallas de proyecto/entorno conservan su cabecera de una fila;
+  - **sin hilo** (sin vincular, hilo desconocido o archivado): pantalla de espera de cristal casi negro con dos reflejos
+    inclinados, la marca **T3** y la palabra grande `NO THREAD` / `OFFLINE` / `ARCHIVED` (más el nombre del hilo en las dos
+    últimas); igual a cualquier distancia; el LED de la barbilla respira apenas en `NO THREAD`;
+  - **barbilla**: LED del color del estado a la derecha, sobre la cara del labio (la banda de 2 px sobre el pie).
+- **Revisión**: `tools/render/submit.sh --final -- --monitors` (`MonitorViews`: muro 6×3, tres escritorios de 3×2 con lámpara,
+  un monitor suelto; vistas `iso_se`, `front`, `wall`, `desks`, `desk1`, `far_20`, `far_50`). El renderer headless dibuja solo
+  modelos de bloque: **el texto de la pantalla (el BER) no se ve**, solo el cristal.
+
 ### Log en vivo (feat/monitor-live-log, P2 de `research/agentcraft-world-elements.md`)
 
 Paquete `client.blocks`, todo dentro del módulo (apagado, nada de esto existe). Tests:

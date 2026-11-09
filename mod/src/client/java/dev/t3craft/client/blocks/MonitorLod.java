@@ -1,6 +1,6 @@
 // Adapted from AgentCraft (https://github.com/blendi-remade/agentcraft)
 // Copyright (c) 2026 AgentCraft contributors. MIT License.
-// Pixel densities (128 px/block for one-block-high screens, 96 for bigger ones) follow
+// Pixel densities (originally 128 px/block for one-block-high screens, 96 for bigger ones; now ~30 columns across, see nearPpb) follow
 // MonitorRenderer.density in mod/src/client/java/dev/agentcraft/client/monitor/MonitorRenderer.java.
 package dev.t3craft.client.blocks;
 
@@ -28,6 +28,8 @@ public final class MonitorLod {
 	public static final int LINE = 10;
 	public static final int GLYPH_W = 6;
 	static final int HEADER = 13;
+	/** The status band under the title row (a thread screen): the state's colour with dark text. */
+	static final int STATUS_BAND = 11;
 	static final int FOOTER = 11;
 	static final int PAD = 4;
 	/** FAR density: 9 characters across one block, ≈ 0.125 block per text line. */
@@ -37,11 +39,12 @@ public final class MonitorLod {
 	 * Face-space layout (pixels; origin = top-left of the whole screen).
 	 *
 	 * @param ppb   pixels per block
-	 * @param bezel margin to the block edge (the model's frame)
+	 * @param bezel margin to the screen's left, right and top edges (the model's 2 px frame)
+	 * @param chin  margin at the bottom (the model's 4 px chin: its upper 2 px carry the LED and the T3 mark, the lower 2 px are the foot ledge)
 	 * @param cols  characters per row inside the padding
 	 * @param rows  log rows (0 for FAR)
 	 */
-	public record Layout(Level level, ScreenExtent extent, float ppb, float bezel, int cols, int rows) {
+	public record Layout(Level level, ScreenExtent extent, float ppb, float bezel, float chin, int cols, int rows) {
 		public float width() {
 			return extent.width() * ppb;
 		}
@@ -64,7 +67,12 @@ public final class MonitorLod {
 		}
 
 		public float y1() {
-			return height() - bezel - PAD / 2f;
+			return height() - chin - PAD / 2f;
+		}
+
+		/** One model pixel (1/16 block) in face pixels. */
+		public float modelPx() {
+			return ppb / 16f;
 		}
 	}
 
@@ -106,10 +114,18 @@ public final class MonitorLod {
 		return distance <= limit ? Level.NEAR : Level.FAR;
 	}
 
-	/** Pixel density of the NEAR level. */
+	/**
+	 * Pixel density of the NEAR level: about 25 characters across whatever the width, so the 8 px font stays
+	 * 1/8 block tall on a 3-wide desk screen (60 px/block: readable at 4-6 blocks) and a lone block gets 96
+	 * (a character is 1/12 block). Very wide walls bottom out at 32 (a character is 1/4 block).
+	 */
 	public static float nearPpb(ScreenExtent e) {
-		return e.minSide() <= 1 ? 128f : 96f;
+		return Math.max(32f, Math.min(96f, 150f / e.width()));
 	}
+
+	/** The model's frame, in model pixels: top / left / right bezel and the bottom chin (incl. the foot's pixel). */
+	static final int BEZEL_PX = 2;
+	static final int CHIN_PX = 4;
 
 	/** FAR: the status word's largest scale (a 3-wide desk screen gets ≈ 3×, readable across a hall). */
 	static final float FAR_STATUS_MAX = 4f;
@@ -172,14 +188,15 @@ public final class MonitorLod {
 
 	public static Layout layout(Level level, ScreenExtent e) {
 		float ppb = level == Level.NEAR ? nearPpb(e) : FAR_PPB;
-		float bezel = ppb / 16f; // one model pixel of frame
+		float bezel = BEZEL_PX * ppb / 16f;
+		float chin = CHIN_PX * ppb / 16f;
 		float innerW = e.width() * ppb - 2 * (bezel + PAD);
 		int cols = Math.max(1, (int) Math.floor(innerW / GLYPH_W));
 		int rows = 0;
 		if (level == Level.NEAR) {
-			float innerH = e.height() * ppb - 2 * bezel - PAD - HEADER - FOOTER;
+			float innerH = e.height() * ppb - bezel - chin - PAD - HEADER - STATUS_BAND - FOOTER;
 			rows = Math.max(1, (int) Math.floor(innerH / LINE));
 		}
-		return new Layout(level, e, ppb, bezel, cols, rows);
+		return new Layout(level, e, ppb, bezel, chin, cols, rows);
 	}
 }

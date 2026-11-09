@@ -101,6 +101,17 @@ final class ScreenDraw {
 		}
 	}
 
+	/**
+	 * A parallelogram with horizontal top and bottom edges: the top edge runs {@code xTl..xTr} at {@code y0}, the bottom
+	 * edge {@code xBl..xBr} at {@code y1} (a slanted glass reflection).
+	 */
+	static void slant(PoseStack.Pose pose, VertexConsumer vc, float xTl, float xTr, float xBl, float xBr, float y0, float y1, float z, int argb, int light) {
+		vc.addVertex(pose, xTl, y0, z).setUv(0.5f, 0.5f).setColor(argb).setLight(light);
+		vc.addVertex(pose, xBl, y1, z).setUv(0.5f, 0.5f).setColor(argb).setLight(light);
+		vc.addVertex(pose, xBr, y1, z).setUv(0.5f, 0.5f).setColor(argb).setLight(light);
+		vc.addVertex(pose, xTr, y0, z).setUv(0.5f, 0.5f).setColor(argb).setLight(light);
+	}
+
 	/** Darkens an opaque colour ({@code f} 0 = black, 1 = unchanged). */
 	static int shade(int rgb, float f) {
 		int r = Math.round(((rgb >> 16) & 0xFF) * f);
