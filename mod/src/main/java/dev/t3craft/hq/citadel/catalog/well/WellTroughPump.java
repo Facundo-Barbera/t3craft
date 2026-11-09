@@ -77,20 +77,20 @@ public final class WellTroughPump implements Variant {
 	}
 
 	/** The materials of one build: three families by seed, each a dark base, a body, a chiseled trim and its slabs. */
-	private record Mat(Block baseA, Block baseB, Block rim, Block rimAlt, Block rimCrack, Block trim, Block wall, Block cap,
+	private record Mat(Block rim, Block rimAlt, Block rimCrack, Block trim, Block wall, Block cap,
 			Block pave1, Block pave2, Block edge) {
 	}
 
 	private static Mat mat(Plot p) {
 		return switch (p.hash(5, 5, 5, 3)) {
-			case 0 -> new Mat(Blocks.COBBLESTONE, Blocks.MOSSY_COBBLESTONE, Blocks.STONE_BRICKS, Blocks.MOSSY_STONE_BRICKS,
+			case 0 -> new Mat(Blocks.STONE_BRICKS, Blocks.MOSSY_STONE_BRICKS,
 					Blocks.CRACKED_STONE_BRICKS, Blocks.CHISELED_STONE_BRICKS, Blocks.STONE_BRICK_WALL, Blocks.STONE_BRICK_SLAB,
 					Blocks.COBBLESTONE_SLAB, Blocks.ANDESITE_SLAB, Blocks.STONE_BRICK_SLAB);
-			// dark footing, deepslate bricks and pale tuff on top: the gradient keeps the dark build readable
-			case 1 -> new Mat(Blocks.COBBLED_DEEPSLATE, Blocks.DEEPSLATE_BRICKS, Blocks.DEEPSLATE_BRICKS, Blocks.TUFF_BRICKS,
+			// deepslate bricks with pale tuff on top: the gradient keeps the dark build readable
+			case 1 -> new Mat(Blocks.DEEPSLATE_BRICKS, Blocks.TUFF_BRICKS,
 					Blocks.CRACKED_DEEPSLATE_BRICKS, Blocks.CHISELED_TUFF_BRICKS, Blocks.TUFF_BRICK_WALL, Blocks.TUFF_BRICK_SLAB,
 					Blocks.TUFF_SLAB, Blocks.POLISHED_TUFF_SLAB, Blocks.DEEPSLATE_TILE_SLAB);
-			default -> new Mat(Blocks.COBBLESTONE, Blocks.MOSSY_COBBLESTONE, Blocks.BRICKS, Blocks.STONE_BRICKS,
+			default -> new Mat(Blocks.BRICKS, Blocks.STONE_BRICKS,
 					Blocks.BRICKS, Blocks.CHISELED_STONE_BRICKS, Blocks.BRICK_WALL, Blocks.BRICK_SLAB,
 					Blocks.BRICK_SLAB, Blocks.STONE_BRICK_SLAB, Blocks.COBBLESTONE_SLAB);
 		};
@@ -120,7 +120,7 @@ public final class WellTroughPump implements Variant {
 		Mat m = mat(p);
 		int w = p.w();
 		int d = p.d();
-		boolean roof = p.h() >= 6 && p.hash(6, 6, 6, 2) == 1;
+		boolean roof = p.h() >= 5 && p.hash(6, 6, 6, 2) == 1;
 		boolean dbl = w >= 11;
 		int water = dbl ? Math.min(MAX_WATER, (w - 4) / 2) : (w <= 8 ? w - 3 : Math.min(MAX_WATER, w - 4));
 		int len = dbl ? 2 * water + 3 : water + 2;
@@ -163,10 +163,6 @@ public final class WellTroughPump implements Variant {
 
 	// ------------------------------------------------------------------ one row: trough(s) and pump
 
-	private static BlockState base(Plot p, Mat m, int u, int v) {
-		return p.hash(u, 0, v, 3) == 0 ? b(m.baseB()) : b(m.baseA());
-	}
-
 	private static BlockState rimStone(Plot p, Mat m, int u, int v) {
 		return switch (p.hash(u, 1, v, 6)) {
 			case 0, 1 -> b(m.rimAlt());
@@ -175,6 +171,10 @@ public final class WellTroughPump implements Variant {
 		};
 	}
 
+	/**
+	 * [depth] a low trough: the water at ground level with a rim of one block all round and a taller back wall and
+	 * end piers of two, so from the front the water shows over a low lip while the back and the ends give it mass.
+	 */
 	private static void row(CitadelCanvas c, Plot p, Mat m, Row r, boolean roof) {
 		int vf = r.vf();
 		int vm = r.vm();
@@ -183,17 +183,26 @@ public final class WellTroughPump implements Variant {
 		int u1 = r.um() + r.len() - 1;
 		for (int u = u0; u <= u1; u++) {
 			for (int v = vf; v <= vk; v++) {
-				p.set(c, u, 0, v, base(p, m, u, v));
 				boolean cell = u == r.pu() || u == r.capL() || u == r.capR();
-				BlockState st;
+				BlockState low;
+				BlockState high = null;
 				if (cell) {
-					st = v == vm && u != r.pu() ? b(m.rim()) : b(m.trim());
+					low = v == vm && u != r.pu() ? b(m.rim()) : b(m.trim());
+					if (u != r.pu()) {
+						high = v == vm ? b(m.rim()) : b(m.trim()); // end pier, two high
+					}
 				} else if (v == vm) {
-					st = b(Blocks.WATER); // [depth] contained water: rim all round, a footing under
+					low = b(Blocks.WATER); // contained: rim all round, solid ground under
 				} else {
-					st = rimStone(p, m, u, v);
+					low = rimStone(p, m, u, v);
+					if (v == vk) {
+						high = rimStone(p, m, u, vk + 3); // back wall
+					}
 				}
-				p.set(c, u, 1, v, st);
+				p.set(c, u, 0, v, low);
+				if (high != null) {
+					p.set(c, u, 1, v, high);
+				}
 			}
 		}
 		pump(c, p, m, r);
@@ -207,35 +216,28 @@ public final class WellTroughPump implements Variant {
 	}
 
 	/**
-	 * [depth] the pump: a chiseled housing across the rim (1 × 3 at y2), a head over the water row, a wall neck and
+	 * [depth] the pump: a chiseled housing across the rim (1 × 3 at y1), a head over the water row, a wall neck and
 	 * a slab cap. The crank is a lever on the housing's front face, at hand height from the paving; with no room in
 	 * front it is a stone button on top.
 	 */
 	private static void pump(CitadelCanvas c, Plot p, Mat m, Row r) {
 		int pu = r.pu();
 		for (int v = r.vf(); v <= r.vk(); v++) {
-			p.set(c, pu, 2, v, b(m.trim()));
+			p.set(c, pu, 1, v, b(m.trim()));
 		}
 		int vm = r.vm();
-		boolean tall = p.h() >= 5;
-		if (tall) {
-			p.set(c, pu, 3, vm, b(m.wall()));
-			p.set(c, pu, 4, vm, slab(m.cap()));
-			// [depth] a wall post on each end of the housing: a gate-like head, and no floor on top of it to stand on
-			p.set(c, pu, 3, r.vk(), b(m.wall()));
-			if (r.vf() >= 1) {
-				p.set(c, pu, 3, r.vf(), b(m.wall()));
-			}
-		} else {
-			p.set(c, pu, 3, vm, slab(m.cap()));
-		}
+		p.set(c, pu, 2, vm, b(m.wall()));
+		p.set(c, pu, 3, vm, slab(m.cap()));
+		// [depth] a wall post on each end of the housing: a gate-like head, and no floor on top of it to stand on
+		p.set(c, pu, 2, r.vk(), b(m.wall()));
 		if (r.vf() >= 1) {
-			p.put(c, pu, 2, r.vf() - 1, b(Blocks.LEVER)
+			p.set(c, pu, 2, r.vf(), b(m.wall()));
+			p.put(c, pu, 1, r.vf() - 1, b(Blocks.LEVER)
 					.setValue(BlockStateProperties.ATTACH_FACE, AttachFace.WALL)
 					.setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH)
 					.setValue(BlockStateProperties.POWERED, p.hash(pu, 2, r.vf(), 2) == 0), CitadelCanvas.DECOR);
 		} else {
-			p.put(c, pu, 3, r.vf(), b(Blocks.STONE_BUTTON)
+			p.put(c, pu, 2, r.vf(), b(Blocks.STONE_BUTTON)
 					.setValue(BlockStateProperties.ATTACH_FACE, AttachFace.FLOOR)
 					.setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH), CitadelCanvas.DECOR);
 		}
@@ -244,29 +246,29 @@ public final class WellTroughPump implements Variant {
 	/** [finish] a copper spout (waxed lightning rod) pouring over the water, one each side of the pump when it is double. */
 	private static void spouts(CitadelCanvas c, Plot p, Row r) {
 		BlockState rod = Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState();
-		p.set(c, r.pu() + 1, 2, r.vm(), rod.setValue(BlockStateProperties.FACING, Direction.EAST));
+		p.set(c, r.pu() + 1, 1, r.vm(), rod.setValue(BlockStateProperties.FACING, Direction.EAST));
 		if (r.dbl()) {
-			p.set(c, r.pu() - 1, 2, r.vm(), rod.setValue(BlockStateProperties.FACING, Direction.WEST));
+			p.set(c, r.pu() - 1, 1, r.vm(), rod.setValue(BlockStateProperties.FACING, Direction.WEST));
 		}
 	}
 
 	/** [finish] a lily pad drifting at the far end of the water, away from the spouts (by seed). */
 	private static void lily(CitadelCanvas c, Plot p, Row r) {
-		int lo = r.dbl() ? r.pu() + 2 : r.pu() + 2;
+		int lo = r.pu() + 2;
 		int hi = r.capR() - 1;
 		if (lo <= hi && p.hash(r.vf(), 2, 9, 3) != 0) {
-			p.set(c, lo + p.hash(r.vf(), 2, 3, hi - lo + 1), 2, r.vm(), b(Blocks.LILY_PAD));
+			p.set(c, lo + p.hash(r.vf(), 2, 3, hi - lo + 1), 1, r.vm(), b(Blocks.LILY_PAD));
 		}
 		if (r.dbl() && p.hash(r.vf(), 2, 8, 2) == 0) {
 			int l2 = r.capL() + 1;
 			int h2 = r.pu() - 2;
 			if (l2 <= h2) {
-				p.set(c, l2 + p.hash(r.vf(), 2, 4, h2 - l2 + 1), 2, r.vm(), b(Blocks.LILY_PAD));
+				p.set(c, l2 + p.hash(r.vf(), 2, 4, h2 - l2 + 1), 1, r.vm(), b(Blocks.LILY_PAD));
 			}
 		}
 	}
 
-	/** A cherry post with a lantern on the back corner of each end cap (the pump house carries its own lights). */
+	/** A cherry post with a lantern on the back corner pier of each end (the pump house carries its own lights). */
 	private static void lanternPosts(CitadelCanvas c, Plot p, Row r) {
 		int[] ends = r.dbl() ? new int[] {r.capL(), r.capR()} : new int[] {r.capR()};
 		for (int u : ends) {
@@ -276,9 +278,9 @@ public final class WellTroughPump implements Variant {
 	}
 
 	/**
-	 * [finish] a pump house: four cherry posts and a 3 × 3 hip roof of cherry stairs at y5 (high enough to stand
-	 * under), a slab on top, a lantern hanging beside the spout. The rim cells it covers are filled (housing, a
-	 * cauldron, a barrel) so nobody has a floor up there.
+	 * [finish] a pump house: four cherry posts and a 3 × 3 hip roof of cherry stairs at y4 (3 blocks over the rim, enough
+	 * to stand under), a slab on top, a lantern hanging beside the spout. The rim cells it covers are filled (housing,
+	 * a cauldron, a barrel) so nobody has a floor up there.
 	 */
 	private static void canopy(CitadelCanvas c, Plot p, Row r) {
 		int cu = r.cu();
@@ -287,31 +289,31 @@ public final class WellTroughPump implements Variant {
 		int vk = r.vk();
 		for (int u : new int[] {cu - 1, cu + 1}) {
 			for (int v : new int[] {vf, vk}) {
-				for (int y = 2; y <= 4; y++) {
-					if (u == r.pu() && y <= 3) {
+				for (int y = 1; y <= 3; y++) {
+					if (u == r.pu() && y <= 2) {
 						continue; // the pump housing and its wall posts are already there
 					}
-					p.set(c, u, y, v, y == 4 ? b(Blocks.STRIPPED_CHERRY_LOG) : b(Blocks.CHERRY_FENCE));
+					p.set(c, u, y, v, y == 3 ? b(Blocks.STRIPPED_CHERRY_LOG) : b(Blocks.CHERRY_FENCE));
 				}
 			}
 		}
 		for (int u = cu - 1; u <= cu + 1; u++) {
-			p.set(c, u, 5, vf, stairs(Blocks.CHERRY_STAIRS, Direction.SOUTH));
-			p.set(c, u, 5, vk, stairs(Blocks.CHERRY_STAIRS, Direction.NORTH));
+			p.set(c, u, 4, vf, stairs(Blocks.CHERRY_STAIRS, Direction.SOUTH));
+			p.set(c, u, 4, vk, stairs(Blocks.CHERRY_STAIRS, Direction.NORTH));
 		}
-		p.set(c, cu - 1, 5, vm, stairs(Blocks.CHERRY_STAIRS, Direction.EAST));
-		p.set(c, cu + 1, 5, vm, stairs(Blocks.CHERRY_STAIRS, Direction.WEST));
-		p.set(c, cu, 5, vm, b(Blocks.CHERRY_PLANKS));
-		if (p.h() > 6) {
-			p.set(c, cu, 6, vm, slab(Blocks.CHERRY_SLAB));
+		p.set(c, cu - 1, 4, vm, stairs(Blocks.CHERRY_STAIRS, Direction.EAST));
+		p.set(c, cu + 1, 4, vm, stairs(Blocks.CHERRY_STAIRS, Direction.WEST));
+		p.set(c, cu, 4, vm, b(Blocks.CHERRY_PLANKS));
+		if (p.h() > 5) {
+			p.set(c, cu, 5, vm, slab(Blocks.CHERRY_SLAB));
 		}
-		p.put(c, cu + 1, 4, vm, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
+		p.put(c, cu + 1, 3, vm, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
 		if (r.dbl()) {
-			p.put(c, cu - 1, 4, vm, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
+			p.put(c, cu - 1, 3, vm, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
 		} else {
 			// single: the rim cells under the roof beside the spout hold the bucket and a barrel (no floor to stand on)
-			p.set(c, cu, 2, vf, b(Blocks.WATER_CAULDRON).setValue(BlockStateProperties.LEVEL_CAULDRON, 3));
-			p.set(c, cu, 2, vk, BARREL_UP);
+			p.set(c, cu, 1, vf, b(Blocks.WATER_CAULDRON).setValue(BlockStateProperties.LEVEL_CAULDRON, 3));
+			p.set(c, cu, 1, vk, BARREL_UP);
 		}
 	}
 
