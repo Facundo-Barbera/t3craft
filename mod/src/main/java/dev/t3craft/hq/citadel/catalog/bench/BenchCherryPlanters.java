@@ -251,11 +251,9 @@ public final class BenchCherryPlanters implements Variant {
 					arm(c, p, o + x, v);
 				}
 			}
-			if (v < nd - 1) { // benches face each other; their backs are the arms plus a trapdoor
+			if (v < nd - 1) { // benches face each other; their backs are the stair backs and the arms
 				seat(c, p, o + 1, v, Direction.WEST);
-				set(c, p, o + 1, 1, v, backrest(Direction.WEST));
 				seat(c, p, o + nw - 2, v, Direction.EAST);
-				set(c, p, o + nw - 2, 1, v, backrest(Direction.EAST));
 			}
 		}
 		for (int x = 1; x < nw - 1; x++) {
@@ -280,12 +278,10 @@ public final class BenchCherryPlanters implements Variant {
 		}
 		for (int x = 2; x < nw - 1; x++) {
 			seat(c, p, o + x, nd - 2, Direction.SOUTH); // along the back, facing out
-			set(c, p, o + x, 1, nd - 2, backrest(Direction.SOUTH));
 		}
 		bed(c, p, o + nw - 1, nd - 2, true); // the arm at the open end
 		for (int v = 0; v <= nd - 3; v++) {
 			seat(c, p, o + 1, v, Direction.WEST); // along the left
-			set(c, p, o + 1, 1, v, backrest(Direction.WEST));
 		}
 		// the elbow is a corner table with a light
 		set(c, p, o + 1, 0, nd - 2, b(Blocks.CHISELED_DEEPSLATE));
@@ -356,11 +352,6 @@ public final class BenchCherryPlanters implements Variant {
 		}
 	}
 
-	/** A trapdoor backrest standing at the {@code back} edge of a seat cell. */
-	private static BlockState backrest(Direction back) {
-		return BACK.setValue(BlockStateProperties.HORIZONTAL_FACING, back.getOpposite());
-	}
-
 	/**
 	 * Under a roof an azalea would be a place to stand (it has a collision box) with only two blocks of headroom, so
 	 * the roofed cells get soft plants (flowers) instead.
@@ -395,11 +386,11 @@ public final class BenchCherryPlanters implements Variant {
 
 	/** Soil a plant may stand on: moss and rooted dirt, or dirt and coarse dirt, by seed. */
 	private static BlockState soil(Plot p, int u, int y, int v) {
-		int k = p.hash(u, y, v, 5);
+		int k = p.hash(u, y, v, 6);
 		if (p.hash(9, 9, 9, 4) != 0) { // three seeds in four are mossy
 			return k == 0 ? b(Blocks.ROOTED_DIRT) : b(Blocks.MOSS_BLOCK);
 		}
-		return k == 0 ? b(Blocks.COARSE_DIRT) : k == 1 ? b(Blocks.ROOTED_DIRT) : b(Blocks.DIRT);
+		return k == 0 ? b(Blocks.COARSE_DIRT) : k == 1 ? b(Blocks.ROOTED_DIRT) : b(Blocks.MOSS_BLOCK); // earth seeds keep moss in the mix
 	}
 
 	private static BlockState plant(Plot p, int u, int y, int v) {
