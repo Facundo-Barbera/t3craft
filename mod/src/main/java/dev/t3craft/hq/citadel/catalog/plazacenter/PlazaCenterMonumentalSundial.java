@@ -250,7 +250,7 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 					if (inRing) {
 						// gold only on the outer layer of the bezel (the inner one stays dark, so the ring is continuous);
 						// the quarters are 3 wide there and 1 wide on the inner layer
-						boolean outer = k.rd < 5 || r > k.rd - 0.8;
+						boolean outer = r > k.rd - 0.8;
 						double wide = card ? (outer ? cardW : 0.55) : (outer ? 0.55 : -1);
 						if (perp < wide) {
 							k.mk[u][v] = true;
