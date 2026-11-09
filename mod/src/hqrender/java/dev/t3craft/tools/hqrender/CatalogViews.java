@@ -61,7 +61,8 @@ final class CatalogViews {
 			case FOUNTAIN, WELL -> 7;
 			case TREE -> 14;
 			case GARDEN -> 5;
-			case STATUE, GATE, PLAZA_CENTER, TOWER_TOP, GAZEBO -> 10;
+			case STATUE, GATE, PLAZA_CENTER, TOWER_TOP -> 10;
+			case GAZEBO -> 13; // the patio's gazebo plot at scale 200 is 7–13 × 7–13 × 13
 			case BRIDGE -> 6;
 			case ROOF -> 8;
 		};
