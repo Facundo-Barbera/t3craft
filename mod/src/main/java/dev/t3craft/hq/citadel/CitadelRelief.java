@@ -39,10 +39,10 @@ import org.jspecify.annotations.Nullable;
  * <h2>Concept</h2>
  *
  * An acropolis campus, not a mesa: the core (hub on its podium, patio, promenade, ramps, inner street) is the
- * highest terrace, and each ring of barrios stands one low step below the one inside it (relief 2: core +5, ring 1
+ * highest terrace, and each ring of barrios stands one low step below the one inside it (relief 2: core +6, ring 1
  * +3, ring 2 +1, ring 3 on the ground; the lawn round the last street banks down to the natural ground). Steps are
  * 1 to 3 blocks, never more than 6 in all, so the differences read as design: low retaining walls of stone brick with
- * a stone-brick balustrade on top (piers every few cells), hedges and flowers at their foot, the avenues turned into
+ * a light balustrade on top (calcite piers every 7 cells, diorite rails), hedges and flowers at their foot, the avenues turned into
  * wide slab ramps that start just past their torii, and stairs wherever a path meets a step.
  *
  * <h2>How</h2>
@@ -450,11 +450,12 @@ public final class CitadelRelief {
 				continue;
 			}
 			double arc = RingCampusGeometry.theta(x, z) * RingCampusGeometry.r(x, z);
+			// [palette] a light balustrade over the dark kerb: calcite piers with a quartz cap, diorite rails between
 			if (Math.floorMod(Math.round(arc), 7) == 0) {
-				c.set(x, y, z, b(Blocks.CHISELED_STONE_BRICKS));
-				c.set(x, y + 1, z, slab(Blocks.SMOOTH_STONE_SLAB));
+				c.set(x, y, z, b(Blocks.CALCITE));
+				c.set(x, y + 1, z, slab(Blocks.SMOOTH_QUARTZ_SLAB));
 			} else {
-				c.set(x, y, z, b(Blocks.STONE_BRICK_WALL));
+				c.set(x, y, z, b(Blocks.DIORITE_WALL));
 			}
 		}
 		for (long cc : foot) {
@@ -664,7 +665,8 @@ public final class CitadelRelief {
 			if (w.contains(p.asLong())) {
 				ok++;
 			} else if (lost.size() < 8) {
-				lost.add("desk m" + ws.module() + "/" + ws.slot() + "@" + p.toShortString());
+				lost.add("desk m" + ws.module() + "/" + ws.slot() + "@" + p.toShortString() + "[" + name(c.at(p.getX(), p.getY(), p.getZ())) + "/"
+						+ name(c.at(p.getX(), p.getY() - 1, p.getZ())) + "]");
 			}
 		}
 		int an = 0;
@@ -677,11 +679,16 @@ public final class CitadelRelief {
 			an++;
 			if (w.contains(a.block().asLong())) {
 				aok++;
-			} else if (lost.size() < 12) {
-				lost.add(a.name() + "@" + a.block().toShortString());
+			} else if (lost.size() < 14) {
+				BlockPos p = a.block();
+				lost.add(a.name() + "@" + p.toShortString() + "[" + name(c.at(p.getX(), p.getY(), p.getZ())) + "/" + name(c.at(p.getX(), p.getY() - 1, p.getZ())) + "]");
 			}
 		}
 		lastReport = "relief " + RingCampusGeometry.relief() + ": desks reachable " + ok + "/" + desks + ", walk anchors " + aok + "/" + an
 				+ (lost.isEmpty() ? "" : "; unreachable: " + String.join(", ", lost));
+	}
+
+	private static String name(@Nullable BlockState s) {
+		return s == null ? "-" : s.getBlock().getDescriptionId().replace("block.minecraft.", "");
 	}
 }

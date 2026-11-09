@@ -630,7 +630,7 @@ public final class RingCampusGeometry {
 	// ------------------------------------------------------------------ relief (design/citadel-terraces)
 
 	/** Terrace lifts in blocks per relief (rows) for the core and rings 1..3 (columns); the lawn banks down to 0. */
-	private static final int[][] LEVELS = {{0, 0, 0, 0}, {3, 2, 1, 0}, {5, 3, 1, 0}, {6, 4, 2, 0}};
+	private static final int[][] LEVELS = {{0, 0, 0, 0}, {3, 2, 1, 0}, {6, 3, 1, 0}, {6, 4, 2, 0}};
 
 	/** The relief in use ({@code LayoutParams.RINGCAMPUS_RELIEF}, pack key {@code terrain.relief}, 0..3, default 2). */
 	public static int relief() {
