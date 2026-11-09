@@ -56,9 +56,10 @@ Incluye el catálogo (60 variantes, con la ola B: bancas, jardineras, postes, po
   - `HqConstruction` sigue mandando un trabajo por parte;
   - con 8 builders algunos adelantan el anillo siguiente.
 - `citadel/scale-port`: **dentro de `citadel/next`** (`3d03dd0`), que compila. La escala por defecto es 1.0. Con 1.5 los nodos y algunos detalles mantienen tamaño fijo, y hay que verlo en render.
-- `fix/chat-send-agents-menu` (en curso):
-  - arreglar el segundo mensaje que se pierde;
-  - menú de agentes con los activos arriba y filtro, y los terminados abajo.
+- `fix/chat-send-agents-menu`: código listo, **sin compilar ni probar**.
+  - el segundo mensaje ya no se pierde: se encola detrás del que está en vuelo (`ComposerState` outbox, "⏱ Queued");
+  - menú de agentes con filtro Active/All, activos arriba y terminados abajo (plegados con Active).
+  - Probar en juego: dos Enter seguidos en un hilo idle y en uno corriendo; dos mensajes en un hilo nuevo (draft).
 - `cat/wave-c`: estatuas, gazebos, mástiles, puentes y remates de torre.
 - `citadel/light-aesthetic`: luz visible solo como diseño (faroles con ritmo, linternas en aleros, apliques junto a puertas, candelabros centrados) y relleno invisible. Nada de bloques luminosos visibles "donde caigan".
 - `feat/ui-hq-menu-lineage`:

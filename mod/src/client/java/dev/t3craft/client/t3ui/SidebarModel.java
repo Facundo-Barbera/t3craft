@@ -279,6 +279,24 @@ public final class SidebarModel {
 	}
 
 	/**
+	 * {@link #childrenOf} that are not {@link #liveChild}: done, settled or ended in an error (the
+	 * agents menu's "Finished" section, below the live ones).
+	 */
+	public List<ThreadRow> finishedChildrenOf(String parentKey) {
+		List<ThreadRow> kids = childrenOf(parentKey);
+		if (kids.isEmpty()) {
+			return kids;
+		}
+		List<ThreadRow> out = new ArrayList<>(kids.size());
+		for (ThreadRow r : kids) {
+			if (!liveChild(r)) {
+				out.add(r);
+			}
+		}
+		return List.copyOf(out);
+	}
+
+	/**
 	 * Delegated children of {@code parentKey} among every row (search and filter ignored), in
 	 * sidebar order, any state. Empty when it has none. Indexed once per update.
 	 */

@@ -33,10 +33,14 @@ un enlace (`SidebarModel.find` las sigue encontrando). Los subagentes del provee
 ## Header del hilo
 
 - Hijo: breadcrumb `↳ padre › hijo`, el padre clicable.
-- Padre: chip `N agents ▾`; tooltip con cada hijo y su estado; clic abre un menú con los hijos
-  (`glifo título · estado`) que abre el elegido. Solo hijos vivos (`SidebarModel.liveChildrenOf`):
-  idle o activos (working, waiting, needs input), nunca settled, done ni error. Sin hijos vivos no
-  hay chip.
+- Padre: chip `N agents ▾` (N = hijos activos: idle, working, waiting, needs input,
+  `SidebarModel.liveChildrenOf`); sin activos pero con terminados, `0/M agents ▾`; sin hijos no hay
+  chip. Tooltip con cada hijo activo y su estado.
+- fix/chat-send-agents-menu: el clic abre un menú con una fila de filtro (`Show: ● Active ○ All`,
+  por defecto Active), los activos arriba (`glifo título · estado`, abre el elegido) y debajo los
+  terminados (done, settled o error, `SidebarModel.finishedChildrenOf`): con Active quedan plegados
+  tras `▸ Finished (M)` y un clic los despliega atenuados; con All van bajo un encabezado
+  `Finished (M)`. El filtro y el plegado se recuerdan mientras la pantalla esté abierta.
 
 ## Ciudad
 
