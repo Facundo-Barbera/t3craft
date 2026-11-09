@@ -55,7 +55,10 @@ public final class WallLayout {
 	/** Lane width from which headers are drawn at 1.5x (titles stay 1.25x). */
 	static final int MID_LANE = 88;
 
-	/** Text scales and the card / header sizes that go with them (board px). */
+	/**
+	 * Text scales and the card / header sizes that go with them (board px). {@code cardH}: a card with a one-line title;
+	 * a two-line title adds {@link #lineStep()}.
+	 */
 	public record Metrics(float titleScale, float headScale, int headerH, int cardH) {
 		static Metrics of(float laneW) {
 			if (laneW >= WIDE_LANE) {
@@ -67,9 +70,14 @@ public final class WallLayout {
 			return new Metrics(1f, 1f, 13, 27);
 		}
 
-		/** Height of the footer line's top from the card's top. */
-		public float footY() {
-			return cardH - 4 - FOOT_H;
+		/** Extra height of a second title line. */
+		public int lineStep() {
+			return (int) Math.ceil(8 * titleScale);
+		}
+
+		/** Height of a card whose title takes {@code lines} (1 or 2) lines. */
+		public int cardH(int lines) {
+			return cardH + (lines - 1) * lineStep();
 		}
 	}
 
@@ -83,8 +91,8 @@ public final class WallLayout {
 	public record Lane(int column, String id, float x, float w, String label, String count, int color) {
 	}
 
-	/** A card's slot and its texts (already clipped to fit). {@code age}: compact age ("5m"), "" when unknown. */
-	public record Slot(String key, int column, float x, float y, float w, float h, String title, String footer, String age,
+	/** A card's slot and its texts (already clipped to fit): the title on one or two lines ({@code title2} is "" when it fits on one). {@code age}: compact age ("5m"), "" when unknown. */
+	public record Slot(String key, int column, float x, float y, float w, float h, String title, String title2, String footer, String age,
 			Attention attention, EnvBadge badge) {
 		boolean contains(float px, float py) {
 			return px >= x && px <= x + w && py >= y && py <= y + h;
@@ -141,12 +149,6 @@ public final class WallLayout {
 		return (width - 2 * EDGE - GAP * (n - 1)) / n;
 	}
 
-	/** How many card rows fit under a header in a wall {@code height} px tall (cards of {@code m}). */
-	static int rows(float height, Metrics m) {
-		float avail = height - 2 * EDGE - m.headerH() - HEAD_GAP - 4;
-		return avail < m.cardH() ? 0 : (int) ((avail + CARD_GAP) / (m.cardH() + CARD_GAP));
-	}
-
 	/** Most columns that stay readable on a wall {@code width} px wide (project/environment modes). */
 	public static int maxColumns(float width) {
 		return Math.max(1, (int) ((width - 2 * EDGE + GAP) / (72 + GAP)));
@@ -156,12 +158,12 @@ public final class WallLayout {
 		int n = Math.max(1, columns.size());
 		float laneW = laneWidth(width, n);
 		Metrics mt = Metrics.of(laneW);
-		int rows = rows(height, mt);
 		List<Lane> lanes = new ArrayList<>(columns.size());
 		List<Slot> slots = new ArrayList<>();
 		List<More> more = new ArrayList<>();
 		int total = 0;
 		float cardW = laneW - 2 * CARD_INSET;
+		float bottom = height - EDGE - 4;
 		for (int i = 0; i < columns.size(); i++) {
 			WallColumns.Column c = columns.get(i);
 			float x = EDGE + i * (laneW + GAP);
@@ -171,29 +173,70 @@ public final class WallLayout {
 			int labelRoom = (int) ((laneW - 2 * CARD_PAD - pillW - 4) / mt.headScale());
 			lanes.add(new Lane(i, c.id(), x, laneW, clip(c.label(), labelRoom, m), count, c.color()));
 			total += c.count();
-			int shown = c.count() <= rows ? c.count() : Math.max(0, rows - 1);
-			float y = EDGE + mt.headerH() + HEAD_GAP;
 			float titleRoom = (cardW - STRIPE - 2 * CARD_PAD) / mt.titleScale();
-			for (int k = 0; k < shown; k++) {
+			// titles on one or two lines, so heights differ: how many cards fit decides the "+N more" chip
+			List<String[]> titles = new ArrayList<>(c.count());
+			float all = 0;
+			for (WallCard card : c.cards()) {
+				String[] t = wrap(card.title(), (int) titleRoom, m);
+				titles.add(t);
+				all += mt.cardH(t[1].isEmpty() ? 1 : 2) + CARD_GAP;
+			}
+			float y = EDGE + mt.headerH() + HEAD_GAP;
+			boolean fitsAll = y + all - CARD_GAP <= bottom;
+			float limit = fitsAll ? bottom : bottom - (CHIP_H + CARD_GAP);
+			int shown = 0;
+			for (int k = 0; k < c.count(); k++) {
 				WallCard card = c.cards().get(k);
+				String[] t = titles.get(k);
+				float h = mt.cardH(t[1].isEmpty() ? 1 : 2);
+				if (y + h > limit) {
+					break;
+				}
 				String age = Ago.format(nowMs, card.activityMs());
 				String footer = footer(card, mode);
 				float footRoom = cardW - STRIPE - 2 * CARD_PAD - BADGE - 3 - (age.isEmpty() ? 0 : m.width(age) + 5);
-				slots.add(new Slot(card.key(), i, x + CARD_INSET, y, cardW, mt.cardH(),
-						clip(card.title(), (int) titleRoom, m),
-						clip(footer, (int) footRoom, m), age,
-						card.attention(), card.badge()));
-				y += mt.cardH() + CARD_GAP;
+				slots.add(new Slot(card.key(), i, x + CARD_INSET, y, cardW, h, t[0], t[1],
+						clip(footer, (int) footRoom, m), age, card.attention(), card.badge()));
+				y += h + CARD_GAP;
+				shown++;
 			}
 			int hidden = c.count() - shown;
-			if (hidden > 0 && rows > 0) {
+			if (hidden > 0 && y + CHIP_H <= bottom) {
 				String text = "+" + hidden + " more";
 				float chipW = Math.min(cardW, m.width(text) + 12);
-				more.add(new More(i, x + (laneW - chipW) / 2f, y + (mt.cardH() - CHIP_H) / 2f, chipW, CHIP_H, hidden,
-						c.cards().get(shown).key(), text));
+				more.add(new More(i, x + (laneW - chipW) / 2f, y, chipW, CHIP_H, hidden, c.cards().get(shown).key(), text));
 			}
 		}
 		return new Layout(width, height, mode, mt, List.copyOf(lanes), List.copyOf(slots), List.copyOf(more), total);
+	}
+
+	/**
+	 * A title on at most two lines of {@code maxW} px: the first breaks at the last space that fits (or in the
+	 * middle of a word that is longer than the line), the second is clipped with an ellipsis. {"title", ""} when
+	 * it fits on one.
+	 */
+	static String[] wrap(String text, int maxW, Measure m) {
+		if (text == null || text.isEmpty() || maxW <= 0) {
+			return new String[] {"", ""};
+		}
+		if (m.width(text) <= maxW) {
+			return new String[] {text, ""};
+		}
+		int end = text.length();
+		while (end > 0 && m.width(text.substring(0, end)) > maxW) {
+			end = text.offsetByCodePoints(end, -1);
+		}
+		if (end == 0) {
+			return new String[] {clip(text, maxW, m), ""};
+		}
+		int brk = text.lastIndexOf(' ', end);
+		if (brk <= 0 || brk < end / 2 && end < text.length()) {
+			brk = end; // no good space: break inside the word
+		}
+		String first = text.substring(0, brk).stripTrailing();
+		String rest = text.substring(brk).stripLeading();
+		return new String[] {first, clip(rest, maxW, m)};
 	}
 
 	/** Width of a header's count pill: the number at the header scale plus padding. */

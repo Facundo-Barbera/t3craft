@@ -41,8 +41,8 @@ import org.jspecify.annotations.Nullable;
  * that fly (lifted, with a shadow) to their new column and glow where they land.
  *
  * <p>Look (kit/thread-board): a dark backing in a brass-keylined frame; four dark lanes, each with a
- * header in its state colour (label at 1.75x, count in a pill) and loose cream cards inset from the lane
- * with a gap between them: state stripe, title at 1.25x, then badge, project and the thread's age at 1x.
+ * header in its state colour (label at 1.75x, count in a pill) and loose charcoal cards (cream text) inset from the lane
+ * with a gap between them: state stripe, title (up to two lines, 1.25x), then badge, project and the thread's age at 1x.
  * Headers and titles are scaled so they read from 6-10 blocks ({@link WallLayout.Metrics}).
  *
  * <p>Opaque layers drawn in the solid pass with explicit z steps that grow with the distance
@@ -61,16 +61,22 @@ public final class ThreadBoardRenderer implements BlockEntityRenderer<ThreadBoar
 	/** Board pixels per block (one character ≈ 6 px). */
 	public static final float PPB = 64f;
 	/** Dark backing of the board, the frame band around it and the lanes on it. */
-	static final int BACK = 0xFF16110E;
+	static final int BACK = 0xFF110D0B;
 	static final int FRAME = 0xFF2E2620;
-	static final int LANE = 0xFF251D17;
-	/** Shadow under a card (on a lane) and the dark pill of a header's count. */
-	static final int SHADOW = 0xFF0E0B09;
+	static final int KEYLINE = 0xFF6F5A20;
+	static final int LANE = 0xFF1C1612;
+	/** A card: warm charcoal on the darker lane, with cream text (T3 Code's dark look); shadow under it; the header's count pill. */
+	static final int CARD = 0xFF39312B;
+	static final int SHADOW = 0xFF080605;
 	static final int PILL = 0xFF17120F;
 	static final int CHIP = 0xFF3B3028;
 	static final int CREAM = 0xFFF4EFE6;
 	static final int INK = 0xFF1F1E1D;
+	/** Second-line text on a card (project, age): cream, dimmed. */
+	static final int SOFT = 0xFFC4BAAA;
 	private static final int MAX_CACHED = 64;
+	/** A card shorter than this (still gliding to its size) draws no text. */
+	private static final float MIN_TEXT_H = 20f;
 
 	public static final class State extends BlockEntityRenderState {
 		Direction facing = Direction.NORTH;
@@ -168,7 +174,7 @@ public final class ThreadBoardRenderer implements BlockEntityRenderer<ThreadBoar
 				countW[i] = font.width(lane.count());
 			}
 			for (WallLayout.Slot s : l.cards()) {
-				cards.put(s.key(), new FormattedCharSequence[] {seq(s.title()), seq(s.footer()), seq(s.badge().initial()), seq(s.age())});
+				cards.put(s.key(), new FormattedCharSequence[] {seq(s.title()), seq(s.footer()), seq(s.badge().initial()), seq(s.age()), seq(s.title2())});
 			}
 			for (WallLayout.More m : l.more()) {
 				more.add(seq(m.text()));
@@ -231,7 +237,7 @@ public final class ThreadBoardRenderer implements BlockEntityRenderer<ThreadBoar
 
 		// opaque layers (solid pass, explicit z steps): keyline, frame, backing, lanes + headers, chips, settled cards; then the flying ones
 		collector.order(0).submitCustomGeometry(ps, ScreenDraw.fill(), (pose, vc) -> {
-			ScreenDraw.rect(pose, vc, 0, 0, w, h, 0, theme.brass(), light);
+			ScreenDraw.rect(pose, vc, 0, 0, w, h, 0, KEYLINE, light);
 			ScreenDraw.rect(pose, vc, 1.5f, 1.5f, w - 1.5f, h - 1.5f, -z, FRAME, light);
 			ScreenDraw.rect(pose, vc, WallLayout.FRAME, WallLayout.FRAME, w - WallLayout.FRAME, h - WallLayout.FRAME, -2 * z, BACK, light);
 			for (WallLayout.Lane lane : l.lanes()) {
@@ -293,8 +299,6 @@ public final class ThreadBoardRenderer implements BlockEntityRenderer<ThreadBoar
 	private void cards(PoseStack.Pose pose, VertexConsumer vc, State s, WallBoard b, List<WallLayout.Slot> list, boolean lifted, float z0,
 			boolean text, int light) {
 		float z = s.zStep;
-		WallLayout.Layout l = b.layout();
-		WallLayout.Metrics mt = l == null ? WallLayout.Metrics.of(WallLayout.WIDE_LANE) : l.metrics();
 		for (WallLayout.Slot slot : list) {
 			WallBoard.Anim a = b.anim(slot.key());
 			if (a == null || a.flying != lifted) {
@@ -309,11 +313,11 @@ public final class ThreadBoardRenderer implements BlockEntityRenderer<ThreadBoar
 				// resting shadow: a dark edge under and to the right, so the card reads as a loose slip on the lane
 				ScreenDraw.rect(pose, vc, a.x + 1, a.y + 2, a.x + a.w + 1.5f, a.y + a.h + 2.5f, -z0, SHADOW, light);
 			}
-			ScreenDraw.rect(pose, vc, a.x, a.y, a.x + a.w, a.y + a.h, -z0 - z, CREAM, light);
-			ScreenDraw.rect(pose, vc, a.x, a.y, a.x + WallLayout.STRIPE, a.y + a.h, -z0 - 2 * z, 0xFF000000 | theme.color(slot.attention()), light);
-			if (text && a.h >= mt.cardH() - 1) {
+			ScreenDraw.rect(pose, vc, a.x, a.y, a.x + a.w, a.y + a.h, -z0 - z, CARD, light);
+			ScreenDraw.rect(pose, vc, a.x, a.y, a.x + WallLayout.STRIPE, a.y + a.h, -z0 - 2 * z, 0xFF000000 | WallColumns.color(slot.attention()), light);
+			if (text && a.h >= MIN_TEXT_H) {
 				float bx = a.x + WallLayout.STRIPE + WallLayout.CARD_PAD;
-				float by = a.y + mt.footY() - 0.5f;
+				float by = a.y + a.h - WallLayout.CARD_PAD - WallLayout.FOOT_H - 0.5f;
 				ScreenDraw.rect(pose, vc, bx, by, bx + WallLayout.BADGE, by + WallLayout.BADGE, -z0 - 2 * z, 0xFF000000 | slot.badge().background(), light);
 			}
 		}
@@ -324,17 +328,20 @@ public final class ThreadBoardRenderer implements BlockEntityRenderer<ThreadBoar
 		for (WallLayout.Slot slot : list) {
 			WallBoard.Anim a = b.anim(slot.key());
 			FormattedCharSequence[] seqs = g.cards().get(slot.key());
-			if (a == null || a.flying != lifted || seqs == null || a.h < mt.cardH() - 1) {
+			if (a == null || a.flying != lifted || seqs == null || a.h < MIN_TEXT_H) {
 				continue;
 			}
 			float tx = a.x + WallLayout.STRIPE + WallLayout.CARD_PAD;
-			float fy = a.y + mt.footY();
-			text(t, ps, seqs[0], tx, a.y + 4, mt.titleScale(), INK, light);
+			float fy = a.y + a.h - WallLayout.CARD_PAD - WallLayout.FOOT_H;
+			text(t, ps, seqs[0], tx, a.y + 4, mt.titleScale(), CREAM, light);
+			if (!slot.title2().isEmpty()) {
+				text(t, ps, seqs[4], tx, a.y + 4 + mt.lineStep(), mt.titleScale(), CREAM, light);
+			}
 			text(t, ps, seqs[2], tx + (WallLayout.BADGE - font.width(seqs[2])) / 2f + 0.5f, fy, 1f, slot.badge().foreground(), light);
-			text(t, ps, seqs[1], tx + WallLayout.BADGE + 3, fy, 1f, theme.muted(), light);
+			text(t, ps, seqs[1], tx + WallLayout.BADGE + 3, fy, 1f, SOFT, light);
 			if (!slot.age().isEmpty()) {
 				float aw = font.width(seqs[3]);
-				text(t, ps, seqs[3], a.x + a.w - WallLayout.CARD_PAD - aw, fy, 1f, theme.muted(), light);
+				text(t, ps, seqs[3], a.x + a.w - WallLayout.CARD_PAD - aw, fy, 1f, SOFT, light);
 			}
 		}
 	}
@@ -365,7 +372,7 @@ public final class ThreadBoardRenderer implements BlockEntityRenderer<ThreadBoar
 			return mix(LANE, theme.brass(), Math.min(1f, a.glow / WallBoard.GLOW_S));
 		}
 		if (slot.attention() == Attention.NEEDS_YOU) {
-			return mix(LANE, theme.needsYou(), 0.35f + 0.65f * (0.5f + 0.5f * (float) Math.sin(s.time * 3.2f)));
+			return mix(LANE, 0xFF000000 | WallColumns.color(Attention.NEEDS_YOU), 0.35f + 0.65f * (0.5f + 0.5f * (float) Math.sin(s.time * 3.2f)));
 		}
 		return 0;
 	}

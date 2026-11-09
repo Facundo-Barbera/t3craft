@@ -201,8 +201,8 @@ public final class CitadelHub {
 	 * <ul>
 	 * <li>a sill of dark oak planks under the board (it replaces the old beam base);</li>
 	 * <li>a post of stripped dark oak (vertical log) at each end, from the sill to the lintel, one cell outside the board;</li>
-	 * <li>a lintel of stripped dark oak along the top with three lit copper bulbs (the board's warning lights);</li>
-	 * <li>a cornice: upside-down dark oak stairs one cell in front of the lintel, with the back on the wall.</li>
+	 * <li>a lintel of stripped dark oak along the top;</li>
+	 * <li>a cornice: upside-down dark oak stairs one cell in front of the lintel, with the back on the wall, and three lit copper bulbs set in it (the board's warning lights, lit faces to the aisle).</li>
 	 * </ul>
 	 * Nothing is lower than the sill, nor sticks out below head height: the aisle stays clear ({@code x = -hubX + 1} and up are free).
 	 */
@@ -224,8 +224,9 @@ public final class CitadelHub {
 				}
 			}
 			boolean bulb = i == 1 || i == wall.width() / 2 || i == wall.width() - 2;
-			c.set(base.atY(top), bulb ? lamp : darkLog(along.getAxis()));
-			c.set(base.atY(top).relative(out), cornice);
+			c.set(base.atY(top), darkLog(along.getAxis()));
+			// the bulbs sit in the cornice row, in front of the lintel, so their lit faces show to the aisle
+			c.set(base.atY(top).relative(out), bulb ? lamp : cornice);
 		}
 	}
 

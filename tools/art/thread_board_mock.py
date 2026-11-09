@@ -26,18 +26,19 @@ EDGE, FRAME_PX, GAP, CARD_GAP, CARD_INSET, HEAD_GAP, CHIP_H = 8, 6, 6, 6, 5, 6, 
 CARD_PAD, STRIPE, BADGE, FOOT_H = 4, 5, 9, 8
 WIDE_LANE, MID_LANE = 120, 88
 
-BRASS = 0xC9A227
+KEYLINE = 0x6F5A20
 FRAME = 0x2E2620
-BACK = 0x16110E
-LANE = 0x251D17
-SHADOW = 0x0E0B09
+BACK = 0x110D0B
+LANE = 0x1C1612
+CARD = 0x39312B
+SHADOW = 0x080605
 PILL = 0x17120F
 CHIP = 0x3B3028
 CREAM = 0xF4EFE6
 INK = 0x1F1E1D
-MUTED = 0x655E55
-# ChatTheme.warmStudio status colours
-C_NEEDS, C_ERROR, C_WORKING, C_DONE = 0xD97757, 0xC2413B, 0x2FA3A0, 0x8FA98B
+SOFT = 0xC4BAAA
+# ThreadState colours (the lamps' and the NPC nametags'): WallColumns.color
+C_NEEDS, C_ERROR, C_WORKING, C_DONE = 0xFFAA00, 0xFF5555, 0x55FFFF, 0x55FF55
 BADGES = {"V": 0x2F7F8A, "M": 0x8A5A2F, "P": 0x5A6FA8}
 
 
@@ -153,6 +154,21 @@ def clip(s, max_w):
     return s.rstrip() + "…" if s else "…"
 
 
+def wrap(s, max_w):
+    """WallLayout.wrap: (line 1, line 2); line 2 is '' when the title fits on one line."""
+    if text_w(s) <= max_w:
+        return s, ""
+    end = len(s)
+    while end > 0 and text_w(s[:end]) > max_w:
+        end -= 1
+    if end == 0:
+        return clip(s, max_w), ""
+    brk = s.rfind(" ", 0, end + 1)
+    if brk <= 0 or brk < end // 2:
+        brk = end
+    return s[:brk].rstrip(), clip(s[brk:].lstrip(), max_w)
+
+
 SAMPLE = {
     "Working": (C_WORKING, [
         ("Wire the thread board to ThreadState", "t3craft", "now", "V"), ("Chat panel: scroll anchoring", "t3-code", "3m", "V"),
@@ -171,17 +187,16 @@ SAMPLE = {
 def draw(out, wblocks, hblocks, ncards, k=4):
     W, H = wblocks * PPB, hblocks * PPB
     c = Canvas(W, H, k)
-    c.rect(0, 0, W, H, BRASS)
+    c.rect(0, 0, W, H, KEYLINE)
     c.rect(1.5, 1.5, W - 1.5, H - 1.5, FRAME)
     c.rect(FRAME_PX, FRAME_PX, W - FRAME_PX, H - FRAME_PX, BACK)
     cols = list(SAMPLE.items())
     n = len(cols)
     lane_w = (W - 2 * EDGE - GAP * (n - 1)) / n
     ts, hs, head_h, card_h = metrics(lane_w)
-    avail = H - 2 * EDGE - head_h - HEAD_GAP - 4
-    rows = 0 if avail < card_h else int((avail + CARD_GAP) // (card_h + CARD_GAP))
+    line_step = int(-(-8 * ts // 1))
     card_w = lane_w - 2 * CARD_INSET
-    foot_y = card_h - 4 - FOOT_H
+    bottom = H - EDGE - 4
     shown_total = 0
     for i, (label, (color, cards)) in enumerate(cols):
         cards = cards[:ncards]
@@ -196,36 +211,45 @@ def draw(out, wblocks, hblocks, ncards, k=4):
         label_room = (lane_w - 2 * CARD_PAD - pw - 4) / hs
         c.text(clip(label, label_room), x0 + CARD_PAD, ty, hs, on_color(color))
         c.text(count, x1 - 3 - pw + (pw - text_w(count) * hs) / 2, ty, hs, CREAM)
-        shown = len(cards) if len(cards) <= rows else max(0, rows - 1)
+        title_room = (card_w - STRIPE - 2 * CARD_PAD) / ts
+        wrapped = [wrap(cd[0], title_room) for cd in cards]
+        heights = [card_h + (line_step if w2[1] else 0) for w2 in wrapped]
         y = EDGE + head_h + HEAD_GAP
-        for title, proj, age, env in cards[:shown]:
+        fits_all = y + sum(h + CARD_GAP for h in heights) - CARD_GAP <= bottom
+        limit = bottom if fits_all else bottom - (CHIP_H + CARD_GAP)
+        shown = 0
+        for (title, proj, age, env), (l1, l2), h in zip(cards, wrapped, heights):
+            if y + h > limit:
+                break
             cx = x0 + CARD_INSET
-            c.rect(cx + 1, y + 2, cx + card_w + 1.5, y + card_h + 2.5, SHADOW)
-            c.rect(cx, y, cx + card_w, y + card_h, CREAM)
-            c.rect(cx, y, cx + STRIPE, y + card_h, color)
+            c.rect(cx + 1, y + 2, cx + card_w + 1.5, y + h + 2.5, SHADOW)
+            c.rect(cx, y, cx + card_w, y + h, CARD)
+            c.rect(cx, y, cx + STRIPE, y + h, color)
             tx = cx + STRIPE + CARD_PAD
-            c.text(clip(title, (card_w - STRIPE - 2 * CARD_PAD) / ts), tx, y + 4, ts, INK)
-            fy = y + foot_y
+            c.text(l1, tx, y + 4, ts, CREAM)
+            if l2:
+                c.text(l2, tx, y + 4 + line_step, ts, CREAM)
+            fy = y + h - CARD_PAD - FOOT_H
             c.rect(tx, fy - 0.5, tx + BADGE, fy + BADGE - 0.5, BADGES[env])
             c.text(env, tx + (BADGE - ADV + 1) / 2, fy, 1, CREAM)
             foot_room = card_w - STRIPE - 2 * CARD_PAD - BADGE - 3 - (text_w(age) + 5)
-            c.text(clip(proj, foot_room), tx + BADGE + 3, fy, 1, MUTED)
-            c.text(age, cx + card_w - CARD_PAD - text_w(age), fy, 1, MUTED)
-            y += card_h + CARD_GAP
+            c.text(clip(proj, foot_room), tx + BADGE + 3, fy, 1, SOFT)
+            c.text(age, cx + card_w - CARD_PAD - text_w(age), fy, 1, SOFT)
+            y += h + CARD_GAP
+            shown += 1
             shown_total += 1
         hidden = len(cards) - shown
-        if hidden > 0 and rows > 0:
+        if hidden > 0 and y + CHIP_H <= bottom:
             t = "+%d more" % hidden
             cw = min(card_w, text_w(t) + 12)
             mx = x0 + (lane_w - cw) / 2
-            my = y + (card_h - CHIP_H) / 2
-            c.rect(mx, my, mx + cw, my + CHIP_H, CHIP)
-            c.text(t, mx + (cw - text_w(t)) / 2, my + (CHIP_H - 8) / 2 + 0.5, 1, CREAM)
+            c.rect(mx, y, mx + cw, y + CHIP_H, CHIP)
+            c.text(t, mx + (cw - text_w(t)) / 2, y + (CHIP_H - 8) / 2 + 0.5, 1, CREAM)
     os.makedirs(out, exist_ok=True)
     full = os.path.join(out, "wall_face_%dx%d.png" % (wblocks, hblocks))
     c.png(full)  # 4 px per board px
     c.png(os.path.join(out, "wall_face_%dx%d_at8blocks.png" % (wblocks, hblocks)), scale_down=max(1, round(k * PPB / 96)))
-    print("lane %.1f px, title %.2fx, header %.2fx, card %d px, rows %d, cards drawn %d -> %s" % (lane_w, ts, hs, card_h, rows, shown_total, out))
+    print("lane %.1f px, title %.2fx, header %.2fx, card %d px (+%d for a 2nd line), cards drawn %d -> %s" % (lane_w, ts, hs, card_h, line_step, shown_total, out))
 
 
 if __name__ == "__main__":
