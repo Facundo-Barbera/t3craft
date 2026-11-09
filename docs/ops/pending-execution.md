@@ -85,6 +85,21 @@ Quedan como estaban:
   - la desinstalación de herramientas pesadas en la VPS;
   - que el relay traiga solo reportes, sin PNG.
 
+### Ejecución (2026-11-09, noche)
+- **Fase 0 (#2, cerrado):**
+  - el proyecto t3craft está registrado en el T3 de la VPS;
+  - convenciones en `docs/dev.md`, regla de issues en `AGENTS.md`;
+  - `tools/refactor/{moves.tsv,apply-moves.sh}`;
+  - `.gitattributes` con `merge=union` para el changelog.
+- **Fase 1 (#3, cerrado):** 1a, 1b, 1c y 1d integrados, cada uno compilado en el PC en su SHA exacto. Build limpio final de main (`bfb0f6e6`): `BUILD SUCCESSFUL`.
+- **#1:** informe en `docs/plans/t3-connect.md` y resumen comentado en el issue. Sigue abierto hasta que decida Facundo.
+- **VPS:** desinstalados el JDK, `~/.gradle`, los build dirs y los PNG de los cachés de render/coord. Hay stubs `java`/`javac`/`gradle` en `~/.local/bin`. El relay ya no trae PNG.
+- **PC:** se borraron los 173 worktrees de jobs. **El daemon de render quedó parado:** se levanta con `tools/render/start-daemon.sh`.
+- **Ramas:** en origin quedan main, las 10 activas y `research/game-ui-integrations` (hilo de Facundo). Hay 32 tags `archive/*`.
+- **Límite de T3:** `delegate_task` contra un entorno vinculado no admite `isolation: worktree`, así que el hijo trabaja en el checkout compartido del proyecto.
+  - Los hijos de implementación van **de a uno**: cada uno hace checkout de su rama, push, y vuelve a main.
+  - Los hijos de solo lectura pueden ir en paralelo si leen con `git show origin/main:` y escriben en `/tmp`.
+
 ### Propuestas pendientes de OK (versión anterior; ver arriba lo aprobado)
 - **Las 40 ramas sin integrar.** Archivar quiere decir: tag `archive/<rama>` subido, después se borran la rama y su worktree en la VPS.
   - **Se quedan, en pausa:** `cat/gate-torii-cherry2`, `cat/gate-arch-battlement2`, `cat/lamp-brazier-tripod2`, `cat/tree-azalea-blossom2`, `struct/signposts`, `cat/statue-obelisk-braziers` y `feat/kit-blocks-art`. Sus rondas 1 (`cat/gate-torii-cherry`, `cat/gate-arch-battlement`, `cat/lamp-brazier-tripod`, `cat/tree-azalea-blossom`) se quedan hasta cerrar la ronda 2.
