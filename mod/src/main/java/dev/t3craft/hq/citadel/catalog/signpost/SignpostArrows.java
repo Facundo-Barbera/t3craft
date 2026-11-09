@@ -11,29 +11,33 @@ import dev.t3craft.hq.citadel.catalog.Variant;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.core.Direction;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.StairBlock;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.Half;
 import net.minecraft.world.level.block.state.properties.SlabType;
 
 /**
- * Concept: a crossroads fingerpost: a stripped cherry post on a deepslate footing with two or three
- * hanging-sign "arms" at staggered heights, each pointing a different way where the plot allows,
- * alternating cherry and bamboo boards, topped by a lantern on tall plots.
+ * A crossroads fingerpost with real arrows: a dark post on a deepslate footing, and two or three arrows at
+ * staggered heights, each pointing a different way where the plot allows (left, right, towards the front).
+ * Each arrow runs through the post: a stair head on one side, the shaft through the post, a slab tail on the
+ * other side. Pink cherry, yellow bamboo and pale birch arrows alternate; a lantern crowns tall posts.
  *
- * <p>The tricks:
  * <ul>
- * <li><b>Arms</b>: a wall hanging sign attaches by its bar to the block beside it, perpendicular to
- *     its facing, so a sign in the cell next to the post with {@code facing} turned 90° reads as a
- *     board sticking out of the post.</li>
- * <li><b>Silhouette</b>: arms at different heights and directions (left, right, towards the front),
- *     never a symmetric cross; when only one side has room the arms stack on it, like real fingerposts.</li>
- * <li><b>Base</b>: a stepped plinth of stairs leaning on the footing, with a potted flower, where room.</li>
+ * <li><b>Arrow head</b>: an upside-down stair whose low step sits against the post, so the board tapers
+ *     to a point away from it.</li>
+ * <li><b>Contrast</b>: a near-black dark oak post against bright boards; deepslate at the foot.</li>
+ * <li><b>Silhouette</b>: arrows at irregular heights and in different directions, never a symmetric
+ *     cross; on a narrow plot they stack on the open side, like real fingerposts.</li>
  * </ul>
- * Size: 2–3 × 1–2 × 3+. The post stands at the back; arms take the cells beside and in front of it.
+ * Size: 2–3 × 1–2 × 3+ (it uses up to 7 blocks of height).
  */
 public final class SignpostArrows implements Variant {
-	private static final BlockState POST = b(Blocks.STRIPPED_CHERRY_LOG); // axis Y by default
+	private static final Block[][] WOODS = {
+			{Blocks.CHERRY_PLANKS, Blocks.CHERRY_STAIRS, Blocks.CHERRY_SLAB},
+			{Blocks.BAMBOO_PLANKS, Blocks.BAMBOO_STAIRS, Blocks.BAMBOO_SLAB},
+			{Blocks.BIRCH_PLANKS, Blocks.BIRCH_STAIRS, Blocks.BIRCH_SLAB}};
 
 	@Override
 	public String id() {
@@ -76,23 +80,20 @@ public final class SignpostArrows implements Variant {
 		int d = p.d();
 		int pu = w == 3 ? 1 : p.hash(0, 0, 0, 2); // width 2: the post on the left or right column by seed
 		int pv = d - 1;
-		int cap = p.h() >= 5 ? Math.min(p.h() - 1, 6) : -1; // a lantern on top only when there is room above three arms
-		int postTop = Math.min(p.h() - 1, 5);
-		int step = postTop >= 5 ? 2 : 1; // tall plots space the boards out, so each one reads on its own
+		int top = Math.min(p.h() - 1, 6);
+		boolean lantern = top >= 4;
+		int postTop = lantern ? top - 1 : top;
 
-		// --- footing and post
+		// --- footing and post: a deepslate footing, a stripped log collar, a slim dark fence above
 		p.set(c, pu, 0, pv, p.hash(pu, 0, pv, 3) == 0 ? b(Blocks.CHISELED_DEEPSLATE) : b(Blocks.POLISHED_DEEPSLATE));
 		for (int y = 1; y <= postTop; y++) {
-			// a log at the foot, a slim fence above: the boards hang off a thin post, not a pink column
-			p.set(c, pu, y, pv, y == 1 ? POST : b(Blocks.CHERRY_FENCE));
+			p.set(c, pu, y, pv, y == 1 ? b(Blocks.STRIPPED_DARK_OAK_LOG) : b(Blocks.DARK_OAK_FENCE));
 		}
-		if (cap > postTop) {
-			p.set(c, pu, cap, pv, b(Blocks.LANTERN));
-		} else if (postTop + 1 < p.h()) {
-			p.set(c, pu, postTop + 1, pv, stairs(Blocks.CHERRY_STAIRS, Direction.NORTH)); // a pitched cap over the arms
+		if (lantern) {
+			p.set(c, pu, top, pv, b(Blocks.LANTERN));
 		}
 
-		// --- the directions the arms can take, in a fixed order with a seed-chosen start
+		// --- the directions an arrow head can take, in a fixed order with a seed-chosen start
 		List<Direction> dirs = new ArrayList<>();
 		for (Direction dir : new Direction[] {Direction.WEST, Direction.NORTH, Direction.EAST}) {
 			if (p.has(pu + dir.getStepX(), 0, pv + dir.getStepZ())) {
@@ -100,23 +101,13 @@ public final class SignpostArrows implements Variant {
 			}
 		}
 		int start = p.hash(1, 0, 0, dirs.size());
-		int arms = Math.min(3, (postTop - 1) / step + 1); // top first
-		for (int i = 0; i < arms; i++) {
+		int[] heights = postTop >= 5 ? new int[] {postTop, postTop - 1, postTop - 3}
+				: postTop >= 3 ? new int[] {postTop, postTop - 1} : new int[] {postTop};
+		int wood = p.hash(2, 0, 0, WOODS.length);
+		for (int i = 0; i < heights.length; i++) {
 			Direction dir = dirs.get((start + i) % dirs.size());
-			int y = postTop - i * step;
-			if (i == arms - 1 && arms == 3 && step == 1 && dirs.size() == 1) {
-				break; // three arms stacked on one side crowd the post: keep two
-			}
-			// the arm is a real board: a plank slab board next to the post (alternating cherry / bamboo),
-			// with a wall sign on its front face where the plot has room; it reads from far away, unlike a hanging sign
-			boolean cherry = i % 2 == 0;
-			int au = pu + dir.getStepX();
-			int av = pv + dir.getStepZ();
-			p.set(c, au, y, av, slab(cherry ? Blocks.CHERRY_SLAB : Blocks.BAMBOO_SLAB).setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP));
-			if (p.has(au, y, av - 1)) {
-				p.put(c, au, y, av - 1, b(cherry ? Blocks.BAMBOO_WALL_SIGN : Blocks.CHERRY_WALL_SIGN)
-						.setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH), CitadelCanvas.DECOR);
-			}
+			Block[] m = WOODS[(wood + i) % WOODS.length];
+			arrow(c, p, pu, heights[i], pv, dir, m);
 		}
 
 		// --- base: stairs leaning on the footing in the free ground cells beside it, one potted flower
@@ -131,10 +122,24 @@ public final class SignpostArrows implements Variant {
 				p.set(c, u, 0, v, b(Blocks.POTTED_ALLIUM));
 				potted = true;
 			} else if (dir == Direction.NORTH) {
-				p.set(c, u, 0, v, slab(Blocks.DEEPSLATE_TILE_SLAB)); // the front: a low step to read the signs from
+				p.set(c, u, 0, v, slab(Blocks.DEEPSLATE_TILE_SLAB)); // the front: a low step to read the arrows from
 			} else {
 				p.set(c, u, 0, v, stairs(Blocks.DEEPSLATE_BRICK_STAIRS, dir.getOpposite()));
 			}
+		}
+	}
+
+	/** One arrow through the post at height y: the head towards {@code dir}, the tail on the other side. */
+	private static void arrow(CitadelCanvas c, Plot p, int pu, int y, int pv, Direction dir, Block[] m) {
+		p.set(c, pu, y, pv, b(m[0])); // the shaft through the post
+		int hu = pu + dir.getStepX();
+		int hv = pv + dir.getStepZ();
+		// head: the stair's low step sits against the post, its full upper half runs out to the tip
+		p.set(c, hu, y, hv, stairs(m[1], dir.getOpposite()).setValue(StairBlock.HALF, Half.TOP));
+		int tu = pu - dir.getStepX();
+		int tv = pv - dir.getStepZ();
+		if (p.has(tu, y, tv)) {
+			p.set(c, tu, y, tv, slab(m[2]).setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP)); // the tail
 		}
 	}
 }

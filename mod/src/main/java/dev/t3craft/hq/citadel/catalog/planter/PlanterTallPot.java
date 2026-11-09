@@ -31,7 +31,8 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
  * <li><b>Dwarf cherry</b>: a log trunk with a leaf crown, wider and two-tiered when the plot allows,
  *     pink petals fallen at the foot.</li>
  * </ul>
- * Size: 1–3 × 1–3 × 3+ (the plant grows up to 4 blocks over the pot when there is height).
+ * Size: 1–3 × 1–3 × 3+ (the plant grows up to 4 blocks over the pot when there is height). A 1 × 1 plot
+ * gets its own design: an urn on a stand (see {@code single}).
  */
 public final class PlanterTallPot implements Variant {
 	@Override
@@ -73,6 +74,10 @@ public final class PlanterTallPot implements Variant {
 	public void build(CitadelCanvas c, Plot p) {
 		int w = p.w();
 		int d = p.d();
+		if (w == 1 && d == 1) {
+			single(c, p);
+			return;
+		}
 		int cu = w / 2;
 		int cv = d / 2;
 		boolean bamboo = p.hash(0, 0, 0, 2) == 0;
@@ -130,6 +135,21 @@ public final class PlanterTallPot implements Variant {
 				p.set(c, u, 0, v, s);
 			}
 		}
+	}
+
+	/**
+	 * The 1 × 1 design: an urn on a stand. A slim deepslate wall stem (on a polished foot when there is
+	 * height), an iron cauldron as the bowl with its legs and rim, and a flowering azalea bush spilling over
+	 * it. Three different silhouettes stacked (thin post, open bowl, round bush) instead of three cubes.
+	 */
+	private static void single(CitadelCanvas c, Plot p) {
+		int y = 0;
+		if (p.h() >= 4) {
+			p.set(c, 0, y++, 0, p.hash(0, 0, 0, 3) == 0 ? b(Blocks.CHISELED_DEEPSLATE) : b(Blocks.POLISHED_DEEPSLATE));
+		}
+		p.set(c, 0, y++, 0, b(Blocks.POLISHED_DEEPSLATE_WALL).setValue(BlockStateProperties.UP, true));
+		p.set(c, 0, y++, 0, b(Blocks.CAULDRON));
+		p.set(c, 0, y, 0, p.hash(0, 1, 0, 3) == 0 ? b(Blocks.AZALEA) : b(Blocks.FLOWERING_AZALEA));
 	}
 
 	/** A thick bamboo stalk from y0 to y1 with the right leaves, and a shorter one beside it if there is room. */
