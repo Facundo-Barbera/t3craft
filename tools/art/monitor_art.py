@@ -1,27 +1,41 @@
 #!/usr/bin/env python3
-"""kit/monitor: generates the monitor textures, block models and the blockstate.
+"""kit/monitor2: generates the monitor textures, block models and the blockstate.
 
 Standard library only (zlib/struct), light enough for the VPS. Run from the repo root:
 
     python3 tools/art/monitor_art.py
 
-Design: a desk monitor in graphite/steel. A monitor block is a full cube whose north face (the front) is the
-glass; the frame is a raised lip (1 px) made of strips that exist only on the SIDES THAT ARE NOT CONNECTED to
-another monitor, so a wall of monitors is one big glass with one continuous frame:
+Design: a desk monitor in graphite/steel. A monitor block is a full cube for collision, but its MODEL lives wholly inside
+the cube (nothing sticks out of the block, which also keeps the headless renderer, that only tests a quad in the cell
+that owns it, from cutting slivers at the seams of a wall):
 
-    top / left / right bezel   2 px (lip stands 1 px proud of the glass: the glass looks recessed)
-    bottom chin                3 px; its lowest pixel is a "foot": a steel ledge 3 px deep (the stand, or a plinth
-                               on a wall). The renderer puts a status LED and the T3 mark on the chin.
+    z 4..16   the casing; its front (z = 4) is the glass
+    z 3..4    the frame: a 1 px lip, so the glass looks recessed
+    z 1..11   the stand's base plate (a bottom-row block only), 2 px proud of the lip, z 6..10 the neck
 
-Corner ownership: the left and right strips are full height and own the corners; the top and bottom strips stop
-at a corner only when that side's strip exists (variants `_l`, `_r`, `_lr`), so the frame has no overlaps.
+The frame is made of strips that exist only on the SIDES THAT ARE NOT CONNECTED to another monitor (blockstate
+properties up/down/left/right = false), so a wall of monitors is one big glass with one continuous frame, and every strip
+picks its texture rows from what is next to it (connected textures), so a wall has no seams:
+
+    top / left / right bezel   2 px
+    bottom chin                2 px (y 3..5) with the status LED; the glass starts at y = 5 (MonitorLod.CHIN_PX = 5)
+    stand                      below the chin, on a bottom-row block only (down = false): the casing is lifted 3 px and
+                               rests on a dark neck over a 10 x 10 px base plate (narrower than the block: a stand, not a
+                               skirt); a block with a monitor under it has a full-height casing, no chin, no stand.
+
+Corner ownership: the left and right strips are full height and own the corners; the top and bottom strips stop at a
+corner only when that side has a strip (variants `_l`, `_r`, `_l_r`). Side strips come in four variants by the neighbours
+above/below (`_u`, `_d`, `_ud`): they only get a top / bottom cap where the frame really ends.
 
 North-facing model (viewer looks south): the viewer's left is +x. A north face maps u = 16 - x, v = 16 - y.
 
-Textures (16x16):  monitor_front   the frame as seen from the front (strips and the item sample it)
+Textures (16x16):  monitor_front   the frame as seen from the front. Rows: 0 light bezel, 1 steel bezel, 2-10 the side
+                                   posts (cols 0-1 left, 14-15 right) and the glass, 11-12 the chin; strips sample
+                                   single rows (uniform ones) so nothing repeats a mark at a seam
                    monitor_screen  the glass (the renderer paints over it; headless renders show this)
-                   monitor_side / monitor_top / monitor_back   the casing
-                   monitor_trim    small swatches for the lip faces and the foot (rows noted below)
+                   monitor_side / monitor_top / monitor_back   the casing; side and top are uniform along the wall
+                   monitor_trim    swatches: rows 0-9 base plate top, 10 neck front, 11 plate edge, 12 dark (undersides,
+                                   neck sides), 13 lip inner face (bright edge round the glass), 14 lip top, 15 lip side
 """
 import json
 import os
@@ -32,6 +46,9 @@ ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "mod
 TEX = os.path.join(ROOT, "textures", "block")
 MODELS = os.path.join(ROOT, "models", "block")
 STATES = os.path.join(ROOT, "blockstates")
+
+GLASS_Z = 4   # the glass plane; the lip is z 3..4
+LIFT = 3      # a bottom-row casing is lifted this much: chin band y 3..5
 
 
 # ---------------------------------------------------------------- png
@@ -72,9 +89,13 @@ ACCENT = rgb(0x3FB7C2)   # T3 teal
 
 # ---------------------------------------------------------------- textures
 def frame_pixel(x, y):
-    """The frame seen from the front: bezel 2 px (top / sides), chin 4 px, glass inside."""
-    if y > 11:  # chin (visible band rows 12-13, then the foot's two rows)
-        return SHADE if y == 12 else (BODY if y == 13 else DEEP)
+    """The frame seen from the front: bezel 2 px (top / sides), chin 2 px (rows 11-12), glass inside."""
+    if y >= 13:
+        return DEEP
+    if y == 12:
+        return SHADE
+    if y == 11:
+        return STEEL
     if y < 2:
         if x == 15:
             return BODY
@@ -111,20 +132,21 @@ def box_casing(vents):
 
 
 def make_side():
-    # plain brushed casing with a soft vertical gradient: no per-block inset, so the end of a wall is one flat plate
-    g = box_casing([])
-    for y in range(1, 15):
-        c = STEEL if y < 3 else (BODY if y < 12 else SHADE)
-        for x in range(1, 15):
-            g[y][x] = c
+    """Uniform along y (stacked blocks show no band); the face samples cols 0..11 (z 4..16), edges a shade lighter."""
+    g = grid(BODY)
+    for y in range(16):
+        g[y][0] = STEEL
+        g[y][11] = STEEL
     return g
 
 
 def make_top():
-    g = box_casing([])
-    for y in range(1, 15):
-        for x in range(1, 15):
-            g[y][x] = BODY if 3 <= y <= 12 else STEEL
+    """Uniform along x (a wall's top is one plate); the face samples rows 4..15 (z 4..16): a light front edge, a dark rear."""
+    g = grid(BODY)
+    for x in range(16):
+        g[4][x] = STEEL
+        g[5][x] = STEEL
+        g[15][x] = SHADE
     return g
 
 
@@ -143,22 +165,24 @@ def make_back():
 
 
 def make_trim():
-    """Swatches. rows 0-4 foot top (brushed steel, front edge brightest), rows 6-7 foot front, row 9 foot end,
-    row 11 lip inner faces (bright edge round the glass), row 13 lip top, row 15 lip outer side."""
     g = grid(rgb(0x000000))
-    top = [rgb(0x5C616A), rgb(0x6F747E), rgb(0x868C96), rgb(0x9AA1AB), rgb(0xC4CAD3)]
-    for y in range(5):
+    # rows 0-9: base plate top, brightest at the front edge (row 0), darker towards the back
+    top = [0xC4CAD3, 0xA9B0BA, 0x9AA1AB, 0x868C96, 0x7A808A, 0x6F747E, 0x666B75, 0x5E636C, 0x565B64, 0x4E525A]
+    for y in range(10):
         for x in range(16):
-            c = top[y]
-            if y == 1 and x % 4 == 0:
-                c = rgb(0x757A84)
+            c = rgb(top[y])
+            if y in (3, 6) and x % 4 == 0:  # brushed grain
+                c = rgb(top[y - 1])
             g[y][x] = c
-    g[6] = [rgb(0x1E2024)] * 16
-    g[7] = [rgb(0x4A4E57)] * 16
-    g[9] = [rgb(0x30323A)] * 16
-    g[11] = [INNER] * 16
-    g[13] = [rgb(0xA0A6B0)] * 16
-    g[15] = [rgb(0x565B64)] * 16
+    # row 10: neck front, lit from the left (viewer's left is the low x of u = 16 - x... the face is mirrored, see the model)
+    neck = [0x30343C] * 16
+    neck[6], neck[7], neck[8], neck[9] = 0x454B55, 0x3A3F48, 0x30343C, 0x272A31
+    g[10] = [rgb(c) for c in neck]
+    g[11] = [rgb(0x4A4E57)] * 16     # plate edge (front, ends)
+    g[12] = [rgb(0x1A1C21)] * 16     # undersides, neck sides: in shadow
+    g[13] = [INNER] * 16             # lip inner faces
+    g[14] = [rgb(0xA0A6B0)] * 16     # lip top
+    g[15] = [rgb(0x565B64)] * 16     # lip outer side
     return g
 
 
@@ -167,36 +191,60 @@ def north_uv(xa, xb, ya, yb):
     return [16 - xb, 16 - yb, 16 - xa, 16 - ya]
 
 
-TRIM_FOOT_TOP = "#trim", [0, 0, 16, 5]
-TRIM_FOOT_FRONT = "#trim", [0, 6, 16, 8]
-TRIM_FOOT_END = "#trim", [0, 9, 5, 10]
-TRIM_LIP_INNER = "#trim", [0, 11, 16, 12]
-TRIM_LIP_TOP = "#trim", [0, 13, 16, 14]
-TRIM_LIP_SIDE = "#trim", [0, 15, 16, 16]
+def trim(row, u0=0, u1=16):
+    """A face sampling one row of the trim swatches (uniform along the row, any width)."""
+    return {"texture": "#trim", "uv": [u0, row, u1, row + 1]}
 
 
-def face(spec):
-    tex, uv = spec
-    return {"texture": tex, "uv": uv}
+TRIM_PLATE_EDGE = 11
+TRIM_DARK = 12
+TRIM_LIP_INNER = 13
+TRIM_LIP_TOP = 14
+TRIM_LIP_SIDE = 15
+
+
+def frame(u0, v0, u1, v1):
+    return {"texture": "#frame", "uv": [u0, v0, u1, v1]}
 
 
 def element(frm, to, faces):
     return {"from": frm, "to": to, "faces": faces}
 
 
-def strip_left():
-    """Viewer's left (x 14..16), full height."""
-    return element([14, 0, -1], [16, 16, 0], {
-        "north": {"texture": "#frame", "uv": north_uv(14, 16, 0, 16)},
-        "east": face(TRIM_LIP_SIDE), "west": face(TRIM_LIP_INNER),
-        "up": face(TRIM_LIP_TOP), "down": face(TRIM_LIP_INNER)})
+LZ0 = GLASS_Z - 1  # lip front
+LZ1 = GLASS_Z      # lip back = glass plane
 
 
-def strip_right():
-    return element([0, 0, -1], [2, 16, 0], {
-        "north": {"texture": "#frame", "uv": north_uv(0, 2, 0, 16)},
-        "west": face(TRIM_LIP_SIDE), "east": face(TRIM_LIP_INNER),
-        "up": face(TRIM_LIP_TOP), "down": face(TRIM_LIP_INNER)})
+def side_strip(left, up_n, down_n):
+    """The post at the viewer's left (x 14..16) or right (x 0..2). up_n / down_n: a monitor is there, so the strip
+    continues instead of ending in a cap. Texture rows come from monitor_front: caps from its bezel / chin rows, the
+    middle from one uniform row of the post."""
+    xa, xb = (14, 16) if left else (0, 2)
+    u0, u1 = (0, 2) if left else (14, 16)
+    outer, inner = ("east", "west") if left else ("west", "east")
+    yb = 0 if down_n else LIFT
+    ym0 = yb if down_n else yb + 2
+    ym1 = 16 if up_n else 14
+    out = []
+
+    def sides(extra=None):
+        f = {"north": None, outer: trim(TRIM_LIP_SIDE, 0, 1), inner: trim(TRIM_LIP_INNER, 0, 1)}
+        if extra:
+            f.update(extra)
+        return f
+
+    mid = sides()
+    mid["north"] = frame(u0, 5, u1, 6)
+    out.append(element([xa, ym0, LZ0], [xb, ym1, LZ1], mid))
+    if not up_n:
+        cap = sides({"up": trim(TRIM_LIP_TOP, 0, 2)})
+        cap["north"] = frame(u0, 0, u1, 2)
+        out.append(element([xa, 14, LZ0], [xb, 16, LZ1], cap))
+    if not down_n:
+        cap = sides({"down": trim(TRIM_DARK, 0, 2)})
+        cap["north"] = frame(u0, 11, u1, 13)
+        out.append(element([xa, yb, LZ0], [xb, yb + 2, LZ1], cap))
+    return out
 
 
 def span(l, r):
@@ -206,25 +254,31 @@ def span(l, r):
 
 def strip_up(l, r):
     xa, xb = span(l, r)
-    return element([xa, 14, -1], [xb, 16, 0], {
-        "north": {"texture": "#frame", "uv": north_uv(xa, xb, 14, 16)},
-        "up": face(TRIM_LIP_TOP), "down": face(TRIM_LIP_INNER)})
+    return [element([xa, 14, LZ0], [xb, 16, LZ1], {
+        "north": frame(2, 0, 14, 2),
+        "up": trim(TRIM_LIP_TOP, 0, 16), "down": trim(TRIM_LIP_INNER, 0, 16)})]
 
 
 def strip_down(l, r):
-    """Chin (y 2..4) and the foot under it (y 0..2, 5 px deep)."""
+    """The chin band (y 3..5): the glass sits above it, the stand below it."""
     xa, xb = span(l, r)
-    chin = element([xa, 2, -1], [xb, 4, 0], {
-        "north": {"texture": "#frame", "uv": north_uv(xa, xb, 2, 4)},
-        "up": face(TRIM_LIP_INNER)})
-    faces = {"north": face(TRIM_FOOT_FRONT), "up": face(TRIM_FOOT_TOP), "down": face(TRIM_FOOT_END)}
-    # end faces only where the foot really ends (a side with its own strip); inside a wall they are hidden anyway
-    if l:
-        faces["east"] = face(TRIM_FOOT_END)
-    if r:
-        faces["west"] = face(TRIM_FOOT_END)
-    foot = element([0, 0, -5], [16, 2, 0], faces)
-    return [chin, foot]
+    return [element([xa, LIFT, LZ0], [xb, LIFT + 2, LZ1], {
+        "north": frame(2, 11, 14, 13),
+        "up": trim(TRIM_LIP_INNER, 0, 16), "down": trim(TRIM_DARK, 0, 16)})]
+
+
+def stand():
+    """Neck and base plate under a lifted casing: the plate (10 x 10, 1 px thick, 2 px proud of the lip) and a 4 x 4 neck
+    set back under the casing; the casing's own underside is dark, so the neck reads as a stem in shadow."""
+    plate = element([3, 0, 1], [13, 1, 11], {
+        "up": {"texture": "#trim", "uv": [3, 0, 13, 10]},
+        "north": trim(TRIM_PLATE_EDGE, 3, 13), "south": trim(TRIM_PLATE_EDGE, 3, 13),
+        "east": trim(TRIM_PLATE_EDGE, 0, 10), "west": trim(TRIM_PLATE_EDGE, 0, 10),
+        "down": trim(TRIM_DARK, 3, 13)})
+    neck = element([6, 1, 6], [10, LIFT, 10], {
+        "north": trim(10, 6, 10), "south": trim(TRIM_DARK, 6, 10),
+        "east": trim(TRIM_DARK, 6, 10), "west": trim(TRIM_DARK, 6, 10)})
+    return [plate, neck]
 
 
 def model(elements, extra_textures=None):
@@ -234,14 +288,19 @@ def model(elements, extra_textures=None):
     return {"parent": "minecraft:block/block", "ambientocclusion": False, "textures": t, "elements": elements}
 
 
-def body():
-    return element([0, 0, 0], [16, 16, 16], {
-        "north": {"texture": "#screen", "uv": [0, 0, 16, 16]},
-        "south": {"texture": "#back", "uv": [0, 0, 16, 16]},
-        "east": {"texture": "#side", "uv": [0, 0, 16, 16]},
-        "west": {"texture": "#side", "uv": [0, 0, 16, 16]},
-        "up": {"texture": "#top", "uv": [0, 0, 16, 16]},
-        "down": {"texture": "#top", "uv": [0, 0, 16, 16]}})
+def body(lifted):
+    """The casing, z 4..16; its north face is the glass. Lifted (bottom row): it rests on the stand, 3 px above the floor."""
+    y0 = LIFT if lifted else 0
+    h = 16 - y0
+    faces = {
+        "north": {"texture": "#screen", "uv": [0, 0, 16, h]},
+        "south": {"texture": "#back", "uv": [0, 0, 16, h]},
+        "east": {"texture": "#side", "uv": [0, 0, 12, h]},
+        "west": {"texture": "#side", "uv": [0, 0, 12, h]},
+        "up": {"texture": "#top", "uv": [0, GLASS_Z, 16, 16]}}
+    if lifted:
+        faces["down"] = trim(TRIM_DARK, 0, 16)
+    return element([0, y0, GLASS_Z], [16, 16, 16], faces)
 
 
 BODY_TEXTURES = {
@@ -251,6 +310,10 @@ BODY_TEXTURES = {
 
 def suffix(l, r):
     return ("_l" if l else "") + ("_r" if r else "")
+
+
+def vsuffix(u, d):
+    return ("_u" if u else "") + ("_d" if d else "")
 
 
 def write_json(path, data):
@@ -265,19 +328,24 @@ def main():
                        ("back", make_back()), ("trim", make_trim())):
         write_png(os.path.join(TEX, "monitor_%s.png" % name), rows)
 
-    # the cube with the glass and the casing, no frame (the strips are added by the blockstate)
-    write_json(os.path.join(MODELS, "monitor_panel.json"), model([body()], BODY_TEXTURES))
-    write_json(os.path.join(MODELS, "monitor_edge_left.json"), model([strip_left()]))
-    write_json(os.path.join(MODELS, "monitor_edge_right.json"), model([strip_right()]))
+    # the casing with the glass, no frame (the strips and the stand are added by the blockstate)
+    write_json(os.path.join(MODELS, "monitor_panel.json"), model([body(False)], BODY_TEXTURES))
+    write_json(os.path.join(MODELS, "monitor_panel_lift.json"), model([body(True)], BODY_TEXTURES))
+    write_json(os.path.join(MODELS, "monitor_stand.json"), model(stand()))
+    for u in (False, True):
+        for d in (False, True):
+            write_json(os.path.join(MODELS, "monitor_edge_left%s.json" % vsuffix(u, d)), model(side_strip(True, u, d)))
+            write_json(os.path.join(MODELS, "monitor_edge_right%s.json" % vsuffix(u, d)), model(side_strip(False, u, d)))
     for l in (False, True):
         for r in (False, True):
-            write_json(os.path.join(MODELS, "monitor_edge_up%s.json" % suffix(l, r)), model([strip_up(l, r)]))
+            write_json(os.path.join(MODELS, "monitor_edge_up%s.json" % suffix(l, r)), model(strip_up(l, r)))
             write_json(os.path.join(MODELS, "monitor_edge_down%s.json" % suffix(l, r)), model(strip_down(l, r)))
-    # the item: the whole monitor, every side framed
-    item = [body(), strip_left(), strip_right(), strip_up(True, True)] + strip_down(True, True)
+    # the item: the whole monitor, every side framed, on its stand
+    item = [body(True)] + side_strip(True, False, False) + side_strip(False, False, False) + strip_up(True, True) + strip_down(True, True) + stand()
     write_json(os.path.join(MODELS, "monitor.json"), model(item, BODY_TEXTURES))
 
-    # blockstate (multipart): panel + the strips of the sides not connected; up/down pick the corner variant
+    # blockstate (multipart): casing + the strips of the sides not connected; up/down pick the corner variant, left/right
+    # strips their caps; a bottom-row block (down = false) gets the chin band and the stand
     parts = []
     for facing, y in (("north", 0), ("east", 90), ("south", 180), ("west", 270)):
         def apply(m):
@@ -286,15 +354,20 @@ def main():
                 a["y"] = y
             return a
 
-        parts.append({"when": {"facing": facing}, "apply": apply("monitor_panel")})
+        parts.append({"when": {"facing": facing, "down": "true"}, "apply": apply("monitor_panel")})
+        parts.append({"when": {"facing": facing, "down": "false"}, "apply": apply("monitor_panel_lift")})
+        parts.append({"when": {"facing": facing, "down": "false"}, "apply": apply("monitor_stand")})
         for side in ("up", "down"):
             for l in (False, True):
                 for r in (False, True):
                     # left/right = "false" means NO neighbour there, so that side has a strip
                     parts.append({"when": {"facing": facing, side: "false", "left": "false" if l else "true", "right": "false" if r else "true"},
                                   "apply": apply("monitor_edge_%s%s" % (side, suffix(l, r)))})
-        parts.append({"when": {"facing": facing, "left": "false"}, "apply": apply("monitor_edge_left")})
-        parts.append({"when": {"facing": facing, "right": "false"}, "apply": apply("monitor_edge_right")})
+        for side in ("left", "right"):
+            for u in (False, True):
+                for d in (False, True):
+                    parts.append({"when": {"facing": facing, side: "false", "up": "true" if u else "false", "down": "true" if d else "false"},
+                                  "apply": apply("monitor_edge_%s%s" % (side, vsuffix(u, d)))})
     write_json(os.path.join(STATES, "monitor.json"), {"multipart": parts})
 
 
