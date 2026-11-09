@@ -215,7 +215,7 @@ final class CampusViews {
 	/** Writes a PNG; over 480 KB it is written again with a 256-colour palette. */
 	static void save(BufferedImage img, Path f) throws Exception {
 		ImageIO.write(img, "png", f.toFile());
-		if (Files.size(f) > 480 * 1024) {
+		if (Boolean.getBoolean("t3craft.render.palette") && Files.size(f) > 480 * 1024) {
 			ImageIO.write(quantize(img), "png", f.toFile());
 		}
 	}

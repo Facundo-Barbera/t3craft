@@ -47,7 +47,9 @@ q() { printf '%q' "$1"; }
 while [ $# -gt 0 ]; do
 	case "$1" in
 		--kind) kind="${2:?--kind needs hq or ui}"; shift 2 ;;
-		--preview) priority=preview; shift ;;
+		--preview) # the PC renders high quality: preview only when someone explicitly allows it
+			if [ "${T3CRAFT_RENDER_ALLOW_PREVIEW:-0}" = 1 ]; then priority=preview; else echo "submit: --preview ignored on the render PC (final, supersampled); set T3CRAFT_RENDER_ALLOW_PREVIEW=1 to force it" >&2; fi
+			shift ;;
 		--final) priority=final; shift ;;
 		--worktree) worktree="${2:?--worktree needs a path}"; shift 2 ;;
 		--agent) agent="${2:?--agent needs a name}"; shift 2 ;;
