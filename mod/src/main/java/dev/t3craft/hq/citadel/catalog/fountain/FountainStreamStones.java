@@ -184,8 +184,8 @@ public final class FountainStreamStones implements Variant {
 		}
 
 		void plan() {
-			hd = n >= 10 ? 2 : 1;
-			pl = n >= 13 ? 4 : n >= 9 ? 3 : 2;
+			hd = n >= 11 ? 2 : 1;
+			pl = n >= 12 ? 3 : 2;
 			pa1 = n - 3;
 			pa0 = pa1 - pl + 1;
 			ht = Math.max(3, Math.min(5, p.h() - 3));
@@ -193,13 +193,16 @@ public final class FountainStreamStones implements Variant {
 			int lo = 2;
 			int hi = m - 4;
 			sc = new int[n];
+			// the centre line swings across the plot in an S (about one and a quarter waves), up to two cells a column
+			int len = pa0 - 1 - hd;
 			double phase = p.hash(3, 0, 0, 628) / 100.0;
+			double freq = (len >= 5 ? 7.9 : 3.8) / len;
 			int prev = -1;
 			for (int a = hd + 1; a <= pa0 - 1; a++) {
-				double t = (lo + hi) / 2.0 + (hi - lo) / 2.0 * Math.sin(phase + (a - hd) * 0.95);
+				double t = (lo + hi) / 2.0 + (hi - lo) / 2.0 * 1.15 * Math.sin(phase + (a - hd) * freq);
 				int val = (int) Math.round(t);
 				if (prev >= 0) {
-					val = Math.max(prev - 1, Math.min(prev + 1, val));
+					val = Math.max(prev - 2, Math.min(prev + 2, val));
 				}
 				val = Math.max(lo, Math.min(hi, val));
 				sc[a] = val;
@@ -218,8 +221,15 @@ public final class FountainStreamStones implements Variant {
 			// water
 			k[hd][s0] = WATER;
 			for (int a = hd + 1; a <= pa0 - 1; a++) {
-				k[a][sc[a]] = WATER;
-				k[a][sc[a] + 1] = WATER;
+				int from = sc[a];
+				int to = sc[a] + 1;
+				if (a > hd + 1 && Math.abs(sc[a] - sc[a - 1]) >= 2) { // a sharp bend: the column joins both ends
+					from = Math.min(sc[a], sc[a - 1]);
+					to = Math.max(sc[a], sc[a - 1]) + 1;
+				}
+				for (int s = from; s <= to; s++) {
+					k[a][s] = WATER;
+				}
 			}
 			for (int a = pa0; a <= pa1; a++) {
 				for (int s = ps0; s < ps0 + pw; s++) {
@@ -259,14 +269,47 @@ public final class FountainStreamStones implements Variant {
 					|| (in(a, s - 1) && k[a][s - 1] == WATER) || (in(a, s + 1) && k[a][s + 1] == WATER);
 		}
 
+		/** A column that can carry a crossing: two water cells, rims on both sides, free ground for the stairs. */
+		boolean straight(int a) {
+			int sw = sc[a];
+			return k[a][sw] == WATER && k[a][sw + 1] == WATER && k[a][sw - 1] == RIM && k[a][sw + 2] == RIM
+					&& sw - 2 >= 0 && sw + 3 < m && k[a][sw - 2] == OUT && k[a][sw + 3] == OUT
+					&& (sw - 3 < 0 || k[a][sw - 3] != WATER) && (sw + 4 >= m || k[a][sw + 4] != WATER);
+		}
+
 		/** Picks where and how the stream is crossed; the deck cells become DECK, the stair cells STAIR. */
 		void crossing() {
-			int region = pa0 - 1 - hd;
-			wc = Math.min(n >= 11 ? 3 : 2, region);
-			int lowest = hd + 1;
-			int highest = pa0 - wc;
-			ac = lowest + p.hash(5, 0, 0, highest - lowest + 1);
+			// candidate columns: exactly two cells of water, both banks and both stair cells free
+			wc = Math.min(2, pa0 - 1 - hd);
+			java.util.List<Integer> ok = new java.util.ArrayList<>();
+			while (ok.isEmpty() && wc >= 1) {
+				for (int a = hd + 1; a + wc - 1 <= pa0 - 1; a++) {
+					boolean fits = true;
+					for (int i = 0; i < wc && fits; i++) {
+						fits = straight(a + i);
+					}
+					if (fits) {
+						ok.add(a);
+					}
+				}
+				if (ok.isEmpty()) {
+					wc--;
+				}
+			}
+			if (ok.isEmpty()) {
+				wc = 0;
+				return;
+			}
+			ac = ok.get(p.hash(5, 0, 0, ok.size()));
 			bridge = p.hash(6, 0, 0, 2) == 0;
+			if (bridge) {
+				int[][] posts = {{ac - 1, sc[ac] - 1}, {ac + wc, sc[ac + wc - 1] + 2}};
+				for (int[] q : posts) {
+					if (in(q[0], q[1])) {
+						res[q[0]][q[1]] = true;
+					}
+				}
+			}
 			for (int i = 0; i < wc; i++) {
 				int a = ac + i;
 				int sl = sc[a] - 1;
@@ -410,8 +453,9 @@ public final class FountainStreamStones implements Variant {
 			}
 		}
 
-		boolean inCrossing(int a) {
-			return a >= ac && a < ac + wc;
+		/** Whether {@code (a, s)} is one of the two cells reserved for the bridge's lantern posts. */
+		boolean postCell(int a, int s) {
+			return bridge && wc > 0 && ((a == ac - 1 && s == sc[ac] - 1) || (a == ac + wc && s == sc[ac + wc - 1] + 2));
 		}
 
 		void drawCrossing() {
@@ -441,20 +485,20 @@ public final class FountainStreamStones implements Variant {
 					}
 				}
 			}
-			if (bridge) { // a lantern post on each bank at the ends of the bridge
+			if (bridge && wc > 0) { // a lantern post on each bank at the ends of the bridge (reserved in crossing())
 				post(ac - 1, sc[ac] - 1);
 				post(ac + wc, sc[ac + wc - 1] + 2);
 			}
 		}
 
-		/** A stripped-log post with a lantern, on a free or bank cell. */
+		/** A lantern post on a free or bank cell. */
 		void post(int a, int s) {
-			if (!in(a, s) || res[a][s] || (k[a][s] != OUT && k[a][s] != RIM)) {
+			if (!in(a, s) || (k[a][s] != OUT && !(k[a][s] == RIM && postCell(a, s))) || (res[a][s] && !postCell(a, s))) {
 				return;
 			}
 			res[a][s] = true;
-			set(a, s, 0, b(Blocks.STRIPPED_SPRUCE_LOG));
-			set(a, s, 1, b(Blocks.STRIPPED_SPRUCE_LOG));
+			set(a, s, 0, b(Blocks.POLISHED_ANDESITE));
+			set(a, s, 1, b(Blocks.SPRUCE_FENCE));
 			set(a, s, 2, b(Blocks.LANTERN));
 		}
 
