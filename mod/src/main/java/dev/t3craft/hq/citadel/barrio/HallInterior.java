@@ -239,8 +239,8 @@ public final class HallInterior {
 		}
 		int mid = r.c();
 		int off = Math.max(5, W / 4);
-		int u0 = fh() + 1;
-		int u1 = D - 5;
+		int u0 = 3;
+		int u1 = D - 6;
 		for (int side = -1; side <= 1; side += 2) {
 			int v = mid + side * off;
 			int i = 0;
