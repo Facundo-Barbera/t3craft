@@ -921,6 +921,20 @@ public final class FountainKoiPond implements Variant {
 				}
 			}
 			for (int u = 0; u < w; u++) {
+				for (int v = 0; v < d; v++) {
+					if (k[u][v] != RIM) {
+						continue;
+					}
+					int top = -1;
+					for (int y = 3; y < h; y++) {
+						top = keep[u][y][v] ? y : top;
+					}
+					for (int y = 2; y <= top; y++) {
+						keep[u][y][v] = true; // no gap between the rim top and the crown: nobody can stand under it
+					}
+				}
+			}
+			for (int u = 0; u < w; u++) {
 				for (int y = 0; y < h; y++) {
 					for (int v = 0; v < d; v++) {
 						if (keep[u][y][v]) {
@@ -940,9 +954,9 @@ public final class FountainKoiPond implements Variant {
 		}
 
 		/**
-		 * Whether a leaf may hang at {@code (u, y, v)}. Over open water from the surface up. Never over a rim top or a
-		 * rock in the water (nobody walks there, and the audit calls a standable cell under a roof that nobody reaches
-		 * sealed). Elsewhere only where whoever stands below keeps 2.85 blocks of headroom.
+		 * Whether a leaf may hang at {@code (u, y, v)}. Over open water from the surface up. Over a rim top only when the
+		 * crown is carried down to it (the audit calls a standable cell under a roof that nobody reaches sealed); never
+		 * over a rock in the water. Elsewhere only where whoever stands below keeps 2.85 blocks of headroom.
 		 */
 		boolean roomFor(int u, int y, int v) {
 			if (u == treeU && v == treeV) {
@@ -951,7 +965,10 @@ public final class FountainKoiPond implements Variant {
 			if (k[u][v] == WATER) {
 				return y >= 2;
 			}
-			if (k[u][v] == RIM || k[u][v] == ISLAND) {
+			if (k[u][v] == RIM) {
+				return y >= 3; // the crown is carried down to the rim top (see tree()): the rim stone below is then filled, not walkable
+			}
+			if (k[u][v] == ISLAND) {
 				return false;
 			}
 			double top = foot[u][v];
