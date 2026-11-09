@@ -25,14 +25,14 @@ import net.minecraft.world.level.block.state.properties.Half;
  * <li><b>Row</b> (w &lt; 6 or d &lt; 4; what the leader asks for, 2–3 × 1 × 3): one bench, pillars at the ends,
  *     a backing planter strip when d ≥ 2 and flower beds behind it when d ≥ 3. A long plot is cut into runs of
  *     four seats by planter pillars (no stretched bench). With height it gets a shade: a cherry awning on fence
- *     posts (h ≥ 5) or a small cherry tree behind (h ≥ 6, d ≥ 3), chosen by seed.</li>
+ *     posts (h ≥ 6) or a small cherry tree behind (h ≥ 7, d ≥ 3), chosen by seed.</li>
  * <li><b>U nook</b> (w ≥ 6, d ≥ 4): two benches face each other across a low table (slab top on wall legs, a
  *     potted shrub), planter strips behind each and behind the table, the front left open to sit down from the
  *     path. Wider or deeper plots keep the nook at most 8 × 6 and fill the rest with flower beds.</li>
  * <li><b>L nook</b> (w ≥ 6, d ≥ 5, by seed against the U): a bench along the back and one along the left,
  *     meeting at a little corner table with a lantern; the low table sits inside the L.</li>
  * </ul>
- * Nooks may carry a cherry pergola (h ≥ 5) with slats and a hanging lantern.
+ * Nooks may carry a cherry pergola (h ≥ 6) with slats and a hanging lantern.
  *
  * <p>Planters are real: every plant stands on soil (moss, rooted dirt, dirt or coarse dirt by seed, never on bare
  * stone), so {@code CitadelSupport} has nothing to swap. Plant set by seed: blossom, wildflowers or greens.
@@ -164,7 +164,7 @@ public final class BenchCherryPlanters implements Variant {
 		}
 		// --- shade
 		int shade = p.hash(5, 5, 5, 3); // 0 none, 1 awning, 2 tree
-		if (shade == 1 && h >= 5 && w >= 4) {
+		if (shade == 1 && h >= 6 && w >= 4) {
 			for (int u = 0; u < w; u++) {
 				if (pillar[u]) {
 					for (int v = 0; v < pd; v++) {
@@ -174,31 +174,31 @@ public final class BenchCherryPlanters implements Variant {
 			}
 			for (int u = 0; u < w; u++) {
 				for (int v = 0; v < pd; v++) {
-					set(c, p, u, 4, v, slab(Blocks.CHERRY_SLAB));
-					if (h >= 6 && v == pd - 1 && p.hash(u, 5, v, 4) == 0) {
-						set(c, p, u, 5, v, leaves(Blocks.CHERRY_LEAVES));
+					set(c, p, u, 5, v, slab(Blocks.CHERRY_SLAB));
+					if (h >= 7 && v == pd - 1 && p.hash(u, 5, v, 4) == 0) {
+						set(c, p, u, 6, v, leaves(Blocks.CHERRY_LEAVES));
 					}
 				}
 			}
 			for (int u = s0 + 1; u <= s1; u += 4) { // a lantern over every run
-				p.put(c, u, 3, 0, LANTERN.setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
+				p.put(c, u, 4, 0, LANTERN.setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
 			}
-		} else if (shade == 2 && h >= 6 && d >= 3 && w >= 4) {
+		} else if (shade == 2 && h >= 7 && d >= 3 && w >= 4) {
 			tree(c, p, p.hash(6, 0, 0, 2) == 0 ? 1 : w - 2, d - 1);
 		}
 	}
 
-	/** A small cherry behind the bench: trunk on moss, a round crown from y3 up (all above head height). */
+	/** A small cherry behind the bench: trunk on moss, a round crown from y4 up (all above head height, even on a planter top). */
 	private static void tree(CitadelCanvas c, Plot p, int tu, int tv) {
 		set(c, p, tu, 0, tv, b(Blocks.MOSS_BLOCK));
-		for (int y = 1; y <= 3; y++) {
+		for (int y = 1; y <= 4; y++) {
 			set(c, p, tu, y, tv, b(Blocks.CHERRY_LOG));
 		}
-		for (int y = 3; y <= 5; y++) {
-			int r = y == 4 ? 2 : 1;
+		for (int y = 4; y <= 6; y++) {
+			int r = y == 5 ? 2 : 1;
 			for (int du = -r; du <= r; du++) {
 				for (int dv = -r; dv <= r; dv++) {
-					if (Math.abs(du) + Math.abs(dv) > r + (y == 4 ? 1 : 0) || (y == 3 && du == 0 && dv == 0)) {
+					if (Math.abs(du) + Math.abs(dv) > r + (y == 5 ? 1 : 0) || (y == 4 && du == 0 && dv == 0)) {
 						continue;
 					}
 					int u = tu + du;
@@ -231,7 +231,7 @@ public final class BenchCherryPlanters implements Variant {
 		} else {
 			uNook(c, p, o, nw, nd);
 		}
-		if (h >= 5 && p.hash(5, 5, 5, 2) == 1) {
+		if (h >= 6 && p.hash(5, 5, 5, 2) == 1) {
 			pergola(c, p, o, 0, o + nw - 1, nd - 1);
 		}
 	}
@@ -307,20 +307,20 @@ public final class BenchCherryPlanters implements Variant {
 		}
 		for (int v = v0; v <= v1; v++) {
 			for (int u = u0; u <= u1; u++) {
-				boolean edge = u == u0 || u == u1 || v == v0 || v == v1;
-				if (edge || (u - u0) % 2 == 0) {
-					set(c, p, u, 4, v, slab(Blocks.CHERRY_SLAB));
+				boolean beam = v == v0 || v == v1; // beams along the front and the back, slats across: the nook stays visible from above
+				if (beam || (u - u0) % 2 == 0) {
+					set(c, p, u, 5, v, slab(Blocks.CHERRY_SLAB));
 				}
 			}
 		}
 		int uc = (u0 + u1) / 2;
 		int vc = (v0 + v1) / 2;
-		set(c, p, uc, 4, vc, slab(Blocks.CHERRY_SLAB));
-		p.put(c, uc, 3, vc, LANTERN.setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
-		if (p.h() >= 6) {
+		set(c, p, uc, 5, vc, slab(Blocks.CHERRY_SLAB));
+		p.put(c, uc, 4, vc, LANTERN.setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
+		if (p.h() >= 7) {
 			int bu = p.hash(1, 6, 1, 2) == 0 ? u0 + 1 : u1 - 1;
-			set(c, p, bu, 5, v1, leaves(Blocks.CHERRY_LEAVES));
-			set(c, p, bu, 5, v1 - 1, leaves(Blocks.FLOWERING_AZALEA_LEAVES));
+			set(c, p, bu, 6, v1, leaves(Blocks.CHERRY_LEAVES));
+			set(c, p, bu, 6, v1 - 1, leaves(Blocks.FLOWERING_AZALEA_LEAVES));
 		}
 	}
 
@@ -416,12 +416,13 @@ public final class BenchCherryPlanters implements Variant {
 		}
 	}
 
-	/** A roof post: deepslate foot, wall, two cherry fence blocks (top at y3, the roof is y4). */
+	/** A roof post: deepslate foot, wall, three cherry fence blocks (top at y4, the roof is y5: 3 blocks over a planter top). */
 	private static void post(CitadelCanvas c, Plot p, int u, int v) {
 		set(c, p, u, 0, v, box(p, u, 0, v));
 		set(c, p, u, 1, v, WALL);
 		set(c, p, u, 2, v, FENCE);
 		set(c, p, u, 3, v, FENCE);
+		set(c, p, u, 4, v, FENCE);
 	}
 
 	/** Writes only inside the box, so the report shows no clipping. */
