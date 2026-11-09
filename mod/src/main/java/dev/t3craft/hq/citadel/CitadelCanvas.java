@@ -171,7 +171,7 @@ public final class CitadelCanvas {
 	/** Fixture cells the light pass never replaces (desks, screens, terminal, board). */
 	public final Set<Long> fixtures = new HashSet<>();
 	/** fix/settle-sources (diagnostics): a catalog piece painted on its plot, {@code id} = {@code FAMILY:variant}. */
-	public record Piece(String id, int x, int z, int sx, int sz) {
+	public record Piece(String id, int x, int y0, int z, int sx, int sz, String front) {
 	}
 
 	/** The catalog pieces painted on this canvas, in order (diagnostics: who owns a floating group). */

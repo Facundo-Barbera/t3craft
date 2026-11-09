@@ -1216,7 +1216,7 @@ public final class PlanReport {
 			int listed = 0;
 			for (var s2 : dev.t3craft.hq.citadel.CitadelSettle.lastSources()) {
 				if (listed++ < o.maxList) {
-					sb.append(String.format(Locale.ROOT, "      %-7s %2d blocks drop %d at %d,%d,%d  %s / %s  %s  %s%n", s2.outcome(), s2.blocks(), s2.drop(), s2.x(), s2.y(), s2.z(), s2.group(), s2.zone(), s2.piece(), s2.blocksOf()));
+					sb.append(String.format(Locale.ROOT, "      %-7s %2d blocks drop %d at %d,%d,%d  %s / %s  %s  %s%n", s2.outcome(), s2.blocks(), s2.drop(), s2.x(), s2.y(), s2.z(), s2.group(), s2.zone(), s2.piece(), s2.blocksOf() + "  " + s2.box()));
 				}
 			}
 		}
@@ -1279,6 +1279,7 @@ public final class PlanReport {
 			so.addProperty("blocks", s2.blocks());
 			so.addProperty("at", s2.x() + "," + s2.y() + "," + s2.z());
 			so.addProperty("made", s2.blocksOf());
+			so.addProperty("box", s2.box());
 			allJ.add(so);
 		}
 		j.add("settleGroups", allJ);

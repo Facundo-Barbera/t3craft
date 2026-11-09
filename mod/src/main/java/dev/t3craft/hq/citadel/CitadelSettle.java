@@ -68,7 +68,7 @@ public final class CitadelSettle {
 	 * fix/settle-sources (render diagnostics): one floating group the last pass handled, where it was (before falling),
 	 * who owned the column (the canvas group and zone kind), what it was made of, what happened and how far it fell.
 	 */
-	public record Source(String group, String zone, String piece, String outcome, int drop, int blocks, int x, int y, int z, String blocksOf) {
+	public record Source(String group, String zone, String piece, String outcome, int drop, int blocks, int x, int y, int z, String blocksOf, String box) {
 	}
 
 	/** The groups of the last pass, in the order they were settled (render diagnostics only). */
@@ -135,14 +135,27 @@ public final class CitadelSettle {
 			}
 		}
 		String piece = "";
+		String box = "";
+		int[] bb = {Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MIN_VALUE, Integer.MIN_VALUE, Integer.MIN_VALUE};
+		for (long k : g) {
+			bb[0] = Math.min(bb[0], BlockPos.getX(k));
+			bb[1] = Math.min(bb[1], BlockPos.getY(k));
+			bb[2] = Math.min(bb[2], BlockPos.getZ(k));
+			bb[3] = Math.max(bb[3], BlockPos.getX(k));
+			bb[4] = Math.max(bb[4], BlockPos.getY(k));
+			bb[5] = Math.max(bb[5], BlockPos.getZ(k));
+		}
 		for (CitadelCanvas.Piece pc : c.pieces) {
 			if (x >= pc.x() && x < pc.x() + pc.sx() && z >= pc.z() && z < pc.z() + pc.sz()) {
 				piece = pc.id();
+				// plot-relative: u/v run from the plot's x/z corner, y from the plot's base (the piece's own y 0 before the relief lift)
+				box = "plot " + pc.sx() + "x" + pc.sz() + " front " + pc.front() + " rel x " + (bb[0] - pc.x()) + ".." + (bb[3] - pc.x()) + " z " + (bb[2] - pc.z()) + ".." + (bb[5] - pc.z())
+						+ " relY " + (bb[1] - pc.y0()) + ".." + (bb[4] - pc.y0());
 			}
 		}
 		StringBuilder sb = new StringBuilder();
 		kinds.entrySet().stream().sorted((p, q) -> q.getValue() - p.getValue()).limit(3).forEach(e -> sb.append(sb.length() == 0 ? "" : ",").append(e.getKey()));
-		return new Source(group, zone, piece, outcome, drop, g.size(), x, y, z, sb.toString());
+		return new Source(group, zone, piece, outcome, drop, g.size(), x, y, z, sb.toString(), box);
 	}
 
 	/** One line about the last pass (render diagnostics, {@code PlanReport}'s split pieces). */
