@@ -17,25 +17,28 @@ import net.minecraft.world.level.block.state.properties.AttachFace;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 
 /**
- * A village water point that is used: a stone trough with its water held to the brim, a hand pump at the head
- * of it (stone housing, chiseled head, a lever for the crank and a copper spout that pours into the water), a
- * bucket and a cauldron beside it, a bench and barrels, all on its own paving of slabs.
+ * A village water point that is used: a low stone trough with its water held at ground level, a hand pump at the
+ * head of it (chiseled housing, wall neck, a lever for the crank, a copper spout pouring into the water, and a
+ * cherry crossbar with a lantern when it stands in the open), a bucket (low cauldron) and a full cauldron
+ * beside it, a cherry bench and barrels, all on its own chessboard paving of slabs with iron drain grates.
  *
  * <p>Sizes 5–16 × 3–14: the trough never stretches. It stays at most 6 water cells long; a wide plot
  * (11 and up) gets a <b>double</b> trough, one pump in the middle pouring to both sides; a deep plot (11 and up)
- * gets a second row, a <b>wash-house</b>, with its own pump, and a 3-wide walk between the two.
+ * gets a second row, a <b>wash-house</b> (pilas of 4 split by piers, a copper tap over each, a sloped washboard
+ * rim, a grate in the paving in front), and a 3-wide walk between the two rows.
  *
  * <pre>
- *  plan, 10 wide × 7 deep, a pump house        section along the spout
- *  v0  ░ ░ ░ ░ ░ ░ ░ ░ ░ ░   paving, bucket     y5 ▀▀▀   roof on posts (when the seed says so)
- *  v1  ▣ ▬ ▬ ▬ ▬ ▬ ▬ ▣ ▣ B   front rim            y4 ┃ ▄ ┃
- *  v2  ▣ ≈ ≈ ≈ ≈ ≈ ≈ ▣ c ◘   water, cauldron      y3 ┃ ╫ ┃  neck
- *  v3  ▣ ▬ ▬ ▬ ▬ ▬ ▬ ▣ ▣ B   back rim              y2 ▣►≈◄▣  head, spout, water
- *  v4  ░ ░ ═ ═ ═ ░ ░ ░ ░ ░   bench                y1 ▓≈≈≈▓  rim, water
+ *  plan, 11 wide x 7 deep, double trough          section across the pump (v ->)
+ *  v0  . . . . . . L . . . . .   paving, lever      y4  ▀▀▀    roof of a pump house (seed), or lantern
+ *  v1  # ~ ~ ~ ~ H ~ ~ ~ ~ #   front lip (1 high)  y3  ┃ ▄ ┃   crossbar / roof posts
+ *  v2  # ~ ~ ~ ~ P ~ ~ ~ ~ #   water, pump        y2  ▣ ╫ ▣   wall posts, neck
+ *  v3  # # # # # H # # # # #   back wall (2 high)  y1  ▣ ▣ ▣   housing, spout, back wall
+ *  v4  b c . . = = = . . c b   bench, barrels       y0  ▓ ≈ ▓   lip, water at ground level
  * </pre>
  *
- * Materials by seed: grey stone brick, deepslate or red brick (3–5 per build), cherry for wood. No fire anywhere:
- * the only lights are lanterns on a post or under the roof.
+ * Materials by seed: grey stone brick on a cobble/andesite yard, deepslate with tuff, or a grey stone trough in a red
+ * brick yard (3–5 per build), cherry for wood, a dark tile roof on the light builds. No fire anywhere: the only
+ * lights are lanterns on a post, on the pump or under the roof.
  */
 public final class WellTroughPump implements Variant {
 	private static final BlockState BARREL_UP = b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP);
