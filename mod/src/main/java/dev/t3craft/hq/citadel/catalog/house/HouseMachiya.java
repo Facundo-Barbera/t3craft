@@ -35,8 +35,8 @@ import net.minecraft.world.level.block.state.properties.Half;
  *
  * <pre>
  *  plan (front = v 0, aisle on the left, flips by seed)         section through the aisle
- *  v0   porch, dog-fence, posts, canopy (hisashi) outer row     y10  plate, roof from y11 (tiles, 2:1)
- *  v1   koshi lattice, noren banners, canopy inner row          y6-9 upper floor: kitchen, table, beds
+ *  v0   porch, dog-fence, posts, low canopy (hisashi) row       y9   plate, roof from y10 (tiles, 2:1)
+ *  v1   koshi lattice, noren valance, canopy tile row           y6-8 upper floor: kitchen, table, beds
  *  v2   front wall: shoji panes, double door                    y5   floor beams
  *  v3.. mise (shop) beside the toori-niwa (earth aisle, 2-4     y1-4 mise, workshop, toori-niwa (4 free)
  *       wide, runs the whole depth), then a workshop            y0   plinth, mud, planks
@@ -46,11 +46,11 @@ import net.minecraft.world.level.block.state.properties.Half;
  * </pre>
  *
  * Walkability (the gallery's {@code WalkAudit}): nothing is sealed and nothing is low. The ground floor
- * ceiling is at y5 and the upper one is the roof underside, so a 1-high counter still leaves 3 free blocks;
+ * ceiling is at y5 and the upper one is the roof underside (from y10), so a 1-high counter still leaves 3 free blocks;
  * the stair cuts its own hole and fences it; no surface lies under an overhang (the canopy has no roof lip
  * over it, the sakura crown is a single thick layer), so there are no standable pockets nobody can reach.
  *
- * Size: 9–11 × 14–16 × 17+ (it grows with the plot, up to the plot's own maximum).
+ * Size: 9–11 × 14–16 × 16+ (it grows with the plot, up to the plot's own maximum).
  */
 public final class HouseMachiya implements Variant {
 	/** Floor between the storeys (beam layer). The upper floor is stood on at y6. */
