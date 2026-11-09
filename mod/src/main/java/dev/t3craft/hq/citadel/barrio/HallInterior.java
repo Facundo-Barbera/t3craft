@@ -190,18 +190,6 @@ public final class HallInterior {
 		int h = HallStyle.hash(seed, f);
 		board(c, r, y, env, h, desks);
 		archive(c, r, y, W, h, desks);
-		// the two front corners just inside the common zone: a tub plant or a pot
-		for (int sd = 0; sd < 2; sd++) {
-			final int side = sd;
-			BlockPos p = r.cell(1, sd == 0 ? 0 : W - 1, y);
-			place(c, desks, p, () -> {
-				if (side == 0) {
-					tub(c, p);
-				} else {
-					put(c, p, HallStyle.pot(h + 3));
-				}
-			});
-		}
 		// between the side desks: a lamp on a table on each side wall
 		for (int v : new int[] {0, W - 1}) {
 			BlockPos p = r.cell(D - 5, v, y);
@@ -218,7 +206,10 @@ public final class HallInterior {
 				.setValue(BlockStateProperties.HORIZONTAL_FACING, r.back().getOpposite())));
 	}
 
-	/** The project board: three columns of cards (to do, doing, done) under a header in the project's colour, over chests. */
+	/**
+	 * The project board: a header plate in the project's colour between two dark frame cells, over two rows of
+	 * cards in three columns (to do red, doing yellow, done lime; the empty slots are white), over chests.
+	 */
 	private static void board(CitadelCanvas c, Room r, int y, DyeColor env, int h, Set<Long> desks) {
 		DyeColor[] cards = {DyeColor.RED, DyeColor.YELLOW, DyeColor.LIME};
 		for (int v = 0; v <= 2; v++) {
@@ -227,9 +218,11 @@ public final class HallInterior {
 				continue;
 			}
 			c.set(base, chest(r.back()));
+			// the columns hold 2, 1 and 1 cards (by the hall's hash the first two rows swap)
+			boolean full = v == 0 || HallStyle.hash(h, v) % 2 == 0;
 			c.set(base.above(1), concrete(cards[v]));
-			c.set(base.above(2), HallStyle.hash(h, v) % 2 == 0 ? concrete(cards[v]) : concrete(DyeColor.WHITE));
-			c.set(base.above(3), concrete(env));
+			c.set(base.above(2), full ? concrete(cards[v]) : concrete(DyeColor.WHITE));
+			c.set(base.above(3), v == 1 ? concrete(env) : b(Blocks.DARK_OAK_PLANKS));
 		}
 	}
 
