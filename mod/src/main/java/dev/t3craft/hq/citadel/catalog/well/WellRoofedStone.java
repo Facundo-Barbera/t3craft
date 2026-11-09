@@ -51,7 +51,7 @@ public final class WellRoofedStone implements Variant {
 	}
 
 	private static final RoofSet[] ROOFS = {
-		new RoofSet(Blocks.DEEPSLATE_TILE_STAIRS, Blocks.DEEPSLATE_TILE_SLAB, Blocks.DEEPSLATE_TILES, Blocks.CHERRY_LOG, Blocks.STRIPPED_CHERRY_LOG, Blocks.CHERRY_FENCE),
+		new RoofSet(Blocks.DEEPSLATE_TILE_STAIRS, Blocks.DEEPSLATE_TILE_SLAB, Blocks.DEEPSLATE_TILES, Blocks.SPRUCE_LOG, Blocks.STRIPPED_SPRUCE_LOG, Blocks.SPRUCE_FENCE),
 		new RoofSet(Blocks.CHERRY_STAIRS, Blocks.CHERRY_SLAB, Blocks.CHERRY_PLANKS, Blocks.DARK_OAK_LOG, Blocks.STRIPPED_DARK_OAK_LOG, Blocks.DARK_OAK_FENCE),
 		new RoofSet(Blocks.SPRUCE_STAIRS, Blocks.SPRUCE_SLAB, Blocks.SPRUCE_PLANKS, Blocks.DARK_OAK_LOG, Blocks.STRIPPED_DARK_OAK_LOG, Blocks.DARK_OAK_FENCE),
 		new RoofSet(Blocks.MUD_BRICK_STAIRS, Blocks.MUD_BRICK_SLAB, Blocks.MUD_BRICKS, Blocks.SPRUCE_LOG, Blocks.STRIPPED_SPRUCE_LOG, Blocks.SPRUCE_FENCE),
@@ -163,7 +163,7 @@ public final class WellRoofedStone implements Variant {
 	 * (kerb + chiseled) with a lantern standing on it.
 	 */
 	private static void kerb(CitadelCanvas c, Plot p, Geo g, StoneSet st) {
-		BlockState lantern = b(Blocks.LANTERN);
+		BlockState lantern = b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true);
 		for (int u = g.uL(); u <= g.uR(); u++) {
 			for (int v = g.v0(); v <= g.v1(); v++) {
 				boolean cu = u == g.uL() || u == g.uR();
@@ -173,7 +173,9 @@ public final class WellRoofedStone implements Variant {
 				} else if (cu && cv) {
 					p.set(c, u, 0, v, kerbBlock(p, st, u, v));
 					p.set(c, u, 1, v, b(st.chiseled()));
-					p.set(c, u, 2, v, lantern);
+					// a lantern hangs on a chain from the crossbar over the pedestal
+					p.put(c, u, AXLE, v, b(Blocks.IRON_CHAIN).setValue(BlockStateProperties.AXIS, Direction.Axis.Y), CitadelCanvas.HANGING);
+					p.put(c, u, AXLE - 1, v, lantern, CitadelCanvas.HANGING);
 				} else if (v == g.v0()) {
 					p.set(c, u, 0, v, slab(st.slabA())); // the low front lip
 				} else {
@@ -188,7 +190,7 @@ public final class WellRoofedStone implements Variant {
 	private static void frame(CitadelCanvas c, Plot p, Geo g, RoofSet roof, StoneSet st) {
 		int va = g.va();
 		int[] postV = g.cs() == 3 ? new int[] {va} : new int[] {va, g.v1() - 1};
-		BlockState pale = log(Blocks.STRIPPED_OAK_LOG, Direction.Axis.X);
+		BlockState pale = log(Blocks.STRIPPED_BIRCH_LOG, Direction.Axis.X);
 		for (int u : new int[] {g.uL(), g.uR()}) {
 			for (int v : postV) {
 				// [depth] a thick log post on a stone base; the axle (or a log) is its capital
@@ -200,7 +202,7 @@ public final class WellRoofedStone implements Variant {
 			}
 			// the crossbar over the post carries the roof and the lip
 			for (int v = g.v0(); v <= g.v1(); v++) {
-				p.set(c, u, BAR, v, log(roof.stripped(), Direction.Axis.Z));
+				p.set(c, u, BAR, v, log(roof.log(), Direction.Axis.Z));
 			}
 		}
 		// the axle: a pale stripped log across the shaft, resting on the post tops
