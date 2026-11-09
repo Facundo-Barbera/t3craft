@@ -254,19 +254,23 @@ public final class TowerTopCopperSpire implements Variant {
 		int a = r[1] - r[0] + 1;
 		int bd = r[3] - r[2] + 1;
 		boolean needle = i == n - 1 && n >= 2;
+		// the upper rings (from 3 wide down) are copper, so the point is a copper cone and not a 1 × 1 post
+		boolean cone = n >= 3 && i >= n - 2;
 		for (int v = r[2]; v <= r[3]; v++) {
 			for (int u = r[0]; u <= r[1]; u++) {
 				boolean onU = stairCourse && a > 2 && (u == r[0] || u == r[1]);
 				boolean onV = stairCourse && bd > 2 && (v == r[2] || v == r[3]);
 				BlockState st;
 				if (onU && onV) {
-					st = slab(i == 0 ? Blocks.CHERRY_SLAB : Blocks.DEEPSLATE_TILE_SLAB); // hip
+					st = slab(i == 0 ? Blocks.CHERRY_SLAB : cone ? Blocks.CUT_COPPER_SLAB.waxed().unaffected() : Blocks.DEEPSLATE_TILE_SLAB); // hip
 				} else if (onU || onV) {
 					Direction up = onU ? (u == r[0] ? Direction.EAST : Direction.WEST) : (v == r[2] ? Direction.SOUTH : Direction.NORTH);
 					Block blk = i == 0 ? Blocks.CHERRY_STAIRS
+							: cone ? copper(p, u, y, v, Blocks.CUT_COPPER_STAIRS.waxed().unaffected(), Blocks.CUT_COPPER_STAIRS.waxed().exposed(),
+									Blocks.CUT_COPPER_STAIRS.waxed().weathered())
 							: p.hash(u, y, v, 5) == 0 ? Blocks.POLISHED_DEEPSLATE_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS;
 					st = stairs(blk, up);
-				} else if (needle) {
+				} else if (needle || cone) {
 					st = b(copper(p, u, y, v, Blocks.CUT_COPPER.waxed().unaffected(), Blocks.CUT_COPPER.waxed().exposed(),
 							Blocks.CUT_COPPER.waxed().weathered()));
 				} else {
