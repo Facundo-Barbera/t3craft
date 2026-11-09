@@ -228,9 +228,11 @@ public final class CitadelPodium {
 			// and at the top, and the ones at the foot, the start of the second flight and the top carry a lantern
 			if (newel(p, d)) {
 				c.set(x, top, z, PIER);
-				c.set(x, top + 1, z, CALCITE);
 				if (lit(p, d)) {
+					c.set(x, top + 1, z, CALCITE);
 					c.set(x, top + 2, z, b(Blocks.LANTERN));
+				} else {
+					c.set(x, top + 1, z, CitadelRelief.slabOf(CALCITE)); // an unlit newel is only a pier with a slab, not a lone white block
 				}
 			} else if (h % 2 == 0) {
 				c.set(x, top, z, CitadelRelief.slabOf(copingBlock(x, z)));
@@ -291,8 +293,9 @@ public final class CitadelPodium {
 
 	/** The stairs of the corbel under a cap (the cap's family, a step darker). */
 	private static Block corbelStairs(long bay, int top) {
+		// darker than the cap over it, so the overhang casts a visible band under the light line
 		int j = hash((int) bay, top, 362) % 10;
-		return j < 4 ? Blocks.TUFF_BRICK_STAIRS : j < 8 ? Blocks.STONE_BRICK_STAIRS : Blocks.MOSSY_STONE_BRICK_STAIRS;
+		return j < 5 ? Blocks.DEEPSLATE_BRICK_STAIRS : j < 8 ? Blocks.TUFF_BRICK_STAIRS : Blocks.STONE_BRICK_STAIRS;
 	}
 
 	/** The gallery's outer edge (two rows beyond the deck, see {@code CitadelPaving#promenade}) and the stripe inside it, with no black row. */
@@ -482,7 +485,8 @@ public final class CitadelPodium {
 				for (int y = f.floor() + 1; y < f.top(); y++) {
 					c.set(f.x(), y, f.z(), PIER);
 				}
-				c.set(f.x(), f.top(), f.z(), b(Blocks.SMOOTH_QUARTZ));
+				// the cap is a stair that dies against the wall (high side to the wall), not a white block
+				c.set(f.x(), f.top(), f.z(), stairs(Blocks.STONE_BRICK_STAIRS, f.toWall()));
 			} else {
 				c.set(f.x(), f.top() - 1, f.z(), stairs(corbelStairs(bay, f.top()), f.toWall()).setValue(StairBlock.HALF, Half.TOP));
 				c.set(f.x(), f.top(), f.z(), capBlock(bay, f.top()));

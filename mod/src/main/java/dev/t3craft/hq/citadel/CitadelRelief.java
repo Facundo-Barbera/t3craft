@@ -210,7 +210,11 @@ public final class CitadelRelief {
 		for (Map.Entry<Long, Integer> e : half.entrySet()) {
 			int x = colX(e.getKey());
 			int z = colZ(e.getKey());
-			if (e.getValue() < 2 || c.zoneAt(x, z).kind() != Kind.LAWN) {
+			if (c.zoneAt(x, z).kind() != Kind.LAWN) {
+				continue;
+			}
+			if (e.getValue() < 2) {
+				footBorder(c, half, x, z, e.getValue());
 				continue;
 			}
 			int g = e.getValue() / 2;
@@ -245,9 +249,37 @@ public final class CitadelRelief {
 				}
 				continue;
 			}
-			if (!nearKerb) {
-				smallTree(c, half, x, g, z);
+			smallTree(c, half, x, g, z);
+		}
+	}
+
+	/** The flat grass against the foot of the bank: a border of low shrubs, ferns and flowers, so the wall does not meet the lawn with a sharp cut. */
+	private static void footBorder(CitadelCanvas c, Map<Long, Integer> half, int x, int z, int h) {
+		if (h >= 2 || c.at(x, 0, z) == null || c.at(x, 0, z).getBlock() != Blocks.GRASS_BLOCK || !free(c, x, 1, z) || nearAvenue(c, x, z)) {
+			return;
+		}
+		boolean foot = false;
+		for (Direction dir : DIRS) {
+			Integer hn = half.get(col(x + dir.getStepX(), z + dir.getStepZ()));
+			if (hn != null && hn >= 2) {
+				foot = true;
 			}
+		}
+		if (!foot) {
+			return;
+		}
+		int k = Math.floorMod((x * 7727) ^ (z * 92821), 100);
+		if (k < 28) {
+			c.set(x, 1, z, leavesOf(k % 3 == 0 ? Blocks.AZALEA_LEAVES : Blocks.FLOWERING_AZALEA_LEAVES));
+		} else if (k < 52) {
+			c.set(x, 1, z, b(Blocks.FERN));
+		} else if (k < 75) {
+			c.set(x, 1, z, b(switch (k % 4) {
+				case 0 -> Blocks.PINK_TULIP;
+				case 1 -> Blocks.ALLIUM;
+				case 2 -> Blocks.AZURE_BLUET;
+				default -> Blocks.OXEYE_DAISY;
+			}));
 		}
 	}
 
@@ -264,12 +296,12 @@ public final class CitadelRelief {
 		for (int dx = -1; dx <= 1; dx++) {
 			for (int dz = -1; dz <= 1; dz++) {
 				Integer hn = half.get(col(x + dx, z + dz));
-				if (hn == null || hn / 2 > g || c.zoneAt(x + dx, z + dz).kind() != Kind.LAWN) {
+				if (hn == null || hn / 2 > g + 1 || c.zoneAt(x + dx, z + dz).kind() != Kind.LAWN) {
 					return;
 				}
 			}
 		}
-		for (int y = g + 1; y <= g + 5; y++) {
+		for (int y = g + 1; y <= g + 6; y++) {
 			if (!free(c, x, y, z)) {
 				BlockState at = c.at(x, y, z);
 				if (y != g + 1 || solid(at)) {
@@ -282,12 +314,12 @@ public final class CitadelRelief {
 		for (int y = g + 1; y <= g + 3; y++) {
 			c.set(x, y, z, b(Blocks.CHERRY_LOG));
 		}
-		for (int dy = 3; dy <= 5; dy++) {
-			int rad = dy == 5 ? 1 : 2;
+		for (int dy = 4; dy <= 6; dy++) {
+			int rad = dy == 6 ? 1 : 2;
 			for (int dx = -rad; dx <= rad; dx++) {
 				for (int dz = -rad; dz <= rad; dz++) {
 					boolean corner = Math.abs(dx) == rad && Math.abs(dz) == rad;
-					if (corner || dx == 0 && dz == 0 && dy <= 3) {
+					if (corner) {
 						continue;
 					}
 					if (free(c, x + dx, g + dy, z + dz)) {
@@ -819,7 +851,7 @@ public final class CitadelRelief {
 			}
 			double arc = RingCampusGeometry.theta(x, z) * RingCampusGeometry.r(x, z);
 			// [palette] a light parapet over the dark kerb, the line that draws each terrace from above
-			c.set(x, y, z, b(Blocks.CALCITE));
+			c.set(x, y, z, CitadelPodium.copingBlock(x, z)); // design/citadel-terraces4: runs of calcite, stone, andesite, tuff, mossy
 			long u = Math.round(arc);
 			if (toLow != null && Math.floorMod(u, 5) == 0 && free(c, x, y + 1, z) && free(c, x, y + 2, z)) {
 				boolean lantern = Math.floorMod(Math.floorDiv(u, 5), 2) == 0;
@@ -911,7 +943,7 @@ public final class CitadelRelief {
 		for (int y = gl + 1; y < cap; y++) {
 			c.set(nx, y, nz, b(Blocks.STONE_BRICKS));
 		}
-		c.set(nx, cap, nz, CitadelCanvas.stairs(Blocks.SMOOTH_QUARTZ_STAIRS, toLow.getOpposite()));
+		c.set(nx, cap, nz, CitadelCanvas.stairs(Blocks.STONE_BRICK_STAIRS, toLow.getOpposite()));
 	}
 
 	/**
