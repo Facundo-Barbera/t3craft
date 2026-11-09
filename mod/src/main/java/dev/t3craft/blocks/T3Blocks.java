@@ -183,8 +183,9 @@ public final class T3Blocks {
 		return c;
 	}
 
+	/** noOcclusion: the status lamp model is a small lantern, not a cube; neighbours must keep their faces next to it. */
 	private static BlockBehaviour.Properties lampProps() {
-		return BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(0.8f).sound(SoundType.COPPER).lightLevel(StatusLampBlock::light);
+		return BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(0.8f).sound(SoundType.COPPER).noOcclusion().lightLevel(StatusLampBlock::light);
 	}
 
 	static Identifier id(String path) {

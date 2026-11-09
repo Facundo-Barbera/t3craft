@@ -38,6 +38,26 @@ glowstone + redstone; lámpara ⇄ bombilla, 1:1 sin forma. Modelos y texturas p
 Los colores son los de `ThreadState`/`StationStatus` (lo comprueba un test): lámpara, pantalla,
 nametag y HUD coinciden.
 
+### Aspecto de la lámpara (kit/status-lamp)
+
+Modelo de farol en cápsula, simétrico arriba/abajo (sirve sobre la pantalla y colgada de una cadena, como la
+baliza del hub): tapas de acero con anillos dorados y una lente de 10 px. Solo la lente y sus aletas brillan
+(`light_emission` por elemento, también en el juego). El estado se lee por color, silueta y animación:
+
+| `status` | Silueta | Glifo | Animación |
+|---|---|---|---|
+| `off` | lente oscura y delgada, sin brillo | reflejo apagado | ninguna |
+| `idle` | vela gris delgada y tenue | pausa | ninguna |
+| `working` | lente de 8 px con banda brillante | anillo que gira | 4 fotogramas (`frametime` 3) |
+| `done` | lente verde lisa y estable | check | ninguna |
+| `attention` | lente de 10 px con 4 cuernos (estrella de sirena) | `!` | parpadeo lento (`frametime` 12) |
+| `error` | lente ancha y baja con 8 garras (corona de púas) | X | parpadeo rápido (`frametime` 5, < 3 Hz) |
+
+Texturas y modelos se generan con `python3 tools/art/status_lamp_art.py` (solo biblioteca estándar); las tiras
+animadas llevan `.png.mcmeta`. Galería de revisión: `tools/render/submit.sh --final -- --lamps` (`LampViews`),
+y `--lamp-demo` pone estados en las lámparas de cualquier render de plan. `lampProps` ahora lleva `noOcclusion`
+(el modelo ya no es un cubo; también afecta a `board_lamp`, que sigue siendo un cubo sin consecuencias visibles).
+
 ## El interruptor (modo "solo GUI")
 
 Un único punto de registro: **`T3Blocks.init(BlocksSwitch, BlockRegistrar)`**, llamado una vez desde
