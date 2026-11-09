@@ -310,13 +310,13 @@ public final class GardenFlowerRoseArch implements Variant {
 					int m = Math.min(hi - lo + 1, vhi - vlo + 1);
 					boolean tallCell;
 					boolean groupA;
-					if (m >= 7 && k == 1) { // a flowering boxwood ring between the border flowers and the core
+					if (m >= 7 && k == 2) { // a flowering boxwood ring between the two flower bands and the core
 						set(u, 1, v, p.hash(u, 1, v, 2) == 0 ? leaves(Blocks.FLOWERING_AZALEA_LEAVES) : leaves(Blocks.AZALEA_LEAVES));
 						continue;
 					}
 					if (m >= 7) {
 						tallCell = k >= 3;
-						groupA = (k == 0) == (swap == 0); // border flowers one colour, the ring inside the hedge the other
+						groupA = (k == 0) == (swap == 0); // outer band one colour, the band inside it the other
 					} else if (m >= 3) {
 						int thr = m >= 6 ? 2 : 1;
 						tallCell = k >= thr;
@@ -531,9 +531,7 @@ public final class GardenFlowerRoseArch implements Variant {
 						}
 					} else if (dist == 1) {
 						at(alongV, s, t, 2, climb(uu, 2, vv));
-						if (p.hash(uu, 3, vv, 4) != 0) {
-							at(alongV, s, t, 3, climb(uu, 3, vv));
-						}
+						at(alongV, s, t, 3, climb(uu, 3, vv));
 					}
 					if (dist <= 1) {
 						at(alongV, s, t, 4, rail); // none over a window: a hedge top under it would be a sealed floor
@@ -543,7 +541,7 @@ public final class GardenFlowerRoseArch implements Variant {
 					int uu = alongV ? t : s;
 					int vv = alongV ? s : t;
 					if (dist == 0) {
-						at(alongV, s, t, 4, b(Blocks.CHERRY_PLANKS));
+						at(alongV, s, t, 4, t == tc0 + 1 ? slab(Blocks.CHERRY_SLAB) : b(Blocks.CHERRY_PLANKS));
 					} else if (dist == 1) {
 						at(alongV, s, t, 4, climb(uu, 4, vv));
 						if (p.h() > 5 && p.hash(uu, 5, vv, 3) != 0) {
@@ -606,7 +604,8 @@ public final class GardenFlowerRoseArch implements Variant {
 		void bath(int u, int v) {
 			set(u, 0, v, b(Blocks.POLISHED_ANDESITE));
 			set(u, 1, v, b(Blocks.STONE_BRICK_WALL));
-			set(u, 2, v, b(Blocks.WATER_CAULDRON).setValue(BlockStateProperties.LEVEL_CAULDRON, 3));
+			set(u, 2, v, b(Blocks.STONE_BRICK_WALL));
+			set(u, 3, v, b(Blocks.WATER_CAULDRON).setValue(BlockStateProperties.LEVEL_CAULDRON, 3));
 		}
 
 		/** The centre of a square, by seed: bird-bath, lantern pillar or a topiary rose on a plinth. */
@@ -638,6 +637,22 @@ public final class GardenFlowerRoseArch implements Variant {
 			lamp(pu + 4, 0);
 			for (int vc : vcs) {
 				centre(pu + 1, vc);
+				if (cross) {
+					// benches on the arms' kerbs near the square, back to the walk, seat looking at the beds
+					for (int side = 0; side < 2; side++) {
+						for (int row = 0; row < 2; row++) {
+							if (((side + row + alt) & 1) != 0 && pu < 12) {
+								continue;
+							}
+							int v = row == 0 ? vc - 2 : vc + 2;
+							int from = side == 0 ? pu - 5 : pu + 5;
+							for (int u = from; u <= from + 2; u++) {
+								set(u, 1, v, b(Blocks.AIR));
+								set(u, 0, v, stairs(Blocks.CHERRY_STAIRS, row == 0 ? Direction.SOUTH : Direction.NORTH));
+							}
+						}
+					}
+				}
 				for (int v : new int[] {vc - 2, vc + 2}) {
 					lamp(pu - 1, v);
 					lamp(pu + 3, v);
