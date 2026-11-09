@@ -21,6 +21,8 @@ final class Scene {
 	final int sz;
 	private final int[] cells;
 	private final List<List<BlockModels.Quad>> models = new ArrayList<>();
+	/** Per model id: opaque half-block sub-cells ({@link BlockModels#occupancy}). */
+	private int[] masks = new int[64];
 	private final Map<Object, Integer> ids = new HashMap<>();
 	private final Map<BlockState, Integer> stateIds = new IdentityHashMap<>();
 	private final BlockModels blocks;
@@ -51,7 +53,7 @@ final class Scene {
 		}
 		Integer id = stateIds.get(s);
 		if (id == null) {
-			id = intern(s, blocks.quads(s));
+			id = intern(s, blocks.quads(s), blocks.occupancy(s));
 			stateIds.put(s, id);
 		}
 		cells[index(p.getX(), p.getY(), p.getZ())] = id;
@@ -73,20 +75,29 @@ final class Scene {
 		if (id == null) {
 			List<BlockModels.Quad> merged = new ArrayList<>(models.get(cur));
 			merged.addAll(extra);
-			id = intern(k, merged);
+			id = intern(k, merged, masks[cur]);
 		}
 		cells[i] = id;
 	}
 
-	private int intern(Object key, List<BlockModels.Quad> quads) {
+	private int intern(Object key, List<BlockModels.Quad> quads, int mask) {
 		Integer id = ids.get(key);
 		if (id != null) {
 			return id;
 		}
 		models.add(List.copyOf(quads));
 		id = models.size() - 1;
+		if (id >= masks.length) {
+			masks = java.util.Arrays.copyOf(masks, masks.length * 2);
+		}
+		masks[id] = mask;
 		ids.put(key, id);
 		return id;
+	}
+
+	/** Opaque half-block sub-cells of a cell (0 outside the grid), see {@link BlockModels#occupancy}. */
+	int occupancy(int x, int y, int z) {
+		return inside(x, y, z) ? masks[cells[index(x, y, z)]] : 0;
 	}
 
 	/** Quads of a cell (empty outside the grid). */

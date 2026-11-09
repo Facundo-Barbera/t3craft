@@ -502,6 +502,9 @@ final class JobRunner {
 				if (!argv.contains("--ss")) {
 					argv.addAll(List.of("--ss", "1"));
 				}
+				if (!argv.contains("--final")) {
+					argv.add("--preview"); // flat look, no AO / soft shadows (tools/render-quality)
+				}
 			}
 			argv.addAll(List.of("--out", out.toString()));
 		} else {
