@@ -234,6 +234,13 @@ public final class StallClothLanterns implements Variant {
 			} else {
 				s = b(Blocks.DARK_OAK_PLANKS); // [palette] the ridge rows in dark oak: a cap that breaks the slope's colour
 			}
+			if (y > prev && v >= 3) {
+				// a rising step touches the row before it only along an edge (stairs climb diagonally), so on a
+				// shallow plot the whole ridge hangs by nothing: a spruce beam under it ties it to the row below
+				for (int u = 0; u < g.w; u++) {
+					p.set(c, u, y - 1, v, b(Blocks.SPRUCE_SLAB).setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP));
+				}
+			}
 			for (int u = 0; u < g.w; u++) {
 				BlockState t = s;
 				if (y == prev) { // [depth] a flat ridge row: the eaves bevel down at both ends
