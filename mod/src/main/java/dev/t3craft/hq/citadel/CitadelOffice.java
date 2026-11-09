@@ -933,9 +933,9 @@ public final class CitadelOffice {
 		}
 		// the briefing table of the command post, north of the rug: a low table with a seat either side, on the room's axis
 		table(c, 0, y, -4);
-		set(c, -1, y, -4, cherryStairs(Direction.EAST, false));
-		set(c, 1, y, -4, cherryStairs(Direction.WEST, false));
-		set(c, 0, y, -3, cherryStairs(Direction.NORTH, false));
+		set(c, -1, y, -4, cherryStairs(Direction.WEST, false));
+		set(c, 1, y, -4, cherryStairs(Direction.EAST, false));
+		set(c, 0, y, -3, cherryStairs(Direction.SOUTH, false));
 		// the consoles: a bank of five console terminals (kit role CONSOLE; a lectern with the blocks module off), side by side at
 		// dz = 2, centred on the axis, so their screens read as one command desk, facing the player on the rug to the north. That
 		// leaves a 3-wide aisle (dz = 3..5) between the bank and the podiums. A slab with a lantern closes the bank on each end.
