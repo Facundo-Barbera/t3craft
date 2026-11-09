@@ -84,7 +84,7 @@ public final class HouseSmallStudio implements Variant {
 
 	private record Scheme(Block frame, Block beam, BlockState[] wall, BlockState[] foot, BlockState[] porch, BlockState[] floor, Block rug,
 			Block roof, Block eave, Block alt, Block ridge, Block ridgeSlab, Block door, Block shutter, Block fence, Block sill,
-			Block step, BlockState[] chimney, Block chimneyStair, Block chimneySlab, DyeColor bed, DyeColor glass) {
+			Block step, BlockState[] chimney, Block chimneyStair, Block chimneySlab, DyeColor bed, DyeColor glass, Block lintel) {
 	}
 
 	private static BlockState[] mix(Block... bl) {
@@ -97,7 +97,7 @@ public final class HouseSmallStudio implements Variant {
 
 	private static final Scheme[] SCHEMES = {
 			// cherry roof, slate crest and eave, calcite plaster, dark oak frame, deepslate footing
-			new Scheme(Blocks.STRIPPED_BIRCH_LOG, Blocks.DARK_OAK_LOG,
+			new Scheme(Blocks.STRIPPED_CHERRY_LOG, Blocks.DARK_OAK_LOG,
 					mix(Blocks.CALCITE, Blocks.CALCITE, Blocks.CALCITE, Blocks.CALCITE, Blocks.POLISHED_DIORITE),
 					mix(Blocks.DEEPSLATE_BRICKS, Blocks.DEEPSLATE_BRICKS, Blocks.CRACKED_DEEPSLATE_BRICKS, Blocks.POLISHED_DEEPSLATE, Blocks.DEEPSLATE_TILES),
 					mix(Blocks.POLISHED_DEEPSLATE, Blocks.DEEPSLATE_TILES, Blocks.DEEPSLATE_BRICKS, Blocks.DEEPSLATE_TILES),
@@ -106,18 +106,18 @@ public final class HouseSmallStudio implements Variant {
 					Blocks.DARK_OAK_DOOR, Blocks.CHERRY_TRAPDOOR, Blocks.CHERRY_FENCE, Blocks.DEEPSLATE_BRICK_STAIRS,
 					Blocks.DEEPSLATE_BRICK_STAIRS,
 					mix(Blocks.BRICKS, Blocks.BRICKS, Blocks.BRICKS, Blocks.STONE_BRICKS), Blocks.BRICK_STAIRS, Blocks.BRICK_SLAB,
-					DyeColor.PINK, DyeColor.PINK),
+					DyeColor.PINK, DyeColor.PINK, Blocks.CHERRY_PLANKS),
 			// slate roof with a spruce eave, stone-brick walls, spruce frame, mossy cobble footing
-			new Scheme(Blocks.STRIPPED_SPRUCE_LOG, Blocks.SPRUCE_LOG,
+			new Scheme(Blocks.STRIPPED_BIRCH_LOG, Blocks.SPRUCE_LOG,
 					mix(Blocks.STONE_BRICKS, Blocks.STONE_BRICKS, Blocks.STONE_BRICKS, Blocks.STONE_BRICKS, Blocks.MOSSY_STONE_BRICKS, Blocks.CRACKED_STONE_BRICKS),
 					mix(Blocks.COBBLESTONE, Blocks.MOSSY_COBBLESTONE, Blocks.COBBLESTONE, Blocks.POLISHED_ANDESITE, Blocks.STONE_BRICKS),
 					mix(Blocks.STONE_BRICKS, Blocks.COBBLESTONE, Blocks.STONE_BRICKS, Blocks.MOSSY_STONE_BRICKS),
 					mix(Blocks.SPRUCE_PLANKS, Blocks.SPRUCE_PLANKS, Blocks.DARK_OAK_PLANKS), Blocks.BAMBOO_MOSAIC,
-					Blocks.DEEPSLATE_TILE_STAIRS, Blocks.SPRUCE_STAIRS, Blocks.DEEPSLATE_BRICK_STAIRS, Blocks.POLISHED_DEEPSLATE, Blocks.POLISHED_DEEPSLATE_SLAB,
+					Blocks.DEEPSLATE_TILE_STAIRS, Blocks.SPRUCE_STAIRS, Blocks.DEEPSLATE_BRICK_STAIRS, Blocks.STONE_BRICKS, Blocks.STONE_BRICK_SLAB,
 					Blocks.SPRUCE_DOOR, Blocks.SPRUCE_TRAPDOOR, Blocks.SPRUCE_FENCE, Blocks.STONE_BRICK_STAIRS,
 					Blocks.STONE_BRICK_STAIRS,
 					mix(Blocks.STONE_BRICKS, Blocks.COBBLESTONE, Blocks.MOSSY_STONE_BRICKS, Blocks.CRACKED_STONE_BRICKS), Blocks.STONE_BRICK_STAIRS, Blocks.STONE_BRICK_SLAB,
-					DyeColor.RED, DyeColor.LIGHT_BLUE),
+					DyeColor.RED, DyeColor.LIGHT_BLUE, Blocks.CHISELED_STONE_BRICKS),
 	};
 
 	/** Height of the roof's first row (the eave) and of the plate beam on the walls. */
@@ -278,6 +278,8 @@ public final class HouseSmallStudio implements Variant {
 					BlockState st;
 					if (v < pd) {
 						st = pick(s.porch(), u, 0, v);
+					} else if (v >= pd && (u == 1 || u == W - 2 || v == pd || v == D - 1)) {
+						st = pick(s.foot(), u, 0, v); // [palette] the plinth runs under the walls
 					} else if (u == iu1 && v >= cv0 && v <= cv1) {
 						st = b(Blocks.DEEPSLATE_TILES); // [palette] the hearth stone
 					} else if (u > iu0 && u < iu1 && v > iv0 && v < iv1 - 1) {
@@ -331,7 +333,7 @@ public final class HouseSmallStudio implements Variant {
 				for (int y = 1; y <= ROOF; y++) {
 					BlockState st;
 					if (isDoor) {
-						st = y == 4 || y == 5 ? beam(ax) : null; // y1-2 door (see doors()), y3 free
+						st = y == 5 ? beam(ax) : y == 4 ? b(s.lintel()) : null; // y1-2 door (see doors()), y3 free, a light lintel over it
 					} else if (isPost) {
 						st = post();
 					} else if (y == 1) {
@@ -478,6 +480,15 @@ public final class HouseSmallStudio implements Variant {
 				for (int y = ROOF + 1; y <= h - 2; y++) {
 					set(u, y, 0, TimberKit.fence(s.fence(), false, false, false, false));
 				}
+			}
+			// [finish] a lantern on a chain over the doorstep, so the door reads from far away
+			for (int y = ROOF + 1; y < ridgeY; y++) {
+				put(doorLo, y, pd - 1, b(Blocks.IRON_CHAIN).setValue(BlockStateProperties.AXIS, Direction.Axis.Y), CitadelCanvas.HANGING);
+			}
+			put(doorLo, ROOF, pd - 1, TimberKit.lantern(true), CitadelCanvas.HANGING);
+			// [finish] a lightning rod at each end of the ridge
+			for (int v : new int[] {0, D - 1}) {
+				set(doorLo, ridgeY + 2, v, b(Blocks.LIGHTNING_ROD));
 			}
 			// [finish] lanterns hang from the beam beside the steps, flower pots on the rail
 			for (int u : new int[] {2, W - 3}) {
