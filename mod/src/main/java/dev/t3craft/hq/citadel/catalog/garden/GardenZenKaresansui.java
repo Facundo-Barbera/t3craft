@@ -64,8 +64,8 @@ public final class GardenZenKaresansui implements Variant {
 			Blocks.STONE_SLAB, Blocks.COBBLED_DEEPSLATE_SLAB};
 	private static final Block[] ROCK_STAIRS = {Blocks.STONE_STAIRS, Blocks.ANDESITE_STAIRS, Blocks.COBBLESTONE_STAIRS, Blocks.MOSSY_COBBLESTONE_STAIRS,
 			Blocks.STONE_STAIRS, Blocks.COBBLED_DEEPSLATE_STAIRS};
-	private static final Block[] STEP = {Blocks.ANDESITE, Blocks.POLISHED_ANDESITE, Blocks.TUFF, Blocks.COBBLED_DEEPSLATE, Blocks.SMOOTH_BASALT,
-			Blocks.POLISHED_DEEPSLATE, Blocks.ANDESITE, Blocks.TUFF};
+	private static final Block[] STEP = {Blocks.COBBLED_DEEPSLATE, Blocks.POLISHED_DEEPSLATE, Blocks.DEEPSLATE_BRICKS, Blocks.SMOOTH_BASALT,
+			Blocks.COBBLED_DEEPSLATE, Blocks.POLISHED_DEEPSLATE, Blocks.ANDESITE};
 
 	private static final Block[] STEP_LIGHT = {Blocks.SMOOTH_STONE, Blocks.STONE_BRICKS, Blocks.STONE, Blocks.MOSSY_STONE_BRICKS, Blocks.SMOOTH_STONE,
 			Blocks.STONE_BRICKS};
@@ -412,7 +412,7 @@ public final class GardenZenKaresansui implements Variant {
 				set(u, 4, 0, beam);
 			}
 			// the lintel's ends overhang as top slabs, 3 blocks over the wall below (no headroom flag)
-			BlockState tip = slab(Blocks.CHERRY_SLAB).setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP);
+			BlockState tip = slab(Blocks.DEEPSLATE_TILE_SLAB).setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP);
 			if (cu - 3 >= 1) {
 				set(cu - 3, 4, 0, tip);
 			}
@@ -453,7 +453,7 @@ public final class GardenZenKaresansui implements Variant {
 				}
 				// roof: eave stairs, a tile ridge row, stairs on the wall beam; at least 3 blocks over the floor
 				setAB(a, 4, front, stairs(Blocks.DEEPSLATE_TILE_STAIRS, toWall()));
-				setAB(a, 4, sb - 2, b(Blocks.DEEPSLATE_TILES));
+				setAB(a, 4, sb - 2, b(p.hash(a, 4, side, 4) == 0 ? Blocks.CRACKED_DEEPSLATE_TILES : Blocks.DEEPSLATE_TILES));
 				setAB(a, 4, sb - 1, stairs(Blocks.DEEPSLATE_TILE_STAIRS, toWall().getOpposite()));
 				if (h >= 6) {
 					setAB(a, 5, sb - 2, slab(Blocks.DEEPSLATE_TILE_SLAB));
@@ -469,7 +469,9 @@ public final class GardenZenKaresansui implements Variant {
 						setAB(i + k, 1, r0, stairs(Blocks.CHERRY_STAIRS, toWall()));
 					}
 					if (i + 3 <= run[1]) {
-						setAB(i + 3, 1, r0, cushion(i + 3));
+						// a low tea table with a lantern between two benches
+						setAB(i + 3, 1, r0, slab(Blocks.CHERRY_SLAB));
+						setAB(i + 3, 2, r0, b(Blocks.LANTERN));
 					}
 					i += 5;
 				}
@@ -638,7 +640,7 @@ public final class GardenZenKaresansui implements Variant {
 						if (f <= 0.05) {
 							continue;
 						}
-						int hgt = (int) Math.round(peak * Math.pow(f, 0.85));
+						int hgt = (int) Math.round(peak * Math.pow(f, 1.0));
 						if (u == cx && v == cz) {
 							hgt = peak;
 						} else {
@@ -654,7 +656,7 @@ public final class GardenZenKaresansui implements Variant {
 
 		/** A group of 3 or 5 rocks of different sizes, never taller than the plot allows. */
 		void rockGroup(int tries) {
-			int maxPeak = Math.min(6, 2 * (h - 2));
+			int maxPeak = Math.min(8, 2 * (h - 1)); // a standing stone up to 4 blocks
 			boolean five = rnd.nextInt(3) == 0 && Math.min(sa - 2, sb - 6) >= 8;
 			for (int attempt = 0; attempt < 3; attempt++) {
 				int n = attempt == 0 && five ? 5 : 3;
@@ -669,10 +671,10 @@ public final class GardenZenKaresansui implements Variant {
 					double th = rnd.nextDouble() * Math.PI * 2;
 					List<double[]> rocks = new ArrayList<>();
 					rocks.add(new double[] {gx, gz, 1.9 * cs, maxPeak});
-					rocks.add(new double[] {gx + Math.round(3.0 * cs * Math.cos(th)), gz + Math.round(3.0 * cs * Math.sin(th)), 1.5 * cs, Math.max(2, maxPeak * 2 / 3)});
-					rocks.add(new double[] {gx + Math.round(2.7 * cs * Math.cos(th + 2.3)), gz + Math.round(2.7 * cs * Math.sin(th + 2.3)), 1.15, Math.max(1, maxPeak / 3)});
+					rocks.add(new double[] {gx + Math.round(3.0 * cs * Math.cos(th)), gz + Math.round(3.0 * cs * Math.sin(th)), 1.5 * cs, Math.max(2, maxPeak * 5 / 8)});
+					rocks.add(new double[] {gx + Math.round(2.7 * cs * Math.cos(th + 2.3)), gz + Math.round(2.7 * cs * Math.sin(th + 2.3)), 1.15, Math.max(1, maxPeak / 4)});
 					if (n == 5) {
-						rocks.add(new double[] {gx + Math.round(3.6 * Math.cos(th + 4.2)), gz + Math.round(3.6 * Math.sin(th + 4.2)), 1.3, Math.max(2, maxPeak / 2)});
+						rocks.add(new double[] {gx + Math.round(3.6 * Math.cos(th + 4.2)), gz + Math.round(3.6 * Math.sin(th + 4.2)), 1.3, Math.max(2, maxPeak * 3 / 8)});
 						rocks.add(new double[] {gx + Math.round(2.2 * Math.cos(th + 1.2)), gz + Math.round(2.2 * Math.sin(th + 1.2)), 0.8, 1});
 					}
 					Map<Long, Integer> hm = heights(rocks);
@@ -850,7 +852,7 @@ public final class GardenZenKaresansui implements Variant {
 				}
 				default -> {
 					ridge = b(Blocks.GRAVEL);
-					groove = slab(Blocks.POLISHED_DIORITE_SLAB);
+					groove = slab(Blocks.COBBLED_DEEPSLATE_SLAB);
 				}
 			}
 			for (int u = 1; u < w - 1; u++) {
