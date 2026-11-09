@@ -1,5 +1,7 @@
 # Citadel Studio
 
+> **Fixed rule (2026-11-09, AGENTS.md rule 8):** Citadel Studio never runs on the VPS again. The render server and the viewer live on Facundo's PC (my-pc). The VPS instructions below are historical.
+
 A small web page for watching and steering the citadel design swarm (the agents polishing the
 `hybrid-ringcampus` HQ layout). Facundo opens it on his Mac or phone over Tailscale. With it he can:
 

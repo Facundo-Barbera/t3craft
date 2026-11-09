@@ -47,7 +47,11 @@ gradle/gradlew, a render (`tools/render/*`, `hqRender`, `uiRender`) or Minecraft
    `submit.sh` also stops waiting by itself when the process that launched it is gone.
 7. **Agent count.** Keep at most **8 child agents running at once**. Each one is a process that costs CPU while it
    thinks. Launch more only in waves, after the previous wave finishes, and never while the load is above 6.
-8. **Renders run on Facundo's PC, never on the VPS.**
+8. **Renders run on Facundo's PC, never on the VPS. This is a fixed rule (Facundo, 2026-11-09).**
+   - **The VPS never again runs renders, the render daemon or Citadel Studio,** moratorium or not. The render
+     server, its spool (`~/.cache/t3craft-render`) and the viewer Facundo watches live all live on the PC
+     (my-pc, WSL, `~/projects/t3craft`).
+   - Every render job goes to the PC, through the relay (`tools/render/submit.sh` → `tools/render/remote-submit.sh`).
    - The render daemon runs only on my-pc (WSL Ubuntu, Tailscale 100.64.0.20): one daemon, **1 worker**.
      `start-daemon.sh` refuses to start on the VPS.
    - Agents still call `tools/render/submit.sh` exactly as before. It relays to the PC through

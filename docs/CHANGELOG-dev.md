@@ -10,6 +10,7 @@ One line per structural commit on `main`, newest first:
 
 ## Entries
 
+- 2026-11-09 chore/renders-on-pc RELOAD — docs only: fixed rule, the VPS never again runs renders, the render daemon or Citadel Studio; render server and viewer live on my-pc; every job goes through the relay.
 - 2026-11-09 tools/render-remote RELOAD — renders move to Facundo's PC (my-pc, WSL): submit.sh relays through tools/render/remote-submit.sh (rsync worktree over SSH into ~/t3craft-jobs/<agent>, PC inbox, status polled and mirrored, results copied back to the local outbox); start-daemon.sh refuses to run on the VPS; the VPS heavy lock is only for the coordinator's gradle (pending execution: not tested).
 - 2026-11-09 chore/moratorium RELOAD — docs only: run-nothing moratorium in AGENTS.md; docs/pending-execution.md lists the unverified branches waiting for execution.
 - 2026-11-09 chore/vps-heavy-rules RELOAD — VPS rules after the load-39 incident (AGENTS.md, docs/incidents/2026-11-09-vps-saturation.md): tools/heavy.sh (global lock /tmp/t3craft-heavy.lock, nice/ionice, MemoryMax, timeout, cleanup); render daemon holds the lock, defaults 1 worker / load 6 and needs ~/.cache/t3craft-coord/renders-approved; submit.sh refuses without approval and stops when its launcher dies; gradle daemons idle out after 10 min.

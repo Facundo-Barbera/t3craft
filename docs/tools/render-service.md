@@ -1,6 +1,8 @@
 # Shared render service
 
-> **Since 2026-11-09 (AGENTS.md):** renders run on **Facundo's PC (my-pc, WSL)**, never on the VPS. `start-daemon.sh` refuses to start on the VPS. On the PC: one daemon, 1 worker, load limit 6.
+> **Fixed rule (Facundo, 2026-11-09; AGENTS.md rule 8):** the render server, its spool (`~/.cache/t3craft-render`) and the live viewer live on **Facundo's PC (my-pc, WSL, `~/projects/t3craft`)**. The VPS NEVER runs renders, the render daemon or Citadel Studio again; every render job is sent to the PC through the relay.
+>
+> Renders run on **Facundo's PC (my-pc, WSL)**, never on the VPS. `start-daemon.sh` refuses to start on the VPS. On the PC: one daemon, 1 worker, load limit 6.
 >
 > `submit.sh` (on the VPS) only works inside a render session Facundo approved (`~/.cache/t3craft-coord/renders-approved`), and by default it hands the request to `tools/render/remote-submit.sh`.
 >
