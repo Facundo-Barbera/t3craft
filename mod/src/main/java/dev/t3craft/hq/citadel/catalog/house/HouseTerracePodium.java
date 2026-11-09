@@ -139,11 +139,15 @@ public final class HouseTerracePodium implements Variant {
 		int roofKind = p.hash(3, 9, 17, 3);
 		int wi = wc - 2;
 		int bt0 = dc >= 18 ? 2 : dc >= 15 ? 1 : 0;
-		int tf;
+		// the front terrace is as deep as the plot allows (a portico needs 3, a table row wants 1 more), then the podium gets lower
+		int tf = portico ? 3 : 2;
+		search:
 		while (true) {
-			tf = portico ? 3 : 2;
-			if (dc - pod - 2 - tf - bt0 >= 7) {
-				break;
+			for (int t = portico ? 4 : 3; t >= (portico ? 3 : 2); t--) {
+				if (dc - pod - 2 - t - bt0 >= 7) {
+					tf = t;
+					break search;
+				}
 			}
 			if (pod > 2) {
 				pod--;
@@ -310,14 +314,24 @@ public final class HouseTerracePodium implements Variant {
 				boolean frontBack = v == pod || v == g.dc - 1;
 				int edge = frontBack ? Math.abs(u - g.cu) : v - pod;
 				boolean pier = ring && edge % 4 == 2;
+				boolean corner = (u == 0 || u == g.wc - 1) && frontBack;
+				boolean bay = ring && !corner && edge % 4 == 0;
+				boolean stairBehind = v == pod && Math.abs(u - g.cu) <= g.sh + 1;
 				for (int y = 0; y < pod; y++) {
 					BlockState st;
 					if (y == pod - 1) {
 						st = ring ? cornice(p, u, y, v) : pave(p, u, y, v);
 					} else if (y == 0) {
-						st = ring ? mix(p, u, y, v, Blocks.POLISHED_DEEPSLATE, Blocks.POLISHED_DEEPSLATE, Blocks.DEEPSLATE_BRICKS) : dark(p, u, y, v);
+						if (bay && !stairBehind) {
+							st = pane(Blocks.IRON_BARS, frontBack); // a cellar grille in the middle of every bay
+						} else {
+							st = ring ? mix(p, u, y, v, Blocks.POLISHED_DEEPSLATE, Blocks.COBBLED_DEEPSLATE, Blocks.DEEPSLATE_BRICKS, Blocks.POLISHED_DEEPSLATE) : dark(p, u, y, v);
+						}
 					} else if (ring && v == pod && y == 1 && Math.abs(u - g.cu) % 4 == 0 && Math.abs(u - g.cu) > g.sh + 1) {
 						st = b(Blocks.LANTERN);
+					} else if (ring && y == pod - 2 && !stairBehind) {
+						// [depth] a cove under the cornice: inverted stairs whose low half is cut away on the outside
+						st = ringStair(Blocks.DEEPSLATE_BRICK_STAIRS, v == pod, v == g.dc - 1, u == 0, u == g.wc - 1, true);
 					} else if (pier) {
 						st = b(Blocks.CHISELED_DEEPSLATE);
 					} else {
@@ -529,54 +543,56 @@ public final class HouseTerracePodium implements Variant {
 		int e = g.hv1 + 1;
 		int minDim = Math.min(bb - a + 1, e - v0 + 1);
 		int room = g.h - 1 - pp;
-		int tMax = Math.min(Math.min(7, (minDim - 1) / 2), room - 1);
-		if (tMax < 1) {
+		// a gentle slope of 1 in 2: from the eave stair a full block, then a slab, a block, a slab... one half block per ring;
+		// the innermost rings are the ridge. rEff keeps the crest (and its cap slab) inside the plot's height.
+		int rEff = Math.min((minDim - 1) / 2, 2 * (room - 2) + 1);
+		if (rEff < 2) {
 			return;
 		}
+		int j = rEff / 2;
 		for (int u = a; u <= bb; u++) {
 			for (int v = v0; v <= e; v++) {
 				int rr = Math.min(Math.min(u - a, bb - u), Math.min(v - v0, e - v));
-				if (rr < tMax) {
-					boolean n = v == v0 + rr;
-					boolean s = v == e - rr;
-					boolean w = u == a + rr;
-					boolean ee = u == bb - rr;
-					k.set(u, pp + rr, v, ringStair(rr == 0 ? rf.eave() : rf.stairs(), n, s, w, ee, false));
-					for (int y = pp + 1; y < pp + rr; y++) {
+				if (rr == 0) {
+					k.set(u, pp, v, ringStair(rf.eave(), v == v0, v == e, u == a, u == bb, false));
+				} else if (rr < rEff) {
+					int solidTop = rr % 2 == 1 ? pp + (rr - 1) / 2 : pp + rr / 2 - 1;
+					for (int y = pp + 1; y <= solidTop; y++) {
 						k.set(u, y, v, mix(p, u, y, v, rf.solid(), rf.solid(), rf.solidAlt()));
+					}
+					if (rr % 2 == 0) {
+						k.set(u, pp + rr / 2, v, slab(rf.slab()));
 					}
 				} else {
-					for (int y = pp + 1; y < pp + tMax; y++) {
+					for (int y = pp + 1; y < pp + j; y++) {
 						k.set(u, y, v, mix(p, u, y, v, rf.solid(), rf.solid(), rf.solidAlt()));
 					}
-					k.set(u, pp + tMax, v, b(rf.ridge()));
-					if (pp + tMax + 1 <= g.h - 1) {
-						k.set(u, pp + tMax + 1, v, slab(rf.slab()));
+					if (j >= 1) {
+						k.set(u, pp + j, v, b(rf.ridge()));
 					}
+					k.set(u, pp + j + 1, v, slab(rf.slab()));
 				}
 			}
 		}
 		// finials at both ends of the ridge
-		int fu = bb - a + 1 - 2 * tMax;
-		int fv = e - v0 + 1 - 2 * tMax;
-		if (pp + tMax + 1 <= g.h - 1 && Math.max(fu, fv) >= 2) {
-			int mu = (a + bb) / 2;
-			int mv = (v0 + e) / 2;
-			BlockState rod = b(Blocks.LIGHTNING_ROD.waxed().unaffected());
-			if (fu >= fv) {
-				k.set(a + tMax, pp + tMax + 1, mv, rod);
-				k.set(bb - tMax, pp + tMax + 1, mv, rod);
-			} else {
-				k.set(mu, pp + tMax + 1, v0 + tMax, rod);
-				k.set(mu, pp + tMax + 1, e - tMax, rod);
-			}
+		int fu = bb - a + 1 - 2 * rEff;
+		int fv = e - v0 + 1 - 2 * rEff;
+		BlockState rod = b(Blocks.LIGHTNING_ROD.waxed().unaffected());
+		int mu = (a + bb) / 2;
+		int mv = (v0 + e) / 2;
+		if (fu >= fv) {
+			k.set(a + rEff, pp + j + 1, mv, rod);
+			k.set(bb - rEff, pp + j + 1, mv, rod);
+		} else {
+			k.set(mu, pp + j + 1, v0 + rEff, rod);
+			k.set(mu, pp + j + 1, e - rEff, rod);
 		}
 		// two chimneys through the slopes, either side
-		if (tMax >= 3) {
+		if (rEff >= 3) {
 			int cv = (v0 + e) / 2;
-			int top = Math.min(pp + tMax + 2, g.h - 2);
+			int top = Math.min(pp + j + 3, g.h - 2);
 			for (int cu : new int[] {a + 2, bb - 2}) {
-				for (int y = pp + 2; y <= top; y++) {
+				for (int y = pp + 1; y <= top; y++) {
 					k.set(cu, y, cv, k.hash(cu, y, cv, 3) == 0 ? b(Blocks.DEEPSLATE_BRICKS) : b(Blocks.BRICKS));
 				}
 				k.set(cu, top + 1, cv, slab(Blocks.DEEPSLATE_BRICK_SLAB));
