@@ -69,27 +69,10 @@ Incluye el catálogo (60 variantes, con la ola B: bancas, jardineras, postes, po
 ## Arreglo del lag al iniciar un hilo: integrado
 `fix/new-thread-hitch` ya está en main (`a031a79`), compilado. Trae el detector de trabones: `/t3dev perf hitches`, con WARN en latest.log cuando un frame o tick pasa de ~50 ms. Si el lag sigue, ese log dice qué fue.
 
-## Renders en el PC de Facundo (my-pc): probar 1 job
-**BLOQUEADO 2026-11-09:** la VPS no tiene acceso SSH al PC (`Permission denied (publickey…)`). Hay que agregar en `~/.ssh/authorized_keys` del user `wsluser` en WSL esta clave pública de la VPS:
-`ssh-ed25519 AAAA...REDACTED example-key`
-Además, en WSL, `sshd` tiene que escuchar en la IP de Tailscale del PC (100.64.0.20), o bien hay que darle a `T3CRAFT_RENDER_HOST` el host y el puerto correctos. Con eso, el coordinador corre el job de prueba (paso 4).
-Código listo (`tools/render/remote-submit.sh`, `submit.sh` lo usa por defecto; `start-daemon.sh` se niega en la VPS). Sin probar. Pasos:
-1. **PC** (lo prepara Taller):
-   - WSL Ubuntu 24.04, user `wsluser`, JDK 25;
-   - `~/projects/t3craft` en main;
-   - `git`, `rsync`, `python3` y `sshd` accesibles por Tailscale (100.64.0.20);
-   - un primer build de Gradle hecho (bootstrap y caché de Loom).
-2. **VPS → PC, SSH sin contraseña:** la clave del user `wsluser` de la VPS en `~/.ssh/authorized_keys` del PC. Probar `ssh -o BatchMode=yes user@100.64.0.20 true`, que no es pesado.
-3. **En el PC:** `cd ~/projects/t3craft && tools/render/start-daemon.sh` (1 worker por defecto). Esperar a que `--status` diga `running`.
-4. **En la VPS,** con la sesión aprobada (crear `~/.cache/t3craft-coord/renders-approved` con el alcance), lanzar un job chico: `tools/render/submit.sh --agent prueba-relay -- --catalog LAMP`.
-   - Se espera ver `~/t3craft-jobs/prueba-relay` creado en el PC, la compilación en el PC y los PNG y `report.txt` en `~/.cache/t3craft-render/outbox/prueba-relay-*` de la VPS.
-   - Debe salir con código 0.
-5. **Si falla,** revisar:
-   - el `daemon.log` del PC;
-   - que el `HOME` de ambos sea `/home/user` (el relay reescribe las rutas si difieren);
-   - que el PC tenga `rsync`.
-6. **Citadel Studio** (si se vuelve a levantar en la VPS) lee el outbox local y el `daemon.json` que el relay copia mientras espera.
-
+## Renders en el PC de Facundo (my-pc): FUNCIONA (2026-11-09)
+- **Relay probado de punta a punta.** El job `prueba-relay` (`--catalog LAMP`) compiló en el PC, renderizó la galería con etiquetas y trajo PNGs y reporte a la VPS, con código de salida 0.
+- **Transporte:** scripts por stdin (`ssh -T user@100.64.0.20 < script`) y archivos en tar+base64. No se usa rsync ni scp.
+- **Aprobación de la sesión:** `~/.cache/t3craft-coord/renders-approved` en la VPS. Alcance: el swarm de diseño de la ciudadela.
 ## Revisiones a mano en curso (solo código)
 - `review/wip-catalog`: terminada. Las 16 ramas `cat/*` parecen listas para compilar; informe en `docs/reviews/wip-catalog.md`, ya en main.
 - `review/wip-citadel`: revisa `citadel/*`, `citadel/scale`, `fix/plan-connect` y `fix/new-thread-hitch`, y propone el orden de integración. Informe en `docs/reviews/wip-citadel.md`.
