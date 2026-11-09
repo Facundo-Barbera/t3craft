@@ -425,21 +425,26 @@ public final class CloisterRoom {
 		q.fill(tx, 1, 8, tz, LOG);
 		q.set(tx - sx, 7, tz, LOG.setValue(BlockStateProperties.AXIS, Direction.Axis.X));
 		q.set(tx, 6, tz - sz, LOG.setValue(BlockStateProperties.AXIS, Direction.Axis.Z));
-		for (int ax = -4; ax <= 4; ax++) {
-			for (int az = -4; az <= 4; az++) {
-				for (int ay = -3; ay <= 3; ay++) {
+		// three overlapping lobes: {dx, y, dz, radius squared}: the main ball, one leaning towards the court's centre, one low
+		// and one high on the other side, so the crown is not a single cube
+		int[][] lobes = {{0, 9, 0, 7}, {-2 * sx, 8, 0, 5}, {0, 10, -2 * sz, 5}, {sx * 2, 8, sz, 4}};
+		for (int ax = -5; ax <= 5; ax++) {
+			for (int az = -5; az <= 5; az++) {
+				for (int y = 5; y <= 13; y++) {
 					int x = tx + ax;
 					int z = tz + az;
-					int y = 9 + ay;
 					int r = Math.max(Math.abs(x), Math.abs(z));
 					// inside the garth anywhere; over the gallery only above its roof (it hangs over the rim like a real tree)
 					if (r > 5 && (r > 7 || y <= ceil(r))) {
 						continue;
 					}
-					double noise = Math.floorMod(x * 7 + y * 13 + z * 17 + tx * 5, 5) * 0.55;
-					double d = ax * ax + az * az + ay * ay * 1.1;
-					if (d <= 9.6 + noise) {
-						q.putIfFree(x, y, z, pink, CitadelCanvas.SOLID);
+					double noise = Math.floorMod(x * 7 + y * 13 + z * 17 + tx * 5, 4) * 0.4;
+					for (int[] lb : lobes) {
+						double d = (ax - lb[0]) * (ax - lb[0]) + (az - lb[2]) * (az - lb[2]) + (y - lb[1]) * (y - lb[1]);
+						if (d <= lb[3] + noise - 0.6) {
+							q.putIfFree(x, y, z, pink, CitadelCanvas.SOLID);
+							break;
+						}
 					}
 				}
 			}
