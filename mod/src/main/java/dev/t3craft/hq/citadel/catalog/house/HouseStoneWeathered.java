@@ -100,12 +100,31 @@ public final class HouseStoneWeathered implements Variant {
 
 		roofM(c, p, wa, vm, w, d);
 		roofA(c, p, wa, vm, d);
+		valley(c, p, wa, vm, w, d);
 		gables(c, p, wa, vm, w, d);
 		chimney(c, p, w, vm);
 		bay(c, p, wa);
 		windows(aFront, aLeft, aRight, mRight, back, wa, vm, w, d);
 		porch(c, p, wa, vm, w);
 		yard(c, p, wa, vm, w, d);
+		eaves(c, p, wa, vm, w, d);
+	}
+
+	/**
+	 * [depth] every long eave stands on beam tails: a dark oak log pokes out of the wall under the eave every
+	 * second cell, an upside-down stair hugging the wall under it. Cells taken by shutters or the porch are skipped.
+	 */
+	private static void eaves(CitadelCanvas c, Plot p, int wa, int vm, int w, int d) {
+		for (int v = 3; v <= d - 3; v += 2) {
+			EaveKit.corbel(c, p, 0, PLATE - 1, v, Direction.EAST, Blocks.DARK_OAK_LOG, Blocks.DARK_OAK_STAIRS);
+		}
+		for (int v = 3; v <= vm - 2; v += 2) {
+			EaveKit.corbel(c, p, wa + 1, PLATE - 1, v, Direction.WEST, Blocks.DARK_OAK_LOG, Blocks.DARK_OAK_STAIRS);
+		}
+		for (int u = wa + 2; u <= w - 3; u += 2) {
+			EaveKit.corbel(c, p, u, PLATE - 1, d - 1, Direction.NORTH, Blocks.DARK_OAK_LOG, Blocks.DARK_OAK_STAIRS);
+			EaveKit.corbel(c, p, u, PLATE - 1, vm - 1, Direction.SOUTH, Blocks.DARK_OAK_LOG, Blocks.DARK_OAK_STAIRS);
+		}
 	}
 
 	// ------------------------------------------------------------------ walls
@@ -267,7 +286,7 @@ public final class HouseStoneWeathered implements Variant {
 				}
 				int l = lvA(u, wa);
 				int y = PLATE + l;
-				boolean eave = u == 0 || u == wa + 1;
+				boolean eave = u == 0 || u == wa + 1 || v == 1 || v == d - 1; // [depth] dark oak barge boards on the rakes
 				boolean leftHalf = u < wa + 1 - u;
 				boolean middle = u == wa + 1 - u;
 				if (middle) {
@@ -286,6 +305,34 @@ public final class HouseStoneWeathered implements Variant {
 		}
 	}
 
+	/**
+	 * [finish] a clean roof junction: the back block's roof is as high as the wing's ridge, so it runs into the
+	 * wing's slope. Wherever the back block's slope is higher than the wing's slope (right half of the wing),
+	 * its stairs take over and the gap under them is filled, which leaves one straight valley and no floating ridge end.
+	 */
+	private static void valley(CitadelCanvas c, Plot p, int wa, int vm, int w, int d) {
+		int rows = d - vm + 1;
+		int top = PLATE + lvM(vm - 1 + (rows - 1) / 2, vm, d);
+		for (int v = vm; v <= d - 2; v++) {
+			int lm = lvM(v, vm, d);
+			boolean front = v - (vm - 1) < d - 1 - v;
+			boolean middle = v - (vm - 1) == d - 1 - v;
+			for (int u = wa; u > 0 && 2 * u > wa + 1; u--) {
+				int la = lvA(u, wa);
+				if (lm <= la) {
+					continue;
+				}
+				for (int y = PLATE + la; y < PLATE + lm; y++) {
+					p.set(c, u, y, v, b(Blocks.CHERRY_PLANKS));
+				}
+				p.set(c, u, PLATE + lm, v, middle ? b(Blocks.CHERRY_PLANKS) : stairs(Blocks.CHERRY_STAIRS, front ? Direction.SOUTH : Direction.NORTH));
+				if (PLATE + lm == top) {
+					p.set(c, u, top + 1, v, slab(Blocks.DEEPSLATE_TILE_SLAB));
+				}
+			}
+		}
+	}
+
 	/** Back block roof, ridge along u, from the wing to the right overhang. */
 	private static void roofM(CitadelCanvas c, Plot p, int wa, int vm, int w, int d) {
 		int rows = d - vm + 1; // v vm-1 .. d-1
@@ -299,7 +346,7 @@ public final class HouseStoneWeathered implements Variant {
 				if (middle) {
 					p.set(c, u, y, v, b(Blocks.CHERRY_PLANKS));
 				} else {
-					p.set(c, u, y, v, stairs(eave ? Blocks.DARK_OAK_STAIRS : Blocks.CHERRY_STAIRS, front ? Direction.SOUTH : Direction.NORTH));
+					p.set(c, u, y, v, stairs(eave || u == w - 1 ? Blocks.DARK_OAK_STAIRS : Blocks.CHERRY_STAIRS, front ? Direction.SOUTH : Direction.NORTH));
 				}
 			}
 		}
@@ -320,7 +367,9 @@ public final class HouseStoneWeathered implements Variant {
 		for (int v : new int[] {2, d - 2}) {
 			for (int u = 1; u <= wa; u++) {
 				for (int y = PLATE + 1; y <= PLATE + lvA(u, wa) - 1; y++) {
-					p.set(c, u, y, v, y == PLATE + 1 || p.hash(u, y, v, 3) == 0 ? b(Blocks.POLISHED_ANDESITE) : b(Blocks.STONE_BRICKS));
+					// [depth] a dark oak tie beam under the gable, polished stone above
+					p.set(c, u, y, v, y == PLATE + 1 ? StoneKit.log(Blocks.DARK_OAK_LOG, Direction.Axis.X)
+							: p.hash(u, y, v, 3) == 0 ? b(Blocks.POLISHED_ANDESITE) : b(Blocks.STONE_BRICKS));
 				}
 			}
 			int cu = (1 + wa) / 2;
@@ -344,9 +393,9 @@ public final class HouseStoneWeathered implements Variant {
 		int u = w - 4;
 		int v = vm + 2;
 		for (int y = PLATE + 2; y <= PLATE + 6; y++) {
-			p.set(c, u, y, v, p.hash(u, y, v, 3) == 0 ? b(Blocks.COBBLESTONE) : b(Blocks.STONE_BRICKS));
+			p.set(c, u, y, v, b(Blocks.BRICKS));
 		}
-		p.set(c, u, PLATE + 7, v, slab(Blocks.STONE_BRICK_SLAB));
+		p.set(c, u, PLATE + 7, v, slab(Blocks.BRICK_SLAB));
 	}
 
 	// ------------------------------------------------------------------ porch, yard

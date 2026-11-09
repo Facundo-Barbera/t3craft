@@ -60,6 +60,15 @@ public final class BuildJob {
 	private final double blocksPerTick;
 	private final @Nullable BuildCost cost;
 	/**
+	 * fix/build-walkable: the start-up ground primer of a radial job (the ground of the columns near the
+	 * player, planned in a few ms on a worker); places while the full radial plan is still being analysed
+	 * ({@link DeferredCursor}), so the floor under and around the player is there in the first second.
+	 * Null for other jobs. Server thread once done.
+	 */
+	private final java.util.concurrent.@Nullable CompletableFuture<GroundPrimer> primerFuture;
+	private @Nullable GroundPrimer primer;
+	private boolean primerFailed;
+	/**
 	 * fix/hq-build-stutter: the meter of a charged job is built off-thread ({@link Offload}); the job
 	 * places nothing until it is there (a tick or two). Null future = free job.
 	 */
@@ -160,8 +169,18 @@ public final class BuildJob {
 			// when a crew submits); everything else off-thread (the job waits in PENDING meanwhile). The
 			// schedule is deterministic for a plan, so where it is computed does not change the build.
 			this.cursor = plan.size() <= BuildPlanner.SYNC_PLAN_LIMIT ? crew.get() : new DeferredCursor(planned, layered, plan.size(), f);
+			if (radial && cursor instanceof DeferredCursor) {
+				double[] pf = focusWorld == null ? GroundPrimer.fallbackFocus(plan)
+						: planFocus(focusWorld.getX() + 0.5, focusWorld.getZ() + 0.5, this.origin, rotation);
+				// fix/build-walkable-level: the primer lays the floor at the player's level (its feet cell), not the terrain under it
+				int level = focusWorld == null ? WalkLevels.NO_LEVEL : focusWorld.getY() - this.origin.getY();
+				this.primerFuture = Offload.supply(dev.t3craft.debug.PerfStats.STEP_RADIAL_PRIMER_ASYNC, () -> GroundPrimer.plan(plan, pf[0], pf[1], level));
+			} else {
+				this.primerFuture = null;
+			}
 		} else {
 			this.radial = false;
+			this.primerFuture = null;
 			this.cursor = plan.size() <= BuildPlanner.SYNC_PLAN_LIMIT ? layered.get() : new DeferredCursor(layered, layered, plan.size(), f);
 		}
 		this.cost = cost;
@@ -189,6 +208,37 @@ public final class BuildJob {
 		};
 		BlockPos rel = world.subtract(origin).rotate(back);
 		return new int[] {rel.getX(), rel.getZ()};
+	}
+
+	/**
+	 * fix/build-walkable: plan-relative continuous {@code {x, z}} of world point {@code (wx, wz)}, in the
+	 * convention of plan cells (cell {@code c} spans {@code [c, c + 1)}), for a plan at {@code origin} turned
+	 * by {@code rotation}. Rotates the offset from the origin cell's centre back (as {@link BlockPos#rotate}).
+	 */
+	static double[] planFocus(double wx, double wz, BlockPos origin, Rotation rotation) {
+		double dx = wx - (origin.getX() + 0.5);
+		double dz = wz - (origin.getZ() + 0.5);
+		double rx;
+		double rz;
+		switch (rotation) {
+			case CLOCKWISE_90 -> { // back = counter-clockwise: (x, z) -> (z, -x)
+				rx = dz;
+				rz = -dx;
+			}
+			case COUNTERCLOCKWISE_90 -> { // back = clockwise: (x, z) -> (-z, x)
+				rx = -dz;
+				rz = dx;
+			}
+			case CLOCKWISE_180 -> {
+				rx = -dx;
+				rz = -dz;
+			}
+			default -> {
+				rx = dx;
+				rz = dz;
+			}
+		}
+		return new double[] {rx + 0.5, rz + 0.5};
 	}
 
 	/**
@@ -281,7 +331,7 @@ public final class BuildJob {
 			materialsChanged = true;
 			cursor.resume();
 		}
-		int n = cursor.tick(allowance, (front, i) -> {
+		FrontCursor.Step stepFn = (front, i) -> {
 			Placement p = plan.get(i);
 			if (m != null) {
 				int seg = cursor.segment();
@@ -310,13 +360,54 @@ public final class BuildJob {
 				onPlaced.placed(this, i, wp, ws);
 			}
 			return o;
-		});
+		};
+		int n = cursor.tick(allowance, stepFn);
+		if (live == null && primerFuture != null) {
+			n += tickPrimer(stepFn); // fix/build-walkable: the floor near the player while the radial plan is analysed
+		}
 		if (m != null && cursor.blocked() && !waitingForMaterials) {
 			waitingForMaterials = true;
 			materialsChanged = true;
 			retryIn = MATERIAL_RETRY_TICKS;
 		}
 		return n;
+	}
+
+	/**
+	 * fix/build-walkable: one tick of the start-up primer (radial jobs still planning): up to
+	 * {@code build.corridorBlocksPerTick + build.groundBlocksPerTick} ground entries, nearest the player first,
+	 * within {@code build.corridorMsPerTick}; taken from the foundation budget. Server thread.
+	 */
+	private int tickPrimer(FrontCursor.Step stepFn) {
+		java.util.concurrent.CompletableFuture<GroundPrimer> f = primerFuture;
+		if (f == null || primerFailed || cursor.state() != JobState.PENDING) {
+			return 0; // paused or cancelled meanwhile: nothing (the real cursor applies it when it arrives)
+		}
+		GroundPrimer g = primer;
+		if (g == null) {
+			if (!f.isDone()) {
+				return 0;
+			}
+			try {
+				g = f.join();
+			} catch (RuntimeException e) {
+				primerFailed = true;
+				dev.t3craft.T3Craft.LOGGER.warn("ground primer failed off-thread; the radial plan lays the ground when it is ready", e);
+				return 0;
+			}
+			primer = g;
+		}
+		if (g.done()) {
+			return 0;
+		}
+		BuildTuning t = BuildBudget.global().tuning();
+		int max = t.corridorBlocksPerTick() + t.groundBlocksPerTick();
+		long nanos = (long) (t.corridorMsPerTick() * 1_000_000.0);
+		long t0 = System.nanoTime();
+		int[] counts = g.tick(stepFn, max, nanos);
+		BuildBudget.global().spendFoundation(counts[0], System.nanoTime() - t0);
+		dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_RADIAL_PRIMER, t0);
+		return 0; // not counted as job progress: the radial cursor counts these entries when it reaches them (skipped)
 	}
 
 	private static @Nullable CompoundTag withoutItems(@Nullable CompoundTag tag) {
@@ -464,6 +555,9 @@ public final class BuildJob {
 
 	/** The front that places plan entry {@code index} (for the crew: one builder per front). */
 	public int frontOf(int index) {
+		if (radial && cursor instanceof DeferredCursor d && d.ready() == null) {
+			return -1; // fix/build-walkable: the start-up primer's ground, no builder animates it
+		}
 		return cursor.frontOf(index);
 	}
 
@@ -497,12 +591,22 @@ public final class BuildJob {
 	 * before {@link #tick}; no-op for other jobs and while the job still plans.
 	 */
 	public void focus(@Nullable BlockPos playerWorld) {
+		focusAt(playerWorld == null ? null : new double[] {playerWorld.getX() + 0.5, playerWorld.getY(), playerWorld.getZ() + 0.5});
+	}
+
+	/**
+	 * fix/build-walkable: like {@link #focus(BlockPos)} with the player's exact world position {@code {x, y, z}}
+	 * (or null), so the radial cursor measures its velocity and aims its ground corridor. Server thread.
+	 * fix/build-walkable-level: an optional fourth value (1 / 0: on the ground) steadies the player's level;
+	 * the cursor gets {@code {x, z, y, onGround}} plan-relative (y relative to the origin; rotation keeps y).
+	 */
+	public void focusAt(double @Nullable [] playerWorld) {
 		JobCursor live = cursor instanceof DeferredCursor d ? d.ready() : cursor;
 		if (live instanceof RadialCursor rc) {
 			double[] rel = null;
 			if (playerWorld != null) {
-				int[] f = planFocus(playerWorld, origin, rotation);
-				rel = new double[] {f[0], f[1]};
+				double[] h = planFocus(playerWorld[0], playerWorld[2], origin, rotation);
+				rel = new double[] {h[0], h[1], playerWorld[1] - origin.getY(), playerWorld.length > 3 ? playerWorld[3] : 1.0};
 			}
 			rc.focus(rel, System.currentTimeMillis());
 		}
@@ -546,6 +650,12 @@ public final class BuildJob {
 
 	/** Blocks per tick this job wants: {@code blocksPerTick × fronts}. */
 	public double rate() {
+		// fix/build-radial-tune: a radial job asks for what its builders can place (climbers faster); its
+		// ground and fill have their own budget
+		JobCursor live = cursor instanceof DeferredCursor d ? d.ready() : cursor;
+		if (live instanceof RadialCursor rc) {
+			return rc.rate();
+		}
 		// feat/build-near-player: the foundation has its own budget; one block keeps the job's slot ticking
 		return cursor.fastPhase() ? Math.min(1.0, blocksPerTick) : blocksPerTick * fronts();
 	}

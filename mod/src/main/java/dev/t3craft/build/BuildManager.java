@@ -163,7 +163,7 @@ public final class BuildManager {
 					BlockSink sink = wrap == null ? base : wrap.apply(base);
 					try {
 						if (job.radial()) {
-							job.focus(focusOf(level, job)); // feat/build-radial: the centre follows the player
+							job.focusAt(focusOf(level, job)); // feat/build-radial: the centre follows the player
 						}
 						job.openSupply(server);
 						job.tick(allow, sink, (jb, i, pos, state) -> {
@@ -219,9 +219,11 @@ public final class BuildManager {
 	 * feat/build-radial: the player a radial job centres on: the nearest non-spectator player of its level
 	 * within {@code buildNearPlayer.radius} blocks (horizontally, 32 vertically) of the build's box; null =
 	 * nobody in the build (or {@code buildNearPlayer.enabled} false): the job centres on the hub / spawn.
-	 * A few multiplications per player and tick.
+	 * A few multiplications per player and tick. fix/build-walkable: the exact position {@code {x, y, z}}
+	 * (not the block), so the radial job can measure the player's velocity for its ground corridor.
+	 * fix/build-walkable-level: {@code {x, y, z, onGround}} (1 or 0): the y sets the level the job builds at.
 	 */
-	static @Nullable BlockPos focusOf(ServerLevel level, BuildJob job) {
+	static double @Nullable [] focusOf(ServerLevel level, BuildJob job) {
 		BuildTuning t = BuildBudget.global().tuning();
 		if (!t.nearPlayer()) {
 			return null;
@@ -229,7 +231,7 @@ public final class BuildManager {
 		net.minecraft.world.level.levelgen.structure.BoundingBox box = job.worldBounds();
 		double r2 = (double) t.nearPlayerRadius() * t.nearPlayerRadius();
 		double best = Double.MAX_VALUE;
-		BlockPos out = null;
+		double[] out = null;
 		for (net.minecraft.server.level.ServerPlayer p : level.players()) {
 			if (p.isSpectator()) {
 				continue;
@@ -243,7 +245,7 @@ public final class BuildManager {
 			double d = dx * dx + dz * dz;
 			if (d <= r2 && dy <= 32 && d < best) {
 				best = d;
-				out = BlockPos.containing(px, py, pz);
+				out = new double[] {px, py, pz, p.onGround() ? 1 : 0};
 			}
 		}
 		return out;

@@ -108,6 +108,28 @@ public final class HouseTimberCottage implements Variant {
 		roof(c, p, s, u1, u2, vj, vb);
 		chimney(c, p, u2 - 1, vb - 1);
 		yard(c, p, r, u1, u2, vf, vb, cu);
+		eaves(c, p, s, u1, u2, vj, vb, cu);
+	}
+
+	/**
+	 * [depth] the eaves stand on beam tails: under the front and back eave a log pokes out of the wall at every
+	 * post, with an upside-down stair hugging the wall under it; under the two gable overhangs the same at the
+	 * corner posts.
+	 */
+	private static void eaves(CitadelCanvas c, Plot p, Scheme s, int u1, int u2, int vj, int vb, int cu) {
+		int d = p.d();
+		Block log = s.frame();
+		Block st = Blocks.SPRUCE_STAIRS;
+		for (int u = u1; u <= u2; u++) {
+			if (isPost(u, u1, u2, -1) || u == cu) {
+				EaveKit.corbel(c, p, u, PLATE - 1, 0, Direction.SOUTH, log, st);
+				EaveKit.corbel(c, p, u, PLATE - 1, d - 1, Direction.NORTH, log, st);
+			}
+		}
+		for (int v : new int[] {vj, vb}) {
+			EaveKit.corbel(c, p, 0, PLATE - 1, v, Direction.EAST, log, st);
+			EaveKit.corbel(c, p, p.w() - 1, PLATE - 1, v, Direction.WEST, log, st);
+		}
 	}
 
 	// ------------------------------------------------------------------ base
@@ -248,6 +270,15 @@ public final class HouseTimberCottage implements Variant {
 		for (int u = u1 + 1; u < u2; u++) {
 			if (!(isPost(u, u1, u2, -1) || u == cu)) {
 				p.set(c, u, 5, vj - 1, stairs(Blocks.SPRUCE_STAIRS, Direction.SOUTH).setValue(BlockStateProperties.HALF, Half.TOP));
+				// [finish] a flowering window box on every sill
+				p.set(c, u, 6, vj - 1, TimberKit.planter(p, u, 6, vj - 1));
+			}
+		}
+		// [finish] the back facade gets the same care as the front: sills and flowering boxes under every window
+		for (int u = u1 + 1; u < u2; u++) {
+			if (isWindow(u, u1, u2, -1)) {
+				p.set(c, u, 5, vb + 1, stairs(Blocks.SPRUCE_STAIRS, Direction.NORTH).setValue(BlockStateProperties.HALF, Half.TOP));
+				p.set(c, u, 6, vb + 1, TimberKit.planter(p, u, 6, vb + 1));
 			}
 		}
 		// [depth] a top plate: a horizontal beam over every wall at y8, under the roof
@@ -286,12 +317,12 @@ public final class HouseTimberCottage implements Variant {
 				if (middle) {
 					st = b(Blocks.POLISHED_DEEPSLATE); // odd depth: a full ridge row
 				} else {
-					st = stairs(eave ? s.eave() : s.roof(), front ? Direction.SOUTH : Direction.NORTH);
+					st = stairs(eave || u == 0 || u == w - 1 ? s.eave() : s.roof(), front ? Direction.SOUTH : Direction.NORTH); // [depth] the rakes get a barge board in the eave colour
 				}
 				p.set(c, u, y, v, st);
 				// [depth] under the overhanging gable rows, an upside-down stair closes the eave
 				if ((u == 0 || u == w - 1) && !middle && y - 1 >= PLATE) {
-					p.set(c, u, y - 1, v, stairs(s.roof(), front ? Direction.NORTH : Direction.SOUTH).setValue(BlockStateProperties.HALF, Half.TOP));
+					p.set(c, u, y - 1, v, stairs(Blocks.DARK_OAK_STAIRS, front ? Direction.NORTH : Direction.SOUTH).setValue(BlockStateProperties.HALF, Half.TOP));
 				}
 			}
 		}
@@ -310,7 +341,7 @@ public final class HouseTimberCottage implements Variant {
 		for (int u : new int[] {u1, u2}) {
 			for (int v = vj; v <= vb; v++) {
 				for (int y = PLATE + 1; y < roofY(v, d); y++) {
-					BlockState st = v == mid ? post(s) : b(Blocks.CHERRY_PLANKS);
+					BlockState st = v == mid ? post(s) : y == PLATE + 3 ? beam(s, Direction.Axis.Z) : b(Blocks.CHERRY_PLANKS);
 					if (y == PLATE + 2 && Math.abs(v - mid) == 1) {
 						st = pane(false, true); // [palette] a pair of tinted lights flanking the king post
 					}

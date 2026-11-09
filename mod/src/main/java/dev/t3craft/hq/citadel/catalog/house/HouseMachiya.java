@@ -90,9 +90,9 @@ public final class HouseMachiya implements Variant {
 	}
 
 	private static final Scheme[] SCHEMES = {
-			new Scheme(Blocks.DARK_OAK_TRAPDOOR, Blocks.DARK_OAK_LOG, Blocks.CHERRY_STAIRS, DyeColor.BLUE, Blocks.DARK_OAK_DOOR),
+			new Scheme(Blocks.SPRUCE_TRAPDOOR, Blocks.DARK_OAK_LOG, Blocks.DARK_OAK_STAIRS, DyeColor.BLUE, Blocks.DARK_OAK_DOOR),
 			new Scheme(Blocks.SPRUCE_TRAPDOOR, Blocks.SPRUCE_LOG, Blocks.DARK_OAK_STAIRS, DyeColor.RED, Blocks.CHERRY_DOOR),
-			new Scheme(Blocks.DARK_OAK_TRAPDOOR, Blocks.CHERRY_LOG, Blocks.DARK_OAK_STAIRS, DyeColor.CYAN, Blocks.DARK_OAK_DOOR),
+			new Scheme(Blocks.SPRUCE_TRAPDOOR, Blocks.DARK_OAK_LOG, Blocks.DARK_OAK_STAIRS, DyeColor.CYAN, Blocks.DARK_OAK_DOOR),
 	};
 
 	/** Fixed lines of the plan. */
@@ -117,23 +117,49 @@ public final class HouseMachiya implements Variant {
 		roof(c, p, s, g);
 		udatsu(c, p, g);
 		street(c, p, s, g);
+		frontPosts(c, p, s, g);
 		courtyard(c, p, r, g);
+	}
+
+	/**
+	 * [depth] the hisashi stands on its own posts, one row in front of the lattice, so the facade reads as three
+	 * planes: posts and canopy, the lattice fins, the plaster wall. Posts also rise proud of the upper floor.
+	 */
+	private static void frontPosts(CitadelCanvas c, Plot p, Scheme s, Geo g) {
+		int cu = g.cu();
+		for (int u : new int[] {g.u1(), g.u2(), cu - 3, cu + 3}) {
+			if (u < g.u1() || u > g.u2()) {
+				continue;
+			}
+			p.set(c, u, 0, 0, b(Blocks.POLISHED_DEEPSLATE));
+			for (int y = 1; y <= 3; y++) {
+				p.set(c, u, y, 0, log(s.trim(), Direction.Axis.Y));
+			}
+		}
+		for (int u = g.u1(); u <= g.u2(); u++) {
+			if (isPost(u, g.u1(), g.u2())) {
+				for (int y = 6; y <= 7; y++) {
+					p.set(c, u, y, 1, log(s.trim(), Direction.Axis.Y));
+				}
+			}
+		}
 	}
 
 	// ------------------------------------------------------------------ materials
 
 	/** [palette] the heavy dark band: three deepslate textures mixed by a per-cell hash. */
 	private static BlockState stone(Plot p, int u, int y, int v) {
+		// [palette] a lighter stone footing than the dark timber and plaster above it, so the planes read apart
 		return switch (p.hash(u, y, v, 6)) {
-			case 0 -> b(Blocks.CRACKED_DEEPSLATE_BRICKS);
-			case 1 -> b(Blocks.COBBLED_DEEPSLATE);
-			default -> b(Blocks.DEEPSLATE_BRICKS);
+			case 0 -> b(Blocks.CRACKED_STONE_BRICKS);
+			case 1 -> b(Blocks.POLISHED_ANDESITE);
+			default -> b(Blocks.STONE_BRICKS);
 		};
 	}
 
 	/** [palette] plaster: calcite with the odd tuff-brick patch where the weather got at it. */
 	private static BlockState plaster(Plot p, int u, int y, int v) {
-		return p.hash(u, y, v, 11) == 0 ? b(Blocks.TUFF_BRICKS) : b(Blocks.CALCITE);
+		return b(Blocks.CALCITE); // [palette] a clean whitewash: regular light panels between the dark posts
 	}
 
 	/** [palette] the lowest plaster course, darker: gradient from deepslate through tuff to calcite. */
@@ -202,7 +228,8 @@ public final class HouseMachiya implements Variant {
 				continue;
 			}
 			for (int y = 1; y <= 3; y++) {
-				p.set(c, u, y, 1, trapdoor(s.lattice(), Direction.EAST, true, Half.BOTTOM)); // a fin on the west side of the cell
+				// a fin on one side of the cell; the sides alternate, so the lattice zigzags and has real depth
+				p.set(c, u, y, 1, trapdoor(s.lattice(), (u - u1) % 2 == 0 ? Direction.EAST : Direction.WEST, true, Half.BOTTOM));
 			}
 			p.set(c, u, 1, 1, trapdoor(s.lattice(), Direction.NORTH, false, Half.BOTTOM)); // kick plate
 			p.set(c, u, 3, 1, trapdoor(s.lattice(), Direction.NORTH, false, Half.TOP)); // header
@@ -234,7 +261,9 @@ public final class HouseMachiya implements Variant {
 			p.set(c, u, BEAM1, 0, stair(Blocks.DEEPSLATE_TILE_STAIRS, Direction.SOUTH));
 			p.set(c, u, 5, 1, stair(Blocks.DEEPSLATE_TILE_STAIRS, Direction.SOUTH));
 			if (!noren && (u - u1) % 2 == 0) {
-				p.set(c, u, 3, 0, stairTop(Blocks.DARK_OAK_STAIRS, Direction.NORTH)); // [depth] rafter brackets under the lip
+				// [depth] rafter brackets under the lip: a beam tail with a stair corbel under it, like the upper eave
+				p.set(c, u, 3, 0, log(Blocks.STRIPPED_SPRUCE_LOG, Direction.Axis.Z));
+				p.set(c, u, 2, 0, stairTop(Blocks.DARK_OAK_STAIRS, Direction.SOUTH));
 			}
 		}
 		// the canopy ends on the side pillars
@@ -263,7 +292,13 @@ public final class HouseMachiya implements Variant {
 				} else {
 					st = plaster(p, u, y, 2);
 				}
-				p.set(c, u, y, g.vf(), st);
+				if (isPost(u, u1, u2)) {
+					p.set(c, u, y, g.vf(), st);
+				} else {
+					// [depth] the plaster and the slatted windows sit one block behind the posts
+					p.set(c, u, y, g.vf(), CitadelCanvas.AIR);
+					p.set(c, u, y, g.vf() + 1, st);
+				}
 			}
 		}
 		// [depth] a sill and a lintel frame every window: upside-down stairs under, a beam over
@@ -383,7 +418,7 @@ public final class HouseMachiya implements Variant {
 				}
 				BlockState st;
 				if (center || k % 2 == 1) {
-					st = p.hash(u, y, v, 4) == 0 ? b(Blocks.POLISHED_DEEPSLATE) : b(Blocks.DEEPSLATE_TILES); // [palette] a few lighter tiles
+					st = b(Blocks.DEEPSLATE_TILES);
 				} else {
 					st = stair(k == 0 ? s.fascia() : p.hash(u, y, v, 6) == 0 ? Blocks.DEEPSLATE_BRICK_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS, up);
 				}
@@ -401,17 +436,19 @@ public final class HouseMachiya implements Variant {
 			p.set(c, u, ROOF0, g.rf() - 1, stair(s.fascia(), Direction.NORTH));
 			p.set(c, u, ROOF0, g.rb() + 1, stair(s.fascia(), Direction.SOUTH));
 			if ((u - g.u1()) % 2 == 0) {
-				p.set(c, u, PLATE, g.rf(), log(s.trim(), Direction.Axis.Z));
-				p.set(c, u, PLATE, g.rb(), log(s.trim(), Direction.Axis.Z));
+				p.set(c, u, PLATE, g.rf(), log(Blocks.STRIPPED_SPRUCE_LOG, Direction.Axis.Z));
+				p.set(c, u, PLATE, g.rb(), log(Blocks.STRIPPED_SPRUCE_LOG, Direction.Axis.Z));
 			}
 		}
-		// [finish] end tiles on the ridge: a short wall post at each side
-		int midV = g.rf() + (n - 1) / 2;
-		int top = roofY(midV, g) + 2;
-		for (int u : new int[] {g.u1(), g.u2()}) {
-			p.set(c, u, top, midV, wall(Blocks.DEEPSLATE_BRICK_WALL, true, false, false, false, false));
-			if (n % 2 == 0) {
-				p.set(c, u, top, midV + 1, wall(Blocks.DEEPSLATE_BRICK_WALL, true, false, false, false, false));
+		// [depth] both lips rest on rafter tails that run out from the wall plate, with a stair corbel under each
+		for (int u = g.u1(); u <= g.u2(); u += 2) {
+			EaveKit.tail(c, p, u, PLATE, g.rf() - 1, Direction.SOUTH, Blocks.STRIPPED_SPRUCE_LOG);
+			EaveKit.tail(c, p, u, PLATE, g.rb() + 1, Direction.NORTH, Blocks.STRIPPED_SPRUCE_LOG);
+			if (EaveKit.free(c, p, u, PLATE - 1, g.rf())) {
+				p.set(c, u, PLATE - 1, g.rf(), stairTop(Blocks.DARK_OAK_STAIRS, Direction.SOUTH));
+			}
+			if (EaveKit.free(c, p, u, PLATE - 1, g.rb())) {
+				p.set(c, u, PLATE - 1, g.rb(), stairTop(Blocks.DARK_OAK_STAIRS, Direction.NORTH));
 			}
 		}
 	}

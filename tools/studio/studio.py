@@ -250,7 +250,8 @@ def state_payload() -> dict:
     by_agent: dict[str, list[dict]] = {}
     for j in jobs:
         by_agent.setdefault(j["agent"], []).append(j)
-    names = [a for a in by_agent if a.startswith("citadel-") or a.startswith("facundo-")]
+    # every agent with jobs in the outbox (design-*, t3-*, prueba-*, citadel-*, facundo-*...), plus the fixed list
+    names = list(by_agent)
     names += [a for a in fixed if a not in names]
     cards = []
     for a in names:
@@ -266,8 +267,9 @@ def state_payload() -> dict:
             "lastImages": {"id": with_img["id"], "images": with_img["images"][:6]} if with_img else None,
             "feedback": fb,
         })
-    order = {a: i for i, a in enumerate(fixed)}
-    cards.sort(key=lambda c: (c["agent"].startswith("facundo-"), order.get(c["agent"], 1_000), c["agent"]))
+    # most recent activity first; agents with no job yet (fixed list only) at the end
+    latest = {a: (js[0]["when"] or 0) for a, js in by_agent.items() if js}
+    cards.sort(key=lambda c: (-latest.get(c["agent"], 0), c["agent"]))
     return {"daemon": daemon_state(), "agents": cards, "now": int(time.time() * 1000)}
 
 

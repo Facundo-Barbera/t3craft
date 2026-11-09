@@ -256,6 +256,18 @@ public final class PerfStats {
 	public static final String STEP_PRIORITY_ASYNC = "step.build.priority_async.ns";
 	/** feat/build-radial: server, one tick of a radial job (both streams: foundation and builders). */
 	public static final String STEP_RADIAL_TICK = "step.build.radial.ns";
+	/** fix/build-radial-tune: server, the walkable-surface stream of a radial tick (ground + one support layer, ring-limited). */
+	public static final String STEP_RADIAL_GROUND = "step.build.radial_ground.ns";
+	/** fix/build-walkable: server, the ground corridor ahead of the walking player (first stream of a radial tick). */
+	public static final String STEP_RADIAL_CORRIDOR = "step.build.radial_corridor.ns";
+	/** fix/build-walkable: server, the start-up ground primer of a radial job still planning. */
+	public static final String STEP_RADIAL_PRIMER = "step.build.radial_primer.ns";
+	/** fix/build-walkable: async, the start-up ground primer's plan (columns near the player). */
+	public static final String STEP_RADIAL_PRIMER_ASYNC = "step.build.radial_primer_async.ns";
+	/** fix/build-radial-tune: server, the builders of a radial tick (span picks, courses, climbing). */
+	public static final String STEP_RADIAL_BUILDERS = "step.build.radial_builders.ns";
+	/** fix/build-radial-tune: server, the hidden-fill stream of a radial tick (terrain under the surface, rings behind). */
+	public static final String STEP_RADIAL_FILL = "step.build.radial_fill.ns";
 	/** feat/build-radial: async, plan analysis of a radial job (foundation split, columns, first order). */
 	public static final String STEP_RADIAL_PLAN = "step.build.radial_plan_async.ns";
 	/** feat/build-radial: async, column re-order around the moved centre. */
@@ -314,6 +326,8 @@ public final class PerfStats {
 	public static final String STEP_NPC_LABELS_ASYNC = "step.npc.labels_async.ns";
 	/** Client (feat/npc-idle-wander): idle strollers of the tick (spots picked, route results applied, stretch snapshots copied). */
 	public static final String STEP_NPC_WANDER = "step.npc.wander.ns";
+	/** Client (feat/lead-review-walk): children awaiting their lead's review (queues, spot assignment, per-NPC plan). */
+	public static final String STEP_NPC_REVIEW = "step.npc.review.ns";
 	/** Async (feat/npc-idle-wander): one stroller A* over a snapshot, on an {@code Offload} worker. */
 	public static final String STEP_NPC_WANDER_ASYNC = "step.npc.wander_async.ns";
 	/** Client: workstation stations tick (spawns included). */

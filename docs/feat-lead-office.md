@@ -25,7 +25,8 @@ activo nunca desplaza a un líder: las oficinas libres van a los candidatos con 
 
 ```json
 "leadOffice": { "enabled": true, "minAgeHours": 6, "recentChildren": 3, "recentWindowHours": 24,
-  "workingChildren": 2, "holdMinutes": 45, "minHoldMinutes": 10, "maxOffices": 3, "briefing": true }
+  "workingChildren": 2, "holdMinutes": 45, "minHoldMinutes": 10, "maxOffices": 3, "briefing": true,
+  "childrenWaitForReview": true, "childrenNearLead": true }
 ```
 
 ## La oficina en el HQ: genérica para todos los layouts
@@ -114,6 +115,80 @@ cálculo asíncrono (`HqTarget` en `Offload`). La pantalla del líder se memoiza
    entorno.
 
 No hay que tocar nada más.
+
+## Revisión: los hijos terminados esperan al líder (feat/lead-review-walk)
+
+Idea de Facundo: quien revisa el trabajo de una tarea delegada es el líder, no el jugador.
+
+**Quién espera.** Un hijo (subagente o tarea delegada) con NPC propio, vivo (no archivado, settled ni
+borrado), cuyo padre tiene escritorio, espera revisión cuando está `done`, o `idle` tras completar un
+turno (`latestRunCompletedAt`). Lo calcula `LeadOfficeClient.reviews` en el mismo refresh con throttle
+(una pasada por los shells) y lo publica en `LeadRoster.reviews()` (hijo → `Review(padre, título,
+inOffice)`).
+
+**Dónde espera** (`npc.behavior.ReviewWalk`):
+- Si el padre tiene oficina de líder: en las sillas de visita de la oficina, sentado y mirando al
+  líder; si no alcanzan, en puntos frente a la puerta de la oficina; si tampoco, en filas detrás del
+  escritorio del líder (`AnchorSource.reviewSeats`).
+  - Las sillas son anclas nuevas `leadseat_<npcId>#k` (`AnchorNames.leadSeat`): la celda libre frente a
+    cada silla, como los bancos del hub. Las publican `CitadelLeadOffice` (slots 4 y 5, cuatro
+    sillas) y la oficina classic (`LeadOfficeRoom.seats`, las dos sillas de visita del slot 1). No son
+    anclas "standing", así que los validadores del plan las ignoran.
+  - La puerta es el ancla `module@<i>` del módulo del escritorio del líder: tres puntos dos bloques
+    fuera de la puerta, mirando hacia dentro (`HqWorldAnchors.reviewSeats`, cacheado por instancia).
+  - Con el fallback (`LeadOfficeDecor`, y la ciudadela mientras `CitadelLeadOffice` no esté enganchada)
+    no hay sillas: se usan la puerta y las filas.
+- Si el padre no tiene oficina (no es líder o no cupo): filas detrás del escritorio del padre (a 1,8
+  bloques y luego cada 1,3; centro, derecha, izquierda), mirándolo.
+- Varios hijos del mismo padre forman una **fila** en orden de llegada: el primero toma el mejor sitio
+  y, cuando uno se va, los demás avanzan.
+
+**Comportamiento.** La espera se le pasa al cerebro como un paseo (`NpcBrain.stroll`: ir, quedarse de
+pie o sentado, mirar), así que no hay estado nuevo en el cerebro. Un NPC que acaba de terminar celebra
+y luego camina. Si un sitio resulta inalcanzable, se descarta durante 60 s y se le da otro. Mientras
+espera no pasea (`IdleWander`).
+- Vuelve a trabajar: el modo WORKING ignora el paseo y el NPC vuelve a su escritorio.
+- Pasa a settled o archivado, o el líder lo descarta: sale de la lista y se va como cualquier hilo
+  (`Departure`).
+
+**Sin aviso para el jugador.** Un hijo que reporta a su padre no dispara el aviso "Thread finished"
+(chat, toast y sonido) al terminar (`LeadOfficeClient.reportsToParent`, filtrado en
+`T3CraftClient.refreshDirect`). Los estados que sí necesitan al jugador (needs input, error) avisan
+igual. El panel del NPC muestra `⌛ Esperando revisión de <padre>` (`t3craft.lead.awaitingReview`).
+
+**Config.** `leadOffice.childrenWaitForReview` (true por defecto). Con false, todo lo anterior queda
+apagado y los hijos se comportan como antes.
+
+### Escritorios de los hijos cerca de la oficina
+
+`dev.t3craft.hq.lead.LeadTeamSeats`, aplicado en `HqTarget.compute` después del allocator de cualquier
+layout (no se tocó ningún allocator):
+- Solo se mueve un hijo de líder cuyo asiento es **nuevo** en esta asignación. Los asientos que ya
+  existían nunca se mueven, así que nada salta en un replan. El resultado pasa a ser el `previous` de la
+  siguiente asignación, y los allocators lo conservan.
+- Se mueve solo entre módulos de **su propio proyecto**, al módulo cuyos escritorios están más cerca
+  del escritorio del líder (la oficina), si queda al menos 1 bloque más cerca. Puede ir a un slot libre
+  o intercambiarse con otro hilo que también sea nuevo y no sea hijo de líder. Nadie que ya tenía
+  escritorio cambia de sitio.
+- Las distancias salen de las anclas `desk_<id>` del plan del layout asignado, así que valen las
+  posiciones reales de cada estilo: mismo hall o ala primero, luego el más cercano. El plan se genera
+  dos veces solo cuando hay un movimiento (en el cálculo asíncrono de siempre).
+- No crea índices de módulo. Un módulo que queda vacío (solo puede ser uno creado en esta misma
+  asignación) se elimina. El formato guardado no cambia.
+- Config: `leadOffice.childrenNearLead` (true por defecto).
+
+**Límite.** El hijo comparte el proyecto del padre. Si todos los módulos del proyecto están llenos, el
+anexo nuevo va donde lo ponga el allocator de cada layout. En la ciudadela, en el anillo y en el
+ensanche, eso es junto a los módulos del proyecto, no necesariamente junto a la oficina. El roster de
+líderes llega por `LeadOffices.current()` y el detector corre cada 2 s, así que un hijo que entra justo
+antes de que el detector lo vea se sienta donde diga el allocator.
+
+## Rendimiento (revisión)
+
+`ReviewWalk` reasigna sitios como mucho cada 20 ticks, o cuando cambian el roster o la base. Por NPC
+solo hace una lectura de mapa. El paseo usa la `Navigation` compartida del director (caché de rutas y
+presupuesto de nodos por tick, responde PENDING mientras busca). Nada corre en el render thread. Step de
+PerfStats: `npc.review`.
 
 ## Límites conocidos
 

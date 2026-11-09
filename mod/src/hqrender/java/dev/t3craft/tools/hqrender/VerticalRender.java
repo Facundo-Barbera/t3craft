@@ -181,7 +181,7 @@ final class VerticalRender {
 	static void write(BufferedImage img, Path f) throws Exception {
 		ByteArrayOutputStream bytes = new ByteArrayOutputStream();
 		ImageIO.write(img, "png", bytes);
-		if (bytes.size() > MAX_BYTES) {
+		if (Boolean.getBoolean("t3craft.render.palette") && bytes.size() > MAX_BYTES) {
 			bytes.reset();
 			ImageIO.write(quantize(img), "png", bytes);
 		}

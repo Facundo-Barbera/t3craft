@@ -11,9 +11,47 @@ import org.jspecify.annotations.Nullable;
  *
  * @param leads    the leads, sorted by {@link Lead#slot()} (a lead keeps its slot while it holds the office)
  * @param briefing new children (NPC id) that should stop by their lead's office first, to the lead's NPC id
+ * @param reviews  feat/lead-review-walk: finished children (NPC id) waiting for their parent's review, to
+ *                 who reviews them; filled by the client ({@link #withReviews}), empty from the detector
  */
-public record LeadRoster(List<Lead> leads, Map<String, String> briefing) {
-	public static final LeadRoster EMPTY = new LeadRoster(List.of(), Map.of());
+public record LeadRoster(List<Lead> leads, Map<String, String> briefing, Map<String, Review> reviews) {
+	public static final LeadRoster EMPTY = new LeadRoster(List.of(), Map.of(), Map.of());
+
+	/**
+	 * feat/lead-review-walk: a finished child waits for its parent to review its work.
+	 *
+	 * @param parentNpcId the reviewer's NPC id ({@code <env>:<threadId>}): the lead, or the plain parent
+	 * @param parentTitle the reviewer's thread title ("awaiting review from &lt;title&gt;")
+	 * @param inOffice    true when the reviewer holds a lead office (wait there), false = by its desk
+	 */
+	public record Review(String parentNpcId, String parentTitle, boolean inOffice) {
+	}
+
+	/** Shape before feat/lead-review-walk (no reviews). */
+	public LeadRoster(List<Lead> leads, Map<String, String> briefing) {
+		this(leads, briefing, Map.of());
+	}
+
+	/** This roster with {@code r} as its reviews. */
+	public LeadRoster withReviews(Map<String, Review> r) {
+		return new LeadRoster(leads, briefing, r);
+	}
+
+	/**
+	 * feat/lead-review-walk: every live delegated child of a lead (NPC id) to its lead's NPC id. Used to
+	 * seat a lead's new children near its office ({@link LeadTeamSeats}).
+	 */
+	public Map<String, String> childrenOfLeads() {
+		Map<String, String> out = new java.util.TreeMap<>();
+		for (Lead l : leads) {
+			for (LeadSignals.Child c : l.children()) {
+				if (c.delegated() && !c.gone()) {
+					out.put(l.childNpcId(c), l.npcId());
+				}
+			}
+		}
+		return out;
+	}
 
 	/**
 	 * One lead.
@@ -42,6 +80,7 @@ public record LeadRoster(List<Lead> leads, Map<String, String> briefing) {
 	public LeadRoster {
 		leads = List.copyOf(leads);
 		briefing = Map.copyOf(briefing);
+		reviews = Map.copyOf(reviews);
 	}
 
 	public @Nullable Lead lead(String npcId) {

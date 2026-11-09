@@ -29,7 +29,7 @@ final class StoneKit {
 
 	/** [palette] the heavy dark base: mostly deepslate bricks, a few cracked and cobbled patches. */
 	static BlockState deep(Plot p, int u, int y, int v) {
-		return switch (p.hash(u, y, v, 8)) {
+		return switch (p.hash(u, y, v, 12)) {
 			case 0 -> b(Blocks.CRACKED_DEEPSLATE_BRICKS);
 			case 1 -> b(Blocks.COBBLED_DEEPSLATE);
 			default -> b(Blocks.DEEPSLATE_BRICKS);
@@ -38,7 +38,7 @@ final class StoneKit {
 
 	/** [palette] the middle body: clean stone bricks with the odd cracked or polished block. */
 	static BlockState mid(Plot p, int u, int y, int v) {
-		return switch (p.hash(u, y, v, 12)) {
+		return switch (p.hash(u, y, v, 18)) {
 			case 0 -> b(Blocks.CRACKED_STONE_BRICKS);
 			case 1 -> b(Blocks.POLISHED_ANDESITE);
 			default -> b(Blocks.STONE_BRICKS);
@@ -47,7 +47,7 @@ final class StoneKit {
 
 	/** [palette] the light upper body: stone bricks, polished andesite and calcite flecks. */
 	static BlockState light(Plot p, int u, int y, int v) {
-		return switch (p.hash(u, y, v, 10)) {
+		return switch (p.hash(u, y, v, 16)) {
 			case 0 -> b(Blocks.POLISHED_ANDESITE);
 			case 1 -> b(Blocks.CALCITE);
 			default -> b(Blocks.STONE_BRICKS);
@@ -270,10 +270,19 @@ final class StoneKit {
 					p.set(c, u0 + du, 1, v0 + dv, slab(Blocks.STONE_BRICK_SLAB));
 				}
 				if (corner) {
-					p.set(c, u0 + du, 1, v0 + dv, log(Blocks.STRIPPED_DARK_OAK_LOG, Direction.Axis.Y));
-					p.set(c, u0 + du, 2, v0 + dv, log(Blocks.STRIPPED_DARK_OAK_LOG, Direction.Axis.Y));
+					p.set(c, u0 + du, 1, v0 + dv, log(Blocks.STRIPPED_SPRUCE_LOG, Direction.Axis.Y));
+					p.set(c, u0 + du, 2, v0 + dv, log(Blocks.STRIPPED_SPRUCE_LOG, Direction.Axis.Y));
 				}
-				p.set(c, u0 + du, 3, v0 + dv, du == 1 && dv == 1 ? b(Blocks.DARK_OAK_PLANKS) : slab(Blocks.DARK_OAK_SLAB));
+				// a pitched roof: stairs rising to the middle, slabs on the corners, a slab cap
+				if (du == 1 && dv == 1) {
+					p.set(c, u0 + 1, 3, v0 + 1, b(Blocks.SPRUCE_PLANKS));
+					p.set(c, u0 + 1, 4, v0 + 1, slab(Blocks.SPRUCE_SLAB));
+				} else if (corner) {
+					p.set(c, u0 + du, 3, v0 + dv, slab(Blocks.SPRUCE_SLAB));
+				} else {
+					Direction high = du == 1 ? (dv == 0 ? Direction.SOUTH : Direction.NORTH) : (du == 0 ? Direction.EAST : Direction.WEST);
+					p.set(c, u0 + du, 3, v0 + dv, stairs(Blocks.SPRUCE_STAIRS, high));
+				}
 			}
 		}
 		p.put(c, u0 + 1, 2, v0 + 1, lantern(true), CitadelCanvas.HANGING);

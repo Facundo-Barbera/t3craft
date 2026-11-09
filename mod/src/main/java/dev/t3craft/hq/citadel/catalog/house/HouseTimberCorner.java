@@ -27,6 +27,8 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.Half;
+import net.minecraft.world.level.block.state.properties.StairsShape;
 
 /**
  * A corner house: an L of two gabled wings (one along the street, one along the side street) with a
@@ -131,6 +133,7 @@ public final class HouseTimberCorner implements Variant {
 		chimney(c, p, g);
 		yard(c, p, g);
 		strips(c, p, g);
+		eaves(c, p, g);
 	}
 
 	// ------------------------------------------------------------------ materials
@@ -279,8 +282,8 @@ public final class HouseTimberCorner implements Variant {
 	// ------------------------------------------------------------------ roofs
 
 	private static void roofs(CitadelCanvas c, Plot p, Geo g, Scheme s) {
-		Block ridge = Blocks.DEEPSLATE_BRICKS;
-		Block cap = Blocks.DEEPSLATE_BRICK_SLAB;
+		Block ridge = Blocks.DARK_OAK_PLANKS;
+		Block cap = Blocks.DARK_OAK_SLAB;
 		gable(c, p, true, 6, g.w() - 1, 1, 7, PLATE, s.roof(), s.eave(), ridge, cap, false, true);
 		gable(c, p, false, 7, g.d() - 1, 0, 6, PLATE, s.roof(), s.eave(), ridge, cap, false, true);
 		// the valley where the two wings meet
@@ -322,7 +325,8 @@ public final class HouseTimberCorner implements Variant {
 					if (half == 0) {
 						st = b(Blocks.DEEPSLATE_TILE_WALL);
 					} else if (eu && ev) {
-						st = copperBlock(true); // [palette] exposed copper ribs on the hips
+						// [finish] the hips are outer-corner stairs of the same copper: a clean diagonal, no loose cubes
+						st = JapaneseKit.stair(copperStairs(false), cornerFacing(v == 4 - half, u == 3 - half), Half.BOTTOM, StairsShape.OUTER_LEFT);
 					} else if (eu || ev) {
 						Direction f = u == 3 - half ? Direction.EAST : u == 3 + half ? Direction.WEST : v == 4 - half ? Direction.SOUTH : Direction.NORTH;
 						st = stair(copperStairs(false), f, false);
@@ -340,6 +344,37 @@ public final class HouseTimberCorner implements Variant {
 		}
 		for (int u = 1; u <= 5; u++) {
 			p.set(c, u, 10, 1, stair(copperStairs(true), Direction.SOUTH, true));
+		}
+	}
+
+	/** Facing of an outer-corner stair at a ring corner: {@code top} = the north row, {@code left} = the west column. */
+	private static Direction cornerFacing(boolean top, boolean left) {
+		if (top) {
+			return left ? Direction.SOUTH : Direction.WEST;
+		}
+		return left ? Direction.EAST : Direction.NORTH;
+	}
+
+	/**
+	 * [depth] every eave stands on beam tails: a cherry log pokes out of the wall under the eave every second
+	 * cell, with an upside-down stair hugging the wall under it.
+	 */
+	private static void eaves(CitadelCanvas c, Plot p, Geo g) {
+		Block log = Blocks.CHERRY_LOG;
+		Block st = Blocks.CHERRY_STAIRS;
+		for (int u = 7; u <= g.ue(); u += 2) {
+			EaveKit.corbel(c, p, u, PLATE - 1, 1, Direction.SOUTH, log, st);
+			EaveKit.corbel(c, p, u, PLATE - 1, 7, Direction.NORTH, log, st);
+		}
+		for (int v = 8; v <= g.ub(); v += 2) {
+			EaveKit.corbel(c, p, 0, PLATE - 1, v, Direction.EAST, log, st);
+			EaveKit.corbel(c, p, 6, PLATE - 1, v, Direction.WEST, log, st);
+		}
+		for (int v : new int[] {2, 6}) {
+			EaveKit.corbel(c, p, g.w() - 1, PLATE - 1, v, Direction.WEST, log, st);
+		}
+		for (int u : new int[] {1, 5}) {
+			EaveKit.corbel(c, p, u, PLATE - 1, g.d() - 1, Direction.NORTH, log, st);
 		}
 	}
 
@@ -471,6 +506,10 @@ public final class HouseTimberCorner implements Variant {
 		p.set(c, w - 3, 1, d - 2, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
 		p.set(c, w - 2, 2, d - 2, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
 		p.set(c, w - 2, 1, d - 3, b(Blocks.COMPOSTER));
+		// a roofed well as the focal point of the garden (only where the plot is deep enough to leave the path free)
+		if (d >= 14) {
+			StoneKit.well(c, p, 8, 7);
+		}
 	}
 
 	/** Bushes and pots on the footing round the street fronts and the back of the side wing. */

@@ -37,6 +37,24 @@ final class LeadOfficeRoom {
 	}
 
 	/**
+	 * feat/lead-review-walk: the visitors' chairs of lead office {@code i} (slot 1, across the corridor from
+	 * the lead's desk), as {@link AnchorNames#leadSeat} anchors facing the lead: like the hub benches, the
+	 * free cell in front of each chair {@link #furnish} puts there.
+	 */
+	static java.util.List<Anchor> seats(int i, String leadNpcId) {
+		int u0 = HqGeometry.segmentU(0);
+		int chairZ = HqGeometry.wz(i, HqGeometry.chairV(1));
+		java.util.List<Anchor> out = new java.util.ArrayList<>();
+		int n = 0;
+		for (int k = 0; k < 3; k += 2) {
+			// like the hub benches' anchors: the free cell in front of the chair, facing the lead
+			BlockPos chair = new BlockPos(HqGeometry.wx(i, u0 + k), 1, chairZ);
+			out.add(Anchor.at(AnchorNames.leadSeat(leadNpcId, n++), chair.relative(Direction.NORTH), Direction.NORTH));
+		}
+		return out;
+	}
+
+	/**
 	 * Furniture of a vacant slot {@code slot} (1..5) of a lead office {@code i}, written into the desk
 	 * module's canvas after the style drew its bare floor.
 	 */

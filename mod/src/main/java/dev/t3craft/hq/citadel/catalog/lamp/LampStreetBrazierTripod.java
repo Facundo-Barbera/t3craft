@@ -2,6 +2,7 @@ package dev.t3craft.hq.citadel.catalog.lamp;
 
 import static dev.t3craft.hq.citadel.CitadelCanvas.b;
 import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
+import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
 
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.catalog.Family;
@@ -16,23 +17,26 @@ import net.minecraft.world.level.block.state.properties.Half;
 import net.minecraft.world.level.block.state.properties.SlabType;
 
 /**
- * Fire brazier on a stone tripod: three slim pale legs on dark feet (two at the front, one at the back)
- * hold a copper bowl, a plus of upside-down stairs with open corners, and a campfire (a soul campfire on
- * some seeds) burns in it. Two copper rods rise from the front corners as horns. The legs, the air between
- * them and the bowl overhanging the plus make the silhouette; the copper is the one warm colour next to the
- * grey stone, so the bowl reads at once.
+ * Brazier on a tripod: a shallow bowl of polished deepslate with a thin copper rim and an open fire,
+ * carried by three dark legs that splay out to the left, the right and the back and lean in to a dark
+ * collar under the bowl. The front stays open, so the fire and the empty space under the bowl read.
  *
  * <ul>
- * <li><b>Gradient dark → light, bottom → top</b>: cobbled deepslate feet, stone-brick and andesite legs,
- *     bright copper bowl, fire on top.</li>
- * <li><b>Depth</b>: the legs stand apart with open air between them; the bowl overhangs; the corners of the
- *     bowl are open, so the flame is seen from every side.</li>
- * <li><b>Safe fire</b>: a campfire only burns the block it is in (it never spreads) and nothing flammable is
- *     next to it.</li>
+ * <li><b>Silhouette</b>: thin legs leaning in → a dark knot → a bowl that tapers to the knot and widens to
+ *     the rim. The legs lean with a stair at their top (the high step towards the knot).</li>
+ * <li><b>Contrast</b>: near-black nether-brick legs with blackstone knees, dark polished deepslate bowl, a thin copper rim; the flame is the brightest thing on it.</li>
+ * <li><b>Safe fire</b>: a campfire (it never spreads) with nothing flammable round it.</li>
  * </ul>
- * Size: 3 × 3 × 4–6. Legs are two to four blocks.
+ * Size: 3 × 3 × 4–6. The legs are one to three blocks before they lean in.
  */
 public final class LampStreetBrazierTripod implements Variant {
+	/** The three leg feet (left, right, back) and the direction each one leans in, towards the centre. */
+	private static final int[][] LEGS = {{0, 1}, {2, 1}, {1, 2}};
+	private static final Direction[] LEAN = {Direction.EAST, Direction.WEST, Direction.NORTH};
+	private static final int[][] SIDES = {{1, 0}, {1, 2}, {0, 1}, {2, 1}};
+	private static final Direction[] IN = {Direction.SOUTH, Direction.NORTH, Direction.EAST, Direction.WEST};
+	private static final int[][] CORNERS = {{0, 0}, {2, 0}, {0, 2}, {2, 2}};
+
 	@Override
 	public String id() {
 		return "lamp_street_brazier_tripod";
@@ -70,39 +74,49 @@ public final class LampStreetBrazierTripod implements Variant {
 
 	@Override
 	public void build(CitadelCanvas c, Plot p) {
-		int dish = Math.min(p.h() - 2, 4); // y of the dish; the fire sits on it
-		int fire = dish + 1;
-		int[][] legs = {{0, 0}, {2, 0}, {1, 2}};
-		boolean soul = p.hash(0, 0, 0, 3) == 0;
+		int dish = Math.min(p.h() - 2, 4); // the bowl; the fire and the rim sit on it
+		int knot = dish - 1; // where the legs meet, under the bowl
+		int lean = knot - 1; // the leaning top of each leg
+		boolean soul = p.hash(0, 0, 0, 4) == 0;
 
-		// --- legs: dark foot, then pale slim walls; the gaps between them are the point of the silhouette
-		for (int[] l : legs) {
-			int u = l[0];
-			int v = l[1];
-			p.set(c, u, 0, v, b(p.hash(u, 0, v, 2) == 0 ? Blocks.COBBLED_DEEPSLATE_WALL : Blocks.DEEPSLATE_BRICK_WALL));
-			for (int y = 1; y < dish; y++) {
-				p.set(c, u, y, v, b(y == 1 ? Blocks.STONE_BRICK_WALL : Blocks.ANDESITE_WALL));
+		// --- legs: thin dark fence posts, then a stair whose high step leans in to the knot
+		for (int i = 0; i < 3; i++) {
+			int u = LEGS[i][0];
+			int v = LEGS[i][1];
+			for (int y = 0; y < lean; y++) {
+				p.set(c, u, y, v, b(Blocks.NETHER_BRICK_FENCE)); // thin dark iron-like legs
 			}
+			// the knee: a stair leaning in to the knot (on the lowest plots the leg is just a thin post)
+			p.set(c, u, lean, v, lean == 0 ? b(Blocks.NETHER_BRICK_FENCE) : stairs(Blocks.POLISHED_BLACKSTONE_STAIRS, LEAN[i]));
 		}
-		// ash patch under the bowl: the only thing on the ground between the legs
-		p.set(c, 1, 0, 1, slab(Blocks.BLACKSTONE_SLAB));
+		// --- the knot: a slim dark collar where the three legs meet, ash on the ground under it
+		p.set(c, 1, knot, 1, b(Blocks.POLISHED_BLACKSTONE_WALL));
+		if (knot >= 2) {
+			p.set(c, 1, 0, 1, slab(Blocks.BLACKSTONE_SLAB));
+		}
 
-		// --- bowl: a plus of upside-down verdigris stairs (oxidized copper) on a bright copper heart, the corners left open
-		// so light and sky show between the horns (the legs' corners carry a slab only where a leg arrives)
-		BlockState cu0 = Blocks.CUT_COPPER_STAIRS.waxed().oxidized().defaultBlockState().setValue(StairBlock.HALF, Half.TOP);
-		p.set(c, 1, dish, 1, b(Blocks.CUT_COPPER.waxed().unaffected()));
-		p.set(c, 1, dish, 0, cu0.setValue(StairBlock.FACING, Direction.NORTH));
-		p.set(c, 1, dish, 2, cu0.setValue(StairBlock.FACING, Direction.SOUTH));
-		p.set(c, 0, dish, 1, cu0.setValue(StairBlock.FACING, Direction.WEST));
-		p.set(c, 2, dish, 1, cu0.setValue(StairBlock.FACING, Direction.EAST));
-		BlockState copper = slab(Blocks.CUT_COPPER_SLAB.waxed().unaffected()).setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP);
-		p.set(c, 0, dish, 0, copper);
-		p.set(c, 2, dish, 0, copper);
-		// tall horns on the two front legs only: an asymmetric crown, not a cage
-		p.set(c, 0, fire, 0, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState());
-		p.set(c, 2, fire, 0, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState());
+		// --- bowl: upside-down stairs taper from the rim down to the knot; upper slabs close the corners
+		p.set(c, 1, dish, 1, b(Blocks.POLISHED_DEEPSLATE));
+		for (int i = 0; i < 4; i++) {
+			int[] s = SIDES[i];
+			p.set(c, s[0], dish, s[1], stairs(Blocks.POLISHED_DEEPSLATE_STAIRS, IN[i]).setValue(StairBlock.HALF, Half.TOP));
+		}
+		BlockState corner = slab(Blocks.POLISHED_DEEPSLATE_SLAB).setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP);
+		for (int[] k : CORNERS) {
+			p.set(c, k[0], dish, k[1], corner);
+		}
 
-		// --- fire, in the open
-		p.set(c, 1, fire, 1, soul ? b(Blocks.SOUL_CAMPFIRE) : b(Blocks.CAMPFIRE));
+		// --- rim: a thin ring of closed copper trapdoors (a 3-pixel plate) on all eight rim cells: a bright edge
+		// on the dark bowl, with the fire standing well above it
+		BlockState rim = b(Blocks.COPPER_TRAPDOOR.waxed().unaffected());
+		for (int[] s : SIDES) {
+			p.set(c, s[0], dish + 1, s[1], rim);
+		}
+		for (int[] k : CORNERS) {
+			p.set(c, k[0], dish + 1, k[1], rim);
+		}
+
+		// --- the fire, in the open
+		p.set(c, 1, dish + 1, 1, b(soul ? Blocks.SOUL_CAMPFIRE : Blocks.CAMPFIRE).setValue(BlockStateProperties.LIT, true));
 	}
 }

@@ -212,10 +212,13 @@ final class TownRender {
 		}
 	}
 
-	/** Writes a PNG; when it is over {@link #MAX_BYTES}, writes it again with a 256-colour palette. */
+	/**
+	 * Writes a truecolour PNG. Only with {@code -Dt3craft.render.palette=true} (images meant for the repo's docs) is
+	 * one over {@link #MAX_BYTES} written again with a 256-colour palette: the palette bands and grains the image.
+	 */
 	static void write(BufferedImage img, Path f) throws Exception {
 		ImageIO.write(img, "png", f.toFile());
-		if (Files.size(f) > MAX_BYTES) {
+		if (Boolean.getBoolean("t3craft.render.palette") && Files.size(f) > MAX_BYTES) {
 			ImageIO.write(quantize(img), "png", f.toFile());
 		}
 	}

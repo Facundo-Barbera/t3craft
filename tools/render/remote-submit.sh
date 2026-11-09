@@ -30,7 +30,8 @@ R_REPO="${T3CRAFT_RENDER_REMOTE_REPO:-projects/t3craft}"
 R_JOBS="${T3CRAFT_RENDER_REMOTE_JOBS:-t3craft-jobs}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 kind=hq
-priority=preview
+# the render PC has room: high quality by default (final, supersampled); --preview only when asked for
+priority=final
 agent="${T3CRAFT_AGENT:-}"
 worktree=""
 wait_for=1
@@ -46,7 +47,9 @@ q() { printf '%q' "$1"; }
 while [ $# -gt 0 ]; do
 	case "$1" in
 		--kind) kind="${2:?--kind needs hq or ui}"; shift 2 ;;
-		--preview) priority=preview; shift ;;
+		--preview) # the PC renders high quality: preview only when someone explicitly allows it
+			if [ "${T3CRAFT_RENDER_ALLOW_PREVIEW:-0}" = 1 ]; then priority=preview; else echo "submit: --preview ignored on the render PC (final, supersampled); set T3CRAFT_RENDER_ALLOW_PREVIEW=1 to force it" >&2; fi
+			shift ;;
 		--final) priority=final; shift ;;
 		--worktree) worktree="${2:?--worktree needs a path}"; shift 2 ;;
 		--agent) agent="${2:?--agent needs a name}"; shift 2 ;;
@@ -120,6 +123,10 @@ payload="$(cd "$worktree" && tar cz mod/src mod/build.gradle mod/gradle.properti
 packs_local=""
 packs_payload=""
 args=("$@")
+# default supersampling on the PC: 3x3 per pixel (clean edges); the agent's own --ss wins
+if [ "$priority" = final ] && [[ " ${args[*]} " != *" --ss "* ]]; then
+	args+=(--ss "${T3CRAFT_RENDER_SS:-3}")
+fi
 for i in "${!args[@]}"; do
 	if [ "${args[$i]}" = "--packs" ] && [ $((i + 1)) -lt ${#args[@]} ]; then
 		packs_local="${args[$((i + 1))]}"

@@ -88,6 +88,8 @@ public final class BehaviorDirector {
 	private java.util.function.@Nullable Supplier<Set<String>> pinnedThreads;
 	/** feat/lead-office: new children stop by their lead's office first. Lazy: hot-swap safe. */
 	private @Nullable LeadBriefing briefing;
+	/** feat/lead-review-walk: finished children wait for their lead's review. Lazy: hot-swap safe. */
+	private @Nullable ReviewWalk reviewWalk;
 
 	/**
 	 * Plug in a physical base (null = none, grid layout only). See {@link AnchorSource}.
@@ -236,6 +238,10 @@ public final class BehaviorDirector {
 		return briefing = dev.t3craft.debug.HotSwapFields.orInit(briefing, LeadBriefing::new);
 	}
 
+	private ReviewWalk reviewWalk() {
+		return reviewWalk = dev.t3craft.debug.HotSwapFields.orInit(reviewWalk, ReviewWalk::new);
+	}
+
 	private Map<String, @Nullable Departure> departures() {
 		return departures = dev.t3craft.debug.HotSwapFields.orInit(departures, HashMap::new);
 	}
@@ -248,6 +254,7 @@ public final class BehaviorDirector {
 	public void forget(String npcId, @Nullable ClientLevel lvl) {
 		brains.remove(npcId);
 		wander().forget(npcId);
+		reviewWalk().forget(npcId);
 		departures().remove(npcId);
 		Overlay o = overlays.remove(npcId);
 		if (o != null) {
@@ -266,6 +273,7 @@ public final class BehaviorDirector {
 		brains.clear();
 		departures().clear();
 		wander().reset();
+		reviewWalk().reset();
 		approaches.reset();
 		anchorsBefore = null;
 		navigation = null;
@@ -348,6 +356,17 @@ public final class BehaviorDirector {
 		if (tick % 100 == 0) {
 			briefing.prune();
 		}
+		// feat/lead-review-walk: finished children of a lead (or of any parent with a desk) wait for its review
+		ReviewWalk reviews = reviewWalk();
+		Set<String> present = new HashSet<>();
+		for (Body b : bodies) {
+			present.add(b.id());
+		}
+		reviews.begin(tick, layout, dev.t3craft.hq.lead.LeadOffices.current().reviews(), present, id -> {
+			NpcBrain nb = brains.get(id);
+			return nb == null ? null : nb.pos();
+		});
+		long reviewNs = reviews.spentNs();
 		Set<String> alive = new HashSet<>();
 		for (Body b : bodies) {
 			alive.add(b.id());
@@ -381,9 +400,18 @@ public final class BehaviorDirector {
 
 			brain.approach(approachSpots.get(b.id()));
 			boolean error = "error".equals(info.state());
-			IdleWander.Plan stroll = strollers.update(b.id(), mode, error, brain, mode == Mode.COMPLETED ? rest : home);
+			long r0 = System.nanoTime();
+			IdleWander.Plan review = error ? null : reviews.plan(b.id(), brain);
+			reviewNs += System.nanoTime() - r0;
+			IdleWander.Plan stroll;
+			if (review != null) {
+				strollers.forget(b.id()); // awaiting review: no idle strolls; the walk uses the shared navigation
+				stroll = review;
+			} else {
+				stroll = strollers.update(b.id(), mode, error, brain, mode == Mode.COMPLETED ? rest : home);
+			}
 			brain.stroll(stroll == null ? null : stroll.spot(), stroll != null && stroll.sit(), stroll == null ? null : stroll.look());
-			brain.tick(mode, error, t, playerPos, stroll == null ? nav : strollers.navigator(b.id(), nav));
+			brain.tick(mode, error, t, playerPos, stroll == null || review != null ? nav : strollers.navigator(b.id(), nav));
 			rescue(brain, layout.spawn());
 			apply(lvl, b, brain, o, summary, playerPos);
 		}
@@ -393,6 +421,7 @@ public final class BehaviorDirector {
 			}
 		}
 		dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_NPC_WANDER, System.nanoTime() - strollers.spentNs());
+		dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_NPC_REVIEW, System.nanoTime() - reviewNs);
 	}
 
 	/** Farther than this (blocks) from the way in, a stranded NPC is put back there; nearer, it stays. */
