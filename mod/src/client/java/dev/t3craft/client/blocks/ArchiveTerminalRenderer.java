@@ -30,10 +30,13 @@ import org.jspecify.annotations.Nullable;
 public final class ArchiveTerminalRenderer implements BlockEntityRenderer<ArchiveTerminalBlockEntity, ArchiveTerminalRenderer.State> {
 	/** Screen pixels per block (≈ 6 px per character). */
 	static final float PPB = 160f;
-	/** The screen housing of the north-facing model: x 1..15, y 7..16, front at z = 6 (16ths). */
+	/**
+	 * The screen housing of the north-facing model: x 1..15, y 7..15, front at z = 6 (16ths). The model's visor
+	 * (a cherry cap, y 15..16) hangs 1/16 in front of the housing, so the glass starts one model pixel below the top.
+	 */
 	static final float SCREEN_X0 = PPB * 1 / 16f;
 	static final float SCREEN_X1 = PPB * 15 / 16f;
-	static final float SCREEN_Y0 = 0f;
+	static final float SCREEN_Y0 = PPB * 1 / 16f;
 	static final float SCREEN_Y1 = PPB * 9 / 16f;
 	static final float DEPTH = 6 / 16f - 0.003f;
 	static final int LINE_HEIGHT = 10;
