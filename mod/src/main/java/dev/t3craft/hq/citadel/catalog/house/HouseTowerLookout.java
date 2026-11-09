@@ -3,14 +3,12 @@ package dev.t3craft.hq.citadel.catalog.house;
 import static dev.t3craft.hq.citadel.CitadelCanvas.b;
 import static dev.t3craft.hq.citadel.catalog.house.HouseTowerKit.fence;
 import static dev.t3craft.hq.citadel.catalog.house.HouseTowerKit.hangingLantern;
-import static dev.t3craft.hq.citadel.catalog.house.HouseTowerKit.lantern;
 import static dev.t3craft.hq.citadel.catalog.house.HouseTowerKit.log;
 import static dev.t3craft.hq.citadel.catalog.house.HouseTowerKit.pane;
 import static dev.t3craft.hq.citadel.catalog.house.HouseTowerKit.put;
 import static dev.t3craft.hq.citadel.catalog.house.HouseTowerKit.set;
 import static dev.t3craft.hq.citadel.catalog.house.HouseTowerKit.slab;
 import static dev.t3craft.hq.citadel.catalog.house.HouseTowerKit.stair;
-import static dev.t3craft.hq.citadel.catalog.house.HouseTowerKit.wall;
 
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.catalog.Family;
@@ -22,36 +20,40 @@ import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BedPart;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
+import net.minecraft.world.level.block.state.properties.StairsShape;
 
 /**
- * A lived-in lookout tower: a round shaft (an octagon-ish disc in blocks) of three storeys on a
- * flared base with four buttresses, a cherry gallery that corbels out under a ring of glass and
- * cherry pillars (the lantern room), and a steep conical roof of deepslate tiles with a cherry eave
- * ring, a lantern and a lightning rod on the tip.
+ * A lookout tower you walk up: a square stone shaft of three storeys (guard room, watch quarters, and a glazed
+ * lookout cabin) with a square spiral stair inside, under a copper hip roof, with a corbelled timber balcony round
+ * the cabin.
  *
- * <p>Palette, dark to light, bottom to top: deepslate bricks (cracked / cobbled / polished mix) for
- * the base storey, stone bricks (mossy / cracked) for the middle, calcite plaster for the top, then
- * cherry for the gallery and lantern room, and a dark roof edged in cherry.
+ * <p>The stair is a flight of 5 steps per storey (one step per cell, first step head-on, the floor above cut over the
+ * run) that hugs the walls of the 5x5 core room: storey 0 to 1 climbs the west wall (south-bound), storey 1 to 2 the
+ * south wall (east-bound). The ring is {@code k} cells wide (2 when the plot is 15x15 or more, else 1) and every flight
+ * is that wide. The cut in each floor is ringed by shelves, barrels and chests (a one-block parapet nobody falls over
+ * without meaning to), so no fences are needed and nothing is a sealed pocket.
+ *
+ * <p>Palette, dark to light, bottom to top: deepslate bricks (cracked / cobbled mix) with polished-deepslate quoins,
+ * stone bricks (mossy / cracked) with a chiselled string course, then timber (dark oak or cherry) and glass for the
+ * cabin, under oxidised copper edged in cherry with a bright copper crown and a lightning rod.
  *
  * <pre>
- *  y17+ finial: fence, lantern, rod        radius r = rr + 0.6 is the wall ring (rr = 2 or 3)
- *  y12-16 cone, one ring smaller per row   centre (cx, cz) = ((w-1)/2, rr+2)
- *  y10-11 lantern room: pillars + glass    front margin v0: step and path, v1: talus
- *  y9 gallery floor (r + 1) and rail
- *  y7-8 calcite storey, window slits
- *  y4-5 stone storey                       floors at y3, y6 and y9, ladder against the back wall
- *  y1-2 deepslate storey, door, buttresses y0 flared base (stairs round the foot)
+ *  u: ox..ox+R-1 plot of the balcony (R = B+4) | u0..u1 shaft (B = I+2, I = 5+2k)
+ *  v: 0-1 portico steps | v0=2 front wall | v1 back wall
+ *  y: 0 floor | 1-4 guard room | 5 floor | 6-9 watch room | 10 floor+balcony deck | 11-14 cabin | 14 eave | 14-19 roof
+ *  stair: flight 1 on the west wall, v k..k+4, y1..5  (door at the north wall, first step from the NW corner)
+ *         flight 2 on the south wall, u k..k+4, y6..10 (first step from the SW corner, ends in the cabin)
  * </pre>
  *
- * Size: 8–10 × 8–10 × 21+.
+ * Size: 13–18 × 13–18 × 21+.
  */
 public final class HouseTowerLookout implements Variant {
-	private static final int F1 = 3;
-	private static final int F2 = 6;
-	private static final int GAL = 9;
-	private static final int CEIL = 12;
+	private static final int F1 = 5;
+	private static final int F2 = 10;
+	private static final int EAVE = 14;
 
 	@Override
 	public String id() {
@@ -65,12 +67,12 @@ public final class HouseTowerLookout implements Variant {
 
 	@Override
 	public int minW() {
-		return 8;
+		return 13;
 	}
 
 	@Override
 	public int minD() {
-		return 8;
+		return 13;
 	}
 
 	@Override
@@ -80,94 +82,98 @@ public final class HouseTowerLookout implements Variant {
 
 	@Override
 	public int maxW() {
-		return 10;
+		return 18;
 	}
 
 	@Override
 	public int maxD() {
-		return 10;
+		return 18;
 	}
 
-	private record Scheme(Block log, Block trim, Block planks, Block fence, Block door, Block trap, Block roof, Block roofStair, Block roofSlab, Block eaveStair) {
+	private record Scheme(Block log, Block stripped, Block planks, Block fence, Block door, Block roofStair, Block roofBlock, Block eaveStair,
+			Block crownStair, Block crownBlock) {
 	}
 
 	private static final Scheme[] SCHEMES = {
-			new Scheme(Blocks.CHERRY_LOG, Blocks.STRIPPED_CHERRY_LOG, Blocks.CHERRY_PLANKS, Blocks.CHERRY_FENCE, Blocks.CHERRY_DOOR, Blocks.CHERRY_TRAPDOOR,
-					Blocks.DEEPSLATE_TILES, Blocks.DEEPSLATE_TILE_STAIRS, Blocks.DEEPSLATE_TILE_SLAB, Blocks.CHERRY_STAIRS),
-			new Scheme(Blocks.DARK_OAK_LOG, Blocks.STRIPPED_DARK_OAK_LOG, Blocks.DARK_OAK_PLANKS, Blocks.DARK_OAK_FENCE, Blocks.DARK_OAK_DOOR, Blocks.DARK_OAK_TRAPDOOR,
-					Blocks.CHERRY_PLANKS, Blocks.CHERRY_STAIRS, Blocks.CHERRY_SLAB, Blocks.DEEPSLATE_TILE_STAIRS),
+			new Scheme(Blocks.DARK_OAK_LOG, Blocks.STRIPPED_DARK_OAK_LOG, Blocks.DARK_OAK_PLANKS, Blocks.DARK_OAK_FENCE, Blocks.DARK_OAK_DOOR,
+					Blocks.CUT_COPPER_STAIRS.waxed().oxidized(), Blocks.CUT_COPPER.waxed().oxidized(), Blocks.CHERRY_STAIRS,
+					Blocks.CUT_COPPER_STAIRS.waxed().unaffected(), Blocks.CUT_COPPER.waxed().unaffected()),
+			new Scheme(Blocks.CHERRY_LOG, Blocks.STRIPPED_CHERRY_LOG, Blocks.CHERRY_PLANKS, Blocks.CHERRY_FENCE, Blocks.CHERRY_DOOR,
+					Blocks.CUT_COPPER_STAIRS.waxed().oxidized(), Blocks.CUT_COPPER.waxed().oxidized(), Blocks.DARK_OAK_STAIRS,
+					Blocks.CUT_COPPER_STAIRS.waxed().unaffected(), Blocks.CUT_COPPER.waxed().unaffected()),
 	};
 
-	/** Disc geometry of one build. */
-	private record G(Plot p, Scheme s, int cx, int cz, int rr, int w, int d) {
-		boolean in(int u, int v, double rad) {
-			double du = u - cx;
-			double dv = v - cz;
-			return du * du + dv * dv <= rad * rad;
+	/**
+	 * Geometry of one build. Interior cells are {@code (a, b)}, 0..in-1, a west to east, b front to back; the shaft
+	 * walls are the rectangle u0..u1 x v0..v1; the balcony ring is the two rows of cells round it.
+	 */
+	private record G(Plot p, Scheme s, int k, int in, int bw, int rw, int ox, int u0, int u1, int v0, int v1, int m, int c) {
+		int iu(int a) {
+			return u0 + 1 + a;
 		}
 
-		double wallR() {
-			return rr + 0.6;
+		int iv(int bb) {
+			return v0 + 1 + bb;
 		}
 
-		/** Inside the disc of radius rad with at least one of the 8 neighbours outside. */
-		boolean rim8(int u, int v, double rad) {
-			if (!in(u, v, rad)) {
-				return false;
+		/** Chebyshev distance to the shaft rectangle (0 inside or on the wall). */
+		int dist(int u, int v) {
+			int du = u < u0 ? u0 - u : Math.max(0, u - u1);
+			int dv = v < v0 ? v0 - v : Math.max(0, v - v1);
+			return Math.max(du, dv);
+		}
+
+		boolean corner(int u, int v) {
+			return (u < u0 || u > u1) && (v < v0 || v > v1);
+		}
+
+		/** The direction from an outside cell towards the shaft. */
+		Direction toward(int u, int v) {
+			if (u < u0) {
+				return Direction.EAST;
 			}
-			for (int du = -1; du <= 1; du++) {
-				for (int dv = -1; dv <= 1; dv++) {
-					if (!in(u + du, v + dv, rad)) {
-						return true;
-					}
-				}
+			if (u > u1) {
+				return Direction.WEST;
 			}
-			return false;
+			return v < v0 ? Direction.SOUTH : Direction.NORTH;
 		}
 
-		boolean rim4(int u, int v, double rad) {
-			if (!in(u, v, rad)) {
-				return false;
-			}
-			return !in(u + 1, v, rad) || !in(u - 1, v, rad) || !in(u, v + 1, rad) || !in(u, v - 1, rad);
+		/** Position along the face of an outside, non-corner cell. */
+		int along(int u, int v) {
+			Direction t = toward(u, v);
+			return t == Direction.EAST || t == Direction.WEST ? v - v0 : u - u0;
 		}
 
-		boolean wall(int u, int v) {
-			return rim8(u, v, wallR());
-		}
-
-		/** The direction that points from this cell towards the centre (the ascent of a roof stair). */
-		Direction inward(int u, int v) {
-			int dx = cx - u;
-			int dz = cz - v;
-			if (Math.abs(dx) > Math.abs(dz)) {
-				return dx > 0 ? Direction.EAST : Direction.WEST;
-			}
-			return dz > 0 ? Direction.SOUTH : Direction.NORTH;
+		boolean outer(int u, int v) {
+			return u >= ox && u < ox + rw && v >= 0 && v < rw && dist(u, v) == 2;
 		}
 	}
 
 	@Override
 	public void build(CitadelCanvas c, Plot p) {
-		Random r = p.rng(0x100C_0077L);
+		Random r = p.rng(0x100C_0A11L);
 		Scheme s = SCHEMES[r.nextInt(SCHEMES.length)];
-		int rr = Math.min(2, Math.min((p.w() - 2) / 2, (p.d() - 4) / 2)); // always a slim shaft (5 wide), however big the plot
-		G g = new G(p, s, (p.w() - 1) / 2, rr + 2, rr, p.w(), p.d());
-		base(c, g);
-		shaft(c, g);
+		int k = p.w() >= 15 && p.d() >= 15 ? 2 : 1;
+		int in = 5 + 2 * k;
+		int bw = in + 2;
+		int rw = bw + 4;
+		int ox = (p.w() - rw) / 2;
+		int u0 = ox + 2;
+		G g = new G(p, s, k, in, bw, rw, ox, u0, u0 + bw - 1, 2, 2 + bw - 1, (bw - 1) / 2, (in - 1) / 2);
+		foundation(c, g);
+		walls(c, g);
 		floors(c, g);
-		gallery(c, g);
-		lanternRoom(c, g);
-		cone(c, g);
-		porch(c, g);
-		buttresses(c, g);
-		yard(c, g, r);
+		stairs(c, g);
+		balcony(c, g);
+		roof(c, g);
+		furnish(c, g);
+		yard(c, g);
 	}
 
 	// ------------------------------------------------------------------ materials
 
 	private static BlockState deepslate(Plot p, int u, int y, int v) {
-		return switch (p.hash(u, y, v, 10)) {
+		return switch (p.hash(u, y, v, 9)) {
 			case 0 -> b(Blocks.CRACKED_DEEPSLATE_BRICKS);
 			case 1 -> b(Blocks.COBBLED_DEEPSLATE);
 			default -> b(Blocks.DEEPSLATE_BRICKS);
@@ -175,355 +181,397 @@ public final class HouseTowerLookout implements Variant {
 	}
 
 	private static BlockState stone(Plot p, int u, int y, int v) {
-		return switch (p.hash(u, y, v, 14)) {
+		return switch (p.hash(u, y, v, 12)) {
 			case 0 -> b(Blocks.MOSSY_STONE_BRICKS);
 			case 1 -> b(Blocks.CRACKED_STONE_BRICKS);
 			default -> b(Blocks.STONE_BRICKS);
 		};
 	}
 
-	private static BlockState plaster(Plot p, int u, int y, int v) {
-		return p.hash(u, y, v, 9) == 0 ? b(Blocks.SMOOTH_QUARTZ) : b(Blocks.CALCITE);
-	}
-
 	private static Block pinkPane() {
 		return Blocks.STAINED_GLASS_PANE.pick(DyeColor.PINK);
 	}
 
-	// ------------------------------------------------------------------ base
-
-	/** The foot: the disc of the wall ring in dark stone, and a talus of stairs one block wider. */
-	private static void base(CitadelCanvas c, G g) {
-		for (int u = 0; u < g.w; u++) {
-			for (int v = 0; v < g.d; v++) {
-				if (g.in(u, v, g.wallR())) {
-					set(c, g.p, u, 0, v, g.wall(u, v) ? deepslate(g.p, u, 0, v) : b(Blocks.SPRUCE_PLANKS));
-				} else if (g.in(u, v, g.rr + 1.6)) {
-					set(c, g.p, u, 0, v, stair(Blocks.DEEPSLATE_BRICK_STAIRS, g.inward(u, v), false));
-				}
-			}
-		}
-		// [depth] a battered foot: the shaft widens by a block over two courses, closed by a sloped stair, so the body tapers upwards
-		for (int u = 0; u < g.w; u++) {
-			for (int v = 0; v < g.d; v++) {
-				if (g.in(u, v, g.rr + 1.4) && !g.in(u, v, g.wallR()) && !(Math.abs(u - g.cx) <= 1 && v < g.cz)) {
-					set(c, g.p, u, 0, v, deepslate(g.p, u, 0, v));
-					set(c, g.p, u, 1, v, deepslate(g.p, u, 1, v));
-					set(c, g.p, u, 2, v, stair(Blocks.DEEPSLATE_BRICK_STAIRS, g.inward(u, v), false));
-				}
-			}
-		}
-	}
-
-	// ------------------------------------------------------------------ shaft
-
-	private static BlockState shaftBlock(G g, int u, int y, int v) {
-		if (y == F1 || y == F2) {
-			return b(Blocks.POLISHED_DEEPSLATE); // string courses (dark band) at the floors
-		}
-		if (y <= 2) {
-			return deepslate(g.p, u, y, v);
-		}
-		if (y <= 5) {
-			return stone(g.p, u, y, v);
-		}
-		return plaster(g.p, u, y, v);
-	}
-
-	private static boolean windowCell(G g, int u, int v) {
-		int du = Math.abs(u - g.cx);
-		int dv = Math.abs(v - g.cz);
-		return (du == 1 && dv >= g.rr) || (dv == 1 && du >= g.rr);
-	}
-
-	private static boolean cardinal(G g, int u, int v) {
-		return u == g.cx || v == g.cz;
-	}
-
-	private void shaftRing(CitadelCanvas c, G g, int y0, int y1) {
-		for (int u = 0; u < g.w; u++) {
-			for (int v = 0; v < g.d; v++) {
-				if (!g.wall(u, v)) {
-					continue;
-				}
-				for (int y = y0; y <= y1; y++) {
-					BlockState st = shaftBlock(g, u, y, v);
-					boolean row = y == 2 || y == 5 || y == 8;
-					if (windowCell(g, u, v) && row) {
-						// [depth] a slit window: glass pane set back, a stone sill sticking out below
-						boolean alongU = Math.abs(g.inward(u, v).getStepX()) == 0;
-						st = pane(g.s.fence() == Blocks.CHERRY_FENCE && g.p.hash(u, y, v, 3) == 0 ? pinkPane() : Blocks.GLASS_PANE, alongU);
-					}
-					set(c, g.p, u, y, v, st);
-				}
-			}
-		}
-	}
-
-	private void shaft(CitadelCanvas c, G g) {
-		shaftRing(c, g, 1, 8);
-		// [depth] sills: upside-down stairs sticking out under each window, with a flower pot
-		for (int u = 0; u < g.w; u++) {
-			for (int v = 0; v < g.d; v++) {
-				if (!g.wall(u, v) || !windowCell(g, u, v)) {
-					continue;
-				}
-				for (int y : new int[] {2, 5, 8}) {
-					Direction out = g.inward(u, v).getOpposite();
-					int su = u + out.getStepX();
-					int sv = v + out.getStepZ();
-					if (g.wall(su, sv) || g.in(su, sv, g.wallR())) {
-						continue;
-					}
-					set(c, g.p, su, y - 1, sv, stair(Blocks.STONE_BRICK_STAIRS, out.getOpposite(), true));
-					if (y > 2 && g.p.hash(su, y, sv, 2) == 0) {
-						set(c, g.p, su, y, sv, b(Blocks.POTTED_PINK_TULIP));
-					}
-				}
-			}
-		}
-		// pilasters up the four cardinal faces (the front one is the porch)
-		for (Direction dir : new Direction[] {Direction.EAST, Direction.WEST, Direction.SOUTH}) {
-			int pu = g.cx + dir.getStepX() * (g.rr + 1);
-			int pv = g.cz + dir.getStepZ() * (g.rr + 1);
-			for (int y = 1; y <= 8; y++) {
-				set(c, g.p, pu, y, pv, y <= 2 ? b(Blocks.DEEPSLATE_BRICKS) : y <= 5 ? b(Blocks.STONE_BRICKS) : b(Blocks.CALCITE)); // pilasters follow the palette gradient
-			}
-		}
-	}
-
-	// ------------------------------------------------------------------ floors, ladder, interior
-
-	private void floors(CitadelCanvas c, G g) {
-		int ladderU = g.cx;
-		int ladderV = g.cz + g.rr - 1;
-		for (int fy : new int[] {F1, F2}) {
-			for (int u = 0; u < g.w; u++) {
-				for (int v = 0; v < g.d; v++) {
-					if (g.in(u, v, g.wallR()) && !g.wall(u, v) && !(u == ladderU && v == ladderV)) {
-						set(c, g.p, u, fy, v, b(Blocks.SPRUCE_PLANKS));
-					}
-				}
-			}
-		}
-		// ladder against the back wall, up to the gallery floor
-		for (int y = 1; y <= GAL; y++) {
-			set(c, g.p, ladderU, y, ladderV, b(Blocks.LADDER).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH));
-		}
-		// the rooms are a plus of 5 cells (door, centre, ladder, two side bays) and 2 high: furniture goes in a side
-		// bay (never behind the door, on the centre or at the ladder) and the lantern stands on it, off the walk
-		set(c, g.p, g.cx - 1, 1, g.cz, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
-		set(c, g.p, g.cx - 1, 2, g.cz, lantern());
-		set(c, g.p, g.cx + 1, 4, g.cz, b(Blocks.BOOKSHELF));
-		set(c, g.p, g.cx + 1, 5, g.cz, lantern());
-		set(c, g.p, g.cx - 1, 7, g.cz, b(Blocks.CRAFTING_TABLE));
-		set(c, g.p, g.cx - 1, 8, g.cz, lantern());
-		// lantern room: hung over the west bay (the east bay is the way to the gallery door)
-		put(c, g.p, g.cx - 1, CEIL - 1, g.cz, hangingLantern(), CitadelCanvas.HANGING);
-	}
-
-	// ------------------------------------------------------------------ gallery
-
-	private void gallery(CitadelCanvas c, G g) {
-		double rg = g.rr + 1.1;
-		for (int u = 0; u < g.w; u++) {
-			for (int v = 0; v < g.d; v++) {
-				if (!g.in(u, v, rg)) {
-					continue;
-				}
-				boolean outer = !g.in(u, v, g.wallR());
-				if (outer) {
-					// the corbelled floor ring: planks on a ring of upside-down stairs
-					set(c, g.p, u, GAL, v, b(g.s.planks()));
-					set(c, g.p, u, GAL - 1, v, stair(Blocks.POLISHED_DEEPSLATE_STAIRS, g.inward(u, v), true));
-					// rail posts and rails round the outside
-					boolean post = Math.abs(u - g.cx) == Math.abs(v - g.cz) && Math.abs(u - g.cx) > 0;
-					boolean door = u > g.cx && v == g.cz;
-					if (post) {
-						set(c, g.p, u, GAL + 1, v, log(g.s.trim(), Direction.Axis.Y));
-						set(c, g.p, u, GAL + 2, v, log(g.s.trim(), Direction.Axis.Y));
-					} else {
-						boolean n = g.in(u, v - 1, rg) && !g.in(u, v - 1, g.wallR());
-						boolean e = g.in(u + 1, v, rg) && !g.in(u + 1, v, g.wallR());
-						boolean s2 = g.in(u, v + 1, rg) && !g.in(u, v + 1, g.wallR());
-						boolean w2 = g.in(u - 1, v, rg) && !g.in(u - 1, v, g.wallR());
-						set(c, g.p, u, GAL + 1, v, fence(g.s.fence(), n, e, s2, w2));
-					}
-					if (door) {
-						// the way out to the gallery: a gap in the rail at the east
-						set(c, g.p, u, GAL + 1, v, b(Blocks.AIR));
-					}
-				} else if (!g.wall(u, v)) {
-					set(c, g.p, u, GAL, v, (u == g.cx && v == g.cz + g.rr - 1) ? b(Blocks.AIR) : b(Blocks.SPRUCE_PLANKS));
-				}
-			}
-		}
-		// the gallery ring is one rail wide, so the east door opens onto a small railed landing: the cell at the
-		// door plus a plank on three sides, each carrying a fence (without them the door gives onto a drop)
-		int du = g.cx + g.rr + 1;
-		int[][] guard = {{du, g.cz - 1}, {du, g.cz + 1}, {du + 1, g.cz}};
-		for (int[] q : guard) {
-			set(c, g.p, q[0], GAL, q[1], b(g.s.planks()));
-			set(c, g.p, q[0], GAL - 1, q[1], stair(Blocks.POLISHED_DEEPSLATE_STAIRS, Direction.WEST, true));
-			boolean tip = q[0] == du + 1;
-			set(c, g.p, q[0], GAL + 1, q[1], tip ? fence(g.s.fence(), true, false, true, false) : fence(g.s.fence(), false, true, false, true));
-		}
-	}
-
-	// ------------------------------------------------------------------ lantern room
-
-	private static boolean pillarCell(G g, int u, int v) {
-		int du = Math.abs(u - g.cx);
-		int dv = Math.abs(v - g.cz);
-		return du == 0 || dv == 0 || du == dv;
-	}
-
-	private void lanternRoom(CitadelCanvas c, G g) {
-		for (int u = 0; u < g.w; u++) {
-			for (int v = 0; v < g.d; v++) {
-				if (!g.wall(u, v)) {
-					continue;
-				}
-				// the course at the foot of the lantern room (the gallery floor level is the planks ring)
-				boolean eastDoor = u > g.cx && v == g.cz;
-				for (int y = GAL; y <= CEIL - 1; y++) {
-					BlockState st;
-					if (y == GAL) {
-						st = b(g.s.planks());
-					} else if (eastDoor) {
-						st = y == GAL + 1 ? doorBlock(g, Direction.EAST, true) : doorBlock(g, Direction.EAST, false);
-					} else if (pillarCell(g, u, v)) {
-						st = b(Blocks.QUARTZ_PILLAR); // pale pillars between the glass: clean light band under the crown
-					} else {
-						boolean n = g.wall(u, v - 1);
-						boolean e = g.wall(u + 1, v);
-						boolean s2 = g.wall(u, v + 1);
-						boolean w2 = g.wall(u - 1, v);
-						st = pane(g.p.hash(u, y, v, 4) == 0 ? pinkPane() : Blocks.GLASS_PANE, true)
-								.setValue(BlockStateProperties.NORTH, n).setValue(BlockStateProperties.EAST, e)
-								.setValue(BlockStateProperties.SOUTH, s2).setValue(BlockStateProperties.WEST, w2);
-					}
-					set(c, g.p, u, y, v, st);
-				}
-			}
-		}
-		// the ceiling disc and a ring beam
-		for (int u = 0; u < g.w; u++) {
-			for (int v = 0; v < g.d; v++) {
-				if (g.in(u, v, g.wallR())) {
-					set(c, g.p, u, CEIL - 1 + 1, v, g.wall(u, v) ? b(g.s.planks()) : b(g.s.roof()));
-				}
-			}
-		}
-	}
-
-	private static BlockState doorBlock(G g, Direction facing, boolean lower) {
+	private static BlockState door(G g, Direction facing, boolean lower) {
 		return g.s.door().defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, facing)
 				.setValue(BlockStateProperties.DOUBLE_BLOCK_HALF, lower ? DoubleBlockHalf.LOWER : DoubleBlockHalf.UPPER);
 	}
 
-	// ------------------------------------------------------------------ cone roof
+	private static BlockState facing(Block block, Direction dir) {
+		return b(block).setValue(BlockStateProperties.HORIZONTAL_FACING, dir);
+	}
 
-	private void cone(CitadelCanvas c, G g) {
-		double r0 = g.rr + 1.1;
-		int y = CEIL;
-		int k = 0;
-		double r = r0;
-		int topY = y;
-		while (r >= 0.0) {
-			boolean single = !g.in(g.cx + 1, g.cz, r) && !g.in(g.cx - 1, g.cz, r) && !g.in(g.cx, g.cz + 1, r) && !g.in(g.cx, g.cz - 1, r);
-			for (int u = 0; u < g.w; u++) {
-				for (int v = 0; v < g.d; v++) {
-					if (!g.in(u, v, r)) {
+	private static BlockState barrel() {
+		return b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP);
+	}
+
+	/** An interior cell write: {@code (a, b)} are interior coordinates. */
+	private static void fi(CitadelCanvas c, G g, int a, int y, int bb, BlockState st) {
+		set(c, g.p, g.iu(a), y, g.iv(bb), st);
+	}
+
+	// ------------------------------------------------------------------ foundation
+
+	/** y0: the shaft's base course and the ground floor, a talus of stairs round the foot, pilasters on every face. */
+	private void foundation(CitadelCanvas c, G g) {
+		for (int u = g.ox; u < g.ox + g.rw; u++) {
+			for (int v = 0; v < g.rw; v++) {
+				int d = g.dist(u, v);
+				if (d == 0) {
+					boolean wallCell = u == g.u0 || u == g.u1 || v == g.v0 || v == g.v1;
+					if (wallCell) {
+						set(c, g.p, u, 0, v, deepslate(g.p, u, 0, v));
+					} else {
+						int a = u - g.u0 - 1;
+						int bb = v - g.v0 - 1;
+						set(c, g.p, u, 0, v, ((a + bb) & 1) == 0 ? b(Blocks.DEEPSLATE_TILES) : b(Blocks.POLISHED_DEEPSLATE));
+					}
+				} else if (d == 1) {
+					if (g.corner(u, v)) {
+						set(c, g.p, u, 0, v, b(Blocks.POLISHED_DEEPSLATE));
 						continue;
 					}
-					boolean crown = r < 2.7; // the top rings are oxidised copper, to match the library's dome
-					Block stairBlock = crown ? Blocks.CUT_COPPER_STAIRS.waxed().oxidized() : k == 0 ? g.s.eaveStair() : g.s.roofStair();
-					if (single) {
-						set(c, g.p, u, y, v, slab(Blocks.CUT_COPPER_SLAB.waxed().oxidized(), false));
-					} else if (g.rim4(u, v, r)) {
-						set(c, g.p, u, y, v, stair(stairBlock, g.inward(u, v), false));
-					} else {
-						set(c, g.p, u, y, v, b(crown ? Blocks.CUT_COPPER.waxed().oxidized() : g.s.roof()));
+					int t = g.along(u, v);
+					boolean entry = g.toward(u, v) == Direction.SOUTH && Math.abs(t - g.m) <= 1;
+					if (entry) {
+						continue;
+					}
+					if (Math.abs(t - g.m) == 2) {
+						// [depth] a pilaster: a stone rib that stands one block proud of the wall up to the balcony
+						for (int y = 0; y <= 8; y++) {
+							set(c, g.p, u, y, v, y <= 1 ? deepslate(g.p, u, y, v) : stone(g.p, u, y, v));
+						}
+						continue;
+					}
+					set(c, g.p, u, 0, v, stair(Blocks.DEEPSLATE_BRICK_STAIRS, g.toward(u, v), false));
+				}
+			}
+		}
+	}
+
+	// ------------------------------------------------------------------ walls
+
+	private static boolean windowT(G g, int t) {
+		return t >= 1 && t <= g.m - 3 || t >= g.m + 3 && t <= g.bw - 2 || t == g.m;
+	}
+
+	private void walls(CitadelCanvas c, G g) {
+		for (int u = g.u0; u <= g.u1; u++) {
+			for (int v = g.v0; v <= g.v1; v++) {
+				boolean n = v == g.v0;
+				boolean sh = v == g.v1;
+				boolean w = u == g.u0;
+				boolean e = u == g.u1;
+				if (!(n || sh || w || e)) {
+					continue;
+				}
+				boolean corner = (n || sh) && (w || e);
+				boolean alongU = n || sh;
+				int t = alongU ? u - g.u0 : v - g.v0;
+				for (int y = 1; y <= EAVE; y++) {
+					set(c, g.p, u, y, v, wallCell(g, u, y, v, corner, alongU, t, n, e, w));
+				}
+				if (!corner && windowT(g, t)) {
+					// [depth] a sill sticking out under each slit window
+					Direction out = n ? Direction.NORTH : sh ? Direction.SOUTH : w ? Direction.WEST : Direction.EAST;
+					int su = u + out.getStepX();
+					int sv = v + out.getStepZ();
+					for (int wy : new int[] {2, 7}) {
+						set(c, g.p, su, wy - 1, sv, slab(Blocks.POLISHED_DEEPSLATE_SLAB, true));
 					}
 				}
 			}
-			topY = y;
-			k++;
-			y++;
-			r = r0 - 0.7 * k;
-			if (single) {
-				break;
-			}
-		}
-		// finial: cherry fence, a lantern and a lightning rod
-		set(c, g.p, g.cx, topY + 1, g.cz, fence(g.s.fence(), false, false, false, false));
-		set(c, g.p, g.cx, topY + 2, g.cz, lantern());
-		set(c, g.p, g.cx, topY + 3, g.cz, b(Blocks.LIGHTNING_ROD.waxed().unaffected()));
-	}
-
-	// ------------------------------------------------------------------ porch, buttresses, yard
-
-	/** The front door: a lintel, a hood on posts, a step and hanging lanterns. */
-	private void porch(CitadelCanvas c, G g) {
-		int vd = g.cz - g.rr; // front-most wall cell at the centre column
-		while (!g.wall(g.cx, vd)) {
-			vd++;
-		}
-		int cu = g.cx;
-		set(c, g.p, cu, 1, vd, doorBlock(g, Direction.NORTH, true));
-		set(c, g.p, cu, 2, vd, doorBlock(g, Direction.NORTH, false));
-		// [depth] the doorway frame stands proud: log jambs and a lintel course
-		for (int side = -1; side <= 1; side += 2) {
-			for (int y = 1; y <= 2; y++) {
-				set(c, g.p, cu + side, y, vd - 1, log(g.s.log(), Direction.Axis.Y));
-			}
-			set(c, g.p, cu + side, 3, vd - 1, stair(g.s.eaveStair(), side < 0 ? Direction.EAST : Direction.WEST, true));
-			// planters on the ground (they used to float a block up, with a lantern hung inside the bush)
-			set(c, g.p, cu + side * 2, 0, vd - 1, b(Blocks.MOSS_BLOCK));
-			set(c, g.p, cu + side * 2, 1, vd - 1, side < 0 ? b(Blocks.FLOWERING_AZALEA) : b(Blocks.AZALEA));
-		}
-		set(c, g.p, cu, 3, vd - 1, stair(g.s.eaveStair(), Direction.SOUTH, true));
-		set(c, g.p, cu, 3, vd, stair(g.s.eaveStair(), Direction.SOUTH, false));
-		set(c, g.p, cu, 0, vd - 1, b(Blocks.POLISHED_DEEPSLATE));
-		set(c, g.p, cu, 0, vd - 2, stair(Blocks.DEEPSLATE_BRICK_STAIRS, Direction.SOUTH, false));
-		set(c, g.p, cu - 1, 0, vd - 1, slab(Blocks.POLISHED_DEEPSLATE_SLAB, false));
-		set(c, g.p, cu + 1, 0, vd - 1, slab(Blocks.POLISHED_DEEPSLATE_SLAB, false));
-	}
-
-	/** Buttress walls at the foot of the east, west and back faces. */
-	private void buttresses(CitadelCanvas c, G g) {
-		for (Direction dir : new Direction[] {Direction.EAST, Direction.WEST, Direction.SOUTH}) {
-			int dist = g.rr + 2;
-			int bu = g.cx + dir.getStepX() * dist;
-			int bv = g.cz + dir.getStepZ() * dist;
-			set(c, g.p, bu, 0, bv, b(Blocks.POLISHED_DEEPSLATE));
-			set(c, g.p, bu, 1, bv, wall(Blocks.DEEPSLATE_BRICK_WALL, false, false, false, false, true));
-			if (dir != Direction.SOUTH) {
-				set(c, g.p, bu, 2, bv, lantern()); // the yard's light, on the side buttress posts
-			}
-			for (int side = -1; side <= 1; side += 2) {
-				int su = bu + dir.getStepZ() * side;
-				int sv = bv + dir.getStepX() * side;
-				set(c, g.p, su, 0, sv, slab(Blocks.POLISHED_DEEPSLATE_SLAB, false));
-			}
 		}
 	}
 
-	private void yard(CitadelCanvas c, G g, Random r) {
-		// planted corners round the talus, deterministic by seed
-		for (int u = 0; u < g.w; u++) {
-			for (int v = 0; v < g.d; v++) {
-				if (g.in(u, v, g.rr + 3.2) && !g.in(u, v, g.rr + 1.6) && v > 0 && g.p.hash(u, 0, v, 3) == 0
-						&& !(Math.abs(u - g.cx) <= 1 && v < g.cz)) {
-					set(c, g.p, u, 0, v, b(Blocks.MOSS_BLOCK));
-					set(c, g.p, u, 1, v, g.p.hash(u, 1, v, 2) == 0 ? b(Blocks.FLOWERING_AZALEA) : b(Blocks.FERN));
+	private BlockState wallCell(G g, int u, int y, int v, boolean corner, boolean alongU, int t, boolean n, boolean e, boolean w) {
+		Scheme s = g.s;
+		if (corner) {
+			if (y <= 9) {
+				return y % 2 == 1 ? b(Blocks.POLISHED_DEEPSLATE) : b(Blocks.DEEPSLATE_BRICKS); // dark quoins up the corners
+			}
+			return y == 10 ? log(s.stripped(), Direction.Axis.Y) : log(s.log(), Direction.Axis.Y);
+		}
+		Direction.Axis ax = alongU ? Direction.Axis.X : Direction.Axis.Z;
+		if (y == 10) {
+			return log(s.stripped(), ax); // the beam under the lookout floor
+		}
+		if (y >= 11) {
+			return cabinCell(g, u, y, v, alongU, t, n, e, w, ax);
+		}
+		if (n && t == g.m && (y == 1 || y == 2)) {
+			return door(g, Direction.NORTH, y == 1);
+		}
+		if (n && Math.abs(t - g.m) == 1 && y <= 2) {
+			return log(s.log(), Direction.Axis.Y); // [depth] timber jambs
+		}
+		if (n && Math.abs(t - g.m) <= 1 && y == 3) {
+			return log(s.stripped(), Direction.Axis.X); // lintel
+		}
+		if (windowT(g, t) && (y == 2 || y == 3 || y == 7 || y == 8)) {
+			return pane(g.p.hash(u, y, v, 5) == 0 ? pinkPane() : Blocks.GLASS_PANE, alongU);
+		}
+		if (y <= 2) {
+			return deepslate(g.p, u, y, v);
+		}
+		if (y == F1) {
+			return b(Blocks.CHISELED_STONE_BRICKS);
+		}
+		if (y == 9) {
+			return b(Blocks.POLISHED_DEEPSLATE);
+		}
+		return stone(g.p, u, y, v);
+	}
+
+	private BlockState cabinCell(G g, int u, int y, int v, boolean alongU, int t, boolean n, boolean e, boolean w, Direction.Axis ax) {
+		Scheme s = g.s;
+		if (t == g.m - 1 || t == g.m + 1) {
+			return log(s.log(), Direction.Axis.Y);
+		}
+		if (y == EAVE) {
+			return log(s.stripped(), ax);
+		}
+		if (t == g.m && (n || e || w)) {
+			if (y == 11 || y == 12) {
+				return door(g, n ? Direction.NORTH : e ? Direction.EAST : Direction.WEST, y == 11);
+			}
+			return b(s.planks());
+		}
+		if (y == 11) {
+			return b(Blocks.STONE_BRICKS);
+		}
+		return pane(g.p.hash(u, y, v, 4) == 0 ? pinkPane() : Blocks.GLASS_PANE, alongU);
+	}
+
+	// ------------------------------------------------------------------ floors and stairs
+
+	private static boolean hole0(G g, int a, int bb) {
+		return a < g.k && bb >= g.k && bb <= g.k + 3;
+	}
+
+	private static boolean flight0End(G g, int a, int bb) {
+		return a < g.k && bb == g.k + 4;
+	}
+
+	private static boolean hole1(G g, int a, int bb) {
+		return bb >= g.in - g.k && a >= g.k && a <= g.k + 3;
+	}
+
+	private static boolean flight1End(G g, int a, int bb) {
+		return bb >= g.in - g.k && a == g.k + 4;
+	}
+
+	private void floors(CitadelCanvas c, G g) {
+		for (int a = 0; a < g.in; a++) {
+			for (int bb = 0; bb < g.in; bb++) {
+				if (!hole0(g, a, bb) && !flight0End(g, a, bb)) {
+					fi(c, g, a, F1, bb, b(Blocks.SPRUCE_PLANKS));
+				}
+				if (!hole1(g, a, bb) && !flight1End(g, a, bb)) {
+					fi(c, g, a, F2, bb, b(g.s.planks()));
 				}
 			}
 		}
-		// a barrel and a woodpile by the door
-		set(c, g.p, g.cx - 3, 0, g.cz - g.rr - 1, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
-		set(c, g.p, g.cx + 3, 0, g.cz - g.rr - 1, log(Blocks.STRIPPED_SPRUCE_LOG, Direction.Axis.Z));
-		// (a shutter trapdoor used to replace the upper half of the west door jamb here: removed)
+	}
+
+	/** Two masonry flights of five steps; the step cells are solid beneath, so nobody walks under a low ceiling. */
+	private void stairs(CitadelCanvas c, G g) {
+		for (int j = 1; j <= 5; j++) {
+			for (int lane = 0; lane < g.k; lane++) {
+				// flight 1: west wall, going south, from the ground floor to y5
+				int u0 = g.iu(lane);
+				int v0 = g.iv(g.k + j - 1);
+				set(c, g.p, u0, j, v0, stair(Blocks.STONE_BRICK_STAIRS, Direction.SOUTH, false));
+				for (int y = 1; y < j; y++) {
+					set(c, g.p, u0, y, v0, stone(g.p, u0, y, v0));
+				}
+				// flight 2: south wall, going east, from y5 to y10
+				int u1 = g.iu(g.k + j - 1);
+				int v1 = g.iv(g.in - g.k + lane);
+				set(c, g.p, u1, F1 + j, v1, stair(Blocks.STONE_BRICK_STAIRS, Direction.EAST, false));
+				for (int y = F1 + 1; y < F1 + j; y++) {
+					set(c, g.p, u1, y, v1, stone(g.p, u1, y, v1));
+				}
+			}
+		}
+	}
+
+	// ------------------------------------------------------------------ balcony
+
+	private void balcony(CitadelCanvas c, G g) {
+		for (int u = g.ox; u < g.ox + g.rw; u++) {
+			for (int v = 0; v < g.rw; v++) {
+				int d = g.dist(u, v);
+				if (d < 1 || d > 2) {
+					continue;
+				}
+				boolean corner = g.corner(u, v);
+				Direction to = g.toward(u, v);
+				int t = g.along(u, v);
+				boolean entry = !corner && to == Direction.SOUTH && Math.abs(t - g.m) <= 1;
+				// [depth] the corbels under the deck: stairs against the wall, a top slab on the outer edge
+				if (entry) {
+					set(c, g.p, u, 9, v, log(g.s.stripped(), Direction.Axis.X));
+				} else if (d == 1) {
+					set(c, g.p, u, 9, v, stair(Blocks.POLISHED_DEEPSLATE_STAIRS, to, true));
+				} else {
+					set(c, g.p, u, 9, v, slab(Blocks.POLISHED_DEEPSLATE_SLAB, true));
+				}
+				if (d == 2) {
+					Direction.Axis ax = to == Direction.NORTH || to == Direction.SOUTH ? Direction.Axis.X : Direction.Axis.Z;
+					set(c, g.p, u, F2, v, log(g.s.stripped(), ax));
+					boolean post = corner || Math.abs(t - g.m) == 2;
+					if (post) {
+						for (int y = 11; y <= 13; y++) {
+							set(c, g.p, u, y, v, log(g.s.log(), Direction.Axis.Y));
+						}
+					} else {
+						set(c, g.p, u, 11, v, fence(g.s.fence(), g.outer(u, v - 1), g.outer(u + 1, v), g.outer(u, v + 1), g.outer(u - 1, v)));
+					}
+				} else {
+					set(c, g.p, u, F2, v, b(g.s.planks()));
+				}
+			}
+		}
+		// the spyglasses: a copper tube on the rail, one east and one south; lanterns hang over the front and west rails
+		int eu = g.ox + g.rw - 1;
+		int ev = g.v0 + g.m;
+		set(c, g.p, eu, 12, ev, b(Blocks.LIGHTNING_ROD.waxed().unaffected()).setValue(BlockStateProperties.FACING, Direction.EAST));
+		int su = g.u0 + g.m;
+		int sv = g.rw - 1;
+		set(c, g.p, su, 12, sv, b(Blocks.LIGHTNING_ROD.waxed().unaffected()).setValue(BlockStateProperties.FACING, Direction.SOUTH));
+		put(c, g.p, g.u0 + g.m, 13, 0, hangingLantern(), CitadelCanvas.HANGING);
+		put(c, g.p, g.ox, 13, g.v0 + g.m, hangingLantern(), CitadelCanvas.HANGING);
+		// portico lanterns under the front beam, either side of the steps
+		put(c, g.p, g.u0 + g.m - 1, 8, 1, hangingLantern(), CitadelCanvas.HANGING);
+		put(c, g.p, g.u0 + g.m + 1, 8, 1, hangingLantern(), CitadelCanvas.HANGING);
+	}
+
+	// ------------------------------------------------------------------ roof
+
+	/** A hip roof: stair rims round solid layers, one block in per layer; the eave ring rides on the balcony posts. */
+	private void roof(CitadelCanvas c, G g) {
+		int size = g.rw;
+		for (int l = 0; size >= 3; l++, size -= 2) {
+			int y = EAVE + l;
+			int umin = g.ox + l;
+			int umax = g.ox + g.rw - 1 - l;
+			int vmin = l;
+			int vmax = g.rw - 1 - l;
+			boolean crown = size <= 5;
+			for (int u = umin; u <= umax; u++) {
+				for (int v = vmin; v <= vmax; v++) {
+					if (l == 0 && g.dist(u, v) == 0) {
+						continue; // the cabin stays open up to its beam
+					}
+					boolean cu = u == umin || u == umax;
+					boolean cv = v == vmin || v == vmax;
+					if (!cu && !cv) {
+						set(c, g.p, u, y, v, b(crown ? g.s.crownBlock() : g.s.roofBlock()));
+						continue;
+					}
+					Block sb = l == 0 ? g.s.eaveStair() : crown ? g.s.crownStair() : g.s.roofStair();
+					Direction fx = u == umin ? Direction.EAST : Direction.WEST;
+					Direction fz = v == vmin ? Direction.SOUTH : Direction.NORTH;
+					if (cu && cv) {
+						StairsShape shape = fz == fx.getCounterClockWise() ? StairsShape.OUTER_LEFT : StairsShape.OUTER_RIGHT;
+						set(c, g.p, u, y, v, stair(sb, fx, false).setValue(BlockStateProperties.STAIRS_SHAPE, shape));
+					} else {
+						set(c, g.p, u, y, v, stair(sb, cu ? fx : fz, false));
+					}
+				}
+			}
+			if (size == 3) {
+				set(c, g.p, (umin + umax) / 2, y + 1, (vmin + vmax) / 2, b(Blocks.LIGHTNING_ROD.waxed().unaffected()));
+			}
+		}
+	}
+
+	// ------------------------------------------------------------------ furniture
+
+	private static BlockState bed(Direction head, boolean isHead) {
+		return b(Blocks.PINK_BED).setValue(BlockStateProperties.HORIZONTAL_FACING, head)
+				.setValue(BlockStateProperties.BED_PART, isHead ? BedPart.HEAD : BedPart.FOOT);
+	}
+
+	private void furnish(CitadelCanvas c, G g) {
+		int in = g.in;
+		int k = g.k;
+		int cc = g.c;
+		// ---- ground floor, the guard room: stores along the east wall, a workbench row on the south wall, a bench by the door
+		fi(c, g, in - 1, 1, 1, barrel());
+		fi(c, g, in - 1, 1, 2, barrel());
+		fi(c, g, in - 1, 1, 3, facing(Blocks.CHEST, Direction.WEST));
+		fi(c, g, cc - 1, 1, in - 1, b(Blocks.CRAFTING_TABLE));
+		fi(c, g, cc, 1, in - 1, facing(Blocks.FURNACE, Direction.NORTH));
+		fi(c, g, cc + 1, 1, in - 1, b(Blocks.SMITHING_TABLE));
+		fi(c, g, cc + 2, 1, 0, stair(g.s.eaveStair(), Direction.NORTH, false));
+		fi(c, g, cc + 3, 1, 0, barrel());
+		put(c, g.p, g.iu(cc), 4, g.iv(cc), hangingLantern(), CitadelCanvas.HANGING);
+
+		// ---- first floor, the watch room: a wall of shelves, a reading desk, two bunks, stores; a parapet round the stair well
+		for (int a = cc - 2; a <= cc + 2; a++) {
+			fi(c, g, a, F1 + 1, 0, b(Blocks.BOOKSHELF));
+		}
+		fi(c, g, cc, F1 + 1, 1, facing(Blocks.LECTERN, Direction.SOUTH).setValue(BlockStateProperties.HAS_BOOK, true));
+		for (int bb : new int[] {2, 4}) {
+			fi(c, g, in - 2, F1 + 1, bb, bed(Direction.EAST, false));
+			fi(c, g, in - 1, F1 + 1, bb, bed(Direction.EAST, true));
+		}
+		fi(c, g, in - 1, F1 + 1, 1, barrel());
+		fi(c, g, in - 1, F1 + 1, 3, facing(Blocks.CHEST, Direction.WEST));
+		fi(c, g, in - 1, F1 + 1, 5, barrel());
+		for (int bb = k; bb <= k + 3; bb++) {
+			fi(c, g, k, F1 + 1, bb, b(Blocks.BOOKSHELF));
+		}
+		for (int a = 0; a < k; a++) {
+			fi(c, g, a, F1 + 1, k - 1, barrel());
+		}
+		put(c, g.p, g.iu(cc), 9, g.iv(cc), hangingLantern(), CitadelCanvas.HANGING);
+
+		// ---- the lookout cabin: a map table in the middle, benches under the windows, a parapet round the stair well
+		fi(c, g, cc, F2 + 1, cc, b(Blocks.CARTOGRAPHY_TABLE));
+		for (int a = k; a <= k + 3; a++) {
+			fi(c, g, a, F2 + 1, in - k - 1, a % 2 == 0 ? barrel() : facing(Blocks.CHEST, Direction.NORTH));
+		}
+		for (int a = 0; a < k; a++) {
+			for (int bb = in - k; bb < in; bb++) {
+				fi(c, g, a, F2 + 1, bb, barrel());
+			}
+		}
+		for (int a = 1; a <= in - 2; a++) {
+			if (a != cc) {
+				fi(c, g, a, F2 + 1, 0, stair(g.s.eaveStair(), Direction.NORTH, false));
+			}
+		}
+		for (int bb = 1; bb < cc; bb++) {
+			fi(c, g, in - 1, F2 + 1, bb, stair(g.s.eaveStair(), Direction.EAST, false));
+			fi(c, g, 0, F2 + 1, bb, stair(g.s.eaveStair(), Direction.WEST, false));
+		}
+		put(c, g.p, g.iu(cc - 1), 14, g.iv(cc + 1), hangingLantern(), CitadelCanvas.HANGING);
+	}
+
+	// ------------------------------------------------------------------ yard
+
+	private void yard(CitadelCanvas c, G g) {
+		int eu = g.u0 + g.m;
+		// the portico steps: a polished slab, then three stairs head-on to the door
+		for (int dx = -1; dx <= 1; dx++) {
+			set(c, g.p, eu + dx, 0, 0, slab(Blocks.POLISHED_DEEPSLATE_SLAB, false));
+			set(c, g.p, eu + dx, 0, 1, stair(Blocks.DEEPSLATE_BRICK_STAIRS, Direction.SOUTH, false));
+		}
+		// planters either side of the steps and shrubs at the four corners
+		for (int side = -1; side <= 1; side += 2) {
+			set(c, g.p, eu + side * 3, 0, 0, b(Blocks.MOSS_BLOCK));
+			set(c, g.p, eu + side * 3, 1, 0, side < 0 ? b(Blocks.FLOWERING_AZALEA) : b(Blocks.AZALEA));
+		}
+		int[][] corners = {{g.ox, 0}, {g.ox + g.rw - 1, 0}, {g.ox, g.rw - 1}, {g.ox + g.rw - 1, g.rw - 1}};
+		for (int[] q : corners) {
+			set(c, g.p, q[0], 0, q[1], b(Blocks.MOSS_BLOCK));
+			set(c, g.p, q[0], 1, q[1], g.p.hash(q[0], 1, q[1], 2) == 0 ? b(Blocks.FLOWERING_AZALEA) : b(Blocks.FERN));
+		}
+		// a barrel and a woodpile by the back wall
+		set(c, g.p, g.u0 + 1, 0, g.v1 + 2, barrel());
+		set(c, g.p, g.u1 - 1, 0, g.v1 + 2, log(Blocks.STRIPPED_SPRUCE_LOG, Direction.Axis.X));
 	}
 }
