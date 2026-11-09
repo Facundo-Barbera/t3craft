@@ -35,7 +35,7 @@ import net.minecraft.world.level.block.state.BlockState;
  *
  * <pre>
  * ./gradlew hqRender                                  # every view, default style, into build/hq-render
- * ./gradlew hqRender -PhqArgs="--style classic --only full"
+ * ./gradlew hqRender -PhqArgs="--style cherry --only full"
  * </pre>
  *
  * Options: {@code --out DIR}, {@code --style ID}, {@code --only SUBSTR} (comma-separated view-name
