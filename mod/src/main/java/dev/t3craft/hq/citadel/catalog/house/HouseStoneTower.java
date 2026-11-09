@@ -61,8 +61,8 @@ public final class HouseStoneTower implements Variant {
 	private static final Block[] ROOF_STAIR = {Blocks.DEEPSLATE_TILE_STAIRS, Blocks.BRICK_STAIRS, Blocks.MUD_BRICK_STAIRS};
 	private static final Block[] ROOF_FILL = {Blocks.DEEPSLATE_TILES, Blocks.BRICKS, Blocks.MUD_BRICKS};
 	private static final Block[] EAVE_STAIR = {Blocks.CHERRY_STAIRS, Blocks.DEEPSLATE_BRICK_STAIRS, Blocks.DEEPSLATE_TILE_STAIRS};
-	private static final Block[] CAP_STAIR = {Blocks.CHERRY_STAIRS, Blocks.DEEPSLATE_TILE_STAIRS, Blocks.DEEPSLATE_TILE_STAIRS};
-	private static final Block[] CAP_FILL = {Blocks.CHERRY_PLANKS, Blocks.DEEPSLATE_TILES, Blocks.DEEPSLATE_TILES};
+	private static final Block[] CAP_STAIR = ROOF_STAIR; // dormer gables roof in the main roof's own material
+	private static final Block[] CAP_FILL = ROOF_FILL;
 	private static final Block[] ROOF_SLAB = {Blocks.DEEPSLATE_TILE_SLAB, Blocks.BRICK_SLAB, Blocks.MUD_BRICK_SLAB};
 	private static final Block[] FLOWERS = {Blocks.POPPY, Blocks.CORNFLOWER, Blocks.AZURE_BLUET, Blocks.ALLIUM, Blocks.DANDELION, Blocks.FERN};
 
@@ -489,10 +489,11 @@ public final class HouseStoneTower implements Variant {
 					wl.set(tt, y + 2, 0, stUp(Blocks.DEEPSLATE_BRICK_STAIRS, along(wl, sign)));
 				}
 			}
-			// [depth] a pale sill block with a diorite stair jutting out under it, and a cherry hood over the lintel band
+			// [depth] a pale sill block with an upside-down diorite stair jutting out under it (nothing to stand on), and a
+			// dark upside-down stair hood over the lintel band
 			wl.set(t, y - 1, 0, b(Blocks.POLISHED_DIORITE));
-			setFreeWall(wl, t, y - 1, 1, wl.stairIn(Blocks.POLISHED_DIORITE_STAIRS, false));
-			setFreeWall(wl, t, y + 3, 1, wl.stairIn(Blocks.CHERRY_STAIRS, true));
+			setFreeWall(wl, t, y - 1, 1, wl.stairIn(Blocks.POLISHED_DIORITE_STAIRS, true));
+			setFreeWall(wl, t, y + 3, 1, wl.stairIn(Blocks.DEEPSLATE_BRICK_STAIRS, true));
 			if (shutters && p.hash(wl.u(t, 0), y, wl.v(t, 0), 3) == 0) {
 				for (int sign : new int[] {-1, 1}) {
 					if (!solidCorner(wl, t + sign)) {
@@ -680,13 +681,15 @@ public final class HouseStoneTower implements Variant {
 			int[][] corners = {{cu0, cv0, -1, -1}, {cu1, cv0, 1, -1}, {cu0, cv1, -1, 1}, {cu1, cv1, 1, 1}};
 			for (int[] k : corners) {
 				int[][] cells = {{k[0] + k[2], k[1]}, {k[0] + k[2], k[1] + k[3]}, {k[0], k[1] + k[3]}};
-				for (int[] cell : cells) {
+				for (int ci = 0; ci < cells.length; ci++) {
+					int[] cell = cells[ci];
 					if (onAnnex(cell[0], cell[1])) {
 						continue;
 					}
 					for (int y = 0; y <= 13; y++) {
+						// the diagonal cell is the deepslate spine; the two flanks are stone, so the buttress is not a black slab
 						BlockState s = y <= 1 ? b(Blocks.POLISHED_DEEPSLATE) : y == 13 ? b(Blocks.DEEPSLATE_BRICKS)
-								: quoin(cell[0], y, cell[1]);
+								: ci == 1 ? quoin(cell[0], y, cell[1]) : body(cell[0], y, cell[1]);
 						if (y == F1 || y == F2) {
 							s = b(Blocks.DEEPSLATE_BRICKS);
 						}
@@ -729,7 +732,7 @@ public final class HouseStoneTower implements Variant {
 				boolean edge = Math.abs(du) == half;
 				Direction towardsMiddle = du < 0 ? Direction.EAST : Direction.WEST;
 				set(u, DECK + 1, v, b(Blocks.POLISHED_DIORITE));
-				set(u, DECK + 2, v, edge ? b(Blocks.DEEPSLATE_BRICKS) : glass());
+				set(u, DECK + 2, v, edge ? b(Blocks.STONE_BRICKS) : glass());
 				for (int row = 0; row <= 1; row++) {
 					int vv = v + row * dv;
 					BlockState gable = edge ? stairs(capStair, towardsMiddle) : row == 0 ? b(Blocks.POLISHED_DIORITE) : b(capFill);
