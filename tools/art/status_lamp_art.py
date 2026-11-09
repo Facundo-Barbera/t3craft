@@ -15,8 +15,8 @@ Design (a thread's state has to read at a glance and from afar: colour + silhoue
                            done  plain green lens with a check mark, steady
                            attention  8-wide lens + 4 horns (a siren star), orange "!" that blinks slowly
                            error  wide squat lens + 8 claws (crown of spikes), red X that blinks fast
-  * texture layout (16 px wide; frame = 16x16): rows 0-1 bright strip (band), rows 2-3 plain lens colour (flares,
-    spikes, top faces), rows 4-12 the glyph crop each model face points at. Frame 0 is the "lit" one (renders show it).
+  * texture layout (16 px wide; frame = 16x16): rows 0-1 bright strip (band), row 2 plain lens colour (flares,
+    spikes, top faces), rows 3-13 the glyph crop each model face points at. Frame 0 is the "lit" one (renders show it).
 """
 import json
 import os
@@ -67,18 +67,18 @@ GLYPHS = {
     "x": ["##..##", ".####.", "..##..", "..##..", ".####.", "##..##"],
     "pause": ["#..#", "#..#", "#..#", "#..#"],
 }
-# 4x4 ring, clockwise from the top-left corner
-RING = [(0, 0), (1, 0), (2, 0), (3, 0), (3, 1), (3, 2), (3, 3), (2, 3), (1, 3), (0, 3), (0, 2), (0, 1)]
+# 6x6 ring, clockwise from the top-left corner (20 px)
+RING = [(i, 0) for i in range(6)] + [(5, j) for j in range(1, 6)] + [(i, 5) for i in range(4, -1, -1)] + [(0, j) for j in range(4, 0, -1)]
 
 # state -> lens crop (x0, y0, x1, y1) in texture px = lens face size in model px (1:1 texel density)
 # name: (colour, crop, frames, frametime)
 STATES = {
-    "off": (0x2A2A2A, (5, 4, 11, 12), 1, 0),
-    "idle": (0xAAAAAA, (6, 4, 10, 12), 1, 0),
-    "working": (0x55FFFF, (5, 4, 11, 12), 4, 3),
-    "attention": (0xFFAA00, (4, 4, 12, 12), 2, 12),
-    "error": (0xFF5555, (3, 4, 13, 12), 2, 5),
-    "done": (0x55FF55, (5, 4, 11, 12), 1, 0),
+    "off": (0x2A2A2A, (5, 3, 11, 13), 1, 0),
+    "idle": (0xAAAAAA, (6, 3, 10, 13), 1, 0),
+    "working": (0x55FFFF, (4, 3, 12, 13), 4, 3),
+    "attention": (0xFFAA00, (3, 3, 13, 13), 2, 12),
+    "error": (0xFF5555, (2, 3, 14, 13), 2, 5),
+    "done": (0x55FF55, (4, 3, 12, 13), 1, 0),
 }
 
 
@@ -121,10 +121,10 @@ def lens_frame(name, f):
                 if ch == "#":
                     img[oy + j][ox + i] = px(glyph_col)
     if name == "working":
-        ox = int(round(cx - 2))
-        oy = int(round(cy - 2))
+        ox = int(round(cx - 3))
+        oy = int(round(cy - 3))
         for k, (i, j) in enumerate(RING):
-            head = ((k - 3 * f) % 12) < 4
+            head = ((k - 5 * f) % 20) < 7
             img[oy + j][ox + i] = px(glyph_col if head else darken(c, 0.62))
     return img
 
@@ -186,11 +186,11 @@ def element(frm, to, kind, crop=None, emit=0, skip=()):
             faces[fc] = {"texture": "#base", "uv": [0, 1, 2, 4]}
         elif kind == "lens":
             if fc in ("up", "down"):
-                faces[fc] = {"texture": "#lens", "uv": [0, 2, 2, 4]}
+                faces[fc] = {"texture": "#lens", "uv": [0, 2, 2, 3]}
             else:
                 faces[fc] = {"texture": "#lens", "uv": list(crop)}
         elif kind == "plain":
-            faces[fc] = {"texture": "#lens", "uv": [0, 2, 2, 4]}
+            faces[fc] = {"texture": "#lens", "uv": [0, 2, 2, 3]}
         else:
             faces[fc] = {"texture": "#lens", "uv": [0, 0, 2, 2]}
     e = {"from": list(frm), "to": list(to), "faces": faces}
@@ -203,10 +203,10 @@ def body():
     """Caps and gold rings, symmetric about y = 8."""
     return [
         element([4, 0, 4], [12, 1, 12], "steel"),
-        element([5, 1, 5], [11, 3, 11], "steel"),
-        element([4.5, 3, 4.5], [11.5, 4, 11.5], "gold"),
-        element([4.5, 12, 4.5], [11.5, 13, 11.5], "gold"),
-        element([5, 13, 5], [11, 15, 11], "steel"),
+        element([5, 1, 5], [11, 2, 11], "steel"),
+        element([4.5, 2, 4.5], [11.5, 3, 11.5], "gold"),
+        element([4.5, 13, 4.5], [11.5, 14, 11.5], "gold"),
+        element([5, 14, 5], [11, 15, 11], "steel"),
         element([4, 15, 4], [12, 16, 12], "steel"),
     ]
 
@@ -216,27 +216,26 @@ def model(name):
     emit = {"off": 0, "idle": 7, "working": 13, "attention": 15, "error": 15, "done": 11}[name]
     els = body()
     x0, y0, x1, y1 = crop
-    lens = element([x0, 4, x0], [x1, 12, x1], "lens", crop=crop, emit=emit, skip=("up", "down") if x1 - x0 <= 7 else ())
-    # lens boxes are square in plan: x0..x1 on both axes except the crop's width vs depth (all states are square)
-    els.append(lens)
+    # lens: square in plan, y 3..13; the rings are as wide as the narrow lenses, so those hide their up/down faces
+    els.append(element([x0, 3, x0], [x1, 13, x1], "lens", crop=crop, emit=emit, skip=("up", "down") if x1 - x0 <= 7 else ()))
     if name == "working":
-        els.append(element([4, 7, 4], [12, 9, 12], "bright", emit=emit))
+        els.append(element([x0 - 1, 7, x0 - 1], [x1 + 1, 9, x1 + 1], "bright", emit=emit))
     elif name == "attention":
         # four horns with a tip: a siren star
         els += [
-            element([12, 6, 7], [15, 10, 9], "plain", emit=emit), element([15, 7, 7.5], [16, 9, 8.5], "bright", emit=emit),
-            element([1, 6, 7], [4, 10, 9], "plain", emit=emit), element([0, 7, 7.5], [1, 9, 8.5], "bright", emit=emit),
-            element([7, 6, 1], [9, 10, 4], "plain", emit=emit), element([7.5, 7, 0], [8.5, 9, 1], "bright", emit=emit),
-            element([7, 6, 12], [9, 10, 15], "plain", emit=emit), element([7.5, 7, 15], [8.5, 9, 16], "bright", emit=emit),
+            element([13, 6, 7], [15, 10, 9], "plain", emit=emit), element([15, 7, 7.5], [16, 9, 8.5], "bright", emit=emit),
+            element([1, 6, 7], [3, 10, 9], "plain", emit=emit), element([0, 7, 7.5], [1, 9, 8.5], "bright", emit=emit),
+            element([7, 6, 1], [9, 10, 3], "plain", emit=emit), element([7.5, 7, 0], [8.5, 9, 1], "bright", emit=emit),
+            element([7, 6, 13], [9, 10, 15], "plain", emit=emit), element([7.5, 7, 15], [8.5, 9, 16], "bright", emit=emit),
         ]
     elif name == "error":
-        # eight claws, four up and four down, at the corners of the squat lens
-        for cx in (3, 11):
-            for cz in (3, 11):
-                els.append(element([cx, 12, cz], [cx + 2, 14, cz + 2], "plain", emit=emit))
-                els.append(element([cx + 0.5, 14, cz + 0.5], [cx + 1.5, 16, cz + 1.5], "bright", emit=emit))
-                els.append(element([cx, 2, cz], [cx + 2, 4, cz + 2], "plain", emit=emit))
-                els.append(element([cx + 0.5, 0, cz + 0.5], [cx + 1.5, 2, cz + 1.5], "bright", emit=emit))
+        # eight claws, four up and four down, at the corners of the wide squat lens
+        for cx in (2, 12):
+            for cz in (2, 12):
+                els.append(element([cx, 13, cz], [cx + 2, 15, cz + 2], "plain", emit=emit))
+                els.append(element([cx + 0.5, 15, cz + 0.5], [cx + 1.5, 16, cz + 1.5], "bright", emit=emit))
+                els.append(element([cx, 1, cz], [cx + 2, 3, cz + 2], "plain", emit=emit))
+                els.append(element([cx + 0.5, 0, cz + 0.5], [cx + 1.5, 1, cz + 1.5], "bright", emit=emit))
     return {
         "parent": "minecraft:block/block",
         "textures": {"base": "t3craft:block/status_lamp_base", "lens": "t3craft:block/status_lamp_%s" % name, "particle": "t3craft:block/status_lamp_base"},

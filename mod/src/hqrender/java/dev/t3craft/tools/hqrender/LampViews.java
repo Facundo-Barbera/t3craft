@@ -72,14 +72,14 @@ final class LampViews {
 		int n = ORDER.length;
 		int x2 = (n - 1) * STRIDE + 3;
 		BlockModels models = new BlockModels();
-		Scene scene = new Scene(models, -3, -2, -3, x2 + 2, 7, 8);
+		Scene scene = new Scene(models, -3, -2, -7, x2 + 2, 9, 8);
 		BlockState floor = kit.state(HqKit.Role.FLOOR, Direction.NORTH);
 		BlockState stone = kit.state(HqKit.Role.FLOOR_ACCENT, Direction.NORTH);
 		BlockState dirt = Blocks.DIRT.defaultBlockState();
 		for (int x = scene.minX; x < scene.minX + scene.sx; x++) {
 			for (int z = scene.minZ; z < scene.minZ + scene.sz; z++) {
 				scene.set(new BlockPos(x, -1, z), dirt);
-				boolean deck = x >= -1 && x <= x2 && z >= -1 && z <= 6;
+				boolean deck = x >= -1 && x <= x2 && z >= -5 && z <= 6;
 				scene.set(new BlockPos(x, 0, z), deck ? (z == 2 ? stone : floor) : Blocks.GRASS_BLOCK.defaultBlockState());
 			}
 		}
@@ -95,27 +95,29 @@ final class LampViews {
 				}
 			}
 			scene.set(new BlockPos(x0 + 1, 4, 0), k.lamp().setValue(StatusLampBlock.STATUS, ORDER[i]));
-			// the hanging one (beacon style), on the row behind the label strip
-			scene.set(new BlockPos(x0 + 1, 3, 5), k.lamp().setValue(StatusLampBlock.STATUS, ORDER[i]));
-			scene.set(new BlockPos(x0 + 1, 4, 5), Blocks.IRON_CHAIN.defaultBlockState());
+			// the hanging one (beacon style), on a row behind the desks and above their screens
+			scene.set(new BlockPos(x0 + 1, 6, -4), k.lamp().setValue(StatusLampBlock.STATUS, ORDER[i]));
+			scene.set(new BlockPos(x0 + 1, 7, -4), Blocks.IRON_CHAIN.defaultBlockState());
 			labels.add(new Object[] {LABEL[i], new double[] {x0 + 1.5, 1, 3.4}});
 		}
 		// the beam the lamps hang from, on two posts
 		for (int x = -1; x <= x2; x++) {
-			scene.set(new BlockPos(x, 5, 5), kit.state(HqKit.Role.BEAM, Direction.EAST));
+			scene.set(new BlockPos(x, 8, -4), kit.state(HqKit.Role.BEAM, Direction.EAST));
 		}
-		for (int y = 1; y <= 4; y++) {
-			scene.set(new BlockPos(-1, y, 5), kit.state(HqKit.Role.BEAM, Direction.UP));
-			scene.set(new BlockPos(x2, y, 5), kit.state(HqKit.Role.BEAM, Direction.UP));
+		for (int y = 1; y <= 7; y++) {
+			scene.set(new BlockPos(-1, y, -4), kit.state(HqKit.Role.BEAM, Direction.UP));
+			scene.set(new BlockPos(x2, y, -4), kit.state(HqKit.Role.BEAM, Direction.UP));
 		}
 
 		Renderer.Clip all = new Renderer.Clip(scene.minX, -1, scene.minZ, scene.minX + scene.sx - 1, 6, scene.minZ + scene.sz - 1);
-		Renderer.Clip mid = new Renderer.Clip(2 * STRIDE - 1, -1, -2, 4 * STRIDE + 3, 6, 6);
+		Renderer.Clip mid = new Renderer.Clip(2 * STRIDE - 1, -1, -2, 4 * STRIDE + 3, 6, 3);
+		Renderer.Clip hang = new Renderer.Clip(-1, 4, -6, x2, 9, -3);
 		double iso = Math.min(48, 1300.0 / ((scene.sx + scene.sz) * 0.75)) * scaleMul;
 		List<Object[]> views = new ArrayList<>();
 		views.add(new Object[] {"iso_se", "from the south-east", all, new Renderer.Camera(35, 28, iso), 1});
 		views.add(new Object[] {"front", "from the front, eye level of a player 6 blocks away", all, new Renderer.Camera(8, 12, iso), 1});
 		views.add(new Object[] {"closeup", "working, needs you, error up close", mid, new Renderer.Camera(28, 20, iso * 2.2), 1});
+		views.add(new Object[] {"hang", "hanging from a chain (the hub beacon)", hang, new Renderer.Camera(25, 14, iso * 1.3), 1});
 		// far: about 50 and 100 blocks away on a 1080p screen (70° FOV: 1080 / (1.4 d) px per block), enlarged ×4
 		views.add(new Object[] {"far_50", "as seen from ~50 blocks (15 px/block, shown x4)", all, new Renderer.Camera(35, 20, 15), 4});
 		views.add(new Object[] {"far_100", "as seen from ~100 blocks (8 px/block, shown x4)", all, new Renderer.Camera(35, 20, 8), 4});
