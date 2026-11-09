@@ -162,6 +162,18 @@ public final class AnchorNames {
 		return "desk_" + threadId;
 	}
 
+	/** Prefix of {@link #leadSeat}. */
+	public static final String LEAD_SEAT = "leadseat_";
+
+	/**
+	 * feat/lead-review-walk: visitor seat {@code k} of lead {@code leadNpcId}'s office (a chair cell, the
+	 * occupant facing the lead's desk). Children waiting for the lead's review sit there, lowest {@code k}
+	 * first. Not a {@link #standing} anchor (the cell holds the chair block), so plan validators skip it.
+	 */
+	public static String leadSeat(String leadNpcId, int k) {
+		return LEAD_SEAT + leadNpcId + "#" + k;
+	}
+
 	/** Centre of the front face of a thread's monitor block. */
 	public static String monitor(String threadId) {
 		return "monitor_" + threadId;

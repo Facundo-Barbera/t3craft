@@ -84,4 +84,17 @@ public interface AnchorSource {
 	default List<Pos> sights() {
 		return List.of();
 	}
+
+	/** feat/lead-review-walk: a place to wait for a lead's review; {@code sit} = in front of a chair (crouch there). */
+	record ReviewSeat(Anchor spot, boolean sit) {
+	}
+
+	/**
+	 * feat/lead-review-walk: where children waiting for lead {@code leadNpcId}'s review go, best first: the
+	 * office's visitor chairs, then spots in front of its door. Empty = none known (the {@link ReviewWalk}
+	 * then uses spots in front of the lead's desk). Cached by the implementation: called every tick.
+	 */
+	default List<ReviewSeat> reviewSeats(String leadNpcId) {
+		return List.of();
+	}
 }

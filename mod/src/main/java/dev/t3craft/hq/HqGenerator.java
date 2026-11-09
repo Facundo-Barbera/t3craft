@@ -272,6 +272,10 @@ public final class HqGenerator {
 		for (int slot = 0; slot < w.capacity(); slot++) {
 			desk(b, i, slot, w.threadAt(slot), office ? accent : null);
 		}
+		if (office && w.leadNpcId() != null && w.threadAt(1) == null) {
+			// feat/lead-review-walk: the visitors' chairs, where children awaiting the lead's review sit
+			LeadOfficeRoom.seats(i, w.leadNpcId()).forEach(b::anchor);
+		}
 		boolean first = layout.modulesOf(w.projectKey()).get(0) == w;
 		Anchor door = Anchor.at(AnchorNames.module(i), new BlockPos(HqGeometry.wx(i, 1), 1, HqGeometry.wz(i, (DOOR_V1 + DOOR_V2) / 2)),
 				HqGeometry.outward(i));

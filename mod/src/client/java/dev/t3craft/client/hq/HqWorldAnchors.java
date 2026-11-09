@@ -215,4 +215,45 @@ public final class HqWorldAnchors implements AnchorSource {
 	public @Nullable Anchor rest(String npcId, String groupId) {
 		return benches.isEmpty() ? lobby(npcId) : benches.get(Math.floorMod(npcId.hashCode(), benches.size()));
 	}
+
+	/** feat/lead-review-walk: {@link #reviewSeats} per lead, computed once per instance (a new plan or build state makes a new one). */
+	private final java.util.Map<String, List<ReviewSeat>> reviewSeats = new java.util.HashMap<>();
+
+	/**
+	 * feat/lead-review-walk: the lead office's visitor chairs ({@code leadseat_<id>#k}, built ones), then
+	 * three spots outside the office's door ({@code module@<i>} of the lead's desk module), facing in.
+	 * Empty when the lead has no built desk.
+	 */
+	@Override
+	public List<ReviewSeat> reviewSeats(String leadNpcId) {
+		return reviewSeats.computeIfAbsent(leadNpcId, this::computeReviewSeats);
+	}
+
+	private List<ReviewSeat> computeReviewSeats(String lead) {
+		if (!deskBuilt(lead)) {
+			return List.of();
+		}
+		List<ReviewSeat> out = new ArrayList<>();
+		for (int k = 0;; k++) {
+			dev.t3craft.hq.Anchor a = plan.anchor(AnchorNames.leadSeat(lead, k));
+			if (a == null) {
+				break;
+			}
+			if (HqSiteFrame.builds(a.block()) && standsAt(a.block())) {
+				out.add(new ReviewSeat(HqAnchorSource.convert(site.anchor(a)), true));
+			}
+		}
+		Workstation w = plan.workstation(lead);
+		dev.t3craft.hq.Anchor door = w == null ? null : plan.anchor(AnchorNames.module(w.module()));
+		if (door != null) {
+			net.minecraft.core.Direction in = door.facing();
+			net.minecraft.core.BlockPos outside = door.block().relative(in.getOpposite(), 2);
+			for (net.minecraft.core.BlockPos p : List.of(outside, outside.relative(in.getClockWise()), outside.relative(in.getCounterClockWise()))) {
+				if (HqSiteFrame.builds(p) && standsAt(p)) {
+					out.add(new ReviewSeat(HqAnchorSource.convert(site.anchor(dev.t3craft.hq.Anchor.at(door.name(), p, in))), false));
+				}
+			}
+		}
+		return List.copyOf(out);
+	}
 }

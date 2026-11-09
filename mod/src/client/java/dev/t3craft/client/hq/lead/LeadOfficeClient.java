@@ -7,6 +7,8 @@ import dev.t3craft.hq.lead.LeadRoster;
 import dev.t3craft.t3.LeadSignals;
 import dev.t3craft.t3.NpcView;
 import dev.t3craft.t3.ShellState;
+import dev.t3craft.t3.ThreadShell;
+import dev.t3craft.t3.ThreadState;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -35,6 +37,8 @@ public final class LeadOfficeClient {
 
 	private static final LeadDetector DETECTOR = new LeadDetector();
 	private static long lastRun;
+	/** feat/lead-review-walk: NPC ids of live subagents/delegated tasks whose parent has a desk (they report to it). */
+	private static volatile Set<String> reportsToParent = Set.of();
 
 	private LeadOfficeClient() {
 	}
@@ -51,6 +55,7 @@ public final class LeadOfficeClient {
 		LeadPolicy policy = LeadPolicy.active();
 		if (!policy.enabled()) {
 			DETECTOR.clear();
+			reportsToParent = Set.of();
 			LeadOffices.use(LeadRoster.EMPTY);
 			return;
 		}
@@ -66,21 +71,93 @@ public final class LeadOfficeClient {
 				eligible.add(v.id());
 			}
 		}
-		LeadOffices.use(DETECTOR.update(byEnv, eligible::contains, policy, nowMs));
+		LeadRoster roster = DETECTOR.update(byEnv, eligible::contains, policy, nowMs);
+		if (policy.childrenWaitForReview()) {
+			Set<String> reports = new HashSet<>();
+			roster = roster.withReviews(reviews(shells, eligible, roster, reports));
+			reportsToParent = Set.copyOf(reports);
+		} else {
+			reportsToParent = Set.of();
+		}
+		LeadOffices.use(roster);
+	}
+
+	/**
+	 * feat/lead-review-walk: the children waiting for their parent's review. A child counts when it is a
+	 * subagent or delegated task with an NPC of its own, alive (not archived, settled or deleted), whose
+	 * parent has a desk; it waits when it is done, or idle after finishing a turn. One pass over each
+	 * environment's shells.
+	 *
+	 * @param eligible NPC ids with a desk (not settled)
+	 * @param reports  filled with every such child, finished or not (they never notify the player when done)
+	 */
+	static Map<String, LeadRoster.Review> reviews(Map<String, ShellState.View> shells, Set<String> eligible, LeadRoster roster, Set<String> reports) {
+		Map<String, LeadRoster.Review> out = new java.util.TreeMap<>();
+		for (Map.Entry<String, ShellState.View> e : shells.entrySet()) {
+			ShellState.View view = e.getValue();
+			if (view == null || view.threads() == null) {
+				continue;
+			}
+			String env = e.getKey();
+			Map<String, ThreadShell> byId = new HashMap<>();
+			for (ThreadShell t : view.threads()) {
+				if (t != null) {
+					byId.put(t.id(), t);
+				}
+			}
+			for (ThreadShell t : byId.values()) {
+				String parent = t.parentThreadId();
+				if (!t.isSubagent() || parent == null || parent.isEmpty() || parent.equals(t.id())) {
+					continue;
+				}
+				if (t.archivedAt() != null || t.settledAt() != null || t.deletedAt() != null) {
+					continue;
+				}
+				String child = env + ":" + t.id();
+				String parentNpc = env + ":" + parent;
+				if (!eligible.contains(child) || !eligible.contains(parentNpc)) {
+					continue;
+				}
+				reports.add(child);
+				ThreadState s = ThreadState.of(t);
+				if (s == ThreadState.DONE || (s == ThreadState.IDLE && t.latestRunCompletedAt() != null)) {
+					ThreadShell p = byId.get(parent);
+					String title = p == null || p.title() == null || p.title().isBlank() ? parent : p.title();
+					out.put(child, new LeadRoster.Review(parentNpc, title, roster.isLead(parentNpc)));
+				}
+			}
+		}
+		return out;
+	}
+
+	/**
+	 * feat/lead-review-walk: true when {@code npcId} is a child that reports to its parent (who reviews
+	 * its work), so its "thread finished" notice is not for the player. False with
+	 * {@code leadOffice.childrenWaitForReview} off.
+	 */
+	public static boolean reportsToParent(String npcId) {
+		LeadPolicy p = LeadPolicy.active();
+		return p.enabled() && p.childrenWaitForReview() && reportsToParent.contains(npcId);
 	}
 
 	/** Bridge mode, disconnect or world change: no leads. */
 	public static synchronized void clear() {
 		DETECTOR.clear();
 		lastRun = 0;
+		reportsToParent = Set.of();
 		LeadOffices.use(LeadRoster.EMPTY);
 	}
 
-	/** "Coordinating N agents" for a lead's NPC id, null for anyone else. */
+	/**
+	 * "Coordinating N agents" for a lead's NPC id; feat/lead-review-walk: "Awaiting review from &lt;parent&gt;"
+	 * for a finished child waiting for its parent; null for anyone else.
+	 */
 	public static @Nullable Component plate(String npcId) {
-		LeadRoster.Lead l = LeadOffices.current().lead(npcId);
+		LeadRoster roster = LeadOffices.current();
+		LeadRoster.Lead l = roster.lead(npcId);
 		if (l == null) {
-			return null;
+			LeadRoster.Review r = roster.reviews().get(npcId);
+			return r == null ? null : Component.translatable("t3craft.lead.awaitingReview", r.parentTitle()).withStyle(ChatFormatting.GOLD);
 		}
 		int n = l.coordinating() > 0 ? l.coordinating() : l.liveChildren().size();
 		return Component.translatable("t3craft.lead.coordinating", n).withStyle(ChatFormatting.LIGHT_PURPLE);
