@@ -134,14 +134,14 @@ public final class HouseTimberOverhang implements Variant {
 			w = p.w();
 			d = p.d();
 			h = p.h();
-			Random r = p.rng(0x0FE12A47L);
-			front = r.nextInt(3) != 0;
-			floors = r.nextInt(2) == 0 ? 2 : 3;
-			int roofKind = r.nextInt(2);
-			int fillKind = r.nextInt(4);
-			int shutKind = r.nextInt(3);
-			rug = new DyeColor[] {DyeColor.RED, DyeColor.BLUE, DyeColor.GREEN, DyeColor.PURPLE}[r.nextInt(4)];
-			bedColor = new DyeColor[] {DyeColor.RED, DyeColor.WHITE, DyeColor.CYAN, DyeColor.YELLOW}[r.nextInt(4)];
+			// the hash mixes the seed well (java.util.Random streams of near seeds start alike)
+			front = p.hash(11, 3, 5, 3) != 0;
+			floors = p.hash(12, 4, 6, 2) == 0 ? 2 : 3;
+			int roofKind = p.hash(13, 5, 7, 2);
+			int fillKind = p.hash(14, 6, 8, 4);
+			int shutKind = p.hash(15, 7, 9, 3);
+			rug = new DyeColor[] {DyeColor.RED, DyeColor.BLUE, DyeColor.GREEN, DyeColor.PURPLE}[p.hash(16, 8, 1, 4)];
+			bedColor = new DyeColor[] {DyeColor.RED, DyeColor.WHITE, DyeColor.CYAN, DyeColor.YELLOW}[p.hash(17, 9, 2, 4)];
 			int hMax = h - 1;
 			y0 = floors == 3 ? 12 : 10;
 			// widest cross dimension (wall line to wall line of the lowest floor) the roof allows under the box
@@ -468,10 +468,12 @@ public final class HouseTimberOverhang implements Variant {
 					TimberKit.put(g.c, g.p, alongU, line + out, i, y, trap(g.shutter, leftN ? highFace : lowFace, true, false));
 				}
 			} else {
-				// a one-wide window: sill, a full-block flower box and a small hood over it, so nothing can be stood on
-				TimberKit.put(g.c, g.p, alongU, line + out, i, w1 - 1, stair(Blocks.DARK_OAK_STAIRS, toWall, true));
-				TimberKit.put(g.c, g.p, alongU, line + out, i, w1, CitadelCanvas.leaves(g.p.hash(u, w1, v, 3) == 0 ? Blocks.AZALEA_LEAVES : Blocks.FLOWERING_AZALEA_LEAVES));
-				TimberKit.put(g.c, g.p, alongU, line + out, i, w2 + 1, stair(Blocks.DARK_OAK_STAIRS, toWall, true));
+				// a one-one window: a flowering box set into the wall under it and one shutter, hinged on a hashed side
+				TimberKit.put(g.c, g.p, alongU, line, i, w1 - 1, CitadelCanvas.leaves(g.p.hash(u, w1, v, 3) == 0 ? Blocks.AZALEA_LEAVES : Blocks.FLOWERING_AZALEA_LEAVES));
+				boolean hash = g.p.hash(u, w1, v, 2) == 0;
+				for (int y = w1; y <= w2; y++) {
+					TimberKit.put(g.c, g.p, alongU, line + out, i, y, trap(g.shutter, hash ? highFace : lowFace, true, false));
+				}
 			}
 		}
 	}
@@ -897,12 +899,13 @@ public final class HouseTimberOverhang implements Variant {
 		for (int u = uc - 1; u <= uc + 2; u++) {
 			g.set(u, 0, vStoop, stair(Blocks.STONE_BRICK_STAIRS, Direction.SOUTH, false));
 		}
+		// lantern posts out in the open (a lantern top under a roof would be a ledge nobody reaches)
+		int vLamp = Math.max(0, g.b0 - 4);
 		for (int u : new int[] {uc - 3, uc + 4}) {
-			g.set(u, 0, vStoop, b(Blocks.POLISHED_DEEPSLATE));
-			g.set(u, 1, vStoop, fence(Blocks.DARK_OAK_FENCE, false, false, false, false));
-			g.set(u, 2, vStoop, fence(Blocks.DARK_OAK_FENCE, false, false, false, false));
-			g.set(u, 3, vStoop, lantern(false));
-			g.set(u, 4, vStoop, slab(Blocks.DEEPSLATE_TILE_SLAB, false));
+			g.set(u, 0, vLamp, b(Blocks.POLISHED_DEEPSLATE));
+			g.set(u, 1, vLamp, fence(Blocks.DARK_OAK_FENCE, false, false, false, false));
+			g.set(u, 2, vLamp, fence(Blocks.DARK_OAK_FENCE, false, false, false, false));
+			g.set(u, 3, vLamp, lantern(false));
 		}
 		for (int v = 1; v <= vStoop - 1; v++) {
 			for (int u = g.a0 - 1; u <= g.a1 + 1; u++) {
