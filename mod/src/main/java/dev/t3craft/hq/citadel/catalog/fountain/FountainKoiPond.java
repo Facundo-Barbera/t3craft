@@ -151,8 +151,8 @@ public final class FountainKoiPond implements Variant {
 
 		/** Two overlapping lobes with a wobbling edge; water stays inside {@code 1..w-2 × 1..d-2} so a rim always fits. */
 		void mask() {
-			double ru = Math.max(1.6, cu - 1.9);
-			double rv = Math.max(1.6, cv - 1.9);
+			double ru = Math.max(1.7, cu - 1.25);
+			double rv = Math.max(1.7, cv - 1.25);
 			double ph1 = rng.nextDouble() * Math.PI * 2;
 			double ph2 = rng.nextDouble() * Math.PI * 2;
 			double a2 = 0.10 + rng.nextDouble() * 0.08;
@@ -300,7 +300,7 @@ public final class FountainKoiPond implements Variant {
 				rl = wl - 1;
 				rr = wr + 1;
 				int run = wr - wl + 1;
-				if (run >= 5) {
+				if (run >= 6) {
 					island = true;
 					iu = wl + 2 + rng.nextInt(run - 4); // which side of the pond the islet sits on
 					toroSide = rng.nextBoolean() ? 1 : -1;
@@ -403,7 +403,7 @@ public final class FountainKoiPond implements Variant {
 					if (k[u][v] != RIM || nearBridge(u, v)) {
 						continue;
 					}
-					switch (p.hash(u, 7, v, 9)) {
+					switch (p.hash(u, 7, v, 14)) {
 						case 0 -> put(c, p, u, 2, v, slab(Blocks.MOSSY_COBBLESTONE_SLAB));
 						case 1 -> put(c, p, u, 2, v, b(Blocks.MOSS_CARPET));
 						case 2 -> put(c, p, u, 2, v, slab(Blocks.ANDESITE_SLAB));
@@ -420,17 +420,17 @@ public final class FountainKoiPond implements Variant {
 					}
 				}
 			}
-			int clusters = Math.min(rim.size() / 3, 1 + (w * d) / 70);
+			int clusters = Math.min(rim.size() / 3, 1 + (w * d) / 110);
 			Collections.shuffle(rim, rng);
 			for (int i = 0; i < clusters; i++) {
 				int u = rim.get(i)[0];
 				int v = rim.get(i)[1];
-				rock(u, v, 2 + p.hash(u, 8, v, 2));
+				rock(u, v, 1 + p.hash(u, 8, v, 2));
 				for (Direction dir : DIRS) {
 					int nu = u + dir.getStepX();
 					int nv = v + dir.getStepZ();
 					if (p.has(nu, 0, nv) && k[nu][nv] == RIM && !nearBridge(nu, nv) && p.hash(nu, 8, nv, 3) != 0) {
-						rock(nu, nv, 1 + p.hash(nu, 6, nv, 2));
+						rock(nu, nv, 1);
 					}
 				}
 			}
@@ -658,8 +658,13 @@ public final class FountainKoiPond implements Variant {
 
 		void corners() {
 			int[][] corner = {{0, 0}, {w - 1, 0}, {0, d - 1}, {w - 1, d - 1}};
-			List<Integer> roles = new ArrayList<>(List.of(0, 1, 2, 3)); // 0 tree, 1 lantern, 2 bamboo, 3 bench
-			Collections.shuffle(roles, rng);
+			// 0 tree, 1 lantern, 2 bamboo, 3 bench. The tall things go to the back corners so they never hide the water
+			// from the front; the lantern and the bench stay at the front, looking at the pond.
+			List<Integer> front = new ArrayList<>(List.of(1, 3));
+			List<Integer> back = new ArrayList<>(List.of(0, 2));
+			Collections.shuffle(front, rng);
+			Collections.shuffle(back, rng);
+			List<Integer> roles = List.of(front.get(0), front.get(1), back.get(0), back.get(1));
 			for (int i = 0; i < 4; i++) {
 				int su = corner[i][0];
 				int sv = corner[i][1];
@@ -867,25 +872,25 @@ public final class FountainKoiPond implements Variant {
 			if (treeU < 0) {
 				return;
 			}
-			int t = Math.min(5, h - 2);
+			int t = Math.min(4, h - 2);
 			if (t < 3) {
 				return;
 			}
 			for (int y = 0; y < t; y++) {
-				put(c, p, treeU, y, treeV, b(Blocks.CHERRY_LOG));
+				put(c, p, treeU, y, treeV, b(y < 2 ? Blocks.CHERRY_LOG : Blocks.STRIPPED_CHERRY_LOG));
 			}
 			double lu = Math.signum(cu - treeU);
 			double lv = Math.signum(cv - treeV);
-			double ccu = treeU + lu * 1.2;
-			double ccv = treeV + lv * 1.2;
-			double ccy = t - 0.4;
+			double ccu = treeU + lu * 0.9;
+			double ccv = treeV + lv * 0.9;
+			double ccy = t - 0.1;
 			boolean[][][] leaf = new boolean[w][h][d];
 			for (int u = 0; u < w; u++) {
 				for (int y = 0; y < h; y++) {
 					for (int v = 0; v < d; v++) {
-						double e = sq((u - ccu) / 2.6) + sq((y - ccy) / 1.7) + sq((v - ccv) / 2.6);
+						double e = sq((u - ccu) / 2.6) + sq((y - ccy) / 1.9) + sq((v - ccv) / 2.6);
 						boolean trunk = u == treeU && v == treeV && y < t;
-						if (e <= 1.0 && !trunk && p.hash(u, y, v, 5) != 0 && roomFor(u, y, v)) {
+						if (e <= 1.0 && !trunk && p.hash(u, y, v, 8) != 0 && roomFor(u, y, v)) {
 							leaf[u][y][v] = true;
 						}
 					}
