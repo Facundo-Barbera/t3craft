@@ -205,6 +205,7 @@ public final class WellRoofedStone implements Variant {
 		int cu = g.cs() == 4 ? g.uL() + 1 + p.hash(3, 0, 0, 2) : g.uL() + 1;
 		for (int u = g.uL() + 1; u <= g.uR() - 1; u++) {
 			p.set(c, u, BAR - 1, va, log(roof.stripped(), Direction.Axis.X));
+			p.set(c, u, BAR, va, log(roof.stripped(), Direction.Axis.X)); // a tie beam over the axle: nobody can stand on it
 		}
 		p.put(c, cu, BAR - 1, va - 1, b(Blocks.LEVER)
 				.setValue(BlockStateProperties.ATTACH_FACE, AttachFace.WALL)
