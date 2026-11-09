@@ -38,6 +38,26 @@ glowstone + redstone; lámpara ⇄ bombilla, 1:1 sin forma. Modelos y texturas p
 Los colores son los de `ThreadState`/`StationStatus` (lo comprueba un test): lámpara, pantalla,
 nametag y HUD coinciden.
 
+### Aspecto de la lámpara (kit/status-lamp)
+
+Modelo de farol en cápsula, simétrico arriba/abajo (sirve sobre la pantalla y colgada de una cadena, como la
+baliza del hub): tapas de acero con anillos dorados y una lente de 10 px. Solo la lente y sus aletas brillan
+(`light_emission` por elemento, también en el juego). El estado se lee por color, silueta y animación:
+
+| `status` | Silueta | Glifo | Animación |
+|---|---|---|---|
+| `off` | lente oscura y delgada, sin brillo | reflejo apagado | ninguna |
+| `idle` | vela gris delgada y tenue | pausa | ninguna |
+| `working` | lente de 8 px con banda brillante | anillo que gira | 4 fotogramas (`frametime` 3) |
+| `done` | lente verde lisa y estable | check | ninguna |
+| `attention` | lente de 10 px con 4 cuernos (estrella de sirena) | `!` | parpadeo lento (`frametime` 12) |
+| `error` | lente ancha y baja con 8 garras (corona de púas) | X | parpadeo rápido (`frametime` 5, < 3 Hz) |
+
+Texturas y modelos se generan con `python3 tools/art/status_lamp_art.py` (solo biblioteca estándar); las tiras
+animadas llevan `.png.mcmeta`. Galería de revisión: `tools/render/submit.sh --final -- --lamps` (`LampViews`),
+y `--lamp-demo` pone estados en las lámparas de cualquier render de plan. `lampProps` ahora lleva `noOcclusion`
+(el modelo ya no es un cubo; también afecta a `board_lamp`, que sigue siendo un cubo sin consecuencias visibles).
+
 ## El interruptor (modo "solo GUI")
 
 Un único punto de registro: **`T3Blocks.init(BlocksSwitch, BlockRegistrar)`**, llamado una vez desde
@@ -360,7 +380,7 @@ ninguno. Ítems en la pestaña **T3Craft**, loot tables (se sueltan a sí mismos
 | `t3craft:beam_cap` | Remate de columna: cuello y corona laqueada con banda de latón. | — |
 | `t3craft:paper_lantern` | Farol de papel. Es un `LampBlockEntity` (mismo tipo que la lámpara de estado): con `{"binding": "thread:<k>"}` o `module:<k1>,…` respira con el hilo (BER de lamps-breathe, con el brillo sobre el cuerpo de papel); sin vincular es un farol cálido. | `status` (luz 12 apagado/sin vincular, ≥ 9 vinculado) |
 | `t3craft:room_plaque` | Placa de sala: marco de cerezo con placa de tinta; el texto lo dibuja `PlaqueRenderer`. Sin colisión, como un letrero. | `facing` = frente (cuelga del bloque de detrás) |
-| `t3craft:cherry_railing` | Barandilla en el borde `facing` de la celda (postes, pasamanos, balaustres). No conecta (sin tags). | `facing` = borde |
+| `t3craft:cherry_railing` | Barandilla en el borde `facing` de la celda que se une con sus vecinas (`KitRailingBlock`): pasamanos continuo, postes solo en extremos y giros, esquinas cerradas (`turn`) y escalones de una celda tendidos con un tramo lateral (`step`); en una esquina interior la celda deja solo el poste (`front=false`). Lo resuelven `getStateForPlacement`/`updateShape` en el mundo y `PlanConnect` en los planos, con la misma regla pura (`KitRailingBlock.resolve`, solo lee el `facing` de las barandillas vecinas). | `facing` = borde; `front`; `left`/`right` = `open`, `post`, `turn`, `step` |
 | `t3craft:cherry_planter` | Maceta de cerezo (tiesto, tronco, copa en flor). Todo opaco: sin capas cutout. | — |
 | `t3craft:stone_lantern` | Linterna de piedra (tōrō) con musgo. | luz 13 |
 
@@ -384,7 +404,7 @@ el bloque propio o su sustituto vanilla:
 | `BEAM_CAP` | `beamCap()` | `beam_cap` | `polished_blackstone` |
 | `LANTERN` | `lantern()` | `paper_lantern` | `waxed_copper_lantern[hanging=false]` |
 | `PLAQUE` | `plaque(front)` + `plaqueData(dye, líneas…)` | `room_plaque[facing]` + texto | `cherry_wall_sign[facing]` + texto encerado |
-| `RAILING` | `railing(edge)` | `cherry_railing[facing]` | `waxed_copper_bars` (como el `Palette` actual) |
+| `RAILING` | `railing(edge)` | `cherry_railing[facing]` (extremos por `PlanConnect`) | `waxed_copper_bars` (como el `Palette` actual) |
 | `GARDEN_PLANTER` | `gardenPlanter()` | `cherry_planter` | `potted_cherry_sapling` |
 | `GARDEN_LANTERN` | `gardenLantern()` | `stone_lantern` | `lantern[hanging=false]` |
 
@@ -393,7 +413,7 @@ el bloque propio o su sustituto vanilla:
 - `plaqueData(DyeColor, String...)`: datos de block entity de la placa (o del letrero, en vanilla),
   hasta 4 líneas; la primera en el color del entorno.
 - `custom()` (false en vanilla) e `id()`/`HqKit.fingerprint()` (`"vanilla"` o `KitBlocks.ID` =
-  `kit-1`) para los hashes de construcción: el estilo que use el kit debe incluirlo en su hash y
+  `kit-2` desde kit/cherry-railing) para los hashes de construcción: el estilo que use el kit debe incluirlo en su hash y
   subir `KitBlocks.ID` si cambia algún estado.
 - Forma: cada rol tiene la misma "clase" que su fallback donde importa al caminar (suelos y paneles
   son cubos enteros; escritorio, barandilla, farol y jardín no son de paso en ninguno de los dos).

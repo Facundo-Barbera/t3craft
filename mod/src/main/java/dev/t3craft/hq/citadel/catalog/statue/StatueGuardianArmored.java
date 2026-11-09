@@ -203,7 +203,12 @@ public final class StatueGuardianArmored implements Variant {
 		// helm and copper plume
 		for (int u = cl; u <= cr; u++) {
 			p.set(c, u, head, vf, helm);
-			p.set(c, u, crest, vf, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState());
+			if (cl == cr) {
+				p.set(c, u, crest, vf, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState());
+			} else {
+				// a two-wide head: a peaked helm (two stairs rising to the middle), not two rods that read as antennae
+				p.set(c, u, crest, vf, stairs(Blocks.POLISHED_BLACKSTONE_BRICK_STAIRS, u == cl ? Direction.EAST : Direction.WEST));
+			}
 		}
 
 		// tabard at the front, cape at the back: wall banners hanging on the chest

@@ -211,6 +211,9 @@ public final class HqRender {
 		String catalogFront = null;
 		int catalogSizes = 3;
 		int catalogSeeds = 2;
+		// kit/status-lamp: the status lamp gallery, and demo lamp states in plan renders
+		boolean lamps = false;
+		boolean lampDemo = false;
 		// tools/render-quality: look switches, on in final and off in preview (see Renderer.Look)
 		Boolean previewOpt = null;
 		java.util.Map<String, String> lookOpts = new java.util.LinkedHashMap<>();
@@ -252,6 +255,8 @@ public final class HqRender {
 					pieceMode = true;
 				}
 				case "--catalog" -> catalog = args[++i];
+				case "--lamps" -> lamps = true;
+				case "--lamp-demo" -> lampDemo = true;
 				case "--front" -> catalogFront = args[++i];
 				case "--sizes" -> catalogSizes = Integer.parseInt(args[++i]);
 				case "--seeds" -> catalogSeeds = Integer.parseInt(args[++i]);
@@ -281,6 +286,11 @@ public final class HqRender {
 		if (vanilla) {
 			HqFixtures.use(null);
 		}
+		if (lamps) {
+			// kit/status-lamp: the status lamp in every state, on desks and hanging (LampViews)
+			LampViews.run(out, scaleOpt == null ? 1.0 : scaleOpt, ss, only);
+			return;
+		}
 		if (catalog != null) {
 			// citadel/catalog: variants of the catalog on their own, in a grid (CatalogViews)
 			CatalogViews.run(catalog, catalogFront, catalogSizes, Math.max(1, catalogSeeds), out, scaleOpt == null ? 1.0 : scaleOpt, ss, only);
@@ -297,6 +307,7 @@ public final class HqRender {
 			piece.ss = ss;
 			piece.npcs = npcs;
 			piece.scale = scaleOpt == null ? 1.0 : scaleOpt;
+			piece.lampDemo = lampDemo;
 			if (packs != null) {
 				dev.t3craft.hq.pack.HqLayoutPacks.Load l = dev.t3craft.hq.pack.HqLayoutPacks.reload(packs);
 				for (String e : l.errors()) {
