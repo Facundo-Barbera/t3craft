@@ -500,7 +500,7 @@ public final class HouseStoneWeathered implements Variant {
 			if (roofKind == 0) {
 				return band ? Blocks.DEEPSLATE_BRICK_STAIRS : h == 0 ? Blocks.COBBLED_DEEPSLATE_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS;
 			}
-			return band ? Blocks.DARK_OAK_STAIRS : h == 0 ? Blocks.OAK_STAIRS : Blocks.SPRUCE_STAIRS;
+			return band ? Blocks.DARK_OAK_STAIRS : Blocks.SPRUCE_STAIRS;
 		}
 
 		BlockState roofSolid() {
@@ -555,6 +555,7 @@ public final class HouseStoneWeathered implements Variant {
 				set(du - 1, P + 3, v, stairs(roofStair(du - 1, v, false), Direction.EAST));
 				set(du + 1, P + 3, v, stairs(roofStair(du + 1, v, false), Direction.WEST));
 			}
+			set(du, P + 3, va + 1, roofSolid()); // no open pocket behind the gablet
 			for (int v = va; v <= va + 2; v++) {
 				set(du, P + 4, v, roofSolid());
 				set(du, P + 5, v, ridgeSlab());
