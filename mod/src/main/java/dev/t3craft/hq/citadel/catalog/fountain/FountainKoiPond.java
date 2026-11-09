@@ -940,32 +940,24 @@ public final class FountainKoiPond implements Variant {
 		}
 
 		/**
-		 * Whether a leaf may hang at {@code (u, y, v)}: over open water from the surface up; elsewhere only when
-		 * everyone who can stand on this cell or on any of its 8 neighbours keeps 2.85 blocks of headroom (the
-		 * audit measures with the body's width, so a leaf beside a rim top counts too).
+		 * Whether a leaf may hang at {@code (u, y, v)}. Over open water from the surface up. Never over a rim top or a
+		 * rock in the water (nobody walks there, and the audit calls a standable cell under a roof that nobody reaches
+		 * sealed). Elsewhere only where whoever stands below keeps 2.85 blocks of headroom.
 		 */
 		boolean roomFor(int u, int y, int v) {
 			if (u == treeU && v == treeV) {
 				return y >= 3;
 			}
-			double top = -1;
-			for (int du = -1; du <= 1; du++) {
-				for (int dv = -1; dv <= 1; dv++) {
-					int nu = u + du;
-					int nv = v + dv;
-					if (nu < 0 || nu >= w || nv < 0 || nv >= d) {
-						continue;
-					}
-					double f = foot[nu][nv];
-					BlockState g = p.at(c, nu, 0, nv);
-					if (g != null && (g.is(Blocks.AZALEA) || g.is(Blocks.FLOWERING_AZALEA))) {
-						f = Math.max(f, 1.0); // an azalea bush is a step you can stand on
-					}
-					top = Math.max(top, f);
-				}
+			if (k[u][v] == WATER) {
+				return y >= 2;
 			}
-			if (top < 0) {
-				return y >= 2; // only water around
+			if (k[u][v] == RIM || k[u][v] == ISLAND) {
+				return false;
+			}
+			double top = foot[u][v];
+			BlockState g = p.at(c, u, 0, v);
+			if (g != null && (g.is(Blocks.AZALEA) || g.is(Blocks.FLOWERING_AZALEA))) {
+				top = Math.max(top, 1.0); // an azalea bush is a step you can stand on
 			}
 			return y >= (int) Math.ceil(top + 2.85);
 		}
