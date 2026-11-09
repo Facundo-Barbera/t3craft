@@ -152,7 +152,7 @@ public final class HouseTowerLookout implements Variant {
 	public void build(CitadelCanvas c, Plot p) {
 		Random r = p.rng(0x100C_0077L);
 		Scheme s = SCHEMES[r.nextInt(SCHEMES.length)];
-		int rr = Math.min((p.w() - 2) / 2, (p.d() - 4) / 2);
+		int rr = Math.min(2, Math.min((p.w() - 2) / 2, (p.d() - 4) / 2)); // always a slim shaft (5 wide), however big the plot
 		G g = new G(p, s, (p.w() - 1) / 2, rr + 2, rr, p.w(), p.d());
 		base(c, g);
 		shaft(c, g);
@@ -168,16 +168,15 @@ public final class HouseTowerLookout implements Variant {
 	// ------------------------------------------------------------------ materials
 
 	private static BlockState deepslate(Plot p, int u, int y, int v) {
-		return switch (p.hash(u, y, v, 7)) {
+		return switch (p.hash(u, y, v, 10)) {
 			case 0 -> b(Blocks.CRACKED_DEEPSLATE_BRICKS);
 			case 1 -> b(Blocks.COBBLED_DEEPSLATE);
-			case 2 -> b(Blocks.POLISHED_DEEPSLATE);
 			default -> b(Blocks.DEEPSLATE_BRICKS);
 		};
 	}
 
 	private static BlockState stone(Plot p, int u, int y, int v) {
-		return switch (p.hash(u, y, v, 8)) {
+		return switch (p.hash(u, y, v, 14)) {
 			case 0 -> b(Blocks.MOSSY_STONE_BRICKS);
 			case 1 -> b(Blocks.CRACKED_STONE_BRICKS);
 			default -> b(Blocks.STONE_BRICKS);
@@ -202,6 +201,16 @@ public final class HouseTowerLookout implements Variant {
 					set(c, g.p, u, 0, v, g.wall(u, v) ? deepslate(g.p, u, 0, v) : b(Blocks.SPRUCE_PLANKS));
 				} else if (g.in(u, v, g.rr + 1.6)) {
 					set(c, g.p, u, 0, v, stair(Blocks.DEEPSLATE_BRICK_STAIRS, g.inward(u, v), false));
+				}
+			}
+		}
+		// [depth] a battered foot: the shaft widens by a block over two courses, closed by a sloped stair, so the body tapers upwards
+		for (int u = 0; u < g.w; u++) {
+			for (int v = 0; v < g.d; v++) {
+				if (g.in(u, v, g.rr + 1.4) && !g.in(u, v, g.wallR()) && !(Math.abs(u - g.cx) <= 1 && v < g.cz)) {
+					set(c, g.p, u, 0, v, deepslate(g.p, u, 0, v));
+					set(c, g.p, u, 1, v, deepslate(g.p, u, 1, v));
+					set(c, g.p, u, 2, v, stair(Blocks.DEEPSLATE_BRICK_STAIRS, g.inward(u, v), false));
 				}
 			}
 		}
@@ -279,7 +288,7 @@ public final class HouseTowerLookout implements Variant {
 			int pu = g.cx + dir.getStepX() * (g.rr + 1);
 			int pv = g.cz + dir.getStepZ() * (g.rr + 1);
 			for (int y = 1; y <= 8; y++) {
-				set(c, g.p, pu, y, pv, y <= 2 ? b(Blocks.DEEPSLATE_BRICKS) : log(g.s.log(), Direction.Axis.Y));
+				set(c, g.p, pu, y, pv, y <= 2 ? b(Blocks.DEEPSLATE_BRICKS) : y <= 5 ? b(Blocks.STONE_BRICKS) : b(Blocks.CALCITE)); // pilasters follow the palette gradient
 			}
 		}
 	}
@@ -313,7 +322,7 @@ public final class HouseTowerLookout implements Variant {
 	// ------------------------------------------------------------------ gallery
 
 	private void gallery(CitadelCanvas c, G g) {
-		double rg = g.rr + 1.6;
+		double rg = g.rr + 1.1;
 		for (int u = 0; u < g.w; u++) {
 			for (int v = 0; v < g.d; v++) {
 				if (!g.in(u, v, rg)) {
@@ -371,7 +380,7 @@ public final class HouseTowerLookout implements Variant {
 					} else if (eastDoor) {
 						st = y == GAL + 1 ? doorBlock(g, Direction.EAST, true) : doorBlock(g, Direction.EAST, false);
 					} else if (pillarCell(g, u, v)) {
-						st = log(g.s.trim(), Direction.Axis.Y);
+						st = b(Blocks.QUARTZ_PILLAR); // pale pillars between the glass: clean light band under the crown
 					} else {
 						boolean n = g.wall(u, v - 1);
 						boolean e = g.wall(u + 1, v);
@@ -403,7 +412,7 @@ public final class HouseTowerLookout implements Variant {
 	// ------------------------------------------------------------------ cone roof
 
 	private void cone(CitadelCanvas c, G g) {
-		double r0 = g.rr + 1.6;
+		double r0 = g.rr + 1.1;
 		int y = CEIL;
 		int k = 0;
 		double r = r0;
@@ -415,24 +424,21 @@ public final class HouseTowerLookout implements Variant {
 					if (!g.in(u, v, r)) {
 						continue;
 					}
-					Block stairBlock = k == 0 ? g.s.eaveStair() : g.s.roofStair();
+					boolean crown = r < 2.7; // the top rings are oxidised copper, to match the library's dome
+					Block stairBlock = crown ? Blocks.CUT_COPPER_STAIRS.waxed().oxidized() : k == 0 ? g.s.eaveStair() : g.s.roofStair();
 					if (single) {
-						set(c, g.p, u, y, v, slab(g.s.roofSlab(), false));
+						set(c, g.p, u, y, v, slab(Blocks.CUT_COPPER_SLAB.waxed().oxidized(), false));
 					} else if (g.rim4(u, v, r)) {
 						set(c, g.p, u, y, v, stair(stairBlock, g.inward(u, v), false));
-						if (k == 0) {
-							// [depth] the eave ring closes underneath with an upside-down stair
-							set(c, g.p, u, y - 1, v, stair(g.s.roofStair(), g.inward(u, v).getOpposite(), true).setValue(BlockStateProperties.HALF, net.minecraft.world.level.block.state.properties.Half.TOP));
-						}
 					} else {
-						set(c, g.p, u, y, v, b(g.s.roof()));
+						set(c, g.p, u, y, v, b(crown ? Blocks.CUT_COPPER.waxed().oxidized() : g.s.roof()));
 					}
 				}
 			}
 			topY = y;
 			k++;
 			y++;
-			r = r0 - 0.9 * k;
+			r = r0 - 0.7 * k;
 			if (single) {
 				break;
 			}
@@ -457,7 +463,7 @@ public final class HouseTowerLookout implements Variant {
 		// [depth] the doorway frame stands proud: log jambs and a lintel course
 		for (int side = -1; side <= 1; side += 2) {
 			for (int y = 1; y <= 2; y++) {
-				set(c, g.p, cu + side, y, vd - 1, log(g.s.trim(), Direction.Axis.Y));
+				set(c, g.p, cu + side, y, vd - 1, log(g.s.log(), Direction.Axis.Y));
 			}
 			set(c, g.p, cu + side, 3, vd - 1, stair(g.s.eaveStair(), side < 0 ? Direction.EAST : Direction.WEST, true));
 			put(c, g.p, cu + side * 2, 2, vd - 1, hangingLantern(), CitadelCanvas.HANGING);

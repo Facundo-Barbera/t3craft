@@ -246,55 +246,79 @@ public final class HouseLibraryCopper implements Variant {
 	// ------------------------------------------------------------------ dome
 
 	/**
-	 * [finish] a hemispherical shell of waxed cut copper, layer by layer, one level of patina per height: new orange
-	 * at the drum, exposed, weathered, and verdigris at the crown. Eight chiselled ribs follow the pier lines.
+	 * [finish] the dome as a stack of stepped rings: every layer is a ring of waxed cut-copper stairs (the high side
+	 * towards the crown) over a solid core, each ring one block smaller than the one below, with a patina stage per
+	 * ring from new orange at the drum to verdigris at the crown, a slab skirt over the cornice, four stained oculi
+	 * at the compass points of the first ring, a slab cap and a gold lantern finial.
 	 */
 	private static void dome(CitadelCanvas c, Plot p, Geo g) {
 		int w = p.w();
 		int d = p.d();
-		double rd = g.r() + 0.3;
-		int layers = (int) Math.round(rd) + 1;
-		double[] rk = new double[layers + 1];
-		for (int k = 0; k <= layers; k++) {
-			double t = (k + 0.5) / (layers + 0.5);
-			rk[k] = rd * Math.sqrt(Math.max(0.0, 1 - t * t));
+		double r0 = g.r() + 0.35;
+		// a bulged profile: the first courses climb almost straight (a copper drum), then the rings close faster and faster
+		double[] drops = {0.3, 0.6, 0.9, 1.1, 1.2, 1.3};
+		// skirt: a ring of copper slabs sitting on the cornice, one block of overhang
+		for (int u = 0; u < w; u++) {
+			for (int v = 0; v < d; v++) {
+				double dist = g.dist(u, v);
+				if (dist > r0 && dist <= g.r() + 0.95) {
+					p.set(c, u, 9, v, b(copperSlab(0)));
+				}
+			}
 		}
-		for (int k = 0; k < layers; k++) {
+		int k = 0;
+		double rk = r0;
+		while (rk >= 1.0) {
 			int y = 9 + k;
-			int base = k <= 1 ? 2 : 3; // weathered skirt, verdigris crown
+			double rn = rk - drops[Math.min(k, drops.length - 1)];
+			int level = Math.min(3, k * 4 / 5);
 			for (int u = 0; u < w; u++) {
 				for (int v = 0; v < d; v++) {
 					double dist = g.dist(u, v);
-					boolean top = rk[k + 1] < 0.7;
-					if (dist > rk[k] + 0.15 || (!top && dist <= Math.min(rk[k + 1] - 0.3, rk[k] - 1.25))) {
+					if (dist > rk) {
 						continue;
 					}
-					// one patina stage per ring: weathered skirt, oxidized (verdigris) above; no per-block noise
-					int level = base;
-					double sec = g.sector(u, v);
-					boolean rib = (sec < 0.07 || sec > 0.93) && k > 0;
+					boolean exposed = dist > rn;
 					BlockState st;
-					if (k == 1 && sec > 0.4 && sec < 0.6 && (Math.abs(u - g.cu()) < 0.6 || Math.abs(v - g.cv()) < 0.6)) {
-						st = tintBlock(JEWELS[p.hash(u, 0, v, JEWELS.length)]); // oculi at the four compass points
-					} else if (rib) {
-						st = b(chiseled(2)); // chiselled ribs in the weathered tone: relief without colour noise
+					if (!exposed && k <= 1 && dist > rk - 1.0) {
+						// [depth] the first two courses are a drum: calcite piers between stained-glass lights
+						double sec = g.sector(u, v);
+						st = (sec < 0.2 || sec > 0.8) ? b(Blocks.CALCITE) : tintBlock(JEWELS[p.hash(u, k, v, JEWELS.length)]);
+					} else if (!exposed) {
+						st = b(copper(level)); // core under the next ring
+					} else if (k == 0 && (Math.abs(u - g.cu()) < 0.6 || Math.abs(v - g.cv()) < 0.6)) {
+						st = b(chiseled(level)); // a chiselled copper boss at the four compass points
 					} else {
-						st = b(copper(level));
+						st = stair(copperStair(level), opposite(g.out(u, v)), false);
 					}
 					p.set(c, u, y, v, st);
 				}
 			}
+			k++;
+			rk = rn;
 		}
-		// finial: a stepped cap, a copper lantern-room and a lightning rod
+		// crown: a slab cap, a copper lantern-room and a lightning rod
+		int top = 9 + k;
+		for (int u = 0; u < w; u++) {
+			for (int v = 0; v < d; v++) {
+				if (g.dist(u, v) <= 0.8) {
+					p.set(c, u, top, v, b(copperSlab(3)));
+				}
+			}
+		}
 		int uc = g.lo();
 		int vc = (int) Math.round(g.cv());
-		int top = 9 + layers;
-		p.set(c, uc, top, vc, b(copperSlab(3)));
 		p.set(c, uc, top + 1, vc, lantern(false));
 		p.set(c, uc, top + 2, vc, b(Blocks.LIGHTNING_ROD.waxed().oxidized()));
-		if (g.hi() != g.lo()) {
-			p.set(c, g.hi(), top, vc, b(copperSlab(3)));
-		}
+	}
+
+	private static Block copperStair(int level) {
+		return switch (level) {
+			case 0 -> Blocks.CUT_COPPER_STAIRS.waxed().unaffected();
+			case 1 -> Blocks.CUT_COPPER_STAIRS.waxed().exposed();
+			case 2 -> Blocks.CUT_COPPER_STAIRS.waxed().weathered();
+			default -> Blocks.CUT_COPPER_STAIRS.waxed().oxidized();
+		};
 	}
 
 	// ------------------------------------------------------------------ front: door wall and portico

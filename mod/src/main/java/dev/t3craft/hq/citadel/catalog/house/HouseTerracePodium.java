@@ -120,6 +120,7 @@ public final class HouseTerracePodium implements Variant {
 		balustrade(c, p, g);
 		ground(c, p, g);
 		upper(c, p, g);
+		relief(c, p, g);
 		deck(c, p, g, r);
 		pergola(c, p, g, r);
 		hut(c, p, g);
@@ -442,6 +443,41 @@ public final class HouseTerracePodium implements Variant {
 		}
 	}
 
+	/**
+	 * [depth] relief for the side and back walls: a stone sill with a flower pot under every recessed window and a
+	 * hooded lintel (an upside-down stair) over it, on both storeys, between the peristyle pillars.
+	 */
+	private static void relief(CitadelCanvas c, Plot p, G g) {
+		for (int s = 0; s < 2; s++) {
+			int u = s == 0 ? g.b0() - 1 : g.b1() + 1;
+			Direction in = s == 0 ? Direction.EAST : Direction.WEST;
+			for (int v = VWALL + 1; v < g.ve(); v++) {
+				if ((v - VWALL) % 3 == 0) {
+					continue; // a pillar stands here
+				}
+				for (int wy : new int[] {4, 8}) {
+					p.set(c, u, wy - 1, v, stair(Blocks.TUFF_BRICK_STAIRS, in, true)); // sill
+					p.set(c, u, wy, v, b(p.hash(u, wy, v, 2) == 0 ? Blocks.POTTED_FLOWERING_AZALEA : Blocks.POTTED_FERN));
+					p.set(c, u, wy + 1, v, stair(copperStairs(), in, true)); // hooded lintel
+				}
+			}
+		}
+		for (int u = g.b0() + 1; u < g.b1(); u++) {
+			if (Math.abs(u - g.cu()) % 3 == 0) {
+				continue;
+			}
+			int v = g.ve() + 1;
+			for (int wy : new int[] {4, 8}) {
+				if (Math.abs(u - g.cu()) % 3 != 1) {
+					continue; // only the cells in front of a back window
+				}
+				p.set(c, u, wy - 1, v, stair(Blocks.TUFF_BRICK_STAIRS, Direction.NORTH, true));
+				p.set(c, u, wy, v, b(p.hash(u, wy, v, 2) == 0 ? Blocks.POTTED_FLOWERING_AZALEA : Blocks.POTTED_FERN));
+				p.set(c, u, wy + 1, v, stair(copperStairs(), Direction.NORTH, true));
+			}
+		}
+	}
+
 	// ------------------------------------------------------------------ roof deck and garden (y10 / y11)
 
 	private static boolean ringCell(G g, int u, int v) {
@@ -570,7 +606,7 @@ public final class HouseTerracePodium implements Variant {
 		int u1 = u0 + 2;
 		int v0 = pv0();
 		int v1 = v0 + 2;
-		int top = DECK + 4;
+		int top = DECK + 3; // low enough for the roof to stay inside the plot's minimum height
 		for (int u : new int[] {u0, u1}) {
 			for (int v : new int[] {v0, v1}) {
 				for (int y = DECK + 1; y < top; y++) {
@@ -586,14 +622,45 @@ public final class HouseTerracePodium implements Variant {
 		for (int u = u0; u <= u1; u++) {
 			p.set(c, u, top, v0 + 1, u == u0 + 1 ? slabTop(Blocks.CHERRY_SLAB) : slab(Blocks.CHERRY_SLAB));
 		}
-		// blossom draped over the slats
-		for (int u = u0 - 1; u <= u1 + 1; u++) {
-			if (p.hash(u, top, v0, 2) == 0) {
-				p.set(c, u, top + 1, v0, leaves(Blocks.FLOWERING_AZALEA_LEAVES));
+		// [finish] a real hipped roof on the pavilion: an oxidised-copper eave ring over the beams, a cherry ring above
+		// it, a cherry core, a copper cap and a lantern finial. Corners are slabs so the hips read cleanly.
+		int mu0 = u0 - 1;
+		int mu1 = u1 + 1;
+		int mv0 = v0 - 1;
+		int mv1 = v1 + 1;
+		for (int u = mu0; u <= mu1; u++) {
+			for (int v = mv0; v <= mv1; v++) {
+				boolean edgeU = u == mu0 || u == mu1;
+				boolean edgeV = v == mv0 || v == mv1;
+				if (edgeU && edgeV) {
+					p.set(c, u, top + 1, v, slab(Blocks.CUT_COPPER_SLAB.waxed().oxidized()));
+				} else if (edgeU || edgeV) {
+					Direction in = edgeV ? (v == mv0 ? Direction.SOUTH : Direction.NORTH) : (u == mu0 ? Direction.EAST : Direction.WEST);
+					p.set(c, u, top + 1, v, stair(copperStairs(), in, false));
+				} else {
+					p.set(c, u, top + 1, v, b(Blocks.CHERRY_PLANKS));
+				}
 			}
-			if (p.hash(u, top, v1, 2) == 0) {
-				p.set(c, u, top + 1, v1, leaves(Blocks.FLOWERING_AZALEA_LEAVES));
+		}
+		for (int u = u0; u <= u1; u++) {
+			for (int v = v0; v <= v1; v++) {
+				boolean edgeU = u == u0 || u == u1;
+				boolean edgeV = v == v0 || v == v1;
+				if (edgeU && edgeV) {
+					p.set(c, u, top + 2, v, slab(Blocks.CHERRY_SLAB));
+				} else if (edgeU || edgeV) {
+					Direction in = edgeV ? (v == v0 ? Direction.SOUTH : Direction.NORTH) : (u == u0 ? Direction.EAST : Direction.WEST);
+					p.set(c, u, top + 2, v, stair(Blocks.CHERRY_STAIRS, in, false));
+				} else {
+					p.set(c, u, top + 2, v, b(Blocks.CHERRY_PLANKS));
+				}
 			}
+		}
+		if (p.has(u0 + 1, top + 3, v0 + 1)) {
+			p.set(c, u0 + 1, top + 3, v0 + 1, slab(Blocks.CUT_COPPER_SLAB.waxed().oxidized()));
+		}
+		if (p.has(u0 + 1, top + 4, v0 + 1)) {
+			p.set(c, u0 + 1, top + 4, v0 + 1, b(Blocks.LANTERN));
 		}
 		// under the pergola: table, benches facing it, lanterns
 		int mu = u0 + 1;

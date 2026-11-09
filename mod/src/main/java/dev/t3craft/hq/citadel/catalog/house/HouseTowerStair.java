@@ -93,7 +93,7 @@ public final class HouseTowerStair implements Variant {
 	}
 
 	private static final Scheme[] SCHEMES = {
-			new Scheme(Blocks.CHERRY_LOG, Blocks.STRIPPED_CHERRY_LOG, Blocks.DEEPSLATE_TILE_STAIRS, Blocks.DEEPSLATE_TILE_SLAB,
+			new Scheme(Blocks.DARK_OAK_LOG, Blocks.STRIPPED_CHERRY_LOG, Blocks.DEEPSLATE_TILE_STAIRS, Blocks.DEEPSLATE_TILE_SLAB,
 					Blocks.CHERRY_STAIRS, Blocks.CHERRY_PLANKS, Blocks.CHERRY_FENCE, Blocks.CHERRY_DOOR, Blocks.CHERRY_TRAPDOOR),
 			new Scheme(Blocks.DARK_OAK_LOG, Blocks.STRIPPED_DARK_OAK_LOG, Blocks.CHERRY_STAIRS, Blocks.CHERRY_SLAB,
 					Blocks.DEEPSLATE_TILE_STAIRS, Blocks.DARK_OAK_PLANKS, Blocks.DARK_OAK_FENCE, Blocks.DARK_OAK_DOOR, Blocks.DARK_OAK_TRAPDOOR),
@@ -109,7 +109,7 @@ public final class HouseTowerStair implements Variant {
 		Scheme s = SCHEMES[r.nextInt(SCHEMES.length)];
 		int w = p.w();
 		int d = p.d();
-		int bw = w - 4;
+		int bw = Math.min(5, w - 4); // always a slim 5-wide body
 		if (bw % 2 == 0) {
 			bw--;
 		}
@@ -117,13 +117,14 @@ public final class HouseTowerStair implements Variant {
 		int u2 = u1 + bw - 1;
 		int vf = 2;
 		int vb = d - 2;
-		L l = new L(p, s, w, d, u1, u2, u2 + 1, u2 + 2, w - 1, vf, vb, (u1 + u2) / 2, (vf + vb) / 2, vf + 4);
+		L l = new L(p, s, w, d, u1, u2, u2 + 1, u2 + 2, u2 + 3, vf, vb, (u1 + u2) / 2, (vf + vb) / 2, vf + 4);
 
 		plinth(c, l);
 		for (int k = 1; k <= 4; k++) {
 			storey(c, l, k);
 		}
 		floors(c, l);
+		buttresses(c, l);
 		porch(c, l);
 		terrace(c, l);
 		stairs(c, l);
@@ -303,7 +304,14 @@ public final class HouseTowerStair implements Variant {
 					boolean edge = u == l.u1 || u == l.u2 || v == l.vf || v == l.vb;
 					if (edge) {
 						boolean alongU = v == l.vf || v == l.vb;
-						set(c, p, u, by, v, log(l.s.trim(), alongU ? Direction.Axis.X : Direction.Axis.Z));
+						if (by == PLATE) {
+							set(c, p, u, by, v, log(l.s.trim(), alongU ? Direction.Axis.X : Direction.Axis.Z));
+						} else {
+							// [finish] thin bands: the floor edge is wall material (one shade lighter than the course below) and
+							// only a half-block ledge of stairs marks the storey; posts run through
+							boolean post = alongU ? frontPost(l, u) : sidePost(l, v);
+							set(c, p, u, by, v, post ? frameY(l) : infill(l, by == B1 ? 2 : by == B2 ? 3 : 4, u, by, v));
+						}
 					} else {
 						set(c, p, u, by, v, b(Blocks.SPRUCE_PLANKS));
 					}
@@ -336,6 +344,28 @@ public final class HouseTowerStair implements Variant {
 		set(c, p, l.u1 + 1, 5, l.vb - 1, b(Blocks.BOOKSHELF));
 		set(c, p, l.u1 + 1, 7, l.vb - 1, b(Blocks.CHEST).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.EAST));
 		set(c, p, l.u1 + 1, 10, l.vb - 1, b(Blocks.CRAFTING_TABLE));
+	}
+
+	/**
+	 * [depth] stone buttresses up the west and back walls: dark at the foot, stone in the middle, calcite at the top, a
+	 * block proud of the wall, between the windows. They break the long flat faces and make the body read as tapering.
+	 */
+	private static void buttresses(CitadelCanvas c, L l) {
+		Plot p = l.p;
+		for (int v = l.vf + 1; v < l.vb; v++) {
+			if ((v - l.vf) % 2 == 0 && !winS(l, v) && !sidePost(l, v)) {
+				for (int y = 1; y <= 8; y++) {
+					set(c, p, l.u1 - 1, y, v, infill(l, y <= 2 ? 1 : y <= 5 ? 2 : 4, l.u1 - 1, y, v));
+				}
+			}
+		}
+		for (int u = l.u1 + 1; u < l.u2; u++) {
+			if (!winF(l, u)) {
+				for (int y = 1; y <= 8; y++) {
+					set(c, p, u, y, l.vb + 1, infill(l, y <= 2 ? 1 : y <= 5 ? 2 : 4, u, y, l.vb + 1));
+				}
+			}
+		}
 	}
 
 	// ------------------------------------------------------------------ front: porch, balcony
@@ -447,7 +477,7 @@ public final class HouseTowerStair implements Variant {
 		for (int lane : new int[] {l.iu, l.ou}) {
 			set(c, p, lane, 0, vl + 1, b(Blocks.POLISHED_DEEPSLATE));
 			for (int y = 1; y <= B3 + 1; y++) {
-				set(c, p, lane, y, vl + 1, y <= B3 ? log(l.s.frame(), Direction.Axis.Y) : fence(l.s.fence(), false, false, false, false));
+				set(c, p, lane, y, vl + 1, y <= B3 ? infill(l, y <= 3 ? 1 : y <= 6 ? 2 : 4, lane, y, vl + 1) : fence(l.s.fence(), false, false, false, false));
 			}
 		}
 		for (int y = B1 + 1; y <= B3 + 1; y++) {
@@ -569,6 +599,18 @@ public final class HouseTowerStair implements Variant {
 		set(c, p, mid, top + 1, 0, fence(l.s.fence(), false, false, false, false));
 		set(c, p, mid, top + 2, 0, lantern());
 		set(c, p, mid, top + 1, l.d - 1, fence(l.s.fence(), false, false, false, false));
+		// the front overhang is carried: two cherry posts rise from the terrace rail to a beam under the roof
+		for (int u : new int[] {l.u1, l.iu}) {
+			for (int y = B2 + 1; y < PLATE; y++) {
+				set(c, p, u, y, 0, log(l.s.frame(), Direction.Axis.Y));
+			}
+		}
+		for (int u = l.u1; u <= l.iu; u++) {
+			set(c, p, u, PLATE, 0, log(l.s.frame(), Direction.Axis.X));
+			if (u > l.u1 && u < l.iu) {
+				set(c, p, u, PLATE - 1, 0, stair(l.s.eave(), Direction.SOUTH, true)); // a cove under the beam
+			}
+		}
 		// bracket under the front gable overhang
 		set(c, p, mid, roofY(l, mid) - 1, 0, stair(l.s.eave(), Direction.SOUTH, true));
 		set(c, p, mid, roofY(l, mid) - 1, 1, b(l.s.planks()));

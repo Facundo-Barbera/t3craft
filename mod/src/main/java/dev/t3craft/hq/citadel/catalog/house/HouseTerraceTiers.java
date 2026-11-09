@@ -510,10 +510,31 @@ public final class HouseTerraceTiers implements Variant {
 			for (int u = g.c0(); u <= g.c1(); u++) {
 				int top = PLATE + Math.min(u - ru0, ru1 - u);
 				for (int y = PLATE + 1; y < top; y++) {
-					p.set(c, u, y, v, u == cu && y == PLATE + 1 ? pane(Blocks.STAINED_GLASS_PANE.pick(DyeColor.PINK), true) : b(Blocks.CHERRY_PLANKS));
+					boolean outline = y == top - 1 && y > PLATE;
+					p.set(c, u, y, v, u == cu && y == PLATE + 1 ? pane(Blocks.STAINED_GLASS_PANE.pick(DyeColor.PINK), true) : outline ? b(Blocks.CHERRY_PLANKS) : plaster(p, u, y, v));
 				}
 			}
 		}
+		// the back overhang is closed too: a cherry gable board under the roof's last row, and a soffit over the wall top
+		for (int vv : new int[] {vTop, VC - 1}) {
+			for (int u = ru0; u <= ru1; u++) {
+				int top = PLATE + Math.min(u - ru0, ru1 - u);
+				for (int y = PLATE; y < top; y++) {
+					boolean outline = y == top - 1 && y > PLATE;
+					p.set(c, u, y, vv, u == cu && y == PLATE + 1 ? pane(Blocks.STAINED_GLASS_PANE.pick(DyeColor.PINK), true) : outline ? b(Blocks.CHERRY_PLANKS) : plaster(p, u, y, vv));
+				}
+			}
+		}
+		for (int u = ru0 + 1; u < ru1; u++) {
+			p.set(c, u, PLATE, g.ve(), log(Blocks.CHERRY_LOG, Direction.Axis.X));
+		}
+		// a brick chimney on the east slope breaks the ridge line
+		int chu = cu + 2;
+		int chv = (VC + g.ve()) / 2;
+		for (int y = PLATE + 1; y <= PLATE + 4; y++) {
+			p.set(c, chu, y, chv, p.hash(chu, y, chv, 3) == 0 ? b(Blocks.DEEPSLATE_BRICKS) : b(Blocks.BRICKS));
+		}
+		p.set(c, chu, PLATE + 5, chv, slab(Blocks.DEEPSLATE_BRICK_SLAB));
 		// finial on the ridge
 		p.set(c, cu, PLATE + 4, (VC + g.ve()) / 2, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState());
 	}
