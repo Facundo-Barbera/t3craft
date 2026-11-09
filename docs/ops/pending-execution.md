@@ -85,6 +85,15 @@ Quedan como estaban:
   - la desinstalación de herramientas pesadas en la VPS;
   - que el relay traiga solo reportes, sin PNG.
 
+### Migración a repo público (2026-11-09, noche): hecha
+- **Repo nuevo:** `Facundo-Barbera/t3craft`, público.
+  - El historial está reescrito y saneado: autor único con noreply y sin datos personales ni de terceros. Se conserva `gradle-wrapper.jar`.
+  - Secret scanning y push protection activos. Actions apagado.
+- **Repo viejo:** `t3craft-private-archive`, privado y archivado. Conserva los tags `archive/*` y el historial de Actions.
+- **Issues:** los 20 están en el repo nuevo con la misma numeración. #2 y #9 se recrearon limpios para no publicar el historial de ediciones; los originales quedan en el archivo.
+- **Clones nuevos:** VPS, PC y Mac, con hook `pre-push` de guardia. El `origin` del PC es el clon de la VPS.
+- **Variables de entorno:** los valores reales de host viven en variables (`T3CRAFT_VPS_HOSTNAME`, `T3CRAFT_RENDER_HOST`; perfil de la VPS y `~/.zshenv` de la Mac), porque los valores por defecto del repo ahora son placeholders.
+
 ### Ejecución (2026-11-09, noche)
 - **Fase 0 (#2, cerrado):**
   - el proyecto t3craft está registrado en el T3 de la VPS;
