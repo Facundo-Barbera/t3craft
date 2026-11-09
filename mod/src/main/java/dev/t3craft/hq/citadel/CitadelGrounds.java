@@ -160,6 +160,10 @@ public final class CitadelGrounds {
 	/** A lot column: grass with a mossy verge against the roads (the barrio then paves its own court over it). */
 	private static void lot(CitadelCanvas c, int x, int z, Zone zn) {
 		c.set(x, 0, z, CitadelPaving.lotGround(c, x, z, zn));
+		BlockState cover = CitadelPaving.vergeCover(c, x, z, zn);
+		if (cover != null) {
+			c.set(x, 1, z, cover);
+		}
 	}
 
 	/** A node column: the kit's floor (the node's piece paints its room over it). */

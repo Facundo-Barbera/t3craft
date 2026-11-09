@@ -60,6 +60,13 @@ final class CitadelPaving {
 	static final BlockState RUNNER = b(Blocks.BAMBOO_PLANKS);
 	static final BlockState RUNNER_SLAB = slab(Blocks.BAMBOO_SLAB);
 	static final BlockState KERB_SLAB = slab(Blocks.DEEPSLATE_TILE_SLAB);
+	static final BlockState CALCITE = CitadelCanvas.CALCITE;
+	static final BlockState POLISHED = b(Blocks.POLISHED_DEEPSLATE);
+	static final BlockState SIDE = b(Blocks.SMOOTH_STONE);
+	static final BlockState SIDE_SLAB = slab(Blocks.SMOOTH_STONE_SLAB);
+	static final BlockState MUD = b(Blocks.MUD_BRICKS);
+	static final BlockState PACKED_MUD = b(Blocks.PACKED_MUD);
+	static final BlockState RIB_BAND = CitadelCanvas.RIB;
 
 	// Sizes: all proportions or mirrors of the geometry.
 
@@ -78,9 +85,10 @@ final class CitadelPaving {
 	static final double RUNNER_FRAC = 0.22;
 	/** Joints every this many widths of the road. */
 	static final double JOINT_FRAC = 1.15;
-	/** A crossing's rosette: radius of the pink disc, of the white ring and of the bamboo rim, as fractions of the street's width. */
-	static final double DISC_FRAC = 0.2;
-	static final double RING_FRAC = 0.36;
+	/** A crossing's rosette: radius of the heart, of the terracotta disc, of the calcite ring and of the polished rim, as fractions of the street's width. */
+	static final double HEART_FRAC = 0.1;
+	static final double DISC_FRAC = 0.28;
+	static final double RING_FRAC = 0.4;
 	static final double RIM_FRAC = 0.5;
 	/** The plaza at the foot of the main ramp: half width, in avenue half widths. */
 	static final double PLAZA_FRAC = 2.35;
@@ -154,7 +162,12 @@ final class CitadelPaving {
 		if (d > KERB_D) {
 			return kerb(x, z);
 		}
-		return avenueField(c, x, z, d, along(x, z, n));
+		double s = along(x, z, n);
+		long gate = (long) RingCampusGeometry.ringInner(zn.ring()) + CitadelStreetscape.GATE_IN;
+		if (d > RUNNER_D && Math.abs(Math.round(s) - gate) == 1) {
+			return RIB_BAND; // the threshold on both sides of the gate
+		}
+		return avenueField(c, x, z, d, s);
 	}
 
 	/** The paved part of an avenue (or of its mouth into a street): runner, tile, joints and the cenefa. */
@@ -165,27 +178,27 @@ final class CitadelPaving {
 		if (d > KERB_D - CENEFA_W) {
 			int h = hash(x, z);
 			if (Math.floorMod((int) Math.round(s), 2) == 0) {
-				return CHISELED;
+				return CALCITE;
 			}
 			return h < 14 ? MOSSY : h < 22 ? CRACKED : BRICKS;
 		}
 		return joint(s, 2 * AVENUE_HALF) ? JOINT : c.accent();
 	}
 
-	/** Kind of a ramp column: 0 runner, 1 field, 2 kerb. */
+	/** Kind of a ramp column: 0 runner, 1 bamboo core, 2 smooth-stone side, 3 kerb. */
 	static int rampBand(int x, int z) {
 		double d = RingCampusGeometry.radialDistance(x, z, 8);
-		return d <= RUNNER_D ? 0 : d <= KERB_D ? 1 : 2;
+		return d <= RUNNER_D ? 0 : d <= AVENUE_HALF * 0.5 ? 1 : d <= KERB_D ? 2 : 3;
 	}
 
 	/** The full block of a ramp step of band {@code band}. */
 	static BlockState rampFull(int band) {
-		return band == 0 ? RUNNER : band == 1 ? BAMBOO : FOOT;
+		return band == 0 ? RUNNER : band == 1 ? BAMBOO : band == 2 ? SIDE : FOOT;
 	}
 
 	/** The half block (when the step is a half) of a ramp column of band {@code band}. */
 	static BlockState rampHalf(int band) {
-		return band == 0 ? RUNNER_SLAB : band == 1 ? slab(Blocks.BAMBOO_MOSAIC_SLAB) : KERB_SLAB;
+		return band == 0 ? RUNNER_SLAB : band == 1 ? slab(Blocks.BAMBOO_MOSAIC_SLAB) : band == 2 ? SIDE_SLAB : KERB_SLAB;
 	}
 
 	// ------------------------------------------------------------------ streets and crossings
@@ -246,24 +259,26 @@ final class CitadelPaving {
 			int n = mouthOut && dOut <= dIn ? nOut : nIn;
 			return plaza ? plazaField(c, x, z, rc, width) : avenueField(c, x, z, d, along(x, z, n));
 		}
-		return streetField(x, z, r, lo, hi, kerbT);
+		return m >= 2 ? warmField(x, z, r, lo, hi, kerbT) : streetField(x, z, r, lo, hi, kerbT);
 	}
 
 	/**
 	 * The rosette of a crossing, {@code md} from its centre ({@code dx}, {@code dz} the offsets): a
-	 * pink terracotta disc, a white ring with four red spokes (the arms of a cross) and a bamboo rim; {@code null}
-	 * outside it.
+	 * chiselled-brick heart (the landmark's plinth), a pinwheel of pink and magenta terracotta, a ring
+	 * of calcite and a rim of polished deepslate; {@code null} outside it.
 	 */
 	static BlockState rosette(double md, double dx, double dz, double width) {
+		if (md <= HEART_FRAC * width) {
+			return CHISELED;
+		}
 		if (md <= DISC_FRAC * width) {
-			return terracotta(DyeColor.PINK);
+			return terracotta((dx >= 0) == (dz >= 0) ? DyeColor.PINK : DyeColor.MAGENTA);
 		}
 		if (md <= RING_FRAC * width) {
-			boolean spoke = (Math.abs(dx) < 0.6) != (Math.abs(dz) < 0.6);
-			return terracotta(spoke ? DyeColor.RED : DyeColor.WHITE);
+			return CALCITE;
 		}
 		if (md <= RIM_FRAC * width) {
-			return BAMBOO;
+			return POLISHED;
 		}
 		return null;
 	}
@@ -303,6 +318,24 @@ final class CitadelPaving {
 		return h < 6 ? MOSSY : h < 10 ? CRACKED : BRICKS;
 	}
 
+	/**
+	 * The field of a neighbourhood street (the streets of ring 2 and 3, warmer and humbler than the
+	 * grey ring-1 street): mud bricks, a packed-mud lane against each kerb and a joint every so often.
+	 */
+	private static BlockState warmField(int x, int z, double r, double lo, double hi, double kerbT) {
+		double width = hi - lo;
+		double edge = Math.min(r - lo, hi - r) - kerbT;
+		double arc = RingCampusGeometry.theta(x, z) * (lo + hi) / 2;
+		int h = hash(x, z);
+		if (edge < EDGE_FRAC * width) {
+			return h < 30 ? MOSSY : PACKED_MUD;
+		}
+		if (joint(arc, width)) {
+			return PACKED_MUD;
+		}
+		return h < 8 ? CRACKED : MUD;
+	}
+
 	// ------------------------------------------------------------------ verges
 
 	/** Width of the verge of a lot against a road: 0.45 of an avenue half width (1.5 unscaled). */
@@ -325,6 +358,31 @@ final class CitadelPaving {
 		int h = hash(x, z);
 		int moss = edge < VERGE_W / 2 ? 70 : 35;
 		return h < moss ? CitadelCanvas.MOSS : h < moss + 12 ? b(Blocks.COARSE_DIRT) : CitadelCanvas.GRASS;
+	}
+
+	/**
+	 * What lies on the verge of a lot at {@code y = 1}, or {@code null}: a low stone-brick slab (one in
+	 * three mossy) on the first row against the kerb, which turns the kerb into a step down to the
+	 * lawn, and a fern on the second. Never inside the barrio's own square.
+	 */
+	static BlockState vergeCover(CitadelCanvas c, int x, int z, Zone zn) {
+		int m = zn.ring();
+		double r = RingCampusGeometry.r(x, z);
+		double d = RingCampusGeometry.radialDistance(x, z, RingCampusGeometry.lotsIn(m));
+		double edge = Math.min(d - AVENUE_HALF,
+				Math.min(r - RingCampusGeometry.ringInner(m), RingCampusGeometry.ringOuter(m) - r));
+		if (edge >= VERGE_W) {
+			return null;
+		}
+		RingCampusGeometry.Lot l = RingCampusGeometry.lot(zn.lot());
+		if (Math.abs(l.a(x, z)) <= l.reach() && Math.abs(l.b(x, z)) <= l.reach()) {
+			return null;
+		}
+		int h = hash(x, z);
+		if (edge < VERGE_W / 2) {
+			return h % 3 == 0 ? slab(Blocks.MOSSY_STONE_BRICK_SLAB) : slab(Blocks.STONE_BRICK_SLAB);
+		}
+		return h < 20 ? b(Blocks.FERN) : null;
 	}
 
 	// ------------------------------------------------------------------ patio and bridges
