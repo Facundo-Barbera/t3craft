@@ -587,7 +587,7 @@ public final class HouseStoneManorCourt implements Variant {
 					if (su >= 0 && su < pw && sv >= 0 && sv < pd) {
 						sillAt[su][sv] = true;
 					}
-				} else if (r.eave) {
+				} else if (lvl(r.u(t, 1), r.v(t, 1)) == 0) {
 					r.set(t, y - 1, 1, r.stairIn(Blocks.STONE_BRICK_STAIRS, true));
 					r.set(t, y, 1, p.hash(r.u(t, 1), y, r.v(t, 1), 3) == 0 ? leaves(Blocks.FLOWERING_AZALEA_LEAVES) : leaves(Blocks.AZALEA_LEAVES));
 				}
@@ -990,7 +990,7 @@ public final class HouseStoneManorCourt implements Variant {
 						BlockState s = switch (i % 3) {
 							case 0 -> StoneKit.barrel();
 							case 1 -> fac(Blocks.CHEST, in);
-							default -> b(Blocks.COMPOSTER);
+							default -> b(Blocks.HAY_BLOCK);
 						};
 						fur(rm, i, 0, 0, s);
 					}
@@ -1026,7 +1026,7 @@ public final class HouseStoneManorCourt implements Variant {
 					table(rm, 1, n - 2, in);
 					fur(rm, 0, 4, 0, b(Blocks.POTTED_CHERRY_SAPLING));
 					fur(rm, n - 1, 4, 0, StoneKit.barrel());
-					lanterns(rm, new int[] {mid}, 2);
+					lanterns(rm, new int[] {1, n - 2}, 4);
 				}
 				case LOUNGE -> {
 					for (int i = 1; i < n - 1; i++) {
@@ -1045,7 +1045,7 @@ public final class HouseStoneManorCourt implements Variant {
 							}
 						}
 					}
-					lanterns(rm, new int[] {mid}, 2);
+					lanterns(rm, new int[] {1, n - 2}, 4);
 				}
 				case BEDROOM -> {
 					DyeColor[] cols = {DyeColor.RED, DyeColor.BLUE, DyeColor.WHITE, DyeColor.CYAN};
@@ -1068,8 +1068,8 @@ public final class HouseStoneManorCourt implements Variant {
 				}
 				case STUDY -> {
 					for (int i = 0; i < n; i++) {
-						if (winBehind(rm, i) || i == mid) {
-							continue;
+						if (winBehind(rm, i) || i == mid || lvl(rm.u(i, 0), rm.v(i, 0)) > 2) {
+							continue; // a tall shelf only where the roof is right over it (nothing to stand on top)
 						}
 						for (int y = 0; y <= 3; y++) {
 							fur(rm, i, 0, y, b(Blocks.BOOKSHELF));
@@ -1150,12 +1150,13 @@ public final class HouseStoneManorCourt implements Variant {
 					w.set(u, 0, v, f);
 				}
 			}
+			int cw = cu1 - cu0 + 1;
+			int ch = cv1 - cv0 + 1;
+			int rimR = cw >= 11 && ch >= 9 ? 3 : ch >= 7 ? 2 : 1;
 			if (well) {
 				well(gc - 1, cyc - 1);
 			} else {
-				int cw = cu1 - cu0 + 1;
-				int ch = cv1 - cv0 + 1;
-				fountain(gc, cyc, cw >= 11 && ch >= 9 ? 3 : ch >= 7 ? 2 : 1);
+				fountain(gc, cyc, rimR);
 			}
 			// the tree in a front corner, a bench on the other side of the gate
 			int tu = treeEast ? cu1 - 1 : cu0 + 1;
@@ -1170,11 +1171,15 @@ public final class HouseStoneManorCourt implements Variant {
 				w.set(u, 0, cv1, b(Blocks.MOSS_BLOCK));
 				w.set(u, 1, cv1, p.hash(u, 1, cv1, 2) == 0 ? b(Blocks.FLOWERING_AZALEA) : b(Blocks.AZALEA));
 			}
-			for (int s : new int[] {-2, 2}) {
-				int u = gc + s;
-				w.set(u, 1, cv1, StoneKit.wallBlock(Blocks.STONE_BRICK_WALL, false, false, false, false, true));
-				w.set(u, 2, cv1, StoneKit.wallBlock(Blocks.STONE_BRICK_WALL, false, false, false, false, true));
-				w.set(u, 3, cv1, StoneKit.lantern(false));
+			for (int s : new int[] {-1, 1}) {
+				int u = gc + s * (rimR == 3 ? 4 : 3);
+				if (u <= cu0 || u >= cu1) {
+					continue;
+				}
+				// (one row in from the roof's eave, so nobody can stand on a lantern under it)
+				w.set(u, 1, cv1 - 1, StoneKit.wallBlock(Blocks.STONE_BRICK_WALL, false, false, false, false, true));
+				w.set(u, 2, cv1 - 1, StoneKit.wallBlock(Blocks.STONE_BRICK_WALL, false, false, false, false, true));
+				w.set(u, 3, cv1 - 1, StoneKit.lantern(false));
 			}
 		}
 
@@ -1234,18 +1239,19 @@ public final class HouseStoneManorCourt implements Variant {
 
 		private void tree(int tu, int tv) {
 			w.set(tu, 0, tv, b(Blocks.MOSS_BLOCK));
-			for (int y = 1; y <= 5; y++) {
+			for (int y = 1; y <= 6; y++) {
 				w.set(tu, y, tv, StoneKit.log(Blocks.CHERRY_LOG, Direction.Axis.Y));
 			}
-			for (int y = 4; y <= 7; y++) {
-				int r = y <= 5 ? 2 : y == 6 ? 1 : 1;
+			// the crown starts at head height + 3 and never sits under a roof (nothing to stand on)
+			for (int y = 5; y <= 8; y++) {
+				int r = y <= 6 ? 2 : 1;
 				for (int du = -r; du <= r; du++) {
 					for (int dv = -r; dv <= r; dv++) {
 						boolean corner = Math.abs(du) == r && Math.abs(dv) == r;
-						if ((du == 0 && dv == 0 && y <= 5) || (y <= 5 && corner) || (y == 7 && corner)) {
+						if ((du == 0 && dv == 0 && y <= 6) || (y != 7 && corner)) {
 							continue;
 						}
-						if (p.hash(tu + du, y, tv + dv, 6) == 0) {
+						if (p.hash(tu + du, y, tv + dv, 6) == 0 || lvl(tu + du, tv + dv) >= 0) {
 							continue;
 						}
 						placeFree(tu + du, y, tv + dv, leaves(Blocks.CHERRY_LEAVES));
