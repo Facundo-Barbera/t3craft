@@ -180,7 +180,7 @@ public final class HqRender {
 	}
 
 	/** Whether final-look renders use the GPU unless {@code --no-gpu} (tools/render-gpu). */
-	private static final boolean GPU_DEFAULT_FINAL = false;
+	private static final boolean GPU_DEFAULT_FINAL = true;
 
 	private static void runJob(String[] args) throws Exception {
 		long started = System.currentTimeMillis() - 2000;
