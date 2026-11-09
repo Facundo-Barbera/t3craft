@@ -246,7 +246,7 @@ public final class TreeCherryWeeping implements Variant {
 			order[i] = i;
 		}
 		java.util.Arrays.sort(order, (x, y) -> Double.compare(gap[y], gap[x]));
-		for (int k = 0; k < Math.min(2, n); k++) {
+		for (int k = 0; k < (n >= 5 ? 3 : 2); k++) { // a third door on the big, many-limbed trees
 			int i = order[k];
 			double da = ang[i] + (twig && i == widest ? 0.66 : 0.5) * gap[i];
 			double dx = Math.cos(da);
@@ -267,9 +267,9 @@ public final class TreeCherryWeeping implements Variant {
 		}
 
 		// ---- fallen petals: thick at the foot and under the curtains, thinning out, a little moss between
-		TreeKit.ground(t, (w - 1) / 2.0, (d - 1) / 2.0, mn * 0.5 + 1.6, (u, v, k) -> {
+		TreeKit.ground(t, (w - 1) / 2.0, (d - 1) / 2.0, mn * 0.5 + 2.2, (u, v, k) -> {
 			int hsh = t.hash(u, 0, v, 100);
-			int pet = (int) (72 - 40 * k) + (hang[v * w + u] != 0 ? 18 : 0);
+			int pet = (int) (84 - 36 * k) + (hang[v * w + u] != 0 ? 14 : 0);
 			if (hsh < pet) {
 				return TreeKit.petals(1 + t.hash(u, 1, v, k < 0.55 ? 4 : 2), t.hash(u, 2, v, 4));
 			}
