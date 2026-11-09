@@ -19,7 +19,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import net.minecraft.core.Direction;
-import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BambooLeaves;
@@ -106,6 +105,7 @@ public final class FountainKoiPond implements Variant {
 		final boolean[][] res;
 		/** Height of the walking surface over each cell (stairs 1, rim 2, deck 2.5); -1 over water. Decides where leaves may hang. */
 		final double[][] foot;
+		final boolean[][] shaded;
 		boolean bridge;
 		int vb = -1;
 		int wl;
@@ -128,6 +128,7 @@ public final class FountainKoiPond implements Variant {
 			this.k = new int[w][d];
 			this.res = new boolean[w][d];
 			this.foot = new double[w][d];
+			this.shaded = new boolean[w][d];
 		}
 
 		void run() {
@@ -145,6 +146,7 @@ public final class FountainKoiPond implements Variant {
 			corners();
 			shore();
 			tree();
+			lilies();
 		}
 
 		// ------------------------------------------------------------------ 1. the pond mask
@@ -618,18 +620,21 @@ public final class FountainKoiPond implements Variant {
 				int tu = u + t.getStepX();
 				int tv = v + t.getStepZ();
 				boolean white = placed % 3 == 1;
-				p.set(c, u, 0, v, CitadelCanvas.terracotta(white ? DyeColor.WHITE : DyeColor.ORANGE));
+				p.set(c, u, 0, v, white ? b(Blocks.WHITE_CONCRETE) : b(Blocks.ORANGE_CONCRETE));
 				if (p.has(tu, 0, tv) && openWater(tu, tv) && k[tu][tv] == WATER) {
-					p.set(c, tu, 0, tv, CitadelCanvas.terracotta(placed % 3 == 2 ? DyeColor.ORANGE : DyeColor.WHITE));
+					p.set(c, tu, 0, tv, placed % 3 == 2 ? b(Blocks.ORANGE_CONCRETE) : b(Blocks.WHITE_CONCRETE));
 				}
 				placed++;
 			}
-			// lily pads
-			for (int[] a : wet) {
-				int u = a[0];
-				int v = a[1];
-				if (k[u][v] == WATER && p.hash(u, 5, v, 4) == 0) {
-					put(c, p, u, 2, v, b(Blocks.LILY_PAD));
+		}
+
+		/** Lily pads on open water, but never under the crown (a pad can be walked on, and would get a low roof). */
+		void lilies() {
+			for (int u = 1; u < w - 1; u++) {
+				for (int v = 1; v < d - 1; v++) {
+					if (openWater(u, v) && k[u][v] == WATER && !shaded[u][v] && p.hash(u, 5, v, 4) == 0) {
+						put(c, p, u, 2, v, b(Blocks.LILY_PAD));
+					}
 				}
 			}
 		}
@@ -916,6 +921,7 @@ public final class FountainKoiPond implements Variant {
 				for (int y = 0; y < h; y++) {
 					for (int v = 0; v < d; v++) {
 						if (keep[u][y][v]) {
+							shaded[u][v] |= y < 6;
 							put(c, p, u, y, v, CitadelCanvas.leaves(Blocks.CHERRY_LEAVES));
 						}
 					}
@@ -937,7 +943,12 @@ public final class FountainKoiPond implements Variant {
 			if (u == treeU && v == treeV) {
 				return y >= 3;
 			}
-			return y >= (int) Math.ceil(foot[u][v] + 2.85);
+			BlockState g = p.at(c, u, 0, v);
+			double top = foot[u][v];
+			if (g != null && (g.is(Blocks.AZALEA) || g.is(Blocks.FLOWERING_AZALEA))) {
+				top = Math.max(top, 1.0); // an azalea bush is a step you can stand on
+			}
+			return y >= (int) Math.ceil(top + 2.85);
 		}
 
 		static double sq(double x) {
