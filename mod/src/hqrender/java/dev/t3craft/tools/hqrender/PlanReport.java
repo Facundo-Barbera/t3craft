@@ -1056,12 +1056,18 @@ public final class PlanReport {
 		Map<String, BlockPos> first = new HashMap<>();
 		Map<BlockPos, String> groups = PlanProbe.groups(plan);
 		Map<String, Integer> byGroup = new TreeMap<>();
+		Map<String, Integer> overBelow = new TreeMap<>();
+		Map<String, BlockPos> overFirst = new HashMap<>();
 		Map<String, Map<String, Integer>> typesOfGroup = new TreeMap<>();
 		JsonArray lj = new JsonArray();
 		for (PlanProbe.Unsupported u : all) {
 			String id = id(u.state());
 			String g = groups.getOrDefault(u.pos(), "(none)");
 			byId.merge(id, 1, Integer::sum);
+			Placement under = plan.at(u.pos().below());
+			String over = id + " over " + (under == null ? "(nothing in the plan)" : id(under.state()));
+			overBelow.merge(over, 1, Integer::sum);
+			overFirst.putIfAbsent(over, u.pos());
 			byGroup.merge(g, 1, Integer::sum);
 			typesOfGroup.computeIfAbsent(g, k -> new TreeMap<>()).merge(id, 1, Integer::sum);
 			first.putIfAbsent(id, u.pos());
@@ -1083,6 +1089,15 @@ public final class PlanReport {
 			}
 			sb.append(String.format(Locale.ROOT, "    %5d  %s  e.g. %s%n", e.getValue(), e.getKey(), c(first.get(e.getKey()))));
 		}
+		sb.append("  by what is under it:\n");
+		n = 0;
+		for (Map.Entry<String, Integer> e : overBelow.entrySet()) {
+			if (n++ >= o.maxList) {
+				sb.append("    … more\n");
+				break;
+			}
+			sb.append(String.format(Locale.ROOT, "    %5d  %s  e.g. %s%n", e.getValue(), e.getKey(), c(overFirst.get(e.getKey()))));
+		}
 		sb.append("  by group (top ").append(o.maxList).append("):\n");
 		List<Map.Entry<String, Integer>> groupsSorted = new ArrayList<>(byGroup.entrySet());
 		groupsSorted.sort((a, b) -> b.getValue() - a.getValue());
@@ -1102,6 +1117,9 @@ public final class PlanReport {
 		JsonObject jg = new JsonObject();
 		byGroup.forEach(jg::addProperty);
 		j.add("byGroup", jg);
+		JsonObject jo = new JsonObject();
+		overBelow.forEach(jo::addProperty);
+		j.add("byBlockOver", jo);
 		j.add("list", lj);
 		json.add("unsupported", j);
 		sections.add(sb.toString());
