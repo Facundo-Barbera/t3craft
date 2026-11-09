@@ -17,9 +17,9 @@ import org.jspecify.annotations.Nullable;
  * section of {@code config/t3craft.json} (read-only here; the client's ConfigStore keeps unknown
  * sections on save, so this key survives without this class ever writing):
  * <pre>{@code
- * "hq": { "style": "cherry" }     // cherry (default) | classic (spine styles)
+ * "hq": { "style": "cherry" }     // cherry (the only spine style)
  * }</pre>
- * Absent file, section or key: {@link #DEFAULT_ID}. Unknown or removed id (campus, ring, vertical...): the default plus one warning naming it.
+ * Absent file, section or key: {@link #DEFAULT_ID}. Unknown or removed id (classic, campus, ring, vertical...): the default plus one warning naming it.
  */
 public final class HqStyles {
 	/** Config section and key. */
@@ -28,7 +28,7 @@ public final class HqStyles {
 	/** The default style: "Campus de cerezo" (docs/research/hq-styles.md §C). */
 	public static final String DEFAULT_ID = CherryStyle.ID;
 
-	private static final List<HqStyle> ALL = List.of(new CherryStyle(), new ClassicStyle());
+	private static final List<HqStyle> ALL = List.of(new CherryStyle());
 	/**
 	 * Styles with their own layout ({@link HqStyle#ownLayout()}): selectable by id like the others,
 	 * but not in {@link #all()}, which lists the styles that paint the shared spine geometry.
@@ -83,10 +83,6 @@ public final class HqStyles {
 
 	public static HqStyle defaultStyle() {
 		return byId(DEFAULT_ID);
-	}
-
-	public static HqStyle classic() {
-		return byId(ClassicStyle.ID);
 	}
 
 	/** The style plans are generated with ({@link #DEFAULT_ID} until the config says otherwise). */

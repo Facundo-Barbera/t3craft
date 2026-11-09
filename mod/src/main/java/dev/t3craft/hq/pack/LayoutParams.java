@@ -96,12 +96,10 @@ public final class LayoutParams {
 	public static final Spec LIGHT_LATTICE = spec(ANY, "lighting.lattice", 9, 5, 9,
 			"legacy: period of the old floor-lamp lattice on outdoor grounds; ignored since the built-in fill became invisible minecraft:light");
 
-	// ------------------------------------------------------------------ classic (CherryStyle / ClassicStyle)
+	// ------------------------------------------------------------------ classic (CherryStyle)
 
 	public static final Spec CLASSIC_PETALS = spec("classic", "portico.petalsEvery", 3, 2, 9,
 			"pink petals on every Nth garden cell of the portico (rest moss)");
-	public static final Spec CLASSIC_INLAY = spec("classic", "spine.inlayEvery", 4, 3, 12,
-			"classic style: a copper inlay every N blocks down the spine's centre line");
 
 	// ------------------------------------------------------------------ hybrid-ringcampus
 
