@@ -1170,6 +1170,24 @@ public final class CitadelOffice {
 	 * plan with the map. Only lawn columns of the terrace zone are touched, in the flat frame the relief lifts afterwards.
 	 */
 	public static void garden(CitadelCanvas c) {
+		int zoneOk = 0;
+		int soilOk = 0;
+		int tiers = 0;
+		for (int dx = E + 1; dx <= 20; dx++) {
+			for (int dz = -6; dz <= 15; dz++) {
+				if (c.zoneAt(CX() + dx, CZ() + dz).kind() == RingCampusGeometry.Kind.TERRACE) {
+					zoneOk++;
+				}
+				if (lawn(c, CX() + dx, CZ() + dz)) {
+					soilOk++;
+				}
+				if (tier(c, dx, dz) > 0) {
+					tiers++;
+				}
+			}
+		}
+		System.out.println("office garden: centre " + CX() + "," + CZ() + " terrace " + zoneOk + " lawn " + soilOk + " tiers " + tiers + " at(33,0,61)="
+				+ c.at(33, 0, 61) + " zone=" + c.zoneAt(33, 61).kind());
 		for (int dx = E + 1; dx <= 20; dx++) {
 			for (int dz = -6; dz <= 15; dz++) {
 				gardenColumn(c, dx, dz);
