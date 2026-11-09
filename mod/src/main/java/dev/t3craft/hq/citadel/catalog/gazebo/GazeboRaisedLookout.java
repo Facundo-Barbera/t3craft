@@ -7,6 +7,7 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.catalog.Family;
 import dev.t3craft.hq.citadel.catalog.Plot;
+import dev.t3craft.hq.citadel.catalog.Support;
 import dev.t3craft.hq.citadel.catalog.Variant;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.Block;
@@ -290,6 +291,9 @@ public final class GazeboRaisedLookout implements Variant {
 				}
 				int y = eave + k;
 				Block mat = k == 0 ? Blocks.DEEPSLATE_TILE_STAIRS : Blocks.CHERRY_STAIRS;
+				if (k >= 1) {
+					Support.roofUnder(c, p, u, y, v, mat); // fix/settle-sources: each ring rests on the one below, not on its edge
+				}
 				boolean tieU = dl == k && dr == k;
 				boolean tieV = df == k && db == k;
 				if ((tieU || tieV) && k == kTop && !truncated) {

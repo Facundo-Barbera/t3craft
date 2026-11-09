@@ -7,6 +7,7 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.catalog.Family;
 import dev.t3craft.hq.citadel.catalog.Plot;
+import dev.t3craft.hq.citadel.catalog.Support;
 import dev.t3craft.hq.citadel.catalog.Variant;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.Blocks;
@@ -232,8 +233,11 @@ public final class WellRoofedStone implements Variant {
 				BlockState st = middle ? b(Blocks.STRIPPED_CHERRY_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.X)
 						: stairs(eave ? Blocks.CHERRY_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS, front ? Direction.SOUTH : Direction.NORTH);
 				p.set(c, u, y, v, st);
-				if (w >= 5 && (u == 0 || u == w - 1) && !middle && !eave && y - 1 >= ROOF) {
-					p.set(c, u, y - 1, v, stairs(Blocks.DEEPSLATE_TILE_STAIRS, front ? Direction.NORTH : Direction.SOUTH).setValue(BlockStateProperties.HALF, Half.TOP));
+				if (w >= 3 && (u == 0 || u == w - 1) && !middle && !eave && y - 1 >= ROOF) {
+					// fix/settle-sources: also on the narrow wells (w 3-4), where the gable's upper rows touched the eave only on an edge
+					Support.fillIfFree(c, p, u, y - 1, v, stairs(Blocks.DEEPSLATE_TILE_STAIRS, front ? Direction.NORTH : Direction.SOUTH).setValue(BlockStateProperties.HALF, Half.TOP));
+				} else if ((u == 0 || u == w - 1) && middle && y - 1 >= ROOF) {
+					Support.fillIfFree(c, p, u, y - 1, v, b(Blocks.DEEPSLATE_TILES)); // the ridge log rests on the gable end, not on the edges of the rows beside it
 				}
 			}
 		}

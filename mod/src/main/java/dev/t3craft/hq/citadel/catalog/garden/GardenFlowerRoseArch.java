@@ -8,6 +8,7 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.catalog.Family;
 import dev.t3craft.hq.citadel.catalog.Plot;
+import dev.t3craft.hq.citadel.catalog.Support;
 import dev.t3craft.hq.citadel.catalog.Variant;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.Block;
@@ -352,6 +353,7 @@ public final class GardenFlowerRoseArch implements Variant {
 			if (path[u][1]) {
 				for (int lu : new int[] {u - 2, u + 2}) {
 					if (lu > 0 && lu < w - 1 && !path[lu][0]) {
+						Support.fillIfFree(c, p, lu, 0, 0, b(Blocks.STONE_BRICKS)); // fix/settle-sources: a footing under the post (the ground row is open at the entry)
 						p.set(c, lu, 1, 0, b(Blocks.CHERRY_FENCE));
 						p.set(c, lu, 2, 0, b(Blocks.CHERRY_FENCE));
 						p.set(c, lu, 3, 0, b(Blocks.LANTERN));

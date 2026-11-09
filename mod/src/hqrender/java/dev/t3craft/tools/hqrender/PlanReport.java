@@ -1054,14 +1054,31 @@ public final class PlanReport {
 		}
 		Map<String, Integer> byId = new TreeMap<>();
 		Map<String, BlockPos> first = new HashMap<>();
+		Map<BlockPos, String> groups = PlanProbe.groups(plan);
+		Map<String, Integer> byGroup = new TreeMap<>();
+		Map<String, Integer> overBelow = new TreeMap<>();
+		Map<String, BlockPos> overFirst = new HashMap<>();
+		Map<String, Map<String, Integer>> typesOfGroup = new TreeMap<>();
 		JsonArray lj = new JsonArray();
 		for (PlanProbe.Unsupported u : all) {
 			String id = id(u.state());
+			String g = groups.getOrDefault(u.pos(), "(none)");
 			byId.merge(id, 1, Integer::sum);
+			Placement under = plan.at(u.pos().below());
+			String over = id + " over " + (under == null ? "(nothing in the plan)" : id(under.state()));
+			overBelow.merge(over, 1, Integer::sum);
+			overFirst.putIfAbsent(over, u.pos());
+			byGroup.merge(g, 1, Integer::sum);
+			typesOfGroup.computeIfAbsent(g, k -> new TreeMap<>()).merge(id, 1, Integer::sum);
 			first.putIfAbsent(id, u.pos());
 			if (lj.size() < JSON_LIST) {
 				JsonObject e = new JsonObject();
 				e.addProperty("block", id);
+				e.addProperty("group", g);
+				e.addProperty("state", u.state().toString());
+				Placement up = plan.at(u.pos().above());
+				e.addProperty("above", up == null ? "(nothing)" : up.state().toString());
+				e.addProperty("below", under == null ? "(nothing)" : under.state().toString());
 				e.add("pos", arr(u.pos().getX(), u.pos().getY(), u.pos().getZ()));
 				lj.add(e);
 			}
@@ -1076,8 +1093,37 @@ public final class PlanReport {
 			}
 			sb.append(String.format(Locale.ROOT, "    %5d  %s  e.g. %s%n", e.getValue(), e.getKey(), c(first.get(e.getKey()))));
 		}
+		sb.append("  by what is under it:\n");
+		n = 0;
+		for (Map.Entry<String, Integer> e : overBelow.entrySet()) {
+			if (n++ >= o.maxList) {
+				sb.append("    … more\n");
+				break;
+			}
+			sb.append(String.format(Locale.ROOT, "    %5d  %s  e.g. %s%n", e.getValue(), e.getKey(), c(overFirst.get(e.getKey()))));
+		}
+		sb.append("  by group (top ").append(o.maxList).append("):\n");
+		List<Map.Entry<String, Integer>> groupsSorted = new ArrayList<>(byGroup.entrySet());
+		groupsSorted.sort((a, b) -> b.getValue() - a.getValue());
+		n = 0;
+		for (Map.Entry<String, Integer> e : groupsSorted) {
+			if (n++ >= o.maxList) {
+				sb.append("    … more groups\n");
+				break;
+			}
+			sb.append(String.format(Locale.ROOT, "    %5d  %s  %s%n", e.getValue(), e.getKey(), typesOfGroup.get(e.getKey())));
+		}
 		JsonObject j = new JsonObject();
 		j.addProperty("blocks", all.size());
+		JsonObject jt = new JsonObject();
+		byId.forEach(jt::addProperty);
+		j.add("byBlock", jt);
+		JsonObject jg = new JsonObject();
+		byGroup.forEach(jg::addProperty);
+		j.add("byGroup", jg);
+		JsonObject jo = new JsonObject();
+		overBelow.forEach(jo::addProperty);
+		j.add("byBlockOver", jo);
 		j.add("list", lj);
 		json.add("unsupported", j);
 		sections.add(sb.toString());
@@ -1190,6 +1236,36 @@ public final class PlanReport {
 			sb.append("    ").append(s).append('\n');
 		}
 		sb.append("  settle: ").append(dev.t3craft.hq.citadel.CitadelSettle.lastSummary()).append('\n');
+		// fix/settle-sources: who the settled groups came from (canvas group / zone kind), most first
+		JsonArray srcJ = new JsonArray();
+		{
+			int shown = 0;
+			for (var e : dev.t3craft.hq.citadel.CitadelSettle.lastByOrigin().entrySet()) {
+				int[] a = e.getValue();
+				double mean = a[1] == 0 ? 0 : (double) a[3] / a[1];
+				if (shown++ < o.maxList) {
+					sb.append(String.format(Locale.ROOT, "    origin %-34s %3d groups (%d blocks): %d fell (mean %.1f), %d post, %d removed, %d left%n", e.getKey(), a[0], a[2], a[1], mean, a[4], a[5], a[6]));
+				}
+				if (srcJ.size() < JSON_LIST) {
+					JsonObject sj2 = new JsonObject();
+					sj2.addProperty("origin", e.getKey());
+					sj2.addProperty("groups", a[0]);
+					sj2.addProperty("blocks", a[2]);
+					sj2.addProperty("fell", a[1]);
+					sj2.addProperty("meanDrop", mean);
+					sj2.addProperty("post", a[4]);
+					sj2.addProperty("removed", a[5]);
+					sj2.addProperty("left", a[6]);
+					srcJ.add(sj2);
+				}
+			}
+			int listed = 0;
+			for (var s2 : dev.t3craft.hq.citadel.CitadelSettle.lastSources()) {
+				if (listed++ < o.maxList) {
+					sb.append(String.format(Locale.ROOT, "      %-7s %2d blocks drop %d at %d,%d,%d  %s / %s  %s  %s%n", s2.outcome(), s2.blocks(), s2.drop(), s2.x(), s2.y(), s2.z(), s2.group(), s2.zone(), s2.piece(), s2.blocksOf() + "  " + s2.box()));
+				}
+			}
+		}
 		sb.append("  beams: ").append(runs).append(" runs of horizontal logs, ").append(bad.size()).append(" with nothing solid under them or at their ends (")
 				.append(lonely).append(" touch nothing, ").append(heldOnly).append(" only hang from a wall or ceiling)\n");
 		JsonArray bj = new JsonArray();
@@ -1237,6 +1313,23 @@ public final class PlanReport {
 		j.addProperty("settleRemovedBlocks", st[5]);
 		j.addProperty("settleLeft", st[6]);
 		j.addProperty("settleLeftBlocks", st[7]);
+		j.add("settleOrigins", srcJ);
+		JsonArray allJ = new JsonArray();
+		for (var s2 : dev.t3craft.hq.citadel.CitadelSettle.lastSources()) {
+			JsonObject so = new JsonObject();
+			so.addProperty("group", s2.group());
+			so.addProperty("zone", s2.zone());
+			so.addProperty("piece", s2.piece());
+			so.addProperty("outcome", s2.outcome());
+			so.addProperty("drop", s2.drop());
+			so.addProperty("blocks", s2.blocks());
+			so.addProperty("at", s2.x() + "," + s2.y() + "," + s2.z());
+			so.addProperty("made", s2.blocksOf());
+			so.addProperty("box", s2.box());
+			so.addProperty("detail", s2.detail());
+			allJ.add(so);
+		}
+		j.add("settleGroups", allJ);
 		json.add("split", j);
 		sections.add(sb.toString());
 		summary.put("settled floating", dev.t3craft.hq.citadel.CitadelSettle.lastSummary());

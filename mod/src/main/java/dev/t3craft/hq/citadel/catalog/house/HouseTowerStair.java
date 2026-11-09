@@ -16,6 +16,7 @@ import static dev.t3craft.hq.citadel.catalog.house.HouseTowerKit.wall;
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.catalog.Family;
 import dev.t3craft.hq.citadel.catalog.Plot;
+import dev.t3craft.hq.citadel.catalog.Support;
 import dev.t3craft.hq.citadel.catalog.Variant;
 import java.util.Random;
 import net.minecraft.core.Direction;
@@ -578,9 +579,13 @@ public final class HouseTowerStair implements Variant {
 				if (i >= m) {
 					boolean apex = u == l.cu && v == mid;
 					set(c, p, u, y, v, apex ? b(Blocks.GOLD_BLOCK) : b(Blocks.DEEPSLATE_TILES));
+					Support.roofUnder(c, p, u, y, v, Blocks.DEEPSLATE_TILES); // fix/settle-sources: touches the ring below on a face
 					continue;
 				}
 				Block blk = i == 0 ? l.s.eave() : l.s.roof();
+				if (i >= 1) {
+					Support.roofUnder(c, p, u, y, v, blk); // fix/settle-sources: each ring rests on the one below, not on its edge
+				}
 				Direction fu = u - uw < ue - u ? Direction.EAST : Direction.WEST;
 				Direction fv = v - vn < vsr - v ? Direction.SOUTH : Direction.NORTH;
 				if (du < dv) {

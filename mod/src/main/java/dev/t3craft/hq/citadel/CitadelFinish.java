@@ -649,6 +649,7 @@ public final class CitadelFinish {
 		}
 		CitadelRelief.apply(c);
 		CitadelSettle.apply(c); // fix/relief-floating: no floating group survives the relief (it falls, gets a post or goes)
+		CitadelSupport.apply(c); // fix/unsupported-blocks: plants get soil, lanterns a hook, nothing is left that vanilla would drop
 		fillAir(c);
 		CitadelAmbience.lights(c);
 		PlanShapes.resolve(c.cells);
