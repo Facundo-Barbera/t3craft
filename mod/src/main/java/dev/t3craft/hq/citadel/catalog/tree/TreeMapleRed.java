@@ -159,7 +159,7 @@ public final class TreeMapleRed implements Variant {
 			int py = lowY + ((k & 1) == 1 && H >= 10 ? 1 : 0) + (r.nextInt(5) == 0 ? 1 : 0);
 			double rx = rbase * (0.9 + r.nextDouble() * 0.35);
 			double rz = rx * (0.72 + r.nextDouble() * 0.28);
-			fan(t, r, cu0, cv0, ang, 0.8 + r.nextDouble() * 0.15, rx, rz, py, 2 + (k & 1), tu, tv, id++, sun, bias, 0.0, m);
+			fan(t, r, cu0, cv0, ang, 0.8 + r.nextDouble() * 0.15, rx, rz, py, (m <= 5 ? 2 : 3) + (k & 1), tu, tv, id++, sun, bias, 0.0, m);
 		}
 		if (H >= 13) {
 			int nMid = m >= 8 ? 3 : 2;
