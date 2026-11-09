@@ -119,6 +119,7 @@ final class RingCampusGenerator {
 		for (int k = 0; k < 8; k++) {
 			dev.t3craft.hq.citadel.CitadelNodes.node(canvas, RingCampusGeometry.node(k));
 		}
+		dev.t3craft.hq.citadel.CitadelOffice.office(canvas);
 		int lotCount = RingCampusGeometry.base(canvas.rings + 1);
 		for (int lot = 0; lot < lotCount; lot++) {
 			TreeMap<Integer, HqLayout.Module> mods = canvas.lots.get(lot);
