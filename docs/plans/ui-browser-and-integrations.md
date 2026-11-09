@@ -1,7 +1,23 @@
 # Plan: interfaces, navegador e integraciones
 
-Rama `research/game-ui-integrations`, 2026-11-09. **Nada de esto está implementado ni aprobado para implementarse.**
-Este hilo es de investigación y docs: no se tocó código del mod, no se compiló y no se abrió ninguna imagen.
+Rama `research/game-ui-integrations`, 2026-11-09. Este hilo es de investigación y docs: no se tocó código del mod, no se
+compiló y no se abrió ninguna imagen.
+
+## Estado
+
+**Plan aprobado por Facundo (2026-11-09).** El coordinador lo toma como siguiente frente **cuando terminen la limpieza
+(issue #5) y la migración del repo**. Hecho ya, en este hilo y solo en docs:
+
+- **Fase 0 del frente A escrita en `docs/dev.md`** (sección "UI cycle", más el diagnóstico en "Hot-swap"): cliente de
+  desarrollo en Windows nativo con el IDE del mismo lado y en depuración, qué recarga F3+T, T4 por defecto (compilar en la PC,
+  jugar en el Mac), WSL solo para renders, y las cinco causas de que un hot-swap no haga nada.
+- **Q1 aprobada:** los tokens de UI pasan a `ui-style.json`, **después del issue #5**.
+- **Q5 aprobada:** el **coordinador** actualiza `AGENTS.md` con la regla del cliente de Windows. Este hilo **no toca
+  `AGENTS.md`**.
+- **Issues creados** a partir de §10 (ver esa sección).
+- Las otras seis preguntas de §9 **siguen abiertas** hasta la fase que bloquea cada una.
+
+Nada del código del mod está implementado: todas las fases 1 a 7 están por hacer.
 
 - **Investigación de respaldo:** `docs/research/game-ui-and-integrations.md` (catálogo completo, 14 anexos, con las fuentes y
   lo que quedó por verificar). Este plan es la versión ordenada y decidida de ese material.
@@ -68,7 +84,7 @@ Tareas: mover el cliente de desarrollo a **Windows nativo** con el IDE del mismo
 *Build and run using: IntelliJ*, y **sin** `-Pt3craft.hotswap` al principio. Resultado: HotSwap de cuerpos de método, que es lo
 que la propia doc de Fabric cita para *"screen element alignment"*.
 - Esfuerzo: **S**, sin código. Lo hace Facundo en su PC.
-- **Dato del PC:** correr Minecraft dentro de WSL con WSLg no es buen camino (OpenSSL por software, techo de ~72 fps por la
+- **Dato del PC:** correr Minecraft dentro de WSL con WSLg no es buen camino (OpenGL por software, techo de ~72 fps por la
   copia de cuadros, inestabilidad reportada). De ahí D7.
 
 ### A2. Lo que Fabric da gratis y hoy no se aprovecha
@@ -212,9 +228,9 @@ compila ahí, a través de `tools/heavy.sh`. Con D7 hay dos cosas nuevas:
 - `tools/heavy.sh` es un script de Linux con un lock en `/tmp`: un Gradle en Windows **no toma ese lock**, así que un build de
   Facundo y uno del coordinador en WSL podrían coincidir en la misma máquina.
 
-**Propuesta (no aplicada):** una fila o nota en esa tabla que diga que Windows corre el cliente de desarrollo interactivo de
-Facundo y que WSL se queda con Gradle de agentes y renders, y una línea sobre el lock. **No toco `AGENTS.md` sin tu OK**: es el
-archivo que gobierna a todos los hilos y el coordinador puede estar mergeando.
+**Resuelto (Q5 aprobada):** el **coordinador** añade a esa tabla que Windows corre el cliente de desarrollo interactivo y que
+WSL se queda con el Gradle de los agentes y los renders, más una línea sobre el lock. Este hilo no toca `AGENTS.md`.
+`docs/dev.md` ya documenta los dos lados de la PC y el aviso del lock.
 
 ### 6.2 Choque con la limpieza en curso (issues #3 a #8)
 La limpieza mueve paquetes (#5) y toca duplicados y clases grandes (#6). **B1 y B4 tocan muchos archivos de `client/`**, así que
@@ -272,16 +288,16 @@ navegador". Conviene decidirlo **después** de C1.
 
 ## 9. Preguntas que bloquean fases
 
-| # | Pregunta | Bloquea |
-|---|---|---|
-| **Q1** | ¿Apruebas mover los tokens de UI a `ui-style.json` (cambio en `ChatTheme` y sus consumidores) para que F3+T recargue colores y medidas? | Fase 2 |
-| **Q2** | ¿El UI scale propio **reemplaza** al GUI scale en nuestras pantallas, o es un **multiplicador** encima de él? Lo segundo es más seguro para quien ya tiene el suyo afinado | Fase 4 |
-| **Q3** | Gmail y Google Chat: ¿aceptas que probablemente no se puedan loguear y que el navegador sirva para GitHub, docs y dashboards? ¿O quieres explorar el cliente nativo de correo? | C4 |
-| **Q4** | ¿Autorizas el **spike C1** (compilar y abrir el juego en el PC para medir qué sitios funcionan)? | Fase 1 |
-| **Q5** | ¿Actualizo `AGENTS.md` con D7 y la nota del lock (6.1)? | 6.1 |
-| **Q6** | ¿Qué pantallas quieres pulir primero: las de widgets vanilla (ajustes, emparejado, confirmaciones) o el chat? | Fase 3 |
-| **Q7** | ¿Apruebas un "runner de escenarios de UI" con los client gametests (capturas reales, repetibles) a pesar de la regla "sin tests"? Lo trataría como herramienta, no como suite | Opcional en fase 2 |
-| **Q8** | ¿Cuáles de estas ideas convierto en **issues**? `gh` está autenticado en esta máquina; no creo ninguno hasta que apruebes | Todo el seguimiento |
+| # | Pregunta | Bloquea | Estado |
+|---|---|---|---|
+| **Q1** | ¿Mover los tokens de UI a `ui-style.json` (cambio en `ChatTheme` y sus consumidores) para que F3+T recargue colores y medidas? | Fase 2 | **Aprobada (2026-11-09), a hacer después del issue #5** |
+| **Q2** | ¿El UI scale propio **reemplaza** al GUI scale en nuestras pantallas, o es un **multiplicador** encima de él? Lo segundo es más seguro para quien ya tiene el suyo afinado | Fase 4 | Abierta |
+| **Q3** | Gmail y Google Chat: ¿se acepta que probablemente no se puedan loguear y que el navegador sirva para GitHub, docs y dashboards? ¿O se explora el cliente nativo de correo? | C4 | Abierta, se decide con el resultado de C1 |
+| **Q4** | ¿Se autoriza el **spike C1** (compilar y abrir el juego en la PC para medir qué sitios funcionan)? | Fase 1 | Abierta |
+| **Q5** | ¿Actualizar `AGENTS.md` con D7 y la nota del lock (6.1)? | 6.1 | **Aprobada (2026-11-09): lo hace el coordinador** |
+| **Q6** | ¿Qué pantallas se pulen primero: las de widgets vanilla (ajustes, emparejado, confirmaciones) o el chat? | Fase 3 | Abierta |
+| **Q7** | ¿Se aprueba un "runner de escenarios de UI" con los client gametests (capturas reales, repetibles) a pesar de la regla "sin tests"? Sería una herramienta, no una suite | Opcional en fase 2 | Abierta |
+| **Q8** | ¿Cuáles de estas ideas se convierten en **issues**? | Todo el seguimiento | **Resuelta: los 10 de §10, creados el 2026-11-09** |
 
 ### Preguntas abiertas de menor urgencia (del mapa original)
 - **Scopes:** costo y tokens piden `diagnostics:read`, el navegador interactivo de T3 pide `preview:operate`, y comentar PRs
@@ -294,15 +310,23 @@ navegador". Conviene decidirlo **después** de C1.
 
 ---
 
-## 10. Issues propuestos (pendientes de aprobación, Q8)
+## 10. Issues (creados el 2026-11-09, etiqueta `enhancement`)
 
-1. **Ciclo de desarrollo de UI**: arreglar el hot reload oficial, documentarlo en `dev.md`, script del jar al Mac (frente A).
-2. **Tokens de UI como recurso** con recarga por F3+T (B1).
-3. **Galería de pantallas `/t3dev ui`** (B2).
-4. **Kit de UI y migración de las pantallas de widgets vanilla** (B3 y B4).
-5. **UI scale propio y fuente TTF** (B5).
-6. **Spike: navegador embebido**, qué sitios cargan y se loguean en Rinku y MCEF Modern (C1).
-7. **Navegador para cosas de fuera**: `WebScreen`, lanzadores y lista de dominios (C2 y C3).
-8. **Señales discretas de atención**: título de ventana, parpadeo de la barra de tareas, action bar (frente D).
-9. **Cola de atención**: tecla "siguiente hilo que me necesita" y flecha hacia su NPC (frente D).
-10. **Eventos salientes**: webhook genérico con ntfy y Discord como primeras plantillas (frente D).
+| Issue | Tema | Frente | Fase | Dependencias |
+|---|---|---|---|---|
+| [#11](https://github.com/Facundo-Barbera/t3craft/issues/11) | Ciclo de desarrollo de UI: hot reload oficial y ver el resultado con fidelidad | A (A1, A4) | 0 y 1 | Ninguna. A3 ya hecho en `docs/dev.md` |
+| [#12](https://github.com/Facundo-Barbera/t3craft/issues/12) | Tokens de UI como recurso recargable con F3+T | B1 | 2 | **Después del #5.** Q1 aprobada |
+| [#13](https://github.com/Facundo-Barbera/t3craft/issues/13) | Galería de pantallas `/t3dev ui <escenario>` | B2 | 2 | Conviene tras el frente A |
+| [#14](https://github.com/Facundo-Barbera/t3craft/issues/14) | Kit de UI propio y migración de las pantallas con widgets vanilla | B3 y B4 | 3 | **Después del #5** y del #12. Q6 abierta |
+| [#15](https://github.com/Facundo-Barbera/t3craft/issues/15) | Escala de UI propia, fuente TTF y catálogo de iconos | B5 y B6 | 4 | Tras el #14. **Q2 abierta** |
+| [#16](https://github.com/Facundo-Barbera/t3craft/issues/16) | Spike: medir qué sitios funcionan en un navegador embebido (CEF) | C1 | 1 | Necesita compilar y abrir el juego en la PC. **Q4 abierta** |
+| [#17](https://github.com/Facundo-Barbera/t3craft/issues/17) | Navegador en el juego para cosas de fuera: pantalla, lanzadores y dominios | C2 y C3 | 5 | Tras el #16. Q3 se decide con su informe |
+| [#18](https://github.com/Facundo-Barbera/t3craft/issues/18) | Señales discretas de atención: título de ventana, atención del sistema y barra de acción | D | 6 | Ninguna fuerte |
+| [#19](https://github.com/Facundo-Barbera/t3craft/issues/19) | Cola de atención: tecla al siguiente hilo que te necesita e indicador direccional | D | 6 | Ninguna fuerte |
+| [#20](https://github.com/Facundo-Barbera/t3craft/issues/20) | Eventos salientes: webhook genérico con plantillas de push y chat | D | 6 | Ninguna fuerte |
+
+Los cuerpos se escribieron sin datos de infraestructura (sin IPs, nombres de máquina, usuarios ni rutas personales) porque el
+repo se va a publicar y los issues se transfieren al repo nuevo. Por eso no llevan enlaces a archivos: citan la ruta del plan y
+su sección, que sobreviven a la transferencia.
+
+El diff nativo (idea nº 6 del mapa original) **no tiene issue todavía**: su prioridad depende del #16, ver 7.1.
