@@ -201,7 +201,7 @@ public final class PlazaCenterOctagonBandstand implements Variant {
 		int n = Math.min(Math.min(cu, w - 1 - cu), Math.min(cv, d - 1 - cv));
 		int ph = n >= 8 && p.h() >= 12 ? 2 : 1;
 		int pl = n - ph;
-		int k = pl - 1;
+		int k = Math.min(pl - 1, 5 + Math.max(0, p.h() - 10) / 2); // a big platform keeps a wide apron round a pavilion the roof can cover
 		int t = (int) Math.round(0.4142 * k);
 		Geo g = new Geo(cu, cv, n, ph, pl, k, t, n >= 9 ? 2 : 1);
 
@@ -236,6 +236,7 @@ public final class PlazaCenterOctagonBandstand implements Variant {
 			}
 		}
 		finial(c, p, g, roof);
+		apron(c, p, g);
 		stage(c, p, g);
 		for (int sx = -1; sx <= 1; sx += 2) {
 			for (int sz = -1; sz <= 1; sz += 2) {
@@ -369,7 +370,7 @@ public final class PlazaCenterOctagonBandstand implements Variant {
 			if (m > ri - 1 && m > 0.5) {
 				p.set(c, u, y, v, stairs(r.stair(rib, 0), in));
 			} else {
-				p.set(c, u, y, v, r.tread(false, p.hash(u, y, v, 7)));
+				p.set(c, u, y, v, r.tread(rib && m > 2.5, p.hash(u, y, v, 7)));
 			}
 		}
 	}
@@ -386,6 +387,25 @@ public final class PlazaCenterOctagonBandstand implements Variant {
 				s = fs >= 2 && i == 0 ? b(Blocks.GOLD_BLOCK) : Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState();
 			}
 			at(c, p, g, 0, y + i, 0, s);
+		}
+	}
+
+	/** On a wide apron (platform bigger than the pavilion): a lamp post on each diagonal, at the platform's edge. */
+	private void apron(CitadelCanvas c, Plot p, Geo g) {
+		if (g.pl() - g.k() < 3) {
+			return;
+		}
+		int q = (int) Math.floor((g.pl() + 0.4) / Math.sqrt(2));
+		for (int sx = -1; sx <= 1; sx += 2) {
+			for (int sz = -1; sz <= 1; sz += 2) {
+				int dx = sx * q;
+				int dz = sz * q;
+				int y = g.h();
+				at(c, p, g, dx, y, dz, b(Blocks.POLISHED_DEEPSLATE));
+				at(c, p, g, dx, y + 1, dz, b(Blocks.CHERRY_FENCE));
+				at(c, p, g, dx, y + 2, dz, b(Blocks.CHERRY_FENCE));
+				at(c, p, g, dx, y + 3, dz, Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, false));
+			}
 		}
 	}
 
