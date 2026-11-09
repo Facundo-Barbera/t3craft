@@ -56,32 +56,44 @@ generador:
   muestra al líder y a sus hijos vivos con su estado (`client.blocks.LeadFeed`). Se memoiza con la
   versión del roster.
 
-### Ciudadela: cómo engancharla (coordinador)
+### Ciudadela: la oficina (struct/lead-office)
 
-La pieza está en `citadel/CitadelLeadOffice.java`. No se tocó ningún archivo existente de la
-ciudadela. En `CitadelBarrios.hall`, dentro de `for (HqLayout.Module mod : ...)`, envuelve el bucle
-de escritorios:
+La pieza está en `citadel/CitadelLeadOffice.java` y la llama `CitadelBarrios.hall`. Todo sale de
+`r.w()`, `r.d()` y `fh()` (ninguna medida fija), así que sirve a cualquier escala de la ciudadela:
 
 ```java
-if (!CitadelLeadOffice.place(c, mod, r, f)) {
-    for (int slot = 0; slot < mod.capacity(); slot++) {
-        String thread = mod.threadAt(slot);
-        if (thread != null) {
-            desk(c, mod.index(), r, f, slot, thread);
-        }
-    }
-}
+boolean leadHall = CitadelLeadOffice.isLead(ground);              // módulo de planta baja de un líder
+int F = upper != null || leadHall && CitadelLeadOffice.twoFloors(r) ? 2 : 1;
+...
+if (leadHall) { if (F == 2) CitadelLeadOffice.flight(c, r, style); }   // sin mobiliario genérico
+else { hallStairs / HallInterior.furnish }
+...
+if (!CitadelLeadOffice.place(c, mod, r, f, style, mats)) { /* los 6 escritorios de siempre */ }
 ```
 
-`place` devuelve `false` y no pinta nada si el módulo no es una oficina de líder. La pieza pinta:
-- el escritorio del líder (slot 0);
-- una big screen de 3×2 en el slot 1 (`bigscreen_lead@<i>@3x2=project:lead:<npcId>`);
-- el estandarte;
-- librero (slot 2) y pizarra (slot 3);
-- sillas que miran al fondo (slots 4 y 5).
+`place` devuelve `false` y no pinta nada si el módulo no es una oficina de líder en planta baja.
+`CitadelBarrios.deskAt` es el cuerpo de `desk` con un `DeskSpot` arbitrario.
 
-Esa clave `lead@<i>` desactiva el fallback para ese módulo. Mientras no se enganche, la ciudadela usa
-el fallback.
+**Sala grande** (`w >= 13`; escala 200, por defecto: 17×20, 7 de alto): una planta con todo.
+- Pasillo central de 5 con alfombra, que lleva de la puerta al escritorio del líder (3 de ancho, monitor
+  3×2); el líder está de pie en el pasillo, mirando al fondo, como los demás escritorios.
+- Detrás, en la pared del fondo, la big screen `bigscreen_lead@<i>@11x4=project:lead:<npcId>` sobre un mueble
+  de cofres y barriles, entre dos mástiles.
+- Sala de espera: 3 filas de 6 sillas a cada lado del pasillo separadas 3 bloques, mirando al líder y a la
+  pantalla (`leadseat_<npcId>#k`: la celda libre delante de cada silla, las más cercanas primero, 18). Salón
+  con mesa baja y 8 asientos (oeste), estantes de archivo en el vestíbulo.
+- Pizarra de notas de 8×4 en la pared oeste (los cristales de detrás pasan a muro).
+- Rincón de reuniones (este): mesa de 4×2 con 12 sillas en total, alfombra y pizarra de presentación en el
+  muro frontal; mostrador de utilidades en la pared este (mesa de trabajo, cofre, barril, atril, cartografía).
+- Vigas de techo cada 5 filas con linternas colgantes; suelo de piedra en el vestíbulo y bajo el escritorio.
+- Asta con bandera del color del entorno en la cumbrera (fuera de la chimenea).
+
+**Sala pequeña** (`w < 13`, escala 100: 9×10): usa **las dos plantas** del salón (el líder no comparte su
+barrio): abajo la sala de briefing (mismo programa con pantalla 7×3, pizarra 4×3, dos filas de 4 sillas) y
+una escalera a lo largo del muro este (`flight`: primer escalón de frente, 2 libres encima); arriba la sala
+de planificación (mesa de 4×2 con 8 sillas, pizarra de presentación, mostrador y estantes).
+
+Esa clave `lead@<i>` desactiva el fallback para ese módulo.
 
 ## "Dirigir"
 
@@ -131,8 +143,7 @@ inOffice)`).
   líder; si no alcanzan, en puntos frente a la puerta de la oficina; si tampoco, en filas detrás del
   escritorio del líder (`AnchorSource.reviewSeats`).
   - Las sillas son anclas nuevas `leadseat_<npcId>#k` (`AnchorNames.leadSeat`): la celda libre frente a
-    cada silla, como los bancos del hub. Las publican `CitadelLeadOffice` (slots 4 y 5, cuatro
-    sillas) y la oficina classic (`LeadOfficeRoom.seats`, las dos sillas de visita del slot 1). No son
+    cada silla, como los bancos del hub. Las publican `CitadelLeadOffice` (la sala de espera: 8 sillas a 9×10, 18 a 17×20) y la oficina classic (`LeadOfficeRoom.seats`, las dos sillas de visita del slot 1). No son
     anclas "standing", así que los validadores del plan las ignoran.
   - La puerta es el ancla `module@<i>` del módulo del escritorio del líder: tres puntos dos bloques
     fuera de la puerta, mirando hacia dentro (`HqWorldAnchors.reviewSeats`, cacheado por instancia).
