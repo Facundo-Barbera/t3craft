@@ -90,6 +90,7 @@ The recommended loop for screens, the HUD and anything else visual. Plan:
 |---|---|---|
 | Method bodies (layout maths, draw calls, conditions) | IDE: *Build Project* / *Reload changed classes* | Client started in debug mode |
 | Textures, GUI sprites, their `.mcmeta` nine-slice, models, fonts, `lang` | **F3+T** in game | Nothing. Works today |
+| UI colours and metrics (`ChatTheme` tokens in `assets/t3craft/gui/ui-style.json`) | **F3+T** in game | Nothing. See "UI tokens" below |
 | Datapack data | `/reload` | Server-side only, not used by the UI |
 | Fields, records, new methods, nested classes | Restart, or JBR (see "Shape changes") | — |
 
@@ -132,6 +133,45 @@ not the default, and it needs a direct connection on the private network to be w
 `uiRender` (`docs/tools/ui-render.md`) paints `T3Screen` and its dialogs to PNG with mock data and no
 game at all. Treat it as a **layout check**, not a design tool: it allocates `Minecraft` without
 running its constructor, paints with Java2D, and has no Unifont, shaders, IME or clipboard.
+
+### 6. UI tokens: restyle with F3+T (#12)
+
+The colours and metrics of the chat kit (`ChatTheme`: panel, ink, accent, status colours, row heights,
+margins…) live in `mod/src/main/resources/assets/t3craft/gui/ui-style.json`, not in Java. A Fabric reload
+listener (`UiStyleReloader`) re-reads it on every resource reload, so **F3+T restyles the open screens**
+(`T3Screen`, the archive, the wall boards) with no HotSwap, no debugger and no restart.
+
+- Two themes: `warm_studio` (the paper console, the default) and `terminal` (dark teal, flat fills).
+  Keys are the `ChatTheme` component names; colours are `"#RRGGBB"` or `"#AARRGGBB"`, metrics are numbers.
+- A missing key keeps its built-in value (`ChatTheme.builtinWarmStudio()` / `builtinTerminal()`), so a
+  resource pack can override a single colour. **When you add a token to `ChatTheme`, add its key to the file
+  and its built-in value in Java** (the file is the one you edit; the Java value is the fallback).
+- Bad values are skipped with a WARN in `latest.log` (`t3craft/ui-style`); a file that is not valid JSON is
+  ignored whole and the previous style stays, so a typo while editing never blanks the UI.
+- Edit the file in the source tree, rebuild resources (`./gradlew processResources`, or the IDE's build),
+  press F3+T. Never hard-code a colour in a screen: add a token.
+- Screens read `ChatTheme.warmStudio()` / `terminal()` (same instance until a reload). A screen that keeps
+  the theme in a field compares `theme != ChatTheme.warmStudio()` in `tick()` and re-lays itself (see
+  `T3Screen.syncTheme`).
+
+### 7. The UI gallery: `/t3dev ui <scenario>` (#13)
+
+`/t3dev ui` lists the scenarios and `/t3dev ui inbox` opens one, with **fake data and no T3 or network**
+(`client/debug/UiGallery`). After a restart you are one command away from the exact screen you were
+tuning; combined with F3+T it is the fast loop for visual work.
+
+| Scenario | Opens |
+|---|---|
+| `inbox`, `inbox-readonly`, `inbox-empty` | The main T3 screen: every thread state and a running conversation / read-only / no threads |
+| `confirm`, `snooze` | The destructive-action confirmation and the snooze presets |
+| `pair`, `operate-pair`, `environments`, `settings` | Pairing, enable-control, the environment list and the settings (vanilla-widget screens) |
+| `queue` | The queued-runs screen (reads the live queue) |
+
+The fake environment is `t3dev-gallery`; its transcripts never reach the disk cache. Real things stay
+real: `settings` saves the actual config, and an action aimed at the fake environment fails with the usual
+error toast. To add a scenario, add a `Scenario` to `UiGallery.SCENARIOS`. The scenarios are written in
+code because the `uiRender` fixtures live in a tool source set that is not in the mod jar; `uiRender`
+remains the headless layout check for agents.
 
 ## Hot-swap
 

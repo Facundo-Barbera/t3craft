@@ -23,6 +23,7 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
+import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.network.chat.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,7 +39,7 @@ import org.slf4j.LoggerFactory;
  *   another branch is just skipped) so a redefinition is noticed even before those modules subscribe
  *   their own {@link dev.t3craft.debug.Resettable}.</li>
  *   <li>Registers the client-only {@code /t3dev} command: {@code status}, {@code reset}, {@code check},
- *   {@code enable <module>}, {@code disable <module>}.</li>
+ *   {@code enable <module>}, {@code disable <module>}, and {@code ui [scenario]} (the UI gallery, {@link UiGallery}).</li>
  * </ul>
  */
 public final class DevReloadClient implements ClientModInitializer {
@@ -118,6 +119,11 @@ public final class DevReloadClient implements ClientModInitializer {
 							c.getSource().sendFeedback(prefix().append("perf counters reset"));
 							return 1;
 						})))
+				.then(literal("ui")
+						.executes(c -> uiList(c.getSource()))
+						.then(argument("scenario", StringArgumentType.word())
+								.suggests((c, b) -> SharedSuggestionProvider.suggest(UiGallery.ids(), b))
+								.executes(c -> uiOpen(c.getSource(), StringArgumentType.getString(c, "scenario")))))
 				.then(literal("check").executes(c -> {
 					boolean changed = DevReload.get().checkForRedefinition();
 					c.getSource().sendFeedback(prefix().append(changed ? "redefinition found; state reset" : "no class layout change"));
@@ -135,6 +141,27 @@ public final class DevReloadClient implements ClientModInitializer {
 					c.getSource().sendFeedback(prefix().append("disabled " + m));
 					return 1;
 				}))));
+	}
+
+	/** {@code /t3dev ui}: the gallery's scenarios (issue #13, docs/dev.md "UI cycle"). */
+	private static int uiList(FabricClientCommandSource src) {
+		src.sendFeedback(prefix().append("UI gallery: /t3dev ui <scenario> (fake data, no T3 needed); F3+T restyles it live"));
+		for (UiGallery.Scenario s : UiGallery.scenarios()) {
+			src.sendFeedback(Component.literal("  " + s.id() + " ").withStyle(ChatFormatting.AQUA)
+					.append(Component.literal(s.description()).withStyle(ChatFormatting.GRAY)));
+		}
+		return UiGallery.scenarios().size();
+	}
+
+	/** {@code /t3dev ui <scenario>}: opens it on the next tick (the chat screen that ran the command closes right after). */
+	private static int uiOpen(FabricClientCommandSource src, String id) {
+		net.minecraft.client.gui.screens.Screen screen = UiGallery.open(id);
+		if (screen == null) {
+			src.sendFeedback(prefix().append("no scenario '" + id + "'; /t3dev ui lists them").withStyle(ChatFormatting.RED));
+			return 0;
+		}
+		T3CraftClient.get().openNextTick(screen);
+		return 1;
 	}
 
 	/** FPS and every counter with activity in the last second (see docs/dev.md, "Performance"). */

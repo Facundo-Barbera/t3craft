@@ -152,6 +152,9 @@ public final class ThreadCache {
 		this.clock = clock;
 	}
 
+	/** Environment id of the {@code /t3dev ui} gallery's fake data: its transcripts are kept out of {@link #recent}. */
+	public static final String GALLERY_ENV = "t3dev-gallery";
+
 	static String key(String envId, String threadId) {
 		return envId + ":" + threadId;
 	}
@@ -289,7 +292,8 @@ public final class ThreadCache {
 		List<Entry> out = new ArrayList<>();
 		for (int i = all.size() - 1; i >= 0 && out.size() < n; i--) {
 			Entry e = all.get(i);
-			if (e.transcript.hasSnapshot()) {
+			// /t3dev ui (#13): the gallery's fake threads never reach the disk cache
+			if (e.transcript.hasSnapshot() && !e.key.startsWith(GALLERY_ENV + ":")) {
 				out.add(e);
 			}
 		}
