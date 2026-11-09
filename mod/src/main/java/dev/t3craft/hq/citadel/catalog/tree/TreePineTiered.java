@@ -100,7 +100,7 @@ public final class TreePineTiered implements Variant {
 		for (int k = 0; k < n; k++) {
 			yb[k] = FIRST + (int) Math.round(k * gap);
 			// a pad with a mound over it only where the gap to the next cloud stays open; else a single layer
-			th[k] = gap >= 2.9 && yb[k] + 1 < H ? 2 : 1;
+			th[k] = gap >= 3.9 && yb[k] + 1 < H ? 2 : 1;
 		}
 		int yTop = yb[n - 1]; // the trunk ends inside the top pad: no bare log head over the crown
 
@@ -214,7 +214,7 @@ public final class TreePineTiered implements Variant {
 			if (y >= H) {
 				break;
 			}
-			double scale = thick == 1 ? 0.95 : ly == 0 ? 1.0 : 0.68;
+			double scale = thick == 1 ? 1.0 : ly == 0 ? 1.0 : 0.66;
 			int u0 = (int) Math.floor(cu - rx * 1.5);
 			int u1 = (int) Math.ceil(cu + rx * 1.5);
 			int v0 = (int) Math.floor(cv - rz * 1.5);
@@ -243,7 +243,7 @@ public final class TreePineTiered implements Variant {
 							t.leafOf(u, y - 2, v, TIP, id);
 						}
 					}
-					if (topLayer && q < 0.6 * lim && y + 1 < H && t.hash(u, y + 13, v, 4) == 0) {
+					if (hangOk && topLayer && q < 0.6 * lim && y + 1 < H && t.hash(u, y + 13, v, 4) == 0) {
 						t.leafOf(u, y + 1, v, NEEDLE, id); // a tuft on top: lumpy, not a plate
 					}
 				}
