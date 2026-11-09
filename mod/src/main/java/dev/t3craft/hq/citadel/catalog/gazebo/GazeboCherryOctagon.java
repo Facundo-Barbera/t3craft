@@ -8,6 +8,7 @@ import dev.t3craft.hq.citadel.catalog.Family;
 import dev.t3craft.hq.citadel.catalog.Plot;
 import dev.t3craft.hq.citadel.catalog.Variant;
 import net.minecraft.core.Direction;
+import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -52,6 +53,8 @@ import net.minecraft.world.level.block.state.properties.Half;
  */
 public final class GazeboCherryOctagon implements Variant {
 	private static final BlockState HANGING_LANTERN = b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true);
+	private static final BlockState CUSHION = Blocks.CARPET.pick(DyeColor.PINK).defaultBlockState();
+	private static final BlockState PINK_GLASS = Blocks.STAINED_GLASS.pick(DyeColor.PINK).defaultBlockState();
 	private static final Direction[] HORIZ = {Direction.NORTH, Direction.EAST, Direction.SOUTH, Direction.WEST};
 	/** First layer of the roof (the brim); the clear height under it is 4. */
 	private static final int ROOF_Y = 5;
@@ -360,7 +363,7 @@ public final class GazeboCherryOctagon implements Variant {
 				switch (use) {
 					case 0 -> {
 						p.set(c, cu, 1, cv, log(Blocks.STRIPPED_CHERRY_LOG, Direction.Axis.X));
-						p.set(c, cu, 2, cv, b(Blocks.PINK_CANDLE).setValue(BlockStateProperties.LIT, true));
+						p.set(c, cu, 2, cv, b(Blocks.POTTED_PINK_TULIP));
 					}
 					case 1 -> p.set(c, cu, 1, cv, b(Blocks.JUKEBOX));
 					default -> p.set(c, cu, 1, cv, b(Blocks.LECTERN).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH));
@@ -372,8 +375,8 @@ public final class GazeboCherryOctagon implements Variant {
 				}
 			}
 			if (use == 0) {
-				p.set(c, cu + i, 1, cv - 1, b(Blocks.PINK_CARPET)); // cushions
-				p.set(c, cu + i, 1, cv + 1, b(Blocks.PINK_CARPET));
+				p.set(c, cu + i, 1, cv - 1, CUSHION); // cushions
+				p.set(c, cu + i, 1, cv + 1, CUSHION);
 			}
 		}
 	}
@@ -392,7 +395,7 @@ public final class GazeboCherryOctagon implements Variant {
 			int y = ROOF_Y + j;
 			if (j == drum) {
 				if (m <= rho[j] && m > rho[j] - 1.0) {
-					p.set(c, u, y, v, dx == 0 || dz == 0 ? b(Blocks.PINK_STAINED_GLASS) : b(Blocks.STRIPPED_CHERRY_WOOD));
+					p.set(c, u, y, v, dx == 0 || dz == 0 ? PINK_GLASS : b(Blocks.STRIPPED_CHERRY_WOOD));
 				}
 				continue;
 			}
