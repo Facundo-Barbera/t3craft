@@ -50,6 +50,11 @@ Incluye el catálogo (60 variantes, con la ola B: bancas, jardineras, postes, po
 ## En curso (solo código)
 - `feat/build-near-player`: **integrado en main** (rama `82597e6`), compilado y sin probar en juego. Base por capas (estimación: de ~7–9 min a ~10–20 s), arranque inmediato junto al jugador, prioridad por cercanía, 96 bloques por tick y hasta 8 builders. Pendiente: en supervivencia, las alas se siguen construyendo en orden de índice.
 
+## En curso (solo código, 2026-11-09)
+- `feat/build-radial`: según el feedback de Facundo, construir alrededor del jugador en anillos de 5 bloques. Un anillo queda bien terminado antes de pasar al siguiente, y el centro se mueve con el jugador. La base va a un ritmo intermedio (configurable) y el modo por partes queda como fallback.
+- `citadel/scale-port`: la escala configurable portada sobre `citadel/next`, por defecto 1.0, con el plan idéntico al actual.
+- `cat/wave-c`: estatuas, gazebos, mástiles, puentes y remates de torre.
+
 ## Renders en el PC de Facundo (my-pc): probar 1 job
 **BLOQUEADO 2026-11-09:** la VPS no tiene acceso SSH al PC (`Permission denied (publickey…)`). Hay que agregar en `~/.ssh/authorized_keys` del user `wsluser` en WSL esta clave pública de la VPS:
 `ssh-ed25519 AAAA...REDACTED example-key`
