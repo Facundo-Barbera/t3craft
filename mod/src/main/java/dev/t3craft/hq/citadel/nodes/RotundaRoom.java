@@ -6,6 +6,8 @@ import dev.t3craft.hq.RingCampusGeometry.Zone;
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.CitadelHub;
 import dev.t3craft.hq.citadel.CitadelNodes;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -171,35 +173,47 @@ public final class RotundaRoom {
 	// The scaled rotunda (scale > 1): painted directly at its real size, not magnified from the design size.
 	//
 	// Plan (R = the zone's radius, 14 at scale 2; everything is derived from it):
-	//   hall      radius R - 2.5 (11.5), open floor, centre = planning table over a floor clock (dial of
-	//             calcite, accent ring, 12 hour marks, quarter marks lit, hands at ten o'clock)
+	//   hall      radius R - 2.5 (11.5), open floor. The floor clock is a complete dial of calcite (gold rim, dark
+	//             outer ring, 12 marks, hands at ten past ten) pushed 3 west of the centre so nothing stands on it;
+	//             the planning table (a cartography table) is the hub the hands turn on
 	//   drum      d in (R - 2.5, R - 1], height h = sy(10) (14): deepslate base, calcite string course, 16 cherry
-	//             pilasters, tall windows with blackstone mullions, lintel, lit band; doors 5 wide, 5 high on
-	//             N, S and W (the street runs N-S through the node; the east side is the display wall)
+	//             pilasters, tall windows with blackstone mullions, a dark blackstone cornice; doors 5 wide, 5 high
+	//             on N, S and W (the street runs N-S through the node; the east side is the display wall)
+	//   tambour   a dark clerestory drum of 5 courses on the cornice: string course, deepslate frieze with a
+	//             blackstone strip over every pilaster and one lit oculus over every window, upper cornice
 	//   plinth    d in (R - 1, R]: a slab ring with a buttress at every pilaster
-	//   dome      glass shell on 16 cherry ribs, a dark skirt, a cherry belt, a bamboo cap; an open oculus
-	//             under the lantern (a round glass lantern drum with a roof, a gold ball and a rod)
+	//   dome      uniform frosted glass on 8 cherry ribs and two cherry purlins, a cherry belt at the springing, a
+	//             bamboo cap; an open oculus under the lantern (a round glass lantern drum with a roof, a gold
+	//             ball and a rod)
 	//   display   the east side of the hall is cut flat at x = xw: a wall of archive shelves with the
-	//             "schedule" screen (7 x 3, y 2..4) framed by piers, a lintel and a cornice, facing west
-	//   seating   two rows of benches facing the screen, a 3-wide aisle between them; chests and lecterns
-	//             under every other window, benches under the rest; eight chandeliers hang from the ribs
+	//             "schedule" screen (7 x 3, y 2..4) framed by piers, a lintel and a cornice, facing west; over it
+	//             a row of plaques (the colours of the board and its title)
+	//   seating   two rows of benches facing the screen, a 3-wide aisle between them, a clear stage in front of
+	//             the screen with a presenter's atril on each side
+	//   archive   twelve month chests with a plaque each, and a register atril (with its plaque) after every
+	//             third one, round the west and north-south part of the drum wall; door plaques over N, S and W
 	// =====================================================================================================
 
 	/** Dimensions of the scaled rotunda, all from the zone's radius. */
 	private static final BlockState SLOG = b(Blocks.STRIPPED_CHERRY_LOG);
 	/** The dome's skin: frosted, so the room under it does not show through. */
 	private static final BlockState DOME_GLASS = Blocks.STAINED_GLASS.pick(net.minecraft.world.item.DyeColor.WHITE).defaultBlockState();
+	/** Courses of the dark tambour between the colonnade and the dome. */
+	private static final int TAMBOUR = 5;
+	/** The months of the archive chests. */
+	private static final String[] MONTHS = {"ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"};
 
-	private record Geo(double size, double ri, double rw, int h, int dh, int xw, double lr, double dial) {
+	private record Geo(double size, double ri, double rw, double rd, int h, int dh, int xw, double lr, double dial) {
 		static Geo of(CitadelCanvas c, Node nd) {
 			double size = nd.size();
 			double ri = size - 2.5;
 			double rw = size - 1.0;
+			double rd = rw - 0.5;
 			int h = c.sy(10);
-			int dh = (int) Math.round(1.15 * rw);
-			int xw = (int) Math.floor(ri) - 2;
+			int dh = (int) Math.round(1.12 * rd);
+			int xw = (int) Math.floor(ri) - 1;
 			double lr = size >= 12 ? 3.5 : 2.0;
-			return new Geo(size, ri, rw, h, dh, xw, lr, Math.round(ri * 0.62));
+			return new Geo(size, ri, rw, rd, h, dh, xw, lr, Math.round(ri * 0.43));
 		}
 
 		/** x of the screen plane (one in front of the display wall). */
@@ -211,10 +225,20 @@ public final class RotundaRoom {
 			return Math.min(5, h - 4);
 		}
 
+		/** Springing of the dome: the top of the tambour. */
+		int base() {
+			return h + TAMBOUR;
+		}
+
+		/** x of the centre of the floor clock (west of the middle of the hall, so the seats stay off the dial). */
+		int dialX() {
+			return -3;
+		}
+
 		/** Top of the dome shell at distance {@code d} from the centre. */
 		int top(double d) {
-			double q = Math.max(0, 1 - (d / rw) * (d / rw));
-			return h + (int) Math.round(dh * Math.sqrt(q));
+			double q = Math.max(0, 1 - (d / rd) * (d / rd));
+			return base() + (int) Math.round(dh * Math.sqrt(q));
 		}
 	}
 
@@ -262,6 +286,7 @@ public final class RotundaRoom {
 				double d = Math.hypot(dx, dz);
 				dialFloor(c, g, x, z, dx, dz, d);
 				drum(c, g, x, z, dx, dz, d);
+				tambour(c, g, x, z, dx, dz, d);
 				displayWall(c, g, x, z, dx, dz, d);
 				glassDome(c, g, x, z, dx, dz, d);
 			}
@@ -269,14 +294,14 @@ public final class RotundaRoom {
 		furnishHall(c, g, nd);
 	}
 
-	/** The fixtures of the scaled rotunda: the schedule screen (7 x 3 at reading height, with its base) and a walk spot. */
+	/** The fixtures of the scaled rotunda: the schedule screen (7 x 3 at reading height, with its base) and a walk spot in the aisle. */
 	public static void fixtures(CitadelCanvas c, Node nd) {
 		Geo g = Geo.of(c, nd);
 		int cx = nd.cx();
 		int cz = nd.cz();
 		CitadelHub.bigScreen(c, new dev.t3craft.hq.HqGeometry.Surface(new net.minecraft.core.BlockPos(cx + g.xs(), 2, cz - 3),
 				net.minecraft.core.Direction.SOUTH, net.minecraft.core.Direction.WEST, 7, 3), "schedule", "", true);
-		c.walkSpot(new net.minecraft.core.BlockPos(cx - 3, 1, cz), net.minecraft.core.Direction.EAST);
+		c.walkSpot(new net.minecraft.core.BlockPos(cx + 5, 1, cz), net.minecraft.core.Direction.EAST);
 	}
 
 	// ------------------------------------------------------------------ floor: the clock
@@ -285,35 +310,47 @@ public final class RotundaRoom {
 		BlockState s = c.floor();
 		if (d > g.ri) {
 			s = door(g, dx, dz) ? c.floor() : CitadelCanvas.FOOT;
-		} else if (d <= g.dial + 0.5) {
-			s = d >= g.dial - 0.5 ? c.accent() : CALCITE;
-			double mr = g.dial - 1.5;
+			c.set(x, 0, z, s);
+			return;
+		}
+		if (d > g.ri - 1.0) {
+			s = RIB; // a dark skirting ring under the archive chests
+		}
+		int u = dx - g.dialX();
+		double r = Math.hypot(u, dz);
+		double face = g.dial - 0.5;
+		if (r <= face) {
+			s = CALCITE;
+			double mr = face - 1.0;
 			for (int hr = 0; hr < 12; hr++) {
 				double a = hr * Math.PI / 6;
 				int mx = (int) Math.round(mr * Math.sin(a));
 				int mz = (int) Math.round(-mr * Math.cos(a));
-				if (dx == mx && dz == mz) {
+				if (u == mx && dz == mz) {
 					s = hr % 3 == 0 ? b(Blocks.GOLD_BLOCK) : RIB;
-				} else if (hr % 3 == 0 && Math.abs(dx - mx) + Math.abs(dz - mz) == 1 && d < g.dial - 0.5) {
-					s = BAMBOO;
 				}
 			}
-			if (hand(dx, dz, 0, g.dial - 1, 0.9) || hand(dx, dz, 5 * Math.PI / 3, g.dial - 2.5, 1.2)) {
+			if (hand(u, dz, 5 * Math.PI / 3, mr - 0.9, 0.8) || hand(u, dz, Math.PI / 3, mr - 0.1, 0.8)) {
 				s = RIB;
 			}
-		} else if (d <= g.dial + 1.5) {
-			s = c.accent();
+			if (r < 1.5 && !(u == 0 && dz == 0)) {
+				s = BAMBOO;
+			}
+		} else if (r <= face + 1.0) {
+			s = BAMBOO;
+		} else if (r <= face + 2.0) {
+			s = RIB;
 		}
 		c.set(x, 0, z, s);
 	}
 
-	/** A clock hand from the centre along the clockwise angle {@code a} from north, {@code len} long, {@code thick} wide. */
+	/** A clock hand from the hub along the clockwise angle {@code a} from north, {@code len} long, {@code thick} wide. */
 	private static boolean hand(int dx, int dz, double a, double len, double thick) {
 		double ux = Math.sin(a);
 		double uz = -Math.cos(a);
 		double t = dx * ux + dz * uz;
 		double perp = Math.abs(dx * uz - dz * ux);
-		return t >= 1.5 && t <= len && perp <= thick;
+		return t >= 1.0 && t <= len && perp <= thick;
 	}
 
 	// ------------------------------------------------------------------ the drum and its plinth
@@ -352,7 +389,8 @@ public final class RotundaRoom {
 				continue;
 			}
 			if (y == g.h) {
-				s = c.kit.wallPanel(true);
+				// the cornice of the colonnade: dark, with an upside-down stair lip all round
+				s = d > g.rd - 0.5 ? NodeDecor.invStairs(Blocks.POLISHED_BLACKSTONE_BRICK_STAIRS, NodeDecor.inward(dx, dz)) : RIB;
 			} else if (jamb || pil < 0.55) {
 				s = y <= 2 ? RIB : SLOG;
 			} else if (y <= 3) {
@@ -370,6 +408,39 @@ public final class RotundaRoom {
 		}
 	}
 
+	/**
+	 * The tambour: a dark drum of {@link #TAMBOUR} courses between the colonnade and the dome. Course 1 a blackstone
+	 * string course (a slab ledge outside), courses 2 to 4 a deepslate frieze with a blackstone strip over each of the
+	 * 16 pilaster axes and one lit oculus (a froglight, framed by the strips and a lintel) over each window, the top
+	 * course a blackstone cornice with an upside-down stair lip.
+	 */
+	private static void tambour(CitadelCanvas c, Geo g, int x, int z, int dx, int dz, double d) {
+		if (d <= g.ri || d > g.rw) {
+			return;
+		}
+		double pil = arc(dx, dz, 16, 0);
+		boolean strip = pil < 0.6;
+		boolean oculus = arc(dx, dz, 16, 0.5) < 0.5;
+		boolean wall = d <= g.rd;
+		net.minecraft.core.Direction in = NodeDecor.inward(dx, dz);
+		for (int i = 1; i <= TAMBOUR; i++) {
+			int y = g.h + i;
+			BlockState s = null;
+			if (i == 1) {
+				s = wall ? RIB : slab(Blocks.POLISHED_BLACKSTONE_BRICK_SLAB);
+			} else if (i == TAMBOUR) {
+				s = wall ? RIB : NodeDecor.invStairs(Blocks.POLISHED_BLACKSTONE_BRICK_STAIRS, in);
+			} else if (strip) {
+				s = RIB;
+			} else if (wall) {
+				s = oculus && i == 3 ? LIGHT : (oculus && i == 4 ? RIB : NodeDecor.footMix(x, y, z));
+			}
+			if (s != null) {
+				c.set(x, y, z, s);
+			}
+		}
+	}
+
 	// ------------------------------------------------------------------ the flat east wall: shelves behind the screen
 
 	private static void displayWall(CitadelCanvas c, Geo g, int x, int z, int dx, int dz, double d) {
@@ -379,7 +450,7 @@ public final class RotundaRoom {
 		for (int y = 1; y <= g.h; y++) {
 			BlockState s;
 			if (y == g.h) {
-				s = c.kit.wallPanel(true);
+				s = RIB;
 			} else if (dx > g.xw) {
 				s = CitadelCanvas.FOOT;
 			} else if (y <= 3) {
@@ -404,26 +475,29 @@ public final class RotundaRoom {
 	// ------------------------------------------------------------------ the glass dome and its lantern
 
 	private static void glassDome(CitadelCanvas c, Geo g, int x, int z, int dx, int dz, double d) {
-		if (d > g.rw) {
+		if (d > g.rd) {
 			return;
 		}
+		int base = g.base();
 		int top = g.top(d);
-		int low = g.top(Math.min(g.rw, d + 1));
-		int lo = Math.max(g.h + 1, Math.min(low, top));
+		int low = g.top(Math.min(g.rd, d + 1));
+		int lo = Math.max(base + 1, Math.min(low, top));
 		net.minecraft.core.Direction in = NodeDecor.inward(dx, dz);
 		int topIn = g.top(Math.max(0, d - 1));
 		if (d >= g.lr - 0.5) {
+			double rib = arc(dx, dz, 8, 0);
+			boolean purlin = d >= g.lr + 2.5 && (Math.abs(d - 0.76 * g.rd) < 0.7 || Math.abs(d - 0.5 * g.rd) < 0.6);
 			for (int y = lo; y <= top; y++) {
-				int rel = y - g.h;
+				int rel = y - base;
 				boolean ramp = y == top && d >= 1 && topIn == top + 1;
 				BlockState s;
 				if (rel <= 2) {
-					s = CitadelCanvas.FOOT;
+					s = CitadelCanvas.PLANKS; // the cherry belt at the springing
 				} else if (rel >= g.dh - 1 && d < g.lr + 2.0) {
 					s = y == top && d > g.lr + 0.5 ? stairs(Blocks.BAMBOO_MOSAIC_STAIRS, in) : BAMBOO;
-				} else if (arc(dx, dz, 8, 0) < 0.6 && d >= g.lr + 1.5) {
+				} else if (rib < 0.6 && d >= g.lr + 1.5) {
 					s = ramp ? stairs(Blocks.CHERRY_STAIRS, in) : SLOG;
-				} else if (rel == g.dh / 2) {
+				} else if (purlin) {
 					s = CitadelCanvas.PLANKS;
 				} else {
 					s = DOME_GLASS;
@@ -434,25 +508,25 @@ public final class RotundaRoom {
 		// the lantern: a round drum of glass between 8 posts, a light inside, a tiered roof with an eave,
 		// a gold ball and a rod
 		if (d <= g.lr + 1.0) {
-			int base = g.top(g.lr);
+			int lb = g.top(g.lr);
 			if (d <= g.lr && d > g.lr - 1.0) {
-				for (int y = base + 1; y <= base + 5; y++) {
+				for (int y = lb + 1; y <= lb + 5; y++) {
 					c.set(x, y, z, arc(dx, dz, 8, 0) < 0.6 ? SLOG : GLASS);
 				}
 			}
 			if (dx == 0 && dz == 0) {
-				c.set(x, base + 3, z, LIGHT);
+				c.set(x, lb + 3, z, LIGHT);
 			}
 			double[] tier = {g.lr + 1.0, g.lr - 0.5, g.lr - 2.0};
 			for (int t = 0; t < tier.length; t++) {
 				if (d <= tier[t]) {
 					boolean edge = d > tier[t] - 1.0;
-					c.set(x, base + 6 + t, z, edge ? stairs(t < 2 ? Blocks.CHERRY_STAIRS : Blocks.BAMBOO_MOSAIC_STAIRS, in) : BAMBOO);
+					c.set(x, lb + 6 + t, z, edge ? stairs(t < 2 ? Blocks.CHERRY_STAIRS : Blocks.BAMBOO_MOSAIC_STAIRS, in) : BAMBOO);
 				}
 			}
 			if (dx == 0 && dz == 0) {
-				c.set(x, base + 9, z, b(Blocks.GOLD_BLOCK));
-				c.set(x, base + 10, z, NodeDecor.ROD);
+				c.set(x, lb + 9, z, b(Blocks.GOLD_BLOCK));
+				c.set(x, lb + 10, z, NodeDecor.ROD);
 			}
 		}
 	}
@@ -460,45 +534,19 @@ public final class RotundaRoom {
 	// ------------------------------------------------------------------ furniture
 
 	private static void furnishHall(CitadelCanvas c, Geo g, Node nd) {
-		int cx = nd.cx();
-		int cz = nd.cz();
 		BlockState lanternUp = Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, false);
-		// the planning table in the middle of the clock: a cartography table, an atril on each side, slabs at the corners
-		put(c, nd, 0, 1, 0, b(Blocks.CARTOGRAPHY_TABLE), CitadelCanvas.SOLID);
-		for (net.minecraft.core.Direction f : net.minecraft.core.Direction.Plane.HORIZONTAL) {
-			put(c, nd, f.getStepX(), 1, f.getStepZ(), NodeDecor.facing(Blocks.LECTERN, f).setValue(BlockStateProperties.HAS_BOOK, true), CitadelCanvas.SOLID);
-		}
-		for (int sx : new int[] {-1, 1}) {
-			for (int sz : new int[] {-1, 1}) {
-				put(c, nd, sx, 1, sz, slab(Blocks.CHERRY_SLAB), CitadelCanvas.SOLID);
+		net.minecraft.core.Direction west = net.minecraft.core.Direction.WEST;
+		// the planning table is the hub of the floor clock: a cartography table the hands turn on
+		put(c, nd, g.dialX(), 1, 0, b(Blocks.CARTOGRAPHY_TABLE), CitadelCanvas.SOLID);
+		// two rows of benches facing the screen, a 3-wide aisle between them; the dial ends before the first row
+		for (int row : new int[] {4, 6}) {
+			for (int dz = 2; dz <= 6; dz++) {
+				put(c, nd, row, 1, dz, stairs(Blocks.CHERRY_STAIRS, west), CitadelCanvas.SOLID);
+				put(c, nd, row, 1, -dz, stairs(Blocks.CHERRY_STAIRS, west), CitadelCanvas.SOLID);
 			}
 		}
-		// two rows of benches facing the screen, a 3-wide aisle between them
-		for (int row : new int[] {g.xw - 6, g.xw - 4}) {
-			for (int dz = 2; dz <= 5; dz++) {
-				put(c, nd, row, 1, dz, stairs(Blocks.CHERRY_STAIRS, net.minecraft.core.Direction.WEST), CitadelCanvas.SOLID);
-				put(c, nd, row, 1, -dz, stairs(Blocks.CHERRY_STAIRS, net.minecraft.core.Direction.WEST), CitadelCanvas.SOLID);
-			}
-		}
-		// round the drum, one module under each window: benches, or a chest - atril - chest station
-		int span = (int) Math.ceil(g.ri);
-		for (int dx = -span; dx <= span; dx++) {
-			for (int dz = -span; dz <= span; dz++) {
-				double d = Math.hypot(dx, dz);
-				if (d > g.ri || d <= g.ri - 1.0 || Math.min(Math.abs(dx), Math.abs(dz)) <= 3 || dx >= g.xw - 2) {
-					continue;
-				}
-				int sector = Math.floorMod((int) Math.floor(Math.atan2(dz, dx) / (Math.PI / 8)), 16);
-				double mid = arc(dx, dz, 16, 0.5);
-				if (sector % 2 == 0) {
-					put(c, nd, dx, 1, dz, stairs(Blocks.CHERRY_STAIRS, NodeDecor.outward(dx, dz)), CitadelCanvas.SOLID);
-				} else if (mid < 0.7) {
-					put(c, nd, dx, 1, dz, NodeDecor.facing(Blocks.LECTERN, NodeDecor.inward(dx, dz)).setValue(BlockStateProperties.HAS_BOOK, true), CitadelCanvas.SOLID);
-				} else if (mid < 1.7) {
-					put(c, nd, dx, 1, dz, NodeDecor.facing(Blocks.CHEST, NodeDecor.inward(dx, dz)), CitadelCanvas.SOLID);
-				}
-			}
-		}
+		// the archive: twelve month chests and, after every third, a register atril, each with a plaque on the wall
+		archive(c, g, nd);
 		// the frame of the screen (plane xs): piers, a lintel, a cornice, lanterns on top
 		int xs = g.xs();
 		for (int dz = -5; dz <= 5; dz++) {
@@ -520,13 +568,23 @@ public final class RotundaRoom {
 				put(c, nd, xs, y, dz, s, CitadelCanvas.SOLID);
 			}
 		}
+		// the board's title and key over the screen: what each colour of the screen means (see feat-schedule-board)
+		sign(c, nd, xs, 7, -4, west, DyeColor.CYAN, "Corriendo", "ahora");
+		sign(c, nd, xs, 7, -2, west, DyeColor.RED, "Fallo", "ultima vez");
+		sign(c, nd, xs, 7, 0, west, DyeColor.ORANGE, "Proximas", "tareas", "programadas");
+		sign(c, nd, xs, 7, 2, west, DyeColor.LIME, "Todo bien", "ultima vez");
+		sign(c, nd, xs, 7, 4, west, DyeColor.GRAY, "Pausada", "o bloqueada");
 		// a presenter's atril at each side of the screen, a planter beyond it
 		for (int sz : new int[] {-1, 1}) {
-			put(c, nd, xs - 1, 1, 4 * sz, NodeDecor.facing(Blocks.LECTERN, net.minecraft.core.Direction.WEST).setValue(BlockStateProperties.HAS_BOOK, true), CitadelCanvas.SOLID);
-			put(c, nd, xs - 1, 1, 7 * sz, c.kit.gardenPlanter(), CitadelCanvas.SOLID);
+			put(c, nd, xs - 1, 1, 6 * sz, NodeDecor.facing(Blocks.LECTERN, west).setValue(BlockStateProperties.HAS_BOOK, true), CitadelCanvas.SOLID);
+			put(c, nd, xs - 1, 1, 8 * sz, c.kit.gardenPlanter(), CitadelCanvas.SOLID);
 		}
 		put(c, nd, xs, 7, -5, lanternUp, CitadelCanvas.DECOR);
 		put(c, nd, xs, 7, 5, lanternUp, CitadelCanvas.DECOR);
+		// door plaques over the pilasters above the three doors
+		sign(c, nd, -11, 7, 0, net.minecraft.core.Direction.EAST, DyeColor.ORANGE, "Rotonda", "Tareas", "programadas");
+		sign(c, nd, 0, 7, -11, net.minecraft.core.Direction.SOUTH, DyeColor.ORANGE, "Rotonda", "Tareas", "programadas");
+		sign(c, nd, 0, 7, 11, net.minecraft.core.Direction.NORTH, DyeColor.ORANGE, "Rotonda", "Tareas", "programadas");
 		// eight chandeliers on the ribs: a chain from the dome and a lantern above head height
 		for (int j = 0; j < 8; j++) {
 			double a = j * Math.PI / 4;
@@ -536,12 +594,63 @@ public final class RotundaRoom {
 			if (dx >= g.xs() || !in(c, nd, dx, dz) || arc(dx, dz, 16, 0) > 0.6) {
 				continue;
 			}
-			int lo = Math.max(g.h + 1, Math.min(g.top(Math.min(g.rw, d + 1)), g.top(d)));
+			int lo = Math.max(g.base() + 1, Math.min(g.top(Math.min(g.rd, d + 1)), g.top(d)));
 			for (int y = g.h - 3; y < lo; y++) {
 				put(c, nd, dx, y, dz, Blocks.IRON_CHAIN.defaultBlockState(), CitadelCanvas.HANGING);
 			}
 			put(c, nd, dx, g.h - 4, dz, Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
 		}
+	}
+
+	/**
+	 * The archive of the rotunda: the cells of the ring just inside the drum wall (clear of the three doors and of the
+	 * display wall), in clockwise order from the west door. Sixteen are used, evenly spread: after every third month
+	 * chest comes a register atril (a lectern with its book). Each has a plaque above it on the wall behind: the
+	 * month, or the quarter.
+	 */
+	private static void archive(CitadelCanvas c, Geo g, Node nd) {
+		java.util.List<int[]> ring = new java.util.ArrayList<>();
+		int span = (int) Math.ceil(g.ri);
+		for (int dx = -span; dx <= span; dx++) {
+			for (int dz = -span; dz <= span; dz++) {
+				double d = Math.hypot(dx, dz);
+				if (d > g.ri || d <= g.ri - 1.0 || Math.min(Math.abs(dx), Math.abs(dz)) < 4 || dx >= g.xw - 3 || !in(c, nd, dx, dz)) {
+					continue;
+				}
+				ring.add(new int[] {dx, dz});
+			}
+		}
+		ring.sort(java.util.Comparator.comparingDouble(p -> Math.atan2(p[1], p[0])));
+		int slots = 16;
+		if (ring.size() < slots) {
+			slots = ring.size();
+		}
+		int month = 0;
+		int quarter = 0;
+		for (int i = 0; i < slots; i++) {
+			int[] p = ring.get((int) Math.round(i * (ring.size() - 1) / (double) Math.max(1, slots - 1)));
+			net.minecraft.core.Direction face = NodeDecor.inward(p[0], p[1]);
+			if (i % 4 == 3 || month >= MONTHS.length) {
+				put(c, nd, p[0], 1, p[1], NodeDecor.facing(Blocks.LECTERN, face).setValue(BlockStateProperties.HAS_BOOK, true), CitadelCanvas.SOLID);
+				sign(c, nd, p[0], 2, p[1], face, DyeColor.YELLOW, "Registro", "T" + (++quarter));
+			} else {
+				put(c, nd, p[0], 1, p[1], NodeDecor.facing(Blocks.CHEST, face), CitadelCanvas.SOLID);
+				sign(c, nd, p[0], 2, p[1], face, DyeColor.ORANGE, "Archivo", MONTHS[month++]);
+			}
+		}
+	}
+
+	/** A plaque (a fixture, never replaced by the light pass) at the node offset {@code (dx, y, dz)}, its front towards {@code face}. */
+	private static void sign(CitadelCanvas c, Node nd, int dx, int y, int dz, net.minecraft.core.Direction face, DyeColor color, String... lines) {
+		if (!in(c, nd, dx, dz)) {
+			return;
+		}
+		int x = nd.cx() + dx;
+		int z = nd.cz() + dz;
+		c.put(x, y, z, c.kit.plaque(face), CitadelCanvas.DECOR);
+		long k = BlockPos.asLong(x, y, z);
+		c.data.put(k, c.kit.plaqueData(color, lines));
+		c.fixtures.add(k);
 	}
 
 	private static void put(CitadelCanvas c, Node nd, int dx, int y, int dz, BlockState s, int layer) {
