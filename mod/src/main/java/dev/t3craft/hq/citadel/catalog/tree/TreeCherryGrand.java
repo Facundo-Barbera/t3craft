@@ -79,13 +79,13 @@ public final class TreeCherryGrand implements Variant {
 		int wv1 = wv0 + mn - 1;
 		boolean big = mn >= 10;
 
-		int cy = CLEAR + 1; // the dome's centre layer
-		int nUp = Math.min(p.h() - 1 - cy, mn >= 9 ? 3 : 2); // a wide, flat dome: a few layers on a big spread
+		int cy = CLEAR + (p.h() >= 13 ? 2 : 1); // the dome's centre layer: taller plots get a thicker crown on the same clear trunk
+		int nUp = Math.min(p.h() - 1 - cy, mn >= 8 ? 3 : 2); // a wide, flat dome: a few layers on a big spread
 		double ryUp = nUp + 0.6 + r.nextDouble() * 0.3;
 		int ou = r.nextInt(2);
 		int ov = r.nextInt(2);
 		double lean = r.nextDouble() * Math.PI * 2;
-		double amp = 0.4 + r.nextDouble() * 1.0;
+		double amp = mn < 9 ? 0.3 + r.nextDouble() * 0.4 : 0.4 + r.nextDouble() * 1.0;
 		double lu = Math.cos(lean) * amp;
 		double lv = Math.sin(lean) * amp;
 		// the base shifts against the lean, so the crown's centre stays in the middle of the plot
@@ -94,21 +94,21 @@ public final class TreeCherryGrand implements Variant {
 		int[][] lead = TreeKit.trunk(t, TreeKit.CHERRY, bu, bv, 0, Math.min(cy + 1, p.h() - 1), ou, ov, lu, lv);
 
 		// ---- roots: 4–5, short; one or two reach further
-		roots(t, bu, bv, 4 + r.nextInt(2), big ? 4 : 3);
+		roots(t, bu, bv, 4 + r.nextInt(2), 3);
 
 		// ---- the dome
 		double cu = lead[0][cy];
 		double cv = lead[1][cy];
 		int lobes = 3 + r.nextInt(3); // 3, 4 or 5 lobes on the rim
 		double phi = r.nextDouble() * Math.PI * 2;
-		double lobeAmp = 0.17 + r.nextDouble() * 0.08;
+		double lobeAmp = mn < 9 ? 0.10 + r.nextDouble() * 0.04 : 0.17 + r.nextDouble() * 0.08;
 		double rRoom = Math.min(Math.min(cu - wu0, wu1 - cu), Math.min(cv - wv0, wv1 - cv)) + 0.9;
 		double rWant = Math.min(mn * 0.5 - 0.6, 7.2);
 		double rBase = Math.min(rWant, rRoom / (1 + lobeAmp + 0.04));
-		rBase = Math.max(rBase, 2.3);
-		double ryDown = 1.9;
+		rBase = Math.max(rBase, Math.min(rWant, mn * 0.5 - 0.5));
+		double ryDown = (cy - CLEAR) + 1.9; // the underside always bottoms out at y4
 		// sky windows: a few vertical slits right through the shell
-		int nHoles = big ? 3 : 1 + r.nextInt(2);
+		int nHoles = rBase < 3.4 ? 0 : big ? 3 : 1 + r.nextInt(2); // small crowns keep their shell whole
 		double[][] holes = new double[nHoles][2];
 		for (int i = 0; i < nHoles; i++) {
 			double a = phi + (i + 0.3 + r.nextDouble() * 0.4) / nHoles * Math.PI * 2 + 0.5;
@@ -148,7 +148,7 @@ public final class TreeCherryGrand implements Variant {
 					}
 					boolean hole = false;
 					for (double[] h : holes) {
-						if (Math.abs(u - h[0]) < 0.95 && Math.abs(v - h[1]) < 0.95) {
+						if (y >= cy && u == Math.round(h[0]) && v == Math.round(h[1])) { // 1×1 windows, never in the underside
 							hole = true;
 							break;
 						}
@@ -193,18 +193,18 @@ public final class TreeCherryGrand implements Variant {
 					edge = s;
 				}
 			}
-			double reach = Math.min(room(su, sv, ex, ez, wu0, wu1, wv0, wv1) - 0.2, edge + 2.7);
-			if (reach < 3.0) {
+			double reach = Math.min(room(su, sv, ex, ez, wu0, wu1, wv0, wv1) - 0.8, edge + 2.4);
+			if (reach < edge + 1.0 || reach < 3.0) {
 				continue;
 			}
 			int tu = (int) Math.round(su + ex * reach);
 			int tv = (int) Math.round(sv + ez * reach);
-			int ty = cy + (reach >= edge + 2 ? 1 : 0);
+			int ty = Math.min(cy + 1 + (p.h() >= 13 ? 1 : 0), p.h() - 3); // the limb climbs out of the dome
 			List<int[]> limb = TreeKit.branch(t, LIMB, new int[] {su, sy, sv}, new int[] {tu, ty, tv}, false);
 			darkBase(t, limb);
-			// a small tuft that rests on the tip (never wider than the plot)
-			for (int dy = 0; dy <= 1; dy++) {
-				double tr = dy == 0 ? 1.5 : 1.0;
+			// a blossom tuft rests on the tip and hides the end of the wood from above
+			for (int dy = 0; dy <= 2; dy++) {
+				double tr = dy == 2 ? 0.9 : 1.6;
 				for (int dv = -2; dv <= 2; dv++) {
 					for (int du = -2; du <= 2; du++) {
 						int u = tu + du;
@@ -214,9 +214,6 @@ public final class TreeCherryGrand implements Variant {
 						}
 						if (dy == 0 && du == 0 && dv == 0) {
 							continue; // the tip itself
-						}
-						if (t.hash(u, ty + dy, v, 5) < 1) {
-							continue;
 						}
 						t.leaf(u, ty + dy, v, TreeKit.SAKURA.a());
 					}
@@ -288,7 +285,7 @@ public final class TreeCherryGrand implements Variant {
 			boolean diag = du != 0 && dv != 0;
 			int u = du < 0 ? bu - 1 : du > 0 ? bu + 2 : bu + t.hash(k, 1, 3, 2);
 			int v = dv < 0 ? bv - 1 : dv > 0 ? bv + 2 : bv + t.hash(k, 2, 3, 2);
-			int len = longOne ? 3 + t.hash(k, 3, 3, Math.max(1, maxLen - 2)) : 1 + t.hash(k, 3, 3, 2);
+			int len = longOne ? 3 : 1; // short roots are a single cell: a flare, not a starfish
 			if (diag) {
 				t.woodSoft(u - du, 0, v, TreeKit.CHERRY.bark()); // the corner touches the trunk only by an edge
 			}
@@ -297,9 +294,6 @@ public final class TreeCherryGrand implements Variant {
 				t.wood(u, 0, v, TreeKit.CHERRY.bark()); // bark on all sides: a log end facing the camera shows pale rings
 				if (tip) {
 					t.cover(u, 1, v, Blocks.MOSS_CARPET.defaultBlockState()); // a moss cap on the root's end
-				}
-				if (diag && i < len - 1) {
-					t.woodSoft(u + du, 0, v, TreeKit.CHERRY.bark());
 				}
 				u += du;
 				v += dv;
