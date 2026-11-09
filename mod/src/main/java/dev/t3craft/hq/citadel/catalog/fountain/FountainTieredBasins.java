@@ -1,10 +1,8 @@
 package dev.t3craft.hq.citadel.catalog.fountain;
 
 import static dev.t3craft.hq.citadel.CitadelCanvas.b;
-import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
 import static dev.t3craft.hq.citadel.catalog.fountain.FountainKit.FALL;
 import static dev.t3craft.hq.citadel.catalog.fountain.FountainKit.WATER;
-import static dev.t3craft.hq.citadel.catalog.fountain.FountainKit.disk;
 import static dev.t3craft.hq.citadel.catalog.fountain.FountainKit.pillar;
 import static dev.t3craft.hq.citadel.catalog.fountain.FountainKit.stair;
 import static dev.t3craft.hq.citadel.catalog.fountain.FountainKit.stairTop;
@@ -19,31 +17,35 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
- * A monumental three-tier fountain: a wide deepslate basin, a polished-stone bowl above it and a small
- * cup on top, each one lighter than the one below, with the water spilling over four lips per tier and
- * falling into the next basin.
+ * A plaza fountain of stepped basins on a paved plinth: a wide pool whose stair rim is a bench, one or two
+ * smaller bowls above it on drums, water that spills over wide lips from bowl to bowl, and a jet on top.
  *
- * <p>Concept: Trevi / Villa d'Este in the citadel palette. Dark pooled base (deepslate, cracked and
- * mossy), polished andesite and diorite bowls, quartz caps and a gold-studded top cup. What makes it
- * memorable is the silhouette (a wide skirt, a flared mid bowl, a slim cup and a jet) and the cascades:
- * the bowls are cups, not slabs, because the underside of every bowl is a ring of upside-down stairs
- * that narrows towards the stem.
+ * <p>Concept: Trevi / Villa d'Este in the citadel palette. A one-block <b>plinth</b> (stairs all round, so it
+ * is walked up from any side) carries everything. The pool bed is dark deepslate tile; the rim is a ring of
+ * stone-brick stairs whose low step is a seat and whose back keeps the water in. Above it every bowl is
+ * lighter than the one below (stone brick, polished diorite, smooth quartz), sits on a drum with a copper
+ * (or gold) collar, curves in underneath with upside-down stairs and spills through lips that fall as real
+ * water into the next basin. The top is a stem capped in copper with a water crown that falls into the
+ * bowl. The paving follows the shape of the pool (dark inlay, stone brick, andesite bands, a light cross
+ * of calcite for the walks) and, when the plot has room, benches, lamp posts and planters ring the plaza.
  *
  * <pre>
- *  section through the axis (n = 9, h = 7)          y6  ▓ jet       cap slabs
- *                                                   y5    ▒▒▒      top cup, 4 lips
- *      jet          ·                               y4  ▓▓ ▒ ▓▓   mid bowl cap + stem
- *     cup        ▒▒▒▒▒                              y3  ▓ ≈≈≈ ▓   mid bowl water, 4 lips
- *   mid bowl  ▓▓▓▓≈≈≈▓▓▓▓      ← falls              y2  ▓▓▓▓▓▓▓   mid floor / cornice
- *   basin ▓▓▓▓▓▓▓≈≈≈≈≈▓▓▓▓▓▓▓                       y1  rim ≈ water ≈ rim
- *                                                   y0  deepslate floor + dark rim base
+ *  section along the axis (2 tiers, h = 7)
+ *                  ▒        y5-6  crown: water on a copper-capped stem, falls into the bowl
+ *       ≈≈▒▒▒≈≈            y4    bowl water, stair rim (back keeps the water)
+ *    ≈≈  ▓▓▓▓▓▓  ≈≈  falls  y3    bowl floor on a drum, underside of upside-down stairs
+ *  ▟▓≈≈≈≈≈≈≈≈≈≈≈≈≈▓▙       y1    pool water, stair rim = bench
+ *  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓       y0    plinth: pool bed + paving, stairs on the edge
  * </pre>
  *
- * Size: 7–11 × 7–11 × 7+ (a round figure centred in the plot; at 7 wide the top cup is a single urn,
- * from 9 wide a real cup with its own lips; extra height lifts the top cup, so its cascade falls further).
+ * <p>Size: 7–23 × 7–23 × 7+ and more (the figure scales with the plot: pool radius = half the plot minus
+ * the plinth edge and a paved apron; the plaza gets benches and lamps from about 17 wide). The seed picks the
+ * shape (round, octagonal or square), 2 or 3 bowls (3 needs radius 7 and height 9) and the accent (copper or
+ * gold). Water is always held in: every pool cell has stair or block on its four sides, and the falls land
+ * inside the basin below. No fire or lava anywhere.
  */
 public final class FountainTieredBasins implements Variant {
-	private static final BlockState GOLD = b(Blocks.GOLD_BLOCK);
+	private static final Direction[] DIRS = {Direction.NORTH, Direction.SOUTH, Direction.EAST, Direction.WEST};
 
 	@Override
 	public String id() {
@@ -72,199 +74,325 @@ public final class FountainTieredBasins implements Variant {
 
 	@Override
 	public int maxW() {
-		return 11;
+		return 23;
 	}
 
 	@Override
 	public int maxD() {
-		return 11;
+		return 23;
 	}
 
 	@Override
 	public void build(CitadelCanvas c, Plot p) {
 		FountainKit k = new FountainKit(c, p);
-		int n = Math.min(Math.min(p.w(), p.d()), 11);
+		int w = p.w();
+		int d = p.d();
+		int h = p.h();
+		int n = Math.min(w, d);
 		if (n % 2 == 0) {
 			n--;
 		}
-		int big = (n - 1) / 2; // radius of the lower basin
-		int mid = big - 1; // rim radius of the mid bowl
-		int cup = mid - 2; // rim radius of the top cup (0: a single urn)
-		int extra = Math.max(0, p.h() - 7); // extra height lifts the bowls, so the cascades fall further
-		int lift2 = Math.min(2, (extra + 1) / 2);
-		int lift3 = Math.min(2, extra - lift2);
+		int half = (n - 1) / 2;
+		int shape = k.hash(0, 0, 0, 3); // 0 round, 1 octagon, 2 square
+		boolean gold = k.hash(1, 0, 0, 2) == 0;
+		BlockState accent = gold ? b(Blocks.GOLD_BLOCK) : b(Blocks.CUT_COPPER.waxed().unaffected());
 
-		basin(k, big);
-		corners(k, big);
-		plinth(k);
-		midBowl(k, mid, lift2);
-		int y0 = 4 + lift2; // first layer above the mid bowl's cap
-		if (cup >= 1) {
-			topCup(k, cup, y0, y0 + lift3);
+		if (half - 1 <= 2 && shape == 2) {
+			shape = 1; // a square 5x5 pool leaves no corners for lamps and bushes
+		}
+		int pave = half <= 4 ? 0 : half <= 7 ? 1 : half / 3; // paved apron between the pool and the plinth edge
+		int rad = half - 1 - pave; // pool radius
+		boolean three = rad >= 7 && h >= 9 && k.hash(2, 0, 0, 2) == 0;
+		int r1;
+		int r2 = 0;
+		if (three) {
+			r1 = Math.min(rad - 2, Math.round(rad * 0.68f));
+			r2 = Math.min(r1 - 2, Math.max(2, Math.round(rad * 0.41f)));
 		} else {
-			urn(k, y0, y0 + lift3);
+			r1 = rad >= 5 ? Math.min(rad - 2, Math.round(rad * 0.62f)) : rad == 4 ? 2 : 0;
 		}
-	}
+		// vertical unit: the figure grows taller with its radius (as far as the plot's height allows)
+		int g = Math.max(1, Math.min(6, rad / 4));
+		while (g > 1 && (three ? 2 + g + 1 + g + 3 : 2 + g + 3) > h - 1) {
+			g--;
+		}
+		int f1 = r1 >= 2 ? 2 + g : 1;
+		int f2 = f1 + 1 + g;
+		int fTop = three ? f2 : f1;
+		int x = r1 >= 2 ? Math.max(0, Math.min(g, h - 5 - fTop)) : 0; // extra stem height under the crown
 
-	// ------------------------------------------------------------------ lower basin
-
-	/** The wide pool: dark floor, a two-course rim (deepslate under stone brick) and a light cap with four pilasters. */
-	private static void basin(FountainKit k, int r) {
-		for (int dz = -r; dz <= r; dz++) {
-			for (int dx = -r; dx <= r; dx++) {
-				if (!disk(dx, dz, r)) {
+		int cu = k.cu;
+		int cv = k.cv;
+		for (int dz = -cv; dz <= d - 1 - cv; dz++) {
+			for (int dx = -cu; dx <= w - 1 - cu; dx++) {
+				int u = cu + dx;
+				int v = cv + dz;
+				if (u == 0 || v == 0 || u == w - 1 || v == d - 1) {
+					plinthEdge(k, dx, dz, u, v, w, d);
 					continue;
 				}
-				boolean axis = dx == 0 || dz == 0;
-				if (!disk(dx, dz, r - 1)) {
-					// [palette] rim: dark base course, stone-brick body, light polished cap
-					k.set(dx, 0, dz, k.pick(dx, 0, dz, b(Blocks.POLISHED_DEEPSLATE), b(Blocks.DEEPSLATE_BRICKS), b(Blocks.DEEPSLATE_BRICKS),
-							b(Blocks.CRACKED_DEEPSLATE_BRICKS)));
-					k.set(dx, 1, dz, axis ? b(Blocks.CHISELED_STONE_BRICKS)
-							: k.pick(dx, 1, dz, b(Blocks.CALCITE), b(Blocks.STONE_BRICKS), b(Blocks.CALCITE), b(Blocks.MOSSY_STONE_BRICKS),
-									b(Blocks.POLISHED_ANDESITE)));
-					// [depth] the rim stays low (top at y2) so the cascades above it show; pilasters on the diagonals
-					// rise one block with a chiselled cap and a lantern
-					boolean pilaster = Math.abs(dx) == Math.abs(dz) && Math.abs(dx) >= r - 1 && r >= 3;
-					if (pilaster) {
-						k.set(dx, 2, dz, b(Blocks.CHISELED_STONE_BRICKS));
-						k.set(dx, 3, dz, b(Blocks.LANTERN));
+				if (ins(shape, dx, dz, rad)) {
+					poolCell(k, shape, dx, dz, rad);
+				} else {
+					apron(k, shape, dx, dz, rad, half, pave, accent);
+				}
+			}
+		}
+
+		// bowls
+		if (r1 >= 2) {
+			bowl(k, shape, r1, f1, rad, 1, 0, 1, accent, gold);
+		}
+		if (three) {
+			bowl(k, shape, r2, f2, r1, 2, f1, f1 + 1, accent, gold);
+		}
+		int fLast = three ? f2 : f1;
+		int rLast = three ? r2 : r1;
+		int baseWater = rLast >= 2 ? fLast + 1 : 1; // the water level the crown falls into
+		crown(k, fLast, x, baseWater, accent, rLast >= 2, h, gold);
+
+		// bubblers in a big pool: a ring of small copper-topped nozzles between the shore and the first bowl
+		if (rad >= 9) {
+			int rn = (rad + r1) / 2;
+			int dd = Math.round(rn * 0.707f);
+			int[][] at = {{rn, 0}, {-rn, 0}, {0, rn}, {0, -rn}, {dd, dd}, {-dd, dd}, {dd, -dd}, {-dd, -dd}};
+			for (int[] a : at) {
+				if (ins(shape, a[0], a[1], rad - 3) && !ins(shape, a[0], a[1], r1 + 2)) {
+					k.set(a[0], 1, a[1], accent);
+					k.set(a[0], 2, a[1], WATER);
+					for (Direction dir : DIRS) {
+						k.set(a[0] + dir.getStepX(), 2, a[1] + dir.getStepZ(), FALL);
 					}
-				} else {
-					k.set(dx, 0, dz, k.pick(dx, 0, dz, b(Blocks.DEEPSLATE_TILES), b(Blocks.DEEPSLATE_TILES), b(Blocks.POLISHED_DEEPSLATE),
-							b(Blocks.CRACKED_DEEPSLATE_TILES)));
-					k.set(dx, 1, dz, WATER);
 				}
 			}
 		}
 	}
 
-	/** [transition] lamp posts and planters in the cells the round basin leaves free in the corners of the box. */
-	private static void corners(FountainKit k, int r) {
-		for (int dz = -r; dz <= r; dz++) {
-			for (int dx = -r; dx <= r; dx++) {
-				if (disk(dx, dz, r)) {
-					continue;
-				}
-				if (Math.abs(dx) == r && Math.abs(dz) == r) {
-					k.set(dx, 0, dz, b(Blocks.POLISHED_DEEPSLATE));
-					k.set(dx, 1, dz, b(Blocks.DEEPSLATE_BRICK_WALL));
-					k.set(dx, 2, dz, b(Blocks.LANTERN));
-				} else {
-					k.set(dx, 0, dz, k.pick(dx, 0, dz, b(Blocks.STONE_BRICKS), b(Blocks.MOSSY_STONE_BRICKS), b(Blocks.STONE_BRICKS)));
-					k.set(dx, 1, dz, k.pick(dx, 1, dz, b(Blocks.POTTED_FLOWERING_AZALEA), b(Blocks.POTTED_CORNFLOWER),
-							b(Blocks.POTTED_PINK_TULIP), b(Blocks.POTTED_FLOWERING_AZALEA)));
-				}
+	// ------------------------------------------------------------------ shapes
+
+	/** Whether the cell is inside the figure of radius {@code r}: round, octagonal or square. */
+	private static boolean ins(int shape, int dx, int dz, int r) {
+		if (r < 0) {
+			return false;
+		}
+		return switch (shape) {
+			case 0 -> FountainKit.disk(dx, dz, r);
+			case 1 -> FountainKit.oct(dx, dz, r);
+			default -> Math.abs(dx) <= r && Math.abs(dz) <= r;
+		};
+	}
+
+	/** The one-cell edge of the figure: inside, with a side that is not. */
+	private static boolean rim(int shape, int dx, int dz, int r) {
+		return ins(shape, dx, dz, r) && !(ins(shape, dx + 1, dz, r) && ins(shape, dx - 1, dz, r) && ins(shape, dx, dz + 1, r) && ins(shape, dx, dz - 1, r));
+	}
+
+	/** The smallest radius whose figure contains the cell (the ring the cell is on). */
+	private static int ringIdx(int shape, int dx, int dz) {
+		int r = Math.max(Math.abs(dx), Math.abs(dz));
+		while (!ins(shape, dx, dz, r)) {
+			r++;
+		}
+		return r;
+	}
+
+	/** Direction from a rim cell towards the water: opposite its only open side, else towards the centre. */
+	private static Direction inward(int shape, int dx, int dz, int r) {
+		int open = 0;
+		Direction last = null;
+		for (Direction dir : DIRS) {
+			if (!ins(shape, dx + dir.getStepX(), dz + dir.getStepZ(), r)) {
+				open++;
+				last = dir;
 			}
+		}
+		return open == 1 ? last.getOpposite() : toward(dx, dz);
+	}
+
+	// ------------------------------------------------------------------ plinth, pool, apron
+
+	/** [transition] the plinth edge is a ring of stairs rising inwards: the plaza is walked up from every side. */
+	private static void plinthEdge(FountainKit k, int dx, int dz, int u, int v, int w, int d) {
+		Direction f = u == 0 ? Direction.EAST : u == w - 1 ? Direction.WEST : v == 0 ? Direction.SOUTH : Direction.NORTH;
+		if (Math.abs(dx) <= 1 || Math.abs(dz) <= 1) {
+			k.set(dx, 0, dz, stair(Blocks.SMOOTH_QUARTZ_STAIRS, f));
+			return;
+		}
+		k.set(dx, 0, dz, k.pick(dx, 0, dz, stair(Blocks.STONE_BRICK_STAIRS, f), stair(Blocks.STONE_BRICK_STAIRS, f),
+				stair(Blocks.POLISHED_ANDESITE_STAIRS, f), stair(Blocks.DEEPSLATE_BRICK_STAIRS, f), stair(Blocks.MOSSY_STONE_BRICK_STAIRS, f)));
+	}
+
+	/** One cell of the big pool: dark bed and water inside, a base course and a stair rim (the seat) on the edge. */
+	private static void poolCell(FountainKit k, int shape, int dx, int dz, int rad) {
+		if (rim(shape, dx, dz, rad)) {
+			// [palette] dark base course under a stone-brick bench rim; its back (inwards) holds the water
+			k.set(dx, 0, dz, k.pick(dx, 0, dz, b(Blocks.POLISHED_DEEPSLATE), b(Blocks.DEEPSLATE_BRICKS), b(Blocks.DEEPSLATE_BRICKS),
+					b(Blocks.CRACKED_DEEPSLATE_BRICKS)));
+			Direction f = inward(shape, dx, dz, rad);
+			k.set(dx, 1, dz, k.pick(dx, 1, dz, stair(Blocks.SMOOTH_QUARTZ_STAIRS, f), stair(Blocks.SMOOTH_QUARTZ_STAIRS, f),
+					stair(Blocks.POLISHED_DIORITE_STAIRS, f), stair(Blocks.SMOOTH_QUARTZ_STAIRS, f)));
+		} else {
+			k.set(dx, 0, dz, k.pick(dx, 0, dz, b(Blocks.DEEPSLATE_TILES), b(Blocks.DEEPSLATE_TILES), b(Blocks.POLISHED_DEEPSLATE),
+					b(Blocks.CRACKED_DEEPSLATE_TILES)));
+			k.set(dx, 1, dz, WATER);
 		}
 	}
 
-	/** A stepped plinth in the middle of the pool (stairs climbing to a centre block, planted corners cut as slabs). */
-	private static void plinth(FountainKit k) {
-		k.set(0, 1, 0, b(Blocks.POLISHED_DEEPSLATE));
-		for (int dz = -1; dz <= 1; dz++) {
-			for (int dx = -1; dx <= 1; dx++) {
-				if (dx == 0 && dz == 0) {
-					continue;
-				}
-				if (dx == 0 || dz == 0) {
-					k.set(dx, 1, dz, stair(Blocks.DEEPSLATE_BRICK_STAIRS, toward(dx, dz)));
-				} else {
-					k.set(dx, 1, dz, slab(Blocks.DEEPSLATE_TILE_SLAB));
-				}
-			}
+	/** The paving round the pool (bands that follow its shape, a light cross for the walks) and its furniture. */
+	private static void apron(FountainKit k, int shape, int dx, int dz, int rad, int half, int pave, BlockState accent) {
+		int m = ringIdx(shape, dx, dz) - rad;
+		boolean cross = Math.abs(dx) <= 1 || Math.abs(dz) <= 1;
+		BlockState s;
+		if (cross) {
+			// [finish] the walks: a calcite line between polished diorite, from the pool to the plinth edge
+			s = Math.min(Math.abs(dx), Math.abs(dz)) == 0 ? b(Blocks.CALCITE) : b(Blocks.POLISHED_DIORITE);
+		} else if (m == 1) {
+			s = k.pick(dx, 0, dz, b(Blocks.POLISHED_DEEPSLATE), b(Blocks.POLISHED_DEEPSLATE), b(Blocks.DEEPSLATE_TILES));
+		} else {
+			s = switch ((m / 2) % 3) {
+				case 0 -> k.pick(dx, 0, dz, b(Blocks.STONE_BRICKS), b(Blocks.STONE_BRICKS), b(Blocks.MOSSY_STONE_BRICKS), b(Blocks.CRACKED_STONE_BRICKS));
+				case 1 -> k.pick(dx, 0, dz, b(Blocks.POLISHED_ANDESITE), b(Blocks.POLISHED_ANDESITE), b(Blocks.ANDESITE));
+				default -> k.pick(dx, 0, dz, b(Blocks.SMOOTH_STONE), b(Blocks.POLISHED_ANDESITE), b(Blocks.STONE_BRICKS));
+			};
+		}
+		k.set(dx, 0, dz, s);
+
+		// furniture on the ring just inside the plinth edge
+		int bc = half - 1;
+		if (Math.max(Math.abs(dx), Math.abs(dz)) != bc) {
+			return;
+		}
+		int ax = Math.abs(dx);
+		int az = Math.abs(dz);
+		if (ax == bc && az == bc) {
+			lamp(k, dx, dz, accent);
+			// [finish] a flowering bush on each side of the corner lamp
+			k.set(dx - Integer.signum(dx), 1, dz, b(Blocks.FLOWERING_AZALEA));
+			k.set(dx, 1, dz - Integer.signum(dz), b(Blocks.FLOWERING_AZALEA));
+			return;
+		}
+		if (pave < 2) {
+			return;
+		}
+		int t = ax == bc ? az : ax;
+		if (t <= 1 || t > bc - 2) {
+			return;
+		}
+		int q = (t - 2) % 8;
+		if (q <= 2) {
+			// [finish] a bench: stairs with the back outwards, a seat towards the plaza
+			Direction f = ax == bc ? (dx > 0 ? Direction.EAST : Direction.WEST) : (dz > 0 ? Direction.SOUTH : Direction.NORTH);
+			k.set(dx, 1, dz, stair(Blocks.STONE_BRICK_STAIRS, f));
+		} else if ((t - 2) % 16 == 12) {
+			lamp(k, dx, dz, accent);
+		} else if (q == 5) {
+			k.set(dx, 1, dz, k.pick(dx, 1, dz, b(Blocks.POTTED_FLOWERING_AZALEA), b(Blocks.POTTED_CORNFLOWER), b(Blocks.POTTED_PINK_TULIP)));
 		}
 	}
 
-	// ------------------------------------------------------------------ mid bowl
+	/** A lamp post: a deepslate plinth, a wall shaft and a lantern. */
+	private static void lamp(FountainKit k, int dx, int dz, BlockState accent) {
+		k.set(dx, 1, dz, b(Blocks.POLISHED_DEEPSLATE));
+		k.set(dx, 2, dz, b(Blocks.STONE_BRICK_WALL));
+		k.set(dx, 3, dz, b(Blocks.STONE_BRICK_WALL));
+		k.set(dx, 4, dz, b(Blocks.LANTERN));
+	}
+
+	// ------------------------------------------------------------------ bowls
 
 	/**
-	 * The mid bowl: floor at y2, a ring of upside-down stairs under the rim (the cup profile), the rim at y3
-	 * with its water, a quartz cap at y4. Four lips on the compass points let the water fall into the basin.
+	 * A bowl of radius {@code r} with its floor at {@code f}: a drum under it, a ring of upside-down stairs
+	 * (the cup profile), a stair rim that holds the water, and lips (a notch at the compass points, wider
+	 * on bigger bowls) where the water falls into the basin below ({@code rb}, whose water is at
+	 * {@code lowWater}).
 	 */
-	private static void midBowl(FountainKit k, int r, int lift) {
-		int f = 2 + lift; // y of the floor
-		for (int y = 2; y < f; y++) {
-			k.set(0, y, 0, pillar(Blocks.QUARTZ_PILLAR)); // stem under a lifted bowl
+	private static void bowl(FountainKit k, int shape, int r, int f, int rb, int tier, int baseY, int lowWater, BlockState accent, boolean gold) {
+		boolean light = tier >= 2;
+		int dr = r >= 3 ? r - 2 : 0;
+		// [depth] the drum: a stone-brick shaft with a collar of accent under the bowl
+		for (int y = baseY + 1; y < f; y++) {
+			for (int dz = -dr; dz <= dr; dz++) {
+				for (int dx = -dr; dx <= dr; dx++) {
+					if (!ins(shape, dx, dz, dr)) {
+						continue;
+					}
+					boolean collar = y == f - 1 && (dr == 0 || rim(shape, dx, dz, dr));
+					if (collar) {
+						k.set(dx, y, dz, accent);
+					} else if (dr == 0) {
+						k.set(0, y, 0, pillar(Blocks.QUARTZ_PILLAR));
+					} else {
+						k.set(dx, y, dz, k.pick(dx, y, dz, b(Blocks.STONE_BRICKS), b(Blocks.CHISELED_STONE_BRICKS), b(Blocks.STONE_BRICKS),
+								b(Blocks.POLISHED_ANDESITE)));
+					}
+				}
+			}
 		}
+		int wl = r >= 5 ? r / 4 : 0; // half-width of a lip beyond its centre cell
 		for (int dz = -r; dz <= r; dz++) {
 			for (int dx = -r; dx <= r; dx++) {
-				if (!disk(dx, dz, r)) {
+				if (!ins(shape, dx, dz, r)) {
 					continue;
 				}
-				boolean ring = !disk(dx, dz, r - 1);
-				boolean lip = ring && (dx == 0 || dz == 0);
-				if (!ring) {
-					k.set(dx, f, dz, k.pick(dx, 2, dz, b(Blocks.POLISHED_ANDESITE), b(Blocks.POLISHED_ANDESITE), b(Blocks.POLISHED_DIORITE)));
-					if (dx != 0 || dz != 0) {
-						k.set(dx, f + 1, dz, WATER);
-					}
-					continue;
-				}
-				if (lip) {
-					for (int y = 2; y <= f; y++) {
-						k.set(dx, y, dz, FALL); // the cascade drops out of the lip, into the basin
-					}
+				if (!rim(shape, dx, dz, r)) {
+					// [palette] each bowl is lighter than the one below
+					k.set(dx, f, dz, light ? k.pick(dx, f, dz, b(Blocks.POLISHED_DIORITE), b(Blocks.CALCITE), b(Blocks.POLISHED_DIORITE))
+							: k.pick(dx, f, dz, b(Blocks.POLISHED_ANDESITE), b(Blocks.POLISHED_DIORITE), b(Blocks.POLISHED_ANDESITE)));
 					k.set(dx, f + 1, dz, WATER);
 					continue;
 				}
-				// [depth] the underside curves in towards the stem: upside-down stairs facing the centre
-				k.set(dx, f, dz, stairTop(Blocks.POLISHED_ANDESITE_STAIRS, toward(dx, dz)));
-				k.set(dx, f + 1, dz, k.pick(dx, 3, dz, b(Blocks.POLISHED_DIORITE), b(Blocks.POLISHED_DIORITE), b(Blocks.POLISHED_ANDESITE)));
-				k.set(dx, f + 2, dz, slab(Blocks.SMOOTH_QUARTZ_SLAB));
-			}
-		}
-		// pedestal in the middle of the bowl, carrying the top cup
-		k.set(0, f + 1, 0, b(Blocks.CHISELED_QUARTZ_BLOCK));
-	}
-
-	// ------------------------------------------------------------------ top cup
-
-	/** The top cup: a small flared bowl on a quartz stem, gold studs on the diagonals, four lips and a jet. */
-	private static void topCup(FountainKit k, int r, int y0, int a) {
-		for (int y = y0; y < a; y++) {
-			k.set(0, y, 0, pillar(Blocks.QUARTZ_PILLAR));
-		}
-		for (int dz = -r; dz <= r; dz++) {
-			for (int dx = -r; dx <= r; dx++) {
-				if (!disk(dx, dz, r)) {
-					continue;
-				}
-				boolean ring = !disk(dx, dz, r - 1);
-				boolean lip = ring && (dx == 0 || dz == 0);
-				if (!ring) {
-					k.set(dx, a, dz, b(Blocks.POLISHED_DIORITE));
-					k.set(dx, a + 1, dz, WATER);
-					if (dx == 0 && dz == 0) {
-						k.set(0, a + 2, 0, b(Blocks.END_ROD)); // a pale finial: no free source to spill
-					}
-					continue;
-				}
+				Direction in = inward(shape, dx, dz, r);
+				int sx = Math.abs(dx) >= Math.abs(dz) ? Integer.signum(dx) : 0;
+				int sz = sx == 0 ? Integer.signum(dz) : 0;
+				int ox = dx + sx;
+				int oz = dz + sz;
+				boolean lip = Math.min(Math.abs(dx), Math.abs(dz)) <= wl && !ins(shape, ox, oz, r) && ins(shape, ox, oz, rb) && !rim(shape, ox, oz, rb);
 				if (lip) {
-					for (int y = y0; y <= a; y++) {
-						k.set(dx, y, dz, FALL);
+					// the notch: water carries on over the lip and falls into the basin below
+					k.set(dx, f, dz, b(Blocks.POLISHED_DIORITE));
+					k.set(dx, f + 1, dz, WATER);
+					for (int y = lowWater + 1; y <= f + 1; y++) {
+						k.set(ox, y, oz, FALL);
 					}
-					k.set(dx, a + 1, dz, WATER);
 					continue;
 				}
-				k.set(dx, a, dz, stairTop(Blocks.POLISHED_DIORITE_STAIRS, toward(dx, dz)));
-				boolean stud = Math.abs(dx) == Math.abs(dz);
-				k.set(dx, a + 1, dz, stud ? GOLD : b(Blocks.POLISHED_DIORITE));
-				k.set(dx, a + 2, dz, slab(Blocks.SMOOTH_QUARTZ_SLAB));
+				// [depth] the underside curves in towards the drum; the rim stair has its back to the water
+				boolean corbel = !gold && k.hash(dx, f, dz, 3) != 0;
+				k.set(dx, f, dz, stairTop(corbel ? Blocks.CUT_COPPER_STAIRS.waxed().unaffected() : Blocks.DEEPSLATE_BRICK_STAIRS, in));
+				k.set(dx, f + 1, dz, light ? k.pick(dx, f + 1, dz, stair(Blocks.SMOOTH_QUARTZ_STAIRS, in), stair(Blocks.SMOOTH_QUARTZ_STAIRS, in),
+						stair(Blocks.POLISHED_DIORITE_STAIRS, in))
+						: k.pick(dx, f + 1, dz, stair(Blocks.POLISHED_DIORITE_STAIRS, in), stair(Blocks.POLISHED_DIORITE_STAIRS, in),
+								stair(Blocks.SMOOTH_QUARTZ_STAIRS, in)));
 			}
 		}
 	}
 
-	/** At the smallest size the top is an urn on the stem: a quartz vessel brimming over with a jet. */
-	private static void urn(FountainKit k, int y0, int a) {
-		for (int y = y0; y <= a; y++) {
+	/**
+	 * The top: a stem (quartz, capped in copper or gold) rising from the top bowl's floor (or from the pool, when
+	 * the top has no bowl), and water on its cap that falls on four sides into the water below.
+	 */
+	private static void crown(FountainKit k, int f, int x, int baseWater, BlockState accent, boolean bowl, int h, boolean gold) {
+		int st = f + 2 + x; // y of the cap
+		if (!bowl) {
+			for (int y = 1; y < f; y++) {
+				k.set(0, y, 0, pillar(Blocks.QUARTZ_PILLAR));
+			}
+		}
+		k.set(0, f, 0, bowl ? b(Blocks.POLISHED_DIORITE) : b(Blocks.CHISELED_QUARTZ_BLOCK));
+		k.set(0, f + 1, 0, b(Blocks.CHISELED_QUARTZ_BLOCK));
+		for (int y = f + 2; y < st; y++) {
 			k.set(0, y, 0, pillar(Blocks.QUARTZ_PILLAR));
 		}
-		k.set(0, a + 1, 0, b(Blocks.CHISELED_QUARTZ_BLOCK));
-		k.set(0, a + 2, 0, b(Blocks.END_ROD)); // finial, not a free source
-		for (Direction d : new Direction[] {Direction.NORTH, Direction.SOUTH, Direction.EAST, Direction.WEST}) {
-			k.set(d.getStepX(), a, d.getStepZ(), stairTop(Blocks.POLISHED_DIORITE_STAIRS, d.getOpposite()));
-			k.set(d.getStepX(), a + 1, d.getStepZ(), FALL);
+		k.set(0, st, 0, accent);
+		k.set(0, st + 1, 0, WATER);
+		if (st + 2 < h) {
+			// [finish] a slim finial over the water: a copper lightning rod, or an end rod with the gold
+			k.set(0, st + 2, 0, gold ? b(Blocks.END_ROD) : b(Blocks.LIGHTNING_ROD.waxed().unaffected()));
+		}
+		for (Direction dir : DIRS) {
+			for (int y = baseWater + 1; y <= st + 1; y++) {
+				k.set(dir.getStepX(), y, dir.getStepZ(), FALL);
+			}
 		}
 	}
 }
