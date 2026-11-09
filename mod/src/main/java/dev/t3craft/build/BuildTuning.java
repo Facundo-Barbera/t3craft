@@ -11,25 +11,45 @@ import java.util.List;
 
 /**
  * Throughput settings shared by every builder (site, HQ, demo, debug), from the optional {@code "build"}
- * section of {@code config/t3craft.json}. Read-only and additive: absent file/section/key → default;
+ * section of {@code config/t3craft.json} (and, feat/build-near-player, the top-level
+ * {@code "buildNearPlayer"} object). Read-only and additive: absent file/section/key → default;
  * invalid value → default plus a warning naming only the key. feat/config's store keeps unknown
  * sections when it saves, so this section survives without this class ever writing.
  * <pre>{@code
  * "build": {
- *   "maxBlocksPerTick": 48,    // global budget per server tick, shared by all running jobs
+ *   "maxBlocksPerTick": 96,    // global budget per server tick, shared by all running crews (still capped by 8 ms/tick)
  *   "maxConcurrentJobs": 3,    // jobs that place at the same time; the rest wait their turn
- *   "frontsPerJob": 4,         // parallel fronts per job (capped by the crew size)
+ *   "frontsPerJob": 8,         // parallel fronts per job (capped by the crew size)
  *   "maxEffectsPerTick": 8,    // placement sounds + particle bursts per tick, all jobs together
  *   "autoThrottle": true,      // lower the budget while the server tick is slow
- *   "targetMspt": 40           // ...above this many ms per tick (smoothed)
- * }
+ *   "targetMspt": 40,          // ...above this many ms per tick (smoothed)
+ *   "fastFoundation": true,    // ground, fill and floors go in fast layers, no builder animation
+ *   "foundationBlocksPerTick": 192, // most foundation blocks per server tick (all jobs together)
+ *   "foundationMsPerTick": 10, // ...and most wall-clock ms per server tick for them
+ *   "blocksPerTick": 6,        // pace of one builder (floor), blocks per tick
+ *   "crew": 8,                 // most builders per crew; crews grow with the visible part of the plan
+ *   "order": "radial",         // feat/build-radial: "radial" (around the player, ring by ring) or "parts" (part by part)
+ *   "radialRing": 5            // width of a ring, blocks
+ * },
+ * "buildNearPlayer": { "enabled": true, "radius": 48 }
  * }</pre>
- * Defaults and their reasons: docs/feat-parallel-build.md.
+ * Defaults and their reasons: docs/feat-parallel-build.md, docs/feat-build-near-player.md, docs/feat-build-radial.md
+ * (feat/build-radial lowered foundationBlocksPerTick 4096 → 192 and blocksPerTick 12 → 6: a visible pace).
  */
 public record BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int frontsPerJob, int maxEffectsPerTick, boolean autoThrottle,
-		double targetMspt) {
+		double targetMspt, boolean fastFoundation, int foundationBlocksPerTick, double foundationMsPerTick, double blocksPerTick, int crew,
+		boolean nearPlayer, int nearPlayerRadius, boolean radial, int radialRing) {
 	public static final String SECTION = "build";
-	public static final BuildTuning DEFAULTS = new BuildTuning(48, 3, 4, 8, true, 40.0);
+	/** feat/build-near-player: top-level object {@code {enabled, radius}}. */
+	public static final String NEAR_SECTION = "buildNearPlayer";
+	/** Builders of a crew before it grows with the plan. */
+	public static final int BASE_CREW = 4;
+	/** Visible (non-foundation) entries per extra builder. */
+	public static final int ENTRIES_PER_BUILDER = 3000;
+	/** feat/build-radial: {@code build.order} values. */
+	public static final String ORDER_RADIAL = "radial";
+	public static final String ORDER_PARTS = "parts";
+	public static final BuildTuning DEFAULTS = new BuildTuning(96, 3, 8, 8, true, 40.0, true, 192, 10.0, 6.0, 8, true, 48, true, 5);
 
 	public BuildTuning {
 		maxBlocksPerTick = clamp(maxBlocksPerTick, 1, 4096);
@@ -39,6 +59,29 @@ public record BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int front
 		if (!(targetMspt >= 10 && targetMspt <= 1000)) {
 			targetMspt = 40.0;
 		}
+		foundationBlocksPerTick = clamp(foundationBlocksPerTick, 64, 65536);
+		if (!(foundationMsPerTick >= 1 && foundationMsPerTick <= 40)) {
+			foundationMsPerTick = 10.0;
+		}
+		if (!(blocksPerTick >= 0.5 && blocksPerTick <= 64)) {
+			blocksPerTick = 12.0;
+		}
+		crew = clamp(crew, 1, 16);
+		nearPlayerRadius = clamp(nearPlayerRadius, 8, 512);
+		radialRing = clamp(radialRing, 1, 64);
+	}
+
+	/** feat/build-near-player constructor: the feat/build-radial settings at their defaults. */
+	public BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int frontsPerJob, int maxEffectsPerTick, boolean autoThrottle, double targetMspt,
+			boolean fastFoundation, int foundationBlocksPerTick, double foundationMsPerTick, double blocksPerTick, int crew, boolean nearPlayer,
+			int nearPlayerRadius) {
+		this(maxBlocksPerTick, maxConcurrentJobs, frontsPerJob, maxEffectsPerTick, autoThrottle, targetMspt, fastFoundation, foundationBlocksPerTick,
+				foundationMsPerTick, blocksPerTick, crew, nearPlayer, nearPlayerRadius, true, 5);
+	}
+
+	/** Pre-feat/build-near-player constructor: the new settings at their defaults. */
+	public BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int frontsPerJob, int maxEffectsPerTick, boolean autoThrottle, double targetMspt) {
+		this(maxBlocksPerTick, maxConcurrentJobs, frontsPerJob, maxEffectsPerTick, autoThrottle, targetMspt, true, 192, 10.0, 6.0, 8, true, 48, true, 5);
 	}
 
 	private static int clamp(int v, int lo, int hi) {
@@ -48,6 +91,17 @@ public record BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int front
 	/** Fronts for a job built by {@code crew} builders: one front per builder, at most {@link #frontsPerJob}. */
 	public int frontsFor(int crew) {
 		return Math.max(1, Math.min(frontsPerJob, crew));
+	}
+
+	/**
+	 * feat/build-near-player: builders for a plan with {@code visibleEntries} entries the crew animates
+	 * (foundation excluded): {@code asked} (at least {@link #BASE_CREW}), plus one per
+	 * {@link #ENTRIES_PER_BUILDER}, at most {@link #crew}.
+	 */
+	public int crewFor(int asked, int visibleEntries) {
+		int base = Math.max(1, Math.min(asked, crew));
+		int grown = Math.max(base, BASE_CREW) + Math.max(0, visibleEntries) / ENTRIES_PER_BUILDER;
+		return Math.max(base, Math.min(crew, grown));
 	}
 
 	public record Result(BuildTuning tuning, List<String> warnings) {
@@ -68,32 +122,69 @@ public record BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int front
 	/** @param root the whole t3craft.json object (or null) */
 	public static Result parse(JsonObject root) {
 		List<String> warn = new ArrayList<>();
-		if (root == null || !root.has(SECTION)) {
+		if (root == null) {
 			return new Result(DEFAULTS, List.of());
 		}
-		if (!root.get(SECTION).isJsonObject()) {
-			return new Result(DEFAULTS, List.of(SECTION));
-		}
-		JsonObject s = root.getAsJsonObject(SECTION);
 		BuildTuning d = DEFAULTS;
-		int blocks = (int) number(s, "maxBlocksPerTick", d.maxBlocksPerTick(), 1, 4096, true, warn);
-		int jobs = (int) number(s, "maxConcurrentJobs", d.maxConcurrentJobs(), 1, 64, true, warn);
-		int fronts = (int) number(s, "frontsPerJob", d.frontsPerJob(), 1, 16, true, warn);
-		int effects = (int) number(s, "maxEffectsPerTick", d.maxEffectsPerTick(), 0, 256, true, warn);
-		boolean auto = d.autoThrottle();
-		if (s.has("autoThrottle")) {
-			JsonElement e = s.get("autoThrottle");
-			if (e.isJsonPrimitive() && e.getAsJsonPrimitive().isBoolean()) {
-				auto = e.getAsBoolean();
+		JsonObject s = new JsonObject();
+		if (root.has(SECTION)) {
+			if (root.get(SECTION).isJsonObject()) {
+				s = root.getAsJsonObject(SECTION);
 			} else {
-				warn.add(SECTION + ".autoThrottle");
+				warn.add(SECTION);
 			}
 		}
-		double mspt = number(s, "targetMspt", d.targetMspt(), 10, 1000, false, warn);
-		return new Result(new BuildTuning(blocks, jobs, fronts, effects, auto, mspt), List.copyOf(warn));
+		int blocks = (int) number(SECTION, s, "maxBlocksPerTick", d.maxBlocksPerTick(), 1, 4096, true, warn);
+		int jobs = (int) number(SECTION, s, "maxConcurrentJobs", d.maxConcurrentJobs(), 1, 64, true, warn);
+		int fronts = (int) number(SECTION, s, "frontsPerJob", d.frontsPerJob(), 1, 16, true, warn);
+		int effects = (int) number(SECTION, s, "maxEffectsPerTick", d.maxEffectsPerTick(), 0, 256, true, warn);
+		boolean auto = bool(SECTION, s, "autoThrottle", d.autoThrottle(), warn);
+		double mspt = number(SECTION, s, "targetMspt", d.targetMspt(), 10, 1000, false, warn);
+		boolean fast = bool(SECTION, s, "fastFoundation", d.fastFoundation(), warn);
+		int fBlocks = (int) number(SECTION, s, "foundationBlocksPerTick", d.foundationBlocksPerTick(), 64, 65536, true, warn);
+		double fMs = number(SECTION, s, "foundationMsPerTick", d.foundationMsPerTick(), 1, 40, false, warn);
+		double pace = number(SECTION, s, "blocksPerTick", d.blocksPerTick(), 0.5, 64, false, warn);
+		int crew = (int) number(SECTION, s, "crew", d.crew(), 1, 16, true, warn);
+		boolean radial = d.radial();
+		if (s.has("order")) {
+			JsonElement e = s.get("order");
+			String v = e.isJsonPrimitive() && e.getAsJsonPrimitive().isString() ? e.getAsString().trim().toLowerCase(java.util.Locale.ROOT) : "";
+			if (ORDER_RADIAL.equals(v)) {
+				radial = true;
+			} else if (ORDER_PARTS.equals(v)) {
+				radial = false;
+			} else {
+				warn.add(SECTION + ".order");
+			}
+		}
+		int ring = (int) number(SECTION, s, "radialRing", d.radialRing(), 1, 64, true, warn);
+		boolean near = d.nearPlayer();
+		int radius = d.nearPlayerRadius();
+		if (root.has(NEAR_SECTION)) {
+			if (root.get(NEAR_SECTION).isJsonObject()) {
+				JsonObject n = root.getAsJsonObject(NEAR_SECTION);
+				near = bool(NEAR_SECTION, n, "enabled", near, warn);
+				radius = (int) number(NEAR_SECTION, n, "radius", radius, 8, 512, true, warn);
+			} else {
+				warn.add(NEAR_SECTION);
+			}
+		}
+		return new Result(new BuildTuning(blocks, jobs, fronts, effects, auto, mspt, fast, fBlocks, fMs, pace, crew, near, radius, radial, ring), List.copyOf(warn));
 	}
 
-	private static double number(JsonObject s, String key, double def, double lo, double hi, boolean integer, List<String> warn) {
+	private static boolean bool(String section, JsonObject s, String key, boolean def, List<String> warn) {
+		if (!s.has(key)) {
+			return def;
+		}
+		JsonElement e = s.get(key);
+		if (e.isJsonPrimitive() && e.getAsJsonPrimitive().isBoolean()) {
+			return e.getAsBoolean();
+		}
+		warn.add(section + "." + key);
+		return def;
+	}
+
+	private static double number(String section, JsonObject s, String key, double def, double lo, double hi, boolean integer, List<String> warn) {
 		if (!s.has(key) || s.get(key).isJsonNull()) {
 			return def;
 		}
@@ -104,7 +195,7 @@ public record BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int front
 				return v;
 			}
 		}
-		warn.add(SECTION + "." + key);
+		warn.add(section + "." + key);
 		return def;
 	}
 }

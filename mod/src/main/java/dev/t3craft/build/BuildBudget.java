@@ -35,6 +35,9 @@ public final class BuildBudget {
 	private long workNanos;
 	private int workBlocks;
 	private double nanosPerBlock;
+	/** feat/build-near-player: what fast foundation layers may still use this tick (blocks, ns), all jobs together. */
+	private int foundationBlocksLeft;
+	private long foundationNanosLeft;
 	/** fix/new-thread-hitch: light-changing placements this tick, and the extra budget they still owe. */
 	private int lightBlocks;
 	private double lightDebt;
@@ -131,6 +134,9 @@ public final class BuildBudget {
 		lightBlocks = 0;
 		remaining = effectiveMax;
 		effectsLeft = t.maxEffectsPerTick();
+		// feat/build-near-player: the foundation budget follows the same MSPT / FPS throttle
+		foundationBlocksLeft = TickGovernor.apply(t.foundationBlocksPerTick(), factor);
+		foundationNanosLeft = (long) (t.foundationMsPerTick() * 1_000_000.0 * Math.max(TickGovernor.MIN_FACTOR, factor));
 		lastClaimants = Math.max(1, claimants.size());
 		claimants.clear();
 	}
@@ -157,6 +163,25 @@ public final class BuildBudget {
 		}
 		long fit = (long) Math.floor(MS_PER_TICK * 1_000_000.0 / nanosPerBlock);
 		return (int) Math.max(1, Math.min(blocks, fit));
+	}
+
+	/**
+	 * feat/build-near-player: blocks a fast foundation layer may place now (0 when this tick's foundation
+	 * budget, in blocks or in wall-clock time, is spent). Server thread.
+	 */
+	public synchronized int foundationBlocks() {
+		return foundationNanosLeft > 0 ? Math.max(0, foundationBlocksLeft) : 0;
+	}
+
+	/** Wall-clock ns fast foundation layers may still use this tick. */
+	public synchronized long foundationNanos() {
+		return Math.max(0, foundationNanosLeft);
+	}
+
+	/** A fast foundation layer used {@code blocks} entries and {@code nanos} of this tick. */
+	public synchronized void spendFoundation(int blocks, long nanos) {
+		foundationBlocksLeft -= Math.max(0, blocks);
+		foundationNanosLeft -= Math.max(0, nanos);
 	}
 
 	/** Reports placement work done this tick (server thread): wall time and blocks actually placed. */

@@ -385,8 +385,9 @@ public final class ComposerView implements ConversationPanel.Footer {
 			int ny = box.y() - NOTICE_H + 1;
 			String s = ChatDraw.clip(font, nt, w - 8);
 			notice = new Rect(bx + 4, ny, font.width(s) + 2, 9);
-			g.text(font, s, bx + 4, ny, ComposerSkin.ERROR, false);
-			if (notice.contains(mouseX, mouseY)) {
+			boolean isError = state.error() != null;
+			g.text(font, s, bx + 4, ny, isError ? ComposerSkin.ERROR : ComposerSkin.MUTED, false);
+			if (isError && notice.contains(mouseX, mouseY)) {
 				g.setTooltipForNextFrame(font, List.of(Component.literal(nt).getVisualOrderText(),
 						Component.literal("Click to dismiss").withColor(0xFFA0A0A0).getVisualOrderText()), mouseX, mouseY);
 			}
@@ -497,7 +498,11 @@ public final class ComposerView implements ConversationPanel.Footer {
 
 	private @Nullable String noticeText() {
 		String err = state.error();
-		return err == null ? null : "⚠ " + err;
+		if (err != null) {
+			return "⚠ " + err;
+		}
+		String st = state.status();
+		return st == null ? null : "⏱ " + st;
 	}
 
 	private static void drawScrollbar(GuiGraphicsExtractor g, int x, int y, int h, int total, int vis) {
@@ -611,7 +616,8 @@ public final class ComposerView implements ConversationPanel.Footer {
 				case STOPPING -> "Interrupting…";
 				case SEND_DISABLED -> state.isDraft() ? "Write the first message" : "Nothing to send";
 				default -> state.isDraft() ? "Start the thread · Enter"
-						: state.running() ? "Steer message · Enter · Ctrl+Enter or Ctrl+click to queue" : "Submit message · Enter";
+						: state.unsent() > 0 ? "Queue message · Enter (goes out after the one being sent)"
+							: state.running() ? "Steer message · Enter · Ctrl+Enter or Ctrl+click to queue" : "Submit message · Enter";
 			};
 			g.setTooltipForNextFrame(font, Component.literal(tip), mouseX, mouseY);
 		}
@@ -626,7 +632,7 @@ public final class ComposerView implements ConversationPanel.Footer {
 			setFocused(false);
 			return false;
 		}
-		if (notice.contains(mx, my)) {
+		if (notice.contains(mx, my) && state.error() != null) {
 			state.clearError();
 			return true;
 		}
@@ -820,14 +826,26 @@ public final class ComposerView implements ConversationPanel.Footer {
 
 	/** Ctrl+V: true when the clipboard held images (added), false to paste text instead. */
 	private boolean pasteImages() {
-		List<ImageSources.Picked> imgs = ImageSources.clipboardImages();
+		// fix/paste-crash: a bad clipboard image (or a decoder/texture failure) must never take the game down
+		List<ImageSources.Picked> imgs;
+		try {
+			imgs = ImageSources.clipboardImages();
+		} catch (Throwable t) {
+			dev.t3craft.T3Craft.LOGGER.warn("[t3craft] reading the clipboard failed", t);
+			return false;
+		}
 		if (imgs.isEmpty()) {
 			return false;
 		}
-		for (ImageSources.Picked p : imgs) {
-			if (!addImage(p.bytes(), p.name())) {
-				break;
+		try {
+			for (ImageSources.Picked p : imgs) {
+				if (!addImage(p.bytes(), p.name())) {
+					break;
+				}
 			}
+		} catch (Throwable t) {
+			dev.t3craft.T3Craft.LOGGER.warn("[t3craft] pasting an image failed", t);
+			state.setError("Could not paste that image: " + t.getClass().getSimpleName());
 		}
 		return true;
 	}

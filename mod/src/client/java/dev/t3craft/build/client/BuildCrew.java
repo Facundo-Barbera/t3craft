@@ -22,8 +22,9 @@ import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The animated crew of one build, on the client thread: builders appear a short walk away, walk to
- * the site, then the job is submitted ({@code submitter}); every block the server places is
+ * The animated crew of one build, on the client thread: builders appear a short walk away and walk to
+ * the site while the job already runs (feat/build-near-player: it is submitted on the first tick, no
+ * wait for the crew to arrive; a player near the site sees the crew appear next to them); every block the server places is
  * assigned to a builder, who moves to a spot just outside the footprint (raised as the structure
  * grows, as if on scaffolding), faces the block, holds it and swings. When the job ends the crew
  * walks off and vanishes in a puff.
@@ -38,8 +39,9 @@ final class BuildCrew implements BuildHandle {
 	private static final double MAX_WORK_SPEED = 0.6;
 	/** Pace a walk would need (blocks per tick) above which the builder leaps to its spot instead. */
 	private static final double LEAP_SPEED = 2 * MAX_WORK_SPEED;
-	private static final int ARRIVE_TIMEOUT_TICKS = 20 * 10;
 	private static final int LEAVE_TIMEOUT_TICKS = 20 * 6;
+	/** feat/build-near-player: builders appear this far from a player standing near the site. */
+	static final double NEAR_SPAWN_DISTANCE = 3.0;
 	/** fix/crew-route-stutter: a goal this close (straight, blocks) with a clear line is walked straight, no A*. */
 	static final double DIRECT_RANGE = 3.0;
 
@@ -64,12 +66,26 @@ final class BuildCrew implements BuildHandle {
 	private final IdSource ids;
 	/** fix/crew-route-stutter: shared route searches (snapshot + background A*, per-tick budget). */
 	private final CrewRoutes routes;
+	/** feat/build-near-player: the crew appears by the player (and stands at the player's height over the void). */
+	private final boolean nearPlayer;
+	private final Vec3 viewer;
+	/** Feet height used where a column has no ground at all (void world, island not built yet). */
+	private final double fallbackY;
 	/** Builders that appear per client tick, and that vanish per tick when leaving. */
 	static final int SPAWNS_PER_TICK = 1;
 	private int despawned;
 
 	BuildCrew(String label, ClientLevel level, BoundingBox bounds, int crewSize, Vec3 approachFrom, IdSource ids, CrewRoutes routes,
 			Supplier<BuildJob> submitter) {
+		this(label, level, bounds, crewSize, approachFrom, false, ids, routes, submitter);
+	}
+
+	/** @param nearPlayer {@code approachFrom} is a player close to the site ({@link #near}): the crew appears by them */
+	BuildCrew(String label, ClientLevel level, BoundingBox bounds, int crewSize, Vec3 approachFrom, boolean nearPlayer, IdSource ids, CrewRoutes routes,
+			Supplier<BuildJob> submitter) {
+		this.nearPlayer = nearPlayer;
+		this.viewer = approachFrom;
+		this.fallbackY = nearPlayer ? Math.floor(approachFrom.y) : bounds.minY();
 		this.label = label;
 		this.routes = routes;
 		this.level = level;
@@ -77,7 +93,8 @@ final class BuildCrew implements BuildHandle {
 		this.submitter = submitter;
 		this.ids = ids;
 		Vec3 c = center();
-		this.spawnCenter = c;
+		// feat/build-near-player: next to the player when they are near the site, not on the far side of it
+		this.spawnCenter = nearPlayer ? new Vec3(approachFrom.x, bounds.minY(), approachFrom.z) : c;
 		Vec3 toViewer = new Vec3(approachFrom.x - c.x, 0, approachFrom.z - c.z);
 		double base = toViewer.lengthSqr() < 1e-4 ? 0 : Math.atan2(toViewer.z, toViewer.x);
 		int n = Math.max(1, crewSize);
@@ -103,12 +120,16 @@ final class BuildCrew implements BuildHandle {
 			Vec3 dir = outward.get(i);
 			BuilderAvatar b = new BuilderAvatar(level, label + "#" + i + "@" + System.identityHashCode(this), "Builder " + (i + 1), this::groundY);
 			b.setId(ids.next());
-			double sx = c.x + dir.x * SPAWN_DISTANCE;
-			double sz = c.z + dir.z * SPAWN_DISTANCE;
+			// near the player: a few blocks from them on their side of the site, else a short walk off the site
+			// (dir points from the site's centre to the player: by the player, step towards the site)
+			double dist = nearPlayer ? -NEAR_SPAWN_DISTANCE : SPAWN_DISTANCE;
+			double sx = c.x + dir.x * dist;
+			double sz = c.z + dir.z * dist;
 			b.snapTo(sx, groundY(sx, sz), sz, 0f, 0f);
 			level.addEntity(b);
 			poof(b.position());
-			Vec3 entry = perimeterSpot(c.x + dir.x * 100, bounds.minY(), c.z + dir.z * 100);
+			Vec3 entry = nearPlayer ? perimeterSpot(viewer.x - dir.x * 2, bounds.minY(), viewer.z - dir.z * 2)
+					: perimeterSpot(c.x + dir.x * 100, bounds.minY(), c.z + dir.z * 100);
 			b.walkTo(entry, WALK_SPEED);
 			b.lookAt(c.add(0, 1, 0));
 			builders.add(b);
@@ -178,9 +199,10 @@ final class BuildCrew implements BuildHandle {
 			case ARRIVING -> {
 				if (cancelRequested) {
 					leave();
-				} else if (builders.size() < crewSize) {
-					spawnSome();
-				} else if (phaseTicks >= ARRIVE_TIMEOUT_TICKS || builders.stream().allMatch(b -> b.arrived(1.0))) {
+				} else {
+					// feat/build-near-player: the job starts right away (it plans off-thread and lays the
+					// foundation while the builders appear and walk in); it used to wait for the whole crew to
+					// arrive, up to 200 ticks (10 s, always in a void world: no ground to arrive on).
 					BuildJob j = submitter.get();
 					job = j;
 					if (pauseRequested) {
@@ -191,10 +213,12 @@ final class BuildCrew implements BuildHandle {
 					}
 					phase = Phase.BUILDING;
 					phaseTicks = 0;
+					spawnSome();
 				}
 			}
 			case BUILDING -> {
-				// finished() moves us on; nothing to do per tick.
+				// finished() moves us on; the rest of the crew appears one per tick.
+				spawnSome();
 			}
 			case LEAVING -> {
 				if (despawned > 0 || phaseTicks >= LEAVE_TIMEOUT_TICKS || builders.stream().allMatch(b -> b.arrived(1.0))) {
@@ -432,6 +456,16 @@ final class BuildCrew implements BuildHandle {
 	}
 
 	private double groundY(double x, double z) {
-		return level.getHeight(Heightmap.Types.MOTION_BLOCKING, Mth.floor(x), Mth.floor(z));
+		int h = level.getHeight(Heightmap.Types.MOTION_BLOCKING, Mth.floor(x), Mth.floor(z));
+		// feat/build-near-player: an empty column (void) has no ground: stand at the site's (or player's) level
+		return h <= level.getMinY() ? fallbackY : h;
+	}
+
+	/** feat/build-near-player: whether {@code viewer} is within {@code radius} blocks (horizontally, and 32 vertically) of {@code box}. */
+	static boolean near(BoundingBox box, Vec3 viewer, int radius) {
+		double dx = Math.max(0, Math.max(box.minX() - viewer.x, viewer.x - (box.maxX() + 1)));
+		double dz = Math.max(0, Math.max(box.minZ() - viewer.z, viewer.z - (box.maxZ() + 1)));
+		double dy = Math.max(0, Math.max(box.minY() - viewer.y, viewer.y - (box.maxY() + 1)));
+		return dx * dx + dz * dz <= (double) radius * radius && dy <= 32;
 	}
 }

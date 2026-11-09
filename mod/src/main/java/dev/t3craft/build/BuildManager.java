@@ -97,7 +97,13 @@ public final class BuildManager {
 	/** Like {@link #submit(String, ResourceKey, BlockPos, Rotation, BuildPlan, double, BuildCost, UnaryOperator, int)} with a {@link BuildPlanner}. */
 	public BuildJob submit(String label, ResourceKey<Level> dimension, BlockPos origin, Rotation rotation, BuildPlan plan, double blocksPerTick,
 			@Nullable BuildCost cost, @Nullable UnaryOperator<BlockSink> wrap, int fronts, BuildPlanner planner) {
-		BuildJob job = new BuildJob(nextId.getAndIncrement(), label, dimension, origin, rotation, plan, blocksPerTick, cost, fronts, planner);
+		return submit(label, dimension, origin, rotation, plan, blocksPerTick, cost, wrap, fronts, planner, null);
+	}
+
+	/** feat/build-near-player: like the overload above; a crew starts by {@code focusWorld} (the player), null = anywhere. */
+	public BuildJob submit(String label, ResourceKey<Level> dimension, BlockPos origin, Rotation rotation, BuildPlan plan, double blocksPerTick,
+			@Nullable BuildCost cost, @Nullable UnaryOperator<BlockSink> wrap, int fronts, BuildPlanner planner, @Nullable BlockPos focusWorld) {
+		BuildJob job = new BuildJob(nextId.getAndIncrement(), label, dimension, origin, rotation, plan, blocksPerTick, cost, fronts, planner, focusWorld);
 		if (wrap != null) {
 			wraps.put(job.id(), wrap);
 		}
@@ -156,6 +162,9 @@ public final class BuildManager {
 					UnaryOperator<BlockSink> wrap = wraps.get(job.id());
 					BlockSink sink = wrap == null ? base : wrap.apply(base);
 					try {
+						if (job.radial()) {
+							job.focus(focusOf(level, job)); // feat/build-radial: the centre follows the player
+						}
 						job.openSupply(server);
 						job.tick(allow, sink, (jb, i, pos, state) -> {
 							for (BuildListener l : listeners) {
@@ -204,6 +213,40 @@ public final class BuildManager {
 			rates[i] = active.get(i).rate();
 		}
 		return budget.allocate(RUNNER, states, rates);
+	}
+
+	/**
+	 * feat/build-radial: the player a radial job centres on: the nearest non-spectator player of its level
+	 * within {@code buildNearPlayer.radius} blocks (horizontally, 32 vertically) of the build's box; null =
+	 * nobody in the build (or {@code buildNearPlayer.enabled} false): the job centres on the hub / spawn.
+	 * A few multiplications per player and tick.
+	 */
+	static @Nullable BlockPos focusOf(ServerLevel level, BuildJob job) {
+		BuildTuning t = BuildBudget.global().tuning();
+		if (!t.nearPlayer()) {
+			return null;
+		}
+		net.minecraft.world.level.levelgen.structure.BoundingBox box = job.worldBounds();
+		double r2 = (double) t.nearPlayerRadius() * t.nearPlayerRadius();
+		double best = Double.MAX_VALUE;
+		BlockPos out = null;
+		for (net.minecraft.server.level.ServerPlayer p : level.players()) {
+			if (p.isSpectator()) {
+				continue;
+			}
+			double px = p.getX();
+			double py = p.getY();
+			double pz = p.getZ();
+			double dx = Math.max(0, Math.max(box.minX() - px, px - (box.maxX() + 1)));
+			double dz = Math.max(0, Math.max(box.minZ() - pz, pz - (box.maxZ() + 1)));
+			double dy = Math.max(0, Math.max(box.minY() - py, py - (box.maxY() + 1)));
+			double d = dx * dx + dz * dz;
+			if (d <= r2 && dy <= 32 && d < best) {
+				best = d;
+				out = BlockPos.containing(px, py, pz);
+			}
+		}
+		return out;
 	}
 
 	/** Cancels and forgets every job (server stopping / world change). Listeners are kept. */

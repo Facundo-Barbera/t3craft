@@ -9,6 +9,12 @@ package dev.t3craft.hq.layout;
  * @param nameKey lang key of the display name ({@code t3craft.hq.layout.<id>.name})
  * @param descKey lang key of the one-line description ({@code t3craft.hq.layout.<id>.desc})
  * @param large   the layout needs a lot of room (campus): a menu may warn before choosing it
+ * @param primary the main design ({@link HqLayouts#PRIMARY_ID}): the HQ menu lists it first and the
+ *                rest under "Legacy". Presentation only; ids, default and registry order are unchanged.
  */
-public record HqLayoutInfo(String id, String nameKey, String descKey, boolean large) {
+public record HqLayoutInfo(String id, String nameKey, String descKey, boolean large, boolean primary) {
+	/** A non-primary (legacy) layout; the constructor from before {@code primary} existed. */
+	public HqLayoutInfo(String id, String nameKey, String descKey, boolean large) {
+		this(id, nameKey, descKey, large, false);
+	}
 }

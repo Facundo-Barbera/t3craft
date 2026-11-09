@@ -215,6 +215,12 @@ public final class ImageSources {
 	/** AWT fallback, only when the JVM is not headless. */
 	private static List<Picked> awtImage() {
 		try {
+			// fix/paste-crash: AWT's clipboard inside the SDL window on Windows can take the whole JVM down
+			// (a second native message loop); only used where it is known to be safe, or when asked for
+			boolean windows = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
+			if (windows && !Boolean.getBoolean("t3craft.awtClipboard")) {
+				return List.of();
+			}
 			if (java.awt.GraphicsEnvironment.isHeadless()) {
 				return List.of();
 			}

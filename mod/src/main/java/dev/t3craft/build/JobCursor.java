@@ -29,7 +29,16 @@ public interface JobCursor {
 
 	int frontCount();
 
+	/** The front (builder) that places {@code index}; -1 = no builder (a fast foundation entry, {@link FoundationCursor}). */
 	int frontOf(int index);
+
+	/**
+	 * feat/build-near-player: laying fast foundation layers right now ({@link FoundationCursor}): they
+	 * have their own per-tick budget, so the job asks almost nothing of the crews' budget meanwhile.
+	 */
+	default boolean fastPhase() {
+		return false;
+	}
 
 	JobState state();
 

@@ -1,9 +1,7 @@
 package dev.t3craft.client.t3ui;
 
 import dev.t3craft.client.chat.Attention;
-import dev.t3craft.client.chat.RowLineage;
 import dev.t3craft.client.chat.ThreadRow;
-import dev.t3craft.t3.Lineage;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -45,14 +43,10 @@ import org.jspecify.annotations.Nullable;
  * the thread back on the next {@link #expireSnoozes} (the view calls it every frame; it is a long
  * compare until then).
  *
- * <p>feat/thread-lineage: delegated tasks (T3 {@code delegate_task} children, {@link
- * dev.t3craft.client.chat.RowLineage}) nest under their parent like in T3 Code: right after it,
- * one level deeper ({@link Nest#depth()}), in the parent's place (folder, Pinned, Working…). The
- * parent row carries the count ({@link Nest#children()}) and folds its children
- * ({@link #toggleChildren}). A child goes to the root of its own place, with its parent's title
- * ({@link Nest#parentTitle()}), when the parent is not listed here (settled, another project under
- * the filter, another environment, not matching the search), or when the child itself is pinned or
- * settled. Provider subagents are never rows.
+ * <p>feat/ui-hq-menu-lineage: delegated tasks (T3 {@code delegate_task} children, {@link
+ * dev.t3craft.client.chat.RowLineage}) are not sidebar rows (no nesting, no counter): the lineage
+ * lives only in the thread header's agents menu ({@link #liveChildrenOf}), and a child opened from
+ * there (or from a block, a link) is still found by {@link #find}. Provider subagents are never rows.
  *
  * <p>The selection follows the thread by key when the list reorders; {@link #move} walks thread
  * rows only (headers are skipped), top list first then the open dock sections, and never enters a
@@ -90,44 +84,7 @@ public final class SidebarModel {
 	 * @param collapsed folder closed (headers)
 	 * @param envs      environment labels of the folder (PROJECT) or of the row (THREAD)
 	 */
-	public record Item(Kind kind, String key, String label, @Nullable ThreadRow row, int count, int attention, boolean collapsed, String envs,
-			Nest nest) {
-		public Item {
-			nest = nest == null ? Nest.NONE : nest;
-		}
-
-		/** Shape before {@code nest} (feat/thread-lineage). */
-		public Item(Kind kind, String key, String label, @Nullable ThreadRow row, int count, int attention, boolean collapsed, String envs) {
-			this(kind, key, label, row, count, attention, collapsed, envs, Nest.NONE);
-		}
-	}
-
-	/**
-	 * feat/thread-lineage: a thread row's place in its family.
-	 *
-	 * @param depth       0 for a root row, 1 for a delegated child nested under it, …
-	 * @param children    delegated children nested under this row (the "N agents" counter)
-	 * @param working     of those children (and theirs), how many run or need the user
-	 * @param collapsed   the children are folded away
-	 * @param last        last child of its parent (the guide line stops at the middle)
-	 * @param guides      bit {@code L-1} set: the guide line of ancestor level {@code L} (1 ≤ L < depth)
-	 *                    runs on past this row
-	 * @param parentTitle a root row of a delegated task whose parent is not listed here: the parent's
-	 *                    title ("" when unknown); null otherwise
-	 * @param delegated   the row is a delegated task
-	 */
-	public record Nest(int depth, int children, int working, boolean collapsed, boolean last, int guides, @Nullable String parentTitle,
-			boolean delegated) {
-		public static final Nest NONE = new Nest(0, 0, 0, false, false, 0, null, false);
-
-		/** Orphaned delegated task drawn at the root with "↳ parent: …". */
-		public boolean orphan() {
-			return parentTitle != null;
-		}
-
-		public boolean guide(int level) {
-			return level >= 1 && level < 32 && (guides & (1 << (level - 1))) != 0;
-		}
+	public record Item(Kind kind, String key, String label, @Nullable ThreadRow row, int count, int attention, boolean collapsed, String envs) {
 	}
 
 	/**
@@ -152,12 +109,8 @@ public final class SidebarModel {
 	/** Earliest snooze end among the listed rows after the last build (0 = none). */
 	private long nextWake;
 	private @Nullable String selectedKey;
-	/** Parents whose delegated children are folded (open by default). */
-	private final Set<String> kidsCollapsed = new HashSet<>();
 	/** Parent key → delegated children among {@link #all}, built on first use after each update. */
 	private @Nullable Map<String, List<ThreadRow>> childIndex;
-	/** Child key → key of the row it is nested under, as of the last build. */
-	private Map<String, String> nestedUnder = Map.of();
 
 	private List<Item> items = List.of();
 	private List<Dock> dock = List.of();
@@ -286,29 +239,66 @@ public final class SidebarModel {
 		rebuild();
 	}
 
-	// ---- lineage (feat/thread-lineage) ---------------------------------------------------------
+	// ---- lineage (feat/thread-lineage, feat/ui-hq-menu-lineage) --------------------------------
 
-	/** The children of {@code parentKey} are folded (no effect while searching: all open then). */
-	public boolean childrenCollapsed(String parentKey) {
-		return kidsCollapsed.contains(parentKey);
-	}
-
-	/** Folds or unfolds the delegated children nested under {@code parentKey}. */
-	public void toggleChildren(String parentKey) {
-		if (!kidsCollapsed.remove(parentKey)) {
-			kidsCollapsed.add(parentKey);
-		}
-		rebuild();
-	}
-
-	/** Key of the row {@code key} is nested under in the current list, or null (root row). */
-	public @Nullable String nestedUnder(String key) {
-		return nestedUnder.get(key);
+	/**
+	 * A delegated task with a parent: not a sidebar row (feat/ui-hq-menu-lineage); it is reached from
+	 * its parent's header agents menu.
+	 */
+	public static boolean hiddenDelegated(ThreadRow r) {
+		return r.lineage().delegated() && r.lineage().hasParent();
 	}
 
 	/**
-	 * Delegated children of {@code parentKey} among every listed row (search and filter ignored),
-	 * in sidebar order, for the thread header. Empty when it has none. Indexed once per update.
+	 * A child the header agents menu lists: idle or active (working, waiting, needs input), never
+	 * settled, done or ended in an error.
+	 */
+	public static boolean liveChild(ThreadRow r) {
+		if (r.settled()) {
+			return false;
+		}
+		return switch (r.state()) {
+			case IDLE, WORKING, NEEDS_ATTENTION -> true;
+			case DONE, ERROR -> false;
+		};
+	}
+
+	/** {@link #childrenOf} filtered to {@link #liveChild}: the header's {@code N agents ▾} chip and menu. */
+	public List<ThreadRow> liveChildrenOf(String parentKey) {
+		List<ThreadRow> kids = childrenOf(parentKey);
+		if (kids.isEmpty()) {
+			return kids;
+		}
+		List<ThreadRow> out = new ArrayList<>(kids.size());
+		for (ThreadRow r : kids) {
+			if (liveChild(r)) {
+				out.add(r);
+			}
+		}
+		return out.size() == kids.size() ? kids : List.copyOf(out);
+	}
+
+	/**
+	 * {@link #childrenOf} that are not {@link #liveChild}: done, settled or ended in an error (the
+	 * agents menu's "Finished" section, below the live ones).
+	 */
+	public List<ThreadRow> finishedChildrenOf(String parentKey) {
+		List<ThreadRow> kids = childrenOf(parentKey);
+		if (kids.isEmpty()) {
+			return kids;
+		}
+		List<ThreadRow> out = new ArrayList<>(kids.size());
+		for (ThreadRow r : kids) {
+			if (!liveChild(r)) {
+				out.add(r);
+			}
+		}
+		return List.copyOf(out);
+	}
+
+	/**
+	 * Delegated children of {@code parentKey} among every row (search and filter ignored), in
+	 * sidebar order, any state. Empty when it has none. Indexed once per update.
 	 */
 	public List<ThreadRow> childrenOf(String parentKey) {
 		Map<String, List<ThreadRow>> idx = childIndex;
@@ -351,20 +341,12 @@ public final class SidebarModel {
 		if (r == null) {
 			return false;
 		}
+		if (hiddenDelegated(r)) {
+			return true; // not a sidebar row: leave the search, filter and folders as they are
+		}
 		if (selected() == null) {
 			query = "";
 			project = null;
-		}
-		// feat/thread-lineage: a nested child shows inside its parent's place, unfolded
-		rebuild();
-		for (int i = 0; i < Lineage.MAX_DEPTH; i++) {
-			String up = nestedUnder.get(r.key());
-			ThreadRow p = up == null ? null : find(up);
-			if (p == null) {
-				break;
-			}
-			kidsCollapsed.remove(p.key());
-			r = p;
 		}
 		long now = System.currentTimeMillis();
 		if (r.pinned()) {
@@ -461,7 +443,7 @@ public final class SidebarModel {
 
 	private void rebuild() {
 		// project choices from every row (the filter does not depend on the search)
-		Map<String, List<ThreadRow>> byProject = group(all);
+		Map<String, List<ThreadRow>> byProject = group(all.stream().filter(r -> !hiddenDelegated(r)).toList());
 		List<Project> ps = new ArrayList<>();
 		for (Map.Entry<String, List<ThreadRow>> e : byProject.entrySet()) {
 			List<ThreadRow> rs = e.getValue();
@@ -480,21 +462,20 @@ public final class SidebarModel {
 			if (search && !matches(r, words)) {
 				continue;
 			}
+			if (hiddenDelegated(r)) {
+				continue; // feat/ui-hq-menu-lineage: delegated tasks live in the parent's header menu
+			}
 			matching.add(r);
 		}
 
 		long now = System.currentTimeMillis();
-		Family fam = family(matching, now);
-		nestedUnder = fam.under();
-
 		List<Item> out = new ArrayList<>();
 		List<ThreadRow> listed = new ArrayList<>();
-		List<ThreadRow> pinned = matching.stream().filter(r -> r.pinned() && !fam.under().containsKey(r.key())).sorted(THREAD_ORDER).toList();
+		List<ThreadRow> pinned = matching.stream().filter(ThreadRow::pinned).sorted(THREAD_ORDER).toList();
 		if (!pinned.isEmpty()) {
 			boolean closed = !search && collapsed.contains(PINNED);
-			List<ThreadRow> famRows = withKids(pinned, fam);
-			out.add(new Item(Kind.SECTION, PINNED, "Pinned", null, famRows.size(), attention(famRows), closed, ""));
-			emitAll(pinned, fam, out, listed, closed, search);
+			out.add(new Item(Kind.SECTION, PINNED, "Pinned", null, pinned.size(), attention(pinned), closed, ""));
+			emitAll(pinned, out, listed, closed);
 		}
 		long wake = 0;
 		List<ThreadRow> work = new ArrayList<>();
@@ -506,8 +487,8 @@ public final class SidebarModel {
 			if (until != null && until > now && (wake == 0 || until < wake)) {
 				wake = until;
 			}
-			if (r.pinned() || fam.under().containsKey(r.key())) {
-				continue; // pinned roots are listed above; nested children follow their parent
+			if (r.pinned()) {
+				continue; // listed above
 			}
 			if (working(r)) {
 				work.add(r);
@@ -524,162 +505,41 @@ public final class SidebarModel {
 		for (Map.Entry<String, List<ThreadRow>> e : folders.entrySet()) {
 			List<ThreadRow> rs = e.getValue();
 			boolean closed = !search && collapsed.contains(e.getKey());
-			List<ThreadRow> famRows = withKids(rs, fam);
-			out.add(new Item(Kind.PROJECT, e.getKey(), projectLabel(rs.getFirst()), null, famRows.size(), attention(famRows), closed,
-					String.join(", ", envLabels(famRows))));
-			emitAll(rs, fam, out, listed, closed, search);
+			out.add(new Item(Kind.PROJECT, e.getKey(), projectLabel(rs.getFirst()), null, rs.size(), attention(rs), closed,
+					String.join(", ", envLabels(rs))));
+			emitAll(rs, out, listed, closed);
 		}
 		List<Dock> docks = new ArrayList<>();
-		dockSection(docks, listed, fam, search, WORKING, "Working", work, !search && collapsed.contains(WORKING));
-		dockSection(docks, listed, fam, search, SNOOZED, "Snoozed", snoozed, !search && !snoozedOpen);
-		dockSection(docks, listed, fam, search, SETTLED, "Settled", settled, !search && !settledOpen);
+		dockSection(docks, listed, WORKING, "Working", work, !search && collapsed.contains(WORKING));
+		dockSection(docks, listed, SNOOZED, "Snoozed", snoozed, !search && !snoozedOpen);
+		dockSection(docks, listed, SETTLED, "Settled", settled, !search && !settledOpen);
 		dock = List.copyOf(docks);
 		items = List.copyOf(out);
 		threads = List.copyOf(listed);
 	}
 
-	private void dockSection(List<Dock> docks, List<ThreadRow> listed, Family fam, boolean search, String key, String label, List<ThreadRow> rows,
-			boolean closed) {
+	private static void dockSection(List<Dock> docks, List<ThreadRow> listed, String key, String label, List<ThreadRow> rows, boolean closed) {
 		if (rows.isEmpty()) {
 			return;
 		}
 		List<ThreadRow> sorted = new ArrayList<>(rows);
 		sorted.sort(THREAD_ORDER);
 		List<Item> its = new ArrayList<>();
-		emitAll(sorted, fam, its, listed, closed, search);
-		List<ThreadRow> famRows = withKids(sorted, fam);
-		docks.add(new Dock(key, label, famRows.size(), attention(famRows), closed, List.copyOf(its)));
+		emitAll(sorted, its, listed, closed);
+		docks.add(new Dock(key, label, sorted.size(), attention(sorted), closed, List.copyOf(its)));
 	}
 
 	private static Item threadItem(ThreadRow r) {
-		return threadItem(r, Nest.NONE);
+		return new Item(Kind.THREAD, r.key(), r.title(), r, 0, r.needsAttention() ? 1 : 0, false, r.envLabel());
 	}
 
-	private static Item threadItem(ThreadRow r, Nest nest) {
-		return new Item(Kind.THREAD, r.key(), r.title(), r, 0, r.needsAttention() ? 1 : 0, false, r.envLabel(), nest);
-	}
-
-	// ---- nesting (feat/thread-lineage) ----------------------------------------------------------
-
-	/** Who is nested under whom in one build: child key → parent key, parent key → children (sorted). */
-	private record Family(Map<String, String> under, Map<String, List<ThreadRow>> kids) {
-	}
-
-	/** Where a row goes on its own: Pinned, Working, Snoozed, Settled or its project folder. */
-	private static String place(ThreadRow r, long now) {
-		if (r.pinned()) {
-			return PINNED;
-		}
-		if (working(r)) {
-			return WORKING;
-		}
-		if (r.details().snoozed(now)) {
-			return SNOOZED;
-		}
-		if (r.settled()) {
-			return SETTLED;
-		}
-		return projectKey(r);
-	}
-
-	/**
-	 * A delegated child nests under its parent when the parent is among {@code rows} (listed after
-	 * search and filter) and neither is in Settled and the child is not pinned (pinned rows stay in
-	 * Pinned). Cycles in bad data are cut: a row never nests under its own descendant.
-	 */
-	private static Family family(List<ThreadRow> rows, long now) {
-		Map<String, ThreadRow> byKey = new HashMap<>();
+	/** Rows of one place; hidden rows (closed folder) still go to {@code listed}. */
+	private static void emitAll(List<ThreadRow> rows, List<Item> out, List<ThreadRow> listed, boolean closed) {
 		for (ThreadRow r : rows) {
-			byKey.put(r.key(), r);
-		}
-		Map<String, String> under = new HashMap<>();
-		for (ThreadRow r : rows) {
-			RowLineage l = r.lineage();
-			if (!l.delegated() || l.parentKey() == null || l.parentKey().equals(r.key()) || r.pinned() || SETTLED.equals(place(r, now))) {
-				continue;
+			listed.add(r);
+			if (!closed) {
+				out.add(threadItem(r));
 			}
-			ThreadRow p = byKey.get(l.parentKey());
-			if (p == null || SETTLED.equals(place(p, now))) {
-				continue;
-			}
-			under.put(r.key(), p.key());
-		}
-		// cut cycles: walk each chain, drop the link that closes a loop
-		for (String k : new ArrayList<>(under.keySet())) {
-			Set<String> seen = new HashSet<>();
-			String cur = k;
-			while (cur != null && under.containsKey(cur)) {
-				if (!seen.add(cur) || seen.size() > Lineage.MAX_DEPTH) {
-					under.remove(cur);
-					break;
-				}
-				cur = under.get(cur);
-			}
-		}
-		Map<String, List<ThreadRow>> kids = new HashMap<>();
-		for (Map.Entry<String, String> e : under.entrySet()) {
-			kids.computeIfAbsent(e.getValue(), x -> new ArrayList<>()).add(byKey.get(e.getKey()));
-		}
-		kids.values().forEach(l -> l.sort(THREAD_ORDER));
-		return new Family(Map.copyOf(under), Map.copyOf(kids));
-	}
-
-	/** {@code roots} plus all their nested descendants (counts and attention of a section). */
-	private static List<ThreadRow> withKids(List<ThreadRow> roots, Family fam) {
-		if (fam.kids().isEmpty()) {
-			return roots;
-		}
-		List<ThreadRow> out = new ArrayList<>(roots.size());
-		for (ThreadRow r : roots) {
-			addTree(r, fam, out, 0);
-		}
-		return out;
-	}
-
-	private static void addTree(ThreadRow r, Family fam, List<ThreadRow> out, int depth) {
-		out.add(r);
-		if (depth >= Lineage.MAX_DEPTH) {
-			return;
-		}
-		for (ThreadRow k : fam.kids().getOrDefault(r.key(), List.of())) {
-			addTree(k, fam, out, depth + 1);
-		}
-	}
-
-	private void emitAll(List<ThreadRow> roots, Family fam, List<Item> out, List<ThreadRow> listed, boolean closed, boolean search) {
-		for (ThreadRow r : roots) {
-			emit(r, fam, out, listed, closed, search, 0, 0, false);
-		}
-	}
-
-	/** One row and (unless folded) its nested children, depth first. Hidden rows still go to {@code listed}. */
-	private void emit(ThreadRow r, Family fam, List<Item> out, List<ThreadRow> listed, boolean closed, boolean search, int depth, int guides,
-			boolean last) {
-		listed.add(r);
-		List<ThreadRow> ks = depth >= Lineage.MAX_DEPTH ? List.of() : fam.kids().getOrDefault(r.key(), List.of());
-		boolean folded = !search && !ks.isEmpty() && kidsCollapsed.contains(r.key());
-		if (!closed) {
-			String orphan = null;
-			if (depth == 0 && r.lineage().delegated() && r.lineage().hasParent()) {
-				orphan = r.lineage().parentTitle();
-				if (orphan.isBlank() && r.lineage().parentKey() != null) {
-					ThreadRow p = find(r.lineage().parentKey());
-					orphan = p == null ? "" : p.title();
-				}
-			}
-			int busy = 0;
-			if (!ks.isEmpty()) {
-				for (ThreadRow d : withKids(ks, fam)) {
-					if (working(d) || d.needsAttention()) {
-						busy++;
-					}
-				}
-			}
-			out.add(threadItem(r, new Nest(depth, ks.size(), busy, folded, last, guides, orphan, r.lineage().delegated())));
-		}
-		int childGuides = depth >= 1 && !last && depth <= 31 ? guides | (1 << (depth - 1)) : guides;
-		for (int i = 0; i < ks.size(); i++) {
-			emit(ks.get(i), fam, out, listed, closed || folded, search, depth + 1, childGuides, i == ks.size() - 1);
 		}
 	}
 

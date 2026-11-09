@@ -3,6 +3,7 @@ package dev.t3craft.client.chat.compose;
 import dev.t3craft.client.chat.ChatEntry;
 import dev.t3craft.t3.OperateResult;
 import dev.t3craft.t3.ThreadControl;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -28,6 +29,12 @@ import org.jspecify.annotations.Nullable;
  * (Ctrl+Enter / Ctrl+click: <i>queues</i> it), as T3 Code ({@link ChatSender.Delivery}); the
  * optimistic row carries the "Steer" mark. A <b>draft thread</b> ({@link #setDraft}) has no
  * thread yet: its first message goes to a {@link Launcher} (the host's {@code launchThread}).
+ *
+ * <p>fix/chat-send-agents-menu: no message is ever dropped. Each one gets its own ids and row at
+ * once; while one is in flight the next ones of that thread wait in an outbox (marked "Queued",
+ * sent as {@code queue_after_active} one after another once T3 accepted the previous); messages
+ * written while a draft launches follow it to the new thread ({@link #carryDraft}). A failure puts
+ * that message and the ones behind it back in the composer with the error.
  */
 public final class ComposerState {
 	/** What the primary button at the right of the controls bar is, as in T3's {@code ComposerPrimaryActions}. */
@@ -76,6 +83,14 @@ public final class ComposerState {
 		}
 	}
 
+	/** One message on its way: where it goes and the optimistic row that stands for it. */
+	private record Outgoing(Pending row, String envId, String threadId, @Nullable String title, String text, ChatSender.Ids ids) {
+	}
+
+	/** Text and images written while the draft was launching (no thread id yet). */
+	private record Held(Pending row, String text) {
+	}
+
 	/**
 	 * Sends a draft thread's first message: the host launches the thread
 	 * ({@code orchestration.launchThread}) and calls {@code done} once. On success the host replaces
@@ -92,6 +107,10 @@ public final class ComposerState {
 	private final ComposerText editor = new ComposerText();
 	private final List<Pending> pending = new ArrayList<>();
 	private final Set<String> sending = new HashSet<>();
+	/** Messages waiting for the one in flight on the same thread (sent in order, one at a time). */
+	private final Map<String, ArrayDeque<Outgoing>> outbox = new HashMap<>();
+	/** Messages written while a draft thread was launching: they follow it to the new thread. */
+	private final Map<String, List<Held>> heldForDraft = new HashMap<>();
 	private final Map<String, String> errors = new HashMap<>();
 	private @Nullable Launcher launcher;
 	private long savedAt;
@@ -104,6 +123,7 @@ public final class ComposerState {
 	private @Nullable String activeRunId;
 	private boolean stopping;
 	private long version;
+	private long heldSeq;
 
 	public ComposerState(ChatSender sender, LongSupplier clock) {
 		this(sender, clock, ComposerDrafts.shared());
@@ -182,6 +202,21 @@ public final class ComposerState {
 		if (err != null) {
 			errors.put(nk, err);
 		}
+		List<Held> held = heldForDraft.remove(ok);
+		if (held != null) {
+			List<Held> moved = new ArrayList<>();
+			for (Held h : held) {
+				Pending r = h.row();
+				Pending nr = new Pending(nk, r.messageId(), r.text(), r.at(), r.images(), r.delivery());
+				int at = pending.indexOf(r);
+				if (at >= 0) {
+					pending.set(at, nr);
+				}
+				moved.add(new Held(nr, h.text()));
+			}
+			heldForDraft.put(nk, moved);
+			version++;
+		}
 		key = nk;
 		this.envId = envId;
 		this.threadId = draftId;
@@ -204,6 +239,11 @@ public final class ComposerState {
 
 	/** Forgets a discarded draft thread's text and images. */
 	public void discard(String threadKey) {
+		List<Held> held = heldForDraft.remove(threadKey);
+		if (held != null) {
+			held.forEach(h -> pending.remove(h.row()));
+			version++;
+		}
 		drafts.remove(threadKey);
 		errors.remove(threadKey);
 		if (threadKey.equals(key)) {
@@ -344,14 +384,17 @@ public final class ComposerState {
 		if (!canOperate) {
 			return Button.ENABLE_CONTROL;
 		}
+		boolean empty = editor.isBlank() && images().isEmpty();
+		if (!empty) {
+			return Button.SEND; // a send in flight never blocks the next one: it waits behind it
+		}
 		if (sending.contains(key)) {
 			return Button.SENDING;
 		}
-		boolean empty = editor.isBlank() && images().isEmpty();
-		if (running && empty && launcher == null) {
+		if (running && launcher == null) {
 			return stopping ? Button.STOPPING : Button.STOP;
 		}
-		return empty ? Button.SEND_DISABLED : Button.SEND;
+		return Button.SEND_DISABLED;
 	}
 
 	/** The primary button's click: send, or stop while a turn runs with an empty input. */
@@ -378,31 +421,86 @@ public final class ComposerState {
 		return submit(false);
 	}
 
-	/** How the next message would go out ({@code alternate}: Ctrl held). */
+	/**
+	 * How the next message would go out ({@code alternate}: Ctrl held). While an earlier message
+	 * of this composer is still on its way (or the draft is still launching) it is queued behind it.
+	 */
 	public ChatSender.Delivery delivery(boolean alternate) {
+		ArrayDeque<Outgoing> waiting = key == null ? null : outbox.get(key);
+		if (key != null && (sending.contains(key) || waiting != null && !waiting.isEmpty())) {
+			return ChatSender.Delivery.QUEUE;
+		}
 		if (!running || launcher != null) {
 			return ChatSender.Delivery.AUTO;
 		}
 		return alternate ? ChatSender.Delivery.QUEUE : ChatSender.Delivery.STEER;
 	}
 
-	/** Sends; {@code alternate} (Ctrl+Enter, Ctrl+click) queues instead of steering a running turn. */
+	/** Messages of the current thread written here and not yet accepted by T3 (in flight or waiting). */
+	public int unsent() {
+		if (key == null) {
+			return 0;
+		}
+		int n = sending.contains(key) ? 1 : 0;
+		ArrayDeque<Outgoing> q = outbox.get(key);
+		List<Held> h = heldForDraft.get(key);
+		return n + (q == null ? 0 : q.size()) + (h == null ? 0 : h.size());
+	}
+
+	/** The line shown above the composer while messages are on their way, or null. */
+	public @Nullable String status() {
+		int n = unsent();
+		if (n == 0) {
+			return null;
+		}
+		if (isDraft()) {
+			return n == 1 ? "Starting the thread…" : "Starting the thread… · " + (n - 1) + " queued";
+		}
+		return n == 1 ? "Sending…" : "Sending… · " + (n - 1) + " queued";
+	}
+
+	/**
+	 * Sends; {@code alternate} (Ctrl+Enter, Ctrl+click) queues instead of steering a running turn.
+	 * Never drops a message: while an earlier one is on its way this one waits behind it (shown as
+	 * "Queued") and goes out with its own ids once T3 accepted the earlier one.
+	 */
 	public boolean submit(boolean alternate) {
 		List<ImageAttachment> imgs = images();
-		if (key == null || !canOperate || sending.contains(key) || editor.isBlank() && imgs.isEmpty()) {
+		if (key == null || !canOperate || editor.isBlank() && imgs.isEmpty()) {
 			return false;
 		}
 		String k = key;
 		String text = editor.text().strip();
+		ChatSender.Delivery delivery = delivery(alternate);
 		editor.clear();
 		drafts.remove(k);
 		errors.remove(k);
-		sending.add(k);
 		Launcher l = launcher;
 		if (l != null) {
+			if (sending.contains(k)) {
+				// the thread does not exist yet: hold it, it follows the draft (carryDraft)
+				Pending p = new Pending(k, "held-" + (++heldSeq), text, clock.getAsLong(), imgs,
+						ChatSender.Delivery.QUEUE);
+				pending.add(p);
+				heldForDraft.computeIfAbsent(k, x -> new ArrayList<>()).add(new Held(p, text));
+				version++;
+				return true;
+			}
+			sending.add(k);
 			l.launch(text, imgs, r -> {
 				sending.remove(k);
 				if (!r.ok()) {
+					List<Held> held = heldForDraft.remove(k);
+					if (held != null) {
+						for (int i = held.size() - 1; i >= 0; i--) {
+							Held h = held.get(i);
+							if (pending.remove(h.row())) {
+								version++;
+							}
+							restore(k, h.text());
+							restoreImages(k, h.row().images());
+						}
+					}
 					restore(k, text);
 					restoreImages(k, imgs);
 					if (r.outcome() != OperateResult.Outcome.CANCELLED) {
@@ -412,13 +510,57 @@ public final class ComposerState {
 			});
 			return true;
 		}
-		ChatSender.Delivery delivery = delivery(alternate);
 		ChatSender.Ids ids = sender.newIds();
 		Pending p = new Pending(k, ids.messageId(), text, clock.getAsLong(), imgs, delivery);
 		pending.add(p);
 		version++;
-		sender.send(envId, threadId, title, text, imgs, ids, delivery, r -> sent(k, p, text, r));
+		Outgoing o = new Outgoing(p, envId, threadId, title, text, ids);
+		if (sending.contains(k)) {
+			outbox.computeIfAbsent(k, x -> new ArrayDeque<>()).add(o);
+		} else {
+			dispatch(k, o);
+		}
 		return true;
+	}
+
+	private void dispatch(String k, Outgoing o) {
+		sending.add(k);
+		sender.send(o.envId(), o.threadId(), o.title(), o.text(), o.row().images(), o.ids(), o.row().delivery(), r -> sent(k, o, r));
+	}
+
+	/**
+	 * The draft {@code draftKey} became the thread {@code envId:threadId}: what was written while it
+	 * launched goes to that thread, queued after its first turn, and the text being typed becomes
+	 * that thread's draft (call before {@link #discard} of the draft).
+	 */
+	public void carryDraft(String draftKey, String envId, String threadId) {
+		String nk = envId + ":" + threadId;
+		if (draftKey.equals(key)) {
+			if (!editor.isEmpty()) {
+				drafts.save(nk, editor.text(), editor.caret());
+			}
+			List<ImageAttachment> imgs = drafts.images(draftKey);
+			if (!imgs.isEmpty()) {
+				drafts.setImages(nk, imgs);
+			}
+		}
+		List<Held> held = heldForDraft.remove(draftKey);
+		if (held == null) {
+			return;
+		}
+		for (Held h : held) {
+			pending.remove(h.row());
+			ChatSender.Ids ids = sender.newIds();
+			Pending p = new Pending(nk, ids.messageId(), h.text(), h.row().at(), h.row().images(), ChatSender.Delivery.QUEUE);
+			pending.add(p);
+			Outgoing o = new Outgoing(p, envId, threadId, null, h.text(), ids);
+			if (sending.contains(nk)) {
+				outbox.computeIfAbsent(nk, x -> new ArrayDeque<>()).add(o);
+			} else {
+				dispatch(nk, o);
+			}
+		}
+		version++;
 	}
 
 	private void restoreImages(String k, List<ImageAttachment> imgs) {
@@ -430,17 +572,37 @@ public final class ComposerState {
 		drafts.setImages(k, back);
 	}
 
-	private void sent(String k, Pending p, String text, OperateResult r) {
+	private void sent(String k, Outgoing o, OperateResult r) {
 		sending.remove(k);
+		ArrayDeque<Outgoing> q = outbox.get(k);
 		if (r.ok()) {
-			return; // the row stays until the server's user_message replaces it
+			// the row stays until the server's user_message replaces it; the next one goes out now
+			Outgoing next = q == null ? null : q.poll();
+			if (q != null && q.isEmpty()) {
+				outbox.remove(k);
+			}
+			if (next != null) {
+				dispatch(k, next);
+			}
+			return;
 		}
-		if (pending.remove(p)) {
-			version++;
+		// failed: this one and everything waiting behind it come back to the composer, in order
+		List<Outgoing> back = new ArrayList<>();
+		back.add(o);
+		if (q != null) {
+			back.addAll(q);
+			outbox.remove(k);
 		}
-		restore(k, text);
-		restoreImages(k, p.images());
-		errors.put(k, ThreadControl.feedback(r).text());
+		for (int i = back.size() - 1; i >= 0; i--) {
+			Outgoing b = back.get(i);
+			if (pending.remove(b.row())) {
+				version++;
+			}
+			restore(k, b.text());
+			restoreImages(k, b.row().images());
+		}
+		String why = ThreadControl.feedback(r).text();
+		errors.put(k, back.size() == 1 ? why : why + " (" + back.size() + " messages back in the composer)");
 	}
 
 	// ---- images -------------------------------------------------------------------------------

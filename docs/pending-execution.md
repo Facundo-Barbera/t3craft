@@ -36,27 +36,43 @@ house-timber, house-stone, house-japanese, house-terrace, house-workshop, house-
 ## Arreglo del crash al abrir el HQ: integrado
 `fix/void-null-layer`, commit del fix `c9b98ce`, merge en main `b3c2df1`. Compilado una vez con `tools/heavy.sh`. Para actualizar el juego en Windows, hacer pull de main (o de ese commit) y recompilar.
 
-## Renders en el PC de Facundo (my-pc): probar 1 job
-**BLOQUEADO 2026-11-09:** la VPS no tiene acceso SSH al PC (`Permission denied (publickey…)`). Hay que agregar en `~/.ssh/authorized_keys` del user `wsluser` en WSL esta clave pública de la VPS:
-`ssh-ed25519 AAAA...REDACTED example-key`
-Además, en WSL, `sshd` tiene que escuchar en la IP de Tailscale del PC (100.64.0.20), o bien hay que darle a `T3CRAFT_RENDER_HOST` el host y el puerto correctos. Con eso, el coordinador corre el job de prueba (paso 4).
-Código listo (`tools/render/remote-submit.sh`, `submit.sh` lo usa por defecto; `start-daemon.sh` se niega en la VPS). Sin probar. Pasos:
-1. **PC** (lo prepara Taller):
-   - WSL Ubuntu 24.04, user `wsluser`, JDK 25;
-   - `~/projects/t3craft` en main;
-   - `git`, `rsync`, `python3` y `sshd` accesibles por Tailscale (100.64.0.20);
-   - un primer build de Gradle hecho (bootstrap y caché de Loom).
-2. **VPS → PC, SSH sin contraseña:** la clave del user `wsluser` de la VPS en `~/.ssh/authorized_keys` del PC. Probar `ssh -o BatchMode=yes user@100.64.0.20 true`, que no es pesado.
-3. **En el PC:** `cd ~/projects/t3craft && tools/render/start-daemon.sh` (1 worker por defecto). Esperar a que `--status` diga `running`.
-4. **En la VPS,** con la sesión aprobada (crear `~/.cache/t3craft-coord/renders-approved` con el alcance), lanzar un job chico: `tools/render/submit.sh --agent prueba-relay -- --catalog LAMP`.
-   - Se espera ver `~/t3craft-jobs/prueba-relay` creado en el PC, la compilación en el PC y los PNG y `report.txt` en `~/.cache/t3craft-render/outbox/prueba-relay-*` de la VPS.
-   - Debe salir con código 0.
-5. **Si falla,** revisar:
-   - el `daemon.log` del PC;
-   - que el `HOME` de ambos sea `/home/user` (el relay reescribe las rutas si difieren);
-   - que el PC tenga `rsync`.
-6. **Citadel Studio** (si se vuelve a levantar en la VPS) lee el outbox local y el `daemon.json` que el relay copia mientras espera.
+## Arreglo de Ctrl+V: integrado
+`fix/paste-crash`: el commit del arreglo es `faf953e` y el merge en main es `6562e0e`. Compilado.
+- En Windows ya no se usa el portapapeles AWT (se puede volver a activar con `-Dt3craft.awtClipboard=true`).
+- La lectura del portapapeles y el pegado de imágenes quedan envueltos: un fallo muestra un error en el composer en vez de crashear.
+- Si vuelve a crashear, hace falta el crash report (`crash-reports/` o `hs_err_pid*.log` en el directorio `run`).
 
+## `citadel/next`: compila (2026-11-09)
+Incluye el catálogo (60 variantes, con la ola B: bancas, jardineras, postes, pozos, abrevadero, invernadero, cobertizo y pérgola), la colocación, el gancho de la oficina y las 10 ramas del swarm 1 (sin `scale` ni `1-connect`).
+- Compilado con `tools/heavy.sh`: hubo que renombrar un `record Tail` duplicado que venía de `fix/new-thread-hitch`.
+- Falta: renders en el PC (por el relay, bloqueado por la clave SSH) y la integración a main.
+
+## En curso (solo código)
+- `feat/build-near-player`: **integrado en main** (rama `82597e6`), compilado y sin probar en juego. Base por capas (estimación: de ~7–9 min a ~10–20 s), arranque inmediato junto al jugador, prioridad por cercanía, 96 bloques por tick y hasta 8 builders. Pendiente: en supervivencia, las alas se siguen construyendo en orden de índice.
+
+## En curso (solo código, 2026-11-09)
+- `feat/build-radial`: **integrado en main** (`f436217`) y compilado. Construye en anillos de 5 bloques alrededor del jugador; la base tarda ~1,7 min estimados. Quedan pendientes tres cosas:
+  - en supervivencia no hay orden radial;
+  - `HqConstruction` sigue mandando un trabajo por parte;
+  - con 8 builders algunos adelantan el anillo siguiente.
+- `citadel/scale-port`: **dentro de `citadel/next`** (`3d03dd0`), que compila. La escala por defecto es 1.0. Con 1.5 los nodos y algunos detalles mantienen tamaño fijo, y hay que verlo en render.
+- `fix/chat-send-agents-menu`: código listo, **sin compilar ni probar**.
+  - el segundo mensaje ya no se pierde: se encola detrás del que está en vuelo (`ComposerState` outbox, "⏱ Queued");
+  - menú de agentes con filtro Active/All, activos arriba y terminados abajo (plegados con Active).
+  - Probar en juego: dos Enter seguidos en un hilo idle y en uno corriendo; dos mensajes en un hilo nuevo (draft).
+- `cat/wave-c`: estatuas, gazebos, mástiles, puentes y remates de torre.
+- `citadel/light-aesthetic`: luz visible solo como diseño (faroles con ritmo, linternas en aleros, apliques junto a puertas, candelabros centrados) y relleno invisible. Nada de bloques luminosos visibles "donde caigan".
+- `feat/ui-hq-menu-lineage`:
+  - en el menú de HQ, la ciudadela va arriba y el resto en una sección "Legacy";
+  - el linaje sale del sidebar y queda solo en el menú de agentes del header, mostrando solo hijos idle o activos.
+
+## Arreglo del lag al iniciar un hilo: integrado
+`fix/new-thread-hitch` ya está en main (`a031a79`), compilado. Trae el detector de trabones: `/t3dev perf hitches`, con WARN en latest.log cuando un frame o tick pasa de ~50 ms. Si el lag sigue, ese log dice qué fue.
+
+## Renders en el PC de Facundo (my-pc): FUNCIONA (2026-11-09)
+- **Relay probado de punta a punta.** El job `prueba-relay` (`--catalog LAMP`) compiló en el PC, renderizó la galería con etiquetas y trajo PNGs y reporte a la VPS, con código de salida 0.
+- **Transporte:** scripts por stdin (`ssh -T user@100.64.0.20 < script`) y archivos en tar+base64. No se usa rsync ni scp.
+- **Aprobación de la sesión:** `~/.cache/t3craft-coord/renders-approved` en la VPS. Alcance: el swarm de diseño de la ciudadela.
 ## Revisiones a mano en curso (solo código)
 - `review/wip-catalog`: terminada. Las 16 ramas `cat/*` parecen listas para compilar; informe en `docs/reviews/wip-catalog.md`, ya en main.
 - `review/wip-citadel`: revisa `citadel/*`, `citadel/scale`, `fix/plan-connect` y `fix/new-thread-hitch`, y propone el orden de integración. Informe en `docs/reviews/wip-citadel.md`.

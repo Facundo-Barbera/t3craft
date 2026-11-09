@@ -67,6 +67,11 @@ public final class CrewCursor implements JobCursor {
 	static final int NEAR_TICKS = (int) Math.ceil(6.0 / 0.6);
 	/** Next entries of a lane that only a builder no slower than its owner may steal. */
 	static final int STEAL_KEEP = 4;
+	/**
+	 * feat/build-near-player: work of another lane farther than this (walk ticks, about 24 blocks at
+	 * {@link #RUN_PER_TICK}) is not stolen: a builder keeps to its own side instead of crossing the map.
+	 */
+	static final int STEAL_MAX_TICKS = 40;
 
 	/**
 	 * Builder {@code front} starts walking to plan-relative feet cell {@code stand} to apply plan entry
@@ -409,7 +414,7 @@ public final class CrewCursor implements JobCursor {
 					continue;
 				}
 				int c = cost(f, i);
-				if (c < bestCost && (ahead >= STEAL_KEEP || c <= cost(g, i))) {
+				if (c <= STEAL_MAX_TICKS && c < bestCost && (ahead >= STEAL_KEEP || c <= cost(g, i))) {
 					best = i;
 					bestCost = c;
 				}

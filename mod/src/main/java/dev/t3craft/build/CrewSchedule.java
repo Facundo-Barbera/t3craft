@@ -61,6 +61,16 @@ public final class CrewSchedule {
 
 	/** Schedule of a {@link BuildPlan} (plan-relative cells; decoration = blocks that do not occlude). */
 	public static CrewSchedule of(BuildPlan plan, int builders) {
+		return of(plan, builders, null, null);
+	}
+
+	/**
+	 * feat/build-near-player: schedule of {@code plan} with solid cells already standing ({@code external},
+	 * plan-relative, packed with {@link CrewPlanner#key}: the fast foundation) and a plan-relative
+	 * {@code focus {x, z}} to start from (the player); both may be null.
+	 */
+	public static CrewSchedule of(BuildPlan plan, int builders, it.unimi.dsi.fastutil.longs.@org.jspecify.annotations.Nullable LongSet external,
+			int @org.jspecify.annotations.Nullable [] focus) {
 		int n = plan.size();
 		int[] x = new int[n];
 		int[] y = new int[n];
@@ -75,7 +85,7 @@ public final class CrewSchedule {
 			air[i] = p.state().isAir();
 			decor[i] = !air[i] && !p.state().canOcclude();
 		}
-		return CrewPlanner.plan(x, y, z, air, decor, builders);
+		return CrewPlanner.plan(x, y, z, air, decor, builders, external, focus);
 	}
 
 	public int total() {

@@ -109,6 +109,10 @@ public final class T3Screen extends Screen {
 	private final SidebarView sidebarView = new SidebarView(model, new SidebarHost());
 	private boolean menuOpen;
 	private boolean projectMenuOpen;
+	/** Agents menu filter: false = active only (default), true = all children. */
+	private boolean agentsShowAll;
+	/** Agents menu with the "active" filter: the finished section unfolded. */
+	private boolean agentsFinishedOpen;
 	private boolean notifications;
 	private boolean autoSelected;
 	private int ticks;
@@ -823,10 +827,15 @@ public final class T3Screen extends Screen {
 			// T3's breadcrumb: project › title
 			String project = target.project() == null || target.project().isBlank() ? "" : target.project();
 			String title = target.title() == null || target.title().isBlank() ? target.threadId() : target.title();
-			// feat/thread-lineage: a parent lists its delegated children (state, click to open)
-			List<ThreadRow> kids = row == null ? List.of() : model.childrenOf(row.key());
-			if (!kids.isEmpty()) {
-				String label = kids.size() + (kids.size() == 1 ? " agent ▾" : " agents ▾");
+			// feat/thread-lineage: a parent lists its delegated children (state, click to open).
+			// feat/ui-hq-menu-lineage: the only place the lineage shows (not the sidebar).
+			// fix/chat-send-agents-menu: the chip counts the active children (idle, working, waiting,
+			// needs input); with none active but some finished it reads "0/N agents"
+			List<ThreadRow> kids = row == null ? List.of() : model.liveChildrenOf(row.key());
+			List<ThreadRow> finished = row == null ? List.of() : model.finishedChildrenOf(row.key());
+			if (!kids.isEmpty() || !finished.isEmpty()) {
+				String label = kids.isEmpty() ? "0/" + finished.size() + (finished.size() == 1 ? " agent ▾" : " agents ▾")
+						: kids.size() + (kids.size() == 1 ? " agent ▾" : " agents ▾");
 				int w = font.width(label) + 10;
 				if (right - w > x + 60) {
 					Rect chipR = new Rect(right - w, tr.y(), w, tr.h());
@@ -836,8 +845,12 @@ public final class T3Screen extends Screen {
 					for (ThreadRow k : kids) {
 						tip.add(childLine(k));
 					}
+					if (!finished.isEmpty()) {
+						tip.add(finished.size() + " finished");
+					}
 					tip.add("Click: open one");
-					hits.add(new Hit(chipR, () -> openChildrenMenu(kids, chipR), null, tip));
+					String parentKey = row.key();
+					hits.add(new Hit(chipR, () -> openChildrenMenu(parentKey, chipR), null, tip));
 					right = chipR.x() - 4;
 				}
 			}
@@ -896,18 +909,53 @@ public final class T3Screen extends Screen {
 
 	/** One child in the header list: state glyph, title, state word (feat/thread-lineage). */
 	private static String childLine(ThreadRow k) {
-		String state = SidebarModel.working(k) ? "working" : k.attention().word;
+		String state = SidebarModel.working(k) ? "working" : k.settled() && k.state() != dev.t3craft.t3.ThreadState.ERROR ? "settled" : k.attention().word;
 		return k.state().glyph + " " + k.title() + " · " + state;
 	}
 
-	/** The header's children popup: one row per delegated child, choosing it opens that thread. */
-	private void openChildrenMenu(List<ThreadRow> kids, Rect anchor) {
+	/**
+	 * The header's children popup (fix/chat-send-agents-menu): a filter row (active / all), the
+	 * active children (idle, working, waiting, needs input), then the finished ones (done, settled,
+	 * error) under their own header. With the "active" filter the finished section is folded behind
+	 * a "▸ Finished (N)" row (one click unfolds it, dimmed); with "all" it is always shown. Choosing a
+	 * child opens that thread; the filter and fold rows re-open the menu with the new choice.
+	 */
+	private void openChildrenMenu(String parentKey, Rect anchor) {
 		menuOpen = false;
 		projectMenuOpen = false;
+		List<ThreadRow> kids = model.liveChildrenOf(parentKey);
+		List<ThreadRow> finished = model.finishedChildrenOf(parentKey);
 		List<T3Slots.MenuItem> items = new ArrayList<>();
+		String filter = agentsShowAll ? "Show: ○ Active  ● All" : "Show: ● Active  ○ All";
+		items.add(new T3Slots.MenuItem(filter, true, () -> {
+			agentsShowAll = !agentsShowAll;
+			openChildrenMenu(parentKey, anchor);
+		}, true));
+		if (kids.isEmpty()) {
+			items.add(new T3Slots.MenuItem("No active agents", false, () -> {
+			}));
+		}
 		for (ThreadRow k : kids) {
 			String key = k.key();
 			items.add(new T3Slots.MenuItem(childLine(k), true, () -> open(key)));
+		}
+		if (!finished.isEmpty()) {
+			boolean shown = agentsShowAll || agentsFinishedOpen;
+			if (agentsShowAll) {
+				items.add(new T3Slots.MenuItem("── Finished (" + finished.size() + ") ──", false, () -> {
+				}));
+			} else {
+				items.add(new T3Slots.MenuItem((shown ? "▾ " : "▸ ") + "Finished (" + finished.size() + ")", true, () -> {
+					agentsFinishedOpen = !agentsFinishedOpen;
+					openChildrenMenu(parentKey, anchor);
+				}, true));
+			}
+			if (shown) {
+				for (ThreadRow k : finished) {
+					String key = k.key();
+					items.add(new T3Slots.MenuItem("  " + childLine(k), true, () -> open(key), !agentsShowAll));
+				}
+			}
 		}
 		contextItems = items;
 		contextX = anchor.x();
@@ -1078,7 +1126,8 @@ public final class T3Screen extends Screen {
 			if (it.enabled() && rr.contains(mouseX, mouseY)) {
 				g.fill(rr.x(), rr.y(), rr.right(), rr.bottom(), t.hover());
 			}
-			g.text(font, ChatDraw.clip(font, it.label(), rr.w() - 6), rr.x() + 3, ry + 2, it.enabled() ? t.text() : t.disabled(), t.shadow());
+			int color = !it.enabled() ? t.disabled() : it.dim() ? t.muted() : t.text();
+			g.text(font, ChatDraw.clip(font, it.label(), rr.w() - 6), rr.x() + 3, ry + 2, color, t.shadow());
 			if (it.enabled()) {
 				menuHits.add(new Hit(rr, () -> {
 					close.run();
@@ -1227,6 +1276,8 @@ public final class T3Screen extends Screen {
 	private void launched(String envId, String threadId) {
 		ThreadDraft d = draft;
 		if (d != null && composer != null) {
+			// what was written while it launched follows it (queued after the first turn)
+			composer.state().carryDraft(d.key(), envId, threadId);
 			composer.state().discard(d.key());
 		}
 		draft = null;
