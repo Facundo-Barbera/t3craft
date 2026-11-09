@@ -16,45 +16,48 @@ import net.minecraft.world.level.block.state.properties.AttachFace;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 
 /**
- * Village well that works and reads as one: a stone kerb at bench height (one block above the ground,
- * half a block over the paving) with the water showing inside, a windlass (axle, crank lever, a bucket
- * on an iron chain) between two or four timber posts on stone bases, under a gable roof of stairs with a
- * real 1:1 pitch, eaves on every side and open gable ends facing the visitor. Round it: a small flagstone paving,
- * a bench, a water trough (two cauldrons) and barrels where the plot has room, and a free walk all
- * round the kerb.
+ * Village well that works and reads as one: a stone kerb with the water showing inside (the front is
+ * lowered to a half-block lip between two chiseled corner pedestals), a windlass (a pale stripped-log axle
+ * on top of two thick log posts, a crank lever on its front, a bucket on an iron chain right over the water)
+ * under a light gable roof: stairs at a real 1:1 pitch, a thin slab lip for the eaves and a soffit of the
+ * same material as the roof. The whole plot outside the kerb is flagstone paving with a lamp post on each
+ * front corner, a bench, a trough, barrels and pots round it.
  *
  * <pre>
- *  front elevation (w = 7, d = 7, core 3 x 3)       plan (core 3 x 3, plot 7 x 7)
- *  y6     ▄▄██▄▄    ridge                            . . . . . . .   . ground (ferns, moss)
- *  y5   ▄▀▀   ▀▀▄   roof stairs, 1:1 pitch           . ▒ ▒ ▒ ▒ ▒ .   ▒ paving (slabs)
- *  y4  ▀▀▀▀▀▀▀▀▀▀▀  eave row + timber soffit          B ▒ ▣ ▬ ▣ ▒ T   ▣ corner base + lantern
- *  y3  ═╪═══◦═══╪═  crossbars + axle (+ crank)        B ▒ ╫ ≈ ╫ ▒ T   ╫ post on its base, ≈ water
- *  y2  ◘ ║  ┆  ║ ◘  posts, lanterns, chain            B ▒ ▣ ▬ ▣ ▒ T   ▬ kerb (front: step stair)
- *  y1  ▣ ▣  ◘  ▣ ▣  bases, bucket                    . ▒ ▒ ▒ ▒ ▒ .   B bench, T trough
- *  y0  ▒▒▒▓▓≈▓▓▒▒▒  kerb, water, paving               . . . ▒ . . .   (approach, 3 wide)
+ *  front elevation (w = 7, core 3 x 3)
+ *  y7        ▄██▄          ridge (roof material, soffit under it)
+ *  y6     ▂▄▀▀▀▀▀▀▄▂       stairs + slab lip (thin eave)
+ *  y5      ═══════         crossbars (stripped timber, along v)
+ *  y4      ═╪═◦═╪═         pale axle on the posts, crank lever
+ *  y3      ║  ┆  ║         log posts, chain
+ *  y2     ◘║  ┆  ║◘        pedestal lanterns
+ *  y1     ▣ ▣ ◘  ▣ ▣       stone bases, bucket
+ *  y0   ▒▒▓▓▓▂≈▂▓▓▓▒▒      kerb (front lip lowered), water, paving
  * </pre>
  *
- * Roof, timber and stone sets come from the seed. Size: 3–8 × 3–8 × 9+ (the core is 3 × 3, or 4 × 4
- * from 7 × 7 up; the rest of the plot becomes paving and furniture).
+ * Roof, timber and stone sets come from the seed. Size: 3–8 × 3–8 × 8+ (the core is 3 × 3, or 4 × 4 from
+ * 6 × 6 up; the rest of the plot is paving and furniture).
  */
 public final class WellRoofedStone implements Variant {
 	/** The roof's lowest row (the eaves). */
-	private static final int ROOF = 5;
-	/** The crossbars and the axle: the layer right under the roof. */
+	private static final int ROOF = 6;
+	/** The crossbars: the layer right under the roof. */
 	private static final int BAR = ROOF - 1;
+	/** The axle: on the post tops, under the crossbars. */
+	private static final int AXLE = BAR - 1;
 
-	/** A roof set: slope stairs, ridge block, trim stairs (eave row and gable edge), and the timber that goes with it. */
-	private record RoofSet(Block stairs, Block ridge, Block eave, Block planks, Block log, Block stripped, Block fence) {
+	/** A roof set: slope stairs, matching slab (the eave lip), ridge/soffit block, and the timber that goes with it. */
+	private record RoofSet(Block stairs, Block slab, Block ridge, Block log, Block stripped, Block fence) {
 	}
 
 	private static final RoofSet[] ROOFS = {
-		new RoofSet(Blocks.DEEPSLATE_TILE_STAIRS, Blocks.DEEPSLATE_TILES, Blocks.CHERRY_STAIRS, Blocks.CHERRY_PLANKS, Blocks.CHERRY_LOG, Blocks.STRIPPED_CHERRY_LOG, Blocks.CHERRY_FENCE),
-		new RoofSet(Blocks.CHERRY_STAIRS, Blocks.CHERRY_PLANKS, Blocks.DARK_OAK_STAIRS, Blocks.DARK_OAK_PLANKS, Blocks.DARK_OAK_LOG, Blocks.STRIPPED_DARK_OAK_LOG, Blocks.DARK_OAK_FENCE),
-		new RoofSet(Blocks.SPRUCE_STAIRS, Blocks.SPRUCE_PLANKS, Blocks.DARK_OAK_STAIRS, Blocks.DARK_OAK_PLANKS, Blocks.DARK_OAK_LOG, Blocks.STRIPPED_DARK_OAK_LOG, Blocks.DARK_OAK_FENCE),
-		new RoofSet(Blocks.MUD_BRICK_STAIRS, Blocks.MUD_BRICKS, Blocks.SPRUCE_STAIRS, Blocks.SPRUCE_PLANKS, Blocks.SPRUCE_LOG, Blocks.STRIPPED_SPRUCE_LOG, Blocks.SPRUCE_FENCE),
+		new RoofSet(Blocks.DEEPSLATE_TILE_STAIRS, Blocks.DEEPSLATE_TILE_SLAB, Blocks.DEEPSLATE_TILES, Blocks.CHERRY_LOG, Blocks.STRIPPED_CHERRY_LOG, Blocks.CHERRY_FENCE),
+		new RoofSet(Blocks.CHERRY_STAIRS, Blocks.CHERRY_SLAB, Blocks.CHERRY_PLANKS, Blocks.DARK_OAK_LOG, Blocks.STRIPPED_DARK_OAK_LOG, Blocks.DARK_OAK_FENCE),
+		new RoofSet(Blocks.SPRUCE_STAIRS, Blocks.SPRUCE_SLAB, Blocks.SPRUCE_PLANKS, Blocks.DARK_OAK_LOG, Blocks.STRIPPED_DARK_OAK_LOG, Blocks.DARK_OAK_FENCE),
+		new RoofSet(Blocks.MUD_BRICK_STAIRS, Blocks.MUD_BRICK_SLAB, Blocks.MUD_BRICKS, Blocks.SPRUCE_LOG, Blocks.STRIPPED_SPRUCE_LOG, Blocks.SPRUCE_FENCE),
 	};
 
-	/** A stone set: three kerb tones (main, second, third), the chiseled corner, the step stair and three paving slabs. */
+	/** A stone set: three kerb tones (main, second, third), the chiseled corner, the bench stair and three paving slabs. */
 	private record StoneSet(Block a, Block bb, Block cc, Block chiseled, Block stair, Block slabA, Block slabB, Block slabC) {
 	}
 
@@ -67,8 +70,8 @@ public final class WellRoofedStone implements Variant {
 				Blocks.COBBLESTONE_SLAB, Blocks.MOSSY_COBBLESTONE_SLAB, Blocks.STONE_BRICK_SLAB),
 	};
 
-	/** The well's geometry in the plot: a square core {@code cs × cs} with its roof overhangs. */
-	private record Geo(int w, int d, int cs, int uL, int uR, int v0, int v1, int ovU, int ovV) {
+	/** The well's geometry in the plot: a square core {@code cs × cs} with a thin eave lip. */
+	private record Geo(int w, int d, int cs, int uL, int uR, int v0, int v1, int ovU) {
 		static Geo of(Plot p) {
 			int w = p.w();
 			int d = p.d();
@@ -78,11 +81,10 @@ public final class WellRoofedStone implements Variant {
 			int v0 = (d - cs) / 2;
 			int v1 = v0 + cs - 1;
 			int ovU = uL >= 1 && w - 1 - uR >= 1 ? 1 : 0;
-			int ovV = 0; // the gables stay flush so the windlass can be seen from the front
-			return new Geo(w, d, cs, uL, uR, v0, v1, ovU, ovV);
+			return new Geo(w, d, cs, uL, uR, v0, v1, ovU);
 		}
 
-		/** Middle column / row of the core (the first of the two on a 4 core's far side). */
+		/** Middle column of the core (the first of the two on a 4 core's far side). */
 		int uc() {
 			return uL + cs / 2;
 		}
@@ -156,98 +158,96 @@ public final class WellRoofedStone implements Variant {
 	}
 
 	/**
-	 * [depth] the kerb is one full block, a bench height (half a block over the paving): water inside, a
-	 * chiseled pedestal on every corner and a step stair in the middle of the front so it can be climbed.
+	 * [depth] a stone kerb with the water inside. The front, between the two corner pedestals, drops to a
+	 * half-block lip (so the water, the chain and the bucket show); each corner is a two-block pedestal
+	 * (kerb + chiseled) with a lantern standing on it.
 	 */
 	private static void kerb(CitadelCanvas c, Plot p, Geo g, StoneSet st) {
+		BlockState lantern = b(Blocks.LANTERN);
 		for (int u = g.uL(); u <= g.uR(); u++) {
 			for (int v = g.v0(); v <= g.v1(); v++) {
-				boolean edge = u == g.uL() || u == g.uR() || v == g.v0() || v == g.v1();
-				if (!edge) {
+				boolean cu = u == g.uL() || u == g.uR();
+				boolean cv = v == g.v0() || v == g.v1();
+				if (!cu && !cv) {
 					p.set(c, u, 0, v, b(Blocks.WATER));
-					continue;
+				} else if (cu && cv) {
+					p.set(c, u, 0, v, kerbBlock(p, st, u, v));
+					p.set(c, u, 1, v, b(st.chiseled()));
+					p.set(c, u, 2, v, lantern);
+				} else if (v == g.v0()) {
+					p.set(c, u, 0, v, slab(st.slabA())); // the low front lip
+				} else {
+					p.set(c, u, 0, v, kerbBlock(p, st, u, v));
 				}
-				p.set(c, u, 0, v, kerbBlock(p, st, u, v));
 			}
 		}
-		p.set(c, g.uc(), 0, g.v0(), stairs(st.stair(), Direction.SOUTH)); // the step: rises towards the shaft
 	}
 
 	// ------------------------------------------------------------------ posts, crossbars, windlass
 
 	private static void frame(CitadelCanvas c, Plot p, Geo g, RoofSet roof, StoneSet st) {
-		BlockState lantern = b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true);
-		int[] postV = g.cs() == 3 ? new int[] {g.v0() + 1} : new int[] {g.v0() + 1, g.v0() + 2};
+		int va = g.va();
+		int[] postV = g.cs() == 3 ? new int[] {va} : new int[] {va, g.v1() - 1};
+		BlockState pale = log(Blocks.STRIPPED_OAK_LOG, Direction.Axis.X);
 		for (int u : new int[] {g.uL(), g.uR()}) {
-			// [depth] corner pedestals; a lantern on a short chain hangs from the crossbar end over each of them
-			for (int v : new int[] {g.v0(), g.v1()}) {
-				p.set(c, u, 1, v, b(st.chiseled()));
-				p.set(c, u, 2, v, slab(st.slabA())); // the pedestal's cap
-				if (v == g.v1()) {
-					// the lanterns hang at the back, so the front stays clear for the windlass
-					p.put(c, u, BAR - 1, v, lantern, CitadelCanvas.HANGING);
-				}
-			}
-			// the fence posts stand on stone bases under the crossbar
 			for (int v : postV) {
+				// [depth] a thick log post on a stone base; the axle (or a log) is its capital
 				p.set(c, u, 1, v, b(st.a()));
-				for (int y = 2; y < BAR; y++) {
-					p.set(c, u, y, v, b(roof.fence()));
+				int top = v == va ? AXLE - 1 : AXLE;
+				for (int y = 2; y <= top; y++) {
+					p.set(c, u, y, v, log(roof.log(), Direction.Axis.Y));
 				}
 			}
-			// the crossbar over the end of the shaft carries the roof and holds the axle
+			// the crossbar over the post carries the roof and the lip
 			for (int v = g.v0(); v <= g.v1(); v++) {
 				p.set(c, u, BAR, v, log(roof.stripped(), Direction.Axis.Z));
 			}
 		}
-		// the axle across the shaft, between the crossbars; the crank lever sticks out of its front
-		int va = g.va();
-		int cu = g.cs() == 4 ? g.uL() + 1 + p.hash(3, 0, 0, 2) : g.uL() + 1;
-		for (int u = g.uL() + 1; u <= g.uR() - 1; u++) {
-			p.set(c, u, BAR - 1, va, log(roof.stripped(), Direction.Axis.X));
-			p.set(c, u, BAR, va, log(roof.stripped(), Direction.Axis.X)); // a tie beam over the axle: nobody can stand on it
+		// the axle: a pale stripped log across the shaft, resting on the post tops
+		for (int u = g.uL(); u <= g.uR(); u++) {
+			p.set(c, u, AXLE, va, pale);
 		}
-		p.put(c, cu, BAR - 1, va - 1, b(Blocks.LEVER)
+		int cu = g.cs() == 4 ? g.uL() + 1 + p.hash(3, 0, 0, 2) : g.uc();
+		// the crank: a lever on the front of the axle
+		p.put(c, cu, AXLE, g.v0(), b(Blocks.LEVER)
 				.setValue(BlockStateProperties.ATTACH_FACE, AttachFace.WALL)
 				.setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH), CitadelCanvas.DECOR);
 		// the bucket (a water cauldron) hangs on an iron chain from the axle, just over the water
-		for (int y = BAR - 2; y >= 2; y--) {
+		for (int y = AXLE - 1; y >= 2; y--) {
 			p.put(c, cu, y, va, b(Blocks.IRON_CHAIN).setValue(BlockStateProperties.AXIS, Direction.Axis.Y), CitadelCanvas.HANGING);
 		}
 		p.put(c, cu, 1, va, b(Blocks.WATER_CAULDRON).setValue(BlockStateProperties.LEVEL_CAULDRON, 3), CitadelCanvas.HANGING);
 	}
 
-	// ------------------------------------------------------------------ roof (y4+)
+	// ------------------------------------------------------------------ roof (y6+)
 
 	/**
 	 * [depth] gable roof, ridge along v (front to back, so the visitor looks into the open gable and sees the
-	 * windlass), pitch 1:1 in stairs of one material from the eave to a block ridge (or two stairs meeting). Under every row from the second a timber block
-	 * closes the soffit, so the whole roof is one face-connected mass resting on the crossbars: no loose
-	 * overhang. The gable ends stay open.
+	 * windlass), pitch 1:1 in stairs of one material up to a block ridge (or two stairs meeting). The soffit
+	 * under the upper rows is the roof's own material, so the roof is one tone and one face-connected mass
+	 * resting on the crossbars. The eaves are a thin lip of slabs one block past the posts. The gables stay open.
 	 */
 	private static void roof(CitadelCanvas c, Plot p, Geo g, RoofSet roof) {
-		int ru0 = g.uL() - g.ovU();
-		int cols = g.uR() + g.ovU() - ru0 + 1;
-		int rv0 = g.v0() - g.ovV();
-		int rv1 = g.v1() + g.ovV();
-		BlockState planks = b(roof.planks());
+		int cols = g.cs();
+		BlockState soffit = b(roof.ridge());
 		for (int r = 0; r < cols; r++) {
-			int u = ru0 + r;
+			int u = g.uL() + r;
 			int t = Math.min(r, cols - 1 - r);
 			int y = ROOF + t;
 			boolean ridgeBlock = cols % 2 == 1 && r == cols / 2;
 			boolean leftSide = r < cols - 1 - r; // rises towards +u
-			for (int v = rv0; v <= rv1; v++) {
-				BlockState st;
-				if (ridgeBlock) {
-					st = b(roof.ridge());
-				} else {
-					st = stairs(roof.stairs(), leftSide ? Direction.EAST : Direction.WEST);
-				}
+			for (int v = g.v0(); v <= g.v1(); v++) {
+				BlockState st = ridgeBlock ? soffit : stairs(roof.stairs(), leftSide ? Direction.EAST : Direction.WEST);
 				p.set(c, u, y, v, st);
 				if (t >= 1) {
-					p.set(c, u, y - 1, v, planks); // timber soffit under the slope
+					p.set(c, u, y - 1, v, soffit);
 				}
+			}
+		}
+		if (g.ovU() > 0) {
+			for (int v = g.v0(); v <= g.v1(); v++) {
+				p.set(c, g.uL() - 1, ROOF, v, slab(roof.slab()));
+				p.set(c, g.uR() + 1, ROOF, v, slab(roof.slab()));
 			}
 		}
 	}
@@ -262,20 +262,13 @@ public final class WellRoofedStone implements Variant {
 				if (u >= g.uL() && u <= g.uR() && v >= g.v0() && v <= g.v1()) {
 					continue;
 				}
-				int dist = Math.max(Math.max(g.uL() - u, u - g.uR()), Math.max(g.v0() - v, v - g.v1()));
+				// [palette] flagstones: three slab tones mixed by hash; the whole plot outside the kerb is paved
+				int n = p.hash(u, 0, v, 6);
 				boolean approach = v < g.v0() && Math.abs(u - g.uc()) <= 1;
-				if (dist <= 1 || approach) {
-					// [palette] flagstones: three slab tones mixed by hash
-					int n = p.hash(u, 0, v, 6);
-					p.set(c, u, 0, v, slab(n < 3 ? st.slabA() : n < 5 ? st.slabB() : st.slabC()));
-				} else {
-					int n = p.hash(u, 0, v, 10);
-					if (n == 0) {
-						p.set(c, u, 0, v, b(Blocks.FERN));
-					} else if (n == 1) {
-						p.set(c, u, 0, v, b(Blocks.MOSS_CARPET));
-					}
+				if (approach) {
+					n = 3 + n % 3; // the approach is the darker mix
 				}
+				p.set(c, u, 0, v, slab(n < 3 ? st.slabA() : n < 5 ? st.slabB() : st.slabC()));
 			}
 		}
 		furniture(c, p, g, roof, st);
@@ -289,10 +282,29 @@ public final class WellRoofedStone implements Variant {
 		return b(Blocks.WATER_CAULDRON).setValue(BlockStateProperties.LEVEL_CAULDRON, 3);
 	}
 
+	/** A lamp post: a stone foot, two fence posts and a lantern on top. */
+	private static void lampPost(CitadelCanvas c, Plot p, RoofSet roof, StoneSet st, int u, int v) {
+		if (u < 0 || v < 0 || u >= p.w() || v >= p.d()) {
+			return;
+		}
+		p.set(c, u, 0, v, b(st.cc()));
+		p.set(c, u, 1, v, b(roof.fence()));
+		p.set(c, u, 2, v, b(roof.fence()));
+		p.set(c, u, 3, v, b(Blocks.LANTERN));
+	}
+
+	private static void pot(CitadelCanvas c, Plot p, int u, int v) {
+		if (u < 0 || v < 0 || u >= p.w() || v >= p.d()) {
+			return;
+		}
+		p.set(c, u, 0, v, b(p.hash(u, 0, v, 2) == 0 ? Blocks.POTTED_FERN : Blocks.POTTED_AZALEA_BUSH));
+	}
+
 	/**
-	 * Uses round the well, only in the band outside the paving ring so the walk round the kerb stays free:
-	 * a bench and a trough on the two sides (by seed), barrels behind. A plot with no such band gets a
-	 * barrel and a trough cauldron in the two back corners of the paving.
+	 * Uses round the well. Lamp posts mark the two front corners of the plot and, where the plot is big
+	 * enough, a bench and a trough face each other across the well on the two sides (by seed) with barrels
+	 * and pots behind; the walk round the kerb stays free. A plot with no such band gets a barrel and a
+	 * trough cauldron in the two back corners.
 	 */
 	private static void furniture(CitadelCanvas c, Plot p, Geo g, RoofSet roof, StoneSet st) {
 		int w = g.w();
@@ -352,6 +364,13 @@ public final class WellRoofedStone implements Variant {
 				p.set(c, uc, 0, bb, barrel());
 				p.set(c, uc - 1, 1, bb, barrel());
 			}
+			// pots on the back corners of the plot, when no trough or bench takes them
+			if (hasL) {
+				pot(c, p, 0, d - 1);
+			}
+			if (hasR) {
+				pot(c, p, w - 1, d - 1);
+			}
 		}
 		if (!hasL && !hasR && !hasB) {
 			int cv = g.v1() + 1;
@@ -361,6 +380,11 @@ public final class WellRoofedStone implements Variant {
 			if (g.uR() + 1 < w && cv < d) {
 				p.set(c, g.uR() + 1, 0, cv, water());
 			}
+		}
+		// lamp posts on the two front corners of the plot (outside the approach)
+		if (g.v0() >= 1 && g.uL() >= 1 && w - 1 - g.uR() >= 1) {
+			lampPost(c, p, roof, st, 0, 0);
+			lampPost(c, p, roof, st, w - 1, 0);
 		}
 	}
 
