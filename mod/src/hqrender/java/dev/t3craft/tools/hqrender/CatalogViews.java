@@ -61,7 +61,8 @@ final class CatalogViews {
 			case FOUNTAIN, WELL -> 7;
 			case TREE -> 14;
 			case GARDEN -> 5;
-			case STATUE, GATE, PLAZA_CENTER, TOWER_TOP, GAZEBO -> 10;
+			case GATE -> 14; // the city asks for scy(10) = 14 at scale 2
+			case STATUE, PLAZA_CENTER, TOWER_TOP, GAZEBO -> 10;
 			case BRIDGE -> 6;
 			case ROOF -> 8;
 		};
