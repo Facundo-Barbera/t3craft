@@ -154,14 +154,14 @@ public final class CitadelLeadOffice {
 		}
 		// a tall pole of dark wall blocks with a gold finial, and a swallow-tailed banner 6 long and 4 high in the
 		// environment's colour with a stripe of its second colour (concrete: it also reads in the plan renders)
-		int pole = 10;
+		int pole = 8;
 		BlockState mast = b(Blocks.DEEPSLATE_BRICK_WALL);
 		for (int y = top + 1; y <= top + pole; y++) {
 			c.set(at.getX(), y, at.getZ(), mast);
 		}
 		c.set(at.getX(), top + pole + 1, at.getZ(), b(Blocks.GOLD_BLOCK));
 		BlockState cloth = b(Blocks.CONCRETE.pick(env));
-		BlockState stripe = b(Blocks.CONCRETE.pick(style.alt(env)));
+		BlockState stripe = b(Blocks.CONCRETE.pick(DyeColor.WHITE));
 		int[] length = {6, 6, 5, 3};
 		for (int row = 0; row < length.length; row++) {
 			for (int k = 1; k <= length[row]; k++) {
