@@ -35,13 +35,13 @@ import net.minecraft.world.level.block.state.properties.StairsShape;
  * <li><b>Silhouette</b>: tower parapet (highest) → curtain parapet with a raised middle merlon → arch.</li>
  * </ul>
  *
- * <p><b>Avenue size</b> (13+ wide, 4+ deep, 14+ high: what the avenues of the 200 % city ask for): a real gatehouse, see
- * {@link Large}. Two 4-wide towers with a guard room in one and a walkable spiral stair in the other, a round or pointed
+ * <p><b>Avenue size</b> (11+ wide, 4+ deep, 14+ high: what the avenues of the 200 % city ask for): a real gatehouse, see
+ * {@link Large}. A 4-wide stair tower and a guard tower (4 wide, 3 below 13 wide plots) with a guard room in one and a walkable spiral stair in the other, a round or pointed
  * arch of marked voussoirs under a battlemented curtain you walk along (door of each tower onto the wall walk), a
  * raised shield with a banner over the keystone, a raised portcullis, lanterns, and a hip roof on each tower. Material
  * (stone brick, tuff, deepslate), arch shape, tower plan and stair side change with the seed. Smaller plots keep the
  * original pilastered design ({@link #buildSmall}).
- * <p>Size: 5–21 × 2–8 × 8+ (the avenue design needs 13+ × 4+ × 14+).
+ * <p>Size: 5–21 × 2–8 × 8+ (the avenue design needs 11+ × 4+ × 14+; below 13 wide the guard tower is 3 wide).
  */
 public final class GateArchBattlement implements Variant {
 	private static final BlockState CALCITE = b(Blocks.CALCITE);
@@ -93,7 +93,7 @@ public final class GateArchBattlement implements Variant {
 
 	@Override
 	public void build(CitadelCanvas c, Plot p) {
-		if (p.w() >= 13 && p.d() >= 4 && p.h() >= 14) {
+		if (p.w() >= 11 && p.d() >= 4 && p.h() >= 14) {
 			new Large(c, p).build();
 		} else {
 			buildSmall(c, p);
@@ -303,7 +303,7 @@ public final class GateArchBattlement implements Variant {
 	 * The avenue gatehouse. Local frame, front NORTH: {@code u} across the avenue, {@code v} along it (the passage runs
 	 * front to back), {@code y} up.
 	 * <ul>
-	 * <li>two 4-wide towers ({@code u} 0..3 and {@code w-4..w-1}), the opening between them is {@code w-8} wide;</li>
+	 * <li>a 4-wide stair tower and a guard tower (4 wide, or 3 when the plot is under 13 wide) at the two ends, the opening between them is {@code w-8} wide ({@code w-7} on the narrow plots);</li>
 	 * <li>arch: ring course at y 6 in the middle, 3 at the jambs (round or pointed by seed), voussoirs alternating pale
 	 *     and body, the keystone one course taller; a raised portcullis of iron bars under the ring;</li>
 	 * <li>curtain: deck at y 7 (corbel table of stairs under the face), walk at y 8, parapet with merlons and crenels;</li>
@@ -331,6 +331,10 @@ public final class GateArchBattlement implements Variant {
 		private final int rec;
 		/** Row (v) of the stair's first cell: the doorways and the wall walk line up on it. */
 		private final int sv;
+		/** Width of the guard tower: 4 like the stair tower on wide plots, 3 on the 11-12 wide plots the city actually offers. */
+		private final int gw;
+		private final int lw;
+		private final int rw;
 
 		Large(CitadelCanvas c, Plot p) {
 			this.c = c;
@@ -339,12 +343,15 @@ public final class GateArchBattlement implements Variant {
 			this.d = p.d();
 			this.rec = p.d() >= 6 ? 1 : 0;
 			this.sv = 1 + rec;
+			this.gw = p.w() >= 13 ? 4 : 3;
 			this.m = MATS[p.hash(7, 7, 7, MATS.length)];
 			boolean cherryRoof = bit(4);
 			this.roofStairs = cherryRoof ? Blocks.CHERRY_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS;
 			this.roofBlock = cherryRoof ? Blocks.CHERRY_PLANKS : Blocks.DEEPSLATE_TILES;
 			this.bannerColor = cherryRoof ? DyeColor.PINK : DyeColor.RED;
 			this.stairLeft = bit(1);
+			this.lw = stairLeft ? 4 : gw;
+			this.rw = stairLeft ? gw : 4;
 			this.rounded = bit(2);
 			this.pointed = bit(3);
 		}
@@ -412,15 +419,16 @@ public final class GateArchBattlement implements Variant {
 		}
 
 		private void tower(boolean left, boolean stairTower) {
-			int u0 = left ? 0 : w - 4;
-			int u1 = u0 + 3;
+			int tw = stairTower ? 4 : gw;
+			int u0 = left ? 0 : w - tw;
+			int u1 = u0 + tw - 1;
 			int outer = left ? u0 : u1;
 			int inner = left ? u1 : u0;
 			Direction in = fd(left, Direction.EAST);
 			Direction out = in.getOpposite();
 			// frame column t (0 outer .. 3 inner) -> u
-			int[] col = new int[4];
-			for (int t = 0; t < 4; t++) {
+			int[] col = new int[tw];
+			for (int t = 0; t < tw; t++) {
 				col[t] = left ? t : w - 1 - t;
 			}
 			int top = 11; // last wall course; the roof starts at 12
@@ -508,14 +516,14 @@ public final class GateArchBattlement implements Variant {
 			if (stairTower) {
 				stairTower(left, col, in, out, inner);
 			} else {
-				guardRoom(left, col, in, out, inner);
+				guardRoom(left, col, in, out, inner, tw);
 			}
 			// the doorway onto the wall walk, over a sill at y 8, 3 high
 			for (int y = 9; y <= 11; y++) {
 				set(inner, y, sv, AIR);
 			}
 			// lookout chamber: hollow y 9..11, with a lantern from the ceiling
-			for (int t = 1; t <= 2; t++) {
+			for (int t = 1; t <= tw - 2; t++) {
 				for (int v = 1; v <= d - 2; v++) {
 					for (int y = 9; y <= 11; y++) {
 						set(col[t], y, v, AIR);
@@ -565,8 +573,9 @@ public final class GateArchBattlement implements Variant {
 		}
 
 		/** Guard room: cherry floor, door, bench, chest with a lantern, a hanging lantern; y 1..4. */
-		private void guardRoom(boolean left, int[] col, Direction in, Direction out, int inner) {
-			for (int t = 1; t <= 2; t++) {
+		private void guardRoom(boolean left, int[] col, Direction in, Direction out, int inner, int tw) {
+			int ic = tw - 2; // innermost interior column: the corridor from the door
+			for (int t = 1; t <= ic; t++) {
 				for (int v = 1; v <= d - 2; v++) {
 					set(col[t], 0, v, Blocks.CHERRY_PLANKS);
 					for (int y = 1; y <= 4; y++) {
@@ -582,13 +591,13 @@ public final class GateArchBattlement implements Variant {
 			set(inner, 3, sv, AIR);
 			set(inner, 4, sv, m.trim);
 			// bench along the outer wall, the chest at the back with a lantern on it
-			int benchTo = Math.min(d - 3, 3);
+			int benchTo = tw >= 4 ? Math.min(d - 3, 3) : 0; // a 1-wide room keeps its corridor free
 			for (int v = 1; v <= benchTo; v++) {
 				set(col[1], 1, v, stairs(Blocks.CHERRY_STAIRS, out));
 			}
 			set(col[1], 1, d - 2, b(Blocks.CHEST).setValue(BlockStateProperties.HORIZONTAL_FACING, in));
-			p.put(c, col[2], 4, d / 2, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
-			if (d >= 7) {
+			p.put(c, col[ic], 4, tw >= 4 ? d / 2 : sv, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
+			if (tw >= 4 && d >= 7) {
 				set(col[1], 1, d - 3, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
 			}
 		}
@@ -601,8 +610,8 @@ public final class GateArchBattlement implements Variant {
 		// ------------------------------------------------------------------ curtain over the arch
 
 		private void curtain() {
-			int a0 = 4;
-			int ow = w - 8;
+			int a0 = lw;
+			int ow = w - lw - rw;
 			double half = (ow - 1) / 2.0;
 			int rise = Math.min(3, ow / 2);
 			int side = C - rise;
@@ -699,6 +708,9 @@ public final class GateArchBattlement implements Variant {
 			for (int v : new int[] {rec, d - 1 - rec}) {
 				for (int i : new int[] {0, ow - 1}) {
 					boolean merlon = ((int) Math.floor(Math.abs(i - half))) % 2 == 0;
+					if (Math.abs(i - half) <= (ow % 2 == 1 ? 1.0 : 1.5)) {
+						continue; // under the shield's pediment
+					}
 					set(a0 + i, merlon ? 11 : 10, v, b(Blocks.LANTERN));
 				}
 			}
