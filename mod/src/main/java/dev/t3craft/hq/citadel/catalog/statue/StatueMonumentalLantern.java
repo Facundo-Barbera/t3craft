@@ -10,6 +10,7 @@ import dev.t3craft.hq.citadel.catalog.Plot;
 import dev.t3craft.hq.citadel.catalog.Variant;
 import net.minecraft.core.Direction;
 import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.StairBlock;
 import net.minecraft.world.level.block.state.BlockState;
@@ -17,6 +18,8 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.level.block.state.properties.Half;
 import net.minecraft.world.level.block.state.properties.SlabType;
+import net.minecraft.world.level.block.state.properties.StairsShape;
+import net.minecraft.world.level.block.state.properties.WallSide;
 
 /**
  * Concept: a monumental lantern at the top of a flight of steps, like the beacon of a harbour square.
@@ -86,6 +89,13 @@ public final class StatueMonumentalLantern implements Variant {
 		int w = p.w();
 		int d = p.d();
 		int steps = Math.min(d - 1, p.h() >= 10 ? 2 : 1); // rows 0..steps-1: the stair; the rest: the platform at y = steps
+		while (steps > 0 && !headFits(w, d, steps)) {
+			steps--; // fewer steps rather than a head cut by the plot's sides
+		}
+		if (!headFits(w, d, steps)) {
+			compact(c, p); // 2 wide or 2 deep: a head of 3 cannot fit, build the whole lamp in a 2 × 2
+			return;
+		}
 		boolean cheeks = w >= 4;
 
 		// --- the stair and its cheek walls
@@ -177,6 +187,64 @@ public final class StatueMonumentalLantern implements Variant {
 				}
 			}
 		}
+	}
+
+	/** Whether the lamp head (one ring round the centred column) stays inside the plot with {@code steps} steps. */
+	private static boolean headFits(int w, int d, int steps) {
+		int ul = (w - 1) / 2;
+		int ur = w / 2;
+		int vl = steps + (d - 1 - steps) / 2;
+		int vr = steps + (d - steps) / 2;
+		return ul >= 1 && ur <= w - 2 && vl >= 1 && vr <= d - 2;
+	}
+
+	/**
+	 * The lamp for a 2-wide plot (the hub's 2 × 2 × 8), whole inside a centred 2 × 2: a dark plinth with a
+	 * chamfered top, a clustered shaft of walls (thinner than the head, so the head reads), a copper bowl
+	 * that flares out from the middle, a cage of four copper lanterns and a pointed copper cap.
+	 */
+	private static void compact(CitadelCanvas c, Plot p) {
+		int u0 = (p.w() - 2) / 2;
+		int v0 = (p.d() - 2) / 2;
+		int cap = Math.min(p.h() - 1, 9);
+		int lamp = cap - 1;
+		int bowl = cap - 2;
+		BlockState lantern = Blocks.COPPER_LANTERN.waxed().unaffected().defaultBlockState();
+		for (int i = 0; i < 2; i++) {
+			for (int j = 0; j < 2; j++) {
+				int u = u0 + i;
+				int v = v0 + j;
+				Direction inU = i == 0 ? Direction.EAST : Direction.WEST;
+				Direction inV = j == 0 ? Direction.SOUTH : Direction.NORTH;
+				// the quarter that points at the middle of the 2 × 2, on both axes
+				StairsShape shape = inV == inU.getClockWise() ? StairsShape.OUTER_RIGHT : StairsShape.OUTER_LEFT;
+				p.set(c, u, 0, v, platform(p, u, 0, v, false));
+				// [depth] chamfered plinth top
+				p.set(c, u, 1, v, stairs(Blocks.DEEPSLATE_BRICK_STAIRS, inU).setValue(StairBlock.SHAPE, shape));
+				for (int y = 2; y < bowl; y++) {
+					// [palette] a dark foot, stone brick shaft, a light diorite course under the bowl
+					Block wb = y == 2 ? Blocks.POLISHED_DEEPSLATE_WALL : y == bowl - 1 ? Blocks.DIORITE_WALL
+							: p.hash(u, y, v, 4) == 0 ? Blocks.MOSSY_STONE_BRICK_WALL : Blocks.STONE_BRICK_WALL;
+					p.set(c, u, y, v, b(wb).setValue(BlockStateProperties.UP, true)
+							.setValue(wallSide(inU), WallSide.TALL).setValue(wallSide(inV), WallSide.TALL)
+							.setValue(wallSide(inU.getOpposite()), WallSide.NONE).setValue(wallSide(inV.getOpposite()), WallSide.NONE));
+				}
+				// [depth] the bowl flares out from the shaft, the cap rises back to a point
+				p.set(c, u, bowl, v, stairs(Blocks.CUT_COPPER_STAIRS.waxed().unaffected(), inU).setValue(StairBlock.HALF, Half.TOP)
+						.setValue(StairBlock.SHAPE, shape));
+				p.set(c, u, lamp, v, lantern);
+				p.set(c, u, cap, v, stairs(Blocks.CUT_COPPER_STAIRS.waxed().unaffected(), inU).setValue(StairBlock.SHAPE, shape));
+			}
+		}
+	}
+
+	private static net.minecraft.world.level.block.state.properties.EnumProperty<WallSide> wallSide(Direction d) {
+		return switch (d) {
+			case NORTH -> BlockStateProperties.NORTH_WALL;
+			case SOUTH -> BlockStateProperties.SOUTH_WALL;
+			case WEST -> BlockStateProperties.WEST_WALL;
+			default -> BlockStateProperties.EAST_WALL;
+		};
 	}
 
 	/** [palette] dark steps and platform; a calcite rim on the platform's top course. */
