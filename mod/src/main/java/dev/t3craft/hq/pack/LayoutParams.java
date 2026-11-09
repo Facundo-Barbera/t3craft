@@ -124,13 +124,6 @@ public final class LayoutParams {
 	public static final Spec VERTICAL_FACADE_LIGHT = spec("vertical", "facade.lightEvery", 4, 3, 9,
 			"lit panels in the tower facades every N blocks");
 
-	// ------------------------------------------------------------------ village
-
-	public static final Spec VILLAGE_CEILING_LIGHT = spec("village", "hall.ceilingLightEvery", 4, 3, 8,
-			"hall ceiling light panels on an N×N grid");
-	public static final Spec VILLAGE_LANE_LANTERN = spec("village", "lanes.lanternEvery", 11, 5, 41,
-			"garden lanterns beside the lanes: 1 cell in N");
-
 	// ------------------------------------------------------------------ hybrid-ringcampus
 
 	public static final Spec RINGCAMPUS_STREET_LIGHT = spec("hybrid-ringcampus", "streets.lightEvery", 41, 17, 97,
@@ -155,11 +148,6 @@ public final class LayoutParams {
 	 */
 	public static final Spec RINGCAMPUS_RELIEF = spec("hybrid-ringcampus", "terrain.relief", 2, 0, 3,
 			"campus terraces: 0 flat, 1 gentle (steps of 1, 3 in all), 2 default (steps of 2, 6 in all), 3 acropolis (steps 3/2/1, 6 in all)");
-
-	// ------------------------------------------------------------------ hybrid-terraces
-
-	public static final Spec TERRACES_TEMPLE_LIGHT = spec("hybrid-terraces", "temple.ceilingLightEvery", 4, 3, 8,
-			"temple ceiling light panels on an N×N grid");
 
 	/** Every parameter, in declaration order. */
 	public static List<Spec> all() {

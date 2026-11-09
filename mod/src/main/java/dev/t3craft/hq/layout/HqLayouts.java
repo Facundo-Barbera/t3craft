@@ -22,9 +22,7 @@ import org.jspecify.annotations.Nullable;
  *   <li>{@code campus}: hexagonal barrios round a plaza (very large);</li>
  *   <li>{@code ring}: rings of sectors with radial avenues;</li>
  *   <li>{@code vertical}: towers with an atrium and skybridges;</li>
- *   <li>{@code village}: a hill village on terraces;</li>
- *   <li>{@code hybrid-ringcampus}: a ringed citadel whose sectors are campus barrios;</li>
- *   <li>{@code hybrid-terraces}: an acropolis on terraces with sky islands and bridges (hybrid).</li>
+ *   <li>{@code hybrid-ringcampus}: a ringed citadel whose sectors are campus barrios (the default).</li>
  * </ul>
  *
  * <p>The choice lives in {@code config/t3craft.json} as the top-level key {@value #CONFIG_KEY}
@@ -41,9 +39,7 @@ public final class HqLayouts {
 	public static final String CAMPUS = "campus";
 	public static final String RING = "ring";
 	public static final String VERTICAL = "vertical";
-	public static final String VILLAGE = "village";
 	public static final String HYBRID_RINGCAMPUS = "hybrid-ringcampus";
-	public static final String HYBRID_TERRACES = "hybrid-terraces";
 	/**
 	 * The main design, listed first in the HQ menu; every other layout is shown under "Legacy".
 	 * Presentation only: it is not the {@link #DEFAULT_ID} and the registry order does not change.
@@ -55,9 +51,7 @@ public final class HqLayouts {
 			info(CAMPUS, true),
 			info(RING, false),
 			info(VERTICAL, false),
-			info(VILLAGE, false),
-			info(HYBRID_RINGCAMPUS, false),
-			info(HYBRID_TERRACES, false));
+			info(HYBRID_RINGCAMPUS, false));
 
 	private HqLayouts() {
 	}
@@ -86,7 +80,7 @@ public final class HqLayouts {
 		return List.copyOf(out);
 	}
 
-	/** Every layout, in menu order: classic, campus, ring, vertical, village, hybrid-ringcampus, hybrid-terraces. */
+	/** Every layout, in menu order: classic, campus, ring, vertical, hybrid-ringcampus. */
 	public static List<HqLayoutInfo> all() {
 		return ALL;
 	}

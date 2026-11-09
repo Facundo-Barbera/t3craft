@@ -43,9 +43,7 @@ import net.minecraft.world.level.block.state.BlockState;
  * (supersampling), {@code --vanilla} (no mod blocks), {@code --no-npcs}, {@code --projects 4,10,20} (rosters of N
  * projects with varied thread counts, three environments and settled threads; the default for styles
  * with their own layout, e.g. {@code --style campus}, which also renders a 4 → 10 → 20 comparison).
- * {@code --style village} renders the village layout (layout/village, {@link VillageRender}).
- * {@code --style hybrid-terraces} renders the terraced acropolis (design/hybrid-terraces, {@link TerracesRender}).
- * {@code --layout ID} (feat/hq-layouts: classic, campus, ring, vertical, ensanche, village or all) renders a
+ * {@code --layout ID} (feat/hq-layouts: classic, campus, ring, vertical or all) renders a
  * registered layout through the game's pipeline with {@code --projects} (default 4), see {@link LayoutViews};
  * {@code --layout hybrid-ringcampus} renders that hybrid's own gallery ({@link RingCampusViews}, default 4,10,20).
  * {@code --packs DIR} (feat/hq-layout-packs) generates with the layout packs in {@code DIR} (the game's
@@ -397,18 +395,6 @@ public final class HqRender {
 			for (String p : models.problems) {
 				System.out.println("note: " + p);
 			}
-			return;
-		}
-		if (dev.t3craft.hq.TerraceGenerator.ID.equals(styleId)) {
-			// design/hybrid-terraces: the terraced acropolis grown 4 -> 10 -> 20 (see TerracesRender)
-			Files.createDirectories(out);
-			TerracesRender.run(out, only, scaleMul, ss, npcs, new BlockModels());
-			return;
-		}
-		if (dev.t3craft.hq.VillageGenerator.ID.equals(styleId)) {
-			// layout/village: its own generator and views (see VillageRender)
-			Files.createDirectories(out);
-			VillageRender.run(out, only, scaleMul, ss, npcs, new BlockModels());
 			return;
 		}
 		HqStyle style = styleId == null ? HqStyles.byId(HqStyles.DEFAULT_ID) : HqStyles.byId(styleId);
