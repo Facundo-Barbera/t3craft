@@ -35,7 +35,7 @@ import net.minecraft.world.level.block.state.properties.WallSide;
  * </ul>
  *
  * <pre>
- *  side view (d = 24, h = 8)
+ *  side view (d = 24, h = 9)
  *  y5           ♦ ▫ ▫ ▫ ▫ ♦          lantern / cap on the parapet posts
  *  y4        ┬┬┬┬┬┬┬┬┬┬┬┬┬┬           parapet (low walls)
  *  y3   ♦  ▄▄▄▀▀▀▀▀▀▀▀▀▀▀▀▀▀▄▄▄  ♦    coping + deck, lamps on the newels
@@ -44,7 +44,7 @@ import net.minecraft.world.level.block.state.properties.WallSide;
  *  y0   ▓▓▓▓                   ▓▓▓▓   plinth, air under the arch
  * </pre>
  *
- * Size: 5–9 × 13–31 × 8+ (the deck is {@code w - 2} wide: 3 to 7 clear between the parapets). The crown
+ * Size: 5–9 × 17–31 × 9+ (the deck is {@code w - 2} wide: 3 to 7 clear between the parapets). The crown
  * rises up to {@code 2 (h - 3)} half blocks and never more than the 1:2 ramp allows.
  */
 public final class BridgeStoneArch implements Variant {
@@ -65,12 +65,12 @@ public final class BridgeStoneArch implements Variant {
 
 	@Override
 	public int minD() {
-		return 13;
+		return 17;
 	}
 
 	@Override
 	public int minH() {
-		return 8;
+		return 9;
 	}
 
 	@Override
@@ -90,13 +90,14 @@ public final class BridgeStoneArch implements Variant {
 		int h = p.h();
 
 		// deck level in half blocks: 1 = a slab at y0, 2 = a full block at y0, 3 = full + slab at y1…
-		int lvMax = Math.max(2, Math.min(2 * (h - 3), (d + 1) / 2 - 1));
+		// the ramps climb half a block per cell; the plateau keeps at least 7 cells (d - 2 (lvMax - 1))
+		int lvMax = Math.max(4, Math.min(2 * (h - 3), ((d - 5) / 2) & ~1));
 		int[] lv = profile(d, lvMax);
 		int crown = (d - 1) / 2;
 		double cm = (d - 1) / 2.0;
 
-		// the arch: air for y < open[v] inside the span (abutments of `a` cells at both ends)
-		int a = Math.max(2, d / 6);
+		// the arch: air for y < open[v] inside the span; it covers the plateau and a little of each ramp
+		int a = Math.max(2, lvMax - 3);
 		int vs = a;
 		int ve = d - 1 - a;
 		int lvC = lv[crown];
@@ -124,22 +125,11 @@ public final class BridgeStoneArch implements Variant {
 		}
 	}
 
-	/** Deck level per cell: a flattened parabola, never more than one half block of change per cell. */
+	/** Deck level per cell: ramps of half a block per cell up to a flat plateau over the arch. */
 	private static int[] profile(int d, int lvMax) {
 		int[] lv = new int[d];
-		double mid = (d - 1) / 2.0;
-		double half = d / 2.0;
 		for (int v = 0; v < d; v++) {
-			double t = Math.abs((v - mid) / half);
-			lv[v] = 1 + (int) Math.round((lvMax - 1) * (1.0 - Math.pow(t, 2.2)));
-		}
-		lv[0] = 1;
-		lv[d - 1] = 1;
-		for (int v = 1; v < d; v++) {
-			lv[v] = Math.min(lv[v], lv[v - 1] + 1);
-		}
-		for (int v = d - 2; v >= 0; v--) {
-			lv[v] = Math.min(lv[v], lv[v + 1] + 1);
+			lv[v] = Math.min(lvMax, Math.min(v + 1, d - v));
 		}
 		return lv;
 	}
@@ -236,7 +226,7 @@ public final class BridgeStoneArch implements Variant {
 		}
 
 		// parapet: low walls with capped posts
-		boolean post = (k % 4 == 0 && k > 0) || (d % 2 == 1 && v == crown);
+		boolean post = (k % 5 == 0 && k > 0) || (d % 2 == 1 && v == crown);
 		boolean n = railY(lv, v - 1) >= ry;
 		boolean s = railY(lv, v + 1) >= ry;
 		BlockState wall = b(post ? Blocks.POLISHED_DEEPSLATE_WALL : p.hash(u, ry, v, 4) == 0 ? Blocks.MOSSY_STONE_BRICK_WALL : Blocks.STONE_BRICK_WALL)
@@ -248,7 +238,7 @@ public final class BridgeStoneArch implements Variant {
 		p.set(c, u, ry, v, wall);
 		if (post && ry + 1 < p.h()) {
 			// [finish] a lantern on every other post (and the crown), a smooth stone cap on the rest
-			boolean lit = (d % 2 == 1 && v == crown) || k % 8 == 4;
+			boolean lit = (d % 2 == 1 && v == crown) || k % 10 == 5;
 			p.set(c, u, ry + 1, v, lit ? b(Blocks.LANTERN) : slab(Blocks.SMOOTH_STONE_SLAB));
 		}
 	}
@@ -259,7 +249,6 @@ public final class BridgeStoneArch implements Variant {
 		p.set(c, u, 1, v, b(Blocks.DEEPSLATE_BRICK_WALL).setValue(BlockStateProperties.UP, true));
 		p.set(c, u, 2, v, b(Blocks.CHERRY_FENCE));
 		p.set(c, u, 3, v, b(Blocks.LANTERN));
-		p.set(c, u, 4, v, slab(Blocks.CHERRY_SLAB));
 	}
 
 	/** [palette] walkway paving: stone bricks with polished andesite joints across the deck. */
