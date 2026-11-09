@@ -1216,7 +1216,7 @@ public final class CitadelOffice {
 	private static void northWall(CitadelCanvas c, int y) {
 		int z = -W;
 		// the board keeps to the room's palette (cherry, black, teal): muted terracotta headers, pale notes, no saturated bars
-		DyeColor[] col = {DyeColor.RED, DyeColor.ORANGE, DyeColor.CYAN, DyeColor.GREEN};
+		DyeColor[] col = {DyeColor.RED, DyeColor.BROWN, DyeColor.CYAN, DyeColor.LIGHT_GRAY};
 		String[] name = {"Por hacer", "En curso", "Revision", "Hecho"};
 		int[] notes = {2, 1, 1, 2}; // sticky notes per column, from the bottom up
 		for (int i = 0; i < 4; i++) {
