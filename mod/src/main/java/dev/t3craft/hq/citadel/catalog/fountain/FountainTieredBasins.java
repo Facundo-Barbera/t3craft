@@ -103,13 +103,13 @@ public final class FountainTieredBasins implements Variant {
 		int r1;
 		int r2 = 0;
 		if (three) {
-			r1 = Math.min(rad - 2, Math.round(rad * 0.70f));
-			r2 = Math.min(r1 - 2, Math.max(2, Math.round(rad * 0.40f)));
+			r1 = Math.min(rad - 2, Math.round(rad * 0.68f));
+			r2 = Math.min(r1 - 2, Math.max(2, Math.round(rad * 0.41f)));
 		} else {
 			r1 = rad >= 5 ? Math.min(rad - 2, Math.round(rad * 0.62f)) : rad == 4 ? 2 : 0;
 		}
 		// vertical unit: the figure grows taller with its radius (as far as the plot's height allows)
-		int g = Math.max(1, Math.min(6, rad / 7));
+		int g = Math.max(1, Math.min(6, rad / 4));
 		while (g > 1 && (three ? 2 + g + 1 + g + 3 : 2 + g + 3) > h - 1) {
 			g--;
 		}
@@ -131,17 +131,17 @@ public final class FountainTieredBasins implements Variant {
 				if (ins(shape, dx, dz, rad)) {
 					poolCell(k, shape, dx, dz, rad);
 				} else {
-					apron(k, shape, dx, dz, rad, half, pave);
+					apron(k, shape, dx, dz, rad, half, pave, accent);
 				}
 			}
 		}
 
 		// bowls
 		if (r1 >= 2) {
-			bowl(k, shape, r1, f1, rad, 1, 0, 1);
+			bowl(k, shape, r1, f1, rad, 1, 0, 1, accent, gold);
 		}
 		if (three) {
-			bowl(k, shape, r2, f2, r1, 2, f1, f1 + 1);
+			bowl(k, shape, r2, f2, r1, 2, f1, f1 + 1, accent, gold);
 		}
 		int fLast = three ? f2 : f1;
 		int rLast = three ? r2 : r1;
@@ -222,8 +222,8 @@ public final class FountainTieredBasins implements Variant {
 			k.set(dx, 0, dz, k.pick(dx, 0, dz, b(Blocks.POLISHED_DEEPSLATE), b(Blocks.DEEPSLATE_BRICKS), b(Blocks.DEEPSLATE_BRICKS),
 					b(Blocks.CRACKED_DEEPSLATE_BRICKS)));
 			Direction f = inward(shape, dx, dz, rad);
-			k.set(dx, 1, dz, k.pick(dx, 1, dz, stair(Blocks.STONE_BRICK_STAIRS, f), stair(Blocks.STONE_BRICK_STAIRS, f),
-					stair(Blocks.POLISHED_ANDESITE_STAIRS, f), stair(Blocks.MOSSY_STONE_BRICK_STAIRS, f)));
+			k.set(dx, 1, dz, k.pick(dx, 1, dz, stair(Blocks.SMOOTH_QUARTZ_STAIRS, f), stair(Blocks.SMOOTH_QUARTZ_STAIRS, f),
+					stair(Blocks.POLISHED_DIORITE_STAIRS, f), stair(Blocks.SMOOTH_QUARTZ_STAIRS, f)));
 		} else {
 			k.set(dx, 0, dz, k.pick(dx, 0, dz, b(Blocks.DEEPSLATE_TILES), b(Blocks.DEEPSLATE_TILES), b(Blocks.POLISHED_DEEPSLATE),
 					b(Blocks.CRACKED_DEEPSLATE_TILES)));
@@ -232,14 +232,14 @@ public final class FountainTieredBasins implements Variant {
 	}
 
 	/** The paving round the pool (bands that follow its shape, a light cross for the walks) and its furniture. */
-	private static void apron(FountainKit k, int shape, int dx, int dz, int rad, int half, int pave) {
+	private static void apron(FountainKit k, int shape, int dx, int dz, int rad, int half, int pave, BlockState accent) {
 		int m = ringIdx(shape, dx, dz) - rad;
 		boolean cross = Math.abs(dx) <= 1 || Math.abs(dz) <= 1;
 		BlockState s;
 		if (m == 1) {
 			s = k.pick(dx, 0, dz, b(Blocks.POLISHED_DEEPSLATE), b(Blocks.POLISHED_DEEPSLATE), b(Blocks.DEEPSLATE_TILES));
 		} else if (cross) {
-			s = k.pick(dx, 0, dz, b(Blocks.CALCITE), b(Blocks.POLISHED_DIORITE), b(Blocks.CALCITE));
+			s = Math.min(Math.abs(dx), Math.abs(dz)) == 0 ? b(Blocks.CALCITE) : b(Blocks.POLISHED_DIORITE);
 		} else {
 			s = switch ((m / 2) % 3) {
 				case 0 -> k.pick(dx, 0, dz, b(Blocks.STONE_BRICKS), b(Blocks.STONE_BRICKS), b(Blocks.MOSSY_STONE_BRICKS), b(Blocks.CRACKED_STONE_BRICKS));
@@ -257,7 +257,10 @@ public final class FountainTieredBasins implements Variant {
 		int ax = Math.abs(dx);
 		int az = Math.abs(dz);
 		if (ax == bc && az == bc) {
-			lamp(k, dx, dz);
+			lamp(k, dx, dz, accent);
+			// [finish] a flowering bush on each side of the corner lamp
+			k.set(dx - Integer.signum(dx), 1, dz, b(Blocks.FLOWERING_AZALEA));
+			k.set(dx, 1, dz - Integer.signum(dz), b(Blocks.FLOWERING_AZALEA));
 			return;
 		}
 		if (pave < 2) {
@@ -271,18 +274,17 @@ public final class FountainTieredBasins implements Variant {
 		if (q <= 2) {
 			// [finish] a bench: stairs with the back outwards, a seat towards the plaza
 			Direction f = ax == bc ? (dx > 0 ? Direction.EAST : Direction.WEST) : (dz > 0 ? Direction.SOUTH : Direction.NORTH);
-			k.set(dx, 1, dz, k.pick(dx, 1, dz, stair(Blocks.STONE_BRICK_STAIRS, f), stair(Blocks.STONE_BRICK_STAIRS, f),
-					stair(Blocks.POLISHED_DIORITE_STAIRS, f)));
-		} else if (q == 4) {
-			lamp(k, dx, dz);
-		} else if (q == 6) {
+			k.set(dx, 1, dz, stair(Blocks.STONE_BRICK_STAIRS, f));
+		} else if ((t - 2) % 16 == 12) {
+			lamp(k, dx, dz, accent);
+		} else if (q == 5) {
 			k.set(dx, 1, dz, k.pick(dx, 1, dz, b(Blocks.POTTED_FLOWERING_AZALEA), b(Blocks.POTTED_CORNFLOWER), b(Blocks.POTTED_PINK_TULIP)));
 		}
 	}
 
 	/** A lamp post: a deepslate plinth, a wall shaft and a lantern. */
-	private static void lamp(FountainKit k, int dx, int dz) {
-		k.set(dx, 1, dz, b(Blocks.POLISHED_ANDESITE));
+	private static void lamp(FountainKit k, int dx, int dz, BlockState accent) {
+		k.set(dx, 1, dz, b(Blocks.POLISHED_DEEPSLATE));
 		k.set(dx, 2, dz, b(Blocks.STONE_BRICK_WALL));
 		k.set(dx, 3, dz, b(Blocks.STONE_BRICK_WALL));
 		k.set(dx, 4, dz, b(Blocks.LANTERN));
@@ -296,7 +298,7 @@ public final class FountainTieredBasins implements Variant {
 	 * on bigger bowls) where the water falls into the basin below ({@code rb}, whose water is at
 	 * {@code lowWater}).
 	 */
-	private static void bowl(FountainKit k, int shape, int r, int f, int rb, int tier, int baseY, int lowWater) {
+	private static void bowl(FountainKit k, int shape, int r, int f, int rb, int tier, int baseY, int lowWater, BlockState accent, boolean gold) {
 		boolean light = tier >= 2;
 		int dr = r >= 3 ? r - 2 : 0;
 		// [depth] the drum: a stone-brick shaft with a collar of accent under the bowl
@@ -306,7 +308,10 @@ public final class FountainTieredBasins implements Variant {
 					if (!ins(shape, dx, dz, dr)) {
 						continue;
 					}
-					if (dr == 0) {
+					boolean collar = y == f - 1 && (dr == 0 || rim(shape, dx, dz, dr));
+					if (collar) {
+						k.set(dx, y, dz, accent);
+					} else if (dr == 0) {
 						k.set(0, y, 0, pillar(Blocks.QUARTZ_PILLAR));
 					} else {
 						k.set(dx, y, dz, k.pick(dx, y, dz, b(Blocks.STONE_BRICKS), b(Blocks.CHISELED_STONE_BRICKS), b(Blocks.STONE_BRICKS),
@@ -344,7 +349,7 @@ public final class FountainTieredBasins implements Variant {
 					continue;
 				}
 				// [depth] the underside curves in towards the drum; the rim stair has its back to the water
-				k.set(dx, f, dz, stairTop(light ? Blocks.POLISHED_DIORITE_STAIRS : Blocks.POLISHED_ANDESITE_STAIRS, in));
+				k.set(dx, f, dz, stairTop(gold ? Blocks.DEEPSLATE_BRICK_STAIRS : Blocks.CUT_COPPER_STAIRS.waxed().unaffected(), in));
 				k.set(dx, f + 1, dz, light ? k.pick(dx, f + 1, dz, stair(Blocks.SMOOTH_QUARTZ_STAIRS, in), stair(Blocks.SMOOTH_QUARTZ_STAIRS, in),
 						stair(Blocks.POLISHED_DIORITE_STAIRS, in))
 						: k.pick(dx, f + 1, dz, stair(Blocks.POLISHED_DIORITE_STAIRS, in), stair(Blocks.POLISHED_DIORITE_STAIRS, in),
