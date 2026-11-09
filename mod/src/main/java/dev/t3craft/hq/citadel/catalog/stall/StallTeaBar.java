@@ -113,7 +113,7 @@ public final class StallTeaBar implements Variant {
 		for (int i = 0; i <= k; i++) {
 			cols[i] = px0 + (span * i + k / 2) / k;
 		}
-		java.util.Random r = p.rng(0x7EAB);
+		java.util.Random r = p.rng(0xC0FFEE);
 		boolean flip = r.nextBoolean();
 		boolean hip = r.nextBoolean();
 		int mat = r.nextInt(3);
