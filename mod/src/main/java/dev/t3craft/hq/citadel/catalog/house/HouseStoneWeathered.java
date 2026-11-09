@@ -233,7 +233,6 @@ public final class HouseStoneWeathered implements Variant {
 			windows();
 			portal();
 			roofMain();
-			dormer();
 			if (ell) {
 				roofAnnex();
 			}
@@ -256,10 +255,11 @@ public final class HouseStoneWeathered implements Variant {
 		BlockState mat(int u, int y, int v) {
 			int h = p.hash(u, y, v, 20);
 			return switch (y) {
-				case 0 -> h < 6 + 4 * moss ? b(Blocks.MOSSY_COBBLESTONE) : b(Blocks.COBBLESTONE);
-				case 1 -> h < 2 + 3 * moss ? b(Blocks.MOSSY_STONE_BRICKS) : h < 6 + 3 * moss ? b(Blocks.CRACKED_STONE_BRICKS) : b(Blocks.STONE_BRICKS);
-				case 2 -> h < 2 * moss ? b(Blocks.MOSSY_STONE_BRICKS) : h < 2 * moss + 3 ? b(Blocks.CRACKED_STONE_BRICKS) : b(Blocks.STONE_BRICKS);
-				case 3, 4 -> h < moss ? b(Blocks.MOSSY_STONE_BRICKS) : h < moss + 2 ? b(Blocks.CRACKED_STONE_BRICKS) : b(Blocks.STONE_BRICKS);
+				case 0 -> h < 4 + 5 * moss ? b(Blocks.MOSSY_COBBLESTONE) : b(Blocks.COBBLESTONE);
+				case 1 -> h < 1 + 5 * moss ? b(Blocks.MOSSY_COBBLESTONE) : h < 5 + 5 * moss ? b(Blocks.MOSSY_STONE_BRICKS) : h < 10 + 4 * moss ? b(Blocks.CRACKED_STONE_BRICKS) : b(Blocks.STONE_BRICKS);
+				case 2 -> h < 4 * moss ? b(Blocks.MOSSY_STONE_BRICKS) : h < 4 * moss + 5 ? b(Blocks.CRACKED_STONE_BRICKS) : b(Blocks.STONE_BRICKS);
+				case 3 -> h < 2 * moss ? b(Blocks.MOSSY_STONE_BRICKS) : h < 2 * moss + 4 ? b(Blocks.CRACKED_STONE_BRICKS) : b(Blocks.STONE_BRICKS);
+				case 4 -> h < moss ? b(Blocks.MOSSY_STONE_BRICKS) : h < moss + 3 ? b(Blocks.CRACKED_STONE_BRICKS) : b(Blocks.STONE_BRICKS);
 				case 6 -> h < moss ? b(Blocks.MOSSY_STONE_BRICKS) : h < moss + 3 ? b(Blocks.CRACKED_STONE_BRICKS) : b(Blocks.STONE_BRICKS);
 				default -> h < 3 ? b(Blocks.CRACKED_STONE_BRICKS) : b(Blocks.STONE_BRICKS);
 			};
@@ -422,7 +422,12 @@ public final class HouseStoneWeathered implements Variant {
 			if (sill) {
 				wl.set(a, y - 1, 1, wl.stairIn(Blocks.STONE_BRICK_STAIRS, false));
 			}
+			// shutters vary by window (both sides, one side, none) so a long wall is not a row of identical frames
+			int var = p.hash(a, y, wl.a, 4);
 			for (int dt = -1; dt <= 1; dt += 2) {
+				if (var == 0 || var == 1 && dt == 1) {
+					continue;
+				}
 				for (int k = 0; k < 2; k++) {
 					wl.set(a + dt, y + k, 1, wl.shutter(Blocks.DARK_OAK_TRAPDOOR));
 				}
@@ -475,6 +480,11 @@ public final class HouseStoneWeathered implements Variant {
 					BlockState st = u == du && y == P - 2 ? b(Blocks.CHISELED_STONE_BRICKS) : p.hash(u, y, n, 6) == 0 ? b(Blocks.CRACKED_STONE_BRICKS) : b(Blocks.STONE_BRICKS);
 					set(u, y, n, st);
 				}
+			}
+			// a slit window in the bay, with the real window behind it
+			for (int y = P - 3; y <= P - 2; y++) {
+				set(du, y, n, StoneKit.pane(true));
+				front.set(du, y, 0, front.pane());
 			}
 			// the door in the front wall, a transom, a timber lintel
 			front.set(du, 1, 0, front.door(Blocks.DARK_OAK_DOOR, true));
@@ -531,34 +541,6 @@ public final class HouseStoneWeathered implements Variant {
 						set(u, P + lmax + 1, v, ridgeSlab());
 					}
 				}
-			}
-		}
-
-		/**
-		 * [depth] a wall gablet over the portal: the front wall rises through the eave two courses, with a window and a small
-		 * gable roof running back into the main slope. Flush with the wall (no overhang, nothing to stand on under it).
-		 */
-		void dormer() {
-			for (int u = du - 1; u <= du + 1; u++) {
-				for (int y = P + 1; y <= P + 2; y++) {
-					if (u == du) {
-						set(u, y, va, front.pane());
-					} else {
-						set(u, y, va, p.hash(u, y, va, 5) == 0 ? b(Blocks.CRACKED_STONE_BRICKS) : b(Blocks.STONE_BRICKS));
-					}
-				}
-			}
-			set(du, P + 3, va, b(Blocks.POLISHED_ANDESITE));
-			set(du - 2, P + 2, va, stairs(Blocks.DARK_OAK_STAIRS, Direction.EAST));
-			set(du + 2, P + 2, va, stairs(Blocks.DARK_OAK_STAIRS, Direction.WEST));
-			for (int v = va; v <= va + 1; v++) {
-				set(du - 1, P + 3, v, stairs(roofStair(du - 1, v, false), Direction.EAST));
-				set(du + 1, P + 3, v, stairs(roofStair(du + 1, v, false), Direction.WEST));
-			}
-			set(du, P + 3, va + 1, roofSolid()); // no open pocket behind the gablet
-			for (int v = va; v <= va + 2; v++) {
-				set(du, P + 4, v, roofSolid());
-				set(du, P + 5, v, ridgeSlab());
 			}
 		}
 
@@ -642,13 +624,19 @@ public final class HouseStoneWeathered implements Variant {
 			int vc = iv0 + 1;
 			int mk = kRight ? mu1 : mu0;
 			int col = kRight ? mu1 + 1 : mu0 - 1;
-			stack(col, vc, Math.min(p.h() - 1, P + lmax + 2), true);
+			int sTop = Math.min(p.h() - 2, P + lmax + 2);
+			stack(col, vc, sTop, true);
+			set(col, sTop + 1, vc, b(Blocks.COBBLESTONE_WALL)); // two stone chimney pots
+			set(col, sTop + 1, vc + 1, b(Blocks.COBBLESTONE_WALL));
 			// the hearth: a furnace and a smoker in the wall plane, facing the room
 			set(mk, 1, vc, lit(Blocks.FURNACE, inK));
 			set(mk, 1, vc + 1, lit(Blocks.SMOKER, inK));
 			if (ell) {
 				int fcol = annexLeft ? ao - 1 : ao + 1;
-				stack(fcol, iv1 - 1, Math.min(p.h() - 1, 12), false);
+				int fTop = Math.min(p.h() - 2, 12);
+				stack(fcol, iv1 - 1, fTop, false);
+				set(fcol, fTop + 1, iv1 - 1, b(Blocks.COBBLESTONE_WALL));
+				set(fcol, fTop + 1, iv1, b(Blocks.COBBLESTONE_WALL));
 				Direction inA = annexLeft ? Direction.EAST : Direction.WEST;
 				set(ao, 1, iv1 - 1, lit(Blocks.BLAST_FURNACE, inA));
 				set(ao, 1, iv1, lit(Blocks.FURNACE, inA));
@@ -800,6 +788,15 @@ public final class HouseStoneWeathered implements Variant {
 			set(cm, 1, iv0, fac(Blocks.CHEST, inA.getOpposite()));
 			set(ao + step() * 2, 5, iv0 + 2, invisibleLight(13));
 			set(ao + step() * 2, 3, iv0 + 2, invisibleLight(13));
+			// outside, in front of the forge: an anvil and a grindstone under the lean-to eave (low things, easy to step over)
+			set(c0, 0, va - 1, fac(Blocks.ANVIL, Direction.WEST));
+			set(ao + step() * 3, 0, va - 1, fac(Blocks.GRINDSTONE, Direction.SOUTH));
+			// beam tails under the lean-to's front and back eaves, so the overhang is held up
+			for (int j = 0; j < ai; j += 2) {
+				int col = ao + j * step();
+				EaveKit.corbel(c, p, col, PA + j, va - 1, Direction.SOUTH, Blocks.DARK_OAK_LOG, Blocks.DARK_OAK_STAIRS);
+				EaveKit.corbel(c, p, col, PA + j, vb + 1, Direction.NORTH, Blocks.DARK_OAK_LOG, Blocks.DARK_OAK_STAIRS);
+			}
 		}
 
 		// -------------------------------------------------------------- lot
