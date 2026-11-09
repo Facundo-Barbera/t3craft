@@ -2,6 +2,13 @@
 
 These rules come from Facundo and override any other instruction, brief or habit.
 
+## CURRENT MORATORIUM (Facundo, 2026-11-09): run nothing
+
+Until Facundo lifts it: **no gradle, compiling, renders, java, heavy scripts or tests, anywhere** (coordinator,
+child threads, delegated tasks, subagents). Allowed: writing code, commits (no AI credit), planning, documentation.
+Any task that needs something run is left **pending execution** in `docs/pending-execution.md` and reported to
+Facundo; it is never launched.
+
 ## VPS: heavy processes (incident 2026-11-09, see `docs/incidents/2026-11-09-vps-saturation.md`)
 
 The VPS is shared: T3 Code runs on it, along with every agent. A "heavy process" is **anything that runs java,
