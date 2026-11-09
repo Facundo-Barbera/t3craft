@@ -1,5 +1,6 @@
 package dev.t3craft.hq;
 
+import dev.t3craft.blocks.KitRailingBlock;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -51,6 +52,9 @@ import net.minecraft.world.phys.shapes.VoxelShape;
  *     {@code shouldRaisePost} (post above, not a straight run, or something on top that needs it).</li>
  * <li><b>Stairs</b> ({@link StairBlock#SHAPE}): vanilla's {@code getStairsShape} from the stairs behind
  *     and in front with the same {@code HALF}.</li>
+ * <li><b>Kit railings</b> ({@link KitRailingBlock}, kit/cherry-railing): the block's own rule
+ *     ({@link KitRailingBlock#resolve}): continuous runs, posts at ends and turns, closed corners and
+ *     bridged steps, from the {@code FACING} of the railings around (pure, one pass).</li>
  * </ul>
  *
  * "Sturdy" is {@code isFaceSturdy(EmptyBlockGetter, ZERO, face)} (what vanilla asks, a pure function of
@@ -74,7 +78,7 @@ public final class PlanConnect {
 	/** True for the blocks this pass shapes. */
 	public static boolean shaped(BlockState s) {
 		Block b = s.getBlock();
-		return b instanceof CrossCollisionBlock || b instanceof WallBlock || b instanceof StairBlock;
+		return b instanceof CrossCollisionBlock || b instanceof WallBlock || b instanceof StairBlock || b instanceof KitRailingBlock;
 	}
 
 	/** True for the blocks that connect sideways (fences, walls, panes, bars). */
@@ -107,6 +111,7 @@ public final class PlanConnect {
 		List<Long> stairs = new ArrayList<>();
 		List<Long> sides = new ArrayList<>();
 		List<Long> walls = new ArrayList<>();
+		List<Long> railings = new ArrayList<>();
 		for (Map.Entry<Long, BlockState> e : cells.entrySet()) {
 			Block b = e.getValue().getBlock();
 			if (b instanceof StairBlock) {
@@ -115,8 +120,21 @@ public final class PlanConnect {
 				sides.add(e.getKey());
 			} else if (b instanceof WallBlock) {
 				walls.add(e.getKey());
+			} else if (b instanceof KitRailingBlock) {
+				railings.add(e.getKey());
 			}
 		}
+		// kit railings read only the FACING of the railings around, which this pass never changes
+		Map<Long, BlockState> railOut = new HashMap<>();
+		for (long k : railings) {
+			BlockState s = cells.get(k);
+			BlockPos p = BlockPos.of(k);
+			BlockState u = KitRailingBlock.resolve(s, (dx, dz) -> at(cells, p.offset(dx, 0, dz)));
+			if (u != s) {
+				railOut.put(k, u);
+			}
+		}
+		cells.putAll(railOut);
 		// stairs read only the facing/half of their neighbours, so one pass over the original states is exact
 		Map<Long, BlockState> stairOut = new HashMap<>();
 		for (long k : stairs) {
