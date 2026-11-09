@@ -138,9 +138,9 @@ public final class PlanterTallPot implements Variant {
 	}
 
 	/**
-	 * The 1 × 1 design: a blossom topiary in an iron bowl on a stand. A deepslate wall stem (or a polished foot
-	 * and a slim fence stem when there is height), a cauldron as the bowl with its legs and rim, and a ball of
-	 * cherry blossom sitting in it. Three different silhouettes stacked (post, open bowl, pink ball).
+	 * The 1 × 1 design: a blossom topiary in a pale pot on a dark stand. A deepslate wall stem (or a polished
+	 * foot and a slim fence stem when there is height), a calcite pot and a ball of cherry blossom on it:
+	 * dark → white → pink, the citadel palette in three blocks.
 	 */
 	private static void single(CitadelCanvas c, Plot p) {
 		int y = 0;
@@ -149,7 +149,7 @@ public final class PlanterTallPot implements Variant {
 		}
 		p.set(c, 0, y, 0, y == 0 ? b(Blocks.POLISHED_DEEPSLATE_WALL).setValue(BlockStateProperties.UP, true) : b(Blocks.NETHER_BRICK_FENCE));
 		y++;
-		p.set(c, 0, y++, 0, b(Blocks.CAULDRON));
+		p.set(c, 0, y++, 0, b(Blocks.CALCITE)); // a pale glazed pot body against the dark stand
 		p.set(c, 0, y, 0, leaves(Blocks.CHERRY_LEAVES));
 	}
 

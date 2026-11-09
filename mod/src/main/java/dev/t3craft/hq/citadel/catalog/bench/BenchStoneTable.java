@@ -19,8 +19,8 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
  * A picnic table in stone under a cherry pergola: dark deepslate benches on both long sides, a pale smooth
  * quartz top on stone-brick wall legs, a flowering azalea set into the middle of a long table. Wide plots
  * add the table ends (a lantern post and a planted block); tall wide plots raise a cherry pergola over the
- * whole set: fence posts on deepslate feet, two long beams, cross rafters, blossom between them and a
- * lantern hanging over the table.
+ * whole set: fence posts on deepslate feet, two long beams, slim fence slats, blossom along the edges and
+ * lanterns hanging over the table.
  *
  * <ul>
  * <li><b>Gradient</b>: deepslate benches (the base) → stone-brick legs → the pale quartz top → the pink
@@ -119,7 +119,7 @@ public final class BenchStoneTable implements Variant {
 		}
 	}
 
-	/** A cherry pergola over the set: four posts, two long beams (y 3), cross rafters (y 4), blossom, a lantern. */
+	/** A cherry pergola over the set: four posts, two long beams (y 3), fence slats (y 4), blossom on the edges, lanterns. */
 	private static void pergola(CitadelCanvas c, Plot p, int w) {
 		for (int u : new int[] {0, w - 1}) {
 			for (int v : new int[] {0, 2}) {
@@ -129,7 +129,7 @@ public final class BenchStoneTable implements Variant {
 			}
 		}
 		BlockState beam = b(Blocks.STRIPPED_CHERRY_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.X);
-		BlockState rafter = b(Blocks.STRIPPED_CHERRY_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.Z);
+		BlockState rafter = b(Blocks.CHERRY_FENCE); // slim slats across the beams (connected front to back)
 		for (int u = 0; u < w; u++) {
 			p.set(c, u, 3, 0, beam);
 			p.set(c, u, 3, 2, beam);
@@ -137,8 +137,8 @@ public final class BenchStoneTable implements Variant {
 			for (int v = 0; v < 3; v++) {
 				if (isRafter) {
 					p.set(c, u, 4, v, rafter);
-				} else if (p.hash(u, 4, v, 3) != 0 && !(v == 1 && u == w / 2)) {
-					p.set(c, u, 4, v, leaves(Blocks.CHERRY_LEAVES)); // blossom between the rafters, gaps by hash, open over the lantern
+				} else if (v != 1 && p.hash(u, 4, v, 3) != 0) {
+					p.set(c, u, 4, v, leaves(Blocks.CHERRY_LEAVES)); // blossom along the edges between the slats; the middle row stays open to the sky
 				}
 			}
 		}
@@ -149,8 +149,12 @@ public final class BenchStoneTable implements Variant {
 			p.set(c, cu, 5, 1, leaves(Blocks.CHERRY_LEAVES));
 			p.set(c, w - 1 - cu, 5, 2, leaves(Blocks.CHERRY_LEAVES));
 		}
-		// a lantern hangs from the middle rafter over the table
-		p.put(c, w / 2, 3, 1, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
+		// lanterns hang from the slats over the table
+		for (int u = 1; u < w - 1; u++) {
+			if (u % 2 == 0 && (u == 2 || w >= 5)) {
+				p.put(c, u, 3, 1, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
+			}
+		}
 	}
 
 	private static void end(CitadelCanvas c, Plot p, int u, boolean lantern) {

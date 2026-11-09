@@ -10,7 +10,6 @@ import dev.t3craft.hq.citadel.catalog.Family;
 import dev.t3craft.hq.citadel.catalog.Plot;
 import dev.t3craft.hq.citadel.catalog.Variant;
 import net.minecraft.core.Direction;
-import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
@@ -18,7 +17,7 @@ import net.minecraft.world.level.block.state.properties.Half;
 
 /**
  * Neighbourhood gate: an arched passage between two towers. Each tower face is framed by pilasters with a
- * recessed panel between them (a pink pennant in the front panels of wide towers), a pale corbelled cornice
+ * recessed panel between them (a cherry-pink panel in the front recesses of wide towers), a pale corbelled cornice
  * and a parapet whose merlons step in height (full corners, half middles, open crenels). The curtain over the
  * arch is lower than the towers, with its own cornice and a parapet whose middle merlon rises above the rest.
  *
@@ -28,7 +27,7 @@ import net.minecraft.world.level.block.state.properties.Half;
  * <li><b>Depth</b>: no tower face is a flat wall: the pilasters stand one block proud of the recessed
  *     panels, the cornice of upside-down stairs overhangs them, slim towers get a window through.</li>
  * <li><b>Gradient</b>: deepslate plinth, stone-brick body (cracked / mossy mix by hash), polished
- *     andesite pilaster caps, pale diorite cornices, a calcite keystone, pink pennants.</li>
+ *     andesite pilaster caps, pale diorite cornices, a cherry arch ring with a calcite keystone, cherry panels.</li>
  * <li><b>Silhouette</b>: tower parapet (highest) → curtain parapet with a raised middle merlon → arch.</li>
  * </ul>
  * Size: 5–11 × 2–4 × 8+ (uses up to 10 blocks of height).
@@ -148,10 +147,10 @@ public final class GateArchBattlement implements Variant {
 			int panelTop = tCornice - 2;
 			if (pl >= 3) {
 				for (int u = u0 + 1; u < u1; u++) {
-					// front: a pink pennant set into the recess, under a chiselled stone
+					// front: a cherry-pink panel set into the recess, under a chiselled stone
 					for (int y = 2; y <= panelTop; y++) {
 						p.set(c, u, y, 0, AIR);
-						p.set(c, u, y, 1, y == panelTop ? b(Blocks.CHISELED_STONE_BRICKS) : b(Blocks.WOOL.pick(DyeColor.PINK)));
+						p.set(c, u, y, 1, y == panelTop ? b(Blocks.CHISELED_STONE_BRICKS) : b(Blocks.CHERRY_PLANKS));
 					}
 					p.set(c, u, 1, 0, stairs(Blocks.STONE_BRICK_STAIRS, Direction.SOUTH)); // a sill at the foot of the recess
 					if (d >= 3) {
@@ -195,7 +194,8 @@ public final class GateArchBattlement implements Variant {
 			for (int v = 0; v < d; v++) {
 				int from = side + Math.min(e, rise);
 				if (e < rise) {
-					p.set(c, u, side + e, v, stairs(Blocks.STONE_BRICK_STAIRS, left ? Direction.WEST : Direction.EAST)
+					boolean face = v == 0 || v == d - 1;
+					p.set(c, u, side + e, v, stairs(face ? Blocks.CHERRY_STAIRS : Blocks.STONE_BRICK_STAIRS, left ? Direction.WEST : Direction.EAST)
 							.setValue(BlockStateProperties.HALF, Half.TOP));
 					from = side + e + 1;
 				}
@@ -214,6 +214,16 @@ public final class GateArchBattlement implements Variant {
 					}
 				} else {
 					p.set(c, u, cornice, v, b(p.hash(u, cornice, v, 4) == 0 ? Blocks.STRIPPED_CHERRY_WOOD : Blocks.CHERRY_PLANKS));
+				}
+			}
+		}
+		// arch ring: the course over the opening is cherry on both faces (the shoulders are cherry stairs), so the
+		// arch reads as a pink band framing the passage
+		for (int i = 0; i < ow; i++) {
+			int e = Math.min(i, ow - 1 - i);
+			if (e >= rise) {
+				for (int v : new int[] {0, d - 1}) {
+					p.set(c, a0 + i, crown, v, b(Blocks.STRIPPED_CHERRY_WOOD));
 				}
 			}
 		}

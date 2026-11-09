@@ -16,7 +16,7 @@ import net.minecraft.world.level.block.state.properties.Half;
 
 /**
  * A myōjin torii in vermilion: two slim red pillars on black feet, a tie beam (nuki) that runs through the
- * pillars and out past them, a gilded plaque (gakuzuka) in the middle, a red under-beam (shimaki) and over
+ * pillars and out past them, a dark plaque (gakuzuka) in the middle, a red under-beam (shimaki) and over
  * it a thin dark kasagi whose two tips sweep up. Everything sits in one plane, so the gate reads as lines
  * against the sky, not as a roof.
  *
@@ -27,7 +27,7 @@ import net.minecraft.world.level.block.state.properties.Half;
  *     stairs turned outward (the upturned tips) over upside-down stairs that taper the shimaki ends, so
  *     each end curves up. The nuki is shorter than the kasagi and longer than the pillar span.</li>
  * <li><b>Palette</b>: black deepslate and blackstone feet → stripped mangrove red (pillars, nuki, shimaki)
- *     → a dark kasagi line; gilded blackstone on the plaque, stone lanterns outside on wide plots.</li>
+ *     → a dark kasagi line; a dark chiselled plaque (gold-faced on tall gates), stone lanterns outside on wide plots.</li>
  * </ul>
  * Size: 5–11 × 2–4 × 8+ (uses up to 10 blocks of height).
  */
@@ -87,7 +87,8 @@ public final class GateToriiCherry implements Variant {
 		// --- pillars: black foot, red shaft up to the shimaki; plinth stairs in front and behind
 		for (int u : new int[] {lp, rp}) {
 			p.set(c, u, 0, vc, b(p.hash(u, 0, vc, 3) == 0 ? Blocks.CHISELED_POLISHED_BLACKSTONE : Blocks.POLISHED_BLACKSTONE));
-			for (int y = 1; y < shimaki; y++) {
+			p.set(c, u, 1, vc, b(Blocks.POLISHED_BLACKSTONE)); // the black foot ring (kamaki), two blocks high
+			for (int y = 2; y < shimaki; y++) {
 				p.set(c, u, y, vc, RED);
 			}
 			for (int v : new int[] {vc - 1, vc + 1}) {
@@ -108,13 +109,14 @@ public final class GateToriiCherry implements Variant {
 			}
 		}
 
-		// --- gakuzuka: a gilded plaque in the middle, between nuki and shimaki
+		// --- gakuzuka: a dark plaque in the middle, between nuki and shimaki, with a gold face on tall gates
 		int ow = rp - lp - 1;
 		int pc = lp + 1 + (ow - 1) / 2;
 		for (int y = nuki + 1; y < shimaki; y++) {
-			p.set(c, pc, y, vc, b(Blocks.GILDED_BLACKSTONE));
+			BlockState face = gap >= 2 && y == nuki + 1 ? b(Blocks.GOLD_BLOCK) : b(Blocks.CHISELED_POLISHED_BLACKSTONE);
+			p.set(c, pc, y, vc, face);
 			if (ow % 2 == 0) {
-				p.set(c, pc + 1, y, vc, b(Blocks.GILDED_BLACKSTONE));
+				p.set(c, pc + 1, y, vc, face);
 			}
 		}
 

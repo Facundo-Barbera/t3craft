@@ -1,6 +1,7 @@
 package dev.t3craft.hq.citadel.catalog.lamp;
 
 import static dev.t3craft.hq.citadel.CitadelCanvas.b;
+import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
 import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
 
 import dev.t3craft.hq.citadel.CitadelCanvas;
@@ -8,23 +9,24 @@ import dev.t3craft.hq.citadel.catalog.Family;
 import dev.t3craft.hq.citadel.catalog.Plot;
 import dev.t3craft.hq.citadel.catalog.Variant;
 import net.minecraft.core.Direction;
-import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.StairBlock;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.Half;
+import net.minecraft.world.level.block.state.properties.SlabType;
 
 /**
- * Kasuga-style stone lantern (tōrō), all in stone: a stepped dark foot (kiso), a slim shaft (sao), a
- * cross-shaped flared platform (chūdai), a single glowing light box (hibukuro) open to the air on every
- * side, a square hipped hat (kasa) sloping down from a crown, and a jewel finial (hōju).
+ * Kasuga-style stone lantern (tōrō), all in stone: a low dark plinth (kiso), a slim shaft (sao), a flared
+ * platform (chūdai), a light chamber (hibukuro) of four corner posts round a glowing heart, open on every
+ * face, a thin wide hat (kasa) of slabs round a raised crown, and a jewel finial (hōju).
  *
  * <ul>
- * <li><b>Silhouette</b>: wide → slim → cross → glowing waist → wide hat → point. Every level has a different
- *     width (3, 1, cross, 1, 3, 1), so it reads as a tōrō from far away, not as a stack of cubes.</li>
- * <li><b>Gradient</b>: deepslate foot, stone-brick shaft and platform, a warm light, polished andesite hat,
- *     a pale diorite-wall jewel.</li>
- * <li><b>Depth</b>: the platform flares on upside-down stairs; the hat and the foot slope on stairs whose
- *     corner pieces join as outer corners, so both are square hips (no cross of loose tiles).</li>
+ * <li><b>Silhouette</b>: low plinth → slim shaft → flared platform → open lit chamber → thin hat → crown →
+ *     point. Heavy pieces are half blocks (plinth, hat), so the lantern reads light, not as a stack of cubes.</li>
+ * <li><b>Gradient</b>: deepslate plinth, stone-brick shaft and platform, stone-brick posts round a warm light,
+ *     polished andesite and smooth stone hat, a pale diorite-wall jewel.</li>
+ * <li><b>Depth</b>: the platform flares on upside-down stairs; the chamber is open between its posts; the
+ *     crown stands half a block above the hat's slab eave.</li>
  * </ul>
  * Size: 3 × 3 × 4–6. Height 6 is the full tōrō; 5 drops the finial; 4 also drops the shaft.
  */
@@ -75,12 +77,16 @@ public final class LampStreetToro implements Variant {
 		boolean finial = p.h() >= 6;
 		int y = 0;
 
-		// --- kiso: a dark stepped foot, stairs stepping down on all sides (the corners take outer shapes), one
-		// corner a potted fern
+		// --- kiso: a low plinth: a polished heart in a ring of deepslate slabs, one corner a potted fern
 		p.set(c, 1, y, 1, b(Blocks.POLISHED_DEEPSLATE));
-		ring(c, p, y, Blocks.DEEPSLATE_BRICK_STAIRS, Half.BOTTOM);
-		int[] pot = CORNERS[p.hash(0, 0, 0, 4)];
-		p.set(c, pot[0], y, pot[1], b(Blocks.POTTED_FERN));
+		for (int[] k : SIDES) {
+			p.set(c, k[0], y, k[1], slab(p.hash(k[0], 0, k[1], 3) == 0 ? Blocks.COBBLED_DEEPSLATE_SLAB : Blocks.DEEPSLATE_BRICK_SLAB));
+		}
+		int pot = p.hash(0, 0, 0, 4);
+		for (int i = 0; i < 4; i++) {
+			int[] k = CORNERS[i];
+			p.set(c, k[0], y, k[1], i == pot ? b(Blocks.POTTED_FERN) : slab(Blocks.DEEPSLATE_TILE_SLAB));
+		}
 		y++;
 
 		// --- sao: a slim round shaft, so the lantern stands clear of its foot
@@ -88,21 +94,31 @@ public final class LampStreetToro implements Variant {
 			p.set(c, 1, y++, 1, b(p.hash(1, 1, 1, 3) == 0 ? Blocks.MOSSY_STONE_BRICK_WALL : Blocks.STONE_BRICK_WALL));
 		}
 
-		// --- chūdai: a cross-shaped platform flaring on upside-down stairs, its corners left open
+		// --- chūdai: a square platform flaring on upside-down stairs, upper slabs at the corners
 		p.set(c, 1, y, 1, b(Blocks.CHISELED_STONE_BRICKS));
 		for (int i = 0; i < 4; i++) {
 			p.set(c, SIDES[i][0], y, SIDES[i][1], stairs(Blocks.STONE_BRICK_STAIRS, IN[i]).setValue(StairBlock.HALF, Half.TOP));
 		}
+		for (int[] k : CORNERS) {
+			p.set(c, k[0], y, k[1], slab(Blocks.STONE_BRICK_SLAB).setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP));
+		}
 		y++;
 
-		// --- hibukuro: a single glowing box, open air all round it: the waist between platform and hat
+		// --- hibukuro: a chamber of four stone corner posts round a glowing heart, open on all four faces
+		for (int[] k : CORNERS) {
+			p.set(c, k[0], y, k[1], b(Blocks.STONE_BRICK_WALL));
+		}
 		p.set(c, 1, y, 1, b(Blocks.OCHRE_FROGLIGHT));
 		y++;
 
-		// --- kasa: a hipped stone hat sloping down on all four sides from a crown block (the corner stairs
-		// face along their row, so they meet the side stairs as outer corners: a square hat, never a cross)
+		// --- kasa: a thin square hat of slabs (a wide, light eave) round a raised crown block
 		p.set(c, 1, y, 1, b(Blocks.POLISHED_ANDESITE));
-		ring(c, p, y, Blocks.POLISHED_ANDESITE_STAIRS, Half.BOTTOM);
+		for (int[] k : SIDES) {
+			p.set(c, k[0], y, k[1], slab(Blocks.POLISHED_ANDESITE_SLAB));
+		}
+		for (int[] k : CORNERS) {
+			p.set(c, k[0], y, k[1], slab(Blocks.SMOOTH_STONE_SLAB));
+		}
 		y++;
 
 		// --- hōju: the jewel on the crown
@@ -111,16 +127,5 @@ public final class LampStreetToro implements Variant {
 		}
 	}
 
-	/**
-	 * The eight cells round the centre as stairs of one half: the sides face the centre, the corners face along
-	 * their row towards the middle, so they meet the side stairs as outer corners (a hipped ring).
-	 */
-	private static void ring(CitadelCanvas c, Plot p, int y, Block stair, Half half) {
-		for (int i = 0; i < 4; i++) {
-			p.set(c, SIDES[i][0], y, SIDES[i][1], stairs(stair, IN[i]).setValue(StairBlock.HALF, half));
-		}
-		for (int[] k : CORNERS) {
-			p.set(c, k[0], y, k[1], stairs(stair, k[0] == 0 ? Direction.EAST : Direction.WEST).setValue(StairBlock.HALF, half));
-		}
 	}
 }
