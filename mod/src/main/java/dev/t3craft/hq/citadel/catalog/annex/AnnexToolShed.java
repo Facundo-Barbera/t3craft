@@ -68,7 +68,7 @@ public final class AnnexToolShed implements Variant {
 					Blocks.DARK_OAK_LOG, Blocks.STRIPPED_DARK_OAK_LOG, Blocks.BIRCH_PLANKS, Blocks.STRIPPED_BIRCH_LOG, Blocks.CHERRY_DOOR, Blocks.CHERRY_TRAPDOOR),
 	};
 
-	private static final Block[] FIREWOOD = {Blocks.OAK_LOG, Blocks.SPRUCE_LOG, Blocks.BIRCH_LOG, Blocks.OAK_LOG, Blocks.DARK_OAK_LOG, Blocks.CHERRY_LOG};
+	private static final Block[] FIREWOOD = {Blocks.OAK_LOG, Blocks.SPRUCE_LOG, Blocks.OAK_LOG, Blocks.SPRUCE_LOG, Blocks.OAK_LOG, Blocks.BIRCH_LOG};
 	private static final Block[] POTS = {Blocks.POTTED_FERN, Blocks.POTTED_AZALEA, Blocks.POTTED_CORNFLOWER};
 
 	@Override
@@ -440,7 +440,7 @@ public final class AnnexToolShed implements Variant {
 
 		// ------------------------------------------------------------------ the front
 
-		/** The stoop (two stone steps under the hood), two posts under the front eave, pots, a rain barrel and the barrel with the lantern. */
+		/** The stoop (two stone steps under the front eave), pots, a rain barrel and the barrel with the lantern. */
 		void porch() {
 			int vs = vf - 1;
 			// a stone slab apron when the yard is two deep
@@ -452,12 +452,9 @@ public final class AnnexToolShed implements Variant {
 			for (int u = dl; u <= dl + 1; u++) {
 				set(u, 0, vs, b(Blocks.STONE_BRICK_STAIRS).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.SOUTH).setValue(BlockStateProperties.HALF, Half.BOTTOM));
 			}
-			// hood posts, up to the roof edge
+			// the front eave hangs one block over the stoop on its own (no posts: they hid the door)
 			for (int u : new int[] {u0, u1}) {
 				set(u, 0, vs, rubble(u, 0, vs));
-				for (int y = 1; y <= (gable ? PLATE : PLATE - 1); y++) {
-					set(u, y, vs, log(pal.frame(), Direction.Axis.Y));
-				}
 			}
 			for (int u = u0 + 1; u < u1; u++) {
 				if (isDoorCol(u)) {
@@ -578,9 +575,7 @@ public final class AnnexToolShed implements Variant {
 				for (int v = vf; v <= vb - 1; v++) {
 					for (int y = 0; y <= PLATE - 1; y++) {
 						Block lg = FIREWOOD[p.hash(u, y, v, FIREWOOD.length)];
-						// logs lie along the wall (z) on the first column, across (x) on the second
-						Direction.Axis ax = (u - u1) % 2 == 1 ? Direction.Axis.Z : Direction.Axis.X;
-						set(u, y, v, log(lg, ax));
+						set(u, y, v, log(lg, Direction.Axis.X)); // ring ends face the open side
 					}
 				}
 			}
