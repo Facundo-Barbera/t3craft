@@ -38,6 +38,8 @@ public final class TreeAzaleaBlossom implements Variant {
 	private static final Wood WOOD = new Wood(Blocks.OAK_LOG, Blocks.OAK_WOOD, b(Blocks.OAK_WOOD));
 	private static final BlockState GREEN = leaves(Blocks.AZALEA_LEAVES);
 	private static final BlockState BLOOM = leaves(Blocks.FLOWERING_AZALEA_LEAVES);
+	/** A few small islands of real pink on the sunny top (a tenth of the shell at most). */
+	private static final BlockState PINK = leaves(Blocks.CHERRY_LEAVES);
 	/** The lowest y of any leaf or limb (the trunk and its foot aside): 4 free blocks under the crown. */
 	private static final int CLEAR = 4;
 
@@ -160,7 +162,7 @@ public final class TreeAzaleaBlossom implements Variant {
 	private static void shapeDome(X x) {
 		Random r = x.r;
 		double rc = x.rc;
-		x.ryM = Math.max(1.3, Math.min(Math.min(3.0, rc * 0.45 + 0.6), (x.avail - 0.4) / 1.92));
+		x.ryM = Math.max(1.3, Math.min(Math.min(4.0, rc * 0.62 + 0.8), (x.avail - 0.4) / 1.92));
 		x.cyM = CLEAR + x.ryM * 0.92;
 		x.rxM = x.ru * (0.7 + 0.1 * r.nextDouble());
 		x.rzM = x.rv * (0.7 + 0.1 * r.nextDouble());
@@ -232,7 +234,7 @@ public final class TreeAzaleaBlossom implements Variant {
 			t.wood(su, 0, sv, b(Blocks.MANGROVE_ROOTS));
 			TreeKit.branch(t, WOOD, new int[] {su, 1, sv}, new int[] {su, CLEAR - 1, sv}, false);
 			TreeKit.branch(t, WOOD, new int[] {su, CLEAR - 1, sv}, new int[] {tu, CLEAR + 1, tv}, false);
-			for (int y = 1; y <= CLEAR - 2; y++) {
+			for (int y = 1; y <= CLEAR - 1; y++) {
 				t.wood(su, y, sv, b(Blocks.MANGROVE_ROOTS)); // the lower stem is a prop root
 			}
 			x.tips.add(new int[] {tu, CLEAR + 1, tv});
@@ -348,19 +350,22 @@ public final class TreeAzaleaBlossom implements Variant {
 			double c2 = t.hash(Math.floorDiv(s[0], 2) + 7, Math.floorDiv(s[1], 2), Math.floorDiv(s[2], 2) - 3, 100) / 100.0;
 			double noise = t.hash(s[0] + 5, s[1] + 9, s[2] + 13, 100) < 22 ? c2 : big4;
 			boolean flower = noise < pf;
+			double isle = t.hash(Math.floorDiv(s[0] + 1, 3) + 31, Math.floorDiv(s[1], 3) + 2, Math.floorDiv(s[2] + 2, 3) - 17, 100) / 100.0;
+			boolean pink = flower && top > 0.15 && sun > -0.2 && isle < 0.2;
 			t.clear(s[0], s[1], s[2]);
 			int flank = 0; // no cap on a lone spike: it needs two leaf neighbours on its own level
 			for (int[] o : n6) {
 				flank += o[1] == 0 && t.kind(s[0] + o[0], s[1], s[2] + o[2]) == TreeKit.LEAF ? 1 : 0;
 			}
 			boolean freeTop = flank >= 2 && s[1] + 1 < x.p.h() && t.empty(s[0], s[1] + 1, s[2]);
-			if (flower && freeTop && t.hash(s[0] + 1, s[1] + 4, s[2] + 2, 100) < 74) {
+			boolean capPatch = t.hash(Math.floorDiv(s[0], 2) + 13, Math.floorDiv(s[1], 2), Math.floorDiv(s[2], 2) + 4, 100) < 62;
+			if (flower && freeTop && capPatch && t.hash(s[0] + 1, s[1] + 4, s[2] + 2, 100) < 90) {
 				t.fixed(s[0], s[1], s[2], b(Blocks.MOSS_BLOCK));
-				boolean bush = t.hash(s[0], s[1] + 8, s[2], 3) != 0 && (s[1] + 2 >= x.p.h() || t.empty(s[0], s[1] + 2, s[2]));
+				boolean bush = t.hash(s[0], s[1] + 8, s[2], 5) != 0 && (s[1] + 2 >= x.p.h() || t.empty(s[0], s[1] + 2, s[2]));
 				t.cover(s[0], s[1] + 1, s[2], bush ? b(Blocks.FLOWERING_AZALEA)
 						: TreeKit.petals(2 + t.hash(s[0], s[1], s[2], 3), t.hash(s[0], s[1] + 1, s[2], 4)));
 			} else {
-				t.leaf(s[0], s[1], s[2], flower ? BLOOM : GREEN);
+				t.leaf(s[0], s[1], s[2], pink ? PINK : flower ? BLOOM : GREEN);
 			}
 		}
 	}
@@ -368,10 +373,10 @@ public final class TreeAzaleaBlossom implements Variant {
 	/** Knots of rooted dirt in the underside of the crown (hanging roots or a spore blossom go under them later). */
 	private static void knots(X x) {
 		Vox t = x.t;
-		int maxKnots = 2 + (int) (x.rc * 1.2);
+		int maxKnots = 3 + (int) (x.rc * 2.0);
 		for (int vv = 1; vv < x.d - 1 && x.knots.size() < maxKnots; vv++) {
 			for (int uu = 1; uu < x.w - 1 && x.knots.size() < maxKnots; uu++) {
-				if (t.kind(uu, CLEAR, vv) != TreeKit.LEAF || !t.empty(uu, CLEAR - 1, vv) || t.hash(uu + 4, CLEAR, vv + 6, 100) >= 16) {
+				if (t.kind(uu, CLEAR, vv) != TreeKit.LEAF || !t.empty(uu, CLEAR - 1, vv) || t.hash(uu + 4, CLEAR, vv + 6, 100) >= 24) {
 					continue;
 				}
 				t.fixed(uu, CLEAR, vv, b(Blocks.ROOTED_DIRT));
