@@ -1,0 +1,257 @@
+{
+  "parent": "minecraft:block/block",
+  "ambientocclusion": false,
+  "textures": {
+    "rail": "t3craft:block/kit_railing",
+    "post": "t3craft:block/kit_railing_post",
+    "particle": "t3craft:block/kit_railing"
+  },
+  "elements": [
+    {
+      "from": [
+        12,
+        0,
+        0
+      ],
+      "to": [
+        16,
+        2,
+        4
+      ],
+      "faces": {
+        "north": {
+          "texture": "#post",
+          "uv": [
+            0,
+            13,
+            4,
+            15
+          ]
+        },
+        "south": {
+          "texture": "#post",
+          "uv": [
+            0,
+            13,
+            4,
+            15
+          ]
+        },
+        "east": {
+          "texture": "#post",
+          "uv": [
+            0,
+            13,
+            4,
+            15
+          ]
+        },
+        "west": {
+          "texture": "#post",
+          "uv": [
+            0,
+            13,
+            4,
+            15
+          ]
+        },
+        "up": {
+          "texture": "#post",
+          "uv": [
+            8,
+            6,
+            12,
+            10
+          ]
+        },
+        "down": {
+          "texture": "#post",
+          "uv": [
+            8,
+            6,
+            12,
+            10
+          ],
+          "cullface": "down"
+        }
+      }
+    },
+    {
+      "from": [
+        12.5,
+        2,
+        0.5
+      ],
+      "to": [
+        15.5,
+        15,
+        3.5
+      ],
+      "faces": {
+        "north": {
+          "texture": "#post",
+          "uv": [
+            0,
+            2,
+            3,
+            15
+          ]
+        },
+        "south": {
+          "texture": "#post",
+          "uv": [
+            0,
+            2,
+            3,
+            15
+          ]
+        },
+        "east": {
+          "texture": "#post",
+          "uv": [
+            0,
+            2,
+            3,
+            15
+          ]
+        },
+        "west": {
+          "texture": "#post",
+          "uv": [
+            0,
+            2,
+            3,
+            15
+          ]
+        }
+      }
+    },
+    {
+      "from": [
+        12,
+        15,
+        0
+      ],
+      "to": [
+        16,
+        17,
+        4
+      ],
+      "faces": {
+        "north": {
+          "texture": "#post",
+          "uv": [
+            12,
+            0,
+            16,
+            2
+          ]
+        },
+        "south": {
+          "texture": "#post",
+          "uv": [
+            12,
+            0,
+            16,
+            2
+          ]
+        },
+        "east": {
+          "texture": "#post",
+          "uv": [
+            12,
+            0,
+            16,
+            2
+          ]
+        },
+        "west": {
+          "texture": "#post",
+          "uv": [
+            12,
+            0,
+            16,
+            2
+          ]
+        },
+        "up": {
+          "texture": "#post",
+          "uv": [
+            8,
+            0,
+            12,
+            4
+          ]
+        },
+        "down": {
+          "texture": "#post",
+          "uv": [
+            8,
+            6,
+            12,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "from": [
+        13,
+        17,
+        1
+      ],
+      "to": [
+        15,
+        18,
+        3
+      ],
+      "faces": {
+        "north": {
+          "texture": "#post",
+          "uv": [
+            8,
+            4,
+            10,
+            5
+          ]
+        },
+        "south": {
+          "texture": "#post",
+          "uv": [
+            8,
+            4,
+            10,
+            5
+          ]
+        },
+        "east": {
+          "texture": "#post",
+          "uv": [
+            8,
+            4,
+            10,
+            5
+          ]
+        },
+        "west": {
+          "texture": "#post",
+          "uv": [
+            8,
+            4,
+            10,
+            5
+          ]
+        },
+        "up": {
+          "texture": "#post",
+          "uv": [
+            9,
+            1,
+            11,
+            3
+          ]
+        }
+      }
+    }
+  ]
+}

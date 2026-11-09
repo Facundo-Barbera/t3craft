@@ -203,8 +203,9 @@ public final class GazeboCherryOctagon implements Variant {
 
 	private static void ring(CitadelCanvas c, Plot p, int u, int v, int dx, int dz, int k, int t) {
 		if (isColumn(dx, dz, k, t)) {
-			p.set(c, u, 1, v, log(Blocks.STRIPPED_CHERRY_LOG, Direction.Axis.Y));
-			p.set(c, u, 2, v, log(Blocks.STRIPPED_CHERRY_LOG, Direction.Axis.Y));
+			// [palette] bark-dark cherry columns: against the pink benches and valance they make the pavilion read open
+			p.set(c, u, 1, v, log(Blocks.CHERRY_LOG, Direction.Axis.Y));
+			p.set(c, u, 2, v, log(Blocks.CHERRY_LOG, Direction.Axis.Y));
 			p.set(c, u, 3, v, b(Blocks.STRIPPED_CHERRY_WOOD)); // capital
 			return;
 		}
