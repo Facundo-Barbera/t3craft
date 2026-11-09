@@ -457,8 +457,14 @@ public final class HouseTerraceCascade implements Variant {
 		for (int y = G1 + 2; y <= PLATE - 1; y++) {
 			x.put(cu, y, vc, b(Blocks.IRON_CHAIN), CitadelCanvas.HANGING);
 		}
-		// a tap on the kerb beside the spout: a cauldron to draw water from, a barrel by it
-		x.set(cu - 1, G1, spout, b(Blocks.WATER_CAULDRON));
+		// a lavoir off the channel: a pocket of water with a sloped washing stone and a barrel beside it
+		if (g.t >= 4) {
+			int lr = spout - 1;
+			x.set(cu - 1, DECK, lr, b(Blocks.WATER));
+			x.set(cu - 1, G1, lr, AIR);
+			x.set(cu - 2, G1, lr, stair(Blocks.STONE_BRICK_STAIRS, Direction.WEST, false));
+			x.set(cu - 2, G1, lr + 1, barrel());
+		}
 		if (cu - 2 > g.ud + 1) {
 			x.set(cu - 2, G1, vc, barrel());
 		}
