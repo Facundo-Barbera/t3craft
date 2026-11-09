@@ -26,7 +26,9 @@ Questions:
 
 **(b)** Would you consider a headless "client mode" of the CLI that logs in, discovers the linked environments, and exposes a local read-only interface (the shell snapshot and event streams) without running any agents? A third-party app could then talk to a local process and never handle account credentials itself.
 
-**(c)** Is direct pairing against the T3 Connect tunnel hostname supported, or expected to work? For example `t3 auth pairing create --base-url https://<tunnel-host>`, followed by `/oauth/token` and the WebSocket against that host. It looks like it should pass through the tunnel, but I could not confirm it from the source.
+**(c)** Is direct pairing against the T3 Connect tunnel hostname supported and expected to stay stable? For example `t3 auth pairing create --scope orchestration:read --base-url https://<tunnel-host>`, followed by `/oauth/token`, the WebSocket ticket and `/ws` against that host. In a read-only test on a real linked environment this worked end to end (token exchange, ticket and a 101 upgrade); we only want to know it is an intended path. Related: is there a supported way to print the tunnel hostname from the CLI? `t3 connect status` does not show it, and `t3 pair` has no Connect option.
+
+**(d)** Linked environments forward the MCP thread tools to other machines, but the local WebSocket API does not aggregate remote environments. Would you consider forwarding `subscribeShell` (or a thread summary) over an environment link, so a client could use the player's own local T3 as its single entry point?
 
 Any pointer to existing docs, or a "not planned", would already help us decide. Happy to contribute documentation or a small proof of concept if there is interest.
 

@@ -8,6 +8,8 @@ Estado: **solo investigación, no se implementa nada**. Lectura de solo lectura 
 
 Lo que no se pudo confirmar se marca **«No confirmado»**. No se probó nada contra un T3 real.
 
+> **Actualización (2026-11-09, noche):** el seguimiento está en `docs/plans/t3-connect-followup.md`. Resuelve dos puntos abiertos de este documento: **C+ (emparejar contra el hostname del túnel) funciona**, probado contra un T3 Connect real, y **el servidor T3 local no agrega los shells de otros entornos** (§5, pregunta 4). Las demás conclusiones se mantienen.
+
 ## 1. Estado actual (camino C) y sus puntos débiles
 
 En modo `direct` (`ModConfig.Mode.DIRECT`, el predeterminado), el mod se empareja **con cada entorno por separado**:
