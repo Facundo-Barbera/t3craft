@@ -332,8 +332,26 @@ final class CatalogViews {
 		return out;
 	}
 
+	/** Exact {w, d, h} boxes from {@code --box WxDxH[,WxDxH…]}; null = the spread over the variant's range. */
+	private static List<int[]> boxOverride;
+
+	static void boxes(String spec) {
+		List<int[]> out = new ArrayList<>();
+		for (String part : spec.split(",")) {
+			String[] t = part.trim().toLowerCase().split("x");
+			if (t.length != 3) {
+				throw new IllegalArgumentException("--box wants WxDxH[,WxDxH…], got " + spec);
+			}
+			out.add(new int[] {Integer.parseInt(t[0]), Integer.parseInt(t[1]), Integer.parseInt(t[2])});
+		}
+		boxOverride = out;
+	}
+
 	/** {w, d, h} sizes spread over the variant's range: min, middle, max (deduplicated, up to n). */
 	private static List<int[]> sizes(Variant v, int n) {
+		if (boxOverride != null) {
+			return boxOverride;
+		}
 		int w1 = v.minW();
 		int w2 = cap(v.maxW(), w1);
 		int d1 = v.minD();

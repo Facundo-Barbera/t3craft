@@ -298,6 +298,7 @@ public final class HqRender {
 				case "--lamp-demo" -> lampDemo = true;
 				case "--front" -> catalogFront = args[++i];
 				case "--sizes" -> catalogSizes = Integer.parseInt(args[++i]);
+				case "--box" -> CatalogViews.boxes(args[++i]); // exact catalog sizes: WxDxH[,WxDxH…] (replaces the spread)
 				case "--seeds" -> catalogSeeds = Integer.parseInt(args[++i]);
 				case "--radius" -> radius = Integer.parseInt(args[++i]);
 				case "--name" -> piece.name = args[++i];
