@@ -76,7 +76,7 @@ public final class TreeCherryGrand implements Variant {
 		double lean = r.nextDouble() * Math.PI * 2;
 		int[][] lead = TreeKit.trunk(t, TreeKit.CHERRY, bu, bv, y2, crownY, ou, ov,
 				Math.cos(lean) * 0.9, Math.sin(lean) * 0.9);
-		TreeKit.roots(t, TreeKit.CHERRY, bu, bv, 6, 2 + (sc > 1.1 ? 1 : 0), -1, 3);
+		TreeKit.roots(t, TreeKit.CHERRY, bu, bv, 5, 2, -1, 3);
 
 		double a0 = r.nextDouble();
 		for (int i = 0; i < LOBES.length; i++) {

@@ -302,7 +302,7 @@ public final class TreeBirchGrove implements Variant {
 			int[] dd = diag[(first + k * 2 + (k > 1 ? 1 : 0)) % 4];
 			int du = dd[0];
 			int dv = dd[1];
-			int len = 2 + t.hash(u0 + k, 1, v0 + salt, 2);
+			int len = 1 + t.hash(u0 + k, 1, v0 + salt, 2);
 			// face cell (flare, bark), corner, then one more step out on each axis
 			int[][] cells = {{u0 + du, v0}, {u0 + du, v0 + dv}, {u0 + 2 * du, v0 + dv}, {u0 + 2 * du, v0 + 2 * dv}};
 			for (int i = 0; i <= len && i < cells.length; i++) {

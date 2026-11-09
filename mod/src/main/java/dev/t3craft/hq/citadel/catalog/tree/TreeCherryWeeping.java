@@ -115,17 +115,21 @@ public final class TreeCherryWeeping implements Variant {
 				}
 			}
 		}
+		boolean[] col = new boolean[t.w * t.d]; // one strand per column, never two side by side (no walls)
 		for (int[] s : seeds) {
 			int u = s[0];
 			int y = s[1];
 			int v = s[2];
+			if (busy(col, t.w, t.d, u, v)) {
+				continue;
+			}
 			int pick = t.hash(u, y, v, 20);
-			if (pick >= 9) {
+			if (pick >= 14) {
 				continue; // gaps: a bit less than half the rim hangs
 			}
 			// very uneven lengths: stubs, mid strands and a few long ones that nearly reach the grass
 			int room = y - 1;
-			int len = pick < 3 ? 1 + t.hash(u, 1, v, 2) : pick < 6 ? 2 + t.hash(u, 2, v, 3) : room - 1 - t.hash(u, 3, v, 3);
+			int len = pick < 4 ? 1 + t.hash(u, 1, v, 2) : pick < 10 ? 2 + t.hash(u, 2, v, 3) : room - 1 - t.hash(u, 3, v, 3);
 			len = Math.max(1, Math.min(len, room));
 			int ku = (int) Math.signum(Math.round(u - ccu));
 			int kv = (int) Math.signum(Math.round(v - ccv));
@@ -138,12 +142,26 @@ public final class TreeCherryWeeping implements Variant {
 				}
 			}
 			TreeKit.hang(t, u, y - 1, v, len, 1, TreeKit.SAKURA.a(), TreeKit.SAKURA.b(), ku, kv, kink);
+			col[v * t.w + u] = true;
 		}
 
 		// a thick drift of petals
 		TreeKit.petalCarpet(t, ccu, ccv, Math.min(p.w(), p.d()) / 2.0 + 1.0);
 		t.prune();
 		t.flush(c);
+	}
+
+	private static boolean busy(boolean[] col, int w, int d, int u, int v) {
+		for (int dv = -1; dv <= 1; dv++) {
+			for (int du = -1; du <= 1; du++) {
+				int a = u + du;
+				int b = v + dv;
+				if ((du == 0 || dv == 0) && a >= 0 && a < w && b >= 0 && b < d && col[b * w + a]) {
+					return true;
+				}
+			}
+		}
+		return false;
 	}
 
 	private static boolean contains(List<int[]> cells, int u, int y, int v) {

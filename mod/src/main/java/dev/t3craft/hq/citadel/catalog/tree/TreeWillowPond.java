@@ -159,6 +159,7 @@ public final class TreeWillowPond implements Variant {
 				}
 			}
 		}
+		boolean[] longCol = new boolean[t.w * t.d]; // long strands never side by side: a fringe, not a wall
 		for (int[] s : seeds) {
 			int u = s[0];
 			int y = s[1];
@@ -184,6 +185,19 @@ public final class TreeWillowPond implements Variant {
 				len = Math.min(len, 3); // the front row stays short: the pool shows
 			}
 			len = TreeKit.clamp(len, 1, room);
+			if (len >= 3) {
+				boolean near = false;
+				for (int[] o : new int[][] {{1, 0}, {-1, 0}, {0, 1}, {0, -1}, {0, 0}}) {
+					int a2 = u + o[0];
+					int b2 = v + o[1];
+					near |= a2 >= 0 && a2 < t.w && b2 >= 0 && b2 < t.d && longCol[b2 * t.w + a2];
+				}
+				if (near) {
+					len = Math.min(len, 1 + t.hash(u, 8, v, 2));
+				} else {
+					longCol[v * t.w + u] = true;
+				}
+			}
 			int ku = Integer.signum((int) Math.round(u - mu));
 			int kv = Integer.signum((int) Math.round(v - mv));
 			boolean kink = len >= 3 && t.hash(u, 4, v, 3) == 0;

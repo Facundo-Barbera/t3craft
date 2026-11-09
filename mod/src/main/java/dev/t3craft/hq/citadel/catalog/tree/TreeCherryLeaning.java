@@ -68,8 +68,8 @@ public final class TreeCherryLeaning implements Variant {
 		bu = TreeKit.clamp(bu + (p.w() >= 6 ? su : 0), 0, p.w() - 2);
 		bv = TreeKit.clamp(bv, 0, p.d() - 2);
 		int top = H - 3;
-		double leanU = su * Math.max(1, (p.w() - 3) * 0.6);
-		double leanV = sv * Math.max(1, (p.d() - 3) * 0.5);
+		double leanU = su * Math.max(1.5, (p.w() - 3) * 0.9);
+		double leanV = sv * Math.max(1.0, (p.d() - 3) * 0.6);
 		int ou = su > 0 ? 1 : 0;
 		int ov = sv > 0 ? 1 : 0;
 		int[][] lead = TreeKit.trunk(t, TreeKit.CHERRY, bu, bv, 2, top, ou, ov, leanU, leanV);
