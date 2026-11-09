@@ -34,8 +34,8 @@ public final class TreePineTiered implements Variant {
 	private static final BlockState TIP = leaves(Blocks.DARK_OAK_LEAVES);
 	private static final BlockState LIGHT = leaves(Blocks.AZALEA_LEAVES);
 
-	/** The lowest cloud's bottom layer: the bough under it is at y = 3. */
-	private static final int FIRST = 4;
+	/** The lowest cloud's bottom layer: the bough under it is at y = 4 (four clear blocks to walk under). */
+	private static final int FIRST = 5;
 
 	@Override
 	public String id() {
@@ -85,15 +85,15 @@ public final class TreePineTiered implements Variant {
 		int ov = r.nextInt(2);
 		int bu = TreeKit.base(w, ou);
 		int bv = TreeKit.base(d, ov);
-		int[][] lead = TreeKit.trunk(t, WOOD, bu, bv, 2, 2, ou, ov, 0, 0);
-		int cu0 = lead[0][2];
-		int cv0 = lead[1][2];
+		int[][] lead = TreeKit.trunk(t, WOOD, bu, bv, 1, 1, ou, ov, 0, 0);
+		int cu0 = lead[0][1];
+		int cv0 = lead[1][1];
 		boolean big = Math.min(w, d) >= 7;
 		TreeKit.roots(t, WOOD, bu, bv, big ? 4 : 3, 1, -1, 7);
 
 		// ---- tiers: 3..5 clouds, at least 3 layers apart, the last one on the leader
 		int bLast = H - 1;
-		int nMax = Math.min(5, (int) ((bLast - FIRST) / 3.0) + 1);
+		int nMax = Math.min(5, (int) ((bLast - FIRST) / 2.6) + 1);
 		int n = nMax <= 3 ? 3 : 3 + r.nextInt(nMax - 2);
 		int[] yb = new int[n];
 		int[] th = new int[n];
@@ -120,14 +120,14 @@ public final class TreePineTiered implements Variant {
 		int[] sv = new int[H + 1];
 		int cu = cu0;
 		int cv = cv0;
-		for (int y = 0; y <= 2; y++) {
+		for (int y = 0; y <= 1; y++) {
 			su[y] = cu0;
 			sv[y] = cv0;
 		}
-		for (int y = 3; y <= yTop; y++) {
-			double f = (y - 3) / (double) Math.max(1, yTop - 3);
+		for (int y = 2; y <= yTop; y++) {
+			double f = (y - 2) / (double) Math.max(1, yTop - 2);
 			double e = f * f * (3 - 2 * f);
-			double sway = Math.sin(phase + (y - 3) * 0.4) * 0.3 * Math.min(1.0, (y - 2) / 3.0);
+			double sway = Math.sin(phase + (y - 2) * 0.4) * 0.15 * Math.min(1.0, (y - 1) / 3.0);
 			int tu = TreeKit.clamp((int) Math.round(cu0 + lu * leanMax * e + pu * sway), 1, w - 2);
 			int tv = TreeKit.clamp((int) Math.round(cv0 + lv * leanMax * e + pv * sway), 1, d - 2);
 			int du = Integer.signum(tu - cu);
@@ -159,7 +159,7 @@ public final class TreePineTiered implements Variant {
 		for (int k = 0; k < n; k++) {
 			int b = yb[k];
 			double fk = n == 1 ? 0 : k / (double) (n - 1);
-			double rad = half * (0.86 - 0.28 * fk) + 0.35;
+			double rad = Math.min(3.3, half * (0.86 - 0.28 * fk) + 0.35);
 			double sgn = sgn0 * ((k & 1) == 0 ? 1 : -1);
 			boolean top = k == n - 1;
 			double off = top ? 0 : Math.max(1.0, half * (0.42 + 0.26 * r.nextDouble()));
@@ -174,10 +174,12 @@ public final class TreePineTiered implements Variant {
 			int cj = (int) Math.round(ccv);
 			if (!top) {
 				// the bough: leaves the trunk a layer or two under the pad, ends under its middle and climbs into it
-				int ya = Math.max(3, b - 2);
-				TreeKit.branch(t, WOOD, new int[] {su[ya], ya, sv[ya]}, new int[] {ci, b - 1, cj}, false);
+				int ya = b - 2;
+				// level first (a log run that reads as a limb), then one block up into the pad
+				TreeKit.branch(t, WOOD, new int[] {su[ya], ya, sv[ya]}, new int[] {ci, ya, cj}, false);
+				TreeKit.branch(t, WOOD, new int[] {ci, ya, cj}, new int[] {ci, b - 1, cj}, false);
 			}
-			if (!top && b - 2 >= 3) {
+			if (!top && b - 2 >= 4) {
 				// a short dead stub on the other side: a limb that was pruned
 				int ou2 = (int) Math.signum(su[b - 2] - ci);
 				int ov2 = (int) Math.signum(sv[b - 2] - cj);
@@ -222,6 +224,7 @@ public final class TreePineTiered implements Variant {
 	 * two blocks (never below y = 4, never touching another cloud), and the top gets a few tufts.
 	 */
 	private static void cloud(Vox t, double cu, double cv, int yb, int thick, double rx, double rz, int id, double ph, int H, boolean hangOk, boolean belly) {
+		belly = false; // flat undersides
 		for (int ly = 0; ly < thick; ly++) {
 			int y = yb + ly;
 			if (y >= H) {
@@ -249,7 +252,7 @@ public final class TreePineTiered implements Variant {
 					}
 					int pct = topLayer ? 42 : 24;
 					boolean tip = t.hash(u >> 1, y, v >> 1, 100) < pct || (q > lim - 0.3 && t.hash(u, y + 7, v, 4) == 0);
-					boolean sunny = topLayer && q < lim - 0.35 && t.hash(u, y + 21, v, 6) == 0;
+					boolean sunny = topLayer && q < lim - 0.35 && t.hash(u, y + 21, v, 3) == 0 && q < lim - 0.2;
 					t.leafOf(u, y, v, sunny ? LIGHT : tip ? TIP : NEEDLE, id);
 					if (belly && ly == 0 && q < 0.55 * lim) {
 						t.leafOf(u, y - 1, v, NEEDLE, id); // a sagging belly under the pad's middle
