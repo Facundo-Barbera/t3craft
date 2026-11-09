@@ -5,6 +5,7 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
 
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.catalog.Plot;
+import dev.t3craft.hq.citadel.catalog.Support;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -132,7 +133,8 @@ final class JapaneseKit {
 		// hanging blossom under the rim of the crown
 		for (int du = -cr; du <= cr; du += 2) {
 			for (int dv = -cr; dv <= cr; dv += 2) {
-				if ((Math.abs(du) == cr || Math.abs(dv) == cr) && p.hash(u + du, top, v + dv, 3) != 0) {
+				// fix/settle-sources: the blossom hangs from a leaf of the crown, never from a gap in it
+				if ((Math.abs(du) == cr || Math.abs(dv) == cr) && p.hash(u + du, top, v + dv, 3) != 0 && Support.present(c, p, u + du, top - 1, v + dv)) {
 					p.set(c, u + du, top - 2, v + dv, CitadelCanvas.leaves(Blocks.CHERRY_LEAVES));
 				}
 			}
