@@ -1,7 +1,6 @@
 package dev.t3craft.hq.citadel.catalog.statue;
 
 import static dev.t3craft.hq.citadel.CitadelCanvas.b;
-import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
 import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
 
 import dev.t3craft.hq.citadel.CitadelCanvas;
@@ -15,27 +14,39 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 
 /**
- * Concept: a memorial obelisk on a stepped pyramid, with a brazier burning on each corner. The shaft
- * rises from a chiselled die that carries the inscription (a dark oak plaque on the front, chiselled
- * deepslate on all four faces), climbs from dark polished deepslate through stone bricks to calcite, is
- * banded with chiselled courses, and ends in a gold pyramidion with a copper rod (a copper-stair cap on a
- * two-wide shaft). The four corner braziers are campfires (soul fire on some seeds) on deepslate posts.
+ * Concept: a memorial needle on the rim of the promenade, lit by four braziers. A slender one-block
+ * obelisk of pale ashlar with dark bands rises from a low stepped foot (a plus of plinth blocks with stair
+ * shoulders), carries a name plaque on the front of its chiselled die and ends in a gilded capstone with
+ * a copper rod. A campfire (soul campfire on some seeds) burns on a stone pedestal at each corner of the
+ * foot, so the promenade is lit from four sides without any flammable block touching a fire.
  *
  * <ul>
- * <li><b>Palette, dark → light, bottom → top</b>: deepslate tiles and bricks for the pyramid, polished
- *     deepslate at the foot of the shaft, stone bricks (mossy or cracked by hash) in the middle, calcite
- *     at the top, gold and copper as the crown.</li>
- * <li><b>Depth</b>: every ring of the base steps in towards the shaft (stairs facing it, slabs on the
- *     inner corners); the plaque stands off the die; chiselled bands every few courses break the shaft.</li>
- * <li><b>Silhouette</b>: a needle, much taller than wide, with four low flames round its foot; unlike
- *     the guardian it has no figure and no steps from one side only.</li>
+ * <li><b>Scale</b>: the foot is at most two courses high and the whole piece fits a 3 × 3 core (the
+ *     shaft stands on the middle cell, which is where the hub places a statue's centre); a 5 × 5 plot adds
+ *     an outer ring with the braziers and a seat on every side; a 4-wide plot gets benches on its spare
+ *     strip. The shaft grows with the height, up to 12 courses.</li>
+ * <li><b>Palette</b>, by seed: pale quartz bricks, calcite or dark polished deepslate for the shaft, always
+ *     with bands of the opposite tone, deepslate for the foot, gold on the point. The plaque is a wall sign
+ *     (wood by seed); the fire is a campfire or a soul campfire.</li>
+ * <li><b>Silhouette</b>: a needle at the centre of a low, wide cross with four lights, nothing like the
+ *     monumental lantern or the guardian.</li>
  * </ul>
- * The shaft takes the centre column(s) (one or two per axis, by parity); the base has as many steps
- * as the narrow side allows (one on 3–4, two on 5). The obelisk grows with the height up to 12 courses.
  *
- * <p>Size: 3–5 × 3–5 × 8+.
+ * <p>Size: 2–5 × 2–5 × 8+ (2 × 2 on a scale-1 hub, 3 × 3 and 4 × 4 × 11 on the default scale).
  */
 public final class StatueObeliskBraziers implements Variant {
+	/** Shaft, band and die by seed. */
+	private record Stone(Block body, Block band, Block foot, Block step) {
+	}
+
+	private static final Stone[] STONES = {
+			new Stone(Blocks.QUARTZ_BRICKS, Blocks.POLISHED_DEEPSLATE, Blocks.POLISHED_DEEPSLATE, Blocks.DEEPSLATE_BRICK_STAIRS),
+			new Stone(Blocks.CALCITE, Blocks.DEEPSLATE_TILES, Blocks.DEEPSLATE_BRICKS, Blocks.DEEPSLATE_BRICK_STAIRS),
+			new Stone(Blocks.POLISHED_DEEPSLATE, Blocks.CALCITE, Blocks.DEEPSLATE_TILES, Blocks.DEEPSLATE_TILE_STAIRS),
+	};
+	private static final Block[] SIGNS = {Blocks.DARK_OAK_WALL_SIGN, Blocks.CHERRY_WALL_SIGN, Blocks.SPRUCE_WALL_SIGN,
+			Blocks.MANGROVE_WALL_SIGN};
+
 	@Override
 	public String id() {
 		return "statue_obelisk_braziers";
@@ -48,12 +59,12 @@ public final class StatueObeliskBraziers implements Variant {
 
 	@Override
 	public int minW() {
-		return 3;
+		return 2;
 	}
 
 	@Override
 	public int minD() {
-		return 3;
+		return 2;
 	}
 
 	@Override
@@ -75,104 +86,134 @@ public final class StatueObeliskBraziers implements Variant {
 	public void build(CitadelCanvas c, Plot p) {
 		int w = p.w();
 		int d = p.d();
-		int ul = (w - 1) / 2;
-		int ur = w / 2;
-		int vl = (d - 1) / 2;
-		int vr = d / 2;
-		int steps = (Math.min(w, d) - 1) / 2; // 1 on 3–4, 2 on 5: the shaft stands on y = steps
-		boolean soul = p.hash(0, 0, 0, 4) == 0;
+		int cu = (w - 1) / 2; // the shaft's cell: where the hub puts a statue's centre
+		int cv = (d - 1) / 2;
+		int r = Math.min(2, Math.min(Math.min(cu, w - 1 - cu), Math.min(cv, d - 1 - cv)));
+		Stone st = STONES[p.hash(1, 0, 0, STONES.length)];
+		boolean soul = p.hash(2, 0, 0, 2) == 1;
+		Block sign = SIGNS[p.hash(3, 0, 0, SIGNS.length)];
+		int top = Math.min(p.h() - 1, 11);
 
-		// --- the stepped base: each cell rises with its distance from the plot's edge
-		for (int v = 0; v < d; v++) {
-			for (int u = 0; u < w; u++) {
-				int eu = Math.min(u, w - 1 - u);
-				int ev = Math.min(v, d - 1 - v);
-				int e = Math.min(Math.min(eu, ev), steps);
-				boolean corner = (u == 0 || u == w - 1) && (v == 0 || v == d - 1);
-				if (corner) {
-					// [finish] a brazier on each outer corner: a dark post and the fire on it
-					p.set(c, u, 0, v, b(Blocks.POLISHED_DEEPSLATE_WALL));
-					p.set(c, u, 1, v, soul ? b(Blocks.SOUL_CAMPFIRE) : b(Blocks.CAMPFIRE));
+		// --- the needle
+		for (int y = 0; y <= top - 2; y++) {
+			p.set(c, cu, y, cv, shaft(st, p, cu, y, cv));
+		}
+		p.set(c, cu, top - 1, cv, b(Blocks.GOLD_BLOCK)); // [finish] the gilded capstone
+		p.set(c, cu, top, cv, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState());
+
+		if (r == 0) {
+			small(c, p, st, soul, sign, cu, cv);
+			return;
+		}
+
+		// --- the foot: a plus of plinth blocks (the front one carries the plaque) with stair shoulders
+		for (int i = -1; i <= 1; i++) {
+			for (int j = -1; j <= 1; j++) {
+				if (i == 0 && j == 0) {
 					continue;
 				}
-				for (int y = 0; y < e; y++) {
-					p.set(c, u, y, v, base(p, u, y, v));
+				int u = cu + i;
+				int v = cv + j;
+				boolean corner = i != 0 && j != 0;
+				if (corner) {
+					if (r == 1) {
+						brazier(c, p, st, soul, u, v);
+					} else {
+						p.set(c, u, 0, v, b(st.foot));
+					}
+					continue;
 				}
-				if (e == steps) {
-					continue; // the top of the base: full up to y = steps - 1
-				}
-				if (eu == ev) {
-					p.set(c, u, e, v, slab(e == 0 ? Blocks.DEEPSLATE_TILE_SLAB : Blocks.DEEPSLATE_BRICK_SLAB));
-				} else {
-					// [depth] a step climbing towards the shaft
-					Direction up = ev < eu ? (v < vl ? Direction.SOUTH : Direction.NORTH) : (u < ul ? Direction.EAST : Direction.WEST);
-					p.set(c, u, e, v, stairs(e == 0 ? Blocks.DEEPSLATE_TILE_STAIRS : Blocks.DEEPSLATE_BRICK_STAIRS, up));
+				p.set(c, u, 0, v, b(st.foot));
+				if (!(i == 0 && j == -1)) {
+					p.set(c, u, 1, v, stairs(st.step, toward(u, v, cu, cv))); // [depth] a shoulder
 				}
 			}
 		}
+		// the plaque, on the die, above the front plinth
+		p.put(c, cu, 1, cv - 1, b(sign).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH), CitadelCanvas.DECOR);
 
-		// --- the shaft
-		int y0 = steps;
-		int top = Math.min(p.h() - 1, y0 + 11); // the rod (or the cap) sits on top
-		boolean needle = ul == ur && vl == vr;
-		int capY = needle ? top - 1 : top; // gold pyramidion (needle) or copper-stair cap
-		for (int y = y0; y < capY; y++) {
-			int k = y - y0; // course
-			double f = (double) (y - y0) / Math.max(1, capY - y0);
-			for (int v = vl; v <= vr; v++) {
-				for (int u = ul; u <= ur; u++) {
-					p.set(c, u, y, v, shaft(p, u, y, v, k, f));
+		if (r == 2) {
+			// outer ring: a brazier on each corner, a seat on every other cell facing the shaft
+			for (int i = -2; i <= 2; i++) {
+				for (int j = -2; j <= 2; j++) {
+					if (Math.max(Math.abs(i), Math.abs(j)) != 2) {
+						continue;
+					}
+					int u = cu + i;
+					int v = cv + j;
+					if (Math.abs(i) == 2 && Math.abs(j) == 2) {
+						brazier(c, p, st, soul, u, v);
+					} else {
+						p.set(c, u, 0, v, stairs(st.step, toward(u, v, cu, cv)));
+					}
 				}
 			}
-		}
-		if (needle) {
-			p.set(c, ul, capY, vl, b(Blocks.GOLD_BLOCK));
-			p.set(c, ul, top, vl, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState());
 		} else {
-			// a two-wide shaft gets a pyramid cap of copper stairs, each rising towards the middle
-			for (int v = vl; v <= vr; v++) {
-				for (int u = ul; u <= ur; u++) {
-					Direction in = ul != ur ? (u == ul ? Direction.EAST : Direction.WEST) : (v == vl ? Direction.SOUTH : Direction.NORTH);
-					p.set(c, u, capY, v, stairs(Blocks.CUT_COPPER_STAIRS.waxed().unaffected(), in));
+			// spare strips of a 4-wide plot: a bench on each, back to the shaft
+			if (cu + 2 < w) {
+				for (int j = -1; j <= 1; j++) {
+					p.set(c, cu + 2, 0, cv + j, stairs(st.step, Direction.WEST));
+				}
+			}
+			if (cv + 2 < d) {
+				for (int i = -1; i <= 1; i++) {
+					p.set(c, cu + i, 0, cv + 2, stairs(st.step, Direction.NORTH));
 				}
 			}
 		}
+	}
 
-		// --- the inscription: a plaque hung on the front of the die (on the step in front of it)
-		int pv = vl - 1;
-		if (pv >= 0) {
-			for (int u = ul; u <= ur; u++) {
-				p.put(c, u, y0, pv, b(Blocks.DARK_OAK_WALL_SIGN).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH),
-						CitadelCanvas.DECOR);
+	/** The 2-wide plots of a scale-1 hub: the needle in the corner cell, a brazier on the far diagonal, seats between. */
+	private static void small(CitadelCanvas c, Plot p, Stone st, boolean soul, Block sign, int cu, int cv) {
+		boolean placed = false;
+		for (int i = -1; i <= 1; i++) {
+			for (int j = -1; j <= 1; j++) {
+				int u = cu + i;
+				int v = cv + j;
+				if ((i == 0 && j == 0) || !p.has(u, 0, v)) {
+					continue;
+				}
+				if (i != 0 && j != 0) {
+					brazier(c, p, st, soul, u, v);
+				} else {
+					p.set(c, u, 0, v, stairs(st.step, toward(u, v, cu, cv)));
+					if (!placed && j == 0 && p.has(u, 1, v)) {
+						Direction side = i > 0 ? Direction.EAST : Direction.WEST;
+						p.put(c, u, 1, v, b(sign).setValue(BlockStateProperties.HORIZONTAL_FACING, side), CitadelCanvas.DECOR);
+						placed = true;
+					}
+				}
 			}
 		}
 	}
 
-	/** [palette] the pyramid: dark tiles at the foot, deepslate bricks above. */
-	private static BlockState base(Plot p, int u, int y, int v) {
-		int hsh = p.hash(u, y, v, 5);
-		if (y == 0) {
-			return hsh == 0 ? b(Blocks.CRACKED_DEEPSLATE_TILES) : b(Blocks.DEEPSLATE_TILES);
-		}
-		return hsh == 0 ? b(Blocks.CRACKED_DEEPSLATE_BRICKS) : b(Blocks.DEEPSLATE_BRICKS);
+	/** [finish] a campfire (soul campfire by seed) on a stone pedestal: contained fire, nothing flammable next to it. */
+	private static void brazier(CitadelCanvas c, Plot p, Stone st, boolean soul, int u, int v) {
+		p.set(c, u, 0, v, b(st.foot));
+		p.set(c, u, 1, v, soul ? b(Blocks.SOUL_CAMPFIRE) : b(Blocks.CAMPFIRE));
 	}
 
-	/** [palette] die, then dark → light along the shaft, with chiselled bands. */
-	private static BlockState shaft(Plot p, int u, int y, int v, int course, double f) {
-		if (course == 0) {
+	/** The stair direction that climbs towards the shaft. */
+	private static Direction toward(int u, int v, int cu, int cv) {
+		int dx = cu - u;
+		int dz = cv - v;
+		if (Math.abs(dx) > Math.abs(dz)) {
+			return dx > 0 ? Direction.EAST : Direction.WEST;
+		}
+		return dz > 0 ? Direction.SOUTH : Direction.NORTH;
+	}
+
+	/** [palette] plinth, chiselled die, then pale ashlar with a dark band every third course. */
+	private static BlockState shaft(Stone st, Plot p, int u, int y, int v) {
+		if (y == 0) {
+			return b(st.foot);
+		}
+		if (y == 1) {
 			return b(Blocks.CHISELED_DEEPSLATE); // the die: the inscribed block
 		}
-		if (course == 1) {
-			return b(Blocks.POLISHED_DEEPSLATE);
+		if ((y - 2) % 3 == 2) {
+			return b(st.band);
 		}
-		if (course % 4 == 0) {
-			return f > 0.6 ? b(Blocks.CHISELED_QUARTZ_BLOCK) : b(Blocks.CHISELED_STONE_BRICKS); // a band
-		}
-		if (f > 0.66) {
-			return b(Blocks.CALCITE);
-		}
-		int hsh = p.hash(u, y, v, 6);
-		Block body = hsh == 0 ? Blocks.MOSSY_STONE_BRICKS : hsh == 1 ? Blocks.CRACKED_STONE_BRICKS : Blocks.STONE_BRICKS;
-		return b(body);
+		return b(st.body);
 	}
 }
