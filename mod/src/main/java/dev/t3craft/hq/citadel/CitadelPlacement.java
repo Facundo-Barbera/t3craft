@@ -2058,7 +2058,7 @@ public final class CitadelPlacement {
 		int first = hash(seed, 0, 0, 2) == 0 ? 1 : -1;
 		int offFrom = (int) Math.ceil(AVENUE_EDGE());
 		int offTo = (int) Math.floor(CitadelCanvas.dims().avenueHalf);
-		for (int i = 0; i <= 2 * LAMP_STEP(); i++) {
+		for (int i = 0; i <= 3 * LAMP_STEP(); i++) {
 			int t = t0 + step * i;
 			for (int s = 0; s < 2; s++) {
 				for (int off = offFrom; off <= offTo; off++) {
@@ -2076,7 +2076,7 @@ public final class CitadelPlacement {
 					for (int a = -half; a <= half && ok; a++) {
 						for (int j = 0; j < SIGN_D && ok; j++) {
 							BlockPos q = post.relative(across, a).relative(face, j);
-							ok = airColumn(city, q.getX(), q.getZ(), h);
+							ok = airColumn(city, q.getX(), q.getZ(), a == 0 ? 1 : 2, h);
 							x0 = Math.min(x0, q.getX());
 							z0 = Math.min(z0, q.getZ());
 							x1 = Math.max(x1, q.getX());
@@ -2095,13 +2095,16 @@ public final class CitadelPlacement {
 		return false;
 	}
 
-	/** A column with nothing in it from the ground up to {@code top} and outside the node rooms (a sign's arm may hang over it). */
-	private static boolean airColumn(City city, int x, int z, int top) {
+	/**
+	 * A column with nothing in it from {@code from} up to {@code top} and outside the node rooms. A sign's arms hang over such
+	 * a column from {@code from = 2}, so the plants of the lot beside the road do not count.
+	 */
+	private static boolean airColumn(City city, int x, int z, int from, int top) {
 		CitadelCanvas c = city.c;
 		if (c.zoneAt(x, z).kind() == Kind.NODE || city.anchorCols.contains(col(x, z))) {
 			return false;
 		}
-		for (int y = 1; y <= top; y++) {
+		for (int y = from; y <= top; y++) {
 			if (!clear(c.at(x, y, z))) {
 				return false;
 			}
@@ -2110,12 +2113,12 @@ public final class CitadelPlacement {
 	}
 
 	/**
-	 * A notice board in an empty lot's plaza (struct/signposts, scale 1.5 and up), on two plazas in three: in the walk ring
+	 * A notice board in every empty lot's plaza that has room (struct/signposts, scale 1.5 and up): in the walk ring
 	 * beside the plaza's outer edge, on the quarter of a side (clear of the lanes that cross the middle, of the corner lamps
 	 * and of the benches on the diagonals), facing the plaza's middle. One at most per plaza.
 	 */
 	private static void noticeBoard(City city, int cx, int cz, int side, long seed) {
-		if (!dense() || hash(seed, cx, cz, 3) == 0 || !fitsAny(Family.SIGNPOST, SIGN_W(), SIGN_D, SIGN_H())) {
+		if (!dense() || !fitsAny(Family.SIGNPOST, SIGN_W(), SIGN_D, SIGN_H())) {
 			return;
 		}
 		CitadelCanvas c = city.c;
@@ -2141,7 +2144,7 @@ public final class CitadelPlacement {
 							BlockPos q0 = new BlockPos(cx, 0, cz).relative(wall, half - j).relative(along, a + i);
 							long k = col(q0.getX(), q0.getZ());
 							ok = city.paved.contains(k) && !city.taken.contains(k) && !clear(c.at(q0.getX(), 0, q0.getZ()))
-									&& airColumn(city, q0.getX(), q0.getZ(), h);
+									&& airColumn(city, q0.getX(), q0.getZ(), 1, h);
 							x0 = Math.min(x0, q0.getX());
 							z0 = Math.min(z0, q0.getZ());
 							x1 = Math.max(x1, q0.getX());
