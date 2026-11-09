@@ -291,7 +291,7 @@ public final class TreeAzaleaBlossom implements Variant {
 		for (int[] tp : tips) {
 			int[][] around = {{0, 1, 0}, {1, 0, 0}, {-1, 0, 0}, {0, 0, 1}, {0, 0, -1}, {1, 1, 0}, {-1, 1, 0}, {0, 1, 1}, {0, 1, -1}};
 			for (int[] o : around) {
-				if (tp[1] + o[1] >= CLEAR && t.hash(tp[0] + o[0], tp[1] + o[1], tp[2] + o[2], 3) != 0) {
+				if (tp[1] + o[1] >= CLEAR) {
 					t.leaf(tp[0] + o[0], tp[1] + o[1], tp[2] + o[2], t.hash(tp[0], tp[1] + o[1], tp[2] + o[2], 2) == 0 ? GREEN : BLOOM);
 				}
 			}
