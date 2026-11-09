@@ -83,17 +83,19 @@ public final class TreeAzaleaBlossom implements Variant {
 		int d = p.d();
 		double cu0 = (w - 1) / 2.0;
 		double cv0 = (d - 1) / 2.0;
-		double ru = TreeKit.clamp(w / 2.0 - 0.7, 2.0, 8.5);
-		double rv = TreeKit.clamp(d / 2.0 - 0.7, 2.0, 8.5);
+		double ru = TreeKit.clamp(w / 2.0 - 0.55, 2.0, 8.5);
+		double rv = TreeKit.clamp(d / 2.0 - 0.55, 2.0, 8.5);
 		double rc = Math.min(ru, rv);
 		boolean big = rc >= 4.5;
 		int avail = p.h() - CLEAR;
 
 		// ---- the balls of the crown: {cu, cy, cv, rx, ry, rz}
-		double ryM = Math.max(1.3, Math.min(rc * (0.62 + 0.18 * r.nextDouble()), (avail - 0.4) / 1.92));
+		boolean small = rc < 3.5; // a 5–6 wide plot: the crown nearly fills it
+		double ryM = Math.max(1.3, Math.min(rc * (small ? 0.95 + 0.1 * r.nextDouble() : 0.62 + 0.18 * r.nextDouble()),
+				(avail - 0.4) / 1.92));
 		double cyM = CLEAR + ryM * 0.92;
-		double rxM = ru * (0.74 + 0.08 * r.nextDouble());
-		double rzM = rv * (0.74 + 0.08 * r.nextDouble());
+		double rxM = ru * (small ? 0.95 : 0.74 + 0.08 * r.nextDouble());
+		double rzM = rv * (small ? 0.95 : 0.74 + 0.08 * r.nextDouble());
 		double slack = Math.max(0, Math.min(w / 2.0 - 0.5 - rxM, d / 2.0 - 0.5 - rzM));
 		double la = r.nextDouble() * Math.PI * 2;
 		double lamp = Math.min(slack, 0.3 + 0.7 * r.nextDouble());
@@ -223,7 +225,7 @@ public final class TreeAzaleaBlossom implements Variant {
 		double sx = Math.cos(sa);
 		double sz = Math.sin(sa);
 		double fb = 0.48 + 0.2 * r.nextDouble();
-		int nHoles = rc < 3.5 ? 1 : 2 + Math.min(4, (int) (rc / 2.0));
+		int nHoles = rc < 2.6 ? 0 : rc < 3.5 ? 1 : 2 + Math.min(4, (int) (rc / 2.0));
 		double[][] holes = new double[nHoles][4];
 		for (int i = 0; i < nHoles; i++) {
 			double ang = r.nextDouble() * Math.PI * 2;
