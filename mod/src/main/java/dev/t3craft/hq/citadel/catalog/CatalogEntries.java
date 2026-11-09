@@ -56,6 +56,9 @@ final class CatalogEntries {
 			new dev.t3craft.hq.citadel.catalog.tree.TreeAzaleaBlossom(), // tree_azalea_blossom
 			new dev.t3craft.hq.citadel.catalog.tree.TreeCloudPinePot(), // tree_cloud_pine_pot
 			new dev.t3craft.hq.citadel.catalog.tree.TreeWillowPond(), // tree_willow_pond
+			new dev.t3craft.hq.citadel.catalog.lamp.LampStreetAvenueDouble(), // lamp_street_avenue_double
+			new dev.t3craft.hq.citadel.catalog.lamp.LampStreetBrazierTripod(), // lamp_street_brazier_tripod
+			new dev.t3craft.hq.citadel.catalog.lamp.LampStreetToro(), // lamp_street_toro
 	};
 
 	static final List<Variant> ALL = List.of(ENTRIES);
