@@ -81,17 +81,6 @@ Tiene las mismas etiquetas, prioridades y colores que el pill de T3. El punto la
 Connecting. Completed y Failed se muestran hasta que el hilo vuelve a correr, porque el shell no
 trae el watermark de lectura.
 
-### `ThreadActionsBar` (widget)
-```java
-ThreadActionsBar bar = new ThreadActionsBar(font, line -> status = line);
-bar.buttons().forEach(this::addRenderableWidget);  // una vez
-bar.setBounds(x, y, w, h); bar.setThread(env, shell); bar.render(g); bar.setVisible(v);
-```
-Muestra el chip de estado más los botones Interrupt (solo si hay un run activo), Stop, Settle y
-Archive. Todas son destructivas, así que piden confirmación en el juego, y sin operate se ven
-deshabilitadas con el tooltip "Requires control (operate)". Reutiliza `ThreadControlUi` y
-`ThreadOpsUi`.
-
 ### `NewThreadDialog` (Screen)
 ```java
 NewThreadDialog.open(env, projectId);                                  // el hilo creado queda seleccionado en el chat

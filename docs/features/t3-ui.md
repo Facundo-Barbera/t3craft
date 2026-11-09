@@ -78,7 +78,7 @@ Both branches were merged into this one (`origin/feat/chat-compose` 627e8e0, `or
 | Sidebar "New thread", Ctrl+N, ⋯ | feat/t3-actions `NewThreadDialog` | environment from the selected thread, project from the sidebar filter (or the selected thread's project) mapped to a real T3 project by `ProjectMatch` (same name, selected environment first); the created thread is selected in the screen. |
 | ⋯ menu | feat/t3-actions `RegisterProjectDialog`, `ActionsClient.archive` | "Register project…", "Archive thread" (destructive, asks first). |
 
-feat/t3-actions' `ThreadActionsBar` is not used: the header keeps `T3HeaderActions` (Interrupt, Stop,
+feat/t3-actions' `ThreadActionsBar` was not used (and was removed in cleanup #3): the header keeps `T3HeaderActions` (Interrupt, Stop,
 Settle, Snooze, Pin, Unpin, Read) and Archive lives in the menu.
 
 ## Keys
