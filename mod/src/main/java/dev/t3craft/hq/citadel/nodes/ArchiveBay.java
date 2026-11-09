@@ -152,6 +152,61 @@ public final class ArchiveBay {
 		}
 	}
 
+	/**
+	 * The terminal's bay of the grand cloister ({@link CloisterRoom#grand}), in the real offsets of its design: the terminal at
+	 * {@code (5, 1, -11)} facing south in a niche of 5 (x 3..7) cut in the north shelf line (rows -11 and -12), the pilasters
+	 * of the wall at x = 3 and 7 as its posts, a beam over it; the terminal between two desk wings (a lectern with a book on
+	 * the west one, a lantern on the east one) with a calcite backdrop behind it, a plaque over it and a lantern hung from the
+	 * beam. In front of it, a dais (estrado) of half-height slabs, 5 wide and 3 deep (x 3..7, z -10..-8): a dark frame, a
+	 * cherry field, and a pale cell where the player stands (the ARCHIVE anchor, {@code (5, 1, -10)}). It is walked on and off
+	 * like any half step; the aisle keeps its three rows.
+	 */
+	public static void buildGrand(CitadelCanvas c, Node nd) {
+		int cx = nd.cx();
+		int cz = nd.cz();
+		int tdx = CloisterRoom.TERMINAL_X;
+		int front = CloisterRoom.TERMINAL_Z;
+		BlockState topSlab = NodeDecor.topSlab(Blocks.CHERRY_SLAB);
+		for (int dx = tdx - 2; dx <= tdx + 2; dx++) {
+			int off = dx - tdx;
+			for (int dz = front - 1; dz <= front; dz++) {
+				boolean frontRow = dz == front;
+				for (int y = 1; y <= 3; y++) {
+					BlockState st;
+					if (Math.abs(off) == 2) {
+						st = CloisterRoom.STRIP;
+					} else if (off == 0) {
+						st = frontRow ? null : CALCITE;
+					} else if (frontRow) {
+						st = y == 1 ? topSlab : y == 2 ? wingTop(off < 0) : archStairs(off);
+					} else {
+						st = bookcase(y);
+					}
+					if (st != null) {
+						c.set(cx + dx, y, cz + dz, st);
+					}
+				}
+				c.set(cx + dx, 4, cz + dz, c.kit.beam(Direction.Axis.X));
+			}
+		}
+		int x = cx + tdx;
+		int z = cz + front;
+		c.put(x, 2, z, c.kit.plaque(Direction.SOUTH), DECOR);
+		c.data.put(BlockPos.asLong(x, 2, z), c.kit.plaqueData(DyeColor.ORANGE, "", "Archivo", "hilos cerrados", ""));
+		c.fixtures.add(BlockPos.asLong(x, 2, z));
+		c.put(x, 3, z, LANTERN_HUNG, HANGING);
+		// the dais
+		BlockState frame = CitadelCanvas.slab(Blocks.POLISHED_BLACKSTONE_BRICK_SLAB);
+		BlockState field = CitadelCanvas.slab(Blocks.CHERRY_SLAB);
+		BlockState stand = CitadelCanvas.slab(Blocks.CALCITE_SLAB);
+		for (int dx = tdx - 2; dx <= tdx + 2; dx++) {
+			for (int dz = front + 1; dz <= front + 3; dz++) {
+				boolean edge = Math.abs(dx - tdx) == 2 || dz == front + 3;
+				c.set(cx + dx, 1, cz + dz, dx == tdx && dz == front + 1 ? stand : edge ? frame : field);
+			}
+		}
+	}
+
 	/** What stands on a desk wing (cell y = 2): a lectern with a book on the west one, a standing lantern on the east one. */
 	private static BlockState wingTop(boolean west) {
 		return west ? NodeDecor.facing(Blocks.LECTERN, Direction.SOUTH).setValue(BlockStateProperties.HAS_BOOK, true)
