@@ -384,6 +384,9 @@ public final class TreeAzaleaBlossom implements Variant {
 			t.wood(su, 0, sv, b(Blocks.MANGROVE_ROOTS));
 			TreeKit.branch(t, WOOD, new int[] {su, 1, sv}, new int[] {su, CLEAR - 1, sv}, false);
 			TreeKit.branch(t, WOOD, new int[] {su, CLEAR - 1, sv}, new int[] {tu, CLEAR + 1, tv}, false);
+			for (int y = 1; y <= CLEAR - 2; y++) {
+				t.wood(su, y, sv, b(Blocks.MANGROVE_ROOTS)); // the lower stem is a prop root
+			}
 			x.tips.add(new int[] {tu, CLEAR + 1, tv});
 			for (int[] f : X.FACES) {
 				int ou = su + f[0];
@@ -492,14 +495,14 @@ public final class TreeAzaleaBlossom implements Variant {
 		for (int[] s : shell) {
 			double sun = ((s[0] - x.cuM) * x.sx + (s[2] - x.cvM) * x.sz) / x.rc;
 			double top = (s[1] - x.cyM) / x.ryM;
-			double pf = TreeKit.clamp(x.fb - 0.12 + 1.1 * sun + 0.5 * top, 0.03, 0.97);
+			double pf = TreeKit.clamp(x.fb + 0.02 + 1.1 * sun + 0.5 * top, 0.05, 0.98);
 			double big4 = t.hash(Math.floorDiv(s[0] + 2, 4) + 21, Math.floorDiv(s[1], 3), Math.floorDiv(s[2] + 1, 4) - 8, 100) / 100.0;
 			double c2 = t.hash(Math.floorDiv(s[0], 2) + 7, Math.floorDiv(s[1], 2), Math.floorDiv(s[2], 2) - 3, 100) / 100.0;
 			double noise = t.hash(s[0] + 5, s[1] + 9, s[2] + 13, 100) < 22 ? c2 : big4;
 			boolean flower = noise < pf;
 			t.clear(s[0], s[1], s[2]);
 			boolean freeTop = s[1] + 1 < x.p.h() && t.empty(s[0], s[1] + 1, s[2]);
-			if (flower && freeTop && t.hash(s[0] + 1, s[1] + 4, s[2] + 2, 100) < 62) {
+			if (flower && freeTop && t.hash(s[0] + 1, s[1] + 4, s[2] + 2, 100) < 74) {
 				t.fixed(s[0], s[1], s[2], b(Blocks.MOSS_BLOCK));
 				boolean bush = t.hash(s[0], s[1] + 8, s[2], 3) != 0 && (s[1] + 2 >= x.p.h() || t.empty(s[0], s[1] + 2, s[2]));
 				t.cover(s[0], s[1] + 1, s[2], bush ? b(Blocks.FLOWERING_AZALEA)
@@ -646,7 +649,7 @@ public final class TreeAzaleaBlossom implements Variant {
 		if (u >= fx0 - 2 && u <= fx1 + 2 && v >= fz0 - 2 && v <= fz1 + 2) {
 			return false;
 		}
-		if (t.kind(u, CLEAR, v) == TreeKit.FIXED || t.kind(u, CLEAR - 1, v) != TreeKit.EMPTY) {
+		if (t.kind(u, CLEAR, v) == TreeKit.FIXED || t.kind(u, CLEAR, v) == TreeKit.WOOD || t.kind(u, CLEAR - 1, v) != TreeKit.EMPTY) {
 			return false; // a knot of rooted dirt overhead
 		}
 		for (int[] o : taken) {
