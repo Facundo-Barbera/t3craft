@@ -138,6 +138,10 @@ class Canvas:
                     + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b""))
 
 
+def shade(rgb, f):
+    return (int(((rgb >> 16) & 255) * f) << 16) | (int(((rgb >> 8) & 255) * f) << 8) | int((rgb & 255) * f)
+
+
 def on_color(rgb):
     r, g, b = ((rgb >> 16) & 255) / 255, ((rgb >> 8) & 255) / 255, (rgb & 255) / 255
     return INK if 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.45 else CREAM
@@ -203,13 +207,14 @@ def draw(out, wblocks, hblocks, ncards, k=4):
         x0 = EDGE + i * (lane_w + GAP)
         x1 = x0 + lane_w
         c.rect(x0, EDGE, x1, H - EDGE, LANE)
-        c.rect(x0, EDGE, x1, EDGE + head_h, color)
+        c.rect(x0, EDGE, x1, EDGE + head_h, shade(color, 0.55))
+        c.rect(x0, EDGE + head_h - 3, x1, EDGE + head_h, color)
         count = str(len(cards))
         pw = max(head_h - 6, text_w(count) * hs + 8)
         c.rect(x1 - 3 - pw, EDGE + 3, x1 - 3, EDGE + head_h - 3, PILL)
         ty = EDGE + (head_h - 8 * hs) / 2 + 0.5
         label_room = (lane_w - 2 * CARD_PAD - pw - 4) / hs
-        c.text(clip(label, label_room), x0 + CARD_PAD, ty, hs, on_color(color))
+        c.text(clip(label, label_room), x0 + CARD_PAD, ty, hs, CREAM)
         c.text(count, x1 - 3 - pw + (pw - text_w(count) * hs) / 2, ty, hs, CREAM)
         title_room = (card_w - STRIPE - 2 * CARD_PAD) / ts
         wrapped = [wrap(cd[0], title_room) for cd in cards]

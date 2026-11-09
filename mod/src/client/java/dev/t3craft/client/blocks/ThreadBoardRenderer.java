@@ -41,7 +41,7 @@ import org.jspecify.annotations.Nullable;
  * that fly (lifted, with a shadow) to their new column and glow where they land.
  *
  * <p>Look (kit/thread-board): a dark backing in a brass-keylined frame; four dark lanes, each with a
- * header in its state colour (label at 1.75x, count in a pill) and loose charcoal cards (cream text) inset from the lane
+ * header in its state colour toned down, with a full-colour edge (label at 1.75x, count in a pill) and loose charcoal cards (cream text) inset from the lane
  * with a gap between them: state stripe, title (up to two lines, 1.25x), then badge, project and the thread's age at 1x.
  * Headers and titles are scaled so they read from 6-10 blocks ({@link WallLayout.Metrics}).
  *
@@ -243,7 +243,9 @@ public final class ThreadBoardRenderer implements BlockEntityRenderer<ThreadBoar
 			for (WallLayout.Lane lane : l.lanes()) {
 				float x0 = lane.x(), x1 = lane.x() + lane.w();
 				ScreenDraw.rect(pose, vc, x0, WallLayout.EDGE, x1, h - WallLayout.EDGE, -3 * z, LANE, light);
-				ScreenDraw.rect(pose, vc, x0, WallLayout.EDGE, x1, WallLayout.EDGE + mt.headerH(), -4 * z, 0xFF000000 | lane.color(), light);
+				// the header band is the state colour toned down; its bottom edge is the full colour (the lamps' and stripes' colour)
+				ScreenDraw.rect(pose, vc, x0, WallLayout.EDGE, x1, WallLayout.EDGE + mt.headerH(), -4 * z, ScreenDraw.shade(lane.color(), 0.55f), light);
+				ScreenDraw.rect(pose, vc, x0, WallLayout.EDGE + mt.headerH() - 3, x1, WallLayout.EDGE + mt.headerH(), -5 * z, 0xFF000000 | lane.color(), light);
 				float pw = pill(s.glyphs, lane, mt);
 				ScreenDraw.rect(pose, vc, x1 - 3 - pw, WallLayout.EDGE + 3, x1 - 3, WallLayout.EDGE + mt.headerH() - 3, -5 * z, PILL, light);
 			}
@@ -264,8 +266,7 @@ public final class ThreadBoardRenderer implements BlockEntityRenderer<ThreadBoar
 			for (int i = 0; i < l.lanes().size(); i++) {
 				WallLayout.Lane lane = l.lanes().get(i);
 				float ty = WallLayout.EDGE + (mt.headerH() - 8 * hs) / 2f + 0.5f;
-				int fg = onColor(lane.color());
-				text(t, ps, g.lanes().get(i), lane.x() + WallLayout.CARD_PAD, ty, hs, fg, light);
+				text(t, ps, g.lanes().get(i), lane.x() + WallLayout.CARD_PAD, ty, hs, CREAM, light);
 				float pw = pill(g, lane, mt);
 				float cx = lane.x() + lane.w() - 3 - pw + (pw - g.countW()[i] * hs) / 2f;
 				text(t, ps, g.counts().get(i), cx, ty, hs, CREAM, light);
@@ -350,14 +351,6 @@ public final class ThreadBoardRenderer implements BlockEntityRenderer<ThreadBoar
 	private static float pill(@Nullable Glyphs g, WallLayout.Lane lane, WallLayout.Metrics mt) {
 		float digits = g != null && lane.column() < g.countW().length ? g.countW()[lane.column()] : 6f * lane.count().length();
 		return Math.max(mt.headerH() - 6, digits * mt.headScale() + 8);
-	}
-
-	/** Ink on light header colours, cream on dark ones. */
-	static int onColor(int rgb) {
-		double r = ((rgb >> 16) & 0xFF) / 255.0;
-		double g = ((rgb >> 8) & 0xFF) / 255.0;
-		double bl = (rgb & 0xFF) / 255.0;
-		return 0.2126 * r + 0.7152 * g + 0.0722 * bl > 0.45 ? INK : CREAM;
 	}
 
 	/**

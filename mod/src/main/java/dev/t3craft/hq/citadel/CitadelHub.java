@@ -200,9 +200,9 @@ public final class CitadelHub {
 	 * outer wall. All in the wall's own plane except the cornice, which steps one cell out over the heads:
 	 * <ul>
 	 * <li>a sill of dark oak planks under the board (it replaces the old beam base);</li>
-	 * <li>a post of stripped dark oak (vertical log) at each end, from the sill to the lintel, one cell outside the board;</li>
+	 * <li>a post of stripped dark oak (vertical log, on a polished blackstone foot) at each end, from the sill to the lintel, one cell outside the board;</li>
 	 * <li>a lintel of stripped dark oak along the top;</li>
-	 * <li>a cornice: upside-down dark oak stairs one cell in front of the lintel, with the back on the wall, and three lit copper bulbs set in it (the board's warning lights, lit faces to the aisle).</li>
+	 * <li>a cornice: upside-down dark oak stairs one cell in front of the lintel, with the back on the wall, notched at the three lit copper bulbs set flush in the lintel (the board's warning lights, lit faces to the aisle);</li>
 	 * </ul>
 	 * Nothing is lower than the sill, nor sticks out below head height: the aisle stays clear ({@code x = -hubX + 1} and up are free).
 	 */
@@ -219,14 +219,17 @@ public final class CitadelHub {
 			BlockPos base = wall.origin().relative(along, i);
 			c.set(base.atY(below), planks);
 			if (i < 0 || i == wall.width()) {
-				for (int y = below + 1; y < top; y++) {
+				c.set(base.atY(below + 1), CitadelCanvas.RIB); // polished blackstone foot: the post's steel-dark base
+				for (int y = below + 2; y < top; y++) {
 					c.set(base.atY(y), darkLog(Direction.Axis.Y));
 				}
 			}
 			boolean bulb = i == 1 || i == wall.width() / 2 || i == wall.width() - 2;
-			c.set(base.atY(top), darkLog(along.getAxis()));
-			// the bulbs sit in the cornice row, in front of the lintel, so their lit faces show to the aisle
-			c.set(base.atY(top).relative(out), bulb ? lamp : cornice);
+			// the bulbs sit flush in the lintel, in a notch of the cornice, so their lit face shows to the aisle
+			c.set(base.atY(top), bulb ? lamp : darkLog(along.getAxis()));
+			if (!bulb) {
+				c.set(base.atY(top).relative(out), cornice);
+			}
 		}
 	}
 
