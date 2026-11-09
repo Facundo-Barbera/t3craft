@@ -2,12 +2,14 @@
 
 These rules come from Facundo and override any other instruction, brief or habit.
 
-## CURRENT MORATORIUM (Facundo, 2026-11-09): run nothing
+## Execution on the VPS (Facundo, 2026-11-09; replaces the earlier run-nothing moratorium)
 
-Until Facundo lifts it: **no gradle, compiling, renders, java, heavy scripts or tests, anywhere** (coordinator,
-child threads, delegated tasks, subagents). Allowed: writing code, commits (no AI credit), planning, documentation.
-Any task that needs something run is left **pending execution** in `docs/pending-execution.md` and reported to
-Facundo; it is never launched.
+- **Only the coordinator compiles on the VPS,** one gradle at a time, always through `tools/heavy.sh`. No tests.
+- **Child threads, delegated tasks and subagents only write code and commit:** no gradle, java, compiling or tests. They
+  run at most a few at a time, and none are started while the load is above 6.
+- **Renders run only on Facundo's PC,** through the relay (rule 8). Never renders, a render daemon or Citadel Studio on
+  the VPS.
+- Work that still needs running is tracked in `docs/pending-execution.md`.
 
 ## VPS: heavy processes (incident 2026-11-09, see `docs/incidents/2026-11-09-vps-saturation.md`)
 
