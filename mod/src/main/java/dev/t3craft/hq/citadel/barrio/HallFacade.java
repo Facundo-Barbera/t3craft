@@ -94,7 +94,8 @@ public final class HallFacade {
 		if (s == HallStyle.TIMBER && ly == (fh() + 1) / 2) {
 			return beamLike(c, m.post(), along);
 		}
-		return s == HallStyle.BALCONY ? b(Blocks.STAINED_GLASS_PANE.pick(env)) : PANE;
+		// the project's colour is an accent: tinted glass in one bay of three, clear glass between
+		return s == HallStyle.BALCONY && Math.floorMod(t / 3, 3) == 0 ? b(Blocks.STAINED_GLASS_PANE.pick(env)) : PANE;
 	}
 
 	/** The dark footing course: deepslate bricks with a cracked one now and then; stone bricks (a little moss) on stone halls. */
@@ -339,7 +340,7 @@ public final class HallFacade {
 		int H = fh();
 		int hw = 3;
 		boolean deck = s == HallStyle.BALCONY && F == 2;
-		int beamY = deck ? H - 1 : H - 3;
+		int beamY = deck ? H - 1 : H - 2;
 		boolean deep = true;
 		for (int dv = -hw; dv <= hw && deep; dv++) {
 			for (int y = 1; y <= beamY + 2; y++) {

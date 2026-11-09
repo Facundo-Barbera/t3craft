@@ -43,7 +43,7 @@ public final class HallInterior {
 		for (int f = 0; f < F; f++) {
 			int y = f * fh() + 1;
 			floor(c, r, f, s);
-			deskRugs(c, r, f, env);
+			deskRugs(c, r, f, s, env);
 			rug(c, r, F, f, s, env);
 			furniture(c, r, F, f, y, s, env, seed, desks);
 			commonTable(c, r, F, y, s, env, desks);
@@ -180,14 +180,27 @@ public final class HallInterior {
 	 * colour, from the desk's wall out into the hall. Together with the aisle runner they split the big room into
 	 * team areas. Only floor cells are redrawn (never a stair, never the stair hole, never the walls).
 	 */
-	private static void deskRugs(CitadelCanvas c, Room r, int f, DyeColor env) {
+	private static void deskRugs(CitadelCanvas c, Room r, int f, HallStyle s, DyeColor env) {
 		int W = r.w();
 		int D = r.d();
 		if (W < 15) {
 			return;
 		}
 		int yf = f * fh();
-		DyeColor edge = env == DyeColor.GRAY ? DyeColor.BLACK : DyeColor.GRAY;
+		// a rug must read against its floor: dark floors (wood) get a pale border, stone a black one, quartz a grey one;
+		// a dark or fully saturated project colour is softened for the field of the rug
+		DyeColor edge = switch (s) {
+			case TIMBER, SHUTTERED -> DyeColor.LIGHT_GRAY;
+			case STONE -> DyeColor.BLACK;
+			case BALCONY -> DyeColor.GRAY;
+		};
+		DyeColor field = switch (env) {
+			case BLACK, GRAY, BROWN -> DyeColor.CYAN;
+			case MAGENTA -> DyeColor.PINK;
+			case LIGHT_GRAY, WHITE -> DyeColor.LIGHT_BLUE;
+			default -> env;
+		};
+		env = field;
 		int depth = 5;
 		int half = 2;
 		for (int slot = 0; slot < 6; slot++) {
@@ -239,10 +252,9 @@ public final class HallInterior {
 		}
 		int mid = r.c();
 		int half = 2;
-		int uc = Math.max(r.d() / 2, F == 2 ? fh() + 4 : 0);
-		if (uc + half + 1 > r.d() - 5) {
-			uc = r.d() - 6 - half;
-		}
+		// at the end of the aisle, in front of the back desks' lectern, so the middle of the hall stays an open plaza and the
+		// aisle is never cut: the way to every desk runs round the table's two sides
+		int uc = Math.max(r.d() - 7, F == 2 ? fh() + 4 : 0);
 		BlockState top = s.stairCore();
 		for (int u = uc - half; u <= uc + half; u++) {
 			for (int dv = -1; dv <= 1; dv++) {
@@ -337,7 +349,8 @@ public final class HallInterior {
 	private static void kanban(CitadelCanvas c, Room r, int y, DyeColor env, int h, Set<Long> desks, int n) {
 		DyeColor[] cards = {DyeColor.RED, DyeColor.ORANGE, DyeColor.YELLOW, DyeColor.LIME, DyeColor.GREEN};
 		int rows = Math.max(3, fh() - 3);
-		int stages = n - 2;
+		// stages sit on every other column, with a dark column between them: cards never touch sideways
+		int stages = (n - 1) / 2;
 		for (int k = 0; k < n; k++) {
 			int v = r.c() - 2 - k;
 			BlockPos base = r.cell(0, v, y);
@@ -350,15 +363,19 @@ public final class HallInterior {
 				}
 				continue;
 			}
-			int idx = stages - k;
+			boolean stageCol = k % 2 == 1;
+			int idx = stages - 1 - (k - 1) / 2;
 			DyeColor stage = cards[stages <= 1 ? 0 : idx * (cards.length - 1) / (stages - 1)];
-			c.set(base, chest(r.back()));
+			c.set(base, stageCol ? chest(r.back()) : b(Blocks.DARK_OAK_PLANKS));
+			boolean prev = false;
 			for (int row = 1; row <= rows - 1; row++) {
-				boolean card = HallStyle.hash(h, v, row) % 100 < 56;
-				boolean blank = card && HallStyle.hash(v, row, h) % 6 == 0;
+				// a card needs a dark cell above and below it: no two cards stack
+				boolean card = stageCol && !prev && HallStyle.hash(h, v, row) % 100 < 70;
+				boolean blank = card && HallStyle.hash(v, row, h) % 5 == 0;
 				c.set(base.above(row), card ? concrete(blank ? DyeColor.WHITE : stage) : b(Blocks.BLACKSTONE));
+				prev = card;
 			}
-			c.set(base.above(rows), terracotta(stage));
+			c.set(base.above(rows), stageCol ? terracotta(stage) : b(Blocks.BLACKSTONE));
 			c.set(base.above(rows + 1), k == n / 2 ? concrete(env) : b(Blocks.DARK_OAK_PLANKS));
 		}
 	}
