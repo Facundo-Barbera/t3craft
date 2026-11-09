@@ -8,6 +8,10 @@ al mundo HQ: abre un menú propio, que vuelve a la pantalla de origen con **Esc*
   o lo abre, y entra. Si vanilla cancela la carga, se vuelve a este menú.
 - **Tipo de layout del HQ**: la lista de `HqLayouts.all()` (de feat/hq-layouts), cada una con su nombre
   y una línea de descripción (`t3craft.hq.layout.<id>.name` / `.desc`).
+  - Orden de presentación (`HqLayouts.menuOrder()`, feat/ui-hq-menu-lineage): primero el diseño
+    principal (`HqLayouts.PRIMARY_ID` = `hybrid-ringcampus`, etiqueta PRINCIPAL), luego una fila de
+    encabezado "Legacy" y los demás en el orden del registro. Los ids, el layout por defecto y
+    `HqLayouts.all()` no cambian.
   - La elegida va con un marco blanco y "▶". La construida (`HqLayoutState.builtLayoutId`), con la
     etiqueta verde **CONSTRUIDO**. Las de `large = true` (campus), con **MUY GRANDE** y la descripción en
     naranja.

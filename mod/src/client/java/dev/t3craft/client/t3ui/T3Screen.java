@@ -823,8 +823,10 @@ public final class T3Screen extends Screen {
 			// T3's breadcrumb: project › title
 			String project = target.project() == null || target.project().isBlank() ? "" : target.project();
 			String title = target.title() == null || target.title().isBlank() ? target.threadId() : target.title();
-			// feat/thread-lineage: a parent lists its delegated children (state, click to open)
-			List<ThreadRow> kids = row == null ? List.of() : model.childrenOf(row.key());
+			// feat/thread-lineage: a parent lists its delegated children (state, click to open).
+			// feat/ui-hq-menu-lineage: the only place the lineage shows (not the sidebar), and only the
+			// live children: idle or active (working, waiting, needs input); no chip when there are none
+			List<ThreadRow> kids = row == null ? List.of() : model.liveChildrenOf(row.key());
 			if (!kids.isEmpty()) {
 				String label = kids.size() + (kids.size() == 1 ? " agent ▾" : " agents ▾");
 				int w = font.width(label) + 10;
