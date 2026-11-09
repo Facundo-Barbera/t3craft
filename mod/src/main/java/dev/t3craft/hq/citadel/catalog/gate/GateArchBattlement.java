@@ -246,9 +246,15 @@ public final class GateArchBattlement implements Variant {
 			}
 		}
 
-		// --- lanterns hang at the edges of the opening (the centre stays clear), mid depth
+		// --- lanterns, mid depth, never in the passage's 3-high clear profile: standing in the towers' inner
+		// niches when there are niches, else hanging at the edges of the opening only if they stay above y 2
 		int lv = d / 2;
-		p.put(c, a0, side - 1, lv, LANTERN.setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
-		p.put(c, a0 + ow - 1, side - 1, lv, LANTERN.setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
+		if (d >= 3 && pl >= 2) {
+			p.set(c, a0 - 1, 2, lv, LANTERN);
+			p.set(c, a0 + ow, 2, lv, LANTERN);
+		} else if (side - 1 >= 3) {
+			p.put(c, a0, side - 1, lv, LANTERN.setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
+			p.put(c, a0 + ow - 1, side - 1, lv, LANTERN.setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
+		}
 	}
 }

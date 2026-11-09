@@ -108,6 +108,8 @@ public final class HouseStoneWeathered implements Variant {
 		porch(c, p, wa, vm, w);
 		yard(c, p, wa, vm, w, d);
 		eaves(c, p, wa, vm, w, d);
+		// walkability audit: a way up to the sealed upper floor
+		dev.t3craft.hq.citadel.catalog.InteriorStair.stone(c, p, 1, 5);
 	}
 
 	/**
@@ -430,13 +432,15 @@ public final class HouseStoneWeathered implements Variant {
 			p.set(c, u, 4, vo, stairs(Blocks.CHERRY_STAIRS, Direction.SOUTH));
 			p.set(c, u, 4, vo + 1, slab(Blocks.CHERRY_SLAB));
 		}
-		p.put(c, ua + 1, 2, vo, StoneKit.lantern(true), CitadelCanvas.HANGING);
-		p.put(c, ub - 1, 2, vo, StoneKit.lantern(true), CitadelCanvas.HANGING);
+		// lanterns hung from the porch roof slab in the two back corners: under the front beam (y2) they hung at head
+		// height, and on a narrow plot ua + 1 is the door column
+		p.put(c, ua, 3, vm - 1, StoneKit.lantern(true), CitadelCanvas.HANGING);
+		p.put(c, ub, 3, vm - 1, StoneKit.lantern(true), CitadelCanvas.HANGING);
 		// step and planters
 		if (vo - 1 >= 0) {
 			p.set(c, cu, 0, vo - 1, stairs(Blocks.STONE_BRICK_STAIRS, Direction.SOUTH));
 		}
-		p.set(c, ua + 1, 1, vm - 1, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
+		p.set(c, ua, 1, vm - 1, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP)); // in the corner, not in front of the door
 	}
 
 	private static void yard(CitadelCanvas c, Plot p, int wa, int vm, int w, int d) {
@@ -450,9 +454,10 @@ public final class HouseStoneWeathered implements Variant {
 			p.set(c, u, 1, 1, p.hash(u, 1, 1, 3) == 0 ? leaves(Blocks.FLOWERING_AZALEA_LEAVES) : leaves(Blocks.AZALEA_LEAVES));
 		}
 		// a bench against the wing wall and flower beds
-		if (vm - 3 >= 3) {
-			p.set(c, wa + 1, 0, 3, stairs(Blocks.STONE_BRICK_STAIRS, Direction.WEST));
-			p.set(c, wa + 1, 0, 4, stairs(Blocks.STONE_BRICK_STAIRS, Direction.WEST));
+		int vo = vm - 2; // the porch's front row: the bench stays in front of it (it used to land under a porch post)
+		if (vo - 2 >= 2) {
+			p.set(c, wa + 1, 0, vo - 2, stairs(Blocks.STONE_BRICK_STAIRS, Direction.WEST));
+			p.set(c, wa + 1, 0, vo - 1, stairs(Blocks.STONE_BRICK_STAIRS, Direction.WEST));
 		}
 		for (int u = wa + 3; vm >= 6 && u <= w - 2; u++) {
 			if (Math.abs(u - cu) <= 1) {

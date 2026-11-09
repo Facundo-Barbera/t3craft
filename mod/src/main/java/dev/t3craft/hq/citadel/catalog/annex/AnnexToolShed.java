@@ -272,9 +272,9 @@ public final class AnnexToolShed implements Variant {
 		for (int u = 0; u < w; u++) {
 			p.set(c, u, WALL_TOP, 0, PLATE_X);
 		}
-		int lu = s.door() > s.u0() + 1 ? s.door() - 1 : s.door() + 1;
-		p.put(c, lu, WALL_TOP - 1, 0, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
+		// the lantern stands on the barrel by the door: hung from the beam (y 2) it was at head height over the deck
 		p.set(c, s.u1(), 0, s.vf() - 1, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
+		p.set(c, s.u1(), 1, s.vf() - 1, b(Blocks.LANTERN));
 		int su = s.u1() + 1;
 		int sv = s.vf() - 1;
 		if (!(su == w - 1 && sv == 0)) {

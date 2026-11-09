@@ -10,6 +10,7 @@ import net.minecraft.nbt.CompoundTag;
 import dev.t3craft.hq.RingCampusGeometry.Kind;
 import dev.t3craft.hq.RingCampusGeometry.Node;
 import dev.t3craft.hq.RingCampusGeometry.Zone;
+import dev.t3craft.hq.citadel.nodes.ArchiveBay;
 import dev.t3craft.hq.citadel.nodes.CloisterRoom;
 import dev.t3craft.hq.citadel.nodes.LoungeRoom;
 import dev.t3craft.hq.citadel.nodes.NodeDecor;
@@ -49,7 +50,7 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.GRASS;
  *     {@code ARCHIVE_TERMINAL} (face) on it and {@code ARCHIVE} (at) one block south of it, and a walk spot at
  *     {@code (cx - 4, 1, cz)}.</li>
  * <li><b>{@link #sunken} — lounge</b> ({@code Kind.LOUNGE_SUNKEN}) → {@link LoungeRoom}: a sunken amphitheatre
- *     of half steps down to {@code y = -3} with pools, a fire pavilion, sofas and trees. Fixtures
+ *     of half steps down to {@code y = -3} with flower beds, an open hearth, sofas and trees. Fixtures
  *     ({@link #loungeFixtures}): a walk spot at {@code (cx + 1, -2, cz)}; no screen.</li>
  * <li><b>{@link #pillar} — diagonal nodes</b> ({@code Kind.PILLAR}): a paved round whose monument is chosen by
  *     the index {@code k} of the node ({@link NodeDecor#pillarVariant}); built by {@link NodeDecor}.</li>
@@ -274,11 +275,16 @@ public final class CitadelNodes {
 		CloisterRoom.cell(c, x, z, dx, dz);
 	}
 
-	/** The fixtures of the cloister: the archive terminal and its anchors, and a walk spot. */
+	/**
+	 * The fixtures of the cloister: the archive terminal, its anchors and a walk spot. The consultation bay round the
+	 * terminal (niche, plaque, lantern, rug) is painted here, in real offsets after the magnification
+	 * ({@link ArchiveBay}).
+	 */
 	public static void cloisterFixtures(CitadelCanvas c, Node nd) {
 		int cx = nd.cx();
 		int cz = nd.cz();
-		BlockPos t = new BlockPos(cx + real(3, c.k), 1, cz + realInner(-6, c.k));
+		ArchiveBay.build(c, nd);
+		BlockPos t = new BlockPos(cx + ArchiveBay.terminalX(c.k), 1, cz + ArchiveBay.terminalZ(c.k));
 		c.fixture(t, c.style.archiveTerminal(Direction.SOUTH));
 		c.anchor(Anchor.face(AnchorNames.ARCHIVE_TERMINAL, t, Direction.SOUTH));
 		c.anchor(Anchor.at(AnchorNames.ARCHIVE, t.south(), Direction.NORTH));

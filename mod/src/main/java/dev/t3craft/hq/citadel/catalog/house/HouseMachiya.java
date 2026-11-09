@@ -119,6 +119,8 @@ public final class HouseMachiya implements Variant {
 		street(c, p, s, g);
 		frontPosts(c, p, s, g);
 		courtyard(c, p, r, g);
+		// walkability audit: a way up to the sealed upper floor
+		dev.t3craft.hq.citadel.catalog.InteriorStair.timber(c, p, 1, 5);
 	}
 
 	/**
@@ -535,7 +537,8 @@ public final class HouseMachiya implements Variant {
 		JapaneseKit.sakura(c, p, ut, 1, g.d() - 3, 0);
 		JapaneseKit.stoneLantern(c, p, ul, 1, g.d() - 2);
 		// a pair of moss tufts and a pot by the back door
-		p.set(c, g.cu() + 1, 1, g.vb() + 1, b(Blocks.POTTED_FERN));
-		p.set(c, g.cu() - 1, 1, g.vb() + 1, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
+		// on the ground beside the back step (the courtyard paving starts further back, so at y1 they floated)
+		p.set(c, g.cu() + 1, 0, g.vb() + 1, b(Blocks.POTTED_FERN));
+		p.set(c, g.cu() - 1, 0, g.vb() + 1, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
 	}
 }

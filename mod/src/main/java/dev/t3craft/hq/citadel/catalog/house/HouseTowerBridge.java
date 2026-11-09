@@ -10,7 +10,6 @@ import static dev.t3craft.hq.citadel.catalog.house.HouseTowerKit.put;
 import static dev.t3craft.hq.citadel.catalog.house.HouseTowerKit.set;
 import static dev.t3craft.hq.citadel.catalog.house.HouseTowerKit.slab;
 import static dev.t3craft.hq.citadel.catalog.house.HouseTowerKit.stair;
-import static dev.t3craft.hq.citadel.catalog.house.HouseTowerKit.trapdoor;
 
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.catalog.Family;
@@ -103,6 +102,9 @@ public final class HouseTowerBridge implements Variant {
 		gallery(c, l);
 		arch(c, l);
 		yard(c, l);
+		// walkability audit: a way up to the sealed upper floor
+		dev.t3craft.hq.citadel.catalog.InteriorStair.stone(c, p, 1, 5);
+		dev.t3craft.hq.citadel.catalog.InteriorStair.stone(c, p, 5, 9);
 	}
 
 	// ------------------------------------------------------------------ materials
@@ -200,8 +202,9 @@ public final class HouseTowerBridge implements Variant {
 				}
 			}
 			put(c, p, cu, y0 + 2, l.cz, hangingLantern(), CitadelCanvas.HANGING);
-			for (int y = y0; y <= y0 + 2 && y <= plate - 1; y++) {
-				if (st < storeys || true) {
+			// the ladder runs through the floor hole above (y0 + 3) so it can be climbed out of; the top storey has none
+			if (st < storeys) {
+				for (int y = y0; y <= y0 + 3; y++) {
 					set(c, p, cu, y, vb - 1, b(Blocks.LADDER).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH));
 				}
 			}
@@ -238,6 +241,9 @@ public final class HouseTowerBridge implements Variant {
 		if (out == Direction.NORTH && st == 1) {
 			return false; // the front door
 		}
+		if (out == Direction.SOUTH) {
+			return false; // the ladder stands against the back wall's middle
+		}
 		if (st == 2 && ((out == Direction.EAST && cu == l.ucl) || (out == Direction.WEST && cu == l.ucr))) {
 			return false; // the gallery door
 		}
@@ -256,7 +262,7 @@ public final class HouseTowerBridge implements Variant {
 		}
 		boolean bridgeSide = st == 2 && mid && ((out == Direction.EAST && cu == l.ucl) || (out == Direction.WEST && cu == l.ucr));
 		if (bridgeSide) {
-			return y == y0 + 2 ? log(l.s.log(), Direction.Axis.X) : b(Blocks.AIR);
+			return b(Blocks.AIR); // 3 high: the floor beam above is the lintel
 		}
 		if (isWin(l, cu, st, y, y0, u, v, va, vb)) {
 			return b(Blocks.AIR);
@@ -268,7 +274,7 @@ public final class HouseTowerBridge implements Variant {
 		};
 	}
 
-	/** Glass set back behind each window opening, a sill and shutters outside. */
+	/** Glass in each window opening (in the wall plane: set back it stood inside the 3×3 rooms), a sill outside. */
 	private void windows(CitadelCanvas c, L l, int cu, int st, int y0, int va, int vb) {
 		Plot p = l.p;
 		for (int u = cu - 2; u <= cu + 2; u++) {
@@ -281,12 +287,12 @@ public final class HouseTowerBridge implements Variant {
 				for (int y = y0; y <= y0 + 2; y++) {
 					if (isWin(l, cu, st, y, y0, u, v, va, vb)) {
 						any = true;
-						Direction in = out.getOpposite();
 						boolean alongU = out.getAxis() == Direction.Axis.Z;
-						set(c, p, u + in.getStepX(), y, v + in.getStepZ(), pane(p.hash(u, y, v, 4) == 0 ? pinkPane() : Blocks.GLASS_PANE, alongU));
+						set(c, p, u, y, v, pane(p.hash(u, y, v, 4) == 0 ? pinkPane() : Blocks.GLASS_PANE, alongU));
 					}
 				}
-				if (any) {
+				boolean passage = (out == Direction.EAST && cu == l.ucl) || (out == Direction.WEST && cu == l.ucr);
+				if (any && !passage) { // no sill sticking into the passage between the towers at head height
 					set(c, p, u + out.getStepX(), y0, v + out.getStepZ(), stair(Blocks.STONE_BRICK_STAIRS, out.getOpposite(), true));
 					if (st > 1) {
 						set(c, p, u + out.getStepX(), y0 + 1, v + out.getStepZ(), b(Blocks.POTTED_PINK_TULIP));
@@ -388,21 +394,23 @@ public final class HouseTowerBridge implements Variant {
 			for (int v : new int[] {cz - 1, cz + 1}) {
 				boolean post = (u - u1) % 2 == 1 || u == u1 + 1 || u == u2 - 1;
 				Direction out = v < cz ? Direction.NORTH : Direction.SOUTH;
-				for (int y = 5; y <= 6; y++) {
+				// the gallery is 3 high (y5-7) so nothing scrapes the head; the beam at y8 carries the roof
+				for (int y = 5; y <= 7; y++) {
 					if (post) {
 						set(c, p, u, y, v, log(l.s.trim(), Direction.Axis.Y));
 					} else if (y == 5) {
 						set(c, p, u, y, v, fence(l.s.fence(), false, true, false, true));
 					} else {
-						// [depth] a lattice: panes set back behind the rail
+						// [depth] a lattice: panes over the rail
 						set(c, p, u, y, v, pane(p.hash(u, y, v, 4) == 0 ? pinkPane() : Blocks.GLASS_PANE, true));
 					}
 				}
-				set(c, p, u, 7, v, log(l.s.log(), Direction.Axis.X));
+				set(c, p, u, 8, v, log(l.s.log(), Direction.Axis.X));
 				// brackets under the floor beam
 				set(c, p, u, 3, v, stair(Blocks.DARK_OAK_STAIRS, out.getOpposite(), true));
-				// flower boxes on the rail
+				// flower boxes outside the rail, each on a sill (they used to float in the air)
 				if (!post && p.hash(u, 5, v, 2) == 0) {
+					set(c, p, u, 5, v + out.getStepZ(), stair(Blocks.STONE_BRICK_STAIRS, out.getOpposite(), true));
 					put(c, p, u, 6, v + out.getStepZ(), b(Blocks.POTTED_PINK_TULIP), CitadelCanvas.DECOR);
 				}
 			}
@@ -419,10 +427,10 @@ public final class HouseTowerBridge implements Variant {
 				}
 			}
 			// ceiling and lamp
-			set(c, p, u, 7, cz, b(l.s.planks()));
+			set(c, p, u, 8, cz, b(l.s.planks()));
 		}
 		for (int u = u1 + 1; u < u2; u += 3) {
-			put(c, p, u, 6, cz, hangingLantern(), CitadelCanvas.HANGING);
+			put(c, p, u, 7, cz, hangingLantern(), CitadelCanvas.HANGING); // above head height (walk at y5-6)
 		}
 	}
 
@@ -436,7 +444,8 @@ public final class HouseTowerBridge implements Variant {
 		int cz = l.cz;
 		for (int v = cz - 1; v <= cz + 1; v++) {
 			for (int u = u1; u <= u2; u++) {
-				set(c, p, u, 0, v, b(Blocks.POLISHED_DEEPSLATE));
+				// a bottom slab: walking through the passage from the ground is a half step, not a jump
+				set(c, p, u, 0, v, slab(Blocks.POLISHED_DEEPSLATE_SLAB, false));
 			}
 			set(c, p, u1, 3, v, stair(Blocks.DEEPSLATE_BRICK_STAIRS, Direction.EAST, true));
 			set(c, p, u2, 3, v, stair(Blocks.DEEPSLATE_BRICK_STAIRS, Direction.WEST, true));
@@ -444,27 +453,22 @@ public final class HouseTowerBridge implements Variant {
 				set(c, p, u, 3, v, slab(Blocks.POLISHED_DEEPSLATE_SLAB, true));
 			}
 		}
-		// jambs: a deepslate wall course on each pier, the passage floor edged
-		put(c, p, (u1 + u2) / 2, 2, cz, hangingLantern(), CitadelCanvas.HANGING);
+		// (no lantern under the arch: hung below the y3 slab it sat at head height in the middle of the passage)
 	}
 
 	// ------------------------------------------------------------------ yard
 
 	private void yard(CitadelCanvas c, L l) {
 		Plot p = l.p;
-		for (int u = 0; u < l.w; u++) {
-			if (p.hash(u, 0, 1, 4) == 0 && u > l.ucl + 2 && u < l.ucr - 2) {
-				continue;
-			}
-		}
-		set(c, p, 1, 1, l.d - 1, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
-		set(c, p, 2, 1, l.d - 1, b(Blocks.COMPOSTER));
-		set(c, p, l.w - 3, 1, l.d - 1, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
+		// on the ground (they used to float a block up)
+		set(c, p, 1, 0, l.d - 1, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
+		set(c, p, 2, 0, l.d - 1, b(Blocks.COMPOSTER));
+		set(c, p, l.w - 3, 0, l.d - 1, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
 		for (int side = -1; side <= 1; side += 2) {
 			int cu = side < 0 ? l.ucl : l.ucr;
 			set(c, p, cu + side * 3, 0, TA + 2, b(Blocks.MOSS_BLOCK));
 			set(c, p, cu + side * 3, 1, TA + 2, b(Blocks.FLOWERING_AZALEA));
 		}
-		set(c, p, (l.ucl + l.ucr) / 2, 1, TA - 1, trapdoor(l.s.trap(), Direction.SOUTH, true, false));
+		// (an open trapdoor used to stand alone in the mouth of the passage here: removed)
 	}
 }

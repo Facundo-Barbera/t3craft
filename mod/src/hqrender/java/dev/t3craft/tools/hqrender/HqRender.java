@@ -74,6 +74,9 @@ import net.minecraft.world.level.block.state.BlockState;
  *   <li>{@code --group NAME}: the blocks a group owns ({@code hub}, {@code module_3}…), same padding.</li>
  *   <li>{@code --anchor NAME [--radius N]}: a cube of radius N (default 10) around an anchor; an
  *   unambiguous part of the name is enough.</li>
+ *   <li>{@code --leads N} (citadel rosters, feat/lead-office): thread {@code t0} of each of the first N projects
+ *   is a lead, moved to its own office project {@code lead:<id>} as the game's live roster does, so its
+ *   office is drawn (e.g. {@code --leads 1 --anchor leadseat}). Default 0: rosters are unchanged.</li>
  *   <li>Views written, as {@code NAME_iso_se|iso_ne|iso_nw|iso_sw.png} (four corners), {@code NAME_plan.png}
  *   (cut at {@code --cut-y Y}, default 5 above the base) and {@code NAME_section.png} (vertical cut through
  *   the middle, or at {@code --section-at N}). {@code --name NAME} sets the prefix; {@code --only plan,iso}
@@ -238,6 +241,8 @@ public final class HqRender {
 						projects.add(Integer.parseInt(n.trim()));
 					}
 				}
+				// feat/lead-office: the first N projects' t0 thread holds a lead's office (Growth.leads)
+				case "--leads" -> Growth.leads = Math.max(0, Integer.parseInt(args[++i]));
 				case "--region" -> {
 					target = PieceViews.Target.region(args[++i]);
 					pieceMode = true;

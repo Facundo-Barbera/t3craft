@@ -7,7 +7,6 @@ import static dev.t3craft.hq.citadel.catalog.house.JapaneseKit.lantern;
 import static dev.t3craft.hq.citadel.catalog.house.JapaneseKit.log;
 import static dev.t3craft.hq.citadel.catalog.house.JapaneseKit.stair;
 import static dev.t3craft.hq.citadel.catalog.house.JapaneseKit.stairTop;
-import static dev.t3craft.hq.citadel.catalog.house.JapaneseKit.trapdoor;
 
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.catalog.Family;
@@ -18,12 +17,14 @@ import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.level.block.state.properties.Half;
 import net.minecraft.world.level.block.state.properties.StairsShape;
 
 /**
  * A tea house (chashitsu) at the end of a roji garden. A small plaster hut under a bamboo-shingle hip
- * roof with up-curled corners; the guest enters by a tiny crawl door (nijiriguchi) from a stone step.
+ * roof with up-curled corners; the guest enters by a low door (after the nijiriguchi, but 2 high) from a stone step.
  * In front: a brushwood fence with a roofed gate, stepping stones over moss and raked gravel, a stone
  * water basin (tsukubai), a stone lantern and a cherry. Meant for the odd small lot.
  *
@@ -150,9 +151,11 @@ public final class HouseJapaneseTeahouse implements Variant {
 					BlockState st;
 					if (corner) {
 						st = log(Blocks.DARK_OAK_LOG, Direction.Axis.Y);
-					} else if (v == bv0 && u == cu && y == 1) {
-						// [depth] the crawl door: a small hatch sunk into the wall
-						st = trapdoor(Blocks.DARK_OAK_TRAPDOOR, Direction.NORTH, true, Half.BOTTOM);
+					} else if (v == bv0 && u == cu && y <= 2) {
+						// the entrance: a low dark door, 2 high so it can be walked through (the 1-high crawl hatch was a
+						// trapdoor plate that closed the opening)
+						st = b(Blocks.DARK_OAK_DOOR).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH)
+								.setValue(BlockStateProperties.DOUBLE_BLOCK_HALF, y == 1 ? DoubleBlockHalf.LOWER : DoubleBlockHalf.UPPER);
 					} else if (y == 2 && (u - bu0) % 2 == 0) {
 						// [depth] a bamboo-lattice window: crossed rails behind the plaster line
 						st = fence(Blocks.SPRUCE_FENCE, true, true, true, true);
@@ -280,8 +283,11 @@ public final class HouseJapaneseTeahouse implements Variant {
 	private static void eaves(CitadelCanvas c, Plot p, int bu0, int bu1, int bv0, int bv1) {
 		Block log = Blocks.DARK_OAK_LOG;
 		Block st = Blocks.DARK_OAK_STAIRS;
+		int cu = bu0 + (bu1 - bu0 + 1) / 2; // the door column: its corbel's pendant post stood on the door step
 		for (int u = bu0; u <= bu1; u += 2) {
-			EaveKit.corbel(c, p, u, 4, bv0 - 1, Direction.SOUTH, log, st);
+			if (u != cu) {
+				EaveKit.corbel(c, p, u, 4, bv0 - 1, Direction.SOUTH, log, st);
+			}
 			EaveKit.corbel(c, p, u, 4, bv1 + 1, Direction.NORTH, log, st);
 		}
 		for (int v = bv0 + 1; v <= bv1 - 1; v += 2) {

@@ -50,6 +50,63 @@ public final class PlanProbe {
 		}).floor(cell.getX(), cell.getY(), cell.getZ()));
 	}
 
+	/**
+	 * {@link PlanNav} over any cell function, for tools that walk a finished build outside a plan (the catalog
+	 * gallery's walkability audit): feet cells reachable on foot, the feet height of a cell and the clearance
+	 * over it. A cell reads as air where {@code states} gives {@code null}.
+	 */
+	public static final class Walk {
+		private final PlanNav nav;
+		private final java.util.function.LongFunction<BlockState> states;
+
+		Walk(java.util.function.LongFunction<BlockState> states) {
+			this.states = states;
+			this.nav = new PlanNav(states);
+		}
+
+		/** Every feet cell reachable on foot from {@code start}; empty when {@code start} is not standable. */
+		public Set<BlockPos> reachable(BlockPos start) {
+			return nav.reachable(start);
+		}
+
+		/** Feet height when standing in the cell (a stair is stood on from the cell above it), or NaN. */
+		public double floor(int x, int y, int z) {
+			return nav.floor(x, y, z);
+		}
+
+		/**
+		 * Free height over the feet of a standable cell: from the feet to the bottom of the first collision box above
+		 * them within {@code limit} blocks, or {@code +Infinity} when there is none (open sky).
+		 */
+		public double clearance(int x, int y, int z, int limit) {
+			double f = nav.floor(x, y, z);
+			if (Double.isNaN(f)) {
+				return Double.NaN;
+			}
+			double best = Double.POSITIVE_INFINITY;
+			int base = (int) Math.floor(f);
+			for (int cy = base; cy <= base + limit; cy++) {
+				BlockState s = states.apply(BlockPos.asLong(x, cy, z));
+				if (s == null || s.isAir()) {
+					continue;
+				}
+				for (net.minecraft.world.phys.AABB a : s.getCollisionShape(net.minecraft.world.level.EmptyBlockGetter.INSTANCE, BlockPos.ZERO).toAabbs()) {
+					double bottom = cy + a.minY;
+					// only what is over the body's column (not the step the body stands on)
+					if (bottom >= f + 1e-6 && a.minX < 0.8 && a.maxX > 0.2 && a.minZ < 0.8 && a.maxZ > 0.2) {
+						best = Math.min(best, bottom - f);
+					}
+				}
+			}
+			return best;
+		}
+	}
+
+	/** A {@link Walk} over {@code states}. */
+	public static Walk walk(java.util.function.LongFunction<BlockState> states) {
+		return new Walk(states);
+	}
+
 	private static Map<Long, BlockState> cells(BuildPlan plan) {
 		Map<Long, BlockState> cells = new HashMap<>(plan.size() * 2);
 		for (Placement p : plan.placements()) {
