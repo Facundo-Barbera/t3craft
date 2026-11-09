@@ -352,12 +352,15 @@ public final class AnnexGreenhouseCopper implements Variant {
 				}
 				p.set(c, u, y, v, st);
 				if (g.hip) {
-					// a hip's rings step up one block each, touching only at the corners: a second pane on top of every
-					// ring below the plateau (a copper block on the ribs) makes the stairs meet face to face, so the roof
-					// is one piece from the gutter to the ridge whatever the height (a gable gets that from its end walls)
+					// a hip's rings step up one block each, touching only at the corners: a block on top of every ring
+					// below the plateau makes the steps meet face to face, so the roof is one piece from the gutter to
+					// the ridge whatever the height (a gable gets that from its end walls). It is the tread of the step:
+					// a copper slab (a stair facing uphill on the ribs), so every step has a solid copper nose and the
+					// glass is the fill between them
 					int m = Math.min(du, dv);
 					if (m < g.r) {
-						p.set(c, u, PLATE + m + 1, v, rib ? POST_W : glass);
+						Direction up = du <= dv ? (u < w - 1 - u ? Direction.EAST : Direction.WEST) : (v - g.vf < g.vb - v ? Direction.SOUTH : Direction.NORTH);
+						p.set(c, u, PLATE + m + 1, v, rib ? stairs(RIB_W, up) : slab(SLAB_O));
 					}
 				}
 			}
