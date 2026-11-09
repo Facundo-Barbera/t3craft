@@ -257,7 +257,7 @@ public final class LoungeRoom {
 				return c.floor();
 			}
 			if (a == 2) {
-				return c.accent();
+				return b(Blocks.POLISHED_DEEPSLATE);
 			}
 			int sx = dx < 0 ? -1 : 1;
 			int sz = dz < 0 ? -1 : 1;
@@ -269,7 +269,7 @@ public final class LoungeRoom {
 			}
 			return switch (theme(sx, sz)) {
 				case 0 -> ((ax + az) & 1) == 0 ? b(Blocks.SMOOTH_STONE) : b(Blocks.POLISHED_DEEPSLATE);
-				case 1 -> c.floor();
+				case 1 -> b(Blocks.POLISHED_DEEPSLATE);
 				case 2 -> ((ax + az) & 1) == 0 ? NodeDecor.footMix(dx, 0, dz) : b(Blocks.POLISHED_DEEPSLATE);
 				default -> GRASS; // plants stand on grass (moss is not accepted by the vegetation support check)
 			};
@@ -294,14 +294,14 @@ public final class LoungeRoom {
 				for (int dz = -6; dz <= 6; dz++) {
 					double d = Math.hypot(dx, dz);
 					if (Math.min(Math.abs(dx), Math.abs(dz)) >= 3 && d > 5.4 && d <= PIT_R) {
-						set(dx, PIT_Y + 1, dz, stairs(Blocks.CHERRY_STAIRS, NodeDecor.outward(dx, dz)));
+						set(dx, PIT_Y + 1, dz, stairs(Blocks.BAMBOO_MOSAIC_STAIRS, NodeDecor.outward(dx, dz)));
 					}
 				}
 			}
 			for (int sx : new int[] {-1, 1}) {
 				for (int sz : new int[] {-1, 1}) {
 					for (int[] t : new int[][] {{3, 3}, {3, 4}, {4, 3}}) {
-						set(sx * t[0], PIT_Y + 1, sz * t[1], slab(Blocks.CHERRY_SLAB));
+						set(sx * t[0], PIT_Y + 1, sz * t[1], slab(Blocks.BAMBOO_MOSAIC_SLAB));
 					}
 					set(sx * 3, PIT_Y + 2, sz * 3, pot(sx * 2 + sz + 7));
 				}
@@ -327,12 +327,8 @@ public final class LoungeRoom {
 					}
 					if (a == 2) {
 						set(dx, 1, dz, b(Blocks.STONE_BRICK_WALL));
-					} else if (a == 5 && along == 5) {
-						set(dx, 1, dz, b(Blocks.STONE_BRICK_WALL));
-						set(dx, 2, dz, b(Blocks.STONE_BRICK_WALL));
-						put(dx, 3, dz, lanternUp(), DECOR);
 					} else if (d <= 7.5) {
-						set(dx, 1, dz, stairs(Blocks.CHERRY_STAIRS, NodeDecor.outward(dx, dz)));
+						set(dx, 1, dz, stairs(Blocks.BAMBOO_MOSAIC_STAIRS, NodeDecor.outward(dx, dz)));
 					} else if (Math.floorMod(dx * 5 + dz * 3, 3) == 0) {
 						set(dx, 1, dz, pot(dx * 3 + dz));
 					}
@@ -341,7 +337,7 @@ public final class LoungeRoom {
 		}
 
 		/**
-		 * The pergola: a ring beam on twelve dark posts, and outside it an awning of cherry stairs that slopes down
+		 * The pergola: a ring beam on twelve dark posts, and outside it an awning of cherry slabs flat under the beam
 		 * to the rim (so the bars, shelves and the rack are under a roof) with warm glow panels under it. The
 		 * entrances stay open between their posts.
 		 */
@@ -362,7 +358,7 @@ public final class LoungeRoom {
 					if (ring) {
 						set(dx, ROOF_Y, dz, beam(ax >= az ? Direction.Axis.Z : Direction.Axis.X));
 					} else if (a >= 3) {
-						set(dx, ROOF_Y - 1, dz, stairs(Blocks.CHERRY_STAIRS, NodeDecor.inward(dx, dz)));
+						set(dx, ROOF_Y - 1, dz, NodeDecor.topSlab(Blocks.CHERRY_SLAB));
 						if (Math.floorMod(dx * 3 + dz * 5, 7) == 0) {
 							// the panel hangs under its stair: its lit face is the bottom, its frame never shows from above
 							set(dx, ROOF_Y - 2, dz, c.kit.glowPanel(Direction.DOWN, false));
@@ -411,11 +407,11 @@ public final class LoungeRoom {
 
 		/** A bench cell whose back is towards {@code ascent} (the sitter looks the other way). */
 		void bench(int u, int v, Direction ascent) {
-			set(u, 1, v, stairs(Blocks.CHERRY_STAIRS, ascent));
+			set(u, 1, v, stairs(Blocks.BAMBOO_MOSAIC_STAIRS, ascent));
 		}
 
 		void table(int u, int v) {
-			set(u, 1, v, slab(Blocks.CHERRY_SLAB));
+			set(u, 1, v, slab(Blocks.BAMBOO_MOSAIC_SLAB));
 		}
 
 		/** A low table {@code len} long along u at row {@code v}, a bench on each side facing it. */
@@ -427,9 +423,9 @@ public final class LoungeRoom {
 			}
 		}
 
-		/** A warm glow panel under a stair of the awning at {@code (u, v)}. */
+		/** A warm glow panel under a slab of the awning at {@code (u, v)}. */
 		void lamp(int u, int v) {
-			set(u, ROOF_Y - 1, v, stairs(Blocks.CHERRY_STAIRS, NodeDecor.inward(sx * u, sz * v)));
+			set(u, ROOF_Y - 1, v, NodeDecor.topSlab(Blocks.CHERRY_SLAB));
 			set(u, ROOF_Y - 2, v, r.c.kit.glowPanel(Direction.DOWN, false));
 		}
 
