@@ -183,7 +183,7 @@ public final class PlanterTallPot implements Variant {
 
 	private static BlockState potted(int kind) {
 		return switch (kind) {
-			case 0 -> b(Blocks.POTTED_FLOWERING_AZALEA_BUSH);
+			case 0 -> b(Blocks.POTTED_FLOWERING_AZALEA);
 			case 1 -> b(Blocks.POTTED_FERN);
 			case 2 -> b(Blocks.POTTED_BAMBOO);
 			default -> b(Blocks.POTTED_CHERRY_SAPLING);
