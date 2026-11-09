@@ -7,6 +7,8 @@ import dev.t3craft.hq.citadel.catalog.Variant;
 import dev.t3craft.hq.citadel.catalog.tree.TreeKit.Vox;
 import java.util.List;
 import java.util.Random;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 
 /**
  * The great cherry: a 2×2 trunk with roots that spread over the grass (and a heavier collar on big plots)
@@ -55,6 +57,10 @@ public final class TreeCherryGrand implements Variant {
 		return 9;
 	}
 
+	/** Stripped cherry for the limbs: pale pink wood that reads against the dark trunk and the blossom. */
+	private static final TreeKit.Wood LIMB = new TreeKit.Wood(Blocks.STRIPPED_CHERRY_LOG, Blocks.STRIPPED_CHERRY_WOOD,
+			TreeKit.CHERRY.rootTip());
+
 	/** The lowest y a leaf or a limb may occupy: 4 blocks of clear walk under the crown. */
 	private static final int CLEAR = 4;
 
@@ -71,7 +77,7 @@ public final class TreeCherryGrand implements Variant {
 		int wv1 = wv0 + mn - 1;
 		boolean big = mn >= 10;
 
-		int H = Math.min(p.h(), 12 + mn / 2);
+		int H = Math.min(p.h(), 11 + mn / 2);
 		H = Math.max(Math.min(p.h(), 11), H - r.nextInt(3)); // another height per seed
 		int y2 = H >= 15 ? 4 : H >= 13 ? 3 : 2; // 2×2 up to y2 - 1, three cells at y2, then the leader
 		int crownY = H - 3;
@@ -116,7 +122,7 @@ public final class TreeCherryGrand implements Variant {
 			double ex = Math.cos(ang);
 			double ez = Math.sin(ang);
 			double frac = (g0 + i * 0.618) % 1.0; // spreads the heights so neighbours differ
-			int ly = TreeKit.clamp(5 + (int) Math.round(frac * (crownY - 5) * 0.85), 5, crownY);
+			int ly = TreeKit.clamp(5 + (int) Math.round(Math.pow(frac, 1.5) * (crownY - 5) * 0.9), 5, crownY);
 			int sy = TreeKit.clamp(ly - 2 - r.nextInt(2), sy0, crownY - 1);
 			int su = lead[0][sy];
 			int sv = lead[1][sy];
@@ -128,12 +134,13 @@ public final class TreeCherryGrand implements Variant {
 			int tv = (int) Math.round(sv + ez * reach);
 			rx = Math.max(1.3, fit(tu, wu0, wu1, rx));
 			rz = Math.max(1.3, fit(tv, wv0, wv1, rz));
-			List<int[]> limb = TreeKit.branch(t, TreeKit.CHERRY, new int[] {su, sy, sv}, new int[] {tu, ly - 1, tv}, false);
+			List<int[]> limb = TreeKit.branch(t, LIMB, new int[] {su, sy, sv}, new int[] {tu, ly - 1, tv}, false);
+			darkBase(t, limb);
 			if (sc >= 1.25) { // the base of a big limb is two logs thick (never below the walk height)
 				for (int k = 0; k < Math.min(2, limb.size()); k++) {
 					int[] cell = limb.get(k);
 					if (cell[1] - 1 >= CLEAR) {
-						t.woodSoft(cell[0], cell[1] - 1, cell[2], TreeKit.CHERRY.bark());
+						t.woodSoft(cell[0], cell[1] - 1, cell[2], k == 0 ? TreeKit.CHERRY.bark() : LIMB.bark());
 					}
 				}
 			}
@@ -152,7 +159,7 @@ public final class TreeCherryGrand implements Variant {
 						double sr = (1.5 + r.nextDouble() * 0.4) * ls;
 						double sx = Math.max(1.2, fit(fu, wu0, wu1, sr));
 						double sz = Math.max(1.2, fit(fv, wv0, wv1, sr));
-						TreeKit.branch(t, TreeKit.CHERRY, new int[] {mid[0], mid[1], mid[2]}, new int[] {fu, sat - 1, fv}, false);
+						TreeKit.branch(t, LIMB, new int[] {mid[0], mid[1], mid[2]}, new int[] {fu, sat - 1, fv}, false);
 						lobe(t, fu, sat, fv, sx, sz, sat + 1 <= H - 1 ? 1 : 0, 1, TreeKit.SAKURA.swap(), 0.45, 40 + i, 10 + i);
 					}
 				}
@@ -206,10 +213,24 @@ public final class TreeCherryGrand implements Variant {
 					if (ly != 0 && q > 0.5 && t.hash(u + salt, y * 3, v, 6) < 2) {
 						continue; // the rim of the top and bottom layers comes and goes
 					}
-					t.leafOf(u, y, v, TreeKit.tone(t, lv, u, y, v, dy, q, salt), 1000 + id);
+					t.leafOf(u, y, v, tone(t, lv, u, y, v, dy, salt), 1000 + id);
 				}
 			}
 		}
+	}
+
+	/** The dark first two cells of a limb are the trunk's own bark, so the pale wood starts clear of the leader. */
+	private static void darkBase(Vox t, List<int[]> limb) {
+		for (int k = 0; k < Math.min(2, limb.size()); k++) {
+			int[] cell = limb.get(k);
+			t.wood(cell[0], cell[1], cell[2], TreeKit.CHERRY.bark());
+		}
+	}
+
+	/** Cherry leaves, with the flowering azalea in pairs: a little on top, some on the flanks, a third below. */
+	private static BlockState tone(Vox t, TreeKit.Leaves lv, int u, int y, int v, double dy, int salt) {
+		int pct = dy < -0.2 ? 38 : dy < 0.35 ? 18 : 6;
+		return t.hash(u + salt, y, Math.floorDiv(v, 2), 100) < pct ? lv.b() : lv.a();
 	}
 
 	/** Drips under the rim of the lowest layer {@code yl} of a lobe (never below the walk height). */
