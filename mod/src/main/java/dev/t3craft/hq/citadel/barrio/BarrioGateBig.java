@@ -315,9 +315,9 @@ final class BarrioGateBig {
 			c.fixtures.add(sign.asLong());
 			c.set(r.cell(D - 1, mid, DECK + 4), BarrioKit.lantern(false));
 			c.set(r.cell(tu, mid, DECK + 4), BarrioKit.lantern(false));
-			// a lantern over the street doorway of each tower, so the door reads from afar
-			for (int dv = -HALF; dv <= HALF; dv += 2 * HALF) {
-				c.set(r.cell(tu + 1 + rowsOff, mid + dv, 4), BarrioKit.lantern(true));
+			// a lantern hanging in the street doorway of each tower from its stone lintel, so the door reads from afar
+			for (int dv = -HALF - 1; dv <= HALF + 1; dv += 2 * (HALF + 1)) {
+				c.set(r.cell(tu + 1 + rowsOff, mid + dv, 3), BarrioKit.lantern(true));
 			}
 			// banners in the project's colour on the tower walls beside the passage (the doorway row is left clear)
 			for (int a : new int[] {2 + rowsOff, 3 + rowsOff}) {
