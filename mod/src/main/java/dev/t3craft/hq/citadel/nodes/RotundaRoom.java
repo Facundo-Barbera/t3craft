@@ -194,7 +194,7 @@ public final class RotundaRoom {
 			double ri = size - 2.5;
 			double rw = size - 1.0;
 			int h = c.sy(10);
-			int dh = (int) Math.round(1.0 * rw);
+			int dh = (int) Math.round(1.15 * rw);
 			int xw = (int) Math.floor(ri) - 2;
 			double lr = size >= 12 ? 2.5 : 1.5;
 			return new Geo(size, ri, rw, h, dh, xw, lr, Math.round(ri * 0.62));
@@ -402,16 +402,15 @@ public final class RotundaRoom {
 		int top = g.top(d);
 		int low = g.top(Math.min(g.rw, d + 1));
 		int lo = Math.max(g.h + 1, Math.min(low, top));
-		double rib = arc(dx, dz, 16, 0);
 		if (d >= g.lr - 0.5) {
 			for (int y = lo; y <= top; y++) {
 				int rel = y - g.h;
 				BlockState s;
 				if (rel <= 2) {
 					s = CitadelCanvas.FOOT;
-				} else if (rel >= g.dh - 1) {
+				} else if (rel >= g.dh - 1 && d < g.lr + 2.0) {
 					s = BAMBOO;
-				} else if (rib < 0.6 && d >= g.lr + 1.5) {
+				} else if (arc(dx, dz, 8, 0) < 0.6 && d >= g.lr + 1.5) {
 					s = SLOG;
 				} else if (rel == g.dh / 2) {
 					s = CitadelCanvas.PLANKS;
