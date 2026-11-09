@@ -13,8 +13,9 @@
 #   RENDER_PARALLELISM  render threads in total, split between the workers (default 6 -> 2 per job)
 #   RENDER_LOAD_MAX     above this 1-min load no job starts while another runs (default 6)
 #   RENDER_XMX          max heap (default 2g + 1.5g per worker: 3584m with 1 worker)
-# Needs Facundo's approval: the file ~/.cache/t3craft-coord/renders-approved (see AGENTS.md). While it runs,
-# the daemon holds the global heavy-process lock /tmp/t3craft-heavy.lock, so no other java/gradle runs.
+# Runs ONLY on the render PC (my-pc, WSL), never on the VPS (AGENTS.md). One daemon, 1 worker. On the PC it
+# holds the PC's own /tmp/t3craft-heavy.lock while alive. Approval of render sessions is enforced on the VPS
+# side, in tools/render/submit.sh (~/.cache/t3craft-coord/renders-approved there).
 # It restarts itself on exit code 75 (a render thread that would not stop). Log: $RENDER_HOME/daemon.log.
 # Protocol and limits: docs/tools/render-service.md
 set -euo pipefail
@@ -39,7 +40,6 @@ PARALLELISM="$(int_or "${RENDER_PARALLELISM:-}" 6)"
 XMX="${RENDER_XMX:-$((2048 + 1536 * WORKERS))m}"
 export RENDER_WORKERS="$WORKERS" RENDER_PARALLELISM="$PARALLELISM"
 export RENDER_LOAD_MAX="${RENDER_LOAD_MAX:-6}"
-APPROVAL="$HOME/.cache/t3craft-coord/renders-approved"
 HEAVY_LOCK=/tmp/t3craft-heavy.lock
 
 NICE=(nice -n 19)
@@ -86,9 +86,9 @@ if [ "$mode" = supervise ] || [ "$mode" = foreground ]; then
 	exit 0
 fi
 
-# Facundo must approve a render session (AGENTS.md, "VPS: heavy processes")
-if [ ! -f "$APPROVAL" ]; then
-	echo "start-daemon: renders are not approved ($APPROVAL missing). Ask Facundo first; see AGENTS.md." >&2
+# never on the VPS (AGENTS.md: renders run on the render PC)
+if [ "$(hostname)" = "${T3CRAFT_VPS_HOSTNAME:-vps-env}" ] || [ -n "${T3CRAFT_IS_VPS:-}" ]; then
+	echo "start-daemon: this is the VPS; the render daemon runs only on the render PC (my-pc). See AGENTS.md." >&2
 	exit 1
 fi
 

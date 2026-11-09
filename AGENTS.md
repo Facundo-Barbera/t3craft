@@ -16,7 +16,7 @@ gradle/gradlew, a render (`tools/render/*`, `hqRender`, `uiRender`) or Minecraft
 
 1. **One heavy process at a time on the whole VPS.** Every heavy process goes through `tools/heavy.sh`, which takes
    the global lock `/tmp/t3craft-heavy.lock`. If the lock is held, it exits 75 instead of queueing.
-   The render daemon holds that lock for as long as it is alive: while it runs, nobody compiles or builds anything else.
+   On the VPS that lock is only for the coordinator's gradle builds: **renders never run on the VPS** (rule 8).
 2. **Only the coordinator launches heavy processes.** Child threads, delegated tasks and subagents only write code
    and commit/push. They never run java, gradle, builds, tests or renders. Renders are the only exception, and only
    inside a render session Facundo approved (rule 5).
@@ -33,8 +33,7 @@ gradle/gradlew, a render (`tools/render/*`, `hqRender`, `uiRender`) or Minecraft
    available, wait and do not queue more work. `tools/heavy.sh` waits up to 10 min and then gives up with code 75.
    Do not start new agents while the load is above 6 either.
 5. **No batch renders without Facundo's approval.**
-   - The render daemon and `tools/render/submit.sh` refuse to run unless `~/.cache/t3craft-coord/renders-approved`
-     exists.
+   - `tools/render/submit.sh` refuses to run unless `~/.cache/t3craft-coord/renders-approved` exists on the VPS.
    - Only the coordinator creates that file, and only after Facundo approves a render session. In the file it writes
      the scope (which agents, roughly how many jobs, expiry). It deletes the file when the session ends.
    - In a session the daemon runs with its defaults: **1 worker, load limit 6**. Nobody raises `RENDER_WORKERS`,
@@ -46,6 +45,16 @@ gradle/gradlew, a render (`tools/render/*`, `hqRender`, `uiRender`) or Minecraft
    worktree, the coordinator checks `ps` for processes whose arguments or cwd mention that worktree or agent: java,
    gradle, `submit.sh` loops, `sleep`. It kills them, then runs `./gradlew --stop` in that worktree's `mod/`.
    `submit.sh` also stops waiting by itself when the process that launched it is gone.
+8. **Renders run on Facundo's PC, never on the VPS.**
+   - The render daemon runs only on my-pc (WSL Ubuntu, Tailscale 100.64.0.20): one daemon, **1 worker**.
+     `start-daemon.sh` refuses to start on the VPS.
+   - Agents still call `tools/render/submit.sh` exactly as before. It relays to the PC through
+     `tools/render/remote-submit.sh`:
+     - rsync of the worktree over SSH (`T3CRAFT_RENDER_HOST`);
+     - the job goes into the PC daemon's inbox;
+     - the relay polls `status.json`;
+     - the PNGs and the report come back to the local outbox.
+   - Compiling the worktree happens on the PC. Renders still need Facundo's approval (rule 5).
 7. **Agent count.** Keep at most **8 child agents running at once**. Each one is a process that costs CPU while it
    thinks. Launch more only in waves, after the previous wave finishes, and never while the load is above 6.
 

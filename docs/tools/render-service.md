@@ -1,6 +1,16 @@
 # Shared render service
 
-> **Since 2026-11-09 (AGENTS.md, "VPS: heavy processes"):** the daemon and `submit.sh` only run inside a render session Facundo approved (`~/.cache/t3craft-coord/renders-approved`). The daemon holds the global heavy-process lock, defaults to 1 worker and load limit 6, and nobody raises those limits without his OK.
+> **Since 2026-11-09 (AGENTS.md):** renders run on **Facundo's PC (my-pc, WSL)**, never on the VPS. `start-daemon.sh` refuses to start on the VPS. On the PC: one daemon, 1 worker, load limit 6.
+>
+> `submit.sh` (on the VPS) only works inside a render session Facundo approved (`~/.cache/t3craft-coord/renders-approved`), and by default it hands the request to `tools/render/remote-submit.sh`.
+>
+> **Remote relay**, step by step (agents notice no difference):
+> 1. It checks over SSH that the PC daemon is alive and that the agent has nothing pending there.
+> 2. It rsyncs the worktree (without `.git`, `build`, `.gradle`, `mod/run` or `docs/research`) into a per-agent git worktree on the PC, `~/t3craft-jobs/<agent>`. That worktree is created once from the PC repo `~/projects/t3craft`, which is the daemon's baseline, so the daemon accepts it and its Loom cache survives between jobs.
+> 3. It drops the request into the PC inbox, with the paths rewritten. `--packs` folders are synced too.
+> 4. While the job runs, it mirrors `status.json` and `daemon.json` into the local spool, so Citadel Studio still works. When the job ends, it copies the whole outbox folder back.
+>
+> Settings: `T3CRAFT_RENDER_HOST` (default `user@100.64.0.20`), `T3CRAFT_RENDER_REMOTE_REPO`, `T3CRAFT_RENDER_REMOTE_JOBS`. `T3CRAFT_RENDER_MODE=local` is only for running ON the PC.
 
 One long-lived JVM renders for every agent. Dozens of agents see their designs (HQ plans, and UI
 screens through the plug below) while the VPS (12 cores, 47 GB, shared) stays responsive.
