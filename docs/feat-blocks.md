@@ -188,7 +188,9 @@ Monitor de escritorio de oficina en grafito/acero, con el cristal hundido. Todo 
 - **Pie** (solo en un bloque de la fila inferior, `down=false`): la carcasa se levanta 3 px (`monitor_panel_lift`) sobre un
   **cuello** oscuro de 4×4 px y una **base** de 10×10 px y 1 px de grosor, 2 px por delante del labio, con la cara superior clara
   (`monitor_stand`). Más estrecho que el bloque: se lee como soporte, no como zócalo. Un bloque con otro monitor debajo tiene la
-  carcasa entera y ni barbilla ni pie. En un muro de N de ancho hay un pie por bloque de la fila inferior.
+  carcasa entera y ni barbilla ni pie. Un monitor suelto lleva un pie centrado; una pantalla ancha, un pie en cada bloque de los
+  extremos (`monitor_stand_l`/`_r`, desplazados hacia fuera, como un televisor con dos patas) y ninguno entre medias (la carcasa queda
+  levantada y se ve la mesa debajo).
 - **Carcasa**: `monitor_side`/`monitor_top` lisas; `monitor_back` con rejilla y placa "T3". El ítem usa `models/block/monitor.json`
   (todos los lados enmarcados, con pie). Texturas: `monitor_front` (el marco visto de frente), `monitor_screen` (el cristal; el
   renderer lo tapa), `monitor_trim` (muestras para labios, pie y cuello; filas anotadas en `monitor_art.py`).

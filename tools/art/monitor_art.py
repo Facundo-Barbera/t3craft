@@ -21,7 +21,9 @@ picks its texture rows from what is next to it (connected textures), so a wall h
     bottom chin                2 px (y 3..5) with the status LED; the glass starts at y = 5 (MonitorLod.CHIN_PX = 5)
     stand                      below the chin, on a bottom-row block only (down = false): the casing is lifted 3 px and
                                rests on a dark neck over a 10 x 10 px base plate (narrower than the block: a stand, not a
-                               skirt); a block with a monitor under it has a full-height casing, no chin, no stand.
+                               skirt). A lone monitor has one centred stand; a wide screen has a foot on each END block
+                               (shifted outwards, like a TV on two legs) and none in between; a block with a monitor under
+                               it has a full-height casing, no chin, no stand.
 
 Corner ownership: the left and right strips are full height and own the corners; the top and bottom strips stop at a
 corner only when that side has a strip (variants `_l`, `_r`, `_l_r`). Side strips come in four variants by the neighbours
@@ -137,6 +139,8 @@ def make_side():
     for y in range(16):
         g[y][0] = STEEL
         g[y][11] = STEEL
+        g[y][6] = SHADE  # the seam between the front shell and the back cover
+        g[y][7] = rgb(0x575C66)
     return g
 
 
@@ -147,6 +151,8 @@ def make_top():
         g[4][x] = STEEL
         g[5][x] = STEEL
         g[15][x] = SHADE
+        g[10][x] = SHADE  # the same seam, over the top (continuous along a wall)
+        g[11][x] = rgb(0x575C66)
     return g
 
 
@@ -174,7 +180,7 @@ def make_trim():
             if y in (3, 6) and x % 4 == 0:  # brushed grain
                 c = rgb(top[y - 1])
             g[y][x] = c
-    # row 10: neck front, lit from the left (viewer's left is the low x of u = 16 - x... the face is mirrored, see the model)
+    # row 10: neck front, lit from the left
     neck = [0x30343C] * 16
     neck[6], neck[7], neck[8], neck[9] = 0x454B55, 0x3A3F48, 0x30343C, 0x272A31
     g[10] = [rgb(c) for c in neck]
@@ -267,15 +273,21 @@ def strip_down(l, r):
         "up": trim(TRIM_LIP_INNER, 0, 16), "down": trim(TRIM_DARK, 0, 16)})]
 
 
-def stand():
+STAND_X = {"": 0, "_l": 2, "_r": -2}  # centred (a lone monitor), or shifted to the viewer's left (+x) / right (-x) end
+
+
+def stand(kind=""):
     """Neck and base plate under a lifted casing: the plate (10 x 10, 1 px thick, 2 px proud of the lip) and a 4 x 4 neck
-    set back under the casing; the casing's own underside is dark, so the neck reads as a stem in shadow."""
-    plate = element([3, 0, 1], [13, 1, 11], {
+    set back under the casing; the casing's own underside is dark, so the neck reads as a stem in shadow. A lone monitor
+    has one centred stand; a wide screen stands on its two end blocks (`_l`, `_r`), the feet shifted towards the ends like a
+    TV on two legs; the blocks between have none (the casing is lifted, the desk shows under it)."""
+    dx = STAND_X[kind]
+    plate = element([3 + dx, 0, 1], [13 + dx, 1, 11], {
         "up": {"texture": "#trim", "uv": [3, 0, 13, 10]},
         "north": trim(TRIM_PLATE_EDGE, 3, 13), "south": trim(TRIM_PLATE_EDGE, 3, 13),
         "east": trim(TRIM_PLATE_EDGE, 0, 10), "west": trim(TRIM_PLATE_EDGE, 0, 10),
         "down": trim(TRIM_DARK, 3, 13)})
-    neck = element([6, 1, 6], [10, LIFT, 10], {
+    neck = element([6 + dx, 1, 6], [10 + dx, LIFT, 10], {
         "north": trim(10, 6, 10), "south": trim(TRIM_DARK, 6, 10),
         "east": trim(TRIM_DARK, 6, 10), "west": trim(TRIM_DARK, 6, 10)})
     return [plate, neck]
@@ -331,7 +343,8 @@ def main():
     # the casing with the glass, no frame (the strips and the stand are added by the blockstate)
     write_json(os.path.join(MODELS, "monitor_panel.json"), model([body(False)], BODY_TEXTURES))
     write_json(os.path.join(MODELS, "monitor_panel_lift.json"), model([body(True)], BODY_TEXTURES))
-    write_json(os.path.join(MODELS, "monitor_stand.json"), model(stand()))
+    for kind in STAND_X:
+        write_json(os.path.join(MODELS, "monitor_stand%s.json" % kind), model(stand(kind)))
     for u in (False, True):
         for d in (False, True):
             write_json(os.path.join(MODELS, "monitor_edge_left%s.json" % vsuffix(u, d)), model(side_strip(True, u, d)))
@@ -356,7 +369,10 @@ def main():
 
         parts.append({"when": {"facing": facing, "down": "true"}, "apply": apply("monitor_panel")})
         parts.append({"when": {"facing": facing, "down": "false"}, "apply": apply("monitor_panel_lift")})
-        parts.append({"when": {"facing": facing, "down": "false"}, "apply": apply("monitor_stand")})
+        # stands: a lone monitor (no neighbour left or right) one in the middle; the end blocks of a wide screen a foot each
+        parts.append({"when": {"facing": facing, "down": "false", "left": "false", "right": "false"}, "apply": apply("monitor_stand")})
+        parts.append({"when": {"facing": facing, "down": "false", "left": "false", "right": "true"}, "apply": apply("monitor_stand_l")})
+        parts.append({"when": {"facing": facing, "down": "false", "left": "true", "right": "false"}, "apply": apply("monitor_stand_r")})
         for side in ("up", "down"):
             for l in (False, True):
                 for r in (False, True):

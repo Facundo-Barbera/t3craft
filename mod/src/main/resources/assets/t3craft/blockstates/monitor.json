@@ -21,10 +21,34 @@
     {
       "when": {
         "facing": "north",
-        "down": "false"
+        "down": "false",
+        "left": "false",
+        "right": "false"
       },
       "apply": {
         "model": "t3craft:block/monitor_stand"
+      }
+    },
+    {
+      "when": {
+        "facing": "north",
+        "down": "false",
+        "left": "false",
+        "right": "true"
+      },
+      "apply": {
+        "model": "t3craft:block/monitor_stand_l"
+      }
+    },
+    {
+      "when": {
+        "facing": "north",
+        "down": "false",
+        "left": "true",
+        "right": "false"
+      },
+      "apply": {
+        "model": "t3craft:block/monitor_stand_r"
       }
     },
     {
@@ -226,10 +250,36 @@
     {
       "when": {
         "facing": "east",
-        "down": "false"
+        "down": "false",
+        "left": "false",
+        "right": "false"
       },
       "apply": {
         "model": "t3craft:block/monitor_stand",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "facing": "east",
+        "down": "false",
+        "left": "false",
+        "right": "true"
+      },
+      "apply": {
+        "model": "t3craft:block/monitor_stand_l",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "facing": "east",
+        "down": "false",
+        "left": "true",
+        "right": "false"
+      },
+      "apply": {
+        "model": "t3craft:block/monitor_stand_r",
         "y": 90
       }
     },
@@ -448,10 +498,36 @@
     {
       "when": {
         "facing": "south",
-        "down": "false"
+        "down": "false",
+        "left": "false",
+        "right": "false"
       },
       "apply": {
         "model": "t3craft:block/monitor_stand",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "facing": "south",
+        "down": "false",
+        "left": "false",
+        "right": "true"
+      },
+      "apply": {
+        "model": "t3craft:block/monitor_stand_l",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "facing": "south",
+        "down": "false",
+        "left": "true",
+        "right": "false"
+      },
+      "apply": {
+        "model": "t3craft:block/monitor_stand_r",
         "y": 180
       }
     },
@@ -670,10 +746,36 @@
     {
       "when": {
         "facing": "west",
-        "down": "false"
+        "down": "false",
+        "left": "false",
+        "right": "false"
       },
       "apply": {
         "model": "t3craft:block/monitor_stand",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "facing": "west",
+        "down": "false",
+        "left": "false",
+        "right": "true"
+      },
+      "apply": {
+        "model": "t3craft:block/monitor_stand_l",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "facing": "west",
+        "down": "false",
+        "left": "true",
+        "right": "false"
+      },
+      "apply": {
+        "model": "t3craft:block/monitor_stand_r",
         "y": 270
       }
     },
