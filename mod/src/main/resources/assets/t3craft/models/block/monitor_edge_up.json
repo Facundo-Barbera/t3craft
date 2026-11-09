@@ -3,14 +3,14 @@
   "textures": {
     "particle": "t3craft:block/monitor_side",
     "frame": "t3craft:block/monitor_front",
-    "side": "t3craft:block/monitor_side"
+    "trim": "t3craft:block/monitor_trim"
   },
   "elements": [
     {
       "from": [
         0,
-        15,
-        -0.6
+        14,
+        -1
       ],
       "to": [
         16,
@@ -21,46 +21,28 @@
         "north": {
           "texture": "#frame",
           "uv": [
-            2,
-            0,
-            14,
-            1
-          ]
-        },
-        "east": {
-          "texture": "#side",
-          "uv": [
             0,
             0,
-            1,
-            1
-          ]
-        },
-        "west": {
-          "texture": "#side",
-          "uv": [
-            0,
-            0,
-            1,
-            1
+            16,
+            2
           ]
         },
         "up": {
-          "texture": "#side",
+          "texture": "#trim",
           "uv": [
             0,
-            0,
-            1,
-            1
+            10,
+            16,
+            11
           ]
         },
         "down": {
-          "texture": "#side",
+          "texture": "#trim",
           "uv": [
             0,
-            0,
-            1,
-            1
+            8,
+            16,
+            9
           ]
         }
       }

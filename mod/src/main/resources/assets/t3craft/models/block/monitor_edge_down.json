@@ -3,14 +3,46 @@
   "textures": {
     "particle": "t3craft:block/monitor_side",
     "frame": "t3craft:block/monitor_front",
-    "side": "t3craft:block/monitor_side"
+    "trim": "t3craft:block/monitor_trim"
   },
   "elements": [
     {
       "from": [
         0,
+        1,
+        -1
+      ],
+      "to": [
+        16,
+        3,
+        0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#frame",
+          "uv": [
+            0,
+            13,
+            16,
+            15
+          ]
+        },
+        "up": {
+          "texture": "#trim",
+          "uv": [
+            0,
+            8,
+            16,
+            9
+          ]
+        }
+      }
+    },
+    {
+      "from": [
         0,
-        -0.6
+        0,
+        -3
       ],
       "to": [
         16,
@@ -19,48 +51,48 @@
       ],
       "faces": {
         "north": {
-          "texture": "#frame",
-          "uv": [
-            2,
-            15,
-            14,
-            16
-          ]
-        },
-        "east": {
-          "texture": "#side",
+          "texture": "#trim",
           "uv": [
             0,
-            0,
-            1,
-            1
-          ]
-        },
-        "west": {
-          "texture": "#side",
-          "uv": [
-            0,
-            0,
-            1,
-            1
+            4,
+            16,
+            5
           ]
         },
         "up": {
-          "texture": "#side",
+          "texture": "#trim",
           "uv": [
             0,
             0,
-            1,
-            1
+            16,
+            3
           ]
         },
         "down": {
-          "texture": "#side",
+          "texture": "#trim",
           "uv": [
             0,
+            8,
+            16,
+            9
+          ]
+        },
+        "east": {
+          "texture": "#trim",
+          "uv": [
             0,
-            1,
-            1
+            6,
+            3,
+            7
+          ]
+        },
+        "west": {
+          "texture": "#trim",
+          "uv": [
+            0,
+            6,
+            3,
+            7
           ]
         }
       }

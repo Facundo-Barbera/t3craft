@@ -1,0 +1,51 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "particle": "t3craft:block/monitor_side",
+    "frame": "t3craft:block/monitor_front",
+    "trim": "t3craft:block/monitor_trim"
+  },
+  "elements": [
+    {
+      "from": [
+        2,
+        14,
+        -1
+      ],
+      "to": [
+        16,
+        16,
+        0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#frame",
+          "uv": [
+            0,
+            0,
+            14,
+            2
+          ]
+        },
+        "up": {
+          "texture": "#trim",
+          "uv": [
+            0,
+            10,
+            16,
+            11
+          ]
+        },
+        "down": {
+          "texture": "#trim",
+          "uv": [
+            0,
+            8,
+            16,
+            9
+          ]
+        }
+      }
+    }
+  ]
+}
