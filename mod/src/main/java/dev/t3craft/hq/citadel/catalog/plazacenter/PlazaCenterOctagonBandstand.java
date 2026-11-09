@@ -19,7 +19,7 @@ import net.minecraft.world.level.block.state.properties.Half;
  * from 17 wide) is climbed on all four axes by steps of stairs (3 or 5 wide, no jumps). On it, eight
  * stripped-cherry columns on polished-deepslate bases carry a beam; a cherry balustrade joins them and
  * stays open on the four axes, so the pavilion is crossed from any side. Under an octagonal hip roof of
- * stairs (real pitch, eave, dark hip ribs) the stage is a concentric parquet of cherry and bamboo with a
+ * stairs (real pitch, a contrasting eave course and cap) the stage is a concentric parquet of cherry and bamboo with a
  * jukebox (record in) between note blocks, a ring of musicians' benches with lecterns (music stands)
  * against the balustrade, potted saplings in the front and a hanging lantern.
  * Outside, in the four corners of the plot: cherry benches facing the pavilion with azalea hedges
@@ -201,9 +201,9 @@ public final class PlazaCenterOctagonBandstand implements Variant {
 		int n = Math.min(Math.min(cu, w - 1 - cu), Math.min(cv, d - 1 - cv));
 		int ph = n >= 8 && p.h() >= 12 ? 2 : 1;
 		int pl = n - ph;
-		int k = Math.min(pl >= 7 ? pl - 2 : pl - 1, 6 + Math.max(0, p.h() - 10) / 2); // a big platform keeps a wide apron round a pavilion the roof can cover
+		int k = Math.min(pl - 1, 7 + Math.max(0, p.h() - 10) / 2); // a big platform keeps a wide apron round a pavilion the roof can cover
 		int t = (int) Math.round(0.4142 * k);
-		Geo g = new Geo(cu, cv, n, ph, pl, k, t, n >= 9 ? 2 : 1);
+		Geo g = new Geo(cu, cv, n, ph, pl, k, t, 2);
 
 		// roof: as many layers as the height allows, flatter (steps of 2 or 3 cells) when it is short
 		int lmax = p.h() - ph - 6;
@@ -284,7 +284,7 @@ public final class PlazaCenterOctagonBandstand implements Variant {
 			p.set(c, u, y, v, b(Blocks.DEEPSLATE_BRICKS));
 		}
 		// facing = the way up: the tall half is towards the platform
-		Block blk = p.hash(u, ys, v, 3) == 0 ? Blocks.POLISHED_ANDESITE_STAIRS : Blocks.STONE_BRICK_STAIRS;
+		Block blk = Math.min(Math.abs(dx), Math.abs(dz)) <= 1 ? Blocks.POLISHED_ANDESITE_STAIRS : Blocks.STONE_BRICK_STAIRS;
 		p.set(c, u, ys, v, stairs(blk, out(dx, dz).getOpposite()));
 	}
 
@@ -341,25 +341,12 @@ public final class PlazaCenterOctagonBandstand implements Variant {
 
 	// ------------------------------------------------------------------ hip roof
 
-	private static boolean isRib(int dx, int dz, double m) {
-		if (m <= 1.4) {
-			return false;
-		}
-		double angle = Math.atan2(dz, dx);
-		double step = Math.PI / 4;
-		double offs = Math.PI / 8;
-		double rel = (angle - offs) / step;
-		double da = Math.abs(angle - (Math.round(rel) * step + offs));
-		return m * Math.sin(da) < 0.42;
-	}
-
 	private void roof(CitadelCanvas c, Plot p, Geo g, Roof r, int u, int v, int dx, int dz, double m) {
 		int base = g.h() + 4;
-		boolean rib = isRib(dx, dz, m);
-		Direction in = out(dx, dz).getOpposite();
+				Direction in = out(dx, dz).getOpposite();
 		// the eave: one block beyond the beam, low side out
 		if (m > g.k() + 0.5 && m <= g.k() + 1.5) {
-			p.set(c, u, base, v, stairs(r.stair(rib, 0), in));
+			p.set(c, u, base, v, stairs(r.stair(true, 0), in)); // the dark (or pink) eave course
 		}
 		for (int i = 1; i <= r.layers(); i++) {
 			double ri = g.k() + 0.5 - r.s() * (i - 1);
@@ -368,9 +355,9 @@ public final class PlazaCenterOctagonBandstand implements Variant {
 			}
 			int y = base + i;
 			if (m > ri - 1 && m > 0.5) {
-				p.set(c, u, y, v, stairs(r.stair(rib, 0), in));
+				p.set(c, u, y, v, stairs(r.stair(false, 0), in));
 			} else {
-				p.set(c, u, y, v, r.tread(rib && m > 2.5, p.hash(u, y, v, 7)));
+				p.set(c, u, y, v, r.tread(i == r.layers(), p.hash(u, y, v, 7)));
 			}
 		}
 	}
@@ -401,7 +388,7 @@ public final class PlazaCenterOctagonBandstand implements Variant {
 				int dx = sx * q;
 				int dz = sz * q;
 				int y = g.h();
-				at(c, p, g, dx, y, dz, b(Blocks.POLISHED_DEEPSLATE));
+				at(c, p, g, dx, y, dz, b(Blocks.POLISHED_DEEPSLATE_WALL));
 				at(c, p, g, dx, y + 1, dz, b(Blocks.CHERRY_FENCE));
 				at(c, p, g, dx, y + 2, dz, b(Blocks.CHERRY_FENCE));
 				at(c, p, g, dx, y + 3, dz, Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, false));
@@ -495,7 +482,7 @@ public final class PlazaCenterOctagonBandstand implements Variant {
 				int v = g.cv() + dz;
 				switch (role) {
 					case 1 -> {
-						at(c, p, g, dx, 0, dz, b(Blocks.POLISHED_DEEPSLATE));
+						at(c, p, g, dx, 0, dz, b(Blocks.POLISHED_DEEPSLATE_WALL));
 						at(c, p, g, dx, 1, dz, b(Blocks.CHERRY_FENCE));
 						at(c, p, g, dx, 2, dz, b(Blocks.CHERRY_FENCE));
 						at(c, p, g, dx, 3, dz, Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, false));
