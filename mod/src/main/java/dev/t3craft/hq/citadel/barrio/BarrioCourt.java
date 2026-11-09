@@ -75,21 +75,27 @@ public final class BarrioCourt {
 	public static void tree(CitadelCanvas c, Lot l) {
 		BlockPos ctr = l.centre();
 		CitadelGrounds.tree(c, ctr.getX(), ctr.getZ());
+		int r = c.s(CENTRE_R) + (c.k > 1.5 ? 1 : 0);
 		for (int sa = -1; sa <= 1; sa += 2) {
 			for (int sb = -1; sb <= 1; sb += 2) {
-				c.set(l.at(sa * CENTRE_R, sb * CENTRE_R, 1), stairs(Blocks.CHERRY_STAIRS, alongA(l, sa)));
+				c.set(l.at(sa * r, sb * r, 1), stairs(Blocks.CHERRY_STAIRS, alongA(l, sa)));
 			}
 		}
 	}
 
-	/** A pool of one cell with a planter on each diagonal. */
+	/** A pool (one cell at scale 1, {@code 2s - 1} wide when scaled) with a planter on each diagonal. */
 	public static void pool(CitadelCanvas c, Lot l) {
-		BlockPos ctr = l.centre();
-		c.set(ctr.getX(), -1, ctr.getZ(), FOOT);
-		c.set(ctr.getX(), 0, ctr.getZ(), WATER);
+		int r = c.s(CENTRE_R);
+		for (int a = -(r - 1); a <= r - 1; a++) {
+			for (int bb = -(r - 1); bb <= r - 1; bb++) {
+				BlockPos p = l.at(a, bb, 0);
+				c.set(p.getX(), -1, p.getZ(), FOOT);
+				c.set(p, WATER);
+			}
+		}
 		for (int sa = -1; sa <= 1; sa += 2) {
 			for (int sb = -1; sb <= 1; sb += 2) {
-				c.set(l.at(sa * CENTRE_R, sb * CENTRE_R, 1), c.kit.gardenPlanter());
+				c.set(l.at(sa * r, sb * r, 1), c.kit.gardenPlanter());
 			}
 		}
 	}
@@ -99,12 +105,22 @@ public final class BarrioCourt {
 		BlockPos ctr = l.centre();
 		c.set(ctr.getX(), -1, ctr.getZ(), FOOT);
 		c.set(ctr.getX(), 0, ctr.getZ(), WATER);
-		c.set(ctr.getX(), 1, ctr.getZ(), b(Blocks.STONE_BRICK_WALL));
-		c.set(ctr.getX(), 2, ctr.getZ(), b(Blocks.STONE_BRICK_WALL));
-		c.set(ctr.getX(), 3, ctr.getZ(), BarrioKit.lantern(false));
+		int top = c.sy(2);
+		for (int y = 1; y <= top; y++) {
+			c.set(ctr.getX(), y, ctr.getZ(), b(Blocks.STONE_BRICK_WALL));
+		}
+		c.set(ctr.getX(), top + 1, ctr.getZ(), BarrioKit.lantern(false));
+		int r = c.s(CENTRE_R);
+		for (int a = -(r - 1); a <= r - 1; a++) {
+			for (int bb = -(r - 1); bb <= r - 1; bb++) {
+				BlockPos p = l.at(a, bb, 0);
+				c.set(p.getX(), -1, p.getZ(), FOOT);
+				c.set(p, WATER);
+			}
+		}
 		for (int sa = -1; sa <= 1; sa += 2) {
 			for (int sb = -1; sb <= 1; sb += 2) {
-				BlockPos p = l.at(sa * CENTRE_R, sb * CENTRE_R, 0);
+				BlockPos p = l.at(sa * r, sb * r, 0);
 				c.set(p.getX(), -1, p.getZ(), FOOT);
 				c.set(p, WATER);
 			}
@@ -114,20 +130,25 @@ public final class BarrioCourt {
 	/** A well under a small pergola: four posts, a ring of slabs, the lantern hanging over the water. */
 	public static void gazebo(CitadelCanvas c, Lot l) {
 		BlockPos ctr = l.centre();
-		c.set(ctr.getX(), -1, ctr.getZ(), FOOT);
-		c.set(ctr.getX(), 0, ctr.getZ(), WATER);
-		for (int a = -CENTRE_R; a <= CENTRE_R; a++) {
-			for (int bb = -CENTRE_R; bb <= CENTRE_R; bb++) {
-				boolean post = a != 0 && bb != 0;
+		int r = c.s(CENTRE_R);
+		int roof = c.sy(4);
+		for (int a = -r; a <= r; a++) {
+			for (int bb = -r; bb <= r; bb++) {
+				boolean post = Math.abs(a) == r && Math.abs(bb) == r;
+				if (Math.abs(a) < r && Math.abs(bb) < r) {
+					BlockPos p = l.at(a, bb, 0);
+					c.set(p.getX(), -1, p.getZ(), FOOT);
+					c.set(p, WATER);
+				}
 				if (post) {
-					for (int y = 1; y <= 3; y++) {
+					for (int y = 1; y < roof; y++) {
 						c.set(l.at(a, bb, y), b(Blocks.CHERRY_FENCE));
 					}
 				}
-				c.set(l.at(a, bb, 4), BarrioKit.slabOf(Blocks.CHERRY_STAIRS));
+				c.set(l.at(a, bb, roof), BarrioKit.slabOf(Blocks.CHERRY_STAIRS));
 			}
 		}
-		c.set(l.at(0, 0, 3), BarrioKit.lantern(true));
+		c.set(l.at(0, 0, roof - 1), BarrioKit.lantern(true));
 	}
 
 	// ------------------------------------------------------------------ quadrants and corners
