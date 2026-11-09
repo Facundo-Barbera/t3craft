@@ -296,10 +296,8 @@ public final class LampCherryPost implements Variant {
 		}
 	}
 
-	/** The foot of a flanking mast: a low slab step on the side facing the other mast and a planted pot behind it. */
+	/** The foot of a flanking mast: a planted pot behind it (never under an arm: a raised floor there would cut the lantern's headroom). */
 	private static void dress(CitadelCanvas c, Plot p, int cu, int cv) {
-		int in = cu == 0 ? 1 : p.w() - 2;
-		p.set(c, in, 0, cv, slab(Blocks.STONE_BRICK_SLAB));
 		if (cv + 1 < p.d()) {
 			p.set(c, cu, 0, cv + 1, p.hash(cu, 0, 7, 2) == 0 ? b(Blocks.POTTED_FLOWERING_AZALEA) : b(Blocks.POTTED_FERN));
 		}
