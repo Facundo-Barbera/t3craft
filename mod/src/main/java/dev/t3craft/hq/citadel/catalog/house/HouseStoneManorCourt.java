@@ -28,7 +28,7 @@ import net.minecraft.world.level.block.state.BlockState;
  * A stone manor round a small open court. Two storeys on a dark rusticated foot, belt course and
  * cornice, pilasters between the window bays, a hipped slate roof that slopes both outwards to the
  * eaves and inwards to the court, and a gate pavilion on the front: a three-wide arched passage
- * under a balcony and a pediment with a gold crest, leading into the court (flagstones, a bush in
+ * under a balcony and a three-storey keep with its own hip roof, leading into the court (flagstones, a bush in
  * a moss bed, corner lamp posts).
  *
  * <pre>
@@ -41,7 +41,7 @@ import net.minecraft.world.level.block.state.BlockState;
  *  d-2  ■■■■■■■■■ back wing
  * </pre>
  *
- * Size: 13–15 × 14–15 × 16+. An even width leaves one empty column on the right.
+ * Size: 13–15 × 14–15 × 18+. An even width leaves one empty column on the right.
  */
 public final class HouseStoneManorCourt implements Variant {
 	private static final int PLATE = 9;
@@ -69,7 +69,7 @@ public final class HouseStoneManorCourt implements Variant {
 
 	@Override
 	public int minH() {
-		return 16;
+		return 18;
 	}
 
 	@Override
@@ -383,7 +383,34 @@ public final class HouseStoneManorCourt implements Variant {
 			hipLayer(c, p, u0 - 1, v0 - 1, u0 + 3, v0 + 3, PLATE + 3, Blocks.CUT_COPPER_STAIRS.waxed().exposed(), b(Blocks.CUT_COPPER.waxed().exposed()));
 			hipLayer(c, p, u0, v0, u0 + 2, v0 + 2, PLATE + 4, Blocks.CUT_COPPER_STAIRS.waxed().exposed(), b(Blocks.CUT_COPPER.waxed().exposed()));
 			p.set(c, u0 + 1, PLATE + 5, v0 + 1, slab(Blocks.CUT_COPPER_SLAB.waxed().exposed()));
-				p.set(c, u0 + 1, PLATE + 6, v0 + 1, Blocks.LIGHTNING_ROD.waxed().exposed().defaultBlockState());
+			p.set(c, u0 + 1, PLATE + 6, v0 + 1, Blocks.LIGHTNING_ROD.waxed().exposed().defaultBlockState());
+			cornerCornice(c, p, g, u0, v0);
+		}
+	}
+
+	/**
+	 * [depth] the copper hip roofs get a cornice of their own: a ring of inverted stone-brick stairs (slabs at
+	 * the four corners) round the pavilion, right under the overhanging first copper course, wherever the
+	 * main roof is not already there to carry it.
+	 */
+	private static void cornerCornice(CitadelCanvas c, Plot p, G g, int u0, int v0) {
+		for (int u = u0 - 1; u <= u0 + 3; u++) {
+			for (int v = v0 - 1; v <= v0 + 3; v++) {
+				boolean inU = u >= u0 && u <= u0 + 2;
+				boolean inV = v >= v0 && v <= v0 + 2;
+				if ((inU && inV) || level(g, u, v) >= 2) {
+					continue;
+				}
+				BlockState st;
+				if (!inU && !inV) {
+					st = topSlab(Blocks.STONE_BRICK_SLAB);
+				} else if (inU) {
+					st = stUp(Blocks.STONE_BRICK_STAIRS, v < v0 ? Direction.SOUTH : Direction.NORTH);
+				} else {
+					st = stUp(Blocks.STONE_BRICK_STAIRS, u < u0 ? Direction.EAST : Direction.WEST);
+				}
+				p.set(c, u, PLATE + 2, v, st);
+			}
 		}
 	}
 
@@ -467,26 +494,72 @@ public final class HouseStoneManorCourt implements Variant {
 		for (int u = cu - 2; u <= cu + 2; u++) {
 			p.set(c, u, PLATE, 0, stUp(Blocks.STONE_BRICK_STAIRS, Direction.SOUTH));
 		}
-		// pediment: a cross gable, ridge along v, with a gold crest
-		for (int v = 1; v <= 4; v++) {
-			p.set(c, cu - 2, PLATE + 1, v, stairs(Blocks.DEEPSLATE_TILE_STAIRS, Direction.EAST));
-			p.set(c, cu + 2, PLATE + 1, v, stairs(Blocks.DEEPSLATE_TILE_STAIRS, Direction.WEST));
-			p.set(c, cu - 1, PLATE + 2, v, stairs(Blocks.DEEPSLATE_TILE_STAIRS, Direction.EAST));
-			p.set(c, cu + 1, PLATE + 2, v, stairs(Blocks.DEEPSLATE_TILE_STAIRS, Direction.WEST));
-			p.set(c, cu, PLATE + 3, v, slab(Blocks.DEEPSLATE_BRICK_SLAB));
-			p.set(c, cu, PLATE + 2, v, b(Blocks.DEEPSLATE_TILES));
-			p.set(c, cu - 1, PLATE + 1, v, b(Blocks.DEEPSLATE_TILES));
-			p.set(c, cu + 1, PLATE + 1, v, b(Blocks.DEEPSLATE_TILES));
-			p.set(c, cu, PLATE + 1, v, b(Blocks.DEEPSLATE_TILES));
+		keep(c, p, cu);
+	}
+
+	/**
+	 * [finish] the gate keep: a three-storey body over the passage, taller than the corner pavilions. Light
+	 * walls with quoins, a window on the front and on both flanks with shutters, a chiseled frieze, a cornice
+	 * ring of inverted stairs and its own hip roof along v with a ridge cap and a lightning rod.
+	 */
+	private static void keep(CitadelCanvas c, Plot p, int cu) {
+		int y0 = PLATE + 1;
+		int top = PLATE + 4;
+		for (int y = y0; y <= top; y++) {
+			for (int u = cu - 1; u <= cu + 1; u++) {
+				for (int v = 1; v <= 5; v++) {
+					boolean quoin = (u != cu) && (v == 1 || v == 5);
+					BlockState st;
+					if (y == top) {
+						st = (u == cu && v == 1) ? b(Blocks.CHISELED_STONE_BRICKS) : b(Blocks.CALCITE);
+					} else if (quoin) {
+						st = y % 2 == 0 ? b(Blocks.CALCITE) : b(Blocks.POLISHED_ANDESITE);
+					} else {
+						st = light(p, u, y, v);
+					}
+					p.set(c, u, y, v, st);
+				}
+			}
 		}
-		// front triangle in stone under the roof edge, with the crest
-		for (int u = cu - 1; u <= cu + 1; u++) {
-			p.set(c, u, PLATE + 1, 1, b(Blocks.POLISHED_ANDESITE));
+		// windows: front (with sill and shutters), both flanks and the court side
+		for (int y = PLATE + 2; y <= PLATE + 3; y++) {
+			p.set(c, cu, y, 1, StoneKit.pane(true));
+			p.set(c, cu, y, 5, StoneKit.pane(true));
+			p.set(c, cu - 1, y, 3, StoneKit.pane(false));
+			p.set(c, cu + 1, y, 3, StoneKit.pane(false));
+			p.set(c, cu - 1, y, 0, StoneKit.shutter(Blocks.SPRUCE_TRAPDOOR, Direction.NORTH));
+			p.set(c, cu + 1, y, 0, StoneKit.shutter(Blocks.SPRUCE_TRAPDOOR, Direction.NORTH));
 		}
-		p.set(c, cu, PLATE + 2, 1, b(Blocks.CHISELED_STONE_BRICKS));
-		p.set(c, cu - 1, PLATE + 1, 1, b(Blocks.CHISELED_STONE_BRICKS));
-		p.set(c, cu + 1, PLATE + 1, 1, b(Blocks.CHISELED_STONE_BRICKS));
+		p.set(c, cu, PLATE + 1, 0, stairs(Blocks.STONE_BRICK_STAIRS, Direction.SOUTH)); // sill
 		p.set(c, cu, PLATE + 1, 1, b(Blocks.CHISELED_STONE_BRICKS));
+		// cornice ring: inverted stairs round the body, slabs at the four corners
+		for (int u = cu - 2; u <= cu + 2; u++) {
+			for (int v = 0; v <= 6; v++) {
+				boolean inU = u >= cu - 1 && u <= cu + 1;
+				boolean inV = v >= 1 && v <= 5;
+				if (inU && inV) {
+					continue;
+				}
+				BlockState st;
+				if (!inU && !inV) {
+					st = topSlab(Blocks.STONE_BRICK_SLAB);
+				} else if (inU) {
+					st = stUp(Blocks.STONE_BRICK_STAIRS, v < 1 ? Direction.SOUTH : Direction.NORTH);
+				} else {
+					st = stUp(Blocks.STONE_BRICK_STAIRS, u < cu ? Direction.EAST : Direction.WEST);
+				}
+				p.set(c, u, top, v, st);
+			}
+		}
+		// the roof: a hip along v on the cornice
+		Block copper = Blocks.CUT_COPPER_STAIRS.waxed().exposed();
+		BlockState copperBlock = b(Blocks.CUT_COPPER.waxed().exposed());
+		hipLayer(c, p, cu - 2, 0, cu + 2, 6, top + 1, copper, copperBlock);
+		hipLayer(c, p, cu - 1, 1, cu + 1, 5, top + 2, copper, copperBlock);
+		for (int v = 2; v <= 4; v++) {
+			p.set(c, cu, top + 3, v, slab(Blocks.CUT_COPPER_SLAB.waxed().exposed()));
+		}
+		p.set(c, cu, top + 4, 3, Blocks.LIGHTNING_ROD.waxed().exposed().defaultBlockState());
 	}
 
 	// ------------------------------------------------------------------ court

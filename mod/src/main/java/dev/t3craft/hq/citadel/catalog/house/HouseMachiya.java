@@ -117,7 +117,32 @@ public final class HouseMachiya implements Variant {
 		roof(c, p, s, g);
 		udatsu(c, p, g);
 		street(c, p, s, g);
+		frontPosts(c, p, s, g);
 		courtyard(c, p, r, g);
+	}
+
+	/**
+	 * [depth] the hisashi stands on its own posts, one row in front of the lattice, so the facade reads as three
+	 * planes: posts and canopy, the lattice fins, the plaster wall. Posts also rise proud of the upper floor.
+	 */
+	private static void frontPosts(CitadelCanvas c, Plot p, Scheme s, Geo g) {
+		int cu = g.cu();
+		for (int u : new int[] {g.u1(), g.u2(), cu - 3, cu + 3}) {
+			if (u < g.u1() || u > g.u2()) {
+				continue;
+			}
+			p.set(c, u, 0, 0, b(Blocks.POLISHED_DEEPSLATE));
+			for (int y = 1; y <= 3; y++) {
+				p.set(c, u, y, 0, log(s.trim(), Direction.Axis.Y));
+			}
+		}
+		for (int u = g.u1(); u <= g.u2(); u++) {
+			if (isPost(u, g.u1(), g.u2())) {
+				for (int y = 6; y <= 7; y++) {
+					p.set(c, u, y, 1, log(s.trim(), Direction.Axis.Y));
+				}
+			}
+		}
 	}
 
 	// ------------------------------------------------------------------ materials
@@ -202,7 +227,8 @@ public final class HouseMachiya implements Variant {
 				continue;
 			}
 			for (int y = 1; y <= 3; y++) {
-				p.set(c, u, y, 1, trapdoor(s.lattice(), Direction.EAST, true, Half.BOTTOM)); // a fin on the west side of the cell
+				// a fin on one side of the cell; the sides alternate, so the lattice zigzags and has real depth
+				p.set(c, u, y, 1, trapdoor(s.lattice(), (u - u1) % 2 == 0 ? Direction.EAST : Direction.WEST, true, Half.BOTTOM));
 			}
 			p.set(c, u, 1, 1, trapdoor(s.lattice(), Direction.NORTH, false, Half.BOTTOM)); // kick plate
 			p.set(c, u, 3, 1, trapdoor(s.lattice(), Direction.NORTH, false, Half.TOP)); // header
@@ -403,6 +429,17 @@ public final class HouseMachiya implements Variant {
 			if ((u - g.u1()) % 2 == 0) {
 				p.set(c, u, PLATE, g.rf(), log(s.trim(), Direction.Axis.Z));
 				p.set(c, u, PLATE, g.rb(), log(s.trim(), Direction.Axis.Z));
+			}
+		}
+		// [depth] both lips rest on rafter tails that run out from the wall plate, with a stair corbel under each
+		for (int u = g.u1(); u <= g.u2(); u += 2) {
+			EaveKit.tail(c, p, u, PLATE, g.rf() - 1, Direction.SOUTH, s.trim());
+			EaveKit.tail(c, p, u, PLATE, g.rb() + 1, Direction.NORTH, s.trim());
+			if (EaveKit.free(c, p, u, PLATE - 1, g.rf())) {
+				p.set(c, u, PLATE - 1, g.rf(), stairTop(Blocks.DARK_OAK_STAIRS, Direction.SOUTH));
+			}
+			if (EaveKit.free(c, p, u, PLATE - 1, g.rb())) {
+				p.set(c, u, PLATE - 1, g.rb(), stairTop(Blocks.DARK_OAK_STAIRS, Direction.NORTH));
 			}
 		}
 		// [finish] end tiles on the ridge: a short wall post at each side

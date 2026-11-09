@@ -108,6 +108,28 @@ public final class HouseTimberCottage implements Variant {
 		roof(c, p, s, u1, u2, vj, vb);
 		chimney(c, p, u2 - 1, vb - 1);
 		yard(c, p, r, u1, u2, vf, vb, cu);
+		eaves(c, p, s, u1, u2, vj, vb, cu);
+	}
+
+	/**
+	 * [depth] the eaves stand on beam tails: under the front and back eave a log pokes out of the wall at every
+	 * post, with an upside-down stair hugging the wall under it; under the two gable overhangs the same at the
+	 * corner posts.
+	 */
+	private static void eaves(CitadelCanvas c, Plot p, Scheme s, int u1, int u2, int vj, int vb, int cu) {
+		int d = p.d();
+		Block log = s.frame();
+		Block st = Blocks.SPRUCE_STAIRS;
+		for (int u = u1; u <= u2; u++) {
+			if (isPost(u, u1, u2, -1) || u == cu) {
+				EaveKit.corbel(c, p, u, PLATE - 1, 0, Direction.SOUTH, log, st);
+				EaveKit.corbel(c, p, u, PLATE - 1, d - 1, Direction.NORTH, log, st);
+			}
+		}
+		for (int v : new int[] {vj, vb}) {
+			EaveKit.corbel(c, p, 0, PLATE - 1, v, Direction.EAST, log, st);
+			EaveKit.corbel(c, p, p.w() - 1, PLATE - 1, v, Direction.WEST, log, st);
+		}
 	}
 
 	// ------------------------------------------------------------------ base

@@ -100,12 +100,31 @@ public final class HouseStoneWeathered implements Variant {
 
 		roofM(c, p, wa, vm, w, d);
 		roofA(c, p, wa, vm, d);
+		valley(c, p, wa, vm, w, d);
 		gables(c, p, wa, vm, w, d);
 		chimney(c, p, w, vm);
 		bay(c, p, wa);
 		windows(aFront, aLeft, aRight, mRight, back, wa, vm, w, d);
 		porch(c, p, wa, vm, w);
 		yard(c, p, wa, vm, w, d);
+		eaves(c, p, wa, vm, w, d);
+	}
+
+	/**
+	 * [depth] every long eave stands on beam tails: a dark oak log pokes out of the wall under the eave every
+	 * second cell, an upside-down stair hugging the wall under it. Cells taken by shutters or the porch are skipped.
+	 */
+	private static void eaves(CitadelCanvas c, Plot p, int wa, int vm, int w, int d) {
+		for (int v = 3; v <= d - 3; v += 2) {
+			EaveKit.corbel(c, p, 0, PLATE - 1, v, Direction.EAST, Blocks.DARK_OAK_LOG, Blocks.DARK_OAK_STAIRS);
+		}
+		for (int v = 3; v <= vm - 2; v += 2) {
+			EaveKit.corbel(c, p, wa + 1, PLATE - 1, v, Direction.WEST, Blocks.DARK_OAK_LOG, Blocks.DARK_OAK_STAIRS);
+		}
+		for (int u = wa + 2; u <= w - 3; u += 2) {
+			EaveKit.corbel(c, p, u, PLATE - 1, d - 1, Direction.NORTH, Blocks.DARK_OAK_LOG, Blocks.DARK_OAK_STAIRS);
+			EaveKit.corbel(c, p, u, PLATE - 1, vm - 1, Direction.SOUTH, Blocks.DARK_OAK_LOG, Blocks.DARK_OAK_STAIRS);
+		}
 	}
 
 	// ------------------------------------------------------------------ walls
@@ -282,6 +301,34 @@ public final class HouseStoneWeathered implements Variant {
 			} else {
 				p.set(c, wa / 2, top + 1, v, slab(Blocks.DEEPSLATE_TILE_SLAB));
 				p.set(c, wa / 2 + 1, top + 1, v, slab(Blocks.DEEPSLATE_TILE_SLAB));
+			}
+		}
+	}
+
+	/**
+	 * [finish] a clean roof junction: the back block's roof is as high as the wing's ridge, so it runs into the
+	 * wing's slope. Wherever the back block's slope is higher than the wing's slope (right half of the wing),
+	 * its stairs take over and the gap under them is filled, which leaves one straight valley and no floating ridge end.
+	 */
+	private static void valley(CitadelCanvas c, Plot p, int wa, int vm, int w, int d) {
+		int rows = d - vm + 1;
+		int top = PLATE + lvM(vm - 1 + (rows - 1) / 2, vm, d);
+		for (int v = vm; v <= d - 2; v++) {
+			int lm = lvM(v, vm, d);
+			boolean front = v - (vm - 1) < d - 1 - v;
+			boolean middle = v - (vm - 1) == d - 1 - v;
+			for (int u = wa; u > 0 && 2 * u > wa + 1; u--) {
+				int la = lvA(u, wa);
+				if (lm <= la) {
+					continue;
+				}
+				for (int y = PLATE + la; y < PLATE + lm; y++) {
+					p.set(c, u, y, v, b(Blocks.CHERRY_PLANKS));
+				}
+				p.set(c, u, PLATE + lm, v, middle ? b(Blocks.CHERRY_PLANKS) : stairs(Blocks.CHERRY_STAIRS, front ? Direction.SOUTH : Direction.NORTH));
+				if (PLATE + lm == top) {
+					p.set(c, u, top + 1, v, slab(Blocks.DEEPSLATE_TILE_SLAB));
+				}
 			}
 		}
 	}
