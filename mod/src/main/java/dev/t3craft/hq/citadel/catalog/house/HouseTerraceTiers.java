@@ -107,6 +107,7 @@ public final class HouseTerraceTiers implements Variant {
 		final int[] ve;
 		final int[] s;
 		final int[] c;
+		int type;
 
 		Geo(int n) {
 			this.n = n;
@@ -132,27 +133,33 @@ public final class HouseTerraceTiers implements Variant {
 		}
 
 		static Geo plan(int w, int d, int h, int type, int want) {
+			int[] rights = type == 0 ? new int[] {5, 3} : new int[] {0};
+			int[] steps = type == 0 ? new int[] {6, 5} : new int[] {5, 4};
 			for (int n = want; n >= 2; n--) {
-				Geo g = new Geo(n);
-				g.ua[0] = LANE_W;
-				g.ub[0] = w - 2;
-				g.va[0] = 2;
-				g.ve[0] = d - 2;
-				int step = type == 0 ? 5 : 4;
-				for (int i = 1; i < n; i++) {
-					g.ua[i] = g.ua[i - 1] + 3;
-					g.ub[i] = type == 0 ? g.ub[i - 1] - 3 : g.ub[i - 1];
-					g.va[i] = g.va[i - 1] + step;
-					g.ve[i] = g.ve[0];
-				}
-				for (int i = 0; i < n; i++) {
-					g.s[i] = 1 + PITCH * i;
-					g.c[i] = g.s[i] + 4;
-				}
-				int t = n - 1;
-				boolean ok = g.ub[t] - g.ua[t] + 1 >= 8 && g.ve[t] - g.va[t] + 1 >= 7 && g.ve[0] >= (n == 3 ? 16 : 13) && h >= (n == 3 ? 20 : 17);
-				if (ok) {
-					return g;
+				for (int right : rights) {
+					for (int step : steps) {
+						Geo g = new Geo(n);
+						g.type = type;
+						g.ua[0] = LANE_W;
+						g.ub[0] = w - 2;
+						g.va[0] = 2;
+						g.ve[0] = d - 2;
+						for (int i = 1; i < n; i++) {
+							g.ua[i] = g.ua[i - 1] + 3;
+							g.ub[i] = type == 0 ? g.ub[i - 1] - right : g.ub[i - 1];
+							g.va[i] = g.va[i - 1] + step;
+							g.ve[i] = g.ve[0];
+						}
+						for (int i = 0; i < n; i++) {
+							g.s[i] = 1 + PITCH * i;
+							g.c[i] = g.s[i] + 4;
+						}
+						int t = n - 1;
+						boolean ok = g.ub[t] - g.ua[t] + 1 >= 8 && g.ve[t] - g.va[t] + 1 >= 7 && g.ve[0] >= (n == 3 ? 16 : 13) && h >= (n == 3 ? 20 : 17);
+						if (ok) {
+							return g;
+						}
+					}
 				}
 			}
 			return null;
@@ -284,7 +291,7 @@ public final class HouseTerraceTiers implements Variant {
 	}
 
 	private static BlockState post() {
-		return b(Blocks.STRIPPED_CHERRY_LOG);
+		return b(Blocks.STRIPPED_DARK_OAK_LOG);
 	}
 
 	private static BlockState face(Block blk, Direction f) {
@@ -485,9 +492,10 @@ public final class HouseTerraceTiers implements Variant {
 		int xl = na + 1;
 		int xr = ub - 1;
 		int promV = nv - 1;
-		int trunkU = xr - 1;
-		int trunkV = va + 2;
-		boolean tree = xr - xl >= 7 && i < g.n;
+		boolean sideTree = g.type == 0 && i < g.n - 2 && ub - nb - 1 >= 2 && ve - nv >= 5;
+		int trunkU = sideTree ? ub - 1 : xr - 1;
+		int trunkV = sideTree ? nv + 3 : va + 2;
+		boolean tree = sideTree || xr - xl >= 7;
 		for (int u = ua + 1; u < ub; u++) {
 			for (int v = va + 1; v < ve; v++) {
 				if (g.in(i + 1, u, v)) {
@@ -578,7 +586,8 @@ public final class HouseTerraceTiers implements Variant {
 				x.set(u, l0 + j, r, stair(Blocks.STONE_BRICK_STAIRS, Direction.SOUTH, false));
 			}
 			for (int y = l0; y <= l0 + j + 1; y++) {
-				x.set(c0 - 1, y, r, y == l0 + j + 1 ? b(Blocks.POLISHED_ANDESITE) : midStone(p, c0 - 1, y, r));
+				BlockState cheek = y == l0 + j + 1 ? b(Blocks.POLISHED_ANDESITE) : j % 3 == 2 ? post() : y < l0 + 2 ? darkStone(p, c0 - 1, y, r) : midStone(p, c0 - 1, y, r);
+				x.set(c0 - 1, y, r, cheek);
 			}
 		}
 		for (int r = r0 + rise; r <= r0 + rise + 1; r++) {
@@ -614,12 +623,42 @@ public final class HouseTerraceTiers implements Variant {
 	// ------------------------------------------------------------------ roof
 
 	/**
-	 * A small hip roof over the last volume: an eave ring of cherry stairs one block out, deepslate-tile rings
-	 * stepping in, a flat ridge capped with slabs and a brick chimney. The mass under it is solid, so there is
-	 * no attic to seal.
+	 * A hip roof on the rectangle {@code a..bb × v0..e} whose eave ring sits at layer {@code pp}: stairs on every
+	 * ring (outer corners set), stepping in one block per layer for {@code tMax} rings, a flat ridge on the rest. The
+	 * mass under the stairs is solid, so there is no attic to seal.
+	 */
+	private static void hip(B x, int a, int bb, int v0, int e, int pp, int tMax, int h, boolean cap, Block eave) {
+		Plot p = x.p;
+		for (int u = a; u <= bb; u++) {
+			for (int v = v0; v <= e; v++) {
+				int r = Math.min(Math.min(u - a, bb - u), Math.min(v - v0, e - v));
+				if (r < tMax) {
+					boolean n = v == v0 + r;
+					boolean s = v == e - r;
+					boolean w = u == a + r;
+					boolean ee = u == bb - r;
+					x.set(u, pp + r, v, ringStair(r == 0 ? eave : Blocks.DEEPSLATE_TILE_STAIRS, n, s, w, ee, false));
+					for (int y = pp + 1; y < pp + r; y++) {
+						x.set(u, y, v, roofStone(p, u, y, v));
+					}
+				} else {
+					for (int y = pp + 1; y < pp + tMax; y++) {
+						x.set(u, y, v, roofStone(p, u, y, v));
+					}
+					x.set(u, pp + tMax, v, b(Blocks.POLISHED_DEEPSLATE));
+					if (cap && pp + tMax + 1 <= h - 1) {
+						x.set(u, pp + tMax + 1, v, slab(Blocks.DEEPSLATE_TILE_SLAB));
+					}
+				}
+			}
+		}
+	}
+
+	/**
+	 * The roof of the last volume: a hip roof with a cherry eave and, when there is height for it, a second small
+	 * roof on a glowing glass lantern in the middle (a double roof), a gold-quiet finial and two brick chimneys.
 	 */
 	private static void roof(B x, Geo g, int h) {
-		Plot p = x.p;
 		int i = g.n - 1;
 		int pp = g.c[i];
 		int a = g.ua[i] - 1;
@@ -632,37 +671,53 @@ public final class HouseTerraceTiers implements Variant {
 		if (tMax < 1) {
 			return;
 		}
-		for (int u = a; u <= bb; u++) {
-			for (int v = v0; v <= e; v++) {
-				int r = Math.min(Math.min(u - a, bb - u), Math.min(v - v0, e - v));
-				if (r < tMax) {
-					boolean n = v == v0 + r;
-					boolean s = v == e - r;
-					boolean w = u == a + r;
-					boolean ee = u == bb - r;
-					x.set(u, pp + r, v, ringStair(r == 0 ? Blocks.CHERRY_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS, n, s, w, ee, false));
-					for (int y = pp + 1; y < pp + r; y++) {
-						x.set(u, y, v, roofStone(p, u, y, v));
-					}
-				} else {
-					for (int y = pp + 1; y < pp + tMax; y++) {
-						x.set(u, y, v, roofStone(p, u, y, v));
-					}
-					x.set(u, pp + tMax, v, b(Blocks.POLISHED_DEEPSLATE));
-					if (pp + tMax + 1 <= h - 1) {
-						x.set(u, pp + tMax + 1, v, slab(Blocks.DEEPSLATE_TILE_SLAB));
+		// the lantern: inner rectangle after the rings, if it is at least 5 across and the height allows 2 rings
+		int ia = a + tMax;
+		int ib = bb - tMax;
+		int ja = v0 + tMax;
+		int jb = e - tMax;
+		int m = Math.min(ib - ia + 1, jb - ja + 1);
+		int y1 = pp + tMax + 1;
+		int pb = y1 + 2;
+		int tt = Math.min(2, (m - 1) / 2);
+		while (tt >= 1 && pb + tt + 1 > h - 1) {
+			tt--;
+		}
+		boolean lantern = m >= 5 && tt >= 1;
+		hip(x, a, bb, v0, e, pp, tMax, h, !lantern, Blocks.CHERRY_STAIRS);
+		if (lantern) {
+			for (int u = ia; u <= ib; u++) {
+				for (int v = ja; v <= jb; v++) {
+					int r = Math.min(Math.min(u - ia, ib - u), Math.min(v - ja, jb - v));
+					if (r >= 2) {
+						for (int y = y1; y <= pb; y++) {
+							x.set(u, y, v, b(Blocks.OCHRE_FROGLIGHT));
+						}
+					} else if (r == 1) {
+						boolean horiz = v == ja + 1 || v == jb - 1;
+						boolean corner = (u == ia + 1 || u == ib - 1) && horiz;
+						for (int y = y1; y <= y1 + 1; y++) {
+							x.set(u, y, v, corner ? b(Blocks.STRIPPED_CHERRY_LOG) : pane(Blocks.GLASS_PANE, horiz));
+						}
+						x.set(u, pb, v, log(Blocks.STRIPPED_CHERRY_LOG, horiz ? Direction.Axis.X : Direction.Axis.Z));
 					}
 				}
 			}
-		}
-		// chimney on the ridge
-		int cu = a + tMax + 1;
-		int cv = (v0 + e) / 2;
-		if (cu < bb - tMax && pp + tMax + 3 <= h - 1) {
-			for (int y = pp + tMax + 1; y <= pp + tMax + 2; y++) {
-				x.set(cu, y, cv, x.hash(cu, y, cv, 3) == 0 ? b(Blocks.DEEPSLATE_BRICKS) : b(Blocks.BRICKS));
+			hip(x, ia, ib, ja, jb, pb, tt, h, true, Blocks.CHERRY_STAIRS);
+			int top = pb + tt + 2;
+			if (top <= h - 1) {
+				x.set((ia + ib) / 2, top, (ja + jb) / 2, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState());
 			}
-			x.set(cu, pp + tMax + 3, cv, slab(Blocks.DEEPSLATE_BRICK_SLAB));
+		}
+		// two chimneys through the slopes, either side of the ridge
+		int cv = (v0 + e) / 2;
+		if (tMax >= 2 && pp + tMax + 3 <= h - 1) {
+			for (int cu : new int[] {a + 1, bb - 1}) {
+				for (int y = pp + 2; y <= pp + tMax + 2; y++) {
+					x.set(cu, y, cv, x.hash(cu, y, cv, 3) == 0 ? b(Blocks.DEEPSLATE_BRICKS) : b(Blocks.BRICKS));
+				}
+				x.set(cu, pp + tMax + 3, cv, slab(Blocks.DEEPSLATE_BRICK_SLAB));
+			}
 		}
 	}
 
