@@ -256,9 +256,6 @@ public final class TreeCherryWeeping implements Variant {
 				if (f < 0) {
 					continue; // the centre stays open
 				}
-				if (Math.floorMod(u + 2 * v, 3) != par) {
-					continue; // a lattice of one cell in three: fine hair, never two strands side by side
-				}
 				int y0c = -1;
 				for (int y = CLEAR - 1; y < p.h(); y++) {
 					byte k = t.kind(u, y, v);
@@ -266,6 +263,16 @@ public final class TreeCherryWeeping implements Variant {
 						y0c = y;
 						break;
 					}
+				}
+				if (Math.floorMod(u + 2 * v, 3) != par) {
+					// between the strands the hem only has short drips, so its edge is ragged (3+ blocks stay free under it)
+					if (f > 0.45 && y0c > CLEAR + 1 && t.empty(u, y0c - 1, v) && t.hash(u, 9, v, 100) < 38) {
+						t.leaf(u, y0c - 1, v, TreeKit.SAKURA.a());
+						if (y0c - 2 >= CLEAR && t.hash(u, 10, v, 100) < 30) {
+							t.leaf(u, y0c - 2, v, TreeKit.SAKURA.b());
+						}
+					}
+					continue; // a lattice of one cell in three carries the long strands: fine hair, never two side by side
 				}
 				if (y0c < 0 || t.kind(u, y0c - 1, v) != TreeKit.EMPTY) {
 					continue;
@@ -300,6 +307,8 @@ public final class TreeCherryWeeping implements Variant {
 						su += ku; // the step is a leaf beside the last one, face-connected
 						sv += kv;
 						t.leaf(su, y, sv, TreeKit.SAKURA.a());
+						t.leaf(su, y + 1, sv, TreeKit.SAKURA.a()); // and two above it, so the step is no ledge to stand on
+						t.leaf(su, y + 2, sv, TreeKit.SAKURA.a());
 					}
 				}
 				strand[v * w + u] = true;
