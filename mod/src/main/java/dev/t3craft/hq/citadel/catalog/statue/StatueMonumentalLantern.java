@@ -363,7 +363,7 @@ public final class StatueMonumentalLantern implements Variant {
 	// ------------------------------------------------------------------ compact (2 x 2)
 
 	/**
-	 * The lantern in the centred 2 × 2 cells: a foot of four blocks, a 2-tall shaft with a chiselled band, a
+	 * The lantern in the centred 2 × 2 cells: a foot of four blocks, four slim posts on a plinth block under a chiselled band, a
 	 * platform, a froglight lamp, a hipped copper roof. Used for 2-wide or 2-deep plots, and below 10 high.
 	 */
 	private static void compact(CitadelCanvas c, Plot p, Pal pal) {
@@ -382,7 +382,7 @@ public final class StatueMonumentalLantern implements Variant {
 				Direction bb = j == 0 ? Direction.SOUTH : Direction.NORTH;
 				p.set(c, u, 0, v, pal.base(u, v));
 				for (int y = 1; y <= shaftTop; y++) {
-					p.set(c, u, y, v, y == 1 ? b(pal.plinth) : y == shaftTop ? b(pal.node) : pal.shaftBlock(u, y, v));
+					p.set(c, u, y, v, y == 1 ? b(pal.plinth) : y == shaftTop ? b(pal.node) : pal.post(u, y, v)); // four slim posts on the plinth
 				}
 				// [depth] the platform flares (a top-half hip), the roof is a hip, the apex a second one
 				p.set(c, u, plat, v, hip(pal.platStairs, a, bb, true));
