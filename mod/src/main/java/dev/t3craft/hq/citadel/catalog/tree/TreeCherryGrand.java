@@ -105,17 +105,17 @@ public final class TreeCherryGrand implements Variant {
 					int fu = (int) Math.round(mu + fx * fr);
 					int fv = (int) Math.round(mv + fz * fr);
 					TreeKit.branch(t, TreeKit.CHERRY, new int[] {mu, my, mv}, new int[] {fu, my + 1, fv}, false);
-					TreeKit.lobe(t, fu, my + 1.3, fv, 1.3 * sc, 1.2 * sc, 0.9, 0.6, TreeKit.SAKURA.swap(), 0.35, 40 + i);
+					TreeKit.lobe(t, fu, my + 1, fv, 1.4 * sc, 1.3 * sc, 1.6, 1.0, TreeKit.SAKURA.swap(), 0.35, 40 + i);
 				}
 			}
-			TreeKit.lobe(t, tu, ly + 0.3, tv, rx, rz, 1.4, 0.8, TreeKit.SAKURA, 0.4, i);
+			TreeKit.lobe(t, tu, ly, tv, rx, rz, 1.9, 1.2, TreeKit.SAKURA, 0.4, i);
 			drips(t, tu, ly, tv, rx, rz, i);
 		}
 		// the crown on the leader
 		int cu = lead[0][crownY];
 		int cv = lead[1][crownY];
 		double cr = TreeKit.clamp(Math.min(Math.min(cu, p.w() - 1 - cu), Math.min(cv, p.d() - 1 - cv)) + 0.6, 1.6, 2.4 * sc);
-		TreeKit.lobe(t, cu, crownY + 0.6, cv, cr, cr * 0.9, 1.4, 1.0, TreeKit.SAKURA, 0.4, 9);
+		TreeKit.lobe(t, cu, crownY + 1, cv, cr, cr * 0.9, 1.9, 1.3, TreeKit.SAKURA, 0.4, 9);
 
 		TreeKit.petalCarpet(t, bu + 0.5, bv + 0.5, Math.min(p.w(), p.d()) / 2.0 + 0.8);
 		t.prune();

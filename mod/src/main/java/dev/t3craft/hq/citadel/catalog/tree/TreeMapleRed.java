@@ -1,31 +1,38 @@
 package dev.t3craft.hq.citadel.catalog.tree;
 
 import static dev.t3craft.hq.citadel.CitadelCanvas.b;
-import static dev.t3craft.hq.citadel.CitadelCanvas.leaves;
 
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.catalog.Family;
 import dev.t3craft.hq.citadel.catalog.Plot;
 import dev.t3craft.hq.citadel.catalog.Variant;
-import net.minecraft.core.Direction;
+import dev.t3craft.hq.citadel.catalog.tree.TreeKit.Leaves;
+import dev.t3craft.hq.citadel.catalog.tree.TreeKit.Vox;
+import dev.t3craft.hq.citadel.catalog.tree.TreeKit.Wood;
+import java.util.Random;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.state.BlockState;
 
 /**
- * Maple: a short, stout reddish trunk on mangrove roots that forks into four limbs, carrying a broad,
- * bumpy dome made of clustered lobes (one big crown, four lobes over the limb tips, four lower fillers),
- * wider than it is tall. Leaves are mangrove (dark, low and inside) and acacia (lighter, high and outside);
- * the underside hangs ragged and the ground below is a bed of leaf litter with a mushroom or two.
+ * Red maple in autumn: a stout dark 2×2 trunk on spreading roots that thins and forks low into four
+ * diagonal limbs, carrying a broad umbrella of six rounded lobes of different sizes with sky between them.
+ * The colour runs by lobe, from scarlet low and inside (nether wart and red wool) through red-orange to
+ * orange at the sunny top (orange wool with honeycomb), each lobe two-toned. Leaf litter, a mushroom and
+ * moss below.
  *
- * <p>Silhouette: the round, wide "umbrella" (the birch is a slender grove, the pine a stepped spire).
- * Both leaf blocks are biome-tinted by the game, so the warm tones depend on the biome's foliage colour.
+ * <p>The maple uses untinted blocks for its foliage: every vanilla leaf that could be red is biome-tinted
+ * green in the renders and in plains.
  *
- * <p>Size: 7–9 × 7–9 × 9–14 (the dome stops at {@code min(w, d) + 2}; extra height stays empty).
+ * <p>Size: 7–9 × 7–9 × 9+ (the dome stops at 12 high; extra height stays empty).
  */
 public final class TreeMapleRed implements Variant {
-	private static final BlockState BARK = b(Blocks.MANGROVE_LOG);
-	private static final BlockState BARK_PALE = b(Blocks.STRIPPED_MANGROVE_LOG);
-	private static final BlockState ROOTS = b(Blocks.MANGROVE_ROOTS);
+	private static final Wood WOOD = new Wood(Blocks.DARK_OAK_LOG, Blocks.DARK_OAK_WOOD, b(Blocks.MANGROVE_ROOTS));
+	/** By lobe, low → high: scarlet, red, red-orange, orange. */
+	private static final Leaves[] RAMP = {
+			new Leaves(b(Blocks.NETHER_WART_BLOCK), b(Blocks.RED_WOOL), null, 3, 0),
+			new Leaves(b(Blocks.RED_WOOL), b(Blocks.NETHER_WART_BLOCK), null, 4, 0),
+			new Leaves(b(Blocks.RED_WOOL), b(Blocks.ORANGE_WOOL), null, 3, 0),
+			new Leaves(b(Blocks.ORANGE_WOOL), b(Blocks.HONEYCOMB_BLOCK), null, 4, 0),
+	};
 
 	@Override
 	public String id() {
@@ -64,179 +71,69 @@ public final class TreeMapleRed implements Variant {
 
 	@Override
 	public void build(CitadelCanvas c, Plot p) {
-		int w = p.w();
-		int d = p.d();
-		int top = Math.min(p.h() - 1, Math.min(w, d) + 2);
-		int t = MixedTreeKit.clamp(Math.round((top + 1) * 0.45f), 4, 6); // fork height: a trunk that shows
-		double cx = (w - 1) / 2.0;
-		double cz = (d - 1) / 2.0;
-		double radius = (Math.min(w, d) - 1) / 2.0; // 3..4
-		int uLo = MixedTreeKit.lo(w);
-		int uHi = MixedTreeKit.hi(w);
-		int vLo = MixedTreeKit.lo(d);
-		int vHi = MixedTreeKit.hi(d);
+		Vox t = new Vox(p);
+		Random r = p.rng(0x3A91);
+		int H = Math.min(p.h(), 12);
+		double sc = Math.min(p.w(), p.d()) / 7.0;
+		int bu = (p.w() - 2) / 2;
+		int bv = (p.d() - 2) / 2;
+		int y2 = 2;
+		int fork = H >= 11 ? 4 : 3;
+		int[][] lead = TreeKit.trunk(t, WOOD, bu, bv, y2, H - 3, r.nextInt(2), r.nextInt(2), 0, 0);
+		TreeKit.roots(t, WOOD, bu, bv, 7, 2 + (sc > 1.1 ? 1 : 0), -1, 5);
 
-		ground(c, p, cx, cz, radius, uLo, uHi, vLo, vHi);
-		canopy(c, p, cx, cz, radius, t, top);
-		limbs(c, p, radius, t, uLo, uHi, vLo, vHi);
-		trunk(c, p, t, uLo, uHi, vLo, vHi);
-	}
-
-	// ------------------------------------------------------------------ ground
-
-	/** [finish] leaf litter under the dome, roots hugging the trunk, mushrooms and moss between them. */
-	private static void ground(CitadelCanvas c, Plot p, double cx, double cz, double radius, int uLo, int uHi, int vLo, int vHi) {
-		for (int u = 0; u < p.w(); u++) {
-			for (int v = 0; v < p.d(); v++) {
-				double dist = Math.hypot(u - cx, v - cz);
-				if (dist <= radius + 0.6 && p.hash(u, 0, v, 3) == 0) {
-					MixedTreeKit.put(c, p, u, 0, v, b(Blocks.LEAF_LITTER));
-				}
+		// four limbs, low and diagonal, to the four side lobes; each lobe's tone follows its height
+		double a0 = r.nextDouble() * Math.PI * 2;
+		int[] lobeY = {fork + 2, fork + 3, fork + 2, fork + 4};
+		for (int i = 0; i < 4; i++) {
+			double ang = a0 + i * Math.PI / 2 + (r.nextDouble() - 0.5) * 0.5;
+			double ex = Math.cos(ang);
+			double ez = Math.sin(ang);
+			int ly = Math.min(lobeY[(i + r.nextInt(2)) % 4], H - 4);
+			double rx = (1.8 + r.nextDouble() * 0.5) * sc;
+			double rz = rx * (0.8 + r.nextDouble() * 0.2);
+			int su = lead[0][fork];
+			int sv = lead[1][fork];
+			double reach = TreeKit.clamp(TreeKit.room(t, su, sv, ex, ez, 0) - Math.max(rx, rz) + 0.7, 1.2, 3.0 * sc);
+			int tu = (int) Math.round(su + ex * reach);
+			int tv = (int) Math.round(sv + ez * reach);
+			TreeKit.branch(t, WOOD, new int[] {su, fork, sv}, new int[] {tu, ly, tv}, true);
+			int tone = ly <= fork + 2 ? 1 : 2;
+			TreeKit.lobe(t, tu, ly + 0.2, tv, rx, rz, 1.9, 1.2, RAMP[tone], 0.45, i);
+			// a low scarlet skirt lobe under every other limb, hanging off its elbow
+			if (i % 2 == 0) {
+				int mu = (su + tu * 2) / 3;
+				int mv = (sv + tv * 2) / 3;
+				TreeKit.lobe(t, mu + ex * 0.6, ly - 1.4, mv + ez * 0.6, 1.4 * sc, 1.3 * sc, 1.4, 1.0, RAMP[0], 0.35, 20 + i);
 			}
 		}
-		for (int u = uLo - 1; u <= uHi + 1; u++) {
-			for (int v = vLo - 1; v <= vHi + 1; v++) {
-				boolean insideU = u >= uLo && u <= uHi;
-				boolean insideV = v >= vLo && v <= vHi;
-				if (insideU && insideV) {
-					continue;
-				}
-				int n = p.hash(u, 0, v, 4);
-				if (insideU || insideV) { // next to the trunk: roots, a second tier on some
-					MixedTreeKit.put(c, p, u, 0, v, n < 3 ? ROOTS : b(Blocks.MOSS_CARPET));
-					if (n == 0) {
-						MixedTreeKit.put(c, p, u, 1, v, ROOTS);
-					}
-				} else { // the corners: litter, a red mushroom or moss
-					BlockState s = switch (p.hash(u, 1, v, 3)) {
-						case 0 -> b(Blocks.RED_MUSHROOM);
-						case 1 -> b(Blocks.MOSS_CARPET);
-						default -> b(Blocks.LEAF_LITTER);
-					};
-					MixedTreeKit.put(c, p, u, 0, v, s);
-				}
+		// the high centre: an orange crown on the leader and a smaller red-orange cap beside it
+		int top = H - 3;
+		int cu = lead[0][top];
+		int cv = lead[1][top];
+		double cr = 2.3 * sc;
+		TreeKit.lobe(t, cu, top + 0.4, cv, cr, cr * 0.9, 1.9, 1.3, RAMP[3], 0.45, 9);
+		double ca = a0 + Math.PI / 4;
+		int ku = (int) Math.round(lead[0][top - 2] + Math.cos(ca) * 1.6 * sc);
+		int kv = (int) Math.round(lead[1][top - 2] + Math.sin(ca) * 1.6 * sc);
+		TreeKit.branch(t, WOOD, new int[] {lead[0][top - 3], top - 3, lead[1][top - 3]}, new int[] {ku, top - 1, kv}, false);
+		TreeKit.lobe(t, ku, top - 0.8, kv, 1.6 * sc, 1.5 * sc, 1.7, 1.1, RAMP[2], 0.4, 11);
+
+		// leaf litter, thick under the dome, a mushroom and moss among the roots
+		TreeKit.ground(t, bu + 0.5, bv + 0.5, Math.min(p.w(), p.d()) / 2.0 + 0.7, (u, v, k) -> {
+			int hsh = t.hash(u, 0, v, 100);
+			if (hsh < 62 - 25 * k) {
+				return b(Blocks.LEAF_LITTER);
 			}
-		}
-	}
-
-	// ------------------------------------------------------------------ trunk and limbs
-
-	private static void trunk(CitadelCanvas c, Plot p, int t, int uLo, int uHi, int vLo, int vHi) {
-		for (int y = 0; y <= t + 1; y++) {
-			for (int u = uLo; u <= uHi; u++) {
-				for (int v = vLo; v <= vHi; v++) {
-					// [palette] mostly bark, a few stripped (pale) patches higher up
-					MixedTreeKit.put(c, p, u, y, v, y >= 2 && p.hash(u, y, v, 6) == 0 ? BARK_PALE : BARK);
-				}
+			if (hsh < 66) {
+				return b(Blocks.RED_MUSHROOM);
 			}
-		}
-	}
-
-	/** Four limbs, one per side, rising one block every two: horizontal logs, a vertical one where they climb. */
-	private static void limbs(CitadelCanvas c, Plot p, double radius, int t, int uLo, int uHi, int vLo, int vHi) {
-		int len = (int) Math.ceil(radius) - 1;
-		int[][] dirs = {{1, 0, uHi, vLo}, {-1, 0, uLo, vHi}, {0, -1, uLo, vLo}, {0, 1, uHi, vHi}};
-		for (int[] dir : dirs) {
-			Direction.Axis axis = dir[0] != 0 ? Direction.Axis.X : Direction.Axis.Z;
-			int prevY = t;
-			for (int i = 1; i <= len; i++) {
-				int u = dir[2] + dir[0] * i;
-				int v = dir[3] + dir[1] * i;
-				int y = t + (i - 1); // climbs one block per step
-				if (y > prevY) {
-					MixedTreeKit.put(c, p, u, y - 1, v, b(Blocks.MANGROVE_LOG));
-				}
-				MixedTreeKit.put(c, p, u, y, v, MixedTreeKit.log(Blocks.MANGROVE_LOG, axis));
-				prevY = y;
+			if (hsh < 76) {
+				return b(Blocks.MOSS_CARPET);
 			}
-		}
-	}
-
-	// ------------------------------------------------------------------ canopy
-
-	/** Lobe = {centre u, centre y, centre v, horizontal radius, vertical radius}. */
-	private static double[][] lobes(double cx, double cz, double radius, int t, int top) {
-		double ry = Math.max(1.8, (top - t) * 0.36);
-		double[][] l = new double[9][];
-		l[0] = new double[] {cx, top - ry + 0.5, cz, radius * 0.8 + 0.3, ry};
-		double a = radius * 0.5; // lobes over the limb tips, kept inside the box with room to spare
-		double tr = radius * 0.45 + 0.7;
-		double ty = t + 2.8;
-		l[1] = new double[] {cx + a, ty, cz, tr, 1.6};
-		l[2] = new double[] {cx - a, ty, cz, tr, 1.6};
-		l[3] = new double[] {cx, ty, cz + a, tr, 1.6};
-		l[4] = new double[] {cx, ty, cz - a, tr, 1.6};
-		double bd = radius * 0.42;
-		double fr = radius * 0.4 + 0.6;
-		double fy = t + 3.6;
-		l[5] = new double[] {cx + bd, fy, cz + bd, fr, 1.5};
-		l[6] = new double[] {cx - bd, fy, cz + bd, fr, 1.5};
-		l[7] = new double[] {cx + bd, fy, cz - bd, fr, 1.5};
-		l[8] = new double[] {cx - bd, fy, cz - bd, fr, 1.5};
-		return l;
-	}
-
-	private static double density(double[][] lobes, int u, int y, int v) {
-		double best = Double.MAX_VALUE;
-		for (double[] l : lobes) {
-			double du = u - l[0];
-			double dy = y - l[1];
-			double dv = v - l[2];
-			best = Math.min(best, (du * du + dv * dv) / (l[3] * l[3]) + dy * dy / (l[4] * l[4]));
-		}
-		return best;
-	}
-
-	private static void canopy(CitadelCanvas c, Plot p, double cx, double cz, double radius, int t, int top) {
-		int w = p.w();
-		int d = p.d();
-		double[][] lobes = lobes(cx, cz, radius, t, top);
-		boolean[][][] g = new boolean[w][top + 1][d];
-		for (int y = t + 1; y <= top; y++) {
-			for (int u = 0; u < w; u++) {
-				for (int v = 0; v < d; v++) {
-					double q = density(lobes, u, y, v);
-					if (q > 1.0 || (q > 0.7 && p.hash(u, y, v, 5) == 0)) {
-						continue; // [finish] ragged surface
-					}
-					g[u][y][v] = true;
-				}
-			}
-		}
-		// [finish] a fringe of leaves hanging from the underside (bottom-up so one row never cascades)
-		for (int y = t + 1; y < top; y++) {
-			for (int u = 0; u < w; u++) {
-				for (int v = 0; v < d; v++) {
-					if (!g[u][y][v] && g[u][y + 1][v] && p.hash(u, y, v, 4) == 0) {
-						g[u][y][v] = true;
-					}
-				}
-			}
-		}
-		for (int y = t + 1; y <= top; y++) {
-			double f = (y - t) / (double) Math.max(1, top - t);
-			for (int u = 0; u < w; u++) {
-				for (int v = 0; v < d; v++) {
-					if (g[u][y][v]) {
-						// [palette] dark mangrove low, lighter acacia climbing towards the crown
-						boolean light = p.hash(u, y, v, 10) < 2 + f * 5;
-						BlockState s = leaves(light ? Blocks.ACACIA_LEAVES : Blocks.MANGROVE_LEAVES);
-						// [palette] both leaves are biome-tinted (green on plains): red patches, untinted, on the sunny outer shell,
-						// chosen per 2x2x2 chunk so they read as clusters of foliage and not as loose cubes
-						if (f > 0.3 && density(lobes, u, y, v) > 0.4) {
-							// [finish] colour by 2x2x2 chunk: orange-brown on the lower shell, scarlet towards the crown,
-							// each chunk one colour with a few leaf blocks left in, so it reads as foliage and not confetti
-							int zone = p.hash(u >> 1, y >> 1, v >> 1, 5);
-							boolean lower = f < 0.62;
-							if (zone < 3 && p.hash(u, y, v, 6) != 0) {
-								s = lower ? dev.t3craft.hq.citadel.CitadelCanvas.terracotta(net.minecraft.world.item.DyeColor.ORANGE)
-										: b(Blocks.NETHER_WART_BLOCK);
-							}
-						}
-						MixedTreeKit.put(c, p, u, y, v, s);
-					}
-				}
-			}
-		}
+			return null;
+		});
+		t.prune();
+		t.flush(c);
 	}
 }

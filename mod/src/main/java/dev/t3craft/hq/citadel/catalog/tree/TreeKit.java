@@ -294,6 +294,9 @@ final class TreeKit {
 			lv[y] = cv;
 			t.wood(cu, y, cv, wd.log(Direction.Axis.Y));
 		}
+		if (yTop > y2 && yTop < t.h) {
+			t.wood(cu, yTop, cv, wd.bark());
+		}
 		for (int y = Math.min(yTop, t.h - 1) + 1; y <= t.h; y++) {
 			lu[y] = cu;
 			lv[y] = cv;
@@ -340,7 +343,7 @@ final class TreeKit {
 				boolean tip = i == len - 1 && len > 1;
 				BlockState s = tip ? wd.rootTip() : i == 0 ? wd.bark() : diag ? wd.bark() : wd.log(ax);
 				t.wood(u, 0, v, s);
-				if (i == 0 && t.hash(u, 1, v, 3) != 0) {
+				if (i == 0 && len >= 2 && t.hash(u, 1, v, 3) == 0) {
 					t.woodSoft(u, 1, v, wd.bark()); // the flare up the trunk
 				}
 				if (diag) {
@@ -448,6 +451,7 @@ final class TreeKit {
 	 */
 	static void lobe(Vox t, double cu, double cy, double cv, double rx, double rz, double up, double down,
 			Leaves lv, double rough, int salt) {
+		cy = Math.round(cy); // whole layers: a domed profile (wide middle, narrower top, small underside)
 		int u1 = (int) Math.floor(cu - rx - 1);
 		int u2 = (int) Math.ceil(cu + rx + 1);
 		int v1 = (int) Math.floor(cv - rz - 1);
@@ -462,7 +466,8 @@ final class TreeKit {
 					double dyr = y - cy;
 					double dy = dyr >= 0 ? dyr / Math.max(0.5, up) : dyr / Math.max(0.5, down);
 					double q = du * du + dv * dv + dy * dy;
-					double jit = (t.hash(u + salt * 13, y + salt * 7, v + salt * 3, 9) - 4) / 4.0 * rough;
+					// mostly inwards: bites out of the edge, rarely a bump (outward jitter squares the outline)
+					double jit = (t.hash(u + salt * 13, y + salt * 7, v + salt * 3, 9) - 6) / 6.0 * rough;
 					if (q > 1.0 + jit) {
 						continue;
 					}
