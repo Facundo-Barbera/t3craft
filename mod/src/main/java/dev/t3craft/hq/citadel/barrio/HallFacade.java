@@ -51,6 +51,9 @@ public final class HallFacade {
 	 */
 	public static BlockState wallBlock(CitadelCanvas c, HallStyle s, Mats m, DyeColor env, int seed, int t, int ly, Direction.Axis along) {
 		boolean pier = Math.floorMod(t, 3) == 0;
+		if (tall()) {
+			return tallWall(c, s, m, env, seed, pier, t, ly, along);
+		}
 		boolean glass = !pier && ly >= 2;
 		return switch (s) {
 			case TIMBER -> pier ? m.post() : (ly <= 3 ? (glass ? PANE : m.wall()) : ly == 4 ? beamLike(c, m.post(), along) : m.wall());
@@ -58,6 +61,46 @@ public final class HallFacade {
 			case SHUTTERED -> glass && ly <= 3 ? PANE : m.wall();
 			case BALCONY -> glass && ly <= 3 ? b(Blocks.STAINED_GLASS_PANE.pick(env)) : (!pier && ly == 5 ? bandOf(c, m, along) : m.wall());
 		};
+	}
+
+	/** Scaled halls (floor height 8 or more) get the tall-window facade of struct/barrio-hall2. */
+	static boolean tall() {
+		return fh() >= 8;
+	}
+
+	/**
+	 * The wall of a scaled hall: a dark footing course (deepslate bricks, stone bricks on stone halls) under tall
+	 * windows that run from the second row to one short of the band, with a lintel row over them; the piers between
+	 * the windows keep their material (posts, stone bricks). No smooth stretch of wall: the windows take the
+	 * height. Timber halls get a transom bar half way up the glass.
+	 */
+	private static BlockState tallWall(CitadelCanvas c, HallStyle s, Mats m, DyeColor env, int seed, boolean pier, int t, int ly, Direction.Axis along) {
+		int lintel = fh() - 1;
+		if (ly == 1) {
+			return footing(s, seed, t, ly);
+		}
+		if (pier) {
+			return s == HallStyle.STONE ? plinth(seed, t, ly) : m.post();
+		}
+		if (ly == lintel) {
+			return switch (s) {
+				case TIMBER -> beamLike(c, m.post(), along);
+				case STONE -> HallStyle.hash(seed, t, ly) % 3 == 0 ? b(Blocks.CHISELED_STONE_BRICKS) : STONE_BRICKS;
+				default -> m.wall();
+			};
+		}
+		if (s == HallStyle.TIMBER && ly == (fh() + 1) / 2) {
+			return beamLike(c, m.post(), along);
+		}
+		return s == HallStyle.BALCONY ? b(Blocks.STAINED_GLASS_PANE.pick(env)) : PANE;
+	}
+
+	/** The dark footing course: deepslate bricks with a cracked one now and then; stone bricks (a little moss) on stone halls. */
+	private static BlockState footing(HallStyle s, int seed, int t, int ly) {
+		if (s == HallStyle.STONE) {
+			return plinth(seed, t, ly);
+		}
+		return HallStyle.hash(seed, t, ly) % 4 == 0 ? b(Blocks.CRACKED_DEEPSLATE_BRICKS) : b(Blocks.DEEPSLATE_BRICKS);
 	}
 
 	private static BlockState plinth(int seed, int t, int ly) {
@@ -160,16 +203,18 @@ public final class HallFacade {
 	 * (the porch is there), never next to a corner, and only into free cells.
 	 */
 	private static void pilasters(CitadelCanvas c, Room r, int F, Mats m, HallStyle s) {
-		if (s != HallStyle.TIMBER && s != HallStyle.BALCONY) {
+		if (!tall() && s != HallStyle.TIMBER && s != HallStyle.BALCONY) {
 			return;
 		}
 		int mid = r.c();
 		int top = F * fh();
+		BlockState foot = tall() ? b(Blocks.DEEPSLATE_BRICKS) : STONE_BRICKS;
+		BlockState shaft = tall() && s == HallStyle.STONE ? STONE_BRICKS : m.post();
 		for (int side = 0; side < 4; side++) {
 			int len = side < 2 ? r.w() : r.d();
 			Direction out = outward(r, side);
 			for (int t = 1; t < len - 1; t++) {
-				if (Math.floorMod(t, 3) != 0 || (side == 0 && Math.abs(t - mid) <= 2)) {
+				if (!hasPilaster(s, t) || (side == 0 && Math.abs(t - mid) <= (tall() ? 3 : 2))) {
 					continue;
 				}
 				BlockPos base = outside(r, side, t, 1);
@@ -177,13 +222,29 @@ public final class HallFacade {
 				if (there != null && !there.isAir()) {
 					continue;
 				}
-				c.set(base, STONE_BRICKS);
+				c.set(base, foot);
 				for (int y = 2; y < top; y++) {
-					c.set(outside(r, side, t, y), m.post());
+					c.set(outside(r, side, t, y), shaft);
 				}
 				c.set(outside(r, side, t, top), stairs(m.roof(), out.getOpposite()));
+				if (tall()) {
+					// a second, lower step of the footing: the pilaster stands on a two-course plinth
+					BlockPos below = outside(r, side, t, 2);
+					c.set(below, foot);
+				}
 			}
 		}
+	}
+
+	/** Which piers carry a protruding pilaster: all of them, except every other one on shuttered halls (their shutters). */
+	private static boolean hasPilaster(HallStyle s, int t) {
+		if (Math.floorMod(t, 3) != 0) {
+			return false;
+		}
+		if (s == HallStyle.SHUTTERED && tall()) {
+			return (t / 3) % 2 == 0;
+		}
+		return s == HallStyle.TIMBER || s == HallStyle.BALCONY || tall();
 	}
 
 	/** The door: jambs either side and a lintel (a keystone on stone halls). The opening (3 wide, 3 high) stays clear. */
@@ -192,7 +253,7 @@ public final class HallFacade {
 		BlockState jamb = s == HallStyle.STONE ? STONE_BRICKS : m.post();
 		BlockState lintel = s == HallStyle.STONE ? STONE_BRICKS : beamLike(c, m.post(), r.side().getAxis());
 		for (int dv = -2; dv <= 2; dv += 4) {
-			for (int y = 1; y <= 4; y++) {
+			for (int y = 1; y <= (tall() ? fh() - 2 : 4); y++) {
 				c.set(r.cell(-1, mid + dv, y), jamb);
 			}
 		}
@@ -206,6 +267,10 @@ public final class HallFacade {
 
 	/** Porch, hood, lamp posts or balcony in front of the door, by style. Lanterns always flank the door. */
 	private static void porch(CitadelCanvas c, Room r, int F, Mats m, HallStyle s, int seed) {
+		if (tall()) {
+			portico(c, r, F, m, s, seed);
+			return;
+		}
 		int mid = r.c();
 		Direction in = r.back();
 		Direction.Axis sideAxis = r.side().getAxis();
@@ -255,6 +320,84 @@ public final class HallFacade {
 		}
 	}
 
+	private static boolean open(CitadelCanvas c, BlockPos p) {
+		BlockState st = c.at(p.getX(), p.getY(), p.getZ());
+		return st == null || st.isAir();
+	}
+
+	/**
+	 * The entrance portico of a scaled hall: two columns (a dark footing, a shaft, a beam capital) three cells either
+	 * side of the door's axis, two cells out when the courtyard is free there (one otherwise), joined by a beam over
+	 * the approach and a stepped roof of the hall's own stairs that leans on the wall. Hanging lanterns light the door.
+	 * On a balcony hall of two floors the beam carries a deck level with the upper floor, with a fence and flower pots,
+	 * instead of the roof. The three-wide approach and the jambs stay clear.
+	 */
+	private static void portico(CitadelCanvas c, Room r, int F, Mats m, HallStyle s, int seed) {
+		int mid = r.c();
+		int H = fh();
+		int hw = 3;
+		boolean deck = s == HallStyle.BALCONY && F == 2;
+		int beamY = deck ? H - 1 : H - 3;
+		boolean deep = true;
+		for (int dv = -hw; dv <= hw && deep; dv++) {
+			for (int y = 1; y <= beamY + 2; y++) {
+				deep = open(c, r.cell(-3, mid + dv, y));
+				if (!deep) {
+					break;
+				}
+			}
+		}
+		int uf = deep ? -3 : -2;
+		Direction in = r.back();
+		Direction.Axis sideAxis = r.side().getAxis();
+		BlockState footing = s == HallStyle.STONE ? STONE_BRICKS : b(Blocks.DEEPSLATE_BRICKS);
+		BlockState shaft = s == HallStyle.STONE ? b(Blocks.POLISHED_ANDESITE) : m.post();
+		BlockState cap = s == HallStyle.STONE ? b(Blocks.CHISELED_STONE_BRICKS) : beamLike(c, m.post(), sideAxis);
+		BlockState beam = beamLike(c, m.post(), sideAxis);
+		for (int dv = -hw; dv <= hw; dv += 2 * hw) {
+			for (int u = uf; u <= -2; u++) {
+				c.set(r.cell(u, mid + dv, 1), footing);
+				for (int y = 2; y < beamY; y++) {
+					c.set(r.cell(u, mid + dv, y), shaft);
+				}
+			}
+		}
+		for (int u = uf; u <= -2; u++) {
+			for (int dv = -hw; dv <= hw; dv++) {
+				c.set(r.cell(u, mid + dv, beamY), Math.abs(dv) == hw ? cap : beam);
+			}
+		}
+		if (deck) {
+			for (int u = uf; u <= -2; u++) {
+				for (int dv = -hw; dv <= hw; dv++) {
+					c.set(r.cell(u, mid + dv, H), PLANKS);
+				}
+			}
+			for (int dv = -hw; dv <= hw; dv++) {
+				BlockPos p = r.cell(uf, mid + dv, H + 1);
+				if (Math.abs(dv) == 1) {
+					put(c, p, HallStyle.pot(HallStyle.hash(seed, dv)));
+				} else {
+					c.set(p, b(s.fence()));
+				}
+			}
+			for (int u = uf + 1; u <= -2; u++) {
+				for (int dv = -hw; dv <= hw; dv += 2 * hw) {
+					c.set(r.cell(u, mid + dv, H + 1), b(s.fence()));
+				}
+			}
+		} else {
+			for (int dv = -hw; dv <= hw; dv++) {
+				c.set(r.cell(uf, mid + dv, beamY + 1), stairs(m.roof(), in));
+				if (uf == -3) {
+					c.set(r.cell(-2, mid + dv, beamY + 1), m.ridge());
+					c.set(r.cell(-2, mid + dv, beamY + 2), stairs(m.roof(), in));
+				}
+			}
+		}
+		hangLanterns(c, r, mid, beamY - 1);
+	}
+
 	/** Two posts (y 1..{@code top}) either side of the door's approach. */
 	private static void posts(CitadelCanvas c, Room r, int mid, int top, BlockState post) {
 		for (int dv = -2; dv <= 2; dv += 4) {
@@ -298,6 +441,10 @@ public final class HallFacade {
 					}
 					int hsh = HallStyle.hash(seed, side, t / 3, f);
 					boolean boxes = (side == 0 || f == 1) && hsh % 3 != 0;
+					if (tall()) {
+						tallWindow(c, r, side, t, yb, f, s, out, hsh, pier, boxes, shutter);
+						continue;
+					}
 					switch (s) {
 						case SHUTTERED -> {
 							if (pier) {
@@ -324,6 +471,33 @@ public final class HallFacade {
 					}
 				}
 			}
+		}
+	}
+
+	/**
+	 * What goes outside a wall cell of a scaled hall: on a window column a sill (dark deepslate-brick stair on the ground
+	 * floor, the style's slab above) with a flower box on some of them; on a pier, the shutters of a shuttered hall
+	 * (on the piers that carry no pilaster) or ivy on stone piers without one.
+	 */
+	private static void tallWindow(CitadelCanvas c, Room r, int side, int t, int yb, int f, HallStyle s, Direction out, int hsh, boolean pier, boolean boxes, Block shutter) {
+		if (pier) {
+			if (s == HallStyle.SHUTTERED && !hasPilaster(s, t)) {
+				for (int ly = 2; ly <= fh() - 3; ly++) {
+					put(c, outside(r, side, t, yb + ly), trapdoor(shutter, out, true, Half.BOTTOM));
+				}
+			} else if (s == HallStyle.STONE && !hasPilaster(s, t) && hsh % 4 == 0) {
+				ivy(c, r, side, t, yb, out, hsh);
+			}
+			return;
+		}
+		BlockPos ledge = outside(r, side, t, yb + 1);
+		if (f == 0) {
+			c.set(ledge, stairs(Blocks.DEEPSLATE_BRICK_STAIRS, out.getOpposite()));
+		} else {
+			c.set(ledge, topSlab(s.slab()));
+		}
+		if (boxes) {
+			put(c, outside(r, side, t, yb + 2), HallStyle.pot(hsh / 7 + t));
 		}
 	}
 

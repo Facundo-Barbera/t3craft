@@ -13,6 +13,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.Half;
 import net.minecraft.world.level.block.state.properties.StairsShape;
 import static dev.t3craft.hq.citadel.CitadelCanvas.GLASS;
+import static dev.t3craft.hq.citadel.CitadelCanvas.fh;
 import static dev.t3craft.hq.citadel.CitadelCanvas.b;
 import static dev.t3craft.hq.citadel.CitadelCanvas.leaves;
 import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
@@ -91,11 +92,126 @@ public final class BarrioRoofs {
 			}
 		}
 		int seed = BarrioKit.hash(r.origin().getX(), r.origin().getZ(), top);
-		dormers(c, r, top, mats, seed);
+		if (grand(r)) {
+			// struct/barrio-hall2: a break in the long slopes instead of two small dormers: a cross gable on each side, staggered
+			IntBinaryOperator mainY = (u, v) -> top + Math.max(1, Math.min(v + 1, W - v));
+			crossGable(c, r, top, mats, 2, D / 4, 3, mainY);
+			crossGable(c, r, top, mats, 3, D - 1 - D / 4, 3, mainY);
+		} else {
+			dormers(c, r, top, mats, seed);
+		}
 		if (hasChimney(seed)) {
 			IntBinaryOperator kAt = (u, v) -> Math.min(v + 1, W - v);
 			chimney(c, r, top, mats, chimneySide(seed), D / 2 - 1, kAt);
 		}
+	}
+
+	/** Halls big enough (scale 1.5 and up) for cross gables and a cupola; the scale-1 roofs stay as they were. */
+	private static boolean grand(Room r) {
+		return r.w() >= 15 && r.d() >= 16 && fh() >= 8;
+	}
+
+	/**
+	 * A cross gable (a "break" of the slope): a gable roof of its own, {@code 2*half+1} cells wide, that comes out of a
+	 * slope and meets it. {@code side} is the wall it faces (0 door wall, 1 back wall, 2 the {@code v = -1} wall, 3 the
+	 * {@code v = W} wall), {@code tc} the cell along that wall where its ridge runs (the ridge is perpendicular to the
+	 * wall), {@code mainY} the height of the main roof's surface at a cell. Its face stands flush with the wall plane as
+	 * a gable end with a window, its two slopes are stairs towards the ridge (a slab ridge with a finial at the front),
+	 * and the cheeks that stand clear of the main slope are closed in the ridge material. It ends where it dives into the
+	 * main slope. Hollow underneath, like the roof it grows from.
+	 */
+	private static void crossGable(CitadelCanvas c, Room r, int top, Mats mats, int side, int tc, int half, IntBinaryOperator mainY) {
+		int W = r.w();
+		int D = r.d();
+		Block roof = mats.roof();
+		int yr = top + half + 3;
+		boolean alongV = side < 2;
+		Direction plus = alongV ? r.side() : r.back();
+		for (int n = 0; n < Math.max(W, D); n++) {
+			boolean any = false;
+			for (int dt = -half; dt <= half; dt++) {
+				int t = tc + dt;
+				int u;
+				int v;
+				if (side == 0) {
+					u = -1 + n;
+					v = t;
+				} else if (side == 1) {
+					u = D - n;
+					v = t;
+				} else if (side == 2) {
+					u = t;
+					v = -1 + n;
+				} else {
+					u = t;
+					v = W - n;
+				}
+				int yc = yr - Math.abs(dt);
+				int ym = mainY.applyAsInt(u, v);
+				if (yc <= ym) {
+					continue;
+				}
+				any = true;
+				BlockPos p = r.cell(u, v, 0);
+				if (dt == 0) {
+					c.set(p.atY(yc), mats.ridge());
+					c.set(p.atY(yc + 1), n == 0 ? BarrioKit.finial(roof) : BarrioKit.slabOf(roof));
+				} else {
+					Direction f = dt < 0 ? plus : plus.getOpposite();
+					c.set(p.atY(yc), BarrioKit.stair(BarrioKit.tone(roof, Math.abs(dt), p.getX(), yc, p.getZ()), f));
+				}
+				if (Math.abs(dt) == half) {
+					for (int y = ym + 1; y < yc; y++) {
+						c.set(p.atY(y), mats.ridge());
+					}
+				}
+				if (n == 0) {
+					for (int y = top + 1; y < yc; y++) {
+						boolean window = dt == 0 && (y == top + 3 || y == top + 4);
+						c.set(p.atY(y), window ? GLASS : mats.wall());
+					}
+				}
+			}
+			if (!any) {
+				break;
+			}
+		}
+	}
+
+	/**
+	 * A lantern on the apex of a hipped roof: a glazed cupola three cells wide over the apex ridge ({@code ua..ub}), posts
+	 * at the corners, glass between them, a lantern inside and a small hip roof with a rod on top. The apex row itself is
+	 * its floor.
+	 */
+	private static void cupola(CitadelCanvas c, Room r, int top, Mats mats, int ua, int ub) {
+		int mid = r.c();
+		int y0 = top + mid + 1;
+		Block roof = mats.roof();
+		for (int u = ua; u <= ub; u++) {
+			for (int v = mid - 1; v <= mid + 1; v++) {
+				boolean edgeU = u == ua || u == ub;
+				boolean edgeV = v != mid;
+				BlockPos p = r.cell(u, v, 0);
+				if (edgeV) {
+					c.set(p.atY(y0), mats.ridge());
+				}
+				if (edgeU || edgeV) {
+					boolean corner = edgeU && edgeV;
+					BlockState wall = corner ? mats.post() : GLASS;
+					c.set(p.atY(y0 + 1), wall);
+					c.set(p.atY(y0 + 2), wall);
+					Direction in = edgeV ? (v < mid ? r.side() : r.side().getOpposite()) : (u == ua ? r.back() : r.back().getOpposite());
+					c.set(p.atY(y0 + 3), corner ? BarrioKit.slabOf(roof) : BarrioKit.stair(roof, in));
+				} else {
+					c.set(p.atY(y0 + 1), CitadelCanvas.AIR);
+					c.set(p.atY(y0 + 2), CitadelCanvas.AIR);
+					c.set(p.atY(y0 + 3), BarrioKit.slabOf(roof));
+				}
+			}
+		}
+		int uc = (ua + ub) / 2;
+		c.set(r.cell(uc, mid, y0 + 1), BarrioKit.lantern(false));
+		c.set(r.cell(uc, mid, y0 + 4), BarrioKit.rod());
 	}
 
 	private static boolean hasChimney(int seed) {
@@ -187,7 +303,15 @@ public final class BarrioRoofs {
 			c.set(r.cell(k - 1, mid, top + k - 1), mats.ridge());
 		}
 		int seed = BarrioKit.hash(r.origin().getX(), r.origin().getZ(), top);
-		if (hasChimney(seed)) {
+		if (grand(r)) {
+			// struct/barrio-hall2: a gablet on each of the four slopes (a pediment over the door) and a glazed cupola on the apex
+			IntBinaryOperator mainY = (u, v) -> top + Math.max(1, Math.min(Math.min(v + 1, W - v), Math.min(u + 1, D - u)));
+			crossGable(c, r, top, mats, 0, mid, 3, mainY);
+			crossGable(c, r, top, mats, 1, mid, 3, mainY);
+			crossGable(c, r, top, mats, 2, D / 2, 3, mainY);
+			crossGable(c, r, top, mats, 3, D / 2, 3, mainY);
+			cupola(c, r, top, mats, ridgeA, ridgeB);
+		} else if (hasChimney(seed)) {
 			IntBinaryOperator kAt = (u, v) -> Math.min(Math.min(v + 1, W - v), Math.min(u + 1, D - u));
 			chimney(c, r, top, mats, chimneySide(seed), D / 2 - 1, kAt);
 		}

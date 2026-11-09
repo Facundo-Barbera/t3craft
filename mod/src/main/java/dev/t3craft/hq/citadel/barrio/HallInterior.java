@@ -43,8 +43,10 @@ public final class HallInterior {
 		for (int f = 0; f < F; f++) {
 			int y = f * fh() + 1;
 			floor(c, r, f, s);
+			deskRugs(c, r, f, env);
 			rug(c, r, F, f, s, env);
 			furniture(c, r, F, f, y, s, env, seed, desks);
+			commonTable(c, r, F, y, s, env, desks);
 			workArea(c, r, f, y, s, desks, seed);
 			runway(c, r, F, y, desks);
 			pendants(c, r, F, f, m, desks);
@@ -172,6 +174,117 @@ public final class HallInterior {
 		}
 	}
 
+	/**
+	 * Scaled halls ({@code W >= 15}): each of the six desk slots gets its own work-zone rug, five by five cells in the
+	 * floor itself (wool, so desks, standing cells and the navigation are untouched): a grey border round the project's
+	 * colour, from the desk's wall out into the hall. Together with the aisle runner they split the big room into
+	 * team areas. Only floor cells are redrawn (never a stair, never the stair hole, never the walls).
+	 */
+	private static void deskRugs(CitadelCanvas c, Room r, int f, DyeColor env) {
+		int W = r.w();
+		int D = r.d();
+		if (W < 15) {
+			return;
+		}
+		int yf = f * fh();
+		DyeColor edge = env == DyeColor.GRAY ? DyeColor.BLACK : DyeColor.GRAY;
+		int depth = 5;
+		int half = 2;
+		for (int slot = 0; slot < 6; slot++) {
+			BlockPos dp = RingCampusGeometry.desk(r, 0, slot).desk();
+			int ud = (dp.getX() - r.origin().getX()) * r.back().getStepX() + (dp.getZ() - r.origin().getZ()) * r.back().getStepZ();
+			int vd = (dp.getX() - r.origin().getX()) * r.side().getStepX() + (dp.getZ() - r.origin().getZ()) * r.side().getStepZ();
+			int u0;
+			int u1;
+			int v0;
+			int v1;
+			if (slot < 2) {
+				u0 = ud - depth + 1;
+				u1 = ud;
+				v0 = vd - half;
+				v1 = vd + half;
+			} else {
+				u0 = ud - half;
+				u1 = ud + half;
+				v0 = vd == 0 ? 0 : W - depth;
+				v1 = vd == 0 ? depth - 1 : W - 1;
+			}
+			for (int u = u0; u <= u1; u++) {
+				for (int v = v0; v <= v1; v++) {
+					if (u < 0 || u >= D || v < 0 || v >= W) {
+						continue;
+					}
+					BlockPos p = r.cell(u, v, yf);
+					BlockState now = c.at(p.getX(), p.getY(), p.getZ());
+					if (now == null || now.isAir() || now.getBlock() instanceof net.minecraft.world.level.block.StairBlock) {
+						continue;
+					}
+					boolean border = u == u0 || u == u1 || v == v0 || v == v1;
+					c.set(p, b(Blocks.WOOL.pick(border ? edge : env)));
+				}
+			}
+		}
+	}
+
+	/**
+	 * Scaled halls: the common table, in the middle of the hall, where the aisle ends: five cells long and three wide in
+	 * the style's own planks, with a runner in the project's colour, a cartography table in the middle (the project map),
+	 * lanterns and pots, three chairs (stair seats) down each long side and one at each head. The aisle runs into
+	 * its end and the room walks round it. On a two-floor hall it stands past the stair flight and its landing
+	 * ({@code u >= fh + 2}), and the hall's own table and chairs are only put into free, floored cells.
+	 */
+	private static void commonTable(CitadelCanvas c, Room r, int F, int y, HallStyle s, DyeColor env, Set<Long> desks) {
+		if (r.w() < 15) {
+			return;
+		}
+		int mid = r.c();
+		int half = 2;
+		int uc = Math.max(r.d() / 2, F == 2 ? fh() + 4 : 0);
+		if (uc + half + 1 > r.d() - 5) {
+			uc = r.d() - 6 - half;
+		}
+		BlockState top = s.stairCore();
+		for (int u = uc - half; u <= uc + half; u++) {
+			for (int dv = -1; dv <= 1; dv++) {
+				BlockPos p = r.cell(u, mid + dv, y);
+				boolean centre = u == uc && dv == 0;
+				placeOnRug(c, desks, p, () -> c.set(p, centre ? b(Blocks.CARTOGRAPHY_TABLE) : top));
+			}
+		}
+		for (int u = uc - half; u <= uc + half; u++) {
+			BlockPos p = r.cell(u, mid, y + 1);
+			if (u != uc && !free(c, p.below())) {
+				put(c, p, b(Blocks.CARPET.pick(env)));
+			}
+		}
+		int[][] props = {{uc - 1, 1}, {uc + 1, -1}};
+		for (int[] pr : props) {
+			BlockPos p = r.cell(pr[0], mid + pr[1], y + 1);
+			if (!free(c, p.below())) {
+				put(c, p, HallFacade.lantern());
+			}
+		}
+		int[][] pots = {{uc - 1, -1}, {uc + 1, 1}};
+		for (int[] pr : pots) {
+			BlockPos p = r.cell(pr[0], mid + pr[1], y + 1);
+			if (!free(c, p.below())) {
+				put(c, p, HallStyle.pot(HallStyle.hash(uc, pr[0], pr[1])));
+			}
+		}
+		// chairs: the seat's back is away from the table
+		for (int u = uc - 1; u <= uc + 1; u++) {
+			for (int side = -1; side <= 1; side += 2) {
+				BlockPos p = r.cell(u, mid + 2 * side, y);
+				Direction back = side < 0 ? r.side().getOpposite() : r.side();
+				placeOnRug(c, desks, p, () -> c.set(p, stairs(s.stairBlock(), back)));
+			}
+		}
+		BlockPos head = r.cell(uc - half - 1, mid, y);
+		placeOnRug(c, desks, head, () -> c.set(head, stairs(s.stairBlock(), r.back().getOpposite())));
+		BlockPos foot = r.cell(uc + half + 1, mid, y);
+		placeOnRug(c, desks, foot, () -> c.set(foot, stairs(s.stairBlock(), r.back())));
+	}
+
 	// ------------------------------------------------------------------ furniture
 
 	private static BlockState chest(Direction facing) {
@@ -210,19 +323,62 @@ public final class HallInterior {
 				.setValue(BlockStateProperties.HORIZONTAL_FACING, r.back().getOpposite())));
 	}
 
-	/** Columns of the board and of the archive: three in a one-storey-wide hall, five in a wider one. */
+	/** Columns of the board and of the archive: three in a one-storey-wide hall, five in a wider one, seven in a scaled hall. */
 	private static int zoneWidth(Room r) {
-		return Math.min(5, r.c() - 1);
+		return Math.min(r.w() >= 15 ? 7 : 5, r.c() - 1);
+	}
+
+	/**
+	 * Scaled halls (struct/barrio-hall2): the board is a kanban. A dark slate backdrop in a frame of dark-oak logs and
+	 * planks, five stage columns (a muted terracotta header each: to do red, doing orange, review yellow, done lime,
+	 * shipped green), loose cards (single concrete cells in the stage colour, a blank white one now and then) with
+	 * gaps between them, over a row of chests. The project's colour sits on the middle of the top rail.
+	 */
+	private static void kanban(CitadelCanvas c, Room r, int y, DyeColor env, int h, Set<Long> desks, int n) {
+		DyeColor[] cards = {DyeColor.RED, DyeColor.ORANGE, DyeColor.YELLOW, DyeColor.LIME, DyeColor.GREEN};
+		int rows = Math.max(3, fh() - 3);
+		int stages = n - 2;
+		for (int k = 0; k < n; k++) {
+			int v = r.c() - 2 - k;
+			BlockPos base = r.cell(0, v, y);
+			if (!floored(c, base) || desks.contains(col(base.getX(), base.getZ()))) {
+				continue;
+			}
+			if (k == 0 || k == n - 1) {
+				for (int row = 0; row <= rows + 1; row++) {
+					c.set(base.above(row), b(Blocks.DARK_OAK_LOG));
+				}
+				continue;
+			}
+			int idx = stages - k;
+			DyeColor stage = cards[stages <= 1 ? 0 : idx * (cards.length - 1) / (stages - 1)];
+			c.set(base, chest(r.back()));
+			for (int row = 1; row <= rows - 1; row++) {
+				boolean card = HallStyle.hash(h, v, row) % 100 < 56;
+				boolean blank = card && HallStyle.hash(v, row, h) % 6 == 0;
+				c.set(base.above(row), card ? concrete(blank ? DyeColor.WHITE : stage) : b(Blocks.BLACKSTONE));
+			}
+			c.set(base.above(rows), terracotta(stage));
+			c.set(base.above(rows + 1), k == n / 2 ? concrete(env) : b(Blocks.DARK_OAK_PLANKS));
+		}
+	}
+
+	private static BlockState terracotta(DyeColor col) {
+		return b(Blocks.DYED_TERRACOTTA.pick(col));
 	}
 
 	/**
 	 * The project board, on the door wall left of the door's jamb: a header plate in the project's colour between
 	 * dark frame cells over rows of cards (to do red, doing orange, review yellow, done lime, shipped green; the
-	 * empty slots are white), over chests.
+	 * empty slots are white), over chests. Scaled halls draw a kanban instead ({@link #kanban}).
 	 */
 	private static void board(CitadelCanvas c, Room r, int y, DyeColor env, int h, Set<Long> desks) {
 		DyeColor[] cards = {DyeColor.RED, DyeColor.ORANGE, DyeColor.YELLOW, DyeColor.LIME, DyeColor.GREEN};
 		int n = zoneWidth(r);
+		if (r.w() >= 15 && n >= 5) {
+			kanban(c, r, y, env, h, desks, n);
+			return;
+		}
 		int rows = fh() >= 8 ? 3 : 2;
 		for (int k = 0; k < n; k++) {
 			int v = r.c() - 2 - k;
