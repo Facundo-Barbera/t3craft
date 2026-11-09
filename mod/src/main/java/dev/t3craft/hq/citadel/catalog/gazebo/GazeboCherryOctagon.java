@@ -369,8 +369,7 @@ public final class GazeboCherryOctagon implements Variant {
 					default -> p.set(c, cu, 1, cv, b(Blocks.LECTERN).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH));
 				}
 			} else {
-				p.set(c, cu + i, 1, cv, log(Blocks.STRIPPED_CHERRY_LOG, Direction.Axis.X));
-				p.set(c, cu + i, 2, cv, pot(p.hash(cu + i, 2, cv, 2))); // nobody can stand on the table
+				p.set(c, cu + i, 1, cv, CitadelCanvas.slab(Blocks.CHERRY_SLAB)); // the low wings of the table: a walkable half step
 			}
 			if (use == 0) {
 				p.set(c, cu + i, 1, cv - 1, CUSHION); // cushions
@@ -412,10 +411,11 @@ public final class GazeboCherryOctagon implements Variant {
 			}
 			boolean brim = j == 0 || (drum >= 0 && j == drum + 1);
 			Block mat;
-			if (brim && m > rho[j] - 1.0) {
+			if (ribs && (dx == 0 || dz == 0 || Math.abs(dx) == Math.abs(dz))) {
+				// [depth] dark hip tiles run down the eight hips, so the roof reads as an octagon from afar
+				mat = p.hash(u, y, v, 4) == 0 ? Blocks.POLISHED_DEEPSLATE_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS;
+			} else if (brim && !ribs && m > rho[j] - 1.0) {
 				mat = p.hash(u, y, v, 4) == 0 ? Blocks.DEEPSLATE_TILE_STAIRS : Blocks.POLISHED_DEEPSLATE_STAIRS;
-			} else if (ribs && (dx == 0 || dz == 0 || Math.abs(dx) == Math.abs(dz))) {
-				mat = Blocks.BAMBOO_MOSAIC_STAIRS; // [depth] the eight hips read as an octagon from afar
 			} else {
 				mat = Blocks.CHERRY_STAIRS;
 			}
