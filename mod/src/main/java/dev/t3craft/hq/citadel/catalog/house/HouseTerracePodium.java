@@ -437,7 +437,7 @@ public final class HouseTerracePodium implements Variant {
 							st = switch (t) {
 								case 0 -> door(Blocks.CHERRY_DOOR, Direction.NORTH, true);
 								case 1 -> door(Blocks.CHERRY_DOOR, Direction.NORTH, false);
-								case 2 -> pane(Blocks.STAINED_GLASS_PANE.pick(DyeColor.PINK), true);
+								case 2 -> CitadelCanvas.AIR; // an open transom: the doorway is 3 free blocks high
 								default -> log(Blocks.STRIPPED_CHERRY_LOG, beam);
 							};
 						} else if (t == 3) {
@@ -529,7 +529,7 @@ public final class HouseTerracePodium implements Variant {
 		int e = g.hv1 + 1;
 		int minDim = Math.min(bb - a + 1, e - v0 + 1);
 		int room = g.h - 1 - pp;
-		int tMax = Math.min(Math.min(6, (minDim - 1) / 2), room - 1);
+		int tMax = Math.min(Math.min(7, (minDim - 1) / 2), room - 1);
 		if (tMax < 1) {
 			return;
 		}
@@ -710,20 +710,14 @@ public final class HouseTerracePodium implements Variant {
 				place(k, u, yu, v, Blocks.CARPET.pick(DyeColor.WHITE).defaultBlockState());
 			}
 		}
-		// ---- lanterns hung from the ceilings, clear of the centre and of the stair
+		// ---- lanterns hung from the ceilings over the middle of the room: the floor there is flat (carpet), so nothing
+		// stands under them and the headroom stays above 3
 		for (int storey = 0; storey < 2; storey++) {
 			int y = pod + 3 + 5 * storey;
-			for (int du : new int[] {-2, 2}) {
-				for (int v : new int[] {iv0 + 1, last}) {
-					k.put(cu + du, y, v, hanging(Blocks.LANTERN), CitadelCanvas.HANGING);
-				}
-			}
-		}
-		if (id >= 8) {
-			for (int storey = 0; storey < 2; storey++) {
-				for (int du : new int[] {-2, 2}) {
-					k.put(cu + du, pod + 3 + 5 * storey, (iv0 + last) / 2 + 1, hanging(Blocks.LANTERN), CitadelCanvas.HANGING);
-				}
+			k.put(cu, y, iv0 + 2, hanging(Blocks.LANTERN), CitadelCanvas.HANGING);
+			k.put(cu, y, last, hanging(Blocks.LANTERN), CitadelCanvas.HANGING);
+			if (id >= 8) {
+				k.put(cu, y, (iv0 + last) / 2 + 1, hanging(Blocks.LANTERN), CitadelCanvas.HANGING);
 			}
 		}
 	}
