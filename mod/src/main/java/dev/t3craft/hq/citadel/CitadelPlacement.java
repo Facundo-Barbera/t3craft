@@ -322,9 +322,17 @@ public final class CitadelPlacement {
 		return s == null || s.isAir();
 	}
 
+	/**
+	 * A bush of the lot ground that a plot clears: the flowering azalea always; from scale 1.5 the plain azalea too (struct/hq-density2:
+	 * the garden belt of a barrio has one cell in twenty of them, which kept every 13-wide square from being free).
+	 */
+	private static boolean isBush(@Nullable BlockState s) {
+		return is(s, Blocks.FLOWERING_AZALEA_LEAVES) || dense() && is(s, Blocks.AZALEA_LEAVES);
+	}
+
 	/** Clear for a plot: empty, or an azalea bush of the lot ground (cleared before building). */
 	private static boolean clearOrBush(@Nullable BlockState s) {
-		return clear(s) || is(s, Blocks.FLOWERING_AZALEA_LEAVES);
+		return clear(s) || isBush(s);
 	}
 
 	/** Lot ground nobody has paved: grass, moss, or a light let into the grass by the lattice. */
@@ -358,6 +366,38 @@ public final class CitadelPlacement {
 
 	private static boolean placeable(Family f, int w, int d, int h) {
 		return fitsAny(f, w, d, h) || hasFallback(f, w, d, h);
+	}
+
+	/**
+	 * struct/hq-density2: the house designs of two or more storeys that a person can walk up (a flight cut inside by
+	 * {@code InteriorStair}, or a stair outside), by weight; every other house is 0. The lookout tower (a ladder) stays out.
+	 * Built once: the catalog is fixed for the run.
+	 */
+	private static volatile @Nullable Map<String, Integer> tallWeights;
+
+	private static Map<String, Integer> tallHouses() {
+		Map<String, Integer> w = tallWeights;
+		if (w == null) {
+			Map<String, Integer> tall = Map.of("house_timber_corner", 10, "house_stone_tower", 8, "house_terrace_tiers", 8,
+					"house_tower_bridge", 5, "house_stone_manor_court", 4, "house_tower_stair", 3, "house_machiya", 3,
+					"house_timber_overhang", 3);
+			Map<String, Integer> all = new HashMap<>();
+			for (Variant v : Catalog.of(Family.HOUSE)) {
+				all.put(v.id(), tall.getOrDefault(v.id(), 0));
+			}
+			w = Map.copyOf(all);
+			tallWeights = w;
+		}
+		return w;
+	}
+
+	/** {@link #build} of a piece whose local sizes come from the world box and the way it faces; false when nothing fits. */
+	private static boolean piece(CitadelCanvas c, Family f, int x, int z, int sx, int sz, int h, Direction face, long seed) {
+		boolean side = face.getAxis() == Direction.Axis.X;
+		if (!placeable(f, side ? sz : sx, side ? sx : sz, h)) {
+			return false;
+		}
+		return build(c, f, x, 1, z, sx, sz, h, face, seed);
 	}
 
 	/** The cardinal a vector points to (dominant axis). */
@@ -396,7 +436,7 @@ public final class CitadelPlacement {
 		for (int xx = x; xx < x + sx; xx++) {
 			for (int zz = z; zz < z + sz; zz++) {
 				for (int y = y0; y < y0 + 3; y++) {
-					if (is(c.at(xx, y, zz), Blocks.FLOWERING_AZALEA_LEAVES)) {
+					if (isBush(c.at(xx, y, zz))) {
 						c.set(xx, y, zz, AIR);
 					}
 				}
@@ -810,7 +850,7 @@ public final class CitadelPlacement {
 				}
 				c.set(x, 0, z, Math.abs(bb) <= CORRIDOR_HALF() + flare ? c.accent() : FOOT);
 				for (int y = 1; y <= 3; y++) {
-					if (is(c.at(x, y, z), Blocks.FLOWERING_AZALEA_LEAVES)) {
+					if (isBush(c.at(x, y, z))) {
 						c.set(x, y, z, AIR);
 					}
 				}
@@ -902,6 +942,19 @@ public final class CitadelPlacement {
 			}
 		}
 		int ring = l.ring();
+		if (dense()) {
+			// struct/hq-density2: the gate arm's grey square becomes two bays with a use each, and two of the four
+			// corner squares (a diagonal pair) become fenced kitchen gardens with a gate, a path and a well
+			forecourt(city, l, seed);
+			int pair = hash(seed, 13, 0, 2);
+			for (int sa = -1; sa <= 1; sa += 2) {
+				for (int sb = -1; sb <= 1; sb += 2) {
+					if ((sa * sb > 0 ? 0 : 1) == pair) {
+						huerto(city, pk, l, sa, sb, mix(seed, 80 + 2 * sa + sb));
+					}
+				}
+			}
+		}
 		List<Req> reqs = new ArrayList<>();
 		if (hash(seed, 1, 0, 2) == 0) {
 			reqs.add(req(Family.FOUNTAIN, 5, 7, 5, 7, scy(7), Mode.NEAR));
@@ -910,8 +963,10 @@ public final class CitadelPlacement {
 		}
 		if (dense()) {
 			// dwellings that grow with the lot: houses of the catalog (their frontage up to 15 · √k) with a yard each,
-			// in the corner squares and the belt, before the annexes take the room
-			for (int i = 0; i < (ring == 1 ? 2 : 3); i++) {
+			// in the corner squares and the belt, before the annexes take the room. struct/hq-density2: the first is
+			// always a tall one (two or three storeys that can be climbed), so no barrio is a row of low roofs
+			reqs.add(new Req(Family.HOUSE, 12, sp(15), 12, sp(15), HOUSE_H(), Mode.NEAR, tallHouses()));
+			for (int i = 1; i < (ring == 1 ? 2 : 3); i++) {
 				reqs.add(new Req(Family.HOUSE, 9, sp(15), 9, sp(15), HOUSE_H(), Mode.NEAR));
 			}
 		}
@@ -990,7 +1045,10 @@ public final class CitadelPlacement {
 		if (sx - 2 * in < 9 || sz - 2 * in < 9) {
 			return false;
 		}
-		if (!build(c, Family.HOUSE, x + in, 1, z + in, sx - 2 * in, sz - 2 * in, HOUSE_H(), front, seed)) {
+		// struct/hq-density2: the house of a hall slot is the barrio's skyline across the courtyard: a tall design if one
+		// fits the slot, any house otherwise
+		if (!build(c, Family.HOUSE, x + in, 1, z + in, sx - 2 * in, sz - 2 * in, HOUSE_H(), front, seed, tallHouses())
+				&& !build(c, Family.HOUSE, x + in, 1, z + in, sx - 2 * in, sz - 2 * in, HOUSE_H(), front, seed)) {
 			return false;
 		}
 		yardRing(c, new Placed(x + in, z + in, sx - 2 * in, sz - 2 * in, front), seed);
@@ -1063,7 +1121,7 @@ public final class CitadelPlacement {
 		}
 		c.set(x, 0, z, b(Blocks.DIRT_PATH));
 		for (int y = 1; y <= 2; y++) {
-			if (is(c.at(x, y, z), Blocks.FLOWERING_AZALEA_LEAVES)) {
+			if (isBush(c.at(x, y, z))) {
 				c.set(x, y, z, AIR);
 			}
 		}
@@ -1110,6 +1168,266 @@ public final class CitadelPlacement {
 		}
 		pk.take(x0, z0, sx, sz);
 		return true;
+	}
+
+	// ------------------------------------------------------------------ corners and forecourt (struct/hq-density2)
+
+	/** The shrub of the beds (a sweet berry bush would hurt whoever walks by). */
+	private static final BlockState SHRUB = b(Blocks.FLOWERING_AZALEA);
+	/** Smallest side of a fenced corner garden (cells). */
+	private static final int HUERTO_MIN = 13;
+
+	/** Clears the azalea bushes of the garden belt from a column (up to 3 cells high). */
+	private static void clearBush(CitadelCanvas c, int x, int z) {
+		for (int y = 1; y <= 3; y++) {
+			if (isBush(c.at(x, y, z))) {
+				c.set(x, y, z, AIR);
+			}
+		}
+	}
+
+	/**
+	 * The forecourt of a barrio: the paved arm that runs from the gatehouse to the corridor (as wide as the courtyard) used to be
+	 * a grey square. Now a 7-wide walk stays down its middle (the corridor's width) and on each side a bay takes over: a deepslate
+	 * kerb, then grass with a use, by the lot's seed and always two different ones: a market (two stalls, planters, a shade
+	 * tree, a bench), a garden (a tree, two benches, planters) or a well (a well, two benches, planters).
+	 */
+	private static void forecourt(City city, Lot l, long seed) {
+		int g = l.court();
+		int r0 = g + 2 + l.gateD();
+		int r1 = l.reach();
+		int edge = g + 1;
+		int walk = CURB();
+		if (r1 - r0 < 6 || edge - walk - 1 < 5) {
+			return;
+		}
+		int first = hash(seed, 21, 0, 3);
+		for (int side = -1; side <= 1; side += 2) {
+			bay(city, l, side, r0, r1, walk, edge, (first + (side > 0 ? 1 : 0)) % 3, mix(seed, 70 + side));
+		}
+	}
+
+	/** One bay of the forecourt: the cells {@code walk + 1 .. edge} from the axis on {@code side}, rows {@code r0 .. r1} from the court. */
+	private static void bay(City city, Lot l, int side, int r0, int r1, int walk, int edge, int prog, long seed) {
+		CitadelCanvas c = city.c;
+		List<int[]> cells = new ArrayList<>();
+		int x0 = Integer.MAX_VALUE;
+		int z0 = Integer.MAX_VALUE;
+		int x1 = Integer.MIN_VALUE;
+		int z1 = Integer.MIN_VALUE;
+		for (int a = r0; a <= r1; a++) {
+			for (int off = walk + 1; off <= edge; off++) {
+				BlockPos p = l.at(-a, side * off, 0);
+				int x = p.getX();
+				int z = p.getZ();
+				long k = col(x, z);
+				if (!inLot(c, l, x, z) || c.hallCols.containsKey(k) || city.anchorCols.contains(k) || city.paved.contains(k)) {
+					continue;
+				}
+				boolean free = true;
+				for (int y = 1; y <= CLEAR_TOP() && free; y++) {
+					free = clearOrBush(c.at(x, y, z));
+				}
+				if (!free) {
+					continue;
+				}
+				cells.add(new int[] {x, z, off});
+				x0 = Math.min(x0, x);
+				z0 = Math.min(z0, z);
+				x1 = Math.max(x1, x);
+				z1 = Math.max(z1, z);
+			}
+		}
+		if (cells.isEmpty()) {
+			return;
+		}
+		Packer pk = new Packer(x0, z0, x1, z1);
+		for (int[] k : cells) {
+			clearBush(c, k[0], k[1]);
+			if (k[2] == walk + 1) {
+				c.set(k[0], 0, k[1], FOOT);
+			} else {
+				c.set(k[0], 0, k[1], CitadelCanvas.GRASS);
+				pk.avail[pk.i(k[0], k[1])] = true;
+			}
+		}
+		Direction toward = lotDir(l, 0, -side);
+		Site site = new Site() {
+			@Override
+			public Direction front(double x, double z) {
+				return toward;
+			}
+
+			@Override
+			public double pathDist(double x, double z) {
+				return Math.abs(lb(l, x, z));
+			}
+		};
+		List<Req> reqs = new ArrayList<>();
+		switch (prog) {
+			case 0 -> {
+				for (int i = 0; i < 2; i++) {
+					reqs.add(req(Family.STALL, 3, 6, 3, 5, scy(6), Mode.NEAR));
+				}
+				reqs.add(req(Family.TREE, 5, 6, 5, 6, CLEAR_TOP(), Mode.SCATTER));
+				reqs.add(new Req(Family.BENCH, 2, 3, 1, 1, BENCH_H, Mode.NEAR));
+			}
+			case 1 -> {
+				reqs.add(req(Family.TREE, 5, 6, 5, 6, CLEAR_TOP(), Mode.SCATTER));
+				for (int i = 0; i < 2; i++) {
+					reqs.add(new Req(Family.BENCH, 2, 3, 1, 1, BENCH_H, Mode.NEAR));
+				}
+			}
+			default -> {
+				reqs.add(req(Family.WELL, 3, 5, 3, 5, scy(8), Mode.NEAR));
+				for (int i = 0; i < 2; i++) {
+					reqs.add(new Req(Family.BENCH, 2, 3, 1, 1, BENCH_H, Mode.NEAR));
+				}
+			}
+		}
+		for (int i = 0; i < 3; i++) {
+			reqs.add(new Req(Family.PLANTER, 1, 2, 1, 1, PLANTER_H, Mode.NEAR));
+		}
+		int salt = 0;
+		for (Req r : reqs) {
+			place(c, pk, site, r, seed, salt++);
+		}
+		// what the plots left: grass with ferns and flowers, never a bare square
+		for (int[] k : cells) {
+			int x = k[0];
+			int z = k[1];
+			if (k[2] == walk + 1 || pk.isUsed(x, z) || !clear(c.at(x, 1, z))) {
+				continue;
+			}
+			int roll = hash(seed, x, z, 100);
+			if (roll < 38) {
+				c.set(x, 1, z, SHORT_GRASS);
+			} else if (roll < 50) {
+				c.set(x, 1, z, FERN);
+			} else if (roll < 62) {
+				c.set(x, 1, z, FLOWERS[roll % FLOWERS.length]);
+			}
+		}
+	}
+
+	/**
+	 * A corner square of a barrio as a fenced kitchen garden ("huerto"): an azalea hedge all round it with a post and a lantern at
+	 * the corners and either side of two 3-wide gates (on the two sides that face the halls), a dirt path from each gate to a little
+	 * paved square with a well in its middle, rows of beds (berry bushes, flowers, pumpkins, melons, ferns) separated by narrow
+	 * walks, a scarecrow, and a compost corner (composter, barrel, hay) at the far end. It takes the whole square from the
+	 * inner corner out, as big as the square allows (down to {@value #HUERTO_MIN}); a clipped square that cannot take it stays as it is.
+	 */
+	private static void huerto(City city, Packer pk, Lot l, int sa, int sb, long seed) {
+		int cs = l.court() + 1 + CLUSTER_KEEP();
+		int full = l.reach() + 1 - cs + 1;
+		for (int n = full % 2 == 1 ? full : full - 1; n >= HUERTO_MIN; n -= 2) {
+			BlockPos p1 = l.at(sa * cs, sb * cs, 0);
+			BlockPos p2 = l.at(sa * (cs + n - 1), sb * (cs + n - 1), 0);
+			int x0 = Math.min(p1.getX(), p2.getX());
+			int z0 = Math.min(p1.getZ(), p2.getZ());
+			if (!pk.fits(x0, z0, n, n)) {
+				continue;
+			}
+			paintHuerto(city, pk, l, sa, sb, cs, n, seed);
+			pk.take(x0, z0, n, n);
+			return;
+		}
+	}
+
+	private static void paintHuerto(City city, Packer pk, Lot l, int sa, int sb, int cs, int n, long seed) {
+		CitadelCanvas c = city.c;
+		int mid = (n - 1) / 2;
+		BlockState hedge = leaves(Blocks.AZALEA_LEAVES);
+		BlockState bloom = leaves(Blocks.FLOWERING_AZALEA_LEAVES);
+		BlockState fence = b(Blocks.CHERRY_FENCE);
+		BlockState path = b(Blocks.DIRT_PATH);
+		for (int u = 0; u < n; u++) {
+			for (int v = 0; v < n; v++) {
+				BlockPos g = l.at(sa * (cs + u), sb * (cs + v), 0);
+				int x = g.getX();
+				int z = g.getZ();
+				clearBush(c, x, z);
+				int du = Math.abs(u - mid);
+				int dv = Math.abs(v - mid);
+				boolean edgeU = u == 0 || u == n - 1;
+				boolean edgeV = v == 0 || v == n - 1;
+				if (edgeU || edgeV) {
+					boolean gate = (u == 0 && dv <= 1) || (v == 0 && du <= 1);
+					boolean post = (edgeU && edgeV) || (u == 0 && dv == 2) || (v == 0 && du == 2);
+					if (gate) {
+						c.set(x, 0, z, path);
+					} else if (post) {
+						c.set(x, 0, z, FOOT);
+						c.set(x, 1, z, fence);
+						c.set(x, 2, z, fence);
+						c.set(x, 3, z, Blocks.LANTERN.defaultBlockState());
+					} else {
+						c.set(x, 1, z, hash(seed, x, z, 4) == 0 ? bloom : hedge);
+					}
+				} else if (du <= 3 && dv <= 3) {
+					int roll = hash(seed, x, z, 10);
+					c.set(x, 0, z, roll < 6 ? CitadelPaving.BRICKS : roll < 8 ? CitadelPaving.CRACKED : CitadelPaving.MOSSY);
+				} else if ((dv <= 1 && u <= mid - 4) || (du <= 1 && v <= mid - 4)) {
+					c.set(x, 0, z, path);
+				} else {
+					huertoBed(c, x, z, u, v, n, seed);
+				}
+			}
+		}
+		// the scarecrow, in a bed near the far side
+		BlockPos sc = l.at(sa * (cs + n - 3), sb * (cs + 3), 1);
+		c.set(sc, fence);
+		c.set(sc.above(), b(Blocks.HAY_BLOCK));
+		c.set(sc.above(2), b(Blocks.CARVED_PUMPKIN));
+		// the well in the middle of the paved square (a planter when no well fits)
+		BlockPos w1 = l.at(sa * (cs + mid - 2), sb * (cs + mid - 2), 0);
+		BlockPos w2 = l.at(sa * (cs + mid + 2), sb * (cs + mid + 2), 0);
+		if (!piece(c, Family.WELL, Math.min(w1.getX(), w2.getX()), Math.min(w1.getZ(), w2.getZ()), 5, 5, scy(8), lotDir(l, -sa, 0), mix(seed, 3))) {
+			c.set(l.at(sa * (cs + mid), sb * (cs + mid), 1), c.kit.gardenPlanter());
+		}
+		// from each gate a dirt path runs on across the verge to the paved cross of the barrio
+		for (int gate = 0; gate < 2; gate++) {
+			for (int t = 1; t <= CLUSTER_KEEP(); t++) {
+				BlockPos m = gate == 0 ? l.at(sa * (cs - t), sb * (cs + mid), 0) : l.at(sa * (cs + mid), sb * (cs - t), 0);
+				if (leadCell(city, pk, m.getX(), m.getZ()) != 0) {
+					break;
+				}
+				for (int dd = -1; dd <= 1; dd += 2) {
+					BlockPos s = gate == 0 ? l.at(sa * (cs - t), sb * (cs + mid + dd), 0) : l.at(sa * (cs + mid + dd), sb * (cs - t), 0);
+					leadCell(city, pk, s.getX(), s.getZ());
+				}
+			}
+		}
+	}
+
+	/** One cell of the beds of a corner garden: every third row of {@code v} is a dirt walk, the rest are rooted-dirt beds by strips. */
+	private static void huertoBed(CitadelCanvas c, int x, int z, int u, int v, int n, long seed) {
+		if (u >= n - 4 && v >= n - 4) {
+			c.set(x, 0, z, b(Blocks.ROOTED_DIRT));
+			if (u == n - 3 && v == n - 3) {
+				c.set(x, 1, z, b(Blocks.HAY_BLOCK));
+			} else if (u == n - 3 && v == n - 2) {
+				c.set(x, 1, z, b(Blocks.COMPOSTER));
+			} else if (u == n - 2 && v == n - 3) {
+				c.set(x, 1, z, b(Blocks.BARREL));
+			}
+			return;
+		}
+		if (v % 3 == 0) {
+			c.set(x, 0, z, b(Blocks.DIRT_PATH));
+			return;
+		}
+		c.set(x, 0, z, b(Blocks.ROOTED_DIRT));
+		int roll = hash(seed, x, z, 10);
+		BlockState crop = switch (hash(seed, u / 4, v / 3, 6)) {
+			case 0 -> roll < 6 ? SHRUB : FLOWERS[roll % FLOWERS.length];
+			case 1 -> FLOWERS[roll % FLOWERS.length];
+			case 2 -> roll < 5 ? b(Blocks.PUMPKIN) : SHORT_GRASS;
+			case 3 -> roll < 5 ? b(Blocks.MELON) : FERN;
+			case 4 -> roll < 6 ? BUSH : FERN;
+			default -> FLOWERS[(roll + u) % FLOWERS.length];
+		};
+		c.set(x, 1, z, crop);
 	}
 
 	// ------------------------------------------------------------------ empty lots
@@ -1211,7 +1529,8 @@ public final class CitadelPlacement {
 	 * the lot's seed plus two per quadrant, so the four are always different. Nothing wide is left for a forest.
 	 */
 	private static void compound(City city, Lot l, Packer pk, long seed) {
-		plaza(city, pk, l, seed);
+		// struct/hq-density2: every wedge has one clear focus at its crossing: a fountain plaza, a pond or a market
+		plaza(city, pk, l, seed, hash(seed, 11, 0, 3));
 		Set<Long> mine = new HashSet<>();
 		lane(city, l, pk, mine, true, seed);
 		lane(city, l, pk, mine, false, mix(seed, 1));
@@ -1405,11 +1724,21 @@ public final class CitadelPlacement {
 	 * square is free or nothing fits the middle.
 	 */
 	private static boolean plaza(City city, Packer pk, Lot l, long seed) {
+		return plaza(city, pk, l, seed, 0);
+	}
+
+	/**
+	 * {@link #plaza(City, Packer, Lot, long)} with a focus (struct/hq-density2; 0 is the old plaza): 0 the plaza centre or fountain with
+	 * benches on the diagonals of its walk ring, 1 a pond with an island and a cherry tree (the paved square is 4 bigger), 2 a market
+	 * (four stalls facing a well, benches on the other two sides; 4 bigger too).
+	 */
+	private static boolean plaza(City city, Packer pk, Lot l, long seed, int focus) {
 		CitadelCanvas c = city.c;
 		int cx = l.centre().getX();
 		int cz = l.centre().getZ();
 		Direction front = l.out().getOpposite();
-		for (int side = EMPTY_PLAZA() + (l.ring() > 1 ? 2 : 0); side >= PLAZA_SIDES()[PLAZA_SIDES().length - 1] + 2 * PLAZA_RING(); side -= 2) {
+		int extra = focus == 0 ? 0 : 4;
+		for (int side = EMPTY_PLAZA() + (l.ring() > 1 ? 2 : 0) + extra; side >= PLAZA_SIDES()[PLAZA_SIDES().length - 1] + 2 * PLAZA_RING(); side -= 2) {
 			int x0 = cx - side / 2;
 			int z0 = cz - side / 2;
 			if (!pk.fits(x0, z0, side, side)) {
@@ -1418,24 +1747,41 @@ public final class CitadelPlacement {
 			int inner = side - 2 * PLAZA_RING();
 			int ix = x0 + PLAZA_RING();
 			int iz = z0 + PLAZA_RING();
+			int fo = focus == 1 && inner / 2 - 3 < 5 || focus == 2 && inner < 19 ? 0 : focus;
 			Family f = fitsAny(Family.PLAZA_CENTER, inner, inner, PLAZA_H()) ? Family.PLAZA_CENTER
 					: fitsAny(Family.FOUNTAIN, inner, inner, PLAZA_H()) ? Family.FOUNTAIN : Family.TREE;
-			if (!placeable(f, inner, inner, PLAZA_H())) {
+			if (fo == 0 && !placeable(f, inner, inner, PLAZA_H())) {
 				continue;
 			}
 			for (int x = x0; x < x0 + side; x++) {
 				for (int z = z0; z < z0 + side; z++) {
 					int ring = Math.max(Math.abs(x - cx), Math.abs(z - cz));
-					c.set(x, 0, z, ring % 3 == 0 || ring == side / 2 ? FOOT : c.accent());
+					if (fo == 0) {
+						c.set(x, 0, z, ring % 3 == 0 || ring == side / 2 ? FOOT : c.accent());
+					} else {
+						// pond and market: a deepslate edge, a ring of accent paving, then stone bricks (cracked and mossy by patches)
+						int roll = hash(seed, x, z, 10);
+						c.set(x, 0, z, ring == side / 2 ? FOOT : ring == side / 2 - 1 ? c.accent()
+								: roll < 6 ? CitadelPaving.BRICKS : roll < 8 ? CitadelPaving.CRACKED : CitadelPaving.MOSSY);
+					}
 					for (int y = 1; y <= 3; y++) {
-						if (is(c.at(x, y, z), Blocks.FLOWERING_AZALEA_LEAVES)) {
+						if (isBush(c.at(x, y, z))) {
 							c.set(x, y, z, AIR);
 						}
 					}
 					city.paved.add(col(x, z));
 				}
 			}
-			build(c, f, ix, 1, iz, inner, inner, PLAZA_H(), front, mix(seed, 7));
+			switch (fo) {
+				case 1 -> pondFocus(city, cx, cz, inner, seed);
+				case 2 -> marketFocus(city, cx, cz, inner, seed);
+				default -> {
+					build(c, f, ix, 1, iz, inner, inner, PLAZA_H(), front, mix(seed, 7));
+					if (dense()) {
+						ringBenches(city, cx, cz, (inner - 1) / 2 + 2, seed);
+					}
+				}
+			}
 			int[][] corners = {{x0, z0}, {x0 + side - 1, z0}, {x0, z0 + side - 1}, {x0 + side - 1, z0 + side - 1}};
 			for (int[] k : corners) {
 				Direction in = cardinalOf(cx - k[0], cz - k[1]);
@@ -1447,6 +1793,91 @@ public final class CitadelPlacement {
 			return true;
 		}
 		return false;
+	}
+
+	/** Four benches on the diagonals of a plaza, {@code q} cells from the centre on each axis, facing it. */
+	private static void ringBenches(City city, int cx, int cz, int q, long seed) {
+		int n = 0;
+		for (int sx = -1; sx <= 1; sx += 2) {
+			for (int sz = -1; sz <= 1; sz += 2) {
+				int x = cx + sx * q;
+				int z = cz + sz * q;
+				Direction face = cardinalOf(cx - x, cz - z);
+				if (face.getAxis() == Direction.Axis.X) {
+					piece(city.c, Family.BENCH, x, z - 1, 1, 3, BENCH_H, face, mix(seed, 900 + n++));
+				} else {
+					piece(city.c, Family.BENCH, x - 1, z, 3, 1, BENCH_H, face, mix(seed, 900 + n++));
+				}
+			}
+		}
+	}
+
+	/** A round pond with a mossy island and a cherry tree on it, lily pads, a dark rim, benches round it. */
+	private static void pondFocus(City city, int cx, int cz, int inner, long seed) {
+		CitadelCanvas c = city.c;
+		int r = inner / 2 - 3;
+		int r2 = r * r + r;
+		int rim2 = (r + 1) * (r + 1) + r + 1;
+		for (int dx = -r - 2; dx <= r + 2; dx++) {
+			for (int dz = -r - 2; dz <= r + 2; dz++) {
+				int d2 = dx * dx + dz * dz;
+				int x = cx + dx;
+				int z = cz + dz;
+				if (d2 <= 5) {
+					c.set(x, -1, z, FOOT);
+					c.set(x, 0, z, CitadelCanvas.MOSS);
+				} else if (d2 <= r2) {
+					c.set(x, -1, z, FOOT);
+					c.set(x, 0, z, CitadelCanvas.WATER);
+					if (d2 > 9 && hash(seed, x, z, 100) < 10) {
+						c.set(x, 1, z, b(Blocks.LILY_PAD));
+					}
+				} else if (d2 <= rim2) {
+					c.set(x, 0, z, FOOT);
+				}
+			}
+		}
+		CitadelGrounds.tree(c, cx, cz);
+		ringBenches(city, cx, cz, r + 3, seed);
+	}
+
+	/** A market square: two stalls on the north side and two on the south facing in, a well in the middle, benches east and west. */
+	private static void marketFocus(City city, int cx, int cz, int inner, long seed) {
+		CitadelCanvas c = city.c;
+		int hi = (inner - 1) / 2;
+		int fs = 5;
+		int fd = 4;
+		int n = 0;
+		// a cross of walk 5 wide stays free (the lanes come in along it); the stalls stand on its four arms' sides
+		for (int sz = -1; sz <= 1; sz += 2) {
+			for (int sx = -1; sx <= 1; sx += 2) {
+				int x = sx > 0 ? cx + 3 : cx - 3 - (fs - 1);
+				int z = sz < 0 ? cz - hi : cz + hi - (fd - 1);
+				piece(c, Family.STALL, x, z, fs, fd, scy(6), sz < 0 ? Direction.SOUTH : Direction.NORTH, mix(seed, 950 + n++));
+			}
+		}
+		if (hi >= 11) {
+			for (int sx = -1; sx <= 1; sx += 2) {
+				for (int sz = -1; sz <= 1; sz += 2) {
+					int x = sx > 0 ? cx + hi - (fd - 1) : cx - hi;
+					int z = sz > 0 ? cz + 3 : cz - 3 - (fs - 1);
+					piece(c, Family.STALL, x, z, fd, fs, scy(6), sx > 0 ? Direction.WEST : Direction.EAST, mix(seed, 950 + n++));
+				}
+			}
+		}
+		// the middle: the plaza centre (a fountain pavilion) when one fits the free square between the stalls, else a well
+		int ms = 2 * (hi - fd - 1) + 1;
+		boolean done = false;
+		while (!done && ms >= 5) {
+			if (fitsAny(Family.PLAZA_CENTER, ms, ms, PLAZA_H()) || fitsAny(Family.FOUNTAIN, ms, ms, PLAZA_H())) {
+				Family f = fitsAny(Family.PLAZA_CENTER, ms, ms, PLAZA_H()) ? Family.PLAZA_CENTER : Family.FOUNTAIN;
+				done = piece(c, f, cx - ms / 2, cz - ms / 2, ms, ms, PLAZA_H(), Direction.SOUTH, mix(seed, 960));
+			}
+			ms -= 2;
+		}
+		if (!done && !piece(c, Family.WELL, cx - 2, cz - 2, 5, 5, scy(8), Direction.SOUTH, mix(seed, 960))) {
+			CitadelGrounds.tree(c, cx, cz);
+		}
 	}
 
 	// ------------------------------------------------------------------ ground texture

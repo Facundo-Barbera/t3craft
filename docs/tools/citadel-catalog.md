@@ -193,6 +193,26 @@ of this runs and the plan is unchanged.
 - Tools: `Packer.limit/unlimit` confine the plots to a parcel, `Packer.block` takes a painted cell, `Req.weights` biases the
   variants a request gets (by id), `placeBox(..., pad)` reserves the yard.
 
+### Density 2 (struct/hq-density2, scale 1.5 and up)
+
+- **Corner squares** of a barrio (the four `[court + 1 + CLUSTER_KEEP, reach + 1]` squares between the arms): a diagonal pair (by the
+  lot's seed) becomes a fenced **huerto** (`huerto`/`paintHuerto`): azalea hedge all round it, corner posts with a lantern, two 3-wide
+  gates on the sides facing the halls with a dirt path from each to a small paved square with a well, rows of beds (flowers, shrubs,
+  pumpkins, melons, ferns) with dirt walks between them, a scarecrow, a compost corner. A clipped square that cannot take it (13 cells
+  at least) stays as before. The plain azalea of the garden belt now counts as a bush a plot may clear (`isBush`), which is what lets
+  13-wide squares be free.
+- **Forecourt** (`forecourt`/`bay`): the paved arm from the gatehouse to the corridor is no longer a grey square. A 7-wide walk stays
+  in the middle; on each side a deepslate kerb and a grass **bay** with a use (always two different ones): market (2 stalls, shade tree,
+  bench), garden (tree, 2 benches) or well (well, 2 benches), plus planters and ferns/flowers on what is left.
+- **Tall houses**: the first `HOUSE` of every barrio (and the house of an unused hall slot, `slotHouse`) is picked from the designs of
+  two or more storeys that can be walked up (`tallHouses()`: timber_corner, stone_tower, terrace_tiers, tower_bridge, manor_court,
+  tower_stair, machiya, timber_overhang; never the ladder-only lookout tower). `slotHouse` falls back to any house when none fits.
+- **Wedge focus**: the plaza at the crossing of an empty lot's lanes (`plaza(..., focus)`, focus = lot seed mod 3): 0 plaza centre or
+  fountain with benches on the diagonals of the walk ring; 1 a pond with a mossy island, a cherry tree, lily pads and benches
+  (`pondFocus`); 2 a market square of 8 stalls facing a plaza-centre fountain, with a free 5-wide cross for the lanes
+  (`marketFocus`). The pond and the market have a paved square 4 bigger.
+- Cost: +0.5 % placements at scale 200 (2.423 M → 2.436 M).
+
 ### Streets and avenues
 
 All of these sit on the edge band. The middle of every street stays clear.
