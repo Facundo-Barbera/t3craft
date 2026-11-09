@@ -327,12 +327,18 @@ public final class GateArchBattlement implements Variant {
 		private final boolean stairLeft;
 		private final boolean rounded;
 		private final boolean pointed;
+		/** The curtain's faces stand back this many blocks from the towers' faces (deep plots only). */
+		private final int rec;
+		/** Row (v) of the stair's first cell: the doorways and the wall walk line up on it. */
+		private final int sv;
 
 		Large(CitadelCanvas c, Plot p) {
 			this.c = c;
 			this.p = p;
 			this.w = p.w();
 			this.d = p.d();
+			this.rec = p.d() >= 6 ? 1 : 0;
+			this.sv = 1 + rec;
 			this.m = MATS[p.hash(7, 7, 7, MATS.length)];
 			boolean cherryRoof = bit(4);
 			this.roofStairs = cherryRoof ? Blocks.CHERRY_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS;
@@ -480,8 +486,10 @@ public final class GateArchBattlement implements Variant {
 			for (int y : new int[] {4, 10}) {
 				set(col[1], y, 0, AIR);
 				set(col[1], y, d - 1, AIR);
-				set(outer, y, mid, AIR);
+				set(outer, y, mid, y == 10 && !stairTower ? b(Blocks.LANTERN) : AIR); // the guard tower's lookout glows through its slit
 				if (y == 4) {
+					set(col[1], 3, 0, m.trim);
+					set(col[1], 3, d - 1, m.trim);
 					set(col[1], 5, 0, top(stairs(m.trimStairs, Direction.NORTH)));
 					set(col[1], 5, d - 1, top(stairs(m.trimStairs, Direction.SOUTH)));
 					set(outer, 5, mid, top(stairs(m.trimStairs, out)));
@@ -496,7 +504,7 @@ public final class GateArchBattlement implements Variant {
 			}
 			// the doorway onto the wall walk, over a sill at y 8, 3 high
 			for (int y = 9; y <= 11; y++) {
-				set(inner, y, 1, AIR);
+				set(inner, y, sv, AIR);
 			}
 			// lookout chamber: hollow y 9..11, with a lantern from the ceiling
 			for (int t = 1; t <= 2; t++) {
@@ -508,8 +516,9 @@ public final class GateArchBattlement implements Variant {
 			}
 			if (!stairTower) {
 				set(col[1], 9, d - 2, Blocks.BARREL);
+			} else {
+				p.put(c, col[1], 11, sv, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
 			}
-			p.put(c, col[stairTower ? 1 : 2], 11, stairTower ? 1 : mid, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
 
 			// --- roof: hip of stairs, the lowest course a ceiling over the chamber
 			int y = 12;
@@ -529,10 +538,10 @@ public final class GateArchBattlement implements Variant {
 		private void stairTower(boolean left, int[] col, Direction in, Direction out, int inner) {
 			// the arched doorway onto the avenue: 3 high, trim lintel
 			for (int y = 0; y <= 2; y++) {
-				set(inner, y, 1, AIR);
+				set(inner, y, sv, AIR);
 			}
-			set(inner, 3, 1, m.trim);
-			int[][] cell = {{2, 1}, {1, 1}, {1, 2}, {2, 2}};
+			set(inner, 3, sv, m.trim);
+			int[][] cell = {{2, sv}, {1, sv}, {1, sv + 1}, {2, sv + 1}};
 			Direction[] face = {out, Direction.SOUTH, in, Direction.NORTH};
 			for (int j = 0; j < 4; j++) {
 				int u = col[cell[j][0]];
@@ -561,11 +570,11 @@ public final class GateArchBattlement implements Variant {
 				}
 			}
 			// door: a threshold stair, a cherry door, an open transom, a trim lintel
-			set(inner, 0, 1, stairs(Blocks.CHERRY_STAIRS, out));
-			set(inner, 1, 1, door(in, true));
-			set(inner, 2, 1, door(in, false));
-			set(inner, 3, 1, AIR);
-			set(inner, 4, 1, m.trim);
+			set(inner, 0, sv, stairs(Blocks.CHERRY_STAIRS, out));
+			set(inner, 1, sv, door(in, true));
+			set(inner, 2, sv, door(in, false));
+			set(inner, 3, sv, AIR);
+			set(inner, 4, sv, m.trim);
 			// bench along the outer wall, the chest at the back with a lantern on it
 			int benchTo = Math.min(d - 3, 3);
 			for (int v = 1; v <= benchTo; v++) {
@@ -597,7 +606,7 @@ public final class GateArchBattlement implements Variant {
 				double dy = pointed ? rise * Math.pow(1 - t, 0.6) : rise * Math.sqrt(1 - t * t);
 				s[i] = side + (int) Math.round(dy);
 			}
-			boolean backPlaque = d >= 5;
+			boolean backPlaque = d - 2 - 2 * rec >= 3; // the walk keeps at least one free row
 			for (int i = 0; i < ow; i++) {
 				int u = a0 + i;
 				double dist = Math.abs(i - half);
@@ -607,9 +616,9 @@ public final class GateArchBattlement implements Variant {
 				boolean recess = dist <= 0.5;
 				boolean cap = dist <= (ow % 2 == 1 ? 1.0 : 1.5);
 				boolean merlon = ((int) Math.floor(dist)) % 2 == 0;
-				for (int v = 0; v < d; v++) {
-					boolean face = v == 0 || v == d - 1;
-					Direction outward = v == 0 ? Direction.NORTH : Direction.SOUTH;
+				for (int v = rec; v <= d - 1 - rec; v++) {
+					boolean face = v == rec || v == d - 1 - rec;
+					Direction outward = v == rec ? Direction.NORTH : Direction.SOUTH;
 					// arch ring (voussoirs on the faces, body inside) and the spandrel up to the corbel table
 					for (int y = s[i]; y < DECK - 1; y++) {
 						if (face && y <= ringTop) {
@@ -634,12 +643,12 @@ public final class GateArchBattlement implements Variant {
 					}
 					// parapet: breast wall, merlons, a raised shield with a banner over the keystone
 					if (face) {
-						boolean plaque = v == 0 || backPlaque;
+						boolean plaque = v == rec || backPlaque;
 						if (plaque && recess) {
-							set(u, 9, v, AIR);
+							set(u, 9, v, slab(m.trimSlab)); // a ledge under the shield
 							p.put(c, u, 10, v, b(Blocks.WALL_BANNER.pick(bannerColor)).setValue(BlockStateProperties.HORIZONTAL_FACING, outward),
 									CitadelCanvas.DECOR);
-							int back = v == 0 ? 1 : d - 2;
+							int back = v == rec ? rec + 1 : d - 2 - rec;
 							set(u, 9, back, wall(u, 9, back));
 							set(u, 10, back, wall(u, 10, back));
 							set(u, 11, v, slab(m.trimSlab));
@@ -663,9 +672,9 @@ public final class GateArchBattlement implements Variant {
 				}
 				boolean e = i + 1 < ow && s[i + 1] >= 5;
 				boolean wst = i > 0 && s[i - 1] >= 5;
-				set(a0 + i, s[i] - 1, 1, bars(e, wst));
+				set(a0 + i, s[i] - 1, rec + 1, bars(e, wst));
 				if (s[i] >= 6 && ((int) Math.floor(Math.abs(i - half))) % 2 == 0) {
-					set(a0 + i, s[i] - 2, 1, bars(false, false));
+					set(a0 + i, s[i] - 2, rec + 1, bars(false, false));
 				}
 			}
 			// lanterns hanging under the arch on both sides, mid depth, where the passage is 4 high
@@ -679,7 +688,7 @@ public final class GateArchBattlement implements Variant {
 				p.put(c, a0 + ow - 1 - il, s[ow - 1 - il] - 1, d / 2, lan, CitadelCanvas.HANGING);
 			}
 			// lanterns on the parapet at both ends of the walk
-			for (int v : new int[] {0, d - 1}) {
+			for (int v : new int[] {rec, d - 1 - rec}) {
 				for (int i : new int[] {0, ow - 1}) {
 					boolean merlon = ((int) Math.floor(Math.abs(i - half))) % 2 == 0;
 					set(a0 + i, merlon ? 11 : 10, v, b(Blocks.LANTERN));
