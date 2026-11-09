@@ -244,7 +244,8 @@ public final class HallFacade {
 		int mid = r.c();
 		int top = F * fh();
 		BlockState foot = tall() ? b(Blocks.DEEPSLATE_BRICKS) : STONE_BRICKS;
-		BlockState shaft = tall() && s == HallStyle.STONE ? STONE_BRICKS : postBlock(s, m);
+		// barrio-hall3: dark polished deepslate shafts on stone halls, so the pilasters separate from the stone-brick wall
+		BlockState shaft = tall() && s == HallStyle.STONE ? b(Blocks.POLISHED_DEEPSLATE) : postBlock(s, m);
 		for (int side = 0; side < 4; side++) {
 			int len = side < 2 ? r.w() : r.d();
 			Direction out = outward(r, side);

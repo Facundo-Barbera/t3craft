@@ -379,10 +379,12 @@ public final class HallInterior {
 			for (int row = 1; row <= rows - 1; row++) {
 				boolean card = (row + k) % 2 == 0 && HallStyle.hash(h, v, row) % 100 < 88;
 				boolean blank = card && HallStyle.hash(v, row, h) % 6 == 0;
-				c.set(base.above(row), card ? concrete(blank ? DyeColor.WHITE : stage) : b(Blocks.BLACKSTONE));
+				// a light board (calcite) so the saturated cards pop; the dark-oak frame closes it
+				c.set(base.above(row), card ? concrete(blank ? DyeColor.GRAY : stage) : b(Blocks.CALCITE));
 			}
-			c.set(base.above(rows), terracotta(stage));
-			c.set(base.above(rows + 1), k == n / 2 ? concrete(env) : b(Blocks.DARK_OAK_PLANKS));
+			c.set(base.above(rows), b(Blocks.WOOL.pick(stage)));
+			// the project's colour is a title plate three cells wide on the middle of the rail
+			c.set(base.above(rows + 1), Math.abs(k - n / 2) <= 1 ? concrete(env) : b(Blocks.DARK_OAK_PLANKS));
 		}
 	}
 
@@ -529,6 +531,10 @@ public final class HallInterior {
 		for (int u = cu - PENDANT_STEP * (cu / PENDANT_STEP); u < D - 1; u += PENDANT_STEP) {
 			for (int v = mid - PENDANT_STEP * (mid / PENDANT_STEP); v < W; v += PENDANT_STEP) {
 				if (u < 1 || v < 1 || v > W - 2 || F == 1 && u == cu && v == mid) {
+					continue;
+				}
+				// the kanban stands on the door wall left of the aisle: no lantern hangs in front of it
+				if (W >= 15 && u <= 3 && v < mid - 1) {
 					continue;
 				}
 				// walkability audit: never over the flight of a two-floor hall (a pendant over the first steps was at

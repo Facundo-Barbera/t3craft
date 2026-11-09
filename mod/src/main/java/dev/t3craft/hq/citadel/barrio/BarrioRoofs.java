@@ -63,12 +63,12 @@ public final class BarrioRoofs {
 
 	/** Last sloped ring of a grand gable roof: even, and leaving a deck at least as wide as the clerestory (5). */
 	private static int gableCap(Room r) {
-		return Math.max(4, (r.c() - 3) / 2 * 2);
+		return Math.max(4, (r.w() - 5) / 4 * 2);
 	}
 
 	/** Last sloped ring of a grand hipped roof: even, leaving a deck wider than the cupola (5). */
 	private static int hipCap(Room r) {
-		return Math.max(4, (r.c() - 4) / 2 * 2);
+		return Math.max(4, (Math.min(r.w(), r.d()) - 5) / 4 * 2);
 	}
 
 	/** The bottom slab that goes with a roof stair (also the second-tone stairs of {@link BarrioKit#altStairs}). */
@@ -172,8 +172,8 @@ public final class BarrioRoofs {
 			// slope and ends in a closed back, and the clerestory on the deck
 			IntBinaryOperator mainY = (u, v) -> top + lift(Math.min(v + 1, W - v), kcap);
 			int pr = lift(kcap + 1, kcap) + 2;
-			crossGable(c, r, top, mats, 2, D / 4, 3, pr, kcap + 1, mainY, tint);
-			crossGable(c, r, top, mats, 3, D - 1 - D / 4, 3, pr, kcap + 1, mainY, tint);
+			crossGable(c, r, top, mats, 2, D / 4, 3, pr, kcap, mainY, tint);
+			crossGable(c, r, top, mats, 3, D - 1 - D / 4, 3, pr, kcap, mainY, tint);
 			clerestory(c, r, top + lift(kcap + 1, kcap), mats, tint);
 			return;
 		}
@@ -237,7 +237,7 @@ public final class BarrioRoofs {
 					// a low ridge of slabs (a full block under a slab read as a wall); a finial on the face
 					c.set(p.atY(yc), BarrioKit.slabOf(roof));
 					if (n == 0) {
-						c.set(p.atY(yc + 1), BarrioKit.finial(roof));
+						c.set(p.atY(yc + 1), HallFacade.frame(Direction.Axis.Y));
 					}
 				} else {
 					Direction f = dt < 0 ? plus : plus.getOpposite();
@@ -300,6 +300,23 @@ public final class BarrioRoofs {
 				}
 			}
 		}
+		// barrio-hall3: the cupola's own eave, one cell wide, in the roof's second tone (corner cells are slabs)
+		Block alt = BarrioKit.altStairs(roof);
+		for (int du = -3; du <= 3; du++) {
+			for (int dv = -3; dv <= 3; dv++) {
+				if (Math.max(Math.abs(du), Math.abs(dv)) != 3) {
+					continue;
+				}
+				BlockPos q = r.cell(uc + du, vc + dv, y0 + 4);
+				BlockState there = c.at(q.getX(), q.getY(), q.getZ());
+				if (there != null && !there.isAir()) {
+					continue;
+				}
+				boolean corner = Math.abs(du) == 3 && Math.abs(dv) == 3;
+				Direction in = Math.abs(dv) == 3 ? (dv < 0 ? r.side() : r.side().getOpposite()) : (du < 0 ? r.back() : r.back().getOpposite());
+				c.set(q, corner ? gentleSlab(alt) : BarrioKit.stair(alt, in));
+			}
+		}
 		BlockPos lamp = r.cell(uc, vc, y0 + 3);
 		c.put(lamp.getX(), lamp.getY(), lamp.getZ(), BarrioKit.lantern(true), CitadelCanvas.HANGING);
 		c.set(r.cell(uc, vc, y0 + 6), BarrioKit.rod());
@@ -347,8 +364,8 @@ public final class BarrioRoofs {
 			BlockPos p = r.cell(u, mid, yDeck + 2);
 			c.put(p.getX(), p.getY(), p.getZ(), BarrioKit.lantern(true), CitadelCanvas.HANGING);
 		}
-		c.set(r.cell(u0, mid, yDeck + 5), BarrioKit.finial(roof));
-		c.set(r.cell(u1, mid, yDeck + 5), BarrioKit.finial(roof));
+		c.set(r.cell(u0, mid, yDeck + 5), HallFacade.frame(Direction.Axis.Y));
+		c.set(r.cell(u1, mid, yDeck + 5), HallFacade.frame(Direction.Axis.Y));
 	}
 
 	private static boolean hasChimney(int seed) {
@@ -481,10 +498,10 @@ public final class BarrioRoofs {
 				return top + lift(k, kcap);
 			};
 			int pr = lift(kcap + 1, kcap) + 2;
-			crossGable(c, r, top, mats, 0, mid, 3, pr, kcap + 1, mainY, tint);
-			crossGable(c, r, top, mats, 1, mid, 3, pr, kcap + 1, mainY, tint);
-			crossGable(c, r, top, mats, 2, D / 2, 3, pr, kcap + 1, mainY, tint);
-			crossGable(c, r, top, mats, 3, D / 2, 3, pr, kcap + 1, mainY, tint);
+			crossGable(c, r, top, mats, 0, mid, 3, pr, kcap, mainY, tint);
+			crossGable(c, r, top, mats, 1, mid, 3, pr, kcap, mainY, tint);
+			crossGable(c, r, top, mats, 2, D / 2, 3, pr, kcap, mainY, tint);
+			crossGable(c, r, top, mats, 3, D / 2, 3, pr, kcap, mainY, tint);
 			cupola(c, r, top + lift(kcap + 1, kcap), mats, (D - 1) / 2, mid, tint);
 		} else if (hasChimney(seed)) {
 			IntBinaryOperator kAt = (u, v) -> Math.min(Math.min(v + 1, W - v), Math.min(u + 1, D - u));
