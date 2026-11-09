@@ -258,14 +258,14 @@ public final class LoungeRoom {
 			if (a == 2) {
 				return c.accent();
 			}
-			if (d > 13.0) {
-				return NodeDecor.footMix(dx, 0, dz);
-			}
-			if (d <= 9.3) {
-				return NodeDecor.stoneMix(dx, 0, dz);
-			}
 			int sx = dx < 0 ? -1 : 1;
 			int sz = dz < 0 ? -1 : 1;
+			if (d > 13.0) {
+				return theme(sx, sz) == 3 ? MOSS : NodeDecor.footMix(dx, 0, dz);
+			}
+			if (d <= 9.3) {
+				return ((ax + az) & 1) == 0 ? b(Blocks.POLISHED_DEEPSLATE) : NodeDecor.footMix(dx, 0, dz);
+			}
 			return switch (theme(sx, sz)) {
 				case 0 -> ((ax + az) & 1) == 0 ? b(Blocks.SMOOTH_STONE) : b(Blocks.POLISHED_DEEPSLATE);
 				case 1 -> c.floor();
@@ -322,11 +322,11 @@ public final class LoungeRoom {
 					}
 					if (d <= 7.5 || a == 2) {
 						set(dx, 1, dz, b(Blocks.STONE_BRICK_WALL));
-						boolean post = (a == 5 && along == 5) || (a == 3 && along == 6);
+						boolean post = a == 5 && along == 5;
 						if (post) {
 							set(dx, 2, dz, b(Blocks.STONE_BRICK_WALL));
 							put(dx, 3, dz, lanternUp(), DECOR);
-						} else if (a >= 3 && Math.floorMod(dx * 5 + dz * 3, 4) == 0) {
+						} else if (a >= 3 && Math.floorMod(dx * 5 + dz * 3, 6) == 0) {
 							set(dx, 2, dz, pot(dx * 3 + dz));
 						}
 					}
@@ -345,7 +345,7 @@ public final class LoungeRoom {
 					int az = Math.abs(dz);
 					int a = Math.min(ax, az);
 					double d = Math.hypot(dx, dz);
-					if (d <= 9.8 || d > 13.95) {
+					if (d <= 10.6 || d > 13.95) {
 						continue;
 					}
 					boolean ring = d > 10.6 && d <= 11.9;
@@ -354,10 +354,10 @@ public final class LoungeRoom {
 					} else if (a >= 3) {
 						int par = ax >= az ? az : ax;
 						if (par % 2 == 0) {
+							set(dx, ROOF_Y, dz, slab(Blocks.CHERRY_SLAB));
 							if (Math.floorMod(dx * 3 + dz * 5, 9) == 0) {
-								set(dx, ROOF_Y, dz, c.kit.glowPanel(Direction.DOWN, false));
-							} else {
-								set(dx, ROOF_Y, dz, slab(Blocks.CHERRY_SLAB));
+								// the panel hangs under its slab: its lit face is the bottom, its frame never shows from above
+								set(dx, ROOF_Y - 1, dz, c.kit.glowPanel(Direction.DOWN, false));
 							}
 							int sx = dx < 0 ? -1 : 1;
 							int sz = dz < 0 ? -1 : 1;
@@ -423,6 +423,12 @@ public final class LoungeRoom {
 			}
 		}
 
+		/** A warm glow panel under a cherry slab of the pergola at {@code (u, v)}. */
+		void lamp(int u, int v) {
+			set(u, ROOF_Y, v, slab(Blocks.CHERRY_SLAB));
+			set(u, ROOF_Y - 1, v, r.c.kit.glowPanel(Direction.DOWN, false));
+		}
+
 		/** A glow strip along the foot of a counter or shelf, in the cell where people stand. */
 		void strip(int u, int v, Direction looks) {
 			put(u, 1, v, r.c.kit.glowStrip(looks, false, false), DECOR);
@@ -464,7 +470,7 @@ public final class LoungeRoom {
 		q.tea(8, 5, 2);
 		q.set(8, 2, 5, pot(1));
 		q.set(9, 1, 9, b(Blocks.POTTED_FLOWERING_AZALEA));
-		q.set(9, 6, 10, q.r.c.kit.glowPanel(Direction.DOWN, false));
+		q.lamp(9, 10);
 	}
 
 	/** Library: shelf walls along v = 11 and u = 11 with a lectern in each, a reading table with a lantern. */
@@ -498,10 +504,10 @@ public final class LoungeRoom {
 			q.strip(10, v, g);
 		}
 		q.tea(8, 5, 2);
-		q.put(8, 2, 5, lanternUp(), DECOR);
+		q.set(8, 2, 5, pot(0));
 		q.set(9, 2, 5, pot(2));
 		q.set(9, 1, 9, b(Blocks.CARTOGRAPHY_TABLE));
-		q.set(9, 6, 10, q.r.c.kit.glowPanel(Direction.DOWN, false));
+		q.lamp(9, 10);
 	}
 
 	/** Music: a jukebox with its disc and speakers, a record rack and chest, benches and tables round it. */
@@ -534,7 +540,7 @@ public final class LoungeRoom {
 		}
 		q.table(9, 7);
 		q.set(9, 2, 7, pot(4));
-		q.set(9, 6, 9, q.r.c.kit.glowPanel(Direction.DOWN, false));
+		q.lamp(9, 9);
 	}
 
 	/** Garden: azalea and flower beds along v = 10..11, a cherry tree in the corner, a tea table with benches. */
@@ -572,11 +578,11 @@ public final class LoungeRoom {
 		q.set(9, 8, 9, leaves(Blocks.CHERRY_LEAVES));
 		q.tea(8, 5, 2);
 		q.set(8, 2, 5, pot(2));
-		q.put(9, 2, 5, lanternUp(), DECOR);
+		q.set(9, 2, 5, pot(1));
 		q.set(11, 1, 4, b(Blocks.POTTED_FLOWERING_AZALEA));
 		q.set(11, 1, 6, b(Blocks.POTTED_BAMBOO));
 		q.set(11, 1, 8, q.r.c.kit.gardenPlanter());
-		q.set(9, 6, 7, q.r.c.kit.glowPanel(Direction.DOWN, false));
+		q.lamp(9, 7);
 	}
 
 	// ------------------------------------------------------------------ legacy design (scale below 1.9)
