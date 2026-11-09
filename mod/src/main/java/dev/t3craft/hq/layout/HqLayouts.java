@@ -22,10 +22,8 @@ import org.jspecify.annotations.Nullable;
  *   <li>{@code campus}: hexagonal barrios round a plaza (very large);</li>
  *   <li>{@code ring}: rings of sectors with radial avenues;</li>
  *   <li>{@code vertical}: towers with an atrium and skybridges;</li>
- *   <li>{@code ensanche}: blocks with patios on a street grid;</li>
  *   <li>{@code village}: a hill village on terraces;</li>
  *   <li>{@code hybrid-ringcampus}: a ringed citadel whose sectors are campus barrios;</li>
- *   <li>{@code hybrid-towncenter}: town centre with towers (ensanche blocks, civic plaza, towers and skybridges);</li>
  *   <li>{@code hybrid-terraces}: an acropolis on terraces with sky islands and bridges (hybrid).</li>
  * </ul>
  *
@@ -43,10 +41,8 @@ public final class HqLayouts {
 	public static final String CAMPUS = "campus";
 	public static final String RING = "ring";
 	public static final String VERTICAL = "vertical";
-	public static final String ENSANCHE = "ensanche";
 	public static final String VILLAGE = "village";
 	public static final String HYBRID_RINGCAMPUS = "hybrid-ringcampus";
-	public static final String HYBRID_TOWNCENTER = "hybrid-towncenter";
 	public static final String HYBRID_TERRACES = "hybrid-terraces";
 	/**
 	 * The main design, listed first in the HQ menu; every other layout is shown under "Legacy".
@@ -59,10 +55,8 @@ public final class HqLayouts {
 			info(CAMPUS, true),
 			info(RING, false),
 			info(VERTICAL, false),
-			info(ENSANCHE, false),
 			info(VILLAGE, false),
 			info(HYBRID_RINGCAMPUS, false),
-			info(HYBRID_TOWNCENTER, false),
 			info(HYBRID_TERRACES, false));
 
 	private HqLayouts() {
@@ -92,7 +86,7 @@ public final class HqLayouts {
 		return List.copyOf(out);
 	}
 
-	/** Every layout, in menu order: classic, campus, ring, vertical, ensanche, village, hybrid-ringcampus, hybrid-towncenter, hybrid-terraces. */
+	/** Every layout, in menu order: classic, campus, ring, vertical, village, hybrid-ringcampus, hybrid-terraces. */
 	public static List<HqLayoutInfo> all() {
 		return ALL;
 	}

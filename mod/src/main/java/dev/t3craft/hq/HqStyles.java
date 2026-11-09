@@ -33,12 +33,11 @@ public final class HqStyles {
 	 * Styles with their own layout ({@link HqStyle#ownLayout()}): selectable by id like the others,
 	 * but not in {@link #all()}, which lists the styles that paint the shared spine geometry.
 	 * layout/campus: {@link CampusStyle}; layout/ring: {@link RingStyle}; layout/vertical: {@link VerticalStyle};
-	 * layout/blocks: {@link EnsancheStyle}; design/hybrid-ringcampus: {@link RingCampusStyle};
-	 * design/hybrid-towncenter: {@link TowncenterStyle};
+	 * design/hybrid-ringcampus: {@link RingCampusStyle};
 	 * design/hybrid-terraces: {@link TerraceStyle}.
 	 */
-	private static final List<HqStyle> LAYOUTS = List.of(new CampusStyle(), new RingStyle(), new VerticalStyle(), new EnsancheStyle(),
-			new VillageStyle(), new RingCampusStyle(), new TowncenterStyle(), new TerraceStyle());
+	private static final List<HqStyle> LAYOUTS = List.of(new CampusStyle(), new RingStyle(), new VerticalStyle(),
+			new VillageStyle(), new RingCampusStyle(), new TerraceStyle());
 	private static volatile @Nullable HqStyle active;
 
 	private HqStyles() {
@@ -52,11 +51,6 @@ public final class HqStyles {
 	/** The styles with their own layout (campus, ring...); not in {@link #all()}. */
 	public static List<HqStyle> layouts() {
 		return LAYOUTS;
-	}
-
-	/** Styles with their own ground plan as a {@link TownLayout} (layout/blocks: {@code ensanche}). */
-	public static List<HqStyle> towns() {
-		return LAYOUTS.stream().filter(s -> s instanceof EnsancheStyle).toList();
 	}
 
 	/** Ids of every selectable style ({@link #all()} then {@link #layouts()}). */

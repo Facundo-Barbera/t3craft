@@ -124,11 +124,6 @@ public final class LayoutParams {
 	public static final Spec VERTICAL_FACADE_LIGHT = spec("vertical", "facade.lightEvery", 4, 3, 9,
 			"lit panels in the tower facades every N blocks");
 
-	// ------------------------------------------------------------------ ensanche
-
-	public static final Spec ENSANCHE_CEILING_LIGHT = spec("ensanche", "hall.ceilingLightEvery", 6, 3, 9,
-			"hall ceiling light panels on an N×N grid");
-
 	// ------------------------------------------------------------------ village
 
 	public static final Spec VILLAGE_CEILING_LIGHT = spec("village", "hall.ceilingLightEvery", 4, 3, 8,
@@ -160,11 +155,6 @@ public final class LayoutParams {
 	 */
 	public static final Spec RINGCAMPUS_RELIEF = spec("hybrid-ringcampus", "terrain.relief", 2, 0, 3,
 			"campus terraces: 0 flat, 1 gentle (steps of 1, 3 in all), 2 default (steps of 2, 6 in all), 3 acropolis (steps 3/2/1, 6 in all)");
-
-	// ------------------------------------------------------------------ hybrid-towncenter
-
-	public static final Spec TOWNCENTER_CEILING_LAMP = spec("hybrid-towncenter", "hall.ceilingLampEvery", 6, 4, 9,
-			"civic hall ceiling lamps on an N×N grid");
 
 	// ------------------------------------------------------------------ hybrid-terraces
 

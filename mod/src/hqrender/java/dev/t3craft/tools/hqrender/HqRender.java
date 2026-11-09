@@ -44,7 +44,6 @@ import net.minecraft.world.level.block.state.BlockState;
  * projects with varied thread counts, three environments and settled threads; the default for styles
  * with their own layout, e.g. {@code --style campus}, which also renders a 4 → 10 → 20 comparison).
  * {@code --style village} renders the village layout (layout/village, {@link VillageRender}).
- * {@code --style hybrid-towncenter} renders the town centre with towers ({@link TowncenterRender}).
  * {@code --style hybrid-terraces} renders the terraced acropolis (design/hybrid-terraces, {@link TerracesRender}).
  * {@code --layout ID} (feat/hq-layouts: classic, campus, ring, vertical, ensanche, village or all) renders a
  * registered layout through the game's pipeline with {@code --projects} (default 4), see {@link LayoutViews};
@@ -419,21 +418,6 @@ public final class HqRender {
 		Files.createDirectories(out);
 		BlockModels models = new BlockModels();
 		String sid = style.id();
-		if (sid.equals(dev.t3craft.hq.TowncenterGrid.ID)) {
-			// design/hybrid-towncenter: town centre with towers (TowncenterRender)
-			TowncenterRender.render(models, style, out, only, ss, npcs);
-			for (String p : models.problems) {
-				System.out.println("note: " + p);
-			}
-			return;
-		}
-		if (HqStyles.towns().contains(style)) {
-			TownRender.render(models, style, out, only, ss, npcs);
-			for (String p : models.problems) {
-				System.out.println("note: " + p);
-			}
-			return;
-		}
 		if (sid.equals("vertical")) {
 			// layout/vertical: towers, bridges and podium for 4, 10 and 20 projects (VerticalRender)
 			VerticalRender.run(models, style, out, only, scaleMul, ss, npcs);
