@@ -182,7 +182,7 @@ public final class RotundaRoom {
 	//   tambour   a dark clerestory drum of 5 courses on the cornice: string course, deepslate frieze with a
 	//             blackstone strip over every pilaster and one lit oculus over every window, upper cornice
 	//   plinth    d in (R - 1, R]: a slab ring with a buttress at every pilaster
-	//   dome      uniform frosted glass on 8 cherry ribs and two cherry purlins, a cherry belt at the springing, a
+	//   dome      uniform frosted glass on 8 cherry ribs, a cherry belt at the springing, a
 	//             bamboo cap; an open oculus under the lantern (a round glass lantern drum with a roof, a gold
 	//             ball and a rod)
 	//   display   the east side of the hall is cut flat at x = xw: a wall of archive shelves with the
@@ -330,7 +330,7 @@ public final class RotundaRoom {
 					s = hr % 3 == 0 ? b(Blocks.GOLD_BLOCK) : RIB;
 				}
 			}
-			if (hand(u, dz, 5 * Math.PI / 3, mr - 0.9, 0.8) || hand(u, dz, Math.PI / 3, mr - 0.1, 0.8)) {
+			if (hand(u, dz, 5 * Math.PI / 3, mr - 0.9, 0.5) || hand(u, dz, Math.PI / 3, mr - 0.1, 0.5)) {
 				s = RIB;
 			}
 			if (r < 1.5 && !(u == 0 && dz == 0)) {
@@ -486,19 +486,16 @@ public final class RotundaRoom {
 		int topIn = g.top(Math.max(0, d - 1));
 		if (d >= g.lr - 0.5) {
 			double rib = arc(dx, dz, 8, 0);
-			boolean purlin = d >= g.lr + 2.5 && (Math.abs(d - 0.76 * g.rd) < 0.7 || Math.abs(d - 0.5 * g.rd) < 0.6);
 			for (int y = lo; y <= top; y++) {
 				int rel = y - base;
 				boolean ramp = y == top && d >= 1 && topIn == top + 1;
 				BlockState s;
-				if (rel <= 2) {
+				if (rel <= 1) {
 					s = CitadelCanvas.PLANKS; // the cherry belt at the springing
 				} else if (rel >= g.dh - 1 && d < g.lr + 2.0) {
 					s = y == top && d > g.lr + 0.5 ? stairs(Blocks.BAMBOO_MOSAIC_STAIRS, in) : BAMBOO;
 				} else if (rib < 0.6 && d >= g.lr + 1.5) {
 					s = ramp ? stairs(Blocks.CHERRY_STAIRS, in) : SLOG;
-				} else if (purlin) {
-					s = CitadelCanvas.PLANKS;
 				} else {
 					s = DOME_GLASS;
 				}
