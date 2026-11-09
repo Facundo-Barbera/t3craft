@@ -287,14 +287,14 @@ public final class GateArchBattlement implements Variant {
 	private static final Mat[] MATS = {
 			// stone brick on a deepslate base, polished diorite trim
 			new Mat(Blocks.STONE_BRICKS, Blocks.STONE_BRICK_STAIRS, Blocks.DEEPSLATE_BRICKS, Blocks.DEEPSLATE_BRICK_STAIRS,
-					Blocks.POLISHED_DIORITE, Blocks.POLISHED_DIORITE_STAIRS, Blocks.POLISHED_DIORITE_SLAB, Blocks.CALCITE),
+					Blocks.POLISHED_DIORITE, Blocks.POLISHED_DIORITE_STAIRS, Blocks.POLISHED_DIORITE_SLAB, Blocks.CHERRY_PLANKS),
 			// pale tuff brick on a deepslate base, polished diorite trim
 			new Mat(Blocks.TUFF_BRICKS, Blocks.TUFF_BRICK_STAIRS, Blocks.DEEPSLATE_BRICKS, Blocks.DEEPSLATE_BRICK_STAIRS,
-					Blocks.POLISHED_DIORITE, Blocks.POLISHED_DIORITE_STAIRS, Blocks.POLISHED_DIORITE_SLAB, Blocks.CALCITE),
-			// dark deepslate brick on a blackstone base, stone-brick trim
+					Blocks.POLISHED_DIORITE, Blocks.POLISHED_DIORITE_STAIRS, Blocks.POLISHED_DIORITE_SLAB, Blocks.CHERRY_PLANKS),
+			// dark deepslate brick on a blackstone base, polished andesite trim
 			new Mat(Blocks.DEEPSLATE_BRICKS, Blocks.DEEPSLATE_BRICK_STAIRS, Blocks.POLISHED_BLACKSTONE_BRICKS,
-					Blocks.POLISHED_BLACKSTONE_BRICK_STAIRS, Blocks.STONE_BRICKS, Blocks.STONE_BRICK_STAIRS, Blocks.STONE_BRICK_SLAB,
-					Blocks.CALCITE)};
+					Blocks.POLISHED_BLACKSTONE_BRICK_STAIRS, Blocks.POLISHED_ANDESITE, Blocks.POLISHED_ANDESITE_STAIRS, Blocks.POLISHED_ANDESITE_SLAB,
+					Blocks.CHERRY_PLANKS)};
 
 	/**
 	 * The avenue gatehouse. Local frame, front NORTH: {@code u} across the avenue, {@code v} along it (the passage runs
@@ -304,13 +304,13 @@ public final class GateArchBattlement implements Variant {
 	 * <li>tower faces: dark base with a sloping talus, body of one stone, long-and-short quoins in the trim stone up every corner,
 	 *     trim string courses between the floors (y 5 and 8), a corbel table of upside-down stairs under the roof, framed arrow slits
 	 *     and windows;</li>
-	 * <li>arch: ring course at y 6 in the middle (the opening is 6 high and free), 4 at the jambs (round or pointed by seed);
-	 *     voussoirs alternate dark and light in one unbroken run from jamb to jamb, a calcite keystone two blocks tall; the portcullis
-	 *     is raised into a slot of the ring, out of the passage;</li>
+	 * <li>arch: ring course at y 6 in the middle (the opening is 6 high and free), 3 at the jambs (round or pointed by seed);
+	 *     voussoirs alternate dark and light in one unbroken run from jamb to jamb, a cherry keystone two blocks wide, with a trim block over it; the portcullis
+	 *     is raised into a slot of the ring, out of the passage (the passage is lit from the guard door's transom);</li>
 	 * <li>curtain: deck at y 7 (corbel table of stairs under the face), walk at y 8, parapet with merlons and crenels, a shield with banners over the keystone;</li>
 	 * <li>tower A (guard): door on the street face under a lit transom, window and banner over it, bench, chest, lantern, room y 0..4 (the ground is its floor);
 	 *     tower B (stair): a spiral of cherry stairs (first step head-on from an arched doorway) that rises 9 and comes out through a doorway onto the wall walk;</li>
-	 * <li>both towers have a lookout chamber at wall-walk level (y 9..11) with arrow slits, and a hip roof of stairs (y 12) topped by a weathered-copper cap (y 13).</li>
+	 * <li>both towers have a lookout chamber at wall-walk level (y 9..11) with arrow slits, and a hip roof of stairs (y 12) topped by a thin weathered-copper cap (y 13).</li>
 	 * </ul>
 	 */
 	private static final class Large {
@@ -549,7 +549,11 @@ public final class GateArchBattlement implements Variant {
 
 			// --- roof: a hip of stairs (the lowest course is the ceiling over the chamber) and a weathered-copper cap
 			ringIn(u0, u1, 0, d - 1, 12, roofStairs, roofBlock);
-			ringIn(u0 + 1, u1 - 1, 1, d - 2, 13, Blocks.CUT_COPPER_STAIRS.waxed().weathered(), Blocks.CUT_COPPER.waxed().weathered());
+			for (int u = u0 + 1; u <= u1 - 1; u++) {
+				for (int v = 1; v <= d - 2; v++) {
+					set(u, 13, v, slab(Blocks.CUT_COPPER_SLAB.waxed().weathered())); // a thin copper cap on the hip
+				}
+			}
 		}
 
 		private void banner(int u, int y, int v, Direction facing) {
@@ -596,6 +600,7 @@ public final class GateArchBattlement implements Variant {
 			set(inner, 0, sv, door(in, true));
 			set(inner, 1, sv, door(in, false));
 			set(inner, 2, sv, AIR);
+			p.put(c, inner, 2, sv, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING); // lights the passage
 			set(inner, 3, sv, m.trim);
 			// bench along the outer wall, the chest at the back with a lantern on it
 			int benchTo = tw >= 4 ? Math.min(d - 3, 3) : 0; // a 1-wide room keeps its corridor free
@@ -620,13 +625,13 @@ public final class GateArchBattlement implements Variant {
 			int a0 = lw;
 			int ow = w - lw - rw;
 			double half = (ow - 1) / 2.0;
-			int rise = Math.min(3, ow / 2);
+			int rise = ow >= 4 ? 3 : ow / 2; // jambs 3 high, the middle 6 (a 4-wide opening climbs in one step per side)
 			int side = C - rise;
 			int[] s = new int[ow];
 			for (int i = 0; i < ow; i++) {
 				double t = half == 0 ? 0 : Math.abs(i - half) / half;
 				double dy = pointed ? rise * Math.pow(1 - t, 0.6) : rise * Math.sqrt(1 - t * t);
-				s[i] = side + (int) Math.round(dy);
+				s[i] = Math.abs(i - half) <= 0.5 ? C : side + (int) Math.round(dy);
 			}
 			// top course of the ring in each column: it climbs to meet the column nearer the middle
 			int[] ringTop = new int[ow];
@@ -674,7 +679,7 @@ public final class GateArchBattlement implements Variant {
 					// corbel table on the faces with the keystone one course taller; the walk's floor above it
 					if (face) {
 						if (keyCol) {
-							set(u, DECK - 1, v, m.key);
+							set(u, DECK - 1, v, m.trim); // a trim block over the keystone, so the cherry stone is read on its own
 						} else if (i % 2 == 0) {
 							set(u, DECK - 1, v, top(stairs(m.trimStairs, outward)));
 						} else {
@@ -718,12 +723,6 @@ public final class GateArchBattlement implements Variant {
 				if (s[i] + 1 < DECK - 1) {
 					set(a0 + i, s[i] + 1, rec + 1, bars(e, wst));
 				}
-			}
-			// lanterns hanging under the arch on both jambs, mid depth: the middle of the passage stays 6 high
-			if (ow >= 3) {
-				BlockState lan = b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true);
-				p.put(c, a0, s[0] - 1, d / 2, lan, CitadelCanvas.HANGING);
-				p.put(c, a0 + ow - 1, s[ow - 1] - 1, d / 2, lan, CitadelCanvas.HANGING);
 			}
 			// lanterns on the parapet at both ends of the walk
 			for (int v : new int[] {rec, d - 1 - rec}) {
