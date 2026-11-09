@@ -90,8 +90,8 @@ public final class BridgeStoneArch implements Variant {
 		int h = p.h();
 
 		// deck level in half blocks: 1 = a slab at y0, 2 = a full block at y0, 3 = full + slab at y1…
-		// the ramps climb half a block per cell; the plateau keeps at least 7 cells (d - 2 (lvMax - 1))
-		int lvMax = Math.max(4, Math.min(2 * (h - 3), ((d - 5) / 2) & ~1));
+		// the ramps climb half a block per cell; the plateau keeps at least 5 cells (d - 2 (lvMax - 1))
+		int lvMax = Math.max(4, Math.min(2 * (h - 3), ((d - 3) / 2) & ~1));
 		int[] lv = profile(d, lvMax);
 		int crown = (d - 1) / 2;
 		double cm = (d - 1) / 2.0;
