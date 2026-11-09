@@ -140,7 +140,11 @@ public final class PlazaCenterGlazedRosette implements Variant {
 		int br = n >= 9 ? 2 : 1;
 		for (int sx = -1; sx <= 1; sx += 2) {
 			for (int sz = -1; sz <= 1; sz += 2) {
-				tree(c, p, cu + sx * (n - 1), cv + sz * (n - 1), br);
+				if (sz > 0 || n >= 9) {
+					tree(c, p, cu + sx * (n - 1), cv + sz * (n - 1), br);
+				} else {
+					bush(c, p, cu + sx * (n - 1), cv + sz * (n - 1));
+				}
 			}
 		}
 		centre(c, p, cu, cv, cr, type, top);
@@ -172,7 +176,7 @@ public final class PlazaCenterGlazedRosette implements Variant {
 				} else {
 					p.set(c, u, 1, v, b(Blocks.PINK_PETALS));
 				}
-			} else if (pa != 2) {
+			} else {
 				p.set(c, u, 1, v, stairs(Blocks.CHERRY_STAIRS, f));
 			}
 			return;
@@ -181,6 +185,10 @@ public final class PlazaCenterGlazedRosette implements Variant {
 			return; // the centre piece lays its own base
 		}
 		boolean path = pa <= 1;
+		if (cheb == cr + 1 && !path) {
+			p.set(c, u, 0, v, b(Blocks.POLISHED_ANDESITE)); // polished ring round the centre piece
+			return;
+		}
 		if (e < 2.0) {
 			p.set(c, u, 0, v, path ? gl(DyeColor.WHITE, f) : b(Blocks.POLISHED_ANDESITE));
 			return;
@@ -199,6 +207,10 @@ public final class PlazaCenterGlazedRosette implements Variant {
 		BlockState petal = invert ? gl(glaze, f) : gl(DyeColor.WHITE, f);
 		if (path) {
 			p.set(c, u, 0, v, pa == 1 ? gl(DyeColor.WHITE, f) : invert ? gl(glaze, f) : gl(DyeColor.WHITE, f));
+			return;
+		}
+		if (pa == 2) {
+			p.set(c, u, 0, v, b(Blocks.POLISHED_ANDESITE)); // kerb along the axis paths
 			return;
 		}
 		if (zi > 0 && local < 1.0) {
@@ -271,9 +283,24 @@ public final class PlazaCenterGlazedRosette implements Variant {
 		}
 	}
 
+	/** A low flowering bush on a front corner bed: shade is for the back corners, the front stays open to the street and the camera. */
+	private void bush(CitadelCanvas c, Plot p, int tu, int tv) {
+		for (int dz = -1; dz <= 1; dz++) {
+			for (int dx = -1; dx <= 1; dx++) {
+				if (dx == 0 && dz == 0) {
+					safe(c, p, tu, 1, tv, b(Blocks.CHERRY_LOG));
+					safe(c, p, tu, 2, tv, CitadelCanvas.leaves(Blocks.FLOWERING_AZALEA_LEAVES));
+				} else if (dx * dx + dz * dz <= 1) {
+					safe(c, p, tu + dx, 1, tv + dz, CitadelCanvas.leaves(p.hash(tu + dx, 1, tv + dz, 2) == 0 ? Blocks.FLOWERING_AZALEA_LEAVES : Blocks.AZALEA_LEAVES));
+				}
+			}
+		}
+	}
+
 	/** Lamp posts on the rim, two at each axis, beside the ramp. */
 	private void lamps(CitadelCanvas c, Plot p, int cu, int cv, int n) {
-		int[][] spots = {{n, 2}, {n, -2}, {-n, 2}, {-n, -2}, {2, n}, {-2, n}, {2, -n}, {-2, -n}};
+		int[][] spots = n >= 8 ? new int[][] {{n, 2}, {n, -2}, {-n, 2}, {-n, -2}, {2, n}, {-2, n}, {2, -n}, {-2, -n}}
+				: new int[][] {{n, 2}, {-2, n}, {-n, -2}, {2, -n}};
 		for (int[] s : spots) {
 			int u = cu + s[0];
 			int v = cv + s[1];
@@ -342,7 +369,7 @@ public final class PlazaCenterGlazedRosette implements Variant {
 		p.set(c, cu, yp + 1, cv, b(Blocks.POLISHED_DEEPSLATE));
 		int cross = top - 1;
 		for (int y = yp + 2; y < cross; y++) {
-			p.set(c, cu, y, cv, wall(Blocks.POLISHED_DEEPSLATE_WALL, false, false, false, false));
+			p.set(c, cu, y, cv, y <= yp + 3 ? b(Blocks.POLISHED_DEEPSLATE) : wall(Blocks.POLISHED_DEEPSLATE_WALL, false, false, false, false));
 		}
 		p.set(c, cu, cross, cv, wall(Blocks.POLISHED_DEEPSLATE_WALL, true, true, true, true));
 		p.set(c, cu, top, cv, b(Blocks.LANTERN));
@@ -370,22 +397,25 @@ public final class PlazaCenterGlazedRosette implements Variant {
 				int v = cv + dz;
 				boolean corner = Math.abs(dx) == cr && Math.abs(dz) == cr;
 				if (cheb < cr || corner) {
-					p.set(c, u, 1, v, p.hash(u, 1, v, 5) == 0 ? b(Blocks.CRACKED_STONE_BRICKS) : b(Blocks.STONE_BRICKS));
+					// pedestal: two courses of stone brick, the lower one darker
+					p.set(c, u, 1, v, p.hash(u, 1, v, 5) == 0 ? b(Blocks.CRACKED_DEEPSLATE_BRICKS) : b(Blocks.DEEPSLATE_BRICKS));
+					p.set(c, u, 2, v, p.hash(u, 2, v, 5) == 0 ? b(Blocks.CRACKED_STONE_BRICKS) : b(Blocks.STONE_BRICKS));
 				} else {
-					p.set(c, u, 1, v, top(stairs(Blocks.STONE_BRICK_STAIRS, out(dx, dz).getOpposite())));
+					p.set(c, u, 1, v, stairs(Blocks.DEEPSLATE_BRICK_STAIRS, out(dx, dz).getOpposite()));
+					p.set(c, u, 2, v, top(stairs(Blocks.STONE_BRICK_STAIRS, out(dx, dz).getOpposite())));
 				}
 				if (corner) {
-					p.set(c, u, 2, v, wall(Blocks.POLISHED_DEEPSLATE_WALL, false, false, false, false));
 					p.set(c, u, 3, v, wall(Blocks.POLISHED_DEEPSLATE_WALL, false, false, false, false));
-					p.set(c, u, 4, v, b(Blocks.LANTERN));
+					p.set(c, u, 4, v, wall(Blocks.POLISHED_DEEPSLATE_WALL, false, false, false, false));
+					p.set(c, u, 5, v, b(Blocks.LANTERN));
 				} else if (dx == 0 && dz == 0) {
-					p.set(c, u, 2, v, b(Blocks.GOLD_BLOCK));
+					p.set(c, u, 3, v, b(Blocks.GOLD_BLOCK));
 				} else if (dx == 0 || dz == 0 || cr == 3 && cheb == 2) {
-					p.set(c, u, 2, v, CitadelCanvas.terracotta(DyeColor.LIGHT_GRAY));
+					p.set(c, u, 3, v, CitadelCanvas.terracotta(DyeColor.LIGHT_GRAY));
 				} else if (cheb == 1) {
-					p.set(c, u, 2, v, CitadelCanvas.terracotta(DyeColor.PINK));
+					p.set(c, u, 3, v, CitadelCanvas.terracotta(DyeColor.RED));
 				} else {
-					p.set(c, u, 2, v, p.hash(u, 2, v, 4) == 0 ? CitadelCanvas.terracotta(DyeColor.LIME) : CitadelCanvas.terracotta(DyeColor.GREEN));
+					p.set(c, u, 3, v, p.hash(u, 3, v, 4) == 0 ? CitadelCanvas.terracotta(DyeColor.LIME) : CitadelCanvas.terracotta(DyeColor.GREEN));
 				}
 			}
 		}
