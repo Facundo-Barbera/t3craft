@@ -1355,6 +1355,16 @@ public final class CitadelPlacement {
 				}
 			}
 		}
+		// what every parcel gets after its own use, as far as the room goes: a dwelling for whoever works it (the
+		// programs with a house of their own get a second, smaller one), a kitchen garden, shade, flower pots
+		reqs.add(new Req(Family.HOUSE, 9, sp(11), 9, sp(11), HOUSE_H(), Mode.NEAR));
+		for (int i = 0; i < 2; i++) {
+			reqs.add(req(Family.GARDEN, 6, 9, 6, 9, scy(5), Mode.SCATTER));
+			reqs.add(req(Family.TREE, 5, 7, 5, 7, CLEAR_TOP(), Mode.SCATTER));
+		}
+		for (int i = 0; i < 3; i++) {
+			reqs.add(new Req(Family.PLANTER, 1, 2, 1, 1, PLANTER_H, Mode.NEAR));
+		}
 		for (Req r : reqs) {
 			placeReq(city, pk, site, r, seed, salt++);
 		}
