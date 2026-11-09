@@ -153,6 +153,11 @@ public final class HubUndercroft {
 	/** Dark tiled floor with a cross of light stone brick lanes along the axes (the walking lines to the stairs and the index table). */
 	private static BlockState floorBlock(int x, int z) {
 		boolean lane = Math.abs(x) <= 1 || Math.abs(z) <= 1;
+		// struct/hub4: a red runner down the middle of each lane (from scale 2), so the lanes read as the way to the stairs and the table
+		boolean runner = HubDims.TALL() && ((x == 0 && Math.abs(z) >= 4) || (z == 0 && Math.abs(x) >= 4));
+		if (runner) {
+			return CitadelCanvas.terracotta(DyeColor.RED);
+		}
 		return lane ? HubBlocks.stoneBrick(x, fy(), z) : HubBlocks.darkBase(x, fy(), z);
 	}
 
@@ -360,6 +365,7 @@ public final class HubUndercroft {
 			frontDesk(c, sx);
 			islandChests(c, sx, lay);
 			carrels(c, sx);
+			wallCabinets(c, sx);
 		}
 	}
 
@@ -378,6 +384,26 @@ public final class HubUndercroft {
 								Blocks.CHEST.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, away));
 					}
 				}
+			}
+		}
+	}
+
+	/**
+	 * The filing cabinets of the south corridors (struct/hub4): along the east and west walls, between the stairwell and the stack
+	 * of the wall, a run of chests and barrels (alternating) facing the corridor, with a lantern on every third one. The two cells
+	 * beside them stay free.
+	 */
+	private static void wallCabinets(CitadelCanvas c, int sx) {
+		Direction toCentre = sx > 0 ? Direction.WEST : Direction.EAST;
+		int x = sx * (HubDims.INNER() - 1);
+		int z0 = HubDims.ARCH_Z0() + 2;
+		for (int z = z0; z <= z0 + 10; z++) {
+			boolean chest = (z - z0) % 2 == 0;
+			put(c, x, sy(), z, chest
+					? Blocks.CHEST.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, toCentre)
+					: Blocks.BARREL.defaultBlockState().setValue(BlockStateProperties.FACING, Direction.UP));
+			if ((z - z0) % 3 == 1) {
+				put(c, x, sy() + 1, z, Blocks.LANTERN.defaultBlockState());
 			}
 		}
 	}
