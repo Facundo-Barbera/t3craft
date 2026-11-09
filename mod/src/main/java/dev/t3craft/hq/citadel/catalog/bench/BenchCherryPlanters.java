@@ -334,9 +334,9 @@ public final class BenchCherryPlanters implements Variant {
 
 	// ------------------------------------------------------------------ parts
 
-	/** Upside-down cherry stairs hugging each post under the beam (the post-and-beam joint): depth on the roof. */
+	/** Upside-down cherry stairs hugging each post under the beam (the post-and-beam joint) of the front beam: depth on the roof. */
 	private static void braces(CitadelCanvas c, Plot p, int u0, int v0, int u1, int v1) {
-		for (int v : new int[] {v0, v1}) {
+		for (int v : new int[] {v0}) { // the front posts only: over the planter strips at the back they would leave 2 blocks to stand under
 			set(c, p, u0 + 1, 4, v, stairs(Blocks.CHERRY_STAIRS, Direction.WEST).setValue(BlockStateProperties.HALF, Half.TOP));
 			set(c, p, u1 - 1, 4, v, stairs(Blocks.CHERRY_STAIRS, Direction.EAST).setValue(BlockStateProperties.HALF, Half.TOP));
 		}
