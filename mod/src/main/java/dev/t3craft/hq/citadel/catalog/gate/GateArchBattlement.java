@@ -308,7 +308,7 @@ public final class GateArchBattlement implements Variant {
 	 *     voussoirs alternate dark and light in one unbroken run from jamb to jamb, a calcite keystone two blocks tall; the portcullis
 	 *     is raised into a slot of the ring, out of the passage;</li>
 	 * <li>curtain: deck at y 7 (corbel table of stairs under the face), walk at y 8, parapet with merlons and crenels, a shield with banners over the keystone;</li>
-	 * <li>tower A (guard): door on the street face under a lit transom, window and banner over it, floor, bench, chest, lantern, room y 1..4;
+	 * <li>tower A (guard): door on the street face under a lit transom, window and banner over it, bench, chest, lantern, room y 0..4 (the ground is its floor);
 	 *     tower B (stair): a spiral of cherry stairs (first step head-on from an arched doorway) that rises 9 and comes out through a doorway onto the wall walk;</li>
 	 * <li>both towers have a lookout chamber at wall-walk level (y 9..11) with arrow slits, and a hip roof of stairs (y 12) topped by a weathered-copper cap (y 13).</li>
 	 * </ul>
@@ -496,14 +496,13 @@ public final class GateArchBattlement implements Variant {
 					set(c1, 6, v, pane(true)); // window into the well
 					set(c1, 7, v, pane(true));
 				} else if (front) {
-					// the guard's door on the street: a threshold, a cherry door, a transom with a lantern under a trim lintel,
-					// a window and a banner over it
-					set(fc, 0, v, stairs(Blocks.CHERRY_STAIRS, Direction.SOUTH));
-					set(fc, 1, v, door(Direction.NORTH, true));
-					set(fc, 2, v, door(Direction.NORTH, false));
-					set(fc, 3, v, AIR);
-					p.put(c, fc, 3, v, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
-					set(fc, 4, v, top(stairs(m.trimStairs, face)));
+					// the guard's door on the street, at street level (a door needs a full block under it): a cherry door, a transom
+					// with a lantern under a trim lintel, a window and a banner over it
+					set(fc, 0, v, door(Direction.NORTH, true));
+					set(fc, 1, v, door(Direction.NORTH, false));
+					set(fc, 2, v, AIR);
+					p.put(c, fc, 2, v, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
+					set(fc, 3, v, top(stairs(m.trimStairs, face)));
 					set(fc, 6, v, pane(true));
 					set(fc, 7, v, AIR);
 					banner(fc, 7, v, face);
@@ -582,33 +581,31 @@ public final class GateArchBattlement implements Variant {
 			}
 		}
 
-		/** Guard room: cherry floor, doors, bench, chest with a lantern, a hanging lantern; y 1..4. */
+		/** Guard room: doors at street level (the ground is its floor), bench, chest with a lantern, a hanging lantern; y 0..4. */
 		private void guardRoom(boolean left, int[] col, Direction in, Direction out, int inner, int tw) {
 			int ic = tw - 2; // innermost interior column: the corridor from the door
 			for (int t = 1; t <= ic; t++) {
 				for (int v = 1; v <= d - 2; v++) {
-					set(col[t], 0, v, Blocks.CHERRY_PLANKS);
-					for (int y = 1; y <= 4; y++) {
+					for (int y = 0; y <= 4; y++) {
 						set(col[t], y, v, AIR);
 					}
-					set(col[t], 5, v, Blocks.CHERRY_PLANKS);
+					set(col[t], 5, v, Blocks.CHERRY_PLANKS); // ceiling
 				}
 			}
-			// door on the passage: a threshold stair, a cherry door, an open transom, a trim lintel
-			set(inner, 0, sv, stairs(Blocks.CHERRY_STAIRS, out));
-			set(inner, 1, sv, door(in, true));
-			set(inner, 2, sv, door(in, false));
-			set(inner, 3, sv, AIR);
-			set(inner, 4, sv, m.trim);
+			// door on the passage: a cherry door, an open transom, a trim lintel
+			set(inner, 0, sv, door(in, true));
+			set(inner, 1, sv, door(in, false));
+			set(inner, 2, sv, AIR);
+			set(inner, 3, sv, m.trim);
 			// bench along the outer wall, the chest at the back with a lantern on it
 			int benchTo = tw >= 4 ? Math.min(d - 3, 3) : 0; // a 1-wide room keeps its corridor free
 			for (int v = 1; v <= benchTo; v++) {
-				set(col[1], 1, v, stairs(Blocks.CHERRY_STAIRS, out));
+				set(col[1], 0, v, stairs(Blocks.CHERRY_STAIRS, out));
 			}
-			set(col[1], 1, d - 2, b(Blocks.CHEST).setValue(BlockStateProperties.HORIZONTAL_FACING, in));
+			set(col[1], 0, d - 2, b(Blocks.CHEST).setValue(BlockStateProperties.HORIZONTAL_FACING, in));
 			p.put(c, col[ic], 4, tw >= 4 ? d / 2 : sv, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
 			if (tw >= 4 && d >= 7) {
-				set(col[1], 1, d - 3, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
+				set(col[1], 0, d - 3, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
 			}
 		}
 
