@@ -65,7 +65,7 @@ final class BarrioGateBig {
 	/** Height of the walls of a guard room (the roof layer, which is also its ceiling, sits above). */
 	private static final int ANNEX_TOP = 4;
 	/** Height of the walls of a tower. */
-	private static final int TOWER_TOP = 10;
+	private static final int TOWER_TOP = 12;
 	/** Height of the walls over the passage at the middle, one block less at {@code |dv| = 1}, two at {@code |dv| = 2}. */
 	private static final int GABLE_WALL = 10;
 	/** Height of the sign board (plaques). */
@@ -100,6 +100,7 @@ final class BarrioGateBig {
 		final DyeColor col;
 		final BlockState wool;
 		final BlockState panelBg;
+		final BlockState letter;
 
 		Gate(CitadelCanvas c, Lot l, HqLayout.Module lead, Mats mats) {
 			this.c = c;
@@ -116,7 +117,9 @@ final class BarrioGateBig {
 			this.side = r.side();
 			this.col = HqStyle.envColor(lead);
 			this.wool = b(Blocks.WOOL.pick(col));
-			this.panelBg = dark(col) ? CALCITE : b(Blocks.POLISHED_BLACKSTONE_BRICKS);
+			this.panelBg = b(Blocks.POLISHED_BLACKSTONE_BRICKS);
+			// the initial: the project's wool, or white when the colour is too dark to read on the black panel
+			this.letter = dark(col) ? b(Blocks.WOOL.pick(DyeColor.WHITE)) : wool;
 		}
 
 		void build() {
@@ -301,7 +304,7 @@ final class BarrioGateBig {
 			// the viewer comes from the hub looking along -back: his left is +side, so columns run towards -v
 			int col3 = 2 - cx;
 			String[] g = glyph(initial());
-			return g[cy].charAt(col3) == '1' ? wool : panelBg;
+			return g[cy].charAt(col3) == '1' ? letter : panelBg;
 		}
 
 		String initial() {
