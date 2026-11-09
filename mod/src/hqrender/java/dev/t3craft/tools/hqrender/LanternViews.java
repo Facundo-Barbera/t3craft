@@ -92,9 +92,12 @@ final class LanternViews {
 		for (int x = s1; x <= s1 + 7; x++) {
 			scene.set(new BlockPos(x, 6, 0), kit.state(HqKit.Role.BEAM, Direction.EAST));
 		}
+		// the middle one hangs on a chain, the others straight from the beam (the two ways the citadel hangs them)
 		for (int i = 0; i < 3; i++) {
-			scene.setModel(new BlockPos(s1 + 2 + i * 2, 5, 0), M + "_hanging_" + TONES[i], 0);
+			int y = i == 1 ? 4 : 5;
+			scene.setModel(new BlockPos(s1 + 1 + i * 2, y, 0), M + "_hanging_" + TONES[i], 0);
 		}
+		scene.set(new BlockPos(s1 + 3, 5, 0), Blocks.IRON_CHAIN.defaultBlockState());
 
 		// 3. wall: three cherry pillars with panels between, a bracket lantern on the front of each, at head height + 1
 		int s2 = 2 * STATION;
@@ -165,8 +168,8 @@ final class LanternViews {
 
 	/** The box of station {@code s}: its 8 columns, from {@code zMin} (back) to {@code zMax} (front, towards the viewer), 9 blocks high. */
 	private static Renderer.Clip station(int s, int zMin, int zMax) {
-		int x0 = s * STATION - 1;
-		return new Renderer.Clip(x0, -1, zMin, x0 + STATION, 8, zMax);
+		int x0 = s * STATION;
+		return new Renderer.Clip(x0, -1, zMin, x0 + STATION - 1, 8, zMax);
 	}
 
 	/** Nearest-neighbour enlargement (each pixel becomes a {@code k × k} square). */

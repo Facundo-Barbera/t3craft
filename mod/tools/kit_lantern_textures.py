@@ -238,8 +238,8 @@ def stone():
 # ---- paper ------------------------------------------------------------------------------------
 def tall():
     """
-    Side of the tall lantern's paper box (body element 3..13 wide, 4..13 high of the upper half,
-    uv [3, 3, 13, 12]): lit paper with a hot core, two kumiko rails and a centre stile in the top panel.
+    Side of the tall lantern's paper box (body element 2..14 wide, 4..13 high of the upper half,
+    uv [2, 3, 14, 12]): lit paper with a hot core, two kumiko rails and a centre stile in the top panel.
     """
     rng = random.Random(312)
     ramp = TONES["paper"]
@@ -247,9 +247,9 @@ def tall():
     img = Img()
     img.rect(0, 0, 15, 15, ramp[1])
     for y in range(3, 12):
-        for x in range(3, 13):
-            img.set(x, y, glow(ramp, x, y, 7.5, 7.5, 6.0, 6.0, rng, bias=1.0))
-    for x in range(3, 13):
+        for x in range(2, 14):
+            img.set(x, y, glow(ramp, x, y, 7.5, 7.5, 7.0, 6.0, rng, bias=1.0))
+    for x in range(2, 14):
         img.set(x, 3, ramp[2])
         img.set(x, 6, rib[1])
         img.set(x, 9, rib[1])
@@ -257,12 +257,10 @@ def tall():
         img.set(7, y, rib[0])
         img.set(8, y, rib[1])
     for y in range(3, 12):
-        img.set(3, y, ramp[1] if y % 3 else ramp[0])
-        img.set(12, y, ramp[1] if y % 3 else ramp[0])
-    img.set(7, 7, ramp[5])
-    img.set(8, 7, ramp[5])
-    img.set(7, 8, ramp[5])
-    img.set(8, 8, ramp[5])
+        img.set(2, y, ramp[1] if y % 3 else ramp[0])
+        img.set(13, y, ramp[1] if y % 3 else ramp[0])
+    for x, y in ((7, 7), (8, 7), (7, 8), (8, 8), (6, 7), (9, 8)):
+        img.set(x, y, ramp[5])
     return img
 
 
@@ -313,19 +311,19 @@ def chochin(tone):
     img = Img()
     img.rect(0, 0, 15, 15, ramp[1])
     for y in range(2, 14):
-        for x in range(2, 14):
-            img.set(x, y, glow(ramp, x, y, 7.5, 8.0, 5.4, 5.6, rng, bias=1.1))
+        for x in range(1, 15):
+            img.set(x, y, glow(ramp, x, y, 7.5, 8.0, 6.8, 5.6, rng, bias=1.1))
     for y in range(2, 14):
         if y % 2 == 0:  # a rib: darker where the barrel turns away
-            for x in range(2, 14):
+            for x in range(1, 15):
                 img.set(x, y, rib[0] if abs(x - 7.5) > 3.5 else rib[1])
     if tone == "vermilion":
-        for x in range(2, 14):
+        for x in range(1, 15):
             img.set(x, 8, INK[1] if x % 3 else INK[0])
             img.set(x, 9, INK[0] if abs(x - 7.5) > 3.5 else INK[1])
     elif tone == "rose":
         cream = hexc("#FFF4EC")
-        for x in range(2, 14):
+        for x in range(1, 15):
             if x % 3 == 1:
                 img.set(x, 9, cream)
                 img.set(x - 1, 9, ramp[5])

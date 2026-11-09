@@ -99,7 +99,7 @@ def andon():
 
 def chochin(tone):
     """
-    Hanging chochin: a round barrel of lit paper (widths 8, 10, 12, 10, 8 px) between dark lacquer rings,
+    Hanging chochin: a round barrel of lit paper (widths 10, 12, 14, 12, 10 px) between dark lacquer rings,
     a brass lid, a cord up to the top of the block (it meets a chain or the block above) and a brass drop.
     """
     return model({
@@ -109,14 +109,14 @@ def chochin(tone):
         "particle": "t3craft:block/kit_lantern_chochin_" + tone,
     }, [
         el((7, 0.5, 7), (9, 2, 9), "brass", name="drop"),
-        el((5, 2, 5), (11, 3, 11), "band", name="bottom ring"),
-        el((4, 3, 4), (12, 4, 12), "paper", name="tier 8", glow=True),
-        el((3, 4, 3), (13, 6, 13), "paper", name="tier 10", glow=True),
-        el((2, 6, 2), (14, 10, 14), "paper", name="belly", glow=True),
-        el((3, 10, 3), (13, 12, 13), "paper", name="tier 10 top", glow=True),
-        el((4, 12, 4), (12, 13, 12), "paper", name="tier 8 top", glow=True),
-        el((5, 13, 5), (11, 14, 11), "band", name="top ring"),
-        el((6, 14, 6), (10, 15, 10), "brass", name="lid"),
+        el((4, 2, 4), (12, 3, 12), "band", name="bottom ring"),
+        el((3, 3, 3), (13, 4, 13), "paper", name="tier 10", glow=True),
+        el((2, 4, 2), (14, 6, 14), "paper", name="tier 12", glow=True),
+        el((1, 6, 1), (15, 10, 15), "paper", name="belly", glow=True),
+        el((2, 10, 2), (14, 12, 14), "paper", name="tier 12 top", glow=True),
+        el((3, 12, 3), (13, 13, 13), "paper", name="tier 10 top", glow=True),
+        el((4, 13, 4), (12, 14, 12), "band", name="top ring"),
+        el((5, 14, 5), (11, 15, 11), "brass", name="lid"),
         el((7.5, 15, 7.5), (8.5, 16, 8.5), "band", faces=SIDES, name="cord"),
     ])
 
@@ -165,32 +165,32 @@ TALL_TEXTURES = {
 
 
 def tall_lower():
-    """Lower half of the plaza lantern: a stepped dark stone plinth, a lacquer collar and the cherry post."""
+    """Lower half of the plaza lantern: a two-step dark stone plinth, a lacquer collar and a 6 px cherry post."""
     return model(TALL_TEXTURES, [
-        el((2, 0, 2), (14, 2, 14), "stone", name="plinth foot"),
-        el((3, 2, 3), (13, 4, 13), "stone", name="plinth"),
-        el((4, 4, 4), (12, 5, 12), "dark", name="collar"),
-        el((6, 5, 6), (10, 16, 10), "cherry", faces=SIDES + ("down",), name="post"),
-        el((5, 10, 5), (11, 11, 11), "dark", name="post ring"),
+        el((1, 0, 1), (15, 2, 15), "stone", name="plinth foot"),
+        el((2, 2, 2), (14, 4, 14), "stone", name="plinth"),
+        el((3, 4, 3), (13, 5, 13), "dark", name="collar"),
+        el((5, 5, 5), (11, 16, 11), "cherry", faces=SIDES + ("down",), name="post"),
+        el((4, 10, 4), (12, 11, 12), "dark", name="post ring"),
     ])
 
 
 def tall_upper():
     """
-    Upper half: the post's last 3 px, a lacquer tray, a big paper box (10 px, cherry corner posts, dark head rail)
-    and a two-step hip roof with a brass-vented cap. The paper glows.
+    Upper half: the post's last 3 px, a lacquer tray, a big paper box (12 px, cherry corner posts, dark head rail)
+    and a two-step hip roof (eaves across the whole cell) with a brass-vented cap. The paper glows.
     """
-    side_uv = {s: [3, 3, 13, 12] for s in SIDES}
+    side_uv = {s: [2, 3, 14, 12] for s in SIDES}
     els = [
-        el((6, 0, 6), (10, 3, 10), "cherry", faces=SIDES + ("down",), name="post"),
-        el((2, 3, 2), (14, 4, 14), "dark", name="tray"),
-        el((3, 4, 3), (13, 13, 13), "paper", faces=SIDES, uv=side_uv, name="paper", glow=True),
-        el((3.5, 4, 3.5), (12.5, 13, 12.5), "paper", faces=("up", "down"), name="paper ends", glow=True),
-        el((2, 13, 2), (14, 14, 14), "dark", faces=SIDES + ("down",), name="head rail"),
-        el((1, 14, 1), (15, 15, 15), {**{s: "dark" for s in SIDES}, "up": "roof", "down": "dark"}, name="roof eaves"),
-        el((4, 15, 4), (12, 16, 12), {**{s: "brass" for s in SIDES}, "up": "finial", "down": "dark"}, name="roof cap"),
+        el((5, 0, 5), (11, 3, 11), "cherry", faces=SIDES + ("down",), name="post"),
+        el((1, 3, 1), (15, 4, 15), "dark", name="tray"),
+        el((2, 4, 2), (14, 13, 14), "paper", faces=SIDES, uv=side_uv, name="paper", glow=True),
+        el((2.5, 4, 2.5), (13.5, 13, 13.5), "paper", faces=("up", "down"), name="paper ends", glow=True),
+        el((1, 13, 1), (15, 14, 15), "dark", faces=SIDES + ("down",), name="head rail"),
+        el((0, 14, 0), (16, 15, 16), {**{s: "dark" for s in SIDES}, "up": "roof", "down": "dark"}, name="roof eaves"),
+        el((3, 15, 3), (13, 16, 13), {**{s: "brass" for s in SIDES}, "up": "finial", "down": "dark"}, name="roof cap"),
     ]
-    els += posts((2, 12), (2, 12), 4, 14, "cherry")
+    els += posts((1, 13), (1, 13), 4, 14, "cherry")
     return model(TALL_TEXTURES, els)
 
 
