@@ -85,7 +85,7 @@ public final class StallTeaBar implements Variant {
 
 	/** The seed-derived measures of one build, local coordinates. */
 	private record Geo(int w, int d, int h, int ox, int px0, int px1, int cd, int hd, int bar, int back, int cap, int gap, int[] cols,
-			boolean hip, int mat, boolean flip, boolean cloth, int accent) {
+			boolean hip, boolean side, int mat, boolean flip, boolean cloth, int accent) {
 		boolean isCol(int u) {
 			for (int c : cols) {
 				if (c == u) {
@@ -118,6 +118,8 @@ public final class StallTeaBar implements Variant {
 		boolean hip = r.nextBoolean();
 		int mat = r.nextInt(3);
 		boolean cloth = r.nextBoolean();
+		int cap = Math.max(0, h - 1 - EAVE);
+		boolean side = r.nextBoolean() && (w - 1) / 2 <= cap + 1; // ridge along the depth: a gable end to the street, only where the slope fits
 		int accent = r.nextInt(3);
 		int a = px0 + 1;
 		int z = px1 - 1;
@@ -127,14 +129,14 @@ public final class StallTeaBar implements Variant {
 		} else {
 			gap = (px0 + px1) / 2 + (flip ? 1 : 0);
 		}
-		Geo tmp = new Geo(w, d, h, ox, px0, px1, cd, hd, bar, back, Math.max(0, h - 1 - EAVE), gap, cols, false, 0, flip, false, 0);
+		Geo tmp = new Geo(w, d, h, ox, px0, px1, cd, hd, bar, back, cap, gap, cols, false, false, 0, flip, false, 0);
 		while (tmp.isCol(gap) && gap < z) {
 			gap++;
 		}
 		if (gap > z) {
 			gap = a;
 		}
-		return new Geo(w, d, h, ox, px0, px1, cd, hd, bar, back, Math.max(0, h - 1 - EAVE), gap, cols, hip, mat, flip, cloth, accent);
+		return new Geo(w, d, h, ox, px0, px1, cd, hd, bar, back, cap, gap, cols, hip, side, mat, flip, cloth, accent);
 	}
 
 	@Override
@@ -180,7 +182,11 @@ public final class StallTeaBar implements Variant {
 
 	/** [palette] a polished-deepslate base, a pale stripped-cherry shaft; the beam is the caller's. */
 	private static void post(CitadelCanvas c, Plot p, int u, int v, int beamY) {
-		p.set(c, u, 0, v, b(Blocks.POLISHED_DEEPSLATE));
+		p.set(c, u, 0, v, switch (p.hash(u, 0, v, 4)) { // [palette] a mixed deepslate base, never uniform
+			case 0 -> b(Blocks.DEEPSLATE_BRICKS);
+			case 1 -> b(Blocks.CRACKED_DEEPSLATE_BRICKS);
+			default -> b(Blocks.POLISHED_DEEPSLATE);
+		});
 		for (int y = 1; y < beamY; y++) {
 			p.set(c, u, y, v, b(Blocks.STRIPPED_CHERRY_LOG));
 		}
@@ -425,11 +431,11 @@ public final class StallTeaBar implements Variant {
 		int[][] ry = new int[g.w][g.d];
 		for (int v = g.cd; v < g.d; v++) {
 			for (int u = 0; u < g.w; u++) {
-				int a = v - g.cd;
-				int bk = g.d - 1 - v;
-				int dv = Math.min(a, bk);
-				int du = g.hip ? Math.min(u, g.w - 1 - u) : Integer.MAX_VALUE;
-				int n = Math.min(dv, du);
+				int pa = g.side ? u : v - g.cd; // the sloping axis: front to back, or (side ridge) left to right
+				int pb = g.side ? g.w - 1 - u : g.d - 1 - v;
+				int dp = Math.min(pa, pb);
+				int ds = !g.hip ? Integer.MAX_VALUE : g.side ? Math.min(v - g.cd, g.d - 1 - v) : Math.min(u, g.w - 1 - u);
+				int n = Math.min(dp, ds);
 				int t = Math.min(n, g.cap);
 				for (int y = EAVE; y < EAVE + t; y++) {
 					p.set(c, u, y, v, b(Blocks.CHERRY_PLANKS)); // ceiling and the roof's body
@@ -438,7 +444,9 @@ public final class StallTeaBar implements Variant {
 					p.set(c, u, EAVE + t, v, roofBlock(g.mat)); // a flat top
 					continue;
 				}
-				Direction f = g.hip && du < dv ? dirU(u, g.w) : dirV(a, bk);
+				Direction prim = g.side ? dirU(u, g.w) : dirV(v - g.cd, g.d - 1 - v);
+				Direction sec = g.side ? dirV(v - g.cd, g.d - 1 - v) : dirU(u, g.w);
+				Direction f = g.hip && ds < dp ? sec : prim;
 				if (f == null) {
 					p.set(c, u, EAVE + t, v, roofSlab(g.mat)); // the ridge
 				} else {
@@ -513,7 +521,7 @@ public final class StallTeaBar implements Variant {
 			boolean rafter = v == g.cd - 1 || g.cd >= 5 && v == g.cd / 2;
 			for (int u = a; u <= z; u++) {
 				if (g.cloth) {
-					p.set(c, u, 4, v, terracotta((u & 1) == 0 ? DyeColor.WHITE : DyeColor.LIGHT_GRAY));
+					p.set(c, u, 4, v, terracotta(DyeColor.WHITE));
 				} else if (rafter) {
 					p.set(c, u, 4, v, log(Blocks.CHERRY_LOG, Direction.Axis.X));
 				} else if (((u - g.px0) & 1) == 1) {
@@ -545,6 +553,13 @@ public final class StallTeaBar implements Variant {
 				} else {
 					p.set(c, u, 0, vt - 1, stairs(Blocks.CHERRY_STAIRS, Direction.NORTH));
 					p.set(c, u, 0, vt + 1, stairs(Blocks.CHERRY_STAIRS, Direction.SOUTH));
+				}
+			}
+		}
+		for (int v = 1; v < g.cd; v += 2) { // [finish] azalea bushes along the court's sides, clear of the tables
+			for (int u : new int[] {a, z}) {
+				if (!seat[u] && !g.isCol(u)) {
+					p.set(c, u, 0, v, p.hash(u, 0, v, 2) == 0 ? b(Blocks.FLOWERING_AZALEA) : b(Blocks.AZALEA));
 				}
 			}
 		}
