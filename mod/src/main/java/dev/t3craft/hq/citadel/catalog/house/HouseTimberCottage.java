@@ -94,7 +94,7 @@ public final class HouseTimberCottage implements Variant {
 	private static final Scheme[] SCHEMES = {
 			new Scheme(Blocks.STRIPPED_SPRUCE_LOG, b(Blocks.CALCITE), Blocks.DEEPSLATE_TILE_STAIRS, Blocks.CHERRY_STAIRS, Blocks.DEEPSLATE_BRICK_STAIRS,
 					Blocks.DEEPSLATE_TILES, Blocks.DEEPSLATE_TILE_SLAB, Blocks.CHERRY_DOOR, Blocks.CHERRY_TRAPDOOR, Blocks.SPRUCE_STAIRS),
-			new Scheme(Blocks.STRIPPED_SPRUCE_LOG, b(Blocks.CALCITE), Blocks.CHERRY_STAIRS, Blocks.DEEPSLATE_TILE_STAIRS, Blocks.MANGROVE_STAIRS,
+			new Scheme(Blocks.STRIPPED_SPRUCE_LOG, b(Blocks.CALCITE), Blocks.CHERRY_STAIRS, Blocks.DEEPSLATE_TILE_STAIRS, null,
 					Blocks.POLISHED_DEEPSLATE, Blocks.DEEPSLATE_TILE_SLAB, Blocks.DARK_OAK_DOOR, Blocks.DARK_OAK_TRAPDOOR, Blocks.SPRUCE_STAIRS),
 	};
 
@@ -282,6 +282,7 @@ public final class HouseTimberCottage implements Variant {
 			proud();
 			roof();
 			gables();
+			hood();
 			dormers();
 			porch();
 			hearth();
@@ -475,6 +476,37 @@ public final class HouseTimberCottage implements Variant {
 						set(u, y, v, st);
 					}
 				}
+			}
+		}
+
+		/**
+		 * [finish] a small gable over the door bay on one-storey houses: it crosses the front slope (clears the slope there), has a
+		 * king post and a thin ridge cap. The cavity behind it is the porch roof only.
+		 */
+		void hood() {
+			if (two) {
+				return;
+			}
+			int t0 = d0 - 2;
+			int t1 = d0 + doorW + 1;
+			for (int u = t0; u <= t1; u++) {
+				for (int v = fy; v <= fy + 1; v++) {
+					for (int y = plate; y <= plate + 3; y++) {
+						set(u, y, v, AIR);
+					}
+				}
+			}
+			TimberKit.gable(c, p, false, fy, fy + 1, t0, t1, plate, s.roof(), s.eave(), s.ridge(), s.ridgeSlab(), true, false);
+			int n = t1 - t0 + 1;
+			int m0 = t0 + (n - 1) / 2;
+			int m1 = t0 + n / 2;
+			for (int u = m0; u <= m1; u++) {
+				for (int v = fy; v <= fy + 1; v++) {
+					set(u, plate + 2, v, TimberKit.slab(s.ridgeSlab(), false));
+					set(u, plate + 3, v, AIR);
+				}
+				set(u, plate, fy, frame()); // [depth] king post(s) under the hood ridge
+				set(u, plate + 1, fy, m0 == m1 ? frame() : TimberKit.pane(true, DyeColor.PINK));
 			}
 		}
 
