@@ -91,7 +91,7 @@ public final class TreeCloudPinePot implements Variant {
 		int d = p.d();
 		int small = Math.min(w, d);
 		boolean three = small >= 7 && p.h() >= 13 && r.nextBoolean(); // three clouds only on the big plots
-		int H = Math.min(p.h(), three ? 14 : small >= 5 ? 12 : 9);
+		int H = Math.min(p.h(), three ? 13 : small >= 5 ? 11 : 9);
 		int sch = r.nextInt(4);
 		int shape = r.nextInt(3); // 0 square, 1 octagon, 2 long window box
 		boolean alongU = w > d || (w == d && r.nextBoolean()); // the axis the clouds spread along
@@ -245,12 +245,12 @@ public final class TreeCloudPinePot implements Variant {
 		py[n - 1] = top;
 		// one clear layer between the clouds, and the lowest one above the planter's rim (a seat) with room to walk
 		if (n == 3) {
-			py[0] = 6;
-			py[1] = 9;
+			py[0] = 5;
+			py[1] = 8;
 		} else {
-			py[0] = small >= 5 ? Math.min(6, top - 3) : top - 3;
+			py[0] = small >= 5 ? top - 4 : top - 3;
 		}
-		double base = small >= 7 ? 3.4 : small == 6 ? 2.9 : small == 5 ? 2.5 : small == 4 ? 2.0 : 1.6;
+		double base = small >= 7 ? 2.9 : small == 6 ? 2.5 : small == 5 ? 2.1 : small == 4 ? 1.8 : 1.5;
 		double[] pr = new double[n];
 		for (int k = 0; k < n; k++) {
 			pr[k] = base * (k == n - 1 ? 0.88 : k == 0 ? 1.0 : 0.94);
@@ -260,10 +260,10 @@ public final class TreeCloudPinePot implements Variant {
 		for (int k = 0; k < n - 1; k++) {
 			int side = k % 2 == 0 ? sg : -sg;
 			// the limb runs level under the pad (small plots: it may start lower, nobody walks there)
-			int ys = small >= 5 ? py[k] - 1 : Math.min(py[k] - 1, Math.max(3, py[k] - 2));
+			int ys = small >= 5 ? Math.max(3, py[k] - 2) : Math.min(py[k] - 1, Math.max(3, py[k] - 2));
 			double ra = Math.min(pr[k] * 1.25, (lenA - 1) / 2.0 + 0.4);
 			double rp = Math.min(pr[k] * 0.95, (lenP - 1) / 2.0 + 0.4);
-			double off = Math.max(2.0, Math.round(ra * 1.0));
+			double off = Math.max(2.0, Math.round(ra * 1.2));
 			double tA = alongU ? tu[ys] : tv[ys];
 			double tP = alongU ? tv[ys] : tu[ys];
 			double ca = TreeKit.clamp(tA + side * off, ra - 0.4, lenA - 1 - (ra - 0.4));
@@ -301,7 +301,7 @@ public final class TreeCloudPinePot implements Variant {
 			double rp = Math.min(rc * 0.9, (lenP - 1) / 2.0 + 0.4);
 			double tA = alongU ? tu[trunkTop] : tv[trunkTop];
 			double tP = alongU ? tv[trunkTop] : tu[trunkTop];
-			double shift = rc >= 2.0 ? -(n % 2 == 0 ? sg : -sg) : 0;
+			double shift = rc >= 2.4 ? -2 * (n % 2 == 0 ? sg : -sg) : rc >= 1.7 ? -(n % 2 == 0 ? sg : -sg) : 0;
 			double ca = TreeKit.clamp(tA + shift, ra - 0.4, lenA - 1 - (ra - 0.4));
 			double cp = TreeKit.clamp(tP, rp - 0.4, lenP - 1 - (rp - 0.4));
 			double cuD = alongU ? ca : cp;
@@ -329,8 +329,10 @@ public final class TreeCloudPinePot implements Variant {
 					t.fixed(u, 1, v, hsh <= 2 ? b(Blocks.FLOWERING_AZALEA) : b(Blocks.MOSSY_COBBLESTONE));
 				} else if (hsh <= 2) {
 					t.cover(u, 1, v, b(Blocks.MOSS_CARPET));
-				} else if (hsh == 3) {
+				} else if (hsh <= 4) {
 					t.cover(u, 1, v, b(Blocks.FERN));
+				} else if (hsh == 5) {
+					t.fixed(u, 1, v, b(Blocks.FLOWERING_AZALEA));
 				}
 			}
 		}
@@ -405,9 +407,6 @@ public final class TreeCloudPinePot implements Variant {
 				if (corner) {
 					t.fixed(u, 0, v, post(sch, 0));
 					t.fixed(u, 1, v, post(sch, 1));
-					if (t.hash(u, 2, v, 3) == 0) {
-						t.fixed(u, 2, v, b(Blocks.POTTED_FLOWERING_AZALEA)); // a little pot on the post
-					}
 				} else {
 					t.fixed(u, 0, v, wall(sch, t, u, v, ev));
 					t.fixed(u, 1, v, rim(sch));
@@ -453,7 +452,7 @@ public final class TreeCloudPinePot implements Variant {
 			if (y >= t.h) {
 				break;
 			}
-			double sc = ly == 0 ? 1.0 : 0.6;
+			double sc = ly == 0 ? 1.0 : 0.5;
 			for (int v = (int) Math.floor(cv - rz - 1); v <= (int) Math.ceil(cv + rz + 1); v++) {
 				for (int u = (int) Math.floor(cu - rx - 1); u <= (int) Math.ceil(cu + rx + 1); u++) {
 					double du = (u - cu) / rx;
