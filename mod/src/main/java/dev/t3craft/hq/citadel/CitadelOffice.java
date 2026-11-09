@@ -51,6 +51,14 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
  * stairs, and nothing is added to the door's side: the footprint grew by two blocks on every side, and the tower moved out
  * by the same two ({@link #RIM_OFFSET}) so its door is still on the deck's rim.
  *
+ * <h2>Utility (struct/leader-office6)</h2>
+ *
+ * More to use, in the cells that were free: the control room's north wall gets a kanban task board and a wall map of the citadel over
+ * a supply bench (crafting table, anvil, double chest, barrel; {@link #northWall}), the briefing table moves to the board's side and
+ * out of the door-to-rug route; the lobby gets a rest corner by the door (bench, smoker and a barrel of drinks); the archive's bays
+ * and the model of the HQ get plaques ({@link #bayHeader}). No block of the kit and no anchor moved. Stores are labelled with plaques,
+ * not item frames (entities cannot live in the plan).
+ *
  * <h2>Plan (local coordinates {@code (dx, dz)} from the tower's centre {@link #CX()}, {@link #CZ()}; north is -dz, the hub)</h2>
  *
  * <pre>
@@ -788,12 +796,12 @@ public final class CitadelOffice {
 		sign(c, CX(), F0() + 5, CZ() - E, Direction.NORTH, DyeColor.ORANGE, "", "Facundo", "Oficina", "");
 		// struct/leader-office6, the rest corner by the door (north-east, off every route): a bench of two seats against the north wall
 		// looking out over the entrance, a smoker and a barrel of drinks as a counter, a lantern on it and a plaque
-		set(c, 3, y, -6, cherryStairs(Direction.NORTH, false));
-		set(c, 4, y, -6, cherryStairs(Direction.NORTH, false));
-		set(c, 5, y, -6, facing(Blocks.SMOKER, Direction.SOUTH));
-		set(c, 6, y, -6, barrel());
-		set(c, 6, y + 1, -6, lantern(false));
-		sign(c, CX() + 5, y, CZ() - 5, Direction.SOUTH, DyeColor.ORANGE, "", "Descanso", "comida y bebida", "");
+		set(c, 4, y, -6, stairs(Blocks.DARK_OAK_STAIRS, Direction.NORTH)); // dark, so it reads against the floor; one cell off the rug
+		set(c, 5, y, -6, stairs(Blocks.DARK_OAK_STAIRS, Direction.NORTH));
+		set(c, 6, y, -6, facing(Blocks.SMOKER, Direction.SOUTH));
+		set(c, 6, y, -5, barrel());
+		set(c, 6, y + 1, -5, lantern(false));
+		sign(c, CX() + 6, y + 2, CZ() - 6, Direction.SOUTH, DyeColor.ORANGE, "", "Descanso", "comida y bebida", "");
 		for (int[] p : new int[][] {{-4, -4}, {4, -4}, {0, -4}, {-2, 0}, {2, 0}, {-4, 4}, {4, 4}, {0, 5}, {-5, 0}, {5, 0}}) {
 			hang(c, p[0], F1() - 1, p[1]);
 		}
@@ -906,7 +914,7 @@ public final class CitadelOffice {
 			}
 		}
 		set(c, 0, y + 2, 0, lantern(false));
-		// struct/leader-office6: plaques that name the bays (a dark oak strip over each bay of shelves, with its plaque) and the model
+		// struct/leader-office6: plaques that name the bays (a spruce strip over each bay of shelves, with its plaque) and the model
 		String[][] bayText = {
 			{"Bahia A", "Proyectos", "en curso"},
 			{"Bahia B", "Proyectos", "archivados"},
@@ -916,7 +924,7 @@ public final class CitadelOffice {
 			bayHeader(c, CX() - 5 + 4 * b, y + 3, CZ() - 6, Direction.Axis.X, Direction.SOUTH, "", bayText[b][0], bayText[b][1], bayText[b][2]);
 		}
 		for (int dx : new int[] {-3, 1}) {
-			set(c, dx, y + 3, -6, CitadelCanvas.b(Blocks.DARK_OAK_PLANKS)); // the gaps' caps, so the run reads as one
+			set(c, dx, y + 3, -6, CitadelCanvas.b(Blocks.SPRUCE_PLANKS)); // the gaps' caps, so the run reads as one
 		}
 		bayHeader(c, CX() - 6, y + 3, CZ() - 4, Direction.Axis.Z, Direction.EAST, "", "Sala de", "lectura", "");
 		bayHeader(c, CX() - 6, y + 3, CZ() + 3, Direction.Axis.Z, Direction.EAST, "", "Estudio", "", "");
@@ -1207,7 +1215,8 @@ public final class CitadelOffice {
 	 */
 	private static void northWall(CitadelCanvas c, int y) {
 		int z = -W;
-		DyeColor[] col = {DyeColor.RED, DyeColor.YELLOW, DyeColor.LIGHT_BLUE, DyeColor.LIME};
+		// the board keeps to the room's palette (cherry, black, teal): muted terracotta headers, pale notes, no saturated bars
+		DyeColor[] col = {DyeColor.RED, DyeColor.ORANGE, DyeColor.CYAN, DyeColor.GREEN};
 		String[] name = {"Por hacer", "En curso", "Revision", "Hecho"};
 		int[] notes = {2, 1, 1, 2}; // sticky notes per column, from the bottom up
 		for (int i = 0; i < 4; i++) {
@@ -1215,23 +1224,20 @@ public final class CitadelOffice {
 			set(c, dx, y, z, CitadelCanvas.b(Blocks.DEEPSLATE_BRICKS));
 			set(c, dx, y + 3, z, CitadelCanvas.terracotta(col[i]));
 			for (int r = 0; r < 2; r++) {
-				set(c, dx, y + 1 + r, z, r < notes[i] ? wool(col[i]) : concrete(DyeColor.BLACK));
+				set(c, dx, y + 1 + r, z, r < notes[i] ? wool(DyeColor.PINK) : concrete(DyeColor.BLACK));
 			}
 			sign(c, CX() + dx, y + 4, CZ() + z, Direction.SOUTH, col[i], "", name[i], "", "");
 		}
 		// wall map (dx 2..5, three rows, bottom first) over the supply bench
 		String[] map = {
-			"YYMR", // y + 1 (south: barrios and this tower, in red)
+			"PPPR", // y + 1 (south: barrios in the model's pink, and this tower, in red)
 			"scCs", // y + 2 (the hub: calcite round a copper heart, on the sandstone of the map)
-			"BBGG" // y + 3 (north)
+			"PPPP" // y + 3 (north)
 		};
 		for (int r = 0; r < map.length; r++) {
 			for (int k = 0; k < 4; k++) {
 				BlockState s = switch (map[r].charAt(k)) {
-					case 'Y' -> CitadelCanvas.terracotta(DyeColor.YELLOW);
-					case 'M' -> CitadelCanvas.terracotta(DyeColor.MAGENTA);
-					case 'B' -> CitadelCanvas.terracotta(DyeColor.LIGHT_BLUE);
-					case 'G' -> CitadelCanvas.terracotta(DyeColor.LIME);
+					case 'P' -> CitadelCanvas.terracotta(DyeColor.PINK);
 					case 'R' -> concrete(DyeColor.RED);
 					case 'C' -> Blocks.CUT_COPPER.waxed().unaffected().defaultBlockState();
 					case 'c' -> CALCITE;
@@ -1246,17 +1252,17 @@ public final class CitadelOffice {
 		set(c, 4, y, z, chest(Direction.SOUTH, ChestType.RIGHT));
 		set(c, 5, y, z, chest(Direction.SOUTH, ChestType.LEFT));
 		set(c, 6, y, z, barrel());
-		sign(c, CX() + 3, y + 4, CZ() + z, Direction.SOUTH, DyeColor.LIGHT_BLUE, "", "Mapa de", "la ciudadela", "");
+		sign(c, CX() + 3, y + 4, CZ() + z, Direction.SOUTH, DyeColor.ORANGE, "", "Mapa de", "la ciudadela", "");
 		sign(c, CX() + 5, y + 4, CZ() + z, Direction.SOUTH, DyeColor.ORANGE, "", "Suministros", "mesa, yunque", "cofres");
 	}
 
 	/**
-	 * A bay header in the archive: three dark oak planks over the bay's shelves and a plaque on the aisle side of the middle one.
+	 * A bay header in the archive: three spruce planks over the bay's shelves and a plaque on the aisle side of the middle one.
 	 * {@code (x, z)} is the middle block (absolute), {@code along} the axis of the strip, {@code face} the way the plaque looks.
 	 */
 	private static void bayHeader(CitadelCanvas c, int x, int y, int z, Direction.Axis along, Direction face, String... lines) {
 		for (int i = -1; i <= 1; i++) {
-			c.set(x + (along == Direction.Axis.X ? i : 0), y, z + (along == Direction.Axis.Z ? i : 0), CitadelCanvas.b(Blocks.DARK_OAK_PLANKS));
+			c.set(x + (along == Direction.Axis.X ? i : 0), y, z + (along == Direction.Axis.Z ? i : 0), CitadelCanvas.b(Blocks.SPRUCE_PLANKS));
 		}
 		sign(c, x + face.getStepX(), y, z + face.getStepZ(), face, DyeColor.ORANGE, lines);
 	}
