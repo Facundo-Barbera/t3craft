@@ -141,10 +141,10 @@ public final class HallInterior {
 
 	private static net.minecraft.world.level.block.Block floorBlock(HallStyle s, boolean edge, boolean dark, int hsh) {
 		return switch (s) {
-			case TIMBER -> edge ? Blocks.DARK_OAK_PLANKS : dark ? Blocks.SPRUCE_PLANKS : Blocks.BAMBOO_PLANKS;
+			case TIMBER -> edge ? Blocks.DARK_OAK_PLANKS : dark ? Blocks.SPRUCE_PLANKS : Blocks.CHERRY_PLANKS;
 			case STONE -> edge ? Blocks.POLISHED_DEEPSLATE : dark ? (hsh % 8 == 0 ? Blocks.MOSSY_STONE_BRICKS : Blocks.STONE_BRICKS) : Blocks.POLISHED_ANDESITE;
 			case SHUTTERED -> edge ? Blocks.POLISHED_BLACKSTONE_BRICKS : dark ? Blocks.DARK_OAK_PLANKS : Blocks.SPRUCE_PLANKS;
-			case BALCONY -> edge ? Blocks.POLISHED_DEEPSLATE : dark ? Blocks.BAMBOO_MOSAIC : Blocks.BAMBOO_PLANKS;
+			case BALCONY -> edge ? Blocks.POLISHED_DEEPSLATE : dark ? Blocks.BAMBOO_MOSAIC : Blocks.SMOOTH_QUARTZ;
 		};
 	}
 
