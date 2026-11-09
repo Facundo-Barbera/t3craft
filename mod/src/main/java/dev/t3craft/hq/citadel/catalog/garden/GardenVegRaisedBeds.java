@@ -155,7 +155,7 @@ public final class GardenVegRaisedBeds implements Variant {
 
 		void layout() {
 			int usable = w - 2;
-			int[] tryW = p.hash(0, 1, 0, 2) == 0 ? new int[] {7, 5} : new int[] {5, 7};
+			int[] tryW = p.hash(0, 1, 0, 2) == 0 ? new int[] {9, 7, 5} : new int[] {5, 7, 9};
 			int best = -1;
 			int bestLeft = Integer.MAX_VALUE;
 			for (int t : tryW) {
@@ -164,7 +164,7 @@ public final class GardenVegRaisedBeds implements Variant {
 				}
 				int n = Math.max(1, (usable + 2) / (t + 2));
 				int left = usable - n * t - (n - 1) * 2;
-				if (left < bestLeft) {
+				if (left < bestLeft || left == bestLeft && t > best && p.hash(0, 1, 0, 2) == 0) {
 					bestLeft = left;
 					best = t;
 				}
@@ -361,6 +361,9 @@ public final class GardenVegRaisedBeds implements Variant {
 						} else {
 							set(u, 0, v, b(wood.planks()));
 						}
+						if (eu && p.hash(u, 13, v, 6) == 0) {
+							set(u, 1, v, pot(u, v));
+						}
 						continue;
 					}
 					int iu = u - ox - 1;
@@ -379,6 +382,16 @@ public final class GardenVegRaisedBeds implements Variant {
 			if (!patch && il >= 5 && p.hash(bi, 9, 9, 4) == 0) {
 				scarecrow(ox + 1, oz + 1 + midR);
 			}
+		}
+
+		BlockState pot(int u, int v) {
+			return b(switch (p.hash(u, 14, v, 5)) {
+				case 0 -> Blocks.POTTED_RED_TULIP;
+				case 1 -> Blocks.POTTED_OXEYE_DAISY;
+				case 2 -> Blocks.POTTED_CORNFLOWER;
+				case 3 -> Blocks.POTTED_ALLIUM;
+				default -> Blocks.POTTED_AZURE_BLUET;
+			});
 		}
 
 		int rootKind(int bi, int iu, int iv, int iw, int il, int midC) {
@@ -411,7 +424,7 @@ public final class GardenVegRaisedBeds implements Variant {
 				}
 				set(u, 0, v, b(Blocks.DIRT));
 				boolean pumpkinRow = iv % 2 == 0;
-				if (stage(bi, pumpkinRow ? midC - 1 : midC + 1, iv, il) >= 7) {
+				if (stage(bi, pumpkinRow ? midC - 1 : midC + 1, iv, il) >= 5) {
 					set(u, 1, v, pumpkinRow ? b(Blocks.PUMPKIN) : b(Blocks.MELON));
 				}
 				return;
@@ -423,11 +436,11 @@ public final class GardenVegRaisedBeds implements Variant {
 				if (stemRow) {
 					int age = stage(bi, iu, iv, il);
 					if (iv == midR) {
-						age = Math.min(age, 5);
+						age = Math.min(age, 4);
 					}
 					Block stem = left ? Blocks.PUMPKIN_STEM : Blocks.MELON_STEM;
 					Block attached = left ? Blocks.ATTACHED_PUMPKIN_STEM : Blocks.ATTACHED_MELON_STEM;
-					if (age >= 7) {
+					if (age >= 5 && iv != midR) {
 						set(u, 1, v, b(attached).setValue(BlockStateProperties.HORIZONTAL_FACING, left ? Direction.EAST : Direction.WEST));
 					} else {
 						set(u, 1, v, b(stem).setValue(BlockStateProperties.AGE_7, age));
@@ -487,9 +500,11 @@ public final class GardenVegRaisedBeds implements Variant {
 				set(ue, y, vf, b(wood.log()));
 				set(su, y, vb, b(wood.log()));
 				set(ue, y, vb, b(wood.log()));
-				set(su, y, vm, b(wood.planks()));
-				set(ue, y, vm, b(wood.planks()));
 			}
+			set(su, 0, vm, b(wood.planks()));
+			set(ue, 0, vm, b(wood.planks()));
+			set(su, 1, vm, b(wood.fence()));
+			set(ue, 1, vm, b(wood.fence()));
 			for (int u = su + 1; u <= su + 3; u++) {
 				set(u, 0, vf, slab(wood.slab()));
 				set(u, 0, vm, slab(wood.slab()));
@@ -499,11 +514,6 @@ public final class GardenVegRaisedBeds implements Variant {
 			set(su + 2, 0, vb, barrel());
 			set(su + 2, 1, vb, b(Blocks.LANTERN));
 			set(su + 3, 0, vb, flip ? composter(su + 3, vb) : chest());
-			for (int u = su + 1; u <= su + 3; u++) {
-				for (int y = u == su + 2 ? 2 : 1; y <= 3; y++) {
-					set(u, y, vb, b(wood.planks()));
-				}
-			}
 			set(su + 1, 0, vm, b(Blocks.HAY_BLOCK));
 			roof(su, ue, vf);
 		}
@@ -566,8 +576,8 @@ public final class GardenVegRaisedBeds implements Variant {
 			boolean flip = p.hash(bu, 8, 0, 2) == 1;
 			set(bu + 1, 0, v, flip ? chest() : composter(bu + 1, v));
 			set(bu + 2, 0, v, barrel());
-			set(bu + 2, 1, v, b(Blocks.LANTERN));
 			set(bu + 3, 0, v, flip ? composter(bu + 3, v) : chest());
+			set(flip ? bu : bu + 4, 3, v, b(Blocks.LANTERN));
 			for (int u = bu; u <= bu + 4; u++) {
 				set(u, 4, v, stairs(wood.stairs(), Direction.NORTH));
 			}
