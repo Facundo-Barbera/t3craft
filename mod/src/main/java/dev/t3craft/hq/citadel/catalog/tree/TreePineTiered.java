@@ -126,7 +126,7 @@ public final class TreePineTiered implements Variant {
 		for (int y = 3; y <= yTop; y++) {
 			double f = (y - 3) / (double) Math.max(1, yTop - 3);
 			double e = f * f * (3 - 2 * f);
-			double sway = Math.sin(phase + (y - 3) * 0.5) * 0.7 * Math.min(1.0, (y - 2) / 3.0);
+			double sway = Math.sin(phase + (y - 3) * 0.4) * 0.5 * Math.min(1.0, (y - 2) / 3.0);
 			int tu = TreeKit.clamp((int) Math.round(cu0 + lu * leanMax * e + pu * sway), 1, w - 2);
 			int tv = TreeKit.clamp((int) Math.round(cv0 + lv * leanMax * e + pv * sway), 1, d - 2);
 			int du = Integer.signum(tu - cu);
@@ -159,7 +159,7 @@ public final class TreePineTiered implements Variant {
 		for (int k = 0; k < n; k++) {
 			int b = yb[k];
 			double fk = n == 1 ? 0 : k / (double) (n - 1);
-			double rad = half * (0.82 - 0.3 * fk) + 0.3;
+			double rad = half * (0.86 - 0.28 * fk) + 0.35;
 			double sgn = sgn0 * ((k & 1) == 0 ? 1 : -1);
 			boolean top = k == n - 1;
 			double off = top ? 0 : Math.max(1.0, half * (0.42 + 0.26 * r.nextDouble()));
@@ -225,7 +225,7 @@ public final class TreePineTiered implements Variant {
 					double q = Math.hypot(du, dv);
 					double a = Math.atan2(dv, du);
 					double m = 1 + 0.15 * Math.sin(5 * a + ph) + 0.09 * Math.sin(8 * a + 2 * ph);
-					double lim = scale * m + (t.hash(u, y, v, 9) - 4) / 4.0 * 0.16;
+					double lim = scale * m + (t.hash(u, y, v, 9) - 4) / 4.0 * 0.11;
 					if (q > lim) {
 						continue;
 					}
