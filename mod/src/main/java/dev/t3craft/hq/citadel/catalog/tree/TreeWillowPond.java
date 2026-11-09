@@ -85,7 +85,7 @@ public final class TreeWillowPond implements Variant {
 		int s = r.nextBoolean() ? -1 : 1; // the side of the box the tree stands on (the pond is on the other)
 		double lean = 0.5 + r.nextDouble() * 0.4;
 		double spin = r.nextDouble() * 0.7 - 0.35;
-		int dens = 13 + r.nextInt(4); // strands per 20 candidate cells
+		int dens = 15 + r.nextInt(4); // strands per 20 candidate cells
 		double pondK = 0.92 + r.nextDouble() * 0.2;
 		double[] kidney = {(r.nextDouble() - 0.5) * 1.1, 0.15 + r.nextDouble() * 0.5, 0.5 + r.nextDouble() * 0.2};
 		int extraLimbs = r.nextInt(2);
@@ -167,7 +167,7 @@ public final class TreeWillowPond implements Variant {
 					}
 					int top = y - 1;
 					int roll = t.hash(u, 4, v, 10);
-					int bottom = roll < 6 ? 1 : TreeKit.clamp(top - (2 + t.hash(u, 6, v, 3)), 1, top);
+					int bottom = roll < 8 ? 1 : TreeKit.clamp(top - (2 + t.hash(u, 6, v, 3)), 1, top);
 					BlockState under = t.get(u, 0, v);
 					int leafMin = t.kind(u, 0, v) != TreeKit.EMPTY && under != null && under.getBlock() != Blocks.WATER ? 4 : 3;
 					int tail = top - bottom + 1 >= 4 ? 3 : 2;
@@ -221,7 +221,7 @@ public final class TreeWillowPond implements Variant {
 	 */
 	private static void limb(Vox t, int[][] lead, int yTop, int i, double ex, double ez, double ra, double rmax,
 			Leaves lv) {
-		int sy = Math.max(3, yTop - 4);
+		int sy = Math.max(4, yTop - 4); // limbs stay at y4 or above: 2.85 of headroom over a bank
 		int ay = Math.max(sy, yTop - 2); // the apex stays under the crown pad: no bare log horns above the leaves
 		int ty = Math.max(4, yTop - 4 - (i % 3)); // the limb's end: over a bank (feet at y1) it keeps 2.85 of headroom
 		int su = lead[0][sy];
