@@ -68,6 +68,7 @@ public final class KitBlocks implements HqKit {
 		}
 		m.put(Role.GLOW_PANEL, "glow_panel");
 		m.put(Role.GLOW_PANEL_COOL, "glow_panel");
+		m.put(Role.CONSOLE, "console_terminal"); // not in IDS: T3Blocks registers it with its own block entity and adds it to the map
 		return Collections.unmodifiableMap(m);
 	}
 
@@ -163,6 +164,7 @@ public final class KitBlocks implements HqKit {
 			// the edge only; PlanConnect (or the world) resolves the ends from the neighbours
 			case RAILING -> s.setValue(KitRailingBlock.FACING, h);
 			case PLAQUE -> s.setValue(KitPlaqueBlock.FACING, h);
+			case CONSOLE -> s.setValue(ConsoleTerminalBlock.FACING, h);
 			case BEAM -> s.setValue(RotatedPillarBlock.AXIS, facing.getAxis());
 			case WALL_PANEL -> s.setValue(KitPanelBlock.LIT, false);
 			case WALL_PANEL_LIT -> s.setValue(KitPanelBlock.LIT, true);

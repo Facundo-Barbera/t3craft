@@ -10,6 +10,7 @@ import net.minecraft.nbt.CompoundTag;
 import dev.t3craft.hq.RingCampusGeometry.Kind;
 import dev.t3craft.hq.RingCampusGeometry.Node;
 import dev.t3craft.hq.RingCampusGeometry.Zone;
+import dev.t3craft.hq.citadel.nodes.ArchiveBay;
 import dev.t3craft.hq.citadel.nodes.CloisterRoom;
 import dev.t3craft.hq.citadel.nodes.LoungeRoom;
 import dev.t3craft.hq.citadel.nodes.NodeDecor;
@@ -274,11 +275,16 @@ public final class CitadelNodes {
 		CloisterRoom.cell(c, x, z, dx, dz);
 	}
 
-	/** The fixtures of the cloister: the archive terminal and its anchors, and a walk spot. */
+	/**
+	 * The fixtures of the cloister: the archive terminal, its anchors and a walk spot. The consultation bay round the
+	 * terminal (niche, plaque, lantern, rug) is painted here, in real offsets after the magnification
+	 * ({@link ArchiveBay}).
+	 */
 	public static void cloisterFixtures(CitadelCanvas c, Node nd) {
 		int cx = nd.cx();
 		int cz = nd.cz();
-		BlockPos t = new BlockPos(cx + real(3, c.k), 1, cz + realInner(-6, c.k));
+		ArchiveBay.build(c, nd);
+		BlockPos t = new BlockPos(cx + ArchiveBay.terminalX(c.k), 1, cz + ArchiveBay.terminalZ(c.k));
 		c.fixture(t, c.style.archiveTerminal(Direction.SOUTH));
 		c.anchor(Anchor.face(AnchorNames.ARCHIVE_TERMINAL, t, Direction.SOUTH));
 		c.anchor(Anchor.at(AnchorNames.ARCHIVE, t.south(), Direction.NORTH));

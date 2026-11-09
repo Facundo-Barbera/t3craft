@@ -37,6 +37,7 @@ final class VanillaHqKit implements HqKit {
 					.setValue(LightBlock.LEVEL, 12);
 			case GLOW_PANEL -> Blocks.OCHRE_FROGLIGHT.defaultBlockState();
 			case GLOW_PANEL_COOL -> Blocks.SEA_LANTERN.defaultBlockState();
+			case CONSOLE -> Blocks.LECTERN.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, h);
 		};
 	}
 

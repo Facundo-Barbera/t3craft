@@ -65,7 +65,9 @@ public interface HqKit {
 		 */
 		GLOW_PANEL,
 		/** Glow panel, cool (T3 cyan). */
-		GLOW_PANEL_COOL;
+		GLOW_PANEL_COOL,
+		/** Console terminal (kit/console-terminal): opens the T3 composer, or the chat of its bound thread. Oriented: front. Vanilla: lectern. */
+		CONSOLE;
 
 		public String id() {
 			return name().toLowerCase(Locale.ROOT);
@@ -73,7 +75,7 @@ public interface HqKit {
 
 		/** Whether {@link #state(Role, Direction)} looks at {@code facing}. */
 		public boolean oriented() {
-			return this == DESK || this == BEAM || this == PLAQUE || this == RAILING || this == GLOW_PANEL || this == GLOW_PANEL_COOL
+			return this == DESK || this == BEAM || this == PLAQUE || this == RAILING || this == CONSOLE || this == GLOW_PANEL || this == GLOW_PANEL_COOL
 					|| strip();
 		}
 
@@ -186,6 +188,11 @@ public interface HqKit {
 	 */
 	default BlockState glowPanel(Direction facing, boolean cool) {
 		return state(cool ? Role.GLOW_PANEL_COOL : Role.GLOW_PANEL, facing);
+	}
+
+	/** The console terminal, front (keyboard side, where the player stands) towards {@code front}. */
+	default BlockState console(Direction front) {
+		return state(Role.CONSOLE, front);
 	}
 
 	/** {@link #id()} of the active kit, {@code "vanilla"} for {@link #VANILLA}. */

@@ -1,0 +1,102 @@
+{
+  "parent": "minecraft:block/block",
+  "ambientocclusion": false,
+  "textures": {
+    "particle": "t3craft:block/monitor_side",
+    "frame": "t3craft:block/monitor_front",
+    "trim": "t3craft:block/monitor_trim"
+  },
+  "elements": [
+    {
+      "from": [
+        2,
+        2,
+        -1
+      ],
+      "to": [
+        14,
+        4,
+        0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#frame",
+          "uv": [
+            2,
+            12,
+            14,
+            14
+          ]
+        },
+        "up": {
+          "texture": "#trim",
+          "uv": [
+            0,
+            11,
+            16,
+            12
+          ]
+        }
+      }
+    },
+    {
+      "from": [
+        0,
+        0,
+        -5
+      ],
+      "to": [
+        16,
+        2,
+        0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#trim",
+          "uv": [
+            0,
+            6,
+            16,
+            8
+          ]
+        },
+        "up": {
+          "texture": "#trim",
+          "uv": [
+            0,
+            0,
+            16,
+            5
+          ]
+        },
+        "down": {
+          "texture": "#trim",
+          "uv": [
+            0,
+            9,
+            5,
+            10
+          ]
+        },
+        "east": {
+          "texture": "#trim",
+          "uv": [
+            0,
+            9,
+            5,
+            10
+          ]
+        },
+        "west": {
+          "texture": "#trim",
+          "uv": [
+            0,
+            9,
+            5,
+            10
+          ]
+        }
+      }
+    }
+  ]
+}
