@@ -32,6 +32,7 @@ public final class TreePineTiered implements Variant {
 	private static final Wood WOOD = new Wood(Blocks.SPRUCE_LOG, Blocks.SPRUCE_WOOD, b(Blocks.MANGROVE_ROOTS));
 	private static final BlockState NEEDLE = leaves(Blocks.SPRUCE_LEAVES);
 	private static final BlockState TIP = leaves(Blocks.DARK_OAK_LEAVES);
+	private static final BlockState LIGHT = leaves(Blocks.AZALEA_LEAVES);
 
 	/** The lowest cloud's bottom layer: the bough under it is at y = 3. */
 	private static final int FIRST = 4;
@@ -88,11 +89,11 @@ public final class TreePineTiered implements Variant {
 		int cu0 = lead[0][2];
 		int cv0 = lead[1][2];
 		boolean big = Math.min(w, d) >= 7;
-		TreeKit.roots(t, WOOD, bu, bv, big ? 5 : 4, big ? 2 : 1, -1, 7);
+		TreeKit.roots(t, WOOD, bu, bv, big ? 4 : 3, 1, -1, 7);
 
 		// ---- tiers: 3..5 clouds, at least 3 layers apart, the last one on the leader
-		int bLast = H - 2;
-		int nMax = Math.min(5, (int) ((bLast - FIRST) / 2.6) + 1);
+		int bLast = H - 1;
+		int nMax = Math.min(5, (int) ((bLast - FIRST) / 3.0) + 1);
 		int n = nMax <= 3 ? 3 : 3 + r.nextInt(nMax - 2);
 		int[] yb = new int[n];
 		int[] th = new int[n];
@@ -126,7 +127,7 @@ public final class TreePineTiered implements Variant {
 		for (int y = 3; y <= yTop; y++) {
 			double f = (y - 3) / (double) Math.max(1, yTop - 3);
 			double e = f * f * (3 - 2 * f);
-			double sway = Math.sin(phase + (y - 3) * 0.4) * 0.5 * Math.min(1.0, (y - 2) / 3.0);
+			double sway = Math.sin(phase + (y - 3) * 0.4) * 0.3 * Math.min(1.0, (y - 2) / 3.0);
 			int tu = TreeKit.clamp((int) Math.round(cu0 + lu * leanMax * e + pu * sway), 1, w - 2);
 			int tv = TreeKit.clamp((int) Math.round(cv0 + lv * leanMax * e + pv * sway), 1, d - 2);
 			int du = Integer.signum(tu - cu);
@@ -155,7 +156,6 @@ public final class TreePineTiered implements Variant {
 
 		// ---- clouds and their boughs
 		double half = (Math.min(w, d) - 1) / 2.0;
-		int prevTop = 2;
 		for (int k = 0; k < n; k++) {
 			int b = yb[k];
 			double fk = n == 1 ? 0 : k / (double) (n - 1);
@@ -174,11 +174,25 @@ public final class TreePineTiered implements Variant {
 			int cj = (int) Math.round(ccv);
 			if (!top) {
 				// the bough: leaves the trunk a layer or two under the pad, ends under its middle and climbs into it
-				int ya = k >= 1 && b - 2 >= prevTop + 2 ? b - 2 : b - 1;
+				int ya = Math.max(3, b - 2);
 				TreeKit.branch(t, WOOD, new int[] {su[ya], ya, sv[ya]}, new int[] {ci, b - 1, cj}, false);
 			}
+			if (!top && b - 2 >= 3) {
+				// a short dead stub on the other side: a limb that was pruned
+				int ou2 = (int) Math.signum(su[b - 2] - ci);
+				int ov2 = (int) Math.signum(sv[b - 2] - cj);
+				if (Math.abs(su[b - 2] - ci) >= Math.abs(sv[b - 2] - cj)) {
+					ov2 = 0;
+				} else {
+					ou2 = 0;
+				}
+				if (ou2 != 0 || ov2 != 0) {
+					t.woodSoft(su[b - 2] + ou2, b - 2, sv[b - 2] + ov2, WOOD.log(ou2 != 0 ? net.minecraft.core.Direction.Axis.X : net.minecraft.core.Direction.Axis.Z));
+					t.woodSoft(su[b - 2] + 2 * ou2, b - 1, sv[b - 2] + 2 * ov2, WOOD.bark());
+					t.woodSoft(su[b - 2] + 2 * ou2, b - 2, sv[b - 2] + 2 * ov2, WOOD.bark());
+				}
+			}
 			cloud(t, ccu, ccv, b, th[k], rx, rz, k + 1, phase + k * 1.7, H, gap >= 4.9, k > 0 && gap >= 3.4);
-			prevTop = b + th[k] - 1;
 		}
 
 		// ---- the foot: ferns, moss, mushrooms, and a mossy boulder away from the lean
@@ -235,7 +249,8 @@ public final class TreePineTiered implements Variant {
 					}
 					int pct = topLayer ? 42 : 24;
 					boolean tip = t.hash(u >> 1, y, v >> 1, 100) < pct || (q > lim - 0.3 && t.hash(u, y + 7, v, 4) == 0);
-					t.leafOf(u, y, v, tip ? TIP : NEEDLE, id);
+					boolean sunny = topLayer && q < lim - 0.35 && t.hash(u, y + 21, v, 6) == 0;
+					t.leafOf(u, y, v, sunny ? LIGHT : tip ? TIP : NEEDLE, id);
 					if (belly && ly == 0 && q < 0.55 * lim) {
 						t.leafOf(u, y - 1, v, NEEDLE, id); // a sagging belly under the pad's middle
 					}
