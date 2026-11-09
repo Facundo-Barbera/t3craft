@@ -103,12 +103,12 @@ public final class TreeCherryGrand implements Variant {
 		double phi = r.nextDouble() * Math.PI * 2;
 		double lobeAmp = mn < 9 ? 0.10 + r.nextDouble() * 0.04 : 0.17 + r.nextDouble() * 0.08;
 		double rRoom = Math.min(Math.min(cu - wu0, wu1 - cu), Math.min(cv - wv0, wv1 - cv)) + 0.9;
-		double rWant = Math.min(mn * 0.5 - 0.6, 7.2);
+		double rWant = Math.min(mn * 0.5 - (mn < 9 ? 0.9 : 0.6), 7.2);
 		double rBase = Math.min(rWant, rRoom / (1 + lobeAmp + 0.04));
 		rBase = Math.max(rBase, Math.min(rWant, mn * 0.5 - 0.5));
 		double ryDown = (cy - CLEAR) + 1.9; // the underside always bottoms out at y4
 		// sky windows: a few vertical slits right through the shell
-		int nHoles = rBase < 3.4 ? 0 : big ? 3 : 1 + r.nextInt(2); // small crowns keep their shell whole
+		int nHoles = rBase < 3.9 ? 0 : big ? 3 : 1 + r.nextInt(2); // small crowns keep their shell whole
 		double[][] holes = new double[nHoles][2];
 		for (int i = 0; i < nHoles; i++) {
 			double a = phi + (i + 0.3 + r.nextDouble() * 0.4) / nHoles * Math.PI * 2 + 0.5;
@@ -137,7 +137,10 @@ public final class TreeCherryGrand implements Variant {
 					if (q > rem * (1.0 + jit)) {
 						continue;
 					}
-					if (q > 0.55 * rem && t.hash(u + 5, y + 11, v, 12) < 2) {
+					if (y < CLEAR + (int) Math.round(2.2 * Math.sqrt(Math.min(q, 1.0)))) {
+						continue; // an umbrella: thick over the trunk, a rim one or two layers thick, no vertical wall
+					}
+					if (q > 0.7 * rem && t.hash(u + 5, y + 11, v, 12) < 3) {
 						continue; // an eroded shell, not a smooth skin
 					}
 					if (y == CLEAR && t.hash(u, y + 3, v + 7, 10) < 3) {
@@ -194,26 +197,23 @@ public final class TreeCherryGrand implements Variant {
 				}
 			}
 			double reach = Math.min(room(su, sv, ex, ez, wu0, wu1, wv0, wv1) - 0.8, edge + 2.4);
-			if (reach < edge + 1.0 || reach < 3.0) {
+			if (reach < edge + 0.5) {
 				continue;
 			}
 			int tu = (int) Math.round(su + ex * reach);
 			int tv = (int) Math.round(sv + ez * reach);
-			int ty = cy; // the limb climbs out of the dome (and stays under its top)
+			int ty = cy; // the limb climbs out from under the rim, the bare wood showing for a cell or two
 			List<int[]> limb = TreeKit.branch(t, LIMB, new int[] {su, sy, sv}, new int[] {tu, ty, tv}, false);
 			darkBase(t, limb);
-			// a blossom tuft rests on the tip and hides the end of the wood from above
-			for (int dy = 0; dy <= 1; dy++) {
-				double tr = dy == 1 ? 1.1 : 1.5;
+			// a blossom tuft rests on top of the tip, so the end of the wood is covered from above but the flank shows
+			for (int dy = 1; dy <= 2; dy++) {
+				double tr = dy == 1 ? 1.5 : 0.6;
 				for (int dv = -2; dv <= 2; dv++) {
 					for (int du = -2; du <= 2; du++) {
 						int u = tu + du;
 						int v = tv + dv;
-						if (u < wu0 || u > wu1 || v < wv0 || v > wv1 || du * du + dv * dv > tr * tr + 0.3) {
+						if (u < wu0 || u > wu1 || v < wv0 || v > wv1 || du * du + dv * dv > tr * tr + 0.3 || ty + dy >= p.h()) {
 							continue;
-						}
-						if (dy == 0 && du == 0 && dv == 0) {
-							continue; // the tip itself
 						}
 						t.leaf(u, ty + dy, v, TreeKit.SAKURA.a());
 					}
@@ -294,6 +294,9 @@ public final class TreeCherryGrand implements Variant {
 				t.wood(u, 0, v, TreeKit.CHERRY.bark()); // bark on all sides: a log end facing the camera shows pale rings
 				if (tip) {
 					t.cover(u, 1, v, Blocks.MOSS_CARPET.defaultBlockState()); // a moss cap on the root's end
+				}
+				if (diag && i < len - 1) {
+					t.woodSoft(u + du, 0, v, TreeKit.CHERRY.bark()); // ties each diagonal step to the next
 				}
 				u += du;
 				v += dv;
