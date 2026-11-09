@@ -273,6 +273,25 @@ public final class FountainOctagonStatue implements Variant {
 	private static void figure(FountainKit k, Pal pal, String[][] pat, int fig, int g, int rp, int rs, int h) {
 		int yb = g + 1;
 		int hc = (g % 2 == 1 ? g : g + 1) / 2;
+		// nothing hangs over a standable dais cell: a base block goes under every part of the figure that overhangs it
+		for (int li = 1; li < 5; li++) {
+			for (int zi = 0; zi < 3; zi++) {
+				for (int xi = 0; xi < 3; xi++) {
+					if (pat[li][zi].charAt(xi) == '.') {
+						continue;
+					}
+					int[] xr = span(xi, g, hc, false);
+					int[] zr = span(zi, g, hc, false);
+					for (int dz = zr[0]; dz <= zr[1]; dz++) {
+						for (int dx = xr[0]; dx <= xr[1]; dx++) {
+							if (oct(dx, dz, rs)) {
+								k.set(dx, yb, dz, pal.statD[0]);
+							}
+						}
+					}
+				}
+			}
+		}
 		for (int li = 0; li < 5; li++) {
 			for (int zi = 0; zi < 3; zi++) {
 				for (int xi = 0; xi < 3; xi++) {
