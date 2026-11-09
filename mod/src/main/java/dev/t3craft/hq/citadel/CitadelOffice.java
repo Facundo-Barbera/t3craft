@@ -1251,51 +1251,75 @@ public final class CitadelOffice {
 		}
 	}
 
+	/** A bed of the podium's middle tier (grass on its top block {@code y = 3}, free above) at the absolute cell. */
+	private static boolean bed(CitadelCanvas c, int x, int z) {
+		if (c.zoneAt(x, z).kind() != RingCampusGeometry.Kind.TERRACE) {
+			return false;
+		}
+		BlockState g = c.at(x, 3, z);
+		return g != null && Flora.soil(g);
+	}
+
 	/**
-	 * The arbor on the upper tier east of the tower, {@code dx = 8..10}, {@code dz = -5..1}: six cherry posts three high, beams
-	 * along its length, rafters across, two benches facing each other with a cartography table between them, two hanging
-	 * lanterns. Built only when the whole footprint is garden.
+	 * The arbor, found on the grass field east of the tower (the podium's middle tier, top block y = 3): a 3 x 7 footprint,
+	 * {@code dx0 .. dx0 + 2}, {@code dz0 .. dz0 + 6}, nearest the tower that is all bed. Six cherry posts three high, beams along its
+	 * length, rafters across, two benches facing each other with a cartography table between them, a second pair, two hanging
+	 * lanterns, stone paving under it. Nothing is built when the field has no such place.
 	 */
 	private static void arbor(CitadelCanvas c) {
-		for (int dx = 8; dx <= 10; dx++) {
-			for (int dz = -5; dz <= 1; dz++) {
-				if (tier(c, dx, dz) != T1) {
+		for (int dx0 = E + 2; dx0 <= 14; dx0++) {
+			for (int dz0 = -4; dz0 >= -14; dz0--) {
+				boolean ok = true;
+				for (int dx = dx0 - 1; dx <= dx0 + 3 && ok; dx++) {
+					for (int dz = dz0 - 1; dz <= dz0 + 7 && ok; dz++) {
+						ok = bed(c, CX() + dx, CZ() + dz);
+					}
+				}
+				if (ok) {
+					arborAt(c, dx0, dz0, 3);
 					return;
 				}
 			}
 		}
-		int b = T1 + 1; // standing level
-		// the paving under it (and the cell between it and the path, dz = 2), clear above
-		for (int dx = 8; dx <= 10; dx++) {
-			for (int dz = -5; dz <= 2; dz++) {
-				set(c, dx, T1, dz, gardenPath(CX() + dx, CZ() + dz));
-				for (int y = b; y <= b + 4; y++) {
-					set(c, dx, y, dz, AIR);
+	}
+
+	private static void arborAt(CitadelCanvas c, int dx0, int dz0, int g) {
+		int b = g + 1; // standing level
+		int mid = dx0 + 1;
+		// the paving under it, clear above (and a margin of path round it, so it reads as a place)
+		for (int dx = dx0 - 1; dx <= dx0 + 3; dx++) {
+			for (int dz = dz0 - 1; dz <= dz0 + 7; dz++) {
+				boolean inside = dx >= dx0 && dx <= dx0 + 2 && dz >= dz0 && dz <= dz0 + 6;
+				if (inside || Math.floorMod(dx + dz, 2) == 0) {
+					set(c, dx, g, dz, gardenPath(CX() + dx, CZ() + dz));
+					for (int y = b; y <= b + 4; y++) {
+						set(c, dx, y, dz, AIR);
+					}
 				}
 			}
 		}
-		for (int dx : new int[] {8, 10}) {
-			for (int dz : new int[] {-5, -2, 1}) {
+		for (int dx : new int[] {dx0, dx0 + 2}) {
+			for (int dz : new int[] {dz0, dz0 + 3, dz0 + 6}) {
 				for (int y = b; y < b + 3; y++) {
 					set(c, dx, y, dz, LOG);
 				}
 			}
-			for (int dz = -5; dz <= 1; dz++) {
+			for (int dz = dz0; dz <= dz0 + 6; dz++) {
 				set(c, dx, b + 3, dz, c.kit.beam(Direction.Axis.Z));
 			}
 		}
-		for (int dz : new int[] {-5, -3, -1, 1}) {
-			for (int dx = 8; dx <= 10; dx++) {
+		for (int dz = dz0; dz <= dz0 + 6; dz += 2) {
+			for (int dx = dx0; dx <= dx0 + 2; dx++) {
 				set(c, dx, b + 4, dz, c.kit.beam(Direction.Axis.X));
 			}
 		}
-		hang(c, 9, b + 3, -3);
-		hang(c, 9, b + 3, -1);
+		hang(c, mid, b + 3, dz0 + 2);
+		hang(c, mid, b + 3, dz0 + 4);
 		// two benches facing each other with the map table between them, and a second pair
-		set(c, 9, b, -3, CitadelCanvas.b(Blocks.CARTOGRAPHY_TABLE));
-		for (int dz : new int[] {-3, 0}) {
-			set(c, 8, b, dz, cherryStairs(Direction.WEST, false));
-			set(c, 10, b, dz, cherryStairs(Direction.EAST, false));
+		set(c, mid, b, dz0 + 1, CitadelCanvas.b(Blocks.CARTOGRAPHY_TABLE));
+		for (int dz : new int[] {dz0 + 1, dz0 + 5}) {
+			set(c, dx0, b, dz, cherryStairs(Direction.WEST, false));
+			set(c, dx0 + 2, b, dz, cherryStairs(Direction.EAST, false));
 		}
 	}
 }
