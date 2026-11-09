@@ -235,6 +235,14 @@ public final class TreeCherryLeaning implements Variant {
 			t.wood(q.u, q.y, q.v, TreeKit.CHERRY.bark()); // the end of a limb inside its cloud: no pale log end showing through a gap
 		}
 		t.wood(tu, ytip, tv, TreeKit.CHERRY.bark());
+		// bury the end of every limb: leaves over and around it, so no bare log pokes out of a cloud
+		int[][] around = {{0, 1, 0}, {1, 0, 0}, {-1, 0, 0}, {0, 0, 1}, {0, 0, -1}, {0, 1, 1}};
+		for (Pad q : pads) {
+			for (int[] o : around) {
+				t.leaf(q.u + o[0], q.y + o[1], q.v + o[2], PINK.a());
+			}
+		}
+		t.leaf(tu, ytip + 1, tv, PINK.a());
 		int salt = 1;
 		for (Pad q : pads) {
 			TreeKit.lobe(t, q.u, q.y, q.v, q.rx, q.rz, Math.max(q.rx, q.rz) >= 2.3 ? 2.0 : 1.0, 1.0, PINK, 0.45, salt++);
