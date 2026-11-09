@@ -99,7 +99,7 @@ public final class LampStreetBrazierTripod implements Variant {
 
 	@Override
 	public void build(CitadelCanvas c, Plot p) {
-		Look look = new Look(pick(p, 1, 3), pick(p, 2, 2) == 1, pick(p, 3, 3), pick(p, 4, 3) == 0);
+		Look look = new Look(pick(p, 1, 3), pick(p, 2, 3) != 0, pick(p, 3, 3), pick(p, 4, 3) == 0);
 		int w = p.w();
 		int d = p.d();
 		int cv1 = (d - 1) / 2;
@@ -135,8 +135,8 @@ public final class LampStreetBrazierTripod implements Variant {
 	/** The thin stem of a leg. */
 	private static BlockState stem(Look k) {
 		return switch (k.legs()) {
-			case 0 -> b(Blocks.IRON_BARS);
-			case 1 -> b(Blocks.COPPER_BARS.waxed().exposed());
+			case 0 -> b(Blocks.POLISHED_BLACKSTONE_WALL); // wrought iron
+			case 1 -> b(Blocks.CUT_COPPER.waxed().exposed()); // a copper post: bars are too thin to read
 			default -> b(Blocks.STONE_BRICK_WALL);
 		};
 	}
@@ -234,42 +234,28 @@ public final class LampStreetBrazierTripod implements Variant {
 			// facing outwards, upside down: the low half is towards the centre, so the base steps in to the knot
 			p.set(c, cu + sides[i][0], dd, cv + sides[i][1], bowlStairs(k, dirs[i], Half.TOP));
 		}
-		for (int su = -1; su <= 1; su += 2) {
-			for (int sv = -1; sv <= 1; sv += 2) {
-				p.set(c, cu + su, dd, cv + sv, bowlSlab(k, SlabType.TOP));
-			}
-		}
+		// the base is a plus (no corners), so the bowl is narrow at the bottom and wide at the rim
 		int y = dd + 1;
+		for (int i = 0; i < 4; i++) {
+			// the rim slopes in: low step towards the fire, tall half outside
+			p.set(c, cu + sides[i][0], y, cv + sides[i][1], bowlStairs(k, dirs[i].getOpposite(), Half.BOTTOM));
+		}
 		switch (k.shape()) {
-			case 0 -> { // plate with a copper lip: closed trapdoors, a bright thin edge
-				BlockState lip = b(Blocks.COPPER_TRAPDOOR.waxed().unaffected());
-				for (int su = -1; su <= 1; su++) {
-					for (int sv = -1; sv <= 1; sv++) {
-						if (su != 0 || sv != 0) {
-							p.set(c, cu + su, y, cv + sv, lip);
-						}
-					}
-				}
-			}
-			case 1 -> { // cup: the rim slopes in (low step towards the fire), corners are low slabs
-				for (int i = 0; i < 4; i++) {
-					p.set(c, cu + sides[i][0], y, cv + sides[i][1], bowlStairs(k, dirs[i].getOpposite(), Half.BOTTOM));
-				}
+			case 0 -> { // cup: low slabs close the corners
 				for (int su = -1; su <= 1; su += 2) {
 					for (int sv = -1; sv <= 1; sv += 2) {
 						p.set(c, cu + su, y, cv + sv, bowlSlab(k, SlabType.BOTTOM));
 					}
 				}
 			}
-			default -> { // cage: a ring of thin bars round the fire
-				BlockState bar = k.legs() == 1 ? b(Blocks.COPPER_BARS.waxed().exposed()) : b(Blocks.IRON_BARS);
-				for (int su = -1; su <= 1; su++) {
-					for (int sv = -1; sv <= 1; sv++) {
-						if (su != 0 || sv != 0) {
-							p.set(c, cu + su, y, cv + sv, bar);
-						}
+			case 1 -> { // firepit: the corners are stone-brick posts that the rim is tied to with a low wall
+				for (int su = -1; su <= 1; su += 2) {
+					for (int sv = -1; sv <= 1; sv += 2) {
+						p.set(c, cu + su, y, cv + sv, b(Blocks.POLISHED_BLACKSTONE_WALL));
 					}
 				}
+			}
+			default -> { // cross: a plus-shaped basin, the corners stay open
 			}
 		}
 		p.set(c, cu, y, cv, fire(k));
@@ -305,11 +291,13 @@ public final class LampStreetBrazierTripod implements Variant {
 				int u = cu + dx;
 				int v = cv + dz;
 				BlockState s;
-				if (dist <= r) {
-					s = slab(p.hash(u, 0, v, 5) == 0 ? Blocks.POLISHED_BLACKSTONE_SLAB : Blocks.POLISHED_BLACKSTONE_BRICK_SLAB);
+				int h = p.hash(u, 0, v, 6);
+				if (dist == 1) {
+					s = slab(Blocks.POLISHED_BLACKSTONE_BRICK_SLAB); // the one dark ring, round the foot
+				} else if (dist == 2) {
+					s = slab(h == 0 ? Blocks.COBBLESTONE_SLAB : h == 1 ? Blocks.POLISHED_ANDESITE_SLAB : Blocks.STONE_BRICK_SLAB);
 				} else {
-					int h = p.hash(u, 0, v, 6);
-					s = slab(h == 0 ? Blocks.MOSSY_STONE_BRICK_SLAB : h == 1 ? Blocks.COBBLESTONE_SLAB : Blocks.STONE_BRICK_SLAB);
+					s = slab(h == 0 ? Blocks.MOSSY_STONE_BRICK_SLAB : h <= 2 ? Blocks.STONE_SLAB : Blocks.POLISHED_ANDESITE_SLAB);
 				}
 				p.set(c, u, 0, v, s);
 			}
