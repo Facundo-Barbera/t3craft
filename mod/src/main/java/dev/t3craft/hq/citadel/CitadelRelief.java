@@ -180,6 +180,21 @@ public final class CitadelRelief {
 						c.set(x + dir.getStepX(), g + 1, z + dir.getStepZ(), hh == 0 ? slab(Blocks.MOSSY_COBBLESTONE_SLAB) : b(Blocks.FERN));
 					}
 				}
+			} else if (s != null && s.getBlock() == Blocks.GRASS_BLOCK && c.at(x, g + 1, z) == null) {
+				// design/citadel-terraces3: the beds of the bank are planted (azaleas one block high, ferns, low flowers)
+				int h = Math.floorMod((x * 7919) ^ (z * 104729), 100);
+				if (h < 5) {
+					c.set(x, g + 1, z, leavesOf(Blocks.FLOWERING_AZALEA_LEAVES));
+				} else if (h < 16) {
+					c.set(x, g + 1, z, b(Blocks.FERN));
+				} else if (h < 30) {
+					c.set(x, g + 1, z, b(switch (h % 4) {
+						case 0 -> Blocks.PINK_TULIP;
+						case 1 -> Blocks.ALLIUM;
+						case 2 -> Blocks.AZURE_BLUET;
+						default -> Blocks.OXEYE_DAISY;
+					}));
+				}
 			}
 		}
 	}
@@ -529,13 +544,31 @@ public final class CitadelRelief {
 				case 0, 1 -> b(Blocks.PINK_TULIP);
 				case 2 -> b(Blocks.ALLIUM);
 				case 3 -> b(Blocks.AZURE_BLUET);
-				case 4, 5 -> b(Blocks.SHORT_GRASS);
+				case 4 -> b(Blocks.SHORT_GRASS);
+				case 5, 6 -> b(Blocks.FERN);
+				// design/citadel-terraces3: a low azalea now and then (one block, spaced) so the wall has green in front
+				case 7 -> nearAvenue(c, x, z) ? null : leavesOf(Blocks.FLOWERING_AZALEA_LEAVES);
 				default -> null;
 			};
 			if (plant != null) {
 				c.set(x, g + 1, z, plant);
 			}
 		}
+	}
+
+	private static boolean nearAvenue(CitadelCanvas c, int x, int z) {
+		for (int dx = -3; dx <= 3; dx++) {
+			for (int dz = -3; dz <= 3; dz++) {
+				if (c.zoneAt(x + dx, z + dz).kind() == Kind.AVENUE) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	private static BlockState leavesOf(Block b) {
+		return CitadelCanvas.leaves(b);
 	}
 
 	/**
@@ -567,11 +600,13 @@ public final class CitadelRelief {
 		if (ground == null || ground.getBlock() != Blocks.GRASS_BLOCK && ground.getBlock() != Blocks.MOSS_BLOCK || !open(c, nx, gl + 1, nz)) {
 			return;
 		}
-		int cap = g - 1;
+		// design/citadel-terraces3: the pilaster rises the whole wall and its quartz stair meets the walking level (it was a dark
+		// stump a block under the coping)
+		int cap = g;
 		for (int y = gl + 1; y < cap; y++) {
-			c.set(nx, y, nz, b(Blocks.POLISHED_BLACKSTONE_BRICKS));
+			c.set(nx, y, nz, b(Blocks.STONE_BRICKS));
 		}
-		c.set(nx, cap, nz, CitadelCanvas.stairs(Blocks.POLISHED_BLACKSTONE_BRICK_STAIRS, toLow.getOpposite()));
+		c.set(nx, cap, nz, CitadelCanvas.stairs(Blocks.SMOOTH_QUARTZ_STAIRS, toLow.getOpposite()));
 	}
 
 	/**
@@ -650,15 +685,21 @@ public final class CitadelRelief {
 		if (kind == Kind.LAWN) {
 			return h < 8 ? b(Blocks.MOSSY_STONE_BRICKS) : h < 12 ? b(Blocks.MOSSY_COBBLESTONE) : b(Blocks.STONE_BRICKS);
 		}
-		// [palette] dark heavy walls under the light parapet, so every terrace reads as a band from above
+		// [palette] design/citadel-terraces3: dark footing, a mixed middle and a lighter course under the parapet (no more
+		// black body under a white stripe); a pilaster line of stone bricks every 7 cells of arc
+		if (height - course == 1) {
+			// the course under the parapet: lighter; a wall of 2 has only this one, so it keeps some deepslate
+			int dark = height <= 2 ? 8 : 4;
+			return h < dark ? b(Blocks.DEEPSLATE_BRICKS) : h < dark + 7 ? b(Blocks.TUFF_BRICKS) : h < dark + 13 ? b(Blocks.STONE_BRICKS) : b(Blocks.MOSSY_STONE_BRICKS);
+		}
 		if (course <= 1) {
-			return b(Blocks.POLISHED_DEEPSLATE);
+			return h < 12 ? b(Blocks.POLISHED_DEEPSLATE) : h < 18 ? b(Blocks.DEEPSLATE_BRICKS) : b(Blocks.CRACKED_DEEPSLATE_BRICKS);
 		}
 		double arc = RingCampusGeometry.theta(x, z) * RingCampusGeometry.r(x, z);
 		if (Math.floorMod(Math.round(arc), 7) == 0) {
-			return b(Blocks.POLISHED_BLACKSTONE_BRICKS);
+			return b(Blocks.STONE_BRICKS);
 		}
-		return h < 4 ? b(Blocks.CRACKED_DEEPSLATE_BRICKS) : h < 7 ? b(Blocks.DEEPSLATE_TILES) : b(Blocks.DEEPSLATE_BRICKS);
+		return h < 4 ? b(Blocks.CRACKED_DEEPSLATE_BRICKS) : h < 7 ? b(Blocks.DEEPSLATE_TILES) : h < 11 ? b(Blocks.TUFF_BRICKS) : b(Blocks.DEEPSLATE_BRICKS);
 	}
 
 	// ------------------------------------------------------------------ materials
