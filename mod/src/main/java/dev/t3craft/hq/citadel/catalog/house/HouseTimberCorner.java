@@ -493,6 +493,8 @@ public final class HouseTimberCorner implements Variant {
 					st = b(Blocks.DARK_OAK_PLANKS);
 				} else if (decorate && t == 5 && y <= PLATE + 2) {
 					st = pane(!planeIsU, DyeColor.PINK);
+				} else if (decorate && t == 5) {
+					st = dark(Direction.Axis.Y); // king post
 				} else {
 					st = plaster(p, planeIsU ? plane : t, y, planeIsU ? t : plane);
 				}
@@ -525,8 +527,18 @@ public final class HouseTimberCorner implements Variant {
 	private static void roofs(CitadelCanvas c, Plot p, Geo g, Scheme s) {
 		Block ridge = Blocks.DARK_OAK_PLANKS;
 		Block cap = Blocks.DARK_OAK_SLAB;
-		gable(c, p, true, 10, g.ue() + 1, 0, 10, PLATE, s.roof(), s.eave(), ridge, cap, s.alt(), false, true);
-		gable(c, p, false, 10, g.vb() + 1, 0, 10, PLATE, s.roof(), s.eave(), ridge, cap, s.alt(), false, true);
+		gable(c, p, true, 10, g.ue() + 1, 0, 10, PLATE, s.roof(), s.eave(), ridge, cap, false, true);
+		gable(c, p, false, 10, g.vb() + 1, 0, 10, PLATE, s.roof(), s.eave(), ridge, cap, false, true);
+		// [palette] two courses of a second tile across each slope, level with the dormer-height of the wing
+		for (int t : new int[] {3, 7}) {
+			int h = PLATE + Math.min(t, 10 - t);
+			for (int sv = 10; sv <= g.ue() + 1; sv++) {
+				p.set(c, sv, h, t, stair(s.alt(), t < 5 ? Direction.SOUTH : Direction.NORTH, false));
+			}
+			for (int sv = 10; sv <= g.vb() + 1; sv++) {
+				p.set(c, t, h, sv, stair(s.alt(), t < 5 ? Direction.EAST : Direction.WEST, false));
+			}
+		}
 		// the valley where the two wings meet
 		p.set(c, 10, PLATE, 10, b(Blocks.DEEPSLATE_TILES));
 	}
