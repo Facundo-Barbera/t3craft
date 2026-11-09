@@ -486,12 +486,20 @@ public final class GateArchBattlement implements Variant {
 			for (int y : new int[] {4, 10}) {
 				set(col[1], y, 0, AIR);
 				set(col[1], y, d - 1, AIR);
-				set(outer, y, mid, y == 10 && !stairTower ? b(Blocks.LANTERN) : AIR); // the guard tower's lookout glows through its slit
+				if (y == 10) {
+					set(outer, y, mid, !stairTower ? b(Blocks.LANTERN) : AIR); // the guard tower's lookout glows through its slit
+				}
 				if (y == 4) {
 					set(col[1], 3, 0, m.trim);
 					set(col[1], 3, d - 1, m.trim);
 					set(col[1], 5, 0, top(stairs(m.trimStairs, Direction.NORTH)));
 					set(col[1], 5, d - 1, top(stairs(m.trimStairs, Direction.SOUTH)));
+					// a tall pink-glass window in the outer face (lights the guard room and the stair), sill and lintel in trim
+					BlockState pane = b(Blocks.STAINED_GLASS_PANE.pick(DyeColor.PINK)).setValue(BlockStateProperties.NORTH, true)
+							.setValue(BlockStateProperties.SOUTH, true);
+					set(outer, 2, mid, m.trim);
+					set(outer, 3, mid, pane);
+					set(outer, 4, mid, pane);
 					set(outer, 5, mid, top(stairs(m.trimStairs, out)));
 				}
 			}
