@@ -98,9 +98,39 @@ final class HubDims {
 		return 5;
 	}
 
-	/** Cells of the stair run: one per block of drop but the last, so the foot of the stair is the archive floor (3 at scale 1). */
+	/**
+	 * How far the archive's floor is sunk below the ground (struct/hub3): 0 at scale 1, 3 from a podium of 6 (scale 2: the
+	 * archive goes from 5 free blocks to 8, 7 under the recessed ceiling panels). The podium {@code y0} is not touched: the
+	 * gallery and the bridges share it, only the hall under the nave gets deeper.
+	 */
+	static int ARCH_DROP() {
+		int y = CitadelCanvas.y0();
+		return y >= 6 ? 3 : y == 5 ? 2 : 0;
+	}
+
+	/** y of the archive's floor block (0 at scale 1, -3 at scale 2); the walking cells are one above. */
+	static int ARCH_FLOOR() {
+		return -ARCH_DROP();
+	}
+
+	/** Stairs of a run: one per block between the nave floor and the archive floor (4 at scale 1, 9 at scale 2). */
+	static int ARCH_STEPS() {
+		return CitadelCanvas.y0() + ARCH_DROP();
+	}
+
+	/** Flat cells of the landing in the middle of a long run (0 below 7 steps, else 2). */
+	static int ARCH_LAND() {
+		return ARCH_STEPS() >= 7 ? 2 : 0;
+	}
+
+	/** Cells of the stair run: the steps and the landing; the last step leaves onto the archive floor. */
 	static int ARCH_RUN() {
-		return Math.max(1, CitadelCanvas.y0() - 1);
+		return ARCH_STEPS() + ARCH_LAND();
+	}
+
+	/** Cells of the clear height of the archive under the ceiling (the floor block and the nave's floor excluded). */
+	static int ARCH_FREE() {
+		return CitadelCanvas.y0() - 1 - ARCH_FLOOR();
 	}
 
 	/** Stairs span |x| from ARCH_X0 (9, the aisle) to ARCH_X1 (11, a lane of the aisle's width: 3 wide). */

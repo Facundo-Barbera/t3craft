@@ -1,6 +1,7 @@
 package dev.t3craft.hq.citadel.hub;
 
 import dev.t3craft.hq.citadel.CitadelCanvas;
+import dev.t3craft.hq.citadel.CitadelHub;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.Blocks;
 import static dev.t3craft.hq.citadel.CitadelCanvas.CALCITE;
@@ -37,14 +38,23 @@ public final class HubScreens {
 				c.fixture(new net.minecraft.core.BlockPos(x, y, z), c.kit.beam(Direction.Axis.Y));
 			}
 		}
+		Direction wall = look.getOpposite();
 		for (int z = a; z <= b; z++) {
 			c.fixture(new net.minecraft.core.BlockPos(x, top, z), c.kit.beam(Direction.Axis.Z));
-			// the cornice: a top slab on the wall plane and one more into the room
+			// the cornice (struct/hub3: three courses deep, so it throws a shadow instead of reading as one flat slab):
+			// a top slab on the wall plane, a block of planks one cell out with a crown slab over it, and a lip of
+			// upside-down stairs two cells out (the crown only where it is under the aisle's ceiling)
 			c.set(x, top + 1, z, HubBlocks.slabTop(Blocks.CHERRY_SLAB));
-			c.set(x - sx, top + 1, z, HubBlocks.slabTop(Blocks.CHERRY_SLAB));
+			c.set(x - sx, top + 1, z, Blocks.CHERRY_PLANKS.defaultBlockState());
+			c.set(x - 2 * sx, top + 1, z, HubBlocks.stairsTop(Blocks.CHERRY_STAIRS, wall));
+			if (top + 2 < CitadelHub.aisleTop()) {
+				c.set(x - sx, top + 2, z, CitadelCanvas.slab(Blocks.CHERRY_SLAB));
+				c.set(x, top + 2, z, CitadelCanvas.slab(Blocks.CHERRY_SLAB));
+			}
 		}
-		c.set(x - sx, top + 1, a, HubBlocks.stairsTop(Blocks.CHERRY_STAIRS, Direction.SOUTH));
-		c.set(x - sx, top + 1, b, HubBlocks.stairsTop(Blocks.CHERRY_STAIRS, Direction.NORTH));
+		// the ends of the lip turn in
+		c.set(x - 2 * sx, top + 1, a, HubBlocks.stairsTop(Blocks.CHERRY_STAIRS, Direction.SOUTH));
+		c.set(x - 2 * sx, top + 1, b, HubBlocks.stairsTop(Blocks.CHERRY_STAIRS, Direction.NORTH));
 		for (int z = zLo; z <= zHi; z++) {
 			// warm wash from the cornice, cool line along the sill (no collision: the standing cells stay free)
 			c.set(x - sx, top, z, c.kit.glowStrip(look, true, false));

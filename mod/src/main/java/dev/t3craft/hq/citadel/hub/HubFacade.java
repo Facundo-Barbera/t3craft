@@ -218,24 +218,43 @@ public final class HubFacade {
 		}
 	}
 
-	/** Main portal (south, 5 x 5, stepped arch) and the north door under the board (3 x 3), both framed in calcite; doors never scale. */
+	/** Half width of the main portal: 2 (5 wide) at scale 1; from scale 2 it grows with the nave, {@code s(2) + 1} (11 wide at 200). */
+	static int portalHalf() {
+		int s = CitadelCanvas.dims().s(1);
+		return s > 1 ? CitadelCanvas.dims().s(2) + 1 : 2;
+	}
+
+	/** Height of the main portal's opening: 5 at scale 1; from scale 2, {@code hy(6)} (10 at 200, under a nave 30 high). */
+	static int portalHeight() {
+		return CitadelCanvas.dims().s(1) > 1 ? CitadelHub.hy(6) : 5;
+	}
+
+	/**
+	 * Main portal (south, a stepped arch: 5 x 5 at scale 1, 11 x 10 at 200, so it is no longer a small door under a nave 30
+	 * high; struct/hub3) and the north door under the board (3 x 3), both framed in calcite. The width and height of the
+	 * opening only change what is cut in the wall: the bridge and the anchors do not depend on them.
+	 */
 	static void portals(CitadelCanvas c, int x, int z) {
-		if (z > 0 && Math.abs(x) <= 3) {
-			portalFrame(c, x, z, 2, 5);
+		int half = portalHalf();
+		if (z > 0 && Math.abs(x) <= half + 1) {
+			portalFrame(c, x, z, half, portalHeight());
 		}
 		if (z < 0 && Math.abs(x) <= 2) {
 			portalFrame(c, x, z, 1, 3);
 		}
 	}
 
-	/** Opens the cell if it is inside the opening ({@code half}, {@code h} tall) and trims the jambs and lintel. */
+	/**
+	 * Opens the cell if it is inside the opening ({@code half}, {@code h} tall) and trims the jambs and lintel. A wide
+	 * opening ({@code half >= 4}) has a stepped head: two cells shorter at the jamb, one at the next cell in.
+	 */
 	private static void portalFrame(CitadelCanvas c, int x, int z, int half, int h) {
 		int ax = Math.abs(x);
 		if (ax <= half) {
-			boolean arch = ax == half && h >= 5;
-			c.fill(x, y0() + 1, y0() + h - (arch ? 1 : 0), z, CitadelCanvas.AIR);
-			if (arch) {
-				c.set(x, y0() + h, z, CALCITE);
+			int cut = h < 5 ? 0 : half >= 4 ? (ax == half ? 2 : ax == half - 1 ? 1 : 0) : (ax == half ? 1 : 0);
+			c.fill(x, y0() + 1, y0() + h - cut, z, CitadelCanvas.AIR);
+			if (cut > 0) {
+				c.fill(x, y0() + h - cut + 1, y0() + h, z, CALCITE);
 			}
 			c.set(x, y0() + h + 1, z, CALCITE);
 		} else {
