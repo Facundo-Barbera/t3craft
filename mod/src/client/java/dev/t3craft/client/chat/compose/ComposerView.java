@@ -820,14 +820,26 @@ public final class ComposerView implements ConversationPanel.Footer {
 
 	/** Ctrl+V: true when the clipboard held images (added), false to paste text instead. */
 	private boolean pasteImages() {
-		List<ImageSources.Picked> imgs = ImageSources.clipboardImages();
+		// fix/paste-crash: a bad clipboard image (or a decoder/texture failure) must never take the game down
+		List<ImageSources.Picked> imgs;
+		try {
+			imgs = ImageSources.clipboardImages();
+		} catch (Throwable t) {
+			dev.t3craft.T3Craft.LOGGER.warn("[t3craft] reading the clipboard failed", t);
+			return false;
+		}
 		if (imgs.isEmpty()) {
 			return false;
 		}
-		for (ImageSources.Picked p : imgs) {
-			if (!addImage(p.bytes(), p.name())) {
-				break;
+		try {
+			for (ImageSources.Picked p : imgs) {
+				if (!addImage(p.bytes(), p.name())) {
+					break;
+				}
 			}
+		} catch (Throwable t) {
+			dev.t3craft.T3Craft.LOGGER.warn("[t3craft] pasting an image failed", t);
+			state.setError("Could not paste that image: " + t.getClass().getSimpleName());
 		}
 		return true;
 	}
