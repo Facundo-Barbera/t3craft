@@ -553,8 +553,9 @@ public final class TowerRoom {
 		}
 		// flight 2
 		int zb0 = zStart + dirZ * (n1 - 1);
-		int holeFirst = -1;
-		int holeLast = -1;
+		boolean hole = false;
+		int holeFirst = 0;
+		int holeLast = 0;
 		for (int i = 0; i < n2; i++) {
 			int z = zb0 - dirZ * i;
 			int y = d0 + n1 + 1 + i;
@@ -568,14 +569,15 @@ public final class TowerRoom {
 				}
 			}
 			if (y >= d1 - 3 && y < d1) {
-				if (holeFirst < 0) {
+				if (!hole) {
 					holeFirst = z;
+					hole = true;
 				}
 				holeLast = z;
 			}
 		}
 		// rail round the cut, on the upper level: along both sides and across the end away from the exit
-		if (holeFirst >= 0) {
+		if (hole) {
 			int lo = Math.min(holeFirst, holeLast);
 			int hi = Math.max(holeFirst, holeLast);
 			for (int z = lo; z <= hi; z++) {
