@@ -72,7 +72,7 @@ public final class TreeCherryWeeping implements Variant {
 		// the crown dome on the leader
 		int lu = lead[0][yTop];
 		int lv = lead[1][yTop];
-		TreeKit.lobe(t, lu, yTop + 1, lv, 2.1 * sc, 1.9 * sc, 2.0, 1.2, TreeKit.SAKURA, 0.3, 0);
+		TreeKit.lobe(t, lu, yTop + 1, lv, 1.7 * sc, 1.6 * sc, 1.6, 1.0, TreeKit.SAKURA, 0.3, 0);
 
 		// limbs: out and up, each to a small lobe
 		int n = sc > 1.1 ? 5 : 4;

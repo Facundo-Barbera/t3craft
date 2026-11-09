@@ -10,13 +10,12 @@ import dev.t3craft.hq.citadel.catalog.Variant;
 import dev.t3craft.hq.citadel.catalog.tree.TreeKit.Vox;
 import dev.t3craft.hq.citadel.catalog.tree.TreeKit.Wood;
 import java.util.Random;
-import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
  * A tall pine: a 2×2 spruce trunk with diagonal roots that thins to one leader, dressed from low down to the
- * tip in a cone of overlapping whorls. Every second layer is a whorl of five to seven needle arms of uneven
+ * tip in a cone of sawtooth tiers. The bottom layer of every tier is a whorl of five to seven needle arms of uneven
  * length (each whorl turned by the golden angle, so the arms never stack into a pagoda), whose tips droop a
  * block; the layer between is a fuller, narrower collar that hides the trunk, so the cone is continuous,
  * ragged at the edge and layered without bare trunk between floors. Spruce needles with clumps of dark-oak
@@ -88,10 +87,14 @@ public final class TreePineTiered implements Variant {
 			double cu = y <= y2 ? bu + 0.5 : lead[0][Math.min(y, top - 2)];
 			double cv = y <= y2 ? bv + 0.5 : lead[1][Math.min(y, top - 2)];
 			double margin = Math.min(Math.min(cu, p.w() - 1 - cu), Math.min(cv, p.d() - 1 - cv)) + 0.45;
-			double f = (top - y + 0.6) / (double) (top - yBase + 1); // 1 at the foot, 0 at the tip
-			double rCone = Math.max(0.6, margin * f); // straight-sided cone
-			boolean whorl = ((top - y) & 1) == 0 && y < top - 1;
-			double ph = phase + (y / 2) * GOLDEN;
+			// sawtooth tiers of three layers: a wide whorl, a mid layer, a narrow shoulder; the next whorl
+			// starts wider than the shoulder below it, so the cone steps without bare trunk between floors
+			int nT = Math.max(1, (top - 1 - yBase) / 3 + 1);
+			int k = (y - yBase) / 3;
+			int ph3 = (y - yBase) % 3;
+			double rt = Math.max(1.0, margin * (1.0 - k / (nT + 0.4)));
+			boolean whorl = ph3 == 0 && y < top - 1;
+			double ph = phase + k * GOLDEN;
 			int span = (int) Math.ceil(margin) + 1;
 			for (int v = (int) Math.floor(cv) - span; v <= (int) Math.ceil(cv) + span; v++) {
 				for (int u = (int) Math.floor(cu) - span; u <= (int) Math.ceil(cu) + span; u++) {
@@ -105,9 +108,14 @@ public final class TreePineTiered implements Variant {
 						int arm = (int) Math.floor(((th - ph) / (Math.PI * 2) + 10) * arms) % arms;
 						double armLen = 0.8 + 0.25 * t.hash(arm, y, 3, 3);
 						double wave = Math.pow(Math.max(0, Math.cos(arms * (th - ph) / 2)), 2);
-						lim = rCone * (0.7 + 0.4 * wave) * armLen + 0.3;
+						lim = rt * (0.72 + 0.4 * wave) * armLen + 0.25;
+					} else if (ph3 == 1) {
+						lim = rt * 0.72 + 0.2;
 					} else {
-						lim = Math.max(1.0, rCone * 0.55); // the collar: a clear step in under each whorl
+						lim = Math.max(0.9, rt * 0.42);
+					}
+					if (y >= top - 1) {
+						lim = y == top ? 0.2 : 1.0; // the spire
 					}
 					lim -= t.hash(u, y, v, 4) * 0.12;
 					if (dist > lim) {
@@ -124,13 +132,6 @@ public final class TreePineTiered implements Variant {
 						}
 					}
 				}
-			}
-			// stubs of branch inside the low whorls, seen between the arms from below
-			if (whorl && y <= yBase + 4) {
-				Direction dir = Direction.from2DDataValue(t.hash(y, 1, 1, 4));
-				int su = (int) Math.round(cu) + dir.getStepX();
-				int sv = (int) Math.round(cv) + dir.getStepZ();
-				t.woodSoft(su, y, sv, WOOD.log(dir.getAxis()));
 			}
 		}
 		// spire: the needles close over the leader and a last tuft

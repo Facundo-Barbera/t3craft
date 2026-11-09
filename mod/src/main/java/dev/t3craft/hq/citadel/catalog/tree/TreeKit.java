@@ -285,8 +285,9 @@ final class TreeKit {
 				}
 			}
 			if (du != 0 || dv != 0) {
-				// the step: a sideways log on the layer below joins the old and the new column
-				t.wood(cu + du, y - 1, cv + dv, wd.log(du != 0 ? Direction.Axis.X : Direction.Axis.Z));
+				// the step: bark on the layer below joins the old and the new column (no pale log end)
+				t.wood(cu, y - 1, cv, wd.bark());
+				t.wood(cu + du, y - 1, cv + dv, wd.bark());
 			}
 			cu += du;
 			cv += dv;
@@ -341,7 +342,7 @@ final class TreeKit {
 			}
 			for (int i = 0; i < len; i++) {
 				boolean tip = i == len - 1 && len > 1;
-				BlockState s = tip ? wd.rootTip() : i == 0 ? wd.bark() : diag ? wd.bark() : wd.log(ax);
+				BlockState s = tip || i >= 2 ? wd.rootTip() : i == 0 ? wd.bark() : diag ? wd.rootTip() : wd.log(ax);
 				t.wood(u, 0, v, s);
 				if (i == 0 && len >= 2 && t.hash(u, 1, v, 3) == 0) {
 					t.woodSoft(u, 1, v, wd.bark()); // the flare up the trunk
@@ -475,6 +476,11 @@ final class TreeKit {
 					if (Math.abs(du) > 0.62 && Math.abs(dv) > 0.62 && Math.abs(dy) > 0.55) {
 						continue;
 					}
+					// ragged crown and underside: the outer cells of the top and bottom layers come and go
+					double hr = du * du + dv * dv;
+					if ((dy > 0.35 || dy < -0.45) && hr > 0.28 && t.hash(u + salt, y * 3, v, 5) < 2) {
+						continue;
+					}
 					t.leaf(u, y, v, tone(t, lv, u, y, v, dy, q, salt));
 				}
 			}
@@ -483,15 +489,14 @@ final class TreeKit {
 
 	/** The leaf for a cell of a lobe: clumps of the second tone (more below), the accent on the upper shell. */
 	static BlockState tone(Vox t, Leaves lv, int u, int y, int v, double dy, double q, int salt) {
-		boolean clump = t.hash(Math.floorDiv(u + salt, 2), Math.floorDiv(y, 2), Math.floorDiv(v - salt, 2), lv.clumpOneIn()) == 0;
 		if (lv.accent() != null && lv.accentOneIn() > 0 && dy > 0.1 && q > 0.35
 				&& t.hash(u, y + 31, v + salt, lv.accentOneIn()) == 0) {
 			return lv.accent();
 		}
-		if (clump || (dy < -0.3 && t.hash(u + 5, y, v, 3) == 0)) {
-			return lv.b();
-		}
-		return lv.a();
+		// shading, not cubes: the second tone takes most of the underside, some of the flanks, little of the top
+		int pct = dy < -0.2 ? 70 : dy < 0.35 ? 100 / Math.max(2, lv.clumpOneIn()) + 5 : 8;
+		boolean pair = t.hash(u + salt, y, Math.floorDiv(v, 2), 100) < pct; // pairs, not 2×2×2 blocks
+		return pair ? lv.b() : lv.a();
 	}
 
 	/**
