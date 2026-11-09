@@ -148,6 +148,7 @@ public final class CitadelRelief {
 		edges(c, half, keep);
 		walls(c, half, filled);
 		bancales(c, half);
+		bankGreen(c, half);
 	}
 
 	/** The lawn's grass steps get a mossy stone-brick kerb on their edge: terraced garden beds, not contour lines. */
@@ -195,6 +196,135 @@ public final class CitadelRelief {
 						case 2 -> Blocks.AZURE_BLUET;
 						default -> Blocks.OXEYE_DAISY;
 					}));
+				}
+			}
+		}
+	}
+
+	/**
+	 * design/citadel-terraces4: the outer bank reads from afar: a hedge (azalea leaves, one or two high, with small gaps) along the
+	 * back of each tread, just inside its kerb, and small cherry and azalea trees (a trunk of 3 and a crown of 3 layers) in loose
+	 * groves on the treads, never next to a kerb or an avenue.
+	 */
+	private static void bankGreen(CitadelCanvas c, Map<Long, Integer> half) {
+		for (Map.Entry<Long, Integer> e : half.entrySet()) {
+			int x = colX(e.getKey());
+			int z = colZ(e.getKey());
+			if (c.zoneAt(x, z).kind() != Kind.LAWN) {
+				continue;
+			}
+			if (e.getValue() < 2) {
+				footBorder(c, half, x, z, e.getValue());
+				continue;
+			}
+			int g = e.getValue() / 2;
+			BlockState s = c.at(x, g, z);
+			if (s == null || s.getBlock() != Blocks.GRASS_BLOCK || nearAvenue(c, x, z)) {
+				continue;
+			}
+			boolean behindKerb = false;
+			boolean nearKerb = false;
+			for (int dx = -1; dx <= 1; dx++) {
+				for (int dz = -1; dz <= 1; dz++) {
+					if (dx == 0 && dz == 0) {
+						continue;
+					}
+					BlockState n = c.at(x + dx, g, z + dz);
+					Integer hn = half.get(col(x + dx, z + dz));
+					if (n != null && (n.getBlock() == Blocks.STONE_BRICKS || n.getBlock() == Blocks.MOSSY_STONE_BRICKS) && hn != null && hn / 2 == g) {
+						nearKerb = true;
+						if (dx == 0 || dz == 0) {
+							behindKerb = true;
+						}
+					}
+				}
+			}
+			int h = Math.floorMod((x * 7727) ^ (z * 92821), 100);
+			if (behindKerb) {
+				if (h % 11 != 0 && free(c, x, g + 2, z) && (c.at(x, g + 1, z) == null || !solid(c.at(x, g + 1, z)) || c.at(x, g + 1, z).getBlock() instanceof LeavesBlock)) {
+					c.set(x, g + 1, z, leavesOf(h % 5 < 2 ? Blocks.AZALEA_LEAVES : Blocks.FLOWERING_AZALEA_LEAVES));
+					if (Math.floorMod(Math.floorDiv(x, 5) * 31 + Math.floorDiv(z, 5) * 17, 4) == 0 && h % 3 != 0) {
+						c.set(x, g + 2, z, leavesOf(Blocks.FLOWERING_AZALEA_LEAVES));
+					}
+				}
+				continue;
+			}
+			smallTree(c, half, x, g, z);
+		}
+	}
+
+	/** The flat grass against the foot of the bank: a border of low shrubs, ferns and flowers, so the wall does not meet the lawn with a sharp cut. */
+	private static void footBorder(CitadelCanvas c, Map<Long, Integer> half, int x, int z, int h) {
+		if (h >= 2 || c.at(x, 0, z) == null || c.at(x, 0, z).getBlock() != Blocks.GRASS_BLOCK || !free(c, x, 1, z) || nearAvenue(c, x, z)) {
+			return;
+		}
+		boolean foot = false;
+		for (Direction dir : DIRS) {
+			Integer hn = half.get(col(x + dir.getStepX(), z + dir.getStepZ()));
+			if (hn != null && hn >= 2) {
+				foot = true;
+			}
+		}
+		if (!foot) {
+			return;
+		}
+		int k = Math.floorMod((x * 7727) ^ (z * 92821), 100);
+		if (k < 28) {
+			c.set(x, 1, z, leavesOf(k % 3 == 0 ? Blocks.AZALEA_LEAVES : Blocks.FLOWERING_AZALEA_LEAVES));
+		} else if (k < 52) {
+			c.set(x, 1, z, b(Blocks.FERN));
+		} else if (k < 75) {
+			c.set(x, 1, z, b(switch (k % 4) {
+				case 0 -> Blocks.PINK_TULIP;
+				case 1 -> Blocks.ALLIUM;
+				case 2 -> Blocks.AZURE_BLUET;
+				default -> Blocks.OXEYE_DAISY;
+			}));
+		}
+	}
+
+	/** A small tree on the tread cell (x, g, z) when it is the centre chosen for its 9 x 9 cell and the 5 x 5 round it is free. */
+	private static void smallTree(CitadelCanvas c, Map<Long, Integer> half, int x, int g, int z) {
+		int i = Math.floorDiv(x, 7);
+		int j = Math.floorDiv(z, 7);
+		int cx = 7 * i + 1 + Math.floorMod((i * 73856093) ^ (j * 19349663), 5);
+		int cz = 7 * j + 1 + Math.floorMod((i * 83492791) ^ (j * 2654435), 5);
+		if (x != cx || z != cz || Math.floorMod((i * 31 + j * 17) ^ (i * j), 10) >= 7) {
+			return;
+		}
+		// the trunk's column is free and the 3 x 3 round it is not higher than the tread; the crown only takes the free cells
+		for (int dx = -1; dx <= 1; dx++) {
+			for (int dz = -1; dz <= 1; dz++) {
+				Integer hn = half.get(col(x + dx, z + dz));
+				if (hn == null || hn / 2 > g + 1 || c.zoneAt(x + dx, z + dz).kind() != Kind.LAWN) {
+					return;
+				}
+			}
+		}
+		for (int y = g + 1; y <= g + 6; y++) {
+			if (!free(c, x, y, z)) {
+				BlockState at = c.at(x, y, z);
+				if (y != g + 1 || solid(at)) {
+					return;
+				}
+			}
+		}
+		boolean pink = Math.floorMod(i * 5 + j * 3, 5) < 3;
+		BlockState crown = leavesOf(pink ? Blocks.CHERRY_LEAVES : Blocks.FLOWERING_AZALEA_LEAVES);
+		for (int y = g + 1; y <= g + 3; y++) {
+			c.set(x, y, z, b(Blocks.CHERRY_LOG));
+		}
+		for (int dy = 4; dy <= 6; dy++) {
+			int rad = dy == 6 ? 1 : 2;
+			for (int dx = -rad; dx <= rad; dx++) {
+				for (int dz = -rad; dz <= rad; dz++) {
+					boolean corner = Math.abs(dx) == rad && Math.abs(dz) == rad;
+					if (corner) {
+						continue;
+					}
+					if (free(c, x + dx, g + dy, z + dz)) {
+						c.set(x + dx, g + dy, z + dz, crown);
+					}
 				}
 			}
 		}
@@ -678,7 +808,31 @@ public final class CitadelRelief {
 				foot.add(col(nx, nz));
 			}
 		}
-		for (Map.Entry<Long, Direction> re : rail.entrySet()) {
+		// design/citadel-terraces4: the parapet is continuous. Along the diagonal of a circle the edge cells only touch at their corners
+		// (they read as stumps with gaps), so a cell of the same level that touches the drop by a corner, with both its sides at its own
+		// level, joins the line; posts every 5 cells of arc (a stone post, a quartz cap and a lantern or a planter) hold it together
+		Map<Long, Direction> line = new HashMap<>(rail);
+		for (Map.Entry<Long, Integer> e : half.entrySet()) {
+			if (rail.containsKey(e.getKey())) {
+				continue;
+			}
+			int x = colX(e.getKey());
+			int z = colZ(e.getKey());
+			int h = e.getValue();
+			corner:
+			for (int dx = -1; dx <= 1; dx += 2) {
+				for (int dz = -1; dz <= 1; dz += 2) {
+					Integer hd = half.get(col(x + dx, z + dz));
+					Integer hx = half.get(col(x + dx, z));
+					Integer hz = half.get(col(x, z + dz));
+					if (hd != null && h - hd >= 4 && hx != null && h - hx < 4 && hx <= h && hz != null && h - hz < 4 && hz <= h) {
+						line.put(e.getKey(), null);
+						break corner;
+					}
+				}
+			}
+		}
+		for (Map.Entry<Long, Direction> re : line.entrySet()) {
 			long cc = re.getKey();
 			int x = colX(cc);
 			int z = colZ(cc);
@@ -691,19 +845,22 @@ public final class CitadelRelief {
 			if (nearKeep(keep, x, y, z)) {
 				continue;
 			}
-			lookout(c, x, y, z, re.getValue(), keep);
-			double arc = RingCampusGeometry.theta(x, z) * RingCampusGeometry.r(x, z);
-			// [palette] a light parapet over the dark kerb, the line that draws each terrace from above: calcite with a
-			// little polished diorite, and a pier of chiseled quartz with a quartz cap every 7 cells
-			c.set(x, y, z, b(Blocks.CALCITE));
-			long beat = Math.floorMod(Math.round(arc), 14);
-			if (beat == 0) {
-				c.set(x, y + 1, z, b(Blocks.POTTED_FLOWERING_AZALEA)); // a planter on the pier
-			} else if (beat == 7) {
-				c.set(x, y + 1, z, slab(Blocks.SMOOTH_QUARTZ_SLAB));
+			Direction toLow = re.getValue();
+			if (toLow != null) {
+				lookout(c, x, y, z, toLow, keep);
 			}
-			if (beat == 0 || beat == 7) {
-				buttress(c, half, x, z, re.getValue(), g); // design/citadel-terraces2: a pilaster under each pier of the parapet
+			double arc = RingCampusGeometry.theta(x, z) * RingCampusGeometry.r(x, z);
+			// [palette] a light parapet over the dark kerb, the line that draws each terrace from above
+			c.set(x, y, z, CitadelPodium.copingBlock(x, z)); // design/citadel-terraces4: runs of calcite, stone, andesite, tuff, mossy
+			long u = Math.round(arc);
+			if (toLow != null && Math.floorMod(u, 5) == 0 && free(c, x, y + 1, z) && free(c, x, y + 2, z)) {
+				boolean lantern = Math.floorMod(Math.floorDiv(u, 5), 2) == 0;
+				c.set(x, y, z, b(Blocks.CHISELED_STONE_BRICKS));
+				c.set(x, y + 1, z, b(Blocks.POLISHED_ANDESITE)); // a mid grey shaft, not a white cube
+				c.set(x, y + 2, z, lantern ? b(Blocks.LANTERN) : b(Blocks.POTTED_FLOWERING_AZALEA));
+				if (lantern) {
+					buttress(c, half, x, z, toLow, g); // design/citadel-terraces2: a pilaster under each lit post
+				}
 			}
 		}
 		for (long cc : foot) {
@@ -786,7 +943,7 @@ public final class CitadelRelief {
 		for (int y = gl + 1; y < cap; y++) {
 			c.set(nx, y, nz, b(Blocks.STONE_BRICKS));
 		}
-		c.set(nx, cap, nz, CitadelCanvas.stairs(Blocks.SMOOTH_QUARTZ_STAIRS, toLow.getOpposite()));
+		c.set(nx, cap, nz, CitadelCanvas.stairs(Blocks.STONE_BRICK_STAIRS, toLow.getOpposite()));
 	}
 
 	/**
@@ -873,13 +1030,13 @@ public final class CitadelRelief {
 			return h < dark ? b(Blocks.DEEPSLATE_BRICKS) : h < dark + 7 ? b(Blocks.TUFF_BRICKS) : h < dark + 13 ? b(Blocks.STONE_BRICKS) : b(Blocks.MOSSY_STONE_BRICKS);
 		}
 		if (course <= 1) {
-			return h < 12 ? b(Blocks.POLISHED_DEEPSLATE) : h < 18 ? b(Blocks.DEEPSLATE_BRICKS) : b(Blocks.CRACKED_DEEPSLATE_BRICKS);
+			return h < 5 ? b(Blocks.POLISHED_DEEPSLATE) : h < 16 ? b(Blocks.DEEPSLATE_BRICKS) : b(Blocks.CRACKED_DEEPSLATE_BRICKS);
 		}
 		double arc = RingCampusGeometry.theta(x, z) * RingCampusGeometry.r(x, z);
 		if (Math.floorMod(Math.round(arc), 7) == 0) {
 			return b(Blocks.STONE_BRICKS);
 		}
-		return h < 4 ? b(Blocks.CRACKED_DEEPSLATE_BRICKS) : h < 7 ? b(Blocks.DEEPSLATE_TILES) : h < 11 ? b(Blocks.TUFF_BRICKS) : b(Blocks.DEEPSLATE_BRICKS);
+		return h < 4 ? b(Blocks.CRACKED_DEEPSLATE_BRICKS) : h < 6 ? b(Blocks.DEEPSLATE_TILES) : h < 15 ? b(Blocks.TUFF_BRICKS) : b(Blocks.DEEPSLATE_BRICKS);
 	}
 
 	// ------------------------------------------------------------------ materials
