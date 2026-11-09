@@ -297,7 +297,7 @@ public final class WellRoofedStone implements Variant {
 		if (u < 0 || v < 0 || u >= p.w() || v >= p.d()) {
 			return;
 		}
-		p.set(c, u, 0, v, b(p.hash(u, 0, v, 2) == 0 ? Blocks.POTTED_FERN : Blocks.POTTED_AZALEA_BUSH));
+		p.set(c, u, 0, v, b(p.hash(u, 0, v, 2) == 0 ? Blocks.POTTED_FERN : Blocks.POTTED_AZALEA));
 	}
 
 	/**
