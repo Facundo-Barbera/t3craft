@@ -1,14 +1,12 @@
-# feat/devx: CI, hot-swap safety net, GameTests, dev docs
+# feat/devx: hot-swap safety net, GameTests, dev docs
 
 Branch `feat/devx`, based on `main` at `fc38fd2`. Scope: build/tooling and `dev.t3craft.debug`
 (plus its client glue `dev.t3craft.client.debug`). No other module's code changed.
 
 ## What was done
 
-1. **CI** (`.github/workflows/mod.yml`): on push/PR touching `mod/**` (and manual dispatch):
-   Temurin 25 + Gradle cache, `./gradlew build` (compile, JUnit, compile GameTests, jar), uploads
-   `mod/build/libs/*.jar` as `t3craft-mod-<sha>`, test reports on failure. Second job runs the client
-   GameTests under xvfb, `continue-on-error`, uploading logs/screenshots/crash reports.
+1. *(Removed on 2026-11-09: the hosted build workflow is gone and GitHub Actions is off for the repo.
+   Builds run only on the PC, see `docs/dev.md`.)*
 2. **Hot-swap safety net** (`mod/src/main/java/dev/t3craft/debug`, pure Java, JUnit-tested):
    - `Resettable` + `ResetReason` (`REDEFINITION`, `RECOVERY`, `MANUAL`): the generic reset hook.
    - `DevReload`: registry keyed by id (re-registering replaces), `resetAll` isolates each failing
