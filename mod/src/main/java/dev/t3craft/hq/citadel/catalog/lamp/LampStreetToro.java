@@ -18,18 +18,16 @@ import net.minecraft.world.level.block.state.properties.Half;
 import net.minecraft.world.level.block.state.properties.SlabType;
 
 /**
- * Japanese stone lantern (tōrō): a stepped mossy base, a slim post, a wide plate, a one-block light box
- * that glows, a dark hat roof whose corners curl up, and a small finial. The silhouette is the point:
- * wide → thin → wide → glowing neck → wide hat → point. Because the light box is a single block, the hat
- * and the plate really overhang it.
+ * Japanese stone lantern (tōrō): a dark stepped base, a slim pale post, a white quartz plate, a one-block
+ * light box that glows with open air round it, and a cherry-pink hat whose corners curl up, with a candle
+ * finial. Contrast is the point: dark foot → grey post → white plate → glowing neck → pink hat.
  *
  * <ul>
- * <li><b>Gradient</b>: mossy cobblestone and cracked stone at the foot, stone bricks in the post, light
- *     polished andesite and smooth stone in the plate, a warm froglight in the neck and a dark deepslate
- *     tile hat on top (stone that has weathered).</li>
- * <li><b>Depth</b>: the base steps in, the plate and the hat overhang, the hat corners are upside-down
- *     slabs so the eaves curl up.</li>
- * <li><b>Transition to the ground</b>: moss carpet and azalea pots in the base corners.</li>
+ * <li><b>Gradient</b>: deepslate at the foot, stone brick post, quartz and calcite plate, warm froglight,
+ *     cherry hat (the only warm colour besides the light).</li>
+ * <li><b>Depth</b>: the base steps in, the plate and the hat overhang the single-block light box, the hat
+ *     corners are upside-down slabs so the eaves curl up.</li>
+ * <li><b>Transition to the ground</b>: moss carpet and pots in the base corners.</li>
  * </ul>
  * Size: 3 × 3 × 4–6. Height 6 gets the full tōrō; lower plots drop the post, then the finial.
  */
@@ -80,10 +78,10 @@ public final class LampStreetToro implements Variant {
 		Direction[] toCentre = {Direction.SOUTH, Direction.NORTH, Direction.EAST, Direction.WEST};
 		int[][] corners = {{0, 0}, {2, 0}, {0, 2}, {2, 2}};
 
-		// --- base: a stepped square, darker and mossier than the rest
-		p.set(c, cu, y, cv, b(p.hash(cu, 0, cv, 2) == 0 ? Blocks.MOSSY_COBBLESTONE : Blocks.CHISELED_STONE_BRICKS));
+		// --- base: the only dark part, a stepped square of deepslate bricks with mossy corners
+		p.set(c, cu, y, cv, b(p.hash(cu, 0, cv, 2) == 0 ? Blocks.CHISELED_DEEPSLATE : Blocks.POLISHED_DEEPSLATE));
 		for (int[] s : sides) {
-			p.set(c, s[0], y, s[1], stairs(p.hash(s[0], 0, s[1], 3) == 0 ? Blocks.MOSSY_COBBLESTONE_STAIRS : Blocks.COBBLESTONE_STAIRS, toCentre[s[2]]));
+			p.set(c, s[0], y, s[1], stairs(p.hash(s[0], 0, s[1], 3) == 0 ? Blocks.COBBLED_DEEPSLATE_STAIRS : Blocks.DEEPSLATE_BRICK_STAIRS, toCentre[s[2]]));
 		}
 		int pot = p.hash(0, 0, 0, 4);
 		for (int i = 0; i < 4; i++) {
@@ -94,42 +92,38 @@ public final class LampStreetToro implements Variant {
 		}
 		y++;
 
-		// --- post: a thin stone column
+		// --- post: a slim pale column (stone brick wall) so the lantern floats clear of the base
 		if (post) {
 			p.set(c, cu, y++, cv, b(Blocks.STONE_BRICK_WALL));
 		}
 
-		// --- plate (nakadai): light stone, a plus of upside-down stairs round a polished heart
-		p.set(c, cu, y, cv, b(Blocks.POLISHED_ANDESITE));
+		// --- plate (nakadai): white quartz, upside-down stairs flare out round a calcite heart
+		p.set(c, cu, y, cv, b(Blocks.CALCITE));
 		for (int[] s : sides) {
-			p.set(c, s[0], y, s[1], stairs(Blocks.POLISHED_ANDESITE_STAIRS, toCentre[s[2]]).setValue(StairBlock.HALF, Half.TOP));
+			p.set(c, s[0], y, s[1], stairs(Blocks.SMOOTH_QUARTZ_STAIRS, toCentre[s[2]]).setValue(StairBlock.HALF, Half.TOP));
 		}
 		y++;
 
-		// --- light box (hibukuro): a single glowing block, nothing around it
+		// --- light box (hibukuro): one glowing block, open air on its four sides
 		p.set(c, cu, y, cv, b(Blocks.OCHRE_FROGLIGHT));
 		y++;
 
-		// --- hat (kasa): dark tile stairs climbing to the middle, corners curl up (upside-down slabs)
+		// --- hat (kasa): cherry-pink, the one warm colour. Stairs rise to the middle, corners curl up
 		for (int[] s : sides) {
-			p.set(c, s[0], y, s[1], stairs(Blocks.DEEPSLATE_TILE_STAIRS, toCentre[s[2]]));
+			p.set(c, s[0], y, s[1], stairs(Blocks.CHERRY_STAIRS, toCentre[s[2]]));
 		}
-		BlockState tip = slab(Blocks.DEEPSLATE_TILE_SLAB).setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP);
+		BlockState tip = slab(Blocks.CHERRY_SLAB).setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP);
 		for (int[] k : corners) {
 			p.set(c, k[0], y, k[1], tip);
-			if (finial && p.hash(k[0], 1, k[1], 2) == 0) {
-				// the eaves curl up on the corners the seed picks: a second slab, so the hat is not a block with four identical horns
-				p.set(c, k[0], y + 1, k[1], slab(Blocks.DEEPSLATE_TILE_SLAB));
-			}
 		}
-		p.set(c, cu, y, cv, b(Blocks.POLISHED_DEEPSLATE));
+		p.set(c, cu, y, cv, b(Blocks.CHERRY_PLANKS));
 		y++;
 
-		// --- finial (hōju): a pale jewel, a candle on the crown
+		// --- finial (hōju): a pale jewel, a candle on the crown; the hat peak
 		if (finial) {
 			p.set(c, cu, y, cv, b(Blocks.DYED_CANDLE.pick(DyeColor.WHITE)).setValue(BlockStateProperties.LIT, true));
 		} else if (y < p.h()) {
-			p.set(c, cu, y, cv, slab(Blocks.SMOOTH_STONE_SLAB));
+			p.set(c, cu, y, cv, slab(Blocks.SMOOTH_QUARTZ_SLAB));
 		}
 	}
 }

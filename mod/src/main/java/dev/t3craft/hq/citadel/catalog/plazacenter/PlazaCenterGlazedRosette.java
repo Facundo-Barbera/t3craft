@@ -199,13 +199,14 @@ public final class PlazaCenterGlazedRosette implements Variant {
 	// ------------------------------------------------------------------ obelisk
 
 	private void obelisk(CitadelCanvas c, Plot p, int cu, int cv, int top) {
-		// y1-2: 3×3 dark pedestal of deepslate brick, chiselled on the faces
+		// y1-2: 3×3 pedestal, pale at the top: calcite and chiselled quartz over a dark deepslate course at the foot
 		for (int y = 1; y <= 2; y++) {
 			for (int dz = -1; dz <= 1; dz++) {
 				for (int dx = -1; dx <= 1; dx++) {
 					int h = p.hash(cu + dx, y, cv + dz, 5);
 					boolean face = (dx == 0) != (dz == 0);
-					p.set(c, cu + dx, y, cv + dz, face && y == 2 ? b(Blocks.CHISELED_DEEPSLATE) : h == 0 ? b(Blocks.CRACKED_DEEPSLATE_BRICKS) : h == 1 ? b(Blocks.POLISHED_DEEPSLATE) : b(Blocks.DEEPSLATE_BRICKS));
+					p.set(c, cu + dx, y, cv + dz, y == 1 ? (h == 0 ? b(Blocks.CRACKED_DEEPSLATE_BRICKS) : h == 1 ? b(Blocks.POLISHED_ANDESITE) : b(Blocks.DEEPSLATE_BRICKS))
+							: face ? b(Blocks.CHISELED_QUARTZ_BLOCK) : h == 0 ? b(Blocks.POLISHED_ANDESITE) : b(Blocks.CALCITE));
 				}
 			}
 		}

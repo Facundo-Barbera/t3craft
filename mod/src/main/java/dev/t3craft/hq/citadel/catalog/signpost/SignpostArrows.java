@@ -11,10 +11,10 @@ import dev.t3craft.hq.citadel.catalog.Variant;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.core.Direction;
-import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.SlabType;
 
 /**
  * Concept: a crossroads fingerpost: a stripped cherry post on a deepslate footing with two or three
@@ -76,16 +76,20 @@ public final class SignpostArrows implements Variant {
 		int d = p.d();
 		int pu = w == 3 ? 1 : p.hash(0, 0, 0, 2); // width 2: the post on the left or right column by seed
 		int pv = d - 1;
-		int cap = p.h() >= 5 ? 4 : -1; // a lantern on top only when there is room above three arms
-		int postTop = Math.min(p.h() - 1, 3);
+		int cap = p.h() >= 5 ? Math.min(p.h() - 1, 6) : -1; // a lantern on top only when there is room above three arms
+		int postTop = Math.min(p.h() - 1, 5);
+		int step = postTop >= 5 ? 2 : 1; // tall plots space the boards out, so each one reads on its own
 
 		// --- footing and post
 		p.set(c, pu, 0, pv, p.hash(pu, 0, pv, 3) == 0 ? b(Blocks.CHISELED_DEEPSLATE) : b(Blocks.POLISHED_DEEPSLATE));
 		for (int y = 1; y <= postTop; y++) {
-			p.set(c, pu, y, pv, POST);
+			// a log at the foot, a slim fence above: the boards hang off a thin post, not a pink column
+			p.set(c, pu, y, pv, y == 1 ? POST : b(Blocks.CHERRY_FENCE));
 		}
-		if (cap > 0) {
+		if (cap > postTop) {
 			p.set(c, pu, cap, pv, b(Blocks.LANTERN));
+		} else if (postTop + 1 < p.h()) {
+			p.set(c, pu, postTop + 1, pv, stairs(Blocks.CHERRY_STAIRS, Direction.NORTH)); // a pitched cap over the arms
 		}
 
 		// --- the directions the arms can take, in a fixed order with a seed-chosen start
@@ -96,16 +100,23 @@ public final class SignpostArrows implements Variant {
 			}
 		}
 		int start = p.hash(1, 0, 0, dirs.size());
-		int arms = Math.min(3, postTop); // y1..postTop, top first
+		int arms = Math.min(3, (postTop - 1) / step + 1); // top first
 		for (int i = 0; i < arms; i++) {
 			Direction dir = dirs.get((start + i) % dirs.size());
-			int y = postTop - i;
-			if (i == arms - 1 && arms == 3 && y == 1 && dirs.size() == 1) {
+			int y = postTop - i * step;
+			if (i == arms - 1 && arms == 3 && step == 1 && dirs.size() == 1) {
 				break; // three arms stacked on one side crowd the post: keep two
 			}
-			Block sign = (i % 2 == 0) ? Blocks.CHERRY_WALL_HANGING_SIGN : Blocks.BAMBOO_WALL_HANGING_SIGN;
-			p.put(c, pu + dir.getStepX(), y, pv + dir.getStepZ(),
-					b(sign).setValue(BlockStateProperties.HORIZONTAL_FACING, dir.getClockWise()), CitadelCanvas.DECOR);
+			// the arm is a real board: a plank slab board next to the post (alternating cherry / bamboo),
+			// with a wall sign on its front face where the plot has room; it reads from far away, unlike a hanging sign
+			boolean cherry = i % 2 == 0;
+			int au = pu + dir.getStepX();
+			int av = pv + dir.getStepZ();
+			p.set(c, au, y, av, slab(cherry ? Blocks.CHERRY_SLAB : Blocks.BAMBOO_SLAB).setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP));
+			if (p.has(au, y, av - 1)) {
+				p.put(c, au, y, av - 1, b(cherry ? Blocks.BAMBOO_WALL_SIGN : Blocks.CHERRY_WALL_SIGN)
+						.setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH), CitadelCanvas.DECOR);
+			}
 		}
 
 		// --- base: stairs leaning on the footing in the free ground cells beside it, one potted flower

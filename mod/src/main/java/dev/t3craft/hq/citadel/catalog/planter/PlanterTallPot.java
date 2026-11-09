@@ -77,12 +77,13 @@ public final class PlanterTallPot implements Variant {
 		int cv = d / 2;
 		boolean bamboo = p.hash(0, 0, 0, 2) == 0;
 		int top = p.h() - 1;
-		int lip = p.h() >= 5 ? 2 : 1; // pot body y1 (and a calcite lip at y2 on tall plots)
+		boolean wide = w >= 3 && d >= 3; // a stepped two-tier pot: brown clay stairs climbing to the plant
+		int lip = p.h() >= 5 && !wide ? 2 : 1; // pot body y1 (and a calcite lip at y2 on tall plots)
 		int plantTop = Math.min(top, lip + (bamboo ? 4 : 3)); // the cherry trunk is short; the crown is bounded by the plot
 
 		// --- the pot
 		p.set(c, cu, 0, cv, p.hash(cu, 0, cv, 3) == 0 ? b(Blocks.CHISELED_DEEPSLATE) : b(Blocks.POLISHED_DEEPSLATE));
-		BlockState body = bamboo ? b(Blocks.BAMBOO_BLOCK) : terracotta(DyeColor.PINK); // bamboo block: axis Y by default
+		BlockState body = bamboo ? b(Blocks.BAMBOO_BLOCK) : b(Blocks.MUD_BRICKS); // brown clay body (pink terracotta rendered as a dark red block); bamboo block has axis Y by default
 		p.set(c, cu, 1, cv, body);
 		if (lip == 2) {
 			p.set(c, cu, 2, cv, body); // a two-high glazed body (no white band: stacked stripes read as a candy cane)
@@ -95,6 +96,15 @@ public final class PlanterTallPot implements Variant {
 			cherry(c, p, cu, cv, lip + 1, plantTop);
 		}
 
+		if (wide) {
+			// the four corners: low moss, petals, a flowering bush or a slab, never the same twice
+			for (int[] k : new int[][] {{0, 0}, {w - 1, 0}, {0, d - 1}, {w - 1, d - 1}}) {
+				int h = p.hash(k[0], 0, k[1], 4);
+				p.set(c, k[0], 0, k[1], h == 0 ? b(Blocks.FLOWERING_AZALEA) : h == 1 ? b(Blocks.MOSS_CARPET)
+						: h == 2 ? petals(p, k[0], k[1]) : slab(Blocks.MUD_BRICK_SLAB));
+			}
+		}
+
 		// --- round the foot: small pots, petals, a slab step (only where the plot leaves room)
 		Direction[] around = {Direction.WEST, Direction.EAST, Direction.NORTH, Direction.SOUTH};
 		for (Direction dir : around) {
@@ -103,9 +113,10 @@ public final class PlanterTallPot implements Variant {
 			if (!p.has(u, 0, v)) {
 				continue;
 			}
-			if (w >= 3 && d >= 3) {
-				// [depth] a stepped plinth: stairs climbing to the pot on the four sides
-				p.set(c, u, 0, v, stairs(Blocks.DEEPSLATE_BRICK_STAIRS, dir.getOpposite()));
+			if (wide) {
+				// [depth] a stepped pot: a dark brick tier at the ground, clay stairs on it climbing to the body
+				p.set(c, u, 0, v, p.hash(u, 0, v, 3) == 0 ? b(Blocks.CRACKED_DEEPSLATE_BRICKS) : b(Blocks.DEEPSLATE_BRICKS));
+				p.set(c, u, 1, v, stairs(Blocks.MUD_BRICK_STAIRS, dir.getOpposite()));
 				continue;
 			}
 			int k = p.hash(u, 0, v, 4);
