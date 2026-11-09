@@ -30,8 +30,10 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
  * mossy step on the outside. The bed is pale sand and gravel under one block of water, so the orange and white
  * koi lying on it are easy to read, with lily pads on top. A small cherry footbridge crosses the pond; when the
  * pond is wide enough it lands on a mossy islet with a stone lantern and a flowering azalea, and carries on to
- * the far bank. Each corner of the plot gets one thing to use or look at: a bench that faces the water, a stone
- * lantern, a bamboo clump and a young cherry tree.
+ * the far bank. Each corner of the plot gets one thing to use or look at: a cherry bench with a back that faces the
+ * water, a stone lantern, a bamboo clump in a stone-edged planter and a dwarf cherry (bent trunk, cloud crown). The
+ * rim has pale stretches of calcite and diorite, standing stones of different size, and moss beds with small flowers;
+ * a few sea lanterns glow in the bed since the water is opaque from above.
  *
  * <pre>
  *  top view (front = bottom)          side section along the bridge
@@ -379,6 +381,13 @@ public final class FountainKoiPond implements Variant {
 
 		/** Lighter top stones: andesite, mossy cobble, plain cobble, brick, a little gravel. */
 		BlockState rimTop(int u, int v) {
+			if (p.hash(u / 2, 21, v / 2, 4) == 0) { // a pale stretch of the rim: calcite and diorite, so the ring is not all grey
+				return switch (p.hash(u, 22, v, 4)) {
+					case 0 -> b(Blocks.DIORITE);
+					case 1 -> b(Blocks.POLISHED_DIORITE);
+					default -> b(Blocks.CALCITE);
+				};
+			}
 			return switch (p.hash(u, 1, v, 10)) {
 				case 0, 1 -> b(Blocks.MOSSY_COBBLESTONE);
 				case 2, 3 -> b(Blocks.ANDESITE);
@@ -407,12 +416,23 @@ public final class FountainKoiPond implements Variant {
 						continue;
 					}
 					if (v < cv - 1) {
-						continue; // the front stays low so the water shows from the street
+						// the front stays low so the water shows from the street: only moss and a flower here and there
+						switch (p.hash(u, 17, v, 9)) {
+							case 0 -> flowerRim(u, v);
+							case 1 -> put(c, p, u, 2, v, b(Blocks.MOSS_CARPET));
+							default -> {
+							}
+						}
+						continue;
 					}
-					switch (p.hash(u, 7, v, 14)) {
+					switch (p.hash(u, 7, v, 16)) {
 						case 0 -> put(c, p, u, 2, v, slab(Blocks.MOSSY_COBBLESTONE_SLAB));
 						case 1 -> put(c, p, u, 2, v, b(Blocks.MOSS_CARPET));
 						case 2 -> put(c, p, u, 2, v, slab(Blocks.ANDESITE_SLAB));
+						case 3 -> put(c, p, u, 2, v, slab(Blocks.POLISHED_DIORITE_SLAB));
+						case 4 -> put(c, p, u, 2, v, b(Blocks.COBBLESTONE_WALL)); // a narrow standing stone
+						case 5 -> put(c, p, u, 2, v, b(Blocks.MOSSY_COBBLESTONE_WALL));
+						case 6, 7 -> flowerRim(u, v);
 						default -> {
 						}
 					}
@@ -442,13 +462,31 @@ public final class FountainKoiPond implements Variant {
 			}
 		}
 
-		/** A rock {@code height} blocks above the rim top (y 2 upwards), capped with a slab or moss. */
+		/** A moss bed on the rim top with a small flower in it. */
+		void flowerRim(int u, int v) {
+			p.set(c, u, 1, v, b(Blocks.MOSS_BLOCK));
+			put(c, p, u, 2, v, switch (p.hash(u, 18, v, 5)) {
+				case 0 -> b(Blocks.AZURE_BLUET);
+				case 1 -> b(Blocks.CORNFLOWER);
+				case 2 -> b(Blocks.PINK_TULIP);
+				case 3 -> b(Blocks.LILY_OF_THE_VALLEY);
+				default -> b(Blocks.OXEYE_DAISY);
+			});
+		}
+
+		/** A rock {@code height} blocks above the rim top (y 2 upwards), capped with a slab, moss or a pale stone. */
 		void rock(int u, int v, int height) {
 			int top = Math.min(height, h - 3);
 			for (int i = 0; i < top; i++) {
 				put(c, p, u, 2 + i, v, i == 0 ? rimTop(u, v + 31) : rimTop(u + 17, v));
 			}
-			put(c, p, u, 2 + top, v, p.hash(u, 11, v, 3) == 0 ? b(Blocks.MOSS_CARPET) : slab(Blocks.MOSSY_COBBLESTONE_SLAB));
+			BlockState cap = switch (p.hash(u, 11, v, 5)) {
+				case 0 -> b(Blocks.MOSS_CARPET);
+				case 1 -> slab(Blocks.POLISHED_DIORITE_SLAB);
+				case 2 -> b(Blocks.CALCITE);
+				default -> slab(Blocks.MOSSY_COBBLESTONE_SLAB);
+			};
+			put(c, p, u, 2 + top, v, cap);
 			foot[u][v] = 2 + top;
 		}
 
@@ -589,14 +627,15 @@ public final class FountainKoiPond implements Variant {
 			Collections.shuffle(wet, rng);
 			int area = w * d;
 			// stepping rocks: lone stones that break up the surface
-			int rocks = Math.min(area / 40, 40);
+			int rocks = Math.min(Math.max(area / 40, 1), 40);
 			for (int[] a : wet) {
 				if (rocks <= 0) {
 					break;
 				}
 				int u = a[0];
 				int v = a[1];
-				if (k[u][v] == WATER && !(bridge && Math.abs(v - vb) <= 2) && surrounded(u, v)) {
+				boolean room = area < 80 ? count(u, v, WATER) == 4 : surrounded(u, v); // small ponds: one stone is enough
+				if (k[u][v] == WATER && !(bridge && Math.abs(v - vb) <= 2) && room) {
 					k[u][v] = ISLAND;
 					res[u][v] = true;
 					p.set(c, u, 0, v, rimBase(u, v));
@@ -630,13 +669,25 @@ public final class FountainKoiPond implements Variant {
 				}
 				placed++;
 			}
+			// the water is opaque from above, so a few sea lanterns glow in the bed where the fish are
+			int glow = 1 + area / 45;
+			for (int i = wet.size() - 1; i >= 0 && glow > 0; i--) {
+				int u = wet.get(i)[0];
+				int v = wet.get(i)[1];
+				BlockState bed = p.at(c, u, 0, v);
+				boolean plain = bed != null && (bed.is(Blocks.SAND) || bed.is(Blocks.GRAVEL) || bed.is(Blocks.CLAY));
+				if (k[u][v] == WATER && plain && !(bridge && Math.abs(v - vb) <= 2)) {
+					p.set(c, u, 0, v, b(Blocks.SEA_LANTERN));
+					glow--;
+				}
+			}
 		}
 
 		/** Lily pads on open water, but never under the crown (a pad can be walked on, and would get a low roof). */
 		void lilies() {
 			for (int u = 1; u < w - 1; u++) {
 				for (int v = 1; v < d - 1; v++) {
-					if (openWater(u, v) && k[u][v] == WATER && !shaded[u][v] && p.hash(u, 5, v, 4) == 0) {
+					if (openWater(u, v) && k[u][v] == WATER && !shaded[u][v] && p.hash(u, 5, v, 3) == 0) {
 						put(c, p, u, 2, v, b(Blocks.LILY_PAD));
 					}
 				}
@@ -764,6 +815,7 @@ public final class FountainKoiPond implements Variant {
 		/** A bamboo clump on podzol, with a little fern: the anchor cell and the free cells next to it. */
 		void bamboo(int u0, int v0) {
 			int n = 0;
+			List<int[]> bed = new ArrayList<>();
 			for (int du = -1; du <= 1; du++) {
 				for (int dv = -1; dv <= 1; dv++) {
 					int u = u0 + du;
@@ -784,7 +836,42 @@ public final class FountainKoiPond implements Variant {
 						put(c, p, u, y, v, s);
 					}
 					foot[u][v] = 9;
+					bed.add(new int[] {u, v});
 					n++;
+				}
+			}
+			// planter edge: stone-brick stairs rising towards the bed on its four sides, slabs on the diagonals
+			List<int[]> edge = new ArrayList<>();
+			for (int[] a : bed) {
+				for (int du = -1; du <= 1; du++) {
+					for (int dv = -1; dv <= 1; dv++) {
+						int u = a[0] + du;
+						int v = a[1] + dv;
+						if (free(u, v)) {
+							edge.add(new int[] {u, v});
+							res[u][v] = true;
+						}
+					}
+				}
+			}
+			for (int[] e : edge) {
+				Direction toBed = null;
+				for (Direction dir : DIRS) {
+					int nu = e[0] + dir.getStepX();
+					int nv = e[1] + dir.getStepZ();
+					for (int[] a : bed) {
+						if (a[0] == nu && a[1] == nv && toBed == null) {
+							toBed = dir;
+						}
+					}
+				}
+				boolean mossy = p.hash(e[0], 23, e[1], 2) == 0;
+				if (toBed != null) {
+					p.set(c, e[0], 0, e[1], stairs(mossy ? Blocks.MOSSY_STONE_BRICK_STAIRS : Blocks.STONE_BRICK_STAIRS, toBed));
+					foot[e[0]][e[1]] = 1;
+				} else {
+					p.set(c, e[0], 0, e[1], slab(mossy ? Blocks.MOSSY_STONE_BRICK_SLAB : Blocks.STONE_BRICK_SLAB));
+					foot[e[0]][e[1]] = 0.5;
 				}
 			}
 		}
@@ -801,7 +888,9 @@ public final class FountainKoiPond implements Variant {
 			}
 			Direction back = face.getOpposite();
 			Direction tan = face.getClockWise();
-			int seats = 0;
+			// cherry bench with a back: three seats facing the water, a cherry rail behind them between two
+			// stripped-log posts (one carries a lantern), a flowering azalea behind that
+			BlockState rail = b(Blocks.CHERRY_FENCE).setValue(PondKit.side(tan), true).setValue(PondKit.side(tan.getOpposite()), true);
 			for (int i = -1; i <= 1; i++) {
 				int u = u0 + i * tan.getStepX();
 				int v = v0 + i * tan.getStepZ();
@@ -809,25 +898,62 @@ public final class FountainKoiPond implements Variant {
 					continue;
 				}
 				// the stair rises towards its facing: the back of the seat is away from the water
-				net.minecraft.world.level.block.Block seat = switch (p.hash(u, 15, v, 3)) {
-					case 0 -> Blocks.STONE_BRICK_STAIRS;
-					case 1 -> Blocks.ANDESITE_STAIRS;
-					default -> Blocks.MOSSY_STONE_BRICK_STAIRS;
-				};
-				p.set(c, u, 0, v, stairs(seat, back));
+				p.set(c, u, 0, v, stairs(Blocks.CHERRY_STAIRS, back));
 				res[u][v] = true;
 				foot[u][v] = 1;
-				seats++;
 				int bu = u + back.getStepX();
 				int bv = v + back.getStepZ();
 				if (free(bu, bv)) {
-					put(c, p, bu, 0, bv, p.hash(bu, 16, bv, 2) == 0 ? b(Blocks.FLOWERING_AZALEA) : b(Blocks.AZALEA));
+					put(c, p, bu, 0, bv, rail);
 					res[bu][bv] = true;
+					foot[bu][bv] = 9;
+					int au = bu + back.getStepX();
+					int av = bv + back.getStepZ();
+					if (free(au, av) && i == 0) {
+						put(c, p, au, 0, av, p.hash(au, 16, av, 2) == 0 ? b(Blocks.FLOWERING_AZALEA) : b(Blocks.AZALEA));
+						res[au][av] = true;
+					}
 				}
 			}
-			if (seats == 0) {
-				return;
+			for (int i = -2; i <= 2; i += 4) {
+				int pu = u0 + i * tan.getStepX() + back.getStepX();
+				int pv = v0 + i * tan.getStepZ() + back.getStepZ();
+				if (free(pu, pv)) {
+					put(c, p, pu, 0, pv, b(Blocks.STRIPPED_CHERRY_LOG));
+					put(c, p, pu, 1, pv, b(Blocks.STRIPPED_CHERRY_LOG));
+					if (i < 0) {
+						put(c, p, pu, 2, pv, b(Blocks.LANTERN));
+					}
+					res[pu][pv] = true;
+					foot[pu][pv] = 9;
+				}
 			}
+		}
+
+		boolean nearRim(int u, int v) {
+			for (int du = -2; du <= 2; du++) {
+				for (int dv = -2; dv <= 2; dv++) {
+					int nu = u + du;
+					int nv = v + dv;
+					if (nu >= 0 && nu < w && nv >= 0 && nv < d && k[nu][nv] == RIM) {
+						return true;
+					}
+				}
+			}
+			return false;
+		}
+
+		/** Moss, ferns and small flowers close to the water. */
+		BlockState wetPlant(int u, int v) {
+			return switch (p.hash(u, 24, v, 9)) {
+				case 0 -> b(Blocks.AZURE_BLUET);
+				case 1 -> b(Blocks.PINK_PETALS);
+				case 2, 3 -> b(Blocks.MOSS_CARPET);
+				case 4 -> b(Blocks.FERN);
+				case 5 -> b(Blocks.LILY_OF_THE_VALLEY);
+				case 6 -> b(Blocks.CORNFLOWER);
+				default -> null;
+			};
 		}
 
 		// ------------------------------------------------------------------ 8. shore: mossy steps up to the rim, plants
@@ -861,7 +987,7 @@ public final class FountainKoiPond implements Variant {
 						p.set(c, u, 0, v, slab(p.hash(u, 4, v, 2) == 0 ? Blocks.ANDESITE_SLAB : Blocks.MOSSY_COBBLESTONE_SLAB));
 						foot[u][v] = 0.5;
 					} else {
-						BlockState plant = PondKit.shorePlant(p, u, v);
+						BlockState plant = nearRim(u, v) ? wetPlant(u, v) : PondKit.shorePlant(p, u, v);
 						if (plant != null) {
 							p.set(c, u, 0, v, plant);
 						}
@@ -881,36 +1007,74 @@ public final class FountainKoiPond implements Variant {
 			if (treeU < 0) {
 				return;
 			}
-			int t = Math.min(h >= 7 ? 5 : 4, h - 2);
-			if (t < 3) {
+			int top = h - 1; // the highest layer a leaf may use
+			int ty = Math.min(3, top - 1); // the trunk stands to ty, then bends one cell towards the pond
+			if (ty < 2) {
 				return;
 			}
-			for (int y = 0; y < t; y++) {
+			double du0 = cu - treeU;
+			double dv0 = cv - treeV;
+			int su = (int) Math.signum(du0);
+			int sv = (int) Math.signum(dv0);
+			int[][] opts = Math.abs(du0) >= Math.abs(dv0) ? new int[][] {{su, 0}, {0, sv}} : new int[][] {{0, sv}, {su, 0}};
+			int bu = treeU;
+			int bv = treeV;
+			boolean bent = false;
+			if (ty >= 3) {
+				for (int[] o : opts) {
+					if ((o[0] != 0 || o[1] != 0) && free(treeU + o[0], treeV + o[1])) {
+						bu = treeU + o[0];
+						bv = treeV + o[1];
+						bent = true;
+						break;
+					}
+				}
+			}
+			for (int y = 0; y <= ty; y++) {
 				put(c, p, treeU, y, treeV, b(y < 2 ? Blocks.CHERRY_LOG : Blocks.STRIPPED_CHERRY_LOG));
 			}
-			double lu = Math.signum(cu - treeU);
-			double lv = Math.signum(cv - treeV);
-			double ccu = treeU + lu * 0.9;
-			double ccv = treeV + lv * 0.9;
-			double ccy = t - 0.1;
+			List<int[]> seeds = new ArrayList<>();
+			seeds.add(new int[] {treeU, ty, treeV});
+			if (bent) {
+				Direction.Axis axis = bu != treeU ? Direction.Axis.X : Direction.Axis.Z;
+				put(c, p, bu, ty, bv, b(Blocks.CHERRY_LOG).setValue(BlockStateProperties.AXIS, axis));
+				seeds.add(new int[] {bu, ty, bv});
+				if (ty + 1 <= top) {
+					put(c, p, bu, ty + 1, bv, b(Blocks.CHERRY_LOG));
+					seeds.add(new int[] {bu, ty + 1, bv});
+				}
+				res[bu][bv] = true;
+			}
+			// a cloud crown: three flat lumps (the main one over the water side, a small one higher, a low one further out)
+			int ps = p.hash(treeU, 30, treeV, 2) == 0 ? 1 : -1;
+			int lu = su == 0 ? 1 : su;
+			int lv = sv == 0 ? 1 : sv;
+			double cy = Math.max(3.6, top - 1.2);
+			double[][] lumps = {
+				{bu + 1.0 * lu, cy, bv + 1.0 * lv, 2.6, 1.2},
+				{bu - 0.2 * lu - 1.4 * ps * lv, cy + 0.9, bv - 0.2 * lv + 1.4 * ps * lu, 1.8, 0.95},
+				{bu + 2.0 * lu + 1.3 * ps * lv, cy - 0.7, bv + 2.0 * lv - 1.3 * ps * lu, 1.7, 0.85},
+			};
 			boolean[][][] leaf = new boolean[w][h][d];
 			for (int u = 0; u < w; u++) {
 				for (int y = 0; y < h; y++) {
 					for (int v = 0; v < d; v++) {
-						double e = sq((u - ccu) / 2.6) + sq((y - ccy) / 1.9) + sq((v - ccv) / 2.6);
-						boolean trunk = u == treeU && v == treeV && y < t;
-						if (e <= 1.0 && !trunk && p.hash(u, y, v, e > 0.6 ? 3 : 9) != 0 && roomFor(u, y, v)) {
+						double e = 9;
+						for (double[] l : lumps) {
+							e = Math.min(e, sq((u - l[0]) / l[3]) + sq((y - l[1]) / l[4]) + sq((v - l[2]) / l[3]));
+						}
+						boolean log = (u == treeU && v == treeV && y <= ty) || (bent && u == bu && v == bv && (y == ty || y == ty + 1));
+						if (e <= 1.0 && !log && p.hash(u, y, v, e > 0.6 ? 3 : 9) != 0 && roomFor(u, y, v)) {
 							leaf[u][y][v] = true;
 						}
 					}
 				}
 			}
 			boolean[][][] keep = new boolean[w][h][d];
-			ArrayDeque<int[]> q = new ArrayDeque<>();
-			q.add(new int[] {treeU, t - 1, treeV});
+			ArrayDeque<int[]> q = new ArrayDeque<>(seeds);
+			int[][] around = {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}};
 			while (!q.isEmpty()) {
 				int[] a = q.poll();
-				int[][] around = {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}};
 				for (int[] o : around) {
 					int u = a[0] + o[0];
 					int y = a[1] + o[1];
@@ -926,11 +1090,11 @@ public final class FountainKoiPond implements Variant {
 					if (k[u][v] != RIM) {
 						continue;
 					}
-					int top = -1;
+					int hi = -1;
 					for (int y = 3; y < h; y++) {
-						top = keep[u][y][v] ? y : top;
+						hi = keep[u][y][v] ? y : hi;
 					}
-					for (int y = 2; y <= top; y++) {
+					for (int y = 2; y <= hi; y++) {
 						keep[u][y][v] = true; // no gap between the rim top and the crown: nobody can stand under it
 					}
 				}
