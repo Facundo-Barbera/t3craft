@@ -380,7 +380,7 @@ public final class CitadelPlacement {
 		if (w == null) {
 			Map<String, Integer> tall = Map.of("house_timber_corner", 10, "house_stone_tower", 8, "house_terrace_tiers", 8,
 					"house_tower_bridge", 5, "house_stone_manor_court", 4, "house_tower_stair", 3, "house_machiya", 3,
-					"house_timber_overhang", 3);
+					"house_timber_overhang", 3, "house_tower_lookout", 3); // cat/house-tower-lookout: walkable now (no ladder)
 			Map<String, Integer> all = new HashMap<>();
 			for (Variant v : Catalog.of(Family.HOUSE)) {
 				all.put(v.id(), tall.getOrDefault(v.id(), 0));
