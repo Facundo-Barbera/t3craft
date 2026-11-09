@@ -221,8 +221,11 @@ public final class CloisterRoom {
 	//   r 6        the arcade: columns at aa = 2 and 6, arches 3 wide, a beam and corbels
 	//   r 0..5     the garth: a fountain, a ring path and the cross paths, four lawns with a cherry tree and two benches each
 	//
-	// Heights: arcade columns 7, aisle ceiling 9 at the arcade rising to 14 at the wall; roof stairs from y = 9 (arcade) to
-	// y = 15; wall coping y = 16; corner towers 21; gable 30.
+	// Heights: arcade columns 7 (chiseled deepslate base, chiseled capital flared by corbels), the roof is its own ceiling and
+	// rises half a block per ring (slab, stair, slab...) from y = 9 at the arcade to 12 at the wall, so the garth reads as open
+	// to the sky instead of a funnel; 8 dormers (aa = 5 on each face); wall coping y = 14, with a stepped pediment over the
+	// east, south and west gates and the bell gable (to 32) over the north one; corner towers 16, finials of calcite, oxidized
+	// copper and a lantern (no gold). The garth holds two round-crowned cherry trees (y 5..9) in the lawns (3, 3) and (-3, -3).
 
 	/** Half side of the grand cloister's footprint (the node's half at k = 2). */
 	public static final int H = 14;
@@ -230,6 +233,8 @@ public final class CloisterRoom {
 	public static final int TERMINAL_X = 5;
 	public static final int TERMINAL_Z = -11;
 	private static final int Y_TOP = 40;
+	/** Height of the outer wall's coping (the wall plane r = 13 reaches this y; the gallery roof stays under it). */
+	private static final int WALL_TOP = 14;
 	/** Rosy stripped cherry log: pilasters and columns. */
 	public static final BlockState STRIP = b(Blocks.STRIPPED_CHERRY_LOG);
 
@@ -391,23 +396,7 @@ public final class CloisterRoom {
 				int tz = 4 * sz;
 				if (sx == sz) {
 					// a cherry tree in two opposite lawns
-					q.fill(tx, 1, 4, tz, LOG);
-					for (int ax = -2; ax <= 2; ax++) {
-						for (int az = -2; az <= 2; az++) {
-							int m = Math.abs(ax) + Math.abs(az);
-							if (m <= 1 && m > 0) {
-								q.set(tx + ax, 4, tz + az, pink);
-							}
-							if (m <= 2 && !(ax == 2 * sx && az == 0 && sz > 0)) {
-								q.set(tx + ax, 5, tz + az, pink);
-							}
-							if (m <= 1) {
-								q.set(tx + ax, 6, tz + az, pink);
-							}
-						}
-					}
-					q.set(tx, 7, tz, pink);
-					q.set(tx - sx, 7, tz, pink);
+					cherryTree(q, 3 * sx, 3 * sz, sx, sz, pink);
 				} else {
 					// a flowering hedge bed in the other two
 					for (int ax = 0; ax <= 1; ax++) {
@@ -421,6 +410,34 @@ public final class CloisterRoom {
 				q.set(4 * sx, 1, 3 * sz, stairs(Blocks.CHERRY_STAIRS, sx > 0 ? Direction.EAST : Direction.WEST));
 				q.set(2 * sx, 1, 4 * sz, stairs(Blocks.CHERRY_STAIRS, sz > 0 ? Direction.SOUTH : Direction.NORTH));
 				q.set(3 * sx, 1, 4 * sz, stairs(Blocks.CHERRY_STAIRS, sz > 0 ? Direction.SOUTH : Direction.NORTH));
+			}
+		}
+	}
+
+	/**
+	 * A cherry tree of the garth at {@code (tx, tz)}: a trunk 6 high that forks (a branch towards the court's centre), and a
+	 * round, lumpy crown (an ellipsoid about 3 across, squashed, its rim eaten by a deterministic noise) from y = 5 to 9, level
+	 * with the arcade's roof. The crown is kept inside the garth (r &le; 5): it never touches the arcade or the roof.
+	 */
+	private static void cherryTree(Q q, int tx, int tz, int sx, int sz, BlockState pink) {
+		q.fill(tx, 1, 6, tz, LOG);
+		q.set(tx - sx, 6, tz, LOG.setValue(BlockStateProperties.AXIS, Direction.Axis.X));
+		q.set(tx, 5, tz - sz, LOG.setValue(BlockStateProperties.AXIS, Direction.Axis.Z));
+		for (int ax = -3; ax <= 3; ax++) {
+			for (int az = -3; az <= 3; az++) {
+				for (int ay = -2; ay <= 3; ay++) {
+					int x = tx + ax;
+					int z = tz + az;
+					if (Math.max(Math.abs(x), Math.abs(z)) > 5) {
+						continue;
+					}
+					int y = 7 + ay;
+					double noise = Math.floorMod(x * 7 + y * 13 + z * 17 + tx * 5, 5) * 0.55;
+					double d = ax * ax + az * az + ay * ay * 1.5;
+					if (d <= 8.0 + noise) {
+						q.putIfFree(x, y, z, pink, CitadelCanvas.SOLID);
+					}
+				}
 			}
 		}
 	}
@@ -441,21 +458,61 @@ public final class CloisterRoom {
 		CitadelCanvas c = q.c;
 		q.set(dx, 0, dz, r == 6 ? FOOT : (r <= 9 ? c.floor() : (r == 10 ? CALCITE : NodeDecor.footMix(q.cx + dx, 0, q.cz + dz))));
 		Direction out = NodeDecor.outward(dx, dz);
-		if (r >= 7) {
-			q.set(dx, r + 2, dz, PLANKS);
-		}
-		// roof stairs, high side outward: cherry, with a deepslate-tile edge at the arcade and at the wall
-		boolean trim = r == 6 || r == 12;
-		q.set(dx, r + 3, dz, stairs(trim ? Blocks.DEEPSLATE_TILE_STAIRS : Blocks.CHERRY_STAIRS, out));
+		// the roof is its own ceiling: slabs and stairs alternate, half a block of rise per ring
+		int roofY = ceil(r);
+		q.set(dx, roofY, dz, roofCell(r, out));
 		if (r >= 7 && r <= 11 && pilasterLine(aa)) {
 			// a rafter under the ceiling, along the line of each pilaster
-			q.set(dx, r + 1, dz, LOG.setValue(BlockStateProperties.AXIS, ns ? Direction.Axis.Z : Direction.Axis.X));
+			q.set(dx, roofY - 1, dz, LOG.setValue(BlockStateProperties.AXIS, ns ? Direction.Axis.Z : Direction.Axis.X));
 		}
 		if (r == 12 && pilasterLine(aa)) {
-			q.fill(dx, 1, r + 1, dz, STRIP);
+			q.fill(dx, 1, roofY - 1, dz, STRIP);
+		}
+		if ((r == 8 || r == 9) && aa >= 4 && aa <= 6) {
+			dormer(q, dx, dz, r, ns, a);
 		}
 		if (r == 6) {
 			arcade(q, dx, dz, ns, a);
+		}
+	}
+
+	/** Underside of the gallery roof at ring {@code r} (6..12): 9 at the arcade, 12 at the wall (a rise of half a block per ring). */
+	private static int ceil(int r) {
+		return 9 + (r - 6) / 2;
+	}
+
+	/**
+	 * The roof cell of ring {@code r}: a slab on the even rings and a stair (high side outward) on the odd ones, so the roof
+	 * climbs one block every two rings. Cherry, with a stone-brick rim at the arcade and a deepslate-tile gutter at the wall.
+	 */
+	private static BlockState roofCell(int r, Direction out) {
+		boolean slabCell = (r - 6) % 2 == 0;
+		if (slabCell) {
+			return slab(r == 6 ? Blocks.STONE_BRICK_SLAB : r == 12 ? Blocks.DEEPSLATE_TILE_SLAB : Blocks.CHERRY_SLAB);
+		}
+		return stairs(Blocks.CHERRY_STAIRS, out);
+	}
+
+	/**
+	 * A dormer (buhardilla) on the gallery roof, 3 wide (aa 4..6) and 2 deep (rings 8 and 9): its floor is a plank block that
+	 * keeps the ceiling closed, a recessed glass window between two cherry posts in front, calcite behind, a cherry gable
+	 * (stairs either side of a plank ridge) and a stone-brick ridge cap (caballete) along the top.
+	 */
+	private static void dormer(Q q, int dx, int dz, int r, boolean ns, int a) {
+		int l = a - (a > 0 ? 5 : -5);
+		Direction plus = ns ? Direction.EAST : Direction.SOUTH;
+		boolean front = r == 8;
+		q.set(dx, 10, dz, PLANKS);
+		if (Math.abs(l) == 1) {
+			BlockState wall = front ? STRIP : CALCITE;
+			q.set(dx, 11, dz, wall);
+			q.set(dx, 12, dz, wall);
+			q.set(dx, 13, dz, stairs(Blocks.CHERRY_STAIRS, l < 0 ? plus : plus.getOpposite()));
+		} else {
+			q.set(dx, 11, dz, front ? GLASS : CALCITE);
+			q.set(dx, 12, dz, front ? GLASS : CALCITE);
+			q.set(dx, 13, dz, PLANKS);
+			q.set(dx, 14, dz, slab(Blocks.STONE_BRICK_SLAB));
 		}
 	}
 
@@ -463,9 +520,20 @@ public final class CloisterRoom {
 	private static void arcade(Q q, int dx, int dz, boolean ns, int a) {
 		CitadelCanvas c = q.c;
 		if (isColumn(a)) {
-			q.set(dx, 1, dz, FOOT);
+			// a column with a base (chiseled deepslate plinth, and on the court side a deepslate step leaning on it) and a capital
+			// (a chiseled core flared by stone-brick corbels towards the court and the aisle; the springers of the arches are the
+			// cherry corbels along the arcade)
+			q.set(dx, 1, dz, b(Blocks.CHISELED_DEEPSLATE));
 			q.fill(dx, 2, 6, dz, STRIP);
 			q.set(dx, 7, dz, b(Blocks.CHISELED_STONE_BRICKS));
+			if (Math.abs(dx) != Math.abs(dz)) {
+				Direction toColumn = NodeDecor.outward(dx, dz);
+				int sx = toColumn.getStepX();
+				int sz = toColumn.getStepZ();
+				q.set(dx - sx, 1, dz - sz, stairs(Blocks.DEEPSLATE_TILE_STAIRS, toColumn));
+				q.set(dx - sx, 7, dz - sz, NodeDecor.invStairs(Blocks.STONE_BRICK_STAIRS, toColumn));
+				q.set(dx + sx, 7, dz + sz, NodeDecor.invStairs(Blocks.STONE_BRICK_STAIRS, toColumn.getOpposite()));
+			}
 		} else {
 			Direction plus = ns ? Direction.EAST : Direction.SOUTH;
 			if (isColumn(a + 1)) {
@@ -486,27 +554,69 @@ public final class CloisterRoom {
 		q.set(dx, 0, dz, FOOT);
 		boolean desk = aa >= 8 && aa <= 10;
 		int winLo = desk ? 4 : 6;
-		for (int y = 1; y <= 16; y++) {
+		for (int y = 1; y <= WALL_TOP; y++) {
 			BlockState s;
 			if (aa <= 2) {
-				s = y <= 4 ? AIR : (y == 5 ? RIB : (y <= 14 ? CALCITE : (y == 15 ? RIB : slab(Blocks.STONE_BRICK_SLAB))));
+				s = y <= 4 ? AIR : (y == 5 ? RIB : (y <= WALL_TOP - 2 ? CALCITE : (y == WALL_TOP - 1 ? RIB : slab(Blocks.STONE_BRICK_SLAB))));
 			} else if (y <= 2) {
 				s = NodeDecor.footMix(x, y, z);
-			} else if (y == 15) {
+			} else if (y == WALL_TOP - 1) {
 				s = RIB;
-			} else if (y == 16) {
+			} else if (y == WALL_TOP) {
 				s = slab(Blocks.STONE_BRICK_SLAB);
 			} else if (pilasterLine(aa)) {
 				s = STRIP;
-			} else if (y >= winLo && y <= 12) {
+			} else if (y >= winLo && y <= WALL_TOP - 3) {
 				s = GLASS;
 			} else {
 				s = CALCITE;
 			}
 			q.set(dx, y, dz, s);
 		}
-		if (ns && dz < 0 && aa <= 3) {
+		gateTop(q, dx, dz, ns, aa);
+	}
+
+	/** Over the gates: the bell gable on the north face, a stepped pediment on the other three. */
+	private static void gateTop(Q q, int dx, int dz, boolean ns, int aa) {
+		if (aa > 3) {
+			return;
+		}
+		if (ns && dz < 0) {
 			gable(q, dx, dz, aa);
+		} else {
+			pediment(q, dx, dz, ns, aa);
+		}
+	}
+
+	/**
+	 * A stepped pediment over the east, south and west gates (two thick, like the bell gable): calcite stepping up from the
+	 * coping to a column 4 high at the gate's axis, cherry stairs on the shoulders, an oculus of glass, a stone-brick cap
+	 * with a standing lantern.
+	 */
+	private static void pediment(Q q, int dx, int dz, boolean ns, int aa) {
+		int a = ns ? dx : dz;
+		Direction toCentre = ns ? (a > 0 ? Direction.WEST : Direction.EAST) : (a > 0 ? Direction.NORTH : Direction.SOUTH);
+		int base = WALL_TOP;
+		switch (aa) {
+			case 3 -> q.set(dx, base, dz, stairs(Blocks.CHERRY_STAIRS, toCentre));
+			case 2 -> {
+				q.set(dx, base, dz, CALCITE);
+				q.set(dx, base + 1, dz, stairs(Blocks.CHERRY_STAIRS, toCentre));
+			}
+			case 1 -> {
+				q.fill(dx, base, base + 1, dz, CALCITE);
+				q.set(dx, base + 2, dz, stairs(Blocks.CHERRY_STAIRS, toCentre));
+			}
+			default -> {
+				q.set(dx, base, dz, CALCITE);
+				q.set(dx, base + 1, dz, GLASS);
+				q.set(dx, base + 2, dz, CALCITE);
+				q.set(dx, base + 3, dz, b(Blocks.STONE_BRICKS));
+				if (Math.max(Math.abs(dx), Math.abs(dz)) == H) {
+					// only the outer layer carries the lantern
+					q.put(dx, base + 4, dz, Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, false), DECOR);
+				}
+			}
 		}
 	}
 
@@ -523,17 +633,15 @@ public final class CloisterRoom {
 			q.set(dx, 1, dz, NodeDecor.footMix(x, 1, z));
 			q.set(dx, 2, dz, NodeDecor.footMix(x, 2, z));
 			if (pilasterLine(aa)) {
-				q.fill(dx, 3, 14, dz, STRIP);
+				q.fill(dx, 3, WALL_TOP - 2, dz, STRIP);
 			} else {
 				// a sill under the recessed window and a cherry hood over it
 				q.set(dx, aa >= 8 && aa <= 10 ? 3 : 5, dz, slab(Blocks.STONE_BRICK_SLAB));
-				q.set(dx, 13, dz, NodeDecor.invStairs(Blocks.CHERRY_STAIRS, NodeDecor.inward(dx, dz)));
+				q.set(dx, WALL_TOP - 2, dz, NodeDecor.invStairs(Blocks.CHERRY_STAIRS, NodeDecor.inward(dx, dz)));
 			}
 		}
-		q.set(dx, 15, dz, NodeDecor.invStairs(Blocks.CHERRY_STAIRS, NodeDecor.inward(dx, dz)));
-		if (ns && dz < 0 && aa <= 3) {
-			gable(q, dx, dz, aa);
-		}
+		q.set(dx, WALL_TOP - 1, dz, NodeDecor.invStairs(Blocks.CHERRY_STAIRS, NodeDecor.inward(dx, dz)));
+		gateTop(q, dx, dz, ns, aa);
 	}
 
 	/** A corner tower, 3 x 3 (|dx|, |dz| in 12..14): calcite on a dark base, a stripped-cherry corner, slits, a stair cap, a gold finial. */
@@ -547,15 +655,16 @@ public final class CloisterRoom {
 		boolean extreme = Math.abs(dx) == 14 && Math.abs(dz) == 14;
 		boolean slit = Math.abs(dx) == 14 && Math.abs(dz) == 13 || Math.abs(dx) == 13 && Math.abs(dz) == 14;
 		q.set(dx, 0, dz, FOOT);
-		for (int y = 1; y <= 16; y++) {
+		int body = WALL_TOP + 2;
+		for (int y = 1; y <= body; y++) {
 			BlockState s;
 			if (y <= 2) {
 				s = NodeDecor.footMix(x, y, z);
-			} else if (y == 4 || y == 15) {
+			} else if (y == 4 || y == body - 1) {
 				s = RIB;
 			} else if (extreme) {
 				s = STRIP;
-			} else if (slit && y >= 10 && y <= 12) {
+			} else if (slit && y >= 9 && y <= 11) {
 				s = GLASS;
 			} else {
 				s = CALCITE;
@@ -563,14 +672,14 @@ public final class CloisterRoom {
 			q.set(dx, y, dz, s);
 		}
 		if (du == 0 && dv == 0) {
-			q.set(dx, 17, dz, CALCITE);
-			q.set(dx, 18, dz, CALCITE);
-			q.set(dx, 19, dz, b(Blocks.GOLD_BLOCK));
-			q.set(dx, 20, dz, NodeDecor.ROD);
-			q.set(dx, 21, dz, NodeDecor.ROD);
+			// the finial: a calcite drum, a verdigris copper cap, a standing lantern and a rod
+			q.set(dx, body + 1, dz, CALCITE);
+			q.set(dx, body + 2, dz, b(Blocks.OXIDIZED_CUT_COPPER));
+			q.put(dx, body + 3, dz, Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, false), DECOR);
+			q.set(dx, body + 4, dz, NodeDecor.ROD);
 		} else {
 			Direction toCentre = du != 0 ? (du > 0 ? Direction.WEST : Direction.EAST) : (dv > 0 ? Direction.NORTH : Direction.SOUTH);
-			q.set(dx, 17, dz, stairs(Blocks.CHERRY_STAIRS, toCentre));
+			q.set(dx, body + 1, dz, stairs(Blocks.CHERRY_STAIRS, toCentre));
 		}
 	}
 
@@ -586,7 +695,7 @@ public final class CloisterRoom {
 			case 1 -> 29;
 			default -> 32;
 		};
-		for (int y = 16; y < top; y++) {
+		for (int y = WALL_TOP; y < top; y++) {
 			BlockState s = CALCITE;
 			if (aa <= 1 && y >= 21 && y <= 23) {
 				s = AIR;
