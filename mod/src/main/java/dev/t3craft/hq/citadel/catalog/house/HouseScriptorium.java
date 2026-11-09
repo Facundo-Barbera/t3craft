@@ -662,9 +662,9 @@ public final class HouseScriptorium implements Variant {
 				p.set(c, u2, 15, v + 1, b(Blocks.STONE_BRICKS));
 				p.set(c, u3, 15, v, CitadelCanvas.AIR); // the opening in the roof
 				for (int u : new int[] {u2, u3}) {
-					p.set(c, u, 16, v - 1, stair(m.trimStairs(), Direction.SOUTH, false));
-					p.set(c, u, 16, v + 1, stair(m.trimStairs(), Direction.NORTH, false));
-					p.set(c, u, 16, v, b(m.trimPlanks()));
+					p.set(c, u, 16, v - 1, stair(m.roof(), Direction.SOUTH, false));
+					p.set(c, u, 16, v + 1, stair(m.roof(), Direction.NORTH, false));
+					p.set(c, u, 16, v, b(m.roofBlock()));
 				}
 			}
 		}
@@ -838,6 +838,10 @@ public final class HouseScriptorium implements Variant {
 					p.set(c, wd, 2, r, candle(2));
 				}
 			}
+		}
+		// [finish] lamps under the loft so the binding corner is lit: lanterns hanging from the loft floor
+		for (int r : new int[] {vs + 1, ivb - 2}) {
+			p.put(c, g.col(iw / 2), LOFT - 1, r, lantern(true), CitadelCanvas.HANGING);
 		}
 		// binding and ink under the loft: loom, barrels, ink still and quill table along the back wall
 		for (int k = 2; k <= iw - 2; k++) {
