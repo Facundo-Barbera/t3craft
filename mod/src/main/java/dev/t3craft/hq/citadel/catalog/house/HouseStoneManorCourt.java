@@ -380,9 +380,10 @@ public final class HouseStoneManorCourt implements Variant {
 			for (int t = v0; t <= v0 + 2; t++) {
 				lr.set(t, PLATE + 2, 1, lr.stairIn(Blocks.STONE_BRICK_STAIRS, true));
 			}
-			hipLayer(c, p, u0 - 1, v0 - 1, u0 + 3, v0 + 3, PLATE + 3, Blocks.STONE_BRICK_STAIRS, b(Blocks.DEEPSLATE_TILES));
-			hipLayer(c, p, u0, v0, u0 + 2, v0 + 2, PLATE + 4, Blocks.DEEPSLATE_TILE_STAIRS, b(Blocks.DEEPSLATE_TILES));
-			p.set(c, u0 + 1, PLATE + 5, v0 + 1, slab(Blocks.DEEPSLATE_BRICK_SLAB));
+			hipLayer(c, p, u0 - 1, v0 - 1, u0 + 3, v0 + 3, PLATE + 3, Blocks.CUT_COPPER_STAIRS.waxed().exposed(), b(Blocks.CUT_COPPER.waxed().exposed()));
+			hipLayer(c, p, u0, v0, u0 + 2, v0 + 2, PLATE + 4, Blocks.CUT_COPPER_STAIRS.waxed().exposed(), b(Blocks.CUT_COPPER.waxed().exposed()));
+			p.set(c, u0 + 1, PLATE + 5, v0 + 1, slab(Blocks.CUT_COPPER_SLAB.waxed().exposed()));
+				p.set(c, u0 + 1, PLATE + 6, v0 + 1, Blocks.LIGHTNING_ROD.waxed().exposed().defaultBlockState());
 		}
 	}
 
@@ -482,10 +483,10 @@ public final class HouseStoneManorCourt implements Variant {
 		for (int u = cu - 1; u <= cu + 1; u++) {
 			p.set(c, u, PLATE + 1, 1, b(Blocks.POLISHED_ANDESITE));
 		}
-		p.set(c, cu, PLATE + 2, 1, b(Blocks.GOLD_BLOCK));
-		p.set(c, cu - 1, PLATE + 1, 1, b(Blocks.GOLD_BLOCK));
-		p.set(c, cu + 1, PLATE + 1, 1, b(Blocks.GOLD_BLOCK));
-		p.set(c, cu, PLATE + 1, 1, b(Blocks.GOLD_BLOCK));
+		p.set(c, cu, PLATE + 2, 1, b(Blocks.CHISELED_STONE_BRICKS));
+		p.set(c, cu - 1, PLATE + 1, 1, b(Blocks.CHISELED_STONE_BRICKS));
+		p.set(c, cu + 1, PLATE + 1, 1, b(Blocks.CHISELED_STONE_BRICKS));
+		p.set(c, cu, PLATE + 1, 1, b(Blocks.CHISELED_STONE_BRICKS));
 	}
 
 	// ------------------------------------------------------------------ court
