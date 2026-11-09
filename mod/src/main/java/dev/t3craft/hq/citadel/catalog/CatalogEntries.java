@@ -15,6 +15,9 @@ final class CatalogEntries {
 	}
 
 	private static final Variant[] ENTRIES = {
+			new dev.t3craft.hq.citadel.catalog.house.HouseJapaneseEngawa(), // house_japanese_engawa
+			new dev.t3craft.hq.citadel.catalog.house.HouseJapaneseTeahouse(), // house_japanese_teahouse
+			new dev.t3craft.hq.citadel.catalog.house.HouseMachiya(), // house_machiya
 			new dev.t3craft.hq.citadel.catalog.house.HouseTimberCottage(), // house_timber_cottage
 			new dev.t3craft.hq.citadel.catalog.lamp.LampCherryPost(), // lamp_cherry_post
 	};
