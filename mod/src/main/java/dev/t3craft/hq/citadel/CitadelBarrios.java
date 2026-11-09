@@ -232,6 +232,24 @@ public final class CitadelBarrios {
 			BlockPos inside = f == 0 ? r.cell(2, mid - 1, y) : r.cell(D - 2, mid, y);
 			c.anchor(Anchor.at(AnchorNames.module(mod.index()), door, r.back()));
 			c.anchor(Anchor.at(AnchorNames.walkModule(mod.index()), inside, r.back()));
+			if (f != 0) {
+				hangModuleLamp(c, door, r.back(), (f + 1) * fh());
+			}
+		}
+	}
+
+	/**
+	 * fix/floating-fixtures: the blocks module puts a module's bulb 3 above the cell one step in front of its door anchor
+	 * ({@code HqBindings.moduleLamp}). On the ground floor that cell is a block of the facade wall, but an upper module's door is
+	 * the landing inside the hall, so the bulb stood in mid-air. It now hangs from the ceiling on an iron chain, like the hall's
+	 * pendant lanterns (the cells of the chain are the bulb's only neighbours: air all round otherwise).
+	 *
+	 * @param ceilY the y of the ceiling slab over the module's floor
+	 */
+	private static void hangModuleLamp(CitadelCanvas c, BlockPos door, Direction back, int ceilY) {
+		BlockPos lamp = door.relative(back.getOpposite()).above(3);
+		for (int y = lamp.getY() + 1; y < ceilY; y++) {
+			c.put(lamp.getX(), y, lamp.getZ(), Blocks.IRON_CHAIN.defaultBlockState(), HANGING);
 		}
 	}
 
