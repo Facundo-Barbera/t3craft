@@ -223,27 +223,32 @@ public final class PlanterTallPot implements Variant {
 			p.set(c, u, 1, v, potted(kind));
 			return;
 		}
-		p.set(c, u, 0, v, foot(m, p, u, v));
 		if (h == 3) {
-			p.set(c, u, 1, v, m.urn());
+			// the mid pot has no foot (two high), the tall one has it (three): a pair is never level
+			int y = 0;
+			if (tier == 2) {
+				p.set(c, u, y++, v, foot(m, p, u, v));
+			}
+			p.set(c, u, y++, v, m.urn());
 			// a ball of blossom or azalea: a shrub with presence on a one-cell pot
-			p.set(c, u, 2, v, switch (p.hash(u, 4, v, 3)) {
+			p.set(c, u, y, v, switch (p.hash(u, 4, v, 3)) {
 				case 0 -> leaves(Blocks.CHERRY_LEAVES);
 				case 1 -> leaves(Blocks.FLOWERING_AZALEA_LEAVES);
 				default -> leaves(Blocks.AZALEA_LEAVES);
 			});
 			return;
 		}
-		int body = Math.max(1, Math.min(tier == 2 ? 3 : 2, h - 4));
+		p.set(c, u, 0, v, foot(m, p, u, v));
+		int body = Math.max(1, Math.min(tier == 2 ? 2 : 1, h - 4)); // never a stretched tower: 5 or 6 high at most, plus the plant
 		for (int y = 1; y <= body; y++) {
 			p.set(c, u, y, v, y == body && body >= 2 ? m.lip() : body(m, p, u, y, v));
 		}
 		int sy = body + 1;
 		p.set(c, u, sy, v, soil(p, u, v));
-		int room = h - sy - 1;
+		int room = Math.min(h - sy - 1, 3);
 		int y1 = sy + 1;
 		if (kind == 2 && room >= 2) {
-			stalk(c, p, u, v, y1, y1 + Math.min(room, 4) - 1);
+			stalk(c, p, u, v, y1, y1 + room - 1);
 		} else if (kind == 1) {
 			if (room >= 2) {
 				p.set(c, u, y1, v, b(Blocks.LARGE_FERN).setValue(BlockStateProperties.DOUBLE_BLOCK_HALF, DoubleBlockHalf.LOWER));
