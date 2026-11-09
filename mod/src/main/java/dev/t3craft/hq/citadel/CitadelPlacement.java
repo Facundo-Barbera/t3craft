@@ -100,9 +100,9 @@ public final class CitadelPlacement {
 		return RingCampusGeometry.sOdd(CitadelCanvas.dims().k, n);
 	}
 
-	/** A count of plots at scale 1, times the scale (a bigger lot asks for more plots; identity at scale 1). */
+	/** A count of plots at scale 1, times {@code k^1.5} (a lot has k² the area and plots grow by √k, so this fills it a little denser than at scale 1; identity at scale 1; a request that finds no room is skipped). */
 	private static int cnt(int n) {
-		return (int) Math.round(n * CitadelCanvas.dims().k);
+		return (int) Math.round(n * Math.pow(CitadelCanvas.dims().k, 1.5));
 	}
 
 	/** A plot request with its sizes at scale 1: frontage and depth grow with {@code s}, the height is given scaled. */
