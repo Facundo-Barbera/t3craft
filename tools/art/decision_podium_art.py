@@ -156,7 +156,7 @@ def panel_frame(name, f):
     plain = fill if name not in ("working", "idle") else c if name == "working" else rgb(0x8A8A8A)
     img = [[px(plain)] * 16 for _ in range(16)]
     if name == "off":
-        img = [[px(rgb(0x2A333B))] * 16 for _ in range(16)]
+        img = [[px(rgb(0x22303A))] * 16 for _ in range(16)]
     # the display: darker 1 px edge, a lighter top row (glass), the fill
     edge = darken(fill, 0.62) if name != "off" else rgb(0x0F1318)
     for y in range(PH):
@@ -229,7 +229,14 @@ def write_textures():
                 elif y in (10, 12, 14) and 1 <= x <= 5:
                     c = darken(paper, 0.55)  # lines of text
             else:
-                c = brass
+                # (8..15, 8..15): the engraved plaque on the shaft: bright rim, darker field, two engraved lines
+                c = darken(brass, 0.78)
+                if x == 8 or y == 8:
+                    c = lighten(brass, 0.45)
+                elif x == 15 or y == 15:
+                    c = darken(brass, 0.55)
+                elif y in (10, 12) and 10 <= x <= 13:
+                    c = darken(brass, 0.45)
             row.append(px(c))
         rows.append(row)
     write_png(os.path.join(TEX, "decision_podium_brass.png"), rows)
@@ -259,15 +266,28 @@ def box(frm, to, tex, uv_side=None, uv_top=None, emit=0, skip=(), uv_front=None)
 
 
 def model(name):
+    """A lectern, not a pot: a stepped plinth, a slim shaft with a collar and a brass plaque, a desk that slopes up toward the
+    display (-22.5 degrees, like the console's keyboard), a slip and a big brass bell on it, and a framed display on top. The
+    silhouette is the same in every state, so the lectern reads as a lectern even with the display off. Everything stays inside
+    DecisionPodiumBlock's hitbox (plinth 1-15 x 0-2, shaft 4-12 x 2-8, desk 1-15 x 8-10, panel 1-15 x 10-16 x z 8-14)."""
     emit = EMIT[name]
+    slope = {"angle": -22.5, "axis": "x", "origin": [8, 9, 5.5]}
     els = [
-        # plinth, shaft, desk (the same boxes as DecisionPodiumBlock.NORTH_BOXES)
-        box([1, 0, 1], [15, 2, 15], "#stone", [0, 0, 14, 2], [1, 1, 15, 15]),
-        box([4, 2, 5], [12, 8, 13], "#bark", [0, 0, 8, 6], [4, 5, 12, 13]),
-        box([1, 8, 2], [15, 10, 14], "#wood", [0, 0, 14, 2], [1, 2, 15, 14]),
-        # a cream permission slip on the desk, right of the display's centre
-        box([9, 10, 3], [13, 10.4, 7], "#brass", [0, 8, 4, 8.4], [0, 8, 4, 12]),
-        # the bell: dome, knob, clapper
+        # plinth: two steps
+        box([1, 0, 1], [15, 1, 15], "#stone", [0, 0, 14, 1], [1, 1, 15, 15]),
+        box([2.5, 1, 2.5], [13.5, 2, 13.5], "#stone", [1, 0, 12, 1], [2, 2, 14, 14]),
+        # shaft: slim, with a cherry collar under the desk and a brass plaque on the front
+        box([5, 2, 6], [11, 7, 12], "#bark", [0, 0, 6, 5], [5, 6, 11, 12]),
+        box([4, 7, 5], [12, 8, 13], "#wood", [0, 0, 8, 1], [4, 5, 12, 13]),
+        {"from": [6, 3, 5.7], "to": [10, 6, 6], "faces": {"north": {"texture": "#brass", "uv": [8, 8, 12, 11]}}},
+        # under the sloped desk: a filler so there is no daylight between the shaft and the slope
+        box([2, 8, 4], [14, 9, 13], "#wood", [0, 0, 12, 1], [2, 4, 14, 13]),
+        # the desk: a slab that slopes up toward the display
+        {**box([1, 8.6, 2], [15, 9.6, 9], "#wood", [0, 0, 14, 1], [1, 2, 15, 9]), "rotation": slope},
+        # a cream permission slip lying on the slope, right of the display's centre
+        {**box([9, 9.6, 3.5], [13, 9.75, 7.5], "#brass", [0, 8, 4, 8.15], [0, 8, 4, 12]), "rotation": slope},
+        # the bell, big: base ring, flared dome, knob, clapper
+        box([2, 9, 3], [7, 10, 8], "#brass", [0, 5, 5, 6], [0, 0, 5, 5]),
         box([2.5, 10, 3.5], [6.5, 12.5, 7.5], "#brass", [0, 0, 4, 2.5], [0, 0, 4, 4]),
         box([3.5, 12.5, 4.5], [5.5, 13.5, 6.5], "#brass", [8, 0, 10, 1], [8, 0, 10, 2]),
         box([4, 9.6, 5], [5, 10.4, 6], "#brass", [8, 2, 9, 3], [8, 2, 9, 3], skip=("up",)),
@@ -278,10 +298,18 @@ def model(name):
     if emit:
         panel["light_emission"] = emit
     els.append(panel)
+    # brass frame around the display: it only covers the window's own 1 px edge, so no glyph is hidden
+    for frm, to, uv in (
+        ([0.7, 10, 7.4], [1.7, 16, 8], [0, 0, 1, 6]),       # left
+        ([14.3, 10, 7.4], [15.3, 16, 8], [0, 0, 1, 6]),     # right
+        ([0.7, 15.2, 7.4], [15.3, 16, 8], [0, 0, 14, 1]),   # top rail
+        ([0.7, 10, 7.4], [15.3, 10.8, 8], [0, 0, 14, 1]),   # bottom rail
+    ):
+        els.append(box(frm, to, "#brass", uv, uv))
     if name in ("attention", "error"):
         # ring marks: two glowing bars flank the bell (the bell is ringing), lens colour
-        for (x0, x1) in ((1.2, 2.2), (6.8, 7.8)):
-            els.append(box([x0, 11.5, 4.5], [x1, 14, 6], "#lens", [0, 0, 2, 2], [0, 0, 2, 2], emit=15))
+        for (x0, x1) in ((0.8, 1.8), (7.2, 8.2)):
+            els.append(box([x0, 11.5, 4.5], [x1, 14.5, 6], "#lens", [0, 0, 2, 2], [0, 0, 2, 2], emit=15))
     return {
         "parent": "minecraft:block/block",
         "textures": {

@@ -18,7 +18,8 @@ Texture layout (all 16x16):
   console_terminal_top     slate top plate: cabinet top, housing top
   console_terminal_keys    keyboard top: region x 1-15, y 0-8 (14 x 8 px = the wedge's top)
   console_terminal_bezel   dark bezel: housing front
-  console_terminal_screen  screen at x 2-13, y 3-7 (12 x 5 px = the glass), LED swatches at (0,8) amber and (2,8) teal
+  console_terminal_screen  screen at x 2-13, y 3-7 (12 x 5 px = the glass), LED swatches at (0,8) amber and (2,8) accent
+  console_terminal_screen_violet / _gold  the same screen with another title bar + LED (accent variants, weighted in the blockstate)
 """
 import json
 import os
@@ -65,6 +66,7 @@ STEEL_LO = (44, 49, 58)
 STEEL_EDGE = (30, 34, 41)
 BEZEL = (22, 25, 31)
 BEZEL_HI = (38, 43, 51)
+BEZEL_STEEL = (52, 58, 68)
 TEAL = (64, 214, 208)
 TEAL_MID = (32, 128, 136)
 TEAL_DIM = (16, 62, 72)
@@ -149,17 +151,19 @@ def top():
 
 
 def bezel():
-    img = new(BEZEL)
+    """Monitor frame: mid steel with a lit top/left edge and a dark outline, so the screen reads as a monitor, not as a hole."""
+    img = new(BEZEL_STEEL)
     for y in range(16):
         for x in range(16):
-            img[y][x] = px(shade(BEZEL, noise(x, y)))
+            img[y][x] = px(shade(BEZEL_STEEL, noise(x, y)))
     for i in range(16):
-        img[0][i] = px(shade(BEZEL, -8))
-        img[15][i] = px(shade(BEZEL, -8))
-        img[i][0] = px(shade(BEZEL, -8))
-        img[i][15] = px(shade(BEZEL, -8))
+        img[0][i] = px(STEEL_HI)
+        img[15][i] = px(STEEL_EDGE)
+        img[i][0] = px(STEEL_HI)
+        img[i][15] = px(STEEL_EDGE)
     for i in range(1, 15):
-        img[1][i] = px(BEZEL_HI)
+        img[1][i] = px(shade(BEZEL_STEEL, 12))
+        img[14][i] = px(shade(BEZEL_STEEL, -14))
     return img
 
 
@@ -192,9 +196,19 @@ def keys():
     return img
 
 
-def screen():
-    """Glass: x 2-13, y 3-7 (12 x 5). A structured terminal UI on a flat teal field: a title bar, a prompt line (chevron,
-    amber cursor), two text lines of different length, nothing random. Reads as an interface, not noise."""
+# accent variants: the title bar, the T3 tick and the LED swatch change; the field and the text stay teal so it still reads as a T3 console.
+# name -> (title bar, tick, led).  "" is the T3 teal one (the first variant of the blockstate).
+ACCENTS = {
+    "": (TEAL_MID, TEAL_HI, TEAL),
+    "violet": ((110, 88, 200), (222, 208, 255), (170, 140, 255)),
+    "gold": ((176, 124, 40), (255, 230, 170), (255, 200, 90)),
+}
+
+
+def screen(accent=""):
+    """Glass: x 2-13, y 3-7 (12 x 5). A structured terminal UI on a flat teal field: a title bar (in the accent colour), a prompt
+    line (chevron, amber cursor), two text lines of different length, nothing random. Reads as an interface, not noise."""
+    bar, tick, led = ACCENTS[accent]
     img = new(BEZEL)
     gx, gy = 2, 3
     W, H = 12, 5
@@ -205,11 +219,11 @@ def screen():
     def put(dx, dy, c):
         img[gy + dy][gx + dx] = px(c)
 
-    # row 0: title bar (lighter teal) with a bright T3 tick at the left
+    # row 0: title bar with a bright tick at the left
     for dx in range(W):
-        put(dx, 0, TEAL_MID)
-    put(0, 0, TEAL_HI)
-    put(1, 0, TEAL_HI)
+        put(dx, 0, bar)
+    put(0, 0, tick)
+    put(1, 0, tick)
     # row 1: text line, long
     for dx in range(1, 10):
         put(dx, 1, TEAL)
@@ -224,11 +238,11 @@ def screen():
     for dx in range(1, 8):
         put(dx, 4, TEAL_DIM2)
     put(10, 4, AMBER)
-    # LED swatches for the model's two indicator lights
+    # LED swatches for the model's two chin lights: amber at (0,8), the accent at (2,8)
     for (x, y) in ((0, 8), (1, 8), (0, 9), (1, 9)):
         img[y][x] = px(AMBER)
     for (x, y) in ((2, 8), (3, 8), (2, 9), (3, 9)):
-        img[y][x] = px(TEAL)
+        img[y][x] = px(led)
     return img
 
 
@@ -240,8 +254,21 @@ def face(tex, uv, cull=None):
     return f
 
 
-def model():
+def box6(frm, to, faces, emission=0, rotation=None):
+    e = {"from": frm, "to": to, "faces": faces}
+    if rotation:
+        e["rotation"] = rotation
+    if emission:
+        e["light_emission"] = emission
+    return e
+
+
+def model(accent=""):
+    """Desk + a slim monitor: foot plate, neck, a thin frame leaning back 8 degrees with a chin, a small rear shell. The hitbox
+    (ConsoleTerminalBlock: cabinet 0-7 + a 2-14 x 7-15 x 8-13 volume) is untouched: everything stays inside it."""
     side = [0, 9, 16, 16]
+    lean = {"angle": 8, "axis": "x", "origin": [8, 9.5, 9.6]}
+    scr = "screen"
     elements = [
         {   # cabinet
             "from": [0, 0, 0], "to": [16, 7, 16],
@@ -266,45 +293,35 @@ def model():
                 "down": face("body", [1, 0, 15, 6]),
             },
         },
-        {   # screen housing
-            "from": [1, 7, 8], "to": [15, 15, 11],
-            "faces": {
-                "up": face("top", [1, 3, 15, 8]),
-                "north": face("bezel", [1, 1, 15, 9]),
-                "south": face("body", [1, 1, 15, 9]),
-                "west": face("body", [5, 1, 8, 9]),
-                "east": face("body", [8, 1, 11, 9]),
-            },
-        },
-        {   # indicator LEDs on top of the housing (emissive): amber and teal
-            "from": [2.5, 15, 9.5], "to": [4, 15.8, 11],
-            "faces": {
-                "up": face("screen", [0, 8, 2, 10]),
-                "north": face("screen", [0, 8, 2, 10]),
-                "south": face("screen", [0, 8, 2, 10]),
-                "west": face("screen", [0, 8, 2, 10]),
-                "east": face("screen", [0, 8, 2, 10]),
-            },
-            "light_emission": 15,
-        },
-        {
-            "from": [12, 15, 9.5], "to": [13.5, 15.8, 11],
-            "faces": {
-                "up": face("screen", [2, 8, 4, 10]),
-                "north": face("screen", [2, 8, 4, 10]),
-                "south": face("screen", [2, 8, 4, 10]),
-                "west": face("screen", [2, 8, 4, 10]),
-                "east": face("screen", [2, 8, 4, 10]),
-            },
-            "light_emission": 15,
-        },
-        {   # the glass, 12 x 5, just in front of the bezel (emissive)
-            "from": [2, 9, 7.9], "to": [14, 14, 8],
-            "faces": {
-                "north": face("screen", [2, 3, 14, 8]),
-            },
-            "light_emission": 15,
-        },
+        # --- the monitor stand: a flat foot plate, a neck
+        box6([4.5, 7, 8.6], [11.5, 7.7, 12.4], {
+            "up": face("top", [4, 8, 12, 12]), "north": face("body", [4, 9, 12, 10]), "south": face("body", [4, 9, 12, 10]),
+            "west": face("body", [8, 9, 12, 10]), "east": face("body", [8, 9, 12, 10]),
+        }),
+        box6([6.8, 7.7, 10], [9.2, 10.5, 11.6], {
+            "north": face("body", [6, 6, 9, 10]), "south": face("body", [6, 6, 9, 10]),
+            "west": face("body", [8, 6, 10, 10]), "east": face("body", [8, 6, 10, 10]),
+        }),
+        # --- the monitor: a thin frame (1.5 px) leaning back; width 14 (bezel 1 px each side), 1 px chin below the glass
+        box6([1, 9.5, 9.3], [15, 16, 10.8], {
+            "north": face("bezel", [1, 1, 15, 7.5]),
+            "south": face("body", [1, 1, 15, 7.5]),
+            "up": face("bezel", [1, 0, 15, 2]),
+            "down": face("body", [1, 0, 15, 2]),
+            "west": face("bezel", [0, 1, 2, 7.5]),
+            "east": face("bezel", [0, 1, 2, 7.5]),
+        }, rotation=lean),
+        # rear shell: a narrower, slightly deeper back so the profile is a tapered LCD and not a slab
+        box6([3.5, 10.4, 10.8], [12.5, 14.6, 12], {
+            "south": face("body", [3, 3, 12, 8]), "north": face("body", [3, 3, 12, 8]),
+            "up": face("top", [3, 3, 12, 5]), "down": face("body", [3, 3, 12, 5]),
+            "west": face("body", [3, 3, 5, 8]), "east": face("body", [3, 3, 5, 8]),
+        }, rotation=lean),
+        # the glass, 12 x 5, just in front of the bezel (emissive)
+        box6([2, 10.5, 9.2], [14, 15.5, 9.3], {"north": face(scr, [2, 3, 14, 8])}, emission=15, rotation=lean),
+        # two chin LEDs (emissive): amber left, the accent right
+        box6([2.3, 9.7, 9.2], [3.8, 10.3, 9.3], {"north": face(scr, [0, 8, 2, 9])}, emission=15, rotation=lean),
+        box6([12.2, 9.7, 9.2], [13.7, 10.3, 9.3], {"north": face(scr, [2, 8, 4, 9])}, emission=15, rotation=lean),
     ]
     return {
         "parent": "minecraft:block/block",
@@ -315,55 +332,47 @@ def model():
             "top": "t3craft:block/console_terminal_top",
             "keys": "t3craft:block/console_terminal_keys",
             "bezel": "t3craft:block/console_terminal_bezel",
-            "screen": "t3craft:block/console_terminal_screen",
+            "screen": "t3craft:block/console_terminal_screen" + ("_" + accent if accent else ""),
         },
         "elements": elements,
     }
 
 
+def blockstate():
+    """Orientation by `facing`; the accent is a weighted pick among three models (the game picks one per position, so a bank of
+    consoles is not three clones). No new property, so ConsoleTerminalBlock and the kernel are untouched."""
+    variants = {}
+    for facing, y in (("north", 0), ("east", 90), ("south", 180), ("west", 270)):
+        lst = []
+        for accent in ACCENTS:
+            v = {"model": "t3craft:block/console_terminal" + ("_" + accent if accent else ""), "weight": 1}
+            if y:
+                v["y"] = y
+            lst.append(v)
+        variants["facing=" + facing] = lst
+    return {"variants": variants}
+
+
 # ---------------------------------------------------------------- review sheets
-def elevation(tex):
-    """A rough front elevation (units x 8 px): cabinet front, keyboard strip, bezel with glass. Not a render, a layout check."""
-    k = 8
-    W, H = 16 * k, 16 * k
-    canvas = [[(18, 20, 24, 255)] * W for _ in range(H)]
-
-    def blit(img, ux, uy, uw, uh, dx, dy_top):
-        # img crop (ux,uy,uw,uh) pasted with its top-left at model x=dx, model y (from the top) = dy_top, at k px per texel
-        for j in range(uh):
-            for i in range(uw):
-                p = img[uy + j][ux + i]
-                for b in range(k):
-                    for a in range(k):
-                        yy = (dy_top + j) * k + b
-                        xx = (dx + i) * k + a
-                        if 0 <= yy < H and 0 <= xx < W:
-                            canvas[yy][xx] = p
-
-    # cabinet front: model y 0..7 -> from the top 9..16
-    blit(tex["front"], 0, 9, 16, 7, 0, 9)
-    # keyboard top seen from the front: 1 unit strip (rows 0..) is too thin; show keys as a strip above the cabinet
-    blit(tex["keys"], 1, 0, 14, 1, 1, 8)
-    # housing bezel: x 2..14, model y 7..14.5 -> top 1.5..9: use 12 x 7
-    blit(tex["bezel"], 2, 1, 12, 7, 2, 1)
-    # glass: x 3..13, y 9.5..13.5 -> top 2.5..6.5
-    blit(tex["screen"], 3, 4, 10, 4, 3, 3)
-    return canvas
-
-
 def main():
-    tex = {"body": body(), "front": front(), "top": top(), "keys": keys(), "bezel": bezel(), "screen": screen()}
+    tex = {"body": body(), "front": front(), "top": top(), "keys": keys(), "bezel": bezel()}
     os.makedirs(TEX, exist_ok=True)
     os.makedirs(MODELS, exist_ok=True)
     for name, img in tex.items():
         write_png(os.path.join(TEX, "console_terminal_%s.png" % name), img)
-    with open(os.path.join(MODELS, "console_terminal.json"), "w") as f:
-        json.dump(model(), f, indent=2)
+    for accent in ACCENTS:
+        img = screen(accent)
+        tex["screen" + ("_" + accent if accent else "")] = img
+        write_png(os.path.join(TEX, "console_terminal_screen%s.png" % ("_" + accent if accent else "")), img)
+        with open(os.path.join(MODELS, "console_terminal%s.json" % ("_" + accent if accent else "")), "w") as f:
+            json.dump(model(accent), f, indent=2)
+            f.write("\n")
+    with open(os.path.join(ROOT, "blockstates", "console_terminal.json"), "w") as f:
+        json.dump(blockstate(), f, indent=2)
         f.write("\n")
     if "--preview" in sys.argv:
         out = sys.argv[sys.argv.index("--preview") + 1]
         os.makedirs(out, exist_ok=True)
-        # one sheet: the six textures side by side at 12x
         names = list(tex)
         sheet = [[(18, 20, 24, 255)] * (len(names) * 17 * 12) for _ in range(16 * 12)]
         for n, name in enumerate(names):
@@ -372,9 +381,8 @@ def main():
                 for x, p in enumerate(row):
                     sheet[y][n * 17 * 12 + x] = p
         write_png(os.path.join(out, "textures.png"), sheet)
-        write_png(os.path.join(out, "elevation.png"), elevation(tex))
         print("preview:", out)
-    print("wrote", len(tex), "textures and the model")
+    print("wrote", len(tex), "textures and", len(ACCENTS), "models")
 
 
 if __name__ == "__main__":
