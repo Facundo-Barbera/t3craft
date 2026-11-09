@@ -80,6 +80,11 @@ import net.minecraft.world.level.block.state.BlockState;
  *   keeps just views whose suffix contains one of the words.</li>
  *   <li>{@code --scale F}: <b>in piece mode</b> multiplies the automatic fit (about 1100 px across the
  *   piece, so 1 = full detail, 0.5 = small preview); {@code --ss 1} turns supersampling off for speed.</li>
+ *   <li>Look (every mode, tools/render-quality): {@code --final} (default) turns on soft sun shadows, ambient
+ *   occlusion, the sky lighting with tonemap and bloom, and the Mitchell filter; {@code --preview} (or
+ *   {@code --ss 1} without {@code --final}) keeps the old flat look. Override one by one with {@code --ao/--no-ao},
+ *   {@code --shadows/--hard-shadows/--no-shadows}, {@code --sky/--no-sky}, {@code --bloom/--no-bloom},
+ *   {@code --filter box|tent|mitchell}, {@code --shadow-rays N}. See docs/tools/hq-render.md.</li>
  *   <li>{@code --compare DIR}: after the run, for every PNG written here, the image of the same name in DIR
  *   (before) next to the new one (after) as {@code compare_NAME.png}, and {@code compare.txt} with the
  *   pixel difference and whether both {@code report.json} have the same plan signature. Works with any
@@ -105,6 +110,39 @@ public final class HqRender {
 	}
 
 	private record View(String name, String title, Renderer.Clip clip, Renderer.Camera cam) {
+	}
+
+	private static Renderer.Look look(boolean preview, java.util.Map<String, String> opts) {
+		Renderer.Look l = preview ? Renderer.Look.preview() : Renderer.Look.finalLook();
+		for (java.util.Map.Entry<String, String> e : opts.entrySet()) {
+			switch (e.getKey()) {
+				case "--ao" -> l.ao = true;
+				case "--no-ao" -> l.ao = false;
+				case "--shadows" -> l.shadows = true;
+				case "--hard-shadows" -> {
+					l.shadows = false;
+					l.hardShadows = true;
+				}
+				case "--no-shadows" -> {
+					l.shadows = false;
+					l.hardShadows = false;
+				}
+				case "--sky" -> l.sky = true;
+				case "--no-sky" -> l.sky = false;
+				case "--bloom" -> l.bloom = true;
+				case "--no-bloom" -> l.bloom = false;
+				case "--shadow-rays" -> l.shadowRays = Math.max(1, Integer.parseInt(e.getValue()));
+				case "--filter" -> {
+					if (!List.of("box", "tent", "mitchell").contains(e.getValue())) {
+						throw new IllegalArgumentException("--filter must be box, tent or mitchell, not " + e.getValue());
+					}
+					l.filter = e.getValue();
+				}
+				default -> {
+				}
+			}
+		}
+		return l;
 	}
 
 	/**
@@ -173,8 +211,16 @@ public final class HqRender {
 		String catalogFront = null;
 		int catalogSizes = 3;
 		int catalogSeeds = 2;
+		// tools/render-quality: look switches, on in final and off in preview (see Renderer.Look)
+		Boolean previewOpt = null;
+		java.util.Map<String, String> lookOpts = new java.util.LinkedHashMap<>();
 		for (int i = 0; i < args.length; i++) {
 			switch (args[i]) {
+				case "--preview" -> previewOpt = true;
+				case "--final" -> previewOpt = false;
+				case "--ao", "--shadows", "--hard-shadows", "--sky", "--bloom", "--no-ao", "--no-shadows", "--no-sky", "--no-bloom" -> lookOpts.put(args[i], "");
+				case "--filter" -> lookOpts.put("--filter", args[++i]);
+				case "--shadow-rays" -> lookOpts.put("--shadow-rays", args[++i]);
 				case "--out" -> out = Path.of(args[++i]);
 				case "--style" -> styleId = args[++i];
 				case "--layout" -> layoutId = args[++i];
@@ -228,6 +274,9 @@ public final class HqRender {
 				default -> throw new IllegalArgumentException("unknown option " + args[i]);
 			}
 		}
+		// no --preview/--final: --ss 1 (what the render service adds to previews) counts as a preview
+		Renderer.look = look(previewOpt != null ? previewOpt : ss <= 1, lookOpts);
+		System.out.println("look: " + Renderer.look);
 		double scaleMul = scaleOpt == null ? 1.6 : scaleOpt;
 		if (vanilla) {
 			HqFixtures.use(null);

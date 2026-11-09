@@ -45,6 +45,8 @@ final class BlockModels {
 		final int uvRot;
 		final int tint;
 		final boolean emissive;
+		/** False for faces the model marks {@code "shade": false} (plants, torches): lit evenly, not by their normal. */
+		boolean shade = true;
 
 		Quad(double[] p0, double[] e1, double[] e2, double[] n, Texture tex, double[] uv, int uvRot, int tint, boolean emissive) {
 			this.p0 = p0;
@@ -106,6 +108,22 @@ final class BlockModels {
 			this.px = px;
 		}
 
+		private double opaque = -1;
+
+		/** Fraction of texels that are (nearly) opaque: what decides whether a face blocks light for ambient occlusion. */
+		double opaqueFraction() {
+			if (opaque < 0) {
+				int n = 0;
+				for (int c : px) {
+					if (((c >>> 24) & 255) > 200) {
+						n++;
+					}
+				}
+				opaque = px.length == 0 ? 0 : n / (double) px.length;
+			}
+			return opaque;
+		}
+
 		static Texture solid(int argb) {
 			return new Texture(1, 1, new int[] {argb});
 		}
@@ -125,16 +143,35 @@ final class BlockModels {
 	private final Map<String, JsonObject> json = new HashMap<>();
 	private final Map<String, Texture> textures = new HashMap<>();
 	private final Map<BlockState, List<Quad>> byState = new HashMap<>();
+	private final Map<BlockState, Integer> masks = new HashMap<>();
+	/** Occupancy being built by {@link #build} (bits of {@link #bit}); only touched under the monitor. */
+	private int buildMask;
 	/** What could not be resolved (texture ids, block ids without quads), for the run's report. */
 	final java.util.Set<String> problems = new java.util.TreeSet<>();
 
 	synchronized List<Quad> quads(BlockState state) {
 		List<Quad> q = byState.get(state);
 		if (q == null) {
+			buildMask = 0;
 			q = List.copyOf(build(state));
 			byState.put(state, q);
+			masks.put(state, buildMask);
 		}
 		return q;
+	}
+
+	/**
+	 * Which of the block's eight half-block sub-cells are filled with opaque model elements (bit
+	 * {@code x | z<<1 | y<<2}, each 0 = low half, 1 = high half). A full stone block is 0xFF, a bottom
+	 * slab 0x0F, glass, plants and fences 0. Used by the renderer's ambient occlusion.
+	 */
+	synchronized int occupancy(BlockState state) {
+		quads(state);
+		return masks.getOrDefault(state, 0);
+	}
+
+	static int bit(int x, int y, int z) {
+		return 1 << (x | (z << 1) | (y << 2));
 	}
 
 	// ------------------------------------------------------------------ resources
@@ -334,6 +371,7 @@ final class BlockModels {
 		Resolved m = resolveModel(v.get("model").getAsString());
 		int rx = v.has("x") ? v.get("x").getAsInt() : 0;
 		int ry = v.has("y") ? v.get("y").getAsInt() : 0;
+		boolean uvlock = v.has("uvlock") && v.get("uvlock").getAsBoolean() && (rx != 0 || ry != 0);
 		if (m.elements() == null) {
 			return;
 		}
@@ -343,18 +381,87 @@ final class BlockModels {
 			double[] to = vec(el.getAsJsonArray("to"));
 			JsonObject rot = el.has("rotation") ? el.getAsJsonObject("rotation") : null;
 			JsonObject faces = el.getAsJsonObject("faces");
+			double opaque = 0;
+			int faceCount = 0;
 			for (Map.Entry<String, JsonElement> fe : faces.entrySet()) {
 				JsonObject f = fe.getValue().getAsJsonObject();
 				Texture t = resolveTexture(m.textures(), f.get("texture").getAsString());
+				opaque += t == MISSING ? 0 : t.opaqueFraction();
+				faceCount++;
 				double[] uv = f.has("uv") ? vec(f.getAsJsonArray("uv")) : defaultUv(fe.getKey(), from, to);
 				int uvRot = f.has("rotation") ? f.get("rotation").getAsInt() : 0;
 				int faceTint = f.has("tintindex") ? tint : 0xFFFFFF;
-				Quad q = face(fe.getKey(), from, to, rot, rx, ry, t, uv, uvRot, faceTint, emissive);
+				Quad q;
+				if (uvlock && rot == null) {
+					// uvlock (stairs, slabs, walls…): the texture stays aligned with the world, so rotate the box
+					// first and take the uv the rotated face would have unrotated
+					double[] c1 = from.clone();
+					double[] c2 = to.clone();
+					variantRotate(c1, rx, ry, 8);
+					variantRotate(c2, rx, ry, 8);
+					double[] nf = {Math.min(c1[0], c2[0]), Math.min(c1[1], c2[1]), Math.min(c1[2], c2[2])};
+					double[] nt = {Math.max(c1[0], c2[0]), Math.max(c1[1], c2[1]), Math.max(c1[2], c2[2])};
+					String nd = rotateDir(fe.getKey(), rx, ry);
+					q = face(nd, nf, nt, null, 0, 0, t, defaultUv(nd, nf, nt), uvRot, faceTint, emissive);
+				} else {
+					q = face(fe.getKey(), from, to, rot, rx, ry, t, uv, uvRot, faceTint, emissive);
+				}
+				if (q != null && el.has("shade") && !el.get("shade").getAsBoolean()) {
+					q.shade = false;
+				}
 				if (q != null) {
 					out.add(q);
 				}
 			}
+			boolean rotated = rot != null && rot.has("angle") && rot.get("angle").getAsDouble() != 0;
+			if (!rotated && faceCount > 0 && opaque / faceCount >= 0.5 && !blockPath.contains("glass") && !blockPath.contains("water")) {
+				buildMask |= elementMask(from, to, rx, ry);
+			}
 		}
+	}
+
+	/** Face direction after the variant rotation (x first, then y), as {@link #variantRotate} turns points. */
+	private static String rotateDir(String dir, int rx, int ry) {
+		double[] n = switch (dir) {
+			case "north" -> new double[] {0, 0, -1};
+			case "south" -> new double[] {0, 0, 1};
+			case "west" -> new double[] {-1, 0, 0};
+			case "east" -> new double[] {1, 0, 0};
+			case "up" -> new double[] {0, 1, 0};
+			default -> new double[] {0, -1, 0};
+		};
+		variantRotate(n, rx, ry, 0);
+		if (n[1] > 0.5) {
+			return "up";
+		}
+		if (n[1] < -0.5) {
+			return "down";
+		}
+		if (n[0] > 0.5) {
+			return "east";
+		}
+		if (n[0] < -0.5) {
+			return "west";
+		}
+		return n[2] > 0 ? "south" : "north";
+	}
+
+	/** Sub-cells (see {@link #occupancy}) whose centres lie inside the element box, after the variant rotation. */
+	private static int elementMask(double[] from, double[] to, int rx, int ry) {
+		int mask = 0;
+		for (int iy = 0; iy < 2; iy++) {
+			for (int iz = 0; iz < 2; iz++) {
+				for (int ix = 0; ix < 2; ix++) {
+					double[] c = {4 + 8 * ix, 4 + 8 * iy, 4 + 8 * iz};
+					if (c[0] < from[0] || c[0] > to[0] || c[1] < from[1] || c[1] > to[1] || c[2] < from[2] || c[2] > to[2]) {
+						continue;
+					}
+					variantRotate(c, rx, ry, 8);
+					mask |= bit(c[0] > 8 ? 1 : 0, c[1] > 8 ? 1 : 0, c[2] > 8 ? 1 : 0);
+				}
+			}
+		}
+		return mask;
 	}
 
 	private static double[] vec(JsonArray a) {
@@ -527,6 +634,7 @@ final class BlockModels {
 			box(out, new double[] {7.5, 0, 7.5}, new double[] {8.5, 9, 8.5}, t, 0, tint, emissive);
 			box(out, new double[] {0, 9, 7}, new double[] {16, 17, 9}, t, 0, tint, emissive);
 		} else if (path.contains("chest")) {
+			buildMask = 0xFF;
 			box(out, new double[] {1, 0, 1}, new double[] {15, 14, 15}, t, 0, tint, emissive);
 		} else if (!t.equals(MISSING)) {
 			box(out, new double[] {2, 0, 2}, new double[] {14, 12, 14}, t, 0, tint, emissive);
@@ -545,7 +653,7 @@ final class BlockModels {
 
 	private static int tintOf(String path) {
 		return switch (path) {
-			case "grass_block", "short_grass", "tall_grass", "fern", "large_fern", "potted_fern", "sugar_cane", "bush" -> 0x91BD59;
+			case "grass_block", "short_grass", "tall_grass", "fern", "large_fern", "potted_fern", "sugar_cane", "bush", "pink_petals", "wildflowers" -> 0x91BD59;
 			case "oak_leaves", "jungle_leaves", "acacia_leaves", "dark_oak_leaves", "mangrove_leaves", "vine" -> 0x77AB2F;
 			case "spruce_leaves" -> 0x619961;
 			case "birch_leaves" -> 0x80A755;
