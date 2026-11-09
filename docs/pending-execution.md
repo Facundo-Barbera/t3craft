@@ -36,6 +36,20 @@ house-timber, house-stone, house-japanese, house-terrace, house-workshop, house-
 ## Arreglo del crash al abrir el HQ: integrado
 `fix/void-null-layer`, commit del fix `c9b98ce`, merge en main `b3c2df1`. Compilado una vez con `tools/heavy.sh`. Para actualizar el juego en Windows, hacer pull de main (o de ese commit) y recompilar.
 
+## Arreglo de Ctrl+V: integrado
+`fix/paste-crash`: el commit del arreglo es `faf953e` y el merge en main es `6562e0e`. Compilado.
+- En Windows ya no se usa el portapapeles AWT (se puede volver a activar con `-Dt3craft.awtClipboard=true`).
+- La lectura del portapapeles y el pegado de imágenes quedan envueltos: un fallo muestra un error en el composer en vez de crashear.
+- Si vuelve a crashear, hace falta el crash report (`crash-reports/` o `hs_err_pid*.log` en el directorio `run`).
+
+## `citadel/next`: compila (2026-11-09)
+Incluye el catálogo (49 variantes), la colocación, el gancho de la oficina y las 10 ramas del swarm 1 (sin `scale` ni `1-connect`).
+- Compilado con `tools/heavy.sh`: hubo que renombrar un `record Tail` duplicado que venía de `fix/new-thread-hitch`.
+- Falta: renders en el PC (por el relay, bloqueado por la clave SSH) y la integración a main.
+
+## En curso (solo código)
+- `feat/build-near-player`: los builders construyen primero cerca del jugador y arrancan cerca en el mundo void.
+
 ## Renders en el PC de Facundo (my-pc): probar 1 job
 **BLOQUEADO 2026-11-09:** la VPS no tiene acceso SSH al PC (`Permission denied (publickey…)`). Hay que agregar en `~/.ssh/authorized_keys` del user `wsluser` en WSL esta clave pública de la VPS:
 `ssh-ed25519 AAAA...REDACTED example-key`
