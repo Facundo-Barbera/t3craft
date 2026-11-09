@@ -269,7 +269,6 @@ public final class LampCherryPost implements Variant {
 		}
 		BlockState light = switch (kind) {
 			case 1 -> PaperLanterns.hanging(tone);
-			case 2 -> c.kit.glowPanel(Direction.DOWN, false);
 			default -> LANTERN.setValue(BlockStateProperties.HANGING, true);
 		};
 		p.put(c, tu, ly, tv, light, CitadelCanvas.HANGING);
