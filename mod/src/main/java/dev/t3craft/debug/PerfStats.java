@@ -256,6 +256,12 @@ public final class PerfStats {
 	public static final String STEP_PRIORITY_ASYNC = "step.build.priority_async.ns";
 	/** feat/build-radial: server, one tick of a radial job (both streams: foundation and builders). */
 	public static final String STEP_RADIAL_TICK = "step.build.radial.ns";
+	/** fix/build-radial-tune: server, the walkable-surface stream of a radial tick (ground + one support layer, ring-limited). */
+	public static final String STEP_RADIAL_GROUND = "step.build.radial_ground.ns";
+	/** fix/build-radial-tune: server, the builders of a radial tick (span picks, courses, climbing). */
+	public static final String STEP_RADIAL_BUILDERS = "step.build.radial_builders.ns";
+	/** fix/build-radial-tune: server, the hidden-fill stream of a radial tick (terrain under the surface, rings behind). */
+	public static final String STEP_RADIAL_FILL = "step.build.radial_fill.ns";
 	/** feat/build-radial: async, plan analysis of a radial job (foundation split, columns, first order). */
 	public static final String STEP_RADIAL_PLAN = "step.build.radial_plan_async.ns";
 	/** feat/build-radial: async, column re-order around the moved centre. */

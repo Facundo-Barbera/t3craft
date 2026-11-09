@@ -12,48 +12,64 @@ import org.jspecify.annotations.Nullable;
  * player) instead of part by part: every column ({@code x, z}) of the plan gets a priority from its
  * horizontal distance to the centre, rounded to rings of {@code build.radialRing} blocks (5 → ring 0 is
  * everything within 5 blocks, ring 1 within 10, …), and the columns of the nearest ring go first.
- * When the centre moves the order is recomputed off-thread ({@link Offload}, {@code build.radial_order_async})
- * and what was pending elsewhere waits for later.
+ * When the centre moves the order is recomputed off-thread ({@link Offload}, {@code build.radial_order_async}),
+ * a little ahead of the player in the direction it walks, and what was pending elsewhere waits for later.
  *
- * <p><b>Inside a column, always bottom-up</b>, and an entry goes only once it is supported, so nothing
- * floats:
+ * <p><b>Each column has three parts</b> (fix/build-radial-tune), bottom-up in the plan:
+ * <ol>
+ *   <li><b>fill</b>: the hidden terrain of the column's bottom stack (the void island's deep layers, podium
+ *   fill), every {@link Foundation} terrain entry of the stack but the top two;</li>
+ *   <li><b>ground</b>: the top of that stack, the walkable surface, plus the one layer right under it so it
+ *   does not look like a sheet of paper;</li>
+ *   <li><b>above</b>: everything over the ground (walls, roofs, decoration, upper floors).</li>
+ * </ol>
+ * Ground goes before its fill (the one exception to "nothing floats", and only for terrain of the plan:
+ * no temporary floors are ever placed). Above goes bottom-up and only once supported:
  * <ul>
- *   <li>the lowest entry of a column rests on the terrain (or is the bottom of the void island);</li>
- *   <li>above it, the cell below must hold a placed solid entry of the plan, or, where the column has a
- *   gap (a roof over a hall, a bridge, a balcony), one of the four side cells (and for decoration the cell
- *   above too: hanging lanterns) must;</li>
+ *   <li>the cell below holds a placed solid entry of the plan, or, where the column has a gap (a roof over
+ *   a hall, a bridge, a balcony), one of the four side cells (and for decoration the cell above too:
+ *   hanging lanterns) does;</li>
  *   <li>falling blocks (sand, gravel, concrete powder) need the cell below;</li>
  *   <li>air entries (clearing) need nothing and support nothing.</li>
  * </ul>
- * A column whose head is not supported <b>stalls</b> (its entries above wait too) and wakes when a
- * neighbour cell of its head is placed. Stalled columns never hold the expansion back. If every column
- * left is stalled (a plan with truly floating pieces) the nearest one is forced, as the crew planner does.
+ * A column whose head is not supported <b>stalls</b> and wakes when a neighbour cell of its head is placed.
+ * Stalled columns never hold the expansion back. If every column left is stalled (a plan with truly
+ * floating pieces) the nearest one is forced, as the crew planner does.
  *
- * <p><b>Two streams</b> share the column order, each with its own per-tick budget:
+ * <p><b>The front ring.</b> {@link #visRing} is the ring of the nearest column with ground or above work
+ * left that is not stalled: the ring being finished. Everything is held to it:
  * <ol>
- *   <li><b>Foundation</b> ({@link Foundation}: terrain, the void island, floors and fill, plus air
- *   entries and entries already right in the world): no builder, {@link #frontOf} is -1, so no animation
- *   and no client event. Budget {@link BuildBudget#foundationBlocks} ({@code build.foundationBlocksPerTick},
- *   {@code build.foundationMsPerTick}, MSPT / FPS throttle).</li>
- *   <li><b>Builders</b>: everything else (walls, roofs, decoration). Each builder claims the free column of
- *   the current ring nearest to where it stands (a neighbouring ring when its ring has no free column left),
- *   walks to a spot beside it ({@link Walker}), places the column's entries bottom-up at
- *   {@code perBuilder} blocks per tick at most (raising its spot as the column grows, as if on scaffolding)
- *   and moves on once the column is done, stalled or its head is foundation again. They draw from the
- *   crews' budget ({@link BuildBudget#claim}) as every crew does.</li>
+ *   <li><b>Ground stream</b> (no builder, {@link #frontOf} -1): ground and air entries, and above entries
+ *   already right in the world, at most {@code build.foundationRingsAhead} rings beyond the front ring and
+ *   {@code build.groundBlocksPerTick} per tick (within {@link BuildBudget#foundationBlocks}). So the walkable
+ *   floor grows from the player's feet, a little ahead of the builders, never across the whole island.</li>
+ *   <li><b>Builders</b>: claim a <b>span</b> (a run of up to {@link #SPAN_MAX} neighbouring tall columns: a
+ *   piece of wall or tower; short columns are spans of one) in the front ring, at most
+ *   {@code build.builderRingsAhead} rings ahead. When their ring has no free span they help on the tallest
+ *   span of it (up to {@link #SPAN_CREW} builders) instead of going further. A builder raises its span in
+ *   courses (the lowest head of its columns first, so side support within the span counts in the same
+ *   pass) and climbs in place as it rises; it walks only to a new span or a column out of reach. Pace:
+ *   {@code build.climbBlocksPerTick} on tall spans, {@code perBuilder} otherwise, out of the crews' budget
+ *   ({@link BuildBudget#claim}).</li>
+ *   <li><b>Fill stream</b>: the hidden fill, {@code build.fillBlocksPerTick} per tick out of what the ground
+ *   left of the foundation budget, only {@code build.fillRingsBehind} rings behind the front ring (or
+ *   anywhere once nothing above or ground is left).</li>
  * </ol>
+ * With {@code build.fastFoundation} (off by default) the old fast base comes back: every foundation entry
+ * goes in the streams, with no ring limit, at the whole foundation budget.
  *
  * <p>Game-thread cost per tick: bounded scans ({@link #SCAN_MAX} columns per stream, {@link #PICK_SCAN} per
- * pick) over flat arrays, a handful of hash lookups per placed entry (support and wake-ups), and nothing
- * else; the plan analysis ({@link #plan}) runs off-thread in the job's {@link DeferredCursor}.
- * Plain Java, no world access (the world is read only through the {@code already} probe).
+ * pick, {@link #SPAN_MAX} per builder placement) over flat arrays, a handful of hash lookups per placed
+ * entry (support and wake-ups), and nothing else; the plan analysis ({@link #plan}) runs off-thread in the
+ * job's {@link DeferredCursor}. Plain Java, no world access (the world is read only through the
+ * {@code already} probe and the placements).
  */
 public final class RadialCursor implements JobCursor {
 	/** Columns a stream looks at per tick (besides the ones it works on). */
 	static final int SCAN_MAX = 8192;
-	/** World reads ({@code already} probe) the foundation stream makes per tick for builder heads. */
+	/** World reads ({@code already} probe) the ground stream makes per tick for builder heads. */
 	static final int PROBES_MAX = 1024;
-	/** Columns a builder looks at when it picks its next column. */
+	/** Columns a builder looks at when it picks its next span. */
 	static final int PICK_SCAN = 1024;
 	/** The centre moved this far (blocks) since the last order: recompute it. */
 	public static final double MOVE = 4.0;
@@ -62,8 +78,24 @@ public final class RadialCursor implements JobCursor {
 	public static final double DRIFT = 1.0;
 	/** Never two orders closer than this. */
 	public static final long MIN_GAP_MS = 750;
-	/** A builder raises its spot once the column's head is this far above its feet. */
+	/** A builder climbs once the head it places is this far above its feet. */
 	static final int RAISE_ABOVE = 3;
+	/** fix/build-radial-tune: a column with at least this many solid entries above its ground is tall (wall, tower). */
+	static final int TALL = 4;
+	/** Most columns in one span. */
+	static final int SPAN_MAX = 8;
+	/** Most builders on one span (its owner and helpers). */
+	static final int SPAN_CREW = 3;
+	/** A helper joins a span only when it has this many entries left. */
+	static final int HELP_MIN = 6;
+	/** A builder places up to this far (horizontally, each axis) from where it stands without walking. */
+	static final int REACH = 4;
+	/** The order centres this many rings ahead of the player in the direction it walked. */
+	static final double LEAD = 0.5;
+	/** Fill entries already right in the world (skips) per tick at most. */
+	static final int FILL_SKIPS = 1024;
+	/** No front ring (nothing above or ground left that is not stalled). */
+	static final int NO_RING = Integer.MAX_VALUE / 4;
 
 	/** Builder {@code front} starts walking to plan-relative feet cell {@code stand} to apply {@code index}, arriving in {@code ticks}. */
 	@FunctionalInterface
@@ -79,8 +111,11 @@ public final class RadialCursor implements JobCursor {
 	private final boolean[] air;
 	private final boolean[] decor;
 	private final boolean[] falling;
-	/** Placed by the foundation stream (foundation or air). */
+	/** Placed by a stream, never by a builder: air, ground, fill (fastFoundation: every foundation entry). */
 	private final boolean[] fast;
+	/** Ground entries (surface + one support layer): supported by definition. */
+	private final boolean[] ground;
+	private final boolean fastMode;
 	private final Long2IntOpenHashMap cellAt;
 	private final Long2IntOpenHashMap colAt;
 	private final int cols;
@@ -89,31 +124,46 @@ public final class RadialCursor implements JobCursor {
 	private final int[] colStart;
 	private final int[] colEntries;
 	private final int[] colOf;
+	/** Fill entries of each column: the first {@code colFill[c]} of its bottom-up entries. */
+	private final int[] colFill;
 	private final int ring;
 	private final int[] fallback;
+	private final int[] spanOf;
+	private final int[] spanStart;
+	private final int[] spanCols;
+	private final boolean[] tallSpan;
 
 	// ---- dynamic state (server thread) --------------------------------------------------------
+	/** Next ground/above entry of each column (index into its bottom-up entries, starts at {@link #colFill}). */
 	private final int[] colNext;
+	/** Next fill entry of each column (0 … {@link #colFill}). */
+	private final int[] fillNext;
+	private final int[] colLeft;
 	private final boolean[] stalled;
 	/** Head entry of each column already found supported (support never goes away); -1 = not checked. */
 	private final int[] okHead;
 	private final int[] colTop;
-	private final int[] colClaim;
 	private final boolean[] applied;
 	private final boolean[] forced;
 	private final int[] by;
+	private final int[] spanCrew;
+	private final int[] spanLead;
 	private int colsDone;
 	private int[] order;
 	private int[] posOf;
 	private int[] ringAt;
-	private int fPtr;
+	private int gPtr;
 	private int bPtr;
-	private int fWake = Integer.MAX_VALUE;
+	private int lPtr;
+	private int vPtr;
+	private int gWake = Integer.MAX_VALUE;
 	private int bWake = Integer.MAX_VALUE;
+	private int vWake = Integer.MAX_VALUE;
+	private int visRing;
 
 	private final int builders;
 	private final double perBuilder;
-	private final int[] tcol;
+	private final int[] tspan;
 	private final int[] walkLeft;
 	private final int[] px;
 	private final int[] py;
@@ -138,8 +188,9 @@ public final class RadialCursor implements JobCursor {
 	private volatile int failed;
 	private volatile JobState state = JobState.PENDING;
 
-	private RadialCursor(BuildPlan plan, Foundation.@Nullable Split split, int builders, double perBuilder, int ring, int @Nullable [] focus) {
+	private RadialCursor(BuildPlan plan, Foundation.Split split, boolean fastMode, int builders, double perBuilder, int ring, int @Nullable [] focus) {
 		this.n = plan.size();
+		this.fastMode = fastMode;
 		this.ring = Math.max(1, ring);
 		this.builders = Math.max(1, builders);
 		this.perBuilder = Math.max(1.0, perBuilder);
@@ -150,6 +201,7 @@ public final class RadialCursor implements JobCursor {
 		decor = new boolean[n];
 		falling = new boolean[n];
 		fast = new boolean[n];
+		ground = new boolean[n];
 		cellAt = new Long2IntOpenHashMap(Math.max(16, n));
 		cellAt.defaultReturnValue(-1);
 		colAt = new Long2IntOpenHashMap();
@@ -190,13 +242,9 @@ public final class RadialCursor implements JobCursor {
 			minZ = Math.min(minZ, z[i]);
 			maxZ = Math.max(maxZ, z[i]);
 		}
-		if (split != null) {
-			for (int i : split.foundation()) {
-				fast[i] = true;
-			}
-		}
-		for (int i = 0; i < n; i++) {
-			fast[i] |= air[i];
+		boolean[] terrain = new boolean[n];
+		for (int i : split.foundation()) {
+			terrain[i] = !air[i];
 		}
 		cols = nc;
 		colX = Arrays.copyOf(cxs, nc);
@@ -230,6 +278,76 @@ public final class RadialCursor implements JobCursor {
 				colEntries[k] = (int) tmp[k - a];
 			}
 		}
+		// fix/build-radial-tune: per column, the bottom terrain stack splits into fill (hidden) and ground
+		// (its top two entries: the walkable surface and the layer under it); the rest is above
+		colFill = new int[nc];
+		boolean[] tallCol = new boolean[nc];
+		for (int c = 0; c < nc; c++) {
+			int a = colStart[c];
+			int b = colStart[c + 1];
+			int t = 0;
+			while (a + t < b && terrain[colEntries[a + t]]) {
+				t++;
+			}
+			colFill[c] = Math.max(0, t - 2);
+			for (int k = 0; k < t; k++) {
+				int i = colEntries[a + k];
+				if (k < colFill[c]) {
+					fast[i] = true; // fill: the fill stream
+				} else {
+					ground[i] = true;
+				}
+			}
+			int solidAbove = 0;
+			for (int k = a + t; k < b; k++) {
+				if (!air[colEntries[k]]) {
+					solidAbove++;
+				}
+			}
+			tallCol[c] = solidAbove >= TALL;
+		}
+		for (int i = 0; i < n; i++) {
+			fast[i] |= air[i] || ground[i] || fastMode && terrain[i];
+		}
+		// spans: neighbouring tall columns (4-connected) in runs of up to SPAN_MAX; every other column alone
+		spanOf = new int[nc];
+		Arrays.fill(spanOf, -1);
+		int[] sStart = new int[nc + 1];
+		int[] sCols = new int[nc];
+		boolean[] sTall = new boolean[nc];
+		int ns = 0;
+		int k = 0;
+		for (int c = 0; c < nc; c++) {
+			if (spanOf[c] >= 0) {
+				continue;
+			}
+			int first = k;
+			sStart[ns] = first;
+			spanOf[c] = ns;
+			sCols[k++] = c;
+			if (tallCol[c]) {
+				sTall[ns] = true;
+				int qh = first;
+				while (qh < k && k - first < SPAN_MAX) {
+					int q = sCols[qh++];
+					for (int d = 0; d < 4 && k - first < SPAN_MAX; d++) {
+						int nb = colAt.get(CrewPlanner.key(colX[q] + (d == 0 ? 1 : d == 1 ? -1 : 0), 0, colZ[q] + (d == 2 ? 1 : d == 3 ? -1 : 0)));
+						if (nb >= 0 && spanOf[nb] < 0 && tallCol[nb]) {
+							spanOf[nb] = ns;
+							sCols[k++] = nb;
+						}
+					}
+				}
+			}
+			ns++;
+		}
+		sStart[ns] = k;
+		spanStart = Arrays.copyOf(sStart, ns + 1);
+		spanCols = sCols;
+		tallSpan = Arrays.copyOf(sTall, ns);
+		spanCrew = new int[ns];
+		spanLead = new int[ns];
+		Arrays.fill(spanLead, -1);
 		// where the build centres while no player is in it: the given focus, else the origin when it is
 		// inside the footprint (the demo's hub), else the middle of the footprint
 		if (focus != null) {
@@ -239,14 +357,17 @@ public final class RadialCursor implements JobCursor {
 		} else {
 			fallback = new int[] {n == 0 ? 0 : (minX + maxX) / 2, n == 0 ? 0 : (minZ + maxZ) / 2};
 		}
-		colNext = new int[nc];
+		colNext = Arrays.copyOf(colFill, nc);
+		fillNext = new int[nc];
+		colLeft = new int[nc];
+		for (int c = 0; c < nc; c++) {
+			colLeft[c] = colStart[c + 1] - colStart[c];
+		}
 		stalled = new boolean[nc];
 		okHead = new int[nc];
 		Arrays.fill(okHead, -1);
 		colTop = new int[nc];
 		Arrays.fill(colTop, Integer.MIN_VALUE);
-		colClaim = new int[nc];
-		Arrays.fill(colClaim, -1);
 		applied = new boolean[n];
 		forced = new boolean[n];
 		by = new int[n];
@@ -259,8 +380,9 @@ public final class RadialCursor implements JobCursor {
 		order = o[0];
 		ringAt = o[1];
 		posOf = positions(order);
-		tcol = new int[this.builders];
-		Arrays.fill(tcol, -1);
+		visRing = nc == 0 ? NO_RING : ringAt[0];
+		tspan = new int[this.builders];
+		Arrays.fill(tspan, -1);
 		walkLeft = new int[this.builders];
 		Arrays.fill(walkLeft, -1);
 		px = new int[this.builders];
@@ -275,19 +397,20 @@ public final class RadialCursor implements JobCursor {
 	}
 
 	/**
-	 * Analyses {@code plan} (off-thread: {@link DeferredCursor}): the foundation split, columns, bottom-up
-	 * order and the first ring order around {@code focus} (plan-relative {@code {x, z}}, null = the hub).
+	 * Analyses {@code plan} (off-thread: {@link DeferredCursor}): the foundation split (always: it tells
+	 * terrain, ground and fill apart), columns, bottom-up order, spans and the first ring order around
+	 * {@code focus} (plan-relative {@code {x, z}}, null = the hub).
 	 *
 	 * @param builders   builders (fronts) of the crew
-	 * @param perBuilder most blocks one builder places per tick
+	 * @param perBuilder most blocks one builder places per tick (tall spans: {@code build.climbBlocksPerTick})
 	 * @param ring       ring width, blocks ({@code build.radialRing})
-	 * @param fastFoundation lay the foundation without builders ({@code build.fastFoundation}); false = builders do everything but air
+	 * @param fastFoundation the old fast base ({@code build.fastFoundation}, off by default): every foundation
+	 *                   entry in the streams, no ring limit, the whole foundation budget
 	 */
 	static RadialCursor plan(BuildPlan plan, int builders, double perBuilder, int ring, int @Nullable [] focus, boolean fastFoundation) {
 		long t0 = System.nanoTime();
 		try {
-			Foundation.Split split = fastFoundation ? Foundation.of(plan) : null;
-			return new RadialCursor(plan, split, builders, perBuilder, ring, focus);
+			return new RadialCursor(plan, Foundation.of(plan), fastFoundation, builders, perBuilder, ring, focus);
 		} finally {
 			dev.t3craft.debug.PerfStats.stepAsync(dev.t3craft.debug.PerfStats.STEP_RADIAL_PLAN, t0);
 		}
@@ -328,12 +451,12 @@ public final class RadialCursor implements JobCursor {
 
 	// ---- wiring (server thread) ---------------------------------------------------------------
 
-	/** Entries already right in the world (skipped by the foundation stream, no walk); null = none known. */
+	/** Entries already right in the world (skipped by the ground stream, no walk); null = none known. */
 	void probe(@Nullable IntPredicate already) {
 		this.already = already;
 	}
 
-	/** Who hears a builder start walking. */
+	/** Who hears a builder start walking (or climb). */
 	void walker(@Nullable Walker w) {
 		this.walker = w;
 	}
@@ -341,7 +464,9 @@ public final class RadialCursor implements JobCursor {
 	/**
 	 * The centre now, plan-relative; null = nobody in the build (the hub / spawn fallback). Cheap: at most
 	 * starts an off-thread re-order (moved more than {@link #MOVE}, or {@link #INTERVAL_MS} passed and it
-	 * drifted {@link #DRIFT}; never closer than {@link #MIN_GAP_MS}; one at a time). Server thread.
+	 * drifted {@link #DRIFT}; never closer than {@link #MIN_GAP_MS}; one at a time). The new order centres
+	 * {@link #LEAD} rings ahead of the player along the way it moved, so walking towards the edge of what is
+	 * built brings the ground on that side first. Server thread.
 	 */
 	void focus(double @Nullable [] rel, long nowMs) {
 		double fx = rel == null ? fallback[0] : rel[0];
@@ -351,17 +476,22 @@ public final class RadialCursor implements JobCursor {
 		if (pendingOrder != null || nowMs - sortedAt < MIN_GAP_MS) {
 			return;
 		}
-		double moved = Math.hypot(fx - sortedX, fz - sortedZ);
+		double mx = fx - sortedX;
+		double mz = fz - sortedZ;
+		double moved = Math.hypot(mx, mz);
 		if (moved <= MOVE && !(moved >= DRIFT && nowMs - sortedAt >= INTERVAL_MS)) {
 			return;
 		}
+		double lead = rel == null || moved < DRIFT ? 0.0 : LEAD * ring / moved;
+		double ox = fx + mx * lead;
+		double oz = fz + mz * lead;
 		sortedX = fx;
 		sortedZ = fz;
 		sortedAt = nowMs;
 		int[] xs = colX;
 		int[] zs = colZ;
 		int r = ring;
-		pendingOrder = Offload.supply(dev.t3craft.debug.PerfStats.STEP_RADIAL_ORDER, () -> order(xs, zs, fx, fz, r));
+		pendingOrder = Offload.supply(dev.t3craft.debug.PerfStats.STEP_RADIAL_ORDER, () -> order(xs, zs, ox, oz, r));
 	}
 
 	/** Installs a finished re-order (the scans start again from the new nearest ring). */
@@ -380,17 +510,20 @@ public final class RadialCursor implements JobCursor {
 		order = o[0];
 		ringAt = o[1];
 		posOf = positions(order);
-		fPtr = 0;
+		gPtr = 0;
 		bPtr = 0;
-		fWake = Integer.MAX_VALUE;
+		lPtr = 0;
+		vPtr = 0;
+		gWake = Integer.MAX_VALUE;
 		bWake = Integer.MAX_VALUE;
+		vWake = Integer.MAX_VALUE;
 	}
 
 	// ---- columns ------------------------------------------------------------------------------
 
 	private static final int DONE = 0, STALLED = 1, FAST = 2, BUILD = 3;
 
-	/** Head entry of column {@code c}, or -1 when the column is done. */
+	/** Head (next ground / above entry) of column {@code c}, or -1 when its ground and above are done. */
 	private int head(int c) {
 		int k = colStart[c] + colNext[c];
 		return k < colStart[c + 1] ? colEntries[k] : -1;
@@ -416,7 +549,7 @@ public final class RadialCursor implements JobCursor {
 
 	/** Whether head {@code i} of column {@code c} may go now (see the class doc). */
 	private boolean supported(int i, int c) {
-		if (air[i] || forced[i] || colNext[c] == 0) {
+		if (air[i] || forced[i] || ground[i] || colNext[c] == 0) {
 			return true;
 		}
 		int below = cellAt.get(CrewPlanner.key(x[i], y[i] - 1, z[i]));
@@ -438,10 +571,14 @@ public final class RadialCursor implements JobCursor {
 	}
 
 	/** Records that {@code i} was applied (any outcome but BLOCKED); wakes the neighbours it supports. */
-	private void applied(int i, BuildCursor.Outcome o) {
+	private void applied(int i, BuildCursor.Outcome o, boolean isFill) {
 		applied[i] = true;
 		int c = colOf[i];
-		colNext[c]++;
+		if (isFill) {
+			fillNext[c]++;
+		} else {
+			colNext[c]++;
+		}
 		done++;
 		switch (o) {
 			case PLACED -> placed++;
@@ -459,7 +596,7 @@ public final class RadialCursor implements JobCursor {
 			wake(x[i], y[i] + 1, z[i]);
 			wake(x[i], y[i] - 1, z[i]);
 		}
-		if (head(c) < 0) {
+		if (--colLeft[c] == 0) {
 			colsDone++;
 		}
 	}
@@ -476,11 +613,12 @@ public final class RadialCursor implements JobCursor {
 		}
 	}
 
-	/** Column {@code c} may have work for a stream again: let the streams look back at it. */
+	/** Column {@code c} may have work again: let the streams and the front look back at it. */
 	private void touched(int c) {
 		int p = posOf[c];
-		fWake = Math.min(fWake, p);
+		gWake = Math.min(gWake, p);
 		bWake = Math.min(bWake, p);
+		vWake = Math.min(vWake, p);
 	}
 
 	// ---- tick ---------------------------------------------------------------------------------
@@ -501,13 +639,19 @@ public final class RadialCursor implements JobCursor {
 		int n0 = done;
 		try {
 			installOrder();
-			fPtr = Math.min(fPtr, fWake);
+			gPtr = Math.min(gPtr, gWake);
 			bPtr = Math.min(bPtr, bWake);
-			fWake = Integer.MAX_VALUE;
+			vPtr = Math.min(vPtr, vWake);
+			gWake = Integer.MAX_VALUE;
 			bWake = Integer.MAX_VALUE;
-			int fastDone = tickFoundation(step);
-			int built = tickBuilders(allowance, step);
-			if (fastDone == 0 && built == 0 && colsDone < cols && idle()) {
+			vWake = Integer.MAX_VALUE;
+			BuildTuning t = BuildBudget.global().tuning();
+			visRing = frontRing();
+			int groundDone = tickGround(step, t);
+			int built = tickBuilders(allowance, step, t);
+			tickFill(step, t);
+			// the hidden fill never holds a stuck piece back: only ground and builders count here
+			if (groundDone == 0 && built == 0 && colsDone < cols && idle()) {
 				forceOne();
 			}
 		} finally {
@@ -519,14 +663,29 @@ public final class RadialCursor implements JobCursor {
 		return done - n0;
 	}
 
-	/** Foundation stream: fast entries (and entries already right) of the columns in ring order. */
-	private int tickFoundation(FrontCursor.Step step) {
+	/** The ring being finished: that of the nearest column with ground or above work left, not stalled. */
+	private int frontRing() {
+		int scanned = 0;
+		while (vPtr < cols && scanned < SCAN_MAX) {
+			int st = stateOf(order[vPtr]);
+			if (st != DONE && st != STALLED) {
+				break;
+			}
+			vPtr++;
+			scanned++;
+		}
+		return vPtr < cols ? ringAt[vPtr] : NO_RING;
+	}
+
+	/** Ground stream: ground and air entries (and entries already right) of the columns in ring order, ring-limited. */
+	private int tickGround(FrontCursor.Step step, BuildTuning t) {
 		BuildBudget b = BuildBudget.global();
-		int max = b.foundationBlocks();
+		int max = fastMode ? b.foundationBlocks() : Math.min(b.foundationBlocks(), t.groundBlocksPerTick());
 		long nanos = b.foundationNanos();
 		if (max <= 0 || nanos <= 0) {
 			return 0;
 		}
+		int limit = fastMode ? NO_RING : visRing + t.foundationRingsAhead();
 		long t0 = System.nanoTime();
 		int count = 0;
 		int skips = 0;
@@ -535,15 +694,18 @@ public final class RadialCursor implements JobCursor {
 		IntPredicate al = already;
 		try {
 			outer:
-			while (fPtr < cols && count < max && scanned < SCAN_MAX && state == JobState.RUNNING) {
-				int p = fPtr;
+			while (gPtr < cols && count < max && scanned < SCAN_MAX && state == JobState.RUNNING) {
+				int p = gPtr;
+				if (ringAt[p] > limit) {
+					break; // the floor waits for the front ring
+				}
 				int c = order[p];
 				scanned++;
 				while (true) {
 					int st = stateOf(c);
 					int i = head(c);
 					boolean right = false;
-					if (st == BUILD && colClaim[c] < 0 && al != null && skips < BuildCursor.DEFAULT_MAX_SKIPS_PER_TICK) {
+					if (st == BUILD && spanCrew[spanOf[c]] == 0 && al != null && skips < BuildCursor.DEFAULT_MAX_SKIPS_PER_TICK) {
 						if (probes >= PROBES_MAX) {
 							break outer; // look again next tick, from this column
 						}
@@ -555,7 +717,7 @@ public final class RadialCursor implements JobCursor {
 						if (o == BuildCursor.Outcome.BLOCKED) {
 							break outer; // free jobs never block; keep it for the next tick
 						}
-						applied(i, o);
+						applied(i, o, false);
 						if (o == BuildCursor.Outcome.SKIPPED) {
 							skips++;
 						} else {
@@ -572,100 +734,229 @@ public final class RadialCursor implements JobCursor {
 					break;
 				}
 				// this stream has nothing more for column c until it is touched again (release / wake)
-				fPtr = p + 1;
+				gPtr = p + 1;
 				if ((scanned & 255) == 0 && System.nanoTime() - t0 > nanos) {
 					break;
 				}
 			}
 		} finally {
 			b.spendFoundation(count, System.nanoTime() - t0);
+			dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_RADIAL_GROUND, t0);
 		}
 		return count + skips;
 	}
 
-	/** Builder stream: each builder works its claimed column bottom-up, then picks the next one. */
-	private int tickBuilders(double allowance, FrontCursor.Step step) {
-		for (int f = 0; f < builders; f++) {
-			if (tcol[f] >= 0 && walkLeft[f] > 0) {
-				walkLeft[f]--;
-			}
-			if (tcol[f] < 0) {
-				pick(f);
-			}
+	/** Fill stream: the hidden terrain under the ground, rings behind the front, out of the foundation budget left. */
+	private int tickFill(FrontCursor.Step step, BuildTuning t) {
+		BuildBudget b = BuildBudget.global();
+		int max = fastMode ? b.foundationBlocks() : Math.min(b.foundationBlocks(), t.fillBlocksPerTick());
+		long nanos = b.foundationNanos();
+		if (max <= 0 || nanos <= 0) {
+			return 0;
 		}
-		double a = Math.max(0, allowance);
-		credit = Math.min(credit + a, Math.max(1.0, a));
-		int[] used = new int[builders];
-		int applies = 0;
+		int limit = fastMode || visRing >= NO_RING ? NO_RING : visRing - t.fillRingsBehind();
+		if (limit < 0) {
+			return 0;
+		}
+		long t0 = System.nanoTime();
+		int count = 0;
 		int skips = 0;
-		boolean progress = true;
-		while (credit >= 1.0 && progress && state == JobState.RUNNING) {
-			progress = false;
-			for (int j = 0; j < builders && credit >= 1.0; j++) {
-				int f = (rr + j) % builders;
-				if (tcol[f] < 0 || walkLeft[f] != 0 || used[f] >= perBuilder) {
-					continue;
+		int scanned = 0;
+		try {
+			outer:
+			while (lPtr < cols && count < max && scanned < SCAN_MAX && state == JobState.RUNNING) {
+				int p = lPtr;
+				if (ringAt[p] > limit) {
+					break;
 				}
-				int c = tcol[f];
-				int st = stateOf(c);
-				if (st != BUILD) {
-					release(f, st);
-					pick(f);
-					continue;
-				}
-				int i = head(c);
-				if (y[i] > py[f] + RAISE_ABOVE || y[i] < py[f] - 2) {
-					standFor(f, c, i); // up the scaffold (or down): a short walk, the next turn places
-					continue;
-				}
-				BuildCursor.Outcome o = step.apply(f, i);
-				if (o == BuildCursor.Outcome.BLOCKED) {
-					continue;
-				}
-				by[i] = f;
-				applied(i, o);
-				applies++;
-				progress = true;
-				if (o == BuildCursor.Outcome.SKIPPED) {
-					if (++skips >= BuildCursor.DEFAULT_MAX_SKIPS_PER_TICK) {
-						credit = Math.min(credit, 0.999);
+				int c = order[p];
+				scanned++;
+				while (fillNext[c] < colFill[c]) {
+					int i = colEntries[colStart[c] + fillNext[c]];
+					BuildCursor.Outcome o = step.apply(-1, i);
+					if (o == BuildCursor.Outcome.BLOCKED) {
+						break outer;
 					}
-				} else {
-					credit -= 1.0;
-					used[f]++;
+					applied(i, o, true);
+					if (o == BuildCursor.Outcome.SKIPPED) {
+						if (++skips >= FILL_SKIPS) {
+							break outer;
+						}
+					} else {
+						count++;
+					}
+					if (count >= max || ((count + skips) & 63) == 0 && System.nanoTime() - t0 > nanos) {
+						break outer;
+					}
 				}
-				rr = (f + 1) % builders;
+				lPtr = p + 1;
+				if ((scanned & 255) == 0 && System.nanoTime() - t0 > nanos) {
+					break;
+				}
 			}
+		} finally {
+			b.spendFoundation(count, System.nanoTime() - t0);
+			dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_RADIAL_FILL, t0);
 		}
-		return applies;
+		return count + skips;
 	}
 
-	/** Builder {@code f} lets go of its column (done, stalled, or foundation's turn). */
-	private void release(int f, int st) {
-		int c = tcol[f];
-		if (c >= 0) {
-			colClaim[c] = -1;
-			if (st == FAST) {
-				fWake = Math.min(fWake, posOf[c]);
-			} else if (st == BUILD) {
-				bWake = Math.min(bWake, posOf[c]);
+	/** Builders: each raises its span in courses, climbing in place, then picks the next span. */
+	private int tickBuilders(double allowance, FrontCursor.Step step, BuildTuning t) {
+		long t0 = System.nanoTime();
+		try {
+			double climb = Math.max(perBuilder, t.climbBlocksPerTick());
+			int limit = visRing + t.builderRingsAhead();
+			for (int f = 0; f < builders; f++) {
+				if (tspan[f] >= 0 && walkLeft[f] > 0) {
+					walkLeft[f]--;
+				}
+				if (tspan[f] < 0) {
+					pick(f, limit);
+				}
 			}
+			double a = Math.max(0, allowance);
+			credit = Math.min(credit + a, Math.max(1.0, a));
+			int[] used = new int[builders];
+			int applies = 0;
+			int skips = 0;
+			boolean progress = true;
+			while (credit >= 1.0 && progress && state == JobState.RUNNING) {
+				progress = false;
+				for (int j = 0; j < builders && credit >= 1.0; j++) {
+					int f = (rr + j) % builders;
+					int s = tspan[f];
+					if (s < 0 || walkLeft[f] != 0 || used[f] >= (tallSpan[s] ? climb : perBuilder)) {
+						continue;
+					}
+					int c = next(f, limit);
+					if (c < 0) {
+						release(f);
+						pick(f, limit);
+						continue;
+					}
+					int i = head(c);
+					if (Math.abs(colX[c] - px[f]) > REACH || Math.abs(colZ[c] - pz[f]) > REACH) {
+						standFor(f, c, i); // out of reach: a short walk along the span
+						if (walkLeft[f] != 0) {
+							continue;
+						}
+					} else if (y[i] > py[f] + RAISE_ABOVE || y[i] < py[f] - 2) {
+						climbTo(f, i); // up (or down) the scaffold where it stands: no walk
+					}
+					BuildCursor.Outcome o = step.apply(f, i);
+					if (o == BuildCursor.Outcome.BLOCKED) {
+						continue;
+					}
+					by[i] = f;
+					applied(i, o, false);
+					applies++;
+					progress = true;
+					if (o == BuildCursor.Outcome.SKIPPED) {
+						if (++skips >= BuildCursor.DEFAULT_MAX_SKIPS_PER_TICK) {
+							credit = Math.min(credit, 0.999);
+						}
+					} else {
+						credit -= 1.0;
+						used[f]++;
+					}
+					rr = (f + 1) % builders;
+				}
+			}
+			return applies;
+		} finally {
+			dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_RADIAL_BUILDERS, t0);
 		}
-		tcol[f] = -1;
-		walkLeft[f] = -1;
 	}
 
 	/**
-	 * Free builder {@code f} claims the free column of the nearest open ring closest to where it stands
-	 * (the ring after it when that ring has none free), and walks there.
+	 * The column of builder {@code f}'s span to place next: the lowest head among its columns a builder
+	 * may work (within {@code limit} rings), nearest to the builder on a tie (courses: the span rises as
+	 * one, so side support inside it counts in the same pass); -1 when none is left.
 	 */
-	private void pick(int f) {
+	private int next(int f, int limit) {
+		int s = tspan[f];
 		int best = -1;
-		double bestD = Double.MAX_VALUE;
-		int bestRing = -1;
+		int bestY = Integer.MAX_VALUE;
+		int bestD = Integer.MAX_VALUE;
+		for (int k = spanStart[s]; k < spanStart[s + 1]; k++) {
+			int c = spanCols[k];
+			int st = stateOf(c);
+			if (st == FAST) {
+				gWake = Math.min(gWake, posOf[c]);
+				continue;
+			}
+			if (st != BUILD || ringAt[posOf[c]] > limit) {
+				continue;
+			}
+			int hy = y[head(c)];
+			int d = Math.abs(colX[c] - px[f]) + Math.abs(colZ[c] - pz[f]);
+			if (hy < bestY || hy == bestY && d < bestD) {
+				best = c;
+				bestY = hy;
+				bestD = d;
+			}
+		}
+		return best;
+	}
+
+	/** Builder {@code f} lets go of its span (nothing it may work is left there now). */
+	private void release(int f) {
+		int s = tspan[f];
+		if (s >= 0) {
+			spanCrew[s] = Math.max(0, spanCrew[s] - 1);
+			if (spanLead[s] == f) {
+				spanLead[s] = -1;
+				for (int g = 0; g < builders; g++) {
+					if (g != f && tspan[g] == s) {
+						spanLead[s] = g;
+						break;
+					}
+				}
+			}
+			for (int k = spanStart[s]; k < spanStart[s + 1]; k++) {
+				int c = spanCols[k];
+				int st = stateOf(c);
+				if (st == FAST) {
+					gWake = Math.min(gWake, posOf[c]);
+				} else if (st == BUILD) {
+					bWake = Math.min(bWake, posOf[c]);
+				}
+			}
+		}
+		tspan[f] = -1;
+		walkLeft[f] = -1;
+	}
+
+	/** Entries left (ground and above) in span {@code s}. */
+	private int spanLeft(int s) {
+		int left = 0;
+		for (int k = spanStart[s]; k < spanStart[s + 1]; k++) {
+			int c = spanCols[k];
+			left += colStart[c + 1] - colStart[c] - colNext[c];
+		}
+		return left;
+	}
+
+	/**
+	 * Free builder {@code f} takes work in the nearest ring with builder work (at most {@code limit}):
+	 * the free span closest to it there; else it helps on that ring's tallest span (fewer than
+	 * {@link #SPAN_CREW} builders on it); only when that ring has neither does it look at the next ring.
+	 */
+	private void pick(int f, int limit) {
+		int free = -1;
+		int freeD = Integer.MAX_VALUE;
+		int help = -1;
+		int helpLeft = 0;
+		int helpD = Integer.MAX_VALUE;
+		int ringNow = -1;
 		boolean leading = true;
 		int seen = 0;
 		for (int p = bPtr; p < cols && seen < PICK_SCAN; p++) {
+			int r = ringAt[p];
+			if (r > limit) {
+				break;
+			}
 			int c = order[p];
 			seen++;
 			int st = stateOf(c);
@@ -674,32 +965,74 @@ public final class RadialCursor implements JobCursor {
 					bPtr = p + 1;
 				}
 				if (st == FAST) {
-					fWake = Math.min(fWake, p);
+					gWake = Math.min(gWake, p);
 				}
 				continue;
 			}
 			leading = false;
-			if (colClaim[c] >= 0) {
-				continue;
+			if (r != ringNow) {
+				if (free >= 0 || help >= 0) {
+					break;
+				}
+				ringNow = r;
 			}
-			if (bestRing >= 0 && ringAt[p] > bestRing) {
-				break;
+			int s = spanOf[c];
+			int d = Math.abs(colX[c] - px[f]) + Math.abs(colZ[c] - pz[f]);
+			if (spanCrew[s] == 0) {
+				if (d < freeD) {
+					free = c;
+					freeD = d;
+				}
+			} else if (free < 0 && tallSpan[s] && spanCrew[s] < SPAN_CREW) {
+				int left = spanLeft(s);
+				if (left >= HELP_MIN && (left > helpLeft || left == helpLeft && d < helpD)) {
+					help = c;
+					helpLeft = left;
+					helpD = d;
+				}
 			}
-			bestRing = ringAt[p];
-			double dx = colX[c] - px[f];
-			double dz = colZ[c] - pz[f];
-			double d = dx * dx + dz * dz;
+		}
+		int c = free >= 0 ? free : help;
+		if (c < 0) {
+			return;
+		}
+		int s = spanOf[c];
+		int anchor = c;
+		if (free >= 0 && spanStart[s + 1] - spanStart[s] > 1) {
+			anchor = middle(s); // the owner stands by the middle of its span: every column within reach
+		}
+		tspan[f] = s;
+		spanCrew[s]++;
+		if (spanLead[s] < 0) {
+			spanLead[s] = f;
+		}
+		int target = next(f, limit);
+		standFor(f, anchor, head(target >= 0 ? target : c));
+	}
+
+	/** The column of span {@code s} nearest to the span's centroid. */
+	private int middle(int s) {
+		double mx = 0;
+		double mz = 0;
+		int a = spanStart[s];
+		int b = spanStart[s + 1];
+		for (int k = a; k < b; k++) {
+			mx += colX[spanCols[k]];
+			mz += colZ[spanCols[k]];
+		}
+		mx /= b - a;
+		mz /= b - a;
+		int best = spanCols[a];
+		double bestD = Double.MAX_VALUE;
+		for (int k = a; k < b; k++) {
+			int c = spanCols[k];
+			double d = (colX[c] - mx) * (colX[c] - mx) + (colZ[c] - mz) * (colZ[c] - mz);
 			if (d < bestD) {
 				bestD = d;
 				best = c;
 			}
 		}
-		if (best < 0) {
-			return;
-		}
-		colClaim[best] = f;
-		tcol[f] = best;
-		standFor(f, best, head(best));
+		return best;
 	}
 
 	/**
@@ -738,14 +1071,23 @@ public final class RadialCursor implements JobCursor {
 		}
 	}
 
-	/** No builder has a column it can work and every column left is stalled or waits for nobody. */
+	/** Builder {@code f} climbs (or steps down) the scaffold where it stands to place {@code i}: no walk, it places this turn. */
+	private void climbTo(int f, int i) {
+		py[f] = y[i] - 1;
+		Walker w = walker;
+		if (w != null) {
+			w.walking(f, i, new int[] {px[f], py[f], pz[f]}, 1);
+		}
+	}
+
+	/** No builder has a span and every column with ground or above work left is stalled. */
 	private boolean idle() {
 		for (int f = 0; f < builders; f++) {
-			if (tcol[f] >= 0) {
+			if (tspan[f] >= 0) {
 				return false;
 			}
 		}
-		return fPtr >= cols && bPtr >= cols && fWake == Integer.MAX_VALUE && bWake == Integer.MAX_VALUE;
+		return vPtr >= cols && vWake == Integer.MAX_VALUE;
 	}
 
 	/** Every column left is stalled: the nearest one goes on regardless (a floating piece of the plan). */
@@ -768,20 +1110,44 @@ public final class RadialCursor implements JobCursor {
 		}
 	}
 
+	/**
+	 * Blocks per tick this job wants from the crews' budget (server thread): each builder on a tall span
+	 * {@code build.climbBlocksPerTick}, the others {@code perBuilder}; 1 while no builder has work (the
+	 * ground and fill have their own budget).
+	 */
+	public double rate() {
+		if (state.isTerminal()) {
+			return 0.0;
+		}
+		double climb = Math.max(perBuilder, BuildBudget.global().tuning().climbBlocksPerTick());
+		double r = 0;
+		boolean any = false;
+		for (int f = 0; f < builders; f++) {
+			int s = tspan[f];
+			if (s >= 0) {
+				any = true;
+				r += tallSpan[s] ? climb : perBuilder;
+			} else {
+				r += perBuilder;
+			}
+		}
+		return any ? r : Math.min(1.0, perBuilder);
+	}
+
 	// ---- JobCursor ----------------------------------------------------------------------------
 
-	/** Laying foundation with no builder at work yet (the job asks almost nothing of the crews' budget). */
+	/** Laying ground or fill with no builder at work (the job asks almost nothing of the crews' budget). */
 	@Override
 	public boolean fastPhase() {
-		if (state.isTerminal()) {
+		if (state.isTerminal() || colsDone >= cols) {
 			return false;
 		}
 		for (int f = 0; f < builders; f++) {
-			if (tcol[f] >= 0) {
+			if (tspan[f] >= 0) {
 				return false;
 			}
 		}
-		return bPtr >= cols && fPtr < cols;
+		return true;
 	}
 
 	@Override
@@ -843,7 +1209,7 @@ public final class RadialCursor implements JobCursor {
 		return builders;
 	}
 
-	/** The builder that placed (or works on) {@code index}; -1 for the foundation stream (no animation). */
+	/** The builder that placed (or works on) {@code index}; -1 for the streams (ground, fill, air: no animation). */
 	@Override
 	public int frontOf(int index) {
 		if (index < 0 || index >= n) {
@@ -853,7 +1219,7 @@ public final class RadialCursor implements JobCursor {
 		if (b >= 0) {
 			return b;
 		}
-		return fast[index] ? -1 : colClaim[colOf[index]];
+		return fast[index] ? -1 : spanLead[spanOf[colOf[index]]];
 	}
 
 	@Override
@@ -891,8 +1257,9 @@ public final class RadialCursor implements JobCursor {
 		return n == 0 ? 1.0 : (double) done / n;
 	}
 
-	/** Columns / columns done / current centre (status, debug). */
+	/** Columns / columns done / current centre / front ring (status, debug). */
 	public String describe() {
-		return "radial cols " + colsDone + "/" + cols + " centre " + Math.round(cx) + "," + Math.round(cz) + " ring " + ring;
+		return "radial cols " + colsDone + "/" + cols + " centre " + Math.round(cx) + "," + Math.round(cz) + " ring " + ring + " front "
+				+ (visRing >= NO_RING ? "-" : String.valueOf(visRing));
 	}
 }
