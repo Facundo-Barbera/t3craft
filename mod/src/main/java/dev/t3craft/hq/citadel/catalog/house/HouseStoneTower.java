@@ -181,11 +181,11 @@ public final class HouseStoneTower implements Variant {
 			deck();
 			annex();
 			flights();
+			pilasters();
 			windows();
 			porch();
 			balcony();
 			wingTerrace();
-			pilasters();
 			buttresses();
 			rings();
 			if (battle) {
@@ -433,6 +433,9 @@ public final class HouseStoneTower implements Variant {
 			for (int sign : new int[] {-1, 1}) {
 				int tt = t + sign * 1;
 				if (!solidCorner(wl, tt)) {
+					// [depth] a pale jamb each side and inverted stairs on the top corners frame the dark glass
+					wl.set(tt, y, 0, b(Blocks.POLISHED_ANDESITE));
+					wl.set(tt, y + 1, 0, b(Blocks.CALCITE));
 					wl.set(tt, y + 2, 0, stUp(Blocks.STONE_BRICK_STAIRS, along(wl, sign)));
 				}
 			}
