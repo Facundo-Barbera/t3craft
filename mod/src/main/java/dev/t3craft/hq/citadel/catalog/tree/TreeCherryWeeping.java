@@ -4,18 +4,19 @@ import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.catalog.Family;
 import dev.t3craft.hq.citadel.catalog.Plot;
 import dev.t3craft.hq.citadel.catalog.Variant;
-import dev.t3craft.hq.citadel.catalog.tree.CherryKit.Vox;
+import dev.t3craft.hq.citadel.catalog.tree.TreeKit.Vox;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
 /**
- * The weeping cherry: a 2×2 trunk that thins into a leader, four or five limbs that arch up and then
- * fall like a fountain, a leafy ribbon along the outer half of every arch and curtains of leaves (an
- * azalea tip on each strand) hanging 2–5 blocks from it, so the silhouette is a sheaf of falling
- * pink with the branches seen through the gaps. A thick drift of petals covers the ground.
+ * The weeping cherry: a 2×2 trunk with diagonal roots that thins to a leader, a small domed crown on top
+ * and four or five limbs that climb out diagonally from it and end in small rounded lobes. From the rim of
+ * every lobe and from the outer half of every limb hang strands of blossom of very different lengths, some
+ * stepping outwards on the way down: a ragged sheaf of falling pink, never a straight curtain, with the
+ * limbs seen through the gaps. A thick drift of petals covers the ground.
  *
- * <p>Size: 6–9 × 6–9 × 9+.
+ * <p>Size: 6–9 × 6–9 × 9+ (the tree stops at 13 high).
  */
 public final class TreeCherryWeeping implements Variant {
 	@Override
@@ -56,91 +57,93 @@ public final class TreeCherryWeeping implements Variant {
 	@Override
 	public void build(CitadelCanvas c, Plot p) {
 		Vox t = new Vox(p);
-		Random r = p.rng(0x3E2D);
-		double cu = (p.w() - 1) / 2.0;
-		double cv = (p.d() - 1) / 2.0;
-		int bu = (int) Math.floor(cu);
-		int bv = (int) Math.floor(cv);
-		int top = p.h() - 1;
-		int cy = top - 1;
-		int yFork = Math.max(3, Math.min(5, Math.round(p.h() * 0.36f)));
-		int minY = 3; // strands stop here, so the petals show underneath
+		Random r = p.rng(0x3E3E);
+		int H = Math.min(p.h(), 13);
+		double sc = Math.min(p.w(), p.d()) / 7.0;
+		int bu = (p.w() - 2) / 2;
+		int bv = (p.d() - 2) / 2;
+		int yTop = H - 3;
+		int[][] lead = TreeKit.trunk(t, TreeKit.CHERRY, bu, bv, 3, yTop, r.nextInt(2), r.nextInt(2),
+				r.nextInt(3) - 1, r.nextInt(3) - 1);
+		TreeKit.roots(t, TreeKit.CHERRY, bu, bv, 5, 2, -1, 13);
 
-		double lean = r.nextDouble() * Math.PI * 2;
-		int[][] path = CherryKit.path(p.h(), bu, bv, Math.cos(lean) * 1.2, Math.sin(lean) * 1.2, 1, cy - 1);
-		int[][] lead = CherryKit.trunk(t, path, yFork, cy - 1, r.nextInt(2), r.nextInt(2));
-		CherryKit.roots(t, bu, bv, 6, 3, -1);
+		// the crown dome on the leader
+		int lu = lead[0][yTop];
+		int lv = lead[1][yTop];
+		TreeKit.lobe(t, lu, yTop + 1, lv, 1.6 * sc, 1.5 * sc, 1.7, 1.0, TreeKit.SAKURA, 0.3, 0);
 
-		// --- arching limbs: up, over, down
-		int n = p.w() >= 8 && p.d() >= 8 ? 5 : 4;
+		// limbs: out and up, each to a small lobe
+		int n = sc > 1.1 ? 5 : 4;
 		double a0 = r.nextDouble() * Math.PI * 2;
+		List<int[]> limbCells = new ArrayList<>();
 		for (int i = 0; i < n; i++) {
-			double ang = a0 + i * Math.PI * 2 / n + (r.nextDouble() - 0.5) * 0.5;
+			double ang = a0 + i * Math.PI * 2 / n + (r.nextDouble() - 0.5) * 0.6;
 			double ex = Math.cos(ang);
 			double ez = Math.sin(ang);
-			int y0 = Math.min(yFork + 1 + (i % 3), cy - 2);
-			int su = lead[0][y0];
-			int sv = lead[1][y0];
-			double room = CherryKit.room(t, su, sv, ex, ez);
-			double s = Math.max(2.6, Math.min(4.8, room - 0.3));
-			int rise = Math.max(1, Math.min(2 + (i % 2), top - 1 - y0));
-			int drop = rise + 2 + (i % 2); // the tip ends well below the start: the arch falls
+			int sy = TreeKit.clamp(yTop - 1 - (i % 3), 4, yTop);
+			int su = lead[0][sy];
+			int sv = lead[1][sy];
+			double reach = TreeKit.clamp(TreeKit.room(t, su, sv, ex, ez, 0) - 0.6, 1.5, 3.4 * sc);
+			int tu = (int) Math.round(su + ex * reach);
+			int tv = (int) Math.round(sv + ez * reach);
+			int ty = Math.min(sy + 1 + (i & 1), H - 2);
+			List<int[]> cells = TreeKit.branch(t, TreeKit.CHERRY, new int[] {su, sy, sv}, new int[] {tu, ty, tv}, false);
+			limbCells.addAll(cells.subList(cells.size() / 2, cells.size()));
+			TreeKit.lobe(t, tu, ty, tv, 1.2 * sc, 1.1 * sc, 1.2, 0.6, i % 2 == 0 ? TreeKit.SAKURA : TreeKit.SAKURA.swap(), 0.3, i + 1);
+		}
 
-			// sample the arch and join the samples with connected lines
-			List<int[]> arch = new ArrayList<>();
-			int[] prev = {su, y0, sv};
-			for (int k = 1; k <= 5; k++) {
-				double f = k / 5.0;
-				int u = (int) Math.round(su + ex * s * f);
-				int v = (int) Math.round(sv + ez * s * f);
-				int y = Math.max(minY + 2, y0 + (int) Math.round(rise * 4 * f * (1 - f)) - (int) Math.round(drop * f * f));
-				List<int[]> seg = CherryKit.line(prev[0], prev[1], prev[2], u, y, v);
-				CherryKit.branch(t, seg, k == 1 ? 2 : 0, ex, ez);
-				arch.addAll(seg);
-				prev = new int[] {u, y, v};
-			}
-
-			// leaves wrap the outer half of the arch; single-block strands of different lengths hang from it
-			int from = arch.size() * 2 / 5;
-			double px = -ez;
-			double pz = ex;
-			for (int k = from; k < arch.size(); k++) {
-				int[] a = arch.get(k);
-				double f = (k - from) / (double) Math.max(1, arch.size() - from);
-				if (k % 2 == 0) {
-					t.add(a[0], a[1] + 1, a[2], CherryKit.LEAF);
-				}
-				for (int side = -1; side <= 1; side++) {
-					int u = a[0] + (side == 0 ? 0 : (Math.abs(px) >= Math.abs(pz) ? side : 0));
-					int v = a[2] + (side == 0 ? 0 : (Math.abs(px) >= Math.abs(pz) ? 0 : side));
-					if (side != 0 && k % 4 == 1) {
-						t.add(u, a[1], v, t.hash(u, a[1], v, 3) == 0 ? CherryKit.LEAF2 : CherryKit.LEAF);
-						t.add(u, a[1] + 1, v, CherryKit.LEAF);
-					}
-					int chance = side == 0 ? 22 : 8;
-					if (t.hash(u, a[1] + 7, v, 100) < chance + (int) (f * 15)) {
-						int len = 2 + t.hash(u + 5, a[1], v, 4) + (int) Math.round(f * 2);
-						CherryKit.strand(t, u, a[1] - (side == 0 ? 1 : 0), v, len, minY);
+		// strands: from every leaf with air below that lies away from the trunk, and from the outer limbs
+		double ccu = bu + 0.5;
+		double ccv = bv + 0.5;
+		List<int[]> seeds = new ArrayList<>();
+		for (int y = 3; y < t.h; y++) {
+			for (int v = 0; v < t.d; v++) {
+				for (int u = 0; u < t.w; u++) {
+					byte k = t.kind(u, y, v);
+					if ((k == TreeKit.LEAF || k == TreeKit.WOOD && contains(limbCells, u, y, v))
+							&& t.empty(u, y - 1, v) && Math.hypot(u - ccu, v - ccv) > 1.6) {
+						seeds.add(new int[] {u, y, v});
 					}
 				}
 			}
 		}
-
-		// --- crown: a low mushroom of leaves on the leader with a skirt of short strands
-		int lu = lead[0][cy - 1];
-		int lv = lead[1][cy - 1];
-		double margin = Math.min(Math.min(lu, p.w() - 1 - lu), Math.min(lv, p.d() - 1 - lv)) + 0.5;
-		double cra = Math.min(2.8, margin);
-		CherryKit.cloud(t, lu, cy, lv, cra, cra * 0.9, 1, 0, 0, 1, 5, minY);
-		for (int a = 0; a < 14; a++) { // a short fringe round the dome
-			double an = a * Math.PI * 2 / 14;
-			int u = (int) Math.round(lu + Math.cos(an) * (cra - 0.3));
-			int v = (int) Math.round(lv + Math.sin(an) * (cra * 0.9 - 0.3));
-			if (t.get(u, cy, v) != null && t.hash(u, cy, v, 3) != 0) {
-				CherryKit.strand(t, u, cy - 1, v, 2 + t.hash(u, 3, v, 3), minY);
+		for (int[] s : seeds) {
+			int u = s[0];
+			int y = s[1];
+			int v = s[2];
+			int pick = t.hash(u, y, v, 20);
+			if (pick >= 11) {
+				continue; // gaps: about half the rim hangs
 			}
+			// very uneven lengths: stubs, mid strands and a few long ones that nearly reach the grass
+			int room = y - 1;
+			int len = pick < 4 ? 1 + t.hash(u, 1, v, 2) : pick < 9 ? 2 + t.hash(u, 2, v, 3) : room - t.hash(u, 3, v, 2);
+			len = Math.max(1, Math.min(len, room));
+			int ku = (int) Math.signum(Math.round(u - ccu));
+			int kv = (int) Math.signum(Math.round(v - ccv));
+			boolean kink = len >= 3 && t.hash(u, 4, v, 3) == 0;
+			if (kink && ku != 0 && kv != 0) {
+				if (t.hash(u, 5, v, 2) == 0) {
+					ku = 0;
+				} else {
+					kv = 0;
+				}
+			}
+			TreeKit.hang(t, u, y - 1, v, len, 1, TreeKit.SAKURA.a(), TreeKit.SAKURA.b(), ku, kv, kink);
 		}
-		CherryKit.ground(t, cu, cv, Math.min(p.w(), p.d()) / 2.0 + 1.0);
+
+		// a thick drift of petals
+		TreeKit.petalCarpet(t, ccu, ccv, Math.min(p.w(), p.d()) / 2.0 + 1.0);
+		t.prune();
 		t.flush(c);
+	}
+
+	private static boolean contains(List<int[]> cells, int u, int y, int v) {
+		for (int[] c : cells) {
+			if (c[0] == u && c[1] == y && c[2] == v) {
+				return true;
+			}
+		}
+		return false;
 	}
 }

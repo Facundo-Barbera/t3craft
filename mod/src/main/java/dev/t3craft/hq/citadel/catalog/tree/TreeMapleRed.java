@@ -10,6 +10,7 @@ import dev.t3craft.hq.citadel.catalog.tree.TreeKit.Leaves;
 import dev.t3craft.hq.citadel.catalog.tree.TreeKit.Vox;
 import dev.t3craft.hq.citadel.catalog.tree.TreeKit.Wood;
 import java.util.Random;
+import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.block.Blocks;
 
 /**
@@ -28,10 +29,10 @@ public final class TreeMapleRed implements Variant {
 	private static final Wood WOOD = new Wood(Blocks.DARK_OAK_LOG, Blocks.DARK_OAK_WOOD, b(Blocks.MANGROVE_ROOTS));
 	/** By lobe, low → high: scarlet, red, red-orange, orange. */
 	private static final Leaves[] RAMP = {
-			new Leaves(b(Blocks.NETHER_WART_BLOCK), b(Blocks.RED_WOOL), null, 3, 0),
-			new Leaves(b(Blocks.RED_WOOL), b(Blocks.NETHER_WART_BLOCK), null, 4, 0),
-			new Leaves(b(Blocks.RED_WOOL), b(Blocks.ORANGE_WOOL), null, 3, 0),
-			new Leaves(b(Blocks.ORANGE_WOOL), b(Blocks.HONEYCOMB_BLOCK), null, 4, 0),
+			new Leaves(b(Blocks.NETHER_WART_BLOCK), b(Blocks.WOOL.pick(DyeColor.RED)), null, 3, 0),
+			new Leaves(b(Blocks.WOOL.pick(DyeColor.RED)), b(Blocks.NETHER_WART_BLOCK), null, 4, 0),
+			new Leaves(b(Blocks.WOOL.pick(DyeColor.RED)), b(Blocks.WOOL.pick(DyeColor.ORANGE)), null, 3, 0),
+			new Leaves(b(Blocks.WOOL.pick(DyeColor.ORANGE)), b(Blocks.HONEYCOMB_BLOCK), null, 4, 0),
 	};
 
 	@Override

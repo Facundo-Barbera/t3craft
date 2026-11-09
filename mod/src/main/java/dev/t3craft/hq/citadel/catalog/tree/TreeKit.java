@@ -521,6 +521,25 @@ final class TreeKit {
 		}
 	}
 
+	/** One- and two-block drips under the rim of a lobe, so its underside is not a flat plate. */
+	static void drips(Vox t, int cu, int cy, int cv, double rx, double rz, int salt) {
+		int y = cy - 1;
+		for (int v = (int) (cv - rz); v <= cv + rz; v++) {
+			for (int u = (int) (cu - rx); u <= cu + rx; u++) {
+				double q = Math.pow((u - cu) / rx, 2) + Math.pow((v - cv) / rz, 2);
+				if (q < 0.35 || q > 1.0 || t.hash(u, y + salt, v, 4) != 0) {
+					continue;
+				}
+				if (t.kind(u, y + 1, v) != LEAF && t.kind(u, y, v) != LEAF) {
+					continue;
+				}
+				int len = 1 + t.hash(u, 3, v + salt, 2);
+				int top = t.kind(u, y, v) == LEAF ? y - 1 : y;
+				hang(t, u, top, v, len, 2, SAKURA.a(), SAKURA.b(), 0, 0, false);
+			}
+		}
+	}
+
 	// ------------------------------------------------------------------ ground
 
 	/** Cover on y = 0 within {@code radius} of {@code (cu, cv)}: {@code pick} gets (u, v, k in 0..1 from the centre) and may return null. */

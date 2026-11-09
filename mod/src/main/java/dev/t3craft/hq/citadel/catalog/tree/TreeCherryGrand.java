@@ -109,7 +109,7 @@ public final class TreeCherryGrand implements Variant {
 				}
 			}
 			TreeKit.lobe(t, tu, ly, tv, rx, rz, 1.9, 1.2, TreeKit.SAKURA, 0.4, i);
-			drips(t, tu, ly, tv, rx, rz, i);
+			TreeKit.drips(t, tu, ly, tv, rx, rz, i);
 		}
 		// the crown on the leader
 		int cu = lead[0][crownY];
@@ -120,24 +120,5 @@ public final class TreeCherryGrand implements Variant {
 		TreeKit.petalCarpet(t, bu + 0.5, bv + 0.5, Math.min(p.w(), p.d()) / 2.0 + 0.8);
 		t.prune();
 		t.flush(c);
-	}
-
-	/** One- and two-block drips under the rim of a lobe, so its underside is not a flat plate. */
-	static void drips(Vox t, int cu, int cy, int cv, double rx, double rz, int salt) {
-		int y = cy - 1;
-		for (int v = (int) (cv - rz); v <= cv + rz; v++) {
-			for (int u = (int) (cu - rx); u <= cu + rx; u++) {
-				double q = Math.pow((u - cu) / rx, 2) + Math.pow((v - cv) / rz, 2);
-				if (q < 0.35 || q > 1.0 || t.hash(u, y + salt, v, 4) != 0) {
-					continue;
-				}
-				if (t.kind(u, y + 1, v) != TreeKit.LEAF && t.kind(u, y, v) != TreeKit.LEAF) {
-					continue;
-				}
-				int len = 1 + t.hash(u, 3, v + salt, 2);
-				int top = t.kind(u, y, v) == TreeKit.LEAF ? y - 1 : y;
-				TreeKit.hang(t, u, top, v, len, 2, TreeKit.SAKURA.a(), TreeKit.SAKURA.b(), 0, 0, false);
-			}
-		}
 	}
 }
