@@ -1,7 +1,6 @@
 package dev.t3craft.hq.citadel.catalog.lamp;
 
 import static dev.t3craft.hq.citadel.CitadelCanvas.b;
-import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
 import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
 
 import dev.t3craft.hq.citadel.CitadelCanvas;
@@ -12,16 +11,12 @@ import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.StairBlock;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.Half;
-import net.minecraft.world.level.block.state.properties.SlabType;
 
 /**
- * Kasuga-style stone lantern (tōrō), all in stone: a stepped dark foot (kiso), a slim shaft (sao), a flared
- * platform (chūdai), a light box (hibukuro) whose four corner posts frame a glowing heart with open windows
- * on every side, a hat (kasa) that slopes down from a crown and lifts at its four corners, and a jewel
- * finial (hōju).
+ * Kasuga-style stone lantern (tōrō), all in stone: a stepped dark foot (kiso), a slim shaft (sao), a round
+ * flared platform (chūdai), a light box (hibukuro) whose four thin iron corner posts frame a glowing heart
+ * with open windows on every side, a hipped hat (kasa) sloping down from a crown, and a jewel finial (hōju).
  *
  * <ul>
  * <li><b>Silhouette</b>: wide → slim → wide → open cage → wide hat → point. Every level has a different
@@ -80,56 +75,34 @@ public final class LampStreetToro implements Variant {
 		boolean finial = p.h() >= 6;
 		int y = 0;
 
-		// --- kiso: a dark stepped foot. Stairs step down from a polished heart; the corners are moss and a pot
+		// --- kiso: a dark stepped foot, stairs stepping down on all sides (the corners take outer shapes), one
+		// corner a potted fern
 		p.set(c, 1, y, 1, b(Blocks.POLISHED_DEEPSLATE));
-		for (int i = 0; i < 4; i++) {
-			int[] s = SIDES[i];
-			Block st = p.hash(s[0], y, s[1], 3) == 0 ? Blocks.COBBLED_DEEPSLATE_STAIRS : Blocks.DEEPSLATE_BRICK_STAIRS;
-			p.set(c, s[0], y, s[1], stairs(st, IN[i]));
-		}
-		int pot = p.hash(0, 0, 0, 4);
-		for (int i = 0; i < 4; i++) {
-			int[] k = CORNERS[i];
-			BlockState s = i == pot ? b(p.hash(1, 0, 3, 2) == 0 ? Blocks.POTTED_FERN : Blocks.POTTED_AZALEA)
-					: i == (pot + 2) % 4 ? slab(Blocks.MOSSY_COBBLESTONE_SLAB)
-							: b(Blocks.MOSS_CARPET);
-			p.set(c, k[0], y, k[1], s);
-		}
+		ring(c, p, y, Blocks.DEEPSLATE_BRICK_STAIRS, Half.BOTTOM);
+		int[] pot = CORNERS[p.hash(0, 0, 0, 4)];
+		p.set(c, pot[0], y, pot[1], b(Blocks.POTTED_FERN));
 		y++;
 
 		// --- sao: a slim round shaft, so the lantern stands clear of its foot
 		if (shaft) {
-			p.set(c, 1, y++, 1, b(p.hash(1, y, 1, 3) == 0 ? Blocks.MOSSY_STONE_BRICK_WALL : Blocks.STONE_BRICK_WALL));
+			p.set(c, 1, y++, 1, b(p.hash(1, 1, 1, 3) == 0 ? Blocks.MOSSY_STONE_BRICK_WALL : Blocks.STONE_BRICK_WALL));
 		}
 
-		// --- chūdai: a 3 × 3 platform that flares out on upside-down stairs, upper slabs at the corners
+		// --- chūdai: a round flared platform: upside-down stairs all round a chiselled heart
 		p.set(c, 1, y, 1, b(Blocks.CHISELED_STONE_BRICKS));
-		for (int i = 0; i < 4; i++) {
-			int[] s = SIDES[i];
-			p.set(c, s[0], y, s[1], top(stairs(Blocks.STONE_BRICK_STAIRS, IN[i])));
-		}
-		for (int[] k : CORNERS) {
-			p.set(c, k[0], y, k[1], topSlab(Blocks.STONE_BRICK_SLAB));
-		}
+		ring(c, p, y, Blocks.STONE_BRICK_STAIRS, Half.TOP);
 		y++;
 
-		// --- hibukuro: four slim posts at the corners frame a glowing heart; every side is an open window
+		// --- hibukuro: thin iron posts at the corners frame a glowing heart; every side is an open window
 		for (int[] k : CORNERS) {
-			p.set(c, k[0], y, k[1], b(Blocks.ANDESITE_WALL));
+			p.set(c, k[0], y, k[1], b(Blocks.IRON_BARS));
 		}
 		p.set(c, 1, y, 1, b(Blocks.OCHRE_FROGLIGHT));
 		y++;
 
-		// --- kasa: a crown block, stairs sloping down to the eaves; the corners are pale stairs turned outward,
-		// so they sit on the posts and their high step lifts the eave at each corner
+		// --- kasa: a hipped stone hat sloping down from a crown block (the corner stairs take outer shapes)
 		p.set(c, 1, y, 1, b(Blocks.POLISHED_ANDESITE));
-		for (int i = 0; i < 4; i++) {
-			int[] s = SIDES[i];
-			p.set(c, s[0], y, s[1], stairs(Blocks.POLISHED_ANDESITE_STAIRS, IN[i]));
-		}
-		for (int[] k : CORNERS) {
-			p.set(c, k[0], y, k[1], stairs(Blocks.POLISHED_DIORITE_STAIRS, k[0] == 0 ? Direction.WEST : Direction.EAST));
-		}
+		ring(c, p, y, Blocks.POLISHED_ANDESITE_STAIRS, Half.BOTTOM);
 		y++;
 
 		// --- hōju: the jewel on the crown
@@ -138,11 +111,16 @@ public final class LampStreetToro implements Variant {
 		}
 	}
 
-	private static BlockState top(BlockState stair) {
-		return stair.setValue(StairBlock.HALF, Half.TOP);
-	}
-
-	private static BlockState topSlab(Block b) {
-		return b.defaultBlockState().setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP);
+	/**
+	 * The eight cells round the centre as stairs of one half: the sides face the centre, the corners face along
+	 * their row towards the middle, so they meet the side stairs as outer corners (a hipped ring).
+	 */
+	private static void ring(CitadelCanvas c, Plot p, int y, Block stair, Half half) {
+		for (int i = 0; i < 4; i++) {
+			p.set(c, SIDES[i][0], y, SIDES[i][1], stairs(stair, IN[i]).setValue(StairBlock.HALF, half));
+		}
+		for (int[] k : CORNERS) {
+			p.set(c, k[0], y, k[1], stairs(stair, k[0] == 0 ? Direction.EAST : Direction.WEST).setValue(StairBlock.HALF, half));
+		}
 	}
 }

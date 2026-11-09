@@ -137,8 +137,8 @@ public final class BenchStoneTable implements Variant {
 			for (int v = 0; v < 3; v++) {
 				if (isRafter) {
 					p.set(c, u, 4, v, rafter);
-				} else if (v != 1 || p.hash(u, 4, v, 2) == 0) {
-					p.set(c, u, 4, v, leaves(Blocks.CHERRY_LEAVES)); // blossom between the rafters, the middle often open
+				} else if (p.hash(u, 4, v, 3) != 0 && !(v == 1 && u == w / 2)) {
+					p.set(c, u, 4, v, leaves(Blocks.CHERRY_LEAVES)); // blossom between the rafters, gaps by hash, open over the lantern
 				}
 			}
 		}

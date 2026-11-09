@@ -130,6 +130,15 @@ public final class GateArchBattlement implements Variant {
 					}
 				}
 			}
+			// [depth] a string course at the springing of the arch: a pale band round the tower faces, so no face
+			// runs more than three courses without a break (the recesses below cut through it where they open)
+			for (int u = u0; u <= u1; u++) {
+				for (int v = 0; v < d; v++) {
+					if (v == 0 || v == d - 1 || u == outer) {
+						p.set(c, u, side, v, b(p.hash(u, side, v, 3) == 0 ? Blocks.CHISELED_STONE_BRICKS : Blocks.POLISHED_ANDESITE));
+					}
+				}
+			}
 			// pilaster caps: polished andesite where the cornice meets the tower corners, one course down
 			for (int v : new int[] {0, d - 1}) {
 				p.set(c, outer, tCornice - 1, v, b(Blocks.POLISHED_ANDESITE));

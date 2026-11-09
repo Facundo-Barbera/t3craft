@@ -149,7 +149,7 @@ public final class PlanterTallPot implements Variant {
 		}
 		p.set(c, 0, y++, 0, b(Blocks.POLISHED_DEEPSLATE_WALL).setValue(BlockStateProperties.UP, true));
 		p.set(c, 0, y++, 0, b(Blocks.CAULDRON));
-		p.set(c, 0, y, 0, p.hash(0, 1, 0, 3) == 0 ? b(Blocks.AZALEA) : b(Blocks.FLOWERING_AZALEA));
+		p.set(c, 0, y, 0, b(Blocks.FLOWERING_AZALEA));
 	}
 
 	/** A thick bamboo stalk from y0 to y1 with the right leaves, and a shorter one beside it if there is room. */

@@ -24,7 +24,7 @@ import net.minecraft.world.level.block.state.properties.SlabType;
  * <ul>
  * <li><b>Silhouette</b>: thin legs leaning in → a gold knot → a bowl that tapers to the knot and widens to
  *     the rim. The legs lean with a stair at their top (the high step towards the knot).</li>
- * <li><b>Contrast</b>: near-black blackstone legs, dark polished deepslate bowl, a glowing copper rim and a
+ * <li><b>Contrast</b>: near-black nether-brick legs with blackstone knees, dark polished deepslate bowl, a glowing copper lip and a
  *     gold collar; the flame is the brightest thing on it.</li>
  * <li><b>Safe fire</b>: a campfire (it never spreads) with nothing flammable round it.</li>
  * </ul>
@@ -80,12 +80,12 @@ public final class LampStreetBrazierTripod implements Variant {
 		int lean = knot - 1; // the leaning top of each leg
 		boolean soul = p.hash(0, 0, 0, 4) == 0;
 
-		// --- legs: a dark foot, slim blackstone walls, then a stair whose high step leans in to the knot
+		// --- legs: thin dark fence posts, then a stair whose high step leans in to the knot
 		for (int i = 0; i < 3; i++) {
 			int u = LEGS[i][0];
 			int v = LEGS[i][1];
 			for (int y = 0; y < lean; y++) {
-				p.set(c, u, y, v, b(y == 0 ? Blocks.POLISHED_DEEPSLATE_WALL : Blocks.POLISHED_BLACKSTONE_WALL));
+				p.set(c, u, y, v, b(Blocks.NETHER_BRICK_FENCE)); // thin dark iron-like legs
 			}
 			p.set(c, u, lean, v, stairs(Blocks.POLISHED_BLACKSTONE_STAIRS, LEAN[i]));
 		}
@@ -106,13 +106,14 @@ public final class LampStreetBrazierTripod implements Variant {
 			p.set(c, k[0], dish, k[1], corner);
 		}
 
-		// --- rim: a low ring of bright copper slabs round the fire, gold-capped at the front corners
-		BlockState rim = slab(Blocks.CUT_COPPER_SLAB.waxed().unaffected());
-		for (int[] s : SIDES) {
-			p.set(c, s[0], dish + 1, s[1], rim);
+		// --- rim: bright copper stairs turned outward, so their high step is a raised lip round a sunken bed
+		// (the corner stairs face along the row and close the lip as inner corners)
+		for (int i = 0; i < 4; i++) {
+			int[] s = SIDES[i];
+			p.set(c, s[0], dish + 1, s[1], stairs(Blocks.CUT_COPPER_STAIRS.waxed().unaffected(), IN[i].getOpposite()));
 		}
 		for (int[] k : CORNERS) {
-			p.set(c, k[0], dish + 1, k[1], k[1] == 0 ? b(Blocks.LIGHTNING_ROD.waxed().unaffected()) : rim);
+			p.set(c, k[0], dish + 1, k[1], stairs(Blocks.CUT_COPPER_STAIRS.waxed().unaffected(), k[1] == 0 ? Direction.NORTH : Direction.SOUTH));
 		}
 
 		// --- the fire, in the open

@@ -21,12 +21,11 @@ import net.minecraft.world.level.block.state.properties.SlabType;
 /**
  * A crossroads fingerpost with real arrows: a dark post on a deepslate footing, and two or three arrows at
  * staggered heights, each pointing a different way where the plot allows (left, right, towards the front).
- * Each arrow runs through the post: a stair head on one side, the shaft through the post, a slab tail on the
- * other side. Pink cherry, yellow bamboo and pale birch arrows alternate; a lantern crowns tall posts.
+ * Each arrow is a thin slab board across the post that thickens into a stair head on one side. Pink cherry, yellow bamboo and pale birch arrows alternate; a lantern crowns tall posts.
  *
  * <ul>
- * <li><b>Arrow head</b>: an upside-down stair whose low step sits against the post, so the board tapers
- *     to a point away from it.</li>
+ * <li><b>Arrow head</b>: an upside-down stair whose full step is at the far end, at the tip of a half-block
+ *     board, so each arrow reads as a thin shaft ending in a heavier head.</li>
  * <li><b>Contrast</b>: a near-black dark oak post against bright boards; deepslate at the foot.</li>
  * <li><b>Silhouette</b>: arrows at irregular heights and in different directions, never a symmetric
  *     cross; on a narrow plot they stack on the open side, like real fingerposts.</li>
@@ -129,13 +128,16 @@ public final class SignpostArrows implements Variant {
 		}
 	}
 
-	/** One arrow through the post at height y: the head towards {@code dir}, the tail on the other side. */
+	/**
+	 * One arrow at height y: a thin board (an upper slab) on the tail side of the post and a head on the other
+	 * side. The head is an upside-down stair whose full step is at the far end, so the board thickens into a
+	 * point away from the post. The post itself carries a plank block where the arrow crosses it.
+	 */
 	private static void arrow(CitadelCanvas c, Plot p, int pu, int y, int pv, Direction dir, Block[] m) {
-		p.set(c, pu, y, pv, b(m[0])); // the shaft through the post
+		p.set(c, pu, y, pv, slab(m[2]).setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP)); // the board across the post
 		int hu = pu + dir.getStepX();
 		int hv = pv + dir.getStepZ();
-		// head: the stair's low step sits against the post, its full upper half runs out to the tip
-		p.set(c, hu, y, hv, stairs(m[1], dir.getOpposite()).setValue(StairBlock.HALF, Half.TOP));
+		p.set(c, hu, y, hv, stairs(m[1], dir).setValue(StairBlock.HALF, Half.TOP));
 		int tu = pu - dir.getStepX();
 		int tv = pv - dir.getStepZ();
 		if (p.has(tu, y, tv)) {
