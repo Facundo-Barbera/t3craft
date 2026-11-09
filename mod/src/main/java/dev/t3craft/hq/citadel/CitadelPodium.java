@@ -124,7 +124,7 @@ public final class CitadelPodium {
 	 */
 	private static int terraceD(int x, int z, double r) {
 		double a = RingCampusGeometry.theta(x, z);
-		double warp = 1.6 * Math.sin(11 * a + 0.3) + 1.0 * Math.sin(19 * a + 1.7);
+		double warp = 1.1 * Math.sin(7 * a + 0.3) + 0.6 * Math.sin(13 * a + 1.7); // gentler: runs of 5 or more cells before a step
 		return (int) Math.round(CitadelCanvas.dims().rampR - r + warp);
 	}
 
@@ -220,11 +220,12 @@ public final class CitadelPodium {
 
 	/** One block of a wall seen from the low side; {@code depth} 1 is the course under the coping. */
 	private static BlockState wall(int x, int y, int z, int depth) {
+		// a mixed face (bricks, cracked bricks, tiles, polished) so the dark band is not a flat black stripe under the coping
+		int h = hash(x, z, 311 + y) % 20;
 		if (depth == 1) {
-			int h = hash(x, z, 311 + y) % 10;
-			return h < 2 ? BRICK_CRACKED : h < 4 ? TILES : BRICK;
+			return h < 5 ? BRICK_CRACKED : h < 9 ? TILES : h < 12 ? BASE : BRICK;
 		}
-		return BASE;
+		return h < 11 ? BASE : h < 16 ? BRICK : h < 18 ? BRICK_CRACKED : TILES;
 	}
 
 	// ------------------------------------------------------------------ the tiers
