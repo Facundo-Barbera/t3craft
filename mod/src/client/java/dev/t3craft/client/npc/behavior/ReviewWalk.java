@@ -168,7 +168,7 @@ final class ReviewWalk {
 	 * null (not waiting for a review: normal behaviour). Reads the brain's stroll failure: an unreachable
 	 * spot is dropped and another one handed out at the next assignment.
 	 */
-	@Nullable IdleWander.Plan plan(String id, NpcBrain brain) {
+	IdleWander.@Nullable Plan plan(String id, NpcBrain brain) {
 		long t0 = System.nanoTime();
 		try {
 			IdleWander.Plan p = assigned.get(id);
