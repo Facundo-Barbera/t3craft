@@ -174,7 +174,7 @@ def wrap_rect(img, x0, y0, w, h, fn):
 # stone: warm greys (andesite family) with a hint of cherry and of calcite, never a saturated dot
 FLAG = [hexc(c) for c in ("#938F89", "#908C86", "#8C8882", "#96928C")]
 FLAG_CHERRY = hexc("#9A8B86")
-FLAG_CALCITE = hexc("#B5B1A7")
+FLAG_CALCITE = hexc("#A8A59C")
 JOINT = hexc("#625E58")
 
 # layouts: rectangles (x, y, w, h) that start on the tile edge, so every block edge keeps a joint. No piece is
@@ -203,7 +203,7 @@ def floor_stone(variant=0, seed=32):
     for i, (x0, y0, w, h) in enumerate(rects):
         base = FLAG[(i + variant) % len(FLAG)]
         if i == tint_i:
-            base = mix(base, FLAG_CHERRY if tint_kind == "cherry" else FLAG_CALCITE, 0.85 if tint_kind == "calcite" else 0.6)
+            base = mix(base, FLAG_CHERRY if tint_kind == "cherry" else FLAG_CALCITE, 0.7 if tint_kind == "calcite" else 0.6)
         cells = {}
         # coarse 8x8 clouds so a flag shades softly instead of salt-and-pepper
         for cy in range(0, h + 8, 8):
@@ -216,7 +216,7 @@ def floor_stone(variant=0, seed=32):
                 return
             d = cells[(lx // 8, ly // 8)]
             if lx == 1 or ly == 1:
-                d += 5 if calcite else 3  # chamfer next to the joint
+                d += 4 if calcite else 3  # chamfer next to the joint
             elif lx == w - 1 or ly == h - 1:
                 d -= 2
             img.set(x, y, shade(base, d))
