@@ -180,6 +180,21 @@ public final class CitadelRelief {
 						c.set(x + dir.getStepX(), g + 1, z + dir.getStepZ(), hh == 0 ? slab(Blocks.MOSSY_COBBLESTONE_SLAB) : b(Blocks.FERN));
 					}
 				}
+			} else if (s != null && s.getBlock() == Blocks.GRASS_BLOCK && c.at(x, g + 1, z) == null) {
+				// design/citadel-terraces3: the beds of the bank are planted (azaleas one block high, ferns, low flowers)
+				int h = Math.floorMod((x * 7919) ^ (z * 104729), 100);
+				if (h < 5) {
+					c.set(x, g + 1, z, leavesOf(Blocks.FLOWERING_AZALEA_LEAVES));
+				} else if (h < 16) {
+					c.set(x, g + 1, z, b(Blocks.FERN));
+				} else if (h < 30) {
+					c.set(x, g + 1, z, b(switch (h % 4) {
+						case 0 -> Blocks.PINK_TULIP;
+						case 1 -> Blocks.ALLIUM;
+						case 2 -> Blocks.AZURE_BLUET;
+						default -> Blocks.OXEYE_DAISY;
+					}));
+				}
 			}
 		}
 	}
