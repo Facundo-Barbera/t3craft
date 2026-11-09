@@ -18,9 +18,9 @@ import dev.t3craft.hq.citadel.catalog.Family;
 import dev.t3craft.hq.citadel.catalog.Plot;
 import dev.t3craft.hq.citadel.catalog.Support;
 import dev.t3craft.hq.citadel.catalog.Variant;
-import java.util.Random;
 import net.minecraft.core.Direction;
 import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.Mirror;
 import net.minecraft.world.level.block.state.BlockState;
@@ -139,13 +139,13 @@ public final class HouseForgeAtelier implements Variant {
 			w = p.w();
 			d = p.d();
 			h = p.h();
-			Random r = p.rng(0xF026_E002L);
 			int pw0 = Math.max(3, Math.round(w * 0.22f));
 			bw = Math.min(19, w - pw0);
 			pw = w - bw;
-			patioRight = r.nextBoolean();
-			flipB = r.nextBoolean();
-			kind = r.nextInt(3);
+			// seed choices, mixed through the hash so near seeds do not agree: side of the yard, side of the hearth and chimney, wall stone
+			patioRight = p.hash(101, 0, 7, 2) == 0;
+			flipB = p.hash(211, 0, 13, 2) == 0;
+			kind = p.hash(307, 0, 29, 3);
 			patioLocalRight = patioRight != flipB;
 			u0 = patioRight ? 0 : pw;
 			vb = d - 2;
@@ -390,7 +390,9 @@ public final class HouseForgeAtelier implements Variant {
 					boolean edge = v == 1 || v == d - 1 || bu == 0 || bu == bw - 1 || (v - VF) % 4 == 0; // [depth] a lighter rafter course over every wall post
 					BlockState st;
 					if (rs < rc || (bw % 2 == 0 && rc == rc0 && rs == rc)) {
-						st = stair(edge ? Blocks.POLISHED_BLACKSTONE_BRICK_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS, left ? Direction.EAST : Direction.WEST, false);
+						Block tile = edge ? Blocks.POLISHED_BLACKSTONE_BRICK_STAIRS
+								: p.hash(mu(bu), y, v, 7) == 0 ? Blocks.DEEPSLATE_BRICK_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS; // a few weathered tiles
+						st = stair(tile, left ? Direction.EAST : Direction.WEST, false);
 					} else {
 						st = b(Blocks.DEEPSLATE_TILES);
 					}
