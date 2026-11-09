@@ -98,7 +98,7 @@ public final class SignpostArrows implements Variant {
 		}
 
 		// --- the arrows: from just under the lantern down, two rows apart, opposite ways
-		int lowest = base ? 2 : 1;
+		int lowest = Math.max(1, Math.min(3, top - 1)); // arms hang over the road: at least 3 blocks of headroom under them
 		int first = p.hash(1, 0, 0, 2) == 0 ? 1 : -1;
 		int wood = p.hash(2, 0, 0, WOODS.length);
 		int i = 0;
@@ -123,7 +123,9 @@ public final class SignpostArrows implements Variant {
 		if (reach >= 2) {
 			int hc = pc + s * (reach - 1); // head column: tall side towards the tail, so the stairs fall away to the tip
 			put(c, p, hc, y + 1, pv, stairs(m[1], tail));
-			put(c, p, hc, y - 1, pv, stairs(m[1], tail).setValue(BlockStateProperties.HALF, Half.TOP));
+			if (y >= 4) { // the lower wedge stays 3 blocks over the road: a walker never meets it
+				put(c, p, hc, y - 1, pv, stairs(m[1], tail).setValue(BlockStateProperties.HALF, Half.TOP));
+			}
 		}
 	}
 
