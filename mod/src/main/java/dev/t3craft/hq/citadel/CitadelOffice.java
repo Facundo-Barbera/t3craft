@@ -76,7 +76,8 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
  *
  * <ul>
  * <li><b>Threads</b>: a 7 x 4 big screen (south wall, key {@code office}) bound to {@code HqGenerator.hubBinding}, the
- *     environment with most modules, as on the hub; three consoles (lecterns) face it, the standing cell in front of
+ *     environment with most modules, as on the hub; three console terminals (kit role {@code CONSOLE}, lecterns without
+ *     the blocks module) face it, the standing cell in front of
  *     them is the {@link #OFFICE} anchor.</li>
  * <li><b>Projects</b>: two 3 x 3 screens on the west wall (keys {@code office_w0}, {@code office_w1}), each bound to
  *     {@code project:<key>} of the two projects with most desks taken ({@link #projectBindings}); unbound while the
@@ -106,7 +107,7 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
  *
  * Anchors: {@code OFFICE} (in front of the consoles, facing the main screen), {@code OFFICE_BALCONY}, three big screens,
  * five board lamps ({@code board_lamp_5..9}). Fixtures (never replaced by the light pass): the screens and their bases, the
- * board, its lamps, the signs. No kernel class is touched.
+ * board, its lamps, the signs. No kernel class is touched here; the consoles come from {@code HqKit.Role.CONSOLE}.
  */
 public final class CitadelOffice {
 	/**
@@ -694,9 +695,10 @@ public final class CitadelOffice {
 				set(c, dx, y, dz, carpet(edge ? RUG_EDGE : RUG));
 			}
 		}
-		// the consoles: three lecterns facing the player, slabs between them with a lantern and a plant
+		// the consoles: three console terminals (kit role CONSOLE; a lectern with the blocks module off) facing the
+		// player, who stands north of them; slabs between them with a lantern and a plant
 		for (int dx : new int[] {-3, -1, 1}) {
-			set(c, dx, y, 1, facing(Blocks.LECTERN, Direction.NORTH));
+			set(c, dx, y, 1, c.kit.console(Direction.NORTH));
 		}
 		set(c, -2, y, 1, topSlab(Blocks.CHERRY_SLAB));
 		set(c, 0, y, 1, topSlab(Blocks.CHERRY_SLAB));

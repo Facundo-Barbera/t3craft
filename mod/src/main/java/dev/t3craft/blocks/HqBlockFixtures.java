@@ -60,6 +60,12 @@ public final class HqBlockFixtures implements HqFixtures {
 					.setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING, facing);
 		}
 
+		/** The console terminal (kit/console-terminal), front towards {@code facing} (default: the vanilla lectern stand-in). */
+		default BlockState consoleTerminal(Direction facing) {
+			return net.minecraft.world.level.block.Blocks.LECTERN.defaultBlockState()
+					.setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING, facing);
+		}
+
 		/** Room plaque with its front towards {@code facing} (replaces the HQ's wall signs); null keeps the signs. */
 		default @Nullable BlockState plaque(Direction facing) {
 			return null;
