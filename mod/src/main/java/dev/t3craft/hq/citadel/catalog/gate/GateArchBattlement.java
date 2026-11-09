@@ -540,7 +540,7 @@ public final class GateArchBattlement implements Variant {
 
 			// --- roof: a hip of stairs (the lowest course is the ceiling over the chamber) and a weathered-copper cap
 			ringIn(u0, u1, 0, d - 1, 12, roofStairs, roofBlock);
-			ringIn(u0 + 1, u1 - 1, 1, d - 2, 13, Blocks.WEATHERED_CUT_COPPER_STAIRS, Blocks.WEATHERED_CUT_COPPER);
+			ringIn(u0 + 1, u1 - 1, 1, d - 2, 13, Blocks.CUT_COPPER_STAIRS.waxed().weathered(), Blocks.CUT_COPPER.waxed().weathered());
 		}
 
 		private void banner(int u, int y, int v, Direction facing) {
