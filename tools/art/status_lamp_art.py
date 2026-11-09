@@ -73,7 +73,7 @@ RING = [(i, 0) for i in range(6)] + [(5, j) for j in range(1, 6)] + [(i, 5) for 
 # state -> lens crop (x0, y0, x1, y1) in texture px = lens face size in model px (1:1 texel density)
 # name: (colour, crop, frames, frametime)
 STATES = {
-    "off": (0x2A2A2A, (4, 3, 12, 13), 1, 0),
+    "off": (0x2A2A2A, (5, 3, 11, 13), 1, 0),
     "idle": (0xAAAAAA, (5, 3, 11, 13), 1, 0),
     "working": (0x55FFFF, (4, 3, 12, 13), 4, 3),
     "attention": (0xFFAA00, (3, 3, 13, 13), 2, 10),
@@ -103,16 +103,20 @@ def lens_frame(name, f):
         for x in range(16):
             img[y][x] = px(lighten(fill, 0.38) if name != "off" else rgb(0x2A333B))
     if name != "off":
-        # lens shading: 1 px darker border, a 2x2 warm core highlight at the top-left (the glyph paints over it)
+        # lens as glass: 1 px darker vertical edges, rows fade to 80 % at the top and bottom, a 2x2 core highlight
         edge = darken(fill, 0.70)
         for y in range(y0, y1):
+            k = 0.80 if y in (y0, y0 + 1, y1 - 1, y1 - 2) else 1.0
             for x in range(x0, x1):
-                if x in (x0, x1 - 1) or y in (y0, y1 - 1):
-                    img[y][x] = px(edge)
-        for (x, y) in ((x0 + 1, y0 + 1), (x0 + 2, y0 + 1), (x0 + 1, y0 + 2), (x0 + 2, y0 + 2)):
+                img[y][x] = px(edge if x in (x0, x1 - 1) else darken(fill, k))
+        for (x, y) in ((x0 + 1, y0 + 2), (x0 + 2, y0 + 2), (x0 + 1, y0 + 3), (x0 + 2, y0 + 3)):
             img[y][x] = px(lighten(fill, 0.40))
+    # rows 14-15: the claws' darker shade
+    for y in (14, 15):
+        for x in range(16):
+            img[y][x] = px(darken(fill, 0.55))
     # glyph
-    glyph_col = darken(c, 0.30) if lit else lighten(c, 0.15)
+    glyph_col = darken(c, 0.30 if name != "attention" else 0.16) if lit else lighten(c, 0.15)
     gname = {"idle": "pause", "attention": "bang", "error": "x", "done": "check"}.get(name)
     cx = (x0 + x1) / 2.0
     cy = (y0 + y1) / 2.0
@@ -196,6 +200,8 @@ def element(frm, to, kind, crop=None, emit=0, skip=()):
                 faces[fc] = {"texture": "#lens", "uv": list(crop)}
         elif kind == "plain":
             faces[fc] = {"texture": "#lens", "uv": [0, 2, 2, 3]}
+        elif kind == "claw":
+            faces[fc] = {"texture": "#lens", "uv": [0, 14, 2, 16]}
         else:
             faces[fc] = {"texture": "#lens", "uv": [0, 0, 2, 2]}
     e = {"from": list(frm), "to": list(to), "faces": faces}
@@ -204,15 +210,17 @@ def element(frm, to, kind, crop=None, emit=0, skip=()):
     return e
 
 
-def body(ring):
-    """Caps and rings, symmetric about y = 8; 10 px plates so the cap is never narrower than the lens."""
+def body(ring, small=False):
+    """Caps and rings, symmetric about y = 8; plates are lens + 2 px (10 px; 8 px for the small idle/off candle)."""
+    a = 4 if small else 3
+    b = 16 - a
     return [
-        element([3, 0, 3], [13, 1, 13], "steel"),
-        element([4, 1, 4], [12, 2, 12], "steel"),
-        element([3.5, 2, 3.5], [12.5, 3, 12.5], ring),
-        element([3.5, 13, 3.5], [12.5, 14, 12.5], ring),
-        element([4, 14, 4], [12, 15, 12], "steel"),
-        element([3, 15, 3], [13, 16, 13], "steel"),
+        element([a, 0, a], [b, 1, b], "steel"),
+        element([a + 1, 1, a + 1], [b - 1, 2, b - 1], "steel"),
+        element([a + 0.5, 2, a + 0.5], [b - 0.5, 3, b - 0.5], ring),
+        element([a + 0.5, 13, a + 0.5], [b - 0.5, 14, b - 0.5], ring),
+        element([a + 1, 14, a + 1], [b - 1, 15, b - 1], "steel"),
+        element([a, 15, a], [b, 16, b], "steel"),
     ]
 
 
@@ -220,7 +228,7 @@ def model(name):
     col, crop, n, ft = STATES[name]
     emit = {"off": 0, "idle": 7, "working": 13, "attention": 15, "error": 15, "done": 13}[name]
     # attention: steel rings, so the orange does not read as brass
-    els = body("steel" if name == "attention" else "gold")
+    els = body("steel" if name in ("attention", "off") else "gold", small=name in ("idle", "off"))
     x0, y0, x1, y1 = crop
     # lens: square in plan, y 3..13; the rings are wider than the lens, so up/down faces stay hidden except on 10 px lenses
     els.append(element([x0, 3, x0], [x1, 13, x1], "lens", crop=crop, emit=emit, skip=("up", "down") if x1 - x0 <= 8 else ()))
@@ -239,13 +247,16 @@ def model(name):
             els.append(horn(5, 7, 6.5, 9.5, 5.5, 10.5))
             els.append(horn(7, 8, 7, 9, 6.5, 9.5))
     elif name == "error":
-        # eight claws, four up and four down, at the corners of the 10 px lens
+        # eight claws (up and down, darker red) and four corner nubs sticking out at mid height: a jagged outline
         for cx in (3, 11):
             for cz in (3, 11):
-                els.append(element([cx, 13, cz], [cx + 2, 15, cz + 2], "plain", emit=emit))
-                els.append(element([cx + 0.5, 15, cz + 0.5], [cx + 1.5, 16, cz + 1.5], "plain", emit=emit))
-                els.append(element([cx, 1, cz], [cx + 2, 3, cz + 2], "plain", emit=emit))
-                els.append(element([cx + 0.5, 0, cz + 0.5], [cx + 1.5, 1, cz + 1.5], "plain", emit=emit))
+                els.append(element([cx, 13, cz], [cx + 2, 15, cz + 2], "claw", emit=emit))
+                els.append(element([cx + 0.5, 15, cz + 0.5], [cx + 1.5, 16, cz + 1.5], "claw", emit=emit))
+                els.append(element([cx, 1, cz], [cx + 2, 3, cz + 2], "claw", emit=emit))
+                els.append(element([cx + 0.5, 0, cz + 0.5], [cx + 1.5, 1, cz + 1.5], "claw", emit=emit))
+        for nx in (1, 13):
+            for nz in (1, 13):
+                els.append(element([nx, 6.5, nz], [nx + 2, 9.5, nz + 2], "claw", emit=emit))
     return {
         "parent": "minecraft:block/block",
         "textures": {"base": "t3craft:block/status_lamp_base", "lens": "t3craft:block/status_lamp_%s" % name, "particle": "t3craft:block/status_lamp_base"},
