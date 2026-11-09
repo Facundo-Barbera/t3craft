@@ -94,7 +94,15 @@ public final class HouseJapaneseTeahouse implements Variant {
 
 	// ------------------------------------------------------------------ geometry
 
-	private record Mats(Block stair, Block slab, BlockState full, BlockState ridge, BlockState cap) {
+	/** Roof materials: stair and slab variants (picked by hash, so no flat plane), the eave's two courses, the ridge. */
+	private record Mats(Block[] stairs, Block[] slabs, Block fStair, Block fSlab, BlockState full, BlockState ridge, BlockState cap) {
+		Block stair(int i) {
+			return stairs[Math.min(i, stairs.length - 1)];
+		}
+
+		Block slab(int i) {
+			return slabs[Math.min(i, slabs.length - 1)];
+		}
 	}
 
 	/** Fixed lines of the plan, all in local coordinates of an unmirrored house (sala on the low-u side). */
@@ -171,8 +179,12 @@ public final class HouseJapaneseTeahouse implements Variant {
 			gx = Math.max(3, Math.min(maxGx, sx + (rj ? -2 : 1)));
 			bu = w - 4;
 			roof = thatch
-					? new Mats(Blocks.BAMBOO_MOSAIC_STAIRS, Blocks.BAMBOO_MOSAIC_SLAB, b(Blocks.BAMBOO_MOSAIC), b(Blocks.DARK_OAK_PLANKS), slab(Blocks.DARK_OAK_SLAB))
-					: new Mats(Blocks.DEEPSLATE_TILE_STAIRS, Blocks.DEEPSLATE_TILE_SLAB, b(Blocks.DEEPSLATE_TILES), b(Blocks.STONE_BRICKS), slab(Blocks.STONE_BRICK_SLAB));
+					? new Mats(new Block[] {Blocks.BAMBOO_MOSAIC_STAIRS, Blocks.BAMBOO_STAIRS, Blocks.SPRUCE_STAIRS},
+							new Block[] {Blocks.BAMBOO_MOSAIC_SLAB, Blocks.BAMBOO_SLAB, Blocks.SPRUCE_SLAB}, Blocks.DARK_OAK_STAIRS, Blocks.DARK_OAK_SLAB,
+							b(Blocks.BAMBOO_MOSAIC), b(Blocks.DARK_OAK_PLANKS), slab(Blocks.DARK_OAK_SLAB))
+					: new Mats(new Block[] {Blocks.DEEPSLATE_TILE_STAIRS, Blocks.DEEPSLATE_BRICK_STAIRS, Blocks.COBBLED_DEEPSLATE_STAIRS},
+							new Block[] {Blocks.DEEPSLATE_TILE_SLAB, Blocks.DEEPSLATE_BRICK_SLAB, Blocks.COBBLED_DEEPSLATE_SLAB}, Blocks.SPRUCE_STAIRS, Blocks.SPRUCE_SLAB,
+							b(Blocks.DEEPSLATE_TILES), b(Blocks.STONE_BRICKS), slab(Blocks.STONE_BRICK_SLAB));
 			post = new boolean[w];
 			post[wu0] = true;
 			post[wu1] = true;
@@ -387,9 +399,9 @@ public final class HouseJapaneseTeahouse implements Variant {
 					g.set(u, y - 1, v, m.full());
 				}
 				if (gg % 2 == 0) {
-					g.set(u, y, v, gg == 0 ? slab(Blocks.DARK_OAK_SLAB) : slab(m.slab()));
+					g.set(u, y, v, gg == 0 ? slab(m.fSlab()) : slab(m.slab(variant(g.p, u, gg, v))));
 				} else {
-					Block sb = gg == 1 ? Blocks.DARK_OAK_STAIRS : m.stair(); // the second course is dark too: a deep fascia
+					Block sb = gg == 1 ? m.fStair() : m.stair(variant(g.p, u, gg, v)); // the first two courses are the fascia
 					g.set(u, y, v, d2 != null ? cornerStair(sb, d1, d2) : stair(sb, d1));
 				}
 			}
@@ -402,6 +414,12 @@ public final class HouseJapaneseTeahouse implements Variant {
 				g.set(u, PLATE + q.g(u, v) / 2 + 1, v, cornerStair(Blocks.DARK_OAK_STAIRS, a, bb));
 			}
 		}
+	}
+
+	/** [palette] which stair/slab variant a roof cell uses: mostly the main one, some brick or cobble (tiles) or plain bamboo and spruce (thatch). */
+	private static int variant(Plot p, int u, int gg, int v) {
+		int h = p.hash(u, gg, v, 10);
+		return h < 7 ? 0 : h < 9 ? 1 : 2;
 	}
 
 	private static void ridge(Pen g, G q, int u, int v, int gg, int y) {
@@ -483,6 +501,9 @@ public final class HouseJapaneseTeahouse implements Variant {
 			int v = q.wv1;
 			if (q.post[u]) {
 				column(g, u, v);
+				if (u != q.wu0 && u != q.wu1) {
+					column(g, u, v + 1); // [depth] a pilaster standing 1 block proud of the back wall, under the eave
+				}
 			} else {
 				boolean win = u == (q.mu0 + q.mu1) / 2;
 				g.set(u, 1, v, stone(p, u, 1, v));
@@ -493,8 +514,19 @@ public final class HouseJapaneseTeahouse implements Variant {
 			top(g, p, q, u, v, Direction.Axis.X);
 		}
 		// side walls
+		boolean[] sidePost = new boolean[q.d];
+		for (int v : posts(q.wv0, q.wv1)) {
+			sidePost[v] = true;
+		}
 		for (int v = q.wv0 + 1; v < q.wv1; v++) {
 			for (int u : new int[] {q.wu0, q.wu1}) {
+				if (sidePost[v]) {
+					// [depth] a post in the wall plane and a pilaster 1 block proud of it, under the eave
+					column(g, u, v);
+					column(g, u == q.wu0 ? 0 : q.w - 1, v);
+					top(g, p, q, u, v, Direction.Axis.Z);
+					continue;
+				}
 				boolean win = u == q.wu0 ? (v - q.sv0) % 3 == 1 : v == (q.sv0 + q.sv1) / 2;
 				g.set(u, 1, v, stone(p, u, 1, v));
 				g.set(u, 2, v, win ? paperV : plaster(p, u, 2, v));
@@ -629,18 +661,19 @@ public final class HouseJapaneseTeahouse implements Variant {
 		}
 		for (int u : new int[] {gx - 2, gx + 2}) {
 			pst[u][0] = true;
-			for (int y = 0; y <= 3; y++) {
+			for (int y = 0; y <= 4; y++) {
 				g.set(u, y, 0, log(Blocks.SPRUCE_LOG, Direction.Axis.Y));
 			}
 		}
 		for (int u = gx - 2; u <= gx + 2; u++) {
-			g.set(u, 4, 0, log(Blocks.SPRUCE_LOG, Direction.Axis.X));
+			g.set(u, 5, 0, log(Blocks.SPRUCE_LOG, Direction.Axis.X));
 		}
 		for (int u = gx - 3; u <= gx + 3; u++) {
-			g.set(u, 5, 0, stair(q.roof.stair(), Direction.SOUTH));
-			g.set(u, 5, 1, stair(q.roof.stair(), Direction.NORTH));
+			g.set(u, 6, 0, stair(q.roof.stair(0), Direction.SOUTH));
+			g.set(u, 6, 1, stair(q.roof.stair(0), Direction.NORTH));
 		}
-		g.put(gx, 3, 0, lantern(true), CitadelCanvas.HANGING);
+		g.put(gx - 1, 4, 0, lantern(true), CitadelCanvas.HANGING);
+		g.put(gx + 1, 4, 0, lantern(true), CitadelCanvas.HANGING);
 		// machiai: the waiting bench against the fence, roofed on wide plots
 		int bu = q.bu;
 		boolean shelter = w >= 14;
@@ -699,10 +732,46 @@ public final class HouseJapaneseTeahouse implements Variant {
 		if (g.free(lu, 0, tv) && g.free(lu, 3, tv)) {
 			JapaneseKit.stoneLantern(g.c, g.p, g.mu(lu), 0, tv);
 		}
-		// azaleas, moss and ferns on what is left
-		for (int[] a : new int[][] {{1, gd - 1}, {w - 2, gd - 1}, {1, 1}}) {
-			if (g.free(a[0], 0, a[1]) && g.free(a[0], 1, a[1])) {
-				g.set(a[0], 0, a[1], CitadelCanvas.leaves(p.hash(a[0], 0, a[1], 2) == 0 ? Blocks.FLOWERING_AZALEA_LEAVES : Blocks.AZALEA_LEAVES));
+		// [finish] the accent tree: a small cherry in the first spot of the roji where trunk and crown fit
+		tree: for (int v = 1; v <= gd - 2; v++) {
+			for (int u = 2; u <= w - 3; u++) {
+				boolean ok = g.free(u, 0, v) && g.free(u, 1, v) && g.free(u, 2, v) && g.free(u, 3, v);
+				for (int du = -1; ok && du <= 1; du++) {
+					for (int dv = -1; ok && dv <= 1; dv++) {
+						ok = g.free(u + du, 4, v + dv) && g.free(u + du, 5, v + dv);
+					}
+				}
+				if (!ok) {
+					continue;
+				}
+				for (int y = 0; y <= 3; y++) {
+					g.set(u, y, v, b(Blocks.CHERRY_LOG));
+				}
+				for (int du = -1; du <= 1; du++) {
+					for (int dv = -1; dv <= 1; dv++) {
+						g.set(u + du, 4, v + dv, CitadelCanvas.leaves(Blocks.CHERRY_LEAVES));
+						if ((du == 0 || dv == 0) && p.hash(u + du, 5, v + dv, 5) != 0) {
+							g.set(u + du, 5, v + dv, CitadelCanvas.leaves(Blocks.CHERRY_LEAVES));
+						}
+					}
+				}
+				g.set(u, 6, v, CitadelCanvas.leaves(Blocks.CHERRY_LEAVES));
+				for (int du = -2; du <= 2; du++) {
+					for (int dv = -1; dv <= 1; dv++) {
+						if (g.free(u + du, 0, v + dv) && p.hash(u + du, 0, v + dv, 3) == 0) {
+							g.set(u + du, 0, v + dv, b(Blocks.PINK_PETALS));
+						}
+					}
+				}
+				break tree;
+			}
+		}
+		// azalea hedges along the side fences, moss and ferns on what is left
+		for (int v = 1; v <= gd - 2; v++) {
+			for (int u : new int[] {1, w - 2}) {
+				if (g.free(u, 0, v) && g.free(u, 1, v) && p.hash(u, 0, v, 4) != 0) {
+					g.set(u, 0, v, CitadelCanvas.leaves(p.hash(u, 0, v, 2) == 0 ? Blocks.FLOWERING_AZALEA_LEAVES : Blocks.AZALEA_LEAVES));
+				}
 			}
 		}
 		for (int v = 1; v < gd; v++) {
@@ -711,9 +780,9 @@ public final class HouseJapaneseTeahouse implements Variant {
 					continue;
 				}
 				int hsh = p.hash(u, 0, v, 100);
-				if (hsh < 45) {
+				if (hsh < 60) {
 					g.set(u, 0, v, b(Blocks.MOSS_CARPET));
-				} else if (hsh < 55) {
+				} else if (hsh < 70) {
 					g.set(u, 0, v, b(Blocks.FERN));
 				}
 			}
