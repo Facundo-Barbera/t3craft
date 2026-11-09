@@ -22,7 +22,6 @@ import dev.t3craft.hq.RingCampusGeometry;
 import dev.t3craft.hq.RingCampusGeometry.Kind;
 import dev.t3craft.hq.RingCampusGeometry.Zone;
 import dev.t3craft.hq.Workstation;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -183,16 +182,29 @@ public final class CitadelFinish {
 
 	// ------------------------------------------------------------------ light pass
 
-	private static boolean noCollision(CitadelCanvas c, long k) {
+	/**
+	 * Whether the cell lets an NPC through. fix/demo-reconcile-offthread: the answer is kept per block state (states are
+	 * shared instances; whether a state's collision shape is empty does not depend on where it stands).
+	 */
+	private static boolean noCollision(CitadelCanvas c, long k, Map<BlockState, Boolean> memo) {
 		BlockState s = c.cells.get(k);
-		return s == null || s.getCollisionShape(EmptyBlockGetter.INSTANCE, BlockPos.of(k)).isEmpty();
+		if (s == null) {
+			return true;
+		}
+		Boolean r = memo.get(s);
+		if (r == null) {
+			r = s.getCollisionShape(EmptyBlockGetter.INSTANCE, BlockPos.of(k)).isEmpty();
+			memo.put(s, r);
+		}
+		return r;
 	}
 
-	private static boolean standable(CitadelCanvas c, int x, int y, int z) {
+	private static boolean standable(CitadelCanvas c, int x, int y, int z, Map<BlockState, Boolean> memo) {
 		if (c.zoneAt(x, z).kind() == Kind.NONE) {
 			return false;
 		}
-		return noCollision(c, BlockPos.asLong(x, y, z)) && noCollision(c, BlockPos.asLong(x, y + 1, z)) && !noCollision(c, BlockPos.asLong(x, y - 1, z));
+		return noCollision(c, BlockPos.asLong(x, y, z), memo) && noCollision(c, BlockPos.asLong(x, y + 1, z), memo)
+				&& !noCollision(c, BlockPos.asLong(x, y - 1, z), memo);
 	}
 
 	/**
@@ -201,33 +213,58 @@ public final class CitadelFinish {
 	 * these lights every cell it really walks.
 	 */
 	static List<BlockPos> walkable(CitadelCanvas c) {
-		Set<Long> seen = new HashSet<>();
-		ArrayDeque<BlockPos> todo = new ArrayDeque<>();
+		// fix/demo-reconcile-offthread: primitive long set and queue (no boxed Long per cell), memoised
+		// collision per state; same cells, same order as before
+		it.unimi.dsi.fastutil.longs.LongOpenHashSet seen = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
+		it.unimi.dsi.fastutil.longs.LongArrayFIFOQueue todo = new it.unimi.dsi.fastutil.longs.LongArrayFIFOQueue();
+		Map<BlockState, Boolean> memo = new java.util.IdentityHashMap<>();
+		int bottom = c.style.bottom();
+		int top = c.style.top();
 		BlockPos spawn = spawn();
-		if (standable(c, spawn.getX(), spawn.getY(), spawn.getZ())) {
+		if (standable(c, spawn.getX(), spawn.getY(), spawn.getZ(), memo)) {
 			seen.add(spawn.asLong());
-			todo.add(spawn);
+			todo.enqueue(spawn.asLong());
 		}
 		while (!todo.isEmpty()) {
-			BlockPos p = todo.poll();
+			long p = todo.dequeueLong();
+			int px = BlockPos.getX(p);
+			int py = BlockPos.getY(p);
+			int pz = BlockPos.getZ(p);
 			for (Direction d : Direction.Plane.HORIZONTAL) {
+				int nx = px + d.getStepX();
+				int nz = pz + d.getStepZ();
 				for (int dy = -1; dy <= 1; dy++) {
-					BlockPos n = p.relative(d).above(dy);
-					if (n.getY() < c.style.bottom() || n.getY() > c.style.top() || seen.contains(n.asLong())) {
+					int ny = py + dy;
+					if (ny < bottom || ny > top) {
 						continue;
 					}
-					if (standable(c, n.getX(), n.getY(), n.getZ())) {
-						seen.add(n.asLong());
-						todo.add(n);
+					long n = BlockPos.asLong(nx, ny, nz);
+					if (seen.contains(n)) {
+						continue;
+					}
+					if (standable(c, nx, ny, nz, memo)) {
+						seen.add(n);
+						todo.enqueue(n);
 					}
 				}
 			}
 		}
-		List<BlockPos> out = new ArrayList<>();
-		for (long k : seen) {
-			out.add(BlockPos.of(k));
+		long[] keys = seen.toLongArray();
+		int n = keys.length;
+		int[] xs = new int[n];
+		int[] ys = new int[n];
+		int[] zs = new int[n];
+		for (int i = 0; i < n; i++) {
+			xs[i] = BlockPos.getX(keys[i]);
+			ys[i] = BlockPos.getY(keys[i]);
+			zs[i] = BlockPos.getZ(keys[i]);
 		}
-		out.sort(Comparator.comparingInt((BlockPos p) -> p.getY()).thenComparingInt(p -> p.getZ()).thenComparingInt(p -> p.getX()));
+		// y, then z, then x (positions are unique, so the result does not depend on the set's iteration order)
+		int[] order = dev.t3craft.build.Layers.sortByKeys(ys, zs, xs);
+		List<BlockPos> out = new ArrayList<>(n);
+		for (int i : order) {
+			out.add(new BlockPos(xs[i], ys[i], zs[i]));
+		}
 		return out;
 	}
 
@@ -518,15 +555,44 @@ public final class CitadelFinish {
 
 	/** The placement order: group, layer, then y (top-down for hanging cells), z, x. */
 	private static List<Cell> placementOrder(CitadelCanvas c, Map<Long, String> groups) {
-		List<Cell> all = new ArrayList<>(c.cells.size());
-		for (long k : c.cells.keySet()) {
-			all.add(new Cell(BlockPos.of(k), groups.get(k), c.layers.getOrDefault(k, SOLID)));
+		// fix/demo-reconcile-offthread: the group comparator (string prefixes, parseInt) ran on every
+		// comparison of a sort over every cell; now each distinct group gets its rank once and the cells are
+		// sorted on primitive keys. Same order: GROUPS is a total order, and positions are unique.
+		int n = c.cells.size();
+		long[] keys = new long[n];
+		String[] gs = new String[n];
+		int[] layer = new int[n];
+		int i = 0;
+		Map<String, Integer> distinct = new HashMap<>();
+		for (Map.Entry<Long, BlockState> e : c.cells.entrySet()) {
+			long k = e.getKey();
+			keys[i] = k;
+			gs[i] = groups.get(k);
+			layer[i] = c.layers.getOrDefault(k, SOLID);
+			distinct.putIfAbsent(gs[i], 0);
+			i++;
 		}
-		all.sort(Comparator.<Cell, String>comparing(Cell::group, GROUPS)
-				.thenComparingInt(Cell::layer)
-				.thenComparingInt(cc -> cc.layer() == HANGING ? -cc.pos().getY() : cc.pos().getY())
-				.thenComparingInt(cc -> cc.pos().getZ())
-				.thenComparingInt(cc -> cc.pos().getX()));
+		List<String> names = new ArrayList<>(distinct.keySet());
+		names.sort(GROUPS);
+		for (int r = 0; r < names.size(); r++) {
+			distinct.put(names.get(r), r);
+		}
+		int[] rank = new int[n];
+		int[] yKey = new int[n];
+		int[] zs = new int[n];
+		int[] xs = new int[n];
+		for (int j = 0; j < n; j++) {
+			rank[j] = distinct.get(gs[j]);
+			int y = BlockPos.getY(keys[j]);
+			yKey[j] = layer[j] == HANGING ? -y : y;
+			zs[j] = BlockPos.getZ(keys[j]);
+			xs[j] = BlockPos.getX(keys[j]);
+		}
+		int[] order = dev.t3craft.build.Layers.sortByKeys(rank, layer, yKey, zs, xs);
+		List<Cell> all = new ArrayList<>(n);
+		for (int j : order) {
+			all.add(new Cell(BlockPos.of(keys[j]), gs[j], layer[j]));
+		}
 		return all;
 	}
 
