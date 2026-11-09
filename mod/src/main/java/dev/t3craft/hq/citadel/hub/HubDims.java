@@ -92,7 +92,8 @@ final class HubDims {
 	static final int TERRACE_X1 = 12;
 	/** Corner towers: half-width of the shaft (3 x 3 => 1), offset of the centre outward from the vertex, shaft top, eave half-width. */
 	static final int TOWER_HALF = 1;
-	static final int TOWER_CENTER = 12;
+	static final int TOWER_X = 9;
+	static final int TOWER_Z = 14;
 	static final int TOWER_TOP_A = 16;
 	static final int TOWER_TOP_B = 14;
 	static final int TOWER_EAVE = 2;

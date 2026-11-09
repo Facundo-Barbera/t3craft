@@ -7,8 +7,8 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.PLANKS;
 import static dev.t3craft.hq.citadel.CitadelCanvas.Y0;
 
 /**
- * The four corner towers of the wall: a hollow 3 x 3 shaft on each diagonal, against the middle of the
- * chamfer (it never takes an interior cell nor the patio stairs). Dark base, stone-brick shaft with
+ * The four towers flanking the north and south gables: a hollow 3 x 3 shaft at each outer vertex of the
+ * faces (it never takes an interior cell, nor the diagonal paths and patio stairs the walkers use). Dark base, stone-brick shaft with
  * calcite corner posts and slit windows on the outer faces, a corbelled cornice and a stepped cherry cap
  * with a spire. Paints after the wall, on top of it.
  */
@@ -16,12 +16,12 @@ final class HubTowers {
 	private HubTowers() {
 	}
 
-	/** One tower on each diagonal, against the middle of the chamfer; the heights alternate. */
+	/** One tower at each end of the north and south faces, flanking the gables and the bridges; the heights alternate. */
 	static void paint(CitadelCanvas c) {
 		for (int sx = -1; sx <= 1; sx += 2) {
 			for (int sz = -1; sz <= 1; sz += 2) {
 				int top = sx * sz > 0 ? HubDims.TOWER_TOP_A : HubDims.TOWER_TOP_B;
-				tower(c, sx * HubDims.TOWER_CENTER, sz * HubDims.TOWER_CENTER, sx, sz, top);
+				tower(c, sx * HubDims.TOWER_X, sz * HubDims.TOWER_Z, sx, sz, top);
 			}
 		}
 	}
