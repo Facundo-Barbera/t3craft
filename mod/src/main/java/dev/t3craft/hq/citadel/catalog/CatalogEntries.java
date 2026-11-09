@@ -61,6 +61,9 @@ final class CatalogEntries {
 			new dev.t3craft.hq.citadel.catalog.lamp.LampStreetAvenueDouble(), // lamp_street_avenue_double
 			new dev.t3craft.hq.citadel.catalog.lamp.LampStreetBrazierTripod(), // lamp_street_brazier_tripod
 			new dev.t3craft.hq.citadel.catalog.lamp.LampStreetToro(), // lamp_street_toro
+			new dev.t3craft.hq.citadel.catalog.plazacenter.PlazaCenterGlazedRosette(), // plaza_center_glazed_rosette
+			new dev.t3craft.hq.citadel.catalog.plazacenter.PlazaCenterMonumentalSundial(), // plaza_center_monumental_sundial
+			new dev.t3craft.hq.citadel.catalog.plazacenter.PlazaCenterOctagonBandstand(), // plaza_center_octagon_bandstand
 	};
 
 	static final List<Variant> ALL = List.of(ENTRIES);
