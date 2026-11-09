@@ -90,15 +90,6 @@ public final class TreeCherryGrand implements Variant {
 		int[][] lead = TreeKit.trunk(t, TreeKit.CHERRY, bu, bv, y2, crownY, ou, ov,
 				Math.cos(lean) * amp, Math.sin(lean) * amp);
 
-		for (int y = 1; y <= y2; y++) { // pale patches in the bark
-			for (int v = bv; v <= bv + 1; v++) {
-				for (int u = bu; u <= bu + 1; u++) {
-					if (t.kind(u, y, v) == TreeKit.WOOD && t.hash(u, y, v, 7) == 0) {
-						t.wood(u, y, v, LIMB.bark());
-					}
-				}
-			}
-		}
 		// ---- roots spread out, a flare one block high against the trunk, a collar on the big ones
 		TreeKit.roots(t, TreeKit.CHERRY, bu, bv, 6 + (big ? 2 : 0), 2 + (big ? 1 : 0) + (mn >= 13 ? 1 : 0), -1, 3);
 		if (big) {
