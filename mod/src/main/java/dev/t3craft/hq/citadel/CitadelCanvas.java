@@ -246,6 +246,40 @@ public final class CitadelCanvas {
 		cells.put(k, s);
 		layers.put(k, layer);
 		data.remove(k);
+		if (rigidDepth > 0) {
+			liftFrom.put(k, rigidCol);
+		} else if (!liftFrom.isEmpty()) {
+			liftFrom.remove(k);
+		}
+	}
+
+	// ------------------------------------------------------------------ relief (design/citadel-terraces)
+
+	/**
+	 * Cells written while a rigid piece is open ({@link #rigid}) → the column whose terrace lift they take, so a tree
+	 * or a catalog piece near a step moves up in one piece instead of being sheared by the columns it overhangs.
+	 */
+	public final Map<Long, Long> liftFrom = new HashMap<>();
+	private int rigidDepth;
+	private long rigidCol;
+	/** Lift in blocks of each column, filled by {@code CitadelRelief.apply} (empty before it, or with relief 0). */
+	public final Map<Long, Integer> lift = new HashMap<>();
+
+	/** Opens a rigid piece whose cells all take the terrace lift of the column {@code (x, z)} (nests: the outer one wins). */
+	public void rigid(int x, int z) {
+		if (rigidDepth++ == 0) {
+			rigidCol = col(x, z);
+		}
+	}
+
+	/** Closes the rigid piece opened by {@link #rigid}. */
+	public void unrigid() {
+		rigidDepth = Math.max(0, rigidDepth - 1);
+	}
+
+	/** The terrace lift (blocks) of a column once the relief is applied; 0 before. */
+	public int liftAt(int x, int z) {
+		return lift.getOrDefault(col(x, z), 0);
 	}
 
 	public void fixture(BlockPos p, BlockState s) {

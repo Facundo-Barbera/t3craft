@@ -74,8 +74,8 @@ public final class StallTeaBar implements Variant {
 		pillars(c, p);
 		bar(c, p);
 		stools(c, p);
-		back(c, p);
 		roof(c, p);
+		back(c, p); // after the roof: the chimney rises through the back eave
 		lights(c, p);
 	}
 
@@ -87,7 +87,7 @@ public final class StallTeaBar implements Variant {
 		for (int u : new int[] {0, w - 1}) {
 			for (int v : new int[] {0, d - 1}) {
 				p.set(c, u, 0, v, b(Blocks.POLISHED_DEEPSLATE)); // [palette] dark footing...
-				p.set(c, u, 1, v, b(Blocks.CHERRY_LOG)); // ...pink shaft...
+				p.set(c, u, 1, v, b(Blocks.CHERRY_FENCE)); // ...a slim pink shaft, so the front stays open...
 				p.set(c, u, 2, v, b(Blocks.STRIPPED_CHERRY_LOG)); // ...pale bracket under the eave
 			}
 		}
@@ -109,7 +109,7 @@ public final class StallTeaBar implements Variant {
 
 	private static void bar(CitadelCanvas c, Plot p) {
 		int w = p.w();
-		for (int u = 0; u < w; u++) {
+		for (int u = 1; u < w - 1; u++) { // the bar stops short of the pillars: open sides
 			p.set(c, u, 0, 1, barBody(p, u));
 			switch (p.hash(u, 1, 1, 5)) {
 				case 0 -> p.set(c, u, 1, 1, b(Blocks.WATER_CAULDRON).setValue(BlockStateProperties.LEVEL_CAULDRON, 3)); // a kettle
@@ -118,9 +118,7 @@ public final class StallTeaBar implements Variant {
 				default -> p.set(c, u, 1, 1, b(Blocks.POTTED_PINK_TULIP));
 			}
 		}
-		// [finish] the ends of the bar carry a standing lantern; the middle always has a kettle and a teapot
-		p.set(c, 0, 1, 1, b(Blocks.LANTERN));
-		p.set(c, w - 1, 1, 1, b(Blocks.LANTERN));
+		// [finish] the middle always has a kettle and a teapot (lanterns hang from the roof above the bar ends)
 		int mid = w / 2;
 		p.set(c, mid, 1, 1, b(Blocks.WATER_CAULDRON).setValue(BlockStateProperties.LEVEL_CAULDRON, 3));
 		p.set(c, mid - 1, 1, 1, b(Blocks.FLOWER_POT));
@@ -152,7 +150,10 @@ public final class StallTeaBar implements Variant {
 		// [finish] a deepslate-brick chimney through the back eave
 		p.set(c, hearth, 2, back, b(Blocks.DEEPSLATE_BRICKS));
 		p.set(c, hearth, EAVE, back, b(Blocks.DEEPSLATE_BRICKS));
-		p.set(c, hearth, RIDGE, back, b(Blocks.DEEPSLATE_BRICK_WALL));
+		p.set(c, hearth, RIDGE, back, b(Blocks.DEEPSLATE_BRICKS));
+		if (p.h() > RIDGE + 1) {
+			p.set(c, hearth, RIDGE + 1, back, b(Blocks.DEEPSLATE_BRICK_WALL)); // the flue clears the ridge
+		}
 		// a woven mat on the aisle floor
 		for (int v = 2; v < back; v++) {
 			for (int u = 1; u < w - 1; u++) {
@@ -161,47 +162,60 @@ public final class StallTeaBar implements Variant {
 		}
 	}
 
-	// ------------------------------------------------------------------ roof (y3..y4)
+	// ------------------------------------------------------------------ roof (y3..y5)
 
 	/**
-	 * [depth] hip roof of deepslate tiles: stairs on the eave rows and the first inner rows, a flat
-	 * tile band in the middle, a cherry-stair eave line at the front and back, and the four corner
-	 * tips raised one block like a tea house in the east.
+	 * [depth] a hip roof in three tiers: a cherry eave ring at y3 sloping in from all four sides, with
+	 * stripped-cherry blocks over the pillars carrying upturned slab tips; a deepslate-tile ring one
+	 * row in at y4 (stairs on its edges, tiles inside); from height 6 a ridge of tile slabs with a cherry
+	 * cap along u. The eaves overhang the bar and the back shelf, so the roof reads as a tea house.
 	 */
 	private static void roof(CitadelCanvas c, Plot p) {
 		int w = p.w();
 		int d = p.d();
-		for (int v = 0; v < d; v++) {
-			boolean eave = v == 0 || v == d - 1;
-			for (int u = 0; u < w; u++) {
-				BlockState s;
-				if (eave) {
-					s = stairs(Blocks.CHERRY_STAIRS, v == 0 ? Direction.SOUTH : Direction.NORTH);
-					p.set(c, u, EAVE, v, s);
+		for (int u = 0; u < w; u++) {
+			for (int v = 0; v < d; v++) {
+				boolean l = u == 0;
+				boolean r = u == w - 1;
+				boolean f = v == 0;
+				boolean k = v == d - 1;
+				if ((l || r) && (f || k)) {
+					p.set(c, u, EAVE, v, b(Blocks.STRIPPED_CHERRY_LOG)); // [finish] a pale bracket block over each pillar
+				} else if (f || k || l || r) {
+					Direction up = f ? Direction.SOUTH : k ? Direction.NORTH : l ? Direction.EAST : Direction.WEST;
+					p.set(c, u, EAVE, v, stairs(Blocks.DEEPSLATE_TILE_STAIRS, up)); // [palette] a dark eave line parts the roof from the posts
 				} else {
-					boolean inner = v == 1 || v == d - 2;
-					s = inner ? stairs(Blocks.DEEPSLATE_TILE_STAIRS, v <= (d - 1) / 2 ? Direction.SOUTH : Direction.NORTH)
-							: b(Blocks.DEEPSLATE_TILES);
-					p.set(c, u, RIDGE, v, s);
+					boolean il = u == 1;
+					boolean ir = u == w - 2;
+					boolean iff = v == 1;
+					boolean ik = v == d - 2;
+					BlockState st;
+					if ((il || ir) && (iff || ik)) {
+						st = b(Blocks.CHERRY_PLANKS);
+					} else if (iff || ik || il || ir) {
+						Direction up = iff ? Direction.SOUTH : ik ? Direction.NORTH : il ? Direction.EAST : Direction.WEST;
+						st = stairs(Blocks.CHERRY_STAIRS, up);
+					} else {
+						st = b(Blocks.CHERRY_PLANKS);
+					}
+					p.set(c, u, RIDGE, v, st);
 				}
 			}
 		}
-		// the roof of the side edges: tile slabs close the ends under the ridge
-		for (int v = 1; v < d - 1; v++) {
-			p.set(c, 0, EAVE, v, slab(Blocks.DEEPSLATE_TILE_SLAB));
-			p.set(c, w - 1, EAVE, v, slab(Blocks.DEEPSLATE_TILE_SLAB));
-		}
-		// [finish] upturned corner tips
-		for (int u : new int[] {0, w - 1}) {
-			for (int v : new int[] {0, d - 1}) {
-				p.set(c, u, RIDGE, v, slab(Blocks.DEEPSLATE_TILE_SLAB));
-			}
-		}
 		if (p.h() > RIDGE + 1) {
+			int va = (d - 1) / 2;
+			int vb = d / 2;
 			for (int u = 1; u < w - 1; u++) {
-				p.set(c, u, RIDGE + 1, d / 2, slab(Blocks.CHERRY_SLAB));
+				boolean end = u == 1 || u == w - 2;
+				for (int v = va; v <= vb; v++) {
+					p.set(c, u, RIDGE + 1, v, slab(Blocks.DEEPSLATE_TILE_SLAB)); // [palette] the dark ridge line
+				}
 			}
 		}
+		// [finish] lanterns hang from the front eave beside the noren, symmetric about the bar
+		BlockState lantern = b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true);
+		p.put(c, 1, EAVE, 1, lantern, CitadelCanvas.HANGING); // under the tile ring, over the bar
+		p.put(c, w - 2, EAVE, 1, lantern, CitadelCanvas.HANGING);
 	}
 
 	// ------------------------------------------------------------------ lights
@@ -211,7 +225,9 @@ public final class StallTeaBar implements Variant {
 		// [finish] a noren: a short red curtain hung from the front eave, with a white edge cell, so the
 		// front reads as a tea house at a glance
 		for (int u = 1; u < w - 1; u++) {
-			p.set(c, u, 2, 0, Blocks.WOOL.pick(((u + p.hash(1, 1, 1, 2)) & 1) == 0 ? DyeColor.RED : DyeColor.WHITE).defaultBlockState());
+			if (((u + p.hash(1, 1, 1, 2)) & 1) == 0) {
+				p.set(c, u, 2, 0, Blocks.WOOL.pick(DyeColor.RED).defaultBlockState()); // short noren tabs, gaps between
+			}
 		}
 	}
 }

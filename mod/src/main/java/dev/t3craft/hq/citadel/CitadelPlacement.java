@@ -347,6 +347,15 @@ public final class CitadelPlacement {
 	 */
 	private static boolean build(CitadelCanvas c, Family f, int x, int y0, int z, int sx, int sz, int h, Direction front, long seed) {
 		Plot p = Plot.ofWorld(x, y0, z, sx, sz, h, front, seed);
+		// design/citadel-terraces: a piece never straddles a step of the relief (it would be cut by the retaining wall)
+		int terrace = CitadelRelief.halves(c, x, z);
+		for (int xx = x; xx < x + sx; xx++) {
+			for (int zz = z; zz < z + sz; zz++) {
+				if (CitadelRelief.halves(c, xx, zz) != terrace) {
+					return false;
+				}
+			}
+		}
 		Variant v = Catalog.pick(f, p);
 		if (v == null && !hasFallback(f, p.w(), p.d(), h)) {
 			return false;
@@ -360,15 +369,18 @@ public final class CitadelPlacement {
 				}
 			}
 		}
-		if (v == null) {
-			fallback(c, f, p);
-			return true;
-		}
+		c.rigid(x + sx / 2, z + sz / 2);
 		try {
+			if (v == null) {
+				fallback(c, f, p);
+				return true;
+			}
 			v.build(c, p);
 		} catch (RuntimeException e) {
 			// a broken variant must not take the city down: what it wrote stays, the gallery shows the error
 			T3Craft.LOGGER.warn("[citadel] catalog variant {} failed on {}: {}", v.id(), p, e.toString());
+		} finally {
+			c.unrigid();
 		}
 		return true;
 	}

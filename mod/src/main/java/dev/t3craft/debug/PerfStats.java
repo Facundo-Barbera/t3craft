@@ -336,7 +336,7 @@ public final class PerfStats {
 	// fix/new-thread-hitch: what a new thread sets off that was not timed before
 	/** Client: the client-thread part of a demo HQ (re)build start (marker, choose source, parts, crews). */
 	public static final String STEP_DEMO_RECONCILE = "step.demo.reconcile.ns";
-	/** Async: demo HQ prepared for a new roster (layout plan, old plan, diff, baked parts, fingerprint). */
+	/** Async: demo HQ prepared (entry, start signal, rebuild, new roster, pack reload: layout plan, old plan, diff, baked parts, fingerprint). */
 	public static final String STEP_DEMO_PREPARE = "step.demo.prepare_async.ns";
 	/** Async: demo fixture bindings (thread → monitor / lamp) for a new roster. */
 	public static final String STEP_DEMO_BINDINGS = "step.demo.bindings_async.ns";

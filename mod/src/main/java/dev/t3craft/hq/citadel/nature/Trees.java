@@ -87,13 +87,16 @@ public final class Trees {
 	/** A tree of {@code species} and {@code seed} with its foot at {@code (x, z)}. */
 	public static void tree(CitadelCanvas c, int x, int z, Species species, int seed) {
 		Tree t = build(species, seed);
+		c.rigid(x, z);
 		for (Cell cell : t.cells()) {
 			placeCell(c, x, z, cell);
 		}
+		c.unrigid();
 	}
 
 	/** One column of a tree whose foot is at {@code (tx, tz)}: the cells at offset {@code (x - tx, z - tz)}. */
 	public static void placeColumn(CitadelCanvas c, Tree t, int tx, int tz, int x, int z) {
+		c.rigid(tx, tz);
 		int dx = x - tx;
 		int dz = z - tz;
 		for (Cell cell : t.cells()) {
@@ -101,6 +104,7 @@ public final class Trees {
 				placeCell(c, tx, tz, cell);
 			}
 		}
+		c.unrigid();
 	}
 
 	/** True when the offset {@code (dx, dz)} can hold a cell of this tree. */

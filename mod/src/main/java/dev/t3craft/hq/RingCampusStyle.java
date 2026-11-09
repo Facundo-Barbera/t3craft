@@ -63,7 +63,7 @@ public final class RingCampusStyle extends HqStyle {
 	@Override
 	public int top() {
 		// two-floor halls with their roofs, the hub vault and beacon, the review tower's spire (40 at scale 1)
-		return Math.max(40, RingCampusGeometry.dims().sy(40));
+		return Math.max(40, RingCampusGeometry.dims().sy(40)) + RingCampusGeometry.level(0); // design/citadel-terraces: the core's lift
 	}
 
 	@Override
