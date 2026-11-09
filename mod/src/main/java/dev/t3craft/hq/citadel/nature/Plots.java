@@ -259,6 +259,13 @@ public final class Plots {
 			p.put(-h, bb, 2, f);
 			p.put(-h, bb, 3, lantern());
 		}
+		// a lamp post now and then along the fence, so the garden is lit inside
+		for (int i = -h + 3; i < h; i += 6) {
+			for (int[] q : new int[][] {{i, -h}, {i, h}, {h, i}}) {
+				p.put(q[0], q[1], 2, f);
+				p.put(q[0], q[1], 3, lantern());
+			}
+		}
 	}
 
 	/** A path cell: the floor of the kit in two tones, matching the streets. */
@@ -464,6 +471,12 @@ public final class Plots {
 		p.ground(0, 0, FOOT);
 		p.column(0, 0, 1, 2, b(Blocks.STONE_BRICK_WALL));
 		p.put(0, 0, 3, lantern());
+		for (int sa = -1; sa <= 1; sa += 2) {
+			for (int sb = -1; sb <= 1; sb += 2) {
+				p.force(sa * 2, sb * 2, 1, b(Blocks.STONE_BRICK_WALL));
+				p.force(sa * 2, sb * 2, 2, lantern());
+			}
+		}
 	}
 
 	// ------------------------------------------------------------------ 2: building site
@@ -571,6 +584,10 @@ public final class Plots {
 		for (int sg = -1; sg <= 1; sg += 2) {
 			p.put(-h, sg * 3, 2, f);
 			p.put(-h, sg * 3, 3, lantern());
+			for (int sa = -1; sa <= 1; sa += 2) {
+				p.column(sa * h, sg * h, 1, 2, f);
+				p.put(sa * h, sg * h, 3, lantern());
+			}
 		}
 	}
 
@@ -581,8 +598,8 @@ public final class Plots {
 		int h = p.h;
 		int ca = Dims.s(2);
 		int cb = Dims.s(-2 + Math.floorMod(p.lot, 3) * 2 - 2);
-		double rx = Dims.sd(5.6);
-		double ry = Dims.sd(4.3);
+		double rx = Dims.sd(6.4);
+		double ry = Dims.sd(4.8);
 		// the pond: an ellipse with a wobbly edge, a deep bed
 		int pr = (int) Math.ceil(rx) + 2;
 		int pq = (int) Math.ceil(ry) + 2;
@@ -616,13 +633,13 @@ public final class Plots {
 		p.put(ca - 2, cb + 1, 1, fence(p.lot));
 		p.put(ca - 2, cb + 1, 2, lantern());
 		p.put(ca - 2, cb, 1, fence(p.lot));
-		// a winding path from the gate to the dock
-		int pb = 0;
-		for (int a = -h; a <= da - 1; a++) {
-			pb += Integer.compare(cb, pb) * (hash(a, 1, 21) % 3 == 0 ? 1 : 0);
-			int wob = (int) Math.round(Math.sin(a * 0.55 + p.lot) * 1.4);
+		// a winding path from the gate to the dock, straightening as it gets there
+		int pa1 = da - 1;
+		for (int a = -h; a <= pa1; a++) {
+			double t = (a + h) / (double) Math.max(1, pa1 + h);
+			int centre = (int) Math.round(cb * t + Math.sin(a * 0.55 + p.lot) * 1.6 * (1 - t));
 			for (int w = 0; w <= 1; w++) {
-				p.ground(a, pb + wob + w, a % 3 == 0 ? b(Blocks.COBBLESTONE) : b(Blocks.DIRT_PATH));
+				p.ground(a, centre + w, a % 3 == 0 ? b(Blocks.COBBLESTONE) : b(Blocks.DIRT_PATH));
 			}
 		}
 		// reeds on the rim
@@ -642,6 +659,9 @@ public final class Plots {
 			p.put(ca + k * 2, bb0, 1, stairs(Blocks.SPRUCE_STAIRS, p.toward(ca + k * 2, bb0, ca, cb)));
 			p.put(ca + k * 2 + 1, bb0, 1, stairs(Blocks.SPRUCE_STAIRS, p.toward(ca + k * 2 + 1, bb0, ca, cb)));
 		}
+		p.put(ca + 4, bb0, 1, fence(p.lot));
+		p.put(ca + 4, bb0, 2, fence(p.lot));
+		p.put(ca + 4, bb0, 3, lantern());
 		// trees: birches behind, a cherry by the water
 		p.tree(h - 3, -h + 3, Species.BIRCH, p.salt(1));
 		p.tree(h - 2, -h + 7, Species.BIRCH, p.salt(2));
