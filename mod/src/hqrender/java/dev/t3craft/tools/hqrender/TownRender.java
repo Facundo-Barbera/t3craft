@@ -14,11 +14,9 @@ import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
-import java.awt.image.IndexColorModel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -29,12 +27,9 @@ import javax.imageio.ImageIO;
  * Views of a town style (layout/blocks, {@code ensanche}): the same HQ grown from 4 to 10 to 20
  * projects (each step keeps the previous layout, so nothing moves), and for each size an aerial view,
  * a cut plan, the hub, a work room with its 3×2 screens and agents, and a special room; plus one
- * comparison strip drawn with the same camera and scale. PNGs over {@value #MAX_BYTES} bytes are
- * written again with a 256-colour palette.
+ * comparison strip drawn with the same camera and scale.
  */
 final class TownRender {
-	static final long MAX_BYTES = 480 * 1024;
-
 	private TownRender() {
 	}
 
@@ -212,74 +207,9 @@ final class TownRender {
 		}
 	}
 
-	/**
-	 * Writes a truecolour PNG. Only with {@code -Dt3craft.render.palette=true} (images meant for the repo's docs) is
-	 * one over {@link #MAX_BYTES} written again with a 256-colour palette: the palette bands and grains the image.
-	 */
+	/** Writes a truecolour PNG. */
 	static void write(BufferedImage img, Path f) throws Exception {
 		ImageIO.write(img, "png", f.toFile());
-		if (Boolean.getBoolean("t3craft.render.palette") && Files.size(f) > MAX_BYTES) {
-			ImageIO.write(quantize(img), "png", f.toFile());
-		}
-	}
-
-	/** Popularity palette over 5-bit channels (the 256 most used colours), nearest-colour mapping. */
-	static BufferedImage quantize(BufferedImage img) {
-		int w = img.getWidth();
-		int h = img.getHeight();
-		Map<Integer, Integer> count = new HashMap<>();
-		int[] px = img.getRGB(0, 0, w, h, null, 0, w);
-		for (int c : px) {
-			count.merge(key(c), 1, Integer::sum);
-		}
-		List<Map.Entry<Integer, Integer>> top = new ArrayList<>(count.entrySet());
-		top.sort((a, b) -> b.getValue() != a.getValue().intValue() ? Integer.compare(b.getValue(), a.getValue()) : Integer.compare(a.getKey(), b.getKey()));
-		int n = Math.min(256, top.size());
-		byte[] r = new byte[n];
-		byte[] g = new byte[n];
-		byte[] b = new byte[n];
-		int[] pal = new int[n];
-		for (int i = 0; i < n; i++) {
-			int k = top.get(i).getKey();
-			int rr = ((k >> 10) & 31) * 255 / 31;
-			int gg = ((k >> 5) & 31) * 255 / 31;
-			int bb = (k & 31) * 255 / 31;
-			r[i] = (byte) rr;
-			g[i] = (byte) gg;
-			b[i] = (byte) bb;
-			pal[i] = (rr << 16) | (gg << 8) | bb;
-		}
-		IndexColorModel cm = new IndexColorModel(8, n, r, g, b);
-		BufferedImage outImg = new BufferedImage(w, h, BufferedImage.TYPE_BYTE_INDEXED, cm);
-		Map<Integer, Integer> nearest = new HashMap<>();
-		byte[] data = ((java.awt.image.DataBufferByte) outImg.getRaster().getDataBuffer()).getData();
-		for (int i = 0; i < px.length; i++) {
-			int k = key(px[i]);
-			Integer idx = nearest.get(k);
-			if (idx == null) {
-				int c = px[i];
-				int best = 0;
-				long bestD = Long.MAX_VALUE;
-				for (int j = 0; j < n; j++) {
-					int dr = ((c >> 16) & 255) - ((pal[j] >> 16) & 255);
-					int dg = ((c >> 8) & 255) - ((pal[j] >> 8) & 255);
-					int db = (c & 255) - (pal[j] & 255);
-					long dd = 3L * dr * dr + 4L * dg * dg + 2L * db * db;
-					if (dd < bestD) {
-						bestD = dd;
-						best = j;
-					}
-				}
-				idx = best;
-				nearest.put(k, idx);
-			}
-			data[i] = (byte) (int) idx;
-		}
-		return outImg;
-	}
-
-	private static int key(int argb) {
-		return (((argb >> 19) & 31) << 10) | (((argb >> 11) & 31) << 5) | ((argb >> 3) & 31);
 	}
 
 	/** Every desk of a plan, for logs. */

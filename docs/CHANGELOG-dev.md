@@ -9,6 +9,7 @@ One line per structural commit on `main`, newest first:
 - `RELOAD`: no structural change; code/behaviour, resources/lang or config only (hot-reload / rebuild is enough).
 
 ## Entries
+- 2026-11-09 cleanup/1b-tool-leftovers RELOAD — tools and assets only (#3): removed the obsolete `-Dt3craft.render.palette` option and its 256-colour quantizers from hqrender (renders were already always truecolour), the redundant `check` dependsOn in `mod/build.gradle`, the test/gametest directory skip in `JobRunner`, and the unused `kit_lantern_end.png`/`kit_lantern_side.png` textures with their generator code. No mod code change.
 - 2026-11-09 tools/relay-reports-only RELOAD — render relay (`tools/render/remote-submit.sh`): when a job ends it copies back only `status.json` and `report*.txt`/`report*.json`; PNGs stay on the render PC (AGENTS.md rule 9). Tools and docs only, no mod change.
 - 2026-11-09 cleanup/phase-0 RELOAD — docs and tools only (#2): code conventions in `docs/dev.md`, issue-backlog rule in `AGENTS.md`, decisions D1–D5 and issue numbers in `docs/plans/code-cleanup.md`, D4 scope in `docs/ops/pending-execution.md`, and `tools/refactor/{moves.tsv,apply-moves.sh}` (replays class/package moves on any branch; python3 + git only). No mod change.
 - 2026-11-09 docs/cleanup-plan RELOAD — docs only: code cleanup proposal `docs/plans/code-cleanup.md` (pending approval) and `docs/ops/pending-execution.md` updated after the CI removal and the repo layout. Nothing to refresh in the game.

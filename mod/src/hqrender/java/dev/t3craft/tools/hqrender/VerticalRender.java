@@ -13,8 +13,6 @@ import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
-import java.awt.image.IndexColorModel;
-import java.io.ByteArrayOutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -36,8 +34,6 @@ final class VerticalRender {
 
 	private record View(String name, String title, Renderer.Clip clip, Renderer.Camera cam) {
 	}
-
-	private static final long MAX_BYTES = 480 * 1024;
 
 	static void run(BlockModels models, HqStyle style, Path out, List<String> only, double scaleMul, int ss, boolean npcs) throws Exception {
 		HqLayout layout = null;
@@ -177,145 +173,8 @@ final class VerticalRender {
 		}
 	}
 
-	/** Writes a PNG; above {@link #MAX_BYTES} it is re-encoded with a 256-colour palette (median cut). */
+	/** Writes a truecolour PNG. */
 	static void write(BufferedImage img, Path f) throws Exception {
-		ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-		ImageIO.write(img, "png", bytes);
-		if (Boolean.getBoolean("t3craft.render.palette") && bytes.size() > MAX_BYTES) {
-			bytes.reset();
-			ImageIO.write(quantize(img), "png", bytes);
-		}
-		Files.write(f, bytes.toByteArray());
-	}
-
-	/** Median-cut quantization to 256 colours over a 15-bit histogram. */
-	static BufferedImage quantize(BufferedImage src) {
-		int w = src.getWidth();
-		int h = src.getHeight();
-		int[] px = src.getRGB(0, 0, w, h, null, 0, w);
-		int[] hist = new int[1 << 15];
-		for (int c : px) {
-			hist[key(c)]++;
-		}
-		List<int[]> boxes = new ArrayList<>();
-		List<Integer> bins = new ArrayList<>();
-		for (int i = 0; i < hist.length; i++) {
-			if (hist[i] > 0) {
-				bins.add(i);
-			}
-		}
-		int[] all = bins.stream().mapToInt(Integer::intValue).toArray();
-		boxes.add(all);
-		while (boxes.size() < 256) {
-			int best = -1;
-			long bestScore = 0;
-			int bestAxis = 0;
-			for (int b = 0; b < boxes.size(); b++) {
-				int[] box = boxes.get(b);
-				if (box.length < 2) {
-					continue;
-				}
-				long count = 0;
-				int[] min = {31, 31, 31};
-				int[] max = {0, 0, 0};
-				for (int k : box) {
-					count += hist[k];
-					for (int a = 0; a < 3; a++) {
-						int v = (k >> (10 - 5 * a)) & 31;
-						min[a] = Math.min(min[a], v);
-						max[a] = Math.max(max[a], v);
-					}
-				}
-				for (int a = 0; a < 3; a++) {
-					long score = (long) (max[a] - min[a]) * (long) Math.sqrt(count);
-					if (score > bestScore) {
-						bestScore = score;
-						best = b;
-						bestAxis = a;
-					}
-				}
-			}
-			if (best < 0) {
-				break;
-			}
-			int[] box = boxes.remove(best);
-			final int ax = bestAxis;
-			Integer[] sorted = java.util.Arrays.stream(box).boxed().toArray(Integer[]::new);
-			java.util.Arrays.sort(sorted, java.util.Comparator.comparingInt(k -> (k >> (10 - 5 * ax)) & 31));
-			long total = 0;
-			for (int k : box) {
-				total += hist[k];
-			}
-			long acc = 0;
-			int cut = 1;
-			for (int i = 0; i < sorted.length - 1; i++) {
-				acc += hist[sorted[i]];
-				if (acc * 2 >= total) {
-					cut = i + 1;
-					break;
-				}
-				cut = i + 1;
-			}
-			int[] a1 = new int[cut];
-			int[] a2 = new int[sorted.length - cut];
-			for (int i = 0; i < sorted.length; i++) {
-				if (i < cut) {
-					a1[i] = sorted[i];
-				} else {
-					a2[i - cut] = sorted[i];
-				}
-			}
-			boxes.add(a1);
-			boxes.add(a2);
-		}
-		int n = boxes.size();
-		byte[] r = new byte[n];
-		byte[] g = new byte[n];
-		byte[] bl = new byte[n];
-		int[][] pal = new int[n][3];
-		for (int b = 0; b < n; b++) {
-			long cr = 0, cg = 0, cb = 0, cnt = 0;
-			for (int k : boxes.get(b)) {
-				long c = hist[k];
-				cr += c * (((k >> 10) & 31) * 255 / 31);
-				cg += c * (((k >> 5) & 31) * 255 / 31);
-				cb += c * ((k & 31) * 255 / 31);
-				cnt += c;
-			}
-			pal[b][0] = (int) (cr / Math.max(1, cnt));
-			pal[b][1] = (int) (cg / Math.max(1, cnt));
-			pal[b][2] = (int) (cb / Math.max(1, cnt));
-			r[b] = (byte) pal[b][0];
-			g[b] = (byte) pal[b][1];
-			bl[b] = (byte) pal[b][2];
-		}
-		int[] map = new int[1 << 15];
-		java.util.Arrays.fill(map, -1);
-		IndexColorModel cm = new IndexColorModel(8, n, r, g, bl);
-		BufferedImage out = new BufferedImage(w, h, BufferedImage.TYPE_BYTE_INDEXED, cm);
-		byte[] data = ((java.awt.image.DataBufferByte) out.getRaster().getDataBuffer()).getData();
-		for (int i = 0; i < px.length; i++) {
-			int k = key(px[i]);
-			int m = map[k];
-			if (m < 0) {
-				int cr = ((k >> 10) & 31) * 255 / 31, cg = ((k >> 5) & 31) * 255 / 31, cb = (k & 31) * 255 / 31;
-				int bestD = Integer.MAX_VALUE;
-				for (int b = 0; b < n; b++) {
-					int dr = cr - pal[b][0], dg = cg - pal[b][1], db = cb - pal[b][2];
-					int d = dr * dr + dg * dg + db * db;
-					if (d < bestD) {
-						bestD = d;
-						m = b;
-					}
-				}
-				map[k] = m;
-			}
-			data[i] = (byte) m;
-		}
-		return out;
-	}
-
-	private static int key(int argb) {
-		return (((argb >> 19) & 31) << 10) | (((argb >> 11) & 31) << 5) | ((argb >> 3) & 31);
+		ImageIO.write(img, "png", f.toFile());
 	}
 }

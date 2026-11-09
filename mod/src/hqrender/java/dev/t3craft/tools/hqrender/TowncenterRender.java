@@ -28,7 +28,7 @@ import java.util.Map;
  * view, a cut plan, the civic hall, the plaza's singular buildings, a podium room and a tower room
  * with their 3×2 screens and standing agents, a section through a tower's stair atrium, the covered
  * market, the signal box and the library; plus a comparison strip drawn with the same camera and
- * scale. PNGs over {@value TownRender#MAX_BYTES} bytes are written with a 256-colour palette.
+ * scale.
  */
 final class TowncenterRender {
 	private TowncenterRender() {

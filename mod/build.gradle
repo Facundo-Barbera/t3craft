@@ -69,10 +69,6 @@ sourceSets {
 	}
 }
 
-tasks.named("check") {
-	dependsOn tasks.named("hqrenderClasses")
-}
-
 tasks.register("hqRender", JavaExec) {
 	group = "t3craft"
 	description = "Renders the HQ (every style view) to PNGs in build/hq-render, headless"

@@ -14,11 +14,9 @@ import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
-import java.awt.image.IndexColorModel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -212,124 +210,8 @@ final class CampusViews {
 				(System.nanoTime() - t0) / 1e9);
 	}
 
-	/** Writes a PNG; over 480 KB it is written again with a 256-colour palette. */
+	/** Writes a truecolour PNG. */
 	static void save(BufferedImage img, Path f) throws Exception {
 		ImageIO.write(img, "png", f.toFile());
-		if (Boolean.getBoolean("t3craft.render.palette") && Files.size(f) > 480 * 1024) {
-			ImageIO.write(quantize(img), "png", f.toFile());
-		}
-	}
-
-	/** Median-cut to 256 colours (5 bits per channel histogram), nearest-colour mapping. */
-	static BufferedImage quantize(BufferedImage src) {
-		int w = src.getWidth();
-		int h = src.getHeight();
-		int[] px = src.getRGB(0, 0, w, h, null, 0, w);
-		int[] hist = new int[1 << 15];
-		for (int p : px) {
-			hist[key(p)]++;
-		}
-		List<int[]> boxes = new ArrayList<>();
-		List<Integer> colours = new ArrayList<>();
-		for (int i = 0; i < hist.length; i++) {
-			if (hist[i] > 0) {
-				colours.add(i);
-			}
-		}
-		boxes.add(colours.stream().mapToInt(Integer::intValue).toArray());
-		while (boxes.size() < 256) {
-			int bi = -1;
-			long bestCount = -1;
-			for (int i = 0; i < boxes.size(); i++) {
-				int[] b = boxes.get(i);
-				if (b.length < 2) {
-					continue;
-				}
-				long c = 0;
-				for (int col : b) {
-					c += hist[col];
-				}
-				if (c > bestCount) {
-					bestCount = c;
-					bi = i;
-				}
-			}
-			if (bi < 0) {
-				break;
-			}
-			int[] b = boxes.remove(bi);
-			int ch = widestChannel(b);
-			Integer[] sorted = Arrays.stream(b).boxed().toArray(Integer[]::new);
-			Arrays.sort(sorted, (p, q) -> Integer.compare(channel(p, ch), channel(q, ch)));
-			long half = 0;
-			long total = 0;
-			for (int col : b) {
-				total += hist[col];
-			}
-			// cut where half the pixels are on each side, both sides non-empty (a dominant last colour gets a box of its own)
-			int cut = sorted.length - 1;
-			for (int i = 0; i < sorted.length - 1; i++) {
-				half += hist[sorted[i]];
-				if (half * 2 >= total) {
-					cut = i + 1;
-					break;
-				}
-			}
-			boxes.add(Arrays.stream(sorted, 0, cut).mapToInt(Integer::intValue).toArray());
-			boxes.add(Arrays.stream(sorted, cut, sorted.length).mapToInt(Integer::intValue).toArray());
-		}
-		int n = boxes.size();
-		byte[] r = new byte[n];
-		byte[] g = new byte[n];
-		byte[] bl = new byte[n];
-		int[] map = new int[1 << 15];
-		for (int i = 0; i < n; i++) {
-			long sr = 0, sg = 0, sb = 0, c = 0;
-			for (int col : boxes.get(i)) {
-				int wgt = hist[col];
-				sr += (long) ((col >> 10) & 31) * wgt;
-				sg += (long) ((col >> 5) & 31) * wgt;
-				sb += (long) (col & 31) * wgt;
-				c += wgt;
-				map[col] = i;
-			}
-			c = Math.max(1, c);
-			r[i] = (byte) (sr * 255 / (31 * c));
-			g[i] = (byte) (sg * 255 / (31 * c));
-			bl[i] = (byte) (sb * 255 / (31 * c));
-		}
-		IndexColorModel cm = new IndexColorModel(8, n, r, g, bl);
-		BufferedImage outImg = new BufferedImage(w, h, BufferedImage.TYPE_BYTE_INDEXED, cm);
-		byte[] data = ((java.awt.image.DataBufferByte) outImg.getRaster().getDataBuffer()).getData();
-		for (int i = 0; i < px.length; i++) {
-			data[i] = (byte) map[key(px[i])];
-		}
-		return outImg;
-	}
-
-	private static int key(int argb) {
-		return ((argb >> 19) & 31) << 10 | ((argb >> 11) & 31) << 5 | ((argb >> 3) & 31);
-	}
-
-	private static int channel(int key, int ch) {
-		return (key >> (10 - 5 * ch)) & 31;
-	}
-
-	private static int widestChannel(int[] box) {
-		int best = 0;
-		int span = -1;
-		for (int ch = 0; ch < 3; ch++) {
-			int lo = 31, hi = 0;
-			for (int col : box) {
-				int v = channel(col, ch);
-				lo = Math.min(lo, v);
-				hi = Math.max(hi, v);
-			}
-			if (hi - lo > span) {
-				span = hi - lo;
-				best = ch;
-			}
-		}
-		return best;
 	}
 }

@@ -452,8 +452,7 @@ final class JobRunner {
 		Path b = mod.resolve("build");
 		List<Path> roots = new ArrayList<>();
 		try (Stream<Path> s = Files.list(b.resolve("classes/java"))) {
-			s.filter(Files::isDirectory).filter(p -> !p.getFileName().toString().equals("test") && !p.getFileName().toString().equals("gametest"))
-					.sorted().forEach(roots::add);
+			s.filter(Files::isDirectory).sorted().forEach(roots::add);
 		}
 		for (String res : new String[] {"resources/main", "resources/client"}) {
 			if (Files.isDirectory(b.resolve(res))) {
