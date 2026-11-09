@@ -375,8 +375,16 @@ final class BlockModels {
 		if (m.elements() == null) {
 			return;
 		}
+		// models that mark their glowing parts ("light_emission" on elements, kit/status-lamp) glow only there,
+		// as in the game; the others glow whole when the block gives off light
+		boolean perElement = false;
+		for (JsonElement ee : m.elements()) {
+			perElement |= ee.getAsJsonObject().has("light_emission");
+		}
+		boolean blockEmissive = emissive;
 		for (JsonElement ee : m.elements()) {
 			JsonObject el = ee.getAsJsonObject();
+			emissive = perElement ? el.has("light_emission") && el.get("light_emission").getAsInt() > 0 : blockEmissive;
 			double[] from = vec(el.getAsJsonArray("from"));
 			double[] to = vec(el.getAsJsonArray("to"));
 			JsonObject rot = el.has("rotation") ? el.getAsJsonObject("rotation") : null;
