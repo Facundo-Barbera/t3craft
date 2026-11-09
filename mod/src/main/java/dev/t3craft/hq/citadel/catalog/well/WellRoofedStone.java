@@ -24,13 +24,11 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
  *
  * <pre>
  *  front elevation (w = 7, core 3 x 3)
- *  y7        ▄██▄          ridge (roof material, soffit under it)
- *  y6     ▂▄▀▀▀▀▀▀▄▂       stairs + slab lip (thin eave)
- *  y5      ═══════         crossbars (stripped timber, along v)
- *  y4      ═╪═◦═╪═         pale axle on the posts, crank lever
- *  y3      ║  ┆  ║         log posts, chain
- *  y2     ◘║  ┆  ║◘        pedestal lanterns
- *  y1     ▣ ▣ ◘  ▣ ▣       stone bases, bucket
+ *  y5        ▄██▄          ridge (roof material, soffit under it)
+ *  y4     ▂▄▀▀▀▀▀▀▄▂       stairs + slab lip on big plots (thin eave)
+ *  y3      ═╪═◦═╪═         pale axle on the post tops, trapdoor crank, chains
+ *  y2     ◘║  ┆  ║◘        log posts, pedestal lanterns
+ *  y1     ▣ ║  ◘  ║ ▣      kerb pedestals, bucket
  *  y0   ▒▒▓▓▓▂≈▂▓▓▓▒▒      kerb (front lip lowered), water, paving
  * </pre>
  *
@@ -39,11 +37,9 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
  */
 public final class WellRoofedStone implements Variant {
 	/** The roof's lowest row (the eaves). */
-	private static final int ROOF = 5;
-	/** The crossbars: the layer right under the roof. */
-	private static final int BAR = ROOF - 1;
-	/** The axle: on the post tops, under the crossbars. */
-	private static final int AXLE = BAR - 1;
+	private static final int ROOF = 4;
+	/** The axle: on the post tops, right under the roof. */
+	private static final int AXLE = ROOF - 1;
 
 	/** A roof set: slope stairs, matching slab (the eave lip), ridge/soffit block, and the timber that goes with it. */
 	private record RoofSet(Block stairs, Block slab, Block ridge, Block log, Block stripped, Block fence) {
@@ -163,7 +159,7 @@ public final class WellRoofedStone implements Variant {
 	/**
 	 * [depth] a stone kerb with the water inside. The front, between the two corner pedestals, drops to a
 	 * half-block lip (so the water, the chain and the bucket show); each corner is a two-block pedestal
-	 * (kerb + chiseled) with a lantern standing on it.
+	 * (kerb + chiseled) with a lantern hanging over it.
 	 */
 	private static void kerb(CitadelCanvas c, Plot p, Geo g, StoneSet st) {
 		BlockState lantern = b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true);
@@ -176,22 +172,19 @@ public final class WellRoofedStone implements Variant {
 				} else if (cu && cv) {
 					p.set(c, u, 0, v, kerbBlock(p, st, u, v));
 					p.set(c, u, 1, v, b(st.chiseled()));
-					// a lantern hangs on a chain from the crossbar over the pedestal
+					// a lantern hangs on a chain from the eave over the pedestal
 					p.put(c, u, AXLE, v, b(Blocks.IRON_CHAIN).setValue(BlockStateProperties.AXIS, Direction.Axis.Y), CitadelCanvas.HANGING);
 					p.put(c, u, AXLE - 1, v, lantern, CitadelCanvas.HANGING);
 				} else if (v == g.v0()) {
 					p.set(c, u, 0, v, slab(st.slabA())); // the low front lip
 				} else {
 					p.set(c, u, 0, v, kerbBlock(p, st, u, v));
-					if (v == g.v1() && g.v1() + 1 < g.d()) {
-						p.set(c, u, 1, v, slab(st.slabA())); // the back wall is a half block higher: a backdrop for the bucket
-					}
 				}
 			}
 		}
 	}
 
-	// ------------------------------------------------------------------ posts, crossbars, windlass
+	// ------------------------------------------------------------------ posts and windlass
 
 	private static void frame(CitadelCanvas c, Plot p, Geo g, RoofSet roof, StoneSet st) {
 		int va = g.va();
@@ -205,18 +198,10 @@ public final class WellRoofedStone implements Variant {
 					p.set(c, u, y, v, log(roof.log(), Direction.Axis.Y));
 				}
 			}
-			// the crossbar over the post carries the roof and the lip
-			for (int v = g.v0(); v <= g.v1(); v++) {
-				p.set(c, u, BAR, v, log(roof.log(), Direction.Axis.Z));
-			}
 		}
 		// the axle: a pale stripped log across the shaft, resting on the post tops
 		for (int u = g.uL(); u <= g.uR(); u++) {
 			p.set(c, u, AXLE, va, pale);
-		}
-		// a tie beam over the axle closes the gap under the roof, so nobody can stand on the axle
-		for (int u = g.uL() + 1; u <= g.uR() - 1; u++) {
-			p.set(c, u, BAR, va, log(roof.log(), Direction.Axis.X));
 		}
 		int cu = g.cs() == 4 ? g.uL() + 1 + p.hash(3, 0, 0, 2) : g.uc();
 		// the crank: an open trapdoor handle plate on the front of the axle
@@ -234,7 +219,7 @@ public final class WellRoofedStone implements Variant {
 	 * [depth] gable roof, ridge along v (front to back, so the visitor looks into the open gable and sees the
 	 * windlass), pitch 1:1 in stairs of one material up to a block ridge (or two stairs meeting). The soffit
 	 * under the upper rows is the roof's own material, so the roof is one tone and one face-connected mass
-	 * resting on the crossbars. The eaves are a thin lip of slabs one block past the posts. The gables stay open.
+	 * resting on the posts and the axle. The eaves are a thin lip of slabs one block past the posts. The gables stay open.
 	 */
 	private static void roof(CitadelCanvas c, Plot p, Geo g, RoofSet roof) {
 		int cols = g.cs();
