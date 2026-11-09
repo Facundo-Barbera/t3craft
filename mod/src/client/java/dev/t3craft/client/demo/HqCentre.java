@@ -46,7 +46,7 @@ record HqCentre(BlockPos feet, BlockPos floor, @Nullable BlockState planFloor, f
 	static @Nullable HqCentre of(DemoWorldSpec spec, int worldMinY, String layoutId) {
 		try {
 			dev.t3craft.hq.plan.BuildPlan empty = dev.t3craft.hq.HqPlans.generate(dev.t3craft.hq.HqLayout.EMPTY,
-					dev.t3craft.hq.HqStyles.forLayout(layoutId));
+					dev.t3craft.hq.style.HqStyles.forLayout(layoutId));
 			int lift = DemoHq.lift(spec.originY(), worldMinY, empty.footprint().minY());
 			HqSite site = DemoHq.worldSite(new BlockPos(spec.originX(), spec.originY(), spec.originZ()), lift);
 			for (String name : List.of(AnchorNames.HUB, AnchorNames.SPAWN)) {

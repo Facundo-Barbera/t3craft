@@ -1,7 +1,13 @@
 package dev.t3craft.hq.citadel.barrio;
 
+import static dev.t3craft.hq.citadel.CitadelCanvas.AIR;
+import static dev.t3craft.hq.citadel.CitadelCanvas.DECOR;
+import static dev.t3craft.hq.citadel.CitadelCanvas.FOOT;
+import static dev.t3craft.hq.citadel.CitadelCanvas.HANGING;
+import static dev.t3craft.hq.citadel.CitadelCanvas.PLANKS;
+import static dev.t3craft.hq.citadel.CitadelCanvas.b;
+
 import dev.t3craft.hq.HqLayout;
-import dev.t3craft.hq.HqStyle;
 import dev.t3craft.hq.RingCampusGeometry;
 import dev.t3craft.hq.RingCampusGeometry.Kind;
 import dev.t3craft.hq.RingCampusGeometry.Lot;
@@ -11,6 +17,7 @@ import dev.t3craft.hq.SignTags;
 import dev.t3craft.hq.citadel.CitadelBarrios;
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.CitadelCanvas.Mats;
+import dev.t3craft.hq.style.HqStyle;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeMap;
@@ -25,12 +32,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.Half;
 import net.minecraft.world.level.block.state.properties.StairsShape;
-import static dev.t3craft.hq.citadel.CitadelCanvas.AIR;
-import static dev.t3craft.hq.citadel.CitadelCanvas.DECOR;
-import static dev.t3craft.hq.citadel.CitadelCanvas.FOOT;
-import static dev.t3craft.hq.citadel.CitadelCanvas.HANGING;
-import static dev.t3craft.hq.citadel.CitadelCanvas.PLANKS;
-import static dev.t3craft.hq.citadel.CitadelCanvas.b;
 
 /**
  * The gatehouse of a barrio at scale 2 and up (struct/barrio-gatehouse, round 2 struct/barrio-gatehouse2), and the arm of

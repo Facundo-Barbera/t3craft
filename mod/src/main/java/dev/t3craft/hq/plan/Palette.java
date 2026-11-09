@@ -1,7 +1,7 @@
 package dev.t3craft.hq.plan;
 
 import dev.t3craft.hq.HqLayout;
-import dev.t3craft.hq.HqStyle;
+import dev.t3craft.hq.style.HqStyle;
 import net.minecraft.core.Direction;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.block.Block;

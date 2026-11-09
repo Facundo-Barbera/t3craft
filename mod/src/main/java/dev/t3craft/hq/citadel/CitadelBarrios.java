@@ -18,7 +18,6 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
 import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
 
 import dev.t3craft.hq.HqLayout;
-import dev.t3craft.hq.HqStyle;
 import dev.t3craft.hq.RingCampusGeometry;
 import dev.t3craft.hq.RingCampusGeometry.DeskSpot;
 import dev.t3craft.hq.RingCampusGeometry.Lot;
@@ -31,6 +30,7 @@ import dev.t3craft.hq.citadel.barrio.BarrioRoofs;
 import dev.t3craft.hq.plan.Anchor;
 import dev.t3craft.hq.plan.AnchorNames;
 import dev.t3craft.hq.plan.Workstation;
+import dev.t3craft.hq.style.HqStyle;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;

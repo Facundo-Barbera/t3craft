@@ -10,6 +10,8 @@ import dev.t3craft.hq.pack.LayoutParams;
 import dev.t3craft.hq.plan.Box;
 import dev.t3craft.hq.plan.BuildPlan;
 import dev.t3craft.hq.plan.Palette;
+import dev.t3craft.hq.style.HqStyle;
+import dev.t3craft.hq.style.HqStyles;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.Locale;

@@ -1,4 +1,4 @@
-package dev.t3craft.hq;
+package dev.t3craft.hq.style;
 
 import static dev.t3craft.hq.HqGeometry.BOARD_HALF;
 import static dev.t3craft.hq.HqGeometry.BOARD_Z;
@@ -13,6 +13,7 @@ import static dev.t3craft.hq.HqGeometry.SEGMENT;
 import static dev.t3craft.hq.HqGeometry.SPINE;
 import static dev.t3craft.hq.HqGeometry.WING_WALL;
 
+import dev.t3craft.hq.HqGeometry;
 import dev.t3craft.hq.plan.Box;
 import dev.t3craft.hq.plan.PlanBuilder;
 import java.util.Collections;
@@ -44,7 +45,7 @@ import org.jspecify.annotations.Nullable;
  * are always {@code persistent}, there are no trapdoors on walking floors and no fences or stone
  * walls that would need block tags to connect (a stone lantern is a lone wall post).
  */
-final class CherryStyle extends HqStyle {
+public final class CherryStyle extends HqStyle {
 	static final String ID = "cherry";
 
 	/** Roof surface y and block kind by distance from the eave (wing: 0..6, 6 = ridge over the corridor). */
@@ -52,7 +53,7 @@ final class CherryStyle extends HqStyle {
 
 	private final Map<Role, BlockState> palette;
 
-	CherryStyle() {
+	public CherryStyle() {
 		Map<Role, BlockState> m = new EnumMap<>(Role.class);
 		m.put(Role.FLOOR, Blocks.BAMBOO_MOSAIC.defaultBlockState());
 		m.put(Role.FOOTING, Blocks.DEEPSLATE_TILES.defaultBlockState());
@@ -198,7 +199,7 @@ final class CherryStyle extends HqStyle {
 	}
 
 	@Override
-	BlockState bench(Direction back) {
+	public BlockState bench(Direction back) {
 		return stairs(Blocks.CHERRY_STAIRS, back);
 	}
 
@@ -223,7 +224,7 @@ final class CherryStyle extends HqStyle {
 	// ------------------------------------------------------------------ hub
 
 	@Override
-	void hub(PlanBuilder.Canvas c, boolean northDoor) {
+	public void hub(PlanBuilder.Canvas c, boolean northDoor) {
 		for (int z = -HUB; z <= HUB; z++) {
 			for (int x = -HUB; x <= HUB; x++) {
 				int m = Math.max(Math.abs(x), Math.abs(z));
@@ -304,7 +305,7 @@ final class CherryStyle extends HqStyle {
 
 	/** The board: a dark slate notice board in a cherry frame under its own little tiled roof. */
 	@Override
-	void board(PlanBuilder.Canvas c, SignText sign) {
+	public void board(PlanBuilder.Canvas c, SignText sign) {
 		int z = BOARD_Z;
 		for (int y = 1; y <= 5; y++) {
 			c.set(-BOARD_HALF - 1, y, z, post());
@@ -328,7 +329,7 @@ final class CherryStyle extends HqStyle {
 	// ------------------------------------------------------------------ archive nook
 
 	@Override
-	void archiveNook(PlanBuilder.Canvas c) {
+	public void archiveNook(PlanBuilder.Canvas c) {
 		Box n = HqGeometry.archiveNook();
 		int tx = HqGeometry.ARCHIVE_TERMINAL.getX();
 		for (int x = n.minX(); x <= n.maxX(); x++) {
@@ -343,7 +344,7 @@ final class CherryStyle extends HqStyle {
 
 	/** Entrance garden: a cherry deck (engawa) under a torii, gravel path, two cherry trees, stone lanterns. */
 	@Override
-	void portico(PlanBuilder.Canvas c) {
+	public void portico(PlanBuilder.Canvas c) {
 		int gate = PORTICO_Z2 - 1;
 		for (int z = PORTICO_Z1; z <= PORTICO_Z2; z++) {
 			for (int x = -PORTICO_X; x <= PORTICO_X; x++) {
@@ -390,7 +391,7 @@ final class CherryStyle extends HqStyle {
 	// ------------------------------------------------------------------ spine
 
 	@Override
-	void spineRow(PlanBuilder.Canvas c, int r, @Nullable SignText eastSign, @Nullable SignText westSign) {
+	public void spineRow(PlanBuilder.Canvas c, int r, @Nullable SignText eastSign, @Nullable SignText westSign) {
 		int zn = HqGeometry.rowNorth(r);
 		for (int v = 0; v < ROW; v++) {
 			int z = zn + v;
@@ -455,7 +456,7 @@ final class CherryStyle extends HqStyle {
 	}
 
 	@Override
-	void spineCap(PlanBuilder.Canvas c, Box box) {
+	public void spineCap(PlanBuilder.Canvas c, Box box) {
 		int z = box.minZ();
 		for (int x = -SPINE; x <= SPINE; x++) {
 			int ax = Math.abs(x);
@@ -493,7 +494,7 @@ final class CherryStyle extends HqStyle {
 	}
 
 	@Override
-	void wingEndWall(PlanBuilder.Canvas c, int i, int u, boolean inner) {
+	public void wingEndWall(PlanBuilder.Canvas c, int i, int u, boolean inner) {
 		int x = HqGeometry.wx(i, u);
 		for (int v = 0; v < ROW; v++) {
 			int z = HqGeometry.wz(i, v);
@@ -520,7 +521,7 @@ final class CherryStyle extends HqStyle {
 	}
 
 	@Override
-	void segment(PlanBuilder.Canvas c, int i, int s, DyeColor accent) {
+	public void segment(PlanBuilder.Canvas c, int i, int s, DyeColor accent) {
 		int u0 = HqGeometry.segmentU(s);
 		for (int col = 0; col < SEGMENT; col++) {
 			int x = HqGeometry.wx(i, u0 + col);
@@ -595,7 +596,7 @@ final class CherryStyle extends HqStyle {
 
 	/** A standing desk against the wall (cabinet and two tops; the 3×2 screen goes on top), the agent's free cell behind. */
 	@Override
-	void desk(PlanBuilder.Canvas c, DeskCells d) {
+	public void desk(PlanBuilder.Canvas c, DeskCells d) {
 		BlockPos top = d.computer().below();
 		BlockPos right = d.right();
 		Direction side = d.facing().getClockWise();

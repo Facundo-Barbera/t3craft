@@ -1,9 +1,17 @@
 package dev.t3craft.hq.citadel.hub;
 
-import dev.t3craft.hq.HqStyle;
+import static dev.t3craft.hq.citadel.CitadelCanvas.AIR;
+import static dev.t3craft.hq.citadel.CitadelCanvas.CALCITE;
+import static dev.t3craft.hq.citadel.CitadelCanvas.LOG;
+import static dev.t3craft.hq.citadel.CitadelCanvas.RIB;
+import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
+import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
+import static dev.t3craft.hq.citadel.CitadelCanvas.y0;
+
 import dev.t3craft.hq.RingCampusGeometry.Kind;
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.CitadelHub;
+import dev.t3craft.hq.style.HqStyle;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.core.BlockPos;
@@ -14,13 +22,6 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.WallSide;
-import static dev.t3craft.hq.citadel.CitadelCanvas.AIR;
-import static dev.t3craft.hq.citadel.CitadelCanvas.CALCITE;
-import static dev.t3craft.hq.citadel.CitadelCanvas.LOG;
-import static dev.t3craft.hq.citadel.CitadelCanvas.RIB;
-import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
-import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
-import static dev.t3craft.hq.citadel.CitadelCanvas.y0;
 
 /**
  * The archive: the hall under the nave's floor. It used to be a closed, empty room the walkable floor floated over;
