@@ -219,7 +219,7 @@ public final class TowerRoom {
 	// the stairs and the furniture. All heights are absolute (the ground floor block is y = 0, standing is y = 1).
 	//
 	//   level      deck block   stand   free      what
-	//   L0 hall    0            1       1..11     review hall: the "review" screen (7 x 4) in the north wall, seats, review table
+	//   L0 hall    0            1       1..11     review hall: the "review" screen (7 x 4, y 5..8) in the north wall, seats, review table
 	//   L1 loft    12           13      13..22    reviewers' workroom, terrace on the base roof (doors north and south)
 	//   L2 gallery 23           24      24..33    archive gallery
 	//   L3 belfry  34           35      35..43    open belfry with the bell, balcony ring, then roof and spire (to y = 56)
@@ -236,7 +236,7 @@ public final class TowerRoom {
 	private static final int CEIL = 44;
 	private static final int Y_TOP = 70;
 	/** Bottom row of the review screen (its cells are y = 6..9) and the wall column it sits in (north, r = 11). */
-	public static final int SCREEN_Y = 6;
+	public static final int SCREEN_Y = 5;
 	public static final int SCREEN_Z = 11;
 
 	private static final BlockState LANTERN_UP = Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, false);
@@ -390,12 +390,14 @@ public final class TowerRoom {
 		CitadelCanvas c = q.c;
 		int x = q.cx + dx;
 		int z = q.cz + dz;
+		// the north door is a block lower: the review screen sits above it at eye height
+		int top = dz < 0 && Math.abs(dz) > Math.abs(dx) ? 3 : 4;
 		for (int y = 1; y <= 11; y++) {
 			BlockState s;
 			if (aa <= 2) {
-				if (y <= 4) {
+				if (y <= top) {
 					s = AIR;
-				} else if (y == 5) {
+				} else if (y == top + 1) {
 					s = RIB;
 				} else if (y == 11 && r == 11) {
 					s = c.kit.wallPanel(true);
@@ -421,15 +423,15 @@ public final class TowerRoom {
 		}
 		// a hanging lantern at each side of every door, under the lintel
 		if (r == 12 && aa == 2) {
-			q.put(dx, 4, dz, LANTERN_DOWN, HANGING);
+			q.put(dx, top, dz, LANTERN_DOWN, HANGING);
 		}
 	}
 
 	/** The frame of the review screen: a dark sill, jambs and lintel in the north wall's inner layer. */
 	private static void screenFrame(Q q) {
 		for (int x = -4; x <= 4; x++) {
-			q.set(x, 5, -SCREEN_Z, RIB);
-			q.set(x, 10, -SCREEN_Z, b(Blocks.GOLD_BLOCK));
+			q.set(x, SCREEN_Y - 1, -SCREEN_Z, RIB);
+			q.set(x, SCREEN_Y + 4, -SCREEN_Z, b(Blocks.GOLD_BLOCK));
 		}
 		for (int y = SCREEN_Y; y <= SCREEN_Y + 3; y++) {
 			q.set(-4, y, -SCREEN_Z, RIB);
