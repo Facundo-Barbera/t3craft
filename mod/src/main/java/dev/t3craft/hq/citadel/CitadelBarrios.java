@@ -353,6 +353,8 @@ public final class CitadelBarrios {
 		for (BlockPos p : Workstation.screenCells(Workstation.screenOriginFor(monitor, screenFacing), screenFacing.getCounterClockWise())) {
 			c.fixture(p, c.style.computer(true));
 		}
+		// a lit lamp on top of the screen, in the middle: it marks the desk from across the hall
+		c.fixture(monitor.above(2), Blocks.REDSTONE_LAMP.defaultBlockState().setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.LIT, true));
 		BlockPos stand = d.stand();
 		c.set(stand, AIR);
 		c.set(stand.above(), AIR);
