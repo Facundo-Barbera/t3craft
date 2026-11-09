@@ -1,7 +1,6 @@
 package dev.t3craft.hq.citadel.catalog.plazacenter;
 
 import static dev.t3craft.hq.citadel.CitadelCanvas.b;
-import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
 import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
 
 import dev.t3craft.hq.citadel.CitadelCanvas;
@@ -9,27 +8,36 @@ import dev.t3craft.hq.citadel.catalog.Family;
 import dev.t3craft.hq.citadel.catalog.Plot;
 import dev.t3craft.hq.citadel.catalog.Variant;
 import net.minecraft.core.Direction;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.Half;
 
 /**
- * An octagonal bandstand: a dark deepslate dais one step above the pavement, a parquet stage of cherry
- * and bamboo in concentric octagons, eight quartz columns joined by a balustrade of slabs and cherry
- * balusters (open on the four axes), a cherry beam, and a ribbed dome of cherry stairs on a dark
- * skirt, with polished-diorite ribs over the columns, a gold finial with a rod and a chandelier
- * hanging in the middle. The leftover plot corners hold small cherry trees on moss beds.
+ * An octagonal music pavilion you can walk into and use. A dark deepslate platform one block high (two
+ * from 17 wide) is climbed on all four axes by steps of stairs (3 or 5 wide, no jumps). On it, eight
+ * stripped-cherry columns on polished-deepslate bases carry a beam; a cherry balustrade joins them and
+ * stays open on the four axes, so the pavilion is crossed from any side. Under an octagonal hip roof of
+ * stairs (real pitch, eave, dark hip ribs) the stage is a concentric parquet of cherry and bamboo with a
+ * jukebox (record in) between note blocks, a ring of musicians' benches with lecterns (music stands)
+ * against the balustrade, potted saplings in the front and a hanging lantern.
+ * Outside, in the four corners of the plot: cherry benches facing the pavilion with azalea hedges
+ * behind, lamp posts, and (bigger plots) mossy flower beds.
+ *
+ * <p>By seed: roof of slate, oxidised copper or cherry, and the finial (a lantern on a post or a gold
+ * orb on a lightning-rod spire).
  *
  * <pre>
- *  section                           top view (octagon metric m = max(|x|, |z|, (|x|+|z|)/√2))
- *       ╿ rod                          ·  ◆ c ◆  ·      ◆ column on every vertex
- *       ▲ gold                         ◆ ┌──────┐ ◆     ┌ balustrade, open on the axes
- *     ▗▄▙▟▄▖  dome, ribs                ·│stage │·
- *     ▌║   ║▐  columns                 ◆ └──────┘ ◆
- *   ▔▔▔▔▔▔▔▔▔  dais y0                   ·  ◆   ◆  ·
+ *  side view                              plan (one quadrant)
+ *        ╿ finial                          ▒▒ steps (axis)   ◆ column   ░ rail   s seat  L lectern
+ *      ▗▄▙▟▄▖  hip roof                     ┌─────────────
+ *     ▟▌     ▐▙ eave                        │ ·  ·  ◆ ░ (open at the axis)
+ *     ▐▌ ║ ║ ▐▌ columns, open rails         │ ·  L s ░
+ *   ▄▄▟▛▔▔▔▔▔▜▙▄▄ platform + steps          │ ▒▒ ▒▒  ◆
  * </pre>
  *
- * Size: 13–15 × 13–15 × 10+ (the dome gains a layer or two with more height).
+ * Size: 13–21 × 13–21 × 10+ (grows with the scale like every plaza centre).
  */
 public final class PlazaCenterOctagonBandstand implements Variant {
 	@Override
@@ -59,13 +67,15 @@ public final class PlazaCenterOctagonBandstand implements Variant {
 
 	@Override
 	public int maxW() {
-		return 15;
+		return 21;
 	}
 
 	@Override
 	public int maxD() {
-		return 15;
+		return 21;
 	}
+
+	// ------------------------------------------------------------------ geometry
 
 	/** Octagonal distance: level sets are regular octagons with apothem {@code m}. */
 	private static double oct(int dx, int dz) {
@@ -74,13 +84,113 @@ public final class PlazaCenterOctagonBandstand implements Variant {
 		return Math.max(Math.max(ax, az), (ax + az) / Math.sqrt(2));
 	}
 
+	/** The local side a cell lies on (ties go to x). */
 	private static Direction out(int dx, int dz) {
 		return Math.abs(dx) >= Math.abs(dz) ? (dx > 0 ? Direction.EAST : Direction.WEST) : (dz > 0 ? Direction.SOUTH : Direction.NORTH);
 	}
 
-	private static BlockState log(net.minecraft.world.level.block.Block blk, Direction.Axis axis) {
+	private static BlockState log(Block blk, Direction.Axis axis) {
 		return blk.defaultBlockState().setValue(BlockStateProperties.AXIS, axis);
 	}
+
+	private static BlockState topStairs(Block blk, Direction facing) {
+		return stairs(blk, facing).setValue(BlockStateProperties.HALF, Half.TOP);
+	}
+
+	/**
+	 * @param cu centre column, cv centre row (local)
+	 * @param n  free half-extent in every direction from the centre
+	 * @param h  platform height (1, or 2 from n = 8)
+	 * @param pl platform apothem (octagon metric)
+	 * @param k  radius of the column ring
+	 * @param t  offset of the two columns on each face
+	 * @param sw half-width of the steps (1 = 3 wide, 2 = 5 wide)
+	 */
+	private record Geo(int cu, int cv, int n, int h, int pl, int k, int t, int sw) {
+		boolean ring(double m) {
+			return m > k - 0.5 && m <= k + 0.5;
+		}
+
+		boolean column(int dx, int dz) {
+			int ax = Math.abs(dx);
+			int az = Math.abs(dz);
+			return (ax == k && az == t) || (ax == t && az == k);
+		}
+
+		/** Balustrade: the ring minus the columns minus the openings on the four axes. */
+		boolean rail(int dx, int dz) {
+			return ring(oct(dx, dz)) && !column(dx, dz) && Math.min(Math.abs(dx), Math.abs(dz)) > 1;
+		}
+
+		boolean solid(int dx, int dz) {
+			return column(dx, dz) || rail(dx, dz);
+		}
+
+		boolean interior(double m) {
+			return m <= k - 0.5;
+		}
+
+		boolean centre(int dx, int dz) {
+			return Math.abs(dx) <= 1 && Math.abs(dz) <= 1;
+		}
+
+		/** A cell of the musicians' ring: inside, against the balustrade, not in an entrance lane. */
+		boolean seat(int dx, int dz) {
+			return interior(oct(dx, dz)) && Math.min(Math.abs(dx), Math.abs(dz)) >= 2
+					&& (solid(dx + 1, dz) || solid(dx - 1, dz) || solid(dx, dz + 1) || solid(dx, dz - 1));
+		}
+	}
+
+	/** The roof: material kind, step per layer, layers, finial. */
+	private record Roof(int kind, int s, int layers, int fs, int fin) {
+		Block stair(boolean rib, int hash) {
+			if (rib) {
+				return switch (kind) {
+					case 0 -> Blocks.CHERRY_STAIRS;
+					case 1 -> Blocks.DEEPSLATE_BRICK_STAIRS;
+					default -> Blocks.DEEPSLATE_TILE_STAIRS;
+				};
+			}
+			return switch (kind) {
+				case 0 -> Blocks.DEEPSLATE_TILE_STAIRS;
+				case 1 -> Blocks.CUT_COPPER_STAIRS.waxed().oxidized();
+				default -> Blocks.CHERRY_STAIRS;
+			};
+		}
+
+		BlockState tread(boolean rib, int hash) {
+			if (rib) {
+				return switch (kind) {
+					case 0 -> b(Blocks.CHERRY_PLANKS);
+					case 1 -> b(Blocks.DEEPSLATE_BRICKS);
+					default -> b(Blocks.DEEPSLATE_TILES);
+				};
+			}
+			return switch (kind) {
+				case 0 -> b(hash == 0 ? Blocks.CRACKED_DEEPSLATE_TILES : Blocks.DEEPSLATE_TILES);
+				case 1 -> Blocks.CUT_COPPER.waxed().oxidized().defaultBlockState();
+				default -> b(Blocks.CHERRY_PLANKS);
+			};
+		}
+	}
+
+	private static void at(CitadelCanvas c, Plot p, Geo g, int dx, int y, int dz, BlockState s) {
+		int u = g.cu() + dx;
+		int v = g.cv() + dz;
+		if (p.has(u, y, v)) {
+			p.set(c, u, y, v, s);
+		}
+	}
+
+	private static void atLayer(CitadelCanvas c, Plot p, Geo g, int dx, int y, int dz, BlockState s, int layer) {
+		int u = g.cu() + dx;
+		int v = g.cv() + dz;
+		if (p.has(u, y, v)) {
+			p.put(c, u, y, v, s, layer);
+		}
+	}
+
+	// ------------------------------------------------------------------ build
 
 	@Override
 	public void build(CitadelCanvas c, Plot p) {
@@ -88,158 +198,299 @@ public final class PlazaCenterOctagonBandstand implements Variant {
 		int d = p.d();
 		int cu = w / 2;
 		int cv = d / 2;
-		double a0 = Math.min(Math.min(cu, w - 1 - cu), Math.min(cv, d - 1 - cv)) + 0.5;
-		int k = (int) Math.floor(a0 - 2.0); // radius of the column ring
-		int t = (int) Math.round(0.4142 * k); // offset of the two columns on each face
-		int jTop = Math.max(2, Math.min(5, p.h() - 7)); // dome layers above the base layer
-		double rho0 = k + 1.1;
+		int n = Math.min(Math.min(cu, w - 1 - cu), Math.min(cv, d - 1 - cv));
+		int ph = n >= 8 ? 2 : 1;
+		int pl = n - ph;
+		int k = pl - 1;
+		int t = (int) Math.round(0.4142 * k);
+		Geo g = new Geo(cu, cv, n, ph, pl, k, t, n >= 9 ? 2 : 1);
+
+		// roof: as many layers as the height allows, flatter (steps of 2 or 3 cells) when it is short
+		int lmax = p.h() - ph - 5;
+		int s = 3;
+		int layers = lmax;
+		for (int cand = 1; cand <= 3; cand++) {
+			int need = 1 + (k - 1 + cand - 1) / cand;
+			if (need <= lmax) {
+				s = cand;
+				layers = need;
+				break;
+			}
+		}
+		layers = Math.max(1, layers);
+		int fs = Math.max(1, Math.min(6, p.h() - 1 - (ph + 3 + layers)));
+		Roof roof = new Roof(p.rng(11).nextInt(3), s, layers, fs, p.rng(12).nextInt(2));
 
 		for (int v = 0; v < d; v++) {
 			for (int u = 0; u < w; u++) {
 				int dx = u - cu;
 				int dz = v - cv;
 				double m = oct(dx, dz);
-				if (m > a0) {
-					corner(c, p, u, v, m - a0, w, d);
-				} else if (m > a0 - 1.0) {
-					// [depth] the single step up to the dais, low side out: the stair faces inwards (tall half towards the dais) so it is climbed walking in
-					p.set(c, u, 0, v, stairs(Blocks.DEEPSLATE_BRICK_STAIRS, out(dx, dz).getOpposite()));
+				if (m <= pl) {
+					platform(c, p, g, u, v, dx, dz, m);
+					frame(c, p, g, u, v, dx, dz, m);
 				} else {
-					floor(c, p, u, v, dx, dz, m, k);
+					steps(c, p, g, u, v, dx, dz);
 				}
-				ring(c, p, u, v, dx, dz, m, k, t);
-				dome(c, p, u, v, dx, dz, m, k, jTop, rho0);
+				roof(c, p, g, roof, u, v, dx, dz, m);
 			}
 		}
-		int apex = 5 + jTop;
-		p.set(c, cu, apex, cv, b(Blocks.GOLD_BLOCK));
-		p.set(c, cu, apex + 1, cv, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState());
-		for (int y = 4; y < apex; y++) {
-			p.put(c, cu, y, cv, Blocks.IRON_CHAIN.defaultBlockState(), CitadelCanvas.HANGING);
+		finial(c, p, g, roof);
+		stage(c, p, g);
+		for (int sx = -1; sx <= 1; sx += 2) {
+			for (int sz = -1; sz <= 1; sz += 2) {
+				corner(c, p, g, sx, sz);
+			}
 		}
-		p.put(c, cu, 3, cv, Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
 	}
 
-	// ------------------------------------------------------------------ dais and stage
+	// ------------------------------------------------------------------ platform, steps
 
-	private void floor(CitadelCanvas c, Plot p, int u, int v, int dx, int dz, double m, int k) {
-		int h = p.hash(u, 0, v, 6);
-		if (m > k + 0.5) {
-			// promenade around the rail: heavy dark stone, mixed
-			p.set(c, u, 0, v, h == 0 ? b(Blocks.POLISHED_ANDESITE) : h < 3 ? b(Blocks.STONE_BRICKS) : b(Blocks.DEEPSLATE_TILES));
-		} else if (m <= 1.0) {
-			p.set(c, u, 0, v, b(Blocks.CHISELED_DEEPSLATE));
-		} else if (m <= 2.2) {
-			p.set(c, u, 0, v, h == 0 ? log(Blocks.STRIPPED_CHERRY_LOG, Direction.Axis.Y) : b(Blocks.CHERRY_PLANKS));
-		} else if (m <= 3.2) {
-			p.set(c, u, 0, v, b(Blocks.BAMBOO_MOSAIC));
+	private void platform(CitadelCanvas c, Plot p, Geo g, int u, int v, int dx, int dz, double m) {
+		int top = g.h() - 1;
+		for (int y = 0; y < top; y++) {
+			p.set(c, u, y, v, p.hash(u, y, v, 5) == 0 ? b(Blocks.CRACKED_DEEPSLATE_BRICKS) : b(Blocks.DEEPSLATE_BRICKS));
+		}
+		BlockState s;
+		int hs = p.hash(u, top, v, 6);
+		if (m > g.k() + 0.5) {
+			// the walk outside the balustrade: dark bricks, mixed
+			s = hs == 0 ? b(Blocks.CRACKED_DEEPSLATE_BRICKS) : hs < 3 ? b(Blocks.POLISHED_DEEPSLATE) : b(Blocks.DEEPSLATE_BRICKS);
+		} else if (g.ring(m)) {
+			s = b(Blocks.POLISHED_DEEPSLATE);
+		} else if (m <= 1.5) {
+			s = b(Blocks.CHISELED_DEEPSLATE);
+		} else if (m <= 2.5) {
+			s = hs == 0 ? log(Blocks.STRIPPED_CHERRY_LOG, Direction.Axis.Y) : b(Blocks.CHERRY_PLANKS);
 		} else {
-			p.set(c, u, 0, v, h == 0 ? log(Blocks.STRIPPED_CHERRY_LOG, Direction.Axis.Y) : b(Blocks.CHERRY_PLANKS));
+			int band = (int) Math.floor(m - 2.5);
+			s = (band & 1) == 0 ? b(Blocks.BAMBOO_MOSAIC) : hs == 0 ? log(Blocks.STRIPPED_CHERRY_LOG, Direction.Axis.Y) : b(Blocks.CHERRY_PLANKS);
 		}
+		p.set(c, u, top, v, s);
 	}
 
-	// ------------------------------------------------------------------ columns, balustrade, beam, eaves
-
-	private void ring(CitadelCanvas c, Plot p, int u, int v, int dx, int dz, double m, int k, int t) {
+	private void steps(CitadelCanvas c, Plot p, Geo g, int u, int v, int dx, int dz) {
 		int ax = Math.abs(dx);
 		int az = Math.abs(dz);
-		boolean column = (ax == k && az == t) || (ax == t && az == k);
-		boolean inRing = m > k - 0.5 && m <= k + 0.5;
-		if (column) {
-			p.set(c, u, 1, v, b(Blocks.POLISHED_DEEPSLATE));
-			p.set(c, u, 2, v, b(Blocks.QUARTZ_PILLAR));
-			p.set(c, u, 3, v, b(Blocks.CHISELED_QUARTZ_BLOCK));
-			p.set(c, u, 4, v, log(Blocks.STRIPPED_CHERRY_WOOD, ax >= az ? Direction.Axis.Z : Direction.Axis.X));
+		int a = Math.max(ax, az);
+		int lat = Math.min(ax, az);
+		int e = a - g.pl();
+		if (lat > g.sw() || e < 1 || e > g.h()) {
 			return;
 		}
-		if (inRing) {
-			// beam over everything; axis follows the face, diagonal steps use planks
-			boolean faceX = ax == k && az < t;
-			boolean faceZ = az == k && ax < t;
-			p.set(c, u, 4, v, faceX ? log(Blocks.STRIPPED_CHERRY_WOOD, Direction.Axis.Z) : faceZ ? log(Blocks.STRIPPED_CHERRY_WOOD, Direction.Axis.X) : b(Blocks.CHERRY_PLANKS));
-			boolean gap = (faceX && az <= 1) || (faceZ && ax <= 1);
-			if (!gap) {
-				// [depth] balustrade: slabs with cherry balusters on every second cell
-				if (((ax + az) & 1) == 0) {
-					p.set(c, u, 1, v, slab(Blocks.POLISHED_DIORITE_SLAB));
-				} else {
-					p.set(c, u, 1, v, b(Blocks.CHERRY_FENCE));
-					if (p.hash(u, 3, v, 3) == 0) {
-						p.put(c, u, 3, v, Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
+		int ys = g.h() - e;
+		for (int y = 0; y < ys; y++) {
+			p.set(c, u, y, v, b(Blocks.DEEPSLATE_BRICKS));
+		}
+		// facing = the way up: the tall half is towards the platform
+		Block blk = p.hash(u, ys, v, 3) == 0 ? Blocks.POLISHED_DEEPSLATE_STAIRS : Blocks.DEEPSLATE_BRICK_STAIRS;
+		p.set(c, u, ys, v, stairs(blk, out(dx, dz).getOpposite()));
+	}
+
+	// ------------------------------------------------------------------ columns, rail, beam
+
+	private BlockState fence(Geo g, int dx, int dz) {
+		return b(Blocks.CHERRY_FENCE)
+				.setValue(BlockStateProperties.NORTH, g.solid(dx, dz - 1))
+				.setValue(BlockStateProperties.SOUTH, g.solid(dx, dz + 1))
+				.setValue(BlockStateProperties.EAST, g.solid(dx + 1, dz))
+				.setValue(BlockStateProperties.WEST, g.solid(dx - 1, dz));
+	}
+
+	private void frame(CitadelCanvas c, Plot p, Geo g, int u, int v, int dx, int dz, double m) {
+		int y0 = g.h();
+		int beam = y0 + 3;
+		int ax = Math.abs(dx);
+		int az = Math.abs(dz);
+		if (g.column(dx, dz)) {
+			// [depth] a dark base, two shafts and a beam-height capital
+			p.set(c, u, y0, v, b(Blocks.POLISHED_DEEPSLATE));
+			p.set(c, u, y0 + 1, v, log(Blocks.STRIPPED_CHERRY_LOG, Direction.Axis.Y));
+			p.set(c, u, y0 + 2, v, log(Blocks.STRIPPED_CHERRY_LOG, Direction.Axis.Y));
+			p.set(c, u, beam, v, log(Blocks.STRIPPED_CHERRY_WOOD, ax > az ? Direction.Axis.Z : Direction.Axis.X));
+			return;
+		}
+		if (g.ring(m)) {
+			p.set(c, u, beam, v, log(Blocks.STRIPPED_CHERRY_WOOD, ax > az ? Direction.Axis.Z : Direction.Axis.X));
+			if (g.rail(dx, dz)) {
+				p.set(c, u, y0, v, fence(g, dx, dz));
+				// brackets under the beam next to each column
+				Direction toCol = null;
+				for (Direction dir : new Direction[] {Direction.EAST, Direction.WEST, Direction.SOUTH, Direction.NORTH}) {
+					if (g.column(dx + dir.getStepX(), dz + dir.getStepZ())) {
+						toCol = dir;
+						break;
 					}
 				}
-			} else if (ax + az == k) {
-				// hanging lantern over the middle of each entrance
-				p.put(c, u, 3, v, Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
+				if (toCol != null) {
+					p.set(c, u, y0 + 2, v, topStairs(Blocks.CHERRY_STAIRS, toCol));
+				} else if (((ax + az) & 1) == 0) {
+					// [finish] a standing lantern on every other balustrade post
+					p.set(c, u, y0 + 1, v, Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, false));
+				}
 			}
-		} else if (m > k + 0.5 && m <= k + 1.5) {
-			// eaves: dark tile stairs, low side out
-			p.set(c, u, 4, v, stairs(Blocks.DEEPSLATE_TILE_STAIRS, out(dx, dz)));
+			return;
+		}
+		if (g.interior(m)) {
+			// ceiling of the stage
+			p.set(c, u, beam, v, m <= 1.5 ? b(Blocks.BAMBOO_MOSAIC) : b(Blocks.CHERRY_PLANKS));
 		}
 	}
 
-	// ------------------------------------------------------------------ ribbed dome
+	// ------------------------------------------------------------------ hip roof
 
-	private static double rhoOf(int j, int jTop, double rho0) {
-		return rho0 * (1.0 - Math.pow(j / (jTop + 0.7), 1.8));
-	}
-
-	private void dome(CitadelCanvas c, Plot p, int u, int v, int dx, int dz, double m, int k, int jTop, double rho0) {
+	private static boolean isRib(int dx, int dz, double m) {
+		if (m <= 1.4) {
+			return false;
+		}
 		double angle = Math.atan2(dz, dx);
-		// distance to the nearest rib (they run over the column vertices, 22.5° + 45° k)
 		double step = Math.PI / 4;
 		double offs = Math.PI / 8;
 		double rel = (angle - offs) / step;
 		double da = Math.abs(angle - (Math.round(rel) * step + offs));
-		double rib = m * Math.sin(da);
-		for (int j = 0; j <= jTop; j++) {
-			double rho = rhoOf(j, jTop, rho0);
-			boolean last = j == jTop;
-			// each ring reaches one block under the next ring's outer edge, so the shell has no hole
-			double thick = last ? rho : rho - rhoOf(j + 1, jTop, rho0) + 1.0;
-			if (m > rho || (!last && m <= rho - thick)) {
+		return m * Math.sin(da) < 0.55;
+	}
+
+	private void roof(CitadelCanvas c, Plot p, Geo g, Roof r, int u, int v, int dx, int dz, double m) {
+		int base = g.h() + 3;
+		boolean rib = isRib(dx, dz, m);
+		Direction in = out(dx, dz).getOpposite();
+		// the eave: one block beyond the beam, low side out
+		if (m > g.k() + 0.5 && m <= g.k() + 1.5) {
+			p.set(c, u, base, v, stairs(r.stair(rib, 0), in));
+		}
+		for (int i = 1; i <= r.layers(); i++) {
+			double ri = g.k() + 0.5 - r.s() * (i - 1);
+			if (m > ri) {
 				continue;
 			}
-			double next = last ? 0 : rhoOf(j + 1, jTop, rho0);
-			boolean exposed = !last && m > next;
-			boolean isRib = rib < 0.6 && m > 1.4;
-			int y = 5 + j;
-			if (last) {
-				p.set(c, u, y, v, b(Blocks.CHERRY_PLANKS));
-			} else if (exposed) {
-				p.set(c, u, y, v, isRib ? stairs(Blocks.POLISHED_DIORITE_STAIRS, out(dx, dz)) : stairs(Blocks.CHERRY_STAIRS, out(dx, dz)));
+			int y = base + i;
+			if (m > ri - 1 && m > 0.5) {
+				p.set(c, u, y, v, stairs(r.stair(rib, 0), in));
 			} else {
-				p.set(c, u, y, v, isRib ? b(Blocks.POLISHED_DIORITE) : b(Blocks.CHERRY_PLANKS));
+				p.set(c, u, y, v, r.tread(rib, p.hash(u, y, v, 7)));
 			}
 		}
 	}
 
-	// ------------------------------------------------------------------ corners: cherry trees on moss
-
-	private void corner(CitadelCanvas c, Plot p, int u, int v, double beyond, int w, int d) {
-		if (beyond <= 0.5) {
-			int h = p.hash(u, 0, v, 4);
-			p.set(c, u, 0, v, h == 0 ? slab(Blocks.MOSSY_STONE_BRICK_SLAB) : slab(Blocks.STONE_BRICK_SLAB));
-			return;
+	private void finial(CitadelCanvas c, Plot p, Geo g, Roof r) {
+		int y = g.h() + 3 + r.layers() + 1;
+		int fs = r.fs();
+		BlockState lantern = Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, false);
+		for (int i = 0; i < fs; i++) {
+			BlockState s;
+			if (r.fin() == 0) {
+				s = i == fs - 1 ? lantern : b(Blocks.CHERRY_FENCE);
+			} else {
+				s = fs >= 2 && i == 0 ? b(Blocks.GOLD_BLOCK) : Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState();
+			}
+			at(c, p, g, 0, y + i, 0, s);
 		}
-		boolean edge = u == 0 || v == 0 || u == w - 1 || v == d - 1;
-		p.set(c, u, 0, v, edge ? b(Blocks.DEEPSLATE_BRICKS) : b(Blocks.MOSS_BLOCK));
-		boolean tip = (u == 1 || u == w - 2) && (v == 1 || v == d - 2);
-		if (tip) {
-			p.set(c, u, 1, v, log(Blocks.CHERRY_LOG, Direction.Axis.Y));
-			p.set(c, u, 2, v, log(Blocks.CHERRY_LOG, Direction.Axis.Y));
-			for (int dv = -1; dv <= 1; dv++) {
-				for (int du = -1; du <= 1; du++) {
-					if (du == 0 && dv == 0) {
-						continue;
+	}
+
+	// ------------------------------------------------------------------ the stage: music
+
+	private void stage(CitadelCanvas c, Plot p, Geo g) {
+		int y = g.h();
+		at(c, p, g, 0, y, 0, Blocks.JUKEBOX.defaultBlockState().setValue(BlockStateProperties.HAS_RECORD, true));
+		at(c, p, g, -1, y, 0, b(Blocks.NOTE_BLOCK));
+		at(c, p, g, 1, y, 0, b(Blocks.NOTE_BLOCK));
+		at(c, p, g, 0, y, 1, b(Blocks.NOTE_BLOCK));
+		atLayer(c, p, g, 0, y + 2, 0, Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
+		for (int dz = -g.k(); dz <= g.k(); dz++) {
+			for (int dx = -g.k(); dx <= g.k(); dx++) {
+				if (!g.seat(dx, dz)) {
+					continue;
+				}
+				if (dz < 0) {
+					// front half: potted saplings in the corners of the stage
+					if (((Math.abs(dx) + Math.abs(dz)) & 1) == 0) {
+						at(c, p, g, dx, y, dz, b(Blocks.POTTED_CHERRY_SAPLING));
 					}
-					p.set(c, u + du, 3, v + dv, CitadelCanvas.leaves(Blocks.CHERRY_LEAVES));
+					continue;
+				}
+				Direction f = out(dx, dz);
+				if (!g.solid(dx + f.getStepX(), dz + f.getStepZ())) {
+					Direction alt = f.getAxis() == Direction.Axis.X ? (dz > 0 ? Direction.SOUTH : Direction.NORTH) : (dx > 0 ? Direction.EAST : Direction.WEST);
+					f = alt;
+				}
+				// seat: tall half (the backrest) against the balustrade
+				at(c, p, g, dx, y, dz, stairs(Blocks.CHERRY_STAIRS, f));
+				if (((Math.abs(dx) + Math.abs(dz)) & 1) == 0) {
+					int lx = dx - f.getStepX();
+					int lz = dz - f.getStepZ();
+					if (!g.centre(lx, lz) && !g.seat(lx, lz) && g.interior(oct(lx, lz))) {
+						// the music stand in front of the seat, its book towards the player
+						at(c, p, g, lx, y, lz, Blocks.LECTERN.defaultBlockState()
+								.setValue(BlockStateProperties.HORIZONTAL_FACING, f).setValue(BlockStateProperties.HAS_BOOK, true));
+					}
 				}
 			}
-			p.set(c, u, 3, v, log(Blocks.CHERRY_LOG, Direction.Axis.Y));
-			p.set(c, u, 4, v, CitadelCanvas.leaves(Blocks.CHERRY_LEAVES));
-		} else if (!edge && p.hash(u, 1, v, 3) == 0) {
-			p.set(c, u, 1, v, p.hash(u, 2, v, 2) == 0 ? b(Blocks.PINK_PETALS) : CitadelCanvas.leaves(Blocks.FLOWERING_AZALEA_LEAVES));
+		}
+	}
+
+	// ------------------------------------------------------------------ the four corners of the plot
+
+	/** 0 nothing, 1 lamp, 2 bench facing along z, 3 bench facing along x, 4 hedge, 5 flower bed. */
+	private static int cornerRole(Geo g, int a, int bb, double m) {
+		int n = g.n();
+		if (m <= g.pl() + 0.5) {
+			return 0;
+		}
+		if (a == n - 1 && bb == n - 1) {
+			return 1;
+		}
+		if (bb == n - 1 && a >= n - 4 && a <= n - 2) {
+			return 2;
+		}
+		if (a == n - 1 && bb >= n - 4 && bb <= n - 2) {
+			return 3;
+		}
+		if ((bb == n && a >= n - 4 && a <= n) || (a == n && bb >= n - 4 && bb <= n)) {
+			return 4;
+		}
+		if (a >= g.sw() + 3 && bb >= g.sw() + 3 && a <= n && bb <= n && m > g.pl() + 1.5) {
+			return 5;
+		}
+		return 0;
+	}
+
+	private void corner(CitadelCanvas c, Plot p, Geo g, int sx, int sz) {
+		int n = g.n();
+		for (int bb = 0; bb <= n; bb++) {
+			for (int a = 0; a <= n; a++) {
+				int dx = sx * a;
+				int dz = sz * bb;
+				int role = cornerRole(g, a, bb, oct(dx, dz));
+				if (role == 0) {
+					continue;
+				}
+				int u = g.cu() + dx;
+				int v = g.cv() + dz;
+				switch (role) {
+					case 1 -> {
+						at(c, p, g, dx, 0, dz, b(Blocks.POLISHED_DEEPSLATE));
+						at(c, p, g, dx, 1, dz, b(Blocks.CHERRY_FENCE));
+						at(c, p, g, dx, 2, dz, b(Blocks.CHERRY_FENCE));
+						at(c, p, g, dx, 3, dz, Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, false));
+					}
+					case 2 -> at(c, p, g, dx, 0, dz, stairs(Blocks.CHERRY_STAIRS, sz > 0 ? Direction.SOUTH : Direction.NORTH));
+					case 3 -> at(c, p, g, dx, 0, dz, stairs(Blocks.CHERRY_STAIRS, sx > 0 ? Direction.EAST : Direction.WEST));
+					case 4 -> {
+						// the hedge behind a bench, with the odd flowering shrub
+						boolean flowering = p.has(u, 0, v) && p.hash(u, 0, v, 3) == 0;
+						at(c, p, g, dx, 0, dz, CitadelCanvas.leaves(flowering ? Blocks.FLOWERING_AZALEA_LEAVES : Blocks.AZALEA_LEAVES));
+					}
+					default -> {
+						at(c, p, g, dx, 0, dz, b(Blocks.MOSS_BLOCK));
+						int h = p.hash(u, 1, v, 8);
+						BlockState plant = h < 3 ? b(Blocks.PINK_PETALS) : h < 5 ? CitadelCanvas.leaves(Blocks.FLOWERING_AZALEA_LEAVES) : h == 5 ? b(Blocks.FERN) : null;
+						if (plant != null) {
+							at(c, p, g, dx, 1, dz, plant);
+						}
+					}
+				}
+			}
 		}
 	}
 }
