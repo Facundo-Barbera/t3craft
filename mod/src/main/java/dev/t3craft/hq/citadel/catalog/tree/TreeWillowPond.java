@@ -28,13 +28,13 @@ import net.minecraft.world.level.block.state.properties.BooleanProperty;
  * ground), with a free cell round each strand so there are gaps; hanging roots dangle from the limbs. The
  * seed picks the side of the tree, how far it leans, how the limbs turn and how dense the curtains are.
  *
- * <p>Size: 7–15 × 7–15 × 9+ (the tree stops at 13 high). Everything is drawn through {@link TreeKit}.
+ * <p>Size: 8–15 × 8–15 × 9+ (the tree stops at 13 high). Everything is drawn through {@link TreeKit}.
  */
 public final class TreeWillowPond implements Variant {
-	private static final Wood WOOD = new Wood(Blocks.OAK_LOG, Blocks.OAK_WOOD, b(Blocks.MANGROVE_ROOTS));
+	private static final Wood WOOD = new Wood(Blocks.SPRUCE_LOG, Blocks.SPRUCE_WOOD, b(Blocks.MANGROVE_ROOTS));
 	private static final Leaves GREEN = Leaves.of(Blocks.OAK_LEAVES, Blocks.AZALEA_LEAVES).clumps(3);
 	private static final Leaves DEEP = Leaves.of(Blocks.AZALEA_LEAVES, Blocks.OAK_LEAVES).clumps(3);
-	private static final Leaves CROWN = GREEN.withAccent(leaves(Blocks.BIRCH_LEAVES), 6);
+	private static final Leaves CROWN = GREEN.withAccent(leaves(Blocks.BIRCH_LEAVES), 4);
 	private static final BlockState STRAND_A = leaves(Blocks.BIRCH_LEAVES);
 	private static final BlockState STRAND_B = leaves(Blocks.OAK_LEAVES);
 	private static final BlockState STRAND_C = leaves(Blocks.AZALEA_LEAVES);
@@ -51,12 +51,12 @@ public final class TreeWillowPond implements Variant {
 
 	@Override
 	public int minW() {
-		return 7;
+		return 8;
 	}
 
 	@Override
 	public int minD() {
-		return 7;
+		return 8;
 	}
 
 	@Override
@@ -87,6 +87,10 @@ public final class TreeWillowPond implements Variant {
 		double spin = r.nextDouble() * 0.7 - 0.35;
 		int dens = 13 + r.nextInt(4); // strands per 20 candidate cells
 		double pondK = 0.92 + r.nextDouble() * 0.2;
+		double[] kidney = {(r.nextDouble() - 0.5) * 1.1, 0.15 + r.nextDouble() * 0.5, 0.5 + r.nextDouble() * 0.2};
+		int extraLimbs = r.nextInt(2);
+		boolean longDome = r.nextBoolean();
+		int hVar = r.nextInt(2);
 
 		// the trunk's 2×2 foot: on the tree's side, towards the back
 		int u0 = TreeKit.clamp((int) Math.round((w - 1) / 2.0 + s * w * 0.24) - 1, 1, w - 3);
@@ -95,13 +99,13 @@ public final class TreeWillowPond implements Variant {
 		// fixed pieces first: the tree never overwrites them
 		garden(t, w, d);
 		boolean[][] wet = new boolean[w][d];
-		double[] centroid = pond(t, w, d, s, u0, v0, pondK, wet);
+		double[] centroid = pond(t, w, d, s, u0, v0, pondK, kidney, wet);
 		double pu = centroid[0];
 		double pv = centroid[1];
 
 		// trunk: thick 2×2 foot, then a 1×1 leader that leans out over the water
-		int yTop = TreeKit.clamp(H - 4, 5, 9);
-		int y2 = yTop >= 7 ? 4 : 3;
+		int yTop = TreeKit.clamp(H - 4 - hVar, 5, 9);
+		int y2 = TreeKit.clamp(yTop - 3, 3, 6); // a thick 2×2 trunk, thinning only near the crown
 		int ou = s > 0 ? 0 : 1; // the leader starts on the 2×2 cell nearer the pond
 		int ov = 0;
 		double maxLean = sc * 1.3 + 0.7;
@@ -114,13 +118,13 @@ public final class TreeWillowPond implements Variant {
 		int lv = lead[1][yTop];
 
 		// 1. the domed crown pad on the leader
-		double rd = TreeKit.clamp(1.8 * sc, 1.9, 3.6);
-		TreeKit.lobe(t, lu, yTop, lv, rd, rd * 0.9, 2.2, 1.0, CROWN, 0.35, 0);
+		double rd = TreeKit.clamp(1.7 * sc, 1.9, 3.4);
+		TreeKit.lobe(t, lu, yTop, lv, longDome ? rd * 1.2 : rd * 0.8, longDome ? rd * 0.8 : rd * 1.2, 2.2, 1.0, CROWN, 0.5, 0);
 
 		// 2. the arching limbs: the first one reaches out over the water, the others spread round the trunk
-		double ra = TreeKit.clamp(1.5 * sc, 1.6, 3.0);
+		double ra = TreeKit.clamp(1.35 * sc, 1.5, 2.7);
 		double rmax = 3.0 * sc + 0.6;
-		int n = Math.min(w, d) >= 10 ? 4 : 3;
+		int n = (Math.min(w, d) >= 10 ? 4 : 3) + extraLimbs;
 		double ang0 = Math.atan2(pv - lv, pu - lu) + spin;
 		for (int i = 0; i < n; i++) {
 			double a = ang0 + i * (2 * Math.PI / n) + (i == 0 ? 0 : (t.hash(i, 3, 9, 7) - 3) * 0.12);
@@ -129,6 +133,21 @@ public final class TreeWillowPond implements Variant {
 
 		// 3. the curtains: separate strands from the outer rim of the pads, a free cell all round each one
 		boolean[] col = new boolean[t.w * t.d];
+		boolean[] bare = new boolean[t.w * t.d]; // the trunk and its leaning leader stay visible: no strands within 2
+		for (int y = 0; y <= yTop; y++) {
+			int cu0 = y <= y2 ? u0 : lead[0][y];
+			int cv0 = y <= y2 ? v0 : lead[1][y];
+			int ext = y <= y2 ? 1 : 0;
+			for (int dv = -2; dv <= 2 + ext; dv++) {
+				for (int du = -2; du <= 2 + ext; du++) {
+					int a = cu0 + du;
+					int bb = cv0 + dv;
+					if (a >= 0 && a < t.w && bb >= 0 && bb < t.d) {
+						bare[bb * t.w + a] = true;
+					}
+				}
+			}
+		}
 		for (int y = 3; y < t.h; y++) {
 			for (int v = 0; v < t.d; v++) {
 				for (int u = 0; u < t.w; u++) {
@@ -143,7 +162,7 @@ public final class TreeWillowPond implements Variant {
 					if (t.kind(u + ou2, y, v + ov2) == TreeKit.LEAF) {
 						continue; // not the outer rim
 					}
-					if (busy(col, t.w, t.d, u, v) || t.hash(u, y, v, 20) >= dens) {
+					if (bare[v * t.w + u] || busy(col, t.w, t.d, u, v) || t.hash(u, y, v, 20) >= dens) {
 						continue;
 					}
 					int top = y - 1;
@@ -152,10 +171,10 @@ public final class TreeWillowPond implements Variant {
 					BlockState under = t.get(u, 0, v);
 					int leafMin = t.kind(u, 0, v) != TreeKit.EMPTY && under != null && under.getBlock() != Blocks.WATER ? 4 : 3;
 					int tail = top - bottom + 1 >= 4 ? 3 : 2;
-					int pick = t.hash(u, 7, v, 3);
+					int pick = t.hash(u, 7, v, 4);
 					boolean ew = Math.abs(u - lu) > Math.abs(v - lv);
-					strand(t, u, top, v, bottom, leafMin, tail, pick == 0 ? STRAND_A : pick == 1 ? STRAND_B : STRAND_C,
-							pick == 0 ? STRAND_B : STRAND_A, ew);
+					strand(t, u, top, v, bottom, leafMin, tail, pick <= 1 ? STRAND_A : pick == 2 ? STRAND_B : STRAND_C,
+							pick <= 1 ? STRAND_B : STRAND_A, ew);
 					col[v * t.w + u] = true;
 				}
 			}
@@ -204,7 +223,7 @@ public final class TreeWillowPond implements Variant {
 			Leaves lv) {
 		int sy = Math.max(3, yTop - 4);
 		int ay = Math.max(sy, yTop - 2); // the apex stays under the crown pad: no bare log horns above the leaves
-		int ty = Math.max(4, yTop - 4 - (i & 1)); // the limb's end: over a bank (feet at y1) it keeps 2.85 of headroom
+		int ty = Math.max(4, yTop - 4 - (i % 3)); // the limb's end: over a bank (feet at y1) it keeps 2.85 of headroom
 		int su = lead[0][sy];
 		int sv = lead[1][sy];
 		double reach = TreeKit.clamp(TreeKit.room(t, su, sv, ex, ez, ra * 0.5), 2.0, rmax);
@@ -294,11 +313,16 @@ public final class TreeWillowPond implements Variant {
 	 * @param wet filled with the water cells
 	 * @return the centre of the water {@code {u, v}}
 	 */
-	private static double[] pond(Vox t, int w, int d, int s, int u0, int v0, double k, boolean[][] wet) {
+	private static double[] pond(Vox t, int w, int d, int s, int u0, int v0, double k, double[] kid, boolean[][] wet) {
 		double cu = (w - 1) / 2.0 - s * w * 0.07;
 		double cv = Math.max(3.0, Math.min(d - 4.0, d * 0.36 + 0.9));
 		double au = TreeKit.clamp(w * 0.4 * k, 2.1, 6.5);
 		double av = TreeKit.clamp(d * 0.28 * k, 1.7, 4.5);
+		// a second, smaller oval offset from the first makes the water kidney-shaped
+		double cu2 = cu + kid[0] * au;
+		double cv2 = cv + kid[1] * av;
+		double au2 = au * kid[2];
+		double av2 = av * kid[2];
 		int e = w >= 11 && d >= 11 ? 1 : 0; // a strip of bank between the trunk and the water on big plots
 		double su = 0;
 		double sv = 0;
@@ -311,7 +335,9 @@ public final class TreeWillowPond implements Variant {
 				double du = (u - cu) / au;
 				double dv = (v - cv) / av;
 				double jit = (t.hash(u, 3, v, 9) - 4) * 0.05;
-				if (du * du + dv * dv <= 1.0 + jit) {
+				double du2 = (u - cu2) / au2;
+				double dv2 = (v - cv2) / av2;
+				if (du * du + dv * dv <= 1.0 + jit || du2 * du2 + dv2 * dv2 <= 1.0) {
 					wet[u][v] = true;
 					su += u;
 					sv += v;
@@ -361,10 +387,9 @@ public final class TreeWillowPond implements Variant {
 		BlockState s = switch (k) {
 			case 0, 1 -> b(Blocks.MOSSY_STONE_BRICKS);
 			case 2, 3 -> b(Blocks.MOSSY_COBBLESTONE);
-			case 4 -> b(Blocks.COBBLESTONE);
-			case 5 -> b(Blocks.GRAVEL);
-			case 6 -> b(Blocks.MOSS_BLOCK);
-			case 7 -> b(Blocks.CRACKED_STONE_BRICKS);
+			case 4, 5 -> b(Blocks.GRAVEL);
+			case 6, 7 -> b(Blocks.MOSS_BLOCK);
+			case 8 -> b(Blocks.COBBLESTONE);
 			default -> b(Blocks.STONE_BRICKS);
 		};
 		t.fixed(u, 0, v, s);
@@ -384,6 +409,9 @@ public final class TreeWillowPond implements Variant {
 					}
 					if (open && t.hash(u, 5, v, 3) == 0) {
 						t.cover(u, 1, v, b(Blocks.LILY_PAD));
+					} else if (open && t.hash(u, 9, v, 7) == 0) {
+						// a stepping stone just under the surface
+						t.fixed(u, 0, v, slab(Blocks.MOSSY_COBBLESTONE_SLAB).setValue(BlockStateProperties.WATERLOGGED, true));
 					}
 					continue;
 				}
