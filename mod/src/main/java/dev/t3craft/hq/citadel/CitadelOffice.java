@@ -46,9 +46,9 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
  * <h2>Scale (struct/leader-office)</h2>
  *
  * Facundo found the old tower tight and its stairs a jump. The interior grew from 7 x 7 x 4 per level to
- * <b>9 x 9</b> with <b>5-high rooms</b> (the control room 7 high): about 2.7 times the volume per level, and a
- * fourth of the old floor is no longer taken by stairs. Every route is at least three blocks wide, every stair is a
- * walking stair (see below).
+ * <b>9 x 9</b> with <b>5-high rooms</b> (the control room 7 high): 2.1 times the old volume in the lobby and the
+ * archive, 2.3 times in the control room, and no stair eats the middle of a room any more. Every route is at least
+ * three blocks wide, every stair is a walking stair (see below).
  *
  * <h2>Plan (local coordinates {@code (dx, dz)} from the tower's centre {@link #CX()}, {@link #CZ()}; north is -dz, the hub)</h2>
  *
@@ -56,9 +56,10 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
  *   m = max(|dx|, |dz|)   m <= 4 interior 9 x 9     m = 5 wall     m = 6 skirt, pilasters, eave
  *
  *   level    floor y   feet y   what
- *   lobby    y0()        +1     rug from the door, 4 double chests / barrels, 7 workbenches (crafting, smithing,
- *                               fletching, stonecutter, grindstone, loom, blast furnace), stair A (west)
- *   archive  y0() + 6    +1     archive lecterns and shelves, cartography table, model of the HQ, bed, stair B (east)
+ *   lobby    y0()        +1     rug from the door, 2 double chests and barrels, 7 workbenches (crafting, smithing,
+ *                               fletching, stonecutter, grindstone, loom, blast furnace), anvil, ender chest, stair A (west)
+ *   archive  y0() + 6    +1     archive lecterns and shelves, cartography and enchanting tables, jukebox, model of the HQ,
+ *                               bed, stair B (east)
  *   control  y0() + 12   +1     big screens, attention board, consoles, chests; north door to the balcony
  *   ceiling  y0() + 20   -      rafters; clerestory band, hip roof, lantern cupola
  * </pre>
@@ -565,8 +566,9 @@ public final class CitadelOffice {
 		set(c, 1, y, 4, Blocks.GRINDSTONE.defaultBlockState());
 		set(c, 2, y, 4, facing(Blocks.LOOM, Direction.NORTH));
 		set(c, 3, y, 4, facing(Blocks.BLAST_FURNACE, Direction.NORTH));
-		shelves(c, -4, y, 4, 2);
-		set(c, -4, y, 3, Blocks.POTTED_FLOWERING_AZALEA.defaultBlockState());
+		// utility corner: an anvil and an ender chest (storage that follows the player)
+		set(c, -4, y, 4, facing(Blocks.ANVIL, Direction.EAST));
+		set(c, -4, y, 3, facing(Blocks.ENDER_CHEST, Direction.EAST));
 		// banners on the door's inner jambs, a plaque over the door outside
 		set(c, -2, y + 2, -4, wallBanner(Direction.SOUTH));
 		set(c, 2, y + 2, -4, wallBanner(Direction.SOUTH));
@@ -599,7 +601,7 @@ public final class CitadelOffice {
 		set(c, -4, y, -4, facing(Blocks.BED.pick(BED), Direction.NORTH).setValue(BlockStateProperties.BED_PART, BedPart.HEAD));
 		set(c, -4, y, -3, facing(Blocks.BED.pick(BED), Direction.NORTH).setValue(BlockStateProperties.BED_PART, BedPart.FOOT));
 		set(c, -3, y, -4, chest(Direction.SOUTH, ChestType.SINGLE));
-		set(c, -3, y, -3, Blocks.POTTED_FLOWERING_AZALEA.defaultBlockState());
+		set(c, -3, y, -3, Blocks.JUKEBOX.defaultBlockState());
 		// south wall: shelves and the archive lecterns (stand-ins for the archive terminal, see the class comment)
 		for (int dx : new int[] {-4, -3, -1, 1}) {
 			shelves(c, dx, y, 4, 3);
@@ -614,6 +616,7 @@ public final class CitadelOffice {
 		set(c, -1, y, -4, Blocks.POTTED_BAMBOO.defaultBlockState());
 		set(c, 0, y, -4, Blocks.CARTOGRAPHY_TABLE.defaultBlockState());
 		set(c, 1, y, -4, facing(Blocks.LECTERN, Direction.SOUTH));
+		set(c, 2, y, -4, Blocks.ENCHANTING_TABLE.defaultBlockState());
 		set(c, 3, y, -4, cherryStairs(Direction.SOUTH, false));
 		set(c, 4, y, -4, cherryStairs(Direction.SOUTH, false));
 		set(c, 4, y, -3, cherryStairs(Direction.WEST, false));
@@ -855,11 +858,5 @@ public final class CitadelOffice {
 	public static void anchors(CitadelCanvas c) {
 		c.anchor(Anchor.at(OFFICE, new BlockPos(CX(), F2() + 1, CZ()), Direction.SOUTH));
 		c.anchor(Anchor.at(OFFICE_BALCONY, new BlockPos(CX(), F2() + 1, CZ() - 7), Direction.NORTH));
-		// DEBUG-WALK (temporary, removed before the final commit): standing spots the report checks for reachability
-		int[][] probes = {{0, F0() + 1, -3}, {-3, F0() + 1, -4}, {-4, F1() + 1, 3}, {2, F1() + 1, 0}, {-2, F1() + 1, -4}, {3, F1() + 1, 4},
-				{3, F2() + 1, -3}, {0, F2() + 1, 0}, {0, F2() + 1, -7}};
-		for (int i = 0; i < probes.length; i++) {
-			c.anchor(Anchor.at("walk_zz_office_" + i, new BlockPos(CX() + probes[i][0], probes[i][1], CZ() + probes[i][2]), Direction.NORTH));
-		}
 	}
 }
