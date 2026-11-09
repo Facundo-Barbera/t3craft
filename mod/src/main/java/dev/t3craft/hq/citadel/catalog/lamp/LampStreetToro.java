@@ -176,24 +176,29 @@ public final class LampStreetToro implements Variant {
 		// --- chūdai: a platform that flares past the shaft (top slabs, or bottom slabs on the yukimi legs)
 		p.set(c, cu, yP, cv, b(Blocks.CHISELED_STONE_BRICKS));
 		for (int[] k : SIDES) {
-			slabAt(c, p, u0 + k[0], yP, v0 + k[1], low);
+			slabAt(c, p, u0 + k[0], yP, v0 + k[1], false);
 		}
 		for (int[] k : CORNERS) {
-			slabAt(c, p, u0 + k[0], yP, v0 + k[1], low);
+			if (low) {
+				// yukimi: a squat foot block on each leg, so the top slabs between them rest on stone
+				p.set(c, u0 + k[0], yP, v0 + k[1], brick(p, u0 + k[0], yP, v0 + k[1]));
+			} else {
+				slabAt(c, p, u0 + k[0], yP, v0 + k[1], false);
+			}
 		}
 
 		// --- hibukuro: the light
 		p.set(c, cu, yC, cv, b(Blocks.OCHRE_FROGLIGHT));
 
 		// --- kasa: a block over the light, an eave of top slabs round it
-		// (kasuga: top slabs, so nobody can stand on the platform under it; yukimi: a flat eave of bottom slabs)
+		// (top slabs: the light stays visible under them and nobody can stand on the platform below)
 		p.set(c, cu, yH, cv, b(Blocks.POLISHED_ANDESITE));
-		BlockState eave = slab(Blocks.POLISHED_ANDESITE_SLAB);
+		BlockState eave = topSlab(slab(Blocks.POLISHED_ANDESITE_SLAB));
 		for (int[] k : SIDES) {
-			p.set(c, u0 + k[0], yH, v0 + k[1], low ? eave : topSlab(eave));
+			p.set(c, u0 + k[0], yH, v0 + k[1], eave);
 		}
 		for (int[] k : CORNERS) {
-			p.set(c, u0 + k[0], yH, v0 + k[1], low ? eave : topSlab(eave));
+			p.set(c, u0 + k[0], yH, v0 + k[1], eave);
 		}
 		if (yH + 1 < y + hh) {
 			// kasuga: the corners curl up on slabs that rest on the eave
