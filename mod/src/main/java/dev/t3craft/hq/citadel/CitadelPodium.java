@@ -13,9 +13,14 @@ import dev.t3craft.hq.RingCampusGeometry;
 import dev.t3craft.hq.RingCampusGeometry.Dims;
 import dev.t3craft.hq.RingCampusGeometry.Kind;
 import dev.t3craft.hq.citadel.nature.Flora;
+import java.util.ArrayList;
+import java.util.List;
 import net.minecraft.core.Direction;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.StairBlock;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.Half;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -65,6 +70,7 @@ public final class CitadelPodium {
 	private static final BlockState STONE = b(Blocks.STONE_BRICKS);
 	private static final BlockState STONE_MOSSY = b(Blocks.MOSSY_STONE_BRICKS);
 	private static final BlockState PIER = STONE;
+	private static final BlockState ANDESITE = b(Blocks.POLISHED_ANDESITE);
 
 	/** The shape of the climb, in cells and blocks (see the class comment). */
 	record Profile(int h1, int h2, int fa, int land, int length) {
@@ -116,13 +122,28 @@ public final class CitadelPodium {
 	/** The top block (y) of a stair column, the parapet of the flights included. */
 	private static int rampTop(Profile p, int x, int z, int d) {
 		int h = halves(p, d);
-		return cheek(p, x, z, d) ? (h + 1) / 2 + 1 : h / 2;
+		return cheek(p, x, z, d) ? cheekTop(h) : h / 2;
+	}
+
+	/**
+	 * design/citadel-terraces4: the block (y) that ends a cheek of the flights at {@code h} half blocks of climb: the cheek rises a
+	 * half block per cell, 1.5 blocks over the tread, as a full block on the odd cells and a slab on the even ones
+	 * (it used to rise a hard block every second cell).
+	 */
+	static int cheekTop(int h) {
+		return (h + 3) / 2 + (h % 2 == 0 ? 1 : 0);
 	}
 
 	/** Cells (from the street) where a cheek ends in a newel: the foot, both ends of the landing and the top of the flights. */
 	private static boolean newel(Profile p, int d) {
 		int landEnd = p.fa() + p.land();
 		return d == 1 || d == p.fa() || d == landEnd + 1 || d == landEnd + 2 * y0() - p.fa();
+	}
+
+	/** The newels that carry a lantern: two at the foot, two where the second flight starts and two at the top (the cheeks are two). */
+	private static boolean lit(Profile p, int d) {
+		int landEnd = p.fa() + p.land();
+		return d == 1 || d == landEnd + 1 || d == landEnd + 2 * y0() - p.fa();
 	}
 
 	/** The one-column parapet on each side of a flight (none on the landing, where the ring walk comes in). */
@@ -156,16 +177,6 @@ public final class CitadelPodium {
 		int low = Integer.MAX_VALUE;
 		for (Direction dir : DIRS) {
 			low = Math.min(low, top(c, p, x + dir.getStepX(), z + dir.getStepZ()));
-		}
-		return low;
-	}
-
-	private static int lowestDiagonal(CitadelCanvas c, Profile p, int x, int z) {
-		int low = Integer.MAX_VALUE;
-		for (int dx = -1; dx <= 1; dx += 2) {
-			for (int dz = -1; dz <= 1; dz += 2) {
-				low = Math.min(low, top(c, p, x + dx, z + dz));
-			}
 		}
 		return low;
 	}
@@ -212,14 +223,19 @@ public final class CitadelPodium {
 		int low = lowestNeighbour(c, p, x, z);
 		solid(c, x, z, top, low);
 		if (cheek) {
-			// one column wide: the wall palette under a coping that follows the flight; a newel (pier, calcite cap and lantern)
-			// stops each flight at its foot, at both ends of the landing and at the top, so the cheeks end in a finial
+			// one column wide: the wall palette under a cap that climbs with the flight a half block per cell (full block on the odd
+			// cells, slab on the even ones); a newel (pier, calcite cap) stops each flight at its foot, at both ends of the landing
+			// and at the top, and the ones at the foot, the start of the second flight and the top carry a lantern
 			if (newel(p, d)) {
 				c.set(x, top, z, PIER);
 				c.set(x, top + 1, z, CALCITE);
-				c.set(x, top + 2, z, b(Blocks.LANTERN));
+				if (lit(p, d)) {
+					c.set(x, top + 2, z, b(Blocks.LANTERN));
+				}
+			} else if (h % 2 == 0) {
+				c.set(x, top, z, CitadelRelief.slabOf(copingBlock(x, z)));
 			} else {
-				c.set(x, top, z, coping(x, z));
+				c.set(x, top, z, copingBlock(x, z));
 			}
 		} else if (landing) {
 			c.set(x, top, z, CitadelPaving.rampFull(band));
@@ -240,16 +256,17 @@ public final class CitadelPodium {
 	}
 
 	/** One block of a wall seen from the low side; {@code depth} 1 is the course under the coping. */
-	private static BlockState wall(int x, int y, int z, int depth) {
-		// a gradient: a light course under the coping, a mixed middle, a dark footing (3 courses at most)
+	static BlockState wall(int x, int y, int z, int depth) {
+		// design/citadel-terraces4: a gradient with no black band: a light course under the coping, a mid grey-green middle and a
+		// dark (deepslate brick, not tile) footing; polished deepslate and tiles only in small amounts, deep down
 		int h = hash(x, z, 311 + y) % 20;
 		if (depth == 1) {
-			return h < 8 ? TUFF : h < 13 ? STONE : h < 16 ? STONE_MOSSY : BRICK;
+			return h < 7 ? TUFF : h < 12 ? STONE : h < 15 ? STONE_MOSSY : h < 18 ? ANDESITE : BRICK;
 		}
 		if (depth == 2) {
-			return h < 5 ? POLISHED : h < 10 ? BRICK : h < 14 ? TUFF : h < 17 ? BRICK_CRACKED : TILES;
+			return h < 6 ? BRICK : h < 11 ? TUFF : h < 14 ? STONE : h < 16 ? STONE_MOSSY : h < 18 ? BRICK_CRACKED : POLISHED;
 		}
-		return h < 8 ? POLISHED : h < 14 ? BRICK : h < 17 ? TILES : BRICK_CRACKED;
+		return h < 8 ? BRICK : h < 12 ? BRICK_CRACKED : h < 16 ? POLISHED : TILES;
 	}
 
 	/** The face of the gallery's plinth (wall B) at {@code depth} courses under its rim, in the palette of the other walls. */
@@ -257,9 +274,50 @@ public final class CitadelPodium {
 		return wall(x, y, z, depth);
 	}
 
-	/** The coping of a wall: mostly calcite, with stone bricks now and then so the line is not a flat white stripe. */
-	private static BlockState coping(int x, int z) {
-		return hash(x, z, 351) % 5 < 2 ? STONE : CALCITE;
+	/**
+	 * The light cap of a wall, a stair cheek or the edge of the gallery: runs of 3 cells of one material (calcite, stone bricks,
+	 * polished andesite, tuff bricks, mossy bricks) so the top line is never a continuous white stripe.
+	 */
+	static BlockState copingBlock(int x, int z) {
+		int j = hash(Math.floorDiv(x, 3), Math.floorDiv(z, 3), 351) % 20;
+		return j < 7 ? CALCITE : j < 12 ? STONE : j < 15 ? ANDESITE : j < 18 ? TUFF : STONE_MOSSY;
+	}
+
+	/** The cap of the cornice of a wall, one material for each bay of {@link #BAY} cells of arc. */
+	private static BlockState capBlock(long bay, int top) {
+		int j = hash((int) bay, top, 361) % 20;
+		return j < 6 ? CALCITE : j < 11 ? STONE : j < 14 ? ANDESITE : j < 17 ? TUFF : STONE_MOSSY;
+	}
+
+	/** The stairs of the corbel under a cap (the cap's family, a step darker). */
+	private static Block corbelStairs(long bay, int top) {
+		int j = hash((int) bay, top, 362) % 10;
+		return j < 4 ? Blocks.TUFF_BRICK_STAIRS : j < 8 ? Blocks.STONE_BRICK_STAIRS : Blocks.MOSSY_STONE_BRICK_STAIRS;
+	}
+
+	/** The gallery's outer edge (two rows beyond the deck, see {@code CitadelPaving#promenade}) and the stripe inside it, with no black row. */
+	static BlockState deckEdge(CitadelCanvas c, int x, int z, double r, BlockState base) {
+		if (profile() == null) {
+			return base;
+		}
+		double rim = CitadelPaving.promenadeRim();
+		double w = CitadelPaving.promenadeWidth();
+		if (RingCampusGeometry.radialDistance(x, z, 8) <= c.g.avenueHalf) {
+			return base; // the mouths of the avenues keep their runner
+		}
+		if (r > rim) {
+			if (base == CALCITE) {
+				return copingBlock(x, z);
+			}
+			if (base == FOOT) {
+				return hash(x, z, 371) % 3 == 0 ? TUFF : ANDESITE;
+			}
+			return base;
+		}
+		if (r > rim - w / 6 && base == c.accent()) {
+			return hash(x, z, 372) % 4 == 0 ? TUFF : STONE;
+		}
+		return base;
 	}
 
 	// ------------------------------------------------------------------ the tiers
@@ -269,13 +327,18 @@ public final class CitadelPodium {
 	 * runs along the wall. Nothing stands on it.
 	 */
 	private static void apron(CitadelCanvas c, Profile p, int x, int z, int d) {
-		if (d > p.fa() - 3) {
-			c.set(x, 0, z, d == p.fa() ? c.accent() : c.floor());
+		if (d == p.fa()) {
+			verge(c, x, z);
+			return;
+		}
+		if (d > p.fa() - 4) {
+			// the paved walk, 3 cells wide, with its accent line on the wall side
+			c.set(x, 0, z, d == p.fa() - 1 ? c.accent() : c.floor());
 			return;
 		}
 		c.set(x, 0, z, hash(x, z, 321) % 9 == 0 ? MOSS : GRASS);
 		int h = hash(x, z, 322) % 100;
-		if (d == p.fa() - 3 && h < 38 && RingCampusGeometry.radialDistance(x, z, 8) >= CitadelCanvas.dims().avenueHalf + 2.0) {
+		if (d == p.fa() - 4 && h < 38 && RingCampusGeometry.radialDistance(x, z, 8) >= CitadelCanvas.dims().avenueHalf + 2.0) {
 			// design/citadel-terraces3: a broken line of azaleas on the lawn side of the paved walk, green in front of wall A
 			c.set(x, 1, z, leaves(h % 3 == 0 ? Blocks.AZALEA_LEAVES : Blocks.FLOWERING_AZALEA_LEAVES));
 		} else if (h < 22) {
@@ -285,16 +348,26 @@ public final class CitadelPodium {
 		}
 	}
 
+	/**
+	 * design/citadel-terraces4: the verge at the foot of wall A, the row under its cornice (the buttresses stand here, not on the
+	 * walk): grass with low ferns and flowers, an azalea now and then, never anything that closes the walk.
+	 */
+	private static void verge(CitadelCanvas c, int x, int z) {
+		c.set(x, 0, z, hash(x, z, 323) % 5 == 0 ? MOSS : GRASS);
+		int h = hash(x, z, 324) % 100;
+		if (h < 14) {
+			c.set(x, 1, z, leaves(h % 3 == 0 ? Blocks.AZALEA_LEAVES : Blocks.FLOWERING_AZALEA_LEAVES));
+		} else if (h < 40) {
+			Flora.plantOn(c, x, 0, z, b(Blocks.FERN));
+		} else if (h < 70) {
+			Flora.plantOn(c, x, 0, z, Flora.bloom(1 + Math.floorDiv(x + z, 6), h >> 1));
+		}
+	}
+
 	/** The ring walk of the middle tier: a coping on the edge of wall A, the kit's floor between. */
 	private static void ringWalk(CitadelCanvas c, Profile p, int x, int z, int d, int top, int lowestNeighbour) {
-		if (d == p.fa() + 1) {
-			// the coping is a continuous line: a cell that only touches the drop at a corner gets it too
-			c.set(x, top, z, top - Math.min(lowestNeighbour, lowestDiagonal(c, p, x, z)) >= 2 ? coping(x, z) : c.accent());
-		} else if (d == p.fa() + p.land()) {
-			c.set(x, top, z, c.accent());
-		} else {
-			c.set(x, top, z, c.floor());
-		}
+		// design/citadel-terraces4: the edge over wall A is a line of the kit's accent; the cap of the cornice (below) is the light line
+		c.set(x, top, z, d == p.fa() + 1 || d == p.fa() + p.land() ? c.accent() : c.floor());
 	}
 
 	/** The beds at the foot of the gallery's plinth: low flowers and a bush now and then, never a tree. */
@@ -322,20 +395,34 @@ public final class CitadelPodium {
 		}
 	}
 
-	// ------------------------------------------------------------------ buttresses
+	// ------------------------------------------------------------------ cornice and buttresses
+
+	/** Cells of arc of a bay of the cornice: 2 of buttress, then a run of corbel and cap in one material. */
+	private static final int BAY = 8;
+
+	/** A cell at the foot of a high wall (wall A: the verge of the apron; wall B: the last bed cell, against the gallery's plinth). */
+	private record Foot(int x, int z, Direction toWall, int floor, int top, long u) {
+	}
 
 	/**
-	 * A pilaster every {@code s(5)} cells of arc on the foot of each wall: a pier of polished blackstone bricks capped
-	 * by a stair against the wall, one block under the coping. Not within 2 cells of a stair, so the foot stays free.
-	 * Runs on the finished flat plan (the beds and the paving are already there).
+	 * design/citadel-terraces4: the cornice and the buttresses of the walls of the tiers, on the finished flat plan (the beds and the
+	 * paving are already there).
+	 *
+	 * <p>Along the foot of each wall (the verge of wall A, the last bed cell against wall B) the wall is crowned by a cornice that
+	 * overhangs the foot by one block: inverted stairs (the corbel, the high side against the wall) one block under a cap at the
+	 * level of the walk above. The cap is one material for each bay of {@link #BAY} cells (calcite, stone bricks, polished andesite,
+	 * tuff bricks, mossy bricks), so the top is not a continuous white line. Two cells of each bay are a buttress instead, one cell
+	 * deep, the whole height of the wall, capped in quartz: it stands on the verge, never on the walk. Nothing walks under the
+	 * cornice (the foot is planted) and the walk above is not narrower.
 	 */
 	static void buttresses(CitadelCanvas c) {
 		Profile p = profile();
 		if (p == null) {
 			return;
 		}
-		int every = Math.max(4, c.s(5));
-		double clear = c.g.avenueHalf + 2.0;
+		double clear = c.g.avenueHalf + 1.0;
+		double clearPier = c.g.avenueHalf + 3.0;
+		List<Foot> feet = new ArrayList<>();
 		for (long key : c.zones.keySet()) {
 			if (c.zones.get(key).kind() != Kind.TERRACE) {
 				continue;
@@ -343,49 +430,63 @@ public final class CitadelPodium {
 			int x = CitadelCanvas.colX(key);
 			int z = CitadelCanvas.colZ(key);
 			double r = RingCampusGeometry.r(x, z);
-			if (RingCampusGeometry.radialDistance(x, z, 8) <= clear
-					|| Math.floorMod(Math.round(RingCampusGeometry.theta(x, z) * r), every) != 0) {
+			if (RingCampusGeometry.radialDistance(x, z, 8) <= clear) {
 				continue;
 			}
-			int here = terraceTop(p, terraceD(x, z, r));
+			int d = terraceD(x, z, r);
+			int here = terraceTop(p, d);
+			Direction toWall = null;
+			int wallTop = 0;
 			for (Direction dir : DIRS) {
-				int hn = top(c, p, x + dir.getStepX(), z + dir.getStepZ());
-				if (hn < here + 2) {
-					continue;
+				int nx = x + dir.getStepX();
+				int nz = z + dir.getStepZ();
+				Kind k = c.zoneAt(nx, nz).kind();
+				int t = k == Kind.TERRACE || k == Kind.GALLERY ? top(c, p, nx, nz) : 0;
+				boolean wallB = k == Kind.GALLERY && here == p.h1();
+				boolean wallA = k == Kind.TERRACE && here == 0 && d == p.fa();
+				if ((wallA || wallB) && t >= here + 2) {
+					toWall = dir;
+					wallTop = t;
+					break;
 				}
-				// design/citadel-terraces3: only in the middle of a run of the wall (a cell each side and two cells along), so no
-				// pilaster stands alone at the end of a wall or beside a stair, and two cells wide
-				int tx = dir.getStepZ() != 0 ? 1 : 0;
-				int tz = dir.getStepX() != 0 ? 1 : 0;
-				if (against(c, p, x - tx, z - tz, dir, here, hn, clear) && against(c, p, x + tx, z + tz, dir, here, hn, clear)
-						&& against(c, p, x + 2 * tx, z + 2 * tz, dir, here, hn, clear)) {
-					pier(c, x, z, here, hn, dir);
-					pier(c, x + tx, z + tz, here, hn, dir);
+			}
+			if (toWall == null) {
+				// the corner cell of a wall that turns: touches the wall only by a corner, between two foot cells
+				for (int dx = -1; dx <= 1 && toWall == null; dx += 2) {
+					for (int dz = -1; dz <= 1 && toWall == null; dz += 2) {
+						Kind k = c.zoneAt(x + dx, z + dz).kind();
+						if (k != Kind.TERRACE && k != Kind.GALLERY) {
+							continue;
+						}
+						int t = top(c, p, x + dx, z + dz);
+						boolean wallB = k == Kind.GALLERY && here == p.h1();
+						boolean wallA = k == Kind.TERRACE && here == 0 && d == p.fa();
+						if ((wallA || wallB) && t >= here + 2 && top(c, p, x + dx, z) < here + 2 && top(c, p, x, z + dz) < here + 2
+								&& c.zoneAt(x + dx, z).kind() != Kind.RAMP && c.zoneAt(x, z + dz).kind() != Kind.RAMP) {
+							toWall = dx > 0 ? Direction.EAST : Direction.WEST;
+							wallTop = t;
+						}
+					}
 				}
-				break;
+			}
+			if (toWall != null && wallTop - here == 3) {
+				feet.add(new Foot(x, z, toWall, here, wallTop, Math.round(RingCampusGeometry.theta(x, z) * r)));
 			}
 		}
-	}
-
-	/** True when the cell stands at the foot of the same wall (same two levels), on a terrace and clear of the stairs. */
-	private static boolean against(CitadelCanvas c, Profile p, int x, int z, Direction dir, int here, int hn, double clear) {
-		return c.zoneAt(x, z).kind() == Kind.TERRACE && top(c, p, x, z) == here && top(c, p, x + dir.getStepX(), z + dir.getStepZ()) == hn
-				&& RingCampusGeometry.radialDistance(x, z, 8) > clear;
-	}
-
-	/**
-	 * The pier at the foot of a wall of top {@code wallTop}, standing on a surface at {@code floor}, against the wall to
-	 * {@code towards}: it rises the whole height of the wall and ends in a quartz stair that meets the coping, so it reads as
-	 * a buttress of the wall and not as a stump under it.
-	 */
-	private static void pier(CitadelCanvas c, int x, int z, int floor, int wallTop, Direction towards) {
-		int capY = wallTop;
-		for (int y = floor + 1; y < capY; y++) {
-			c.set(x, y, z, PIER);
-		}
-		c.set(x, capY, z, stairs(Blocks.SMOOTH_QUARTZ_STAIRS, towards));
-		for (int y = capY + 1; y <= capY + 3; y++) {
-			c.set(x, y, z, CitadelCanvas.AIR);
+		for (Foot f : feet) {
+			long bay = Math.floorDiv(f.u(), BAY);
+			int k = (int) Math.floorMod(f.u(), (long) BAY);
+			boolean pier = k < 2 && RingCampusGeometry.radialDistance(f.x(), f.z(), 8) > clearPier;
+			if (pier) {
+				// the buttress: one cell deep, the height of the wall, a quartz cap level with the walk
+				for (int y = f.floor() + 1; y < f.top(); y++) {
+					c.set(f.x(), y, f.z(), PIER);
+				}
+				c.set(f.x(), f.top(), f.z(), b(Blocks.SMOOTH_QUARTZ));
+			} else {
+				c.set(f.x(), f.top() - 1, f.z(), stairs(corbelStairs(bay, f.top()), f.toWall()).setValue(StairBlock.HALF, Half.TOP));
+				c.set(f.x(), f.top(), f.z(), capBlock(bay, f.top()));
+			}
 		}
 	}
 
