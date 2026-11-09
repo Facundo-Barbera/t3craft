@@ -107,8 +107,8 @@ public final class TreeCherryWeeping implements Variant {
 		for (int dy = 0; dy <= 1; dy++) {
 			for (int v = bv; v <= bv + 1; v++) {
 				for (int u = bu; u <= bu + 1; u++) {
-					if (dy == 1 && (u != lu0 || v != lv0) && t.hash(u, 1, v, 3) == 0) {
-						continue; // one corner of the flare is missing at y = 1: not a block
+					if (dy == 1 && (u != lu0 || v != lv0)) {
+						continue; // the flare is one layer: a 2×2 foot under a 1×1 trunk, not a black cube
 					}
 					t.wood(u, dy, v, TreeKit.CHERRY.bark()); // bark all round: a pale log end at the flare reads as a lit block
 				}
@@ -262,8 +262,7 @@ public final class TreeCherryWeeping implements Variant {
 				if (f < 0) {
 					continue; // the centre stays open
 				}
-				boolean limbCol = t.kind(u, sheet[u][v] - 1, v) == TreeKit.WOOD;
-				if (!limbCol && Math.floorMod(u + 2 * v, 3) != par) {
+				if (Math.floorMod(u + 2 * v, 3) != par) {
 					continue; // a lattice of one cell in three: fine hair, never two strands side by side
 				}
 				int y0c = -1;
