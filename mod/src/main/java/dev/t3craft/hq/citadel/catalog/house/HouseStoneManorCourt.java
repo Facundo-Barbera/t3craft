@@ -106,7 +106,7 @@ public final class HouseStoneManorCourt implements Variant {
 
 	private static final Scheme[] SCHEMES = {
 			new Scheme(Blocks.DEEPSLATE_TILE_STAIRS, Blocks.DEEPSLATE_BRICK_STAIRS, Blocks.DEEPSLATE_TILES, Blocks.DEEPSLATE_TILE_SLAB),
-			new Scheme(Blocks.CUT_COPPER_STAIRS.waxed().oxidized(), Blocks.CUT_COPPER_STAIRS.waxed().oxidized(),
+			new Scheme(Blocks.CUT_COPPER_STAIRS.waxed().oxidized(), Blocks.CUT_COPPER_STAIRS.waxed().weathered(),
 					Blocks.CUT_COPPER.waxed().oxidized(), Blocks.CUT_COPPER_SLAB.waxed().oxidized()),
 			new Scheme(Blocks.BRICK_STAIRS, Blocks.BRICK_STAIRS, Blocks.BRICKS, Blocks.BRICK_SLAB),
 	};
@@ -900,7 +900,7 @@ public final class HouseStoneManorCourt implements Variant {
 						w.set(u, y, v, b(sch.solid()));
 						w.set(u, y + 1, v, slab(sch.slab()));
 					} else {
-						Block blk = l == 0 ? Blocks.STONE_BRICK_STAIRS : p.hash(u, y, v, 7) == 0 ? sch.alt() : sch.stair();
+						Block blk = l == 0 ? Blocks.STONE_BRICK_STAIRS : p.hash(u, y, v, 6) == 0 ? sch.alt() : sch.stair();
 						w.set(u, y, v, stairs(blk, high));
 					}
 				}
@@ -1251,7 +1251,9 @@ public final class HouseStoneManorCourt implements Variant {
 						if ((du == 0 && dv == 0 && y <= 6) || (y != 7 && corner)) {
 							continue;
 						}
-						if (p.hash(tu + du, y, tv + dv, 6) == 0 || lvl(tu + du, tv + dv) >= 0) {
+						// holes only in the outer ring of the low layers: a gap in a column would leave a 2-high pocket to stand in
+						boolean ring = Math.abs(du) == 2 || Math.abs(dv) == 2;
+						if ((ring && y <= 6 && p.hash(tu + du, y, tv + dv, 6) == 0) || lvl(tu + du, tv + dv) >= 0) {
 							continue;
 						}
 						placeFree(tu + du, y, tv + dv, leaves(Blocks.CHERRY_LEAVES));
