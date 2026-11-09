@@ -134,6 +134,9 @@ final class CatalogViews {
 				.append(cells.size()).append(" build(s), fronts ").append(dirs).append('\n');
 		rep.append(String.format(Locale.ROOT, "%-44s %6s %8s %8s  %s%n", "build", "blocks", "clipped", "outside", "notes"));
 		int problems = 0;
+		// walkability audit (docs/tools/citadel-catalog.md): on by default for the gallery's report, -Dt3craft.walkAudit=false skips it
+		boolean walkAudit = !"false".equalsIgnoreCase(System.getProperty("t3craft.walkAudit"));
+		StringBuilder walkFlags = new StringBuilder();
 		for (Cell c : cells) {
 			Plot p = c.plot();
 			int x1 = p.x0();
@@ -176,6 +179,19 @@ final class CatalogViews {
 				problems++;
 			}
 			rep.append(String.format(Locale.ROOT, "%-44s %6d %8d %8d  %s%n", c.label(), blocks, p.clipped(), outside, note));
+			if (walkAudit) {
+				try {
+					List<String> w = WalkAudit.run(p, canvas, gap);
+					for (String line : w) {
+						rep.append("    walk: ").append(line).append('\n');
+						if (line.startsWith("FLAG")) {
+							walkFlags.append(String.format(Locale.ROOT, "%-44s %s%n", c.label(), line));
+						}
+					}
+				} catch (RuntimeException e) {
+					rep.append("    walk: audit failed: ").append(e).append('\n');
+				}
+			}
 			if (c == firstOf(cells, c.v())) {
 				rep.append("    palette: ");
 				byBlock.entrySet().stream().sorted((a, b) -> b.getValue() - a.getValue()).limit(14)
@@ -185,6 +201,10 @@ final class CatalogViews {
 		}
 		rep.append(problems == 0 ? "OK: every build stayed inside its plot.\n"
 				: "WARNING: " + problems + " build(s) clipped, wrote outside the plot or failed (clipped = writes dropped by Plot; outside = blocks set on the canvas directly, outside the box).\n");
+
+		if (walkFlags.length() > 0) {
+			rep.append("WALK FLAGS (builds with something to look at):\n").append(walkFlags);
+		}
 
 		// ---- views
 		Renderer.Clip all = new Renderer.Clip(scene.minX, -1, scene.minZ, scene.minX + scene.sx - 1, maxH + 1, scene.minZ + scene.sz - 1);
