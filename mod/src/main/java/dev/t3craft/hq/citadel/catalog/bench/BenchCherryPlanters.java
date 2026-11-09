@@ -104,7 +104,12 @@ public final class BenchCherryPlanters implements Variant {
 		int lanternCol;
 		int s0;
 		int s1;
-		if (w >= 4) {
+		if (w == 2) {
+			// two seats and no pillar: a bench for two. With depth, one cell of the planter strip carries a lantern
+			s0 = 0;
+			s1 = 1;
+			lanternCol = -1;
+		} else if (w >= 4) {
 			pillar[0] = true;
 			pillar[w - 1] = true;
 			s0 = 1;
@@ -156,6 +161,9 @@ public final class BenchCherryPlanters implements Variant {
 				}
 			}
 		}
+		if (w == 2 && d >= 2 && h >= 3) {
+			set(c, p, p.hash(3, 3, 3, 2), 2, 1, LANTERN); // a lantern on the soil behind one seat
+		}
 		// --- flower beds behind
 		for (int v = 2; v < d; v++) {
 			for (int u = 0; u < w; u++) {
@@ -175,9 +183,6 @@ public final class BenchCherryPlanters implements Variant {
 			for (int u = 0; u < w; u++) {
 				for (int v = 0; v < pd; v++) {
 					set(c, p, u, 5, v, slab(Blocks.CHERRY_SLAB));
-					if (h >= 7 && v == pd - 1 && p.hash(u, 5, v, 4) == 0) {
-						set(c, p, u, 6, v, leaves(Blocks.CHERRY_LEAVES));
-					}
 				}
 			}
 			softUnder(c, p, 0, 0, w - 1, pd - 1);
@@ -232,7 +237,7 @@ public final class BenchCherryPlanters implements Variant {
 		} else {
 			uNook(c, p, o, nw, nd);
 		}
-		if (h >= 6 && p.hash(5, 5, 5, 2) == 1) {
+		if (h >= 6) {
 			pergola(c, p, o, 0, o + nw - 1, nd - 1);
 		}
 	}
@@ -243,20 +248,23 @@ public final class BenchCherryPlanters implements Variant {
 				if (v == 0) {
 					lanternPost(c, p, o + x, v);
 				} else {
-					bed(c, p, o + x, v, true);
+					arm(c, p, o + x, v);
 				}
 			}
-			if (v < nd - 1) { // benches face each other; their backs are the strips
+			if (v < nd - 1) { // benches face each other; their backs are the arms plus a trapdoor
 				seat(c, p, o + 1, v, Direction.WEST);
+				set(c, p, o + 1, 1, v, backrest(Direction.WEST));
 				seat(c, p, o + nw - 2, v, Direction.EAST);
+				set(c, p, o + nw - 2, 1, v, backrest(Direction.EAST));
 			}
 		}
 		for (int x = 1; x < nw - 1; x++) {
 			bed(c, p, o + x, nd - 1, true);
 		}
 		int zw = nw - 4;
-		int tw = zw <= 3 ? zw : zw - 2;
-		table(c, p, o + 2 + (zw - tw) / 2, 1, tw, nd - 2);
+		int tw = Math.min(zw, 2);
+		int td = Math.min(nd - 2, 3);
+		table(c, p, o + 2 + (zw - tw) / 2, 1 + (nd - 2 - td) / 2, tw, td);
 	}
 
 	private static void lNook(CitadelCanvas c, Plot p, int o, int nw, int nd) {
@@ -267,15 +275,17 @@ public final class BenchCherryPlanters implements Variant {
 			if (v == 0) {
 				lanternPost(c, p, o, v);
 			} else {
-				bed(c, p, o, v, true);
+				arm(c, p, o, v);
 			}
 		}
 		for (int x = 2; x < nw - 1; x++) {
 			seat(c, p, o + x, nd - 2, Direction.SOUTH); // along the back, facing out
+			set(c, p, o + x, 1, nd - 2, backrest(Direction.SOUTH));
 		}
 		bed(c, p, o + nw - 1, nd - 2, true); // the arm at the open end
 		for (int v = 0; v <= nd - 3; v++) {
 			seat(c, p, o + 1, v, Direction.WEST); // along the left
+			set(c, p, o + 1, 1, v, backrest(Direction.WEST));
 		}
 		// the elbow is a corner table with a light
 		set(c, p, o + 1, 0, nd - 2, b(Blocks.CHISELED_DEEPSLATE));
@@ -291,7 +301,7 @@ public final class BenchCherryPlanters implements Variant {
 				if (leg) {
 					set(c, p, u, 0, v, WALL);
 				}
-				set(c, p, u, 1, v, slab(Blocks.SMOOTH_QUARTZ_SLAB));
+				set(c, p, u, 1, v, slab(Blocks.BAMBOO_MOSAIC_SLAB));
 			}
 		}
 		if (tw * td >= 4 || tw * td == 2) {
@@ -319,14 +329,37 @@ public final class BenchCherryPlanters implements Variant {
 		int vc = (v0 + v1) / 2;
 		set(c, p, uc, 5, vc, slab(Blocks.CHERRY_SLAB));
 		p.put(c, uc, 4, vc, LANTERN.setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
-		if (p.h() >= 7) {
-			int bu = p.hash(1, 6, 1, 2) == 0 ? u0 + 1 : u1 - 1;
-			set(c, p, bu, 6, v1, leaves(Blocks.CHERRY_LEAVES));
-			set(c, p, bu, 6, v1 - 1, leaves(Blocks.FLOWERING_AZALEA_LEAVES));
-		}
+		braces(c, p, u0, v0, u1, v1);
 	}
 
 	// ------------------------------------------------------------------ parts
+
+	/** Upside-down cherry stairs hugging each post under the beam (the post-and-beam joint): depth on the roof. */
+	private static void braces(CitadelCanvas c, Plot p, int u0, int v0, int u1, int v1) {
+		for (int v : new int[] {v0, v1}) {
+			set(c, p, u0 + 1, 4, v, stairs(Blocks.CHERRY_STAIRS, Direction.WEST).setValue(BlockStateProperties.HALF, Half.TOP));
+			set(c, p, u1 - 1, 4, v, stairs(Blocks.CHERRY_STAIRS, Direction.EAST).setValue(BlockStateProperties.HALF, Half.TOP));
+		}
+	}
+
+	/** An armrest: deepslate box, a cherry slab on top, a potted flower on every other one. */
+	private static void arm(CitadelCanvas c, Plot p, int u, int v) {
+		set(c, p, u, 0, v, box(p, u, 0, v));
+		set(c, p, u, 1, v, slab(Blocks.CHERRY_SLAB));
+		if (p.hash(u, 2, v, 2) == 0) {
+			set(c, p, u, 2, v, switch (p.hash(u, 3, v, 4)) {
+				case 0 -> b(Blocks.POTTED_FLOWERING_AZALEA);
+				case 1 -> b(Blocks.POTTED_ALLIUM);
+				case 2 -> b(Blocks.POTTED_RED_TULIP);
+				default -> b(Blocks.POTTED_AZALEA);
+			});
+		}
+	}
+
+	/** A trapdoor backrest standing at the {@code back} edge of a seat cell. */
+	private static BlockState backrest(Direction back) {
+		return BACK.setValue(BlockStateProperties.HORIZONTAL_FACING, back.getOpposite());
+	}
 
 	/**
 	 * Under a roof an azalea would be a place to stand (it has a collision box) with only two blocks of headroom, so
@@ -370,25 +403,29 @@ public final class BenchCherryPlanters implements Variant {
 	}
 
 	private static BlockState plant(Plot p, int u, int y, int v) {
-		int k = p.hash(u, y, v, 6);
+		int k = p.hash(u, y, v, 8);
 		return switch (p.hash(8, 8, 8, 3)) {
 			case 0 -> switch (k) { // blossom
-				case 2, 3 -> b(Blocks.AZALEA);
-				case 4 -> b(Blocks.PINK_PETALS).setValue(BlockStateProperties.FLOWER_AMOUNT, 1 + p.hash(u, y, v, 4))
+				case 0, 1 -> b(Blocks.PINK_TULIP);
+				case 2, 3 -> b(Blocks.PINK_PETALS).setValue(BlockStateProperties.FLOWER_AMOUNT, 1 + p.hash(u, y, v, 4))
 						.setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH);
-				default -> b(Blocks.FLOWERING_AZALEA);
+				case 4 -> b(Blocks.FLOWERING_AZALEA);
+				case 5 -> b(Blocks.ALLIUM);
+				default -> b(Blocks.RED_TULIP);
 			};
 			case 1 -> switch (k) { // wildflowers
-				case 0 -> b(Blocks.ALLIUM);
-				case 1 -> b(Blocks.CORNFLOWER);
-				case 2 -> b(Blocks.AZURE_BLUET);
-				case 3 -> b(Blocks.OXEYE_DAISY);
-				case 4 -> b(Blocks.RED_TULIP);
-				default -> b(Blocks.PINK_TULIP);
+				case 0, 1 -> b(Blocks.ALLIUM);
+				case 2, 3 -> b(Blocks.CORNFLOWER);
+				case 4 -> b(Blocks.AZURE_BLUET);
+				case 5 -> b(Blocks.OXEYE_DAISY);
+				case 6 -> b(Blocks.AZALEA);
+				default -> b(Blocks.RED_TULIP);
 			};
-			default -> switch (k) { // greens
-				case 2 -> b(Blocks.AZALEA);
-				case 3, 4 -> b(Blocks.LILY_OF_THE_VALLEY);
+			default -> switch (k) { // white and green
+				case 0, 1, 2 -> b(Blocks.LILY_OF_THE_VALLEY);
+				case 3, 4 -> b(Blocks.AZURE_BLUET);
+				case 5 -> b(Blocks.OXEYE_DAISY);
+				case 6 -> b(Blocks.AZALEA);
 				default -> b(Blocks.FLOWERING_AZALEA);
 			};
 		};
