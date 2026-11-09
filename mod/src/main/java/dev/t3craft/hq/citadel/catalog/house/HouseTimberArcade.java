@@ -252,6 +252,7 @@ public final class HouseTimberArcade implements Variant {
 			walls();
 			plates();
 			gableEnds();
+			rakePosts();
 			roofs();
 			loggia();
 			arcade();
@@ -493,6 +494,20 @@ public final class HouseTimberArcade implements Variant {
 			}
 		}
 
+		/** The side posts rise to the rake of the roof overhang, so their tops are not a ledge under it. */
+		void rakePosts() {
+			for (int v = 1; v <= vb; v++) {
+				boolean post = v == 1 || v == 5 || v == vb || ((v - 1) % 4 == 0 && vb - v >= 2);
+				if (!post) {
+					continue;
+				}
+				for (int y = PLATE; y <= ridgeY(v) - 2; y++) {
+					set(0, y, v, dark());
+					set(w - 1, y, v, dark());
+				}
+			}
+		}
+
 		// ------------------------------------------------------------------ roof
 
 		void roofs() {
@@ -533,16 +548,19 @@ public final class HouseTimberArcade implements Variant {
 					}
 					set(u, FL, v, b(Blocks.CHERRY_PLANKS)); // the deck
 				}
+				set(u, PLATE, 1, CitadelCanvas.AIR); // no plate beam in the open front of the balcony
 			}
 			// side walls and the back wall of the balcony
 			for (int v = 1; v <= 4; v++) {
-				for (int y = y1; y <= y2; y++) {
+				int top = Math.max(CB, ridgeY(v)) - 1;
+				for (int y = y1; y <= top; y++) {
 					set(pa, y, v, v == 4 ? dark() : plaster(pa, y, v));
 					set(pb, y, v, v == 4 ? dark() : plaster(pb, y, v));
 				}
 			}
 			for (int u = pa + 1; u <= pb - 1; u++) {
-				for (int y = y1; y <= y2; y++) {
+				int top = Math.max(CB + Math.min(u - pa, pb - u), ridgeY(4)) - 1;
+				for (int y = y1; y <= top; y++) {
 					set(u, y, 4, plaster(u, y, 4));
 				}
 				set(u, y1, 0, fence(Blocks.CHERRY_FENCE, false, true, false, true));
@@ -637,18 +655,13 @@ public final class HouseTimberArcade implements Variant {
 			}
 		}
 
-		/** [depth] A dark ledge (with the odd pot) under the upper windows, and a soffit under the eave. */
+		/** [depth] A dark soffit under the eave: a row of upside-down stairs over the upper windows. */
 		void ledge() {
 			for (int u = 1; u <= w - 2; u++) {
 				if (isPier(u) || (u >= pa && u <= pb)) {
 					continue;
 				}
-				set(u, FL + 1, 0, slab(Blocks.DARK_OAK_SLAB, false));
 				set(u, PLATE - 1, 0, stair(Blocks.DARK_OAK_STAIRS, Direction.SOUTH, true));
-				if (p.hash(u, FL + 2, 0, 4) == 0) {
-					BlockState pot = p.hash(u, FL + 2, 1, 2) == 0 ? Blocks.POTTED_FLOWERING_AZALEA.defaultBlockState() : Blocks.POTTED_CHERRY_SAPLING.defaultBlockState();
-					item(u, FL + 2, 0, pot);
-				}
 			}
 		}
 
@@ -666,11 +679,9 @@ public final class HouseTimberArcade implements Variant {
 					if (k % 2 == 0 && k != eb) {
 						// a stall: counter with goods on it
 						set(x, 1, 4, b(Blocks.DARK_OAK_PLANKS));
-						BlockState goods = switch (p.hash(x, 2, 4, 5)) {
-							case 0 -> b(Blocks.MELON);
-							case 1 -> b(Blocks.PUMPKIN);
-							case 2 -> b(Blocks.HAY_BLOCK);
-							case 3 -> lantern(false);
+						BlockState goods = switch (p.hash(x, 2, 4, 6)) {
+							case 0 -> Blocks.POTTED_FLOWERING_AZALEA.defaultBlockState();
+							case 1 -> Blocks.POTTED_FERN.defaultBlockState();
 							default -> null;
 						};
 						if (goods != null) {
@@ -684,9 +695,6 @@ public final class HouseTimberArcade implements Variant {
 							default -> barrel();
 						};
 						set(x, 1, 4, st);
-						if (p.hash(x, 2, 4, 3) == 0 && st.is(Blocks.BARREL)) {
-							set(x, 2, 4, barrel());
-						}
 					}
 				}
 			}
@@ -753,20 +761,19 @@ public final class HouseTimberArcade implements Variant {
 			for (int v = vs; v <= vL; v++) {
 				boolean doorway = v == vd || v == vd + 1;
 				boolean postRow = v == vs || v == vL || v == vd - 1 || v == vd + 2;
-				for (int y = FL + 1; y <= PLATE - 1; y++) {
+				for (int y = FL + 1; y < ridgeY(v); y++) { // up to the roof, so nothing can be stood on top
 					BlockState s;
 					if (doorway && y <= FL + 3) {
 						s = CitadelCanvas.AIR;
 					} else if (doorway && y == FL + 4) {
 						s = log(Blocks.DARK_OAK_LOG, Direction.Axis.Z);
-					} else if (postRow) {
-						s = dark();
+					} else if (postRow || y == PLATE) {
+						s = y == PLATE ? log(Blocks.DARK_OAK_LOG, Direction.Axis.Z) : dark();
 					} else {
 						s = plaster(u, y, v);
 					}
 					set(u, y, v, s);
 				}
-				set(u, PLATE, v, log(Blocks.DARK_OAK_LOG, Direction.Axis.Z));
 			}
 		}
 
@@ -843,8 +850,9 @@ public final class HouseTimberArcade implements Variant {
 				if (Math.abs(u - bd) <= 1) {
 					continue;
 				}
-				set(u, 1, vL, b(Blocks.BOOKSHELF));
-				set(u, 2, vL, p.hash(u, 2, 0, 3) == 0 ? face(Blocks.CHISELED_BOOKSHELF, Direction.NORTH) : b(Blocks.BOOKSHELF));
+				for (int y = 1; y <= FL - 1; y++) { // floor to ceiling: no ledge on top
+					set(u, y, vL, y % 2 == 0 && p.hash(u, y, 0, 3) == 0 ? face(Blocks.CHISELED_BOOKSHELF, Direction.NORTH) : b(Blocks.BOOKSHELF));
+				}
 			}
 			int cv = vL - 2;
 			for (int u = s0 + 1; u <= s1 - 1; u++) {
@@ -904,9 +912,6 @@ public final class HouseTimberArcade implements Variant {
 					item(fc, 1, v, face(Blocks.CHEST, in));
 				} else {
 					item(fc, 1, v, barrel());
-					if (p.hash(fc, 2, v, 2) == 0) {
-						item(fc, 2, v, barrel());
-					}
 				}
 			}
 			for (int u = a0; u <= a1; u++) {
@@ -914,9 +919,6 @@ public final class HouseTimberArcade implements Variant {
 					continue;
 				}
 				item(u, 1, vL, p.hash(u, 1, vL, 2) == 0 ? barrel() : face(Blocks.CHEST, Direction.NORTH));
-				if (p.hash(u, 2, vL, 2) == 0) {
-					item(u, 2, vL, barrel());
-				}
 			}
 			p.put(c, (a0 + a1) / 2, 5, VF + 3, lantern(true), CitadelCanvas.HANGING);
 		}
@@ -1004,8 +1006,9 @@ public final class HouseTimberArcade implements Variant {
 		void study(int s0c, int s1c) {
 			int y = FL + 1;
 			for (int u = s0c; u <= s1c; u++) {
-				item(u, y, vL, b(Blocks.BOOKSHELF));
-				item(u, y + 1, vL, p.hash(u, y + 1, vL, 3) == 0 ? face(Blocks.CHISELED_BOOKSHELF, Direction.NORTH) : b(Blocks.BOOKSHELF));
+				for (int yy = y; yy < ridgeY(vL); yy++) { // up to the roof: no ledge on top
+					item(u, yy, vL, (yy - y) % 2 == 1 && p.hash(u, yy, vL, 3) == 0 ? face(Blocks.CHISELED_BOOKSHELF, Direction.NORTH) : b(Blocks.BOOKSHELF));
+				}
 			}
 			int mx = (s0c + s1c) / 2;
 			for (int u = mx - 1; u <= mx + 1; u++) {
