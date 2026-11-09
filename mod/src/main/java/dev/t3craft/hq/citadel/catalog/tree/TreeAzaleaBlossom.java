@@ -225,7 +225,7 @@ public final class TreeAzaleaBlossom implements Variant {
 		double sx = Math.cos(sa);
 		double sz = Math.sin(sa);
 		double fb = 0.48 + 0.2 * r.nextDouble();
-		int nHoles = rc < 2.6 ? 0 : rc < 3.5 ? 1 : 2 + Math.min(4, (int) (rc / 2.0));
+		int nHoles = rc < 2.6 ? 0 : rc < 3.5 ? 1 : 3 + (int) (rc * 0.6);
 		double[][] holes = new double[nHoles][4];
 		for (int i = 0; i < nHoles; i++) {
 			double ang = r.nextDouble() * Math.PI * 2;
@@ -234,7 +234,7 @@ public final class TreeAzaleaBlossom implements Variant {
 			holes[i][0] = cuM + Math.cos(ang) * horiz * rxM * 0.9;
 			holes[i][1] = cyM + el * ryM * 0.9;
 			holes[i][2] = cvM + Math.sin(ang) * horiz * rzM * 0.9;
-			holes[i][3] = rc < 3.5 ? 0.8 : 1.0 + r.nextDouble() * Math.min(1.8, rc * 0.22);
+			holes[i][3] = rc < 3.5 ? 0.8 : 1.0 + r.nextDouble() * Math.min(2.4, rc * 0.3);
 		}
 		for (int y = CLEAR; y < p.h(); y++) {
 			for (int vv = 0; vv < d; vv++) {
@@ -251,7 +251,7 @@ public final class TreeAzaleaBlossom implements Variant {
 					if (dist > 1.0 + jit) {
 						continue;
 					}
-					if (dist > 0.78 && t.hash(uu + 3, y + 5, vv + 7, 100) < 22) {
+					if (dist > 0.74 && t.hash(uu + 3, y + 5, vv + 7, 100) < 28) {
 						continue; // an eroded rim
 					}
 					if (y <= CLEAR + 1 && dist > 0.55 && t.hash(uu + 9, y, vv + 1, 100) < 25) {
@@ -271,7 +271,7 @@ public final class TreeAzaleaBlossom implements Variant {
 						continue;
 					}
 					double sun = ((uu - cuM) * sx + (vv - cvM) * sz) / rc;
-					double pf = TreeKit.clamp(fb + 0.3 * sun + 0.04 * (y - cyM), 0.12, 0.85);
+					double pf = TreeKit.clamp(fb + 0.45 * sun + 0.04 * (y - cyM), 0.1, 0.92);
 					double fine = t.hash(uu, y + 17, vv, 100) / 100.0;
 					double coarse = t.hash(Math.floorDiv(uu, 2) + 7, Math.floorDiv(y, 2), Math.floorDiv(vv, 2) - 3, 100) / 100.0;
 					boolean flower = (t.hash(uu + 1, y + 2, vv + 3, 100) < 28 ? fine : coarse) < pf;
