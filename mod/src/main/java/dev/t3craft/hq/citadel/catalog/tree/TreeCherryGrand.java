@@ -101,9 +101,9 @@ public final class TreeCherryGrand implements Variant {
 		double cv = lead[1][cy];
 		int lobes = 3 + r.nextInt(3); // 3, 4 or 5 lobes on the rim
 		double phi = r.nextDouble() * Math.PI * 2;
-		double lobeAmp = mn < 9 ? 0.10 + r.nextDouble() * 0.04 : 0.17 + r.nextDouble() * 0.08;
+		double lobeAmp = 0.18 + r.nextDouble() * 0.06;
 		double rRoom = Math.min(Math.min(cu - wu0, wu1 - cu), Math.min(cv - wv0, wv1 - cv)) + 0.9;
-		double rWant = Math.min(mn * 0.5 - (mn < 9 ? 0.9 : 0.6), 7.2);
+		double rWant = Math.min(mn * 0.5 - (mn < 9 ? 0.6 : 0.6), 7.2);
 		double rBase = Math.min(rWant, rRoom / (1 + lobeAmp + 0.04));
 		rBase = Math.max(rBase, Math.min(rWant, mn * 0.5 - 0.5));
 		double ryDown = 1.9;
@@ -138,7 +138,7 @@ public final class TreeCherryGrand implements Variant {
 						continue;
 					}
 					double sq = Math.sqrt(Math.min(q, 1.0));
-					if (y < CLEAR + (int) Math.round(2.0 * sq) || y > cy + nUp - (int) Math.round(1.3 * sq)) {
+					if (y < CLEAR + (int) Math.round(2.0 * sq) || y > cy + nUp - (int) Math.round(1.0 * sq)) {
 						continue; // a lens: thick over the trunk, a rim one layer thick, no vertical wall, no step on the top
 					}
 					if (q > 0.7 * rem && t.hash(u + 5, y + 11, v, 12) < 3) {
@@ -181,9 +181,19 @@ public final class TreeCherryGrand implements Variant {
 
 		// ---- side limbs: 2–3 come out of the flank of the dome by at least two cells, ending in a tuft of blossom
 		int side = 2 + (r.nextInt(3) == 0 ? 1 : 0);
-		int d0 = r.nextInt(4);
-		for (int i = 0; i < side; i++) { // along the diagonals: that is where the plot has the most room beyond the crown
-			double ang = Math.PI / 4 + ((d0 + i * (side == 2 ? 2 : 1)) % 4) * Math.PI / 2 + (r.nextDouble() - 0.5) * 0.3;
+		// the valleys between the rim lobes are where the crown is shortest: the limbs leave through the roomiest ones
+		int nv = lobes;
+		double[] vAng = new double[nv];
+		double[] vRoom = new double[nv];
+		Integer[] order = new Integer[nv];
+		for (int i = 0; i < nv; i++) {
+			vAng[i] = phi + (Math.PI + i * Math.PI * 2) / lobes;
+			vRoom[i] = room(lead[0][CLEAR], lead[1][CLEAR], Math.cos(vAng[i]), Math.sin(vAng[i]), wu0, wu1, wv0, wv1);
+			order[i] = i;
+		}
+		java.util.Arrays.sort(order, (x, y) -> Double.compare(vRoom[y], vRoom[x]));
+		for (int i = 0; i < Math.min(side, nv); i++) {
+			double ang = vAng[order[i]];
 			double ex = Math.cos(ang);
 			double ez = Math.sin(ang);
 			int sy = CLEAR;
