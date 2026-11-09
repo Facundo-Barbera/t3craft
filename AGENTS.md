@@ -99,4 +99,12 @@ the PC**, never on the VPS or the Mac mini.
 - **No GitHub Actions or other paid GitHub services** (Facundo, 2026-11-09). Actions is disabled for the repo and
   `.github/` was deleted; never add workflows, Dependabot, code scanning, Pages or anything else that bills minutes
   or storage. Builds run only on the PC.
+- **Backlog in GitHub issues** (Facundo, 2026-11-09): every piece of work has an issue in
+  `Facundo-Barbera/t3craft`.
+  - The child's brief and its branch name cite it (`#N`, e.g. `cleanup/1a-dead-code` for #3).
+  - Each commit message ends with `Refs #N`.
+  - The coordinator's merge into `main` closes it (`Closes #N` in the merge commit).
+  - New ideas or bugs found along the way become new issues, not TODOs.
+- **Code conventions** are in `docs/dev.md` ("Code conventions"). Package moves are recorded in
+  `tools/refactor/moves.tsv`.
 - **Config changes are additive.** Every branch adds a RELOAD or RESTART line to `docs/CHANGELOG-dev.md`.

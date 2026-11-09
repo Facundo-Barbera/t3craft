@@ -1,0 +1,9 @@
+# Class and package moves in mod/ (cleanup plan docs/plans/code-cleanup.md, phase 3 = #5).
+# One move per line, in the order they landed on main; tools/refactor/apply-moves.sh replays them.
+#
+#   <old FQN><TAB><new FQN><TAB><issue / note>
+#
+# - Class:   dev.t3craft.hq.Box<TAB>dev.t3craft.hq.plan.Box              (the simple name may change too)
+# - Package: dev.t3craft.portable.*<TAB>dev.t3craft.survival.*           (every class directly in that package)
+#
+# Never edit or reorder lines that already landed: older branches replay this file from the top.

@@ -1,6 +1,6 @@
 # Code cleanup plan for mod/, bridge/ and protocol/
 
-**Status:** proposal, waiting for Facundo's approval (2026-11-09). Nothing here runs until he approves it.
+**Status:** approved by Facundo on 2026-11-09, decisions in section 7. One GitHub issue per phase (`#N` in section 5). Running.
 
 **Basis:** a read-only survey of `main` at `44d7e167`.
 - `mod/` has 811 Java files, about 192.7k LOC:
@@ -152,17 +152,17 @@ hqrender  dev.t3craft.tools.hqrender  + RenderBlocks (out of dev.t3craft.blocks)
 
 | phase | task (1 child each) | depends on | compilation on the PC |
 |---|---|---|---|
-| **0** | Phase 0 above (coordinator) | Facundo's decisions (section 7) | — |
-| **1** zero risk (parallel) | 1a: remove `CherryKit` and `ThreadActionsBar`, inline `MixedTreeKit`, remove 4 lang keys ×3 | — | 1 per branch |
+| **0** (#2) | Phase 0 above (coordinator) | Facundo's decisions (section 7) | — |
+| **1** zero risk (parallel) (#3) | 1a: remove `CherryKit` and `ThreadActionsBar`, inline `MixedTreeKit`, remove 4 lang keys ×3 | — | 1 per branch |
 | | 1b: tool leftovers (`-Dt3craft.render.palette`, double `check`, `JobRunner` skip of test/gametest, 2 `kit_lantern_*` textures, `VENDORED.md`) | — | 1 |
 | | 1c: yaw wrap ×4 → `Motion.wrapDegrees`, a single `stableHash` | — | 1 |
-| | 1d: FQN strings → class literals (`DevReloadClient`, `PortableLinks`); make `RenderDaemon` and `JobRunner` strings constants | — | 1 |
-| **2** legacy (serial) | 2a: default layout = citadel, and migration of worlds stored with a legacy layout | decision D1 | 1 + plan report |
+| | 1d: FQN strings → class literals (`DevReloadClient`, `PortableLinks`); make `RenderDaemon` and `JobRunner` strings constants; check that `debug`/`client.debug` are off by default (D3) | — | 1 |
+| **2** legacy (serial) (#4) | 2a: default layout = citadel; a config or world with a legacy or unknown layout id falls back to the citadel with a log warning, no crash | D1 | 1 + plan report |
 | | 2b: remove ensanche + hybrid-towncenter (main, hqrender views, params, lang) | 2a | 1 + plan report |
 | | 2c: remove village + hybrid-terraces | 2b | 1 + plan report |
 | | 2d: remove campus, ring (+`Growth`) and vertical | 2c | 1 + plan report |
 | | 2e: `ClassicStyle` (move `inward()` into `CherryStyle` first) | 2d | 1 |
-| **3** packages (serial, move window) | 3a: end the split packages (`RenderBlocks` → `tools.hqrender`, the 2 client `hq` classes → `client.hq`) | 1d | 1 |
+| **3** packages (serial, move window) (#5) | 3a: end the split packages (`RenderBlocks` → `tools.hqrender`, the 2 client `hq` classes → `client.hq`) | 1d | 1 |
 | | 3b: `portable` → `survival` | 3a | 1 |
 | | 3c: `hq` plan core → `hq.plan` (**kernel**) | 3b | 1 |
 | | 3d: `hq` styles → `hq.style` | 3c | 1 |
@@ -170,17 +170,16 @@ hqrender  dev.t3craft.tools.hqrender  + RenderBlocks (out of dev.t3craft.blocks)
 | | 3f: `blocks` → `blocks.status` / `blocks.kit` (**kernel**, together with 3c in a single daemon restart) | 3e | 1 |
 | | 3g: `client.demo` HQ menu → `client.hq.menu` | 3f | 1 |
 | | 3h: single `Box`; rename `build.BuildPlan` and `build.Placement` | 3g | 1 |
-| **4** duplicates (parallel by area) | 4a: citadel block-state kit consolidation | 3 | 1 + identical plan report |
+| **4** duplicates (parallel by area) (#6) | 4a: citadel block-state kit consolidation | 3 | 1 + identical plan report |
 | | 4b: client `clip`/`wrap` → `client.text` | 3 | 1 |
 | | 4c: citadel `hash`/`mix` → `Plot.hash`/`Flora.hash` | 3 | 1 + identical plan report |
 | | 4d (optional, one per child): split `CitadelPlacement` (2402), `CitadelOffice` (1865), `RadialCursor` (1756), `PlanReport` (1655), `ConversationPanel` (1641), `T3Screen` (1551), `RequestCard`, `SiteService` | 4a–4c | 1 + identical plan report for citadel |
-| **5** bridge (decision D2) | 5a: if it is retired, tag `archive/bridge`, remove `bridge/` and `protocol/`, remove `Mode.BRIDGE` + `client.link`, and make the mod warn when it reads `mode: bridge` | D2 | 1 (RESTART) |
-| | 5b: if it stays, freeze it, `protocol/protocol.md` → `bridge/PROTOCOL.md`, fix the drift | D2 | — |
-| **6** docs | README (stale: it still describes the bridge as primary), `docs/api.md`, `THIRD_PARTY_NOTICES.md` paths | 5 | — |
+| **5** bridge (D2: frozen) (#7) | 5a: mark `bridge/` and `protocol/` as legacy and frozen (README and a note at the top of `bridge/` and `protocol.md`), with no code changes. Retiring it is decided when the investigation in #1 (T3 Connect) closes | #1 | — |
+| **6** docs (#8) | README (stale: it still describes the bridge as primary), `docs/api.md`, `THIRD_PARTY_NOTICES.md` paths | 5 | — |
 
 There are about 22–26 child tasks in total.
 - **Compilation:** each one gets a single gradle `build hqrenderClasses uirenderClasses` on the PC, around 20 s warm, one at a time.
-- **Plan report:** phases 2a–2d, 4a, 4c and the citadel splits in 4d also need a before/after plan report (`hqRender` report from `PlanReport`, without images) with an identical signature. That means running `hqRender`, so it needs Facundo's OK (section 7).
+- **Plan report:** phases 2a–2d, 4a, 4c and the citadel splits in 4d also need a before/after plan report (`hqRender` report from `PlanReport`, without images) with an identical signature. Facundo approved it with the D4 scope (section 7).
 - **Kernel:** phases 3c and 3f change the daemon kernel. The daemon is stopped today, and its next start rebuilds the baseline.
 - **Final pass:** a full build plus a smoke test in the game by Facundo, because the RESTART lines are cumulative.
 
@@ -194,10 +193,15 @@ There are about 22–26 child tasks in total.
   - Resume or close the paused rounds **before** phase 3, or else apply `tools/refactor/apply-moves.sh` when resuming them (it is mechanical, done by a child with no compiling).
   - `hq.citadel.catalog.*` keeps its paths.
 
-## 7. Decisions for Facundo
+## 7. Decisions (Facundo, 2026-11-09)
 
-- **D1.** Retire the 7 legacy layouts and `ClassicStyle` (about 17k LOC), and make the citadel the default. If approved: what happens to worlds stored with a legacy layout (rebuild on the citadel, or a notice)? This change is not additive to the config, so it needs his explicit OK.
-- **D2.** The bridge: retire it (move or archive `bridge/` and `protocol/`, remove `Mode.BRIDGE`) or freeze it. Is the bridge service on the homelab still running?
-- **D3.** `debug` and `client.debug` (hot-swap, HitchWatch): stay in the jar, or move to a dev-only source set?
-- **D4.** OK to run `hqRender` in report-only mode on the PC (no images) to validate plans before and after (phases 2, 4a, 4c and 4d).
-- **D5.** Order relative to the design rounds: close the paused rounds before phase 3, or run phase 3 and adapt them afterwards with the script.
+- **D1:** the 7 legacy layouts and `ClassicStyle` are retired and **deleted, with no archive tag** (git history keeps them). The citadel becomes the default layout. A config or world with an old id falls back to the citadel with a log warning, no crash.
+- **D2:** the bridge is **frozen**: no changes, marked as legacy. Whether it is retired is decided when the T3 Connect investigation closes (#1: A, a native Java client; B, a T3 Code CLI as a backend sidecar; C, the current `direct` mode).
+- **D3:** `debug` and `client.debug` stay in the jar, **off by default** (phase 1d checks this).
+- **D4:** `hqRender` on the PC is approved **only for plan reports**:
+  - only the coordinator runs it;
+  - the output is text only (plan signature before and after);
+  - one at a time, through `heavy.sh`;
+  - no PNGs are made or fetched;
+  - it holds while the cleanup lasts.
+- **D5:** the paused rounds do not hold up phase 3. They are adapted with `tools/refactor/apply-moves.sh` when they resume.

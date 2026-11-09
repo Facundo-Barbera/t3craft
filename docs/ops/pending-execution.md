@@ -64,7 +64,28 @@ Quedan como estaban:
   - main compila (`2bca8f4b`, `build hqrenderClasses uirenderClasses`, 18 s).
   - **El daemon de render quedó parado:** tenía el lock pesado global tomado y no hay sesión de renders. Se levanta con `tools/render/start-daemon.sh` y en el arranque recompila el baseline.
 
-### Propuestas pendientes de OK (no se tocaron)
+### Aprobado por Facundo (2026-11-09, noche)
+- **Plan de limpieza** (`docs/plans/code-cleanup.md`) con las decisiones D1–D5. Hay un issue por fase: #2 (fase 0), #3 (1), #4 (2), #5 (3), #6 (4), #7 (5) y #8 (6). La investigación de T3 Connect es #1.
+- **D4, alcance de `hqRender` en el PC, mientras dure la limpieza:**
+  - lo corre **solo el coordinador** y **solo para reportes del plan**;
+  - la salida es texto, con la firma del plan antes y después;
+  - uno a la vez, con `tools/heavy.sh`;
+  - **no se generan ni se traen PNG**.
+
+  Todo otro render sigue necesitando una sesión aprobada (regla 5 de `AGENTS.md`).
+- **Limpieza de ramas:** se conserva solo lo activo en origin, la VPS, el PC y la Mac.
+  - Lo integrado se borra.
+  - Lo que no está integrado y no está activo se archiva con el tag `archive/<rama>` y se borra.
+  - Lo activo:
+    - las 6 rondas en pausa;
+    - `feat/kit-blocks-art`;
+    - `cat/planter-tall-pot`, `cat/bridge-stone-arch` y `cat/bridge-covered-timber`, que esperan decisiones de diseño.
+- **Otras aprobaciones:**
+  - borrar los worktrees de jobs del PC;
+  - la desinstalación de herramientas pesadas en la VPS;
+  - que el relay traiga solo reportes, sin PNG.
+
+### Propuestas pendientes de OK (versión anterior; ver arriba lo aprobado)
 - **Las 40 ramas sin integrar.** Archivar quiere decir: tag `archive/<rama>` subido, después se borran la rama y su worktree en la VPS.
   - **Se quedan, en pausa:** `cat/gate-torii-cherry2`, `cat/gate-arch-battlement2`, `cat/lamp-brazier-tripod2`, `cat/tree-azalea-blossom2`, `struct/signposts`, `cat/statue-obelisk-braziers` y `feat/kit-blocks-art`. Sus rondas 1 (`cat/gate-torii-cherry`, `cat/gate-arch-battlement`, `cat/lamp-brazier-tripod`, `cat/tree-azalea-blossom`) se quedan hasta cerrar la ronda 2.
   - **Se quedan hasta que Facundo decida:** `cat/planter-tall-pot` (`PLANTER_H`) y `cat/bridge-stone-arch` / `cat/bridge-covered-timber` (puentes).
