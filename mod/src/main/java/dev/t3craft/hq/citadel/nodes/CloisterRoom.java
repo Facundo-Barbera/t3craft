@@ -394,8 +394,8 @@ public final class CloisterRoom {
 			for (int sz : new int[] {-1, 1}) {
 				int tx = 4 * sx;
 				int tz = 4 * sz;
-				if (sx == sz) {
-					// a cherry tree in two opposite lawns
+				if (sz < 0) {
+					// a cherry tree in each of the two north lawns (side by side, so the crowns do not line up for the cameras)
 					cherryTree(q, 3 * sx, 3 * sz, sx, sz, pink);
 				} else {
 					// a flowering hedge bed in the other two
