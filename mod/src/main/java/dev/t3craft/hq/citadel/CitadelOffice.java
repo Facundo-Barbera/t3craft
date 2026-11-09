@@ -776,6 +776,10 @@ public final class CitadelOffice {
 		set(c, 1, y, 3, chest(Direction.SOUTH, ChestType.LEFT));
 		set(c, 2, y, 3, chest(Direction.SOUTH, ChestType.RIGHT));
 		set(c, 3, y, 3, chest(Direction.SOUTH, ChestType.LEFT));
+		// labels on the faces of the barrels that head each store, so every store reads at a glance
+		sign(c, CX() - 3, y, CZ() - 1, Direction.SOUTH, DyeColor.ORANGE, "", "Madera", "y piedra", "");
+		sign(c, CX() + 3, y, CZ() - 1, Direction.SOUTH, DyeColor.ORANGE, "", "Minerales", "y herramientas", "");
+		sign(c, CX() - 1, y, CZ() + 4, Direction.SOUTH, DyeColor.ORANGE, "", "Comida", "y combustible", "");
 		// the walls are left to the aisles: banners on the door's inner jambs and plaques that name the zones
 		set(c, -2, y + 2, -6, wallBanner(Direction.SOUTH));
 		set(c, 2, y + 2, -6, wallBanner(Direction.SOUTH));
@@ -927,6 +931,11 @@ public final class CitadelOffice {
 				set(c, dx, y, dz, carpet(edge ? RUG_EDGE : RUG));
 			}
 		}
+		// the briefing table of the command post, north of the rug: a low table with a seat either side, on the room's axis
+		table(c, 0, y, -4);
+		set(c, -1, y, -4, cherryStairs(Direction.EAST, false));
+		set(c, 1, y, -4, cherryStairs(Direction.WEST, false));
+		set(c, 0, y, -3, cherryStairs(Direction.NORTH, false));
 		// the consoles: a bank of five console terminals (kit role CONSOLE; a lectern with the blocks module off), side by side at
 		// dz = 2, centred on the axis, so their screens read as one command desk, facing the player on the rug to the north. That
 		// leaves a 3-wide aisle (dz = 3..5) between the bank and the podiums. A slab with a lantern closes the bank on each end.
@@ -1194,12 +1203,13 @@ public final class CitadelOffice {
 		for (int dx : new int[] {-2, 2}) {
 			set(c, dx, f + 1, -12, cherryStairs(Direction.SOUTH, false));
 		}
-		// the copper spyglass on a pedestal at the rail (dx 4): a block of cut copper, three lightning rods lying north as the tube and
+		// the copper spyglass on a pedestal at the rail (dx 4): a block of cut copper, a tube of two cut copper slabs lying north with a finder rod on top and
 		// a copper grate as the lens over the rail post; the observer stands at (4, -10) with its plaque in front
 		set(c, 4, f + 1, -11, Blocks.CUT_COPPER.waxed().unaffected().defaultBlockState());
-		BlockState tube = Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState().setValue(BlockStateProperties.FACING, Direction.NORTH);
+		BlockState tube = Blocks.CUT_COPPER_SLAB.waxed().unaffected().defaultBlockState().setValue(BlockStateProperties.SLAB_TYPE, SlabType.BOTTOM);
 		set(c, 4, f + 2, -11, tube);
 		set(c, 4, f + 2, -12, tube);
+		set(c, 4, f + 3, -11, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState().setValue(BlockStateProperties.FACING, Direction.UP));
 		set(c, 4, f + 2, -13, Blocks.COPPER_GRATE.waxed().unaffected().defaultBlockState());
 		sign(c, CX() + 4, f + 1, CZ() - 10, Direction.SOUTH, DyeColor.ORANGE, "", "Mirador", "", "");
 		// the open-air meeting table (dx -6..-4, dz -11): three low table cells, seats on both long sides and at the ends
