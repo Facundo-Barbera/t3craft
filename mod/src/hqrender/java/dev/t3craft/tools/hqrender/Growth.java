@@ -35,13 +35,26 @@ final class Growth {
 	/** Active threads per project (7+ adds a floor, 13+ a third). */
 	private static final int[] THREADS = {5, 9, 3, 6, 2, 13, 4, 1, 7, 3, 2, 5, 8, 1, 4, 3, 6, 2, 1, 4};
 
+	/**
+	 * {@code --leads N} (feat/lead-office): thread {@code t0} of each of the first N projects is a lead and sits
+	 * in its own office project ({@code lead:<threadId>}, label {@code ★ <project>}), as
+	 * {@code LeadOfficeClient.project} does in the game. 0 (the default) leaves every roster as it was.
+	 */
+	static int leads;
+
 	static HqInput roster(int n) {
 		HqInput.Builder b = HqInput.builder();
 		for (int p = 0; p < n; p++) {
 			String env = ENVS[p % ENVS.length];
 			String key = env + ":" + NAMES[p];
 			for (int t = 0; t < THREADS[p]; t++) {
-				b.thread(key, NAMES[p], env, env.toUpperCase(Locale.ROOT), key + "-t" + t);
+				String id = key + "-t" + t;
+				if (t == 0 && p < leads) {
+					b.thread(dev.t3craft.hq.lead.LeadOffices.projectKey(id), dev.t3craft.hq.lead.LeadOffices.label(NAMES[p]), env,
+							env.toUpperCase(Locale.ROOT), id);
+					continue;
+				}
+				b.thread(key, NAMES[p], env, env.toUpperCase(Locale.ROOT), id);
 			}
 			if (p % 3 == 0) {
 				b.thread(key, NAMES[p], env, env.toUpperCase(Locale.ROOT), key + "-s0", true);
