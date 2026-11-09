@@ -223,8 +223,15 @@ public final class TreeMapleRed implements Variant {
 						BlockState s = leaves(light ? Blocks.ACACIA_LEAVES : Blocks.MANGROVE_LEAVES);
 						// [palette] both leaves are biome-tinted (green on plains): red patches, untinted, on the sunny outer shell,
 						// chosen per 2x2x2 chunk so they read as clusters of foliage and not as loose cubes
-						if (f > 0.45 && density(lobes, u, y, v) > 0.5 && p.hash(u >> 1, y >> 1, v >> 1, 3) == 0 && p.hash(u, y, v, 4) != 0) {
-							s = b(Blocks.NETHER_WART_BLOCK);
+						if (f > 0.3 && density(lobes, u, y, v) > 0.4) {
+							// [finish] colour by 2x2x2 chunk: orange-brown on the lower shell, scarlet towards the crown,
+							// each chunk one colour with a few leaf blocks left in, so it reads as foliage and not confetti
+							int zone = p.hash(u >> 1, y >> 1, v >> 1, 5);
+							boolean lower = f < 0.62;
+							if (zone < 3 && p.hash(u, y, v, 6) != 0) {
+								s = lower ? dev.t3craft.hq.citadel.CitadelCanvas.terracotta(net.minecraft.world.item.DyeColor.ORANGE)
+										: b(Blocks.NETHER_WART_BLOCK);
+							}
 						}
 						MixedTreeKit.put(c, p, u, y, v, s);
 					}

@@ -64,7 +64,7 @@ public final class TreeCherryWeeping implements Variant {
 		int top = p.h() - 1;
 		int cy = top - 1;
 		int yFork = Math.max(3, Math.min(5, Math.round(p.h() * 0.36f)));
-		int minY = 2; // strands stop here, so the petals show underneath
+		int minY = 3; // strands stop here, so the petals show underneath
 
 		double lean = r.nextDouble() * Math.PI * 2;
 		int[][] path = CherryKit.path(p.h(), bu, bv, Math.cos(lean) * 1.2, Math.sin(lean) * 1.2, 1, cy - 1);
@@ -113,11 +113,11 @@ public final class TreeCherryWeeping implements Variant {
 				for (int side = -1; side <= 1; side++) {
 					int u = a[0] + (side == 0 ? 0 : (Math.abs(px) >= Math.abs(pz) ? side : 0));
 					int v = a[2] + (side == 0 ? 0 : (Math.abs(px) >= Math.abs(pz) ? 0 : side));
-					if (side != 0 && k % 2 == 1) {
+					if (side != 0 && k % 4 == 1) {
 						t.add(u, a[1], v, t.hash(u, a[1], v, 3) == 0 ? CherryKit.LEAF2 : CherryKit.LEAF);
 						t.add(u, a[1] + 1, v, CherryKit.LEAF);
 					}
-					int chance = side == 0 ? 34 : 16;
+					int chance = side == 0 ? 22 : 8;
 					if (t.hash(u, a[1] + 7, v, 100) < chance + (int) (f * 15)) {
 						int len = 2 + t.hash(u + 5, a[1], v, 4) + (int) Math.round(f * 2);
 						CherryKit.strand(t, u, a[1] - (side == 0 ? 1 : 0), v, len, minY);

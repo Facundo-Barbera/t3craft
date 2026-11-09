@@ -173,7 +173,7 @@ public final class TreeBirchGrove implements Variant {
 	// ------------------------------------------------------------------ trunk
 
 	private static void trunk(CitadelCanvas c, Plot p, Trunk t, int index) {
-		for (int y = 0; y <= t.top() + 1; y++) {
+		for (int y = 0; y <= t.top(); y++) {
 			if (y < t.leanY()) {
 				MixedTreeKit.put(c, p, t.u0(), y, t.v0(), TRUNK);
 			} else if (y == t.leanY()) {
@@ -202,41 +202,46 @@ public final class TreeBirchGrove implements Variant {
 
 	private static void canopy(CitadelCanvas c, Plot p, Trunk t) {
 		double margin = Math.min(Math.min(t.uT(), p.w() - 1 - t.uT()), Math.min(t.vT(), p.d() - 1 - t.vT())) + 0.7;
-		double ru = Math.min(2.1, margin);
-		double ry = 2.9;
-		double cy = t.top() + 0.6;
-		int reach = (int) Math.ceil(ru);
-		boolean[][][] g = new boolean[reach * 2 + 1][6][reach * 2 + 1]; // [du][dy + 2][dv]
-		for (int dy = -2; dy <= 3; dy++) {
+		double ru = Math.min(2.6, margin);
+		int reach = (int) Math.ceil(ru) + 1;
+		// [depth] five tiers of foliage, each a slightly off-centre disc of its own radius: a layered, irregular crown,
+		// not an ellipsoid. Tier 0 is the skirt under the crown, tier 4 the airy tuft on top.
+		double[] radius = {0.8, 1.0, 0.95, 0.7, 0.4};
+		boolean[][][] g = new boolean[reach * 2 + 1][7][reach * 2 + 1]; // [du][dy + 3][dv]
+		for (int k = 0; k < 5; k++) {
+			int dy = k - 2;
 			int y = t.top() + dy;
+			double ou = (p.hash(t.uT(), k, t.vT(), 3) - 1) * 0.7;
+			double ov = (p.hash(t.vT(), k + 7, t.uT(), 3) - 1) * 0.7;
+			double rk = ru * radius[k];
 			for (int du = -reach; du <= reach; du++) {
 				for (int dv = -reach; dv <= reach; dv++) {
-					double q = (du * du + dv * dv) / (ru * ru) + (y - cy) * (y - cy) / (ry * ry);
 					int u = t.uT() + du;
 					int v = t.vT() + dv;
-					if (q > 1.0 || (q > 0.85 && p.hash(u, y, v, 2) == 0) || (q > 0.55 && p.hash(u, y, v, 3) == 0)) {
-						continue; // [finish] airy: birch crowns are see-through
+					double q = ((du - ou) * (du - ou) + (dv - ov) * (dv - ov)) / (rk * rk);
+					if (q > 1.0 || (q > 0.7 && p.hash(u, y, v, 3) == 0) || (k == 4 && q > 0.45 && p.hash(u, y, v, 2) == 0)) {
+						continue; // [finish] ragged, airy edge
 					}
-					g[du + reach][dy + 2][dv + reach] = true;
+					g[du + reach][dy + 3][dv + reach] = true;
 				}
 			}
 		}
 		// a fringe hanging under the leaves (bottom-up, so a row never cascades into the next)
-		for (int dy = -2; dy <= 2; dy++) {
+		for (int dy = -3; dy <= 1; dy++) {
 			for (int du = -reach; du <= reach; du++) {
 				for (int dv = -reach; dv <= reach; dv++) {
-					if (!g[du + reach][dy + 2][dv + reach] && g[du + reach][dy + 3][dv + reach]
+					if (!g[du + reach][dy + 3][dv + reach] && g[du + reach][dy + 4][dv + reach]
 							&& p.hash(t.uT() + du, t.top() + dy, t.vT() + dv, 3) == 0) {
-						g[du + reach][dy + 2][dv + reach] = true;
+						g[du + reach][dy + 3][dv + reach] = true;
 					}
 				}
 			}
 		}
-		for (int dy = -2; dy <= 3; dy++) {
+		for (int dy = -3; dy <= 2; dy++) {
 			int y = t.top() + dy;
 			for (int du = -reach; du <= reach; du++) {
 				for (int dv = -reach; dv <= reach; dv++) {
-					if (!g[du + reach][dy + 2][dv + reach]) {
+					if (!g[du + reach][dy + 3][dv + reach]) {
 						continue;
 					}
 					int u = t.uT() + du;
