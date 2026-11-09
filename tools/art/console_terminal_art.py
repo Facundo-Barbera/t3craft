@@ -72,8 +72,9 @@ AMBER = (255, 176, 64)
 AMBER_DIM = (150, 96, 34)
 SCREEN_BG = (8, 22, 30)
 SCREEN_BG2 = (10, 29, 38)
-FIELD = (14, 70, 78)
+FIELD = (12, 58, 66)
 FIELD2 = (18, 84, 92)
+TEAL_DIM2 = (40, 120, 128)
 TEAL_HI = (180, 255, 250)
 TEAL_MID2 = (96, 190, 190)
 KEY = (116, 126, 142)
@@ -192,39 +193,37 @@ def keys():
 
 
 def screen():
-    """Glass: x 2-13, y 3-7 (12 x 5). A teal-lit terminal: lit field, chevron prompt, amber cursor, text lines, status bar.
-    The field is mid-teal (not near black) so the screen reads as a lit rectangle from 6+ blocks."""
+    """Glass: x 2-13, y 3-7 (12 x 5). A structured terminal UI on a flat teal field: a title bar, a prompt line (chevron,
+    amber cursor), two text lines of different length, nothing random. Reads as an interface, not noise."""
     img = new(BEZEL)
     gx, gy = 2, 3
     W, H = 12, 5
     for y in range(H):
         for x in range(W):
-            img[gy + y][gx + x] = px(FIELD2 if y % 2 else FIELD)
+            img[gy + y][gx + x] = px(FIELD)
 
     def put(dx, dy, c):
         img[gy + dy][gx + dx] = px(c)
 
-    # row 0: chevron top, bright title text
-    put(0, 0, TEAL_HI)
-    for dx in (3, 4, 5, 6, 7):
-        put(dx, 0, TEAL_HI)
-    # row 1: chevron tip, amber cursor
-    put(1, 1, TEAL_HI)
-    put(3, 1, AMBER)
-    put(4, 1, AMBER)
-    # row 2: chevron bottom, dim text
-    put(0, 2, TEAL_HI)
-    for dx in (4, 5, 6, 8, 9):
-        put(dx, 2, TEAL)
-    # row 3: more text
-    for dx in (1, 2, 3, 5, 6, 7, 8):
-        put(dx, 3, TEAL_MID2)
-    # row 4: status bar with a bright tick
+    # row 0: title bar (lighter teal) with a bright T3 tick at the left
     for dx in range(W):
-        put(dx, 4, TEAL_MID)
-    put(9, 4, TEAL_HI)
-    put(10, 4, TEAL_HI)
-    put(11, 4, TEAL_HI)
+        put(dx, 0, TEAL_MID)
+    put(0, 0, TEAL_HI)
+    put(1, 0, TEAL_HI)
+    # row 1: text line, long
+    for dx in range(1, 10):
+        put(dx, 1, TEAL)
+    # row 2: text line, short
+    for dx in range(1, 6):
+        put(dx, 2, TEAL)
+    # row 3: prompt: chevron + amber cursor
+    put(1, 3, TEAL_HI)
+    put(3, 3, AMBER)
+    put(4, 3, AMBER)
+    # row 4: status line, dim, with an amber status pixel at the right
+    for dx in range(1, 8):
+        put(dx, 4, TEAL_DIM2)
+    put(10, 4, AMBER)
     # LED swatches for the model's two indicator lights
     for (x, y) in ((0, 8), (1, 8), (0, 9), (1, 9)):
         img[y][x] = px(AMBER)
@@ -256,25 +255,25 @@ def model():
             },
         },
         {   # slanted keyboard: a wedge tilted like the vanilla lectern's top; the front edge sits just above the cabinet top
-            "from": [1, 7, 1], "to": [15, 8.5, 7],
+            "from": [1, 4, 1], "to": [15, 8.5, 7],
             "rotation": {"angle": -22.5, "axis": "x", "origin": [8, 7.75, 4]},
             "faces": {
                 "up": face("keys", [1, 0, 15, 6]),
-                "north": face("body", [1, 12, 15, 14]),
-                "south": face("body", [1, 12, 15, 14]),
-                "west": face("body", [0, 12, 6, 14]),
-                "east": face("body", [10, 12, 16, 14]),
+                "north": face("body", [1, 9, 15, 13.5]),
+                "south": face("body", [1, 9, 15, 13.5]),
+                "west": face("body", [0, 9, 6, 13.5]),
+                "east": face("body", [10, 9, 16, 13.5]),
                 "down": face("body", [1, 0, 15, 6]),
             },
         },
         {   # screen housing
-            "from": [1, 7, 8], "to": [15, 15, 13],
+            "from": [1, 7, 8], "to": [15, 15, 11],
             "faces": {
                 "up": face("top", [1, 3, 15, 8]),
                 "north": face("bezel", [1, 1, 15, 9]),
                 "south": face("body", [1, 1, 15, 9]),
-                "west": face("body", [3, 1, 8, 9]),
-                "east": face("body", [8, 1, 13, 9]),
+                "west": face("body", [5, 1, 8, 9]),
+                "east": face("body", [8, 1, 11, 9]),
             },
         },
         {   # indicator LEDs on top of the housing (emissive): amber and teal

@@ -712,13 +712,11 @@ public final class CitadelOffice {
 		}
 		set(c, 1, y, 0, topSlab(Blocks.CHERRY_SLAB));
 		set(c, 1, y + 1, 0, lantern(false));
-		// under the main screen: the decision podiums (five, west to east) and two barrels of storage
+		// under the main screen: the decision podiums (five, every other cell from west to east, so each one has a free cell beside
+		// it and its own display reads); plants in the gaps at the ends
 		podiums(c, y);
-		for (int dx = 2; dx <= 3; dx++) {
-			set(c, dx, y, 4, barrel());
-		}
-		set(c, -4, y, 4, Blocks.POTTED_FLOWERING_AZALEA.defaultBlockState());
-		set(c, 4, y, 4, Blocks.POTTED_BAMBOO.defaultBlockState());
+		set(c, -3, y, 4, Blocks.POTTED_FLOWERING_AZALEA.defaultBlockState());
+		set(c, 3, y, 4, Blocks.POTTED_BAMBOO.defaultBlockState());
 		// threads screen: 7 x 4 on the south wall, bound to the hub's feed
 		HqGeometry.Surface main = new HqGeometry.Surface(new BlockPos(CX() + 3, F2() + 3, CZ() + 4), Direction.WEST, Direction.NORTH, 7, 4);
 		CitadelHub.bigScreen(c, main, OFFICE, HqGenerator.hubBinding(c.layout), true);
@@ -730,7 +728,8 @@ public final class CitadelOffice {
 		CitadelHub.bigScreen(c, new HqGeometry.Surface(new BlockPos(CX() - 4, F2() + 3, CZ() - 1), Direction.NORTH, Direction.EAST, 3, 3),
 				"office_w1", projects.get(1), false);
 		for (int dz = -3; dz <= 3; dz++) {
-			if (dz != 0) {
+			// a free cell either side of the merge station (dz = 0), so it is not boxed in
+			if (Math.abs(dz) >= 2) {
 				set(c, -4, y, dz, chest(Direction.EAST, ChestType.SINGLE));
 			}
 		}
@@ -831,7 +830,7 @@ public final class CitadelOffice {
 
 	/**
 	 * The decision podiums: a row of {@link #PODIUMS} along the south wall under the threads screen, fronts to the north
-	 * (to the player who comes from the consoles), at {@code dx = -3..1}. Podium {@code i} is bound {@code board:<i>} (anchor
+	 * (to the player who comes from the consoles), at {@code dx = -4, -2, 0, 2, 4}. Podium {@code i} is bound {@code board:<i>} (anchor
 	 * {@link AnchorNames#podium}): the i-th most urgent thread that needs the player, lit and with a bell and a {@code !} when
 	 * it waits; a click opens it to answer the pending question or permission. So the office is where the player decides, and the
 	 * lamps of {@link #attentionBoard} keep ranks 6 to 10 on the wall. A lectern in the plan: the blocks module swaps each one for
@@ -840,7 +839,7 @@ public final class CitadelOffice {
 	 */
 	private static void podiums(CitadelCanvas c, int y) {
 		for (int i = 0; i < PODIUMS; i++) {
-			BlockPos p = new BlockPos(CX() - 3 + i, y, CZ() + 4);
+			BlockPos p = new BlockPos(CX() - 4 + 2 * i, y, CZ() + 4);
 			c.fixture(p, facing(Blocks.LECTERN, Direction.NORTH));
 			c.anchor(Anchor.face(AnchorNames.podium(i), p, Direction.NORTH));
 		}
