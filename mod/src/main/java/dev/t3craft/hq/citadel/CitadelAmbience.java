@@ -16,6 +16,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.EmptyBlockGetter;
 import net.minecraft.world.level.block.Blocks;
@@ -473,7 +474,8 @@ final class CitadelAmbience {
 				BlockPos q = p.above(k);
 				BlockState s = c.cells.get(q.asLong());
 				if (s != null && !s.isAir()) {
-					ceiling = s.isCollisionShapeFullBlock(EmptyBlockGetter.INSTANCE, q) && s.getLightEmission() == 0 ? k : -1;
+					// leaves are a full block too, but a tree crown is not an eave: nothing hangs from it
+					ceiling = s.isCollisionShapeFullBlock(EmptyBlockGetter.INSTANCE, q) && s.getLightEmission() == 0 && !s.is(BlockTags.LEAVES) ? k : -1;
 					break;
 				}
 			}
