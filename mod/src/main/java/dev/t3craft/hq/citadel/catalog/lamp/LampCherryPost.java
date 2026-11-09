@@ -20,27 +20,28 @@ import net.minecraft.world.level.block.state.properties.Half;
 import net.minecraft.world.level.block.state.properties.SlabType;
 
 /**
- * Cherry street lamp: a stone foot, a slim cherry mast with stripped-log collars, one or two arms and a light at
- * every tip. Three silhouettes by plot and seed:
+ * Cherry street lamp: a stone foot, a stone-brick wall plinth, a slim cherry mast with upper-slab collars, one or two arms
+ * and a light at every tip. Three silhouettes by plot and seed:
  *
  * <ul>
  * <li><b>Crook</b> (height 5+, seed): the arm springs from the very top of the mast and the light hangs under its
  *     tip, on an iron chain from height 6 (the lantern stays at or above y3, so a walker never ducks);</li>
- * <li><b>Crossarm</b> (height 6, seed): the arm crosses the mast three below its top, a lantern box stands on each
- *     tip under a cherry slab roof, and the mast ends in a matching cap;</li>
+ * <li><b>Crossarm</b> (height 6, seed): the arm crosses the mast three below its top, a light box stands on each
+ *     tip under a thin roof, and the mast ends in a matching cap;</li>
  * <li><b>Box</b> (no room for an arm: height 4, or a 1 × 1 plot): the mast carries one light box with its roof.</li>
  * </ul>
  *
- * <p>Plots from 5 wide are a flanking pair of masts with their arms turned inwards; narrower ones are a single mast
- * with one arm or two (front and back, else left and right), by seed. The seed also picks the light: a vanilla
- * lantern, the kit's paper lantern (via {@link PaperLanterns}, vanilla fallback) or the kit's glow strip under the
- * arm (falls back to the lantern when the blocks module is off).
+ * <p>Plots from 5 wide are a flanking pair of masts with their arms turned inwards (feet dressed with a planted pot);
+ * narrower ones are a single mast with one arm or two (front and back, else left and right), by seed. Every choice is
+ * a per-plot seeded stream ({@code pick}), so the three seeds of a size differ: the light (vanilla lantern, the kit's
+ * paper lantern via {@link PaperLanterns} with its vanilla fallback, or a froglight box), the roof (cherry plate,
+ * bamboo plate or cherry slab) and the foot (deepslate, chiseled, bricks or a lighter stone brick).
  *
  * <ul>
- * <li><b>Gradient dark → light</b>: polished or chiseled deepslate foot, deepslate-brick wall plinth, cherry fence mast,
- *     stripped cherry collars, cherry slab roofs.</li>
- * <li><b>Depth</b>: collars thicken the mast where it carries load; arms of two blocks get an upside-down stair
- *     corbel; roofs sit one block above the light; a 3 × 3 plot gets a stepped plinth round the foot.</li>
+ * <li><b>Gradient dark → light</b>: deepslate or stone foot, stone-brick wall plinth, cherry fence mast, cherry slab
+ *     collars, cherry or bamboo roofs.</li>
+ * <li><b>Depth</b>: the collar is a ring wider than the post; arms of two blocks get an upside-down stair corbel; roofs
+ *     sit directly on the light; a 3 × 3 plot gets a stepped plinth round the foot.</li>
  * <li><b>Support</b>: every light hangs from a chain or fence, or stands on a fence under its roof. The arms stay
  *     inside the plot and at least 3 blocks above the ground.</li>
  * </ul>
@@ -48,7 +49,6 @@ import net.minecraft.world.level.block.state.properties.SlabType;
  */
 public final class LampCherryPost implements Variant {
 	private static final BlockState FENCE = b(Blocks.CHERRY_FENCE);
-	private static final BlockState LOG = b(Blocks.STRIPPED_CHERRY_LOG);
 	/** The collar: an upper-half cherry slab, a ring wider than the post just under the arm joint or the light box. */
 	private static final BlockState COLLAR = slab(Blocks.CHERRY_SLAB).setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP);
 	private static final BlockState LANTERN = b(Blocks.LANTERN);
@@ -95,10 +95,9 @@ public final class LampCherryPost implements Variant {
 	@Override
 	public void build(CitadelCanvas c, Plot p) {
 		int hh = Math.min(p.h(), 6);
-		int kind = p.hash(0, 0, 0, 3); // 0 vanilla lantern, 1 kit paper, 2 kit glow strip
-		boolean glow = kind == 2 && glowReal(c); // the strip under the arm needs the kit; the lit box has a fallback
-		String tone = p.hash(0, 0, 1, 2) == 0 ? "paper" : "rose";
-		boolean two = p.hash(1, 0, 0, 2) == 0;
+		int kind = pick(p, 1, 3); // 0 vanilla lantern, 1 kit paper lantern, 2 froglight box
+		String tone = pick(p, 2, 2) == 0 ? "paper" : "rose";
+		boolean two = pick(p, 3, 2) == 0;
 		boolean pair = p.w() >= 5;
 		int cv = p.d() >= 5 ? 2 : p.d() >= 2 ? 1 : 0;
 		int[] posts = pair ? new int[] {0, p.w() - 1} : new int[] {p.w() / 2};
@@ -106,14 +105,14 @@ public final class LampCherryPost implements Variant {
 		boolean canArm = hh >= 5;
 		int style = 0;
 		if (canArm) {
-			style = hh >= 6 && p.hash(2, 0, 0, 2) == 1 ? 2 : 1;
+			style = hh >= 6 && pick(p, 5, 2) == 1 ? 2 : 1;
 		}
 		for (int cu : posts) {
 			List<Arm> arms = canArm ? arms(p, cu, cv, pair, two) : List.of();
 			if (arms.isEmpty()) {
 				box(c, p, cu, cv, hh, kind, tone);
 			} else {
-				mast(c, p, cu, cv, hh, style, arms, kind, tone, glow);
+				mast(c, p, cu, cv, hh, style, arms, kind, tone);
 			}
 		}
 		if (!pair && p.w() >= 3 && p.d() >= 3) {
@@ -126,8 +125,11 @@ public final class LampCherryPost implements Variant {
 		}
 	}
 
-	private static boolean glowReal(CitadelCanvas c) {
-		return c.kit != null && !c.kit.glowStrip(Direction.NORTH, true, false).is(Blocks.LIGHT);
+	/** A seeded choice in 0..n-1, one stream per salt (the cell hash of {@link Plot} is too regular for whole-plot choices). */
+	private static int pick(Plot p, int salt, int n) {
+		java.util.Random r = p.rng(0x1A47L * salt);
+		r.nextInt();
+		return r.nextInt(n);
 	}
 
 	// ------------------------------------------------------------------ layout
@@ -170,7 +172,7 @@ public final class LampCherryPost implements Variant {
 		if (n >= 1) {
 			out.add(new Arm(Direction.NORTH, Math.min(2, n)));
 		} else if (e >= 1 || w >= 1) {
-			boolean east = e >= 1 && (w < 1 || p.hash(3, 0, 0, 2) == 0);
+			boolean east = e >= 1 && (w < 1 || pick(p, 6, 2) == 0);
 			out.add(new Arm(east ? Direction.EAST : Direction.WEST, Math.min(2, east ? e : w)));
 		}
 		return out;
@@ -179,9 +181,10 @@ public final class LampCherryPost implements Variant {
 	// ------------------------------------------------------------------ parts
 
 	private static BlockState foot(Plot p, int u, int v) {
-		return switch (p.hash(u, 0, v, 3)) {
+		return switch (pick(p, 100 + 7 * u + v, 4)) {
 			case 0 -> b(Blocks.CHISELED_DEEPSLATE);
 			case 1 -> b(Blocks.DEEPSLATE_BRICKS);
+			case 2 -> b(Blocks.STONE_BRICKS); // a lighter foot now and then: the dark → light gradient starts at the ground
 			default -> b(Blocks.POLISHED_DEEPSLATE);
 		};
 	}
@@ -197,8 +200,6 @@ public final class LampCherryPost implements Variant {
 			BlockState s = FENCE;
 			if (y == 1 && hh >= 5) {
 				s = plinthWall(p, u, v); // stone first, wood above
-			} else if (y == 2 && collarY >= 4) {
-				s = LOG; // the debarked lower mast: one stripped log between the stone and the slim fence
 			}
 			p.set(c, u, y, v, s);
 		}
@@ -218,22 +219,27 @@ public final class LampCherryPost implements Variant {
 			p.set(c, u, 1, v, FENCE);
 		}
 		p.set(c, u, top - 1, v, standingLight(c, p, kind));
-		p.set(c, u, top, v, roof());
+		p.set(c, u, top, v, roof(p));
 	}
 
-	/** A thin cherry plate: a roof that reads as a canopy, not a block. */
-	private static BlockState roof() {
-		return b(Blocks.CHERRY_TRAPDOOR).setValue(BlockStateProperties.HALF, Half.BOTTOM); // bottom half: it sits on whatever is under it
+	/** The roof: a thin plate that reads as a canopy, not a block. Cherry or bamboo plate, or a cherry slab, by seed. */
+	private static BlockState roof(Plot p) {
+		return switch (pick(p, 4, 3)) {
+			case 0 -> b(Blocks.BAMBOO_TRAPDOOR).setValue(BlockStateProperties.HALF, Half.BOTTOM);
+			case 1 -> slab(Blocks.CHERRY_SLAB);
+			default -> b(Blocks.CHERRY_TRAPDOOR).setValue(BlockStateProperties.HALF, Half.BOTTOM); // bottom half: it sits on what is under it
+		};
 	}
 
 	private static BlockState standingLight(CitadelCanvas c, Plot p, int kind) {
 		return switch (kind) {
 			case 1 -> PaperLanterns.standing();
+			case 2 -> b(Blocks.OCHRE_FROGLIGHT);
 			default -> LANTERN;
 		};
 	}
 
-	private static void mast(CitadelCanvas c, Plot p, int u, int v, int hh, int style, List<Arm> arms, int kind, String tone, boolean glow) {
+	private static void mast(CitadelCanvas c, Plot p, int u, int v, int hh, int style, List<Arm> arms, int kind, String tone) {
 		int top = hh - 1;
 		int armY = style == 2 ? 3 : top;
 		shaft(c, p, u, v, hh, armY - 1);
@@ -244,14 +250,14 @@ public final class LampCherryPost implements Variant {
 		p.set(c, u, armY, v, tee);
 		if (style == 2) {
 			p.set(c, u, armY + 1, v, FENCE);
-			p.set(c, u, top, v, roof()); // the mast's own cap, matching the tip roofs
+			p.set(c, u, top, v, roof(p)); // the mast's own cap, matching the tip roofs
 		}
 		for (Arm a : arms) {
-			arm(c, p, u, v, a, armY, top, style, kind, tone, glow);
+			arm(c, p, u, v, a, armY, top, style, kind, tone);
 		}
 	}
 
-	private static void arm(CitadelCanvas c, Plot p, int u, int v, Arm a, int armY, int top, int style, int kind, String tone, boolean glow) {
+	private static void arm(CitadelCanvas c, Plot p, int u, int v, Arm a, int armY, int top, int style, int kind, String tone) {
 		Direction d = a.dir();
 		for (int i = 1; i <= a.len(); i++) {
 			int au = u + d.getStepX() * i;
@@ -269,15 +275,9 @@ public final class LampCherryPost implements Variant {
 		int tu = u + d.getStepX() * a.len();
 		int tv = v + d.getStepZ() * a.len();
 		if (style == 2) {
-			if (glow) {
-				// the kit's glow strip runs under the whole crossarm (no collision, the arm cells are 3 up)
-				for (int i = 1; i <= a.len(); i++) {
-					p.set(c, u + d.getStepX() * i, armY - 1, v + d.getStepZ() * i, c.kit.glowStrip(d, true, false));
-				}
-			}
 			// light box on the tip: the light stands on the fence, a cherry slab roof one above
 			p.set(c, tu, armY + 1, tv, standingLight(c, p, kind));
-			p.set(c, tu, armY + 2, tv, roof());
+			p.set(c, tu, armY + 2, tv, roof(p));
 			return;
 		}
 		// crook: a chain from the tip (height 6) and the light under it
