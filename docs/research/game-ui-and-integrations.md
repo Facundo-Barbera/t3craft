@@ -1,5 +1,8 @@
 # Interfaces del juego e integraciones externas: mapa inicial
 
+> **El plan ordenado y con las decisiones de Facundo está en `docs/plans/ui-browser-and-integrations.md`.** Este doc es el
+> material de respaldo: catálogo completo, anexos y fuentes. Si los dos difieren, manda el plan.
+
 Rama `research/game-ui-integrations`, fecha 2026-11-09. Solo investigación: no se tocó código, no se compiló nada y no se
 abrió ninguna imagen. Las rutas de código pueden cambiar por la limpieza en curso (issues #3 a #8).
 
