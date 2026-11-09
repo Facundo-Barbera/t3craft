@@ -960,6 +960,45 @@ public final class CitadelPlacement {
 	 */
 	private static void yard(City city, Packer pk, Placed pl, long seed) {
 		CitadelCanvas c = city.c;
+		Plot yp = yardRing(c, pl, seed);
+		int mid = (yp.w() - 1) / 2;
+		// the lead path: 3 wide from the gate, away from the house, until something else is in the way
+		for (int t = 1; t <= LEAD_MAX(); t++) {
+			BlockPos m = yp.world(mid, -1, -t);
+			if (leadCell(city, pk, m.getX(), m.getZ()) != 0) {
+				break;
+			}
+			for (int du = -1; du <= 1; du += 2) {
+				BlockPos s = yp.world(mid + du, -1, -t);
+				leadCell(city, pk, s.getX(), s.getZ());
+			}
+		}
+	}
+
+	/** Whether the plan is dense enough for the barrios' denser composition (see {@link #dense}); public for the barrio package. */
+	public static boolean isDense() {
+		return dense();
+	}
+
+	/**
+	 * A house of the catalog on an unused hall slot of a barrio (struct/hq-density): the world box {@code sx × sz} at
+	 * {@code (x, z)} facing {@code front}, with its yard ({@link #yardRing}) all round it. False (nothing written)
+	 * when no house fits that box. The box includes the yard: the house takes {@value #YARD} cells less each side.
+	 */
+	public static boolean slotHouse(CitadelCanvas c, int x, int z, int sx, int sz, Direction front, long seed) {
+		int in = YARD;
+		if (sx - 2 * in < 9 || sz - 2 * in < 9) {
+			return false;
+		}
+		if (!build(c, Family.HOUSE, x + in, 1, z + in, sx - 2 * in, sz - 2 * in, HOUSE_H(), front, seed)) {
+			return false;
+		}
+		yardRing(c, new Placed(x + in, z + in, sx - 2 * in, sz - 2 * in, front), seed);
+		return true;
+	}
+
+	/** The ring of cells of a house's yard (see {@link #yard}) without the lead path; returns the yard's plot. */
+	private static Plot yardRing(CitadelCanvas c, Placed pl, long seed) {
 		Plot yp = Plot.ofWorld(pl.x() - YARD, 1, pl.z() - YARD, pl.sx() + 2 * YARD, pl.sz() + 2 * YARD, 4, pl.front(), seed);
 		int w = yp.w();
 		int d = yp.d();
@@ -1008,17 +1047,7 @@ public final class CitadelPlacement {
 				}
 			}
 		}
-		// the lead path: 3 wide from the gate, away from the house, until something else is in the way
-		for (int t = 1; t <= LEAD_MAX(); t++) {
-			BlockPos m = yp.world(mid, -1, -t);
-			if (leadCell(city, pk, m.getX(), m.getZ()) != 0) {
-				break;
-			}
-			for (int du = -1; du <= 1; du += 2) {
-				BlockPos s = yp.world(mid + du, -1, -t);
-				leadCell(city, pk, s.getX(), s.getZ());
-			}
-		}
+		return yp;
 	}
 
 	/** One cell of a lead path: dirt path on free soft ground. 0 painted; 1 something is in the way (path, plot, wall, edge). */
