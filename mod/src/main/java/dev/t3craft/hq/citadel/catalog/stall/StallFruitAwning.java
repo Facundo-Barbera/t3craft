@@ -178,9 +178,12 @@ public final class StallFruitAwning implements Variant {
 		};
 	}
 
-	/** [depth] goods come in runs of two cells so each kind reads from the street. */
+	/**
+	 * [depth] goods come in runs of two cells so each kind reads from the street; melons and pumpkins
+	 * dominate and the red fruit is the accent (one run in five), so the stall never turns into a rainbow.
+	 */
 	private static int kindAt(Plot p, int u, int salt) {
-		return p.hash(u / 2, salt, 1, 3);
+		return new int[] {0, 1, 0, 1, 2}[p.hash(u / 2, salt, 1, 5)];
 	}
 
 	/**
@@ -199,7 +202,7 @@ public final class StallFruitAwning implements Variant {
 			p.set(c, u, 0, g.pv, p.hash(u, 0, g.pv, 4) == 0 ? b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.NORTH) : b(Blocks.CHERRY_PLANKS));
 			int k = kindAt(p, u, 1);
 			p.set(c, u, 1, g.pv, goods(k));
-			p.set(c, u, 2, g.pv, goods((k + 1 + p.hash(u / 2, 2, 1, 2)) % 3));
+			p.set(c, u, 2, g.pv, goods(k == 2 || p.hash(u / 2, 2, 1, 3) != 0 ? k : 1 - k)); // the upper course repeats the run, now and then the other fruit
 		}
 		if (g.fy >= 4 && g.hi() - g.lo() >= 3) {
 			for (int u : new int[] {g.lo(), g.hi()}) {
@@ -230,7 +233,7 @@ public final class StallFruitAwning implements Variant {
 			p.set(c, u, 0, 0, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
 			int k = kindAt(p, u, 7);
 			for (int y = 1; y <= g.fy - 2; y++) {
-				p.set(c, u, y, 0, goods((k + y - 1) % 3));
+				p.set(c, u, y, 0, goods(k)); // one fruit per crate, however high it is heaped
 			}
 			p.set(c, u, g.fy - 1, 0, fringe);
 		}
@@ -261,14 +264,14 @@ public final class StallFruitAwning implements Variant {
 				p.set(c, u, 3, g.bv, b(Blocks.STRIPPED_CHERRY_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.X)); // [depth] header beam
 			}
 		}
-		// [depth] a tall plot's cloth drops at the back as a plain skirt down to the beam, across the whole width
+		// [depth] a tall plot's cloth drops at the back as a skirt, in the roof's own stripes, down to the beam, across the whole width
 		// (posts excepted), so nobody can stand on the beam and the back reads as cloth, not as a wall
 		for (int u = 0; u < g.w; u++) {
 			if (u == g.ix || u == g.w - 1 - g.ix) {
 				continue;
 			}
-			for (int y = 4; y <= g.ay(g.bv) - 2; y++) {
-				p.set(c, u, y, g.bv, st[0]);
+			for (int y = 4; y < g.ay(g.bv); y++) {
+				p.set(c, u, y, g.bv, st[u % 2]);
 			}
 		}
 	}
@@ -293,7 +296,7 @@ public final class StallFruitAwning implements Variant {
 				int ctop = g.ay(cv) - 2;
 				p.set(c, su, 0, cv, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
 				for (int y = 1; y <= ctop; y++) {
-					p.set(c, su, y, cv, goods((p.hash(su, 4, cv, 3) + y) % 3));
+					p.set(c, su, y, cv, goods(p.hash(su, 4, cv, 2)));
 				}
 			}
 		}
