@@ -1,0 +1,2 @@
+# Every branch prepends one line to the dev changelog; keep both sides on merge instead of conflicting.
+docs/CHANGELOG-dev.md merge=union
