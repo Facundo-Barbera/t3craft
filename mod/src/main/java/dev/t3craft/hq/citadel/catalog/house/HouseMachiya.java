@@ -55,8 +55,8 @@ import net.minecraft.world.level.block.state.properties.Half;
 public final class HouseMachiya implements Variant {
 	/** Floor between the storeys (beam layer). The upper floor is stood on at y6. */
 	private static final int F2 = 5;
-	private static final int PLATE = 10;
-	private static final int ROOF0 = 11;
+	private static final int PLATE = 9;
+	private static final int ROOF0 = 10;
 
 	@Override
 	public String id() {
@@ -80,7 +80,7 @@ public final class HouseMachiya implements Variant {
 
 	@Override
 	public int minH() {
-		return 17;
+		return 16;
 	}
 
 	@Override
@@ -331,7 +331,7 @@ public final class HouseMachiya implements Variant {
 	private static void frontGround(Pen g, Plot p, Geo q, Scheme s) {
 		int vf = q.vf();
 		BlockState paper = paneU(glassPane(DyeColor.WHITE));
-		BlockState banner = b(Blocks.WALL_BANNER.pick(s.noren())).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH);
+		BlockState noren = paneU(glassPane(s.noren()));
 		for (int u = q.u1(); u <= q.u2(); u++) {
 			// wall plane (v2): a double door in the aisle, shoji panes over plaster elsewhere
 			if (entrance(q, u)) {
@@ -351,7 +351,7 @@ public final class HouseMachiya implements Variant {
 			}
 			// lattice plane (v1): [depth] koshi fins one block proud of the wall, a kick plate, a header
 			if (entrance(q, u)) {
-				g.put(u, 4, 1, banner, CitadelCanvas.DECOR); // [finish] the split noren: one flap each side of the slit
+				g.set(u, 4, 1, noren); // [finish] the noren valance, dyed, across the doorway (4 free blocks under it)
 			} else if (isPillar(q, u)) {
 				for (int y = 1; y <= 4; y++) {
 					g.set(u, y, 1, beam(Direction.Axis.Y));
@@ -364,7 +364,7 @@ public final class HouseMachiya implements Variant {
 				g.set(u, 1, 1, fence(Blocks.DARK_OAK_FENCE, false, fr, false, fl));
 				g.set(u, 2, 1, shutter(side));
 				g.set(u, 3, 1, shutter(side));
-				g.set(u, 4, 1, beam(Direction.Axis.X));
+				g.set(u, 4, 1, b(Blocks.DEEPSLATE_TILES)); // the lean-to's solid inner edge, flush with the lattice
 			}
 			// porch plane (v0): posts and a low bamboo dog-fence (inu-yarai), the doorway left open
 			if (entrance(q, u)) {
@@ -388,37 +388,39 @@ public final class HouseMachiya implements Variant {
 	}
 
 	/**
-	 * [depth] the hisashi: a two-step lean-to of tiles, one row at v0 over the porch and one at v1 over the
-	 * lattice. Nothing overhangs it (the main roof starts flush at v2), so no surface is left under a roof
-	 * where nobody could reach it.
+	 * [depth] the hisashi: a low lean-to of dark tiles over the porch, one stair row at v0 meeting a tile row
+	 * at v1 that sits on the lattice. It is one block high, so the koshi stays readable from above, and nothing
+	 * overhangs it (the main roof starts flush at v2): no surface is left under a roof where nobody could reach it.
 	 */
 	private static void canopy(Pen g, Geo q) {
-		int[] kind = kinds(q.u1(), q.u2());
 		for (int u = 0; u < q.w(); u++) {
 			g.set(u, 4, 0, stair(Blocks.DEEPSLATE_TILE_STAIRS, Direction.SOUTH));
-			boolean post = u >= q.u1() && u <= q.u2() && kind[u - q.u1()] == 1;
-			if (post) {
-				for (int y = 5; y <= 9; y++) {
-					g.set(u, y, 1, beam(Direction.Axis.Y)); // [depth] posts stand proud of the upper floor
-				}
-			} else {
-				g.set(u, 5, 1, stair(Blocks.DEEPSLATE_TILE_STAIRS, Direction.SOUTH));
+			if (u < q.u1() || u > q.u2()) {
+				g.set(u, 4, 1, b(Blocks.DEEPSLATE_TILES)); // the eave runs on past the side walls
 			}
 		}
+	}
+
+	/**
+	 * [depth] mushiko-mado: a window of upright dark slats (fence posts, no glass), the wall left almost blank
+	 * round it. A post stands in the middle of every cell, so there is no ledge to stand on behind it.
+	 */
+	private static BlockState slat(boolean along, boolean left, boolean right) {
+		return along ? fence(Blocks.DARK_OAK_FENCE, false, right, false, left) : fence(Blocks.DARK_OAK_FENCE, left, false, right, false);
 	}
 
 	private static void frontUpper(Pen g, Plot p, Geo q) {
 		int[] kind = kinds(q.u1(), q.u2());
 		for (int u = q.u1(); u <= q.u2(); u++) {
 			int k = kind[u - q.u1()];
-			for (int y = 6; y <= 9; y++) {
+			for (int y = 6; y <= 8; y++) {
 				BlockState st;
 				if (k == 1) {
 					st = beam(Direction.Axis.Y);
-				} else if (k == 2 && y == 7) {
-					st = shutter(Direction.NORTH); // [depth] mushiko-mado: a slatted window sunk into the wall
-				} else if (k == 2 && y == 8) {
-					st = paneU(glassPane(DyeColor.WHITE)); // paper above the slats; its post also keeps the sill from being a ledge
+				} else if (k == 2 && (y == 7 || y == 8)) {
+					boolean l = u > q.u1() && kind[u - 1 - q.u1()] == 2;
+					boolean rr = u < q.u2() && kind[u + 1 - q.u1()] == 2;
+					st = slat(true, l, rr);
 				} else {
 					st = plaster();
 				}
@@ -431,37 +433,28 @@ public final class HouseMachiya implements Variant {
 
 	private static void sides(Pen g, Plot p, Geo q) {
 		int vf = q.vf();
-		int[] kind = kinds(vf, q.vb());
-		BlockState glass = paneV(b(Blocks.GLASS_PANE));
+		// the flanks of a town house are almost blind: plaster on a stone course, a post at each end and a
+		// single upper slit window every few cells, with its shutters on the outside
 		for (int uc : new int[] {q.u1(), q.u2()}) {
 			boolean west = uc == q.u1();
 			int out = west ? 0 : q.w() - 1;
 			Direction face = west ? Direction.WEST : Direction.EAST;
 			for (int v = vf + 1; v < q.vb(); v++) {
-				int k = kind[v - vf];
-				for (int y : new int[] {1, 2, 3, 4, 6, 7, 8, 9}) {
+				boolean window = (v - vf) % 3 == 2 && v <= q.vb() - 2;
+				for (int y : new int[] {1, 2, 3, 4, 6, 7, 8}) {
 					BlockState st;
-					if (k == 1) {
-						st = beam(Direction.Axis.Y);
-					} else if (y == 1) {
+					if (y == 1) {
 						st = stone(p, uc, y, v);
-					} else if (k == 2 && (y == 2 || y == 3 || y == 7 || y == 8)) {
-						st = glass;
+					} else if (window && y == 7) {
+						st = slat(false, false, false);
 					} else {
 						st = plaster();
 					}
 					g.set(uc, y, v, st);
 				}
-				if (k == 2) {
-					// [depth] open shutters either side of the window group, on the outside face
-					for (int dv : new int[] {-1, 1}) {
-						int vv = v + dv;
-						if (vv > vf && vv < q.vb() && kind[vv - vf] != 2) {
-							for (int y : new int[] {2, 3, 7, 8}) {
-								g.set(out, y, vv, shutter(face));
-							}
-						}
-					}
+				if (window) {
+					g.set(out, 7, v - 1, shutter(face)); // [depth] open shutters either side, on the outside face
+					g.set(out, 7, v + 1, shutter(face));
 				}
 			}
 		}
@@ -470,9 +463,8 @@ public final class HouseMachiya implements Variant {
 	private static void back(Pen g, Plot p, Geo q) {
 		int vb = q.vb();
 		int[] kind = kinds(q.u1(), q.u2());
-		BlockState glass = paneU(b(Blocks.GLASS_PANE));
 		for (int u = q.u1(); u <= q.u2(); u++) {
-			// ground: a 2-wide opening at the end of the aisle, windows in the rooms' stretch
+			// ground: a 2-wide opening at the end of the aisle, plaster elsewhere
 			if (!entrance(q, u)) {
 				for (int y = 1; y <= 4; y++) {
 					BlockState st;
@@ -480,8 +472,6 @@ public final class HouseMachiya implements Variant {
 						st = beam(Direction.Axis.Y);
 					} else if (y == 1) {
 						st = stone(p, u, y, vb);
-					} else if (u >= q.r0() && (y == 2 || y == 3)) {
-						st = glass;
 					} else {
 						st = plaster();
 					}
@@ -489,12 +479,14 @@ public final class HouseMachiya implements Variant {
 				}
 			}
 			int k = kind[u - q.u1()];
-			for (int y = 6; y <= 9; y++) {
+			for (int y = 6; y <= 8; y++) {
 				BlockState st;
 				if (k == 1) {
 					st = beam(Direction.Axis.Y);
 				} else if (k == 2 && (y == 7 || y == 8)) {
-					st = glass;
+					boolean l = u > q.u1() && kind[u - 1 - q.u1()] == 2;
+					boolean rr = u < q.u2() && kind[u + 1 - q.u1()] == 2;
+					st = slat(true, l, rr);
 				} else {
 					st = plaster();
 				}
@@ -591,8 +583,8 @@ public final class HouseMachiya implements Variant {
 				if (ridge || k % q.step() != 0) {
 					st = b(Blocks.DEEPSLATE_TILES);
 				} else {
-					// [palette] the eave rows are brick (a lighter line than the dark tiles above it); no heavy brown band on the front
-					Block sb = k == 0 || p.hash(u, y, v, 6) == 0 ? Blocks.DEEPSLATE_BRICK_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS;
+					// [palette] clean tiles with the eave rows in brick, a lighter line; no heavy brown band on the front
+					Block sb = k == 0 ? Blocks.DEEPSLATE_BRICK_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS;
 					st = stair(sb, up);
 				}
 				g.set(u, y, v, st);
