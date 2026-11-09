@@ -76,8 +76,6 @@ final class CitadelPaving {
 	static final BlockState ACERA_PAVER = JOINT;
 	/** Period (cells along the road) of the courses of the sidewalk: a pattern, not a size, so it is not scaled. */
 	static final int ACERA_EVERY = 6;
-	/** The dashed line down the middle of a street: 3 cells of smooth stone, 3 of road. A pattern, not a size. */
-	static final int DASH = 3;
 
 	// Sizes: all proportions or mirrors of the geometry.
 
@@ -225,11 +223,14 @@ final class CitadelPaving {
 		if (d > ACERA_D()) {
 			return sidewalk(s);
 		}
+		BlockState plaza = avenuePlaza(c, x, z, zn.ring(), n, d, s); // the plazoleta also swallows the gutter
+		if (plaza != null) {
+			return plaza;
+		}
 		if (d > MOUTH_D()) {
 			return kerb(x, z); // the gutter
 		}
-		BlockState plaza = avenuePlaza(c, x, z, zn.ring(), n, d, s);
-		return plaza != null ? plaza : avenueField(c, x, z, d, s);
+		return avenueField(c, x, z, d, s);
 	}
 
 	/**
@@ -241,16 +242,17 @@ final class CitadelPaving {
 		double l = across(x, z, n);
 		double w = m == 1 ? RingCampusGeometry.ringInner(1) - CitadelCanvas.dims().rampR : CitadelCanvas.dims().street;
 		double rc = m == 1 ? (CitadelCanvas.dims().rampR + RingCampusGeometry.ringInner(1)) / 2 : RingCampusGeometry.ringInner(m) - w / 2.0;
+		double zebra = d > RUNNER_D() ? l : Double.NaN; // the crossing over the avenue's mouth: stripes along the avenue, the runner stays
 		double md = Math.hypot(l, s - rc);
 		if (md <= PLAZA_R_FRAC * w) {
-			return plazoleta(c, md, l, s - rc, d, w);
+			return plazoleta(c, md, l, s - rc, d, w, zebra);
 		}
 		if (m >= 2) {
 			double wo = CitadelCanvas.dims().street;
 			double rco = RingCampusGeometry.ringOuter(m) + wo / 2.0;
 			double mdo = Math.hypot(l, s - rco);
 			if (mdo <= PLAZA_R_FRAC * wo) {
-				return plazoleta(c, mdo, l, s - rco, d, wo);
+				return plazoleta(c, mdo, l, s - rco, d, wo, zebra);
 			}
 		}
 		return null;
@@ -344,7 +346,7 @@ final class CitadelPaving {
 				}
 			}
 			if (md <= PLAZA_R_FRAC * width) {
-				return plazoleta(c, md, dx, dz, lat, width);
+				return plazoleta(c, md, dx, dz, lat, width, lat > MOUTH_D() ? r : Double.NaN); // a crossing over the street's arms
 			}
 		}
 		if (mouthIn || mouthOut) {
@@ -363,7 +365,7 @@ final class CitadelPaving {
 	 * field of the kit's tile with an arc of joints every three cells (the avenue's runner flows through it) and
 	 * a polished rim on the last cell. Covers {@code md <= PLAZA_R_FRAC * width}.
 	 */
-	static BlockState plazoleta(CitadelCanvas c, double md, double dx, double dz, double lat, double width) {
+	static BlockState plazoleta(CitadelCanvas c, double md, double dx, double dz, double lat, double width, double zebra) {
 		if (md <= HEART_FRAC * width) {
 			return CHISELED;
 		}
@@ -382,7 +384,12 @@ final class CitadelPaving {
 		if (lat <= RUNNER_D()) {
 			return c.floor();
 		}
-		return Math.floorMod((int) Math.round(md), 3) == 0 ? JOINT : c.accent();
+		// a zebra crossing near the rim, on the arms: stripes of calcite along the way, every other cell
+		if (!Double.isNaN(zebra) && md >= PLAZA_R_FRAC * width - 4.0 && md <= PLAZA_R_FRAC * width - 1.5 && Math.floorMod((int) Math.round(zebra), 2) == 0) {
+			return CALCITE;
+		}
+		// concentric rings of polished deepslate over polished andesite
+		return Math.floorMod((int) Math.round(md), 3) == 0 ? POLISHED : JOINT;
 	}
 
 	/** The plaza at the foot of the main ramp: the avenue's tile, with arcs of joints round the rosette. */
@@ -406,15 +413,15 @@ final class CitadelPaving {
 		if (edge < LANE_FRAC * width) {
 			return hash(x, z) < 5 ? CRACKED : BRICKS;
 		}
-		if (dashed(r, lo, hi, arc)) {
-			return SIDE;
+		if (median(r, lo, hi)) {
+			return POLISHED;
 		}
 		return joint(arc, width) ? BRICKS : JOINT;
 	}
 
-	/** The cell is on the dashed line down the middle of a street (one cell wide, {@link #DASH} on, {@link #DASH} off). */
-	private static boolean dashed(double r, double lo, double hi, double arc) {
-		return Math.abs(r - (lo + hi) / 2) < 0.5 && Math.floorMod((int) Math.round(arc), 2 * DASH) < DASH;
+	/** The cell is on the median of a street: a band about two cells wide down the middle, in a tone of its own. */
+	private static boolean median(double r, double lo, double hi) {
+		return Math.abs(r - (lo + hi) / 2) < 0.9;
 	}
 
 	/**
@@ -429,10 +436,10 @@ final class CitadelPaving {
 		if (edge < LANE_FRAC * width) {
 			return hash(x, z) < 5 ? MOSSY : PACKED_MUD;
 		}
-		if (dashed(r, lo, hi, arc)) {
-			return SIDE;
+		if (median(r, lo, hi)) {
+			return BRICKS;
 		}
-		return joint(arc, width) ? BRICKS : MUD;
+		return joint(arc, width) ? PACKED_MUD : MUD;
 	}
 
 	// ------------------------------------------------------------------ verges

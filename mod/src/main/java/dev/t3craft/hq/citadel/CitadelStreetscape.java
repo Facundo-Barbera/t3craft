@@ -74,6 +74,7 @@ final class CitadelStreetscape {
 	static final BlockState FENCE = b(Blocks.CHERRY_FENCE);
 	static final BlockState AWNING = slab(Blocks.CHERRY_SLAB);
 	static final BlockState BIN = b(Blocks.COMPOSTER);
+	static final BlockState BASE = slab(Blocks.STONE_BRICK_SLAB);
 	static final BlockState BARREL = Blocks.BARREL.defaultBlockState().setValue(BlockStateProperties.FACING, Direction.UP);
 
 	/** The 16 points of the compass, clockwise from north (the label of an avenue's sign). */
@@ -105,7 +106,7 @@ final class CitadelStreetscape {
 	/** Height of a lantern post of a plaza (wall blocks under the lantern). */
 	static final int PLAZA_POST = 3;
 	/** Height of the walls (stone-brick posts) under the tall lantern of a focal point. */
-	static final int FOCAL_POSTS = 4;
+	static final int FOCAL_POSTS = 6;
 	/** Lateral distance (cells from the avenue's axis) of the benches of a plazoleta: just past the mouth of the avenue. */
 	static int BENCH_LAT() {
 		return (int) Math.round(CitadelPaving.MOUTH_D() + 1.25);
@@ -221,12 +222,32 @@ final class CitadelStreetscape {
 		return false;
 	}
 
-	/** A focal point: a chiselled plinth, wall posts and the kit's tall paper lantern ({@code 3 + FOCAL_POSTS} high). */
+	/**
+	 * A focal point ({@code 3 + FOCAL_POSTS} high): a chiselled plinth on a 3x3 base of stone-brick slabs (half a
+	 * block: a walker steps over it), wall posts, four cherry slabs at the top of the shaft each with a lantern
+	 * hanging from it, and the kit's tall paper lantern on top.
+	 */
 	static void focalLantern(CitadelCanvas c, int x, int z) {
 		c.set(x, 1, z, PLINTH);
 		c.fill(x, 2, 1 + FOCAL_POSTS, z, POST);
 		c.set(x, 2 + FOCAL_POSTS, z, tallLantern(false));
 		c.set(x, 3 + FOCAL_POSTS, z, tallLantern(true));
+		for (int dx = -1; dx <= 1; dx++) {
+			for (int dz = -1; dz <= 1; dz++) {
+				if ((dx != 0 || dz != 0) && freeColumn(c, x + dx, z + dz, 1, 1) && c.at(x + dx, 0, z + dz) != null) {
+					c.set(x + dx, 1, z + dz, BASE);
+				}
+			}
+		}
+		int[][] arms = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+		for (int[] a : arms) {
+			int ax = x + a[0];
+			int az = z + a[1];
+			if (freeColumn(c, ax, az, FOCAL_POSTS - 1, FOCAL_POSTS + 1) && c.at(ax, 0, az) != null) {
+				c.set(ax, FOCAL_POSTS + 1, az, AWNING);
+				c.set(ax, FOCAL_POSTS, az, HANGING_LANTERN);
+			}
+		}
 	}
 
 	// ------------------------------------------------------------------ avenues
@@ -295,26 +316,20 @@ final class CitadelStreetscape {
 		if (Math.abs(arc - Math.rint(arc)) > 0.45) {
 			return;
 		}
-		int every = 2 * STEP();
-		long round = Math.round(arc);
-		int phase = (int) Math.floorMod(round, (long) every);
+		int every = STEP();
 		boolean outer = r > rc;
+		// the two rows alternate: a tree at 0 of the outer row, at half a step of the inner row
+		int p = (int) Math.floorMod(Math.round(arc) - (outer ? 0 : every / 2), (long) every);
 		Direction toLots = outer ? nearest(x, z) : nearest(x, z).getOpposite();
 		if (nearNode(c, x, z, 4)) {
 			return;
 		}
-		if (outer) {
-			if (phase == 0 && RingCampusGeometry.radialDistance(x, z, nIn) > room + 2
-					&& (nOut == 0 || RingCampusGeometry.radialDistance(x, z, nOut) > room + 2)) {
-				tree(c, x, z);
-			} else if (phase == 1) {
-				bench(c, x, z, toLots);
-			} else if (phase == every - 1) {
-				bin(c, x, z);
-			}
-		} else if (phase == every / 2) {
+		if (p == 0 && RingCampusGeometry.radialDistance(x, z, nIn) > room + 2
+				&& (nOut == 0 || RingCampusGeometry.radialDistance(x, z, nOut) > room + 2)) {
+			tree(c, x, z);
+		} else if (p == 1) {
 			bench(c, x, z, toLots);
-		} else if (phase == every / 2 + 1) {
+		} else if (p == every - 1) {
 			bin(c, x, z);
 		}
 	}
@@ -399,20 +414,23 @@ final class CitadelStreetscape {
 		for (int sa = -1; sa <= 1; sa += 2) {
 			Direction back = nearest(sa * f.ux(), sa * f.uz());
 			for (int sl = -1; sl <= 1; sl += 2) {
-				int bx = f.x(sl * lat, sa * edge);
-				int bz = f.z(sl * lat, sa * edge);
-				if (sidewalkFree(c, bx, bz, 1)) {
-					bench(c, bx, bz, back);
+				// a bench of three cells, back to the lots, facing the focal point; a bin between it and the avenue's mouth
+				for (int i = 0; i < 3; i++) {
+					int bx = f.x(sl * (lat + i), sa * edge);
+					int bz = f.z(sl * (lat + i), sa * edge);
+					if (sidewalkFree(c, bx, bz, 1)) {
+						bench(c, bx, bz, back);
+					}
 				}
-				int nx = f.x(sl * (lat + 1), sa * edge);
-				int nz = f.z(sl * (lat + 1), sa * edge);
-				if ((sa > 0 || sl > 0) && sidewalkFree(c, nx, nz, 1)) {
+				int nx = f.x(sl * (lat - 1), sa * edge);
+				int nz = f.z(sl * (lat - 1), sa * edge);
+				if (sidewalkFree(c, nx, nz, 1)) {
 					bin(c, nx, nz);
 				}
 			}
 		}
-		sign(c, f, m, ang, lat + 3, edge);
-		stall(c, f, -(lat + 3), -edge);
+		sign(c, f, m, ang, lat + 4, edge);
+		stall(c, f, -(lat + 8), -edge);
 		c.unrigid();
 	}
 
@@ -443,20 +461,23 @@ final class CitadelStreetscape {
 	 */
 	private static void stall(CitadelCanvas c, Frame f, int lat, int along) {
 		int inward = along > 0 ? -1 : 1;
-		for (int dl = -1; dl <= 1; dl++) {
+		for (int dl = -2; dl <= 2; dl++) {
 			if (!sidewalkFree(c, f.x(lat + dl, along), f.z(lat + dl, along), 4)
 					|| !groundFree(c, f.x(lat + dl, along + inward), f.z(lat + dl, along + inward), 4)) {
 				return;
 			}
 		}
-		c.fill(f.x(lat - 1, along), 1, 3, f.z(lat - 1, along), FENCE);
-		c.fill(f.x(lat + 1, along), 1, 3, f.z(lat + 1, along), FENCE);
-		c.set(f.x(lat, along), 1, f.z(lat, along), BARREL);
+		c.fill(f.x(lat - 2, along), 1, 3, f.z(lat - 2, along), FENCE);
+		c.fill(f.x(lat + 2, along), 1, 3, f.z(lat + 2, along), FENCE);
 		for (int dl = -1; dl <= 1; dl++) {
+			c.set(f.x(lat + dl, along), 1, f.z(lat + dl, along), BARREL);
+		}
+		for (int dl = -2; dl <= 2; dl++) {
 			c.set(f.x(lat + dl, along), 4, f.z(lat + dl, along), AWNING);
 			c.set(f.x(lat + dl, along + inward), 4, f.z(lat + dl, along + inward), AWNING);
 		}
-		c.set(f.x(lat, along + inward), 3, f.z(lat, along + inward), HANGING_LANTERN);
+		c.set(f.x(lat - 1, along + inward), 3, f.z(lat - 1, along + inward), HANGING_LANTERN);
+		c.set(f.x(lat + 1, along + inward), 3, f.z(lat + 1, along + inward), HANGING_LANTERN);
 	}
 
 	// ------------------------------------------------------------------ plaza of the main ramp
