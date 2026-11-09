@@ -78,7 +78,7 @@ public final class WellRoofedStone implements Variant {
 			int v0 = (d - cs) / 2;
 			int v1 = v0 + cs - 1;
 			int ovU = uL >= 1 && w - 1 - uR >= 1 ? 1 : 0;
-			int ovV = v0 >= 1 && d - 1 - v1 >= 1 ? 1 : 0;
+			int ovV = 0; // the gables stay flush so the windlass can be seen from the front
 			return new Geo(w, d, cs, uL, uR, v0, v1, ovU, ovV);
 		}
 
