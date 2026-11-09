@@ -95,6 +95,7 @@ final class MonitorViews {
 		views.add(new Object[] {"front", "eye level, 7 blocks away", all, new Renderer.Camera(6, 10, iso), 1});
 		views.add(new Object[] {"wall", "6x3 wall from the left, low: frame depth and continuity", wallClip, new Renderer.Camera(-38, 14, iso * 2.4), 1});
 		views.add(new Object[] {"desks", "desk screens and the lone monitor, close", desks, new Renderer.Camera(28, 20, iso * 1.6), 1});
+		views.add(new Object[] {"desk1", "one desk screen with its lamp, very close", new Renderer.Clip(7, 0, -3, 11, 5, 3), new Renderer.Camera(24, 16, iso * 4.2), 1});
 		views.add(new Object[] {"far_20", "as seen from ~20 blocks (38 px/block, x2)", all, new Renderer.Camera(20, 14, 38), 2});
 		views.add(new Object[] {"far_50", "as seen from ~50 blocks (15 px/block, x4)", all, new Renderer.Camera(20, 14, 15), 4});
 		for (Object[] v : views) {

@@ -58,11 +58,11 @@ def grid(fill):
 
 
 # ---------------------------------------------------------------- palette
-LIGHT = rgb(0x6A6F78)    # top-left highlight of the bezel
-STEEL = rgb(0x4A4E56)
-BODY = rgb(0x3A3D44)     # flat casing
-SHADE = rgb(0x2B2D32)
-DEEP = rgb(0x1B1C20)
+LIGHT = rgb(0x9097A2)    # top-left highlight of the bezel
+STEEL = rgb(0x646A74)
+BODY = rgb(0x4B4F58)     # flat casing
+SHADE = rgb(0x363942)
+DEEP = rgb(0x23252B)
 LIP = rgb(0x0F1012)      # inner lip (towards the glass)
 GLASS = rgb(0x0B0D0F)
 GLASS2 = rgb(0x0E1114)
@@ -110,15 +110,19 @@ def box_casing(vents):
 
 
 def make_side():
-    # panel groove along the middle and three vent slits towards the back
-    g = box_casing([(5, 8, 14), (7, 8, 14), (9, 8, 14)])
-    for x in range(1, 15):
-        g[12][x] = SHADE
+    # clean brushed casing: an inset panel line, no vents (the sides show on a lone monitor and at the ends of a wall)
+    g = box_casing([])
+    for i in range(3, 13):
+        g[3][i] = g[12][i] = SHADE
+        g[i][3] = g[i][12] = SHADE
     return g
 
 
 def make_top():
-    g = box_casing([(y, 3, 13) for y in range(3, 13, 2)])
+    g = box_casing([])
+    for i in range(1, 15):
+        g[7][i] = SHADE
+        g[8][i] = LIGHT if i % 2 == 0 else STEEL
     return g
 
 
@@ -137,21 +141,21 @@ def make_back():
 
 
 def make_trim():
-    """Swatches. rows 0-2 foot top (brushed steel, front edge brightest), row 4 foot front, row 6 foot end,
-    row 8 lip inner faces (dark), row 10 lip top (bright), row 12 lip outer side."""
+    """Swatches. rows 0-3 foot top (brushed steel, front edge brightest), row 5 foot front, row 7 foot end,
+    row 9 lip inner faces (dark), row 11 lip top (bright), row 13 lip outer side."""
     g = grid(rgb(0x000000))
-    top = [rgb(0x4E525A), rgb(0x62666E), rgb(0x7E838C)]
-    for y in range(3):
+    top = [rgb(0x5C616A), rgb(0x6F747E), rgb(0x868C96), rgb(0xA9B0BA)]
+    for y in range(4):
         for x in range(16):
             c = top[y]
             if y == 1 and x % 4 == 0:
-                c = rgb(0x585C64)
+                c = rgb(0x757A84)
             g[y][x] = c
-    g[4] = [rgb(0x35383E)] * 16
-    g[6] = [rgb(0x2A2C31)] * 16
-    g[8] = [LIP] * 16
-    g[10] = [rgb(0x777C85)] * 16
-    g[12] = [rgb(0x44474E)] * 16
+    g[5] = [rgb(0x41444C)] * 16
+    g[7] = [rgb(0x30323A)] * 16
+    g[9] = [LIP] * 16
+    g[11] = [rgb(0xA0A6B0)] * 16
+    g[13] = [rgb(0x565B64)] * 16
     return g
 
 
@@ -160,12 +164,12 @@ def north_uv(xa, xb, ya, yb):
     return [16 - xb, 16 - yb, 16 - xa, 16 - ya]
 
 
-TRIM_FOOT_TOP = "#trim", [0, 0, 16, 3]
-TRIM_FOOT_FRONT = "#trim", [0, 4, 16, 5]
-TRIM_FOOT_END = "#trim", [0, 6, 3, 7]
-TRIM_LIP_INNER = "#trim", [0, 8, 16, 9]
-TRIM_LIP_TOP = "#trim", [0, 10, 16, 11]
-TRIM_LIP_SIDE = "#trim", [0, 12, 16, 13]
+TRIM_FOOT_TOP = "#trim", [0, 0, 16, 4]
+TRIM_FOOT_FRONT = "#trim", [0, 5, 16, 6]
+TRIM_FOOT_END = "#trim", [0, 7, 4, 8]
+TRIM_LIP_INNER = "#trim", [0, 9, 16, 10]
+TRIM_LIP_TOP = "#trim", [0, 11, 16, 12]
+TRIM_LIP_SIDE = "#trim", [0, 13, 16, 14]
 
 
 def face(spec):
@@ -205,12 +209,12 @@ def strip_up(l, r):
 
 
 def strip_down(l, r):
-    """Chin (y 1..3) and the foot under it (y 0..1, 3 px deep)."""
+    """Chin (y 1..3) and the foot under it (y 0..1, 4 px deep)."""
     xa, xb = span(l, r)
     chin = element([xa, 1, -1], [xb, 3, 0], {
         "north": {"texture": "#frame", "uv": north_uv(xa, xb, 1, 3)},
         "up": face(TRIM_LIP_INNER)})
-    foot = element([0, 0, -3], [16, 1, 0], {
+    foot = element([0, 0, -4], [16, 1, 0], {
         "north": face(TRIM_FOOT_FRONT), "up": face(TRIM_FOOT_TOP), "down": face(TRIM_LIP_INNER),
         "east": face(TRIM_FOOT_END), "west": face(TRIM_FOOT_END)})
     return [chin, foot]
