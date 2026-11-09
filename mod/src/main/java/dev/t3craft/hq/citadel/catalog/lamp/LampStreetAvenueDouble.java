@@ -26,7 +26,7 @@ import net.minecraft.world.level.block.state.properties.Half;
  * <li><b>Three heads by seed</b>: <i>crossbar</i> (a cross arm along the avenue, lanterns hung on chains, two per
  *     side from 9 wide), <i>candelabra</i> (two arms that end in posts with a standing lantern each, and a spike
  *     between) and <i>crossroads</i> (arms also towards the street and the back, from 3 deep).</li>
- * <li><b>Three materials by seed</b>: light stone brick on a deepslate foot, polished deepslate with gilt, or
+ * <li><b>Four materials by seed</b>: light stone brick on a deepslate foot, deepslate with a calcite capital, or a cherry-armed light-stone one, or
  *     deepslate with waxed copper (cut copper at the foot, copper bars, chain and lanterns) and a little weathering.</li>
  * <li><b>Useful</b>: from 2 deep a name plate (wall sign) hangs on the shaft at eye height; from
  *     5 wide a waste bin (cauldron); from 7 wide a bench facing the street. Everything stands beside the foot, so
@@ -39,7 +39,7 @@ import net.minecraft.world.level.block.state.properties.Half;
  * <li><b>Support</b>: every chain hangs from an arm bar, every lantern from a chain or stands on a post, and the
  *     arms spring from the boss or the capital on top of the shaft.</li>
  * </ul>
- * Size: 3–13 × 1–7 × 9+ (the shaft grows with the height, up to 7).
+ * Size: 5–13 × 1–7 × 9+ (the shaft grows with the height, up to 7).
  */
 public final class LampStreetAvenueDouble implements Variant {
 	/** One material set: foot, plinth, shaft, capital, arms and lanterns. */
@@ -56,20 +56,28 @@ public final class LampStreetAvenueDouble implements Variant {
 			case 1:
 				return new Mat(b(Blocks.POLISHED_BLACKSTONE_BRICKS), b(Blocks.CRACKED_POLISHED_BLACKSTONE_BRICKS),
 						slab(Blocks.POLISHED_BLACKSTONE_BRICK_SLAB), Blocks.POLISHED_BLACKSTONE_BRICK_STAIRS,
-						b(Blocks.CHISELED_DEEPSLATE), b(Blocks.POLISHED_DEEPSLATE_WALL), b(Blocks.DEEPSLATE_TILE_WALL),
+						b(Blocks.CHISELED_TUFF_BRICKS), b(Blocks.POLISHED_DEEPSLATE_WALL), b(Blocks.DEEPSLATE_TILE_WALL),
 						b(Blocks.POLISHED_DEEPSLATE_WALL), Blocks.IRON_BARS, b(Blocks.IRON_CHAIN).setValue(BlockStateProperties.AXIS, Direction.Axis.Y),
-						Blocks.DEEPSLATE_TILE_STAIRS, b(Blocks.CHISELED_POLISHED_BLACKSTONE), b(Blocks.GILDED_BLACKSTONE),
+						Blocks.TUFF_BRICK_STAIRS, b(Blocks.CALCITE), b(Blocks.GILDED_BLACKSTONE),
 						b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true),
 						b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, false));
 			case 2:
 				return new Mat(deepFoot, deepCracked, deepSlab, Blocks.DEEPSLATE_BRICK_STAIRS,
-						b(Blocks.CHISELED_COPPER.waxed().exposed()), b(Blocks.CUT_COPPER.waxed().unaffected()),
-						b(Blocks.CUT_COPPER.waxed().exposed()), b(Blocks.POLISHED_DEEPSLATE_WALL), Blocks.COPPER_BARS.waxed().unaffected(),
-						b(Blocks.COPPER_CHAIN.waxed().unaffected()).setValue(BlockStateProperties.AXIS, Direction.Axis.Y),
-						Blocks.CUT_COPPER_STAIRS.waxed().unaffected(), b(Blocks.CHISELED_COPPER.waxed().unaffected()),
-						b(Blocks.COPPER_GRATE.waxed().exposed()),
+						b(Blocks.CHISELED_COPPER.waxed().exposed()), b(Blocks.POLISHED_DEEPSLATE_WALL),
+						b(Blocks.DEEPSLATE_TILE_WALL), b(Blocks.DEEPSLATE_TILE_WALL), Blocks.COPPER_BARS.waxed().exposed(),
+						b(Blocks.COPPER_CHAIN.waxed().exposed()).setValue(BlockStateProperties.AXIS, Direction.Axis.Y),
+						Blocks.CUT_COPPER_STAIRS.waxed().exposed(), b(Blocks.CHISELED_COPPER.waxed().weathered()),
+						b(Blocks.COPPER_GRATE.waxed().weathered()),
 						b(Blocks.COPPER_LANTERN.waxed().unaffected()).setValue(BlockStateProperties.HANGING, true),
 						b(Blocks.COPPER_LANTERN.waxed().unaffected()).setValue(BlockStateProperties.HANGING, false));
+			case 3:
+				return new Mat(deepFoot, deepCracked, deepSlab, Blocks.DEEPSLATE_BRICK_STAIRS,
+						b(Blocks.CHISELED_STONE_BRICKS), b(Blocks.DIORITE_WALL), b(Blocks.ANDESITE_WALL),
+						b(Blocks.DIORITE_WALL), Blocks.CHERRY_FENCE,
+						b(Blocks.IRON_CHAIN).setValue(BlockStateProperties.AXIS, Direction.Axis.Y),
+						Blocks.CHERRY_STAIRS, b(Blocks.STRIPPED_CHERRY_LOG), b(Blocks.GILDED_BLACKSTONE),
+						b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true),
+						b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, false));
 			default:
 				return new Mat(deepFoot, deepCracked, deepSlab, Blocks.DEEPSLATE_BRICK_STAIRS,
 						b(Blocks.CHISELED_STONE_BRICKS), b(Blocks.STONE_BRICK_WALL), b(Blocks.MOSSY_STONE_BRICK_WALL),
@@ -92,7 +100,7 @@ public final class LampStreetAvenueDouble implements Variant {
 
 	@Override
 	public int minW() {
-		return 3;
+		return 5;
 	}
 
 	@Override
@@ -154,7 +162,7 @@ public final class LampStreetAvenueDouble implements Variant {
 	public void build(CitadelCanvas c, Plot p) {
 		int w = p.w();
 		int d = p.d();
-		Mat m = mat(p.hash(7, 7, 7, 3));
+		Mat m = mat(p.hash(7, 7, 7, 4));
 		int type = p.hash(5, 5, 5, 3);
 		int yS = Math.max(5, Math.min(7, p.h() - 4));
 		int cv = d / 2;
@@ -174,18 +182,14 @@ public final class LampStreetAvenueDouble implements Variant {
 		int a = Math.min(4, Math.min(cu, w - 1 - cu));
 		lamp(c, p, m, type, cu, cv, a, bv, yS, true);
 		int side = p.hash(6, 6, 6, 2) == 0 ? 1 : -1;
-		if (w >= 5) {
-			s(c, p, cu + side * 2, 0, cv, b(Blocks.CAULDRON)); // a waste bin beside the foot
-		}
-		if (w >= 7) {
-			bench(c, p, m, cu - side * 3, cu - side * 2, cv);
-		}
+		s(c, p, cu + side * 2, 0, cv, b(Blocks.COMPOSTER)); // a waste bin beside the foot
+		bench(c, p, m, cu - side * 3, cu - side * 2, cv);
 	}
 
 	/** A bench of stairs on the row {@code v}, from {@code u1} to {@code u2}, its seat open to the street. */
 	private static void bench(CitadelCanvas c, Plot p, Mat m, int u1, int u2, int v) {
 		for (int u = Math.min(u1, u2); u <= Math.max(u1, u2); u++) {
-			s(c, p, u, 0, v, stairs(m.footStairs(), Direction.SOUTH));
+			s(c, p, u, 0, v, stairs(Blocks.CHERRY_STAIRS, Direction.SOUTH));
 		}
 	}
 
@@ -271,7 +275,8 @@ public final class LampStreetAvenueDouble implements Variant {
 				}
 			}
 		}
-		s(c, p, cu, yArm + 1, cv, rod());
+		s(c, p, cu, yArm + 1, cv, m.lanternStand());
+		s(c, p, cu, yArm + 2, cv, rod());
 	}
 
 	/** Two arms that end in posts with a standing lantern, and a spike between them. */
@@ -292,7 +297,7 @@ public final class LampStreetAvenueDouble implements Variant {
 				}
 			}
 		}
-		s(c, p, cu, yArm + 1, cv, b(m.bars()));
+		s(c, p, cu, yArm + 1, cv, m.capital());
 		s(c, p, cu, yArm + 2, cv, rod());
 	}
 
@@ -307,7 +312,7 @@ public final class LampStreetAvenueDouble implements Variant {
 		int g = u2 - u1 + 1;
 		int d = p.d();
 		if (g == 1) {
-			s(c, p, u1, 0, cv, b(Blocks.CAULDRON));
+			s(c, p, u1, 0, cv, b(Blocks.COMPOSTER));
 			return;
 		}
 		if (g < 3 || d < 5) {
@@ -327,15 +332,15 @@ public final class LampStreetAvenueDouble implements Variant {
 				boolean eN = v == iv0;
 				boolean eS = v == iv1;
 				if ((eW || eE) && (eN || eS)) {
-					s(c, p, u, 0, v, m.footSlab());
+					s(c, p, u, 0, v, slab(Blocks.STONE_BRICK_SLAB));
 				} else if (eN) {
-					s(c, p, u, 0, v, stairs(m.footStairs(), Direction.SOUTH));
+					s(c, p, u, 0, v, stairs(Blocks.STONE_BRICK_STAIRS, Direction.SOUTH));
 				} else if (eS) {
-					s(c, p, u, 0, v, stairs(m.footStairs(), Direction.NORTH));
+					s(c, p, u, 0, v, stairs(Blocks.STONE_BRICK_STAIRS, Direction.NORTH));
 				} else if (eW) {
-					s(c, p, u, 0, v, stairs(m.footStairs(), Direction.EAST));
+					s(c, p, u, 0, v, stairs(Blocks.STONE_BRICK_STAIRS, Direction.EAST));
 				} else if (eE) {
-					s(c, p, u, 0, v, stairs(m.footStairs(), Direction.WEST));
+					s(c, p, u, 0, v, stairs(Blocks.STONE_BRICK_STAIRS, Direction.WEST));
 				} else if (u == um && v == vm) {
 					// the stele: it marks the way, a name plate on its face and a lantern on top
 					s(c, p, u, 0, v, m.dado());
@@ -358,7 +363,7 @@ public final class LampStreetAvenueDouble implements Variant {
 			case 2 -> b(Blocks.CORNFLOWER);
 			case 3 -> b(Blocks.FERN);
 			case 4 -> b(Blocks.FLOWERING_AZALEA);
-			default -> b(Blocks.MOSS_CARPET);
+			default -> b(Blocks.PINK_PETALS);
 		};
 	}
 }
