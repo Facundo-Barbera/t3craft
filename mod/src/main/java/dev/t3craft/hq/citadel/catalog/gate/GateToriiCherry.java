@@ -108,19 +108,19 @@ public final class GateToriiCherry implements Variant {
 		int ow = ou1 - ou0 + 1;
 		int v0 = (d - 2) / 2;
 		int v1 = Math.min(d - 1, v0 + 1);
-		boolean second = d >= 6 && ow >= 9 && p.hash(2, 0, 0, 2) == 0;
+		boolean second = d >= 8 && ow >= 9 && p.hash(2, 0, 0, 2) == 0;
 
 		// --- elevation: cap row c0 (a tall myōjin's tips climb two rows over it), body rows, shimaki, plaque rows, nuki
 		int top = Math.min(h, 16) - 1;
 		boolean tall = top >= 10;
 		int c0 = !tall ? top : shinmei ? top - 1 : top - 2;
-		int body = !tall ? (top >= 9 ? 1 : 0) : top >= 12 ? 2 : 1;
+		int body = !tall && top < 9 ? 0 : 1; // a slim kasagi: one row of planks under the cap
 		int shim = c0 - body - 1;
 		int gapRows = top >= 13 ? 2 : 1;
 		int gapTop = shim - 1;
 		int gapBot = gapTop - gapRows + 1;
 		int nuki = gapBot - 1;
-		int rise = shinmei ? 0 : Math.min(5, 2 * (top - c0 + 1) - 1); // half blocks the tips climb over the cap line
+		int rise = shinmei ? 0 : Math.min(4, 2 * (top - c0 + 1) - 1); // half blocks the tips climb over the cap line
 
 		// --- hashira on kamebara: two dark blocks of foot, a brick collar, the shaft with a binding under the nuki
 		int bandY = nuki - 1 >= 4 ? nuki - 1 : -1;
@@ -141,19 +141,19 @@ public final class GateToriiCherry implements Variant {
 				}
 				// the stair collar of the foot, front and back
 				if (v0 - 1 >= 0) {
-					p.set(c, u, 0, v0 - 1, stairs(Blocks.POLISHED_DEEPSLATE_STAIRS, Direction.SOUTH));
+					p.set(c, u, 0, v0 - 1, slab(Blocks.POLISHED_DEEPSLATE_SLAB));
 				}
 				if (v1 + 1 <= d - 1) {
-					p.set(c, u, 0, v1 + 1, stairs(Blocks.POLISHED_DEEPSLATE_STAIRS, Direction.NORTH));
+					p.set(c, u, 0, v1 + 1, slab(Blocks.POLISHED_DEEPSLATE_SLAB));
 				}
 			}
 		}
 		for (int v = v0; v <= v1; v++) { // and on the outer sides
 			if (l0 - 1 >= 0) {
-				p.set(c, l0 - 1, 0, v, stairs(Blocks.POLISHED_DEEPSLATE_STAIRS, Direction.EAST));
+				p.set(c, l0 - 1, 0, v, slab(Blocks.POLISHED_DEEPSLATE_SLAB));
 			}
 			if (r1 + 1 <= w - 1) {
-				p.set(c, r1 + 1, 0, v, stairs(Blocks.POLISHED_DEEPSLATE_STAIRS, Direction.WEST));
+				p.set(c, r1 + 1, 0, v, slab(Blocks.POLISHED_DEEPSLATE_SLAB));
 			}
 		}
 
@@ -170,12 +170,12 @@ public final class GateToriiCherry implements Variant {
 		}
 
 		// --- gakuzuka: a dark frame with a lit name panel (both faces), one or two rows tall
-		int plW = ow >= 11 ? 7 : ow >= 9 ? 5 : ow >= 7 ? 3 : 1;
+		int plW = ow >= 9 ? 5 : ow >= 7 ? 3 : 1;
 		if (w % 2 == 0) {
 			plW++;
 		}
 		int ps = (w - plW) / 2;
-		BlockState lit = b(p.hash(5, 0, 0, 2) == 0 ? Blocks.OCHRE_FROGLIGHT : Blocks.SHROOMLIGHT);
+		BlockState lit = b(Blocks.SHROOMLIGHT);
 		for (int u = ps; u < ps + plW; u++) {
 			boolean frame = plW < 3 || u == ps || u == ps + plW - 1;
 			for (int y = gapBot; y <= gapTop; y++) {
@@ -200,7 +200,7 @@ public final class GateToriiCherry implements Variant {
 			}
 		}
 
-		// --- shimaki: the red under-beam, the poking ends of a myōjin taper on dark red-brick stairs
+		// --- shimaki: the red under-beam, the poking ends of a myōjin are plain red, in line with the nuki
 		for (int u = l0; u <= r1; u++) {
 			for (int v = v0; v <= v1; v++) {
 				p.set(c, u, shim, v, RED);
@@ -209,10 +209,10 @@ public final class GateToriiCherry implements Variant {
 		if (!shinmei) {
 			for (int v = v0; v <= v1; v++) {
 				if (l0 - 1 >= 0) {
-					p.set(c, l0 - 1, shim, v, stairs(Blocks.RED_NETHER_BRICK_STAIRS, Direction.EAST).setValue(BlockStateProperties.HALF, Half.TOP));
+					p.set(c, l0 - 1, shim, v, RED);
 				}
 				if (r1 + 1 <= w - 1) {
-					p.set(c, r1 + 1, shim, v, stairs(Blocks.RED_NETHER_BRICK_STAIRS, Direction.WEST).setValue(BlockStateProperties.HALF, Half.TOP));
+					p.set(c, r1 + 1, shim, v, RED);
 				}
 			}
 		}
@@ -310,9 +310,8 @@ public final class GateToriiCherry implements Variant {
 			boolean outside = tips && (u < p0 || u > p1);
 			int rb = outside && r >= 2 ? Math.min(2, r - 1) : 0; // one block of lift at most: nobody can stand under the tip
 			boolean end = u == b0 || u == b1;
-			Direction out = 2 * u < mid ? Direction.WEST : Direction.EAST;
-			int yb = c0 - body + rb / 2;
-			int hh = 1 + r; // half blocks of the top surface over the cap line
+						int yb = c0 - body + rb / 2;
+			int hh = 1 + r - (end && tips && r >= 2 ? 1 : 0); // half blocks over the cap line; the last column is a notch lower: a point, not an ear
 			boolean odd = hh % 2 == 1;
 			int cap = odd ? c0 + hh / 2 : c0 + hh / 2 - 1;
 			for (int v = kv0; v <= kv1; v++) {
@@ -320,7 +319,7 @@ public final class GateToriiCherry implements Variant {
 					BlockState s;
 					if (y == yb && rb % 2 == 1) {
 						s = slab(Blocks.CHERRY_SLAB).setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP);
-					} else if (y == yb && body >= 2 && (end || (!outside && rb == 0 && (v == kv0 || v == kv1)))) {
+					} else if (y == yb && body >= 1 && (end || (!outside && rb == 0 && (v == kv0 || v == kv1)))) {
 						// the underside: thin at the faces and at the very tips, flat in the middle of the depth
 						Direction face = end ? (u == b0 ? Direction.EAST : Direction.WEST) : (v == kv0 ? Direction.SOUTH : Direction.NORTH);
 						if (kv0 == kv1 && !end) {
@@ -334,7 +333,7 @@ public final class GateToriiCherry implements Variant {
 					}
 					p.set(c, u, y, v, s);
 				}
-				BlockState piece = odd ? slab(Blocks.DEEPSLATE_TILE_SLAB) : end && tips && r > 0 ? stairs(Blocks.DEEPSLATE_TILE_STAIRS, out) : TILE;
+				BlockState piece = odd ? slab(Blocks.DEEPSLATE_TILE_SLAB) : TILE;
 				p.set(c, u, cap, v, piece);
 			}
 		}
