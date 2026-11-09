@@ -412,6 +412,9 @@ public final class GazeboCherryOctagon implements Variant {
 			if (drumLo >= 0 && j >= drumLo && j <= drumHi) {
 				if (m <= rho[j] && m > rho[j] - 1.0) {
 					p.set(c, u, y, v, dx == 0 || dz == 0 ? PINK_GLASS : b(Blocks.STRIPPED_CHERRY_WOOD));
+				} else if (j == drumHi && m > rho[j] && m <= rho[j + 1]) {
+					// [depth] brackets under the upper eave, leaning on the drum
+					p.set(c, u, y, v, upside(Blocks.CHERRY_STAIRS, in(dx, dz)));
 				}
 				continue;
 			}
