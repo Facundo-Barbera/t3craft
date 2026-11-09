@@ -111,7 +111,7 @@ public enum HallStyle {
 	/** The second colour of the rugs, never equal to {@code env}. */
 	public DyeColor alt(DyeColor env) {
 		DyeColor a = switch (this) {
-			case TIMBER -> DyeColor.BROWN;
+			case TIMBER -> DyeColor.LIGHT_GRAY;
 			case STONE -> DyeColor.LIGHT_GRAY;
 			default -> DyeColor.WHITE;
 		};

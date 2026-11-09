@@ -42,10 +42,12 @@ public final class HallInterior {
 		Set<Long> desks = deskColumns(r);
 		for (int f = 0; f < F; f++) {
 			int y = f * fh() + 1;
+			floor(c, r, f, s);
 			rug(c, r, F, f, s, env);
-			furniture(c, r, F, f, y, s, seed, desks);
+			furniture(c, r, F, f, y, s, env, seed, desks);
 			workArea(c, r, f, y, s, desks, seed);
 			pendants(c, r, F, f, m, desks);
+			beams(c, r, f, m);
 		}
 		if (F == 1) {
 			chandelier(c, r);
@@ -114,110 +116,152 @@ public final class HallInterior {
 		c.set(base, stairs(s.stairBlock(), wall));
 	}
 
-	// ------------------------------------------------------------------ rugs
+	// ------------------------------------------------------------------ floor and rug
 
-	private static void rug(CitadelCanvas c, Room r, int F, int f, HallStyle s, DyeColor env) {
+	/**
+	 * The floor of one storey, redrawn over the shell's plain floor: a dark frame one cell wide along the walls
+	 * and a 2x2 checker of two tones inside, by style. Only cells that still hold the shell's floor block are
+	 * touched (never the stair hole, never a stair step on the slab level).
+	 */
+	private static void floor(CitadelCanvas c, Room r, int f, HallStyle s) {
 		int W = r.w();
 		int D = r.d();
-		int mid = r.c();
-		int uMax = D - 3;
-		DyeColor alt = s.alt(env);
-		int y = f * fh() + 1;
-		for (int u = 0; u <= uMax; u++) {
-			for (int v = 1; v <= W - 2; v++) {
-				DyeColor col = rugColor(s, u, v, uMax, W, mid, env, alt);
-				if (col == null) {
+		int yf = f * fh();
+		BlockState plain = c.floor();
+		for (int u = 0; u < D; u++) {
+			for (int v = 0; v < W; v++) {
+				BlockPos p = r.cell(u, v, yf);
+				BlockState now = c.at(p.getX(), p.getY(), p.getZ());
+				if (now == null || !now.equals(plain)) {
 					continue;
 				}
-				BlockPos p = r.cell(u, v, y);
-				if (floored(c, p) && !(f == 1 && F == 2 && fenced(r, u, v))) {
-					c.set(p, b(Blocks.CARPET.pick(col)));
-				}
+				boolean edge = u == 0 || u == D - 1 || v == 0 || v == W - 1;
+				boolean accent = HallStyle.hash(u, v, f) % 9 == 0;
+				c.set(p, b(floorBlock(s, edge, accent)));
 			}
 		}
 	}
 
-	private static @Nullable DyeColor rugColor(HallStyle s, int u, int v, int uMax, int W, int mid, DyeColor env, DyeColor alt) {
-		switch (s) {
-			case TIMBER -> {
-				// a runner along the aisle
-				int dv = Math.abs(v - mid);
-				return dv > 1 ? null : dv == 1 ? alt : env;
-			}
-			case STONE -> {
-				// a bordered rug
-				if (u < 1 || u > uMax - 1 || v < 2 || v > W - 3) {
-					return null;
+	/** A calm floor: one field with a sparse second tone, inside a dark frame (all in the hall's own palette). */
+	private static net.minecraft.world.level.block.Block floorBlock(HallStyle s, boolean edge, boolean accent) {
+		return switch (s) {
+			case TIMBER -> edge || accent ? Blocks.DARK_OAK_PLANKS : Blocks.SPRUCE_PLANKS;
+			case STONE -> edge ? Blocks.POLISHED_DEEPSLATE : accent ? Blocks.MOSSY_STONE_BRICKS : Blocks.STONE_BRICKS;
+			case SHUTTERED -> edge ? Blocks.POLISHED_BLACKSTONE_BRICKS : accent ? Blocks.SPRUCE_PLANKS : Blocks.DARK_OAK_PLANKS;
+			case BALCONY -> edge ? Blocks.POLISHED_DEEPSLATE : accent ? Blocks.BAMBOO_MOSAIC : Blocks.SMOOTH_QUARTZ;
+		};
+	}
+
+	/**
+	 * The aisle: a runner three cells wide on the hall's centre line from the door to the back, in the project's
+	 * colour with a lighter edge. It is flat (the navigation walks over it) and skips the stairs and the railing.
+	 */
+	private static void rug(CitadelCanvas c, Room r, int F, int f, HallStyle s, DyeColor env) {
+		int D = r.d();
+		int mid = r.c();
+		DyeColor alt = s.alt(env);
+		int y = f * fh() + 1;
+		for (int u = 0; u <= D - 2; u++) {
+			for (int dv = -1; dv <= 1; dv++) {
+				BlockPos p = r.cell(u, mid + dv, y);
+				if (floored(c, p) && !(f == 1 && F == 2 && fenced(r, u, mid + dv))) {
+					c.set(p, b(Blocks.CARPET.pick(dv == 0 ? env : alt)));
 				}
-				return u == 1 || u == uMax - 1 || v == 2 || v == W - 3 ? alt : env;
-			}
-			case SHUTTERED -> {
-				// a checkered rug
-				if (u < 1 || u > uMax - 1 || v < 2 || v > W - 3) {
-					return null;
-				}
-				return (u + v) % 2 == 0 ? env : alt;
-			}
-			default -> {
-				// concentric rings
-				int ring = Math.min(Math.min(u, uMax - u), Math.min(v - 1, W - 2 - v));
-				return ring % 2 == 0 ? alt : env;
 			}
 		}
 	}
 
 	// ------------------------------------------------------------------ furniture
 
-	private static void furniture(CitadelCanvas c, Room r, int F, int f, int y, HallStyle s, int seed, Set<Long> desks) {
+	private static BlockState chest(Direction facing) {
+		return Blocks.CHEST.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, facing);
+	}
+
+	private static BlockState concrete(DyeColor col) {
+		return b(Blocks.CONCRETE.pick(col));
+	}
+
+	/**
+	 * The common zone is the strip along the door wall, on both sides of the door's aisle (cells {@code u = 0},
+	 * three each side): on one side the project board over a row of chests, on the other the archive (barrel,
+	 * chest and lectern with shelves above). Nothing stands in the aisle three cells wide, nor in the desks' columns.
+	 */
+	private static void furniture(CitadelCanvas c, Room r, int F, int f, int y, HallStyle s, DyeColor env, int seed, Set<Long> desks) {
 		int W = r.w();
 		int D = r.d();
 		int mid = r.c();
 		int h = HallStyle.hash(seed, f);
-		// the two front corners: cells (0,0) (1,0) (0,1) and their mirror
-		for (int sd = 0; sd < 2; sd++) {
-			final int side = sd;
-			int v0 = side == 0 ? 0 : W - 1;
-			int step = side == 0 ? 1 : -1;
-			BlockPos a = r.cell(0, v0, y);
-			BlockPos bb = r.cell(1, v0, y);
-			BlockPos cc = r.cell(0, v0 + step, y);
-			Direction wall = r.back().getOpposite();
-			boolean first = side == 0;
-			switch (s) {
-				case TIMBER -> {
-					place(c, desks, a, () -> shelf(c, a, 3, false, h));
-					place(c, desks, bb, () -> shelf(c, bb, 2, true, h + 1));
-					place(c, desks, cc, () -> tub(c, cc));
-				}
-				case STONE -> {
-					place(c, desks, a, () -> tub(c, a));
-					place(c, desks, bb, () -> shelf(c, bb, 2, false, h));
-					place(c, desks, cc, () -> put(c, cc, HallStyle.pot(h + side)));
-				}
-				case SHUTTERED -> {
-					place(c, desks, a, () -> bench(c, a, wall, s));
-					place(c, desks, cc, () -> bench(c, cc, wall, s));
-					place(c, desks, bb, () -> shelf(c, bb, first ? 2 : 1, true, h + 3));
-				}
-				case BALCONY -> {
-					place(c, desks, a, () -> shelf(c, a, 2, true, h));
-					place(c, desks, bb, () -> tub(c, bb));
-					place(c, desks, cc, () -> put(c, cc, HallStyle.pot(h + 2 + side)));
-				}
-			}
-		}
+		board(c, r, y, env, h, desks);
+		archive(c, r, y, W, h, desks);
 		// between the side desks: a lamp on a table on each side wall
 		for (int v : new int[] {0, W - 1}) {
 			BlockPos p = r.cell(D - 5, v, y);
 			place(c, desks, p, () -> lamp(c, p, s));
 		}
-		// the back corners and the back centre
+		// the back corners
 		for (int v : new int[] {0, W - 1}) {
 			BlockPos p = r.cell(D - 1, v, y);
 			place(c, desks, p, () -> tub(c, p));
 		}
+		// the project log: a lectern on the back centre line, between the two back desks, in front of the window
 		BlockPos back = r.cell(D - 1, mid, y);
-		place(c, desks, back, () -> shelf(c, back, s == HallStyle.SHUTTERED ? 2 : 3, s != HallStyle.TIMBER, h + 5));
+		place(c, desks, back, () -> c.set(back, Blocks.LECTERN.defaultBlockState()
+				.setValue(BlockStateProperties.HORIZONTAL_FACING, r.back().getOpposite())));
+	}
+
+	/** Columns of the board and of the archive: three in a one-storey-wide hall, five in a wider one. */
+	private static int zoneWidth(Room r) {
+		return Math.min(5, r.c() - 1);
+	}
+
+	/**
+	 * The project board, on the door wall left of the door's jamb: a header plate in the project's colour between
+	 * dark frame cells over rows of cards (to do red, doing orange, review yellow, done lime, shipped green; the
+	 * empty slots are white), over chests.
+	 */
+	private static void board(CitadelCanvas c, Room r, int y, DyeColor env, int h, Set<Long> desks) {
+		DyeColor[] cards = {DyeColor.RED, DyeColor.ORANGE, DyeColor.YELLOW, DyeColor.LIME, DyeColor.GREEN};
+		int n = zoneWidth(r);
+		int rows = fh() >= 8 ? 3 : 2;
+		for (int k = 0; k < n; k++) {
+			int v = r.c() - 2 - k;
+			BlockPos base = r.cell(0, v, y);
+			if (!floored(c, base) || desks.contains(col(base.getX(), base.getZ()))) {
+				continue;
+			}
+			DyeColor card = cards[n == 3 ? k * 2 : n - 1 - k];
+			c.set(base, chest(r.back()));
+			for (int row = 1; row <= rows; row++) {
+				boolean on = row == 1 || HallStyle.hash(h, v, row) % 3 != 0;
+				c.set(base.above(row), concrete(on ? card : DyeColor.WHITE));
+			}
+			c.set(base.above(rows + 1), k == n / 2 ? concrete(env) : b(Blocks.DARK_OAK_PLANKS));
+		}
+	}
+
+	/**
+	 * The archive, on the door wall right of the door's jamb: a lectern next to the door, then chests and barrels,
+	 * with bookshelves over the chests and barrels.
+	 */
+	private static void archive(CitadelCanvas c, Room r, int y, int W, int h, Set<Long> desks) {
+		int n = zoneWidth(r);
+		int shelf = Math.min(3, fh() - 4);
+		for (int k = 0; k < n; k++) {
+			BlockPos base = r.cell(0, r.c() + 2 + k, y);
+			if (!floored(c, base) || desks.contains(col(base.getX(), base.getZ()))) {
+				continue;
+			}
+			if (k == 0) {
+				c.set(base, Blocks.LECTERN.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, r.back()));
+				continue;
+			}
+			c.set(base, k % 2 == 1 ? chest(r.back())
+					: Blocks.BARREL.defaultBlockState().setValue(BlockStateProperties.FACING, r.back()));
+			for (int row = 1; row <= shelf - 1; row++) {
+				c.set(base.above(row), b(Blocks.BOOKSHELF));
+			}
+			put(c, base.above(shelf), HallStyle.pot(h + k));
+		}
 	}
 
 	/** Work blocks of the tables of a scaled hall, in the order a row repeats them. */
@@ -326,6 +370,27 @@ public final class HallInterior {
 				}
 				c.put(p.getX(), ceil - 1, p.getZ(), Blocks.IRON_CHAIN.defaultBlockState(), HANGING);
 				c.put(p.getX(), ceil - 2, p.getZ(), HallFacade.hangingLantern(), HANGING);
+			}
+		}
+	}
+
+	/**
+	 * Ceiling beams: a beam across the hall's width under the ceiling every {@value #PENDANT_STEP} cells, halfway
+	 * between two rows of pendant lanterns (so it never meets one) and clear of the stair hole. They give the
+	 * ceiling depth and make the height of the hall readable.
+	 */
+	private static void beams(CitadelCanvas c, Room r, int f, Mats m) {
+		int W = r.w();
+		int D = r.d();
+		int cu = D / 2;
+		int yb = (f + 1) * fh() - 1;
+		BlockState beam = HallFacade.beamLike(c, m.post(), r.side().getAxis());
+		for (int u = cu % PENDANT_STEP + PENDANT_STEP / 2; u < D; u += PENDANT_STEP) {
+			for (int v = 0; v < W; v++) {
+				BlockPos p = r.cell(u, v, yb);
+				if (free(c, p) && !free(c, p.above())) {
+					c.set(p, beam);
+				}
 			}
 		}
 	}
