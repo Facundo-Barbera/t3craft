@@ -107,7 +107,16 @@ public final class CitadelPlacement {
 
 	/** A plot request with its sizes at scale 1: frontage and depth grow with {@code s}, the height is given scaled. */
 	private static Req req(Family f, int minW, int maxW, int minD, int maxD, int h, Mode mode) {
-		return new Req(f, sc(minW), sc(maxW), sc(minD), sc(maxD), h, mode);
+		return new Req(f, sp(minW), sp(maxW), sp(minD), sp(maxD), h, mode);
+	}
+
+	/**
+	 * A plot side at scale {@code k}: {@code n · √k}. Catalog variants keep their own proportions and detail, so
+	 * the plots grow by the square root and their <i>count</i> by {@code k} ({@link #cnt}): a lot has {@code k²}
+	 * times the area, plots {@code k} times, so the fill stays what it is at scale 1 (a lot never looks empty).
+	 */
+	static int sp(int n) {
+		return Math.max(1, (int) Math.round(n * Math.sqrt(CitadelCanvas.dims().k)));
 	}
 
 	/** Free cells kept between two plots of a lot. */

@@ -3,6 +3,10 @@ package dev.t3craft.hq.citadel;
 import dev.t3craft.hq.Anchor;
 import dev.t3craft.hq.AnchorNames;
 import dev.t3craft.hq.HqGeometry;
+import dev.t3craft.hq.RingCampusGeometry;
+import java.util.HashMap;
+import java.util.Map;
+import net.minecraft.nbt.CompoundTag;
 import dev.t3craft.hq.RingCampusGeometry.Kind;
 import dev.t3craft.hq.RingCampusGeometry.Node;
 import dev.t3craft.hq.RingCampusGeometry.Zone;
@@ -64,20 +68,43 @@ public final class CitadelNodes {
 	private CitadelNodes() {
 	}
 
-	/** Paints node {@code nd}: all of its columns, then its furniture, then the fixtures of its kind. */
+	/**
+	 * Paints node {@code nd}: all of its columns, then its furniture, then the fixtures of its kind.
+	 *
+	 * <p>Scale ({@code k > 1}): the rooms are designed at one size (the shell classes and {@link NodeDecor}
+	 * work in design offsets {@code (dx, dz)} from the centre). They are painted at that size over the
+	 * node's centre, then magnified horizontally onto the node's real zone ({@link #magnify}): every real
+	 * column copies the design column {@code (round(dx / k), round(dz / k))}, so walls, piers, windows,
+	 * doors, stairs and furniture grow by {@code k} in plan and keep their heights (a stair step stays one
+	 * block high and becomes {@code k} deep, a door stays 3 high and becomes {@code 3k} wide). Fixtures
+	 * (screens, terminal, walk spots) keep their size and move to the scaled position.
+	 */
 	public static void node(CitadelCanvas c, Node nd) {
-		// the node's zone grows with the citadel's scale (nd.size()); the rooms keep their designed size in
-		// its centre and the rest of the zone is their apron (floor only): see TowerRoom, RotundaRoom, CloisterRoom
-		int R = Math.max(8, (int) Math.ceil(nd.size()) + 1);
-		for (int x = nd.cx() - R; x <= nd.cx() + R; x++) {
-			for (int z = nd.cz() - R; z <= nd.cz() + R; z++) {
-				Zone zn = c.zoneAt(x, z);
-				if (zn.kind() == Kind.NODE && zn.node() == nd.k()) {
-					nodeCell(c, nd, x, z);
+		double k = c.k;
+		if (k <= 1.0) {
+			int R = Math.max(8, (int) Math.ceil(nd.size()) + 1);
+			for (int x = nd.cx() - R; x <= nd.cx() + R; x++) {
+				for (int z = nd.cz() - R; z <= nd.cz() + R; z++) {
+					Zone zn = c.zoneAt(x, z);
+					if (zn.kind() == Kind.NODE && zn.node() == nd.k()) {
+						nodeCell(c, nd, x, z);
+					}
 				}
 			}
+			NodeDecor.furnish(c, nd);
+		} else {
+			Node design = new Node(nd.k(), nd.kind(), nd.cx(), nd.cz(), nd.size() / k);
+			int R = Math.max(8, (int) Math.ceil(design.size()) + 1);
+			for (int x = nd.cx() - R; x <= nd.cx() + R; x++) {
+				for (int z = nd.cz() - R; z <= nd.cz() + R; z++) {
+					if (design.contains(x, z)) {
+						nodeCell(c, nd, x, z);
+					}
+				}
+			}
+			NodeDecor.furnish(c, nd);
+			magnify(c, nd, design, R, k);
 		}
-		NodeDecor.furnish(c, nd);
 		switch (nd.kind()) {
 			case REVIEW_TOWER -> towerFixtures(c, nd);
 			case SCHEDULE_ROTUNDA -> rotundaFixtures(c, nd);
@@ -85,6 +112,108 @@ public final class CitadelNodes {
 			case LOUNGE_SUNKEN -> loungeFixtures(c, nd);
 			default -> {
 			}
+		}
+	}
+
+	private static final int Y_MIN = -8;
+	private static final int Y_MAX = 90;
+
+	/** A design offset of a real offset {@code n}: {@code round(|n| / k)} with the sign of {@code n}. */
+	static int design(int n, double k) {
+		int a = (int) Math.floor(Math.abs(n) / k + 0.5);
+		return n < 0 ? -a : a;
+	}
+
+	/** The real offset at the middle of the span of design offset {@code u}: {@code round(u · k)}. */
+	static int real(int u, double k) {
+		return RingCampusGeometry.s(k, u);
+	}
+
+	/** The real offset of the face of design offset {@code u} nearest the centre (a wall's inner face). */
+	static int realInner(int u, double k) {
+		int a = Math.abs(u);
+		int n = (int) Math.max(0, Math.ceil((a - 0.5) * k - 1e-9));
+		while (design(n, k) < a) {
+			n++;
+		}
+		while (n > 0 && design(n - 1, k) >= a) {
+			n--;
+		}
+		return u < 0 ? -n : n;
+	}
+
+	/** Copies each real column of the node from the design column it magnifies (see {@link #node}). */
+	private static void magnify(CitadelCanvas c, Node nd, Node design, int R, double k) {
+		int cx = nd.cx();
+		int cz = nd.cz();
+		int span = (int) Math.ceil(nd.size()) + 2;
+		int dspan = Math.max(R, (int) Math.ceil(design.size()) + 1);
+		// 1. snapshot of the design columns
+		Map<Long, Column> snap = new HashMap<>();
+		for (int dx = -dspan; dx <= dspan; dx++) {
+			for (int dz = -dspan; dz <= dspan; dz++) {
+				if (design.contains(cx + dx, cz + dz)) {
+					snap.put(CitadelCanvas.col(dx, dz), Column.of(c, cx + dx, cz + dz));
+				}
+			}
+		}
+		// 2. every real column of the node takes the design column it magnifies
+		for (int dx = -span; dx <= span; dx++) {
+			for (int dz = -span; dz <= span; dz++) {
+				Zone zn = c.zoneAt(cx + dx, cz + dz);
+				if (zn.kind() != Kind.NODE || zn.node() != nd.k()) {
+					continue;
+				}
+				int u = design(dx, k);
+				int w = design(dz, k);
+				Column src = snap.get(CitadelCanvas.col(u, w));
+				while (src == null && (u != 0 || w != 0)) {
+					u -= Integer.signum(u);
+					w -= Integer.signum(w);
+					src = snap.get(CitadelCanvas.col(u, w));
+				}
+				if (src != null) {
+					src.paste(c, cx + dx, cz + dz);
+				}
+			}
+		}
+	}
+
+	/** The cells of one column, from {@link #Y_MIN} to {@link #Y_MAX}. */
+	private record Column(Map<Integer, BlockState> states, Map<Integer, Integer> layers, Map<Integer, CompoundTag> data) {
+		static Column of(CitadelCanvas c, int x, int z) {
+			Map<Integer, BlockState> st = new HashMap<>();
+			Map<Integer, Integer> ly = new HashMap<>();
+			Map<Integer, CompoundTag> dt = new HashMap<>();
+			for (int y = Y_MIN; y <= Y_MAX; y++) {
+				long key = BlockPos.asLong(x, y, z);
+				BlockState s = c.cells.get(key);
+				if (s != null) {
+					st.put(y, s);
+					ly.put(y, c.layers.getOrDefault(key, CitadelCanvas.SOLID));
+					CompoundTag t = c.data.get(key);
+					if (t != null) {
+						dt.put(y, t);
+					}
+				}
+			}
+			return new Column(st, ly, dt);
+		}
+
+		void paste(CitadelCanvas c, int x, int z) {
+			for (int y = Y_MIN; y <= Y_MAX; y++) {
+				long key = BlockPos.asLong(x, y, z);
+				c.cells.remove(key);
+				c.layers.remove(key);
+				c.data.remove(key);
+			}
+			states.forEach((y, s) -> {
+				c.put(x, y, z, s, layers.get(y));
+				CompoundTag t = data.get(y);
+				if (t != null) {
+					c.data.put(BlockPos.asLong(x, y, z), t);
+				}
+			});
 		}
 	}
 
@@ -118,8 +247,9 @@ public final class CitadelNodes {
 	public static void towerFixtures(CitadelCanvas c, Node nd) {
 		int cx = nd.cx();
 		int cz = nd.cz();
-		CitadelHub.bigScreen(c, new HqGeometry.Surface(new BlockPos(cx - 3, 5, cz - 5), Direction.EAST, Direction.SOUTH, 7, 4), "review", "", false);
-		c.walkSpot(new BlockPos(cx, 1, cz - 2), Direction.NORTH);
+		// the screen keeps its 7 x 4; it stays flush in the (thicker) north wall, on the wall's inner face
+		CitadelHub.bigScreen(c, new HqGeometry.Surface(new BlockPos(cx - 3, 5, cz + realInner(-5, c.k)), Direction.EAST, Direction.SOUTH, 7, 4), "review", "", false);
+		c.walkSpot(new BlockPos(cx, 1, cz + real(-2, c.k)), Direction.NORTH);
 	}
 
 	// ------------------------------------------------------------------ schedule rotunda
@@ -133,8 +263,8 @@ public final class CitadelNodes {
 	public static void rotundaFixtures(CitadelCanvas c, Node nd) {
 		int cx = nd.cx();
 		int cz = nd.cz();
-		CitadelHub.bigScreen(c, new HqGeometry.Surface(new BlockPos(cx + 4, 2, cz - 2), Direction.SOUTH, Direction.WEST, 5, 3), "schedule", "", true);
-		c.walkSpot(new BlockPos(cx - 1, 1, cz), Direction.EAST);
+		CitadelHub.bigScreen(c, new HqGeometry.Surface(new BlockPos(cx + real(4, c.k), 2, cz - 2), Direction.SOUTH, Direction.WEST, 5, 3), "schedule", "", true);
+		c.walkSpot(new BlockPos(cx + real(-1, c.k), 1, cz), Direction.EAST);
 	}
 
 	// ------------------------------------------------------------------ archive cloister
@@ -148,11 +278,11 @@ public final class CitadelNodes {
 	public static void cloisterFixtures(CitadelCanvas c, Node nd) {
 		int cx = nd.cx();
 		int cz = nd.cz();
-		BlockPos t = new BlockPos(cx + 3, 1, cz - 6);
+		BlockPos t = new BlockPos(cx + real(3, c.k), 1, cz + realInner(-6, c.k));
 		c.fixture(t, c.style.archiveTerminal(Direction.SOUTH));
 		c.anchor(Anchor.face(AnchorNames.ARCHIVE_TERMINAL, t, Direction.SOUTH));
 		c.anchor(Anchor.at(AnchorNames.ARCHIVE, t.south(), Direction.NORTH));
-		c.walkSpot(new BlockPos(cx - 4, 1, cz), Direction.EAST);
+		c.walkSpot(new BlockPos(cx + real(-4, c.k), 1, cz), Direction.EAST);
 	}
 
 	// ------------------------------------------------------------------ lounge
@@ -164,7 +294,7 @@ public final class CitadelNodes {
 
 	/** The fixtures of the lounge: a walk spot at the bottom of the amphitheatre. */
 	public static void loungeFixtures(CitadelCanvas c, Node nd) {
-		c.walkSpot(new BlockPos(nd.cx() + 1, -2, nd.cz()), Direction.WEST);
+		c.walkSpot(new BlockPos(nd.cx() + real(1, c.k), -2, nd.cz()), Direction.WEST);
 	}
 
 	// ------------------------------------------------------------------ diagonal nodes
