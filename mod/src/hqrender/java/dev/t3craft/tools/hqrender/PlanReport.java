@@ -737,6 +737,7 @@ public final class PlanReport {
 		int seen = 0;
 		int floor = 0;
 		JsonArray floorJ = new JsonArray();
+		Map<String, JsonArray> cellsByType = new TreeMap<>(); // the first cells of each emitter type, to find a piece in the plan
 		for (Placement p : plan.placements()) {
 			if (!in(p.rel()) || p.state().getLightEmission() <= 0) {
 				continue;
@@ -753,6 +754,10 @@ public final class PlanReport {
 			}
 			boolean inFloor = !invisible && open(plan, pos.above()) && reach.contains(pos.above());
 			int[] t = byType.computeIfAbsent(id(p.state()), k -> new int[3]);
+			JsonArray cells = cellsByType.computeIfAbsent(id(p.state()), k -> new JsonArray());
+			if (cells.size() < 40) {
+				cells.add(arr(pos.getX(), pos.getY(), pos.getZ()));
+			}
 			t[0]++;
 			total++;
 			if (visible) {
@@ -788,6 +793,7 @@ public final class PlanReport {
 			t.addProperty("total", e.getValue()[0]);
 			t.addProperty("seen", e.getValue()[1]);
 			t.addProperty("floor", e.getValue()[2]);
+			t.add("cells", cellsByType.get(e.getKey()));
 			tj.add(e.getKey(), t);
 		}
 		JsonObject j = new JsonObject();
