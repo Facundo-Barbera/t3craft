@@ -73,9 +73,11 @@ final class CitadelPaving {
 	static final BlockState RIB_BAND = CitadelCanvas.RIB;
 	/** The sidewalk of every road: smooth stone, with a course of stone brick across it every {@link #ACERA_EVERY} cells. */
 	static final BlockState ACERA = SIDE;
-	static final BlockState ACERA_PAVER = BRICKS;
+	static final BlockState ACERA_PAVER = JOINT;
 	/** Period (cells along the road) of the courses of the sidewalk: a pattern, not a size, so it is not scaled. */
-	static final int ACERA_EVERY = 4;
+	static final int ACERA_EVERY = 6;
+	/** The dashed line down the middle of a street: 3 cells of smooth stone, 3 of road. A pattern, not a size. */
+	static final int DASH = 3;
 
 	// Sizes: all proportions or mirrors of the geometry.
 
@@ -404,7 +406,15 @@ final class CitadelPaving {
 		if (edge < LANE_FRAC * width) {
 			return hash(x, z) < 5 ? CRACKED : BRICKS;
 		}
+		if (dashed(r, lo, hi, arc)) {
+			return SIDE;
+		}
 		return joint(arc, width) ? BRICKS : JOINT;
+	}
+
+	/** The cell is on the dashed line down the middle of a street (one cell wide, {@link #DASH} on, {@link #DASH} off). */
+	private static boolean dashed(double r, double lo, double hi, double arc) {
+		return Math.abs(r - (lo + hi) / 2) < 0.5 && Math.floorMod((int) Math.round(arc), 2 * DASH) < DASH;
 	}
 
 	/**
@@ -419,7 +429,10 @@ final class CitadelPaving {
 		if (edge < LANE_FRAC * width) {
 			return hash(x, z) < 5 ? MOSSY : PACKED_MUD;
 		}
-		return joint(arc, width) ? PACKED_MUD : MUD;
+		if (dashed(r, lo, hi, arc)) {
+			return SIDE;
+		}
+		return joint(arc, width) ? BRICKS : MUD;
 	}
 
 	// ------------------------------------------------------------------ verges

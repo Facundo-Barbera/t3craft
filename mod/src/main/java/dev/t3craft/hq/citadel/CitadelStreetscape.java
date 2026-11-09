@@ -105,7 +105,7 @@ final class CitadelStreetscape {
 	/** Height of a lantern post of a plaza (wall blocks under the lantern). */
 	static final int PLAZA_POST = 3;
 	/** Height of the walls (stone-brick posts) under the tall lantern of a focal point. */
-	static final int FOCAL_POSTS = 2;
+	static final int FOCAL_POSTS = 4;
 	/** Lateral distance (cells from the avenue's axis) of the benches of a plazoleta: just past the mouth of the avenue. */
 	static int BENCH_LAT() {
 		return (int) Math.round(CitadelPaving.MOUTH_D() + 1.25);
