@@ -67,6 +67,7 @@ public final class HouseJapaneseEngawa implements Variant {
 	private static final int FL = 1; // the floor blocks (deck, tatami); people stand on y2
 	private static final int ST = 2; // the layer people stand in
 	private static final int BEAM = 6; // beam on posts and walls; 4 clear blocks y2..y5 under it
+	private static final boolean CUTAWAY = true; // TEMP
 	private static final int BASE = 6; // roof height of ring 0 (the eave tip)
 
 	@Override
@@ -110,7 +111,7 @@ public final class HouseJapaneseEngawa implements Variant {
 
 	private static final Scheme[] SCHEMES = {
 			new Scheme(Blocks.DARK_OAK_LOG, Blocks.CHERRY_STAIRS, Blocks.BAMBOO_MOSAIC, Blocks.SPRUCE_PLANKS),
-			new Scheme(Blocks.DARK_OAK_LOG, Blocks.DARK_OAK_STAIRS, Blocks.SPRUCE_PLANKS, Blocks.DARK_OAK_PLANKS),
+			new Scheme(Blocks.DARK_OAK_LOG, Blocks.CHERRY_STAIRS, Blocks.SPRUCE_PLANKS, Blocks.DARK_OAK_PLANKS),
 			new Scheme(Blocks.SPRUCE_LOG, Blocks.SPRUCE_STAIRS, Blocks.BAMBOO_MOSAIC, Blocks.OAK_PLANKS),
 	};
 
@@ -235,7 +236,9 @@ public final class HouseJapaneseEngawa implements Variant {
 			garden();
 			program();
 			walls();
-			roof();
+			if (!CUTAWAY) {
+				roof();
+			}
 		}
 
 		// ------------------------------------------------------------------ layout: footprint, rings, rooms
@@ -384,9 +387,9 @@ public final class HouseJapaneseEngawa implements Variant {
 
 		BlockState stone(int a, int y, int bb) {
 			return switch (p.hash(a, y, bb, 6)) {
-				case 0 -> b(Blocks.CRACKED_DEEPSLATE_BRICKS);
-				case 1 -> b(Blocks.COBBLED_DEEPSLATE);
-				default -> b(Blocks.DEEPSLATE_BRICKS);
+				case 0 -> b(Blocks.MOSSY_STONE_BRICKS);
+				case 1 -> b(Blocks.CRACKED_STONE_BRICKS);
+				default -> b(Blocks.STONE_BRICKS);
 			};
 		}
 
@@ -559,12 +562,12 @@ public final class HouseJapaneseEngawa implements Variant {
 							firstUp = i;
 						}
 					}
-					Block mat = r == 0 ? s.fascia() : p.hash(a, h, bb, 6) == 0 ? Blocks.DEEPSLATE_BRICK_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS;
+					Block mat = r == 0 ? s.fascia() : (r % 3 == 1 || p.hash(a, h, bb, 6) == 0) ? Blocks.DEEPSLATE_BRICK_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS;
 					boolean ridge = isRidge(a, bb);
 					int y = h;
 					if (ridge) {
 						set(a, h, bb, b(Blocks.POLISHED_DEEPSLATE));
-						set(a, h + 1, bb, slab(Blocks.DEEPSLATE_BRICK_SLAB));
+						set(a, h + 1, bb, slab(Blocks.CHERRY_SLAB));
 						int rn = 0;
 						boolean opp = false;
 						boolean ns = false;
@@ -883,9 +886,6 @@ public final class HouseJapaneseEngawa implements Variant {
 			if (hi - lo >= 3) {
 				set(far, 1, gb, b(Blocks.FLOWERING_AZALEA));
 				set(far + (nearHigh ? 1 : -1), 1, gb, b(Blocks.POTTED_CHERRY_SAPLING));
-			}
-			if (gb >= 3 && hi - lo >= 4) {
-				JapaneseKit.sakura(c, p, mu(far, 2), 1, mv(far, 2), 0);
 			}
 		}
 
