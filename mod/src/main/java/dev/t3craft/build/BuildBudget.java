@@ -35,15 +35,12 @@ public final class BuildBudget {
 	private long workNanos;
 	private int workBlocks;
 	private double nanosPerBlock;
-<<<<<<< HEAD
 	/** feat/build-near-player: what fast foundation layers may still use this tick (blocks, ns), all jobs together. */
 	private int foundationBlocksLeft;
 	private long foundationNanosLeft;
-=======
 	/** fix/new-thread-hitch: light-changing placements this tick, and the extra budget they still owe. */
 	private int lightBlocks;
 	private double lightDebt;
->>>>>>> origin/fix/new-thread-hitch
 
 	/**
 	 * Wall-clock budget for block placement per server tick (ms), out of the 50 ms tick: the
