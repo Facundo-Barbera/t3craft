@@ -122,7 +122,7 @@ public final class StallFruitAwning implements Variant {
 		posts(c, p, g);
 		counter(c, p, g);
 		apron(c, p, g);
-		backWall(c, p, g);
+		backWall(c, p, g, st);
 		aisle(c, p, g);
 		lights(c, p, g);
 	}
@@ -131,19 +131,13 @@ public final class StallFruitAwning implements Variant {
 
 	/**
 	 * [depth] stripes run front to back across the whole width (past the posts); the cloth is flat over
-	 * the counter and then steps up half a block per row. A slab ridge crowns the back when there is height for it.
+	 * the counter and then steps up half a block per row.
 	 */
 	private static void awning(CitadelCanvas c, Plot p, Geo g, BlockState[] st) {
 		for (int v = 0; v < g.d; v++) {
 			int y = g.ay(v);
 			for (int u = 0; u < g.w; u++) {
 				p.set(c, u, y, v, st[u % 2]);
-			}
-		}
-		int top = g.ay(g.bv) + 1;
-		if (top < g.h) {
-			for (int u = 0; u < g.w; u++) {
-				p.set(c, u, top, g.bv, slab(Blocks.DARK_OAK_SLAB));
 			}
 		}
 	}
@@ -243,9 +237,9 @@ public final class StallFruitAwning implements Variant {
 
 	/**
 	 * A chest first, barrels with produce next, and a bench at the end (stairs facing the counter). When the
-	 * cloth is higher than 3, a dark-oak header beam spans the back over everything but the bench.
+	 * cloth is higher than 3, a dark-oak header beam spans the back over everything but the bench and the cloth drops to it.
 	 */
-	private static void backWall(CitadelCanvas c, Plot p, Geo g) {
+	private static void backWall(CitadelCanvas c, Plot p, Geo g, BlockState[] st) {
 		int n = g.hi() - g.lo() + 1;
 		boolean beam = g.ay(g.bv) > 3;
 		for (int k = 0; k < n; k++) {
@@ -262,6 +256,9 @@ public final class StallFruitAwning implements Variant {
 			}
 			if (beam) {
 				p.set(c, u, 3, g.bv, b(Blocks.DARK_OAK_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.X)); // [depth] header beam
+				for (int y = 4; y <= g.ay(g.bv) - 2; y++) {
+					p.set(c, u, y, g.bv, st[u % 2]); // [depth] a tall plot's cloth drops as a back valance down to the beam, nobody stands on it
+				}
 			}
 		}
 	}
