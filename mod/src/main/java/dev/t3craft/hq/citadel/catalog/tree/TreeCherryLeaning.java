@@ -142,6 +142,15 @@ public final class TreeCherryLeaning implements Variant {
 		for (int y = 1; y < YS; y++) {
 			t.wood(lu, y, lv, TreeKit.CHERRY.log(net.minecraft.core.Direction.Axis.Y));
 		}
+		// a buttress on the back of the column, one block high: the trunk looks pulled by the lean
+		int backU = lu - du;
+		int backV = lv - dv;
+		if (diag) {
+			backU = lu;
+		}
+		if (backU >= bu && backU <= bu + 1 && backV >= bv && backV <= bv + 1) {
+			t.wood(backU, 1, backV, TreeKit.CHERRY.bark());
+		}
 		int bias = octant(-du, -dv);
 		TreeKit.roots(t, TreeKit.CHERRY, bu, bv, 3, 2, bias, 11);
 
@@ -149,6 +158,16 @@ public final class TreeCherryLeaning implements Variant {
 		int eu = lu + ke * du;
 		int ev = lv + ke * dv;
 		List<int[]> segA = TreeKit.branch(t, TreeKit.CHERRY, new int[] {lu, YS, lv}, new int[] {eu, yElbow, ev}, false);
+		// a heavier trunk where it leaves the foot (6+ wide, straight leans): a second log beside the first ones, never lower than y = 3
+		if (mn >= 7 && !diag) {
+			int side = r.nextBoolean() ? 1 : -1;
+			int pu = -dv * side;
+			int pv = du * side;
+			for (int i = 1; i < Math.min(4, segA.size()); i++) {
+				int[] q = segA.get(i);
+				t.woodSoft(q[0] + pu, q[1], q[2] + pv, TreeKit.CHERRY.bark());
+			}
+		}
 		List<int[]> segB = TreeKit.branch(t, TreeKit.CHERRY, new int[] {eu, yElbow, ev}, new int[] {tu, ytip, tv}, false);
 
 		// ---- clouds
