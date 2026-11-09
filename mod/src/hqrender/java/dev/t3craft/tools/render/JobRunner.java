@@ -46,12 +46,19 @@ final class JobRunner {
 	private record Entry(String className, String method) {
 	}
 
+	/** Read by {@link #entryOf}; a string because the class is loaded through {@code RenderClassLoader} per job, not linked here. */
+	private static final String HQ_RENDER_CLASS = "dev.t3craft.tools.hqrender.HqRender";
+	private static final String HQ_RENDER_METHOD = "run";
+	/** Read by {@link #entryOf}; a string for the same reason (the plug for tools/ui-render, see docs/tools/render-service.md). */
+	private static final String UI_RENDER_CLASS = "dev.t3craft.tools.uirender.UiRender";
+	private static final String UI_RENDER_METHOD = "render";
+
 	private static Entry entryOf(String kind) {
 		return switch (kind) {
 			// ./gradlew hqRender's renderer, minus the boot (the daemon booted once)
-			case "hq" -> new Entry("dev.t3craft.tools.hqrender.HqRender", "run");
+			case "hq" -> new Entry(HQ_RENDER_CLASS, HQ_RENDER_METHOD);
 			// the plug for tools/ui-render: public static void render(String[] args) in this class (see docs/tools/render-service.md)
-			case "ui" -> new Entry("dev.t3craft.tools.uirender.UiRender", "render");
+			case "ui" -> new Entry(UI_RENDER_CLASS, UI_RENDER_METHOD);
 			default -> throw new IllegalArgumentException(kind);
 		};
 	}

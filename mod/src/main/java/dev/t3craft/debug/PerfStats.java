@@ -46,6 +46,21 @@ public final class PerfStats {
 		this.windowStartNs = nanoClock.getAsLong();
 	}
 
+	/**
+	 * Master switch (decision D3: debug tooling is off in a normal game). While off, {@link #add} and the
+	 * step timers do nothing, so the hot paths cost one volatile read. Turned on at start-up by
+	 * {@code DevReloadClient} in a development environment or with {@code -Dt3craft.perf=true}.
+	 */
+	private static volatile boolean enabled;
+
+	public static void setEnabled(boolean on) {
+		enabled = on;
+	}
+
+	public static boolean enabled() {
+		return enabled;
+	}
+
 	public static PerfStats get() {
 		return INSTANCE;
 	}
@@ -82,6 +97,9 @@ public final class PerfStats {
 	 * calls and two map lookups.
 	 */
 	public static long step(String key, long startNs) {
+		if (!enabled) {
+			return 0;
+		}
 		long ns = System.nanoTime() - startNs;
 		INSTANCE.add(key, ns);
 		INSTANCE.peak(key, ns);
@@ -97,6 +115,9 @@ public final class PerfStats {
 
 	/** Like {@link #step} for work done <b>off</b> the game threads (background planner): timed, peak kept, no WARN. */
 	public static long stepAsync(String key, long startNs) {
+		if (!enabled) {
+			return 0;
+		}
 		long ns = System.nanoTime() - startNs;
 		INSTANCE.add(key, ns);
 		INSTANCE.peak(key, ns);
@@ -137,7 +158,7 @@ public final class PerfStats {
 	}
 
 	public void add(String key, long n) {
-		if (n != 0) {
+		if (n != 0 && enabled) {
 			totals.computeIfAbsent(key, k -> new AtomicLong()).addAndGet(n);
 		}
 	}

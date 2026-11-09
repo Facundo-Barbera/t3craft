@@ -59,9 +59,7 @@ PortableItems (common) ─ TerminalItem.use() (cliente) ─► PortableClient.op
 
 ### Integración necesaria (Taller)
 
-1. **feat/chat.** Si exporta un `public static void open(String envId, String threadId)` en `ChatScreens`, en uno de estos paquetes: `dev.t3craft.client.chat`, `dev.t3craft.client.screen` o `dev.t3craft.client`, se descubre solo por reflexión (`PortableLinks.CHAT_CANDIDATES`). Si no, o para que quede explícito, al iniciar el cliente:
-   `PortableLinks.setChat(ChatScreens::open);`
-   Mientras tanto se usa el `ThreadChatScreen` provisional que ya está en main.
+1. **feat/chat.** `PortableLinks` referencia `dev.t3craft.client.chat.ChatScreens.open(String, String)` directamente (referencia de método en tiempo de compilación, sin reflexión); `PortableClient` la reemplaza con `PortableLinks.setChat(...)`.
 2. **feat/config.** `PortableLinks.setEnvironments(parent -> mc.gui.setScreen(new <PantallaEntornos>(parent)));`. Mientras tanto se usa el `PairScreen` de main.
 3. Nada más. El registro en `T3CraftClient` y el hook de `Notifier` ya están en esta rama.
 
@@ -182,7 +180,7 @@ widget (bounds, tema inyectable, modo compacto). El portable lo incrustará dent
   - Estados de conexión: `NOT_CONFIGURED`, `DISCONNECTED`, basta un entorno ok, y en bridge manda el enlace (las filas viejas con el enlace caído cuentan como desconectado).
   - `splitId`.
 - `NotificationLogTest`: vacío por defecto, el más nuevo primero, no leídos, anillo acotado, entrada sin hilo.
-- `PortableLinksTest`: descubre un `open(String, String)` estático por nombre, ignora métodos de instancia y cae al fallback.
+- `PortableLinksTest` (histórico; ya no hay descubrimiento por reflexión): enlazaba un `open(String, String)` estático por nombre.
 - `held/HeldScreenModelTest`: estados honestos, lista unificada con chips y orden por atención, último mensaje del hilo top, recorte a ancho y filas, `+n more`, igualdad de entradas → igualdad de filas, `Badge`.
 - `held/HeldScreenCacheTest`: no redibuja con el mismo estado reconstruido cada tick; sí con cambio de estado o de último mensaje; `invalidate()`; copia defensiva.
 - `held/BitmapFontTest`: anchos con regla vanilla (hoja sintética), plegado de acentos, dibujo y recorte, `clip`, rejilla ASCII clásica, fallback de cajas.
