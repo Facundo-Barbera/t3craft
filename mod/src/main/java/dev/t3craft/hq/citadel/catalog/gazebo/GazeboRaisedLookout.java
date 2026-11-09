@@ -380,18 +380,20 @@ public final class GazeboRaisedLookout implements Variant {
 						s(u, platform, v, b(Blocks.DARK_OAK_FENCE)
 								.setValue(BlockStateProperties.NORTH, n).setValue(BlockStateProperties.SOUTH, so)
 								.setValue(BlockStateProperties.WEST, we).setValue(BlockStateProperties.EAST, e));
-					} else {
-						// corners and ends: polished deepslate newels with a lantern
+					} else if ((u == 0 || u == w - 1) && (v == 0 || v == d - 1)) {
+						// the four corners of the deck: a tall polished-deepslate lamp post (the top is under the ceiling, nobody can stand on it)
 						s(u, platform, v, b(Blocks.POLISHED_DEEPSLATE_WALL).setValue(BlockStateProperties.UP, true)
 								.setValue(BlockStateProperties.NORTH_WALL, n ? WallSide.LOW : WallSide.NONE)
 								.setValue(BlockStateProperties.SOUTH_WALL, so ? WallSide.LOW : WallSide.NONE)
 								.setValue(BlockStateProperties.WEST_WALL, we ? WallSide.LOW : WallSide.NONE)
 								.setValue(BlockStateProperties.EAST_WALL, e ? WallSide.LOW : WallSide.NONE));
-						if ((u == 0 || u == w - 1) && (v == 0 || v == d - 1)) {
-							// the four corners of the deck: a tall lamp post (the top is under the ceiling, nobody can stand on it)
-							s(u, platform + 1, v, b(Blocks.POLISHED_DEEPSLATE_WALL).setValue(BlockStateProperties.UP, true));
-							s(u, platform + 2, v, b(Blocks.LANTERN));
-						}
+						s(u, platform + 1, v, b(Blocks.POLISHED_DEEPSLATE_WALL).setValue(BlockStateProperties.UP, true));
+						s(u, platform + 2, v, b(Blocks.LANTERN));
+					} else {
+						// inner corners and ends: the same dark-oak fence, with its sides joined
+						s(u, platform, v, b(Blocks.DARK_OAK_FENCE)
+								.setValue(BlockStateProperties.NORTH, n).setValue(BlockStateProperties.SOUTH, so)
+								.setValue(BlockStateProperties.WEST, we).setValue(BlockStateProperties.EAST, e));
 					}
 				}
 			}
@@ -550,12 +552,24 @@ public final class GazeboRaisedLookout implements Variant {
 
 		// -------------------------------------------------------------- hipped copper roof
 
-		private Block copperStairs(int t) {
-			return t <= 4 ? Blocks.CUT_COPPER_STAIRS.waxed().weathered() : Blocks.CUT_COPPER_STAIRS.waxed().oxidized();
+		/** Patina by height: oxidised at the eave, weathered in the middle, bright copper near the ridge; a little noise. */
+		private int tier(int k, int kmax, int noise) {
+			int base = kmax <= 0 ? 1 : Math.min(2, k * 3 / (kmax + 1));
+			if (noise == 0) {
+				return Math.min(2, base + 1);
+			}
+			if (noise == 1) {
+				return Math.max(0, base - 1);
+			}
+			return base;
 		}
 
-		private Block copperSlab(int t) {
-			return t <= 4 ? Blocks.CUT_COPPER_SLAB.waxed().weathered() : Blocks.CUT_COPPER_SLAB.waxed().oxidized();
+		private Block copperStairs(int tier) {
+			return tier == 0 ? Blocks.CUT_COPPER_STAIRS.waxed().oxidized() : tier == 1 ? Blocks.CUT_COPPER_STAIRS.waxed().weathered() : Blocks.CUT_COPPER_STAIRS.waxed().exposed();
+		}
+
+		private Block copperSlab(int tier) {
+			return tier == 0 ? Blocks.CUT_COPPER_SLAB.waxed().oxidized() : tier == 1 ? Blocks.CUT_COPPER_SLAB.waxed().weathered() : Blocks.CUT_COPPER_SLAB.waxed().exposed();
 		}
 
 		private void roofSet(int u, int y, int v, BlockState st) {
@@ -587,15 +601,15 @@ public final class GazeboRaisedLookout implements Variant {
 					boolean tieU = dl == k && dr == k;
 					boolean tieV = df == k && db == k;
 					if ((tieU || tieV) && k == kmax) {
-						roofSet(u, y, v, slab(Blocks.CUT_COPPER_SLAB.waxed().oxidized())); // the ridge cap
+						roofSet(u, y, v, slab(Blocks.CUT_COPPER_SLAB.waxed().exposed())); // the ridge cap, bright copper
 						continue;
 					}
-					int t = p.hash(u, y, v, 8);
+					int t = p.hash(u, y, v, 8); // 0 and 1 shift the tier, the rest keep it
 					if (slabRing) {
-						roofSet(u, y, v, slab(copperSlab(t)));
+						roofSet(u, y, v, slab(copperSlab(tier(k, kmax, t))));
 						continue;
 					}
-					Block mat = k == 0 ? Blocks.DEEPSLATE_TILE_STAIRS : copperStairs(t);
+					Block mat = k == 0 ? Blocks.DARK_OAK_STAIRS : copperStairs(tier(k, kmax, t));
 					boolean lr = dl == k || dr == k;
 					boolean fb = df == k || db == k;
 					Direction inU = dl == k ? Direction.EAST : Direction.WEST;
