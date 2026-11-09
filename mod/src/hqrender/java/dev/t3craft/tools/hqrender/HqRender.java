@@ -220,6 +220,7 @@ public final class HqRender {
 		boolean lampDemo = false;
 		// kit/paper-lantern: the paper-lantern gallery
 		boolean lanterns = false;
+		boolean officeBlocks = false; // kit/office-blocks-review: console, podium, merge station, glow blocks (OfficeBlockViews)
 		// tools/render-quality: look switches, on in final and off in preview (see Renderer.Look)
 		Boolean previewOpt = null;
 		java.util.Map<String, String> lookOpts = new java.util.LinkedHashMap<>();
@@ -266,6 +267,7 @@ public final class HqRender {
 				case "--lamps" -> lamps = true;
 				case "--monitors" -> monitors = true;
 				case "--lanterns" -> lanterns = true;
+				case "--office-blocks" -> officeBlocks = true;
 				case "--lamp-demo" -> lampDemo = true;
 				case "--front" -> catalogFront = args[++i];
 				case "--sizes" -> catalogSizes = Integer.parseInt(args[++i]);
@@ -299,6 +301,10 @@ public final class HqRender {
 		if (monitors) {
 			// kit/monitor: wall, desk screens and a lone monitor (MonitorViews)
 			MonitorViews.run(out, scaleOpt == null ? 1.0 : scaleOpt, ss, only);
+			return;
+		}
+		if (officeBlocks) {
+			OfficeBlockViews.run(out, scaleOpt == null ? 1.0 : scaleOpt, ss, only);
 			return;
 		}
 		if (lanterns) {
