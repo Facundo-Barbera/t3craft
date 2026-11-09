@@ -3,11 +3,11 @@ package dev.t3craft.hq.citadel.catalog.fountain;
 import static dev.t3craft.hq.citadel.CitadelCanvas.b;
 import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
 import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
-import static dev.t3craft.hq.citadel.catalog.fountain.FountainKit.DIRS;
-import static dev.t3craft.hq.citadel.catalog.fountain.FountainKit.OUT;
-import static dev.t3craft.hq.citadel.catalog.fountain.FountainKit.RIM;
-import static dev.t3craft.hq.citadel.catalog.fountain.FountainKit.WATER;
-import static dev.t3craft.hq.citadel.catalog.fountain.FountainKit.put;
+import static dev.t3craft.hq.citadel.catalog.fountain.PondKit.DIRS;
+import static dev.t3craft.hq.citadel.catalog.fountain.PondKit.OUT;
+import static dev.t3craft.hq.citadel.catalog.fountain.PondKit.RIM;
+import static dev.t3craft.hq.citadel.catalog.fountain.PondKit.WATER;
+import static dev.t3craft.hq.citadel.catalog.fountain.PondKit.put;
 
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.catalog.Family;
@@ -129,12 +129,12 @@ public final class FountainKoiPond implements Variant {
 			for (int v = 0; v < d; v++) {
 				switch (k[u][v]) {
 					case WATER -> {
-						p.set(c, u, 0, v, FountainKit.bed(p, u, v, touches(k, u, v, RIM)));
-						p.set(c, u, 1, v, FountainKit.water());
+						p.set(c, u, 0, v, PondKit.bed(p, u, v, touches(k, u, v, RIM)));
+						p.set(c, u, 1, v, PondKit.water());
 					}
 					case RIM -> {
-						p.set(c, u, 0, v, FountainKit.rimBase(p, u, v));
-						p.set(c, u, 1, v, FountainKit.rimTop(p, u, 1, v));
+						p.set(c, u, 0, v, PondKit.rimBase(p, u, v));
+						p.set(c, u, 1, v, PondKit.rimTop(p, u, 1, v));
 						switch (p.hash(u, 7, v, 10)) { // [depth] slabs and moss break the rim line, a rare boulder
 							case 0, 1 -> put(c, p, u, 2, v, slab(Blocks.MOSSY_COBBLESTONE_SLAB));
 							case 2 -> put(c, p, u, 2, v, b(Blocks.MOSSY_COBBLESTONE));
@@ -181,21 +181,21 @@ public final class FountainKoiPond implements Variant {
 		int fu = flip ? w - 1 : 0; // the "first" side
 		int ou = flip ? 0 : w - 1;
 		if (k[fu][0] == OUT) {
-			FountainKit.toro(c, p, fu, 0);
+			PondKit.toro(c, p, fu, 0);
 			reserved[fu][0] = true;
 		}
 		for (int i = 0; i < 3; i++) { // cairn on the other front corner
 			int bu = ou + (flip ? i / 2 : -(i / 2));
 			int bv = i % 2 == 1 ? 1 : 0;
 			if (p.has(bu, 0, bv) && k[bu][bv] == OUT && !reserved[bu][bv]) {
-				FountainKit.boulder(c, p, bu, bv, i == 0 ? 3 : 2 - i % 2);
+				PondKit.boulder(c, p, bu, bv, i == 0 ? 3 : 2 - i % 2);
 				reserved[bu][bv] = true;
 			}
 		}
-		FountainKit.grove(c, p, k, reserved, fu, flip ? -1 : 1, d - 1, -1, 6);
+		PondKit.grove(c, p, k, reserved, fu, flip ? -1 : 1, d - 1, -1, 6);
 		int treeU = flip ? 0 : w - 1;
 		if (k[treeU][d - 1] == OUT && !reserved[treeU][d - 1]) {
-			FountainKit.cherry(c, p, treeU, d - 1, flip ? 1 : -1);
+			PondKit.cherry(c, p, treeU, d - 1, flip ? 1 : -1);
 			reserved[treeU][d - 1] = true;
 		}
 
@@ -216,13 +216,13 @@ public final class FountainKoiPond implements Variant {
 					}
 				}
 				if (rims == 1) {
-					p.set(c, u, 0, v, FountainKit.shoreStep(p, u, v, toRim));
+					p.set(c, u, 0, v, PondKit.shoreStep(p, u, v, toRim));
 				} else if (rims > 1) {
 					p.set(c, u, 0, v, slab(Blocks.MOSSY_COBBLESTONE_SLAB));
 				} else if (bridge && v == vb && (u < rl || u > rr)) {
 					p.set(c, u, 0, v, slab(p.hash(u, 2, v, 2) == 0 ? Blocks.MOSSY_STONE_BRICK_SLAB : Blocks.STONE_BRICK_SLAB));
 				} else {
-					BlockState plant = FountainKit.shorePlant(p, u, v);
+					BlockState plant = PondKit.shorePlant(p, u, v);
 					if (plant != null) {
 						p.set(c, u, 0, v, plant);
 					}
@@ -286,25 +286,25 @@ public final class FountainKoiPond implements Variant {
 				for (int sv = vb - 1; sv <= vb + 1; sv += 2) {
 					plinth(c, p, u, sv);
 					put(c, p, u, 2, sv, b(Blocks.STRIPPED_CHERRY_LOG)); // one-block base, then a slim fence post
-					put(c, p, u, 3, sv, FountainKit.fence(false, false, false, false));
+					put(c, p, u, 3, sv, PondKit.fence(false, false, false, false));
 					put(c, p, u, 4, sv, b(Blocks.LANTERN));
 				}
 			}
 		}
 		// one lantern hangs under the crest, over the koi
 		int cu = rl + n / 2;
-		FountainKit.putLayer(c, p, cu, 2, vb, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
+		PondKit.putLayer(c, p, cu, 2, vb, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
 	}
 
 	/** Masonry pier from the bed up to the water line, under a bridge stair. */
 	private static void pier(CitadelCanvas c, Plot p, int u, int v) {
-		put(c, p, u, 0, v, FountainKit.rimBase(p, u, v));
-		put(c, p, u, 1, v, FountainKit.brick(p, u, 1, v));
+		put(c, p, u, 0, v, PondKit.rimBase(p, u, v));
+		put(c, p, u, 1, v, PondKit.brick(p, u, 1, v));
 	}
 
 	/** Solid footing for a post, in case the cell is not part of the rim. */
 	private static void plinth(CitadelCanvas c, Plot p, int u, int v) {
-		put(c, p, u, 0, v, FountainKit.rimBase(p, u, v));
-		put(c, p, u, 1, v, FountainKit.brick(p, u, 1, v));
+		put(c, p, u, 0, v, PondKit.rimBase(p, u, v));
+		put(c, p, u, 1, v, PondKit.brick(p, u, 1, v));
 	}
 }

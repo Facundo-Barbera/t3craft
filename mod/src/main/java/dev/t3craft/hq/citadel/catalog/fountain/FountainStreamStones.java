@@ -2,10 +2,10 @@ package dev.t3craft.hq.citadel.catalog.fountain;
 
 import static dev.t3craft.hq.citadel.CitadelCanvas.b;
 import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
-import static dev.t3craft.hq.citadel.catalog.fountain.FountainKit.OUT;
-import static dev.t3craft.hq.citadel.catalog.fountain.FountainKit.RIM;
-import static dev.t3craft.hq.citadel.catalog.fountain.FountainKit.WATER;
-import static dev.t3craft.hq.citadel.catalog.fountain.FountainKit.put;
+import static dev.t3craft.hq.citadel.catalog.fountain.PondKit.OUT;
+import static dev.t3craft.hq.citadel.catalog.fountain.PondKit.RIM;
+import static dev.t3craft.hq.citadel.catalog.fountain.PondKit.WATER;
+import static dev.t3craft.hq.citadel.catalog.fountain.PondKit.put;
 
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.catalog.Family;
@@ -92,7 +92,7 @@ public final class FountainStreamStones implements Variant {
 		}
 		for (int u = 0; u < w; u++) {
 			for (int v = 0; v < d; v++) {
-				if (k[u][v] == OUT && FountainKit.touches(k, u, v, WATER)) {
+				if (k[u][v] == OUT && PondKit.touches(k, u, v, WATER)) {
 					k[u][v] = RIM;
 				}
 			}
@@ -102,14 +102,14 @@ public final class FountainStreamStones implements Variant {
 		for (int u = 0; u < w; u++) {
 			for (int v = 0; v < d; v++) {
 				if (k[u][v] == WATER) {
-					p.set(c, u, 0, v, FountainKit.bed(p, u, v, FountainKit.touches(k, u, v, RIM)));
-					p.set(c, u, 1, v, FountainKit.water());
+					p.set(c, u, 0, v, PondKit.bed(p, u, v, PondKit.touches(k, u, v, RIM)));
+					p.set(c, u, 1, v, PondKit.water());
 				} else if (k[u][v] == RIM) {
-					p.set(c, u, 0, v, FountainKit.rimBase(p, u, v));
+					p.set(c, u, 0, v, PondKit.rimBase(p, u, v));
 					int r = p.hash(u, 1, v, 10);
-					BlockState top = r < 4 ? b(Blocks.MOSS_BLOCK) : r < 6 ? b(Blocks.GRASS_BLOCK) : r < 7 ? b(Blocks.COARSE_DIRT) : FountainKit.rimTop(p, u, 1, v);
+					BlockState top = r < 4 ? b(Blocks.MOSS_BLOCK) : r < 6 ? b(Blocks.GRASS_BLOCK) : r < 7 ? b(Blocks.COARSE_DIRT) : PondKit.rimTop(p, u, 1, v);
 					p.set(c, u, 1, v, top);
-					BlockState plant = r < 7 ? FountainKit.shorePlant(p, u, v) : null; // [finish] banks are planted, not paved
+					BlockState plant = r < 7 ? PondKit.shorePlant(p, u, v) : null; // [finish] banks are planted, not paved
 					if (plant != null) {
 						put(c, p, u, 2, v, plant);
 					}
@@ -132,8 +132,8 @@ public final class FountainStreamStones implements Variant {
 							: below == 1 ? b(Blocks.MOSSY_COBBLESTONE) : y == 2 ? b(Blocks.TUFF) : b(Blocks.ANDESITE));
 				}
 				if (k[u][v] == OUT) { // footing where the mound stands off the water
-					p.set(c, u, 0, v, FountainKit.rimBase(p, u, v));
-					p.set(c, u, 1, v, FountainKit.rimTop(p, u, 1, v));
+					p.set(c, u, 0, v, PondKit.rimBase(p, u, v));
+					p.set(c, u, 1, v, PondKit.rimTop(p, u, 1, v));
 					reserved[u][v] = true;
 				}
 				BlockState cap = switch (p.hash(u, 4, v, 4)) {
@@ -167,16 +167,16 @@ public final class FountainStreamStones implements Variant {
 		// --- 5. the lantern on the pool side, a cherry behind it, a bamboo grove behind the stream
 		int lu = flip ? 0 : w - 1;
 		if (k[lu][0] == OUT) {
-			FountainKit.toro(c, p, lu, 0);
+			PondKit.toro(c, p, lu, 0);
 			reserved[lu][0] = true;
 		}
 		if (k[lu][d - 1] == OUT) {
-			FountainKit.cherry(c, p, lu, d - 1, flip ? 1 : -1);
+			PondKit.cherry(c, p, lu, d - 1, flip ? 1 : -1);
 			reserved[lu][d - 1] = true;
 		}
-		FountainKit.grove(c, p, k, reserved, w / 2 - 1, 1, d - 1, -1, 6);
+		PondKit.grove(c, p, k, reserved, w / 2 - 1, 1, d - 1, -1, 6);
 
 		// --- 6. banks of the margin: steps, ferns, flowers
-		FountainKit.shore(c, p, k, reserved);
+		PondKit.shore(c, p, k, reserved);
 	}
 }

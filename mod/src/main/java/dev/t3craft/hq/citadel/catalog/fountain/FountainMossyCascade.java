@@ -2,11 +2,11 @@ package dev.t3craft.hq.citadel.catalog.fountain;
 
 import static dev.t3craft.hq.citadel.CitadelCanvas.b;
 import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
-import static dev.t3craft.hq.citadel.catalog.fountain.FountainKit.OUT;
-import static dev.t3craft.hq.citadel.catalog.fountain.FountainKit.RIM;
-import static dev.t3craft.hq.citadel.catalog.fountain.FountainKit.WATER;
-import static dev.t3craft.hq.citadel.catalog.fountain.FountainKit.put;
-import static dev.t3craft.hq.citadel.catalog.fountain.FountainKit.putLayer;
+import static dev.t3craft.hq.citadel.catalog.fountain.PondKit.OUT;
+import static dev.t3craft.hq.citadel.catalog.fountain.PondKit.RIM;
+import static dev.t3craft.hq.citadel.catalog.fountain.PondKit.WATER;
+import static dev.t3craft.hq.citadel.catalog.fountain.PondKit.put;
+import static dev.t3craft.hq.citadel.catalog.fountain.PondKit.putLayer;
 
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.catalog.Family;
@@ -103,11 +103,11 @@ public final class FountainMossyCascade implements Variant {
 		for (int u = 0; u < w; u++) {
 			for (int v = 0; v < d; v++) {
 				if (k[u][v] == WATER) {
-					p.set(c, u, 0, v, FountainKit.bed(p, u, v, FountainKit.touches(k, u, v, RIM)));
-					p.set(c, u, 1, v, FountainKit.water());
+					p.set(c, u, 0, v, PondKit.bed(p, u, v, PondKit.touches(k, u, v, RIM)));
+					p.set(c, u, 1, v, PondKit.water());
 				} else if (k[u][v] == RIM) {
-					p.set(c, u, 0, v, FountainKit.rimBase(p, u, v));
-					p.set(c, u, 1, v, FountainKit.rimTop(p, u, 1, v));
+					p.set(c, u, 0, v, PondKit.rimBase(p, u, v));
+					p.set(c, u, 1, v, PondKit.rimTop(p, u, 1, v));
 					switch (p.hash(u, 7, v, 8)) { // [depth] caps and moss break the rim line
 						case 0 -> put(c, p, u, 2, v, slab(Blocks.MOSSY_COBBLESTONE_SLAB));
 						case 1 -> put(c, p, u, 2, v, b(Blocks.MOSSY_COBBLESTONE));
@@ -148,17 +148,17 @@ public final class FountainMossyCascade implements Variant {
 		splash.add(new int[] {uf - 1, d - 3});
 		splash.add(new int[] {uf + fw, d - 3});
 		for (int fu = uf; fu < uf + fw; fu++) {
-			p.set(c, fu, top, d - 2, FountainKit.water()); // spring source in the notch
-			p.set(c, fu, top, d - 3, FountainKit.water().setValue(LiquidBlock.LEVEL, 1)); // the lip
+			p.set(c, fu, top, d - 2, PondKit.water()); // spring source in the notch
+			p.set(c, fu, top, d - 3, PondKit.water().setValue(LiquidBlock.LEVEL, 1)); // the lip
 			for (int y = top - 1; y >= 2; y--) {
-				p.set(c, fu, y, d - 3, FountainKit.fallingWater());
+				p.set(c, fu, y, d - 3, PondKit.fallingWater());
 			}
 			// [depth] a mossy brow juts over the lip: an upside-down stair with its back to the crag
 			put(c, p, fu, top + 1, d - 3, CitadelCanvas.stairs(Blocks.MOSSY_COBBLESTONE_STAIRS, Direction.SOUTH).setValue(BlockStateProperties.HALF, Half.TOP));
 			splash.add(new int[] {fu, d - 4});
 		}
 		for (int[] s : splash) {
-			p.set(c, s[0], 1, s[1], FountainKit.rimTop(p, s[0], 1, s[1]));
+			p.set(c, s[0], 1, s[1], PondKit.rimTop(p, s[0], 1, s[1]));
 			p.set(c, s[0], 2, s[1], p.hash(s[0], 2, s[1], 2) == 0 ? b(Blocks.MOSSY_COBBLESTONE) : b(Blocks.ANDESITE));
 			put(c, p, s[0], 3, s[1], p.hash(s[0], 3, s[1], 2) == 0 ? b(Blocks.MOSS_CARPET) : slab(Blocks.MOSSY_COBBLESTONE_SLAB));
 			k[s[0]][s[1]] = RIM;
@@ -183,7 +183,7 @@ public final class FountainMossyCascade implements Variant {
 		int sideU = p.hash(2, 0, 0, 2) == 0 ? 0 : w - 1;
 		for (int v = 1; v <= 3; v++) {
 			if (k[sideU][v] == OUT && !reserved[sideU][v]) {
-				FountainKit.boulder(c, p, sideU, v, v == 2 ? 3 : 2);
+				PondKit.boulder(c, p, sideU, v, v == 2 ? 3 : 2);
 				reserved[sideU][v] = true;
 			}
 		}
@@ -231,7 +231,7 @@ public final class FountainMossyCascade implements Variant {
 		put(c, p, w - 2, 2, 1, b(Blocks.LANTERN));
 
 		// --- 6. shore: steps, ferns, azaleas and petals on the margin
-		FountainKit.shore(c, p, k, reserved);
+		PondKit.shore(c, p, k, reserved);
 	}
 
 	/** Top y of the crag at {@code (u, v)}: highest around the spring, falling away with noise. */

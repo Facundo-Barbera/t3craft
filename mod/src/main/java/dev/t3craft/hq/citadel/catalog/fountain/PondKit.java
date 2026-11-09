@@ -21,7 +21,7 @@ import net.minecraft.world.level.block.state.properties.BooleanProperty;
  * <p>Water note: the plot's ground (y = -1) is not ours, so ponds are raised basins: a bed at y = 0, the
  * water surface block at y = 1 and a complete ring of solid rim at y = 1 so no source ever flows out.
  */
-final class FountainKit {
+final class PondKit {
 	/** Cell classes of a pond mask. */
 	static final int OUT = 0;
 	static final int WATER = 1;
@@ -30,7 +30,7 @@ final class FountainKit {
 	/** The four local horizontal directions (NORTH = towards the front, v - 1). */
 	static final Direction[] DIRS = {Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST};
 
-	private FountainKit() {
+	private PondKit() {
 	}
 
 	/** Writes only when the cell is inside the plot (decoration that may overhang the box). */
