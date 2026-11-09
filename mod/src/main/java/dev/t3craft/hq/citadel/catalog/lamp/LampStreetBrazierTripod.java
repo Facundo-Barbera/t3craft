@@ -87,9 +87,9 @@ public final class LampStreetBrazierTripod implements Variant {
 		// ash patch under the bowl: the only thing on the ground between the legs
 		p.set(c, 1, 0, 1, slab(Blocks.BLACKSTONE_SLAB));
 
-		// --- bowl: a plus of upside-down copper stairs on a copper heart, the corners left open
+		// --- bowl: a plus of upside-down verdigris stairs (oxidized copper) on a bright copper heart, the corners left open
 		// so light and sky show between the horns (the legs' corners carry a slab only where a leg arrives)
-		BlockState cu0 = Blocks.CUT_COPPER_STAIRS.waxed().unaffected().defaultBlockState().setValue(StairBlock.HALF, Half.TOP);
+		BlockState cu0 = Blocks.CUT_COPPER_STAIRS.waxed().oxidized().defaultBlockState().setValue(StairBlock.HALF, Half.TOP);
 		p.set(c, 1, dish, 1, b(Blocks.CUT_COPPER.waxed().unaffected()));
 		p.set(c, 1, dish, 0, cu0.setValue(StairBlock.FACING, Direction.NORTH));
 		p.set(c, 1, dish, 2, cu0.setValue(StairBlock.FACING, Direction.SOUTH));
