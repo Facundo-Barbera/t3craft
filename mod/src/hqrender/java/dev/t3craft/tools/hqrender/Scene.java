@@ -113,6 +113,20 @@ final class Scene {
 		return inside(x, y, z) ? masks[cells[index(x, y, z)]] : 0;
 	}
 
+	/** The raw grid (model id per cell, x fastest, then z, then y) and the interned models and masks, for the GPU export (tools/render-gpu). */
+	int[] cellsRaw() {
+		return cells;
+	}
+
+	List<List<BlockModels.Quad>> modelsRaw() {
+		return models;
+	}
+
+	/** Occupancy per model id; only the first {@code modelsRaw().size()} entries are meaningful. */
+	int[] masksRaw() {
+		return masks;
+	}
+
 	/** Quads of a cell (empty outside the grid). */
 	List<BlockModels.Quad> at(int x, int y, int z) {
 		return inside(x, y, z) ? models.get(cells[index(x, y, z)]) : List.of();

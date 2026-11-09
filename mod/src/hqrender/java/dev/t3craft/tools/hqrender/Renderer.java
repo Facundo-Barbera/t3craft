@@ -94,7 +94,7 @@ final class Renderer {
 	private static final int BACKGROUND = 0xFFEEF1F4;
 	private static final int SKY_TOP = 0xD3E2EF;
 	private static final int SKY_BOTTOM = 0xF4F2EE;
-	private static final double[] LIN = new double[256];
+	static final double[] LIN = new double[256];
 	private static final double[] DEC = new double[1024];
 	private static final byte[] SRGB = new byte[4097];
 
@@ -114,15 +114,16 @@ final class Renderer {
 		}
 	}
 
-	private final Scene scene;
-	private final Clip clip;
-	private final double[] d;
-	private final double[] right;
-	private final double[] up;
-	private final Look lk;
-	private final double[] sun;
-	private final double[] sunU;
-	private final double[] sunV;
+	// package-private: GpuTrace (tools/render-gpu) exports them to the GPU
+	final Scene scene;
+	final Clip clip;
+	final double[] d;
+	final double[] right;
+	final double[] up;
+	final Look lk;
+	final double[] sun;
+	final double[] sunU;
+	final double[] sunV;
 
 	Renderer(Scene scene, Clip clip, Camera cam) {
 		this.scene = scene;
@@ -160,10 +161,28 @@ final class Renderer {
 		int W = w * ss;
 		int H = h * ss;
 		double px = scale * ss;
-		int[] buf = new int[W * H];
-		byte[] glow = lk.bloom ? new byte[W * H] : null;
 		final double s0 = sMin;
 		final double t1 = tMax;
+		// tools/render-gpu: the GPU traces the sub-samples when asked to; the CPU is the fallback (and the reference in --gpu-compare)
+		Gpu.Mode gm = Gpu.mode;
+		GpuTrace.Result gres = null;
+		BufferedImage gpuImg = null;
+		double gpuMs = 0;
+		if (gm != Gpu.Mode.OFF) {
+			long g0 = System.nanoTime();
+			gres = GpuTrace.trace(this, W, H, px, s0, t1, lk.bloom, ss, scale, gm == Gpu.Mode.COMPARE);
+			if (gres != null) {
+				gpuImg = gres.rgb != null ? imageOf(gres.rgb, w, h) : resolve(gres.buf, gres.glow, w, h, ss, scale);
+			}
+			gpuMs = (System.nanoTime() - g0) / 1e6;
+			if (gpuImg != null && gm == Gpu.Mode.AUTO) {
+				System.out.printf(java.util.Locale.ROOT, "gpu: %dx%d (%dx%d sub-samples) in %.2f s (%s)%n", w, h, W, H, gpuMs / 1000, gres.info);
+				return gpuImg;
+			}
+		}
+		long c0 = System.nanoTime();
+		int[] buf = new int[W * H];
+		byte[] glow = lk.bloom ? new byte[W * H] : null;
 		IntStream.range(0, H).parallel().forEach(py -> {
 			double v = (py + 0.5) / H;
 			for (int x = 0; x < W; x++) {
@@ -172,7 +191,12 @@ final class Renderer {
 				buf[py * W + x] = trace(s, t, v, py * W + x, glow);
 			}
 		});
-		return resolve(buf, glow, w, h, ss, scale);
+		BufferedImage cpuImg = resolve(buf, glow, w, h, ss, scale);
+		if (gpuImg != null) {
+			Gpu.compare(cpuImg, gpuImg, buf, gres.buf != null ? gres.buf : new int[0], (System.nanoTime() - c0) / 1e6, gpuMs, gres.info);
+			return gpuImg;
+		}
+		return cpuImg;
 	}
 
 	// ------------------------------------------------------------------ reconstruction
@@ -200,6 +224,28 @@ final class Renderer {
 				return x < 0.5 ? 1 : 0;
 			}
 		}
+	}
+
+	/** The reconstruction filter's taps over the sub-sample offsets {@code kMin..kMax} (the same for every pixel); the GPU resolve uses them too. */
+	record Taps(int kMin, int kMax, double[] wk) {
+	}
+
+	Taps taps(int ss) {
+		boolean box = ss == 1 || lk.filter == null || lk.filter.equals("box");
+		int kMin = box ? 0 : -2 * ss;
+		int kMax = box ? ss - 1 : 3 * ss - 1;
+		double[] wk = new double[kMax - kMin + 1];
+		for (int k = kMin; k <= kMax; k++) {
+			wk[k - kMin] = box ? 1 : filterWeight((k + 0.5) / ss - 0.5);
+		}
+		return new Taps(kMin, kMax, wk);
+	}
+
+	/** Packed 0xRRGGBB pixels (from the GPU resolve) as an image. */
+	private static BufferedImage imageOf(int[] rgb, int w, int h) {
+		BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
+		img.setRGB(0, 0, w, h, rgb, 0, w);
+		return img;
 	}
 
 	private BufferedImage resolve(int[] buf, byte[] glow, int w, int h, int ss, double scale) {

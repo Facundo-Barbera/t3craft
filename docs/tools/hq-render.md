@@ -48,7 +48,7 @@ Written, in `--out` (default `build/hq-render`): `NAME_iso_se.png`, `NAME_iso_ne
 
 ## Look: lighting, shadows, AO, filter
 
-`Renderer` is a CPU ray caster (no GPU): one ray per sub-pixel walks the block grid and hits the textured quads
+`Renderer` is a ray caster (CPU, or the RTX through CUDA, see "GPU" below): one ray per sub-pixel walks the block grid and hits the textured quads
 of each cell. `BlockModels` builds those quads from the **real vanilla models and textures** in the client jar
 (blockstate variants and multipart, parents, element from/to, per-face uv, uv rotation, element rotations with
 rescale, variant x/y rotations, `uvlock`, tint indices). Textures are sampled **nearest** (texel-exact, the
@@ -74,6 +74,86 @@ is the shadow rays. `--shadow-rays 1` or `--hard-shadows` halves it.
 
 `Renderer.look` is a static that `HqRender` sets at the start of every run. A JVM therefore renders with one
 look at a time, which suits the render service (1 worker on the PC).
+
+## GPU
+
+On the render PC the ray tracing runs on the **RTX 3050** (tools/render-gpu). Final looks use it by default; if the GPU is not
+there, or anything goes wrong, that image (or the rest of the job) is rendered on the CPU exactly as before. Output is always a
+full-colour PNG (no palette).
+
+| Flag | Meaning |
+| --- | --- |
+| `--gpu` / `--no-gpu` | Force the GPU (still falls back to the CPU if it is missing) / force the CPU. Default: GPU in final looks, CPU in `--preview` (and `--ss 1` without `--final`). |
+| `--gpu-compare` | Every image is rendered on both: the GPU one is kept, and the log prints `gpu-compare #N`: CPU and GPU seconds, speed-up, image difference (mean per channel, max, share of pixels over 4 and over 16 of 255) and the share of identical sub-samples. `gpu-compare/NN_cpu.png`, `_gpu.png`, `_diff.png` (difference x8, black = equal) are written next to the other images. |
+| `--gpu-no-resolve` | Only the ray tracing on the GPU; the filter, bloom and sRGB stay on the CPU. |
+| `--gpu-probe` | Writes `gpu-probe.txt` (and the log) with what the machine offers, see "What was probed". Renders nothing. |
+| `--gpu-nvrtc` | Dev: compile `mod/src/hqrender/cuda/trace.cu` with NVRTC instead of using the committed PTX and write `trace.ptx` into the output folder. |
+| `--gpu-fail-test` | Dev: the GPU child fails at start, to check the CPU fallback. |
+
+**How it works.** `Renderer.render` hands the scene to `GpuTrace`, which flattens it (the grid of model ids, the quads of every
+model, the textures, the look) into a temp file. A **child JVM** (`gpu/GpuChild serve`, one per job, started on the first
+image and closed when the job ends) maps the file, uploads it and runs the kernel; a driver crash or a hang costs that child,
+never the shared daemon. The child talks to the CUDA **driver API** through Java's foreign function API (`gpu/Cu`, libcuda from
+`/usr/lib/wsl/lib`): no CUDA toolkit, no JNI, no LWJGL, no window. Nothing is installed.
+
+The kernel (`mod/src/hqrender/cuda/trace.cu`) is a port of `Renderer.trace`: the same voxel walk, quad intersection, alpha test,
+translucent blending, smooth-lighting AO, soft sun shadows (same hash, so the same jitter), flat and sky looks; then
+`Renderer.resolve` and the bloom (separable filter taps, gaussian blur, screen blend, sRGB). One thread per sub-sample, in
+float, in clip-local coordinates (the ray origin is computed in double and moved to where the ray enters the clip box).
+Launches are bands of rows that adapt to take about 100 ms each, so the desktop on the same GPU keeps drawing and the
+Windows watchdog never fires. If an image needs more device memory than is free, that image goes to the CPU and the GPU keeps
+serving the next ones.
+
+**The kernel is committed as PTX** (`gpu/TracePtx.java`, generated): the driver JIT-compiles it (about 2 s the first time, 16 ms
+when the driver's cache has it), so at run time only the driver is needed. To change the kernel:
+
+```
+# 1. edit mod/src/hqrender/cuda/trace.cu; a render job on the PC compiles it with NVRTC and keeps the PTX
+tools/render/submit.sh --layout hybrid-ringcampus --projects 4 --only hub --gpu-compare --gpu-nvrtc
+# 2. embed the PTX it wrote (needs the PC to have a libnvrtc.so.12: T3CRAFT_NVRTC or the pip package of the PC's Python venvs)
+python3 tools/render/gen-trace-ptx.py ~/.cache/t3craft-render/outbox/<job>/trace.ptx
+```
+
+**Same picture?** Compared with the CPU in the same job (`--gpu-compare`, final look, `--ss 3`):
+
+| Scene | Images | Identical sub-samples | Mean difference | Pixels > 16 of 255 |
+| --- | --- | --- | --- | --- |
+| hub, `--layout hybrid-ringcampus --projects 4 --only hub` (isometric) | 3 | 99.6 % | 0.015 / 255 | 0.003 % |
+| catalog gallery, `HOUSE:house_timber_cottage,LAMP:lamp_cherry_post --scale 2` | 3 | 99.6 to 99.8 % | 0.010 to 0.012 / 255 | 0.000 to 0.005 % |
+| aerial views, `--projects 4,10,20 --only aerial` | 3 | 98.1 to 98.3 % | 0.055 to 0.062 / 255 | 0.005 to 0.008 % |
+| hub sections (axis-aligned rays) | 3 | 98.8 % | 3.6 / 255 | 4.8 % |
+
+The differences are float against double (an edge texel here and there) and the soft-shadow jitter (the hash is the same, its
+output is truncated to 24 bits). The one scene with a visible difference, the **sections**, is the CPU's fault: rays exactly
+parallel to a grid axis leave one-pixel light cracks along cell borders in the CPU image (`02_cpu.png`); the GPU gives faces a
+tolerance of 1.5e-4 blocks at their edges and has no cracks.
+
+**Speed** (render PC: 11 CPU threads, RTX 3050; image seconds including the filter, bloom and sRGB; the first image of a job also
+pays about 2 s for the child JVM and the PTX JIT when the driver's cache is cold, 0.3 s when it is warm):
+
+| Scene | CPU | GPU | Speed-up |
+| --- | --- | --- | --- |
+| hub, 4 projects, 1995x1878 sub-samples (3.7 M) | 0.41 to 1.1 s | 0.09 to 0.15 s | 3 to 6x |
+| hub section, 2031x909 sub-samples (1.8 M) | 0.28 to 0.64 s | 0.05 to 0.07 s | 5.5 to 9x |
+| catalog gallery at `--scale 2`, 8055x5526 sub-samples (44.5 M) | 3.9 to 4.8 s | 0.83 s | 4.7x |
+| catalog gallery at `--scale 2`, 8535x2961 sub-samples (25.3 M) | 5.5 s | 0.56 s | 9.8x |
+| aerial 4, 10 and 20 projects, about 4820x3315 sub-samples (16 M) | 7.5 to 9.1 s | 1.16 to 1.27 s | 6.2 to 7.5x |
+
+(The kernel itself takes 20 to 900 ms per image; the rest of the GPU time is the export of the scene, the child's round trip and
+the download of 4 bytes per pixel.) After the GPU, what is left of a render is the PNG encoding. Plain `--layout hybrid-ringcampus
+--projects 4 --only hub` with no GPU flag (default path): 0.51 s for the first image (child JVM and PTX load included), then 0.04 to
+0.07 s each; that job's 70 s are growing the plan, not rendering. Flat look (`--no-sky --no-ao --hard-shadows --no-bloom --filter box`,
+catalog gallery): 99.5 to 99.9 % identical sub-samples, 1.9 to 8x.
+
+**What was probed** (`--gpu-probe`, job `render-gpu-1794228843154`, WSL Ubuntu 24.04, driver 621.14 / CUDA 13.5, Mesa 25.2.8):
+
+| Route | Result |
+| --- | --- |
+| CUDA driver API (`/usr/lib/wsl/lib/libcuda.so.1`) through FFM | Works. RTX 3050, cc 8.6, 18 SMs, 6 GB (about 5 GB free next to the desktop). The driver JIT-compiles hand-written PTX (`.target sm_52`, `sm_75` and `sm_86` all load; the JIT takes 7 to 215 ms for a toy kernel) and runs it. **This is the route in use.** No `nvcc`; NVRTC is only used as a dev tool for the kernel (the PC's Python venvs ship `libnvrtc.so.12`). |
+| EGL surfaceless (`EGL_MESA_platform_surfaceless`) + OpenGL compute | A 4.3 core context and compute shaders work, but Mesa picks **llvmpipe (CPU)**. |
+| same with `GALLIUM_DRIVER=d3d12` | Compute shaders work on `D3D12 (AMD Radeon 740M Graphics)`: Mesa's d3d12 driver picks the **iGPU**, not the RTX (`MESA_D3D12_DEFAULT_ADAPTER_NAME` was not tried). |
+| EGL device platform | One device, llvmpipe again. |
+| EGL default display (`eglGetDisplay`) | Hangs (timed out after 90 s: it tries the desktop's display server). Never used; no window can appear because nothing but a surfaceless context is ever created. |
 
 ## The report
 
