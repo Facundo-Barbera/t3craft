@@ -57,8 +57,8 @@ public final class TreeCherryGrand implements Variant {
 		return 9;
 	}
 
-	/** Stripped cherry for the limbs: pale pink wood that reads against the dark trunk and the blossom. */
-	private static final TreeKit.Wood LIMB = new TreeKit.Wood(Blocks.STRIPPED_CHERRY_LOG, Blocks.STRIPPED_CHERRY_WOOD,
+	/** Stripped cherry wood (a pillar with no log ends) for the limbs: pale pink that reads against the dark trunk and the blossom. */
+	private static final TreeKit.Wood LIMB = new TreeKit.Wood(Blocks.STRIPPED_CHERRY_WOOD, Blocks.STRIPPED_CHERRY_WOOD,
 			TreeKit.CHERRY.rootTip());
 
 	/** The lowest y a leaf or a limb may occupy: 4 blocks of clear walk under the crown. */
@@ -114,13 +114,13 @@ public final class TreeCherryGrand implements Variant {
 			double ez = Math.sin(ang);
 			double frac = (g0 + i * 0.618) % 1.0; // spreads the heights so neighbours differ
 			int ly = TreeKit.clamp(5 + (int) Math.round(Math.pow(frac, 1.5) * (crownY - 5) * 0.9), 5, crownY);
-			int sy = TreeKit.clamp(ly - 2 - r.nextInt(2), sy0, crownY - 1);
+			int sy = TreeKit.clamp(ly - 3 - r.nextInt(2), sy0, crownY - 1);
 			int su = lead[0][sy];
 			int sv = lead[1][sy];
 			double rx = (2.1 + r.nextDouble() * 0.8) * ls;
 			double rz = rx * (0.8 + r.nextDouble() * 0.3);
 			double room = room(su, sv, ex, ez, wu0, wu1, wv0, wv1);
-			double reach = TreeKit.clamp(Math.min((1.0 + r.nextDouble() * 1.0) * sc, room - 1.2), 0.8, 4.5 * ls);
+			double reach = TreeKit.clamp(Math.min((1.0 + r.nextDouble() * 1.0) * sc, room - 1.2), 1.5, 4.5 * ls);
 			int tu = (int) Math.round(su + ex * reach);
 			int tv = (int) Math.round(sv + ez * reach);
 			rx = Math.max(1.3, fit(tu, wu0, wu1, rx));
@@ -151,14 +151,14 @@ public final class TreeCherryGrand implements Variant {
 						double sx = Math.max(1.2, fit(fu, wu0, wu1, sr));
 						double sz = Math.max(1.2, fit(fv, wv0, wv1, sr));
 						TreeKit.branch(t, LIMB, new int[] {mid[0], mid[1], mid[2]}, new int[] {fu, sat - 1, fv}, false);
-						lobe(t, fu, sat, fv, sx, sz, sat + 1 <= H - 1 ? 1 : 0, 1, TreeKit.SAKURA.swap(), 0.45, 40 + i, 10 + i);
+						lobe(t, fu, sat, fv, sx, sz, sat + 1 <= H - 1 ? 1 : 0, 1, TreeKit.SAKURA.swap(), 0.45, 40 + i, 10 + i, null);
 					}
 				}
 			}
 			int avail = H - 1 - ly;
 			int nUp = avail >= 2 ? 2 : avail >= 1 ? 1 : 0;
 			int nDown = ly >= CLEAR + 2 && Math.min(rx, rz) >= 2.2 ? 2 : 1;
-			lobe(t, tu, ly, tv, rx, rz, nUp, nDown, TreeKit.SAKURA, 0.5, i, 1 + (i * 2) / n); // two halves merge: two sky seams
+			lobe(t, tu, ly, tv, rx, rz, nUp, nDown, TreeKit.SAKURA, 0.5, i, 1 + (i * 2) / n, lead); // two halves merge: two sky seams
 			drips(t, tu, ly - nDown, tv, rx, rz, i);
 		}
 
@@ -166,7 +166,7 @@ public final class TreeCherryGrand implements Variant {
 		int cu = lead[0][crownY];
 		int cv = lead[1][crownY];
 		double cr = TreeKit.clamp(Math.min(Math.min(cu - wu0, wu1 - cu), Math.min(cv - wv0, wv1 - cv)) + 1.0, 2.0, 2.7 * ls);
-		lobe(t, cu, crownY + 1, cv, cr, cr * (0.85 + r.nextDouble() * 0.2), 1, 1, TreeKit.SAKURA, 0.5, 9, 1);
+		lobe(t, cu, crownY + 1, cv, cr, cr * (0.85 + r.nextDouble() * 0.2), 1, 1, TreeKit.SAKURA, 0.5, 9, 1, null);
 
 		// ---- flares one block high against the trunk, only where there is room to stand above them
 		for (int v = bv - 1; v <= bv + 2; v++) {
@@ -189,10 +189,11 @@ public final class TreeCherryGrand implements Variant {
 	 * A rounded lobe of leaves: {@code nUp} layers above the centre layer and {@code nDown} below, each
 	 * narrower than the middle one (a dome, never a plate), edge jittered, outer rings of the end layers
 	 * ragged. Lobes with the same {@code id} merge; different ids keep a one-cell seam of sky between them.
-	 * Nothing below the walk height.
+	 * Nothing below the walk height. With {@code lead} (the leader's column per y) the lower half of the lobe leaves
+	 * a one-cell gap around the trunk, so the trunk and the limb that carries the lobe show beneath it.
 	 */
 	private static void lobe(Vox t, double cu, double cy, double cv, double rx, double rz, int nUp, int nDown,
-			TreeKit.Leaves lv, double rough, int salt, int id) {
+			TreeKit.Leaves lv, double rough, int salt, int id, int[][] lead) {
 		int iy = (int) Math.round(cy);
 		for (int ly = -nDown; ly <= nUp; ly++) {
 			int y = iy + ly;
@@ -210,6 +211,9 @@ public final class TreeCherryGrand implements Variant {
 					double q = du * du + dv * dv;
 					double jit = (t.hash(u + salt * 13, y + salt * 7, v + salt * 3, 9) - 4.5) / 4.0 * rough * 0.6;
 					if (q > 1.0 + jit) {
+						continue;
+					}
+					if (lead != null && y <= iy && Math.abs(u - lead[0][y]) <= 1 && Math.abs(v - lead[1][y]) <= 1) {
 						continue;
 					}
 					if (ly != 0 && q > 0.5 && t.hash(u + salt, y * 3, v, 6) < 2) {
