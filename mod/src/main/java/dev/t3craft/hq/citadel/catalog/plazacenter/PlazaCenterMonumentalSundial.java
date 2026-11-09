@@ -44,7 +44,7 @@ import net.minecraft.world.level.block.state.BlockState;
  * </pre>
  *
  * Size: 9–23 × 9–23 × 8+ (the plaza centres of the city are 13–21 wide at scale 2). The platform radius is {@code R - 2},
- * the dial radius {@code R - 2 - tiers}, with 2 tiers from half-width 12.
+ * the dial radius {@code R - 2 - tiers}, with 2 tiers from half-width 9.
  */
 public final class PlazaCenterMonumentalSundial implements Variant {
 	@Override
@@ -124,7 +124,7 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 		k.cv = k.d / 2;
 		k.half = Math.min(Math.min(k.cu, k.w - 1 - k.cu), Math.min(k.cv, k.d - 1 - k.cv));
 		k.rt = Math.max(3, k.half - 2);
-		k.tiers = k.half >= 12 ? 2 : 1;
+		k.tiers = k.half >= 9 ? 2 : 1;
 		k.rd = Math.max(2, k.rt - k.tiers);
 		k.yd = k.tiers;
 		k.pw = k.half >= 13 ? 4 : k.half >= 9 ? 3 : 2;
