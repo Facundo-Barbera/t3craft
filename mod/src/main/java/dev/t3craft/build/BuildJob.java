@@ -172,7 +172,9 @@ public final class BuildJob {
 			if (radial && cursor instanceof DeferredCursor) {
 				double[] pf = focusWorld == null ? GroundPrimer.fallbackFocus(plan)
 						: planFocus(focusWorld.getX() + 0.5, focusWorld.getZ() + 0.5, this.origin, rotation);
-				this.primerFuture = Offload.supply(dev.t3craft.debug.PerfStats.STEP_RADIAL_PRIMER_ASYNC, () -> GroundPrimer.plan(plan, pf[0], pf[1]));
+				// fix/build-walkable-level: the primer lays the floor at the player's level (its feet cell), not the terrain under it
+				int level = focusWorld == null ? WalkLevels.NO_LEVEL : focusWorld.getY() - this.origin.getY();
+				this.primerFuture = Offload.supply(dev.t3craft.debug.PerfStats.STEP_RADIAL_PRIMER_ASYNC, () -> GroundPrimer.plan(plan, pf[0], pf[1], level));
 			} else {
 				this.primerFuture = null;
 			}
@@ -595,11 +597,17 @@ public final class BuildJob {
 	/**
 	 * fix/build-walkable: like {@link #focus(BlockPos)} with the player's exact world position {@code {x, y, z}}
 	 * (or null), so the radial cursor measures its velocity and aims its ground corridor. Server thread.
+	 * fix/build-walkable-level: an optional fourth value (1 / 0: on the ground) steadies the player's level;
+	 * the cursor gets {@code {x, z, y, onGround}} plan-relative (y relative to the origin; rotation keeps y).
 	 */
 	public void focusAt(double @Nullable [] playerWorld) {
 		JobCursor live = cursor instanceof DeferredCursor d ? d.ready() : cursor;
 		if (live instanceof RadialCursor rc) {
-			double[] rel = playerWorld == null ? null : planFocus(playerWorld[0], playerWorld[2], origin, rotation);
+			double[] rel = null;
+			if (playerWorld != null) {
+				double[] h = planFocus(playerWorld[0], playerWorld[2], origin, rotation);
+				rel = new double[] {h[0], h[1], playerWorld[1] - origin.getY(), playerWorld.length > 3 ? playerWorld[3] : 1.0};
+			}
 			rc.focus(rel, System.currentTimeMillis());
 		}
 	}

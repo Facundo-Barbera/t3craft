@@ -395,3 +395,116 @@ All four are read every tick (`/t3craft debug build-tuning reload`). The ring se
   The corridor takes over as soon as the radial plan is ready.
 - The corridor does not look at heights: a player flying above the build still gets the ground ahead of
   them.
+
+---
+
+# fix/build-walkable-level: the player's height decides what goes next
+
+## What Facundo saw and asked for (2026-11-09)
+After fix/build-walkable "el resto funciona súper bien", except the central hub: its walkable floor stands over
+a room nobody can enter, so the floor you walk on is that room's roof. The corridor and the primer took the
+column's terrain stack as "the surface", so they laid the hidden room's floor first; the real floor was
+"above" work and waited for the walls under it. Confirmed afterwards: **the player's current height guides
+the priority of everything near it**, not only a tie-break in the corridor:
+1. first the walkable floor nearest the player's feet, in the corridor and the rings;
+2. then what is at that height (walls at head height, railings, stairs a flight up or down);
+3. what lies far under or far over (hidden rooms, high roofs) later.
+When the player goes up or down (stairs, a ramp, a house's terrace) the reference level follows, with the
+same kind of hysteresis as the centre. The walk test (cross the map in a straight line without falling) must
+hold over the hub and over any structure with rooms under its walkable floor (podiums, terraces, bridges).
+
+## How it works
+### Walkable candidates (off-thread, `RadialCursor.plan` / `GroundPrimer.plan`)
+`WalkLevels` holds the shared rules.
+- A **walkable cell** is a plan block one can stand on (a collision shape: full cubes, slabs, stairs,
+  carpets) with two passable cells over it in the final plan (absent, air, or no collision: torches, flowers).
+- A **floor** is a walkable cell inside a 2 × 2 square of walkable cells at its height. The top of a
+  one-thick wall or a fence line is never a floor.
+- Per column, the candidates are its floors in the "above" part plus its terrain top when walkable, stored
+  as flat arrays (`candStart`, `candK`, `candSup`). `candSup` marks a floor that gets the block right under it
+  when lifted: on the floor's edges (a side cell with nothing to stand on) or under a thin floor (slab, carpet).
+  Shapes are cached per block state, so this stays one more pass over the plan.
+
+### The level (server thread, `RadialCursor.trackLevel`)
+- `BuildManager.focusOf` now hands over `{x, y, z, onGround}`; `BuildJob.focusAt` passes the cursor
+  `{x, z, y − origin.y, onGround}`.
+- The level is the player's feet cell (the cell over the block it stands on, slabs included).
+- It changes when the feet moved **2 blocks** (`WalkLevels.LEVEL_MOVE`: falling into a room, a flight of
+  stairs), or **1 block held on the ground for 0.75 s** (a step, the top of a ramp; a jump never counts),
+  never twice within 0.75 s. The centre's twin: 4 blocks horizontally, or a drift held over time.
+- Each level change and each re-order bumps `levelVersion`. The columns choose again lazily (`ensure`): one
+  int compare per column look while nothing changed, a loop over 1–3 candidates when it did.
+
+### The surface of a column (`RadialCursor.ensure`)
+Only within `levelRings` of the centre: `ceil((corridorLength + 4 + radialRing) / radialRing)`, 6 rings
+(30 blocks) with the defaults, so as far as the corridor can reach before the next re-order. Farther away, and
+with nobody in the build, every column keeps its terrain surface and one bottom-up pointer, as before.
+- The surface is the candidate whose feet height (`y + 1`) is nearest the level, at most 3 blocks away
+  (`PICK_REACH`). On a tie the higher one wins. It is never "the lowest of the stack".
+- **Terrain wins:** nothing changes (ground + support, the fix/build-radial-tune split).
+- **A floor wins** (the hub's floor over its hall, a terrace, a podium top, a bridge deck): the column is
+  **lifted**. A second pointer `up` starts at that floor, or at its support block when it has one. Both are
+  placed **like ground**: the corridor and the ground stream place them, with no builder and no support
+  needed. It is the plan's own floor, the same exception the terrain surface already had; never a temporary
+  floor. The builders continue upwards from it (railings, walls, the roof) with the support rule.
+- **What lies under it is under work:** the hidden room's floor (its terrain), walls, interior and
+  decoration. It no longer counts for the front ring. The fill stream lays it, `fillRingsBehind` rings
+  behind the front (or anywhere once nothing else is left), bottom-up with the support rule. An unsupported
+  head waits (`underStalled`) and wakes when a neighbour is placed, like the others. So a ring becomes
+  walkable first, and what it hides goes in afterwards, like the fill.
+- Pointers skip entries already applied, so placing out of order costs nothing. When the player leaves, or
+  steps back down, the column chooses again. Whatever is left of it continues bottom-up or under the new
+  floor, and what was already placed is skipped.
+
+### The band (builders)
+- `pick` takes the nearest ring with a free (or helpable) span whose head is in the player's band:
+  `WalkLevels.inBand`, from 3 under the floor the player stands on to 3 over its feet. That covers walls at
+  head height, a 3-high ceiling, railings, and stairs a flight up or down.
+- Only when no ring within the builder limit has any band work does a builder take the first ring's work out of
+  the band (high roofs, a tower top, the ground far under a terrace).
+- A builder that took its span for band work leaves it once its band courses are done (`tband`), and picks
+  again. With no band work left, it comes back to the same span as the fallback, so it never thrashes.
+- The front ring and the ring limits are unchanged.
+
+### The primer (`GroundPrimer.plan(plan, fx, fz, level)`)
+`BuildJob` passes the level of `focusWorld` (feet cell − origin y). Per column, the primer makes the same
+choice: the walkable floor nearest the feet (2 × 2 rule, ±3), else the terrain stack's top as before. When it
+picks a floor, it lays that floor and, on the floor's edges or under a thin floor, the block under it. The
+radial cursor makes the same choice when it arrives and finds those cells already right.
+
+### Animation
+Lifted floors and under work are laid by streams, so no builder walks to them: `frontOf` is −1 while a stream
+applies (`streaming`).
+
+## Cost
+- **Off-thread** (plan analysis): one more pass over the plan (≈ 4 hash lookups per entry for walkability,
+  the 2 × 2 test only on walkable cells), and one `getCollisionShape` per distinct block state.
+- **Game thread**:
+  - `ensure` costs one int compare per column look. After a level change or a re-order, the first look at
+    each column within 6 rings (≈ 2 800 columns) loops over 1–3 candidates and may rewind the scan pointers
+    of that column (bounded by `SCAN_MAX`).
+  - `pick` keeps two candidates instead of one, with the same bounded scan.
+  - The under work shares the fill stream's budget (`fillBlocksPerTick`, foundation ms) and its timer.
+  - No new world reads.
+- **Measurement:** all of it falls under the existing PerfStats steps `build.radial_corridor`,
+  `build.radial_ground`, `build.radial_builders` and `build.radial_fill` (inside `build.radial`) and
+  `build.radial_plan_async` / `build.radial_primer_async` off-thread. **There are no new steps.** The
+  budgets are unchanged: corridor 64 / 3 ms, ground 32, fill 128 within the foundation budget, builders
+  within the crews' budget.
+
+## Walk test, case by case (reasoning, not tried in game)
+| where the player walks | surface the corridor lays | what waits |
+|---|---|---|
+| hub floor over the hidden hall | the hub floor (+ edge support) | the hall's floor, walls, interior: fill stream, rings behind |
+| open island | terrain ground (unchanged) | fill |
+| podium or terrace top, rooms under | the top floor (2 × 2 or wider) | the rooms |
+| bridge deck ≥ 2 wide over a gap | the deck; its edge blocks get the block under them if solid | the piers under it |
+| descending stairs into a room | the room's floor becomes the surface once the feet drop 2 (or 1 held on the ground for 0.75 s) | the floor that was above, the roof |
+
+## Pending / not done
+- **Not compiled or tried in game:** the coordinator compiles.
+- One-wide walkways (catwalks, one-wide bridges) are not floors (2 × 2 rule). The builders raise them with
+  the support rule, within the band, so they come early but not at corridor speed.
+- A flying player 4 or more blocks over every floor gets the terrain surfaces (no floor within ±3). The band
+  follows its height, so builders work near it.
+- The level only looks at the nearest player in the build, as the centre does.
