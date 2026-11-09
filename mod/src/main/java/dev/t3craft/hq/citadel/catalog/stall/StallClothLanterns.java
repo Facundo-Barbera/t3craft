@@ -194,7 +194,7 @@ public final class StallClothLanterns implements Variant {
 		// bolts come in runs of two cells (one roll is two blocks wide); three sober terracottas of the seed's
 		// scheme plus cream and white wool, so the goods are the loudest thing on the front
 		DyeColor[] st = STOCK[g.idx];
-		return switch (p.hash(u / 2, 1, v, 7)) {
+		return switch (p.hash((u - g.lo()) / 2, 1, v, 7)) {
 			case 0 -> terracotta(st[0]);
 			case 1 -> terracotta(st[1]);
 			case 2 -> terracotta(g.accent);
@@ -220,8 +220,7 @@ public final class StallClothLanterns implements Variant {
 			// [palette] [depth] the front edge of the roof is a band of the seed's terracotta (the stall's one patch
 			// of colour, readable from the street); it runs post to post, never out over the side walk
 			if (u >= g.postL() && u <= g.postR()) {
-				// [depth] a scalloped valance: an accent block, then a thin spruce slab, alternately (lighter than a solid band)
-				p.set(c, u, 3, 1, (u & 1) == 0 ? terracotta(g.accent) : b(Blocks.SPRUCE_SLAB).setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP));
+				p.set(c, u, 3, 1, terracotta(g.accent));
 			}
 		}
 		for (int v = 2; v < g.d; v++) {
@@ -229,9 +228,9 @@ public final class StallClothLanterns implements Variant {
 			int prev = g.ry(v - 1);
 			BlockState s;
 			if (y > prev) {
-				s = stairs(Blocks.SPRUCE_STAIRS, Direction.NORTH);
+				s = stairs(Blocks.OAK_STAIRS, Direction.NORTH); // [palette] a light oak slope over dark posts: the roof does not melt into them
 			} else if (y < prev) {
-				s = stairs(Blocks.SPRUCE_STAIRS, Direction.SOUTH);
+				s = stairs(Blocks.OAK_STAIRS, Direction.SOUTH);
 			} else {
 				s = b(Blocks.DARK_OAK_PLANKS); // [palette] the ridge rows in dark oak: a cap that breaks the slope's colour
 			}
@@ -253,21 +252,21 @@ public final class StallClothLanterns implements Variant {
 
 	private static void posts(CitadelCanvas c, Plot p, Geo g) {
 		for (int u : new int[] {g.postL(), g.postR()}) {
-			post(c, p, u, 1, 3); // front: up to the valance
-			post(c, p, u, g.bv, g.ry(g.bv)); // back: up to the roof
+			post(c, p, u, 1, 3, true); // front: cherry, up to the valance
+			post(c, p, u, g.bv, g.ry(g.bv), false); // back: bark-brown spruce, up to the roof
 			if (g.d >= 7) {
-				post(c, p, u, g.bv - 3, g.ry(g.bv - 3));
+				post(c, p, u, g.bv - 3, g.ry(g.bv - 3), false);
 			}
 		}
 	}
 
 	/** [palette] a polished-deepslate footing (the basa), a stripped cherry shaft, a plank collar at the roof. */
-	private static void post(CitadelCanvas c, Plot p, int u, int v, int top) {
+	private static void post(CitadelCanvas c, Plot p, int u, int v, int top, boolean cherry) {
 		p.set(c, u, 0, v, b(Blocks.POLISHED_DEEPSLATE));
 		for (int y = 1; y < top - 1; y++) {
-			p.set(c, u, y, v, b(Blocks.SPRUCE_LOG)); // [palette] bark-brown posts: the cherry is kept for the counter and the stool
+			p.set(c, u, y, v, b(cherry ? Blocks.STRIPPED_CHERRY_LOG : Blocks.SPRUCE_LOG));
 		}
-		p.set(c, u, top - 1, v, b(Blocks.SPRUCE_PLANKS));
+		p.set(c, u, top - 1, v, b(cherry ? Blocks.CHERRY_PLANKS : Blocks.SPRUCE_PLANKS));
 	}
 
 	// ------------------------------------------------------------------ the counter
@@ -291,7 +290,7 @@ public final class StallClothLanterns implements Variant {
 			p.set(c, u, 1, v, b(Blocks.LOOM).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH));
 		} else if (k == 9) {
 			p.set(c, u, 1, v, b(Blocks.CHERRY_SLAB).setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP)); // a bare board
-		} else if (p.hash(u / 2, 3, v, 3) != 0) {
+		} else if (p.hash((u - g.lo()) / 2, 3, v, 3) != 0) {
 			p.set(c, u, 1, v, cloth(p, g, u, 1, v));
 			p.set(c, u, 2, v, cloth(p, g, u, 1, v));
 		} else {
