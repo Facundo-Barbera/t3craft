@@ -24,6 +24,7 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.Half;
 import net.minecraft.world.level.block.state.properties.StairsShape;
 import static dev.t3craft.hq.citadel.CitadelCanvas.AIR;
+import static dev.t3craft.hq.citadel.CitadelCanvas.BAMBOO;
 import static dev.t3craft.hq.citadel.CitadelCanvas.CALCITE;
 import static dev.t3craft.hq.citadel.CitadelCanvas.DECOR;
 import static dev.t3craft.hq.citadel.CitadelCanvas.FOOT;
@@ -65,11 +66,11 @@ final class BarrioGateBig {
 	/** Height of the walls of a guard room (the roof layer, which is also its ceiling, sits above). */
 	private static final int ANNEX_TOP = 4;
 	/** Height of the walls of a tower. */
-	private static final int TOWER_TOP = 12;
+	private static final int TOWER_TOP = 13;
 	/** Height of the walls over the passage at the middle, one block less at {@code |dv| = 1}, two at {@code |dv| = 2}. */
-	private static final int GABLE_WALL = 10;
+	private static final int GABLE_WALL = 11;
 	/** Height of the sign board (plaques). */
-	private static final int PLAQUE_Y = 7;
+	private static final int PLAQUE_Y = 8;
 
 	/** Whether the gate room is big enough for this design. */
 	static boolean fits(Room r) {
@@ -138,7 +139,9 @@ final class BarrioGateBig {
 			for (int s = 0; s < 2; s++) {
 				int v0 = s == 0 ? 0 : W - sw;
 				pyramid(new Room(r.cell(0, v0, 0), back, side, sw, tu), ANNEX_TOP + 1, false, s);
-				pyramid(new Room(r.cell(tu, v0, 0), back, side, sw, D - tu), TOWER_TOP + 1, true, s);
+				Room tower = new Room(r.cell(tu, v0, 0), back, side, sw, D - tu);
+				pyramid(tower, TOWER_TOP + 1, true, s);
+				cornice(tower, TOWER_TOP - 1);
 			}
 			gableVerge();
 			passageDressing();
@@ -191,8 +194,8 @@ final class BarrioGateBig {
 		void passageCol(int u, int v, int dv) {
 			int a = Math.abs(dv);
 			c.set(r.cell(u, v, 0), passageFloor(u, dv));
-			// clear height: 3 at the sides, 4 next to the middle, 5 in the middle; the arch piece sits just above it
-			int clear = 5 - a;
+			// clear height: 4 at the sides, 5 next to the middle, 6 in the middle; the arch piece sits just above it
+			int clear = 6 - a;
 			int top = GABLE_WALL - a;
 			for (int y = 1; y <= clear; y++) {
 				c.set(r.cell(u, v, y), AIR);
@@ -237,9 +240,9 @@ final class BarrioGateBig {
 		/** Lanterns under the vault, banners on the passage walls, the hanging sign of the project at the hub end. */
 		void passageDressing() {
 			for (int u = 1; u < D - 2; u += 3) {
-				c.set(r.cell(u, mid, 5), BarrioKit.lantern(true));
+				c.set(r.cell(u, mid, 6), BarrioKit.lantern(true));
 			}
-			BlockPos sign = r.cell(D - 1, mid, 5);
+			BlockPos sign = r.cell(D - 1, mid, 6);
 			BlockState hs = Blocks.CHERRY_HANGING_SIGN.defaultBlockState().setValue(CeilingHangingSignBlock.ROTATION, CitadelBarrios.rotation(back))
 					.setValue(CeilingHangingSignBlock.ATTACHED, false);
 			c.put(sign.getX(), sign.getY(), sign.getZ(), hs, HANGING);
@@ -271,23 +274,53 @@ final class BarrioGateBig {
 			for (int y = 1; y <= TOWER_TOP; y++) {
 				BlockState s;
 				if (!perimeter) {
-					s = mats.wall();
+					// the letter sits one block into the tower, behind the recess on the face
+					s = u == D - 2 && y >= 5 && y <= 9 ? letterCell(tv, y, left) : mats.wall();
 				} else if (corner) {
 					s = mats.post();
 				} else if (y <= 2) {
 					s = FOOT;
 				} else if (y == 3) {
-					s = mats.wall();
+					s = towerStone(u, v, y);
+				} else if (hubFace && !edgeV && (y == 4 || y == 10)) {
+					s = BAMBOO;
 				} else if (y == 4 || y == TOWER_TOP) {
 					s = band(uFace);
-				} else if (hubFace && !edgeV) {
-					s = letterCell(tv, y, left);
+				} else if (hubFace && !edgeV && y >= 5 && y <= 9) {
+					s = AIR;
 				} else if (!edgeU && edgeV && (y == 6 || y == 7) && tu_ == (D - tu) / 2 && (v == 0 || v == W - 1)) {
 					s = b(Blocks.GLASS_PANE);
 				} else {
-					s = mats.wall();
+					s = towerStone(u, v, y);
 				}
 				c.set(r.cell(u, v, y), s);
+			}
+		}
+
+		/** The light stone of the towers (the hall behind is the barrio's own colour; the gate is told apart by it): bricks, a few mossy and cracked. */
+		BlockState towerStone(int u, int v, int y) {
+			int h = Math.floorMod(u * 7 + v * 13 + y * 5, 11);
+			return b(h == 0 ? Blocks.MOSSY_STONE_BRICKS : h == 1 ? Blocks.CRACKED_STONE_BRICKS : Blocks.STONE_BRICKS);
+		}
+
+		/** A row of upside-down stone-brick stairs one block out under the top of a tower: a shadow line (not at the corners). */
+		void cornice(Room s, int y) {
+			int w = s.w();
+			int d = s.d();
+			for (int u = -1; u <= d; u++) {
+				for (int v = -1; v <= w; v++) {
+					boolean uEdge = u == -1 || u == d;
+					boolean vEdge = v == -1 || v == w;
+					if (uEdge == vEdge) {
+						continue;
+					}
+					BlockPos p = s.cell(u, v, y);
+					if (insideGate(p)) {
+						continue;
+					}
+					Direction in = u == -1 ? back : u == d ? back.getOpposite() : v == -1 ? side : side.getOpposite();
+					c.set(p, BarrioKit.stair(Blocks.STONE_BRICK_STAIRS, in, StairsShape.STRAIGHT, Half.TOP));
+				}
 			}
 		}
 
@@ -533,6 +566,7 @@ final class BarrioGateBig {
 			}
 		}
 		apron(c, l, a0, walk);
+		flanks(c, l, a0, a1, walk);
 		for (int a = a0 + 1; a < a1; a++) {
 			int n = a - a0;
 			if (n % 4 == 1) {
@@ -560,6 +594,29 @@ final class BarrioGateBig {
 				continue;
 			}
 			c.set(p, Math.floorMod(bb, 2) == 0 ? c.floor() : CALCITE);
+		}
+	}
+
+	/**
+	 * The strips of the cross beside the gate and beside the walk that were the plain grey accent (with the old light lattice's cyan dots):
+	 * stone bricks, mossy and cracked ones. The bays of the forecourt take most of them over afterwards; what they leave stays paved.
+	 */
+	private static void flanks(CitadelCanvas c, Lot l, int a0, int a1, int walk) {
+		int edge = l.court() + 1;
+		int gateEdge = (l.gateW() + 1) / 2 + 1;
+		for (int a = l.court() + 1; a <= a1; a++) {
+			int from = a < a0 ? gateEdge : walk + 1;
+			for (int side = -1; side <= 1; side += 2) {
+				for (int k = from; k <= edge; k++) {
+					BlockPos p = l.at(-a, side * k, 0);
+					BlockState above = c.at(p.getX(), 1, p.getZ());
+					if (!inLot(c, l, p) || (above != null && !above.isAir())) {
+						continue;
+					}
+					int h = Math.floorMod(a * 5 + k * 3, 7);
+					c.set(p, b(h == 0 ? Blocks.MOSSY_STONE_BRICKS : h == 1 ? Blocks.CRACKED_STONE_BRICKS : Blocks.STONE_BRICKS));
+				}
+			}
 		}
 	}
 
