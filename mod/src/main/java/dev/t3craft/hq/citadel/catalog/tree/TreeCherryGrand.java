@@ -180,6 +180,7 @@ public final class TreeCherryGrand implements Variant {
 		}
 
 		TreeKit.petalCarpet(t, bu + 0.5, bv + 0.5, mn / 2.0 + 1.6);
+		trimBareTips(t);
 		t.prune();
 		t.flush(c);
 	}
@@ -242,6 +243,37 @@ public final class TreeCherryGrand implements Variant {
 	private static BlockState tone(Vox t, TreeKit.Leaves lv, int u, int y, int v, double dy, int salt) {
 		int pct = dy < -0.2 ? 38 : dy < 0.35 ? 18 : 6;
 		return t.hash(u + salt, y, Math.floorDiv(v, 2), 100) < pct ? lv.b() : lv.a();
+	}
+
+	/** Removes pale limb cells that end in the open: a tip with at most one wood neighbour and no leaf beside it. */
+	private static void trimBareTips(Vox t) {
+		int[][] n6 = {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}};
+		for (int pass = 0; pass < 4; pass++) {
+			boolean any = false;
+			for (int y = CLEAR; y < t.h; y++) {
+				for (int v = 0; v < t.d; v++) {
+					for (int u = 0; u < t.w; u++) {
+						if (t.kind(u, y, v) != TreeKit.WOOD || t.get(u, y, v).getBlock() != Blocks.STRIPPED_CHERRY_WOOD) {
+							continue;
+						}
+						int wood = 0;
+						int leaf = 0;
+						for (int[] o : n6) {
+							byte k = t.kind(u + o[0], y + o[1], v + o[2]);
+							wood += k == TreeKit.WOOD ? 1 : 0;
+							leaf += k == TreeKit.LEAF ? 1 : 0;
+						}
+						if (wood <= 1 && leaf == 0) {
+							t.clear(u, y, v);
+							any = true;
+						}
+					}
+				}
+			}
+			if (!any) {
+				break;
+			}
+		}
 	}
 
 	/** Drips under the rim of the lowest layer {@code yl} of a lobe (never below the walk height). */
