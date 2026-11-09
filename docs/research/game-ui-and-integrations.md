@@ -458,6 +458,123 @@ Si el mod lleva su propia instancia de T3 y usa T3 Connect, el **emparejamiento 
 Conviene decidir primero el #1 y luego rediseñar esas pantallas una sola vez. Lo que sí es independiente del #1: el kit, el UI
 scale y la fuente.
 
+## 8. Anexo: navegador dentro del juego
+
+Pregunta de Facundo (2026-11-09): ¿se puede ver un "browser" dentro del juego para explorar cosas? Hay **cuatro vías reales**. La
+más interesante no necesita meter Chromium en el mod.
+
+### 8.1 Vía A (recomendada para empezar): el navegador del servidor de T3, transmitido al juego
+T3 Code ya sabe correr una pestaña de navegador **en el servidor** (Chromium headless) y mostrarla a clientes que no tienen
+runtime local: la app web, la móvil y el escritorio la ven así. Evidencia (contratos vendorizados en
+`bridge/vendor/t3-contracts/src/preview.ts`, `auth.ts`, `rpc.ts`, y el código público de `pingdotgg/t3code`:
+`packages/client-runtime/src/preview/serverBrowserStream.ts`, `apps/server/src/preview/ServerBrowserStream.ts`):
+
+- **Protocolo:** WebSocket en `/api/preview-stream/ws?threadId&tabId&maxWidth&maxHeight`. El servidor manda **frames JPEG
+  binarios**, el cliente responde `{"type":"ack"}` por cada uno (control de flujo) y **nunca recibe frames más grandes que
+  `maxWidth` × `maxHeight`**. Mensajes JSON de estado: viewport, control, portapapeles, descargas, popups, diálogos, selector de archivos.
+- **Entrada (JSON):** `mouse` (move/down/up, coordenadas en px CSS de la página, botones, modificadores, clickCount), `wheel`,
+  `key` (con `key`, `code`, `keyCode` de Windows y `text`), `text`, `resize`, `viewport`, `navigate`, `history` (atrás/adelante),
+  `reload`, `takeControl` / `releaseControl`, `dialog`.
+- **Permisos:** **ver** exige `orchestration:read` (`authenticateMediaRequest(AuthOrchestrationReadScope)`), que el mod ya tiene.
+  **Interactuar** exige el scope `preview:operate` (el servidor lo comprueba con `session.scopes.includes(AuthPreviewOperateScope)`
+  y sin él entra en modo solo lectura). Hoy el mod **rechaza** cualquier scope fuera de `read` + `operate`, así que ese scope
+  sería una decisión de política (pregunta 3 abajo). Un cliente que va con un servidor viejo trata `preview:operate` como
+  hijo de `orchestration:operate` (`legacyParents` en `auth.ts`), pero **los servidores no amplían permisos**.
+- **Qué se puede mostrar:** las pestañas de preview de un hilo (`preview.list`, eventos `subscribePreviewEvents`) y los
+  **servidores locales que levantó el agente** (`subscribeDiscoveredLocalServers`, con `agent.threadId` cuando lo inició el
+  hilo). Los agentes abren previews con `preview_open` (`runtime: "server"`) y T3 permite un `previewUrl` por script de proyecto.
+- **Quién maneja la pestaña:** `control.controller` es `agent`, `you`, `another-viewer` o `unclaimed`. Un visor pasivo no
+  roba el control (parámetro `interactive=false`).
+- **Qué necesita el mod:** un cliente WebSocket (ya tiene uno para RPC), decodificar JPEG (`javax.imageio` sin ventana; el mod ya
+  usa `java.awt.image` en `ImageSources`), subir a una `DynamicTexture` y dibujarla en una pantalla o en un monitor del
+  mundo. Sin dependencias nuevas, sin descargas de 100 MB, sin procesos hijos.
+- **Esfuerzo:** visor solo lectura M (descubrir pestañas, conectar, texturizar, `ack`, límites de tamaño, reconexión);
+  entrada completa +M (teclas de Minecraft → `key`/`code`/`keyCode`, rueda, texto por SDL3, foco, UI scale); en el mundo (monitor)
+  +M con raycast.
+- **Riesgos y puntos a verificar:**
+  - El host del servidor puede pedir preparación (cierre `4503`, `need: sandbox | libraries`, con el comando que lo arregla).
+  - Solo hay frames si la pestaña es del servidor (`headless`/`runtime: "server"`), no si la abrió el escritorio de alguien.
+  - No he leído cómo se arma el token del `DeviceHubAccess` (`withDeviceHubQuery`) para clientes de terceros; hay que ver
+    si acepta el Bearer del pairing en el upgrade. **(verificar en el código del servidor)**
+  - El formato y los permisos pueden cambiar (T3 Code es nightly; el VPS corre `0.1.8-nightly`). Marcar como dependencia
+    frágil y tolerante: si falla, el visor muestra "no disponible", no "vacío".
+  - Ancho de banda y CPU: JPEG a 30 fps o más y varias pantallas a la vez. Solo suscribirse a lo visible/cercano (patrón de
+    los monitores de log en vivo, con refcount) y pedir `maxWidth` pequeño en el mundo.
+  - Privacidad: el visor ve lo que ve el agente (cookies de sesión del perfil de preview, datos de la app). Es la misma
+    visibilidad que ya da T3.
+  - El **issue #1** (T3 Connect o CLI) cambia cómo se obtiene el acceso al servidor; el protocolo de frames es el mismo.
+
+### 8.2 Vía B: Chromium dentro del juego (CEF), si se quiere un navegador general
+- **Qué es:** una librería-mod que embebe Chromium (JCEF) y lo renderiza a una textura.
+- **Estado para 26.3 (verificado en las fichas, no ejecutado):** el MCEF original de CinemaMod llega hasta **1.21.4** (Chromium 116);
+  hay **dos forks que ya declaran 26.3**: **MCEF Modern** (DimasKama, Fabric, "26.3, 26.2, 26.1.x, 1.21.10–1.21.11", LGPL-2.1,
+  inicialización asíncrona, API documentada) y **Rinku** (Keksuccino, Fabric/NeoForge/Forge, Chromium mucho más nuevo, 60 fps por
+  defecto y 120+ configurable, LGPL-2.1, Maven en `keksuccino.github.io/maven`). Ambos son librerías: no hacen nada solas.
+- **Cómo se usaría:** dependencia **opcional** (`suggests` en `fabric.mod.json`, igual que Mod Menu y cargada por separado), una
+  `WebScreen` que crea el navegador, dibuja su textura y reenvía ratón, rueda y teclado. Ya existen mods de pantallas web en el
+  mundo basados en MCEF (WebDisplays y sus ports a Fabric).
+- **Costes:**
+  - Descarga de binarios de Chromium en el primer arranque, del orden de **~136 MB** (cifra de `mcef-codec`; la de cada fork
+    puede variar), guardados en `config/`. Hay antivirus que la bloquean; hace falta internet.
+  - Varios procesos Chromium hijos (renderer, GPU, red) y varios cientos de MB de RAM. En el PC de Facundo es aceptable; en un
+    portátil flojo no.
+  - **Sin H.264/AAC** en los builds estándar: no reproduce el vídeo de la mayoría de sitios. Existe `mcef-codec` para 26.2.
+  - Atado a la versión de Minecraft: el original quedó 6 versiones atrás; hoy las ports siguen a una sola persona cada una.
+    Riesgo de mantenimiento y de que la primera 26.4 rompa.
+  - Audio por el sistema, no por el mixer de Minecraft **(verificar)**. Cursor, IME, portapapeles y foco son trabajo propio.
+  - Es un navegador general que ejecuta JS de cualquier sitio: superficie de ataque. Hay que limitar a una lista de
+    dominios o a localhost/tailnet, y no guardar credenciales de T3 en su perfil.
+  - **No usar para iniciar sesión de T3 Connect/OAuth:** muchos proveedores bloquean los webviews embebidos y la práctica
+    recomendada es el navegador del sistema (RFC 8252). El inicio de sesión sigue con código de dispositivo o `openUri`.
+- **Licencia:** LGPL-2.1 de las librerías. Depender de ellas por Maven y no copiar ni modificar su código es compatible con
+  el MIT del mod; no incluirlas dentro del jar.
+- **Esfuerzo:** spike S a M (abrir una URL en una pantalla); producto completo M a L (pestañas, barra de direcciones,
+  descargas, permisos de dominios).
+
+### 8.3 Vía C: renderizador propio de HTML/Markdown (sin JS)
+Para docs, PRs y páginas simples con `Jsoup` + el layout de `Markdown`/`TextWrap` que el chat ya tiene. Cero dependencias nativas,
+rápido y coherente con el tema, pero **no es un navegador**: nada de JS, formularios ni CSS reales. Esfuerzo M. Solo vale si el caso
+de uso es leer documentación.
+
+### 8.4 Vía D: el navegador del sistema (ya existe)
+`Blaze3D.openUri` abre URLs con la confirmación vanilla (`ConversationPanel`, `MergeStationScreen`). Es lo que cubre hoy
+"abrir el PR" o "abrir la doc". Mejoras baratas: abrir el preview de un hilo en el navegador, y los esquemas `t3code://` y
+`vscode://` (ver I5 e I6).
+
+### 8.5 Descartadas
+- **JavaFX WebView / Swing:** chocan con GLFW en macOS (dos event loops en el hilo principal).
+- **Headless Chromium propio en el PC/VPS** que transmita capturas: duplica lo que T3 ya hace en la vía A y añade un proceso pesado
+  (las reglas de `AGENTS.md` restringen procesos pesados al PC).
+
+### 8.6 Qué se vería en el juego (casos de uso, por valor)
+1. **Pantalla de preview en el HQ** (la mejor idea de este anexo): el monitor del hilo o una "pantalla de revisión" muestra la
+   app que el agente está construyendo (`localhost:5173` visto desde el servidor de T3). Se ve desde el escritorio del NPC,
+   con el log en vivo al lado, y se puede entrar y tocar. Es algo que **solo el juego** puede hacer de forma diegética.
+   Vía A.
+2. **Revisión de cambios** (G9): la lista de archivos y +N/−N en la UI propia y, para el diff completo o la página del PR, una
+   pestaña web. Vía A si el PR se abre en una pestaña del servidor; vía B si se quiere abrir `github.com`.
+3. **Documentación y búsqueda mientras se juega:** sirve, pero es el uso que menos aporta a t3craft y el que más cuesta
+   (navegador general, seguridad). Vía D o B. WebDisplays ya lo cubre para quien lo quiera.
+4. **La app web de T3 dentro del juego** (estrategia alternativa a unificar la UI nativa, §7): en vez de reescribir diff, terminal,
+   ajustes o plan, un panel carga el T3 web de ese entorno. Ganancia: fidelidad total y cero mantenimiento de pantallas. Pérdida:
+   estética propia, accesibilidad y diegético; además exige que el T3 web acepte la sesión del pairing (cookie) **(verificar)** y
+   es solo vía B. Puede convivir: UI nativa para lo cotidiano y el web para lo pesado.
+5. **Dashboards** (Grafana, estado de servicios) en paredes del HQ: vía B, nicho.
+
+### 8.7 Recomendación
+Empezar por la **vía A en solo lectura** (un spike M): una `PreviewScreen` y, si funciona, el monitor en el mundo. Si el protocolo de
+T3 no acepta el pairing de terceros o queda inestable, caer a **D** con el spike de **B** (MCEF Modern o Rinku) solo para localhost.
+Decidir antes si se acepta el scope `preview:operate` (pregunta 3) y cómo le queda a esto el issue #1.
+
+### 8.8 Preguntas para Facundo
+1. ¿Qué quieres explorar con el navegador: **ver lo que construyen los agentes** (preview), **revisar PRs/diffs**, o **navegar por la
+   web en general**? Cambia la vía.
+2. ¿Aceptas una descarga opcional de ~100 a 150 MB (Chromium) para el navegador general, o prefieres cero dependencias?
+3. ¿Se permite pedir el scope `preview:operate` además de `read` y `operate`, o el visor es **solo lectura**?
+4. ¿La pantalla de preview debe estar **en el mundo** (monitor del hilo), en una **pantalla** o en ambas?
+5. ¿Qué entornos corren los previews hoy (servidor remoto, `localhost` del VPS por Tailscale)? Condiciona si el visor del
+   servidor alcanza las apps.
+
 ## Fuentes web
 
 - GLFW, `glfwRequestWindowAttention`: https://www.glfw.org/docs/latest/group__window.html
@@ -469,3 +586,10 @@ scale y la fuente.
 - T3 Code, enlaces profundos: https://github.com/pingdotgg/t3code/issues/26915
 - Narrador de Minecraft en Linux (flite): https://github.com/flathub/com.mojang.Minecraft/issues/14
 - AWT y GLFW en macOS: https://github.com/libgdx/libgdx/pull/6673
+- MCEF original (hasta 1.21.4): https://github.com/CinemaMod/mcef
+- MCEF Modern (26.3): https://modrinth.com/mod/mcef-modern y https://github.com/DimasKama/mcef-modern
+- Rinku (26.3): https://www.curseforge.com/minecraft/mc-mods/mcef-keksuccino y https://github.com/Keksuccino/Rinku
+- mcef-codec (H.264/AAC): https://github.com/menntdev/mcef-codec
+- WebDisplays (Fabric): https://www.curseforge.com/minecraft/mc-mods/webdisplays-unofficial-fabric
+- T3 Code, preview en servidor y streaming: `packages/client-runtime/src/preview/serverBrowserStream.ts` y
+  `apps/server/src/preview/ServerBrowserStream.ts` en https://github.com/pingdotgg/t3code
