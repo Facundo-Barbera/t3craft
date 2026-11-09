@@ -1,14 +1,13 @@
 package dev.t3craft.hq.citadel.catalog.house;
 
+import static dev.t3craft.hq.citadel.CitadelCanvas.AIR;
 import static dev.t3craft.hq.citadel.CitadelCanvas.b;
 import static dev.t3craft.hq.citadel.CitadelCanvas.leaves;
 import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
 import static dev.t3craft.hq.citadel.catalog.house.TerraceKit.door;
 import static dev.t3craft.hq.citadel.catalog.house.TerraceKit.hanging;
 import static dev.t3craft.hq.citadel.catalog.house.TerraceKit.log;
-import static dev.t3craft.hq.citadel.catalog.house.TerraceKit.mix;
 import static dev.t3craft.hq.citadel.catalog.house.TerraceKit.pane;
-import static dev.t3craft.hq.citadel.catalog.house.TerraceKit.slabTop;
 import static dev.t3craft.hq.citadel.catalog.house.TerraceKit.stair;
 import static dev.t3craft.hq.citadel.catalog.house.TerraceKit.trap;
 import static dev.t3craft.hq.citadel.catalog.house.TerraceKit.vine;
@@ -18,37 +17,42 @@ import dev.t3craft.hq.citadel.catalog.Family;
 import dev.t3craft.hq.citadel.catalog.Plot;
 import dev.t3craft.hq.citadel.catalog.Variant;
 import dev.t3craft.hq.citadel.catalog.house.TerraceKit.Links;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
 import net.minecraft.core.Direction;
 import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.Mirror;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BedPart;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 
 /**
- * A hillside cottage: a mossy retaining wall holds a raised garden terrace, the cottage stands on it
- * under a long warm-brick roof, and a small waterfall spills from a stone channel in the terrace
- * through a niche between two buttresses into a lily pond at the foot of the wall. A stair climbs
- * along the left edge to the terrace.
+ * A hillside house with a real waterfall. A mossy retaining wall holds a raised terrace; a two-storey
+ * house stands on it (kitchen and living room below, bedroom and study above, 4 free blocks per floor).
+ * The water has a visible origin and a use: a downpipe from the eave feeds a carved stone mask on the house
+ * wall, whose mouth pours into a stone channel that crosses the terrace (a slab bridge crosses it), irrigates
+ * a bed of crops and feeds a lavoir; at the lip of the retaining wall it falls (one jump into a pond, or two:
+ * through a washing trough) into a lily pond at the foot. A 2-wide stair climbs along the side to the
+ * terrace. The pond and the cascade never leave the plot.
  *
  * <pre>
- *  side section, front on the left                       y12  ridge, chimney
- *                                       ____/\____            long gable roof (resin brick)
- *                                      │ cottage  │      y4-6 stone base, plaster, dark-oak frame
- *   lily pond ▒▒ ┌╲ spout   garden  ... ├──────────┤
- *   ▒▒▒▒▒▒▒▒▒▒▒ ┌┘ channel (water y3)   terrace deck y3
- *   ▒pond y0▒▒ ║ retaining wall, buttresses, vines (y0..y3)
- *   stair ▁▂▃▅ ║
+ *  side section, front on the left                      roof (tile, brick or tuff brick), ridge, chimney
+ *                                          ____/\____
+ *   downpipe ┐  mask ▒ pours               │ upper  │  bedroom, study (y9..12)
+ *   pond ▒▒ ╲ falls    channel ▒▒▒▒▒ crops   ├────────┤
+ *   ▒▒▒▒▒▒▒ ║  retaining wall (y0..3)       │ lower  │  kitchen, living room (y4..7)
+ *   stair ▁▂▃▅ ║                             └────────┘
  * </pre>
  *
- * Size: 11–15 × 12–15 × 14+. The waterfall stands to the right of the door column.
+ * Size: 14–24 wide × 14–26 deep × 21+ high. The seed picks the side of the water, one or two jumps and the
+ * roof material.
  */
 public final class HouseTerraceCascade implements Variant {
-	private static final int VW = 3; // v of the retaining wall's front face
-	private static final int DECK = 3; // top layer of the platform
-	private static final int PLATE = 8;
+	private static final int DECK = 3; // top layer of the platform; the terrace and the ground floor stand on y4
+	private static final int G1 = 4; // feet level of the terrace and the ground floor
+	private static final int SLAB = 8; // layer of the upper floor (the ceiling of the ground floor)
+	private static final int G2 = 9; // feet level of the upper floor
+	private static final int PLATE = 13; // plate beams; the roof starts here
 
 	@Override
 	public String id() {
@@ -62,477 +66,909 @@ public final class HouseTerraceCascade implements Variant {
 
 	@Override
 	public int minW() {
-		return 11;
+		return 14;
 	}
 
 	@Override
 	public int minD() {
-		return 12;
+		return 14;
 	}
 
 	@Override
 	public int minH() {
-		return 15;
+		return 21;
 	}
 
 	@Override
 	public int maxW() {
-		return 15;
+		return 24;
 	}
 
 	@Override
 	public int maxD() {
-		return 15;
+		return 26;
 	}
 
-	private record G(int w, int d, int cu, int ha, int hh, int vh, int ve, int uf) {
-		int eL() {
-			return cu - ha;
+	// ------------------------------------------------------------------ the plan
+
+	/** The plan of one build, in local terms with the water on the right (a flip mirrors it on the canvas). */
+	private static final class G {
+		final int w;
+		final int d;
+		final int h;
+		final int jumps; // 1 or 2
+		final int roof; // 0 deepslate tile, 1 brick, 2 tuff brick
+		final int cu; // the column of the channel and the fall
+		final int gd; // v of the retaining wall's front face
+		final int bd; // rows of the washing trough (two jumps)
+		final int vr; // the row of the trough's front rim (two jumps)
+		final int t; // rows of terrace in front of the house
+		final int hu0;
+		final int hu1;
+		final int hv0;
+		final int hv1;
+		final int wh;
+		final int dh;
+		final int ud; // the door's column
+		final int pa; // pond u range
+		final int pb;
+		final int iu0;
+		final int iu1;
+		final int iv0;
+		final int iv1;
+		final boolean part;
+		final int pw; // partition column
+		final int cv; // chimney row
+
+		G(Plot p, int jumps, int roof) {
+			w = p.w();
+			d = p.d();
+			h = p.h();
+			this.jumps = jumps;
+			this.roof = roof;
+			gd = d <= 15 ? 4 : d <= 19 ? 5 : 6;
+			bd = gd == 4 ? 1 : 2;
+			vr = gd - bd - 1;
+			int cap = Math.min(Math.min(d - gd - 3, 2 * (h - 17)), 11);
+			dh = Math.max(cap, 7);
+			t = d - gd - dh;
+			hv0 = gd + t;
+			hv1 = d - 1;
+			wh = Math.min(w - 4, 16);
+			hu1 = w - 3;
+			hu0 = hu1 - wh + 1;
+			ud = hu0 + wh / 2 - 1;
+			cu = w - 6 - (w >= 18 ? 2 : 0);
+			pb = cu + 2;
+			pa = Math.max(4, cu - 7);
+			iu0 = hu0 + 1;
+			iu1 = hu1 - 1;
+			iv0 = hv0 + 1;
+			iv1 = hv1 - 1;
+			part = iu1 - iu0 + 1 >= 12;
+			pw = iu0 + 4;
+			cv = hv0 + 2;
 		}
 
-		int eR() {
-			return cu + ha;
+		int roofY(int v) {
+			return Math.min(PLATE + (v - (hv0 - 1)), PLATE + 1 + (hv1 - v));
 		}
 
-		int pv1() {
-			return d - 2; // back row of the platform
+		int top() {
+			int m = 0;
+			for (int v = hv0 - 1; v <= hv1; v++) {
+				m = Math.max(m, roofY(v));
+			}
+			return m;
+		}
+	}
+
+	/** Writes through the plot, mirroring u (and the block states) when the water goes on the left. */
+	private static final class X {
+		final CitadelCanvas c;
+		final Plot p;
+		final boolean flip;
+		final int w;
+
+		X(CitadelCanvas c, Plot p, boolean flip) {
+			this.c = c;
+			this.p = p;
+			this.flip = flip;
+			this.w = p.w();
 		}
 
-		int h0() {
-			return cu - hh;
+		int mu(int u) {
+			return flip ? w - 1 - u : u;
 		}
 
-		int h1() {
-			return cu + hh;
+		void put(int u, int y, int v, BlockState s, int layer) {
+			p.put(c, mu(u), y, v, flip ? s.mirror(Mirror.FRONT_BACK) : s, layer);
+		}
+
+		void set(int u, int y, int v, BlockState s) {
+			put(u, y, v, s, CitadelCanvas.SOLID);
+		}
+
+		boolean free(int u, int y, int v) {
+			BlockState s = p.at(c, mu(u), y, v);
+			return s == null || s.isAir();
+		}
+
+		int hash(int u, int y, int v, int n) {
+			return p.hash(u, y, v, n);
+		}
+
+		/** [palette] a deterministic texture mix: repeat an entry to weigh it. */
+		BlockState mix(int u, int y, int v, Block... blocks) {
+			return b(blocks[hash(u, y, v, blocks.length)]);
 		}
 	}
 
 	@Override
 	public void build(CitadelCanvas c, Plot p) {
-		Random r = p.rng(0xCA5C_ADE5L);
-		int w = p.w();
-		int d = p.d();
-		int cu = (w - 1) / 2;
-		int ha = Math.min(cu - 1, w - 2 - cu);
-		int hh = Math.min(ha - 1, 4);
-		int gd = d >= 14 ? 3 : 2;
-		G g = new G(w, d, cu, ha, hh, VW + 1 + gd, d - 2, cu + ha - 3);
-		platform(c, p, g);
-		climb(c, p, g);
-		pond(c, p, g, r);
-		waterfall(c, p, g);
-		terrace(c, p, g, r);
-		house(c, p, g);
-		roof(c, p, g);
-		margins(c, p, g, r);
+		boolean flip = p.hash(3, 3, 3, 2) == 1;
+		int jumps = 1 + p.hash(4, 1, 6, 2);
+		int roof = p.hash(1, 1, 7, 3);
+		G g = new G(p, jumps, roof);
+		X x = new X(c, p, flip);
+		platform(x, g);
+		climb(x, g);
+		pond(x, g);
+		terrace(x, g);
+		house(x, g);
+		spring(x, g);
+		floors(x, g);
+		partition(x, g);
+		stairs(x, g);
+		interior(x, g);
+		upstairs(x, g);
+		roof(x, g);
+		chimney(x, g);
+		sides(x, g);
+		yard(x, g);
+		margins(x, g);
 	}
 
 	// ------------------------------------------------------------------ materials
 
-	private static BlockState foot(Plot p, int u, int y, int v) {
-		return mix(p, u, y, v, Blocks.MOSSY_COBBLESTONE, Blocks.COBBLESTONE, Blocks.ANDESITE, Blocks.MOSSY_COBBLESTONE, Blocks.COBBLED_DEEPSLATE);
+	private static BlockState foot(X x, int u, int y, int v) {
+		return x.mix(u, y, v, Blocks.MOSSY_COBBLESTONE, Blocks.COBBLESTONE, Blocks.ANDESITE, Blocks.MOSSY_COBBLESTONE, Blocks.COBBLED_DEEPSLATE);
 	}
 
-	private static BlockState wallStone(Plot p, int u, int y, int v) {
-		return mix(p, u, y, v, Blocks.MOSSY_STONE_BRICKS, Blocks.STONE_BRICKS, Blocks.MOSSY_STONE_BRICKS, Blocks.CRACKED_STONE_BRICKS, Blocks.STONE_BRICKS);
+	/** Stone brick with moss kept to the lower courses. */
+	private static BlockState wallStone(X x, int u, int y, int v) {
+		if (y <= 1) {
+			return x.mix(u, y, v, Blocks.MOSSY_STONE_BRICKS, Blocks.STONE_BRICKS, Blocks.MOSSY_STONE_BRICKS, Blocks.CRACKED_STONE_BRICKS, Blocks.STONE_BRICKS);
+		}
+		return x.mix(u, y, v, Blocks.STONE_BRICKS, Blocks.STONE_BRICKS, Blocks.MOSSY_STONE_BRICKS, Blocks.CRACKED_STONE_BRICKS, Blocks.STONE_BRICKS, Blocks.STONE_BRICKS);
 	}
 
-	private static BlockState plaster(Plot p, int u, int y, int v) {
-		return mix(p, u, y, v, Blocks.CALCITE, Blocks.CALCITE, Blocks.CALCITE, Blocks.SMOOTH_QUARTZ);
+	private static BlockState rim(X x, int u, int y, int v) {
+		return x.mix(u, y, v, Blocks.STONE_BRICKS, Blocks.MOSSY_STONE_BRICKS, Blocks.POLISHED_ANDESITE, Blocks.STONE_BRICKS, Blocks.COBBLESTONE);
+	}
+
+	private static BlockState plaster(X x, int u, int y, int v) {
+		return x.mix(u, y, v, Blocks.CALCITE, Blocks.CALCITE, Blocks.CALCITE, Blocks.SMOOTH_QUARTZ);
 	}
 
 	private static BlockState frame() {
 		return log(Blocks.DARK_OAK_LOG, Direction.Axis.Y);
 	}
 
-	private static BlockState glass(Plot p, int u, int v, boolean alongU) {
-		return pane(p.hash(u, 5, v, 3) == 0 ? Blocks.STAINED_GLASS_PANE.pick(DyeColor.PINK) : Blocks.GLASS_PANE, alongU);
+	private static BlockState glass(X x, int u, int v, boolean alongU) {
+		return pane(x.hash(u, 5, v, 6) == 0 ? Blocks.STAINED_GLASS_PANE.pick(DyeColor.PINK) : Blocks.GLASS_PANE, alongU);
 	}
 
 	private static BlockState falling() {
 		return Blocks.WATER.defaultBlockState().setValue(BlockStateProperties.LEVEL, 8);
 	}
 
-	// ------------------------------------------------------------------ the retaining wall and platform (y0..y3)
+	private static BlockState facing(Block blk, Direction f) {
+		return b(blk).setValue(BlockStateProperties.HORIZONTAL_FACING, f);
+	}
+
+	private static BlockState barrel() {
+		return b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP);
+	}
+
+	// ------------------------------------------------------------------ the platform: retaining wall and deck (y0..3)
 
 	/**
-	 * [palette] cobble and andesite at the foot, mossy brick above, a polished lip on the deck edge.
-	 * [depth] buttresses jut from the front face and the sides, capped with slabs.
+	 * [palette] cobble and andesite at the foot, stone brick above with the moss kept to the lower courses.
+	 * The deck layer (y3) is laid here and re-laid by the terrace and the house.
 	 */
-	private static void platform(CitadelCanvas c, Plot p, G g) {
-		for (int u = g.eL(); u <= g.eR(); u++) {
-			for (int v = VW; v <= g.pv1(); v++) {
-				p.set(c, u, 0, v, foot(p, u, 0, v));
-				p.set(c, u, 1, v, p.hash(u, 1, v, 3) == 0 ? foot(p, u, 1, v) : wallStone(p, u, 1, v));
-				p.set(c, u, 2, v, wallStone(p, u, 2, v));
-				p.set(c, u, DECK, v, b(Blocks.STONE_BRICKS));
+	private static void platform(X x, G g) {
+		for (int u = 1; u <= g.w - 2; u++) {
+			for (int v = g.gd; v <= g.d - 1; v++) {
+				x.set(u, 0, v, foot(x, u, 0, v));
+				x.set(u, 1, v, x.hash(u, 1, v, 3) == 0 ? foot(x, u, 1, v) : wallStone(x, u, 1, v));
+				x.set(u, 2, v, wallStone(x, u, 2, v));
+				x.set(u, DECK, v, x.mix(u, DECK, v, Blocks.STONE_BRICKS, Blocks.STONE_BRICKS, Blocks.POLISHED_ANDESITE, Blocks.ANDESITE));
 			}
-		}
-		// front buttresses either side of the waterfall niche and one more to the left
-		int[] bu = {g.uf() - 1, g.uf() + 1, g.uf() - 5};
-		for (int u : bu) {
-			if (u <= g.eL() + 1 || u >= g.eR()) {
-				continue;
-			}
-			for (int y = 0; y <= DECK; y++) {
-				p.set(c, u, y, VW - 1, y == DECK ? b(Blocks.POLISHED_ANDESITE) : y == 0 ? foot(p, u, y, VW - 1) : wallStone(p, u, y, VW - 1));
-			}
-			p.set(c, u, DECK + 1, VW - 1, slab(Blocks.STONE_BRICK_SLAB));
-		}
-		// side and back buttresses in the margin
-		for (int v = VW + 2; v <= g.pv1(); v += 3) {
-			for (int u : new int[] {g.eL() - 1, g.eR() + 1}) {
-				p.set(c, u, 0, v, foot(p, u, 0, v));
-				p.set(c, u, 1, v, wallStone(p, u, 1, v));
-				p.set(c, u, 2, v, slabTop(Blocks.STONE_BRICK_SLAB));
-			}
-		}
-		for (int u = g.eL() + 2; u <= g.eR() - 2; u += 3) {
-			p.set(c, u, 0, g.pv1() + 1, foot(p, u, 0, g.pv1() + 1));
-			p.set(c, u, 1, g.pv1() + 1, slabTop(Blocks.STONE_BRICK_SLAB));
 		}
 	}
 
-	/** The climbing stair on the left edge: four steps with a sloping cheek, a lantern post on the top. */
-	private static void climb(CitadelCanvas c, Plot p, G g) {
-		int sl = g.eL();
+	/**
+	 * The stair to the terrace: 2 wide, 4 steps rising along v at the left, the first step met head-on, nothing
+	 * above it, a cheek of stone on the water side, and the terrace itself as the landing.
+	 */
+	private static void climb(X x, G g) {
+		int s0 = g.gd - 4;
 		for (int k = 0; k <= 3; k++) {
-			for (int y = 0; y < k; y++) {
-				p.set(c, sl, y, k, wallStone(p, sl, y, k));
-			}
-			p.set(c, sl, k, k, stair(Blocks.STONE_BRICK_STAIRS, Direction.SOUTH, false));
-			if (k < 3) {
-				for (int y = 0; y <= k; y++) {
-					p.set(c, sl + 1, y, k, y == 0 ? foot(p, sl + 1, y, k) : wallStone(p, sl + 1, y, k));
+			int v = s0 + k;
+			for (int u = 1; u <= 2; u++) {
+				for (int y = 0; y < k; y++) {
+					x.set(u, y, v, wallStone(x, u, y, v));
 				}
-				p.set(c, sl + 1, k + 1, k, stair(Blocks.STONE_BRICK_STAIRS, Direction.SOUTH, false));
+				x.set(u, k, v, stair(Blocks.STONE_BRICK_STAIRS, Direction.SOUTH, false));
+			}
+			for (int y = 0; y <= k; y++) {
+				x.set(3, y, v, y == 0 ? foot(x, 3, y, v) : wallStone(x, 3, y, v));
 			}
 		}
 	}
 
-	// ------------------------------------------------------------------ the pond (y0, v 0..2)
-
-	/** [finish] a shallow lily pond in a stone kerb: rim blocks, water, pads, a few reeds. */
-	private static void pond(CitadelCanvas c, Plot p, G g, Random r) {
-		int u0 = g.eL() + 2;
-		int u1 = g.eR() - 1;
-		for (int u = u0 - 1; u <= g.eR(); u++) {
-			p.set(c, u, 0, 0, u == u0 - 1 || u == g.eR() ? b(Blocks.POLISHED_ANDESITE) : mix(p, u, 0, 0, Blocks.STONE_BRICKS, Blocks.MOSSY_STONE_BRICKS, Blocks.POLISHED_ANDESITE));
-		}
-		for (int v = 1; v <= VW - 1; v++) {
-			p.set(c, g.eR(), 0, v, mix(p, g.eR(), 0, v, Blocks.STONE_BRICKS, Blocks.MOSSY_STONE_BRICKS));
-		}
-		for (int u = u0; u <= u1; u++) {
-			for (int v = 1; v <= VW - 1; v++) {
-				p.set(c, u, 0, v, b(Blocks.WATER));
-				if (p.hash(u, 1, v, 3) == 0) {
-					p.set(c, u, 1, v, b(Blocks.LILY_PAD));
-				}
-			}
-		}
-		// stepping stones across the pond to the right end
-		for (int u = u0 + 1; u <= u1; u += 2) {
-			p.set(c, u, 0, 1, slab(Blocks.POLISHED_ANDESITE_SLAB));
-		}
-		// a corner of reeds and a flowering shrub on the kerb
-		p.set(c, u1, 1, 1, b(Blocks.SUGAR_CANE));
-		p.set(c, u1, 1, 2, b(Blocks.SUGAR_CANE));
-		p.set(c, u1, 2, 2, b(Blocks.SUGAR_CANE));
-		p.set(c, g.eR(), 1, 0, b(Blocks.FLOWERING_AZALEA));
-	}
+	// ------------------------------------------------------------------ the pond and the fall (y0..4, v < gd)
 
 	/**
-	 * [depth] the waterfall: a channel sunk in the deck, a stone spout in the lip of the wall, a fall of
-	 * water between two buttresses into the pond, with vines on the stone either side.
+	 * [finish] a lily pond in a kerb of stone, held between two pillars where the water arrives. With one jump
+	 * the water falls straight from the lip of the wall into it; with two it first fills a washing trough
+	 * on the wall (a lavoir) that spills over its front rim.
 	 */
-	private static void waterfall(CitadelCanvas c, Plot p, G g) {
-		int uf = g.uf();
-		p.set(c, uf, DECK, VW, b(Blocks.WATER));
-		p.set(c, uf, DECK, VW + 1, b(Blocks.WATER));
-		p.set(c, uf, DECK, VW + 2, b(Blocks.CHISELED_STONE_BRICKS));
-		p.set(c, uf, DECK + 1, VW + 2, b(Blocks.DECORATED_POT));
-		for (int y = 1; y <= DECK; y++) {
-			p.set(c, uf, y, VW - 1, y == DECK ? b(Blocks.WATER) : falling());
+	private static void pond(X x, G g) {
+		int cu = g.cu;
+		int vp = g.jumps == 1 ? g.gd - 1 : g.vr;
+		for (int u = g.pa - 1; u <= g.pb + 1; u++) {
+			x.set(u, 0, 0, rim(x, u, 0, 0));
 		}
-		// the stone either side of the channel, a ledge of upside-down stairs under the spout
-		p.set(c, uf - 1, DECK, VW, b(Blocks.CHISELED_STONE_BRICKS));
-		p.set(c, uf + 1, DECK, VW, b(Blocks.CHISELED_STONE_BRICKS));
-		// vines on the wall face, beside the fall (the buttresses stand at uf-1 and uf+1)
-		for (int u = g.eL() + 2; u <= g.eR() - 1; u++) {
-			int du = Math.abs(u - uf);
-			if (du >= 2 && p.at(c, u, 2, VW - 1) == null && p.hash(u, 2, VW, 3) == 0) {
-				p.put(c, u, 3, VW - 1, vine(Direction.SOUTH), CitadelCanvas.DECOR);
-				p.put(c, u, 2, VW - 1, vine(Direction.SOUTH), CitadelCanvas.DECOR);
+		for (int v = 1; v <= g.gd - 1; v++) {
+			x.set(g.pa - 1, 0, v, rim(x, g.pa - 1, 0, v));
+			x.set(g.pb + 1, 0, v, rim(x, g.pb + 1, 0, v));
+		}
+		for (int u = g.pa; u <= g.pb; u++) {
+			for (int v = 1; v <= vp; v++) {
+				x.set(u, 0, v, b(Blocks.WATER));
+				if (u != cu && x.hash(u, 1, v, 4) == 0) {
+					x.set(u, 1, v, b(Blocks.LILY_PAD));
+				}
 			}
 		}
+		// ferns and shrubs on the front kerb, the pond's only soft edge
+		for (int u = g.pa; u <= g.pb; u += 2) {
+			if (x.hash(u, 1, 0, 3) == 0) {
+				x.set(u, 1, 0, b(Blocks.FERN));
+			} else if (x.hash(u, 1, 0, 3) == 1) {
+				x.set(u, 1, 0, b(Blocks.FLOWERING_AZALEA));
+			}
+		}
+		if (g.jumps == 1) {
+			for (int y = 0; y <= 3; y++) {
+				x.set(cu - 1, y, g.gd - 1, y == 0 ? foot(x, cu - 1, y, g.gd - 1) : wallStone(x, cu - 1, y, g.gd - 1));
+				x.set(cu + 1, y, g.gd - 1, y == 0 ? foot(x, cu + 1, y, g.gd - 1) : wallStone(x, cu + 1, y, g.gd - 1));
+			}
+			x.set(cu - 1, 4, g.gd - 1, slab(Blocks.STONE_BRICK_SLAB));
+			x.set(cu + 1, 4, g.gd - 1, slab(Blocks.STONE_BRICK_SLAB));
+			x.set(cu - 1, 5, g.gd - 1, b(Blocks.LANTERN));
+			x.set(cu + 1, 5, g.gd - 1, b(Blocks.LANTERN));
+			for (int y = 1; y <= 3; y++) {
+				x.set(cu, y, g.gd - 1, falling());
+			}
+			return;
+		}
+		// two jumps: the trough (y2 water on a stone base), its cheeks, the spill notch, the planters beside it
+		for (int v = g.vr + 1; v <= g.gd - 1; v++) {
+			for (int u = g.pa; u <= g.pb; u++) {
+				int du = Math.abs(u - cu);
+				if (du <= 1) {
+					x.set(u, 0, v, foot(x, u, 0, v));
+					x.set(u, 1, v, wallStone(x, u, 1, v));
+					x.set(u, 2, v, b(Blocks.WATER));
+				} else if (du == 2) {
+					for (int y = 0; y <= 2; y++) {
+						x.set(u, y, v, y == 0 ? foot(x, u, y, v) : wallStone(x, u, y, v));
+					}
+					x.set(u, 3, v, slab(Blocks.STONE_BRICK_SLAB));
+				} else {
+					x.set(u, 0, v, rim(x, u, 0, v));
+					x.set(u, 1, v, x.hash(u, 1, v, 2) == 0 ? b(Blocks.AZALEA) : b(Blocks.FLOWERING_AZALEA));
+				}
+			}
+		}
+		x.set(cu - 2, 4, g.gd - 1, b(Blocks.LANTERN));
+		x.set(cu + 2, 4, g.gd - 1, b(Blocks.LANTERN));
+		for (int s : new int[] {-1, 1}) {
+			x.set(cu + s, 0, g.vr, foot(x, cu + s, 0, g.vr));
+			x.set(cu + s, 1, g.vr, wallStone(x, cu + s, 1, g.vr));
+			x.set(cu + s, 2, g.vr, slab(Blocks.STONE_BRICK_SLAB));
+		}
+		x.set(cu, 2, g.vr, b(Blocks.WATER));
+		x.set(cu, 1, g.vr, falling());
+		x.set(cu, 3, g.gd - 1, falling());
 	}
 
-	// ------------------------------------------------------------------ the terrace garden (y3 / y4)
-
-	private static boolean inHouse(G g, int u, int v) {
-		return u >= g.h0() - 1 && u <= g.h1() + 1 && v >= g.vh() - 1;
-	}
+	// ------------------------------------------------------------------ the terrace (y3 deck, y4 and up)
 
 	/**
-	 * [finish] beds of grass and moss with a paver path from the stair to the door, hedges on the
-	 * wall, a cherry tree leaning over the pond, and a parapet of mossy brick linked by hand.
+	 * [depth] the terrace: paved path from the stair to the door, lawn and flowers, a slab kerb along the edge
+	 * with lantern posts, hedges on the sides, and the water: a channel sunk in the deck from a stone cistern
+	 * (fed by a downpipe from the eave) to the lip of the wall, with kerbs, a slab bridge and a bed of crops
+	 * it irrigates.
 	 */
-	private static void terrace(CitadelCanvas c, Plot p, G g, Random r) {
-		int cu = g.cu();
-		for (int u = g.eL() + 1; u < g.eR(); u++) {
-			for (int v = VW + 1; v < g.pv1(); v++) {
-				if (inHouse(g, u, v) || (u == g.uf() && v <= VW + 2)) {
-					continue;
-				}
-				boolean path = (v == VW + 1 && u <= cu) || (u == cu && v < g.vh());
+	private static void terrace(X x, G g) {
+		int cu = g.cu;
+		int vEnd = g.hv0 - 1;
+		for (int u = 1; u <= g.w - 2; u++) {
+			for (int v = g.gd; v <= vEnd; v++) {
+				boolean path = v == g.gd || u <= 2 || (v == g.gd + 1 && u <= g.ud + 1) || Math.abs(u - g.ud) <= 1;
 				if (path) {
-					p.set(c, u, DECK, v, mix(p, u, DECK, v, Blocks.POLISHED_ANDESITE, Blocks.STONE_BRICKS, Blocks.ANDESITE, Blocks.POLISHED_ANDESITE));
+					x.set(u, DECK, v, x.mix(u, DECK, v, Blocks.POLISHED_ANDESITE, Blocks.STONE_BRICKS, Blocks.ANDESITE, Blocks.POLISHED_ANDESITE));
 					continue;
 				}
-				p.set(c, u, DECK, v, mix(p, u, DECK, v, Blocks.GRASS_BLOCK, Blocks.GRASS_BLOCK, Blocks.MOSS_BLOCK, Blocks.COARSE_DIRT));
-				int k = p.hash(u, DECK, v, 12);
+				x.set(u, DECK, v, x.mix(u, DECK, v, Blocks.GRASS_BLOCK, Blocks.GRASS_BLOCK, Blocks.MOSS_BLOCK, Blocks.COARSE_DIRT));
+				int k = x.hash(u, DECK, v, 12);
 				BlockState plant = switch (k) {
-					case 0, 1 -> b(Blocks.AZALEA);
-					case 2 -> b(Blocks.FLOWERING_AZALEA);
-					case 3 -> b(Blocks.PINK_PETALS);
-					case 4 -> b(Blocks.ALLIUM);
-					case 5 -> b(Blocks.CORNFLOWER);
-					case 6 -> b(Blocks.POPPY);
-					case 7, 8 -> b(Blocks.SHORT_GRASS);
-					case 9 -> b(Blocks.FERN);
+					case 0 -> b(Blocks.PINK_PETALS);
+					case 1 -> b(Blocks.ALLIUM);
+					case 2 -> b(Blocks.CORNFLOWER);
+					case 3 -> b(Blocks.POPPY);
+					case 4, 5 -> b(Blocks.SHORT_GRASS);
+					case 6 -> b(Blocks.FERN);
 					default -> null;
 				};
 				if (plant != null) {
-					p.set(c, u, DECK + 1, v, plant);
+					x.set(u, G1, v, plant);
 				}
 			}
 		}
-		// the tree: a cherry at the front-right corner of the terrace, canopy over the fall
-		int tu = g.eR() - 1;
-		int tv = VW + 1;
-		p.set(c, tu, DECK, tv, b(Blocks.COARSE_DIRT));
-		for (int y = DECK + 1; y <= DECK + 3; y++) {
-			p.set(c, tu, y, tv, log(Blocks.CHERRY_LOG, Direction.Axis.Y));
+		// the edge of the terrace: a low kerb of slabs (walkable), with posts and lanterns
+		int[] posts = g.w >= 18 ? new int[] {3, cu - 2, cu + 2, g.w - 2} : new int[] {3, g.w - 2};
+		for (int u = 3; u <= g.w - 2; u++) {
+			boolean post = false;
+			for (int pu : posts) {
+				post |= pu == u;
+			}
+			if (post) {
+				x.set(u, G1, g.gd, b(Blocks.POLISHED_ANDESITE));
+				x.set(u, G1 + 1, g.gd, b(Blocks.LANTERN));
+			} else {
+				x.set(u, G1, g.gd, slab(Blocks.STONE_BRICK_SLAB));
+			}
 		}
-		for (int dy = 0; dy <= 2; dy++) {
-			int rad = dy == 1 ? 2 : 1;
+		// the channel, from the spout down to the lip, kerbed in stone; a slab bridge where the terrace is deep enough
+		int vc = g.hv0 - 1;
+		int spout = vc;
+		boolean bridge = g.t >= 4;
+		int vb = g.gd + 1;
+		for (int v = g.gd; v <= spout; v++) {
+			x.set(cu, DECK, v, b(Blocks.WATER));
+			if (v > g.gd) {
+				if (bridge && v == vb) {
+					x.set(cu, G1, v, slab(Blocks.STONE_BRICK_SLAB));
+				} else {
+					x.set(cu - 1, G1, v, slab(Blocks.MOSSY_STONE_BRICK_SLAB));
+					x.set(cu + 1, G1, v, slab(Blocks.STONE_BRICK_SLAB));
+				}
+			}
+		}
+		// the spring: a stone mask on the house wall (see spring()) pours into the channel; a downpipe from the
+		// eave (a downpipe) feeds it. The water falls two blocks from the mask into the head of the channel.
+		x.set(cu, G1 + 1, vc, b(Blocks.WATER));
+		x.set(cu, G1, vc, falling());
+		for (int y = G1 + 2; y <= PLATE - 1; y++) {
+			x.set(cu, y, vc, b(Blocks.DARK_OAK_FENCE));
+		}
+		// a lavoir off the channel: a pocket of water with a sloped washing stone and a barrel beside it
+		if (g.t >= 4) {
+			int lr = spout - 1;
+			x.set(cu - 1, DECK, lr, b(Blocks.WATER));
+			x.set(cu - 1, G1, lr, AIR);
+			x.set(cu - 2, G1, lr, stair(Blocks.STONE_BRICK_STAIRS, Direction.WEST, false));
+			x.set(cu - 2, G1, lr + 1, barrel());
+		}
+		if (cu - 2 > g.ud + 1) {
+			x.set(cu - 2, G1, vc, barrel());
+		}
+		// the irrigated bed right of the channel
+		for (int u = cu + 2; u <= g.w - 3; u++) {
+			for (int v = g.gd + 1; v <= vEnd; v++) {
+				x.set(u, DECK, v, b(Blocks.FARMLAND).setValue(BlockStateProperties.MOISTURE, 7));
+				Block crop = switch (x.hash(u, 2, v, 3)) {
+					case 0 -> Blocks.WHEAT;
+					case 1 -> Blocks.CARROTS;
+					default -> Blocks.POTATOES;
+				};
+				x.set(u, G1, v, b(crop).setValue(BlockStateProperties.AGE_7, 3 + x.hash(u, 1, v, 5)));
+			}
+		}
+		// lamps either side of the door and a bench against the wall where there is room
+		for (int s : new int[] {-2, 2}) {
+			int lu = g.ud + s;
+			if (Math.abs(lu - cu) <= 1) {
+				continue;
+			}
+			x.set(lu, G1, vc, b(Blocks.MOSSY_STONE_BRICK_WALL));
+			x.set(lu, G1 + 1, vc, b(Blocks.MOSSY_STONE_BRICK_WALL));
+			x.set(lu, G1 + 2, vc, b(Blocks.LANTERN));
+		}
+		// a hedge on the left edge of the terrace, flowers on the right (a hedge there would be a ledge over the crops)
+		for (int v = g.gd + 1; v <= vEnd; v++) {
+			x.set(1, G1, v, leaves(x.hash(1, G1, v, 3) == 0 ? Blocks.FLOWERING_AZALEA_LEAVES : Blocks.AZALEA_LEAVES));
+			x.set(g.w - 2, DECK, v, b(Blocks.MOSS_BLOCK));
+			x.set(g.w - 2, G1, v, x.hash(g.w - 2, G1, v, 2) == 0 ? b(Blocks.PINK_PETALS) : b(Blocks.CORNFLOWER));
+		}
+		// on a deep terrace: a cherry on the left lawn, and room to sit under it
+		if (g.t >= 6 && g.ud >= 9) {
+			cherry(x, 5, g.gd + 3);
+			if (g.t >= 8 && g.ud >= 12) {
+				cherry(x, g.ud - 4, g.gd + g.t - 5); // its crown stays clear of the eave's row
+			}
+			x.set(7, G1, g.gd + 3, stair(Blocks.DARK_OAK_STAIRS, Direction.WEST, false));
+		}
+	}
+
+	/** A cherry tree: a 5-high trunk, the crown starting 4 blocks over the feet so the cells beneath stay roomy. */
+	private static void cherry(X x, int tu, int tv) {
+		for (int y = G1; y <= G1 + 4; y++) {
+			x.set(tu, y, tv, log(Blocks.CHERRY_LOG, Direction.Axis.Y));
+		}
+		for (int dy = 0; dy <= 3; dy++) {
+			int rad = dy == 0 || dy == 3 ? 1 : 2;
 			for (int du = -rad; du <= rad; du++) {
 				for (int dv = -rad; dv <= rad; dv++) {
-					if (Math.abs(du) == 2 && Math.abs(dv) == 2) {
+					if (rad == 2 && Math.abs(du) == 2 && Math.abs(dv) == 2) {
 						continue;
 					}
-					p.set(c, tu + du, DECK + 3 + dy, tv + dv, leaves(Blocks.CHERRY_LEAVES));
-				}
-			}
-		}
-		parapet(c, p, g);
-		// a bench facing the pond, one row behind the path (it used to stand on the 1-wide path from the stair)
-		int bu = g.eL() + 2;
-		p.set(c, bu, DECK + 1, VW + 2, stair(Blocks.DARK_OAK_STAIRS, Direction.SOUTH, false));
-		p.set(c, bu + 1, DECK + 1, VW + 2, stair(Blocks.DARK_OAK_STAIRS, Direction.SOUTH, false));
-	}
-
-	/** [depth] a low wall round the platform edge, with an opening at the stair and posts with lanterns. */
-	private static void parapet(CitadelCanvas c, Plot p, G g) {
-		Links run = new Links();
-		List<int[]> posts = new ArrayList<>();
-		int u0 = g.eL();
-		int u1 = g.eR();
-		int v1 = g.pv1();
-		for (int u = u0; u <= u1; u++) {
-			for (int v = VW; v <= v1; v++) {
-				if (!(u == u0 || u == u1 || v == VW || v == v1)) {
-					continue;
-				}
-				if (u == u0 && v <= VW + 1) {
-					continue; // the stair arrives here
-				}
-				if (v == VW && (u == g.uf())) {
-					continue; // the channel
-				}
-				boolean corner = (u == u1 && (v == VW || v == v1)) || (u == u0 && v == v1);
-				boolean end = (v == VW && (u == g.uf() - 1 || u == g.uf() + 1 || u == u0 + 1)) || (u == u0 && v == VW + 2);
-				if (corner || end) {
-					posts.add(new int[] {u, v, corner || (v == VW && u == u0 + 1) ? 1 : 0});
-					run.partner(u, v);
-				} else {
-					run.add(u, v);
-				}
-			}
-		}
-		run.emitWalls(c, p, DECK + 1, Blocks.MOSSY_STONE_BRICK_WALL);
-		for (int[] q : posts) {
-			p.set(c, q[0], DECK + 1, q[1], b(Blocks.POLISHED_ANDESITE));
-			p.set(c, q[0], DECK + 2, q[1], q[2] == 1 ? b(Blocks.LANTERN) : slab(Blocks.STONE_BRICK_SLAB));
-		}
-	}
-
-	// ------------------------------------------------------------------ the cottage (y4..y6)
-
-	private static void house(CitadelCanvas c, Plot p, G g) {
-		int cu = g.cu();
-		int vh = g.vh();
-		int ve = g.ve();
-		for (int u = g.h0(); u <= g.h1(); u++) {
-			for (int v = vh; v <= ve; v++) {
-				if (!(u == g.h0() || u == g.h1() || v == vh || v == ve)) {
-					continue;
-				}
-				boolean sideWall = u == g.h0() || u == g.h1();
-				boolean front = v == vh;
-				int du = Math.abs(u - cu);
-				boolean post;
-				boolean window;
-				if (sideWall) {
-					int k = v - vh;
-					post = k == 0 || v == ve || k % 4 == 0;
-					window = !post && k % 4 == 2;
-				} else if (front) {
-					post = du == 1 || du == g.hh();
-					window = du == 2 || (du == 4 && du < g.hh());
-				} else {
-					post = du % 4 == 0;
-					window = du % 4 == 2;
-				}
-				for (int y = 4; y <= 7; y++) {
-					BlockState st;
-					if (post) {
-						st = frame();
-					} else if (y == 4) {
-						st = foot(p, u, y, v);
-					} else if (window && (y == 5 || y == 6)) {
-						st = glass(p, u, v, !sideWall);
-					} else {
-						st = plaster(p, u, y, v);
+					if (du == 0 && dv == 0 && dy <= 1) {
+						continue;
 					}
-					p.set(c, u, y, v, st);
+					if ((Math.abs(du) == 2 || Math.abs(dv) == 2) && x.hash(tu + du, dy, tv + dv, 4) == 0) {
+						continue; // an uneven crown
+					}
+					x.set(tu + du, G1 + 4 + dy, tv + dv, leaves(Blocks.CHERRY_LEAVES));
 				}
 			}
 		}
-		p.set(c, cu, 4, vh, door(Blocks.DARK_OAK_DOOR, Direction.NORTH, true));
-		p.set(c, cu, 5, vh, door(Blocks.DARK_OAK_DOOR, Direction.NORTH, false));
-		p.set(c, cu, 6, vh, log(Blocks.DARK_OAK_LOG, Direction.Axis.X));
-		p.set(c, cu, 7, vh, log(Blocks.DARK_OAK_LOG, Direction.Axis.X));
-		// [finish] shutters beside the windows, a step and lanterns at the door
-		for (int s : new int[] {-1, 1}) {
-			p.set(c, cu + s * 3, 5, vh - 1, trap(Blocks.DARK_OAK_TRAPDOOR, Direction.NORTH, true, false));
-			p.set(c, cu + s * 3, 6, vh - 1, trap(Blocks.DARK_OAK_TRAPDOOR, Direction.NORTH, true, false));
-			// hung from the eave (y8) rather than floating two blocks under it; skipped where the cherry's crown is
-			if (p.at(c, cu + s, 7, vh - 1) == null) {
-				p.put(c, cu + s, 7, vh - 1, hanging(Blocks.LANTERN), CitadelCanvas.HANGING);
-			}
-		}
-		// no step in front of the door: the door sill is at deck level, the cell in front stays clear
-		// plate beams
-		for (int u = g.h0(); u <= g.h1(); u++) {
-			p.set(c, u, PLATE, vh, log(Blocks.DARK_OAK_LOG, Direction.Axis.X));
-			p.set(c, u, PLATE, ve, log(Blocks.DARK_OAK_LOG, Direction.Axis.X));
-		}
-		for (int v = vh; v <= ve; v++) {
-			p.set(c, g.h0(), PLATE, v, log(Blocks.DARK_OAK_LOG, Direction.Axis.Z));
-			p.set(c, g.h1(), PLATE, v, log(Blocks.DARK_OAK_LOG, Direction.Axis.Z));
-		}
 	}
 
-	// ------------------------------------------------------------------ roof (y7+)
+	// ------------------------------------------------------------------ the house (y4..13)
+
+	/** 0 plain, 1 post, 2 window (u or v is the position along the wall; kc the centre). */
+	private static int bay(int k, int kc, int len, boolean front) {
+		if (k == 0 || k == len - 1) {
+			return 1;
+		}
+		int dk = Math.abs(k - kc);
+		if (front) {
+			if (dk % 4 == 1) {
+				return 1;
+			}
+			return dk % 4 == 3 ? 2 : 0;
+		}
+		if (dk % 4 == 0) {
+			return 1;
+		}
+		return dk % 4 == 2 ? 2 : 0;
+	}
 
 	/**
-	 * [finish] gable roof, ridge along u: warm resin brick with a cherry eave line, a polished ridge
-	 * with a cherry slab cap, side gables with a king post and a pink light, and a chimney.
+	 * [depth] timber frame on a stone plinth: dark oak posts, calcite panels, a dark oak band at the floor
+	 * and plate beams, 2-high windows with shutters, corbels under the eave, a recessed door with a transom.
 	 */
-	private static void roof(CitadelCanvas c, Plot p, G g) {
-		int rv0 = g.vh() - 1;
-		int rv1 = g.d() - 1;
-		int u0 = g.h0() - 1;
-		int u1 = g.h1() + 1;
-		int top = PLATE + (rv1 - rv0) / 2;
-		boolean oddRows = (rv1 - rv0) % 2 == 0;
-		for (int v = rv0; v <= rv1; v++) {
-			int y = PLATE + Math.min(v - rv0, rv1 - v);
-			boolean frontSlope = v - rv0 < rv1 - v;
-			boolean middle = v - rv0 == rv1 - v;
-			boolean eave = v == rv0 || v == rv1;
-			for (int u = u0; u <= u1; u++) {
-				BlockState st;
-				if (middle) {
-					st = b(Blocks.POLISHED_DEEPSLATE);
-				} else {
-					st = stair(eave ? Blocks.CHERRY_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS, frontSlope ? Direction.SOUTH : Direction.NORTH, false);
-				}
-				p.set(c, u, y, v, st);
-				if ((u == u0 || u == u1) && !middle && y - 1 >= PLATE) {
-					p.set(c, u, y - 1, v, stair(Blocks.DEEPSLATE_TILE_STAIRS, frontSlope ? Direction.NORTH : Direction.SOUTH, true));
-				}
-			}
-		}
-		for (int u = u0; u <= u1; u++) {
-			if (oddRows) {
-				p.set(c, u, top + 1, rv0 + (rv1 - rv0) / 2, slab(Blocks.CHERRY_SLAB));
-			} else {
-				p.set(c, u, top + 1, rv0 + (rv1 - rv0) / 2, slab(Blocks.CHERRY_SLAB));
-				p.set(c, u, top + 1, rv0 + (rv1 - rv0) / 2 + 1, slab(Blocks.CHERRY_SLAB));
-			}
-		}
-		// gables
-		int mid = (g.vh() + g.ve()) / 2;
-		for (int u : new int[] {g.h0(), g.h1()}) {
-			for (int v = g.vh(); v <= g.ve(); v++) {
-				for (int y = PLATE + 1; y < PLATE + Math.min(v - rv0, rv1 - v); y++) {
-					BlockState st = v == mid ? frame() : plaster(p, u, y, v);
-					if (y == PLATE + 2 && Math.abs(v - mid) == 1) {
-						st = pane(Blocks.STAINED_GLASS_PANE.pick(DyeColor.PINK), false);
-					}
-					p.set(c, u, y, v, st);
-				}
-			}
-		}
-		// the chimney, through the back slope at the left gable
-		int cuChim = g.h0() + 1;
-		int cv = rv0 + (rv1 - rv0) / 2 + 1;
-		int ctop = Math.min(top + 2, p.h() - 1);
-		for (int y = PLATE; y < ctop; y++) {
-			p.set(c, cuChim, y, cv, p.hash(cuChim, y, cv, 3) == 0 ? b(Blocks.COBBLESTONE) : b(Blocks.STONE_BRICKS));
-		}
-		p.set(c, cuChim, ctop, cv, slab(Blocks.STONE_BRICK_SLAB));
-	}
-
-	// ------------------------------------------------------------------ margins (ground level)
-
-	/** [finish] hedges at the foot of the platform, a barrel and a woodpile, a lantern post by the stair. */
-	private static void margins(CitadelCanvas c, Plot p, G g, Random r) {
-		for (int v = VW + 1; v <= g.pv1() + 1; v++) {
-			for (int u : new int[] {g.eL() - 1, g.eR() + 1}) {
-				if (p.at(c, u, 1, v) != null) {
+	private static void house(X x, G g) {
+		int kd = g.ud - g.hu0;
+		for (int u = g.hu0; u <= g.hu1; u++) {
+			for (int v = g.hv0; v <= g.hv1; v++) {
+				if (!(u == g.hu0 || u == g.hu1 || v == g.hv0 || v == g.hv1)) {
 					continue;
 				}
-				int k = p.hash(u, 0, v, 6);
-				if (k == 0) {
-					p.set(c, u, 0, v, b(Blocks.BARREL));
-				} else if (k == 1) {
-					p.set(c, u, 0, v, log(Blocks.STRIPPED_SPRUCE_LOG, Direction.Axis.Z));
+				boolean side = u == g.hu0 || u == g.hu1;
+				boolean front = v == g.hv0;
+				boolean isDoor = front && u == g.ud;
+				int kind;
+				if (side) {
+					kind = bay(v - g.hv0, g.dh / 2, g.dh, false);
+				} else if (front) {
+					kind = bay(u - g.hu0, kd, g.wh, true);
 				} else {
-					p.set(c, u, 0, v, leaves(k == 2 ? Blocks.FLOWERING_AZALEA_LEAVES : Blocks.AZALEA_LEAVES));
+					kind = bay(u - g.hu0, g.wh / 2, g.wh, false);
+				}
+				boolean corner = side && (v == g.hv0 || v == g.hv1);
+				if (corner) {
+					kind = 1;
+				}
+				if (isDoor) {
+					kind = 0;
+				}
+				if (kind == 2 && front && Math.abs(u - g.cu) <= 1) {
+					kind = 0;
+				}
+				if (kind == 2 && u == g.hu0 && v >= g.cv - 1 && v <= g.cv + 2) {
+					kind = 0;
+				}
+				boolean post = kind == 1;
+				boolean win = kind == 2;
+				for (int y = G1; y <= PLATE; y++) {
+					BlockState st;
+					if (y == PLATE || y == SLAB) {
+						st = log(Blocks.DARK_OAK_LOG, side ? Direction.Axis.Z : Direction.Axis.X);
+						if (post && y == SLAB) {
+							st = frame();
+						}
+					} else if (post) {
+						st = frame();
+					} else if (y == G1) {
+						if (isDoor) {
+							continue;
+						}
+						st = foot(x, u, y, v);
+					} else if (isDoor && y <= G1 + 3) {
+						if (y == G1 + 1) {
+							continue;
+						}
+						st = y == G1 + 2 ? glass(x, u, v, true) : log(Blocks.DARK_OAK_LOG, Direction.Axis.X);
+					} else if (win && (y == G1 + 1 || y == G1 + 2 || y == G2 + 1 || y == G2 + 2)) {
+						st = glass(x, u, v, !side);
+					} else if (isDoor && (y == G2 + 1 || y == G2 + 2)) {
+						st = glass(x, u, v, true);
+					} else {
+						st = plaster(x, u, y, v);
+					}
+					x.set(u, y, v, st);
+				}
+				if (front) {
+					if (isDoor) {
+						x.set(u, G1, v, door(Blocks.DARK_OAK_DOOR, Direction.NORTH, true));
+						x.set(u, G1 + 1, v, door(Blocks.DARK_OAK_DOOR, Direction.NORTH, false));
+						continue;
+					}
+					// shutters beside the windows and a corbel under the eave at every post
+					if (win) {
+						for (int s : new int[] {-1, 1}) {
+							int su = u + s;
+							if (Math.abs(su - g.cu) <= 2 || (Math.abs(su - g.ud) <= 1)) {
+								continue;
+							}
+							x.set(su, G1 + 1, v - 1, trap(Blocks.DARK_OAK_TRAPDOOR, Direction.NORTH, true, false));
+							x.set(su, G1 + 2, v - 1, trap(Blocks.DARK_OAK_TRAPDOOR, Direction.NORTH, true, false));
+							x.set(su, G2 + 1, v - 1, trap(Blocks.DARK_OAK_TRAPDOOR, Direction.NORTH, true, false));
+							x.set(su, G2 + 2, v - 1, trap(Blocks.DARK_OAK_TRAPDOOR, Direction.NORTH, true, false));
+						}
+					}
+					if (post && u != g.cu) {
+						x.set(u, PLATE - 1, v - 1, stair(Blocks.DARK_OAK_STAIRS, Direction.SOUTH, true));
+						if (Math.abs(u - g.ud) == 1 && Math.abs(u - g.cu) > 1) {
+							x.put(u, PLATE - 2, v - 1, hanging(Blocks.LANTERN), CitadelCanvas.HANGING);
+						}
+					}
 				}
 			}
 		}
-		for (int u = g.eL(); u <= g.eR(); u++) {
-			if (p.at(c, u, 1, g.pv1() + 1) == null) {
-				p.set(c, u, 0, g.pv1() + 1, leaves(p.hash(u, 0, 9, 3) == 0 ? Blocks.FLOWERING_AZALEA_LEAVES : Blocks.AZALEA_LEAVES));
+	}
+
+	/** [depth] the spring: a carved mask in the wall, a keystone over it; the water leaves its mouth into the channel. */
+	private static void spring(X x, G g) {
+		int u = g.cu;
+		x.set(u, G1 + 1, g.hv0, b(Blocks.CHISELED_STONE_BRICKS));
+		x.set(u, G1 + 2, g.hv0, b(Blocks.POLISHED_ANDESITE));
+		x.set(u - 1, G1 + 1, g.hv0, wallStone(x, u - 1, G1 + 1, g.hv0));
+		x.set(u + 1, G1 + 1, g.hv0, wallStone(x, u + 1, G1 + 1, g.hv0));
+		x.set(u, G1, g.hv0, b(Blocks.POLISHED_ANDESITE));
+	}
+
+	/** The floors: planks on the deck, and the slab that is the ceiling below and the floor above. */
+	private static void floors(X x, G g) {
+		for (int u = g.iu0; u <= g.iu1; u++) {
+			for (int v = g.iv0; v <= g.iv1; v++) {
+				x.set(u, DECK, v, x.mix(u, DECK, v, Blocks.SPRUCE_PLANKS, Blocks.SPRUCE_PLANKS, Blocks.DARK_OAK_PLANKS));
+				x.set(u, SLAB, v, x.mix(u, SLAB, v, Blocks.DARK_OAK_PLANKS, Blocks.DARK_OAK_PLANKS, Blocks.SPRUCE_PLANKS));
 			}
 		}
-		// the left strip beside the stair: a lantern post and a flower bed
-		int lu = g.eL() - 1;
-		p.set(c, lu, 0, 0, b(Blocks.MOSSY_STONE_BRICK_WALL));
-		p.set(c, lu, 1, 0, b(Blocks.MOSSY_STONE_BRICK_WALL));
-		p.set(c, lu, 2, 0, b(Blocks.LANTERN));
-		for (int v = 1; v <= VW; v++) {
-			p.set(c, lu, 0, v, leaves(v == 2 ? Blocks.FLOWERING_AZALEA_LEAVES : Blocks.AZALEA_LEAVES));
+	}
+
+	/** A partition in the wider houses: kitchen (left) from living room, bedroom from study, a 3-wide opening at the front. */
+	private static void partition(X x, G g) {
+		if (!g.part) {
+			return;
 		}
-		// front row: a hedge in front of the pond rim, open at the stair
-		for (int u = g.eL() + 2; u < g.eR(); u++) {
-			if (p.hash(u, 0, 0, 3) == 0) {
-				p.set(c, u, 1, 0, p.hash(u, 1, 0, 2) == 0 ? b(Blocks.FLOWERING_AZALEA) : b(Blocks.FERN));
+		for (int v = g.iv0; v <= g.iv1; v++) {
+			boolean open = v <= g.iv0 + 2;
+			for (int y : new int[] {G1, G1 + 1, G1 + 2, G1 + 3, G2, G2 + 1, G2 + 2, G2 + 3}) {
+				boolean lintel = y == G1 + 3 || y == G2 + 3;
+				if (open && !lintel) {
+					continue;
+				}
+				x.set(g.pw, y, v, lintel && open ? log(Blocks.DARK_OAK_LOG, Direction.Axis.Z) : y == G1 ? foot(x, g.pw, y, v) : plaster(x, g.pw, y, v));
 			}
+		}
+		x.set(g.pw, G1, g.iv0 + 3, log(Blocks.DARK_OAK_LOG, Direction.Axis.Y));
+		x.set(g.pw, G2, g.iv0 + 3, log(Blocks.DARK_OAK_LOG, Direction.Axis.Y));
+		// closed up to the roof, so there is no ledge on top of it
+		for (int v = g.iv0; v <= g.iv1; v++) {
+			for (int y = PLATE; y < g.roofY(v); y++) {
+				x.set(g.pw, y, v, plaster(x, g.pw, y, v));
+			}
+		}
+	}
+
+	/**
+	 * The stair to the upper floor: one flight of 5 along the back wall, rising towards the left, a cut in the
+	 * floor over it with a rail, approached head-on from the room and stepping off onto the upper floor.
+	 */
+	private static void stairs(X x, G g) {
+		int su = g.iu1 - 1;
+		int v = g.iv1;
+		for (int j = 0; j <= 4; j++) {
+			int u = su - j;
+			for (int y = G1; y < G1 + j; y++) {
+				x.set(u, y, v, b(Blocks.SPRUCE_PLANKS));
+			}
+			x.set(u, G1 + j, v, stair(Blocks.SPRUCE_STAIRS, Direction.WEST, false));
+			if (j < 4) {
+				x.set(u, SLAB, v, AIR);
+			}
+		}
+		Links rail = new Links();
+		for (int u = su - 3; u <= su; u++) {
+			rail.add(u, v - 1);
+		}
+		rail.add(g.iu1, v);
+		rail.partner(g.iu1, v - 1);
+		rail.partner(g.iu1 + 1, v);
+		for (int u = su - 3; u <= su; u++) {
+			x.set(u, G2, v - 1, rail.fence(Blocks.DARK_OAK_FENCE, u, v - 1));
+		}
+		x.set(g.iu1, G2, v, rail.fence(Blocks.DARK_OAK_FENCE, g.iu1, v));
+	}
+
+	/** Ground floor: kitchen along the left wall (counter, ranges, sink), living room with a table, a runner, lanterns. */
+	private static void interior(X x, G g) {
+		int lw = g.iu0;
+		for (int v = g.iv0; v <= g.iv1; v++) {
+			int k = v - g.iv0;
+			BlockState st = switch (k % 5) {
+				case 0 -> b(Blocks.CRAFTING_TABLE);
+				case 1 -> facing(Blocks.FURNACE, Direction.EAST).setValue(BlockStateProperties.LIT, true);
+				case 2 -> facing(Blocks.SMOKER, Direction.EAST).setValue(BlockStateProperties.LIT, true);
+				case 3 -> b(Blocks.WATER_CAULDRON);
+				default -> barrel();
+			};
+			x.set(lw, G1, v, st);
+		}
+		x.set(lw + 1, G1, g.iv1, facing(Blocks.CHEST, Direction.NORTH));
+		// the living room's library: shelves from floor to ceiling along the right wall
+		for (int v = g.iv0; v <= g.iv1 - 2; v++) {
+			for (int y = G1; y <= G1 + 3; y++) {
+				x.set(g.iu1, y, v, b(Blocks.BOOKSHELF));
+			}
+		}
+		int su0 = g.part ? g.pw + 1 : g.iu0 + 1;
+		int tu = su0 + 2;
+		int tv = g.iv0 + 2;
+		x.set(tu, G1, tv, slab(Blocks.SPRUCE_SLAB));
+		x.set(tu + 1, G1, tv, slab(Blocks.SPRUCE_SLAB));
+		x.set(tu, G1, tv - 1, stair(Blocks.DARK_OAK_STAIRS, Direction.NORTH, false));
+		x.set(tu + 1, G1, tv - 1, stair(Blocks.DARK_OAK_STAIRS, Direction.NORTH, false));
+		x.set(tu, G1, tv + 1, stair(Blocks.DARK_OAK_STAIRS, Direction.SOUTH, false));
+		x.set(tu + 1, G1, tv + 1, stair(Blocks.DARK_OAK_STAIRS, Direction.SOUTH, false));
+		// a runner from the door, lanterns from the ceiling
+		x.set(g.ud, G1, g.iv0, b(Blocks.CARPET.pick(DyeColor.RED)));
+		int ku = g.iu0 + 1;
+		x.put(ku, G1 + 3, g.iv0 + 2, hanging(Blocks.LANTERN), CitadelCanvas.HANGING);
+		x.put(tu - 1, G1 + 3, tv, hanging(Blocks.LANTERN), CitadelCanvas.HANGING);
+	}
+
+	/** Upper floor: bedroom (bed, chest, wardrobe) on the left, study (shelves, lectern, desk) on the right. */
+	private static void upstairs(X x, G g) {
+		int u0 = g.iu0;
+		BlockState bed = b(Blocks.BED.pick(DyeColor.RED)).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.SOUTH);
+		x.set(u0, G2, g.iv1 - 1, bed.setValue(BlockStateProperties.BED_PART, BedPart.FOOT));
+		x.set(u0, G2, g.iv1, bed.setValue(BlockStateProperties.BED_PART, BedPart.HEAD));
+		x.set(u0, G2, g.iv0, facing(Blocks.CHEST, Direction.EAST));
+		x.set(u0, G2, g.iv0 + 1, barrel());
+		x.set(u0 + 1, G2, g.iv1 - 1, slab(Blocks.SPRUCE_SLAB));
+		x.set(u0 + 1, G2 + 1, g.iv1 - 1, b(Blocks.LANTERN));
+		if (g.part) {
+			BlockState bed2 = b(Blocks.BED.pick(DyeColor.BLUE)).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.SOUTH);
+			x.set(u0 + 3, G2, g.iv1 - 1, bed2.setValue(BlockStateProperties.BED_PART, BedPart.FOOT));
+			x.set(u0 + 3, G2, g.iv1, bed2.setValue(BlockStateProperties.BED_PART, BedPart.HEAD));
+		}
+		// the study on the right, in furniture no taller than a step: a bookcase and a desk with a lectern and a map table
+		int ru = g.iu1;
+		for (int v = g.iv0; v <= g.iv1 - 1; v++) {
+			x.set(ru, G2, v, v % 2 == 0 ? b(Blocks.BOOKSHELF) : facing(Blocks.CHISELED_BOOKSHELF, Direction.WEST));
+		}
+		x.set(ru, G2 + 1, g.iv0 + 1, b(Blocks.LANTERN));
+		x.set(ru - 1, G2, g.iv0, facing(Blocks.LECTERN, Direction.SOUTH).setValue(BlockStateProperties.HAS_BOOK, true));
+		x.set(ru - 2, G2, g.iv0, b(Blocks.CARTOGRAPHY_TABLE));
+		x.set(ru - 3, G2, g.iv0, slab(Blocks.SPRUCE_SLAB));
+		x.set(ru - 3, G2 + 1, g.iv0, b(Blocks.LANTERN));
+		x.set(ru - 2, G2, g.iv0 + 1, stair(Blocks.DARK_OAK_STAIRS, Direction.NORTH, false));
+		x.set(ru - 1, G2, g.iv0 + 1, b(Blocks.CARPET.pick(DyeColor.RED)));
+	}
+
+	// ------------------------------------------------------------------ the roof (y13+)
+
+	/**
+	 * [finish] gable roof, ridge along u, in tile, brick or mud brick with a contrasting eave line, a capped
+	 * ridge, a 1-block overhang at the front and the gables, and plaster gables with a king post and light.
+	 */
+	private static void roof(X x, G g) {
+		Block main;
+		Block eaveBlk;
+		BlockState mid;
+		Block cap;
+		switch (g.roof) {
+			case 1 -> {
+				main = Blocks.BRICK_STAIRS;
+				eaveBlk = Blocks.STONE_BRICK_STAIRS;
+				mid = b(Blocks.BRICKS);
+				cap = Blocks.STONE_BRICK_SLAB;
+			}
+			case 2 -> {
+				main = Blocks.TUFF_BRICK_STAIRS;
+				eaveBlk = Blocks.DARK_OAK_STAIRS;
+				mid = b(Blocks.TUFF_BRICKS);
+				cap = Blocks.DARK_OAK_SLAB;
+			}
+			default -> {
+				main = Blocks.DEEPSLATE_TILE_STAIRS;
+				eaveBlk = Blocks.CHERRY_STAIRS;
+				mid = b(Blocks.POLISHED_DEEPSLATE);
+				cap = Blocks.CHERRY_SLAB;
+			}
+		}
+		int rv0 = g.hv0 - 1;
+		int rv1 = g.hv1;
+		int u0 = g.hu0 - 1;
+		int u1 = g.hu1 + 1;
+		int top = g.top();
+		for (int v = rv0; v <= rv1; v++) {
+			int a = PLATE + (v - rv0);
+			int bb = PLATE + 1 + (rv1 - v);
+			int y = Math.min(a, bb);
+			boolean frontSlope = a < bb;
+			boolean middle = a == bb;
+			boolean eaveRow = v == rv0 || v == rv1;
+			for (int u = u0; u <= u1; u++) {
+				BlockState st = middle ? mid : stair(eaveRow ? eaveBlk : main, frontSlope ? Direction.SOUTH : Direction.NORTH, false);
+				x.set(u, y, v, st);
+				if ((u == u0 || u == u1) && !middle && y - 1 >= PLATE) {
+					x.set(u, y - 1, v, stair(main, frontSlope ? Direction.NORTH : Direction.SOUTH, true));
+				}
+				if (y == top) {
+					x.set(u, top + 1, v, slab(cap));
+				}
+			}
+		}
+		// gables: plaster under the slope, a king post in the middle, a pink light either side of it
+		int midV = (g.hv0 + g.hv1) / 2;
+		for (int u : new int[] {g.hu0, g.hu1}) {
+			for (int v = g.hv0; v <= g.hv1; v++) {
+				int ry = g.roofY(v);
+				for (int y = PLATE + 1; y < ry; y++) {
+					BlockState st = v == midV ? frame() : plaster(x, u, y, v);
+					if (y == PLATE + 2 && Math.abs(v - midV) == 2) {
+						st = pane(Blocks.STAINED_GLASS_PANE.pick(DyeColor.PINK), false);
+					}
+					x.set(u, y, v, st);
+				}
+			}
+		}
+	}
+
+	/** [depth] an outside chimney stack against the left gable, behind the kitchen range: a broad base, a drip course, a slim flue up past the ridge. */
+	private static void chimney(X x, G g) {
+		int u = g.hu0 - 1;
+		int ctop = Math.min(g.top() + 1, g.h - 2);
+		for (int y = G1; y <= ctop; y++) {
+			for (int v = g.cv; v <= g.cv + 1; v++) {
+				x.set(u, y, v, x.hash(u, y, v, 3) == 0 ? b(Blocks.COBBLESTONE) : b(Blocks.STONE_BRICKS));
+			}
+		}
+		x.set(u, ctop + 1, g.cv, slab(Blocks.STONE_BRICK_SLAB));
+		x.set(u, ctop + 1, g.cv + 1, slab(Blocks.STONE_BRICK_SLAB));
+	}
+
+	// ------------------------------------------------------------------ sides and margins
+
+	/** The deck beside the house: lawn on the wide plots, hedges at the back and on the platform edge. */
+	private static void sides(X x, G g) {
+		for (int u = 1; u < g.hu0; u++) {
+			for (int v = g.hv0; v <= g.hv1; v++) {
+				boolean chim = u == g.hu0 - 1 && v >= g.cv - 1 && v <= g.cv + 2;
+				if (chim) {
+					continue;
+				}
+				x.set(u, DECK, v, x.mix(u, DECK, v, Blocks.GRASS_BLOCK, Blocks.GRASS_BLOCK, Blocks.MOSS_BLOCK));
+				int k = x.hash(u, DECK, v, 8);
+				if (k == 0) {
+					x.set(u, G1, v, b(Blocks.PINK_PETALS));
+				} else if (k == 1) {
+					x.set(u, G1, v, b(Blocks.SHORT_GRASS));
+				} else if (k == 2) {
+					x.set(u, G1, v, b(Blocks.CORNFLOWER));
+				}
+			}
+		}
+		for (int v = g.hv0; v <= g.hv1; v++) {
+			x.set(g.w - 2, DECK, v, b(Blocks.MOSS_BLOCK));
+			if (x.hash(g.w - 2, G1, v, 3) == 0) {
+				x.set(g.w - 2, G1, v, b(Blocks.FERN));
+			}
+		}
+	}
+
+	/**
+	 * [finish] the ground in front of the wall: flowers on the left of the pond with a bench facing it, and a
+	 * few buttress piers with lanterns along the foot of the wall where there is open ground.
+	 */
+	private static void yard(X x, G g) {
+		for (int u = 4; u <= g.pa - 2; u++) {
+			for (int v = 0; v <= g.gd - 1; v++) {
+				int k = x.hash(u, 0, v, 6);
+				BlockState plant = switch (k) {
+					case 0 -> b(Blocks.PINK_PETALS);
+					case 1 -> b(Blocks.CORNFLOWER);
+					case 2 -> b(Blocks.FERN);
+					case 3 -> b(Blocks.ALLIUM);
+					default -> null;
+				};
+				if (plant != null) {
+					x.set(u, 0, v, plant);
+				}
+			}
+		}
+		if (g.pa - 2 >= 5) {
+			x.set(g.pa - 2, 0, 1, stair(Blocks.DARK_OAK_STAIRS, Direction.WEST, false));
+			x.set(g.pa - 2, 0, 2, stair(Blocks.DARK_OAK_STAIRS, Direction.WEST, false));
+			x.set(g.pa - 2, 0, 0, b(Blocks.MOSSY_STONE_BRICK_WALL));
+			x.set(g.pa - 2, 1, 0, b(Blocks.LANTERN));
+		}
+		for (int u = 5; u <= g.pa - 3; u += 4) {
+			pier(x, g, u);
+		}
+		if (g.pb + 3 <= g.w - 2) {
+			pier(x, g, g.pb + 3);
+		}
+	}
+
+	private static void pier(X x, G g, int u) {
+		for (int y = 0; y <= 3; y++) {
+			x.set(u, y, g.gd - 1, y == 0 ? foot(x, u, y, g.gd - 1) : wallStone(x, u, y, g.gd - 1));
+		}
+		x.set(u, 4, g.gd - 1, b(Blocks.LANTERN));
+	}
+
+	/** [finish] the two outer columns at the foot of the platform: a path of flowers and ferns, vines up the wall, a lamp post each side. */
+	private static void margins(X x, G g) {
+		for (int v = 0; v < g.d; v++) {
+			for (int u : new int[] {0, g.w - 1}) {
+				boolean right = u != 0;
+				if (v >= g.gd) {
+					int k = x.hash(u, 0, v, 7);
+					BlockState plant = switch (k) {
+						case 0 -> b(Blocks.FERN);
+						case 1 -> b(Blocks.CORNFLOWER);
+						case 2 -> b(Blocks.PINK_PETALS);
+						case 3 -> b(Blocks.SHORT_GRASS);
+						default -> null;
+					};
+					if (plant != null) {
+						x.set(u, 0, v, plant);
+					}
+					if (x.hash(u, 3, v, 3) == 0) {
+						Direction side = right ? Direction.WEST : Direction.EAST;
+						x.put(u, 3, v, vine(side), CitadelCanvas.DECOR);
+						x.put(u, 2, v, vine(side), CitadelCanvas.DECOR);
+					}
+				}
+			}
+		}
+		int lv = g.gd + (g.hv0 - g.gd) / 2;
+		for (int u : new int[] {0, g.w - 1}) {
+			x.set(u, 0, lv, b(Blocks.MOSSY_STONE_BRICK_WALL));
+			x.set(u, 1, lv, b(Blocks.MOSSY_STONE_BRICK_WALL));
+			x.set(u, 2, lv, b(Blocks.LANTERN));
 		}
 	}
 }
