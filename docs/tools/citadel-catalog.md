@@ -76,6 +76,14 @@ tools/render/submit.sh --final -- --catalog WELL:well_roofed_stone --scale 1.5 -
   - `report.txt` lists, for every build, the block count, the `clipped` and `outside` counts and any build error, plus the
     palette of each variant. The last line says `OK: every build stayed inside its plot.` or gives a `WARNING`.
 
+**Walkability audit.** Every gallery build is also walked (`WalkAudit`, same rules as the NPC navigation, doors and gates
+read as open, starting from the path ring) and `report.txt` gets `walk:` lines per build: feet cells reached and floor
+levels, stairs reached, `FLAG sealed` (a floor under a roof nobody reaches: no way up), `FLAG low` (reached cells under a roof
+with under 2.85 blocks of headroom, doorways aside) and `FLAG fire` (campfire, fire or lava with water within 2 cells).
+`walk_cells.txt` and `walk_blocks.txt` hold the raw cells for offline analysis. A multi-storey house should call
+`InteriorStair.timber(c, p, lower, upper)` / `.stone(...)` at the end of `build` (the layers a person stands in on each floor): it cuts a
+flight at a free, head-on, reachable site, or nothing when the plot has no room.
+
 Check `--front all` at least once. A stair, door, log or lantern that points the wrong way in the E/S/W rows means the
 state was not set in local terms.
 

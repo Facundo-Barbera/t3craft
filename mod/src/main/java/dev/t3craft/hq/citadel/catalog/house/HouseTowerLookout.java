@@ -10,7 +10,6 @@ import static dev.t3craft.hq.citadel.catalog.house.HouseTowerKit.put;
 import static dev.t3craft.hq.citadel.catalog.house.HouseTowerKit.set;
 import static dev.t3craft.hq.citadel.catalog.house.HouseTowerKit.slab;
 import static dev.t3craft.hq.citadel.catalog.house.HouseTowerKit.stair;
-import static dev.t3craft.hq.citadel.catalog.house.HouseTowerKit.trapdoor;
 import static dev.t3craft.hq.citadel.catalog.house.HouseTowerKit.wall;
 
 import dev.t3craft.hq.citadel.CitadelCanvas;
@@ -311,12 +310,16 @@ public final class HouseTowerLookout implements Variant {
 		for (int y = 1; y <= GAL; y++) {
 			set(c, g.p, ladderU, y, ladderV, b(Blocks.LADDER).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH));
 		}
-		for (int y : new int[] {3, 7, 10}) {
-			put(c, g.p, g.cx, y, g.cz, hangingLantern(), CitadelCanvas.HANGING);
-		}
-		set(c, g.p, g.cx - 1, 1, g.cz + 1, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
-		set(c, g.p, g.cx + 1, 4, g.cz + 1, b(Blocks.BOOKSHELF));
-		set(c, g.p, g.cx - 1, 7, g.cz + 1, b(Blocks.CRAFTING_TABLE));
+		// the rooms are a plus of 5 cells (door, centre, ladder, two side bays) and 2 high: furniture goes in a side
+		// bay (never behind the door, on the centre or at the ladder) and the lantern stands on it, off the walk
+		set(c, g.p, g.cx - 1, 1, g.cz, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
+		set(c, g.p, g.cx - 1, 2, g.cz, lantern());
+		set(c, g.p, g.cx + 1, 4, g.cz, b(Blocks.BOOKSHELF));
+		set(c, g.p, g.cx + 1, 5, g.cz, lantern());
+		set(c, g.p, g.cx - 1, 7, g.cz, b(Blocks.CRAFTING_TABLE));
+		set(c, g.p, g.cx - 1, 8, g.cz, lantern());
+		// lantern room: hung over the west bay (the east bay is the way to the gallery door)
+		put(c, g.p, g.cx - 1, CEIL - 1, g.cz, hangingLantern(), CitadelCanvas.HANGING);
 	}
 
 	// ------------------------------------------------------------------ gallery
@@ -354,6 +357,16 @@ public final class HouseTowerLookout implements Variant {
 					set(c, g.p, u, GAL, v, (u == g.cx && v == g.cz + g.rr - 1) ? b(Blocks.AIR) : b(Blocks.SPRUCE_PLANKS));
 				}
 			}
+		}
+		// the gallery ring is one rail wide, so the east door opens onto a small railed landing: the cell at the
+		// door plus a plank on three sides, each carrying a fence (without them the door gives onto a drop)
+		int du = g.cx + g.rr + 1;
+		int[][] guard = {{du, g.cz - 1}, {du, g.cz + 1}, {du + 1, g.cz}};
+		for (int[] q : guard) {
+			set(c, g.p, q[0], GAL, q[1], b(g.s.planks()));
+			set(c, g.p, q[0], GAL - 1, q[1], stair(Blocks.POLISHED_DEEPSLATE_STAIRS, Direction.WEST, true));
+			boolean tip = q[0] == du + 1;
+			set(c, g.p, q[0], GAL + 1, q[1], tip ? fence(g.s.fence(), true, false, true, false) : fence(g.s.fence(), false, true, false, true));
 		}
 	}
 
@@ -466,9 +479,9 @@ public final class HouseTowerLookout implements Variant {
 				set(c, g.p, cu + side, y, vd - 1, log(g.s.log(), Direction.Axis.Y));
 			}
 			set(c, g.p, cu + side, 3, vd - 1, stair(g.s.eaveStair(), side < 0 ? Direction.EAST : Direction.WEST, true));
-			put(c, g.p, cu + side * 2, 2, vd - 1, hangingLantern(), CitadelCanvas.HANGING);
-			set(c, g.p, cu + side * 2, 1, vd - 1, b(Blocks.MOSS_BLOCK));
-			set(c, g.p, cu + side * 2, 2, vd - 1, side < 0 ? b(Blocks.FLOWERING_AZALEA) : b(Blocks.AZALEA));
+			// planters on the ground (they used to float a block up, with a lantern hung inside the bush)
+			set(c, g.p, cu + side * 2, 0, vd - 1, b(Blocks.MOSS_BLOCK));
+			set(c, g.p, cu + side * 2, 1, vd - 1, side < 0 ? b(Blocks.FLOWERING_AZALEA) : b(Blocks.AZALEA));
 		}
 		set(c, g.p, cu, 3, vd - 1, stair(g.s.eaveStair(), Direction.SOUTH, true));
 		set(c, g.p, cu, 3, vd, stair(g.s.eaveStair(), Direction.SOUTH, false));
@@ -486,6 +499,9 @@ public final class HouseTowerLookout implements Variant {
 			int bv = g.cz + dir.getStepZ() * dist;
 			set(c, g.p, bu, 0, bv, b(Blocks.POLISHED_DEEPSLATE));
 			set(c, g.p, bu, 1, bv, wall(Blocks.DEEPSLATE_BRICK_WALL, false, false, false, false, true));
+			if (dir != Direction.SOUTH) {
+				set(c, g.p, bu, 2, bv, lantern()); // the yard's light, on the side buttress posts
+			}
 			for (int side = -1; side <= 1; side += 2) {
 				int su = bu + dir.getStepZ() * side;
 				int sv = bv + dir.getStepX() * side;
@@ -508,9 +524,6 @@ public final class HouseTowerLookout implements Variant {
 		// a barrel and a woodpile by the door
 		set(c, g.p, g.cx - 3, 0, g.cz - g.rr - 1, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
 		set(c, g.p, g.cx + 3, 0, g.cz - g.rr - 1, log(Blocks.STRIPPED_SPRUCE_LOG, Direction.Axis.Z));
-		// a hanging shutter on the stone course (trapdoors)
-		for (Direction dir : new Direction[] {Direction.NORTH}) {
-			set(c, g.p, g.cx - 1, 2, g.cz - g.rr - 1, trapdoor(g.s.trap(), dir, true, false));
-		}
+		// (a shutter trapdoor used to replace the upper half of the west door jamb here: removed)
 	}
 }

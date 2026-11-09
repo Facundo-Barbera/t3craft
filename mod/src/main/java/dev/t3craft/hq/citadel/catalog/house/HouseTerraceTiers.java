@@ -142,6 +142,9 @@ public final class HouseTerraceTiers implements Variant {
 		roofC(c, p, g);
 		yard(c, p, g, r);
 		vines(c, p, g);
+		// walkability audit: a way up to the sealed upper floor
+		dev.t3craft.hq.citadel.catalog.InteriorStair.timber(c, p, 1, 5);
+		dev.t3craft.hq.citadel.catalog.InteriorStair.timber(c, p, 5, 9);
 	}
 
 	// ------------------------------------------------------------------ materials

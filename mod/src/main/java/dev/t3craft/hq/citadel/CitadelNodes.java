@@ -49,7 +49,7 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.GRASS;
  *     {@code ARCHIVE_TERMINAL} (face) on it and {@code ARCHIVE} (at) one block south of it, and a walk spot at
  *     {@code (cx - 4, 1, cz)}.</li>
  * <li><b>{@link #sunken} — lounge</b> ({@code Kind.LOUNGE_SUNKEN}) → {@link LoungeRoom}: a sunken amphitheatre
- *     of half steps down to {@code y = -3} with pools, a fire pavilion, sofas and trees. Fixtures
+ *     of half steps down to {@code y = -3} with flower beds, an open hearth, sofas and trees. Fixtures
  *     ({@link #loungeFixtures}): a walk spot at {@code (cx + 1, -2, cz)}; no screen.</li>
  * <li><b>{@link #pillar} — diagonal nodes</b> ({@code Kind.PILLAR}): a paved round whose monument is chosen by
  *     the index {@code k} of the node ({@link NodeDecor#pillarVariant}); built by {@link NodeDecor}.</li>

@@ -109,6 +109,8 @@ public final class HouseTimberCottage implements Variant {
 		chimney(c, p, u2 - 1, vb - 1);
 		yard(c, p, r, u1, u2, vf, vb, cu);
 		eaves(c, p, s, u1, u2, vj, vb, cu);
+		// walkability audit: a way up to the sealed upper floor
+		dev.t3craft.hq.citadel.catalog.InteriorStair.timber(c, p, 1, 5);
 	}
 
 	/**

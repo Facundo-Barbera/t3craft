@@ -60,8 +60,8 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
  *     {@link #lobby}, {@link #library}, {@link #study}, {@link #balcony}, {@link #roof},
  *     {@link #anchors}.</li>
  * <li>{@link #stairways}: two flights of five steps in the west column (ground to library, rising south)
- *     and the east column (library to office, rising north), each with the well in the floor above it
- *     fenced. Step {@code i} of a flight stands at {@code y = floor + 1 + i}; the last step is in the
+ *     and the east column (library to office, rising north), each started one cell in from the corner and
+ *     with the well in the floor above it fenced. Step {@code i} of a flight stands at {@code y = floor + 1 + i}; the last step is in the
  *     floor row above, so a player walks off it onto the next floor.</li>
  * <li>{@link #bigScreen}: the personal screen. A 5 x 3 big screen against the south wall of the office,
  *     bound to {@code HqGenerator.hubBinding(layout)}, the feed of the environment with most modules:
@@ -372,43 +372,44 @@ public final class CitadelOffice {
 	// ------------------------------------------------------------------ stairs
 
 	/**
-	 * Two flights of five steps. West column {@code dx = -3}: from the ground floor rising south, steps at
-	 * {@code dz = -3..1}; its well in the library floor is {@code dz = -2..0}. East column {@code dx = 3}:
-	 * from the library rising north, steps at {@code dz = 3..-1}; its well in the office floor is
-	 * {@code dz = 0..2}. The wells are fenced on the open sides; the mass under each step is plank.
+	 * Two flights of five steps, each started one cell in from the corner so the first step is met head on
+	 * from a free floor cell (walkability audit: a first step in a corner, against the wall, had to be jumped).
+	 * West column {@code dx = -3}: from the ground floor rising south, steps at {@code dz = -2..2}, walked onto
+	 * from {@code (-3, -3)}; its well in the library floor is {@code dz = -1..1}. East column {@code dx = 3}: from
+	 * the library rising north, steps at {@code dz = 2..-2}, walked onto from {@code (3, 3)}; its well in the
+	 * office floor is {@code dz = -1..1}. The top step is in the floor row above, so a player walks off it onto
+	 * the next floor (west: at {@code (-3, 2)}, east: at {@code (3, -2)}), with two free blocks over every step.
+	 * The wells are fenced on the open sides; the mass under each step is plank.
 	 */
 	public static void stairways(CitadelCanvas c) {
 		for (int i = 0; i < 5; i++) {
-			// ground to library: step i at dz = -3 + i, y = F0() + 1 + i, rising south
+			// ground to library: step i at dz = -2 + i, y = F0() + 1 + i, rising south
 			int x = CX() - 3;
-			int z = CZ() - 3 + i;
+			int z = CZ() - 2 + i;
 			c.set(x, F0() + 1 + i, z, cherryStairs(Direction.SOUTH, false));
 			for (int y = F0() + 1; y < F0() + 1 + i; y++) {
 				c.set(x, y, z, PLANKS);
 			}
-			// library to office: step i at dz = 3 - i, y = F1() + 1 + i, rising north
+			// library to office: step i at dz = 2 - i, y = F1() + 1 + i, rising north
 			int xe = CX() + 3;
-			int ze = CZ() + 3 - i;
+			int ze = CZ() + 2 - i;
 			c.set(xe, F1() + 1 + i, ze, cherryStairs(Direction.NORTH, false));
 			for (int y = F1() + 1; y < F1() + 1 + i; y++) {
 				c.set(xe, y, ze, PLANKS);
 			}
 		}
-		// the wells: the headroom of a step through the floor above, from the step before it (the nav sweeps the move)
-		for (int dz = -2; dz <= 0; dz++) {
+		// the wells: the headroom of steps 2 and 3 through the floor above, plus the step before (the nav sweeps the move)
+		for (int dz = -1; dz <= 1; dz++) {
 			c.set(CX() - 3, F1(), CZ() + dz, AIR);
-		}
-		for (int dz = 0; dz <= 2; dz++) {
 			c.set(CX() + 3, F2(), CZ() + dz, AIR);
 		}
-		// fences round them, on the floor above (the north end of the first well is a bookcase)
-		for (int dz = -2; dz <= 0; dz++) {
+		// fences round them on the floor above: the inner side, and the end away from the top step
+		for (int dz = -1; dz <= 1; dz++) {
 			c.set(CX() - 2, F1() + 1, CZ() + dz, fence());
-		}
-		for (int dz = 0; dz <= 2; dz++) {
 			c.set(CX() + 2, F2() + 1, CZ() + dz, fence());
 		}
-		c.set(CX() + 3, F2() + 1, CZ() + 3, fence());
+		c.set(CX() - 3, F1() + 1, CZ() - 2, fence());
+		c.set(CX() + 3, F2() + 1, CZ() + 2, fence());
 	}
 
 	// ------------------------------------------------------------------ lobby (ground level, feet y = F0() + 1)
@@ -450,10 +451,7 @@ public final class CitadelOffice {
 	/** Library: bookcases round a north window, the cartography table and a lectern, a bed, a rug and plants. */
 	public static void library(CitadelCanvas c) {
 		int y = F1() + 1;
-		// bookcases: both sides of the north window and the south-west corner
-		for (int dz : new int[] {2, 3}) {
-			shelves(c, -3, y, dz, 3);
-		}
+		// bookcases: the north-west corner and the south wall (the west flight comes up at (-3, 2), kept free)
 		shelves(c, -3, y, -3, 3);
 		shelves(c, -2, y, -3, 3);
 		shelves(c, -2, y, 3, 3);
@@ -497,9 +495,10 @@ public final class CitadelOffice {
 				c.set(CX() + dx, y, CZ() + dz, carpet(edge ? RUG_EDGE : RUG));
 			}
 		}
-		// sofa against the east wall (north end), bookcases in the north-west, plants in the south-west
-		c.set(CX() + 3, y, CZ() - 3, cherryStairs(Direction.EAST, false));
-		c.set(CX() + 3, y, CZ() - 2, cherryStairs(Direction.EAST, false));
+		// a bench against the north wall east of the door (the east flight comes up at (3, -2), kept free and
+		// walked off to the west), bookcases in the north-west, plants in the south-west
+		c.set(CX() + 2, y, CZ() - 3, cherryStairs(Direction.NORTH, false));
+		c.set(CX() + 3, y, CZ() - 3, cherryStairs(Direction.NORTH, false));
 		for (int dz : new int[] {-3, -2}) {
 			shelves(c, -3, y, dz, 3);
 		}

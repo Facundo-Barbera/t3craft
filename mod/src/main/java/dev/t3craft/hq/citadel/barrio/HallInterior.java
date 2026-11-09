@@ -76,10 +76,11 @@ public final class HallInterior {
 		return s == null || s.isAir();
 	}
 
-	/** A free cell with a solid floor under it (not the stair hole). */
+	/** A free cell with a solid floor under it (not the stair hole, not a stair). */
 	private static boolean floored(CitadelCanvas c, BlockPos p) {
 		BlockState below = c.at(p.getX(), p.getY() - 1, p.getZ());
-		return free(c, p) && below != null && !below.isAir();
+		// not on a stair either: a rug over the top step of the flight lifts the floor by 1/16 and makes the last step a jump
+		return free(c, p) && below != null && !below.isAir() && !(below.getBlock() instanceof net.minecraft.world.level.block.StairBlock);
 	}
 
 	private static void put(CitadelCanvas c, BlockPos p, BlockState s) {
@@ -304,6 +305,11 @@ public final class HallInterior {
 		for (int u = cu - PENDANT_STEP * (cu / PENDANT_STEP); u < D - 1; u += PENDANT_STEP) {
 			for (int v = mid - PENDANT_STEP * (mid / PENDANT_STEP); v < W; v += PENDANT_STEP) {
 				if (u < 1 || v < 1 || v > W - 2 || F == 1 && u == cu && v == mid) {
+					continue;
+				}
+				// walkability audit: never over the flight of a two-floor hall (a pendant over the first steps was at
+				// head height of the climber: the ring-1 hall's upper floor could not be reached on foot)
+				if (F == 2 && f == 0 && Math.abs(v - mid) <= 1 && u <= fh()) {
 					continue;
 				}
 				BlockPos p = r.cell(u, v, ceil);

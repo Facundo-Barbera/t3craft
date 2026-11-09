@@ -107,6 +107,8 @@ public final class HouseStoneTower implements Variant {
 		porch(front, c, p, u1);
 		tower(c, p);
 		yard(c, p, u1, v1);
+		// walkability audit: a way up to the sealed upper floor
+		dev.t3craft.hq.citadel.catalog.InteriorStair.stone(c, p, 1, 5);
 	}
 
 	// ------------------------------------------------------------------ floors and walls

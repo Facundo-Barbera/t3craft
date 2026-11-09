@@ -91,7 +91,24 @@ public final class AnnexGreenhouseCopper implements Variant {
 		lanterns(c, p, vf, vb, cu);
 		if (vf == 1) {
 			apron(c, p, cu);
+		} else {
+			groundDoor(c, p, cu);
 		}
+	}
+
+	/**
+	 * Without an apron (d = 5) there is no room for a step outside the door, and a door on the plinth would
+	 * leave a full block to jump from the street. So the door stands on the ground (y0..y1) with a copper
+	 * lintel over it, and the step up to the floor (y0, top at 1) is the first path cell inside.
+	 */
+	private static void groundDoor(CitadelCanvas c, Plot p, int cu) {
+		for (int y = 0; y <= 1; y++) {
+			p.set(c, cu, y, 0, b(Blocks.CHERRY_DOOR)
+					.setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH)
+					.setValue(BlockStateProperties.DOUBLE_BLOCK_HALF, y == 0 ? DoubleBlockHalf.LOWER : DoubleBlockHalf.UPPER));
+		}
+		p.set(c, cu, 2, 0, POST);
+		p.set(c, cu, 0, 1, stairs(Blocks.MUD_BRICK_STAIRS, Direction.SOUTH));
 	}
 
 	/** Roof height over column u: the eaves at PLATE, then one step up per column, two steps at most. */
