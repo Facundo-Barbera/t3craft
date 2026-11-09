@@ -17,9 +17,9 @@ import net.minecraft.world.level.block.state.properties.Half;
 import net.minecraft.world.level.block.state.properties.WallSide;
 
 /**
- * Watering trough: a long log trough on a rough cobble footing, filled to the brim, with a stone
- * hand pump on its back rim (chiseled head, lever handle, a copper spout over the water) and a
- * lantern post at the pump end. At the other end barrels and a bucket-cauldron; a curb in front and
+ * Watering trough: a long stone trough on a rough cobble footing, filled to the brim, with a stone
+ * hand pump on its back rim (chiseled head, lever handle, a copper spout over the water) under a
+ * little cherry pump house. At the other end barrels and a bucket-cauldron; a curb in front and
  * hay bales behind when the plot is deep enough.
  *
  * <pre>
@@ -31,7 +31,7 @@ import net.minecraft.world.level.block.state.properties.WallSide;
  *  v4  ▦ ✿ . ▦ ✿ . .   hay, flowers
  * </pre>
  *
- * Size: 5–8 × 3–5 × 4+ (from height 5 a pump house roof on four posts over the pump end; ridge cap from 6, finial from 7).
+ * Size: 5–8 × 3–5 × 4+ (the pump house roof sits at y3 on 4-high plots, y4 from 5; ridge cap and finial when there is room).
  */
 public final class WellTroughPump implements Variant {
 	private static final BlockState CORNER = b(Blocks.CHISELED_STONE_BRICKS);
@@ -84,11 +84,7 @@ public final class WellTroughPump implements Variant {
 
 		trough(c, p, ue, vf, vm, vk);
 		pump(c, p, pu, vm, vk);
-		if (p.h() >= 5) {
-			canopy(c, p, ue, vf, vm, vk);
-		} else {
-			lanternPost(c, p, vk);
-		}
+		canopy(c, p, ue, vf, vm, vk);
 		barrels(c, p, w - 1, vf, vm, vk);
 		if (vf == 1) {
 			curb(c, p);
@@ -156,58 +152,51 @@ public final class WellTroughPump implements Variant {
 				.setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.EAST), CitadelCanvas.DECOR);
 	}
 
-	/** A spruce fence post on the back-left corner log, joined to the pump head, with a lantern on top. */
-	private static void lanternPost(CitadelCanvas c, Plot p, int vk) {
-		int top = p.h() >= 5 ? 3 : 2;
-		for (int y = 2; y <= top; y++) {
-			BlockState f = b(Blocks.CHERRY_FENCE);
-			if (y == 2) {
-				f = f.setValue(BlockStateProperties.EAST, true); // the pump head is a full block beside it
-			}
-			p.set(c, 0, y, vk, f);
-		}
-		p.set(c, 0, top + 1, vk, b(Blocks.LANTERN));
-	}
-
 	// ------------------------------------------------------------------ canopy (h >= 5)
 
 	/**
-	 * [finish] a little pump house: a gable roof on four spruce posts over the pump end only (u 0..2),
+	 * [finish] a little pump house: a gable roof on four cherry posts over the pump end only (u 0..2),
 	 * so the rest of the trough stays open and its water shows. A cherry eave line (stepped one lower
 	 * over the curb and the hay row when the plot has them), deepslate tiles, a cherry ridge cap from
 	 * height 6, closed gables and a lantern hanging beside the spout.
 	 */
 	private static void canopy(CitadelCanvas c, Plot p, int ue, int vf, int vm, int vk) {
+		int r = p.h() >= 5 ? 4 : 3; // the roof row; a lower pump house on 4-high plots (over the pump cap)
 		int ur = Math.min(2, ue - 1); // the canopy's right posts; the trough runs on past them in the open
 		for (int u : new int[] {0, ur}) {
 			for (int v : new int[] {vf, vk}) {
-				p.set(c, u, 2, v, b(Blocks.CHERRY_FENCE));
-				p.set(c, u, 3, v, b(Blocks.STRIPPED_CHERRY_LOG));
+				for (int y = 2; y < r; y++) {
+					p.set(c, u, y, v, y == r - 1 && r == 4 ? b(Blocks.STRIPPED_CHERRY_LOG) : b(Blocks.CHERRY_FENCE));
+				}
 			}
 		}
 		boolean frontOver = vf > 0;
 		boolean backOver = vk + 1 < p.d();
 		for (int u = 0; u <= ur; u++) {
 			if (frontOver) {
-				p.set(c, u, 3, vf - 1, stairs(Blocks.CHERRY_STAIRS, Direction.SOUTH));
+				p.set(c, u, r - 1, vf - 1, stairs(Blocks.CHERRY_STAIRS, Direction.SOUTH));
 			}
 			if (backOver) {
-				p.set(c, u, 3, vk + 1, stairs(Blocks.CHERRY_STAIRS, Direction.NORTH));
+				p.set(c, u, r - 1, vk + 1, stairs(Blocks.CHERRY_STAIRS, Direction.NORTH));
 			}
-			p.set(c, u, 4, vf, stairs(frontOver ? Blocks.DEEPSLATE_TILE_STAIRS : Blocks.CHERRY_STAIRS, Direction.SOUTH));
-			p.set(c, u, 4, vk, stairs(backOver ? Blocks.DEEPSLATE_TILE_STAIRS : Blocks.CHERRY_STAIRS, Direction.NORTH));
-			p.set(c, u, 4, vm, b(Blocks.DEEPSLATE_TILES));
-			if (p.h() >= 6) {
-				p.set(c, u, 5, vm, slab(Blocks.CHERRY_SLAB));
+			p.set(c, u, r, vf, stairs(frontOver ? Blocks.DEEPSLATE_TILE_STAIRS : Blocks.CHERRY_STAIRS, Direction.SOUTH));
+			p.set(c, u, r, vk, stairs(backOver ? Blocks.DEEPSLATE_TILE_STAIRS : Blocks.CHERRY_STAIRS, Direction.NORTH));
+			p.set(c, u, r, vm, b(Blocks.DEEPSLATE_TILES));
+			if (p.h() > r + 1) {
+				p.set(c, u, r + 1, vm, slab(Blocks.CHERRY_SLAB));
 			}
 		}
-		if (p.h() >= 7) {
-			p.set(c, 1, 6, vm, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState()); // [finish] a copper finial
+		if (p.h() > r + 2) {
+			p.set(c, 1, r + 2, vm, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState()); // [finish] a copper finial
 		}
-		// [depth] the gable ends: a spruce beam over the water side, upside-down stairs at the corners
-		p.set(c, 0, 3, vm, stairs(Blocks.SPRUCE_STAIRS, Direction.EAST).setValue(BlockStateProperties.HALF, Half.TOP));
-		p.set(c, ur, 3, vm, stairs(Blocks.SPRUCE_STAIRS, Direction.WEST).setValue(BlockStateProperties.HALF, Half.TOP));
-		p.put(c, ur, 2, vm, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
+		if (r == 4) {
+			// [depth] the gable ends: upside-down stairs under the ridge; a lantern hangs beside the spout
+			p.set(c, 0, 3, vm, stairs(Blocks.SPRUCE_STAIRS, Direction.EAST).setValue(BlockStateProperties.HALF, Half.TOP));
+			p.set(c, ur, 3, vm, stairs(Blocks.SPRUCE_STAIRS, Direction.WEST).setValue(BlockStateProperties.HALF, Half.TOP));
+			p.put(c, ur, 2, vm, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
+		} else {
+			p.set(c, p.w() - 1, 2, vk, b(Blocks.LANTERN)); // no headroom under the low roof: the lantern stands on the barrels
+		}
 	}
 
 	// ------------------------------------------------------------------ props

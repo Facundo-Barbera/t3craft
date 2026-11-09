@@ -185,7 +185,7 @@ public final class StallTeaBar implements Variant {
 					p.set(c, u, EAVE, v, b(Blocks.STRIPPED_CHERRY_LOG)); // [finish] a pale bracket block over each pillar
 				} else if (f || k || l || r) {
 					Direction up = f ? Direction.SOUTH : k ? Direction.NORTH : l ? Direction.EAST : Direction.WEST;
-					p.set(c, u, EAVE, v, stairs(Blocks.CHERRY_STAIRS, up));
+					p.set(c, u, EAVE, v, stairs(Blocks.DEEPSLATE_TILE_STAIRS, up)); // [palette] a dark eave line parts the roof from the posts
 				} else {
 					boolean il = u == 1;
 					boolean ir = u == w - 2;

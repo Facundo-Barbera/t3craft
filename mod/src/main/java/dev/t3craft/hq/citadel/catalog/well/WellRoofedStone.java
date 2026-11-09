@@ -244,7 +244,7 @@ public final class WellRoofedStone implements Variant {
 		for (int u = 0; u < w; u++) {
 			if (d % 2 == 1) {
 				boolean finial = u == cu;
-				p.set(c, u, top + 1, d / 2, finial ? Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState() : slab(Blocks.DEEPSLATE_TILE_SLAB));
+				p.set(c, u, top + 1, d / 2, finial ? Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState() : slab(Blocks.CHERRY_SLAB));
 			} else {
 				p.set(c, u, top + 1, d / 2 - 1, slab(Blocks.CHERRY_SLAB));
 				p.set(c, u, top + 1, d / 2, slab(Blocks.CHERRY_SLAB));
