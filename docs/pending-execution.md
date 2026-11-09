@@ -66,6 +66,11 @@ Ola 2, pendiente:
   - en supervivencia no hay orden radial;
   - `HqConstruction` sigue mandando un trabajo por parte;
   - con 8 builders algunos adelantan el anillo siguiente.
+- `fix/build-radial-tune` (solo código, sin compilar): el suelo crece desde los pies del jugador.
+  - Primero la superficie (y una capa de soporte), como mucho 1 anillo por delante; el relleno oculto va 2 anillos por detrás.
+  - Builders por tramos de muro: suben por hiladas y trepan sin caminar, a 10 bloques/tick, y ayudan en su anillo en vez de saltar al siguiente.
+  - `fastFoundation` ahora está apagado por defecto.
+  - Falta: compilar y probarlo en juego, sobre todo el anillo 0 cerrado, los muros y que el suelo siga al jugador en el void.
 - `citadel/scale-port`: **dentro de `citadel/next`** (`3d03dd0`), que compila. La escala por defecto es 1.0. Con 1.5 los nodos y algunos detalles mantienen tamaño fijo, y hay que verlo en render.
 - `fix/chat-send-agents-menu`: código listo, **sin compilar ni probar**.
   - el segundo mensaje ya no se pierde: se encola detrás del que está en vuelo (`ComposerState` outbox, "⏱ Queued");

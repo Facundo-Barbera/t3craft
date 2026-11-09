@@ -546,6 +546,12 @@ public final class BuildJob {
 
 	/** Blocks per tick this job wants: {@code blocksPerTick × fronts}. */
 	public double rate() {
+		// fix/build-radial-tune: a radial job asks for what its builders can place (climbers faster); its
+		// ground and fill have their own budget
+		JobCursor live = cursor instanceof DeferredCursor d ? d.ready() : cursor;
+		if (live instanceof RadialCursor rc) {
+			return rc.rate();
+		}
 		// feat/build-near-player: the foundation has its own budget; one block keeps the job's slot ticking
 		return cursor.fastPhase() ? Math.min(1.0, blocksPerTick) : blocksPerTick * fronts();
 	}
