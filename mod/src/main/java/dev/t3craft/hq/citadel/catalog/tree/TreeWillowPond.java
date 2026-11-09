@@ -3,43 +3,36 @@ package dev.t3craft.hq.citadel.catalog.tree;
 import static dev.t3craft.hq.citadel.CitadelCanvas.b;
 import static dev.t3craft.hq.citadel.CitadelCanvas.leaves;
 import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
-import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
 
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.catalog.Family;
 import dev.t3craft.hq.citadel.catalog.Plot;
 import dev.t3craft.hq.citadel.catalog.Variant;
-import net.minecraft.core.Direction;
+import dev.t3craft.hq.citadel.catalog.tree.TreeKit.Leaves;
+import dev.t3craft.hq.citadel.catalog.tree.TreeKit.Vox;
+import dev.t3craft.hq.citadel.catalog.tree.TreeKit.Wood;
+import java.util.Random;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 
 /**
- * Weeping willow beside the water: a mossy stone pool at the front with lily pads and stepping stones,
- * a dark-oak trunk that flares into roots and leans out over the pond, and a wide flat dome of leaves
- * whose rim lets fall a curtain of hanging leaves and vines down to the water.
+ * Weeping willow beside the water: an oval pool at the front (a mossy stone rim with rounded corners,
+ * water, lily pads, submerged stepping stones and a stone lantern on the free corner). Right behind the
+ * rim stands a dark-oak 2×2 trunk on diagonal roots, bare for its first blocks; its leader carries a domed
+ * crown lobe, two limbs run out to lower side lobes, and one limb arches up and over the pond (rise, apex,
+ * fall) to a lobe hanging above the water. Each lobe keeps a notch of air from the next, in two greens.
+ * Only the outer rim of the crown hangs: separate 1-wide strands, 2–5 long, never side by side nor
+ * diagonal neighbours, stopping two blocks above the water, leaves with a vine at the tip. Ferns, moss, a
+ * flowering azalea bush and a mossy boulder behind.
  *
- * <pre>
- *  local layout (v = 0 at the front)            section
- *  v0     ▒ rim ▒ ▒ ▒ ▒ ▒ lantern                  crown   ▄▄▄▄▄▄▄▄
- *  v1-2   ▒ ≈ water, lilies, stones ≈ ▒            curtain ║║ ║║║ ║ ║   (leaves, then vines)
- *  v3     ▒ ▒ roots ▒ ▒ ▒                          trunk     ╲│
- *  v4..   ferns, moss, azalea clumps, boulder      pool   ▒≈≈≈≈▒  roots
- * </pre>
- *
- * <ul>
- * <li><b>[depth]</b> the crown has a lumpy dome profile and the curtain hangs at several lengths, so the
- *     silhouette is a ragged fringe, never a flat wall; the pool is a ring of stone with rounded corners.</li>
- * <li><b>[palette]</b> trunk dark oak (heavy) → oak / azalea / a little birch leaves (light highlights);
- *     rim mossy stone bricks, cobble and cracked bricks mixed by hash.</li>
- * <li><b>[finish]</b> root flare of stairs and mangrove roots, a hanging lantern from the front bough,
- *     a stone lantern, lilies, ferns, azalea shrubs and a mossy boulder.</li>
- * </ul>
- * Size: 7–9 × 7–9 × 9+ (the tree stops at 13 high).
+ * <p>Size: 7–9 × 7–9 × 9+ (the tree stops at 12 high).
  */
 public final class TreeWillowPond implements Variant {
-	private static final BlockState LOG = b(Blocks.DARK_OAK_LOG);
-	private static final BlockState WOOD = b(Blocks.DARK_OAK_WOOD);
+	private static final Wood WOOD = new Wood(Blocks.DARK_OAK_LOG, Blocks.DARK_OAK_WOOD, b(Blocks.MANGROVE_ROOTS));
+	private static final Leaves GREEN = Leaves.of(Blocks.OAK_LEAVES, Blocks.AZALEA_LEAVES).clumps(3);
+	private static final Leaves DEEP = Leaves.of(Blocks.AZALEA_LEAVES, Blocks.DARK_OAK_LEAVES).clumps(3);
+	private static final Leaves CROWN = GREEN.withAccent(leaves(Blocks.BIRCH_LEAVES), 7);
 
 	@Override
 	public String id() {
@@ -78,247 +71,259 @@ public final class TreeWillowPond implements Variant {
 
 	@Override
 	public void build(CitadelCanvas c, Plot p) {
+		Vox t = new Vox(p);
+		Random r = p.rng(0x5A11);
 		int w = p.w();
 		int d = p.d();
-		int top = Math.min(p.h(), 13) - 1;
+		int H = Math.min(p.h(), 12);
+		double sc = Math.min(w, d) / 7.0;
 		int pd = d >= 9 ? 4 : 3; // the pool covers v 0..pd
-		int crownH = Math.max(4, Math.min(6, top - 3));
-		int cb = top - crownH + 1; // lowest crown layer
-		double ccu = (w - 1) / 2.0;
-		double ccv = (d - 1) / 2.0;
-		double ru = ccu + 0.4;
-		double rv = ccv + 0.4;
-		int tu = (w - 1) / 2;
-		int tv = pd + 1;
+		int bu = (w - 2) / 2;
+		int bv = pd + 1; // the 2×2 stands right behind the back rim
+		int s = r.nextBoolean() ? -1 : 1; // the side the arching limb reaches out to
 
-		pond(c, p, w, pd, tu);
-		ground(c, p, w, d, pd, tu, tv);
+		// the fixed pieces first: the tree never overwrites them
+		pond(t, w, pd, bu);
+		garden(t, w, d);
 
-		// --- crown: a dome, wide at the bottom, narrowing to a ragged top
-		boolean[][][] cr = new boolean[w][top + 1][d];
-		int[][] lowest = new int[w][d];
-		for (int u = 0; u < w; u++) {
-			for (int v = 0; v < d; v++) {
-				lowest[u][v] = -1;
-			}
-		}
-		for (int y = cb; y <= top; y++) {
-			double t = (double) (y - cb) / (crownH - 1);
-			double f = t < 0.55 ? 0.82 + 0.18 * (t / 0.55) : 1.0 - (t - 0.55) / 0.45 * 0.7;
-			for (int u = 0; u < w; u++) {
-				for (int v = 0; v < d; v++) {
-					double du = (u - ccu) / ru;
-					double dv = (v - ccv) / rv;
-					double n = (p.hash(u, y, v, 100) - 50) / 50.0 * 0.2;
-					if (du * du + dv * dv + n <= f * f) {
-						cr[u][y][v] = true;
-						if (lowest[u][v] < 0) {
-							lowest[u][v] = y;
-						}
-						int s = p.hash(u, y, v, 10);
-						BlockState lf = s < 6 ? leaves(Blocks.OAK_LEAVES) : s < 8 ? leaves(Blocks.AZALEA_LEAVES)
-								: s == 8 && y > cb ? leaves(Blocks.BIRCH_LEAVES) : leaves(Blocks.OAK_LEAVES);
-						set(c, p, u, y, v, lf);
+		// trunk: an upright 2×2 on roots, its leader bare up to the limbs (the trunk shows under the crown)
+		int yTop = H - 3;
+		int ou = s < 0 ? 0 : 1;
+		int[][] lead = TreeKit.trunk(t, WOOD, bu, bv, 2, yTop, ou, 0, 0, 0);
+		TreeKit.roots(t, WOOD, bu, bv, 5, 2, 4, 21);
+		int lu = lead[0][yTop];
+		int lv = lead[1][yTop];
+
+		// 1. the domed crown lobe on the leader (two cap layers), a little back from the pond
+		double rd = TreeKit.clamp(1.9 * sc, 1.9, 2.4);
+		TreeKit.lobe(t, lu, yTop, lv + 0.3, rd, rd * 0.9, 2.2, 1.0, CROWN, 0.35, 0);
+
+		// 2. the arching limb: up from the bare trunk to an apex, then out and down over the water to a lobe
+		int ay = yTop - 1;
+		int ty = ay - (H >= 11 ? 2 : 1);
+		int sy = Math.max(3, ay - 3);
+		int asu = lead[0][sy];
+		int asv = lead[1][sy];
+		int tv = pd / 2;
+		int tu = TreeKit.clamp(asu + s * (w >= 8 ? 3 : 2), 1, w - 2);
+		int au = (int) Math.round(asu + (tu - asu) * 0.45);
+		int av = (int) Math.round(asv + (tv - asv) * 0.45);
+		TreeKit.branch(t, WOOD, new int[] {asu, sy, asv}, new int[] {au, ay, av}, false);
+		TreeKit.branch(t, WOOD, new int[] {au, ay, av}, new int[] {tu, ty, tv}, false);
+		double ra = TreeKit.clamp(1.6 * sc, 1.6, 2.0);
+		TreeKit.lobe(t, tu, ty + 1, tv, ra, ra * 0.9, 1.0, 0.0, DEEP, 0.35, 3);
+
+		// 3. two lower side lobes on short limbs (crown underside four or more blocks above the ground)
+		int cyS = yTop - 1;
+		int cy2 = yTop >= 7 ? cyS - 1 : cyS;
+		limbLobe(t, lead, Math.max(3, cyS - 2), -s, 0.35, TreeKit.clamp(1.9 * sc, 1.8, 2.3), cyS, GREEN, 1);
+		limbLobe(t, lead, Math.max(3, cy2 - 1), s * 0.6, 0.8, TreeKit.clamp(1.7 * sc, 1.6, 2.1), cy2, DEEP.swap(), 2);
+
+		// the curtain: only the outer rim hangs, separate strands with a free cell all round each
+		double ccu = bu + 0.5;
+		double ccv = bv + 0.5;
+		boolean[] col = new boolean[t.w * t.d];
+		for (int y = 3; y < t.h; y++) {
+			for (int v = 0; v < t.d; v++) {
+				for (int u = 0; u < t.w; u++) {
+					if (t.kind(u, y, v) != TreeKit.LEAF || !t.empty(u, y - 1, v)) {
+						continue;
 					}
-				}
-			}
-		}
-
-		// --- the curtain: every edge column drops leaves, then vines, at its own length
-		int[][] du4 = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
-		for (int u = 0; u < w; u++) {
-			for (int v = 0; v < d; v++) {
-				int lo = lowest[u][v];
-				if (lo < 2) {
-					continue;
-				}
-				boolean edge = false;
-				for (int[] n : du4) {
-					int nu = u + n[0];
-					int nv = v + n[1];
-					if (nu < 0 || nv < 0 || nu >= w || nv >= d || lowest[nu][nv] < 0 || lowest[nu][nv] > lo) {
-						edge = true;
+					if (Math.hypot(u - ccu, v - ccv) < 1.8) {
+						continue;
 					}
+					int ou2 = Integer.signum((int) Math.round(u - ccu));
+					int ov2 = Integer.signum((int) Math.round(v - ccv));
+					if (t.kind(u + ou2, y, v + ov2) == TreeKit.LEAF) {
+						continue; // not the outer rim
+					}
+					if (busy(col, t.w, t.d, u, v)) {
+						continue;
+					}
+					if (t.hash(u, y, v, 20) >= 12) {
+						continue; // gaps
+					}
+					int room = y - 2; // cells y - 1 down to 2: the lowest stays two blocks over the water
+					if (room < 2) {
+						continue;
+					}
+					int len = Math.min(2 + t.hash(u, 2, v, 4), room);
+					int vines = len >= 3 ? 1 : 0;
+					boolean ew = Math.abs(u - ccu) > Math.abs(v - ccv);
+					boolean deep = t.hash(u, 7, v, 3) == 0;
+					strand(t, u, y - 1, v, len, vines, deep ? DEEP.a() : GREEN.a(), deep ? GREEN.a() : DEEP.a(), ew);
+					col[v * t.w + u] = true;
 				}
-				boolean inner = !edge && lo == cb && p.hash(u, 3, v, 7) == 0;
-				if (!edge && !inner) {
-					continue;
-				}
-				// open windows in the front curtain so the pool and the trunk show through
-				if (v <= 2 && p.hash(u, 8, v, 3) == 0) {
-					continue;
-				}
-				boolean front = v <= 2 && edge;
-				int ylo;
-				if (inner) {
-					ylo = Math.max(1, lo - 2 - p.hash(u, 4, v, 2));
-				} else if (front) {
-					ylo = 2 + p.hash(u, 1, v, 3) * 2; // shorter at the front: the pool stays visible
-				} else if (v <= pd) {
-					ylo = 1 + p.hash(u, 1, v, 3); // over the water: reaches it
-				} else {
-					ylo = 2 + p.hash(u, 1, v, 4);
-				}
-				ylo = Math.min(ylo, lo - 1);
-				boolean ew = Math.abs(u - ccu) / ru > Math.abs(v - ccv) / rv;
-				curtain(c, p, u, v, lo, ylo, ew);
 			}
 		}
 
-		// --- trunk: roots, flare, a lean over the pond, boughs
-		int[][] flare = {{-1, 0}, {1, 0}, {0, 1}, {0, -1}};
-		for (int[] f : flare) {
-			int fu = tu + f[0];
-			int fv = tv + f[1];
-			boolean side = f[1] == 0;
-			if (f[1] < 0) {
-				set(c, p, fu, 0, fv, b(Blocks.MANGROVE_ROOTS));
-				set(c, p, fu - 1, 0, fv, b(Blocks.MANGROVE_ROOTS));
-			} else {
-				set(c, p, fu, 0, fv, LOG.setValue(BlockStateProperties.AXIS, side ? Direction.Axis.X : Direction.Axis.Z));
+		// ferns, grass, moss and a few flowering azaleas on the free ground
+		TreeKit.ground(t, (w - 1) / 2.0, (d - 1) / 2.0, Math.max(w, d), (u, v, k) -> {
+			int hsh = t.hash(u, 0, v, 100);
+			if (hsh < 16) {
+				return b(Blocks.FERN);
 			}
-			Direction toTrunk = f[0] == -1 ? Direction.EAST : f[0] == 1 ? Direction.WEST : f[1] == 1 ? Direction.NORTH : Direction.SOUTH;
-			set(c, p, fu, 1, fv, stairs(Blocks.DARK_OAK_STAIRS, toTrunk));
+			if (hsh < 28) {
+				return b(Blocks.SHORT_GRASS);
+			}
+			if (hsh < 38) {
+				return b(Blocks.MOSS_CARPET);
+			}
+			if (hsh < 41 && v > pd) {
+				return b(Blocks.FLOWERING_AZALEA);
+			}
+			return null;
+		});
+		t.prune();
+		t.flush(c);
+	}
+
+	/**
+	 * A limb from the leader at {@code sy} out along {@code (ex, ez)} to a lobe of radius {@code rad} centred
+	 * at height {@code cy}; the limb ends on the lobe's underside (cy - 1).
+	 */
+	private static void limbLobe(Vox t, int[][] lead, int sy, double ex, double ez, double rad, int cy, Leaves lv,
+			int salt) {
+		double n = Math.hypot(ex, ez);
+		double nx = ex / n;
+		double nz = ez / n;
+		int su = lead[0][sy];
+		int sv = lead[1][sy];
+		double reach = TreeKit.clamp(TreeKit.room(t, su, sv, nx, nz, 0) - rad * 0.4, 1.5, 3.2);
+		int tu = (int) Math.round(su + nx * reach);
+		int tv = (int) Math.round(sv + nz * reach);
+		TreeKit.branch(t, WOOD, new int[] {su, sy, sv}, new int[] {tu, cy - 1, tv}, false);
+		TreeKit.lobe(t, tu, cy, tv, rad, rad * 0.9, 1.0, 1.0, lv, 0.4, salt);
+	}
+
+	/** True when a strand already hangs in this column or any of its eight neighbours. */
+	private static boolean busy(boolean[] col, int w, int d, int u, int v) {
+		for (int dv = -1; dv <= 1; dv++) {
+			for (int du = -1; du <= 1; du++) {
+				int a = u + du;
+				int b = v + dv;
+				if (a >= 0 && a < w && b >= 0 && b < d && col[b * w + a]) {
+					return true;
+				}
+			}
 		}
-		set(c, p, tu, 0, tv, WOOD);
-		set(c, p, tu, 1, tv, WOOD);
-		set(c, p, tu, 2, tv, LOG);
-		set(c, p, tu, 3, tv, LOG);
-		set(c, p, tu, 3, tv - 1, LOG.setValue(BlockStateProperties.AXIS, Direction.Axis.Z)); // the bend: leans towards the water
-		for (int y = 4; y <= cb + 1; y++) {
-			set(c, p, tu, y, tv - 1, y == cb - 1 ? WOOD : LOG);
-		}
-		int by = cb - 1;
-		BlockState ax = LOG.setValue(BlockStateProperties.AXIS, Direction.Axis.X);
-		BlockState az = LOG.setValue(BlockStateProperties.AXIS, Direction.Axis.Z);
-		for (int k = 1; k <= 2; k++) {
-			set(c, p, tu - k, by, tv - 1, k == 2 ? WOOD.setValue(BlockStateProperties.AXIS, Direction.Axis.X) : ax);
-			set(c, p, tu + k, by, tv - 1, k == 2 ? WOOD.setValue(BlockStateProperties.AXIS, Direction.Axis.X) : ax);
-		}
-		for (int k = 1; k <= 2 && tv - 1 - k >= 0; k++) {
-			set(c, p, tu, by, tv - 1 - k, k == 2 ? WOOD.setValue(BlockStateProperties.AXIS, Direction.Axis.Z) : az);
-		}
-		if (tv - 3 >= 0 && by - 1 >= 1) {
-			p.put(c, tu, by - 1, tv - 3, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
+		return false;
+	}
+
+	/**
+	 * A straight hanging strand from {@code (u, yTop, v)} down {@code len} cells (never below y = 2, and it
+	 * stops at anything already there): leaves, the last {@code vines} cells vines (else the {@code tip} leaf).
+	 */
+	private static void strand(Vox t, int u, int yTop, int v, int len, int vines, BlockState body, BlockState tip,
+			boolean ew) {
+		for (int k = 0; k < len; k++) {
+			int y = yTop - k;
+			if (y < 2 || !t.empty(u, y, v)) {
+				break;
+			}
+			boolean vine = k >= len - vines;
+			BlockState st = vine ? vine(ew, k == len - vines) : k == len - 1 ? tip : body;
+			t.leaf(u, y, v, st);
 		}
 	}
 
-	/** A hanging curtain from the crown's lowest block {@code lo} down to {@code ylo}. */
-	private static void curtain(CitadelCanvas c, Plot p, int u, int v, int lo, int ylo, boolean ew) {
-		int len = lo - ylo;
-		int style = p.hash(u, 2, v, 4);
-		int leafLen = switch (style) {
-			case 0 -> len;
-			case 1 -> Math.max(1, len * 2 / 3);
-			case 2 -> Math.max(1, len / 3);
-			default -> 0;
-		};
-		boolean tail = leafLen > 0 && ylo - 1 >= 1;
-		for (int i = 0; i < len + (tail ? 1 : 0); i++) {
-			int y = lo - 1 - i;
-			if (i < leafLen) {
-				set(c, p, u, y, v, leaves(p.hash(u, y, v, 3) == 0 ? Blocks.AZALEA_LEAVES : Blocks.OAK_LEAVES));
-			} else {
-				BlockState vine = b(Blocks.VINE)
-						.setValue(ew ? BlockStateProperties.EAST : BlockStateProperties.NORTH, true)
-						.setValue(ew ? BlockStateProperties.WEST : BlockStateProperties.SOUTH, true);
-				if (i == leafLen) {
-					vine = vine.setValue(BlockStateProperties.UP, true);
-				}
-				set(c, p, u, y, v, vine);
-			}
-		}
+	/** A vine hanging in the middle of its cell: two opposite faces, and the top one also clings upwards. */
+	private static BlockState vine(boolean ew, boolean top) {
+		BlockState s = b(Blocks.VINE)
+				.setValue(ew ? BlockStateProperties.EAST : BlockStateProperties.NORTH, true)
+				.setValue(ew ? BlockStateProperties.WEST : BlockStateProperties.SOUTH, true);
+		return top ? s.setValue(BlockStateProperties.UP, true) : s;
 	}
 
-	/** The pool: a ring of mossy stone with rounded corners, water inside, lilies and stepping stones, a stone lantern. */
-	private static void pond(CitadelCanvas c, Plot p, int w, int pd, int tu) {
+	/**
+	 * The pool: an oval of water inside the box v 0..pd, ringed (4-adjacent, so the water is sealed) by a
+	 * mixed mossy rim; the box corners outside the ring stay ground, which rounds the outline. Submerged
+	 * stepping stones zig-zag from the front to the trunk, lily pads float, and a stone lantern stands on the
+	 * front right corner.
+	 */
+	private static void pond(Vox t, int w, int pd, int bu) {
+		double cu = (w - 1) / 2.0;
+		double au = cu - 0.5;
+		double cv = pd / 2.0;
+		double av = cv - 0.3;
+		boolean[][] wet = new boolean[w][pd + 1];
+		for (int u = 1; u <= w - 2; u++) {
+			for (int v = 1; v <= pd - 1; v++) {
+				double du = (u - cu) / au;
+				double dv = (v - cv) / av;
+				wet[u][v] = du * du + dv * dv <= 1.0;
+			}
+		}
+		int[][] n4 = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
 		for (int u = 0; u < w; u++) {
 			for (int v = 0; v <= pd; v++) {
-				boolean edge = u == 0 || u == w - 1 || v == 0 || v == pd;
-				boolean corner = (u == 1 || u == w - 2) && (v == 1 || v == pd - 1);
-				if (edge || corner) {
-					rim(c, p, u, v);
-				} else {
-					set(c, p, u, 0, v, b(Blocks.WATER));
-					if (p.hash(u, 5, v, 3) == 0) {
-						set(c, p, u, 1, v, b(Blocks.LILY_PAD));
-					}
-				}
-			}
-		}
-		// stepping stones from the front to the trunk
-		set(c, p, tu - 1, 0, 1, slab(Blocks.MOSSY_COBBLESTONE_SLAB));
-		set(c, p, tu - 1, 1, 1, b(Blocks.AIR));
-		set(c, p, tu, 0, 2, slab(Blocks.MOSSY_COBBLESTONE_SLAB));
-		set(c, p, tu, 1, 2, b(Blocks.AIR));
-		if (pd == 4) {
-			set(c, p, tu, 0, 3, slab(Blocks.MOSSY_COBBLESTONE_SLAB));
-			set(c, p, tu, 1, 3, b(Blocks.AIR));
-		}
-		set(c, p, tu - 1, 0, 0, b(Blocks.MOSSY_STONE_BRICKS)); // landing
-		// stone lantern on the front right corner
-		set(c, p, w - 1, 0, 0, b(Blocks.STONE_BRICKS));
-		set(c, p, w - 1, 1, 0, b(Blocks.STONE_BRICK_WALL));
-		set(c, p, w - 1, 2, 0, b(Blocks.LANTERN));
-		set(c, p, w - 1, 3, 0, slab(Blocks.STONE_BRICK_SLAB));
-	}
-
-	private static void rim(CitadelCanvas c, Plot p, int u, int v) {
-		int r = p.hash(u, 0, v, 7);
-		BlockState s = switch (r) {
-			case 0 -> b(Blocks.MOSSY_STONE_BRICKS);
-			case 1 -> b(Blocks.CRACKED_STONE_BRICKS);
-			case 2 -> slab(Blocks.MOSSY_STONE_BRICK_SLAB);
-			case 3 -> b(Blocks.MOSSY_COBBLESTONE);
-			case 4 -> b(Blocks.DEEPSLATE_BRICKS);
-			default -> b(Blocks.STONE_BRICKS);
-		};
-		set(c, p, u, 0, v, s);
-		if (r == 0 || r == 3) {
-			int g = p.hash(u, 1, v, 4);
-			if (g == 0) {
-				set(c, p, u, 1, v, b(Blocks.FERN));
-			} else if (g == 1) {
-				set(c, p, u, 1, v, b(Blocks.SHORT_GRASS));
-			}
-		}
-	}
-
-	/** Behind the pool: moss, ferns, azalea clumps in the back corners and a mossy boulder. */
-	private static void ground(CitadelCanvas c, Plot p, int w, int d, int pd, int tu, int tv) {
-		for (int u = 0; u < w; u++) {
-			for (int v = pd + 1; v < d; v++) {
-				if (Math.abs(u - tu) <= 1 && Math.abs(v - tv) <= 1) {
-					continue; // root flare
-				}
-				switch (p.hash(u, 0, v, 9)) {
-					case 0 -> {
-						set(c, p, u, 0, v, b(Blocks.MOSS_BLOCK));
-						if (p.hash(u, 1, v, 2) == 0) {
-							set(c, p, u, 1, v, b(Blocks.FERN));
+				if (wet[u][v]) {
+					boolean stone = u == bu - 1 + (v & 1) && v >= 1;
+					if (stone) {
+						t.fixed(u, 0, v, slab(Blocks.MOSSY_COBBLESTONE_SLAB).setValue(BlockStateProperties.WATERLOGGED, true));
+					} else {
+						t.fixed(u, 0, v, b(Blocks.WATER));
+						if (t.hash(u, 5, v, 3) == 0) {
+							t.fixed(u, 1, v, b(Blocks.LILY_PAD));
 						}
 					}
-					case 1, 2 -> set(c, p, u, 0, v, b(Blocks.FERN));
-					case 3, 4 -> set(c, p, u, 0, v, b(Blocks.SHORT_GRASS));
-					case 5 -> set(c, p, u, 0, v, b(Blocks.MOSS_CARPET));
-					default -> {
+					continue;
+				}
+				boolean rim = false;
+				for (int[] n : n4) {
+					int nu = u + n[0];
+					int nv = v + n[1];
+					if (nu >= 0 && nu < w && nv >= 0 && nv <= pd && wet[nu][nv]) {
+						rim = true;
 					}
+				}
+				if (rim) {
+					rim(t, u, v);
 				}
 			}
 		}
-		for (int u : new int[] {0, w - 1}) {
-			set(c, p, u, 0, d - 1, leaves(Blocks.AZALEA_LEAVES));
-			set(c, p, u, 1, d - 1, leaves(Blocks.FLOWERING_AZALEA_LEAVES));
-			set(c, p, u, 0, d - 2, leaves(Blocks.FLOWERING_AZALEA_LEAVES));
-		}
-		set(c, p, w - 2, 0, d - 2, b(Blocks.MOSSY_COBBLESTONE));
-		set(c, p, w - 3, 0, d - 2, slab(Blocks.MOSSY_COBBLESTONE_SLAB));
-		set(c, p, w - 2, 1, d - 2, slab(Blocks.MOSSY_COBBLESTONE_SLAB));
+		// the stone lantern on the front right corner (outside the ring)
+		t.fixed(w - 1, 0, 0, b(Blocks.STONE_BRICKS));
+		t.fixed(w - 1, 1, 0, b(Blocks.STONE_BRICK_WALL));
+		t.fixed(w - 1, 2, 0, b(Blocks.LANTERN));
+		t.fixed(w - 1, 3, 0, slab(Blocks.STONE_BRICK_SLAB));
+		// a pebble on the front left corner
+		t.fixed(0, 0, 0, slab(Blocks.MOSSY_COBBLESTONE_SLAB));
 	}
 
-	private static void set(CitadelCanvas c, Plot p, int u, int y, int v, BlockState s) {
-		if (p.has(u, y, v)) {
-			p.set(c, u, y, v, s);
+	private static void rim(Vox t, int u, int v) {
+		int k = t.hash(u, 0, v, 8);
+		BlockState s = switch (k) {
+			case 0, 1 -> b(Blocks.MOSSY_STONE_BRICKS);
+			case 2 -> b(Blocks.CRACKED_STONE_BRICKS);
+			case 3 -> b(Blocks.MOSSY_COBBLESTONE);
+			case 4 -> b(Blocks.COBBLESTONE);
+			default -> b(Blocks.STONE_BRICKS);
+		};
+		t.fixed(u, 0, v, s);
+		if (k <= 1 || k == 3) {
+			int g = t.hash(u, 1, v, 4);
+			if (g == 0) {
+				t.cover(u, 1, v, b(Blocks.FERN));
+			} else if (g == 1) {
+				t.cover(u, 1, v, b(Blocks.MOSS_CARPET));
+			}
 		}
+	}
+
+	/** Behind the pool: a flowering azalea bush in one back corner and a mossy boulder in the other. */
+	private static void garden(Vox t, int w, int d) {
+		boolean flip = t.hash(1, 2, 3, 2) == 0;
+		int bushU = flip ? w - 1 : 0;
+		int rockU = flip ? 0 : w - 1;
+		int in = flip ? -1 : 1; // from the bush corner towards the middle
+		t.fixed(bushU, 0, d - 1, leaves(Blocks.AZALEA_LEAVES));
+		t.fixed(bushU, 1, d - 1, leaves(Blocks.FLOWERING_AZALEA_LEAVES));
+		t.fixed(bushU, 0, d - 2, leaves(Blocks.FLOWERING_AZALEA_LEAVES));
+		t.fixed(bushU + in, 0, d - 1, leaves(Blocks.AZALEA_LEAVES));
+		t.fixed(rockU, 0, d - 1, b(Blocks.MOSSY_COBBLESTONE));
+		t.fixed(rockU, 1, d - 1, slab(Blocks.MOSSY_COBBLESTONE_SLAB));
+		t.fixed(rockU - in, 0, d - 1, slab(Blocks.MOSSY_COBBLESTONE_SLAB));
+		t.fixed(rockU, 0, d - 2, slab(Blocks.COBBLESTONE_SLAB));
 	}
 }

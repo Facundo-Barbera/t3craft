@@ -4,17 +4,17 @@ import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.catalog.Family;
 import dev.t3craft.hq.citadel.catalog.Plot;
 import dev.t3craft.hq.citadel.catalog.Variant;
-import dev.t3craft.hq.citadel.catalog.tree.CherryKit.Vox;
-import java.util.List;
+import dev.t3craft.hq.citadel.catalog.tree.TreeKit.Vox;
 import java.util.Random;
 
 /**
- * The great cherry: a 2×2 trunk that thins at the fork, roots spilling over the grass, a leader and four
- * diagonal limbs at staggered heights, each ending in a turned elliptical cloud of leaves, a crown on
- * top and a carpet of fallen petals. The canopy is tiered like a pagoda (branches show between the
- * clouds), never a ball.
+ * The great cherry: a 2×2 trunk with diagonal roots that thins to a single leader, and five limbs that
+ * leave it at staggered heights and climb diagonally out to five rounded lobes of blossom of different
+ * sizes, spiralling up around the trunk with sky between them, plus a crown lobe on the leader. Each lobe
+ * mixes cherry leaves with clumps of flowering azalea (deeper underneath); short drips soften the
+ * undersides; fallen petals thin out from the trunk.
  *
- * <p>Size: 7–9 × 7–9 × 11+ (the crown reaches the top of the box).
+ * <p>Size: 7–9 × 7–9 × 11+ (the tree stops at 14 high).
  */
 public final class TreeCherryGrand implements Variant {
 	@Override
@@ -52,69 +52,75 @@ public final class TreeCherryGrand implements Variant {
 		return 9;
 	}
 
+	/** Lobes: {angle offset (turns), height fraction, size factor}, spiralling up; the last is the crown. */
+	private static final double[][] LOBES = {
+			{0.00, 0.44, 1.05},
+			{0.42, 0.58, 1.10},
+			{0.71, 0.70, 0.85},
+			{0.18, 0.80, 0.90},
+	};
+
 	@Override
 	public void build(CitadelCanvas c, Plot p) {
 		Vox t = new Vox(p);
-		Random r = p.rng(0x5A4C);
-		double cu = (p.w() - 1) / 2.0;
-		double cv = (p.d() - 1) / 2.0;
-		int bu = (int) Math.floor(cu);
-		int bv = (int) Math.floor(cv);
-		int top = p.h() - 1;
-		int cy = top - 1; // crown middle layer
-		int yFork = Math.max(4, Math.min(5, Math.round(p.h() * 0.36f)));
-
-		// --- trunk: 2×2, thinning at the fork, leaning a little so it is not a pole
+		Random r = p.rng(0x6A11);
+		int H = Math.min(p.h(), 14);
+		double ys = (H - 1) / 13.0;
+		double sc = Math.min(p.w(), p.d()) / 7.0;
+		int ou = r.nextInt(2);
+		int ov = r.nextInt(2);
+		int bu = TreeKit.base(p.w(), ou);
+		int bv = TreeKit.base(p.d(), ov);
+		int y2 = 2; // 2×2 for two blocks, then three cells, then the 1×1 leader
+		int crownY = H - 3;
 		double lean = r.nextDouble() * Math.PI * 2;
-		int[][] path = CherryKit.path(p.h(), bu, bv, Math.cos(lean) * 1.5, Math.sin(lean) * 1.5, 1, cy - 2);
-		int[][] lead = CherryKit.trunk(t, path, yFork, cy - 1, r.nextInt(2), r.nextInt(2));
-		CherryKit.roots(t, bu, bv, 6, 3, -1);
+		int[][] lead = TreeKit.trunk(t, TreeKit.CHERRY, bu, bv, y2, crownY, ou, ov,
+				Math.cos(lean) * 0.9, Math.sin(lean) * 0.9);
+		TreeKit.roots(t, TreeKit.CHERRY, bu, bv, 5, 2, -1, 3);
 
-		// --- four limbs in two tiers (low pair, high pair), turning around the leader
-		double a0 = r.nextDouble() * Math.PI * 2;
-		for (int i = 0; i < 4; i++) {
-			boolean high = i % 2 == 1;
-			double ang = a0 + i * Math.PI / 2 + (r.nextDouble() - 0.5) * 0.7;
+		double a0 = r.nextDouble();
+		for (int i = 0; i < LOBES.length; i++) {
+			double ang = (a0 + LOBES[i][0] + (r.nextDouble() - 0.5) * 0.08) * Math.PI * 2;
 			double ex = Math.cos(ang);
 			double ez = Math.sin(ang);
-			int y0 = Math.min(high ? yFork + 2 : yFork - 1, cy - 4);
-			int su = lead[0][y0];
-			int sv = lead[1][y0];
-			double room = CherryKit.room(t, su, sv, ex, ez);
-			double ra = Math.min(high ? 2.9 : 3.2, Math.max(1.8, room - 0.5));
-			double s = Math.max(1.8, Math.min(3.8, room - ra + 0.4));
-			int ty = Math.min(y0 + (high ? 2 : 1 + (i & 2) / 2), cy - 2);
-			int tu = (int) Math.round(su + ex * s);
-			int tv = (int) Math.round(sv + ez * s);
-			List<int[]> cells = CherryKit.line(su, y0, sv, tu, ty, tv);
-			CherryKit.branch(t, cells, high ? 1 : 2, ex, ez);
-
-			// a twig from the middle of the limb, to the side, with its own small cloud
-			int[] mid = cells.get(cells.size() / 2);
-			double fa = ang + (i % 3 == 0 ? 0.95 : -0.95);
-			double fx = Math.cos(fa);
-			double fz = Math.sin(fa);
-			double froom = CherryKit.room(t, mid[0], mid[2], fx, fz);
-			double fl = Math.min(2.0, froom - 1.3);
-			if (fl >= 1.0) {
-				int fu = (int) Math.round(mid[0] + fx * fl);
-				int fv = (int) Math.round(mid[2] + fz * fl);
-				int fy = mid[1] + 1;
-				CherryKit.branch(t, CherryKit.line(mid[0], mid[1], mid[2], fu, fy, fv), 0, fx, fz);
-				CherryKit.cloud(t, fu + fx * 0.3, fy + 1, fv + fz * 0.3, 2.2, 1.7, fx, fz, 0, 1, 20 + i, 2);
+			int ly = (int) Math.round(LOBES[i][1] * (H - 1));
+			double rx = (2.0 + r.nextDouble() * 0.4) * LOBES[i][2] * sc;
+			double rz = rx * (0.8 + r.nextDouble() * 0.25);
+			int sy = TreeKit.clamp(ly - 4, y2 + 1, crownY - 1);
+			int su = lead[0][sy];
+			int sv = lead[1][sy];
+			double room = TreeKit.room(t, su, sv, ex, ez, 0);
+			double reach = TreeKit.clamp(room - Math.max(rx, rz) + 1.0, 1.0, 3.2 * sc);
+			int tu = (int) Math.round(su + ex * reach);
+			int tv = (int) Math.round(sv + ez * reach);
+			TreeKit.branch(t, TreeKit.CHERRY, new int[] {su, sy, sv}, new int[] {tu, ly - 1, tv}, false); // into the lobe's underside: the limb shows up to the leaves
+			// a twig off the limb towards the side, with a small satellite lobe (two tones swapped)
+			if (i < 3) {
+				double fa = ang + (i % 2 == 0 ? 1.1 : -1.1);
+				double fx = Math.cos(fa);
+				double fz = Math.sin(fa);
+				int mu = (su + tu) / 2;
+				int mv = (sv + tv) / 2;
+				int my = (sy + ly) / 2;
+				double fr = TreeKit.clamp(TreeKit.room(t, mu, mv, fx, fz, 0) - 1.2, 0, 2.0);
+				if (fr >= 1.0) {
+					int fu = (int) Math.round(mu + fx * fr);
+					int fv = (int) Math.round(mv + fz * fr);
+					TreeKit.branch(t, TreeKit.CHERRY, new int[] {mu, my, mv}, new int[] {fu, my + 1, fv}, false);
+					TreeKit.lobe(t, fu, my + 1, fv, 1.6 * sc, 1.5 * sc, 1.7, 1.0, TreeKit.SAKURA.swap(), 0.35, 40 + i);
+				}
 			}
-
-			CherryKit.cloud(t, tu + ex * 0.4, ty + 1, tv + ez * 0.4, ra, ra * 0.72, ex, ez, 1, high ? 1 : 0, i, 2);
+			TreeKit.lobe(t, tu, ly, tv, rx, rz, 2.1, 1.2, TreeKit.SAKURA, 0.4, i);
+			TreeKit.drips(t, tu, ly, tv, rx, rz, i);
 		}
+		// the crown on the leader
+		int cu = lead[0][crownY];
+		int cv = lead[1][crownY];
+		double cr = TreeKit.clamp(Math.min(Math.min(cu, p.w() - 1 - cu), Math.min(cv, p.d() - 1 - cv)) + 1.0, 2.0, 2.6 * sc);
+		TreeKit.lobe(t, cu, crownY + 1, cv, cr, cr * 0.9, 2.2, 1.3, TreeKit.SAKURA, 0.4, 9);
 
-		// --- crown on top of the leader, turned against the lowest limb
-		int lu = lead[0][cy - 1];
-		int lv = lead[1][cy - 1];
-		double margin = Math.min(Math.min(lu, p.w() - 1 - lu), Math.min(lv, p.d() - 1 - lv)) + 0.5;
-		double cra = Math.min(2.8, margin);
-		double ca = a0 + 0.8;
-		CherryKit.cloud(t, lu, cy, lv, cra, cra * 0.9, Math.cos(ca), Math.sin(ca), 0, 1, 9, 2);
-		CherryKit.ground(t, cu, cv, Math.min(p.w(), p.d()) / 2.0 + 0.9);
+		TreeKit.petalCarpet(t, bu + 0.5, bv + 0.5, Math.min(p.w(), p.d()) / 2.0 + 0.8);
+		t.prune();
 		t.flush(c);
 	}
 }

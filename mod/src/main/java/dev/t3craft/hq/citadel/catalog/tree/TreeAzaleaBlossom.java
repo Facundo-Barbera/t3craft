@@ -2,36 +2,38 @@ package dev.t3craft.hq.citadel.catalog.tree;
 
 import static dev.t3craft.hq.citadel.CitadelCanvas.b;
 import static dev.t3craft.hq.citadel.CitadelCanvas.leaves;
-import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
-import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
 
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.catalog.Family;
 import dev.t3craft.hq.citadel.catalog.Plot;
 import dev.t3craft.hq.citadel.catalog.Variant;
+import dev.t3craft.hq.citadel.catalog.tree.TreeKit.Leaves;
+import dev.t3craft.hq.citadel.catalog.tree.TreeKit.Vox;
+import dev.t3craft.hq.citadel.catalog.tree.TreeKit.Wood;
+import java.util.List;
+import java.util.Random;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 
 /**
- * Flowering azalea tree in a round planter: a cherry-wood trunk that forks into two boughs, a rounded,
- * lumpy crown of flowering azalea leaves with cherry-blossom pink on top, drips of blossom hanging
- * from the rim and fallen petals on a moss bed. The planter is a dark deepslate curb with a pale cap.
+ * Flowering azalea in a low round planter: a short 1×1 oak trunk on a one-block flare of oak bark (and a
+ * diagonal root or two on wider plots) that forks into two or three visible 1-wide diagonal limbs, while the
+ * leader climbs on into the crown. The crown is a domed central lobe on the leader with smaller side lobes
+ * on the limbs, each a separate lobe (notches of air between them), each mixing azalea and flowering azalea
+ * evenly (the dominant tone swapped from lobe to lobe) with a sparse sprinkle of cherry-blossom pink. The
+ * planter is a single ring of mossy stone, mossy cobble and deepslate bricks with gaps where moss or grass
+ * shows; the bed is moss with petals and azalea bushes.
  *
- * <ul>
- * <li><b>[depth]</b> lumpy crown (noise in 2×2×2 clumps), a forked trunk with a root flare, a curb
- *     that steps from deepslate to a light cap, petals and a flowering bush at different heights.</li>
- * <li><b>[palette]</b> deepslate bricks / polished / cracked (dark) → moss → cherry wood → azalea,
- *     flowering azalea and cherry leaves (the pink rises with the height).</li>
- * <li><b>[finish]</b> a lantern hanging from a fence arm under the fork, a stripped-wood knot at the
- *     fork, drips of leaves under the crown and fallen petals even outside the bed.</li>
- * </ul>
- * Size: 5–9 × 5–9 × 9+ (the tree stops at 13 high).
+ * <p>Size: 5–9 × 5–9 × 9+ (the tree stops at 13 high).
  */
 public final class TreeAzaleaBlossom implements Variant {
-	private static final BlockState WOOD = b(Blocks.CHERRY_WOOD);
-	private static final BlockState STRIPPED = b(Blocks.STRIPPED_CHERRY_WOOD);
+	private static final Wood WOOD = new Wood(Blocks.OAK_LOG, Blocks.OAK_WOOD, b(Blocks.OAK_WOOD));
+	private static final Leaves BLOOM = Leaves.of(Blocks.FLOWERING_AZALEA_LEAVES, Blocks.AZALEA_LEAVES).clumps(2)
+			.withAccent(leaves(Blocks.CHERRY_LEAVES), 6);
+	private static final Leaves GREEN = Leaves.of(Blocks.AZALEA_LEAVES, Blocks.FLOWERING_AZALEA_LEAVES).clumps(2)
+			.withAccent(leaves(Blocks.CHERRY_LEAVES), 6);
 
 	@Override
 	public String id() {
@@ -70,141 +72,223 @@ public final class TreeAzaleaBlossom implements Variant {
 
 	@Override
 	public void build(CitadelCanvas c, Plot p) {
+		Vox t = new Vox(p);
+		Random r = p.rng(0xA2A1EAL);
 		int w = p.w();
 		int d = p.d();
-		int top = Math.min(p.h(), 13) - 1;
-		int cu = (w - 1) / 2;
-		int cv = (d - 1) / 2;
-		double ccu = (w - 1) / 2.0;
-		double ccv = (d - 1) / 2.0;
-		int tr = Math.max(3, (top + 1) * 3 / 8); // fork height
-		int cb = tr + 2; // crown bottom
-		int crownH = top - cb + 1;
+		int H = Math.min(p.h(), 13);
+		int m = Math.min(w, d);
+		int yC = H - 4; // the centre of the domed crown lobe
+		int yF = TreeKit.clamp((int) Math.round(H * 0.3), 2, yC - 3); // the fork: a short bare trunk below it
+		int lift = (H - 9) / 3;
 
-		bed(c, p, w, d, ccu, ccv, cu, cv);
+		// ---- trunk: 1×1 oak from the ground to the crown, a one-block flare of bark at the foot
+		int tu0 = (w - 1) / 2;
+		int tv0 = (d - 1) / 2;
+		int[][] lead = leader(t, tu0, tv0, yF, yC - 1, r.nextInt(4), r.nextInt(3) == 0);
+		flare(t, tu0, tv0, m >= 7);
 
-		// --- crown: rounded, lumpy, full of blossom
-		double ru = ccu + 0.45;
-		double rv = ccv + 0.45;
-		int[][] lowest = new int[w][d];
-		for (int u = 0; u < w; u++) {
-			for (int v = 0; v < d; v++) {
-				lowest[u][v] = -1;
+		// ---- limbs: two or three diagonals out of the fork, each ending under a side lobe
+		int nL = m >= 7 ? 3 : 2;
+		double a0 = r.nextDouble() * Math.PI * 2;
+		double step = nL == 3 ? Math.PI * 2 / 3 : Math.PI * 0.9;
+		int front = 0;
+		double minEz = 9;
+		@SuppressWarnings("unchecked")
+		List<int[]>[] limbCells = new List[nL];
+		int[][] ends = new int[nL][];
+		double[] rads = new double[nL];
+		for (int i = 0; i < nL; i++) {
+			double ang = a0 + i * step + (r.nextDouble() - 0.5) * 0.5;
+			double ex = Math.cos(ang);
+			double ez = Math.sin(ang);
+			int sy = TreeKit.clamp(yF + (i == 1 ? 1 : 0), 2, yC - 2);
+			int su = lead[0][sy];
+			int sv = lead[1][sy];
+			int ly = TreeKit.clamp(yF + 2 + (i % 2) + lift, sy + 1, yC - 1);
+			double rx = TreeKit.clamp(1.3 + (m - 5) * 0.22 + r.nextDouble() * 0.3, 1.3, 2.3);
+			double rz = rx * (0.85 + r.nextDouble() * 0.2);
+			double room = TreeKit.room(t, su, sv, ex, ez, 0);
+			double reach = TreeKit.clamp(room - 0.5, 1.4, 1.2 + m * 0.25);
+			int tu = TreeKit.clamp((int) Math.round(su + ex * reach), 0, w - 1);
+			int tv = TreeKit.clamp((int) Math.round(sv + ez * reach), 0, d - 1);
+			if (tu == su && tv == sv) {
+				tu = TreeKit.clamp(su + (ex >= 0 ? 1 : -1), 0, w - 1);
+			}
+			limbCells[i] = TreeKit.branch(t, WOOD, new int[] {su, sy, sv}, new int[] {tu, ly - 1, tv}, false);
+			ends[i] = new int[] {tu, ly, tv};
+			rads[i] = rx;
+			if (ez < minEz) {
+				minEz = ez;
+				front = i;
 			}
 		}
-		for (int y = cb; y <= top; y++) {
-			double t = (double) (y - cb) / Math.max(1, crownH - 1);
-			double k = (t - 0.45) / 0.62;
-			double f = Math.sqrt(Math.max(0, 1 - k * k));
+
+		// ---- the crown: the domed central lobe first, then the side lobes (each its own salt: notches show)
+		int cu = lead[0][yC];
+		int cv = lead[1][yC];
+		double cr = TreeKit.clamp(2.0 + (m - 5) * 0.2, 2.0, 2.8);
+		TreeKit.lobe(t, cu, yC, cv, cr, cr * 0.92, 2.2, 1.0, BLOOM, 0.4, 9);
+		for (int i = 0; i < nL; i++) {
+			int[] e = ends[i];
+			double rx = rads[i];
+			TreeKit.lobe(t, e[0], e[1], e[2], rx, rx * 0.9, 1.2, 0.9, i % 2 == 0 ? GREEN : BLOOM, 0.4, i);
+			if (m >= 7) {
+				TreeKit.drips(t, e[0], e[1], e[2], rx, rx * 0.9, 5 + i);
+			}
+		}
+		// on the widest plots a fifth, small lobe on a twig off the leader, between two limbs
+		if (m >= 9) {
+			double fa = a0 + step * 0.5;
+			int sy = TreeKit.clamp(yC - 3, yF + 1, yC - 2);
+			int su = lead[0][sy];
+			int sv = lead[1][sy];
+			int fu = TreeKit.clamp((int) Math.round(su + Math.cos(fa) * 2.2), 1, w - 2);
+			int fv = TreeKit.clamp((int) Math.round(sv + Math.sin(fa) * 2.2), 1, d - 2);
+			if (fu != su || fv != sv) {
+				TreeKit.branch(t, WOOD, new int[] {su, sy, sv}, new int[] {fu, sy + 1, fv}, false);
+				TreeKit.lobe(t, fu, sy + 2, fv, 1.5, 1.4, 1.0, 0.0, GREEN.swap(), 0.35, 22);
+			}
+		}
+
+		// ---- the planter: one ring on y = 0 only, mossy stone, mossy cobble and deepslate, with gaps of moss or grass
+		final double ccu = (w - 1) / 2.0;
+		final double ccv = (d - 1) / 2.0;
+		for (int v = 0; v < d; v++) {
 			for (int u = 0; u < w; u++) {
-				for (int v = 0; v < d; v++) {
-					double du = (u - ccu) / ru;
-					double dv = (v - ccv) / rv;
-					double n = (p.hash(u >> 1, y >> 1, v >> 1, 100) - 50) / 50.0 * 0.28 + (p.hash(u, y, v, 100) - 50) / 50.0 * 0.1;
-					if (du * du + dv * dv + n <= f * f) {
-						if (lowest[u][v] < 0) {
-							lowest[u][v] = y;
-						}
-						int s = p.hash(u, y, v, 20);
-						BlockState lf;
-						if (t > 0.55) {
-							lf = s < 6 ? leaves(Blocks.CHERRY_LEAVES) : s < 15 ? leaves(Blocks.FLOWERING_AZALEA_LEAVES) : leaves(Blocks.AZALEA_LEAVES);
-						} else {
-							lf = s < 2 ? leaves(Blocks.CHERRY_LEAVES) : s < 12 ? leaves(Blocks.FLOWERING_AZALEA_LEAVES) : leaves(Blocks.AZALEA_LEAVES);
-						}
-						set(c, p, u, y, v, lf);
-					}
-				}
-			}
-		}
-		// drips of blossom under the rim
-		int[][] n4 = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
-		for (int u = 0; u < w; u++) {
-			for (int v = 0; v < d; v++) {
-				int lo = lowest[u][v];
-				if (lo < 2) {
+				if (!inBed(u, v, ccu, ccv) || !rim(u, v, ccu, ccv) || !t.empty(u, 0, v)) {
 					continue;
 				}
-				boolean edge = false;
-				for (int[] n : n4) {
-					int nu = u + n[0];
-					int nv = v + n[1];
-					if (nu < 0 || nv < 0 || nu >= w || nv >= d || lowest[nu][nv] < 0 || lowest[nu][nv] > lo) {
-						edge = true;
-					}
-				}
-				if (edge && lo > cb - 1) {
-					int g = p.hash(u, 7, v, 5);
-					if (g < 2) {
-						set(c, p, u, lo - 1, v, leaves(Blocks.FLOWERING_AZALEA_LEAVES));
-					}
-					if (g == 0 && lo - 2 >= 2) {
-						set(c, p, u, lo - 2, v, leaves(Blocks.CHERRY_LEAVES));
-					}
+				int k = t.hash(u, 0, v, 10);
+				if (k < 3) {
+					t.fixed(u, 0, v, b(Blocks.MOSSY_STONE_BRICKS));
+				} else if (k < 5) {
+					t.fixed(u, 0, v, b(Blocks.MOSSY_COBBLESTONE));
+				} else if (k < 7) {
+					t.fixed(u, 0, v, b(Blocks.DEEPSLATE_BRICKS));
+				} else if (k < 9) {
+					t.cover(u, 0, v, b(Blocks.MOSS_CARPET));
+				} else {
+					t.cover(u, 0, v, b(Blocks.SHORT_GRASS));
 				}
 			}
 		}
 
-		// --- trunk: root flare, trunk, fork into two boughs and a spine
-		set(c, p, cu, 0, cv, b(Blocks.ROOTED_DIRT));
-		int[][] flare = {{-1, 0, 1}, {1, 0, 1}, {0, 1, 1}, {0, -1, 1}};
-		for (int[] f : flare) {
-			Direction toTrunk = f[0] == -1 ? Direction.EAST : f[0] == 1 ? Direction.WEST : f[1] == 1 ? Direction.NORTH : Direction.SOUTH;
-			if (p.hash(cu + f[0], 3, cv + f[1], 3) != 0) {
-				set(c, p, cu + f[0], 1, cv + f[1], stairs(Blocks.CHERRY_STAIRS, toTrunk));
+		// ---- the bed: moss, petals and azalea bushes inside; a few petals and moss outside
+		final double fcu = tu0;
+		final double fcv = tv0;
+		TreeKit.ground(t, ccu, ccv, 99, (u, v, k) -> {
+			int hsh = t.hash(u, 0, v, 100);
+			if (!inBed(u, v, ccu, ccv)) {
+				if (hsh < 22) {
+					return TreeKit.petals(1 + t.hash(u, 1, v, 2), t.hash(u, 2, v, 4));
+				}
+				return hsh < 32 ? b(Blocks.MOSS_CARPET) : null;
+			}
+			boolean far = Math.hypot(u - fcu, v - fcv) > 1.6;
+			if (hsh < 20) {
+				return TreeKit.petals(1 + t.hash(u, 1, v, 4), t.hash(u, 2, v, 4));
+			}
+			if (far && hsh < 28) {
+				return b(Blocks.FLOWERING_AZALEA);
+			}
+			if (far && hsh < 31) {
+				return b(Blocks.AZALEA);
+			}
+			return hsh < 85 ? b(Blocks.MOSS_CARPET) : null;
+		});
+		// at least one flowering azalea bush on the bed
+		int bu = TreeKit.clamp(tu0 + (r.nextBoolean() ? 2 : -2), 1, w - 2);
+		int bv = TreeKit.clamp(tv0 + (r.nextBoolean() ? 1 : -1), 1, d - 2);
+		if (t.kind(bu, 0, bv) == TreeKit.COVER) {
+			t.clear(bu, 0, bv);
+		}
+		t.cover(bu, 0, bv, b(Blocks.FLOWERING_AZALEA));
+
+		t.prune();
+		t.flush(c);
+
+		// ---- a lantern hanging under the front limb (only where it hangs from wood, with air below)
+		List<int[]> cells = limbCells[front];
+		int[] best = null;
+		for (int[] cell : cells) {
+			int u = cell[0];
+			int y = cell[1];
+			int v = cell[2];
+			if (y < 3 || Math.abs(u - lead[0][y]) + Math.abs(v - lead[1][y]) < 2) {
+				continue;
+			}
+			if (t.kind(u, y, v) != TreeKit.WOOD || !t.empty(u, y - 1, v) || !t.empty(u, y - 2, v)) {
+				continue;
+			}
+			if (best == null || y < best[1]) {
+				best = cell;
 			}
 		}
-		for (int y = 1; y < tr; y++) {
-			set(c, p, cu, y, cv, WOOD);
-		}
-		set(c, p, cu, tr, cv, STRIPPED); // the knot of the fork
-		int reach = w >= 7 ? 2 : 1;
-		line(c, p, cu, tr, cv, cu - reach, cb + 1, cv, WOOD);
-		line(c, p, cu, tr, cv, cu + reach, cb + 2, cv, WOOD);
-		for (int y = tr + 1; y <= Math.min(top - 1, cb + crownH / 2 + 1); y++) {
-			set(c, p, cu, y, cv, y == cb ? STRIPPED : WOOD);
-		}
-		// lantern arm towards the front
-		if (cv - 1 >= 0) {
-			set(c, p, cu, tr + 1, cv - 1, b(Blocks.CHERRY_FENCE).setValue(BlockStateProperties.SOUTH, true));
-			p.put(c, cu, tr, cv - 1, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
+		if (best != null) {
+			p.put(c, best[0], best[1] - 1, best[2], b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true),
+					CitadelCanvas.HANGING);
 		}
 	}
 
-	/** The round planter: dark curb with a light cap, moss, petals and a small flowering bush. */
-	private static void bed(CitadelCanvas c, Plot p, int w, int d, double ccu, double ccv, int cu, int cv) {
-		for (int u = 0; u < w; u++) {
-			for (int v = 0; v < d; v++) {
-				if (!inBed(u, v, ccu, ccv)) {
-					// fallen petals and a little moss outside the bed
-					int g = p.hash(u, 0, v, 4);
-					if (g == 0) {
-						set(c, p, u, 0, v, petals(p, u, v, 1 + p.hash(u, 2, v, 2)));
-					} else if (g == 1) {
-						set(c, p, u, 0, v, b(Blocks.MOSS_CARPET));
-					}
-					continue;
-				}
-				boolean rim = !inBed(u + 1, v, ccu, ccv) || !inBed(u - 1, v, ccu, ccv) || !inBed(u, v + 1, ccu, ccv) || !inBed(u, v - 1, ccu, ccv);
-				if (rim) {
-					int r = p.hash(u, 0, v, 6);
-					set(c, p, u, 0, v, r < 3 ? b(Blocks.DEEPSLATE_BRICKS) : r < 5 ? b(Blocks.POLISHED_DEEPSLATE) : b(Blocks.CRACKED_DEEPSLATE_BRICKS));
-					if (p.hash(u, 1, v, 7) != 0) { // the cap is missing now and then: blossom spills over
-						set(c, p, u, 1, v, p.hash(u, 2, v, 2) == 0 ? slab(Blocks.POLISHED_DIORITE_SLAB) : slab(Blocks.STONE_BRICK_SLAB));
-					}
-				} else {
-					int dist = Math.abs(u - cu) + Math.abs(v - cv);
-					set(c, p, u, 0, v, dist <= 1 || p.hash(u, 0, v, 6) == 0 ? b(Blocks.ROOTED_DIRT) : b(Blocks.MOSS_BLOCK));
-					if (dist >= 1) {
-						switch (p.hash(u, 1, v, 9)) {
-							case 0, 1, 2 -> set(c, p, u, 1, v, b(Blocks.MOSS_CARPET));
-							case 3, 4 -> set(c, p, u, 1, v, petals(p, u, v, 1 + p.hash(u, 3, v, 4)));
-							case 5 -> set(c, p, u, 1, v, b(Blocks.FLOWERING_AZALEA));
-							case 6 -> set(c, p, u, 1, v, b(Blocks.SHORT_GRASS));
-							default -> {
-							}
-						}
-					}
+	/**
+	 * The 1×1 oak leader from y = 0 to {@code yTop}: straight up to the fork, then (with {@code lean}) one
+	 * sideways step towards face {@code dir} two blocks above it, the step joined by a bark block.
+	 */
+	private static int[][] leader(Vox t, int cu, int cv, int yF, int yTop, int dir, boolean lean) {
+		int[][] faces = {{1, 0}, {0, 1}, {-1, 0}, {0, -1}};
+		int[] lu = new int[t.h + 1];
+		int[] lv = new int[t.h + 1];
+		int u = cu;
+		int v = cv;
+		int yStep = lean && yTop - yF >= 4 ? yF + 2 : -1;
+		for (int y = 0; y <= t.h; y++) {
+			if (y == yStep) {
+				int nu = TreeKit.clamp(u + faces[dir][0], 1, t.w - 2);
+				int nv = TreeKit.clamp(v + faces[dir][1], 1, t.d - 2);
+				t.wood(nu, y - 1, nv, WOOD.bark());
+				t.wood(u, y - 1, v, WOOD.bark());
+				u = nu;
+				v = nv;
+			}
+			lu[y] = u;
+			lv[y] = v;
+			if (y <= yTop && y < t.h) {
+				t.wood(u, y, v, WOOD.log(Direction.Axis.Y));
+			}
+		}
+		return new int[][] {lu, lv};
+	}
+
+	/** A one-block flare of oak bark on two or three faces of the foot; with {@code roots} a diagonal root or two. */
+	private static void flare(Vox t, int cu, int cv, boolean roots) {
+		int[][] faces = {{1, 0}, {0, 1}, {-1, 0}, {0, -1}};
+		int skip = t.hash(cu, 0, cv, 4);
+		int skip2 = t.hash(cu, 1, cv, 2) == 0 ? (skip + 2) % 4 : -1;
+		for (int k = 0; k < 4; k++) {
+			if (k != skip && k != skip2) {
+				t.woodSoft(cu + faces[k][0], 0, cv + faces[k][1], WOOD.bark());
+			}
+		}
+		if (!roots) {
+			return;
+		}
+		// diagonal roots: from a flare face one log round the corner, then one more step out
+		for (int k = 0; k < 4; k++) {
+			if (k == skip || k == skip2 || t.hash(cu + k, 2, cv, 2) != 0) {
+				continue;
+			}
+			int fu = cu + faces[k][0];
+			int fv = cv + faces[k][1];
+			int[] side = faces[(k + 1) % 4];
+			int ru = fu + side[0];
+			int rv = fv + side[1];
+			if (t.empty(ru, 0, rv)) {
+				t.wood(ru, 0, rv, WOOD.log(side[0] != 0 ? Direction.Axis.X : Direction.Axis.Z));
+				int ou = ru + faces[k][0];
+				int ov = rv + faces[k][1];
+				if (t.empty(ou, 0, ov)) {
+					t.wood(ou, 0, ov, WOOD.log(faces[k][0] != 0 ? Direction.Axis.X : Direction.Axis.Z));
 				}
 			}
 		}
@@ -216,44 +300,8 @@ public final class TreeAzaleaBlossom implements Variant {
 		return du * du + dv * dv <= 1.0;
 	}
 
-	private static BlockState petals(Plot p, int u, int v, int amount) {
-		Direction[] dirs = {Direction.NORTH, Direction.EAST, Direction.SOUTH, Direction.WEST};
-		return b(Blocks.PINK_PETALS)
-				.setValue(BlockStateProperties.FLOWER_AMOUNT, amount)
-				.setValue(BlockStateProperties.HORIZONTAL_FACING, dirs[p.hash(u, 9, v, 4)]);
-	}
-
-	/** A thick line of wood: vertical with horizontal links where it steps sideways. */
-	private static void line(CitadelCanvas c, Plot p, int ua, int ya, int va, int ub, int yb, int vb, BlockState wood) {
-		int steps = Math.max(1, yb - ya);
-		int pu = ua;
-		int pv = va;
-		for (int i = 0; i <= steps; i++) {
-			int y = ya + i;
-			int tu = ua + rnd((double) (ub - ua) * i / steps);
-			int tv = va + rnd((double) (vb - va) * i / steps);
-			int u0 = Math.min(pu, tu);
-			int u1 = Math.max(pu, tu);
-			int v0 = Math.min(pv, tv);
-			int v1 = Math.max(pv, tv);
-			Direction.Axis ax = u1 > u0 || v1 > v0 ? (u1 - u0 >= v1 - v0 ? Direction.Axis.X : Direction.Axis.Z) : Direction.Axis.Y;
-			for (int u = u0; u <= u1; u++) {
-				for (int v = v0; v <= v1; v++) {
-					set(c, p, u, y, v, wood.setValue(BlockStateProperties.AXIS, ax));
-				}
-			}
-			pu = tu;
-			pv = tv;
-		}
-	}
-
-	private static int rnd(double x) {
-		return (int) (Math.signum(x) * Math.floor(Math.abs(x) + 0.5));
-	}
-
-	private static void set(CitadelCanvas c, Plot p, int u, int y, int v, BlockState s) {
-		if (p.has(u, y, v)) {
-			p.set(c, u, y, v, s);
-		}
+	private static boolean rim(int u, int v, double ccu, double ccv) {
+		return !inBed(u + 1, v, ccu, ccv) || !inBed(u - 1, v, ccu, ccv) || !inBed(u, v + 1, ccu, ccv)
+				|| !inBed(u, v - 1, ccu, ccv);
 	}
 }
