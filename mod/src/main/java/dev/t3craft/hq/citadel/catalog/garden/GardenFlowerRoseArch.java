@@ -445,7 +445,7 @@ public final class GardenFlowerRoseArch implements Variant {
 		void arms() {
 			int n = vcs.length;
 			if (n == 0) {
-				addMain(frames(1, d - 3, 2));
+				addMain(d < 11 ? new int[] {d - 3} : frames(1, d - 3, 2));
 			} else {
 				addMain(frames(1, vcs[0] - 4, 0));
 				for (int i = 0; i < n; i++) {
@@ -455,8 +455,10 @@ public final class GardenFlowerRoseArch implements Variant {
 			}
 			if (cross) {
 				for (int vc : vcs) {
-					arm(false, vc - 1, frames(2, pu - 4, 1));
-					arm(false, vc - 1, frames(pu + 6, w - 3, 1));
+					if (pu - 6 >= 5) { // short arms stay a plain walk: arches round the square would pile up
+						arm(false, vc - 1, frames(2, pu - 4, 1));
+						arm(false, vc - 1, frames(pu + 6, w - 3, 1));
+					}
 				}
 			}
 		}
@@ -503,7 +505,7 @@ public final class GardenFlowerRoseArch implements Variant {
 					if (dist == 0) {
 						at(alongV, s, t, 0, p.hash(uu, 8, vv, 3) == 0 ? b(Blocks.MOSSY_STONE_BRICKS) : b(Blocks.POLISHED_ANDESITE));
 						for (int y = 1; y <= 3; y++) {
-							at(alongV, s, t, y, b(Blocks.STRIPPED_CHERRY_LOG));
+							at(alongV, s, t, y, b(Blocks.CHERRY_FENCE)); // thin posts: the flowers behind them show
 						}
 					} else if (dist == 1) {
 						at(alongV, s, t, 2, climb(uu, 2, vv));
@@ -529,6 +531,12 @@ public final class GardenFlowerRoseArch implements Variant {
 						at(alongV, s, t, 4, climb(uu, 4, vv));
 					} else {
 						at(alongV, s, t, 4, slab(Blocks.CHERRY_SLAB));
+						if (p.hash(uu, 11, vv, 4) == 0) {
+							at(alongV, s, t, 3, Blocks.VINE.defaultBlockState().setValue(BlockStateProperties.UP, true)); // hangs from the slab
+						}
+					}
+					if (dist == 0 && p.hash(uu, 12, vv, 2) == 0) {
+						at(alongV, s, t, 3, Blocks.VINE.defaultBlockState().setValue(BlockStateProperties.UP, true)); // hangs from the beam
 					}
 				}
 			}
@@ -536,17 +544,29 @@ public final class GardenFlowerRoseArch implements Variant {
 				for (int side = 0; side < 2; side++) {
 					int out = side == 0 ? tl - 1 : tr + 1;
 					tallAt(alongV, f, out, pal.arch); // nothing roofed above it: a roofed bed cell would count as a sealed floor
-					at(alongV, f, out, 3, vine(side == 0 ? faceL : faceR)); // hangs on the post's outer face
 				}
 			}
 			for (int i = 0; i + 1 < fr.length; i++) {
-				if (fr[i + 1] - fr[i] >= 4) {
-					int mid = (fr[i] + fr[i + 1]) / 2;
-					for (int t : new int[] {tl, tr}) {
-						at(alongV, mid, t, 1, b(Blocks.CHERRY_FENCE));
-						at(alongV, mid, t, 2, b(Blocks.CHERRY_FENCE));
-						at(alongV, mid, t, 3, b(Blocks.LANTERN));
+				int gap = fr[i + 1] - fr[i];
+				if (gap < 4) {
+					continue;
+				}
+				int mid = (fr[i] + fr[i + 1]) / 2;
+				// a bench in the window of one side (its back to the walk, the seat looking at the parterre), the lamp on the other
+				boolean benchLeft = ((i + (alongV ? 0 : 1)) & 1) == 0;
+				boolean bench = gap >= 5;
+				for (int side = 0; side < 2; side++) {
+					int t = side == 0 ? tl : tr;
+					if (bench && (side == 0) == benchLeft) {
+						for (int s = fr[i] + 2; s <= fr[i + 1] - 2; s++) {
+							at(alongV, s, t, 1, b(Blocks.AIR));
+							at(alongV, s, t, 0, stairs(Blocks.CHERRY_STAIRS, side == 0 ? faceL : faceR));
+						}
+						continue;
 					}
+					at(alongV, mid, t, 1, b(Blocks.CHERRY_FENCE));
+					at(alongV, mid, t, 2, b(Blocks.CHERRY_FENCE));
+					at(alongV, mid, t, 3, b(Blocks.LANTERN));
 				}
 			}
 		}
@@ -567,6 +587,25 @@ public final class GardenFlowerRoseArch implements Variant {
 			set(u, 2, v, b(Blocks.WATER_CAULDRON).setValue(BlockStateProperties.LEVEL_CAULDRON, 3));
 		}
 
+		/** The centre of a square, by seed: bird-bath, lantern pillar or a topiary rose on a plinth. */
+		void centre(int u, int v) {
+			switch (p.hash(2, 0, 2, 3)) {
+				case 1 -> {
+					set(u, 0, v, b(Blocks.CHISELED_STONE_BRICKS));
+					set(u, 1, v, b(Blocks.STONE_BRICK_WALL));
+					set(u, 2, v, b(Blocks.STONE_BRICK_WALL));
+					set(u, 3, v, b(Blocks.LANTERN));
+				}
+				case 2 -> {
+					set(u, 0, v, b(Blocks.CHISELED_STONE_BRICKS));
+					set(u, 1, v, b(Blocks.STONE_BRICK_WALL));
+					set(u, 2, v, climb(u, 2, v));
+					set(u, 3, v, leaves(Blocks.FLOWERING_AZALEA_LEAVES));
+				}
+				default -> bath(u, v);
+			}
+		}
+
 		void furniture() {
 			// the niche: a bench on the last row of the walk, its back against the hedge
 			for (int u = pu; u <= pu + 2; u++) {
@@ -576,7 +615,7 @@ public final class GardenFlowerRoseArch implements Variant {
 			lamp(pu - 2, 0);
 			lamp(pu + 4, 0);
 			for (int vc : vcs) {
-				bath(pu + 1, vc);
+				centre(pu + 1, vc);
 				for (int v : new int[] {vc - 2, vc + 2}) {
 					lamp(pu - 1, v);
 					lamp(pu + 3, v);
