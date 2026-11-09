@@ -11,6 +11,9 @@ import dev.t3craft.hq.RingCampusGeometry.Room;
 import dev.t3craft.hq.SignTags;
 import dev.t3craft.hq.Workstation;
 import dev.t3craft.hq.citadel.CitadelCanvas.Mats;
+import dev.t3craft.hq.citadel.barrio.BarrioCourt;
+import dev.t3craft.hq.citadel.barrio.BarrioGate;
+import dev.t3craft.hq.citadel.barrio.BarrioRoofs;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -152,54 +155,32 @@ public final class CitadelBarrios {
 				c.set(x, 0, z, lattice(x, z) ? LIGHT : c.accent());
 			} else if (a <= reach && bb <= reach) {
 				if (Math.floorMod(a * 3 + bb * 5, 7) == 0 && !lattice(x, z)) {
-					c.set(x, 1, z, leaves(Blocks.FLOWERING_AZALEA_LEAVES));
+					c.set(x, 1, z, BarrioCourt.bush(x, z));
 				}
 			} else if (Math.floorMod(x * 7 + z * 11, 29) == 0 && !lattice(x, z)) {
-				c.set(x, 1, z, leaves(Blocks.FLOWERING_AZALEA_LEAVES));
+				c.set(x, 1, z, BarrioCourt.bush(x, z));
 			}
 		}
 	}
 
-	/** The courtyard's centre: a cherry tree on even lots, a pool with four planters on odd lots. */
+	/** The courtyard's centre and its dressing, one of four variants by the lot's hash ({@link BarrioCourt}). */
 	public static void courtyardCentre(CitadelCanvas c, int lot, Lot l) {
-		if (lot % 2 == 0) {
-			courtyardTree(c, l);
-		} else {
-			courtyardPool(c, l);
-		}
+		BarrioCourt.centre(c, lot, l);
 	}
 
-	/** Even lots: a cherry tree in the middle of the courtyard. */
+	/** Variant 0 of the courtyard's centre: a cherry tree with benches. */
 	public static void courtyardTree(CitadelCanvas c, Lot l) {
-		BlockPos ctr = l.centre();
-		CitadelGrounds.tree(c, ctr.getX(), ctr.getZ());
+		BarrioCourt.tree(c, l);
 	}
 
-	/** Odd lots: a pool in the middle of the courtyard with a garden planter on each diagonal. */
+	/** Variant 1 of the courtyard's centre: a pool with planters. */
 	public static void courtyardPool(CitadelCanvas c, Lot l) {
-		BlockPos ctr = l.centre();
-		c.set(ctr.getX(), -1, ctr.getZ(), FOOT);
-		c.set(ctr.getX(), 0, ctr.getZ(), WATER);
-		for (int sa = -1; sa <= 1; sa += 2) {
-			for (int sb = -1; sb <= 1; sb += 2) {
-				c.set(l.at(sa, sb, 1), c.kit.gardenPlanter());
-			}
-		}
+		BarrioCourt.pool(c, l);
 	}
 
-	/** An empty hall slot: a little garden with a tree. */
+	/** An empty hall slot: a little garden ({@link BarrioCourt#slotGarden}). */
 	public static void slotGarden(CitadelCanvas c, Room r) {
-		for (int u = -1; u <= r.d(); u++) {
-			for (int v = -1; v <= r.w(); v++) {
-				BlockPos p = r.cell(u, v, 0);
-				c.set(p, lattice(p.getX(), p.getZ()) ? LIGHT : ((u + v) % 5 == 0 ? MOSS : GRASS));
-				if (r.corner(u, v) && !lattice(p.getX(), p.getZ())) {
-					c.set(p.above(), leaves(Blocks.FLOWERING_AZALEA_LEAVES));
-				}
-			}
-		}
-		BlockPos t = r.cell(r.d() / 2, r.c(), 0);
-		CitadelGrounds.tree(c, t.getX(), t.getZ());
+		BarrioCourt.slotGarden(c, r);
 	}
 
 	// ------------------------------------------------------------------ halls
@@ -316,140 +297,26 @@ public final class CitadelBarrios {
 		}
 	}
 
-	/** Gable roof (type 0): the ridge runs along the depth, the gable ends are filled with the wall material. */
+	/** Gable roof (type 0): ridge along the depth ({@link BarrioRoofs#gable}). */
 	public static void roofGable(CitadelCanvas c, Room r, int top, Mats mats) {
-		int W = r.w();
-		int D = r.d();
-		int mid = r.c();
-		for (int u = -1; u <= D; u++) {
-			for (int v = -1; v <= W; v++) {
-				BlockPos p = r.cell(u, v, 0);
-				int dv1 = v + 1;
-				int dv2 = W - v;
-				int du1 = u + 1;
-				int k = Math.min(dv1, dv2);
-				int y = top + Math.max(1, k);
-				boolean ridge = v == mid;
-				BlockState s;
-				if (ridge) {
-					s = mats.ridge();
-				} else {
-					s = stairs(mats.roof(), slopeFacing(r, k, dv1, dv2, du1));
-				}
-				c.set(p.atY(y), s);
-				if (u == -1 || u == D) {
-					for (int yy = top + 1; yy < y; yy++) {
-						c.set(p.atY(yy), mats.wall());
-					}
-				}
-			}
-		}
+		BarrioRoofs.gable(c, r, top, mats);
 	}
 
-	/** Hipped roof (type 1): four slopes, a short ridge along the centre. */
+	/** Hipped roof (type 1): four slopes closed by corner stairs ({@link BarrioRoofs#hipped}). */
 	public static void roofHipped(CitadelCanvas c, Room r, int top, Mats mats) {
-		int W = r.w();
-		int D = r.d();
-		int mid = r.c();
-		for (int u = -1; u <= D; u++) {
-			for (int v = -1; v <= W; v++) {
-				BlockPos p = r.cell(u, v, 0);
-				int dv1 = v + 1;
-				int dv2 = W - v;
-				int du1 = u + 1;
-				int du2 = D - u;
-				int k = Math.min(Math.min(dv1, dv2), Math.min(du1, du2));
-				int y = top + Math.max(1, k);
-				boolean ridge = v == mid && Math.min(du1, du2) > mid + 1;
-				BlockState s;
-				if (ridge) {
-					s = mats.ridge();
-				} else {
-					s = stairs(mats.roof(), slopeFacing(r, k, dv1, dv2, du1));
-				}
-				c.set(p.atY(y), s);
-			}
-		}
+		BarrioRoofs.hipped(c, r, top, mats);
 	}
 
-	/** Flat roof (type 2): a parapet round the edge and a green roof (moss carpet, some azalea) inside. */
+	/** Flat roof (type 2): a parapet and a green roof with a tree and a pergola ({@link BarrioRoofs#flat}). */
 	public static void roofFlat(CitadelCanvas c, Room r, int top, Mats mats) {
-		int W = r.w();
-		int D = r.d();
-		for (int u = -1; u <= D; u++) {
-			for (int v = -1; v <= W; v++) {
-				BlockPos p = r.cell(u, v, 0);
-				if (r.wall(u, v)) {
-					c.set(p.atY(top + 1), mats.wall());
-					c.set(p.atY(top + 2), slab(Blocks.DEEPSLATE_TILE_SLAB));
-				} else {
-					c.set(p.atY(top + 1), Math.floorMod(u * 3 + v * 5, 7) == 0 ? leaves(Blocks.FLOWERING_AZALEA_LEAVES) : b(Blocks.MOSS_CARPET));
-				}
-			}
-		}
-	}
-
-	/** The facing of the roof stair on the slope whose distance to the edge is {@code k}. */
-	private static Direction slopeFacing(Room r, int k, int dv1, int dv2, int du1) {
-		if (k == dv1) {
-			return r.side();
-		} else if (k == dv2) {
-			return r.side().getOpposite();
-		} else if (k == du1) {
-			return r.back();
-		} else {
-			return r.back().getOpposite();
-		}
+		BarrioRoofs.flat(c, r, top, mats);
 	}
 
 	// ------------------------------------------------------------------ gatehouse and sign
 
-	/** The gatehouse on the hub side: an arched passage into the courtyard, the project's sign under the arch. */
+	/** The gatehouse on the hub side ({@link BarrioGate#gatehouse}). */
 	public static void gatehouse(CitadelCanvas c, Lot l, HqLayout.Module lead, Mats mats) {
-		Room r = l.gate();
-		int W = r.w();
-		int D = r.d();
-		int mid = r.c();
-		for (int u = 0; u < D; u++) {
-			for (int v = 0; v < W; v++) {
-				BlockPos p = r.cell(u, v, 0);
-				boolean passage = Math.abs(v - mid) <= 1;
-				c.set(p, passage ? c.accent() : FOOT);
-				if (passage) {
-					for (int y = 1; y <= 4; y++) {
-						c.set(p.atY(y), AIR);
-					}
-					c.set(p.atY(5), c.kit.beam(r.back().getAxis()));
-				} else {
-					boolean corner = (u == 0 || u == D - 1) && (v == 0 || v == W - 1);
-					for (int y = 1; y <= 5; y++) {
-						c.set(p.atY(y), corner ? mats.post() : (y == 3 && u == D / 2 && (v == 0 || v == W - 1) ? c.kit.wallPanel(true) : mats.wall()));
-					}
-				}
-				c.set(p.atY(6), mats.ridge());
-				int k = Math.min(Math.min(u + 1, D - u), Math.min(v + 1, W - v));
-				int kmax = Math.min((D + 1) / 2, (W + 1) / 2);
-				BlockState s;
-				if (k == kmax) {
-					s = mats.ridge();
-				} else if (k == u + 1) {
-					s = stairs(mats.roof(), r.back());
-				} else if (k == D - u) {
-					s = stairs(mats.roof(), r.back().getOpposite());
-				} else if (k == v + 1) {
-					s = stairs(mats.roof(), r.side());
-				} else {
-					s = stairs(mats.roof(), r.side().getOpposite());
-				}
-				c.set(p.atY(6 + k), s);
-			}
-		}
-		BlockPos sign = r.cell(D - 1, mid, 4);
-		BlockState hs = Blocks.CHERRY_HANGING_SIGN.defaultBlockState().setValue(CeilingHangingSignBlock.ROTATION, rotation(r.back()))
-				.setValue(CeilingHangingSignBlock.ATTACHED, false);
-		c.put(sign.getX(), sign.getY(), sign.getZ(), hs, HANGING);
-		c.data.put(sign.asLong(), barrioSign(c, lead).signTag());
-		c.fixtures.add(sign.asLong());
+		BarrioGate.gatehouse(c, l, lead, mats);
 	}
 
 	public static int rotation(Direction facing) {
@@ -462,14 +329,7 @@ public final class CitadelBarrios {
 	}
 
 	public static HqStyle.SignText barrioSign(CitadelCanvas c, HqLayout.Module w) {
-		String label = w.label();
-		String l1 = label.length() <= SignTags.LINE ? label : label.substring(0, SignTags.LINE);
-		String l2 = label.length() <= SignTags.LINE ? "" : label.substring(SignTags.LINE);
-		int desks = 0;
-		for (HqLayout.Module m : c.layout.modulesOf(w.projectKey())) {
-			desks += m.desks().size();
-		}
-		return new HqStyle.SignText(HqStyle.envColor(w), l1, l2, desks + (desks == 1 ? " desk" : " desks"), w.envLabel());
+		return BarrioGate.barrioSign(c, w);
 	}
 
 	// ------------------------------------------------------------------ desks
