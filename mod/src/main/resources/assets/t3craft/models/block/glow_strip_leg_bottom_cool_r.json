@@ -1,0 +1,12 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {"t": "t3craft:block/glow_strip_cool", "particle": "t3craft:block/kit_glow_frame"},
+  "elements": [
+    {"from": [14, 0, 0], "to": [16, 3, 14], "faces": {
+      "east": {"texture": "#t", "uv": [0, 12, 14, 15], "cullface": "east"},
+      "down": {"texture": "#t", "uv": [0, 12, 14, 14], "rotation": 90, "cullface": "down"}}},
+    {"from": [14, 0, 0], "to": [16, 3, 14], "faces": {
+      "west": {"texture": "#t", "uv": [0, 0, 14, 3]},
+      "up": {"texture": "#t", "uv": [0, 4, 14, 6], "rotation": 90}}, "light_emission": 15}
+  ]
+}

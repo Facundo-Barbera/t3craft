@@ -1,0 +1,47 @@
+{
+  "parent": "minecraft:block/block",
+  "ambientocclusion": false,
+  "textures": {
+    "rail": "t3craft:block/kit_railing",
+    "post": "t3craft:block/kit_railing_post",
+    "particle": "t3craft:block/kit_railing"
+  },
+  "elements": [
+    {
+      "from": [4, 13, 0], "to": [12, 16, 3],
+      "faces": {
+        "north": {"texture": "#rail", "uv": [4, 0, 12, 3]},
+        "south": {"texture": "#rail", "uv": [4, 0, 12, 3]},
+        "up": {"texture": "#rail", "uv": [4, 4, 12, 7]},
+        "down": {"texture": "#rail", "uv": [4, 11, 12, 14]}
+      }
+    },
+    {
+      "from": [4, 11, 1], "to": [12, 12, 3],
+      "faces": {
+        "north": {"texture": "#rail", "uv": [4, 8, 12, 9]},
+        "south": {"texture": "#rail", "uv": [4, 8, 12, 9]},
+        "up": {"texture": "#rail", "uv": [4, 5, 12, 7]},
+        "down": {"texture": "#rail", "uv": [4, 10, 12, 12]}
+      }
+    },
+    {
+      "from": [4, 1, 1], "to": [12, 3, 3],
+      "faces": {
+        "north": {"texture": "#rail", "uv": [4, 8, 12, 10]},
+        "south": {"texture": "#rail", "uv": [4, 8, 12, 10]},
+        "up": {"texture": "#rail", "uv": [4, 5, 12, 7]},
+        "down": {"texture": "#rail", "uv": [4, 14, 12, 16]}
+      }
+    },
+    {
+      "from": [7, 3, 1], "to": [9, 11, 3],
+      "faces": {
+        "north": {"texture": "#post", "uv": [4, 3, 6, 11]},
+        "south": {"texture": "#post", "uv": [4, 3, 6, 11]},
+        "east": {"texture": "#post", "uv": [4, 3, 6, 11]},
+        "west": {"texture": "#post", "uv": [4, 3, 6, 11]}
+      }
+    }
+  ]
+}

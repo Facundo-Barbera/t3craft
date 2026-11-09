@@ -1,5 +1,6 @@
 package dev.t3craft.hq;
 
+import dev.t3craft.blocks.KitGlowStripBlock;
 import dev.t3craft.blocks.KitRailingBlock;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -55,6 +56,8 @@ import net.minecraft.world.phys.shapes.VoxelShape;
  * <li><b>Kit railings</b> ({@link KitRailingBlock}, kit/cherry-railing): the block's own rule
  *     ({@link KitRailingBlock#resolve}): continuous runs, posts at ends and turns, closed corners and
  *     bridged steps, from the {@code FACING} of the railings around (pure, one pass).</li>
+ * <li><b>Kit glow strips</b> ({@link KitGlowStripBlock}): the leg of an inner corner, from the strip in front
+ *     ({@link KitGlowStripBlock#resolve}).</li>
  * </ul>
  *
  * "Sturdy" is {@code isFaceSturdy(EmptyBlockGetter, ZERO, face)} (what vanilla asks, a pure function of
@@ -78,7 +81,8 @@ public final class PlanConnect {
 	/** True for the blocks this pass shapes. */
 	public static boolean shaped(BlockState s) {
 		Block b = s.getBlock();
-		return b instanceof CrossCollisionBlock || b instanceof WallBlock || b instanceof StairBlock || b instanceof KitRailingBlock;
+		return b instanceof CrossCollisionBlock || b instanceof WallBlock || b instanceof StairBlock || b instanceof KitRailingBlock
+				|| b instanceof KitGlowStripBlock;
 	}
 
 	/** True for the blocks that connect sideways (fences, walls, panes, bars). */
@@ -112,6 +116,7 @@ public final class PlanConnect {
 		List<Long> sides = new ArrayList<>();
 		List<Long> walls = new ArrayList<>();
 		List<Long> railings = new ArrayList<>();
+		List<Long> strips = new ArrayList<>();
 		for (Map.Entry<Long, BlockState> e : cells.entrySet()) {
 			Block b = e.getValue().getBlock();
 			if (b instanceof StairBlock) {
@@ -122,8 +127,21 @@ public final class PlanConnect {
 				walls.add(e.getKey());
 			} else if (b instanceof KitRailingBlock) {
 				railings.add(e.getKey());
+			} else if (b instanceof KitGlowStripBlock) {
+				strips.add(e.getKey());
 			}
 		}
+		// glow strips read only the facing/half of the strip in front, which this pass never changes
+		Map<Long, BlockState> stripOut = new HashMap<>();
+		for (long k : strips) {
+			BlockState s = cells.get(k);
+			BlockPos p = BlockPos.of(k);
+			BlockState u = KitGlowStripBlock.resolve(s, at(cells, p.relative(s.getValue(KitGlowStripBlock.FACING))));
+			if (u != s) {
+				stripOut.put(k, u);
+			}
+		}
+		cells.putAll(stripOut);
 		// kit railings read only the FACING of the railings around, which this pass never changes
 		Map<Long, BlockState> railOut = new HashMap<>();
 		for (long k : railings) {
