@@ -69,7 +69,7 @@ public final class HubRoof {
 	/**
 	 * Gabled dormers (struct/hub5), from scale 2: on each slope of the nave, at the bays between the hips nearest the ends
 	 * (z = +-12 and +-20 at 200), a window with a pediment. Five wide: a front of light stone brick jambs, two rows of stained
-	 * panes, a chiselled lintel and a calcite tympanum, under a deepslate gable (stairs and a slab ridge) that runs back into the
+	 * panes, a chiselled lintel and a calcite tympanum, under a cherry gable (stairs, with a light stone slab ridge) that runs back into the
 	 * slope until it meets it. The box is solid above the lintel so no stair of the gable hangs from another; the window rows have
 	 * only a shallow cavity (the slope closes it behind).
 	 */
@@ -103,7 +103,7 @@ public final class HubRoof {
 					net.minecraft.world.level.block.state.BlockState s = null;
 					if (a == 2) {
 						// cheeks and jambs up to the lintel, then the low stair of the gable
-						s = r <= 3 ? HubBlocks.stoneBrick(x, y, z) : r == 4 ? HubBlocks.stoneStairs(dz < 0 ? Direction.SOUTH : Direction.NORTH, false) : null;
+						s = r <= 3 ? HubBlocks.stoneBrick(x, y, z) : r == 4 ? HubBlocks.roofStairs(dz < 0 ? Direction.SOUTH : Direction.NORTH) : null;
 					} else if (a == 1) {
 						if (r <= 2) {
 							s = face ? HubBlocks.pane(HubBlocks.GLASS_COLORS[tint]) : null;
@@ -112,7 +112,7 @@ public final class HubRoof {
 						} else if (r == 4) {
 							s = face ? CALCITE : PLANKS;
 						} else if (r == 5) {
-							s = HubBlocks.stoneStairs(dz < 0 ? Direction.SOUTH : Direction.NORTH, false);
+							s = HubBlocks.roofStairs(dz < 0 ? Direction.SOUTH : Direction.NORTH);
 						}
 					} else {
 						if (r <= 2) {
@@ -122,7 +122,7 @@ public final class HubRoof {
 						} else if (r <= 5) {
 							s = face ? CALCITE : PLANKS;
 						} else {
-							s = slab(Blocks.DEEPSLATE_TILE_SLAB);
+							s = HubBlocks.stoneSlab(false);
 						}
 					}
 					if (s != null) {
