@@ -178,8 +178,8 @@ public final class FountainMossyCascade implements Variant {
 			for (int i = 1; i < n; i++) {
 				t[i] = 1 + Math.round((T - 1) * (float) (n - i) / n);
 			}
-			pool = Math.max(2, Math.round(0.30f * d) - 1);
 			int back = 1 + d / 14;
+			pool = Math.max(2, Math.min(Math.round(0.38f * d) - 1, (d - 1) - 2 - n - back - n)); // every trough keeps at least one row
 			int rest = Math.max(n, (d - 1) - 2 - pool - n - back);
 			bn = 2 + pool;
 			int[] len = new int[n];
@@ -547,11 +547,11 @@ public final class FountainMossyCascade implements Variant {
 					if (!p.has(u, y, v) || p.at(c, u, y, v) != null) {
 						continue;
 					}
-					int h = p.hash(u, y, v, 12);
+					int h = p.hash(u, y, v, 24);
 					int kind = switch (theme) {
-						case 0 -> h <= 1 ? 1 : h <= 3 ? 2 : h == 4 ? 3 : h == 5 ? 4 : h == 6 ? 5 : h == 7 ? 6 : 0;
-						case 1 -> h <= 1 ? 2 : h == 2 ? 4 : h == 3 ? 5 : h == 4 || h == 5 || h == 7 ? 6 : 0;
-						default -> h <= 2 ? 1 : h == 3 ? 4 : h <= 5 ? 2 : h == 6 ? 3 : h == 7 ? 6 : 0;
+						case 0 -> h <= 2 ? 1 : h <= 7 ? 2 : h <= 9 ? 3 : h <= 11 ? 4 : h <= 14 ? 5 : h == 15 ? 6 : 0;
+						case 1 -> h <= 1 ? 1 : h <= 6 ? 2 : h <= 8 ? 4 : h <= 11 ? 5 : h <= 14 ? 6 : 0;
+						default -> h <= 5 ? 1 : h <= 7 ? 4 : h <= 11 ? 2 : h == 12 ? 3 : h == 13 ? 6 : 0;
 					};
 					switch (kind) {
 						case 1 -> p.set(c, u, y, v, b(Blocks.FLOWERING_AZALEA));
