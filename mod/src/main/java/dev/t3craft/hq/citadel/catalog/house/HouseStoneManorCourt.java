@@ -155,10 +155,10 @@ public final class HouseStoneManorCourt implements Variant {
 	private static BlockState mat(Plot p, int u, int y, int v) {
 		return switch (y) {
 			case 0, 1 -> deep(p, u, y, v);
-			case 2 -> p.hash(u, y, v, 5) < 2 ? deep(p, u, y, v) : mid(p, u, y, v);
+			case 2 -> p.hash(u, y, v, 6) < 1 ? deep(p, u, y, v) : mid(p, u, y, v);
 			case 3, 4 -> mid(p, u, y, v);
 			case BELT -> b(Blocks.CALCITE);
-			case 6 -> p.hash(u, y, v, 5) < 2 ? mid(p, u, y, v) : light(p, u, y, v);
+			case 6 -> p.hash(u, y, v, 6) < 1 ? mid(p, u, y, v) : light(p, u, y, v);
 			case 7 -> light(p, u, y, v);
 			case 8 -> p.hash(u, y, v, 6) == 0 ? b(Blocks.CHISELED_STONE_BRICKS) : light(p, u, y, v);
 			default -> b(Blocks.CALCITE);
@@ -380,9 +380,9 @@ public final class HouseStoneManorCourt implements Variant {
 			for (int t = v0; t <= v0 + 2; t++) {
 				lr.set(t, PLATE + 2, 1, lr.stairIn(Blocks.STONE_BRICK_STAIRS, true));
 			}
-			hipLayer(c, p, u0 - 1, v0 - 1, u0 + 3, v0 + 3, PLATE + 3, Blocks.CUT_COPPER_STAIRS.waxed().exposed(), b(Blocks.CUT_COPPER.waxed().exposed()));
-			p.set(c, u0 + 1, PLATE + 4, v0 + 1, slab(Blocks.CUT_COPPER_SLAB.waxed().exposed()));
-			p.set(c, u0 + 1, PLATE + 5, v0 + 1, Blocks.LIGHTNING_ROD.waxed().exposed().defaultBlockState());
+			hipLayer(c, p, u0 - 1, v0 - 1, u0 + 3, v0 + 3, PLATE + 3, Blocks.CUT_COPPER_STAIRS.waxed().oxidized(), b(Blocks.CUT_COPPER.waxed().oxidized()));
+			p.set(c, u0 + 1, PLATE + 4, v0 + 1, slab(Blocks.CUT_COPPER_SLAB.waxed().oxidized()));
+			p.set(c, u0 + 1, PLATE + 5, v0 + 1, Blocks.LIGHTNING_ROD.waxed().oxidized().defaultBlockState());
 			cornerCornice(c, p, g, u0, v0);
 		}
 	}
@@ -551,14 +551,14 @@ public final class HouseStoneManorCourt implements Variant {
 			}
 		}
 		// the roof: a hip along v on the cornice
-		Block copper = Blocks.CUT_COPPER_STAIRS.waxed().exposed();
-		BlockState copperBlock = b(Blocks.CUT_COPPER.waxed().exposed());
+		Block copper = Blocks.CUT_COPPER_STAIRS.waxed().oxidized();
+		BlockState copperBlock = b(Blocks.CUT_COPPER.waxed().oxidized());
 		hipLayer(c, p, cu - 2, 0, cu + 2, 6, top + 1, copper, copperBlock);
 		hipLayer(c, p, cu - 1, 1, cu + 1, 5, top + 2, copper, copperBlock);
 		for (int v = 2; v <= 4; v++) {
-			p.set(c, cu, top + 3, v, slab(Blocks.CUT_COPPER_SLAB.waxed().exposed()));
+			p.set(c, cu, top + 3, v, slab(Blocks.CUT_COPPER_SLAB.waxed().oxidized()));
 		}
-		p.set(c, cu, top + 4, 3, Blocks.LIGHTNING_ROD.waxed().exposed().defaultBlockState());
+		p.set(c, cu, top + 4, 3, Blocks.LIGHTNING_ROD.waxed().oxidized().defaultBlockState());
 		// [depth] the keep's cornice stands on corbels: beam tails and stair brackets under the front and side runs
 		for (int u : new int[] {cu - 2, cu, cu + 2}) {
 			EaveKit.corbel(c, p, u, top - 1, 0, Direction.SOUTH, Blocks.DARK_OAK_LOG, Blocks.STONE_BRICK_STAIRS);

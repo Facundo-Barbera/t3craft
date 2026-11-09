@@ -92,7 +92,7 @@ public final class HouseMachiya implements Variant {
 	private static final Scheme[] SCHEMES = {
 			new Scheme(Blocks.DARK_OAK_TRAPDOOR, Blocks.DARK_OAK_LOG, Blocks.CHERRY_STAIRS, DyeColor.BLUE, Blocks.DARK_OAK_DOOR),
 			new Scheme(Blocks.SPRUCE_TRAPDOOR, Blocks.SPRUCE_LOG, Blocks.DARK_OAK_STAIRS, DyeColor.RED, Blocks.CHERRY_DOOR),
-			new Scheme(Blocks.DARK_OAK_TRAPDOOR, Blocks.CHERRY_LOG, Blocks.DARK_OAK_STAIRS, DyeColor.CYAN, Blocks.DARK_OAK_DOOR),
+			new Scheme(Blocks.SPRUCE_TRAPDOOR, Blocks.DARK_OAK_LOG, Blocks.CHERRY_STAIRS, DyeColor.CYAN, Blocks.DARK_OAK_DOOR),
 	};
 
 	/** Fixed lines of the plan. */
@@ -261,7 +261,7 @@ public final class HouseMachiya implements Variant {
 			p.set(c, u, 5, 1, stair(Blocks.DEEPSLATE_TILE_STAIRS, Direction.SOUTH));
 			if (!noren && (u - u1) % 2 == 0) {
 				// [depth] rafter brackets under the lip: a beam tail with a stair corbel under it, like the upper eave
-				p.set(c, u, 3, 0, log(s.trim(), Direction.Axis.Z));
+				p.set(c, u, 3, 0, log(Blocks.STRIPPED_SPRUCE_LOG, Direction.Axis.Z));
 				p.set(c, u, 2, 0, stairTop(Blocks.DARK_OAK_STAIRS, Direction.SOUTH));
 			}
 		}
@@ -435,28 +435,19 @@ public final class HouseMachiya implements Variant {
 			p.set(c, u, ROOF0, g.rf() - 1, stair(s.fascia(), Direction.NORTH));
 			p.set(c, u, ROOF0, g.rb() + 1, stair(s.fascia(), Direction.SOUTH));
 			if ((u - g.u1()) % 2 == 0) {
-				p.set(c, u, PLATE, g.rf(), log(s.trim(), Direction.Axis.Z));
-				p.set(c, u, PLATE, g.rb(), log(s.trim(), Direction.Axis.Z));
+				p.set(c, u, PLATE, g.rf(), log(Blocks.STRIPPED_SPRUCE_LOG, Direction.Axis.Z));
+				p.set(c, u, PLATE, g.rb(), log(Blocks.STRIPPED_SPRUCE_LOG, Direction.Axis.Z));
 			}
 		}
 		// [depth] both lips rest on rafter tails that run out from the wall plate, with a stair corbel under each
 		for (int u = g.u1(); u <= g.u2(); u += 2) {
-			EaveKit.tail(c, p, u, PLATE, g.rf() - 1, Direction.SOUTH, s.trim());
-			EaveKit.tail(c, p, u, PLATE, g.rb() + 1, Direction.NORTH, s.trim());
+			EaveKit.tail(c, p, u, PLATE, g.rf() - 1, Direction.SOUTH, Blocks.STRIPPED_SPRUCE_LOG);
+			EaveKit.tail(c, p, u, PLATE, g.rb() + 1, Direction.NORTH, Blocks.STRIPPED_SPRUCE_LOG);
 			if (EaveKit.free(c, p, u, PLATE - 1, g.rf())) {
 				p.set(c, u, PLATE - 1, g.rf(), stairTop(Blocks.DARK_OAK_STAIRS, Direction.SOUTH));
 			}
 			if (EaveKit.free(c, p, u, PLATE - 1, g.rb())) {
 				p.set(c, u, PLATE - 1, g.rb(), stairTop(Blocks.DARK_OAK_STAIRS, Direction.NORTH));
-			}
-		}
-		// [finish] end tiles on the ridge: a short wall post at each side
-		int midV = g.rf() + (n - 1) / 2;
-		int top = roofY(midV, g) + 2;
-		for (int u : new int[] {g.u1(), g.u2()}) {
-			p.set(c, u, top, midV, wall(Blocks.DEEPSLATE_BRICK_WALL, true, false, false, false, false));
-			if (n % 2 == 0) {
-				p.set(c, u, top, midV + 1, wall(Blocks.DEEPSLATE_BRICK_WALL, true, false, false, false, false));
 			}
 		}
 	}

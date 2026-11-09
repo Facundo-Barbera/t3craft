@@ -192,7 +192,8 @@ public final class HouseJapaneseTeahouse implements Variant {
 
 	/** [palette] a few brown courses in the thatch, so it weathers instead of being one saturated yellow. */
 	private static Block thatch(Plot p, Block mat, int u, int k, int v) {
-		return p.hash(u, k, v, 5) == 0 ? Blocks.SPRUCE_STAIRS : mat;
+		boolean brown = k == 1 ? p.hash(u, k, v, 3) == 0 : p.hash(u, k, v, 3) != 0;
+		return brown ? Blocks.SPRUCE_STAIRS : mat;
 	}
 
 	/**
@@ -251,7 +252,7 @@ public final class HouseJapaneseTeahouse implements Variant {
 		int v1 = rv1 - 2;
 		for (int u = u0 + 1; u < u1; u++) {
 			for (int v = v0 + 1; v < v1; v++) {
-				p.set(c, u, 6, v, b(Blocks.BAMBOO_MOSAIC));
+				p.set(c, u, 6, v, b(Blocks.SPRUCE_PLANKS));
 			}
 		}
 		for (int u = u0; u <= u1; u++) {
@@ -259,8 +260,6 @@ public final class HouseJapaneseTeahouse implements Variant {
 				p.set(c, u, 7, v, slab(Blocks.DARK_OAK_SLAB));
 			}
 		}
-		p.set(c, (u0 + u1) / 2, 8, (v0 + v1) / 2, JapaneseKit.wall(Blocks.DEEPSLATE_BRICK_WALL, true, false, false, false, false));
-		p.set(c, (u0 + u1) / 2, 9, (v0 + v1) / 2, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState());
 		// [depth] a slim post under each lifted corner, the lantern hangs beside it
 		for (int[] cc : new int[][] {{ru0, rv0}, {ru1, rv0}, {ru0, rv1}, {ru1, rv1}}) {
 			p.set(c, cc[0], 0, cc[1], stone(p, cc[0], 0, cc[1]));
@@ -351,8 +350,8 @@ public final class HouseJapaneseTeahouse implements Variant {
 		// the stone lantern on the other side and the cherry behind it
 		int lu = right ? cu - 2 : cu + 2;
 		JapaneseKit.stoneLantern(c, p, lu, 1, bvv);
-		int tu = right ? cu - 3 : cu + 3;
-		JapaneseKit.sakura(c, p, tu < 2 ? 2 : Math.min(tu, w - 3), 1, Math.min(bv0 - 2, 3), 0);
+		int tu = right ? 2 : w - 3; // [depth] the cherry stands in the corner, not in front of the hut
+		JapaneseKit.sakura(c, p, tu, 1, Math.min(bv0 - 3, 3), 0);
 		// azalea and moss tufts in the corners
 		p.set(c, 1, 1, 1, CitadelCanvas.leaves(Blocks.FLOWERING_AZALEA_LEAVES));
 		p.set(c, w - 2, 1, 1, CitadelCanvas.leaves(Blocks.AZALEA_LEAVES));

@@ -367,7 +367,9 @@ public final class HouseStoneWeathered implements Variant {
 		for (int v : new int[] {2, d - 2}) {
 			for (int u = 1; u <= wa; u++) {
 				for (int y = PLATE + 1; y <= PLATE + lvA(u, wa) - 1; y++) {
-					p.set(c, u, y, v, y == PLATE + 1 || p.hash(u, y, v, 3) == 0 ? b(Blocks.POLISHED_ANDESITE) : b(Blocks.STONE_BRICKS));
+					// [depth] a dark oak tie beam under the gable, polished stone above
+					p.set(c, u, y, v, y == PLATE + 1 ? StoneKit.log(Blocks.DARK_OAK_LOG, Direction.Axis.X)
+							: p.hash(u, y, v, 3) == 0 ? b(Blocks.POLISHED_ANDESITE) : b(Blocks.STONE_BRICKS));
 				}
 			}
 			int cu = (1 + wa) / 2;
@@ -391,9 +393,9 @@ public final class HouseStoneWeathered implements Variant {
 		int u = w - 4;
 		int v = vm + 2;
 		for (int y = PLATE + 2; y <= PLATE + 6; y++) {
-			p.set(c, u, y, v, p.hash(u, y, v, 3) == 0 ? b(Blocks.DEEPSLATE_BRICKS) : b(Blocks.BRICKS));
+			p.set(c, u, y, v, b(Blocks.BRICKS));
 		}
-		p.set(c, u, PLATE + 7, v, slab(Blocks.STONE_BRICK_SLAB));
+		p.set(c, u, PLATE + 7, v, slab(Blocks.BRICK_SLAB));
 	}
 
 	// ------------------------------------------------------------------ porch, yard

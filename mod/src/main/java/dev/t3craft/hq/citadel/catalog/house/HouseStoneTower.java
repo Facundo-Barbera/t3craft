@@ -129,7 +129,7 @@ public final class HouseStoneTower implements Variant {
 			case 0, 1 -> deep(p, u, y, v);
 			case 2 -> p.hash(u, y, v, 5) < 2 ? deep(p, u, y, v) : mid(p, u, y, v);
 			case 3 -> mid(p, u, y, v);
-			case 4 -> b(Blocks.CALCITE); // belt course
+			case 4 -> b(Blocks.POLISHED_ANDESITE); // belt course
 			case 5 -> p.hash(u, y, v, 5) < 2 ? mid(p, u, y, v) : light(p, u, y, v);
 			case 6 -> light(p, u, y, v);
 			default -> b(Blocks.CALCITE); // top plate under the cornice
@@ -398,20 +398,20 @@ public final class HouseStoneTower implements Variant {
 		StoneKit.discLayer(c, p, TC, TC, 12, R_CROWN, Blocks.DEEPSLATE_BRICK_STAIRS, b(Blocks.DEEPSLATE_BRICKS), true);
 		int[] radii = {8, 5, 2, 1};
 		for (int i = 0; i < radii.length; i++) {
-			StoneKit.discLayer(c, p, TC, TC, 13 + i, radii[i], i == 0 ? Blocks.DEEPSLATE_BRICK_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS,
-					b(Blocks.DEEPSLATE_TILES), false);
+			StoneKit.discLayer(c, p, TC, TC, 13 + i, radii[i], Blocks.CUT_COPPER_STAIRS.waxed().oxidized(),
+					b(Blocks.CUT_COPPER.waxed().oxidized()), false);
 		}
-		p.set(c, TC, 17, TC, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState());
+		p.set(c, TC, 17, TC, Blocks.LIGHTNING_ROD.waxed().oxidized().defaultBlockState());
 	}
 
 	/** [palette] the tower is the darkest mass: deepslate up to the belt, a mix, then lighter stone under the crown. */
 	private static BlockState towerMat(Plot p, int u, int y, int v) {
 		return switch (y) {
 			case 0, 1, 2, 3 -> deep(p, u, y, v);
-			case 4 -> b(Blocks.CALCITE);
+			case 4 -> b(Blocks.POLISHED_DEEPSLATE);
 			case 5, 6 -> p.hash(u, y, v, 3) == 0 ? mid(p, u, y, v) : deep(p, u, y, v);
 			case 7, 8 -> mid(p, u, y, v);
-			case 9 -> b(Blocks.CALCITE);
+			case 9 -> b(Blocks.POLISHED_ANDESITE);
 			default -> light(p, u, y, v);
 		};
 	}

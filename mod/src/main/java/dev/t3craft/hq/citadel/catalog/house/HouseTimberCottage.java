@@ -322,7 +322,7 @@ public final class HouseTimberCottage implements Variant {
 				p.set(c, u, y, v, st);
 				// [depth] under the overhanging gable rows, an upside-down stair closes the eave
 				if ((u == 0 || u == w - 1) && !middle && y - 1 >= PLATE) {
-					p.set(c, u, y - 1, v, stairs(s.roof(), front ? Direction.NORTH : Direction.SOUTH).setValue(BlockStateProperties.HALF, Half.TOP));
+					p.set(c, u, y - 1, v, stairs(Blocks.DARK_OAK_STAIRS, front ? Direction.NORTH : Direction.SOUTH).setValue(BlockStateProperties.HALF, Half.TOP));
 				}
 			}
 		}
@@ -341,7 +341,7 @@ public final class HouseTimberCottage implements Variant {
 		for (int u : new int[] {u1, u2}) {
 			for (int v = vj; v <= vb; v++) {
 				for (int y = PLATE + 1; y < roofY(v, d); y++) {
-					BlockState st = v == mid ? post(s) : b(Blocks.CHERRY_PLANKS);
+					BlockState st = v == mid ? post(s) : y == PLATE + 3 ? beam(s, Direction.Axis.Z) : b(Blocks.CHERRY_PLANKS);
 					if (y == PLATE + 2 && Math.abs(v - mid) == 1) {
 						st = pane(false, true); // [palette] a pair of tinted lights flanking the king post
 					}
