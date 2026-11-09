@@ -287,6 +287,36 @@ public final class TreeAzaleaBlossom implements Variant {
 			}
 		}
 
+		// the visible shell decides the look from afar: exposed leaves bloom in big patches on the sun face and the top,
+		// and stay plain green on the shade side and underneath (the inside keeps the even mix)
+		List<int[]> shell = new ArrayList<>();
+		int[][] n6 = {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}};
+		for (int y = CLEAR; y < p.h(); y++) {
+			for (int vv = 0; vv < d; vv++) {
+				for (int uu = 0; uu < w; uu++) {
+					if (t.kind(uu, y, vv) != TreeKit.LEAF) {
+						continue;
+					}
+					for (int[] o : n6) {
+						if (!t.in(uu + o[0], y + o[1], vv + o[2]) || t.kind(uu + o[0], y + o[1], vv + o[2]) == TreeKit.EMPTY) {
+							shell.add(new int[] {uu, y, vv});
+							break;
+						}
+					}
+				}
+			}
+		}
+		for (int[] s : shell) {
+			double sun = ((s[0] - cuM) * sx + (s[2] - cvM) * sz) / rc;
+			double top = (s[1] - cyM) / ryM;
+			double pf = TreeKit.clamp(fb - 0.1 + 1.1 * sun + 0.45 * top, 0.03, 0.97);
+			double big4 = t.hash(Math.floorDiv(s[0] + 2, 4) + 21, Math.floorDiv(s[1], 3), Math.floorDiv(s[2] + 1, 4) - 8, 100) / 100.0;
+			double c2 = t.hash(Math.floorDiv(s[0], 2) + 7, Math.floorDiv(s[1], 2), Math.floorDiv(s[2], 2) - 3, 100) / 100.0;
+			double noise = t.hash(s[0] + 5, s[1] + 9, s[2] + 13, 100) < 30 ? c2 : big4;
+			t.clear(s[0], s[1], s[2]);
+			t.leaf(s[0], s[1], s[2], noise < pf ? BLOOM : GREEN);
+		}
+
 		// leaves over every tip (after the bites, so a tip is never left bare)
 		for (int[] tp : tips) {
 			int[][] around = {{0, 1, 0}, {1, 0, 0}, {-1, 0, 0}, {0, 0, 1}, {0, 0, -1}, {1, 1, 0}, {-1, 1, 0}, {0, 1, 1}, {0, 1, -1}};
@@ -367,7 +397,7 @@ public final class TreeAzaleaBlossom implements Variant {
 			// petals in drifts 2–3 blocks wide (coarse noise) plus single ones, moss between
 			boolean drift = t.hash(Math.floorDiv(uu, 2) + 5, 0, Math.floorDiv(vv, 2) + 1, 100) < (k < 0.6 ? 55 : 32);
 			int pet = drift ? 80 : 16;
-			int moss = drift ? 14 : k < 0.8 ? 46 : 38;
+			int moss = drift ? 14 : k < 0.8 ? 62 : 54;
 			if (hsh < pet) {
 				return TreeKit.petals(drift ? 2 + t.hash(uu, 1, vv, 3) : 1, t.hash(uu, 2, vv, 4));
 			}
