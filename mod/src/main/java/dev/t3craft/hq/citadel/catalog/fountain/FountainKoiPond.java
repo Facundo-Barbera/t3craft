@@ -1039,7 +1039,8 @@ public final class FountainKoiPond implements Variant {
 				}
 			}
 			for (int y = 0; y <= ty; y++) {
-				put(c, p, treeU, y, treeV, b(Blocks.CHERRY_LOG));
+				// bark and stripped bark mixed, so the trunk is neither a black post nor a pink one
+				put(c, p, treeU, y, treeV, b(y == 0 || p.hash(treeU, y + 40, treeV, 2) == 0 ? Blocks.CHERRY_LOG : Blocks.STRIPPED_CHERRY_LOG));
 			}
 			List<int[]> seeds = new ArrayList<>();
 			seeds.add(new int[] {treeU, ty, treeV});
@@ -1098,6 +1099,9 @@ public final class FountainKoiPond implements Variant {
 						}
 					}
 				}
+			}
+			if (bent && ty + 1 < h) {
+				leaf[treeU][ty + 1][treeV] = true; // a leaf over the trunk top: no walkable nook beside the bent log
 			}
 			boolean[][][] keep = new boolean[w][h][d];
 			ArrayDeque<int[]> q = new ArrayDeque<>(seeds);
