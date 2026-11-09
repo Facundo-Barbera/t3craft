@@ -115,6 +115,8 @@ public final class LayoutParams {
 			"lights let into the streets on a lattice: 1 cell in N");
 	public static final Spec RINGCAMPUS_TERRACE_BUSH = spec("hybrid-ringcampus", "terrace.bushEvery", 23, 11, 97,
 			"terraces: an azalea bush on 1 cell in N");
+	public static final Spec RINGCAMPUS_CATALOG = spec("hybrid-ringcampus", "catalog.enabled", 1, 0, 1,
+			"catalog placement (CitadelPlacement): annexes, gardens, trees, street lamps, gates, plazas; 1 on, 0 off");
 
 	// ------------------------------------------------------------------ hybrid-towncenter
 

@@ -128,6 +128,9 @@ final class RingCampusGenerator {
 				CitadelBarrios.barrio(canvas, lot, mods);
 			}
 		}
+		if (dev.t3craft.hq.citadel.CitadelPlacement.enabled()) {
+			dev.t3craft.hq.citadel.CitadelPlacement.city(canvas);
+		}
 		canvas.anchor(Anchor.at(AnchorNames.SPAWN, CitadelFinish.SPAWN, Direction.NORTH));
 		return CitadelFinish.build(canvas);
 	}
