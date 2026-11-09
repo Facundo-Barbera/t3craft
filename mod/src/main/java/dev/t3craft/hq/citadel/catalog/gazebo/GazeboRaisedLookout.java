@@ -163,8 +163,8 @@ public final class GazeboRaisedLookout implements Variant {
 		BlockState s = switch (p.hash(u, 0, v, 6)) {
 			case 0 -> b(Blocks.POTTED_PINK_TULIP);
 			case 1 -> b(Blocks.POTTED_FLOWERING_AZALEA);
-			case 2 -> leaves(Blocks.FLOWERING_AZALEA_LeaveS);
-			case 3 -> leaves(Blocks.AZALEA_LeaveS);
+			case 2 -> leaves(Blocks.FLOWERING_AZALEA_LEAVES);
+			case 3 -> leaves(Blocks.AZALEA_LEAVES);
 			case 4 -> b(Blocks.POTTED_FERN);
 			default -> b(Blocks.PINK_PETALS).setValue(BlockStateProperties.FLOWER_AMOUNT, 1 + p.hash(u, 2, v, 4))
 					.setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.from2DDataValue(p.hash(u, 3, v, 4)));
