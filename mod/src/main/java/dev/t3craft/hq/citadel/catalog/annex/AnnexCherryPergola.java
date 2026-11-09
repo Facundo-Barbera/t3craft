@@ -43,8 +43,8 @@ import net.minecraft.world.level.block.state.properties.Half;
  */
 public final class AnnexCherryPergola implements Variant {
 	private static final BlockState LOG = b(Blocks.STRIPPED_CHERRY_LOG);
-	private static final BlockState BEAM_Z = LOG.setValue(BlockStateProperties.AXIS, Direction.Axis.Z);
-	private static final BlockState BEAM_X = LOG.setValue(BlockStateProperties.AXIS, Direction.Axis.X);
+	private static final BlockState BEAM_Z = b(Blocks.STRIPPED_DARK_OAK_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.Z);
+	private static final BlockState BEAM_X = b(Blocks.STRIPPED_DARK_OAK_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.X);
 	private static final BlockState LEAVES = leaves(Blocks.CHERRY_LEAVES);
 	private static final BlockState AZALEA_LEAVES = leaves(Blocks.FLOWERING_AZALEA_LEAVES);
 	private static final BlockState VINE = b(Blocks.VINE);
@@ -108,7 +108,7 @@ public final class AnnexCherryPergola implements Variant {
 			w = p.w();
 			d = p.d();
 			h = p.h();
-			k = Math.max(2, Math.min(5, h - 3));
+			k = Math.max(2, Math.min(4, h - 3));
 			beam = k + 1;
 			raf = k + 2;
 			mid = d >= 9 ? (d - 1) / 2 : -1;
@@ -237,9 +237,9 @@ public final class AnnexCherryPergola implements Variant {
 					continue;
 				}
 				if (g.postRow(v - 1)) {
-					p.set(c, u, g.k, v, stairs(Blocks.CHERRY_STAIRS, Direction.SOUTH).setValue(BlockStateProperties.HALF, Half.TOP));
+					p.set(c, u, g.k, v, stairs(Blocks.DARK_OAK_STAIRS, Direction.SOUTH).setValue(BlockStateProperties.HALF, Half.TOP));
 				} else if (g.postRow(v + 1)) {
-					p.set(c, u, g.k, v, stairs(Blocks.CHERRY_STAIRS, Direction.NORTH).setValue(BlockStateProperties.HALF, Half.TOP));
+					p.set(c, u, g.k, v, stairs(Blocks.DARK_OAK_STAIRS, Direction.NORTH).setValue(BlockStateProperties.HALF, Half.TOP));
 				}
 			}
 		}
@@ -252,10 +252,10 @@ public final class AnnexCherryPergola implements Variant {
 			if (!g.rafterRow(v)) {
 				continue;
 			}
-			p.set(c, 0, g.raf, v, stairs(Blocks.CHERRY_STAIRS, Direction.WEST));
-			p.set(c, w - 1, g.raf, v, stairs(Blocks.CHERRY_STAIRS, Direction.EAST));
+			p.set(c, 0, g.raf, v, stairs(Blocks.DARK_OAK_STAIRS, Direction.WEST));
+			p.set(c, w - 1, g.raf, v, stairs(Blocks.DARK_OAK_STAIRS, Direction.EAST));
 			for (int u = 1; u < w - 1; u++) {
-				p.set(c, u, g.raf, v, b(Blocks.CHERRY_FENCE)
+				p.set(c, u, g.raf, v, b(Blocks.DARK_OAK_FENCE)
 						.setValue(BlockStateProperties.WEST, true)
 						.setValue(BlockStateProperties.EAST, true));
 			}
@@ -272,16 +272,16 @@ public final class AnnexCherryPergola implements Variant {
 		int v = g.d - 1;
 		BlockState leafA = g.plant == 1 ? AZALEA_LEAVES : LEAVES;
 		for (int u = 1; u < g.w - 1; u++) {
-			boolean upright = u == 1 || u == g.w - 2 || u % 2 == 1;
+			boolean upright = u == 1 || u == g.w - 2 || u % 3 == 1;
 			for (int y = 1; y <= g.k; y++) {
 				boolean rail = y == 2 || y == g.k;
 				if (upright || rail) {
-					BlockState f = b(Blocks.CHERRY_FENCE);
+					BlockState f = b(Blocks.DARK_OAK_FENCE);
 					if (rail) {
 						f = f.setValue(BlockStateProperties.WEST, true).setValue(BlockStateProperties.EAST, true);
 					}
 					p.set(c, u, y, v, f);
-				} else if (y >= 3 && p.hash(u, y, v, 3) != 0) {
+				} else if (y >= 3 && p.hash(u, y, v, 3) == 0) {
 					p.set(c, u, y, v, p.hash(u, y, v, g.plant == 1 ? 2 : 4) == 0 ? AZALEA_LEAVES : leafA);
 				}
 			}
@@ -332,7 +332,7 @@ public final class AnnexCherryPergola implements Variant {
 		// table, one block high: a fence post at each end, cherry slabs (top half) between them
 		for (int u = g.ua; u <= g.ub; u++) {
 			boolean end = u == g.ua || u == g.ub;
-			p.set(c, u, 1, g.tv, end ? b(Blocks.CHERRY_FENCE)
+			p.set(c, u, 1, g.tv, end ? b(Blocks.DARK_OAK_FENCE)
 					: b(Blocks.CHERRY_SLAB).setValue(BlockStateProperties.SLAB_TYPE, net.minecraft.world.level.block.state.properties.SlabType.TOP));
 		}
 		// chairs at both ends of the table and on its front side, facing the table
@@ -343,6 +343,7 @@ public final class AnnexCherryPergola implements Variant {
 		}
 		// a pot on the table's first post
 		p.set(c, g.ua, 2, g.tv, pot(p, g, g.ua, g.tv));
+		p.set(c, g.ub, 2, g.tv, b(Blocks.LANTERN)); // a standing lantern on the other end post
 		// pots flanking the entrance, inside the front corners
 		p.set(c, 1, 1, 1, pot(p, g, 1, 1));
 		p.set(c, w - 2, 1, 1, pot(p, g, w - 2, 1));
@@ -403,7 +404,6 @@ public final class AnnexCherryPergola implements Variant {
 	private static void canopy(CitadelCanvas c, Plot p, G g) {
 		int w = g.w;
 		int d = g.d;
-		int gap = g.cover == 2 ? 6 : 3;
 		for (int v = 0; v < d; v++) {
 			boolean rafter = g.rafterRow(v);
 			boolean bay = g.cover == 1 && g.full && !rafter && v >= g.tv - 1 && v <= g.tv + 1;
@@ -411,7 +411,11 @@ public final class AnnexCherryPergola implements Variant {
 				if (!rafter) {
 					if (bay) {
 						p.set(c, u, g.raf, v, slab(Blocks.CHERRY_SLAB));
-					} else if (p.hash(u, g.raf, v, gap) != 0) {
+					} else if (switch (g.cover) {
+						case 0 -> p.hash(u, g.raf, v, 3) == 0;
+						case 1 -> p.hash(u, g.raf, v, 2) == 0;
+						default -> p.hash(u, g.raf, v, 6) != 0;
+					}) {
 						p.set(c, u, g.raf, v, p.hash(u, g.raf, v, g.plant == 1 ? 3 : 7) == 0 ? AZALEA_LEAVES : LEAVES);
 						g.leaf[u][v] = true;
 					}
@@ -474,21 +478,21 @@ public final class AnnexCherryPergola implements Variant {
 	 * and one under each cross beam, all above head height.
 	 */
 	private static void lights(CitadelCanvas c, Plot p, G g) {
+		if (g.k < 4) {
+			return; // low: a lantern would leave under 2.85 of head room
+		}
 		int w = g.w;
 		int d = g.d;
-		if (g.k < 3) {
-			return; // compact: no lantern would leave head room
-		}
-		int ly = g.k >= 4 ? g.k - 1 : g.k;
 		BlockState chain = b(Blocks.IRON_CHAIN).setValue(BlockStateProperties.AXIS, Direction.Axis.Y);
 		BlockState lamp = b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true);
-		// over the table: a chain from the rafter over the table row
-		int[] us = g.full && g.ub - g.ua >= 4 ? new int[] {g.ua + 1, g.ub - 1} : new int[] {g.full ? (g.ua + g.ub) / 2 : w / 2};
-		for (int u : us) {
-			for (int y = ly + 1; y <= g.beam; y++) {
-				p.put(c, u, y, g.tv, chain, CitadelCanvas.HANGING);
+		// chain lanterns from the rafter row in front of the table (over bare floor, never over chairs or the table)
+		int lv = g.full ? g.tv - 2 : g.tv;
+		int[] us = g.full && g.ub - g.ua >= 4 ? new int[] {g.ua + 1, g.ub - 1} : new int[] {w / 2};
+		if (lv >= 1 && g.rafterRow(lv)) {
+			for (int u : us) {
+				p.put(c, u, g.beam, lv, chain, CitadelCanvas.HANGING);
+				p.put(c, u, g.k, lv, lamp, CitadelCanvas.HANGING);
 			}
-			p.put(c, u, ly, g.tv, lamp, CitadelCanvas.HANGING);
 		}
 		// under the side beams, in the middle of each gap between posts wider than 2
 		int prev = 0;
