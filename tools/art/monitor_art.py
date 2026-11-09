@@ -111,19 +111,20 @@ def box_casing(vents):
 
 
 def make_side():
-    # clean brushed casing: an inset panel line, no vents (the sides show on a lone monitor and at the ends of a wall)
+    # plain brushed casing with a soft vertical gradient: no per-block inset, so the end of a wall is one flat plate
     g = box_casing([])
-    for i in range(3, 13):
-        g[3][i] = g[12][i] = SHADE
-        g[i][3] = g[i][12] = SHADE
+    for y in range(1, 15):
+        c = STEEL if y < 3 else (BODY if y < 12 else SHADE)
+        for x in range(1, 15):
+            g[y][x] = c
     return g
 
 
 def make_top():
     g = box_casing([])
-    for i in range(1, 15):
-        g[7][i] = SHADE
-        g[8][i] = LIGHT if i % 2 == 0 else STEEL
+    for y in range(1, 15):
+        for x in range(1, 15):
+            g[y][x] = BODY if 3 <= y <= 12 else STEEL
     return g
 
 
@@ -152,8 +153,8 @@ def make_trim():
             if y == 1 and x % 4 == 0:
                 c = rgb(0x757A84)
             g[y][x] = c
-    g[6] = [rgb(0x5A5E67)] * 16
-    g[7] = [rgb(0x30323A)] * 16
+    g[6] = [rgb(0x1E2024)] * 16
+    g[7] = [rgb(0x4A4E57)] * 16
     g[9] = [rgb(0x30323A)] * 16
     g[11] = [INNER] * 16
     g[13] = [rgb(0xA0A6B0)] * 16

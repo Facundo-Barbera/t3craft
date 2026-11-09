@@ -434,8 +434,8 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 	}
 
 	/**
-	 * The 3 px chin of the screen's frame: a status LED at the right (the state's colour) and the "T3CRAFT" mark at
-	 * the left, in muted steel. They sit on the chin's face, which stands one model pixel proud of the glass.
+	 * The 4 px chin of the screen's frame: a status LED at the right (the state's colour) in the band above the foot.
+	 * It sits on the chin's face, which stands one model pixel proud of the glass.
 	 */
 	private static void drawChin(State s, Glyphs g, MonitorLod.Layout l, PoseStack ps, SubmitNodeCollector c, int light, float z, int led) {
 		float mp = l.modelPx();
@@ -452,14 +452,6 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 			ScreenDraw.rect(pose, vc, x0 - mp * 0.5f, y0 - mp * 0.25f, x1 + mp * 0.5f, y1 + mp * 0.25f, 0, 0xFF111316, light);
 			ScreenDraw.rect(pose, vc, x0, y0, x1, y1, -z, 0xFF000000 | led, light);
 		});
-		float bs = Math.min(1f, 1.7f * mp / 7f);
-		if (bs >= 0.6f) {
-			ps.pushPose();
-			ps.translate(3 * mp, l.height() - 3 * mp - 3.5f * bs, -z);
-			ps.scale(bs, bs, 1f);
-			text(ps, c, plain("T3CRAFT"), 0, 0, 0xFF8A919B, light);
-			ps.popPose();
-		}
 		ps.popPose();
 	}
 
@@ -524,13 +516,8 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 	}
 
 	private static float rowsTop(MonitorLod.Layout l, Glyphs g) {
-		if (g.topAlign()) {
-			// static status screens read top-down, right under the header
-			return l.bezel() + MonitorLod.HEADER + (g.chip() != null ? MonitorLod.STATUS_BAND : 0) + 3;
-		}
-		// newest row sits just above the footer; fewer rows than room leave the gap at the top
-		float bottom = footerY(l) - 1;
-		return bottom - g.rows().size() * MonitorLod.LINE;
+		// rows read top-down right under the header (a log shorter than the screen leaves the gap at the bottom; a full one is its tail)
+		return l.bezel() + MonitorLod.HEADER + (g.chip() != null ? MonitorLod.STATUS_BAND : 0) + 3;
 	}
 
 	private static float footerY(MonitorLod.Layout l) {

@@ -188,7 +188,7 @@ Monitor de escritorio de oficina en grafito/acero, con el cristal hundido. Todo 
   - **sin hilo** (sin vincular, hilo desconocido o archivado): pantalla de espera de cristal casi negro con dos reflejos
     inclinados, la marca **T3** y la palabra grande `NO THREAD` / `OFFLINE` / `ARCHIVED` (más el nombre del hilo en las dos
     últimas); igual a cualquier distancia; el LED de la barbilla respira apenas en `NO THREAD`;
-  - **barbilla**: LED del color del estado a la derecha y "T3CRAFT" a la izquierda, sobre la cara del labio (la banda de 2 px sobre el pie).
+  - **barbilla**: LED del color del estado a la derecha, sobre la cara del labio (la banda de 2 px sobre el pie).
 - **Revisión**: `tools/render/submit.sh --final -- --monitors` (`MonitorViews`: muro 6×3, tres escritorios de 3×2 con lámpara,
   un monitor suelto; vistas `iso_se`, `front`, `wall`, `desks`, `desk1`, `far_20`, `far_50`). El renderer headless dibuja solo
   modelos de bloque: **el texto de la pantalla (el BER) no se ve**, solo el cristal.
