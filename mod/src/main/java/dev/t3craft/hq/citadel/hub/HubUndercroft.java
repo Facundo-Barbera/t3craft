@@ -402,7 +402,7 @@ public final class HubUndercroft {
 			put(c, x, sy(), z, chest
 					? Blocks.CHEST.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, toCentre)
 					: Blocks.BARREL.defaultBlockState().setValue(BlockStateProperties.FACING, Direction.UP));
-			if ((z - z0) % 3 == 1) {
+			if (!chest && (z - z0) % 3 == 1) { // a lantern needs a full block under it: barrels only
 				put(c, x, sy() + 1, z, Blocks.LANTERN.defaultBlockState());
 			}
 		}
