@@ -133,10 +133,11 @@ public final class GateToriiCherry implements Variant {
 		// --- hanging lanterns at the edges of the opening (the centre stays clear)
 		for (int side = -1; side <= 1; side += 2) {
 			int u = side < 0 ? lp + 1 : rp - 1;
-			for (int y = nuki - 1; y > 2; y--) {
+			int lamp = nuki >= 4 ? 3 : 2; // light rule: lanterns hang at foot + 3 or higher (a 3-high opening has no room)
+			for (int y = nuki - 1; y > lamp; y--) {
 				p.put(c, u, y, vc, b(Blocks.IRON_CHAIN), CitadelCanvas.HANGING);
 			}
-			p.put(c, u, 2, vc, LANTERN.setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
+			p.put(c, u, lamp, vc, LANTERN.setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
 		}
 
 		// --- kasagi. Lower layer: a pink shimaki beam over the shaft depth, flanked by bevelled eaves of

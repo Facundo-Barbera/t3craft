@@ -120,15 +120,16 @@ public final class BannerPoleTallStandard implements Variant {
 		}
 
 		if (single) {
-			p.set(c, cu, head - 1, cv, b(Blocks.GOLD_BLOCK));
+			p.set(c, cu, head - 1, cv, b(Blocks.CHERRY_FENCE)); // slim mast under the banner, not a gold cube
 			// ROTATION_16: 0 faces south, 8 faces north (local front)
 			p.put(c, cu, head, cv, b(Blocks.BANNER.pick(main)).setValue(BlockStateProperties.ROTATION_16, 8), CitadelCanvas.DECOR);
 			return;
 		}
 
 		// --- crosshead, arms, banners
-		p.set(c, cu, head, cv, b(Blocks.STRIPPED_CHERRY_WOOD));
-		p.set(c, cu, head + 1, cv, b(Blocks.GOLD_BLOCK));
+		// the crosshead is a horizontal beam (a log on the X axis), not a cube; a standing lantern crowns the mast
+		p.set(c, cu, head, cv, b(Blocks.STRIPPED_CHERRY_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.X));
+		p.set(c, cu, head + 1, cv, b(Blocks.LANTERN));
 		p.set(c, cu, top, cv, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState());
 		boolean arms = w >= 3 && d >= 2; // one deep: the banners hang off the crosshead's sides instead
 		if (arms) {

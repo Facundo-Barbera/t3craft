@@ -149,7 +149,9 @@ public final class BannerPoleBuntingPair implements Variant {
 				p.set(c, u, y, pv, b(Blocks.CHERRY_FENCE));
 			}
 		}
-		p.set(c, u, line, pv, b(Blocks.STRIPPED_CHERRY_WOOD));
+		// the collar is a fence bracket with its arm reaching towards the line, not a cube
+		p.set(c, u, line, pv, b(Blocks.CHERRY_FENCE)
+				.setValue(u == 0 ? BlockStateProperties.EAST : BlockStateProperties.WEST, true));
 		p.set(c, u, top, pv, lantern);
 	}
 }

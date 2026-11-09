@@ -98,8 +98,9 @@ public final class LampStreetBrazierTripod implements Variant {
 		BlockState copper = slab(Blocks.CUT_COPPER_SLAB.waxed().unaffected()).setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP);
 		for (int[] k : new int[][] {{0, 0}, {2, 0}, {0, 2}, {2, 2}}) {
 			p.set(c, k[0], dish, k[1], copper);
-			// rim horns: a copper slab standing on each corner, the middle of every side stays open for the fire
-			p.set(c, k[0], fire, k[1], slab(Blocks.CUT_COPPER_SLAB.waxed().unaffected()));
+			// rim horns: a copper spike rising from each corner (a second slab would read as a cube),
+			// the middle of every side stays open for the fire
+			p.set(c, k[0], fire, k[1], Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState());
 		}
 
 		// --- fire, in the open
