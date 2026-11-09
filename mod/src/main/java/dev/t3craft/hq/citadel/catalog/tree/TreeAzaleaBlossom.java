@@ -204,10 +204,10 @@ public final class TreeAzaleaBlossom implements Variant {
 	private static void shapeDome(X x) {
 		Random r = x.r;
 		double rc = x.rc;
-		x.ryM = Math.max(1.3, Math.min(Math.min(4.2, rc * 0.62 + 0.9), (x.avail - 0.4) / 1.92));
+		x.ryM = Math.max(1.3, Math.min(Math.min(3.0, rc * 0.45 + 0.6), (x.avail - 0.4) / 1.92));
 		x.cyM = CLEAR + x.ryM * 0.92;
-		x.rxM = x.ru * (0.62 + 0.1 * r.nextDouble());
-		x.rzM = x.rv * (0.62 + 0.1 * r.nextDouble());
+		x.rxM = x.ru * (0.7 + 0.1 * r.nextDouble());
+		x.rzM = x.rv * (0.7 + 0.1 * r.nextDouble());
 		double slack = Math.max(0, Math.min(x.w / 2.0 - 0.5 - x.rxM, x.d / 2.0 - 0.5 - x.rzM));
 		double la = r.nextDouble() * Math.PI * 2;
 		double lamp = Math.min(slack, 0.2 + 0.5 * r.nextDouble());
@@ -218,14 +218,14 @@ public final class TreeAzaleaBlossom implements Variant {
 		double a0 = r.nextDouble() * Math.PI * 2;
 		for (int i = 0; i < nS; i++) {
 			double ang = a0 + i * Math.PI * 2 / nS + (r.nextDouble() - 0.5) * 0.6;
-			double rs = Math.max(1.7, rc * (0.4 + 0.12 * r.nextDouble()));
+			double rs = Math.max(1.9, rc * (0.5 + 0.12 * r.nextDouble()));
 			double dd = Math.max(1.2, rc * (0.62 + 0.22 * r.nextDouble()) - 0.15 * rs);
 			double cu = TreeKit.clamp(x.cu0 + Math.cos(ang) * dd, rs * 0.85, x.w - 1 - rs * 0.85);
 			double cv = TreeKit.clamp(x.cv0 + Math.sin(ang) * dd, rs * 0.85, x.d - 1 - rs * 0.85);
-			double rys = Math.max(1.3, x.ryM * (0.62 + 0.25 * r.nextDouble()));
+			double rys = Math.max(1.3, x.ryM * (0.7 + 0.25 * r.nextDouble()));
 			double lo = CLEAR + 0.9 * rys;
 			double hi = x.p.h() - 0.6 - rys;
-			double cy = Math.max(lo, Math.min(Math.max(lo, hi), x.cyM - x.ryM * (0.15 + 0.45 * r.nextDouble())));
+			double cy = Math.max(lo, Math.min(Math.max(lo, hi), x.cyM - x.ryM * (0.1 + 0.45 * r.nextDouble())));
 			x.balls.add(new double[] {cu, cy, cv, rs, rys, rs * (0.9 + 0.2 * r.nextDouble())});
 		}
 	}
@@ -382,7 +382,8 @@ public final class TreeAzaleaBlossom implements Variant {
 			int tu = su + TreeKit.clamp((int) Math.round(best[0] - su), -2, 2);
 			int tv = sv + TreeKit.clamp((int) Math.round(best[2] - sv), -2, 2);
 			t.wood(su, 0, sv, b(Blocks.MANGROVE_ROOTS));
-			TreeKit.branch(t, WOOD, new int[] {su, 1, sv}, new int[] {tu, CLEAR + 1, tv}, false);
+			TreeKit.branch(t, WOOD, new int[] {su, 1, sv}, new int[] {su, CLEAR - 1, sv}, false);
+			TreeKit.branch(t, WOOD, new int[] {su, CLEAR - 1, sv}, new int[] {tu, CLEAR + 1, tv}, false);
 			x.tips.add(new int[] {tu, CLEAR + 1, tv});
 			for (int[] f : X.FACES) {
 				int ou = su + f[0];
@@ -498,7 +499,7 @@ public final class TreeAzaleaBlossom implements Variant {
 			boolean flower = noise < pf;
 			t.clear(s[0], s[1], s[2]);
 			boolean freeTop = s[1] + 1 < x.p.h() && t.empty(s[0], s[1] + 1, s[2]);
-			if (flower && freeTop && t.hash(s[0] + 1, s[1] + 4, s[2] + 2, 100) < 42) {
+			if (flower && freeTop && t.hash(s[0] + 1, s[1] + 4, s[2] + 2, 100) < 62) {
 				t.fixed(s[0], s[1], s[2], b(Blocks.MOSS_BLOCK));
 				boolean bush = t.hash(s[0], s[1] + 8, s[2], 3) != 0 && (s[1] + 2 >= x.p.h() || t.empty(s[0], s[1] + 2, s[2]));
 				t.cover(s[0], s[1] + 1, s[2], bush ? b(Blocks.FLOWERING_AZALEA)
