@@ -533,6 +533,18 @@ public final class HouseTerracePodium implements Variant {
 	 * with slabs, a lightning-rod finial at each end of the ridge and two chimneys through the slopes. The mass under the
 	 * stairs is solid: no attic, nothing floating.
 	 */
+	/** Rings of stairs at the full slope before the roof flattens to half a block per ring. */
+	private static final int STEEP = 2;
+
+	/** The y of the top row of ridge blocks (the cap slab sits on it) for a ridge ring {@code rEff}. */
+	private static int ridgeTop(int rEff, int pp) {
+		if (rEff <= STEEP) {
+			return pp + rEff;
+		}
+		int t = rEff - STEEP;
+		return t % 2 == 1 ? pp + STEEP + (t + 1) / 2 : pp + STEEP + t / 2;
+	}
+
 	private static void roof(K k, G g) {
 		Plot p = k.p;
 		Roof rf = g.roof;
@@ -542,35 +554,47 @@ public final class HouseTerracePodium implements Variant {
 		int v0 = g.hv0 - 1;
 		int e = g.hv1 + 1;
 		int minDim = Math.min(bb - a + 1, e - v0 + 1);
-		int room = g.h - 1 - pp;
-		// a gentle slope of 1 in 2: from the eave stair a full block, then a slab, a block, a slab... one half block per ring;
-		// the innermost rings are the ridge. rEff keeps the crest (and its cap slab) inside the plot's height.
-		int rEff = Math.min((minDim - 1) / 2, 2 * (room - 2) + 1);
-		if (rEff < 2) {
+		// the profile: the eave stair, then STEEP rings of stairs (1 in 1) for S rings, then a gentle slope (a slab, a block, a slab...,
+		// one half block per ring) up to the ridge, a row of ridge blocks under a slab cap. rEff keeps the crest inside the plot's height
+		// and the whole roof at most 6 blocks over the eaves.
+		int rEff = (minDim - 1) / 2;
+		while (rEff > 2 && (ridgeTop(rEff, pp) > pp + 6 || ridgeTop(rEff, pp) + 1 > g.h - 1)) {
+			rEff--;
+		}
+		if (rEff < 2 || ridgeTop(rEff, pp) + 1 > g.h - 1) {
 			return;
 		}
-		int j = rEff / 2;
+		int rt = ridgeTop(rEff, pp);
 		for (int u = a; u <= bb; u++) {
 			for (int v = v0; v <= e; v++) {
 				int rr = Math.min(Math.min(u - a, bb - u), Math.min(v - v0, e - v));
 				if (rr == 0) {
 					k.set(u, pp, v, ringStair(rf.eave(), v == v0, v == e, u == a, u == bb, false));
+				} else if (rr < rEff && rr <= STEEP) {
+					boolean n = v == v0 + rr;
+					boolean s = v == e - rr;
+					boolean w = u == a + rr;
+					boolean ee = u == bb - rr;
+					k.set(u, pp + rr, v, ringStair(rf.stairs(), n, s, w, ee, false));
+					for (int y = pp + 1; y < pp + rr; y++) {
+						k.set(u, y, v, mix(p, u, y, v, rf.solid(), rf.solid(), rf.solidAlt()));
+					}
 				} else if (rr < rEff) {
-					int solidTop = rr % 2 == 1 ? pp + (rr - 1) / 2 : pp + rr / 2 - 1;
+					int t = rr - STEEP;
+					int slabY = pp + STEEP + (t + 1) / 2;
+					int solidTop = t % 2 == 1 ? slabY - 1 : pp + STEEP + t / 2;
 					for (int y = pp + 1; y <= solidTop; y++) {
 						k.set(u, y, v, mix(p, u, y, v, rf.solid(), rf.solid(), rf.solidAlt()));
 					}
-					if (rr % 2 == 0) {
-						k.set(u, pp + rr / 2, v, slab(rf.slab()));
+					if (t % 2 == 1) {
+						k.set(u, slabY, v, slab(rf.slab()));
 					}
 				} else {
-					for (int y = pp + 1; y < pp + j; y++) {
+					for (int y = pp + 1; y < rt; y++) {
 						k.set(u, y, v, mix(p, u, y, v, rf.solid(), rf.solid(), rf.solidAlt()));
 					}
-					if (j >= 1) {
-						k.set(u, pp + j, v, b(rf.ridge()));
-					}
-					k.set(u, pp + j + 1, v, slab(rf.slab()));
+					k.set(u, rt, v, b(rf.ridge()));
+					k.set(u, rt + 1, v, slab(rf.slab()));
 				}
 			}
 		}
@@ -581,16 +605,16 @@ public final class HouseTerracePodium implements Variant {
 		int mu = (a + bb) / 2;
 		int mv = (v0 + e) / 2;
 		if (fu >= fv) {
-			k.set(a + rEff, pp + j + 1, mv, rod);
-			k.set(bb - rEff, pp + j + 1, mv, rod);
+			k.set(a + rEff, rt + 1, mv, rod);
+			k.set(bb - rEff, rt + 1, mv, rod);
 		} else {
-			k.set(mu, pp + j + 1, v0 + rEff, rod);
-			k.set(mu, pp + j + 1, e - rEff, rod);
+			k.set(mu, rt + 1, v0 + rEff, rod);
+			k.set(mu, rt + 1, e - rEff, rod);
 		}
 		// two chimneys through the slopes, either side
 		if (rEff >= 3) {
 			int cv = (v0 + e) / 2;
-			int top = Math.min(pp + j + 3, g.h - 2);
+			int top = Math.min(rt + 2, g.h - 2);
 			for (int cu : new int[] {a + 2, bb - 2}) {
 				for (int y = pp + 1; y <= top; y++) {
 					k.set(cu, y, cv, k.hash(cu, y, cv, 3) == 0 ? b(Blocks.DEEPSLATE_BRICKS) : b(Blocks.BRICKS));
