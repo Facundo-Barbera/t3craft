@@ -417,6 +417,7 @@ public final class PlanReport {
 		int climbed = 0;
 		List<String> partial = new ArrayList<>();
 		List<String> cut = new ArrayList<>();
+		List<Cut> cuts = new ArrayList<>();
 		for (Map.Entry<Long, BlockState> e : stairs.entrySet()) {
 			if (seen.contains(e.getKey())) {
 				continue;
@@ -488,26 +489,222 @@ public final class PlanReport {
 				}
 				partial.add(line + why);
 			} else if (covered * 2 >= chain.size() && standable > 0) {
-				total++;
-				cut.add(line);
+				cuts.add(new Cut(line, chain, standable));
 			}
 		}
+		// fix/stair-reach: who owns each flight nobody reaches, and is it a real stair or a roof slope made of stairs
+		List<String> roofs = new ArrayList<>();
+		JsonArray detail = new JsonArray();
+		Map<Long, Island> islandOf = new HashMap<>();
+		Map<String, int[]> byOrigin = new TreeMap<>();
+		int[] byClass = new int[3];
+		for (Cut ct : cuts) {
+			Island isl = null;
+			int stands = 0;
+			for (BlockPos s : ct.chain()) {
+				BlockPos stand = s.above();
+				if (PlanProbe.standable(plan, stand)) {
+					isl = islandOf.get(stand.asLong());
+					if (isl == null) {
+						isl = island(plan, reach, stand);
+						for (BlockPos cell : isl.cells()) {
+							islandOf.putIfAbsent(cell.asLong(), isl);
+						}
+					}
+					break;
+				}
+			}
+			if (isl != null) {
+				for (BlockPos s : ct.chain()) {
+					if (isl.cells().contains(s.above())) {
+						stands++;
+					}
+				}
+			}
+			int n = ct.chain().size();
+			int extra = isl == null ? 0 : isl.cells().size() - stands;
+			String cls;
+			String why;
+			if (isl == null || stands == 0) {
+				cls = "roof";
+				why = "no standable step";
+			} else if (ct.standable() * 2 < n) {
+				cls = "other";
+				why = "head room on fewer than half of the steps";
+			} else if (extra < LANDING_CELLS) {
+				cls = "roof";
+				why = "walkable air only on the stairs themselves (" + extra + " more cells), nothing to walk onto or from";
+			} else if (isl.cells().size() > BIG_ISLAND) {
+				cls = "other";
+				why = "part of a large walkable area (" + isl.cells().size() + " cells) the spawn does not reach";
+			} else {
+				cls = "real";
+				why = "a floor of " + isl.cells().size() + " cells with the stairs, " + (isl.gap() < 0 ? "no reached cell near" : "gap " + isl.gap() + " to the walkable network");
+			}
+			BlockPos foot = ct.chain().get(0);
+			String origin = originOf(plan, foot);
+			int[] oc = byOrigin.computeIfAbsent(origin, k -> new int[3]);
+			int ci = cls.equals("roof") ? 0 : cls.equals("real") ? 1 : 2;
+			oc[ci]++;
+			byClass[ci]++;
+			JsonObject d = new JsonObject();
+			d.addProperty("flight", ct.line());
+			d.addProperty("origin", origin);
+			d.addProperty("group", String.valueOf(plan.groupAt(foot)));
+			d.addProperty("class", cls);
+			d.addProperty("why", why);
+			if (isl != null) {
+				d.addProperty("islandCells", isl.cells().size());
+				d.addProperty("islandBox", box(isl.box()));
+				d.addProperty("skyFraction", Math.round(isl.sky() * 100) / 100.0);
+				d.addProperty("gap", isl.gap());
+				d.addProperty("gapFrom", isl.gapFrom());
+				d.addProperty("gapTo", isl.gapTo());
+				d.addProperty("between", isl.between());
+			}
+			detail.add(d);
+			String full = ct.line() + " | " + origin + " | " + cls + ": " + why;
+			if (cls.equals("roof")) {
+				roofs.add(full);
+			} else {
+				cut.add(full);
+				total++;
+			}
+		}
+		int rawTotal = total + roofs.size();
 		StringBuilder sb = new StringBuilder("STAIR FLIGHTS (3+ steps; roofs left out)\n");
-		sb.append("  ").append(climbed).append(" of ").append(total).append(" flights climbed on foot from the spawn\n");
+		sb.append("  ").append(climbed).append(" of ").append(total).append(" flights climbed on foot from the spawn (").append(roofs.size())
+				.append(" roof slopes made of stairs not counted; ").append(rawTotal).append(" with them)\n");
 		listLines(sb, partial, o.maxList, "partly reached");
 		listLines(sb, cut, o.maxList, "under a roof, not reached");
+		sb.append("  not reached by class: ").append(byClass[0]).append(" roof slope, ").append(byClass[1]).append(" real stair, ").append(byClass[2]).append(" other\n");
+		for (Map.Entry<String, int[]> e : byOrigin.entrySet()) {
+			sb.append("    ").append(String.format(Locale.ROOT, "%-44s roof %2d  real %2d  other %2d", e.getKey(), e.getValue()[0], e.getValue()[1], e.getValue()[2])).append('\n');
+		}
 		sections.add(sb.toString());
-		summary.put("stair flights", climbed + " of " + total + " climbed; " + partial.size() + " partial, " + cut.size() + " cut off");
+		summary.put("stair flights", climbed + " of " + total + " climbed; " + partial.size() + " partial, " + cut.size() + " cut off, " + roofs.size() + " roof slopes discarded");
 		JsonObject j = new JsonObject();
 		j.addProperty("total", total);
 		j.addProperty("climbed", climbed);
+		j.addProperty("rawTotal", rawTotal);
+		j.addProperty("roofsDiscarded", roofs.size());
 		JsonArray pj = new JsonArray();
 		partial.forEach(pj::add);
 		j.add("partial", pj);
 		JsonArray cj = new JsonArray();
 		cut.forEach(cj::add);
 		j.add("cutOff", cj);
+		JsonArray rj = new JsonArray();
+		roofs.forEach(rj::add);
+		j.add("roofs", rj);
+		j.add("cutOffDetail", detail);
+		JsonObject cl = new JsonObject();
+		cl.addProperty("roof", byClass[0]);
+		cl.addProperty("real", byClass[1]);
+		cl.addProperty("other", byClass[2]);
+		j.add("byClass", cl);
+		JsonObject bo = new JsonObject();
+		for (Map.Entry<String, int[]> e : byOrigin.entrySet()) {
+			bo.add(e.getKey(), arr(e.getValue()));
+		}
+		j.add("byOrigin", bo);
 		json.add("stairFlights", j);
+	}
+
+	/** A flight nobody reaches: its steps, how many have room to stand, as found. */
+	private record Cut(String line, List<BlockPos> chain, int standable) {
+	}
+
+	/** More walkable cells than the stairs themselves for a flight to count as a stair (a landing at either end). */
+	private static final int LANDING_CELLS = 4;
+	/** An island larger than this is a whole floor, not the surroundings of a stair. */
+	private static final int BIG_ISLAND = 6000;
+
+	/**
+	 * The walkable cells joined to one stand cell, cut off from the spawn's network: their box, the fraction open to the
+	 * sky, and the nearest cell the spawn reaches ({@code gap}, -1 when none within 4 blocks) with what lies between.
+	 */
+	private record Island(Set<BlockPos> cells, int[] box, double sky, int gap, String gapFrom, String gapTo, String between) {
+	}
+
+	private static Island island(BuildPlan plan, Set<BlockPos> reach, BlockPos from) {
+		Set<BlockPos> cells = PlanProbe.reachable(plan, from);
+		int[] bb = {Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MIN_VALUE, Integer.MIN_VALUE, Integer.MIN_VALUE};
+		for (BlockPos p : cells) {
+			bb[0] = Math.min(bb[0], p.getX());
+			bb[1] = Math.min(bb[1], p.getY());
+			bb[2] = Math.min(bb[2], p.getZ());
+			bb[3] = Math.max(bb[3], p.getX());
+			bb[4] = Math.max(bb[4], p.getY());
+			bb[5] = Math.max(bb[5], p.getZ());
+		}
+		int step = Math.max(1, cells.size() / 400);
+		int sampled = 0;
+		int open = 0;
+		int i = 0;
+		int bestD = Integer.MAX_VALUE;
+		BlockPos bestA = null;
+		BlockPos bestB = null;
+		for (BlockPos p : cells) {
+			boolean sample = i++ % step == 0;
+			if (sample) {
+				sampled++;
+				boolean covered = false;
+				for (int dy = 2; dy <= 16 && !covered; dy++) {
+					covered = solidCell(plan.at(p.above(dy)) == null ? null : plan.at(p.above(dy)).state());
+				}
+				if (!covered) {
+					open++;
+				}
+			}
+			if (sample || cells.size() <= 4000) {
+				for (int dx = -4; dx <= 4; dx++) {
+					for (int dz = -4; dz <= 4; dz++) {
+						for (int dy = -2; dy <= 2; dy++) {
+							int d = dx * dx + dz * dz + dy * dy;
+							if (d < bestD && reach.contains(p.offset(dx, dy, dz))) {
+								bestD = d;
+								bestA = p;
+								bestB = p.offset(dx, dy, dz);
+							}
+						}
+					}
+				}
+			}
+		}
+		String between = "";
+		if (bestA != null) {
+			StringBuilder sb = new StringBuilder();
+			int len = Math.max(Math.max(Math.abs(bestB.getX() - bestA.getX()), Math.abs(bestB.getZ() - bestA.getZ())), Math.abs(bestB.getY() - bestA.getY()));
+			int shown = 0;
+			for (int t = 0; t <= len && shown < 14; t++) {
+				int x = bestA.getX() + Math.round((float) (bestB.getX() - bestA.getX()) * t / Math.max(1, len));
+				int y = bestA.getY() + Math.round((float) (bestB.getY() - bestA.getY()) * t / Math.max(1, len));
+				int z = bestA.getZ() + Math.round((float) (bestB.getZ() - bestA.getZ()) * t / Math.max(1, len));
+				for (int dy = -1; dy <= 2; dy++) {
+					Placement pl = plan.at(new BlockPos(x, y + dy, z));
+					if (pl != null && !pl.state().isAir() && shown < 14) {
+						sb.append(c(new BlockPos(x, y + dy, z))).append('=').append(BuiltInRegistries.BLOCK.getKey(pl.state().getBlock()).getPath()).append(' ');
+						shown++;
+					}
+				}
+			}
+			between = sb.toString().trim();
+		}
+		return new Island(cells, bb, sampled == 0 ? 0 : (double) open / sampled, bestA == null ? -1 : (int) Math.round(Math.sqrt(bestD)), bestA == null ? "" : c(bestA),
+				bestB == null ? "" : c(bestB), between);
+	}
+
+	/** The catalog piece ({@code FAMILY:variant}) whose plot holds the cell, else {@code group:<construction group>}. */
+	private static String originOf(BuildPlan plan, BlockPos p) {
+		dev.t3craft.hq.citadel.CitadelCanvas.Piece best = null;
+		for (dev.t3craft.hq.citadel.CitadelCanvas.Piece pc : dev.t3craft.hq.citadel.CitadelFinish.lastPieces()) {
+			if (p.getX() >= pc.x() && p.getX() < pc.x() + pc.sx() && p.getZ() >= pc.z() && p.getZ() < pc.z() + pc.sz()
+					&& (best == null || pc.sx() * pc.sz() < best.sx() * best.sz())) {
+				best = pc;
+			}
+		}
+		return best != null ? best.id() : "group:" + plan.groupAt(p);
 	}
 
 	private static String box(int[] b) {
