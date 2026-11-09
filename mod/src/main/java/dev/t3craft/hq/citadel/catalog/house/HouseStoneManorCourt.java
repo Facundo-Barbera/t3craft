@@ -135,6 +135,8 @@ public final class HouseStoneManorCourt implements Variant {
 		court(c, p, g);
 		chimneys(c, p, g);
 		yard(c, p, g);
+		// walkability audit: a way up to the sealed upper floor
+		dev.t3craft.hq.citadel.catalog.InteriorStair.stone(c, p, 1, 6);
 	}
 
 	// ------------------------------------------------------------------ floors and walls

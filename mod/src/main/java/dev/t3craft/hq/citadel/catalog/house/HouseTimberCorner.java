@@ -134,6 +134,8 @@ public final class HouseTimberCorner implements Variant {
 		yard(c, p, g);
 		strips(c, p, g);
 		eaves(c, p, g);
+		// walkability audit: a way up to the sealed upper floor
+		dev.t3craft.hq.citadel.catalog.InteriorStair.timber(c, p, 1, 5);
 	}
 
 	// ------------------------------------------------------------------ materials

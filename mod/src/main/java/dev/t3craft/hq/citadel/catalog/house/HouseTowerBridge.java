@@ -102,6 +102,9 @@ public final class HouseTowerBridge implements Variant {
 		gallery(c, l);
 		arch(c, l);
 		yard(c, l);
+		// walkability audit: a way up to the sealed upper floor
+		dev.t3craft.hq.citadel.catalog.InteriorStair.stone(c, p, 1, 5);
+		dev.t3craft.hq.citadel.catalog.InteriorStair.stone(c, p, 5, 9);
 	}
 
 	// ------------------------------------------------------------------ materials

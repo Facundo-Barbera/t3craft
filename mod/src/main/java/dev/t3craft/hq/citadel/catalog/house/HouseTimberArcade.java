@@ -145,6 +145,8 @@ public final class HouseTimberArcade implements Variant {
 		chimney(c, p, g);
 		porticoFurniture(c, p, g);
 		strips(c, p, g);
+		// walkability audit: a way up to the sealed upper floor
+		dev.t3craft.hq.citadel.catalog.InteriorStair.timber(c, p, 1, 6);
 	}
 
 	// ------------------------------------------------------------------ materials

@@ -249,6 +249,11 @@ public final class HallInterior {
 				if (u < 1 || v < 1 || v > W - 2 || F == 1 && u == cu && v == mid) {
 					continue;
 				}
+				// walkability audit: never over the flight of a two-floor hall (a pendant over the first steps was at
+				// head height of the climber: the ring-1 hall's upper floor could not be reached on foot)
+				if (F == 2 && f == 0 && Math.abs(v - mid) <= 1 && u <= fh()) {
+					continue;
+				}
 				BlockPos p = r.cell(u, v, ceil);
 				// never over a desk, and only into open air (not the stairs' core under the top step)
 				if (desks.contains(col(p.getX(), p.getZ())) || !free(c, p.below()) || !free(c, p.below(2))) {

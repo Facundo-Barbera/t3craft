@@ -135,6 +135,9 @@ public final class HouseTimberOverhang implements Variant {
 		chimney(c, p, g);
 		garden(c, p, g);
 		strips(c, p, g);
+		// walkability audit: a way up to the sealed upper floor
+		dev.t3craft.hq.citadel.catalog.InteriorStair.timber(c, p, 1, 5);
+		dev.t3craft.hq.citadel.catalog.InteriorStair.timber(c, p, 5, 9);
 	}
 
 	// ------------------------------------------------------------------ materials

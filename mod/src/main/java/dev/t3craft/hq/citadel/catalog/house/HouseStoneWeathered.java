@@ -108,6 +108,8 @@ public final class HouseStoneWeathered implements Variant {
 		porch(c, p, wa, vm, w);
 		yard(c, p, wa, vm, w, d);
 		eaves(c, p, wa, vm, w, d);
+		// walkability audit: a way up to the sealed upper floor
+		dev.t3craft.hq.citadel.catalog.InteriorStair.stone(c, p, 1, 5);
 	}
 
 	/**

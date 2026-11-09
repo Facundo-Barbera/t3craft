@@ -119,6 +119,8 @@ public final class HouseMachiya implements Variant {
 		street(c, p, s, g);
 		frontPosts(c, p, s, g);
 		courtyard(c, p, r, g);
+		// walkability audit: a way up to the sealed upper floor
+		dev.t3craft.hq.citadel.catalog.InteriorStair.timber(c, p, 1, 5);
 	}
 
 	/**
