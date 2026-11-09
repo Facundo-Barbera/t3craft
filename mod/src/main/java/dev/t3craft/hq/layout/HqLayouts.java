@@ -19,9 +19,6 @@ import org.jspecify.annotations.Nullable;
  *
  * <ul>
  *   <li>{@code classic}: the original hub + spine + wings (what the survival site builds);</li>
- *   <li>{@code campus}: hexagonal barrios round a plaza (very large);</li>
- *   <li>{@code ring}: rings of sectors with radial avenues;</li>
- *   <li>{@code vertical}: towers with an atrium and skybridges;</li>
  *   <li>{@code hybrid-ringcampus}: a ringed citadel whose sectors are campus barrios (the default).</li>
  * </ul>
  *
@@ -36,34 +33,28 @@ public final class HqLayouts {
 	public static final String CONFIG_KEY = "hqLayout";
 
 	public static final String CLASSIC = "classic";
-	public static final String CAMPUS = "campus";
-	public static final String RING = "ring";
-	public static final String VERTICAL = "vertical";
 	public static final String HYBRID_RINGCAMPUS = "hybrid-ringcampus";
 	/**
-	 * The main design, listed first in the HQ menu; every other layout is shown under "Legacy".
-	 * Presentation only: it is not the {@link #DEFAULT_ID} and the registry order does not change.
+	 * The main design (the citadel), listed first in the HQ menu and tagged as the main one. It is also the
+	 * {@link #DEFAULT_ID}.
 	 */
 	public static final String PRIMARY_ID = HYBRID_RINGCAMPUS;
 
 	private static final List<HqLayoutInfo> ALL = List.of(
-			info(CLASSIC, false),
-			info(CAMPUS, true),
-			info(RING, false),
-			info(VERTICAL, false),
-			info(HYBRID_RINGCAMPUS, false));
+			info(HYBRID_RINGCAMPUS),
+			info(CLASSIC));
 
 	private HqLayouts() {
 	}
 
-	private static HqLayoutInfo info(String id, boolean large) {
-		return new HqLayoutInfo(id, "t3craft.hq.layout." + id + ".name", "t3craft.hq.layout." + id + ".desc", large,
+	private static HqLayoutInfo info(String id) {
+		return new HqLayoutInfo(id, "t3craft.hq.layout." + id + ".name", "t3craft.hq.layout." + id + ".desc", false,
 				id.equals(PRIMARY_ID));
 	}
 
 	/**
-	 * Every layout in HQ-menu order: the primary ones first ({@link #PRIMARY_ID}), then the legacy
-	 * ones in registry order. Only for display; {@link #all()} keeps the stable registry order.
+	 * Every layout in HQ-menu order: the primary one first ({@link #PRIMARY_ID}), then the rest in
+	 * registry order. Only for display; {@link #all()} keeps the stable registry order.
 	 */
 	public static List<HqLayoutInfo> menuOrder() {
 		List<HqLayoutInfo> out = new java.util.ArrayList<>(ALL.size());
@@ -80,7 +71,7 @@ public final class HqLayouts {
 		return List.copyOf(out);
 	}
 
-	/** Every layout, in menu order: classic, campus, ring, vertical, hybrid-ringcampus. */
+	/** Every layout, in menu order: hybrid-ringcampus, classic. */
 	public static List<HqLayoutInfo> all() {
 		return ALL;
 	}

@@ -41,9 +41,8 @@ import net.minecraft.world.level.block.state.BlockState;
  * Options: {@code --out DIR}, {@code --style ID}, {@code --only SUBSTR} (comma-separated view-name
  * filters), {@code --scale F} (multiplies every view's pixels per block), {@code --ss N}
  * (supersampling), {@code --vanilla} (no mod blocks), {@code --no-npcs}, {@code --projects 4,10,20} (rosters of N
- * projects with varied thread counts, three environments and settled threads; the default for styles
- * with their own layout, e.g. {@code --style campus}, which also renders a 4 → 10 → 20 comparison).
- * {@code --layout ID} (feat/hq-layouts: classic, campus, ring, vertical or all) renders a
+ * projects with varied thread counts, three environments and settled threads; used with {@code --layout}).
+ * {@code --layout ID} (feat/hq-layouts: classic, hybrid-ringcampus or all) renders a
  * registered layout through the game's pipeline with {@code --projects} (default 4), see {@link LayoutViews};
  * {@code --layout hybrid-ringcampus} renders that hybrid's own gallery ({@link RingCampusViews}, default 4,10,20).
  * {@code --packs DIR} (feat/hq-layout-packs) generates with the layout packs in {@code DIR} (the game's
@@ -404,36 +403,8 @@ public final class HqRender {
 		Files.createDirectories(out);
 		BlockModels models = new BlockModels();
 		String sid = style.id();
-		if (sid.equals("vertical")) {
-			// layout/vertical: towers, bridges and podium for 4, 10 and 20 projects (VerticalRender)
-			VerticalRender.run(models, style, out, only, scaleMul, ss, npcs);
-			for (String p : models.problems) {
-				System.out.println("note: " + p);
-			}
-			return;
-		}
-		if (sid.equals("ring")) {
-			// layout/ring: growth through 4, 10 and 20 projects (Growth)
-			Growth.render(style, models, out, projects.isEmpty() ? List.of(4, 10, 20) : projects, only, scaleMul, ss, npcs);
-			for (String p : models.problems) {
-				System.out.println("note: " + p);
-			}
-			return;
-		}
 		if (style.ownLayout() || !projects.isEmpty()) {
-			CampusViews.render(models, style, out, projects.isEmpty() ? List.of(4, 10, 20) : projects, only, scaleMul, ss, npcs);
-			for (String p : models.problems) {
-				System.out.println("note: " + p);
-			}
-			return;
-		}
-
-		if (!projects.isEmpty()) {
-			Growth.render(style, models, out, projects, only, scaleMul, ss, npcs);
-			for (String p : models.problems) {
-				System.out.println("note: " + p);
-			}
-			return;
+			throw new IllegalArgumentException("--style " + sid + " / --projects have no gallery of their own; render a registered layout with --layout ID (--projects N)");
 		}
 		Map<String, HqInput> rosters = new LinkedHashMap<>();
 		rosters.put("1p", roster(new int[] {4}, 0));

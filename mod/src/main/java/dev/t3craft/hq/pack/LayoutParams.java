@@ -103,27 +103,6 @@ public final class LayoutParams {
 	public static final Spec CLASSIC_INLAY = spec("classic", "spine.inlayEvery", 4, 3, 12,
 			"classic style: a copper inlay every N blocks down the spine's centre line");
 
-	// ------------------------------------------------------------------ campus
-
-	public static final Spec CAMPUS_ROOF_AZALEA = spec("campus", "roof.azaleaEvery", 7, 3, 31,
-			"flat roof gardens: a flowering azalea on 1 cell in N");
-	public static final Spec CAMPUS_ROOF_MOSS = spec("campus", "roof.mossEvery", 3, 2, 15,
-			"flat roof gardens: moss carpet on 1 cell in N (of the rest)");
-	public static final Spec CAMPUS_PLAZA_LAMPS = spec("campus", "plaza.lampPostEvery", 6, 4, 12,
-			"hub plaza: a lamp post every N blocks along its outer ring");
-
-	// ------------------------------------------------------------------ ring
-
-	public static final Spec RING_TERRACE_BUSH = spec("ring", "terrace.bushEvery", 23, 11, 97,
-			"terraces: an azalea bush on 1 cell in N");
-	public static final Spec RING_PATIO_PLANTER = spec("ring", "patio.planterEvery", 11, 7, 47,
-			"inner patio: a planter / azalea on 1 cell in N");
-
-	// ------------------------------------------------------------------ vertical
-
-	public static final Spec VERTICAL_FACADE_LIGHT = spec("vertical", "facade.lightEvery", 4, 3, 9,
-			"lit panels in the tower facades every N blocks");
-
 	// ------------------------------------------------------------------ hybrid-ringcampus
 
 	public static final Spec RINGCAMPUS_STREET_LIGHT = spec("hybrid-ringcampus", "streets.lightEvery", 41, 17, 97,

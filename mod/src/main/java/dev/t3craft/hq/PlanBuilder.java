@@ -235,7 +235,7 @@ final class PlanBuilder {
 
 		/**
 		 * The state this module wrote at a cell so far, or null when this module has not written it
-		 * (read-only; hybrid-towncenter's light pass uses it before {@link #close()}).
+		 * (read-only; a light pass may use it before {@link #close()}).
 		 */
 		@Nullable BlockState get(int x, int y, int z) {
 			Cell c = cells.get(BlockPos.asLong(x, y, z));

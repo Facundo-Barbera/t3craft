@@ -15,10 +15,10 @@ public final class DemoPlacement {
 
 	/**
 	 * fix/hq-npc-spawn: the viewpoint for the active HQ layout. Classic keeps {@link #viewpoint(DemoWorldSpec)}
-	 * (in front of its portico). A layout with its own ground plan (campus, ring, vertical, ensanche,
-	 * village) spreads far beyond the classic portico line, so that spot falls inside or under the
-	 * building (in the ring: in the cloister's footing, under the hub's podium), and so did the NPCs'
-	 * provisional grid around the player. Those layouts use their plan's {@code spawn} anchor at the
+	 * (in front of its portico). A layout with its own ground plan (the citadel)
+	 * spreads far beyond the classic portico line, so that spot falls inside or under the
+	 * building (in the cloister's footing, under the hub's podium), and so did the NPCs'
+	 * provisional grid around the player. Such a layout uses their plan's {@code spawn} anchor at the
 	 * demo site instead: a free, standable cell every desk is reachable from (checked by the plan
 	 * validators and {@code DemoHqReachabilityTest}).
 	 */
