@@ -387,6 +387,77 @@ mapas, salvo que se quiera el efecto diegético) y I10 (API local).
 
 ---
 
+## 7. Anexo: cuánta libertad da la UI de Minecraft (unificar Settings, Pairing, etc. con el chat)
+
+Pregunta de Facundo (2026-11-09): si el mod llevara su propia instancia de T3 Code, ¿cuánto se puede unificar y personalizar
+la UI? ¿Iconos propios, texto con tamaño independiente del GUI scale?
+
+**Respuesta corta: casi total.** Una `Screen` es Java arbitrario que dibuja en un lienzo de píxeles de GUI y recibe teclado y
+ratón. Lo que se puede hacer ahí no depende de vanilla, solo de cuánto quiera escribir el mod.
+
+### Por qué hoy las pantallas se ven distintas (en el código)
+- **Chat y T3Screen** (`client/chat/`, `client/t3ui/`) dibujan con `ChatTheme` + `ChatDraw` + el kit de sprites
+  `assets/t3craft/textures/gui/sprites/chat/*` (paneles nine-slice con `.mcmeta`, `pill`, `keycap`, `text_field`,
+  `scroll_*`, `dot_*`, `icon_*`). Todo propio y tematizable (`ChatTheme.warmStudio()` / `terminal()`).
+- **Settings, Environments, Pair, Confirm, NewThread, OperatePair** (`client/config/`, `client/screen/`) heredan de `Screen`
+  con `BaseConfigScreen` y usan los **widgets vanilla** (`Button`, `EditBox`, el toggle "ON/OFF" en verde y rojo). De ahí el salto visual.
+- Ya se hace en el mod lo difícil: composer propio con edición completa (`ComposerText`), listas con scroll, popovers, tooltips,
+  nine-slice, texturas dinámicas (miniaturas de imágenes, pantalla en mano).
+
+### Iconos propios: sí, de tres maneras
+1. **Sprites** (ya existe: `chat/icon_*.png`). PNG en `textures/gui/sprites`, se dibujan con `blitSprite`; con `.mcmeta`
+   `nine_slice` se estiran sin deformar. Un usuario puede reemplazarlos con un resource pack (skin gratis).
+2. **Glifos en una fuente propia** (recomendado para iconos inline). Un `font/*.json` con un proveedor `bitmap` (PNG de
+   iconos mapeados a caracteres Unicode del área privada) o `ttf` (una fuente de iconos vectorial). El icono se escribe
+   dentro de cualquier `Component`: línea de chat, toast, tooltip, botón, label, y se tiñe con el color del texto.
+   El mod ya usa fuentes por `Style.withFont` (`ConversationPanel`, `RequestCard` usan la `uniform` de vanilla).
+3. **Dibujo por código** (`fill`, líneas, formas) y **texturas dinámicas** (`DynamicTexture` desde un `NativeImage`),
+   por ejemplo un **QR** para el pairing o un avatar generado.
+- Vigilar licencias: si se toman iconos de T3 Code o de una librería (Lucide, Phosphor), revisar la licencia; los logos de T3
+  son marca.
+
+### Tamaño de texto independiente del GUI scale: sí, con cuidado
+- El GUI scale de vanilla es **entero** (1, 2, 3, 4, "auto") y global. Todo lo demás se multiplica por él. En 4K con 2 todo
+  queda pequeño y con 3 enorme, y no existe 2,5.
+- **`GuiGraphicsExtractor.pose()`** es una pila `Matrix3x2fStack` (traslación, rotación, escala). Se puede escalar el texto y todo
+  el contenido por un factor fraccionario. El mod ya lo hace en el mundo (`MonitorRenderer`, `StatusScreen`).
+- **Para que se vea nítido** hay que dejar de depender de la fuente bitmap de 8 px (se ve irregular a escalas no enteras) y
+  usar un proveedor **`ttf`** con `size` y `oversample` (Inter, Geist, JetBrains Mono para código; revisar licencia OFL). Eso da
+  texto vectorial, bordes finos y una tipografía más parecida a T3 Code.
+- **Patrón recomendado: "UI scale" propio** (ajuste de 75 % a 200 %, o "igual que T3 web"). Cada pantalla de T3Craft calcula
+  `k = deseado / guiScale`, aplica `pose().scale(k)` al empezar a dibujar, trabaja en un espacio de layout virtual
+  (`width/k`, `height/k`) y **divide las coordenadas del ratón por `k`**. Es el mismo mecanismo para todas las pantallas, y
+  no afecta a los demás mods ni al resto del juego.
+- Alternativa descartada: cambiar `Window` guiScale mientras la pantalla está abierta. Es global, hay que restaurarlo y
+  rompe el HUD, los toasts y otros mods.
+- **Costes del patrón:** hay que transformar a mano el hit-testing y el cursor de texto; verificar que `enableScissor` y los
+  tooltips respeten la escala **(verificar en 26.3)**; los tooltips de vanilla se dibujan sin escala, así que conviene
+  tener los propios (el mod ya los tiene en el chat).
+
+### Qué sí limita
+- **Un solo lienzo:** todo cae dentro de la ventana del juego. Un segundo OS-window (AWT/Swing) choca con GLFW en macOS.
+- **Accesibilidad hay que construirla:** los widgets propios no se narran ni se navegan con teclado, a diferencia de `Button`.
+  Hay que implementar `NarratableEntry` y el foco con Tab, o aceptar la pérdida.
+- **IME y texto:** el composer ya resolvió la entrada por SDL3 (`TextInputManager`); cada campo propio nuevo debe reutilizarlo.
+- **Rendimiento:** pantallas grandes con markdown deben cachear glifos/líneas (el chat ya lo hace con `DrawnRows`).
+- **Resource packs de usuario** pueden sobrescribir nuestros sprites. Es una ventaja si es intencional.
+
+### Cómo se unificaría (propuesta de arquitectura, no implementada)
+1. Extraer del chat un **mini UI kit** compartido: `T3Button`, `T3Toggle`, `T3Field`, `T3Select`, `T3List`, `T3Dialog`,
+   `T3Tabs`, sobre `ChatTheme`/`ChatDraw` (que ya existen). Las pantallas actuales pasarían a usarlos.
+2. Mover **Settings, Environments, Pairing/Operate y Nuevo hilo** a **paneles dentro de `T3Screen`** (como la página de
+   Settings de T3 Code), no pantallas separadas; los diálogos de confirmación pasan a ser modales del kit.
+3. Un solo **UI scale** y una sola **fuente TTF** para todo el kit, con un ajuste en Settings.
+4. Un solo **catálogo de iconos** (sprites o glifos) con nombres estables.
+- Esfuerzo orientativo: kit M, migrar las 6 a 8 pantallas M a L, UI scale + TTF M. Es independiente de la capa de red.
+
+### Relación con "el mod corre su propio T3 Code (CLI)" (issue #1, otro hilo)
+Si el mod lleva su propia instancia de T3 y usa T3 Connect, el **emparejamiento por entorno** (`/t3craft pair`, copiar el enlace
+`https://host/pair#token=…`, `PairScreen`, `OperatePairScreen`, el toggle Read/Control) se reduce a un **flujo de inicio de sesión**
+(código de dispositivo o abrir el navegador, con un QR) y a una lista de entornos. Eso **encoge la superficie de UI a unificar**.
+Conviene decidir primero el #1 y luego rediseñar esas pantallas una sola vez. Lo que sí es independiente del #1: el kit, el UI
+scale y la fuente.
+
 ## Fuentes web
 
 - GLFW, `glfwRequestWindowAttention`: https://www.glfw.org/docs/latest/group__window.html
