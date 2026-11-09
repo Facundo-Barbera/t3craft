@@ -248,6 +248,13 @@ public final class CitadelNodes {
 	public static void towerFixtures(CitadelCanvas c, Node nd) {
 		int cx = nd.cx();
 		int cz = nd.cz();
+		if (TowerRoom.grand(c.k)) {
+			// grand tower (default scale): painted in real offsets; the screen sits in the north wall's inner layer
+			TowerRoom.build(c, nd);
+			CitadelHub.bigScreen(c, new HqGeometry.Surface(new BlockPos(cx - 3, TowerRoom.SCREEN_Y, cz - TowerRoom.SCREEN_Z), Direction.EAST, Direction.SOUTH, 7, 4), "review", "", false);
+			c.walkSpot(new BlockPos(cx, 1, cz - 4), Direction.NORTH);
+			return;
+		}
 		// the screen keeps its 7 x 4; it stays flush in the (thicker) north wall, on the wall's inner face
 		CitadelHub.bigScreen(c, new HqGeometry.Surface(new BlockPos(cx - 3, 5, cz + realInner(-5, c.k)), Direction.EAST, Direction.SOUTH, 7, 4), "review", "", false);
 		c.walkSpot(new BlockPos(cx, 1, cz + real(-2, c.k)), Direction.NORTH);
