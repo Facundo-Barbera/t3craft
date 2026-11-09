@@ -19,12 +19,12 @@ import net.minecraft.world.level.block.state.properties.Half;
  * side, a square hipped hat (kasa) sloping down from a crown, and a jewel finial (hōju).
  *
  * <ul>
- * <li><b>Silhouette</b>: wide → slim → wide → open cage → wide hat → point. Every level has a different
+ * <li><b>Silhouette</b>: wide → slim → cross → glowing waist → wide hat → point. Every level has a different
  *     width (3, 1, cross, 1, 3, 1), so it reads as a tōrō from far away, not as a stack of cubes.</li>
- * <li><b>Gradient</b>: deepslate foot, stone-brick shaft and platform, andesite cage, polished andesite hat
- *     with pale diorite tips (the curled-up corners catch the light), a diorite-wall jewel.</li>
- * <li><b>Depth</b>: the platform flares on upside-down stairs; the hat sides are stairs sloping out and the
- *     corners upper slabs, so the eave line rises at each corner (warabi-te).</li>
+ * <li><b>Gradient</b>: deepslate foot, stone-brick shaft and platform, a warm light, polished andesite hat,
+ *     a pale diorite-wall jewel.</li>
+ * <li><b>Depth</b>: the platform flares on upside-down stairs; the hat and the foot slope on stairs whose
+ *     corner pieces join as outer corners, so both are square hips (no cross of loose tiles).</li>
  * </ul>
  * Size: 3 × 3 × 4–6. Height 6 is the full tōrō; 5 drops the finial; 4 also drops the shaft.
  */
