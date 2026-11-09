@@ -49,19 +49,16 @@ public final class HubRoof {
 		}
 	}
 
-	/** The roof's material by height: dark eave course, cherry body, bamboo near the ridge. */
+	/** The roof's material by height: dark eave course, cherry body. */
 	private static net.minecraft.world.level.block.state.BlockState shell(int x, int ax) {
 		Direction in = towardAxis(x);
 		if (ax >= 5) {
 			return HubBlocks.darkStairs(in, false);
 		}
-		if (ax >= 3) {
+		if (ax >= 2) {
 			return HubBlocks.roofStairs(in);
 		}
-		if (ax == 2) {
-			return Blocks.BAMBOO_MOSAIC_STAIRS.defaultBlockState().setValue(net.minecraft.world.level.block.StairBlock.FACING, in);
-		}
-		return Blocks.BAMBOO_MOSAIC.defaultBlockState();
+		return PLANKS;
 	}
 
 	/** A cell of a drum's ring: calcite corners, base and cornice, stained glass between (rows above {@code glassFrom}). */
@@ -155,7 +152,7 @@ public final class HubRoof {
 			}
 			return;
 		}
-		c.set(x, y, z, arcadeZ(z) ? slab(Blocks.BAMBOO_MOSAIC_SLAB) : HubBlocks.stoneSlab(false));
+		c.set(x, y, z, arcadeZ(z) ? slab(Blocks.CHERRY_SLAB) : HubBlocks.stoneSlab(false));
 		if (ax == HubDims.TERRACE_X0 + 1 && arcadeZ(z)) {
 			c.set(x, y + 1, z, HubBlocks.bush());
 		}
