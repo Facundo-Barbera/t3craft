@@ -198,7 +198,7 @@ public final class ArchiveBay {
 		// the dais
 		BlockState frame = CitadelCanvas.slab(Blocks.POLISHED_BLACKSTONE_BRICK_SLAB);
 		BlockState field = CitadelCanvas.slab(Blocks.CHERRY_SLAB);
-		BlockState stand = CitadelCanvas.slab(Blocks.CALCITE_SLAB);
+		BlockState stand = CitadelCanvas.slab(Blocks.QUARTZ_SLAB);
 		for (int dx = tdx - 2; dx <= tdx + 2; dx++) {
 			for (int dz = front + 1; dz <= front + 3; dz++) {
 				boolean edge = Math.abs(dx - tdx) == 2 || dz == front + 3;
