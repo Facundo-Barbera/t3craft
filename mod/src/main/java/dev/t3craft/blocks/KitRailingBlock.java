@@ -84,12 +84,14 @@ public class KitRailingBlock extends HorizontalDirectionalBlock {
 	}
 
 	private final Function<BlockState, VoxelShape> shapes;
+	private final Function<BlockState, VoxelShape> collisions;
 
 	public KitRailingBlock(BlockBehaviour.Properties properties) {
 		super(properties);
 		registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(FRONT, true)
 				.setValue(LEFT, End.POST).setValue(RIGHT, End.POST));
-		this.shapes = getShapeForEachState(KitRailingBlock::shapeOf);
+		this.shapes = getShapeForEachState(st -> shapeOf(st, 16));
+		this.collisions = getShapeForEachState(st -> shapeOf(st, 24));
 	}
 
 	@Override
@@ -163,36 +165,39 @@ public class KitRailingBlock extends HorizontalDirectionalBlock {
 
 	// ------------------------------------------------------------------ shapes
 
-	private static final VoxelShape RAIL = Block.box(0, 0, 0, 16, 16, 3);
-	private static final VoxelShape POST_L = Block.box(0, 0, 0, 4, 16, 4);
-	private static final VoxelShape POST_R = Block.box(12, 0, 0, 16, 16, 4);
-	private static final VoxelShape SIDE_L = Block.box(0, 0, 0, 3, 16, 16);
-	private static final VoxelShape SIDE_R = Block.box(13, 0, 0, 16, 16, 16);
-
-	private static VoxelShape shapeOf(BlockState s) {
+	/**
+	 * Outline (16 high, what the model shows) or collision (24 high, like a fence: a railing on a
+	 * bridge or a balcony has to stop people, not be hopped over or stood on).
+	 */
+	private static VoxelShape shapeOf(BlockState s, double h) {
+		// north frame: the edge is z 0, left = west (x 0), right = east (x 16)
 		VoxelShape v = Shapes.empty();
 		if (s.getValue(FRONT)) {
-			v = Shapes.or(v, RAIL);
+			v = Shapes.or(v, Block.box(0, 0, 0, 16, h, 3));
 		}
 		End l = s.getValue(LEFT);
 		End r = s.getValue(RIGHT);
-		// north frame: left = west (x 0), right = east (x 16)
 		if (l.post()) {
-			v = Shapes.or(v, POST_L);
+			v = Shapes.or(v, Block.box(0, 0, 0, 4, h, 4));
 		}
 		if (l.side()) {
-			v = Shapes.or(v, SIDE_L);
+			v = Shapes.or(v, Block.box(0, 0, 0, 3, h, 16));
 		}
 		if (r.post()) {
-			v = Shapes.or(v, POST_R);
+			v = Shapes.or(v, Block.box(12, 0, 0, 16, h, 4));
 		}
 		if (r.side()) {
-			v = Shapes.or(v, SIDE_R);
+			v = Shapes.or(v, Block.box(13, 0, 0, 16, h, 16));
 		}
 		if (v.isEmpty()) {
-			v = POST_L;
+			v = Block.box(0, 0, 0, 4, h, 4);
 		}
 		return Shapes.rotateHorizontal(v).get(s.getValue(FACING));
+	}
+
+	@Override
+	protected VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
+		return collisions.apply(state);
 	}
 
 	@Override
