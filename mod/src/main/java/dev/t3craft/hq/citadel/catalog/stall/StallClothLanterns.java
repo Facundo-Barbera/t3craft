@@ -75,9 +75,9 @@ public final class StallClothLanterns implements Variant {
 	}
 
 	/** [palette] the neutral wools of the cloth: they make most of the stock, the accent comes in on top. */
-	private static final DyeColor[] NEUTRAL = {DyeColor.WHITE, DyeColor.LIGHT_GRAY, DyeColor.BROWN, DyeColor.WHITE, DyeColor.LIGHT_GRAY};
+	private static final DyeColor[] NEUTRAL = {DyeColor.LIGHT_GRAY, DyeColor.WHITE, DyeColor.BROWN, DyeColor.LIGHT_GRAY, DyeColor.GRAY};
 	/** [palette] one muted accent per seed (the city's cherry is the main colour, so the stall's accent stays small). */
-	private static final DyeColor[] ACCENT = {DyeColor.RED, DyeColor.BLUE, DyeColor.GREEN, DyeColor.PURPLE};
+	private static final DyeColor[] ACCENT = {DyeColor.RED, DyeColor.BLUE, DyeColor.GREEN, DyeColor.YELLOW};
 	private static final String[] TONE = {"paper", "rose", "paper", "vermilion"};
 
 	private static BlockState wool(DyeColor c) {
@@ -196,10 +196,11 @@ public final class StallClothLanterns implements Variant {
 			if (u == g.pole()) {
 				continue; // the pole passes here
 			}
-			// [palette] cream with an accent stripe every third block: the valance is the stall's one patch of colour
-			p.set(c, u, 3, 1, u % 3 == 0 ? terracotta(g.accent) : wool(u % 3 == 1 ? DyeColor.WHITE : DyeColor.LIGHT_GRAY));
-			if ((u & 1) == 0 && u >= g.lo() && u <= g.hi()) {
-				p.set(c, u, 2, 1, wool(DyeColor.WHITE)); // [depth] a fringe of cream cloth under the valance
+			// [depth] a dark-ish cherry beam closes the front of the roof, and a cloth valance hangs from it two
+			// blocks in three (the third gap shows the goods): an accent stripe, cream and a light grey
+			p.set(c, u, 3, 1, b(Blocks.STRIPPED_CHERRY_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.X));
+			if (u % 3 != 2) {
+				p.set(c, u, 2, 1, u % 3 == 0 ? terracotta(g.accent) : wool(DyeColor.WHITE));
 			}
 		}
 		for (int v = 2; v < g.d; v++) {
@@ -246,27 +247,26 @@ public final class StallClothLanterns implements Variant {
 	private static void counter(CitadelCanvas c, Plot p, Geo g) {
 		for (int u = g.lo(); u <= g.hi(); u++) {
 			p.set(c, u, 0, 1, p.hash(u, 0, 1, 4) == 0 ? b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.NORTH) : b(Blocks.CHERRY_PLANKS));
-			stock(c, p, g, u, 1);
+			stock(c, p, g, u, 1, u % 3 == 2);
 		}
 	}
 
-	/** One pile of stock at {@code (u, 1, v)}: one or two bolts, a carpet, a loom, or a bare board with a lantern. */
-	private static void stock(CitadelCanvas c, Plot p, Geo g, int u, int v) {
-		switch (p.hash(u, 7, v, 8)) {
-			case 0, 1, 2 -> {
-				p.set(c, u, 1, v, cloth(p, g, u, 1, v));
-				p.set(c, u, 2, v, carpet(NEUTRAL[p.hash(u, 2, v, NEUTRAL.length)]));
-			}
-			case 3, 4 -> p.set(c, u, 1, v, cloth(p, g, u, 1, v));
-			case 5 -> {
-				p.set(c, u, 1, v, cloth(p, g, u, 1, v));
-				p.set(c, u, 2, v, cloth(p, g, u, 2, v));
-			}
-			case 6 -> {
-				p.set(c, u, 1, v, wool(DyeColor.WHITE));
-				p.set(c, u, 2, v, carpet(DyeColor.LIGHT_GRAY));
-			}
-			default -> p.set(c, u, 1, v, b(Blocks.LOOM).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH));
+	/**
+	 * One pile of stock at {@code (u, 1, v)}. Under the valance a pile is one block high; where {@code tall} is
+	 * allowed it may be a stack of two (wool and a folded carpet) or a roll of two wools. Now and then a bare cherry
+	 * board with a loom or a lantern breaks the row.
+	 */
+	private static void stock(CitadelCanvas c, Plot p, Geo g, int u, int v, boolean tall) {
+		int k = p.hash(u, 7, v, 8);
+		if (tall && k <= 2) {
+			p.set(c, u, 1, v, cloth(p, g, u, 1, v));
+			p.set(c, u, 2, v, k == 0 ? cloth(p, g, u, 2, v) : carpet(NEUTRAL[p.hash(u, 2, v, NEUTRAL.length)]));
+		} else if (k == 6) {
+			p.set(c, u, 1, v, b(Blocks.LOOM).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH));
+		} else if (k == 7) {
+			p.set(c, u, 1, v, b(Blocks.CHERRY_SLAB)); // a bare board
+		} else {
+			p.set(c, u, 1, v, cloth(p, g, u, 1, v));
 		}
 	}
 
@@ -275,7 +275,7 @@ public final class StallClothLanterns implements Variant {
 		int su = g.flip ? g.lo() : g.hi();
 		for (int v = 2; v <= g.bv - 2; v++) {
 			p.set(c, su, 0, v, p.hash(su, 0, v, 4) == 0 ? b(Blocks.BARREL).setValue(BlockStateProperties.FACING, g.flip ? Direction.EAST : Direction.WEST) : b(Blocks.CHERRY_PLANKS));
-			stock(c, p, g, su, v);
+			stock(c, p, g, su, v, true);
 			// [depth] a beam over the arm (a log along v under the roof) with a length of cloth hanging from it, so
 			// the bolts have a ceiling and nobody can stand on them
 			int beam = g.ry(v) - 1;
@@ -359,11 +359,11 @@ public final class StallClothLanterns implements Variant {
 		int len = Math.min(g.hi() - g.lo() + 1, main ? 5 : 3);
 		Direction in = dir > 0 ? Direction.EAST : Direction.WEST;
 		Direction out = dir > 0 ? Direction.WEST : Direction.EAST;
-		p.set(c, u, top, 0, len > 0 ? fence(Direction.SOUTH, in) : fence(Direction.SOUTH));
+		p.set(c, u, top, 0, b(Blocks.STRIPPED_CHERRY_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.X));
 		hang(c, p, g, u, top - 1, 0);
 		for (int s = 1; s <= len; s++) {
 			int uu = u + dir * s;
-			p.set(c, uu, top, 0, s == len ? fence(out) : fence(out, in));
+			p.set(c, uu, top, 0, b(Blocks.STRIPPED_CHERRY_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.X));
 			if (s % 2 == 0 || s == len) {
 				hang(c, p, g, uu, top - 1, 0);
 			}
