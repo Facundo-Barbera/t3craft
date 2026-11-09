@@ -144,6 +144,7 @@ def front(accent=""):
     for x in range(9, 13):
         img[12][x] = px(led)
     img[11][9] = px(ledmid)
+    img[12][3] = px(led)  # a power pip on the left half, balancing the LED panel
     img[13][12] = px(ledmid)
     return img
 

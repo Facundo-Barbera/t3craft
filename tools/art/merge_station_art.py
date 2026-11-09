@@ -34,7 +34,7 @@ STATES = ["none", "open", "draft", "merged"]
 # state -> (colour, light emission of the lamp elements, 0 = none)
 STATE_COLOR = {"none": 0x8A8F94, "open": 0x55FF55, "draft": 0x7C9CD8, "merged": 0xB583FF}
 EMISSION = {"none": 0, "open": 14, "draft": 10, "merged": 8}
-POST_H = {"none": 2, "open": 5, "draft": 4, "merged": 4}  # lamp post height (px) per state
+POST_H = {"none": 1, "open": 6, "draft": 3, "merged": 4}  # lamp post height (px) per state
 
 # ---------------------------------------------------------------- palette
 SLATE = 0x3A424D
@@ -383,8 +383,8 @@ def model(state):
         }, emission=em),
     ]
     # two lamp posts at the front corners of the desk (clear of the screen, so no text hides behind them): a lamp and a brass cap.
-    # The post height is part of the state, so the four states differ in silhouette and not only in colour: none stubby, draft and
-    # merged medium, open tall (the loudest: a PR waits for you).
+    # The post height is part of the state, so the four states differ in silhouette and not only in colour: none a stub, draft and
+    # merged medium, open tall (6, the cap ends at the top of the block) (the loudest: a PR waits for you).
     h = POST_H[state]
     for x0 in (0, 14.5):
         elements.append(element([x0, 9, 2], [x0 + 1.5, 9 + h, 3.5], {
