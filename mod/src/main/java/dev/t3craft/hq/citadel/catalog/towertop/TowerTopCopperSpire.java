@@ -14,9 +14,11 @@ import net.minecraft.core.Direction;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.StairBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.Half;
+import net.minecraft.world.level.block.state.properties.StairsShape;
 import net.minecraft.world.level.block.state.properties.WallSide;
 
 /**
@@ -128,17 +130,26 @@ public final class TowerTopCopperSpire implements Variant {
 		boolean point = top[0] == top[1] && top[2] == top[3];
 
 		// height budget: rings need n layers at least (one stair course each), the finial 1..3
-		int fin = Math.min(point ? 3 : 2, p.h() - 1 - n); // ≥ 1 because h ≥ 6 and n ≤ 4
+		int fin = Math.min(2, p.h() - 1 - n); // ≥ 1 because h ≥ 6 and n ≤ 4
 		int extra = p.h() - 1 - fin - n;
 		int[] rise = new int[n];
 		java.util.Arrays.fill(rise, 1);
-		for (int i = n - 1; i >= 0 && extra > 0; i--) {
-			rise[i]++; // steeper from the top down: the broach flare stays at the bottom
-			extra--;
+		// spare height goes to the tiled body (ring n-2 down to 0, up to 3 courses each), so the spire tapers
+		// in tall tiers; the copper needle gets at most 2 courses. Giving it to the needle first made a short
+		// tiled stub with a tall copper stick on it.
+		boolean grew = true;
+		while (extra > 0 && grew) {
+			grew = false;
+			for (int i = n - 2; i >= 0 && extra > 0; i--) {
+				if (rise[i] < 3) {
+					rise[i]++;
+					extra--;
+					grew = true;
+				}
+			}
 		}
-		while (extra > 0 && rise[n - 1] < 4) {
-			rise[n - 1]++; // a longer needle
-			extra--;
+		if (extra > 0 && n >= 2 && rise[n - 1] < 2) {
+			rise[n - 1]++;
 		}
 
 		int y = 1;
@@ -224,7 +235,7 @@ public final class TowerTopCopperSpire implements Variant {
 				if (merlon) {
 					int k = p.hash(u, 1, v, 5);
 					p.set(c, u, 1, v, k == 0 ? b(Blocks.MOSSY_STONE_BRICKS) : k == 1 ? b(Blocks.CRACKED_STONE_BRICKS) : b(Blocks.STONE_BRICKS));
-					p.set(c, u, 2, v, slab(Blocks.SMOOTH_STONE_SLAB));
+					p.set(c, u, 2, v, slab(Blocks.STONE_BRICK_SLAB)); // same tone as the merlon: light caps read as loose cubes
 				} else {
 					p.set(c, u, 1, v, slab(Blocks.STONE_BRICK_SLAB));
 				}
@@ -265,16 +276,30 @@ public final class TowerTopCopperSpire implements Variant {
 		}
 	}
 
-	/** [palette] waxed copper with a little patina: mostly fresh, some exposed, a few weathered. */
+	/**
+	 * [palette] waxed copper with a hint of patina: mostly fresh, one cell in eight exposed. (A third of the
+	 * cells in exposed/weathered read as a green checkerboard, like missing textures, in the first render.)
+	 */
 	private static Block copper(Plot p, int u, int y, int v, Block fresh, Block exposed, Block weathered) {
-		int k = p.hash(u, y, v, 6);
-		return k == 0 ? weathered : k <= 2 ? exposed : fresh;
+		return p.hash(u, y, v, 8) == 0 ? exposed : fresh;
 	}
 
 	/** The finial on the top ring's cells, from {@code y} up, {@code fin} layers. */
 	private static void finial(CitadelCanvas c, Plot p, int[] top, int y, int fin) {
 		boolean point = top[0] == top[1] && top[2] == top[3];
 		BlockState rod = Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState();
+		if (top[1] - top[0] == 1 && top[3] - top[2] == 1) {
+			// a 2 × 2 top: a little copper pyramid (outer-corner stairs rising to the middle), not four rods
+			for (int v = top[2]; v <= top[3]; v++) {
+				for (int u = top[0]; u <= top[1]; u++) {
+					Direction inU = u == top[0] ? Direction.EAST : Direction.WEST;
+					Direction inV = v == top[2] ? Direction.SOUTH : Direction.NORTH;
+					StairsShape shape = inV == inU.getClockWise() ? StairsShape.OUTER_RIGHT : StairsShape.OUTER_LEFT;
+					p.set(c, u, y, v, stairs(Blocks.CUT_COPPER_STAIRS.waxed().unaffected(), inU).setValue(StairBlock.SHAPE, shape));
+				}
+			}
+			return;
+		}
 		for (int v = top[2]; v <= top[3]; v++) {
 			for (int u = top[0]; u <= top[1]; u++) {
 				int yy = y;

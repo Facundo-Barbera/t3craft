@@ -52,7 +52,10 @@ import net.minecraft.world.level.block.state.properties.WallSide;
  */
 public final class GazeboRaisedLookout implements Variant {
 	private static final int DECK = 2; // the deck layer; people stand at y = 3
-	private static final int EAVE = 5; // the roof's lowest ring
+	/** The roof's lowest ring: 5, or 6 from h 9 so people under it get 3 blocks of headroom and the posts read. */
+	private static int eave(Plot p) {
+		return p.h() >= 9 ? 6 : 5;
+	}
 
 	@Override
 	public String id() {
@@ -160,8 +163,8 @@ public final class GazeboRaisedLookout implements Variant {
 		BlockState s = switch (p.hash(u, 0, v, 6)) {
 			case 0 -> b(Blocks.POTTED_PINK_TULIP);
 			case 1 -> b(Blocks.POTTED_FLOWERING_AZALEA);
-			case 2 -> leaves(Blocks.FLOWERING_AZALEA_LEAVES);
-			case 3 -> leaves(Blocks.AZALEA_LEAVES);
+			case 2 -> leaves(Blocks.FLOWERING_AZALEA_LeaveS);
+			case 3 -> leaves(Blocks.AZALEA_LeaveS);
 			case 4 -> b(Blocks.POTTED_FERN);
 			default -> b(Blocks.PINK_PETALS).setValue(BlockStateProperties.FLOWER_AMOUNT, 1 + p.hash(u, 2, v, 4))
 					.setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.from2DDataValue(p.hash(u, 3, v, 4)));
@@ -228,17 +231,19 @@ public final class GazeboRaisedLookout implements Variant {
 
 	private static void posts(CitadelCanvas c, Plot p, int w, int d) {
 		BlockState postLog = b(Blocks.STRIPPED_CHERRY_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.Y);
+		int eave = eave(p);
 		for (int v = 0; v < d; v++) {
 			for (int u = 1; u < w; u++) {
 				if (post(u, v, w, d)) {
-					p.set(c, u, 3, v, postLog);
-					p.set(c, u, 4, v, postLog);
-					p.set(c, u, EAVE, v, b(Blocks.STRIPPED_CHERRY_WOOD));
+					for (int y = 3; y < eave; y++) {
+						p.set(c, u, y, v, postLog);
+					}
+					p.set(c, u, eave, v, b(Blocks.STRIPPED_CHERRY_WOOD));
 					// [depth] brackets under the eave on the two outer faces of the post
 					Direction outU = u == 2 ? Direction.WEST : Direction.EAST;
 					Direction outV = v == 1 ? Direction.NORTH : Direction.SOUTH;
-					p.set(c, u + outU.getStepX(), 4, v, upside(Blocks.CHERRY_STAIRS, outU.getOpposite()));
-					p.set(c, u, 4, v + outV.getStepZ(), upside(Blocks.CHERRY_STAIRS, outV.getOpposite()));
+					p.set(c, u + outU.getStepX(), eave - 1, v, upside(Blocks.CHERRY_STAIRS, outU.getOpposite()));
+					p.set(c, u, eave - 1, v + outV.getStepZ(), upside(Blocks.CHERRY_STAIRS, outV.getOpposite()));
 					continue;
 				}
 				// beams along the post ring, between the posts
@@ -246,7 +251,7 @@ public final class GazeboRaisedLookout implements Variant {
 				boolean betweenU = (v == 1 || v == d - 2) && u > 2 && u < w - 2;
 				boolean betweenV = (u == 2 || u == w - 2) && v > 1 && v < d - 2;
 				if (onRing && (betweenU || betweenV)) {
-					p.set(c, u, EAVE, v, b(Blocks.STRIPPED_CHERRY_LOG).setValue(BlockStateProperties.AXIS, betweenU ? Direction.Axis.X : Direction.Axis.Z));
+					p.set(c, u, eave, v, b(Blocks.STRIPPED_CHERRY_LOG).setValue(BlockStateProperties.AXIS, betweenU ? Direction.Axis.X : Direction.Axis.Z));
 				}
 			}
 		}
@@ -259,7 +264,8 @@ public final class GazeboRaisedLookout implements Variant {
 	// ------------------------------------------------------------------ hipped roof (y5..)
 
 	private static void roof(CitadelCanvas c, Plot p, int w, int d) {
-		int maxK = p.h() - 1 - EAVE - 1; // leave the top layer for the rod
+		int eave = eave(p);
+		int maxK = p.h() - 1 - eave - 1; // leave the top layer for the rod
 		int kTop = Math.min((Math.min(w - 1, d) - 1) / 2, maxK);
 		boolean truncated = (Math.min(w - 1, d) - 1) / 2 > maxK;
 		for (int v = 0; v < d; v++) {
@@ -271,10 +277,10 @@ public final class GazeboRaisedLookout implements Variant {
 				int k = Math.min(Math.min(dl, dr), Math.min(df, db));
 				if (k > kTop) {
 					// a flat cap flush with the top of the last ring
-					p.set(c, u, EAVE + kTop, v, b(Blocks.DEEPSLATE_TILE_SLAB).setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP));
+					p.set(c, u, eave + kTop, v, b(Blocks.DEEPSLATE_TILE_SLAB).setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP));
 					continue;
 				}
-				int y = EAVE + k;
+				int y = eave + k;
 				Block mat = k == 0 ? Blocks.DEEPSLATE_TILE_STAIRS : Blocks.CHERRY_STAIRS;
 				boolean tieU = dl == k && dr == k;
 				boolean tieV = df == k && db == k;
@@ -302,19 +308,19 @@ public final class GazeboRaisedLookout implements Variant {
 		// finial and the hanging lantern in the middle of the roof
 		int cu = 1 + (w - 1) / 2;
 		int cv = d / 2;
-		int top = EAVE + kTop;
+		int top = eave + kTop;
 		p.set(c, cu, top + 1, cv, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState());
 		if (!truncated && top + 2 < p.h()) {
 			p.set(c, cu, top + 1, cv, b(Blocks.GOLD_BLOCK));
 			p.set(c, cu, top + 2, cv, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState());
 		}
 		int ck = ring(cu, cv, w, d);
-		int roofAbove = EAVE + Math.min(ck, kTop);
-		for (int y = EAVE; ck >= 2 && y < roofAbove; y++) { // with ck = 1 the lantern hangs from a beam
+		int roofAbove = eave + Math.min(ck, kTop);
+		for (int y = eave; ck >= 2 && y < roofAbove; y++) { // with ck = 1 the lantern hangs from a beam
 			p.put(c, cu, y, cv, Blocks.IRON_CHAIN.defaultBlockState(), CitadelCanvas.HANGING);
 		}
 		if (!post(cu, cv, w, d)) {
-			p.put(c, cu, 4, cv, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
+			p.put(c, cu, eave - 1, cv, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
 		}
 	}
 }
