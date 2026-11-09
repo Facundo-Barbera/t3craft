@@ -149,7 +149,7 @@ public final class AnnexToolShed implements Variant {
 			this.u1 = ov + bw - 1;
 			this.rest = w - 1 - u1;
 			this.lean = rest >= 3 ? 3 : 0;
-			this.vf = d >= 9 ? 2 : 1;
+			this.vf = d >= 8 ? 2 : 1;
 			this.vb = d - 1;
 			this.dl = u0 + (bw - 2) / 2;
 			this.even = bw % 2 == 0;
@@ -466,7 +466,7 @@ public final class AnnexToolShed implements Variant {
 				if (frontWindow(u)) {
 					set(u, 0, vs, b(POTS[p.hash(u, 0, vs, POTS.length)]));
 				} else {
-					set(u, 0, vs, p.hash(u, 0, vs, 2) == 0 ? rainBarrel() : barrel());
+					set(u, 0, vs, barrel());
 				}
 			}
 			// a lantern hangs in front of the door from the front eave (gable: the single pitch has its eave too low)
@@ -547,7 +547,7 @@ public final class AnnexToolShed implements Variant {
 
 		// ------------------------------------------------------------------ the eaves
 
-		/** Under the left eave: the rain barrel, a composter, a barrel, hay and ferns along the side wall, by seed. */
+		/** Under the left eave: barrels, hay, a chopping block and ferns along the side wall, by seed (nothing hollow: a cauldron or composter under a roof reads as a sealed floor). */
 		void leftEave() {
 			if (ov == 0) {
 				return;
@@ -558,11 +558,11 @@ public final class AnnexToolShed implements Variant {
 					continue; // under the window
 				}
 				BlockState st = switch ((v - vf - 1 + off) % 5) {
-					case 0 -> rainBarrel();
-					case 1 -> b(Blocks.COMPOSTER).setValue(BlockStateProperties.LEVEL_COMPOSTER, 4);
-					case 2 -> b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP);
-					case 3 -> b(Blocks.HAY_BLOCK);
-					default -> b(Blocks.FERN);
+					case 0 -> b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP);
+					case 1 -> b(Blocks.HAY_BLOCK);
+					case 2 -> b(Blocks.FERN);
+					case 3 -> log(Blocks.OAK_LOG, Direction.Axis.Y); // an upright chopping block
+					default -> b(Blocks.MOSS_CARPET);
 				};
 				set(u0 - 1, 0, v, st);
 			}
