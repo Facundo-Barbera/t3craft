@@ -106,7 +106,7 @@ public final class StallClothLanterns implements Variant {
 	}
 
 	private static BlockState fence(Direction... joins) {
-		BlockState s = b(Blocks.CHERRY_FENCE);
+		BlockState s = b(Blocks.SPRUCE_FENCE);
 		for (Direction d : joins) {
 			s = s.setValue(side(d), true);
 		}
@@ -220,7 +220,8 @@ public final class StallClothLanterns implements Variant {
 			// [palette] [depth] the front edge of the roof is a band of the seed's terracotta (the stall's one patch
 			// of colour, readable from the street); it runs post to post, never out over the side walk
 			if (u >= g.postL() && u <= g.postR()) {
-				p.set(c, u, 3, 1, terracotta(g.accent));
+				// [depth] a scalloped valance: an accent block, then a thin spruce slab, alternately (lighter than a solid band)
+				p.set(c, u, 3, 1, (u & 1) == 0 ? terracotta(g.accent) : b(Blocks.SPRUCE_SLAB).setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP));
 			}
 		}
 		for (int v = 2; v < g.d; v++) {
@@ -232,15 +233,15 @@ public final class StallClothLanterns implements Variant {
 			} else if (y < prev) {
 				s = stairs(Blocks.SPRUCE_STAIRS, Direction.SOUTH);
 			} else {
-				s = b(Blocks.SPRUCE_PLANKS);
+				s = b(Blocks.DARK_OAK_PLANKS); // [palette] the ridge rows in dark oak: a cap that breaks the slope's colour
 			}
 			for (int u = 0; u < g.w; u++) {
 				BlockState t = s;
 				if (y == prev) { // [depth] a flat ridge row: the eaves bevel down at both ends
 					if (u == 0) {
-						t = stairs(Blocks.SPRUCE_STAIRS, Direction.WEST);
+						t = stairs(Blocks.DARK_OAK_STAIRS, Direction.WEST);
 					} else if (u == g.w - 1) {
-						t = stairs(Blocks.SPRUCE_STAIRS, Direction.EAST);
+						t = stairs(Blocks.DARK_OAK_STAIRS, Direction.EAST);
 					}
 				}
 				p.set(c, u, y, v, t);
@@ -264,9 +265,9 @@ public final class StallClothLanterns implements Variant {
 	private static void post(CitadelCanvas c, Plot p, int u, int v, int top) {
 		p.set(c, u, 0, v, b(Blocks.POLISHED_DEEPSLATE));
 		for (int y = 1; y < top - 1; y++) {
-			p.set(c, u, y, v, b(Blocks.STRIPPED_CHERRY_LOG));
+			p.set(c, u, y, v, b(Blocks.SPRUCE_LOG)); // [palette] bark-brown posts: the cherry is kept for the counter and the stool
 		}
-		p.set(c, u, top - 1, v, b(Blocks.CHERRY_PLANKS));
+		p.set(c, u, top - 1, v, b(Blocks.SPRUCE_PLANKS));
 	}
 
 	// ------------------------------------------------------------------ the counter
@@ -304,7 +305,6 @@ public final class StallClothLanterns implements Variant {
 		int u = g.pole() == g.postL() ? g.postR() : g.postL();
 		p.set(c, u, 0, 0, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
 		p.set(c, u, 1, 0, terracotta(g.accent));
-		p.set(c, u, 2, 0, carpet(DyeColor.WHITE));
 	}
 
 	/** The second arm of the L: a counter along the side opposite the pole, facing into the aisle. */
@@ -393,7 +393,7 @@ public final class StallClothLanterns implements Variant {
 			p.set(c, u, y, 1, fence());
 		}
 		p.set(c, u, top, 1, fence(Direction.NORTH));
-		int len = Math.min(g.hi() - g.lo() + 1, main ? 5 : 3);
+		int len = g.w <= 5 ? 1 : Math.min(g.hi() - g.lo() + 1, main ? 5 : 3);
 		Direction in = dir > 0 ? Direction.EAST : Direction.WEST;
 		Direction out = dir > 0 ? Direction.WEST : Direction.EAST;
 		p.set(c, u, top, 0, fence(Direction.SOUTH, in));
@@ -417,7 +417,7 @@ public final class StallClothLanterns implements Variant {
 	}
 
 	private static BlockState fence() {
-		return b(Blocks.CHERRY_FENCE);
+		return b(Blocks.SPRUCE_FENCE);
 	}
 
 	// ------------------------------------------------------------------ light under the roof
