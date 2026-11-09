@@ -67,7 +67,10 @@ public final class GardenZenKaresansui implements Variant {
 	private static final Block[] STEP = {Blocks.ANDESITE, Blocks.POLISHED_ANDESITE, Blocks.TUFF, Blocks.COBBLED_DEEPSLATE, Blocks.SMOOTH_BASALT,
 			Blocks.POLISHED_DEEPSLATE, Blocks.ANDESITE, Blocks.TUFF};
 
-	private static final Direction[] LOCAL = {Direction.NORTH, Direction.EAST, Direction.SOUTH, Direction.WEST};
+	private static final Block[] STEP_LIGHT = {Blocks.SMOOTH_STONE, Blocks.STONE_BRICKS, Blocks.STONE, Blocks.MOSSY_STONE_BRICKS, Blocks.SMOOTH_STONE,
+			Blocks.STONE_BRICKS};
+
+	private static final Direction[] LOCAL ={Direction.NORTH, Direction.EAST, Direction.SOUTH, Direction.WEST};
 
 	@Override
 	public String id() {
@@ -81,12 +84,12 @@ public final class GardenZenKaresansui implements Variant {
 
 	@Override
 	public int minW() {
-		return 12;
+		return 13;
 	}
 
 	@Override
 	public int minD() {
-		return 12;
+		return 13;
 	}
 
 	@Override
@@ -408,8 +411,12 @@ public final class GardenZenKaresansui implements Variant {
 			}
 			// the lintel's ends overhang as top slabs, 3 blocks over the wall below (no headroom flag)
 			BlockState tip = slab(Blocks.CHERRY_SLAB).setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP);
-			set(cu - 3, 4, 0, tip);
-			set(cu + 3, 4, 0, tip);
+			if (cu - 3 >= 1) {
+				set(cu - 3, 4, 0, tip);
+			}
+			if (cu + 3 <= w - 2) {
+				set(cu + 3, 4, 0, tip);
+			}
 			if (h >= 6) {
 				for (int u = cu - 1; u <= cu + 1; u++) {
 					set(u, 5, 0, slab(Blocks.DEEPSLATE_TILE_SLAB));
@@ -526,7 +533,8 @@ public final class GardenZenKaresansui implements Variant {
 				return false;
 			}
 			kind[u][v] = PATH;
-			set(u, 0, v, b(STEP[p.hash(u, 9, v, STEP.length)]));
+			Block[] mat = pal == 2 ? STEP_LIGHT : STEP; // light stones on dark gravel, dark ones on pale rake
+			set(u, 0, v, b(mat[p.hash(u, 9, v, mat.length)]));
 			return true;
 		}
 
@@ -764,6 +772,9 @@ public final class GardenZenKaresansui implements Variant {
 				if (cx < 2 || cz < 2 || cx > w - 3 || cz > d - 3) {
 					continue;
 				}
+				if (cz < 6 && Math.abs(cx - cu) < 6) {
+					continue; // never in front of the gate
+				}
 				Set<Long> foot = new HashSet<>();
 				foot.add(key(cx, cz));
 				if (!siteOk(foot, false)) {
@@ -805,6 +816,9 @@ public final class GardenZenKaresansui implements Variant {
 						}
 						if (du == 0 && dv == 0 && li < layers - 1) {
 							continue; // the trunk
+						}
+						if (!inside(cx + du, cz + dv)) {
+							continue; // nothing over the wall tops (2.5 of headroom there)
 						}
 						set(cx + du, y, cz + dv, leaves(leafBlock));
 					}
