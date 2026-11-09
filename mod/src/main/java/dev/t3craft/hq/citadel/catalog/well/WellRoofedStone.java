@@ -123,7 +123,9 @@ public final class WellRoofedStone implements Variant {
 				boolean edge = u == uL || u == uR || v == v0 || v == v1;
 				boolean corner = (u == uL || u == uR) && (v == v0 || v == v1);
 				if (!edge) {
-					p.set(c, u, 0, v, b(Blocks.WATER)); // the shaft: water one block under the lip
+					// [finish] the shaft is full to the lip, so the water shows between the posts
+					p.set(c, u, 0, v, b(Blocks.WATER));
+					p.set(c, u, 1, v, b(Blocks.WATER));
 					continue;
 				}
 				p.set(c, u, 0, v, footing(p, u, v));

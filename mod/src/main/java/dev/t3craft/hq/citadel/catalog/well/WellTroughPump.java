@@ -2,6 +2,7 @@ package dev.t3craft.hq.citadel.catalog.well;
 
 import static dev.t3craft.hq.citadel.CitadelCanvas.b;
 import static dev.t3craft.hq.citadel.CitadelCanvas.slab;
+import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
 
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.catalog.Family;
@@ -12,6 +13,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.AttachFace;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.Half;
 import net.minecraft.world.level.block.state.properties.WallSide;
 
 /**
@@ -29,7 +31,7 @@ import net.minecraft.world.level.block.state.properties.WallSide;
  *  v4  ▦ ✿ . ▦ ✿ . .   hay, flowers
  * </pre>
  *
- * Size: 5–8 × 3–5 × 4+ (one more fence block under the lantern from height 5).
+ * Size: 5–8 × 3–5 × 4+ (from height 5 a gable canopy on four posts covers the trough; from 6 a ridge cap).
  */
 public final class WellTroughPump implements Variant {
 	private static final BlockState RIM_X = b(Blocks.STRIPPED_SPRUCE_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.X);
@@ -84,7 +86,11 @@ public final class WellTroughPump implements Variant {
 
 		trough(c, p, ue, vf, vm, vk);
 		pump(c, p, pu, vm, vk);
-		lanternPost(c, p, vk);
+		if (p.h() >= 5) {
+			canopy(c, p, ue, vf, vm, vk);
+		} else {
+			lanternPost(c, p, vk);
+		}
 		barrels(c, p, w - 1, vf, vm, vk);
 		if (vf == 1) {
 			curb(c, p);
@@ -164,6 +170,43 @@ public final class WellTroughPump implements Variant {
 			p.set(c, 0, y, vk, f);
 		}
 		p.set(c, 0, top + 1, vk, b(Blocks.LANTERN));
+	}
+
+	// ------------------------------------------------------------------ canopy (h >= 5)
+
+	/**
+	 * [finish] a little gable roof over the whole trough: spruce posts on the four rim corners, a
+	 * cherry eave line (stepped one lower over the curb and the hay row when the plot has them),
+	 * deepslate tiles over the water, a cherry ridge cap from height 6. A lantern hangs over the water
+	 * from the ridge, so the trough reads as a covered village well from the street.
+	 */
+	private static void canopy(CitadelCanvas c, Plot p, int ue, int vf, int vm, int vk) {
+		for (int u : new int[] {0, ue}) {
+			for (int v : new int[] {vf, vk}) {
+				p.set(c, u, 2, v, b(Blocks.SPRUCE_FENCE));
+				p.set(c, u, 3, v, b(Blocks.SPRUCE_FENCE));
+			}
+		}
+		boolean frontOver = vf > 0;
+		boolean backOver = vk + 1 < p.d();
+		for (int u = 0; u <= ue; u++) {
+			if (frontOver) {
+				p.set(c, u, 3, vf - 1, stairs(Blocks.CHERRY_STAIRS, Direction.SOUTH));
+			}
+			if (backOver) {
+				p.set(c, u, 3, vk + 1, stairs(Blocks.CHERRY_STAIRS, Direction.NORTH));
+			}
+			p.set(c, u, 4, vf, stairs(frontOver ? Blocks.DEEPSLATE_TILE_STAIRS : Blocks.CHERRY_STAIRS, Direction.SOUTH));
+			p.set(c, u, 4, vk, stairs(backOver ? Blocks.DEEPSLATE_TILE_STAIRS : Blocks.CHERRY_STAIRS, Direction.NORTH));
+			p.set(c, u, 4, vm, b(Blocks.DEEPSLATE_TILES));
+			if (p.h() >= 6) {
+				p.set(c, u, 5, vm, slab(Blocks.CHERRY_SLAB));
+			}
+		}
+		// [depth] upside-down stairs close the gable ends under the ridge
+		p.set(c, 0, 3, vm, stairs(Blocks.SPRUCE_STAIRS, Direction.EAST).setValue(BlockStateProperties.HALF, Half.TOP));
+		p.set(c, ue, 3, vm, stairs(Blocks.SPRUCE_STAIRS, Direction.WEST).setValue(BlockStateProperties.HALF, Half.TOP));
+		p.put(c, (ue + 1) / 2, 3, vm, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
 	}
 
 	// ------------------------------------------------------------------ props
