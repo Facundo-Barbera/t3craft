@@ -153,17 +153,35 @@ public final class PlanProbe {
 			if (s.isAir()) {
 				continue;
 			}
-			boolean ok;
-			try {
-				ok = s.canSurvive(view, p.rel());
-			} catch (RuntimeException e) {
-				continue;
-			}
-			if (!ok && !tagBasedOk(s, cells, p.rel())) {
+			if (!survives(view, cells, s, p.rel())) {
 				out.add(new Unsupported(p.rel(), s));
 			}
 		}
 		return out;
+	}
+
+	/**
+	 * A read-only block view over {@code cells} (key = {@link BlockPos#asLong}; a missing cell reads as air). It reads the map
+	 * live, so later edits to the map show through. For {@link #survives}.
+	 */
+	public static LevelAccessor liveView(Map<Long, BlockState> cells) {
+		return PlanShapes.view(cells);
+	}
+
+	/**
+	 * True when {@code s} may stand at {@code pos} among {@code cells} (the check behind {@link #unsupported}): vanilla's
+	 * {@code canSurvive}, with the tag-based rules read from the vanilla tag data (see {@link #tagBasedOk}). A block whose
+	 * check cannot be answered with block reads counts as standing. {@code view} is {@link #liveView} of {@code cells}.
+	 */
+	public static boolean survives(LevelAccessor view, Map<Long, BlockState> cells, BlockState s, BlockPos pos) {
+		try {
+			if (s.canSurvive(view, pos)) {
+				return true;
+			}
+		} catch (RuntimeException e) {
+			return true;
+		}
+		return tagBasedOk(s, cells, pos);
 	}
 
 	// ------------------------------------------------------------------ tag-based survival
