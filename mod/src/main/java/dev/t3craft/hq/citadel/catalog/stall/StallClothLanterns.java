@@ -78,8 +78,15 @@ public final class StallClothLanterns implements Variant {
 	/** [palette] the neutral wools of the cloth: they make most of the stock, the accent comes in on top. */
 	private static final DyeColor[] NEUTRAL = {DyeColor.LIGHT_GRAY, DyeColor.WHITE, DyeColor.BROWN, DyeColor.LIGHT_GRAY, DyeColor.GRAY};
 	/** [palette] one muted accent per seed (the city's cherry is the main colour, so the stall's accent stays small). */
-	private static final DyeColor[] ACCENT = {DyeColor.RED, DyeColor.BLUE, DyeColor.GREEN, DyeColor.YELLOW};
-	private static final String[] TONE = {"paper", "rose", "paper", "vermilion"};
+	private static final DyeColor[] ACCENT = {DyeColor.RED, DyeColor.LIGHT_BLUE, DyeColor.LIME, DyeColor.YELLOW}; // brick, steel blue, sage, ochre
+	/** [palette] the two other stock colours of each scheme, all terracotta: sober but easy to read from the street. */
+	private static final DyeColor[][] STOCK = {
+			{DyeColor.LIGHT_BLUE, DyeColor.BROWN},
+			{DyeColor.YELLOW, DyeColor.BROWN},
+			{DyeColor.ORANGE, DyeColor.BROWN},
+			{DyeColor.LIGHT_BLUE, DyeColor.BROWN},
+	};
+	private static final String[] TONE = {"vermilion", "paper", "paper", "rose"};
 
 	private static BlockState wool(DyeColor c) {
 		return Blocks.WOOL.pick(c).defaultBlockState();
@@ -128,7 +135,7 @@ public final class StallClothLanterns implements Variant {
 	}
 
 	/** The seed-derived measures of one build, local coordinates. */
-	private record Geo(int w, int d, int h, int ix, int bv, int roofMax, int ya, boolean flip, DyeColor accent, String tone) {
+	private record Geo(int w, int d, int h, int ix, int bv, int roofMax, int ya, boolean flip, int idx, DyeColor accent, String tone) {
 		int lo() {
 			return ix + 1;
 		}
@@ -164,14 +171,17 @@ public final class StallClothLanterns implements Variant {
 		int ix = w >= 6 ? 1 : 0; // posts inset: the roof flies one block past them on each side
 		int roofMax = Math.max(4, Math.min(h - 1, 5));
 		int ya = Math.min(h - 1, roofMax + 2);
-		int a = p.hash(5, 5, 5, ACCENT.length);
-		Geo g = new Geo(w, d, h, ix, d - 1, roofMax, ya, p.hash(1, 2, 3, 2) == 1, ACCENT[a], TONE[a]);
+		int a = p.hash(6, 6, 6, ACCENT.length);
+		Geo g = new Geo(w, d, h, ix, d - 1, roofMax, ya, p.hash(0, 0, 0, 2) == 1, a, ACCENT[a], TONE[a]);
 
 		roof(c, p, g);
 		posts(c, p, g);
 		counter(c, p, g);
 		if (w >= 6 && d >= 5) {
 			sideCounter(c, p, g);
+		}
+		if (w <= 5) {
+			crate(c, p, g);
 		}
 		back(c, p, g);
 		aisle(c, p, g);
@@ -181,13 +191,16 @@ public final class StallClothLanterns implements Variant {
 
 	/** One cloth block: mostly neutrals, the seed's accent (a muted terracotta) two times in nine. */
 	private static BlockState cloth(Plot p, Geo g, int u, int y, int v) {
-		// bolts come in runs of two cells (one roll is two blocks wide), so the row reads as rolls and not as a checkerboard
+		// bolts come in runs of two cells (one roll is two blocks wide); three sober terracottas of the seed's
+		// scheme plus cream and white wool, so the goods are the loudest thing on the front
+		DyeColor[] st = STOCK[g.idx];
 		return switch (p.hash(u / 2, 1, v, 7)) {
-			case 0 -> terracotta(g.accent);
-			case 1 -> terracotta(DyeColor.WHITE); // cream
-			case 2, 3 -> wool(DyeColor.WHITE);
-			case 4 -> wool(DyeColor.LIGHT_GRAY);
-			case 5 -> wool(DyeColor.BROWN);
+			case 0 -> terracotta(st[0]);
+			case 1 -> terracotta(st[1]);
+			case 2 -> terracotta(g.accent);
+			case 3 -> terracotta(DyeColor.WHITE); // cream
+			case 4 -> wool(DyeColor.WHITE);
+			case 5 -> terracotta(st[0]);
 			default -> terracotta(DyeColor.WHITE);
 		};
 	}
@@ -204,11 +217,10 @@ public final class StallClothLanterns implements Variant {
 			if (u == g.pole()) {
 				continue; // the pole passes here
 			}
-			// [palette] [depth] the front edge of the roof is a band of the seed's muted terracotta (the stall's one
-			// patch of colour, readable from the street) and a scalloped valance of cream cloth hangs under it
-			p.set(c, u, 3, 1, terracotta(g.accent));
-			if ((u & 1) == 0 && u >= g.lo() && u <= g.hi()) { // never over the side walk outside the posts
-				p.set(c, u, 2, 1, wool(DyeColor.WHITE));
+			// [palette] [depth] the front edge of the roof is a band of the seed's terracotta (the stall's one patch
+			// of colour, readable from the street); it runs post to post, never out over the side walk
+			if (u >= g.postL() && u <= g.postR()) {
+				p.set(c, u, 3, 1, terracotta(g.accent));
 			}
 		}
 		for (int v = 2; v < g.d; v++) {
@@ -263,27 +275,36 @@ public final class StallClothLanterns implements Variant {
 	private static void counter(CitadelCanvas c, Plot p, Geo g) {
 		for (int u = g.lo(); u <= g.hi(); u++) {
 			p.set(c, u, 0, 1, p.hash(u, 0, 1, 4) == 0 ? b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.NORTH) : b(Blocks.CHERRY_PLANKS));
-			stock(c, p, g, u, 1, u % 3 == 2);
+			stock(c, p, g, u, 1, true);
 		}
 	}
 
 	/**
-	 * One pile of stock at {@code (u, 1, v)}. Under the valance a pile is one block high; where {@code tall} is
-	 * allowed it may be a stack of two (wool and a folded carpet) or a roll of two wools. Now and then a bare cherry
-	 * board with a loom or a lantern breaks the row.
+	 * One pile of stock at {@code (u, 1, v)}: a roll two blocks high (runs of two cells share a colour and a
+	 * height, so the top edge is ragged), or a block with a folded carpet on it. Now and then a loom or a bare
+	 * cherry board breaks the row. The cell above must be closed by the valance or a beam.
 	 */
 	private static void stock(CitadelCanvas c, Plot p, Geo g, int u, int v, boolean tall) {
-		int k = p.hash(u, 7, v, 8);
-		if (tall && k <= 2) {
-			p.set(c, u, 1, v, cloth(p, g, u, 1, v));
-			p.set(c, u, 2, v, k == 0 ? cloth(p, g, u, 2, v) : carpet(NEUTRAL[p.hash(u, 2, v, NEUTRAL.length)]));
-		} else if (k == 6) {
+		int k = p.hash(u, 7, v, 10);
+		if (k == 8) {
 			p.set(c, u, 1, v, b(Blocks.LOOM).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH));
-		} else if (k == 7) {
+		} else if (k == 9) {
 			p.set(c, u, 1, v, b(Blocks.CHERRY_SLAB).setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP)); // a bare board
+		} else if (p.hash(u / 2, 3, v, 3) != 0) {
+			p.set(c, u, 1, v, cloth(p, g, u, 1, v));
+			p.set(c, u, 2, v, cloth(p, g, u, 1, v));
 		} else {
 			p.set(c, u, 1, v, cloth(p, g, u, 1, v));
+			p.set(c, u, 2, v, carpet(p.hash(u, 2, v, 2) == 0 ? DyeColor.WHITE : DyeColor.LIGHT_GRAY));
 		}
+	}
+
+	/** On a small plot, a barrel crate of folded cloth stands in the lane's far corner, opposite the pole. */
+	private static void crate(CitadelCanvas c, Plot p, Geo g) {
+		int u = g.pole() == g.postL() ? g.postR() : g.postL();
+		p.set(c, u, 0, 0, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
+		p.set(c, u, 1, 0, terracotta(g.accent));
+		p.set(c, u, 2, 0, carpet(DyeColor.WHITE));
 	}
 
 	/** The second arm of the L: a counter along the side opposite the pole, facing into the aisle. */
