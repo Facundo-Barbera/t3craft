@@ -97,7 +97,9 @@ reachability and the shape/floating checks look at the whole plan, so a piece is
 * **Connect**: fences, walls and panes connected on no side although a neighbour they connect to is beside
   them (`connect:` line on stdout too). Must be 0; nothing is caught per cell.
 * **Floating**: groups of blocks connected to nothing that reaches the ground (y <= 0); **unsupported**:
-  blocks vanilla's `canSurvive` refuses where they stand (grouped by type, with a coordinate).
+  blocks vanilla's `canSurvive` refuses where they stand (grouped by type and by group, with a coordinate; `byBlock`, `byGroup` and
+  the first 2000 in `list` in report.json). Headless the block/fluid tags are unbound, so plants, lily pads, sugar cane and bamboo
+  are judged by `PlanProbe.tagBasedOk` with the tag read from the vanilla data (`supports_vegetation`, …) instead of vanilla's `is(TAG)`.
 * **Settle by origin** (inside SPLIT PIECES, `split.settleOrigins` / `split.settleGroups` in report.json): the groups `CitadelSettle` handled, grouped by the catalog piece (`FAMILY:variant`) or by canvas group / zone for the rest, with the mean fall, and for each group its plot-relative box and, if small, its cells. Use it to find the piece that is born floating: a piece with many groups here has a part that touches its support only on an edge or not at all. `minecraft:light` is ignored.
 * **Split pieces** (`split` in report.json): groups of hanging cells near a terrace step that the column lift would have torn and the relief lifted with their support (`CitadelRelief.lastSplit`), what `CitadelSettle` did with floating groups (fell / got a post / removed / left), and horizontal log beams with nothing solid under them or at their ends (`touch nothing` ones are also in FLOATING; `hang from a wall` ones are held from the side or above).
 * **Build**: ticks the crew (`CrewSchedule` + `CrewCursor`, no world) needs for the scope, with `--crew`
