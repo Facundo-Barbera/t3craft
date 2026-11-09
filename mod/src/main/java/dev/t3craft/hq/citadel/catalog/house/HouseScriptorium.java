@@ -371,11 +371,18 @@ public final class HouseScriptorium implements Variant {
 			}
 			if (pier) {
 				// [depth] piers stand a block proud of the wall, capped with a stair
-				for (int y = 1; y <= 9; y++) {
-					p.set(c, u, y, 0, pier(p, u, y, 0));
+				if (Math.abs(u - cu) == 2) {
+					// [depth] the two inner piers rise as pilasters up the gable face to the rake
+					for (int y = 1; y < roofY(g, u); y++) {
+						p.set(c, u, y, 0, y == 11 ? b(Blocks.CHISELED_QUARTZ_BLOCK) : pier(p, u, y, 0));
+					}
+				} else {
+					for (int y = 1; y <= 9; y++) {
+						p.set(c, u, y, 0, pier(p, u, y, 0));
+					}
+					p.set(c, u, 10, 0, stair(Blocks.STONE_BRICK_STAIRS, Direction.SOUTH, false));
+					p.set(c, u, 12, 0, slab(g.mat.trimSlab(), true)); // a cornice slab: nobody can stand on the cap under the rake
 				}
-				p.set(c, u, 10, 0, stair(Blocks.STONE_BRICK_STAIRS, Direction.SOUTH, false));
-				p.set(c, u, 12, 0, slab(g.mat.trimSlab(), true)); // a cornice slab: nobody can stand on the cap under the rake
 			} else if (!bay) {
 				// [finish] jardinières between the piers
 				p.set(c, u, 0, 0, b(Blocks.MOSS_BLOCK));
@@ -468,7 +475,11 @@ public final class HouseScriptorium implements Variant {
 				}
 				p.set(c, u, y, vb, st);
 			}
-			if (pier) {
+			if (pier && Math.abs(u - cu) == 2) {
+				for (int y = 1; y < roofY(g, u); y++) {
+					p.set(c, u, y, vb + 1, y == 11 ? b(Blocks.CHISELED_QUARTZ_BLOCK) : pier(p, u, y, vb + 1));
+				}
+			} else if (pier) {
 				for (int y = 1; y <= 9; y++) {
 					p.set(c, u, y, vb + 1, pier(p, u, y, vb + 1));
 				}
