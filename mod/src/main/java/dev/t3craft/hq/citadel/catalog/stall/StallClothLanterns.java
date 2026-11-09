@@ -228,7 +228,9 @@ public final class StallClothLanterns implements Variant {
 			int prev = g.ry(v - 1);
 			BlockState s;
 			if (y > prev) {
-				s = stairs(Blocks.OAK_STAIRS, Direction.NORTH); // [palette] a light oak slope over dark posts: the roof does not melt into them
+				// [palette] a light oak slope over dark posts: the roof does not melt into them; the eave row (v2) in the
+				// city's cherry, so the roof grades cherry, oak, dark oak from the lane to the ridge
+				s = stairs(v == 2 ? Blocks.CHERRY_STAIRS : Blocks.OAK_STAIRS, Direction.NORTH);
 			} else if (y < prev) {
 				s = stairs(Blocks.OAK_STAIRS, Direction.SOUTH);
 			} else {
