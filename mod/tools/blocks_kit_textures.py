@@ -172,17 +172,18 @@ def wrap_rect(img, x0, y0, w, h, fn):
 
 
 # stone: warm greys (andesite family) with a hint of cherry and of calcite, never a saturated dot
-FLAG = [hexc(c) for c in ("#8C8882", "#898580", "#85817C", "#8E8A85")]
-FLAG_CHERRY = hexc("#91847F")
-FLAG_CALCITE = hexc("#9A978F")
-JOINT = hexc("#6A665F")
+FLAG = [hexc(c) for c in ("#938F89", "#908C86", "#8C8882", "#96928C")]
+FLAG_CHERRY = hexc("#9A8B86")
+FLAG_CALCITE = hexc("#B5B1A7")
+JOINT = hexc("#625E58")
 
-# layouts: rectangles (x, y, w, h) that start on the tile edge, so every block edge keeps a joint
+# layouts: rectangles (x, y, w, h) that start on the tile edge, so every block edge keeps a joint. No piece is
+# smaller than 16 x 8 px: 2 x 2 flags, or a 2 x 1 flag over two squares.
 STONE_LAYOUTS = (
     # A: 2 x 2 square flags
     ((0, 0, 16, 16), (16, 0, 16, 16), (0, 16, 16, 16), (16, 16, 16, 16)),
-    # B: the same grid, the bottom-right flag split in two long bricks
-    ((0, 0, 16, 16), (16, 0, 16, 16), (0, 16, 16, 16), (16, 16, 16, 8), (16, 24, 16, 8)),
+    # B: the same grid, one flag of calcite (the quiet accent, 1 block in 4 or so)
+    ((0, 0, 16, 16), (16, 0, 16, 16), (0, 16, 16, 16), (16, 16, 16, 16)),
     # C: one long flag across the top, two squares under it
     ((0, 0, 32, 16), (0, 16, 16, 16), (16, 16, 16, 16)),
 )
@@ -190,10 +191,10 @@ STONE_TINT = {0: (3, "cherry"), 1: (1, "calcite"), 2: (2, "cherry")}  # variant 
 
 
 def floor_stone(variant=0, seed=32):
-    """Stone paving: big flags with a thin, soft joint, 2-3 close warm greys, no coloured dots.
+    """Stone paving: big flags with a thin, even joint, 2-3 close warm greys, no coloured dots.
 
-    variant 0: 2 x 2 square flags; 1: one flag split in two bricks; 2: a long flag over two squares. One flag per
-    tile leans cherry or calcite (a quiet nod to the citadel palette).
+    variant 0: 2 x 2 square flags, one leaning cherry; 1: the same with one calcite flag; 2: a long flag over two
+    squares. Joints are 1 px everywhere, also on the block edge (a lighter bevel runs along the inside).
     """
     rng = random.Random(seed + variant * 101)
     img = Img(n=FN)
@@ -202,50 +203,52 @@ def floor_stone(variant=0, seed=32):
     for i, (x0, y0, w, h) in enumerate(rects):
         base = FLAG[(i + variant) % len(FLAG)]
         if i == tint_i:
-            base = mix(base, FLAG_CHERRY if tint_kind == "cherry" else FLAG_CALCITE, 0.6)
+            base = mix(base, FLAG_CHERRY if tint_kind == "cherry" else FLAG_CALCITE, 0.85 if tint_kind == "calcite" else 0.6)
         cells = {}
         # coarse 8x8 clouds so a flag shades softly instead of salt-and-pepper
         for cy in range(0, h + 8, 8):
             for cx in range(0, w + 8, 8):
                 cells[(cx // 8, cy // 8)] = rng.choice((-3, -2, -1, 0, 0, 1, 2))
 
-        def paint(x, y, lx, ly, base=base, cells=cells):
+        def paint(x, y, lx, ly, base=base, cells=cells, w=w, h=h, calcite=(i == tint_i and tint_kind == "calcite")):
             if lx == 0 or ly == 0:
                 img.set(x, y, JOINT)
                 return
             d = cells[(lx // 8, ly // 8)]
             if lx == 1 or ly == 1:
-                d += 3  # faint bevel next to the joint, reads as a chamfer
+                d += 5 if calcite else 3  # chamfer next to the joint
+            elif lx == w - 1 or ly == h - 1:
+                d -= 2
             img.set(x, y, shade(base, d))
 
         wrap_rect(img, x0, y0, w, h, paint)
-        # two or three 2 px pits and flecks per flag, neutral grey only
-        for _ in range(max(2, w * h // 160)):
-            fx = rng.randrange(2, w - 2)
-            fy = rng.randrange(2, h - 1)
-            d = rng.choice((-7, -5, 6))
+        # one or two 2 px pits per flag, neutral grey only (never at the edge, never single-pixel slivers)
+        for _ in range(max(1, w * h // 200)):
+            fx = rng.randrange(3, w - 4)
+            fy = rng.randrange(3, h - 3)
+            d = rng.choice((-6, -5, 5))
             for dx in (0, 1):
                 img.set((x0 + fx + dx) % FN, (y0 + fy) % FN, shade(base, d))
     return img
 
 
 # cherry: strip flooring with boards of different widths and lengths, seams, grain
-BOARD_TONES = [hexc(c) for c in ("#D09B8C", "#CA9486", "#C58E80", "#BE8678")]
-BOARD_SEAM = hexc("#92605A")
-BOARD_END = hexc("#9A665F")
-BOARD_ROWS = (6, 8, 6, 6, 6)  # sums to 32
+BOARD_TONES = [hexc(c) for c in ("#D48E82", "#D08A7E", "#CC867A", "#D2907F")]
+BOARD_SEAM = hexc("#8A554F")
+BOARD_END = hexc("#8F5A54")
+BOARD_ROWS = (8, 8, 8, 8)  # sums to 32
 
 # end joints per variant: for every board row, the x of its butt joint (empty: the board runs the whole tile and
 # on into the next block)
 CHERRY_BREAKS = (
-    ((20,), (), (6,), (), (13,)),
-    ((4,), (), (17,), (), ()),
-    ((), (26,), (), (10,), (21,)),
+    ((20,), (), (6,), (13,)),
+    ((4,), (), (17,), ()),
+    ((), (26,), (), (10,)),
 )
 
 
 def floor_cherry(variant=0, seed=31):
-    """Cherry strip flooring: 5 boards of 6-8 px, butt joints at different places, long grain, no frame."""
+    """Cherry strip flooring: 4 boards of 8 px, butt joints at different places, long grain, no frame."""
     rng = random.Random(seed + variant * 103)
     img = Img(n=FN)
     y = 0
@@ -257,10 +260,11 @@ def floor_cherry(variant=0, seed=31):
             start = cuts[k]
             end = cuts[(k + 1) % n] + (FN if (k + 1) == n else 0)
             tone = rng.choice(BOARD_TONES)
-            # grain: a few 1 px streaks along the whole board, lighter or darker
+            # grain: a few 1 px streaks along the whole board, lighter or darker, plus a lit top edge
             streak = [0] * bh
+            streak[1] = 6
             for _ in range(2):
-                streak[rng.randrange(1, bh)] = rng.choice((-6, -5, 5))
+                streak[rng.randrange(2, bh)] = rng.choice((-7, -5, 4))
             for xx in range(start, end):
                 x = xx % FN
                 for ly in range(bh):
@@ -271,20 +275,22 @@ def floor_cherry(variant=0, seed=31):
                     img.set(x, yy, shade(tone, streak[ly]))
             # a few short dark flecks of grain inside the board
             for _ in range(3):
-                gx = start + rng.randrange(1, max(2, end - start - 3))
-                gy = rng.randrange(1, bh)
+                gx = start + rng.randrange(2, max(3, end - start - 4))
+                gy = rng.randrange(2, bh)
                 for dx in range(rng.choice((2, 3, 4))):
-                    img.set((gx + dx) % FN, (y + gy) % FN, shade(tone, -9))
+                    img.set((gx + dx) % FN, (y + gy) % FN, shade(tone, -10))
             if breaks:
                 for ly in range(bh):
-                    img.set(start % FN, (y + ly) % FN, BOARD_END if ly else BOARD_SEAM)
+                    img.set(start % FN, (y + ly) % FN, BOARD_END)
+                    if ly:
+                        img.set((start + 1) % FN, (y + ly) % FN, shade(tone, 6))
         y += bh
     return img
 
 
 # blockstate picks per floor: texture variants (a, b, c) with weights, and the y rotations allowed. Stone is square
 # paving, so it turns every way; cherry only turns 180 degrees so the boards keep running the same way.
-FLOOR_WEIGHTS = {"stone": (8, 2, 2), "cherry": (5, 4, 4)}
+FLOOR_WEIGHTS = {"stone": (8, 3, 3), "cherry": (5, 4, 4)}
 FLOOR_ROTS = {"stone": (0, 90, 180, 270), "cherry": (0, 180)}
 FLOOR_SUFFIXES = ("", "_b", "_c")
 

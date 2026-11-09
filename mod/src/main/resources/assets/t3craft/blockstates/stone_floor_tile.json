@@ -22,40 +22,40 @@
       },
       {
         "model": "t3craft:block/stone_floor_tile_b",
-        "weight": 2
+        "weight": 3
       },
       {
         "model": "t3craft:block/stone_floor_tile_b",
-        "weight": 2,
+        "weight": 3,
         "y": 90
       },
       {
         "model": "t3craft:block/stone_floor_tile_b",
-        "weight": 2,
+        "weight": 3,
         "y": 180
       },
       {
         "model": "t3craft:block/stone_floor_tile_b",
-        "weight": 2,
+        "weight": 3,
         "y": 270
       },
       {
         "model": "t3craft:block/stone_floor_tile_c",
-        "weight": 2
+        "weight": 3
       },
       {
         "model": "t3craft:block/stone_floor_tile_c",
-        "weight": 2,
+        "weight": 3,
         "y": 90
       },
       {
         "model": "t3craft:block/stone_floor_tile_c",
-        "weight": 2,
+        "weight": 3,
         "y": 180
       },
       {
         "model": "t3craft:block/stone_floor_tile_c",
-        "weight": 2,
+        "weight": 3,
         "y": 270
       }
     ]
