@@ -181,8 +181,15 @@ public final class StallClothLanterns implements Variant {
 
 	/** One cloth block: mostly neutrals, the seed's accent (a muted terracotta) two times in nine. */
 	private static BlockState cloth(Plot p, Geo g, int u, int y, int v) {
-		int k = p.hash(u, y, v, 9);
-		return k < 2 ? terracotta(g.accent) : wool(NEUTRAL[(k - 2) % NEUTRAL.length]);
+		// bolts come in runs of two cells (one roll is two blocks wide), so the row reads as rolls and not as a checkerboard
+		return switch (p.hash(u / 2, 1, v, 7)) {
+			case 0 -> terracotta(g.accent);
+			case 1 -> terracotta(DyeColor.WHITE); // cream
+			case 2, 3 -> wool(DyeColor.WHITE);
+			case 4 -> wool(DyeColor.LIGHT_GRAY);
+			case 5 -> wool(DyeColor.BROWN);
+			default -> terracotta(DyeColor.WHITE);
+		};
 	}
 
 	// ------------------------------------------------------------------ roof
@@ -197,11 +204,11 @@ public final class StallClothLanterns implements Variant {
 			if (u == g.pole()) {
 				continue; // the pole passes here
 			}
-			// [depth] a thin spruce fascia (top slabs) closes the front of the roof, and a cloth valance hangs from it two
-			// blocks in three (the third gap shows the goods): an accent stripe, cream and a light grey
-			p.set(c, u, 3, 1, b(Blocks.SPRUCE_SLAB).setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP));
-			if (u % 3 != 2 && u >= g.lo() && u <= g.hi()) { // never over the side walk outside the posts
-				p.set(c, u, 2, 1, u % 3 == 0 ? terracotta(g.accent) : wool(DyeColor.WHITE));
+			// [palette] [depth] the front edge of the roof is a band of the seed's muted terracotta (the stall's one
+			// patch of colour, readable from the street) and a scalloped valance of cream cloth hangs under it
+			p.set(c, u, 3, 1, terracotta(g.accent));
+			if ((u & 1) == 0 && u >= g.lo() && u <= g.hi()) { // never over the side walk outside the posts
+				p.set(c, u, 2, 1, wool(DyeColor.WHITE));
 			}
 		}
 		for (int v = 2; v < g.d; v++) {
@@ -216,7 +223,15 @@ public final class StallClothLanterns implements Variant {
 				s = b(Blocks.SPRUCE_PLANKS);
 			}
 			for (int u = 0; u < g.w; u++) {
-				p.set(c, u, y, v, s);
+				BlockState t = s;
+				if (y == prev) { // [depth] a flat ridge row: the eaves bevel down at both ends
+					if (u == 0) {
+						t = stairs(Blocks.SPRUCE_STAIRS, Direction.WEST);
+					} else if (u == g.w - 1) {
+						t = stairs(Blocks.SPRUCE_STAIRS, Direction.EAST);
+					}
+				}
+				p.set(c, u, y, v, t);
 			}
 		}
 	}
