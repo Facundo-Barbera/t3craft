@@ -32,7 +32,7 @@ ITEMS = os.path.join(ROOT, "items")
 
 STATES = ["none", "open", "draft", "merged"]
 # state -> (colour, light emission of the lamp elements, 0 = none)
-STATE_COLOR = {"none": 0x8A8F94, "open": 0x55FF55, "draft": 0x7FB0E8, "merged": 0xB583FF}
+STATE_COLOR = {"none": 0x8A8F94, "open": 0x55FF55, "draft": 0x7C9CD8, "merged": 0xB583FF}
 EMISSION = {"none": 0, "open": 14, "draft": 10, "merged": 8}
 POST_H = {"none": 2, "open": 5, "draft": 4, "merged": 4}  # lamp post height (px) per state
 
@@ -386,12 +386,12 @@ def model(state):
     # The post height is part of the state, so the four states differ in silhouette and not only in colour: none stubby, draft and
     # merged medium, open tall (the loudest: a PR waits for you).
     h = POST_H[state]
-    for x0 in (0, 14):
-        elements.append(element([x0, 9, 2], [x0 + 2, 9 + h, 4], {
+    for x0 in (0, 14.5):
+        elements.append(element([x0, 9, 2], [x0 + 1.5, 9 + h, 3.5], {
             "north": ("#lamp", [9, 8, 11, 8 + h], None), "south": ("#lamp", [9, 8, 11, 8 + h], None),
             "east": ("#lamp", [9, 8, 11, 8 + h], None), "west": ("#lamp", [9, 8, 11, 8 + h], None),
         }, emission=em))
-        elements.append(element([x0, 9 + h, 2], [x0 + 2, 10 + h, 4], {
+        elements.append(element([x0, 9 + h, 2], [x0 + 1.5, 10 + h, 3.5], {
             "north": ("#brass", [0, 2, 2, 3], None), "south": ("#brass", [0, 2, 2, 3], None),
             "east": ("#brass", [0, 2, 2, 3], None), "west": ("#brass", [0, 2, 2, 3], None), "up": ("#brass", [0, 0, 2, 2], None),
         }))

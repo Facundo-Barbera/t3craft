@@ -121,7 +121,10 @@ def body():
     return img
 
 
-def front():
+def front(accent=""):
+    led = ACCENTS[accent][2]
+    ledmid = tuple(v * 55 // 100 for v in led)
+    leddim = tuple(v * 25 // 100 for v in led)
     """The cabinet front is the 16 x 7 crop rows 9-15 (model uv [0,9,16,16])."""
     img = plate()
     # vent slits on the left: two dark slots with a lit lip between them
@@ -137,11 +140,11 @@ def front():
             img[y][x] = px(STEEL_EDGE)
     for y in range(11, 14):
         for x in range(9, 13):
-            img[y][x] = px(TEAL_DIM)
+            img[y][x] = px(leddim)
     for x in range(9, 13):
-        img[12][x] = px(TEAL)
-    img[11][9] = px(TEAL_MID)
-    img[13][12] = px(TEAL_MID)
+        img[12][x] = px(led)
+    img[11][9] = px(ledmid)
+    img[13][12] = px(ledmid)
     return img
 
 
@@ -167,7 +170,9 @@ def bezel():
     return img
 
 
-def keys():
+def keys(accent=""):
+    led = ACCENTS[accent][2]
+    ledmid = tuple(v * 55 // 100 for v in led)
     """Keyboard top, region x 1-14, y 0-5 (14 x 6). Row 0 is the north (player) edge: the space bar row; then two rows of keys."""
     img = new(DECK)
     for y in range(16):
@@ -177,9 +182,9 @@ def keys():
     for x in (1, 2, 12, 13, 14):
         img[0][x] = px(KEY_ALT)
     for x in range(4, 11):
-        img[0][x] = px(TEAL_MID)
+        img[0][x] = px(ledmid)
     for x in range(5, 10):
-        img[0][x] = px(TEAL)
+        img[0][x] = px(led)
     # y 2 and y 4: 2 px keys with a 1 px gap, staggered like a real keyboard
     for y, off in ((2, 1), (4, 2)):
         x = off
@@ -312,7 +317,7 @@ def model(accent=""):
             "east": face("bezel", [0, 1, 2, 7.5]),
         }, rotation=lean),
         # rear shell: a narrower, slightly deeper back so the profile is a tapered LCD and not a slab
-        box6([3.5, 10.4, 10.8], [12.5, 14.6, 12], {
+        box6([3.5, 10.4, 10.8], [12.5, 14.6, 11.7], {
             "south": face("body", [3, 3, 12, 8]), "north": face("body", [3, 3, 12, 8]),
             "up": face("top", [3, 3, 12, 5]), "down": face("body", [3, 3, 12, 5]),
             "west": face("body", [3, 3, 5, 8]), "east": face("body", [3, 3, 5, 8]),
@@ -328,9 +333,9 @@ def model(accent=""):
         "textures": {
             "particle": "t3craft:block/console_terminal_body",
             "body": "t3craft:block/console_terminal_body",
-            "front": "t3craft:block/console_terminal_front",
+            "front": "t3craft:block/console_terminal_front" + ("_" + accent if accent else ""),
+            "keys": "t3craft:block/console_terminal_keys" + ("_" + accent if accent else ""),
             "top": "t3craft:block/console_terminal_top",
-            "keys": "t3craft:block/console_terminal_keys",
             "bezel": "t3craft:block/console_terminal_bezel",
             "screen": "t3craft:block/console_terminal_screen" + ("_" + accent if accent else ""),
         },
@@ -355,12 +360,16 @@ def blockstate():
 
 # ---------------------------------------------------------------- review sheets
 def main():
-    tex = {"body": body(), "front": front(), "top": top(), "keys": keys(), "bezel": bezel()}
+    tex = {"body": body(), "top": top(), "bezel": bezel()}
     os.makedirs(TEX, exist_ok=True)
     os.makedirs(MODELS, exist_ok=True)
     for name, img in tex.items():
         write_png(os.path.join(TEX, "console_terminal_%s.png" % name), img)
     for accent in ACCENTS:
+        sfx = "_" + accent if accent else ""
+        for nm, fn in (("front", front), ("keys", keys)):
+            tex[nm + sfx] = fn(accent)
+            write_png(os.path.join(TEX, "console_terminal_%s%s.png" % (nm, sfx)), tex[nm + sfx])
         img = screen(accent)
         tex["screen" + ("_" + accent if accent else "")] = img
         write_png(os.path.join(TEX, "console_terminal_screen%s.png" % ("_" + accent if accent else "")), img)

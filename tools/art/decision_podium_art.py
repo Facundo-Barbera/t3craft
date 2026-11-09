@@ -287,11 +287,13 @@ def model(name):
         {**box([1, 8.6, 2], [15, 9.6, 9], "#wood", [0, 0, 14, 1], [1, 2, 15, 9]), "rotation": slope},
         # a cream permission slip lying on the slope, right of the display's centre
         {**box([9, 9.6, 3.5], [13, 9.75, 7.5], "#brass", [0, 8, 4, 8.15], [0, 8, 4, 12]), "rotation": slope},
-        # the bell, big: base ring, flared dome, knob, clapper
-        box([2, 9, 3], [7, 10, 8], "#brass", [0, 5, 5, 6], [0, 0, 5, 5]),
-        box([2.5, 10, 3.5], [6.5, 12.5, 7.5], "#brass", [0, 0, 4, 2.5], [0, 0, 4, 4]),
-        box([3.5, 12.5, 4.5], [5.5, 13.5, 6.5], "#brass", [8, 0, 10, 1], [8, 0, 10, 2]),
-        box([4, 9.6, 5], [5, 10.4, 6], "#brass", [8, 2, 9, 3], [8, 2, 9, 3], skip=("up",)),
+        # the bell, kept to the left edge so it does not stand in front of the glyphs: base ring, dome, knob, clapper
+        box([1, 9, 3], [4.6, 9.8, 6.6], "#brass", [0, 5, 4, 5.8], [0, 0, 4, 4]),
+        box([1.4, 9.8, 3.4], [4.2, 12, 6.2], "#brass", [0, 0, 3, 2.2], [0, 0, 3, 3]),
+        box([2.2, 12, 4.2], [3.4, 12.8, 5.4], "#brass", [8, 0, 9, 0.8], [8, 0, 9, 1]),
+        box([2.4, 9.6, 4.4], [3.2, 10.4, 5.2], "#brass", [8, 2, 9, 3], [8, 2, 9, 3], skip=("up",)),
+        # a dark lip along the low edge of the sloped desk (the reading rail)
+        {**box([1, 8.6, 1.5], [15, 9.9, 2.2], "#bark", [0, 0, 14, 1.3], [1, 1, 15, 2]), "rotation": slope},
     ]
     # the display panel: the front face crops the 14 x 6 window of the lens texture, the rest is cherry
     panel = box([1, 10, 8], [15, 16, 14], "#wood", [0, 0, 14, 6], [1, 2, 15, 8])
@@ -306,10 +308,10 @@ def model(name):
         ([0.7, 15.2, 7.4], [15.3, 16, 8], [0, 0, 14, 1]),   # top rail
         ([0.7, 10, 7.4], [15.3, 10.8, 8], [0, 0, 14, 1]),   # bottom rail
     ):
-        els.append(box(frm, to, "#brass", uv, uv))
+        els.append(box(frm, to, "#bark", [0, 0, 1, 1], [0, 0, 1, 1]))
     if name in ("attention", "error"):
         # ring marks: two glowing bars flank the bell (the bell is ringing), lens colour
-        for (x0, x1) in ((0.8, 1.8), (7.2, 8.2)):
+        for (x0, x1) in ((0.2, 1.0), (5.0, 5.8)):
             els.append(box([x0, 11.5, 4.5], [x1, 14.5, 6], "#lens", [0, 0, 2, 2], [0, 0, 2, 2], emit=15))
     return {
         "parent": "minecraft:block/block",

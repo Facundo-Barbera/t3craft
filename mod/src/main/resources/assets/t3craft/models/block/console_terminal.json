@@ -4,8 +4,8 @@
     "particle": "t3craft:block/console_terminal_body",
     "body": "t3craft:block/console_terminal_body",
     "front": "t3craft:block/console_terminal_front",
-    "top": "t3craft:block/console_terminal_top",
     "keys": "t3craft:block/console_terminal_keys",
+    "top": "t3craft:block/console_terminal_top",
     "bezel": "t3craft:block/console_terminal_bezel",
     "screen": "t3craft:block/console_terminal_screen"
   },
@@ -355,7 +355,7 @@
       "to": [
         12.5,
         14.6,
-        12
+        11.7
       ],
       "faces": {
         "south": {
