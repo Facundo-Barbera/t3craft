@@ -30,7 +30,7 @@ import net.minecraft.world.level.block.state.properties.SlabType;
  *     one with sharper tips.</li>
  * <li><b>Styles by seed</b>: <i>myōjin</i> (curved kasagi, nuki poking out past the pillars, shimaki and a
  *     red upper tie beam over the plaque: a double beam) most of the time; <i>shinmei</i> (rare): a straight,
- *     flush kasagi on round stripped-stem pillars.</li>
+ *     flush kasagi on round stripped-mangrove-log pillars.</li>
  * <li><b>Function</b>: stone toro or lamp posts, hanging lanterns under the nuki, a lit panel facing both
  *     ways (the catalog cannot write sign text, so it is the blank name plate of the neighbourhood), and on
  *     both sides a waiting bench with a rail back, outside the roadway. With depth, a second, smaller torii
@@ -49,7 +49,7 @@ public final class GateToriiCherry implements Variant {
 	private static final BlockState LANTERN = b(Blocks.LANTERN);
 	private static final BlockState CHERRY = b(Blocks.CHERRY_PLANKS);
 	private static final BlockState TILE = b(Blocks.DEEPSLATE_TILES);
-	private static final BlockState STEM = b(Blocks.STRIPPED_CRIMSON_STEM);
+	private static final BlockState STEM = b(Blocks.STRIPPED_MANGROVE_LOG);
 
 	@Override
 	public String id() {
