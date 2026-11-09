@@ -21,21 +21,22 @@ import net.minecraft.world.level.block.state.properties.Half;
  * <ol>
  * <li><b>step ring</b>, a single course of deepslate-brick stairs climbing inwards (the whole base is one
  *     block high; at the entrances it is the walk-up step, head on, nothing to jump);</li>
- * <li><b>post ring</b>: eight cherry posts (chiselled-deepslate base, two logs, stripped capital) at the
- *     octagon's vertices, a low cherry fence between them (flower pots on top, lanterns hanging over) and
- *     open doorways, 3 to 5 wide, on the front and back faces (and, on big plots and by seed, on the sides);</li>
+ * <li><b>post ring</b>: eight bark-cherry posts (polished-deepslate base, two logs, calcite capital) at the
+ *     octagon's vertices (four corner posts on 7 wide), a low cherry fence between them (flower pots on top,
+ *     lanterns hanging over) and open doorways, 3 to 5 wide, on the front and back faces (and, on big plots
+ *     and by seed, on the sides), each with a half-step approach of stone-brick slabs;</li>
  * <li><b>bench ring</b>: a continuous cherry-stair bench, back outwards, broken only by the doorways;</li>
  * <li><b>centre</b>: a low cherry table (or a jukebox, or a lectern) under a lantern on a chain.</li>
  * </ol>
  * The seed picks the use: tea (table with a candle, cushions, a barrel of leaves), music (jukebox and
  * note blocks) or reading (lectern and chiselled bookshelves), and the roof: one hip, or on tall plots
- * two tiers with a glazed drum between them. Clear height under the eave is 4, brackets of upside-down
- * stairs sit under the eave, the eave edge is dark deepslate tile and the finial is gold (plus a copper
- * rod or a lantern).
+ * two tiers with a glazed drum between them. Clear height under the eave is 4, a bamboo fascia and
+ * brackets of upside-down stairs sit under the pink eave, whose edge (by seed) carries one dark
+ * deepslate course, and the finial is gold (plus a copper rod or a lantern).
  *
  * <p>Palette, dark → light, bottom → top: deepslate bricks / polished / chiselled (base, bases) →
- * cherry (parquet, posts, benches, fence, roof) with a bamboo-mosaic accent → deepslate-tile eave →
- * gold finial.
+ * cherry (parquet, posts, benches, fence, roof) with bamboo-mosaic and calcite accents (floor, fascia,
+ * capitals) → dark eave course → gold finial.
  *
  * <pre>
  *  section (13 wide, two tiers)               plan (9 × 9), front at the bottom
@@ -54,7 +55,6 @@ import net.minecraft.world.level.block.state.properties.Half;
 public final class GazeboCherryOctagon implements Variant {
 	private static final BlockState HANGING_LANTERN = b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true);
 	private static final BlockState CUSHION = Blocks.CARPET.pick(DyeColor.PINK).defaultBlockState();
-	private static final BlockState PINK_GLASS = Blocks.STAINED_GLASS.pick(DyeColor.PINK).defaultBlockState();
 	private static final Direction[] HORIZ = {Direction.NORTH, Direction.EAST, Direction.SOUTH, Direction.WEST};
 	/** First layer of the roof (the brim); the clear height under it is 4. */
 	private static final int ROOF_Y = 5;
@@ -201,6 +201,7 @@ public final class GazeboCherryOctagon implements Variant {
 		boolean sideEntry = r >= 5 && p.hash(2, 2, 2, 2) == 1;
 		Geo geo = new Geo(r, s, lf, r == 3 ? 1 : lf - 1, sideEntry);
 		int use = p.hash(0, 0, 0, 3); // 0 tea, 1 music, 2 reading
+		boolean trim = p.hash(4, 4, 4, 2) == 0; // a dark course along the eave, or a plain pink eave
 
 		// roof profile
 		int layers = p.h() - ROOF_Y; // free layers for roof and finial
@@ -252,7 +253,7 @@ public final class GazeboCherryOctagon implements Variant {
 						default -> inner(c, p, u, v, dx, dz, geo, use, ring);
 					}
 				}
-				roof(c, p, u, v, dx, dz, oct(dx, dz), rho, drumLo, drumHi);
+				roof(c, p, u, v, dx, dz, oct(dx, dz), rho, drumLo, drumHi, trim);
 			}
 		}
 
@@ -296,8 +297,8 @@ public final class GazeboCherryOctagon implements Variant {
 		}
 		if (bracket) {
 			p.set(c, u, 4, v, upside(Blocks.CHERRY_STAIRS, in(dx, dz)));
-		} else if (lamp) {
-			p.put(c, u, 4, v, HANGING_LANTERN, CitadelCanvas.HANGING);
+		} else if (lamp && p.hash(u, 4, v, 2) == 0) {
+			p.put(c, u, 4, v, HANGING_LANTERN, CitadelCanvas.HANGING); // never a symmetric pair either side of a doorway
 		} else if (!geo.aisle(dx, dz)) {
 			// [palette] a bamboo fascia under the pink eave (the doorways stay clear)
 			p.set(c, u, 4, v, upside(Blocks.BAMBOO_MOSAIC_STAIRS, out(dx, dz)));
@@ -313,7 +314,7 @@ public final class GazeboCherryOctagon implements Variant {
 			p.set(c, u, 1, v, b(Blocks.POLISHED_DEEPSLATE));
 			p.set(c, u, 2, v, log(Blocks.CHERRY_LOG, Direction.Axis.Y));
 			p.set(c, u, 3, v, log(Blocks.CHERRY_LOG, Direction.Axis.Y));
-			p.set(c, u, 4, v, b(Blocks.STRIPPED_CHERRY_WOOD));
+			p.set(c, u, 4, v, b(Blocks.CALCITE));
 			return;
 		}
 		int h = p.hash(u, 0, v, 6);
@@ -332,7 +333,7 @@ public final class GazeboCherryOctagon implements Variant {
 			}
 		} else if (geo.benchOnPostRing(dx, dz)) {
 			p.set(c, u, 1, v, stairs(Blocks.CHERRY_STAIRS, out(dx, dz)));
-		} else if (geo.r() == 3 && geo.aisle(dx, dz) && Math.abs(dx) == 1) {
+		} else if (geo.r() == 3 && geo.aisle(dx, dz) && Math.abs(dx) == 1 && p.hash(u, 4, v, 2) == 0) {
 			p.put(c, u, 4, v, HANGING_LANTERN, CitadelCanvas.HANGING); // flank the doorway
 		}
 	}
@@ -405,13 +406,13 @@ public final class GazeboCherryOctagon implements Variant {
 	 * stays hollow inside. The outer ring of a brim is dark deepslate tile. Layer {@code drum} (if any) is a
 	 * glazed wall of one ring, the tier break of a two-tier roof.
 	 */
-	private static void roof(CitadelCanvas c, Plot p, int u, int v, int dx, int dz, double m, double[] rho, int drumLo, int drumHi) {
+	private static void roof(CitadelCanvas c, Plot p, int u, int v, int dx, int dz, double m, double[] rho, int drumLo, int drumHi, boolean trim) {
 		int n = rho.length;
 		for (int j = 0; j < n; j++) {
 			int y = ROOF_Y + j;
 			if (drumLo >= 0 && j >= drumLo && j <= drumHi) {
 				if (m <= rho[j] && m > rho[j] - 1.0) {
-					p.set(c, u, y, v, dx == 0 || dz == 0 ? PINK_GLASS : b(Blocks.STRIPPED_CHERRY_WOOD));
+					p.set(c, u, y, v, Math.abs(dx) == Math.abs(dz) ? b(Blocks.CHERRY_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.Y) : CitadelCanvas.GLASS);
 				} else if (j == drumHi && m > rho[j] && m <= rho[j + 1]) {
 					// [depth] brackets under the upper eave, leaning on the drum
 					p.set(c, u, y, v, upside(Blocks.CHERRY_STAIRS, in(dx, dz)));
@@ -431,7 +432,14 @@ public final class GazeboCherryOctagon implements Variant {
 				p.set(c, u, y, v, b(Blocks.CHERRY_PLANKS));
 				continue;
 			}
-			p.set(c, u, y, v, stairs(Blocks.CHERRY_STAIRS, in(dx, dz)));
+			boolean brim = j == 0 || (drumHi >= 0 && j == drumHi + 1);
+			if (trim && brim && m > rho[j] - 1.0) {
+				// [palette] one dark course along the eave edge (polished deepslate, a few tiles)
+				Block edge = p.hash(u, y, v, 4) == 0 ? Blocks.DEEPSLATE_TILE_STAIRS : Blocks.POLISHED_DEEPSLATE_STAIRS;
+				p.set(c, u, y, v, stairs(edge, in(dx, dz)));
+			} else {
+				p.set(c, u, y, v, stairs(Blocks.CHERRY_STAIRS, in(dx, dz)));
+			}
 		}
 	}
 
@@ -440,6 +448,7 @@ public final class GazeboCherryOctagon implements Variant {
 	/** Flowers and shrubs on the plot outside the octagon; the approach to every doorway stays clear. */
 	private static void outside(CitadelCanvas c, Plot p, int u, int v, int dx, int dz, Geo geo) {
 		if (geo.aisle(dx, dz)) {
+			p.set(c, u, 0, v, CitadelCanvas.slab(Blocks.STONE_BRICK_SLAB)); // the approach: a half step up to the doorway steps
 			return;
 		}
 		switch (p.hash(u, 0, v, 8)) {
