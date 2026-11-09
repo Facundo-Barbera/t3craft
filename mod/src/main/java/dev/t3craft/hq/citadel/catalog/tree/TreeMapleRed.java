@@ -112,7 +112,7 @@ public final class TreeMapleRed implements Variant {
 				t.wood(bu + a, 0, bv + e, WOOD.bark());
 			}
 		}
-		TreeKit.roots(t, WOOD, bu, bv, 2 + r.nextInt(2), 1, -1, 5);
+		TreeKit.roots(t, WOOD, bu, bv, m <= 5 ? 1 + r.nextInt(2) : 2 + r.nextInt(2), 1, -1, 5);
 
 		// ---- the slim trunk: straight to y 3, then a gentle S under the crown (one log per layer)
 		double amp = m >= 8 ? 1.4 : 1.0;
@@ -158,9 +158,9 @@ public final class TreeMapleRed implements Variant {
 		tv[topY] = cv;
 
 		// ---- the floors: wide low fans, fewer and smaller going up, each floor over the gaps of the ones below
-		double rbase = m <= 5 ? 1.9 : TreeKit.clamp(m * 0.34, 1.5, 4.0);
-		int nLow = m <= 5 ? 2 : m <= 8 ? 3 : 4;
-		int nMid = m <= 5 ? 1 : m <= 8 ? 2 : 3;
+		double rbase = m <= 5 ? 1.9 : TreeKit.clamp(m * (m >= 9 ? 0.31 : 0.34), 1.5, 4.0);
+		int nLow = m <= 5 ? 2 : 3;
+		int nMid = m <= 5 ? 1 : 2;
 		List<Double> used = new ArrayList<>();
 		int id = 1;
 		for (int i = 0; i < nF - 1; i++) {
@@ -178,7 +178,12 @@ public final class TreeMapleRed implements Variant {
 		}
 		// the crown, over the leader: the smallest fan and the brightest
 		double rt = m <= 5 ? 1.9 + r.nextDouble() * 0.2 : m <= 8 ? 2.1 + r.nextDouble() * 0.4 : TreeKit.clamp(m * 0.26, 2.4, 3.2);
-		fan(t, tu, tv, topY, 0, 0, rt, rt * (0.8 + r.nextDouble() * 0.2), id, sun, bias, nF - 1, true, m);
+		if (m <= 5) {
+			// a small plot: the crown is one more offset fan on its own limb, not a cap on the column
+			fan(t, tu, tv, topY, widestGap(used, a0, r), 0.5, rt, rt * (0.8 + r.nextDouble() * 0.2), id, sun, bias, nF - 1, false, m);
+		} else {
+			fan(t, tu, tv, topY, 0, 0, rt, rt * (0.8 + r.nextDouble() * 0.2), id, sun, bias, nF - 1, true, m);
+		}
 
 		// ---- fallen leaves under the crown, thick at the trunk and thinning out
 		int salt = 100;
@@ -304,7 +309,8 @@ public final class TreeMapleRed implements Variant {
 		double coarse = (t.hash(Math.floorDiv(u, 2) + 7, y, Math.floorDiv(v, 2), 16) - 7.5) / 7.5;
 		double fine = (t.hash(u, y, v, 16) - 7.5) / 7.5;
 		double h = TreeKit.clamp(hue + coarse * 0.17 + fine * 0.13, 0.0, 0.999);
-		int i = (int) Math.floor(h * 3);
+		// less deep wart red (it filled the gaps and the undersides), orange only as an accent
+		int i = h < 0.25 ? 0 : h < 0.78 ? 1 : 2;
 		if (i == 2 && top && t.hash(u + 3, y, v, 14) == 0) {
 			return HONEY;
 		}
