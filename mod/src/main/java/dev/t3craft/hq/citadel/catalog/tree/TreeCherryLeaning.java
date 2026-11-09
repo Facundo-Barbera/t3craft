@@ -32,7 +32,7 @@ import net.minecraft.world.level.block.Blocks;
 public final class TreeCherryLeaning implements Variant {
 	/** Cherry pink, with flowering azalea only as a sprinkle on the upper shell (a few percent of the leaves). */
 	private static final TreeKit.Leaves PINK = new TreeKit.Leaves(leaves(Blocks.CHERRY_LEAVES), leaves(Blocks.CHERRY_LEAVES),
-			leaves(Blocks.FLOWERING_AZALEA_LEAVES), 3, 9);
+			leaves(Blocks.FLOWERING_AZALEA_LEAVES), 3, 5);
 
 	/** The lean starts here: y = 0..2 stay free under the trunk and under the canopy. */
 	private static final int YS = 3;
@@ -170,10 +170,26 @@ public final class TreeCherryLeaning implements Variant {
 		}
 		List<int[]> segB = TreeKit.branch(t, TreeKit.CHERRY, new int[] {eu, yElbow, ev}, new int[] {tu, ytip, tv}, false);
 
+		// ramps, not zigzags: where the trunk goes along and then up, the inner corner above it is filled (the underside stays open)
+		if (mn >= 6) {
+			for (List<int[]> seg : List.of(segA, segB)) {
+				for (int i = 1; i + 1 < seg.size(); i++) {
+					int[] a0 = seg.get(i - 1);
+					int[] a1 = seg.get(i);
+					int[] a2 = seg.get(i + 1);
+					if (a1[1] == a0[1] && a2[1] == a1[1] + 1 && t.empty(a0[0], a2[1], a0[2])) {
+						t.wood(a0[0], a2[1], a0[2], TreeKit.CHERRY.bark());
+					}
+				}
+			}
+		}
+
 		// ---- clouds
 		double ra = TreeKit.clamp(0.25 * mn + 0.55, 1.9, 2.8);
 		List<Pad> pads = new ArrayList<>();
-		pads.add(padClamped(tu + du, ytip + 1, tv + dv, ra, w, d)); // the cloud sits beyond the tip: the trunk enters it from the side
+		Pad p0 = padClamped(tu + du, ytip + 1, tv + dv, ra, w, d); // the cloud sits beyond the tip: the trunk enters it from the side
+		pads.add(p0);
+		TreeKit.branch(t, TreeKit.CHERRY, new int[] {tu, ytip, tv}, new int[] {p0.u, p0.y, p0.v}, false); // face-connected into the cloud
 
 		// rising limb 1: from the first half of the lean, up and a little outwards
 		int i1 = TreeKit.clamp((int) Math.round(segA.size() * (0.3 + 0.3 * r.nextDouble())), 1, Math.max(1, segA.size() - 1));
@@ -204,6 +220,17 @@ public final class TreeCherryLeaning implements Variant {
 			}
 		}
 
+		// a small tuft on a short twig from the tip, higher than the rest: the crown is tiered (7+ wide)
+		if (mn >= 7) {
+			int side3 = r.nextBoolean() ? 1 : -1;
+			int pu3 = diag ? side3 : -dv * side3;
+			int pv3 = diag ? 0 : du * side3;
+			Pad p3 = padClamped(tu + pu3, Math.min(ytip + 3, hh - 3), tv + pv3, Math.max(1.5, ra * 0.55), w, d);
+			if (p3.y >= ytip + 2) {
+				pads.add(p3);
+				TreeKit.branch(t, TreeKit.CHERRY, new int[] {tu, ytip, tv}, new int[] {p3.u, p3.y, p3.v}, false);
+			}
+		}
 		for (Pad q : pads) {
 			t.wood(q.u, q.y, q.v, TreeKit.CHERRY.bark()); // the end of a limb inside its cloud: no pale log end showing through a gap
 		}
@@ -227,7 +254,7 @@ public final class TreeCherryLeaning implements Variant {
 		for (int y = YS; y < hh; y++) {
 			for (int v = 0; v < d; v++) {
 				for (int u = 0; u < w; u++) {
-					if (t.kind(u, y, v) == TreeKit.LEAF && t.hash(u + 3, y + 5, v + 9, 100) < 6 && !nextToWood(t, u, y, v)) {
+					if (t.kind(u, y, v) == TreeKit.LEAF && t.hash(u + 3, y + 5, v + 9, 100) < 9 && !nextToWood(t, u, y, v)) {
 						t.clear(u, y, v);
 					}
 				}
