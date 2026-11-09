@@ -40,7 +40,7 @@ public final class TreeAzaleaBlossom implements Variant {
 	/** The lowest y of any leaf or limb (the trunk and its foot aside): 4 free blocks under the crown. */
 	private static final int CLEAR = 4;
 	/** 0 = tree with a trunk, 1 = wide low dome on leaning stems. */
-	private static final int MODE = 1;
+	private static final int MODE = 0;
 
 	@Override
 	public String id() {
@@ -501,7 +501,11 @@ public final class TreeAzaleaBlossom implements Variant {
 			double noise = t.hash(s[0] + 5, s[1] + 9, s[2] + 13, 100) < 22 ? c2 : big4;
 			boolean flower = noise < pf;
 			t.clear(s[0], s[1], s[2]);
-			boolean freeTop = s[1] + 1 < x.p.h() && t.empty(s[0], s[1] + 1, s[2]);
+			int flank = 0; // no cap on a lone spike: it needs two leaf neighbours on its own level
+			for (int[] o : n6) {
+				flank += o[1] == 0 && t.kind(s[0] + o[0], s[1], s[2] + o[2]) == TreeKit.LEAF ? 1 : 0;
+			}
+			boolean freeTop = flank >= 2 && s[1] + 1 < x.p.h() && t.empty(s[0], s[1] + 1, s[2]);
 			if (flower && freeTop && t.hash(s[0] + 1, s[1] + 4, s[2] + 2, 100) < 74) {
 				t.fixed(s[0], s[1], s[2], b(Blocks.MOSS_BLOCK));
 				boolean bush = t.hash(s[0], s[1] + 8, s[2], 3) != 0 && (s[1] + 2 >= x.p.h() || t.empty(s[0], s[1] + 2, s[2]));
