@@ -62,7 +62,7 @@ public final class PlazaCenterOctagonBandstand implements Variant {
 
 	@Override
 	public int minH() {
-		return 10;
+		return 14;
 	}
 
 	@Override
