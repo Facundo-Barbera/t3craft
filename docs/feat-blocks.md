@@ -368,6 +368,7 @@ nuestros (`tools/art/console_terminal_art.py` genera las seis texturas y el mode
 - **Datos**: blockstate (4 `facing`), modelo, 6 texturas, ítem, loot table, receta barata
   (panel de vidrio, 2 botones de piedra, redstone, 3 lingotes de hierro), tag `mineable/pickaxe`, lang en `en_us`,
   `es_es` y `es_mx`.
+- **Arte v2 (kit/office-blocks2)**: monitor delgado (bisel de acero, pie, cuello, inclinado 8°, LED en la barbilla) y tres acentos (turquesa T3, violeta, dorado: barra de título + LED) elegidos con una lista ponderada en el blockstate: sin propiedad nueva, sin kernel. La galería `--office-blocks` solo dibuja el primero (el renderer toma la primera entrada de la lista); los tres se ven en `python3 tools/art/console_terminal_art.py --preview DIR`. Acento por vínculo = propiedad nueva en `ConsoleTerminalBlock` (pendiente).
 - **RESTART** (registro nuevo, clases kernel `dev.t3craft.blocks.*` y `HqKit`).
 
 ## Cómo añadir un bloque nuevo
