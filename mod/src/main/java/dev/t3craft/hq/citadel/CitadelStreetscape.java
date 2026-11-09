@@ -386,14 +386,17 @@ final class CitadelStreetscape {
 		}
 		int reach = (int) Math.ceil(CitadelPlaza.KERB_K / Math.min(p.ku(), p.kv())) + 1;
 		c.rigid(cx, cz);
-		focalLantern(c, cx, cz);
 		for (int x = cx - reach; x <= cx + reach; x++) {
 			for (int z = cz - reach; z <= cz + reach; z++) {
 				if (p.metric(x, z) >= CitadelPlaza.KERB_K + 0.5 || !plazaFree(c, p, x, z, 1)) {
 					continue;
 				}
 				int k = p.band(x, z);
-				if (k >= CitadelPlaza.KERB_K) {
+				if (k == 1 && (x != cx || z != cz)) {
+					c.set(x, 1, z, CitadelPaving.BRICKS); // the pedestal of the focal point: a full step round the plinth ...
+				} else if (k == 2) {
+					c.set(x, 1, z, BASE); // ... and a half step round that, so it is walked up
+				} else if (k >= CitadelPlaza.KERB_K) {
 					c.set(x, 1, z, CitadelPlaza.KERB_TOP); // the kerb: half a block over the floor, walked over
 				} else if (p.quadrant(x, z)) {
 					if (k == CitadelPlaza.BENCH_K) {
@@ -406,6 +409,7 @@ final class CitadelStreetscape {
 				}
 			}
 		}
+		focalLantern(c, cx, cz); // after the pedestal: its own 3x3 slabs only go where the pedestal left the cells free
 		if (p.planters()) {
 			for (int sl = -1; sl <= 1; sl += 2) {
 				for (int sa = -1; sa <= 1; sa += 2) {
