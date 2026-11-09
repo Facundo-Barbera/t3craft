@@ -162,7 +162,8 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 		k.rd = k.oct ? k.ptop - 1 : k.ptop;
 		k.yd = tiers;
 		int surface = k.yd + 1;
-		k.g = Math.max(1, Math.min(Math.min(k.rd - 1, p.h() - 2 - surface), 6));
+		// a modest blade: about half the dial radius high, never taller than the plot allows
+		k.g = Math.max(1, Math.min(Math.min(k.rd - 1, p.h() - 2 - surface), Math.max(2, (k.rd + 1) / 2)));
 
 		k.dial = switch (dk) {
 			case 0 -> Blocks.CALCITE;
@@ -247,11 +248,15 @@ public final class PlazaCenterMonumentalSundial implements Variant {
 					double perp = Math.abs(du * ov - dv * ou);
 					boolean card = h % 3 == 0;
 					if (inRing) {
-						if (perp < (card ? cardW : 0.55)) {
+						// gold only on the outer layer of the bezel (the inner one stays dark, so the ring is continuous);
+						// the quarters are 3 wide there and 1 wide on the inner layer
+						boolean outer = k.rd < 5 || r > k.rd - 0.8;
+						double wide = card ? (outer ? cardW : 0.55) : (outer ? 0.55 : -1);
+						if (perp < wide) {
 							k.mk[u][v] = true;
 							break;
 						}
-					} else if (card && r > k.rd - (h == 0 ? 3.6 : 2.6) && perp < 0.6) {
+					} else if (card && r > k.rd - (h == 0 ? 3.6 : 2.6) && perp < 0.55) {
 						k.mk[u][v] = true;
 						break;
 					}
