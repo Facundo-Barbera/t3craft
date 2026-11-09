@@ -223,7 +223,7 @@ public final class TreeMapleRed implements Variant {
 		}
 		int fu0 = (int) Math.round(fu);
 		int fv0 = (int) Math.round(fv);
-		double hue = 0.27 + 0.27 * Math.cos(ang - sun) * (reach > 0 ? 1 : 0.5) + 0.03 * (py - 4) + hueUp + bias;
+		double hue = 0.35 + 0.3 * Math.cos(ang - sun) * (reach > 0 ? 1 : 0.5) + 0.03 * (py - 4) + hueUp + bias;
 		if (reach > 0) {
 			// the limb: from the trunk out and then up into the fan
 			int y0 = TreeKit.clamp(ys, 2, py - 1);
@@ -269,7 +269,7 @@ public final class TreeMapleRed implements Variant {
 				}
 				// the cap: smaller and ragged, brighter
 				if (qq <= 0.58 + jit && (centre || t.hash(u, cy + 1, v + id, 5) != 0)) {
-					t.leafOf(u, cy + 1, v, leaf(t, hue + 0.04, u, cy + 1, v, true), id);
+					t.leafOf(u, cy + 1, v, leaf(t, hue + 0.07, u, cy + 1, v, true), id);
 				}
 				// a few drips under the rim, darker
 				if (qq > 0.7 && qq <= 1.0 + jit && t.hash(u + id, cy - 1, v, 12) == 0 && t.kind(u, cy, v) != TreeKit.EMPTY) {
