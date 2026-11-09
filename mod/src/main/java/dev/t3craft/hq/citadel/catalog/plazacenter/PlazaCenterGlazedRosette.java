@@ -247,18 +247,18 @@ public final class PlazaCenterGlazedRosette implements Variant {
 		p.set(c, u, 0, v, h == 0 ? slab(Blocks.MOSSY_STONE_BRICK_SLAB) : h == 1 ? slab(Blocks.POLISHED_ANDESITE_SLAB) : slab(Blocks.STONE_BRICK_SLAB));
 	}
 
-	/** A small cherry tree: trunk from the moss bed, a compact canopy from 4 blocks up (walk and sit under it). */
+	/** A small cherry tree: trunk from the moss bed, a compact canopy from 5 blocks up (walk and sit under it). */
 	private void tree(CitadelCanvas c, Plot p, int tu, int tv, int br) {
-		for (int y = 1; y <= 4; y++) {
+		for (int y = 1; y <= 5; y++) {
 			safe(c, p, tu, y, tv, b(Blocks.CHERRY_LOG));
 		}
 		double[] rad = br == 1 ? new double[] {1.6, 1.6, 0.9} : new double[] {2.4, 2.4, 1.5};
 		for (int layer = 0; layer < rad.length; layer++) {
-			int y = 4 + layer;
+			int y = 5 + layer;
 			int reach = (int) Math.ceil(rad[layer]);
 			for (int dz = -reach; dz <= reach; dz++) {
 				for (int dx = -reach; dx <= reach; dx++) {
-					if (dx * dx + dz * dz <= rad[layer] * rad[layer] && !(dx == 0 && dz == 0 && y == 4)) {
+					if (dx * dx + dz * dz <= rad[layer] * rad[layer] && !(dx == 0 && dz == 0 && y == 5)) {
 						safe(c, p, tu + dx, y, tv + dz, CitadelCanvas.leaves(p.hash(tu + dx, y, tv + dz, 6) == 0 ? Blocks.FLOWERING_AZALEA_LEAVES : Blocks.CHERRY_LEAVES));
 					}
 				}
