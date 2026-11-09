@@ -195,8 +195,8 @@ public final class TreeCloudPinePot implements Variant {
 		for (int y = 2; y <= trunkTop; y++) {
 			if (y == nextMove) {
 				int step = mi % 4;
-				int dA = step == 0 || step == 2 ? sg : 0;
-				int dP = step == 1 ? pdir : step == 3 ? -pdir : 0;
+				int dA = step == 0 || step == 1 || step == 3 ? sg : 0;
+				int dP = step == 2 ? pdir : 0;
 				int du = alongU ? dA : dP;
 				int dv = alongU ? dP : dA;
 				int nu = cu + du;
@@ -213,7 +213,7 @@ public final class TreeCloudPinePot implements Variant {
 					cu = nu;
 					cv = nv;
 					mi++;
-					nextMove = y + 2 + r.nextInt(2);
+					nextMove = y + 2;
 				} else if (low) {
 					nextMove = y + 1; // retry higher up
 				} else {
@@ -260,10 +260,10 @@ public final class TreeCloudPinePot implements Variant {
 		for (int k = 0; k < n - 1; k++) {
 			int side = k % 2 == 0 ? sg : -sg;
 			// the limb runs level under the pad (small plots: it may start lower, nobody walks there)
-			int ys = small >= 5 ? Math.max(3, py[k] - 2) : Math.min(py[k] - 1, Math.max(3, py[k] - 2));
+			int ys = Math.max(3, py[k] - 3);
 			double ra = Math.min(pr[k] * 1.25, (lenA - 1) / 2.0 + 0.4);
 			double rp = Math.min(pr[k] * 0.95, (lenP - 1) / 2.0 + 0.4);
-			double off = Math.max(2.0, Math.round(ra * 1.2));
+			double off = Math.max(2.0, Math.round(ra * 1.35));
 			double tA = alongU ? tu[ys] : tv[ys];
 			double tP = alongU ? tv[ys] : tu[ys];
 			double ca = TreeKit.clamp(tA + side * off, ra - 0.4, lenA - 1 - (ra - 0.4));
