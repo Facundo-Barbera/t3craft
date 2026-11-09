@@ -6,6 +6,8 @@ import dev.t3craft.hq.RingCampusGeometry.Zone;
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
@@ -33,26 +35,28 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
  *
  * <ul>
  * <li><b>The pit</b> ({@code d <= 6.5}): a conversation pit 2 blocks down ({@code y = -2}). Round a stone-ringed
- *     hearth (an open campfire inside a 3 x 3 ring of stone-brick wall: nobody can step in, no water anywhere near)
- *     stand four curved sofas against the pit wall and a low table in front of each. The four 5-wide aisles
- *     ({@code |dx| <= 2} or {@code |dz| <= 2}, cherry boards) stay clear to the hearth.</li>
- *     <li><b>Four flights</b> of stairs, 3 wide with a rail on each side, one on each axis: two stone-brick stairs,
- *     the first step head-on, nothing over them; the wall between the flights is a 2-high dark base with a light
- *     coping and a low rail with lantern posts and pots.</li>
- * <li><b>The terrace</b> ({@code d > 8.5}): flush with the street, with the four 5-wide axes as entrances (cherry
- *     boards) and a quarter for each use, from the north-west clockwise: <b>cafe</b> (a bar with chest, barrel and
- *     brewing stand, smoker, cauldron, chest; a pantry of barrels, chests and a composter; a low table with benches),
- *     <b>library</b> (shelf walls, two lecterns, a reading table), <b>music</b> (a jukebox with its disc, a record
- *     rack and chest, speakers, sofas and tables round it), <b>garden</b> (azalea and flower beds, a cherry tree, a tea
- *     table).</li>
- * <li><b>The pergola</b> ({@code y = 6}, 5 clear above the floor): a ring beam of stripped cherry on 12 posts (the
- *     eight at the entrances make four gates, with a hanging lantern), a lattice of slabs outside and inside it, and
- *     warm glow panels in the lattice (the kit's {@code glow_panel}). Glow strips run along the foot of the bar, the
- *     shelves and the rack. No lantern hangs anywhere else.</li>
+ *     hearth (an open campfire between four stone piers, under a bell hood and a hollow 3 x 3 chimney that climbs to
+ *     y = 12: nobody can step in, no water anywhere near) stand four curved sofas (a seat of two cherry slabs against a
+ *     back of dark oak stairs) and a low table with a pot in front of each. The four 5-wide aisles ({@code |dx| <= 2}
+ *     or {@code |dz| <= 2}: cherry centre line, dark oak, polished deepslate edge) stay clear to the hearth.</li>
+ * <li><b>Four flights</b> of stairs, 3 wide with a rail on each side, one on each axis: two stone-brick treads with
+ *     deepslate-tile edges, the first step head-on, nothing over them; the wall between the flights is a 2-high dark
+ *     base with a light coping, a ring of cherry benches and a low rail with pots.</li>
+ * <li><b>The terrace</b> ({@code d > 8.5}): flush with the street, with the four 5-wide axes as entrances and a quarter
+ *     for each use, from the north-west clockwise: <b>cafe</b> (smooth stone chequer, tiles at the bar; a bar with chest,
+ *     barrel and brewing stand, smoker, cauldron, chest; a pantry of barrels, chests and a composter; a low table with
+ *     benches), <b>library</b> (dark oak boards, a red rug; shelf walls, two lecterns, a reading table), <b>music</b>
+ *     (tile chequer and a cherry dais; a jukebox with its disc, a record rack and chest, speakers, benches and tables
+ *     round it), <b>garden</b> (grass and a mossy brick patio; azalea and flower beds, a cherry tree, a tea table).</li>
+ * <li><b>The pergola</b> ({@code y = 6}, 4 clear under the awning): an octagonal ring beam of stripped cherry (straight
+ *     on the axes, clean 45 degree diagonals joined with slabs) on 12 dark oak posts with knee-brace brackets (the eight
+ *     at the entrances make four gates, with a hanging lantern; the four diagonal posts end in lantern finials), an awning
+ *     of cherry slabs with a dark oak edge outside it. No glow panel hangs anywhere; glow strips run along the foot of
+ *     the bar, the shelves and the rack.</li>
  * </ul>
  *
- * <p>Palette: deepslate tiles and polished deepslate (base), stone brick (coping, counter bases), cherry (boards,
- * sofas, beams), moss and greens, a little gold in the lanterns and panels. Designed for scale 2; at a larger scale the
+ * <p>Palette: deepslate tiles and polished deepslate (base), stone brick (coping, hearth, chimney), dark oak (sofa backs,
+ * boards, posts), cherry (seats, beams, awning), moss and greens, a little gold in the lanterns. Designed for scale 2; at a larger scale the
  * extra ring beyond radius 14 is plain terrace, at a smaller one (down to 1.9) the room is clipped by the node's
  * zone.
  *
@@ -77,6 +81,11 @@ public final class LoungeRoom {
 	private static final int PIT_Y = -2;
 	/** Height of the pergola's beams and rafters. */
 	private static final int ROOF_Y = 6;
+	/** The ring beam: octagon of half width 11 and diagonal sum 16. The awning reaches out to 13 and 19. */
+	private static final int BEAM_R = 11;
+	private static final int BEAM_T = 16;
+	private static final int AWN_R = 13;
+	private static final int AWN_T = 19;
 	/** The standing cell of the walk spot: east of the hearth in the pit. */
 	public static final int SPOT_DX = 3;
 	public static final int SPOT_Y = -1;
@@ -252,12 +261,18 @@ public final class LoungeRoom {
 			}
 		}
 
+		/** The floor of the five-wide axes (pit and entrances): a cherry centre line, dark oak, a polished deepslate edge. */
+		BlockState aisle(int a) {
+			return switch (a) {
+				case 0 -> b(Blocks.CHERRY_PLANKS);
+				case 1 -> b(Blocks.DARK_OAK_PLANKS);
+				default -> b(Blocks.POLISHED_DEEPSLATE);
+			};
+		}
+
 		BlockState terrace(int dx, int dz, int ax, int az, int a, double d) {
-			if (a <= 1) {
-				return c.floor();
-			}
-			if (a == 2) {
-				return b(Blocks.POLISHED_DEEPSLATE);
+			if (a <= 2) {
+				return aisle(a);
 			}
 			int sx = dx < 0 ? -1 : 1;
 			int sz = dz < 0 ? -1 : 1;
@@ -267,51 +282,106 @@ public final class LoungeRoom {
 			if (d <= 9.3) {
 				return ((ax + az) & 1) == 0 ? b(Blocks.POLISHED_DEEPSLATE) : NodeDecor.footMix(dx, 0, dz);
 			}
+			boolean apron = Math.max(ax, az) >= 10;
+			boolean rug = ax >= 7 && ax <= 10 && az >= 3 && az <= 7;
+			boolean dais = ax >= 8 && ax <= 10 && az >= 8 && az <= 10;
 			return switch (theme(sx, sz)) {
-				case 0 -> ((ax + az) & 1) == 0 ? b(Blocks.SMOOTH_STONE) : b(Blocks.POLISHED_DEEPSLATE);
-				case 1 -> b(Blocks.POLISHED_DEEPSLATE);
-				case 2 -> ((ax + az) & 1) == 0 ? NodeDecor.footMix(dx, 0, dz) : b(Blocks.POLISHED_DEEPSLATE);
-				default -> GRASS; // plants stand on grass (moss is not accepted by the vegetation support check)
+				// cafe: smooth stone and polished deepslate in a chequer, deepslate tiles in front of the bar and pantry
+				case 0 -> apron ? NodeDecor.footMix(dx, 0, dz) : ((ax + az) & 1) == 0 ? b(Blocks.SMOOTH_STONE) : b(Blocks.POLISHED_DEEPSLATE);
+				// library: dark oak boards, tiles in front of the shelves, a red wool rug under the reading table
+				case 1 -> rug ? b(Blocks.WOOL.pick(DyeColor.RED)) : apron ? NodeDecor.footMix(dx, 0, dz) : b(Blocks.DARK_OAK_PLANKS);
+				// music: tiles and polished deepslate in a chequer, a cherry dais under the jukebox
+				case 2 -> dais ? b(Blocks.CHERRY_PLANKS) : ((ax + az) & 1) == 0 ? NodeDecor.footMix(dx, 0, dz) : b(Blocks.POLISHED_DEEPSLATE);
+				// garden: grass (plants stand on grass; moss is not accepted by the vegetation support check), a mossy brick patio
+				default -> rug ? NodeDecor.stoneMix(dx, 0, dz) : GRASS;
 			};
 		}
 
-		/** The hearth: an open campfire inside a ring of stone-brick wall. Nothing wet near, nothing to step in. */
+		/**
+		 * The hearth: an open campfire in a ring of stone-brick wall, under a bell hood and a tall chimney. Four stone
+		 * piers on the corners of the ring carry a lintel 4 above the pit floor (the four sides stay open), a skirt of
+		 * stairs flares out round it, and a hollow 3 x 3 shaft rises through the awning's open middle to a crowned top.
+		 * Nobody can step into the fire, nothing is wet, and the smoke has a way out.
+		 */
 		void hearth() {
 			for (int dx = -1; dx <= 1; dx++) {
 				for (int dz = -1; dz <= 1; dz++) {
 					if (dx == 0 && dz == 0) {
 						set(0, PIT_Y + 1, 0, b(Blocks.CAMPFIRE));
+					} else if (dx != 0 && dz != 0) {
+						// pier: deepslate tiles at the foot, stone brick above, a polished course under the lintel
+						set(dx, PIT_Y + 1, dz, b(Blocks.DEEPSLATE_TILES));
+						set(dx, 0, dz, NodeDecor.stoneMix(dx, 0, dz));
+						set(dx, 1, dz, b(Blocks.STONE_BRICKS));
+						set(dx, 2, dz, b(Blocks.CHISELED_STONE_BRICKS));
 					} else {
 						set(dx, PIT_Y + 1, dz, b(Blocks.STONE_BRICK_WALL));
 					}
 				}
 			}
+			// bell: the lintel ring, and a skirt of stairs that flares out (high back against the lintel)
+			for (int dx = -2; dx <= 2; dx++) {
+				for (int dz = -2; dz <= 2; dz++) {
+					int ax = Math.abs(dx);
+					int az = Math.abs(dz);
+					if (Math.max(ax, az) == 1) {
+						set(dx, 3, dz, b(Blocks.STONE_BRICKS));
+					} else if (Math.max(ax, az) == 2 && Math.min(ax, az) <= 1) {
+						set(dx, 3, dz, stairs(Blocks.STONE_BRICK_STAIRS, NodeDecor.outward(dx, dz)));
+					}
+				}
+			}
+			// the shaft: a hollow 3 x 3 (the campfire's smoke goes up the middle), banded, with a cornice and a cap
+			for (int y = 4; y <= 10; y++) {
+				for (int dx = -1; dx <= 1; dx++) {
+					for (int dz = -1; dz <= 1; dz++) {
+						if (dx != 0 || dz != 0) {
+							boolean band = y == 6 || y == 10;
+							set(dx, y, dz, band ? b(Blocks.POLISHED_DEEPSLATE) : NodeDecor.stoneMix(dx, y, dz));
+						}
+					}
+				}
+			}
+			for (int dx = -2; dx <= 2; dx++) {
+				for (int dz = -2; dz <= 2; dz++) {
+					int ax = Math.abs(dx);
+					int az = Math.abs(dz);
+					if (Math.max(ax, az) == 2 && Math.min(ax, az) <= 1) {
+						set(dx, 11, dz, NodeDecor.invStairs(Blocks.STONE_BRICK_STAIRS, NodeDecor.outward(dx, dz)));
+					} else if (Math.max(ax, az) == 1) {
+						set(dx, 11, dz, b(Blocks.DEEPSLATE_TILES));
+						set(dx, 12, dz, slab(Blocks.DEEPSLATE_TILE_SLAB));
+					}
+				}
+			}
 		}
 
-		/** Four curved sofas against the pit wall and a low table in front of each. */
+		/**
+		 * Four curved sofas in the pit. Each is a seat of two cherry slabs against a back of dark oak stairs that follows
+		 * the wall, and a low table with a pot between them and the aisle.
+		 */
 		void sofas() {
 			for (int dx = -6; dx <= 6; dx++) {
 				for (int dz = -6; dz <= 6; dz++) {
 					double d = Math.hypot(dx, dz);
-					if (Math.min(Math.abs(dx), Math.abs(dz)) >= 3 && d > 5.4 && d <= PIT_R) {
-						set(dx, PIT_Y + 1, dz, stairs(Blocks.BAMBOO_MOSAIC_STAIRS, NodeDecor.outward(dx, dz)));
+					if (Math.min(Math.abs(dx), Math.abs(dz)) < 3 || d > PIT_R) {
+						continue;
 					}
-				}
-			}
-			for (int sx : new int[] {-1, 1}) {
-				for (int sz : new int[] {-1, 1}) {
-					for (int[] t : new int[][] {{3, 3}, {3, 4}, {4, 3}}) {
-						set(sx * t[0], PIT_Y + 1, sz * t[1], slab(Blocks.BAMBOO_MOSAIC_SLAB));
+					if (d > 5.5) {
+						set(dx, PIT_Y + 1, dz, stairs(Blocks.DARK_OAK_STAIRS, NodeDecor.outward(dx, dz)));
+					} else if (d > 4.5) {
+						set(dx, PIT_Y + 1, dz, slab(Blocks.CHERRY_SLAB));
+					} else {
+						set(dx, PIT_Y + 1, dz, slab(Blocks.DARK_OAK_SLAB));
+						set(dx, PIT_Y + 2, dz, pot(dx * 2 + dz + 7));
 					}
-					set(sx * 3, PIT_Y + 2, sz * 3, pot(sx * 2 + sz + 7));
 				}
 			}
 		}
 
 		/**
 		 * The edge of the pit: a ring of cherry benches on the coping looking down into the pit (their backs are the rail),
-		 * a low rail of stone-brick wall on each side of the four flights, four lantern posts on the diagonals and pots on
-		 * the outer ring of the coping.
+		 * a low rail of stone-brick wall on each side of the four flights and pots on the outer ring of the coping.
 		 */
 		void rim() {
 			for (int dx = -9; dx <= 9; dx++) {
@@ -328,7 +398,7 @@ public final class LoungeRoom {
 					if (a == 2) {
 						set(dx, 1, dz, b(Blocks.STONE_BRICK_WALL));
 					} else if (d <= 7.5) {
-						set(dx, 1, dz, stairs(Blocks.BAMBOO_MOSAIC_STAIRS, NodeDecor.outward(dx, dz)));
+						set(dx, 1, dz, stairs(Blocks.CHERRY_STAIRS, NodeDecor.outward(dx, dz)));
 					} else if (Math.floorMod(dx * 5 + dz * 3, 3) == 0) {
 						set(dx, 1, dz, pot(dx * 3 + dz));
 					}
@@ -336,10 +406,16 @@ public final class LoungeRoom {
 			}
 		}
 
+		/** Whether {@code (ax, az)} (absolute offsets) is inside the octagon of half width {@code r} and diagonal sum {@code t}. */
+		private static boolean oct(int ax, int az, int r, int t) {
+			return Math.max(ax, az) <= r && ax + az <= t;
+		}
+
 		/**
-		 * The pergola: a ring beam on twelve dark posts, and outside it an awning of cherry slabs flat under the beam
-		 * to the rim (so the bars, shelves and the rack are under a roof) with warm glow panels under it. The
-		 * entrances stay open between their posts.
+		 * The pergola: a regular-ish octagon ring beam (straight sides on the axes, clean 45 degree diagonals) on twelve
+		 * dark oak posts with knee-brace brackets, and outside it an awning of cherry slabs flat under the beam out to an
+		 * octagonal dark oak edge (so the bars, shelves and the rack are under a roof). The entrances stay open between
+		 * their posts. The diagonal posts rise into lantern finials.
 		 */
 		void pergola() {
 			for (int dx = -15; dx <= 15; dx++) {
@@ -350,22 +426,31 @@ public final class LoungeRoom {
 					int ax = Math.abs(dx);
 					int az = Math.abs(dz);
 					int a = Math.min(ax, az);
-					double d = Math.hypot(dx, dz);
-					if (d <= 10.6 || d > 13.95) {
+					if (!oct(ax, az, AWN_R, AWN_T)) {
 						continue;
 					}
-					boolean ring = d <= 11.9;
-					if (ring) {
-						set(dx, ROOF_Y, dz, beam(ax >= az ? Direction.Axis.Z : Direction.Axis.X));
-					} else if (a >= 3) {
-						set(dx, ROOF_Y - 1, dz, NodeDecor.topSlab(Blocks.CHERRY_SLAB));
-						if (Math.floorMod(dx * 3 + dz * 5, 7) == 0) {
-							// the panel hangs under its stair: its lit face is the bottom, its frame never shows from above
-							set(dx, ROOF_Y - 2, dz, c.kit.glowPanel(Direction.DOWN, false));
+					if (oct(ax, az, BEAM_R, BEAM_T)) {
+						boolean strictlyIn = oct(ax, az, BEAM_R - 1, BEAM_T - 1);
+						if (!strictlyIn) {
+							if (ax == BEAM_R && az <= BEAM_R - 7) {
+								set(dx, ROOF_Y, dz, beam(Direction.Axis.Z));
+							} else if (az == BEAM_R && ax <= BEAM_R - 7) {
+								set(dx, ROOF_Y, dz, beam(Direction.Axis.X));
+							} else {
+								set(dx, ROOF_Y, dz, b(Blocks.STRIPPED_CHERRY_WOOD));
+							}
+						} else if (ax + az == BEAM_T - 1 && Math.max(ax, az) <= BEAM_R - 1) {
+							// fills the step between two diagonal cells: the diagonal reads as one band
+							set(dx, ROOF_Y, dz, slab(Blocks.CHERRY_SLAB));
 						}
+						continue;
+					}
+					if (a >= 3) {
+						boolean edge = !oct(ax + 1, az, AWN_R, AWN_T) || !oct(ax, az + 1, AWN_R, AWN_T);
+						set(dx, ROOF_Y - 1, dz, NodeDecor.topSlab(edge ? Blocks.DARK_OAK_SLAB : Blocks.CHERRY_SLAB));
 						int sx = dx < 0 ? -1 : 1;
 						int sz = dz < 0 ? -1 : 1;
-						if (theme(sx, sz) == 3 && d > 12.2 && Math.floorMod(ax + az * 2, 3) != 0) {
+						if (theme(sx, sz) == 3 && Math.hypot(dx, dz) > 12.2 && Math.floorMod(ax + az * 2, 3) != 0) {
 							set(dx, ROOF_Y, dz, leaves(Blocks.CHERRY_LEAVES));
 						}
 					}
@@ -375,12 +460,40 @@ public final class LoungeRoom {
 			for (int[] p : posts) {
 				set(p[0], 1, p[1], b(Blocks.STONE_BRICKS));
 				for (int y = 2; y < ROOF_Y; y++) {
-					set(p[0], y, p[1], RIB);
+					set(p[0], y, p[1], b(Blocks.STRIPPED_DARK_OAK_LOG));
+				}
+				// knee braces: upside-down stairs under the beam, full height against the post
+				int sx = Integer.signum(p[0]);
+				int sz = Integer.signum(p[1]);
+				int[][] braces;
+				if (Math.abs(p[0]) == BEAM_R) {
+					braces = new int[][] {{p[0], p[1] - 1}, {p[0], p[1] + 1}};
+				} else if (Math.abs(p[1]) == BEAM_R) {
+					braces = new int[][] {{p[0] - 1, p[1]}, {p[0] + 1, p[1]}};
+				} else {
+					braces = new int[][] {{p[0] - sx, p[1]}, {p[0], p[1] - sz}};
+				}
+				for (int[] br : braces) {
+					int ddx = p[0] - br[0];
+					int ddz = p[1] - br[1];
+					Direction towardPost = ddx > 0 ? Direction.EAST : ddx < 0 ? Direction.WEST : ddz > 0 ? Direction.SOUTH : Direction.NORTH;
+					set(br[0], ROOF_Y - 1, br[1], NodeDecor.invStairs(Blocks.DARK_OAK_STAIRS, towardPost.getOpposite()));
+				}
+				if (Math.abs(p[0]) == 8) {
+					// finial: the post climbs through the beam to a lantern
+					set(p[0], ROOF_Y + 1, p[1], b(Blocks.STRIPPED_DARK_OAK_LOG));
+					set(p[0], ROOF_Y + 2, p[1], lanternUp());
 				}
 			}
-			// the four gates: a lantern under the beam over each entrance
+			// the four gates: a lantern under the beam over each entrance, and two under each diagonal
 			for (int[] g : new int[][] {{11, 0}, {-11, 0}, {0, 11}, {0, -11}}) {
 				put(g[0], ROOF_Y - 1, g[1], lanternDown(), HANGING);
+			}
+			for (int sx : new int[] {-1, 1}) {
+				for (int sz : new int[] {-1, 1}) {
+					put(sx * 9, ROOF_Y - 1, sz * 7, lanternDown(), HANGING);
+					put(sx * 7, ROOF_Y - 1, sz * 9, lanternDown(), HANGING);
+				}
 			}
 		}
 	}
@@ -407,11 +520,11 @@ public final class LoungeRoom {
 
 		/** A bench cell whose back is towards {@code ascent} (the sitter looks the other way). */
 		void bench(int u, int v, Direction ascent) {
-			set(u, 1, v, stairs(Blocks.BAMBOO_MOSAIC_STAIRS, ascent));
+			set(u, 1, v, stairs(Blocks.CHERRY_STAIRS, ascent));
 		}
 
 		void table(int u, int v) {
-			set(u, 1, v, slab(Blocks.BAMBOO_MOSAIC_SLAB));
+			set(u, 1, v, slab(Blocks.DARK_OAK_SLAB));
 		}
 
 		/** A low table {@code len} long along u at row {@code v}, a bench on each side facing it. */
@@ -421,12 +534,6 @@ public final class LoungeRoom {
 				bench(u, v - 1, toZ());
 				bench(u, v + 1, toZ().getOpposite());
 			}
-		}
-
-		/** A warm glow panel under a slab of the awning at {@code (u, v)}. */
-		void lamp(int u, int v) {
-			set(u, ROOF_Y - 1, v, NodeDecor.topSlab(Blocks.CHERRY_SLAB));
-			set(u, ROOF_Y - 2, v, r.c.kit.glowPanel(Direction.DOWN, false));
 		}
 
 		/** A glow strip along the foot of a counter or shelf, in the cell where people stand. */
@@ -470,7 +577,6 @@ public final class LoungeRoom {
 		q.tea(8, 5, 2);
 		q.set(8, 2, 5, pot(1));
 		q.set(9, 1, 9, b(Blocks.POTTED_FLOWERING_AZALEA));
-		q.lamp(9, 10);
 	}
 
 	/** Library: shelf walls along v = 11 and u = 11 with a lectern in each, a reading table with a lantern. */
@@ -507,7 +613,6 @@ public final class LoungeRoom {
 		q.set(8, 2, 5, pot(0));
 		q.set(9, 2, 5, pot(2));
 		q.set(9, 1, 9, b(Blocks.CARTOGRAPHY_TABLE));
-		q.lamp(9, 10);
 	}
 
 	/** Music: a jukebox with its disc and speakers, a record rack and chest, benches and tables round it. */
@@ -540,7 +645,6 @@ public final class LoungeRoom {
 		}
 		q.table(9, 7);
 		q.set(9, 2, 7, pot(4));
-		q.lamp(9, 9);
 	}
 
 	/** Garden: azalea and flower beds on grass along v = 10..11, a cherry tree in the corner, a tea table with benches. */
@@ -582,7 +686,6 @@ public final class LoungeRoom {
 		q.set(11, 1, 4, b(Blocks.POTTED_FLOWERING_AZALEA));
 		q.set(11, 1, 6, b(Blocks.POTTED_BAMBOO));
 		q.set(11, 1, 8, q.r.c.kit.gardenPlanter());
-		q.lamp(9, 7);
 	}
 
 	// ------------------------------------------------------------------ legacy design (scale below 1.9)
