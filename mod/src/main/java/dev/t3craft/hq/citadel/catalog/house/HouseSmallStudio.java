@@ -469,6 +469,16 @@ public final class HouseSmallStudio implements Variant {
 					set(u, y, 0, post());
 				}
 			}
+			// [finish] balusters fill the gable face where the beam top would leave 2 free blocks to stand in
+			for (int u = 2; u <= W - 3; u++) {
+				int h = ROOF + Math.min(u, W - 1 - u);
+				if (isPost[u] || (u >= doorLo && u <= doorHi) || h - 7 < 2) {
+					continue;
+				}
+				for (int y = ROOF + 1; y <= h - 2; y++) {
+					set(u, y, 0, TimberKit.fence(s.fence(), false, false, false, false));
+				}
+			}
 			// [finish] lanterns hang from the beam beside the steps, flower pots on the rail
 			for (int u : new int[] {2, W - 3}) {
 				if (free(u, 4, 0) && !isPost[u]) {
