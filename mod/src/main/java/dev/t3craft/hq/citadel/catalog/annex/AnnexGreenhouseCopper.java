@@ -41,9 +41,9 @@ public final class AnnexGreenhouseCopper implements Variant {
 
 	private static final BlockState POST_W = Blocks.CUT_COPPER.waxed().weathered().defaultBlockState();
 	private static final BlockState POST_O = Blocks.CUT_COPPER.waxed().oxidized().defaultBlockState();
-	private static final Block RIB_W = Blocks.CUT_COPPER_STAIRS.waxed().weathered();
-	private static final Block RIB_O = Blocks.CUT_COPPER_STAIRS.waxed().oxidized();
-	private static final Block SLAB_O = Blocks.CUT_COPPER_SLAB.waxed().oxidized();
+	private static final Block RIB_W = Blocks.CUT_COPPER_STAIRS.waxed().exposed();
+	private static final Block RIB_O = Blocks.CUT_COPPER_STAIRS.waxed().weathered();
+	private static final Block SLAB_O = Blocks.CUT_COPPER_SLAB.waxed().weathered();
 	private static final BlockState RIDGE = Blocks.CUT_COPPER.waxed().exposed().defaultBlockState();
 	private static final Block RIDGE_ST = Blocks.CUT_COPPER_STAIRS.waxed().exposed();
 	private static final BlockState EMBLEM = Blocks.CHISELED_COPPER.waxed().exposed().defaultBlockState();
@@ -122,7 +122,7 @@ public final class AnnexGreenhouseCopper implements Variant {
 			dl = w % 2 == 0 ? cu - 1 : cu;
 			int span = vb - vf;
 			int half = (w - 1) / 2;
-			boolean hipWant = w >= 7 && span >= 4 && p.hash(0, 0, 0, 3) == 0;
+			boolean hipWant = w >= 7 && span >= 4 && p.hash(0, 0, 0, 4) == 0;
 			boolean lantWant = w >= 8 && span >= (hipWant ? 4 : 6) && p.hash(1, 0, 0, 2) == 0 && p.h() - 1 - PLATE - 2 >= 1;
 			hip = hipWant;
 			lant = lantWant;
@@ -529,7 +529,7 @@ public final class AnnexGreenhouseCopper implements Variant {
 			return barrel;
 		}
 		if (outer == 0) {
-			return left ? b(Blocks.CHEST).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH) : b(Blocks.COMPOSTER).setValue(BlockStateProperties.LEVEL_COMPOSTER, 3);
+			return left ? b(Blocks.CHEST).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH) : b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP);
 		}
 		return barrel;
 	}
