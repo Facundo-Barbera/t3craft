@@ -80,7 +80,7 @@ public final class WellRoofedStone implements Variant {
 			int uR = uL + cs - 1;
 			int v0 = (d - cs) / 2;
 			int v1 = v0 + cs - 1;
-			int ovU = uL >= 1 && w - 1 - uR >= 1 ? 1 : 0;
+			int ovU = uL >= 2 && w - 1 - uR >= 2 ? 1 : 0;
 			return new Geo(w, d, cs, uL, uR, v0, v1, ovU);
 		}
 
@@ -138,7 +138,11 @@ public final class WellRoofedStone implements Variant {
 	public void build(CitadelCanvas c, Plot p) {
 		Geo g = Geo.of(p);
 		RoofSet roof = ROOFS[p.hash(1, 0, 0, ROOFS.length)];
-		StoneSet st = STONES[p.hash(2, 0, 0, STONES.length)];
+		int si = p.hash(2, 0, 0, STONES.length);
+		if (roof == ROOFS[0] && si == 1) {
+			si = 0; // slate roof over a light kerb, never a muddy dark-on-dark well
+		}
+		StoneSet st = STONES[si];
 		surroundings(c, p, g, roof, st);
 		kerb(c, p, g, st);
 		frame(c, p, g, roof, st);
@@ -205,20 +209,26 @@ public final class WellRoofedStone implements Variant {
 				p.set(c, u, BAR, v, log(roof.log(), Direction.Axis.Z));
 			}
 		}
-		// the axle: a pale stripped log across the shaft, resting on the post tops
-		for (int u = g.uL(); u <= g.uR(); u++) {
+		// the axle: a pale stripped log across the shaft, resting on the post tops; where the plot has a ring
+		// it sticks out one block past each post, and the crank lever is on its east end
+		int ax0 = g.uL() - (g.uL() >= 1 ? 1 : 0);
+		int ax1 = g.uR() + (g.uR() + 1 < g.w() ? 1 : 0);
+		for (int u = ax0; u <= ax1; u++) {
 			p.set(c, u, AXLE, va, pale);
 		}
 		int cu = g.cs() == 4 ? g.uL() + 1 + p.hash(3, 0, 0, 2) : g.uc();
-		// the crank: a lever on the front of the axle
-		p.put(c, cu, AXLE, g.v0(), b(Blocks.LEVER)
-				.setValue(BlockStateProperties.ATTACH_FACE, AttachFace.WALL)
-				.setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH), CitadelCanvas.DECOR);
-		// the bucket (a water cauldron) hangs on an iron chain from the axle, just over the water
-		for (int y = AXLE - 1; y >= 2; y--) {
-			p.put(c, cu, y, va, b(Blocks.IRON_CHAIN).setValue(BlockStateProperties.AXIS, Direction.Axis.Y), CitadelCanvas.HANGING);
+		if (g.uR() + 2 < g.w()) {
+			p.put(c, g.uR() + 2, AXLE, va, b(Blocks.LEVER)
+					.setValue(BlockStateProperties.ATTACH_FACE, AttachFace.WALL)
+					.setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.EAST), CitadelCanvas.DECOR);
+		} else {
+			p.put(c, cu, AXLE, g.v0(), b(Blocks.LEVER)
+					.setValue(BlockStateProperties.ATTACH_FACE, AttachFace.WALL)
+					.setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH), CitadelCanvas.DECOR);
 		}
-		p.put(c, cu, 1, va, b(Blocks.WATER_CAULDRON).setValue(BlockStateProperties.LEVEL_CAULDRON, 3), CitadelCanvas.HANGING);
+		// the bucket (a water cauldron) hangs on a short iron chain from the axle in the front gap, over the water
+		p.put(c, cu, AXLE - 1, va, b(Blocks.IRON_CHAIN).setValue(BlockStateProperties.AXIS, Direction.Axis.Y), CitadelCanvas.HANGING);
+		p.put(c, cu, AXLE - 2, va, b(Blocks.WATER_CAULDRON).setValue(BlockStateProperties.LEVEL_CAULDRON, 3), CitadelCanvas.HANGING);
 	}
 
 	// ------------------------------------------------------------------ roof (y6+)
