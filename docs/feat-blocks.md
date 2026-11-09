@@ -347,7 +347,7 @@ fingerprint del plan cambia (si alguien versiona el plan del demo, sube la versi
 ## Terminal de consola (kit/console-terminal)
 
 `t3craft:console_terminal`: escritorio de mando con teclado inclinado (una cuña a -22,5° como la tapa del
-atril) y una pantalla pequeña emisiva con un prompt `> _` en turquesa T3 (cursor ámbar, línea de estado),
+atril) y una pantalla emisiva de 12×5 px (campo turquesa, no casi negro, para que se lea desde 6 bloques) con un prompt `> _` en turquesa T3 (cursor ámbar, línea de estado),
 más dos LED encima. Pizarra de acero con luz propia (6) y pantalla/LED con `light_emission` 15.
 La idea (una consola que abre la línea de comandos) es de AgentCraft (MIT); código, modelo y texturas son
 nuestros (`tools/art/console_terminal_art.py` genera las seis texturas y el modelo, solo biblioteca estándar).
@@ -364,7 +364,7 @@ nuestros (`tools/art/console_terminal_art.py` genera las seis texturas y el mode
   fallback vanilla: atril. `HqBlockFixtures.States#consoleTerminal(Direction)` para quien coloque por fixtures
   (por defecto atril). `KitBlocks` lo mapea (`ROLE_BLOCKS`) sin añadirlo a `IDS`: lo registra `T3Blocks.init`
   con su propio block entity y lo suma al mapa del kit. La oficina de mando (`CitadelOffice`) pone tres en la sala
-  de control, donde estaban los atriles.
+  de control, en hilera (banco de consolas) a `dz=0`, con pasillo de 3 hacia los podios.
 - **Datos**: blockstate (4 `facing`), modelo, 6 texturas, ítem, loot table, receta barata
   (panel de vidrio, 2 botones de piedra, redstone, 3 lingotes de hierro), tag `mineable/pickaxe`, lang en `en_us`,
   `es_es` y `es_mx`.
