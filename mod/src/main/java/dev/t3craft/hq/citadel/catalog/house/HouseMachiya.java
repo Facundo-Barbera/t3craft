@@ -445,6 +445,9 @@ public final class HouseMachiya implements Variant {
 					BlockState st;
 					if (y == 1) {
 						st = stone(p, uc, y, v);
+					} else if (y == 2 || y == 3) {
+						// [palette] [depth] charred-board siding (yakisugi) on the ground floor, plaster above it
+						st = p.hash(uc, y, v, 5) == 0 ? b(Blocks.SPRUCE_PLANKS) : b(Blocks.DARK_OAK_PLANKS);
 					} else if (window && y == 7) {
 						st = slat(false, false, false);
 					} else {
@@ -472,6 +475,8 @@ public final class HouseMachiya implements Variant {
 						st = beam(Direction.Axis.Y);
 					} else if (y == 1) {
 						st = stone(p, u, y, vb);
+					} else if (y == 2 || y == 3) {
+						st = p.hash(u, y, vb, 5) == 0 ? b(Blocks.SPRUCE_PLANKS) : b(Blocks.DARK_OAK_PLANKS);
 					} else {
 						st = plaster();
 					}
