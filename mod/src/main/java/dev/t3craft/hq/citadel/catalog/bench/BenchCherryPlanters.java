@@ -59,7 +59,7 @@ public final class BenchCherryPlanters implements Variant {
 
 	@Override
 	public int minW() {
-		return 2;
+		return 3; // TEMP-RENDER
 	}
 
 	@Override
@@ -69,7 +69,7 @@ public final class BenchCherryPlanters implements Variant {
 
 	@Override
 	public int minH() {
-		return 2;
+		return 3; // TEMP-RENDER
 	}
 
 	@Override
@@ -299,9 +299,9 @@ public final class BenchCherryPlanters implements Variant {
 			for (int u = u0; u < u0 + tw; u++) {
 				boolean leg = (u == u0 || u == u0 + tw - 1) && (v == v0 || v == v0 + td - 1);
 				if (leg) {
-					set(c, p, u, 0, v, WALL);
+					set(c, p, u, 0, v, FENCE);
 				}
-				set(c, p, u, 1, v, slab(Blocks.BAMBOO_MOSAIC_SLAB));
+				set(c, p, u, 1, v, slab(Blocks.DEEPSLATE_TILE_SLAB));
 			}
 		}
 		if (p.h() < 6 && (tw * td >= 4 || tw * td == 2)) {
@@ -320,7 +320,7 @@ public final class BenchCherryPlanters implements Variant {
 			for (int u = u0; u <= u1; u++) {
 				boolean beam = v == v0 || v == v1; // beams along the front and the back, slats across: the nook stays visible from above
 				if (beam || (u - u0) % 2 == 0) {
-					set(c, p, u, 5, v, slab(Blocks.CHERRY_SLAB));
+					set(c, p, u, 5, v, beam ? slab(Blocks.DEEPSLATE_TILE_SLAB) : slab(Blocks.CHERRY_SLAB)); // dark beams, pink slats
 				}
 			}
 		}
@@ -439,9 +439,7 @@ public final class BenchCherryPlanters implements Variant {
 		if (tall && p.h() >= 3) {
 			set(c, p, u, 0, v, box(p, u, 0, v));
 			set(c, p, u, 1, v, soil(p, u, 1, v));
-			if (p.hash(u, 2, v, 6) != 0) {
-				set(c, p, u, 2, v, plant(p, u, 2, v));
-			}
+			set(c, p, u, 2, v, p.hash(u, 2, v, 6) != 0 ? plant(p, u, 2, v) : b(Blocks.MOSS_CARPET));
 		} else {
 			set(c, p, u, 0, v, soil(p, u, 0, v));
 			set(c, p, u, 1, v, plant(p, u, 1, v));
@@ -455,9 +453,7 @@ public final class BenchCherryPlanters implements Variant {
 			return;
 		}
 		set(c, p, u, 0, v, soil(p, u, 0, v));
-		if (k != 1) {
-			set(c, p, u, 1, v, plant(p, u, 1, v));
-		}
+		set(c, p, u, 1, v, k != 1 ? plant(p, u, 1, v) : b(Blocks.MOSS_CARPET));
 	}
 
 	/** A deepslate post with a lantern on top: light at sitting height. */
