@@ -19,6 +19,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BedPart;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.DoorHingeSide;
+import net.minecraft.world.level.block.state.properties.StairsShape;
 
 /**
  * A small studio-cottage for the little corners of a barrio (the other houses need 9×10 and up, this one fits 9×9).
@@ -134,7 +135,8 @@ public final class HouseSmallStudio implements Variant {
 					Blocks.DEEPSLATE_TILE_STAIRS, Blocks.SPRUCE_STAIRS, Blocks.DEEPSLATE_BRICK_STAIRS, Blocks.STONE_BRICKS, Blocks.STONE_BRICK_SLAB,
 					Blocks.CHERRY_DOOR, Blocks.CHERRY_TRAPDOOR, Blocks.SPRUCE_FENCE, Blocks.STONE_BRICK_STAIRS,
 					Blocks.STONE_BRICK_STAIRS,
-					mix(Blocks.STONE_BRICKS, Blocks.COBBLESTONE, Blocks.MOSSY_STONE_BRICKS, Blocks.CRACKED_STONE_BRICKS), Blocks.STONE_BRICK_STAIRS, Blocks.STONE_BRICK_SLAB,
+					// [palette] a red brick stack against the grey walls and slate, so it does not melt into the roof
+					mix(Blocks.BRICKS, Blocks.BRICKS, Blocks.BRICKS, Blocks.STONE_BRICKS), Blocks.BRICK_STAIRS, Blocks.BRICK_SLAB,
 					DyeColor.RED, DyeColor.LIGHT_BLUE, Blocks.CHISELED_STONE_BRICKS),
 	};
 
@@ -564,6 +566,14 @@ public final class HouseSmallStudio implements Variant {
 			}
 		}
 
+		/** [palette] Gable faces and cheeks of the wings: the wall mix, but light timber-and-plaster against grey stone walls. */
+		BlockState gablePlaster(int u, int y, int v) {
+			if (s.wall()[0].getBlock() != Blocks.STONE_BRICKS) {
+				return pick(s.wall(), u, y, v);
+			}
+			return p.hash(u, y, v, 4) == 0 ? b(Blocks.STRIPPED_BIRCH_LOG) : b(Blocks.BIRCH_PLANKS);
+		}
+
 		/** One cell of a wing's roof, with its gable face (at the side wall) or its cheek (at the wing's edge row). */
 		void wingCell(int u, int v, Wing w, int h) {
 			int t = Math.abs(v - w.dv());
@@ -572,20 +582,28 @@ public final class HouseSmallStudio implements Variant {
 				set(u, top, v, b(s.ridge()));
 				set(u, top + 1, v, TimberKit.slab(s.ridgeSlab(), false));
 			} else {
-				set(u, top, v, TimberKit.stair(s.roof(), v < w.dv() ? Direction.SOUTH : Direction.NORTH, false));
+				Direction up = v < w.dv() ? Direction.SOUTH : Direction.NORTH;
+				// [finish] a valley: where this wing's slope meets the main slope at the same height, an inner corner joins them
+				boolean valley = !w.right() && u + 1 <= W - 2 && wingAt(u + 1, v) == null && hMain(u + 1) == top;
+				if (valley) {
+					set(u, top, v, TimberKit.stair(s.roof(), Direction.EAST, false).setValue(BlockStateProperties.STAIRS_SHAPE,
+							up == Direction.SOUTH ? StairsShape.INNER_RIGHT : StairsShape.INNER_LEFT));
+				} else {
+					set(u, top, v, TimberKit.stair(s.roof(), up, false));
+				}
 			}
 			if (t == w.hw()) {
 				// the cheek: a wall from the main roof up to the wing's eave, glazed under the eave on a tall bay
 				for (int y = h; y < top; y++) {
 					boolean glass = w.tall() && u >= 2 && u <= W - 3 && y > h;
-					set(u, y, v, glass ? TimberKit.pane(true, s.glass()) : pick(s.wall(), u, y, v));
+					set(u, y, v, glass ? TimberKit.pane(true, s.glass()) : gablePlaster(u, y, v));
 				}
 			} else if ((u == 1 && w.left()) || (u == W - 2 && w.right())) {
 				// the gable face on the wall plane: glass up the middle, the top row stays plaster when it is tall
 				int rows = top - h;
 				for (int y = h; y < top; y++) {
 					boolean glass = rows <= 2 || y <= top - 2;
-					set(u, y, v, glass ? TimberKit.pane(false, s.glass()) : pick(s.wall(), u, y, v));
+					set(u, y, v, glass ? TimberKit.pane(false, s.glass()) : gablePlaster(u, y, v));
 				}
 			}
 		}
@@ -744,6 +762,13 @@ public final class HouseSmallStudio implements Variant {
 			if (lt == 2 && Math.abs(D - 2 - sdv) >= 2) {
 				set(-1, 1, D - 2, barrel());
 			}
+			// [depth] a plank end wall closes the back of the shed, with a small window, so it reads as a building
+			for (int u = -lt; u <= 0; u++) {
+				for (int y = 1; y <= (u == 0 ? 4 : lt == 1 ? 3 : u == -lt ? 3 : 4); y++) {
+					boolean win = y == 2 && u == -1 && lt == 2 || y == 2 && u == -1 && lt == 1;
+					set(u, y, D - 1, win ? TimberKit.pane(true, null) : pick(s.floor(), u, y, D - 1));
+				}
+			}
 			// a lantern stands on the log pile (one hung under this low roof would cut the headroom)
 			set(-lt, 3, D - 3, TimberKit.lantern(false));
 		}
@@ -785,6 +810,12 @@ public final class HouseSmallStudio implements Variant {
 				}
 				// lanterns hang over the outer row, where nobody stands on a chair under them
 				put(-lt, 4, (v1 + v2) / 2, TimberKit.lantern(true), CitadelCanvas.HANGING);
+				// planters on the rail between the pergola posts and at the back corner
+				for (int v : new int[] {(v1 + v2) / 2, v2 + 1}) {
+					if (v >= v1 && v <= vB - 1) {
+						set(-lt, 2, v, TimberKit.planter(p, -lt, 2, v));
+					}
+				}
 				// a table with two chairs
 				int tv = (v1 + v2) / 2;
 				for (int v = tv; v <= tv + 1; v++) {
