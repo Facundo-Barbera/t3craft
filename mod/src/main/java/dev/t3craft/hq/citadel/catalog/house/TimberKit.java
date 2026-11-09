@@ -2,6 +2,7 @@ package dev.t3craft.hq.citadel.catalog.house;
 
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.catalog.Plot;
+import dev.t3craft.hq.citadel.catalog.Support;
 import java.util.function.IntFunction;
 import java.util.function.IntPredicate;
 import net.minecraft.core.Direction;
@@ -170,6 +171,15 @@ final class TimberKit {
 			boolean left = i > a && !post.test(i - 1) && win.test(i - 1);
 			boolean right = i < b && !post.test(i + 1) && win.test(i + 1);
 			int line = fixed + outward;
+			// fix/settle-sources: the infill sits one block behind the frame line (a recess), so the sill had nothing to
+			// touch; the cell behind it gets the infill's block and the sill rests on the wall
+			if (sill != null) {
+				BlockState behind = alongU ? p.at(c, i, w1 - 1, fixed) : p.at(c, fixed, w1 - 1, i);
+				BlockState infill = alongU ? p.at(c, i, w1 - 1, fixed - outward) : p.at(c, fixed - outward, w1 - 1, i);
+				if ((behind == null || behind.isAir()) && infill != null && !infill.isAir() && infill.canOcclude()) {
+					put(c, p, alongU, fixed, i, w1 - 1, infill.getBlock().defaultBlockState());
+				}
+			}
 			if (sill != null) {
 				put(c, p, alongU, line, i, w1 - 1, stair(sill, outD.getOpposite(), true));
 			}

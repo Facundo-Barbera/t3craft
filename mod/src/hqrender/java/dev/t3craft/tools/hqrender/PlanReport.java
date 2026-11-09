@@ -1190,6 +1190,36 @@ public final class PlanReport {
 			sb.append("    ").append(s).append('\n');
 		}
 		sb.append("  settle: ").append(dev.t3craft.hq.citadel.CitadelSettle.lastSummary()).append('\n');
+		// fix/settle-sources: who the settled groups came from (canvas group / zone kind), most first
+		JsonArray srcJ = new JsonArray();
+		{
+			int shown = 0;
+			for (var e : dev.t3craft.hq.citadel.CitadelSettle.lastByOrigin().entrySet()) {
+				int[] a = e.getValue();
+				double mean = a[1] == 0 ? 0 : (double) a[3] / a[1];
+				if (shown++ < o.maxList) {
+					sb.append(String.format(Locale.ROOT, "    origin %-34s %3d groups (%d blocks): %d fell (mean %.1f), %d post, %d removed, %d left%n", e.getKey(), a[0], a[2], a[1], mean, a[4], a[5], a[6]));
+				}
+				if (srcJ.size() < JSON_LIST) {
+					JsonObject sj2 = new JsonObject();
+					sj2.addProperty("origin", e.getKey());
+					sj2.addProperty("groups", a[0]);
+					sj2.addProperty("blocks", a[2]);
+					sj2.addProperty("fell", a[1]);
+					sj2.addProperty("meanDrop", mean);
+					sj2.addProperty("post", a[4]);
+					sj2.addProperty("removed", a[5]);
+					sj2.addProperty("left", a[6]);
+					srcJ.add(sj2);
+				}
+			}
+			int listed = 0;
+			for (var s2 : dev.t3craft.hq.citadel.CitadelSettle.lastSources()) {
+				if (listed++ < o.maxList) {
+					sb.append(String.format(Locale.ROOT, "      %-7s %2d blocks drop %d at %d,%d,%d  %s / %s  %s  %s%n", s2.outcome(), s2.blocks(), s2.drop(), s2.x(), s2.y(), s2.z(), s2.group(), s2.zone(), s2.piece(), s2.blocksOf() + "  " + s2.box()));
+				}
+			}
+		}
 		sb.append("  beams: ").append(runs).append(" runs of horizontal logs, ").append(bad.size()).append(" with nothing solid under them or at their ends (")
 				.append(lonely).append(" touch nothing, ").append(heldOnly).append(" only hang from a wall or ceiling)\n");
 		JsonArray bj = new JsonArray();
@@ -1237,6 +1267,23 @@ public final class PlanReport {
 		j.addProperty("settleRemovedBlocks", st[5]);
 		j.addProperty("settleLeft", st[6]);
 		j.addProperty("settleLeftBlocks", st[7]);
+		j.add("settleOrigins", srcJ);
+		JsonArray allJ = new JsonArray();
+		for (var s2 : dev.t3craft.hq.citadel.CitadelSettle.lastSources()) {
+			JsonObject so = new JsonObject();
+			so.addProperty("group", s2.group());
+			so.addProperty("zone", s2.zone());
+			so.addProperty("piece", s2.piece());
+			so.addProperty("outcome", s2.outcome());
+			so.addProperty("drop", s2.drop());
+			so.addProperty("blocks", s2.blocks());
+			so.addProperty("at", s2.x() + "," + s2.y() + "," + s2.z());
+			so.addProperty("made", s2.blocksOf());
+			so.addProperty("box", s2.box());
+			so.addProperty("detail", s2.detail());
+			allJ.add(so);
+		}
+		j.add("settleGroups", allJ);
 		json.add("split", j);
 		sections.add(sb.toString());
 		summary.put("settled floating", dev.t3craft.hq.citadel.CitadelSettle.lastSummary());

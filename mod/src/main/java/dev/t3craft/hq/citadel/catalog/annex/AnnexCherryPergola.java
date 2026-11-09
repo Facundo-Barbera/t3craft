@@ -8,6 +8,7 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.catalog.Family;
 import dev.t3craft.hq.citadel.catalog.Plot;
+import dev.t3craft.hq.citadel.catalog.Support;
 import dev.t3craft.hq.citadel.catalog.Variant;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.Blocks;
@@ -237,7 +238,8 @@ public final class AnnexCherryPergola implements Variant {
 				}
 				if (p.h() > RAFTER + 1) {
 					boolean edge = u == 0 || u == w - 1 || v == 0 || v == d - 1;
-					if (p.hash(u, RAFTER + 1, v, edge ? 3 : 2) == 0) {
+					// fix/settle-sources: the loose top layer only where there are leaves or a rafter under it
+					if (p.hash(u, RAFTER + 1, v, edge ? 3 : 2) == 0 && Support.present(c, p, u, RAFTER, v)) {
 						p.set(c, u, RAFTER + 1, v, LEAVES);
 					}
 				}

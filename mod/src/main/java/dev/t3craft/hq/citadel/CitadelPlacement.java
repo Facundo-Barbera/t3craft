@@ -442,6 +442,7 @@ public final class CitadelPlacement {
 				}
 			}
 		}
+		c.pieces.add(new CitadelCanvas.Piece(f.name() + ":" + (v == null ? "(fallback)" : v.id()), x, y0, z, sx, sz, front.name()));
 		c.rigid(x + sx / 2, z + sz / 2);
 		try {
 			if (v == null) {

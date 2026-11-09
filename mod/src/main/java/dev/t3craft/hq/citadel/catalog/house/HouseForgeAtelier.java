@@ -15,6 +15,7 @@ import static dev.t3craft.hq.citadel.catalog.house.HouseWorkshopKit.trap;
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.catalog.Family;
 import dev.t3craft.hq.citadel.catalog.Plot;
+import dev.t3craft.hq.citadel.catalog.Support;
 import dev.t3craft.hq.citadel.catalog.Variant;
 import java.util.Random;
 import net.minecraft.core.Direction;
@@ -272,6 +273,18 @@ public final class HouseForgeAtelier implements Variant {
 		p.set(c, uc - 2, 1, vc - 2, b(Blocks.COAL_BLOCK));
 		p.put(c, uc - 3, 5, vc, lantern(true), CitadelCanvas.HANGING);
 		p.put(c, 3, 5, VF + 3, lantern(true), CitadelCanvas.HANGING);
+		// fix/settle-sources: the two hall lanterns hang on a chain from the roof (they hung from the air under it)
+		hangChain(c, p, uc - 3, 5, vc);
+		hangChain(c, p, 3, 5, VF + 3);
+	}
+
+	/** An iron chain from the cell above a hanging lantern at {@code y} up to the underside of the main roof over row {@code v}. */
+	private static void hangChain(CitadelCanvas c, Plot p, int u, int y, int v) {
+		for (int yy = y + 1; yy < roofY(v, p.d()); yy++) {
+			if (!Support.present(c, p, u, yy, v)) {
+				p.put(c, u, yy, v, Blocks.IRON_CHAIN.defaultBlockState(), CitadelCanvas.HANGING);
+			}
+		}
 	}
 
 	// ------------------------------------------------------------------ roofs

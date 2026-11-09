@@ -11,6 +11,7 @@ import static dev.t3craft.hq.citadel.catalog.house.JapaneseKit.stairTop;
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.catalog.Family;
 import dev.t3craft.hq.citadel.catalog.Plot;
+import dev.t3craft.hq.citadel.catalog.Support;
 import dev.t3craft.hq.citadel.catalog.Variant;
 import java.util.Random;
 import net.minecraft.core.Direction;
@@ -245,6 +246,9 @@ public final class HouseJapaneseTeahouse implements Variant {
 						y = 6;
 					}
 					p.set(c, u, y, v, st);
+					if (k >= 1) {
+						Support.roofUnder(c, p, u, y, v, mat); // fix/settle-sources: each ring rests on the one below, not on its edge
+					}
 					if (lifted) {
 						BlockState sup = corner ? stair(Blocks.DARK_OAK_STAIRS, cornerFacing(top, left), Half.TOP, StairsShape.OUTER_LEFT)
 								: stairTop(Blocks.DARK_OAK_STAIRS, top ? Direction.NORTH : bot ? Direction.SOUTH : left ? Direction.WEST : Direction.EAST);
