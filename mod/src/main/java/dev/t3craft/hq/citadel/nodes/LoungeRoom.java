@@ -51,7 +51,7 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
  * <li><b>The pergola</b> ({@code y = 6}, 4 clear under the awning): an octagonal ring beam of stripped cherry (straight
  *     on the axes, clean 45 degree diagonals joined with slabs) on 12 dark oak posts with knee-brace brackets (the eight
  *     at the entrances make four gates, with a hanging lantern; the four diagonal posts end in lantern finials), an awning
- *     of cherry slabs with a dark oak edge outside it. No glow panel hangs anywhere; glow strips run along the foot of
+ *     of cherry slabs outside it. No glow panel hangs anywhere; glow strips run along the foot of
  *     the bar, the shelves and the rack.</li>
  * </ul>
  *
