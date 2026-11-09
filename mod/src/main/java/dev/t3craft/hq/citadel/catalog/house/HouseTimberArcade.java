@@ -336,9 +336,9 @@ public final class HouseTimberArcade implements Variant {
 			return log(Blocks.STRIPPED_CHERRY_LOG, Direction.Axis.Y);
 		}
 
-		/** [palette] the timber frame of the walls: cherry, lighter than the dark oak of the eave beam, so the plaster reads. */
+		/** [palette] the timber frame of the walls: the same stripped cherry as the piers, so the pillars run unbroken to the roof; the beams stay dark oak. */
 		static BlockState dark() {
-			return log(Blocks.CHERRY_LOG, Direction.Axis.Y);
+			return log(Blocks.STRIPPED_CHERRY_LOG, Direction.Axis.Y);
 		}
 
 		/** A window cell: in every bay the cells at odd distance from the nearest pier, so slim windows alternate with plaster. */
