@@ -504,6 +504,11 @@ public final class RotundaRoom {
 				put(c, nd, xs, y, dz, s, CitadelCanvas.SOLID);
 			}
 		}
+		// a presenter's atril at each side of the screen, a planter beyond it
+		for (int sz : new int[] {-1, 1}) {
+			put(c, nd, xs - 1, 1, 4 * sz, NodeDecor.facing(Blocks.LECTERN, net.minecraft.core.Direction.WEST).setValue(BlockStateProperties.HAS_BOOK, true), CitadelCanvas.SOLID);
+			put(c, nd, xs - 1, 1, 7 * sz, c.kit.gardenPlanter(), CitadelCanvas.SOLID);
+		}
 		put(c, nd, xs, 7, -5, lanternUp, CitadelCanvas.DECOR);
 		put(c, nd, xs, 7, 5, lanternUp, CitadelCanvas.DECOR);
 		// eight chandeliers on the ribs: a chain from the dome and a lantern above head height
