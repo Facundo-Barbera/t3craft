@@ -34,9 +34,7 @@ import net.minecraft.world.level.block.state.properties.WallSide;
  * Size: 5–8 × 3–5 × 4+ (from height 5 a pump house roof on four posts over the pump end; ridge cap from 6, finial from 7).
  */
 public final class WellTroughPump implements Variant {
-	private static final BlockState RIM_X = b(Blocks.STRIPPED_SPRUCE_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.X);
-	private static final BlockState RIM_Z = b(Blocks.STRIPPED_SPRUCE_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.Z);
-	private static final BlockState CORNER = b(Blocks.STRIPPED_SPRUCE_LOG); // axis Y: end grain on top
+	private static final BlockState CORNER = b(Blocks.CHISELED_STONE_BRICKS);
 	private static final BlockState BARREL_UP = b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP);
 
 	@Override
@@ -123,10 +121,9 @@ public final class WellTroughPump implements Variant {
 				BlockState st;
 				if (end && v != vm) {
 					st = CORNER;
-				} else if (end) {
-					st = RIM_Z;
-				} else if (v != vm) {
-					st = RIM_X;
+				} else if (end || v != vm) {
+					// [palette] light stone rims, a third of them mossy, between chiseled corners
+					st = p.hash(u, 1, v, 3) == 0 ? b(Blocks.MOSSY_STONE_BRICKS) : b(Blocks.STONE_BRICKS);
 				} else {
 					st = b(Blocks.WATER);
 				}
@@ -163,7 +160,7 @@ public final class WellTroughPump implements Variant {
 	private static void lanternPost(CitadelCanvas c, Plot p, int vk) {
 		int top = p.h() >= 5 ? 3 : 2;
 		for (int y = 2; y <= top; y++) {
-			BlockState f = b(Blocks.SPRUCE_FENCE);
+			BlockState f = b(Blocks.CHERRY_FENCE);
 			if (y == 2) {
 				f = f.setValue(BlockStateProperties.EAST, true); // the pump head is a full block beside it
 			}
@@ -184,8 +181,8 @@ public final class WellTroughPump implements Variant {
 		int ur = Math.min(2, ue - 1); // the canopy's right posts; the trough runs on past them in the open
 		for (int u : new int[] {0, ur}) {
 			for (int v : new int[] {vf, vk}) {
-				p.set(c, u, 2, v, b(Blocks.SPRUCE_FENCE));
-				p.set(c, u, 3, v, b(Blocks.SPRUCE_FENCE));
+				p.set(c, u, 2, v, b(Blocks.CHERRY_FENCE));
+				p.set(c, u, 3, v, b(Blocks.STRIPPED_CHERRY_LOG));
 			}
 		}
 		boolean frontOver = vf > 0;

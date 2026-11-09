@@ -39,7 +39,6 @@ public final class AnnexGreenhouseCopper implements Variant {
 	private static final int PLATE = 3;
 
 	private static final BlockState POST = Blocks.CUT_COPPER.waxed().unaffected().defaultBlockState();
-	private static final BlockState RIB_TOP = Blocks.CUT_COPPER.waxed().unaffected().defaultBlockState();
 	private static final Block RIB = Blocks.CUT_COPPER_STAIRS.waxed().unaffected();
 
 	@Override
@@ -194,7 +193,7 @@ public final class AnnexGreenhouseCopper implements Variant {
 				if (!ribRow) {
 					st = b(Blocks.GLASS);
 				} else if (flat) {
-					st = v == vf || v == vb ? RIB_TOP : b(Blocks.GLASS); // the flat top is glass except at the gables
+					st = v == vf || v == vb ? Blocks.CUT_COPPER_SLAB.waxed().unaffected().defaultBlockState() : b(Blocks.GLASS); // a slim copper slab on the gables, glass between
 				} else {
 					st = stairs(RIB, u < w - 1 - u ? Direction.EAST : Direction.WEST);
 				}

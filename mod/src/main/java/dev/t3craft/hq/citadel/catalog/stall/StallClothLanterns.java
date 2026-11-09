@@ -68,9 +68,9 @@ public final class StallClothLanterns implements Variant {
 
 	/** [palette] three dye sets per seed: bright cloth against the dark-cherry timber. */
 	private static final DyeColor[][] SETS = {
-			{DyeColor.CYAN, DyeColor.MAGENTA, DyeColor.YELLOW, DyeColor.WHITE},
-			{DyeColor.BLUE, DyeColor.PINK, DyeColor.ORANGE, DyeColor.WHITE},
-			{DyeColor.PURPLE, DyeColor.LIME, DyeColor.RED, DyeColor.WHITE},
+			{DyeColor.PINK, DyeColor.LIGHT_BLUE, DyeColor.MAGENTA, DyeColor.WHITE},
+			{DyeColor.MAGENTA, DyeColor.PINK, DyeColor.YELLOW, DyeColor.WHITE},
+			{DyeColor.PINK, DyeColor.CYAN, DyeColor.YELLOW, DyeColor.WHITE},
 	};
 
 	private static BlockState wool(DyeColor c) {
@@ -123,7 +123,7 @@ public final class StallClothLanterns implements Variant {
 		}
 		// the crossbeam between the posts (logs along u), with a dark slab cap
 		for (int u = 1; u < w - 1; u++) {
-			p.set(c, u, 3, 1, b(Blocks.CHERRY_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.X));
+			p.set(c, u, 3, 1, b(Blocks.STRIPPED_CHERRY_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.X));
 		}
 		// [depth] pennants hang in front of the beam, alternately two and three blocks long, each ending
 		// in a white tip; their colours rotate through the set (wool, not banner blocks: they read from afar)
@@ -172,11 +172,14 @@ public final class StallClothLanterns implements Variant {
 			p.set(c, u, 3, back, b(Blocks.STRIPPED_CHERRY_LOG));
 		}
 		for (int u = 1; u < w - 1; u++) {
-			p.set(c, u, 3, back, b(Blocks.CHERRY_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.X)); // the rail
-			DyeColor top = set[(u + 1) % 3];
+			p.set(c, u, 3, back, b(Blocks.STRIPPED_CHERRY_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.X)); // the rail
+			DyeColor top = (u & 1) == 0 ? set[3] : set[(u + 1) % 3];
 			DyeColor low = set[(u + 2) % 3];
-			p.set(c, u, 2, back, wool(top)); // [palette] each bolt shades from one dye to a second
-			p.set(c, u, 1, back, wool(low));
+			// [depth] bolts hang at two lengths, so the back is a ragged row of cloth, not a wall
+			p.set(c, u, 2, back, wool(top));
+			if ((u + p.hash(4, 4, 4, 2)) % 2 == 0) {
+				p.set(c, u, 1, back, wool(low));
+			}
 			p.set(c, u, 0, back, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
 		}
 	}

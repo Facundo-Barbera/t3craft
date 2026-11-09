@@ -241,7 +241,9 @@ public final class AnnexToolShed implements Variant {
 			int y = roofY(p, v);
 			boolean top = roofTop(p, v);
 			for (int u = 0; u < w; u++) {
-				Block mat = v == 0 ? Blocks.CHERRY_SLAB : u == 0 || u == w - 1 ? Blocks.DARK_OAK_SLAB : Blocks.SPRUCE_SLAB;
+				// [palette] a cherry fascia on all four edges frames a field of spruce, dark oak mixed in by hash
+				boolean edge = v == 0 || v == p.d() - 1 || u == 0 || u == w - 1;
+				Block mat = edge ? Blocks.CHERRY_SLAB : p.hash(u, y, v, 4) == 0 ? Blocks.DARK_OAK_SLAB : Blocks.SPRUCE_SLAB;
 				SlabType type = !top ? SlabType.BOTTOM : s.wall(u, v) ? SlabType.DOUBLE : SlabType.TOP;
 				p.set(c, u, y, v, b(mat).setValue(BlockStateProperties.SLAB_TYPE, type));
 			}

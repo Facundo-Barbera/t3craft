@@ -182,8 +182,8 @@ public final class StallTeaBar implements Variant {
 				boolean f = v == 0;
 				boolean k = v == d - 1;
 				if ((l || r) && (f || k)) {
-					p.set(c, u, EAVE, v, b(Blocks.STRIPPED_CHERRY_LOG));
-					p.set(c, u, RIDGE, v, slab(Blocks.CHERRY_SLAB)); // [finish] the upturned tip
+					p.set(c, u, EAVE, v, b(Blocks.POLISHED_DEEPSLATE));
+					p.set(c, u, RIDGE, v, slab(Blocks.DEEPSLATE_TILE_SLAB)); // [finish] the upturned dark tip
 				} else if (f || k || l || r) {
 					Direction up = f ? Direction.SOUTH : k ? Direction.NORTH : l ? Direction.EAST : Direction.WEST;
 					p.set(c, u, EAVE, v, stairs(Blocks.CHERRY_STAIRS, up));
@@ -194,12 +194,12 @@ public final class StallTeaBar implements Variant {
 					boolean ik = v == d - 2;
 					BlockState st;
 					if ((il || ir) && (iff || ik)) {
-						st = b(Blocks.DEEPSLATE_TILES);
+						st = b(Blocks.CHERRY_PLANKS);
 					} else if (iff || ik || il || ir) {
 						Direction up = iff ? Direction.SOUTH : ik ? Direction.NORTH : il ? Direction.EAST : Direction.WEST;
-						st = stairs(Blocks.DEEPSLATE_TILE_STAIRS, up);
+						st = stairs(Blocks.CHERRY_STAIRS, up);
 					} else {
-						st = b(Blocks.DEEPSLATE_TILES);
+						st = b(Blocks.CHERRY_PLANKS);
 					}
 					p.set(c, u, RIDGE, v, st);
 				}
@@ -211,7 +211,7 @@ public final class StallTeaBar implements Variant {
 			for (int u = 1; u < w - 1; u++) {
 				boolean end = u == 1 || u == w - 2;
 				for (int v = va; v <= vb; v++) {
-					p.set(c, u, RIDGE + 1, v, end ? slab(Blocks.DEEPSLATE_TILE_SLAB) : slab(Blocks.CHERRY_SLAB));
+					p.set(c, u, RIDGE + 1, v, slab(Blocks.DEEPSLATE_TILE_SLAB)); // [palette] the dark ridge line
 				}
 			}
 		}
@@ -228,7 +228,9 @@ public final class StallTeaBar implements Variant {
 		// [finish] a noren: a short red curtain hung from the front eave, with a white edge cell, so the
 		// front reads as a tea house at a glance
 		for (int u = 1; u < w - 1; u++) {
-			p.set(c, u, 2, 0, Blocks.WOOL.pick(((u + p.hash(1, 1, 1, 2)) & 1) == 0 ? DyeColor.RED : DyeColor.WHITE).defaultBlockState());
+			if (((u + p.hash(1, 1, 1, 2)) & 1) == 0) {
+				p.set(c, u, 2, 0, Blocks.WOOL.pick(DyeColor.RED).defaultBlockState()); // short noren tabs, gaps between
+			}
 		}
 	}
 }

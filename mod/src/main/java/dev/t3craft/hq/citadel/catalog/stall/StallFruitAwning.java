@@ -71,9 +71,9 @@ public final class StallFruitAwning implements Variant {
 
 	/** [palette] the awning's two stripe colours per seed; the timber stays dark and the counter light. */
 	private static final DyeColor[][] STRIPES = {
-			{DyeColor.RED, DyeColor.WHITE},
-			{DyeColor.ORANGE, DyeColor.WHITE},
-			{DyeColor.GREEN, DyeColor.WHITE},
+			{DyeColor.PINK, DyeColor.WHITE},
+			{DyeColor.MAGENTA, DyeColor.WHITE},
+			{DyeColor.PINK, DyeColor.YELLOW}, // yellow stands in for the citadel's gold accent
 	};
 
 	@Override
@@ -136,9 +136,9 @@ public final class StallFruitAwning implements Variant {
 		for (int u : new int[] {0, w - 1}) {
 			for (int v : new int[] {1, d - 1}) {
 				int top = v == 1 ? LIP - 1 : ROOF - 1;
-				p.set(c, u, 0, v, b(Blocks.DARK_OAK_LOG)); // [palette] heavy bark base...
+				p.set(c, u, 0, v, b(Blocks.POLISHED_DEEPSLATE)); // [palette] dark footing...
 				for (int y = 1; y <= top; y++) {
-					p.set(c, u, y, v, y == top && v == 1 ? b(Blocks.STRIPPED_DARK_OAK_LOG) : b(Blocks.DARK_OAK_FENCE)); // ...slim fence shaft, stripped collar
+					p.set(c, u, y, v, y == top ? b(Blocks.STRIPPED_CHERRY_LOG) : b(Blocks.CHERRY_FENCE)); // ...slim pink shaft, pale collar
 				}
 			}
 		}
@@ -202,7 +202,7 @@ public final class StallFruitAwning implements Variant {
 			p.set(c, u, 0, back, p.hash(u, 0, back, 2) == 0 ? b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.NORTH)
 					: b(Blocks.CHEST).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH));
 			p.set(c, u, 1, back, goods(p.hash(u, 1, back, 3)));
-			p.set(c, u, 2, back, b(Blocks.DARK_OAK_PLANKS)); // [depth] a header board over the shelf
+			p.set(c, u, 2, back, b(Blocks.STRIPPED_CHERRY_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.X)); // [depth] a header beam over the shelf
 		}
 	}
 

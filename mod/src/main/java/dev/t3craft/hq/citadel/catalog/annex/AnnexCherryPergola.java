@@ -37,7 +37,7 @@ public final class AnnexCherryPergola implements Variant {
 	private static final int BEAM = 3;
 	private static final int RAFTER = 4;
 
-	private static final BlockState LOG = b(Blocks.CHERRY_LOG);
+	private static final BlockState LOG = b(Blocks.STRIPPED_CHERRY_LOG);
 	private static final BlockState BEAM_Z = b(Blocks.STRIPPED_CHERRY_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.Z);
 	private static final BlockState LEAVES = leaves(Blocks.CHERRY_LEAVES);
 	private static final BlockState AZALEA_LEAVES = leaves(Blocks.FLOWERING_AZALEA_LEAVES);
@@ -227,7 +227,7 @@ public final class AnnexCherryPergola implements Variant {
 					p.set(c, u, RAFTER, v, b(Blocks.CHERRY_FENCE)
 							.setValue(BlockStateProperties.WEST, u > 0)
 							.setValue(BlockStateProperties.EAST, u < w - 1));
-				} else if (p.hash(u, RAFTER, v, 4) != 0) {
+				} else if (p.hash(u, RAFTER, v, 3) != 0) {
 					p.set(c, u, RAFTER, v, p.hash(u, RAFTER, v, 7) == 0 ? AZALEA_LEAVES : LEAVES);
 				}
 				if (p.h() > RAFTER + 1) {
@@ -271,7 +271,7 @@ public final class AnnexCherryPergola implements Variant {
 				continue;
 			}
 			for (int u = 2; u < w - 2; u++) {
-				if (p.hash(u, RAFTER, v, 4) != 0 && p.hash(u, BEAM, v, 2) == 0) {
+				if (p.hash(u, RAFTER, v, 3) != 0 && p.hash(u, BEAM, v, 2) == 0) {
 					p.set(c, u, BEAM, v, vine.setValue(BlockStateProperties.UP, true));
 				}
 			}
