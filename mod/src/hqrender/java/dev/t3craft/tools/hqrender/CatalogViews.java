@@ -333,8 +333,22 @@ final class CatalogViews {
 		return out;
 	}
 
+	/** {@code --box WxDxH[,WxDxH...]}: exact sizes for every variant (the sizes the city asks for), or null for the spread. */
+	static String boxes;
+
 	/** {w, d, h} sizes spread over the variant's range: min, middle, max (deduplicated, up to n). */
 	private static List<int[]> sizes(Variant v, int n) {
+		if (boxes != null) {
+			List<int[]> fixed = new ArrayList<>();
+			for (String b : boxes.split(",")) {
+				String[] t = b.trim().split("x");
+				if (t.length != 3) {
+					throw new IllegalArgumentException("--box wants WxDxH[,WxDxH...], got " + boxes);
+				}
+				fixed.add(new int[] {Integer.parseInt(t[0]), Integer.parseInt(t[1]), Integer.parseInt(t[2])});
+			}
+			return fixed;
+		}
 		int w1 = v.minW();
 		int w2 = cap(v.maxW(), w1);
 		int d1 = v.minD();
