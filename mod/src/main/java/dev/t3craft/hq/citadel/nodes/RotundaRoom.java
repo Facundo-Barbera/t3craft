@@ -188,7 +188,7 @@ public final class RotundaRoom {
 	/** Dimensions of the scaled rotunda, all from the zone's radius. */
 	private static final BlockState SLOG = b(Blocks.STRIPPED_CHERRY_LOG);
 	/** The dome's skin: frosted, so the room under it does not show through. */
-	private static final BlockState DOME_GLASS = b(Blocks.WHITE_STAINED_GLASS);
+	private static final BlockState DOME_GLASS = Blocks.STAINED_GLASS.pick(net.minecraft.world.item.DyeColor.WHITE).defaultBlockState();
 
 	private record Geo(double size, double ri, double rw, int h, int dh, int xw, double lr, double dial) {
 		static Geo of(CitadelCanvas c, Node nd) {
