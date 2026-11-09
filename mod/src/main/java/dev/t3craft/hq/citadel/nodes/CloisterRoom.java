@@ -410,9 +410,9 @@ public final class CloisterRoom {
 		if (r >= 7) {
 			q.set(dx, r + 2, dz, PLANKS);
 		}
-		// roof stairs, high side outward: a cherry eave on the arcade and a cherry ridge at the wall, deepslate tiles between
+		// roof stairs, high side outward: cherry, with a deepslate-tile edge at the arcade and at the wall
 		boolean trim = r == 6 || r == 12;
-		q.set(dx, r + 3, dz, stairs(trim ? Blocks.CHERRY_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS, out));
+		q.set(dx, r + 3, dz, stairs(trim ? Blocks.DEEPSLATE_TILE_STAIRS : Blocks.CHERRY_STAIRS, out));
 		if (r >= 7 && r <= 11 && pilasterLine(aa)) {
 			// a rafter under the ceiling, along the line of each pilaster
 			q.set(dx, r + 1, dz, LOG.setValue(BlockStateProperties.AXIS, ns ? Direction.Axis.Z : Direction.Axis.X));
@@ -484,7 +484,7 @@ public final class CloisterRoom {
 		if (aa <= 2) {
 			q.fill(dx, 1, 4, dz, AIR);
 			q.set(dx, 5, dz, RIB);
-			q.set(dx, 6, dz, aa == 0 ? b(Blocks.GOLD_BLOCK) : RIB);
+			q.set(dx, 6, dz, aa <= 1 ? b(Blocks.GOLD_BLOCK) : RIB);
 		} else {
 			q.set(dx, 1, dz, NodeDecor.footMix(x, 1, z));
 			q.set(dx, 2, dz, NodeDecor.footMix(x, 2, z));
@@ -515,7 +515,7 @@ public final class CloisterRoom {
 			BlockState s;
 			if (y <= 2) {
 				s = NodeDecor.footMix(x, y, z);
-			} else if (y == 4 || y == 8 || y == 15) {
+			} else if (y == 4 || y == 15) {
 				s = RIB;
 			} else if (extreme) {
 				s = STRIP;
@@ -545,10 +545,10 @@ public final class CloisterRoom {
 	private static void gable(Q q, int dx, int dz, int aa) {
 		Direction toCentre = dx > 0 ? Direction.WEST : Direction.EAST;
 		int top = switch (aa) {
-			case 3 -> 18;
-			case 2 -> 22;
-			case 1 -> 26;
-			default -> 28;
+			case 3 -> 20;
+			case 2 -> 26;
+			case 1 -> 29;
+			default -> 32;
 		};
 		for (int y = 16; y < top; y++) {
 			BlockState s = CALCITE;
