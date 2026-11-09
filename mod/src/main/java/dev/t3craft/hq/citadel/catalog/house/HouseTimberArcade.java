@@ -100,9 +100,11 @@ public final class HouseTimberArcade implements Variant {
 
 	private static final Roof[] ROOFS = {
 			new Roof(Blocks.DEEPSLATE_TILE_STAIRS, Blocks.DARK_OAK_STAIRS, Blocks.DEEPSLATE_TILES, Blocks.DEEPSLATE_TILE_SLAB, Blocks.DEEPSLATE_BRICK_STAIRS),
-			new Roof(Blocks.SPRUCE_STAIRS, Blocks.DARK_OAK_STAIRS, Blocks.SPRUCE_PLANKS, Blocks.SPRUCE_SLAB, Blocks.DARK_OAK_STAIRS),
+			new Roof(Blocks.SPRUCE_STAIRS, Blocks.DARK_OAK_STAIRS, Blocks.SPRUCE_PLANKS, Blocks.SPRUCE_SLAB, null),
 			new Roof(Blocks.MANGROVE_STAIRS, Blocks.DARK_OAK_STAIRS, Blocks.MANGROVE_PLANKS, Blocks.MANGROVE_SLAB, null),
 	};
+
+	private static final int[] ROOF_PICK = {0, 1, 0, 1, 2};
 
 	@Override
 	public void build(CitadelCanvas c, Plot p) {
@@ -142,7 +144,7 @@ public final class HouseTimberArcade implements Variant {
 			this.c = c;
 			this.p = p;
 			Random r = p.rng(0xA4CADE5L);
-			roof = ROOFS[r.nextInt(ROOFS.length)];
+			roof = ROOFS[ROOF_PICK[r.nextInt(ROOF_PICK.length)]]; // dark tile 2 of 5, spruce 2 of 5, mangrove 1 of 5
 			flip = r.nextBoolean();
 			w = p.w();
 			d = Math.min(p.d(), 15);
@@ -630,6 +632,12 @@ public final class HouseTimberArcade implements Variant {
 					set(u, y, 0, st);
 				}
 				set(u, PLATE, 0, log(Blocks.DARK_OAK_LOG, Direction.Axis.X)); // the tie beam
+			}
+			// [finish] a post and a copper rod on the front end of the cross ridge
+			int fu = pa + dmax;
+			if (CB + dmax + 3 < p.h()) {
+				set(fu, CB + dmax + 2, 0, b(Blocks.DEEPSLATE_TILE_WALL));
+				set(fu, CB + dmax + 3, 0, Blocks.LIGHTNING_ROD.waxed().exposed().defaultBlockState());
 			}
 		}
 
