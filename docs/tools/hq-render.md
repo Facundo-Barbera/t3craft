@@ -140,7 +140,10 @@ pays about 2 s for the child JVM and the PTX JIT when the driver's cache is cold
 | aerial 4, 10 and 20 projects, about 4820x3315 sub-samples (16 M) | 7.5 to 9.1 s | 1.16 to 1.27 s | 6.2 to 7.5x |
 
 (The kernel itself takes 20 to 900 ms per image; the rest of the GPU time is the export of the scene, the child's round trip and
-the download of 4 bytes per pixel.) After the GPU, what is left of a render is the PNG encoding.
+the download of 4 bytes per pixel.) After the GPU, what is left of a render is the PNG encoding. Plain `--layout hybrid-ringcampus
+--projects 4 --only hub` with no GPU flag (default path): 0.51 s for the first image (child JVM and PTX load included), then 0.04 to
+0.07 s each; that job's 70 s are growing the plan, not rendering. Flat look (`--no-sky --no-ao --hard-shadows --no-bloom --filter box`,
+catalog gallery): 99.5 to 99.9 % identical sub-samples, 1.9 to 8x.
 
 **What was probed** (`--gpu-probe`, job `render-gpu-1794228843154`, WSL Ubuntu 24.04, driver 621.14 / CUDA 13.5, Mesa 25.2.8):
 
