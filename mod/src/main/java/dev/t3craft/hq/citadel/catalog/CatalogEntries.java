@@ -42,6 +42,9 @@ final class CatalogEntries {
 			new dev.t3craft.hq.citadel.catalog.house.HouseTimberCorner(), // house_timber_corner
 			new dev.t3craft.hq.citadel.catalog.bench.BenchCherryPlanters(), // bench_cherry_planters
 			new dev.t3craft.hq.citadel.catalog.bench.BenchStoneTable(), // bench_stone_table
+			new dev.t3craft.hq.citadel.catalog.annex.AnnexCherryPergola(), // annex_cherry_pergola
+			new dev.t3craft.hq.citadel.catalog.annex.AnnexGreenhouseCopper(), // annex_greenhouse_copper
+			new dev.t3craft.hq.citadel.catalog.annex.AnnexToolShed(), // annex_tool_shed
 			new dev.t3craft.hq.citadel.catalog.house.HouseTimberCottage(), // house_timber_cottage
 			new dev.t3craft.hq.citadel.catalog.house.HouseTimberOverhang(), // house_timber_overhang
 			new dev.t3craft.hq.citadel.catalog.house.HouseTowerBridge(), // house_tower_bridge
@@ -70,6 +73,8 @@ final class CatalogEntries {
 			new dev.t3craft.hq.citadel.catalog.planter.PlanterTallPot(), // planter_tall_pot
 			new dev.t3craft.hq.citadel.catalog.signpost.SignpostArrows(), // signpost_arrows
 			new dev.t3craft.hq.citadel.catalog.signpost.SignpostNoticeBoard(), // signpost_notice_board
+			new dev.t3craft.hq.citadel.catalog.well.WellRoofedStone(), // well_roofed_stone
+			new dev.t3craft.hq.citadel.catalog.well.WellTroughPump(), // well_trough_pump
 	};
 
 	static final List<Variant> ALL = List.of(ENTRIES);
