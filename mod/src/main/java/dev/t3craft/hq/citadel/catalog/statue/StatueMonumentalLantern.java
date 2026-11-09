@@ -35,7 +35,7 @@ import net.minecraft.world.level.block.state.properties.StairsShape;
  *     (square) or cut as a hip (chamfered), one or two eaves by seed;</li>
  * <li><b>hōju</b> (jewel): a lightning rod on a single column, a small stepped pyramid on a 2 × 2.</li>
  * </ul>
- * Seed: the stone (mossy bricks with oxidised copper / pale diorite with bright copper / dark deepslate with
+ * Seed: the stone (mossy bricks with oxidised copper / pale diorite with bright copper / grey tuff on deepslate with
  * weathered copper), the roof (square or chamfered, single or double eave from h ≥ 11) and the plaque's text.
  * Palette per surface: 3–5 materials. Unlike the guardian (a figure) and the obelisk (a tapering die with
  * braziers) this one is a slender shaft under a broad, glowing head.
@@ -134,15 +134,15 @@ public final class StatueMonumentalLantern implements Variant {
 					glass = DyeColor.PINK;
 					light = Blocks.PEARLESCENT_FROGLIGHT;
 				}
-				default -> { // dark stone, weathered copper
+				default -> { // grey tuff on a dark foot, weathered copper
 					baseBlock = Blocks.DEEPSLATE_TILES;
 					baseStairs = Blocks.DEEPSLATE_TILE_STAIRS;
 					plinth = Blocks.POLISHED_DEEPSLATE;
-					wall = Blocks.POLISHED_DEEPSLATE_WALL;
-					shaft = Blocks.POLISHED_DEEPSLATE;
-					node = Blocks.CHISELED_DEEPSLATE;
-					platStairs = Blocks.DEEPSLATE_BRICK_STAIRS;
-					platBlock = Blocks.CHISELED_DEEPSLATE;
+					wall = Blocks.TUFF_BRICK_WALL;
+					shaft = Blocks.TUFF_BRICKS;
+					node = Blocks.CHISELED_TUFF_BRICKS;
+					platStairs = Blocks.TUFF_BRICK_STAIRS;
+					platBlock = Blocks.CHISELED_TUFF_BRICKS;
 					copper = 1;
 					glass = DyeColor.ORANGE;
 					light = Blocks.OCHRE_FROGLIGHT;
