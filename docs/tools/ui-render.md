@@ -69,6 +69,10 @@ steering message, a draft), `markdown` (code, lists, quote, table, tool calls, r
 folded steps), `attachments` (3 thumbnails), `context-menu`, `model-picker`, `new-thread-draft`, `no-control`,
 `offline` (cached rows, unreachable machine).
 
+Not covered yet: the kit's pages and dialogs (Settings, Environments, Pair, OperatePair, Confirm, Snooze, NewThread; issue #14).
+They need `ConfigManager` and `OperateClient` seeded in `Mock`; until then the gallery (`/t3dev ui`, `docs/dev.md` "UI cycle" 7) is the way
+to see them.
+
 ### Adding a scenario
 
 1. Create `mod/src/uirender/resources/fixtures/<name>.json` and add the name to `fixtures/index.json`.

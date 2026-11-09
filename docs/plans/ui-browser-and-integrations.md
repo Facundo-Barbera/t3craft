@@ -295,7 +295,7 @@ navegador". Conviene decidirlo **después** de C1.
 | **Q3** | Gmail y Google Chat: ¿se acepta que probablemente no se puedan loguear y que el navegador sirva para GitHub, docs y dashboards? ¿O se explora el cliente nativo de correo? | C4 | Abierta, se decide con el resultado de C1 |
 | **Q4** | ¿Se autoriza el **spike C1** (compilar y abrir el juego en la PC para medir qué sitios funcionan)? | Fase 1 | Abierta |
 | **Q5** | ¿Actualizar `AGENTS.md` con D7 y la nota del lock (6.1)? | 6.1 | **Aprobada (2026-11-09): lo hace el coordinador** |
-| **Q6** | ¿Qué pantallas se pulen primero: las de widgets vanilla (ajustes, emparejado, confirmaciones) o el chat? | Fase 3 | Abierta |
+| **Q6** | ¿Qué pantallas se pulen primero: las de widgets vanilla (ajustes, emparejado, confirmaciones) o el chat? | Fase 3 | **Resuelta (2026-11-09): primero las de widgets vanilla.** Facundo vio las capturas de `uiRender` y pidió adaptar las demás interfaces al estilo del chat |
 | **Q7** | ¿Se aprueba un "runner de escenarios de UI" con los client gametests (capturas reales, repetibles) a pesar de la regla "sin tests"? Sería una herramienta, no una suite | Opcional en fase 2 | Abierta |
 | **Q8** | ¿Cuáles de estas ideas se convierten en **issues**? | Todo el seguimiento | **Resuelta: los 10 de §10, creados el 2026-11-09** |
 
@@ -317,7 +317,7 @@ navegador". Conviene decidirlo **después** de C1.
 | [#11](https://github.com/Facundo-Barbera/t3craft/issues/11) | Ciclo de desarrollo de UI: hot reload oficial y ver el resultado con fidelidad | A (A1, A4) | 0 y 1 | Ninguna. A3 ya hecho en `docs/dev.md` |
 | [#12](https://github.com/Facundo-Barbera/t3craft/issues/12) | Tokens de UI como recurso recargable con F3+T | B1 | 2 | **Después del #5.** Q1 aprobada |
 | [#13](https://github.com/Facundo-Barbera/t3craft/issues/13) | Galería de pantallas `/t3dev ui <escenario>` | B2 | 2 | Conviene tras el frente A |
-| [#14](https://github.com/Facundo-Barbera/t3craft/issues/14) | Kit de UI propio y migración de las pantallas con widgets vanilla | B3 y B4 | 3 | **Después del #5** y del #12. Q6 abierta |
+| [#14](https://github.com/Facundo-Barbera/t3craft/issues/14) | Kit de UI propio y migración de las pantallas con widgets vanilla | B3 y B4 | 3 | **Después del #5** y del #12. Q6 resuelta. **Hecho en `feat/ui-native-kit`** (`docs/features/ui-kit.md`), pendiente de compilar y revisar en la PC |
 | [#15](https://github.com/Facundo-Barbera/t3craft/issues/15) | Escala de UI propia, fuente TTF y catálogo de iconos | B5 y B6 | 4 | Tras el #14. **Q2 abierta** |
 | [#16](https://github.com/Facundo-Barbera/t3craft/issues/16) | Spike: medir qué sitios funcionan en un navegador embebido (CEF) | C1 | 1 | Necesita compilar y abrir el juego en la PC. **Q4 abierta** |
 | [#17](https://github.com/Facundo-Barbera/t3craft/issues/17) | Navegador en el juego para cosas de fuera: pantalla, lanzadores y dominios | C2 y C3 | 5 | Tras el #16. Q3 se decide con su informe |

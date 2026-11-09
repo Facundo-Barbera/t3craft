@@ -65,6 +65,16 @@ public final class OperateUi {
 		return ok;
 	}
 
+	/** {@link #guard(AbstractWidget, String)} for a control of the UI kit. */
+	public static boolean guard(dev.t3craft.client.t3ui.kit.T3Control control, String envId) {
+		boolean ok = canOperate(envId);
+		if (!ok) {
+			control.setEnabled(false);
+			control.setTooltip(Component.translatable(REQUIRES_KEY).getString());
+		}
+		return ok;
+	}
+
 	/**
 	 * Runs {@code action}: read-only → {@code READ_ONLY} at once; destructive → opens
 	 * {@link ConfirmActionScreen} first (then returns to {@code returnTo}); otherwise sends it.

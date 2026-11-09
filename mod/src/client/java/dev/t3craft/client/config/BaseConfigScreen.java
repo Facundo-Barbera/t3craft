@@ -1,5 +1,6 @@
 package dev.t3craft.client.config;
 
+import dev.t3craft.client.chat.ChatTheme;
 import java.util.function.Consumer;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -45,6 +46,14 @@ abstract class BaseConfigScreen extends Screen {
 
 	protected void info(String msg) {
 		status = Component.literal(msg).withStyle(ChatFormatting.YELLOW);
+	}
+
+	/** The kit's backdrop, so the screens still on vanilla widgets (environment edit, outbound) sit in the same frame as the rest. */
+	@Override
+	public void extractBackground(GuiGraphicsExtractor g, int mouseX, int mouseY, float a) {
+		ChatTheme t = ChatTheme.warmStudio();
+		g.fill(0, 0, width, height, t.backdrop());
+		g.fillGradient(0, 0, width, height, t.backdropBottom() & 0x00FFFFFF, t.backdropBottom());
 	}
 
 	@Override

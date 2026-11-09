@@ -163,15 +163,25 @@ tuning; combined with F3+T it is the fast loop for visual work.
 | Scenario | Opens |
 |---|---|
 | `inbox`, `inbox-readonly`, `inbox-empty` | The main T3 screen: every thread state and a running conversation / read-only / no threads |
-| `confirm`, `snooze` | The destructive-action confirmation and the snooze presets |
-| `pair`, `operate-pair`, `environments`, `settings` | Pairing, enable-control, the environment list and the settings (vanilla-widget screens) |
+| `inbox-settings`, `inbox-environments` | The main T3 screen with the settings / environment-list page in the thread's place (what the sidebar's gear and cloud open) |
+| `settings`, `settings-notifications`, `settings-connections`, `environments` | The same pages as screens of their own (a tab each; fake environments) |
+| `confirm`, `snooze`, `launch` | Kit dialogs: the destructive-action confirmation, the snooze presets, the new-thread form |
+| `pair`, `pair-readonly`, `operate-pair` | Kit dialogs: pairing (control by default / read-only) and enable-control |
 | `queue` | The queued-runs screen (reads the live queue) |
 
 The fake environment is `t3dev-gallery`; its transcripts never reach the disk cache. Real things stay
 real: `settings` saves the actual config, and an action aimed at the fake environment fails with the usual
 error toast. To add a scenario, add a `Scenario` to `UiGallery.SCENARIOS`. The scenarios are written in
 code because the `uiRender` fixtures live in a tool source set that is not in the mod jar; `uiRender`
-remains the headless layout check for agents.
+remains the headless layout check for agents (it has no fixtures for the kit's pages and dialogs yet).
+
+### 8. The UI kit (#14)
+
+Settings, Environments, Pair, OperatePair, Confirm, NewThread and Snooze are built on a small kit
+(`client/t3ui/kit`: button, toggle, field, select, list, tabs, dialog, panel) drawn with the `ChatTheme`
+tokens, so a colour or metric change in `ui-style.json` restyles them with F3+T. Settings and Environments
+are pages that open inside `T3Screen` (and as screens of their own); the others are modal dialogs. How it is
+built, how to add a control or a page, and what is left: `docs/features/ui-kit.md`.
 
 ## Hot-swap
 

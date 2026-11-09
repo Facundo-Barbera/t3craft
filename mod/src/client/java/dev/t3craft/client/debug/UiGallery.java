@@ -9,15 +9,19 @@ import dev.t3craft.client.chat.ThreadDirectory;
 import dev.t3craft.client.chat.ThreadList;
 import dev.t3craft.client.chat.ThreadRow;
 import dev.t3craft.client.config.EnvironmentActions;
-import dev.t3craft.client.config.EnvironmentsScreen;
+import dev.t3craft.client.config.EnvironmentActions.EnvRow;
+import dev.t3craft.client.config.EnvironmentsPanel;
+import dev.t3craft.client.config.SettingsPanel;
 import dev.t3craft.client.config.SettingsScreen;
 import dev.t3craft.client.queue.QueueScreen;
 import dev.t3craft.client.screen.ConfirmActionScreen;
+import dev.t3craft.client.screen.NewThreadScreen;
 import dev.t3craft.client.screen.OperatePairScreen;
 import dev.t3craft.client.screen.PairScreen;
 import dev.t3craft.client.screen.SnoozeScreen;
 import dev.t3craft.client.t3ui.T3Screen;
 import dev.t3craft.client.t3ui.T3Slots;
+import dev.t3craft.client.t3ui.kit.T3PanelScreen;
 import dev.t3craft.t3.Environments;
 import dev.t3craft.t3.OperateAction;
 import dev.t3craft.t3.OperateKind;
@@ -63,12 +67,24 @@ public final class UiGallery {
 			new Scenario("inbox", "Main T3 screen: every thread state, a running conversation, the composer", () -> inbox(true, true)),
 			new Scenario("inbox-readonly", "Same, read-only (no composer, no header actions: how an archived thread opens)", () -> inbox(false, true)),
 			new Scenario("inbox-empty", "Main T3 screen with no threads", () -> inbox(true, false)),
-			new Scenario("confirm", "Confirmation before a destructive action (stop a thread)", UiGallery::confirm),
-			new Scenario("snooze", "Snooze presets for one thread", () -> new SnoozeScreen(null, new ThreadOps.Target(ENV, "t-run", "fix/hq-builders-independent"))),
-			new Scenario("pair", "Pair an environment (code field, vanilla widgets)", () -> new PairScreen(null)),
-			new Scenario("operate-pair", "Enable control on a paired environment", UiGallery::operatePair),
-			new Scenario("settings", "T3Craft settings (vanilla widgets; Save writes the real config)", () -> new SettingsScreen(null, EnvironmentActions.DEFAULT)),
-			new Scenario("environments", "Environment list", () -> new EnvironmentsScreen(null, EnvironmentActions.DEFAULT)),
+			new Scenario("inbox-settings", "Main T3 screen with the settings page in the thread's place (what the sidebar's gear opens)",
+					() -> inbox(true, true).withPage(new SettingsPanel(EnvironmentActions.DEFAULT))),
+			new Scenario("inbox-environments", "Main T3 screen with the environment list page (fake environments)",
+					() -> inbox(true, true).withPage(new EnvironmentsPanel(galleryActions()))),
+			new Scenario("confirm", "Kit dialog: confirmation before a destructive action (stop a thread)", UiGallery::confirm),
+			new Scenario("snooze", "Kit dialog: snooze presets for one thread", () -> new SnoozeScreen(null, new ThreadOps.Target(ENV, "t-run", "fix/hq-builders-independent"))),
+			new Scenario("pair", "Kit dialog: pair an environment (three fields, access switch)", () -> new PairScreen(null)),
+			new Scenario("pair-readonly", "Kit dialog: pair, read-only access (no control warning)", () -> new PairScreen(null, true)),
+			new Scenario("operate-pair", "Kit dialog: enable control on a paired environment", UiGallery::operatePair),
+			new Scenario("launch", "Kit dialog: new thread (selects and prompt; empty without a connection with control)", () -> new NewThreadScreen(null, null, null)),
+			new Scenario("settings", "T3Craft settings as a screen of its own, General tab (Save writes the real config)",
+					() -> new SettingsScreen(null, EnvironmentActions.DEFAULT)),
+			new Scenario("settings-notifications", "Settings, Notifications tab (switches and a select)",
+					() -> new T3PanelScreen(null, new SettingsPanel(EnvironmentActions.DEFAULT).tab(1))),
+			new Scenario("settings-connections", "Settings, Connections tab (links and the dangerous button)",
+					() -> new T3PanelScreen(null, new SettingsPanel(EnvironmentActions.DEFAULT).tab(2))),
+			new Scenario("environments", "Environment list with fake environments (ok, connecting, offline, one with control)",
+					() -> new T3PanelScreen(null, new EnvironmentsPanel(galleryActions()))),
 			new Scenario("queue", "Queued runs (reads the live queue, empty without a connection)", () -> new QueueScreen(null, null)));
 
 	private UiGallery() {
@@ -99,12 +115,55 @@ public final class UiGallery {
 		return new ConfirmActionScreen(null, stop, ENV_LABEL, yes -> Minecraft.getInstance().gui.setScreen(null));
 	}
 
+	/** Four fake paired environments for the list page; every action answers with a line and touches nothing. */
+	private static EnvironmentActions galleryActions() {
+		return new EnvironmentActions() {
+			@Override
+			public List<EnvRow> list() {
+				return List.of(
+						new EnvRow("studio", "Studio Mac", "http://studio.example.ts.net:3773/", "ok", ""),
+						new EnvRow("laptop", "Laptop", "http://my-laptop:3773/", "connecting", ""),
+						new EnvRow("vps-env", "VPS", "https://vps.example.ts.net/", "offline", "connection refused"),
+						new EnvRow("old", "Old machine", "http://10.0.0.7:3773/", "-", ""));
+			}
+
+			@Override
+			public Screen pairScreen(Screen parent) {
+				return new PairScreen(parent);
+			}
+
+			@Override
+			public String unpair(String id) {
+				return "Gallery: would forget " + id;
+			}
+
+			@Override
+			public String rename(String id, String newLabel) {
+				return "Gallery: would rename " + id;
+			}
+
+			@Override
+			public void reload() {
+			}
+
+			@Override
+			public boolean operateEnabled(String id) {
+				return id.equals("studio");
+			}
+
+			@Override
+			public String revokeOperate(String id) {
+				return "Gallery: would revoke control for " + id;
+			}
+		};
+	}
+
 	private static Screen operatePair() {
 		return new OperatePairScreen(null, new Environments.Environment(ENV, ENV_LABEL, URI.create("http://127.0.0.1:3773/")));
 	}
 
 	/** The main screen over fake data. {@code operate}: composer and header actions; {@code threads}: false = an empty list. */
-	private static Screen inbox(boolean operate, boolean threads) {
+	private static T3Screen inbox(boolean operate, boolean threads) {
 		long now = System.currentTimeMillis();
 		List<ThreadRow> rows = new ArrayList<>();
 		if (threads) {

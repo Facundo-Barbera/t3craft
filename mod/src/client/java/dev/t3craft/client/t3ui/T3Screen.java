@@ -24,6 +24,11 @@ import dev.t3craft.client.portable.NotificationLog;
 import dev.t3craft.client.t3ui.actions.ActionsClient;
 import dev.t3craft.client.t3ui.actions.ProjectsService;
 import dev.t3craft.client.portable.PortableClient;
+import dev.t3craft.client.config.EnvironmentActions;
+import dev.t3craft.client.config.EnvironmentsPanel;
+import dev.t3craft.client.config.SettingsPanel;
+import dev.t3craft.client.t3ui.kit.T3Panel;
+import dev.t3craft.client.t3ui.kit.T3PanelHost;
 import dev.t3craft.client.t3ui.sidebar.SidebarView;
 import dev.t3craft.client.t3ui.sidebar.WorkingStatus;
 import java.nio.file.Path;
@@ -108,6 +113,30 @@ public final class T3Screen extends Screen {
 	private boolean sidebarVisible;
 	private T3UiKeys.Focus focus = T3UiKeys.Focus.LIST;
 	private final SidebarView sidebarView = new SidebarView(model, new SidebarHost());
+	/**
+	 * The kit's pages (settings, environments): when one is open it takes the thread panel's place, as T3
+	 * Code's settings page does; the sidebar stays. Esc or its ✕ goes back to the thread.
+	 */
+	private final T3PanelHost pages = new T3PanelHost(new T3PanelHost.Owner() {
+		@Override
+		public void relayout() {
+			if (minecraft != null) {
+				rebuildWidgets();
+			}
+		}
+
+		@Override
+		public Screen screen() {
+			return T3Screen.this;
+		}
+
+		@Override
+		public void left() {
+			if (minecraft != null) {
+				rebuildWidgets();
+			}
+		}
+	});
 	private boolean menuOpen;
 	private boolean projectMenuOpen;
 	/** Agents menu filter: false = active only (default), true = all children. */
@@ -204,6 +233,14 @@ public final class T3Screen extends Screen {
 		pendingDraft = new String[] {envId, projectId};
 		autoSelected = true;
 		sidebarVisible = false;
+		return this;
+	}
+
+	/** Opens with a kit page (settings, environments) in the thread panel's place: the gallery. */
+	public T3Screen withPage(T3Panel page) {
+		pages.open(page);
+		sidebarVisible = false;
+		autoSelected = true;
 		return this;
 	}
 
@@ -338,6 +375,50 @@ public final class T3Screen extends Screen {
 		} else if (focus == T3UiKeys.Focus.SEARCH) {
 			focus = T3UiKeys.Focus.LIST;
 		}
+		if (pages.active() && layout.main().w() > 0) {
+			pages.layout(layout.main(), font, theme, this::addRenderableWidget);
+			for (var child : children()) {
+				if (child instanceof EditBox pageBox && pageBox.isFocused()) {
+					setFocused(pageBox); // rebuildWidgets() dropped the screen's focus; the new box kept its own flag
+				}
+			}
+		}
+	}
+
+	// ---- kit pages (settings, environments) ---------------------------------------------------------
+
+	/** Shows {@code page} in the thread panel's place (compact: the sidebar gives way to it). */
+	private void openPage(T3Panel page) {
+		menuOpen = false;
+		projectMenuOpen = false;
+		contextItems = null;
+		notifications = false;
+		if (composer != null) {
+			composer.setFocused(false); // its keys must not swallow the page's
+		}
+		if (requestCard != null) {
+			requestCard.blurOther();
+		}
+		if (layout.compact() && layout.sidebar().w() > 0) {
+			sidebarVisible = false;
+		}
+		pages.open(page);
+	}
+
+	private void openSettingsPage() {
+		openPage(new SettingsPanel(EnvironmentActions.DEFAULT));
+	}
+
+	private void openEnvironmentsPage() {
+		openPage(new EnvironmentsPanel(EnvironmentActions.DEFAULT));
+	}
+
+	/** A thread or a new draft was asked for by the user: the page makes way. */
+	private void closePages() {
+		if (pages.active()) {
+			pages.close();
+			rebuildWidgets();
+		}
 	}
 
 	@Override
@@ -386,6 +467,7 @@ public final class T3Screen extends Screen {
 	@Override
 	public void tick() {
 		syncTheme();
+		pages.tick();
 		refresh();
 		if (conversation != null) {
 			conversation.tick();
@@ -635,6 +717,9 @@ public final class T3Screen extends Screen {
 			drawMain(g, mouseX, mouseY);
 		}
 		super.extractRenderState(g, mouseX, mouseY, a);
+		if (pages.active()) {
+			pages.renderTop(g, font, theme, mouseX, mouseY, new Rect(0, 0, width, height));
+		}
 		if (anyMenuOpen()) {
 			g.nextStratum(); // menus over the text drawn below them
 		}
@@ -706,7 +791,7 @@ public final class T3Screen extends Screen {
 		Rect f = sr.footer();
 		String[] glyphs = {"⚙", "☁", "▤"};
 		String[] tips = {"Settings", "Environments", "Archive"};
-		Runnable[] acts = {() -> slots.openSettings(this), () -> slots.openEnvironments(this), this::openArchive};
+		Runnable[] acts = {this::openSettingsPage, this::openEnvironmentsPage, this::openArchive};
 		int ix = f.x();
 		for (int i = 0; i < glyphs.length; i++) {
 			Rect c = new Rect(ix, f.y(), 14, f.h());
@@ -743,6 +828,7 @@ public final class T3Screen extends Screen {
 
 		@Override
 		public void open(ThreadRow r) {
+			closePages();
 			model.select(r.key());
 			showRow(r);
 			focus = T3UiKeys.Focus.LIST;
@@ -805,6 +891,10 @@ public final class T3Screen extends Screen {
 
 	private void drawMain(GuiGraphicsExtractor g, int mouseX, int mouseY) {
 		ChatTheme t = theme;
+		if (pages.active()) {
+			pages.render(g, font, t, mouseX, mouseY, new Rect(0, 0, width, height));
+			return;
+		}
 		// header panel behind the breadcrumb (T3's ChatHeader: project › thread, state)
 		Rect head = new Rect(layout.main().x(), layout.main().y(), layout.main().w(), mr.title().bottom() + 2 - layout.main().y());
 		ChatDraw.panel(g, t, head);
@@ -1102,6 +1192,7 @@ public final class T3Screen extends Screen {
 		List<T3Slots.MenuItem> items = new ArrayList<>();
 		int unread = NotificationLog.INSTANCE.unread();
 		items.add(new T3Slots.MenuItem(unread > 0 ? "Notifications (" + unread + ")" : "Notifications", true, () -> {
+			closePages();
 			notifications = true;
 			if (layout.compact()) {
 				setSidebarVisible(false);
@@ -1110,8 +1201,8 @@ public final class T3Screen extends Screen {
 		items.add(new T3Slots.MenuItem("New thread", true, this::newThread));
 		slots.menuItems(this, selectedTarget(), items);
 		items.add(new T3Slots.MenuItem("Archive", true, this::openArchive));
-		items.add(new T3Slots.MenuItem("Environments", true, () -> slots.openEnvironments(this)));
-		items.add(new T3Slots.MenuItem("Settings", true, () -> slots.openSettings(this)));
+		items.add(new T3Slots.MenuItem("Environments", true, this::openEnvironmentsPage));
+		items.add(new T3Slots.MenuItem("Settings", true, this::openSettingsPage));
 		items.add(new T3Slots.MenuItem(layout.compact() ? "Show thread" : wideSidebar ? "Hide sidebar (Ctrl+B)" : "Show sidebar (Ctrl+B)", true,
 				() -> setSidebarVisible(layout.compact() ? false : !wideSidebar)));
 		items.add(new T3Slots.MenuItem("Close", true, this::onClose));
@@ -1182,6 +1273,7 @@ public final class T3Screen extends Screen {
 		if (readOnly()) {
 			return;
 		}
+		closePages();
 		T3Slots.Target target = selectedTarget();
 		ThreadDraft d = selectedDraft();
 		openDraft(slots.draftProject(target != null ? target.envId() : d != null ? d.envId : null, model.project(), target));
@@ -1329,6 +1421,9 @@ public final class T3Screen extends Screen {
 		int button = event.button();
 		clickX = mx;
 		clickY = my;
+		if (pages.modalOpen()) {
+			return pages.mouseClicked(mx, my, button); // a confirmation over the page takes every click
+		}
 		for (T3Slots.Popup p : popups) {
 			if (p.isOpen() && p.mouseClicked(mx, my, button)) {
 				return true;
@@ -1346,6 +1441,15 @@ public final class T3Screen extends Screen {
 			projectMenuOpen = false;
 			contextItems = null;
 			return true;
+		}
+		if (pages.active() && (layout.main().contains(mx, my) || pages.overlayOpen())) {
+			if (search != null && search.isFocused()) {
+				search.setFocused(false);
+				setFocused(null);
+				focus = T3UiKeys.Focus.LIST;
+			}
+			// the page's own controls first, then its text boxes (vanilla widgets)
+			return pages.mouseClicked(mx, my, button) || super.mouseClicked(event, doubleClick);
 		}
 		if (requestCard != null && !requestCard.contains(mx, my)) {
 			requestCard.blurOther();
@@ -1423,6 +1527,10 @@ public final class T3Screen extends Screen {
 				return true;
 			}
 		}
+		if (pages.modalOpen() || pages.active() && layout.main().contains(x, y)) {
+			pages.mouseScrolled(x, y, scrollY);
+			return true;
+		}
 		if (anyMenuOpen()) {
 			return true;
 		}
@@ -1440,6 +1548,10 @@ public final class T3Screen extends Screen {
 
 	@Override
 	public boolean keyPressed(KeyEvent e) {
+		if (pages.active() && layout.main().w() > 0 && !anyMenuOpen()) {
+			// a kit page: its select / modal / Esc first, then the focused text box; no thread shortcuts apply
+			return pages.keyPressed(e) || super.keyPressed(e);
+		}
 		for (T3Slots.Popup p : popups) {
 			if (p.isOpen() && p.keyPressed(e)) {
 				return true;
@@ -1552,6 +1664,9 @@ public final class T3Screen extends Screen {
 
 	@Override
 	public boolean charTyped(CharacterEvent event) {
+		if (pages.active()) {
+			return !pages.modalOpen() && super.charTyped(event); // the page's text box, or the sidebar search
+		}
 		for (T3Slots.Popup p : popups) {
 			if (p.isOpen() && p.charTyped(event.codepoint())) {
 				return true;

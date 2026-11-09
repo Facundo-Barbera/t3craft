@@ -5,20 +5,23 @@ import dev.t3craft.client.operate.LaunchClient;
 import dev.t3craft.client.operate.OperateClient;
 import dev.t3craft.client.operate.OperateUi;
 import dev.t3craft.client.search.SearchClient;
+import dev.t3craft.client.t3ui.kit.T3Button;
+import dev.t3craft.client.t3ui.kit.T3Dialog;
+import dev.t3craft.client.t3ui.kit.T3DialogScreen;
+import dev.t3craft.client.t3ui.kit.T3Draw;
+import dev.t3craft.client.t3ui.kit.T3Draw.Tone;
+import dev.t3craft.client.t3ui.kit.T3Select;
 import dev.t3craft.t3.OperateGate;
 import dev.t3craft.t3.OperateResult;
 import dev.t3craft.t3.ThreadLaunch;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.MultiLineEditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.FormattedCharSequence;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -30,12 +33,14 @@ import org.jspecify.annotations.Nullable;
  * through the normal shell flow.
  *
  * <p>Entry points: {@link #open(String, String)} (blocks such as a lectern/board call this with a
- * project preselected), the portable terminal's "New thread…" button.
+ * project preselected), the portable terminal's "New thread…" button. A kit dialog
+ * ({@link T3DialogScreen}, docs/features/ui-kit.md): three {@link T3Select}s and the prompt, which is
+ * still the vanilla {@link MultiLineEditBox} (the kit has no multi-line field yet; the composer of
+ * {@code T3Screen} is the real way to write a prompt since feat/t3-composer).
  */
-public final class NewThreadScreen extends Screen {
-	private static final int W = 360;
+public final class NewThreadScreen extends T3DialogScreen {
+	private static final int W = 380;
 
-	private final @Nullable Screen parent;
 	private @Nullable String env;
 	private @Nullable String projectId;
 	/** Null = project default. */
@@ -45,13 +50,13 @@ public final class NewThreadScreen extends Screen {
 	private boolean busy;
 	private @Nullable OperateResult result;
 	private @Nullable String resultEnv;
-	private Component message = Component.empty();
+	private String message = "";
+	private Tone messageTone = Tone.MUTED;
 
 	private @Nullable MultiLineEditBox promptBox;
 
 	public NewThreadScreen(@Nullable Screen parent, @Nullable String env, @Nullable String projectId) {
-		super(Component.translatable("t3craft.operate.launch.title"));
-		this.parent = parent;
+		super(Component.translatable("t3craft.operate.launch.title"), parent);
 		this.env = env;
 		this.projectId = projectId;
 	}
@@ -95,121 +100,155 @@ public final class NewThreadScreen extends Screen {
 		}
 	}
 
-	private static <T> @Nullable T next(List<T> list, @Nullable T current) {
-		if (list.isEmpty()) {
-			return null;
-		}
-		int i = list.indexOf(current);
-		return list.get((i + 1) % list.size());
-	}
-
 	private ThreadLaunch.@Nullable ProjectChoice project() {
 		return projects().stream().filter(p -> p.id().equals(projectId)).findFirst().orElse(null);
 	}
 
-	private Component modelLabel() {
-		if (model != null) {
-			return Component.literal(model.label());
-		}
+	/** The text of the "project default" model choice, with the model it resolves to. */
+	private String defaultModelText() {
 		ThreadLaunch.ModelChoice d = env == null || projectId == null ? null : ThreadLaunch.resolveModel(LaunchClient.view(env), projectId, null);
-		return d == null ? Component.translatable("t3craft.operate.launch.model.none")
-				: Component.translatable("t3craft.operate.launch.model.default", d.label());
+		return d == null ? T3Draw.tr("t3craft.operate.launch.model.none") : T3Draw.tr("t3craft.operate.launch.model.default", d.label());
 	}
 
-	// ---- layout ---------------------------------------------------------------------------------
-
-	private int left() {
-		return width / 2 - w() / 2;
+	private String modelText() {
+		return model != null ? model.label() : defaultModelText();
 	}
 
-	private int w() {
-		return Math.min(W, width - 32);
+	/** "Environment:" from the "Environment: %s" key, so the label stays translatable. */
+	private static String labelOf(String key) {
+		return T3Draw.template(key)[0].strip();
 	}
+
+	private String envText() {
+		return env == null ? "—" : OperateClient.label(env);
+	}
+
+	// ---- dialog ---------------------------------------------------------------------------------
 
 	@Override
 	protected void init() {
 		if (promptBox != null) {
-			prompt = promptBox.getValue();
+			prompt = promptBox.getValue(); // typed before a rebuild
 		}
 		promptBox = null;
+		super.init();
+		if (promptBox != null) {
+			setInitialFocus(promptBox);
+		}
+	}
+
+	@Override
+	protected T3Dialog buildDialog() {
 		normalize();
-		int x = left();
-		int w = w();
-		int y = 34;
-		int half = w / 2 - 4;
+		T3Dialog d = new T3Dialog(title.getString(), W);
+		String cancel = CommonComponents.GUI_CANCEL.getString();
 		if (!review) {
-			addRenderableWidget(Button.builder(Component.translatable("t3craft.operate.launch.env", env == null ? "—" : OperateClient.label(env)), b -> {
-				env = next(envs(), env);
+			T3Select<String> envSelect = new T3Select<>(envs(), OperateClient::label, env, v -> {
+				env = v;
 				projectId = null;
 				model = null;
 				rebuildWidgets();
-			}).bounds(x, y, w, 20).build()).active = envs().size() > 1;
-			y += 24;
-			ThreadLaunch.ProjectChoice p = project();
-			addRenderableWidget(Button.builder(Component.translatable("t3craft.operate.launch.project", p == null ? "—" : p.label()), b -> {
-				projectId = Objects.requireNonNullElse(next(projects().stream().map(ThreadLaunch.ProjectChoice::id).toList(), projectId), projectId);
+			});
+			envSelect.setEnabled(envs().size() > 1);
+			List<ThreadLaunch.ProjectChoice> ps = projects();
+			T3Select<ThreadLaunch.ProjectChoice> projectSelect = new T3Select<>(ps, ThreadLaunch.ProjectChoice::label, project(), v -> {
+				projectId = v.id();
 				model = null;
 				rebuildWidgets();
-			}).bounds(x, y, w, 20).build()).active = projects().size() > 1;
-			y += 24;
-			addRenderableWidget(Button.builder(Component.translatable("t3craft.operate.launch.model", modelLabel()), b -> {
-				List<ThreadLaunch.ModelChoice> ms = models();
-				int i = model == null ? -1 : ms.indexOf(model);
-				model = i + 1 < ms.size() ? ms.get(i + 1) : null; // cycles back to "project default"
-				rebuildWidgets();
-			}).bounds(x, y, w, 20).build()).active = !models().isEmpty();
-			y += 34;
-			int boxH = Math.max(40, height - y - 64);
-			MultiLineEditBox box = MultiLineEditBox.builder().setX(x).setY(y)
-					.setPlaceholder(Component.translatable("t3craft.operate.launch.prompt.hint").withStyle(ChatFormatting.DARK_GRAY))
-					.build(font, w, boxH, Component.translatable("t3craft.operate.launch.prompt"));
-			box.setCharacterLimit(ThreadLaunch.MAX_PROMPT);
-			box.setValue(prompt);
-			box.setValueListener(v -> prompt = v);
-			promptBox = addRenderableWidget(box);
-			y += boxH + 8;
-			Button reviewButton = addRenderableWidget(Button.builder(Component.translatable("t3craft.operate.launch.review"), b -> toReview())
-					.bounds(x, y, half, 20).build());
-			reviewButton.active = env != null && projectId != null && !busy;
+			});
+			projectSelect.setEnabled(ps.size() > 1);
+			List<ThreadLaunch.ModelChoice> choices = new ArrayList<>();
+			choices.add(null); // "project default"
+			choices.addAll(models());
+			T3Select<ThreadLaunch.ModelChoice> modelSelect = new T3Select<>(choices, m -> m == null ? defaultModelText() : m.label(), model, v -> model = v);
+			modelSelect.setEnabled(!models().isEmpty());
+			T3Button reviewButton = new T3Button(T3Draw.tr("t3craft.operate.launch.review"), T3Button.Style.PRIMARY, this::toReview);
+			reviewButton.setEnabled(env != null && projectId != null && !busy);
 			if (env != null) {
 				OperateUi.guard(reviewButton, env);
 			}
-			addRenderableWidget(Button.builder(CommonComponents.GUI_CANCEL, b -> onClose()).bounds(x + w - half, y, half, 20).build());
-			setInitialFocus(box);
+			int boxH = Math.max(40, Math.min(110, height - 230));
+			d.labelled(labelOf("t3craft.operate.launch.env"), envSelect)
+					.labelled(labelOf("t3craft.operate.launch.project"), projectSelect)
+					.labelled(labelOf("t3craft.operate.launch.model"), modelSelect)
+					.text(T3Draw.tr("t3craft.operate.launch.prompt"), Tone.MUTED)
+					.widget(boxH, r -> {
+						MultiLineEditBox box = MultiLineEditBox.builder().setX(r.x()).setY(r.y())
+								.setPlaceholder(Component.translatable("t3craft.operate.launch.prompt.hint").withStyle(ChatFormatting.DARK_GRAY))
+								.build(font, r.w(), r.h(), Component.translatable("t3craft.operate.launch.prompt"));
+						box.setCharacterLimit(ThreadLaunch.MAX_PROMPT);
+						box.setValue(prompt);
+						box.setValueListener(v -> prompt = v);
+						promptBox = box;
+						return box;
+					})
+					.buttons(reviewButton, new T3Button(cancel, this::onClose));
 		} else {
-			int by = height - 52;
-			Button launch = addRenderableWidget(Button.builder(Component.translatable("t3craft.operate.launch.button").withStyle(ChatFormatting.GOLD), b -> launch())
-					.bounds(x, by, half, 20).build());
-			launch.active = !busy && result == null;
+			T3Button launch = new T3Button(T3Draw.tr("t3craft.operate.launch.button"), T3Button.Style.PRIMARY, this::launch);
+			launch.setEnabled(!busy && result == null);
 			if (env != null) {
 				OperateUi.guard(launch, env);
 			}
-			addRenderableWidget(Button.builder(Component.translatable("t3craft.operate.launch.back"), b -> {
+			T3Button back = new T3Button(T3Draw.tr("t3craft.operate.launch.back"), () -> {
 				review = false;
 				result = null;
-				message = Component.empty();
+				message = "";
 				rebuildWidgets();
-			}).bounds(x + w - half, by, half, 20).build()).active = !busy;
+			});
+			back.setEnabled(!busy);
+			ThreadLaunch.ProjectChoice p = project();
+			d.text(T3Draw.tr("t3craft.operate.launch.summary"), Tone.WARN)
+					.kvKey("t3craft.operate.launch.env", envText())
+					.kvKey("t3craft.operate.launch.project", p == null ? "—" : p.label())
+					.kvKey("t3craft.operate.launch.model", modelText())
+					.kvKey("t3craft.operate.launch.summary.title", ThreadLaunch.title(prompt))
+					.kvKey("t3craft.operate.launch.summary.prompt", ThreadLaunch.promptSummary(prompt))
+					.text(preview(), Tone.CODE)
+					.text(T3Draw.tr("t3craft.operate.launch.summary.mode"), Tone.MUTED)
+					.buttons(launch, back);
 			String newThread = result == null ? null : ThreadLaunch.threadId(result);
 			if (newThread != null && resultEnv != null) {
 				String openEnv = resultEnv;
-				addRenderableWidget(Button.builder(Component.translatable("t3craft.operate.launch.open"), b -> {
+				d.control(new T3Button(T3Draw.tr("t3craft.operate.launch.open"), () -> {
 					T3CraftClient c = T3CraftClient.get();
 					if (c != null) {
 						SearchClient.open(c, openEnv, newThread);
 					}
-				}).bounds(x, by + 24, w, 20).build());
+				}));
 			}
 		}
+		return d.text(this::statusText, this::statusTone, 3).onCancel(this::onClose);
+	}
+
+	/** The first characters of the prompt, as far as a summary page can show. */
+	private String preview() {
+		String p = prompt.strip();
+		return p.length() <= 360 ? p : p.substring(0, 360) + "…";
+	}
+
+	/** Why "Review" is disabled, until a message replaces it. */
+	private String statusText() {
+		if (!message.isEmpty()) {
+			return message;
+		}
+		if (review) {
+			return "";
+		}
+		return env == null ? T3Draw.tr("t3craft.operate.launch.no_envs") : projectId == null ? T3Draw.tr("t3craft.operate.launch.no_projects") : "";
+	}
+
+	private Tone statusTone() {
+		return message.isEmpty() ? Tone.MUTED : messageTone;
 	}
 
 	private void toReview() {
 		String err = ThreadLaunch.validatePrompt(prompt);
 		if (err != null) {
-			message = Component.literal(err).withStyle(ChatFormatting.RED);
+			message = err;
+			messageTone = Tone.ERROR;
 			return;
 		}
-		message = Component.empty();
+		message = "";
 		result = null;
 		review = true;
 		rebuildWidgets();
@@ -221,14 +260,15 @@ public final class NewThreadScreen extends Screen {
 		}
 		busy = true;
 		String launchEnv = env;
-		message = Component.translatable("t3craft.operate.launch.sending").withStyle(ChatFormatting.YELLOW);
+		message = T3Draw.tr("t3craft.operate.launch.sending");
+		messageTone = Tone.WARN;
 		rebuildWidgets();
 		LaunchClient.launch(new ThreadLaunch.Request(launchEnv, projectId, prompt, model), OperateGate.Origin.UI, this, r -> {
 			busy = false;
 			result = r;
 			resultEnv = launchEnv;
-			message = Component.literal(r.ok() ? "Launched." : r.outcome().wire + ": " + r.message())
-					.withStyle(r.ok() ? ChatFormatting.GREEN : ChatFormatting.RED);
+			message = r.ok() ? "Launched." : r.outcome().wire + ": " + r.message();
+			messageTone = r.ok() ? Tone.OK : Tone.ERROR;
 			Minecraft mc = Minecraft.getInstance();
 			if (mc.player != null) {
 				mc.player.sendSystemMessage(LaunchClient.resultLine(launchEnv, r)); // clickable "[open chat]" link
@@ -238,77 +278,5 @@ public final class NewThreadScreen extends Screen {
 			}
 			rebuildWidgets();
 		});
-	}
-
-	// ---- render ---------------------------------------------------------------------------------
-
-	@Override
-	public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float a) {
-		super.extractRenderState(g, mouseX, mouseY, a);
-		int x = left();
-		int w = w();
-		g.centeredText(font, title.copy().withStyle(ChatFormatting.YELLOW), width / 2, 14, 0xFFFFFFFF);
-		// Why "Review" is disabled, on the message line under the buttons. It used to be drawn at
-		// height / 2 - 30 (inside the prompt box) or at y 24 (under the environment button).
-		Component why = env == null ? Component.translatable("t3craft.operate.launch.no_envs")
-				: projectId == null ? Component.translatable("t3craft.operate.launch.no_projects") : null;
-		Component bottom = message.getString().isEmpty() && why != null ? why.copy().withStyle(ChatFormatting.GRAY) : message;
-		if (!review) {
-			if (promptBox != null) {
-				g.text(font, Component.translatable("t3craft.operate.launch.prompt"), x, promptBox.getY() - 10, 0xFFA0A0A0);
-			}
-		} else {
-			int y = 36;
-			ThreadLaunch.ProjectChoice p = project();
-			y = drawWrapped(g, Component.translatable("t3craft.operate.launch.summary").withStyle(ChatFormatting.GOLD), x, y, w) + 4;
-			y = drawWrapped(g, Component.translatable("t3craft.operate.launch.env", env == null ? "—" : OperateClient.label(env)), x, y, w);
-			y = drawWrapped(g, Component.translatable("t3craft.operate.launch.project", p == null ? "—" : p.label()), x, y, w);
-			y = drawWrapped(g, Component.translatable("t3craft.operate.launch.model", modelLabel()), x, y, w);
-			y = drawWrapped(g, Component.translatable("t3craft.operate.launch.summary.title", ThreadLaunch.title(prompt)), x, y, w);
-			y = drawWrapped(g, Component.translatable("t3craft.operate.launch.summary.prompt", ThreadLaunch.promptSummary(prompt))
-					.withStyle(ChatFormatting.GRAY), x, y, w) + 4;
-			y = drawPreview(g, x, y, w, Math.max(0, height - 64 - y - 30));
-			drawWrapped(g, Component.translatable("t3craft.operate.launch.summary.mode").withStyle(ChatFormatting.DARK_GRAY), x, y + 4, w);
-		}
-		// Review page: above the Launch/Back row, since "Open chat" (height - 28) covered height - 24.
-		int my = review ? height - 64 : height - 24;
-		int limit = review ? height - 52 : height;
-		for (FormattedCharSequence s : font.split(bottom, w)) {
-			if (my + font.lineHeight > limit) {
-				break;
-			}
-			g.centeredText(font, s, width / 2, my, 0xFFFFFFFF);
-			my += font.lineHeight;
-		}
-	}
-
-	/** The first lines of the prompt, as far as they fit in {@code maxH}. */
-	private int drawPreview(GuiGraphicsExtractor g, int x, int y, int w, int maxH) {
-		int lines = maxH / font.lineHeight;
-		List<FormattedCharSequence> all = font.split(Component.literal(prompt).withStyle(ChatFormatting.WHITE), w - 8);
-		for (int i = 0; i < Math.min(lines, all.size()); i++) {
-			boolean last = i == lines - 1 && all.size() > lines;
-			g.text(font, last ? Component.literal("…").getVisualOrderText() : all.get(i), x + 8, y, 0xFFFFFFFF);
-			y += font.lineHeight;
-		}
-		return y;
-	}
-
-	private int drawWrapped(GuiGraphicsExtractor g, Component c, int x, int y, int w) {
-		for (FormattedCharSequence s : font.split(c, w)) {
-			g.text(font, s, x, y, 0xFFFFFFFF);
-			y += font.lineHeight;
-		}
-		return y;
-	}
-
-	@Override
-	public void onClose() {
-		minecraft.gui.setScreen(parent);
-	}
-
-	@Override
-	public boolean isPauseScreen() {
-		return false;
 	}
 }
