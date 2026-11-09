@@ -1,19 +1,69 @@
 {
   "variants": {
-    "facing=north": {
-      "model": "t3craft:block/console_terminal"
-    },
-    "facing=east": {
-      "model": "t3craft:block/console_terminal",
-      "y": 90
-    },
-    "facing=south": {
-      "model": "t3craft:block/console_terminal",
-      "y": 180
-    },
-    "facing=west": {
-      "model": "t3craft:block/console_terminal",
-      "y": 270
-    }
+    "facing=north": [
+      {
+        "model": "t3craft:block/console_terminal",
+        "weight": 1
+      },
+      {
+        "model": "t3craft:block/console_terminal_violet",
+        "weight": 1
+      },
+      {
+        "model": "t3craft:block/console_terminal_gold",
+        "weight": 1
+      }
+    ],
+    "facing=east": [
+      {
+        "model": "t3craft:block/console_terminal",
+        "weight": 1,
+        "y": 90
+      },
+      {
+        "model": "t3craft:block/console_terminal_violet",
+        "weight": 1,
+        "y": 90
+      },
+      {
+        "model": "t3craft:block/console_terminal_gold",
+        "weight": 1,
+        "y": 90
+      }
+    ],
+    "facing=south": [
+      {
+        "model": "t3craft:block/console_terminal",
+        "weight": 1,
+        "y": 180
+      },
+      {
+        "model": "t3craft:block/console_terminal_violet",
+        "weight": 1,
+        "y": 180
+      },
+      {
+        "model": "t3craft:block/console_terminal_gold",
+        "weight": 1,
+        "y": 180
+      }
+    ],
+    "facing=west": [
+      {
+        "model": "t3craft:block/console_terminal",
+        "weight": 1,
+        "y": 270
+      },
+      {
+        "model": "t3craft:block/console_terminal_violet",
+        "weight": 1,
+        "y": 270
+      },
+      {
+        "model": "t3craft:block/console_terminal_gold",
+        "weight": 1,
+        "y": 270
+      }
+    ]
   }
 }
