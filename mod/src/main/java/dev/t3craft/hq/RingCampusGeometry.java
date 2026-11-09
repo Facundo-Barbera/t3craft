@@ -627,6 +627,25 @@ public final class RingCampusGeometry {
 		return dims().floorH;
 	}
 
+	// ------------------------------------------------------------------ relief (design/citadel-terraces)
+
+	/** Terrace lifts in blocks per relief (rows) for the core and rings 1..3 (columns); the lawn banks down to 0. */
+	private static final int[][] LEVELS = {{0, 0, 0, 0}, {3, 2, 1, 0}, {5, 3, 1, 0}, {6, 4, 2, 0}};
+
+	/** The relief in use ({@code LayoutParams.RINGCAMPUS_RELIEF}, pack key {@code terrain.relief}, 0..3, default 2). */
+	public static int relief() {
+		return Math.max(0, Math.min(3, dev.t3craft.hq.pack.LayoutParams.RINGCAMPUS_RELIEF.get()));
+	}
+
+	/**
+	 * How many blocks ring {@code m}'s terrace (its band of lots, its avenues, its street; the ring-1 nodes go with
+	 * ring 1) stands above the flat citadel; {@code m = 0} is the core (hub, patio, promenade, ramps, inner street).
+	 * Fixed per ring, never by how many rings are open, so growing never moves a built terrace.
+	 */
+	public static int level(int m) {
+		return LEVELS[relief()][Math.max(0, Math.min(MAX_RINGS, m))];
+	}
+
 	/** Podium level at the scale in use. */
 	public static int podium() {
 		return dims().podium;
@@ -640,7 +659,8 @@ public final class RingCampusGeometry {
 		int e = l.reach() + 1;
 		BlockPos c = l.centre();
 		Dims d = dims();
-		return Box.of(c.getX() - e, 0, c.getZ() - e, c.getX() + e, 2 * d.floorH + d.s(9), c.getZ() + e);
+		int lift = level(l.ring());
+		return Box.of(c.getX() - e, lift, c.getZ() - e, c.getX() + e, lift + 2 * d.floorH + d.s(9), c.getZ() + e);
 	}
 
 	/** Centre cell (x, z) of a ring-1 node: 0 review tower (N), 2 scheduled rotunda (E), 4 archive cloister (S), 6 sunken lounge (W). */

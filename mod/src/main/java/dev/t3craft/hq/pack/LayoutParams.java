@@ -152,6 +152,14 @@ public final class LayoutParams {
 			"terraces: an azalea bush on 1 cell in N");
 	public static final Spec RINGCAMPUS_CATALOG = spec("hybrid-ringcampus", "catalog.enabled", 1, 0, 1,
 			"catalog placement (CitadelPlacement): annexes, gardens, trees, street lamps, gates, plazas; 1 on, 0 off");
+	/**
+	 * design/citadel-terraces: soft campus relief (0..3). The core, each ring and the outer lawn stand on terraces a
+	 * few blocks apart (at most 6 in all), joined by slab ramps on the avenues and stairs where paths cross a step,
+	 * with low capped retaining walls, planters and lookouts. {@code 0} is the flat citadel block by block. See
+	 * {@code CitadelRelief}. It moves anchors and desks up with their terrace.
+	 */
+	public static final Spec RINGCAMPUS_RELIEF = spec("hybrid-ringcampus", "terrain.relief", 2, 0, 3,
+			"campus terraces: 0 flat, 1 gentle (steps of 1), 2 default (steps of 2, 5 in all), 3 strong (6 in all)");
 
 	// ------------------------------------------------------------------ hybrid-towncenter
 

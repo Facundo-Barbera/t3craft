@@ -141,7 +141,7 @@ public final class CitadelFinish {
 		if (hall == null) {
 			return "lot_" + zn.lot();
 		}
-		int f = y >= fh() ? 1 : 0;
+		int f = y - c.liftAt(x, z) >= fh() ? 1 : 0;
 		HqLayout.Module m = mods.get(f * RingCampusGeometry.HALLS + hall[1]);
 		if (m == null) {
 			m = mods.get((1 - f) * RingCampusGeometry.HALLS + hall[1]);
@@ -204,6 +204,7 @@ public final class CitadelFinish {
 		Set<Long> seen = new HashSet<>();
 		ArrayDeque<BlockPos> todo = new ArrayDeque<>();
 		BlockPos spawn = spawn();
+		spawn = spawn.above(c.liftAt(spawn.getX(), spawn.getZ())); // design/citadel-terraces
 		if (standable(c, spawn.getX(), spawn.getY(), spawn.getZ())) {
 			seen.add(spawn.asLong());
 			todo.add(spawn);
@@ -505,7 +506,7 @@ public final class CitadelFinish {
 			int x = colX(e.getKey());
 			int z = colZ(e.getKey());
 			Kind kind = c.zoneAt(x, z).kind();
-			int top = Math.max(e.getValue()[1], kind == Kind.LAWN ? 3 : 5);
+			int top = Math.max(e.getValue()[1], c.liftAt(x, z) + (kind == Kind.LAWN ? 3 : 5));
 			for (int y = e.getValue()[0]; y <= top; y++) {
 				long k = BlockPos.asLong(x, y, z);
 				if (!c.cells.containsKey(k)) {
@@ -573,6 +574,8 @@ public final class CitadelFinish {
 
 	/** Turns the painted canvas into the plan: air, shapes, groups, light pass, placements, modules. */
 	public static BuildPlan build(CitadelCanvas c) {
+		// design/citadel-terraces: the flat citadel goes onto its terraces before anything reads the final cells
+		CitadelRelief.apply(c);
 		fillAir(c);
 		CitadelAmbience.lights(c);
 		PlanShapes.resolve(c.cells);
@@ -584,6 +587,9 @@ public final class CitadelFinish {
 			groups.put(k, groupOf(c, p.getX(), p.getY(), p.getZ()));
 		}
 		light(c, groups);
+		if (Boolean.getBoolean("t3craft.citadel.reliefReport")) {
+			CitadelRelief.check(c, walkable(c));
+		}
 		Map<BlockPos, String> index = new HashMap<>(c.cells.size() * 2);
 		for (long k : c.cells.keySet()) {
 			index.put(BlockPos.of(k), groups.get(k));
