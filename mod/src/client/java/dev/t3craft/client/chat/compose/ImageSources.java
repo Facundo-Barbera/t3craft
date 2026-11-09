@@ -155,6 +155,12 @@ public final class ImageSources {
 	 * Client thread.
 	 */
 	public static List<Picked> clipboardImages() {
+		// fix/paste-crash2: on Windows, asking SDL for image data on the clipboard (image/png, CF_DIB conversion) can
+		// take the whole process down natively, with no crash report. Images are pasted there only when asked for
+		// (-Dt3craft.clipboardImages=true); Ctrl+V pastes text as usual and the clip button picks image files.
+		if (System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win") && !Boolean.getBoolean("t3craft.clipboardImages")) {
+			return List.of();
+		}
 		try {
 			for (String type : CLIPBOARD_TYPES) {
 				if (SDLClipboard.SDL_HasClipboardData(type)) {
