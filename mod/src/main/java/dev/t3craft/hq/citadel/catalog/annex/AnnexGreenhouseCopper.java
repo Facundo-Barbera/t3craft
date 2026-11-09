@@ -337,9 +337,11 @@ public final class AnnexGreenhouseCopper implements Variant {
 					Direction in = du == 0 ? (u == 0 ? Direction.EAST : Direction.WEST) : (v == g.vf ? Direction.SOUTH : Direction.NORTH);
 					boolean corner = du == 0 && dv == 0;
 					st = corner || rib ? stairs(RIB_O, in) : slab(SLAB_O);
+				} else if (g.hip && du == dv && du < g.r) {
+					st = slab(RIDGE_SL); // [depth] the hip arris: a bare-copper spine down each corner of the slope, like the ridge
 				} else if (du >= g.r && dv >= g.r) {
 					if (rib) {
-						st = POST_W;
+						st = g.hip ? RIDGE : POST_W;
 					} else {
 						st = glass;
 					}
@@ -348,9 +350,20 @@ public final class AnnexGreenhouseCopper implements Variant {
 					}
 				} else {
 					Direction in = du <= dv ? (u < w - 1 - u ? Direction.EAST : Direction.WEST) : (v - g.vf < g.vb - v ? Direction.SOUTH : Direction.NORTH);
-					st = rib ? stairs(RIB_W, in) : glass;
+					st = rib ? stairs(g.hip ? RIDGE_ST : RIB_W, in) : glass;
 				}
 				p.set(c, u, y, v, st);
+				if (g.hip) {
+					// a hip's rings step up one block each, touching only at the corners: a block on top of every ring
+					// below the plateau makes the steps meet face to face, so the roof is one piece from the gutter to
+					// the ridge whatever the height (a gable gets that from its end walls). It is glass, a copper stair
+					// facing uphill on the ribs, and a copper slab on the diagonal so the four hip arrises are solid
+					int m = Math.min(du, dv);
+					if (m < g.r) {
+						Direction up = du <= dv ? (u < w - 1 - u ? Direction.EAST : Direction.WEST) : (v - g.vf < g.vb - v ? Direction.SOUTH : Direction.NORTH);
+						p.set(c, u, PLATE + m + 1, v, du == dv ? slab(RIDGE_SL) : rib ? stairs(RIDGE_ST, up) : glass);
+					}
+				}
 			}
 		}
 		// [finish] a thin bare-copper ridge line on top of the glass, with a finial at each end
