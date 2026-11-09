@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentCraft contributors. MIT License.
 package dev.t3craft.client.blocks;
 
+import dev.t3craft.client.chat.Ago;
 import dev.t3craft.client.chat.Attention;
 import dev.t3craft.client.chat.EnvBadge;
 import java.util.ArrayList;
@@ -10,29 +11,67 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Where everything goes on the wall, in board pixels (x right, y down from the wall's top-left
- * corner as seen from the front). Columns share the width equally; each column has a header
- * (label + count) and a stack of fixed-height cards. When a column holds more cards than fit, the
+ * corner as seen from the front). Columns share the width equally; each column is a dark lane with
+ * a coloured header (label + count) and a stack of loose, fixed-height cards inset from the lane
+ * with a gap between them: stripe of the state colour, title, then a footer line with the
+ * environment badge, project and the thread's age. When a column holds more cards than fit, the
  * last slot becomes a "+N more" chip (clicking it opens the first hidden thread). Pure: text widths
  * come from a {@link Measure} (the font in game, a fixed width in tests).
+ *
+ * <p><b>Reading distance (6-10 blocks).</b> A block is 64 board px, so the font's 8 px is only 1/8 of
+ * a block: too small from across the hub. Headers and titles are therefore drawn scaled
+ * ({@link Metrics}: 1.75x / 1.25x on a wall whose lanes are wide enough, smaller scales on narrow walls)
+ * and the layout measures them at that scale; the footer stays at 1x (project, age: secondary).
  *
  * <p>Lanes, headers with counts and the "+N more" overflow chip adapted from AgentCraft's
  * {@code TaskBoard} (which also sizes cards to their titles; here cards have one size so the wall
  * reads evenly from across the hub).
  */
 public final class WallLayout {
-	public static final int PAD = 4;
-	public static final int GAP = 4;
-	public static final int HEADER_H = 14;
-	public static final int CARD_H = 24;
-	public static final int CARD_GAP = 3;
-	public static final int CHIP_H = 12;
+	/** Space between the board's edge and the lanes (frame 6 px + 2 px of backing). */
+	public static final int EDGE = 8;
+	/** Frame band painted around the board (inside the brass keyline). */
+	public static final int FRAME = 6;
+	/** Gap between lanes. */
+	public static final int GAP = 6;
+	public static final int CARD_GAP = 6;
+	/** Room between a lane's side and its cards. */
+	public static final int CARD_INSET = 5;
+	/** Space under the header before the first card. */
+	public static final int HEAD_GAP = 6;
+	public static final int CHIP_H = 14;
 	/** Inner padding of a card's text. */
 	public static final int CARD_PAD = 4;
-	/** Room on a card's left for the attention stripe. */
-	public static final int STRIPE = 3;
+	/** Room on a card's left for the state stripe. */
+	public static final int STRIPE = 5;
 	/** Badge size on a card's footer line. */
 	public static final int BADGE = 9;
+	/** Height of the footer text (the font's 8 px). */
+	public static final int FOOT_H = 8;
 	public static final String ELLIPSIS = "…";
+
+	/** Lane width (px) from which titles are drawn at 1.25x and headers at 1.75x. */
+	static final int WIDE_LANE = 120;
+	/** Lane width from which headers are drawn at 1.5x (titles stay 1.25x). */
+	static final int MID_LANE = 88;
+
+	/** Text scales and the card / header sizes that go with them (board px). */
+	public record Metrics(float titleScale, float headScale, int headerH, int cardH) {
+		static Metrics of(float laneW) {
+			if (laneW >= WIDE_LANE) {
+				return new Metrics(1.25f, 1.75f, 20, 30);
+			}
+			if (laneW >= MID_LANE) {
+				return new Metrics(1.25f, 1.5f, 18, 30);
+			}
+			return new Metrics(1f, 1f, 13, 27);
+		}
+
+		/** Height of the footer line's top from the card's top. */
+		public float footY() {
+			return cardH - 4 - FOOT_H;
+		}
+	}
 
 	/** Text width in board pixels. */
 	@FunctionalInterface
@@ -44,8 +83,8 @@ public final class WallLayout {
 	public record Lane(int column, String id, float x, float w, String label, String count, int color) {
 	}
 
-	/** A card's slot and its texts (already clipped to fit). */
-	public record Slot(String key, int column, float x, float y, float w, float h, String title, String footer,
+	/** A card's slot and its texts (already clipped to fit). {@code age}: compact age ("5m"), "" when unknown. */
+	public record Slot(String key, int column, float x, float y, float w, float h, String title, String footer, String age,
 			Attention attention, EnvBadge badge) {
 		boolean contains(float px, float py) {
 			return px >= x && px <= x + w && py >= y && py <= y + h;
@@ -67,7 +106,7 @@ public final class WallLayout {
 	public record Hit(HitKind kind, String key, int column) {
 	}
 
-	public record Layout(float width, float height, WallMode mode, List<Lane> lanes, List<Slot> cards, List<More> more, int total) {
+	public record Layout(float width, float height, WallMode mode, Metrics metrics, List<Lane> lanes, List<Slot> cards, List<More> more, int total) {
 		/** The card or chip under {@code (x, y)}, or null. */
 		public @Nullable Hit hit(float x, float y) {
 			for (Slot s : cards) {
@@ -96,53 +135,70 @@ public final class WallLayout {
 	private WallLayout() {
 	}
 
-	/** How many card rows fit under a header in a wall {@code height} px tall. */
-	public static int rows(float height) {
-		float avail = height - 2 * PAD - HEADER_H - GAP;
-		return avail < CARD_H ? 0 : (int) ((avail + CARD_GAP) / (CARD_H + CARD_GAP));
+	/** Lane width of {@code columns} columns on a wall {@code width} px wide. */
+	static float laneWidth(float width, int columns) {
+		int n = Math.max(1, columns);
+		return (width - 2 * EDGE - GAP * (n - 1)) / n;
+	}
+
+	/** How many card rows fit under a header in a wall {@code height} px tall (cards of {@code m}). */
+	static int rows(float height, Metrics m) {
+		float avail = height - 2 * EDGE - m.headerH() - HEAD_GAP - 4;
+		return avail < m.cardH() ? 0 : (int) ((avail + CARD_GAP) / (m.cardH() + CARD_GAP));
 	}
 
 	/** Most columns that stay readable on a wall {@code width} px wide (project/environment modes). */
 	public static int maxColumns(float width) {
-		return Math.max(1, (int) ((width - 2 * PAD + GAP) / (64 + GAP)));
+		return Math.max(1, (int) ((width - 2 * EDGE + GAP) / (72 + GAP)));
 	}
 
-	public static Layout build(List<WallColumns.Column> columns, WallMode mode, float width, float height, Measure m) {
+	public static Layout build(List<WallColumns.Column> columns, WallMode mode, float width, float height, Measure m, long nowMs) {
 		int n = Math.max(1, columns.size());
-		float laneW = (width - 2 * PAD - GAP * (n - 1)) / n;
-		int rows = rows(height);
+		float laneW = laneWidth(width, n);
+		Metrics mt = Metrics.of(laneW);
+		int rows = rows(height, mt);
 		List<Lane> lanes = new ArrayList<>(columns.size());
 		List<Slot> slots = new ArrayList<>();
 		List<More> more = new ArrayList<>();
 		int total = 0;
+		float cardW = laneW - 2 * CARD_INSET;
 		for (int i = 0; i < columns.size(); i++) {
 			WallColumns.Column c = columns.get(i);
-			float x = PAD + i * (laneW + GAP);
+			float x = EDGE + i * (laneW + GAP);
 			String count = Integer.toString(c.count());
-			int labelRoom = (int) laneW - 2 * CARD_PAD - m.width(count) - 3;
+			// the count sits in a pill at the header's right; the label gets what is left, at the header scale
+			float pillW = pillWidth(count, m, mt);
+			int labelRoom = (int) ((laneW - 2 * CARD_PAD - pillW - 4) / mt.headScale());
 			lanes.add(new Lane(i, c.id(), x, laneW, clip(c.label(), labelRoom, m), count, c.color()));
 			total += c.count();
 			int shown = c.count() <= rows ? c.count() : Math.max(0, rows - 1);
-			float y = PAD + HEADER_H + GAP;
-			float textRoom = laneW - STRIPE - 2 * CARD_PAD;
+			float y = EDGE + mt.headerH() + HEAD_GAP;
+			float titleRoom = (cardW - STRIPE - 2 * CARD_PAD) / mt.titleScale();
 			for (int k = 0; k < shown; k++) {
 				WallCard card = c.cards().get(k);
+				String age = Ago.format(nowMs, card.activityMs());
 				String footer = footer(card, mode);
-				slots.add(new Slot(card.key(), i, x, y, laneW, CARD_H,
-						clip(card.title(), (int) textRoom, m),
-						clip(footer, (int) (textRoom - BADGE - 3), m),
+				float footRoom = cardW - STRIPE - 2 * CARD_PAD - BADGE - 3 - (age.isEmpty() ? 0 : m.width(age) + 5);
+				slots.add(new Slot(card.key(), i, x + CARD_INSET, y, cardW, mt.cardH(),
+						clip(card.title(), (int) titleRoom, m),
+						clip(footer, (int) footRoom, m), age,
 						card.attention(), card.badge()));
-				y += CARD_H + CARD_GAP;
+				y += mt.cardH() + CARD_GAP;
 			}
 			int hidden = c.count() - shown;
 			if (hidden > 0 && rows > 0) {
 				String text = "+" + hidden + " more";
-				float chipW = Math.min(laneW, m.width(text) + 10);
-				more.add(new More(i, x + (laneW - chipW) / 2f, y + (CARD_H - CHIP_H) / 2f, chipW, CHIP_H, hidden,
+				float chipW = Math.min(cardW, m.width(text) + 12);
+				more.add(new More(i, x + (laneW - chipW) / 2f, y + (mt.cardH() - CHIP_H) / 2f, chipW, CHIP_H, hidden,
 						c.cards().get(shown).key(), text));
 			}
 		}
-		return new Layout(width, height, mode, List.copyOf(lanes), List.copyOf(slots), List.copyOf(more), total);
+		return new Layout(width, height, mode, mt, List.copyOf(lanes), List.copyOf(slots), List.copyOf(more), total);
+	}
+
+	/** Width of a header's count pill: the number at the header scale plus padding. */
+	static float pillWidth(String count, Measure m, Metrics mt) {
+		return Math.max(mt.headerH() - 6, m.width(count) * mt.headScale() + 8);
 	}
 
 	/** Second line of a card: project (status mode) or state word + project, plus queued runs. */
