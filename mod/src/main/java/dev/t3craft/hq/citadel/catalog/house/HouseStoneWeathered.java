@@ -233,6 +233,7 @@ public final class HouseStoneWeathered implements Variant {
 			windows();
 			portal();
 			roofMain();
+			dormer();
 			if (ell) {
 				roofAnnex();
 			}
@@ -417,7 +418,6 @@ public final class HouseStoneWeathered implements Variant {
 			for (int t = a - 1; t <= a + 1; t++) {
 				wl.set(t, y + 2, 0, b(Blocks.POLISHED_ANDESITE));
 			}
-			wl.set(a, y + 2, 1, wl.stairIn(Blocks.STONE_BRICK_STAIRS, true));
 			if (sill) {
 				wl.set(a, y - 1, 1, wl.stairIn(Blocks.STONE_BRICK_STAIRS, false));
 			}
@@ -530,6 +530,33 @@ public final class HouseStoneWeathered implements Variant {
 			}
 		}
 
+		/**
+		 * [depth] a wall gablet over the portal: the front wall rises through the eave two courses, with a window and a small
+		 * gable roof running back into the main slope. Flush with the wall (no overhang, nothing to stand on under it).
+		 */
+		void dormer() {
+			for (int u = du - 1; u <= du + 1; u++) {
+				for (int y = P + 1; y <= P + 2; y++) {
+					if (u == du) {
+						set(u, y, va, front.pane());
+					} else {
+						set(u, y, va, p.hash(u, y, va, 5) == 0 ? b(Blocks.CRACKED_STONE_BRICKS) : b(Blocks.STONE_BRICKS));
+					}
+				}
+			}
+			set(du, P + 3, va, b(Blocks.POLISHED_ANDESITE));
+			set(du - 2, P + 2, va, stairs(Blocks.DARK_OAK_STAIRS, Direction.EAST));
+			set(du + 2, P + 2, va, stairs(Blocks.DARK_OAK_STAIRS, Direction.WEST));
+			for (int v = va; v <= va + 1; v++) {
+				set(du - 1, P + 3, v, stairs(roofStair(du - 1, v, false), Direction.EAST));
+				set(du + 1, P + 3, v, stairs(roofStair(du + 1, v, false), Direction.WEST));
+			}
+			for (int v = va; v <= va + 2; v++) {
+				set(du, P + 4, v, roofSolid());
+				set(du, P + 5, v, ridgeSlab());
+			}
+		}
+
 		/** The forge lean-to: one slope rising to the house wall. */
 		void roofAnnex() {
 			Direction rise = annexLeft ? Direction.EAST : Direction.WEST;
@@ -582,9 +609,7 @@ public final class HouseStoneWeathered implements Variant {
 				set(col, 0, v0 - 1, b(Blocks.COBBLESTONE));
 				set(col, 0, v0 + 2, b(Blocks.MOSSY_COBBLESTONE));
 			}
-			// [finish] a corbelled cap: upside-down stair brackets under the top, a stone course, then the slab
-			set(col, top - 2, v0 - 1, StoneKit.up(stairs(Blocks.STONE_BRICK_STAIRS, Direction.SOUTH)));
-			set(col, top - 2, v0 + 2, StoneKit.up(stairs(Blocks.STONE_BRICK_STAIRS, Direction.NORTH)));
+			// [finish] a polished stone course under the cap slab (no brackets: nothing may overhang a roof cell)
 			set(col, top - 1, v0, b(Blocks.POLISHED_ANDESITE));
 			set(col, top - 1, v0 + 1, b(Blocks.POLISHED_ANDESITE));
 		}
@@ -842,7 +867,6 @@ public final class HouseStoneWeathered implements Variant {
 			if ((u1 - u0 + 1) * (v1 - v0 + 1) >= 6) {
 				set(cu, 1, cv, Blocks.DARK_OAK_FENCE.defaultBlockState());
 				set(cu, 2, cv, b(Blocks.HAY_BLOCK));
-				set(cu, 3, cv, b(Blocks.CARVED_PUMPKIN).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH));
 			}
 		}
 
