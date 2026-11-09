@@ -90,7 +90,7 @@ public final class TreeCherryGrand implements Variant {
 				Math.cos(lean) * amp, Math.sin(lean) * amp);
 
 		// ---- roots spread out, a flare one block high against the trunk, a collar on the big ones
-		roots(t, bu, bv, 6 + (big ? 2 : 0), 3 + (big ? 1 : 0));
+		roots(t, bu, bv, 4 + (big ? 1 : 0), 2 + (big ? 1 : 0)); // few and short: a flare, not a starfish
 		if (big) {
 			int lu = lead[0][y2 + 1];
 			int lv = lead[1][y2 + 1];
@@ -138,7 +138,7 @@ public final class TreeCherryGrand implements Variant {
 					}
 				}
 			}
-			// a twig off the limb with a small satellite lobe (the tones swapped)
+			// a twig off the limb with a small satellite lobe
 			if (i % 2 == 0 || r.nextInt(3) == 0) {
 				int[] mid = limb.get(limb.size() / 2);
 				double fa = ang + (i % 4 < 2 ? 1.0 : -1.0) * (1.0 + r.nextDouble() * 0.4);
@@ -154,7 +154,7 @@ public final class TreeCherryGrand implements Variant {
 						double sx = Math.max(1.2, fit(fu, wu0, wu1, sr));
 						double sz = Math.max(1.2, fit(fv, wv0, wv1, sr));
 						TreeKit.branch(t, LIMB, new int[] {mid[0], mid[1], mid[2]}, new int[] {fu, sat - 1, fv}, false);
-						lobe(t, fu, sat, fv, sx, sz, sat + 1 <= H - 1 ? 1 : 0, 1, TreeKit.SAKURA.swap(), 0.45, 40 + i, 1 + (i * 2) / n, null); // the parent's group: it always grows
+						lobe(t, fu, sat, fv, sx, sz, sat + 1 <= H - 1 ? 1 : 0, 1, TreeKit.SAKURA, 0.45, 40 + i, 1 + (i * 2) / n, null); // the parent's group: it always grows
 					}
 				}
 			}
