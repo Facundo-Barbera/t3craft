@@ -559,6 +559,44 @@ blockstates → modelos → texturas propias `kit_*`, ítems y loot tables).
 - El estilo C (`feat/hq-style-cherry`) es quien usa `HqKit`; esta rama no toca `HqGenerator` ni
   `Palette` (salvo los letreros → placas vía fixtures).
 
+## Estación de merge (kit/merge-station): `t3craft:merge_station`
+
+Pedido de Facundo ("más bloques de control/utilidad en la oficina, portar lo que falte de AgentCraft"): el
+`merge_station` de AgentCraft (MIT) es una pantalla de diff con el botón Merge. Aquí solo se toma la idea; el
+código, el modelo y las texturas son propios (no hay nada que declarar en `THIRD_PARTY_NOTICES.md`). **No hay merge
+desde el juego** (el mod es de solo lectura): la estación sirve para ver qué espera revisión y abrirlo.
+
+| Pieza | Qué es |
+|---|---|
+| `MergeStationBlock` | Escritorio con `facing` (el panel mira al jugador) y la propiedad `pr` (`MergeState`: `none`, `open`, `draft`, `merged`). Luz 0 / 12 / 8 / 6. Click en el cliente → hook `clientUse` (como `ArchiveTerminalBlock`), consumido en ambos lados. |
+| `MergeStationBlockEntity` | `BoundBlockEntity`: solo el binding. En el servidor se registra mientras está cargado (`MergeStationBlockEntity.snapshot()`), igual que `LiveLamps`. |
+| `MergeStationApplier` | Servidor integrado: pone `pr` según lo que el cliente calcula (`MergeFeed.wanted`), solo donde cambia. Remoto: la estación conserva su estado guardado. |
+| `MergeFeed` (cliente, puro) | Une `ThreadRow.details()` (PR vinculado: número, estado `open`/`draft`/`merged`/`closed`, repo, url, +N/−N, de `ThreadExtras`) con el modelo de NPC (proyecto del hilo). Resume por binding: estado = el mejor (open > draft > merged > none); pendientes = open + draft. Un PR vinculado sin snapshot cuenta como open; `closed` cuenta como ninguno. |
+| `MergeStationRenderer` | Dibuja en el panel el número ("3 PRs"), qué significa ("to review") y el título del primero. Glyph runs cacheados por estación; se rehacen solo cuando `BlocksClient` entrega otro `Summary`. |
+| `MergeStationScreen` | Lista de los hilos pendientes (abiertos primero, luego drafts): botón ancho = abre el PR en el navegador con las reglas de enlaces del chat (apagado en ajustes → copia; "preguntar" → confirmación; solo `http(s)`), botón "Chat" = abre el hilo. Sin enlace de T3, el botón ancho abre el chat. |
+
+**Binding** (`BoundBlockEntity`, igual que el monitor): `project:<env:proyecto>`, `env:<envId>` o `thread:<env:hilo>`. A mano:
+`/t3craft blocks link project:<key>` mirando la estación. Sin vincular muestra "NO PR / not linked".
+
+**Estados** (`pr`): `none` lámparas grises apagadas; `open` verde que parpadea (tira de 2 fotogramas), el más llamativo;
+`draft` ámbar fijo rayado; `merged` violeta con un check en el botón. La lente de las lámparas, el botón y la pantalla
+brillan en el juego (`light_emission` por elemento). Arte: `python3 tools/art/merge_station_art.py [--preview DIR]`
+(biblioteca estándar; el preview escribe texturas ampliadas y la vista frontal/superior de cada estado).
+
+**HQ**: rol `HqKit.Role.MERGE_STATION` (con el módulo: `merge_station[facing]`; fallback vanilla: mesa de herrería).
+El plan reserva una con `AnchorNames.mergeStation(key, binding)` (`mergestation_<key>=<binding>`, no es un ancla de pie);
+`HqBindings.of` la lista como `Role.MERGE_STATION` y `HqBlockFixtures` pone el bloque con su binding como dato de block
+entity (`HqBlockFixtures.ID` pasa a `blocks-6`). `CitadelOffice.control` la pone en la sala de control (piso 2), en el
+hueco entre las dos pantallas de proyecto de la pared oeste, mirando al este y vinculada al proyecto de la primera pantalla.
+
+**Cliente**: `BlocksClient` relee los PR cada 10 ticks mientras haya una estación cargada (servidor integrado) o dibujada/usada
+hace menos de 100 ticks; no abre suscripciones (lee `ChatScreens.defaultDirectory().rows()` y el modelo de NPC).
+`ThreadDetails` lleva ahora `prUrl` (aditivo, con el constructor anterior); si T3 no da url se arma
+`https://github.com/<owner/repo>/pull/<n>`.
+
+**Sin probar en el juego ni compilado** (por regla): revisar a ojo el texto del panel (que no quede espejado ni tapado por las
+lámparas de las esquinas), el parpadeo del estado `open` y la lista.
+
 ## Cambios estructurales → **RESTART**
 
 - Bloques: `t3craft:monitor`, `t3craft:status_lamp`, `t3craft:board_lamp`, `t3craft:decision_podium` y el kit del HQ

@@ -110,10 +110,12 @@ import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
  * <h2>Anchors, fixtures and groups</h2>
  *
  * Anchors: {@code OFFICE} (in front of the consoles, facing the main screen), {@code OFFICE_BALCONY}, three big screens,
- * five board lamps ({@code board_lamp_5..9}) and five decision podiums ({@code decision_podium_0..4}, bound {@code board:0..4},
- * under the threads screen: a click opens the thread that needs the player). Fixtures (never replaced by the light pass): the
- * screens and their bases, the board, its lamps, the podiums, the signs. The consoles come from {@code HqKit.Role.CONSOLE}; the
- * podium anchors use the kernel's {@code AnchorNames.podium} (kit/decision-podium).
+ * five board lamps ({@code board_lamp_5..9}), five decision podiums ({@code decision_podium_0..4}, bound {@code board:0..4},
+ * under the threads screen: a click opens the thread that needs the player) and the merge station
+ * ({@code mergestation_office=<binding>}, between the two project screens, bound to the first one's project). Fixtures
+ * (never replaced by the light pass): the screens and their bases, the board, its lamps, the podiums, the merge station, the
+ * signs. The consoles come from {@code HqKit.Role.CONSOLE}, the station from {@code HqKit.Role.MERGE_STATION}; the podium
+ * anchors use the kernel's {@code AnchorNames.podium} (kit/decision-podium).
  */
 public final class CitadelOffice {
 	/**
@@ -734,6 +736,11 @@ public final class CitadelOffice {
 		}
 		set(c, -4, F2() + 3, 0, wallBanner(Direction.EAST));
 		set(c, -4, F2() + 4, 0, wallBanner(Direction.EAST));
+		// merge station (kit role MERGE_STATION; a smithing table without the blocks module) in the gap between the two project
+		// screens, facing the room: its list opens the pending PRs of the first screen's project
+		BlockPos station = new BlockPos(CX() - 4, y, CZ());
+		c.fixture(station, c.kit.mergeStation(Direction.EAST));
+		c.anchor(Anchor.face(AnchorNames.mergeStation("office", projects.get(0)), station, Direction.EAST));
 		attentionBoard(c);
 		// light: lanterns only over the middle and the north half; the screen's side gets invisible light, so nothing hangs in front of it
 		for (int[] p : new int[][] {{-3, -3}, {0, -3}, {3, -3}, {-3, 0}, {0, 0}}) {

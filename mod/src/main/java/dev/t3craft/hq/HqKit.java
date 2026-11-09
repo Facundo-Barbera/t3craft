@@ -67,7 +67,9 @@ public interface HqKit {
 		/** Glow panel, cool (T3 cyan). */
 		GLOW_PANEL_COOL,
 		/** Console terminal (kit/console-terminal): opens the T3 composer, or the chat of its bound thread. Oriented: front. Vanilla: lectern. */
-		CONSOLE;
+		CONSOLE,
+		/** Merge station (kit/merge-station): lists the pending pull requests of its project and opens one. Oriented: panel. Vanilla: smithing table. */
+		MERGE_STATION;
 
 		public String id() {
 			return name().toLowerCase(Locale.ROOT);
@@ -75,7 +77,7 @@ public interface HqKit {
 
 		/** Whether {@link #state(Role, Direction)} looks at {@code facing}. */
 		public boolean oriented() {
-			return this == DESK || this == BEAM || this == PLAQUE || this == RAILING || this == CONSOLE || this == GLOW_PANEL || this == GLOW_PANEL_COOL
+			return this == DESK || this == BEAM || this == PLAQUE || this == RAILING || this == CONSOLE || this == MERGE_STATION || this == GLOW_PANEL || this == GLOW_PANEL_COOL
 					|| strip();
 		}
 
@@ -193,6 +195,11 @@ public interface HqKit {
 	/** The console terminal, front (keyboard side, where the player stands) towards {@code front}. */
 	default BlockState console(Direction front) {
 		return state(Role.CONSOLE, front);
+	}
+
+	/** The merge station, panel (where the player stands) towards {@code front}. */
+	default BlockState mergeStation(Direction front) {
+		return state(Role.MERGE_STATION, front);
 	}
 
 	/** {@link #id()} of the active kit, {@code "vanilla"} for {@link #VANILLA}. */
