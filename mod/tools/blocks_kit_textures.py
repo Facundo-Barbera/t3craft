@@ -233,9 +233,10 @@ def floor_stone(variant=0, seed=32):
 
 
 # cherry: strip flooring with boards of different widths and lengths, seams, grain
-BOARD_TONES = [hexc(c) for c in ("#D48E82", "#D08A7E", "#CC867A", "#D2907F")]
-BOARD_SEAM = hexc("#8A554F")
-BOARD_END = hexc("#8F5A54")
+# two tones that alternate row by row (light / dark board), a warm wood salmon rather than pink
+BOARD_TONES = [hexc("#D09C84"), hexc("#B98568")]
+BOARD_SEAM = hexc("#6E4130")
+BOARD_END = hexc("#5F3627")
 BOARD_ROWS = (8, 8, 8, 8)  # sums to 32
 
 # end joints per variant: for every board row, the x of its butt joint (empty: the board runs the whole tile and
@@ -259,12 +260,14 @@ def floor_cherry(variant=0, seed=31):
         for k in range(n):
             start = cuts[k]
             end = cuts[(k + 1) % n] + (FN if (k + 1) == n else 0)
-            tone = rng.choice(BOARD_TONES)
+            # the two tones alternate by row (same on every variant so the rows line up across blocks); each
+            # board drifts a few levels so neighbours in one row are not identical
+            tone = shade(BOARD_TONES[r % 2], rng.choice((-4, -2, 0, 2, 4)))
             # grain: a few 1 px streaks along the whole board, lighter or darker, plus a lit top edge
             streak = [0] * bh
             streak[1] = 6
             for _ in range(2):
-                streak[rng.randrange(2, bh)] = rng.choice((-7, -5, 4))
+                streak[rng.randrange(2, bh)] = rng.choice((-6, -4, 3))
             for xx in range(start, end):
                 x = xx % FN
                 for ly in range(bh):
@@ -283,7 +286,8 @@ def floor_cherry(variant=0, seed=31):
                 for ly in range(bh):
                     img.set(start % FN, (y + ly) % FN, BOARD_END)
                     if ly:
-                        img.set((start + 1) % FN, (y + ly) % FN, shade(tone, 6))
+                        img.set((start + 1) % FN, (y + ly) % FN, shade(tone, -14))  # shadow in the end joint
+                        img.set((start + 2) % FN, (y + ly) % FN, shade(tone, 5))
         y += bh
     return img
 
