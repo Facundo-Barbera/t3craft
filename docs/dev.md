@@ -15,9 +15,23 @@ and `check`/`build` only compile.
 | Compile + jar | `./gradlew build` | no |
 | Play / debug locally | `./gradlew runClient` | **yes** |
 
-Where these run (see `AGENTS.md`, "Where things run"): Gradle runs **only on the render PC**, one at a
+Where these run (see `AGENTS.md`, "Where things run"): Gradle runs **only on the PC**, one at a
 time, through `tools/heavy.sh`, launched by the coordinator. The VPS runs no Gradle, java or Minecraft at
 all; child threads there only write code and push. On your own machine the daemon is fine.
+
+The PC has **two sides**, and they do different jobs (see "UI cycle" below):
+
+| Side of the PC | Runs |
+|---|---|
+| **Windows, native** | The **interactive dev client** (`runClient`) and the IDE, both on the same side. Launched by the owner of the machine, not by the coordinator |
+| **WSL** | **Renders only** (the render daemon and its relay), plus the Gradle the coordinator runs through `tools/heavy.sh` |
+
+Do not run the dev client inside WSL: with WSLg, OpenGL either falls back to software or pays a
+frame copy out of video memory on every frame (a reported ceiling around 72 fps), and there are open
+reports of instability. Keep it on Windows.
+
+`tools/heavy.sh` is a Linux script whose lock lives on the WSL side, so a Gradle started from
+Windows **does not take that lock**. Avoid building on both sides of the PC at the same time.
 
 ## Builds
 
@@ -56,13 +70,93 @@ minutes and storage). A jar comes from a build on the PC (`mod/build/libs/`) or 
 - **Changelog:** every branch adds its line to `docs/CHANGELOG-dev.md`. Touching `fabric.mod.json`, registries or
   entrypoints is `RESTART`.
 
+## UI cycle
+
+The recommended loop for screens, the HUD and anything else visual. Plan:
+`docs/plans/ui-browser-and-integrations.md`, "Frente A".
+
+### 1. Iterate on the PC, on Windows
+
+- The dev client and the IDE both live on **Windows** (see the table under "Fast loop"). Same side of
+  the machine, or the debugger and the paths cross a boundary for nothing.
+- Start the client **from the IDE in debug mode**, never from a bare terminal: that debug connection
+  is what pushes recompiled classes into the running game. See "Hot-swap".
+- In IntelliJ set **Build and run using: IntelliJ** (not Gradle). With Gradle the usual symptom is
+  "0 classes reloaded".
+
+### 2. What reloads without restarting
+
+| Change | How to apply it | Needs |
+|---|---|---|
+| Method bodies (layout maths, draw calls, conditions) | IDE: *Build Project* / *Reload changed classes* | Client started in debug mode |
+| Textures, GUI sprites, their `.mcmeta` nine-slice, models, fonts, `lang` | **F3+T** in game | Nothing. Works today |
+| Datapack data | `/reload` | Server-side only, not used by the UI |
+| Fields, records, new methods, nested classes | Restart, or JBR (see "Shape changes") | — |
+
+Fabric offers nothing beyond this for code: there is no official hot reload past the JVM's own
+HotSwap. `-XX:+AllowEnhancedClassRedefinition` is **not** a Fabric feature; it belongs to JetBrains
+Runtime, a separate JDK.
+
+Keep this in mind when a visual tweak seems not to apply: colours and metrics that live in Java
+`static final` fields or in static initialisers are **not re-run** by a hot-swap. Values read from a
+resource through the resource manager are the ones F3+T can refresh.
+
+### 3. Look at the result on the Mac (default)
+
+The build happens on the PC and the game runs natively on the Mac:
+
+1. On the PC: `./gradlew build` → `mod/build/libs/`.
+2. Copy that jar to the Mac over the private network and drop it in the `mods/` folder of a normal
+   Minecraft instance (same Minecraft version, Fabric loader, Fabric API).
+3. Play there.
+
+Why this and not screen streaming: the image is **pixel-exact** (no video compression) and the game
+runs natively on the Mac. The trade-off is that a plain instance is **not** the Loom dev client, so
+there is no HotSwap there — F3+T still works for resources. Fast iteration stays on the PC; the Mac
+is where you judge the result.
+
+Transport note: the PC's SSH server uses `wsl.exe` as its shell, so `scp` and `rsync` against it do
+not work. The pattern that does is the one the render relay already uses — feed a script on stdin
+and read the payload back, e.g. `ssh -T <pc> < script.sh > mod.jar.b64`. From the WSL side the
+Windows checkout is reachable under `/mnt/<drive>/…`.
+
+### 4. Judging pixels
+
+Minecraft's font is an 8 px bitmap, so small text and 1 px rules are exactly what video compression
+destroys. Judge kerning, 1 px alignment and edges from the Mac instance above or from a screenshot
+(`F2` writes a PNG), never from a streamed picture. Screen streaming is a fallback for interactivity,
+not the default, and it needs a direct connection on the private network to be worth it.
+
+### 5. Seeing a screen without walking to it
+
+`uiRender` (`docs/tools/ui-render.md`) paints `T3Screen` and its dialogs to PNG with mock data and no
+game at all. Treat it as a **layout check**, not a design tool: it allocates `Minecraft` without
+running its constructor, paints with Java2D, and has no Unifont, shaders, IME or clipboard.
+
 ## Hot-swap
+
+### Why a hot-swap can do nothing at all
+
+Before blaming the mod, check these. They are the reasons this loop is easy to get wrong:
+
+1. **Nothing is pushing the bytecode.** `DevReloadClient` only *detects* that a class changed shape
+   and resets state; it never redefines a class. Launched with a bare `./gradlew runClient` there is
+   no debugger attached and **no class is ever reloaded**. Start from the IDE in debug mode.
+2. **IntelliJ is building with Gradle.** Switch *Build and run using* to IntelliJ, or expect
+   "0 classes reloaded".
+3. **`-Pt3craft.hotswap` on an ordinary JDK.** That flag only exists on JetBrains Runtime, so the JVM
+   **refuses to start** and the game never opens. Leave the flag off until JBR is actually in place.
+4. **IDE and game on different sides of the machine** (for example IDE on Windows, game in WSL).
+   Keep both on Windows.
+5. **The change is in a static initialiser or a `static final`.** Those do not re-run; see "What
+   reloads without restarting".
 
 ### Method bodies (any JDK)
 
 Run `runClient` from the IDE in debug mode (IntelliJ: Gradle run configuration `Minecraft Client`
 generated by Loom, debug ▶) and use "Reload changed classes" / build. Plain JVM HotSwap only
-accepts method-body changes, which do not invalidate in-memory state.
+accepts method-body changes, which do not invalidate in-memory state. Fabric's own docs point at this
+for "screen element alignment", which is most of the UI work.
 
 ### Shape changes (JetBrains Runtime)
 
@@ -74,6 +168,12 @@ Adding/removing fields, records, nested classes requires enhanced redefinition:
    `./gradlew runClient -Pt3craft.hotswap`, which adds `-XX:+AllowEnhancedClassRedefinition` and
    `-Dt3craft.devreload=true`. Without JBR the JVM refuses to start with that flag, which is why it
    is opt-in.
+
+This path is optional and it is the fragile one: enhanced redefinition is a JetBrains extension with
+open crash reports, and one of them triggers when it is combined with `-XX:+UseCompactObjectHeaders`
+(adding an instance field can leave objects on the old class, giving a `ClassCastException` or a hard
+crash). That option is **off by default on JDK 25**, so simply do not turn it on. Reach for JBR only
+if you change class shape often; otherwise method bodies plus F3+T cover the UI loop.
 
 This is where stale state used to crash the game (a `ClassCastException` in `NpcRegistry` after a
 reload: objects of the old class layout still sitting in its maps). The safety net in

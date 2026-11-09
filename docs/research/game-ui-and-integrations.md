@@ -1,0 +1,1100 @@
+# Interfaces del juego e integraciones externas: mapa inicial
+
+> **El plan ordenado y con las decisiones de Facundo está en `docs/plans/ui-browser-and-integrations.md`.** Este doc es el
+> material de respaldo: catálogo completo, anexos y fuentes. Si los dos difieren, manda el plan.
+
+Rama `research/game-ui-integrations`, fecha 2026-11-09. Solo investigación: no se tocó código, no se compiló nada y no se
+abrió ninguna imagen. Las rutas de código pueden cambiar por la limpieza en curso (issues #3 a #8).
+
+**Fuentes**
+- Repo: `README.md`, `docs/features/*.md` (portable, chat, chat-compose, t3-ui, t3-actions, t3-composer, op-launch,
+  op-queue, schedule-board, archive-view, hub-hologram, panel-chips, blocks, workstation, config, lead-office),
+  `docs/research/inventario.md`, `docs/research/agentcraft-world-elements.md`, `docs/research/compat.md` y el código en
+  `mod/src/client/java/dev/t3craft/client/` y `mod/src/main/java/dev/t3craft/t3/`.
+- Web (texto): docs de Fabric (HUD), GLFW, ntfy, Discord, VS Code y el repo `pingdotgg/t3code`. Las URLs están al final.
+- Marca **(verificar)**: no pude confirmar el nombre exacto de la API en Minecraft 26.3 sin compilar. Antes de implementar
+  hay que mirar las firmas reales (el repo ya usa `javap` sobre el jar para eso, ver `docs/research/ui-audit.md`).
+
+**Fuera de alcance:** el issue #1 (T3 Connect o una CLI de T3 Code como backend del mod) lo investiga otro hilo. Aquí solo se
+cita donde cambia la respuesta (ver "Dependencia con el issue #1").
+
+---
+
+## 1. Estado actual
+
+### 1.1 Interfaces dentro del juego
+
+| Categoría | Qué hay hoy | Dónde |
+|---|---|---|
+| Pantalla principal | Pantalla única "T3" (tecla `Y`): sidebar de hilos por proyecto, búsqueda (Ctrl+F), nuevo hilo (Ctrl+N), conversación con markdown, tool calls plegables, composer con imágenes, undo/redo, steer/cola, selector de modelo | `docs/features/t3-ui.md`, `t3-composer.md`, `chat.md`, `chat-compose.md`; `client/t3ui/`, `client/chat/` |
+| Terminal portátil | Ítem `t3craft:t3_terminal` (receta barata), pantalla con entornos, hilos y notificaciones; pantalla "en la mano" dibujada en una textura propia | `docs/features/portable.md`; `client/portable/` (`held/`) |
+| HUD | `StatusBar` (conteos working / needs you / error + badge "n waiting · tecla"), `PeekHud` (banner de entornos) vía `HudElementRegistry` | `client/hud/` |
+| Avisos | `Notifier`: línea de chat con botón `[Answer]`, `SystemToast` (un id por tipo), 3 sonidos vanilla (campana, bajo, level-up), registro de notificaciones. Se pueden apagar por tipo | `client/hud/Notifier.java`, `Toasts.java`; `docs/features/config.md` |
+| Acciones de T3 (operate) | Interrumpir, stop, settle, snooze, pin, archivar, responder aprobaciones y preguntas, nuevo hilo (`launchThread`), cola de runs (ver, reordenar, cancelar), cambiar modelo, acceso y plan mode. Confirmaciones en el juego para lo destructivo y `audit.log` | `docs/features/operate.md`, `t3-actions.md`, `op-launch.md`, `op-queue.md`; `client/operate/`, `client/queue/` |
+| Config | `SettingsScreen`, `EnvironmentsScreen`, Mod Menu (`ModMenuIntegration`), `t3craft.json` con migraciones | `docs/features/config.md`; `client/config/` |
+| Teclas | Categoría "T3Craft": `J` ajustes (por defecto), `Y` terminal, `G` iniciar demo/HQ; sin asignar: entornos, pair, reconnect, reload, toggle notificaciones | `client/config/T3CraftKeys.java`, `portable/PortableClient.java`, `demo/DemoClient.java` |
+| Comandos | `/t3craft status \| reconnect \| reload \| pair \| unpair \| envs \| answer \| search \| snooze \| queue \| schedule \| archive \| operate …` y comandos de HQ, site, builders, survival | `client/T3CraftCommands.java` y vecinos |
+
+### 1.2 Elementos en el mundo
+
+| Elemento | Qué hay hoy | Dónde |
+|---|---|---|
+| NPC por hilo | `RemotePlayer` de cliente con skin por entorno/estado, nameplate con modelo, panel (entorno · proyecto, rama), partículas vanilla, bocadillo con el último resumen, comportamiento (escritorio, tablero, deambular, festejo), helpers para subagentes | `docs/features/npc-behavior.md`, `panel-chips.md`, `npc-helpers.md`; `client/npc/` |
+| Text/Item/Block displays | Etiquetas, tablero de tareas programadas (`TextDisplay`, rota de página), holograma del hub (cabecera, detalle y haz con `BlockDisplay`), props de la estación de trabajo | `hub-hologram.md`, `schedule-board.md`, `workstation.md` |
+| Bloques propios | `monitor` (multibloque, log en vivo), `status_lamp`/`board_lamp`, `decision_podium`, `thread_board` (pared kanban), `archive_terminal`, `merge_station` (PRs), pantalla de estado, kit decorativo y faroles de papel | `docs/features/blocks.md`, `thread-wall.md`, `archive-terminal.md` |
+| HQ | Ciudadela generada, oficina del líder, constructores animados, mundo demo | `docs/features/hq-*.md`, `lead-office.md`, `builders.md` |
+| Enlaces | `Blaze3D.openUri` para URLs web y PR (con confirmación vanilla). Los archivos se **copian** al portapapeles, nunca se abren | `client/chat/Links.java`, `ConversationPanel.java`, `MergeStationScreen.java` |
+
+### 1.3 Integraciones externas
+
+**Hoy no hay ninguna.** Lo único que sale del juego es el WebSocket a cada entorno de T3 (`t3/T3Connection`, `PairingClient`,
+`OperateConnection`) o al bridge legacy. No hay webhooks, notificaciones del sistema, Discord, GitHub directo, voz ni MCP.
+Tampoco hay sonidos propios (no existe `assets/t3craft/sounds*`), ni resource packs integrados, ni mapas, libros, boss bars,
+scoreboard, action bar o título (`grep` sin resultados).
+
+### 1.4 Huecos que se ven en el código (T3 ya los expone)
+
+Del inventario (`docs/research/inventario.md`) y de un `grep` en `mod/src`:
+- **Diff / revisión de cambios:** no hay pantalla. `getTurnDiff` y `getFullThreadDiff` no aparecen en el código.
+- **Costo y tokens:** `usageLimitResetAt` y `serverGetUsageSummary` no se usan.
+- **Salida de comandos en vivo:** `subscribeCommandOutput` no se usa.
+- **Teclas para la cola de atención:** hay aviso con `[Answer]`, pero ninguna tecla de "saltar al siguiente hilo que me necesita".
+- **P11 (partículas teñidas) y P15 (toasts con retrato)** de `agentcraft-world-elements.md` siguen sin hacerse.
+
+---
+
+## 2. Catálogo: interfaces del juego
+
+Esfuerzo: S ≈ ½ a 1 día, M ≈ 2 a 4 días, L ≈ una semana o más. Todo es **client-side** salvo que se diga otra cosa, así que
+funciona en servidores remotos (modo GUI-only, `compat.md`).
+
+### G1. Sonido propio y espacial
+- **Qué es:** `sounds.json` + OGG en el jar. Un cue distinto por estado, un timbre/tono por entorno, y sonidos posicionales:
+  tecleo suave cerca de un escritorio con hilo `working`, un "ding" en el podio cuando algo necesita al jugador.
+- **Aporta:** hoy los 3 avisos usan notas vanilla y suenan en la UI. Un sonido por estado se oye aunque no mires el HUD, y
+  el tecleo ambiente hace que el HQ se sienta vivo sin leer nada.
+- **Viabilidad:** `SoundEvent` con id propio y `SimpleSoundInstance` posicional (`forUI` se usa hoy). Un `SoundEvent` creado por
+  id no necesita registro de servidor para reproducirse en el cliente. **(verificar)** el constructor en 26.3.
+- **Esfuerzo:** S (cues) / M (ambiente posicional con límite de voces).
+- **Riesgos:** los OGG hay que generarlos (el pipeline `tools/art` es Python sin ffmpeg garantizado) o usar sonidos con licencia
+  libre; ruido en el HQ si hay muchos hilos (necesita tope y atenuación).
+
+### G2. Avisos discretos: action bar y título
+- **Qué es:** mensaje en la barra de acción (`setOverlayMessage`) o título/subtítulo para "tu hilo X necesita respuesta", sin
+  toast ni chat.
+- **Aporta:** una capa intermedia entre el chat (se pierde) y el toast (tapa). Útil en combate o con el chat oculto.
+- **Viabilidad:** API de cliente de `Gui`, sin servidor. **(verificar)** el nombre en 26.3 (el mod ya usa `mc.gui.hud.getChat()`,
+  así que hubo reorganización).
+- **Esfuerzo:** S.
+- **Riesgos:** otros mods lo usan. Hay que respetar `notifications.*` y no apilar.
+
+### G3. Indicador direccional al hilo que te necesita
+- **Qué es:** flecha en el borde del HUD (o marcador flotante) hacia el NPC / escritorio / podio del hilo en `needs_attention`.
+- **Aporta:** la ciudadela es grande y los NPC están en sus escritorios; hoy hay que abrir la pantalla `Y` para saber cuál es.
+- **Viabilidad:** proyección de coordenadas del NPC a pantalla en un `HudElement`. Cliente puro.
+- **Esfuerzo:** S a M.
+- **Riesgos:** declutter con la `StatusBar` y con nameplates (ver P13).
+
+### G4. Teclas para la cola de atención
+- **Qué es:** teclas sin asignar por defecto: "siguiente hilo que me necesita" (cicla y abre la tarjeta de respuesta), "último
+  chat abierto", "aprobar / negar" con confirmación.
+- **Aporta:** el flujo principal del mod es atender lo que bloquea a los agentes. Hoy es `Y` + buscar, o el botón del chat.
+- **Viabilidad:** `KeyMappingHelper` ya se usa y `Notifier.takeRecentAsk` ya sabe "el hilo que preguntó hace poco".
+- **Esfuerzo:** S.
+- **Riesgos:** choques de teclas (por eso quedan sin asignar). Aprobar con una tecla es riesgoso: debe pasar por la confirmación
+  que ya existe.
+
+### G5. Menú radial de acciones sobre el NPC
+- **Qué es:** clic derecho largo sobre un NPC, monitor o podio abre un menú radial: Chat, Interrumpir, Settle, Snooze, Abrir PR.
+- **Aporta:** las acciones de operate están en el header del chat; en el mundo solo se abre el chat. Esto cierra el círculo
+  diegético sin pasar por la pantalla.
+- **Viabilidad:** `Screen` propia con el hook de clic que ya existe (`UseEntityCallback`). Las acciones ya pasan por `OperateGate`.
+- **Esfuerzo:** M.
+- **Riesgos:** duplica UI (header + radial); mantener un solo catálogo de acciones. Existe un radial de construcción
+  (`docs/features/build-radial.md`) cuya implementación conviene mirar antes de duplicar.
+
+### G6. Toasts propios (retrato, barra, estado)
+- **Qué es:** una clase `Toast` propia (retrato de la skin del NPC, franja del color del estado, contador "×3") en lugar de
+  `SystemToast`. Es la P15 pendiente de AgentCraft.
+- **Aporta:** se reconoce de un vistazo qué hilo y qué estado sin leer. Los toasts del mismo hilo se fusionan.
+- **Viabilidad:** la interfaz `Toast` de vanilla es pública; se añade con `toastManager().addToast`. **(verificar)** firma en 26.3.
+- **Esfuerzo:** S a M.
+- **Riesgos:** los toasts de vanilla no son clicables; el "Y to answer" se mantiene como hoy.
+
+### G7. El ítem Terminal con estado
+- **Qué es:** el tooltip del `t3_terminal` muestra los conteos (3 working · 1 needs you) y el ítem cambia de textura o muestra una
+  insignia cuando hay algo pendiente.
+- **Aporta:** el inventario es el lugar donde el jugador ya mira; avisa sin HUD.
+- **Viabilidad:** `ItemTooltipCallback` (cliente) para el tooltip. Para el cambio de modelo, las definiciones de ítem de 26.x
+  admiten propiedades condicionales, pero una propiedad propia necesita registro **(verificar)** y toca el módulo de ítems (main).
+- **Esfuerzo:** S (tooltip) / M (modelo dinámico).
+- **Riesgos:** el modelo dinámico entra en la zona "RESTART" y en el módulo que se puede apagar.
+
+### G8. Modo observador / cámara del agente
+- **Qué es:** "ver lo que hace" un hilo: la cámara se pone en su escritorio (o en la del NPC) y el monitor se ve grande, con el
+  log en vivo.
+- **Aporta:** convierte el HQ en una sala de control; combina con el monitor de log en vivo (P2) que ya existe.
+- **Viabilidad:** `Minecraft.setCameraEntity` con una entidad de cliente, o simplemente un teletransporte suave del jugador al
+  ancla del monitor. **(verificar)** que una `RemotePlayer` sin servidor sea aceptada como cámara.
+- **Esfuerzo:** M.
+- **Riesgos:** mareo, interacción con el control del jugador, y en servidores remotos puede chocar con la posición real.
+
+### G9. Pantalla de diff y revisión
+- **Qué es:** `DiffScreen`: lista de archivos A/M/D, unified diff con colores, enlace al PR. Es lo que AgentCraft llama
+  `DiffScreen` y lo que la `merge_station` hoy solo enlaza.
+- **Aporta:** revisar un cambio sin salir del juego. Es el hueco más grande del inventario (T3 lo expone con `orchestration:read`).
+- **Viabilidad:** `getTurnDiff` / `getFullThreadDiff` por RPC de solo lectura. El renderizado de texto con colores ya existe
+  (`Markdown`, `TextWrap`, `ChatDraw`).
+- **Esfuerzo:** M a L (diffs grandes: paginación y límites).
+- **Riesgos:** diffs enormes (memoria, scroll); leer código en una GUI de Minecraft es incómodo, así que debe ser un resumen +
+  "abrir en el editor" (ver I6).
+
+### G10. Costo, tokens y límites
+- **Qué es:** línea de uso en el panel y en el holograma ("$1.20 hoy", "límite en 2 h").
+- **Aporta:** visibilidad de gasto, que AgentCraft ya muestra en `/status`.
+- **Viabilidad:** `usageLimitResetAt` en el shell (read). `serverGetUsageSummary` pide `diagnostics:read`, que el pairing actual
+  rechaza (solo `read` + `operate`), así que el costo exacto no sale sin ampliar scopes.
+- **Esfuerzo:** S (solo lo que ya viene en el shell) / M (con otro scope).
+- **Riesgos:** el scope extra choca con la política "el mod rechaza todo scope de más".
+
+### G11. Salida de comandos en vivo en el monitor
+- **Qué es:** el monitor muestra el tail del comando que corre el agente (`subscribeCommandOutput`).
+- **Aporta:** se ve "qué corre" además de "qué dice".
+- **Viabilidad:** read; un stream acotado por comando.
+- **Esfuerzo:** M.
+- **Riesgos:** volumen de streams (solo los monitores cercanos), secretos impresos por comandos en pantalla.
+
+### G12. Resource packs integrados (temas y accesibilidad)
+- **Qué es:** packs opcionales dentro del jar: tema alto contraste, tema oscuro del papel, sonidos alternativos.
+- **Aporta:** personalización sin tocar código; accesibilidad.
+- **Viabilidad:** Fabric permite packs integrados activables por el jugador (`ResourceManagerHelper.registerBuiltinResourcePack`
+  y su reemplazo de la 1.21.9, con carpeta `resourcepacks/<id>/` en el jar). **(verificar)** la API de 26.x.
+- **Esfuerzo:** S.
+- **Riesgos:** hay que mantener los assets sincronizados con los cambios de GUI; casi nada de la UI depende de texturas (se
+  dibuja con `fill`).
+
+### G13. Boss bar / scoreboard / tab list
+- **Qué es:** barra de jefe cliente con el progreso del plan de un hilo; lista de la tecla Tab con los hilos como "jugadores".
+- **Aporta:** poco: la `StatusBar` custom ya cubre el resumen y lo hace mejor.
+- **Viabilidad:** boss bar: `BossHealthOverlay` guarda un mapa de `LerpingBossEvent`; sin servidor hay que usar un mixin o access
+  widener. Scoreboard: el cliente lo reemplaza al unirse, no vale la pena. Tab: posible con entradas de `PlayerInfo` falsas.
+- **Esfuerzo:** S a M.
+- **Riesgos:** mixins, choques con otros mods. **No recomendado.**
+
+### G14. Libros y mapas
+- **Qué es:** un libro (`BookViewScreen`) para leer el plan de un hilo; un mapa (ítem) como minimapa del HQ con puntos por estado.
+- **Aporta:** estética diegética; el libro como "plan para revisar" en la oficina del líder. El minimapa sirve en ciudadelas grandes.
+- **Viabilidad:** `BookViewScreen` abre libros arbitrarios en el cliente. Un mapa propio requiere mixin o textura propia.
+  Ya existe una pantalla en mano con textura dinámica (`held/HeldScreenTexture`), así que el mapa no hace falta.
+- **Esfuerzo:** S (libro) / M (minimapa).
+- **Riesgos:** valor bajo frente al chat con markdown que ya existe. **Solo si Facundo quiere el efecto "diegético".**
+
+### G15. Narrador (accesibilidad)
+- **Qué es:** leer en voz alta los avisos ("el hilo X necesita tu respuesta") con el narrador del juego.
+- **Aporta:** accesibilidad, y avisos en manos libres.
+- **Viabilidad:** `GameNarrator` es público. En Windows y macOS funciona; en Linux depende de la librería `flite` instalada, y si no
+  está falla con errores de librería.
+- **Esfuerzo:** S.
+- **Riesgos:** el narrador de Minecraft se activa por opción global del jugador. Depende del SO del jugador.
+
+### G16. Shaders y post-efectos
+- **Qué es:** viñeta roja en error, brillo en `needs you`.
+- **Aporta:** casi nada que ya no den los colores y partículas. **No recomendado.** Los shaders además chocan con Iris/Sodium.
+- **Esfuerzo:** L.
+
+### G17. Lo que falta de la lista de Facundo
+- **Carteles (sign):** son bloques con entidad de servidor; el cliente no puede crear uno que se vea. El HQ ya los usa en la
+  construcción (`CitadelHub`, `BarrioGateBig`). Los `TextDisplay` de cliente los reemplazan. Nada que proponer.
+- **Mod Menu:** ya integrado (`ModMenuIntegration`). Nada nuevo.
+- **Partículas y fuegos artificiales:** ya hay festejo con `FIREWORK`. Pendiente solo P11 (partículas teñidas), S.
+- **Interaction entities / botones clicables en hologramas:** hoy los displays no tienen hitbox. Un `raycast` propio sobre
+  anclas daría botones Allow/Deny en el podio (P7). M. Va junto con G5.
+
+---
+
+## 3. Catálogo: integraciones externas
+
+**Premisa a confirmar con Facundo:** el mod solo corre mientras Minecraft está abierto. Todo lo que sale del mod (webhooks,
+notificaciones) deja de funcionar con el juego cerrado. Ver pregunta 1.
+
+### I1. Señal del sistema sin procesos: título de ventana y parpadeo de la barra de tareas
+- **Qué es:** cuando el juego no tiene el foco y un hilo pasa a `needs_attention`: cambiar el título de la ventana
+  ("T3Craft · 2 te necesitan") y pedir atención al SO (`glfwRequestWindowAttention`).
+- **Aporta:** la forma más barata de avisar con el juego en segundo plano. Sin procesos ni red ni permisos.
+- **Viabilidad:** GLFW ≥ 3.3 expone `glfwRequestWindowAttention`; en Windows hace parpadear la barra, en macOS rebota el Dock
+  (atención a la aplicación) y el SO la cancela al enfocar. LWJGL lo trae. Hay que llamarla desde el hilo principal (el tick
+  del cliente lo es). Título: `glfwSetWindowTitle`. Cliente puro.
+- **Esfuerzo:** S.
+- **Riesgos:** comportamiento por SO (en algunos Linux/Wayland no hace nada visible). Respetar `notifications.*`.
+
+### I2. Notificaciones nativas del SO
+- **Qué es:** toast del escritorio con título, texto y el nombre del hilo.
+- **Aporta:** avisa con el juego minimizado, sin depender de la barra de tareas.
+- **Viabilidad:** `java.awt.SystemTray` **no sirve** dentro de Minecraft en macOS: AWT y GLFW compiten por el run loop de Cocoa.
+  Alternativa segura: lanzar un proceso del SO: `notify-send` (Linux), `osascript -e 'display notification …'` (macOS), PowerShell
+  con el toast de Windows. Cliente puro.
+- **Esfuerzo:** S a M (tres plataformas, escapado de argumentos).
+- **Riesgos:** inyección por título/texto del hilo en los argumentos (escapar siempre y no pasar por shell); lanzar procesos desde
+  un mod puede alarmar a antivirus; hay que mostrarlo solo sin foco.
+
+### I3. Push al teléfono: ntfy (o Pushover, Telegram)
+- **Qué es:** un `POST` a un tema de ntfy con `Title`, `Priority`, `Tags` y `Click` (por ejemplo `t3code://threads/<env>/<hilo>`
+  para abrir la app). ntfy admite hasta 3 botones de acción en la notificación.
+- **Aporta:** aviso en el móvil cuando el jugador está lejos, con un toque abre T3 en el hilo. Es la integración más barata
+  de "te necesito" fuera del juego.
+- **Viabilidad:** HTTP simple. `java.net.http.HttpClient` ya se usa en `t3/`. Cliente puro.
+- **Esfuerzo:** S.
+- **Riesgos:** el tema de ntfy.sh es la única "contraseña" (usar tema largo o token); no poner títulos de hilos sensibles en un
+  servidor público (se puede autohospedar); sale del juego, así que debe ser opt-in con aviso claro.
+
+### I4. Webhooks genéricos de eventos (Discord, Slack, Home Assistant, luces)
+- **Qué es:** un solo módulo: `config.integrations.webhooks[]` con una URL y un filtro de eventos (needs you, error, done,
+  hilo nuevo, run terminado). Cubre Discord, Slack, Home Assistant (luz que cambia de color), IFTTT y n8n.
+- **Aporta:** una pieza, muchos destinos. Discord permite `content` hasta 2000 caracteres, hasta 10 `embeds`, `username` y
+  `avatar_url`; los webhooks que no son de una aplicación no admiten botones.
+- **Viabilidad:** HTTP `POST`. Se reutiliza el punto de decisión de `Notifier.transition` para disparar eventos. Cliente puro.
+- **Esfuerzo:** S (Discord) / M (plantillas, reintentos, límites).
+- **Riesgos:** la URL del webhook es un secreto (guardar como credencial, no en `t3craft.json`; nunca en logs); los límites de
+  Discord no están en esa página (el servidor responde 429, hay que respetar `Retry-After`); un hilo que oscila de estado puede
+  inundar el canal (debounce y agrupar).
+
+### I5. Abrir T3 (app o web) en el hilo
+- **Qué es:** botón "Open in T3" que abre el hilo en la app de escritorio, la app móvil o la web.
+- **Aporta:** pasar del juego a la herramienta real sin buscar el hilo.
+- **Viabilidad:** hoy el mod conoce `t3-thread://v2/<env>/<hilo>`, que según T3 es solo un formato de enlace de markdown, no un
+  esquema registrado del SO. La app de iOS reconoce `t3code://threads/<env>/<hilo>` y hay un pedido para el escritorio
+  (issue `pingdotgg/t3code#26915`). La web usa una URL de relay (`https://<relay>.t3coderelay.com/<env>/<hilo>`). `Blaze3D.openUri`
+  ya abre URLs. **(verificar)** qué esquema acepta hoy el escritorio.
+- **Esfuerzo:** S.
+- **Riesgos:** depende de que T3 registre el esquema; el entorno en el esquema es el id de T3, no el que el mod muestra.
+
+### I6. Abrir archivos en el editor
+- **Qué es:** en el chat, un archivo mencionado (`/ruta/archivo.ts:42`) se abre en VS Code, Cursor o Zed.
+- **Aporta:** hoy la ruta solo se copia (`Links.Kind.FILE`) porque el juego corre en otra máquina que los archivos.
+- **Viabilidad:** `vscode://file/{ruta}:línea:columna` y, para archivos remotos, `vscode://vscode-remote/ssh-remote+host/ruta`
+  (documentado). El host sale de la URL del entorno de T3. Cursor y Zed tienen esquemas parecidos **(verificar)**.
+- **Esfuerzo:** S a M (mapa entorno → host SSH configurable).
+- **Riesgos:** el esquema debe estar registrado en la máquina del jugador; la ruta del agente puede no existir donde corre el
+  editor; confirmar siempre antes de abrir.
+
+### I7. GitHub: issues y PRs
+- **Qué es:** (a) ya mostrado: PR vinculado, estado, +N/−N, `merge_station`; (b) añadir enlaces a checks y a la lista de PRs;
+  (c) crear un issue o PR desde el juego.
+- **Aporta:** (a) existe. (b) y (c) cerrarían el ciclo, pero T3 tiene su propio flujo de PR y expone
+  `source-control:write` (fuera de alcance, inventario ítem 25).
+- **Viabilidad:** lo correcto es usar a T3 como intermediario (sus RPC de PR) antes que una API de GitHub con un token en el mod.
+  Un token de GitHub en la config sería un secreto más y duplica lo que T3 ya hace.
+- **Esfuerzo:** S (enlaces) / L (escritura vía `source-control:write`, necesita otro scope).
+- **Riesgos:** ampliar scopes del pairing; no se recomienda guardar un PAT en el mod.
+
+### I8. Voz: dictado y lectura
+- **Qué es:** (a) mantener una tecla para dictar al composer; (b) leer la respuesta en voz alta.
+- **Aporta:** hablar con el agente sin teclear, útil en VR o con las manos ocupadas.
+- **Viabilidad:** el micrófono se captura con OpenAL (`ALC11.alcCaptureOpenDevice`, ya incluido en LWJGL) o `javax.sound`. La
+  transcripción exige un motor: local (whisper.cpp en la máquina del jugador, por proceso externo) o una API. Lectura:
+  `GameNarrator` (ver G15) o TTS externo. Cliente puro, pero el mic pide permiso del SO en macOS.
+- **Esfuerzo:** M (dictado con un motor local) / L (embebido).
+- **Riesgos:** privacidad (audio fuera de la máquina), latencia, dependencias nativas, coste de la API. **Alto esfuerzo, valor
+  incierto.**
+
+### I9. MCP: lo que ya existe y lo que se podría ofrecer
+- **Qué es:** T3 ya corre su propio servidor MCP (`https://<entorno>/mcp`, OAuth, HTTP) para que agentes externos lean
+  proyectos y hilos, lancen y manden mensajes a hilos y consulten proveedores y modelos. Dos direcciones posibles para el mod:
+  1. **El mod como cliente MCP de T3** (otro transporte a T3, además del WebSocket). Eso es del issue #1, no se desarrolla aquí.
+  2. **El mod como servidor MCP local**: expone al agente herramientas del jugador (`notify_player`, `show_on_hologram`,
+     `ask_player_in_game`, `player_location`), para que un agente "llame" al jugador dentro del juego.
+- **Aporta:** (2) es la única idea que da algo **nuevo** a los agentes en vez de solo mostrar lo que ya hacen.
+- **Viabilidad:** (2) un servidor HTTP/stdio en el cliente. Los agentes corren en otras máquinas (VPS), así que hace falta red
+  (Tailscale) y autenticación. Los clientes MCP de Claude Code y Codex admiten HTTP remoto con OAuth. Es la idea más especulativa.
+- **Esfuerzo:** L.
+- **Riesgos:** superficie de ataque (un agente controla el juego del jugador), autenticación, y el modelo de seguridad actual
+  (el mod no escucha puertos; `compat.md`) cambia. **Explorar solo si Facundo ve valor.**
+
+### I10. API local de estado (Stream Deck, barra de menú, OBS)
+- **Qué es:** el mod sirve `http://127.0.0.1:<puerto>/status.json` y un stream con los conteos y los hilos visibles.
+- **Aporta:** integración con Stream Deck, Raycast/Alfred, waybar, un overlay de OBS. AgentCraft tiene algo parecido
+  (DevBridge en `:7879`).
+- **Viabilidad:** `com.sun.net.httpserver` en loopback. Cliente puro.
+- **Esfuerzo:** S a M.
+- **Riesgos:** abre un puerto (solo loopback, con token); casi todo lo que muestra ya lo ofrece T3 directamente a esas
+  herramientas. El valor propio del mod sería "la vista filtrada por mi configuración", que es poco.
+
+### I11. Discord Rich Presence
+- **Qué es:** el estado de Discord del jugador dice "3 agentes trabajando en t3craft".
+- **Aporta:** vistoso, nada funcional.
+- **Viabilidad:** IPC local con el cliente de Discord (socket unix o pipe). Existen mods y bibliotecas. **(verificar)** si hay
+  un cliente Java mantenido.
+- **Esfuerzo:** M.
+- **Riesgos:** expone títulos de hilos a terceros. **No recomendado.**
+
+### I12. Calendario y tareas programadas
+- **Qué es:** exportar el tablero de tareas programadas (`scheduledTasks.subscribe`) como feed `.ics`, o crear tareas desde el juego.
+- **Aporta:** bajo. T3 ya tiene su UI de tareas programadas. Escribir es el ítem 26 del inventario (no aprobado).
+- **Esfuerzo:** S (ics) / M (escritura).
+- **Riesgos:** escritura sin aprobación. **No recomendado ahora.**
+
+---
+
+## 4. Dependencia con el issue #1
+
+Si el issue #1 termina en "el mod habla con T3 Connect o con una CLI/daemon de T3", cambian tres cosas aquí:
+- **Notificaciones con el juego cerrado (I2, I3, I4):** las dos opciones del mod siguen exigiendo el juego abierto. Si Facundo
+  quiere avisos sin el juego, necesita un proceso aparte que escuche a T3 (el bridge actual, congelado como legacy en el issue #7,
+  o el daemon/CLI que salga del #1) y dispare los webhooks. El módulo de eventos (I4) conviene escribirlo como una pieza pura,
+  independiente del cliente, para poder moverlo.
+- **Autenticación (I9):** el servidor MCP de T3 usa OAuth con sesiones de 30 días, igual que el pairing. Lo que decida el #1
+  sobre cuentas de T3 Connect afecta cómo un servidor MCP del mod se autenticaría hacia el exterior.
+- **Scopes (G10, I7):** costo exacto y escritura de PR piden scopes que el mod hoy rechaza.
+
+---
+
+## 5. Top recomendado
+
+Criterio: valor para el flujo "agentes trabajando, el humano atiende lo que bloquea", esfuerzo, riesgo y que no choque con la
+limpieza en curso. Todo es cliente puro.
+
+| # | Idea | Esfuerzo | Por qué primero |
+|---|---|---|---|
+| 1 | **I1 + G2: señales discretas** (título de ventana, parpadeo de barra, action bar) | S | Resuelve "juego en segundo plano" y "no me di cuenta" casi gratis, sin procesos ni red. Se apoya en `Notifier`. |
+| 2 | **G4 + G3: cola de atención** (teclas "siguiente que me necesita" y flecha hacia su NPC) | S a M | El flujo principal del mod. Hoy hay aviso, pero llegar al hilo cuesta varios pasos. |
+| 3 | **I4 con I3: eventos salientes** (webhook genérico con ntfy y Discord como primeras plantillas) | S a M | Una pieza que cubre móvil, Discord y domótica. Define el contrato de eventos que también vale para un daemon futuro. |
+| 4 | **G1: sonido propio** (cue por estado + tecleo ambiente) | S a M | Los 3 avisos actuales son notas vanilla. El audio da presencia al HQ y avisa sin mirar. |
+| 5 | **I5 + I6: saltar a T3 y al editor** (`t3code://`, `vscode://`) | S a M | Cierra el círculo juego a herramienta real. Depende de qué esquemas registre T3 en el escritorio. |
+| 6 | **G9: pantalla de diff y revisión** | M a L | El mayor hueco funcional del inventario y es solo lectura. Se arma sobre `merge_station` y el chat. |
+| 7 | **G6: toasts propios con retrato** | S a M | La P15 que quedó pendiente, y refuerza 1 y 2. |
+| 8 | **I9 (2): servidor MCP local** | L | Lo más nuevo (el agente llama al jugador), pero es lo más especulativo y cambia el modelo de seguridad. Explorar en frío, sin implementar. |
+
+No recomendados por ahora: G13 (boss bar, scoreboard, tab), G16 (shaders), I11 (Rich Presence), I12 (calendario), G14 (libros y
+mapas, salvo que se quiera el efecto diegético) y I10 (API local).
+
+---
+
+## 6. Preguntas para Facundo
+
+1. **¿Dónde corre el juego y cuánto está abierto?** Si Minecraft está abierto solo a ratos, las integraciones salientes del mod
+   (I2, I3, I4) tienen poco alcance y conviene un daemon aparte (ligado al #1). ¿Qué máquina y qué SO (Windows, macOS, Linux)?
+   Cambia G15, I1, I2 y I8.
+2. **¿Qué tanto "diegético" quieres?** ¿Prefieres que todo ocurra en el mundo (libros, mapas, podio, cámara), o priorizas rapidez
+   de atención (teclas, flecha, pantalla)? Decide si G14, G8 y G5 suben o bajan.
+3. **¿Aceptas que el mod envíe datos fuera de la máquina?** (títulos de hilos a ntfy.sh o Discord). ¿Autohospedado, o público
+   con tema aleatorio? ¿Solo "hay algo pendiente" sin títulos?
+4. **¿Qué hace falta para revisar cambios en el juego?** (G9) ¿Diff completo, solo lista de archivos y +N/−N, o solo el enlace
+   al PR y al editor? Esto define si el diff es M o L.
+5. **¿Scopes extra?** Costo y tokens (`diagnostics:read`) y escritura de PR (`source-control:write`) piden ampliar el pairing.
+   ¿Se mantiene la regla "solo read + operate"?
+6. **¿Servidor MCP del mod (I9)?** ¿Te interesa que un agente pueda llamar al jugador dentro del juego, o es demasiado?
+7. **Audio:** ¿hay preferencia por sonidos sintetizados (generados en `tools/art`) o por un pack con licencia libre? (G1)
+8. **Editor y esquemas:** ¿qué editor usas (VS Code, Cursor, Zed) y qué esquema abre la app de escritorio de T3 hoy? (I5, I6)
+9. **¿Qué ideas convierto en issue?** El backlog vive en GitHub issues y `gh` está autenticado en esta máquina. No creo
+   ninguno hasta que apruebes.
+
+---
+
+## 7. Anexo: cuánta libertad da la UI de Minecraft (unificar Settings, Pairing, etc. con el chat)
+
+Pregunta de Facundo (2026-11-09): si el mod llevara su propia instancia de T3 Code, ¿cuánto se puede unificar y personalizar
+la UI? ¿Iconos propios, texto con tamaño independiente del GUI scale?
+
+**Respuesta corta: casi total.** Una `Screen` es Java arbitrario que dibuja en un lienzo de píxeles de GUI y recibe teclado y
+ratón. Lo que se puede hacer ahí no depende de vanilla, solo de cuánto quiera escribir el mod.
+
+### Por qué hoy las pantallas se ven distintas (en el código)
+- **Chat y T3Screen** (`client/chat/`, `client/t3ui/`) dibujan con `ChatTheme` + `ChatDraw` + el kit de sprites
+  `assets/t3craft/textures/gui/sprites/chat/*` (paneles nine-slice con `.mcmeta`, `pill`, `keycap`, `text_field`,
+  `scroll_*`, `dot_*`, `icon_*`). Todo propio y tematizable (`ChatTheme.warmStudio()` / `terminal()`).
+- **Settings, Environments, Pair, Confirm, NewThread, OperatePair** (`client/config/`, `client/screen/`) heredan de `Screen`
+  con `BaseConfigScreen` y usan los **widgets vanilla** (`Button`, `EditBox`, el toggle "ON/OFF" en verde y rojo). De ahí el salto visual.
+- Ya se hace en el mod lo difícil: composer propio con edición completa (`ComposerText`), listas con scroll, popovers, tooltips,
+  nine-slice, texturas dinámicas (miniaturas de imágenes, pantalla en mano).
+
+### Iconos propios: sí, de tres maneras
+1. **Sprites** (ya existe: `chat/icon_*.png`). PNG en `textures/gui/sprites`, se dibujan con `blitSprite`; con `.mcmeta`
+   `nine_slice` se estiran sin deformar. Un usuario puede reemplazarlos con un resource pack (skin gratis).
+2. **Glifos en una fuente propia** (recomendado para iconos inline). Un `font/*.json` con un proveedor `bitmap` (PNG de
+   iconos mapeados a caracteres Unicode del área privada) o `ttf` (una fuente de iconos vectorial). El icono se escribe
+   dentro de cualquier `Component`: línea de chat, toast, tooltip, botón, label, y se tiñe con el color del texto.
+   El mod ya usa fuentes por `Style.withFont` (`ConversationPanel`, `RequestCard` usan la `uniform` de vanilla).
+3. **Dibujo por código** (`fill`, líneas, formas) y **texturas dinámicas** (`DynamicTexture` desde un `NativeImage`),
+   por ejemplo un **QR** para el pairing o un avatar generado.
+- Vigilar licencias: si se toman iconos de T3 Code o de una librería (Lucide, Phosphor), revisar la licencia; los logos de T3
+  son marca.
+
+### Tamaño de texto independiente del GUI scale: sí, con cuidado
+- El GUI scale de vanilla es **entero** (1, 2, 3, 4, "auto") y global. Todo lo demás se multiplica por él. En 4K con 2 todo
+  queda pequeño y con 3 enorme, y no existe 2,5.
+- **`GuiGraphicsExtractor.pose()`** es una pila `Matrix3x2fStack` (traslación, rotación, escala). Se puede escalar el texto y todo
+  el contenido por un factor fraccionario. El mod ya lo hace en el mundo (`MonitorRenderer`, `StatusScreen`).
+- **Para que se vea nítido** hay que dejar de depender de la fuente bitmap de 8 px (se ve irregular a escalas no enteras) y
+  usar un proveedor **`ttf`** con `size` y `oversample` (Inter, Geist, JetBrains Mono para código; revisar licencia OFL). Eso da
+  texto vectorial, bordes finos y una tipografía más parecida a T3 Code.
+- **Patrón recomendado: "UI scale" propio** (ajuste de 75 % a 200 %, o "igual que T3 web"). Cada pantalla de T3Craft calcula
+  `k = deseado / guiScale`, aplica `pose().scale(k)` al empezar a dibujar, trabaja en un espacio de layout virtual
+  (`width/k`, `height/k`) y **divide las coordenadas del ratón por `k`**. Es el mismo mecanismo para todas las pantallas, y
+  no afecta a los demás mods ni al resto del juego.
+- Alternativa descartada: cambiar `Window` guiScale mientras la pantalla está abierta. Es global, hay que restaurarlo y
+  rompe el HUD, los toasts y otros mods.
+- **Costes del patrón:** hay que transformar a mano el hit-testing y el cursor de texto; verificar que `enableScissor` y los
+  tooltips respeten la escala **(verificar en 26.3)**; los tooltips de vanilla se dibujan sin escala, así que conviene
+  tener los propios (el mod ya los tiene en el chat).
+
+### Qué sí limita
+- **Un solo lienzo:** todo cae dentro de la ventana del juego. Un segundo OS-window (AWT/Swing) choca con GLFW en macOS.
+- **Accesibilidad hay que construirla:** los widgets propios no se narran ni se navegan con teclado, a diferencia de `Button`.
+  Hay que implementar `NarratableEntry` y el foco con Tab, o aceptar la pérdida.
+- **IME y texto:** el composer ya resolvió la entrada por SDL3 (`TextInputManager`); cada campo propio nuevo debe reutilizarlo.
+- **Rendimiento:** pantallas grandes con markdown deben cachear glifos/líneas (el chat ya lo hace con `DrawnRows`).
+- **Resource packs de usuario** pueden sobrescribir nuestros sprites. Es una ventaja si es intencional.
+
+### Cómo se unificaría (propuesta de arquitectura, no implementada)
+1. Extraer del chat un **mini UI kit** compartido: `T3Button`, `T3Toggle`, `T3Field`, `T3Select`, `T3List`, `T3Dialog`,
+   `T3Tabs`, sobre `ChatTheme`/`ChatDraw` (que ya existen). Las pantallas actuales pasarían a usarlos.
+2. Mover **Settings, Environments, Pairing/Operate y Nuevo hilo** a **paneles dentro de `T3Screen`** (como la página de
+   Settings de T3 Code), no pantallas separadas; los diálogos de confirmación pasan a ser modales del kit.
+3. Un solo **UI scale** y una sola **fuente TTF** para todo el kit, con un ajuste en Settings.
+4. Un solo **catálogo de iconos** (sprites o glifos) con nombres estables.
+- Esfuerzo orientativo: kit M, migrar las 6 a 8 pantallas M a L, UI scale + TTF M. Es independiente de la capa de red.
+
+### Relación con "el mod corre su propio T3 Code (CLI)" (issue #1, otro hilo)
+Si el mod lleva su propia instancia de T3 y usa T3 Connect, el **emparejamiento por entorno** (`/t3craft pair`, copiar el enlace
+`https://host/pair#token=…`, `PairScreen`, `OperatePairScreen`, el toggle Read/Control) se reduce a un **flujo de inicio de sesión**
+(código de dispositivo o abrir el navegador, con un QR) y a una lista de entornos. Eso **encoge la superficie de UI a unificar**.
+Conviene decidir primero el #1 y luego rediseñar esas pantallas una sola vez. Lo que sí es independiente del #1: el kit, el UI
+scale y la fuente.
+
+## 8. Anexo: navegador dentro del juego
+
+Pregunta de Facundo (2026-11-09): ¿se puede ver un "browser" dentro del juego para explorar cosas? Hay **cuatro vías reales**. La
+más interesante no necesita meter Chromium en el mod.
+
+### 8.1 Vía A (recomendada para empezar): el navegador del servidor de T3, transmitido al juego
+T3 Code ya sabe correr una pestaña de navegador **en el servidor** (Chromium headless) y mostrarla a clientes que no tienen
+runtime local: la app web, la móvil y el escritorio la ven así. Evidencia (contratos vendorizados en
+`bridge/vendor/t3-contracts/src/preview.ts`, `auth.ts`, `rpc.ts`, y el código público de `pingdotgg/t3code`:
+`packages/client-runtime/src/preview/serverBrowserStream.ts`, `apps/server/src/preview/ServerBrowserStream.ts`):
+
+- **Protocolo:** WebSocket en `/api/preview-stream/ws?threadId&tabId&maxWidth&maxHeight`. El servidor manda **frames JPEG
+  binarios**, el cliente responde `{"type":"ack"}` por cada uno (control de flujo) y **nunca recibe frames más grandes que
+  `maxWidth` × `maxHeight`**. Mensajes JSON de estado: viewport, control, portapapeles, descargas, popups, diálogos, selector de archivos.
+- **Entrada (JSON):** `mouse` (move/down/up, coordenadas en px CSS de la página, botones, modificadores, clickCount), `wheel`,
+  `key` (con `key`, `code`, `keyCode` de Windows y `text`), `text`, `resize`, `viewport`, `navigate`, `history` (atrás/adelante),
+  `reload`, `takeControl` / `releaseControl`, `dialog`.
+- **Permisos:** **ver** exige `orchestration:read` (`authenticateMediaRequest(AuthOrchestrationReadScope)`), que el mod ya tiene.
+  **Interactuar** exige el scope `preview:operate` (el servidor lo comprueba con `session.scopes.includes(AuthPreviewOperateScope)`
+  y sin él entra en modo solo lectura). Hoy el mod **rechaza** cualquier scope fuera de `read` + `operate`, así que ese scope
+  sería una decisión de política (pregunta 3 abajo). Un cliente que va con un servidor viejo trata `preview:operate` como
+  hijo de `orchestration:operate` (`legacyParents` en `auth.ts`), pero **los servidores no amplían permisos**.
+- **Qué se puede mostrar:** las pestañas de preview de un hilo (`preview.list`, eventos `subscribePreviewEvents`) y los
+  **servidores locales que levantó el agente** (`subscribeDiscoveredLocalServers`, con `agent.threadId` cuando lo inició el
+  hilo). Los agentes abren previews con `preview_open` (`runtime: "server"`) y T3 permite un `previewUrl` por script de proyecto.
+- **Quién maneja la pestaña:** `control.controller` es `agent`, `you`, `another-viewer` o `unclaimed`. Un visor pasivo no
+  roba el control (parámetro `interactive=false`).
+- **Qué necesita el mod:** un cliente WebSocket (ya tiene uno para RPC), decodificar JPEG (`javax.imageio` sin ventana; el mod ya
+  usa `java.awt.image` en `ImageSources`), subir a una `DynamicTexture` y dibujarla en una pantalla o en un monitor del
+  mundo. Sin dependencias nuevas, sin descargas de 100 MB, sin procesos hijos.
+- **Esfuerzo:** visor solo lectura M (descubrir pestañas, conectar, texturizar, `ack`, límites de tamaño, reconexión);
+  entrada completa +M (teclas de Minecraft → `key`/`code`/`keyCode`, rueda, texto por SDL3, foco, UI scale); en el mundo (monitor)
+  +M con raycast.
+- **Riesgos y puntos a verificar:**
+  - El host del servidor puede pedir preparación (cierre `4503`, `need: sandbox | libraries`, con el comando que lo arregla).
+  - Solo hay frames si la pestaña es del servidor (`headless`/`runtime: "server"`), no si la abrió el escritorio de alguien.
+  - No he leído cómo se arma el token del `DeviceHubAccess` (`withDeviceHubQuery`) para clientes de terceros; hay que ver
+    si acepta el Bearer del pairing en el upgrade. **(verificar en el código del servidor)**
+  - El formato y los permisos pueden cambiar (T3 Code es nightly; el VPS corre `0.1.8-nightly`). Marcar como dependencia
+    frágil y tolerante: si falla, el visor muestra "no disponible", no "vacío".
+  - Ancho de banda y CPU: JPEG a 30 fps o más y varias pantallas a la vez. Solo suscribirse a lo visible/cercano (patrón de
+    los monitores de log en vivo, con refcount) y pedir `maxWidth` pequeño en el mundo.
+  - Privacidad: el visor ve lo que ve el agente (cookies de sesión del perfil de preview, datos de la app). Es la misma
+    visibilidad que ya da T3.
+  - El **issue #1** (T3 Connect o CLI) cambia cómo se obtiene el acceso al servidor; el protocolo de frames es el mismo.
+
+### 8.2 Vía B: Chromium dentro del juego (CEF), si se quiere un navegador general
+- **Qué es:** una librería-mod que embebe Chromium (JCEF) y lo renderiza a una textura.
+- **Estado para 26.3 (verificado en las fichas, no ejecutado):** el MCEF original de CinemaMod llega hasta **1.21.4** (Chromium 116);
+  hay **dos forks que ya declaran 26.3**: **MCEF Modern** (DimasKama, Fabric, "26.3, 26.2, 26.1.x, 1.21.10–1.21.11", LGPL-2.1,
+  inicialización asíncrona, API documentada) y **Rinku** (Keksuccino, Fabric/NeoForge/Forge, Chromium mucho más nuevo, 60 fps por
+  defecto y 120+ configurable, LGPL-2.1, Maven en `keksuccino.github.io/maven`). Ambos son librerías: no hacen nada solas.
+- **Cómo se usaría:** dependencia **opcional** (`suggests` en `fabric.mod.json`, igual que Mod Menu y cargada por separado), una
+  `WebScreen` que crea el navegador, dibuja su textura y reenvía ratón, rueda y teclado. Ya existen mods de pantallas web en el
+  mundo basados en MCEF (WebDisplays y sus ports a Fabric).
+- **Costes:**
+  - Descarga de binarios de Chromium en el primer arranque, del orden de **~136 MB** (cifra de `mcef-codec`; la de cada fork
+    puede variar), guardados en `config/`. Hay antivirus que la bloquean; hace falta internet.
+  - Varios procesos Chromium hijos (renderer, GPU, red) y varios cientos de MB de RAM. En el PC de Facundo es aceptable; en un
+    portátil flojo no.
+  - **Sin H.264/AAC** en los builds estándar: no reproduce el vídeo de la mayoría de sitios. Existe `mcef-codec` para 26.2.
+  - Atado a la versión de Minecraft: el original quedó 6 versiones atrás; hoy las ports siguen a una sola persona cada una.
+    Riesgo de mantenimiento y de que la primera 26.4 rompa.
+  - Audio por el sistema, no por el mixer de Minecraft **(verificar)**. Cursor, IME, portapapeles y foco son trabajo propio.
+  - Es un navegador general que ejecuta JS de cualquier sitio: superficie de ataque. Hay que limitar a una lista de
+    dominios o a localhost/tailnet, y no guardar credenciales de T3 en su perfil.
+  - **No usar para iniciar sesión de T3 Connect/OAuth:** muchos proveedores bloquean los webviews embebidos y la práctica
+    recomendada es el navegador del sistema (RFC 8252). El inicio de sesión sigue con código de dispositivo o `openUri`.
+- **Licencia:** LGPL-2.1 de las librerías. Depender de ellas por Maven y no copiar ni modificar su código es compatible con
+  el MIT del mod; no incluirlas dentro del jar.
+- **Esfuerzo:** spike S a M (abrir una URL en una pantalla); producto completo M a L (pestañas, barra de direcciones,
+  descargas, permisos de dominios).
+
+### 8.3 Vía C: renderizador propio de HTML/Markdown (sin JS)
+Para docs, PRs y páginas simples con `Jsoup` + el layout de `Markdown`/`TextWrap` que el chat ya tiene. Cero dependencias nativas,
+rápido y coherente con el tema, pero **no es un navegador**: nada de JS, formularios ni CSS reales. Esfuerzo M. Solo vale si el caso
+de uso es leer documentación.
+
+### 8.4 Vía D: el navegador del sistema (ya existe)
+`Blaze3D.openUri` abre URLs con la confirmación vanilla (`ConversationPanel`, `MergeStationScreen`). Es lo que cubre hoy
+"abrir el PR" o "abrir la doc". Mejoras baratas: abrir el preview de un hilo en el navegador, y los esquemas `t3code://` y
+`vscode://` (ver I5 e I6).
+
+### 8.5 Descartadas
+- **JavaFX WebView / Swing:** chocan con GLFW en macOS (dos event loops en el hilo principal).
+- **Headless Chromium propio en el PC/VPS** que transmita capturas: duplica lo que T3 ya hace en la vía A y añade un proceso pesado
+  (las reglas de `AGENTS.md` restringen procesos pesados al PC).
+
+### 8.6 Qué se vería en el juego (casos de uso, por valor)
+1. **Pantalla de preview en el HQ** (la mejor idea de este anexo): el monitor del hilo o una "pantalla de revisión" muestra la
+   app que el agente está construyendo (`localhost:5173` visto desde el servidor de T3). Se ve desde el escritorio del NPC,
+   con el log en vivo al lado, y se puede entrar y tocar. Es algo que **solo el juego** puede hacer de forma diegética.
+   Vía A.
+2. **Revisión de cambios** (G9): la lista de archivos y +N/−N en la UI propia y, para el diff completo o la página del PR, una
+   pestaña web. Vía A si el PR se abre en una pestaña del servidor; vía B si se quiere abrir `github.com`.
+3. **Documentación y búsqueda mientras se juega:** sirve, pero es el uso que menos aporta a t3craft y el que más cuesta
+   (navegador general, seguridad). Vía D o B. WebDisplays ya lo cubre para quien lo quiera.
+4. **La app web de T3 dentro del juego** (estrategia alternativa a unificar la UI nativa, §7): en vez de reescribir diff, terminal,
+   ajustes o plan, un panel carga el T3 web de ese entorno. Ganancia: fidelidad total y cero mantenimiento de pantallas. Pérdida:
+   estética propia, accesibilidad y diegético; además exige que el T3 web acepte la sesión del pairing (cookie) **(verificar)** y
+   es solo vía B. Puede convivir: UI nativa para lo cotidiano y el web para lo pesado.
+5. **Dashboards** (Grafana, estado de servicios) en paredes del HQ: vía B, nicho.
+
+### 8.7 Recomendación
+Empezar por la **vía A en solo lectura** (un spike M): una `PreviewScreen` y, si funciona, el monitor en el mundo. Si el protocolo de
+T3 no acepta el pairing de terceros o queda inestable, caer a **D** con el spike de **B** (MCEF Modern o Rinku) solo para localhost.
+Decidir antes si se acepta el scope `preview:operate` (pregunta 3) y cómo le queda a esto el issue #1.
+
+### 8.8 Preguntas para Facundo
+1. ¿Qué quieres explorar con el navegador: **ver lo que construyen los agentes** (preview), **revisar PRs/diffs**, o **navegar por la
+   web en general**? Cambia la vía.
+2. ¿Aceptas una descarga opcional de ~100 a 150 MB (Chromium) para el navegador general, o prefieres cero dependencias?
+3. ¿Se permite pedir el scope `preview:operate` además de `read` y `operate`, o el visor es **solo lectura**?
+4. ¿La pantalla de preview debe estar **en el mundo** (monitor del hilo), en una **pantalla** o en ambas?
+5. ¿Qué entornos corren los previews hoy (servidor remoto, `localhost` del VPS por Tailscale)? Condiciona si el visor del
+   servidor alcanza las apps.
+
+## 9. Anexo: el navegador como bloque (pantalla web en el mundo)
+
+Pregunta de Facundo (2026-11-09): ¿y si el navegador va en bloques y no solo en una interfaz?
+
+### 9.1 Modelo mental: tres capas independientes
+1. **Fuente de página (`PageSource`)**: de dónde salen los píxeles y a dónde van las entradas. Dos implementaciones posibles:
+   - `T3StreamSource` (vía A, §8.1): frames JPEG del navegador del servidor de T3; entrada por JSON.
+   - `CefSource` (vía B, §8.2): Chromium local (Rinku o MCEF Modern), opcional.
+2. **Superficie**: dónde se dibuja. Una `WebScreen` a pantalla completa, un **bloque** en el mundo, o ambas.
+3. **Interacción**: cómo se apunta, se hace clic, se desplaza y se teclea.
+
+Si estas tres capas se separan desde el principio, el bloque, la pantalla y cualquier fuente futura son intercambiables.
+La pantalla completa pasa a ser el "teclado y ratón" del bloque.
+
+### 9.2 Por qué el bloque encaja con lo que ya hay
+Según `docs/features/blocks.md` y el código de `client/blocks/`:
+- **Pared multibloque ya resuelta:** `MonitorWall` y `ScreenExtent` fusionan monitores contiguos del mismo `facing` en una sola
+  pantalla de hasta 12 × 8 bloques, que dibuja el bloque origen (abajo a la izquierda).
+- **Bindings:** el block entity guarda `binding` (`thread:`, `project:`, `env:`, `board:`). Se añadiría `web:<fuente>`:
+  por ejemplo `web:preview:<threadKey>` (el preview del hilo) o `web:url:<…>`. `/t3craft blocks link` y `HqBindings` ya saben
+  vincular una pantalla entera.
+- **Visibilidad con adquirir y soltar:** `MonitorVisibility` decide qué monitores merecen un stream en vivo (radio, visibilidad,
+  histéresis, una suscripción por hilo aunque haya varios monitores). Es exactamente la política que necesita un navegador.
+- **LOD:** `MonitorLod` ya tiene NEAR y FAR. Para web: NEAR = vivo, FAR = último frame congelado o un póster.
+- **Textura dinámica en GPU:** `HeldScreenTexture` (pantalla en mano) ya crea una `DynamicTexture`.
+- **Clic en el bloque:** `BlocksClient` ya resuelve `BlockHitResult` y abre el contenido de la pantalla entera.
+- **Interruptor GUI-only:** el módulo de bloques se apaga entero (`BlocksSwitch`); sin él, solo queda la `WebScreen`.
+- **Archivos nuevos probables:** `WebScreenBlock` o un `Binding.Kind.WEB` sobre `monitor`, un `WebScreenRenderer` (o rama en
+  `MonitorRenderer`) que dibuja un quad texturizado, y `PageSource` con sus dos backends.
+
+### 9.3 Los problemas de verdad
+1. **Apuntar:** el rayo de la mirada da un `BlockHitResult.location`; con `facing` y el `ScreenExtent` se pasa a coordenadas de
+   página (UV a píxeles). Hay que hacerlo cada tick para el hover.
+2. **Clic:** en Minecraft, **clic izquierdo = romper el bloque**. Para que sea clic de página hay que cancelar el ataque cuando
+   se apunta a una pantalla web en modo foco (Fabric tiene `AttackBlockCallback`/`UseBlockCallback` de cliente **(verificar en 26.3)**).
+   La rueda cambia el hotbar: hay que capturarla solo en modo foco (probablemente un mixin sobre el scroll **(verificar)**).
+3. **Teclado:** WASD mueve al jugador, así que escribir en el bloque no puede ser "en vivo" sin capturar teclas. Patrón
+   recomendado:
+   - **Ver y tocar desde lejos** (clic y scroll con el rayo) sin teclado, para botones, pestañas, listas.
+   - **Entrar en foco**: un clic derecho largo o una tecla abre la `WebScreen` a pantalla completa con la misma sesión
+     (la cámara puede acercarse al bloque). Ahí está el teclado, el IME y el portapapeles.
+   Es el mismo patrón que los monitores de ComputerCraft: tocas el monitor, el teclado va por la GUI.
+4. **Coste con muchas pantallas:** una instancia de navegador por **fuente** (no por bloque) y un tope de vivas (por ejemplo 2 o 3);
+   el resto, congeladas. En la vía B cada instancia es un renderer de Chromium; en la A es un JPEG decodificado por frame y el
+   servidor hace el trabajo. Con `maxWidth/maxHeight` pequeños para pantallas lejanas.
+5. **Resolución:** un bloque se ve a ~64 a 128 px por bloque. Una pared de 6 × 4 a 128 px es 768 × 512, suficiente para una app,
+   pequeña para un sitio denso. Las fuentes de página deben reflowear (viewport) en lugar de reducir.
+6. **Seguridad (importante para bloques):** un bloque guarda su URL en el mundo. En un servidor o un mundo compartido, **otro
+   jugador podría poner una URL que tu cliente cargue sin que lo pidas** (rastreo, IP, contenido). Reglas:
+   - nunca cargar una URL de un bloque sin una acción local del jugador ("clic para cargar", o una lista local de dominios);
+   - la vía A no tiene este problema para el contenido, porque la URL la abre el servidor de T3 (el bloque solo lleva el hilo);
+   - preferir bindings a **hilos de T3** antes que URLs libres.
+7. **Audio:** el audio de CEF sale por el sistema, no posicional **(verificar)**. Los bloques empiezan en silencio.
+8. **Multijugador:** los bloques existen solo donde el módulo de bloques está instalado y registrado (integrado o servidor con el
+   mod). En un servidor remoto sin el mod no hay bloques; ahí quedan la `WebScreen` y, si se quiere una pared, un renderer
+   **solo de cliente** en un ancla del HQ (como el holograma). Los `Display` de vanilla no pueden mostrar texturas dinámicas, así
+   que necesitaría un hook de render del nivel **(verificar API de Fabric 26.x)**.
+9. **Mapas e ítems como truco:** un mapa es de 128 × 128 y se actualiza poco. Útil como miniatura, no como navegador.
+
+### 9.4 Qué vía encaja mejor con bloques
+- **A (stream del servidor de T3):** encaja muy bien. Pocos recursos locales, varias pantallas baratas, sin dependencias nativas,
+  y sigue siendo una "vista tonta" como el resto del mod. Limitada al contenido que T3 puede abrir.
+- **B (CEF):** da cualquier sitio, pero cada pared viva cuesta un renderer de Chromium. Mejor para una o dos pantallas
+  generales que para el HQ con una pantalla por hilo.
+- **Conclusión revisada:** para **bloques en el HQ**, A primero (previews por hilo, una pantalla por escritorio o una pared de
+  revisión); B como segundo backend para web general. Para **navegar**, B primero. Por eso la abstracción `PageSource`.
+
+### 9.5 Niveles de entrega y esfuerzo (orientativo)
+| Nivel | Qué se ve y se hace | Esfuerzo |
+|---|---|---|
+| N0 | `PageSource` + `T3StreamSource` + `WebScreen` solo lectura (un hilo) | M |
+| N1 | Bloque `web` (binding `web:preview:<hilo>`) que muestra el preview, solo ver, con LOD y adquirir/soltar | M |
+| N2 | Clic y scroll con el rayo, y foco a pantalla completa con teclado | M a L |
+| N3 | `CefSource` opcional (Rinku/MCEF Modern) y `web:url:` con lista de dominios y confirmación local | M a L |
+| N4 | Paredes grandes, varias fuentes, tope de instancias, póster congelado | M |
+
+### 9.6 Preguntas
+1. ¿Quieres un bloque por hilo (el monitor de cada escritorio muestra el preview) o una pared de revisión compartida?
+2. ¿Tocar desde lejos (clic y scroll) alcanza, o necesitas escribir en el bloque sin abrir la pantalla completa?
+3. ¿Cómo se maneja un bloque que apunta a un sitio general en un mundo compartido: lista de dominios local, clic para cargar, o solo
+   hilos de T3?
+4. ¿El juego va en un servidor remoto con otros jugadores, o es singleplayer o LAN? (condiciona el punto 8 de §9.3)
+
+## 10. Anexo: "revisar todo desde el juego" (el bloque abre el navegador)
+
+> **Corregido el 2026-11-09 por Facundo (ver §13.1): el navegador NO reemplaza nuestras interfaces.** El navegador es para
+> **cosas de fuera** (Gmail, Google Chat, GitHub…), y nuestras pantallas se pulen igual, nativas. Lo que sigue describe la
+> opción "T3 web dentro del juego", que queda **descartada como plan principal**; se conserva porque el inventario de rutas de
+> T3 (10.2), el patrón de lanzadores (10.4) y el análisis de sesión (10.5) siguen siendo válidos y reutilizables.
+
+Aclaración de Facundo (2026-11-09): el objetivo es **poder revisar todo desde el juego**. Las pantallas físicas con navegador serían
+solo decorativas; lo útil es **clic derecho en un bloque (o NPC) → se abre la interfaz, y esa interfaz es el navegador**. Los
+bloques útiles son una idea aparte. Esto cambia las prioridades de §8 y §9.
+
+### 10.1 Qué cambia
+- La pieza central deja de ser la pantalla en el mundo y pasa a ser **`T3WebScreen`**: una `Screen` de pantalla completa con un
+  navegador, abierta en una **ruta concreta** de la app web de T3.
+- El bloque (o el NPC) es solo un **lanzador contextual**. El mod ya funciona así: el clic en un monitor, el NPC o la estación de
+  merge abre algo (`ChatScreenOpener`, `MergeStationScreen`). Se cambia el destino, no el mecanismo.
+- La **vía A (stream del servidor)** deja de ser la principal: solo muestra pestañas de preview. Para "revisar todo" se necesita
+  la **vía B (CEF)** cargando el propio **T3 web**.
+- Las pantallas decorativas pasan a N4: se pueden hacer después con la misma `PageSource`.
+
+### 10.2 T3 web ya tiene casi todo lo que hay que revisar (rutas del repo `pingdotgg/t3code`, `apps/web/src/routes/`)
+| Ruta | Para qué sirve | Lanzador natural en el HQ |
+|---|---|---|
+| `/{environmentId}/{threadId}` | El hilo completo: chat, diff, plan, terminal, archivos | NPC, monitor y escritorio del hilo, podio de decisiones |
+| `/pull-requests` | Lista y revisión de PRs (detalle, checks, archivos, guía de revisión, comentarios) | `merge_station` |
+| `/usage` | Uso y costo | pantalla de estado |
+| `/settings/scheduled-tasks` | Tareas programadas | tablero de tareas programadas |
+| `/settings/archived`, `/settings/threads`, `/settings/worktrees` | Archivo, hilos, worktrees | terminal de archivo |
+| `/settings/source-control`, `/settings/providers`, `/settings/diagnostics`, `/settings/access`, `/settings/connections` | Git, proveedores, diagnóstico, accesos | terminal del líder o un bloque de "administración" |
+| `/new`, `/draft/{id}` | Hilo nuevo | tecla Ctrl+N o el portátil |
+| `/pair`, `/connect` | Emparejar, T3 Connect | el flujo de login (ver 10.5) |
+
+Detrás hay RPC de T3 para todo esto (`pullRequests.*` con 30 métodos, `review.getDiffPreview`, `terminal.observe`,
+`filesystem.browse`, `preview.*`), así que reescribirlo nativamente es mucho trabajo. **Qué se ahorra:** G9 (pantalla de diff),
+G10 (costo), G11 (salida de comandos), la revisión de PRs y casi todos los ajustes del lado de T3.
+
+### 10.3 División de trabajo propuesta (nativo contra web)
+- **Nativo (se queda):** el chat y el composer (ya están muy cuidados), avisos, responder aprobaciones con confirmación en el juego
+  y `audit.log`, el HUD, los hologramas, los NPC, los ajustes propios del mod (HUD, avisos, NPC, UI scale) y el emparejamiento.
+- **Web (se abre en la `T3WebScreen`):** revisar diffs y PRs, terminal, archivos, ajustes de T3, uso, tareas programadas, proveedores.
+- Cada pantalla nativa gana un botón "Abrir en el navegador" que lleva a la ruta equivalente.
+
+### 10.4 Los lanzadores como puertas
+Un bloque o NPC lleva un `binding` (el mod ya lo guarda) y el clic derecho calcula la ruta:
+`thread:<envId:threadId>` → `/{envId}/{threadId}`; `merge_station` → `/pull-requests`; `status_screen` → `/usage`; etc. Cuando se
+pensó en "bloques útiles" (idea aparte de Facundo), este patrón los vuelve baratos: **un bloque = una ruta**. Sin el módulo de
+bloques, el mismo destino se abre con una tecla (`Y`, `J`) o con el clic derecho en el NPC (`UseEntityCallback`, que funciona en
+servidores remotos).
+
+### 10.5 El punto delicado: iniciar sesión en T3 web dentro del navegador embebido
+Evidencia: `docs/internals/environment-auth.md` y `environmentHttp.ts` de T3.
+- La web de T3 se autentica con una **cookie de sesión de navegador**: `POST /api/auth/browser-session { credential }` canjea un
+  credencial de bootstrap (el mismo tipo de enlace de emparejamiento, `/pair#token=…`) y deja la cookie. Hoy el mod canjea su
+  credencial en `POST /oauth/token` y guarda un Bearer: **son dos sesiones distintas**, y un credencial es de un solo uso.
+- El Bearer del mod (`read` + `operate`) **no puede crear otro credencial**: `POST /api/auth/pairing-token` exige `access:write`.
+- Las sesiones **no amplían** lo concedido: lo que el credencial delega es el techo. Por defecto T3 delega todo (incluido
+  `terminal:operate`, una shell como el usuario del servidor) si no se pasan `--scope`.
+- **Opciones:**
+  1. **Un segundo emparejamiento "para el navegador"**, opt-in, con los scopes que quieras para la web (por ejemplo
+     `orchestration:read`, `orchestration:operate`, `source-control:write` si quieres comentar y revisar PRs). Más fricción, claro y seguro.
+  2. **Una sola sesión para ambos:** el mod canjea el credencial en `/api/auth/browser-session`, guarda la cookie, la inyecta en el
+     almacén de cookies de CEF y la usa también para su WebSocket (T3 admite cookies en el upgrade). Menos pasos, pero cambia
+     cómo el mod se autentica; **(verificar)** que el RPC lo acepte con cookie y no solo con Bearer.
+  3. **T3 Connect** (`/api/t3-connect/mint-credential`, **issue #1**): resolvería el canje sin pasos manuales. Es la razón para
+     decidir el #1 antes de fijar este flujo.
+- **Avisos de seguridad que cambian respecto al modelo actual:**
+  - Lo que se hace dentro del navegador **no pasa por `OperateGate` ni por las confirmaciones del juego, ni deja registro en
+    `audit.log`**; actúa la propia app web con los scopes de su sesión.
+  - La cookie de sesión vive en el perfil de CEF en disco: tratarla como un secreto (carpeta propia en `config/t3craft/`, no en el repo,
+    permisos del propietario, un perfil por entorno).
+  - Cargar solo el origen del entorno de T3 (lista cerrada de dominios). Los enlaces externos se abren con `openUri`.
+
+### 10.6 Requisitos y riesgos de la `T3WebScreen` (vía B)
+- **Motor:** necesita un Chromium reciente: T3 web es una app moderna. El MCEF original va con Chromium 116; hay que usar
+  **Rinku o MCEF Modern**. **(verificar)** que T3 web carga sin fallos en cada uno.
+- **Texto y escala:** CEF acepta un factor de escala del dispositivo. Eso resuelve "tamaño de texto independiente del GUI scale"
+  (§7) para esta pantalla casi gratis: el ajuste "UI scale" del mod pasa a ser el zoom de la página.
+- **Entrada:** teclado, IME (SDL3), portapapeles, rueda, arrastrar y soltar, selector de archivos (subir imágenes al composer),
+  descargas, menús contextuales y pestañas nuevas. Trabajo propio, pero un `Screen` los captura bien. M a L.
+- **Audio y voz:** T3 web tiene una sección de voz (`/settings/voice`); el micrófono en CEF necesita manejo de permisos
+  **(verificar)**.
+- **Rendimiento y ciclo de vida:** crear el navegador al abrir, suspenderlo al cerrar (o mantener la sesión viva unos minutos), una sola
+  instancia por entorno. Mientras la pantalla está abierta, Chromium compite por la GPU y usa varios cientos de MB.
+- **Pausa del juego:** una `Screen` pausa el mundo en singleplayer; hay que decidir si las `T3WebScreen` no pausan (`isPauseScreen=false`).
+- **Dependencia y mantenimiento:** descarga de Chromium en el primer arranque (~136 MB según `mcef-codec`), librería opcional
+  (`suggests`), atada a la versión de Minecraft y a un mantenedor por fork. El mod sigue funcionando sin ella (vía D).
+- **Compatibilidad con la limpieza y el #1:** no toca el modelo de red del mod; el #1 solo cambia cómo se obtiene la sesión.
+
+### 10.7 Plan por niveles (reordenado)
+| Nivel | Qué se entrega | Esfuerzo |
+|---|---|---|
+| W0 | Spike: dependencia opcional de Rinku/MCEF Modern, `T3WebScreen` carga `https://<entorno>/…` con una cookie de prueba | S a M |
+| W1 | Entrada completa (teclado, ratón, IME, portapapeles), zoom ligado al UI scale, cierre con Esc/tecla | M |
+| W2 | Sesión: segundo emparejamiento "web" (o sesión única) y perfil por entorno; sin T3 web, caer a `openUri` | M |
+| W3 | Lanzadores: clic derecho en NPC y en monitor/estación de merge/pantalla de estado/tablero abre la ruta correcta; botón "Abrir en navegador" en las pantallas nativas | M |
+| W4 | Descargas, subir archivos, permisos de micrófono, varias pestañas | M a L |
+| W5 | Bloques decorativos y paredes con la `PageSource` (§9), vía A para previews | M |
+
+### 10.8 Preguntas para Facundo
+1. ¿La experiencia objetivo es **T3 web tal cual** dentro del juego (fidelidad total, cero reescritura), o prefieres que lo
+   importante (diff, PR) sea nativo y solo lo demás vaya al navegador?
+2. ¿Qué scopes darías a la sesión web? En particular, ¿**comentar y aprobar PRs** (`source-control:write`) y **terminal**
+   (`terminal:operate`, una shell en el servidor)? Esto es una decisión de seguridad.
+3. ¿Aceptas que lo que se hace en el navegador **no pase por las confirmaciones ni el `audit.log` del juego**?
+4. ¿Segundo emparejamiento "web" (más fricción, más claro) o sesión única (menos pasos, cambia la autenticación del mod)? Depende del #1.
+5. ¿Qué lanzadores quieres primero: NPC, monitor del escritorio, estación de merge, pantalla de estado, tablero de tareas?
+6. ¿Desde qué máquinas jugarás con esto (Windows, macOS, Linux; arm64 o x86_64)? Condiciona el motor CEF.
+
+## 11. Anexo: ver y desarrollar las interfaces sin abrir el juego (un "dev server" de UI de verdad)
+
+Pregunta de Facundo (2026-11-09): ¿hay una forma real, no un hack, de ver las interfaces sin usar el juego, como un dev server?
+
+### 11.1 Qué hay hoy en el repo
+| Herramienta | Qué hace | Límites (según `docs/tools/ui-render.md`) |
+|---|---|---|
+| `uiRender` (`mod/src/uirender/`, `docs/tools/ui-render.md`) | Renderiza `T3Screen` y sus diálogos con **datos mock** a PNG, sin ventana ni GL, con escenarios en JSON (`fixtures/*.json`) y pasos de entrada (`clickText`, `hoverText`, `scroll`) | Hace `Unsafe.allocateInstance` de `Minecraft` y de `GuiGraphicsExtractor` y dibuja con Java2D: no es el render del juego. Sin Unifont (símbolos como `⚙` salen como cuadro), sin shaders ni blur, sin resource packs, sin IME ni portapapeles, entrada simulada, una captura por vez, solo `T3Screen` |
+| Citadel Studio (`tools/studio`) | Visor web en el PC para ver renders y dejar notas | Muestra PNG ya renderizados; no es interactivo |
+| `DevReload`, `/t3dev`, hot-swap (`docs/features/devx.md`, `docs/dev.md`) | Recarga de clases con JBR (`-Pt3craft.hotswap`) y red de seguridad | Necesita el juego corriendo |
+| Client GameTests (`src/gametest`, API `fabric-client-gametest-api-v1`) | Smoke test que arranca el cliente real | Compila, aún sin correr; la API es experimental |
+
+`uiRender` sirve como comprobación rápida de layout para agentes y como volcado de textos (`.texts.txt`). No es lo que Facundo describe: es
+batch, no es el render real y se apoya en internals de Minecraft.
+
+### 11.2 Opciones reales (de menos a más cambio)
+**O1. Galería de UI dentro del cliente real ("Storybook en el juego")**
+- Un registro de escenarios (`UiScenarios`) con los mismos fixtures que `uiRender`, y `/t3dev ui <escenario>` que abre cualquier pantalla
+  (chat, ajustes, emparejado, confirmaciones, selector de modelo…) con datos falsos, sin red ni T3.
+- Con hot-swap de JBR el ciclo es: editar, compilar, ver el cambio en el juego sin reiniciar. Es el render real (fuentes, sprites, shaders).
+- Es lo que hace AgentCraft con su DevBridge (§12): escenas JSON y `dev.screen {open:…}`.
+- Esfuerzo S a M. Necesita el juego abierto (en el PC).
+
+**O2. Cliente real automatizado con la API oficial de Fabric (GameTests de cliente)**
+- `FabricClientGameTest` + `ClientGameTestContext`: crea un mundo, abre pantallas, simula entradas (`TestInput`) y hace
+  `takeScreenshot(...)`. La documentación oficial indica que puede correr sin pantalla con **Xvfb** (`useXVFB = true`) y Mesa por software.
+  La API es **experimental** y hay bugs abiertos en cierre de mundos (issues #5623 y #5655 de `fabric-api`).
+- Aporta capturas **reales** de una lista de escenarios, repetibles, con las mismas fixtures. Es lo más cercano a "CI visual" que
+  existe de forma oficial.
+- Arranca Minecraft completo: ~1 minuto por corrida y es proceso pesado (solo en el PC, con `tools/heavy.sh`). Esfuerzo M.
+- Choque con las reglas: `AGENTS.md` dice que **este repo no tiene tests y que añadir o correr tests está prohibido**. Esto sería un
+  "runner de escenarios de UI", no tests, pero conviene que Facundo lo apruebe explícitamente.
+
+**O3. Servidor de UI en vivo: el cliente real en el PC, visible y manejable desde un navegador**
+- El cliente corre en el PC (ventana o Xvfb). Un módulo de desarrollo captura el framebuffer de la ventana a ~10 a 20 fps, lo manda por
+  WebSocket y un visor web (como Citadel Studio) lo muestra; el ratón y el teclado vuelven al juego por el mismo canal.
+- Es el mismo patrón que usa T3 para su preview (§8.1: JPEG por WebSocket con `ack` y entrada JSON), así que el formato ya está probado.
+- Real: ves y tocas la UI verdadera desde el Mac o el móvil, con hot-swap. Esfuerzo M a L, con riesgo (captura por frame, foco, IME).
+- Es solo para desarrollo (`-Pt3craft.devserver`), nunca en el jar de usuario.
+
+**O4. Pantallas web (HTML/CSS/JS) dentro del juego: ahí sí hay un dev server verdadero**
+- Patrón existente: el mod **WebGUI** (MIT, Fabric y NeoForge, Minecraft 1.20.1 a 26.x) carga cualquier URL como GUI a pantalla completa o HUD,
+  con `window.webgui` para hablar con Java, y recomienda desarrollar en el navegador con **hot reload** y apuntar el mod a la URL. Usa
+  Chromium (~150 MB, descarga en el primer arranque) vía MCEF/Rinku.
+- Para t3craft significaría: las pantallas ricas (revisión, ajustes de T3, listas, diálogos) se hacen como una pequeña app web (Vite +
+  componentes + Storybook) que se **ve y prueba en cualquier navegador sin el juego**, con datos mock; en el juego se carga con CEF.
+  Se unifican de forma natural (§7): un solo sistema de diseño en CSS, iconos SVG, fuentes web, zoom independiente del GUI scale.
+- Y encaja con §10: la **app web de T3 ya es así**. Con CEF, T3 web *es* la UI de revisión, y sus pantallas se desarrollan con el
+  flujo de siempre en T3.
+- Costes: CEF pasa a ser obligatorio para esas pantallas (descarga, RAM, mantenimiento por fork), la integración de entrada se vuelve
+  un puente propio, el **emparejamiento y el arranque deben seguir siendo nativos** (sin red no hay web), y quedan dos stacks de UI.
+  Esfuerzo L, pero cada pantalla nueva sale más barata.
+
+**O5. Reforzar `uiRender` como respaldo ligero**
+- Conservar para agentes y comprobaciones rápidas (`.texts.txt` es útil). Para dejarlo menos frágil: aislar lo que toca de internals tras una
+  interfaz y avisar en el doc de que es una aproximación (no sustituye a O1 u O2). Esfuerzo S.
+
+### 11.3 Comparación
+| | Render real | Sin abrir el juego | Interactivo | Hot reload | Esfuerzo | Riesgo |
+|---|---|---|---|---|---|---|
+| O1 galería en el juego | Sí | No | Sí | Sí (JBR) | S a M | Bajo |
+| O2 GameTests / runner | Sí | Sí (Xvfb en el PC) | Guiado | No | M | API experimental, regla de tests |
+| O3 visor en vivo desde el navegador | Sí | Sí (el juego en el PC, tú desde cualquier equipo) | Sí | Sí | M a L | Medio |
+| O4 pantallas web | Sí (CEF) y en navegador normal | **Sí, totalmente** | Sí | **Sí (HMR)** | L | CEF, dos stacks |
+| O5 `uiRender` | Aproximado | Sí | Pasos simulados | No | S | Frágil |
+
+### 11.4 Recomendación
+- **Corto plazo, para desarrollar bien las pantallas nativas:** **O1** (galería con `/t3dev ui`) y **O2** (capturas reales y
+  repetibles en el PC, si Facundo aprueba el runner). Dejan `uiRender` como comprobación de layout.
+- **Si la UI de revisión va por web** (§10): ese flujo **ya es un dev server real** (Vite, o el dev server de T3 para la app de T3) y
+  decide más que cualquier otra cosa. O4 queda como camino natural para el resto de las pantallas ricas **después** de decidir §10.
+- **O3** es la respuesta literal a "un dev server para ver el juego desde cualquier lado", pero cuesta más. Mejor decidirlo cuando O1 y O2 existan.
+
+### 11.5 Preguntas para Facundo
+1. ¿Prefieres un ciclo con el juego abierto y hot reload (O1), capturas automáticas reales (O2), o ver la UI en el navegador sin el juego (O3 u O4)?
+2. ¿Apruebas un "runner de escenarios de UI" (O2) a pesar de la regla de "sin tests"? Lo trataría como herramienta, no como suite.
+3. ¿Aceptas hacer parte de las pantallas en web con CEF obligatorio (O4), o la UI propia debe seguir nativa y sin dependencias?
+4. ¿El desarrollo de UI se hace solo en el PC (Windows/WSL con GPU) o también quieres verlo desde el Mac y el móvil?
+
+## 12. Anexo: qué aporta AgentCraft para todo esto
+
+Releído el 2026-11-09. Su último commit sigue siendo `8fe3ad2` (2026-10-08), el mismo del relevamiento anterior, así que no hay cambios
+nuevos; esta lectura mira lo que importa para las preguntas de arriba (README, `docs/console.md`, `docs/protocol.md`, `docs/SPEC.md` y los
+tamaños de archivos).
+
+- **No hay navegador, ni web, ni integraciones externas.** Todo es nativo. Su servidor local (Foreman) escucha solo en localhost y
+  **rechaza cualquier conexión con cabecera `Origin`**, para que una página web no pueda manejar a los agentes. No usa Discord,
+  webhooks ni notificaciones del sistema. Sonidos solo vanilla; toasts con retrato enmarcado; barra de progreso estilo boss bar.
+- **Cómo cubre "revisar todo":** con pantallas nativas hechas a medida, alimentadas por su propio protocolo (`DecisionKind`:
+  `question`, `permission`, `merge`; `DiffFile`/`DiffHunk`/`DiffLine` estructurados):
+  - consola (tecla `` ` ``, historial, `@agente`, `/answer`, `/diff`, Tab para completar, sin pausar el juego);
+  - cola de decisiones (tecla `J`, `1` a `9`, Enter sin opción marcada en merges y permisos para que Enter solo nunca apruebe);
+  - **`DiffScreen`** (revisión con lista de archivos A/M/D, números de línea, hunks con contexto plegado, ajuste de línea, teclas `j k n p ] [`,
+    `Ctrl+Enter` para mergear, "copy path", confirmaciones, estados BROWSE/FEEDBACK/CONFIRM/SENDING/DONE);
+  - biblioteca de memoria, tablero de tareas (`TaskScreen`), tarjeta de agente (`AgentCardScreen`).
+- **Qué cuesta hacerlo nativo, medido en sus fuentes:** `DecisionScreen` ~45 KB, `ConsoleScreen` ~39 KB, `AgentCardScreen` ~33 KB, `DiffScreen`,
+  `DiffDoc` y `DiffFixtures` ~25 KB en total. Cada pantalla rica es del orden de mil líneas. Es la medida honesta de "reescribir en nativo" frente a "abrir T3 web".
+- **Su ciclo de desarrollo (relevante para §11):** no tiene simulador gráfico aparte. Usa el **juego real con una API local de desarrollo**
+  (DevBridge por WebSocket en localhost: `dev.camera`, `dev.screenshot`, `dev.screen {open:"decision"}`, `dev.decision {preview}`),
+  **escenas JSON** (`tools/scenes/*.json`) que dejan al juego en un estado conocido y sacan capturas, un backend `sim` determinista de los
+  agentes y una "barra visual" (`docs/visual-bar.md`) para juzgar las capturas. Eso es O1 + O2 con otro nombre; cada visual de su README sale así.
+- **Qué copiar y qué no:**
+  - Copiar el patrón DevBridge/escenas (O1/O2), el diseño de `DiffScreen` (teclas, hunks, estados, "Enter nunca aprueba por sí solo") y la regla de no pausar el juego con la consola.
+  - No copiar su modelo cerrado: no tiene un navegador ni un camino para pantallas que ya existen en otra herramienta. t3craft sí lo tiene (T3 web).
+  - Licencia MIT: adaptar código exige cabecera y entrada en `THIRD_PARTY_NOTICES.md`, como ya se hace.
+
+## 13. Anexo: correcciones y decisiones del 2026-11-09 (tarde)
+
+Tres aclaraciones de Facundo. Esta sección manda sobre lo que digan §8, §10 y §11.
+
+### 13.1 El navegador es para cosas de fuera, no para reemplazar nuestra UI
+**Corrección:** el navegador sirve para **Gmail, Google Chat, GitHub y similares**. Nuestras interfaces se pulen igual, nativas
+(§7). Consecuencias:
+
+- **§10 (T3 web dentro del juego) deja de ser el plan.** Se marca como descartada. Sobreviven su inventario de rutas, el patrón
+  "un lanzador = una ruta" y el análisis de sesión, por si algún día se quiere una pantalla concreta.
+- **La vía A (stream del preview de T3, §8.1) ya no cubre el caso.** Solo muestra pestañas que abre el servidor de T3; no sirve
+  para Gmail. Queda como complemento para ver lo que construyen los agentes.
+- **Hace falta un navegador real: vía B (CEF).** Con **Rinku** o **MCEF Modern** (ambos declaran 26.3, LGPL-2.1, descarga de
+  Chromium de unos 136 a 150 MB en el primer arranque). Confirma lo que ya respondí sobre experiencia y compatibilidad.
+- **El trabajo de UI y el del navegador quedan desacoplados**, lo cual es bueno: el kit nativo (§7) no depende de CEF, y CEF no
+  bloquea el pulido de las pantallas.
+
+**Problema concreto y serio para Gmail y Google Chat: Google bloquea el inicio de sesión en navegadores embebidos.**
+Devuelve "This browser or app may not be secure" y es una política deliberada contra webviews (está reportado una y otra vez en
+apps de Electron y CEF). Opciones, ninguna ideal:
+1. **Aceptar que Gmail y GChat no se logueen dentro del juego.** GitHub y la mayoría de sitios sí funcionan en un webview.
+   El navegador del juego serviría para GitHub, documentación, dashboards y previews, y Gmail se queda fuera.
+2. **Sesión ya iniciada fuera del flujo de Google**: usar un perfil de CEF persistente donde la cookie llegó por otro medio.
+   Frágil y probablemente igual de bloqueado.
+3. **Falsear el user agent** para parecer Chrome de escritorio: a veces funciona, Google lo persigue, y va contra el espíritu de
+   sus términos. **No lo recomiendo.**
+4. **No usar la web para el correo:** cliente nativo contra la API de Gmail o IMAP, mostrado en nuestra propia UI (una pantalla
+   o un bloque "bandeja"). Mucho más trabajo, pero se integra con el HQ (un bloque de correo, avisos) y no depende de CEF.
+   Para Google Chat la API es más limitada.
+- **Pendiente de verificar en el juego:** qué sitios concretos de la lista de Facundo funcionan dentro de Rinku o MCEF Modern.
+  Es la primera cosa que debería medir un spike, antes de construir nada.
+
+### 13.2 Hot reload: por qué no funciona y qué trae Fabric de forma oficial
+Facundo: *"me gustaría el ciclo con hot reload, pero no hemos podido hacerlo funcionar"*, y **sin añadir otro mod**.
+
+**Lo que Fabric y Loom ofrecen de forma oficial (nada de esto es un mod extra):**
+| Mecanismo | Qué recarga | Límite |
+|---|---|---|
+| **HotSwap de la JVM, con el IDE en modo depuración** (`docs.fabricmc.net/develop/debugging`) | Cuerpos de método | Nada estructural (campos, métodos nuevos, records). La propia doc de Fabric cita como caso de uso *"screen element alignment"*, justo lo nuestro |
+| **Mixins** | Hace falta configuración extra en la run configuration | No vale el HotSwap normal |
+| **F3+T** | **Assets: texturas, sprites, `.mcmeta` de nine-slice, modelos, fuentes y lang** | Solo lo que se lee por el **resource manager** |
+| **`/reload`** | Datapacks | Nada de cliente |
+| **`fabric-client-gametest-api-v1`** | Capturas reales y entrada simulada | Experimental; arranca el juego |
+
+**Lo que Fabric no trae:** recarga de código más allá del HotSwap de la JVM. El `-XX:+AllowEnhancedClassRedefinition` que usa
+`-Pt3craft.hotswap` **no es de Fabric**: es de JetBrains Runtime (JBR), un JDK aparte.
+
+**Causas probables de que no haya funcionado nunca** (en orden de probabilidad; `docs/dev.md` ya describe el camino correcto,
+pero es fácil saltárselo):
+1. **Nadie empuja el bytecode.** `DevReloadClient` del mod solo **detecta** cambios de forma y resetea el estado; no redefine
+   clases. Si el juego se lanza con `./gradlew runClient` desde la terminal, no hay depurador atado y **ninguna clase se recarga
+   nunca**. El HotSwap exige lanzar la run configuration de Loom **en modo depuración desde el IDE** y pulsar *Build Project* o
+   *Reload changed classes*.
+2. **IntelliJ compilando con Gradle.** Si *Build and run using* está en Gradle, lo típico es "0 classes reloaded". Hay que
+   ponerlo en **IntelliJ**.
+3. **`-Pt3craft.hotswap` con un JDK normal:** la JVM **se niega a arrancar** con esa bandera si no es JBR. Si se probó así, el
+   síntoma es que el juego no abre, y es fácil leerlo como "el hot reload está roto".
+4. **JBR 25 tiene bugs reales en la redefinición mejorada**: hay crashes abiertos en su repositorio. Uno se dispara solo al
+   combinarla con `-XX:+UseCompactObjectHeaders` (añadir un campo deja instancias en la clase vieja: `ClassCastException` y
+   SIGSEGV); **en JDK 25 esa opción no está activada por defecto**, así que se evita no activándola, pero conviene saberlo.
+5. **El PC es WSL.** Si el IDE está en Windows y Gradle y el juego corren en WSL, el depurador y las rutas cruzan la frontera.
+   Lo más simple es tener el IDE y el juego **del mismo lado**.
+6. **Aunque el HotSwap funcione, la UI no cambiaría:** los colores y las medidas están **en código** (`ChatTheme.warmStudio()`
+   es Java puro, sin recursos). Los valores en campos `static final` y en inicializadores estáticos **no se vuelven a ejecutar**
+   tras un hot-swap, así que un ajuste de paleta o de padding no se vería hasta reiniciar.
+
+**La palanca que no necesita ningún mod, ni JBR, ni depurador: hacer la UI dirigida por datos y usar F3+T.**
+- Mover los tokens de `ChatTheme` (colores, medidas, radios, paddings) a un recurso, por ejemplo
+  `assets/t3craft/gui/ui-style.json`, **leído por el resource manager** con un reload listener. Entonces **F3+T recarga la
+  paleta y las medidas en caliente**, que es el 80 % del trabajo de pulido visual.
+- **Es exactamente lo que hace AgentCraft, pero mejor:** AgentCraft ya tiene sus tokens fuera del código
+  (`assets/agentcraft/gui/ui-style.json`, `palette.json`, `kit.json`) y su `UiStyle` dice *"Never hard-code a colour in a screen
+  or renderer: ask here"*. Su límite es que los carga con `getResourceAsStream` en un **inicializador estático**, o sea por
+  classpath y una sola vez: F3+T no los recarga. Leyéndolos por el resource manager, nosotros sí tendríamos recarga en vivo.
+- Las **sprites, el nine-slice, las fuentes y las traducciones ya se recargan hoy con F3+T** sin tocar nada, porque van por el
+  resource manager.
+- El repo ya usa dos veces este patrón: `HqLayoutPackWatcher` (vigila un archivo de layout) y `ConfigManager` (relee la config
+  cada 2 s). La misma idea aplicada al tema de la UI, y los escenarios de la galería (§11, O1) se vuelven archivos editables.
+- **Qué sigue necesitando reiniciar:** cambios de estructura de las pantallas (widgets nuevos, otra disposición en código). Para
+  eso, O1 (galería `/t3dev ui`) reduce el coste: reinicias y vuelves a la pantalla exacta en un comando, sin navegar el juego.
+
+**Plan sugerido para el ciclo de UI, en orden:**
+1. **Arreglar el camino oficial** (media hora, sin código): run configuration de Loom en **depuración desde el IDE**,
+   *Build and run using: IntelliJ*, IDE y juego del mismo lado, y **sin** `-Pt3craft.hotswap` al principio. Con eso ya hay
+   HotSwap de cuerpos de método, que es lo que Fabric documenta para alinear pantallas.
+2. **Tokens de UI como recurso** (S) → F3+T recarga colores y medidas.
+3. **Galería `/t3dev ui <escenario>`** (S a M) → abrir cualquier pantalla con datos falsos al instante.
+4. **JBR solo si hace falta** cambiar estructura a menudo, sabiendo que es un JDK de terceros y que tiene bugs abiertos.
+5. `uiRender` se queda como comprobación de layout para agentes, no como herramienta de diseño.
+- **Nota:** existe un mod de hot reload para 26.3 (`JHVIW/fabric-hot-reload`, MIT) que vigila el build y recarga código, mixins
+  y recursos. Lo descarto por lo que pidió Facundo (nada de otro mod) y porque es muy inmaduro: una sola jornada de commits,
+  sin estrellas, probado solo en Windows. Se menciona porque su diseño confirma el patrón de los pasos 1 a 3.
+
+### 13.3 Ver la UI en el Mac
+Facundo quiere ver la UI en el Mac. Hay cuatro caminos reales; los dos primeros son los buenos.
+
+| Opción | Qué es | Interactivo | Esfuerzo | Notas |
+|---|---|---|---|---|
+| **M1. El cliente de desarrollo en el propio Mac** | macOS es plataforma de primera para Minecraft; Loom ya pone `-XstartOnFirstThread`. Haría falta JDK 25 (y JBR para macOS si se quiere redefinición mejorada) en el MBP | Sí, total | S | **Lo más simple y el mejor ciclo**: editar, HotSwap y F3+T en la misma máquina, sin red. Choca con una regla: `AGENTS.md` manda Gradle y Minecraft **solo al PC**. Esa regla existe por la saturación de la VPS y por los renders, no por el Mac de Facundo, pero el Mac mini está marcado "solo coordinación", así que **es decisión suya** si el MBP queda habilitado para desarrollo de UI |
+| **M2. Streaming de juego del PC al Mac** | Sunshine en el PC y Moonlight en el Mac (ambos libres), por Tailscale | Sí, con latencia baja | S | Herramienta estándar, no un hack, y no hay que escribir nada. El juego y el IDE se quedan en el PC; el Mac es pantalla y teclado. Lo mejor si el desarrollo debe seguir en el PC |
+| **M3. Visor propio por WebSocket** (O3 de §11) | El mod manda su framebuffer y recibe entrada | Sí | M a L | Solo tiene sentido si se quiere **dentro** de Citadel Studio o desde el móvil. M2 lo cubre mejor y gratis |
+| **M4. PNG de `uiRender` en Citadel Studio** | Ya existe: renders en el PC, vistos desde el Mac | No | — | Útil para revisar, no para desarrollar |
+
+- **Recomendación:** si Facundo acepta desarrollar UI en el MBP, **M1** y se termina el problema (y además el hot reload se
+  vuelve trivial, porque IDE y juego están del mismo lado, punto 5 de 13.2). Si el desarrollo debe quedarse en el PC, **M2**.
+- **Dato a favor de M1:** nada del trabajo de UI necesita la RTX del PC. La GPU solo la usan los renders de HQ (CUDA) y el
+  servicio de renders, que seguirían en el PC.
+- **A verificar para M1:** que exista JBR 25 para macOS arm64, si se quisiera la redefinición mejorada. El HotSwap normal
+  (cuerpos de método) funciona con cualquier JDK 25.
+- **CEF en el Mac** (para el navegador de 13.1): los forks declaran macOS en x86_64 y arm64, pero históricamente AWT y GLFW
+  chocan en macOS. Hay que probarlo en el Mac antes de contar con ello.
+
+### 13.4 Preguntas abiertas
+1. **¿Habilitamos el MBP para desarrollo de UI** (Gradle y `runClient` ahí, M1), o el desarrollo se queda en el PC y usas
+   Moonlight (M2)? Es la decisión que más acelera el ciclo.
+2. **¿Apruebas mover los tokens de UI a un recurso** (`ui-style.json`) para que F3+T recargue colores y medidas? Es un cambio
+   de código en `ChatTheme` y sus consumidores, así que no lo toco sin tu OK.
+3. **Gmail y Google Chat:** ¿aceptas que probablemente **no se puedan loguear** dentro de un navegador embebido y que el
+   navegador del juego sirva para GitHub, docs y dashboards? ¿O te interesa un cliente de correo nativo contra la API?
+4. **¿Hago un spike del navegador** que solo mida qué sitios de tu lista cargan y se loguean en Rinku o MCEF Modern, antes de
+   diseñar nada? Necesita compilar y abrir el juego en el PC, así que lo pediría al coordinador.
+5. ¿Qué pantallas quieres pulir primero con el ciclo nuevo: ajustes, emparejado y confirmaciones (las que usan widgets vanilla),
+   o el chat?
+
+## 14. Anexo: correr el juego en el PC y verlo en el Mac (por Tailscale)
+
+Pregunta de Facundo (2026-11-09): ¿se puede correr en el PC y verlo en el Mac, que están conectados por Tailscale? **Sí.** Pero
+antes hay un detalle del PC que decide todo lo demás.
+
+### 14.1 Primero: ¿dónde corre el juego en el PC, en WSL o en Windows?
+El checkout del PC vive en WSL (`AGENTS.md`: my-pc, WSL, `~/projects/t3craft`). **Correr Minecraft dentro de WSL con WSLg no
+es un buen camino:**
+- La aceleración de OpenGL por hardware en WSL2 suele quedar marcada como no soportada y cae al render por software
+  (`llvmpipe`).
+- Con el camino de hardware (D3D12/Mesa) hay que copiar cada cuadro entre la VRAM y la memoria del sistema para pasarlo a
+  Windows; se reporta un techo de unos 72 a 75 fps y hasta un 50 % de sobrecoste a altas tasas.
+- Hay incidencias abiertas de inestabilidad, incluidos cuelgues del propio Windows en algunas configuraciones.
+
+Conclusión: para el **cliente de desarrollo**, el juego debería correr **en Windows nativo** (y con el IDE también en Windows,
+que además arregla la causa 5 del hot reload, §13.2). Los renders y el demonio de renders se quedan en WSL, donde ya funcionan
+con CUDA. Coste honesto: el PC tendría un checkout de Windows para el cliente de desarrollo, además del de WSL para renders.
+- *Matiz:* para trabajar **solo pantallas** sobre un mundo vacío (el mundo demo superflat o void del mod), incluso el render por
+  software podría alcanzar, porque no hace falta fps. Pero por la inestabilidad reportada no lo recomiendo como camino principal.
+
+### 14.2 Las opciones PC → Mac
+| Opción | Qué es | Interactivo | Fidelidad de imagen | Esfuerzo | Para qué sirve |
+|---|---|---|---|---|---|
+| **T1. Sunshine (PC) + Moonlight (Mac)** | Streaming de juego, los dos libres y de código abierto. Codifica con NVENC en la RTX | Sí, latencia baja | Muy buena, con compresión (ver 14.4) | S, solo instalar y emparejar | **La mejor opción.** Jugar y revisar la UI desde el Mac como si fuera local |
+| **T2. Parsec, Steam Link o NoMachine** | Lo mismo, productos alternativos | Sí | Buena | S | Respaldo si Sunshine da problemas. Steam Link exige añadir el juego como "non-Steam game" |
+| **T3. "Windows App" (RDP) de Microsoft** | Escritorio remoto estándar, ya existe en el Mac | Sí, pero pobre para 3D | Nítida en texto, fps bajos | S | Ver menús y config; no para mirar animaciones ni el mundo |
+| **T4. Jar al Mac: compilar en el PC, jugar en el Mac** | El PC compila (`./gradlew build`), el jar viaja por Tailscale al Mac y ahí corre una instancia normal de Minecraft con el mod | Sí, nativo y fluido | **Perfecta, sin compresión** | S | Respeta "Gradle solo en el PC" y da imagen pixel-exacta. **Sin HotSwap** (no es el cliente de Loom); F3+T sí sirve para recursos. El relay de renders ya mueve archivos así por SSH |
+| **T5. Visor propio por WebSocket** (O3 de §11) | El mod manda su framebuffer y recibe la entrada | Sí | Media | M a L | Solo si se quiere **dentro** de Citadel Studio o en el móvil. T1 lo cubre mejor y gratis |
+| **T6. PNG de `uiRender` o de los gametests en Citadel Studio** | Ya existe: se renderiza en el PC y se mira desde el Mac | No | Pixel-exacta | — | Revisar y comparar, no desarrollar |
+
+### 14.3 Detalles de Tailscale que importan
+- **Direct contra relay.** Comprobar con `tailscale status`: dice `direct`, `relay` (un DERP) o `peer-relay`. Para streaming, una
+  conexión **directa** es imprescindible; un relay añade un salto y la latencia sube mucho (en un caso reportado, de 12 ms a
+  40 ms). Si el PC y el Mac están en la misma red, Tailscale va directo y la calidad es la de la LAN. `tailscale ping` muestra la
+  latencia y qué camino usa.
+- **Nada de abrir puertos al exterior.** Con Tailscale se puede dejar Sunshine solo en el tailnet, sin port forwarding: el
+  firewall del host abre esos puertos únicamente en la interfaz de Tailscale.
+- **Puertos de Sunshine:** TCP 47984, 47989 y 48010, y UDP 47998 a 48010 (más 5353 para descubrimiento).
+- **Gotcha clásico en Windows:** el firewall suele clasificar la interfaz de Tailscale como red "pública" y bloquea esos
+  puertos. Hay que añadir la regla explícitamente para esa interfaz.
+- **Moonlight no descubre el host por el tailnet** (el mDNS no cruza): hay que **añadir el PC a mano** por su IP de Tailscale o
+  su nombre de MagicDNS.
+
+### 14.4 Advertencia específica para trabajo de UI
+El streaming comprime con H.264 o HEVC, y la fuente de Minecraft es un bitmap de 8 px: el texto chico y las líneas de 1 px son
+justo lo que peor sobrevive a la compresión. Recomendaciones:
+- Subir el bitrate (con conexión directa, del orden de 40 a 80 Mbps) y que la resolución del stream **coincida** con la del Mac,
+  sin reescalado.
+- Usar el stream para **disposición, flujo y sensación**, y juzgar lo pixel-exacto (kerning, bordes, alineación de 1 px) con
+  **capturas**: `F2` en el juego escribe un PNG, y el relay de renders y Citadel Studio ya saben traerlas al Mac. O T4, que no
+  comprime nada.
+
+### 14.5 Recomendación
+1. **T1 (Sunshine + Moonlight) como camino principal**, con el cliente de desarrollo en **Windows nativo** en el PC y el IDE
+   también en Windows. Con eso tienes el ciclo completo en el PC (HotSwap y F3+T) y lo ves y manejas desde el Mac.
+2. **T4 como complemento** cuando necesites imagen pixel-exacta o el Mac sin latencia: el PC compila, el jar viaja, juegas nativo.
+3. **T6 para revisar** y comparar, que ya está construido.
+4. Si más adelante quieres el ciclo entero en el Mac, eso es M1 de §13.3 y requiere habilitar Gradle ahí.
+
+### 14.6 Preguntas
+1. ¿Puedo asumir que el cliente de desarrollo del PC pasa a **Windows nativo** (checkout propio ahí), y que WSL se queda con los
+   renders? Es la decisión que desbloquea T1 y el hot reload.
+2. ¿Prefieres **T1** (fluido, con compresión) o **T4** (nítido, sin HotSwap) como camino por defecto para mirar la UI?
+3. ¿Quieres que esto quede documentado en `docs/dev.md` como el ciclo de UI recomendado? Sería un cambio de docs, no de código.
+
+## Fuentes web
+
+- GLFW, `glfwRequestWindowAttention`: https://www.glfw.org/docs/latest/group__window.html
+- Fabric, HUD en 26.x: https://docs.fabricmc.net/develop/rendering/hud
+- ntfy, publicar: https://docs.ntfy.sh/publish/
+- Discord, ejecutar webhook: https://docs.discord.com/developers/resources/webhook
+- VS Code, esquemas de URL: https://code.visualstudio.com/docs/editor/command-line
+- T3 Code, agentes externos y MCP: https://github.com/pingdotgg/t3code/blob/main/docs/user/outside-agents.md
+- T3 Code, enlaces profundos: https://github.com/pingdotgg/t3code/issues/26915
+- Narrador de Minecraft en Linux (flite): https://github.com/flathub/com.mojang.Minecraft/issues/14
+- AWT y GLFW en macOS: https://github.com/libgdx/libgdx/pull/6673
+- MCEF original (hasta 1.21.4): https://github.com/CinemaMod/mcef
+- MCEF Modern (26.3): https://modrinth.com/mod/mcef-modern y https://github.com/DimasKama/mcef-modern
+- Rinku (26.3): https://www.curseforge.com/minecraft/mc-mods/mcef-keksuccino y https://github.com/Keksuccino/Rinku
+- mcef-codec (H.264/AAC): https://github.com/menntdev/mcef-codec
+- Fabric, pruebas automáticas y client game tests: https://docs.fabricmc.net/develop/automatic-testing
+- WebGUI (GUI y HUD web con hot reload): https://modrinth.com/project/tDw1xQja
+- AgentCraft: https://github.com/blendi-remade/agentcraft (README, `docs/console.md`, `docs/protocol.md`, `docs/SPEC.md`,
+  `client/ui/UiStyle.java`)
+- Fabric, depurar y hot-swap: https://docs.fabricmc.net/develop/debugging
+- JetBrains Runtime, redefinición mejorada y sus bugs: https://github.com/JetBrains/JetBrainsRuntime/issues/650 y
+  https://github.com/JetBrains/JetBrainsRuntime/issues/658
+- Compact object headers en JDK 25 (no activados por defecto): https://openjdk.org/jeps/519
+- Google y el inicio de sesión en webviews embebidos: https://github.com/agentify-sh/desktop/issues/11 y
+  https://github.com/tw93/pake/issues/1148
+- fabric-hot-reload (descartado, se cita como referencia de diseño): https://github.com/JHVIW/fabric-hot-reload
+- Moonlight, guía de instalación y puertos: https://github.com/moonlight-stream/moonlight-docs/wiki/Setup-Guide
+- Sunshine y Moonlight sobre Tailscale: https://zeroicey.me/en/posts/tailscale-sunshine-moonlight-remote-desktop/
+- Tailscale, tipos de conexión (direct, relay, peer-relay): https://tailscale.com/docs/reference/connection-types
+- OpenGL acelerado en WSL2, problemas: https://github.com/microsoft/WSL/issues/14033 y
+  https://github.com/microsoft/wslg/issues/469
+- WebDisplays (Fabric): https://www.curseforge.com/minecraft/mc-mods/webdisplays-unofficial-fabric
+- T3 Code, preview en servidor y streaming: `packages/client-runtime/src/preview/serverBrowserStream.ts` y
+  `apps/server/src/preview/ServerBrowserStream.ts` en https://github.com/pingdotgg/t3code
