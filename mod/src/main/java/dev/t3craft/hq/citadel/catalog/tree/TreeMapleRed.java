@@ -8,6 +8,8 @@ import dev.t3craft.hq.citadel.catalog.Plot;
 import dev.t3craft.hq.citadel.catalog.Variant;
 import dev.t3craft.hq.citadel.catalog.tree.TreeKit.Vox;
 import dev.t3craft.hq.citadel.catalog.tree.TreeKit.Wood;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 import net.minecraft.core.Direction;
 import net.minecraft.world.item.DyeColor;
@@ -15,19 +17,23 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
- * Japanese red maple (momiji) in autumn: a slim, sinuous dark trunk on a short flared foot that bends in an S and
- * opens, from 3–4 blocks up, into limbs that curve out and up. Each limb ends inside a flat, scalloped fan of
- * leaves; the fans sit at two or three levels (a low ring, a middle ring on tall plots, a crown over the leader)
- * with sky between them and holes in them, so the crown reads as horizontal layers and never as a cube. The
- * colour is a fine mix of four untinted blocks (nether wart, red wool, orange terracotta, orange wool, a few
- * honeycomb flecks on the sunny top) that runs from deep red under the crown to orange on the sunny side, and
- * each seed leans redder or more orange. A carpet of fallen leaves (leaf litter, red and orange carpet) below.
+ * Japanese red maple (momiji) in autumn: a slim, gently S-bent dark trunk on a short flared foot, clear of branches
+ * up to y 4 (so you walk under it), with its crown in horizontal <em>floors</em>. Floors sit two layers apart (y 4,
+ * 6, 8 and, on some mid-size plots, 10), so there is always one layer of air between one floor and the next and the
+ * slim trunk shows through it. Each floor holds a few flat, scalloped fans of leaves, <b>one block thick</b> (no cap,
+ * no drips), held up by a single thin limb each; the fans of a floor sit over the gaps of the floor below (found by
+ * a widest-gap search), the lowest ones are the widest and the crown over the leader is the smallest but brightest.
+ * Big plots get more fans per floor, not more floors, so the tree grows wider rather than taller.
+ *
+ * <p>Colour is a fine mix of three untinted blocks (nether wart, red wool, a little orange wool and rare honeycomb
+ * flecks on sunny tops): deep red and red nearly everywhere, orange only as an accent on the sun side of the upper
+ * fans. A carpet of fallen leaves (leaf litter, red and orange carpet) lies below.
  *
  * <p>The maple uses untinted blocks for its foliage: every vanilla leaf that could be red is biome-tinted green
  * in the renders and in plains. Everything is drawn into a {@link Vox}, which also removes any leaf that would
  * float.
  *
- * <p>Size: 5–11 × 5–11 × 9+ (the crown height follows the seed, 9–14, and the fans scale with the footprint).
+ * <p>Size: 5–11 × 5–11 × 9+ (three floors reach y 8; a fourth floor, y 10, needs a plot 11 high).
  */
 public final class TreeMapleRed implements Variant {
 	private static final Wood WOOD = new Wood(Blocks.DARK_OAK_LOG, Blocks.DARK_OAK_WOOD, b(Blocks.MANGROVE_ROOTS));
@@ -38,6 +44,8 @@ public final class TreeMapleRed implements Variant {
 			b(Blocks.WOOL.pick(DyeColor.ORANGE)),
 	};
 	private static final BlockState HONEY = b(Blocks.HONEYCOMB_BLOCK);
+	/** The lowest floor and the lowest wood of any limb: 3 free blocks over the foot (walkable underneath). */
+	private static final int FLOOR0 = 4;
 
 	@Override
 	public String id() {
@@ -81,18 +89,22 @@ public final class TreeMapleRed implements Variant {
 		int w = p.w();
 		int d = p.d();
 		int m = Math.min(w, d);
-		int H = Math.min(p.h(), 9 + r.nextInt(3) + (m >= 9 ? 1 : 0));
+		// floors two layers apart: one layer of air between them
+		int nF = p.h() >= 11 && m >= 7 && m <= 9 && r.nextInt(3) == 0 ? 4 : 3;
+		int[] fy = new int[nF];
+		for (int i = 0; i < nF; i++) {
+			fy[i] = FLOOR0 + 2 * i;
+		}
+		int topY = fy[nF - 1];
 		int ou = r.nextInt(2);
 		int ov = r.nextInt(2);
 		int bu = TreeKit.base(w, ou);
 		int bv = TreeKit.base(d, ov);
 		int cu0 = bu + ou;
 		int cv0 = bv + ov;
-		double bias = (r.nextInt(5) - 2) * 0.08; // some trees lean redder, some more orange
+		double bias = (r.nextInt(5) - 2) * 0.03; // some trees lean redder, some a little more orange
 		double sun = r.nextDouble() * Math.PI * 2;
 		double a0 = r.nextDouble() * Math.PI * 2;
-		int lowY = m <= 5 ? 3 : 4;
-		int topY = H >= 13 ? H - 2 : m <= 5 ? 6 : Math.min(H - 2, m <= 7 ? 7 + (H >= 11 ? 1 : 0) : H >= 11 ? 9 : 8); // main layer of the crown pad over the leader (a broad, low crown)
 
 		// ---- foot: a 2×2 flare of bark, short roots
 		for (int a = 0; a < 2; a++) {
@@ -100,26 +112,29 @@ public final class TreeMapleRed implements Variant {
 				t.wood(bu + a, 0, bv + e, WOOD.bark());
 			}
 		}
-		TreeKit.roots(t, WOOD, bu, bv, 3 + r.nextInt(2), 1, -1, 5);
+		TreeKit.roots(t, WOOD, bu, bv, 2 + r.nextInt(2), 1, -1, 5);
 
-		// ---- the sinuous trunk: an S curve that comes back to the axis under the crown
-		double amp = m >= 8 ? 1.6 : 1.2;
+		// ---- the slim trunk: straight to y 3, then a gentle S under the crown (one log per layer)
+		double amp = m >= 8 ? 1.4 : 1.0;
 		double phi = r.nextDouble() * Math.PI * 2;
-		int[] tu = new int[H + 1];
-		int[] tv = new int[H + 1];
+		int[] tu = new int[topY + 1];
+		int[] tv = new int[topY + 1];
 		int cu = cu0;
 		int cv = cv0;
 		tu[0] = cu;
 		tv[0] = cv;
 		tu[1] = cu;
 		tv[1] = cv;
-		int span = Math.max(1, topY - 1);
-		for (int y = 2; y <= topY; y++) {
-			double s = Math.sin((y - 1.0) / span * Math.PI * 2);
-			int goalU = cu0 + (int) Math.round(amp * Math.cos(phi) * s);
-			int goalV = cv0 + (int) Math.round(amp * Math.sin(phi) * s);
-			goalU = TreeKit.clamp(goalU, 1, w - 2);
-			goalV = TreeKit.clamp(goalV, 1, d - 2);
+		t.wood(cu, 1, cv, WOOD.log(Direction.Axis.Y));
+		int span = Math.max(1, topY - 3);
+		for (int y = 2; y <= topY - 1; y++) {
+			int goalU = cu0;
+			int goalV = cv0;
+			if (y >= FLOOR0) {
+				double s = Math.sin((y - 3.0) / span * Math.PI * 2);
+				goalU = TreeKit.clamp(cu0 + (int) Math.round(amp * Math.cos(phi) * s), 1, w - 2);
+				goalV = TreeKit.clamp(cv0 + (int) Math.round(amp * Math.sin(phi) * s), 1, d - 2);
+			}
 			int du = Integer.signum(goalU - cu);
 			int dv = Integer.signum(goalV - cv);
 			if (du != 0 && dv != 0) {
@@ -139,43 +154,31 @@ public final class TreeMapleRed implements Variant {
 			tv[y] = cv;
 			t.wood(cu, y, cv, WOOD.log(Direction.Axis.Y));
 		}
-		if (tu[1] == cu0 && tv[1] == cv0) {
-			t.wood(cu0, 1, cv0, WOOD.log(Direction.Axis.Y));
-		}
-		for (int y = topY + 1; y <= H; y++) {
-			tu[y] = cu;
-			tv[y] = cv;
-		}
-		double ccu = tu[topY];
-		double ccv = tv[topY];
+		tu[topY] = cu;
+		tv[topY] = cv;
 
-		// ---- the fans: a low ring, a middle ring on tall plots, the crown over the leader
-		double rbase = TreeKit.clamp(m * 0.37, 1.9, 4.8);
-		int nLow = m <= 5 ? 2 : m <= 7 ? 3 : m <= 10 ? 4 : 5;
-		double step = Math.PI * 2 / nLow;
+		// ---- the floors: wide low fans, fewer and smaller going up, each floor over the gaps of the ones below
+		double rbase = TreeKit.clamp(m * 0.34, 1.5, 4.0);
+		int nLow = m <= 5 ? 1 : m <= 8 ? 3 : 4;
+		int nMid = m <= 5 ? 1 : m <= 8 ? 2 : 3;
+		List<Double> used = new ArrayList<>();
 		int id = 1;
-		for (int k = 0; k < nLow; k++) {
-			double ang = a0 + k * step + (r.nextDouble() - 0.5) * 0.7;
-			int py = lowY + ((k & 1) == 1 && H >= 10 ? 1 : 0) + (r.nextInt(5) == 0 ? 1 : 0);
-			double rx = rbase * (0.9 + r.nextDouble() * 0.35);
-			double rz = rx * (0.72 + r.nextDouble() * 0.28);
-			fan(t, r, cu0, cv0, ang, 0.8 + r.nextDouble() * 0.15, rx, rz, py, (m <= 5 ? 2 : 3) + (k & 1), tu, tv, id++, sun, bias, 0.0, m);
-		}
-		if (H >= 13) {
-			int nMid = m >= 8 ? 3 : 2;
-			double ms = Math.PI * 2 / nMid;
-			for (int k = 0; k < nMid; k++) {
-				double ang = a0 + step / 2 + k * ms + (r.nextDouble() - 0.5) * 0.6;
-				int py = 7 + (H - 12) / 2 + (k & 1);
-				py = Math.min(py, topY - 3);
-				double rx = rbase * (0.78 + r.nextDouble() * 0.3);
-				double rz = rx * (0.75 + r.nextDouble() * 0.25);
-				fan(t, r, cu0, cv0, ang, 0.34 + r.nextDouble() * 0.1, rx, rz, py, Math.max(3, py - 3), tu, tv, id++, sun, bias, 0.1, m);
+		for (int i = 0; i < nF - 1; i++) {
+			int n = i == 0 ? nLow : i == 1 ? nMid : 2;
+			double step = Math.PI * 2 / n;
+			double rf = rbase * (1.0 - 0.1 * i);
+			double reach = i == 0 ? 0.82 : i == 1 ? 0.55 : 0.45;
+			for (int k = 0; k < n; k++) {
+				double ang = i == 0 ? a0 + k * step + (r.nextDouble() - 0.5) * 0.5 : widestGap(used, a0, r);
+				used.add(ang);
+				double rx = rf * (0.9 + r.nextDouble() * 0.3);
+				double rz = rx * (0.72 + r.nextDouble() * 0.28);
+				fan(t, tu, tv, fy[i], ang, reach, rx, rz, id++, sun, bias, i, false, m);
 			}
 		}
-		// the crown, over the leader: the brightest
-		double rt = m <= 9 ? 1.35 + r.nextDouble() * 0.35 : rbase * (0.78 + r.nextDouble() * 0.2);
-		fan(t, r, ccu, ccv, 0, 0.0, rt, rt * (0.8 + r.nextDouble() * 0.2), topY, topY - 3, tu, tv, id++, sun, bias, 0.2, m);
+		// the crown, over the leader: the smallest fan and the brightest
+		double rt = m <= 5 ? 1.5 + r.nextDouble() * 0.2 : m <= 8 ? 2.1 + r.nextDouble() * 0.4 : TreeKit.clamp(m * 0.26, 2.4, 3.2);
+		fan(t, tu, tv, topY, 0, 0, rt, rt * (0.8 + r.nextDouble() * 0.2), id, sun, bias, nF - 1, true, m);
 
 		// ---- fallen leaves under the crown, thick at the trunk and thinning out
 		int salt = 100;
@@ -202,49 +205,69 @@ public final class TreeMapleRed implements Variant {
 		t.flush(c);
 	}
 
-	/**
-	 * One limb and its fan. The fan's centre is {@code reach} (a fraction of the half-plot) from {@code (cu, cv)} along
-	 * {@code ang} at height {@code py}; with {@code reach == 0} it is centred on {@code (cu, cv)} (the crown). The limb
-	 * starts on the trunk at {@code ys}, goes out and then up, and ends inside the fan.
-	 */
-	private static void fan(Vox t, Random r, double cu, double cv, double ang, double reach, double rx, double rz, int py,
-			int ys, int[] tu, int[] tv, int id, double sun, double bias, double hueUp, int m) {
-		double ex = Math.cos(ang);
-		double ez = Math.sin(ang);
-		double fu = cu;
-		double fv = cv;
-		if (reach > 0) {
-			double half = m / 2.0;
-			double rr = reach * half + 0.6;
-			double room = TreeKit.room(t, cu, cv, ex, ez, 0) - Math.max(rx, rz) * 0.45;
-			rr = TreeKit.clamp(Math.min(rr, room), 1.2, 6.0);
-			fu = cu + ex * rr;
-			fv = cv + ez * rr;
+	/** The angle (from 36 candidates) farthest from every angle already used: the floor above sits over the gaps. */
+	private static double widestGap(List<Double> used, double a0, Random r) {
+		double best = a0;
+		double bestD = -1;
+		for (int j = 0; j < 36; j++) {
+			double a = a0 + j * Math.PI * 2 / 36 + (r.nextDouble() - 0.5) * 0.1;
+			double dmin = 9;
+			for (double u : used) {
+				dmin = Math.min(dmin, Math.abs(Math.atan2(Math.sin(a - u), Math.cos(a - u))));
+			}
+			if (dmin > bestD + 1e-9) {
+				bestD = dmin;
+				best = a;
+			}
 		}
-		int fu0 = (int) Math.round(fu);
-		int fv0 = (int) Math.round(fv);
-		double hue = 0.25 + 0.25 * Math.cos(ang - sun) * (reach > 0 ? 1 : 0.5) + 0.025 * (py - 4) + hueUp + bias;
-		if (reach > 0) {
-			// the limb: from the trunk out and then up into the fan
-			int y0 = TreeKit.clamp(ys, 2, py - 1);
-			int[] a = {tu[y0], y0, tv[y0]};
-			int[] z = {fu0, py, fv0};
-			int[] mid = {(int) Math.round(a[0] + (z[0] - a[0]) * 0.72), y0 + Math.max(0, (py - y0) / 3),
-					(int) Math.round(a[2] + (z[2] - a[2]) * 0.72)};
-			TreeKit.branch(t, WOOD, a, mid, false);
-			TreeKit.branch(t, WOOD, mid, z, false);
-			// a second twig under the rim, sideways, so the fan is held up by more than one limb
-			int[] tw = {(int) Math.round(z[0] - ez * rx * 0.55), py, (int) Math.round(z[2] + ex * rz * 0.55)};
-			TreeKit.branch(t, WOOD, mid, tw, false);
-		}
-		pad(t, fu, py, fv, rx, rz, ang, id, hue);
+		return best;
 	}
 
 	/**
-	 * A flat fan of leaves: the main layer a scalloped ellipse, a ragged cap layer above it (smaller), a few drips
-	 * under the rim, and holes of sky in the main layer on the big ones.
+	 * One fan on the floor at {@code py} and its single thin limb. The crown ({@code crown}) sits on the top of the
+	 * trunk and has no limb; any other fan is centred {@code reach} (a fraction of the half-plot) from the trunk along
+	 * {@code ang}, shrunk to fit the plot, on a limb that leaves the trunk at y 4 or higher and ends under the fan
+	 * (in the fan's layer on the lowest floor).
 	 */
-	private static void pad(Vox t, double cu, int cy, double cv, double rx, double rz, double rot, int id, double hue) {
+	private static void fan(Vox t, int[] tu, int[] tv, int py, double ang, double reach, double rx, double rz, int id,
+			double sun, double bias, int floor, boolean crown, int m) {
+		double hue = 0.40 + 0.14 * Math.cos(ang - sun) * (crown ? 0.5 : 1.0) + 0.02 * floor + bias + (crown ? 0.04 : 0.0);
+		double fu;
+		double fv;
+		if (crown) {
+			fu = tu[py];
+			fv = tv[py];
+		} else {
+			int ey = Math.max(FLOOR0, py - 1);
+			int y0 = Math.max(FLOOR0, py - 3);
+			int su = tu[y0];
+			int sv = tv[y0];
+			double ex = Math.cos(ang);
+			double ez = Math.sin(ang);
+			double room = TreeKit.room(t, su, sv, ex, ez, 0);
+			double rad = Math.max(rx, rz);
+			double rr = TreeKit.clamp(reach * m / 2.0 + 0.4, 1.3, Math.max(1.3, room * 0.8));
+			double s = TreeKit.clamp((room - rr + 0.6) / (1.2 * rad), 0.75, 1.0);
+			rx *= s;
+			rz *= s;
+			fu = su + ex * rr;
+			fv = sv + ez * rr;
+			int fu0 = TreeKit.clamp((int) Math.round(fu), 0, t.w - 1);
+			int fv0 = TreeKit.clamp((int) Math.round(fv), 0, t.d - 1);
+			int[] a = {su, y0, sv};
+			int[] z = {fu0, ey, fv0};
+			int[] mid = {(int) Math.round(a[0] + (z[0] - a[0]) * 0.6), y0 + (ey - y0) / 2, (int) Math.round(a[2] + (z[2] - a[2]) * 0.6)};
+			TreeKit.branch(t, WOOD, a, mid, false);
+			TreeKit.branch(t, WOOD, mid, z, false);
+		}
+		pad(t, fu, py, fv, rx, rz, ang, id, hue, floor >= 1);
+	}
+
+	/**
+	 * A flat fan of leaves, exactly one block thick: a scalloped ellipse with a ragged edge, a notch cut towards one
+	 * side and a few holes of sky on the big ones.
+	 */
+	private static void pad(Vox t, double cu, int cy, double cv, double rx, double rz, double rot, int id, double hue, boolean top) {
 		double R = Math.max(rx, rz);
 		int u0 = (int) Math.floor(cu - R * 1.3) - 1;
 		int u1 = (int) Math.ceil(cu + R * 1.3) + 1;
@@ -253,12 +276,14 @@ public final class TreeMapleRed implements Variant {
 		double notch = rot + id * 2.1;
 		int ci = (int) Math.round(cu);
 		int cj = (int) Math.round(cv);
+		// the centre first: it sits on the limb's end, so the whole fan hangs from it
+		t.leaf(ci, cy, cj, leaf(t, hue, ci, cy, cj, top));
 		for (int v = v0; v <= v1; v++) {
 			for (int u = u0; u <= u1; u++) {
 				double dx = u - cu;
 				double dz = v - cv;
 				double q = Math.sqrt(Math.pow(dx / rx, 2) + Math.pow(dz / rz, 2));
-				double scallop = 1.0 + 0.17 * Math.cos((Math.atan2(dz, dx) + rot) * 5.0);
+				double scallop = 1.0 + 0.19 * Math.cos((Math.atan2(dz, dx) + rot) * 5.0);
 				double qq = q / scallop;
 				double jit = (t.hash(u, cy, v, 9) - 4.0) / 4.0 * 0.16;
 				boolean centre = u == ci && v == cj;
@@ -267,16 +292,8 @@ public final class TreeMapleRed implements Variant {
 					boolean cut = R >= 3.0 && da < 0.3 && qq > 0.6;
 					boolean hole = cut || (R >= 2.9 && !centre && qq > 0.4 && qq < 0.85 && t.hash(u + id, cy + 5, v, 8) == 0);
 					if (!hole) {
-						t.leafOf(u, cy, v, leaf(t, hue + (qq - 0.5) * 0.12, u, cy, v, false), id);
+						t.leafOf(u, cy, v, leaf(t, hue + (qq - 0.5) * 0.12, u, cy, v, top), id);
 					}
-				}
-				// the cap: smaller and ragged, brighter
-				if (qq <= 0.42 + jit && (centre || t.hash(u, cy + 1, v + id, 4) != 0)) {
-					t.leafOf(u, cy + 1, v, leaf(t, hue + 0.03, u, cy + 1, v, true), id);
-				}
-				// a few drips under the rim, darker
-				if (qq > 0.7 && qq <= 1.0 + jit && t.hash(u + id, cy - 1, v, 12) == 0 && t.kind(u, cy, v) != TreeKit.EMPTY) {
-					t.leafOf(u, cy - 1, v, leaf(t, hue - 0.14, u, cy - 1, v, false), id);
 				}
 			}
 		}
