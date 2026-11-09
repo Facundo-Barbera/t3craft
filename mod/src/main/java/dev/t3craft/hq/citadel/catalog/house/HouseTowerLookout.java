@@ -490,7 +490,7 @@ public final class HouseTowerLookout implements Variant {
 	// ------------------------------------------------------------------ furniture
 
 	private static BlockState bed(Direction head, boolean isHead) {
-		return b(Blocks.PINK_BED).setValue(BlockStateProperties.HORIZONTAL_FACING, head)
+		return b(Blocks.BED.pick(DyeColor.PINK)).setValue(BlockStateProperties.HORIZONTAL_FACING, head)
 				.setValue(BlockStateProperties.BED_PART, isHead ? BedPart.HEAD : BedPart.FOOT);
 	}
 
