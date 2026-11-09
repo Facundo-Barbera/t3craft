@@ -30,7 +30,7 @@ import net.minecraft.world.level.block.state.BlockState;
  * <pre>
  *  local layout (front = v 0, looking down)
  *  v0   . . . . . steps . . . . .
- *  v1   ◖◖◖◖◖◖◖                       tower: centre (4,4), shaft radius 3, crown radius 4
+ *  v1   ◖◖◖◖◖◖◖                       tower: centre (3,3), slender 5-wide shaft, crown 7 wide
  *  v3   ◖◖◖◖◖◖◖■■■■■■■■■■■  front wall (door under a hood)
  *  ...  ◖◖◖◖◖◖◖■  hall   ■▐ chimney on the right gable
  *  d-2  . . . .■■■■■■■■■■■  back wall
@@ -40,10 +40,11 @@ import net.minecraft.world.level.block.state.BlockState;
  */
 public final class HouseStoneTower implements Variant {
 	private static final int PLATE = 7;
-	private static final int TC = 4; // tower centre (u and v)
-	private static final int R_OUT = 10; // shaft: squared radius 3.2
-	private static final int R_IN = 5; // hollow inside
-	private static final int R_CROWN = 17; // corbel/eave: squared radius 4.1
+	private static final int TC = 3; // tower centre (u and v)
+	private static final int R_OUT = 5; // shaft: a slender 5x5 with the corners cut (squared radius 2.2)
+	private static final int R_IN = 1; // hollow inside
+	private static final int R_CROWN = 10; // corbel/eave: squared radius 3.2
+	private static final int HALL_U0 = 6; // the hall starts next to the tower, not inside it
 
 	@Override
 	public String id() {
@@ -84,7 +85,7 @@ public final class HouseStoneTower implements Variant {
 	public void build(CitadelCanvas c, Plot p) {
 		int w = p.w();
 		int d = p.d();
-		int u0 = 3;
+		int u0 = HALL_U0;
 		int u1 = w - 2;
 		int v0 = 3;
 		int v1 = d - 2;
@@ -128,7 +129,7 @@ public final class HouseStoneTower implements Variant {
 			case 0, 1 -> deep(p, u, y, v);
 			case 2 -> p.hash(u, y, v, 5) < 2 ? deep(p, u, y, v) : mid(p, u, y, v);
 			case 3 -> mid(p, u, y, v);
-			case 4 -> b(Blocks.CALCITE); // belt course
+			case 4 -> b(Blocks.POLISHED_ANDESITE); // belt course
 			case 5 -> p.hash(u, y, v, 5) < 2 ? mid(p, u, y, v) : light(p, u, y, v);
 			case 6 -> light(p, u, y, v);
 			default -> b(Blocks.CALCITE); // top plate under the cornice
@@ -173,17 +174,17 @@ public final class HouseStoneTower implements Variant {
 	}
 
 	private static void windows(Wall front, Wall back, Wall left, Wall right, int u1, int v1) {
-		int cu = (8 + u1) / 2;
+		int cu = (HALL_U0 + u1) / 2;
 		// front: windows left and right of the porch, both floors; a taller one over the door
 		for (int t : new int[] {cu - 3, cu + 3}) {
-			if (t >= 9 && t <= u1 - 1) {
+			if (t - 1 >= HALL_U0 && t + 1 <= u1) {
 				window(front, t, 2, true);
 				window(front, t, 5, false);
 			}
 		}
 		window(front, cu, 5, false);
 		// back: a window every 4
-		for (int t = 5; t <= u1 - 2; t += 4) {
+		for (int t = HALL_U0 + 2; t <= u1 - 2; t += 4) {
 			window(back, t, 2, true);
 			window(back, t, 5, false);
 		}
@@ -246,19 +247,20 @@ public final class HouseStoneTower implements Variant {
 			for (int u = u0; u <= u1; u++) {
 				if (r == 0) {
 					p.set(c, u, PLATE, v, stairs(Blocks.DARK_OAK_STAIRS, high));
-					// [depth] dentils: inverted stairs under the eave at every second cell
-					if ((u - u0) % 2 == 0) {
-						p.set(c, u, PLATE - 1, v, up(stairs(Blocks.DEEPSLATE_BRICK_STAIRS, high)));
-					}
 				} else if (r == maxRr(d)) {
-					p.set(c, u, ys(r), v, b(Blocks.DEEPSLATE_TILES));
-					p.set(c, u, ys(r) + 1, v, slab(Blocks.DEEPSLATE_BRICK_SLAB));
+					p.set(c, u, ys(r), v, b(Blocks.MUD_BRICKS)); // [palette] a warm clay roof: the hall no longer melts into the dark tower
+					p.set(c, u, ys(r) + 1, v, slab(Blocks.MUD_BRICK_SLAB));
 				} else {
 					boolean lowSlab = (r - 1) % 2 == 0;
-					var blk = p.hash(u, r, v, 6) == 0 ? Blocks.DEEPSLATE_BRICK_SLAB : Blocks.DEEPSLATE_TILE_SLAB;
+					var blk = p.hash(u, r, v, 6) == 0 ? Blocks.BRICK_SLAB : Blocks.MUD_BRICK_SLAB;
 					p.set(c, u, ys(r), v, lowSlab ? slab(blk) : topSlab(blk));
 				}
 			}
+		}
+		// [depth] the front and back eaves stand on beam tails with a stair corbel under each, every second cell
+		for (int u = u0; u <= u1; u += 2) {
+			EaveKit.corbel(c, p, u, PLATE - 1, 2, Direction.SOUTH, Blocks.DARK_OAK_LOG, Blocks.DEEPSLATE_BRICK_STAIRS);
+			EaveKit.corbel(c, p, u, PLATE - 1, d - 1, Direction.NORTH, Blocks.DARK_OAK_LOG, Blocks.DEEPSLATE_BRICK_STAIRS);
 		}
 	}
 
@@ -290,28 +292,35 @@ public final class HouseStoneTower implements Variant {
 	}
 
 	/**
-	 * [finish] a chimney outside the right gable: a wide base, a set-back, a slim stack with a
-	 * stone cap, rising above the ridge.
+	 * [finish] a chimney breast built into the right gable: two wide, it leaves the wall one block proud with
+	 * a stair shoulder under the plate, then carries on flush in the gable plane through the roof and stands
+	 * well above the ridge in a slim stack with a stone cap.
 	 */
 	private static void chimney(CitadelCanvas c, Plot p, int u1, int v0, int v1) {
 		int cv = (v0 + v1) / 2;
 		int cu = u1 + 1;
-		int top = Math.min(ridgeY(p.d()) + 4, p.h() - 1);
-		for (int y = 0; y <= top; y++) {
-			int half = y <= 3 ? 1 : 0;
-			for (int v = cv - half; v <= cv + half; v++) {
-				BlockState s = y <= 2 ? deep(p, cu, y, v) : y <= 5 ? mid(p, cu, y, v) : light(p, cu, y, v);
+		int top = Math.min(ridgeY(p.d()) + 2, p.h() - 2);
+		for (int y = 0; y <= PLATE - 2; y++) {
+			for (int v = cv; v <= cv + 1; v++) {
+				BlockState s = y <= 2 ? deep(p, cu, y, v) : y <= 4 ? mid(p, cu, y, v) : light(p, cu, y, v);
 				p.set(c, cu, y, v, s);
 			}
-			if (y == 4) {
-				p.set(c, cu, 3, cv - 1, stairs(Blocks.STONE_BRICK_STAIRS, Direction.SOUTH)); // set-back
+		}
+		// shoulders: the breast steps back into the wall under the plate
+		for (int v = cv; v <= cv + 1; v++) {
+			p.set(c, cu, PLATE - 1, v, stairs(Blocks.STONE_BRICK_STAIRS, Direction.WEST));
+		}
+		p.set(c, cu, PLATE - 1, cv - 1, stairs(Blocks.STONE_BRICK_STAIRS, Direction.SOUTH));
+		p.set(c, cu, PLATE - 1, cv + 2, stairs(Blocks.STONE_BRICK_STAIRS, Direction.NORTH));
+		// the stack, flush in the gable plane
+		for (int y = PLATE; y <= top; y++) {
+			for (int v = cv; v <= cv + 1; v++) {
+				p.set(c, u1, y, v, y == PLATE ? b(Blocks.CALCITE) : y >= top - 1 ? b(Blocks.DEEPSLATE_BRICKS) : light(p, u1, y, v));
 			}
 		}
-		// set-back slopes on both sides of the base
-		p.set(c, cu, 4, cv - 1, stairs(Blocks.STONE_BRICK_STAIRS, Direction.SOUTH));
-		p.set(c, cu, 4, cv + 1, stairs(Blocks.STONE_BRICK_STAIRS, Direction.NORTH));
-		p.set(c, cu, top, cv, b(Blocks.DEEPSLATE_BRICKS));
-		p.set(c, cu, top + 1, cv, slab(Blocks.DEEPSLATE_BRICK_SLAB));
+		for (int v = cv; v <= cv + 1; v++) {
+			p.set(c, u1, top + 1, v, slab(Blocks.DEEPSLATE_BRICK_SLAB));
+		}
 	}
 
 	// ------------------------------------------------------------------ porch
@@ -321,7 +330,7 @@ public final class HouseStoneTower implements Variant {
 	 * on each side, planters on the foot ledge and a step.
 	 */
 	private static void porch(Wall f, CitadelCanvas c, Plot p, int u1) {
-		int cu = (8 + u1) / 2;
+		int cu = (HALL_U0 + u1) / 2;
 		// opening
 		f.set(cu, 1, 0, f.door(Blocks.DARK_OAK_DOOR, true));
 		f.set(cu, 2, 0, f.door(Blocks.DARK_OAK_DOOR, false));
@@ -374,44 +383,35 @@ public final class HouseStoneTower implements Variant {
 			}
 		}
 		// windows: cardinal ones low, diagonal ones high, arrow slits at the top
-		int[][] cardinal = {{0, -3}, {3, 0}, {0, 3}, {-3, 0}};
-		int[][] diagonal = {{2, -2}, {2, 2}, {-2, 2}, {-2, -2}};
+		int[][] cardinal = {{0, -2}, {0, 2}, {-2, 0}};
+		int[][] diagonal = {{2, -1}, {1, 2}, {-2, 1}, {-1, -2}};
 		for (int[] o : cardinal) {
 			towerWindow(c, p, o[0], o[1], 2, true);
+		}
+		for (int[] o : new int[][] {{0, -2}, {0, 2}, {-2, 0}, {2, 0}}) {
 			p.set(c, TC + o[0], 9, TC + o[1], b(Blocks.TINTED_GLASS));
 		}
 		for (int[] o : diagonal) {
 			towerWindow(c, p, o[0], o[1], 6, false);
 		}
-		// belt courses
-		for (int y : new int[] {4, 9}) {
-			for (int dv = -4; dv <= 4; dv++) {
-				for (int du = -4; du <= 4; du++) {
-					if (StoneKit.rim(du, dv, 13) && !in(du, dv, R_OUT)) {
-						BlockState s = stairs(Blocks.POLISHED_ANDESITE_STAIRS, StoneKit.outward(du, dv, 13).getOpposite());
-						p.set(c, TC + du, y, TC + dv, up(s));
-					}
-				}
-			}
-		}
 		// crown: corbel (inverted stairs, deepslate), then the cone
 		StoneKit.discLayer(c, p, TC, TC, 12, R_CROWN, Blocks.DEEPSLATE_BRICK_STAIRS, b(Blocks.DEEPSLATE_BRICKS), true);
-		int[] radii = {13, 8, R_IN, 2};
+		int[] radii = {8, 5, 2, 1};
 		for (int i = 0; i < radii.length; i++) {
-			StoneKit.discLayer(c, p, TC, TC, 13 + i, radii[i], i == 0 ? Blocks.DARK_OAK_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS,
-					b(Blocks.DEEPSLATE_TILES), false);
+			StoneKit.discLayer(c, p, TC, TC, 13 + i, radii[i], Blocks.CUT_COPPER_STAIRS.waxed().oxidized(),
+					b(Blocks.CUT_COPPER.waxed().oxidized()), false);
 		}
-		p.set(c, TC, 17, TC, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState());
+		p.set(c, TC, 17, TC, Blocks.LIGHTNING_ROD.waxed().oxidized().defaultBlockState());
 	}
 
 	/** [palette] the tower is the darkest mass: deepslate up to the belt, a mix, then lighter stone under the crown. */
 	private static BlockState towerMat(Plot p, int u, int y, int v) {
 		return switch (y) {
 			case 0, 1, 2, 3 -> deep(p, u, y, v);
-			case 4 -> b(Blocks.CALCITE);
+			case 4 -> b(Blocks.POLISHED_DEEPSLATE);
 			case 5, 6 -> p.hash(u, y, v, 3) == 0 ? mid(p, u, y, v) : deep(p, u, y, v);
 			case 7, 8 -> mid(p, u, y, v);
-			case 9 -> b(Blocks.CALCITE);
+			case 9 -> b(Blocks.POLISHED_ANDESITE);
 			default -> light(p, u, y, v);
 		};
 	}
@@ -432,16 +432,16 @@ public final class HouseStoneTower implements Variant {
 	private static void yard(CitadelCanvas c, Plot p, int u1, int v1) {
 		int d = p.d();
 		int w = p.w();
-		int cu = (8 + u1) / 2;
+		int cu = (HALL_U0 + u1) / 2;
 		// front: a low wall along the street with a gap at the steps, a pillar and a lantern at both ends
-		StoneKit.lowWallRunU(c, p, 9, w - 2, 0, cu);
-		for (int u : new int[] {8, w - 1}) {
+		StoneKit.lowWallRunU(c, p, HALL_U0 + 1, w - 2, 0, cu);
+		for (int u : new int[] {HALL_U0, w - 1}) {
 			p.set(c, u, 0, 0, b(Blocks.POLISHED_DEEPSLATE));
 			p.set(c, u, 1, 0, b(Blocks.CHISELED_DEEPSLATE));
 			p.set(c, u, 2, 0, StoneKit.lantern(false));
 		}
 		// beds between the wall and the facade
-		for (int u = 9; u <= w - 2; u++) {
+		for (int u = HALL_U0 + 1; u <= w - 2; u++) {
 			if (Math.abs(u - cu) <= 1) {
 				continue;
 			}

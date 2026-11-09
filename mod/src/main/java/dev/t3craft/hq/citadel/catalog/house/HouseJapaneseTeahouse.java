@@ -40,7 +40,7 @@ import net.minecraft.world.level.block.state.properties.StairsShape;
  * Size: 9–12 × 10–12 × 10+.
  */
 public final class HouseJapaneseTeahouse implements Variant {
-	private static final int BEAM = 4;
+	private static final int BEAM = 5;
 
 	@Override
 	public String id() {
@@ -79,9 +79,9 @@ public final class HouseJapaneseTeahouse implements Variant {
 
 	private static BlockState stone(Plot p, int u, int y, int v) {
 		return switch (p.hash(u, y, v, 6)) {
-			case 0 -> b(Blocks.CRACKED_DEEPSLATE_BRICKS);
-			case 1 -> b(Blocks.COBBLED_DEEPSLATE);
-			default -> b(Blocks.DEEPSLATE_BRICKS);
+			case 0 -> b(Blocks.MOSSY_STONE_BRICKS);
+			case 1 -> b(Blocks.CRACKED_STONE_BRICKS);
+			default -> b(Blocks.STONE_BRICKS);
 		};
 	}
 
@@ -108,6 +108,7 @@ public final class HouseJapaneseTeahouse implements Variant {
 		groundCover(c, p, bu0, bu1, bv0, bv1);
 		hut(c, p, bu0, bu1, bv0, bv1, cu);
 		roof(c, p, bu0 - 1, bu1 + 1, bv0 - 1, bv1 + 1);
+		eaves(c, p, bu0, bu1, bv0, bv1);
 		fenceAndGate(c, p, w, d, cu);
 		roji(c, p, w, d, cu, bv0, mapleRight);
 	}
@@ -142,7 +143,7 @@ public final class HouseJapaneseTeahouse implements Variant {
 				p.set(c, u, 0, v, edge ? stone(p, u, 0, v) : b(Blocks.BAMBOO_MOSAIC));
 			}
 		}
-		for (int y = 1; y <= 3; y++) {
+		for (int y = 1; y <= 4; y++) {
 			for (int u = bu0; u <= bu1; u++) {
 				for (int v : new int[] {bv0, bv1}) {
 					boolean corner = u == bu0 || u == bu1;
@@ -154,10 +155,11 @@ public final class HouseJapaneseTeahouse implements Variant {
 						st = trapdoor(Blocks.DARK_OAK_TRAPDOOR, Direction.NORTH, true, Half.BOTTOM);
 					} else if (y == 2 && (u - bu0) % 2 == 0) {
 						// [depth] a bamboo-lattice window: crossed rails behind the plaster line
-						st = fence(Blocks.BAMBOO_FENCE, true, true, true, true);
+						st = fence(Blocks.SPRUCE_FENCE, true, true, true, true);
 					} else if (y == 1) {
 						st = p.hash(u, y, v, 3) == 0 ? b(Blocks.STONE_BRICKS) : b(Blocks.TUFF_BRICKS);
 					} else {
+						// [palette] light plaster panels framed by the dark posts and beams
 						st = p.hash(u, y, v, 8) == 0 ? b(Blocks.TUFF_BRICKS) : b(Blocks.CALCITE);
 					}
 					p.set(c, u, y, v, st);
@@ -165,7 +167,7 @@ public final class HouseJapaneseTeahouse implements Variant {
 			}
 			for (int v = bv0 + 1; v < bv1; v++) {
 				for (int u : new int[] {bu0, bu1}) {
-					BlockState st = y == 2 && v == (bv0 + bv1) / 2 ? fence(Blocks.BAMBOO_FENCE, true, false, true, false)
+					BlockState st = y == 2 && v == (bv0 + bv1) / 2 ? fence(Blocks.SPRUCE_FENCE, true, false, true, false)
 							: y == 1 ? b(Blocks.TUFF_BRICKS) : p.hash(u, y, v, 8) == 0 ? b(Blocks.TUFF_BRICKS) : b(Blocks.CALCITE);
 					p.set(c, u, y, v, st);
 				}
@@ -189,6 +191,16 @@ public final class HouseJapaneseTeahouse implements Variant {
 
 	// ------------------------------------------------------------------ roof
 
+	/** [palette] a few brown courses in the thatch, so it weathers instead of being one saturated yellow. */
+	private static Block thatch(Plot p, Block mat, int u, int k, int v) {
+		if (k == 0) {
+			return Blocks.DARK_OAK_STAIRS; // a dark fascia line: the overhanging eave reads as one clean edge
+		}
+		// the upper courses go lighter towards the top, a golden thatch over the dark fascia
+		boolean golden = k == 2 ? p.hash(u, k, v, 4) != 0 : p.hash(u, k, v, 2) == 0;
+		return golden ? Blocks.BAMBOO_MOSAIC_STAIRS : Blocks.SPRUCE_STAIRS;
+	}
+
 	/**
 	 * [finish] a hipped bamboo roof of three stair rings, 1:1. Each ring corner is an outer-corner stair; the
 	 * four corners of the lowest ring sweep up (with an upside-down stair under them), the top is capped
@@ -200,7 +212,7 @@ public final class HouseJapaneseTeahouse implements Variant {
 			int u1 = ru1 - k;
 			int v0 = rv0 + k;
 			int v1 = rv1 - k;
-			Block mat = k == 0 ? Blocks.SPRUCE_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS;
+			Block mat = k == 1 ? Blocks.BAMBOO_STAIRS : Blocks.BAMBOO_MOSAIC_STAIRS; // [palette] a golden thatch, nothing like the dark tiles of the engawa house
 			for (int u = u0; u <= u1; u++) {
 				for (int v = v0; v <= v1; v++) {
 					boolean top = v == v0;
@@ -210,30 +222,30 @@ public final class HouseJapaneseTeahouse implements Variant {
 					if (!(top || bot || left || right)) {
 						continue;
 					}
-					int y = 4 + k;
+					int y = 5 + k;
 					BlockState st;
 					boolean corner = (top || bot) && (left || right);
 					if (corner) {
-						st = stair(mat, cornerFacing(top, left), Half.BOTTOM, StairsShape.OUTER_LEFT);
+						st = stair(thatch(p, mat, u, k, v), cornerFacing(top, left), Half.BOTTOM, StairsShape.OUTER_LEFT);
 					} else if (top) {
-						st = stair(mat, Direction.SOUTH);
+						st = stair(thatch(p, mat, u, k, v), Direction.SOUTH);
 					} else if (bot) {
-						st = stair(mat, Direction.NORTH);
+						st = stair(thatch(p, mat, u, k, v), Direction.NORTH);
 					} else if (left) {
-						st = stair(mat, Direction.EAST);
+						st = stair(thatch(p, mat, u, k, v), Direction.EAST);
 					} else {
-						st = stair(mat, Direction.WEST);
+						st = stair(thatch(p, mat, u, k, v), Direction.WEST);
 					}
 					int cd = Math.min(u - u0, u1 - u) + Math.min(v - v0, v1 - v);
 					boolean lifted = k == 0 && cd <= 1;
 					if (lifted) {
-						y = 5;
+						y = 6;
 					}
 					p.set(c, u, y, v, st);
 					if (lifted) {
 						BlockState sup = corner ? stair(Blocks.DARK_OAK_STAIRS, cornerFacing(top, left), Half.TOP, StairsShape.OUTER_LEFT)
 								: stairTop(Blocks.DARK_OAK_STAIRS, top ? Direction.NORTH : bot ? Direction.SOUTH : left ? Direction.WEST : Direction.EAST);
-						p.set(c, u, 4, v, sup);
+						p.set(c, u, 5, v, sup);
 					}
 				}
 			}
@@ -245,18 +257,36 @@ public final class HouseJapaneseTeahouse implements Variant {
 		int v1 = rv1 - 2;
 		for (int u = u0 + 1; u < u1; u++) {
 			for (int v = v0 + 1; v < v1; v++) {
-				p.set(c, u, 6, v, b(Blocks.DEEPSLATE_TILES));
+				p.set(c, u, 7, v, b(Blocks.SPRUCE_PLANKS));
 			}
 		}
-		for (int u = u0; u <= u1; u++) {
-			for (int v = v0; v <= v1; v++) {
-				p.set(c, u, 7, v, slab(Blocks.DEEPSLATE_TILE_SLAB));
-			}
+		// [depth] a slim post under each lifted corner, the lantern hangs beside it
+		for (int[] cc : new int[][] {{ru0, rv0}, {ru1, rv0}, {ru0, rv1}, {ru1, rv1}}) {
+			p.set(c, cc[0], 0, cc[1], stone(p, cc[0], 0, cc[1]));
+			p.set(c, cc[0], 1, cc[1], log(Blocks.DARK_OAK_LOG, Direction.Axis.Y));
+			p.set(c, cc[0], 2, cc[1], log(Blocks.DARK_OAK_LOG, Direction.Axis.Y));
+			p.set(c, cc[0], 3, cc[1], log(Blocks.DARK_OAK_LOG, Direction.Axis.Y));
 		}
-		p.set(c, (u0 + u1) / 2, 8, (v0 + v1) / 2, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState());
 		// [finish] a lantern hanging at each lifted corner
 		for (int[] cc : new int[][] {{ru0, rv0}, {ru1, rv0}, {ru0, rv1}, {ru1, rv1}}) {
-			p.put(c, cc[0], 3, cc[1], lantern(true), CitadelCanvas.HANGING);
+			p.put(c, cc[0], 4, cc[1], lantern(true), CitadelCanvas.HANGING);
+		}
+	}
+
+	/**
+	 * [depth] the thatch overhangs the walls on beam tails: a dark oak log pokes out of the wall under the eave at
+	 * every second cell, with an upside-down stair hugging the wall under it.
+	 */
+	private static void eaves(CitadelCanvas c, Plot p, int bu0, int bu1, int bv0, int bv1) {
+		Block log = Blocks.DARK_OAK_LOG;
+		Block st = Blocks.DARK_OAK_STAIRS;
+		for (int u = bu0; u <= bu1; u += 2) {
+			EaveKit.corbel(c, p, u, 4, bv0 - 1, Direction.SOUTH, log, st);
+			EaveKit.corbel(c, p, u, 4, bv1 + 1, Direction.NORTH, log, st);
+		}
+		for (int v = bv0 + 1; v <= bv1 - 1; v += 2) {
+			EaveKit.corbel(c, p, bu0 - 1, 4, v, Direction.EAST, log, st);
+			EaveKit.corbel(c, p, bu1 + 1, 4, v, Direction.WEST, log, st);
 		}
 	}
 
@@ -271,13 +301,13 @@ public final class HouseJapaneseTeahouse implements Variant {
 			}
 			boolean l = u > 0 && Math.abs(u - 1 - gu) > 1;
 			boolean r = u < w - 1 && Math.abs(u + 1 - gu) > 1;
-			p.set(c, u, 1, 0, fence(Blocks.BAMBOO_FENCE, false, r, false, l));
-			p.set(c, u, 2, 0, fence(Blocks.BAMBOO_FENCE, false, r, false, l));
+			p.set(c, u, 1, 0, fence(Blocks.SPRUCE_FENCE, false, r, false, l));
+			p.set(c, u, 2, 0, fence(Blocks.SPRUCE_FENCE, false, r, false, l));
 		}
 		for (int v = 1; v < d - 6; v++) {
 			for (int u : new int[] {0, w - 1}) {
-				p.set(c, u, 1, v, fence(Blocks.BAMBOO_FENCE, v > 1, false, true, false));
-				p.set(c, u, 2, v, fence(Blocks.BAMBOO_FENCE, false, false, true, false));
+				p.set(c, u, 1, v, fence(Blocks.SPRUCE_FENCE, v > 1, false, true, false));
+				p.set(c, u, 2, v, fence(Blocks.SPRUCE_FENCE, false, false, true, false));
 			}
 		}
 		// gate posts and a small tiled roof
@@ -287,10 +317,12 @@ public final class HouseJapaneseTeahouse implements Variant {
 			}
 		}
 		for (int u = gu - 2; u <= gu + 2; u++) {
-			p.set(c, u, 4, 0, Math.abs(u - gu) == 2 ? stair(Blocks.BAMBOO_MOSAIC_STAIRS, u < gu ? Direction.EAST : Direction.WEST)
-					: slab(Blocks.BAMBOO_MOSAIC_SLAB));
+			p.set(c, u, 4, 0, Math.abs(u - gu) == 2 ? stair(Blocks.SPRUCE_STAIRS, u < gu ? Direction.EAST : Direction.WEST)
+					: slab(Blocks.SPRUCE_SLAB));
 		}
-		p.set(c, gu, 4, 0, b(Blocks.BAMBOO_MOSAIC));
+		p.set(c, gu, 4, 0, b(Blocks.SPRUCE_PLANKS));
+		EaveKit.tail(c, p, gu - 2, 3, 0, Direction.EAST, Blocks.SPRUCE_LOG);
+		EaveKit.tail(c, p, gu + 2, 3, 0, Direction.WEST, Blocks.SPRUCE_LOG);
 		p.put(c, gu, 3, 0, lantern(true), CitadelCanvas.HANGING);
 		p.set(c, gu, 0, 0, b(Blocks.POLISHED_ANDESITE));
 		p.set(c, gu - 1, 0, 0, stone(p, gu - 1, 0, 0));
@@ -319,8 +351,8 @@ public final class HouseJapaneseTeahouse implements Variant {
 		// the stone lantern on the other side and the cherry behind it
 		int lu = right ? cu - 2 : cu + 2;
 		JapaneseKit.stoneLantern(c, p, lu, 1, bvv);
-		int tu = right ? cu - 3 : cu + 3;
-		JapaneseKit.sakura(c, p, tu < 2 ? 2 : Math.min(tu, w - 3), 1, Math.min(bv0 - 2, 3), 0);
+		int tu = right ? 2 : w - 3; // [depth] the cherry stands in the corner, not in front of the hut
+		JapaneseKit.sakura(c, p, tu, 1, Math.min(bv0 - 3, 3), 0);
 		// azalea and moss tufts in the corners
 		p.set(c, 1, 1, 1, CitadelCanvas.leaves(Blocks.FLOWERING_AZALEA_LEAVES));
 		p.set(c, w - 2, 1, 1, CitadelCanvas.leaves(Blocks.AZALEA_LEAVES));
