@@ -136,9 +136,9 @@ public final class GardenVegRaisedBeds implements Variant {
 
 	private static BlockState frame(Plot p, int u, int v) {
 		return switch (p.hash(u, 0, v, 5)) {
-			case 0 -> b(Blocks.SPRUCE_PLANKS);
-			case 1 -> b(Blocks.STRIPPED_DARK_OAK_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.X);
-			default -> b(Blocks.DARK_OAK_PLANKS);
+			case 0, 1, 2 -> b(Blocks.OAK_PLANKS);
+			case 3 -> b(Blocks.STRIPPED_OAK_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.X);
+			default -> b(Blocks.SPRUCE_PLANKS);
 		};
 	}
 
@@ -165,10 +165,10 @@ public final class GardenVegRaisedBeds implements Variant {
 				if (corner) {
 					p.set(c, u, 0, v, b(Blocks.DARK_OAK_LOG));
 					p.set(c, u, 1, v, b(Blocks.DARK_OAK_LOG));
-					p.set(c, u, 2, v, slab(Blocks.SPRUCE_SLAB));
+					p.set(c, u, 2, v, slab(Blocks.OAK_SLAB));
 				} else if (ring) {
 					p.set(c, u, 0, v, frame(p, u, v));
-					p.set(c, u, 1, v, slab(Blocks.SPRUCE_SLAB));
+					p.set(c, u, 1, v, slab(Blocks.OAK_SLAB));
 				} else {
 					int col = u - u0 - 1;
 					Crop type = cols[Math.min(col, cols.length - 1)];
@@ -185,7 +185,7 @@ public final class GardenVegRaisedBeds implements Variant {
 		}
 		// lamp posts on the two corners nearest the path
 		int lampU = u0 == 0 ? u1 : u0;
-		p.set(c, lampU, 2, v0, b(Blocks.SPRUCE_FENCE));
+		p.set(c, lampU, 2, v0, b(Blocks.OAK_FENCE));
 		p.set(c, lampU, 3, v0, b(Blocks.LANTERN));
 	}
 
@@ -193,10 +193,10 @@ public final class GardenVegRaisedBeds implements Variant {
 
 	private static void scarecrow(CitadelCanvas c, Plot p, int u, int v) {
 		p.set(c, u, 0, v, b(Blocks.COARSE_DIRT));
-		p.set(c, u, 1, v, b(Blocks.SPRUCE_FENCE));
+		p.set(c, u, 1, v, b(Blocks.OAK_FENCE));
 		p.set(c, u, 2, v, b(Blocks.HAY_BLOCK));
-		p.set(c, u - 1, 2, v, b(Blocks.SPRUCE_FENCE).setValue(BlockStateProperties.EAST, true));
-		p.set(c, u + 1, 2, v, b(Blocks.SPRUCE_FENCE).setValue(BlockStateProperties.WEST, true));
+		p.set(c, u - 1, 2, v, b(Blocks.OAK_FENCE).setValue(BlockStateProperties.EAST, true));
+		p.set(c, u + 1, 2, v, b(Blocks.OAK_FENCE).setValue(BlockStateProperties.WEST, true));
 		p.set(c, u, 3, v, b(Blocks.CARVED_PUMPKIN).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH));
 		p.set(c, u, 4, v, slab(Blocks.DARK_OAK_SLAB));
 		// straw hands and a few hay tufts at the feet
@@ -214,13 +214,14 @@ public final class GardenVegRaisedBeds implements Variant {
 			p.set(c, uv[0], 2, uv[1], b(Blocks.SPRUCE_LOG));
 		}
 		for (int[] uv : new int[][] {{0, vb}, {3, vb}}) {
-			for (int y = 1; y <= 3; y++) {
+			for (int y = 1; y <= 2; y++) {
 				p.set(c, uv[0], y, uv[1], b(Blocks.SPRUCE_LOG));
 			}
 		}
+		// a mini gable: both rows of stairs rise to the middle, ridge between them
 		for (int u = 0; u <= 3; u++) {
-			p.set(c, u, 3, vf, stairs(Blocks.SPRUCE_STAIRS, Direction.SOUTH));
-			p.set(c, u, 4, vb, stairs(Blocks.SPRUCE_STAIRS, Direction.SOUTH));
+			p.set(c, u, 3, vf, stairs(Blocks.OAK_STAIRS, Direction.SOUTH));
+			p.set(c, u, 3, vb, stairs(Blocks.DARK_OAK_STAIRS, Direction.NORTH));
 		}
 		p.set(c, 1, 1, vb, b(Blocks.COMPOSTER).setValue(BlockStateProperties.LEVEL_COMPOSTER, 8));
 		p.set(c, 2, 1, vb, b(Blocks.COMPOSTER).setValue(BlockStateProperties.LEVEL_COMPOSTER, 5));

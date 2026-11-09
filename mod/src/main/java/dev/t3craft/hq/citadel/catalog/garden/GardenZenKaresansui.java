@@ -36,9 +36,9 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
  * pebbles, a water basin, moss carpets and a pink bonsai.
  */
 public final class GardenZenKaresansui implements Variant {
-	private static final Block[] ROCK = {Blocks.COBBLESTONE, Blocks.MOSSY_COBBLESTONE, Blocks.STONE, Blocks.ANDESITE, Blocks.MOSSY_COBBLESTONE};
-	private static final Block[] ROCK_SLAB = {Blocks.COBBLESTONE_SLAB, Blocks.MOSSY_COBBLESTONE_SLAB, Blocks.STONE_SLAB, Blocks.ANDESITE_SLAB, Blocks.MOSSY_COBBLESTONE_SLAB};
-	private static final Block[] ROCK_STAIRS = {Blocks.COBBLESTONE_STAIRS, Blocks.MOSSY_COBBLESTONE_STAIRS, Blocks.STONE_STAIRS, Blocks.ANDESITE_STAIRS, Blocks.MOSSY_COBBLESTONE_STAIRS};
+	private static final Block[] ROCK = {Blocks.STONE, Blocks.MOSSY_COBBLESTONE, Blocks.ANDESITE, Blocks.STONE, Blocks.COBBLESTONE};
+	private static final Block[] ROCK_SLAB = {Blocks.STONE_SLAB, Blocks.MOSSY_COBBLESTONE_SLAB, Blocks.ANDESITE_SLAB, Blocks.STONE_SLAB, Blocks.COBBLESTONE_SLAB};
+	private static final Block[] ROCK_STAIRS = {Blocks.STONE_STAIRS, Blocks.MOSSY_COBBLESTONE_STAIRS, Blocks.ANDESITE_STAIRS, Blocks.STONE_STAIRS, Blocks.COBBLESTONE_STAIRS};
 
 	private static final Direction[] LOCAL = {Direction.NORTH, Direction.EAST, Direction.SOUTH, Direction.WEST};
 
@@ -390,7 +390,7 @@ public final class GardenZenKaresansui implements Variant {
 	private static void rake(CitadelCanvas c, Plot p, boolean[][] taken, boolean white, int lu, int lv1, int lv2, int tu, int tv) {
 		BlockState groove = white ? b(Blocks.CALCITE) : b(Blocks.SAND);
 		BlockState ridgeBase = white ? b(Blocks.CALCITE) : b(Blocks.SAND);
-		BlockState ridgeCap = white ? slab(Blocks.POLISHED_DIORITE_SLAB) : slab(Blocks.SMOOTH_SANDSTONE_SLAB);
+		BlockState ridgeCap = white ? slab(Blocks.SMOOTH_STONE_SLAB) : slab(Blocks.SMOOTH_SANDSTONE_SLAB);
 		for (int u = 1; u < p.w() - 1; u++) {
 			for (int v = 1; v < p.d() - 1; v++) {
 				if (taken[u][v]) {

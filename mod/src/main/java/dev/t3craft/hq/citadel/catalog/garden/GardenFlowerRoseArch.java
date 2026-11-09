@@ -155,7 +155,7 @@ public final class GardenFlowerRoseArch implements Variant {
 				}
 				int k = p.hash(u, 2, v, 6);
 				p.set(c, u, 1, v, k == 0 ? leaves(Blocks.FLOWERING_AZALEA_LEAVES) : k == 1 ? leaves(Blocks.CHERRY_LEAVES) : leaves(Blocks.AZALEA_LEAVES));
-				if (p.hash(u, 3, v, 3) == 0 || v == d - 1) {
+				if (v == d - 1 && p.hash(u, 3, v, 3) != 0) {
 					p.set(c, u, 2, v, k == 1 ? leaves(Blocks.CHERRY_LEAVES) : leaves(Blocks.AZALEA_LEAVES));
 				}
 			}
@@ -224,7 +224,7 @@ public final class GardenFlowerRoseArch implements Variant {
 					level = 1; // the back always rises against the hedge
 				}
 				for (int y = 0; y < level; y++) {
-					p.set(c, u, y, v, p.hash(u, y, v, 4) == 0 ? b(Blocks.ROOTED_DIRT) : b(Blocks.DIRT));
+					p.set(c, u, y, v, p.hash(u, y, v, 4) == 0 ? b(Blocks.MOSS_BLOCK) : b(Blocks.GRASS_BLOCK));
 				}
 				p.set(c, u, level, v, top(p, u, level, v));
 				taken[u][v] = true;
@@ -238,7 +238,7 @@ public final class GardenFlowerRoseArch implements Variant {
 		int y = level + 1;
 		int drift = p.hash(u / 2, 5, v / 2, 997);
 		int roll = p.hash(u, 6, v, 10);
-		if (roll == 0) {
+		if (roll == 0 && p.hash(u, 12, v, 2) == 0) {
 			return;
 		}
 		if (roll == 1) {
