@@ -309,7 +309,7 @@ public final class BenchCherryPlanters implements Variant {
 		}
 	}
 
-	/** Four fence posts, slat roof of cherry slabs, a hanging lantern in the middle and a clump of blossom. */
+	/** Four fence posts, slat roof of cherry slabs, and two hanging lanterns over the way in. */
 	private static void pergola(CitadelCanvas c, Plot p, int u0, int v0, int u1, int v1) {
 		for (int u : new int[] {u0, u1}) {
 			for (int v : new int[] {v0, v1}) {
@@ -325,10 +325,9 @@ public final class BenchCherryPlanters implements Variant {
 			}
 		}
 		softUnder(c, p, u0, v0, u1, v1);
-		int uc = (u0 + u1) / 2;
-		int vc = (v0 + v1) / 2;
-		set(c, p, uc, 5, vc, slab(Blocks.CHERRY_SLAB));
-		p.put(c, uc, 4, vc, LANTERN.setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
+		for (int u : new int[] {u0 + 2, u1 - 2}) { // two lanterns on the front beam, over the way in (over the table they would leave 2.6 blocks)
+			p.put(c, u, 4, v0, LANTERN.setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
+		}
 		braces(c, p, u0, v0, u1, v1);
 	}
 
