@@ -95,7 +95,7 @@ public final class ThreadDiskCache {
 	}
 
 	/** One recent thread's tail, copied on the caller (fix/new-thread-hitch). */
-	private record Tail(String key, String title, List<ChatEntry> entries) {
+	private record SavedTail(String key, String title, List<ChatEntry> entries) {
 	}
 
 	/**
@@ -105,10 +105,10 @@ public final class ThreadDiskCache {
 	 */
 	public void saveAsync(List<ThreadRow> rows, List<ThreadCache.Entry> recent) {
 		List<ThreadRow> rs = List.copyOf(rows.subList(0, Math.min(rows.size(), MAX_ROWS)));
-		List<Tail> tails = new java.util.ArrayList<>();
+		List<SavedTail> tails = new java.util.ArrayList<>();
 		for (int i = 0; i < recent.size() && i < TAIL_THREADS; i++) {
 			ThreadCache.Entry e = recent.get(i);
-			tails.add(new Tail(e.key(), e.transcript().title(), e.transcript().tail(TAIL_ROWS)));
+			tails.add(new SavedTail(e.key(), e.transcript().title(), e.transcript().tail(TAIL_ROWS)));
 		}
 		CompletableFuture.runAsync(() -> {
 			try {
@@ -121,7 +121,7 @@ public final class ThreadDiskCache {
 				}
 				root.add("rows", ra);
 				JsonObject to = new JsonObject();
-				for (Tail tail : tails) {
+				for (SavedTail tail : tails) {
 					JsonObject t = new JsonObject();
 					t.addProperty("title", tail.title());
 					JsonArray es = new JsonArray();
