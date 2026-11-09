@@ -40,7 +40,7 @@ import net.minecraft.world.level.block.state.BlockState;
  *
  * Options read here: {@code --front N|E|S|W|all} (default S: the facade looks at the iso_se camera; a
  * row per front with {@code all}), {@code --sizes N} (1–3 sizes per variant, default 3),
- * {@code --seeds N} (default 2), plus the usual {@code --out}, {@code --scale}, {@code --ss} and
+ * {@code --seeds N} (default 2), {@code --box WxDxH[,WxDxH...]} (exact sizes), plus the usual {@code --out}, {@code --scale}, {@code --ss} and
  * {@code --only}. Prints (and writes {@code report.txt}) the block count of every build, the writes the
  * plot clipped (outside its box) and any block found outside its plot.
  */
@@ -51,6 +51,9 @@ final class CatalogViews {
 	/** One build of the gallery: a variant in a plot. */
 	private record Cell(Variant v, Plot plot, String label, int row) {
 	}
+
+	/** {@code --box WxDxH[,WxDxH...]}: exact plot sizes instead of the min/middle/max spread (null = spread). */
+	static String boxes;
 
 	/** Upper end of each family's typical height (the gallery's tallest size). */
 	private static int typicalMaxH(Family f) {
@@ -334,6 +337,14 @@ final class CatalogViews {
 
 	/** {w, d, h} sizes spread over the variant's range: min, middle, max (deduplicated, up to n). */
 	private static List<int[]> sizes(Variant v, int n) {
+		if (boxes != null && !boxes.isBlank()) {
+			List<int[]> exact = new ArrayList<>();
+			for (String b : boxes.split(",")) {
+				String[] t = b.trim().toLowerCase(Locale.ROOT).split("x");
+				exact.add(new int[] {Integer.parseInt(t[0]), Integer.parseInt(t[1]), Integer.parseInt(t[2])});
+			}
+			return exact;
+		}
 		int w1 = v.minW();
 		int w2 = cap(v.maxW(), w1);
 		int d1 = v.minD();
