@@ -134,6 +134,8 @@ public final class HouseTimberCorner implements Variant {
 		yard(c, p, g);
 		strips(c, p, g);
 		eaves(c, p, g);
+		// walkability audit: a way up to the sealed upper floor
+		dev.t3craft.hq.citadel.catalog.InteriorStair.timber(c, p, 1, 5);
 	}
 
 	// ------------------------------------------------------------------ materials
@@ -363,7 +365,11 @@ public final class HouseTimberCorner implements Variant {
 		Block log = Blocks.CHERRY_LOG;
 		Block st = Blocks.CHERRY_STAIRS;
 		for (int u = 7; u <= g.ue(); u += 2) {
-			EaveKit.corbel(c, p, u, PLATE - 1, 1, Direction.SOUTH, log, st);
+			// not over the balcony (cu - 2 .. cu + 2): there the corbel and its pendant hung at head height in front of
+			// the balcony door
+			if (Math.abs(u - g.cu()) > 2) {
+				EaveKit.corbel(c, p, u, PLATE - 1, 1, Direction.SOUTH, log, st);
+			}
 			EaveKit.corbel(c, p, u, PLATE - 1, 7, Direction.NORTH, log, st);
 		}
 		for (int v = 8; v <= g.ub(); v += 2) {
@@ -496,11 +502,14 @@ public final class HouseTimberCorner implements Variant {
 			p.set(c, 6, 1, v, stair(Blocks.CHERRY_STAIRS, Direction.WEST, false));
 		}
 		p.set(c, 6, 1, ub - 3, Blocks.POTTED_FLOWERING_AZALEA.defaultBlockState());
-		// lamp post at the plaza
-		p.set(c, cx - 2, 1, gv - 2, b(Blocks.POLISHED_DEEPSLATE));
-		p.set(c, cx - 2, 2, gv - 2, fence(Blocks.CHERRY_FENCE, false, false, false, false));
-		p.set(c, cx - 2, 3, gv - 2, fence(Blocks.CHERRY_FENCE, false, false, false, false));
-		p.set(c, cx - 2, 4, gv - 2, lantern(false));
+		// lamp post at the plaza (not where the well stands: on wide deep plots it landed on the well's rim)
+		boolean onWell = d >= 14 && cx - 2 >= 8 && cx - 2 <= 10 && gv - 2 >= 7 && gv - 2 <= 9;
+		if (!onWell) {
+			p.set(c, cx - 2, 1, gv - 2, b(Blocks.POLISHED_DEEPSLATE));
+			p.set(c, cx - 2, 2, gv - 2, fence(Blocks.CHERRY_FENCE, false, false, false, false));
+			p.set(c, cx - 2, 3, gv - 2, fence(Blocks.CHERRY_FENCE, false, false, false, false));
+			p.set(c, cx - 2, 4, gv - 2, lantern(false));
+		}
 		// barrels in the far corner
 		p.set(c, w - 2, 1, d - 2, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
 		p.set(c, w - 3, 1, d - 2, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));

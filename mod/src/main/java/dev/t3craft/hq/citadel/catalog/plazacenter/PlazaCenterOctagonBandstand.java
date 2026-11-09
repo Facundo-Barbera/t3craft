@@ -102,8 +102,8 @@ public final class PlazaCenterOctagonBandstand implements Variant {
 				if (m > a0) {
 					corner(c, p, u, v, m - a0, w, d);
 				} else if (m > a0 - 1.0) {
-					// [depth] the single step up to the dais, low side out
-					p.set(c, u, 0, v, stairs(Blocks.DEEPSLATE_BRICK_STAIRS, out(dx, dz)));
+					// [depth] the single step up to the dais, low side out: the stair faces inwards (tall half towards the dais) so it is climbed walking in
+					p.set(c, u, 0, v, stairs(Blocks.DEEPSLATE_BRICK_STAIRS, out(dx, dz).getOpposite()));
 				} else {
 					floor(c, p, u, v, dx, dz, m, k);
 				}

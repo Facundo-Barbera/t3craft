@@ -444,11 +444,11 @@ public final class HouseScriptorium implements Variant {
 				for (int y = 1; y <= 3; y++) {
 					p.set(c, u, y, v, chisel && y == 2 ? facing(Blocks.CHISELED_BOOKSHELF, side == 0 ? Direction.EAST : Direction.WEST) : shelf);
 				}
-				// reading desks in front of the shelves, a stool each
+				// reading desks against the shelves (no stools: with them a row of lectern, stool, table, stool, lectern
+				// closed the whole nave from wall to wall)
 				if ((v - 2) % 3 == 1) {
 					int du = side == 0 ? 3 : w - 4;
 					p.set(c, du, 1, v, facing(Blocks.LECTERN, side == 0 ? Direction.WEST : Direction.EAST));
-					p.set(c, du + (side == 0 ? 1 : -1), 1, v, stair(Blocks.SPRUCE_STAIRS, side == 0 ? Direction.WEST : Direction.EAST, false));
 				}
 			}
 		}

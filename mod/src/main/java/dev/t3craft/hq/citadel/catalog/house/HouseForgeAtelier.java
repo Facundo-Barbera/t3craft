@@ -228,7 +228,7 @@ public final class HouseForgeAtelier implements Variant {
 		// [depth] stone buttress feet and sills, a rim of dark stone round the hall
 		for (int v = VF + 1; v <= vb; v++) {
 			if (!sidePost(v, vb)) {
-				p.set(c, 0, 1, v, slab(Blocks.DEEPSLATE_BRICK_SLAB, false));
+				p.set(c, 0, 0, v, base(p, 0, 0, v)); // on the ground: a half slab at y1 floated over nothing
 			}
 		}
 		// the chimney breast on the east flank
@@ -266,8 +266,10 @@ public final class HouseForgeAtelier implements Variant {
 		// [finish] anvil and a quench trough in front of the hearth
 		p.set(c, uc - 3, 1, vc, facing(Blocks.ANVIL, Direction.NORTH));
 		p.set(c, uc - 2, 1, vc + 1, b(Blocks.WATER_CAULDRON));
+		// the smith stands in front of the hearth mouth (uc - 2, vc): the coal sits a row further forward so that cell
+		// stays reachable (it used to be boxed in by coal, trough and anvil)
 		p.set(c, uc - 3, 1, vc - 2, b(Blocks.SMITHING_TABLE));
-		p.set(c, uc - 2, 1, vc - 1, b(Blocks.COAL_BLOCK));
+		p.set(c, uc - 2, 1, vc - 2, b(Blocks.COAL_BLOCK));
 		p.put(c, uc - 3, 5, vc, lantern(true), CitadelCanvas.HANGING);
 		p.put(c, 3, 5, VF + 3, lantern(true), CitadelCanvas.HANGING);
 	}
@@ -483,13 +485,14 @@ public final class HouseForgeAtelier implements Variant {
 		// woodpile along the west flank
 		for (int v = VF + 1; v < vb; v++) {
 			int k = p.hash(0, 0, v, 4);
+			int y0 = p.at(c, 0, 0, v) != null ? 1 : 0; // on the stone rim when there is one
 			if (k <= 1) {
-				p.set(c, 0, 0, v, log(Blocks.STRIPPED_DARK_OAK_LOG, Direction.Axis.Z));
+				p.set(c, 0, y0, v, log(Blocks.STRIPPED_DARK_OAK_LOG, Direction.Axis.Z));
 				if (k == 0) {
-					p.set(c, 0, 1, v, log(Blocks.STRIPPED_DARK_OAK_LOG, Direction.Axis.Z));
+					p.set(c, 0, y0 + 1, v, log(Blocks.STRIPPED_DARK_OAK_LOG, Direction.Axis.Z));
 				}
 			} else if (k == 2) {
-				p.set(c, 0, 0, v, barrel());
+				p.set(c, 0, y0, v, barrel());
 			}
 		}
 		// back strip: charcoal heap, barrels and a water trough

@@ -112,6 +112,8 @@ public final class PieceViews {
 		public int ss = 2;
 		/** Stand-in NPCs at the desks and anchors. */
 		public boolean npcs = true;
+		/** kit/status-lamp {@code --lamp-demo}: lamps lit in demo states ({@link LampViews#demo}). */
+		public boolean lampDemo;
 		/** Blocks added around a module/group box (horizontally; 1 up and down). */
 		public int pad = 1;
 		/** Height the plan view is cut at; null = 5 above the piece's base. */
@@ -387,7 +389,7 @@ public final class PieceViews {
 		System.out.println(planned.label() + ": " + planned.plan().size() + " placements, " + planned.plan().workstations().size() + " desks, footprint "
 				+ planned.plan().footprint());
 		rq.reportOptions.label = planned.label();
-		Result r = open().render(planned.plan(), rq);
+		Result r = open().render(rq.lampDemo ? LampViews.demo(planned.plan()) : planned.plan(), rq);
 		System.out.println("piece " + r.box() + ": " + r.images().size() + " images" + (r.report() == null ? "" : ", report"));
 		for (String p : r.notes()) {
 			System.out.println("note: " + p);

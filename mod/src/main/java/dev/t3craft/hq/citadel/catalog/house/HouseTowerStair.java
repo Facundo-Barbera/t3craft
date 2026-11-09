@@ -244,8 +244,8 @@ public final class HouseTowerStair implements Variant {
 					} else if (frontPost(l, u)) {
 						st = frameY(l);
 					} else if (win && winF(l, u) && !(storey == 1 && side == 1)) {
-						set(c, p, u, y, side == 0 ? v + 1 : v - 1, pane(glass(l, storey, u), true));
-						st = b(Blocks.AIR);
+						// the pane sits in the wall plane: a recessed pane would stand inside the narrow room
+						st = pane(glass(l, storey, u), true);
 					} else {
 						st = infill(l, storey, u, y, v);
 					}
@@ -263,8 +263,7 @@ public final class HouseTowerStair implements Variant {
 					} else if (sidePost(l, v)) {
 						st = log(l.s.frame(), Direction.Axis.Y);
 					} else if (win && winS(l, v) && !(side == 1 && v == l.vd)) {
-						set(c, p, side == 0 ? u + 1 : u - 1, y, v, pane(glass(l, storey, v), false));
-						st = b(Blocks.AIR);
+						st = pane(glass(l, storey, v), false);
 					} else {
 						st = infill(l, storey, u, y, v);
 					}
@@ -334,16 +333,21 @@ public final class HouseTowerStair implements Variant {
 				set(c, p, l.u1 - 1, by, v, stair(Blocks.POLISHED_DEEPSLATE_STAIRS, Direction.EAST, true));
 			}
 		}
-		// the interior is seen through the windows: a lantern per room and a few pieces of furniture
-		int cv = (l.vf + l.vb) / 2;
+		// a lantern per room, hung in the front-left corner: the rooms are 2 high, so a lantern in the middle
+		// would hang at head height across the walk from the door
 		for (int storey = 1; storey <= 4; storey++) {
-			put(c, p, l.cu, y0(storey) + 1, cv, hangingLantern(), CitadelCanvas.HANGING);
+			put(c, p, l.u1 + 1, y0(storey) + 1, l.vf + 1, hangingLantern(), CitadelCanvas.HANGING);
 		}
 		set(c, p, l.u1 + 1, 1, l.vb - 1, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
 		set(c, p, l.u1 + 1, 4, l.vb - 1, b(Blocks.BOOKSHELF));
 		set(c, p, l.u1 + 1, 5, l.vb - 1, b(Blocks.BOOKSHELF));
 		set(c, p, l.u1 + 1, 7, l.vb - 1, b(Blocks.CHEST).setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.EAST));
 		set(c, p, l.u1 + 1, 10, l.vb - 1, b(Blocks.CRAFTING_TABLE));
+	}
+
+	/** Whether a west-wall row carries a buttress (between the windows, off the posts). */
+	private static boolean buttress(L l, int v) {
+		return (v - l.vf) % 2 == 0 && !winS(l, v) && !sidePost(l, v);
 	}
 
 	/**
@@ -353,15 +357,15 @@ public final class HouseTowerStair implements Variant {
 	private static void buttresses(CitadelCanvas c, L l) {
 		Plot p = l.p;
 		for (int v = l.vf + 1; v < l.vb; v++) {
-			if ((v - l.vf) % 2 == 0 && !winS(l, v) && !sidePost(l, v)) {
-				for (int y = 1; y <= 8; y++) {
+			if (buttress(l, v)) {
+				for (int y = 0; y <= 8; y++) {
 					set(c, p, l.u1 - 1, y, v, infill(l, y <= 2 ? 1 : y <= 5 ? 2 : 4, l.u1 - 1, y, v));
 				}
 			}
 		}
 		for (int u = l.u1 + 1; u < l.u2; u++) {
 			if (!winF(l, u)) {
-				for (int y = 1; y <= 8; y++) {
+				for (int y = 0; y <= 8; y++) {
 					set(c, p, u, y, l.vb + 1, infill(l, y <= 2 ? 1 : y <= 5 ? 2 : 4, u, y, l.vb + 1));
 				}
 			}
@@ -407,9 +411,7 @@ public final class HouseTowerStair implements Variant {
 		set(c, p, cu + 1, B1 + 1, 0, fence(l.s.fence(), false, false, true, true));
 		set(c, p, cu - 1, B1 + 1, 1, fence(l.s.fence(), true, false, false, false));
 		set(c, p, cu + 1, B1 + 1, 1, fence(l.s.fence(), true, false, false, false));
-		// the balcony door lintel is the floor beam; a name board over the front door
-		set(c, p, cu, 2, l.vf - 1, stair(Blocks.DEEPSLATE_BRICK_STAIRS, Direction.SOUTH, true));
-		put(c, p, cu, 1, l.vf - 1, hangingLantern(), CitadelCanvas.HANGING);
+		// the balcony floor is the lintel; the cell in front of the door stays clear (2 high up to the balcony)
 	}
 
 	// ------------------------------------------------------------------ third-floor terrace
@@ -425,16 +427,18 @@ public final class HouseTowerStair implements Variant {
 				boolean edge = u == l.u1 || u == l.iu || v == 0;
 				set(c, p, u, B2, v, edge ? log(l.s.trim(), u == l.u1 || u == l.iu ? Direction.Axis.Z : Direction.Axis.X) : b(l.s.planks()));
 			}
-			set(c, p, u, B2 - 1, 1, stair(Blocks.DARK_OAK_STAIRS, Direction.SOUTH, true));
+			if (Math.abs(u - l.cu) > 1) {
+				// no bracket over the balcony: it would be at head height in front of the balcony door
+				set(c, p, u, B2 - 1, 1, stair(Blocks.DARK_OAK_STAIRS, Direction.SOUTH, true));
+			}
 		}
 		// rails: front, west and east edges
 		for (int u = l.u1; u <= l.iu; u++) {
 			set(c, p, u, B2 + 1, 0, fence(l.s.fence(), false, u < l.iu, u == l.iu && false, u > l.u1));
 		}
 		set(c, p, l.u1, B2 + 1, 1, fence(l.s.fence(), true, false, false, false));
-		set(c, p, l.iu, B2 + 1, 1, fence(l.s.fence(), true, false, true, false));
-		// the end of the front rail meets the east rail
-		set(c, p, l.iu, B2 + 1, 0, fence(l.s.fence(), false, false, true, true));
+		// (iu, v1) stays open: it is where the stair's landing 2 steps onto the terrace
+		set(c, p, l.iu, B2 + 1, 0, fence(l.s.fence(), false, false, false, true));
 		put(c, p, l.cu, B2 + 1, 0, b(Blocks.POTTED_PINK_TULIP), CitadelCanvas.DECOR);
 		put(c, p, l.cu - 1, B2 - 1, 0, hangingLantern(), CitadelCanvas.HANGING);
 		put(c, p, l.cu + 1, B2 - 1, 0, hangingLantern(), CitadelCanvas.HANGING);
@@ -511,11 +515,11 @@ public final class HouseTowerStair implements Variant {
 			set(c, p, l.iu, yy, a, log(l.s.frame(), Direction.Axis.Y));
 		}
 		set(c, p, l.iu, 0, a, b(Blocks.POLISHED_DEEPSLATE));
-		set(c, p, l.ou, B2 + 1, a - 1, fence(l.s.fence(), false, false, true, false));
-		set(c, p, l.ou, B2 + 1, a, fence(l.s.fence(), true, true, false, false));
+		// rail round landing 2 on its north and east edges; (ou, a) stays clear: it is the cell in front of flight 3
+		set(c, p, l.ou, B2 + 1, a - 1, fence(l.s.fence(), false, true, false, false));
 		set(c, p, l.su, B2, a, b(l.s.planks()));
-		set(c, p, l.su, B2 + 1, a, fence(l.s.fence(), false, false, false, true));
-		set(c, p, l.su, B2 + 1, a - 1, fence(l.s.fence(), false, false, true, false));
+		set(c, p, l.su, B2 + 1, a, fence(l.s.fence(), true, false, false, false));
+		set(c, p, l.su, B2 + 1, a - 1, fence(l.s.fence(), false, false, true, true));
 		set(c, p, l.su, B2, a - 1, b(l.s.planks()));
 		set(c, p, l.ou, B2, a - 1, b(l.s.planks()));
 
@@ -543,8 +547,9 @@ public final class HouseTowerStair implements Variant {
 		set(c, p, l.su, B3, vl, b(l.s.planks()));
 		set(c, p, l.su, B3 + 1, vl, fence(l.s.fence(), true, false, true, false));
 		set(c, p, l.iu, B3 + 1, vl - 1, fence(l.s.fence(), false, false, false, false));
-		put(c, p, l.iu, B3 + 2, l.vd, hangingLantern(), CitadelCanvas.HANGING);
-		put(c, p, l.iu, B1 + 2, l.vd, hangingLantern(), CitadelCanvas.HANGING);
+		// lanterns off the walk: one on the landing-3 rail post, one hung under landing 3 (high over landing 1)
+		set(c, p, l.su, B3 + 2, vl, lantern());
+		put(c, p, l.iu, B3 - 1, vl, hangingLantern(), CitadelCanvas.HANGING);
 		// planters under flight 2
 		for (int v = a + 1; v < vl; v++) {
 			set(c, p, l.iu, 0, v, b(Blocks.MOSS_BLOCK));
@@ -632,7 +637,13 @@ public final class HouseTowerStair implements Variant {
 	private static void yard(CitadelCanvas c, L l) {
 		Plot p = l.p;
 		for (int v = l.vf + 1; v < l.vb; v++) {
+			if (buttress(l, v) || winS(l, v)) {
+				continue; // never replace a buttress foot or a sill; and never float on the ledge's half slab
+			}
 			int k = p.hash(0, 0, v, 5);
+			if (k <= 2) {
+				set(c, p, 0, 0, v, b(Blocks.POLISHED_DEEPSLATE));
+			}
 			if (k == 0) {
 				set(c, p, 0, 1, v, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
 			} else if (k == 1) {
@@ -641,7 +652,8 @@ public final class HouseTowerStair implements Variant {
 				set(c, p, 0, 1, v, b(Blocks.POTTED_FERN));
 			}
 		}
-		set(c, p, l.u1 + 1, 1, l.d - 1, b(Blocks.COMPOSTER));
-		set(c, p, l.u1 + 2, 1, l.d - 1, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
+		// a composter in the back-west corner, on a full block (behind the back wall the sills and buttresses own the row)
+		set(c, p, l.u1 - 1, 0, l.vb + 1, b(Blocks.POLISHED_DEEPSLATE));
+		set(c, p, l.u1 - 1, 1, l.vb + 1, b(Blocks.COMPOSTER));
 	}
 }

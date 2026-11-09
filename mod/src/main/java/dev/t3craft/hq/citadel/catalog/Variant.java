@@ -52,12 +52,21 @@ public interface Variant {
 
 	/**
 	 * Whether {@code p} is within this variant's size range. The largest frontage and depth grow with the
-	 * citadel's scale ({@code CitadelCanvas.dims().s(maxW())}; identity at scale 1), so that the bigger plots
+	 * citadel's scale ({@code maxW · √k}; identity at scale 1), so that the bigger plots
 	 * of a scaled citadel still find variants: a variant builds to its plot's size, see the contract.
 	 */
 	default boolean fits(Plot p) {
 		dev.t3craft.hq.RingCampusGeometry.Dims g = dev.t3craft.hq.citadel.CitadelCanvas.dims();
-		return p.w() >= minW() && p.w() <= Math.max(maxW(), g.s(maxW())) && p.d() >= minD() && p.d() <= Math.max(maxD(), g.s(maxD())) && p.h() >= minH();
+		return p.w() >= minW() && p.w() <= Math.max(maxW(), grow(maxW(), g.k, family())) && p.d() >= minD() && p.d() <= Math.max(maxD(), grow(maxD(), g.k, family())) && p.h() >= minH();
+	}
+
+	/**
+	 * A maximum size at scale {@code k}. Plots grow by {@code √k} (see {@code CitadelPlacement#sp}), except the
+	 * families sized to a street (gates, plaza centres, bridges), which grow by {@code k} like the street.
+	 */
+	private static int grow(int n, double k, Family f) {
+		boolean street = f == Family.GATE || f == Family.PLAZA_CENTER || f == Family.BRIDGE;
+		return (int) Math.round(n * (street ? k : Math.sqrt(k)));
 	}
 
 	/** Builds the variant into {@code p} on {@code c}. See the contract above. */

@@ -126,6 +126,64 @@ public final class HallFacade {
 		door(c, r, s, m);
 		porch(c, r, F, m, s, seed);
 		windows(c, r, F, s, seed);
+		pilasters(c, r, F, m, s);
+		cornice(c, r, F, m);
+	}
+
+	/**
+	 * A cornice under every floor band: upside-down stairs in the roof's material along the outside of all four
+	 * walls (not beside the door, not on the piers that carry a cap), so each floor ends in a shadow line.
+	 */
+	private static void cornice(CitadelCanvas c, Room r, int F, Mats m) {
+		int mid = r.c();
+		for (int side = 0; side < 4; side++) {
+			int len = side < 2 ? r.w() : r.d();
+			Direction out = outward(r, side);
+			for (int t = 0; t < len; t++) {
+				if (side == 0 && Math.abs(t - mid) <= 2) {
+					continue;
+				}
+				for (int f = 0; f < F - 1; f++) {
+					BlockPos p = outside(r, side, t, (f + 1) * fh());
+					BlockState there = c.at(p.getX(), p.getY(), p.getZ());
+					if (there == null || there.isAir()) {
+						c.set(p, stairs(m.roof(), out.getOpposite()).setValue(BlockStateProperties.HALF, Half.TOP));
+					}
+				}
+			}
+		}
+	}
+
+	/**
+	 * Protruding piers on the free piers of timber and balcony halls: a stone plinth, a post and a stair cap under
+	 * the cornice, one block proud of the wall, so the long walls have depth and a rhythm. Never beside the door
+	 * (the porch is there), never next to a corner, and only into free cells.
+	 */
+	private static void pilasters(CitadelCanvas c, Room r, int F, Mats m, HallStyle s) {
+		if (s != HallStyle.TIMBER && s != HallStyle.BALCONY) {
+			return;
+		}
+		int mid = r.c();
+		int top = F * fh();
+		for (int side = 0; side < 4; side++) {
+			int len = side < 2 ? r.w() : r.d();
+			Direction out = outward(r, side);
+			for (int t = 1; t < len - 1; t++) {
+				if (Math.floorMod(t, 3) != 0 || (side == 0 && Math.abs(t - mid) <= 2)) {
+					continue;
+				}
+				BlockPos base = outside(r, side, t, 1);
+				BlockState there = c.at(base.getX(), base.getY(), base.getZ());
+				if (there != null && !there.isAir()) {
+					continue;
+				}
+				c.set(base, STONE_BRICKS);
+				for (int y = 2; y < top; y++) {
+					c.set(outside(r, side, t, y), m.post());
+				}
+				c.set(outside(r, side, t, top), stairs(m.roof(), out.getOpposite()));
+			}
+		}
 	}
 
 	/** The door: jambs either side and a lintel (a keystone on stone halls). The opening (3 wide, 3 high) stays clear. */

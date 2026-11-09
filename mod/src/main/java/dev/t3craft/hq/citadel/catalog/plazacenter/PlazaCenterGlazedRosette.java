@@ -121,8 +121,8 @@ public final class PlazaCenterGlazedRosette implements Variant {
 		Direction f = out(dx, dz);
 		double ang = Math.atan2(dz, dx);
 		if (e < 1.0) {
-			// [depth] ramp: deepslate tile stairs low side out, so the disc is a raised dais, never a cut edge
-			p.set(c, u, 0, v, p.hash(u, 0, v, 4) == 0 ? stairs(Blocks.MOSSY_STONE_BRICK_STAIRS, f) : stairs(Blocks.STONE_BRICK_STAIRS, f));
+			// [depth] ramp: deepslate tile stairs low side out, so the disc is a raised dais, never a cut edge (facing inwards: the tall half towards the disc, climbed walking in)
+			p.set(c, u, 0, v, p.hash(u, 0, v, 4) == 0 ? stairs(Blocks.MOSSY_STONE_BRICK_STAIRS, f.getOpposite()) : stairs(Blocks.STONE_BRICK_STAIRS, f.getOpposite()));
 			return;
 		}
 		if (e < 2.0) {
@@ -160,9 +160,7 @@ public final class PlazaCenterGlazedRosette implements Variant {
 		if (beyond <= 1.0) {
 			int h = p.hash(u, 0, v, 4);
 			p.set(c, u, 0, v, h == 0 ? slab(Blocks.MOSSY_STONE_BRICK_SLAB) : h == 1 ? slab(Blocks.POLISHED_ANDESITE_SLAB) : slab(Blocks.STONE_BRICK_SLAB));
-			if (beyond <= 0.4 && p.hash(u, 5, v, 3) == 0) {
-				p.set(c, u, 0, v, b(Blocks.STONE_BRICKS));
-			}
+			// (no full blocks sprinkled in this paving: it is the walk round the disc, slabs only)
 			return;
 		}
 		// raised bed: deepslate retaining blocks on the rim, moss inside, bushes and flowers above

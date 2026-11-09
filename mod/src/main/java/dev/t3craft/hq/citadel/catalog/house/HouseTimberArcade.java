@@ -145,6 +145,8 @@ public final class HouseTimberArcade implements Variant {
 		chimney(c, p, g);
 		porticoFurniture(c, p, g);
 		strips(c, p, g);
+		// walkability audit: a way up to the sealed upper floor
+		dev.t3craft.hq.citadel.catalog.InteriorStair.timber(c, p, 1, 6);
 	}
 
 	// ------------------------------------------------------------------ materials
@@ -391,7 +393,7 @@ public final class HouseTimberArcade implements Variant {
 		p.set(c, cd + 1, 6, 0, fence(Blocks.CHERRY_FENCE, false, false, false, true));
 		p.set(c, cd - 1, 7, 0, lantern(false));
 		p.set(c, cd + 1, 7, 0, lantern(false));
-		p.set(c, cd, 6, 0, Blocks.POTTED_FLOWERING_AZALEA.defaultBlockState());
+		// (the middle of the rail stays a fence: a flower pot there was a gap you could step over and fall through)
 		// glazed door onto the balcony
 		p.set(c, cd, 6, 2, door(Blocks.CHERRY_DOOR, Direction.NORTH, false));
 		p.set(c, cd, 7, 2, door(Blocks.CHERRY_DOOR, Direction.NORTH, true));
