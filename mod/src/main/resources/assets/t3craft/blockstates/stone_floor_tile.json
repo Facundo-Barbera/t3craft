@@ -1,7 +1,63 @@
 {
   "variants": {
-    "": {
-      "model": "t3craft:block/stone_floor_tile"
-    }
+    "": [
+      {
+        "model": "t3craft:block/stone_floor_tile",
+        "weight": 8
+      },
+      {
+        "model": "t3craft:block/stone_floor_tile",
+        "weight": 8,
+        "y": 90
+      },
+      {
+        "model": "t3craft:block/stone_floor_tile",
+        "weight": 8,
+        "y": 180
+      },
+      {
+        "model": "t3craft:block/stone_floor_tile",
+        "weight": 8,
+        "y": 270
+      },
+      {
+        "model": "t3craft:block/stone_floor_tile_b",
+        "weight": 2
+      },
+      {
+        "model": "t3craft:block/stone_floor_tile_b",
+        "weight": 2,
+        "y": 90
+      },
+      {
+        "model": "t3craft:block/stone_floor_tile_b",
+        "weight": 2,
+        "y": 180
+      },
+      {
+        "model": "t3craft:block/stone_floor_tile_b",
+        "weight": 2,
+        "y": 270
+      },
+      {
+        "model": "t3craft:block/stone_floor_tile_c",
+        "weight": 2
+      },
+      {
+        "model": "t3craft:block/stone_floor_tile_c",
+        "weight": 2,
+        "y": 90
+      },
+      {
+        "model": "t3craft:block/stone_floor_tile_c",
+        "weight": 2,
+        "y": 180
+      },
+      {
+        "model": "t3craft:block/stone_floor_tile_c",
+        "weight": 2,
+        "y": 270
+      }
+    ]
   }
 }
