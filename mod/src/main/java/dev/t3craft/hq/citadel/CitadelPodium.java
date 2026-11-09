@@ -110,8 +110,22 @@ public final class CitadelPodium {
 	/** The top block (y) of a stair column, the parapet of the flights included. */
 	private static int rampTop(Profile p, int x, int z, int d) {
 		int h = halves(p, d);
-		boolean cheek = CitadelPaving.rampBand(x, z) == 3 && !landing(p, d);
-		return cheek ? (h + 1) / 2 + 1 : h / 2;
+		return cheek(p, x, z, d) ? (h + 1) / 2 + 1 : h / 2;
+	}
+
+	/** The one-column parapet on each side of a flight (none on the landing, where the ring walk comes in). */
+	private static boolean cheek(Profile p, int x, int z, int d) {
+		return !landing(p, d) && RingCampusGeometry.radialDistance(x, z, 8) > CitadelCanvas.dims().avenueHalf - 1.0;
+	}
+
+	/**
+	 * Cells from the street of a terrace column, bent by up to about 2.5 cells along the circle (lobes of 20 to 35 cells
+	 * of arc) so the walls of the tiers are not perfect circles; the flights of the avenues are not bent.
+	 */
+	private static int terraceD(int x, int z, double r) {
+		double a = RingCampusGeometry.theta(x, z);
+		double warp = 1.6 * Math.sin(11 * a + 0.3) + 1.0 * Math.sin(19 * a + 1.7);
+		return (int) Math.round(CitadelCanvas.dims().rampR - r + warp);
 	}
 
 	/** The top block (y) of any column near the podium, as this class paints it (0 for the street, the patio and beyond). */
@@ -119,7 +133,7 @@ public final class CitadelPodium {
 		RingCampusGeometry.Zone zn = c.zoneAt(x, z);
 		return switch (zn.kind()) {
 			case HUB, HUB_WALL, GALLERY, BRIDGE -> y0();
-			case TERRACE -> terraceTop(p, dOut(RingCampusGeometry.r(x, z)));
+			case TERRACE -> terraceTop(p, terraceD(x, z, RingCampusGeometry.r(x, z)));
 			case RAMP -> rampTop(p, x, z, dOut(RingCampusGeometry.r(x, z)));
 			default -> 0;
 		};
@@ -129,6 +143,16 @@ public final class CitadelPodium {
 		int low = Integer.MAX_VALUE;
 		for (Direction dir : DIRS) {
 			low = Math.min(low, top(c, p, x + dir.getStepX(), z + dir.getStepZ()));
+		}
+		return low;
+	}
+
+	private static int lowestDiagonal(CitadelCanvas c, Profile p, int x, int z) {
+		int low = Integer.MAX_VALUE;
+		for (int dx = -1; dx <= 1; dx += 2) {
+			for (int dz = -1; dz <= 1; dz += 2) {
+				low = Math.min(low, top(c, p, x + dx, z + dz));
+			}
 		}
 		return low;
 	}
@@ -145,7 +169,7 @@ public final class CitadelPodium {
 		if (p == null) {
 			return false;
 		}
-		int d = dOut(r);
+		int d = terraceD(x, z, r);
 		int top = terraceTop(p, d);
 		int low = lowestNeighbour(c, p, x, z);
 		solid(c, x, z, top, low);
@@ -167,18 +191,17 @@ public final class CitadelPodium {
 		}
 		int d = dOut(r);
 		int h = halves(p, d);
-		int band = CitadelPaving.rampBand(x, z);
+		// only the central runner is bamboo (the yellow); the rest of the flight is smooth stone
+		int band = CitadelPaving.rampBand(x, z) == 0 ? 0 : 2;
 		boolean landing = landing(p, d);
-		boolean cheek = band == 3 && !landing;
+		boolean cheek = cheek(p, x, z, d);
 		int top = rampTop(p, x, z, d);
 		int low = lowestNeighbour(c, p, x, z);
 		solid(c, x, z, top, low);
 		if (cheek) {
-			// dark parapet along the flight; only its outermost line is light, so the stair stays the bright thing
-			boolean outer = RingCampusGeometry.radialDistance(x, z, 8) > c.g.avenueHalf - 1.0;
-			c.set(x, top, z, outer ? CALCITE : PIER);
+			c.set(x, top, z, CALCITE); // one column wide: a dark body (the wall palette) under a light coping
 		} else if (landing) {
-			c.set(x, top, z, CitadelPaving.rampFull(Math.min(band, 2)));
+			c.set(x, top, z, CitadelPaving.rampFull(band));
 		} else {
 			c.set(x, top, z, CitadelPaving.rampFull(band));
 			if (h % 2 == 1) {
@@ -227,7 +250,8 @@ public final class CitadelPodium {
 	/** The ring walk of the middle tier: a coping on the edge of wall A, the kit's floor between. */
 	private static void ringWalk(CitadelCanvas c, Profile p, int x, int z, int d, int top, int lowestNeighbour) {
 		if (d == p.fa() + 1) {
-			c.set(x, top, z, top - lowestNeighbour >= 2 ? CALCITE : c.accent());
+			// the coping is a continuous line: a cell that only touches the drop at a corner gets it too
+			c.set(x, top, z, top - Math.min(lowestNeighbour, lowestDiagonal(c, p, x, z)) >= 2 ? CALCITE : c.accent());
 		} else if (d == p.fa() + p.land()) {
 			c.set(x, top, z, c.accent());
 		} else {
@@ -270,32 +294,29 @@ public final class CitadelPodium {
 			int x = CitadelCanvas.colX(key);
 			int z = CitadelCanvas.colZ(key);
 			double r = RingCampusGeometry.r(x, z);
-			int d = dOut(r);
-			if (d != p.fa() && !wallBFoot(c, x, z) || RingCampusGeometry.radialDistance(x, z, 8) <= clear) {
+			if (RingCampusGeometry.radialDistance(x, z, 8) <= clear
+					|| Math.floorMod(Math.round(RingCampusGeometry.theta(x, z) * r), every) != 0) {
 				continue;
 			}
-			if (Math.floorMod(Math.round(RingCampusGeometry.theta(x, z) * r), every) != 0) {
-				continue;
-			}
-			int here = terraceTop(p, d);
+			int here = terraceTop(p, terraceD(x, z, r));
 			for (Direction dir : DIRS) {
 				int hn = top(c, p, x + dir.getStepX(), z + dir.getStepZ());
-				if (hn >= here + 2) {
-					pier(c, x, z, here, hn, dir);
-					break;
+				if (hn < here + 2) {
+					continue;
 				}
+				pier(c, x, z, here, hn, dir);
+				// two cells wide: the next cell along the wall, when it too stands at the foot of the same wall
+				int tx = dir.getStepZ() != 0 ? 1 : 0;
+				int tz = dir.getStepX() != 0 ? 1 : 0;
+				int ox = x + tx;
+				int oz = z + tz;
+				if (c.zoneAt(ox, oz).kind() == Kind.TERRACE && top(c, p, ox, oz) == here && top(c, p, ox + dir.getStepX(), oz + dir.getStepZ()) == hn
+						&& RingCampusGeometry.radialDistance(ox, oz, 8) > clear) {
+					pier(c, ox, oz, here, hn, dir);
+				}
+				break;
 			}
 		}
-	}
-
-	/** A bed column against the gallery's plinth. */
-	private static boolean wallBFoot(CitadelCanvas c, int x, int z) {
-		for (Direction dir : DIRS) {
-			if (c.zoneAt(x + dir.getStepX(), z + dir.getStepZ()).kind() == Kind.GALLERY) {
-				return true;
-			}
-		}
-		return false;
 	}
 
 	/** The pier at the foot of a wall of top {@code wallTop}, standing on a surface at {@code floor}, against the wall to {@code towards}. */
