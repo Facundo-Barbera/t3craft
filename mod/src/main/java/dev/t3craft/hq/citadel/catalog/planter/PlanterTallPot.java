@@ -171,6 +171,11 @@ public final class PlanterTallPot implements Variant {
 		return p.hash(u, y, v, 5) == 0 ? m.bodyAlt() : m.body();
 	}
 
+	/** The stem of a one-cell pot: a thin deepslate post. */
+	private static BlockState neck() {
+		return b(Blocks.POLISHED_DEEPSLATE_WALL).setValue(BlockStateProperties.UP, true);
+	}
+
 	private static BlockState soil(Plot p, int u, int v) {
 		return p.hash(u, 9, v, 3) == 0 ? b(Blocks.PODZOL) : b(Blocks.MOSS_BLOCK);
 	}
@@ -239,9 +244,9 @@ public final class PlanterTallPot implements Variant {
 			// the mid pot has no foot (two high), the tall one has it (three): a pair is never level
 			int y = 0;
 			if (tier == 2) {
-				p.set(c, u, y++, v, foot(m, p, u, v));
+				p.set(c, u, y++, v, neck()); // a slim stem under a full belly: an urn, not a post
 			}
-			p.set(c, u, y++, v, m.urn());
+			p.set(c, u, y++, v, p.hash(u, 1, v, 4) == 0 ? m.bodyAlt() : m.urn());
 			// a ball of blossom or azalea: a shrub with presence on a one-cell pot
 			p.set(c, u, y, v, switch (p.hash(u, 4, v, 3)) {
 				case 0 -> leaves(Blocks.CHERRY_LEAVES);
@@ -250,7 +255,7 @@ public final class PlanterTallPot implements Variant {
 			});
 			return;
 		}
-		p.set(c, u, 0, v, foot(m, p, u, v));
+		p.set(c, u, 0, v, neck());
 		int body = Math.max(1, Math.min(tier == 2 ? 2 : 1, h - 4)); // never a stretched tower: 5 or 6 high at most, plus the plant
 		for (int y = 1; y <= body; y++) {
 			p.set(c, u, y, v, y == body && body >= 2 ? m.lip() : body(m, p, u, y, v));
