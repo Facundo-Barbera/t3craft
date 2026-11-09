@@ -171,34 +171,46 @@ TALL_TEXTURES = {
 
 
 def tall_lower():
-    """Lower half of the plaza lantern: a two-step dark stone plinth, a lacquer collar and a 6 px cherry post."""
+    """
+    Lower half of the plaza lantern, a post with a proper base: two stone steps, a lacquer plinth cap, an 8 px cherry
+    shaft with a lacquer collar ring (collarin), a slimmer neck, and a flared lacquer capital (6, 10, 12, 14 px wide)
+    that cradles the head, which starts in the cell above.
+    """
     return model(TALL_TEXTURES, [
-        el((1, 0, 1), (15, 2, 15), "stone", name="plinth foot"),
-        el((2, 2, 2), (14, 4, 14), "stone", name="plinth"),
-        el((3, 4, 3), (13, 5, 13), "dark", name="collar"),
-        el((5, 5, 5), (11, 16, 11), "cherry", faces=SIDES + ("down",), name="post"),
-        el((4, 10, 4), (12, 11, 12), "dark", name="post ring"),
+        el((1, 0, 1), (15, 2, 15), "stone", name="base foot"),
+        el((2, 2, 2), (14, 4, 14), "stone", name="base step"),
+        el((3, 4, 3), (13, 5, 13), "dark", name="plinth cap"),
+        el((4, 5, 4), (12, 10, 12), "cherry", faces=SIDES + ("down",), name="shaft"),
+        el((3, 10, 3), (13, 11, 13), "dark", name="collar"),
+        el((3.5, 11, 3.5), (12.5, 12, 12.5), "brass", faces=SIDES, name="collar band"),
+        el((5, 11, 5), (11, 14, 11), "cherry", faces=SIDES + ("down",), name="neck"),
+        el((4, 14, 4), (12, 15, 12), "dark", name="capital 8"),
+        el((2, 15, 2), (14, 16, 14), "dark", name="capital 12"),
     ])
 
 
 def tall_upper():
     """
-    Upper half: the post's last 2 px, a full-width lacquer tray, a big paper box (12 px, cherry corner posts,
-    dark head rail) and a three-step pyramid roof (eaves across the whole cell) with a brass-vented crown.
-    The paper glows. Its head is 1.2x the standing lantern's and its roof overhangs the light by 2 px.
+    Upper half: the head of a plaza lantern, much bigger than the standing andon. A full-width lacquer tray, a 12 x 10 px
+    paper box (cherry corner posts, dark head rail) that glows, and a pyramid roof of its own (eaves across the whole
+    cell, two steps, brass-vented crown) whose corners rise in four dark tips, like the andon's but at plaza scale.
     """
-    side_uv = {s: [2, 4, 14, 13] for s in SIDES}
+    side_uv = {s: [2, 3, 14, 13] for s in SIDES}
+    roof = lambda a: {**{s: "dark" for s in SIDES}, "up": "roof", "down": "dark"}
     els = [
-        el((5, 0, 5), (11, 2, 11), "cherry", faces=SIDES + ("down",), name="post"),
-        el((0, 2, 0), (16, 3, 16), "dark", name="tray"),
-        el((2, 3, 2), (14, 12, 14), "paper", faces=SIDES, uv=side_uv, name="paper", glow=True),
-        el((2.5, 3, 2.5), (13.5, 12, 13.5), "paper", faces=("up", "down"), name="paper ends", glow=True),
-        el((1, 12, 1), (15, 13, 15), "dark", faces=SIDES + ("down",), name="head rail"),
-        el((0, 13, 0), (16, 14, 16), {**{s: "dark" for s in SIDES}, "up": "roof", "down": "dark"}, name="roof eaves"),
-        el((3, 14, 3), (13, 15, 13), {**{s: "dark" for s in SIDES}, "up": "roof", "down": "dark"}, name="roof mid"),
+        el((0, 0, 0), (16, 1, 16), "dark", name="tray"),
+        el((2, 1, 2), (14, 11, 14), "paper", faces=SIDES, uv=side_uv, name="paper", glow=True),
+        el((2.5, 1, 2.5), (13.5, 11, 13.5), "paper", faces=("up", "down"), name="paper ends", glow=True),
+        el((1, 11, 1), (15, 12, 15), "dark", faces=SIDES + ("down",), name="head rail"),
+        el((0, 12, 0), (16, 13, 16), roof(0), name="roof eaves"),
+        el((3, 13, 3), (13, 14, 13), roof(0), name="roof mid"),
+        el((5, 14, 5), (11, 15, 11), roof(0), name="roof upper"),
         el((6, 15, 6), (10, 16, 10), {**{s: "brass" for s in SIDES}, "up": "finial", "down": "dark"}, name="roof crown"),
     ]
-    els += posts((1, 13), (1, 13), 3, 13, "cherry")
+    els += posts((1, 13), (1, 13), 1, 11, "cherry")
+    for x in (0, 14):
+        for z in (0, 14):
+            els.append(el((x, 13, z), (x + 2, 14, z + 2), roof(0), name="roof tip"))
     return model(TALL_TEXTURES, els)
 
 

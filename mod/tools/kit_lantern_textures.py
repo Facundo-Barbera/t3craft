@@ -12,6 +12,7 @@ older kit_lantern_side/end of blocks_kit_textures.py are left alone).
 Every texture is drawn at the model's texel density (1 texel = 1/16 block), and each paper face is
 drawn for the exact uv window its model element uses, so nothing is stretched.
 """
+import math
 import os
 import random
 import struct
@@ -40,14 +41,14 @@ CHERRY = pal("#3E1E23", "#51282D", "#673338", "#7E4144", "#96524F", "#B06A63")
 STONE = pal("#1B1A21", "#26252D", "#33323C", "#44434E", "#5A5964")
 # backlit paper per tone: edge (cool, dim) -> hot (near the flame)
 TONES = {
-    "paper": pal("#C98F4E", "#E2AE62", "#F2C97C", "#FBDD98", "#FFEDB8", "#FFF7DC"),
-    "rose": pal("#B5555F", "#D2737A", "#E8939A", "#F5B2B4", "#FFCFCC", "#FFE9E2"),
-    "vermilion": pal("#8E2118", "#B5321F", "#D6482A", "#EC6A36", "#FA9450", "#FFC27A"),
+    "paper": pal("#C4601C", "#DE7C28", "#F29836", "#FFB64C", "#FFD173", "#FFEBA8"),
+    "rose": pal("#A9334F", "#CC4F69", "#E8707F", "#F69093", "#FFB69E", "#FFDAB4"),
+    "vermilion": pal("#7A1710", "#A62818", "#CF3F22", "#EB5D2B", "#FF8640", "#FFBA68"),
 }
-# the dark wooden ribs seen through lit paper, per tone
+# the dark wooden ribs seen through lit paper, per tone (warm: the flame shows through them)
 RIB = {
-    "paper": pal("#8C5433", "#A8693E"),
-    "rose": pal("#7A3640", "#94464E"),
+    "paper": pal("#93491E", "#B2602A"),
+    "rose": pal("#7E2A42", "#9C3D54"),
     "vermilion": pal("#5A120E", "#741A13"),
 }
 INK = pal("#1A1216", "#2A1C20")
@@ -91,7 +92,7 @@ def clamp(i, n):
 def glow(ramp, x, y, cx, cy, rx, ry, rng, bias=0.0):
     """A ramp index from the distance to the hot spot (cx, cy), elliptical, with a little fibre jitter."""
     d = ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2
-    v = (1.0 - min(1.0, d)) * (len(ramp) - 1) + bias + rng.uniform(-0.45, 0.45)
+    v = (1.0 - min(1.0, d)) * (len(ramp) - 1) + bias + rng.uniform(-0.4, 0.4) + 0.45 * math.sin(x * 1.25 + y * 0.55)
     return ramp[clamp(int(round(v)), len(ramp))]
 
 
@@ -240,30 +241,33 @@ def stone():
 # ---- paper ------------------------------------------------------------------------------------
 def tall():
     """
-    Side of the tall lantern's paper box (body element 2..14 wide, 3..12 high of the upper half,
-    uv [2, 4, 14, 13]): lit paper with a hot near-white middle band, two kumiko rails and a stile in the top panel.
+    Side of the tall lantern's paper box (element 2..14 wide, 1..11 high of the upper half, uv [2, 3, 14, 13]):
+    lit paper, hot near-white flame band across the middle with a warm amber halo above and below, two kumiko rails,
+    a stile in the top panel and a slow wave of light so the three panels do not read as one gradient.
     """
     rng = random.Random(312)
     ramp = TONES["paper"]
     rib = RIB["paper"]
     img = Img()
     img.rect(0, 0, 15, 15, ramp[1])
-    for y in range(4, 13):
+    for y in range(3, 13):
         for x in range(2, 14):
-            img.set(x, y, glow(ramp, x, y, 7.5, 8.5, 7.0, 5.0, rng, bias=1.3))
+            img.set(x, y, glow(ramp, x, y, 7.5, 8.2, 6.6, 4.6, rng, bias=1.5))
     for x in range(2, 14):
-        img.set(x, 4, ramp[2])
-        img.set(x, 7, rib[1])
-        img.set(x, 11, rib[1])
-    for y in range(4, 7):
+        img.set(x, 3, ramp[2])
+        img.set(x, 6, rib[1])
+        img.set(x, 10, rib[1])
+    for y in range(3, 6):
         img.set(7, y, rib[0])
         img.set(8, y, rib[1])
-    for y in range(4, 13):
+    for y in range(3, 13):
         img.set(2, y, ramp[1] if y % 3 else ramp[0])
         img.set(13, y, ramp[1] if y % 3 else ramp[0])
-    for y in (8, 9, 10):  # the hot band
+    for y in (7, 8, 9):  # the hot band, ribs of the middle rail glowing through
         for x in range(4, 12):
             img.set(x, y, ramp[5] if rng.random() < 0.8 else ramp[4])
+    for x in range(4, 12):  # halo under the rail
+        img.set(x, 11, ramp[4] if rng.random() < 0.7 else ramp[3])
     return img
 
 
@@ -322,8 +326,10 @@ def chochin(tone):
                 img.set(x, y, rib[0] if abs(x - 7.5) > 3.5 else rib[1])
     for y in (7, 8, 9):  # a hot band round the belly (the flame), so the paper reads as lit, not as dark stripes
         for x in range(3, 13):
-            if y % 2 != 0 or abs(x - 7.5) < 3.5:
+            if y % 2 != 0:
                 img.set(x, y, ramp[5] if rng.random() < 0.8 else ramp[4])
+            elif abs(x - 7.5) < 3.5:
+                img.set(x, y, ramp[3])  # the rib in the hot band glows through, a step warmer than the rest of it
     if tone == "vermilion":
         for x in range(1, 15):
             img.set(x, 8, VBAND[1] if x % 3 else VBAND[0])
