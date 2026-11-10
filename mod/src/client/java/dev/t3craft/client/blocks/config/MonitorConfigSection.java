@@ -2,6 +2,9 @@ package dev.t3craft.client.blocks.config;
 
 import dev.t3craft.blocks.Binding;
 import dev.t3craft.blocks.MonitorBlock;
+import dev.t3craft.client.blocks.BlockAccent;
+import dev.t3craft.client.blocks.LogPreview;
+import dev.t3craft.client.blocks.MonitorLog;
 import dev.t3craft.client.blocks.MonitorOptions;
 import dev.t3craft.client.chat.ChatTheme;
 import dev.t3craft.client.workstation.StationStatus;
@@ -22,6 +25,26 @@ public final class MonitorConfigSection implements BlockConfigSection {
 	/** Sample tool rows of a log preview (schematic: the real rows are the thread's last tool calls). */
 	private static final List<String> SAMPLE_LOG = List.of("Read  src/main/App.java", "Edit  src/main/App.java  +12 -3", "Bash  ./gradlew build",
 			"Grep  \"binding\"", "Edit  docs/features/blocks.md  +8 -1", "Read  README.md");
+
+	/** Most rows a log preview takes from a live thread. */
+	private static final int PREVIEW_ROWS = 8;
+
+	/** The newest real rows of a thread's log, oldest first (empty = none available; the preview then shows sample rows). */
+	@FunctionalInterface
+	public interface LogRows {
+		List<MonitorLog.Row> latest(String threadKey, int max);
+	}
+
+	private final LogRows realRows;
+
+	/** The page of the game: real rows from the log feeds the client has open ({@link LogPreview}). */
+	public MonitorConfigSection() {
+		this(LogPreview::latest);
+	}
+
+	public MonitorConfigSection(LogRows realRows) {
+		this.realRows = realRows;
+	}
 
 	@Override
 	public String blockName() {
@@ -59,10 +82,16 @@ public final class MonitorConfigSection implements BlockConfigSection {
 	@Override
 	public void options(BlockConfigPanel.Form form, BlockConfig config) {
 		MonitorOptions o = MonitorOptions.of(config.options());
+		boolean status = config.binding().kind() == Binding.Kind.BEACON;
 		form.select("Text size", Arrays.asList(MonitorOptions.TextSize.values()), t -> t.label, o.textSize(),
 				t -> form.set(MonitorOptions.TEXT_SIZE, t.id, MonitorOptions.TextSize.NORMAL.id));
-		form.select("Accent", MonitorOptions.ACCENTS, MonitorOptions::accentLabel, o.accent(),
+		form.select("Accent", MonitorOptions.ACCENTS, a -> BlockAccent.label(a, status ? "Default" : "Status colour"), o.accent(),
 				a -> form.set(MonitorOptions.ACCENT, a, MonitorOptions.ACCENT_STATUS));
+		if (status) {
+			// the status screen is not a log: no rows to cap, no status chip to age
+			form.note("Text size scales the numbers and labels. The accent colours the PRS TO REVIEW and ACTIVE PROJECTS cells; the tiles keep their state colours.");
+			return;
+		}
 		List<Integer> rows = new ArrayList<>(MonitorOptions.ROW_CHOICES);
 		if (!rows.contains(o.rows())) {
 			rows.add(o.rows()); // a value written by hand stays selectable
@@ -88,11 +117,16 @@ public final class MonitorConfigSection implements BlockConfigSection {
 				BindingChoices.Choice c = choices.find(b);
 				StationStatus st = c.status();
 				String chip = o.showAge() ? st.word + " - 3m" : st.word;
-				for (String s : SAMPLE_LOG) {
+				// the thread's real newest rows when its log is open on the client, sample rows otherwise (T10)
+				List<MonitorLog.Row> real = realRows.latest(b.value(), Math.min(rows, PREVIEW_ROWS));
+				for (MonitorLog.Row r : real) {
 					if (lines.size() >= rows) {
 						break;
 					}
-					lines.add(new BlockPreview.Line(s, t.codeText()));
+					lines.add(new BlockPreview.Line(r.name().isEmpty() ? r.text() : r.name() + "  " + r.text(), 0xFF000000 | r.color()));
+				}
+				for (int i = 0; real.isEmpty() && i < SAMPLE_LOG.size() && lines.size() < rows; i++) {
+					lines.add(new BlockPreview.Line(SAMPLE_LOG.get(i), t.codeText()));
 				}
 				yield new BlockPreview.Model(c.label(), chip, fixed != 0 ? fixed : color(st, t), lines, scale);
 			}
@@ -128,7 +162,7 @@ public final class MonitorConfigSection implements BlockConfigSection {
 						StationStatus.IDLE}) {
 					lines.add(new BlockPreview.Line(s.word + ": " + n[s.ordinal()], color(s, t)));
 				}
-				yield new BlockPreview.Model("Workspace status", "", t.accent(), lines, 1f);
+				yield new BlockPreview.Model("Workspace status", "", fixed != 0 ? fixed : t.accent(), lines, scale);
 			}
 			default -> {
 				lines.add(new BlockPreview.Line("The screen stays dark (standby) until it is bound.", t.muted()));

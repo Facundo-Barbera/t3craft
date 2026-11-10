@@ -193,7 +193,7 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 		}
 		MonitorLod.Level level = MonitorLod.next(lods.get(posKey), distance, extent, client.monitorSettings());
 		lods.put(posKey, level);
-		MonitorOptions opts = MonitorOptions.of(be.options());
+		MonitorOptions opts = MonitorOptions.of(client.screenOptions(be)); // a wall draws with its cells' options (T10)
 		MonitorLod.Layout layout = MonitorLod.layout(level, extent, opts.textSize().density);
 		if (opts.rows() > 0 && layout.rows() > opts.rows()) {
 			layout = new MonitorLod.Layout(layout.level(), layout.extent(), layout.ppb(), layout.bezel(), layout.chin(), layout.cols(), opts.rows());
@@ -210,7 +210,8 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 			try {
 				StatusScreen.Summary summary = client.statusSummary();
 				state.layout = MonitorLod.layout(MonitorLod.Level.FAR, extent);
-				state.status = statusScreen.panel(Minecraft.getInstance().font, summary, state.layout);
+				// T10: text size and accent of the page (the same MonitorOptions) shape the status screen too
+				state.status = statusScreen.panel(Minecraft.getInstance().font, summary, state.layout, StatusScreen.Style.of(opts, ChatTheme.warmStudio()));
 				state.statusTop = summary.top();
 			} catch (RuntimeException e) {
 				T3Craft.LOGGER.debug("T3Craft: status screen layout failed", e);

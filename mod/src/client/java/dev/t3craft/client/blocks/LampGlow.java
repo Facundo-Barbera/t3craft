@@ -53,6 +53,23 @@ public final class LampGlow {
 		};
 	}
 
+	/** The level a lamp holds when its page turned pulsing off ({@link LampOptions#pulse()}): about the middle of each curve. */
+	public static float steadyLevel(LampStatus s) {
+		return switch (s) {
+			case OFF -> 0f;
+			case IDLE -> 0.25f;
+			case DONE -> 0.45f;
+			case WORKING -> 0.6f;
+			case ERROR -> 0.7f;
+			case ATTENTION -> 0.65f;
+		};
+	}
+
+	/** {@code alpha} (0..255) times {@code gain}, kept in range ({@link LampOptions.Glow}). */
+	public static int gain(int alpha, float gain) {
+		return Math.max(0, Math.min(255, Math.round(alpha * gain)));
+	}
+
 	/** Whether the glow of {@code s} changes over time. */
 	public static boolean breathes(LampStatus s) {
 		return s == LampStatus.ATTENTION || s == LampStatus.ERROR || s == LampStatus.WORKING;

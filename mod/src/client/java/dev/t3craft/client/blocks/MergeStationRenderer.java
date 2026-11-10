@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import dev.t3craft.blocks.Binding;
 import dev.t3craft.blocks.MergeStationBlock;
 import dev.t3craft.blocks.MergeStationBlockEntity;
+import dev.t3craft.client.chat.ChatTheme;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -50,7 +51,7 @@ public final class MergeStationRenderer implements BlockEntityRenderer<MergeStat
 	}
 
 	/** The last glyph runs built for one station. */
-	private record Cached(MergeFeed.Summary summary, List<FormattedCharSequence> lines, int[] colors) {
+	private record Cached(MergeFeed.Summary summary, String optionsKey, List<FormattedCharSequence> lines, int[] colors) {
 	}
 
 	private final BlocksClient client;
@@ -78,18 +79,22 @@ public final class MergeStationRenderer implements BlockEntityRenderer<MergeStat
 		Binding b = client.resolve(be.getBlockPos(), be.binding());
 		MergeFeed.Summary s = client.mergeSummary(b);
 		long key = be.getBlockPos().asLong();
+		// the page's options (issue #43); the key includes the resolved accent so a theme reload redraws
+		MergeOptions opts = MergeOptions.of(be.options());
+		int accent = opts == MergeOptions.DEFAULT ? 0 : BlockAccent.argb(opts.accent(), ChatTheme.warmStudio());
+		String optionsKey = opts.showTitle() + ":" + Integer.toHexString(accent);
 		Cached c = cache.get(key);
-		if (c == null || c.summary() != s) {
-			c = build(s, b);
+		if (c == null || c.summary() != s || !c.optionsKey().equals(optionsKey)) {
+			c = build(s, b, opts, accent, optionsKey);
 			cache.put(key, c);
 		}
 		state.lines = c.lines();
 		state.colors = c.colors();
 	}
 
-	private static Cached build(MergeFeed.Summary s, Binding b) {
-		int accent = 0xFF000000 | MergeFeed.color(s.state());
-		String first = s.pending().isEmpty() ? (b.isNone() ? "not linked" : "") : s.pending().get(0).title();
+	private static Cached build(MergeFeed.Summary s, Binding b, MergeOptions opts, int accentOption, String optionsKey) {
+		int accent = accentOption != 0 ? accentOption : 0xFF000000 | MergeFeed.color(s.state());
+		String first = s.pending().isEmpty() ? (b.isNone() ? "not linked" : "") : opts.showTitle() ? s.pending().get(0).title() : "";
 		String[] text = {MergeFeed.headline(s), MergeFeed.subline(s), clip(first)};
 		int[] argb = {accent, 0xFFB8C0C8, 0xFF7C8690};
 		int n = text[2].isEmpty() ? 2 : 3;
@@ -99,7 +104,7 @@ public final class MergeStationRenderer implements BlockEntityRenderer<MergeStat
 			lines.add(Component.literal(text[i]).getVisualOrderText());
 			colors[i] = argb[i];
 		}
-		return new Cached(s, List.copyOf(lines), colors);
+		return new Cached(s, optionsKey, List.copyOf(lines), colors);
 	}
 
 	/** The title cut to the panel's width. */

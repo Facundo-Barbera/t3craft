@@ -136,9 +136,16 @@ public final class BlockConfigPanel extends T3Panel {
 		if (ro != null) {
 			y = text(x, y, w, ro, Tone.WARN) + GAP;
 		}
-		y = text(x, y, w, draft.manual()
-				? "Binding set by hand: the HQ leaves this block alone until you reset it to automatic."
-				: "Automatic: the HQ binds this block. Choosing a binding here pins it.", Tone.MUTED) + GAP;
+		if (!section.kinds().isEmpty()) {
+			y = text(x, y, w, draft.manual()
+					? "Binding set by hand: the HQ leaves this block alone until you reset it to automatic."
+					: "Automatic: the HQ binds this block. Choosing a binding here pins it.", Tone.MUTED) + GAP;
+			Binding stored = draft.binding();
+			if (!stored.isNone() && !section.kinds().contains(stored.kind())) {
+				// e.g. a lamp the HQ bound to a module: the picker has no such kind; say what it is bound to
+				y = text(x, y, w, "Now bound to " + stored.wire() + " (set by the HQ). Picking something below replaces it.", Tone.MUTED) + GAP;
+			}
+		}
 		Form form = new Form(x, y, w);
 		bindingPicker(form);
 		y = form.y + GAP;

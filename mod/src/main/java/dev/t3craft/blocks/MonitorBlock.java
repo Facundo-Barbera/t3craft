@@ -269,6 +269,25 @@ public final class MonitorBlock extends BaseEntityBlock {
 		return "";
 	}
 
+	/**
+	 * The display options of a whole screen: the origin's when it has any, else the first cell that has some. So a
+	 * monitor added to a wall later (it may even become the new origin) shows with the wall's options, not its own
+	 * empty ones. Empty when no cell has options.
+	 */
+	public static java.util.Map<String, String> screenOptions(BlockGetter level, ScreenRect e) {
+		if (level.getBlockEntity(e.origin()) instanceof BoundBlockEntity o && !o.options().isEmpty()) {
+			return o.options();
+		}
+		if (e.isMulti()) {
+			for (BlockPos p : e.cells()) {
+				if (level.getBlockEntity(p) instanceof BoundBlockEntity be && !be.options().isEmpty()) {
+					return be.options();
+				}
+			}
+		}
+		return java.util.Map.of();
+	}
+
 	private static boolean same(BlockState s, Direction facing) {
 		return s.getBlock() instanceof MonitorBlock && s.getValue(FACING) == facing;
 	}

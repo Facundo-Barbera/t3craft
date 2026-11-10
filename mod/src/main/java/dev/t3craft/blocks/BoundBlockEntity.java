@@ -52,6 +52,14 @@ public abstract class BoundBlockEntity extends BlockEntity {
 		super(type, pos, state);
 	}
 
+	/**
+	 * False for the blocks that keep options and a config page but show everything (the thread wall, the archive
+	 * terminal): the HQ never binds them and {@code /t3craft blocks link} refuses them.
+	 */
+	public boolean bindable() {
+		return true;
+	}
+
 	/** Raw stored binding ({@link Binding#parse} it). */
 	public String binding() {
 		return binding;

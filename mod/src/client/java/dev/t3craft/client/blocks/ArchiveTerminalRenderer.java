@@ -5,6 +5,7 @@ import dev.t3craft.blocks.ArchiveTerminalBlock;
 import dev.t3craft.blocks.ArchiveTerminalBlockEntity;
 import dev.t3craft.client.archive.ArchiveClient;
 import dev.t3craft.client.archive.TerminalDisplay;
+import dev.t3craft.client.chat.ChatTheme;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.gui.Font;
@@ -46,6 +47,9 @@ public final class ArchiveTerminalRenderer implements BlockEntityRenderer<Archiv
 		Direction facing = Direction.NORTH;
 		List<FormattedCharSequence> lines = List.of();
 		int[] colors = new int[0];
+		/** The page's options (issue #43): how many lines to draw, and the header's colour (0 = the display's own amber). */
+		int count;
+		int headerColor;
 	}
 
 	private int version = Integer.MIN_VALUE;
@@ -67,6 +71,7 @@ public final class ArchiveTerminalRenderer implements BlockEntityRenderer<Archiv
 		if (archive == null) {
 			state.lines = List.of();
 			state.colors = new int[0];
+			state.count = 0;
 			return;
 		}
 		TerminalDisplay.Screen s = archive.display();
@@ -83,6 +88,9 @@ public final class ArchiveTerminalRenderer implements BlockEntityRenderer<Archiv
 		}
 		state.lines = lines;
 		state.colors = colors;
+		ArchiveOptions opts = ArchiveOptions.of(be.options());
+		state.count = Math.min(lines.size(), opts.lines());
+		state.headerColor = opts == ArchiveOptions.DEFAULT ? 0 : BlockAccent.argb(opts.accent(), ChatTheme.warmStudio());
 	}
 
 	@Override
@@ -92,8 +100,9 @@ public final class ArchiveTerminalRenderer implements BlockEntityRenderer<Archiv
 		MonitorRenderer.toFace(poseStack, s.facing, DEPTH, PPB);
 		collector.order(0).submitTextBackground(poseStack, SCREEN_X0, SCREEN_Y0, SCREEN_X1, SCREEN_Y1, BACKGROUND, Font.DisplayMode.NORMAL, light);
 		float y = SCREEN_Y0 + 5;
-		for (int i = 0; i < s.lines.size() && y + 8 <= SCREEN_Y1; i++) {
-			collector.order(1).submitText(poseStack, SCREEN_X0 + 5, y, s.lines.get(i), false, Font.DisplayMode.POLYGON_OFFSET, light, s.colors[i], 0, 0);
+		for (int i = 0; i < s.lines.size() && i < s.count && y + 8 <= SCREEN_Y1; i++) {
+			int color = i == 0 && s.headerColor != 0 ? s.headerColor : s.colors[i];
+			collector.order(1).submitText(poseStack, SCREEN_X0 + 5, y, s.lines.get(i), false, Font.DisplayMode.POLYGON_OFFSET, light, color, 0, 0);
 			y += i == 0 ? LINE_HEIGHT + 2 : LINE_HEIGHT;
 		}
 		poseStack.popPose();
