@@ -18,6 +18,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -36,6 +37,9 @@ import org.jspecify.annotations.Nullable;
  * <b>Chat</b> opens the thread's chat. Enter on the keyboard cursor does what Open does, or opens the chat
  * when there is no link. Nothing here merges: the mod is read only, the review happens in the browser or in T3.
  *
+ * <p>#51: with {@link #withPlanReview} (the HQ's stations, set by {@link BlocksClient}) a footer button opens the
+ * project plan's Review view over this page; without it (the gallery) the page is unchanged.
+ *
  * <p>Re-reads {@code source} every tick (cheap: {@link BlocksClient} memoizes per refresh) and lays the page
  * out again only when the list changed.
  */
@@ -53,6 +57,8 @@ public final class MergeStationPanel extends T3Panel {
 	private MergeFeed.Summary shown = MergeFeed.Summary.EMPTY;
 	private int openW = 60;
 	private int chatW = 56;
+	/** #51: makes the plan's Review screen over the given parent; null = no footer button. */
+	private @Nullable Function<Screen, Screen> planReview;
 
 	public MergeStationPanel(String bindingLabel, Supplier<MergeFeed.Summary> source, Consumer<MergeFeed.Entry> openChat) {
 		this.bindingLabel = bindingLabel;
@@ -100,6 +106,28 @@ public final class MergeStationPanel extends T3Panel {
 	@Override
 	public String title() {
 		return T3Draw.tr("t3craft.merge.title");
+	}
+
+	/** #51: adds the "Plan review" footer button; {@code screen} makes the plan's Review screen over its argument. */
+	public MergeStationPanel withPlanReview(Function<Screen, Screen> screen) {
+		this.planReview = screen;
+		return this;
+	}
+
+	@Override
+	protected int footerHeight() {
+		return planReview == null ? 0 : T3Control.H + 4;
+	}
+
+	@Override
+	protected void arrangeFooter(Rect footer) {
+		Function<Screen, Screen> review = planReview;
+		if (review == null) {
+			return;
+		}
+		T3Button b = new T3Button(T3Icon.CIRCLE_CHECK, T3Draw.tr("t3craft.merge.plan_review"), T3Button.Style.DEFAULT,
+				() -> host().openScreen(review.apply(host().screen())));
+		pin(b, footer.x(), footer.y() + 4, Math.min(b.preferredWidth(font()), footer.w()), T3Control.H);
 	}
 
 	@Override

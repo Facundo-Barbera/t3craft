@@ -559,11 +559,12 @@ public final class BlocksClient implements ClientModInitializer {
 			}
 			default -> ProjectFeed.name(b);
 		};
-		mc.gui.setScreen(new MergeStationScreen(null, label, () -> mergeSummary(b), e -> {
+		MergeStationPanel panel = new MergeStationPanel(label, () -> mergeSummary(b), e -> {
 			if (e.threadId() != null) {
 				openThread(e.key());
 			}
-		}));
+		}).withPlanReview(parent -> new dev.t3craft.client.plan.PlanScreen(parent, dev.t3craft.client.plan.PlanPanel.View.REVIEW)); // #51
+		mc.gui.setScreen(new MergeStationScreen(null, panel));
 	}
 
 	private void syncHq(Minecraft mc, IntegratedServer server) {
@@ -655,6 +656,8 @@ public final class BlocksClient implements ClientModInitializer {
 		if (mc.player != null && !ClickOptions.podiumSilent(optionsAt(pos))) {
 			mc.player.sendSystemMessage(prefix().append(Component.translatable("t3craft.podium.nobody")));
 		}
+		// #51: nobody waits at the podium, so it opens the project plan's Desk (pending decisions, drafts, proposals)
+		dev.t3craft.client.plan.PlanClient.open(dev.t3craft.client.plan.PlanPanel.View.DESK);
 	}
 
 	/** Opens a thread's chat by NPC key ({@code env:threadId}) through the workstations' opener. */

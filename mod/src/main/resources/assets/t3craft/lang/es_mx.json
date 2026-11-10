@@ -314,6 +314,7 @@
 	"t3craft.merge.all_merged": "Todo lo de aquí ya está fusionado.",
 	"t3craft.merge.no_link": "T3 no dio enlace para este pull request: abre el chat.",
 	"t3craft.merge.link_copied": "Enlace copiado",
+	"t3craft.merge.plan_review": "Revisión del plan",
 	"key.t3craft.open_plan": "Abrir el plan",
 	"t3craft.plan.title": "Plan",
 	"t3craft.plan.view.desk": "Mesa (%s)",
