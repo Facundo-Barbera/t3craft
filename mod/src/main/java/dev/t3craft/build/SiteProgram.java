@@ -17,7 +17,7 @@ import org.jspecify.annotations.Nullable;
  * Design: docs/plans/builder-scheduling.md; how to try it: docs/features/builder-sites.md.
  *
  * <p><b>Entries</b> have a kind, per column bottom-up as in {@link RadialCursor}: {@link #FILL} (hidden terrain of the
- * column's bottom stack), {@link #GROUND} (the top two entries of that stack: the walkable surface and the layer
+ * column's bottom stack), {@link #GROUND} (the top two entries of that stack, plus a paving block lying on it, #48: the walkable surface and the layer
  * under it), {@link #CLEAR} (air) and {@link #BUILD} (everything a builder places). Fill, ground and air are laid by
  * streams, never by a builder.
  *
@@ -95,8 +95,12 @@ final class SiteProgram {
 	static final int STOREY_MIN = 3;
 	/** Rounds of one stage of one storey at most; what is left waits for the late rounds. */
 	static final int MAX_ROUNDS = 6;
-	/** Passes over one bay inside a round (side chains inside the bay). */
-	static final int MAX_PASSES = 4;
+	/**
+	 * Passes over one bay inside a round (side chains inside the bay). #48: was 4, which cut a slab or a roof that grows
+	 * against the sweep after four blocks and sent the rest to later rounds (a speckled surface); a pass that adds nothing
+	 * ends the loop, so this is only a bound.
+	 */
+	static final int MAX_PASSES = 64;
 
 	/** Stages of a storey, in order; {@link #LATE} and {@link #REMATE} exist only in a compiled program. */
 	static final int SLAB = 0;
@@ -343,6 +347,7 @@ final class SiteProgram {
 		colStack = new int[nc];
 		airStart = new int[nc + 1];
 		IntArrayList airs = new IntArrayList();
+		int[] stackT = new int[nc];
 		for (int c = 0; c < nc; c++) {
 			int a = colStart[c];
 			int b = colStart[c + 1];
@@ -350,7 +355,36 @@ final class SiteProgram {
 			while (a + t < b && terrain[colEntries[a + t]]) {
 				t++;
 			}
-			colFill[c] = Math.max(0, t - 2);
+			stackT[c] = t;
+		}
+		// fix/builder-sites-stalls (#48): a paving block that is not a plain full cube (a slab, a stair, a path block) lying
+		// right on a terrain stack, walkable, next to a column whose ground top is at its height, is ground too. Else a mixed
+		// pavement (a plaza, a path) was half streams (its full cubes, laid at once) and half builders (laid much later):
+		// a speckled floor for most of the build.
+		boolean[] pave = new boolean[nc];
+		for (int c = 0; c < nc; c++) {
+			int a = colStart[c];
+			int t = stackT[c];
+			if (t == 0 || a + t >= colStart[c + 1]) {
+				continue;
+			}
+			int i = colEntries[a + t];
+			int top = colEntries[a + t - 1];
+			if (air[i] || decor[i] || falling[i] || !stand[i] || y[i] != y[top] + 1 || !passAt(pass, x[i], y[i] + 1, z[i]) || !passAt(pass, x[i], y[i] + 2, z[i])) {
+				continue;
+			}
+			for (int d = 0; d < 4 && !pave[c]; d++) {
+				int c2 = colAt.get(CrewPlanner.key(colX[c] + (d == 0 ? 1 : d == 1 ? -1 : 0), 0, colZ[c] + (d == 2 ? 1 : d == 3 ? -1 : 0)));
+				if (c2 >= 0 && stackT[c2] > 0 && y[colEntries[colStart[c2] + stackT[c2] - 1]] == y[i]) {
+					pave[c] = true;
+				}
+			}
+		}
+		for (int c = 0; c < nc; c++) {
+			int a = colStart[c];
+			int b = colStart[c + 1];
+			int t = stackT[c] + (pave[c] ? 1 : 0);
+			colFill[c] = Math.max(0, stackT[c] - 2);
 			colStack[c] = t;
 			airStart[c] = airs.size();
 			for (int k = a; k < b; k++) {
@@ -1059,6 +1093,16 @@ final class SiteProgram {
 	 * count as support.
 	 */
 	Program compile(int s, double px, double pz, boolean @Nullable [] doneLocal) {
+		return compile(s, px, pz, doneLocal, null);
+	}
+
+	/**
+	 * Like {@link #compile(int, double, double, boolean[])}; {@code doneAll} (indexed by entry, null = unknown) tells
+	 * which entries of <b>other</b> sites are placed: only those hold this site's entries (#48: a walkway or a wall that
+	 * leans on a building not built yet no longer goes up early, floating; it waits for the late rounds and, at worst,
+	 * the finishing pass).
+	 */
+	Program compile(int s, double px, double pz, boolean @Nullable [] doneLocal, boolean @Nullable [] doneAll) {
 		int b0 = siteBayStart[s];
 		int nb = siteBayStart[s + 1] - b0;
 		int accessCol = -1;
@@ -1101,7 +1145,7 @@ final class SiteProgram {
 		if (doneLocal != null) {
 			System.arraycopy(doneLocal, 0, sim, 0, Math.min(sim.length, doneLocal.length));
 		}
-		Compiler cmp = new Compiler(s, rank, sim);
+		Compiler cmp = new Compiler(s, rank, sim, doneAll, ax, az);
 		IntArrayList late = new IntArrayList();
 		int lastStorey = 0;
 		int k = a;
@@ -1156,26 +1200,54 @@ final class SiteProgram {
 		final IntArrayList taskStart = new IntArrayList();
 		final IntArrayList taskBay = new IntArrayList();
 		final IntArrayList entries = new IntArrayList();
+		/** Entries of the whole plan already placed (other sites hold only where placed); null = all count as standing. */
+		final boolean @Nullable [] doneAll;
+		/** The access column: bays are swept from its side. */
+		final int ax;
+		final int az;
 
-		Compiler(int site, int[] rank, boolean[] sim) {
+		Compiler(int site, int[] rank, boolean[] sim, boolean @Nullable [] doneAll, int ax, int az) {
 			this.site = site;
 			this.bay0 = siteBayStart[site];
 			this.ent0 = siteEntStart[site];
 			this.rank = rank;
 			this.sim = sim;
 			this.stamp = new int[sim.length];
+			this.doneAll = doneAll;
+			this.ax = ax;
+			this.az = az;
 		}
 
-		/** The site-local entries {@code locals} ordered by the wave rank of their bay, keeping their order inside a bay. */
+		/**
+		 * The site-local entries {@code locals} ordered by the wave rank of their bay, then inside a bay bottom-up and,
+		 * in each layer, a serpentine from the access's side: rows across the direction from the access to the bay,
+		 * nearest row first, alternating direction (#48: the plan index used to decide inside a layer; cells a later
+		 * part rewrote sit at the end of the plan, so a layer came out in a scattered order).
+		 */
 		int[] byBay(IntArrayList locals) {
-			long[] keys = new long[locals.size()];
-			for (int q = 0; q < keys.length; q++) {
-				keys[q] = ((long) rank[bayOf[siteEnts[ent0 + locals.getInt(q)]] - bay0] << 32) | q;
+			int m = locals.size();
+			int[] kRank = new int[m];
+			int[] kY = new int[m];
+			int[] kRow = new int[m];
+			int[] kCol = new int[m];
+			for (int q = 0; q < m; q++) {
+				int i = siteEnts[ent0 + locals.getInt(q)];
+				int b = bayOf[i];
+				kRank[q] = rank[b - bay0];
+				kY[q] = y[i];
+				double ddx = bayX[b] - (ax + 0.5);
+				double ddz = bayZ[b] - (az + 0.5);
+				boolean alongX = Math.abs(ddx) >= Math.abs(ddz);
+				int sgn = (alongX ? ddx : ddz) < 0 ? -1 : 1;
+				int row = alongX ? sgn * (x[i] - ax) : sgn * (z[i] - az);
+				int col = alongX ? z[i] - az : x[i] - ax;
+				kRow[q] = row;
+				kCol[q] = (row & 1) == 0 ? col : -col;
 			}
-			Arrays.sort(keys);
-			int[] out = new int[keys.length];
-			for (int q = 0; q < out.length; q++) {
-				out[q] = locals.getInt((int) keys[q]);
+			int[] perm = Layers.sortByKeys(kRank, kY, kRow, kCol);
+			int[] out = new int[m];
+			for (int q = 0; q < m; q++) {
+				out[q] = locals.getInt(perm[q]);
 			}
 			return out;
 		}
@@ -1191,7 +1263,9 @@ final class SiteProgram {
 			}
 			int sj = siteOf[j];
 			if (sj != site) {
-				return sj != details; // other sites are taken as standing; the details come last
+				boolean[] da = doneAll;
+				// other sites hold where they are placed (#48; unknown: taken as standing); the details come last
+				return sj != details && (da == null || da[j]);
 			}
 			int l = localOf[j];
 			return sim[l] || stamp[l] == task;
@@ -1211,7 +1285,13 @@ final class SiteProgram {
 			if (solid(x[i] + 1, y[i], z[i]) || solid(x[i] - 1, y[i], z[i]) || solid(x[i], y[i], z[i] + 1) || solid(x[i], y[i], z[i] - 1)) {
 				return true;
 			}
-			return decor[i] && solid(x[i], y[i] + 1, z[i]);
+			if (decor[i]) {
+				return solid(x[i], y[i] + 1, z[i]);
+			}
+			// #48: a stair or slab roof rises row by row and its rows only touch diagonally: the block one down and one
+			// aside holds it too. Without this every row that did not reach a wall went to the late rounds or the
+			// finishing pass, and the roof stood striped for most of the build.
+			return solid(x[i] + 1, y[i] - 1, z[i]) || solid(x[i] - 1, y[i] - 1, z[i]) || solid(x[i], y[i] - 1, z[i] + 1) || solid(x[i], y[i] - 1, z[i] - 1);
 		}
 
 		/**
