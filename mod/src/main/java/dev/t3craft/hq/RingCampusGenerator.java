@@ -86,6 +86,10 @@ final class RingCampusGenerator {
 
 	BuildPlan generate(HqLayout layout) {
 		canvas.layout = layout;
+		// issue #37: in "slots" mode some places ask a PieceSource first (CitadelSlots); null (legacy) changes nothing
+		canvas.slots = dev.t3craft.hq.citadel.CitadelSlots.mode() == dev.t3craft.hq.citadel.CitadelSlots.Mode.SLOTS
+				? new dev.t3craft.hq.citadel.CitadelSlots(new CitadelMapGenerator().generate(layout), dev.t3craft.hq.citadel.CitadelSlots.source())
+				: null;
 		List<Integer> idx = new ArrayList<>();
 		for (HqLayout.Module m : layout.modules()) {
 			int lot = RingCampusGeometry.lotOf(m.index());
@@ -123,6 +127,7 @@ final class RingCampusGenerator {
 			TreeMap<Integer, HqLayout.Module> mods = canvas.lots.get(lot);
 			if (mods == null) {
 				CitadelGrounds.emptyLot(canvas, lot);
+				dev.t3craft.hq.citadel.CitadelSlots.emptyLot(canvas, lot); // issue #37: only in "slots" mode
 			} else {
 				CitadelBarrios.barrio(canvas, lot, mods);
 			}

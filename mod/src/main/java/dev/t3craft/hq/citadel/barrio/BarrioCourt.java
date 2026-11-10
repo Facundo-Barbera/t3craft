@@ -64,6 +64,15 @@ public final class BarrioCourt {
 		corners(c, l);
 	}
 
+	/**
+	 * The courtyard without its middle: the quadrant dressings and the corner posts, in the same order as
+	 * {@link #centre}. Issue #37: used when the middle comes from a slot piece ({@code CitadelSlots}).
+	 */
+	public static void dressing(CitadelCanvas c, int lot, Lot l) {
+		quadrants(c, lot, l);
+		corners(c, l);
+	}
+
 	private static Direction alongA(Lot l, int s) {
 		return s > 0 ? l.out() : l.out().getOpposite();
 	}
