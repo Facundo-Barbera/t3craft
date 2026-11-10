@@ -47,7 +47,7 @@ public final class PortableClient {
 		// Until feat/chat and feat/config are merged: the screens main already has.
 		PortableLinks.setFallbacks(
 				(env, thread) -> {
-					// the chat browser, like setChat below (was the ThreadChatScreen placeholder)
+					// the chat browser, like setChat below (was a placeholder chat screen, since deleted)
 					NpcInfo info = client.npcs().info(env + ":" + thread);
 					if (info != null) {
 						ChatScreens.openFor(info);

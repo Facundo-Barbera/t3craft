@@ -8,8 +8,8 @@ import java.util.concurrent.CompletableFuture;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Queue management on top of {@link OperateGate} (Minecraft-free, used by the command and, through
- * {@code OperateUi}, by {@code QueueScreen}). Resolves a run in a known queue, builds the action
+ * Queue management on top of {@link OperateGate} (Minecraft-free, used by the command and by
+ * {@code QueuePanel}). Resolves a run in a known queue, builds the action
  * with {@link QueueActions} and leaves every rule to the gate: read-only without an operate token,
  * cancel needs {@code confirmed}, everything audited.
  */

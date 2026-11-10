@@ -214,6 +214,17 @@ public final class QueueCommands {
 	}
 
 	private static void reportNow(CommandContext<FabricClientCommandSource> c, OperateResult r) {
-		c.getSource().sendFeedback(T3CraftCommands.prefix().append(QueueScreen.resultLine(r)));
+		c.getSource().sendFeedback(T3CraftCommands.prefix().append(resultLine(r)));
+	}
+
+	/** Player-facing result line of a queue write, for the chat. */
+	static Component resultLine(OperateResult r) {
+		ChatFormatting color = switch (r.outcome()) {
+			case OK -> ChatFormatting.GREEN;
+			case CANCELLED, READ_ONLY -> ChatFormatting.GRAY;
+			case FAILED -> ChatFormatting.GOLD;
+			default -> ChatFormatting.RED;
+		};
+		return Component.translatable("t3craft.queue.result." + r.outcome().wire, r.message()).withStyle(color);
 	}
 }
