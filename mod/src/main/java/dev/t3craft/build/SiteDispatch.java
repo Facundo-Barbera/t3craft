@@ -17,12 +17,25 @@ package dev.t3craft.build;
  * Distances are compared in buckets of {@link #BUCKET} blocks and the site index (the build order) breaks ties, so
  * the choice does not flip while the player walks about. {@link SiteCursor} adds its own hold before it changes
  * the focus, and never takes a builder off a bay it is raising.
+ *
+ * <p><b>Several sites open</b> ({@code build.sitesOpen}, 2 by default). When the focus moves on, the site left
+ * behind first closes the storey it is on with the crew it has; then the main crew goes and a <b>rear guard</b> of
+ * {@link #REAR} builders stays and keeps raising it, storey by storey, while the player is within {@link #KEEP}
+ * blocks. Beyond that the rear guard closes its storey and the site is frozen (it comes back first when the player
+ * returns: rules 1 and 3). A started site near the player that nobody works gets a rear guard too, while a slot and
+ * two builders are free. {@link #openLimit}: one more site may be open when the crew has builders to spare. The
+ * focus gets {@link #FOCUS_SHARE} of the pace, the others the rest.
  */
 final class SiteDispatch {
 	/** A site keeps the focus, and a started one keeps its place ahead of fresh ones, within this many blocks of the player. */
 	static final double KEEP = 32.0;
 	/** Distances are bucketed by this many blocks. */
 	static final double BUCKET = 8.0;
+
+	/** Builders of a rear guard. */
+	static final int REAR = 2;
+	/** Share of the builders' pace the focus gets while other sites are being worked too. */
+	static final double FOCUS_SHARE = 0.7;
 
 	/** Site states for the dispatch. */
 	static final byte IDLE = 0;
@@ -65,6 +78,33 @@ final class SiteDispatch {
 			}
 		}
 		return started >= 0 ? started : fresh >= 0 ? fresh : any;
+	}
+
+	/**
+	 * Sites that may be open at once: {@code sitesOpen} (the focus and the ones being closed), plus one when the crew
+	 * still has a rear guard to spare after a full focus crew and the rear guards of the others. 1 stays 1 (one site at
+	 * a time, as in phase 1).
+	 */
+	static int openLimit(int sitesOpen, int builders, int crewMax) {
+		if (sitesOpen <= 1) {
+			return 1;
+		}
+		int spare = builders - crewMax - REAR * (sitesOpen - 1);
+		return sitesOpen + (spare >= REAR ? 1 : 0);
+	}
+
+	/**
+	 * The nearest site that was started, is not finished, is not open and is within {@link #KEEP} blocks: the one a
+	 * rear guard is sent to by proximity; -1 = none.
+	 */
+	static int nearestStarted(byte[] state, double[] dist, boolean[] isOpen) {
+		int best = -1;
+		for (int s = 0; s < state.length; s++) {
+			if (state[s] == STARTED && !isOpen[s] && dist[s] <= KEEP && (best < 0 || dist[s] < dist[best])) {
+				best = s;
+			}
+		}
+		return best;
 	}
 
 	/** Whether distance {@code a} falls in a nearer bucket than {@code b} (equal buckets: no, the earlier site stays). */

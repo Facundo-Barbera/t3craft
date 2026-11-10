@@ -34,7 +34,7 @@ Facundo plays. See "Compile risks" at the end.
 |---|---|
 | 1. Dispatch, one open site, front anchored at the access, storeys over the whole site | **done** |
 | 2. Compiled program: real floors, stages, support resolved at compile time, finishing pass; the site's ground as its own wave | **done** |
-| 3. Several open sites, a rear guard, crews by proximity, 70 / 30 pace | not yet |
+| 3. Several open sites, a rear guard, crews by proximity, 70 / 30 pace | **done** |
 | 4. Methods per kind of site (bridge, island, gardening), trades with skins, site signs | not planned here |
 
 ## How it works
@@ -130,8 +130,25 @@ until the ground of its bay is laid.
 
 ### Walking to another building
 
-The open site finishes the storey it is on, closes, and the new one opens. A closed site that is not finished stays
-"started": it comes back first when the player is near it again (rule 3), compiled again from the new access.
+- The new site opens at once, with the builders that are free.
+- The site left behind first **closes the storey it is on** with the crew it has (`closing` in the status). It gets
+  no new builders meanwhile.
+- When that storey is closed, its main crew leaves and a **rear guard** of 2 stays (`rear`) and keeps raising it,
+  storey by storey, while the player is within 32 blocks.
+- Further than 32 blocks, the rear guard closes its storey and the site is **frozen** (`leaving`, then gone from the
+  status). It stays "started": it comes back first when the player is near it again (rules 1 and 3), compiled again
+  from the new access.
+- A started site near the player that nobody works gets a rear guard by itself, while a slot and two builders are
+  free. Sites not started are never opened this way: only the focus starts a building.
+- A site the crew never placed a block in is simply closed when the focus moves on.
+
+**How many at once.** `build.sitesOpen` (2: the focus and the one being closed), plus one when the crew has builders
+to spare: with 12 builders and a focus crew of 6 that is 3 (the focus and two others). The focus always opens at
+once, so for a moment there can be one more; the farthest site over the limit closes at its next storey.
+`build.sitesOpen: 1` is one site at a time: the new focus waits until the old one closed its storey.
+
+**Pace.** While the focus and other sites are worked at once, the focus gets 70 % of the builders' blocks per tick
+and the others 30 %; what one side cannot use goes to the other.
 
 ### The floor
 
@@ -168,8 +185,10 @@ What to do in the game, and what should happen:
 |---|---|
 | stand still in the hub | the crew arrives together at the side you came from; the floor spreads from there; the slab closes, the walls of that storey go up all around, then glass, then lights, and only then the next storey |
 | walk 10–15 blocks inside the hub | nobody drops what they were doing; the status line does not change site, and `task-switches walk` stays 0 |
-| walk into a module | the hub finishes its storey, `closing` shows in the status, then the module opens with its crew |
-| walk back to the hub | it opens again (it is "started"), from the side you came back by |
+| walk into a module | the module opens at once with its crew; the hub shows `closing` until its storey is done, then `rear` with 2 builders |
+| stay in the module | the module gets most of the blocks; the hub keeps rising slowly, a storey at a time |
+| walk 40 blocks away from the hub | the hub shows `leaving`, closes its storey and disappears from the status; its skyline is level |
+| walk back to the hub | it is the focus again, opened from the side you came back by |
 | walk around between buildings | the carpet lays the floor under you and a trail runs to the open site; no `standing on air` in the log |
 | look at a finished building | it has 3 blocks of ground around it; its last wave was `finishing` |
 
@@ -178,21 +197,25 @@ What to do in the game, and what should happen:
 `/t3craft demo status` prints, after the usual prefix (`…, sites, N part(s), building 37%`):
 
 ```
-sites 3/41 | open hub storey 2/4 (floor) structure wave 7/31 bays-left 9 left 5210/8400 crew 6 | focus hub (player inside)
- | builders 6/12 | off-site 0 storey-spread 0 task-switches walk 0 chunk 0 in-site 100% placed 3190 centre 4,12 level 1
+sites 3/41 | focus lot_2 storey 1/3 (floor) structure wave 3/22 bays-left 7 left 2110/2600 crew 5
+ | rear hub storey 3/4 (floor) slab wave 15/31 bays-left 2 left 3020/8400 crew 2 | player in lot_2
+ | builders 7/12 | off-site 0 storey-spread 1 task-switches walk 0 chunk 0 in-site 78% placed 5870 centre 31,12 level 1
 ```
 
 | field | meaning |
 |---|---|
 | `sites a/b` | sites finished / sites of the plan (the details pass counts as one) |
-| `open <name> …` | the open site: storey it is on and whether that storey starts at a real floor or is a fixed lift, stage, wave, bays of that wave not done, builder entries left / total, crew. `planning`: its program is being compiled. `closing`: the focus moved on, it closes at the end of the storey |
-| `focus <name>` | the site the dispatch wants, and whether the player is inside it, in another site, or outside all |
+| `focus <name> …` | the site the crew is sent to: storey it is on and whether that storey starts at a real floor or is a fixed lift, stage, wave, bays of that wave not done, builder entries left / total, crew. `planning`: its program is being compiled |
+| `closing <name> …` | a site the focus left: it is finishing its storey with the crew it had |
+| `rear <name> …` | a site worked by a rear guard of 2. `leaving`: it closes at the end of this storey (too far, or one site too many) |
+| `player in <name>` / `player outside` | the site whose footprint the player stands in |
+| `focus <name> waiting` | the focus could not open yet: too many sites are still closing their storey |
 | `builders a/b` | builders holding a task / builders of the crew |
 | `off-site` | **criterion: 0.** Builder placements in a site that was not open |
 | `storey-spread` | **criterion: at most 1.** Largest difference seen between the storey a builder placed in and the lowest storey of that site with work left. The finishing pass is left out. 1 is normal (a piece waiting for the floor above). More than 1 means a piece waited two storeys for its support |
 | `task-switches walk` | **criterion: 0.** Builders taken off a bay that still had entries because the focus changed |
 | `task-switches chunk` | builders that left a bay because its chunk was not loaded (not a fault) |
-| `in-site` | **criterion: near 100 %.** Share of builder placements, while the player was inside a site, that went to that site |
+| `in-site` | **criterion: the great majority.** Share of builder placements, while the player was inside a site, that went to that site. 100 % with one site open; about 70 % or more while a rear guard works elsewhere |
 | `placed` | builder placements so far |
 | `details` | builder placements of the details pass |
 | `lifted-floor` | floors laid by the corridor or the carpet at the player's level |
@@ -210,7 +233,8 @@ New keys in `build`, all additive:
 | `order` | `"radial"` | `"sites"` turns this on |
 | `siteCrewMin` | 2 | builders an open site gets at least |
 | `siteCrewMax` | 6 | ...and at most |
-| `siteStorey` | 5 | height of a storey, blocks |
+| `siteStorey` | 5 | height of a storey, blocks, where the site has no real floors |
+| `sitesOpen` | 2 | sites open at once (one more when builders are to spare); 1 = one at a time |
 
 Reused as they are: `entriesPerBuilder` (one more builder per this many entries the site has left), `radiusMin` +
 `radiusStep` (the carpet's radius), the corridor keys, `groundBlocksPerTick`, `fillBlocksPerTick`,
@@ -218,7 +242,8 @@ Reused as they are: `entriesPerBuilder` (one more builder per this many entries 
 `radialMinBuilders` do nothing with `"sites"`.
 
 Constants in the code: bay 6 blocks, keep radius 32, bucket 8, footprint margin 2, hold 1 s, apron 3, trail 48 × 3,
-real floor = a sixth of the columns and 12 cells, smallest storey 3, 6 rounds per stage.
+real floor = a sixth of the columns and 12 cells, smallest storey 3, 6 rounds per stage, rear guard 2, focus share
+70 %.
 
 ## Not done / open
 
@@ -229,8 +254,11 @@ real floor = a sixth of the columns and 12 cells, smallest storey 3, 6 rounds pe
   stair is structure, a carpet is enclosure. No list of block types.
 - **Many small waves.** A storey is up to five stages and each can be several rounds. The crew is sized again at
   every wave, so builders stand idle for a moment on short waves (the last bays of a roof, the lights).
-- **One site at a time.** A building left for another waits with its storey closed until the player is near again.
-  The rear guard is phase 3.
+- **A rear guard is slow on purpose** (2 builders, 30 % of the pace shared among the sites that are not the focus).
+  If buildings left behind take too long, raise `sitesOpen` or stay closer.
+- **Islands and bridges** (decisions 12 and 13) are phase 4: an island is not a ground site yet, and a bridge is
+  built like any other site.
+- **No scaffolds or banners** (decision 15): the only sign of a site opening is the crew arriving together.
 - **The ground between sites**, beyond the aprons, the carpet, the trail and the corridor, waits for the last sweep.
 - **Numbers are first guesses**: storey 5, bay 6, crew 2–6, hold 1 s, the real-floor threshold, apron 3.
 - The perf timers reuse the radial keys (`step.build.radial*.ns`).
@@ -239,7 +267,7 @@ real floor = a sixth of the columns and 12 cells, smallest storey 3, 6 rounds pe
 
 Nothing here was compiled. Where a mistake is most likely:
 
-- `BuildTuning` gained 4 record components (`sites`, `siteCrewMin`, `siteCrewMax`, `siteStorey`). A constructor
+- `BuildTuning` gained 5 record components (`sites`, `siteCrewMin`, `siteCrewMax`, `siteStorey`, `sitesOpen`). A constructor
   with the previous 30 arguments was added so older callers keep compiling; a caller of the canonical constructor
   outside this repo's `main` and `client` source sets would break.
 - `BuildPlan` has a new private constructor and `named` / `name` / `workName` / `Builder.nameWork`.

@@ -35,9 +35,16 @@ import org.jspecify.annotations.Nullable;
  * ({@link SiteProgram}), so nothing here stalls waiting for a neighbour: what found no support is the site's
  * finishing pass, its last wave.
  *
- * <p><b>One site at a time.</b> When the focus moves to another site, the open one finishes the storey it is on
- * (never a ragged skyline), closes, and the new one opens. A closed site that is not finished stays "started" and
- * comes back first when the player is near it again; it is then compiled again, from the new access.
+ * <p><b>Leaving a site.</b> When the focus moves to another site, the new one opens at once and the one left behind
+ * first finishes the storey it is on with the crew it has (never a ragged skyline). Then its main crew goes and a
+ * <b>rear guard</b> of {@link SiteDispatch#REAR} builders stays and keeps raising it, storey by storey, while the
+ * player is within {@link SiteDispatch#KEEP} blocks; further away the rear guard closes its storey and the site is
+ * frozen. A started site near the player that nobody works gets a rear guard too. At most {@code build.sitesOpen}
+ * sites are open (one more when the crew has builders to spare, {@link SiteDispatch#openLimit}); the farthest one
+ * over the limit closes at its next storey. The focus gets {@link SiteDispatch#FOCUS_SHARE} of the builders' pace
+ * while other sites are worked too. A closed site that is not finished stays "started" and comes back first when
+ * the player is near it again; it is then compiled again, from the new access. {@code build.sitesOpen: 1} is one
+ * site at a time: the new focus waits until the old one closed its storey.
  *
  * <p><b>Streams</b> (no builder, {@link #frontOf} -1), all out of the foundation budget:
  * <ol>
@@ -122,10 +129,16 @@ public final class SiteCursor implements JobCursor {
 		int crew;
 		int want;
 		int working;
-		/** The focus moved on: the site closes when the storey it is on is done. */
-		boolean closing;
+		/** It is the dispatch's focus. A site that is not is closing its storey, or is worked by a rear guard. */
+		boolean focus;
+		/** Its storey was closed after the focus moved on (or it was opened by proximity): a rear guard works it. */
+		boolean rear;
+		/** It closes at its next storey boundary (too far from the player, or one site too many). */
+		boolean leaving;
 		/** No task of the current storey was taken yet (the site stands at a storey boundary). */
 		boolean fresh = true;
+		/** A storey boundary the dispatch has not looked at yet: a site that is not the focus hands out nothing until it has. */
+		boolean boundary;
 		/** The program ran to its end. */
 		boolean finished;
 
@@ -184,6 +197,8 @@ public final class SiteCursor implements JobCursor {
 	private final int[] pz;
 	private double credit;
 	private int rr;
+	/** Builder placements skipped this tick (already right in the world), all sites together. */
+	private int tickSkips;
 	/** The entry a builder is placing right now ({@link #frontOf} is asked from inside the placement). */
 	private int nowIndex = -1;
 	private int nowFront = -1;
@@ -679,7 +694,7 @@ public final class SiteCursor implements JobCursor {
 		o.finished = true;
 	}
 
-	/** The current wave of {@code o} is done: on to the next. A new storey is a boundary (a closing site stops there). */
+	/** The current wave of {@code o} is done: on to the next. A new storey is a boundary: the dispatch decides there what a site that is not the focus does next. */
 	private void advance(Open o) {
 		SiteProgram.Program g = o.prog;
 		if (g == null || o.wave >= g.waves()) {
@@ -690,8 +705,9 @@ public final class SiteCursor implements JobCursor {
 		enterWave(o);
 		if (!o.finished && g.waveStorey()[o.wave] != storey) {
 			o.fresh = true;
+			o.boundary = true;
 		}
-		dispatchAt = tickNo; // staff the new wave (or close the site) on the next tick
+		dispatchAt = tickNo; // staff the new wave (or close the site, or leave a rear guard) on the next tick
 	}
 
 	/** Next entry of task {@code tk} not applied yet, or -1 when the task has none left. */
@@ -771,30 +787,93 @@ public final class SiteCursor implements JobCursor {
 			candidate = -1;
 			candidateRounds = 0;
 		}
-		// one site at a time: the open one closes its storey when the focus moved on, then the focus opens
+		int limit = SiteDispatch.openLimit(t.sitesOpen(), builders, t.siteCrewMax());
+		int hardCap = t.sitesOpen() <= 1 ? 1 : limit + 1; // the focus opens at once even when a site still has to close its storey
+		// sites over the limit: the farthest ones that are not the focus leave at their next storey boundary
+		int others = 0;
+		for (int k = 0; k < openList.size(); k++) {
+			Open o = open[openList.getInt(k)];
+			if (o == null) {
+				continue;
+			}
+			o.focus = o.site == focusSite;
+			o.leaving = false;
+			if (!o.focus) {
+				others++;
+			}
+		}
+		for (int surplus = others - Math.max(0, limit - (focusSite >= 0 ? 1 : 0)); surplus > 0; surplus--) {
+			Open far = null;
+			for (int k = 0; k < openList.size(); k++) {
+				Open o = open[openList.getInt(k)];
+				if (o != null && !o.focus && !o.leaving && (far == null || dist[o.site] > dist[far.site])) {
+					far = o;
+				}
+			}
+			if (far == null) {
+				break;
+			}
+			far.leaving = true;
+		}
 		for (int k = openList.size() - 1; k >= 0; k--) {
 			Open o = open[openList.getInt(k)];
 			if (o == null) {
 				continue;
 			}
-			o.closing = o.site != focusSite;
-			if (o.closing && (o.prog == null || o.fresh || o.working == 0 && !pickable(o))) {
+			if (o.focus) {
+				o.rear = false;
+				o.boundary = false;
+				continue;
+			}
+			if (dist[o.site] > SiteDispatch.KEEP) {
+				o.leaving = true; // far from the player: it closes its storey and is frozen
+			}
+			boolean untouched = siteState[o.site] == SiteDispatch.IDLE; // no builder ever placed there: nothing to guard
+			boolean stalled = o.prog != null && o.working == 0 && !pickable(o);
+			if (o.fresh && untouched || o.leaving && (o.prog == null || o.fresh || stalled)) {
 				closeSite(o);
+				continue;
+			}
+			if (o.fresh) {
+				o.rear = true; // its storey is closed: the main crew moves on, the rear guard stays
+			}
+			o.boundary = false;
+		}
+		if (focusSite >= 0 && open[focusSite] == null && openList.size() < hardCap) {
+			openSite(focusSite).focus = true;
+		}
+		// by proximity: a started site near the player that nobody works gets a rear guard, while a slot and two builders are free
+		if (openList.size() < limit && (focusSite < 0 || open[focusSite] != null)) {
+			int free = 0;
+			for (int f = 0; f < builders; f++) {
+				if (tSite[f] < 0) {
+					free++;
+				}
+			}
+			if (free >= SiteDispatch.REAR) {
+				boolean[] isOpen = new boolean[p.sites];
+				for (int k = 0; k < openList.size(); k++) {
+					isOpen[openList.getInt(k)] = true;
+				}
+				int near = SiteDispatch.nearestStarted(siteState, dist, isOpen);
+				if (near >= 0 && near != focusSite) {
+					openSite(near).rear = true;
+				}
 			}
 		}
-		if (openList.isEmpty() && focusSite >= 0) {
-			openSite(focusSite);
-		}
-		for (int k = 0; k < openList.size(); k++) {
-			Open o = open[openList.getInt(k)];
-			if (o != null) {
-				staff(o, t);
+		// crews: the focus first, then the sites closing their storey, then the rear guards
+		for (int role = 0; role < 3; role++) {
+			for (int k = 0; k < openList.size(); k++) {
+				Open o = open[openList.getInt(k)];
+				if (o != null && (o.focus ? 0 : o.rear ? 2 : 1) == role) {
+					staff(o, t);
+				}
 			}
 		}
 	}
 
 	/** Opens site {@code s}: its program is compiled off-thread for where the player is now (the access). */
-	private void openSite(int s) {
+	private Open openSite(int s) {
 		Open o = new Open(s);
 		boolean[] snapshot = null;
 		if (siteLeft[s] < p.siteTotal[s]) {
@@ -811,6 +890,7 @@ public final class SiteCursor implements JobCursor {
 		o.pending = Offload.supply(dev.t3craft.debug.PerfStats.STEP_RADIAL_ORDER, () -> program.compile(s, ax, az, doneLocal));
 		open[s] = o;
 		openList.add(s);
+		return o;
 	}
 
 	/** Closes {@code o}: its builders are free again. A builder taken off a task with entries left is counted. */
@@ -840,7 +920,11 @@ public final class SiteCursor implements JobCursor {
 		}
 	}
 
-	/** Sizes the crew of {@code o} ({@link SiteDispatch#crew}) and assigns or frees builders that hold no task. */
+	/**
+	 * Sizes the crew of {@code o} and assigns or frees builders that hold no task. The focus: {@link SiteDispatch#crew}
+	 * with the free builders. A site closing its storey: the same, but it only keeps builders, it gets no new ones. A
+	 * rear guard: {@link SiteDispatch#REAR}.
+	 */
 	private void staff(Open o, BuildTuning t) {
 		int free = 0;
 		for (int f = 0; f < builders; f++) {
@@ -849,7 +933,13 @@ public final class SiteCursor implements JobCursor {
 			}
 		}
 		int tasks = o.prog == null ? builders : o.waveTasksLeft;
-		o.want = o.finished ? 0 : SiteDispatch.crew(siteLeft[o.site], tasks, t.siteCrewMin(), t.siteCrewMax(), t.entriesPerBuilder(), o.crew + free);
+		if (o.finished) {
+			o.want = 0;
+		} else if (o.rear && !o.focus) {
+			o.want = Math.min(Math.min(SiteDispatch.REAR, Math.max(1, tasks)), o.crew + free);
+		} else {
+			o.want = SiteDispatch.crew(siteLeft[o.site], tasks, t.siteCrewMin(), t.siteCrewMax(), t.entriesPerBuilder(), o.focus ? o.crew + free : o.crew);
+		}
 		for (int f = 0; f < builders && o.crew < o.want; f++) {
 			if (tSite[f] < 0) {
 				tSite[f] = o.site;
@@ -895,7 +985,7 @@ public final class SiteCursor implements JobCursor {
 	// ---- streams ------------------------------------------------------------------------------
 
 	/**
-	 * The corridor, as in {@link RadialCursor#tickCorridor}: the floor of every column under the player's feet
+	 * The corridor, as the one of {@link RadialCursor}: the floor of every column under the player's feet
 	 * ({@link #FEET_RADIUS}) and, while it moves, of a corridor {@code build.corridorWidth} wide reaching
 	 * {@code build.corridorLength} blocks ahead along its smoothed velocity. Before every other stream, at
 	 * {@code build.corridorBlocksPerTick} and {@code build.corridorMsPerTick}.
@@ -1252,7 +1342,8 @@ public final class SiteCursor implements JobCursor {
 					return;
 				}
 			}
-			if (sweepCol >= p.cols && sweepParked) {
+			if (sweepCol >= p.cols) {
+				// entries are still left (this method returns at once when none are): columns waited for their chunk; go round again
 				sweepParked = false;
 				sweepCol = 0;
 				sweepAgainAt = tickNo + PARK_TICKS;
@@ -1321,11 +1412,17 @@ public final class SiteCursor implements JobCursor {
 
 	// ---- builders -----------------------------------------------------------------------------
 
-	/** Builders: each raises its task (a bay of the current wave of its site), climbing in place, then takes the next. */
+	/**
+	 * Builders: each raises its task (a bay of the current wave of its site), climbing in place, then takes the next.
+	 * While the focus and other sites are worked at once, the focus gets {@link SiteDispatch#FOCUS_SHARE} of the
+	 * tick's credit and the others the rest; what one side cannot use goes to the other.
+	 */
 	private void tickBuilders(double allowance, FrontCursor.Step step, BuildTuning t) {
 		long t0 = System.nanoTime();
 		try {
 			double climb = Math.max(perBuilder, t.climbBlocksPerTick());
+			boolean focusWork = false;
+			boolean otherWork = false;
 			for (int f = 0; f < builders; f++) {
 				if (walkLeft[f] > 0) {
 					walkLeft[f]--;
@@ -1333,78 +1430,105 @@ public final class SiteCursor implements JobCursor {
 				if (tTask[f] < 0 && tSite[f] >= 0 && walkLeft[f] == 0) {
 					pick(f);
 				}
+				if (tTask[f] >= 0) {
+					if (tSite[f] == focusSite) {
+						focusWork = true;
+					} else {
+						otherWork = true;
+					}
+				}
 			}
 			double a = Math.max(0, allowance);
 			credit = Math.min(credit + a, Math.max(1.0, a));
 			int[] used = new int[builders];
-			int skips = 0;
-			boolean progress = true;
-			while (credit >= 1.0 && progress && state == JobState.RUNNING) {
-				progress = false;
-				for (int j = 0; j < builders && credit >= 1.0; j++) {
-					int f = (rr + j) % builders;
-					int s = tSite[f];
-					int tk = tTask[f];
-					if (s < 0 || tk < 0 || walkLeft[f] != 0) {
-						continue;
-					}
-					Open o = open[s];
-					SiteProgram.Program g = o == null ? null : o.prog;
-					if (o == null || g == null) {
-						tTask[f] = -1;
-						continue;
-					}
-					boolean tall = g.taskStart()[tk + 1] - g.taskStart()[tk] >= TALL_TASK;
-					if (used[f] >= (tall ? climb : perBuilder)) {
-						continue;
-					}
-					int i = taskHead(o, tk);
-					if (i < 0) {
-						release(f);
-						taskOver(o, tk);
-						if (tSite[f] >= 0) {
-							pick(f);
-						}
-						continue;
-					}
-					int c = p.colOf[i];
-					if (Math.abs(p.colX[c] - px[f]) > REACH || Math.abs(p.colZ[c] - pz[f]) > REACH) {
-						standFor(f, c, i); // out of reach: a short walk inside the bay
-						if (walkLeft[f] != 0) {
-							continue;
-						}
-					} else if (p.y[i] > py[f] + RAISE_ABOVE || p.y[i] < py[f] - 2) {
-						climbTo(f, i); // up (or down) the scaffold where it stands: no walk
-					}
-					nowIndex = i;
-					nowFront = f;
-					BuildCursor.Outcome out = step.apply(f, i);
-					nowIndex = -1;
-					if (out == BuildCursor.Outcome.BLOCKED) {
-						o.taskPark[tk] = tickNo + PARK_TICKS; // chunk not loaded: the task waits, the builder takes another
-						lastPark = tickNo;
-						switchChunk++;
-						release(f);
-						continue;
-					}
-					by[i] = f;
-					applied(i, out);
-					count(i);
-					progress = true;
-					if (out == BuildCursor.Outcome.SKIPPED) {
-						if (++skips >= BuildCursor.DEFAULT_MAX_SKIPS_PER_TICK) {
-							credit = Math.min(credit, 0.999);
-						}
-					} else {
-						credit -= 1.0;
-						used[f]++;
-					}
-					rr = (f + 1) % builders;
-				}
+			tickSkips = 0;
+			if (focusWork && otherWork) {
+				double total = credit;
+				// the focus always gets at least one placement when there is credit for one
+				double spent = work(1, Math.max(total * SiteDispatch.FOCUS_SHARE, Math.min(total, 1.0)), climb, used, step);
+				spent += work(2, total - spent, climb, used, step);
+				spent += work(1, total - spent, climb, used, step);
+				credit = total - spent;
+			} else {
+				credit -= work(0, credit, climb, used, step);
+			}
+			if (tickSkips >= BuildCursor.DEFAULT_MAX_SKIPS_PER_TICK) {
+				credit = Math.min(credit, 0.999); // bounded work per tick even where most of a site is already there
 			}
 		} finally {
 			dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_RADIAL_BUILDERS, t0);
 		}
+	}
+
+	/**
+	 * Lets the builders of {@code group} (0: all, 1: the focus site's, 2: the others) place up to {@code limit}
+	 * blocks, in turns; {@code used} counts each builder's placements this tick across calls. Returns the credit spent.
+	 */
+	private double work(int group, double limit, double climb, int[] used, FrontCursor.Step step) {
+		double left = limit;
+		boolean progress = true;
+		while (left >= 1.0 && progress && state == JobState.RUNNING && tickSkips < BuildCursor.DEFAULT_MAX_SKIPS_PER_TICK) {
+			progress = false;
+			for (int j = 0; j < builders && left >= 1.0 && tickSkips < BuildCursor.DEFAULT_MAX_SKIPS_PER_TICK; j++) {
+				int f = (rr + j) % builders;
+				int s = tSite[f];
+				int tk = tTask[f];
+				if (s < 0 || tk < 0 || walkLeft[f] != 0 || group == 1 && s != focusSite || group == 2 && s == focusSite) {
+					continue;
+				}
+				Open o = open[s];
+				SiteProgram.Program g = o == null ? null : o.prog;
+				if (o == null || g == null) {
+					tTask[f] = -1;
+					continue;
+				}
+				boolean tall = g.taskStart()[tk + 1] - g.taskStart()[tk] >= TALL_TASK;
+				if (used[f] >= (tall ? climb : perBuilder)) {
+					continue;
+				}
+				int i = taskHead(o, tk);
+				if (i < 0) {
+					release(f);
+					taskOver(o, tk);
+					if (tSite[f] >= 0) {
+						pick(f);
+					}
+					continue;
+				}
+				int c = p.colOf[i];
+				if (Math.abs(p.colX[c] - px[f]) > REACH || Math.abs(p.colZ[c] - pz[f]) > REACH) {
+					standFor(f, c, i); // out of reach: a short walk inside the bay
+					if (walkLeft[f] != 0) {
+						continue;
+					}
+				} else if (p.y[i] > py[f] + RAISE_ABOVE || p.y[i] < py[f] - 2) {
+					climbTo(f, i); // up (or down) the scaffold where it stands: no walk
+				}
+				nowIndex = i;
+				nowFront = f;
+				BuildCursor.Outcome out = step.apply(f, i);
+				nowIndex = -1;
+				if (out == BuildCursor.Outcome.BLOCKED) {
+					o.taskPark[tk] = tickNo + PARK_TICKS; // chunk not loaded: the task waits, the builder takes another
+					lastPark = tickNo;
+					switchChunk++;
+					release(f);
+					continue;
+				}
+				by[i] = f;
+				applied(i, out);
+				count(i);
+				progress = true;
+				if (out == BuildCursor.Outcome.SKIPPED) {
+					tickSkips++;
+				} else {
+					left -= 1.0;
+					used[f]++;
+				}
+				rr = (f + 1) % builders;
+			}
+		}
+		return limit - left;
 	}
 
 	/** Counters of one builder placement (the acceptance criteria of the plan, see {@link #describe}). */
@@ -1444,7 +1568,8 @@ public final class SiteCursor implements JobCursor {
 	/**
 	 * Free builder {@code f} takes a task of the current wave of its site: the first one nobody holds, in wave order
 	 * (the front spreads from the access); else it helps on the held task with the most left. A task waits while its
-	 * bay's ground is not laid or its chunk is not loaded. A closing site hands out nothing past a storey boundary.
+	 * bay's ground is not laid or its chunk is not loaded. A site that is not the focus hands out nothing past a storey
+	 * boundary until the dispatch looked at it (it may close there, or go on with a rear guard).
 	 */
 	private void pick(int f) {
 		int s = tSite[f];
@@ -1454,7 +1579,7 @@ public final class SiteCursor implements JobCursor {
 		}
 		for (int guard = 0; guard < 4; guard++) {
 			SiteProgram.Program g = o.prog;
-			if (g == null || o.finished || o.closing && o.fresh) {
+			if (g == null || o.finished || o.boundary && !o.focus) {
 				return;
 			}
 			int w = o.wave;
@@ -1741,7 +1866,7 @@ public final class SiteCursor implements JobCursor {
 			working += o.working;
 			SiteProgram.Program g = o.prog;
 			int w = o.wave;
-			sb.append(" | open ").append(p.siteName[s]);
+			sb.append(" | ").append(o.focus ? "focus " : o.rear ? "rear " : "closing ").append(p.siteName[s]);
 			if (g == null) {
 				sb.append(" planning");
 			} else if (w < g.waves()) {
@@ -1752,14 +1877,16 @@ public final class SiteCursor implements JobCursor {
 						.append('/').append(g.waves()).append(" bays-left ").append(o.waveTasksLeft);
 			}
 			sb.append(" left ").append(siteLeft[s]).append('/').append(p.siteTotal[s]).append(" crew ").append(o.crew);
-			if (o.closing) {
-				sb.append(" closing");
+			if (o.leaving) {
+				sb.append(" leaving");
 			}
 		}
 		int focus = focusSite;
 		int inside = insideSite;
-		sb.append(" | focus ").append(focus < 0 ? "-" : p.siteName[focus]);
-		sb.append(inside < 0 ? " (player outside)" : inside == focus ? " (player inside)" : " (player in " + p.siteName[inside] + ")");
+		sb.append(" | player ").append(inside < 0 ? "outside" : "in " + p.siteName[inside]);
+		if (focus >= 0 && open[focus] == null) {
+			sb.append(" | focus ").append(p.siteName[focus]).append(" waiting");
+		}
 		sb.append(" | builders ").append(working).append('/').append(builders);
 		sb.append(" | off-site ").append(offSite).append(" storey-spread ").append(storeySpread).append(" task-switches walk ").append(switchWalk).append(" chunk ")
 				.append(switchChunk);
