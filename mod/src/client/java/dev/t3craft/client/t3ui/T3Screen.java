@@ -191,6 +191,16 @@ public final class T3Screen extends Screen {
 	/** #39: preferred widths (0 = the layout's default), kept while the window is too small to honour them. */
 	private int sidebarPref;
 	private int rightPref;
+	/** #39: frame cap from {@code layout.maxWidth} / {@code layout.maxHeight}. */
+	private int maxW = T3UiLayout.MAX_W;
+	private int maxH = T3UiLayout.MAX_H;
+	/** #39: the {@code layout} block as last applied or written (the poll re-applies only a change). */
+	private com.google.gson.@Nullable JsonElement layoutSeen;
+	/** #39: unsaved layout change and when it happened (saved {@link #LAYOUT_SAVE_MS} later, never per frame). */
+	private boolean layoutDirty;
+	private long layoutDirtyAt;
+	private static final long LAYOUT_SAVE_MS = 500;
+	private static final int LAYOUT_POLL_TICKS = 20;
 	/** #39: drag handles between sidebar | thread and thread | right panel. */
 	private final T3Splitter sidebarSplitter = new T3Splitter(new T3Splitter.Listener() {
 		@Override
@@ -307,6 +317,9 @@ public final class T3Screen extends Screen {
 		// opened on a thread (a block click): in the compact layout show the thread, not the list
 		this.sidebarVisible = T3UiLayout.startsOnSidebar(key);
 		this.wideSidebar = true;
+		com.google.gson.JsonElement saved = T3LayoutPrefs.raw();
+		layoutSeen = saved == null ? null : saved.deepCopy();
+		applyLayoutPrefs(T3LayoutPrefs.parse(saved)); // #39: widths and right panel from config/t3craft.json
 		model.select(key);
 		if (key != null) {
 			autoSelected = true;
@@ -348,6 +361,23 @@ public final class T3Screen extends Screen {
 		sidebarVisible = false;
 		autoSelected = true;
 		return this;
+	}
+
+	/** #39: takes the {@code layout} block's values (on open, and when the poll sees the file changed). */
+	private void applyLayoutPrefs(T3LayoutPrefs p) {
+		sidebarPref = p.sidebarWidth();
+		rightPref = p.rightWidth();
+		maxW = p.maxWidth();
+		maxH = p.maxHeight();
+		if (p.rightPanel() != null) {
+			rightPanelId = p.rightPanel();
+		}
+		String want = currentRightPanelId();
+		if (!p.rightOpen() || want != null && right.active() && !want.equals(right.id())) {
+			right.close(); // closed, or another page asked for: init opens the right one
+			rightFocused = false;
+		}
+		rightOpen = p.rightOpen();
 	}
 
 	/** #39: opens with {@code page} in the right panel under {@code panelId} (the gallery's fake data). */
@@ -474,10 +504,13 @@ public final class T3Screen extends Screen {
 
 	/** {@link #init()}'s body: the panels and their widgets (#39: the right panel and the splitters). */
 	private void layOut() {
-		if (rightOpen && !right.active() && !T3UiLayout.compute(width, height, true).compact() && !right.open(currentRightPanelId())) {
-			rightOpen = false; // nothing registered under that id any more
+		if (rightOpen && !right.active() && !T3UiLayout.compute(width, height, true).compact()) {
+			String id = currentRightPanelId();
+			if (id == null || !right.open(id)) {
+				rightOpen = false; // nothing registered under that id any more
+			}
 		}
-		layout = T3UiLayout.compute(width, height, showSidebarFlag(), sidebarPref, rightPref, rightShown());
+		layout = T3UiLayout.compute(width, height, showSidebarFlag(), sidebarPref, rightPref, rightShown(), maxW, maxH);
 		sr = T3UiLayout.sidebar(layout.sidebar());
 		// the splitters sit in the gaps; the sidebar one only with a thread panel next to it
 		sidebarSplitter.setBounds(layout.main().w() > 0 ? layout.sidebarSplit() : Rect.EMPTY);
@@ -564,6 +597,7 @@ public final class T3Screen extends Screen {
 			rightFocused = false;
 		} else {
 			rightOpen = true;
+			rightPanelId = id;
 			if (!right.open(id)) {
 				rightOpen = false;
 				T3ThreadActions.notice("That panel is not available right now.");
@@ -574,8 +608,46 @@ public final class T3Screen extends Screen {
 		rebuildWidgets();
 	}
 
-	/** The widths or the right panel changed (persisted in phase 5 of #39). */
+	/** The widths or the right panel changed: saved shortly after ({@link #tickLayoutPrefs}), never per frame. */
 	private void layoutChanged() {
+		layoutDirty = true;
+		layoutDirtyAt = System.currentTimeMillis();
+	}
+
+	/** Writes the {@code layout} block now (the debounce ran out, or the screen goes away). */
+	private void saveLayoutPrefs() {
+		layoutDirty = false;
+		String id = rightPanelId != null ? rightPanelId : right.id();
+		com.google.gson.JsonObject written = T3LayoutPrefs.save(sidebarPref, rightPref, rightOpen, id);
+		if (written != null) {
+			layoutSeen = written.deepCopy();
+		}
+	}
+
+	/**
+	 * Per tick: saves a change once {@link #LAYOUT_SAVE_MS} passed with no drag going on, and every
+	 * {@link #LAYOUT_POLL_TICKS} ticks re-applies the block when the config was reloaded with other values.
+	 */
+	private void tickLayoutPrefs() {
+		boolean dragging = sidebarSplitter.dragging() || rightSplitter.dragging();
+		if (layoutDirty) {
+			if (!dragging && System.currentTimeMillis() - layoutDirtyAt >= LAYOUT_SAVE_MS) {
+				saveLayoutPrefs();
+			}
+			return;
+		}
+		if (dragging || ticks % LAYOUT_POLL_TICKS != 0) {
+			return;
+		}
+		com.google.gson.JsonElement now = T3LayoutPrefs.raw();
+		if (java.util.Objects.equals(now, layoutSeen)) {
+			return;
+		}
+		layoutSeen = now == null ? null : now.deepCopy();
+		applyLayoutPrefs(T3LayoutPrefs.parse(now));
+		if (minecraft != null) {
+			rebuildWidgets();
+		}
 	}
 
 	// ---- kit pages (settings, environments) ---------------------------------------------------------
@@ -674,6 +746,11 @@ public final class T3Screen extends Screen {
 		if (queuePage != null) {
 			queuePage.release(); // #39: stop watching queues; laid out again, the page watches again
 		}
+		sidebarSplitter.cancel();
+		rightSplitter.cancel();
+		if (layoutDirty) {
+			saveLayoutPrefs(); // #39: a resize or toggle that the debounce had not written yet
+		}
 		ThreadListCache.get().save(); // feat/t3-thread-cache: list + recent tails for the next game start
 		super.removed();
 	}
@@ -683,6 +760,7 @@ public final class T3Screen extends Screen {
 		syncTheme();
 		pages.tick();
 		right.tick();
+		tickLayoutPrefs();
 		refresh();
 		if (conversation != null) {
 			conversation.tick();
