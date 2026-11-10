@@ -481,5 +481,15 @@
 	"t3craft.plan.status.saved": "Saved: %s",
 	"t3craft.plan.status.checked_saved": "The agent's declaration was saved.",
 	"t3craft.plan.status.removed": "Deleted: %s",
-	"t3craft.plan.status.unlinked": "\"%s\" is a draft again."
+	"t3craft.plan.status.unlinked": "\"%s\" is a draft again.",
+	"t3craft.settings.buildorder.sitesatonce.label": "Sites at once",
+	"t3craft.settings.buildorder.sitesatonce.one": "1 site (yours; the ones you left keep 1 builder)",
+	"t3craft.settings.buildorder.sitesatonce.many": "%s sites",
+	"t3craft.settings.buildorder.sitesatonce.off": "Off (one focus and rear guards, as before)",
+	"t3craft.settings.buildorder.sitesatonce.help": "Sites order: buildings built in parallel, each with its own crew; the one you walk into gets the most. Applies at once.",
+	"t3craft.settings.buildorder.speed.label": "Build speed",
+	"t3craft.settings.buildorder.speed.calm": "Calm (× 0.6)",
+	"t3craft.settings.buildorder.speed.normal": "Normal",
+	"t3craft.settings.buildorder.speed.fast": "Fast (× 1.6)",
+	"t3craft.settings.buildorder.speed.help": "Sites order: the builders' pace and the block budget. The server's time limit per tick still applies. Applies at once."
 }

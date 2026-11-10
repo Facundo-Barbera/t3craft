@@ -20,6 +20,11 @@ build starts, so it applies to the next one; a build already running keeps its o
 (`building HQ: hq v4, 17 part(s), order sites`), the `[demo]` log line and the first line of `/t3craft demo status` say which
 order is in use.
 
+Under it (#53), for the `"sites"` order only: **Sites at once** (1 to 6 sites built in parallel, or *Off* = the #48
+rules; writes `build.sitesAtOnce`) and **Build speed** (Calm / Normal / Fast; writes `build.speed`). Same pattern: each
+key is written only when it changed, the rest of the `build` section stays, the tuning is reloaded on *Save*. Both are
+read by a running build on its next tick (only the order and `build.sitesCrew` wait for the next build).
+
 By hand, `config/t3craft.json`:
 
 ```json
@@ -244,6 +249,11 @@ New keys in `build`, all additive:
 | `siteCrewMax` | 6 | ...and at most |
 | `siteStorey` | 5 | height of a storey, blocks, where the site has no real floors |
 | `sitesOpen` | 2 | sites open at once (one more when builders are to spare); 1 = one at a time |
+| `sitesAtOnce` | 3 | #53: sites built in parallel, each with its own crew (0..6); 0 = the #48 rules above (`sitesOpen`) |
+| `sitesCrew` | 16 | #53: builders of a big `"sites"` plan (1..16), read when the build starts; `radialCrewMax` stays the radial one |
+| `siteCrewLarge` | 10 | #53: a site with much left grows past `siteCrewMax` up to this (one more per 5 × `entriesPerBuilder` left) |
+| `siteBayCrew` | 3 | #53: builders on one bay at most (owner and helpers); was 2, fixed |
+| `speed` | `"normal"` | #53: `"calm"` (× 0.6), `"normal"`, `"fast"` (× 1.6): builders' pace and block budget of `"sites"` builds |
 
 Reused as they are: `entriesPerBuilder` (one more builder per this many entries the site has left), `radiusMin` +
 `radiusStep` (the carpet's radius), the corridor keys, `groundBlocksPerTick`, `fillBlocksPerTick`,
@@ -388,6 +398,127 @@ and each open site its own ` late s1:12 s3:40 remate 5`.
 | `late sN:k` (per site) | its program's late entries per storey | a storey with many: its pieces lean on something placed later |
 | `flying` | the player is airborne: nothing is laid around it | |
 
+## Parallel sites (#53)
+
+Facundo, after playing with #48: "Quiero que se construyan en paralelo, tal vez con límite. Yo aparezco en el HQ y si me
+voy a la oficina no empieza hasta que termina la pieza central."
+
+**Not compiled or played** (same as the rest of this file): the causes come from reading the code.
+
+### Why a new site waited
+
+Everything that made the building the player walks into wait, with the #48 rules:
+
+| what | where | effect |
+|---|---|---|
+| hold of a fresh site | `SiteCursor.dispatch` (`HOLD_FRESH`) | a site not started must be the dispatch's choice for 3 s before it takes the focus, even when the player stands in it |
+| dispatch every 10 ticks | `DISPATCH_EVERY` | entering a building was noticed up to half a second late, then the 3 s started |
+| the old focus keeps its crew | `staff` (a closing site keeps its builders, the focus only gets the free ones) | the hub, the biggest site, kept up to 6 builders until its whole storey was closed (tens of seconds on a large storey); the new site got the leftovers |
+| `hardCap` and `focus waiting` | `dispatch` | with `sitesOpen` sites still closing, the focus did not open at all |
+| rear guard of 2 at 30 % of the pace | `staff`, `tickBuilders` | the site left behind went on very slowly; past 32 blocks it froze |
+| `STARTED_MAX` (3) | `SiteDispatch.focus` | with 3 sites started and not finished, rules 3 and 4 closed the nearest started one first (rule 1, the player's site, still opened) |
+| compile + gathering | `openSite`, `install`, `gather` | milliseconds plus the `Offload` queue, then 20 ticks of walk: kept, it is the crew arriving |
+
+### What changed
+
+With `build.sitesAtOnce` over 0 (default **3**), `SiteCursor.dispatchParallel` and `staffParallel` replace the #48
+dispatch and staffing. `build.sitesAtOnce: 0` brings back the #48 rules exactly (`sitesOpen`, closing, rear guards).
+
+- **Walking in opens at once.** Entering a site's footprint on the ground is checked every tick (not every 10) and
+  takes the focus with no hold. The site opens whatever else is open (no `hardCap`, no `focus waiting`). Flying
+  changes nothing: the player in the air is in no site, and the #48 holds (3 s for a fresh site, `STARTED_MAX`) stay
+  for every choice that is not "the site I walk in".
+- **The site left behind keeps building**, with its own crew, storey by storey, until it is finished. Nothing closes
+  because the player is far.
+- **Ranking and limit.** The open sites that are not the focus are ranked nearest first (buckets of 8 blocks; among
+  equals the most advanced first). The first `sitesAtOnce - 1` are **parallel** sites (a full crew of their own). The
+  next ones, up to 2, are **retained**: they keep **1 builder** and go on slowly, never frozen. Past those, the farthest
+  close at their next storey boundary (`leaving`): they stay started and come back first when the player is near
+  again. So at the limit the building the player walks into always enters, and the farthest one drops to its retainer.
+  To freeze a site the player must walk into `sitesAtOnce + 3` buildings without coming back.
+- **A building only walked through closes**: opened, nothing placed by a builder, the player went on. Nothing is left
+  half-built by passing by.
+- **Builders to spare open sites by proximity**: when the open sites leave at least `siteCrewMin` builders unused and
+  a slot is free, the nearest started site within 32 blocks opens; else, with the player on the ground, the nearest
+  fresh site within 16 blocks once it was the choice for 3 s (6 rounds). Such a site is not closed while untouched
+  (`near` in the status).
+- **Bigger crew**: a big `"sites"` plan gets `build.sitesCrew` builders (default **16**, was 12 = `radialCrewMax`, which
+  stays the radial one). Read when the build starts.
+
+### Who gets the builders
+
+`staffParallel` runs at every dispatch and on any tick a builder is free. In order:
+
+1. **Recount.** Every builder is either free (`tSite -1`) or on exactly one open site; a builder whose site closed is
+   free. `crew` of every open site is recounted from that, so a lend or a close can never leave a count wrong.
+2. **Order**: the focus, then the parallel sites (nearest first), then the retained, then the leaving ones.
+3. **Shares** (`SiteDispatch.shares`), three passes: every site with work gets its **floor** (`siteCrewMin` for the
+   focus and the parallel sites, 1 for the others), so no open site with work stands with none; then each one, in
+   order, up to its **cap** (what it can use now: `SiteDispatch.crew` of its wave and the wave ahead; a site still
+   compiling: the focus up to `siteCrewMax`, the others `siteCrewMin`): the focus takes the most; then what is left
+   one by one up to a hard maximum (`siteCrewMax`; 1 for retained, 2 for leaving sites).
+4. **Moves.** A builder **without a task** leaves a site over its share and goes, in the same call, to the first site
+   under its share. A builder **with a task** stays until the task is done (`release` lets it go then), so
+   `task-switches walk` stays 0.
+5. **The focus first.** If the focus is still under its floor and nobody is free, the lowest-ranked site over its own
+   floor hands one builder over: a free one, else the one whose task has most left (the task is kept, another builder
+   takes it up). Counted as `handovers`.
+
+Limits that keep the floors honest: `sitesAtOnce` is cut to `builders / siteCrewMin` and the retained slots to what is
+left after that, so floors always fit in the crew. If the player ran through more buildings than builders, the
+farthest leaving sites close at once.
+
+Pace: unchanged (#48, decision 14): with more than one site working, the focus gets 70 % of the tick's credit, the
+others 30 %; what one side cannot use goes to the other. Below the global budget every builder works at full pace.
+
+### Reading it in the status
+
+After `sites a/b` the line gets ` | parallel 2/3 retain 1 crew 16 120 b/s handovers 0`: sites with a crew / the limit,
+retained sites, builders of the job, builder blocks per second (all sites, smoothed over a few seconds), handovers.
+Each open site shows `focus`, `parallel` or `retain` (and `leaving`), and after its crew ` crew 5/6 48 b/s`: builders
+on it / its share, its blocks per second. ` near`: opened by proximity.
+
+## Tall and large sites (#53)
+
+"Todavía se siente muy lento. Las edificaciones verticales y un poco más grandes les cuesta." Read from the code, not
+measured.
+
+### Why a tower was slow
+
+| # | cause | where | effect |
+|---|---|---|---|
+| 1 | **walking inside the bay** | `SiteCursor.work` / `standFor` | a builder stands beside the column it places (on its own side) and walks again whenever the next entry is more than `REACH` (4) away on an axis. A bay is 6 wide and is laid in rows across the access direction, alternating, so a builder beside one edge walked across the bay about once or twice per layer, ~5–10 ticks each (0.6 blocks a tick, up to 20), against ~6 ticks of placing for a whole lift of a bay's wall. Walking took most of a builder's time, worst on towers where every layer is a short ring |
+| 2 | **few bays, few builders** | `SiteDispatch.crew`, `SiteCursor.pick` (`TASK_CREW` 2) | a narrow footprint is 1–4 bays, a wave one task per bay, and the crew is never more than the free tasks; one helper per task at most. A 10 × 10 tower used 2–4 builders out of 12 |
+| 3 | **`siteCrewMax` 6, whatever is left** | `staff` | a site with 30 000 entries got the same 6 builders as one with 2 000 |
+| 4 | **storey gates** | `SiteProgram` storeys (lifts of `siteStorey` 5) | a tower with no real floor every few blocks is a lift every 5 blocks: each lift is up to five stages, each one or more waves, each a barrier for the few bays. Many short waves = many tails (#48, cause 1) |
+| 5 | **the rear guard** | #48 dispatch | a tower left behind was 2 builders at 30 % (fixed by "Parallel sites") |
+
+Checked and **not** the cause: `climbBlocksPerTick` (10) **is** applied in `"sites"`: every task of 24 entries or more
+(`TALL_TASK`) is placed at it, the others at `blocksPerTick` (6). The global budget (`maxBlocksPerTick` 96, 8 ms/tick)
+is not reached by 2–4 builders at 6–10 blocks a tick; it can be with 16. The MSPT / FPS throttle cuts the budget only
+when the server or client is slow (`throttle` in the status).
+
+### What changed
+
+- **Stand by the middle of the bay** (1). When a builder has to move, it goes to the middle of its bay's builder columns
+  (the apron left out; helpers one block aside) whenever that reaches the column: from there the whole bay is within
+  `REACH`, so a task is one walk and then climbing in place. Bays merged past 6 blocks fall back to the old spot beside
+  the column. `walks/task` in the status counts the walks inside tasks per task taken: about 1 or less is the goal.
+- **More builders per bay** (2): `build.siteBayCrew` (3) builders on one task (the owner and two helpers; a helper joins
+  only while the task has 8 entries or more left, as before). The crew a site can use counts it: tasks × 3.
+- **Crew by volume** (3): `build.siteCrewLarge` (10): a site's maximum is `siteCrewMax`, one more per 5 ×
+  `entriesPerBuilder` (6 000) entries left, up to 10. A big hall with 24 000 left gets 10; a small module stays at 6.
+- **Taller lifts in towers** (4): a building with a footprint of 144 columns or fewer whose builder entries span 16
+  blocks or more is cut into lifts of 8 (at least `siteStorey`) where it has no real floors. Real floors still start
+  storeys as before, so a tower with floors keeps them; it still rises lift by lift, never column by column.
+- **Speed** (`build.speed`, Settings → *Build speed*): `calm` × 0.6, `normal` × 1, `fast` × 1.6 on the builders' pace
+  (`blocksPerTick` and `climbBlocksPerTick`) and on the global block budget while `build.order` is `"sites"`
+  (`BuildTuning.blockBudget`; other orders: unchanged). The 8 ms per tick cap and the MSPT / FPS throttle apply on top,
+  so "fast" cannot lag the server more than the time cap allows. Read every tick: it changes a running build.
+
+Kept: the wave barrier (a storey still closes before the next starts), the stages, the 70 / 30 pace, every per-tick
+time cap. These changes apply with `sitesAtOnce: 0` too (they are about the crew's work, not the dispatch).
+
 ## Not done / open
 
 - **Support across sites**: since #48 another site holds only where it is already placed when the program is compiled
@@ -443,6 +574,18 @@ added to `BuildJob`, `BuildCommands`, `DemoBuildRun` and `DemoHq` against the re
 
 What can still fail only javac or the game will show: Minecraft API calls (`BlockState.getLightEmission`,
 `canOcclude`, `isAir`) are the same ones other classes in the repo already use.
+
+### Compile risks (#53)
+
+Not compiled either. Where a mistake is most likely:
+
+- `BuildTuning` has 40 record components now (5 new: `sitesAtOnce`, `sitesCrew`, `siteCrewLarge`, `siteBayCrew`,
+  `speed`). Two compatibility constructors (35 and 37 arguments) delegate in order; the arities were counted by a
+  script. `SPEEDS` is declared before `DEFAULTS` because the constructor runs while the class initialises.
+- `SiteCursor.work` gained a `pace` parameter (all four calls changed); `SettingsPanel` uses a `T3Select<Integer>` fed
+  by an `int` field (boxing both ways).
+- Logic that only the game will show: the share / recount loop of `staffParallel`, the proximity opening (`near`), and
+  standing by the middle of a bay (`walks/task` in the status should drop to about 1).
 
 ## Config and restarts
 

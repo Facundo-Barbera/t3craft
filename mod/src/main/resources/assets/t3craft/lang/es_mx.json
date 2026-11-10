@@ -481,5 +481,15 @@
 	"t3craft.plan.status.saved": "Guardada: %s",
 	"t3craft.plan.status.checked_saved": "Guardado lo que declara el agente.",
 	"t3craft.plan.status.removed": "Eliminada: %s",
-	"t3craft.plan.status.unlinked": "«%s» vuelve a borrador."
+	"t3craft.plan.status.unlinked": "«%s» vuelve a borrador.",
+	"t3craft.settings.buildorder.sitesatonce.label": "Obras a la vez",
+	"t3craft.settings.buildorder.sitesatonce.one": "1 obra (la tuya; las que dejas conservan 1 constructor)",
+	"t3craft.settings.buildorder.sitesatonce.many": "%s obras",
+	"t3craft.settings.buildorder.sitesatonce.off": "Desactivado (un foco y retenes, como antes)",
+	"t3craft.settings.buildorder.sitesatonce.help": "Orden por obras: edificios construidos en paralelo, cada uno con su cuadrilla; en el que entras recibe la mayor parte. Se aplica al momento.",
+	"t3craft.settings.buildorder.speed.label": "Velocidad de construcción",
+	"t3craft.settings.buildorder.speed.calm": "Tranquila (× 0.6)",
+	"t3craft.settings.buildorder.speed.normal": "Normal",
+	"t3craft.settings.buildorder.speed.fast": "Rápida (× 1.6)",
+	"t3craft.settings.buildorder.speed.help": "Orden por obras: el ritmo de los constructores y el presupuesto de bloques. El límite de tiempo del servidor por tick sigue valiendo. Se aplica al momento."
 }
