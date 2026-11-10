@@ -34,14 +34,20 @@ import java.util.List;
  *   "groundBlocksPerTick": 32, // walkable surface (+ one support layer) per tick, ring by ring
  *   "fillBlocksPerTick": 128,  // hidden terrain below the surface per tick (low priority, rings behind)
  *   "foundationRingsAhead": 1, // the surface goes at most this many rings ahead of the ring being finished
- *   "builderRingsAhead": 1,    // builders work at most this many rings ahead of it
- *   "fillRingsBehind": 2,      // the hidden fill trails the ring being finished by this many rings
+ *   "builderRingsAhead": 0,    // builders work at most this many rings past the work radius (0: inside it)
+ *   "fillRingsBehind": 2,      // the hidden fill trails the work radius by this many rings
  *   "climbBlocksPerTick": 10,  // pace of a builder raising a tall wall span (floor: blocksPerTick)
  *   // fix/build-walkable (radial jobs): a ground corridor ahead of the walking player, absolute priority
  *   "corridorLength": 20,      // blocks ahead of the player (while it moves); 0 = only the cells under its feet
  *   "corridorWidth": 7,        // width of the corridor, blocks
  *   "corridorBlocksPerTick": 64, // ground entries per tick for the corridor (and the start-up primer), before any other stream
- *   "corridorMsPerTick": 3     // ...and most wall-clock ms per tick for them (not lowered by the MSPT / FPS throttle)
+ *   "corridorMsPerTick": 3,    // ...and most wall-clock ms per tick for them (not lowered by the MSPT / FPS throttle)
+ *   // fix/builder-round-radius (radial jobs): a round work radius around the player
+ *   "radiusMin": 5,            // blocks: the radius a build starts at, and falls back to when the player moves
+ *   "radiusStep": 4,           // blocks: how far past the nearest unfinished column the radius grows once its disc is done
+ *   "radialMinBuilders": 3,    // builders that always take work
+ *   "entriesPerBuilder": 1200, // one more builder per this many entries of builder work within 24 blocks of the player
+ *   "radialCrewMax": 12        // crew of a big radial plan (60 000 entries or more): the most builders that can take work
  * },
  * "buildNearPlayer": { "enabled": true, "radius": 48 }
  * }</pre>
@@ -54,7 +60,8 @@ public record BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int front
 		double targetMspt, boolean fastFoundation, int foundationBlocksPerTick, double foundationMsPerTick, double blocksPerTick, int crew,
 		boolean nearPlayer, int nearPlayerRadius, boolean radial, int radialRing, int groundBlocksPerTick, int fillBlocksPerTick,
 		int foundationRingsAhead, int builderRingsAhead, int fillRingsBehind, double climbBlocksPerTick, int corridorLength, int corridorWidth,
-		int corridorBlocksPerTick, double corridorMsPerTick) {
+		int corridorBlocksPerTick, double corridorMsPerTick, int radiusMin, int radiusStep, int radialMinBuilders, int entriesPerBuilder,
+		int radialCrewMax) {
 	public static final String SECTION = "build";
 	/** feat/build-near-player: top-level object {@code {enabled, radius}}. */
 	public static final String NEAR_SECTION = "buildNearPlayer";
@@ -66,8 +73,15 @@ public record BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int front
 	public static final String ORDER_RADIAL = "radial";
 	public static final String ORDER_PARTS = "parts";
 	/** fix/build-radial-tune: fastFoundation off; ground 32, fill 128, rings ahead 1 / 1, fill 2 rings behind, climb 10. */
-	public static final BuildTuning DEFAULTS = new BuildTuning(96, 3, 8, 8, true, 40.0, false, 192, 10.0, 6.0, 8, true, 48, true, 5, 32, 128, 1, 1, 2,
-			10.0, 20, 7, 64, 3.0);
+	/**
+	 * fix/builder-round-radius: round work radius 5 blocks to start with, 4 blocks more each time the disc is done; builders
+	 * stay inside it ({@code builderRingsAhead} 1 → 0); 3 builders at least, one more per 1200 entries of builder work
+	 * within 24 blocks of the player, up to the crew (12 for a big radial plan).
+	 */
+	public static final BuildTuning DEFAULTS = new BuildTuning(96, 3, 8, 8, true, 40.0, false, 192, 10.0, 6.0, 8, true, 48, true, 5, 32, 128, 1, 0, 2,
+			10.0, 20, 7, 64, 3.0, 5, 4, 3, 1200, 12);
+	/** A radial plan with at least this many entries gets the bigger crew ({@link #radialCrewMax}) so the builders can grow with the work around the player. */
+	public static final int RADIAL_BIG_PLAN = 60_000;
 
 	public BuildTuning {
 		maxBlocksPerTick = clamp(maxBlocksPerTick, 1, 4096);
@@ -101,6 +115,37 @@ public record BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int front
 		if (!(corridorMsPerTick >= 0.1 && corridorMsPerTick <= 20)) {
 			corridorMsPerTick = 3.0;
 		}
+		radiusMin = clamp(radiusMin, 1, 64);
+		radiusStep = clamp(radiusStep, 1, 32);
+		radialMinBuilders = clamp(radialMinBuilders, 1, 16);
+		entriesPerBuilder = clamp(entriesPerBuilder, 50, 1_000_000);
+		radialCrewMax = clamp(radialCrewMax, 1, 16);
+	}
+
+	/** fix/build-walkable constructor: the fix/builder-round-radius settings at their defaults. */
+	public BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int frontsPerJob, int maxEffectsPerTick, boolean autoThrottle, double targetMspt,
+			boolean fastFoundation, int foundationBlocksPerTick, double foundationMsPerTick, double blocksPerTick, int crew, boolean nearPlayer,
+			int nearPlayerRadius, boolean radial, int radialRing, int groundBlocksPerTick, int fillBlocksPerTick, int foundationRingsAhead,
+			int builderRingsAhead, int fillRingsBehind, double climbBlocksPerTick, int corridorLength, int corridorWidth, int corridorBlocksPerTick,
+			double corridorMsPerTick) {
+		this(maxBlocksPerTick, maxConcurrentJobs, frontsPerJob, maxEffectsPerTick, autoThrottle, targetMspt, fastFoundation, foundationBlocksPerTick,
+				foundationMsPerTick, blocksPerTick, crew, nearPlayer, nearPlayerRadius, radial, radialRing, groundBlocksPerTick, fillBlocksPerTick,
+				foundationRingsAhead, builderRingsAhead, fillRingsBehind, climbBlocksPerTick, corridorLength, corridorWidth, corridorBlocksPerTick,
+				corridorMsPerTick, 5, 4, 3, 1200, 12);
+	}
+
+	/**
+	 * fix/builder-round-radius: the crew a free radial plan of {@code planSize} entries gets: the usual {@code crew}, or
+	 * {@link #radialCrewMax} when the plan is big ({@link #RADIAL_BIG_PLAN}), because the builders in use grow with the
+	 * work around the player (an HQ's centre) and the usual 8 is not enough there.
+	 */
+	public int radialCrewFor(int crew, int planSize) {
+		return planSize >= RADIAL_BIG_PLAN ? Math.max(crew, radialCrewMax) : crew;
+	}
+
+	/** Fronts (builders) of a free radial job with a crew of {@code crew}: like {@link #frontsFor} but up to {@link #radialCrewMax}. */
+	public int radialFrontsFor(int crew) {
+		return Math.max(1, Math.min(Math.max(frontsPerJob, radialCrewMax), crew));
 	}
 
 	/** fix/build-radial-tune constructor: the fix/build-walkable corridor settings at their defaults. */
@@ -118,7 +163,7 @@ public record BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int front
 			boolean fastFoundation, int foundationBlocksPerTick, double foundationMsPerTick, double blocksPerTick, int crew, boolean nearPlayer,
 			int nearPlayerRadius, boolean radial, int radialRing) {
 		this(maxBlocksPerTick, maxConcurrentJobs, frontsPerJob, maxEffectsPerTick, autoThrottle, targetMspt, fastFoundation, foundationBlocksPerTick,
-				foundationMsPerTick, blocksPerTick, crew, nearPlayer, nearPlayerRadius, radial, radialRing, 32, 128, 1, 1, 2, 10.0);
+				foundationMsPerTick, blocksPerTick, crew, nearPlayer, nearPlayerRadius, radial, radialRing, 32, 128, 1, 0, 2, 10.0);
 	}
 
 	/** feat/build-near-player constructor: the feat/build-radial settings at their defaults. */
@@ -218,6 +263,11 @@ public record BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int front
 		int cWidth = (int) number(SECTION, s, "corridorWidth", d.corridorWidth(), 1, 15, true, warn);
 		int cBlocks = (int) number(SECTION, s, "corridorBlocksPerTick", d.corridorBlocksPerTick(), 0, 4096, true, warn);
 		double cMs = number(SECTION, s, "corridorMsPerTick", d.corridorMsPerTick(), 0.1, 20, false, warn);
+		int rMin = (int) number(SECTION, s, "radiusMin", d.radiusMin(), 1, 64, true, warn);
+		int rStep = (int) number(SECTION, s, "radiusStep", d.radiusStep(), 1, 32, true, warn);
+		int rBuilders = (int) number(SECTION, s, "radialMinBuilders", d.radialMinBuilders(), 1, 16, true, warn);
+		int perBuilder = (int) number(SECTION, s, "entriesPerBuilder", d.entriesPerBuilder(), 50, 1_000_000, true, warn);
+		int rCrew = (int) number(SECTION, s, "radialCrewMax", d.radialCrewMax(), 1, 16, true, warn);
 		boolean near = d.nearPlayer();
 		int radius = d.nearPlayerRadius();
 		if (root.has(NEAR_SECTION)) {
@@ -230,7 +280,7 @@ public record BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int front
 			}
 		}
 		return new Result(new BuildTuning(blocks, jobs, fronts, effects, auto, mspt, fast, fBlocks, fMs, pace, crew, near, radius, radial, ring, ground, fill, gAhead,
-				bAhead, behind, climb, cLen, cWidth, cBlocks, cMs), List.copyOf(warn));
+				bAhead, behind, climb, cLen, cWidth, cBlocks, cMs, rMin, rStep, rBuilders, perBuilder, rCrew), List.copyOf(warn));
 	}
 
 	private static boolean bool(String section, JsonObject s, String key, boolean def, List<String> warn) {

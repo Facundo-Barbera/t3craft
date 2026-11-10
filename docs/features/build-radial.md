@@ -113,6 +113,10 @@ ground is there, so something stands next to the player within seconds.
 - Want the island in ~1 min: `foundationBlocksPerTick` ≈ 300.
 - Want it in ~2 min: ≈ 150.
 
+> **fix/builder-round-radius** replaced the "front ring" (`visRing`) of this design by an explicit round work radius
+> around the player, parks columns in unloaded chunks and scales the builders in use: see
+> `docs/features/fix-builder-round-radius.md`. Where this page says ring-ahead or lead, that doc wins.
+
 ## Config (additive, `config/t3craft.json`)
 ```json
 "build": { "order": "radial", "radialRing": 5, "foundationBlocksPerTick": 192, "blocksPerTick": 6,

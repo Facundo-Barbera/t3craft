@@ -269,3 +269,7 @@ Ola 2, pendiente:
 ## 4. Sin lanzar
 - Ola B del swarm (ver `~/.cache/t3craft-coord/swarm2-plan.md`).
 - Líderes de familia que coloquen el catálogo en la ciudad.
+
+### `fix/builder-round-radius`: escrita sin compilar ni jugar (pendiente de ejecución)
+- Radio redondo alrededor del jugador (mínimo 5 bloques, crece 4 al completar el disco, vuelve al mínimo al moverse), columnas en chunks sin cargar aparcadas en vez de bloquear todo, y constructores activos que crecen con el trabajo cercano (ver `docs/features/fix-builder-round-radius.md`).
+- Falta: compilar en el PC (`tools/heavy.sh`) y probar en el cliente de Facundo: ¿los builders terminan el HQ?, ¿vuelven con el jugador al moverse?, ¿suben a 12 en el centro del HQ? (`/t3craft demo status` muestra `radius` y `builders k/n`). Línea RESTART en `docs/CHANGELOG-dev.md`.

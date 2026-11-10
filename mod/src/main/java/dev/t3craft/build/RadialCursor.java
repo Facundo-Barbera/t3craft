@@ -14,7 +14,23 @@ import org.jspecify.annotations.Nullable;
  * horizontal distance to the centre, rounded to rings of {@code build.radialRing} blocks (5 → ring 0 is
  * everything within 5 blocks, ring 1 within 10, …), and the columns of the nearest ring go first.
  * When the centre moves the order is recomputed off-thread ({@link Offload}, {@code build.radial_order_async}),
- * a little ahead of the player in the direction it walks, and what was pending elsewhere waits for later.
+ * exactly around the player, and what was pending elsewhere waits for later.
+ *
+ * <p><b>The round radius</b> (fix/builder-round-radius) is what holds everything to the player. The order is
+ * sorted by distance, so the columns within a radius are a prefix of it ({@link #distAt}). The work radius
+ * {@link #reachQ} (quarter blocks) starts at {@code build.radiusMin} (5 blocks) and:
+ * <ol>
+ *   <li>stays there while any column of the disc still has ground or above work (floor first: the ground goes
+ *   before the entries over it in every column, and the ground stream runs {@code build.foundationRingsAhead}
+ *   rings past the radius);</li>
+ *   <li>when the disc is complete, jumps to the nearest column with work left plus {@code build.radiusStep} blocks
+ *   (a few blocks at a time, never the whole plan), until nothing is left;</li>
+ *   <li>starts again at the minimum around the new position when the order is recomputed because the player
+ *   moved ({@link #installOrder}), so the builders come back with the player.</li>
+ * </ol>
+ * Columns that cannot be worked now (chunk not loaded: {@link #PARKED}; head without support: stalled) do not
+ * hold the radius. The number of builders that take new spans ({@link #active}) grows with the work left near the
+ * player ({@link #updateCrew}).
  *
  * <p><b>Each column has three parts</b> (fix/build-radial-tune), bottom-up in the plan:
  * <ol>
@@ -37,23 +53,22 @@ import org.jspecify.annotations.Nullable;
  * Stalled columns never hold the expansion back. If every column left is stalled (a plan with truly
  * floating pieces) the nearest one is forced, as the crew planner does.
  *
- * <p><b>The front ring.</b> {@link #visRing} is the ring of the nearest column with ground or above work
- * left that is not stalled: the ring being finished. Everything is held to it:
+ * <p><b>The streams and the builders</b> are held to the radius ({@link #reachQ}):
  * <ol>
  *   <li><b>Ground stream</b> (no builder, {@link #frontOf} -1): ground and air entries, and above entries
- *   already right in the world, at most {@code build.foundationRingsAhead} rings beyond the front ring and
+ *   already right in the world, at most {@code build.foundationRingsAhead} rings beyond the radius and
  *   {@code build.groundBlocksPerTick} per tick (within {@link BuildBudget#foundationBlocks}). So the walkable
  *   floor grows from the player's feet, a little ahead of the builders, never across the whole island.</li>
  *   <li><b>Builders</b>: claim a <b>span</b> (a run of up to {@link #SPAN_MAX} neighbouring tall columns: a
- *   piece of wall or tower; short columns are spans of one) in the front ring, at most
- *   {@code build.builderRingsAhead} rings ahead. When their ring has no free span they help on the tallest
+ *   piece of wall or tower; short columns are spans of one) inside the radius (plus
+ *   {@code build.builderRingsAhead} rings, 0 by default). When their ring has no free span they help on the tallest
  *   span of it (up to {@link #SPAN_CREW} builders) instead of going further. A builder raises its span in
  *   courses (the lowest head of its columns first, so side support within the span counts in the same
  *   pass) and climbs in place as it rises; it walks only to a new span or a column out of reach. Pace:
  *   {@code build.climbBlocksPerTick} on tall spans, {@code perBuilder} otherwise, out of the crews' budget
  *   ({@link BuildBudget#claim}).</li>
  *   <li><b>Fill stream</b>: the hidden fill, {@code build.fillBlocksPerTick} per tick out of what the ground
- *   left of the foundation budget, only {@code build.fillRingsBehind} rings behind the front ring (or
+ *   left of the foundation budget, only {@code build.fillRingsBehind} rings behind the radius (or
  *   anywhere once nothing above or ground is left).</li>
  * </ol>
  * <p><b>The corridor</b> (fix/build-walkable) runs before all of them: while a player is in the build, the
@@ -74,7 +89,8 @@ import org.jspecify.annotations.Nullable;
  * then placed by the corridor and the ground stream like ground, unsupported; the builders go on upwards from
  * it. What lies under it (the hidden room, its floor, walls and interior) is <b>under work</b>: it no longer
  * holds the front ring and is laid by the fill stream ({@link #underHead}), rings behind, with the support
- * rule. Builders take work in the vertical band of the player ({@link WalkLevels#inBand}) first: walls at head
+ * rule. Builders take work in the vertical band of the player ({@link WalkLevels#inBand}) first (the radius still
+ * waits for the rest of the disc, high roofs included): walls at head
  * height, railings, stairs a flight up or down; high roofs and anything far under it after. The level follows
  * the player with hysteresis ({@link WalkLevels#LEVEL_MOVE}, or 1 block held on the ground for
  * {@link #MIN_GAP_MS}); each change, and each re-order, makes the columns choose again, lazily, one int
@@ -112,12 +128,20 @@ public final class RadialCursor implements JobCursor {
 	static final int HELP_MIN = 6;
 	/** A builder places up to this far (horizontally, each axis) from where it stands without walking. */
 	static final int REACH = 4;
-	/** The order centres this many rings ahead of the player in the direction it walked. */
-	static final double LEAD = 0.5;
 	/** Fill entries already right in the world (skips) per tick at most. */
 	static final int FILL_SKIPS = 1024;
-	/** No front ring (nothing above or ground left that is not stalled). */
-	static final int NO_RING = Integer.MAX_VALUE / 4;
+	/** fix/builder-round-radius: no radius limit (nothing above or ground left that can be worked now). */
+	static final int NO_REACH = Integer.MAX_VALUE / 4;
+	/** {@link #stateOf} of a column whose chunk is not loaded: it waits {@link #PARK_TICKS}, never holds the radius or a stream. */
+	static final int PARKED = 4;
+	/** A column waits this many ticks after a placement answered BLOCKED (chunk not loaded) before it is tried again. */
+	static final int PARK_TICKS = 20;
+	/** The parked columns are looked at again every this many ticks. */
+	static final int UNPARK_EVERY = 10;
+	/** The builders in use are worked out again every this many ticks. */
+	static final int CREW_EVERY = 10;
+	/** The work left that sets the number of builders is counted within this many quarter blocks of the centre (24 blocks). */
+	static final int CROWD_Q = 24 * 4;
 	/** fix/build-walkable: the corridor always covers this radius around the player's feet (blocks). */
 	static final double FEET_RADIUS = 2.0;
 	/** Sample step of the corridor scan (blocks): half a block, so a diagonal corridor has no holes. */
@@ -156,6 +180,8 @@ public final class RadialCursor implements JobCursor {
 	private final int[] colStart;
 	private final int[] colEntries;
 	private final int[] colOf;
+	/** fix/builder-round-radius: entries of each column a builder places (not ground, fill or air) and not applied yet. */
+	private final int[] buildLeft;
 	/** Fill entries of each column: the first {@code colFill[c]} of its bottom-up entries. */
 	private final int[] colFill;
 	private final int ring;
@@ -200,6 +226,17 @@ public final class RadialCursor implements JobCursor {
 	private int[] order;
 	private int[] posOf;
 	private int[] ringAt;
+	/** Distance to the centre, quarter blocks, of {@code order[pos]} (non-decreasing: the order is sorted by distance). */
+	private int[] distAt;
+	/** The work radius, quarter blocks ({@link #NO_REACH} = no limit), see the class doc. */
+	private int reachQ;
+	/** Ticks of this cursor, and when each column may be tried again after BLOCKED (chunk not loaded). */
+	private int tickNo;
+	private final int[] parkUntil;
+	private final IntArrayList parked = new IntArrayList();
+	/** Builders that take new spans (the rest only finish the span they hold): grows with the work left near the player. */
+	private int active;
+	private int crewAt;
 	private int gPtr;
 	private int bPtr;
 	private int lPtr;
@@ -208,7 +245,6 @@ public final class RadialCursor implements JobCursor {
 	private int bWake = Integer.MAX_VALUE;
 	private int vWake = Integer.MAX_VALUE;
 	private int lWake = Integer.MAX_VALUE;
-	private int visRing;
 	/** fix/build-walkable-level: the player's level (plan-relative feet cell), {@link WalkLevels#NO_LEVEL} = nobody. */
 	private int level = WalkLevels.NO_LEVEL;
 	private int levelVersion;
@@ -388,6 +424,13 @@ public final class RadialCursor implements JobCursor {
 		for (int i = 0; i < n; i++) {
 			fast[i] |= air[i] || ground[i] || fastMode && terrain[i];
 		}
+		buildLeft = new int[nc];
+		for (int i = 0; i < n; i++) {
+			if (!fast[i]) {
+				buildLeft[colOf[i]]++;
+			}
+		}
+		parkUntil = new int[nc];
 		// fix/build-walkable-level: walkable candidates per column (floors with two passable cells over them,
 		// and the terrain top when it is walkable)
 		boolean[] walk = new boolean[n];
@@ -503,8 +546,11 @@ public final class RadialCursor implements JobCursor {
 		int[][] o = order(colX, colZ, cx, cz, this.ring);
 		order = o[0];
 		ringAt = o[1];
+		distAt = o[2];
 		posOf = positions(order);
-		visRing = nc == 0 ? NO_RING : ringAt[0];
+		BuildTuning tune = BuildBudget.global().tuning();
+		reachQ = minReachQ(tune);
+		active = Math.min(this.builders, tune.radialMinBuilders());
 		tspan = new int[this.builders];
 		Arrays.fill(tspan, -1);
 		tband = new boolean[this.builders];
@@ -577,7 +623,8 @@ public final class RadialCursor implements JobCursor {
 
 	/**
 	 * Columns sorted by ring (horizontal distance to {@code (fx, fz)} over {@code ring}, floored), then
-	 * distance, then index; returns {@code {order, ringAt}} ({@code ringAt[pos]} = ring of {@code order[pos]}). Pure.
+	 * distance, then index; returns {@code {order, ringAt, distAt}} ({@code ringAt[pos]} = ring of {@code order[pos]},
+	 * {@code distAt[pos]} = its distance in quarter blocks, never decreasing along the order). Pure.
 	 */
 	static int[][] order(int[] colX, int[] colZ, double fx, double fz, int ring) {
 		int nc = colX.length;
@@ -593,11 +640,19 @@ public final class RadialCursor implements JobCursor {
 		Arrays.sort(keys);
 		int[] order = new int[nc];
 		int[] ringAt = new int[nc];
+		int[] distAt = new int[nc];
 		for (int p = 0; p < nc; p++) {
 			order[p] = (int) keys[p];
-			ringAt[p] = (int) (keys[p] >>> 52);
+			long r = keys[p] >>> 52;
+			ringAt[p] = (int) r;
+			distAt[p] = (int) (r * ring * 4L + ((keys[p] >>> 32) & 0xFFFFF));
 		}
-		return new int[][] {order, ringAt};
+		return new int[][] {order, ringAt, distAt};
+	}
+
+	/** The radius a build starts at and falls back to when the player moves, quarter blocks ({@code build.radiusMin}). */
+	static int minReachQ(BuildTuning t) {
+		return Math.max(4, t.radiusMin() * 4);
 	}
 
 	private static int[] positions(int[] order) {
@@ -623,9 +678,10 @@ public final class RadialCursor implements JobCursor {
 	/**
 	 * The centre now, plan-relative; null = nobody in the build (the hub / spawn fallback). Cheap: at most
 	 * starts an off-thread re-order (moved more than {@link #MOVE}, or {@link #INTERVAL_MS} passed and it
-	 * drifted {@link #DRIFT}; never closer than {@link #MIN_GAP_MS}; one at a time). The new order centres
-	 * {@link #LEAD} rings ahead of the player along the way it moved, so walking towards the edge of what is
-	 * built brings the ground on that side first. Server thread.
+	 * drifted {@link #DRIFT}; never closer than {@link #MIN_GAP_MS}; one at a time). The new order centres on the
+	 * player (fix/builder-round-radius: no lead any more, the radius is round around the player; the ground
+	 * corridor already runs ahead of a walking player) and, once installed, the radius starts again at its
+	 * minimum ({@link #installOrder}). Server thread.
 	 */
 	void focus(double @Nullable [] rel, long nowMs) {
 		track(rel, nowMs);
@@ -643,9 +699,8 @@ public final class RadialCursor implements JobCursor {
 		if (moved <= MOVE && !(moved >= DRIFT && nowMs - sortedAt >= INTERVAL_MS)) {
 			return;
 		}
-		double lead = rel == null || moved < DRIFT ? 0.0 : LEAD * ring / moved;
-		double ox = fx + mx * lead;
-		double oz = fz + mz * lead;
+		double ox = fx;
+		double oz = fz;
 		sortedX = fx;
 		sortedZ = fz;
 		sortedAt = nowMs;
@@ -743,7 +798,11 @@ public final class RadialCursor implements JobCursor {
 		}
 		order = o[0];
 		ringAt = o[1];
+		distAt = o[2];
 		posOf = positions(order);
+		// fix/builder-round-radius: the player moved: the radius starts again at its minimum around the new position
+		reachQ = minReachQ(BuildBudget.global().tuning());
+		crewAt = 0;
 		gPtr = 0;
 		bPtr = 0;
 		lPtr = 0;
@@ -846,7 +905,43 @@ public final class RadialCursor implements JobCursor {
 		}
 	}
 
+	/** Column {@code c} waits for its chunk (a placement answered BLOCKED less than {@link #PARK_TICKS} ago). */
+	private boolean parked(int c) {
+		return parkUntil[c] > tickNo;
+	}
+
+	/**
+	 * fix/builder-round-radius: a placement in column {@code c} answered BLOCKED (its chunk is not loaded). The
+	 * column steps aside for {@link #PARK_TICKS}: before, every stream stopped at it (and the builder that took
+	 * it never let go), so one unloaded chunk held the whole build back, even the loaded columns behind it.
+	 */
+	private void park(int c) {
+		if (parked(c)) {
+			return;
+		}
+		parkUntil[c] = tickNo + PARK_TICKS;
+		parked.add(c);
+	}
+
+	/** Every {@link #UNPARK_EVERY} ticks the columns that waited long enough are looked at again (nothing was lost: they were never applied). */
+	private void unpark() {
+		if (parked.isEmpty() || tickNo % UNPARK_EVERY != 0) {
+			return;
+		}
+		for (int k = parked.size() - 1; k >= 0; k--) {
+			int c = parked.getInt(k);
+			if (parkUntil[c] <= tickNo) {
+				parked.set(k, parked.getInt(parked.size() - 1));
+				parked.removeInt(parked.size() - 1);
+				touched(c);
+			}
+		}
+	}
+
 	private int stateOf(int c) {
+		if (parked(c)) {
+			return PARKED;
+		}
 		ensure(c);
 		int i = head(c);
 		if (i < 0) {
@@ -895,6 +990,9 @@ public final class RadialCursor implements JobCursor {
 	private void applied(int i, BuildCursor.Outcome o) {
 		applied[i] = true;
 		int c = colOf[i];
+		if (!fast[i]) {
+			buildLeft[c]--;
+		}
 		done++;
 		switch (o) {
 			case PLACED -> placed++;
@@ -959,7 +1057,9 @@ public final class RadialCursor implements JobCursor {
 		long t0 = System.nanoTime();
 		int n0 = done;
 		try {
+			tickNo++;
 			installOrder();
+			unpark();
 			gPtr = Math.min(gPtr, gWake);
 			bPtr = Math.min(bPtr, bWake);
 			vPtr = Math.min(vPtr, vWake);
@@ -976,13 +1076,15 @@ public final class RadialCursor implements JobCursor {
 				levelVersion++;
 			}
 			int corridor = tickCorridor(step, t); // fix/build-walkable: the floor ahead of the player first
-			visRing = frontRing();
+			updateReach(t);
+			updateCrew(t);
 			int groundDone = tickGround(step, t) + corridor;
 			int built = tickBuilders(allowance, step, t);
 			underDone = 0;
 			int filled = tickFill(step, t);
 			// the hidden fill never holds a stuck piece back: only ground, builders and under work count here
-			if (groundDone == 0 && built == 0 && underDone == 0 && colsDone < cols && idle()) {
+			// (columns waiting for a chunk are not stuck: they come back by themselves, so the scan for a stalled one runs now and then)
+			if (groundDone == 0 && built == 0 && underDone == 0 && colsDone < cols && idle() && (parked.isEmpty() || tickNo % UNPARK_EVERY == 0)) {
 				forceOne(filled == 0);
 			}
 		} finally {
@@ -994,18 +1096,65 @@ public final class RadialCursor implements JobCursor {
 		return done - n0;
 	}
 
-	/** The ring being finished: that of the nearest column with ground or above work left, not stalled. */
-	private int frontRing() {
+	/**
+	 * fix/builder-round-radius: the work radius. {@link #vPtr} walks to the nearest column with ground or above
+	 * work left that can be worked now (not done, stalled or {@link #PARKED}). Inside the radius: the disc is not
+	 * complete, the radius stays. Beyond it: the disc is complete, the radius grows to that column plus
+	 * {@code build.radiusStep} blocks. No such column left: no limit ({@link #NO_REACH}), so the hidden fill and
+	 * whatever woke up behind finish. A tick that scans {@link #SCAN_MAX} done columns without reaching work
+	 * changes nothing and goes on from there next tick.
+	 */
+	private void updateReach(BuildTuning t) {
 		int scanned = 0;
+		boolean found = false;
 		while (vPtr < cols && scanned < SCAN_MAX) {
 			int st = stateOf(order[vPtr]);
-			if (st != DONE && st != STALLED) {
+			if (st != DONE && st != STALLED && st != PARKED) {
+				found = true;
 				break;
 			}
 			vPtr++;
 			scanned++;
 		}
-		return vPtr < cols ? ringAt[vPtr] : NO_RING;
+		if (vPtr >= cols) {
+			reachQ = NO_REACH;
+		} else if (found) {
+			int dq = distAt[vPtr];
+			if (reachQ >= NO_REACH || dq > reachQ) {
+				reachQ = Math.max(minReachQ(t), dq + Math.max(4, t.radiusStep() * 4));
+			}
+		}
+	}
+
+	/** {@code reachQ} plus {@code rings} rings, quarter blocks ({@link #NO_REACH} stays). */
+	private int reachPlus(int rings) {
+		return reachQ >= NO_REACH ? NO_REACH : reachQ + rings * ring * 4;
+	}
+
+	/**
+	 * fix/builder-round-radius: how many builders take new spans. At least {@code build.radialMinBuilders}; one
+	 * more per {@code build.entriesPerBuilder} entries of builder work left within {@link #CROWD_Q} of the
+	 * centre (a wall of the HQ's big centre is thousands of entries, a hut a few hundred); never more than the crew.
+	 * It grows at once and shrinks one builder per look, so a builder is not taken off a wall between two spans.
+	 * A builder that is not in use still finishes the span it holds. Looks every {@link #CREW_EVERY} ticks
+	 * (and after the centre moved): one int add per column within 24 blocks.
+	 */
+	private void updateCrew(BuildTuning t) {
+		int min = Math.min(builders, t.radialMinBuilders());
+		if (builders <= min) {
+			active = builders;
+			return;
+		}
+		if (tickNo < crewAt) {
+			return;
+		}
+		crewAt = tickNo + CREW_EVERY;
+		int pending = 0;
+		for (int p = 0; p < cols && distAt[p] <= CROWD_Q; p++) {
+			pending += buildLeft[order[p]];
+		}
+		int want = Math.max(min, Math.min(builders, min + pending / t.entriesPerBuilder()));
+		active = want >= active ? want : Math.max(want, active - 1);
 	}
 
 	/**
@@ -1049,7 +1198,7 @@ public final class RadialCursor implements JobCursor {
 					int bx = (int) Math.floor(px0 + hx * s - hz * o);
 					int bz = (int) Math.floor(pz0 + hz * s + hx * o);
 					int c = colAt.get(CrewPlanner.key(bx, 0, bz));
-					if (c < 0 || c == last) {
+					if (c < 0 || c == last || parked(c)) {
 						continue;
 					}
 					last = c;
@@ -1062,7 +1211,8 @@ public final class RadialCursor implements JobCursor {
 						}
 						BuildCursor.Outcome out = step.apply(-1, i);
 						if (out == BuildCursor.Outcome.BLOCKED) {
-							break outer; // free jobs never block; look again next tick
+							park(c); // its chunk is not loaded: this column waits, the others of the corridor go on
+							break;
 						}
 						applied(i, out);
 						worked = true;
@@ -1100,7 +1250,7 @@ public final class RadialCursor implements JobCursor {
 		if (max <= 0 || nanos <= 0) {
 			return 0;
 		}
-		int limit = fastMode ? NO_RING : visRing + t.foundationRingsAhead();
+		int limit = fastMode ? NO_REACH : reachPlus(t.foundationRingsAhead());
 		long t0 = System.nanoTime();
 		int count = 0;
 		int skips = 0;
@@ -1112,8 +1262,8 @@ public final class RadialCursor implements JobCursor {
 			outer:
 			while (gPtr < cols && count < max && scanned < SCAN_MAX && state == JobState.RUNNING) {
 				int p = gPtr;
-				if (ringAt[p] > limit) {
-					break; // the floor waits for the front ring
+				if (distAt[p] > limit) {
+					break; // the floor waits for the radius
 				}
 				int c = order[p];
 				scanned++;
@@ -1131,7 +1281,8 @@ public final class RadialCursor implements JobCursor {
 					if (st == FAST || right) {
 						BuildCursor.Outcome o = step.apply(-1, i);
 						if (o == BuildCursor.Outcome.BLOCKED) {
-							break outer; // free jobs never block; keep it for the next tick
+							park(c); // chunk not loaded: this column waits (kept, tried again later), the stream goes on with the next
+							break;
 						}
 						applied(i, o);
 						if (o == BuildCursor.Outcome.SKIPPED) {
@@ -1164,7 +1315,7 @@ public final class RadialCursor implements JobCursor {
 	}
 
 	/**
-	 * Fill stream: the hidden terrain under the ground, rings behind the front, out of the foundation budget
+	 * Fill stream: the hidden terrain under the ground, rings behind the radius, out of the foundation budget
 	 * left. fix/build-walkable-level: then the column's under work (what lies under a lifted floor: the hidden
 	 * room, its floor, walls and interior), bottom-up with the support rule; a head without support waits
 	 * ({@link #underStalled}) and wakes when a neighbour is placed.
@@ -1176,7 +1327,7 @@ public final class RadialCursor implements JobCursor {
 		if (max <= 0 || nanos <= 0) {
 			return 0;
 		}
-		int limit = fastMode || visRing >= NO_RING ? NO_RING : visRing - t.fillRingsBehind();
+		int limit = fastMode || reachQ >= NO_REACH ? NO_REACH : reachQ - t.fillRingsBehind() * ring * 4;
 		if (limit < 0) {
 			return 0;
 		}
@@ -1189,11 +1340,15 @@ public final class RadialCursor implements JobCursor {
 			outer:
 			while (lPtr < cols && count < max && scanned < SCAN_MAX && state == JobState.RUNNING) {
 				int p = lPtr;
-				if (ringAt[p] > limit) {
+				if (distAt[p] > limit) {
 					break;
 				}
 				int c = order[p];
 				scanned++;
+				if (parked(c)) {
+					lPtr = p + 1; // waits for its chunk; unpark() wakes this stream back at it
+					continue;
+				}
 				ensure(c);
 				while (fillNext[c] < colFill[c]) {
 					int i = colEntries[colStart[c] + fillNext[c]];
@@ -1203,7 +1358,8 @@ public final class RadialCursor implements JobCursor {
 					}
 					BuildCursor.Outcome o = step.apply(-1, i);
 					if (o == BuildCursor.Outcome.BLOCKED) {
-						break outer;
+						park(c);
+						break;
 					}
 					applied(i, o);
 					fillNext[c]++;
@@ -1218,7 +1374,7 @@ public final class RadialCursor implements JobCursor {
 						break outer;
 					}
 				}
-				while (!underStalled[c]) {
+				while (!underStalled[c] && !parked(c)) {
 					int i = underHead(c);
 					if (i < 0) {
 						break;
@@ -1229,7 +1385,8 @@ public final class RadialCursor implements JobCursor {
 					}
 					BuildCursor.Outcome o = step.apply(-1, i);
 					if (o == BuildCursor.Outcome.BLOCKED) {
-						break outer;
+						park(c);
+						break;
 					}
 					applied(i, o);
 					underDone++;
@@ -1262,12 +1419,12 @@ public final class RadialCursor implements JobCursor {
 		long t0 = System.nanoTime();
 		try {
 			double climb = Math.max(perBuilder, t.climbBlocksPerTick());
-			int limit = visRing + t.builderRingsAhead();
+			int limit = reachPlus(t.builderRingsAhead());
 			for (int f = 0; f < builders; f++) {
 				if (tspan[f] >= 0 && walkLeft[f] > 0) {
 					walkLeft[f]--;
 				}
-				if (tspan[f] < 0) {
+				if (tspan[f] < 0 && f < active) {
 					pick(f, limit);
 				}
 			}
@@ -1288,7 +1445,9 @@ public final class RadialCursor implements JobCursor {
 					int c = next(f, limit);
 					if (c < 0) {
 						release(f);
-						pick(f, limit);
+						if (f < active) {
+							pick(f, limit);
+						}
 						continue;
 					}
 					int i = head(c);
@@ -1302,6 +1461,7 @@ public final class RadialCursor implements JobCursor {
 					}
 					BuildCursor.Outcome o = step.apply(f, i);
 					if (o == BuildCursor.Outcome.BLOCKED) {
+						park(c); // chunk not loaded: the builder looks at the other columns of its span (or lets go) instead of waiting here
 						continue;
 					}
 					by[i] = f;
@@ -1343,7 +1503,7 @@ public final class RadialCursor implements JobCursor {
 				gWake = Math.min(gWake, posOf[c]);
 				continue;
 			}
-			if (st != BUILD || ringAt[posOf[c]] > limit) {
+			if (st != BUILD || distAt[posOf[c]] > limit) {
 				continue;
 			}
 			int hy = y[head(c)];
@@ -1400,7 +1560,7 @@ public final class RadialCursor implements JobCursor {
 	}
 
 	/**
-	 * Free builder {@code f} takes work in the nearest ring with builder work (at most {@code limit}):
+	 * Free builder {@code f} takes work in the nearest ring with builder work (within {@code limit} quarter blocks of the centre):
 	 * the free span closest to it there; else it helps on that ring's tallest span (fewer than
 	 * {@link #SPAN_CREW} builders on it); only when that ring has neither does it look at the next ring.
 	 * fix/build-walkable-level: only heads in the player's band ({@link WalkLevels#inBand}) count first; when
@@ -1413,10 +1573,10 @@ public final class RadialCursor implements JobCursor {
 		int seen = 0;
 		boolean levelled = level != WalkLevels.NO_LEVEL;
 		for (int p = bPtr; p < cols && seen < PICK_SCAN; p++) {
-			int r = ringAt[p];
-			if (r > limit) {
+			if (distAt[p] > limit) {
 				break;
 			}
+			int r = ringAt[p];
 			int c = order[p];
 			seen++;
 			int st = stateOf(c);
@@ -1615,7 +1775,7 @@ public final class RadialCursor implements JobCursor {
 			if (s >= 0) {
 				any = true;
 				r += tallSpan[s] ? climb : perBuilder;
-			} else {
+			} else if (f < active) {
 				r += perBuilder;
 			}
 		}
@@ -1748,9 +1908,9 @@ public final class RadialCursor implements JobCursor {
 		return n == 0 ? 1.0 : (double) done / n;
 	}
 
-	/** Columns / columns done / current centre / front ring (status, debug). */
+	/** Columns / columns done / current centre / radius and builders in use (status, debug). */
 	public String describe() {
-		return "radial cols " + colsDone + "/" + cols + " centre " + Math.round(cx) + "," + Math.round(cz) + " ring " + ring + " front "
-				+ (visRing >= NO_RING ? "-" : String.valueOf(visRing)) + (level == WalkLevels.NO_LEVEL ? "" : " level " + level) + (hasPlayer ? String.format(java.util.Locale.ROOT, " speed %.1f", Math.hypot(vx, vz)) : "");
+		return "radial cols " + colsDone + "/" + cols + " centre " + Math.round(cx) + "," + Math.round(cz) + " radius "
+				+ (reachQ >= NO_REACH ? "all" : String.valueOf(reachQ / 4)) + " builders " + active + "/" + builders + (parked.isEmpty() ? "" : " waiting-chunks " + parked.size()) + (level == WalkLevels.NO_LEVEL ? "" : " level " + level) + (hasPlayer ? String.format(java.util.Locale.ROOT, " speed %.1f", Math.hypot(vx, vz)) : "");
 	}
 }

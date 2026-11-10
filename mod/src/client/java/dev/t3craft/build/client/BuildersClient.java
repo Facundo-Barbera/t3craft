@@ -177,13 +177,17 @@ public final class BuildersClient implements ClientModInitializer, BuildService 
 		// is split off later, off-thread), every builder works at least build.blocksPerTick, and a player
 		// near the site is where the crew appears and starts working.
 		dev.t3craft.build.BuildTuning tuning = BuildBudget.global().tuning();
-		int crew = tuning.crewFor(crewSize, plan.size() / 4);
+		// fix/builder-round-radius: a free radial job (the BuildJob test, below) of a big plan gets the bigger crew: the
+		// builders that take work grow with the work around the player, up to it
+		boolean radialJob = jobCost == null && tuning.radial() && plan.size() > BuildPlanner.SYNC_PLAN_LIMIT;
+		int crew = radialJob ? tuning.radialCrewFor(tuning.crewFor(crewSize, plan.size() / 4), plan.size()) : tuning.crewFor(crewSize, plan.size() / 4);
+		int fronts = radialJob ? tuning.radialFrontsFor(crew) : tuning.frontsFor(crew);
 		double pace = Math.max(blocksPerTick, tuning.blocksPerTick());
 		net.minecraft.world.level.levelgen.structure.BoundingBox box = BuildJob.boundsOf(plan, origin, rotation);
 		boolean near = tuning.nearPlayer() && BuildCrew.near(box, viewer, tuning.nearPlayerRadius());
 		BlockPos focus = near ? BlockPos.containing(viewer) : null;
 		BuildCrew built = new BuildCrew(label, lvl, box, crew, viewer, near, () -> nextEntityId--, routes,
-				() -> manager.submit(label, dimension, origin, rotation, plan, pace, jobCost, wrap, tuning.frontsFor(crew), BuildPlanner.CREW, focus));
+				() -> manager.submit(label, dimension, origin, rotation, plan, pace, jobCost, wrap, fronts, BuildPlanner.CREW, focus));
 		crews.add(built);
 		return built;
 	}
