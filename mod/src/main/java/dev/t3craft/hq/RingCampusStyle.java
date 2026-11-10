@@ -1,5 +1,10 @@
 package dev.t3craft.hq;
 
+import dev.t3craft.hq.plan.Box;
+import dev.t3craft.hq.plan.BuildPlan;
+import dev.t3craft.hq.plan.PlanBuilder;
+import dev.t3craft.hq.style.CherryStyle;
+import dev.t3craft.hq.style.HqStyle;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -72,7 +77,7 @@ public final class RingCampusStyle extends HqStyle {
 	}
 
 	@Override
-	BuildPlan layoutPlan(HqLayout layout) {
+	public BuildPlan layoutPlan(HqLayout layout) {
 		return new RingCampusGenerator(this).generate(layout);
 	}
 
@@ -95,38 +100,38 @@ public final class RingCampusStyle extends HqStyle {
 	// ------------------------------------------------------------------ spine-grid pieces: unused
 
 	@Override
-	void hub(PlanBuilder.Canvas c, boolean northDoor) {
+	public void hub(PlanBuilder.Canvas c, boolean northDoor) {
 	}
 
 	@Override
-	void board(PlanBuilder.Canvas c, SignText sign) {
+	public void board(PlanBuilder.Canvas c, SignText sign) {
 	}
 
 	@Override
-	void archiveNook(PlanBuilder.Canvas c) {
+	public void archiveNook(PlanBuilder.Canvas c) {
 	}
 
 	@Override
-	void portico(PlanBuilder.Canvas c) {
+	public void portico(PlanBuilder.Canvas c) {
 	}
 
 	@Override
-	void spineRow(PlanBuilder.Canvas c, int r, @Nullable SignText eastSign, @Nullable SignText westSign) {
+	public void spineRow(PlanBuilder.Canvas c, int r, @Nullable SignText eastSign, @Nullable SignText westSign) {
 	}
 
 	@Override
-	void spineCap(PlanBuilder.Canvas c, Box box) {
+	public void spineCap(PlanBuilder.Canvas c, Box box) {
 	}
 
 	@Override
-	void wingEndWall(PlanBuilder.Canvas c, int i, int u, boolean inner) {
+	public void wingEndWall(PlanBuilder.Canvas c, int i, int u, boolean inner) {
 	}
 
 	@Override
-	void segment(PlanBuilder.Canvas c, int i, int s, net.minecraft.world.item.DyeColor accent) {
+	public void segment(PlanBuilder.Canvas c, int i, int s, net.minecraft.world.item.DyeColor accent) {
 	}
 
 	@Override
-	void desk(PlanBuilder.Canvas c, DeskCells cells) {
+	public void desk(PlanBuilder.Canvas c, DeskCells cells) {
 	}
 }

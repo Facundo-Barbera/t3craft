@@ -215,8 +215,8 @@ public final class DemoClient implements ClientModInitializer {
 	/** Starts the background computation of the empty HQ plan of the configured layout (never blocks, never throws). Any thread. */
 	static void warmEmptyPlan() {
 		try {
-			dev.t3craft.hq.HqEmptyPlan.start(dev.t3craft.hq.HqStyles.forLayout(dev.t3craft.client.hq.layout.HqLayoutConfig.selectedId()));
-			dev.t3craft.hq.HqEmptyPlan.start(dev.t3craft.hq.HqStyles.current());
+			dev.t3craft.hq.HqEmptyPlan.start(dev.t3craft.hq.style.HqStyles.forLayout(dev.t3craft.client.hq.layout.HqLayoutConfig.selectedId()));
+			dev.t3craft.hq.HqEmptyPlan.start(dev.t3craft.hq.style.HqStyles.current());
 		} catch (RuntimeException | LinkageError e) {
 			T3Craft.LOGGER.debug("[demo] could not warm the empty HQ plan ({})", e.getClass().getSimpleName());
 		}

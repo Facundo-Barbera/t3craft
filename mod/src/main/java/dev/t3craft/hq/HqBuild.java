@@ -1,5 +1,9 @@
 package dev.t3craft.hq;
 
+import dev.t3craft.hq.plan.AnchorNames;
+import dev.t3craft.hq.plan.BuildPlan;
+import dev.t3craft.hq.plan.Placement;
+import dev.t3craft.hq.plan.PlanShapes;
 import java.util.ArrayList;
 import java.util.List;
 

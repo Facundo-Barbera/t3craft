@@ -139,7 +139,7 @@ public final class DemoHqSource implements DemoStructureSource {
 				}
 			}
 			// The floor layer is the lowest HQ cell whatever the roster: use the empty HQ to size the lift.
-			int planMinY = dev.t3craft.hq.HqEmptyPlan.of(dev.t3craft.hq.HqStyles.current()).footprint().minY();
+			int planMinY = dev.t3craft.hq.HqEmptyPlan.of(dev.t3craft.hq.style.HqStyles.current()).footprint().minY();
 			int lift = DemoHq.lift(spec.originY(), worldMinY, planMinY);
 			boolean diffable = builtWithThis && previousLift == lift;
 			// feat/hq-void-world: in a void world the HQ stands on its island (grown from the one already built)

@@ -1,4 +1,4 @@
-package dev.t3craft.hq;
+package dev.t3craft.hq.plan;
 
 import java.util.Locale;
 import net.minecraft.core.BlockPos;

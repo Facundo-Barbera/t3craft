@@ -1,13 +1,13 @@
 package dev.t3craft.hq.citadel;
 
-import dev.t3craft.hq.Anchor;
-import dev.t3craft.hq.AnchorNames;
-import dev.t3craft.hq.HqKit;
 import dev.t3craft.hq.HqLayout;
 import dev.t3craft.hq.RingCampusGeometry;
 import dev.t3craft.hq.RingCampusGeometry.Zone;
 import dev.t3craft.hq.RingCampusStyle;
-import dev.t3craft.hq.Workstation;
+import dev.t3craft.hq.plan.Anchor;
+import dev.t3craft.hq.plan.AnchorNames;
+import dev.t3craft.hq.plan.Workstation;
+import dev.t3craft.hq.style.HqKit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;

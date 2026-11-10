@@ -1,10 +1,10 @@
 package dev.t3craft.tools.hqrender;
 
-import dev.t3craft.hq.Anchor;
-import dev.t3craft.hq.Box;
-import dev.t3craft.hq.BuildPlan;
-import dev.t3craft.hq.Placement;
-import dev.t3craft.hq.PlanProbe;
+import dev.t3craft.hq.plan.Anchor;
+import dev.t3craft.hq.plan.Box;
+import dev.t3craft.hq.plan.BuildPlan;
+import dev.t3craft.hq.plan.Placement;
+import dev.t3craft.hq.plan.PlanProbe;
 import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Path;

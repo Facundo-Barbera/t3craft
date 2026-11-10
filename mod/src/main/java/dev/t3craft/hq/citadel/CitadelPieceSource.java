@@ -1,12 +1,12 @@
 package dev.t3craft.hq.citadel;
 
 import dev.t3craft.T3Craft;
-import dev.t3craft.hq.HqKit;
 import dev.t3craft.hq.RingCampusStyle;
 import dev.t3craft.hq.citadel.catalog.Catalog;
 import dev.t3craft.hq.citadel.catalog.Family;
 import dev.t3craft.hq.citadel.catalog.Plot;
 import dev.t3craft.hq.citadel.catalog.Variant;
+import dev.t3craft.hq.style.HqKit;
 import dev.t3craft.mapgen.MapLayout;
 import dev.t3craft.mapgen.Piece;
 import dev.t3craft.mapgen.PieceSource;

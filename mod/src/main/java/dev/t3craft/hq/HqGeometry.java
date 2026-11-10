@@ -1,5 +1,7 @@
 package dev.t3craft.hq;
 
+import dev.t3craft.hq.plan.AnchorNames;
+import dev.t3craft.hq.plan.Box;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.core.BlockPos;
@@ -27,25 +29,25 @@ import net.minecraft.core.Direction;
 public final class HqGeometry {
 	static final int TOP = 10;
 	/** Hub half size: walls at |x| = 8, |z| = 8. */
-	static final int HUB = 8;
-	static final int PORTICO_X = 4;
-	static final int PORTICO_Z1 = HUB + 1;
-	static final int PORTICO_Z2 = HUB + 5;
+	public static final int HUB = 8;
+	public static final int PORTICO_X = 4;
+	public static final int PORTICO_Z1 = HUB + 1;
+	public static final int PORTICO_Z2 = HUB + 5;
 	/** Spine walls at |x| = 3. */
-	static final int SPINE = 3;
+	public static final int SPINE = 3;
 	/** Row pitch along the spine (13 cells of wing + 1 garden strip). */
-	static final int ROW = 14;
+	public static final int ROW = 14;
 	/** Wing walls at v = 0 and v = WING_WALL, garden at v = ROW - 1. */
-	static final int WING_WALL = 12;
+	public static final int WING_WALL = 12;
 	/** Cells per desk segment of a wing; public for the client's NPC anchor adapter. */
 	public static final int SEGMENT = 4;
-	static final int DOOR_V1 = 5;
-	static final int DOOR_V2 = 7;
+	public static final int DOOR_V1 = 5;
+	public static final int DOOR_V2 = 7;
 	/** Desk modules span y = 0..DESK_TOP (below the ceiling). */
 	static final int DESK_TOP = 4;
 	/** The board's plane (its blocks sit at this z, its face looks south). */
-	static final int BOARD_Z = -4;
-	static final int BOARD_HALF = 3;
+	public static final int BOARD_Z = -4;
+	public static final int BOARD_HALF = 3;
 
 	/**
 	 * The "Archived" shelf: the hub's south wall, both sides of the entrance ({@code z = SHELF_Z},
@@ -67,10 +69,10 @@ public final class HqGeometry {
 	 * archived thread (feat/archive-terminal); there are no per-thread shelves.
 	 */
 	static final int ARCHIVE_Z = HUB - 1;
-	static final BlockPos ARCHIVE_TERMINAL = new BlockPos(5, 1, ARCHIVE_Z);
+	public static final BlockPos ARCHIVE_TERMINAL = new BlockPos(5, 1, ARCHIVE_Z);
 	static final BlockPos ARCHIVE_STAND = new BlockPos(5, 1, ARCHIVE_Z - 1);
 
-	static Box archiveNook() {
+	public static Box archiveNook() {
 		return new Box(4, 1, ARCHIVE_Z, 6, 4, ARCHIVE_Z);
 	}
 
@@ -187,7 +189,7 @@ public final class HqGeometry {
 	}
 
 	/** Northmost z of spine row {@code r} (wing {@code v = 0}). */
-	static int rowNorth(int r) {
+	public static int rowNorth(int r) {
 		return rowSouth(r) - (ROW - 1);
 	}
 
@@ -214,12 +216,12 @@ public final class HqGeometry {
 	}
 
 	/** World x of wing column {@code u}. */
-	static int wx(int wingIndex, int u) {
+	public static int wx(int wingIndex, int u) {
 		return side(wingIndex) * (SPINE + 1 + u);
 	}
 
 	/** World z of wing line {@code v}. */
-	static int wz(int wingIndex, int v) {
+	public static int wz(int wingIndex, int v) {
 		return rowNorth(row(wingIndex)) + v;
 	}
 
@@ -232,7 +234,7 @@ public final class HqGeometry {
 		return wingBox(wingIndex, 0, 0, 0, ROW - 1, 0, TOP);
 	}
 
-	static int segmentU(int k) {
+	public static int segmentU(int k) {
 		return 1 + SEGMENT * k;
 	}
 

@@ -2,7 +2,7 @@ package dev.t3craft.hq.construct;
 
 import dev.t3craft.hq.HqFootprints;
 import dev.t3craft.hq.HqSite;
-import dev.t3craft.hq.Placement;
+import dev.t3craft.hq.plan.Placement;
 import dev.t3craft.site.CellPlan;
 import dev.t3craft.site.Rect;
 import dev.t3craft.site.SiteFrame;
@@ -49,14 +49,14 @@ public final class HqSiteFrame {
 
 	/**
 	 * The style the survival site builds (feat/hq-layouts): it asks the active layout
-	 * ({@link dev.t3craft.hq.HqStyles#current()}); a layout with its own ground plan (the citadel)
+	 * ({@link dev.t3craft.hq.style.HqStyles#current()}); a layout with its own ground plan (the citadel)
 	 * is far beyond the site's {@link SiteRequest#MAX_ENVELOPE} and its
 	 * one-slot-per-wing frame, so the site keeps the classic spine layout for those. The HQ world
 	 * (demo) builds every layout.
 	 */
-	public static dev.t3craft.hq.HqStyle style() {
-		dev.t3craft.hq.HqStyle s = dev.t3craft.hq.HqStyles.current();
-		return s.ownLayout() ? dev.t3craft.hq.HqStyles.forLayout(dev.t3craft.hq.layout.HqLayouts.CLASSIC) : s;
+	public static dev.t3craft.hq.style.HqStyle style() {
+		dev.t3craft.hq.style.HqStyle s = dev.t3craft.hq.style.HqStyles.current();
+		return s.ownLayout() ? dev.t3craft.hq.style.HqStyles.forLayout(dev.t3craft.hq.layout.HqLayouts.CLASSIC) : s;
 	}
 
 	/** What the HQ asks the site for: the base (hub with the "Archived" shelf, portico), room for the wings, no depth. */
@@ -129,7 +129,7 @@ public final class HqSiteFrame {
 	 * out: site plans carry states only, and {@link HqConstruction} loads it (monitor and lamp
 	 * bindings, sign text) in place right after the expansion is built.
 	 */
-	public static dev.t3craft.build.BuildPlan sitePlan(dev.t3craft.hq.BuildPlan plan, String moduleId) {
+	public static dev.t3craft.build.BuildPlan sitePlan(dev.t3craft.hq.plan.BuildPlan plan, String moduleId) {
 		List<dev.t3craft.build.Placement> out = new ArrayList<>();
 		for (Placement p : plan.placements()) {
 			if (!builds(p.rel()) || !moduleId.equals(owner(p.rel().getX(), p.rel().getZ()))) {

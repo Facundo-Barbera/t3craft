@@ -3,8 +3,8 @@ package dev.t3craft.hq.citadel.catalog;
 import static dev.t3craft.hq.citadel.CitadelCanvas.AIR;
 import static dev.t3craft.hq.citadel.CitadelCanvas.stairs;
 
-import dev.t3craft.hq.PlanProbe;
 import dev.t3craft.hq.citadel.CitadelCanvas;
+import dev.t3craft.hq.plan.PlanProbe;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.function.LongFunction;

@@ -1,9 +1,9 @@
 package dev.t3craft.hq.citadel;
 
-import dev.t3craft.hq.Anchor;
-import dev.t3craft.hq.AnchorNames;
 import dev.t3craft.hq.HqGeometry;
 import dev.t3craft.hq.RingCampusGeometry;
+import dev.t3craft.hq.plan.Anchor;
+import dev.t3craft.hq.plan.AnchorNames;
 import java.util.HashMap;
 import java.util.Map;
 import net.minecraft.nbt.CompoundTag;

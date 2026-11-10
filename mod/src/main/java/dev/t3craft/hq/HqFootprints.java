@@ -1,5 +1,7 @@
 package dev.t3craft.hq;
 
+import dev.t3craft.hq.plan.Box;
+
 /**
  * Public view of the HQ's fixed geometry for whoever places it on real terrain
  * ({@code dev.t3craft.hq.construct}). Splits the ground plan into non-overlapping rectangles, one

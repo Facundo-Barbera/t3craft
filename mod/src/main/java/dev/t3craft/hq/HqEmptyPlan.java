@@ -2,6 +2,9 @@ package dev.t3craft.hq;
 
 import dev.t3craft.build.Offload;
 import dev.t3craft.debug.PerfStats;
+import dev.t3craft.hq.plan.BuildPlan;
+import dev.t3craft.hq.style.HqKit;
+import dev.t3craft.hq.style.HqStyle;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;

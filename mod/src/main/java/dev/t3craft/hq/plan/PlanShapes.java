@@ -1,4 +1,4 @@
-package dev.t3craft.hq;
+package dev.t3craft.hq.plan;
 
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;

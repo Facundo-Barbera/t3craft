@@ -8,7 +8,7 @@ Only `/t3craft debug hq-preview` writes blocks, and only in a singleplayer super
 roster (env, project, thread, settled)
   └─ HqInput.fromRoster / fromNpcs        canonical: sorted, de-duplicated, order-independent
        └─ HqLayout.allocate(in, previous)  modules, desk seats, shelf slots     (plan(in) = no history)
-            └─ HqGenerator.generate(layout) → hq.BuildPlan   placements + anchors + workstations + groups
+            └─ HqGenerator.generate(layout) → hq.plan.BuildPlan   placements + anchors + workstations + groups
                  ├─ HqPlans.byGroup / expansion / forRoster → dev.t3craft.build.BuildPlan (layered)
                  ├─ HqSite(origin, rotation)  world cells/anchors, same transform as BuildJob
                  └─ HqAnchorSource(plan, site) → npc.behavior.AnchorSource
@@ -132,7 +132,7 @@ random histories. Rotate the box with `HqSite` for world coordinates.
 
 ## Output for builders
 
-`hq.BuildPlan` (placements in module order, with every cell listed, air included) is converted with
+`hq.plan.BuildPlan` (placements in module order, with every cell listed, air included) is converted with
 `HqBuild` / `HqPlans` into `dev.t3craft.build.BuildPlan`:
 
 ```java

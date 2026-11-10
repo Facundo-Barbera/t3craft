@@ -1,5 +1,7 @@
-package dev.t3craft.hq;
+package dev.t3craft.hq.style;
 
+import dev.t3craft.hq.SignTags;
+import dev.t3craft.hq.plan.Palette;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.DyeColor;

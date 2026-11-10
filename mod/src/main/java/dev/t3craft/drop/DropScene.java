@@ -1,8 +1,8 @@
 package dev.t3craft.drop;
 
-import dev.t3craft.hq.Placement;
 import dev.t3craft.hq.SignTags;
 import dev.t3craft.hq.pack.RoomTemplate;
+import dev.t3craft.hq.plan.Placement;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;

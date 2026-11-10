@@ -1,5 +1,7 @@
-package dev.t3craft.hq;
+package dev.t3craft.hq.plan;
 
+import dev.t3craft.hq.HqLayout;
+import dev.t3craft.hq.style.HqStyle;
 import net.minecraft.core.Direction;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.block.Block;
@@ -17,7 +19,7 @@ import net.minecraft.world.level.block.state.properties.SlabType;
  * <p>Look and material language inspired by AgentCraft's "Warm Studio" HQ
  * (https://github.com/blendi-remade/agentcraft, MIT); no code copied, see THIRD_PARTY_NOTICES.md.
  */
-final class Palette {
+public final class Palette {
 	final BlockState air = Blocks.AIR.defaultBlockState();
 	final BlockState grass = Blocks.GRASS_BLOCK.defaultBlockState();
 	final BlockState shortGrass = Blocks.SHORT_GRASS.defaultBlockState();

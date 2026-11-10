@@ -1,6 +1,6 @@
 package dev.t3craft.blocks;
 
-import dev.t3craft.hq.HqKit;
+import dev.t3craft.hq.style.HqKit;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;

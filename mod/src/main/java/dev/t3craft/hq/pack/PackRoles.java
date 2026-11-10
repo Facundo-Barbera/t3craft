@@ -1,7 +1,7 @@
 package dev.t3craft.hq.pack;
 
-import dev.t3craft.hq.HqStyle;
 import dev.t3craft.hq.PackDefaults;
+import dev.t3craft.hq.style.HqStyle;
 import java.util.ArrayList;
 import java.util.List;
 

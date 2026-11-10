@@ -1,5 +1,7 @@
-package dev.t3craft.hq;
+package dev.t3craft.hq.plan;
 
+import dev.t3craft.hq.HqFixtures;
+import dev.t3craft.hq.HqLayout;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
