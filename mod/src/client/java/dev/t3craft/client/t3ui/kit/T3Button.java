@@ -6,18 +6,27 @@ import dev.t3craft.client.chat.MouseButtons;
 import dev.t3craft.client.chat.Rect;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A push button. {@link Style#PRIMARY} is the accent fill (the main action), {@link Style#DANGER} the error
  * fill (destructive), {@link Style#GHOST} has no box until hovered (toolbars). The default style is the
  * pill of {@code T3Screen}: raised highlight, 1 px rule, accent on hover.
+ *
+ * <p>It can carry a {@link T3Icon} (drawn in the same colour as the label, so every style and state tints it
+ * alike): icon + label, or an icon alone when the label is {@code null} or empty (give it a tooltip with
+ * {@link #setTooltip}). For a borderless icon button in a toolbar or the sidebar see {@link T3IconButton}.
  */
 public final class T3Button extends T3Control {
 	public enum Style {
 		DEFAULT, PRIMARY, DANGER, GHOST
 	}
 
+	/** Space between the icon and the label. */
+	private static final int ICON_GAP = 4;
+
 	private String label;
+	private @Nullable T3Icon icon;
 	private Style style;
 	private final Runnable action;
 	private boolean emphasised;
@@ -32,8 +41,33 @@ public final class T3Button extends T3Control {
 		this.action = action;
 	}
 
+	/** An icon button; with a {@code label} (may be null) the icon goes before it. */
+	public T3Button(T3Icon icon, @Nullable String label, Runnable action) {
+		this(icon, label, Style.DEFAULT, action);
+	}
+
+	public T3Button(T3Icon icon, @Nullable String label, Style style, Runnable action) {
+		this(label == null ? "" : label, style, action);
+		this.icon = icon;
+	}
+
 	public String label() {
 		return label;
+	}
+
+	public @Nullable T3Icon icon() {
+		return icon;
+	}
+
+	public T3Button setIcon(@Nullable T3Icon icon) {
+		this.icon = icon;
+		return this;
+	}
+
+	/** Width that fits the icon and the label with 6 px on each side. */
+	public int preferredWidth(Font font) {
+		int content = (icon == null ? 0 : T3Icon.SIZE) + (icon != null && !label.isEmpty() ? ICON_GAP : 0) + (label.isEmpty() ? 0 : font.width(label));
+		return content + 12;
 	}
 
 	public T3Button setLabel(String label) {
@@ -103,7 +137,16 @@ public final class T3Button extends T3Control {
 		if ((edge >>> 24) != 0) {
 			ChatDraw.outline(g, r.x(), r.y(), r.w(), r.h(), edge);
 		}
-		T3Draw.centered(g, font, t, label, r.x(), r.y(), r.w(), r.h(), text);
+		if (icon == null) {
+			T3Draw.centered(g, font, t, label, r.x(), r.y(), r.w(), r.h(), text);
+		} else if (label.isEmpty()) {
+			T3Icon.draw(g, t, icon, r.x() + (r.w() - T3Icon.SIZE) / 2, r.y() + (r.h() - T3Icon.SIZE) / 2, T3Icon.SIZE, text);
+		} else {
+			String shown = ChatDraw.clip(font, label, r.w() - 4 - T3Icon.SIZE - ICON_GAP);
+			int x = r.x() + (r.w() - (T3Icon.SIZE + ICON_GAP + font.width(shown))) / 2;
+			T3Icon.draw(g, t, icon, x, r.y() + (r.h() - T3Icon.SIZE) / 2, T3Icon.SIZE, text);
+			g.text(font, shown, x + T3Icon.SIZE + ICON_GAP, r.y() + (r.h() - 8) / 2, text, t.shadow());
+		}
 	}
 
 	@Override
