@@ -129,6 +129,7 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 		dev.t3craft.client.t3ui.T3UiKeys.register(); // #39: the T3 screen's right panel toggle (rebindable, default U)
 		dev.t3craft.client.search.SearchClient.register(this); // feat/search: /t3craft search
 		dev.t3craft.client.queue.QueueClient.register(this); // feat/op-queue: /t3craft queue, QueueScreen
+		dev.t3craft.client.plan.PlanClient.register(this); // #51: /t3craft plan, the "Open plan" key, PlanScreen
 		dev.t3craft.client.hq.layout.HqLayoutPackWatcher.register(); // feat/hq-layout-packs: config/t3craft/hq-layouts, live
 		dev.t3craft.client.chat.UiStyleReloader.register(); // #12: gui/ui-style.json, reloaded by F3+T
 		dev.t3craft.client.drop.DropClient.register(); // feat/ingame-preview-drop: config/t3craft/preview-drop, showroom + portal in the HQ world
