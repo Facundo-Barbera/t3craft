@@ -3,6 +3,7 @@
 package dev.t3craft.client.blocks;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import dev.t3craft.client.chat.ChatTheme;
 import dev.t3craft.client.chat.ThreadRow;
 import dev.t3craft.client.workstation.AgeFormat;
 import dev.t3craft.client.workstation.StationStatus;
@@ -158,17 +159,40 @@ final class StatusScreen {
 	record Panel(Summary src, String key, List<Rect> rects, List<Text> texts) {
 	}
 
+	/**
+	 * The block's display options as the layout needs them (T10, {@link MonitorOptions}): {@code textScale} multiplies
+	 * the largest size the numbers and labels may take (still limited to what fits their cell), {@code accent} (ARGB, 0 =
+	 * the default colours) replaces the colours of the PRS TO REVIEW and ACTIVE PROJECTS cells. The tiles keep their
+	 * state colours: those are the meaning of the screen.
+	 */
+	record Style(float textScale, int accent) {
+		static final Style DEFAULT = new Style(1f, 0);
+
+		Style {
+			textScale = textScale <= 0 ? 1f : Math.max(0.5f, Math.min(2f, textScale));
+		}
+
+		/** The style of a screen with {@code o}; the monitor's {@code textSize} density is the inverse of the text scale. */
+		static Style of(MonitorOptions o, ChatTheme theme) {
+			return o.isDefault() ? DEFAULT : new Style(1f / o.textSize().density, BlockAccent.argb(o.accent(), theme));
+		}
+
+		String key() {
+			return textScale + ":" + Integer.toHexString(accent);
+		}
+	}
+
 	private final Map<String, Panel> panels = new HashMap<>();
 
-	/** The layout of {@code s} on a screen of layout {@code l}, rebuilt only when the summary or the size changed. */
-	Panel panel(Font font, Summary s, MonitorLod.Layout l) {
-		String key = l.extent().width() + "x" + l.extent().height();
+	/** The layout of {@code s} on a screen of layout {@code l}, rebuilt only when the summary, the size or the style changed. */
+	Panel panel(Font font, Summary s, MonitorLod.Layout l, Style style) {
+		String key = l.extent().width() + "x" + l.extent().height() + "|" + style.key();
 		Panel p = panels.get(key);
 		if (p == null || !p.src().equals(s)) {
 			if (panels.size() > MAX_PANELS) {
 				panels.clear();
 			}
-			p = build(font, s, l, key);
+			p = build(font, s, l, key, style);
 			panels.put(key, p);
 		}
 		return p;
@@ -179,7 +203,8 @@ final class StatusScreen {
 	}
 
 	/** Lays {@code s} out in the glass of {@code l} (face pixels, origin at the screen's top left). Package-private for the mock. */
-	static Panel build(Font font, Summary s, MonitorLod.Layout l, String key) {
+	static Panel build(Font font, Summary s, MonitorLod.Layout l, String key, Style style) {
+		float ts = style.textScale();
 		List<Rect> rects = new ArrayList<>();
 		List<Text> texts = new ArrayList<>();
 		float k = l.ppb() / 64f;
@@ -194,7 +219,7 @@ final class StatusScreen {
 		for (int i = 0; i < TILES.size(); i++) {
 			StationStatus st = TILES.get(i);
 			float tx = x0 + i * (tw + gap);
-			tile(font, rects, texts, st, s.count(st), tx, y0, tx + tw, y0 + tilesH, k);
+			tile(font, rects, texts, st, s.count(st), tx, y0, tx + tw, y0 + tilesH, k, ts);
 		}
 		float sy0 = y0 + tilesH + gap;
 		float prW = Math.round((x1 - x0) * 0.22f);
@@ -203,16 +228,19 @@ final class StatusScreen {
 		float pjX = prX + prW + gap;
 		float oldX = pjX + pjW + gap;
 		boolean prsHere = s.prs() > 0;
-		cell(font, rects, texts, prX, sy0, prX + prW, y1, k, prsHere ? PR_COLOR : ZERO_NUMBER, false, "PRS TO REVIEW", MUTED,
-				Integer.toString(s.prs()), prsHere ? PR_COLOR : ZERO_NUMBER);
+		int prColor = style.accent() != 0 ? style.accent() : PR_COLOR;
+		int projectColor = style.accent() != 0 ? style.accent() : PROJECT_COLOR;
+		cell(font, rects, texts, prX, sy0, prX + prW, y1, k, ts, prsHere ? prColor : ZERO_NUMBER, false, "PRS TO REVIEW", MUTED,
+				Integer.toString(s.prs()), prsHere ? prColor : ZERO_NUMBER);
 		boolean projHere = s.projectsActive() > 0;
-		cell(font, rects, texts, pjX, sy0, pjX + pjW, y1, k, projHere ? PROJECT_COLOR : ZERO_NUMBER, false, "ACTIVE PROJECTS", MUTED,
-				s.projectsActive() + "/" + s.projectsTotal(), projHere ? PROJECT_COLOR : ZERO_NUMBER);
-		oldest(font, rects, texts, s, oldX, sy0, x1, y1, k);
+		cell(font, rects, texts, pjX, sy0, pjX + pjW, y1, k, ts, projHere ? projectColor : ZERO_NUMBER, false, "ACTIVE PROJECTS", MUTED,
+				s.projectsActive() + "/" + s.projectsTotal(), projHere ? projectColor : ZERO_NUMBER);
+		oldest(font, rects, texts, s, oldX, sy0, x1, y1, k, ts);
 		return new Panel(s, key, List.copyOf(rects), List.copyOf(texts));
 	}
 
-	private static void tile(Font font, List<Rect> rects, List<Text> texts, StationStatus st, int count, float x0, float y0, float x1, float y1, float k) {
+	private static void tile(Font font, List<Rect> rects, List<Text> texts, StationStatus st, int count, float x0, float y0, float x1, float y1, float k,
+			float ts) {
 		boolean on = count > 0;
 		int color = 0xFF000000 | st.color;
 		boolean pulse = on && st == StationStatus.ATTENTION;
@@ -222,8 +250,8 @@ final class StatusScreen {
 		String num = Integer.toString(count);
 		String label = st.word;
 		float w = x1 - x0 - 8 * k;
-		float labelScale = Math.max(0.75f, Math.min(1.75f * k, w / Math.max(1, font.width(label))));
-		float numScale = Math.min(6f * k, w / Math.max(1, font.width(num)));
+		float labelScale = Math.max(0.75f, Math.min(1.75f * k * ts, w / Math.max(1, font.width(label))));
+		float numScale = Math.min(6f * k * ts, w / Math.max(1, font.width(num)));
 		float areaTop = y0 + STRIPE * k;
 		float areaH = y1 - areaTop;
 		float numH = 8 * numScale;
@@ -242,16 +270,16 @@ final class StatusScreen {
 	}
 
 	/** A cell of the strip: an accent bar on the left, a small label and a big value. */
-	private static void cell(Font font, List<Rect> rects, List<Text> texts, float x0, float y0, float x1, float y1, float k, int accent, boolean pulse,
-			String label, int labelColor, String value, int valueColor) {
+	private static void cell(Font font, List<Rect> rects, List<Text> texts, float x0, float y0, float x1, float y1, float k, float ts, int accent,
+			boolean pulse, String label, int labelColor, String value, int valueColor) {
 		rects.add(new Rect(x0, y0, x1, y1, 1, CELL, false));
 		rects.add(new Rect(x0, y0, x0 + 4 * k, y1, 2, accent, pulse));
 		float left = x0 + 4 * k + 7 * k;
 		float w = x1 - left - 4 * k;
-		float labelScale = Math.max(0.75f, Math.min(1.25f * k, w / Math.max(1, font.width(label))));
+		float labelScale = Math.max(0.75f, Math.min(1.25f * k * ts, w / Math.max(1, font.width(label))));
 		float labelH = 8 * labelScale;
 		float h = y1 - y0;
-		float valueScale = Math.max(1f, Math.min(4f * k, Math.min((h - labelH - 14 * k) / 8f, w / Math.max(1, font.width(value)))));
+		float valueScale = Math.max(1f, Math.min(4f * k * ts, Math.min((h - labelH - 14 * k) / 8f, w / Math.max(1, font.width(value)))));
 		float block = labelH + 4 * k + 8 * valueScale;
 		float top = y0 + (h - block) / 2f;
 		texts.add(new Text(MonitorRenderer.plain(label), left, top, labelScale, labelColor, CELL, false));
@@ -259,7 +287,7 @@ final class StatusScreen {
 	}
 
 	/** The widest cell: who has waited longest for the player (or that nobody is waiting). */
-	private static void oldest(Font font, List<Rect> rects, List<Text> texts, Summary s, float x0, float y0, float x1, float y1, float k) {
+	private static void oldest(Font font, List<Rect> rects, List<Text> texts, Summary s, float x0, float y0, float x1, float y1, float k, float ts) {
 		boolean any = s.oldestTitle() != null;
 		int accent = any ? 0xFF000000 | StationStatus.ATTENTION.color : s.total() == 0 ? ZERO_NUMBER : 0xFF000000 | StationStatus.DONE.color;
 		rects.add(new Rect(x0, y0, x1, y1, 1, CELL, false));
@@ -267,10 +295,10 @@ final class StatusScreen {
 		float left = x0 + 4 * k + 7 * k;
 		float w = x1 - left - 4 * k;
 		String label = any ? (s.oldestAge() == null ? "OLDEST WAITING" : "OLDEST WAITING · " + s.oldestAge()) : "WAITING FOR YOU";
-		float labelScale = Math.max(0.75f, Math.min(1.25f * k, w / Math.max(1, font.width(label))));
+		float labelScale = Math.max(0.75f, Math.min(1.25f * k * ts, w / Math.max(1, font.width(label))));
 		String body = any ? s.oldestTitle() : s.total() == 0 ? "NO THREADS" : "NOBODY";
 		float h = y1 - y0;
-		float bodyScale = Math.max(1f, Math.min(2f * k, (h - 8 * labelScale - 14 * k) / 8f));
+		float bodyScale = Math.max(1f, Math.min(2f * k * ts, (h - 8 * labelScale - 14 * k) / 8f));
 		String shown = MonitorRenderer.ellipsize(font, body, (int) (w / bodyScale));
 		float block = 8 * labelScale + 4 * k + 8 * bodyScale;
 		float top = y0 + (h - block) / 2f;

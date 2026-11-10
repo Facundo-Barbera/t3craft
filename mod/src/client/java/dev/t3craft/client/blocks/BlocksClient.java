@@ -26,6 +26,7 @@ import dev.t3craft.blocks.MonitorBlockEntity;
 import dev.t3craft.blocks.ScreenRect;
 import dev.t3craft.blocks.T3Blocks;
 import dev.t3craft.client.T3CraftClient;
+import dev.t3craft.client.blocks.config.BindingChoices;
 import dev.t3craft.client.blocks.config.BlockConfigPages;
 import dev.t3craft.client.blocks.config.BlockConfigPanel;
 import dev.t3craft.client.chat.ChatScreens;
@@ -55,6 +56,7 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.server.IntegratedServer;
+import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.particles.DustParticleOptions;
@@ -334,6 +336,18 @@ public final class BlocksClient implements ClientModInitializer {
 		}
 		ScreenRect r = MonitorBlock.extent(be.getLevel(), be.getBlockPos(), state);
 		return resolve(r.origin(), MonitorBlock.screenBinding(be.getLevel(), r));
+	}
+
+	/**
+	 * The display options of the whole screen of the monitor {@code be}: a merged screen takes the first cell's that has
+	 * any ({@link MonitorBlock#screenOptions}), so a monitor added to a wall later draws with the wall's options.
+	 */
+	Map<String, String> screenOptions(MonitorBlockEntity be) {
+		var state = be.getBlockState();
+		if (be.getLevel() == null || !MonitorBlock.isConnected(state)) {
+			return be.options();
+		}
+		return MonitorBlock.screenOptions(be.getLevel(), MonitorBlock.extent(be.getLevel(), be.getBlockPos(), state));
 	}
 
 	ScreenExtent extentOf(dev.t3craft.blocks.MonitorBlockEntity be) {
@@ -709,9 +723,25 @@ public final class BlocksClient implements ClientModInitializer {
 					return 1;
 				})
 				.then(literal("link").then(argument("thread", StringArgumentType.greedyString())
+						.suggests((c, b) -> SharedSuggestionProvider.suggest(linkSuggestions(BindingChoices.live()), b))
 						.executes(c -> link(c, linkTarget(StringArgumentType.getString(c, "thread"))))))
 				.then(literal("unlink").executes(c -> link(c, Binding.NONE)))
 				.then(literal("auto").executes(this::auto))));
+	}
+
+	/**
+	 * What {@code /t3craft blocks link} offers while typing (T10): {@code status} and the keys of the threads, projects
+	 * and environments the client knows, the same ones the config page's picker lists ({@link BindingChoices}).
+	 */
+	static List<String> linkSuggestions(BindingChoices choices) {
+		List<String> out = new ArrayList<>();
+		out.add("status");
+		for (Binding.Kind kind : List.of(Binding.Kind.THREAD, Binding.Kind.PROJECT, Binding.Kind.ENV)) {
+			for (BindingChoices.Choice ch : choices.of(kind, "")) {
+				out.add(ch.binding().wire());
+			}
+		}
+		return out;
 	}
 
 	/** {@code project:<key>}, {@code env:<id>} or {@code thread:<key>} as typed; anything else is a thread key. */
@@ -737,7 +767,7 @@ public final class BlocksClient implements ClientModInitializer {
 		}
 		HitResult hit = mc.hitResult;
 		if (!(hit instanceof BlockHitResult bh) || hit.getType() != HitResult.Type.BLOCK
-				|| !(mc.level.getBlockEntity(bh.getBlockPos()) instanceof BoundBlockEntity)) {
+				|| !(mc.level.getBlockEntity(bh.getBlockPos()) instanceof BoundBlockEntity target && target.bindable())) {
 			c.getSource().sendError(prefix().append(Component.translatable("t3craft.blocks.look_at_block")));
 			return 0;
 		}

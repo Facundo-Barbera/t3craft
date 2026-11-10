@@ -51,7 +51,17 @@ public final class WorldBlockTarget implements BlockConfigTarget {
 				}
 			}
 		}
-		return new BlockConfig(b, be.manual(), be.options());
+		// the same for the options (a monitor added to a wall later has none of its own: the wall's are the page's, T10)
+		Map<String, String> options = be.options();
+		if (options.isEmpty()) {
+			for (BlockPos p : section.cells(level, pos)) {
+				if (level.getBlockEntity(p) instanceof BoundBlockEntity o && !o.options().isEmpty()) {
+					options = o.options();
+					break;
+				}
+			}
+		}
+		return new BlockConfig(b, be.manual(), options);
 	}
 
 	@Override
