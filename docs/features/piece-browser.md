@@ -37,14 +37,14 @@ so that trying pieces and variants is clicking instead of typing commands. Packa
 **Filters** (all combine; the folder counts follow the other filters):
 - **Search**: every word must appear in the piece's id, name, folder or tags (`cherry lamp`). Case and accents are folded
   like the sidebar's search (`SidebarModel.fold`, called, not copied): `cafe` finds "Café".
-- **Folder**: the column on the left (a select in the header when the window is narrower than ~430 GUI px). A folder includes its sub-folders.
+- **Folder**: the column on the left (narrower than ~430 px: the Folder select of the Filters rows, and the breadcrumbs). A folder includes its sub-folders.
 - **Tag**: the most common tags of the catalog with their counts.
 - **Size**: small (up to 6 blocks on the larger side), medium (7-12), large (13+).
 - **Favorites only**, and **Sort**: folder + name (default), name, size small first, size large first.
 - "Clear filters" appears while any filter is on.
 
-**Keys**: Up / Down move through the list from anywhere (also while typing in the search box), Enter in the search box or the
-seed box asks for the preview, Esc goes back / closes, the wheel scrolls the list under the pointer.
+**Keys**: see "Keys" under "Narrow layout (#50)" (Up / Down, Home / End, Page Up / Down, Enter, F, Right / Left, Esc); the wheel
+scrolls the list under the pointer.
 
 **Remembered** for the whole session (`PieceBrowserState`): filters, selected piece, facing, size choice, custom size, seed. Close and reopen
 and you are where you were. **Favorites** are kept on disk in `config/t3craft/piece-favorites.json` (a JSON array of ids).
@@ -171,11 +171,80 @@ navigate, and things are missing".
 
 What #50 changed is in "Narrow layout (#50)" below and in `docs/features/t3-ui.md` ("Right panel pages").
 
+## Narrow layout (#50)
+
+Under ~430 px of page width (the main screen's right panel, which is 180-640 px wide; a high GUI scale) the browser has
+**two levels**. The wide layout (three columns) is unchanged, except for a reload button at the end of its second row.
+
+```
+List level                                Options level (a sub-page)
++ [Pieces | Queue]          [max] [x] +   + Timber cottage        [max] [< Back] +
+| (o)[ search ............ ] [= 2]    |   | [^][v]  3 of 21                      |
+| All pieces > House > Japanese 3 [r] |   | Timber cottage                       |
+| -- Filters on: --                   |   | house_timber_cottage                 |
+| [Folder v      ] [Sort v        ]   |   | House / Timber  |  medium            |
+| [Tag v         ] [Size v        ]   |   | Builds 9-15 x 9-15, h 10+            |
+| [Favorites only (o)    ] [Clear]    |   | Faces      [South v              ]   |
+| +--------------------------------+  |   | Plot size  [Middle of its range v]   |
+| | Timber cottage           * >   |  |   | Seed [1 .......] [-][+][shuffle]     |
+| | Timber | 9-15 x 9-15, h 10+    |  |   | [x] Stay here after asking           |
+| | ...                            |  |   |                                      |
+| +--------------------------------+  |   |                                      |
+| [eye Preview] [copy] [*]  [> Opts]  |   | [eye Preview] [copy] [*]             |
+| status line                         |   | status line                          |
++-------------------------------------+   +--------------------------------------+
+```
+
+- **Header** (pinned): search box and the **Filters** button (`sliders-horizontal`; accent when the filters are unfolded;
+  it says how many are on: "Filters (2)", or just "2" under 200 px). Under them the **breadcrumbs** "All pieces > House >
+  Japanese" (every folder but the current one is a link; when the path does not fit, the first folders fold into "...",
+  and the tooltip gives the whole path), the count ("12 of 68") and **reload** (`refresh-cw`, re-reads the catalog:
+  `PieceCatalog.refresh()`).
+- **Filters** unfold in the body above the list, two per row: Folder | Sort, Tag | Size, Favorites only | Clear. Every
+  select has a tooltip with its whole value. Folded or not is remembered for the session.
+- **List**: takes all the height left (at least three rows, then the page scrolls). Each row: name, folder and size,
+  the favorite star and a `chevron-right` that opens the piece's options. A clipped name is in the row's tooltip. With
+  no match and filters on, a "Clear filters" button sits in the empty list.
+- **Options level**: a sub-page of the browser (`PieceBrowserPanel.Detail`). The host's header shows the piece's name and
+  "Back"; its own header has previous / next piece buttons and "3 of 21". Same content as the wide layout's right
+  column. It goes back by itself when the page becomes wide again (the wide layout shows that column) or the piece
+  leaves the catalog.
+- **Footer** at both levels: **Preview** (always labelled, primary), Copy and Favorite (icons with tooltips), and on the
+  list level **Options** at the right end (labelled when it fits). "Preview in game" is one click away and never needs
+  a scroll. The status line stays under them.
+- Opening the options: the row's chevron, a double click on a row, the Options button or Right.
+
+### Keys (both layouts unless marked)
+
+| key | does |
+|---|---|
+| Up / Down | previous / next piece, from anywhere (also while typing in the search box); not while a select or the folder column has the keyboard (they use the arrows) |
+| Home / End, Page Up / Page Down | first / last piece, a page up / down (not while typing) |
+| Enter | on the list: preview the piece; in the search or seed box: preview the selected piece; on a select: open it |
+| F | flip the selected piece's favorite (not while typing) |
+| Right (narrow) | open the selected piece's options |
+| Left, Esc (options level) | back to the list |
+| Esc (list) | close an open select, else close the page / panel |
+| Tab / Shift+Tab | walk the controls; the focused one has the brass ring |
+
+The list's own cursor follows the selection, so there is one highlight. The selection, the list's scroll and the
+filters survive a resize; crossing the narrow threshold brings the selected row back into view.
+
+## Structures (#49) in the page
+
+A structure (`PieceEntry.parametric()` false; folder **Structures**, listed first in the folder column and, with the
+default sort, first in "All pieces"):
+- rows, tooltips and the options say **"Size W x D x H"** (its real size) instead of "Builds 9-15 x 9-15, h 10+";
+- the options show a note ("Fixed structure: built at its own size and facing; plot size and seed do not apply") instead
+  of Faces, Plot size (and its footprint line, capped at 24) and Seed; "Stay here after asking" stays;
+- Preview and Copy always send `/t3craft piece show <id> mid <front> <seed>` (the game ignores the three arguments), so a
+  bad custom size or seed left from another piece never blocks them.
+
 ## Code map
 
 | class | what |
 |---|---|
-| `PieceBrowserPanel` | the kit page (`T3Panel`): header filters, three columns, footer actions |
+| `PieceBrowserPanel` | the kit page (`T3Panel`): header filters, three columns, footer actions; narrow: two levels, `Detail` sub-page, `Crumbs`, `KeyNav` (#50) |
 | `PieceBrowserScreen` | the page as a screen (`T3PanelScreen`, wider frame) |
 | `PieceBrowserState` | session state + favorites file |
 | `PieceEntry`, `PieceCatalogSource`, `PieceCatalog`, `CodePieceSource`, `StructurePieceSource` | the catalog side |
@@ -193,11 +262,6 @@ Kit additions this needed: `T3List.ensureVisible` / `scrollToTop`, `T3Panel.pinF
 - Preview from the HQ world builds the piece on the stage; from another world the chat says the stage lives in the HQ world.
 - Row text: only ASCII and Latin-1 glyphs; the favorite star is the Lucide sprite, tinted.
 
-## Structures: UI changes still to do (#49)
+## Structures: UI changes (#49), done in #50
 
-The data side is in; the page itself was not touched (the right panel's navigation is being redone elsewhere). What the page should do with
-a structure (`!entry.parametric()`):
-- hide the facing, plot-size and seed controls (they are ignored), or show them disabled with a note "fixed size";
-- show "Size 36 x 39 x 51" instead of "Builds 36 x 39, h 51+", and not the plot-size footprint line, which caps at 24;
-- the Copy command can stay `/t3craft piece show <id>`: the three arguments are accepted and ignored;
-- the folder "Structures" could be pinned first in the folder column.
+See "Structures (#49) in the page" above.

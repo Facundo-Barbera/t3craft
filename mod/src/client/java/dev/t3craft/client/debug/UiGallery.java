@@ -42,6 +42,7 @@ import dev.t3craft.client.screen.PairScreen;
 import dev.t3craft.client.screen.SnoozeScreen;
 import dev.t3craft.client.t3ui.T3Screen;
 import dev.t3craft.client.t3ui.T3Slots;
+import dev.t3craft.client.t3ui.T3UiLayout;
 import dev.t3craft.client.t3ui.actions.RegisterProjectDialog;
 import dev.t3craft.client.t3ui.kit.T3KitDemoPanel;
 import dev.t3craft.client.t3ui.kit.T3PanelScreen;
@@ -181,6 +182,8 @@ public final class UiGallery {
 					}))),
 			new Scenario("inbox-right-panel", "Main T3 screen with the right panel open on the piece browser (fake pieces, narrow layout); drag either border, double click resets, U or the header's panel icon toggles (#39; drags save the real layout block)",
 					() -> inbox(true, true).withRightPanel(T3Screen.PIECES_PANEL, galleryPieces())),
+			new Scenario("inbox-right-narrow", "Right panel at its 180 px minimum on the piece browser (#50): one search row, Filters button, breadcrumbs, list; Right or the row chevron opens a piece's options, Back / Esc / Left return (width not saved unless you drag)",
+					() -> inbox(true, true).withRightWidth(T3UiLayout.RIGHT_MIN).withRightPanel(T3Screen.PIECES_PANEL, galleryPieces())),
 			// #42: the main screen at a forced T3 scale, whatever layout.uiScale says
 			new Scenario("inbox-scale", "Main T3 screen at uiScale \"auto\" (#42): the largest whole scale that keeps 960x540 logical units; check clicks, border drags, scroll, text fields, tooltips, menus and modals",
 					() -> inbox(true, true).withUiScale(dev.t3craft.client.t3ui.UiScale.Pref.AUTO)),
