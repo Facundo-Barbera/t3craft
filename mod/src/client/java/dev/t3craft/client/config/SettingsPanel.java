@@ -59,6 +59,8 @@ public final class SettingsPanel extends T3Panel {
 	private Tone statusTone = Tone.MUTED;
 	/** #42: the T3 screens' scale ({@code layout.uiScale}), written on "Save" like the rest of the page. */
 	private UiScale.Pref uiScaleDraft = UiScale.configured();
+	/** The build order ({@code build.order}), written on "Save" when it changed (see {@link BuildOrderSettings}). */
+	private String buildOrderDraft = BuildOrderSettings.current();
 
 	public SettingsPanel(EnvironmentActions actions) {
 		this.actions = actions;
@@ -172,6 +174,9 @@ public final class SettingsPanel extends T3Panel {
 		y = uiScaleRow(x, y, w);
 		y += 8;
 
+		y = buildOrderRow(x, y, w);
+		y += 8;
+
 		String mode = "Mode: " + draft.mode() + (draft.mode().equals("bridge")
 				? " · bridge key " + (draft.bridgeKey() == null ? "not set" : "set")
 				: " · read-only") + " · " + ConfigManager.get().file().getFileName();
@@ -213,6 +218,7 @@ public final class SettingsPanel extends T3Panel {
 		y = link(x, y, w, T3Icon.REFRESH_CW, "Reload from disk", () -> {
 			draft = ConfigManager.get().load();
 			uiScaleDraft = UiScale.configured(); // #42
+			buildOrderDraft = BuildOrderSettings.current();
 			windowText = formatNumber(draft.recentWindowHours());
 			maxText = Integer.toString(draft.maxPerEnvironment());
 			if (windowField != null) {
@@ -402,6 +408,21 @@ public final class SettingsPanel extends T3Panel {
 		};
 	}
 
+	/** "Build order" select (Sites, Radial, Parts) with a line saying when it applies. */
+	private int buildOrderRow(int x, int y, int w) {
+		y = heading(x, y, w, T3Draw.tr("t3craft.settings.buildorder.heading"));
+		y = text(x + 4, y, w - 8, T3Draw.tr("t3craft.settings.buildorder.label"), Tone.MUTED);
+		T3Select<String> select = new T3Select<>(BuildOrderSettings.ORDERS, SettingsPanel::buildOrderLabel, buildOrderDraft,
+				v -> buildOrderDraft = v);
+		place(select, x, y + 1, w, T3Control.H);
+		y += T3Control.H + 4;
+		return text(x + 4, y, w - 8, T3Draw.tr("t3craft.settings.buildorder.help"), Tone.MUTED) + 2;
+	}
+
+	private static String buildOrderLabel(String order) {
+		return T3Draw.tr("t3craft.settings.buildorder." + order);
+	}
+
 	private static String barLabel(String mode) {
 		return switch (mode) {
 			case "also" -> "Also (toast and action bar)";
@@ -452,13 +473,17 @@ public final class SettingsPanel extends T3Panel {
 		if (r.ok()) {
 			// #42: the UI scale lives in the layout prefs, written whatever the labels block does
 			boolean scaleOk = uiScaleDraft.equals(UiScale.configured()) || T3LayoutPrefs.saveUiScale(uiScaleDraft);
+			// the build order lives in the build block: only written (and the tuning reloaded) when it changed
+			boolean orderOk = BuildOrderSettings.save(buildOrderDraft).ok();
 			// the labels block is only touched when this page changed something in it
 			ConfigManager.SaveResult w = world.equals(worldTextSaved) ? r : world.save();
 			if (w.ok()) {
 				worldText = world;
 				worldTextSaved = world;
 				actions.reload();
-				if (scaleOk) {
+				if (!orderOk) {
+					say(T3Draw.tr("t3craft.settings.buildorder.failed"), Tone.WARN);
+				} else if (scaleOk) {
 					say(r.message() + " and reloaded", Tone.OK);
 				} else {
 					say("Settings saved, but the UI scale could not be written", Tone.WARN);

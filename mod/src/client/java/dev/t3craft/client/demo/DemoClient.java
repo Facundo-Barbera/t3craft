@@ -627,7 +627,8 @@ public final class DemoClient implements ClientModInitializer {
 		dev.t3craft.client.npc.NpcGate.set(npcGateFor(quiet));
 		run = new DemoBuildRun(source, plans, root, cfg, delay, quiet ? m -> T3Craft.LOGGER.info("[demo] {}", m) : this::say,
 				() -> installAnchors(source));
-		String msg = "building HQ: " + source.id() + " v" + source.version() + ", " + plans.size() + " part(s)";
+		String msg = "building HQ: " + source.id() + " v" + source.version() + ", " + plans.size() + " part(s), order "
+				+ dev.t3craft.build.BuildBudget.global().tuning().orderName();
 		if (quiet) {
 			T3Craft.LOGGER.info("[demo] roster changed, {}", msg);
 		} else {
@@ -659,7 +660,8 @@ public final class DemoClient implements ClientModInitializer {
 		String chosen = s == null ? "-" : s.choose(cfg.structure()).map(x -> x.id() + " v" + x.version()).orElse("none");
 		say("world '" + cfg.spec().folderId() + "' " + (VanillaDemoWorld.exists(mc, cfg.spec().folderId()) ? "exists" : "not created")
 				+ (root != null ? ", you are in it (" + (activeConfig.spec().voidWorld() ? "void" : "flat") + ")" : "")
-				+ "; new worlds: " + cfg.world() + "; structure " + cfg.structure() + " -> " + chosen);
+				+ "; new worlds: " + cfg.world() + "; structure " + cfg.structure() + " -> " + chosen
+				+ "; build order " + dev.t3craft.build.BuildBudget.global().tuning().orderName());
 		if (root != null) {
 			DemoMarker m = DemoMarkerFile.read(root);
 			say("built: " + (m.structure() == null ? "nothing yet" : m.structure() + " v" + m.version()));
