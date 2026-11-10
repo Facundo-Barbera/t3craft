@@ -9,6 +9,7 @@ import dev.t3craft.client.chat.Rect;
 import dev.t3craft.client.chat.ThreadDetails;
 import dev.t3craft.client.chat.ThreadRow;
 import dev.t3craft.client.t3ui.SidebarModel;
+import dev.t3craft.client.t3ui.kit.T3Icon;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -35,6 +36,8 @@ final class SidebarRow {
 	static final int H3 = H2 + LINE;
 	/** Room the hover quick actions take on line 1. */
 	static final int QUICK_W = 2 * 11 + 2;
+	/** Inline icons on a text line (pin star, draft pen; #27). */
+	static final int INLINE_ICON = 8;
 
 	private SidebarRow() {
 	}
@@ -85,8 +88,8 @@ final class SidebarRow {
 		ChatDraw.envIcon(g, font, badge, x0, y1 - 1, 8);
 		int x = x0 + 11;
 		if (r.pinned()) {
-			g.text(font, "★", x, y1, t.brass(), false);
-			x += clips.width(font, "★") + 3;
+			T3Icon.draw(g, t, T3Icon.STAR, x, y1, INLINE_ICON, t.brass());
+			x += INLINE_ICON + 3;
 		}
 		int right = x1;
 		if (quick) {
@@ -139,7 +142,7 @@ final class SidebarRow {
 
 	/**
 	 * Draws the draft thread's row (feat/t3-composer): line 1 like a thread's (icon, project) with
-	 * "Draft" at the right (the view puts the ✕ there on hover), line 2 "✎ New thread" (or
+	 * "Draft" at the right (the view puts the x there on hover), line 2 pen icon + "New thread" (or
 	 * "Starting…" while it launches).
 	 */
 	static void drawDraft(GuiGraphicsExtractor g, Font font, ChatTheme t, ClipCache clips, Rect rr, ThreadRow r, boolean selected, boolean hover,
@@ -166,9 +169,8 @@ final class SidebarRow {
 			right -= tw + 4;
 		}
 		g.text(font, clips.clip(font, projectLabel(r), right - x - 3), x, y1, t.muted(), false);
-		String pen = "✎";
-		g.text(font, pen, x0, y2, t.accent(), false);
-		int tx = x0 + clips.width(font, pen) + 3;
+		T3Icon.draw(g, t, T3Icon.SQUARE_PEN, x0, y2, INLINE_ICON, t.accent());
+		int tx = x0 + INLINE_ICON + 3;
 		g.text(font, clips.clip(font, r.title(), x1 - tx), tx, y2, selected ? t.text() : t.muted(), t.shadow());
 	}
 

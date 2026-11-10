@@ -27,6 +27,7 @@ import dev.t3craft.client.portable.PortableClient;
 import dev.t3craft.client.config.EnvironmentActions;
 import dev.t3craft.client.config.EnvironmentsPanel;
 import dev.t3craft.client.config.SettingsPanel;
+import dev.t3craft.client.t3ui.kit.T3Icon;
 import dev.t3craft.client.t3ui.kit.T3Panel;
 import dev.t3craft.client.t3ui.kit.T3PanelHost;
 import dev.t3craft.client.t3ui.sidebar.SidebarView;
@@ -36,7 +37,9 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.EditBox;
@@ -69,10 +72,10 @@ import org.jspecify.annotations.Nullable;
  * ({@link WorkingStatus}).
  *
  * <p>feat/t3-composer: the composer sits in T3's centred column under the transcript, and "New
- * thread" (the sidebar's ✎, a project folder's "+", Ctrl+N, the ⋯ menu) opens no window: it adds a
+ * thread" (the sidebar's square-pen icon, a project folder's plus, Ctrl+N, the ⋯ menu) opens no window: it adds a
  * {@link ThreadDraft} row under its project and the thread panel shows "project › New thread", an
  * empty transcript and the composer with the draft's project and workspace chips. The first message
- * launches the thread ({@link DraftLauncher}) and the real thread replaces the draft; Esc or ✕
+ * launches the thread ({@link DraftLauncher}) and the real thread replaces the draft; Esc or the x
  * discards it.
  *
  * <p>Pure logic lives in {@link SidebarModel} (search/filter/grouping/order), {@link T3UiLayout}
@@ -116,7 +119,7 @@ public final class T3Screen extends Screen {
 	private final SidebarView sidebarView = new SidebarView(model, new SidebarHost());
 	/**
 	 * The kit's pages (settings, environments): when one is open it takes the thread panel's place, as T3
-	 * Code's settings page does; the sidebar stays. Esc or its ✕ goes back to the thread.
+	 * Code's settings page does; the sidebar stays. Esc or its x goes back to the thread.
 	 */
 	private final T3PanelHost pages = new T3PanelHost(new T3PanelHost.Owner() {
 		@Override
@@ -149,6 +152,11 @@ public final class T3Screen extends Screen {
 	private int ticks;
 	/** Right-click menu of a sidebar thread: its rows and where it opened; null = closed. */
 	private @Nullable List<T3Slots.MenuItem> contextItems;
+	/**
+	 * #27: rows of {@link #contextItems} drawn with an icon before their label (the agents menu's "Finished"
+	 * fold chevron). By identity: {@link T3Slots.MenuItem} is a record, two rows may be equal.
+	 */
+	private final Map<T3Slots.MenuItem, T3Icon> itemIcons = new IdentityHashMap<>();
 	private int contextX;
 	private int contextY;
 	/** Where the last click was (the context menu opens there). */
@@ -764,7 +772,7 @@ public final class T3Screen extends Screen {
 		int menuW = 16;
 		g.text(font, ChatDraw.clip(font, sub, b.w() - 20 - menuW - 4), b.x() + 16, b.y() + 2, attention > 0 ? t.needsYou() : t.muted(), t.shadow());
 		Rect menu = new Rect(b.right() - menuW, b.y(), menuW, b.h());
-		pill(g, menu, "⋯", menuOpen, mouseX, mouseY);
+		pillIcon(g, menu, T3Icon.ELLIPSIS, menuOpen, mouseX, mouseY);
 		hits.add(new Hit(menu, () -> {
 			menuOpen = !menuOpen;
 			projectMenuOpen = false;
@@ -773,11 +781,12 @@ public final class T3Screen extends Screen {
 		// search row (T3's: search, then the filter and compose icons); the EditBox is drawn over this by super
 		Rect sf = sr.search();
 		ChatDraw.field(g, t, sf, focus == T3UiKeys.Focus.SEARCH);
-		g.text(font, "⌕", sf.x() + 4, sf.y() + (sf.h() - 8) / 2, t.muted(), false);
+		int glass = Math.min(10, sf.h() - 4);
+		T3Icon.draw(g, t, T3Icon.SEARCH, sf.x() + 3, sf.y() + (sf.h() - glass) / 2, glass, t.muted());
 
 		// project filter (T3's project scope menu), lit while a project is chosen
 		Rect p = sr.project();
-		iconButton(g, p, "▾", mouseX, mouseY);
+		iconButton(g, p, T3Icon.CHEVRON_DOWN, mouseX, mouseY);
 		if (model.project() != null) {
 			g.fill(p.x() + 3, p.bottom() - 2, p.right() - 3, p.bottom() - 1, t.accent());
 		}
@@ -788,33 +797,38 @@ public final class T3Screen extends Screen {
 
 		// new thread: a draft row under the project, no window (T3's compose icon)
 		Rect n = sr.newThread();
-		iconButton(g, n, "✎", mouseX, mouseY);
+		iconButton(g, n, T3Icon.SQUARE_PEN, mouseX, mouseY);
 		hits.add(new Hit(n, this::newThread, null, List.of("New thread (Ctrl+N)")));
 
 		drawList(g, mouseX, mouseY);
 
 		// footer: discreet icons, as T3 Code's sidebar bottom row (settings · environments · archive)
 		Rect f = sr.footer();
-		String[] glyphs = {"⚙", "☁", "▤"};
+		T3Icon[] icons = {T3Icon.SETTINGS, T3Icon.CLOUD, T3Icon.ARCHIVE};
 		String[] tips = {"Settings", "Environments", "Archive"};
 		Runnable[] acts = {this::openSettingsPage, this::openEnvironmentsPage, this::openArchive};
 		int ix = f.x();
-		for (int i = 0; i < glyphs.length; i++) {
+		for (int i = 0; i < icons.length; i++) {
 			Rect c = new Rect(ix, f.y(), 14, f.h());
-			iconButton(g, c, glyphs[i], mouseX, mouseY);
+			iconButton(g, c, icons[i], mouseX, mouseY);
 			hits.add(new Hit(c, acts[i], null, List.of(tips[i])));
 			ix += 16;
 		}
 	}
 
-	/** A borderless icon that lights up on hover (T3's ghost icon buttons). */
-	private void iconButton(GuiGraphicsExtractor g, Rect r, String glyph, int mouseX, int mouseY) {
+	/**
+	 * A borderless icon that lights up on hover (T3's ghost icon buttons, {@link dev.t3craft.client.t3ui.kit.T3IconButton}'s
+	 * look): muted at rest, hover wash and accent under the pointer. {@link T3Icon#SIZE}, smaller only when the
+	 * rectangle is (the sidebar footer is 12 px high). The rectangle stays the hit box.
+	 */
+	private void iconButton(GuiGraphicsExtractor g, Rect r, T3Icon icon, int mouseX, int mouseY) {
 		ChatTheme t = theme;
 		boolean hover = r.contains(mouseX, mouseY) && !anyMenuOpen();
 		if (hover) {
 			ChatDraw.round(g, r.x(), r.y(), r.w(), r.h(), t.hover());
 		}
-		g.text(font, glyph, r.x() + (r.w() - font.width(glyph)) / 2, r.y() + (r.h() - 8) / 2, hover ? t.accent() : t.muted(), false);
+		int size = Math.min(T3Icon.SIZE, Math.min(r.w(), r.h()));
+		T3Icon.draw(g, t, icon, r.x() + (r.w() - size) / 2, r.y() + (r.h() - size) / 2, size, hover, true);
 	}
 
 	private boolean anyMenuOpen() {
@@ -909,12 +923,12 @@ public final class T3Screen extends Screen {
 		if (layout.compact()) {
 			// back to the list
 			Rect back = new Rect(x, tr.y(), 14, tr.h());
-			pill(g, back, "‹", false, mouseX, mouseY);
+			pillIcon(g, back, T3Icon.CHEVRON_LEFT, false, mouseX, mouseY);
 			hits.add(new Hit(back, () -> setSidebarVisible(true), null, List.of("Threads (Esc)")));
 			x += 18;
 		} else if (!wideSidebar) {
 			Rect show = new Rect(x, tr.y(), 14, tr.h());
-			pill(g, show, "☰", false, mouseX, mouseY);
+			pillIcon(g, show, T3Icon.PANEL_LEFT, false, mouseX, mouseY);
 			hits.add(new Hit(show, () -> setSidebarVisible(true), null, List.of("Show the sidebar (Ctrl+B)")));
 			x += 18;
 		}
@@ -950,12 +964,12 @@ public final class T3Screen extends Screen {
 			List<ThreadRow> kids = row == null ? List.of() : model.liveChildrenOf(row.key());
 			List<ThreadRow> finished = row == null ? List.of() : model.finishedChildrenOf(row.key());
 			if (!kids.isEmpty() || !finished.isEmpty()) {
-				String label = kids.isEmpty() ? "0/" + finished.size() + (finished.size() == 1 ? " agent ▾" : " agents ▾")
-						: kids.size() + (kids.size() == 1 ? " agent ▾" : " agents ▾");
-				int w = font.width(label) + 10;
+				String label = kids.isEmpty() ? "0/" + finished.size() + (finished.size() == 1 ? " agent" : " agents")
+						: kids.size() + (kids.size() == 1 ? " agent" : " agents");
+				int w = font.width(label) + 10 + CHIP_ICON + 2;
 				if (right - w > x + 60) {
 					Rect chipR = new Rect(right - w, tr.y(), w, tr.h());
-					pill(g, chipR, label, false, mouseX, mouseY);
+					pillLabelIcon(g, chipR, label, T3Icon.CHEVRON_DOWN, false, mouseX, mouseY);
 					List<String> tip = new ArrayList<>();
 					tip.add("Delegated agents");
 					for (ThreadRow k : kids) {
@@ -1042,6 +1056,7 @@ public final class T3Screen extends Screen {
 		List<ThreadRow> kids = model.liveChildrenOf(parentKey);
 		List<ThreadRow> finished = model.finishedChildrenOf(parentKey);
 		List<T3Slots.MenuItem> items = new ArrayList<>();
+		itemIcons.clear();
 		String filter = agentsShowAll ? "Show: ○ Active  ● All" : "Show: ● Active  ○ All";
 		items.add(new T3Slots.MenuItem(filter, true, () -> {
 			agentsShowAll = !agentsShowAll;
@@ -1061,10 +1076,12 @@ public final class T3Screen extends Screen {
 				items.add(new T3Slots.MenuItem("── Finished (" + finished.size() + ") ──", false, () -> {
 				}));
 			} else {
-				items.add(new T3Slots.MenuItem((shown ? "▾ " : "▸ ") + "Finished (" + finished.size() + ")", true, () -> {
+				T3Slots.MenuItem fold = new T3Slots.MenuItem("Finished (" + finished.size() + ")", true, () -> {
 					agentsFinishedOpen = !agentsFinishedOpen;
 					openChildrenMenu(parentKey, anchor);
-				}, true));
+				}, true);
+				items.add(fold);
+				itemIcons.put(fold, shown ? T3Icon.CHEVRON_DOWN : T3Icon.CHEVRON_RIGHT); // #27: drawn, not "▾ " / "▸ "
 			}
 			if (shown) {
 				for (ThreadRow k : finished) {
@@ -1104,11 +1121,11 @@ public final class T3Screen extends Screen {
 		}
 	}
 
-	/** "project › New thread" and a ✕ that discards the draft (T3's draft header). */
+	/** "project › New thread" and an x icon that discards the draft (T3's draft header). */
 	private void drawDraftHeader(GuiGraphicsExtractor g, ThreadDraft d, Rect tr, int x, int mouseX, int mouseY) {
 		ChatTheme t = theme;
 		Rect close = new Rect(tr.right() - 14, tr.y(), 14, tr.h());
-		iconButton(g, close, "✕", mouseX, mouseY);
+		iconButton(g, close, T3Icon.X, mouseX, mouseY);
 		hits.add(new Hit(close, this::discardDraft, null, List.of("Discard the draft (Esc)")));
 		int right = close.x() - 4;
 		ChatDraw.envIcon(g, font, EnvBadge.of(d.envId, d.envLabel), x, tr.y() + 2, 10);
@@ -1221,7 +1238,7 @@ public final class T3Screen extends Screen {
 	private int menuWidth(List<T3Slots.MenuItem> items, int max) {
 		int w = 10;
 		for (T3Slots.MenuItem it : items) {
-			w = Math.max(w, font.width(it.label()) + 12);
+			w = Math.max(w, font.width(it.label()) + 12 + (itemIcons.containsKey(it) ? MENU_ICON + 3 : 0));
 		}
 		return Math.min(w, max);
 	}
@@ -1245,7 +1262,13 @@ public final class T3Screen extends Screen {
 				g.fill(rr.x(), rr.y(), rr.right(), rr.bottom(), t.hover());
 			}
 			int color = !it.enabled() ? t.disabled() : it.dim() ? t.muted() : t.text();
-			g.text(font, ChatDraw.clip(font, it.label(), rr.w() - 6), rr.x() + 3, ry + 2, color, t.shadow());
+			T3Icon icon = itemIcons.get(it);
+			int tx = rr.x() + 3;
+			if (icon != null) {
+				T3Icon.draw(g, t, icon, tx, rr.y() + (rr.h() - MENU_ICON) / 2, MENU_ICON, color);
+				tx += MENU_ICON + 3;
+			}
+			g.text(font, ChatDraw.clip(font, it.label(), rr.right() - 3 - tx), tx, ry + 2, color, t.shadow());
 			if (it.enabled()) {
 				menuHits.add(new Hit(rr, () -> {
 					close.run();
@@ -1260,18 +1283,42 @@ public final class T3Screen extends Screen {
 	private void openContextMenu(ThreadRow r, T3Slots.Target target) {
 		menuOpen = false;
 		projectMenuOpen = false;
+		itemIcons.clear();
 		contextItems = T3ThreadActions.menu(this, r, target);
 		contextX = (int) clickX;
 		contextY = (int) clickY;
 	}
 
-	private void pill(GuiGraphicsExtractor g, Rect r, String label, boolean on, int mouseX, int mouseY) {
+	/** Icon size inside a popup menu row ({@link T3UiLayout#ROW_H} high). */
+	private static final int MENU_ICON = 8;
+	/** Chevron size inside a header chip ("2 agents" + chevron). */
+	private static final int CHIP_ICON = 8;
+
+	/** The header pill box (raised highlight, 1 px rule, accent rule when on); returns whether it is lit (hover or on). */
+	private boolean pillBox(GuiGraphicsExtractor g, Rect r, boolean on, int mouseX, int mouseY) {
 		ChatTheme t = theme;
 		boolean hover = r.contains(mouseX, mouseY);
 		ChatDraw.round(g, r.x(), r.y(), r.w(), r.h(), on ? t.selected() : hover ? t.hover() : t.panelHi());
 		ChatDraw.outline(g, r.x(), r.y(), r.w(), r.h(), on ? t.accent() : t.edge());
-		String s = ChatDraw.clip(font, label, r.w() - 6);
-		g.text(font, s, r.x() + (r.w() - font.width(s)) / 2, r.y() + (r.h() - 8) / 2, hover || on ? t.accent() : t.keycapText(), false);
+		return hover || on;
+	}
+
+	/** A pill with an icon only (the menu, back and show-sidebar buttons): muted, accent when lit. */
+	private void pillIcon(GuiGraphicsExtractor g, Rect r, T3Icon icon, boolean on, int mouseX, int mouseY) {
+		boolean lit = pillBox(g, r, on, mouseX, mouseY);
+		int size = Math.max(4, Math.min(T3Icon.SIZE, Math.min(r.w(), r.h()) - 2));
+		T3Icon.draw(g, theme, icon, r.x() + (r.w() - size) / 2, r.y() + (r.h() - size) / 2, size, lit, true);
+	}
+
+	/** A pill with a label and a small icon after it (the header's agents chip and its chevron). */
+	private void pillLabelIcon(GuiGraphicsExtractor g, Rect r, String label, T3Icon icon, boolean on, int mouseX, int mouseY) {
+		ChatTheme t = theme;
+		boolean lit = pillBox(g, r, on, mouseX, mouseY);
+		int color = lit ? t.accent() : t.keycapText();
+		String s = ChatDraw.clip(font, label, r.w() - 10 - CHIP_ICON - 2);
+		int x = r.x() + (r.w() - font.width(s) - 2 - CHIP_ICON) / 2;
+		g.text(font, s, x, r.y() + (r.h() - 8) / 2, color, false);
+		T3Icon.draw(g, t, icon, x + font.width(s) + 2, r.y() + (r.h() - CHIP_ICON) / 2, CHIP_ICON, lit ? t.accent() : t.muted());
 	}
 
 	// ---- actions ------------------------------------------------------------------------------
@@ -1358,7 +1405,7 @@ public final class T3Screen extends Screen {
 		}
 	}
 
-	/** Esc / ✕: drops the draft and goes back to the thread shown before. */
+	/** Esc / the x: drops the draft and goes back to the thread shown before. */
 	private void discardDraft() {
 		ThreadDraft d = draft;
 		if (d == null) {

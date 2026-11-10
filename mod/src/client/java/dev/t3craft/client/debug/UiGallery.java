@@ -4,6 +4,8 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import dev.t3craft.client.chat.ChatSource;
 import dev.t3craft.client.chat.ConversationPanel;
+import dev.t3craft.client.chat.RowLineage;
+import dev.t3craft.client.chat.ThreadDetails;
 import dev.t3craft.client.chat.ThreadCache;
 import dev.t3craft.client.chat.ThreadDirectory;
 import dev.t3craft.client.chat.ThreadList;
@@ -115,6 +117,8 @@ public final class UiGallery {
 					() -> inbox(true, true).withPage(new dev.t3craft.client.pieces.PieceBrowserPanel())),
 			new Scenario("icons", "Icon gallery: every T3Icon (Lucide) in a grid on both themes, 12 px in its three states and 32 px; wheel scrolls",
 					() -> new IconGalleryScreen(null)),
+			new Scenario("inbox-icons", "Main T3 screen with every sidebar icon in use (#27): pinned stars, folder and dock chevrons, Snoozed and Settled, a worktree row, the header's agents chip with active and finished children; hover a row for check / star, a folder for plus",
+					UiGallery::inboxIcons),
 			new Scenario("model-picker", "The composer's model picker open over a fake catalog (reasoning and extra selects, switches, access, favorites, legacy, many providers)",
 					ModelPickerGalleryScreen::new),
 			new Scenario("kit", "UI kit demo as a screen of its own: Tab / Enter / Space focus, list keys, draggable scrollbars, fields clipped in a scrolling page, a dialog with fields",
@@ -220,6 +224,38 @@ public final class UiGallery {
 		return new OperatePairScreen(null, new Environments.Environment(ENV, ENV_LABEL, URI.create("http://127.0.0.1:3773/")));
 	}
 
+	/**
+	 * #27: the inbox with rows that put every sidebar and header icon on screen: two pinned threads (brass
+	 * star), project folders and the Pinned section (chevrons), Working, Snoozed and Settled in the dock,
+	 * a worktree row with diff and PR, and a parent with delegated children (the header's agents chip, its
+	 * menu with the "Finished" fold). Opens on the parent.
+	 */
+	private static T3Screen inboxIcons() {
+		long now = System.currentTimeMillis();
+		String parent = ENV + ":t-parent";
+		List<ThreadRow> rows = new ArrayList<>();
+		rows.add(row("t-parent", "Coordinator: UI icons wave", "t3craft", ThreadState.WORKING, false, "waiting for children", false, true, now - 30_000));
+		rows.add(row("t-run", "fix/hq-builders-independent", "t3craft", ThreadState.WORKING, false, "running tests", false, false, now - 6_000));
+		rows.add(row("t-pin2", "Pinned and idle", "bridge", ThreadState.IDLE, false, null, false, true, now - 900_000));
+		rows.add(row("t-ask", "feat/attention-queue", "t3craft", ThreadState.NEEDS_ATTENTION, true, null, false, false, now - 120_000));
+		rows.add(new ThreadRow(ENV + ":t-wt", ENV, ENV_LABEL, "t-wt", "feat/ui-icons-sidebar", "t3craft", ThreadState.DONE, false, null, false,
+				now - 400_000L, false, new ThreadDetails("feat/ui-icons-sidebar-27", true, 27, "open", "example/t3craft", 141, 12, "sonnet", "claude",
+						true, null, null)));
+		rows.add(new ThreadRow(ENV + ":t-snz", ENV, ENV_LABEL, "t-snz", "Snoozed until later", "bridge", ThreadState.IDLE, false, null, false,
+				now - 5_000_000L, false, new ThreadDetails(null, false, 0, null, null, -1, -1, null, null, false, null, now + 3_600_000L)));
+		rows.add(row("t-old", "Migrate settings screen", "bridge", ThreadState.DONE, false, null, true, false, now - 3 * 86_400_000L));
+		rows.add(child("t-kid1", "Child: sidebar icons", ThreadState.WORKING, false, parent, now - 20_000));
+		rows.add(child("t-kid2", "Child: picker icons", ThreadState.IDLE, false, parent, now - 60_000));
+		rows.add(child("t-kid3", "Child: queue icons", ThreadState.DONE, false, parent, now - 600_000));
+		rows.add(child("t-kid4", "Child: archive icons", ThreadState.DONE, true, parent, now - 900_000));
+		return inbox(true, rows, parent);
+	}
+
+	private static ThreadRow child(String id, String title, ThreadState state, boolean settled, String parentKey, long activityMs) {
+		return new ThreadRow(ENV + ":" + id, ENV, ENV_LABEL, id, title, "t3craft", state, false, null, settled, activityMs, false, ThreadDetails.EMPTY,
+				new RowLineage(parentKey, "Coordinator: UI icons wave", true));
+	}
+
 	/** The main screen over fake data. {@code operate}: composer and header actions; {@code threads}: false = an empty list. */
 	private static T3Screen inbox(boolean operate, boolean threads) {
 		long now = System.currentTimeMillis();
@@ -232,6 +268,11 @@ public final class UiGallery {
 			rows.add(row("t-idle", "Investigate login redirect", "bridge", ThreadState.IDLE, false, null, false, false, now - 7_200_000));
 			rows.add(row("t-old", "Migrate settings screen", "bridge", ThreadState.DONE, false, null, true, false, now - 3 * 86_400_000L));
 		}
+		return inbox(operate, rows, threads ? ENV + ":t-run" : null);
+	}
+
+	/** The main screen over {@code rows}, opened on {@code select} (null = none). */
+	private static T3Screen inbox(boolean operate, List<ThreadRow> rows, @Nullable String select) {
 		Map<String, ThreadList.EnvInfo> envs = new LinkedHashMap<>();
 		envs.put(ENV, new ThreadList.EnvInfo(ENV_LABEL, "ok", null));
 		List<ThreadRow> fixed = List.copyOf(rows);
@@ -260,7 +301,7 @@ public final class UiGallery {
 			public void pair() {
 			}
 		};
-		return new T3Screen(directory, source(), actions, T3Slots.DEFAULT, threads ? ENV + ":t-run" : null);
+		return new T3Screen(directory, source(), actions, T3Slots.DEFAULT, select);
 	}
 
 	private static ThreadRow row(String id, String title, String project, ThreadState state, boolean pending, @Nullable String activity,
