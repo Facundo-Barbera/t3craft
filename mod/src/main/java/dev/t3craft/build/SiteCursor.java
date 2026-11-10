@@ -143,6 +143,9 @@ public final class SiteCursor implements JobCursor {
 		boolean finished;
 		/** When the site was opened ({@link System#nanoTime}): the status shows how long its program took to arrive. */
 		final long openedAt = System.nanoTime();
+		/** Task of the current wave in each bay of the site (index {@code bay - siteBayStart[site]}), -1 = none; built for wave {@link #bayTaskWave}. */
+		int[] bayTask = new int[0];
+		int bayTaskWave = -1;
 
 		Open(int site) {
 			this.site = site;
@@ -285,6 +288,20 @@ public final class SiteCursor implements JobCursor {
 	private long worstCompileNs;
 	private volatile long lastCompileWorkNs = -1;
 
+	// ---- stall fixes (#48) --------------------------------------------------------------------
+	/** A builder idle this many ticks on a site with nothing it can take is lent to another open site that has a free task. */
+	static final int LEND_AFTER = 40;
+	/** While builders of the focus wait for their bay's ground and the foundation budget is spent, its ground wave still gets this much. */
+	static final int GROUND_RESERVE_BLOCKS = 8;
+	static final long GROUND_RESERVE_NANOS = 500_000L;
+	/** Same-site bays touching each bay (4-neighbour columns), computed when first needed. */
+	private final int[][] bayNbr;
+	/** The builder was lent to its site: it leaves it after one task. */
+	private final boolean[] lent;
+	private long aheadPicks;
+	private long lends;
+	private long groundReserveTicks;
+
 	private @Nullable IntPredicate already;
 	private CrewCursor.@Nullable Walker walker;
 	private int tickNo;
@@ -345,6 +362,8 @@ public final class SiteCursor implements JobCursor {
 		pz = new int[this.builders];
 		idleRun = new int[this.builders];
 		idleWhy = new int[this.builders];
+		lent = new boolean[this.builders];
+		bayNbr = new int[p.bays][];
 		cx = p.fallback[0];
 		cz = p.fallback[1];
 		int baseY = n == 0 ? 0 : p.y[p.colEntries[0]];
@@ -642,6 +661,8 @@ public final class SiteCursor implements JobCursor {
 			if (tickNo >= dispatchAt) {
 				dispatchAt = tickNo + DISPATCH_EVERY;
 				dispatch(t);
+			} else if (freeNow > 0 && !openList.isEmpty()) {
+				staffAll(t); // #48: a builder let go between dispatches (end of a wave, a lent one back) is staffed at once
 			}
 			tickCorridor(step, t);
 			tickCarpet(step, t);
@@ -782,9 +803,180 @@ public final class SiteCursor implements JobCursor {
 			return;
 		}
 		o.taskDone[tk] = true;
+		SiteProgram.Program g = o.prog;
+		if (g != null && (o.wave >= g.waves() || tk < g.waveStart()[o.wave] || tk >= g.waveStart()[o.wave + 1])) {
+			return; // a task of the next wave taken ahead (#48): that wave counts it as done when it starts
+		}
 		if (--o.waveTasksLeft <= 0) {
 			advance(o);
 		}
+	}
+
+	/**
+	 * fix/builder-sites-stalls (#48): the wave after the current one, when a builder may start it ahead: same storey
+	 * (the storey gate stays), not the finishing pass; -1 = none.
+	 */
+	private int aheadWave(Open o) {
+		SiteProgram.Program g = o.prog;
+		if (g == null || o.finished || o.wave >= g.waves()) {
+			return -1;
+		}
+		int w = o.wave + 1;
+		if (w >= g.waves() || w >= g.remateWave() || g.waveStorey()[w] != g.waveStorey()[o.wave]) {
+			return -1;
+		}
+		return w;
+	}
+
+	/** Tasks of the wave a builder may start ahead ({@link #aheadWave}), for the crew size; 0 = none. */
+	private int aheadTasks(Open o) {
+		int w = aheadWave(o);
+		SiteProgram.Program g = o.prog;
+		return w < 0 || g == null ? 0 : g.waveStart()[w + 1] - g.waveStart()[w];
+	}
+
+	/**
+	 * fix/builder-sites-stalls (#48): a free task of the next wave (same storey) whose bay is <b>settled</b>: the
+	 * current wave's tasks in that bay and in every same-site bay touching it are done. The program resolved support
+	 * on "every earlier wave placed", and support is only ever the cell below, above or beside (one column away), so a
+	 * task whose bay and neighbouring bays are done has everything it leans on. Asked only when a builder of the site
+	 * would otherwise stand still. -1 = none.
+	 */
+	private int ahead(Open o) {
+		SiteProgram.Program g = o.prog;
+		int w2 = aheadWave(o);
+		if (g == null || w2 < 0) {
+			return -1;
+		}
+		int b0 = p.siteBayStart[o.site];
+		int nb = p.siteBayStart[o.site + 1] - b0;
+		if (o.bayTask.length != nb) {
+			o.bayTask = new int[nb];
+			o.bayTaskWave = -1;
+		}
+		if (o.bayTaskWave != o.wave) {
+			Arrays.fill(o.bayTask, -1);
+			for (int tk = g.waveStart()[o.wave]; tk < g.waveStart()[o.wave + 1]; tk++) {
+				int lb = g.taskBay()[tk] - b0;
+				if (lb >= 0 && lb < nb) {
+					o.bayTask[lb] = tk;
+				}
+			}
+			o.bayTaskWave = o.wave;
+		}
+		for (int tk = g.waveStart()[w2]; tk < g.waveStart()[w2 + 1]; tk++) {
+			if (o.taskDone[tk] || o.taskCrew[tk] > 0 || o.taskPark[tk] > tickNo) {
+				continue;
+			}
+			int bay = g.taskBay()[tk];
+			if (bayStreamLeft[bay] > 0 || taskHead(o, tk) < 0 || !settled(o, bay, b0, nb)) {
+				continue;
+			}
+			return tk;
+		}
+		return -1;
+	}
+
+	/** Whether the current wave of {@code o} is done in {@code bay} and in the same-site bays touching it. */
+	private boolean settled(Open o, int bay, int b0, int nb) {
+		if (!doneHere(o, bay, b0, nb)) {
+			return false;
+		}
+		for (int b : neighbours(bay)) {
+			if (!doneHere(o, b, b0, nb)) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	private boolean doneHere(Open o, int bay, int b0, int nb) {
+		int lb = bay - b0;
+		if (lb < 0 || lb >= nb) {
+			return true; // not a bay of this site: another site, taken as standing
+		}
+		int tk = o.bayTask[lb];
+		return tk < 0 || o.taskDone[tk] || taskHead(o, tk) < 0;
+	}
+
+	/** Bays of the same site that hold a column next to a column of {@code bay} (cached). */
+	private int[] neighbours(int bay) {
+		int[] out = bayNbr[bay];
+		if (out != null) {
+			return out;
+		}
+		IntArrayList l = new IntArrayList();
+		int site = p.baySite[bay];
+		for (int k = p.bayColStart[bay]; k < p.bayColStart[bay + 1]; k++) {
+			int c = p.bayCols[k];
+			for (int d = 0; d < 4; d++) {
+				int nx = p.colX[c] + (d == 0 ? 1 : d == 1 ? -1 : 0);
+				int nz = p.colZ[c] + (d == 2 ? 1 : d == 3 ? -1 : 0);
+				int c2 = p.colAt.get(CrewPlanner.key(nx, 0, nz));
+				if (c2 < 0) {
+					continue;
+				}
+				for (int q = p.colBayStart[c2]; q < p.colBayStart[c2 + 1]; q++) {
+					int b2 = p.colBays[q];
+					if (b2 != bay && p.baySite[b2] == site && !l.contains(b2)) {
+						l.add(b2);
+					}
+				}
+			}
+		}
+		out = l.toIntArray();
+		bayNbr[bay] = out;
+		return out;
+	}
+
+	/** Whether a builder lent to {@code o} could take something there now: a free task of the current wave, or one ahead. */
+	private boolean lendable(Open o) {
+		SiteProgram.Program g = o.prog;
+		if (g == null || o.finished || o.wave >= g.waves() || o.boundary && !o.focus) {
+			return false;
+		}
+		for (int tk = g.waveStart()[o.wave]; tk < g.waveStart()[o.wave + 1]; tk++) {
+			if (!o.taskDone[tk] && o.taskCrew[tk] == 0 && o.taskPark[tk] <= tickNo && bayStreamLeft[g.taskBay()[tk]] <= 0 && taskHead(o, tk) >= 0) {
+				return true;
+			}
+		}
+		return ahead(o) >= 0;
+	}
+
+	/**
+	 * fix/builder-sites-stalls (#48): builder {@code f} stood {@link #LEND_AFTER} ticks on a site with nothing it can
+	 * take: it goes to another open site with a free task (the focus first, else the nearest), does one task there and
+	 * is free again ({@link #release}); the staffing then sends it where it is wanted.
+	 */
+	private void lend(int f) {
+		int home = tSite[f];
+		Open best = null;
+		double bestD = Double.MAX_VALUE;
+		for (int k = 0; k < openList.size(); k++) {
+			Open o = open[openList.getInt(k)];
+			if (o == null || o.site == home || !lendable(o)) {
+				continue;
+			}
+			SiteProgram.Program g = o.prog;
+			double d = o.focus || g == null ? -1.0 : Math.hypot(g.accessX() - px[f], g.accessZ() - pz[f]);
+			if (d < bestD) {
+				bestD = d;
+				best = o;
+			}
+		}
+		if (best == null) {
+			return;
+		}
+		Open h = home >= 0 ? open[home] : null;
+		if (h != null) {
+			h.crew = Math.max(0, h.crew - 1);
+		}
+		tSite[f] = best.site;
+		best.crew++;
+		lent[f] = true;
+		idleRun[f] = 0;
+		lends++;
+		pick(f);
 	}
 
 	/** Whether a builder could take a task of the current wave of {@code o} right now. */
@@ -913,7 +1105,13 @@ public final class SiteCursor implements JobCursor {
 				}
 			}
 		}
-		// crews: the focus first, then the sites closing their storey, then the rear guards
+		staffAll(t);
+		// #48: builders the closing sites and rear guards just let go reach the focus now, not at the next dispatch
+		staffAll(t);
+	}
+
+	/** Crews: the focus first, then the sites closing their storey, then the rear guards. */
+	private void staffAll(BuildTuning t) {
 		for (int role = 0; role < 3; role++) {
 			for (int k = 0; k < openList.size(); k++) {
 				Open o = open[openList.getInt(k)];
@@ -962,6 +1160,7 @@ public final class SiteCursor implements JobCursor {
 			tTask[f] = -1;
 			tSite[f] = -1;
 			walkLeft[f] = 0;
+			lent[f] = false;
 		}
 		CompletableFuture<SiteProgram.Program> f = o.pending;
 		if (f != null) {
@@ -989,13 +1188,16 @@ public final class SiteCursor implements JobCursor {
 				free++;
 			}
 		}
-		int tasks = o.prog == null ? builders : o.waveTasksLeft;
+		// #48: the wave a builder may start ahead counts too, so a short wave does not send builders away just before a long one
+		int tasks = o.prog == null ? builders : o.waveTasksLeft + aheadTasks(o);
+		// #48: while the focus cannot open, the sites it waits for (leaving, closing their storey) take the free builders
+		boolean hurry = !o.focus && o.leaving && focusSite >= 0 && open[focusSite] == null;
 		if (o.finished) {
 			o.want = 0;
-		} else if (o.rear && !o.focus) {
+		} else if (o.rear && !o.focus && !hurry) {
 			o.want = Math.min(Math.min(SiteDispatch.REAR, Math.max(1, tasks)), o.crew + free);
 		} else {
-			o.want = SiteDispatch.crew(siteLeft[o.site], tasks, t.siteCrewMin(), t.siteCrewMax(), t.entriesPerBuilder(), o.focus ? o.crew + free : o.crew);
+			o.want = SiteDispatch.crew(siteLeft[o.site], tasks, t.siteCrewMin(), t.siteCrewMax(), t.entriesPerBuilder(), o.focus || hurry ? o.crew + free : o.crew);
 		}
 		for (int f = 0; f < builders && o.crew < o.want; f++) {
 			if (tSite[f] < 0) {
@@ -1009,6 +1211,7 @@ public final class SiteCursor implements JobCursor {
 			if (tSite[f] == o.site && tTask[f] < 0) {
 				tSite[f] = -1;
 				o.crew--;
+				lent[f] = false;
 			}
 		}
 	}
@@ -1203,11 +1406,23 @@ public final class SiteCursor implements JobCursor {
 			return;
 		}
 		BuildBudget b = BuildBudget.global();
-		int max = Math.min(b.foundationBlocks(), t.groundBlocksPerTick());
-		if (max <= 0 || b.foundationNanos() <= 0) {
-			return;
-		}
+		Open fo = focusSite >= 0 ? open[focusSite] : null;
+		boolean starved = groundWanted && fo != null && fo.prog != null;
+		// #48: builders of the focus wait for their bay's ground: its wave may use twice the ground pace, within the foundation budget
+		int max = Math.min(b.foundationBlocks(), t.groundBlocksPerTick() * (starved ? 2 : 1));
 		long nanos = b.foundationNanos();
+		boolean reserve = false;
+		if (max <= 0 || nanos <= 0) {
+			if (!starved) {
+				return;
+			}
+			// #48: the foundation budget is spent (corridor, carpet, or the MSPT / FPS throttle) and the focus's builders
+			// stand waiting for ground: a small reserve for the focus's ground wave only
+			max = GROUND_RESERVE_BLOCKS;
+			nanos = GROUND_RESERVE_NANOS;
+			reserve = true;
+			groundReserveTicks++;
+		}
 		long t0 = System.nanoTime();
 		int[] counts = new int[2];
 		// fix/builder-sites-stalls (#48): the resume probe has its own counts (its skips no longer eat the ground wave's)
@@ -1221,6 +1436,10 @@ public final class SiteCursor implements JobCursor {
 					Open o = open[openList.getInt(k)];
 					if (o == null || o.prog == null || (o.site == focusSite) != (pass == 0)) {
 						continue;
+					}
+					if (reserve) {
+						groundWave(o, step, counts, max, t0, nanos);
+						return; // the reserve is the focus's only
 					}
 					probe(o, step, probed, t0, nanos);
 					if (!groundWave(o, step, counts, max, t0, nanos)) {
@@ -1497,6 +1716,9 @@ public final class SiteCursor implements JobCursor {
 				}
 				if (tTask[f] < 0 && tSite[f] >= 0 && walkLeft[f] == 0) {
 					pick(f);
+					if (tTask[f] < 0 && tSite[f] >= 0 && idleRun[f] >= LEND_AFTER) {
+						lend(f); // #48: stood too long with nothing to take here; another open site has work
+					}
 				}
 				if (tTask[f] >= 0) {
 					if (tSite[f] == focusSite) {
@@ -1766,7 +1988,11 @@ public final class SiteCursor implements JobCursor {
 			}
 			int tk = free >= 0 ? free : help;
 			if (tk < 0) {
-				return;
+				tk = ahead(o); // #48: rather than stand until the last bay of the wave is done
+				if (tk < 0) {
+					return;
+				}
+				aheadPicks++;
 			}
 			tTask[f] = tk;
 			o.taskCrew[tk]++;
@@ -1786,9 +2012,10 @@ public final class SiteCursor implements JobCursor {
 		if (o != null && tk >= 0) {
 			o.taskCrew[tk] = Math.max(0, o.taskCrew[tk] - 1);
 			o.working = Math.max(0, o.working - 1);
-			if (o.crew > o.want) {
+			if (o.crew > o.want || lent[f]) {
 				tSite[f] = -1;
-				o.crew--;
+				o.crew = Math.max(0, o.crew - 1);
+				lent[f] = false;
 			}
 		}
 		tTask[f] = -1;
@@ -2021,6 +2248,9 @@ public final class SiteCursor implements JobCursor {
 			}
 			int lr = longestReason;
 			sb.append(String.format(Locale.ROOT, " longest %.1fs %s", longestIdle / 20.0, IDLE_NAMES[lr >= 0 && lr < IDLE_NAMES.length ? lr : 0]));
+		}
+		if (aheadPicks > 0 || lends > 0 || groundReserveTicks > 0) {
+			sb.append(" ahead ").append(aheadPicks).append(" lent ").append(lends).append(" ground-reserve ").append(groundReserveTicks);
 		}
 		if (focusWaitTicks > 0) {
 			sb.append(String.format(Locale.ROOT, " focus-wait %.1fs", focusWaitTicks / 20.0));

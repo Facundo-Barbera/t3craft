@@ -245,6 +245,79 @@ Constants in the code: bay 6 blocks, keep radius 32, bucket 8, footprint margin 
 real floor = a sixth of the columns and 12 cells, smallest storey 3, 6 rounds per stage, rear guard 2, focus share
 70 %.
 
+## Stalls (#48)
+
+Facundo played `"sites"` and saw the builders stand still for a while, then carry on, with good FPS. Nothing could be
+measured where this was written, so the causes come from reading the code; the counters below are there to tell, in
+the next session, which one it was.
+
+### What was found, most likely first
+
+| # | family | where | why builders stand | how long |
+|---|---|---|---|---|
+| 1 | B, planning | `SiteCursor.pick`, `taskOver` (wave barrier) | a wave is one task per bay and the next wave starts only when the **last** bay of this one is done. Builders that finish early can only help a held task (one helper, 8 entries left at least), so most of the crew stands through the tail of every wave. A storey has up to five stages, each several rounds: dozens of tails per storey | the slowest bay of the wave: a fraction of a second normally, several seconds with a tall bay, a slow pace (throttle) or a bay waiting for its ground or chunk |
+| 2 | B, planning | `SiteCursor.tickSites` + `BuildBudget` (ground) | a task waits until its bay's ground and clearing are laid. The site's ground wave runs after the corridor and the carpet out of the same foundation budget; when the MSPT / FPS throttle cuts that budget (it falls ×0.7 a second and climbs back +0.1 a second) the corridor of a walking player can spend all of it, and the site's ground stops | while the throttle is low: seconds |
+| 3 | B, planning | `SiteCursor.staff`, `release`, `dispatch` | at the end of a short wave the crew is sized down and builders leave the site; they come back only at the next dispatch (every 10 ticks), and builders let go by a closing site in a dispatch were staffed after the focus had already been staffed in that same dispatch | up to half a second per wave, repeatedly |
+| 4 | B, planning | `SiteCursor.dispatch` (`hardCap`), `staff` | the focus cannot open while too many sites are still closing their storey (`focus <name> waiting`), and those sites get no new builders, so the freed builders stand until a storey of another site is closed at 30 % of the pace | a storey of a big site: 10 s and more; rare, when walking through several buildings in a row |
+| 5 | B, planning | `SiteCursor.openSite` / `install` | between opening a site and its program arriving (off-thread, `Offload`, shared with other work) its crew stands (`planning`); then it walks to the access for 20 ticks | the compile (milliseconds) plus the queue, plus one second |
+| 6 | A, tick | `SiteCursor.probe` | the resume probe read up to 1024 entries **per open site** per tick with no time check, and its skips used the ground wave's skip budget, so while it ran the ground wave of that tick stopped | a few ms per tick for a few ticks after a site opens; the stopped ground feeds cause 2 |
+| 7 | A, tick | carpet, trail, site ground wave, last sweep rings | bounded by blocks and skips but not by wall-clock time, unlike the radial streams | small (bounded), but they could overrun the foundation time |
+
+Not causes: the program of a site (`SiteProgram.compile`) and the whole analysis (`SiteProgram.of`) already run
+off-thread; the crew's walk to the access is a fixed 20 ticks, it never waits for the last builder; no task is held by
+a builder that does not work it (a holder either walks, at most 20 ticks, or places). Server lag coming from elsewhere
+(chunk loading while flying, mobs) slows the builders through the throttle (`throttle` in the status), it does not
+come from this code.
+
+### What was fixed
+
+- **Ahead of the wave** (cause 1). A builder of a site that would stand takes a task of the **next** wave of the same
+  storey whose bay is settled: the current wave is done in that bay and in every bay of the site touching it. Support
+  is only ever the cell below, above or beside, and the program resolved it on "every earlier wave placed", so such a
+  task has everything it leans on. Never across a storey (the storey gate stays) and never into the finishing pass.
+  The crew size counts that next wave too.
+- **Lent builders** (causes 1 and 4). A builder that stood 40 ticks (2 s) on a site with nothing it can take goes to
+  another open site with a free task (the focus first), does one task there and is free again.
+- **Staffing every tick** (cause 3). Builders let go between dispatches are staffed on the next tick; a dispatch staffs
+  twice, so what a closing site lets go reaches the focus at once.
+- **The focus waiting** (cause 4). While the focus cannot open, the sites it waits for (`leaving`) take the free
+  builders, as the focus would.
+- **Ground for waiting builders** (cause 2). While builders of the focus wait for their bay's ground, its ground wave
+  may use twice `build.groundBlocksPerTick` (inside the foundation budget); when the foundation budget is spent, a
+  reserve of 8 blocks / 0.5 ms a tick for the focus's ground only.
+- **Probe and streams inside the tick budget** (causes 6, 7). The probe has one cap of 1024 for all open sites, its
+  own counts and the foundation time; carpet, trail, ground wave and the rings of the last sweep stop when the
+  foundation time of the tick is spent.
+
+Left: the wave barrier itself across storeys (by design); builders with no site because of the crew size
+(`siteCrewMax` 6 + rear guards of 2: with 12 builders some always have no site, they are `free` in the status, by
+design); the throttle's slow recovery (shared with `"radial"`).
+
+### Reading the counters
+
+After the usual fields, the line of `/t3craft demo status` gets:
+
+```
+| idle 2 free 3 idle-share 14% idle-ticks 812 by wave 61% ground 22% planning 9% chunk 8% longest 3.4s ground
+  ahead 230 lent 4 ground-reserve 0 focus-wait 1.2s worst-tick 3.1ms compile 18ms (work 6, worst 40) throttle 100%/100%
+```
+
+| field | meaning | what to look for |
+|---|---|---|
+| `idle` | builders of a site that hold no task and are not walking, now | |
+| `free` | builders with no site now (crew size, by design) | |
+| `idle-share` | idle builder-ticks / builder-ticks of builders with a site, since the job started | under ~15 % is fine |
+| `idle-ticks` | ticks with at least one idle builder | |
+| `by <reason> %` | why they were idle, share of idle builder-ticks: `wave` (the wave's other tasks are held: barrier), `ground` (a free task waits for its bay's ground), `chunk` (parked, chunk not loaded), `planning` (program not compiled yet), `boundary` (a non-focus site at a storey boundary, waiting for the dispatch), `no-work` (the site has nothing left) | the largest is the cause to work on |
+| `longest` | the longest a builder stood in a row, and why | several seconds with `ground` → the throttle or the foundation budget; with `wave` → a long tail |
+| `ahead` / `lent` / `ground-reserve` | tasks taken ahead of the wave, builders lent to another site, ticks the ground reserve ran | |
+| `focus-wait` | time the focus was chosen and could not hand out work (not open, or compiling) | |
+| `worst-tick` | worst `SiteCursor.tick` of the last one or two minutes, ms | over ~10 ms: the cursor itself is heavy (family A); low while the game lags: the lag is elsewhere |
+| `compile` | last site program: from opening to arrival (queue included), the compile itself, the worst arrival | hundreds of ms → the `Offload` queue |
+| `throttle a%/b%` | build budget factor from MSPT / from client FPS | under 100 % → the server (or the client) is slow and the budget was cut |
+
+A real server freeze shows as a high `worst-tick` only if it is in this cursor; otherwise `throttle` drops after it.
+
 ## Not done / open
 
 - **Support across sites is optimistic**: another site counts as standing (see above). A site built on top of
