@@ -28,9 +28,14 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>Slots mirror the painter's places one to one (ids: {@code hub}, {@code node_k}, {@code lot_n},
  * {@code lot_n_court}, {@code lot_n_gate}, {@code lot_n_hall_h}, {@code spawn}); a lot's halls are children of the
- * lot slot, and a slot is tagged {@code occupied} when a module of the roster stands in it. The painter still
- * draws the blocks of those places itself (the citadel's own pieces are baked into {@code hq.citadel.*}); moving
- * them behind {@link dev.t3craft.mapgen.PieceSource} is the piece catalog's job.
+ * lot slot, and a slot is tagged {@code occupied} when a module of the roster stands in it. By default the painter
+ * draws the blocks of those places itself (the citadel's own pieces are baked into {@code hq.citadel.*}); with
+ * {@code mapgen.citadel.pieces = "slots"} it asks a {@link dev.t3craft.mapgen.PieceSource} for the courtyard centres,
+ * the unbuilt hall spots and the centres of the empty lots first ({@link dev.t3craft.hq.citadel.CitadelSlots}).
+ *
+ * <p>Heights: slot origins are at the terrace's level ({@link RingCampusGeometry#level}); the painter paints flat
+ * ({@code y = 1} on the ground at {@code y = 0}) and lifts every terrace at the end, so it moves a slot to its own
+ * frame before asking for a piece.
  */
 public final class CitadelMapGenerator implements MapGenerator<HqLayout> {
 	@Override
@@ -99,10 +104,13 @@ public final class CitadelMapGenerator implements MapGenerator<HqLayout> {
 		}
 	}
 
-	/** A room as a slot: centred on its interior, facing out of its door wall (the wall at {@code u = -1}). */
+	/**
+	 * A room as a slot: centred on its interior, facing out of its door wall (the wall at {@code u = -1}). An even
+	 * depth loses its back row ({@code halfDeep = (d - 1) / 2}): the footprint never reaches past the back wall.
+	 */
 	private static Slot roomSlot(String id, Slot.Role role, Room r, int y, int height, String group, String parent, Set<String> tags) {
 		BlockPos centre = r.cell((r.d() - 1) / 2, r.c(), y);
-		return new Slot(id, role, centre, r.back().getOpposite(), (r.w() - 1) / 2, r.d() / 2, height, group, parent, tags);
+		return new Slot(id, role, centre, r.back().getOpposite(), (r.w() - 1) / 2, (r.d() - 1) / 2, height, group, parent, tags);
 	}
 
 	/** The zones of the open rings: a column has ground wherever the painter assigns it a zone. */
