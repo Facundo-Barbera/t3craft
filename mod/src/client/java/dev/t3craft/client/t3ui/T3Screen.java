@@ -106,6 +106,8 @@ public final class T3Screen extends Screen {
 		// (createRightPage) so it also watches the selected thread; the factory here watches the working ones only.
 		RightPanels.registerIfAbsent(QUEUE_PANEL, "Queue",
 				() -> new dev.t3craft.client.queue.QueuePanel(dev.t3craft.client.queue.QueuePanel.live(null)));
+		// #51: the project plan (docs/features/project-plan.md)
+		RightPanels.registerIfAbsent("plan", "Plan", dev.t3craft.client.plan.PlanPanel::create);
 	}
 
 	private static final DateTimeFormatter CLOCK = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault());
