@@ -201,6 +201,8 @@ public final class SiteCursor implements JobCursor {
 	private int rr;
 	/** Builder placements skipped this tick (already right in the world), all sites together. */
 	private int tickSkips;
+	/** World reads the resume probe may still make this tick, all open sites together ({@link #PROBES_MAX}). */
+	private int probesLeft;
 	/** The entry a builder is placing right now ({@link #frontOf} is asked from inside the placement). */
 	private int nowIndex = -1;
 	private int nowFront = -1;
@@ -1129,6 +1131,7 @@ public final class SiteCursor implements JobCursor {
 		}
 		int r = Math.min(CARPET_MAX, t.radiusMin() + t.radiusStep());
 		int r2 = r * r;
+		long nanos = b.foundationNanos();
 		long t0 = System.nanoTime();
 		int[] counts = new int[2];
 		boolean complete = true;
@@ -1146,7 +1149,7 @@ public final class SiteCursor implements JobCursor {
 					complete = false;
 					continue;
 				}
-				if (!layGround(c, step, counts, max, STREAM_SKIPS) || !layLift(c, step, counts, max, STREAM_SKIPS)) {
+				if (System.nanoTime() - t0 > nanos || !layGround(c, step, counts, max, STREAM_SKIPS) || !layLift(c, step, counts, max, STREAM_SKIPS)) {
 					budget = false;
 					break;
 				}
@@ -1172,7 +1175,7 @@ public final class SiteCursor implements JobCursor {
 							complete = false;
 							continue;
 						}
-						if (!layGround(c, step, counts, max, STREAM_SKIPS) || !layLift(c, step, counts, max, STREAM_SKIPS)) {
+						if (System.nanoTime() - t0 > nanos || !layGround(c, step, counts, max, STREAM_SKIPS) || !layLift(c, step, counts, max, STREAM_SKIPS)) {
 							budget = false;
 							break trail;
 						}
@@ -1204,8 +1207,13 @@ public final class SiteCursor implements JobCursor {
 		if (max <= 0 || b.foundationNanos() <= 0) {
 			return;
 		}
+		long nanos = b.foundationNanos();
 		long t0 = System.nanoTime();
 		int[] counts = new int[2];
+		// fix/builder-sites-stalls (#48): the resume probe has its own counts (its skips no longer eat the ground wave's)
+		// and one cap for all open sites together, inside the foundation time
+		int[] probed = new int[2];
+		probesLeft = PROBES_MAX;
 		try {
 			// the focus first, then the others
 			for (int pass = 0; pass < 2; pass++) {
@@ -1214,14 +1222,14 @@ public final class SiteCursor implements JobCursor {
 					if (o == null || o.prog == null || (o.site == focusSite) != (pass == 0)) {
 						continue;
 					}
-					probe(o, step, counts);
-					if (!groundWave(o, step, counts, max)) {
+					probe(o, step, probed, t0, nanos);
+					if (!groundWave(o, step, counts, max, t0, nanos)) {
 						return;
 					}
 				}
 			}
 		} finally {
-			b.spendFoundation(counts[0], System.nanoTime() - t0);
+			b.spendFoundation(counts[0] + probed[0], System.nanoTime() - t0);
 			dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_RADIAL_GROUND, t0);
 		}
 	}
@@ -1230,7 +1238,7 @@ public final class SiteCursor implements JobCursor {
 	 * The ground wave of {@code o}: ground, then clearing, of its bays in wave order (nearest the access first). A
 	 * bay with a column waiting for its chunk is passed over and looked at again next tick. False = the budget ended.
 	 */
-	private boolean groundWave(Open o, FrontCursor.Step step, int[] counts, int max) {
+	private boolean groundWave(Open o, FrontCursor.Step step, int[] counts, int max, long t0, long nanos) {
 		SiteProgram.Program g = o.prog;
 		if (g == null) {
 			return true;
@@ -1244,6 +1252,9 @@ public final class SiteCursor implements JobCursor {
 					int c = p.bayCols[k];
 					if (parked(c)) {
 						continue;
+					}
+					if (System.nanoTime() - t0 > nanos) {
+						return false; // the foundation time of this tick is spent: on from here next tick
 					}
 					if (!layGround(c, step, counts, max, STREAM_SKIPS)) {
 						return false;
@@ -1269,18 +1280,20 @@ public final class SiteCursor implements JobCursor {
 	 * Resume: looks at up to {@link #PROBES_MAX} entries of the program of {@code o} in the world and applies the ones
 	 * already right (skipped, no builder), so the crew does not walk a building that is already there.
 	 */
-	private void probe(Open o, FrontCursor.Step step, int[] counts) {
+	private void probe(Open o, FrontCursor.Step step, int[] counts, long t0, long nanos) {
 		IntPredicate al = already;
 		SiteProgram.Program g = o.prog;
 		if (al == null || g == null) {
 			return;
 		}
 		int[] ents = g.entries();
-		int looked = 0;
-		while (o.probeNext < ents.length && looked < PROBES_MAX) {
+		while (o.probeNext < ents.length && probesLeft > 0) {
 			int i = ents[o.probeNext];
 			if (!applied[i]) {
-				looked++;
+				probesLeft--;
+				if ((probesLeft & 63) == 0 && System.nanoTime() - t0 > nanos) {
+					return; // the foundation time of this tick is spent
+				}
 				if (al.test(i) && !stream(p.colOf[i], i, step, counts)) {
 					return; // its chunk went away: this entry again next tick
 				}
@@ -1383,7 +1396,7 @@ public final class SiteCursor implements JobCursor {
 				ringR = 0;
 				ringDx = 0;
 			}
-			if (ringR <= ringMax && !sweepRings(step, counts, max)) {
+			if (ringR <= ringMax && !sweepRings(step, counts, max, t0, nanos)) {
 				return;
 			}
 			int scanned = 0;
@@ -1414,7 +1427,7 @@ public final class SiteCursor implements JobCursor {
 	 * at most {@code r}, walked strip by strip ({@link #ringDx}); a strip is done again when the budget ends inside it
 	 * (applied entries are passed over). True = every ring is done; false = go on next tick.
 	 */
-	private boolean sweepRings(FrontCursor.Step step, int[] counts, int max) {
+	private boolean sweepRings(FrontCursor.Step step, int[] counts, int max, long t0, long nanos) {
 		int scanned = 0;
 		while (ringR <= ringMax) {
 			int r = ringR;
@@ -1433,7 +1446,7 @@ public final class SiteCursor implements JobCursor {
 					}
 				}
 				ringDx++;
-				if (scanned >= SCAN_MAX) {
+				if (scanned >= SCAN_MAX || System.nanoTime() - t0 > nanos) {
 					return false;
 				}
 			}
