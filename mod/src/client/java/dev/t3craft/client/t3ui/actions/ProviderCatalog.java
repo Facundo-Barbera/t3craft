@@ -6,15 +6,18 @@ import com.google.gson.JsonObject;
 import dev.t3craft.t3.Json;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
  * The provider instances of one environment and their models, decoded tolerantly from
  * {@code server.getConfig} ({@code ServerConfig.providers}, {@code ServerProvider} /
- * {@code ServerProviderModel} in {@code packages/contracts/src/server.ts}). The effort of a model is
- * its first {@code select} option descriptor ({@code ModelCapabilities.optionDescriptors}), as
- * {@code TraitsPicker.getSelectedTraits} picks {@code primarySelectDescriptor}. Pure, immutable.
+ * {@code ServerProviderModel} in {@code packages/contracts/src/server.ts}). A model's controls are its
+ * {@code ModelCapabilities.optionDescriptors}: {@code select} and {@code boolean} descriptors. The reasoning
+ * control is the select whose {@code role} is {@code "reasoning"}, else the first select, as
+ * {@code TraitsPicker.getSelectedTraits} picks {@code primarySelectDescriptor}; the other selects and the
+ * booleans are extra controls. Pure, immutable.
  */
 public record ProviderCatalog(List<Provider> providers) {
 	public static final ProviderCatalog EMPTY = new ProviderCatalog(List.of());
@@ -27,13 +30,30 @@ public record ProviderCatalog(List<Provider> providers) {
 	public record Choice(String id, String label, boolean isDefault) {
 	}
 
-	/** The model's effort control: a {@code select} descriptor ({@code effort}, {@code reasoningEffort}…). */
-	public record Effort(String id, String label, List<Choice> choices, @Nullable String currentValue) {
-		public Effort {
+	/**
+	 * One control of a model ({@code ProviderOptionDescriptor}): a {@code select} (choices, a current
+	 * value) or a {@code boolean} switch (fast, thinking...).
+	 *
+	 * @param flag         true for a {@code boolean} descriptor
+	 * @param role         {@code "reasoning"} for the reasoning control, else null
+	 * @param currentValue select: the value the server marks as current/default, else null
+	 * @param currentFlag  boolean: the server's current value, null when it does not say
+	 */
+	public record Descriptor(String id, String label, boolean flag, @Nullable String role, List<Choice> choices, @Nullable String currentValue,
+			@Nullable Boolean currentFlag, @Nullable String description) {
+		public Descriptor {
 			choices = List.copyOf(choices);
 		}
 
-		/** {@code currentValue}, else the choice marked default, else null (T3 shows "Default"). */
+		public boolean isSelect() {
+			return !flag;
+		}
+
+		public boolean isReasoning() {
+			return "reasoning".equals(role);
+		}
+
+		/** Select: {@code currentValue}, else the choice marked default, else null (T3 shows "Default"). */
 		public @Nullable String defaultValue() {
 			if (currentValue != null && has(currentValue)) {
 				return currentValue;
@@ -41,6 +61,7 @@ public record ProviderCatalog(List<Provider> providers) {
 			return choices.stream().filter(Choice::isDefault).map(Choice::id).findFirst().orElse(null);
 		}
 
+		/** Select: the descriptor offers this choice. */
 		public boolean has(@Nullable String value) {
 			return value != null && choices.stream().anyMatch(c -> c.id().equals(value));
 		}
@@ -48,12 +69,83 @@ public record ProviderCatalog(List<Provider> providers) {
 		public String labelOf(@Nullable String value) {
 			return choices.stream().filter(c -> c.id().equals(value)).map(Choice::label).findFirst().orElse(value == null ? "Default" : value);
 		}
+
+		/** Boolean: the starting value (false when the server does not say). */
+		public boolean flagDefault() {
+			return Boolean.TRUE.equals(currentFlag);
+		}
 	}
 
 	/** {@code ServerProviderModel}. */
-	public record Model(String slug, String name, @Nullable String shortName, boolean isDefault, @Nullable Effort effort) {
+	public record Model(String slug, String name, @Nullable String shortName, boolean isDefault, boolean isLegacy, boolean isCustom,
+			@Nullable String badge, @Nullable String subProvider, List<String> aliases, List<Descriptor> descriptors) {
+		public Model {
+			aliases = List.copyOf(aliases);
+			descriptors = List.copyOf(descriptors);
+		}
+
 		public String label() {
 			return shortName != null ? shortName : name;
+		}
+
+		/** The reasoning control: the select with role "reasoning", else the first select; null when there is no select. */
+		public @Nullable Descriptor reasoning() {
+			Descriptor first = null;
+			for (Descriptor d : descriptors) {
+				if (d.isSelect()) {
+					if (d.isReasoning()) {
+						return d;
+					}
+					if (first == null) {
+						first = d;
+					}
+				}
+			}
+			return first;
+		}
+
+		/** The selects other than {@link #reasoning()}, in the server's order. */
+		public List<Descriptor> extraSelects() {
+			Descriptor r = reasoning();
+			return descriptors.stream().filter(d -> d.isSelect() && d != r).toList();
+		}
+
+		/** The boolean switches, in the server's order. */
+		public List<Descriptor> flags() {
+			return descriptors.stream().filter(Descriptor::flag).toList();
+		}
+
+		public @Nullable Descriptor descriptor(@Nullable String id) {
+			return descriptors.stream().filter(d -> d.id().equals(id)).findFirst().orElse(null);
+		}
+
+		/**
+		 * Every word of {@code query} (split on spaces, case-insensitive) is part of the name, short name,
+		 * slug, an alias, the sub-provider or the badge. A blank query matches everything.
+		 */
+		public boolean matches(String query) {
+			String q = query.trim().toLowerCase(Locale.ROOT);
+			if (q.isEmpty()) {
+				return true;
+			}
+			StringBuilder hay = new StringBuilder(name).append(' ').append(slug);
+			if (shortName != null) {
+				hay.append(' ').append(shortName);
+			}
+			if (subProvider != null) {
+				hay.append(' ').append(subProvider);
+			}
+			if (badge != null) {
+				hay.append(' ').append(badge);
+			}
+			aliases.forEach(a -> hay.append(' ').append(a));
+			String h = hay.toString().toLowerCase(Locale.ROOT);
+			for (String word : q.split("\\s+")) {
+				if (!h.contains(word)) {
+					return false;
+				}
+			}
+			return true;
 		}
 	}
 
@@ -79,9 +171,10 @@ public record ProviderCatalog(List<Provider> providers) {
 			return models.stream().filter(m -> m.slug().equals(slug)).findFirst().orElse(null);
 		}
 
-		/** The model marked {@code isDefault}, else the first one; null when there is none. */
+		/** The model marked {@code isDefault}, else the first one that is not legacy, else the first; null when there is none. */
 		public @Nullable Model defaultModel() {
-			return models.stream().filter(Model::isDefault).findFirst().orElse(models.isEmpty() ? null : models.getFirst());
+			return models.stream().filter(Model::isDefault).findFirst()
+					.orElse(models.stream().filter(m -> !m.isLegacy()).findFirst().orElse(models.isEmpty() ? null : models.getFirst()));
 		}
 
 		public List<Modes.Runtime> runtimeModes() {
@@ -162,40 +255,62 @@ public record ProviderCatalog(List<Provider> providers) {
 			return null;
 		}
 		String name = Objects.requireNonNullElse(blank(Json.str(o, "name")), slug);
+		List<String> aliases = new ArrayList<>();
+		JsonArray al = Json.arr(o, "aliases");
+		if (al != null) {
+			for (JsonElement e : al) {
+				String a = e.isJsonPrimitive() ? blank(e.getAsString()) : null;
+				if (a != null) {
+					aliases.add(a);
+				}
+			}
+		}
 		return new Model(slug, name, blank(Json.str(o, "shortName")), Boolean.TRUE.equals(Json.optBool(o, "isDefault")),
-				effort(Json.obj(o, "capabilities")));
+				Boolean.TRUE.equals(Json.optBool(o, "isLegacy")), Boolean.TRUE.equals(Json.optBool(o, "isCustom")), blank(Json.str(o, "badge")),
+				blank(Json.str(o, "subProvider")), aliases, descriptors(Json.obj(o, "capabilities")));
 	}
 
-	/** The first {@code select} descriptor with at least one option, or null. */
-	static @Nullable Effort effort(@Nullable JsonObject caps) {
+	/** The {@code select} (with at least one option) and {@code boolean} descriptors; unknown types are skipped. */
+	static List<Descriptor> descriptors(@Nullable JsonObject caps) {
+		List<Descriptor> out = new ArrayList<>();
 		JsonArray ds = Json.arr(caps, "optionDescriptors");
 		if (ds == null) {
-			return null;
+			return out;
 		}
 		for (JsonElement e : ds) {
-			if (!(e instanceof JsonObject d) || !"select".equals(Json.str(d, "type"))) {
+			if (!(e instanceof JsonObject d)) {
 				continue;
 			}
 			String id = blank(Json.str(d, "id"));
-			JsonArray opts = Json.arr(d, "options");
-			if (id == null || opts == null) {
+			String type = Json.str(d, "type");
+			if (id == null || out.stream().anyMatch(x -> x.id().equals(id))) {
 				continue;
 			}
-			List<Choice> choices = new ArrayList<>();
-			for (JsonElement c : opts) {
-				if (c instanceof JsonObject co) {
-					String cid = blank(Json.str(co, "id"));
-					if (cid != null) {
-						choices.add(new Choice(cid, Objects.requireNonNullElse(blank(Json.str(co, "label")), cid),
-								Boolean.TRUE.equals(Json.optBool(co, "isDefault"))));
+			String label = Objects.requireNonNullElse(blank(Json.str(d, "label")), id);
+			String role = blank(Json.str(d, "role"));
+			String description = blank(Json.str(d, "description"));
+			if ("boolean".equals(type)) {
+				out.add(new Descriptor(id, label, true, role, List.of(), null, Json.optBool(d, "currentValue"), description));
+			} else if ("select".equals(type)) {
+				List<Choice> choices = new ArrayList<>();
+				JsonArray opts = Json.arr(d, "options");
+				if (opts != null) {
+					for (JsonElement c : opts) {
+						if (c instanceof JsonObject co) {
+							String cid = blank(Json.str(co, "id"));
+							if (cid != null) {
+								choices.add(new Choice(cid, Objects.requireNonNullElse(blank(Json.str(co, "label")), cid),
+										Boolean.TRUE.equals(Json.optBool(co, "isDefault"))));
+							}
+						}
 					}
 				}
-			}
-			if (!choices.isEmpty()) {
-				return new Effort(id, Objects.requireNonNullElse(blank(Json.str(d, "label")), id), choices, blank(Json.str(d, "currentValue")));
+				if (!choices.isEmpty()) {
+					out.add(new Descriptor(id, label, false, role, choices, blank(Json.str(d, "currentValue")), null, description));
+				}
 			}
 		}
-		return null;
+		return out;
 	}
 
 	private static @Nullable String blank(@Nullable String s) {

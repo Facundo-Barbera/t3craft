@@ -89,6 +89,10 @@ public final class UiGallery {
 					() -> new dev.t3craft.client.pieces.PieceBrowserScreen(null)),
 			new Scenario("inbox-pieces", "Main T3 screen with the piece browser in the thread's place (the ⋯ menu → Pieces)",
 					() -> inbox(true, true).withPage(new dev.t3craft.client.pieces.PieceBrowserPanel())),
+			new Scenario("model-picker", "Composer model picker over a canned catalog (13 providers, favorites, legacy, reasoning / extra selects / switches, Access); new-thread mode",
+					() -> new dev.t3craft.client.t3ui.actions.ModelPickerGallery(null, false)),
+			new Scenario("model-picker-thread", "Same picker as a thread's picker (Apply / Cancel footer; Apply is aimed at the fake environment and fails with the usual toast)",
+					() -> new dev.t3craft.client.t3ui.actions.ModelPickerGallery(null, true)),
 			new Scenario("queue", "Queued runs (reads the live queue, empty without a connection)", () -> new QueueScreen(null, null)));
 
 	private UiGallery() {

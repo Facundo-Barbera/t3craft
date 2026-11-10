@@ -24,7 +24,7 @@ References: `t3craft-ref/ui/t3code-real.png` (T3 Code, composer at the bottom ce
   switching thread starts a fresh history). Text still arrives through SDL3 text input
   (`TextInputManager`), key and mouse codes are `InputConstants` / `MouseButtons`.
 - **Bar**: clip on the left; on the right the model chip ("✳ Opus 5.5 · Medium ▾": provider glyph,
-  model without the provider prefix, effort, "· Plan" in plan mode; `ModelPicker.composerChip()`),
+  model without the provider prefix, reasoning, "· Plan" in plan mode; see `docs/features/model-picker.md`),
   whose popover opens upwards aligned to its right edge; an access chip ("Full access", "Auto"…) only
   when the access is not the default, as T3's `ComposerFooterModeControls`; then the round button.
 - **Round button**: indigo ↑ send, grey and disabled while there is no text and no image; red ■

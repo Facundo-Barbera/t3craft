@@ -44,7 +44,7 @@ final class ModelPickerControl implements ComposerView.Control, T3Slots.Popup {
 			String k = "draft:" + d.id;
 			if (!k.equals(pickerKey) || picker == null) {
 				ThreadDraft dd = d;
-				picker = ModelPicker.forNewThread(font, d.envId, pick -> dd.pick = pick).composerChip();
+				picker = ModelPicker.forNewThread(font, d.envId, pick -> dd.pick = pick);
 				pickerKey = k;
 				d.pick = picker.pick();
 			}
@@ -64,7 +64,7 @@ final class ModelPickerControl implements ComposerView.Control, T3Slots.Popup {
 		if (!k.equals(pickerKey) || picker == null) {
 			ThreadShell shell = T3Slots.shellOf(t.envId(), t.threadId());
 			picker = ModelPicker.forThread(font, t.envId(), t.threadId(), t.title(), shell == null ? null : ModelPick.fromMeta(shell.meta()), pick -> {
-			}).composerChip();
+			});
 			pickerKey = k;
 		}
 		return picker;
@@ -109,6 +109,11 @@ final class ModelPickerControl implements ComposerView.Control, T3Slots.Popup {
 	@Override
 	public boolean mouseScrolled(double mx, double my, double dy) {
 		return picker != null && picker.mouseScrolled(mx, my, dy);
+	}
+
+	@Override
+	public boolean charTyped(int codepoint) {
+		return picker != null && picker.charTyped(codepoint);
 	}
 
 	/** T3's access chip ("Full access", "Auto"…): only when not the default; opens the picker. */
