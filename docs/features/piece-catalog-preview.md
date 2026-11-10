@@ -80,13 +80,28 @@ After each piece, chat shows its size and block count with **[prev] [next] [relo
 ## Changing piece and reloading
 
 The stage holds one **scene** (piece + floor + lobby). Changing it is a diff against what the world holds, applied on the server
-thread within a 25 ms budget per tick (a million blocks do not stall the game, they just take a few seconds):
+thread within a 10 ms budget per tick (a million blocks do not stall the game, they just take a few seconds):
 
 1. **place** every cell of the new scene whose block differs from the world's;
 2. **clear** every cell of the previous scene the new one does not have;
 3. **sweep** (only when the previous scene is not known: the first piece of a session, or a switch while a change was still going up) the
    recorded area of the stage, clearing anything the new scene does not have. The area is saved with the world
    (`t3craft-piece.json`), so leftovers of an earlier session are cleaned too.
+
+How the work is spread (#38, after a ~94 ms server tick when a stage went up):
+- `PieceStage.step` runs **once a tick** (the first tick of a `show` used to run it twice, once when the offer was taken and once in the tick).
+  The 10 ms budget is also checked **every time the work moves to another chunk**: reading or placing in a chunk that is not loaded loads
+  (or generates) it on the server thread, and the far stage is mostly unloaded. Batches are 500 cells.
+- The floor is emitted in **16x16 tiles** (still south first), and the sweep checks the area tile by tile (every layer of a tile before the
+  next tile), so the work stays on one or two chunks at a time instead of on a whole row of them.
+- The **teleport waits for the lobby**: the player is taken to the arrival pad as soon as the pad, the arch and the signs (`PieceScene.lobbyCells`,
+  the head of the model) are placed, in the first tick or the next few, not before. The action bar shows `Building <piece>: N%` every 10 ticks;
+  `/t3craft piece` shows the percentage too.
+- A second `show` (or `next`, `size`, `clear`...) while a stage is going up **drops the first one**: nothing else holds on to it. If the first
+  had not touched the world yet, the second starts from the same point; otherwise the whole recorded area is swept, as before. A trip the dropped
+  change had asked for is kept. The final world is the same as with one command.
+- Placement flags are unchanged: `PlanApplier` already places with `UPDATE_CLIENTS | UPDATE_KNOWN_SHAPE | UPDATE_SUPPRESS_DROPS` (no neighbour updates) and
+  then does its own shape pass, which connections (panes, stairs) need.
 
 The piece is **built on a worker thread** (a part of the citadel needs the whole plan: a few seconds the first time; the empty citadel's plan is
 the one the game already computes for the HQ world). Plans are kept for the session; `reload` generates them again.

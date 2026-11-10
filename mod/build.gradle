@@ -122,7 +122,7 @@ tasks.register("uiRender", JavaExec) {
 }
 // Icon pipeline (docs/tools/icons.md, issue #24): the Lucide SVGs in tools/art/icons/lucide are rasterised to
 // white-on-transparent PNG sprites (t3craft:icons/<name>) by `generateIcons`, which runs before
-// processResources and adds its output to the main resources. Only the SVGs are in the repo. Apache Batik
+// processClientResources and adds its output to the client resources. Only the SVGs are in the repo. Apache Batik
 // lives in the `icons` source set (build time only): it is not in the mod jar nor in any run classpath.
 // If Batik does not resolve or an icon does not rasterise, generateIcons fails and so does the build: the
 // game is never shipped without its icons.
@@ -154,7 +154,12 @@ def generateIcons = tasks.register("generateIcons", JavaExec) {
 			iconsPx.toString())
 	javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(25) }
 }
-sourceSets.main.resources.srcDir(generateIcons)
+// The sprites are client-only (T3Icon), so they are a resources dir of the `client` source set. With
+// splitEnvironmentSourceSets() the client source set has no resources of its own (no src/client/resources), so
+// processClientResources was NO-SOURCE and never created build/resources/client, which the dev client run
+// config still lists on its classpath (the log warned about the missing directory). The generated dir gives it
+// a source; client.output is on the dev client, hqrender/uirender classpaths and in the jar, like the client classes.
+sourceSets.client.resources.srcDir(generateIcons)
 
 // This repo does not use unit tests: adding or running them is forbidden; verification = compiling.
 // Tests are blocked outright, so `test`, `check` and `build` never run any even if someone adds them back:
@@ -173,8 +178,11 @@ tasks.named("check") {
 	setDependsOn([tasks.named("hqrenderClasses")])
 }
 
-processResources {
+tasks.named("processClientResources") {
 	dependsOn generateIcons
+}
+
+processResources {
 	def version = project.version
 	inputs.property "version", version
 
