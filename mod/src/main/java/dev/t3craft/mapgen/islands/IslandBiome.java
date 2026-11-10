@@ -4,11 +4,12 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import net.minecraft.core.Direction;
+import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
-import net.minecraft.world.level.block.state.properties.DripstoneThickness;
+import net.minecraft.world.level.block.state.properties.SpeleothemThickness;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -43,8 +44,8 @@ public enum IslandBiome {
 			8, Set.of("pine", "birch", "stone", "tower", "lookout", "copper", "forge", "library")),
 	/** Sand over sandstone, a banded terracotta body and a terracotta underside. */
 	DESERT("desert", b(Blocks.SAND), null, b(Blocks.SANDSTONE), b(Blocks.SMOOTH_SANDSTONE), b(Blocks.SANDSTONE), null,
-			new BlockState[] {b(Blocks.TERRACOTTA), b(Blocks.ORANGE_TERRACOTTA), b(Blocks.YELLOW_TERRACOTTA), b(Blocks.SANDSTONE)},
-			b(Blocks.TERRACOTTA), b(Blocks.ORANGE_TERRACOTTA), null, b(Blocks.SMOOTH_SANDSTONE), b(Blocks.CUT_SANDSTONE), List.of(b(Blocks.DEAD_BUSH)),
+			new BlockState[] {b(Blocks.TERRACOTTA), b(Blocks.DYED_TERRACOTTA.pick(DyeColor.ORANGE)), b(Blocks.DYED_TERRACOTTA.pick(DyeColor.YELLOW)), b(Blocks.SANDSTONE)},
+			b(Blocks.TERRACOTTA), b(Blocks.DYED_TERRACOTTA.pick(DyeColor.ORANGE)), null, b(Blocks.SMOOTH_SANDSTONE), b(Blocks.CUT_SANDSTONE), List.of(b(Blocks.DEAD_BUSH)),
 			10, Set.of("terrace", "stone", "sundial", "obelisk", "brazier", "pot", "stall", "trough", "rosette"));
 
 	private final String id;
@@ -95,7 +96,7 @@ public enum IslandBiome {
 	private static BlockState dripstoneTip() {
 		return Blocks.POINTED_DRIPSTONE.defaultBlockState()
 				.setValue(BlockStateProperties.VERTICAL_DIRECTION, Direction.DOWN)
-				.setValue(BlockStateProperties.DRIPSTONE_THICKNESS, DripstoneThickness.TIP);
+				.setValue(BlockStateProperties.SPELEOTHEM_THICKNESS, SpeleothemThickness.TIP);
 	}
 
 	private static BlockState petals(int amount) {
