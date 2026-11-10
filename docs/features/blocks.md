@@ -151,7 +151,7 @@ dejan el binding **manual** (ver abajo); `/t3craft blocks auto` lo devuelve al a
 ### Página de configuración y marca `manual` (#33)
 
 **Gesto:** agachado + clic derecho **con la mano principal vacía** sobre un bloque que tiene página
-(`BlockConfigPages`; hoy solo el monitor y las pantallas grandes) abre `BlockConfigPanel`, un `T3Panel` dentro de
+(`BlockConfigPages`; ver la tabla "Tipo de bloque → opciones" más abajo) abre `BlockConfigPanel`, un `T3Panel` dentro de
 un `T3PanelScreen`. El clic normal hace lo de siempre (abrir el hilo). Con un ítem en la mano, agacharse sigue
 colocándolo contra el bloque, como antes. Sin ítem llave ni tecla nueva. Lo intercepta un `UseBlockCallback` en
 `BlocksClient` (devuelve `FAIL` en el cliente: no llega paquete al servidor, el `use` del bloque no corre).
@@ -196,19 +196,66 @@ tocar dibuja exactamente como antes. El renderer las lee con `be.options()` / `b
 | Rows shown | `rows`: `0` (las que quepan) o un tope | `0` |
 | Show the age | `showAge`: la antigüedad en la ficha de estado | `true` |
 
-La vista lejana ajusta su texto al tamaño de la pantalla y no usa `textSize`; la pantalla de estado (`beacon`) no
-usa estas opciones todavía (T10). Una pared multibloque se edita como una sola: la página escribe todas las
-celdas de `MonitorBlock.extent`, y el renderer lee las opciones de la celda que dibuja.
+La vista lejana ajusta su texto al tamaño de la pantalla y no usa `textSize`. Una pared multibloque se edita como
+una sola: la página escribe todas las celdas de `MonitorBlock.extent`. **Desde #43** el renderer y la página leen las
+opciones de la pared (`MonitorBlock.screenOptions`: las del origen si tiene, si no las de la primera celda que tenga),
+así que un monitor que se agrega después a una pared (aunque pase a ser su nuevo origen) dibuja y se edita con las
+opciones de la pared, sin guardar nada extra.
 
-**Cómo enchufar otra página (T10):** implementar `BlockConfigSection` (nombre, tipos de binding que ofrece,
-etiquetas, celdas que se editan juntas, vista previa y `options(form, config)` con `form.select` /
+**Pantalla de estado** (monitor vinculado a `beacon`; la misma página, el selector Content en "Status (whole HQ)"):
+solo muestra *Text size* y *Accent* (las filas y la edad no existen en esa pantalla). `StatusScreen.Style`: el tamaño
+de texto escala el máximo de números y etiquetas (siempre acotado a lo que cabe en su celda) y el acento sustituye los
+colores de las celdas PRS TO REVIEW y ACTIVE PROJECTS; las fichas de estado conservan sus colores (son el significado de
+la pantalla) y el LED del marco sigue al estado más urgente.
+
+**Cómo enchufar otra página:** implementar `BlockConfigSection` (nombre, tipos de binding que ofrece (vacío = sin
+selector), etiquetas, celdas que se editan juntas, vista previa y `options(form, config)` con `form.select` /
 `form.toggle` / `form.note` / `form.set(key, value, default)`), registrarla con
 `BlockConfigPages.register(MiBloque.class, MiSeccion::new)` y leer las claves en el renderer del bloque con
-`be.option(key, default)`. El gesto, la marca manual, la escritura y el modo de solo lectura ya vienen dados.
+`be.option(key, default)`. El block entity tiene que ser un `BoundBlockEntity` (si el bloque no tiene binding,
+`bindable()` devuelve false: el HQ, el selector y `/t3craft blocks link` lo ignoran). El gesto, la marca manual, la
+escritura y el modo de solo lectura ya vienen dados.
+
+### Tipo de bloque → opciones (#43)
+
+Claves de `options` (cadenas, solo si difieren del default; un bloque sin tocar dibuja y actúa como antes):
+
+| Bloque (clase) | Sección | Bindings que ofrece | Opciones (clave: valores, **default**) | Quién las lee |
+|---|---|---|---|---|
+| `monitor` (`MonitorBlock`), pared o suelto | `MonitorConfigSection` | thread (Log), project, env, beacon (Status) | `textSize`: small / **normal** / large · `accent`: **status** o token del tema · `rows`: **0** o tope · `showAge`: **true** / false | `MonitorRenderer` |
+| `monitor` vinculado a `beacon` (pantalla de estado) | la misma | las mismas | `textSize` y `accent` (las filas y la edad no aplican) | `StatusScreen` vía `StatusScreen.Style` |
+| `status_lamp`, `board_lamp` (`StatusLampBlock`) | `LampConfigSection("Lamp")` | thread (lámpara de escritorio), board (bombilla), beacon | `glow`: off / soft / **normal** / strong · `pulse`: **true** / false · `motes`: **true** / false | `LampRenderer` (`LampOptions`) |
+| `paper_lantern` (`KitLanternBlock`) | `LampConfigSection("Paper lantern")` | las mismas | las mismas (el brillo va sobre el cuerpo de papel) | `LampRenderer` |
+| `decision_podium` (`DecisionPodiumBlock`) | `PodiumConfigSection` | board (ranura), thread | `nobody`: **message** / silent (qué hace el clic si nadie espera) | `BlocksClient.usePodium` (`ClickOptions`) |
+| `merge_station` (`MergeStationBlock`) | `MergeStationConfigSection` | project, env, thread | `accent`: **status** (color del estado del PR) o token · `showTitle`: **true** / false | `MergeStationRenderer` (`MergeOptions`) |
+| `console_terminal` (`ConsoleTerminalBlock`) | `ConsoleConfigSection` | thread | `opens`: **bound** (el hilo vinculado, o uno nuevo si no hay) / new (siempre uno nuevo) | `BlocksClient.useConsole` |
+| `archive_terminal` (`ArchiveTerminalBlock`) | `ArchiveConfigSection` | ninguno (muestra todo el archivo) | `recent`: 1 / 2 / **3** · `accent`: **status** (ámbar) o token (color de la cabecera) | `ArchiveTerminalRenderer` (`ArchiveOptions`) |
+| `thread_board` (`ThreadBoardBlock`), el muro de hilos | `ThreadBoardConfigSection` | ninguno | `columns`: **vacío** (lo que diga el plan o `blocks.threadWall.columns`) / status / project / environment | `ThreadBoardBlockEntity.columns()` → `ThreadBoardRenderer` |
+
+`accent` usa los mismos tokens que el monitor (`BlockAccent`, `MonitorOptions.ACCENTS`). Notas:
+
+- El muro de hilos y la terminal de archivo pasan a ser `BoundBlockEntity` solo para guardar `options`
+  (`bindable()` = false: sin binding, el HQ no los toca y `/t3craft blocks link` los rechaza). NBT aditivo: sus datos
+  viejos (`width`, `height`, `columns`) cargan igual, y la opción `columns` de la página gana sobre la del plan. El
+  tamaño del muro no es una opción: es un marco de bloques reales.
+- Un bloque que el HQ vinculó a algo que su selector no ofrece (una lámpara de módulo, `module:...`) muestra una
+  nota con ese binding; elegir otro lo reemplaza.
+- Un podio vinculado a un hilo (`thread:`) abre ese hilo al hacer clic (antes solo `board:` abría algo).
+- Sin página: la placa (`room_plaque`, el texto lo escribe el plan), las tiras y paneles de luz, y el resto del kit
+  decorativo (no tienen block entity vinculable). Las workstations y sus pantallas flotantes no son bloques: no tienen
+  página, y las pantallas de los escritorios del HQ son monitores (su página es la del monitor). No existe todavía un
+  bloque de tablero de horarios (`task_board`, ver "Esqueleto para después"): cuando exista, se enchufa igual.
+- `/t3craft blocks link` autocompleta (`BlocksClient.linkSuggestions`, `BindingChoices`): `status` y las claves
+  `thread:`, `project:` y `env:` de lo que el cliente conoce.
+- La vista previa del log de un monitor usa las últimas filas reales del hilo cuando el cliente tiene su log abierto
+  (`LogPreview`: un monitor de ese hilo cerca del jugador; la página no abre ninguna suscripción) y las de ejemplo
+  si no. Las demás vistas previas son esquemáticas.
 
 **Galería:** `/t3dev ui block-config-monitor` abre la página sobre un block entity falso en memoria (una pared
-de 3 bloques vinculada a mano a un hilo, texto grande, 5 filas) con hilos, proyectos y entornos falsos. Save y
-Reset solo cambian el bloque falso.
+de 3 bloques vinculada a mano a un hilo, texto grande, 5 filas) con hilos, proyectos y entornos falsos; ese hilo
+tiene filas "reales" falsas. Save y Reset solo cambian el bloque falso. Un escenario por sección nueva:
+`block-config-status`, `block-config-lamp`, `block-config-lantern`, `block-config-podium`, `block-config-merge`,
+`block-config-console`, `block-config-archive` y `block-config-thread-wall`.
 
 ## Monitor
 
