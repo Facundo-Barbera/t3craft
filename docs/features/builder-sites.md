@@ -281,6 +281,26 @@ Nothing here was compiled. Where a mistake is most likely:
   `RadialCursor` does.
 - Syntax was checked with a tree-sitter Java grammar; types were checked by reading only.
 
+### Compile review (#45)
+
+A second blind pass read `SiteCursor`, `SiteProgram`, `SiteDispatch`, `BuildTuning`, `BuildPlan` and the lines `#25`
+added to `BuildJob`, `BuildCommands`, `DemoBuildRun` and `DemoHq` against the real code, and found nothing to change:
+
+- every constructor call of `BuildTuning` (35 arguments in `DEFAULTS` and `parse`, the compatibility constructors
+  delegating in order) and of `BuildPlan` matches its declaration; no other source set (`client`, `hqrender`,
+  `uirender`) calls them;
+- `SiteCursor` implements all of `JobCursor`; every `p.*`, `g.*` (the `Program` record), `SiteDispatch.*`, `PerfStats`,
+  `BuildBudget`, `WalkLevels`, `CrewPlanner`, `CrewCursor.Walker` and `Offload` member it uses exists with that
+  arity and type; every `final` field of `SiteProgram` is assigned once before it is read;
+- `@Nullable` sits where `RadialCursor` puts it (`int @Nullable []`, `SiteProgram.@Nullable Program`,
+  `CrewCursor.@Nullable Walker`), and no local is declared twice in nested scopes (checked with a throw-away
+  tree-sitter script);
+- the nested conditional in `BuildJob` that picks `SiteCursor.plan` or `RadialCursor.plan` is a valid poly conditional,
+  and with `build.order: "radial"` (or `"parts"`) the job takes exactly the branches it took before.
+
+What can still fail only javac or the game will show: Minecraft API calls (`BlockState.getLightEmission`,
+`canOcclude`, `isAir`) are the same ones other classes in the repo already use.
+
 ## Config and restarts
 
 **RESTART** (`BuildTuning` and `BuildPlan` changed shape; three new classes).
