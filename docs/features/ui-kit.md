@@ -1,4 +1,4 @@
-# feat/ui-native-kit: kit de UI propio y pantallas migradas (#14, B3 y B4); teclado, listas y campos (#22); iconos (#28)
+# feat/ui-native-kit: kit de UI propio y pantallas migradas (#14, B3 y B4); teclado, listas y campos (#22); iconos (#28); últimas pantallas vanilla (#26)
 
 Paquete del kit: `dev.t3craft.client.t3ui.kit` (`mod/src/client/java/dev/t3craft/client/t3ui/kit/`).
 Plan: `docs/plans/ui-browser-and-integrations.md`, frente B. La pregunta Q6 quedó respondida por Facundo al ver las
@@ -108,6 +108,10 @@ Los iconos son los `T3Icon` (SVG de Lucide, ver `docs/tools/icons.md`), tintados
 | **Snooze** | `SnoozeScreen` (`T3DialogScreen`) | Tres presets y Cancelar. |
 | **Environment edit** (#23) | `EnvironmentEditPanel` (página) | "Edit" de `EnvironmentsPanel` hace `host().show(...)`: la edición se queda dentro de la página y "Back" vuelve a la lista (antes abría una pantalla vanilla). Nombre, muestras de color (un control privado de la página, `Swatches`), interruptores y campos de ventana y máximo. |
 | **Outbound** (#23) | `OutboundPanel` + `OutboundDestinationPanel` (páginas) | Ajustes → Connections → "Outbound events…" la apila. Interruptor general con modal de confirmación (queda apagado hasta confirmar), lista de destinos en un `T3List`, y la página del destino (nombre, plantilla en un `T3Select`, URL secreta que nunca se muestra de vuelta, acción al tocar, "pending only", eventos, Send test, Delete con confirmación). |
+| **Run queue** (#26) | `QueuePanel` (página) + `QueueScreen` (host `T3PanelScreen`) | Un `T3List`: fila de cabecera por hilo (entorno, título, estado) y una fila por run con tres `T3IconButton` (`chevron-up`, `chevron-down`, `x`). Sin control (operate) los botones quedan deshabilitados con "Requires control (operate)". Cancelar pide confirmación con un modal del kit sobre la página y luego manda la acción confirmada por `OperateGate`; reordenar sale directo. Resultado en el pie. Datos por `QueuePanel.Source` (la real vigila el hilo enfocado y los que trabajan mientras la página se ve). |
+| **Archive** (#26) | `ArchivePanel` + `ArchiveScreen` | Búsqueda (`T3Field`) y filtros de entorno y proyecto con `T3Select` (antes chips que rotaban), `T3List` con scroll (ya no pagina), Older / Refresh en el pie con iconos. El bloque archive terminal, `/t3craft archive` y el portable siguen abriéndola por `ArchiveClient.openArchive`. |
+| **HQ menu** (#26) | `HqMenuPanel` + `HqMenuScreen` (host `T3PanelScreen`, un `Screen` normal: se abre desde la pantalla de título) | Open HQ en la cabecera, `T3List` de layouts (clic o Enter eligen), línea de estado, pie con Export/Reload layouts, Rebuild with y Reset HQ; Rebuild y Reset piden confirmación con un modal del kit, y una negativa se muestra en otro modal. |
+| **Merge station** (#26) | `MergeStationPanel` + `MergeStationScreen` | `T3List` de PRs pendientes con dos botones por fila: Open (`external-link`, deshabilitado sin enlace) y Chat (`message-square`). Solo lectura. |
 | **Register project** (#23) | `RegisterProjectDialog` (`T3DialogScreen`) | `T3Select` de entorno, campos de ruta y nombre, interruptor "create the folder", Register / Cancel; el estado en vivo dice el nombre que tomará, el primer error tras pulsar Register o la respuesta de T3. Mismos puntos de entrada (`new RegisterProjectDialog(...)` y `open(...)`). |
 
 Los puntos de entrada no cambian: `new SettingsScreen(parent, actions)`, `new EnvironmentsScreen(...)`, `new PairScreen(parent[, readOnly])`,
@@ -157,9 +161,12 @@ glifos fuera de Latin-1 que había (`▾`, `—`, `…`, `✕`, `‹`) se sustit
 kit, que no se tocaron porque son de otros hilos o de pantallas sin migrar (excluido lo del selector de modelo,
 `ModelPicker*`/`ProviderCatalog`):
 
-* Colores con `ChatFormatting` o literales `0xFF…` en widgets vanilla sin migrar: `config/BaseConfigScreen` (ON/OFF, estado,
-  título), `config/OutboundScreen` y `config/OutboundDestinationScreen` (avisos ámbar/verde/gris, "Delete" rojo),
-  `t3ui/actions/RegisterProjectDialog` (amarillo, rojo, blanco, gris), `operate/ThreadOpsBar` (rojo del botón peligroso).
+* Colores con `ChatFormatting` o literales `0xFF…` en widgets vanilla sin migrar: `operate/ThreadOpsBar` (rojo del botón
+  peligroso). `BaseConfigScreen`, `OutboundScreen`/`OutboundDestinationScreen` y `RegisterProjectDialog` ya no tienen
+  (borradas o migradas en #23 y #26). Las cuatro pantallas del #26 (cola, archivo, menú del HQ, merge station) dibujan solo con
+  tokens; las paletas de dominio que quedan en esas carpetas son del mundo, no de la GUI: `MergeFeed.color` y
+  `MergeStationRenderer` (el panel del bloque), `TerminalDisplay` y `ArchiveLabel.envColor` (la pantalla del bloque archive
+  terminal, el color de tinte del entorno).
 * Paletas de dominio con literales, que no son tokens de tema: `t3ui/actions/ThreadStatus` (color por estado de hilo),
   `t3ui/sidebar/SidebarRow` (estados y acentos), `t3ui/actions/ThreadStatusChip` (`BG`), `t3ui/DraftControls` (gris del chip y
   fondo del campo). Convendría pasarlos a tokens de `ui-style.json` cuando alguien toque esas pantallas.
@@ -171,8 +178,11 @@ kit, que no se tocaron porque son de otros hilos o de pantallas sin migrar (excl
 
 ## Lo que queda a medias
 
-* `QueueScreen`, `ArchiveScreen`, `HqMenuScreen` y `MergeStationScreen` siguen con widgets vanilla. Las pantallas de `config`
-  (environment edit, outbound) y `RegisterProjectDialog` ya se migraron (#23). `BaseConfigScreen` sigue en el repo y se borra en un hilo posterior.
+* Ya no queda ninguna pantalla de T3Craft con widgets vanilla salvo los diálogos vanilla que abren otros (p. ej. `ConfirmLinkScreen`
+  para un enlace, el `ConfirmScreen` de `DemoClient` al salir de un mundo). `BaseConfigScreen` y el placeholder `ThreadChatScreen`
+  se borraron en el #26 (nadie los usaba).
+* La cola todavía no se abre desde el menú del sidebar de `T3Screen` (solo `/t3craft queue` y la galería): toca `T3Screen`, queda
+  para después.
 * Los botones dentro de las filas de un `T3List` (la lista de entornos) no están en el orden de Tab: se llegan con el ratón.
   La lista sí es una parada de Tab, con su cursor de fila.
 * `T3TextArea` no se recorta en una página con scroll (ver arriba), y la selección con el ratón dentro de un diálogo con cajas
@@ -208,6 +218,10 @@ Con el juego abierto (cliente de desarrollo), `/t3dev ui` lista los escenarios y
 /t3dev ui register-project      dialogo de registrar proyecto (necesita un entorno emparejado para elegir entorno)
 /t3dev ui kit                   el kit entero en una página (teclado, listas, campos, diálogo con campos)
 /t3dev ui inbox-kit             la misma página dentro de T3Screen (el diálogo y el arrastre pasan por T3Screen)
+/t3dev ui queue                 cola de ejecuciones con colas falsas (un entorno con control, otro de solo lectura)
+/t3dev ui archive               archivo con hilos cerrados falsos (búsqueda, selects de entorno y proyecto)
+/t3dev ui hq-menu               menú del HQ con los layouts reales y un HQ construido falso (no abre ni resetea nada)
+/t3dev ui merge-station         merge station con PRs falsos (abierto, draft, uno sin enlace)
 ```
 
 F3+T recarga `ui-style.json` y estas pantallas se re-maquetan. Qué mirar: que Esc retroceda página a página, que el scroll con

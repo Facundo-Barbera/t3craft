@@ -7,7 +7,7 @@ import java.util.function.Consumer;
 import org.jspecify.annotations.Nullable;
 
 /**
- * State of the HQ menu ({@link HqMenuScreen}), pure Java and unit tested: which layout is chosen
+ * State of the HQ menu ({@link HqMenuPanel}), pure Java and unit tested: which layout is chosen
  * (persisted through {@code persist} the moment it changes), which one the HQ on disk is built
  * with, and which actions the menu offers.
  *

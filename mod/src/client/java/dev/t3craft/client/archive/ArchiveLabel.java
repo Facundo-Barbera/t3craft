@@ -1,43 +1,20 @@
 package dev.t3craft.client.archive;
 
-import dev.t3craft.client.workstation.TextFit;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
 import net.minecraft.world.item.DyeColor;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Text of a slot's label (four short lines, fits on one block face) and of a catalog row. Pure.
- *
- * <pre>
- *   Fix login redirect l…     title, white
- *   ● vps                     environment, in its HQ colour
- *   ✔ 2026-11-03              kind + close date, grey
- *   t3craft                   project, light grey
- * </pre>
+ * Small text helpers of the archive (pure): the close date of a row and the environment's HQ colour, used by
+ * the archive terminal block's screen ({@link TerminalDisplay}). The per-slot labels in the world (four lines
+ * with their own colours) are gone: the archive lives only in its screen.
  */
 public final class ArchiveLabel {
-	/** Characters per label line (≈ 0.9 block at {@code ArchiveRenderer}'s scale). */
-	public static final int WIDTH = 22;
-	public static final int TITLE = 0xFFFFFF;
-	public static final int DATE = 0xAAAAAA;
-	public static final int PROJECT = 0xCCCCCC;
 	private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
-	public record Line(String text, int color) {
-	}
-
 	private ArchiveLabel() {
-	}
-
-	public static List<Line> lines(ArchiveEntry e, ZoneId zone) {
-		return List.of(
-				new Line(TextFit.clip(e.title(), WIDTH), TITLE),
-				new Line(TextFit.clip("● " + e.envLabel(), WIDTH), envColor(e.env())),
-				new Line(e.kind().glyph + " " + date(e.closedAtMs(), zone), DATE),
-				new Line(TextFit.clip(e.projectLabel(), WIDTH), PROJECT));
 	}
 
 	/** {@code yyyy-MM-dd} in {@code zone}, or {@code ?} when unknown. */

@@ -2,7 +2,8 @@
 
 ## Qué hace
 
-- **Ver la cola (solo lectura, sin operate)**: `QueueScreen` lista los runs en cola por hilo
+- **Ver la cola (solo lectura, sin operate)**: `QueueScreen` (host `T3PanelScreen` de la página del kit `QueuePanel`,
+  #26) lista los runs en cola por hilo
   (todos los entornos; orden de entrega de T3) y el panel del NPC muestra `⏳ n en cola`.
   `/t3craft queue` abre la pantalla; `/t3craft queue <env:hilo>` lista esa cola en el chat
   (el id corto es clicable y sugiere el comando de cancelar).

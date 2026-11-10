@@ -73,7 +73,6 @@ Reglas para todos:
 | `search.SearchModel` / `search.SearchBox` | Modelo puro del campo de búsqueda (debounce, cancelación, descarte de resultados viejos) y el widget que lo dibuja. Para moverlo a otra pantalla: `layout(...)` como widget y reenviar `tick`, `keyPressed`, `mouseClicked`, `render` y `removed`. |
 | `T3CraftCommands` | Registra `/t3craft`. Para agregar subcomandos, coordina con `feat/devx`/`feat/chat`. `prefix()` es público para mensajes de chat. |
 | `hud.Notifier`, `hud.PeekHud`, `hud.Toasts` | Avisos (chat + toast + sonido), la línea de HUD con el banner y los toasts. `PeekHud.setPeek(text, color)` y `setBanner(text)` (`null` oculta). |
-| `screen.ThreadChatScreen` | Placeholder del chat. Lo reemplaza `feat/chat` y se abre con `new ThreadChatScreen(NpcInfo)`. |
 | `screen.PairScreen` | UI de emparejado de solo lectura. |
 
 ## 5. Escritura: `orchestration:operate` (`feat/operate-core`)

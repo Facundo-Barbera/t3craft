@@ -9,7 +9,7 @@ import org.jspecify.annotations.Nullable;
 /**
  * Default {@link ThreadOpener}: the same chat browser right-clicking the thread's NPC opens
  * ({@link ChatScreens}). Used by workstations, the blocks module's monitors and the thread wall's
- * cards. It used to open the {@code ThreadChatScreen} placeholder ("Chat is not implemented yet"),
+ * cards. It used to open a placeholder screen ("Chat is not implemented yet", since deleted),
  * because nothing ever plugged the chat in with {@code setThreadOpener}.
  */
 public final class ChatScreenOpener implements ThreadOpener {

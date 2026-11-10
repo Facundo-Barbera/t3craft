@@ -2,6 +2,14 @@ package dev.t3craft.client.debug;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import dev.t3craft.blocks.MergeState;
+import dev.t3craft.client.archive.ArchiveEntry;
+import dev.t3craft.client.archive.ArchiveList;
+import dev.t3craft.client.archive.ArchivePanel;
+import dev.t3craft.client.archive.ArchiveScreen;
+import dev.t3craft.client.blocks.MergeFeed;
+import dev.t3craft.client.blocks.MergeStationPanel;
+import dev.t3craft.client.blocks.MergeStationScreen;
 import dev.t3craft.client.chat.ChatSource;
 import dev.t3craft.client.chat.ConversationPanel;
 import dev.t3craft.client.chat.RowLineage;
@@ -10,15 +18,23 @@ import dev.t3craft.client.chat.ThreadCache;
 import dev.t3craft.client.chat.ThreadDirectory;
 import dev.t3craft.client.chat.ThreadList;
 import dev.t3craft.client.chat.ThreadRow;
-import dev.t3craft.client.config.EnvironmentActions;
 import dev.t3craft.client.config.EnvironmentActions.EnvRow;
+import dev.t3craft.client.config.EnvironmentActions;
 import dev.t3craft.client.config.EnvironmentEditPanel;
 import dev.t3craft.client.config.EnvironmentsPanel;
 import dev.t3craft.client.config.OutboundDestinationPanel;
 import dev.t3craft.client.config.OutboundPanel;
 import dev.t3craft.client.config.SettingsPanel;
 import dev.t3craft.client.config.SettingsScreen;
+import dev.t3craft.client.demo.HqMenuModel;
+import dev.t3craft.client.demo.HqMenuPanel;
+import dev.t3craft.client.demo.HqMenuScreen;
+import dev.t3craft.client.queue.QueueActions;
+import dev.t3craft.client.queue.QueueOps;
+import dev.t3craft.client.queue.QueuePanel;
 import dev.t3craft.client.queue.QueueScreen;
+import dev.t3craft.client.queue.QueueStore;
+import dev.t3craft.client.queue.QueuedRun;
 import dev.t3craft.client.screen.ConfirmActionScreen;
 import dev.t3craft.client.screen.OperatePairScreen;
 import dev.t3craft.client.screen.PairScreen;
@@ -28,6 +44,8 @@ import dev.t3craft.client.t3ui.T3Slots;
 import dev.t3craft.client.t3ui.actions.RegisterProjectDialog;
 import dev.t3craft.client.t3ui.kit.T3KitDemoPanel;
 import dev.t3craft.client.t3ui.kit.T3PanelScreen;
+import dev.t3craft.hq.layout.HqLayoutInfo;
+import dev.t3craft.hq.layout.HqLayouts;
 import dev.t3craft.outbound.Destination;
 import dev.t3craft.outbound.OutboundConfig;
 import dev.t3craft.outbound.OutboundStore;
@@ -35,6 +53,7 @@ import dev.t3craft.outbound.Template;
 import dev.t3craft.t3.Environments;
 import dev.t3craft.t3.OperateAction;
 import dev.t3craft.t3.OperateKind;
+import dev.t3craft.t3.OperateResult;
 import dev.t3craft.t3.StreamRegistry;
 import dev.t3craft.t3.T3Connection;
 import dev.t3craft.t3.ThreadOps;
@@ -127,7 +146,15 @@ public final class UiGallery {
 					() -> new T3PanelScreen(null, new T3KitDemoPanel())),
 			new Scenario("inbox-kit", "The same UI kit demo inside the main T3 screen (the dialog with fields and the scrollbar drag go through T3Screen)",
 					() -> inbox(true, true).withPage(new T3KitDemoPanel())),
-			new Scenario("queue", "Queued runs (reads the live queue, empty without a connection)", () -> new QueueScreen(null, null)));
+			new Scenario("queue", "Run queue page with fake queues (two threads, held and automatic runs, one environment read-only; buttons answer locally)",
+					() -> new QueueScreen(null, new QueuePanel(galleryQueue()))),
+			new Scenario("archive", "Archive page with fake closed threads (search, environment and project selects, Older / Refresh)",
+					() -> new ArchiveScreen(null, new ArchivePanel(galleryArchive(), e -> Minecraft.getInstance().gui.setScreen(null), new ArchiveList()))),
+			new Scenario("hq-menu", "HQ menu page (the title screen's T3Craft HQ) over the real layouts, a fake built HQ; Open, Rebuild and Reset do nothing",
+					UiGallery::hqMenu),
+			new Scenario("merge-station", "Merge station page with fake pull requests (open, draft, one without a link); Open copies or opens the fake link",
+					() -> new MergeStationScreen(null, new MergeStationPanel("t3craft (Gallery)", UiGallery::galleryMerge, e -> {
+					}))));
 
 	private UiGallery() {
 	}
@@ -226,6 +253,203 @@ public final class UiGallery {
 				return "Gallery: would revoke control for " + id;
 			}
 		};
+	}
+
+	// ---- queue, archive, HQ menu, merge station (#26) ---------------------------------------------------
+
+	/** Two fake queues: the gallery environment can operate, "laptop" is read-only. Writes answer locally, nothing is sent. */
+	private static QueuePanel.Source galleryQueue() {
+		long now = System.currentTimeMillis();
+		QueueStore.Key run = QueueStore.Key.of(ENV, "t-run");
+		QueueStore.Key other = QueueStore.Key.of("laptop", "t-docs");
+		List<QueuedRun> first = List.of(
+				new QueuedRun(ENV, "t-run", "run-auto", QueuedRun.QUEUED, 4, 1L, false, now - 30_000, null, true, false, "Delegated task finished: hq-gate npcs"),
+				new QueuedRun(ENV, "t-run", "run-a", QueuedRun.QUEUED, 5, 2L, false, now - 20_000, null, false, true, "Also keep the layer order while you split the targets"),
+				new QueuedRun(ENV, "t-run", "run-b", QueuedRun.QUEUED, 6, 3L, false, now - 10_000, null, false, true, "Then run the render check on the citadel"),
+				new QueuedRun(ENV, "t-run", "run-c", QueuedRun.QUEUED, 7, 4L, false, now - 5_000, null, false, true,
+						"A long queued message that does not fit on one row so the preview is clipped at the buttons"));
+		List<QueuedRun> second = List.of(
+				new QueuedRun("laptop", "t-docs", "run-d", QueuedRun.QUEUED, 2, 1L, true, now - 60_000, null, false, true, "Update the archive docs"),
+				new QueuedRun("laptop", "t-docs", "run-e", QueuedRun.QUEUED, 3, 2L, true, now - 50_000, null, false, true, "And the changelog line"));
+		List<QueueStore.Snapshot> snaps = List.of(
+				new QueueStore.Snapshot(run, QueueStore.Status.OK, null, first),
+				new QueueStore.Snapshot(other, QueueStore.Status.OK, null, second),
+				new QueueStore.Snapshot(QueueStore.Key.of(ENV, "t-ask"), QueueStore.Status.LOADING, null, List.of()));
+		QueueOps ops = new QueueOps(null, QueueActions.create()); // builds actions only; the gate is never used here
+		return new QueuePanel.Source() {
+			@Override
+			public void open() {
+			}
+
+			@Override
+			public void close() {
+			}
+
+			@Override
+			public boolean readable() {
+				return true;
+			}
+
+			@Override
+			public String unavailableReason() {
+				return "";
+			}
+
+			@Override
+			public boolean anyWatched() {
+				return true;
+			}
+
+			@Override
+			public List<QueueStore.Snapshot> snapshots() {
+				return snaps;
+			}
+
+			@Override
+			public @Nullable String title(String envId, String threadId) {
+				return switch (threadId) {
+					case "t-run" -> "fix/hq-builders-independent";
+					case "t-docs" -> "docs: archive view";
+					case "t-ask" -> "feat/attention-queue";
+					default -> null;
+				};
+			}
+
+			@Override
+			public String envLabel(String envId) {
+				return envId.equals(ENV) ? ENV_LABEL : "Laptop";
+			}
+
+			@Override
+			public boolean canOperate(String envId) {
+				return envId.equals(ENV);
+			}
+
+			@Override
+			public QueueOps ops() {
+				return ops;
+			}
+
+			@Override
+			public CompletableFuture<OperateResult> submit(OperateAction action, boolean confirmed) {
+				return CompletableFuture.completedFuture(OperateResult.of(OperateResult.Outcome.REJECTED,
+						"gallery: would send " + action.kind().wire + (confirmed ? " (confirmed)" : "")));
+			}
+		};
+	}
+
+	/** Fake closed threads in two environments; Older and Refresh only flip a loading flag for a moment. */
+	private static ArchivePanel.Data galleryArchive() {
+		long day = 86_400_000L;
+		long now = System.currentTimeMillis();
+		List<ArchiveEntry> entries = new ArrayList<>();
+		String[][] rows = {
+				{ENV, ENV_LABEL, "t-a1", "Fix login redirect loop", "p-t3", "t3craft"},
+				{ENV, ENV_LABEL, "t-a2", "Bump dependencies", "p-t3", "t3craft"},
+				{"laptop", "Laptop", "t-a3", "Investigate flaky render test", "p-br", "bridge"},
+				{ENV, ENV_LABEL, "t-a4", "HQ gate NPCs wander off", "p-t3", "t3craft"},
+				{"laptop", "Laptop", "t-a5", "Migrate settings screen to the kit", "p-br", "bridge"},
+				{ENV, ENV_LABEL, "t-a6", "A very long thread title that has to be clipped before the project column starts", "p-t3", "t3craft"},
+				{"laptop", "Laptop", "t-a7", "Docs: archive view", "p-docs", "docs"},
+		};
+		for (int i = 0; i < rows.length; i++) {
+			String[] r = rows[i];
+			entries.add(new ArchiveEntry(ArchiveEntry.key(r[0], r[2]), r[0], r[1], r[2], r[3], r[4], r[5], now - i * day,
+					i % 3 == 1 ? ArchiveEntry.Kind.ARCHIVED : ArchiveEntry.Kind.SETTLED));
+		}
+		for (int i = 0; i < 18; i++) {
+			entries.add(new ArchiveEntry(ArchiveEntry.key(ENV, "t-old" + i), ENV, ENV_LABEL, "t-old" + i, "Older thread " + (i + 1), "p-t3", "t3craft",
+					now - (10 + i) * day, ArchiveEntry.Kind.SETTLED));
+		}
+		List<ArchiveEntry> fixed = List.copyOf(entries);
+		return new ArchivePanel.Data() {
+			@Override
+			public List<ArchiveEntry> entries() {
+				return fixed;
+			}
+
+			@Override
+			public int version() {
+				return 1;
+			}
+
+			@Override
+			public String status() {
+				return ENV_LABEL + " 19+ - Laptop 3 (offline)";
+			}
+
+			@Override
+			public boolean loading() {
+				return false;
+			}
+
+			@Override
+			public boolean canLoadMore() {
+				return true;
+			}
+
+			@Override
+			public boolean canRefresh() {
+				return true;
+			}
+
+			@Override
+			public void loadMore() {
+			}
+
+			@Override
+			public void refresh() {
+			}
+		};
+	}
+
+	/** The real layout registry, with a fake HQ built with the second layout (so "Rebuild with ..." shows); choices are not saved. */
+	private static Screen hqMenu() {
+		List<HqLayoutInfo> layouts = HqLayouts.menuOrder();
+		String built = layouts.get(Math.min(1, layouts.size() - 1)).id();
+		HqMenuModel model = new HqMenuModel(layouts, layouts.getFirst().id(), built, true, id -> {
+		});
+		return new HqMenuScreen(null, new HqMenuPanel(model, new HqMenuPanel.Actions() {
+			@Override
+			public void open(Screen parent) {
+			}
+
+			@Override
+			public @Nullable String refusal() {
+				return null;
+			}
+
+			@Override
+			public String resetBody(HqLayoutInfo layout) {
+				return "Gallery: a zip backup would be saved first, then only the HQ world would be created again with "
+						+ net.minecraft.network.chat.Component.translatable(layout.nameKey()).getString() + ". Nothing is touched here.";
+			}
+
+			@Override
+			public @Nullable String resetAndRebuild(String layoutId) {
+				return "Gallery: would reset and rebuild with " + layoutId + ".";
+			}
+
+			@Override
+			public String exportPacks() {
+				return "Gallery: would export the layouts.";
+			}
+
+			@Override
+			public String reloadPacks() {
+				return "Gallery: would reload the layouts.";
+			}
+		}));
+	}
+
+	private static MergeFeed.Summary galleryMerge() {
+		return new MergeFeed.Summary(MergeState.OPEN, List.of(
+				new MergeFeed.Entry(ENV + ":t-run", ENV, "t-run", "fix/hq-builders-independent", "", MergeState.OPEN, 412, "example/t3craft",
+						"https://example.com/example/t3craft/pull/412", 120, 34),
+				new MergeFeed.Entry(ENV + ":t-ask", ENV, "t-ask", "feat/attention-queue", "", MergeState.OPEN, 415, "example/t3craft", null, 8, 2),
+				new MergeFeed.Entry(ENV + ":t-err", ENV, "t-err", "fix/hq-gate-npcs with a long title that gets clipped before the diff size", "",
+						MergeState.DRAFT, 417, null, null, 1024, 980),
+				new MergeFeed.Entry(ENV + ":t-done", ENV, null, "docs: ui render", "", MergeState.DRAFT, 9, null, null, -1, -1)));
 	}
 
 	private static Screen operatePair() {

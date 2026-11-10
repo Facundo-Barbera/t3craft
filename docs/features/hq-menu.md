@@ -1,7 +1,10 @@
-# feat/hq-menu: menú del HQ (`dev.t3craft.client.demo.HqMenuScreen`)
+# feat/hq-menu: menú del HQ (`dev.t3craft.client.demo.HqMenuScreen` + `HqMenuPanel`)
+
+> Desde el #26 el menú es una página del kit de UI (`HqMenuPanel`) en un host `T3PanelScreen` (`HqMenuScreen`),
+> no widgets vanilla. Abajo, lo que cambió en cada punto.
 
 El botón **"T3Craft HQ"** de la pantalla de título y de la de selección de mundo ya no entra directamente
-al mundo HQ: abre un menú propio, que vuelve a la pantalla de origen con **Esc** o **Volver**.
+al mundo HQ: abre un menú propio, que vuelve a la pantalla de origen con **Esc** o la **X** de la cabecera.
 
 ## Qué hay en el menú
 
@@ -17,24 +20,24 @@ al mundo HQ: abre un menú propio, que vuelve a la pantalla de origen con **Esc*
     los demás en el orden del registro (hoy solo `classic`). No hay sección "Legacy": los 7 layouts
     antiguos (campus, ring, vertical, ensanche, village, hybrid-towncenter, hybrid-terraces) se
     eliminaron (cleanup/2-legacy-layouts, #4). La ciudadela es también el layout por defecto.
-  - La elegida va con un marco blanco y "▶". La construida (`HqLayoutState.builtLayoutId`), con la
-    etiqueta verde **CONSTRUIDO**. Las de `large = true` (hoy ninguna), con **MUY GRANDE** y la descripción en
-    naranja.
-  - Se elige con clic izquierdo (`MouseButtons.isLeft`: 1 en 26.x) o con las flechas, RePág/AvPág e
-    Inicio/Fin. Se guarda en el momento en la clave `hqLayout` de la config.
-  - Si no cabe, la lista tiene scroll con la rueda (una fila por muesca), una barra a la derecha, y el
-    hit-testing tiene en cuenta el scroll y solo acepta clics dentro del recuadro visible
-    (`HqMenuList`).
-  - Enter (`InputConstants.KEY_RETURN`, 40) abre el HQ si ningún botón tiene el foco. Si lo tiene, lo
-    pulsa (vanilla).
+  - La lista es un `T3List`. La elegida va con el relleno `selected` y una barra de acento a la izquierda, y su
+    nombre en acento. La construida (`HqLayoutState.builtLayoutId`), con la etiqueta **CONSTRUIDO** (token
+    `result`). Las de `large = true` (hoy ninguna), con **MUY GRANDE** y la descripción en `youText`.
+    Todos los colores salen de `ChatTheme`.
+  - Se elige con clic izquierdo (`MouseButtons.isLeft`: 1 en 26.x), o con el teclado: Tab hasta la lista,
+    las flechas, RePág/AvPág e Inicio/Fin mueven el cursor y Enter elige. Se guarda en el momento en la
+    clave `hqLayout` de la config.
+  - Si no cabe, la lista tiene scroll con la rueda y la barra arrastrable del kit (`T3List`).
+  - "Abrir HQ" es el botón primario de la cabecera; con el foco (Tab), Enter o Espacio lo pulsan.
 - **Reconstruir con &lt;layout&gt;**: solo aparece si hay un HQ construido y su layout no es el elegido.
   Si no hay HQ construido, basta con elegir: el próximo "Abrir HQ" construye con ese layout.
 - **Resetear HQ**: solo activo si el mundo HQ existe.
+- **Exportar / Recargar layouts** (feat/hq-layout-packs): en el pie, encima de Reconstruir y Resetear.
 
 Línea de estado bajo la lista: "Construido con: X", "aún no hay nada construido" o "aún no hay mundo HQ".
 
 ## Reset y reconstrucción desde el menú (decisión)
-"Resetear HQ" y "Reconstruir con X" usan el mismo flujo: un `ConfirmScreen` vanilla que dice que antes
+"Resetear HQ" y "Reconstruir con X" usan el mismo flujo: un modal de confirmación del kit sobre la página que dice que antes
 se guarda un **zip en `backups/`** (o, con `demo.resetBackup = false`, que **no** hay copia), que solo se
 borra y se recrea el mundo HQ (`saves/<carpeta>`), con qué layout se construirá, y que no se toca ningún
 otro mundo. Al aceptar se llama a `HqRebuild.resetAndRebuild(layoutId)` (punto único de feat/hq-layouts).
@@ -52,15 +55,17 @@ resetear":
    construcción normal levanta el HQ con el `hqLayout` elegido, que ya está guardado.
 
 `DemoClient.resetRefusal()` sigue protegiendo los casos raros: si por lo que sea hay otro mundo abierto,
-se muestra un `AlertScreen` y no se toca nada. El botón de reset de `SettingsScreen` no cambia.
+se muestra un modal con el motivo (antes un `AlertScreen`) y no se toca nada. El botón de reset de `SettingsScreen` no cambia.
 
 ## Código
 | Clase | Qué hace | Test |
 |---|---|---|
 | `HqMenuModel` | Elegida, construida, persistencia solo si cambia, "reconstruir" solo si hay HQ construido y difiere, `warnLarge`, reset solo si existe el mundo | `HqMenuTest` |
-| `HqMenuList` | Geometría de la lista: scroll acotado, `rowAt` con scroll, `ensureVisible`, rueda, barra | `HqMenuTest` |
-| `HqMenuKeys` | Flechas, RePág/AvPág, Inicio/Fin, Enter y Enter numérico con códigos de 26.x; solo el clic izquierdo elige | `HqMenuTest` |
 | `HqMenuBridge` | Une el menú con feat/hq-layouts (registro, `hqLayout`, `builtLayoutId`, `HqRebuild`) | — (cableado) |
-| `HqMenuScreen` | La pantalla (vanilla, sin mixins). Ancho máximo de 340 px, siempre se ve al menos una fila, y los botones se dibujan por encima en ventanas muy bajas | — (render) |
+| `HqMenuPanel` | La página del kit (#26): cabecera con Abrir HQ, `T3List` de layouts, línea de estado, pie con Exportar/Recargar, Reconstruir y Resetear (modales de confirmación). Sus acciones externas pasan por `HqMenuPanel.Actions` (la galería usa unas falsas) | — (render) |
+| `HqMenuScreen` | Host `T3PanelScreen` (un `Screen` normal, no `T3Screen`: se abre desde la pantalla de título), ancho máximo 380 px, y las acciones reales sobre `DemoClient` | — (cableado) |
+
+`HqMenuList` y `HqMenuKeys` (geometría de la lista y teclas de la pantalla vanilla) se borraron en el #26: `T3List` hace
+ambas cosas. `/t3dev ui hq-menu` abre el menú con los layouts reales y un HQ construido falso.
 
 Textos en `en_us`, `es_es` y `es_mx` (`t3craft.hqmenu.*`).
