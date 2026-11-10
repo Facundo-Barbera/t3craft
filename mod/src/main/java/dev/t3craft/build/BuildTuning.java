@@ -53,7 +53,10 @@ import java.util.List;
  *   "siteCrewMin": 2,          // builders an open site gets at least
  *   "siteCrewMax": 6,          // ...and at most (one more per entriesPerBuilder entries it has left)
  *   "siteStorey": 5,           // height of a storey, blocks, where the site has no real floors
- *   "sitesOpen": 2             // sites open at once: the focus and the one being closed (one more when builders are to spare); 1 = one at a time
+ *   "sitesOpen": 2,            // sites open at once: the focus and the one being closed (one more when builders are to spare); 1 = one at a time
+ *   // feat/sites-parallel-pace (#53, order "sites"):
+ *   "sitesAtOnce": 3,          // sites built in parallel (the player's and the others, each with its own crew); 0 = the #48 rules (sitesOpen)
+ *   "sitesCrew": 16            // builders of a big "sites" plan, all sites together (radialCrewMax stays the radial one)
  * },
  * "buildNearPlayer": { "enabled": true, "radius": 48 }
  * }</pre>
@@ -67,7 +70,7 @@ public record BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int front
 		boolean nearPlayer, int nearPlayerRadius, boolean radial, int radialRing, int groundBlocksPerTick, int fillBlocksPerTick,
 		int foundationRingsAhead, int builderRingsAhead, int fillRingsBehind, double climbBlocksPerTick, int corridorLength, int corridorWidth,
 		int corridorBlocksPerTick, double corridorMsPerTick, int radiusMin, int radiusStep, int radialMinBuilders, int entriesPerBuilder,
-		int radialCrewMax, boolean sites, int siteCrewMin, int siteCrewMax, int siteStorey, int sitesOpen) {
+		int radialCrewMax, boolean sites, int siteCrewMin, int siteCrewMax, int siteStorey, int sitesOpen, int sitesAtOnce, int sitesCrew) {
 	public static final String SECTION = "build";
 	/** feat/build-near-player: top-level object {@code {enabled, radius}}. */
 	public static final String NEAR_SECTION = "buildNearPlayer";
@@ -91,7 +94,7 @@ public record BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int front
 	 * within 24 blocks of the player, up to the crew (12 for a big radial plan).
 	 */
 	public static final BuildTuning DEFAULTS = new BuildTuning(96, 3, 8, 8, true, 40.0, false, 192, 10.0, 6.0, 8, true, 48, true, 5, 32, 128, 1, 0, 2,
-			10.0, 20, 7, 64, 3.0, 5, 4, 3, 1200, 12, false, 2, 6, 5, 2);
+			10.0, 20, 7, 64, 3.0, 5, 4, 3, 1200, 12, false, 2, 6, 5, 2, 3, 16);
 	/** A radial plan with at least this many entries gets the bigger crew ({@link #radialCrewMax}) so the builders can grow with the work around the player. */
 	public static final int RADIAL_BIG_PLAN = 60_000;
 
@@ -136,6 +139,35 @@ public record BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int front
 		siteCrewMax = clamp(siteCrewMax, siteCrewMin, 16);
 		siteStorey = clamp(siteStorey, 3, 16);
 		sitesOpen = clamp(sitesOpen, 1, 4);
+		sitesAtOnce = clamp(sitesAtOnce, 0, SITES_AT_ONCE_MAX);
+		sitesCrew = clamp(sitesCrew, 1, 16);
+	}
+
+	/** #53: most sites {@code build.sitesAtOnce} may build in parallel. */
+	public static final int SITES_AT_ONCE_MAX = 6;
+
+	/** feat/builder-sites constructor: the #53 settings at their defaults (3 sites at once, a crew of 16). */
+	public BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int frontsPerJob, int maxEffectsPerTick, boolean autoThrottle, double targetMspt,
+			boolean fastFoundation, int foundationBlocksPerTick, double foundationMsPerTick, double blocksPerTick, int crew, boolean nearPlayer,
+			int nearPlayerRadius, boolean radial, int radialRing, int groundBlocksPerTick, int fillBlocksPerTick, int foundationRingsAhead,
+			int builderRingsAhead, int fillRingsBehind, double climbBlocksPerTick, int corridorLength, int corridorWidth, int corridorBlocksPerTick,
+			double corridorMsPerTick, int radiusMin, int radiusStep, int radialMinBuilders, int entriesPerBuilder, int radialCrewMax, boolean sites,
+			int siteCrewMin, int siteCrewMax, int siteStorey, int sitesOpen) {
+		this(maxBlocksPerTick, maxConcurrentJobs, frontsPerJob, maxEffectsPerTick, autoThrottle, targetMspt, fastFoundation, foundationBlocksPerTick,
+				foundationMsPerTick, blocksPerTick, crew, nearPlayer, nearPlayerRadius, radial, radialRing, groundBlocksPerTick, fillBlocksPerTick,
+				foundationRingsAhead, builderRingsAhead, fillRingsBehind, climbBlocksPerTick, corridorLength, corridorWidth, corridorBlocksPerTick,
+				corridorMsPerTick, radiusMin, radiusStep, radialMinBuilders, entriesPerBuilder, radialCrewMax, sites, siteCrewMin, siteCrewMax, siteStorey,
+				sitesOpen, 3, 16);
+	}
+
+	/** #53: sites are built in parallel ({@code build.sitesAtOnce} over 0); false = the #48 rules ({@code build.sitesOpen}). */
+	public boolean sitesParallel() {
+		return sites && sitesAtOnce > 0;
+	}
+
+	/** The crew of a big plan: {@link #radialCrewMax}, or (#53) {@link #sitesCrew} when sites are built in parallel. */
+	private int bigCrew() {
+		return sitesParallel() ? Math.max(radialCrewMax, sitesCrew) : radialCrewMax;
 	}
 
 	/** fix/builder-round-radius constructor: the feat/builder-sites settings at their defaults (order not "sites"). */
@@ -168,12 +200,12 @@ public record BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int front
 	 * work around the player (an HQ's centre) and the usual 8 is not enough there.
 	 */
 	public int radialCrewFor(int crew, int planSize) {
-		return planSize >= RADIAL_BIG_PLAN ? Math.max(crew, radialCrewMax) : crew;
+		return planSize >= RADIAL_BIG_PLAN ? Math.max(crew, bigCrew()) : crew;
 	}
 
 	/** Fronts (builders) of a free radial job with a crew of {@code crew}: like {@link #frontsFor} but up to {@link #radialCrewMax}. */
 	public int radialFrontsFor(int crew) {
-		return Math.max(1, Math.min(Math.max(frontsPerJob, radialCrewMax), crew));
+		return Math.max(1, Math.min(Math.max(frontsPerJob, bigCrew()), crew));
 	}
 
 	/** fix/build-radial-tune constructor: the fix/build-walkable corridor settings at their defaults. */
@@ -311,6 +343,8 @@ public record BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int front
 		int sMax = (int) number(SECTION, s, "siteCrewMax", d.siteCrewMax(), 1, 16, true, warn);
 		int sStorey = (int) number(SECTION, s, "siteStorey", d.siteStorey(), 3, 16, true, warn);
 		int sOpen = (int) number(SECTION, s, "sitesOpen", d.sitesOpen(), 1, 4, true, warn);
+		int sAtOnce = (int) number(SECTION, s, "sitesAtOnce", d.sitesAtOnce(), 0, SITES_AT_ONCE_MAX, true, warn);
+		int sCrew = (int) number(SECTION, s, "sitesCrew", d.sitesCrew(), 1, 16, true, warn);
 		boolean near = d.nearPlayer();
 		int radius = d.nearPlayerRadius();
 		if (root.has(NEAR_SECTION)) {
@@ -323,7 +357,7 @@ public record BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int front
 			}
 		}
 		return new Result(new BuildTuning(blocks, jobs, fronts, effects, auto, mspt, fast, fBlocks, fMs, pace, crew, near, radius, radial, ring, ground, fill, gAhead,
-				bAhead, behind, climb, cLen, cWidth, cBlocks, cMs, rMin, rStep, rBuilders, perBuilder, rCrew, sites, sMin, sMax, sStorey, sOpen), List.copyOf(warn));
+				bAhead, behind, climb, cLen, cWidth, cBlocks, cMs, rMin, rStep, rBuilders, perBuilder, rCrew, sites, sMin, sMax, sStorey, sOpen, sAtOnce, sCrew), List.copyOf(warn));
 	}
 
 	private static boolean bool(String section, JsonObject s, String key, boolean def, List<String> warn) {

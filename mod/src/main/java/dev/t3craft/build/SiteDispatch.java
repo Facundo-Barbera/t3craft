@@ -148,4 +148,75 @@ final class SiteDispatch {
 		want = Math.min(want, Math.max(Math.min(min, 2), freeTasks));
 		return Math.max(0, Math.min(want, available));
 	}
+
+	// ---- #53: sites in parallel (build.sitesAtOnce over 0) ----------------------------------------
+
+	/** Builders a <b>retained</b> site keeps: one more site than the limit stays open with this many, never with none. */
+	static final int RETAIN = 1;
+	/** Retained sites at most, past {@code build.sitesAtOnce}; past them too the farthest closes at its next storey boundary. */
+	static final int RETAIN_MAX = 2;
+	/** Builders a site that closes at its next storey boundary ({@code leaving}) keeps at most. */
+	static final int LEAVING_CREW = REAR;
+	/** A fresh site this near a player on the ground opens by itself when builders are to spare (after a hold). */
+	static final double NEAR_FRESH = 16.0;
+
+	/**
+	 * Sites built with a full crew at once: {@code atOnce}, but never more than the crew can give {@code crewMin} each
+	 * (so every one of them gets its minimum); at least 1.
+	 */
+	static int activeLimit(int atOnce, int builders, int crewMin) {
+		return Math.max(1, Math.min(atOnce, builders / Math.max(1, crewMin)));
+	}
+
+	/** Retained sites the crew can still keep ({@link #RETAIN} each) after {@code active} sites got {@code crewMin} each; at most {@link #RETAIN_MAX}. */
+	static int retainSlots(int active, int builders, int crewMin) {
+		return Math.max(0, Math.min(RETAIN_MAX, (builders - active * Math.max(1, crewMin)) / RETAIN));
+	}
+
+	/**
+	 * How many builders each open site gets, the sites given in priority order (the player's site first). Three passes:
+	 * every site gets its {@code floor} (so no open site with work stands with none), then each one in order up to
+	 * {@code cap} (what it can use now: the player's site takes the most), then what is left goes one by one, in order,
+	 * up to {@code hard}. Builders past every {@code hard} stay free. Never hands out more than {@code builders}.
+	 */
+	static int[] shares(int builders, int[] floor, int[] cap, int[] hard) {
+		int n = floor.length;
+		int[] out = new int[n];
+		int left = Math.max(0, builders);
+		for (int k = 0; k < n && left > 0; k++) {
+			int g = Math.min(Math.max(0, floor[k]), left);
+			out[k] = g;
+			left -= g;
+		}
+		for (int k = 0; k < n && left > 0; k++) {
+			int g = Math.min(cap[k] - out[k], left);
+			if (g > 0) {
+				out[k] += g;
+				left -= g;
+			}
+		}
+		boolean any = true;
+		while (left > 0 && any) {
+			any = false;
+			for (int k = 0; k < n && left > 0; k++) {
+				if (out[k] < hard[k]) {
+					out[k]++;
+					left--;
+					any = true;
+				}
+			}
+		}
+		return out;
+	}
+
+	/** The nearest site not started, not open and within {@link #NEAR_FRESH} blocks; -1 = none (the details are never near). */
+	static int nearestFresh(byte[] state, double[] dist, boolean[] isOpen) {
+		int best = -1;
+		for (int s = 0; s < state.length; s++) {
+			if (state[s] == IDLE && !isOpen[s] && dist[s] <= NEAR_FRESH && (best < 0 || dist[s] < dist[best])) {
+				best = s;
+			}
+		}
+		return best;
+	}
 }

@@ -244,6 +244,8 @@ New keys in `build`, all additive:
 | `siteCrewMax` | 6 | ...and at most |
 | `siteStorey` | 5 | height of a storey, blocks, where the site has no real floors |
 | `sitesOpen` | 2 | sites open at once (one more when builders are to spare); 1 = one at a time |
+| `sitesAtOnce` | 3 | #53: sites built in parallel, each with its own crew (0..6); 0 = the #48 rules above (`sitesOpen`) |
+| `sitesCrew` | 16 | #53: builders of a big `"sites"` plan (1..16), read when the build starts; `radialCrewMax` stays the radial one |
 
 Reused as they are: `entriesPerBuilder` (one more builder per this many entries the site has left), `radiusMin` +
 `radiusStep` (the carpet's radius), the corridor keys, `groundBlocksPerTick`, `fillBlocksPerTick`,
@@ -387,6 +389,86 @@ and each open site its own ` late s1:12 s3:40 remate 5`.
 | `late` / `remate` | builder entries the compiled programs left to late rounds / to the finishing pass, all programs so far | a site with a large `remate` builds its pieces in the air at the end |
 | `late sN:k` (per site) | its program's late entries per storey | a storey with many: its pieces lean on something placed later |
 | `flying` | the player is airborne: nothing is laid around it | |
+
+## Parallel sites (#53)
+
+Facundo, after playing with #48: "Quiero que se construyan en paralelo, tal vez con límite. Yo aparezco en el HQ y si me
+voy a la oficina no empieza hasta que termina la pieza central."
+
+**Not compiled or played** (same as the rest of this file): the causes come from reading the code.
+
+### Why a new site waited
+
+Everything that made the building the player walks into wait, with the #48 rules:
+
+| what | where | effect |
+|---|---|---|
+| hold of a fresh site | `SiteCursor.dispatch` (`HOLD_FRESH`) | a site not started must be the dispatch's choice for 3 s before it takes the focus, even when the player stands in it |
+| dispatch every 10 ticks | `DISPATCH_EVERY` | entering a building was noticed up to half a second late, then the 3 s started |
+| the old focus keeps its crew | `staff` (a closing site keeps its builders, the focus only gets the free ones) | the hub, the biggest site, kept up to 6 builders until its whole storey was closed (tens of seconds on a large storey); the new site got the leftovers |
+| `hardCap` and `focus waiting` | `dispatch` | with `sitesOpen` sites still closing, the focus did not open at all |
+| rear guard of 2 at 30 % of the pace | `staff`, `tickBuilders` | the site left behind went on very slowly; past 32 blocks it froze |
+| `STARTED_MAX` (3) | `SiteDispatch.focus` | with 3 sites started and not finished, rules 3 and 4 closed the nearest started one first (rule 1, the player's site, still opened) |
+| compile + gathering | `openSite`, `install`, `gather` | milliseconds plus the `Offload` queue, then 20 ticks of walk: kept, it is the crew arriving |
+
+### What changed
+
+With `build.sitesAtOnce` over 0 (default **3**), `SiteCursor.dispatchParallel` and `staffParallel` replace the #48
+dispatch and staffing. `build.sitesAtOnce: 0` brings back the #48 rules exactly (`sitesOpen`, closing, rear guards).
+
+- **Walking in opens at once.** Entering a site's footprint on the ground is checked every tick (not every 10) and
+  takes the focus with no hold. The site opens whatever else is open (no `hardCap`, no `focus waiting`). Flying
+  changes nothing: the player in the air is in no site, and the #48 holds (3 s for a fresh site, `STARTED_MAX`) stay
+  for every choice that is not "the site I walk in".
+- **The site left behind keeps building**, with its own crew, storey by storey, until it is finished. Nothing closes
+  because the player is far.
+- **Ranking and limit.** The open sites that are not the focus are ranked nearest first (buckets of 8 blocks; among
+  equals the most advanced first). The first `sitesAtOnce - 1` are **parallel** sites (a full crew of their own). The
+  next ones, up to 2, are **retained**: they keep **1 builder** and go on slowly, never frozen. Past those, the farthest
+  close at their next storey boundary (`leaving`): they stay started and come back first when the player is near
+  again. So at the limit the building the player walks into always enters, and the farthest one drops to its retainer.
+  To freeze a site the player must walk into `sitesAtOnce + 3` buildings without coming back.
+- **A building only walked through closes**: opened, nothing placed by a builder, the player went on. Nothing is left
+  half-built by passing by.
+- **Builders to spare open sites by proximity**: when the open sites leave at least `siteCrewMin` builders unused and
+  a slot is free, the nearest started site within 32 blocks opens; else, with the player on the ground, the nearest
+  fresh site within 16 blocks once it was the choice for 3 s (6 rounds). Such a site is not closed while untouched
+  (`near` in the status).
+- **Bigger crew**: a big `"sites"` plan gets `build.sitesCrew` builders (default **16**, was 12 = `radialCrewMax`, which
+  stays the radial one). Read when the build starts.
+
+### Who gets the builders
+
+`staffParallel` runs at every dispatch and on any tick a builder is free. In order:
+
+1. **Recount.** Every builder is either free (`tSite -1`) or on exactly one open site; a builder whose site closed is
+   free. `crew` of every open site is recounted from that, so a lend or a close can never leave a count wrong.
+2. **Order**: the focus, then the parallel sites (nearest first), then the retained, then the leaving ones.
+3. **Shares** (`SiteDispatch.shares`), three passes: every site with work gets its **floor** (`siteCrewMin` for the
+   focus and the parallel sites, 1 for the others), so no open site with work stands with none; then each one, in
+   order, up to its **cap** (what it can use now: `SiteDispatch.crew` of its wave and the wave ahead; a site still
+   compiling: the focus up to `siteCrewMax`, the others `siteCrewMin`): the focus takes the most; then what is left
+   one by one up to a hard maximum (`siteCrewMax`; 1 for retained, 2 for leaving sites).
+4. **Moves.** A builder **without a task** leaves a site over its share and goes, in the same call, to the first site
+   under its share. A builder **with a task** stays until the task is done (`release` lets it go then), so
+   `task-switches walk` stays 0.
+5. **The focus first.** If the focus is still under its floor and nobody is free, the lowest-ranked site over its own
+   floor hands one builder over: a free one, else the one whose task has most left (the task is kept, another builder
+   takes it up). Counted as `handovers`.
+
+Limits that keep the floors honest: `sitesAtOnce` is cut to `builders / siteCrewMin` and the retained slots to what is
+left after that, so floors always fit in the crew. If the player ran through more buildings than builders, the
+farthest leaving sites close at once.
+
+Pace: unchanged (#48, decision 14): with more than one site working, the focus gets 70 % of the tick's credit, the
+others 30 %; what one side cannot use goes to the other. Below the global budget every builder works at full pace.
+
+### Reading it in the status
+
+After `sites a/b` the line gets ` | parallel 2/3 retain 1 crew 16 120 b/s handovers 0`: sites with a crew / the limit,
+retained sites, builders of the job, builder blocks per second (all sites, smoothed over a few seconds), handovers.
+Each open site shows `focus`, `parallel` or `retain` (and `leaving`), and after its crew ` crew 5/6 48 b/s`: builders
+on it / its share, its blocks per second. ` near`: opened by proximity.
 
 ## Not done / open
 

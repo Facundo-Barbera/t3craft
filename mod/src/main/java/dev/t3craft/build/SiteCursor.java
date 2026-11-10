@@ -135,6 +135,10 @@ public final class SiteCursor implements JobCursor {
 		boolean rear;
 		/** It closes at its next storey boundary (too far from the player, or one site too many). */
 		boolean leaving;
+		/** #53 (sites in parallel): one site past {@code build.sitesAtOnce}: it keeps {@link SiteDispatch#RETAIN} builder, never none. */
+		boolean retain;
+		/** #53: opened by proximity (builders to spare), not because the player chose it: not closed while untouched. */
+		boolean near;
 		/** No task of the current storey was taken yet (the site stands at a storey boundary). */
 		boolean fresh = true;
 		/** A storey boundary the dispatch has not looked at yet: a site that is not the focus hands out nothing until it has. */
@@ -319,6 +323,23 @@ public final class SiteCursor implements JobCursor {
 	private long lateCompiled;
 	private long remateCompiled;
 
+	// ---- #53: sites in parallel, pace per site --------------------------------------------------
+	/** Distances of the last dispatch (blocks from the player to each site): the staffing between dispatches ranks with them. */
+	private double @Nullable [] lastDist;
+	/** Builders the open sites cannot use now (their useful crews added up): proximity opens a site only with these. */
+	private int spareUseful;
+	/** The fresh site proximity would open, and for how many dispatch rounds in a row it was the one. */
+	private int nearCand = -1;
+	private int nearRounds;
+	/** Builders moved off a task to give the player's site its minimum crew (sites in parallel). */
+	private long handovers;
+	/** Builder placements per site (skips left out), the count one second ago, and blocks per second (smoothed). */
+	private final long[] sitePlaced;
+	private final long[] siteMark;
+	private final double[] siteBps;
+	private long allMark;
+	private double allBps;
+
 	private @Nullable IntPredicate already;
 	private CrewCursor.@Nullable Walker walker;
 	private int tickNo;
@@ -381,6 +402,9 @@ public final class SiteCursor implements JobCursor {
 		idleWhy = new int[this.builders];
 		lent = new boolean[this.builders];
 		bayNbr = new int[p.bays][];
+		sitePlaced = new long[p.sites];
+		siteMark = new long[p.sites];
+		siteBps = new double[p.sites];
 		cx = p.fallback[0];
 		cz = p.fallback[1];
 		int baseY = n == 0 ? 0 : p.y[p.colEntries[0]];
@@ -687,16 +711,31 @@ public final class SiteCursor implements JobCursor {
 			airTicks = hasPlayer && !grounded ? airTicks + 1 : 0;
 			BuildTuning t = BuildBudget.global().tuning();
 			install();
+			if (parallel(t) && p.sites > 0 && hasPlayer && !airborne() && tickNo < dispatchAt) {
+				// #53: walking into a building is answered on this tick, not at the next dispatch round
+				int in = p.siteAt(cx, cz, playerY);
+				if (in >= 0 && in != insideSite && in != focusSite) {
+					dispatchAt = tickNo;
+				}
+			}
 			if (tickNo >= dispatchAt) {
 				dispatchAt = tickNo + DISPATCH_EVERY;
 				dispatch(t);
 			} else if (freeNow > 0 && !openList.isEmpty()) {
-				staffAll(t); // #48: a builder let go between dispatches (end of a wave, a lent one back) is staffed at once
+				// #48: a builder let go between dispatches (end of a wave, a lent one back) is staffed at once
+				if (parallel(t)) {
+					staffParallel(t);
+				} else {
+					staffAll(t);
+				}
 			}
 			tickCorridor(step, t);
 			tickCarpet(step, t);
 			tickSites(step, t);
 			tickBuilders(allowance, step, t);
+			if (tickNo % 20 == 0) {
+				paceSample();
+			}
 			tickFill(step, t);
 			if (sitesDone >= p.sites) {
 				tickSweep(step, t);
@@ -1073,8 +1112,10 @@ public final class SiteCursor implements JobCursor {
 				startedLeft++;
 			}
 		}
-		// #48: a real cap on half-built sites: past it, the nearest started one comes before a new one
-		int want = SiteDispatch.focus(focusSite, insideSite, siteState, dist, startedLeft < SiteDispatch.STARTED_MAX);
+		boolean par = parallel(t);
+		// #48: a real cap on half-built sites: past it, the nearest started one comes before a new one (#53: at least the parallel limit)
+		int startedMax = par ? Math.max(SiteDispatch.STARTED_MAX, t.sitesAtOnce()) : SiteDispatch.STARTED_MAX;
+		int want = SiteDispatch.focus(focusSite, insideSite, siteState, dist, startedLeft < startedMax);
 		if (want != focusSite) {
 			// hold: the player brushing past another building does not move the crew; a site not started yet needs longer (#48)
 			boolean urgent = focusSite < 0 || siteState[focusSite] == SiteDispatch.DONE;
@@ -1085,6 +1126,9 @@ public final class SiteCursor implements JobCursor {
 				candidateRounds = 1;
 			}
 			int hold = want >= 0 && siteState[want] == SiteDispatch.IDLE ? HOLD_FRESH : HOLD;
+			if (par && want >= 0 && want == insideSite) {
+				hold = 1; // #53: walking into a building takes the focus at once (flying, insideSite is -1: the #48 holds stay)
+			}
 			if (urgent || candidateRounds >= hold) {
 				focusSite = want;
 				candidate = -1;
@@ -1093,6 +1137,11 @@ public final class SiteCursor implements JobCursor {
 		} else {
 			candidate = -1;
 			candidateRounds = 0;
+		}
+		if (par) {
+			lastDist = dist;
+			dispatchParallel(t, dist, startedLeft < startedMax);
+			return;
 		}
 		int limit = SiteDispatch.openLimit(t.sitesOpen(), builders, t.siteCrewMax());
 		int hardCap = t.sitesOpen() <= 1 ? 1 : limit + 1; // the focus opens at once even when a site still has to close its storey
@@ -1171,6 +1220,337 @@ public final class SiteCursor implements JobCursor {
 		staffAll(t);
 		// #48: builders the closing sites and rear guards just let go reach the focus now, not at the next dispatch
 		staffAll(t);
+	}
+
+	/**
+	 * #53, sites in parallel ({@code build.sitesAtOnce} over 0; docs/features/builder-sites.md, "Parallel sites"). The
+	 * focus opens at once, whatever else is open. The other open sites are ranked, nearest first (the most advanced
+	 * first among equals): the first {@code sitesAtOnce - 1} are built in parallel with a crew of their own, the next
+	 * {@link SiteDispatch#RETAIN_MAX} are <b>retained</b> ({@link SiteDispatch#RETAIN} builder each: slow, never
+	 * frozen), the rest close at their next storey boundary (started: they come back first). Nothing closes because it
+	 * is far: a site the player left keeps building until it is finished while it is within the limit. A site the player
+	 * only walked through (opened, nothing placed) closes. With builders to spare and a free slot, the nearest started
+	 * site within {@link SiteDispatch#KEEP} opens by proximity, else (on the ground) the nearest fresh one within
+	 * {@link SiteDispatch#NEAR_FRESH}, once it was the choice for {@link #HOLD_FRESH} rounds.
+	 */
+	private void dispatchParallel(BuildTuning t, double[] dist, boolean allowFresh) {
+		int active = SiteDispatch.activeLimit(t.sitesAtOnce(), builders, t.siteCrewMin());
+		int retainMax = SiteDispatch.retainSlots(active, builders, t.siteCrewMin());
+		if (focusSite >= 0 && open[focusSite] == null) {
+			openSite(focusSite);
+		}
+		int[] others = new int[openList.size()];
+		int no = 0;
+		for (int k = 0; k < openList.size(); k++) {
+			int s = openList.getInt(k);
+			Open o = open[s];
+			if (o == null) {
+				continue;
+			}
+			o.focus = s == focusSite;
+			if (o.focus) {
+				o.rear = false;
+				o.retain = false;
+				o.leaving = false;
+				o.boundary = false;
+				continue;
+			}
+			o.rear = false;
+			others[no++] = s;
+		}
+		rank(others, no, dist);
+		int slots = active - (focusSite >= 0 ? 1 : 0);
+		int retained = 0;
+		for (int j = 0; j < no; j++) {
+			Open o = open[others[j]];
+			if (j < slots) {
+				o.retain = false;
+				o.leaving = false;
+			} else if (retained < retainMax) {
+				o.retain = true;
+				o.leaving = false;
+				retained++;
+			} else {
+				o.retain = true;
+				o.leaving = true;
+			}
+		}
+		for (int j = 0; j < no; j++) {
+			Open o = open[others[j]];
+			if (o == null) {
+				continue;
+			}
+			boolean untouched = siteState[o.site] == SiteDispatch.IDLE; // no builder ever placed there: nothing to finish
+			boolean stalled = o.prog != null && o.working == 0 && !pickable(o);
+			if (o.fresh && untouched && !o.near || o.leaving && (o.prog == null || o.fresh || stalled)) {
+				closeSite(o);
+				continue;
+			}
+			o.boundary = false;
+		}
+		// the player ran through more buildings than the crew can keep: the farthest leaving sites close now
+		for (int j = no - 1; j >= 0 && openList.size() > builders; j--) {
+			Open o = open[others[j]];
+			if (o != null && o.leaving) {
+				closeSite(o);
+			}
+		}
+		staffParallel(t);
+		if (openNear(t, dist, active, allowFresh)) {
+			staffParallel(t);
+		}
+	}
+
+	/**
+	 * #53: this job builds sites in parallel. {@code build.sitesAtOnce} only, not {@link BuildTuning#sitesParallel}: that one
+	 * also asks {@code build.order}, which may have been changed for the next build while this one runs.
+	 */
+	private static boolean parallel(BuildTuning t) {
+		return t.sitesAtOnce() > 0;
+	}
+
+	/** Sorts open sites {@code a[0 … len)}: nearer bucket first, then the most advanced (share placed) first. */
+	private void rank(int[] a, int len, double[] dist) {
+		for (int i = 1; i < len; i++) {
+			int v = a[i];
+			int j = i - 1;
+			while (j >= 0 && before(v, a[j], dist)) {
+				a[j + 1] = a[j];
+				j--;
+			}
+			a[j + 1] = v;
+		}
+	}
+
+	private boolean before(int a, int b, double[] dist) {
+		if (SiteDispatch.nearer(dist[a], dist[b])) {
+			return true;
+		}
+		if (SiteDispatch.nearer(dist[b], dist[a])) {
+			return false;
+		}
+		return doneShare(a) > doneShare(b);
+	}
+
+	private double doneShare(int s) {
+		return p.siteTotal[s] == 0 ? 1.0 : 1.0 - (double) siteLeft[s] / p.siteTotal[s];
+	}
+
+	/**
+	 * #53: opens one site by proximity when a slot is free and the open sites leave at least {@code build.siteCrewMin}
+	 * builders unused: the nearest started one within {@link SiteDispatch#KEEP}, else, with the player on the ground and
+	 * fresh sites allowed, the nearest fresh one within {@link SiteDispatch#NEAR_FRESH} once it was the choice for
+	 * {@link #HOLD_FRESH} rounds in a row (#48: flying past buildings opens nothing). True = a site was opened.
+	 */
+	private boolean openNear(BuildTuning t, double[] dist, int active, boolean allowFresh) {
+		int act = 0;
+		boolean[] isOpen = new boolean[p.sites];
+		for (int k = 0; k < openList.size(); k++) {
+			int s = openList.getInt(k);
+			isOpen[s] = true;
+			Open o = open[s];
+			if (o != null && !o.retain) {
+				act++;
+			}
+		}
+		if (act >= active || spareUseful < t.siteCrewMin()) {
+			nearCand = -1;
+			nearRounds = 0;
+			return false;
+		}
+		int s = SiteDispatch.nearestStarted(siteState, dist, isOpen);
+		if (s < 0) {
+			int fresh = allowFresh && hasPlayer && !airborne() ? SiteDispatch.nearestFresh(siteState, dist, isOpen) : -1;
+			if (fresh < 0) {
+				nearCand = -1;
+				nearRounds = 0;
+				return false;
+			}
+			if (fresh == nearCand) {
+				nearRounds++;
+			} else {
+				nearCand = fresh;
+				nearRounds = 1;
+			}
+			if (nearRounds < HOLD_FRESH) {
+				return false;
+			}
+			s = fresh;
+		}
+		if (s == focusSite || s == p.details) {
+			return false;
+		}
+		nearCand = -1;
+		nearRounds = 0;
+		openSite(s).near = true;
+		return true;
+	}
+
+	/**
+	 * #53: the crews of the open sites (sites in parallel). Recounts who is where first (every builder is either free or
+	 * on exactly one open site: a builder of a site that closed is free), then sizes every site with
+	 * {@link SiteDispatch#shares}: the focus first, then the parallel sites nearest first, then the retained ones, then
+	 * the leaving ones. Floors: {@code build.siteCrewMin} for the focus and the parallel sites, {@link SiteDispatch#RETAIN}
+	 * for the others; caps: what the site can use now. Builders without a task leave a site over its share and go to one
+	 * under it; a builder with a task stays until the task is done ({@link #release}), except when the focus has fewer
+	 * than its minimum and nobody is free: then the lowest site over its floor hands one over ({@code handovers}).
+	 */
+	private void staffParallel(BuildTuning t) {
+		int m = openList.size();
+		if (m == 0) {
+			spareUseful = builders;
+			return;
+		}
+		for (int k = 0; k < m; k++) {
+			Open o = open[openList.getInt(k)];
+			if (o != null) {
+				o.crew = 0;
+			}
+		}
+		for (int f = 0; f < builders; f++) {
+			Open o = tSite[f] >= 0 ? open[tSite[f]] : null;
+			if (o == null) {
+				tSite[f] = -1;
+				tTask[f] = -1;
+				lent[f] = false;
+			} else {
+				o.crew++;
+			}
+		}
+		Open[] order = new Open[m];
+		int[] tier = new int[m];
+		int no = 0;
+		for (int k = 0; k < m; k++) {
+			Open o = open[openList.getInt(k)];
+			if (o != null) {
+				order[no] = o;
+				tier[no] = o.focus ? 0 : o.leaving ? 3 : o.retain ? 2 : 1;
+				no++;
+			}
+		}
+		double[] dist = lastDist;
+		for (int i = 1; i < no; i++) {
+			Open v = order[i];
+			int vt = tier[i];
+			int j = i - 1;
+			while (j >= 0 && (vt < tier[j] || vt == tier[j] && dist != null && before(v.site, order[j].site, dist))) {
+				order[j + 1] = order[j];
+				tier[j + 1] = tier[j];
+				j--;
+			}
+			order[j + 1] = v;
+			tier[j + 1] = vt;
+		}
+		int[] floor = new int[no];
+		int[] cap = new int[no];
+		int[] hard = new int[no];
+		int useful = 0;
+		for (int k = 0; k < no; k++) {
+			Open o = order[k];
+			if (o.finished) {
+				continue;
+			}
+			int max = tier[k] <= 1 ? t.siteCrewMax() : tier[k] == 2 ? SiteDispatch.RETAIN : SiteDispatch.LEAVING_CREW;
+			int tasks = o.prog == null ? (o.focus ? max : t.siteCrewMin()) : o.waveTasksLeft + aheadTasks(o);
+			hard[k] = max;
+			cap[k] = tier[k] <= 1 ? SiteDispatch.crew(siteLeft[o.site], tasks, t.siteCrewMin(), max, t.entriesPerBuilder(), Integer.MAX_VALUE)
+					: Math.min(max, Math.max(1, tasks));
+			floor[k] = Math.min(cap[k], tier[k] <= 1 ? t.siteCrewMin() : SiteDispatch.RETAIN);
+			useful += cap[k];
+		}
+		spareUseful = Math.max(0, builders - useful);
+		int[] target = SiteDispatch.shares(builders, floor, cap, hard);
+		for (int k = 0; k < no; k++) {
+			order[k].want = target[k];
+		}
+		// let go: builders holding no task on a site over its share
+		for (int f = builders - 1; f >= 0; f--) {
+			Open o = tSite[f] >= 0 && tTask[f] < 0 ? open[tSite[f]] : null;
+			if (o != null && o.crew > o.want) {
+				tSite[f] = -1;
+				o.crew--;
+				lent[f] = false;
+				walkLeft[f] = 0;
+			}
+		}
+		// take: free builders go to the sites under their share, in order
+		for (int k = 0; k < no; k++) {
+			Open o = order[k];
+			for (int f = 0; f < builders && o.crew < o.want; f++) {
+				if (tSite[f] < 0) {
+					tSite[f] = o.site;
+					tTask[f] = -1;
+					walkLeft[f] = 0;
+					o.crew++;
+				}
+			}
+		}
+		// the focus under its minimum and nobody free: the lowest site over its floor hands a builder over
+		if (no > 0 && order[0].focus && !order[0].finished) {
+			Open fo = order[0];
+			int need = floor[0];
+			for (int k = no - 1; k > 0 && fo.crew < need; k--) {
+				Open o = order[k];
+				while (fo.crew < need && o.crew > floor[k]) {
+					int f = handoverFrom(o);
+					if (f < 0) {
+						break;
+					}
+					dropTask(f);
+					o.crew--;
+					tSite[f] = fo.site;
+					fo.crew++;
+					handovers++;
+				}
+			}
+		}
+	}
+
+	/** A builder of {@code o} to hand over: one without a task first, else the one whose task has the most entries left; -1 = none. */
+	private int handoverFrom(Open o) {
+		int best = -1;
+		int bestLeft = -1;
+		SiteProgram.Program g = o.prog;
+		for (int f = 0; f < builders; f++) {
+			if (tSite[f] != o.site) {
+				continue;
+			}
+			if (tTask[f] < 0) {
+				return f;
+			}
+			int left = g == null ? 0 : g.taskStart()[tTask[f] + 1] - o.taskNext[tTask[f]];
+			if (left > bestLeft) {
+				best = f;
+				bestLeft = left;
+			}
+		}
+		return best;
+	}
+
+	/** Builder {@code f} lets go of its task without leaving its site (the task stays, another builder takes it up). */
+	private void dropTask(int f) {
+		Open o = tSite[f] >= 0 ? open[tSite[f]] : null;
+		int tk = tTask[f];
+		if (o != null && tk >= 0) {
+			o.taskCrew[tk] = Math.max(0, o.taskCrew[tk] - 1);
+			o.working = Math.max(0, o.working - 1);
+		}
+		tTask[f] = -1;
+		walkLeft[f] = 0;
+		lent[f] = false;
+	}
+
+	/** #53 status: blocks per second per site and in all, smoothed over a few seconds (every 20 ticks). */
+	private void paceSample() {
+		long all = 0;
+		for (int s = 0; s < sitePlaced.length; s++) {
+			long d = sitePlaced[s] - siteMark[s];
+			siteMark[s] = sitePlaced[s];
+			siteBps[s] = siteBps[s] * 0.6 + d * 0.4;
+			all += sitePlaced[s];
+		}
+		allBps = allBps * 0.6 + (all - allMark) * 0.4;
+		allMark = all;
 	}
 
 	/** Crews: the focus first, then the sites closing their storey, then the rear guards. */
@@ -1877,6 +2257,9 @@ public final class SiteCursor implements JobCursor {
 				by[i] = f;
 				applied(i, out);
 				count(i);
+				if (out != BuildCursor.Outcome.SKIPPED && p.siteOf[i] >= 0) {
+					sitePlaced[p.siteOf[i]]++; // #53 status: blocks per second per site
+				}
 				progress = true;
 				if (out == BuildCursor.Outcome.SKIPPED) {
 					tickSkips++;
@@ -2347,6 +2730,29 @@ public final class SiteCursor implements JobCursor {
 
 	private String status() {
 		StringBuilder sb = new StringBuilder("sites ").append(sitesDone).append('/').append(p.sites);
+		BuildTuning tn = BuildBudget.global().tuning();
+		boolean par = parallel(tn);
+		if (par) {
+			// #53: sites built in parallel / their limit, retained ones, the crew and its pace now
+			int act = 0;
+			int ret = 0;
+			for (int k = 0; k < openList.size(); k++) {
+				Open o = open[openList.getInt(k)];
+				if (o != null && o.retain) {
+					ret++;
+				} else if (o != null) {
+					act++;
+				}
+			}
+			sb.append(" | parallel ").append(act).append('/').append(SiteDispatch.activeLimit(tn.sitesAtOnce(), builders, tn.siteCrewMin()));
+			if (ret > 0) {
+				sb.append(" retain ").append(ret);
+			}
+			sb.append(String.format(Locale.ROOT, " crew %d %.0f b/s", builders, allBps));
+			if (handovers > 0) {
+				sb.append(" handovers ").append(handovers);
+			}
+		}
 		int working = 0;
 		for (int s = 0; s < open.length; s++) {
 			Open o = open[s];
@@ -2356,7 +2762,7 @@ public final class SiteCursor implements JobCursor {
 			working += o.working;
 			SiteProgram.Program g = o.prog;
 			int w = o.wave;
-			sb.append(" | ").append(o.focus ? "focus " : o.rear ? "rear " : "closing ").append(p.siteName[s]);
+			sb.append(" | ").append(o.focus ? "focus " : par ? o.retain ? "retain " : "parallel " : o.rear ? "rear " : "closing ").append(p.siteName[s]);
 			if (g == null) {
 				sb.append(" planning");
 			} else if (w < g.waves()) {
@@ -2367,6 +2773,12 @@ public final class SiteCursor implements JobCursor {
 						.append('/').append(g.waves()).append(" bays-left ").append(o.waveTasksLeft);
 			}
 			sb.append(" left ").append(siteLeft[s]).append('/').append(p.siteTotal[s]).append(" crew ").append(o.crew);
+			if (par) {
+				sb.append('/').append(o.want).append(String.format(Locale.ROOT, " %.0f b/s", siteBps[s]));
+			}
+			if (o.near) {
+				sb.append(" near");
+			}
 			int[] late = o.lateByStorey;
 			boolean anyLate = false;
 			for (int st = 0; st < late.length; st++) {
