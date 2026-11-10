@@ -2,6 +2,7 @@ package dev.t3craft.client.islands;
 
 import dev.t3craft.T3Craft;
 import dev.t3craft.build.Placement;
+import dev.t3craft.build.ServerLevelSink;
 import dev.t3craft.client.chat.ChatTheme;
 import dev.t3craft.client.demo.VanillaDemoWorld;
 import dev.t3craft.mapgen.islands.Bridge;
@@ -74,16 +75,23 @@ final class IslandsRuntime {
 	/** Cosine needed to start a bridge from {@value #TRIGGER} blocks (about 50°). */
 	private static final double TOWARDS = 0.65;
 	private static final int RESCUE_COOLDOWN = 20;
+	/**
+	 * New bridge plans per check ({@link #nearEdge} and {@link #warm} each run every 4 ticks). Working out the links
+	 * of an island the first time plans dozens of bridges, so it is spread over ticks instead of done at once.
+	 */
+	private static final int PLANS_PER_CHECK = 2;
 
 	private static volatile @Nullable IslandsRuntime active;
 
-	private final IslandField field = new IslandField(IslandsWorld.SEED, IslandsWorld.BASE_Y);
+	private final IslandField field = IslandsWorld.field();
 	private final IslandsState state;
 	private final List<IslandJob> islandJobs = new ArrayList<>();
 	private final Set<String> queued = new HashSet<>();
 	private final List<BridgeJob> bridgeJobs = new ArrayList<>();
 	private final Set<String> activeBridges = new HashSet<>();
 	private final BridgeNetwork network = new BridgeNetwork(field);
+	/** Islands whose links are all planned (see {@link #warmed}). */
+	private final Set<String> linked = new HashSet<>();
 	private final Map<UUID, Vec3> lastPos = new HashMap<>();
 	private final Map<UUID, BlockPos> lastSafe = new HashMap<>();
 	private final Map<UUID, Integer> cooldown = new HashMap<>();
@@ -158,6 +166,8 @@ final class IslandsRuntime {
 			}
 			if (ticks % 4 == 0) {
 				nearEdge(level, p);
+			} else if (ticks % 4 == 2) {
+				warm(p);
 			}
 			rescue(level, p);
 		}
@@ -230,6 +240,9 @@ final class IslandsRuntime {
 		if (cur == null || p.getY() < cur.top() - 1 || p.getY() > cur.top() + 8 || !state.hasIsland(cur.id())) {
 			return;
 		}
+		if (!warmed(cur)) {
+			return; // its bridges are still being planned, a few per check
+		}
 		Bridge best = null;
 		Island bestTo = null;
 		double bestScore = Double.MAX_VALUE;
@@ -272,6 +285,34 @@ final class IslandsRuntime {
 		} else {
 			hint(level, best.startOn(cur.id()));
 		}
+	}
+
+	/**
+	 * Plans, ahead of time, the bridges of the island under the player and then of the islands it links to (the
+	 * ones the player may cross next): {@value #PLANS_PER_CHECK} plans per call, so nothing stutters.
+	 */
+	private void warm(ServerPlayer p) {
+		Island cur = field.islandAt(p.getBlockX(), p.getBlockZ(), 1.5);
+		if (cur == null || !warmed(cur)) {
+			return;
+		}
+		for (Island n : network.links(cur)) {
+			if (!warmed(n)) {
+				return; // the rest next time
+			}
+		}
+	}
+
+	/** Whether every bridge {@code i}'s links need is planned; if not, plans a few more. */
+	private boolean warmed(Island i) {
+		if (linked.contains(i.id())) {
+			return true;
+		}
+		if (network.links(i, PLANS_PER_CHECK) == null) {
+			return false;
+		}
+		linked.add(i.id());
+		return true;
 	}
 
 	/** Where the player is heading: the way they moved since the last check, or where they look when standing still. */
@@ -370,12 +411,17 @@ final class IslandsRuntime {
 				blocks = IslandBlocks.build(field, island, IslandProps.INSTANCE);
 			}
 			List<Placement> list = blocks;
+			ServerLevelSink sink = new ServerLevelSink(level, Block.UPDATE_ALL, false);
 			while (budget > 0 && next < list.size()) {
 				Placement p = list.get(next);
 				if (!force && !level.isLoaded(p.pos())) {
 					return budget;
 				}
 				level.setBlock(p.pos(), p.state(), Block.UPDATE_ALL);
+				if (p.hasBlockEntity()) {
+					// signs, banners...: the citadel's way (ServerLevelSink) loads the piece's block entity data into what is there now
+					sink.place(p.pos(), level.getBlockState(p.pos()), p.blockEntity());
+				}
 				next++;
 				budget--;
 			}

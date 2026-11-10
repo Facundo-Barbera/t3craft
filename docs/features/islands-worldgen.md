@@ -125,7 +125,10 @@ la semilla y la mezcla del estado:
   de margen;
 - la de las islas a ≤ 170 bloques de un jugador, que pueden estar a medias (de estas solo se miran los chunks
   cargados);
-- el pasillo entre cada par de vecinas, donde pueden estar sus puentes.
+- el pasillo entre cada par de vecinas de eje, donde pueden estar sus puentes;
+- la caja de cada **puente diagonal** (#32, #40): cruzan la esquina de cuatro celdas, fuera de todos los pasillos
+  de eje. Se limpian los que estaban construidos (`IslandsState.hasBridge`) o los que pueden estar a medias
+  porque había un jugador cerca de las dos islas; la caja es la de los bloques del plan del puente (campo viejo).
 
 Lo borrado se queda en aire, con un presupuesto por tick (80 000 lecturas, 6 000 borrados) y sin actualizaciones
 de vecinos, así que nada cae ni suelta objetos. Los jugadores que pueden volar vuelan mientras tanto. Al terminar:
@@ -150,15 +153,21 @@ los vuelve a escribir tal cual.
 
 ## Enganches y contrato con los puentes (#32) y el runtime
 
-`IslandsRuntime` no se toca. Sigue creando su campo con `new IslandField(IslandsWorld.SEED, IslandsWorld.BASE_Y)`
-y usando `IslandProps.INSTANCE`. Para que ese código, sin cambiar, use el mundo abierto:
+Al escribirse este corte `IslandsRuntime` no se tocó y seguía creando su campo con
+`new IslandField(IslandsWorld.SEED, IslandsWorld.BASE_Y)`, con un apaño (`IslandField.useSessionMix`) para que ese
+constructor de dos argumentos usara la mezcla del mundo. **Ya no hace falta (#40):**
 
-- `IslandsWorld.SEED` ya **no es una constante**: es `static volatile`. `IslandsClient` la fija desde el estado
-  (`IslandsWorld.use`) antes de `IslandsRuntime.start`. La semilla por defecto pasa a `DEFAULT_SEED`.
-- `new IslandField(seed, baseY)` usa la mezcla de la sesión (`IslandField.useSessionMix`, que fija
-  `IslandsWorld.use`). Es un apaño **provisional**. Lo limpio es que el runtime pase a `IslandsWorld.field()`
-  (o a `new IslandField(seed, baseY, mix)`); queda para quien lleve `IslandsRuntime`.
-- `IslandProps.INSTANCE` ahora es "catálogo primero, provisional después", sin cambiar de tipo.
+- `IslandsRuntime` crea su campo con `IslandsWorld.field()` (semilla, altura base y mezcla del mundo abierto), y el
+  constructor `IslandField(seed, baseY)`, `useSessionMix` y `sessionMix` se eliminaron. El único constructor es
+  `IslandField(seed, baseY, mix)`.
+- `IslandsWorld.SEED` **no es una constante**: es `static volatile`. `IslandsClient` la fija desde el estado
+  (`IslandsWorld.use`, junto con la mezcla) antes de `IslandsRuntime.start`. La semilla por defecto es `DEFAULT_SEED`.
+- `IslandProps.INSTANCE` es "catálogo primero, provisional después", sin cambiar de tipo.
+- El runtime **aplica los datos de bloque** (`Placement.blockEntity()`) de las piezas: después de colocar el bloque,
+  `ServerLevelSink.place` (el camino de la ciudadela) carga la etiqueta en el bloque que haya, así que carteles y
+  estandartes ya no salen en blanco.
+- `IslandField.terrain(ventana)`: solo el suelo de una ventana (sin huecos ni enlaces); lo usa el planificador de
+  puentes en vez de `generate`. `Shape.column` descarta antes las islas cuya caja no contiene la columna.
 
 Lo que la API de `Island`/`IslandField` mantiene para los puentes: `id`, `gx`, `gz`, `size`, `cx`, `cz`, `top`,
 `contains(x, z, slack)`, `surface()`, `distanceTo`, `area()`, `radius()`, `depth(x, z)`, y en el campo `origin()`,
@@ -174,8 +183,9 @@ mezcla, y `cellOf` pasa a ser de instancia. En `main` nadie fuera de `IslandFiel
 
 **El borde de cada isla siempre está en `top`**, porque las terrazas no llegan al 30 % exterior, así que un puente
 a la altura de `top` aterriza a ras. Distancias: entre vecinas hay ≥ 12 bloques de vacío. Con XG en la mezcla
-(celda de 82) dos islas pequeñas vecinas pueden quedar a ~90 bloques de borde a borde; si eso es demasiado para
-un puente, #32 puede pedir celdas más pequeñas o islas puente.
+(celda de 82) dos islas pequeñas vecinas pueden quedar a ~90 bloques de borde a borde. #40: `BridgeNetwork` no
+construye puentes de eje de más de `MAX_AXIS_DECK` = 64 pasos, salvo que sea la única salida de una isla (ver
+[`islands-bridges.md`](islands-bridges.md)).
 
 ## Defaults elegidos (sin preguntar)
 
@@ -189,19 +199,28 @@ un puente, #32 puede pedir celdas más pequeñas o islas puente.
 
 ## Limitaciones conocidas
 
-- El runtime (`IslandsRuntime`, del hilo #32) coloca `Placement.state()` y **no aplica los datos de bloque**: los
-  carteles o estandartes de alguna variante salen en blanco hasta que el runtime aplique `blockEntity()`.
 - Los huecos son cuadrados. Las casas reciben un plot cuadrado del tamaño del hueco, sin pasar de su máximo.
 - La búsqueda de sitio de los huecos cuesta algo; por eso `IslandField` guarda en caché hasta 4096 islas.
 - Sin pruebas unitarias (el repo no las tiene); la verificación es compilar.
 
 ## Riesgos de compilación (revisado a mano, sin compilar)
 
-- Nombres de bloques y propiedades de 26.3: `Blocks.SHORT_GRASS`, `DEAD_BUSH`, `HANGING_ROOTS`, `POINTED_DRIPSTONE`
-  con `BlockStateProperties.VERTICAL_DIRECTION` y `DRIPSTONE_THICKNESS`/`DripstoneThickness.TIP`, `PINK_PETALS`
-  con `FLOWER_AMOUNT`.
-- `MutableComponent.withColor(int)` (el color del texto sale de `ChatTheme.warmStudio().text()`).
-- `ServerPlayer.teleportTo(level, x, y, z, Set.of(), yaw, pitch, true)`: la misma firma que usa el runtime.
+Revisión cruzada tras unir #31, #32 y #36 (#40), solo leyendo el repo (no hay JAR de Minecraft en la VPS). Lo que ya
+usa el repo en otro sitio con la misma API, **confirmado**: `Blocks.SHORT_GRASS` (`CitadelPlacement`), `PINK_PETALS`
+con `FLOWER_AMOUNT` (`CherryStyle`), `Component#withColor(int)` (`Notifier`), `ServerPlayer.teleportTo(level, x, y, z,
+Set.of(), yaw, pitch, true)` y `needsSync` (`VoidGuard`, `PieceStage`), `getGameProfile().name()`, `Blocks.IRON_CHAIN`,
+`Block.updateFromNeighbourShapes`, `Level.isLoaded(pos)`, `sendSystemMessage(c, true)`, y `HqKit.active()` (miembro
+estático de una interfaz: público aunque no lo diga). Los nombres de `Island*`, `Bridge*`, `HqMenu*` y `MapType*`
+entre ramas cuadran (constructores, records, firmas, `IslandField.CELL` ya no lo usa nadie).
+
+**Sin confirmar** (nada más en el repo los usa; son los nombres de Mojang de 1.21.x):
+- `SoundEvents.AMETHYST_BLOCK_CHIME` como `SoundEvent` en `ServerLevel.playSound(null, pos, …)`; si en 26.3 fuera un
+  `Holder`, `.value()`.
+- `Blocks.POINTED_DRIPSTONE` con `BlockStateProperties.VERTICAL_DIRECTION` y `DRIPSTONE_THICKNESS` /
+  `DripstoneThickness.TIP` (import `...block.state.properties.DripstoneThickness`).
+- `Blocks.HANGING_ROOTS`, `DIRT_PATH`, `MOSS_CARPET`.
+- `Abilities.mayfly` como campo público y `ServerPlayer.onUpdateAbilities()` (la regeneración los usa para hacer
+  volar a los jugadores; `flying` sí se usa como campo en `VoidGuard`).
 - Una clase anónima `LinkedHashMap` con `serialVersionUID` estático: requiere Java 16 o posterior.
 
 ## Probarlo

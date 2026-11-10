@@ -46,13 +46,6 @@ public final class IslandField implements MapGenerator<IslandField.Window> {
 	/** Islands kept in the cache. */
 	private static final int CACHE = 4096;
 
-	/**
-	 * The mix the two-argument constructor uses. A shim for the runtime, which makes its field with
-	 * {@code new IslandField(seed, baseY)}: the client sets the open world's mix here before the runtime starts
-	 * ({@code IslandsWorld.use}). New code passes the mix explicitly.
-	 */
-	private static volatile IslandMix sessionMix = IslandMix.DEFAULT;
-
 	private final long seed;
 	private final int baseY;
 	private final IslandMix mix;
@@ -66,26 +59,12 @@ public final class IslandField implements MapGenerator<IslandField.Window> {
 		}
 	});
 
-	/** A field with the session's mix ({@link #useSessionMix}, {@link IslandMix#DEFAULT} until set). */
-	public IslandField(long seed, int baseY) {
-		this(seed, baseY, sessionMix);
-	}
-
 	/** @param baseY y of the grass layer of the spawn island */
 	public IslandField(long seed, int baseY, IslandMix mix) {
 		this.seed = seed;
 		this.baseY = baseY;
 		this.mix = Objects.requireNonNull(mix, "mix");
 		this.cell = cellFor(mix);
-	}
-
-	/** Sets the mix {@link #IslandField(long, int)} uses from now on (the open world's). */
-	public static void useSessionMix(IslandMix mix) {
-		sessionMix = Objects.requireNonNull(mix, "mix");
-	}
-
-	public static IslandMix sessionMix() {
-		return sessionMix;
 	}
 
 	/** The cell side for a mix: room for its biggest island (never less than the large spawn island) and the margins. */
@@ -275,6 +254,11 @@ public final class IslandField implements MapGenerator<IslandField.Window> {
 		return out;
 	}
 
+	/** Only the ground of a window (what {@link #generate} puts in its layout): no slots and no links, so it is cheap. */
+	public TerrainShape terrain(Window w) {
+		return new Shape(w.area(), List.copyOf(islandsIn(w)));
+	}
+
 	@Override
 	public MapLayout generate(Window w) {
 		List<Island> islands = islandsIn(w);
@@ -296,6 +280,10 @@ public final class IslandField implements MapGenerator<IslandField.Window> {
 		@Override
 		public @Nullable Span column(int x, int z) {
 			for (Island i : islands) {
+				int reach = i.size().reach();
+				if (Math.abs(x - i.cx()) > reach || Math.abs(z - i.cz()) > reach) {
+					continue; // outside the island's box: skip the outline maths
+				}
 				if (i.contains(x, z, 0)) {
 					return new Span(i.bottom(x, z) - i.hang(x, z), i.surfaceY(x, z));
 				}

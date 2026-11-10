@@ -174,6 +174,11 @@ public final class IslandsClient implements ClientModInitializer {
 		return s != null && VanillaDemoWorld.isDemoServer(s, IslandsWorld.FOLDER) ? s : null;
 	}
 
+	/** The save folder of the islands world: the only folder the HQ menu's Reset for this map type may delete. */
+	public static String worldFolder() {
+		return IslandsWorld.FOLDER;
+	}
+
 	/**
 	 * Creates the islands world the first time and opens it afterwards: what {@code /t3craft islands} does, also
 	 * called by the HQ menu's map type selector. {@code back} is the screen to return to if vanilla cancels the

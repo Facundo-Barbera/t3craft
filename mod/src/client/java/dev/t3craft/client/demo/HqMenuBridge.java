@@ -6,9 +6,12 @@ import dev.t3craft.client.hq.layout.HqLayoutConfig;
 import dev.t3craft.client.hq.layout.HqLayoutState;
 import dev.t3craft.client.hq.layout.HqRebuild;
 import dev.t3craft.client.islands.IslandsClient;
+import dev.t3craft.client.t3ui.kit.T3Draw;
 import dev.t3craft.hq.layout.HqLayouts;
 import dev.t3craft.mapgen.MapTypes;
+import java.io.IOException;
 import java.nio.file.Path;
+import java.time.LocalDateTime;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import org.jspecify.annotations.Nullable;
@@ -52,6 +55,89 @@ final class HqMenuBridge {
 		} else {
 			demo.open(mc, parent, false); // the citadel: the HQ world, as the button always did
 		}
+	}
+
+	// ---- reset of a map type's own world (the floating islands) ---------------------------------------------------
+
+	/**
+	 * The save folder of a map type's own world that the menu can reset, or null. The citadel is not here: its
+	 * reset also rebuilds, and goes through {@link HqRebuild}.
+	 */
+	private static @Nullable String ownFolder(MapTypes type) {
+		return type.id().equals(MapTypes.FLOATING_ISLANDS.id()) ? IslandsClient.worldFolder() : null;
+	}
+
+	static boolean canReset(MapTypes type) {
+		return ownFolder(type) != null;
+	}
+
+	static boolean worldExists(MapTypes type) {
+		String folder = ownFolder(type);
+		return folder != null && VanillaDemoWorld.exists(Minecraft.getInstance(), folder);
+	}
+
+	/** Why the world of {@code type} cannot be reset now (a world is open, or it does not exist), or null. */
+	static @Nullable String resetRefusal(MapTypes type) {
+		String folder = ownFolder(type);
+		Minecraft mc = Minecraft.getInstance();
+		if (folder == null) {
+			return T3Draw.tr("t3craft.hqmenu.hq_only");
+		}
+		if (mc.level != null) {
+			return T3Draw.tr("t3craft.hqmenu.reset_map.refuse_world");
+		}
+		if (!VanillaDemoWorld.exists(mc, folder)) {
+			return T3Draw.tr("t3craft.hqmenu.reset_map.refuse_none", HqMenuPanel.typeName(type));
+		}
+		return null;
+	}
+
+	/** The question's text: the type's name and folder, and whether a zip backup is made first. */
+	static String resetBody(DemoClient demo, MapTypes type) {
+		String folder = ownFolder(type);
+		boolean backup = HqReset.shouldBackup(demo.loadConfig());
+		return T3Draw.tr(backup ? "t3craft.hqmenu.reset_map.body" : "t3craft.hqmenu.reset_map.body_nobackup", HqMenuPanel.typeName(type),
+				folder == null ? "" : folder);
+	}
+
+	/**
+	 * Deletes the world of {@code type}: {@link HqReset#validate} first (only a real {@code saves/<folder>}), the zip
+	 * backup unless {@code demo.resetBackup} is off (a failed backup deletes nothing), then {@link HqReset#delete}. It
+	 * does not create the world again: Open does, with a fresh field. Returns the result line.
+	 */
+	static String resetWorld(DemoClient demo, MapTypes type) {
+		String why = resetRefusal(type);
+		String folder = ownFolder(type);
+		if (why != null || folder == null) {
+			return why != null ? why : "";
+		}
+		Minecraft mc = Minecraft.getInstance();
+		Path saves = VanillaDemoWorld.savesDir(mc);
+		HqReset.Check check = HqReset.validate(saves, folder);
+		Path target = check.target();
+		if (target == null) {
+			T3Craft.LOGGER.warn("[demo] reset {}: refused, {}", folder, check.reason());
+			return T3Draw.tr("t3craft.hqmenu.reset_map.failed", check.reason());
+		}
+		String backup = T3Draw.tr("t3craft.hqmenu.reset_map.nobackup");
+		if (HqReset.shouldBackup(demo.loadConfig())) {
+			try {
+				Path zip = HqReset.zip(target, VanillaDemoWorld.backupDir(mc), folder, LocalDateTime.now());
+				backup = T3Draw.tr("t3craft.hqmenu.reset_map.backup", zip.getFileName().toString());
+				T3Craft.LOGGER.info("[demo] reset {}: backup written to {}", folder, zip);
+			} catch (IOException | RuntimeException e) {
+				T3Craft.LOGGER.error("[demo] reset {}: backup failed, world left untouched", folder, e);
+				return T3Draw.tr("t3craft.hqmenu.reset_map.failed", "backup failed, nothing deleted (" + e.getClass().getSimpleName() + ")");
+			}
+		}
+		try {
+			HqReset.delete(saves, folder);
+		} catch (IOException | RuntimeException e) {
+			T3Craft.LOGGER.error("[demo] reset {}: could not delete the world", folder, e);
+			return T3Draw.tr("t3craft.hqmenu.reset_map.failed", "could not delete the old world (" + e.getClass().getSimpleName() + "); " + backup);
+		}
+		T3Craft.LOGGER.info("[demo] reset: deleted saves/{} ({})", folder, backup);
+		return T3Draw.tr("t3craft.hqmenu.reset_map.done", HqMenuPanel.typeName(type), backup);
 	}
 
 	private static void persistMapType(String typeId) {

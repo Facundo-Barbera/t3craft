@@ -30,8 +30,9 @@ import org.jspecify.annotations.Nullable;
  *   <li><b>Map type</b>: a {@link T3Select} over the {@code MapTypes} registry (a type registered later shows up
  *       by itself) with the chosen type's name and description. The choice is saved to {@code mapType}
  *       ({@link MapTypeModel}). Each type has its own world, so choosing never regenerates anything: it decides
- *       which world Open goes to. The layout list, Export / Reload, Rebuild and Reset below apply to the
- *       citadel's HQ world and are off for the other types.</li>
+ *       which world Open goes to. The layout list, Export / Reload and Rebuild below apply to the citadel's HQ
+ *       world and are off for the other types; Reset is also offered for a type with a world of its own the menu
+ *       knows how to delete ({@link Actions#canReset}: the floating islands), with the same confirmation.</li>
  *   <li><b>Open HQ</b> (header): create or open the world of the chosen map type (the HQ world for the citadel)
  *       and enter. When a world is open the demo asks itself before leaving it.</li>
  *   <li><b>HQ layout</b>: the {@code HqLayouts} registry in a {@link T3List} (name, one line of description,
@@ -60,6 +61,34 @@ public final class HqMenuPanel extends T3Panel {
 
 		/** Saves the layout and queues the confirmed reset; a refusal, or null. */
 		@Nullable String resetAndRebuild(String layoutId);
+
+		/**
+		 * Whether the menu can reset the world of {@code type}: a map type with a world of its own whose folder Reset
+		 * knows (the floating islands). The citadel resets through {@link #resetAndRebuild}; Rebuild is the citadel's only.
+		 */
+		default boolean canReset(MapTypes type) {
+			return false;
+		}
+
+		/** Whether the world of {@code type} exists (Reset has nothing to delete otherwise). */
+		default boolean worldExists(MapTypes type) {
+			return false;
+		}
+
+		/** Why the world of {@code type} cannot be reset now, or null. */
+		default @Nullable String refusal(MapTypes type) {
+			return refusal();
+		}
+
+		/** Body of the reset question for the world of {@code type} (backup or not, which folder). */
+		default String resetBody(MapTypes type) {
+			return "";
+		}
+
+		/** Backs up (unless configured off) and deletes the world of {@code type}, and only that folder; the result line. */
+		default String resetWorld(MapTypes type) {
+			return refusal(type) != null ? refusal(type) : "";
+		}
 
 		/** Export layouts: the result line. */
 		String exportPacks();
@@ -153,7 +182,11 @@ public final class HqMenuPanel extends T3Panel {
 		y = text(body.x(), y, body.w(), typeSummary(type), Tone.NORMAL) + 6;
 		if (!maps.hqApplies()) {
 			cursorPlaced = false; // the layout list is not placed: scroll it to the chosen layout the next time it is
-			return notice(body.x(), y, body.w(), T3Draw.tr("t3craft.hqmenu.map.own_world", typeName(type)), Tone.NORMAL);
+			y = notice(body.x(), y, body.w(), T3Draw.tr("t3craft.hqmenu.map.own_world", typeName(type)), Tone.NORMAL);
+			if (actions.canReset(type)) {
+				y = text(body.x(), y + 4, body.w(), T3Draw.tr("t3craft.hqmenu.map.reset_note"), Tone.MUTED);
+			}
+			return packStatus == null ? y : text(body.x(), y + 4, body.w(), packStatus, Tone.OK);
 		}
 		y = text(body.x(), y, body.w(), T3Draw.tr("t3craft.hqmenu.layout"), Tone.MUTED) + 2;
 		int lh = T3Draw.lineHeight(font());
@@ -193,9 +226,19 @@ public final class HqMenuPanel extends T3Panel {
 		pin(reload, footer.x() + half + GAP, y, footer.w() - half - GAP, T3Control.H);
 
 		y += T3Control.H + GAP;
-		T3Button reset = new T3Button(T3Icon.TRASH, T3Draw.tr("t3craft.hqmenu.reset"), T3Button.Style.DANGER, () -> confirmReset(false));
-		reset.setTooltip(T3Draw.tr(hq ? "t3craft.hqmenu.reset.tooltip" : "t3craft.hqmenu.hq_only"));
-		reset.setEnabled(hq && model.resetOffered());
+		MapTypes type = maps.selected();
+		boolean own = !hq && actions.canReset(type); // a world of its own that Reset can delete (Rebuild never applies to it)
+		T3Button reset;
+		if (own) {
+			String name = typeName(type);
+			reset = new T3Button(T3Icon.TRASH, T3Draw.tr("t3craft.hqmenu.reset_map", name), T3Button.Style.DANGER, () -> confirmResetWorld(type));
+			reset.setTooltip(T3Draw.tr("t3craft.hqmenu.reset_map.tooltip", name));
+			reset.setEnabled(actions.worldExists(type));
+		} else {
+			reset = new T3Button(T3Icon.TRASH, T3Draw.tr("t3craft.hqmenu.reset"), T3Button.Style.DANGER, () -> confirmReset(false));
+			reset.setTooltip(T3Draw.tr(hq ? "t3craft.hqmenu.reset.tooltip" : "t3craft.hqmenu.hq_only"));
+			reset.setEnabled(hq && model.resetOffered());
+		}
 		if (hq && model.rebuildOffered()) {
 			String name = T3Draw.tr(model.selected().nameKey());
 			pin(new T3Button(T3Icon.REFRESH_CW, T3Draw.tr("t3craft.hqmenu.rebuild", name), () -> confirmReset(true)), footer.x(), y, half, T3Control.H);
@@ -234,10 +277,29 @@ public final class HqMenuPanel extends T3Panel {
 		});
 	}
 
+	/** Asks first, with the same modal as the HQ's; on yes deletes the world of {@code type} (zip backup first, only its folder). */
+	private void confirmResetWorld(MapTypes type) {
+		String why = actions.refusal(type);
+		String name = typeName(type);
+		if (why != null) {
+			alert(T3Draw.tr("t3craft.hqmenu.reset_map.title", name), why);
+			return;
+		}
+		confirm(T3Draw.tr("t3craft.hqmenu.reset_map.title", name), List.of(actions.resetBody(type)), null, T3Draw.tr("t3craft.hqmenu.reset_map", name),
+				true, () -> {
+					packStatus = actions.resetWorld(type);
+					host().relayout();
+				});
+	}
+
 	/** A message with one OK button over the page. */
 	private void alert(String message) {
+		alert(T3Draw.tr("t3craft.demo.reset.title"), message);
+	}
+
+	private void alert(String title, String message) {
 		T3Button ok = new T3Button(CommonComponents.GUI_DONE.getString(), T3Button.Style.PRIMARY, () -> host().modal(null));
-		host().modal(new T3Dialog(T3Draw.tr("t3craft.demo.reset.title"), 320)
+		host().modal(new T3Dialog(title, 320)
 				.text(message, Tone.ERROR)
 				.gap(2)
 				.buttons(ok)
