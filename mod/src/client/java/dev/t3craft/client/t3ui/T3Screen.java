@@ -30,6 +30,8 @@ import dev.t3craft.client.config.SettingsPanel;
 import dev.t3craft.client.t3ui.kit.T3Icon;
 import dev.t3craft.client.t3ui.kit.T3Panel;
 import dev.t3craft.client.t3ui.kit.T3PanelHost;
+import dev.t3craft.client.t3ui.kit.RightPanels;
+import dev.t3craft.client.t3ui.kit.T3RightPanel;
 import dev.t3craft.client.t3ui.sidebar.SidebarView;
 import dev.t3craft.client.t3ui.sidebar.WorkingStatus;
 import java.nio.file.Path;
@@ -84,8 +86,21 @@ import org.jspecify.annotations.Nullable;
  * status chip) are in {@link T3Slots}. No static state; the conversation feed is opened in
  * {@link #init()} and closed in {@link #removed()}, so the screen can be the parent of a dialog
  * and come back to the same thread.
+ *
+ * <p>#39: a right panel ({@link T3RightPanel}) can sit after the thread, showing one {@link RightPanels} page
+ * (the piece browser, {@value #PIECES_PANEL}, is registered here). The header's {@link T3Icon#PANEL_RIGHT}
+ * button or the rebindable key ({@link T3UiKeys#isToggleRightPanel}, default U) toggles it; in the compact
+ * layout the same button opens the page full-screen in the thread's place.
  */
 public final class T3Screen extends Screen {
+	/** #39: id of the piece browser in {@link RightPanels} (the first right panel). */
+	public static final String PIECES_PANEL = "pieces";
+
+	static {
+		// #39: registered from the t3ui side, so client/pieces stays unchanged
+		RightPanels.registerIfAbsent(PIECES_PANEL, "Pieces", dev.t3craft.client.pieces.PieceBrowserPanel::new);
+	}
+
 	private static final DateTimeFormatter CLOCK = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault());
 
 	private final ThreadDirectory directory;
@@ -141,6 +156,37 @@ public final class T3Screen extends Screen {
 			}
 		}
 	});
+	/** #39: the right panel; {@link #rightOpen} is the player's wish (kept while compact hides the panel). */
+	private final T3RightPanel right = new T3RightPanel(new T3RightPanel.Owner() {
+		@Override
+		public void relayout() {
+			if (minecraft != null && !laying) {
+				rebuildWidgets();
+			}
+		}
+
+		@Override
+		public Screen screen() {
+			return T3Screen.this;
+		}
+
+		@Override
+		public void closed() {
+			rightOpen = false;
+			rightFocused = false;
+			layoutChanged();
+			if (minecraft != null && !laying) {
+				rebuildWidgets();
+			}
+		}
+	});
+	private boolean rightOpen;
+	/** Which right panel page to show ({@link RightPanels} id; null = the first registered). */
+	private @Nullable String rightPanelId;
+	/** The last click landed in the right panel: keys and typed characters go to it. */
+	private boolean rightFocused;
+	/** Inside {@link #init()}: a page opening there must not rebuild the widgets again. */
+	private boolean laying;
 	private boolean menuOpen;
 	/** #39: the queue page last opened from the menu (its watches are dropped when the screen goes away). */
 	private dev.t3craft.client.queue.@Nullable QueuePanel queuePage;
@@ -255,6 +301,14 @@ public final class T3Screen extends Screen {
 		return this;
 	}
 
+	/** #39: opens with {@code page} in the right panel under {@code panelId} (the gallery's fake data). */
+	public T3Screen withRightPanel(String panelId, T3Panel page) {
+		rightPanelId = panelId;
+		rightOpen = true;
+		right.show(panelId, page);
+		return this;
+	}
+
 	/** Screen Esc returns to (the archive, a dialog's opener); null = back to the game. */
 	public T3Screen withParent(@Nullable Screen parent) {
 		this.parent = parent;
@@ -361,7 +415,20 @@ public final class T3Screen extends Screen {
 				open(key);
 			}
 		}
-		layout = T3UiLayout.compute(width, height, showSidebarFlag());
+		laying = true;
+		try {
+			layOut();
+		} finally {
+			laying = false;
+		}
+	}
+
+	/** {@link #init()}'s body: the panels and their widgets (#39: the right panel and the splitters). */
+	private void layOut() {
+		if (rightOpen && !right.active() && !T3UiLayout.compute(width, height, true).compact() && !right.open(currentRightPanelId())) {
+			rightOpen = false; // nothing registered under that id any more
+		}
+		layout = T3UiLayout.compute(width, height, showSidebarFlag(), 0, 0, rightShown());
 		sr = T3UiLayout.sidebar(layout.sidebar());
 		mr = T3UiLayout.main(layout.main(), 0); // the composer is the conversation's footer
 
@@ -394,6 +461,69 @@ public final class T3Screen extends Screen {
 				}
 			}
 		}
+		if (rightVisible()) {
+			right.layout(layout.right(), font, theme, this::addRenderableWidget);
+			if (rightFocused) {
+				for (var child : children()) {
+					if (child instanceof AbstractWidget box && box.isFocused() && layout.right().contains(box.getX(), box.getY())) {
+						setFocused(box);
+					}
+				}
+			}
+		}
+	}
+
+	// ---- right panel (#39) -----------------------------------------------------------------------------
+
+	/** The right panel is wanted and has a page (the layout may still leave it out when it does not fit). */
+	private boolean rightShown() {
+		return rightOpen && right.active();
+	}
+
+	/** The right panel is on screen this layout. */
+	private boolean rightVisible() {
+		return right.active() && layout.right().w() > 0;
+	}
+
+	private @Nullable String currentRightPanelId() {
+		String id = rightPanelId;
+		return id != null && RightPanels.get(id) != null ? id : RightPanels.first();
+	}
+
+	/**
+	 * The header button / the key: shows or hides the right panel. Compact: the page opens full-screen in the
+	 * thread's place instead (the panel itself stays as it was, and comes back on a wider window).
+	 */
+	private void toggleRightPanel() {
+		String id = currentRightPanelId();
+		if (id == null) {
+			return;
+		}
+		if (layout.compact()) {
+			T3Panel p = RightPanels.create(id);
+			if (p != null) {
+				openPage(p);
+			}
+			return;
+		}
+		if (rightShown()) {
+			right.close();
+			rightOpen = false;
+			rightFocused = false;
+		} else {
+			rightOpen = true;
+			if (!right.open(id)) {
+				rightOpen = false;
+				T3ThreadActions.notice("That panel is not available right now.");
+				return;
+			}
+		}
+		layoutChanged();
+		rebuildWidgets();
+	}
+
+	/** The widths or the right panel changed (persisted in phase 5 of #39). */
+	private void layoutChanged() {
 	}
 
 	// ---- kit pages (settings, environments) ---------------------------------------------------------
@@ -500,6 +630,7 @@ public final class T3Screen extends Screen {
 	public void tick() {
 		syncTheme();
 		pages.tick();
+		right.tick();
 		refresh();
 		if (conversation != null) {
 			conversation.tick();
@@ -748,9 +879,15 @@ public final class T3Screen extends Screen {
 		if (layout.main().w() > 0) {
 			drawMain(g, mouseX, mouseY);
 		}
+		if (rightVisible()) {
+			right.render(g, font, theme, mouseX, mouseY, new Rect(0, 0, width, height));
+		}
 		super.extractRenderState(g, mouseX, mouseY, a);
 		if (pages.active()) {
 			pages.renderTop(g, font, theme, mouseX, mouseY, new Rect(0, 0, width, height));
+		}
+		if (rightVisible()) {
+			right.renderTop(g, font, theme, mouseX, mouseY, new Rect(0, 0, width, height));
 		}
 		if (anyMenuOpen()) {
 			g.nextStratum(); // menus over the text drawn below them
@@ -949,6 +1086,15 @@ public final class T3Screen extends Screen {
 			pillIcon(g, show, T3Icon.PANEL_LEFT, false, mouseX, mouseY);
 			hits.add(new Hit(show, () -> setSidebarVisible(true), null, List.of("Show the sidebar (Ctrl+B)")));
 			x += 18;
+		}
+		// #39: the right panel's toggle at the header's end (compact: opens the panel's page full-screen)
+		if (currentRightPanelId() != null) {
+			Rect toggle = new Rect(tr.right() - 14, tr.y(), 14, tr.h());
+			pillIcon(g, toggle, T3Icon.PANEL_RIGHT, rightShown() && !layout.compact(), mouseX, mouseY);
+			String keyName = T3UiKeys.toggleRightPanelLabel();
+			String what = layout.compact() ? "Open the side panel" : rightShown() ? "Hide the side panel" : "Show the side panel";
+			hits.add(new Hit(toggle, this::toggleRightPanel, null, List.of(keyName.isEmpty() ? what : what + " (" + keyName + ")")));
+			tr = new Rect(tr.x(), tr.y(), Math.max(0, toggle.x() - 4 - tr.x()), tr.h());
 		}
 		ThreadDraft d = selectedDraft();
 		if (d != null) {
@@ -1245,6 +1391,10 @@ public final class T3Screen extends Screen {
 		items.add(new T3Slots.MenuItem("Environments", true, this::openEnvironmentsPage));
 		items.add(new T3Slots.MenuItem("Pieces", true, this::openPiecesPage));
 		items.add(new T3Slots.MenuItem("Queue", true, this::openQueuePage));
+		if (currentRightPanelId() != null) {
+			items.add(new T3Slots.MenuItem(layout.compact() ? "Open side panel" : rightShown() ? "Hide side panel" : "Show side panel", true,
+					this::toggleRightPanel));
+		}
 		items.add(new T3Slots.MenuItem("Settings", true, this::openSettingsPage));
 		items.add(new T3Slots.MenuItem(layout.compact() ? "Show thread" : wideSidebar ? "Hide sidebar (Ctrl+B)" : "Show sidebar (Ctrl+B)", true,
 				() -> setSidebarVisible(layout.compact() ? false : !wideSidebar)));
@@ -1497,6 +1647,9 @@ public final class T3Screen extends Screen {
 		if (pages.modalOpen()) {
 			return pages.mouseClicked(mx, my, button); // a confirmation over the page takes every click
 		}
+		if (rightVisible() && right.modalOpen()) {
+			return right.mouseClicked(mx, my, button); // the same over the right panel's page
+		}
 		for (T3Slots.Popup p : popups) {
 			if (p.isOpen() && p.mouseClicked(mx, my, button)) {
 				return true;
@@ -1515,6 +1668,13 @@ public final class T3Screen extends Screen {
 			contextItems = null;
 			return true;
 		}
+		if (rightVisible() && (layout.right().contains(mx, my) || right.overlayOpen())) {
+			// #39: the right panel's page: its controls, then its text boxes; keys follow it until a click elsewhere
+			rightFocused = true;
+			blurThreadInputs();
+			return right.mouseClicked(mx, my, button) || super.mouseClicked(event, doubleClick);
+		}
+		rightFocused = false;
 		if (pages.active() && (layout.main().contains(mx, my) || pages.overlayOpen())) {
 			if (search != null && search.isFocused()) {
 				search.setFocused(false);
@@ -1565,6 +1725,20 @@ public final class T3Screen extends Screen {
 		return conversation != null && !notifications && conversation.mouseClicked(mx, my, button);
 	}
 
+	/** The sidebar search, the composer and the request card let go of the keyboard (a click went to the right panel). */
+	private void blurThreadInputs() {
+		if (search != null && search.isFocused()) {
+			search.setFocused(false);
+			focus = T3UiKeys.Focus.LIST;
+		}
+		if (composer != null) {
+			composer.setFocused(false);
+		}
+		if (requestCard != null) {
+			requestCard.blurOther();
+		}
+	}
+
 	private void syncFocusFromWidgets() {
 		if (search != null && search.isFocused()) {
 			focus = T3UiKeys.Focus.SEARCH;
@@ -1588,12 +1762,17 @@ public final class T3Screen extends Screen {
 		if (pages.active() && pages.mouseDragged(event.x(), event.y(), event.button())) {
 			return true; // a scrollbar thumb of the kit page
 		}
+		if (rightVisible() && right.mouseDragged(event.x(), event.y(), event.button())) {
+			return true; // the same in the right panel
+		}
 		return (composer != null && composer.mouseDragged(event.x(), event.y())) || super.mouseDragged(event, dx, dy);
 	}
 
 	@Override
 	public boolean mouseReleased(MouseButtonEvent event) {
-		if (pages.active() && pages.mouseReleased(event.x(), event.y(), event.button())) {
+		boolean used = pages.active() && pages.mouseReleased(event.x(), event.y(), event.button());
+		used |= rightVisible() && right.mouseReleased(event.x(), event.y(), event.button());
+		if (used) {
 			return true;
 		}
 		return (composer != null && composer.mouseReleased()) || super.mouseReleased(event);
@@ -1608,6 +1787,10 @@ public final class T3Screen extends Screen {
 		}
 		if (pages.modalOpen() || pages.active() && layout.main().contains(x, y)) {
 			pages.mouseScrolled(x, y, scrollY);
+			return true;
+		}
+		if (rightVisible() && (right.modalOpen() || layout.right().contains(x, y))) {
+			right.mouseScrolled(x, y, scrollY);
 			return true;
 		}
 		if (anyMenuOpen()) {
@@ -1627,6 +1810,10 @@ public final class T3Screen extends Screen {
 
 	@Override
 	public boolean keyPressed(KeyEvent e) {
+		if (rightVisible() && !anyMenuOpen() && !pages.modalOpen() && (rightFocused || right.modalOpen())) {
+			// #39: the right panel's page has the keyboard (its select / modal / Esc, then its focused text box)
+			return right.keyPressed(e) || super.keyPressed(e);
+		}
 		if (pages.active() && layout.main().w() > 0 && !anyMenuOpen()) {
 			// a kit page: its select / modal / Esc first, then the focused text box; no thread shortcuts apply
 			return pages.keyPressed(e) || super.keyPressed(e);
@@ -1663,6 +1850,10 @@ public final class T3Screen extends Screen {
 				model.query().isEmpty(), compactSidebar, compactThread);
 		if (focus == T3UiKeys.Focus.LIST && a == T3UiKeys.Action.PASS && PortableClient.key() != null && PortableClient.key().matches(e)) {
 			onClose(); // the T3 key closes the screen it opened
+			return true;
+		}
+		if (focus == T3UiKeys.Focus.LIST && a == T3UiKeys.Action.PASS && !anyMenuOpen() && T3UiKeys.isToggleRightPanel(e)) {
+			toggleRightPanel(); // #39: rebindable, default U
 			return true;
 		}
 		switch (a) {
@@ -1743,6 +1934,9 @@ public final class T3Screen extends Screen {
 
 	@Override
 	public boolean charTyped(CharacterEvent event) {
+		if (rightVisible() && !pages.modalOpen() && (rightFocused || right.modalOpen())) {
+			return right.modalOpen() ? right.charTyped(event) : super.charTyped(event); // #39: the right panel's boxes
+		}
 		if (pages.active()) {
 			return pages.modalOpen() ? pages.charTyped(event) : super.charTyped(event); // the modal's box, the page's text box, or the sidebar search
 		}
