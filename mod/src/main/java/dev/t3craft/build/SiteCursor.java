@@ -141,6 +141,8 @@ public final class SiteCursor implements JobCursor {
 		boolean boundary;
 		/** The program ran to its end. */
 		boolean finished;
+		/** When the site was opened ({@link System#nanoTime}): the status shows how long its program took to arrive. */
+		final long openedAt = System.nanoTime();
 
 		Open(int site) {
 			this.site = site;
@@ -244,6 +246,43 @@ public final class SiteCursor implements JobCursor {
 	private int switchChunk;
 	private int lifted;
 
+	// ---- stall diagnostics (status; docs/features/builder-sites.md, "Stalls") -----------------
+	/** Why a builder of a site holds no task and is not walking: indices into {@link #IDLE_NAMES}. */
+	static final int IDLE_NO_WORK = 0;
+	static final int IDLE_PLANNING = 1;
+	static final int IDLE_WAVE = 2;
+	static final int IDLE_GROUND = 3;
+	static final int IDLE_CHUNK = 4;
+	static final int IDLE_BOUNDARY = 5;
+	static final String[] IDLE_NAMES = {"no-work", "planning", "wave", "ground", "chunk", "boundary"};
+	/** The worst cursor tick is kept over windows of this many ticks (one minute); the status shows the last two. */
+	static final int WORST_WINDOW = 1200;
+	/** Idle builder-ticks per reason. */
+	private final long[] idleBy = new long[IDLE_NAMES.length];
+	/** Consecutive idle ticks of each builder, and the reason of its last idle tick. */
+	private final int[] idleRun;
+	private final int[] idleWhy;
+	/** Builder-ticks of builders assigned to a site, and how many of them were idle. */
+	private long builderTicks;
+	private long idleBuilderTicks;
+	/** Ticks with at least one idle builder. */
+	private long idleTicks;
+	private int idleNow;
+	private int freeNow;
+	private int longestIdle;
+	private int longestReason;
+	/** Ticks the focus was chosen but could not hand out work yet (not open, or its program not compiled). */
+	private long focusWaitTicks;
+	/** A builder of the focus waited for its bay's ground in the last tick. */
+	private boolean groundWanted;
+	private long worstTickNs;
+	private long worstPrevNs;
+	private int worstFrom;
+	/** Last site program: wall time from opening to install (queue included), and the compile itself (off-thread). */
+	private long lastCompileNs = -1;
+	private long worstCompileNs;
+	private volatile long lastCompileWorkNs = -1;
+
 	private @Nullable IntPredicate already;
 	private CrewCursor.@Nullable Walker walker;
 	private int tickNo;
@@ -302,6 +341,8 @@ public final class SiteCursor implements JobCursor {
 		px = new int[this.builders];
 		py = new int[this.builders];
 		pz = new int[this.builders];
+		idleRun = new int[this.builders];
+		idleWhy = new int[this.builders];
 		cx = p.fallback[0];
 		cz = p.fallback[1];
 		int baseY = n == 0 ? 0 : p.y[p.colEntries[0]];
@@ -610,6 +651,13 @@ public final class SiteCursor implements JobCursor {
 			}
 		} finally {
 			dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_RADIAL_TICK, t0);
+			long ns = System.nanoTime() - t0;
+			if (tickNo - worstFrom >= WORST_WINDOW) {
+				worstPrevNs = worstTickNs;
+				worstTickNs = 0;
+				worstFrom = tickNo;
+			}
+			worstTickNs = Math.max(worstTickNs, ns);
 		}
 		if (done >= n) {
 			finish();
@@ -638,6 +686,8 @@ public final class SiteCursor implements JobCursor {
 				continue;
 			}
 			o.prog = g;
+			lastCompileNs = System.nanoTime() - o.openedAt;
+			worstCompileNs = Math.max(worstCompileNs, lastCompileNs);
 			int tasks = g.tasks();
 			o.taskNext = Arrays.copyOf(g.taskStart(), tasks);
 			o.taskCrew = new int[tasks];
@@ -887,7 +937,12 @@ public final class SiteCursor implements JobCursor {
 		double ax = cx;
 		double az = cz;
 		SiteProgram program = p;
-		o.pending = Offload.supply(dev.t3craft.debug.PerfStats.STEP_RADIAL_ORDER, () -> program.compile(s, ax, az, doneLocal));
+		o.pending = Offload.supply(dev.t3craft.debug.PerfStats.STEP_RADIAL_ORDER, () -> {
+			long c0 = System.nanoTime();
+			SiteProgram.Program out = program.compile(s, ax, az, doneLocal);
+			lastCompileWorkNs = System.nanoTime() - c0;
+			return out;
+		});
 		open[s] = o;
 		openList.add(s);
 		return o;
@@ -1438,6 +1493,7 @@ public final class SiteCursor implements JobCursor {
 					}
 				}
 			}
+			countIdle();
 			double a = Math.max(0, allowance);
 			credit = Math.min(credit + a, Math.max(1.0, a));
 			int[] used = new int[builders];
@@ -1529,6 +1585,85 @@ public final class SiteCursor implements JobCursor {
 			}
 		}
 		return limit - left;
+	}
+
+	/**
+	 * Stall counters, once per tick after the picks: builders of a site that hold no task and are not walking are idle,
+	 * with the reason {@link #idleReason} gives; builders with no site are counted apart (the crew size, by design).
+	 */
+	private void countIdle() {
+		int idle = 0;
+		int free = 0;
+		boolean ground = false;
+		for (int f = 0; f < builders; f++) {
+			if (tSite[f] < 0) {
+				free++;
+				idleRun[f] = 0;
+				continue;
+			}
+			builderTicks++;
+			if (tTask[f] >= 0 || walkLeft[f] > 0) {
+				idleRun[f] = 0;
+				continue;
+			}
+			idle++;
+			int why = idleReason(f);
+			idleBy[why]++;
+			idleWhy[f] = why;
+			idleRun[f]++;
+			if (idleRun[f] > longestIdle) {
+				longestIdle = idleRun[f];
+				longestReason = why;
+			}
+			if (why == IDLE_GROUND && tSite[f] == focusSite) {
+				ground = true;
+			}
+		}
+		idleBuilderTicks += idle;
+		if (idle > 0) {
+			idleTicks++;
+		}
+		idleNow = idle;
+		freeNow = free;
+		groundWanted = ground;
+		Open fo = focusSite >= 0 ? open[focusSite] : null;
+		if (focusSite >= 0 && (fo == null || fo.prog == null)) {
+			focusWaitTicks++;
+		}
+	}
+
+	/** Why builder {@code f}, on a site, has no task: its site has nothing it could take, and what holds it back. */
+	private int idleReason(int f) {
+		Open o = open[tSite[f]];
+		if (o == null || o.finished) {
+			return IDLE_NO_WORK;
+		}
+		SiteProgram.Program g = o.prog;
+		if (g == null) {
+			return IDLE_PLANNING;
+		}
+		if (o.wave >= g.waves()) {
+			return IDLE_NO_WORK;
+		}
+		if (o.boundary && !o.focus) {
+			return IDLE_BOUNDARY;
+		}
+		boolean held = false;
+		boolean chunk = false;
+		for (int tk = g.waveStart()[o.wave]; tk < g.waveStart()[o.wave + 1]; tk++) {
+			if (o.taskDone[tk] || taskHead(o, tk) < 0) {
+				continue;
+			}
+			if (bayStreamLeft[g.taskBay()[tk]] > 0) {
+				return IDLE_GROUND;
+			}
+			if (o.taskPark[tk] > tickNo) {
+				chunk = true;
+			} else {
+				held = true;
+			}
+		}
+		return chunk ? IDLE_CHUNK : held ? IDLE_WAVE : IDLE_NO_WORK;
 	}
 
 	/** Counters of one builder placement (the acceptance criteria of the plan, see {@link #describe}). */
@@ -1855,6 +1990,37 @@ public final class SiteCursor implements JobCursor {
 		}
 	}
 
+	/**
+	 * The stall counters (docs/features/builder-sites.md, "Stalls"): builders idle now and without a site, share of
+	 * idle builder-ticks and their reasons, the longest a builder stood, the time the focus waited, the worst cursor
+	 * tick of the last minute or two, the last site compile and the budget throttle (MSPT / FPS).
+	 */
+	private void appendStalls(StringBuilder sb) {
+		sb.append(" | idle ").append(idleNow).append(" free ").append(freeNow);
+		long idleAll = idleBuilderTicks;
+		if (idleAll > 0) {
+			sb.append(String.format(Locale.ROOT, " idle-share %.0f%% idle-ticks %d by", idleAll * 100.0 / Math.max(1, builderTicks), idleTicks));
+			for (int r = 0; r < IDLE_NAMES.length; r++) {
+				long v = idleBy[r];
+				if (v > 0) {
+					sb.append(String.format(Locale.ROOT, " %s %.0f%%", IDLE_NAMES[r], v * 100.0 / idleAll));
+				}
+			}
+			int lr = longestReason;
+			sb.append(String.format(Locale.ROOT, " longest %.1fs %s", longestIdle / 20.0, IDLE_NAMES[lr >= 0 && lr < IDLE_NAMES.length ? lr : 0]));
+		}
+		if (focusWaitTicks > 0) {
+			sb.append(String.format(Locale.ROOT, " focus-wait %.1fs", focusWaitTicks / 20.0));
+		}
+		sb.append(String.format(Locale.ROOT, " worst-tick %.1fms", Math.max(worstTickNs, worstPrevNs) / 1e6));
+		long lc = lastCompileNs;
+		if (lc >= 0) {
+			sb.append(String.format(Locale.ROOT, " compile %.0fms (work %.0f, worst %.0f)", lc / 1e6, Math.max(0, lastCompileWorkNs) / 1e6, worstCompileNs / 1e6));
+		}
+		BuildBudget b = BuildBudget.global();
+		sb.append(String.format(Locale.ROOT, " throttle %.0f%%/%.0f%%", b.throttle() * 100, b.fpsThrottle() * 100));
+	}
+
 	private String status() {
 		StringBuilder sb = new StringBuilder("sites ").append(sitesDone).append('/').append(p.sites);
 		int working = 0;
@@ -1904,6 +2070,7 @@ public final class SiteCursor implements JobCursor {
 		if (tickNo - lastPark < PARK_TICKS) {
 			sb.append(" waiting-chunks");
 		}
+		appendStalls(sb);
 		sb.append(" centre ").append(Math.round(cx)).append(',').append(Math.round(cz));
 		if (level != WalkLevels.NO_LEVEL) {
 			sb.append(" level ").append(level);
