@@ -8,7 +8,7 @@ tools/art/icons/lucide/<name>.svg
         |  ./gradlew generateIcons   (Apache Batik, build-only `icons` source set)
         v
 mod/build/generated/icons/assets/t3craft/textures/gui/sprites/icons/<name>.png   (32 px, white on transparent)
-        |  added to the main resources, before processResources
+        |  added to the client resources, before processClientResources
         v
 GUI atlas sprite  t3craft:icons/<name>   ->   T3Icon.<NAME>   ->   tinted at draw time
 ```
@@ -18,8 +18,9 @@ GUI atlas sprite  t3craft:icons/<name>   ->   T3Icon.<NAME>   ->   tinted at dra
 * **Source set `icons`** (`mod/src/icons/java`, like `hqrender` / `uirender`): `dev.t3craft.tools.icons.IconGen`.
   Apache Batik (`batik_version` in `mod/gradle.properties`, pinned) is a dependency of this source set only,
   so it is **not in the mod jar nor in any run classpath**.
-* **`generateIcons`** (`JavaExec`, group `t3craft`): `processResources` depends on it and its output dir
-  (`build/generated/icons`) is a main resources dir. Incremental: the inputs are the SVG folder, the size and
+* **`generateIcons`** (`JavaExec`, group `t3craft`): `processClientResources` depends on it and its output dir
+  (`build/generated/icons`) is a resources dir of the `client` source set (the sprites are client-only; it also
+  gives that source set a source, so `build/resources/client` exists and the dev client stops warning about it). Incremental: the inputs are the SVG folder, the size and
   the generator's classpath; unchanged inputs mean up-to-date, no work.
 * `currentColor` is replaced by white before rasterising, and pixels without ink are transparent *white* (no
   dark fringe when the GPU filters). The output folder is emptied of `.png` first, so a deleted SVG leaves no sprite.
