@@ -73,6 +73,6 @@ up by name), not a compile error; update the list when convenient.
 - First CI run (needs the branch pushed and Actions enabled on the repo); then decide whether the
   GameTest job becomes blocking.
 - Owners to subscribe `NpcRegistry` and guard `T3CraftClient`'s tick (snippet above).
-- Bridge (`bridge/`, vitest) is not in CI yet; a small Node 22 + pnpm job would cover it.
+- Bridge (`bridge/`): legacy and frozen (`bridge/README.md`); no CI or new tooling is planned for it.
 - Possibly a GameTest that spawns fake NPCs through `NpcRegistry.replaceAll` and asserts a reset
   leaves no client-only entities in the level, once the registry subscribes.

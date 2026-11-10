@@ -1,5 +1,9 @@
 # T3Craft — plan técnico
 
+> **Histórico.** Este plan describe la arquitectura original, centrada en el puente. Hoy el puente (`bridge/`,
+> `protocol/`) es **legacy y está congelado** (D2, #7: `bridge/README.md`). El camino vigente es el modo directo
+> (`docs/plans/plan-v2.md`, v2.1).
+
 > **Actualización de arquitectura (aprobada por Facundo, 2026-11-07). Prevalece sobre las secciones 3 y 5 de abajo.**
 >
 > 1. **El puente corre en my-homelab** (Ubuntu 24.04, siempre prendido) como servicio systemd

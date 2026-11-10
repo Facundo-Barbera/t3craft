@@ -4,7 +4,8 @@
 > al puente de §2-§3.** El mod se empareja **directo** con cada instancia de T3, como la app de
 > escritorio con un servidor remoto: se pega un link o código de pairing por entorno, sin
 > pasar por el puente. El puente (`bridge/`) queda como **opción legacy** (modo `bridge`); no se
-> borra.
+> borra. Desde la limpieza de 2026-11-09 además está **congelado** (D2, #7): solo arreglos críticos, ninguna
+> feature nueva (`bridge/README.md`).
 
 ## A. Emparejado con T3: investigación
 

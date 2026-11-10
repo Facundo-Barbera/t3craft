@@ -1,5 +1,10 @@
 # t3craft protocol v1 (mod ⇄ bridge)
 
+> **Legacy and frozen** (decision D2, issue #7). This protocol only serves the legacy `"mode": "bridge"`. The mod's
+> default is direct mode, which pairs with each T3 environment and does not use this protocol. No new messages or
+> fields are added. This document has drifted from `bridge/src/protocol.ts` and stays as it is: where they differ,
+> the code is right. Status, what replaces it and what changes are allowed: `bridge/README.md`.
+
 Source of truth for types: `bridge/src/protocol.ts`. This document must match it.
 
 ## Topology
