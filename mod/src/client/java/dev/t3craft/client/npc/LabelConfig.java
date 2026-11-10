@@ -20,7 +20,7 @@ import org.jspecify.annotations.Nullable;
  * <pre>{@code
  * "labels": {
  *   "mode": "compact", "detailDistance": 4.0, "titleMax": 24,
- *   "nearDistance": 12, "maxVisible": 6, "maxPanels": 1, "declutter": true,
+ *   "style": "hologram", "nearDistance": 12, "maxVisible": 6, "maxPanels": 1, "declutter": true,
  *   "hologram": { "npcTags": true, "workstationScreens": true, "hubHologram": true, "scheduleBoard": true }
  * }}</pre>
  *
@@ -38,9 +38,13 @@ import org.jspecify.annotations.Nullable;
  * @param maxPanels    detail panels open at once (0 = no cap)
  * @param declutter    hide the lower-ranked of two overlapping NPC plates
  * @param sources      which world-text sources are drawn at all
+ * @param hologramStyle {@code "style": "hologram"} (default): one pill plate per NPC instead of
+ *                     the vanilla tag, speech bubbles only on events (fading out), the hub card
+ *                     with a progress ring and the decision podium bubble; {@code "classic"}: the
+ *                     look before (vanilla tag, bubble while near, hub text lines, no podium bubble)
  */
 public record LabelConfig(boolean compact, double detailDistance, int titleMax, double nearDistance, int maxVisible, int maxPanels,
-		boolean declutter, Sources sources) {
+		boolean declutter, Sources sources, boolean hologramStyle) {
 	public static final String KEY = "labels";
 
 	/**
@@ -55,7 +59,7 @@ public record LabelConfig(boolean compact, double detailDistance, int titleMax, 
 		public static final Sources ALL = new Sources(true, true, true, true);
 	}
 
-	public static final LabelConfig DEFAULTS = new LabelConfig(true, 4.0, 24, 12.0, 6, 1, true, Sources.ALL);
+	public static final LabelConfig DEFAULTS = new LabelConfig(true, 4.0, 24, 12.0, 6, 1, true, Sources.ALL, true);
 	private static final Gson GSON = new Gson();
 	private static final long POLL_MS = 2000;
 
@@ -66,7 +70,12 @@ public record LabelConfig(boolean compact, double detailDistance, int titleMax, 
 	/** The pre-world-text record (mode, detail distance, title length); the new keys keep their defaults. */
 	public LabelConfig(boolean compact, double detailDistance, int titleMax) {
 		this(compact, detailDistance, titleMax, DEFAULTS.nearDistance, DEFAULTS.maxVisible, DEFAULTS.maxPanels, DEFAULTS.declutter,
-				DEFAULTS.sources);
+				DEFAULTS.sources, DEFAULTS.hologramStyle);
+	}
+
+	/** Pill plates, event bubbles and the podium bubble: hologram style in compact mode (detailed is the old layout). */
+	public boolean pills() {
+		return hologramStyle && compact;
 	}
 
 	public static LabelConfig parse(@Nullable JsonObject root) {
@@ -103,6 +112,15 @@ public record LabelConfig(boolean compact, double detailDistance, int titleMax, 
 			panels = DEFAULTS.maxPanels;
 		}
 		boolean declutter = bool(o, "declutter", DEFAULTS.declutter);
+		boolean hologram = DEFAULTS.hologramStyle;
+		if (o.get("style") instanceof JsonElement st && st.isJsonPrimitive() && st.getAsJsonPrimitive().isString()) {
+			String v = st.getAsString().trim();
+			if (v.equalsIgnoreCase("classic")) {
+				hologram = false;
+			} else if (v.equalsIgnoreCase("hologram")) {
+				hologram = true;
+			}
+		}
 		Sources src = DEFAULTS.sources;
 		if (o.get("hologram") instanceof JsonObject h) {
 			src = new Sources(bool(h, "npcTags", src.npcTags()), bool(h, "workstationScreens", src.workstationScreens()),
@@ -111,7 +129,7 @@ public record LabelConfig(boolean compact, double detailDistance, int titleMax, 
 			boolean all = hb.getAsBoolean(); // "hologram": false switches every source off at once
 			src = new Sources(all, all, all, all);
 		}
-		return new LabelConfig(compact, dist, max, near, visible, panels, declutter, src);
+		return new LabelConfig(compact, dist, max, near, visible, panels, declutter, src, hologram);
 	}
 
 	/** Missing or unreadable file → defaults (never throws). */

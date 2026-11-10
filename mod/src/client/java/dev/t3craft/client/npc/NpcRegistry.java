@@ -2,6 +2,7 @@ package dev.t3craft.client.npc;
 
 import dev.t3craft.T3Craft;
 import dev.t3craft.client.ClientEntityIds;
+import dev.t3craft.client.chat.ChatTheme;
 import dev.t3craft.client.npc.behavior.Anchor;
 import dev.t3craft.client.npc.behavior.BehaviorDirector;
 import dev.t3craft.client.npc.behavior.GridLayout;
@@ -57,15 +58,29 @@ public final class NpcRegistry {
 	private static final int SWEEP_TICKS = 20 * 10;
 
 	/** What an NPC's name tag and panel are built from (all immutable records). */
-	private record LabelKey(NpcInfo info, LabelConfig labels, ChipsConfig chips, boolean compact) {
+	private record LabelKey(NpcInfo info, LabelConfig labels, ChipsConfig chips, boolean compact, dev.t3craft.client.chat.ChatTheme theme) {
+		/** World text pill plates (hologram style, compact mode). */
+		boolean pills() {
+			return compact && labels.hologramStyle();
+		}
 	}
 
 	/** Built labels of one NPC, tagged with their key and the {@link #labelGen} of the batch. */
-	private record Labels(String id, LabelKey key, int gen, Component nameTag, Component body) {
+	private record Labels(String id, LabelKey key, int gen, Component nameTag, Component body, @Nullable Component pill) {
 		static Labels of(String id, LabelKey k, int gen) {
 			Component tag = k.labels().compact() ? Nameplate.compact(k.info(), k.labels()) : Nameplate.of(k.info(), k.chips());
+			if (k.pills()) {
+				// world text: the pill is the plate, the detail lines open under it
+				Component body = Nameplate.pillDetail(k.info(), k.chips(), k.theme(), k.labels().titleMax());
+				return new Labels(id, k, gen, tag, body, Nameplate.pill(k.info(), k.theme()));
+			}
 			Component body = k.compact() ? Nameplate.detail(k.info(), k.chips()) : Nameplate.info(k.info(), k.chips());
-			return new Labels(id, k, gen, tag, body);
+			return new Labels(id, k, gen, tag, body, null);
+		}
+
+		/** What the declutter pass measures as this NPC's plate: the pill, else the vanilla tag. */
+		Component plate() {
+			return pill != null ? pill : nameTag;
 		}
 	}
 
@@ -87,6 +102,14 @@ public final class NpcRegistry {
 	private final Map<String, Integer> panelCols = new HashMap<>();
 	private final Map<String, Integer> panelLines = new HashMap<>();
 	private PlateLayout.@Nullable Cache plateCache;
+	/** Hologram style: the pill per NPC and the pill with its detail lines under it (built when either changes). */
+	private final Map<String, Component> pillText = new HashMap<>();
+	private final Map<String, Component> pillOpen = new HashMap<>();
+	/** Pills mode and theme the labels were last built for (a change relabels everyone). */
+	private boolean pillsMode = LabelConfig.DEFAULTS.pills();
+	private dev.t3craft.client.chat.@Nullable ChatTheme labelTheme;
+	/** Bottom of the pill above the feet: where the panel display stands (BehaviorDirector's PANEL_Y). */
+	static final double PILL_BASE = 2.45;
 	/** Height of the name tag's centre line above the feet (blocks). */
 	static final double PLATE_BASE = 2.05;
 	/**
@@ -644,10 +667,12 @@ public final class NpcRegistry {
 		int spawnedNow = 0;
 		LabelConfig labelCfg = LabelConfig.current();
 		ChipsConfig chips = ChipsConfig.current();
+		dev.t3craft.client.chat.ChatTheme theme = WorldText.theme();
+		labelTheme = theme;
 		List<Map.Entry<String, LabelKey>> relabel = new ArrayList<>();
 		for (Map.Entry<String, List<NpcInfo>> group : groups.entrySet()) {
 			for (NpcInfo info : group.getValue()) {
-				LabelKey key = new LabelKey(info, labelCfg, chips, compactLabels);
+				LabelKey key = new LabelKey(info, labelCfg, chips, compactLabels, theme);
 				Spawned s = spawned.get(info.id());
 				if (s == null || s.avatar().isRemoved()) {
 					if (spawnedNow >= SPAWNS_PER_TICK || overBudget(t0, spawnedNow)) {
@@ -670,7 +695,8 @@ public final class NpcRegistry {
 					npcByEntityId.put(s.avatar().getId(), info.id());
 					npcByEntityId.put(s.panel().getId(), info.id());
 					labelKey.put(info.id(), key);
-					tagCols.put(info.id(), cols(l.nameTag()));
+					tagCols.put(info.id(), cols(l.plate()));
+					putPill(info.id(), l.pill());
 					panelBody.put(info.id(), l.body());
 					setPanelText(info.id());
 					continue;
@@ -726,7 +752,31 @@ public final class NpcRegistry {
 		if (!text.equals(before)) {
 			panelCols.put(id, cols(text));
 			panelLines.put(id, NpcLabels.lines(text.getString()));
+			composePill(id);
 		}
+	}
+
+	/** Hologram style: the NPC's pill (null in classic style). */
+	private void putPill(String id, @Nullable Component pill) {
+		if (pill == null) {
+			pillText.remove(id);
+			pillOpen.remove(id);
+			return;
+		}
+		if (!pill.equals(pillText.put(id, pill))) {
+			composePill(id);
+		}
+	}
+
+	/** Pill + detail lines, built once per change of either (so a steady tick pushes the same instance). */
+	private void composePill(String id) {
+		Component pill = pillText.get(id);
+		Component detailText = panelText.get(id);
+		if (pill == null) {
+			pillOpen.remove(id);
+			return;
+		}
+		pillOpen.put(id, detailText == null ? pill : pill.copy().append(Component.literal("\n")).append(detailText));
 	}
 
 	/** Applies labels built for the current NPC, if they are still the wanted ones (key and generation). */
@@ -736,7 +786,8 @@ public final class NpcRegistry {
 			return; // gone, dropped, or re-labelled again since
 		}
 		s.avatar().update(l.key().info(), l.nameTag());
-		tagCols.put(l.id(), cols(l.nameTag()));
+		tagCols.put(l.id(), cols(l.plate()));
+		putPill(l.id(), l.pill());
 		panelBody.put(l.id(), l.body());
 		setPanelText(l.id());
 	}
@@ -768,6 +819,8 @@ public final class NpcRegistry {
 	}
 
 	private void forgetMeasures(String id) {
+		pillText.remove(id);
+		pillOpen.remove(id);
 		tagCols.remove(id);
 		panelCols.remove(id);
 		panelLines.remove(id);
@@ -775,6 +828,8 @@ public final class NpcRegistry {
 
 	/** Forgets every label (world change, clear): batches still running are dropped by generation. */
 	private void dropLabels() {
+		pillText.clear();
+		pillOpen.clear();
 		tagCols.clear();
 		panelCols.clear();
 		panelLines.clear();
@@ -809,21 +864,42 @@ public final class NpcRegistry {
 			compactLabels = cfg.compact();
 			dirty = true; // rebuild name tags and panel texts for the new mode
 		}
+		dev.t3craft.client.chat.ChatTheme theme = WorldText.theme();
+		if (cfg.pills() != pillsMode || (labelTheme != null && theme != labelTheme)) {
+			pillsMode = cfg.pills();
+			labelTheme = theme;
+			dirty = true; // pills on/off or a restyle (F3+T): rebuild every label
+		}
 		boolean on = cfg.sources().npcTags();
 		if (mc != null && mc.player != null) {
 			decide(mc, cfg, on);
 		}
+		boolean pills = pillsMode;
+		int plateBg = ChatTheme.withAlpha(theme.panel(), WorldText.PLATE_ALPHA);
 		for (Map.Entry<String, Spawned> e : spawned.entrySet()) {
 			String id = e.getKey();
 			Display.TextDisplay panel = e.getValue().panel();
-			Component text = panelText.get(id);
-			boolean show = on && text != null && panelsShown.contains(id);
-			e.getValue().avatar().setTagHidden(!on || !tagsShown.contains(id));
-			Component want = show ? text : Component.empty();
+			Component want;
+			int bg;
+			if (pills) {
+				// world text: no vanilla tag; the panel display is the pill, the detail opens under it
+				e.getValue().avatar().setTagHidden(true);
+				Component pill = pillText.get(id);
+				boolean plate = on && pill != null && tagsShown.contains(id);
+				Component open = plate && panelsShown.contains(id) ? pillOpen.get(id) : null;
+				want = !plate ? Component.empty() : open != null ? open : pill;
+				bg = plate ? plateBg : 0;
+			} else {
+				Component text = panelText.get(id);
+				boolean show = on && text != null && panelsShown.contains(id);
+				e.getValue().avatar().setTagHidden(!on || !tagsShown.contains(id));
+				want = show ? text : Component.empty();
+				bg = show ? 0x60000000 : 0;
+			}
 			if (!Objects.equals(panel.getText(), want)) {
 				panel.setText(want);
 				dev.t3craft.debug.PerfStats.count(dev.t3craft.debug.PerfStats.DISPLAY_SET_TEXT);
-				panel.setBackgroundColor(show ? 0x60000000 : 0);
+				panel.setBackgroundColor(bg);
 			}
 		}
 	}
@@ -892,8 +968,9 @@ public final class NpcRegistry {
 			int cols = Math.max(tagCols.getOrDefault(s.id(), 8), panels.contains(s.id()) ? panelCols.getOrDefault(s.id(), 0) : 0);
 			double h = PlateLayout.height(lines, 1f);
 			ThreadAvatar a = s.a();
-			// The tag sits at ≈ 2.1 above the feet; an open panel grows upwards from there.
-			plates.add(new PlateLayout.Plate(s.id(), a.getX(), a.getY() + PLATE_BASE + h / 2, a.getZ(), PlateLayout.width(cols, 1f), h,
+			// The tag sits at ≈ 2.1 above the feet (a pill at the panel's 2.45); an open panel grows upwards from there.
+			double base = pillsMode ? PILL_BASE : PLATE_BASE;
+			plates.add(new PlateLayout.Plate(s.id(), a.getX(), a.getY() + base + h / 2, a.getZ(), PlateLayout.width(cols, 1f), h,
 					s.dist(), s.aim(), panels.contains(s.id())));
 		}
 		Set<String> visible = cfg.maxVisible() <= 0 && !cfg.declutter()

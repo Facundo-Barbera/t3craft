@@ -45,6 +45,8 @@ public final class HologramClient implements ClientModInitializer {
 
 	private final HologramState state = new HologramState();
 	private final HologramRenderer renderer = new HologramRenderer();
+	/** World text: the decision podiums' bubbles (hologram style). */
+	private final PodiumBubbles podiums = new PodiumBubbles();
 	private @Nullable ClientLevel level;
 
 	// "done today" cache: shell views by identity + day start
@@ -66,6 +68,7 @@ public final class HologramClient implements ClientModInitializer {
 		ClientTickEvents.END_CLIENT_TICK.register(GuardedEvents.endClientTick(MODULE, this::tick));
 		ClientLifecycleEvents.CLIENT_STOPPING.register(mc -> {
 			renderer.clear(mc.level);
+			podiums.clear(mc.level);
 			state.reset();
 			if (instance == this) {
 				instance = null;
@@ -73,6 +76,7 @@ public final class HologramClient implements ClientModInitializer {
 		});
 		DevReload.get().register("t3craft.hologram", reason -> {
 			renderer.clear(Minecraft.getInstance().level);
+			podiums.clear(Minecraft.getInstance().level);
 			state.reset();
 			lastViews.clear();
 			lastStanding = null;
@@ -94,6 +98,7 @@ public final class HologramClient implements ClientModInitializer {
 		ClientLevel lvl = mc.level;
 		if (lvl != level) {
 			renderer.clear(null); // the old entities died with the old level
+			podiums.clear(null);
 			state.reset();
 			level = lvl;
 		}
@@ -106,8 +111,11 @@ public final class HologramClient implements ClientModInitializer {
 		}
 		// fix/hq-gate-npcs: the hologram stands only in the HQ's own world and dimension
 		// world text: labels.hologram.hubHologram switches the card off on top of hud.hologram
-		boolean enabled = ConfigManager.get().settings().hud().hologram() && dev.t3craft.client.npc.LabelConfig.current().sources().hubHologram()
-				&& HqPresence.allows(mc);
+		dev.t3craft.client.npc.LabelConfig labels = dev.t3craft.client.npc.LabelConfig.current();
+		boolean enabled = ConfigManager.get().settings().hud().hologram() && labels.sources().hubHologram() && HqPresence.allows(mc);
+		// The podium bubbles belong to the same source, hologram style only; they need no hud.hologram.
+		podiums.tick(lvl, labels.pills() && labels.sources().hubHologram() ? HqPresence.shown(mc) : null, client.npcs().all(),
+				labels.pills() && labels.sources().hubHologram());
 		if (!enabled) {
 			state.update(new HologramModel.Inputs(List.of(), 0, false, false));
 			renderer.clear(lvl);
@@ -124,7 +132,7 @@ public final class HologramClient implements ClientModInitializer {
 			done = HologramModel.doneFromStates(entries);
 		}
 		state.update(new HologramModel.Inputs(entries, done, true, stale));
-		renderer.apply(lvl, state.model(), anchor(client));
+		renderer.apply(lvl, state.model(), anchor(client), labels.pills());
 	}
 
 	static List<HologramModel.Entry> entries(List<NpcInfo> npcs) {
@@ -187,7 +195,7 @@ public final class HologramClient implements ClientModInitializer {
 		return board == null ? null : board.pos();
 	}
 
-	private static boolean standing(HqPresence.Standing s, dev.t3craft.hq.Anchor rel) {
+	static boolean standing(HqPresence.Standing s, dev.t3craft.hq.Anchor rel) {
 		if (s.built() == null) {
 			return true;
 		}
