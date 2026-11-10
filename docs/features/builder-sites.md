@@ -122,8 +122,9 @@ is ground, or was placed in an earlier wave, or earlier in the same task. A stag
 - what never finds any (a truly floating piece, or one that leans on a part of the details pass) is the site's
   **finishing pass**, its last wave (`finishing` in the status), placed bay by bay whatever holds it.
 
-Other sites are taken as standing when support is looked up, so a wall that leans on the building next door is not
-held back; if that building is not there yet, the wall stands alone for a while.
+Other sites hold only where they are already placed when the program is compiled (#48; before, they were taken as
+standing and a walkway leaning on an unbuilt tower went up floating). What leans on a building not built yet waits for
+the late rounds and, at worst, the finishing pass.
 
 **What does not change it.** Walking inside the site: nothing is re-ordered when the player moves. A task waits
 until the ground of its bay is laid.
@@ -318,11 +319,72 @@ After the usual fields, the line of `/t3craft demo status` gets:
 
 A real server freeze shows as a high `worst-tick` only if it is in this cursor; otherwise `throttle` drops after it.
 
+## Noise (#48)
+
+Second report from the same session, flying over the citadel: "los builders están construyendo de forma muy rara,
+con mucho ruido". Speckled roofs, floors and paths (holes all over a surface at once), many places half done at once
+and none closed, beams, walkway decks and tower caps up in the air before what holds them.
+
+### What was found
+
+| # | what is seen | where | why |
+|---|---|---|---|
+| 1 | floor patches, walkway decks, tower caps floating; strips of ground under every flight | `SiteCursor.layLift`, `tickCorridor`, `tickCarpet` | the "floor at the player's level" follows the feet in the air too (after a 2-block climb), so a **flying** player had the walkable floor nearest its height (within 3 blocks) laid in a disc of 9 blocks and a corridor 20 ahead, with only one support block under it. The corridor, carpet and trail also laid the ground under the whole flight path |
+| 2 | speckled plazas, paths and paved floors | `SiteProgram` constructor (kinds) + `Foundation` | only plain opaque full cubes are foundation. In a mixed pavement (full blocks with slabs, stairs, path blocks) the full cubes are ground, laid at once by the streams, and the rest are builder entries of their work (often a scattered one, so the details pass at the very end): half a floor for most of the build |
+| 3 | striped stair roofs | `SiteProgram.Compiler.supported` | support was below, beside, or above for decoration. The rows of a stair roof only touch diagonally, so every row that does not reach a wall found no support, went to the `late` rounds and then to the finishing pass, the last wave of the site |
+| 4 | a surface growing in a scattered order inside a bay | `SiteProgram` key (storey, stage, bay, height, **plan index**) and `Compiler.byBay` | inside one layer of a bay the order was the plan's. The plan is spatial per part (`Layers`), but a cell a later part writes again moves to the end of the merged plan (`BuildPlan.Builder.set`), so those cells came last. And a chain that grows against that order stopped after 4 passes (`MAX_PASSES`), the rest waiting for the next round |
+| 5 | many sites started, none closed | `SiteDispatch.focus`, `SiteCursor.dispatch` (`HOLD`) | a new focus needed one second of hold; walking or flying through buildings opened each one for a moment, its crew placed a few blocks and it stayed "started" for good. Nothing capped the started sites |
+| 6 | pieces against another building placed before it | `SiteProgram.Compiler.solid` | other sites counted as standing (documented under "Not done"): a walkway or wall leaning on a node or tower not built yet went up with its first stage |
+
+Not found: no order comes from iterating a hash map or set (the plan builders keep insertion order, the canvas is
+sorted, every program key is spatial but for the plan index tie-break of point 4); two builders on one task place
+consecutive entries of one list, side by side, not interleaved across the bay; BLOCKED + retry only parks chunks not
+loaded (20 ticks), it leaves holes only at the edge of the loaded area.
+
+### What was fixed
+
+- **Flying lays nothing** (1). After 20 ticks without touching the ground the player is `flying`: no corridor, carpet,
+  trail or lifted floor, and the site under it does not count as "the one the player is in".
+- **Pavements are ground** (2). A paving block that is not a full cube, lying right on a column's terrain stack,
+  walkable, next to a column whose ground top is at its height, is ground: the whole pavement comes with the streams.
+- **Diagonal support** (3). A block that is not decoration is held by a block one down and one aside: a stair or slab
+  roof rises row by row from its eaves.
+- **Serpentine from the access** (4). Inside a bay: bottom-up, and each layer in rows across the direction from the
+  access to the bay, nearest row first, alternating direction; the plan index no longer decides. Up to 64 passes per
+  bay and round, so a slab or roof that grows against the sweep is finished in its round.
+- **Hysteresis and a cap** (5). A site not started yet must be the dispatch's choice for 3 s (6 rounds) before it takes
+  the focus. With 3 sites started and not finished (`SiteDispatch.STARTED_MAX`), rules 3 and 4 close the nearest
+  started one (at any distance) before they start a new one; the building the player walks into still opens.
+- **Other sites hold only where placed** (6). Compiled with a snapshot of what is placed: an entry leaning on an
+  unbuilt building goes to the late rounds and, at worst, to the finishing pass at the end of its site.
+
+Left as designed: a wave is still the whole site (one task per bay), so a surface wider than a bay fills bay by bay
+from the access; what never finds support is placed in the finishing pass, whatever holds it.
+
+### Reading the counters
+
+The status line gets, before the stall counters:
+
+```
+| open 2 started 3 opens 7 (1.4/min) late 220 remate 31 flying
+```
+
+and each open site its own ` late s1:12 s3:40 remate 5`.
+
+| field | meaning | what to look for |
+|---|---|---|
+| `open` | sites open now | 2 or 3 normally |
+| `started` | sites started and not finished | stays at 3 or under unless the player walks into new buildings |
+| `opens (n/min)` | sites opened since the job started, and per minute | several per minute while flying = the hysteresis is not enough |
+| `late` / `remate` | builder entries the compiled programs left to late rounds / to the finishing pass, all programs so far | a site with a large `remate` builds its pieces in the air at the end |
+| `late sN:k` (per site) | its program's late entries per storey | a storey with many: its pieces lean on something placed later |
+| `flying` | the player is airborne: nothing is laid around it | |
+
 ## Not done / open
 
-- **Support across sites is optimistic**: another site counts as standing (see above). A site built on top of
-  another site (a hall over a basement of a different group) can go up before what is under it. The citadel has no
-  such pair (a group there is a zone on the map), other layouts may.
+- **Support across sites**: since #48 another site holds only where it is already placed when the program is compiled
+  (see "Noise"). What leans on an unbuilt building goes to the late rounds and the finishing pass; a site built on top
+  of another site can still go up first in that finishing pass.
 - **Stages are told apart by block properties only** (opaque, collision, light): a lantern is a finish, a slab or a
   stair is structure, a carpet is enclosure. No list of block types.
 - **Many small waves.** A storey is up to five stages and each can be several rounds. The crew is sized again at

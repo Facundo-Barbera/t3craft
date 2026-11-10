@@ -146,6 +146,9 @@ public final class SiteCursor implements JobCursor {
 		/** Task of the current wave in each bay of the site (index {@code bay - siteBayStart[site]}), -1 = none; built for wave {@link #bayTaskWave}. */
 		int[] bayTask = new int[0];
 		int bayTaskWave = -1;
+		/** Builder entries its program left to the late rounds, per storey, and to the finishing pass (status). */
+		int[] lateByStorey = new int[0];
+		int remate;
 
 		Open(int site) {
 			this.site = site;
@@ -302,6 +305,20 @@ public final class SiteCursor implements JobCursor {
 	private long lends;
 	private long groundReserveTicks;
 
+	// ---- noise fixes (#48): flight, hysteresis, counters ---------------------------------------
+	/** The player counts as flying after this many ticks without touching the ground (a jump is shorter). */
+	static final int AIRBORNE_TICKS = 20;
+	/** A site not started yet must be chosen this many dispatch rounds in a row (3 s) before it takes the focus. */
+	static final int HOLD_FRESH = 6;
+	/** The player touched the ground in the last report ({@link #focus}). */
+	private boolean grounded = true;
+	private int airTicks;
+	/** Sites opened since the job started. */
+	private long opens;
+	/** Builder entries the compiled programs left to the late rounds / to the finishing pass, all sites. */
+	private long lateCompiled;
+	private long remateCompiled;
+
 	private @Nullable IntPredicate already;
 	private CrewCursor.@Nullable Walker walker;
 	private int tickNo;
@@ -431,6 +448,7 @@ public final class SiteCursor implements JobCursor {
 	 */
 	void focus(double @Nullable [] rel, long nowMs) {
 		track(rel, nowMs);
+		grounded = rel == null || rel.length < 4 || rel[3] != 0;
 		if (rel == null) {
 			cx = p.fallback[0];
 			cz = p.fallback[1];
@@ -484,6 +502,16 @@ public final class SiteCursor implements JobCursor {
 		trackZ = rel[1];
 		trackAt = nowMs;
 		trackValid = true;
+	}
+
+	/**
+	 * #48: the player has not touched the ground for {@link #AIRBORNE_TICKS} (flying). Then no floor is laid around or
+	 * ahead of it (corridor, carpet, trail, a lifted floor at its height: they laid roof terraces, tower tops and
+	 * walkway decks at flight height, floating, and strips of ground along every flight), and the site under it does
+	 * not count as the one it is in.
+	 */
+	private boolean airborne() {
+		return airTicks >= AIRBORNE_TICKS;
 	}
 
 	// ---- bookkeeping --------------------------------------------------------------------------
@@ -597,7 +625,7 @@ public final class SiteCursor implements JobCursor {
 	 * floor's edge or under a thin floor. Its site's tasks find it applied and pass over it. False = the budget ended.
 	 */
 	private boolean layLift(int c, FrontCursor.Step step, int[] counts, int max, int maxSkips) {
-		if (level == WalkLevels.NO_LEVEL || p.candStart[c] >= p.candStart[c + 1] || parked(c)) {
+		if (level == WalkLevels.NO_LEVEL || airborne() || p.candStart[c] >= p.candStart[c + 1] || parked(c)) {
 			return true;
 		}
 		int a = p.colStart[c];
@@ -656,6 +684,7 @@ public final class SiteCursor implements JobCursor {
 		int n0 = done;
 		try {
 			tickNo++;
+			airTicks = hasPlayer && !grounded ? airTicks + 1 : 0;
 			BuildTuning t = BuildBudget.global().tuning();
 			install();
 			if (tickNo >= dispatchAt) {
@@ -716,6 +745,7 @@ public final class SiteCursor implements JobCursor {
 			o.taskCrew = new int[tasks];
 			o.taskPark = new int[tasks];
 			o.taskDone = new boolean[tasks];
+			countLate(o, g);
 			o.wave = 0;
 			o.fresh = true;
 			if (g.remateWave() < g.waves()) {
@@ -737,6 +767,31 @@ public final class SiteCursor implements JobCursor {
 			}
 			gather(o);
 		}
+	}
+
+	/** #48 status: entries of program {@code g} in late rounds, per storey, and in the finishing pass. */
+	private void countLate(Open o, SiteProgram.Program g) {
+		int[] late = new int[p.storeyY[o.site].length];
+		int remate = 0;
+		for (int w = 0; w < g.waves(); w++) {
+			int stage = g.waveStage()[w];
+			if (stage != SiteProgram.LATE && stage != SiteProgram.REMATE) {
+				continue;
+			}
+			int count = g.taskStart()[g.waveStart()[w + 1]] - g.taskStart()[g.waveStart()[w]];
+			if (stage == SiteProgram.REMATE) {
+				remate += count;
+			} else {
+				int st = g.waveStorey()[w];
+				if (st >= 0 && st < late.length) {
+					late[st] += count;
+				}
+				lateCompiled += count;
+			}
+		}
+		remateCompiled += remate;
+		o.lateByStorey = late;
+		o.remate = remate;
 	}
 
 	/** Moves {@code o} to the first wave, from its current one on, that has a task left; none = the program is over. */
@@ -994,7 +1049,7 @@ public final class SiteCursor implements JobCursor {
 	}
 
 	private void dispatch(BuildTuning t) {
-		insideSite = p.sites == 0 ? -1 : p.siteAt(cx, cz, hasPlayer ? playerY : Double.NaN);
+		insideSite = p.sites == 0 || airborne() ? -1 : p.siteAt(cx, cz, hasPlayer ? playerY : Double.NaN);
 		// finished sites leave
 		for (int k = openList.size() - 1; k >= 0; k--) {
 			Open o = open[openList.getInt(k)];
@@ -1012,9 +1067,16 @@ public final class SiteCursor implements JobCursor {
 		for (int s = 0; s < p.sites; s++) {
 			dist[s] = s == p.details ? Double.MAX_VALUE : p.distance(s, cx, cz);
 		}
-		int want = SiteDispatch.focus(focusSite, insideSite, siteState, dist);
+		int startedLeft = 0;
+		for (int s = 0; s < p.sites; s++) {
+			if (siteState[s] == SiteDispatch.STARTED) {
+				startedLeft++;
+			}
+		}
+		// #48: a real cap on half-built sites: past it, the nearest started one comes before a new one
+		int want = SiteDispatch.focus(focusSite, insideSite, siteState, dist, startedLeft < SiteDispatch.STARTED_MAX);
 		if (want != focusSite) {
-			// hold: the player brushing past another building does not move the crew
+			// hold: the player brushing past another building does not move the crew; a site not started yet needs longer (#48)
 			boolean urgent = focusSite < 0 || siteState[focusSite] == SiteDispatch.DONE;
 			if (want == candidate) {
 				candidateRounds++;
@@ -1022,7 +1084,8 @@ public final class SiteCursor implements JobCursor {
 				candidate = want;
 				candidateRounds = 1;
 			}
-			if (urgent || candidateRounds >= HOLD) {
+			int hold = want >= 0 && siteState[want] == SiteDispatch.IDLE ? HOLD_FRESH : HOLD;
+			if (urgent || candidateRounds >= hold) {
 				focusSite = want;
 				candidate = -1;
 				candidateRounds = 0;
@@ -1134,12 +1197,14 @@ public final class SiteCursor implements JobCursor {
 			}
 		}
 		boolean[] doneLocal = snapshot;
+		boolean[] doneAll = applied.clone(); // #48: other sites hold this one only where they are placed
 		double ax = cx;
 		double az = cz;
 		SiteProgram program = p;
+		opens++;
 		o.pending = Offload.supply(dev.t3craft.debug.PerfStats.STEP_RADIAL_ORDER, () -> {
 			long c0 = System.nanoTime();
-			SiteProgram.Program out = program.compile(s, ax, az, doneLocal);
+			SiteProgram.Program out = program.compile(s, ax, az, doneLocal, doneAll);
 			lastCompileWorkNs = System.nanoTime() - c0;
 			return out;
 		});
@@ -1252,7 +1317,7 @@ public final class SiteCursor implements JobCursor {
 	 */
 	private void tickCorridor(FrontCursor.Step step, BuildTuning t) {
 		int max = t.corridorBlocksPerTick();
-		if (!hasPlayer || max <= 0 || p.cols == 0) {
+		if (!hasPlayer || airborne() || max <= 0 || p.cols == 0) {
 			return;
 		}
 		long nanos = (long) (t.corridorMsPerTick() * 1_000_000.0);
@@ -1305,6 +1370,9 @@ public final class SiteCursor implements JobCursor {
 	 * cell or level, or the trail changes target.
 	 */
 	private void tickCarpet(FrontCursor.Step step, BuildTuning t) {
+		if (airborne()) {
+			return; // #48: no carpet and no trail under a flying player
+		}
 		int bx = (int) Math.floor(cx);
 		int bz = (int) Math.floor(cz);
 		// the trail's target: the access of the open site nearest the player, unless the player is in that site
@@ -2236,6 +2304,19 @@ public final class SiteCursor implements JobCursor {
 	 * tick of the last minute or two, the last site compile and the budget throttle (MSPT / FPS).
 	 */
 	private void appendStalls(StringBuilder sb) {
+		// #48 noise: open sites now, started and not finished, openings per minute, entries left to late / finishing
+		int started = 0;
+		for (byte st : siteState) {
+			if (st == SiteDispatch.STARTED) {
+				started++;
+			}
+		}
+		sb.append(" | open ").append(openList.size()).append(" started ").append(started).append(" opens ").append(opens);
+		sb.append(String.format(Locale.ROOT, " (%.1f/min)", opens * 1200.0 / Math.max(1200, tickNo)));
+		sb.append(" late ").append(lateCompiled).append(" remate ").append(remateCompiled);
+		if (airborne()) {
+			sb.append(" flying");
+		}
 		sb.append(" | idle ").append(idleNow).append(" free ").append(freeNow);
 		long idleAll = idleBuilderTicks;
 		if (idleAll > 0) {
@@ -2286,6 +2367,17 @@ public final class SiteCursor implements JobCursor {
 						.append('/').append(g.waves()).append(" bays-left ").append(o.waveTasksLeft);
 			}
 			sb.append(" left ").append(siteLeft[s]).append('/').append(p.siteTotal[s]).append(" crew ").append(o.crew);
+			int[] late = o.lateByStorey;
+			boolean anyLate = false;
+			for (int st = 0; st < late.length; st++) {
+				if (late[st] > 0) {
+					sb.append(anyLate ? " s" : " late s").append(st + 1).append(':').append(late[st]);
+					anyLate = true;
+				}
+			}
+			if (o.remate > 0) {
+				sb.append(" remate ").append(o.remate);
+			}
 			if (o.leaving) {
 				sb.append(" leaving");
 			}

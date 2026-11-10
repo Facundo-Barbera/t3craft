@@ -54,6 +54,15 @@ final class SiteDispatch {
 	 * @return the site to work now, -1 when every site is done
 	 */
 	static int focus(int current, int inside, byte[] state, double[] dist) {
+		return focus(current, inside, state, dist, true);
+	}
+
+	/**
+	 * Like {@link #focus(int, int, byte[], double[])}. {@code allowFresh} false (#48: too many sites are started and
+	 * not finished, {@link #STARTED_MAX}): rules 3 and 4 do not start a new site, the nearest started one is closed
+	 * first, at any distance. The site the player stands in (rule 1) still opens.
+	 */
+	static int focus(int current, int inside, byte[] state, double[] dist, boolean allowFresh) {
 		if (inside >= 0 && state[inside] != DONE) {
 			return inside;
 		}
@@ -61,6 +70,7 @@ final class SiteDispatch {
 			return current;
 		}
 		int started = -1;
+		int startedFar = -1;
 		int fresh = -1;
 		int any = -1;
 		for (int s = 0; s < state.length; s++) {
@@ -73,12 +83,24 @@ final class SiteDispatch {
 			if (state[s] == STARTED && dist[s] <= KEEP && (started < 0 || nearer(dist[s], dist[started]))) {
 				started = s;
 			}
+			if (state[s] == STARTED && (startedFar < 0 || nearer(dist[s], dist[startedFar]))) {
+				startedFar = s;
+			}
 			if (state[s] == IDLE && dist[s] < 1.0e9 && (fresh < 0 || nearer(dist[s], dist[fresh]))) {
 				fresh = s;
 			}
 		}
-		return started >= 0 ? started : fresh >= 0 ? fresh : any;
+		if (started >= 0) {
+			return started;
+		}
+		if (!allowFresh && startedFar >= 0) {
+			return startedFar;
+		}
+		return fresh >= 0 ? fresh : any;
 	}
+
+	/** #48: sites started and not finished at most before rules 3 and 4 open no new one (rule 1, the player's, still does). */
+	static final int STARTED_MAX = 3;
 
 	/**
 	 * Sites that may be open at once: {@code sitesOpen} (the focus and the ones being closed), plus one when the crew
