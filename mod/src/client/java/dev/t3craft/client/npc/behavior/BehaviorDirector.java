@@ -60,6 +60,11 @@ public final class BehaviorDirector {
 		@Nullable String lastSummary;
 		boolean seenSummary;
 		boolean crouching;
+		/** World text (event bubbles): something happened this tick, ticks the bubble still lives, its fade step. */
+		boolean bubbleEvent;
+		int bubbleLeft;
+		int bubbleStep = -1;
+		@Nullable Mode lastMode;
 	}
 
 	private final Map<String, NpcBrain> brains = new HashMap<>();
@@ -394,7 +399,12 @@ public final class BehaviorDirector {
 			String summary = summaries.summary(b.id(), info);
 			if (o.seenSummary && !Objects.equals(summary, o.lastSummary)) {
 				brain.summaryChanged();
+				o.bubbleEvent = true; // world text: a new summary is an event
 			}
+			if (o.lastMode != null && o.lastMode != mode) {
+				o.bubbleEvent = true; // world text: so is a change of state (needs you, done…)
+			}
+			o.lastMode = mode;
 			o.seenSummary = true;
 			o.lastSummary = summary;
 
@@ -536,13 +546,39 @@ public final class BehaviorDirector {
 			panelLines = o.panelLines;
 		}
 		double top = at.y + dev.t3craft.client.npc.NpcLabels.bubbleBase(PANEL_Y, BUBBLE_Y, LINE_H, panelLines) - drop;
-		if (brain.bubbleWanted(dist)) {
-			if (o.bubble == null || o.bubble.isRemoved()) {
-				o.bubble = textDisplay(lvl, 0xB0101010, 1f);
-				o.bubbleText = null;
+		// World text (hologram style): the bubble only after an event, 3.5 to 11 s, fading out. Classic: as before.
+		boolean events = dev.t3craft.client.npc.LabelConfig.current().pills();
+		List<String> lines = null;
+		if (events && o.bubbleEvent) {
+			lines = BubbleText.lines(summary, brain.mode() == null ? Mode.IDLE : brain.mode(), brain.error(), brain.emote());
+			o.bubbleLeft = dev.t3craft.client.npc.WorldText.bubbleTicks(String.join(" ", lines).length());
+		}
+		o.bubbleEvent = false;
+		boolean wanted = events ? o.bubbleLeft > 0 : brain.bubbleWanted(dist);
+		if (o.bubbleLeft > 0) {
+			o.bubbleLeft--;
+		}
+		if (wanted) {
+			int step = events ? dev.t3craft.client.npc.WorldText.fadeStep(o.bubbleLeft + 1) : -1;
+			if (o.bubble != null && !events && o.bubbleStep != -1) {
+				discard(lvl, o.bubble); // back to classic: a fresh bubble with the classic background
+				o.bubble = null;
 			}
-			List<String> lines = BubbleText.lines(summary, brain.mode() == null ? Mode.IDLE : brain.mode(), brain.error(), brain.emote());
-			Component text = bubble(lines);
+			if (o.bubble == null || o.bubble.isRemoved()) {
+				o.bubble = textDisplay(lvl, events ? 0 : 0xB0101010, 1f);
+				o.bubbleText = null;
+				o.bubbleStep = -1;
+			}
+			if (lines == null) {
+				lines = BubbleText.lines(summary, brain.mode() == null ? Mode.IDLE : brain.mode(), brain.error(), brain.emote());
+			}
+			Component text = events ? eventBubble(lines, step) : bubble(lines);
+			if (events && step != o.bubbleStep) {
+				o.bubbleStep = step;
+				var theme = dev.t3craft.client.npc.WorldText.theme();
+				o.bubble.setBackgroundColor(dev.t3craft.client.chat.ChatTheme.withAlpha(theme.panel(),
+						dev.t3craft.client.npc.WorldText.fadeAlpha(dev.t3craft.client.npc.WorldText.BUBBLE_ALPHA, step)));
+			}
 			if (!text.equals(o.bubbleText)) {
 				o.bubble.setText(text);
 				dev.t3craft.debug.PerfStats.count(dev.t3craft.debug.PerfStats.DISPLAY_SET_TEXT);
@@ -595,6 +631,18 @@ public final class BehaviorDirector {
 			default -> {
 			}
 		}
+	}
+
+	/** World text bubble: theme text colours, faded towards the panel colour at {@code step}. */
+	static Component eventBubble(List<String> lines, int step) {
+		var theme = dev.t3craft.client.npc.WorldText.theme();
+		int bg = dev.t3craft.client.npc.WorldText.rgb(theme.panel());
+		MutableComponent c = Component.empty();
+		for (int i = 0; i < lines.size(); i++) {
+			int rgb = dev.t3craft.client.npc.WorldText.rgb(i == 0 ? theme.text() : theme.muted());
+			c.append(Component.literal((i == 0 ? "" : "\n") + lines.get(i)).withColor(dev.t3craft.client.npc.WorldText.fade(rgb, bg, step)));
+		}
+		return c;
 	}
 
 	static Component bubble(List<String> lines) {

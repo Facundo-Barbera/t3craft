@@ -1,5 +1,6 @@
 package dev.t3craft.client.npc;
 
+import dev.t3craft.client.chat.ChatTheme;
 import dev.t3craft.t3.Chips;
 import java.util.ArrayList;
 import java.util.List;
@@ -92,6 +93,33 @@ public final class Nameplate {
 			parts.add(branch);
 		}
 		return parts.isEmpty() ? null : String.join("   ", parts);
+	}
+
+	/**
+	 * World text pill (hologram style): the status dot in the state colour, then one activity line
+	 * ({@link NpcLabels#pillLine}). Built only when the NPC's info changes (cached by text upstream).
+	 */
+	public static Component pill(NpcInfo info, ChatTheme theme) {
+		int dot = WorldText.rgb(theme.color(NpcLabels.state(info.state())));
+		return Component.literal(NpcLabels.DOT + " ").withColor(dot)
+				.append(Component.literal(NpcLabels.pillLine(info.activity(), info.title())).withColor(WorldText.rgb(theme.text())));
+	}
+
+	/**
+	 * The detail lines under an open pill (hologram style): the title (cut to {@code titleMax}), then
+	 * environment · project and the chips, in the theme's muted colour.
+	 */
+	public static Component pillDetail(NpcInfo info, ChipsConfig cfg, ChatTheme theme, int titleMax) {
+		String title = NpcLabels.truncate(info.title() == null ? "" : info.title().strip().replaceAll("\\s+", " "), titleMax);
+		MutableComponent c = Component.literal(title).withColor(WorldText.rgb(theme.text()));
+		if (info.sublabel() != null && !info.sublabel().isBlank()) {
+			c.append(Component.literal("\n" + info.sublabel()).withColor(WorldText.rgb(theme.muted())));
+		}
+		String chips = panelChips(info, cfg);
+		if (chips != null) {
+			c.append(Component.literal("\n" + chips).withColor(WorldText.rgb(theme.muted())));
+		}
+		return c;
 	}
 
 	/** Neighbourhood sign: project in bold, environment below. */

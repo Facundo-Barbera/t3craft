@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentCraft contributors. MIT License.
 package dev.t3craft.client.hologram;
 
+import dev.t3craft.client.chat.ChatTheme;
 import dev.t3craft.t3.ThreadShell;
 import dev.t3craft.t3.ThreadState;
 import java.time.Instant;
@@ -23,7 +24,7 @@ import org.jspecify.annotations.Nullable;
  * rebuilt only when its {@link Inputs} change ({@link HologramState}).
  */
 public record HologramModel(Counts counts, List<Ring> rings, int moreRings, @Nullable Urgent urgent, ThreadState top,
-		boolean byEnvironment, boolean stale) {
+		boolean byEnvironment, boolean stale, int doneNow) {
 
 	/** Rings shown before "+N". */
 	public static final int MAX_RINGS = 4;
@@ -37,7 +38,7 @@ public record HologramModel(Counts counts, List<Ring> rings, int moreRings, @Nul
 	public static final int MUTED = 0xBBBBBB;
 
 	/** Nothing to draw (config off, or no thread at all). */
-	public static final HologramModel HIDDEN = new HologramModel(Counts.ZERO, List.of(), 0, null, ThreadState.IDLE, false, false);
+	public static final HologramModel HIDDEN = new HologramModel(Counts.ZERO, List.of(), 0, null, ThreadState.IDLE, false, false, 0);
 
 	/**
 	 * One thread as the hologram sees it (from the NPC roster, so it matches the HUD bar and the
@@ -121,6 +122,7 @@ public record HologramModel(Counts counts, List<Ring> rings, int moreRings, @Nul
 		int working = 0;
 		int needs = 0;
 		int error = 0;
+		int doneNow = 0;
 		ThreadState top = ThreadState.IDLE;
 		for (Entry e : in.entries()) {
 			ThreadState s = e.threadState();
@@ -128,6 +130,7 @@ public record HologramModel(Counts counts, List<Ring> rings, int moreRings, @Nul
 				case WORKING -> working++;
 				case NEEDS_ATTENTION -> needs++;
 				case ERROR -> error++;
+				case DONE -> doneNow++;
 				default -> {
 				}
 			}
@@ -141,7 +144,7 @@ public record HologramModel(Counts counts, List<Ring> rings, int moreRings, @Nul
 		List<Ring> all = rings(in.entries(), byEnv);
 		List<Ring> shown = all.size() > MAX_RINGS ? all.subList(0, MAX_RINGS) : all;
 		return new HologramModel(new Counts(in.entries().size(), working, needs, error, doneToday), List.copyOf(shown),
-				all.size() - shown.size(), urgent(in.entries(), byEnv), top, byEnv, in.stale());
+				all.size() - shown.size(), urgent(in.entries(), byEnv), top, byEnv, in.stale(), doneNow);
 	}
 
 	/** The more urgent of two states (needs you › error › working › done › idle). */
@@ -284,6 +287,87 @@ public record HologramModel(Counts counts, List<Ring> rings, int moreRings, @Nul
 			lines.add(List.of(new Span("Offline · last known state", DIM)));
 		}
 		return lines;
+	}
+
+	// ---- card (world text, hologram style) -------------------------------------------------------
+
+	/** Threads in the card's progress ring: the open ones (not done) plus those done today. */
+	public int ringTotal() {
+		return Math.max(0, counts.total() - doneNow) + Math.max(0, counts.doneToday());
+	}
+
+	/** Done today, the ring's filled part. */
+	public int ringDone() {
+		return Math.min(ringTotal(), Math.max(0, counts.doneToday()));
+	}
+
+	/** 0..1 for the ring (AgentCraft's ring follows the done count). */
+	public double ringProgress() {
+		int t = ringTotal();
+		return t == 0 ? 0 : ringDone() / (double) t;
+	}
+
+	/** Segments of a ring of {@code segments} that are filled (rounded, never 0 with something done, never all with something open). */
+	public static int filled(int done, int total, int segments) {
+		if (total <= 0 || done <= 0) {
+			return 0;
+		}
+		if (done >= total) {
+			return segments;
+		}
+		int n = (int) Math.round(done * (double) segments / total);
+		return Math.max(1, Math.min(segments - 1, n));
+	}
+
+	/** Caption in the middle of the ring: {@code "4/9"}. */
+	public String ringCaption() {
+		return ringDone() + "/" + ringTotal();
+	}
+
+	/**
+	 * The card's lines under the ring, in theme colours: the counts (zero counts dimmed), the most
+	 * urgent thread (or "All quiet"), the rings per environment / project in one line when there are
+	 * several, and "Offline · last known state" when stale.
+	 */
+	public List<List<Span>> card(ChatTheme theme) {
+		List<List<Span>> lines = new ArrayList<>(4);
+		List<Span> head = new ArrayList<>(7);
+		cardCount(head, theme, ThreadState.WORKING, counts.working(), " working");
+		cardCount(head, theme, ThreadState.NEEDS_ATTENTION, counts.needsYou(), counts.needsYou() == 1 ? " needs you" : " need you");
+		cardCount(head, theme, ThreadState.ERROR, counts.error(), " error");
+		cardCount(head, theme, ThreadState.DONE, counts.doneToday(), " done");
+		lines.add(List.copyOf(head));
+		lines.add(List.of(urgent == null ? new Span("All quiet", rgb(theme.muted()))
+				: new Span(urgent.text(), rgb(theme.color(urgent.state())))));
+		if (rings.size() > 1) {
+			List<Span> r = new ArrayList<>();
+			for (Ring ring : rings) {
+				if (!r.isEmpty()) {
+					r.add(new Span("  ", rgb(theme.disabled())));
+				}
+				r.add(new Span(cut(ring.label(), MAX_RING_LABEL) + " " + ring.done() + "/" + ring.total(),
+						rgb(ring.top() == ThreadState.IDLE && ring.done() > 0 ? theme.done() : theme.color(ring.top()))));
+			}
+			if (moreRings > 0) {
+				r.add(new Span("  +" + moreRings, rgb(theme.disabled())));
+			}
+			lines.add(List.copyOf(r));
+		}
+		if (stale) {
+			lines.add(List.of(new Span("Offline · last known state", rgb(theme.disabled()))));
+		}
+		return lines;
+	}
+
+	private static void cardCount(List<Span> out, ChatTheme theme, ThreadState s, int n, String word) {
+		if (!out.isEmpty()) {
+			out.add(new Span("  ", rgb(theme.disabled())));
+		}
+		out.add(new Span(s.glyph + " " + n + word, rgb(n == 0 ? theme.disabled() : theme.color(s))));
+	}
+
+	private static int rgb(int argb) {
+		return argb & 0xFFFFFF;
 	}
 
 	static String cut(String s, int max) {

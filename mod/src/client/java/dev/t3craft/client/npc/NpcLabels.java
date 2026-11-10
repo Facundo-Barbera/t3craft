@@ -26,7 +26,38 @@ public final class NpcLabels {
 	/** Aim: max range along the view ray. */
 	public static final double AIM_RANGE = 16.0;
 
+	/** World text pill: activity line length (code points, the dot not counted). */
+	public static final int PILL_MAX = 40;
+	/** The pill's status dot. */
+	public static final String DOT = "\u25CF";
+
 	private NpcLabels() {
+	}
+
+	/** The {@link ThreadState} of a wire state; unknown → idle ({@code "attention"} → needs attention). */
+	public static ThreadState state(@Nullable String state) {
+		for (ThreadState s : ThreadState.values()) {
+			if (s.wire.equals(state)) {
+				return s;
+			}
+		}
+		return "attention".equals(state) ? ThreadState.NEEDS_ATTENTION : ThreadState.IDLE;
+	}
+
+	/**
+	 * The pill's one line: the activity's first line, whitespace collapsed and cut to
+	 * {@link #PILL_MAX}; the title when there is no activity.
+	 */
+	public static String pillLine(@Nullable String activity, @Nullable String title) {
+		String a = activity == null ? "" : activity.strip();
+		int nl = a.indexOf('\n');
+		if (nl >= 0) {
+			a = a.substring(0, nl).strip();
+		}
+		if (a.isEmpty()) {
+			a = title == null ? "" : title.strip();
+		}
+		return truncate(a.replaceAll("\\s+", " "), PILL_MAX);
 	}
 
 	/** {@code "⚙ Fix the grid…"}: state glyph, then the title cut to {@code max} code points. */
@@ -150,6 +181,11 @@ public final class NpcLabels {
 
 		public boolean shown() {
 			return shown;
+		}
+
+		/** Opened by a click (or {@link #reveal}) and still within its {@link #CLICK_TICKS}. */
+		public boolean pinned() {
+			return pinned > 0;
 		}
 	}
 }

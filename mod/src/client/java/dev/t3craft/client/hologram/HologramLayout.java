@@ -49,6 +49,53 @@ public final class HologramLayout {
 		return headerY(detailLines) + textHeight(1, HEADER_SCALE);
 	}
 
+	// ---- card style (world text, hologram style) ----------------------------------------------
+
+	/** Card text scale. */
+	public static final float CARD_SCALE = 0.6f;
+	/** Ring radius (blocks, to the segments' centre line) and its segments. */
+	public static final float RING_RADIUS = 0.42f;
+	public static final int RING_SEGMENTS = 16;
+	/** Segment thickness (radial) and depth; length is {@link #RING_FILL} of the arc per segment. */
+	public static final float RING_THICK = 0.07f;
+	public static final float RING_DEPTH = 0.01f;
+	public static final float RING_FILL = 0.78f;
+	/** Gap between the card's top and the ring's outer edge. */
+	public static final double RING_GAP = 0.08;
+	/** Caption scale (the "4/9" in the ring's middle). */
+	public static final float CAPTION_SCALE = 0.9f;
+	/** Soft beam: a thin core and a wider, fainter halo around it. */
+	public static final float BEAM_CORE = 0.06f;
+	public static final float BEAM_HALO = 0.24f;
+
+	/** Centre of the ring above the floor, over a card of {@code cardLines} lines. */
+	public static double ringCentre(int cardLines) {
+		return CARD_BOTTOM + textHeight(cardLines, CARD_SCALE) + RING_GAP + RING_RADIUS + RING_THICK / 2;
+	}
+
+	/** Top of the card style (ring's outer edge) above the floor; stays under {@link #CEILING}. */
+	public static double cardTop(int cardLines) {
+		return ringCentre(cardLines) + RING_RADIUS + RING_THICK / 2;
+	}
+
+	/** Origin (bottom) of the caption display so its one line is centred on the ring. */
+	public static double captionY(int cardLines) {
+		return ringCentre(cardLines) - textHeight(1, CAPTION_SCALE) / 2;
+	}
+
+	/** Length of one ring segment (blocks). */
+	public static float segmentLength() {
+		return (float) (2 * Math.PI * RING_RADIUS / RING_SEGMENTS * RING_FILL);
+	}
+
+	/**
+	 * Angle (radians, from +x, counter-clockwise in the ring's plane) of segment {@code i}: segment 0
+	 * at the top, then clockwise as seen by the viewer, like a progress ring.
+	 */
+	public static double segmentAngle(int i) {
+		return Math.PI / 2 - 2 * Math.PI * i / RING_SEGMENTS;
+	}
+
 	/** Beam height: from just over the floor up to the bottom of the card. */
 	public static float beamHeight() {
 		return (float) (CARD_BOTTOM - BEAM_FLOOR);

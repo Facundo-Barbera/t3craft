@@ -128,8 +128,10 @@ public final class ScheduleClient implements ClientModInitializer {
 		}
 		long now = System.currentTimeMillis();
 		entries = subscribed == null ? List.of() : book.entries(ScheduleClient::envLabel, this::projectTitle);
-		if (lvl == null || mc.player == null || subscribed == null || !dev.t3craft.client.hq.HqPresence.allows(mc)) {
-			// fix/hq-gate-npcs: the board stands only in the HQ's own world and dimension
+		if (lvl == null || mc.player == null || subscribed == null || !dev.t3craft.client.hq.HqPresence.allows(mc)
+				|| !dev.t3craft.client.npc.LabelConfig.current().sources().scheduleBoard()) {
+			// fix/hq-gate-npcs: the board stands only in the HQ's own world and dimension;
+			// world text: labels.hologram.scheduleBoard switches its text off
 			renderer.clear(lvl);
 			return;
 		}

@@ -77,6 +77,8 @@ public final class WorkstationClient implements ClientModInitializer {
 	private @Nullable FileTime configStamp;
 	private @Nullable ClientLevel level;
 	private int ticks;
+	/** {@code blocks.monitor.nearDistance}: beyond it (plus hysteresis) the desk screens hide (world text). */
+	private double screenHideDistance = dev.t3craft.client.blocks.MonitorSettings.DEFAULT.nearDistance();
 
 	/** The running instance (null before init / after the client stops). */
 	public static @Nullable WorkstationClient get() {
@@ -209,6 +211,8 @@ public final class WorkstationClient implements ClientModInitializer {
 			list.add(t);
 			threads.put(t.key(), t);
 		}
+		renderer.viewer(mc.player.getX(), mc.player.getEyeY(), mc.player.getZ(), screenHideDistance,
+				dev.t3craft.client.npc.LabelConfig.current().sources().workstationScreens());
 		renderer.tick(lvl, list, hqDesks, cache, System.currentTimeMillis());
 	}
 
@@ -244,6 +248,8 @@ public final class WorkstationClient implements ClientModInitializer {
 	private void reloadConfig() {
 		Path f = configFile();
 		config = WorkstationConfig.load(f);
+		// World text: a desk screen hides where a monitor would switch to its far level of detail.
+		screenHideDistance = dev.t3craft.client.blocks.MonitorSettings.load(f).nearDistance();
 		configStamp = stamp(f);
 	}
 

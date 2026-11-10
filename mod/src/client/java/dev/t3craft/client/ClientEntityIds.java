@@ -19,7 +19,8 @@ import java.util.Set;
  *  −5,000,000 … −5,999,999  workstations (screens, computer props, hitboxes)
  *  −6,000,000 … −6,999,999  archive shelf (ArchiveRenderer)
  *  −7,000,000 … −7,999,999  schedule board (ScheduleRenderer)
- *  −8,000,000 … −8,999,999  hub hologram (HologramRenderer)
+ *  −8,000,000 … −8,999,999  hub hologram (HologramRenderer from −8,000,000, its decision podium
+ *                           bubbles PodiumBubbles from −8,200,000)
  * </pre>
  * A new client-only owner takes the next free million and is added here.
  */
