@@ -14,9 +14,10 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The built-in {@link PieceSource} of the floating islands: a tree for scenery slots, a small pavilion for the
- * centre and a lamp post on a stone pad for module slots. Stand-ins until the piece catalog fills the slots;
- * they only exist so the first playable cut has something on its islands.
+ * The {@link PieceSource} the islands world uses ({@link #INSTANCE}): the real citadel catalog first
+ * ({@link IslandCatalog}), and for a slot the catalog has nothing for (or when building a catalog piece fails),
+ * the old stand-ins of the first cut: a tree for tree slots, a small pavilion for a centre and a lamp post on a
+ * stone pad for modules and accents.
  */
 public final class IslandProps implements PieceSource {
 	public static final IslandProps INSTANCE = new IslandProps();
@@ -35,8 +36,17 @@ public final class IslandProps implements PieceSource {
 
 	@Override
 	public @Nullable Piece pieceFor(Slot slot, MapLayout map) {
+		Piece real = IslandCatalog.INSTANCE.pieceFor(slot, map);
+		if (real != null && slot.fits(real.size())) {
+			return real;
+		}
+		return standIn(slot);
+	}
+
+	/** The first cut's stand-in for {@code slot}, or null (spawn and other roles stay empty). */
+	public static @Nullable Piece standIn(Slot slot) {
 		return switch (slot.role()) {
-			case DECOR -> tree();
+			case DECOR -> slot.has("accent") ? lampPost(0) : tree();
 			case CENTRE -> pavilion(Math.min(slot.halfAcross(), slot.halfDeep()));
 			case MODULE -> lampPost(Math.min(1, Math.min(slot.halfAcross(), slot.halfDeep())));
 			default -> null;

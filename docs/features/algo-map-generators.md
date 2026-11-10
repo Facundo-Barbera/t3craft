@@ -54,22 +54,21 @@ se toca; no hay forma de que los dos se mezclen (`VanillaDemoWorld.isDemoServer`
 `/t3craft islands confirm`, que guarda y sale de ese mundo), `/t3craft islands status`,
 `/t3craft map list` y `/t3craft map open floating-islands`.
 
-### Generador (`dev.t3craft.mapgen.islands`, puro)
+### Generador (`dev.t3craft.mapgen.islands`, puro): segundo corte (#31)
 
-- `IslandField implements MapGenerator<IslandField.Window>`: una isla por celda de una rejilla de 64 bloques.
-  El tamaño sale del hash de la celda: **pequeña** (radio 5, 40 %), **mediana** (9, 30 %), **grande** (14, 20 %)
-  y **extra grande** (20, 10 %). El centro se desplaza hasta ±10 bloques dentro de la celda, la altura varía
-  ±4 sobre y=64. La celda (0, 0) es siempre la isla mediana de aparición.
-- Las islas nunca se tocan: cada una queda dentro de su celda con un margen de 6 bloques (el contorno ondula
-  con el ángulo, hasta ±12 %), así que entre vecinas hay al menos 12 bloques de vacío. **No hay suelo entre
-  islas**: dos islas de celdas vecinas (4 direcciones) solo están *enlazadas* (`ON_DEMAND`).
-- Forma: contorno circular que ondula con el ángulo; el fondo se afina en cono con algo de ruido. Bloques en
-  `IslandBlocks` (césped, dos de tierra, piedra con vetas de toba, fondo de toba).
-- Huecos por tamaño: pequeña, un árbol; mediana, centro + árbol; grande, centro mayor + 2 módulos + 2 árboles;
-  extra grande, centro mayor + 4 módulos en los ejes + 4 árboles en las diagonales; la isla de aparición
-  añade `spawn`.
-- `IslandProps` es la `PieceSource` provisional (árbol, pabellón, farola sobre losa) para que el primer corte
-  tenga algo en las islas; el catálogo la sustituirá.
+El detalle está en [`islands-worldgen.md`](islands-worldgen.md). En resumen:
+
+- `IslandField implements MapGenerator<IslandField.Window>`: una isla por celda de una rejilla cuyo lado sale de
+  la **mezcla de tamaños** (`IslandMix`, p. ej. `S40,M30,L20,XG10` o un preset) para que quepa su isla más grande
+  con margen: 82 bloques si hay XG, 66 si lo más grande es L. La celda (0, 0) es siempre la isla **grande** de
+  aparición.
+- Formas orgánicas (`Island`): contorno con armónicos 2/3/5 y ruido de borde, panza cónica con estalactitas y
+  raíces o puntas de espeleotema colgando, terrazas en L/XG; cinco paletas vanilla (`IslandBiome`: pradera,
+  piedra/musgo, cerezo, nieve, desierto) elegidas por semilla.
+- Huecos por tamaño (`IslandSlots`): `CENTRE`, `MODULE`, `DECOR` (árbol o acento) y `SPAWN`, colocados de modo
+  que quepan dentro del contorno; el suelo bajo cada hueco se allana.
+- Piezas reales: `IslandCatalog` rellena los huecos con variantes del catálogo de la ciudadela; `IslandProps`
+  usa el catálogo y deja los props provisionales solo como respaldo.
 
 ### Puentes en tiempo real (`BridgePlanner`, `IslandsRuntime`)
 
@@ -97,7 +96,7 @@ se toca; no hay forma de que los dos se mezclen (`VanillaDemoWorld.isDemoServer`
 - Los puentes son rectos, sin barandilla continua (postes cada tres pasos) y sin escalones suaves: el desnivel
   máximo entre islas es 8, así que a veces hay que saltar.
 - Solo se enlazan las 4 vecinas de celda; no hay islas aisladas ni más de un puente por borde.
-- Las piezas son las provisionales de `IslandProps`; `PieceSource` es el punto de enchufe del catálogo.
+- (Segundo corte, #31: las piezas ya vienen del catálogo; ver `islands-worldgen.md`.)
 - Sin título/botón en el menú: se abre con comando. Sin configuración (`demo.*` no aplica a este mundo).
 - Sin pruebas unitarias (el repo no las tiene); la verificación es compilar.
 
