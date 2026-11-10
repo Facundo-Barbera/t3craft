@@ -16,7 +16,7 @@ Tests: `mod/src/test/java/dev/t3craft/client/config/` (25 tests JUnit, todos en 
                      "sounds": { "attention": true, "done": true, "error": true },
                      "connectionToasts": true,
                      "attention": { "windowTitle": true, "taskbarFlash": true, "actionBar": "off" } },
-  "environments": { "my-vps": { "label": null, "color": "#55FFFF", "visible": true,
+  "environments": { "vps-env": { "label": null, "color": "#55FFFF", "visible": true,
                      "filter": { "needsYou": true, "working": true, "recent": true,
                                  "recentWindowHours": null, "maxPerEnvironment": null } } }
   ```

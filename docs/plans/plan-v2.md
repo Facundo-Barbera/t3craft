@@ -70,8 +70,8 @@ rechaza el token y no lo guarda.
 ## B. Arquitectura v2.1
 
 ```
-[PC: Minecraft + mod]  --HTTPS/WSS por Tailscale-->  my-vps T3        (sesión read propia)
-                       --HTTP/WS  por Tailscale-->   my-laptop :3773 (sesión read propia)
+[PC: Minecraft + mod]  --HTTPS/WSS por Tailscale-->  vps-env T3        (sesión read propia)
+                       --HTTP/WS  por Tailscale-->   <laptop> :3773 (sesión read propia)
 [bridge/ en homelab]   opcional, legacy (modo "bridge")
 ```
 - **El mod Java es cliente directo de T3**: WebSocket RPC con `java.net.http`, framing Effect RPC
@@ -111,7 +111,7 @@ rechaza el token y no lo guarda.
 para la separación lectura/operate de §1.)*
 
 Estado de partida: `main` @ `c27b0b9`. Fase 1 funcionando: aldeanos coloreados, filtro de
-visibilidad por entorno (24 h / 40), puente multi-entorno en my-homelab y mod como vista tonta.
+visibilidad por entorno (24 h / 40), puente multi-entorno en <homelab> y mod como vista tonta.
 Facundo pide algo mucho más desarrollado.
 
 Referencias de ideas (no se copia código):

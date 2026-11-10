@@ -6,13 +6,13 @@
 
 > **Actualización de arquitectura (aprobada por Facundo, 2026-11-07). Prevalece sobre las secciones 3 y 5 de abajo.**
 >
-> 1. **El puente corre en my-homelab** (Ubuntu 24.04, siempre prendido) como servicio systemd
+> 1. **El puente corre en <homelab>** (Ubuntu 24.04, siempre prendido) como servicio systemd
 >    (`bridge/deploy/t3craft-bridge.service`, ejemplo sin secretos). Escucha **solo** en la IP de
 >    Tailscale del homelab (`listen.host` en `/etc/t3craft/bridge.json`). La config rechaza
 >    `0.0.0.0`, `::` y cualquier IP que no sea loopback, `100.64.0.0/10` o `fd7a:115c:a1e0::/48`, y
 >    el socket lo vuelve a comprobar al hacer bind.
-> 2. **El puente es cliente de varios T3 a la vez**: hoy son my-vps
->    (`https://my-vps.example.ts.net`) y el portátil my-laptop (puerto 3773).
+> 2. **El puente es cliente de varios T3 a la vez**: hoy son vps-env
+>    (`https://<vps>.<tailnet>.ts.net`) y el portátil <laptop> (puerto 3773).
 >    Cada entorno tiene su propia sesión revocable, con el token en un archivo fuera del repo
 >    referenciado por `environments[].tokenFile`. Los threads de todos los entornos se juntan, y cada
 >    NPC lleva `env`/`envLabel`. Ids únicos: `<env>:<threadId>`.
@@ -29,9 +29,9 @@
 >
 > Diagrama vigente:
 > ```
-> [PC Windows: Minecraft + mod]  --ws://<homelab tailscale>:7878 (t3craft v1)-->  [my-homelab: bridge (systemd)]
->                                                                                   ├─ HTTPS/WSS → my-vps T3 (token propio)
->                                                                                   └─ HTTP/WS  → my-laptop T3 :3773 (token propio)
+> [PC Windows: Minecraft + mod]  --ws://<homelab tailscale>:7878 (t3craft v1)-->  [<homelab>: bridge (systemd)]
+>                                                                                   ├─ HTTPS/WSS → vps-env T3 (token propio)
+>                                                                                   └─ HTTP/WS  → <laptop> T3 :3773 (token propio)
 > ```
 > Decisión sobre `status=="waiting"` (revisada el 8 nov 2026): es un estado vivo de la corrida
 > (espera una herramienta, un `thread_wait`, subagentes o tareas de fondo; está en
@@ -60,7 +60,7 @@ t3code y agentcraft: licencia MIT. pixel-agents: MIT (solo se leyó el README).
   - Alternativa: `npx t3 pair --scope ...` (enlace de emparejamiento de un solo uso que el cliente canjea por un token).
   - Las sesiones con subject `mcp-client` (OAuth de `/mcp`) son **rechazadas** en `/ws`, así que no sirven para el puente.
 - **Flujo WebSocket**: los clientes bearer no ponen el token en la URL:
-  1. `POST https://my-vps.example.ts.net/api/auth/websocket-ticket/rpc` con `Authorization: Bearer <token>` → `{ ticket, expiresAt }` (AuthWebSocketTicketResult, contracts/auth.ts:241). Ticket de vida corta y de un solo uso para la ruta `rpc`.
+  1. `POST https://<vps>.<tailnet>.ts.net/api/auth/websocket-ticket/rpc` con `Authorization: Bearer <token>` → `{ ticket, expiresAt }` (AuthWebSocketTicketResult, contracts/auth.ts:241). Ticket de vida corta y de un solo uso para la ruta `rpc`.
   2. `GET wss://…/ws?orchestrationProtocol=2&wsTicket=<ticket>` (apps/server/src/ws.ts:3506; `ORCHESTRATION_PROTOCOL_QUERY_PARAM="orchestrationProtocol"`, `ORCHESTRATION_PROTOCOL_VERSION=2` en contracts/environment.ts:13-15; `wsTicket` en EnvironmentAuth.ts:583). Si el protocolo no coincide, el servidor responde 426 `orchestration_protocol_incompatible`.
   3. Hay que reemitir el ticket en cada reconexión.
 - Tailscale Serve funciona porque issuer/URLs se derivan de `Host` + `X-Forwarded-Proto`. El servicio headless solo acepta peers loopback/privados/tailnet (docs/internals/remote.md), así que no queda expuesto públicamente. No hay que usar T3 Connect ni el relay.
@@ -114,12 +114,12 @@ pixel-agents: ideas de visualización, como burbujas de diálogo cuando el agent
 Cheggin/minecraft-use (GPL-3.0) y minecraft-agent-ide (sin licencia): **no se revisaron ni se usaron**.
 
 ## 3. Arquitectura recomendada
-*(Reemplazada por la actualización del principio: el puente ya no corre en el PC sino en my-homelab, y se conecta a varios entornos.)*
+*(Reemplazada por la actualización del principio: el puente ya no corre en el PC sino en <homelab>, y se conecta a varios entornos.)*
 ```
-[Minecraft + mod Fabric (cliente)] --ws://127.0.0.1:7878 (JSON t3craft v1)--> [bridge TS (Node 22+), en my-pc]
-     --HTTPS/WSS por Tailscale--> https://my-vps.example.ts.net (T3 server: /api/auth/websocket-ticket/rpc, /ws)
+[Minecraft + mod Fabric (cliente)] --ws://127.0.0.1:7878 (JSON t3craft v1)--> [bridge TS (Node 22+), en <pc>]
+     --HTTPS/WSS por Tailscale--> https://<vps>.<tailnet>.ts.net (T3 server: /api/auth/websocket-ticket/rpc, /ws)
 ```
-- **El puente corre en my-pc (Windows), junto al juego**:
+- **El puente corre en <pc> (Windows), junto al juego**:
   - El mod solo habla con loopback, que no se expone.
   - El token de T3 vive en el PC, en la variable de entorno `T3CRAFT_T3_TOKEN` o en un archivo fuera del repo bajo `%APPDATA%\t3craft\` (opcionalmente cifrado con DPAPI).
   - En el VPS no se instala ni se abre nada.
@@ -174,7 +174,7 @@ t3craft/
 - Hay que decidir la versión de Java/MC (26.3+Java 25 frente a 1.21.11+Java 21).
 - El cliente de Minecraft en Windows necesita Tailscale activo para que el puente llegue al VPS.
 - *(Nuevo)* Con el puente en el tailnet, cualquier nodo del tailnet puede conectarse al puerto 7878. Antes de la fase 3 (aprobar permisos) conviene activar `listen.clientKeyFile` y/o una ACL de Tailscale que solo deje pasar la PC.
-- *(Nuevo)* `my-laptop:3773`: confirmar si se sirve por HTTPS (Tailscale Serve) o por HTTP plano dentro del tailnet. `config.example.json` asume HTTP plano.
+- *(Nuevo)* `<laptop>:3773`: confirmar si se sirve por HTTPS (Tailscale Serve) o por HTTP plano dentro del tailnet. `config.example.json` asume HTTP plano.
 
 ## 8. Prompt para el thread de T3 Code (andamiaje)
 El prompt de andamiaje que se usó para crear este repo es el pedido original (estructura `mod/`,

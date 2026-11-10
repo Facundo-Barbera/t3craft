@@ -3,51 +3,51 @@
 Each T3 Code thread becomes a villager in Minecraft, coloured by its state (working, needs
 attention, done, error, idle) and tagged with the machine it runs on.
 
-> **The bridge is legacy and frozen** (`bridge/`, `protocol/`; decision D2, issue #7). The mod pairs **directly**
-> with each T3 environment (direct mode, the default; see "Direct mode" below). The bridge only gets critical fixes,
-> no new features. Whether it is retired is decided when #1 (T3 Connect) closes. Status and rules:
-> `bridge/README.md`. The diagram and the `mod/`/`bridge/` bullets below still describe the original bridge setup;
-> the README rewrite is phase 6 (#8).
+> **Direct mode is the default.** The mod pairs with each T3 Code environment itself, with no intermediate
+> process. The bridge (`bridge/`, `protocol/`) is **legacy and frozen** (decision D2, issue #7): critical fixes
+> only, no new features. Status and rules: `bridge/README.md`.
 
 ```
-[PC: Minecraft 26.3 + T3Craft mod]  --ws over Tailscale-->  [my-homelab: bridge (systemd)]
-                                                              ├─ my-vps T3        (own token)
-                                                              └─ my-laptop T3   (own token)
+[PC: Minecraft 26.3 + T3Craft mod]  --HTTPS/WSS (Tailscale or LAN)-->  <vps> T3        (own session per environment)
+                                    --HTTP/WS  (Tailscale or LAN)-->  <laptop> T3     (own session per environment)
 ```
 
-- `mod/`: Fabric client-only mod (Minecraft 26.3, Java 25, Loom 1.19.4 no-remap, Mojang names).
-  A dumb view: it draws what the bridge sends. It stores no T3 credentials.
-- `bridge/` (**legacy, frozen**, see `bridge/README.md`): Node 22+ / TypeScript / effect 4.1.2. Talks to every configured T3 environment over
-  authenticated WebSocket RPC and serves the mod on the homelab's Tailscale IP only.
-- `protocol/protocol.md`: the mod⇄bridge protocol v1 (legacy, frozen). `docs/plans/plan.md`: technical plan and the
-  architecture decision.
+- `mod/`: Fabric client mod (Minecraft 26.3, Java 25, Loom 1.19.4 no-remap, Mojang names). In direct mode it pairs
+  with each environment (`/t3craft pair`) and keeps its sessions under `config/t3craft/`. It draws threads as NPCs
+  and brings the T3 UI into the game: chat, sidebar, composer, actions, attention queue, archive and search, a
+  native UI kit (`dev.t3craft.client.t3ui.kit`), a piece browser, the HQ world, blocks, and algorithmic map
+  generators (`dev.t3craft.mapgen`). Per-feature docs: `docs/features/`.
+- `bridge/` (**legacy, frozen**, see `bridge/README.md`): Node 22+ / TypeScript process that fronts several T3
+  environments for the mod in `"mode": "bridge"`. `protocol/protocol.md` is its mod-to-bridge protocol v1 (also
+  frozen).
 - `tools/`: dev tooling. `heavy.sh` runs one heavy process at a time (render PC only), `render/` holds the
   render relay and the PC daemon scripts, `studio/` is Citadel Studio, and `art/` has the texture and model
   generators that write into `mod/src/main/resources`.
-- `docs/`: see `docs/README.md` for what lives where.
+- `docs/`: see `docs/README.md` for what lives where. Technical plan and architecture decision:
+  `docs/plans/plan-v2.md` (direct mode) and `docs/plans/plan.md` (original bridge plan, historical).
 
-Status: scaffolding plus phase 0/1 (list threads with colour). Chat, permissions and thread
-creation are stubs (see TODOs and `docs/plans/plan.md` §6).
+Status: direct mode is complete for reading and (with a second scope) controlling threads: states, chat, approvals,
+new threads, search, archive. See `docs/features/` for each feature and `docs/CHANGELOG-dev.md` for what changed.
 
 ## Direct mode (default): pair the mod with each T3
 
-Since v2.1 the mod talks to each T3 Code environment itself, like the desktop app with a remote
+Since plan v2.1 (2026-11-07) the mod talks to each T3 Code environment itself, like the desktop app with a remote
 server. The bridge below is legacy and frozen (`"mode": "bridge"`, see `bridge/README.md`).
 
 1. On each T3 host, issue a one-time pairing credential (valid 5 minutes by default). By default
    the mod pairs with **read + control** (`orchestration:operate`: send messages, approve, stop…)
    in a single pairing:
    ```bash
-   t3 auth pairing create --scope orchestration:read --scope orchestration:operate --base-url https://my-vps.example.ts.net
+   t3 auth pairing create --scope orchestration:read --scope orchestration:operate --base-url https://<vps>.<tailnet>.ts.net
    ```
    For a **read-only** pairing use only `--scope orchestration:read` and `/t3craft pair --read-only`
    (or the "Access" toggle on the pairing screen). Always pass explicit `--scope`s: without them
    the credential carries every scope. The mod refuses a session that grants anything beyond
    `orchestration:read` + `orchestration:operate`. Destructive actions ask for an in-game
    confirmation and every action lands in `config/t3craft/audit.log`. Details: `docs/features/operate.md`.
-2. In Minecraft run `/t3craft pair`, enter a name (shown on the villagers, e.g. `my-vps`) and
+2. In Minecraft run `/t3craft pair`, enter a name (shown on the villagers, e.g. `vps-env`) and
    paste the link (`https://host/pair#token=…`), or the bare code plus the T3 URL
-   (e.g. `http://my-laptop.<tailnet>.ts.net:3773`). Repeat for each environment. An
+   (e.g. `http://<laptop>.<tailnet>.ts.net:3773`). Repeat for each environment. An
    environment paired read-only can get control later with "Enable control" in the environments
    screen (or `/t3craft operate enable <env>`); `/t3craft operate revoke <env>` takes it back to
    read-only.
@@ -72,7 +72,7 @@ needs-you and error.
 
 Legacy installs only: the bridge is frozen (`bridge/README.md`).
 
-On **each** T3 host, Facundo issues a minimal read-only session (needs nothing else for phase 0/1):
+On **each** T3 host, issue a minimal read-only session (needs nothing else for phase 0/1):
 
 ```bash
 npx t3 auth session issue --scope orchestration:read --token-only
@@ -138,12 +138,12 @@ Fabric Loader 0.20.1 / Minecraft 26.3 instance. In direct mode (the default) pai
 `config/t3craft.json` of the instance (created on first start):
 
 ```json
-{ "bridgeUrl": "ws://my-homelab.<tailnet>.ts.net:7878/", "bridgeKey": null }
+{ "bridgeUrl": "ws://<homelab>.<tailnet>.ts.net:7878/", "bridgeKey": null }
 ```
 
 The default is `ws://127.0.0.1:7878/`. `T3CRAFT_BRIDGE_URL` or `-Dt3craft.bridgeUrl=` override it.
 Tailscale must be up on the PC. In a world, the villagers appear in a ring next to where you stand.
-Right-click one to open its (placeholder) chat screen.
+Right-click one to open its chat.
 
 ## Security rules for this repo
 

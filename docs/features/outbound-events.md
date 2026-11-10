@@ -10,7 +10,7 @@ Issue #20. Plan: `docs/plans/ui-browser-and-integrations.md`, frente D. Investig
 > interruptor general y, además, cada destino.
 >
 > Según el destino, un mensaje puede llevar: el **título del hilo**, el **proyecto**, el **id del entorno**
-> (`my-vps`), el **estado** (necesita tu atención, falló, terminó) y el texto de la actividad ("Approve command?").
+> (`vps-env`), el **estado** (necesita tu atención, falló, terminó) y el texto de la actividad ("Approve command?").
 > Los servicios que los reciben (ntfy.sh público, Discord, Slack…) pueden guardarlos y los ve quien tenga acceso a
 > ese tema o canal.
 >

@@ -5,10 +5,10 @@ What lives where. Rules for agents are in `../AGENTS.md`.
 | path | what |
 |---|---|
 | `CHANGELOG-dev.md` | One RELOAD/RESTART line per structural commit on `main`. Taller reads it at this exact path; do not move it. |
-| `dev.md` | How to build and iterate on the mod (Gradle only on the render PC). |
-| `api.md` | Map of the mod's public classes. |
+| `dev.md` | How to build and iterate on the mod (Gradle only on the PC, never on the VPS), the UI dev loop, hot-swap, code conventions. |
+| `api.md` | Map of the mod's public classes (direct client, NPCs, operate, UI kit, piece browser, map generators). Bridge-only parts are marked legacy. |
 | `features/` | One doc per feature or fix (`<name>.md`, fixes as `fix-<name>.md`). New features add a file here. |
-| `plans/` | Technical plans (`plan.md`, `plan-v2.md`) and design proposals. |
+| `plans/` | Technical plans (`plan-v2.md` is current: direct mode; `plan.md` is the original bridge plan, historical), the cleanup plan and the UI plan and design proposals. |
 | `../bridge/README.md` | The bridge and `protocol/` are legacy and frozen (D2, #7): what it is, what replaces it (direct mode), what changes are allowed. |
 | `tools/` | Render tooling: hq-render, ui-render, icon pipeline (`tools/icons.md`), render service (PC daemon + relay), Citadel Studio, catalog gallery. |
 | `research/` | Research notes (HQ layouts, styles, AgentCraft elements, compat). The render PNGs were removed from the tree; they are in the tag `archive/research-renders-2026-11-09`. |

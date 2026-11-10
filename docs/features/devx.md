@@ -28,14 +28,13 @@ Branch `feat/devx`, based on `main` at `fc38fd2`. Scope: build/tooling and `dev.
    `./gradlew runClientGameTest` runs it. The smoke test checks: entrypoint ran, a throwing tick
    module is contained and disabled after 3 failures while the game keeps ticking, a manual reset
    with a world loaded retries it once, no false redefinition.
-4. **`docs/dev.md`**: how to iterate (commands, CI, GameTests, hot-swap with JBR, how a module
+4. **`docs/dev.md`**: how to iterate (commands, GameTests, hot-swap with JBR, how a module
    subscribes, rules for hot-swap-friendly state).
 5. Tooling: `runClient -Pt3craft.hotswap` adds `-XX:+AllowEnhancedClassRedefinition` and
    `-Dt3craft.devreload=true` (JBR only, hence opt-in). `.gitignore`: `mod/logs/`.
 
 Verified: `./gradlew build` in `mod/` green (JUnit: 16 new tests, plus the existing ones). The client
-GameTests compile but were **not run** (they boot Minecraft; not allowed on the VPS). First real run
-will be the CI job.
+GameTests compile but were **not run** (they boot Minecraft; not allowed on the VPS). The first real run happens on the PC, by the coordinator.
 
 ## Integration points (for the owners of each module; not done here)
 
@@ -70,8 +69,8 @@ up by name), not a compile error; update the list when convenient.
 
 ## Pending
 
-- First CI run (needs the branch pushed and Actions enabled on the repo); then decide whether the
-  GameTest job becomes blocking.
+- First run of the GameTests on the PC (there is no hosted CI: GitHub Actions is off for this repo and
+  stays off); then decide whether they become part of the coordinator's pre-merge check.
 - Owners to subscribe `NpcRegistry` and guard `T3CraftClient`'s tick (snippet above).
 - Bridge (`bridge/`): legacy and frozen (`bridge/README.md`); no CI or new tooling is planned for it.
 - Possibly a GameTest that spawns fake NPCs through `NpcRegistry.replaceAll` and asserts a reset

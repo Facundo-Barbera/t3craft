@@ -1,6 +1,6 @@
 # Citadel Studio
 
-> **Fixed rule (2026-11-09, AGENTS.md rule 8):** Citadel Studio never runs on the VPS again. The render server and the viewer live on Facundo's PC (my-pc). The VPS instructions below are historical.
+> **Fixed rule (2026-11-09, AGENTS.md rule 8):** Citadel Studio never runs on the VPS again. The render server and the viewer live on Facundo's PC (<pc>). The VPS instructions below are historical.
 
 A small web page for watching and steering the citadel design swarm (the agents polishing the
 `hybrid-ringcampus` HQ layout). Facundo opens it on his Mac or phone over Tailscale. With it he can:
@@ -17,7 +17,7 @@ It does no image processing: the PNGs of the render service are served as they a
 ## For the coordinator: start / stop
 
 ```bash
-tools/studio/start.sh                       # background, nice -n 10, on http://100.64.0.30:8765/
+tools/studio/start.sh                       # background, nice -n 10, on http://<tailscale-ip>:8765/
 tools/studio/start.sh --host 100.x.y.z --port 8765
 tools/studio/start.sh --status
 tools/studio/start.sh --stop
@@ -52,7 +52,7 @@ Briefs are served only if they are `.md` files under `~/.cache/t3craft-coord/`.
 
 ## Using it
 
-URL: **http://100.64.0.30:8765/** (Tailscale).
+URL: **http://<tailscale-ip>:8765/** (Tailscale).
 
 - **Tablero** (`/`): one card per agent, showing:
   - the state of its last job, the number of jobs and images, and how long ago;
