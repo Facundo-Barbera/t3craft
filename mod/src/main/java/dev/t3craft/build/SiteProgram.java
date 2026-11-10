@@ -39,14 +39,34 @@ import org.jspecify.annotations.Nullable;
  * {@link #MARGIN} blocks around), not with the box.
  *
  * <p><b>Bays</b> (tramos) cut a site's columns into tiles of {@link #BAY} × {@link #BAY} blocks (tiles under
- * {@link #BAY_MIN} columns join a neighbour): the piece one builder raises. <b>Storeys</b> (plantas) cut its height
- * into lifts of {@code build.siteStorey} blocks from its lowest builder entry.
+ * {@link #BAY_MIN} columns join a neighbour): the piece one builder raises. The free ground within {@link #APRON}
+ * blocks of a footprint joins the site's bays too (for its ground wave only), so a finished building never stands
+ * over the void.
  *
- * <p><b>The program of a site</b> ({@link #compile}) is a list of <i>waves</i>, each a list of <i>tasks</i> (one bay's
- * entries, bottom-up, solids before decoration). A wave is one storey; the next starts only when the whole wave is
- * done, so the site rises as one. Inside a wave the bays are ordered by distance from the <b>access</b>: the
- * column of the site nearest the player when the site opened, frozen from then on. Walking inside the site changes
- * nothing.
+ * <p><b>Storeys</b> (plantas) are the building's real floors where it has them: a height where at least
+ * {@link #FLOOR_SHARE} of the site's builder columns (and {@link #FLOOR_MIN} cells) hold a walkable floor cell
+ * ({@link WalkLevels}: two passable cells over it, inside a 2 × 2 of walkable cells) starts a storey. Where floors are
+ * further apart than a lift and a bit (towers, tall halls, roofs), or there are none, the height is cut into lifts of
+ * {@code build.siteStorey} blocks.
+ *
+ * <p><b>Stages</b> order a storey as a building site does: {@link #SLAB} (the floor layer of a real storey),
+ * {@link #STRUCTURE} (opaque solids: walls, columns, roofs), {@link #ENCLOSURE} (glass, panes, fences, doors) and
+ * {@link #FINISH} (what has no collision or gives light: torches, lanterns, carpets of flowers).
+ *
+ * <p><b>The program of a site</b> ({@link #compile}) is a list of <i>waves</i>, each a list of <i>tasks</i> (the
+ * entries of one bay). The next wave starts only when the whole wave is done, so the site rises as one. A wave is
+ * one <i>round</i> of one stage of one storey, and <b>support is resolved here, not while building</b>: an entry
+ * goes into a round only if what holds it (the cell below; else a side cell; for decoration also the cell above;
+ * falling blocks only the cell below) is ground, or was placed in an earlier wave, or earlier in the same task. So
+ * the tasks of a wave never depend on each other and nothing a builder places floats. What finds no support in
+ * its stage waits for the storey's {@link #LATE} rounds (a lintel over a window, a roof spanning bays), then for the
+ * next storey's (a lantern hanging from the floor above); what never finds any (a truly floating piece, or one that
+ * leans on a part of the details) is the site's <b>finishing pass</b> ({@link #REMATE}), placed last, bay by bay.
+ * Inside a wave the bays are ordered by distance from the <b>access</b>: the column of the site nearest the player
+ * when the site opened, frozen from then on. Walking inside the site changes nothing.
+ *
+ * <p>Other sites are taken as standing when support is looked up (a wall that leans on the building next door is
+ * not held back); the details are not.
  */
 final class SiteProgram {
 	/** Side of a bay tile, blocks: a builder standing by its middle reaches all of it ({@link SiteCursor#REACH}). */
@@ -65,6 +85,27 @@ final class SiteProgram {
 
 	/** Most storeys of a site (what is higher belongs to the last one). */
 	static final int MAX_STOREYS = 128;
+	/** Free ground this near a footprint (blocks, each axis) is laid with that site's ground wave. */
+	static final int APRON = 3;
+	/** A height is a real floor of a site when this share (1 / n) of its builder columns hold a floor cell there... */
+	static final int FLOOR_SHARE = 6;
+	/** ...and at least this many cells do. */
+	static final int FLOOR_MIN = 12;
+	/** Real floors nearer than this to the one below do not start a storey. */
+	static final int STOREY_MIN = 3;
+	/** Rounds of one stage of one storey at most; what is left waits for the late rounds. */
+	static final int MAX_ROUNDS = 6;
+	/** Passes over one bay inside a round (side chains inside the bay). */
+	static final int MAX_PASSES = 4;
+
+	/** Stages of a storey, in order; {@link #LATE} and {@link #REMATE} exist only in a compiled program. */
+	static final int SLAB = 0;
+	static final int STRUCTURE = 1;
+	static final int ENCLOSURE = 2;
+	static final int FINISH = 3;
+	static final int LATE = 4;
+	static final int REMATE = 5;
+	static final String[] STAGE_NAMES = {"slab", "structure", "enclosure", "finishes", "late", "finishing"};
 
 	/** Entry kinds. */
 	static final byte FILL = 0;
@@ -147,9 +188,20 @@ final class SiteProgram {
 	// ---- storeys and the entries of each site -------------------------------------------------
 	/** Base height of every storey of site {@code s}, ascending. */
 	final int[][] storeyY;
+	/** Whether storey {@code k} of site {@code s} starts at a real floor of the building (else it is a fixed lift). */
+	final boolean[][] storeyReal;
 	/** Storey of each {@link #BUILD} entry inside its site; 0 for the others. */
 	final int[] storeyOf;
-	/** Builder entries of site {@code s}, by storey, bay, height, solids before decoration: {@code siteEnts[siteEntStart[s] … siteEntStart[s + 1])}. */
+	/** Stage of each {@link #BUILD} entry ({@link #SLAB} … {@link #FINISH}); 0 for the others. */
+	final byte[] stageOf;
+	/** Free-ground column that joined a site's bays as its apron (never part of a footprint). */
+	final boolean[] apronCol;
+	/** Bounds of the plan's columns. */
+	final int loX;
+	final int hiX;
+	final int loZ;
+	final int hiZ;
+	/** Builder entries of site {@code s}, by storey, stage, bay, height: {@code siteEnts[siteEntStart[s] … siteEntStart[s + 1])}. */
 	final int[] siteEntStart;
 	final int[] siteEnts;
 	/** Position of each {@link #BUILD} entry inside its site's slice of {@link #siteEnts}; -1 for the others. */
@@ -163,10 +215,13 @@ final class SiteProgram {
 	 * @param bayOrder   the site's bays, nearest the access first: the order of its ground wave
 	 * @param waveStart  tasks of wave {@code w}: {@code waveStart[w] … waveStart[w + 1]}
 	 * @param waveStorey storey of each wave
+	 * @param waveStage  stage of each wave ({@link #SLAB} … {@link #REMATE})
+	 * @param remateWave the first wave of the finishing pass ({@code waves()} when there is none)
 	 * @param taskStart  entries of task {@code t}: {@code entries[taskStart[t] … taskStart[t + 1])}
 	 * @param taskBay    bay of each task
 	 */
-	record Program(int site, int accessX, int accessZ, int[] bayOrder, int[] waveStart, int[] waveStorey, int[] taskStart, int[] taskBay, int[] entries) {
+	record Program(int site, int accessX, int accessZ, int[] bayOrder, int[] waveStart, int[] waveStorey, int[] waveStage, int remateWave, int[] taskStart,
+			int[] taskBay, int[] entries) {
 		int waves() {
 			return waveStorey.length;
 		}
@@ -207,6 +262,7 @@ final class SiteProgram {
 		boolean[] stand = new boolean[n];
 		boolean[] pass = new boolean[n];
 		boolean[] full = new boolean[n];
+		boolean[] finish = new boolean[n];
 		for (int i = 0; i < n; i++) {
 			Placement pl = plan.get(i);
 			x[i] = pl.pos().getX();
@@ -218,6 +274,8 @@ final class SiteProgram {
 			stand[i] = !air[i] && shapes.standable(pl.state());
 			pass[i] = shapes.passable(pl.state());
 			full[i] = stand[i] && shapes.full(pl.state());
+			// finishes: what a body walks through, or what gives light (torches, lanterns, flowers, signs)
+			finish[i] = decor[i] && (!stand[i] || pl.state().getLightEmission() > 0);
 			cellAt.put(CrewPlanner.key(x[i], y[i], z[i]), i); // a later entry at the same cell wins (as in plan order)
 			long ck = CrewPlanner.key(x[i], 0, z[i]);
 			int c = colAt.get(ck);
@@ -241,6 +299,10 @@ final class SiteProgram {
 			maxZ = Math.max(maxZ, z[i]);
 		}
 		cols = nc;
+		loX = n == 0 ? 0 : minX;
+		hiX = n == 0 ? 0 : maxX;
+		loZ = n == 0 ? 0 : minZ;
+		hiZ = n == 0 ? 0 : maxZ;
 		colX = Arrays.copyOf(cxs, nc);
 		colZ = Arrays.copyOf(czs, nc);
 		colStart = new int[nc + 1];
@@ -539,11 +601,40 @@ final class SiteProgram {
 			}
 		}
 
+		// the apron: free ground within APRON blocks of a footprint is laid with that site's ground wave (a breadth-first
+		// spread from the footprints, so a column goes to the nearest one)
+		apronCol = new boolean[nc];
+		int[] reach = footSite.clone();
+		IntArrayList frontier = new IntArrayList();
+		for (int c = 0; c < nc; c++) {
+			if (footSite[c] >= 0) {
+				frontier.add(c);
+			}
+		}
+		for (int d = 0; d < APRON && !frontier.isEmpty(); d++) {
+			IntArrayList next = new IntArrayList();
+			for (int q = 0; q < frontier.size(); q++) {
+				int c = frontier.getInt(q);
+				for (int dx = -1; dx <= 1; dx++) {
+					for (int dz = -1; dz <= 1; dz++) {
+						int nb = dx == 0 && dz == 0 ? -1 : colAt.get(CrewPlanner.key(colX[c] + dx, 0, colZ[c] + dz));
+						if (nb < 0 || reach[nb] >= 0 || colStack[nb] <= colFill[nb] && airStart[nb + 1] == airStart[nb]) {
+							continue; // no column, taken, or nothing there for a stream
+						}
+						reach[nb] = reach[c];
+						apronCol[nb] = true;
+						next.add(nb);
+					}
+				}
+			}
+			frontier = next;
+		}
+
 		// ---- bays: every (site, column) pair, tiled per site --------------------------------------
 		LongArrayList pairList = new LongArrayList();
 		for (int c = 0; c < nc; c++) {
-			if (footSite[c] >= 0) {
-				pairList.add(((long) footSite[c] << 32) | c);
+			if (footSite[c] >= 0 || apronCol[c]) {
+				pairList.add(((long) reach[c] << 32) | c);
 			}
 			int last = footSite[c];
 			for (int k = colStart[c]; k < colStart[c + 1]; k++) {
@@ -621,22 +712,64 @@ final class SiteProgram {
 			}
 		}
 
-		// ---- storeys, and the builder entries of each site in program order -----------------------
+		// ---- storeys: real floors where the site has them, fixed lifts elsewhere --------------------
+		int[] buildCols = new int[sites];
+		for (int c = 0; c < nc; c++) {
+			int last = -1;
+			for (int k = colStart[c]; k < colStart[c + 1]; k++) {
+				int i = colEntries[k];
+				if (kind[i] == BUILD && siteOf[i] != last) {
+					last = siteOf[i];
+					buildCols[last]++;
+				}
+			}
+		}
+		int[][] hist = new int[sites][];
+		for (int s = 0; s < sites; s++) {
+			hist[s] = siteTotal[s] == 0 || s == details ? new int[0] : new int[siteBox[s][5] - siteBox[s][4] + 1];
+		}
+		for (int i = 0; i < n; i++) {
+			if (kind[i] == BUILD && siteOf[i] != details && walk[i] && floor(walk, i)) {
+				hist[siteOf[i]][y[i] - siteBox[siteOf[i]][4]]++;
+			}
+		}
 		storeyY = new int[sites][];
+		storeyReal = new boolean[sites][];
 		for (int s = 0; s < sites; s++) {
 			int lo = siteBox[s][4];
 			int hi = siteBox[s][5];
 			if (siteTotal[s] == 0 || s == details) {
 				storeyY[s] = new int[] {siteTotal[s] == 0 ? 0 : lo}; // the details are one pass, bay by bay
+				storeyReal[s] = new boolean[1];
 				continue;
 			}
-			int count = Math.min(MAX_STOREYS, (hi - lo) / lift + 1);
-			storeyY[s] = new int[count];
-			for (int k = 0; k < count; k++) {
-				storeyY[s][k] = lo + k * lift;
+			int need = Math.max(FLOOR_MIN, buildCols[s] / FLOOR_SHARE);
+			IntArrayList bases = new IntArrayList();
+			BooleanArrayList real = new BooleanArrayList();
+			bases.add(lo);
+			real.add(hist[s][0] >= need);
+			int lastBase = lo;
+			for (int yy = lo + 1; yy <= hi + 1 && bases.size() < MAX_STOREYS; yy++) {
+				boolean floorHere = yy <= hi && hist[s][yy - lo] >= need && yy - lastBase >= STOREY_MIN;
+				if (!floorHere && yy <= hi) {
+					continue;
+				}
+				// lifts between the base below and this floor (or the top), while at least a small storey is left over them
+				for (int cut = lastBase + lift; yy - cut >= STOREY_MIN && bases.size() < MAX_STOREYS; cut += lift) {
+					bases.add(cut);
+					real.add(false);
+				}
+				if (floorHere && bases.size() < MAX_STOREYS) {
+					bases.add(yy);
+					real.add(true);
+					lastBase = yy;
+				}
 			}
+			storeyY[s] = bases.toIntArray();
+			storeyReal[s] = real.toBooleanArray();
 		}
 		storeyOf = new int[n];
+		stageOf = new byte[n];
 		siteEntStart = new int[sites + 1];
 		for (int s = 0; s < sites; s++) {
 			siteEntStart[s + 1] = siteEntStart[s] + siteTotal[s];
@@ -656,16 +789,18 @@ final class SiteProgram {
 			int s = siteOf[i];
 			int st = storeyIndex(storeyY[s], y[i]);
 			storeyOf[i] = st;
+			int stage = finish[i] ? FINISH : decor[i] ? ENCLOSURE : storeyReal[s][st] && y[i] == storeyY[s][st] ? SLAB : STRUCTURE;
+			stageOf[i] = (byte) stage;
 			long bayLocal = bayOf[i] - siteBayStart[s];
-			// storey (7 bits) | bay inside the site (18) | height (12) | decoration last (1) | plan index (25)
-			keys[s][filled[s]++] = ((long) (st & 0x7F) << 56) | ((bayLocal & 0x3FFFF) << 38) | ((long) ((y[i] + 2048) & 0xFFF) << 26) | ((decor[i] ? 1L : 0L) << 25)
-					| (i & 0x1FFFFFF);
+			// storey (7 bits) | stage (3) | bay inside the site (17) | height (12) | plan index (24)
+			keys[s][filled[s]++] = ((long) (st & 0x7F) << 56) | ((long) stage << 53) | ((bayLocal & 0x1FFFF) << 36) | ((long) ((y[i] + 2048) & 0xFFF) << 24)
+					| (i & 0xFFFFFF);
 		}
 		for (int s = 0; s < sites; s++) {
 			Arrays.sort(keys[s]);
 			int a = siteEntStart[s];
 			for (int k = 0; k < keys[s].length; k++) {
-				int i = (int) (keys[s][k] & 0x1FFFFFF);
+				int i = (int) (keys[s][k] & 0xFFFFFF);
 				siteEnts[a + k] = i;
 				localOf[i] = k;
 			}
@@ -871,9 +1006,10 @@ final class SiteProgram {
 	// ---- queries (any thread: the data never changes) -----------------------------------------
 
 	/**
-	 * The site the point is in: a column of its footprint within {@link #MARGIN} blocks (each axis), and the height
-	 * between {@link #Y_BELOW} under and {@link #Y_ABOVE} over its builder entries ({@code py} NaN = no height test).
-	 * The nearest footprint wins, then the smaller one (a room before the hall around it); -1 = none.
+	 * The site the point is in: a column of its footprint, or one it builds in, within {@link #MARGIN} blocks (each
+	 * axis), and the height between {@link #Y_BELOW} under and {@link #Y_ABOVE} over its builder entries ({@code py}
+	 * NaN = no height test). The nearest column wins, then the smaller footprint (a room before the hall around it);
+	 * -1 = none. The apron and the details never count.
 	 */
 	int siteAt(double px, double pz, double py) {
 		int bx = (int) Math.floor(px);
@@ -883,21 +1019,21 @@ final class SiteProgram {
 		for (int dx = -MARGIN; dx <= MARGIN; dx++) {
 			for (int dz = -MARGIN; dz <= MARGIN; dz++) {
 				int c = colAt.get(CrewPlanner.key(bx + dx, 0, bz + dz));
-				if (c < 0) {
-					continue;
-				}
-				int s = footSite[c];
-				if (s < 0) {
-					continue;
-				}
-				int[] sb = siteBox[s];
-				if (!Double.isNaN(py) && sb[4] <= sb[5] && (py < sb[4] - Y_BELOW || py > sb[5] + Y_ABOVE)) {
+				if (c < 0 || apronCol[c]) {
 					continue;
 				}
 				int d = Math.max(Math.abs(dx), Math.abs(dz));
-				if (d < bestD || d == bestD && best >= 0 && siteCols[s] < siteCols[best]) {
-					best = s;
-					bestD = d;
+				// every site with something in this column (stacked sites: a basement under a hall), told apart by height
+				for (int q = colBayStart[c]; q < colBayStart[c + 1]; q++) {
+					int s = baySite[colBays[q]];
+					int[] sb = siteBox[s];
+					if (s == details || !Double.isNaN(py) && sb[4] <= sb[5] && (py < sb[4] - Y_BELOW || py > sb[5] + Y_ABOVE)) {
+						continue;
+					}
+					if (d < bestD || d == bestD && best >= 0 && siteCols[s] < siteCols[best]) {
+						best = s;
+						bestD = d;
+					}
 				}
 			}
 		}
@@ -917,9 +1053,10 @@ final class SiteProgram {
 
 	/**
 	 * The order inside site {@code s} for a crew that arrives from {@code (px, pz)}: pure, off-thread. The access is
-	 * the column of the site nearest that point; the bays are ordered by distance from it; every storey is one wave,
-	 * one task per bay. Entries already placed ({@code doneLocal}, indexed like the site's slice of {@link #siteEnts};
-	 * null = none) are left out.
+	 * the column of the site nearest that point; the bays are ordered by distance from it; every storey goes stage
+	 * by stage, every stage in rounds that only hold entries with support (see the class comment). Entries already
+	 * placed ({@code doneLocal}, indexed like the site's slice of {@link #siteEnts}; null = none) are left out and
+	 * count as support.
 	 */
 	Program compile(int s, double px, double pz, boolean @Nullable [] doneLocal) {
 		int b0 = siteBayStart[s];
@@ -929,6 +1066,9 @@ final class SiteProgram {
 		for (int b = b0; b < b0 + nb; b++) {
 			for (int k = bayColStart[b]; k < bayColStart[b + 1]; k++) {
 				int c = bayCols[k];
+				if (apronCol[c]) {
+					continue; // the access is a column of the site itself
+				}
 				double dx = colX[c] + 0.5 - px;
 				double dz = colZ[c] + 0.5 - pz;
 				double d = dx * dx + dz * dz;
@@ -950,58 +1090,194 @@ final class SiteProgram {
 		}
 		Arrays.sort(byDist);
 		int[] bayOrder = new int[nb];
+		int[] rank = new int[nb];
 		for (int j = 0; j < nb; j++) {
 			bayOrder[j] = b0 + (int) byDist[j];
+			rank[(int) byDist[j]] = j;
 		}
 		int a = siteEntStart[s];
 		int e = siteEntStart[s + 1];
-		IntArrayList waveStart = new IntArrayList();
-		IntArrayList waveStorey = new IntArrayList();
-		IntArrayList taskStart = new IntArrayList();
-		IntArrayList taskBay = new IntArrayList();
-		IntArrayList entries = new IntArrayList(e - a);
-		int[] runFrom = new int[nb];
-		int[] runTo = new int[nb];
+		boolean[] sim = new boolean[e - a];
+		if (doneLocal != null) {
+			System.arraycopy(doneLocal, 0, sim, 0, Math.min(sim.length, doneLocal.length));
+		}
+		Compiler cmp = new Compiler(s, rank, sim);
+		IntArrayList late = new IntArrayList();
+		int lastStorey = 0;
 		int k = a;
 		while (k < e) {
-			// one storey: its entries are contiguous in siteEnts, bay by bay
-			int storey = storeyOf[siteEnts[k]];
-			Arrays.fill(runFrom, -1);
-			int end = k;
-			while (end < e && storeyOf[siteEnts[end]] == storey) {
-				int j = bayOf[siteEnts[end]] - b0;
-				if (runFrom[j] < 0) {
-					runFrom[j] = end;
+			// one storey: its entries are contiguous in siteEnts, stage by stage
+			int st = storeyOf[siteEnts[k]];
+			for (int stage = SLAB; stage <= FINISH; stage++) {
+				IntArrayList cand = new IntArrayList();
+				while (k < e && storeyOf[siteEnts[k]] == st && stageOf[siteEnts[k]] == stage) {
+					if (!sim[k - a]) {
+						cand.add(k - a);
+					}
+					k++;
 				}
-				runTo[j] = end + 1;
-				end++;
-			}
-			int tasksBefore = taskBay.size();
-			for (int j = 0; j < nb; j++) {
-				int bj = bayOrder[j] - b0;
-				if (runFrom[bj] < 0) {
-					continue;
-				}
-				int before = entries.size();
-				for (int q = runFrom[bj]; q < runTo[bj]; q++) {
-					if (doneLocal == null || !doneLocal[q - a]) {
-						entries.add(siteEnts[q]);
+				if (!cand.isEmpty()) {
+					IntArrayList left = cmp.rounds(cand, st, stage, false);
+					for (int q = 0; q < left.size(); q++) {
+						late.add(left.getInt(q));
 					}
 				}
-				if (entries.size() > before) {
-					taskStart.add(before);
-					taskBay.add(bayOrder[j]);
-				}
 			}
-			if (taskBay.size() > tasksBefore) {
+			if (!late.isEmpty()) {
+				late = cmp.rounds(late, st, LATE, false); // what is still left waits for the next storey's late rounds
+			}
+			lastStorey = st;
+		}
+		int remateWave = cmp.waveStorey.size();
+		if (!late.isEmpty()) {
+			cmp.rounds(late, lastStorey, REMATE, true); // the finishing pass: placed whatever holds it
+		}
+		cmp.waveStart.add(cmp.taskBay.size());
+		cmp.taskStart.add(cmp.entries.size());
+		return new Program(s, ax, az, bayOrder, cmp.waveStart.toIntArray(), cmp.waveStorey.toIntArray(), cmp.waveStage.toIntArray(), remateWave,
+				cmp.taskStart.toIntArray(), cmp.taskBay.toIntArray(), cmp.entries.toIntArray());
+	}
+
+	/** The working state of one {@link #compile}: what is placed in the simulation, and the waves and tasks so far. */
+	private final class Compiler {
+		final int site;
+		final int bay0;
+		final int ent0;
+		/** Wave rank of each bay of the site (by distance from the access). */
+		final int[] rank;
+		/** Site-local: the entry is placed (before the compile, or in a wave already closed). */
+		final boolean[] sim;
+		/** Site-local: the task that took the entry (ids from 1), to find support inside the task being filled. */
+		final int[] stamp;
+		int task;
+		final IntArrayList waveStart = new IntArrayList();
+		final IntArrayList waveStorey = new IntArrayList();
+		final IntArrayList waveStage = new IntArrayList();
+		final IntArrayList taskStart = new IntArrayList();
+		final IntArrayList taskBay = new IntArrayList();
+		final IntArrayList entries = new IntArrayList();
+
+		Compiler(int site, int[] rank, boolean[] sim) {
+			this.site = site;
+			this.bay0 = siteBayStart[site];
+			this.ent0 = siteEntStart[site];
+			this.rank = rank;
+			this.sim = sim;
+			this.stamp = new int[sim.length];
+		}
+
+		/** The site-local entries {@code locals} ordered by the wave rank of their bay, keeping their order inside a bay. */
+		int[] byBay(IntArrayList locals) {
+			long[] keys = new long[locals.size()];
+			for (int q = 0; q < keys.length; q++) {
+				keys[q] = ((long) rank[bayOf[siteEnts[ent0 + locals.getInt(q)]] - bay0] << 32) | q;
+			}
+			Arrays.sort(keys);
+			int[] out = new int[keys.length];
+			for (int q = 0; q < out.length; q++) {
+				out[q] = locals.getInt((int) keys[q]);
+			}
+			return out;
+		}
+
+		/** Whether the cell holds something that supports a neighbour now: ground, another site's block, or one of this site placed already (or in this task). */
+		boolean solid(int bx, int by, int bz) {
+			int j = cellAt.get(CrewPlanner.key(bx, by, bz));
+			if (j < 0 || air[j]) {
+				return false;
+			}
+			if (kind[j] != BUILD) {
+				return true; // ground and fill: a bay waits for its ground before its builders start
+			}
+			int sj = siteOf[j];
+			if (sj != site) {
+				return sj != details; // other sites are taken as standing; the details come last
+			}
+			int l = localOf[j];
+			return sim[l] || stamp[l] == task;
+		}
+
+		/** The support rule of {@link RadialCursor}, on the simulated state. */
+		boolean supported(int i) {
+			if (colEntries[colStart[colOf[i]]] == i) {
+				return true; // the lowest entry of its column rests on the world
+			}
+			if (solid(x[i], y[i] - 1, z[i])) {
+				return true;
+			}
+			if (falling[i]) {
+				return false;
+			}
+			if (solid(x[i] + 1, y[i], z[i]) || solid(x[i] - 1, y[i], z[i]) || solid(x[i], y[i], z[i] + 1) || solid(x[i], y[i], z[i] - 1)) {
+				return true;
+			}
+			return decor[i] && solid(x[i], y[i] + 1, z[i]);
+		}
+
+		/**
+		 * Schedules {@code cand} (site-local entries of one storey and stage) in rounds: each round is a wave with one
+		 * task per bay, holding the entries supported by what earlier waves placed or by the task itself;
+		 * {@code force} takes everything in one round. Returns what found no support.
+		 */
+		IntArrayList rounds(IntArrayList cand, int storey, int stage, boolean force) {
+			int[] cur = byBay(cand);
+			int size = cur.length;
+			for (int round = 0; round < MAX_ROUNDS && size > 0; round++) {
+				int tasksBefore = taskBay.size();
+				int entriesBefore = entries.size();
+				int keep = 0;
+				int pos = 0;
+				while (pos < size) {
+					int bay = bayOf[siteEnts[ent0 + cur[pos]]];
+					int end = pos;
+					while (end < size && bayOf[siteEnts[ent0 + cur[end]]] == bay) {
+						end++;
+					}
+					task++;
+					int start = entries.size();
+					boolean grew = true;
+					for (int pass = 0; pass < MAX_PASSES && grew; pass++) {
+						grew = false;
+						for (int q = pos; q < end; q++) {
+							int l = cur[q];
+							if (stamp[l] == task) {
+								continue;
+							}
+							int i = siteEnts[ent0 + l];
+							if (force || supported(i)) {
+								stamp[l] = task;
+								entries.add(i);
+								grew = true;
+							}
+						}
+					}
+					if (entries.size() > start) {
+						taskStart.add(start);
+						taskBay.add(bay);
+					}
+					for (int q = pos; q < end; q++) {
+						if (stamp[cur[q]] != task) {
+							cur[keep++] = cur[q]; // left for the next round (keep never passes q)
+						}
+					}
+					pos = end;
+				}
+				if (taskBay.size() == tasksBefore) {
+					break; // nothing found support this round: more rounds would not either
+				}
+				for (int q = entriesBefore; q < entries.size(); q++) {
+					sim[localOf[entries.getInt(q)]] = true;
+				}
 				waveStart.add(tasksBefore);
 				waveStorey.add(storey);
+				waveStage.add(stage);
+				size = keep;
 			}
-			k = end;
+			IntArrayList left = new IntArrayList(size);
+			for (int q = 0; q < size; q++) {
+				left.add(cur[q]);
+			}
+			return left;
 		}
-		waveStart.add(taskBay.size());
-		taskStart.add(entries.size());
-		return new Program(s, ax, az, bayOrder, waveStart.toIntArray(), waveStorey.toIntArray(), taskStart.toIntArray(), taskBay.toIntArray(),
-				entries.toIntArray());
 	}
 }

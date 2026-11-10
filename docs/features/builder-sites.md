@@ -33,7 +33,7 @@ Facundo plays. See "Compile risks" at the end.
 | phase of the plan | state |
 |---|---|
 | 1. Dispatch, one open site, front anchored at the access, storeys over the whole site | **done** |
-| 2. Compiled program: real floors, stages, support resolved at compile time, finishing pass; the site's ground as its own wave | not yet |
+| 2. Compiled program: real floors, stages, support resolved at compile time, finishing pass; the site's ground as its own wave | **done** |
 | 3. Several open sites, a rear guard, crews by proximity, 70 / 30 pace | not yet |
 | 4. Methods per kind of site (bridge, island, gardening), trades with skins, site signs | not planned here |
 
@@ -87,12 +87,46 @@ one that still has work.
 
 ### Inside the site
 
-- A **storey** is 5 blocks (`build.siteStorey`) from the site's lowest builder entry.
-- A storey is one **wave**: one task per bay, bottom-up inside the bay, solids before decoration.
-- Builders take tasks of the current wave only, the first free one in wave order. The next storey starts when
-  every bay of this one is done. So the whole site rises one storey at a time.
-- Walking inside the site changes nothing: nothing is re-ordered when the player moves.
-- A task waits until the ground of its bay is laid.
+**Storeys.** A storey starts at a real floor of the building: a height where at least a sixth of the site's builder
+columns (and 12 cells) hold a walkable floor cell (two passable cells over it, inside a 2 × 2 of walkable cells).
+Floors closer than 3 blocks to the one below do not count. Where floors are further apart than a lift and a bit
+(towers, tall halls, roofs), or there are none, the height is cut into lifts of 5 blocks (`build.siteStorey`).
+The status line says which kind the current storey is: `(floor)` or `(lift)`.
+
+**Stages.** Inside a storey the work goes in the order of a building site:
+
+| stage | what |
+|---|---|
+| `slab` | the floor layer of a real storey (everything at its base height that is not a finish) |
+| `structure` | opaque solids: walls, columns, roofs, stairs |
+| `enclosure` | not opaque but with a body: glass, panes, fences, doors, leaves |
+| `finishes` | what a body walks through, or what gives light: torches, lanterns, flowers, signs |
+| `late` | what found no support in its own stage (below) |
+
+**Waves.** The program of a site is a list of waves; a wave is one task per bay. Builders take tasks of the current
+wave only, the first free one in wave order from the access. The next wave starts when every bay of this one is
+done. So the whole site lays a slab, raises the structure of that storey, closes it, finishes it, and only then
+starts the next storey.
+
+**Support is resolved when the program is compiled, not while building.** An entry goes into a wave only if what
+holds it (the cell below; else a side cell; for decoration also the cell above; falling blocks only the cell below)
+is ground, or was placed in an earlier wave, or earlier in the same task. A stage is therefore several waves
+("rounds"): a flat roof is the ring next to the walls first, then the next bays inwards. Consequences:
+
+- the tasks of one wave never depend on each other, so builders never wait for a neighbour and nothing they place
+  floats;
+- there are no stalled columns and no wake-ups at run time;
+- what finds no support in its stage (a lintel over a window, a roof spanning several bays) goes to the storey's
+  `late` rounds; what still finds none waits for the next storey's `late` rounds (a lantern hanging from the floor
+  above);
+- what never finds any (a truly floating piece, or one that leans on a part of the details pass) is the site's
+  **finishing pass**, its last wave (`finishing` in the status), placed bay by bay whatever holds it.
+
+Other sites are taken as standing when support is looked up, so a wall that leans on the building next door is not
+held back; if that building is not there yet, the wall stands alone for a while.
+
+**What does not change it.** Walking inside the site: nothing is re-ordered when the player moves. A task waits
+until the ground of its bay is laid.
 
 ### Walking to another building
 
@@ -107,9 +141,10 @@ All by streams, no builders:
 |---|---|
 | corridor | the floor under the player and ahead of it while it walks. Same settings as the radial build. |
 | carpet | the floor within `build.radiusMin + build.radiusStep` (9) blocks of the player, nearest first |
-| site wave | ground and clearing of the open site's bays, in wave order from the access |
+| trail | a strip 3 wide from the carpet's edge to the access of the nearest open site, up to 48 blocks, while the player is outside that site |
+| site wave | ground and clearing of the open site's bays, in wave order from the access; it includes the **apron**: the free ground within 3 blocks of the site's footprint, so a finished building does not stand over the void |
 | fill | the hidden terrain under a column whose ground is laid |
-| last sweep | once every site is done, whatever is left of the plan, column by column |
+| last sweep | once every site is done, whatever is left of the plan: in rings around where the player stood when it started, then once more column by column |
 
 "The floor" is the terrain, or the plan's floor at the player's level when that is not the terrain (the hub's floor
 over a hidden room): the corridor and the carpet lay that floor too, and the site's tasks pass over it.
@@ -131,29 +166,30 @@ What to do in the game, and what should happen:
 
 | do | expect |
 |---|---|
-| stand still in the hub | the crew arrives together at the side you came from; the floor spreads from there; the whole hub rises 5 blocks, then the next 5 |
+| stand still in the hub | the crew arrives together at the side you came from; the floor spreads from there; the slab closes, the walls of that storey go up all around, then glass, then lights, and only then the next storey |
 | walk 10–15 blocks inside the hub | nobody drops what they were doing; the status line does not change site, and `task-switches walk` stays 0 |
 | walk into a module | the hub finishes its storey, `closing` shows in the status, then the module opens with its crew |
 | walk back to the hub | it opens again (it is "started"), from the side you came back by |
-| walk around between buildings | the carpet lays the floor under you; no `standing on air` in the log |
+| walk around between buildings | the carpet lays the floor under you and a trail runs to the open site; no `standing on air` in the log |
+| look at a finished building | it has 3 blocks of ground around it; its last wave was `finishing` |
 
 ## The status line
 
 `/t3craft demo status` prints, after the usual prefix (`…, sites, N part(s), building 37%`):
 
 ```
-sites 3/41 | open hub storey 2/6 wave 2/6 bays-left 9 left 5210/8400 crew 6 | focus hub (player inside)
+sites 3/41 | open hub storey 2/4 (floor) structure wave 7/31 bays-left 9 left 5210/8400 crew 6 | focus hub (player inside)
  | builders 6/12 | off-site 0 storey-spread 0 task-switches walk 0 chunk 0 in-site 100% placed 3190 centre 4,12 level 1
 ```
 
 | field | meaning |
 |---|---|
 | `sites a/b` | sites finished / sites of the plan (the details pass counts as one) |
-| `open <name> …` | the open site: storey and wave it is on, bays of that wave not done, builder entries left / total, crew. `planning`: its program is being compiled. `closing`: the focus moved on, it closes at the end of the storey |
+| `open <name> …` | the open site: storey it is on and whether that storey starts at a real floor or is a fixed lift, stage, wave, bays of that wave not done, builder entries left / total, crew. `planning`: its program is being compiled. `closing`: the focus moved on, it closes at the end of the storey |
 | `focus <name>` | the site the dispatch wants, and whether the player is inside it, in another site, or outside all |
 | `builders a/b` | builders holding a task / builders of the crew |
 | `off-site` | **criterion: 0.** Builder placements in a site that was not open |
-| `storey-spread` | **criterion: at most 1.** Largest difference seen between the storey a builder placed in and the lowest storey of that site with work left |
+| `storey-spread` | **criterion: at most 1.** Largest difference seen between the storey a builder placed in and the lowest storey of that site with work left. The finishing pass is left out. 1 is normal (a piece waiting for the floor above). More than 1 means a piece waited two storeys for its support |
 | `task-switches walk` | **criterion: 0.** Builders taken off a bay that still had entries because the focus changed |
 | `task-switches chunk` | builders that left a bay because its chunk was not loaded (not a fault) |
 | `in-site` | **criterion: near 100 %.** Share of builder placements, while the player was inside a site, that went to that site |
@@ -181,19 +217,22 @@ Reused as they are: `entriesPerBuilder` (one more builder per this many entries 
 `climbBlocksPerTick`, `radialCrewMax` (12 builders on a big plan). `build.fastFoundation`, the ring keys and
 `radialMinBuilders` do nothing with `"sites"`.
 
-Constants in the code: bay 6 blocks, keep radius 32, bucket 8, footprint margin 2, hold 1 s.
+Constants in the code: bay 6 blocks, keep radius 32, bucket 8, footprint margin 2, hold 1 s, apron 3, trail 48 × 3,
+real floor = a sixth of the columns and 12 cells, smallest storey 3, 6 rounds per stage.
 
 ## Not done / open
 
-- **Support.** Phase 1 only orders a bay bottom-up, solids before decoration. A roof block can appear before the
-  one beside it, and a piece hanging from a later storey appears early. Phase 2 resolves support when the program is
-  compiled.
-- **Storeys are fixed lifts**, not the building's floors (phase 2).
+- **Support across sites is optimistic**: another site counts as standing (see above). A site built on top of
+  another site (a hall over a basement of a different group) can go up before what is under it. The citadel has no
+  such pair (a group there is a zone on the map), other layouts may.
+- **Stages are told apart by block properties only** (opaque, collision, light): a lantern is a finish, a slab or a
+  stair is structure, a carpet is enclosure. No list of block types.
+- **Many small waves.** A storey is up to five stages and each can be several rounds. The crew is sized again at
+  every wave, so builders stand idle for a moment on short waves (the last bays of a roof, the lights).
 - **One site at a time.** A building left for another waits with its storey closed until the player is near again.
   The rear guard is phase 3.
-- **The ground between sites** is only the carpet and the corridor until every site is done; then the last sweep
-  lays it in column order, not from the player outwards (phase 2 adds an apron around each site and a trail).
-- **Numbers are first guesses**: storey 5, bay 6, crew 2–6, hold 1 s.
+- **The ground between sites**, beyond the aprons, the carpet, the trail and the corridor, waits for the last sweep.
+- **Numbers are first guesses**: storey 5, bay 6, crew 2–6, hold 1 s, the real-floor threshold, apron 3.
 - The perf timers reuse the radial keys (`step.build.radial*.ns`).
 
 ## Compile risks
