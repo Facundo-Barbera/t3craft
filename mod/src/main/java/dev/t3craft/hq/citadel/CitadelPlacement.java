@@ -301,7 +301,6 @@ public final class CitadelPlacement {
 		if (city.arrows + city.boards > 0) {
 			String line = "[citadel] signposts: " + city.arrows + " arrow posts, " + city.boards + " notice boards" + city.spots;
 			T3Craft.LOGGER.info(line);
-			System.out.println(line); // the render report's log shows it (the logger is silent in the headless tools)
 		}
 	}
 

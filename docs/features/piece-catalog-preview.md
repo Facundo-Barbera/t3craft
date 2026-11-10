@@ -22,6 +22,28 @@ Everything that exists in the code and can be built without a world:
 
 A new variant registered in `CatalogEntries` appears in the catalog by itself (restart); nothing else to register.
 
+### Catalog design rounds integrated (#35)
+
+Nine paused design branches were merged into one (`feat/catalog-rounds-35`). All ten pieces already had their line in `CatalogEntries`
+(so they are in the browser and `piece show` takes their id); the branches only rewrote the piece classes. Size = frontage x depth x height
+(`min` and `max` of `show` are the variant's own range). The `bridge_*` designs stay as catalog pieces; they are not wired to mapgen.
+
+| id | origin branch | size range (W x D x H) | see it in game |
+|---|---|---|---|
+| `bridge_covered_timber` | `cat/bridge-covered-timber` | 11-15 x 11-31 x 11+ | `/t3craft piece show bridge_covered_timber mid` |
+| `bridge_stone_arch` | `cat/bridge-stone-arch` | 5-9 x 17-31 x 10+ | `/t3craft piece show bridge_stone_arch mid` |
+| `gate_arch_battlement` | `cat/gate-arch-battlement2` | 5-21 x 2-8 x 8+ (avenue gatehouse from 11 x 4 x 14) | `/t3craft piece show gate_arch_battlement 13x6x16` |
+| `gate_torii_cherry` | `cat/gate-torii-cherry2` | 7-19 x 2-8 x 8+ | `/t3craft piece show gate_torii_cherry mid` |
+| `lamp_street_brazier_tripod` | `cat/lamp-brazier-tripod2` | 1-7 x 1-7 x 6+ | `/t3craft piece show lamp_street_brazier_tripod 5x5x7` |
+| `planter_tall_pot` | `cat/planter-tall-pot` | 1-11 x 1-5 x 3+ | `/t3craft piece show planter_tall_pot 6x3x6` |
+| `signpost_arrows` | `struct/signposts` | 3-7 x 1-2 x 3+ | `/t3craft piece show signpost_arrows 7x2x8` |
+| `signpost_notice_board` | `struct/signposts` | 5-7 x 2 x 5+ | `/t3craft piece show signpost_notice_board 7x2x8` |
+| `statue_obelisk_braziers` | `cat/statue-obelisk-braziers` | 2-5 x 2-5 x 8+ | `/t3craft piece show statue_obelisk_braziers 5x5x10` |
+| `tree_azalea_blossom` | `cat/tree-azalea-blossom2` | 5-17 x 5-17 x 9+ | `/t3craft piece show tree_azalea_blossom mid` |
+
+Add a front and a seed to look at other variations (`... 11x11x14 e 7`). `struct/signposts` also places the arrow posts (on the cardinal
+avenues of every ring) and the notice boards (in empty lot plazas) in the citadel itself, in `CitadelPlacement`, from scale 1.5.
+
 ## Commands
 
 All client commands, HQ world only (elsewhere they say so and do nothing).
