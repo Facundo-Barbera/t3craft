@@ -130,6 +130,11 @@ Quedan como estaban:
 - Tres arreglos (ver `docs/features/fix-hq-load-build-portal.md`): plan del HQ vacío calculado una vez fuera del hilo del servidor (el cuelgue al 16 %), el build radial espera chunks no cargados en vez de descartar bloques, y el portal del preview-drop fijo en el HQ (sin `/t3craft drop portal`).
 - Falta: compilar en el PC (`tools/heavy.sh`) y probar en el cliente de Facundo: entrar al HQ (¿ya no se queda al 16 %?), construir caminando hasta el borde y volver (¿se completa?), y ver el arco al norte de la calle interior y cruzarlo en ambos sentidos. Línea RESTART en `docs/CHANGELOG-dev.md`.
 
+### `feat/piece-catalog-preview`: escrita sin compilar ni jugar (pendiente de ejecución)
+- Catálogo de piezas en el juego (`/t3craft piece ...`), cada pieza a escala real en su propio escenario del mundo HQ; doc en `docs/features/piece-catalog-preview.md`. Ramas base: `fix/hq-load-build-portal` (`822cc454`).
+- Falta: compilar en el PC (`tools/heavy.sh`) y probar en el cliente de Facundo: `/t3craft piece show hq_hub` (¿cabe el edificio central, cuánto tarda, el vestíbulo sube antes del teletransporte?), `next`/`prev` por `house`, `front e`, `size 12x12x14`, `reload` tras un hot swap, `clear` y el arco de vuelta. Línea RESTART en `docs/CHANGELOG-dev.md`.
+- No toca el preview-drop (carpeta, recinto y portal siguen como están): solo archivos nuevos más una línea en `T3CraftClient`.
+
 ### Siguiente, en orden
 1. **Aprobación de Facundo:**
    - plan de limpieza de código (`docs/plans/code-cleanup.md`, decisiones D1–D5);

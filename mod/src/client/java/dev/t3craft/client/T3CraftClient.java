@@ -131,6 +131,7 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 		dev.t3craft.client.hq.layout.HqLayoutPackWatcher.register(); // feat/hq-layout-packs: config/t3craft/hq-layouts, live
 		dev.t3craft.client.chat.UiStyleReloader.register(); // #12: gui/ui-style.json, reloaded by F3+T
 		dev.t3craft.client.drop.DropClient.register(); // feat/ingame-preview-drop: config/t3craft/preview-drop, showroom + portal in the HQ world
+		dev.t3craft.client.piece.PieceClient.register(); // feat/piece-catalog-preview: /t3craft piece, the game's own pieces at real scale in the HQ world
 
 		// Right-click on one of our client-only NPCs opens its chat screen. The entity is unknown to
 		// the server, so the interaction is consumed client-side.

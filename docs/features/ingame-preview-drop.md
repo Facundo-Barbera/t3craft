@@ -1,5 +1,8 @@
 # In-game preview drop (feat/ingame-preview-drop)
 
+> For the game's own buildings and pieces (the HQ's central building, catalog variants, the kit, pack rooms) use the piece catalog
+> instead: `docs/features/piece-catalog-preview.md`. This showroom (120 wide, sides up to 256) stays for schematics from outside the game.
+
 Look at schematics inside the T3Craft HQ world **without restarting the game and without `hqRender`**: drop
 files in a folder, walk through a portal, and a showroom ("recinto") with one pedestal and one sign per file
 follows the folder live.
