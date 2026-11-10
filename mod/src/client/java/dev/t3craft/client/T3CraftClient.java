@@ -426,8 +426,7 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 		Minecraft mc = Minecraft.getInstance();
 		Pairing.Target target;
 		try {
-			// A typed T3 URL (tunnel hostname, Tailscale name…) wins over the host printed in the link.
-			target = Pairing.parseOverridingHost(linkOrCode, hostUrl);
+			target = Pairing.parse(linkOrCode, hostUrl);
 		} catch (Pairing.PairingException e) {
 			done.accept(new PairResult(false, e.getMessage()));
 			return;
@@ -436,10 +435,9 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 		String id = Environments.slug(shown);
 		Environments envs = new Environments(ModConfig.dataDir());
 		java.util.Set<String> scopes = Pairing.pairingScopes(readOnly);
-		new PairingClient(DirectController.newHttpClient())
-				.exchangeVerified(target, "T3Craft (Minecraft " + modVersion + ")", System.getProperty("os.name", ""), scopes, null)
-				.whenComplete((paired, err) -> {
-					Pairing.Session session = paired == null ? null : paired.session();
+		new PairingClient(java.net.http.HttpClient.newHttpClient())
+				.exchange(target, "T3Craft (Minecraft " + modVersion + ")", System.getProperty("os.name", ""), scopes)
+				.whenComplete((session, err) -> {
 					PairResult result;
 					if (err != null) {
 						Throwable cause = err instanceof CompletionException && err.getCause() != null ? err.getCause() : err;
@@ -448,17 +446,14 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 								: "Could not reach " + target.baseUrl() + ": " + T3Connection.sanitize(cause.getClass().getSimpleName()));
 					} else {
 						try {
-							Environments.Environment env = environmentAfterPairing(envs.list(), id, shown, target.baseUrl(), paired.descriptor().environmentId());
-							boolean control = envs.pair(env, session);
+							boolean control = envs.pair(new Environments.Environment(id, shown, target.baseUrl()), session);
 							String until = java.time.Instant.ofEpochMilli(session.expiresAtMs()).toString().substring(0, 10);
 							String how = control
 									? "with control (read + operate). Revoke control any time: /t3craft operate revoke " + id
 									: readOnly ? "read-only"
 									: "read-only: the credential had no orchestration:operate (use \"Enable control\" to add it)";
-							String routes = env.fallbacks().isEmpty() ? "" : " Routes tried in order: " + env.routes().stream()
-									.map(java.net.URI::getHost).collect(java.util.stream.Collectors.joining(", ")) + ".";
 							result = new PairResult(true, "Paired with " + shown + " (" + target.baseUrl() + "), " + how
-									+ ". Session valid until " + until + "." + routes);
+									+ ". Session valid until " + until + ".");
 							dev.t3craft.t3.AuditLog.in(ModConfig.dataDir()).append(new dev.t3craft.t3.AuditLog.Entry(System.currentTimeMillis(), id, null,
 									"pair", false, "ok", "ui", control ? "read+operate" : "read-only"));
 						} catch (IOException | IllegalArgumentException e) {
@@ -476,23 +471,6 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 	}
 
 	public record PairResult(boolean ok, String message) {
-	}
-
-	/**
-	 * The environment record to store after a pairing. Pairing again under the name of an existing
-	 * environment, through another address, adds that address as a route ("LAN first, tunnel as
-	 * fallback"), but only when both report the same environment id; otherwise the new pairing
-	 * replaces the old one. The id comes from the public descriptor, so a route never joins a
-	 * different environment.
-	 */
-	static Environments.Environment environmentAfterPairing(java.util.List<Environments.Environment> existing, String id, String label,
-			java.net.URI url, String environmentId) {
-		for (Environments.Environment old : existing) {
-			if (old.id().equals(id) && environmentId != null && environmentId.equals(old.environmentId())) {
-				return new Environments.Environment(id, label, old.url(), old.fallbacks(), environmentId).withRoute(url);
-			}
-		}
-		return new Environments.Environment(id, label, url, java.util.List.of(), environmentId);
 	}
 
 	/** {@code /t3craft unpair <env>}: deletes the local credential (revoke the session on the host too). */

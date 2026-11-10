@@ -46,7 +46,7 @@ receta que el buscador de `T3Screen`).
 |---|---|---|
 | **Settings** | `SettingsPanel` (página) + `SettingsScreen` (host `T3PanelScreen`) | Tres pestañas: General (filtro, HUD), Notifications (interruptores, sonidos, señales en segundo plano con un `T3Select` para la barra de acción) y Connections (Environments…, Key binds…, Outbound events…, Reload from disk, Reset HQ world). Pie con estado, Save y Done. Mismo borrador y mismas reglas de guardado que antes. |
 | **Environments** | `EnvironmentsPanel` + `EnvironmentsScreen` | `T3List` con las cuatro acciones por fila; Pair new… y Refresh en la cabecera. Unpair y Revoke piden confirmación con un modal del kit sobre la página. |
-| **Pair** | `PairScreen` (`T3DialogScreen`) | Tres `T3Field` (nombre, enlace o código, "T3 URL or T3 Connect tunnel hostname"), interruptor de acceso (lectura + control / solo lectura), estado en vivo. La URL acepta hostname de túnel, URL MCP o enlace y gana sobre el host del enlace de emparejamiento; el comando del host (`t3 auth pairing create …`) se recalcula con ella como `--base-url` (`Pairing.pairingHostCommand(readOnly, typedBaseUrl())`). Enter en cualquier campo empareja. Ver `operate.md`, "Alcanzar un entorno desde otra red". |
+| **Pair** | `PairScreen` (`T3DialogScreen`) | Tres `T3Field`, interruptor de acceso (lectura + control / solo lectura), estado en vivo. Enter en cualquier campo empareja. |
 | **OperatePair** | `OperatePairScreen` (`T3DialogScreen`) | Aviso de riesgo, comando del host, campo, estado. |
 | **Confirm** | `ConfirmActionScreen` (`T3DialogScreen`) | Acción / hilo / entorno / aviso. Enter equivale a Cancelar, como antes (el foco estaba en Cancelar). |
 | **Snooze** | `SnoozeScreen` (`T3DialogScreen`) | Tres presets y Cancelar. |

@@ -18,10 +18,8 @@ import org.jspecify.annotations.Nullable;
  * Pair this Minecraft instance with a T3 environment. By default read + control (operate) in a
  * single pairing ({@link Pairing#DEFAULT_SCOPES}); the "Access" switch (or
  * {@code /t3craft pair --read-only}) asks for {@code orchestration:read} only. Paste the pairing
- * link ({@code https://host/pair#token=…}) or the bare code plus the T3 address. The URL box takes a T3 Connect
- * tunnel hostname, an MCP URL or a link, and wins over the host in a pairing link ({@link Pairing#parseUrl}). The
- * host command shown always carries explicit {@code --scope}s, and {@code --base-url} when the URL box holds a
- * valid address ({@link Pairing#pairingHostCommand}). The session
+ * link ({@code https://host/pair#token=…}) or the bare code plus the host URL. The host command
+ * shown always carries explicit {@code --scope}s ({@link Pairing#pairingHostCommand}). The session
  * is stored in {@code config/t3craft/credentials/}; nothing is shown or logged.
  *
  * <p>A kit dialog ({@link T3DialogScreen}, docs/features/ui-kit.md): three {@link T3Field}s, the access
@@ -49,25 +47,13 @@ public final class PairScreen extends T3DialogScreen {
 		this.readOnly = readOnly;
 	}
 
-	/** The address typed in the URL box as a base URL, or null while it is empty or not valid yet. */
-	private java.net.@Nullable URI typedBaseUrl() {
-		if (host == null || host.value().isBlank()) {
-			return null;
-		}
-		try {
-			return Pairing.parseUrl(host.value());
-		} catch (Pairing.PairingException e) {
-			return null;
-		}
-	}
-
 	@Override
 	protected T3Dialog buildDialog() {
 		if (label == null) { // the fields live as long as the screen: a rebuild keeps what was typed
 			label = new T3Field(font, "Environment name").maxLength(32).hint("Name shown on the villagers, e.g. my-vps");
 			link = new T3Field(font, "Pairing link or code").maxLength(4096).hint("https://host/pair#token=…  or the code");
-			host = new T3Field(font, "T3 URL or T3 Connect tunnel hostname").maxLength(512)
-					.hint("Tunnel hostname, https://host.ts.net or http://host:3773 (optional with a full link)");
+			host = new T3Field(font, "T3 URL (only with a bare code)").maxLength(512)
+					.hint("Only for a bare code: https://host.ts.net or http://host:3773");
 		}
 		T3Toggle access = new T3Toggle(T3Draw.tr(readOnly ? "t3craft.pair.mode.read" : "t3craft.pair.mode.control"), !readOnly, control -> {
 			readOnly = !control;
@@ -79,12 +65,11 @@ public final class PairScreen extends T3DialogScreen {
 		pairButton.setEnabled(!busy);
 		T3Dialog d = new T3Dialog(title.getString(), 400)
 				.text(T3Draw.tr("t3craft.pair.host"), Tone.MUTED)
-				// follows the URL box: the typed address becomes --base-url (3 lines: the longest tunnel hostnames wrap)
-				.text(() -> Pairing.pairingHostCommand(readOnly, typedBaseUrl()), () -> Tone.CODE, 3)
+				.text(Pairing.pairingHostCommand(readOnly, null), Tone.CODE)
 				.gap(2)
 				.field("Environment name", label)
 				.field("Pairing link or code", link)
-				.field("T3 URL or tunnel hostname", host)
+				.field("T3 URL (bare code only)", host)
 				.control(access)
 				.buttons(pairButton, new T3Button(CommonComponents.GUI_CANCEL.getString(), this::onClose));
 		if (!readOnly) {

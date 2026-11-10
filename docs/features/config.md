@@ -48,10 +48,7 @@ Tests: `mod/src/test/java/dev/t3craft/client/config/` (25 tests JUnit, todos en 
   Hide/Show, Edit, Unpair (con `ConfirmScreen` y recordatorio de revocar en el host),
   "Habilitar control" / "Revocar" (control `orchestration:operate`, ver `docs/features/operate.md`) y
   "Pair new…", que abre la `PairScreen` de main (pegar link o código + URL; lectura + control por
-  defecto, toggle "solo lectura" para pedir solo `orchestration:read`). El campo de URL acepta
-  también el hostname de un túnel de T3 Connect y vuelve a emparejar un entorno existente por otra
-  ruta (LAN, Tailscale, túnel): ver "Alcanzar un entorno desde otra red" en `operate.md`.
-  El renombrado conserva las rutas (`Environment.withLabel`).
+  defecto, toggle "solo lectura" para pedir solo `orchestration:read`).
 - `EnvironmentEditScreen`: renombrar, color (paleta de chat de MC + color custom del archivo), visible,
   toggles needs-you / working / recent, ventana y máximo por entorno (vacío = global), reset.
 - Renombrar usa la API pública de main: `Environments.save(env con nuevo label, credential(id))`

@@ -22,8 +22,7 @@ import org.jspecify.annotations.Nullable;
 /**
  * The T3 environments this Minecraft instance is paired with, under {@code <config>/t3craft/}:
  * <ul>
- *   <li>{@code environments.json}: {@code [{id, label, url, urls?, environmentId?}]}, no secrets;
- *   {@code urls} are extra routes to the same environment (LAN, Tailscale, tunnel hostname).</li>
+ *   <li>{@code environments.json}: {@code [{id, label, url}]}, no secrets.</li>
  *   <li>{@code credentials/<id>.json}: {@code {accessToken, scopes, expiresAt}}; owner-only
  *   permissions where the OS supports it. Lives in the player's instance profile, never in a repo.
  *   This is the <i>read</i> zone's token: {@code orchestration:read}, or the combined
@@ -37,50 +36,7 @@ public final class Environments {
 	public static final Pattern ID = Pattern.compile("[a-z0-9][a-z0-9-]{0,31}");
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
-	/**
-	 * A paired environment. {@code url} is the primary address; {@code fallbacks} are other
-	 * addresses of the same environment (LAN, Tailscale, a T3 Connect tunnel hostname), tried in
-	 * order after it ({@link #routes()}). {@code environmentId} is the id the public descriptor
-	 * reported when paired (null if unknown): a route that answers with another id is skipped.
-	 * None of this is secret.
-	 */
-	public record Environment(String id, String label, URI url, List<URI> fallbacks, @Nullable String environmentId) {
-		public Environment {
-			List<URI> clean = new ArrayList<>();
-			for (URI u : fallbacks) {
-				if (!u.equals(url) && !clean.contains(u)) {
-					clean.add(u);
-				}
-			}
-			fallbacks = List.copyOf(clean);
-		}
-
-		public Environment(String id, String label, URI url) {
-			this(id, label, url, List.of(), null);
-		}
-
-		/** Primary address first, then the fallbacks. */
-		public List<URI> routes() {
-			List<URI> all = new ArrayList<>();
-			all.add(url);
-			all.addAll(fallbacks);
-			return List.copyOf(all);
-		}
-
-		public Environment withLabel(String newLabel) {
-			return new Environment(id, newLabel, url, fallbacks, environmentId);
-		}
-
-		public Environment withEnvironmentId(@Nullable String newEnvironmentId) {
-			return new Environment(id, label, url, fallbacks, newEnvironmentId);
-		}
-
-		/** Adds {@code route} as a fallback (no-op when it is already a route). */
-		public Environment withRoute(URI route) {
-			List<URI> next = new ArrayList<>(fallbacks);
-			next.add(route);
-			return new Environment(id, label, url, next, environmentId);
-		}
+	public record Environment(String id, String label, URI url) {
 	}
 
 	private final Path dir;
@@ -131,19 +87,7 @@ public final class Environments {
 					continue;
 				}
 				try {
-					List<URI> fallbacks = new ArrayList<>();
-					JsonArray extra = Json.arr(o, "urls");
-					if (extra != null) {
-						for (JsonElement u : extra) {
-							try {
-								fallbacks.add(Pairing.parseUrl(u.getAsString()));
-							} catch (Pairing.PairingException | RuntimeException ignored) {
-								// skip an invalid extra route, keep the environment
-							}
-						}
-					}
-					out.add(new Environment(id, java.util.Objects.requireNonNullElse(Json.str(o, "label"), id),
-							Pairing.base(URI.create(url)), fallbacks, Json.str(o, "environmentId")));
+					out.add(new Environment(id, java.util.Objects.requireNonNullElse(Json.str(o, "label"), id), Pairing.base(URI.create(url))));
 				} catch (IllegalArgumentException | Pairing.PairingException ignored) {
 					// skip invalid entry
 				}
@@ -182,7 +126,15 @@ public final class Environments {
 		List<Environment> all = new ArrayList<>(list());
 		all.removeIf(e -> e.id().equals(env.id()));
 		all.add(env);
-		writeAtomically(envFile(), GSON.toJson(toJson(all)), false);
+		JsonArray arr = new JsonArray();
+		for (Environment e : all) {
+			JsonObject o = new JsonObject();
+			o.addProperty("id", e.id());
+			o.addProperty("label", e.label());
+			o.addProperty("url", e.url().toString());
+			arr.add(o);
+		}
+		writeAtomically(envFile(), GSON.toJson(arr), false);
 		JsonObject cred = new JsonObject();
 		cred.addProperty("accessToken", session.accessToken());
 		JsonArray scopes = new JsonArray();
@@ -200,34 +152,18 @@ public final class Environments {
 		new OperateCredentials(dir).revoke(id);
 		List<Environment> all = new ArrayList<>(list());
 		boolean removed = all.removeIf(e -> e.id().equals(id));
-		if (removed) {
-			writeAtomically(envFile(), GSON.toJson(toJson(all)), false);
-		}
-		return Files.deleteIfExists(credentialFile(id)) || removed;
-	}
-
-	/**
-	 * {@code [{id, label, url, urls?, environmentId?}]}: {@code urls} (the extra routes) and
-	 * {@code environmentId} are written only when present, so older files stay byte-compatible.
-	 */
-	private static JsonArray toJson(List<Environment> all) {
 		JsonArray arr = new JsonArray();
 		for (Environment e : all) {
 			JsonObject o = new JsonObject();
 			o.addProperty("id", e.id());
 			o.addProperty("label", e.label());
 			o.addProperty("url", e.url().toString());
-			if (!e.fallbacks().isEmpty()) {
-				JsonArray urls = new JsonArray();
-				e.fallbacks().forEach(u -> urls.add(u.toString()));
-				o.add("urls", urls);
-			}
-			if (e.environmentId() != null) {
-				o.addProperty("environmentId", e.environmentId());
-			}
 			arr.add(o);
 		}
-		return arr;
+		if (removed) {
+			writeAtomically(envFile(), GSON.toJson(arr), false);
+		}
+		return Files.deleteIfExists(credentialFile(id)) || removed;
 	}
 
 	/**

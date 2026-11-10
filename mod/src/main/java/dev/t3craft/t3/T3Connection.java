@@ -14,7 +14,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -83,8 +82,6 @@ public final class T3Connection {
 	private final Supplier<Pairing.@Nullable Session> session;
 	private final Listener listener;
 	private final HttpClient http;
-	/** The route in use: the primary address, or the first reachable one of {@code env.routes()}. */
-	private volatile URI base;
 	private final ScheduledExecutorService exec;
 	private final AtomicInteger generation = new AtomicInteger();
 	private volatile boolean stopped;
@@ -104,7 +101,6 @@ public final class T3Connection {
 		this.session = session;
 		this.listener = listener;
 		this.http = http;
-		this.base = env.url();
 		this.exec = Executors.newSingleThreadScheduledExecutor(r -> {
 			Thread t = new Thread(r, "t3craft-t3-" + env.id());
 			t.setDaemon(true);
@@ -235,7 +231,7 @@ public final class T3Connection {
 		if (s == null) {
 			return CompletableFuture.failedFuture(new IllegalStateException("not paired"));
 		}
-		HttpRequest req = HttpRequest.newBuilder(historyUri(base, threadId, cursor))
+		HttpRequest req = HttpRequest.newBuilder(historyUri(env.url(), threadId, cursor))
 				.timeout(Duration.ofSeconds(15))
 				.header("Authorization", "Bearer " + s.accessToken())
 				.header(PROTOCOL_HEADER, String.valueOf(ORCHESTRATION_PROTOCOL))
@@ -425,34 +421,8 @@ public final class T3Connection {
 			setStatus(g, Status.AUTH_FAILED, "session expired: pair again (/t3craft pair)");
 			return;
 		}
-		setStatus(g, Status.CONNECTING, base.toString());
-		if (env.fallbacks().isEmpty()) {
-			requestTicket(g, s);
-			return;
-		}
-		// Several routes (LAN, Tailscale, tunnel hostname): the first whose public descriptor checks out.
-		EnvironmentProbe.firstReachable(http, env.routes(), env.environmentId()).whenCompleteAsync((chosen, err) -> guarded(g, "route", () -> {
-			if (!current(g)) {
-				return;
-			}
-			if (err != null) {
-				retry(g, "no route answers: " + routeError(err));
-				return;
-			}
-			base = chosen;
-			setStatus(g, Status.CONNECTING, chosen.toString());
-			requestTicket(g, s);
-		}), exec);
-	}
-
-	/** The player-facing text of a failed {@link EnvironmentProbe#firstReachable}. */
-	static String routeError(Throwable err) {
-		Throwable c = err instanceof CompletionException && err.getCause() != null ? err.getCause() : err;
-		return c instanceof EnvironmentProbe.ProbeException ? sanitize(c.getMessage()) : rootMessage(c);
-	}
-
-	private void requestTicket(int g, Pairing.Session s) {
-		HttpRequest req = HttpRequest.newBuilder(base.resolve("/api/auth/websocket-ticket/rpc"))
+		setStatus(g, Status.CONNECTING, env.url().toString());
+		HttpRequest req = HttpRequest.newBuilder(env.url().resolve("/api/auth/websocket-ticket/rpc"))
 				.timeout(Duration.ofSeconds(10))
 				.header("Authorization", "Bearer " + s.accessToken())
 				.header("Accept", "application/json")
@@ -493,7 +463,7 @@ public final class T3Connection {
 		ShellState state = new ShellState();
 		http.newWebSocketBuilder()
 				.connectTimeout(Duration.ofSeconds(10))
-				.buildAsync(socketUri(base, ticket), new Handler(g, state))
+				.buildAsync(socketUri(env.url(), ticket), new Handler(g, state))
 				.whenCompleteAsync((ws, err) -> guarded(g, "upgrade", () -> {
 					if (err == null) {
 						if (!current(g)) {

@@ -136,25 +136,7 @@ public final class OperateConnection implements OperateTransport {
 		}
 		connecting = true;
 		int g = ++generation;
-		if (env.fallbacks().isEmpty()) {
-			requestTicket(g, s, env.url());
-			return;
-		}
-		// Several routes: the first whose public descriptor checks out (same rule as the read socket).
-		EnvironmentProbe.firstReachable(http, env.routes(), env.environmentId()).whenCompleteAsync((chosen, err) -> {
-			if (g != generation) {
-				return;
-			}
-			if (err != null) {
-				connectFailed(OperateResult.Outcome.OFFLINE, "no route answers: " + T3Connection.routeError(err));
-				return;
-			}
-			requestTicket(g, s, chosen);
-		}, exec);
-	}
-
-	private void requestTicket(int g, Pairing.Session s, java.net.URI base) {
-		HttpRequest req = HttpRequest.newBuilder(base.resolve("/api/auth/websocket-ticket/rpc"))
+		HttpRequest req = HttpRequest.newBuilder(env.url().resolve("/api/auth/websocket-ticket/rpc"))
 				.timeout(Duration.ofSeconds(10))
 				.header("Authorization", "Bearer " + s.accessToken())
 				.header("Accept", "application/json")
@@ -189,7 +171,7 @@ public final class OperateConnection implements OperateTransport {
 			}
 			http.newWebSocketBuilder()
 					.connectTimeout(Duration.ofSeconds(10))
-					.buildAsync(T3Connection.socketUri(base, ticket), new Handler(g))
+					.buildAsync(T3Connection.socketUri(env.url(), ticket), new Handler(g))
 					.whenCompleteAsync((ws, e2) -> {
 						if (e2 == null) {
 							if (g != generation) {
