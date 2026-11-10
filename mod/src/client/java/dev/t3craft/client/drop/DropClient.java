@@ -35,8 +35,8 @@ import org.jspecify.annotations.Nullable;
 /**
  * feat/ingame-preview-drop: look at schematics inside the T3Craft HQ world without restarting the game.
  * Drop {@code .nbt} / {@code .schem} files in {@code config/t3craft/preview-drop/}; a showroom with one
- * pedestal and sign per file stands in the HQ world, reachable by an arch ({@code /t3craft drop portal}) or
- * {@code /t3craft drop go}, and follows the folder live. See {@code docs/features/ingame-preview-drop.md}.
+ * pedestal and sign per file stands in the HQ world, reachable by the HQ's fixed portal (an arch at the north end
+ * of the inner street, not placed by the player) or {@code /t3craft drop go}, and follows the folder live. See {@code docs/features/ingame-preview-drop.md}.
  *
  * <p>This class is the client half: it polls the folder once a second on a worker thread (reading and laying
  * out a big schematic never stalls the game), hands the latest scene to {@link DropShowroom} (which builds
@@ -44,8 +44,8 @@ import org.jspecify.annotations.Nullable;
  * plus a chat line, and owns the {@code /t3craft drop} commands. Without the HQ world it only reads the
  * folder; no block is ever written anywhere else.
  *
- * <p>Commands: {@code drop} (status), {@code drop go}, {@code drop back}, {@code drop portal},
- * {@code drop reload}, {@code drop rebuild}, {@code drop folder}.
+ * <p>Commands: {@code drop} (status), {@code drop go}, {@code drop back},
+ * {@code drop reload}, {@code drop rebuild}, {@code drop folder}. (There is no {@code drop portal} any more.)
  */
 public final class DropClient {
 	private static final SystemToast.SystemToastId TOAST = new SystemToast.SystemToastId(6000L);
@@ -118,7 +118,6 @@ public final class DropClient {
 				.executes(c -> status(c.getSource()))
 				.then(literal("go").executes(c -> onServer(c.getSource(), (s, server, id) -> s.go(server, id))))
 				.then(literal("back").executes(c -> onServer(c.getSource(), (s, server, id) -> s.back(server, id))))
-				.then(literal("portal").executes(c -> onServer(c.getSource(), (s, server, id) -> s.placePortal(server, id))))
 				.then(literal("rebuild").executes(c -> onServer(c.getSource(), (s, server, id) -> s.rebuild(server, id))))
 				.then(literal("reload").executes(c -> reload(c.getSource())))
 				.then(literal("folder").executes(c -> folderLine(c.getSource()))))));
@@ -254,10 +253,7 @@ public final class DropClient {
 		DropShowroom.Status st = SHOWROOM.status();
 		MutableComponent msg = T3CraftCommands.prefix().append(Component.literal("Preview drop: " + listing.size()
 				+ " schematic(s) in the drop folder; add or replace files any time. ").withStyle(ChatFormatting.GRAY));
-		msg.append(button("[Showroom]", "t3craft drop go", "Go to the showroom (/t3craft drop go)")).append(" ");
-		if (st.portal() == null) {
-			msg.append(button("[Place portal here]", "t3craft drop portal", "Build the arch 4 blocks in front of you")).append(" ");
-		}
+		msg.append(button("[Showroom]", "t3craft drop go", "Go to the showroom (/t3craft drop go), or walk through the portal at the north end of the inner street")).append(" ");
 		msg.append(Component.literal("[Open folder]").withStyle(s -> s.withColor(ChatFormatting.AQUA)
 				.withClickEvent(new ClickEvent.OpenFile(f.dir().toString()))
 				.withHoverEvent(new HoverEvent.ShowText(Component.literal(f.dir().toString())))));
@@ -347,8 +343,8 @@ public final class DropClient {
 		} else {
 			src.sendFeedback(line("showroom " + (st.built() ? "built" : "not built yet") + " at " + (st.showroom() == null ? "?" : st.showroom().toShortString())
 					+ (st.queuedBatches() > 0 ? ", " + st.queuedBatches() + " batch(es) still going up" : "") + "; portal "
-					+ (st.portal() == null ? "not placed (/t3craft drop portal)" : "at " + st.portal().toShortString())));
-			src.sendFeedback(line("/t3craft drop go | back | portal | reload | rebuild | folder"));
+					+ (st.portal() == null ? "not worked out yet (the HQ plan is still loading)" : "fixed in the HQ, at " + st.portal().toShortString())));
+			src.sendFeedback(line("/t3craft drop go | back | reload | rebuild | folder"));
 		}
 		return 1;
 	}

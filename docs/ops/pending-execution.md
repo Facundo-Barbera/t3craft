@@ -126,6 +126,10 @@ Quedan como estaban:
 - Falta: compilar en el PC (`tools/heavy.sh`), y probar en el cliente de Facundo: `/t3craft drop portal`, soltar un `.nbt` y un `.schem`, cruzar el arco, editar y borrar un archivo dentro del recinto, y un archivo roto (camino de error). Línea RESTART en `docs/CHANGELOG-dev.md`.
 - No toca `feat/hq-living-fixes` (solo archivos nuevos más una línea en `T3CraftClient`).
 
+### `fix/hq-load-build-portal`: escrita sin compilar ni jugar (pendiente de ejecución)
+- Tres arreglos (ver `docs/features/fix-hq-load-build-portal.md`): plan del HQ vacío calculado una vez fuera del hilo del servidor (el cuelgue al 16 %), el build radial espera chunks no cargados en vez de descartar bloques, y el portal del preview-drop fijo en el HQ (sin `/t3craft drop portal`).
+- Falta: compilar en el PC (`tools/heavy.sh`) y probar en el cliente de Facundo: entrar al HQ (¿ya no se queda al 16 %?), construir caminando hasta el borde y volver (¿se completa?), y ver el arco al norte de la calle interior y cruzarlo en ambos sentidos. Línea RESTART en `docs/CHANGELOG-dev.md`.
+
 ### Siguiente, en orden
 1. **Aprobación de Facundo:**
    - plan de limpieza de código (`docs/plans/code-cleanup.md`, decisiones D1–D5);

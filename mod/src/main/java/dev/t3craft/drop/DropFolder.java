@@ -221,8 +221,9 @@ public final class DropFolder {
 
 				How to see them
 				  1. Open the T3Craft HQ world.
-				  2. Walk through the portal arch, or run   /t3craft drop go   (come back with /t3craft drop back).
-				     No portal yet? Stand where you want it and run   /t3craft drop portal
+				  2. Walk through the portal arch (fixed in the HQ, at the north end of the inner street, at the foot
+				     of the north ramp; it appears once that street is built), or run   /t3craft drop go
+				     (come back with /t3craft drop back).
 				  3. The showroom is a walled floor with one pedestal and one sign per file (name, size, format).
 
 				Hot reload
@@ -235,8 +236,9 @@ public final class DropFolder {
 
 				--- Español ---
 				Suelta aquí esquemáticos (.nbt de bloque de estructura o .schem de Sponge/WorldEdit) y míralos
-				dentro del juego sin reiniciar. En el mundo T3Craft HQ cruza el portal (o /t3craft drop go; vuelves
-				con /t3craft drop back; si aún no hay portal, colócate donde lo quieras y /t3craft drop portal).
+				dentro del juego sin reiniciar. En el mundo T3Craft HQ cruza el portal (fijo en el HQ, al norte de la
+				calle interior, al pie de la rampa norte; aparece cuando esa calle está construida) o usa /t3craft drop go;
+				vuelves con /t3craft drop back.
 				Añadir, reemplazar o borrar un archivo actualiza el recinto en cerca de un segundo.
 				""";
 	}

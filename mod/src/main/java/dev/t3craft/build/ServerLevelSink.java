@@ -43,6 +43,11 @@ public final class ServerLevelSink implements BlockSink {
 	}
 
 	@Override
+	public boolean loaded(BlockPos pos) {
+		return level.isLoaded(pos);
+	}
+
+	@Override
 	public boolean matches(BlockPos pos, BlockState state) {
 		return level.isLoaded(pos) && level.getBlockState(pos) == state;
 	}

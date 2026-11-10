@@ -22,4 +22,14 @@ public interface BlockSink {
 	default boolean matches(BlockPos worldPos, BlockState state) {
 		return false;
 	}
+
+	/**
+	 * fix/hq-load-build-portal: whether the chunk of {@code worldPos} is loaded, so a block can be placed there now.
+	 * A placement into an unloaded chunk fails for good ({@link BuildCursor.Outcome#FAILED}: the entry counts as
+	 * done and is never tried again), which left holes in the HQ whenever the build ran farther than the chunks
+	 * around the player. The radial build asks first and retries later instead. Default: loaded (sinks without chunks).
+	 */
+	default boolean loaded(BlockPos worldPos) {
+		return true;
+	}
 }

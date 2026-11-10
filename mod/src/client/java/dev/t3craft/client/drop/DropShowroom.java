@@ -22,7 +22,6 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -45,10 +44,13 @@ import org.jspecify.annotations.Nullable;
  *       (changed cells only), a few thousand blocks per server tick, and only while somebody is in or near
  *       it, or has just asked to go there: while you are in the HQ, a changed file only marks the showroom
  *       stale, and the next visit builds it.</li>
- *   <li><b>The HQ portal</b> is an arch the player places with {@code /t3craft drop portal}; walking through
- *       it goes to the showroom, and the showroom's own arch comes back to where the HQ portal was placed.
- *       It is remembered per world in {@code t3craft-drop.json}. The builders know nothing about it: place it
- *       outside the building (the island's edge) or place it again after a rebuild that overwrote it.</li>
+ *   <li><b>The HQ portal</b> is a fixed piece of the main HQ, not something the player places: an arch at the
+ *       north end of the inner street ({@link DemoWorldInfo#portalSpot}, worked out from the plan's spawn anchor).
+ *       This class keeps it standing: every {@link #MAINTAIN_TICKS} ticks, once its chunks are loaded and the
+ *       street under it is built, it lays whatever cell of the arch differs (so an HQ build or rebuild that
+ *       overwrote a cell of it is undone within two seconds). Walking through it goes to the showroom, and the
+ *       showroom's own arch comes back to the hub side of it. An arch a player placed with the old
+ *       {@code /t3craft drop portal} is removed once.</li>
  * </ul>
  * Nothing here touches the HQ plan, the fingerprints or the marker.
  */
@@ -61,6 +63,8 @@ final class DropShowroom {
 	private static final int COOLDOWN_TICKS = 60;
 	/** The showroom counts as "visited" this many blocks beyond its floor. */
 	private static final int NEAR = 24;
+	/** How often the fixed HQ portal is checked (server ticks). */
+	static final int MAINTAIN_TICKS = 40;
 	private static final String STATE_FILE = "t3craft-drop.json";
 
 	private static final DropShowroom INSTANCE = new DropShowroom();
@@ -70,7 +74,7 @@ final class DropShowroom {
 	}
 
 	/** The showroom's world origin: its north-west floor corner. */
-	private record World(Path root, BlockPos origin) {
+	private record World(Path root, BlockPos origin, DemoWorldInfo hq) {
 	}
 
 	/** The HQ arch: its walk-through box, and where people reappear coming back. */
@@ -97,6 +101,10 @@ final class DropShowroom {
 	private DropScene.@Nullable Scene failed;
 	private final ArrayDeque<List<Placement>> queue = new ArrayDeque<>();
 	private @Nullable HqPortal portal;
+	/** The fixed portal has stood complete at least once this session (its street exists): people may use it. */
+	private boolean portalBuilt;
+	/** A portal an older version let the player place (read from the world file): taken down once, then forgotten. */
+	private @Nullable HqPortal legacyPortal;
 	private @Nullable Bounds bounds;
 	private @Nullable Spot lastHq;
 	private final Map<UUID, Integer> cooldown = new HashMap<>();
@@ -135,11 +143,11 @@ final class DropShowroom {
 			world = null;
 			return;
 		}
-		World w = new World(info.root(), new BlockPos(info.originX() + OFFSET_X, info.originY() - 1, info.originZ()));
+		World w = new World(info.root(), new BlockPos(info.originX() + OFFSET_X, info.originY() - 1, info.originZ()), info);
 		readState(w);
 		world = w;
-		T3Craft.LOGGER.info("[drop] preview drop on in the HQ world: showroom at {}, portal {}", w.origin().toShortString(),
-				portal == null ? "not placed" : portal.centre().toShortString());
+		T3Craft.LOGGER.info("[drop] preview drop on in the HQ world: showroom at {}, portal fixed in the HQ (worked out once the plan is ready)",
+				w.origin().toShortString());
 	}
 
 	/** Server thread, {@code SERVER_STOPPING}. */
@@ -153,6 +161,8 @@ final class DropShowroom {
 		failed = null;
 		queue.clear();
 		portal = null;
+		portalBuilt = false;
+		legacyPortal = null;
 		bounds = null;
 		lastHq = null;
 		cooldown.clear();
@@ -177,7 +187,78 @@ final class DropShowroom {
 		if (!queue.isEmpty()) {
 			applyBatch(server, w);
 		}
+		if (server.getTickCount() % MAINTAIN_TICKS == 0) {
+			maintainPortal(server, w);
+		}
 		arches(server, w);
+	}
+
+	/**
+	 * The fixed HQ portal: worked out once the empty HQ plan is ready, then kept complete. Nothing is touched
+	 * until every chunk the arch needs is loaded (this never loads one) and the street under its posts exists
+	 * (the arch never floats over a half-built HQ). Server thread.
+	 */
+	private void maintainPortal(MinecraftServer server, World w) {
+		ServerLevel level = server.overworld();
+		takeDownLegacyPortal(level, w);
+		HqPortal hp = portal;
+		if (hp == null) {
+			DemoWorldInfo.PortalSpot spot = DemoWorldInfo.portalSpot(server, w.hq());
+			if (spot == null) {
+				return; // the plan is still being computed, or this layout has no spawn anchor: ask again later
+			}
+			hp = makePortal(spot.centre(), spot.alongX(), spot.arrive(), spot.yaw());
+			portal = hp;
+			portalAt = hp.centre();
+			T3Craft.LOGGER.info("[drop] HQ portal fixed at {} (north end of the inner street)", hp.centre().toShortString());
+		}
+		DropScene.Portal arch = DropScene.portal(hp.alongX(), false);
+		for (Placement c : arch.cells()) {
+			if (!level.isLoaded(hp.centre().offset(c.rel()))) {
+				return;
+			}
+		}
+		BlockPos left = hp.centre().offset(archCell(hp.alongX(), -2, 0, 0));
+		BlockPos right = hp.centre().offset(archCell(hp.alongX(), 2, 0, 0));
+		if (level.getBlockState(left).isAir() || level.getBlockState(right).isAir()) {
+			return; // no street under the posts yet
+		}
+		List<Placement> missing = new ArrayList<>();
+		for (Placement c : arch.cells()) {
+			if (level.getBlockState(hp.centre().offset(c.rel())) != c.state()) {
+				missing.add(c);
+			}
+		}
+		if (!missing.isEmpty()) {
+			PlanApplier.apply(level, hp.centre(), missing);
+		}
+		portalBuilt = true;
+	}
+
+	/** Removes the arch an older version let the player place (once, when its chunks are loaded), and forgets it in the world file. */
+	private void takeDownLegacyPortal(ServerLevel level, World w) {
+		HqPortal old = legacyPortal;
+		if (old == null) {
+			return;
+		}
+		List<Placement> gone = new ArrayList<>();
+		for (Placement c : DropScene.portal(old.alongX(), false).cells()) {
+			if (!level.isLoaded(old.centre().offset(c.rel()))) {
+				return; // later, when the player is near it
+			}
+			gone.add(new Placement(c.rel(), Blocks.AIR.defaultBlockState()));
+		}
+		HqPortal now = portal;
+		if (now == null || !now.centre().equals(old.centre()) || now.alongX() != old.alongX()) {
+			PlanApplier.apply(level, old.centre(), gone);
+			T3Craft.LOGGER.info("[drop] removed the portal an older version let the player place, at {}", old.centre().toShortString());
+		}
+		legacyPortal = null;
+		writeState(w);
+	}
+
+	private static BlockPos archCell(boolean alongX, int u, int y, int v) {
+		return alongX ? new BlockPos(u, y, v) : new BlockPos(v, y, u);
 	}
 
 	private boolean nearShowroom(MinecraftServer server, World w) {
@@ -200,7 +281,7 @@ final class DropShowroom {
 	}
 
 	private void arches(MinecraftServer server, World w) {
-		HqPortal hp = portal;
+		HqPortal hp = portalBuilt ? portal : null; // an arch that is not up (HQ street not built yet) sends nobody
 		DropScene.Scene s = target;
 		if (hp == null && s == null) {
 			return;
@@ -370,7 +451,7 @@ final class DropShowroom {
 		}
 		HqPortal hp = portal;
 		Spot last = lastHq;
-		if (hp != null) {
+		if (hp != null && portalBuilt) {
 			teleport(server, p, hp.arrive(), hp.yaw());
 		} else if (last != null) {
 			teleport(server, p, last.pos(), last.yaw());
@@ -378,43 +459,6 @@ final class DropShowroom {
 			teleport(server, p, server.overworld().getRespawnData().pos(), p.getYRot());
 		}
 		say(p, "back in the HQ");
-	}
-
-	/** Places the HQ arch four blocks in front of the player (replacing the one placed before). */
-	void placePortal(MinecraftServer server, UUID id) {
-		World w = world;
-		ServerPlayer p = server.getPlayerList().getPlayer(id);
-		if (p == null) {
-			return;
-		}
-		if (w == null) {
-			say(p, "the portal goes in the T3Craft HQ world (title screen > T3Craft HQ)");
-			return;
-		}
-		DropScene.Scene known = target != null ? target : pending.get();
-		if (known != null && inShowroom(p.blockPosition(), w, known)) {
-			say(p, "you are in the showroom; go back to the HQ and stand where the portal should be");
-			return;
-		}
-		ServerLevel level = server.overworld();
-		HqPortal old = portal;
-		if (old != null) {
-			List<Placement> gone = new ArrayList<>();
-			for (Placement c : DropScene.portal(old.alongX(), false).cells()) {
-				gone.add(new Placement(c.rel(), Blocks.AIR.defaultBlockState()));
-			}
-			PlanApplier.apply(level, old.centre(), gone);
-		}
-		Direction look = p.getDirection();
-		boolean alongX = look.getAxis() == Direction.Axis.Z; // looking north or south: the opening spans x
-		BlockPos feet = p.blockPosition();
-		BlockPos centre = new BlockPos(feet.getX() + look.getStepX() * 4, feet.getY() - 1, feet.getZ() + look.getStepZ() * 4);
-		PlanApplier.apply(level, centre, DropScene.portal(alongX, false).cells());
-		portal = makePortal(centre, alongX, feet, look.getOpposite().toYRot());
-		portalAt = centre;
-		writeState(w);
-		say(p, "portal placed at " + centre.toShortString() + "; walk through it to reach the showroom"
-				+ " (the HQ builders do not know about it: keep it outside the building, or place it again after a rebuild)");
 	}
 
 	private static HqPortal makePortal(BlockPos centre, boolean alongX, BlockPos arrive, float yaw) {
@@ -445,11 +489,11 @@ final class DropShowroom {
 		try {
 			JsonObject o = JsonParser.parseString(Files.readString(f, StandardCharsets.UTF_8)).getAsJsonObject();
 			if (o.has("portal")) {
+				// a portal an older version let the player place: not used any more, taken down once (takeDownLegacyPortal)
 				JsonObject p = o.getAsJsonObject("portal");
 				BlockPos centre = new BlockPos(p.get("x").getAsInt(), p.get("y").getAsInt(), p.get("z").getAsInt());
 				BlockPos arrive = new BlockPos(p.get("ax").getAsInt(), p.get("ay").getAsInt(), p.get("az").getAsInt());
-				portal = makePortal(centre, p.get("alongX").getAsBoolean(), arrive, p.get("yaw").getAsFloat());
-				portalAt = centre;
+				legacyPortal = makePortal(centre, p.get("alongX").getAsBoolean(), arrive, p.get("yaw").getAsFloat());
 			}
 			if (o.has("showroom")) {
 				JsonObject s = o.getAsJsonObject("showroom");
@@ -462,7 +506,7 @@ final class DropShowroom {
 
 	private void writeState(World w) {
 		JsonObject o = new JsonObject();
-		HqPortal hp = portal;
+		HqPortal hp = legacyPortal; // only a portal still to be taken down is kept; the fixed one is worked out from the plan
 		if (hp != null) {
 			JsonObject p = new JsonObject();
 			p.addProperty("x", hp.centre().getX());

@@ -169,6 +169,9 @@ public final class DemoClient implements ClientModInitializer {
 			}
 		});
 		ClientTickEvents.END_CLIENT_TICK.register(GuardedEvents.endClientTick("demo", this::tick));
+		// fix/hq-load-build-portal: the empty HQ plan the spawn needs is computed in the background from the start,
+		// so SERVER_STARTED finds it ready instead of generating it on the server thread (the 16% freeze)
+		ClientLifecycleEvents.CLIENT_STARTED.register(mc -> warmEmptyPlan());
 		ClientLifecycleEvents.CLIENT_STOPPING.register(mc -> {
 			if (run != null) {
 				run.cancel();
@@ -207,6 +210,16 @@ public final class DemoClient implements ClientModInitializer {
 		BlockPos hqSpawn = centre != null ? centre : new BlockPos(v[0], v[1], v[2]);
 		BlockPos starter = c == null ? null : new VoidIsland.Starter(c.x(), c.y(), c.z()).spawn();
 		VoidGuard.start(spec.originY(), minY, starter != null ? starter : hqSpawn, hqSpawn);
+	}
+
+	/** Starts the background computation of the empty HQ plan of the configured layout (never blocks, never throws). Any thread. */
+	static void warmEmptyPlan() {
+		try {
+			dev.t3craft.hq.HqEmptyPlan.start(dev.t3craft.hq.HqStyles.forLayout(dev.t3craft.client.hq.layout.HqLayoutConfig.selectedId()));
+			dev.t3craft.hq.HqEmptyPlan.start(dev.t3craft.hq.HqStyles.current());
+		} catch (RuntimeException | LinkageError e) {
+			T3Craft.LOGGER.debug("[demo] could not warm the empty HQ plan ({})", e.getClass().getSimpleName());
+		}
 	}
 
 	/** The layout whose centre the spawn goes to: the one built in this world, else the configured one. */
@@ -279,6 +292,9 @@ public final class DemoClient implements ClientModInitializer {
 		DemoDecision.Action action = DemoDecision.decide(inWorld, inDemo, VanillaDemoWorld.exists(mc, folder), confirmed);
 		Screen back = parent != null ? parent : new TitleScreen();
 		T3Craft.LOGGER.info("[demo] {} '{}'", action, folder);
+		if (action == DemoDecision.Action.OPEN || action == DemoDecision.Action.CREATE) {
+			warmEmptyPlan(); // runs while the world loads
+		}
 		switch (action) {
 			case ALREADY_HERE -> say("you are already in " + cfg.spec().displayName() + " (/t3craft demo rebuild to build again)");
 			case CONFIRM_LEAVE -> mc.gui.setScreen(new ConfirmScreen(yes -> {

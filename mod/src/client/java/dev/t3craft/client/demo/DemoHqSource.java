@@ -8,7 +8,6 @@ import dev.t3craft.client.npc.NpcInfo;
 import dev.t3craft.hq.HqFixtures;
 import dev.t3craft.hq.HqInput;
 import dev.t3craft.hq.HqLayout;
-import dev.t3craft.hq.HqPlans;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
@@ -140,7 +139,7 @@ public final class DemoHqSource implements DemoStructureSource {
 				}
 			}
 			// The floor layer is the lowest HQ cell whatever the roster: use the empty HQ to size the lift.
-			int planMinY = HqPlans.generate(HqLayout.EMPTY).footprint().minY();
+			int planMinY = dev.t3craft.hq.HqEmptyPlan.of(dev.t3craft.hq.HqStyles.current()).footprint().minY();
 			int lift = DemoHq.lift(spec.originY(), worldMinY, planMinY);
 			boolean diffable = builtWithThis && previousLift == lift;
 			// feat/hq-void-world: in a void world the HQ stands on its island (grown from the one already built)

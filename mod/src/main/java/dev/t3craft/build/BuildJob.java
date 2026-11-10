@@ -331,6 +331,8 @@ public final class BuildJob {
 			materialsChanged = true;
 			cursor.resume();
 		}
+		// fix/hq-load-build-portal: a radial free job waits for the chunk instead of dropping the block (FAILED is final)
+		boolean waitForChunks = m == null && (live == null || live instanceof RadialCursor);
 		FrontCursor.Step stepFn = (front, i) -> {
 			Placement p = plan.get(i);
 			if (m != null) {
@@ -351,6 +353,9 @@ public final class BuildJob {
 				}
 			}
 			BlockPos wp = worldPos(i);
+			if (waitForChunks && !sink.loaded(wp)) {
+				return BuildCursor.Outcome.BLOCKED; // the radial streams keep the entry and look again next tick
+			}
 			BlockState ws = worldState(i);
 			BuildCursor.Outcome o = sink.place(wp, ws, m == null ? p.blockEntity() : withoutItems(p.blockEntity()));
 			if (o == BuildCursor.Outcome.PLACED) {

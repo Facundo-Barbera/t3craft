@@ -28,7 +28,8 @@ public final class DemoPlacement {
 			return viewpoint(spec);
 		}
 		try {
-			dev.t3craft.hq.BuildPlan empty = dev.t3craft.hq.HqPlans.generate(dev.t3craft.hq.HqLayout.EMPTY);
+			// fix/hq-load-build-portal: the shared empty plan (computed once, off-thread), not a new generator run per call
+			dev.t3craft.hq.BuildPlan empty = dev.t3craft.hq.HqEmptyPlan.of(style);
 			dev.t3craft.hq.Anchor spawn = empty.anchor(dev.t3craft.hq.AnchorNames.SPAWN);
 			if (spawn == null) {
 				return viewpoint(spec);

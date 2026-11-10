@@ -28,18 +28,31 @@ follows the folder live.
 ## Getting there
 
 1. Open the HQ world (title screen → T3Craft HQ). About 5 seconds after joining, chat shows
-   `Preview drop: N schematic(s) ...` with the buttons **[Showroom]**, **[Place portal here]** (until a portal
-   exists) and **[Open folder]**.
-2. **The portal.** Stand where you want it and run `/t3craft drop portal` (or press the chat button): a crying
-   obsidian arch (5 wide, 6 tall, 2 thick, opening 3×4) is built 4 blocks in front of you, across your view.
-   Walking through it takes you to the showroom. Running the command again moves it.
-   - It is remembered per world in `t3craft-drop.json` in the save folder (centre, orientation, return spot).
-   - The HQ builders know nothing about it. The HQ plan lists every cell of its modules (air included), so an
-     arch **inside** the building is overwritten by the next rebuild of that part. Put it outside the building
-     (the island's edge) or place it again after a rebuild. Nothing in the HQ plan, its fingerprints or the demo
-     marker changes because of this feature.
+   `Preview drop: N schematic(s) ...` with the buttons **[Showroom]** and **[Open folder]**.
+2. **The portal is a fixed piece of the main HQ** (fix/hq-load-build-portal, Facundo 2026-11-09: the player no
+   longer places it). A crying obsidian arch (5 wide, 6 tall, 2 thick, opening 3×4) stands at the **north end of
+   the inner street, at the foot of the north ramp**, on the street's axis, opening towards the hub: the mirror
+   image of the spawn anchor, which is the south end of that street ("where NPCs appear"). In plan coordinates
+   (hub = origin, entrance south = +z) its centre is `(0, 0, -(rampR + innerStreetR) / 2)`, which is `(0, 0, -38)`
+   at scale 1 and `(0, 0, -75)` at the default scale 2; the code takes it from the plan's `spawn` anchor
+   (`DemoWorldInfo.portalSpot`), so it follows the layout's scale. The street is 5 wide at scale 1 and 10 at
+   scale 2, so the 5-wide arch always fits. Walking through it takes you to the showroom; the showroom's arch
+   brings you back to the hub side of it (3 blocks in front, looking at the hub).
+   - Why there: it is always part of the core (present with zero projects), at ground level (no podium, no
+     terrace), clear of the NPC spawn, desks, rings and nodes, and it is the first thing you see coming down
+     the north ramp. A layout without its own ground plan (cherry) gets it 7 blocks in front of the spawn.
+   - It is **not in the HQ plan**: the plan, its fingerprints and the demo marker are unchanged. The drop module
+     keeps it standing instead: every 2 s, only once all the chunks it needs are loaded and the street under its
+     posts is built, it lays any cell of the arch that differs. So a build or rebuild that overwrote a cell of it
+     (street furniture is plan content) is undone within two seconds, and it never floats over a half-built HQ.
+   - Until the street under it is built there is no arch and the portal sends nobody; `/t3craft drop go` works
+     at any time.
+   - Worlds from the earlier version: a portal a player had placed (`t3craft-drop.json`, key `portal`) is removed
+     once when its chunks are loaded, and forgotten.
+   - The README the game wrote into the drop folder is never overwritten: an old one still talks about
+     `/t3craft drop portal`. Delete it and the game writes the new text on the next start.
 3. **No portal needed:** `/t3craft drop go` does the same from anywhere in the HQ world, `/t3craft drop back`
-   returns (to the portal's side, else to where the trip started, else to the world spawn).
+   returns (to the portal's side once it stands, else to where the trip started, else to the world spawn).
 
 ## The showroom
 
@@ -67,12 +80,11 @@ follows the folder live.
 |---|---|
 | `/t3craft drop` | folder, the schematics read (name, size, format, blocks), broken files, showroom and portal state |
 | `/t3craft drop go` / `back` | to the showroom / back |
-| `/t3craft drop portal` | place (or move) the HQ arch in front of you |
 | `/t3craft drop reload` | read every file again |
 | `/t3craft drop rebuild` | forget what was built and compare the whole showroom with the world |
 | `/t3craft drop folder` | print the folder (clickable) |
 
-`go`, `back`, `portal` and `rebuild` only work in the HQ world (integrated server running the configured demo
+`go`, `back` and `rebuild` only work in the HQ world (integrated server running the configured demo
 folder, void or flat); elsewhere they say so and do nothing. The folder reading runs everywhere, but writes no
 block outside the HQ world.
 
@@ -89,7 +101,8 @@ block outside the HQ world.
 - `dev.t3craft.drop.DropFolder`: the folder, README, incremental scan, last-good-version rule.
 - `dev.t3craft.drop.DropScene`: showroom geometry (`Scene`), the walk-through arch (`Portal`), `diff`.
 - `dev.t3craft.client.drop.DropShowroom`: the world side (server thread): diff queue, arches, teleports, the
-  per-world file.
+  per-world file, upkeep of the fixed HQ portal (`maintainPortal`).
+- `DemoWorldInfo.portalSpot`: where the fixed portal stands (from the plan's spawn anchor, via `HqEmptyPlan`).
 - `dev.t3craft.client.drop.DropClient`: client init, worker, toasts/chat, commands.
 - `dev.t3craft.client.demo.DemoWorldInfo`: read-only "is this the HQ world, and where is its origin".
 
@@ -97,7 +110,7 @@ block outside the HQ world.
 
 Written and reviewed by reading only: the rule for this task was no processes (no Gradle, Minecraft or JVM),
 so it has **not been compiled or played**. First thing to do on the PC: compile, then in the HQ world run
-`/t3craft drop portal`, drop a `.nbt` and a `.schem`, walk through, edit/replace/delete a file while standing in
+look for the fixed portal at the north end of the inner street (fix/hq-load-build-portal), drop a `.nbt` and a `.schem`, walk through, edit/replace/delete a file while standing in
 the showroom, and put a broken file in to see the error path. Things most worth a look in game: that the arch
 passes the walk-through box test at sprint speed, sign text on the pedestals, and `.schem` files from the
 editor Facundo uses (v2 vs v3, block entity data of old signs is not translated).
