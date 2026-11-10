@@ -1,7 +1,7 @@
 package dev.t3craft.client.pieces;
 
+import dev.t3craft.client.t3ui.SidebarModel;
 import java.util.List;
-import java.util.Locale;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -68,8 +68,11 @@ public record PieceEntry(String id, String name, String folder, List<String> tag
 		return size == null ? null : size.sizeClass();
 	}
 
-	/** Every word the free-text filter looks in, lower case. */
+	/**
+	 * Every word the free-text filter looks in, folded like the sidebar's search ({@link SidebarModel#fold}: lower
+	 * case, no accents), so "cafe" finds "Caf\u00e9". Fold the query the same way before matching.
+	 */
 	public String haystack() {
-		return (id + " " + name + " " + folder + " " + String.join(" ", tags)).toLowerCase(Locale.ROOT);
+		return SidebarModel.fold(id + " " + name + " " + folder + " " + String.join(" ", tags));
 	}
 }

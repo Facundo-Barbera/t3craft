@@ -109,10 +109,12 @@ public final class UiGallery {
 			new Scenario("register-project", "Kit dialog: register a project (environment select needs a paired environment; Register sends nothing without control)",
 					() -> new RegisterProjectDialog(null, null, (env, projectId) -> {
 					})),
-			new Scenario("pieces", "Piece browser as a screen of its own (the code catalog; Preview needs a world)",
+			new Scenario("pieces", "Piece browser as a screen of its own over fake pieces (folders, accents for the folded search, a piece with no size; favorites stay in memory; Preview needs the HQ world)",
+					() -> new dev.t3craft.client.pieces.PieceBrowserScreen(null, galleryPieces())),
+			new Scenario("pieces-catalog", "Piece browser over the real code catalog (favorites are the real file)",
 					() -> new dev.t3craft.client.pieces.PieceBrowserScreen(null)),
-			new Scenario("inbox-pieces", "Main T3 screen with the piece browser in the thread's place (the ⋯ menu → Pieces)",
-					() -> inbox(true, true).withPage(new dev.t3craft.client.pieces.PieceBrowserPanel())),
+			new Scenario("inbox-pieces", "Main T3 screen with the piece browser (fake pieces) in the thread's place (the ⋯ menu → Pieces)",
+					() -> inbox(true, true).withPage(galleryPieces())),
 			new Scenario("icons", "Icon gallery: every T3Icon (Lucide) in a grid on both themes, 12 px in its three states and 32 px; wheel scrolls",
 					() -> new IconGalleryScreen(null)),
 			new Scenario("model-picker", "The composer's model picker open over a fake catalog (reasoning and extra selects, switches, access, favorites, legacy, many providers)",
@@ -149,6 +151,12 @@ public final class UiGallery {
 	private static Screen confirm() {
 		OperateAction stop = OperateAction.dispatch(OperateKind.THREAD_STOP, ENV, "t-run", "fix/hq-builders-independent", new JsonObject());
 		return new ConfirmActionScreen(null, stop, ENV_LABEL, yes -> Minecraft.getInstance().gui.setScreen(null));
+	}
+
+	/** The piece browser over {@link dev.t3craft.client.pieces.GalleryPieces} (issue #30). */
+	private static dev.t3craft.client.pieces.PieceBrowserPanel galleryPieces() {
+		return dev.t3craft.client.pieces.PieceBrowserPanel.withCatalog(dev.t3craft.client.pieces.GalleryPieces.entries(),
+				dev.t3craft.client.pieces.GalleryPieces.LABEL);
 	}
 
 	private static List<EnvRow> galleryEnvs() {

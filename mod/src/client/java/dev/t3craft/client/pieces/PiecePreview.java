@@ -5,9 +5,10 @@ package dev.t3craft.client.pieces;
  * {@link #request}; whatever answers decides how the piece reaches the world and tells the browser what to
  * show as feedback ({@link Result}).
  *
- * <p>The default is {@code PiecePreviews.CommandPiecePreview}, which runs {@code /t3craft piece show <id> <front> <w> <d> <h> <seed>}.
- * The in-world preview (feat/piece-catalog-preview) can either register that command, or replace the hook with
- * {@code PiecePreviews.install(...)} and call its own API directly. See docs/features/piece-browser.md.
+ * <p>The default is {@code PiecePreviews.CommandPiecePreview}, which runs {@code /t3craft piece show <id> <min|mid|max|WxDxH> <n|e|s|w> <seed>},
+ * the command the in-world preview ({@code client/piece/PieceClient}) registers ({@link PieceRequest#command()}).
+ * Something else can replace the hook with {@code PiecePreviews.install(...)} and call its own API directly.
+ * See docs/features/piece-browser.md.
  */
 @FunctionalInterface
 public interface PiecePreview {
