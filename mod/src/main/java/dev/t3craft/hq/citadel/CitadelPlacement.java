@@ -265,6 +265,10 @@ public final class CitadelPlacement {
 		final Set<Long> taken = new HashSet<>();
 		final Set<Long> paved = new HashSet<>();
 		final Set<Long> anchorCols = new HashSet<>();
+		/** Signposts placed (struct/signposts): arrow posts on the avenues, notice boards in the plazas. */
+		int arrows;
+		int boards;
+		final StringBuilder spots = new StringBuilder();
 
 		City(CitadelCanvas c) {
 			this.c = c;
@@ -294,6 +298,11 @@ public final class CitadelPlacement {
 			}
 		}
 		hub(city);
+		if (city.arrows + city.boards > 0) {
+			String line = "[citadel] signposts: " + city.arrows + " arrow posts, " + city.boards + " notice boards" + city.spots;
+			T3Craft.LOGGER.info(line);
+			System.out.println(line); // the render report's log shows it (the logger is silent in the headless tools)
+		}
 	}
 
 	// ------------------------------------------------------------------ helpers
@@ -1790,6 +1799,7 @@ public final class CitadelPlacement {
 					build(c, Family.LAMP, k[0], 1, k[1], 1, 1, LAMP_H(), in, mix(seed, k[0] * 31L + k[1]));
 				}
 			}
+			noticeBoard(city, cx, cz, side, seed);
 			pk.take(x0, z0, side, side);
 			return true;
 		}
@@ -1992,6 +2002,163 @@ public final class CitadelPlacement {
 		ringFurniture(city, 0);
 		for (int m = 1; m <= city.c.rings; m++) {
 			ringFurniture(city, m);
+		}
+		signposts(city);
+	}
+
+	// ------------------------------------------------------------------ signposts (struct/signposts)
+
+	/** Frontage of a signpost plot, odd so the post stands in the middle of its arms (7 at scale 2). */
+	static int SIGN_W() {
+		return sp(5) | 1;
+	}
+
+	/** Depth of a signpost plot: the post's row and one row in front of it. */
+	static final int SIGN_D = 2;
+
+	/** Height of a signpost plot (8 at scale 2: a lamp's 7 plus the lantern or the ridge on top). */
+	static int SIGN_H() {
+		return scy(5) + 1;
+	}
+
+	private static final Map<String, Integer> ARROWS_ONLY = Map.of("signpost_arrows", 1, "signpost_notice_board", 0);
+	private static final Map<String, Integer> BOARD_ONLY = Map.of("signpost_arrows", 0, "signpost_notice_board", 1);
+
+	/**
+	 * Arrow posts (struct/signposts, scale 1.5 and up): two on every cardinal avenue of every ring, one at the mouth on the
+	 * ring street (facing in, for whoever walks out) and one at the mouth on the ring's inner edge (facing out, for whoever comes
+	 * in). Each stands on the avenue's edge band beside the first free spot found scanning along the avenue, never on the
+	 * middle of the road; its arms hang over the road at head height, so nothing blocks the walk.
+	 */
+	private static void signposts(City city) {
+		if (!dense() || !fitsAny(Family.SIGNPOST, SIGN_W(), SIGN_D, SIGN_H())) {
+			return;
+		}
+		for (int m = 1; m <= city.c.rings; m++) {
+			int n = RingCampusGeometry.lotsIn(m);
+			for (int k = 0; k < n; k++) {
+				if ((4 * k) % n != 0) {
+					continue; // only the cardinal avenues: an axis-aligned box spans them cleanly
+				}
+				Direction out = RingCampusGeometry.cardinal(k * 2 * Math.PI / n);
+				long seed = mix(0x516E0057L, m * 64L + k);
+				signpost(city, m, n, out, out.getOpposite(), RingCampusGeometry.ringOuter(m) - 2, -1, seed);
+				signpost(city, m, n, out, out, RingCampusGeometry.ringInner(m) + 1, 1, mix(seed, 1));
+			}
+		}
+	}
+
+	/** One arrow post on ring {@code m}'s avenue {@code out}, facing {@code face}; scans from {@code t0} along the avenue by {@code step}. */
+	private static boolean signpost(City city, int m, int n, Direction out, Direction face, int t0, int step, long seed) {
+		CitadelCanvas c = city.c;
+		int w = SIGN_W();
+		int h = SIGN_H();
+		int half = (w - 1) / 2;
+		Direction across = out.getClockWise();
+		int first = hash(seed, 0, 0, 2) == 0 ? 1 : -1;
+		int offFrom = (int) Math.ceil(AVENUE_EDGE());
+		int offTo = (int) Math.floor(CitadelCanvas.dims().avenueHalf);
+		for (int i = 0; i <= 3 * LAMP_STEP(); i++) {
+			int t = t0 + step * i;
+			for (int s = 0; s < 2; s++) {
+				for (int off = offFrom; off <= offTo; off++) {
+					BlockPos post = BlockPos.ZERO.relative(out, t).relative(across, (s == 0 ? first : -first) * off);
+					BlockPos step1 = post.relative(face);
+					if (!avenueEdge(city, m, n, post.getX(), post.getZ(), h) || !avenueEdge(city, m, n, step1.getX(), step1.getZ(), h)) {
+						continue;
+					}
+					// the plot: SIGN_W across the road, SIGN_D along it, from the post's row towards the front
+					int x0 = Integer.MAX_VALUE;
+					int z0 = Integer.MAX_VALUE;
+					int x1 = Integer.MIN_VALUE;
+					int z1 = Integer.MIN_VALUE;
+					boolean ok = true;
+					for (int a = -half; a <= half && ok; a++) {
+						for (int j = 0; j < SIGN_D && ok; j++) {
+							BlockPos q = post.relative(across, a).relative(face, j);
+							ok = airColumn(city, q.getX(), q.getZ(), a == 0 ? 1 : 2, h);
+							x0 = Math.min(x0, q.getX());
+							z0 = Math.min(z0, q.getZ());
+							x1 = Math.max(x1, q.getX());
+							z1 = Math.max(z1, q.getZ());
+						}
+					}
+					if (ok && build(c, Family.SIGNPOST, x0, 1, z0, x1 - x0 + 1, z1 - z0 + 1, h, face, mix(seed, 7), ARROWS_ONLY)) {
+						takeBox(city, x0, z0, x1 - x0 + 1, z1 - z0 + 1);
+						city.arrows++;
+						city.spots.append(" A(").append(post.getX()).append(',').append(post.getZ()).append(')');
+						return true;
+					}
+				}
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * A column with nothing in it from {@code from} up to {@code top} and outside the node rooms. A sign's arms hang over such
+	 * a column from {@code from = 2}, so the plants of the lot beside the road do not count.
+	 */
+	private static boolean airColumn(City city, int x, int z, int from, int top) {
+		CitadelCanvas c = city.c;
+		if (c.zoneAt(x, z).kind() == Kind.NODE || city.anchorCols.contains(col(x, z))) {
+			return false;
+		}
+		for (int y = from; y <= top; y++) {
+			if (!clear(c.at(x, y, z))) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * A notice board in every empty lot's plaza that has room (struct/signposts, scale 1.5 and up): in the walk ring
+	 * beside the plaza's outer edge, on the quarter of a side (clear of the lanes that cross the middle, of the corner lamps
+	 * and of the benches on the diagonals), facing the plaza's middle. One at most per plaza.
+	 */
+	private static void noticeBoard(City city, int cx, int cz, int side, long seed) {
+		if (!dense() || !fitsAny(Family.SIGNPOST, SIGN_W(), SIGN_D, SIGN_H())) {
+			return;
+		}
+		CitadelCanvas c = city.c;
+		int w = SIGN_W();
+		int h = SIGN_H();
+		int half = side / 2;
+		int hb = (w - 1) / 2;
+		int start = hash(seed, cz, cx, 4);
+		for (int sd = 0; sd < 4; sd++) {
+			Direction wall = Direction.from2DDataValue((start + sd) & 3);
+			Direction face = wall.getOpposite();
+			Direction along = wall.getClockWise();
+			for (int q = half - hb - 2; q >= hb + 3; q--) {
+				for (int sg = 0; sg < 2; sg++) {
+					int a = (sg == 0) == (hash(seed, sd, q, 2) == 0) ? q : -q;
+					int x0 = Integer.MAX_VALUE;
+					int z0 = Integer.MAX_VALUE;
+					int x1 = Integer.MIN_VALUE;
+					int z1 = Integer.MIN_VALUE;
+					boolean ok = true;
+					for (int i = -hb; i <= hb && ok; i++) {
+						for (int j = 0; j < SIGN_D && ok; j++) {
+							BlockPos q0 = new BlockPos(cx, 0, cz).relative(wall, half - j).relative(along, a + i);
+							long k = col(q0.getX(), q0.getZ());
+							ok = city.paved.contains(k) && !city.taken.contains(k) && !clear(c.at(q0.getX(), 0, q0.getZ()))
+									&& airColumn(city, q0.getX(), q0.getZ(), 1, h);
+							x0 = Math.min(x0, q0.getX());
+							z0 = Math.min(z0, q0.getZ());
+							x1 = Math.max(x1, q0.getX());
+							z1 = Math.max(z1, q0.getZ());
+						}
+					}
+					if (ok && build(c, Family.SIGNPOST, x0, 1, z0, x1 - x0 + 1, z1 - z0 + 1, h, face, mix(seed, 0xB0A2DL), BOARD_ONLY)) {
+						takeBox(city, x0, z0, x1 - x0 + 1, z1 - z0 + 1);
+						city.boards++;
+						city.spots.append(" B(").append(x0).append(',').append(z0).append(')');
+						return;
+					}
+				}
+			}
 		}
 	}
 
