@@ -8,6 +8,7 @@ import dev.t3craft.client.chat.Rect;
 import dev.t3craft.client.chat.ThreadRow;
 import dev.t3craft.client.t3ui.SidebarModel;
 import dev.t3craft.client.t3ui.T3Slots;
+import dev.t3craft.client.t3ui.kit.T3Icon;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -28,7 +29,7 @@ import org.jspecify.annotations.Nullable;
  *   <li><b>Top</b>, scrolling on its own: Pinned and the project folders of {@link SidebarModel#items()},
  *       with rich 2–3 line rows ({@link SidebarRow}).</li>
  *   <li><b>Dock</b>, stuck to the bottom just above the footer icons: {@link SidebarModel#dock()}
- *       (Working with its count, open; Snoozed and Settled closed, with "›"). An open section with
+ *       (Working with its count, open; Snoozed and Settled closed, with a right chevron). An open section with
  *       many threads scrolls on its own inside a capped height; the dock never takes more than
  *       {@value #DOCK_MAX_PCT}% of the list.</li>
  * </ul>
@@ -39,8 +40,12 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>The screen keeps the actions: a {@link Host} opens a thread, prewarms on hover, runs the hover
  * quick actions (settle, pin) and opens the right-click menu (feat/t3-ui-clean). feat/t3-composer:
- * the draft thread ({@link Host#draftKey()}) is a rich row "New thread" under its project with a ✕
- * on hover, and hovering a project folder shows its "+" (a new draft thread there). Client thread only.
+ * the draft thread ({@link Host#draftKey()}) is a rich row "New thread" under its project with an x
+ * on hover, and hovering a project folder shows its plus (a new draft thread there). Client thread only.
+ *
+ * <p>#27: every glyph is a {@link T3Icon} (chevrons of folders and dock sections, plus, check, star, x):
+ * muted at rest, accent under the pointer, disabled colour when it cannot be used; the pin star is brass
+ * while the thread is pinned. Hit boxes and tooltips are the same as with the old glyphs.
  */
 public final class SidebarView {
 	/** Folder / Pinned header row in the top list. */
@@ -52,6 +57,10 @@ public final class SidebarView {
 	static final int MAIN_MIN = 34;
 	static final int WHEEL_PX = 24;
 	static final int SCROLLBAR_W = 7;
+	/** Folder and dock chevrons (#27). */
+	static final int CHEVRON = 8;
+	/** Hover quick-action icons (settle, pin, plus, x) inside their 11 px boxes. */
+	static final int QUICK_ICON = 9;
 
 	/** What the screen does for the sidebar. */
 	public interface Host {
@@ -448,8 +457,10 @@ public final class SidebarView {
 			plusR = new Rect(right - 13, rr.y(), 11, rr.h());
 			right = plusR.x() - 2;
 		}
-		String arrow = it.collapsed() ? "› " : "▾ ";
-		g.text(font, clips.clip(font, arrow + it.label(), right - rr.x() - 4), rr.x() + 2, ty, section ? t.brass() : t.muted(), false);
+		int labelColor = section ? t.brass() : t.muted();
+		T3Icon.draw(g, t, it.collapsed() ? T3Icon.CHEVRON_RIGHT : T3Icon.CHEVRON_DOWN, rr.x() + 2, rr.y() + (rr.h() - CHEVRON) / 2, CHEVRON, labelColor);
+		int lx = rr.x() + 2 + CHEVRON + 2;
+		g.text(font, clips.clip(font, it.label(), right - lx - 2), lx, ty, labelColor, false);
 		String folder = it.key();
 		List<String> tip = new ArrayList<>();
 		tip.add(it.label() + " · " + it.count() + (it.count() == 1 ? " thread" : " threads"));
@@ -460,7 +471,7 @@ public final class SidebarView {
 		hits.add(new Hit(hitR, () -> model.toggleCollapsed(folder),
 				section ? null : () -> model.setProject(folder.equals(model.project()) ? null : folder), tip));
 		if (plus && clip(plusR, hitR).h() > 0) {
-			quickIcon(g, font, t, plusR, "+", true, mouseX, mouseY);
+			quickIcon(g, t, plusR, T3Icon.PLUS, true, 0, mouseX, mouseY);
 			hits.add(new Hit(clip(plusR, hitR), () -> host.newThreadIn(folder), null, List.of("New thread in " + it.label())));
 		}
 	}
@@ -470,9 +481,8 @@ public final class SidebarView {
 			SidebarRow.roundBox(g, head, t.hover(), 0);
 		}
 		int ty = head.y() + (head.h() - 8) / 2;
-		String chevron = d.collapsed() ? "›" : "▾";
-		int right = head.right() - 3 - clips.width(font, chevron);
-		g.text(font, chevron, right, ty, t.muted(), false);
+		int right = head.right() - 3 - CHEVRON;
+		T3Icon.draw(g, t, d.collapsed() ? T3Icon.CHEVRON_RIGHT : T3Icon.CHEVRON_DOWN, right, head.y() + (head.h() - CHEVRON) / 2, CHEVRON, t.muted());
 		String count = Integer.toString(d.count());
 		right -= 4 + clips.width(font, count);
 		g.text(font, count, right, ty, t.muted(), false);
@@ -511,8 +521,9 @@ public final class SidebarView {
 			Rect pinR = new Rect(rr.right() - 14, qy, 11, SidebarRow.LINE + 2);
 			Rect settleR = new Rect(pinR.x() - 11, qy, 11, SidebarRow.LINE + 2);
 			boolean pinned = r.pinned();
-			quickIcon(g, font, t, settleR, "✓", can, mouseX, mouseY);
-			quickIcon(g, font, t, pinR, pinned ? "★" : "☆", can, mouseX, mouseY);
+			quickIcon(g, t, settleR, T3Icon.CHECK, can, 0, mouseX, mouseY);
+			// one stroke sprite, so pinned vs not is the tint: brass pinned, muted not (accent under the pointer)
+			quickIcon(g, t, pinR, T3Icon.STAR, can, pinned ? t.brass() : 0, mouseX, mouseY);
 			String ro = can ? "" : " (needs control)";
 			if (clip(settleR, hitR).h() > 0) {
 				hits.add(new Hit(clip(settleR, hitR), () -> {
@@ -529,28 +540,35 @@ public final class SidebarView {
 		}
 	}
 
-	/** The draft thread's row (feat/t3-composer): project line, "✎ New thread", a ✕ on hover discards it. */
+	/** The draft thread's row (feat/t3-composer): project line, pen + "New thread", an x on hover discards it. */
 	private void drawDraft(GuiGraphicsExtractor g, Font font, ChatTheme t, Rect rr, Rect hitR, ThreadRow r, boolean selected, boolean hover,
 			boolean multi, int mouseX, int mouseY) {
 		SidebarRow.drawDraft(g, font, t, clips, rr, r, selected, hover, multi);
 		if (hitR.h() <= 0) {
 			return;
 		}
-		hits.add(new Hit(hitR, () -> host.open(r), null, List.of("New thread · " + SidebarRow.projectLabel(r), "Esc or ✕ discards it")));
+		hits.add(new Hit(hitR, () -> host.open(r), null, List.of("New thread · " + SidebarRow.projectLabel(r), "Esc or the x discards it")));
 		if (hover) {
 			Rect xr = new Rect(rr.right() - 14, rr.y() + 1, 11, SidebarRow.LINE + 2);
-			quickIcon(g, font, t, xr, "✕", true, mouseX, mouseY);
+			quickIcon(g, t, xr, T3Icon.X, true, 0, mouseX, mouseY);
 			if (clip(xr, hitR).h() > 0) {
 				hits.add(new Hit(clip(xr, hitR), host::discardDraft, null, List.of("Discard the draft")));
 			}
 		}
 	}
 
-	private static void quickIcon(GuiGraphicsExtractor g, Font font, ChatTheme t, Rect r, String glyph, boolean enabled, int mouseX, int mouseY) {
+	/**
+	 * A hover quick action: the icon centred in {@code r} (which stays the hit box), muted at rest (or
+	 * {@code rest} when its alpha is not 0, e.g. brass for a pinned star), accent under the pointer, disabled
+	 * colour when it cannot be used.
+	 */
+	private static void quickIcon(GuiGraphicsExtractor g, ChatTheme t, Rect r, T3Icon icon, boolean enabled, int rest, int mouseX, int mouseY) {
 		boolean hover = r.contains(mouseX, mouseY);
 		if (hover && enabled) {
 			ChatDraw.round(g, r.x(), r.y(), r.w(), r.h(), t.panel());
 		}
-		g.text(font, glyph, r.x() + (r.w() - font.width(glyph)) / 2, r.y() + 2, !enabled ? t.disabled() : hover ? t.accent() : t.muted(), false);
+		int size = Math.min(QUICK_ICON, Math.min(r.w(), r.h()));
+		int tint = !enabled ? t.disabled() : hover ? t.accent() : (rest >>> 24) != 0 ? rest : t.muted();
+		T3Icon.draw(g, t, icon, r.x() + (r.w() - size) / 2, r.y() + (r.h() - size) / 2, size, tint);
 	}
 }

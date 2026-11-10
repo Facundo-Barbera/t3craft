@@ -168,6 +168,7 @@ tuning; combined with F3+T it is the fast loop for visual work.
 | `launch` | The main T3 screen with a new-thread draft open in the composer (what "New thread" does; needs a paired environment with projects, otherwise it shows the plain inbox) |
 | `confirm`, `snooze` | Kit dialogs: the destructive-action confirmation and the snooze presets |
 | `pair`, `pair-readonly`, `operate-pair` | Kit dialogs: pairing (control by default / read-only) and enable-control |
+| `inbox-icons` | The main T3 screen with every sidebar and header icon in use (#27): pinned stars, folder and dock chevrons, Working / Snoozed / Settled, a worktree row, the agents chip with active and finished children |
 | `icons` | The icon gallery (#24): every `T3Icon` in a grid on both themes, 12 px in its three states and 32 px; the wheel scrolls (`docs/tools/icons.md`) |
 | `queue` | The queued-runs screen (reads the live queue) |
 
