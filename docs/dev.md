@@ -168,7 +168,7 @@ tuning; combined with F3+T it is the fast loop for visual work.
 |---|---|
 | `inbox`, `inbox-readonly`, `inbox-empty` | The main T3 screen: every thread state and a running conversation / read-only / no threads |
 | `inbox-settings`, `inbox-environments` | The main T3 screen with the settings / environment-list page in the thread's place (what the sidebar's gear and cloud open) |
-| `settings`, `settings-notifications`, `settings-connections`, `environments` | The same pages as screens of their own (a tab each; fake environments) |
+| `settings`, `settings-notifications`, `settings-connections`, `settings-world-text`, `environments` | The same pages as screens of their own (a tab each; fake environments) |
 | `launch` | The main T3 screen with a new-thread draft open in the composer (what "New thread" does; needs a paired environment with projects, otherwise it shows the plain inbox) |
 | `confirm`, `snooze` | Kit dialogs: the destructive-action confirmation and the snooze presets |
 | `pair`, `pair-readonly`, `operate-pair` | Kit dialogs: pairing (control by default / read-only) and enable-control |

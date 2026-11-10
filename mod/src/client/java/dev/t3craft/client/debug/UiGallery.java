@@ -120,6 +120,8 @@ public final class UiGallery {
 					() -> new T3PanelScreen(null, new SettingsPanel(EnvironmentActions.DEFAULT).tab(1))),
 			new Scenario("settings-connections", "Settings, Connections tab (links and the dangerous button)",
 					() -> new T3PanelScreen(null, new SettingsPanel(EnvironmentActions.DEFAULT).tab(2))),
+			new Scenario("settings-world-text", "Settings, World text tab (style select, plate limits, source switches, Reset to defaults; Save writes the real config)",
+					() -> new T3PanelScreen(null, new SettingsPanel(EnvironmentActions.DEFAULT).tab(3))),
 			new Scenario("environments", "Environment list with fake environments (ok, connecting, offline, one with control)",
 					() -> new T3PanelScreen(null, new EnvironmentsPanel(galleryActions()))),
 			new Scenario("environment-edit", "Environment edit page (name, accent swatches, switches, window and cap; Save writes the real config under the fake id 'studio')",

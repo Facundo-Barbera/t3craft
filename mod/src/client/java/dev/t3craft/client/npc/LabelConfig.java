@@ -46,6 +46,9 @@ import org.jspecify.annotations.Nullable;
 public record LabelConfig(boolean compact, double detailDistance, int titleMax, double nearDistance, int maxVisible, int maxPanels,
 		boolean declutter, Sources sources, boolean hologramStyle) {
 	public static final String KEY = "labels";
+	/** Largest {@code nearDistance} (blocks) and largest {@code maxVisible} / {@code maxPanels} the parser accepts (and Settings offers). */
+	public static final double NEAR_MAX = 128;
+	public static final int COUNT_MAX = 256;
 
 	/**
 	 * {@code labels.hologram}: one switch per world-text source.
@@ -100,15 +103,15 @@ public record LabelConfig(boolean compact, double detailDistance, int titleMax, 
 			max = DEFAULTS.titleMax;
 		}
 		double near = num(o, "nearDistance", DEFAULTS.nearDistance);
-		if (!(near >= 0 && near <= 128)) {
+		if (!(near >= 0 && near <= NEAR_MAX)) {
 			near = DEFAULTS.nearDistance;
 		}
 		int visible = (int) num(o, "maxVisible", DEFAULTS.maxVisible);
-		if (visible < 0 || visible > 256) {
+		if (visible < 0 || visible > COUNT_MAX) {
 			visible = DEFAULTS.maxVisible;
 		}
 		int panels = (int) num(o, "maxPanels", DEFAULTS.maxPanels);
-		if (panels < 0 || panels > 256) {
+		if (panels < 0 || panels > COUNT_MAX) {
 			panels = DEFAULTS.maxPanels;
 		}
 		boolean declutter = bool(o, "declutter", DEFAULTS.declutter);
