@@ -135,6 +135,11 @@ Quedan como estaban:
 - Falta: compilar en el PC (`tools/heavy.sh`) y probar en el cliente de Facundo: `/t3craft piece show hq_hub` (¿cabe el edificio central, cuánto tarda, el vestíbulo sube antes del teletransporte?), `next`/`prev` por `house`, `front e`, `size 12x12x14`, `reload` tras un hot swap, `clear` y el arco de vuelta. Línea RESTART en `docs/CHANGELOG-dev.md`.
 - No toca el preview-drop (carpeta, recinto y portal siguen como están): solo archivos nuevos más una línea en `T3CraftClient`.
 
+### `feat/algo-map-generators`: escrita sin compilar ni jugar (pendiente de ejecución)
+- Interfaz `dev.t3craft.mapgen` (generador, huecos, piezas), el HQ descrito en ese modelo (`hq.CitadelMapGenerator`, sin tocar el pintor) y el mapa nuevo de islas flotantes con puentes en tiempo real; doc en `docs/features/algo-map-generators.md`.
+- Falta: compilar en el PC (`tools/heavy.sh`: `compileJava compileClientJava`) y probar `/t3craft islands`: isla de aparición lista antes de entrar, puente que crece al acercarse a un borde, islas lejanas que se construyen al andar, caída al vacío con rescate. Línea RESTART en `docs/CHANGELOG-dev.md` (nuevo entrypoint cliente).
+- Toca `VanillaDemoWorld` (ahora público), `HqStyle`/`RingCampusStyle` (un método nuevo) y `fabric.mod.json`; no cambia el mundo HQ.
+
 ### Siguiente, en orden
 1. **Aprobación de Facundo:**
    - plan de limpieza de código (`docs/plans/code-cleanup.md`, decisiones D1–D5);

@@ -76,6 +76,11 @@ public final class RingCampusStyle extends HqStyle {
 		return new RingCampusGenerator(this).generate(layout);
 	}
 
+	@Override
+	public dev.t3craft.mapgen.MapLayout mapLayout(HqLayout layout) {
+		return new CitadelMapGenerator().generate(layout);
+	}
+
 	private static Map<Role, BlockState> palette0() {
 		Map<Role, BlockState> m = new EnumMap<>(Role.class);
 		m.putAll(new CherryStyle().palette());
