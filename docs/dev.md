@@ -5,6 +5,10 @@ that runs it is not 25 (foojay resolver in `settings.gradle`).
 
 ## Fast loop
 
+The mod runs in **direct mode** by default (it pairs with each T3 environment itself, `/t3craft pair`); nothing else
+needs to run next to it. The bridge (`bridge/`) is legacy and frozen (`bridge/README.md`): you do not need it to
+develop or test the mod.
+
 **Este repo no usa tests unitarios; prohibido agregarlos o correrlos. Verificación = compilar.**
 Gradle blocks them outright (`mod/build.gradle`): no test source set, every `Test` task disabled,
 and `check`/`build` only compile.
@@ -269,7 +273,7 @@ Rules of thumb for hot-swap-friendly code:
   Static holders of JDK types (`String`, `int`, `Map<String, String>`) are fine; static holders of
   your own records/classes need a `Resettable`.
 - A reset must be idempotent, non-blocking, and must not throw (it is isolated anyway).
-- Keep state rebuildable from the source of truth (config, T3 snapshot, bridge) so a reset is
+- Keep state rebuildable from the source of truth (config, T3 snapshot; the bridge is legacy) so a reset is
   cheap: clear, mark dirty, let the next tick rebuild.
 - Do not change `Resettable`'s shape: it is the one type shared across hot-swaps.
 - New fields on entrypoints (`T3CraftClient`, `*Client`) must be lazy or null-guarded:
