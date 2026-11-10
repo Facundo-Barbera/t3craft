@@ -260,6 +260,11 @@ real floor = a sixth of the columns and 12 cells, smallest storey 3, 6 rounds pe
   built like any other site.
 - **No scaffolds or banners** (decision 15): the only sign of a site opening is the crew arriving together.
 - **The ground between sites**, beyond the aprons, the carpet, the trail and the corridor, waits for the last sweep.
+- **Small works are sites too.** The rules know the citadel's groups (`lot_` + `module_`, `ring_`, `node_`,
+  `grounds`). A layout with many small groups (the classic one has a group per desk) gets a site, a crew arriving
+  and a storey gate for each of them. Joining small works to the building around them is not done.
+- **Commit `b591cdda` (phase 2) does not compile on its own**: an edit left a second copy of part of
+  `SiteCursor.java`. The next commit (`51075508`) removes it. Build from the tip of the branch.
 - **Numbers are first guesses**: storey 5, bay 6, crew 2–6, hold 1 s, the real-floor threshold, apron 3.
 - The perf timers reuse the radial keys (`step.build.radial*.ns`).
 
