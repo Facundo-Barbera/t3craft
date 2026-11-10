@@ -11,7 +11,8 @@ import net.minecraft.network.chat.Component;
 
 /**
  * Text helpers of the UI kit: wrapping on plain strings (so every line is drawn with the theme's shadow
- * flag, never the vanilla default shadow), the colour of a {@link Tone} and the shared tooltip call.
+ * flag, never the vanilla default shadow), the colour of a {@link Tone}, notices (an icon before wrapped
+ * text) and the shared tooltip call.
  */
 public final class T3Draw {
 	/** What a line of text means; the theme decides the colour. */
@@ -32,6 +33,28 @@ public final class T3Draw {
 			case CODE -> t.inlineCode();
 			case TITLE -> t.accent();
 		};
+	}
+
+	/** The icon of a notice in {@code tone}: a triangle for a warning or an error, a check for OK, otherwise info. */
+	public static T3Icon noticeIcon(Tone tone) {
+		return switch (tone) {
+			case WARN, ERROR -> T3Icon.TRIANGLE_EXCLAMATION_POINT;
+			case OK -> T3Icon.CIRCLE_CHECK;
+			default -> T3Icon.INFO;
+		};
+	}
+
+	/** Space a notice's icon takes before its text. */
+	public static final int NOTICE_INDENT = T3Icon.SIZE + 4;
+
+	/**
+	 * A notice: {@link #noticeIcon} (in the tone's colour, centred on the first line) and {@code s} wrapped to the
+	 * rest of {@code w}. Returns the y under the last line.
+	 */
+	public static int notice(GuiGraphicsExtractor g, Font font, ChatTheme t, Tone tone, String s, int x, int y, int w) {
+		int color = color(t, tone);
+		T3Icon.draw(g, t, noticeIcon(tone), x, y + 4 - T3Icon.SIZE / 2, T3Icon.SIZE, color);
+		return wrapped(g, font, t, s, x + NOTICE_INDENT, y, w - NOTICE_INDENT, color, 0);
 	}
 
 	/** Line height of wrapped text. */
@@ -118,7 +141,10 @@ public final class T3Draw {
 		}
 	}
 
-	/** A 7 x 4 px down-pointing triangle with its top-left at ({@code x}, {@code y}): the drop-down caret, drawn so no glyph is needed. */
+	/**
+	 * A 7 x 4 px down-pointing triangle with its top-left at ({@code x}, {@code y}), drawn so no glyph is needed.
+	 * The kit's own controls use {@link T3Icon#CHEVRON_DOWN} now; kept for callers outside the kit.
+	 */
 	public static void caret(GuiGraphicsExtractor g, int x, int y, int color) {
 		g.fill(x, y, x + 7, y + 1, color);
 		g.fill(x + 1, y + 1, x + 6, y + 2, color);
@@ -126,7 +152,7 @@ public final class T3Draw {
 		g.fill(x + 3, y + 3, x + 4, y + 4, color);
 	}
 
-	/** A check mark inside a 10 x 10 box whose top-left is ({@code x}, {@code y}). */
+	/** A check mark drawn with fills inside a 10 x 10 box whose top-left is ({@code x}, {@code y}); {@link T3Check} uses {@link T3Icon#CHECK} now. */
 	public static void tick(GuiGraphicsExtractor g, int x, int y, int color) {
 		int[][] px = {{2, 5}, {3, 6}, {4, 7}, {5, 6}, {6, 5}, {7, 4}, {8, 3}};
 		for (int[] p : px) {

@@ -14,9 +14,11 @@ import org.jspecify.annotations.Nullable;
  * fill (destructive), {@link Style#GHOST} has no box until hovered (toolbars). The default style is the
  * pill of {@code T3Screen}: raised highlight, 1 px rule, accent on hover.
  *
- * <p>It can carry a {@link T3Icon} (drawn in the same colour as the label, so every style and state tints it
- * alike): icon + label, or an icon alone when the label is {@code null} or empty (give it a tooltip with
- * {@link #setTooltip}). For a borderless icon button in a toolbar or the sidebar see {@link T3IconButton}.
+ * <p>It can carry a {@link T3Icon}: icon + label, or an icon alone when the label is {@code null} or empty
+ * ({@link #iconOnly} gives it its tooltip too). On the filled styles ({@code PRIMARY}, {@code DANGER}) the icon
+ * takes the label's colour; on {@code DEFAULT} and {@code GHOST} it follows {@link T3Icon#tint}: muted at
+ * rest, accent under the pointer, disabled when disabled. For a borderless icon button in a toolbar or the
+ * sidebar see {@link T3IconButton}.
  */
 public final class T3Button extends T3Control {
 	public enum Style {
@@ -50,6 +52,13 @@ public final class T3Button extends T3Control {
 	public T3Button(T3Icon icon, @Nullable String label, Style style, Runnable action) {
 		this(label == null ? "" : label, style, action);
 		this.icon = icon;
+	}
+
+	/** An icon-only button with its tooltip (the icon says nothing by itself). */
+	public static T3Button iconOnly(T3Icon icon, String tooltip, Style style, Runnable action) {
+		T3Button b = new T3Button(icon, null, style, action);
+		b.setTooltip(tooltip);
+		return b;
 	}
 
 	public String label() {
@@ -138,14 +147,16 @@ public final class T3Button extends T3Control {
 		if ((edge >>> 24) != 0) {
 			ChatDraw.outline(g, r.x(), r.y(), r.w(), r.h(), edge);
 		}
+		boolean filled = enabled() && (style == Style.PRIMARY || style == Style.DANGER);
+		int iconTint = filled ? text : T3Icon.tint(t, hover, enabled());
 		if (icon == null) {
 			T3Draw.centered(g, font, t, label, r.x(), r.y(), r.w(), r.h(), text);
 		} else if (label.isEmpty()) {
-			T3Icon.draw(g, t, icon, r.x() + (r.w() - T3Icon.SIZE) / 2, r.y() + (r.h() - T3Icon.SIZE) / 2, T3Icon.SIZE, text);
+			T3Icon.draw(g, t, icon, r.x() + (r.w() - T3Icon.SIZE) / 2, r.y() + (r.h() - T3Icon.SIZE) / 2, T3Icon.SIZE, iconTint);
 		} else {
 			String shown = ChatDraw.clip(font, label, r.w() - 4 - T3Icon.SIZE - ICON_GAP);
 			int x = r.x() + (r.w() - (T3Icon.SIZE + ICON_GAP + font.width(shown))) / 2;
-			T3Icon.draw(g, t, icon, x, r.y() + (r.h() - T3Icon.SIZE) / 2, T3Icon.SIZE, text);
+			T3Icon.draw(g, t, icon, x, r.y() + (r.h() - T3Icon.SIZE) / 2, T3Icon.SIZE, iconTint);
 			g.text(font, shown, x + T3Icon.SIZE + ICON_GAP, r.y() + (r.h() - 8) / 2, text, t.shadow());
 		}
 		drawFocus(g, t);

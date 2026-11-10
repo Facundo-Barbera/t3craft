@@ -10,6 +10,7 @@ import dev.t3craft.client.t3ui.kit.T3Button;
 import dev.t3craft.client.t3ui.kit.T3Control;
 import dev.t3craft.client.t3ui.kit.T3Draw;
 import dev.t3craft.client.t3ui.kit.T3Draw.Tone;
+import dev.t3craft.client.t3ui.kit.T3Icon;
 import dev.t3craft.client.t3ui.kit.T3List;
 import dev.t3craft.client.t3ui.kit.T3Panel;
 import dev.t3craft.t3.Pairing;
@@ -24,14 +25,15 @@ import org.jspecify.annotations.Nullable;
 /**
  * Paired T3 environments as a page of the UI kit (docs/features/ui-kit.md): a {@link T3List} with the
  * status, show/hide, edit (name, colour, filter), unpair, control ("Enable control" upgrades a read-only
- * pairing / "Revoke" goes back to read-only) and, in the header, "Pair new…" (read + control by default:
+ * pairing / "Revoke" goes back to read-only) and, in the header, "Pair new..." (read + control by default:
  * paste the link, or the code plus the T3 URL). Shows ids, labels, URLs and connection status only: never a
  * token. Lives inside {@code T3Screen} (☁ in the sidebar) and as {@link EnvironmentsScreen}.
  */
 public final class EnvironmentsPanel extends T3Panel {
 	/** Narrower text columns than this put a row's buttons on a line of their own. */
 	private static final int MIN_TEXT_W = 90;
-	private static final int[] BUTTON_W = {50, 50, 50, 96};
+	/** Show/Hide (eye), Edit (pencil), Unpair (trash; 8 px wider for the icon), control. */
+	private static final int[] BUTTON_W = {50, 50, 58, 96};
 	private static final int GAP = 4;
 	/** Total width of a row's buttons. */
 	private static final int BUTTONS_W = BUTTON_W[0] + BUTTON_W[1] + BUTTON_W[2] + BUTTON_W[3] + 3 * GAP;
@@ -92,9 +94,9 @@ public final class EnvironmentsPanel extends T3Panel {
 
 	@Override
 	protected void arrangeHeader(Rect header) {
-		pin(new T3Button("Pair new…", T3Button.Style.PRIMARY, () -> host().openScreen(actions.pairScreen(host().screen()))), header.x(), header.y(), 90,
-				T3Control.H);
-		pin(new T3Button("Refresh", () -> host().relayout()), header.x() + 94, header.y(), 70, T3Control.H);
+		pin(new T3Button(T3Icon.PLUS, "Pair new...", T3Button.Style.PRIMARY, () -> host().openScreen(actions.pairScreen(host().screen()))), header.x(),
+				header.y(), 90, T3Control.H);
+		pin(new T3Button(T3Icon.REFRESH_CW, "Refresh", () -> host().relayout()), header.x() + 94, header.y(), 70, T3Control.H);
 	}
 
 	@Override
@@ -108,7 +110,7 @@ public final class EnvironmentsPanel extends T3Panel {
 		rowLayout = DialogLayout.EnvRow.of(body.w() - 14, BUTTONS_W, MIN_TEXT_W);
 		list.setRowHeight(rowLayout.rowH());
 		list.setItems(rows);
-		list.setEmptyText("No T3 environment paired yet. Use \"Pair new…\".\n\nOn the T3 host: " + Pairing.pairingHostCommand(false, null)
+		list.setEmptyText("No T3 environment paired yet. Use \"Pair new...\".\n\nOn the T3 host: " + Pairing.pairingHostCommand(false, null)
 				+ "\n\n(read-only: " + Pairing.pairingHostCommand(true, null) + ")");
 		buttons.clear();
 		T3CraftSettings s = ConfigManager.get().settings();
@@ -120,7 +122,7 @@ public final class EnvironmentsPanel extends T3Panel {
 	}
 
 	private List<T3Button> rowButtons(EnvRow r, EnvPrefs p) {
-		T3Button visibility = new T3Button(p.visible() ? "Hide" : "Show", () -> {
+		T3Button visibility = new T3Button(p.visible() ? T3Icon.EYE_OFF : T3Icon.EYE, p.visible() ? "Hide" : "Show", () -> {
 			ConfigManager.SaveResult res = ConfigManager.get().update(st -> st.withEnv(r.id(), st.env(r.id()).withVisible(!st.env(r.id()).visible())));
 			if (res.ok()) {
 				actions.reload();
@@ -130,8 +132,8 @@ public final class EnvironmentsPanel extends T3Panel {
 			}
 			host().relayout();
 		});
-		T3Button edit = new T3Button("Edit", () -> host().show(new EnvironmentEditPanel(actions, r)));
-		T3Button unpair = new T3Button("Unpair", () -> confirm("Unpair " + r.label() + "?",
+		T3Button edit = new T3Button(T3Icon.PENCIL, "Edit", () -> host().show(new EnvironmentEditPanel(actions, r)));
+		T3Button unpair = new T3Button(T3Icon.TRASH, "Unpair", () -> confirm("Unpair " + r.label() + "?",
 				List.of("Deletes the local session(s) for " + r.url() + " (read and control)"
 						+ ". Revoke it on the host too: t3 auth session list / t3 auth session revoke <id>."),
 				null, "Unpair", true, () -> {

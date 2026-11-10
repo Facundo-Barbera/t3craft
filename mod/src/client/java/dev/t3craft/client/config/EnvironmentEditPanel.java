@@ -11,6 +11,7 @@ import dev.t3craft.client.t3ui.kit.T3Control;
 import dev.t3craft.client.t3ui.kit.T3Draw;
 import dev.t3craft.client.t3ui.kit.T3Draw.Tone;
 import dev.t3craft.client.t3ui.kit.T3Field;
+import dev.t3craft.client.t3ui.kit.T3Icon;
 import dev.t3craft.client.t3ui.kit.T3Panel;
 import dev.t3craft.client.t3ui.kit.T3Toggle;
 import java.util.ArrayList;
@@ -75,7 +76,7 @@ public final class EnvironmentEditPanel extends T3Panel {
 	protected void arrangeFooter(Rect footer) {
 		int y = footer.y() + 5;
 		int bw = 56;
-		pin(new T3Button("Back", () -> host().back()), footer.right() - bw, y, bw, T3Control.H);
+		pin(new T3Button(T3Icon.CHEVRON_LEFT, "Back", () -> host().back()), footer.right() - bw, y, bw, T3Control.H);
 		pin(new T3Button("Save", T3Button.Style.PRIMARY, this::save), footer.right() - 2 * bw - 4, y, bw, T3Control.H);
 		int textW = footer.w() - 2 * bw - 14;
 		List<String> lines = T3Draw.wrap(font(), status, textW, 2);
@@ -118,9 +119,9 @@ public final class EnvironmentEditPanel extends T3Panel {
 		y = text(x + 4, y, w - 8, "Max NPCs", Tone.MUTED);
 		placeField(maxField(), x, y + 1, w);
 		y += T3Control.H + 5;
-		y = text(x + 4, y, w - 8, "Leave a number blank to use the global value from Settings.", Tone.MUTED) + 8;
+		y = notice(x + 4, y, w - 8, "Leave a number blank to use the global value from Settings.", Tone.MUTED) + 8;
 
-		T3Button reset = new T3Button("Reset to defaults", this::resetDefaults);
+		T3Button reset = new T3Button(T3Icon.REFRESH_CW, "Reset to defaults", this::resetDefaults);
 		reset.setTooltip("Puts every option of this page back to its default.", "Nothing is written until you press Save.");
 		place(reset, x, y, w, T3Control.H);
 		return y + ROW + 6;
@@ -223,7 +224,7 @@ public final class EnvironmentEditPanel extends T3Panel {
 
 	/**
 	 * A row of colour squares (wrapping onto more rows when narrow), the chosen one ringed with the accent
-	 * token. The first square is "no colour". The colours themselves are the player's data, not tokens.
+	 * token. The first square is "no colour" (a {@link T3Icon#MINUS}). The colours themselves are the player's data, not tokens.
 	 */
 	private static final class Swatches extends T3Control {
 		private static final int SIZE = 14;
@@ -281,7 +282,7 @@ public final class EnvironmentEditPanel extends T3Panel {
 				if (rgb == null) {
 					ChatDraw.round(g, c.x(), c.y(), c.w(), c.h(), t.inset());
 					ChatDraw.outline(g, c.x(), c.y(), c.w(), c.h(), t.edge());
-					T3Draw.centered(g, font, t, "-", c.x(), c.y(), c.w(), c.h(), t.muted());
+					T3Icon.draw(g, t, T3Icon.MINUS, c.x() + 2, c.y() + 2, SIZE - 4, t.muted());
 				} else {
 					ChatDraw.round(g, c.x(), c.y(), c.w(), c.h(), 0xFF000000 | rgb);
 					ChatDraw.outline(g, c.x(), c.y(), c.w(), c.h(), t.edge());

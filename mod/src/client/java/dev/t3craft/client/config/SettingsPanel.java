@@ -9,6 +9,7 @@ import dev.t3craft.client.t3ui.kit.T3Control;
 import dev.t3craft.client.t3ui.kit.T3Draw;
 import dev.t3craft.client.t3ui.kit.T3Draw.Tone;
 import dev.t3craft.client.t3ui.kit.T3Field;
+import dev.t3craft.client.t3ui.kit.T3Icon;
 import dev.t3craft.client.t3ui.kit.T3Panel;
 import dev.t3craft.client.t3ui.kit.T3Select;
 import dev.t3craft.client.t3ui.kit.T3Tabs;
@@ -23,7 +24,7 @@ import org.jspecify.annotations.Nullable;
 /**
  * T3Craft settings as a page of the UI kit (docs/features/ui-kit.md), like T3 Code's settings page: tabs
  * (General, Notifications, Connections) over a scrolling body and a footer with the status line,
- * "Save" and "Done". It lives inside {@code T3Screen} (the ⚙ of the sidebar and the ⋯ menu) and as the
+ * "Save" and "Done". It lives inside {@code T3Screen} (the settings icon of the sidebar and the ellipsis menu) and as the
  * screen {@link SettingsScreen} (Mod Menu, the J key, {@code /t3craft config}).
  *
  * <p>Same behaviour as the vanilla screen it replaces: edits go to a draft and are written on "Save"
@@ -185,11 +186,13 @@ public final class SettingsPanel extends T3Panel {
 
 	private int connections(int x, int y, int w) {
 		y = heading(x, y, w, "Connections");
-		y = link(x, y, w, "Environments…", () -> host().show(new EnvironmentsPanel(actions)));
-		y = link(x, y, w, "Piece browser…", () -> host().openScreen(new dev.t3craft.client.pieces.PieceBrowserScreen(host().screen())));
-		y = link(x, y, w, "Key binds…",() -> host().openScreen(new KeyBindsScreen(host().screen(), Minecraft.getInstance().options)));
-		y = link(x, y, w, "Outbound events…", () -> host().show(new OutboundPanel(new OutboundStore(ModConfig.dataDir()))));
-		y = link(x, y, w, "Reload from disk", () -> {
+		// a page stacked here: its own icon; another screen: external-link
+		y = link(x, y, w, T3Icon.CLOUD, "Environments...", () -> host().show(new EnvironmentsPanel(actions)));
+		y = link(x, y, w, T3Icon.EXTERNAL_LINK, "Piece browser...",
+				() -> host().openScreen(new dev.t3craft.client.pieces.PieceBrowserScreen(host().screen())));
+		y = link(x, y, w, T3Icon.EXTERNAL_LINK, "Key binds...", () -> host().openScreen(new KeyBindsScreen(host().screen(), Minecraft.getInstance().options)));
+		y = link(x, y, w, T3Icon.SEND, "Outbound events...", () -> host().show(new OutboundPanel(new OutboundStore(ModConfig.dataDir()))));
+		y = link(x, y, w, T3Icon.REFRESH_CW, "Reload from disk", () -> {
 			draft = ConfigManager.get().load();
 			windowText = formatNumber(draft.recentWindowHours());
 			maxText = Integer.toString(draft.maxPerEnvironment());
@@ -205,14 +208,14 @@ public final class SettingsPanel extends T3Panel {
 		});
 		y += 8;
 		y = heading(x, y, w, "Testing");
-		T3Button reset = new T3Button(T3Draw.tr("t3craft.demo.reset.button"), T3Button.Style.DANGER, this::resetHq);
+		T3Button reset = new T3Button(T3Icon.TRIANGLE_EXCLAMATION_POINT, T3Draw.tr("t3craft.demo.reset.button"), T3Button.Style.DANGER, this::resetHq);
 		reset.setTooltip(T3Draw.tr("t3craft.demo.reset.button.tooltip"));
 		place(reset, x, y, w, T3Control.H);
 		return y + ROW + 6;
 	}
 
-	private int link(int x, int y, int w, String label, Runnable action) {
-		place(new T3Button(label, action), x, y, w, T3Control.H);
+	private int link(int x, int y, int w, T3Icon icon, String label, Runnable action) {
+		place(new T3Button(icon, label, action), x, y, w, T3Control.H);
 		return y + ROW;
 	}
 
