@@ -168,6 +168,7 @@ tuning; combined with F3+T it is the fast loop for visual work.
 | `launch` | The main T3 screen with a new-thread draft open in the composer (what "New thread" does; needs a paired environment with projects, otherwise it shows the plain inbox) |
 | `confirm`, `snooze` | Kit dialogs: the destructive-action confirmation and the snooze presets |
 | `pair`, `pair-readonly`, `operate-pair` | Kit dialogs: pairing (control by default / read-only) and enable-control |
+| `icons` | The icon gallery (#24): every `T3Icon` in a grid on both themes, 12 px in its three states and 32 px; the wheel scrolls (`docs/tools/icons.md`) |
 | `queue` | The queued-runs screen (reads the live queue) |
 
 The fake environment is `t3dev-gallery`; its transcripts never reach the disk cache. Real things stay
@@ -183,6 +184,9 @@ Settings, Environments, Pair, OperatePair, Confirm and Snooze are built on a sma
 tokens, so a colour or metric change in `ui-style.json` restyles them with F3+T. Settings and Environments
 are pages that open inside `T3Screen` (and as screens of their own); the others are modal dialogs. How it is
 built, how to add a control or a page, and what is left: `docs/features/ui-kit.md`.
+
+Icons (#24) are Lucide SVGs rasterised by `./gradlew generateIcons` into tinted GUI sprites (`T3Icon`,
+`T3Button(icon, …)`, `T3IconButton`); see `docs/tools/icons.md`.
 
 ## Hot-swap
 

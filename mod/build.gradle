@@ -120,6 +120,42 @@ tasks.register("uiRender", JavaExec) {
 	args((project.findProperty("uiArgs") ?: "").toString().split(" ").findAll { it })
 	javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(25) }
 }
+// Icon pipeline (docs/tools/icons.md, issue #24): the Lucide SVGs in tools/art/icons/lucide are rasterised to
+// white-on-transparent PNG sprites (t3craft:icons/<name>) by `generateIcons`, which runs before
+// processResources and adds its output to the main resources. Only the SVGs are in the repo. Apache Batik
+// lives in the `icons` source set (build time only): it is not in the mod jar nor in any run classpath.
+// If Batik does not resolve or an icon does not rasterise, generateIcons fails and so does the build: the
+// game is never shipped without its icons.
+sourceSets {
+	icons {
+	}
+}
+dependencies {
+	iconsImplementation "org.apache.xmlgraphics:batik-transcoder:${project.batik_version}"
+	iconsImplementation "org.apache.xmlgraphics:batik-codec:${project.batik_version}"
+}
+def iconsSvgDir = layout.projectDirectory.dir("../tools/art/icons/lucide")
+def iconsOutDir = layout.buildDirectory.dir("generated/icons")
+def iconsPx = 32
+def generateIcons = tasks.register("generateIcons", JavaExec) {
+	group = "t3craft"
+	description = "Rasterises tools/art/icons/lucide/*.svg to ${iconsPx} px white PNG sprites in build/generated/icons"
+	classpath = sourceSets.icons.runtimeClasspath
+	mainClass = "dev.t3craft.tools.icons.IconGen"
+	systemProperty "java.awt.headless", "true"
+	maxHeapSize = "512m"
+	workingDir = projectDir
+	// incremental: the SVGs, the size and the generator (its classpath) are the inputs
+	inputs.dir(iconsSvgDir).withPropertyName("svgs").withPathSensitivity(PathSensitivity.RELATIVE)
+	inputs.property("iconPx", iconsPx)
+	outputs.dir(iconsOutDir)
+	args(iconsSvgDir.asFile.absolutePath,
+			iconsOutDir.get().dir("assets/t3craft/textures/gui/sprites/icons").asFile.absolutePath,
+			iconsPx.toString())
+	javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(25) }
+}
+sourceSets.main.resources.srcDir(generateIcons)
+
 // This repo does not use unit tests: adding or running them is forbidden; verification = compiling.
 // Tests are blocked outright, so `test`, `check` and `build` never run any even if someone adds them back:
 // no test sources, every Test task disabled, test compilation off, and `check` only compiles.
@@ -138,6 +174,7 @@ tasks.named("check") {
 }
 
 processResources {
+	dependsOn generateIcons
 	def version = project.version
 	inputs.property "version", version
 
