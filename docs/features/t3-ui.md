@@ -71,6 +71,11 @@ or Esc goes back to the list.
 
 Gallery: `/t3dev ui inbox-right-panel`.
 
+**Audit (#50).** Before #50 the panel showed one page with no way to change it from the UI, no way to open it
+full-size from the panel, and a narrow piece browser that overflowed at 180 px. The full read-through is in
+`docs/features/piece-browser.md` ("Audit of the right panel and the narrow layout").
+
+
 ## Own UI scale (#42, part of #15)
 
 The T3 screens (this one, every kit page screen and kit dialog screen) can be drawn at their own GUI scale,

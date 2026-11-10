@@ -100,6 +100,69 @@ A `PieceEntry` is `id`, `name`, `folder` (`"House"` or a path `"House/Japanese"`
 - **The real catalog**: from its client initializer, `PieceCatalog.register(new MySource())`. Same id as a code piece = replaces it;
   new ids are added. Call `PieceCatalog.refresh()` when the source's content changes. The browser asks again every time it opens.
 
+## Audit of the right panel and the narrow layout (#50)
+
+Read-through audit (no game run), done before the #50 changes, as a user would meet the browser in the main
+screen's right panel at its default 280 px and at its minimum 180 px, with the mouse and with the keyboard. The panel's
+frame has an 8 px pad, so the page gets 264 / 164 px and its body 260 / 160 px. Facundo's report: "it is a bit hard to
+navigate, and things are missing".
+
+**Panel header** (`T3RightPanel` over `T3PanelHost`)
+1. The header says "Piece browser" and has an `x`. Nothing tells there could be other pages, and there is no way to
+   change page: the only way is the `layout.rightPanel` key by hand (and only one page is registered).
+2. No way to open the page full-size from the panel. The ⋯ menu's "Pieces" does it, but it is a different path that
+   the panel does not point to; in the compact layout the header icon already opens the page in the thread's place.
+3. Closing works (`x`, Esc while the panel has the keyboard, U, the thread header's panel icon). Keys go to the panel
+   only after a click inside it, which is invisible: nothing in the panel shows it has the keyboard.
+
+**Narrow browser, controls on top** (header of 2 rows = 40 px)
+4. Row 1: search box + Sort select (92 px fixed). At 160 px the search box is 48 px wide: three or four letters.
+5. Row 2: Folder, Tag, Size selects and "Favorites only" (104 px fixed) share what is left. At 260 px the three
+   selects get 43 / 57 / 43 px, i.e. 23 / 37 / 23 px of text ("All..." / "Any t..."); at 160 px 13 / 17 / 13 px, which
+   is less than the chevron: unusable. No select has a tooltip, so a clipped value cannot be read anywhere.
+6. Six controls compete for the top of a 160-260 px column although most visits only search and pick.
+
+**Narrow browser, list and detail side by side** (body)
+7. The list (min 110 px) and the detail column (min 110 px) sit side by side. At 260 px: list 143, detail 111. At 160 px
+   the detail keeps its 110 px and the list drops to 80, so the two need 196 px in 160: **the detail column runs 36 px
+   past the panel's edge** (clipped: the seed buttons and the right end of the selects are cut off).
+8. In 111 px the detail wraps a lot: "Builds 9-15 x 9-15, h 10+" takes 2 lines, the size line under "Plot size" 4,
+   "Seed (same seed, same blocks)" 2; "Stay here after asking" does not fit beside its switch. The column is about
+   240 px tall: with a panel body under ~240 px (GUI scale 3 on 1080p) the whole page scrolls, and **the list scrolls
+   away with it**, because list and detail share the scrolling body.
+9. Rows (24 px, two lines) are fine, but the second line ("folder | 9-15 x 9-15, h 10+") is clipped at 113 px of text and
+   with 3-digit sizes ("120-180 x 120-180, h 40+") it is cut in every row. A clipped **name** has no tooltip (the row
+   tooltip shows id, size and tags, not the name).
+10. The star (18 px square) is a fine target; folder rows (14 px) only exist in the wide layout.
+11. Preview / Copy / Favorite are in the pinned footer, so "Preview in game" is always visible and needs no scroll
+    (good). At 160 px "Clear filters" does not fit in the footer (it needs 80 px after the other three), yet the
+    "no match" text says "Clear the filters (button below)".
+
+**Keyboard**
+12. Up / Down move the selection from anywhere, also from a focused select: the browser's key handler is pinned in the
+    header, before the body, so Down never reaches a focused Faces or Plot size select (Enter still opens it).
+13. After a click on the list it takes the keyboard: Home / End / Page Up / Page Down then move the list's own cursor,
+    not the selection, and Up / Down move the selection but not that cursor: **two highlights** on different rows.
+    Enter on the list does nothing (Enter previews only from the search or seed box). No key for favorite.
+14. Tab walks search, Sort, Folder, Tag, Size, Favorites, list, Faces, Plot size, seed and its 3 buttons, Stay here,
+    Preview, Copy, Favorite, Clear, the `x`: about 17 stops before Preview.
+15. Esc closes an open select, otherwise the whole panel (there is no intermediate level to go back to).
+
+**Resizing with the splitter**
+16. The right panel can grow to half the frame (640 px at 1280), so dragging crosses the 430 px threshold: the folder
+    column and the header jump in and out. Selection (session state) and the list's scroll survive, but the selected
+    row is not brought back into view after the jump, and the focus, remembered by position in the Tab order, can land
+    on another control because the number of header controls changes.
+
+**Empty states**
+17. Empty catalog and "no match" have texts; with no selection the detail column says what to do in 111 px (wraps to 6
+    lines). With no selection the footer buttons are disabled with a "Select a piece first" tooltip (good).
+
+**Folders**: in narrow the folder is only the clipped select (item 5); there is no breadcrumb, so a chosen sub-folder
+("House/Japanese") is not visible once the select is clipped.
+
+What #50 changed is in "Narrow layout (#50)" below and in `docs/features/t3-ui.md` ("Right panel pages").
+
 ## Code map
 
 | class | what |
