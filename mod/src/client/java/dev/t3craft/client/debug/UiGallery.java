@@ -162,7 +162,15 @@ public final class UiGallery {
 					() -> new MergeStationScreen(null, new MergeStationPanel("t3craft (Gallery)", UiGallery::galleryMerge, e -> {
 					}))),
 			new Scenario("inbox-right-panel", "Main T3 screen with the right panel open on the piece browser (fake pieces, narrow layout); drag either border, double click resets, U or the header's panel icon toggles (#39; drags save the real layout block)",
-					() -> inbox(true, true).withRightPanel(T3Screen.PIECES_PANEL, galleryPieces())));
+					() -> inbox(true, true).withRightPanel(T3Screen.PIECES_PANEL, galleryPieces())),
+			// #42: the main screen at a forced T3 scale, whatever layout.uiScale says
+			new Scenario("inbox-scale", "Main T3 screen at uiScale \"auto\" (#42): the largest whole scale that keeps 960x540 logical units; check clicks, border drags, scroll, text fields, tooltips, menus and modals",
+					() -> inbox(true, true).withUiScale(dev.t3craft.client.t3ui.UiScale.Pref.AUTO)),
+			new Scenario("inbox-scale-2", "Main T3 screen at uiScale 2 (#42)",
+					() -> inbox(true, true).withUiScale(dev.t3craft.client.t3ui.UiScale.Pref.fixed(2))),
+			new Scenario("inbox-scale-3", "Main T3 screen at uiScale 3 (#42), with the right panel open",
+					() -> inbox(true, true).withUiScale(dev.t3craft.client.t3ui.UiScale.Pref.fixed(3))
+							.withRightPanel(T3Screen.PIECES_PANEL, galleryPieces())));
 
 	private UiGallery() {
 	}

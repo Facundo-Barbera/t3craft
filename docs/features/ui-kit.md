@@ -46,6 +46,10 @@ receta que el buscador de `T3Screen`).
   cabecera (título y botón `x` / `chevron-left` Back), diálogo modal sobre la página, Tab sobre los controles y el reparto de entrada.
   Quien lo posee reenvía además `charTyped`, `mouseDragged` y `mouseReleased` (ver "Teclado y ratón").
 * **`T3PanelScreen`**: una página como pantalla propia, centrada sobre el fondo del kit.
+* **Escala propia (#42):** `T3PanelScreen`, `T3DialogScreen` y `T3Screen` aplican `t3ui/UiScale` (clave `layout.uiScale`,
+  ver `docs/features/t3-ui.md`): ponen su `width`/`height` en unidades lógicas, dibujan bajo un pose escalado y convierten los
+  eventos de ratón una sola vez. Las páginas, los controles, los menús y los modales trabajan en unidades lógicas y no se
+  enteran. Una pantalla nueva del kit hereda de una de estas tres para tenerlo; un host que sea un `Screen` propio no se escala.
 * **`T3RightPanel`** (#39): el panel derecho de `T3Screen`. Es un `T3PanelHost` con id: cabecera con el título y la `x`,
   la página debajo, modal y reparto de entrada compartidos. Muestra una página de **`RightPanels`**, el registro
   `RightPanels.register(id, título, supplier)` donde cada feature enchufa la suya (el piece browser, `"pieces"`, lo registra
@@ -202,7 +206,10 @@ kit, que no se tocaron porque son de otros hilos o de pantallas sin migrar (excl
   propias solo coloca el cursor (no arrastra la selección).
 * `uiRender` no tiene fixtures de estas pantallas: la galería (`/t3dev ui`) es el camino. Pendiente: un tipo de pantalla
   `settings`/`environments`/`pair` en `Mock` (requiere sembrar `ConfigManager` en modo headless).
-* El #15 (escala propia, fuente TTF) no se tocó; el kit dibuja con la fuente bitmap y el GUI scale de vanilla. Los iconos
+* Del #15, la escala propia llegó con el #42 (`UiScale`, solo escalas enteras; por defecto `"minecraft"`, sin cambios). La fuente
+  TTF sigue pendiente: el kit dibuja con la fuente bitmap. Con una escala propia activa, el hover vanilla de un `EditBox` dentro de
+  un scissor activo compara el ratón lógico con el scissor ya transformado (solo cosmético: el cursor de texto); y un texto con
+  estilo hover de Minecraft (`HoverEvent`) dibujaría su tooltip dos veces (ninguna pantalla T3 lo usa hoy). Los iconos
   llegaron con #24 (pipeline) y #28 (este cromo).
 * `T3IconButton` no es parada de Tab (en el kit de pruebas se llega con el ratón; los `T3Button` con icono sí lo son).
 * Escrito sin compilar (regla de la VPS): el coordinador compila en la PC. Los nombres de la API de Minecraft 26.3 usados se
