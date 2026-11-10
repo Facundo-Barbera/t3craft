@@ -130,7 +130,7 @@ public final class EnvironmentsPanel extends T3Panel {
 			}
 			host().relayout();
 		});
-		T3Button edit = new T3Button("Edit", () -> host().openScreen(new EnvironmentEditScreen(host().screen(), actions, r)));
+		T3Button edit = new T3Button("Edit", () -> host().show(new EnvironmentEditPanel(actions, r)));
 		T3Button unpair = new T3Button("Unpair", () -> confirm("Unpair " + r.label() + "?",
 				List.of("Deletes the local session(s) for " + r.url() + " (read and control)"
 						+ ". Revoke it on the host too: t3 auth session list / t3 auth session revoke <id>."),

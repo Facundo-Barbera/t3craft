@@ -107,7 +107,7 @@ mensaje. La validación se ve en vivo bajo el formulario (`NewThreadForm.errors`
 un `launchThread`. Al terminar vuelve al padre y llama al callback con el `threadId` que devuelve
 T3 (por defecto `ActionsClient.selectThread`, es decir, `SearchClient.open`).
 
-### `RegisterProjectDialog` (Screen)
+### `RegisterProjectDialog` (diálogo del kit, `T3DialogScreen`)
 ```java
 RegisterProjectDialog.open(env, (env, projectId) -> …);
 ```

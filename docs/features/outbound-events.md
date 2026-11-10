@@ -125,8 +125,10 @@ Un fichero ausente, roto o con campos inválidos se lee como **apagado**. Máxim
   - `outbound/OutboundClient`: convierte lo que anuncia `Notifier.transition` en un `OutboundEvent` (entorno e hilo
     salen de `npcId` = `<entorno>:<hilo>`; título y proyecto del texto `"<hilo> · <proyecto> (<entorno>)"`).
   - `hud/Notifier.java`: **una** línea al inicio de `transition(...)` llama a `OutboundClient.onTransition`.
-  - `config/OutboundScreen` y `config/OutboundDestinationScreen`; `config/SettingsScreen` tiene un botón más
-    ("Outbound…").
+  - `config/OutboundPanel` y `config/OutboundDestinationPanel` (páginas del kit; antes `OutboundScreen` y
+    `OutboundDestinationScreen`); Ajustes → Connections → "Outbound events…" apila `OutboundPanel`. El
+    interruptor general pide confirmación al encenderse (queda apagado hasta que se confirma), borrar un destino
+    también la pide, y la URL del webhook nunca se vuelve a mostrar: la página solo dice si hay una guardada.
 - Los ajustes viven en su propio fichero, no en `T3CraftSettings`, para no tocar el record compartido ni el
   `ConfigCodec`; son aditivos y un `t3craft.json` antiguo no cambia.
 
