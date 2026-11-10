@@ -186,6 +186,17 @@ public final class CitadelOffice {
 		return RingCampusGeometry.polar(CitadelCanvas.dims().galleryR + RIM_OFFSET, Math.toRadians(ANGLE_DEG), 0).getZ();
 	}
 
+	/**
+	 * The tower's site in plan coordinates, before the relief: every column {@link #office} paints, from the west bay window
+	 * ({@code dx = -11}) to the garden and its pergola ({@code dx = 24}, {@code dz = -21 .. 17}, see {@link #garden} and
+	 * {@link #arbor}), and from the ground ({@code y = 0}) to the top of the copper spire ({@code CEIL() + 21}). Read by the
+	 * piece catalog ({@code struct_leader_office}, docs/features/piece-catalog-preview.md) to cut the tower out of the
+	 * citadel's plan; it paints nothing.
+	 */
+	public static dev.t3craft.hq.plan.Box site() {
+		return dev.t3craft.hq.plan.Box.of(CX() - E - 3, 0, CZ() - 21, CX() + 24, CEIL() + 21, CZ() + 17);
+	}
+
 	/** Floor rows (the floor block's y): lobby, archive, control room, ceiling of the control room. */
 	static int F0() {
 		return y0();

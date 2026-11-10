@@ -22,6 +22,39 @@ Everything that exists in the code and can be built without a world:
 
 A new variant registered in `CatalogEntries` appears in the catalog by itself (restart); nothing else to register.
 
+### Structures (#49)
+
+Group `struct`: the big structures of the HQ on their own, so the leader's office (the control tower) can be looked at without
+walking the citadel. The piece browser lists them in its **Structures** folder (`client/pieces/StructurePieceSource`).
+
+| id | name | what is cut | sample data | size at the default scale 2 (W x D x H) |
+|---|---|---|---|---|
+| `struct_leader_office` | Leader's office, the control tower | `CitadelOffice`: group `cloister` of the empty citadel, only the columns of the tower's site (`CitadelOffice.site()`: west bay window to the garden and pergola) | none: the empty citadel | footprint 36 x 39, about 51 high (estimate; the stage measures it) |
+| `struct_lead_office` | A lead's office | `CitadelLeadOffice`: the `module_*` groups (the hall and its roof) of a plan with one lead, plus the `lot_*` cells 2 columns round them (the doorstep) | one lead thread (`vps:gamma-t0`, as `hq_lead_office`) | about 23 x 26 (hall 17 x 20 with walls and doorstep) |
+| `struct_hub` | Hub, the central building | `CitadelHub`: group `hub` of the empty citadel (same blocks as `hq_hub`) | none | measured on the first build |
+| `struct_barrio_gate` | Barrio gatehouse | `BarrioGateBig` (scale 2 and up) or `BarrioGate`: group `lot_<id>` of a plan with one small project, the columns of the gate room with its walls and 3 more all round (the banners and plinth, the first rows of the arm and the courtyard) | one project of 4 threads (`vps:alpha`, as `hq_barrio_small`) | about 23 x 18 |
+| `struct_barrio_hall` | Barrio hall | `HallInterior`: the `module_*` groups of the same plan, plus the `lot_*` cells 2 columns round them | one project of 4 threads (one hall floor of desks) | about 23 x 26 |
+
+How they are built: **nothing is painted again**. Each one is cut from a real plan of the citadel (`PlanPiece` with an optional
+area: wanted groups, and only the columns inside a box asked of the plan), the same plans the `hq_*` pieces use, generated once per
+session (`reload` makes them again). So blocks, block entities and heights are exactly what the HQ builders place, and the citadel's
+plan is never touched. The only change in `hq/citadel` is `CitadelOffice.site()`, a public read-only box.
+
+Limits and notes:
+- **Not parametric**: size, front and seed are accepted (the browser always sends them) and ignored.
+- **Scale**: the citadel's own (`LayoutParams.RINGCAMPUS_SCALE`, pack key `scale`, default 2.0). The scale is global, read by every
+  generator, so there is no per-piece scale: to see a lead's office at scale 1 (both floors, 9 x 10 halls), set `scale: 1.0` in the
+  citadel's layout pack and `/t3craft piece reload` (the plans' cache key includes the scale).
+- **Context round the cut**: the office brings the promenade deck, ramps and terrace inside its site (they are `cloister` like the
+  tower); the gate brings a few rows of its arm and courtyard; halls bring their doorstep. That is what stands there in the citadel.
+- **Bound blocks** (screens, status lamps, decision podiums, merge station, consoles): placed with the plan's block entity data, as for
+  `hq_hub`. Anchors (`office`, `board_lamp_*`, `decision_podium_*`, `mergestation_office=...`) are not carried to the stage, so nothing
+  binds them there: they stand as unbound kit blocks (vanilla stand-ins when the blocks module is off).
+- **Size in the browser**: an estimate from the geometry (site footprint, a lower bound of the height) until the structure has been built
+  once in the session; then the size the stage measured (the browser's catalog is refreshed after the build).
+- **Stage**: no change was needed. The stage already grows to the piece (up to 600 a side; the hub is the biggest structure) and its
+  height follows the model; the lobby and the arrival stay 14 blocks south of the piece's south edge, looking north at it.
+
 ### Catalog design rounds integrated (#35)
 
 Nine paused design branches were merged into one (`feat/catalog-rounds-35`). All ten pieces already had their line in `CatalogEntries`
@@ -51,7 +84,7 @@ All client commands, HQ world only (elsewhere they say so and do nothing).
 | command | what |
 |---|---|
 | `/t3craft piece` | what is on the stage, the groups with their counts (clickable), the command list |
-| `/t3craft piece list [group]` | the pieces of a group; each id is clickable and shows the piece |
+| `/t3craft piece list [group]` | the pieces of a group; each id is clickable and shows the piece (`list struct`: the structures) |
 | `/t3craft piece show <id> [size] [front] [seed]` | puts the piece on the stage and takes you to it. Tab completes ids. `size`: `min`, `mid` (default), `max` or `WxDxH` (frontage x depth x height, up to 200); `front`: `n e s w` (default `s`); `seed`: a number (default 1). Size, front and seed only matter for catalog variants |
 | `/t3craft piece next` / `prev` | the next / previous piece of the same group (from nothing: the first / last of `hq`) |
 | `/t3craft piece reload` | builds the current piece **again from the code** and applies only the blocks that changed. You stay where you are |
@@ -118,8 +151,9 @@ the one the game already computes for the HQ world). Plans are kept for the sess
 - `dev.t3craft.piece` (main source set, no world, no client code):
   - `Piece` the interface (`id`, `group`, `title`, `note`, `build(spec, fresh)`); `PieceSpec` the parameters; `PieceModel` the blocks, compact
     (packed position + state per cell, sorted positions for lookups); `PieceScene` the stage around a model (floor, ruler, lobby, arch, signs).
-  - `PieceCatalog` the registry. `VariantPiece` (catalog variants), `PlanPiece` (parts of the citadel / classic plan by construction group), `KitPiece`,
-    `PackPiece`.
+  - `PieceCatalog` the registry. `VariantPiece` (catalog variants), `PlanPiece` (parts of the citadel / classic plan by construction group,
+    optionally cut to an area), `StructurePiece` (the `struct_*` structures: a `PlanPiece` plus search tags and a size for the browser),
+    `KitPiece`, `PackPiece`.
 - `dev.t3craft.client.piece` (client source set):
   - `PieceClient` init, worker thread, commands, chat. `PieceStage` the world side (server thread): scene queue, the three-step diff, the
     return arch, trips, the per-world file.
