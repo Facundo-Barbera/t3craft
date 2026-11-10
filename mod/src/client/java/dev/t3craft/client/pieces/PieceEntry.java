@@ -15,8 +15,15 @@ import org.jspecify.annotations.Nullable;
  * @param folder slash-separated path, never empty; {@code "Other"} when the catalog has no folders
  * @param tags   lower-case words the filter box and the tag filter match
  * @param size   the plot sizes the piece builds well in, or null when unknown
+ * @param parametric whether the size, facing and seed of a request change what is built; false for a structure of the HQ
+ *                   (issue #49: its size is its real one, {@code minW == maxW}, and the game ignores the three arguments)
  */
-public record PieceEntry(String id, String name, String folder, List<String> tags, PieceEntry.@Nullable Dims size) {
+public record PieceEntry(String id, String name, String folder, List<String> tags, PieceEntry.@Nullable Dims size, boolean parametric) {
+	/** A piece built into a plot of the size asked for (every catalog variant). */
+	public PieceEntry(String id, String name, String folder, List<String> tags, PieceEntry.@Nullable Dims size) {
+		this(id, name, folder, tags, size, true);
+	}
+
 	/**
 	 * The size range of a piece, in blocks: frontage {@code minW..maxW}, depth {@code minD..maxD} and the
 	 * height it needs ({@code minH}; extra height may stay empty).

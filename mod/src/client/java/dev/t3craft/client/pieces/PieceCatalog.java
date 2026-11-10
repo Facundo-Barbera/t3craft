@@ -14,10 +14,11 @@ import org.jspecify.annotations.Nullable;
  *
  * <p><b>The hook for the real catalog:</b> the in-world catalog (feat/piece-catalog-preview) calls
  * {@code PieceCatalog.register(source)} from its client initializer. Nothing else changes: the browser reads
- * {@link #all()} every time it is opened or refreshed. Until then the only source is {@link CodePieceSource}.
+ * {@link #all()} every time it is opened or refreshed. Built in: {@link CodePieceSource} (the catalog variants) and
+ * {@link StructurePieceSource} (the HQ's big structures, folder "Structures", issue #49).
  */
 public final class PieceCatalog {
-	private static final List<PieceCatalogSource> SOURCES = new CopyOnWriteArrayList<>(List.of(new CodePieceSource()));
+	private static final List<PieceCatalogSource> SOURCES = new CopyOnWriteArrayList<>(List.of(new CodePieceSource(), new StructurePieceSource()));
 	private static volatile @Nullable List<PieceEntry> merged;
 
 	private PieceCatalog() {

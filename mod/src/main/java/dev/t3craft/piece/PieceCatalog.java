@@ -19,6 +19,8 @@ import org.jspecify.annotations.Nullable;
  * <ul>
  *   <li><b>hq</b>: parts of the citadel cut from its plan: the hub (the central building), the cloister around it,
  *       the nodes of the first street, a barrio with a small and a big project, a lead's office.</li>
+ *   <li><b>struct</b>: the big structures on their own ({@link StructurePiece}, issue #49): the leader's office, a lead's
+ *       office, the hub, a barrio's gatehouse, a barrio hall; the piece browser shows them in its "Structures" folder.</li>
  *   <li><b>classic</b>: parts of the classic spine HQ (hub, portico, spine, wings).</li>
  *   <li><b>kit</b>: the HQ kit's blocks.</li>
  *   <li><b>pack</b>: rooms of the active layout packs (the list follows the packs).</li>
@@ -54,6 +56,7 @@ public final class PieceCatalog {
 		out.add(new PlanPiece("hq_barrio_large", "hq", "Barrio with a big project", "courtyard, gatehouse and halls on two floors (13 threads)",
 				PlanPiece.Source.BARRIO_LARGE, barrio));
 		out.add(new PlanPiece("hq_lead_office", "hq", "A lead's office", "the barrio of a lead's own project", PlanPiece.Source.LEAD_OFFICE, barrio));
+		out.addAll(StructurePiece.all());
 
 		PlanPiece.Source classic = PlanPiece.Source.CLASSIC;
 		out.add(new PlanPiece("classic_hub", "classic", "Classic: hub", "hub of the classic spine HQ", classic, g -> g.equals("hub")));
@@ -98,9 +101,9 @@ public final class PieceCatalog {
 		return out;
 	}
 
-	/** The groups in listing order: hq, classic, kit, pack, then the catalog families. */
+	/** The groups in listing order: hq, struct, classic, kit, pack, then the catalog families. */
 	public static List<String> groups() {
-		Set<String> out = new LinkedHashSet<>(List.of("hq", "classic", "kit", "pack"));
+		Set<String> out = new LinkedHashSet<>(List.of("hq", StructurePiece.GROUP, "classic", "kit", "pack"));
 		for (Piece p : all()) {
 			out.add(p.group());
 		}

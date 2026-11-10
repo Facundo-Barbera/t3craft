@@ -10,6 +10,7 @@ import dev.t3craft.hq.RingCampusGeometry;
 import dev.t3craft.hq.layout.HqLayouts;
 import dev.t3craft.hq.lead.LeadOffices;
 import dev.t3craft.hq.pack.HqLayoutPacks;
+import dev.t3craft.hq.plan.Box;
 import dev.t3craft.hq.plan.BuildPlan;
 import dev.t3craft.hq.plan.Placement;
 import dev.t3craft.hq.style.HqKit;
@@ -20,7 +21,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 import java.util.function.Predicate;
+import org.jspecify.annotations.Nullable;
 
 /**
  * feat/piece-catalog-preview: a part of an HQ plan, cut out by the plan's own construction groups
@@ -55,14 +58,25 @@ final class PlanPiece implements Piece {
 	private final String note;
 	private final Source source;
 	private final Predicate<String> wanted;
+	private final @Nullable Function<BuildPlan, Box> area;
 
 	PlanPiece(String id, String group, String title, String note, Source source, Predicate<String> wanted) {
+		this(id, group, title, note, source, wanted, null);
+	}
+
+	/**
+	 * @param area when not null, only the columns inside this box (its x and z; every height is kept) of the wanted groups are
+	 *             taken: how a structure that has no group of its own (the leader's office) or shares one (a gatehouse in its
+	 *             lot) is cut out of the plan. Asked of the plan each build, so it follows the citadel's scale.
+	 */
+	PlanPiece(String id, String group, String title, String note, Source source, Predicate<String> wanted, @Nullable Function<BuildPlan, Box> area) {
 		this.id = id;
 		this.group = group;
 		this.title = title;
 		this.note = note;
 		this.source = source;
 		this.wanted = wanted;
+		this.area = area;
 	}
 
 	@Override
@@ -97,11 +111,15 @@ final class PlanPiece implements Piece {
 		if (used.isEmpty()) {
 			throw new IllegalStateException("the " + source + " plan has no group for " + id + " (groups: " + plan.groups().size() + ")");
 		}
+		Box box = area == null ? null : area.apply(plan);
 		PieceModel.Builder b = PieceModel.builder();
 		for (Placement p : plan.placements()) {
 			int y = p.rel().getY();
 			if (y < DEEPEST || (p.state().isAir() && y != 0)) {
 				continue; // air above the ground is nothing; air at the ground layer clears a sunken room
+			}
+			if (box != null && (p.rel().getX() < box.minX() || p.rel().getX() > box.maxX() || p.rel().getZ() < box.minZ() || p.rel().getZ() > box.maxZ())) {
+				continue;
 			}
 			String g = plan.groupAt(p.rel());
 			if (g != null && wanted.test(g)) {
@@ -109,6 +127,9 @@ final class PlanPiece implements Piece {
 			}
 		}
 		String groups = used.size() <= 4 ? String.join(", ", used) : used.size() + " groups";
+		if (box != null) {
+			groups += ", cut to " + box.sizeX() + "x" + box.sizeZ() + " columns";
+		}
 		return new Built(b.build(), "from the " + source.name().toLowerCase(java.util.Locale.ROOT).replace('_', ' ') + " plan (" + groups + "), citadel scale "
 				+ RingCampusGeometry.scale() + ", plan " + plan.fingerprint().substring(0, 8));
 	}
