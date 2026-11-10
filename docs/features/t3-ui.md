@@ -30,6 +30,47 @@ Below 330×170 scaled pixels (narrow window or high GUI scale) the screen is com
 time. Opened on a thread (a block) it starts on the thread; opened with Y it starts on the list. `‹`
 or Esc goes back to the list.
 
+## Right panel, resizing and the saved layout (#39)
+
+```
+┌ sidebar ─┐┊┌ thread ─────────────────────── [▥] ┐┊┌ Piece browser ──── x ┐
+│          │┊│ header                              │┊│ (a RightPanels page) │
+│          │┊│ conversation                        │┊│                      │
+│          │┊│ composer                            │┊│                      │
+└──────────┘┊└─────────────────────────────────────┘┊└──────────────────────┘
+            ┊ splitters (T3Splitter, the 4 px gaps): drag; double click = default width
+```
+
+- **Frame.** Still centred, now as large as the window minus 6 px per side, capped at 1280×720 by default
+  (was a fixed 900×520). `layout.maxWidth` / `layout.maxHeight` change the cap (at least 900×520).
+- **Right panel** (`T3RightPanel`, kit): shows one page registered in `RightPanels` (id → factory). The
+  first one is the piece browser (`"pieces"`, registered by `T3Screen`; under 430 px it uses its narrow
+  layout with the folder select). Header with the title and an `x`; Esc closes it while it has the
+  keyboard (keys follow the last click: inside the panel, or anywhere else).
+- **Toggle.** The `panel-right` icon at the end of the thread header, the ⋯ menu's "Show / Hide side
+  panel", or the rebindable key *Show/hide the T3 right panel* (default U, Controls → T3Craft; it fires
+  when the list has the keyboard). Ctrl+B stays the sidebar's.
+- **Widths.** Drag the gap between sidebar and thread, or between thread and right panel. Sidebar
+  120..360 px, right panel 180 px..half the frame, and the thread never under 220 px: a small window
+  shrinks the right panel first, then the sidebar, then leaves the right panel out, without changing
+  the saved widths. Double click on a gap goes back to the default (27 % sidebar, 280 px panel).
+- **Compact** (under 330×170): no right panel; the header icon opens the page full-screen in the
+  thread's place. The widths and the open/closed wish are kept for the next wide window.
+- **Saved** in `config/t3craft.json`, an additive top-level block (`T3LayoutPrefs`):
+
+  ```json
+  "layout": {"sidebarWidth": 180, "rightWidth": 300, "rightOpen": true, "rightPanel": "pieces"}
+  ```
+
+  0 = the default width. Written 500 ms after a drag ends or the panel opens or closes (never per
+  frame), and when the screen closes; other keys of the block (`maxWidth`, `maxHeight`) are kept. The
+  open screen re-reads the block every second, so `/t3craft config reload` applies a hand edit.
+- **Plugging a page in:** `RightPanels.register("diff", "Diff", MyDiffPanel::new)` from the feature's
+  client init; any `T3Panel` works (it gets the same host API as a page in the thread's place).
+- **Queue** (#39): the ⋯ menu's "Queue" opens the kit queue page (`QueuePanel`) in the thread's place.
+
+Gallery: `/t3dev ui inbox-right-panel`.
+
 ## What is copied from T3 Code (structure and behaviour only, no TS code)
 
 | t3craft | T3 Code (`~/projects/t3code-ref`) |
@@ -90,6 +131,7 @@ Settle, Snooze, Pin, Unpin, Read) and Archive lives in the menu.
 | Ctrl+F | search (↑/↓ still step; Esc clears, then leaves the field) |
 | Ctrl+N | new thread |
 | Ctrl+B | hide/show sidebar (compact: switch panel) |
+| U (rebindable) | show/hide the right panel (compact: open its page full-screen) |
 | Enter | compact: open the selected thread; wide: focus the composer (then Enter sends, Shift+Enter newline, Esc leaves) |
 | PgUp/PgDn/End | scroll the conversation |
 | Esc | close menu → leave field → back to the list (compact) → close |

@@ -156,7 +156,9 @@ public final class UiGallery {
 					UiGallery::hqMenu),
 			new Scenario("merge-station", "Merge station page with fake pull requests (open, draft, one without a link); Open copies or opens the fake link",
 					() -> new MergeStationScreen(null, new MergeStationPanel("t3craft (Gallery)", UiGallery::galleryMerge, e -> {
-					}))));
+					}))),
+			new Scenario("inbox-right-panel", "Main T3 screen with the right panel open on the piece browser (fake pieces, narrow layout); drag either border, double click resets, U or the header's panel icon toggles (#39; drags save the real layout block)",
+					() -> inbox(true, true).withRightPanel(T3Screen.PIECES_PANEL, galleryPieces())));
 
 	private UiGallery() {
 	}

@@ -46,6 +46,15 @@ receta que el buscador de `T3Screen`).
   cabecera (título y botón `x` / `chevron-left` Back), diálogo modal sobre la página, Tab sobre los controles y el reparto de entrada.
   Quien lo posee reenvía además `charTyped`, `mouseDragged` y `mouseReleased` (ver "Teclado y ratón").
 * **`T3PanelScreen`**: una página como pantalla propia, centrada sobre el fondo del kit.
+* **`T3RightPanel`** (#39): el panel derecho de `T3Screen`. Es un `T3PanelHost` con id: cabecera con el título y la `x`,
+  la página debajo, modal y reparto de entrada compartidos. Muestra una página de **`RightPanels`**, el registro
+  `RightPanels.register(id, título, supplier)` donde cada feature enchufa la suya (el piece browser, `"pieces"`, lo registra
+  `T3Screen`; luego diff, plan, cola). `T3Screen` reenvía dibujo y entrada como con sus páginas; las teclas van al panel
+  mientras el último clic cayó dentro.
+* **`T3Splitter`** (#39): asa vertical en el hueco de 4 px entre dos paneles (más 1 px de margen a cada lado). Invisible en
+  reposo; al pasar el puntero, lavado `hover`, regla `edge` y cursor de redimensionar; mientras se arrastra, regla `accent`.
+  No sabe de anchos: avisa al `Listener` con la x del puntero (`drag`), una vez al soltar (`released`, ahí se guarda) y
+  con doble clic (`reset`, ancho por defecto). Sin tokens nuevos.
 
 ## Iconos del kit (#28)
 
@@ -127,6 +136,10 @@ primer mensaje lo lanza (`DraftLauncher`). `NewThreadScreen` se eliminó en feat
 El ⚙ y el ☁ del pie del sidebar y los items "Settings" / "Environments" del menú ⋯ abren la página **en el lugar del hilo**
 (como la página de ajustes de T3 Code); el sidebar se queda. Esc o ✕ vuelve al hilo; abrir un hilo o un borrador desde el
 sidebar cierra la página. En el layout compacto la página ocupa la pantalla. La página se re-maqueta sola con F3+T.
+
+El item "Queue" del menú ⋯ (#39) abre la página de la cola (`QueuePanel`) igual, en el lugar del hilo. El **panel derecho**
+(#39, `T3RightPanel`) es otro sitio para páginas: a la derecha del hilo, redimensionable con `T3Splitter`, con los anchos
+guardados en el bloque `layout` de `config/t3craft.json` (ver `docs/features/t3-ui.md`).
 
 ## Cómo usarlo
 
