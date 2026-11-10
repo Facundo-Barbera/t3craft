@@ -89,6 +89,8 @@ public final class UiGallery {
 					() -> new dev.t3craft.client.pieces.PieceBrowserScreen(null)),
 			new Scenario("inbox-pieces", "Main T3 screen with the piece browser in the thread's place (the ⋯ menu → Pieces)",
 					() -> inbox(true, true).withPage(new dev.t3craft.client.pieces.PieceBrowserPanel())),
+			new Scenario("icons", "Icon gallery: every T3Icon (Lucide) in a grid on both themes, 12 px in its three states and 32 px; wheel scrolls",
+					() -> new IconGalleryScreen(null)),
 			new Scenario("queue", "Queued runs (reads the live queue, empty without a connection)", () -> new QueueScreen(null, null)));
 
 	private UiGallery() {

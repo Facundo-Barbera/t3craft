@@ -9,7 +9,7 @@ What lives where. Rules for agents are in `../AGENTS.md`.
 | `api.md` | Map of the mod's public classes. |
 | `features/` | One doc per feature or fix (`<name>.md`, fixes as `fix-<name>.md`). New features add a file here. |
 | `plans/` | Technical plans (`plan.md`, `plan-v2.md`) and design proposals. |
-| `tools/` | Render tooling: hq-render, ui-render, render service (PC daemon + relay), Citadel Studio, catalog gallery. |
+| `tools/` | Render tooling: hq-render, ui-render, icon pipeline (`tools/icons.md`), render service (PC daemon + relay), Citadel Studio, catalog gallery. |
 | `research/` | Research notes (HQ layouts, styles, AgentCraft elements, compat). The render PNGs were removed from the tree; they are in the tag `archive/research-renders-2026-11-09`. |
 | `ops/` | Coordination: `pending-execution.md` (what still needs running), nightly summaries, `incidents/`, `reviews/`. |
 
