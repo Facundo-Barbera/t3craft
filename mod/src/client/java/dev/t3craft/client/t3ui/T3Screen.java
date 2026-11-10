@@ -1518,12 +1518,16 @@ public final class T3Screen extends Screen {
 
 	@Override
 	public boolean mouseDragged(MouseButtonEvent event, double dx, double dy) {
+		if (pages.active() && pages.mouseDragged(event.x(), event.y(), event.button())) {
+			return true; // a kit page: a list's scrollbar thumb, a text area's selection
+		}
 		return (composer != null && composer.mouseDragged(event.x(), event.y())) || super.mouseDragged(event, dx, dy);
 	}
 
 	@Override
 	public boolean mouseReleased(MouseButtonEvent event) {
-		return (composer != null && composer.mouseReleased()) || super.mouseReleased(event);
+		boolean page = pages.active() && pages.mouseReleased(event.x(), event.y(), event.button());
+		return (composer != null && composer.mouseReleased()) || super.mouseReleased(event) || page;
 	}
 
 	@Override
@@ -1671,7 +1675,8 @@ public final class T3Screen extends Screen {
 	@Override
 	public boolean charTyped(CharacterEvent event) {
 		if (pages.active()) {
-			return !pages.modalOpen() && super.charTyped(event); // the page's text box, or the sidebar search
+			// a page's text area or a modal's text box first; then the page's vanilla box, or the sidebar search
+			return pages.charTyped(event) || super.charTyped(event);
 		}
 		for (T3Slots.Popup p : popups) {
 			if (p.isOpen() && p.charTyped(event.codepoint())) {

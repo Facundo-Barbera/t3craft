@@ -89,6 +89,11 @@ public final class UiGallery {
 					() -> new dev.t3craft.client.pieces.PieceBrowserScreen(null)),
 			new Scenario("inbox-pieces", "Main T3 screen with the piece browser in the thread's place (the ⋯ menu → Pieces)",
 					() -> inbox(true, true).withPage(new dev.t3craft.client.pieces.PieceBrowserPanel())),
+			new Scenario("kit-controls", "Kit page with every control (buttons, switch, check boxes, select, field, text area, long list): Tab / Shift+Tab, focus ring, Enter / Space, list keys, scrollbar drag, a modal with fields",
+					() -> new T3PanelScreen(null, new UiKitDemoPanel())),
+			new Scenario("inbox-kit-controls", "Main T3 screen with the kit-controls page in the thread's place (the modal over a page inside T3Screen)",
+					() -> inbox(true, true).withPage(new UiKitDemoPanel())),
+			new Scenario("kit-dialog", "Kit dialog with a field, a text area, a check box, a switch and a select (Tab, focus ring)", () -> new UiKitDemoDialog(null)),
 			new Scenario("queue", "Queued runs (reads the live queue, empty without a connection)", () -> new QueueScreen(null, null)));
 
 	private UiGallery() {

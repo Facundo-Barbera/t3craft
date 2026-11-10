@@ -1,5 +1,6 @@
 package dev.t3craft.client.t3ui.kit;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import dev.t3craft.client.chat.ChatTheme;
 import dev.t3craft.client.chat.MouseButtons;
 import dev.t3craft.client.chat.Rect;
@@ -7,6 +8,7 @@ import java.util.List;
 import java.util.function.IntConsumer;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.input.KeyEvent;
 
 /**
  * A row of text tabs with a 1 px rule under them and an accent underline on the chosen one (T3 Code's
@@ -54,8 +56,42 @@ public final class T3Tabs extends T3Control {
 			g.text(f, labels.get(i), tr.x() + PAD, tr.y() + (tr.h() - 3 - 8) / 2 + 1, on ? t.accent() : hover ? t.text() : t.muted(), t.shadow());
 			if (on) {
 				g.fill(tr.x() + 2, tr.bottom() - 2, tr.right() - 2, tr.bottom(), t.accent());
+				if (hasFocus() && enabled()) {
+					T3Draw.focusRing(g, t, tr);
+				}
 			}
 		}
+	}
+
+	@Override
+	public boolean focusable() {
+		return true;
+	}
+
+	/** Left / Right (or Home / End) change the tab while the strip has the keyboard. */
+	@Override
+	public boolean keyPressed(KeyEvent e) {
+		if (!hasFocus() || !enabled() || !visible() || labels.isEmpty()) {
+			return false;
+		}
+		int k = e.key();
+		int next = selected;
+		if (k == InputConstants.KEY_LEFT) {
+			next = Math.max(0, selected - 1);
+		} else if (k == InputConstants.KEY_RIGHT) {
+			next = Math.min(labels.size() - 1, selected + 1);
+		} else if (k == InputConstants.KEY_HOME) {
+			next = 0;
+		} else if (k == InputConstants.KEY_END) {
+			next = labels.size() - 1;
+		} else {
+			return false;
+		}
+		if (next != selected) {
+			selected = next;
+			onSelect.accept(next);
+		}
+		return true;
 	}
 
 	@Override

@@ -201,7 +201,7 @@ final class DraftControls {
 			cw = width(f);
 			boolean hover = mouseX >= x && mouseX < x + cw && mouseY >= y && mouseY < y + ComposerSkin.CHIP_H;
 			String l = ChatDraw.clip(f, label(d), cw - ComposerSkin.chipWidth(f, "▣", "", ""));
-			ComposerSkin.chip(g, f, x, y, "▣", 0xFF9AA7B8, l, ComposerSkin.TEXT, "", hover, open);
+			ComposerSkin.chip(g, f, x, y, "▣", ComposerSkin.CHIP_ICON, l, ComposerSkin.TEXT, "", hover, open);
 			if (hover && !open) {
 				g.setTooltipForNextFrame(f, Component.literal("Project · " + d.envLabel + " / " + d.projectLabel), mouseX, mouseY);
 			}
@@ -323,7 +323,7 @@ final class DraftControls {
 			cy = y;
 			cw = width(f);
 			boolean hover = mouseX >= x && mouseX < x + cw && mouseY >= y && mouseY < y + ComposerSkin.CHIP_H;
-			ComposerSkin.chip(g, f, x, y, icon(d), 0xFF9AA7B8, d.workspace.workspace.label, ComposerSkin.TEXT, detail(d), hover, open);
+			ComposerSkin.chip(g, f, x, y, icon(d), ComposerSkin.CHIP_ICON, d.workspace.workspace.label, ComposerSkin.TEXT, detail(d), hover, open);
 			if (hover && !open) {
 				g.setTooltipForNextFrame(f, Component.literal(d.workspace.workspace == NewThreadForm.Workspace.WORKTREE
 						? "Workspace · a new git worktree" : "Workspace · the project checkout"), mouseX, mouseY);
@@ -380,7 +380,7 @@ final class DraftControls {
 
 		private void field(GuiGraphicsExtractor g, ComposerText t, Rect r, String placeholder) {
 			boolean on = editing == t;
-			ComposerSkin.box(g, r.x(), r.y(), r.w(), r.h(), 0xFF0F0F12, on ? ComposerSkin.BORDER_FOCUS : ComposerSkin.BORDER);
+			ComposerSkin.box(g, r.x(), r.y(), r.w(), r.h(), ComposerSkin.FIELD_BG, on ? ComposerSkin.BORDER_FOCUS : ComposerSkin.BORDER);
 			t.layout(Integer.MAX_VALUE / 4, font::width);
 			int tx = r.x() + 4;
 			int room = r.w() - 8;

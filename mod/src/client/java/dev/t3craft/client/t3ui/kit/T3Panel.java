@@ -1,5 +1,6 @@
 package dev.t3craft.client.t3ui.kit;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import dev.t3craft.client.chat.ChatDraw;
 import dev.t3craft.client.chat.ChatTheme;
 import dev.t3craft.client.chat.Rect;
@@ -41,7 +42,12 @@ public abstract class T3Panel {
 		/** Opens a screen over the host; closing it comes back here. */
 		void openScreen(Screen next);
 
-		/** Shows a confirmation over the page, or {@code null} to close it. It cannot hold text fields. */
+		/**
+		 * Shows a modal over the page (a confirmation, a small form), or {@code null} to close it. The host
+		 * lays it out once, when this is called and on every rebuild of the screen, so it may hold
+		 * {@link T3Field}s and {@link T3TextArea}s: keep them in the page, as the page's own, and they keep
+		 * their text. The page below stays visible under the veil but takes no input.
+		 */
 		void modal(@Nullable T3Dialog dialog);
 
 		/** The screen showing the page (the parent of screens opened with {@link #openScreen}). */
@@ -60,6 +66,11 @@ public abstract class T3Panel {
 	private final List<Label> labels = new ArrayList<>();
 	private final List<Label> fixedLabels = new ArrayList<>();
 	private final List<AbstractWidget> pending = new ArrayList<>();
+	/** Who has the keyboard; Tab walks {@link #ring}: header, body, footer. */
+	private final T3Focus focus = new T3Focus();
+	private List<T3Control> ring = List.of();
+	/** How many of {@code fixed}'s controls belong to the header (the rest are the footer's). */
+	private int headerCount;
 	private @Nullable Host host;
 	private Font font;
 	private ChatTheme theme = ChatTheme.warmStudio();
@@ -124,11 +135,17 @@ public abstract class T3Panel {
 		return form.add(c);
 	}
 
-	/** A text field in the body; hidden when it is not wholly inside the visible area (a box cannot be clipped). */
+	/**
+	 * A text field in the body. The vanilla box cannot be clipped, so it is live only when wholly inside
+	 * the visible area; while the field is partly out, the kit draws its frame and text itself, clipped
+	 * with the page (so it slides out of view, no jump at the edge), and when it is wholly out it is hidden.
+	 */
 	protected final T3Field placeField(T3Field f, int x, int y, int w) {
 		Rect r = new Rect(x, y, w, T3Control.H);
-		boolean shown = r.y() >= viewport.y() && r.bottom() <= viewport.bottom();
-		pending.add(f.layout(theme, r, shown));
+		boolean whole = r.y() >= viewport.y() && r.bottom() <= viewport.bottom();
+		boolean inView = r.bottom() > viewport.y() && r.y() < viewport.bottom();
+		pending.add(f.layout(theme, r, whole));
+		f.setVisible(inView);
 		return form.add(f);
 	}
 
@@ -184,12 +201,21 @@ public abstract class T3Panel {
 			scroll = max; // the window grew: arrange again from the new offset
 		}
 		arrangeHeader(header);
+		headerCount = fixed.controls().size();
 		arrangeFooter(footer);
 		for (T3Control c : form.controls()) {
 			if (!(c instanceof T3Field)) {
 				c.setVisible(c.bounds().bottom() > viewport.y() && c.bounds().y() < viewport.bottom());
 			}
 		}
+		List<T3Control> r = new ArrayList<>(fixed.controls().subList(0, headerCount));
+		r.addAll(form.controls());
+		r.addAll(fixed.controls().subList(headerCount, fixed.controls().size()));
+		ring = r;
+		form.useFocus(focus, () -> ring);
+		fixed.useFocus(focus, () -> ring);
+		focus.bind(host().screen());
+		focus.restore(ring);
 		pending.forEach(sink);
 	}
 
@@ -260,7 +286,11 @@ public abstract class T3Panel {
 		return true;
 	}
 
-	/** Open selects first, then the controls. */
+	/**
+	 * Open selects first, then Tab / Shift+Tab (the next / previous control of the page, header to footer,
+	 * wrapping), then the controls: a button, switch, list or text area reacts only while it has the
+	 * keyboard (a page may also pin an invisible {@link T3Control} to catch keys of its own).
+	 */
 	public final boolean keyPressed(KeyEvent e) {
 		if (fixed.overlayOpen()) {
 			return fixed.keyPressed(e);
@@ -268,7 +298,73 @@ public abstract class T3Panel {
 		if (form.overlayOpen()) {
 			return form.keyPressed(e);
 		}
+		if (e.key() == InputConstants.KEY_TAB && moveFocus(e.hasShiftDown() ? -1 : 1)) {
+			return true;
+		}
 		return fixed.keyPressed(e) || form.keyPressed(e);
+	}
+
+	/** Tab: the keyboard goes to the next usable control; a body control out of view is scrolled in. */
+	private boolean moveFocus(int dir) {
+		T3Control next = focus.step(ring, dir);
+		if (next == null) {
+			return false;
+		}
+		boolean scrolled = reveal(next);
+		focus.focus(next, ring);
+		if (scrolled) {
+			host().relayout(); // the controls are made again; the focus comes back to the same slot
+		}
+		return true;
+	}
+
+	/** Scrolls the body the least that shows {@code c} (a pinned control never needs it); true when it moved. */
+	private boolean reveal(T3Control c) {
+		if (fixed.controls().contains(c)) {
+			return false;
+		}
+		Rect b = c.bounds();
+		int top = viewport.y() + 2;
+		int bottom = viewport.bottom() - 2;
+		int shift = 0;
+		if (b.y() < top || b.h() > bottom - top && b.bottom() > bottom) {
+			shift = b.y() - top; // above, or taller than the area: show its top
+		} else if (b.bottom() > bottom) {
+			shift = b.bottom() - bottom;
+		}
+		int max = Math.max(0, contentH - (viewport.h() - 4));
+		int next = Math.max(0, Math.min(max, scroll + shift));
+		if (shift == 0 || next == scroll) {
+			return false;
+		}
+		scroll = next;
+		return true;
+	}
+
+	/** A typed character goes to the control that has the keyboard (a text area; a field's box is vanilla). */
+	public final boolean charTyped(int codepoint) {
+		return fixed.charTyped(codepoint) || form.charTyped(codepoint);
+	}
+
+	public final boolean mouseDragged(double mx, double my, int button) {
+		return fixed.mouseDragged(mx, my, button) || form.mouseDragged(mx, my, button);
+	}
+
+	public final boolean mouseReleased(double mx, double my, int button) {
+		boolean a = fixed.mouseReleased(mx, my, button);
+		boolean b = form.mouseReleased(mx, my, button);
+		return a || b;
+	}
+
+	/** Nothing of the page keeps the keyboard (a text area stops the platform's text input). */
+	final void releaseFocus() {
+		focus.clear();
+	}
+
+	/** The page left its host. */
+	final void dispose() {
+		releaseFocus();
+		closed();
 	}
 
 	/** Esc: closes an open select; false = nothing to close, the host goes back. */

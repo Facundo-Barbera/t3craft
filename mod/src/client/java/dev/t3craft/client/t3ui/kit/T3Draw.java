@@ -2,6 +2,7 @@ package dev.t3craft.client.t3ui.kit;
 
 import dev.t3craft.client.chat.ChatDraw;
 import dev.t3craft.client.chat.ChatTheme;
+import dev.t3craft.client.chat.Rect;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.gui.Font;
@@ -52,6 +53,18 @@ public final class T3Draw {
 
 	public static void text(GuiGraphicsExtractor g, Font font, ChatTheme t, String s, int x, int y, int color) {
 		g.text(font, s, x, y, color, t.shadow());
+	}
+
+	/**
+	 * The keyboard focus ring: a 1 px brass outline on the edge of {@code r} and a fainter one just inside
+	 * it, so it reads on a dark button and on a light one. Drawn inside the rectangle (a page clips what is
+	 * outside its area).
+	 */
+	public static void focusRing(GuiGraphicsExtractor g, ChatTheme t, Rect r) {
+		ChatDraw.outline(g, r.x(), r.y(), r.w(), r.h(), t.brass());
+		if (r.w() > 6 && r.h() > 6) {
+			ChatDraw.outline(g, r.x() + 1, r.y() + 1, r.w() - 2, r.h() - 2, ChatTheme.withAlpha(t.brass(), 120));
+		}
 	}
 
 	/** {@code s} centred in {@code r} (both ways), clipped to its width. */

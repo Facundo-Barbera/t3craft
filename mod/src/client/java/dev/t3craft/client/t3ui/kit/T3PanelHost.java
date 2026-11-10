@@ -10,7 +10,9 @@ import java.util.function.Consumer;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 import org.jspecify.annotations.Nullable;
 
@@ -42,6 +44,10 @@ public final class T3PanelHost implements T3Panel.Host {
 	private final T3Form chrome = new T3Form();
 	private @Nullable T3Panel current;
 	private @Nullable T3Dialog modal;
+	/** The modal was laid out by {@link #layout} (once per rebuild of the screen); false = it still has to be. */
+	private boolean modalLaidOut;
+	/** Its initial field got the keyboard (only the first time, so a rebuild does not steal it back). */
+	private boolean modalFocused;
 	private Rect frame = Rect.EMPTY;
 	private int pad = 8;
 
@@ -65,21 +71,28 @@ public final class T3PanelHost implements T3Panel.Host {
 	/** Starts the stack with {@code root}. */
 	public void open(T3Panel root) {
 		stack.clear();
-		modal = null;
+		releaseModal();
 		current = root;
 		root.attach(this);
 		owner.relayout();
+	}
+
+	private void releaseModal() {
+		if (modal != null) {
+			modal.release();
+			modal = null;
+		}
 	}
 
 	// ---- T3Panel.Host --------------------------------------------------------------------------------------
 
 	/** Drops every page at once (the screen moved on to something else); the owner rebuilds its widgets. */
 	public void close() {
-		modal = null;
+		releaseModal();
 		if (current != null) {
-			current.closed();
+			current.dispose();
 		}
-		stack.forEach(T3Panel::closed);
+		stack.forEach(T3Panel::dispose);
 		stack.clear();
 		current = null;
 	}
@@ -101,9 +114,9 @@ public final class T3PanelHost implements T3Panel.Host {
 
 	@Override
 	public void back() {
-		modal = null;
+		releaseModal();
 		if (current != null) {
-			current.closed();
+			current.dispose();
 		}
 		if (stack.isEmpty()) {
 			current = null;
@@ -119,9 +132,20 @@ public final class T3PanelHost implements T3Panel.Host {
 		net.minecraft.client.Minecraft.getInstance().gui.setScreen(next);
 	}
 
+	/**
+	 * Opens a modal, or closes it with {@code null}. The screen is rebuilt so the modal is laid out once
+	 * (its text boxes become widgets of the screen), not on every frame.
+	 */
 	@Override
 	public void modal(@Nullable T3Dialog dialog) {
+		if (dialog == modal) {
+			return;
+		}
+		releaseModal();
 		this.modal = dialog;
+		modalLaidOut = false;
+		modalFocused = false;
+		owner.relayout();
 	}
 
 	@Override
@@ -147,7 +171,24 @@ public final class T3PanelHost implements T3Panel.Host {
 		back.setTooltip(stack.isEmpty() ? "Close (Esc)" : "Back (Esc)");
 		chrome.add(back);
 		Rect inner = new Rect(area.x() + pad, area.y() + pad + HEADER_H + 2, area.w() - 2 * pad, area.h() - 2 * pad - HEADER_H - 2);
-		p.layout(inner, font, t, sink);
+		if (modal == null) {
+			p.layout(inner, font, t, sink);
+			return;
+		}
+		// a modal is open: the page's text boxes stay under the veil but cannot be clicked, focused or typed in
+		p.layout(inner, font, t, w -> {
+			w.visible = false; // T3Field draws its text itself while its box is hidden
+			w.setFocused(false);
+			sink.accept(w);
+		});
+		Screen screen = owner.screen();
+		modal.bind(screen);
+		modal.layout(font, t, screen.width, screen.height, sink); // once: its boxes become widgets of the screen
+		modalLaidOut = true;
+		if (!modalFocused) {
+			modalFocused = true;
+			modal.focusInitial(screen);
+		}
 	}
 
 	public void render(GuiGraphicsExtractor g, Font font, ChatTheme t, int mx, int my, Rect screen) {
@@ -185,8 +226,12 @@ public final class T3PanelHost implements T3Panel.Host {
 		}
 		g.nextStratum();
 		T3Dialog.veil(g, t, screen.w(), screen.h());
-		modal.layout(font, t, screen.w(), screen.h(), w -> {
-		});
+		if (!modalLaidOut) {
+			// the screen never laid the page out (a layout with no room for it): place the modal without text boxes
+			modal.layout(font, t, screen.w(), screen.h(), w -> {
+			});
+			modalLaidOut = true;
+		}
 		modal.render(g, font, t, mx, my);
 		modal.renderOverlays(g, font, t, mx, my, screen);
 	}
@@ -197,12 +242,25 @@ public final class T3PanelHost implements T3Panel.Host {
 		}
 	}
 
+	/** The owning screen is going away: no control keeps the keyboard or the platform's text input. */
+	public void releaseFocus() {
+		if (modal != null) {
+			modal.release();
+		}
+		if (current != null) {
+			current.releaseFocus();
+		}
+		stack.forEach(T3Panel::releaseFocus);
+	}
+
 	// ---- input --------------------------------------------------------------------------------------------------
 
 	public boolean mouseClicked(double mx, double my, int button) {
 		if (modal != null) {
-			modal.mouseClicked(mx, my, button);
-			return true;
+			if (!modal.mouseClicked(mx, my, button)) {
+				modal.clickBox(owner.screen(), mx, my, button); // a text box of the modal takes the click
+			}
+			return true; // the page and the screen under the veil never see it
 		}
 		T3Panel p = current;
 		if (p == null) {
@@ -222,13 +280,43 @@ public final class T3PanelHost implements T3Panel.Host {
 		return current != null && current.mouseScrolled(mx, my, dy);
 	}
 
+	public boolean mouseDragged(double mx, double my, int button) {
+		if (modal != null) {
+			modal.mouseDragged(mx, my, button);
+			return true;
+		}
+		return current != null && current.mouseDragged(mx, my, button);
+	}
+
+	public boolean mouseReleased(double mx, double my, int button) {
+		if (modal != null) {
+			modal.mouseReleased(mx, my, button);
+		}
+		return current != null && current.mouseReleased(mx, my, button);
+	}
+
+	/**
+	 * A typed character: the modal's text box or the page's text area. False = not the host's (a page's
+	 * vanilla text box, or the screen's own, takes it through {@code super.charTyped}); with a modal open
+	 * the answer is always true, and only the modal's boxes hear it.
+	 */
+	public boolean charTyped(CharacterEvent event) {
+		if (modal != null) {
+			if (!modal.charTyped(event.codepoint()) && owner.screen().getFocused() instanceof EditBox box) {
+				box.charTyped(event);
+			}
+			return true;
+		}
+		return current != null && current.charTyped(event.codepoint());
+	}
+
 	/** True when the key was the host's or the page's; Esc with nothing open goes back. */
 	public boolean keyPressed(KeyEvent e) {
 		if (modal != null) {
 			if (e.isEscape()) {
 				modal.cancel();
-			} else {
-				modal.keyPressed(e);
+			} else if (!modal.keyPressed(e) && owner.screen().getFocused() instanceof EditBox box) {
+				box.keyPressed(e); // typing, arrows, backspace in a text box of the modal
 			}
 			return true;
 		}

@@ -1,10 +1,12 @@
 package dev.t3craft.client.t3ui.kit;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import dev.t3craft.client.chat.ChatTheme;
 import dev.t3craft.client.chat.Rect;
 import java.util.List;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import org.jspecify.annotations.Nullable;
 
@@ -22,7 +24,53 @@ public abstract class T3Control {
 	private Rect bounds = Rect.EMPTY;
 	private boolean enabled = true;
 	private boolean visible = true;
+	private boolean focus;
+	private @Nullable Screen screen;
 	private @Nullable List<String> tooltip;
+
+	// ---- keyboard focus ------------------------------------------------------------------------------
+
+	/** True when Tab can land on the control (buttons, switches, selects, lists, fields). */
+	public boolean focusable() {
+		return false;
+	}
+
+	/** True when a click on the control gives it the keyboard (a list, a text area; a button keeps no focus). */
+	public boolean takesClickFocus() {
+		return false;
+	}
+
+	/** The control has the keyboard. {@link T3Field} answers for its vanilla box. */
+	public boolean hasFocus() {
+		return focus;
+	}
+
+	/** Moves the kit focus flag; the {@link T3Focus} of the host decides who gets it. */
+	public void setFocus(boolean on) {
+		if (focus != on) {
+			focus = on;
+			focusChanged(on);
+		}
+	}
+
+	/** The control gained or lost the keyboard (a text area starts or stops the platform's text input). */
+	protected void focusChanged(boolean on) {
+	}
+
+	/** The screen showing the control, given by its host at every layout; null before the first. */
+	protected final @Nullable Screen screen() {
+		return screen;
+	}
+
+	final void bindScreen(@Nullable Screen s) {
+		this.screen = s;
+	}
+
+	/** Enter, keypad Enter or Space: what presses a focused button or switch. */
+	protected static boolean isActivateKey(KeyEvent e) {
+		int k = e.key();
+		return k == InputConstants.KEY_RETURN || k == InputConstants.KEY_NUMPADENTER || k == InputConstants.KEY_SPACE;
+	}
 
 	public Rect bounds() {
 		return bounds;
@@ -74,6 +122,21 @@ public abstract class T3Control {
 	}
 
 	public boolean keyPressed(KeyEvent e) {
+		return false;
+	}
+
+	/** A typed character; only the control that has the keyboard gets it (see {@link T3Form#charTyped}). */
+	public boolean charTyped(int codepoint) {
+		return false;
+	}
+
+	/** The pointer moved with a button held (a scrollbar thumb, a text selection). */
+	public boolean mouseDragged(double mx, double my, int button) {
+		return false;
+	}
+
+	/** The button went up; a control that was dragging stops. */
+	public boolean mouseReleased(double mx, double my, int button) {
 		return false;
 	}
 

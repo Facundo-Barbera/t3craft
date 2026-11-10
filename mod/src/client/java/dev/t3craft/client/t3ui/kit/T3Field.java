@@ -10,6 +10,8 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.input.MouseButtonInfo;
 import net.minecraft.network.chat.Component;
 import org.jspecify.annotations.Nullable;
 
@@ -75,12 +77,37 @@ public final class T3Field extends T3Control {
 		return box != null && box.isFocused();
 	}
 
+	@Override
+	public boolean focusable() {
+		return true;
+	}
+
+	/** The vanilla box has the keyboard (the kit flag is not used for fields). */
+	@Override
+	public boolean hasFocus() {
+		return focused();
+	}
+
 	/** Gives the box the keyboard. */
 	public void focus(Screen host) {
 		if (box != null) {
 			host.setFocused(box);
 			box.setFocused(true);
 		}
+	}
+
+	/**
+	 * A click at ({@code mx}, {@code my}) on the box: it takes the keyboard and puts its caret there. For a host
+	 * that does not pass clicks on to the screen's widgets (a modal over a page); false = the click was not on it.
+	 */
+	public boolean clickAt(Screen host, double mx, double my, int button) {
+		if (box == null || !box.visible || !box.active || !bounds().contains(mx, my)) {
+			return false;
+		}
+		host.setFocused(box);
+		box.setFocused(true);
+		box.mouseClicked(new MouseButtonEvent(mx, my, new MouseButtonInfo(button, 0)), false);
+		return true;
 	}
 
 	public void blur(Screen host) {
@@ -94,11 +121,14 @@ public final class T3Field extends T3Control {
 
 	/**
 	 * (Re)creates the box inside {@code r}, keeping the text, and returns it for the host to add as a
-	 * widget. {@code shown} false hides it (a field scrolled out of its panel).
+	 * widget. {@code shown} false hides the box (a field not wholly inside its panel's area: a box cannot
+	 * be clipped); the frame and the text are then drawn by {@link #render}, which the panel does clip, so
+	 * a field slides out of view instead of vanishing at the edge. The field itself stays visible; a host
+	 * that wants it gone (fully scrolled out) calls {@code setVisible(false)} after this.
 	 */
 	public EditBox layout(ChatTheme t, Rect r, boolean shown) {
 		setBounds(r);
-		setVisible(shown);
+		setVisible(true);
 		boolean wasFocused = box != null && box.isFocused();
 		EditBox b = new EditBox(font, r.x() + 4, r.y() + (r.h() - 8) / 2, Math.max(8, r.w() - 8), 10, box, name);
 		b.setMaxLength(maxLength);
@@ -125,7 +155,18 @@ public final class T3Field extends T3Control {
 		if (!visible()) {
 			return;
 		}
-		ChatDraw.field(g, t, bounds(), focused());
+		Rect r = bounds();
+		ChatDraw.field(g, t, r, focused());
+		if (focused()) {
+			ChatDraw.outline(g, r.x(), r.y(), r.w(), r.h(), t.brass());
+		}
+		if (box == null || !box.visible) {
+			// the box is hidden (half out of its panel, or under a modal's veil): draw its text here, clipped by the host
+			String s = value.isEmpty() && hint != null ? hint : value;
+			if (!s.isEmpty()) {
+				g.text(f, ChatDraw.clip(f, s, r.w() - 8), r.x() + 4, r.y() + (r.h() - 8) / 2, value.isEmpty() ? t.ghost() : t.text(), t.shadow());
+			}
+		}
 	}
 
 	/** Enter while focused runs {@link #onSubmit}; true when it did. */

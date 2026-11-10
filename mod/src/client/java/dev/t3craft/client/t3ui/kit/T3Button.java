@@ -6,6 +6,7 @@ import dev.t3craft.client.chat.MouseButtons;
 import dev.t3craft.client.chat.Rect;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.input.KeyEvent;
 
 /**
  * A push button. {@link Style#PRIMARY} is the accent fill (the main action), {@link Style#DANGER} the error
@@ -104,6 +105,24 @@ public final class T3Button extends T3Control {
 			ChatDraw.outline(g, r.x(), r.y(), r.w(), r.h(), edge);
 		}
 		T3Draw.centered(g, font, t, label, r.x(), r.y(), r.w(), r.h(), text);
+		if (hasFocus() && enabled()) {
+			T3Draw.focusRing(g, t, r);
+		}
+	}
+
+	@Override
+	public boolean focusable() {
+		return true;
+	}
+
+	/** Enter or Space presses the button while it has the keyboard. */
+	@Override
+	public boolean keyPressed(KeyEvent e) {
+		if (hasFocus() && enabled() && visible() && isActivateKey(e)) {
+			action.run();
+			return true;
+		}
+		return false;
 	}
 
 	@Override

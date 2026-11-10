@@ -116,8 +116,26 @@ public class T3PanelScreen extends Screen implements T3PanelHost.Owner {
 	}
 
 	@Override
+	public boolean mouseDragged(MouseButtonEvent event, double dx, double dy) {
+		return host.mouseDragged(event.x(), event.y(), event.button()) || super.mouseDragged(event, dx, dy);
+	}
+
+	@Override
+	public boolean mouseReleased(MouseButtonEvent event) {
+		boolean kit = host.mouseReleased(event.x(), event.y(), event.button());
+		return super.mouseReleased(event) || kit;
+	}
+
+	@Override
 	public boolean charTyped(CharacterEvent event) {
-		return !host.modalOpen() && super.charTyped(event);
+		// a text area of the page or a text box of the modal first; the page's vanilla boxes otherwise
+		return host.charTyped(event) || super.charTyped(event);
+	}
+
+	@Override
+	public void removed() {
+		host.releaseFocus();
+		super.removed();
 	}
 
 	@Override

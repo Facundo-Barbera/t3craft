@@ -33,6 +33,10 @@ public final class ComposerSkin {
 	public static final int ERROR = 0xFFF27C7C;
 	public static final int WARN = 0xFFE8B34B;
 	public static final int POPUP = 0xF6141418;
+	/** Icon glyph of a chip in the bar (the project and workspace chips of a draft). */
+	public static final int CHIP_ICON = 0xFF9AA7B8;
+	/** Fill of a small text box inside a popover of the bar (base ref, branch name). */
+	public static final int FIELD_BG = 0xFF0F0F12;
 
 	/** Chip height in the composer bar. */
 	public static final int CHIP_H = 14;

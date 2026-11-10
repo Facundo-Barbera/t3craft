@@ -55,6 +55,26 @@ public final class T3Select<T> extends T3Control {
 		String s = options.isEmpty() ? "—" : label.apply(options.get(Math.min(selected, options.size() - 1)));
 		g.text(font, ChatDraw.clip(font, s, r.w() - 20), r.x() + 5, r.y() + (r.h() - 8) / 2, enabled() ? t.text() : t.disabled(), t.shadow());
 		g.text(font, "▾", r.right() - 12, r.y() + (r.h() - 8) / 2, enabled() ? (open || hover ? t.accent() : t.muted()) : t.disabled(), false);
+		if (hasFocus() && enabled() && !open) {
+			T3Draw.focusRing(g, t, r);
+		}
+	}
+
+	@Override
+	public boolean focusable() {
+		return true;
+	}
+
+	/** A click opens the list and the select keeps the keyboard (it is then the one that gets Up / Down). */
+	@Override
+	public boolean takesClickFocus() {
+		return true;
+	}
+
+	private void openList() {
+		open = true;
+		highlight = selected;
+		first = Math.max(0, Math.min(selected - MAX_ROWS / 2, options.size() - MAX_ROWS));
 	}
 
 	@Override
@@ -126,9 +146,7 @@ public final class T3Select<T> extends T3Control {
 		if (!enabled() || !visible() || options.isEmpty() || !MouseButtons.isLeft(button) || !bounds().contains(mx, my)) {
 			return false;
 		}
-		open = true;
-		highlight = selected;
-		first = Math.max(0, Math.min(selected - MAX_ROWS / 2, options.size() - MAX_ROWS));
+		openList();
 		return true;
 	}
 
@@ -143,10 +161,14 @@ public final class T3Select<T> extends T3Control {
 
 	@Override
 	public boolean keyPressed(KeyEvent e) {
+		int k = e.key();
 		if (!open) {
+			if (hasFocus() && enabled() && visible() && !options.isEmpty() && (isActivateKey(e) || k == InputConstants.KEY_DOWN)) {
+				openList(); // Enter, Space or Down on the focused select opens its list
+				return true;
+			}
 			return false;
 		}
-		int k = e.key();
 		if (k == InputConstants.KEY_ESCAPE) {
 			open = false;
 		} else if (k == InputConstants.KEY_UP) {

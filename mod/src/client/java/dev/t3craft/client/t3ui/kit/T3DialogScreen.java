@@ -6,6 +6,7 @@ import java.util.List;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
@@ -20,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 public abstract class T3DialogScreen extends Screen {
 	protected final @Nullable Screen parent;
 	private T3Dialog dialog = new T3Dialog("", 200);
+	private final T3Focus focus = new T3Focus();
 	private ChatTheme theme = ChatTheme.warmStudio();
 
 	protected T3DialogScreen(Component title, @Nullable Screen parent) {
@@ -41,6 +43,8 @@ public abstract class T3DialogScreen extends Screen {
 	protected void init() {
 		theme = ChatTheme.warmStudio();
 		dialog = buildDialog();
+		dialog.shareFocus(focus); // the keyboard focus survives the dialog being built again
+		dialog.bind(this);
 		dialog.layout(font, theme, width, height, this::addRenderableWidget);
 		for (var child : children()) {
 			if (child instanceof EditBox box && box.isFocused()) {
@@ -90,9 +94,31 @@ public abstract class T3DialogScreen extends Screen {
 	}
 
 	@Override
+	public boolean mouseDragged(MouseButtonEvent event, double dx, double dy) {
+		return dialog.mouseDragged(event.x(), event.y(), event.button()) || super.mouseDragged(event, dx, dy);
+	}
+
+	@Override
+	public boolean mouseReleased(MouseButtonEvent event) {
+		boolean kit = dialog.mouseReleased(event.x(), event.y(), event.button());
+		return super.mouseReleased(event) || kit;
+	}
+
+	@Override
 	public boolean keyPressed(KeyEvent e) {
-		// an open select takes every key (Esc closes just the list); Esc otherwise reaches Screen → onClose()
+		// Tab, an open select, a focused button: the dialog's; Esc reaches Screen → onClose(); text keys go to the focused box
 		return dialog.keyPressed(e) || super.keyPressed(e);
+	}
+
+	@Override
+	public boolean charTyped(CharacterEvent event) {
+		return dialog.charTyped(event.codepoint()) || super.charTyped(event);
+	}
+
+	@Override
+	public void removed() {
+		dialog.release();
+		super.removed();
 	}
 
 	@Override
