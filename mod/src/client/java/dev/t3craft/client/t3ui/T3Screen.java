@@ -32,6 +32,7 @@ import dev.t3craft.client.t3ui.kit.T3Panel;
 import dev.t3craft.client.t3ui.kit.T3PanelHost;
 import dev.t3craft.client.t3ui.kit.RightPanels;
 import dev.t3craft.client.t3ui.kit.T3RightPanel;
+import dev.t3craft.client.t3ui.kit.T3Splitter;
 import dev.t3craft.client.t3ui.sidebar.SidebarView;
 import dev.t3craft.client.t3ui.sidebar.WorkingStatus;
 import java.nio.file.Path;
@@ -187,6 +188,54 @@ public final class T3Screen extends Screen {
 	private boolean rightFocused;
 	/** Inside {@link #init()}: a page opening there must not rebuild the widgets again. */
 	private boolean laying;
+	/** #39: preferred widths (0 = the layout's default), kept while the window is too small to honour them. */
+	private int sidebarPref;
+	private int rightPref;
+	/** #39: drag handles between sidebar | thread and thread | right panel. */
+	private final T3Splitter sidebarSplitter = new T3Splitter(new T3Splitter.Listener() {
+		@Override
+		public void drag(double mouseX) {
+			int w = T3UiLayout.dragSidebar(layout.frame(), mouseX, layout.right().w());
+			if (w != layout.sidebar().w()) {
+				sidebarPref = w;
+				rebuildWidgets();
+			}
+		}
+
+		@Override
+		public void released() {
+			layoutChanged();
+		}
+
+		@Override
+		public void reset() {
+			sidebarPref = 0;
+			layoutChanged();
+			rebuildWidgets();
+		}
+	});
+	private final T3Splitter rightSplitter = new T3Splitter(new T3Splitter.Listener() {
+		@Override
+		public void drag(double mouseX) {
+			int w = T3UiLayout.dragRight(layout.frame(), mouseX, layout.sidebar().w());
+			if (w != layout.right().w()) {
+				rightPref = w;
+				rebuildWidgets();
+			}
+		}
+
+		@Override
+		public void released() {
+			layoutChanged();
+		}
+
+		@Override
+		public void reset() {
+			rightPref = 0;
+			layoutChanged();
+			rebuildWidgets();
+		}
+	});
 	private boolean menuOpen;
 	/** #39: the queue page last opened from the menu (its watches are dropped when the screen goes away). */
 	private dev.t3craft.client.queue.@Nullable QueuePanel queuePage;
@@ -428,8 +477,11 @@ public final class T3Screen extends Screen {
 		if (rightOpen && !right.active() && !T3UiLayout.compute(width, height, true).compact() && !right.open(currentRightPanelId())) {
 			rightOpen = false; // nothing registered under that id any more
 		}
-		layout = T3UiLayout.compute(width, height, showSidebarFlag(), 0, 0, rightShown());
+		layout = T3UiLayout.compute(width, height, showSidebarFlag(), sidebarPref, rightPref, rightShown());
 		sr = T3UiLayout.sidebar(layout.sidebar());
+		// the splitters sit in the gaps; the sidebar one only with a thread panel next to it
+		sidebarSplitter.setBounds(layout.main().w() > 0 ? layout.sidebarSplit() : Rect.EMPTY);
+		rightSplitter.setBounds(layout.rightSplit());
 		mr = T3UiLayout.main(layout.main(), 0); // the composer is the conversation's footer
 
 		search = null;
@@ -882,6 +934,9 @@ public final class T3Screen extends Screen {
 		if (rightVisible()) {
 			right.render(g, font, theme, mouseX, mouseY, new Rect(0, 0, width, height));
 		}
+		boolean blocked = anyMenuOpen() || pages.modalOpen() || right.modalOpen() || pages.overlayOpen() || right.overlayOpen();
+		sidebarSplitter.render(g, theme, mouseX, mouseY, blocked);
+		rightSplitter.render(g, theme, mouseX, mouseY, blocked);
 		super.extractRenderState(g, mouseX, mouseY, a);
 		if (pages.active()) {
 			pages.renderTop(g, font, theme, mouseX, mouseY, new Rect(0, 0, width, height));
@@ -1668,6 +1723,10 @@ public final class T3Screen extends Screen {
 			contextItems = null;
 			return true;
 		}
+		if (!pages.overlayOpen() && !right.overlayOpen()
+				&& (sidebarSplitter.mouseClicked(mx, my, button, doubleClick) || rightSplitter.mouseClicked(mx, my, button, doubleClick))) {
+			return true; // #39: a drag handle (double click: default width)
+		}
 		if (rightVisible() && (layout.right().contains(mx, my) || right.overlayOpen())) {
 			// #39: the right panel's page: its controls, then its text boxes; keys follow it until a click elsewhere
 			rightFocused = true;
@@ -1759,6 +1818,9 @@ public final class T3Screen extends Screen {
 
 	@Override
 	public boolean mouseDragged(MouseButtonEvent event, double dx, double dy) {
+		if (sidebarSplitter.mouseDragged(event.x()) || rightSplitter.mouseDragged(event.x())) {
+			return true; // #39: resizing; the width is saved on release
+		}
 		if (pages.active() && pages.mouseDragged(event.x(), event.y(), event.button())) {
 			return true; // a scrollbar thumb of the kit page
 		}
@@ -1770,6 +1832,11 @@ public final class T3Screen extends Screen {
 
 	@Override
 	public boolean mouseReleased(MouseButtonEvent event) {
+		boolean split = sidebarSplitter.mouseReleased();
+		split |= rightSplitter.mouseReleased();
+		if (split) {
+			return true;
+		}
 		boolean used = pages.active() && pages.mouseReleased(event.x(), event.y(), event.button());
 		used |= rightVisible() && right.mouseReleased(event.x(), event.y(), event.button());
 		if (used) {
