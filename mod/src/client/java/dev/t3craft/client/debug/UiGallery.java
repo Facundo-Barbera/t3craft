@@ -229,7 +229,7 @@ public final class UiGallery {
 				new EnvRow("studio", "Studio Mac", "http://studio.example.ts.net:3773/", "ok", ""),
 				new EnvRow("laptop", "Laptop", "http://my-laptop:3773/", "connecting", ""),
 				new EnvRow("vps-env", "VPS", "https://vps.example.ts.net/", "offline", "connection refused"),
-				new EnvRow("old", "Old machine", "http://10.0.0.7:3773/", "-", ""));
+				new EnvRow("old", "Old machine", "http://old-machine.example:3773/", "-", ""));
 	}
 
 	/** Seeded once, in a temporary folder: the outbound pages save and delete here, never in the real {@code outbound.json}. */

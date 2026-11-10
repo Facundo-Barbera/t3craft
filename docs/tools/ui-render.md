@@ -8,7 +8,7 @@ limits listed at the end.
 ./gradlew uiRender -PuiArgs="--all"
 ./gradlew uiRender -PuiArgs="--scenario markdown,running --size 2560x1380 --gui-scale 3"
 ./gradlew uiRender -PuiArgs="--scenario many-threads --mouse 400,300"
-./gradlew uiRender -PuiArgs="--scenario many-threads --compare /home/user/projects/t3craft-ref/ui/t3craft-ingame.png"
+./gradlew uiRender -PuiArgs="--scenario many-threads --compare /path/to/reference/t3craft-ingame.png"
 ```
 
 Agents never run gradle or java themselves: ask the shared render service (`docs/tools/render-service.md`).
