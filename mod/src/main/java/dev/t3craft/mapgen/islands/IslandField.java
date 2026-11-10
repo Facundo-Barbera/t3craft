@@ -7,44 +7,92 @@ import dev.t3craft.mapgen.Noise;
 import dev.t3craft.mapgen.Slot;
 import dev.t3craft.mapgen.TerrainShape;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
-import java.util.Set;
-import net.minecraft.core.Direction;
+import java.util.Map;
+import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The endless field of floating islands (generator {@value #ID}). One island per cell of a {@value #CELL}-block
- * grid: its size class comes from the cell's hash, its centre is jittered inside the cell and its height varies
- * by a few blocks. Cell {@code (0, 0)} is always the medium spawn island at {@code baseY}. There is no ground
- * between islands: two islands of neighbouring cells are only <i>linked</i> ({@link #neighbours}); the world
- * builds the bridge when a player nears the edge ({@link BridgePlanner}).
+ * The endless field of floating islands (generator {@value #ID}). One island per cell of a square grid: its size
+ * class comes from the cell's hash and the field's {@link IslandMix}, its centre is jittered inside the cell, its
+ * height varies by a few blocks and its biome ({@link IslandBiome}) follows a region of 3x3 cells most of the
+ * time. Cell {@code (0, 0)} is always the large spawn island at {@code baseY}. There is no ground between
+ * islands: two islands of neighbouring cells are only <i>linked</i> ({@link #neighbours}); the world builds the
+ * bridge when a player nears the edge ({@link BridgePlanner}).
  *
- * <p>Spacing guarantees: every island stays inside its cell with a margin of {@value #MARGIN} blocks (outline
- * wobble included), so islands never touch (at least {@code 2 * MARGIN} blocks of void between cell neighbours)
- * and every cell neighbour is within one bridge of at most about 75 blocks.
+ * <p>Spacing: the cell side is {@link #cellFor}{@code (mix)}, worked out from the biggest size the mix uses
+ * (and the large spawn island): {@code 2 * (reach + MARGIN + MIN_JITTER)}. So every island, whatever its outline,
+ * stays inside its cell with {@value #MARGIN} blocks to spare, islands never touch (at least
+ * {@code 2 * MARGIN} blocks of void between cell neighbours) and a mix of small islands packs them closer than a
+ * mix with extra large ones. Each island jitters as far as its own size leaves room for, up to
+ * {@value #MAX_JITTER}.
  *
  * <p>The map is endless, so {@link #generate} lays out a {@link Window}: the islands that touch it, their slots
- * and the on-demand links between them. Everything is a pure function of the seed.
+ * and the on-demand links between them. Everything is a pure function of the seed and the mix; islands are
+ * cached (a field is used from one thread at a time, the cache is synchronized anyway).
  */
 public final class IslandField implements MapGenerator<IslandField.Window> {
 	public static final String ID = "floating-islands";
-	/** Distance between the grid lines of the cells. */
-	public static final int CELL = 64;
 	/** Largest displacement of an island's centre from its cell's centre. */
-	public static final int MAX_JITTER = 10;
+	public static final int MAX_JITTER = 12;
+	/** Jitter every cell leaves room for, even with its biggest island. */
+	public static final int MIN_JITTER = 4;
 	/** Clear border between an island's outline and its cell's edge. */
 	public static final int MARGIN = 6;
 	/** Islands lie within this many blocks above or below {@code baseY}. */
 	public static final int HEIGHT_RANGE = 4;
+	/** Islands kept in the cache. */
+	private static final int CACHE = 4096;
+
+	/**
+	 * The mix the two-argument constructor uses. A shim for the runtime, which makes its field with
+	 * {@code new IslandField(seed, baseY)}: the client sets the open world's mix here before the runtime starts
+	 * ({@code IslandsWorld.use}). New code passes the mix explicitly.
+	 */
+	private static volatile IslandMix sessionMix = IslandMix.DEFAULT;
 
 	private final long seed;
 	private final int baseY;
+	private final IslandMix mix;
+	private final int cell;
+	private final Map<Long, Island> cache = Collections.synchronizedMap(new LinkedHashMap<Long, Island>(256, 0.75F, true) {
+		private static final long serialVersionUID = 1L;
+
+		@Override
+		protected boolean removeEldestEntry(Map.Entry<Long, Island> eldest) {
+			return size() > CACHE;
+		}
+	});
+
+	/** A field with the session's mix ({@link #useSessionMix}, {@link IslandMix#DEFAULT} until set). */
+	public IslandField(long seed, int baseY) {
+		this(seed, baseY, sessionMix);
+	}
 
 	/** @param baseY y of the grass layer of the spawn island */
-	public IslandField(long seed, int baseY) {
+	public IslandField(long seed, int baseY, IslandMix mix) {
 		this.seed = seed;
 		this.baseY = baseY;
+		this.mix = Objects.requireNonNull(mix, "mix");
+		this.cell = cellFor(mix);
+	}
+
+	/** Sets the mix {@link #IslandField(long, int)} uses from now on (the open world's). */
+	public static void useSessionMix(IslandMix mix) {
+		sessionMix = Objects.requireNonNull(mix, "mix");
+	}
+
+	public static IslandMix sessionMix() {
+		return sessionMix;
+	}
+
+	/** The cell side for a mix: room for its biggest island (never less than the large spawn island) and the margins. */
+	public static int cellFor(IslandMix mix) {
+		IslandSize big = mix.largest().ordinal() >= IslandSize.LARGE.ordinal() ? mix.largest() : IslandSize.LARGE;
+		int side = 2 * (big.reach() + MARGIN + MIN_JITTER);
+		return side + (side & 1);
 	}
 
 	/** The columns {@code [cx - radius, cx + radius] x [cz - radius, cz + radius]}. */
@@ -73,23 +121,86 @@ public final class IslandField implements MapGenerator<IslandField.Window> {
 		return baseY;
 	}
 
+	public IslandMix mix() {
+		return mix;
+	}
+
+	/** Distance between the grid lines of the cells. */
+	public int cell() {
+		return cell;
+	}
+
 	// ------------------------------------------------------------------ islands
 
 	public static String idOf(int gx, int gz) {
 		return "i_" + gx + "_" + gz;
 	}
 
+	/** The cell of an island id {@code i_<gx>_<gz>}, or null when it is not one. */
+	public static int @Nullable [] cellOfId(String id) {
+		if (!id.startsWith("i_")) {
+			return null;
+		}
+		String[] p = id.substring(2).split("_");
+		if (p.length != 2) {
+			return null;
+		}
+		try {
+			return new int[] {Integer.parseInt(p[0]), Integer.parseInt(p[1])};
+		} catch (NumberFormatException e) {
+			return null;
+		}
+	}
+
 	/** The island of cell {@code (gx, gz)}. */
 	public Island island(int gx, int gz) {
+		long key = ((long) gx << 32) | (gz & 0xFFFFFFFFL);
+		Island i = cache.get(key);
+		if (i == null) {
+			i = compute(gx, gz);
+			cache.put(key, i);
+		}
+		return i;
+	}
+
+	private Island compute(int gx, int gz) {
 		boolean spawn = gx == 0 && gz == 0;
-		IslandSize size = spawn ? IslandSize.MEDIUM : IslandSize.pick(Noise.hash(seed, gx, gz, 1, 10));
-		int room = Math.min(MAX_JITTER, CELL / 2 - size.radius() - MARGIN);
+		IslandSize size = spawn ? IslandSize.LARGE : mix.pick(Noise.hash(seed, gx, gz, 1, mix.total()));
+		int room = Math.max(0, Math.min(MAX_JITTER, cell / 2 - size.reach() - MARGIN));
 		int jx = spawn ? 0 : Noise.hash(seed, gx, gz, 2, 2 * room + 1) - room;
 		int jz = spawn ? 0 : Noise.hash(seed, gx, gz, 3, 2 * room + 1) - room;
 		int top = spawn ? baseY : baseY + Noise.hash(seed, gx, gz, 4, 2 * HEIGHT_RANGE + 1) - HEIGHT_RANGE;
-		double phaseA = Noise.unit(seed, gx, gz, 5) * 2 * Math.PI;
-		double phaseB = Noise.unit(seed, gx, gz, 6) * 2 * Math.PI;
-		return new Island(idOf(gx, gz), gx, gz, size, gx * CELL + jx, top, gz * CELL + jz, seed, phaseA, phaseB);
+		Island bare = new Island(idOf(gx, gz), gx, gz, size, biomeOf(gx, gz), gx * cell + jx, top, gz * cell + jz, seed, form(gx, gz, size, spawn),
+				List.of(), List.of());
+		return IslandSlots.lay(bare);
+	}
+
+	/** The cell's biome: its 3x3 region's in 6 cases out of 10, one of its own otherwise. */
+	private IslandBiome biomeOf(int gx, int gz) {
+		IslandBiome[] all = IslandBiome.values();
+		if (Noise.hash(seed, gx, gz, 22, 10) < 6) {
+			return all[Noise.hash(seed, Math.floorDiv(gx + 1, 3), Math.floorDiv(gz + 1, 3), 21, all.length)];
+		}
+		return all[Noise.hash(seed, gx, gz, 23, all.length)];
+	}
+
+	/** The shape parameters of a cell's island; the spawn island is rounder, with a flat plaza in the middle. */
+	private Island.Form form(int gx, int gz, IslandSize size, boolean spawn) {
+		double k = spawn ? 0.5 : 1.0;
+		double tau = 2 * Math.PI;
+		double a2 = k * (0.04 + 0.08 * Noise.unit(seed, gx, gz, 7));
+		double a3 = k * (0.03 + 0.05 * Noise.unit(seed, gx, gz, 9));
+		double a5 = k * (0.02 + 0.03 * Noise.unit(seed, gx, gz, 11));
+		double edgeMax = Island.EDGE_BASE + Island.EDGE_PER_RADIUS * size.radius();
+		double edge = edgeMax * (spawn ? 0.5 : 0.6 + 0.4 * Noise.unit(seed, gx, gz, 13));
+		double belly = 0.75 + 0.6 * Noise.unit(seed, gx, gz, 14);
+		int terraces = switch (size) {
+			case XLARGE -> 2;
+			case LARGE -> 1;
+			default -> 0;
+		};
+		return new Island.Form(a2, tau * Noise.unit(seed, gx, gz, 8), a3, tau * Noise.unit(seed, gx, gz, 10), a5, tau * Noise.unit(seed, gx, gz, 12),
+				edge, belly, terraces, spawn ? 9 : 0);
 	}
 
 	/** The spawn island. */
@@ -98,8 +209,8 @@ public final class IslandField implements MapGenerator<IslandField.Window> {
 	}
 
 	/** The cell a column falls in. */
-	public static int cellOf(int coord) {
-		return Math.floorDiv(coord + CELL / 2, CELL);
+	public int cellOf(int coord) {
+		return Math.floorDiv(coord + cell / 2, cell);
 	}
 
 	/** The island whose ground (widened by {@code slack} blocks) contains the column, or null. */
@@ -120,7 +231,7 @@ public final class IslandField implements MapGenerator<IslandField.Window> {
 
 	/** Every island within {@code radius} blocks (centre to column) of {@code (x, z)}, nearest first. */
 	public List<Island> within(int x, int z, int radius) {
-		int reach = radius + CELL;
+		int reach = radius + cell;
 		List<Island> out = new ArrayList<>();
 		for (int gx = cellOf(x - reach); gx <= cellOf(x + reach); gx++) {
 			for (int gz = cellOf(z - reach); gz <= cellOf(z + reach); gz++) {
@@ -141,48 +252,9 @@ public final class IslandField implements MapGenerator<IslandField.Window> {
 
 	// ------------------------------------------------------------------ slots
 
-	/**
-	 * The slots of an island, in map coordinates ({@code origin} on the grass layer + 1). Small islands hold
-	 * a tree; medium a centre piece and a tree; large a bigger centre, two modules and two trees; extra large
-	 * the biggest centre, four modules on the axes and four trees on the diagonals.
-	 */
+	/** The slots of an island, in map coordinates (see {@link IslandSlots} for what each size holds). */
 	public List<Slot> slots(Island i) {
-		List<Slot> out = new ArrayList<>();
-		String g = i.id();
-		switch (i.size()) {
-			case SMALL -> out.add(slot(i, "tree", Slot.Role.DECOR, 0, 0, Direction.SOUTH, 2, 2, 8));
-			case MEDIUM -> {
-				out.add(slot(i, "centre", Slot.Role.CENTRE, 0, 0, Direction.SOUTH, 2, 2, 7));
-				out.add(slot(i, "tree_0", Slot.Role.DECOR, 5, 4, Direction.SOUTH, 2, 2, 8));
-			}
-			case LARGE -> {
-				out.add(slot(i, "centre", Slot.Role.CENTRE, 0, 0, Direction.SOUTH, 3, 3, 8));
-				out.add(slot(i, "module_0", Slot.Role.MODULE, 8, 0, Direction.WEST, 1, 1, 6));
-				out.add(slot(i, "module_1", Slot.Role.MODULE, -8, 0, Direction.EAST, 1, 1, 6));
-				out.add(slot(i, "tree_0", Slot.Role.DECOR, 0, 8, Direction.SOUTH, 2, 2, 8));
-				out.add(slot(i, "tree_1", Slot.Role.DECOR, 0, -8, Direction.SOUTH, 2, 2, 8));
-			}
-			case XLARGE -> {
-				out.add(slot(i, "centre", Slot.Role.CENTRE, 0, 0, Direction.SOUTH, 4, 4, 9));
-				out.add(slot(i, "module_0", Slot.Role.MODULE, 11, 0, Direction.WEST, 2, 2, 6));
-				out.add(slot(i, "module_1", Slot.Role.MODULE, -11, 0, Direction.EAST, 2, 2, 6));
-				out.add(slot(i, "module_2", Slot.Role.MODULE, 0, 11, Direction.NORTH, 2, 2, 6));
-				out.add(slot(i, "module_3", Slot.Role.MODULE, 0, -11, Direction.SOUTH, 2, 2, 6));
-				out.add(slot(i, "tree_0", Slot.Role.DECOR, 10, 10, Direction.SOUTH, 2, 2, 8));
-				out.add(slot(i, "tree_1", Slot.Role.DECOR, -10, 10, Direction.SOUTH, 2, 2, 8));
-				out.add(slot(i, "tree_2", Slot.Role.DECOR, 10, -10, Direction.SOUTH, 2, 2, 8));
-				out.add(slot(i, "tree_3", Slot.Role.DECOR, -10, -10, Direction.SOUTH, 2, 2, 8));
-			}
-		}
-		if (i.gx() == 0 && i.gz() == 0) {
-			out.add(new Slot(g + ":spawn", Slot.Role.SPAWN, i.surface().offset(0, 0, 4), Direction.NORTH, 0, 0, 3, g, null, Set.of()));
-		}
-		return out;
-	}
-
-	private static Slot slot(Island i, String name, Slot.Role role, int dx, int dz, Direction facing, int halfAcross, int halfDeep, int height) {
-		return new Slot(i.id() + ":" + name, role, i.surface().offset(dx, 0, dz), facing, halfAcross, halfDeep, height, i.id(), null,
-				Set.of(i.size().name().toLowerCase(Locale.ROOT)));
+		return i.slots();
 	}
 
 	// ------------------------------------------------------------------ MapGenerator
@@ -191,8 +263,8 @@ public final class IslandField implements MapGenerator<IslandField.Window> {
 	public List<Island> islandsIn(Window w) {
 		Area a = w.area();
 		List<Island> out = new ArrayList<>();
-		for (int gx = cellOf(a.minX() - CELL); gx <= cellOf(a.maxX() + CELL); gx++) {
-			for (int gz = cellOf(a.minZ() - CELL); gz <= cellOf(a.maxZ() + CELL); gz++) {
+		for (int gx = cellOf(a.minX() - cell); gx <= cellOf(a.maxX() + cell); gx++) {
+			for (int gz = cellOf(a.minZ() - cell); gz <= cellOf(a.maxZ() + cell); gz++) {
 				Island i = island(gx, gz);
 				if (i.area().intersects(a)) {
 					out.add(i);
@@ -216,7 +288,7 @@ public final class IslandField implements MapGenerator<IslandField.Window> {
 				}
 			}
 		}
-		return new MapLayout(ID, seed, new Shape(w.area(), List.copyOf(islands)), slots, links, origin().surface());
+		return new MapLayout(ID, seed, new Shape(w.area(), List.copyOf(islands)), slots, links, origin().surface().offset(0, 0, 4));
 	}
 
 	/** The ground of a window: the islands that touch it. */
@@ -225,7 +297,7 @@ public final class IslandField implements MapGenerator<IslandField.Window> {
 		public @Nullable Span column(int x, int z) {
 			for (Island i : islands) {
 				if (i.contains(x, z, 0)) {
-					return new Span(i.top() - i.depth(x, z) + 1, i.top());
+					return new Span(i.bottom(x, z) - i.hang(x, z), i.surfaceY(x, z));
 				}
 			}
 			return null;
