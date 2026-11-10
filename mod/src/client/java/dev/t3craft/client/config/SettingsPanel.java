@@ -184,7 +184,8 @@ public final class SettingsPanel extends T3Panel {
 	private int connections(int x, int y, int w) {
 		y = heading(x, y, w, "Connections");
 		y = link(x, y, w, "Environments…", () -> host().show(new EnvironmentsPanel(actions)));
-		y = link(x, y, w, "Key binds…", () -> host().openScreen(new KeyBindsScreen(host().screen(), Minecraft.getInstance().options)));
+		y = link(x, y, w, "Piece browser…", () -> host().openScreen(new dev.t3craft.client.pieces.PieceBrowserScreen(host().screen())));
+		y = link(x, y, w, "Key binds…",() -> host().openScreen(new KeyBindsScreen(host().screen(), Minecraft.getInstance().options)));
 		y = link(x, y, w, "Outbound events…", () -> host().openScreen(new OutboundScreen(host().screen())));
 		y = link(x, y, w, "Reload from disk", () -> {
 			draft = ConfigManager.get().load();

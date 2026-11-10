@@ -25,6 +25,8 @@ public final class T3CraftKeys {
 	private final KeyMapping openSettings = key("open_settings", InputConstants.KEY_J);
 	private final KeyMapping openEnvironments = key("open_environments", UNBOUND);
 	private final KeyMapping pair = key("pair", UNBOUND);
+	/** Piece browser (docs/features/piece-browser.md). */
+	private final KeyMapping openPieces = key("open_pieces", InputConstants.KEY_K);
 	private final KeyMapping reconnect = key("reconnect", UNBOUND);
 	private final KeyMapping reload = key("reload", UNBOUND);
 	private final KeyMapping toggleNotifications = key("toggle_notifications", UNBOUND);
@@ -50,7 +52,7 @@ public final class T3CraftKeys {
 	}
 
 	public List<KeyMapping> all() {
-		return List.of(openSettings, openEnvironments, pair, reconnect, reload, toggleNotifications, attentionNext, attentionLast);
+		return List.of(openSettings, openEnvironments, openPieces, pair, reconnect, reload, toggleNotifications, attentionNext, attentionLast);
 	}
 
 	/** Registers with Fabric. Call once from the client initializer. */
@@ -65,6 +67,11 @@ public final class T3CraftKeys {
 		}
 		while (openEnvironments.consumeClick()) {
 			mc.gui.setScreen(new EnvironmentsScreen(null, EnvironmentActions.DEFAULT));
+		}
+		while (openPieces.consumeClick()) {
+			if (mc.gui.screen() == null) { // a text box on screen would type the K
+				mc.gui.setScreen(new dev.t3craft.client.pieces.PieceBrowserScreen(null));
+			}
 		}
 		while (pair.consumeClick()) {
 			mc.gui.setScreen(EnvironmentActions.DEFAULT.pairScreen(null));

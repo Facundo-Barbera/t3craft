@@ -132,6 +132,12 @@ public abstract class T3Panel {
 		return form.add(f);
 	}
 
+	/** A text field in the header or footer: always shown, never scrolled (a search box). */
+	protected final T3Field pinField(T3Field f, int x, int y, int w) {
+		pending.add(f.layout(theme, new Rect(x, y, w, T3Control.H), true));
+		return fixed.add(f);
+	}
+
 	protected final <C extends T3Control> C pin(C c, int x, int y, int w, int h) {
 		c.setBounds(new Rect(x, y, w, h));
 		return fixed.add(c);

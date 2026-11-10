@@ -413,6 +413,11 @@ public final class T3Screen extends Screen {
 		openPage(new EnvironmentsPanel(EnvironmentActions.DEFAULT));
 	}
 
+	/** The piece browser (feat/piece-browser-ui) in the thread panel's place, from the ⋯ menu. */
+	private void openPiecesPage() {
+		openPage(new dev.t3craft.client.pieces.PieceBrowserPanel());
+	}
+
 	/** A thread or a new draft was asked for by the user: the page makes way. */
 	private void closePages() {
 		if (pages.active()) {
@@ -1202,6 +1207,7 @@ public final class T3Screen extends Screen {
 		slots.menuItems(this, selectedTarget(), items);
 		items.add(new T3Slots.MenuItem("Archive", true, this::openArchive));
 		items.add(new T3Slots.MenuItem("Environments", true, this::openEnvironmentsPage));
+		items.add(new T3Slots.MenuItem("Pieces", true, this::openPiecesPage));
 		items.add(new T3Slots.MenuItem("Settings", true, this::openSettingsPage));
 		items.add(new T3Slots.MenuItem(layout.compact() ? "Show thread" : wideSidebar ? "Hide sidebar (Ctrl+B)" : "Show sidebar (Ctrl+B)", true,
 				() -> setSidebarVisible(layout.compact() ? false : !wideSidebar)));
