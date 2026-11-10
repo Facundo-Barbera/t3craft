@@ -76,7 +76,7 @@ Lang: `assets/t3craft/lang/en_us.json` y `es_es.json`.
 - `mod/build.gradle`: repo de Mod Menu (exclusivo), `clientCompileOnly` modmenu, y el classpath de
   `test` incluye `sourceSets.client` (para testear lógica pura del cliente).
 - `mod/gradle.properties`: `modmenu_version`.
-- `mod/src/client/resources/assets/t3craft/lang/*.json` (nuevos; si otra rama añade lang, fusionar claves).
+- `mod/src/main/resources/assets/t3craft/lang/*.json` (nuevos; si otra rama añade lang, fusionar claves).
 
 No toqué `T3CraftClient`, `Notifier`, `DirectController`, `PeekHud` ni nada fuera del paquete.
 
