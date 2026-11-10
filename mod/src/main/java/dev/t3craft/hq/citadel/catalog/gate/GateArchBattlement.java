@@ -10,10 +10,14 @@ import dev.t3craft.hq.citadel.catalog.Family;
 import dev.t3craft.hq.citadel.catalog.Plot;
 import dev.t3craft.hq.citadel.catalog.Variant;
 import net.minecraft.core.Direction;
+import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.level.block.state.properties.Half;
+import net.minecraft.world.level.block.state.properties.StairsShape;
 
 /**
  * Neighbourhood gate: an arched passage between two towers. Each tower face is framed by pilasters with a
@@ -30,7 +34,14 @@ import net.minecraft.world.level.block.state.properties.Half;
  *     andesite pilaster caps, pale diorite cornices, a cherry arch ring with a calcite keystone, cherry panels.</li>
  * <li><b>Silhouette</b>: tower parapet (highest) → curtain parapet with a raised middle merlon → arch.</li>
  * </ul>
- * Size: 5–11 × 2–4 × 8+ (uses up to 10 blocks of height).
+ *
+ * <p><b>Avenue size</b> (11+ wide, 4+ deep, 14+ high: what the avenues of the 200 % city ask for): a real gatehouse, see
+ * {@link Large}. Two square towers (a 4-wide stair tower with a walkable spiral to the wall walk, and a guard tower, 4 wide or 3 below 13 wide,
+ * with a door on the street, a lit transom, a window and a banner), dark base, quoins and string courses, a round or pointed
+ * arch of alternating dark and light voussoirs with a calcite keystone and a free 6-high opening, a battlemented curtain you walk along,
+ * a shield with banners, and a stair hip roof with a weathered-copper cap on each tower. Material (stone brick, tuff, deepslate),
+ * arch shape, stair side and roof change with the seed. Smaller plots keep the original pilastered design ({@link #buildSmall}).
+ * <p>Size: 5–21 × 2–8 × 8+ (the avenue design needs 11+ × 4+ × 14+; below 13 wide the guard tower is 3 wide).
  */
 public final class GateArchBattlement implements Variant {
 	private static final BlockState CALCITE = b(Blocks.CALCITE);
@@ -63,12 +74,12 @@ public final class GateArchBattlement implements Variant {
 
 	@Override
 	public int maxW() {
-		return 11;
+		return 21;
 	}
 
 	@Override
 	public int maxD() {
-		return 4;
+		return 8;
 	}
 
 	/** Stone-brick body with a deterministic mix of cracked and mossy bricks. */
@@ -82,6 +93,15 @@ public final class GateArchBattlement implements Variant {
 
 	@Override
 	public void build(CitadelCanvas c, Plot p) {
+		if (p.w() >= 11 && p.d() >= 4 && p.h() >= 14) {
+			new Large(c, p).build();
+		} else {
+			buildSmall(c, p);
+		}
+	}
+
+	/** The original design, for plots too small for the avenue gatehouse. */
+	private void buildSmall(CitadelCanvas c, Plot p) {
 		int w = p.w();
 		int d = p.d();
 		int hh = Math.min(p.h(), 10);
@@ -255,6 +275,469 @@ public final class GateArchBattlement implements Variant {
 		} else if (side - 1 >= 3) {
 			p.put(c, a0, side - 1, lv, LANTERN.setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
 			p.put(c, a0 + ow - 1, side - 1, lv, LANTERN.setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
+		}
+	}
+
+	// ======================================================================================================== avenue gatehouse
+
+	/** One stone family: body, dark base, light trim (no random patches: the texture is the order of the courses). */
+	private record Mat(Block wall, Block stairs, Block base, Block baseStairs, Block trim, Block trimStairs, Block trimSlab, Block key) {
+	}
+
+	private static final Mat[] MATS = {
+			// stone brick on a deepslate base, polished diorite trim
+			new Mat(Blocks.STONE_BRICKS, Blocks.STONE_BRICK_STAIRS, Blocks.DEEPSLATE_BRICKS, Blocks.DEEPSLATE_BRICK_STAIRS,
+					Blocks.POLISHED_DIORITE, Blocks.POLISHED_DIORITE_STAIRS, Blocks.POLISHED_DIORITE_SLAB, Blocks.CHERRY_PLANKS),
+			// pale tuff brick on a deepslate base, polished diorite trim
+			new Mat(Blocks.TUFF_BRICKS, Blocks.TUFF_BRICK_STAIRS, Blocks.DEEPSLATE_BRICKS, Blocks.DEEPSLATE_BRICK_STAIRS,
+					Blocks.POLISHED_DIORITE, Blocks.POLISHED_DIORITE_STAIRS, Blocks.POLISHED_DIORITE_SLAB, Blocks.CHERRY_PLANKS),
+			// dark deepslate brick on a blackstone base, polished andesite trim
+			new Mat(Blocks.DEEPSLATE_BRICKS, Blocks.DEEPSLATE_BRICK_STAIRS, Blocks.POLISHED_BLACKSTONE_BRICKS,
+					Blocks.POLISHED_BLACKSTONE_BRICK_STAIRS, Blocks.POLISHED_ANDESITE, Blocks.POLISHED_ANDESITE_STAIRS, Blocks.POLISHED_ANDESITE_SLAB,
+					Blocks.CHERRY_PLANKS)};
+
+	/**
+	 * The avenue gatehouse. Local frame, front NORTH: {@code u} across the avenue, {@code v} along it (the passage runs
+	 * front to back), {@code y} up. Square towers only.
+	 * <ul>
+	 * <li>a 4-wide stair tower and a guard tower (4 wide, or 3 when the plot is under 13 wide) at the two ends, the opening between them is {@code w-8} wide ({@code w-7} on the narrow plots);</li>
+	 * <li>tower faces: dark base with a sloping talus, body of one stone, long-and-short quoins in the trim stone up every corner,
+	 *     trim string courses between the floors (y 5 and 8), a corbel table of upside-down stairs under the roof, framed arrow slits
+	 *     and windows;</li>
+	 * <li>arch: ring course at y 6 in the middle (the opening is 6 high and free), 3 at the jambs (round or pointed by seed);
+	 *     voussoirs alternate dark and light in one unbroken run from jamb to jamb, a cherry keystone two blocks wide, with a trim block over it; the portcullis
+	 *     is raised into a slot of the ring, out of the passage (the passage is lit from the guard door's transom);</li>
+	 * <li>curtain: deck at y 7 (corbel table of stairs under the face), walk at y 8, parapet with merlons and crenels, a shield with banners over the keystone;</li>
+	 * <li>tower A (guard): door on the street face under a lit transom, window and banner over it, bench, chest, lantern, room y 0..4 (the ground is its floor);
+	 *     tower B (stair): a spiral of cherry stairs (first step head-on from an arched doorway) that rises 9 and comes out through a doorway onto the wall walk;</li>
+	 * <li>both towers have a lookout chamber at wall-walk level (y 9..11) with arrow slits, and a hip roof of stairs (y 12) topped by a thin weathered-copper cap (y 13).</li>
+	 * </ul>
+	 */
+	private static final class Large {
+		private static final int C = 6; // ring course in the middle of the arch
+		private static final int DECK = 8; // wall-walk floor block; feet at 9
+
+		private final CitadelCanvas c;
+		private final Plot p;
+		private final int w;
+		private final int d;
+		private final Mat m;
+		private final Block roofStairs;
+		private final Block roofBlock;
+		private final DyeColor bannerColor;
+		private final boolean stairLeft;
+		private final boolean pointed;
+		/** The curtain's faces stand back this many blocks from the towers' faces (deep plots only). */
+		private final int rec;
+		/** Row (v) of the stair's first cell: the doorways and the wall walk line up on it. */
+		private final int sv;
+		/** Width of the guard tower: 4 like the stair tower on wide plots, 3 on the 11-12 wide plots the city actually offers. */
+		private final int gw;
+		private final int lw;
+		private final int rw;
+
+		Large(CitadelCanvas c, Plot p) {
+			this.c = c;
+			this.p = p;
+			this.w = p.w();
+			this.d = p.d();
+			this.rec = p.d() >= 6 ? 1 : 0;
+			this.sv = 1 + rec;
+			this.gw = p.w() >= 13 ? 4 : 3;
+			this.m = MATS[p.hash(7, 7, 7, MATS.length)];
+			boolean cherryRoof = bit(4);
+			this.roofStairs = cherryRoof ? Blocks.CHERRY_STAIRS : Blocks.DEEPSLATE_TILE_STAIRS;
+			this.roofBlock = cherryRoof ? Blocks.CHERRY_PLANKS : Blocks.DEEPSLATE_TILES;
+			this.bannerColor = cherryRoof ? DyeColor.PINK : DyeColor.RED;
+			this.stairLeft = bit(1);
+			this.lw = stairLeft ? 4 : gw;
+			this.rw = stairLeft ? gw : 4;
+			this.pointed = bit(3);
+		}
+
+		private boolean bit(int n) {
+			return p.hash(n * 31 + 5, n + 3, n * 17 + 1, 2) == 0;
+		}
+
+		private void set(int u, int y, int v, BlockState s) {
+			p.set(c, u, y, v, s);
+		}
+
+		private void set(int u, int y, int v, Block blk) {
+			p.set(c, u, y, v, b(blk));
+		}
+
+		private static BlockState top(BlockState s) {
+			return s.setValue(BlockStateProperties.HALF, Half.TOP);
+		}
+
+		void build() {
+			towers();
+			curtain();
+		}
+
+		// ------------------------------------------------------------------ stairs round a rectangle
+
+		/** Stairs round the border of a rectangle facing inwards (outer-corner shapes at the corners); {@code core} fills the inside. */
+		private void ringIn(int u0, int u1, int v0, int v1, int y, Block blk, Block core) {
+			for (int u = u0; u <= u1; u++) {
+				for (int v = v0; v <= v1; v++) {
+					Direction fx = u0 == u1 ? null : u == u0 ? Direction.EAST : u == u1 ? Direction.WEST : null;
+					Direction fz = v0 == v1 ? null : v == v0 ? Direction.SOUTH : v == v1 ? Direction.NORTH : null;
+					if (fx != null && fz != null) {
+						StairsShape shape = fz == fx.getCounterClockWise() ? StairsShape.OUTER_LEFT : StairsShape.OUTER_RIGHT;
+						set(u, y, v, stairs(blk, fx).setValue(BlockStateProperties.STAIRS_SHAPE, shape));
+					} else if (fx != null || fz != null) {
+						set(u, y, v, stairs(blk, fx != null ? fx : fz));
+					} else if (core != null) {
+						set(u, y, v, core);
+					}
+				}
+			}
+		}
+
+		// ------------------------------------------------------------------ towers
+
+		private void towers() {
+			tower(stairLeft, true);
+			tower(!stairLeft, false);
+		}
+
+		/** Direction in the tower's own frame (inwards = EAST, towards the passage) mapped to the plot. */
+		private static Direction fd(boolean left, Direction frame) {
+			return left || frame.getAxis() == Direction.Axis.Z ? frame : frame.getOpposite();
+		}
+
+		private BlockState pane(boolean alongU) {
+			BlockState s = b(Blocks.STAINED_GLASS_PANE.pick(DyeColor.PINK));
+			return alongU ? s.setValue(BlockStateProperties.EAST, true).setValue(BlockStateProperties.WEST, true)
+					: s.setValue(BlockStateProperties.NORTH, true).setValue(BlockStateProperties.SOUTH, true);
+		}
+
+		private void tower(boolean left, boolean stairTower) {
+			int tw = stairTower ? 4 : gw;
+			int u0 = left ? 0 : w - tw;
+			int u1 = u0 + tw - 1;
+			int outer = left ? u0 : u1;
+			int inner = left ? u1 : u0;
+			Direction in = fd(left, Direction.EAST);
+			Direction out = in.getOpposite();
+			// frame column t (0 outer .. 3 inner) -> u
+			int[] col = new int[tw];
+			for (int t = 0; t < tw; t++) {
+				col[t] = left ? t : w - 1 - t;
+			}
+			int top = 11; // last wall course; the roof starts at 12
+
+			// --- body: dark base (2 courses) with a sloping talus, one stone above
+			for (int u = u0; u <= u1; u++) {
+				for (int v = 0; v < d; v++) {
+					set(u, 0, v, m.base);
+					set(u, 1, v, m.base);
+					for (int y = 2; y <= top; y++) {
+						set(u, y, v, m.wall);
+					}
+				}
+			}
+			ringIn(u0, u1, 0, d - 1, 1, m.baseStairs, m.base);
+
+			// --- the faces: long-and-short quoins in the trim stone up the corners (the corner shows trim on even courses, the
+			// cell beside it on odd ones), trim string courses at y 5 and 8 (between the floors), a corbel table under the roof
+			for (int u = u0; u <= u1; u++) {
+				for (int v = 0; v < d; v++) {
+					boolean eu = u == u0 || u == u1;
+					boolean ev = v == 0 || v == d - 1;
+					if (!eu && !ev) {
+						continue;
+					}
+					boolean corner = eu && ev;
+					// long and short: the corner column is trim all the way up, the cells beside it alternate between the faces by course
+					int bs = 0; // 0 none, 1 trim on even courses, 2 trim on odd courses
+					if (!corner && ev && tw >= 4 && (u == u0 + 1 || u == u1 - 1)) {
+						bs = 1;
+					} else if (!corner && eu && v == 1) {
+						bs = 2;
+					} else if (!corner && eu && v == d - 2) {
+						bs = 1;
+					}
+					for (int y = 2; y <= 10; y++) {
+						if (y == 5 || y == 8 || corner || (bs == 1 && y % 2 == 0) || (bs == 2 && y % 2 == 1)) {
+							set(u, y, v, m.trim);
+						}
+					}
+					if (corner) {
+						set(u, top, v, m.trim);
+					} else {
+						Direction face = u == u0 ? Direction.WEST : u == u1 ? Direction.EAST : v == 0 ? Direction.NORTH : Direction.SOUTH;
+						set(u, top, v, top(stairs(m.trimStairs, face)));
+					}
+				}
+			}
+			// jambs: the faces of the passage are dressed in trim at both ends, 2 high above the base
+			for (int v : new int[] {0, d - 1}) {
+				set(inner, 2, v, m.trim);
+				set(inner, 3, v, m.trim);
+			}
+
+			// --- openings of the street faces (front v=0, back v=d-1), each framed by the string courses and quoins
+			int c1 = col[1];
+			int fc = !stairTower && tw >= 4 ? col[2] : c1; // the guard tower's door column: the free corridor of a 4-wide room
+			for (int v : new int[] {0, d - 1}) {
+				boolean front = v == 0;
+				Direction face = front ? Direction.NORTH : Direction.SOUTH;
+				set(c1, 10, v, AIR); // lookout slit
+				if (tw >= 4 && stairTower) {
+					set(col[2], 4, v, m.trim); // jamb of the slit
+					set(col[2], 10, v, m.trim);
+				}
+				if (stairTower) {
+					set(c1, 3, v, m.trim); // sill
+					set(c1, 4, v, AIR); // slit, one block high (a taller one would be a standable pocket)
+					set(c1, 6, v, pane(true)); // window into the well
+					set(c1, 7, v, pane(true));
+				} else if (front) {
+					// the guard's door on the street, at street level (a door needs a full block under it): a cherry door, a transom
+					// with a lantern under a trim lintel, a window and a banner over it
+					set(fc, 0, v, door(Direction.NORTH, true));
+					set(fc, 1, v, door(Direction.NORTH, false));
+					set(fc, 2, v, AIR);
+					p.put(c, fc, 2, v, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
+					set(fc, 3, v, top(stairs(m.trimStairs, face)));
+					set(fc, 6, v, pane(true));
+					set(fc, 7, v, AIR);
+					banner(fc, 7, v, face);
+				} else {
+					set(fc, 3, v, m.trim);
+					set(fc, 4, v, AIR); // a slit into the room
+					set(fc, 6, v, pane(true));
+					set(fc, 7, v, AIR);
+					banner(fc, 7, v, face);
+				}
+			}
+			// the outer face: a two-wide pink-glass window (sill and lintel are the trim of the string course) and a lookout slit
+			int w0 = d / 2 - 1;
+			for (int v = w0; v <= w0 + 1; v++) {
+				set(outer, 2, v, m.trim);
+				set(outer, 3, v, pane(false));
+				set(outer, 4, v, pane(false));
+				set(outer, 10, v, AIR);
+			}
+
+			// --- inside
+			if (stairTower) {
+				stairTower(left, col, in, out, inner);
+			} else {
+				guardRoom(left, col, in, out, inner, tw);
+			}
+			// the doorway onto the wall walk, over a sill at y 8, 3 high
+			for (int y = 9; y <= 11; y++) {
+				set(inner, y, sv, AIR);
+			}
+			// lookout chamber: hollow y 9..11, with a lantern from the ceiling
+			for (int t = 1; t <= tw - 2; t++) {
+				for (int v = 1; v <= d - 2; v++) {
+					for (int y = 9; y <= 11; y++) {
+						set(col[t], y, v, AIR);
+					}
+				}
+			}
+			if (stairTower) {
+				p.put(c, col[1], 11, sv, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
+			} else {
+				set(outer, 10, w0 + 1, Blocks.LANTERN); // the guard's lookout glows through its slit (a hanging one would be under 2.85 clear)
+			}
+
+			// --- roof: a hip of stairs (the lowest course is the ceiling over the chamber) and a weathered-copper cap
+			ringIn(u0, u1, 0, d - 1, 12, roofStairs, roofBlock);
+			for (int u = u0 + 1; u <= u1 - 1; u++) {
+				for (int v = 1; v <= d - 2; v++) {
+					set(u, 13, v, slab(Blocks.CUT_COPPER_SLAB.waxed().weathered())); // a thin copper cap on the hip
+				}
+			}
+		}
+
+		private void banner(int u, int y, int v, Direction facing) {
+			p.put(c, u, y, v, b(Blocks.WALL_BANNER.pick(bannerColor)).setValue(BlockStateProperties.HORIZONTAL_FACING, facing),
+					CitadelCanvas.DECOR);
+		}
+
+		/** Spiral of cherry stairs in the 2x2 well (frame columns 1..2, rows 1..2); first step head-on from the doorway. */
+		private void stairTower(boolean left, int[] col, Direction in, Direction out, int inner) {
+			// the arched doorway onto the avenue: 3 high, trim lintel
+			for (int y = 0; y <= 2; y++) {
+				set(inner, y, sv, AIR);
+			}
+			set(inner, 3, sv, m.trim);
+			int[][] cell = {{2, sv}, {1, sv}, {1, sv + 1}, {2, sv + 1}};
+			Direction[] face = {out, Direction.SOUTH, in, Direction.NORTH};
+			for (int j = 0; j < 4; j++) {
+				int u = col[cell[j][0]];
+				int v = cell[j][1];
+				for (int y = j; y <= 8; y++) {
+					boolean step = y == j || y == j + 4 || y == j + 8;
+					if (step) {
+						Direction f = y == 8 ? in : face[j]; // the last step (y 8, cell 0) runs out through the doorway
+						set(u, y, v, stairs(Blocks.CHERRY_STAIRS, f));
+					} else {
+						set(u, y, v, AIR);
+					}
+				}
+			}
+		}
+
+		/** Guard room: doors at street level (the ground is its floor), bench, chest with a lantern, a hanging lantern; y 0..4. */
+		private void guardRoom(boolean left, int[] col, Direction in, Direction out, int inner, int tw) {
+			int ic = tw - 2; // innermost interior column: the corridor from the door
+			for (int t = 1; t <= ic; t++) {
+				for (int v = 1; v <= d - 2; v++) {
+					for (int y = 0; y <= 4; y++) {
+						set(col[t], y, v, AIR);
+					}
+					set(col[t], 5, v, Blocks.CHERRY_PLANKS); // ceiling
+				}
+			}
+			// door on the passage: a cherry door, an open transom, a trim lintel
+			set(inner, 0, sv, door(in, true));
+			set(inner, 1, sv, door(in, false));
+			set(inner, 2, sv, AIR);
+			p.put(c, inner, 2, sv, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING); // lights the passage
+			set(inner, 3, sv, m.trim);
+			// bench along the outer wall, the chest at the back with a lantern on it
+			int benchTo = tw >= 4 ? Math.min(d - 3, 3) : 0; // a 1-wide room keeps its corridor free
+			for (int v = 1; v <= benchTo; v++) {
+				set(col[1], 0, v, stairs(Blocks.CHERRY_STAIRS, out));
+			}
+			set(col[1], 0, d - 2, b(Blocks.CHEST).setValue(BlockStateProperties.HORIZONTAL_FACING, in));
+			p.put(c, col[ic], 4, tw >= 4 ? d / 2 : sv, b(Blocks.LANTERN).setValue(BlockStateProperties.HANGING, true), CitadelCanvas.HANGING);
+			if (tw >= 4 && d >= 7) {
+				set(col[1], 0, d - 3, b(Blocks.BARREL).setValue(BlockStateProperties.FACING, Direction.UP));
+			}
+		}
+
+		private BlockState door(Direction facing, boolean lower) {
+			return Blocks.CHERRY_DOOR.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, facing)
+					.setValue(BlockStateProperties.DOUBLE_BLOCK_HALF, lower ? DoubleBlockHalf.LOWER : DoubleBlockHalf.UPPER);
+		}
+
+		// ------------------------------------------------------------------ curtain over the arch
+
+		private void curtain() {
+			int a0 = lw;
+			int ow = w - lw - rw;
+			double half = (ow - 1) / 2.0;
+			int rise = ow >= 4 ? 3 : ow / 2; // jambs 3 high, the middle 6 (a 4-wide opening climbs in one step per side)
+			int side = C - rise;
+			int[] s = new int[ow];
+			for (int i = 0; i < ow; i++) {
+				double t = half == 0 ? 0 : Math.abs(i - half) / half;
+				double dy = pointed ? rise * Math.pow(1 - t, 0.6) : rise * Math.sqrt(1 - t * t);
+				s[i] = Math.abs(i - half) <= 0.5 ? C : side + (int) Math.round(dy);
+			}
+			// top course of the ring in each column: it climbs to meet the column nearer the middle
+			int[] ringTop = new int[ow];
+			for (int i = 0; i < ow; i++) {
+				int sn = i < half ? s[i + 1] : i > half ? s[i - 1] : s[i];
+				ringTop[i] = Math.max(s[i], sn - 1);
+			}
+			// voussoir number, counted from the keystone down each side: odd ones dark, even ones light, one unbroken run
+			int[][] kk = new int[ow][DECK];
+			int n = 0;
+			for (int i = ow - 1; i >= 0; i--) {
+				if (i < half && Math.abs(i - half) > 0.5) {
+					for (int y = ringTop[i]; y >= s[i]; y--) {
+						kk[i][y] = ++n;
+					}
+				}
+			}
+			n = 0;
+			for (int i = 0; i < ow; i++) {
+				if (i > half && Math.abs(i - half) > 0.5) {
+					for (int y = ringTop[i]; y >= s[i]; y--) {
+						kk[i][y] = ++n;
+					}
+				}
+			}
+			boolean backPlaque = d - 2 - 2 * rec >= 3; // the walk keeps at least one free row
+			for (int i = 0; i < ow; i++) {
+				int u = a0 + i;
+				double dist = Math.abs(i - half);
+				boolean keyCol = dist <= 0.5;
+				boolean recess = dist <= 0.5;
+				boolean cap = dist <= (ow % 2 == 1 ? 1.0 : 1.5);
+				boolean merlon = ((int) Math.floor(dist)) % 2 == 0;
+				for (int v = rec; v <= d - 1 - rec; v++) {
+					boolean face = v == rec || v == d - 1 - rec;
+					Direction outward = v == rec ? Direction.NORTH : Direction.SOUTH;
+					// arch ring (voussoirs on the faces, body inside) and the spandrel up to the corbel table
+					for (int y = s[i]; y < DECK - 1; y++) {
+						if (face && y <= ringTop[i]) {
+							set(u, y, v, keyCol && y == C ? b(m.key) : kk[i][y] % 2 == 1 ? b(m.base) : b(m.trim));
+						} else {
+							set(u, y, v, m.wall);
+						}
+					}
+					// corbel table on the faces with the keystone one course taller; the walk's floor above it
+					if (face) {
+						if (keyCol) {
+							set(u, DECK - 1, v, m.trim); // a trim block over the keystone, so the cherry stone is read on its own
+						} else if (i % 2 == 0) {
+							set(u, DECK - 1, v, top(stairs(m.trimStairs, outward)));
+						} else {
+							set(u, DECK - 1, v, m.trim);
+						}
+						set(u, DECK, v, m.wall);
+					} else {
+						set(u, DECK - 1, v, m.wall);
+						set(u, DECK, v, m.trim);
+					}
+					// parapet: breast wall, merlons, a raised shield with a banner over the keystone
+					if (face) {
+						boolean plaque = v == rec || backPlaque;
+						if (plaque && recess) {
+							set(u, 9, v, slab(m.trimSlab)); // a ledge under the shield
+							p.put(c, u, 10, v, b(Blocks.WALL_BANNER.pick(bannerColor)).setValue(BlockStateProperties.HORIZONTAL_FACING, outward),
+									CitadelCanvas.DECOR);
+							int back = v == rec ? rec + 1 : d - 2 - rec;
+							set(u, 9, back, m.wall);
+							set(u, 10, back, m.wall);
+							set(u, 11, v, slab(m.trimSlab));
+						} else if (plaque && cap) {
+							set(u, 9, v, m.wall);
+							set(u, 10, v, m.wall);
+							set(u, 11, v, slab(m.trimSlab));
+						} else {
+							set(u, 9, v, m.wall);
+							if (merlon) {
+								set(u, 10, v, m.wall);
+							}
+						}
+					}
+				}
+			}
+			// portcullis: raised into a slot of the ring (the row of the body just inside the face), two courses of bars above the
+			// opening, so the passage under it stays free
+			for (int i = 0; i < ow; i++) {
+				boolean e = i + 1 < ow && s[i + 1] == s[i];
+				boolean wst = i > 0 && s[i - 1] == s[i];
+				set(a0 + i, s[i], rec + 1, bars(e, wst));
+				if (s[i] + 1 < DECK - 1) {
+					set(a0 + i, s[i] + 1, rec + 1, bars(e, wst));
+				}
+			}
+			// lanterns on the parapet at both ends of the walk
+			for (int v : new int[] {rec, d - 1 - rec}) {
+				for (int i : new int[] {0, ow - 1}) {
+					boolean merlon = ((int) Math.floor(Math.abs(i - half))) % 2 == 0;
+					if (Math.abs(i - half) <= (ow % 2 == 1 ? 1.0 : 1.5)) {
+						continue; // under the shield's pediment
+					}
+					set(a0 + i, merlon ? 11 : 10, v, b(Blocks.LANTERN));
+				}
+			}
+		}
+
+		private static BlockState bars(boolean east, boolean west) {
+			return b(Blocks.IRON_BARS).setValue(BlockStateProperties.EAST, east).setValue(BlockStateProperties.WEST, west);
 		}
 	}
 }
