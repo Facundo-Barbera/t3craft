@@ -4,7 +4,7 @@ import dev.t3craft.client.hq.layout.HqLayoutPackWatcher;
 import dev.t3craft.client.t3ui.kit.T3Draw;
 import dev.t3craft.client.t3ui.kit.T3PanelScreen;
 import dev.t3craft.hq.layout.HqLayoutInfo;
-import net.minecraft.client.Minecraft;
+import dev.t3craft.mapgen.MapTypes;
 import net.minecraft.client.gui.screens.Screen;
 import org.jspecify.annotations.Nullable;
 
@@ -16,7 +16,7 @@ import org.jspecify.annotations.Nullable;
  */
 public final class HqMenuScreen extends T3PanelScreen {
 	HqMenuScreen(@Nullable Screen parent, DemoClient demo) {
-		super(parent, new HqMenuPanel(HqMenuBridge.model(demo), actions(demo)));
+		super(parent, new HqMenuPanel(HqMenuBridge.model(demo), HqMenuBridge.mapTypes(), actions(demo)));
 	}
 
 	/** Over any model and actions (the gallery's fake menu). */
@@ -33,8 +33,13 @@ public final class HqMenuScreen extends T3PanelScreen {
 	static HqMenuPanel.Actions actions(DemoClient demo) {
 		return new HqMenuPanel.Actions() {
 			@Override
-			public void open(Screen parent) {
-				demo.open(Minecraft.getInstance(), parent, false);
+			public boolean canOpen(MapTypes type) {
+				return HqMenuBridge.canOpen(type);
+			}
+
+			@Override
+			public void open(Screen parent, MapTypes type) {
+				HqMenuBridge.open(demo, type, parent);
 			}
 
 			@Override

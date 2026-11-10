@@ -29,6 +29,7 @@ import dev.t3craft.client.config.SettingsScreen;
 import dev.t3craft.client.demo.HqMenuModel;
 import dev.t3craft.client.demo.HqMenuPanel;
 import dev.t3craft.client.demo.HqMenuScreen;
+import dev.t3craft.client.demo.MapTypeModel;
 import dev.t3craft.client.queue.QueueActions;
 import dev.t3craft.client.queue.QueueOps;
 import dev.t3craft.client.queue.QueuePanel;
@@ -46,6 +47,7 @@ import dev.t3craft.client.t3ui.kit.T3KitDemoPanel;
 import dev.t3craft.client.t3ui.kit.T3PanelScreen;
 import dev.t3craft.hq.layout.HqLayoutInfo;
 import dev.t3craft.hq.layout.HqLayouts;
+import dev.t3craft.mapgen.MapTypes;
 import dev.t3craft.outbound.Destination;
 import dev.t3craft.outbound.OutboundConfig;
 import dev.t3craft.outbound.OutboundStore;
@@ -152,7 +154,7 @@ public final class UiGallery {
 					() -> new QueueScreen(null, new QueuePanel(galleryQueue()))),
 			new Scenario("archive", "Archive page with fake closed threads (search, environment and project selects, Older / Refresh)",
 					() -> new ArchiveScreen(null, new ArchivePanel(galleryArchive(), e -> Minecraft.getInstance().gui.setScreen(null), new ArchiveList()))),
-			new Scenario("hq-menu", "HQ menu page (the title screen's T3Craft HQ) over the real layouts, a fake built HQ; Open, Rebuild and Reset do nothing",
+			new Scenario("hq-menu", "HQ menu page (the title screen's T3Craft HQ) over the real layouts, a fake built HQ and fake map types (one with no opener); Open, Rebuild and Reset do nothing",
 					UiGallery::hqMenu),
 			new Scenario("merge-station", "Merge station page with fake pull requests (open, draft, one without a link); Open copies or opens the fake link",
 					() -> new MergeStationScreen(null, new MergeStationPanel("t3craft (Gallery)", UiGallery::galleryMerge, e -> {
@@ -411,9 +413,22 @@ public final class UiGallery {
 		String built = layouts.get(Math.min(1, layouts.size() - 1)).id();
 		HqMenuModel model = new HqMenuModel(layouts, layouts.getFirst().id(), built, true, id -> {
 		});
-		return new HqMenuScreen(null, new HqMenuPanel(model, new HqMenuPanel.Actions() {
+		// Fake map types next to the two real ones: the second fake has no opener (Open is off, its tooltip names the command).
+		MapTypeModel maps = new MapTypeModel(List.of(MapTypes.CITADEL, MapTypes.FLOATING_ISLANDS,
+				new MapTypes("gallery-archipelago", "Archipelago (gallery)", "A chain of small islands joined by causeways. Made up for the gallery.",
+						"/t3craft map open gallery-archipelago"),
+				new MapTypes("gallery-canyon", "Canyon (gallery)", "A long canyon with a river and cliffside lots. Made up for the gallery, no opener.",
+						"/t3craft map open gallery-canyon")),
+				MapTypes.CITADEL.id(), id -> {
+				});
+		return new HqMenuScreen(null, new HqMenuPanel(model, maps, new HqMenuPanel.Actions() {
 			@Override
-			public void open(Screen parent) {
+			public boolean canOpen(MapTypes type) {
+				return !type.id().equals("gallery-canyon");
+			}
+
+			@Override
+			public void open(Screen parent, MapTypes type) {
 			}
 
 			@Override

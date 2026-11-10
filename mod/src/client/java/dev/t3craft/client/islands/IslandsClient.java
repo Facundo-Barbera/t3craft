@@ -14,8 +14,10 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.network.chat.Component;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Map type "floating islands" (feat/algo-map-generators): its own world (save folder
@@ -85,11 +87,17 @@ public final class IslandsClient implements ClientModInitializer {
 		Pending p = pending;
 		pending = Pending.NONE;
 		if (p != Pending.NONE) {
-			open(mc, p == Pending.OPEN_CONFIRMED);
+			open(mc, p == Pending.OPEN_CONFIRMED, null);
 		}
 	}
 
-	private void open(Minecraft mc, boolean confirmed) {
+	/**
+	 * Creates the islands world the first time and opens it afterwards: what {@code /t3craft islands} does, also
+	 * called by the HQ menu's map type selector. {@code back} is the screen to return to if vanilla cancels the
+	 * load (null: the title screen).
+	 */
+	public static void open(Minecraft mc, boolean confirmed, @Nullable Screen back) {
+		Screen origin = back != null ? back : new TitleScreen();
 		boolean inWorld = mc.level != null;
 		if (inWorld && mc.isLocalServer() && IslandsRuntime.running()) {
 			say("you are already in " + IslandsWorld.NAME);
@@ -105,9 +113,9 @@ public final class IslandsClient implements ClientModInitializer {
 		boolean exists = VanillaDemoWorld.exists(mc, IslandsWorld.FOLDER);
 		T3Craft.LOGGER.info("[islands] {} '{}'", exists ? "OPEN" : "CREATE", IslandsWorld.FOLDER);
 		if (exists) {
-			VanillaDemoWorld.open(mc, IslandsWorld.FOLDER, new TitleScreen());
+			VanillaDemoWorld.open(mc, IslandsWorld.FOLDER, origin);
 		} else {
-			VanillaDemoWorld.createVoidWorld(mc, IslandsWorld.FOLDER, IslandsWorld.NAME, IslandsWorld.SEED, new TitleScreen());
+			VanillaDemoWorld.createVoidWorld(mc, IslandsWorld.FOLDER, IslandsWorld.NAME, IslandsWorld.SEED, origin);
 		}
 	}
 
