@@ -130,6 +130,7 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 		dev.t3craft.client.queue.QueueClient.register(this); // feat/op-queue: /t3craft queue, QueueScreen
 		dev.t3craft.client.hq.layout.HqLayoutPackWatcher.register(); // feat/hq-layout-packs: config/t3craft/hq-layouts, live
 		dev.t3craft.client.chat.UiStyleReloader.register(); // #12: gui/ui-style.json, reloaded by F3+T
+		dev.t3craft.client.drop.DropClient.register(); // feat/ingame-preview-drop: config/t3craft/preview-drop, showroom + portal in the HQ world
 
 		// Right-click on one of our client-only NPCs opens its chat screen. The entity is unknown to
 		// the server, so the interaction is consumed client-side.
@@ -238,7 +239,7 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 		HelperDirector h = helpers;
 		if (h == null) {
 			helpers = h = new HelperDirector();
-			// feat/op-queue: + "⏳ n queued"; feat/lead-office: "Coordinating N agents" first
+			// feat/op-queue: + "â³ n queued"; feat/lead-office: "Coordinating N agents" first
 			npcs.setPanelExtra(dev.t3craft.client.queue.QueueClient.withBadge(dev.t3craft.client.hq.lead.LeadOfficeClient.withPlate(h::panelExtra)));
 		}
 		return h;
@@ -273,7 +274,7 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 		return npcs;
 	}
 
-	/** Last known status per environment: id → {label, status, detail}. */
+	/** Last known status per environment: id â†’ {label, status, detail}. */
 	public Map<String, String[]> environments() {
 		if (direct != null) {
 			Map<String, String[]> m = new LinkedHashMap<>();
@@ -352,7 +353,7 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 		PeekHud.setBanner(problems.isEmpty() ? null : "T3: " + String.join(", ", problems) + "  (/t3craft status)");
 	}
 
-	/** NPC id → last message/run of its thread (epoch ms), for the station policy (fix/hq-stale-stations). */
+	/** NPC id â†’ last message/run of its thread (epoch ms), for the station policy (fix/hq-stale-stations). */
 	private static Map<String, Long> lastActivity(DirectController d, List<dev.t3craft.t3.NpcView> views) {
 		Map<String, dev.t3craft.t3.ShellState.View> shells = d.shellViews();
 		Map<String, Map<String, dev.t3craft.t3.ThreadShell>> byEnv = new HashMap<>();
@@ -495,7 +496,7 @@ public final class T3CraftClient implements ClientModInitializer, BridgeListener
 		if (status == LinkStatus.CONNECTED) {
 			Toasts.link(mc, "Connected");
 		} else if (lastStatus == LinkStatus.CONNECTED) {
-			Toasts.link(mc, "Disconnected, reconnecting…");
+			Toasts.link(mc, "Disconnected, reconnectingâ€¦");
 		}
 		lastStatus = status;
 	}

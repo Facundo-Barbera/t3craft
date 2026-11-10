@@ -121,6 +121,11 @@ Quedan como estaban:
 - **Worktrees de jobs en el PC** (`~/t3craft-jobs`): son 173 worktrees y ocupan 30 GB. Están todos sucios, porque el relay desempaca encima el `mod/src` de cada agente, y su contenido son copias de ramas que ya están subidas. Propuesta: borrarlos; el relay los vuelve a crear cuando hacen falta.
 - **Relay y regla 9:** que el relay deje de copiar PNG a la VPS y traiga solo reportes, o miniaturas generadas en el PC. Está en pausa junto con los renders.
 
+### `feat/ingame-preview-drop`: escrita sin compilar ni jugar (pendiente de ejecución)
+- Carpeta `config/t3craft/preview-drop/`, recinto + portal en el mundo HQ; doc en `docs/features/ingame-preview-drop.md`.
+- Falta: compilar en el PC (`tools/heavy.sh`), y probar en el cliente de Facundo: `/t3craft drop portal`, soltar un `.nbt` y un `.schem`, cruzar el arco, editar y borrar un archivo dentro del recinto, y un archivo roto (camino de error). Línea RESTART en `docs/CHANGELOG-dev.md`.
+- No toca `feat/hq-living-fixes` (solo archivos nuevos más una línea en `T3CraftClient`).
+
 ### Siguiente, en orden
 1. **Aprobación de Facundo:**
    - plan de limpieza de código (`docs/plans/code-cleanup.md`, decisiones D1–D5);
