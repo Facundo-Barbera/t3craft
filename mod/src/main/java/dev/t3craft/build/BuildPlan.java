@@ -22,8 +22,17 @@ public final class BuildPlan {
 	private final List<Placement> placements;
 	private final BlockPos min;
 	private final BlockPos max;
+	/** fix/25: work (obra) of each entry, parallel to {@link #placements}; null = no grouping known. */
+	private final int @Nullable [] work;
+	private final int works;
 
 	private BuildPlan(List<Placement> placements) {
+		this(placements, null, 0);
+	}
+
+	private BuildPlan(List<Placement> placements, int @Nullable [] work, int works) {
+		this.work = work;
+		this.works = work == null ? 0 : works;
 		this.placements = Collections.unmodifiableList(placements);
 		int x0 = Integer.MAX_VALUE, y0 = Integer.MAX_VALUE, z0 = Integer.MAX_VALUE;
 		int x1 = Integer.MIN_VALUE, y1 = Integer.MIN_VALUE, z1 = Integer.MIN_VALUE;
@@ -69,6 +78,19 @@ public final class BuildPlan {
 		return placements.isEmpty();
 	}
 
+	/**
+	 * fix/25-builder-unfinished-columns: how many works (obras: the buildings, towers and wings the plan is made of)
+	 * its entries are grouped in; 0 when the plan carries no grouping (then the radial build orders by distance only).
+	 */
+	public int works() {
+		return works;
+	}
+
+	/** Work (obra) of entry {@code index}, {@code 0 … works() - 1}; -1 for none. */
+	public int workOf(int index) {
+		return work == null ? -1 : work[index];
+	}
+
 	/** Smallest relative corner (ZERO for an empty plan). */
 	public BlockPos min() {
 		return min;
@@ -93,10 +115,16 @@ public final class BuildPlan {
 		}
 		int[] order = Layers.order(x, y, z);
 		List<Placement> out = new ArrayList<>(n);
+		int[] w = work == null ? null : new int[n];
+		int k = 0;
 		for (int i : order) {
 			out.add(placements.get(i));
+			if (w != null) {
+				w[k] = work[i];
+			}
+			k++;
 		}
-		return new BuildPlan(out);
+		return new BuildPlan(out, w, works);
 	}
 
 	/**
@@ -105,14 +133,25 @@ public final class BuildPlan {
 	 */
 	public static final class Builder {
 		private final Map<BlockPos, Placement> entries = new LinkedHashMap<>();
+		private final Map<BlockPos, Integer> workAt = new java.util.HashMap<>();
 
 		private Builder() {
 		}
 
 		public Builder set(BlockPos pos, BlockState state, @Nullable CompoundTag blockEntity) {
+			return set(pos, state, blockEntity, -1);
+		}
+
+		/** Like {@link #set(BlockPos, BlockState, CompoundTag)}; {@code work} (>= 0) is the work (obra) the entry belongs to, the last writer of a cell wins. */
+		public Builder set(BlockPos pos, BlockState state, @Nullable CompoundTag blockEntity, int work) {
 			BlockPos key = pos.immutable();
 			entries.remove(key);
 			entries.put(key, new Placement(key, state, blockEntity));
+			if (work >= 0) {
+				workAt.put(key, work);
+			} else {
+				workAt.remove(key);
+			}
 			return this;
 		}
 
@@ -141,7 +180,18 @@ public final class BuildPlan {
 		}
 
 		public BuildPlan build() {
-			return new BuildPlan(new ArrayList<>(entries.values()));
+			List<Placement> list = new ArrayList<>(entries.values());
+			if (workAt.isEmpty()) {
+				return new BuildPlan(list);
+			}
+			int[] w = new int[list.size()];
+			int max = -1;
+			for (int i = 0; i < w.length; i++) {
+				Integer v = workAt.get(list.get(i).pos());
+				w[i] = v == null ? -1 : v;
+				max = Math.max(max, w[i]);
+			}
+			return new BuildPlan(list, w, max + 1);
 		}
 	}
 }

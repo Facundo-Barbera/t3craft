@@ -89,12 +89,14 @@ final class DemoBuildRun {
 	/**
 	 * feat/build-radial: one plan out of the parts, in build order; a cell written by several parts keeps
 	 * the last part's state, so the world ends as with the parts one after another. Pure; off-thread (timed as {@code build.radial_merge_async}).
+	 * fix/25-builder-unfinished-columns: each entry keeps the index of the part it came from as its work (obra), so the
+	 * radial build can finish one building before it starts the next ({@code RadialCursor}, {@code WorkRank}).
 	 */
 	static BuildPlan merge(List<BuildPlan> plans) {
 		BuildPlan.Builder b = BuildPlan.builder();
-		for (BuildPlan p : plans) {
-			for (dev.t3craft.build.Placement e : p.placements()) {
-				b.set(e.pos(), e.state(), e.blockEntity());
+		for (int j = 0; j < plans.size(); j++) {
+			for (dev.t3craft.build.Placement e : plans.get(j).placements()) {
+				b.set(e.pos(), e.state(), e.blockEntity(), j);
 			}
 		}
 		return b.build();
