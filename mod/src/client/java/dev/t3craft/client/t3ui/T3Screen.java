@@ -102,6 +102,10 @@ public final class T3Screen extends Screen {
 	static {
 		// #39: registered from the t3ui side, so client/pieces stays unchanged
 		RightPanels.registerIfAbsent(PIECES_PANEL, "Pieces", dev.t3craft.client.pieces.PieceBrowserPanel::new);
+		// #50: the run queue (fits from 180 px: one list, three icon buttons per run). This screen builds it itself
+		// (createRightPage) so it also watches the selected thread; the factory here watches the working ones only.
+		RightPanels.registerIfAbsent(QUEUE_PANEL, "Queue",
+				() -> new dev.t3craft.client.queue.QueuePanel(dev.t3craft.client.queue.QueuePanel.live(null)));
 	}
 
 	private static final DateTimeFormatter CLOCK = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault());

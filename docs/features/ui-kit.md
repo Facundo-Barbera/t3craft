@@ -205,8 +205,7 @@ kit, que no se tocaron porque son de otros hilos o de pantallas sin migrar (excl
 * Ya no queda ninguna pantalla de T3Craft con widgets vanilla salvo los diálogos vanilla que abren otros (p. ej. `ConfirmLinkScreen`
   para un enlace, el `ConfirmScreen` de `DemoClient` al salir de un mundo). `BaseConfigScreen` y el placeholder `ThreadChatScreen`
   se borraron en el #26 (nadie los usaba).
-* La cola todavía no se abre desde el menú del sidebar de `T3Screen` (solo `/t3craft queue` y la galería): toca `T3Screen`, queda
-  para después.
+* La cola se abre desde el menú ⋯ de `T3Screen` (#39, en el sitio del hilo) y, desde #50, como página del panel derecho (`queue`).
 * Los botones dentro de las filas de un `T3List` (la lista de entornos) no están en el orden de Tab: se llegan con el ratón.
   La lista sí es una parada de Tab, con su cursor de fila.
 * `T3TextArea` no se recorta en una página con scroll (ver arriba), y la selección con el ratón dentro de un diálogo con cajas

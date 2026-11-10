@@ -43,8 +43,8 @@ or Esc goes back to the list.
 
 - **Frame.** Still centred, now as large as the window minus 6 px per side, capped at 1280×720 by default
   (was a fixed 900×520). `layout.maxWidth` / `layout.maxHeight` change the cap (at least 900×520).
-- **Right panel** (`T3RightPanel`, kit): shows one page registered in `RightPanels` (id → factory). The
-  first one is the piece browser (`"pieces"`, registered by `T3Screen`; under 430 px it uses its narrow
+- **Right panel** (`T3RightPanel`, kit): shows one page registered in `RightPanels` (id → factory): the piece
+  browser and, since #50, the run queue (header switcher, see below). The first one is the piece browser (`"pieces"`, registered by `T3Screen`; under 430 px it uses its narrow
   layout with the folder select). Header with the title and an `x`; Esc closes it while it has the
   keyboard (keys follow the last click: inside the panel, or anywhere else).
 - **Toggle.** The `panel-right` icon at the end of the thread header, the ⋯ menu's "Show / Hide side
@@ -89,7 +89,28 @@ a sub-page:      | Timber cottage ........ [max] [< Back] |
   an open select drawn on top); `T3PanelHost.atRoot()`. `T3RightPanel.Owner` gained defaults `create`, `switchTo`,
   `canExpand`, `expand`. `T3Screen.withRightWidth(px)` for the gallery.
 
-Gallery: `/t3dev ui inbox-right-panel`, `/t3dev ui inbox-right-narrow` (the panel at its 180 px minimum).
+### Right panel pages (#50)
+
+Only pages that already existed as `T3Panel`s and make sense beside a thread; nothing new was written for them.
+
+| id | title | page | notes |
+|---|---|---|---|
+| `pieces` | Pieces | `PieceBrowserPanel` | narrow layout in two levels (`docs/features/piece-browser.md`) |
+| `queue` | Queue | `QueuePanel` | registered by `T3Screen`, which builds it with the selected thread as its focus plus the working threads (like the ⋯ menu's Queue). Fits at 180 px without changes: one list, three 16 px icon buttons per run, a one-line status. The focus is the thread selected when the page opened; selecting another thread does not move it until the page opens again (switch away and back, or U twice). Released with the screen like the ⋯ menu's. |
+
+**Candidates, not registered** (what they lack):
+
+| page | why not yet |
+|---|---|
+| Archive (`ArchivePanel`) | at 180 px the header needs 212 px (search 80 + two 60 px selects) and the row's fixed date and project columns leave the title ~10 px; it is built by `ArchiveClient` with its data, opener and filter, and opening an archived thread replaces the screen. Needs a narrow header (one select + search) and a two-line row. |
+| Settings (`SettingsPanel`) | four tabs need ~290 px; Done / Save call `back()`, which would close the side panel; a long form that belongs in the thread's place (where ⚙ opens it). |
+| Environments (`EnvironmentsPanel`) | four fixed row buttons take 254 px plus 90 px of text: needs an icon-only row (or a row menu) under ~360 px. |
+| Outbound (`OutboundPanel`) | a sub-page of Settings; same width issue as Environments' rows. |
+| HQ menu, Merge station, Block config | bound to the title screen, a merge-station block or a placed block: no meaning beside a thread. |
+| Kit demo (`T3KitDemoPanel`) | a developer gallery (`/t3dev ui kit`). |
+
+Gallery: `/t3dev ui inbox-right-panel`, `/t3dev ui inbox-right-narrow` (the panel at its 180 px minimum),
+`/t3dev ui inbox-right-queue` (the queue page, fake queues).
 
 **Audit (#50).** Before #50 the panel showed one page with no way to change it from the UI, no way to open it
 full-size from the panel, and a narrow piece browser that overflowed at 180 px. The full read-through is in

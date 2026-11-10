@@ -184,6 +184,8 @@ public final class UiGallery {
 					() -> inbox(true, true).withRightPanel(T3Screen.PIECES_PANEL, galleryPieces())),
 			new Scenario("inbox-right-narrow", "Right panel at its 180 px minimum on the piece browser (#50): one search row, Filters button, breadcrumbs, list; Right or the row chevron opens a piece's options, Back / Esc / Left return (width not saved unless you drag)",
 					() -> inbox(true, true).withRightWidth(T3UiLayout.RIGHT_MIN).withRightPanel(T3Screen.PIECES_PANEL, galleryPieces())),
+			new Scenario("inbox-right-queue", "Right panel on the run queue (#50, fake queues): the header's Pieces | Queue tabs switch pages (Pieces opens the real catalog), the maximize button moves the page to the thread's place",
+					() -> inbox(true, true).withRightPanel(T3Screen.QUEUE_PANEL, new QueuePanel(galleryQueue()))),
 			// #42: the main screen at a forced T3 scale, whatever layout.uiScale says
 			new Scenario("inbox-scale", "Main T3 screen at uiScale \"auto\" (#42): the largest whole scale that keeps 960x540 logical units; check clicks, border drags, scroll, text fields, tooltips, menus and modals",
 					() -> inbox(true, true).withUiScale(dev.t3craft.client.t3ui.UiScale.Pref.AUTO)),
