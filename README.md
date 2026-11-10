@@ -3,6 +3,12 @@
 Each T3 Code thread becomes a villager in Minecraft, coloured by its state (working, needs
 attention, done, error, idle) and tagged with the machine it runs on.
 
+> **The bridge is legacy and frozen** (`bridge/`, `protocol/`; decision D2, issue #7). The mod pairs **directly**
+> with each T3 environment (direct mode, the default; see "Direct mode" below). The bridge only gets critical fixes,
+> no new features. Whether it is retired is decided when #1 (T3 Connect) closes. Status and rules:
+> `bridge/README.md`. The diagram and the `mod/`/`bridge/` bullets below still describe the original bridge setup;
+> the README rewrite is phase 6 (#8).
+
 ```
 [PC: Minecraft 26.3 + T3Craft mod]  --ws over Tailscale-->  [my-homelab: bridge (systemd)]
                                                               ├─ my-vps T3        (own token)
@@ -11,9 +17,9 @@ attention, done, error, idle) and tagged with the machine it runs on.
 
 - `mod/`: Fabric client-only mod (Minecraft 26.3, Java 25, Loom 1.19.4 no-remap, Mojang names).
   A dumb view: it draws what the bridge sends. It stores no T3 credentials.
-- `bridge/`: Node 22+ / TypeScript / effect 4.1.2. Talks to every configured T3 environment over
+- `bridge/` (**legacy, frozen**, see `bridge/README.md`): Node 22+ / TypeScript / effect 4.1.2. Talks to every configured T3 environment over
   authenticated WebSocket RPC and serves the mod on the homelab's Tailscale IP only.
-- `protocol/protocol.md`: the mod⇄bridge protocol v1. `docs/plans/plan.md`: technical plan and the
+- `protocol/protocol.md`: the mod⇄bridge protocol v1 (legacy, frozen). `docs/plans/plan.md`: technical plan and the
   architecture decision.
 - `tools/`: dev tooling. `heavy.sh` runs one heavy process at a time (render PC only), `render/` holds the
   render relay and the PC daemon scripts, `studio/` is Citadel Studio, and `art/` has the texture and model
@@ -26,7 +32,7 @@ creation are stubs (see TODOs and `docs/plans/plan.md` §6).
 ## Direct mode (default): pair the mod with each T3
 
 Since v2.1 the mod talks to each T3 Code environment itself, like the desktop app with a remote
-server. The bridge below is optional (legacy `"mode": "bridge"`).
+server. The bridge below is legacy and frozen (`"mode": "bridge"`, see `bridge/README.md`).
 
 1. On each T3 host, issue a one-time pairing credential (valid 5 minutes by default). By default
    the mod pairs with **read + control** (`orchestration:operate`: send messages, approve, stop…)
@@ -64,6 +70,8 @@ needs-you and error.
 
 ## T3 token for the legacy bridge (one per environment)
 
+Legacy installs only: the bridge is frozen (`bridge/README.md`).
+
 On **each** T3 host, Facundo issues a minimal read-only session (needs nothing else for phase 0/1):
 
 ```bash
@@ -75,7 +83,10 @@ Put each token in its own file **outside the repo** (for example `/etc/t3craft/t
 session can be revoked on its own host (`t3 auth` / Sharing & access). Phases 2+ (chat, approvals)
 will need `--scope orchestration:operate`, which is close to admin: issue it separately when needed.
 
-## Bridge
+## Bridge (legacy, frozen)
+
+For existing bridge installs only. New installs use direct mode; the bridge gets critical fixes only
+(`bridge/README.md`).
 
 ```bash
 cd bridge
@@ -122,7 +133,8 @@ cd mod
 ```
 
 On the Windows PC: `gradlew.bat runClient`, or put the jar plus Fabric API 0.165.2+26.3 in a
-Fabric Loader 0.20.1 / Minecraft 26.3 instance. Configure the bridge address in
+Fabric Loader 0.20.1 / Minecraft 26.3 instance. In direct mode (the default) pair with `/t3craft pair` (see
+"Direct mode"). Only for the legacy bridge mode, configure the bridge address in
 `config/t3craft.json` of the instance (created on first start):
 
 ```json

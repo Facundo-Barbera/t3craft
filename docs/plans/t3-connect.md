@@ -162,6 +162,8 @@ Fases:
 
 ## 6. Qué implica para `bridge/` (congelado)
 
+Estado y reglas del congelamiento: `bridge/README.md` (#7).
+
 - Ninguno de los tres caminos usa el bridge. `Mode.BRIDGE` y `client.link` sobreviven solo como una vía opcional que deja ~12 archivos del mod con ramas legadas.
 - El bridge fue, en el fondo, un sidecar propio (un proceso Node que habla el protocolo de T3 con los contratos vendorizados y el mod se conecta por WS local). Su costo real fue seguir el protocolo (27.6k líneas vendorizadas). Es la mejor evidencia de lo que costaría mantener A o un B casero.
 - **Recomendación para D2:** retirarlo cuando se cierre #1 con la decisión «C ahora». Quitar `Mode.BRIDGE`, `client.link` y la carpeta `bridge/`; el historial de git lo conserva. Se reconsidera solo si el camino final fuera un sidecar *propio*, no el CLI de T3.
