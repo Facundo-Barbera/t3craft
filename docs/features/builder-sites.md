@@ -13,7 +13,14 @@ Facundo plays. See "Compile risks" at the end.
 
 ## Turning it on
 
-`config/t3craft.json`:
+From the game (#52): **Settings → General → Building → Build order** (Sites / Radial / Parts), then *Save*. The row
+writes only `build.order` (the rest of the file and of the `build` section stays) and reloads the build tuning, the same
+call as `/t3craft debug build-tuning reload`; nothing is written when the value did not change. The order is read when a
+build starts, so it applies to the next one; a build already running keeps its order. The build start message
+(`building HQ: hq v4, 17 part(s), order sites`), the `[demo]` log line and the first line of `/t3craft demo status` say which
+order is in use.
+
+By hand, `config/t3craft.json`:
 
 ```json
 "build": { "order": "sites" }
@@ -21,6 +28,7 @@ Facundo plays. See "Compile risks" at the end.
 
 - `"radial"` is still the default and is untouched (`RadialCursor`, `CrewCursor`, `FoundationCursor` and the avatar
   client were not edited). Switching back is that one key.
+  The default is a decision pending: the single place to change it is the `sites` flag (the `false` after `12,`) in `BuildTuning.DEFAULTS`; `parse` starts from it.
 - `"sites"` uses everything `"radial"` uses around it: the demo merges the parts into one plan, one crew of up to
   12 builders, the player as the centre, the start-up ground primer. Only the cursor differs.
 - Scope: free jobs (the demo HQ and other free crew jobs over 256 entries). Charged jobs (survival) and the real HQ

@@ -211,6 +211,11 @@ public record BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int front
 		return Math.max(lo, Math.min(hi, v));
 	}
 
+	/** The {@code build.order} value these settings stand for: {@link #ORDER_SITES}, {@link #ORDER_RADIAL} or {@link #ORDER_PARTS}. */
+	public String orderName() {
+		return sites ? ORDER_SITES : radial ? ORDER_RADIAL : ORDER_PARTS;
+	}
+
 	/** Fronts for a job built by {@code crew} builders: one front per builder, at most {@link #frontsPerJob}. */
 	public int frontsFor(int crew) {
 		return Math.max(1, Math.min(frontsPerJob, crew));

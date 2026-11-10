@@ -313,5 +313,12 @@
 	"t3craft.merge.none": "No hay pull requests pendientes aquí.",
 	"t3craft.merge.all_merged": "Todo lo de aquí ya está fusionado.",
 	"t3craft.merge.no_link": "T3 no dio enlace para este pull request: abre el chat.",
-	"t3craft.merge.link_copied": "Enlace copiado"
+	"t3craft.merge.link_copied": "Enlace copiado",
+	"t3craft.settings.buildorder.heading": "Construcción",
+	"t3craft.settings.buildorder.label": "Orden de construcción",
+	"t3craft.settings.buildorder.help": "Se aplica a la próxima construcción que empiece; la que ya está en marcha conserva su orden.",
+	"t3craft.settings.buildorder.sites": "Obras (obras con una cuadrilla cada una)",
+	"t3craft.settings.buildorder.radial": "Radial (alrededor de ti, anillo a anillo)",
+	"t3craft.settings.buildorder.parts": "Partes (parte por parte)",
+	"t3craft.settings.buildorder.failed": "Ajustes guardados, pero no se pudo escribir el orden de construcción"
 }
