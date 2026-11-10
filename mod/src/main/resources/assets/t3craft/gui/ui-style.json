@@ -47,7 +47,9 @@
       "listRow": 13,
       "margin": 8,
       "gap": 4,
-      "pad": 8
+      "pad": 8,
+      "ok": "#6EE7B7",
+      "fail": "#FCA5A5"
     },
     "terminal": {
       "sprites": null,
@@ -94,7 +96,9 @@
       "listRow": 12,
       "margin": 4,
       "gap": 3,
-      "pad": 4
+      "pad": 4,
+      "ok": "#6EE7B7",
+      "fail": "#FCA5A5"
     }
   }
 }

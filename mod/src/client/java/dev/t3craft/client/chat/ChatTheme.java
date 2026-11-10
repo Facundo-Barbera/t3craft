@@ -63,6 +63,8 @@ import org.jspecify.annotations.Nullable;
  * @param margin     outer margin (AgentCraft: 8)
  * @param gap        gap between panels (AgentCraft: 4)
  * @param pad        panel content padding (AgentCraft panel_paper: 8)
+ * @param ok         "yes" marks on the composer's dark cards (an approval option that allows), T3's green
+ * @param fail       "no" marks on the composer's dark cards (an option that denies), T3's red
  */
 public record ChatTheme(
 		@Nullable String sprites,
@@ -109,7 +111,9 @@ public record ChatTheme(
 		int listRow,
 		int margin,
 		int gap,
-		int pad) {
+		int pad,
+		int ok,
+		int fail) {
 
 	public static final String KIT = "t3craft:chat/";
 
@@ -173,7 +177,9 @@ public record ChatTheme(
 				13,
 				8,
 				4,
-				8);
+				8,
+				0xFF6EE7B7, // T3 Code's approve green (the request card is dark in both themes)
+				0xFFFCA5A5); // T3 Code's deny red
 	}
 
 	/** Built-in terminal palette: fallback and base of the {@code terminal} theme in {@code ui-style.json}. */
@@ -223,7 +229,9 @@ public record ChatTheme(
 				12,
 				4,
 				3,
-				4);
+				4,
+				0xFF6EE7B7,
+				0xFFFCA5A5);
 	}
 
 	/** Colour of a thread's attention level. */
@@ -292,6 +300,7 @@ public record ChatTheme(
 		private int addFg, addBg, delFg, delBg, keycapText, needsYou, error, pending, working, done, idle;
 		private boolean shadow;
 		private int row, toolRow, listRow, margin, gap, pad;
+		private int ok, fail;
 
 		private Builder(ChatTheme t) {
 			sprites = t.sprites; backdrop = t.backdrop; backdropBottom = t.backdropBottom; panel = t.panel; panelHi = t.panelHi;
@@ -301,7 +310,7 @@ public record ChatTheme(
 			codeText = t.codeText; inlineCode = t.inlineCode; link = t.link; addFg = t.addFg; addBg = t.addBg; delFg = t.delFg;
 			delBg = t.delBg; keycapText = t.keycapText; needsYou = t.needsYou; error = t.error; pending = t.pending; working = t.working;
 			done = t.done; idle = t.idle; shadow = t.shadow; row = t.row; toolRow = t.toolRow; listRow = t.listRow; margin = t.margin;
-			gap = t.gap; pad = t.pad;
+			gap = t.gap; pad = t.pad; ok = t.ok; fail = t.fail;
 		}
 
 		public Builder sprites(@Nullable String v) { sprites = v; return this; }
@@ -349,12 +358,14 @@ public record ChatTheme(
 		public Builder margin(int v) { margin = Math.max(0, v); return this; }
 		public Builder gap(int v) { gap = Math.max(0, v); return this; }
 		public Builder pad(int v) { pad = Math.max(0, v); return this; }
+		public Builder ok(int v) { ok = v; return this; }
+		public Builder fail(int v) { fail = v; return this; }
 
 		public ChatTheme build() {
 			return new ChatTheme(sprites, backdrop, backdropBottom, panel, panelHi, inset, edge, accent, brass, text, muted, disabled, ghost,
 					selected, hover, you, youText, agent, agentText, tool, toolArg, result, errorText, codeBg, codeText, inlineCode, link, addFg,
 					addBg, delFg, delBg, keycapText, needsYou, error, pending, working, done, idle, shadow, row, toolRow, listRow, margin, gap,
-					pad);
+					pad, ok, fail);
 		}
 	}
 }

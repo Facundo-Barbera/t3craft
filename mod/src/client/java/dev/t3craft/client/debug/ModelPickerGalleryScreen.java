@@ -20,9 +20,10 @@ import net.minecraft.network.chat.Component;
  * providers than rows. Nothing is sent anywhere; favorites are real (they write {@code model-favorites.json}).
  */
 final class ModelPickerGalleryScreen extends Screen {
-	private static final String ENV = "t3dev-gallery";
+	static final String ENV = "t3dev-gallery";
 
-	private static final String CATALOG = """
+	/** The fake {@code server.getConfig} answer (also the composer-icons scenario's). */
+	static final String CATALOG = """
 			{"providers": [
 			 {"instanceId": "claudeAgent", "driver": "claudeAgent", "displayName": "Claude",
 			  "supportedRuntimeModes": ["approval-required", "auto-accept-edits", "auto", "full-access"],

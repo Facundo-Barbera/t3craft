@@ -6,6 +6,7 @@ import dev.t3craft.client.chat.ChatTheme;
 import dev.t3craft.client.chat.ConversationPanel;
 import dev.t3craft.client.chat.MouseButtons;
 import dev.t3craft.client.chat.Rect;
+import dev.t3craft.client.t3ui.kit.T3Icon;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -27,15 +28,15 @@ import org.jspecify.annotations.Nullable;
  * <p>feat/t3-composer: one dark rounded box ({@link ComposerSkin}), at most {@link #setMaxWidth}
  * wide and centred in its bounds:
  * <ul>
- *   <li>on top, the images waiting to go (thumbnails; hovering one shows its ✕);</li>
+ *   <li>on top, the images waiting to go (thumbnails; hovering one shows its {@link T3Icon#X});</li>
  *   <li>the text: grows from {@value #MIN_LINES} to {@value #MAX_LINES} lines, then scrolls;
  *   placeholder as T3; Enter sends, Shift+Enter is a newline; caret, mouse and Shift+arrow
  *   selection, double click selects a word, Ctrl+A/C/X/V, Ctrl+←/→, Home/End, Ctrl+Z / Ctrl+Y
  *   ({@link ComposerText});</li>
  *   <li>the bar: the clip on the left, then the left controls (a draft's project and workspace
  *   chips, {@link #setLeftControls}); on the right the controls ({@link #setControls}: model ·
- *   effort chip, access / plan chips) and the round primary button: ↑ send (disabled while there is
- *   nothing to send), ■ stop while a turn runs and the input is empty, dots while in flight.
+ *   effort chip, access / plan chips) and the round primary button: {@link T3Icon#SEND} (disabled while
+ *   there is nothing to send), a square stop while a turn runs and the input is empty, dots while in flight.
  *   While a turn runs a message <i>steers</i> it (Ctrl+Enter / Ctrl+click queues it instead).</li>
  * </ul>
  * Errors (send, images) show as one discreet line just above the box (click it to dismiss).
@@ -64,6 +65,8 @@ public final class ComposerView implements ConversationPanel.Footer {
 	private static final int THUMB = 30;
 	private static final int STRIP_H = THUMB + 6;
 	private static final int NOTICE_H = 12;
+	/** The icon before the notice line (warning or info), as tall as the text. */
+	private static final int NOTICE_ICON = 8;
 	private static final long DOUBLE_CLICK_MS = 300;
 	private static final AtomicInteger IMAGE_IDS = new AtomicInteger();
 
@@ -148,7 +151,7 @@ public final class ComposerView implements ConversationPanel.Footer {
 	private Rect clip = Rect.EMPTY;
 	private Rect notice = Rect.EMPTY;
 	private final ImageThumbs thumbs = new ImageThumbs();
-	/** Per image on screen: [thumbnail, ✕] rectangles, same order as {@link ComposerState#images()}. */
+	/** Per image on screen: [thumbnail, remove] rectangles, same order as {@link ComposerState#images()}. */
 	private final List<Rect[]> imageRects = new ArrayList<>();
 	/** Path field mode (no native file dialog): the input holds a path; the draft is kept here. */
 	private boolean pathMode;
@@ -383,10 +386,12 @@ public final class ComposerView implements ConversationPanel.Footer {
 		String nt = noticeText();
 		if (nt != null && nh > 0) {
 			int ny = box.y() - NOTICE_H + 1;
-			String s = ChatDraw.clip(font, nt, w - 8);
-			notice = new Rect(bx + 4, ny, font.width(s) + 2, 9);
 			boolean isError = state.error() != null;
-			g.text(font, s, bx + 4, ny, isError ? ComposerSkin.ERROR : ComposerSkin.MUTED, false);
+			int color = isError ? ComposerSkin.ERROR : ComposerSkin.MUTED;
+			String s = ChatDraw.clip(font, nt, w - 8 - NOTICE_ICON - 3);
+			notice = new Rect(bx + 4, ny, NOTICE_ICON + 3 + font.width(s) + 2, 9);
+			T3Icon.draw(g, theme, isError ? T3Icon.TRIANGLE_EXCLAMATION_POINT : T3Icon.INFO, bx + 4, ny, NOTICE_ICON, color);
+			g.text(font, s, bx + 4 + NOTICE_ICON + 3, ny, color, false);
 			if (isError && notice.contains(mouseX, mouseY)) {
 				g.setTooltipForNextFrame(font, List.of(Component.literal(nt).getVisualOrderText(),
 						Component.literal("Click to dismiss").withColor(0xFFA0A0A0).getVisualOrderText()), mouseX, mouseY);
@@ -444,7 +449,9 @@ public final class ComposerView implements ConversationPanel.Footer {
 			if (hover || pathMode) {
 				ComposerSkin.round(g, clip.x(), clip.y(), clip.w(), clip.h(), pathMode ? ComposerSkin.OPEN : ComposerSkin.HOVER);
 			}
-			ComposerSkin.paperclip(g, clip.x() + 5, clip.y() + 2, hover || pathMode ? ComposerSkin.TEXT : ComposerSkin.MUTED);
+			int iy = clip.y() + (clip.h() - T3Icon.SIZE) / 2;
+			T3Icon.draw(g, theme, T3Icon.PAPERCLIP, clip.x() + (clip.w() - T3Icon.SIZE) / 2, iy, T3Icon.SIZE,
+					hover || pathMode ? ComposerSkin.TEXT : ComposerSkin.MUTED);
 			if (hover) {
 				g.setTooltipForNextFrame(font, Component.literal(pathMode ? "Cancel the path field" : "Attach images · or paste one (Ctrl+V)"), mouseX,
 						mouseY);
@@ -499,10 +506,9 @@ public final class ComposerView implements ConversationPanel.Footer {
 	private @Nullable String noticeText() {
 		String err = state.error();
 		if (err != null) {
-			return "⚠ " + err;
+			return err;
 		}
-		String st = state.status();
-		return st == null ? null : "⏱ " + st;
+		return state.status();
 	}
 
 	private static void drawScrollbar(GuiGraphicsExtractor g, int x, int y, int h, int total, int vis) {
@@ -511,7 +517,7 @@ public final class ComposerView implements ConversationPanel.Footer {
 		g.fill(x, y, x + 2, y + th, 0x90FFFFFF); // position follows the caret; a hint, not a control
 	}
 
-	/** The thumbnails row (T3's {@code ComposerAttachmentStrip}): hovering one shows its ✕. */
+	/** The thumbnails row (T3's {@code ComposerAttachmentStrip}): hovering one shows its remove button (an x icon). */
 	private void drawImages(GuiGraphicsExtractor g, Font font, int x, int y, int right, int mouseX, int mouseY) {
 		imageRects.clear();
 		List<ImageAttachment> imgs = state.images();
@@ -542,7 +548,7 @@ public final class ComposerView implements ConversationPanel.Footer {
 			if (over) {
 				boolean overX = x0.contains(mouseX, mouseY);
 				ComposerSkin.circle(g, x0.x(), x0.y(), 8, overX ? ComposerSkin.STOP : 0xE0303036);
-				g.text(font, "✕", x0.x() + 1, x0.y(), 0xFFFFFFFF, false);
+				T3Icon.draw(g, theme, T3Icon.X, x0.x() + 1, x0.y() + 1, 6, ComposerSkin.TEXT);
 				g.setTooltipForNextFrame(font, Component.literal(overX ? "Remove" : img.name() + " · " + ImageAttachment.mb(img.size())), mouseX, mouseY);
 			}
 			ix += THUMB + 5;
@@ -607,7 +613,8 @@ public final class ComposerView implements ConversationPanel.Footer {
 		} else if (stop) {
 			ComposerSkin.stopSquare(g, r.x(), r.y(), BUTTON, fg);
 		} else {
-			ComposerSkin.arrowUp(g, r.x(), r.y(), BUTTON, fg);
+			int is = BUTTON - 6;
+			T3Icon.draw(g, theme, T3Icon.SEND, r.x() + (BUTTON - is) / 2, r.y() + (BUTTON - is) / 2, is, fg);
 		}
 		if (r.contains(mouseX, mouseY)) {
 			String tip = switch (b) {

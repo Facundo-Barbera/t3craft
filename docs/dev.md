@@ -169,6 +169,7 @@ tuning; combined with F3+T it is the fast loop for visual work.
 | `confirm`, `snooze` | Kit dialogs: the destructive-action confirmation and the snooze presets |
 | `pair`, `pair-readonly`, `operate-pair` | Kit dialogs: pairing (control by default / read-only) and enable-control |
 | `icons` | The icon gallery (#24): every `T3Icon` in a grid on both themes, 12 px in its three states and 32 px; the wheel scrolls (`docs/tools/icons.md`) |
+| `model-picker`, `composer-icons` | The composer's model picker open over a fake catalog; the composer with its icons (paperclip, thumbnails, error line, model chip, send) over a sender that sends nothing (#29) |
 | `queue` | The queued-runs screen (reads the live queue) |
 
 The fake environment is `t3dev-gallery`; its transcripts never reach the disk cache. Real things stay

@@ -11,6 +11,7 @@ import dev.t3craft.t3.ThreadControl;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
 
@@ -79,14 +80,36 @@ public final class ChatSender {
 	public record Ids(String commandId, String messageId) {
 	}
 
-	private final OperateGate gate;
+	/** Null only for {@link #preview()}: nothing is ever sent. */
+	private final @Nullable OperateGate gate;
+	private final Predicate<String> allowed;
 	private final Dispatch dispatch;
 	private final Supplier<Ids> ids;
 
 	public ChatSender(OperateGate gate, Dispatch dispatch, Supplier<Ids> ids) {
 		this.gate = gate;
+		this.allowed = gate::canOperate;
 		this.dispatch = dispatch;
 		this.ids = ids;
+	}
+
+	private ChatSender() {
+		this.gate = null;
+		this.allowed = env -> true;
+		this.dispatch = (action, done) -> done.accept(previewRefusal());
+		this.ids = () -> new Ids("cmd-" + UUID.randomUUID(), "msg-" + UUID.randomUUID());
+	}
+
+	/**
+	 * A sender for the UI gallery: every environment may operate (the composer is editable, images attach) and
+	 * every send, upload or interrupt is refused with one line, without touching the network.
+	 */
+	public static ChatSender preview() {
+		return new ChatSender();
+	}
+
+	private static OperateResult previewRefusal() {
+		return OperateResult.of(OperateResult.Outcome.REJECTED, "Gallery: nothing is sent.");
 	}
 
 	public ChatSender(OperateGate gate, Dispatch dispatch) {
@@ -94,7 +117,7 @@ public final class ChatSender {
 	}
 
 	public boolean canOperate(String envId) {
-		return gate.canOperate(envId);
+		return allowed.test(envId);
 	}
 
 	/** The {@code message.dispatch} command (the payload of {@code orchestration.dispatchCommand}). */
@@ -160,6 +183,11 @@ public final class ChatSender {
 	/** {@link #send(String, String, String, String, List, Ids, Consumer)} delivered as {@code delivery}. */
 	public void send(String envId, String threadId, @Nullable String title, String text, List<ImageAttachment> images, Ids ids,
 			Delivery delivery, Consumer<OperateResult> done) {
+		OperateGate gate = this.gate;
+		if (gate == null) {
+			done.accept(previewRefusal());
+			return;
+		}
 		if (images.isEmpty()) {
 			OperateAction a = gate.operate(envId).dispatch(OperateKind.MESSAGE_SEND, threadId, title,
 					messageDispatch(threadId, text, ids, new JsonArray(), delivery));
@@ -239,6 +267,11 @@ public final class ChatSender {
 
 	/** Interrupts {@code runId} ({@code run.interrupt}, destructive: confirmed in game). */
 	public void interrupt(String envId, String threadId, @Nullable String title, String runId, Consumer<OperateResult> done) {
+		OperateGate gate = this.gate;
+		if (gate == null) {
+			done.accept(previewRefusal());
+			return;
+		}
 		dispatch.run(ThreadControl.interrupt(gate.operate(envId), threadId, title, runId), done);
 	}
 }

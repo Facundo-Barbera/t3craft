@@ -3,11 +3,13 @@ package dev.t3craft.client.chat.request;
 import com.google.gson.JsonObject;
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.t3craft.client.chat.ChatDraw;
+import dev.t3craft.client.chat.ChatTheme;
 import dev.t3craft.client.chat.MouseButtons;
 import dev.t3craft.client.chat.Rect;
 import dev.t3craft.client.chat.compose.ComposerSkin;
 import dev.t3craft.client.chat.compose.ComposerText;
 import dev.t3craft.client.chat.compose.ComposerView;
+import dev.t3craft.client.t3ui.kit.T3Icon;
 import dev.t3craft.t3.OperateAction;
 import dev.t3craft.t3.OperateResult;
 import java.util.ArrayList;
@@ -34,7 +36,7 @@ import org.jspecify.annotations.Nullable;
  * rounded box ({@link ComposerSkin}) and the same centred column.
  * <ul>
  *   <li><b>Questions</b> ({@code AskUserQuestion}): one question at a time ("2/3" in the header,
- *   ‹ Back / Next ›), the question text, its options as rows with a radio (or a checkbox when
+ *   &lt; Back / Next &gt;), the question text, its options as rows with a radio (or a checkbox when
  *   {@code multiSelect}), the description under the label and the key cap 1–9 on the right; an
  *   "Other" field for a custom answer; the {@code preview} of the hovered (or chosen) option in
  *   the monospace font. Picking an option of a single-select question that is not the last moves
@@ -333,9 +335,10 @@ public final class RequestCard {
 
 		// ---- error line
 		if (errorShown()) {
-			String s = ChatDraw.clip(font, "⚠ " + error, inner);
-			g.text(font, s, x, y + 2, ComposerSkin.ERROR, false);
-			if (mouseX >= x && mouseX < x + inner && mouseY >= y && mouseY < y + ERROR_H && font.width("⚠ " + error) > inner) {
+			String s = ChatDraw.clip(font, error, inner - 11);
+			T3Icon.draw(g, ChatTheme.warmStudio(), T3Icon.TRIANGLE_EXCLAMATION_POINT, x, y + 2, 8, ComposerSkin.ERROR);
+			g.text(font, s, x + 11, y + 2, ComposerSkin.ERROR, false);
+			if (mouseX >= x && mouseX < x + inner && mouseY >= y && mouseY < y + ERROR_H && font.width(error) > inner - 11) {
 				g.setTooltipForNextFrame(font, Component.literal(error), mouseX, mouseY);
 			}
 			y += ERROR_H;
@@ -377,9 +380,11 @@ public final class RequestCard {
 		ChatDraw.round(g, strip.x() + 6, strip.y() + 6, 4, 4, accent);
 		String what = req.isQuestion() ? "Question for you" : "Approval needed";
 		String more = pending.size() - answered.size() > 1 ? "  +" + (pending.size() - answered.size() - 1) : "";
-		String hint = "Answer ▴";
-		int hw = font.width(hint);
-		g.text(font, hint, strip.right() - 7 - hw, strip.y() + 4, hover ? ComposerSkin.TEXT : ComposerSkin.MUTED, false);
+		String hint = "Answer";
+		int hw = font.width(hint) + 3 + 8;
+		int hintColor = hover ? ComposerSkin.TEXT : ComposerSkin.MUTED;
+		g.text(font, hint, strip.right() - 7 - hw, strip.y() + 4, hintColor, false);
+		T3Icon.draw(g, ChatTheme.warmStudio(), T3Icon.CHEVRON_UP, strip.right() - 7 - 8, strip.y() + 4, 8, hintColor);
 		String label = what + " · " + req.title() + more;
 		g.text(font, ChatDraw.clip(font, label, strip.w() - 26 - hw), strip.x() + 15, strip.y() + 4, ComposerSkin.TEXT, false);
 		if (hover) {
@@ -390,16 +395,17 @@ public final class RequestCard {
 	private void drawHeader(GuiGraphicsExtractor g, Font font, PendingRequest req, @Nullable RequestDraft d, int x, int y, int w, int mouseX,
 			int mouseY, int accent) {
 		int right = x + w;
-		// ▾ hide
+		// chevron: hide
+		ChatTheme t = ChatTheme.warmStudio();
 		Rect hide = new Rect(right - 10, y, 10, 10);
 		boolean hh = hide.contains(mouseX, mouseY);
-		g.text(font, "▾", hide.x() + 2, hide.y() + 1, hh ? ComposerSkin.TEXT : ComposerSkin.MUTED, false);
+		T3Icon.draw(g, t, T3Icon.CHEVRON_DOWN, hide.x() + 1, hide.y() + 1, 8, hh ? ComposerSkin.TEXT : ComposerSkin.MUTED);
 		hits.add(new Hit(hide, this::collapse, "Hide (Esc)"));
 		right -= 14;
 		if (req.dismissible() && canOperate() && sendingId == null) {
 			Rect dis = new Rect(right - 10, y, 10, 10);
 			boolean dh = dis.contains(mouseX, mouseY);
-			g.text(font, "✕", dis.x() + 2, dis.y() + 1, dh ? ComposerSkin.ERROR : ComposerSkin.MUTED, false);
+			T3Icon.draw(g, t, T3Icon.X, dis.x() + 1, dis.y() + 1, 8, dh ? ComposerSkin.ERROR : ComposerSkin.MUTED);
 			hits.add(new Hit(dis, () -> dismiss(req), "Dismiss the question without answering"));
 			right -= 14;
 		}
@@ -556,7 +562,8 @@ public final class RequestCard {
 					ComposerSkin.round(g, row.x(), row.y(), row.w(), row.h(), ComposerSkin.HOVER);
 				}
 				boolean ok = RequestCommands.approves(o.decision());
-				g.text(font, ok ? "✔" : "✖", x + 2, y + 4, ok ? 0xFF6EE7B7 : 0xFFFCA5A5, false);
+				ChatTheme t = ChatTheme.warmStudio();
+				T3Icon.draw(g, t, ok ? T3Icon.CHECK : T3Icon.X, x + 1, y + 4, 8, ok ? t.ok() : t.fail());
 				g.text(font, ChatDraw.clip(font, o.label(), textW), textX, y + 4, LABEL, false);
 				int ly = y + 3 + LINE_H;
 				for (ComposerText.Line l : warn) {
@@ -625,7 +632,7 @@ public final class RequestCard {
 				ly += SMALL_H;
 			}
 			if (cut) {
-				g.text(font, "… " + (lines.size() - n) + " more lines", x + 5, ly, ComposerSkin.PLACEHOLDER, false);
+				g.text(font, "... " + (lines.size() - n) + " more lines", x + 5, ly, ComposerSkin.PLACEHOLDER, false);
 			}
 		}
 		return y + h;
@@ -691,7 +698,7 @@ public final class RequestCard {
 		int tw = field.w() - 12;
 		other.layout(Math.max(20, tw), font::width);
 		if (other.isEmpty()) {
-			String ph = q.options().isEmpty() ? "Type your answer…" : "Other: type your own answer… (Tab)";
+			String ph = q.options().isEmpty() ? "Type your answer..." : "Other: type your own answer... (Tab)";
 			g.text(font, ChatDraw.clip(font, ph, tw), tx, ty + 1, ComposerSkin.PLACEHOLDER, false);
 			if (otherFocused && ChatDraw.caretOn()) {
 				g.fill(tx, ty, tx + 1, ty + 9, ComposerSkin.TEXT);
@@ -741,7 +748,7 @@ public final class RequestCard {
 			ComposerSkin.round(g, right - bw, by, bw, BUTTON_H, ComposerSkin.DISABLED_BG);
 			ComposerSkin.busyDots(g, right - bw + (bw - BUTTON_H) / 2, by, BUTTON_H, ComposerSkin.TEXT, ComposerSkin.DISABLED_FG);
 			right -= bw + 4;
-			hint = "Sending…";
+			hint = "Sending...";
 		} else if (!req.canRespond()) {
 			hint = "Answer it in T3 Code, or send a new message";
 		} else if (d != null) {
@@ -749,17 +756,17 @@ public final class RequestCard {
 			boolean answered = q != null && d.answered(q);
 			boolean last = d.last();
 			boolean ready = last ? d.complete() : answered;
-			right -= button(g, font, last ? "Send ↵" : "Next ›", right, by, true, ready, mouseX, mouseY, this::advance,
+			right -= button(g, font, last ? "Send" : "Next >", right, by, true, ready, mouseX, mouseY, this::advance,
 					last ? "Send the answer (Enter)" : "Next question (Enter)") + 4;
 			if (d.index() > 0) {
-				right -= button(g, font, "‹ Back", right, by, false, true, mouseX, mouseY, () -> step(-1), "Previous question (←)") + 4;
+				right -= button(g, font, "< Back", right, by, false, true, mouseX, mouseY, () -> step(-1), "Previous question (Left)") + 4;
 			}
 			if (req.dismissible()) {
 				right -= button(g, font, "Dismiss", right, by, false, true, mouseX, mouseY, () -> dismiss(req),
 						"Leave the question unanswered") + 4;
 			}
 			hint = q != null && q.options().isEmpty() ? "Enter " + (last ? "send" : "next") + " · Esc hide"
-					: "1–9 choose · Enter " + (last ? "send" : "next") + " · Esc hide";
+					: "1-9 choose · Enter " + (last ? "send" : "next") + " · Esc hide";
 		} else {
 			String accept = null;
 			String decline = null;
@@ -776,7 +783,7 @@ public final class RequestCard {
 			if (decline != null) {
 				right -= button(g, font, decline, right, by, false, true, mouseX, mouseY, () -> decide(req, "decline"), "Decline") + 4;
 			}
-			hint = "1–9 choose · Esc hide";
+			hint = "1-9 choose · Esc hide";
 		}
 		g.text(font, ChatDraw.clip(font, hint, Math.max(0, right - x - 4)), x, by + 3, ComposerSkin.PLACEHOLDER, false);
 	}

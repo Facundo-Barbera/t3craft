@@ -5,6 +5,7 @@
 // AgentCraft's kit, copied to assets/t3craft/textures/gui/sprites/chat/.
 package dev.t3craft.client.chat;
 
+import dev.t3craft.client.t3ui.kit.T3Icon;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -98,6 +99,22 @@ public final class ChatDraw {
 		return w;
 	}
 
+	/**
+	 * A 12 px key cap holding an icon (the header's previous / next): muted at rest, accent under the pointer.
+	 * Returns its width.
+	 */
+	public static int keycap(GuiGraphicsExtractor g, ChatTheme t, T3Icon icon, int x, int y, boolean hover) {
+		int w = 12;
+		if (t.hasSprites()) {
+			sprite(g, t, "keycap", x, y, w, 12);
+		} else {
+			round(g, x, y, w, 11, t.selected());
+			g.fill(x + 1, y + 11, x + w - 1, y + 12, t.edge());
+		}
+		T3Icon.draw(g, t, icon, x + 2, y + 1, 8, T3Icon.tint(t, hover, true));
+		return w;
+	}
+
 	public static int keycapWidth(Font font, String key) {
 		return Math.max(12, font.width(key) + 8);
 	}
@@ -172,23 +189,45 @@ public final class ChatDraw {
 		return (System.currentTimeMillis() / 500) % 2 == 0;
 	}
 
-	/** 12 px tool icon (bash decision edit git memory merge message read test). */
+	/**
+	 * 12 px tool icon (bash decision edit git memory merge message read test): AgentCraft's {@code icon_*} sprite with
+	 * the kit sprites, else the {@link T3Icon} of {@link #toolIcon(String)} in the tool colour.
+	 */
 	public static void toolIcon(GuiGraphicsExtractor g, Font font, ChatTheme t, String icon, int x, int y) {
 		if (t.hasSprites()) {
 			sprite(g, t, "icon_" + icon, x, y, 12, 12);
 		} else {
-			String glyph = switch (icon) {
-				case "edit" -> "✎";
-				case "read" -> "⌕";
-				case "git", "merge" -> "⎇";
-				case "test" -> "✓";
-				case "message" -> "✉";
-				case "decision" -> "?";
-				case "memory" -> "≡";
-				default -> "$";
-			};
-			g.text(font, glyph, x + (12 - font.width(glyph)) / 2, y + 2, t.tool(), false);
+			T3Icon.draw(g, t, toolIcon(icon), x, y, 12, t.tool());
 		}
+	}
+
+	/** The {@link T3Icon} of a tool kind ({@link ToolLine#icon()}); a shell command for anything unknown. */
+	public static T3Icon toolIcon(String icon) {
+		return switch (icon) {
+			case "edit" -> T3Icon.PENCIL;
+			case "read" -> T3Icon.SEARCH;
+			case "git", "merge" -> T3Icon.GIT_BRANCH;
+			case "test" -> T3Icon.CHECK;
+			case "message" -> T3Icon.MESSAGE_SQUARE;
+			case "decision" -> T3Icon.INFO;
+			case "memory" -> T3Icon.FILE_TEXT;
+			default -> T3Icon.TERMINAL;
+		};
+	}
+
+	/**
+	 * The {@link T3Icon} of an attention level, for drawing on screen. {@link Attention#glyph} stays the text form (it goes
+	 * into strings shown elsewhere: monitors, holograms, the action bar).
+	 */
+	public static T3Icon stateIcon(Attention a) {
+		return switch (a) {
+			case NEEDS_YOU -> T3Icon.BELL;
+			case ERROR -> T3Icon.CIRCLE_X;
+			case PENDING -> T3Icon.CIRCLE_EXCLAMATION_POINT;
+			case WORKING -> T3Icon.REFRESH_CW;
+			case DONE -> T3Icon.CIRCLE_CHECK;
+			case IDLE -> T3Icon.MINUS;
+		};
 	}
 
 	/** Square environment icon with its initial (T3 Code sidebar style). Returns its width. */
