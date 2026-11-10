@@ -10,7 +10,10 @@ import dev.t3craft.client.chat.ThreadList;
 import dev.t3craft.client.chat.ThreadRow;
 import dev.t3craft.client.config.EnvironmentActions;
 import dev.t3craft.client.config.EnvironmentActions.EnvRow;
+import dev.t3craft.client.config.EnvironmentEditPanel;
 import dev.t3craft.client.config.EnvironmentsPanel;
+import dev.t3craft.client.config.OutboundDestinationPanel;
+import dev.t3craft.client.config.OutboundPanel;
 import dev.t3craft.client.config.SettingsPanel;
 import dev.t3craft.client.config.SettingsScreen;
 import dev.t3craft.client.queue.QueueScreen;
@@ -20,7 +23,12 @@ import dev.t3craft.client.screen.PairScreen;
 import dev.t3craft.client.screen.SnoozeScreen;
 import dev.t3craft.client.t3ui.T3Screen;
 import dev.t3craft.client.t3ui.T3Slots;
+import dev.t3craft.client.t3ui.actions.RegisterProjectDialog;
 import dev.t3craft.client.t3ui.kit.T3PanelScreen;
+import dev.t3craft.outbound.Destination;
+import dev.t3craft.outbound.OutboundConfig;
+import dev.t3craft.outbound.OutboundStore;
+import dev.t3craft.outbound.Template;
 import dev.t3craft.t3.Environments;
 import dev.t3craft.t3.OperateAction;
 import dev.t3craft.t3.OperateKind;
@@ -28,7 +36,10 @@ import dev.t3craft.t3.StreamRegistry;
 import dev.t3craft.t3.T3Connection;
 import dev.t3craft.t3.ThreadOps;
 import dev.t3craft.t3.ThreadState;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.URI;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -61,6 +72,8 @@ public final class UiGallery {
 
 	private static final String ENV = ThreadCache.GALLERY_ENV;
 	private static final String ENV_LABEL = "Gallery";
+	private static final String GALLERY_DESTINATION = "gallery-demo";
+	private static @Nullable OutboundStore outbound;
 
 	private static final List<Scenario> SCENARIOS = List.of(
 			new Scenario("inbox", "Main T3 screen: every thread state, a running conversation, the composer", () -> inbox(true, true)),
@@ -85,6 +98,16 @@ public final class UiGallery {
 					() -> new T3PanelScreen(null, new SettingsPanel(EnvironmentActions.DEFAULT).tab(2))),
 			new Scenario("environments", "Environment list with fake environments (ok, connecting, offline, one with control)",
 					() -> new T3PanelScreen(null, new EnvironmentsPanel(galleryActions()))),
+			new Scenario("environment-edit", "Environment edit page (name, accent swatches, switches, window and cap; Save writes the real config under the fake id 'studio')",
+					() -> new T3PanelScreen(null, new EnvironmentEditPanel(galleryActions(), galleryEnvs().getFirst()))),
+			new Scenario("outbound", "Outbound events page: master switch with its confirmation and a list of fake destinations (a temporary folder, not the real outbound.json)",
+					() -> new T3PanelScreen(null, new OutboundPanel(galleryOutbound()))),
+			new Scenario("outbound-destination", "One outbound destination page (temporary folder; Send test finds no such destination in the real config)",
+					() -> new T3PanelScreen(null, new OutboundDestinationPanel(galleryOutbound(), GALLERY_DESTINATION, () -> {
+					}))),
+			new Scenario("register-project", "Kit dialog: register a project (environment select needs a paired environment; Register sends nothing without control)",
+					() -> new RegisterProjectDialog(null, null, (env, projectId) -> {
+					})),
 			new Scenario("pieces", "Piece browser as a screen of its own (the code catalog; Preview needs a world)",
 					() -> new dev.t3craft.client.pieces.PieceBrowserScreen(null)),
 			new Scenario("inbox-pieces", "Main T3 screen with the piece browser in the thread's place (the ⋯ menu → Pieces)",
@@ -119,16 +142,38 @@ public final class UiGallery {
 		return new ConfirmActionScreen(null, stop, ENV_LABEL, yes -> Minecraft.getInstance().gui.setScreen(null));
 	}
 
+	private static List<EnvRow> galleryEnvs() {
+		return List.of(
+				new EnvRow("studio", "Studio Mac", "http://studio.example.ts.net:3773/", "ok", ""),
+				new EnvRow("laptop", "Laptop", "http://my-laptop:3773/", "connecting", ""),
+				new EnvRow("vps-env", "VPS", "https://vps.example.ts.net/", "offline", "connection refused"),
+				new EnvRow("old", "Old machine", "http://10.0.0.7:3773/", "-", ""));
+	}
+
+	/** Seeded once, in a temporary folder: the outbound pages save and delete here, never in the real {@code outbound.json}. */
+	private static synchronized OutboundStore galleryOutbound() {
+		if (outbound == null) {
+			try {
+				OutboundStore s = new OutboundStore(Files.createTempDirectory("t3craft-gallery-outbound"));
+				Destination phone = Destination.create(GALLERY_DESTINATION, "Phone (push)");
+				Destination team = Destination.create("gallery-team", "Team channel").withTemplate(Template.CHAT).withEnabled(false)
+						.withPendingOnly(false);
+				s.save(new OutboundConfig(true, List.of(phone, team)));
+				s.setUrl(GALLERY_DESTINATION, "https://ntfy.example.net/gallery");
+				outbound = s;
+			} catch (IOException e) {
+				throw new UncheckedIOException(e);
+			}
+		}
+		return outbound;
+	}
+
 	/** Four fake paired environments for the list page; every action answers with a line and touches nothing. */
 	private static EnvironmentActions galleryActions() {
 		return new EnvironmentActions() {
 			@Override
 			public List<EnvRow> list() {
-				return List.of(
-						new EnvRow("studio", "Studio Mac", "http://studio.example.ts.net:3773/", "ok", ""),
-						new EnvRow("laptop", "Laptop", "http://my-laptop:3773/", "connecting", ""),
-						new EnvRow("vps-env", "VPS", "https://vps.example.ts.net/", "offline", "connection refused"),
-						new EnvRow("old", "Old machine", "http://10.0.0.7:3773/", "-", ""));
+				return galleryEnvs();
 			}
 
 			@Override

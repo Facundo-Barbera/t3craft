@@ -50,6 +50,9 @@ receta que el buscador de `T3Screen`).
 | **OperatePair** | `OperatePairScreen` (`T3DialogScreen`) | Aviso de riesgo, comando del host, campo, estado. |
 | **Confirm** | `ConfirmActionScreen` (`T3DialogScreen`) | Acción / hilo / entorno / aviso. Enter equivale a Cancelar, como antes (el foco estaba en Cancelar). |
 | **Snooze** | `SnoozeScreen` (`T3DialogScreen`) | Tres presets y Cancelar. |
+| **Environment edit** (#23) | `EnvironmentEditPanel` (página) | "Edit" de `EnvironmentsPanel` hace `host().show(...)`: la edición se queda dentro de la página y "Back" vuelve a la lista (antes abría una pantalla vanilla). Nombre, muestras de color (un control privado de la página, `Swatches`), interruptores y campos de ventana y máximo. |
+| **Outbound** (#23) | `OutboundPanel` + `OutboundDestinationPanel` (páginas) | Ajustes → Connections → "Outbound events…" la apila. Interruptor general con modal de confirmación (queda apagado hasta confirmar), lista de destinos en un `T3List`, y la página del destino (nombre, plantilla en un `T3Select`, URL secreta que nunca se muestra de vuelta, acción al tocar, "pending only", eventos, Send test, Delete con confirmación). |
+| **Register project** (#23) | `RegisterProjectDialog` (`T3DialogScreen`) | `T3Select` de entorno, campos de ruta y nombre, interruptor "create the folder", Register / Cancel; el estado en vivo dice el nombre que tomará, el primer error tras pulsar Register o la respuesta de T3. Mismos puntos de entrada (`new RegisterProjectDialog(...)` y `open(...)`). |
 
 Los puntos de entrada no cambian: `new SettingsScreen(parent, actions)`, `new EnvironmentsScreen(...)`, `new PairScreen(parent[, readOnly])`,
 `new OperatePairScreen(...)`, `new ConfirmActionScreen(...)` y `new SnoozeScreen(...)` siguen siendo
@@ -86,9 +89,8 @@ sidebar cierra la página. En el layout compacto la página ocupa la pantalla. L
 
 ## Lo que queda a medias
 
-* `EnvironmentEditScreen`, `OutboundScreen`, `OutboundDestinationScreen`, `RegisterProjectDialog`, `QueueScreen`, `ArchiveScreen`,
-  `HqMenuScreen` y `MergeStationScreen` siguen con widgets vanilla. Las tres de `config` (`BaseConfigScreen`) ya usan el fondo del
-  kit, así que no desentonan al abrirse desde Settings; migrarlas es mecánico con el kit actual.
+* `QueueScreen`, `ArchiveScreen`, `HqMenuScreen` y `MergeStationScreen` siguen con widgets vanilla. Las pantallas de `config`
+  (environment edit, outbound) y `RegisterProjectDialog` ya se migraron (#23). `BaseConfigScreen` sigue en el repo y se borra en un hilo posterior.
 * Falta un campo multilínea del kit y una casilla de verificación; el interruptor cubre el uso actual.
 * El scroll de `T3Panel` es por rueda (sin arrastrar la barra); los campos de texto salen de la vista entera, no se recortan.
 * `uiRender` no tiene fixtures de estas pantallas: la galería (`/t3dev ui`) es el camino. Pendiente: un tipo de pantalla
@@ -112,6 +114,10 @@ Con el juego abierto (cliente de desarrollo), `/t3dev ui` lista los escenarios y
 /t3dev ui confirm
 /t3dev ui snooze
 /t3dev ui launch                nuevo hilo
+/t3dev ui environment-edit      edicion de un entorno falso (Save escribe la config real bajo el id falso "studio")
+/t3dev ui outbound              eventos salientes con destinos falsos (carpeta temporal, no el outbound.json real)
+/t3dev ui outbound-destination  un destino (URL guardada en la carpeta temporal; nunca se muestra)
+/t3dev ui register-project      dialogo de registrar proyecto (necesita un entorno emparejado para elegir entorno)
 ```
 
 F3+T recarga `ui-style.json` y estas pantallas se re-maquetan. Qué mirar: que Esc retroceda página a página, que el scroll con
