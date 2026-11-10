@@ -625,11 +625,18 @@ public final class BlocksClient implements ClientModInitializer {
 	 */
 	private boolean useConsole(BlockPos pos, String own) {
 		Binding b = resolve(pos, own);
-		if (b.kind() == Binding.Kind.THREAD && openThread(b.value())) {
+		// the page's "opens: new thread" (T10) skips the bound thread
+		if (b.kind() == Binding.Kind.THREAD && !ClickOptions.consoleAlwaysNew(optionsAt(pos)) && openThread(b.value())) {
 			return true;
 		}
 		Minecraft.getInstance().gui.setScreen(ChatScreens.create(null).withDraft(null, null));
 		return true;
+	}
+
+	/** The options of the block entity at {@code pos} in the client's level (empty when there is none). */
+	private static Map<String, String> optionsAt(BlockPos pos) {
+		Minecraft mc = Minecraft.getInstance();
+		return mc.level != null && mc.level.getBlockEntity(pos) instanceof BoundBlockEntity be ? be.options() : Map.of();
 	}
 
 	/**
@@ -638,13 +645,15 @@ public final class BlocksClient implements ClientModInitializer {
 	 */
 	private void usePodium(BlockPos pos, String own) {
 		Binding b = resolve(pos, own);
-		String key = b.kind() == Binding.Kind.BOARD ? LampSignals.boardThread(threads.values(), b.boardIndex()) : null;
+		// board:<i> = the i-th thread that needs the player; a podium the page bound to one thread (T10) opens that thread
+		String key = b.kind() == Binding.Kind.BOARD ? LampSignals.boardThread(threads.values(), b.boardIndex())
+				: b.kind() == Binding.Kind.THREAD && threads.containsKey(b.value()) ? b.value() : null;
 		if (key != null) {
 			openThread(key);
 			return;
 		}
 		Minecraft mc = Minecraft.getInstance();
-		if (mc.player != null) {
+		if (mc.player != null && !ClickOptions.podiumSilent(optionsAt(pos))) {
 			mc.player.sendSystemMessage(prefix().append(Component.translatable("t3craft.podium.nobody")));
 		}
 	}

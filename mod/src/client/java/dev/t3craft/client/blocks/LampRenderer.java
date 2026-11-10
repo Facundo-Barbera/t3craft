@@ -55,6 +55,9 @@ public final class LampRenderer implements BlockEntityRenderer<LampBlockEntity, 
 		float inset;
 		float seconds;
 		boolean halo = true;
+		/** The page's options (issue #43): glow factor, and whether the glow breathes with the state. */
+		float gain = 1f;
+		boolean pulse = true;
 	}
 
 	private final BlocksClient client;
@@ -93,18 +96,23 @@ public final class LampRenderer implements BlockEntityRenderer<LampBlockEntity, 
 		state.halo = RenderLod.within(p.getX() + 0.5 - cameraPosition.x, p.getY() + 0.5 - cameraPosition.y, p.getZ() + 0.5 - cameraPosition.z,
 				RenderLod.LAMP_HALO) || state.kind == Binding.Kind.BEACON;
 		state.seconds = be.getLevel() == null ? 0f : (be.getLevel().getGameTime() % 1_000_000L + partialTicks) / 20f;
-		client.sawLamp(be.getBlockPos(), state.kind, state.status);
+		LampOptions opts = LampOptions.of(be.options());
+		state.gain = opts.glow().gain;
+		state.pulse = opts.pulse();
+		if (opts.motes()) {
+			client.sawLamp(be.getBlockPos(), state.kind, state.status); // a lamp whose page turned the motes off is never reported
+		}
 	}
 
 	@Override
 	public void submit(State s, PoseStack poseStack, SubmitNodeCollector collector, CameraRenderState camera) {
-		if (s.status == LampStatus.OFF) {
-			return;
+		if (s.status == LampStatus.OFF || s.gain <= 0f) {
+			return; // glow off in the page: the model and the light of the block state remain
 		}
-		float level = LampGlow.level(s.status, s.seconds);
+		float level = s.pulse ? LampGlow.level(s.status, s.seconds) : LampGlow.steadyLevel(s.status);
 		boolean beacon = s.kind == Binding.Kind.BEACON;
-		int core = LampGlow.argb(s.status.color, LampGlow.alpha(level, beacon ? 110 : 25, beacon ? 245 : 175));
-		int halo = LampGlow.argb(s.status.color, LampGlow.alpha(level, beacon ? 50 : 0, beacon ? 150 : 70));
+		int core = LampGlow.argb(s.status.color, LampGlow.gain(LampGlow.alpha(level, beacon ? 110 : 25, beacon ? 245 : 175), s.gain));
+		int halo = LampGlow.argb(s.status.color, LampGlow.gain(LampGlow.alpha(level, beacon ? 50 : 0, beacon ? 150 : 70), s.gain));
 		for (Direction d : Direction.Plane.HORIZONTAL) {
 			poseStack.pushPose();
 			toFace(poseStack, d, s.inset + (beacon ? -0.02f : -0.004f));
@@ -120,7 +128,7 @@ public final class LampRenderer implements BlockEntityRenderer<LampBlockEntity, 
 			toFace(poseStack, Direction.NORTH, -0.02f);
 			lens(poseStack, collector, core, halo, true);
 			poseStack.popPose();
-			beam(poseStack, collector, LampGlow.argb(s.status.color, LampGlow.alpha(level, 40, 130)), s.status.color & 0xFFFFFF);
+			beam(poseStack, collector, LampGlow.argb(s.status.color, LampGlow.gain(LampGlow.alpha(level, 40, 130), s.gain)), s.status.color & 0xFFFFFF);
 		}
 	}
 
