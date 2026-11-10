@@ -121,6 +121,8 @@ public final class UiGallery {
 					() -> new T3PanelScreen(null, new T3KitDemoPanel())),
 			new Scenario("inbox-kit", "The same UI kit demo inside the main T3 screen (the dialog with fields and the scrollbar drag go through T3Screen)",
 					() -> inbox(true, true).withPage(new T3KitDemoPanel())),
+			new Scenario("block-config-monitor", "Block config page of a monitor wall (fake block entity bound by hand; binding picker with search, preview, options, Reset to automatic)",
+					dev.t3craft.client.blocks.config.BlockConfigGallery::monitor),
 			new Scenario("queue", "Queued runs (reads the live queue, empty without a connection)", () -> new QueueScreen(null, null)));
 
 	private UiGallery() {

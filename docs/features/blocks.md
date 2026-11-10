@@ -145,7 +145,70 @@ Nadie tiene que usar `/t3craft blocks link` en el HQ:
   site (`HqBindings.world(plan, site)`) o, en el demo, la del roster en vivo (`HqPresence.demoBindings`).
 
 A mano: mirando un monitor o lámpara, `/t3craft blocks link <env:thread>` o `/t3craft blocks unlink`
-(solo singleplayer o anfitrión LAN; escribe el block entity en el servidor integrado).
+(solo singleplayer o anfitrión LAN; escribe el block entity en el servidor integrado). Desde #33 los dos
+dejan el binding **manual** (ver abajo); `/t3craft blocks auto` lo devuelve al automático.
+
+### Página de configuración y marca `manual` (#33)
+
+**Gesto:** agachado + clic derecho **con la mano principal vacía** sobre un bloque que tiene página
+(`BlockConfigPages`; hoy solo el monitor y las pantallas grandes) abre `BlockConfigPanel`, un `T3Panel` dentro de
+un `T3PanelScreen`. El clic normal hace lo de siempre (abrir el hilo). Con un ítem en la mano, agacharse sigue
+colocándolo contra el bloque, como antes. Sin ítem llave ni tecla nueva. Lo intercepta un `UseBlockCallback` en
+`BlocksClient` (devuelve `FAIL` en el cliente: no llega paquete al servidor, el `use` del bloque no corre).
+
+**La página**, de arriba abajo:
+
+- nota de solo lectura si el mundo corre en un servidor remoto (la escritura pasa por el servidor integrado, como
+  `BindingWriter`; en remoto todos los controles quedan deshabilitados);
+- si el binding es automático (lo escribe el HQ) o manual;
+- el selector de binding: tipo (`T3Select`), búsqueda (`T3Field`) y destino (`T3Select`), alimentado por
+  `BindingChoices` con las mismas claves que `/t3craft blocks link` (`thread:<npcKey>`,
+  `project:<envId>:<projectId>`, `env:<envId>`, `board:<i>`, `beacon`) a partir de los hilos que el cliente
+  conoce. El binding guardado sigue visible aunque el cliente no lo conozca ("not connected");
+- una vista previa en texto de lo que mostrará el bloque (`BlockPreview`, colores del tema);
+- las opciones propias del bloque;
+- pie: **Save** (escribe binding, `manual` y opciones en todas las celdas), **Reset to automatic** y **Close**.
+
+**Marca `manual`** (`BoundBlockEntity`, clave NBT aditiva `"manual"`, por defecto false; se guarda solo si es
+true, así que un mundo viejo carga igual):
+
+- la ponen en true la página (al guardar un binding distinto del que había; cambiar solo opciones conserva el
+  modo) y `/t3craft blocks link|unlink`;
+- `BindingWriter.apply` se salta los block entities manuales, así que un cambio de roster ya no pisa lo
+  configurado a mano;
+- "Reset to automatic" (o `/t3craft blocks auto`) la limpia en todas las celdas y pide un reenvío completo del HQ
+  (`BlocksClient.requestHqResync`): el HQ reescribe su binding en la siguiente pasada (≤ 1 s). Las opciones se
+  quedan. Un bloque que no es fixture del HQ conserva el binding que tenía;
+- el orden de resolución no cambia: los datos del bloque ganan sobre el fallback de posición.
+
+**Opciones** (`BoundBlockEntity`, compound NBT aditivo `"options"` de strings; se guarda solo si no está vacío;
+máximo 32 claves de ≤ 64 caracteres). Solo se guardan los valores distintos del default, así que un bloque sin
+tocar dibuja exactamente como antes. El renderer las lee con `be.options()` / `be.option(key, def)`.
+
+**Monitor** (`MonitorConfigSection`, opciones en `MonitorOptions`, leídas por `MonitorRenderer`):
+
+| control | qué guarda | default |
+|---|---|---|
+| Content | el tipo de binding: Log (un hilo, `thread:`), Project feed (`project:`), Environment feed (`env:`), Status (`beacon`) | lo que tenga |
+| destino | hilo / proyecto / entorno con búsqueda (Status no tiene) | |
+| Text size | `textSize`: `small` / `normal` / `large` (densidad ×1.25 / ×1 / ×0.75 de la vista cercana) | `normal` |
+| Accent | `accent`: `status` o un token del tema (`accent`, `brass`, `working`, `agent`, `done`, `error`) para la banda de cabecera y las bandas de lejos | `status` |
+| Rows shown | `rows`: `0` (las que quepan) o un tope | `0` |
+| Show the age | `showAge`: la antigüedad en la ficha de estado | `true` |
+
+La vista lejana ajusta su texto al tamaño de la pantalla y no usa `textSize`; la pantalla de estado (`beacon`) no
+usa estas opciones todavía (T10). Una pared multibloque se edita como una sola: la página escribe todas las
+celdas de `MonitorBlock.extent`, y el renderer lee las opciones de la celda que dibuja.
+
+**Cómo enchufar otra página (T10):** implementar `BlockConfigSection` (nombre, tipos de binding que ofrece,
+etiquetas, celdas que se editan juntas, vista previa y `options(form, config)` con `form.select` /
+`form.toggle` / `form.note` / `form.set(key, value, default)`), registrarla con
+`BlockConfigPages.register(MiBloque.class, MiSeccion::new)` y leer las claves en el renderer del bloque con
+`be.option(key, default)`. El gesto, la marca manual, la escritura y el modo de solo lectura ya vienen dados.
+
+**Galería:** `/t3dev ui block-config-monitor` abre la página sobre un block entity falso en memoria (una pared
+de 3 bloques vinculada a mano a un hilo, texto grande, 5 filas) con hilos, proyectos y entornos falsos. Save y
+Reset solo cambian el bloque falso.
 
 ## Monitor
 
@@ -635,7 +698,7 @@ lámparas de las esquinas), el parpadeo del estado `open` y la lista.
 - Entrypoints nuevos: `main` `dev.t3craft.blocks.BlocksInit`, `client`
   `dev.t3craft.client.blocks.BlocksClient`.
 - Tick de cliente (`GuardedEvents`, módulo `blocks`), `CLIENT_STOPPING`, `DevReload`
-  (`t3craft.blocks`), comando `/t3craft blocks [link <thread>|unlink]`.
+  (`t3craft.blocks`), comando `/t3craft blocks [link <thread>|unlink|auto]`.
 - API nueva: `HqFixtures`, `BuildPlan.replacing`, `WorkstationClient.setScreenSuppressor`,
   `WorkstationClient.opener()`.
 - Datos: blockstates, modelos, texturas, loot tables, 4 recetas, lang.
