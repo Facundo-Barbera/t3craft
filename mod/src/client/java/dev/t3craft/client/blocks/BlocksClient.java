@@ -26,6 +26,8 @@ import dev.t3craft.blocks.MonitorBlockEntity;
 import dev.t3craft.blocks.ScreenRect;
 import dev.t3craft.blocks.T3Blocks;
 import dev.t3craft.client.T3CraftClient;
+import dev.t3craft.client.blocks.config.BlockConfigPages;
+import dev.t3craft.client.blocks.config.BlockConfigPanel;
 import dev.t3craft.client.chat.ChatScreens;
 import dev.t3craft.client.debug.GuardedEvents;
 import dev.t3craft.client.npc.NpcInfo;
@@ -89,6 +91,12 @@ import org.jspecify.annotations.Nullable;
  * <p>Live log ({@link MonitorLiveLog}): monitors close to the player and in view hold a read-only
  * share of their thread's stream ({@link MonitorVisibility} decides, with hysteresis; one stream per
  * thread however many monitors show it). Options: {@code blocks.monitor.*} ({@link MonitorSettings}).
+ *
+ * <p>Block config (issue #33): sneak + right click with an empty main hand on a block that has a config page
+ * ({@link BlockConfigPages}) opens {@link BlockConfigPanel}; a plain click does what it always did, and sneaking
+ * with an item in hand still places it against the block. A binding set there or with
+ * {@code /t3craft blocks link} is manual: the HQ pass skips it until "Reset to automatic"
+ * ({@code /t3craft blocks auto}).
  *
  * <p>Integration points: {@link #setHqBindings} (HQ owner: the bindings the HQ's fixtures should have
  * for the live roster; written into the block entities, only where they change) and
@@ -203,6 +211,16 @@ public final class BlocksClient implements ClientModInitializer {
 			// FAIL on the client: consumed, no packet to the server, so neither the block nor the held item acts
 			return h != null && openThread(h.key()) ? InteractionResult.FAIL : InteractionResult.PASS;
 		});
+		UseBlockCallback.EVENT.register((player, lvl, hand, hit) -> {
+			// block config page: sneak + right click with an empty main hand (with an item, sneaking still places it)
+			if (!lvl.isClientSide() || hand != InteractionHand.MAIN_HAND || !player.isShiftKeyDown() || !player.getMainHandItem().isEmpty()
+					|| BlockConfigPages.find(lvl.getBlockState(hit.getBlockPos()).getBlock()) == null
+					|| !(lvl.getBlockEntity(hit.getBlockPos()) instanceof BoundBlockEntity)) {
+				return InteractionResult.PASS;
+			}
+			// FAIL on the client: consumed, no packet to the server, so the block's own use does not run
+			return BlockConfigPanel.open(lvl, hit.getBlockPos()) ? InteractionResult.FAIL : InteractionResult.PASS;
+		});
 		BlockEntityRendererRegistry.register(c.archiveTerminalType(), ctx -> new ArchiveTerminalRenderer());
 		BlockEntityRendererRegistry.register(c.kit().plaqueType(), ctx -> {
 			PlaqueRenderer r = new PlaqueRenderer();
@@ -253,6 +271,18 @@ public final class BlocksClient implements ClientModInitializer {
 	public void setHqBindings(@Nullable Supplier<@Nullable Map<Long, Binding>> source) {
 		hqBindings = source;
 		lastHq = null;
+	}
+
+	/** The next HQ pass re-sends every binding (a block was reset to automatic: it gets its binding back now). */
+	public void requestHqResync() {
+		lastHq = null;
+		lastWanted = null;
+	}
+
+	/** A block's binding was changed by hand: lamps and stations follow on the next tick. */
+	public void bindingsChanged() {
+		lastWanted = null;
+		lastMergeWanted = null;
 	}
 
 	/** Block entities rewritten by the last HQ binding pass (status, tests). */
@@ -680,7 +710,8 @@ public final class BlocksClient implements ClientModInitializer {
 				})
 				.then(literal("link").then(argument("thread", StringArgumentType.greedyString())
 						.executes(c -> link(c, linkTarget(StringArgumentType.getString(c, "thread"))))))
-				.then(literal("unlink").executes(c -> link(c, Binding.NONE)))));
+				.then(literal("unlink").executes(c -> link(c, Binding.NONE)))
+				.then(literal("auto").executes(this::auto))));
 	}
 
 	/** {@code project:<key>}, {@code env:<id>} or {@code thread:<key>} as typed; anything else is a thread key. */
@@ -693,7 +724,10 @@ public final class BlocksClient implements ClientModInitializer {
 		return b.isNone() || b.kind() == Binding.Kind.BOARD || b.kind() == Binding.Kind.MODULE ? Binding.thread(a) : b;
 	}
 
-	/** Binds the t3craft block the player looks at (singleplayer / LAN host only). */
+	/**
+	 * Binds the t3craft block the player looks at (singleplayer / LAN host only). The binding is manual: the HQ
+	 * pass leaves the block alone until {@code /t3craft blocks auto} or the config page's "Reset to automatic".
+	 */
 	private int link(CommandContext<FabricClientCommandSource> c, Binding b) {
 		Minecraft mc = Minecraft.getInstance();
 		IntegratedServer server = mc.getSingleplayerServer();
@@ -720,12 +754,47 @@ public final class BlocksClient implements ClientModInitializer {
 					? MonitorBlock.extent(level, pos, state).cells() : java.util.List.of(pos);
 			for (BlockPos p : cells) {
 				if (level.getBlockEntity(p) instanceof BoundBlockEntity be) {
-					be.setBinding(b.wire());
+					be.setConfig(b.wire(), true, be.options());
 				}
 			}
 		});
 		lastWanted = null;
 		c.getSource().sendFeedback(prefix().append(Component.translatable("t3craft.blocks.linked", b.toString())));
+		return 1;
+	}
+
+	/** {@code /t3craft blocks auto}: the block the player looks at goes back to the HQ's automatic binding. */
+	private int auto(CommandContext<FabricClientCommandSource> c) {
+		Minecraft mc = Minecraft.getInstance();
+		IntegratedServer server = mc.getSingleplayerServer();
+		if (server == null || mc.level == null) {
+			c.getSource().sendError(prefix().append(Component.translatable("t3craft.blocks.singleplayer_only")));
+			return 0;
+		}
+		HitResult hit = mc.hitResult;
+		if (!(hit instanceof BlockHitResult bh) || hit.getType() != HitResult.Type.BLOCK
+				|| !(mc.level.getBlockEntity(bh.getBlockPos()) instanceof BoundBlockEntity)) {
+			c.getSource().sendError(prefix().append(Component.translatable("t3craft.blocks.look_at_block")));
+			return 0;
+		}
+		BlockPos pos = bh.getBlockPos();
+		var dim = mc.level.dimension();
+		server.execute(() -> {
+			ServerLevel level = server.getLevel(dim);
+			if (level == null) {
+				return;
+			}
+			var state = level.getBlockState(pos);
+			java.util.List<BlockPos> cells = state.getBlock() instanceof MonitorBlock
+					? MonitorBlock.extent(level, pos, state).cells() : java.util.List.of(pos);
+			for (BlockPos p : cells) {
+				if (level.getBlockEntity(p) instanceof BoundBlockEntity be) {
+					be.setManual(false);
+				}
+			}
+		});
+		requestHqResync();
+		c.getSource().sendFeedback(prefix().append(Component.translatable("t3craft.blocks.auto")));
 		return 1;
 	}
 

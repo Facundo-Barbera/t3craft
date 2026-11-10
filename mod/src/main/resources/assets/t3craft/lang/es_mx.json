@@ -93,6 +93,7 @@
 	"t3craft.blocks.singleplayer_only": "Solo en un mundo individual o como anfitrión LAN.",
 	"t3craft.blocks.look_at_block": "Mira un monitor o una lámpara de T3Craft.",
 	"t3craft.blocks.linked": "Bloque vinculado a %s.",
+	"t3craft.blocks.auto": "Bloque en automático: el HQ lo vuelve a vincular.",
 	"t3craft.demo.reset.button": "Reiniciar mundo HQ",
 	"t3craft.demo.reset.button.tooltip": "Borra el mundo demo T3Craft HQ y lo crea de nuevo (antes guarda un zip en backups/, salvo que demo.resetBackup sea false). Solo funciona dentro del mundo HQ o desde el menú; nunca toca otros mundos.",
 	"t3craft.demo.void.rescued": "De vuelta en tierra firme: el vacío no es parte del HQ.",

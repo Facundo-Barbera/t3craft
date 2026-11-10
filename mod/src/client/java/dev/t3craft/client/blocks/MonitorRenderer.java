@@ -12,6 +12,7 @@ import dev.t3craft.T3Craft;
 import dev.t3craft.blocks.Binding;
 import dev.t3craft.blocks.MonitorBlock;
 import dev.t3craft.blocks.MonitorBlockEntity;
+import dev.t3craft.client.chat.ChatTheme;
 import dev.t3craft.client.chat.ChatTranscript;
 import dev.t3craft.debug.PerfStats;
 import dev.t3craft.client.workstation.StationScreen;
@@ -63,6 +64,11 @@ import org.jspecify.annotations.Nullable;
  * z-fights past ~40 blocks, the renderer draws off-screen (it is not tied to its chunk section's
  * culling, which also lets a panel draw from its origin) with a configurable view distance, and
  * the far level trades the log for big text.
+ *
+ * <p><b>Options</b> (issue #33, {@link MonitorOptions}, the block entity's {@code options} written by the monitor's
+ * config page; a wall reads its drawing cell's, and the page writes every cell): text size of the NEAR level, accent
+ * (the status colour or a theme token) for the header band and the far face's bands, how many rows the log or feed
+ * shows, and whether the status chip carries the age. Empty options draw exactly as before.
  *
  * <p>Glyph runs are rebuilt only when the content version, level or extent changes; a steady screen
  * costs a map lookup per frame plus the draw.
@@ -187,7 +193,11 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 		}
 		MonitorLod.Level level = MonitorLod.next(lods.get(posKey), distance, extent, client.monitorSettings());
 		lods.put(posKey, level);
-		MonitorLod.Layout layout = MonitorLod.layout(level, extent);
+		MonitorOptions opts = MonitorOptions.of(be.options());
+		MonitorLod.Layout layout = MonitorLod.layout(level, extent, opts.textSize().density);
+		if (opts.rows() > 0 && layout.rows() > opts.rows()) {
+			layout = new MonitorLod.Layout(layout.level(), layout.extent(), layout.ppb(), layout.bezel(), layout.chin(), layout.cols(), opts.rows());
+		}
 		state.layout = layout;
 		state.zStep = MonitorLod.zStep(distance);
 		long ms = System.currentTimeMillis();
@@ -208,13 +218,13 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 			return;
 		}
 		try {
-			state.glyphs = glyphsFor(be, layout);
+			state.glyphs = glyphsFor(be, layout, opts);
 		} catch (RuntimeException e) {
 			T3Craft.LOGGER.debug("T3Craft: monitor layout failed", e);
 		}
 	}
 
-	private Glyphs glyphsFor(MonitorBlockEntity be, MonitorLod.Layout layout) {
+	private Glyphs glyphsFor(MonitorBlockEntity be, MonitorLod.Layout layout, MonitorOptions opts) {
 		// a merged screen shows its first bound cell's binding; a project/env feed is laid out at the screen's size
 		Binding b = client.screenBinding(be);
 		MonitorScreens.Shown shown = b.isFeed() ? client.screens().show(b, layout.cols(), layout.rows() + 1) : client.screens().show(b);
@@ -223,8 +233,9 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 		ChatTranscript.View view = feed != null && feed.live() ? feed.transcript().view() : null;
 		WorkstationThread thread = key == null ? null : client.thread(key);
 		long version = Objects.hash(shown.version(), view == null ? -1 : view.version(), thread == null ? null : thread.status());
+		int accent = opts.isDefault() ? 0 : opts.accentColor(ChatTheme.warmStudio());
 		String cacheKey = shown.id() + "|" + layout.level() + "|" + layout.extent().width() + "x" + layout.extent().height()
-				+ (view == null ? "" : "|live");
+				+ (view == null ? "" : "|live") + opts.cacheKey(accent);
 		Glyphs g = glyphs.get(cacheKey);
 		if (g == null || g.version() != version) {
 			if (glyphs.size() > MAX_CACHED) {
@@ -239,9 +250,12 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 			} else if (view != null) {
 				MonitorLog.Model m = MonitorLog.of(view, thread == null ? null : thread.status(), thread == null ? null : thread.title(),
 						layout.rows(), layout.cols());
-				g = near(font, cacheKey, version, m, shown.screen(), layout);
+				g = near(font, cacheKey, version, m, shown.screen(), layout, opts.showAge());
 			} else {
-				g = nearStatic(font, cacheKey, version, shown.screen(), b.isFeed(), layout);
+				g = nearStatic(font, cacheKey, version, shown.screen(), b.isFeed(), layout, opts.showAge());
+			}
+			if (accent != 0 && g.mode() == Mode.LIVE) {
+				g = withAccent(g, 0xFF000000 | accent);
 			}
 			glyphs.put(cacheKey, g);
 			PerfStats.count(PerfStats.MONITOR_GLYPHS);
@@ -268,7 +282,12 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 	 * ("⚙ WORKING · 3m" gives "WORKING · 3m"); just the word when the age is not known.
 	 */
 	static String chipText(StationStatus st, StationScreen screen) {
-		if (screen.lines().size() > 1) {
+		return chipText(st, screen, true);
+	}
+
+	/** {@link #chipText(StationStatus, StationScreen)}, without the age when {@code withAge} is false (the monitor's showAge option). */
+	static String chipText(StationStatus st, StationScreen screen, boolean withAge) {
+		if (withAge && screen.lines().size() > 1) {
 			String line = screen.lines().get(1).text();
 			int i = line.indexOf(" · ");
 			if (i >= 0 && line.startsWith(screen.status().glyph) && screen.status() == st) {
@@ -319,10 +338,16 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 				List.of(), null, 0, false, ft.statusScale(), ft.titleScale(), st == StationStatus.ATTENTION, Mode.LIVE, null, 0, false, 0f);
 	}
 
-	private static Glyphs near(Font font, String key, long version, MonitorLog.Model m, StationScreen screen, MonitorLod.Layout l) {
+	/** {@code g} with the header band / far bands in {@code accent} instead of the status colour (the accent option). */
+	private static Glyphs withAccent(Glyphs g, int accent) {
+		return new Glyphs(g.cacheKey(), g.version(), g.background(), accent, g.title(), g.status(), g.statusColor(), g.rows(), g.footer(),
+				g.footerColor(), g.caret(), g.statusScale(), g.titleScale(), g.attention(), g.mode(), g.chip(), g.chipW(), g.topAlign(), g.logo());
+	}
+
+	private static Glyphs near(Font font, String key, long version, MonitorLog.Model m, StationScreen screen, MonitorLod.Layout l, boolean showAge) {
 		int w = (int) (l.x1() - l.x0());
 		StationStatus st = m.status();
-		String word = chipText(st, screen);
+		String word = chipText(st, screen, showAge);
 		int chipW = font.width(word) + 6;
 		List<RowGlyph> rows = new ArrayList<>(m.rows().size());
 		for (MonitorLog.Row r : m.rows()) {
@@ -340,7 +365,7 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 	 * status line (and the age) in the header's chip and stacks the rest under the header (branch, last message);
 	 * a project / environment feed ({@code feed}) keeps its own first line as the title and all the rest as rows.
 	 */
-	private static Glyphs nearStatic(Font font, String key, long version, StationScreen s, boolean feed, MonitorLod.Layout l) {
+	private static Glyphs nearStatic(Font font, String key, long version, StationScreen s, boolean feed, MonitorLod.Layout l, boolean showAge) {
 		int w = (int) (l.x1() - l.x0());
 		StationStatus st = s.status();
 		List<RowGlyph> rows = new ArrayList<>();
@@ -350,7 +375,7 @@ public final class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEn
 			StationScreen.Line line = lines.get(i);
 			rows.add(new RowGlyph(null, seq(ellipsize(font, line.text(), w), 0xFF000000 | line.color()), 0));
 		}
-		String chip = feed ? null : chipText(st, s);
+		String chip = feed ? null : chipText(st, s, showAge);
 		int chipW = chip == null ? 0 : font.width(chip) + 6;
 		return new Glyphs(key, version, 0xFF0B0D0F, 0xFF000000 | st.color, seq(ellipsize(font, title, chip == null ? w - font.width(st.word) - 14 : w), TEXT),
 				plain(st.word), 0xFF000000 | st.color, List.copyOf(rows), null, 0, false, 1f, 1f, st == StationStatus.ATTENTION,

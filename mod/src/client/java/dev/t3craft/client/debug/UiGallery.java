@@ -150,6 +150,8 @@ public final class UiGallery {
 					() -> new T3PanelScreen(null, new T3KitDemoPanel())),
 			new Scenario("inbox-kit", "The same UI kit demo inside the main T3 screen (the dialog with fields and the scrollbar drag go through T3Screen)",
 					() -> inbox(true, true).withPage(new T3KitDemoPanel())),
+			new Scenario("block-config-monitor", "Block config page of a monitor wall (fake block entity bound by hand; binding picker with search, preview, options, Reset to automatic)",
+					dev.t3craft.client.blocks.config.BlockConfigGallery::monitor),
 			new Scenario("queue", "Run queue page with fake queues (two threads, held and automatic runs, one environment read-only; buttons answer locally)",
 					() -> new QueueScreen(null, new QueuePanel(galleryQueue()))),
 			new Scenario("archive", "Archive page with fake closed threads (search, environment and project selects, Older / Refresh)",

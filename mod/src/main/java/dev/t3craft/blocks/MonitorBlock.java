@@ -35,7 +35,8 @@ import org.jspecify.annotations.Nullable;
  * The monitor: a full block whose front ({@link #FACING}) is a screen. The block model is a dark
  * bezel; the client's {@code MonitorRenderer} draws the bound thread's status on the front face.
  * Using it opens that thread's chat (client side, through {@link #setClientUse the client hook});
- * the use is consumed on both sides.
+ * the use is consumed on both sides. Sneak + right click with an empty hand opens the monitor's config page instead
+ * (the client module intercepts it before this block sees it, issue #33).
  *
  * <p><b>Large screens.</b> Monitors that touch with the same facing merge into one screen when they
  * form a full rectangle with agreeing bindings ({@link MonitorWall}). {@link #UP}/{@link #DOWN}/
