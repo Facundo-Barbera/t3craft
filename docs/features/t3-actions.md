@@ -25,8 +25,8 @@ Contrato: `~/projects/t3code-ref` @ 15fe2832.
 | Interrumpir / detener / settle | existentes: `ThreadControl` (`run.interrupt`, `thread.stop`) y `ThreadOps.settle` | operate | `docs/features/operate.md` |
 
 Componentes web que se copian (estructura y comportamiento, no código): `apps/web/src/components/chat/`
-`ComposerModelEffort`, `ProviderModelPicker`, `ModelPickerContent`, `TraitsPicker` (el effort es el
-primer descriptor `select`), `ComposerControlsBar`, `runtimeModeConfig.ts` (etiquetas Supervised /
+`ComposerModelEffort`, `ProviderModelPicker`, `ModelPickerContent`, `TraitsPicker` (Reasoning es el
+descriptor `select` con `role: "reasoning"`, o el primero), `ComposerControlsBar`, `runtimeModeConfig.ts` (etiquetas Supervised /
 Auto-accept edits / Auto / Full access); `BranchToolbarEnvModeSelector` y `WorktreeBaseBranchPicker`
 (Local / New worktree); `Sidebar.logic.ts` `resolveThreadStatusPill` (pill de estado);
 `AddProjectToMachineDialog` y el "Add project" de la paleta de comandos.
@@ -49,15 +49,28 @@ ModelPicker p = ModelPicker.forNewThread(font, env, pick -> …);               
 p.setBounds(x, y, w, h);
 p.render(g, mouseX, mouseY);          // al final: el popup se dibuja encima
 p.mouseClicked(x, y, button);         // primero: con el popup abierto consume los clics
-p.keyPressed(keyEvent);               // Esc cierra
-p.mouseScrolled(x, y, dy);            // scroll de la lista de modelos
+p.keyPressed(keyEvent);               // Esc cierra; teclas de edición al buscador
+p.charTyped(codepoint);               // caracteres al buscador
+p.mouseScrolled(x, y, dy);            // scroll de las listas
 p.setEnv(env);                        // solo en forNewThread
 p.pick(); p.isOpen(); p.close(); p.enabled(); p.logic();
 ```
-- Cerrado se muestra como un chip `Provider · Modelo · Effort ▾` (más `· Plan` si aplica). Abierto,
-  el popup va hacia arriba si el chip está en la mitad inferior de la pantalla: providers a la
-  izquierda, modelos a la derecha y filas de Effort, Access (runtime) y Mode (Chat/Plan, solo si el
-  provider expone el toggle).
+- Cerrado se muestra como un chip `Provider · Modelo · Reasoning ▾` (más `· Plan` si el pick está en
+  plan). Abierto (#21), el popover va hacia arriba si el chip está en la mitad inferior de la pantalla
+  y se compone solo con el kit (`T3Field`, `T3List`, `T3Select`, `T3Toggle`, `T3Button`) y tokens de
+  `ChatTheme`:
+  - buscador arriba (filtra por nombre, slug, alias, sub-provider y badge del provider elegido;
+    Enter elige el primero);
+  - providers a la izquierda (lista con scroll) y modelos a la derecha: favoritos primero (cuadrado
+    brass a la izquierda de la fila; se guardan en `config/t3craft/model-favorites.json`, clave
+    `envId/instanceId/slug`, con `FavoritesStore`, el mismo que usa el navegador de piezas), luego el
+    orden de T3; los `isLegacy` quedan tras "Show legacy (N)" (una búsqueda también los recorre);
+    `badge`, `subProvider` e `isCustom` se muestran en la fila;
+  - debajo, los controles del modelo: un `T3Select` para el descriptor de Reasoning, otro `T3Select`
+    por cada select extra y un `T3Toggle` por cada descriptor booleano (fast, thinking...). Salen en
+    `modelSelection.options` como `ProviderOptionSelection` (`id`, `value` string o boolean);
+  - Access: `T3Select` con todos los `supportedRuntimeModes` del provider; la descripción del modo
+    elegido es su tooltip. Ya no hay fila Mode (Chat/Plan) en el popover.
 - `forThread`: los cambios quedan en espera hasta "Apply", que manda solo los comandos que cambiaron
   (`ModelPickerLogic.changed()`). El listener se llama cuando T3 los acepta. `current` sale de
   `ModelPick.fromThreadJson(threadObj)` si el host tiene el objeto del hilo (con
@@ -67,7 +80,9 @@ p.pick(); p.isOpen(); p.close(); p.enabled(); p.logic();
 - `forNewThread`: cada cambio se guarda como valor por defecto del entorno
   (`ProviderService.setDefaultPick`, en memoria durante la sesión) y llega al listener de inmediato.
 - El catálogo se pide al abrir (`server.getConfig`) y se cachea 60 s. Mientras carga, muestra
-  "Loading models…"; si T3 no expone modelos, muestra "No models".
+  "Loading models..."; si T3 no expone modelos, muestra "No models".
+- Escenario de galería: `/t3dev ui model-picker` (catálogo falso con selects, switches, legacy,
+  favoritos reales y más providers que filas).
 
 ### `ThreadStatusChip` (widget) y `ThreadStatus` (lógica)
 ```java
@@ -115,13 +130,17 @@ cuentan solo los hilos de primer nivel.
 
 ### Lógica pura reutilizable
 - `ProviderCatalog.fromServerConfig(json)`: providers e instancias (`selectable()` = enabled,
-  installed, no unavailable y con modelos), modelos (`defaultModel()` = `isDefault` o el primero) y
-  effort (`Effort.defaultValue()` = `currentValue` o la opción por defecto).
-- `ModelPickerLogic`: al cambiar de provider se queda con su modelo por defecto y el effort por
-  defecto; al cambiar de modelo mantiene el effort si existe en el nuevo; el runtime se ajusta a
-  `supportedRuntimeModes`; plan solo con `showInteractionModeToggle`; `changed()`, `commit()` y
+  installed, no unavailable y con modelos), modelos (`defaultModel()` = `isDefault` o el primero;
+  `isLegacy`, `badge`, `aliases`, `subProvider`, `isCustom`) y sus descriptores de opciones
+  (`Option`: select o boolean; `Model.reasoning()`, `extraSelects()`, `toggles()`;
+  `Option.defaultValue()` = `currentValue` o la opción por defecto).
+- `ModelPickerLogic`: al cambiar de provider se queda con su modelo por defecto y las opciones por
+  defecto; al cambiar de modelo mantiene cada opción que existe en el nuevo con un valor válido; el
+  runtime se ajusta a `supportedRuntimeModes`; `selectOption`, `setToggle`, `modelView` (búsqueda,
+  favoritos primero, legacy); plan solo con `showInteractionModeToggle`; `changed()`, `commit()` y
   `reset()`.
-- `ModelPick.modelSelection()`: `{instanceId, model, options?: [{id, value}]}`.
+- `ModelPick.modelSelection()`: `{instanceId, model, options?: [{id, value}]}` con todas las
+  opciones elegidas (`ProviderOptionSelection`).
 - `ThreadCommands`: `configure(...)` y `archive(...)`.
 - `NewThreadForm` / `RegisterProjectForm`: validación y payload.
 - `ProviderService`: caché por entorno (TTL 60 s, reintento a los 5 s si falla) y valor por defecto

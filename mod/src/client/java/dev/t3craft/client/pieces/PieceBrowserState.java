@@ -1,16 +1,6 @@
 package dev.t3craft.client.pieces;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import dev.t3craft.T3Craft;
-import dev.t3craft.client.ModConfig;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Set;
-import java.util.TreeSet;
+import dev.t3craft.client.FavoritesStore;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -51,7 +41,6 @@ public final class PieceBrowserState {
 		}
 	}
 
-	private static final Gson GSON = new Gson();
 	private static final PieceBrowserState INSTANCE = new PieceBrowserState();
 
 	// ---- filters ---------------------------------------------------------------------------------------
@@ -76,8 +65,7 @@ public final class PieceBrowserState {
 	/** Stay in the browser after asking for a preview (default: close it so the piece is on screen). */
 	public boolean keepOpen;
 
-	private final Set<String> favorites = new TreeSet<>();
-	private boolean favoritesLoaded;
+	private final FavoritesStore favorites = new FavoritesStore("piece-favorites.json", "piece browser");
 
 	private PieceBrowserState() {
 	}
@@ -102,63 +90,16 @@ public final class PieceBrowserState {
 
 	// ---- favorites ---------------------------------------------------------------------------------------
 
-	public synchronized boolean isFavorite(String id) {
-		loadFavorites();
-		return favorites.contains(id);
+	public boolean isFavorite(String id) {
+		return favorites.isFavorite(id);
 	}
 
-	public synchronized int favoriteCount() {
-		loadFavorites();
-		return favorites.size();
+	public int favoriteCount() {
+		return favorites.count();
 	}
 
 	/** Flips the favorite flag of {@code id}; returns the new value. */
-	public synchronized boolean toggleFavorite(String id) {
-		loadFavorites();
-		boolean now = favorites.add(id);
-		if (!now) {
-			favorites.remove(id);
-		}
-		saveFavorites();
-		return now;
-	}
-
-	private static Path favoritesFile() {
-		return ModConfig.dataDir().resolve("piece-favorites.json");
-	}
-
-	private void loadFavorites() {
-		if (favoritesLoaded) {
-			return;
-		}
-		favoritesLoaded = true;
-		Path f = favoritesFile();
-		if (!Files.isRegularFile(f)) {
-			return;
-		}
-		try {
-			JsonArray a = GSON.fromJson(Files.readString(f, StandardCharsets.UTF_8), JsonArray.class);
-			if (a != null) {
-				for (JsonElement e : a) {
-					if (e.isJsonPrimitive()) {
-						favorites.add(e.getAsString());
-					}
-				}
-			}
-		} catch (IOException | RuntimeException e) {
-			T3Craft.LOGGER.warn("piece browser: could not read {}", f, e);
-		}
-	}
-
-	private void saveFavorites() {
-		Path f = favoritesFile();
-		try {
-			Files.createDirectories(f.getParent());
-			JsonArray a = new JsonArray();
-			favorites.forEach(a::add);
-			Files.writeString(f, GSON.toJson(a), StandardCharsets.UTF_8);
-		} catch (IOException e) {
-			T3Craft.LOGGER.warn("piece browser: could not write {}", f, e);
-		}
+	public boolean toggleFavorite(String id) {
+		return favorites.toggle(id);
 	}
 }

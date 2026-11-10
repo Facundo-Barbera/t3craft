@@ -111,6 +111,12 @@ final class ModelPickerControl implements ComposerView.Control, T3Slots.Popup {
 		return picker != null && picker.mouseScrolled(mx, my, dy);
 	}
 
+	/** The popover's search box. */
+	@Override
+	public boolean charTyped(int codepoint) {
+		return picker != null && picker.charTyped(codepoint);
+	}
+
 	/** T3's access chip ("Full access", "Auto"…): only when not the default; opens the picker. */
 	ComposerView.Control access() {
 		return new ComposerView.Control() {

@@ -2,14 +2,18 @@
   "providers": [
     {
       "instanceId": "claudeAgent", "driver": "claudeAgent", "displayName": "Claude",
-      "supportedRuntimeModes": ["approval-required", "auto-accept-edits", "full-access"],
+      "supportedRuntimeModes": ["approval-required", "auto-accept-edits", "auto", "full-access"],
       "showInteractionModeToggle": true,
       "models": [
-        {"slug": "claude-opus-5-5", "name": "Claude Opus 5.5", "shortName": "Opus 5.5", "isDefault": true,
-         "capabilities": {"optionDescriptors": [{"type": "select", "id": "effort", "label": "Effort",
-           "options": [{"id": "low", "label": "Low"}, {"id": "medium", "label": "Medium", "isDefault": true}, {"id": "high", "label": "High"}, {"id": "max", "label": "Max"}]}]}},
+        {"slug": "claude-opus-5-5", "name": "Claude Opus 5.5", "shortName": "Opus 5.5", "isDefault": true, "badge": "New",
+         "capabilities": {"optionDescriptors": [
+           {"type": "select", "id": "effort", "label": "Effort", "role": "reasoning",
+            "options": [{"id": "low", "label": "Low"}, {"id": "medium", "label": "Medium", "isDefault": true}, {"id": "high", "label": "High"}, {"id": "max", "label": "Max"}]},
+           {"type": "boolean", "id": "fastMode", "label": "Fast mode", "description": "Faster output at a higher price."}]}},
         {"slug": "claude-sonnet-5-5", "name": "Claude Sonnet 5.5", "shortName": "Sonnet 5.5"},
-        {"slug": "claude-haiku-5-5", "name": "Claude Haiku 5.5", "shortName": "Haiku 5.5"}
+        {"slug": "claude-haiku-5-5", "name": "Claude Haiku 5.5", "shortName": "Haiku 5.5"},
+        {"slug": "claude-opus-4-1", "name": "Claude Opus 4.1", "shortName": "Opus 4.1", "isLegacy": true},
+        {"slug": "claude-sonnet-4", "name": "Claude Sonnet 4", "shortName": "Sonnet 4", "isLegacy": true}
       ]
     },
     {

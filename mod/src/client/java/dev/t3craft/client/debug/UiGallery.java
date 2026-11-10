@@ -91,6 +91,8 @@ public final class UiGallery {
 					() -> inbox(true, true).withPage(new dev.t3craft.client.pieces.PieceBrowserPanel())),
 			new Scenario("icons", "Icon gallery: every T3Icon (Lucide) in a grid on both themes, 12 px in its three states and 32 px; wheel scrolls",
 					() -> new IconGalleryScreen(null)),
+			new Scenario("model-picker", "The composer's model picker open over a fake catalog (reasoning and extra selects, switches, access, favorites, legacy, many providers)",
+					ModelPickerGalleryScreen::new),
 			new Scenario("queue", "Queued runs (reads the live queue, empty without a connection)", () -> new QueueScreen(null, null)));
 
 	private UiGallery() {

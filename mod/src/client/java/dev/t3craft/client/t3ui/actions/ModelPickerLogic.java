@@ -1,8 +1,12 @@
 package dev.t3craft.client.t3ui.actions;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
+import java.util.function.Predicate;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -10,8 +14,8 @@ import org.jspecify.annotations.Nullable;
  * Behaviour copied from T3 Code's composer ({@code ProviderModelPicker}, {@code ModelPickerContent},
  * {@code TraitsPicker}, {@code ComposerControlsBar}):
  * <ul>
- *   <li>choosing a provider selects its default model (or the first one) and that model's default effort;</li>
- *   <li>choosing a model keeps the effort if the new model offers the same value, else falls back to its default;</li>
+ *   <li>choosing a provider selects its default model (or the first one) and that model's default options;</li>
+ *   <li>choosing a model keeps every option the new model also has with a valid value, the rest fall back to their default;</li>
  *   <li>the runtime mode is clamped to what the provider supports; plan mode only when the provider shows the toggle;</li>
  *   <li>{@link #changed()} says which dimensions the player touched, so applying to a thread only
  *   sends the commands that changed.</li>
@@ -19,9 +23,16 @@ import org.jspecify.annotations.Nullable;
  * Pure: no Minecraft, no network.
  */
 public final class ModelPickerLogic {
+	/** The models the list shows for a search and the legacy switch ({@link #modelView}). */
+	public record ModelView(List<ProviderCatalog.Model> models, int legacyCount) {
+		public ModelView {
+			models = List.copyOf(models);
+		}
+	}
+
 	/** What {@code thread.*.set} command a change maps to. */
 	public enum Dimension {
-		/** {@code thread.model-selection.set} (provider, model or effort). */
+		/** {@code thread.model-selection.set} (provider, model or options). */
 		MODEL,
 		/** {@code thread.runtime-mode.set}. */
 		RUNTIME,
@@ -120,9 +131,47 @@ public final class ModelPickerLogic {
 		return p == null ? List.of() : p.models();
 	}
 
-	public ProviderCatalog.@Nullable Effort effort() {
-		ProviderCatalog.Model m = model();
-		return m == null ? null : m.effort();
+	/**
+	 * The models of the current provider the list shows, favorites first, then the rest in T3's order, legacy last.
+	 * A search ({@code query}: every word must be in the label, name, slug, alias, sub-provider or badge) looks through
+	 * the legacy models too; without one they are hidden unless {@code showLegacy} (the selected model always shows).
+	 * {@link ModelView#legacyCount()} is how many legacy models the provider has, 0 while searching (no switch then).
+	 */
+	public ModelView modelView(String query, boolean showLegacy, Predicate<ProviderCatalog.Model> favorite) {
+		String[] words = query.toLowerCase(Locale.ROOT).trim().split("\\s+");
+		boolean searching = !query.isBlank();
+		String selected = pick == null ? null : pick.model();
+		int legacy = 0;
+		List<ProviderCatalog.Model> out = new ArrayList<>();
+		for (ProviderCatalog.Model m : models()) {
+			if (m.isLegacy() && !searching) {
+				legacy++;
+			}
+			boolean visible = searching ? matches(m, words) : !m.isLegacy() || showLegacy || m.slug().equals(selected);
+			if (visible) {
+				out.add(m);
+			}
+		}
+		out.sort(Comparator.comparingInt(m -> favorite.test(m) ? 0 : m.isLegacy() ? 2 : 1)); // stable: T3's order inside each group
+		return new ModelView(out, legacy);
+	}
+
+	private static boolean matches(ProviderCatalog.Model m, String[] words) {
+		StringBuilder hay = new StringBuilder(m.label()).append(' ').append(m.name()).append(' ').append(m.slug());
+		m.aliases().forEach(a -> hay.append(' ').append(a));
+		if (m.subProvider() != null) {
+			hay.append(' ').append(m.subProvider());
+		}
+		if (m.badge() != null) {
+			hay.append(' ').append(m.badge());
+		}
+		String h = hay.toString().toLowerCase(Locale.ROOT);
+		for (String w : words) {
+			if (!w.isEmpty() && !h.contains(w)) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	public List<Modes.Runtime> runtimeModes() {
@@ -159,23 +208,41 @@ public final class ModelPickerLogic {
 			return false;
 		}
 		ModelPick before = pick;
-		ProviderCatalog.Effort e = m.effort();
-		String keep = e != null && e.has(pick.effortValue()) ? pick.effortValue() : e == null ? null : e.defaultValue();
-		pick = new ModelPick(p.instanceId(), m.slug(), e == null ? null : e.id(), keep, pick.runtime(), pick.interaction());
+		pick = new ModelPick(p.instanceId(), m.slug(), defaultOptions(m, pick), pick.runtime(), pick.interaction());
 		mark(before);
 		return true;
 	}
 
-	/** {@code value} null = the model's default effort (no option sent). */
-	public boolean selectEffort(@Nullable String value) {
-		ProviderCatalog.Effort e = effort();
-		if (pick == null || e == null || (value != null && !e.has(value))) {
+	/** Select option {@code id} to {@code value}; null = the option's default (nothing is sent for it). */
+	public boolean selectOption(String id, @Nullable String value) {
+		ProviderCatalog.Model m = model();
+		ProviderCatalog.Option o = m == null ? null : m.option(id);
+		if (pick == null || o == null || !o.isSelect() || (value != null && !o.has(value))) {
 			return false;
 		}
 		ModelPick before = pick;
-		pick = pick.withEffort(e.id(), value);
+		pick = value == null ? pick.withoutOption(id) : pick.withOption(ProviderOptionSelection.of(id, value));
 		mark(before);
 		return true;
+	}
+
+	/** Boolean option {@code id} on or off. */
+	public boolean setToggle(String id, boolean on) {
+		ProviderCatalog.Model m = model();
+		ProviderCatalog.Option o = m == null ? null : m.option(id);
+		if (pick == null || o == null || o.isSelect()) {
+			return false;
+		}
+		ModelPick before = pick;
+		pick = pick.withOption(ProviderOptionSelection.of(id, on));
+		mark(before);
+		return true;
+	}
+
+	/** The value a boolean option shows now: the chosen one, else the descriptor's current value, else off. */
+	public boolean toggleValue(ProviderCatalog.Option o) {
+		ProviderOptionSelection s = pick == null ? null : pick.option(o.id());
+		return s != null ? s.bool() : Boolean.TRUE.equals(o.currentBool());
 	}
 
 	public boolean selectRuntime(Modes.Runtime r) {
@@ -229,10 +296,31 @@ public final class ModelPickerLogic {
 		if (m == null) {
 			throw new IllegalArgumentException("provider without models");
 		}
-		ProviderCatalog.Effort e = m.effort();
 		List<Modes.Runtime> rs = p.runtimeModes();
 		Modes.Runtime r = rs.contains(runtime) ? runtime : rs.contains(Modes.Runtime.DEFAULT) ? Modes.Runtime.DEFAULT : rs.getFirst();
 		Modes.Interaction i = p.showInteractionModeToggle() ? interaction : Modes.Interaction.DEFAULT;
-		return new ModelPick(p.instanceId(), m.slug(), e == null ? null : e.id(), e == null ? null : e.defaultValue(), r, i);
+		return new ModelPick(p.instanceId(), m.slug(), defaultOptions(m, null), r, i);
+	}
+
+	/**
+	 * The options {@code m} starts with: what {@code previous} had chosen when {@code m} has the same option with a
+	 * valid value, else a select's default (when it has one) and a boolean's current value (when T3 sends one).
+	 */
+	static List<ProviderOptionSelection> defaultOptions(ProviderCatalog.Model m, @Nullable ModelPick previous) {
+		List<ProviderOptionSelection> out = new ArrayList<>();
+		for (ProviderCatalog.Option o : m.options()) {
+			ProviderOptionSelection kept = previous == null ? null : previous.option(o.id());
+			if (o.isSelect()) {
+				String v = kept != null && o.has(kept.string()) ? kept.string() : o.defaultValue();
+				if (v != null) {
+					out.add(ProviderOptionSelection.of(o.id(), v));
+				}
+			} else if (kept != null && kept.value() instanceof Boolean) {
+				out.add(kept);
+			} else if (o.currentBool() != null) {
+				out.add(ProviderOptionSelection.of(o.id(), o.currentBool()));
+			}
+		}
+		return out;
 	}
 }
