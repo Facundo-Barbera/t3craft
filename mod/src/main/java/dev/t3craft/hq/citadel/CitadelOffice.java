@@ -793,7 +793,6 @@ public final class CitadelOffice {
 		set(c, 2, y + 2, -6, wallBanner(Direction.SOUTH));
 		sign(c, CX() - 4, y + 2, CZ() - 6, Direction.SOUTH, DyeColor.ORANGE, "", "Taller", "mesas y yunque", "");
 		sign(c, CX() + 4, y + 2, CZ() - 6, Direction.SOUTH, DyeColor.ORANGE, "", "Fundicion", "y almacen", "");
-		sign(c, CX(), F0() + 5, CZ() - E, Direction.NORTH, DyeColor.ORANGE, "", "Facundo", "Oficina", "");
 		// struct/leader-office6, the rest corner by the door (north-east, off every route): a bench of two seats against the north wall
 		// looking out over the entrance, a smoker and a barrel of drinks as a counter, a lantern on it and a plaque
 		set(c, 4, y, -6, stairs(Blocks.DARK_OAK_STAIRS, Direction.NORTH)); // dark, so it reads against the floor; one cell off the rug
@@ -801,7 +800,6 @@ public final class CitadelOffice {
 		set(c, 6, y, -6, facing(Blocks.SMOKER, Direction.SOUTH));
 		set(c, 6, y, -5, barrel());
 		set(c, 6, y + 1, -5, lantern(false));
-		sign(c, CX() + 6, y + 2, CZ() - 6, Direction.SOUTH, DyeColor.ORANGE, "", "Descanso", "comida y bebida", "");
 		for (int[] p : new int[][] {{-4, -4}, {4, -4}, {0, -4}, {-2, 0}, {2, 0}, {-4, 4}, {4, 4}, {0, 5}, {-5, 0}, {5, 0}}) {
 			hang(c, p[0], F1() - 1, p[1]);
 		}
@@ -867,7 +865,6 @@ public final class CitadelOffice {
 		}
 		set(c, 2, y + 3, 6, wallBanner(Direction.NORTH));
 		set(c, 4, y + 3, 6, wallBanner(Direction.NORTH));
-		sign(c, CX() + 3, y + 3, CZ() + 6, Direction.NORTH, DyeColor.ORANGE, "", "Archivo", "", "");
 		// north-east corner: a bed and a chest of its own, a jukebox; the cells in front of the east door (dz -4..-3) stay free
 		set(c, 6, y, -6, facing(Blocks.BED.pick(BED), Direction.NORTH).setValue(BlockStateProperties.BED_PART, BedPart.HEAD));
 		set(c, 6, y, -5, facing(Blocks.BED.pick(BED), Direction.NORTH).setValue(BlockStateProperties.BED_PART, BedPart.FOOT));
@@ -928,7 +925,6 @@ public final class CitadelOffice {
 		}
 		bayHeader(c, CX() - 6, y + 3, CZ() - 4, Direction.Axis.Z, Direction.EAST, "", "Sala de", "lectura", "");
 		bayHeader(c, CX() - 6, y + 3, CZ() + 3, Direction.Axis.Z, Direction.EAST, "", "Estudio", "", "");
-		sign(c, CX(), y, CZ() + 3, Direction.SOUTH, DyeColor.ORANGE, "", "Maqueta del HQ", "plano de la ciudad", "");
 		for (int[] p : new int[][] {{-3, -4}, {0, -4}, {3, -4}, {-3, 4}, {0, 4}, {3, 4}, {-3, 0}}) {
 			hang(c, p[0], F2() - 1, p[1]);
 		}
@@ -994,7 +990,6 @@ public final class CitadelOffice {
 		for (int dx : new int[] {-5, -3, -1, 1, 3, 5}) {
 			c.fixture(new BlockPos(CX() + dx, F2() + 2, CZ() + H), CitadelCanvas.RIB);
 		}
-		sign(c, CX(), F2() + 8, CZ() + H, Direction.NORTH, DyeColor.ORANGE, "", "Facundo", "Hilos", "");
 		// project screens: two 5 x 5 on the west wall, same crown line, chests under them
 		List<String> projects = projectBindings(c, 2);
 		CitadelHub.bigScreen(c, new HqGeometry.Surface(new BlockPos(CX() - H, F2() + 3, CZ() + 5), Direction.NORTH, Direction.EAST, 5, 5),
@@ -1252,8 +1247,6 @@ public final class CitadelOffice {
 		set(c, 4, y, z, chest(Direction.SOUTH, ChestType.RIGHT));
 		set(c, 5, y, z, chest(Direction.SOUTH, ChestType.LEFT));
 		set(c, 6, y, z, barrel());
-		sign(c, CX() + 3, y + 4, CZ() + z, Direction.SOUTH, DyeColor.ORANGE, "", "Mapa de", "la ciudadela", "");
-		sign(c, CX() + 5, y + 4, CZ() + z, Direction.SOUTH, DyeColor.ORANGE, "", "Suministros", "mesa, yunque", "cofres");
 	}
 
 	/**
@@ -1316,14 +1309,13 @@ public final class CitadelOffice {
 			set(c, dx, f + 1, -12, cherryStairs(Direction.SOUTH, false));
 		}
 		// the copper spyglass on a pedestal at the rail (dx 4): a block of cut copper, a tube of two cut copper slabs lying north with a finder rod on top and
-		// a copper grate as the lens over the rail post; the observer stands at (4, -10) with its plaque in front
+		// a copper grate as the lens over the rail post; the observer stands at (4, -10)
 		set(c, 4, f + 1, -11, Blocks.CUT_COPPER.waxed().unaffected().defaultBlockState());
 		BlockState tube = Blocks.CUT_COPPER_SLAB.waxed().unaffected().defaultBlockState().setValue(BlockStateProperties.SLAB_TYPE, SlabType.BOTTOM);
 		set(c, 4, f + 2, -11, tube);
 		set(c, 4, f + 2, -12, tube);
 		set(c, 4, f + 3, -11, Blocks.LIGHTNING_ROD.waxed().unaffected().defaultBlockState().setValue(BlockStateProperties.FACING, Direction.UP));
 		set(c, 4, f + 2, -13, Blocks.COPPER_GRATE.waxed().unaffected().defaultBlockState());
-		sign(c, CX() + 4, f + 1, CZ() - 10, Direction.SOUTH, DyeColor.ORANGE, "", "Mirador", "", "");
 		// the open-air meeting table (dx -6..-4, dz -11): three low table cells, seats on both long sides and at the ends
 		for (int dx = -6; dx <= -4; dx++) {
 			table(c, dx, f + 1, -11);

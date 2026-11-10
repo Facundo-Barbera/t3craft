@@ -1,64 +1,52 @@
 {
-  "variants": {
-    "facing=east,half=bottom,tone=cool": {
-      "model": "t3craft:block/glow_strip_bottom_cool",
-      "y": 90
-    },
-    "facing=east,half=bottom,tone=warm": {
-      "model": "t3craft:block/glow_strip_bottom_warm",
-      "y": 90
-    },
-    "facing=east,half=top,tone=cool": {
-      "model": "t3craft:block/glow_strip_top_cool",
-      "y": 90
-    },
-    "facing=east,half=top,tone=warm": {
-      "model": "t3craft:block/glow_strip_top_warm",
-      "y": 90
-    },
-    "facing=north,half=bottom,tone=cool": {
-      "model": "t3craft:block/glow_strip_bottom_cool"
-    },
-    "facing=north,half=bottom,tone=warm": {
-      "model": "t3craft:block/glow_strip_bottom_warm"
-    },
-    "facing=north,half=top,tone=cool": {
-      "model": "t3craft:block/glow_strip_top_cool"
-    },
-    "facing=north,half=top,tone=warm": {
-      "model": "t3craft:block/glow_strip_top_warm"
-    },
-    "facing=south,half=bottom,tone=cool": {
-      "model": "t3craft:block/glow_strip_bottom_cool",
-      "y": 180
-    },
-    "facing=south,half=bottom,tone=warm": {
-      "model": "t3craft:block/glow_strip_bottom_warm",
-      "y": 180
-    },
-    "facing=south,half=top,tone=cool": {
-      "model": "t3craft:block/glow_strip_top_cool",
-      "y": 180
-    },
-    "facing=south,half=top,tone=warm": {
-      "model": "t3craft:block/glow_strip_top_warm",
-      "y": 180
-    },
-    "facing=west,half=bottom,tone=cool": {
-      "model": "t3craft:block/glow_strip_bottom_cool",
-      "y": 270
-    },
-    "facing=west,half=bottom,tone=warm": {
-      "model": "t3craft:block/glow_strip_bottom_warm",
-      "y": 270
-    },
-    "facing=west,half=top,tone=cool": {
-      "model": "t3craft:block/glow_strip_top_cool",
-      "y": 270
-    },
-    "facing=west,half=top,tone=warm": {
-      "model": "t3craft:block/glow_strip_top_warm",
-      "y": 270
-    }
-  }
+  "multipart": [
+    {"when": {"facing": "north", "half": "bottom", "tone": "warm"}, "apply": {"model": "t3craft:block/glow_strip_bottom_warm"}},
+    {"when": {"facing": "north", "half": "bottom", "tone": "warm", "left": "true"}, "apply": {"model": "t3craft:block/glow_strip_leg_bottom_warm_l"}},
+    {"when": {"facing": "north", "half": "bottom", "tone": "warm", "right": "true"}, "apply": {"model": "t3craft:block/glow_strip_leg_bottom_warm_r"}},
+    {"when": {"facing": "north", "half": "bottom", "tone": "cool"}, "apply": {"model": "t3craft:block/glow_strip_bottom_cool"}},
+    {"when": {"facing": "north", "half": "bottom", "tone": "cool", "left": "true"}, "apply": {"model": "t3craft:block/glow_strip_leg_bottom_cool_l"}},
+    {"when": {"facing": "north", "half": "bottom", "tone": "cool", "right": "true"}, "apply": {"model": "t3craft:block/glow_strip_leg_bottom_cool_r"}},
+    {"when": {"facing": "north", "half": "top", "tone": "warm"}, "apply": {"model": "t3craft:block/glow_strip_top_warm"}},
+    {"when": {"facing": "north", "half": "top", "tone": "warm", "left": "true"}, "apply": {"model": "t3craft:block/glow_strip_leg_top_warm_l"}},
+    {"when": {"facing": "north", "half": "top", "tone": "warm", "right": "true"}, "apply": {"model": "t3craft:block/glow_strip_leg_top_warm_r"}},
+    {"when": {"facing": "north", "half": "top", "tone": "cool"}, "apply": {"model": "t3craft:block/glow_strip_top_cool"}},
+    {"when": {"facing": "north", "half": "top", "tone": "cool", "left": "true"}, "apply": {"model": "t3craft:block/glow_strip_leg_top_cool_l"}},
+    {"when": {"facing": "north", "half": "top", "tone": "cool", "right": "true"}, "apply": {"model": "t3craft:block/glow_strip_leg_top_cool_r"}},
+    {"when": {"facing": "east", "half": "bottom", "tone": "warm"}, "apply": {"model": "t3craft:block/glow_strip_bottom_warm", "y": 90}},
+    {"when": {"facing": "east", "half": "bottom", "tone": "warm", "left": "true"}, "apply": {"model": "t3craft:block/glow_strip_leg_bottom_warm_l", "y": 90}},
+    {"when": {"facing": "east", "half": "bottom", "tone": "warm", "right": "true"}, "apply": {"model": "t3craft:block/glow_strip_leg_bottom_warm_r", "y": 90}},
+    {"when": {"facing": "east", "half": "bottom", "tone": "cool"}, "apply": {"model": "t3craft:block/glow_strip_bottom_cool", "y": 90}},
+    {"when": {"facing": "east", "half": "bottom", "tone": "cool", "left": "true"}, "apply": {"model": "t3craft:block/glow_strip_leg_bottom_cool_l", "y": 90}},
+    {"when": {"facing": "east", "half": "bottom", "tone": "cool", "right": "true"}, "apply": {"model": "t3craft:block/glow_strip_leg_bottom_cool_r", "y": 90}},
+    {"when": {"facing": "east", "half": "top", "tone": "warm"}, "apply": {"model": "t3craft:block/glow_strip_top_warm", "y": 90}},
+    {"when": {"facing": "east", "half": "top", "tone": "warm", "left": "true"}, "apply": {"model": "t3craft:block/glow_strip_leg_top_warm_l", "y": 90}},
+    {"when": {"facing": "east", "half": "top", "tone": "warm", "right": "true"}, "apply": {"model": "t3craft:block/glow_strip_leg_top_warm_r", "y": 90}},
+    {"when": {"facing": "east", "half": "top", "tone": "cool"}, "apply": {"model": "t3craft:block/glow_strip_top_cool", "y": 90}},
+    {"when": {"facing": "east", "half": "top", "tone": "cool", "left": "true"}, "apply": {"model": "t3craft:block/glow_strip_leg_top_cool_l", "y": 90}},
+    {"when": {"facing": "east", "half": "top", "tone": "cool", "right": "true"}, "apply": {"model": "t3craft:block/glow_strip_leg_top_cool_r", "y": 90}},
+    {"when": {"facing": "south", "half": "bottom", "tone": "warm"}, "apply": {"model": "t3craft:block/glow_strip_bottom_warm", "y": 180}},
+    {"when": {"facing": "south", "half": "bottom", "tone": "warm", "left": "true"}, "apply": {"model": "t3craft:block/glow_strip_leg_bottom_warm_l", "y": 180}},
+    {"when": {"facing": "south", "half": "bottom", "tone": "warm", "right": "true"}, "apply": {"model": "t3craft:block/glow_strip_leg_bottom_warm_r", "y": 180}},
+    {"when": {"facing": "south", "half": "bottom", "tone": "cool"}, "apply": {"model": "t3craft:block/glow_strip_bottom_cool", "y": 180}},
+    {"when": {"facing": "south", "half": "bottom", "tone": "cool", "left": "true"}, "apply": {"model": "t3craft:block/glow_strip_leg_bottom_cool_l", "y": 180}},
+    {"when": {"facing": "south", "half": "bottom", "tone": "cool", "right": "true"}, "apply": {"model": "t3craft:block/glow_strip_leg_bottom_cool_r", "y": 180}},
+    {"when": {"facing": "south", "half": "top", "tone": "warm"}, "apply": {"model": "t3craft:block/glow_strip_top_warm", "y": 180}},
+    {"when": {"facing": "south", "half": "top", "tone": "warm", "left": "true"}, "apply": {"model": "t3craft:block/glow_strip_leg_top_warm_l", "y": 180}},
+    {"when": {"facing": "south", "half": "top", "tone": "warm", "right": "true"}, "apply": {"model": "t3craft:block/glow_strip_leg_top_warm_r", "y": 180}},
+    {"when": {"facing": "south", "half": "top", "tone": "cool"}, "apply": {"model": "t3craft:block/glow_strip_top_cool", "y": 180}},
+    {"when": {"facing": "south", "half": "top", "tone": "cool", "left": "true"}, "apply": {"model": "t3craft:block/glow_strip_leg_top_cool_l", "y": 180}},
+    {"when": {"facing": "south", "half": "top", "tone": "cool", "right": "true"}, "apply": {"model": "t3craft:block/glow_strip_leg_top_cool_r", "y": 180}},
+    {"when": {"facing": "west", "half": "bottom", "tone": "warm"}, "apply": {"model": "t3craft:block/glow_strip_bottom_warm", "y": 270}},
+    {"when": {"facing": "west", "half": "bottom", "tone": "warm", "left": "true"}, "apply": {"model": "t3craft:block/glow_strip_leg_bottom_warm_l", "y": 270}},
+    {"when": {"facing": "west", "half": "bottom", "tone": "warm", "right": "true"}, "apply": {"model": "t3craft:block/glow_strip_leg_bottom_warm_r", "y": 270}},
+    {"when": {"facing": "west", "half": "bottom", "tone": "cool"}, "apply": {"model": "t3craft:block/glow_strip_bottom_cool", "y": 270}},
+    {"when": {"facing": "west", "half": "bottom", "tone": "cool", "left": "true"}, "apply": {"model": "t3craft:block/glow_strip_leg_bottom_cool_l", "y": 270}},
+    {"when": {"facing": "west", "half": "bottom", "tone": "cool", "right": "true"}, "apply": {"model": "t3craft:block/glow_strip_leg_bottom_cool_r", "y": 270}},
+    {"when": {"facing": "west", "half": "top", "tone": "warm"}, "apply": {"model": "t3craft:block/glow_strip_top_warm", "y": 270}},
+    {"when": {"facing": "west", "half": "top", "tone": "warm", "left": "true"}, "apply": {"model": "t3craft:block/glow_strip_leg_top_warm_l", "y": 270}},
+    {"when": {"facing": "west", "half": "top", "tone": "warm", "right": "true"}, "apply": {"model": "t3craft:block/glow_strip_leg_top_warm_r", "y": 270}},
+    {"when": {"facing": "west", "half": "top", "tone": "cool"}, "apply": {"model": "t3craft:block/glow_strip_top_cool", "y": 270}},
+    {"when": {"facing": "west", "half": "top", "tone": "cool", "left": "true"}, "apply": {"model": "t3craft:block/glow_strip_leg_top_cool_l", "y": 270}},
+    {"when": {"facing": "west", "half": "top", "tone": "cool", "right": "true"}, "apply": {"model": "t3craft:block/glow_strip_leg_top_cool_r", "y": 270}}
+  ]
 }

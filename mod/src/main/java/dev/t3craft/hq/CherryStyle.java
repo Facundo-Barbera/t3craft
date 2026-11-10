@@ -18,7 +18,6 @@ import java.util.EnumMap;
 import java.util.Map;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -176,10 +175,6 @@ final class CherryStyle extends HqStyle {
 		return hanging || !custom() ? Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, hanging) : kit().lantern();
 	}
 
-	private BlockState plaque(Direction facing) {
-		return kit().plaque(facing);
-	}
-
 	private BlockState petals(int amount, Direction facing) {
 		return Blocks.PINK_PETALS.defaultBlockState().setValue(BlockStateProperties.FLOWER_AMOUNT, amount)
 				.setValue(BlockStateProperties.HORIZONTAL_FACING, facing);
@@ -212,10 +207,6 @@ final class CherryStyle extends HqStyle {
 
 	private BlockState planter() {
 		return kit().gardenPlanter();
-	}
-
-	private CompoundTag plaqueData(SignText t) {
-		return kit().plaqueData(t.color(), t.l1(), t.l2(), t.l3(), t.l4());
 	}
 
 	// ------------------------------------------------------------------ hub
@@ -320,7 +311,6 @@ final class CherryStyle extends HqStyle {
 			c.set(x, 6, z - 1, roof(Direction.SOUTH));
 			c.set(x, 6, z + 1, roof(Direction.NORTH));
 		}
-		c.decor(new BlockPos(0, 5, z + 1), plaque(Direction.SOUTH), plaqueData(sign));
 	}
 
 	// ------------------------------------------------------------------ archive nook
@@ -334,7 +324,6 @@ final class CherryStyle extends HqStyle {
 				c.set(x, y, n.minZ(), x == tx ? air : y == 4 ? beam(Direction.Axis.X) : shelf);
 			}
 		}
-		c.decor(HqGeometry.ARCHIVE_TERMINAL.above(2), plaque(Direction.NORTH), plaqueData(new SignText(DyeColor.BROWN, "", "Archive", "", "")));
 	}
 
 	// ------------------------------------------------------------------ portico
@@ -427,13 +416,6 @@ final class CherryStyle extends HqStyle {
 				c.decor(-2, 1, z, planter());
 				c.decor(2, 1, z, planter());
 			}
-		}
-		int zs = zn + (DOOR_V1 + DOOR_V2) / 2;
-		if (eastSign != null) {
-			c.decor(new BlockPos(2, 4, zs), plaque(Direction.WEST), plaqueData(eastSign));
-		}
-		if (westSign != null) {
-			c.decor(new BlockPos(-2, 4, zs), plaque(Direction.EAST), plaqueData(westSign));
 		}
 	}
 

@@ -168,7 +168,7 @@ public final class T3Blocks {
 		BlockEntityType<LampBlockEntity>[] podiumType = new BlockEntityType[1];
 
 		MonitorBlock monitor = (MonitorBlock) block(r, "monitor", p -> new MonitorBlock(p, () -> monitorType[0]),
-				BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLACK).strength(1.5f).sound(SoundType.METAL));
+				BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLACK).strength(1.5f).sound(SoundType.METAL).noOcclusion());
 		StatusLampBlock lamp = (StatusLampBlock) block(r, "status_lamp", p -> new StatusLampBlock(p, () -> lampType[0]), lampProps());
 		StatusLampBlock board = (StatusLampBlock) block(r, "board_lamp", p -> new StatusLampBlock(p, () -> lampType[0]), lampProps());
 		ThreadBoardBlock wall = (ThreadBoardBlock) block(r, "thread_board", p -> new ThreadBoardBlock(p, () -> wallType[0]),
