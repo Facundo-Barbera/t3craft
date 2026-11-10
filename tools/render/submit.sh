@@ -29,7 +29,7 @@ if [ ! -f "$HOME/.cache/t3craft-coord/renders-approved" ]; then
 	exit 2
 fi
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# Renders run on Facundo's PC (my-pc, WSL), never on the VPS: by default this hands the request to the
+# Renders run on the render PC (WSL), never on the VPS: by default this hands the request to the
 # remote relay, which syncs the worktree there and brings the results back to the same local outbox.
 # T3CRAFT_RENDER_MODE=local is only for running ON the render PC itself.
 if [ "${T3CRAFT_RENDER_MODE:-remote}" != local ]; then

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Remote relay for the render service: renders run on Facundo's PC (WSL, my-pc), NEVER on the VPS.
+# Remote relay for the render service: renders run on the render PC (WSL), NEVER on the VPS.
 # tools/render/submit.sh execs this by default; agents use submit.sh exactly as before (same options, output,
 # exit codes; results in the same local outbox folder).
 #
 # Transport: the PC's sshd is Windows OpenSSH whose default shell is wsl.exe. Remote commands (`ssh pc 'cmd'`),
 # scp and rsync do NOT work; the only thing that works is piping a bash script on stdin:
-#   ssh -T user@100.64.0.20 < script.sh
+#   ssh -T <user>@<pc> < script.sh
 # So every remote step is a script fed on stdin; files travel as tar+base64 inside those scripts.
 #
 # One request:
@@ -19,14 +19,18 @@
 # Compiling happens on the PC (its daemon, one worker). The VPS only runs ssh, tar and base64.
 #
 # Settings (environment):
-#   T3CRAFT_RENDER_HOST         ssh target (default user@100.64.0.20: Windows user winuser, WSL user wsluser)
+#   T3CRAFT_RENDER_HOST         ssh target, REQUIRED, no default (<user>@<pc>: the account whose WSL shell holds the repo)
 #   T3CRAFT_RENDER_REMOTE_REPO  the PC's repo, relative to the WSL home (default projects/t3craft)
 #   T3CRAFT_RENDER_REMOTE_JOBS  per-agent copies on the PC, relative to the WSL home (default t3craft-jobs)
 #   T3CRAFT_RENDER_HOME         local spool (default ~/.cache/t3craft-render); the PC uses its own ~/.cache/t3craft-render
 set -uo pipefail
 
 RENDER_HOME="${T3CRAFT_RENDER_HOME:-$HOME/.cache/t3craft-render}"
-HOST="${T3CRAFT_RENDER_HOST:-user@100.64.0.20}"
+HOST="${T3CRAFT_RENDER_HOST:-}"
+if [ -z "$HOST" ]; then
+	echo "submit: set T3CRAFT_RENDER_HOST to <user>@<pc> (the ssh target of the render PC); there is no default." >&2
+	exit 64
+fi
 R_REPO="${T3CRAFT_RENDER_REMOTE_REPO:-projects/t3craft}"
 R_JOBS="${T3CRAFT_RENDER_REMOTE_JOBS:-t3craft-jobs}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

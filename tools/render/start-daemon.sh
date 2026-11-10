@@ -13,7 +13,7 @@
 #   RENDER_PARALLELISM  render threads in total, split between the workers (default: cores - 1)
 #   RENDER_LOAD_MAX     above this 1-min load no job starts while another runs (default 6)
 #   RENDER_XMX          max heap (default 8g)
-# Runs ONLY on the render PC (my-pc, WSL), never on the VPS (AGENTS.md). One daemon, 1 worker. On the PC it
+# Runs ONLY on the render PC (WSL), never on the VPS (AGENTS.md). One daemon, 1 worker. On the PC it
 # holds the PC's own /tmp/t3craft-heavy.lock while alive. Approval of render sessions is enforced on the VPS
 # side, in tools/render/submit.sh (~/.cache/t3craft-coord/renders-approved there).
 # It restarts itself on exit code 75 (a render thread that would not stop). Log: $RENDER_HOME/daemon.log.
@@ -88,8 +88,8 @@ if [ "$mode" = supervise ] || [ "$mode" = foreground ]; then
 fi
 
 # never on the VPS (AGENTS.md: renders run on the render PC)
-if [ "$(hostname)" = "${T3CRAFT_VPS_HOSTNAME:-vps-env}" ] || [ -n "${T3CRAFT_IS_VPS:-}" ]; then
-	echo "start-daemon: this is the VPS; the render daemon runs only on the render PC (my-pc). See AGENTS.md." >&2
+if { [ -n "${T3CRAFT_VPS_HOSTNAME:-}" ] && [ "$(hostname)" = "$T3CRAFT_VPS_HOSTNAME" ]; } || [ -n "${T3CRAFT_IS_VPS:-}" ]; then
+	echo "start-daemon: this is the VPS; the render daemon runs only on the render PC. See AGENTS.md." >&2
 	exit 1
 fi
 
