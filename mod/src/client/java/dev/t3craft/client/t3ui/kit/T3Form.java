@@ -72,6 +72,25 @@ public final class T3Form {
 		return false;
 	}
 
+	/** A held button moved: the control that took the click (a scrollbar thumb) follows it. */
+	public boolean mouseDragged(double mx, double my, int button) {
+		for (int i = controls.size() - 1; i >= 0; i--) {
+			if (controls.get(i).mouseDragged(mx, my, button)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** Every control hears the release (whichever had a drag going ends it). */
+	public boolean mouseReleased(double mx, double my, int button) {
+		boolean used = false;
+		for (T3Control c : controls) {
+			used |= c.mouseReleased(mx, my, button);
+		}
+		return used;
+	}
+
 	public boolean mouseScrolled(double mx, double my, double dy) {
 		for (T3Control c : controls) {
 			if (c.overlayOpen()) {

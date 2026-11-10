@@ -1,6 +1,5 @@
 package dev.t3craft.client.t3ui.kit;
 
-import com.mojang.blaze3d.platform.InputConstants;
 import dev.t3craft.client.chat.ChatDraw;
 import dev.t3craft.client.chat.ChatTheme;
 import dev.t3craft.client.chat.Rect;
@@ -14,7 +13,10 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.input.MouseButtonInfo;
 import net.minecraft.network.chat.CommonComponents;
 import org.jspecify.annotations.Nullable;
 
@@ -23,13 +25,21 @@ import org.jspecify.annotations.Nullable;
  * labelled fields, controls, a button row, a raw vanilla widget). Built with the fluent methods, laid out
  * with {@link #layout} (every {@code init()}) and drawn with {@link #render}. Two hosts use it:
  * {@link T3DialogScreen} (a screen of its own, over a parent) and {@link T3Panel.Host} implementations
- * ({@code T3Screen}, {@link T3PanelScreen}) for confirmations over a panel.
+ * ({@code T3Screen}, {@link T3PanelScreen}) for dialogs over a panel.
  *
  * <p>Rules for the stack: the position of a block depends only on the blocks above it, so a block whose
  * height changes while the dialog is open (a {@link #text(Supplier, Supplier, int) dynamic text} with
  * reserved lines) must be below every field. The panel grows downward to follow it; its top stays put.
- * A dialog opened over a panel by the host cannot hold fields: it is laid out every frame, and a field's
- * box is created by {@link #layout}.
+ *
+ * <p>Two ways to hold the text boxes of {@link T3Field}s, {@link T3TextArea}s and raw widgets. In a
+ * {@link T3DialogScreen} {@link #layout} hands them to the screen, which owns them as widgets. In a dialog
+ * over a panel the host calls {@link #layoutOwned} once (and again on a resize): the dialog keeps the boxes
+ * and draws them over its own frame, and the host forwards {@link #charTyped}, the mouse and the keys, so
+ * such a dialog may have fields too.
+ *
+ * <p>Keyboard: Tab / Shift+Tab walk the dialog's controls (fields, selects, check boxes, buttons) in the
+ * order they were added; Enter or Space presses a focused button; Enter anywhere else runs
+ * {@link #defaultAction} (not in a multi-line box, where it types a new line). Esc is the host's.
  */
 public final class T3Dialog {
 	private static final int GAP = 4;
@@ -47,11 +57,14 @@ public final class T3Dialog {
 	private final String title;
 	private final int maxWidth;
 	private final List<Block> blocks = new ArrayList<>();
-	private final List<T3Field> fields = new ArrayList<>();
 	private final T3Form form = new T3Form();
+	/** The boxes of a dialog laid out with {@link #layoutOwned}: ours to draw, click and type into. */
+	private final List<AbstractWidget> ownedWidgets = new ArrayList<>();
+	private boolean owned;
+	private @Nullable Screen screen;
 	private @Nullable Runnable onCancel;
 	private @Nullable Runnable defaultAction;
-	private @Nullable T3Field initialFocus;
+	private @Nullable T3Control initialFocus;
 
 	private int[] ys = new int[0];
 	private int left;
@@ -113,8 +126,13 @@ public final class T3Dialog {
 
 	/** A muted label over a text field. */
 	public T3Dialog field(String label, T3Field f) {
-		fields.add(f);
 		blocks.add(new FieldBlock(label, f));
+		return this;
+	}
+
+	/** A muted label over a multi-line text field {@code h} pixels tall (about 9 per line, plus 6). */
+	public T3Dialog textArea(String label, T3TextArea a, int h) {
+		blocks.add(new TextAreaBlock(label, a, Math.max(T3Control.H, h)));
 		return this;
 	}
 
@@ -148,6 +166,18 @@ public final class T3Dialog {
 		return this;
 	}
 
+	/** The multi-line field that has the keyboard when the dialog opens. */
+	public T3Dialog initialFocus(T3TextArea a) {
+		this.initialFocus = a;
+		return this;
+	}
+
+	/** The screen that shows the dialog (so Tab can move the keyboard off its text boxes); null when the dialog owns its boxes. */
+	public T3Dialog setScreen(@Nullable Screen screen) {
+		this.screen = screen;
+		return this;
+	}
+
 	/**
 	 * A yes/no question: {@code lines} as paragraphs, an optional {@code warning}, then the confirm button
 	 * ({@code danger}: error fill, and Enter means "no") and Cancel. {@code onNo} also runs on Esc.
@@ -175,6 +205,16 @@ public final class T3Dialog {
 
 	public static void veil(GuiGraphicsExtractor g, ChatTheme t, int screenW, int screenH) {
 		g.fill(0, 0, screenW, screenH, t.backdrop());
+	}
+
+	/**
+	 * Lays the dialog out for a host that does not own its boxes (a modal over a panel): they are kept here
+	 * and drawn and routed by the dialog. Call once when it opens and again when the screen changes size.
+	 */
+	public void layoutOwned(Font font, ChatTheme t, int screenW, int screenH) {
+		owned = true;
+		ownedWidgets.clear();
+		layout(font, t, screenW, screenH, ownedWidgets::add);
 	}
 
 	public void layout(Font font, ChatTheme t, int screenW, int screenH, Consumer<AbstractWidget> sink) {
@@ -218,6 +258,9 @@ public final class T3Dialog {
 		for (Block b : blocks) {
 			b.render(g, font, t, mx, my);
 		}
+		for (AbstractWidget w : ownedWidgets) {
+			w.extractRenderState(g, mx, my, 0f); // over the frames the blocks just drew
+		}
 	}
 
 	public void renderOverlays(GuiGraphicsExtractor g, Font font, ChatTheme t, int mx, int my, Rect screen) {
@@ -228,10 +271,10 @@ public final class T3Dialog {
 		return form.tooltip(mx, my);
 	}
 
-	/** Call after {@link #layout} and after the host added the widgets. */
-	public void focusInitial(Screen host) {
+	/** Call after {@link #layout} and after the host added the widgets; {@code host} is null for a {@link #layoutOwned} dialog. */
+	public void focusInitial(@Nullable Screen host) {
 		if (initialFocus != null) {
-			initialFocus.focus(host);
+			initialFocus.focusIn(host, false);
 		}
 	}
 
@@ -242,24 +285,80 @@ public final class T3Dialog {
 	}
 
 	public boolean mouseClicked(double mx, double my, int button) {
-		return form.mouseClicked(mx, my, button);
+		if (form.overlayOpen()) {
+			return form.mouseClicked(mx, my, button);
+		}
+		T3Focus.dropNonInput(form.controls());
+		if (form.mouseClicked(mx, my, button)) {
+			T3Focus.afterClick(form.controls(), screen);
+			return true;
+		}
+		if (!owned) {
+			return false; // the screen focuses the clicked box
+		}
+		for (AbstractWidget w : ownedWidgets) {
+			if (w.visible && w.isMouseOver(mx, my)) {
+				for (AbstractWidget o : ownedWidgets) {
+					o.setFocused(o == w);
+				}
+				w.mouseClicked(new MouseButtonEvent(mx, my, new MouseButtonInfo(button, 0)), false);
+				return true;
+			}
+		}
+		return false;
 	}
 
 	public boolean mouseScrolled(double mx, double my, double dy) {
 		return form.mouseScrolled(mx, my, dy);
 	}
 
-	/** Open popups first, then a field's own Enter, then the dialog's default action. Esc is the host's ({@link #cancel()}). */
-	public boolean keyPressed(KeyEvent e) {
-		if (form.keyPressed(e)) {
-			return true;
+	public boolean mouseDragged(double mx, double my, int button) {
+		return form.mouseDragged(mx, my, button);
+	}
+
+	public boolean mouseReleased(double mx, double my, int button) {
+		return form.mouseReleased(mx, my, button);
+	}
+
+	/** Typed characters for the focused box of a {@link #layoutOwned} dialog (a screen's own boxes get them from the screen). */
+	public boolean charTyped(CharacterEvent e) {
+		for (AbstractWidget w : ownedWidgets) {
+			if (w.isFocused()) {
+				return w.charTyped(e);
+			}
 		}
-		for (T3Field f : fields) {
-			if (f.keyPressed(e)) {
+		return false;
+	}
+
+	private boolean enterOwnedByControl() {
+		for (T3Control c : form.controls()) {
+			if (c.focused() && c.consumesEnter()) {
 				return true;
 			}
 		}
-		if (defaultAction != null && (e.key() == InputConstants.KEY_RETURN || e.key() == InputConstants.KEY_NUMPADENTER)) {
+		return false;
+	}
+
+	/**
+	 * Tab / Shift+Tab, then open popups and the focused control (a pressed button, a flipped check box, a
+	 * field's own Enter), then the focused box of an owned dialog, then the dialog's default action on Enter.
+	 * Esc is the host's ({@link #cancel()}).
+	 */
+	public boolean keyPressed(KeyEvent e) {
+		if (T3Focus.isTab(e) && !form.overlayOpen()) {
+			return T3Focus.move(form.controls(), e.hasShiftDown(), screen);
+		}
+		if (form.keyPressed(e)) {
+			return true;
+		}
+		if (owned) {
+			for (AbstractWidget w : ownedWidgets) {
+				if (w.isFocused() && w.keyPressed(e)) {
+					return true;
+				}
+			}
+		}
+		if (defaultAction != null && T3Focus.isEnter(e) && !enterOwnedByControl()) {
 			defaultAction.run();
 			return true;
 		}
@@ -414,12 +513,47 @@ public final class T3Dialog {
 			this.x = x;
 			this.y = y;
 			sink.accept(field.layout(t, new Rect(x, y + LABEL_H, w, T3Control.H), true));
+			form.add(field); // in the Tab order, in reading order
 		}
 
 		@Override
 		public void render(GuiGraphicsExtractor g, Font font, ChatTheme t, int mx, int my) {
 			T3Draw.text(g, font, t, label, x, y, t.muted());
 			field.render(g, font, t, mx, my);
+		}
+	}
+
+	private static final class TextAreaBlock implements Block {
+		private static final int LABEL_H = 11;
+		private final String label;
+		private final T3TextArea area;
+		private final int h;
+		private int x;
+		private int y;
+
+		TextAreaBlock(String label, T3TextArea area, int h) {
+			this.label = label;
+			this.area = area;
+			this.h = h;
+		}
+
+		@Override
+		public int height(Font font, int w) {
+			return LABEL_H + h;
+		}
+
+		@Override
+		public void place(Font font, ChatTheme t, int x, int y, int w, Consumer<AbstractWidget> sink, T3Form form) {
+			this.x = x;
+			this.y = y;
+			sink.accept(area.layout(t, new Rect(x, y + LABEL_H, w, h), true));
+			form.add(area);
+		}
+
+		@Override
+		public void render(GuiGraphicsExtractor g, Font font, ChatTheme t, int mx, int my) {
+			T3Draw.text(g, font, t, label, x, y, t.muted());
+			area.render(g, font, t, mx, my);
 		}
 	}
 

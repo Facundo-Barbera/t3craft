@@ -6,6 +6,7 @@ import dev.t3craft.client.chat.MouseButtons;
 import dev.t3craft.client.chat.Rect;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.input.KeyEvent;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -147,6 +148,22 @@ public final class T3Button extends T3Control {
 			T3Icon.draw(g, t, icon, x, r.y() + (r.h() - T3Icon.SIZE) / 2, T3Icon.SIZE, text);
 			g.text(font, shown, x + T3Icon.SIZE + ICON_GAP, r.y() + (r.h() - 8) / 2, text, t.shadow());
 		}
+		drawFocus(g, t);
+	}
+
+	@Override
+	public boolean focusable() {
+		return true;
+	}
+
+	/** Enter or Space presses the button while it has the keyboard. */
+	@Override
+	public boolean keyPressed(KeyEvent e) {
+		if (focused() && enabled() && visible() && T3Focus.isActivate(e)) {
+			action.run();
+			return true;
+		}
+		return false;
 	}
 
 	@Override

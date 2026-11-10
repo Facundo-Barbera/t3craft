@@ -2,6 +2,7 @@ package dev.t3craft.client.t3ui.kit;
 
 import dev.t3craft.client.chat.ChatDraw;
 import dev.t3craft.client.chat.ChatTheme;
+import dev.t3craft.client.chat.Rect;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.gui.Font;
@@ -105,8 +106,32 @@ public final class T3Draw {
 			return lines;
 		}
 		List<String> cut = new ArrayList<>(lines.subList(0, maxLines));
-		cut.set(maxLines - 1, ChatDraw.clip(font, cut.get(maxLines - 1) + "…", w));
+		cut.set(maxLines - 1, ChatDraw.clip(font, cut.get(maxLines - 1) + "...", w));
 		return cut;
+	}
+
+	/** The keyboard focus ring: a brass 2 px frame (the outer pixel solid, the inner one soft) just inside {@code r}. */
+	public static void focusRing(GuiGraphicsExtractor g, ChatTheme t, Rect r) {
+		ChatDraw.outline(g, r.x(), r.y(), r.w(), r.h(), t.brass());
+		if (r.w() > 4 && r.h() > 4) {
+			ChatDraw.outline(g, r.x() + 1, r.y() + 1, r.w() - 2, r.h() - 2, ChatTheme.withAlpha(t.brass(), 110));
+		}
+	}
+
+	/** A 7 x 4 px down-pointing triangle with its top-left at ({@code x}, {@code y}): the drop-down caret, drawn so no glyph is needed. */
+	public static void caret(GuiGraphicsExtractor g, int x, int y, int color) {
+		g.fill(x, y, x + 7, y + 1, color);
+		g.fill(x + 1, y + 1, x + 6, y + 2, color);
+		g.fill(x + 2, y + 2, x + 5, y + 3, color);
+		g.fill(x + 3, y + 3, x + 4, y + 4, color);
+	}
+
+	/** A check mark inside a 10 x 10 box whose top-left is ({@code x}, {@code y}). */
+	public static void tick(GuiGraphicsExtractor g, int x, int y, int color) {
+		int[][] px = {{2, 5}, {3, 6}, {4, 7}, {5, 6}, {6, 5}, {7, 4}, {8, 3}};
+		for (int[] p : px) {
+			g.fill(x + p[0], y + p[1], x + p[0] + 1, y + p[1] + 2, color);
+		}
 	}
 
 	/** Draws {@code s} wrapped; returns the y under the last line. */

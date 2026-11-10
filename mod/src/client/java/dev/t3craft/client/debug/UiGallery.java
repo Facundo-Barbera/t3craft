@@ -24,6 +24,7 @@ import dev.t3craft.client.screen.SnoozeScreen;
 import dev.t3craft.client.t3ui.T3Screen;
 import dev.t3craft.client.t3ui.T3Slots;
 import dev.t3craft.client.t3ui.actions.RegisterProjectDialog;
+import dev.t3craft.client.t3ui.kit.T3KitDemoPanel;
 import dev.t3craft.client.t3ui.kit.T3PanelScreen;
 import dev.t3craft.outbound.Destination;
 import dev.t3craft.outbound.OutboundConfig;
@@ -116,6 +117,10 @@ public final class UiGallery {
 					() -> new IconGalleryScreen(null)),
 			new Scenario("model-picker", "The composer's model picker open over a fake catalog (reasoning and extra selects, switches, access, favorites, legacy, many providers)",
 					ModelPickerGalleryScreen::new),
+			new Scenario("kit", "UI kit demo as a screen of its own: Tab / Enter / Space focus, list keys, draggable scrollbars, fields clipped in a scrolling page, a dialog with fields",
+					() -> new T3PanelScreen(null, new T3KitDemoPanel())),
+			new Scenario("inbox-kit", "The same UI kit demo inside the main T3 screen (the dialog with fields and the scrollbar drag go through T3Screen)",
+					() -> inbox(true, true).withPage(new T3KitDemoPanel())),
 			new Scenario("queue", "Queued runs (reads the live queue, empty without a connection)", () -> new QueueScreen(null, null)));
 
 	private UiGallery() {

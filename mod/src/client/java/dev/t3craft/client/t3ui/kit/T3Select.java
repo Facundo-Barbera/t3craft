@@ -52,9 +52,21 @@ public final class T3Select<T> extends T3Control {
 		Rect r = bounds();
 		boolean hover = hovered(mx, my);
 		ChatDraw.field(g, t, r, open || hover);
-		String s = options.isEmpty() ? "—" : label.apply(options.get(Math.min(selected, options.size() - 1)));
+		String s = options.isEmpty() ? "-" : label.apply(options.get(Math.min(selected, options.size() - 1)));
 		g.text(font, ChatDraw.clip(font, s, r.w() - 20), r.x() + 5, r.y() + (r.h() - 8) / 2, enabled() ? t.text() : t.disabled(), t.shadow());
-		g.text(font, "▾", r.right() - 12, r.y() + (r.h() - 8) / 2, enabled() ? (open || hover ? t.accent() : t.muted()) : t.disabled(), false);
+		T3Draw.caret(g, r.right() - 12, r.y() + (r.h() - 4) / 2, enabled() ? (open || hover ? t.accent() : t.muted()) : t.disabled());
+		drawFocus(g, t);
+	}
+
+	@Override
+	public boolean focusable() {
+		return true;
+	}
+
+	private void openList() {
+		open = true;
+		highlight = selected;
+		first = Math.max(0, Math.min(selected - MAX_ROWS / 2, options.size() - MAX_ROWS));
 	}
 
 	@Override
@@ -126,9 +138,7 @@ public final class T3Select<T> extends T3Control {
 		if (!enabled() || !visible() || options.isEmpty() || !MouseButtons.isLeft(button) || !bounds().contains(mx, my)) {
 			return false;
 		}
-		open = true;
-		highlight = selected;
-		first = Math.max(0, Math.min(selected - MAX_ROWS / 2, options.size() - MAX_ROWS));
+		openList();
 		return true;
 	}
 
@@ -144,6 +154,11 @@ public final class T3Select<T> extends T3Control {
 	@Override
 	public boolean keyPressed(KeyEvent e) {
 		if (!open) {
+			// closed with the keyboard on it: Enter, Space or Down opens the list
+			if (focused() && enabled() && visible() && !options.isEmpty() && (T3Focus.isActivate(e) || e.key() == InputConstants.KEY_DOWN)) {
+				openList();
+				return true;
+			}
 			return false;
 		}
 		int k = e.key();
