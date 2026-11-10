@@ -45,12 +45,27 @@ import org.jspecify.annotations.Nullable;
  * {@code LevelSettings.DifficultySettings}, {@code net.minecraft.world.level.gamerules}). When
  * porting, only this class should need changes. No mixins.
  */
-final class VanillaDemoWorld {
+public final class VanillaDemoWorld {
 	private VanillaDemoWorld() {
 	}
 
-	static boolean exists(Minecraft mc, String folderId) {
+	public static boolean exists(Minecraft mc, String folderId) {
 		return mc.getLevelSource().levelExists(folderId);
+	}
+
+	/**
+	 * feat/algo-map-generators: creates a creative, peaceful, no-structures void world (the same superflat "void"
+	 * layers as the HQ world) in save folder {@code folderId} and joins it; for map types that build their own
+	 * ground at run time. Vanilla shows its loading screens; on failure it returns to {@code parent}.
+	 */
+	public static void createVoidWorld(Minecraft mc, String folderId, String displayName, long seed, Screen parent) {
+		LevelSettings settings = new LevelSettings(displayName, GameType.CREATIVE,
+				new LevelSettings.DifficultySettings(Difficulty.PEACEFUL, false, false), true, WorldDataConfiguration.DEFAULT);
+		WorldOptions options = new WorldOptions(seed, false, false);
+		mc.createWorldOpenFlows().createFreshLevel(folderId, settings, options, registries -> {
+			WorldDimensions dims = registries.lookupOrThrow(Registries.WORLD_PRESET).getOrThrow(WorldPresets.FLAT).value().createWorldDimensions();
+			return dims.replaceOverworldGenerator(registries, new FlatLevelSource(voidSettings(registries)));
+		}, parent);
 	}
 
 	/**
@@ -148,12 +163,12 @@ final class VanillaDemoWorld {
 	}
 
 	/** Opens an existing save (vanilla backup/upgrade prompts included); cancel returns to {@code parent}. */
-	static void open(Minecraft mc, String folderId, Screen parent) {
+	public static void open(Minecraft mc, String folderId, Screen parent) {
 		mc.createWorldOpenFlows().openWorld(folderId, () -> mc.gui.setScreen(parent));
 	}
 
 	/** Saves and leaves the current world (blocks until the integrated server has stopped). */
-	static void leaveWorld(Minecraft mc) {
+	public static void leaveWorld(Minecraft mc) {
 		mc.disconnectFromWorld(ClientLevel.DEFAULT_QUIT_MESSAGE);
 	}
 
@@ -167,12 +182,12 @@ final class VanillaDemoWorld {
 		return mc.getLevelSource().getBackupPath();
 	}
 
-	static Path worldRoot(MinecraftServer server) {
+	public static Path worldRoot(MinecraftServer server) {
 		return server.getWorldPath(LevelResource.ROOT).toAbsolutePath().normalize();
 	}
 
 	/** Whether this (integrated) server runs the save folder {@code folderId}. */
-	static boolean isDemoServer(MinecraftServer server, String folderId) {
+	public static boolean isDemoServer(MinecraftServer server, String folderId) {
 		if (!server.isSingleplayer()) {
 			return false;
 		}
@@ -190,7 +205,7 @@ final class VanillaDemoWorld {
 	}
 
 	/** {@link #applySetup(MinecraftServer, DemoWorldSpec)} with the world spawn on {@code spawn} (the starter island) when given. */
-	static void applySetup(MinecraftServer server, DemoWorldSpec spec, @Nullable BlockPos spawn) {
+	public static void applySetup(MinecraftServer server, DemoWorldSpec spec, @Nullable BlockPos spawn) {
 		GameRules rules = server.getGameRules();
 		for (Map.Entry<DemoWorldSpec.Rule, Boolean> e : spec.rules().entrySet()) {
 			rules.set(rule(e.getKey()), e.getValue(), server);

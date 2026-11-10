@@ -130,6 +130,11 @@ Quedan como estaban:
 - Tres arreglos (ver `docs/features/fix-hq-load-build-portal.md`): plan del HQ vacío calculado una vez fuera del hilo del servidor (el cuelgue al 16 %), el build radial espera chunks no cargados en vez de descartar bloques, y el portal del preview-drop fijo en el HQ (sin `/t3craft drop portal`).
 - Falta: compilar en el PC (`tools/heavy.sh`) y probar en el cliente de Facundo: entrar al HQ (¿ya no se queda al 16 %?), construir caminando hasta el borde y volver (¿se completa?), y ver el arco al norte de la calle interior y cruzarlo en ambos sentidos. Línea RESTART en `docs/CHANGELOG-dev.md`.
 
+### `feat/algo-map-generators`: escrita sin compilar ni jugar (pendiente de ejecución)
+- Interfaz `dev.t3craft.mapgen` (generador, huecos, piezas), el HQ descrito en ese modelo (`hq.CitadelMapGenerator`, sin tocar el pintor) y el mapa nuevo de islas flotantes con puentes en tiempo real; doc en `docs/features/algo-map-generators.md`.
+- Falta: compilar en el PC (`tools/heavy.sh`: `compileJava compileClientJava`) y probar `/t3craft islands`: isla de aparición lista antes de entrar, puente que crece al acercarse a un borde, islas lejanas que se construyen al andar, caída al vacío con rescate. Línea RESTART en `docs/CHANGELOG-dev.md` (nuevo entrypoint cliente).
+- Toca `VanillaDemoWorld` (ahora público), `HqStyle`/`RingCampusStyle` (un método nuevo) y `fabric.mod.json`; no cambia el mundo HQ.
+
 ### Siguiente, en orden
 1. **Aprobación de Facundo:**
    - plan de limpieza de código (`docs/plans/code-cleanup.md`, decisiones D1–D5);

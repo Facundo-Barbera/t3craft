@@ -117,6 +117,15 @@ public abstract class HqStyle {
 	}
 
 	/**
+	 * feat/algo-map-generators: the shape and slots of {@code layout} as a {@link dev.t3craft.mapgen.MapLayout}
+	 * (the generator model: where the ground is and where pieces stand), or null for a style that has no such
+	 * model yet (every style but the citadel). Does not change what {@link #layoutPlan} paints.
+	 */
+	public dev.t3craft.mapgen.@Nullable MapLayout mapLayout(HqLayout layout) {
+		return null;
+	}
+
+	/**
 	 * Footprint of this layout for whoever reserves ground (site, builders, tests): the xz area every
 	 * placement of the plan of {@code layout} lies in. Default: the spine grid ({@link HqFootprints}).
 	 */
