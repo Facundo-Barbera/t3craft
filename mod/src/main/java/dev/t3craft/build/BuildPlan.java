@@ -25,14 +25,24 @@ public final class BuildPlan {
 	/** fix/25: work (obra) of each entry, parallel to {@link #placements}; null = no grouping known. */
 	private final int @Nullable [] work;
 	private final int works;
+	/** feat/builder-sites: name of each work (the group of the HQ plan it came from), by work index; null = no names known. */
+	private final String @Nullable [] workNames;
+	/** feat/builder-sites: optional label of this plan (the group it builds); a merged plan keeps it as the name of that work. */
+	private final @Nullable String name;
 
 	private BuildPlan(List<Placement> placements) {
 		this(placements, null, 0);
 	}
 
 	private BuildPlan(List<Placement> placements, int @Nullable [] work, int works) {
+		this(placements, work, works, null, null);
+	}
+
+	private BuildPlan(List<Placement> placements, int @Nullable [] work, int works, String @Nullable [] workNames, @Nullable String name) {
 		this.work = work;
 		this.works = work == null ? 0 : works;
+		this.workNames = work == null ? null : workNames;
+		this.name = name;
 		this.placements = Collections.unmodifiableList(placements);
 		int x0 = Integer.MAX_VALUE, y0 = Integer.MAX_VALUE, z0 = Integer.MAX_VALUE;
 		int x1 = Integer.MIN_VALUE, y1 = Integer.MIN_VALUE, z1 = Integer.MIN_VALUE;
@@ -91,6 +101,25 @@ public final class BuildPlan {
 		return work == null ? -1 : work[index];
 	}
 
+	/**
+	 * feat/builder-sites: the name of work {@code work} (the HQ group it came from: {@code hub}, {@code lot_3},
+	 * {@code module_7}, {@code ring_1}, ...), or null when the plan carries no names. {@link SiteProgram} groups works
+	 * into building sites with it.
+	 */
+	public @Nullable String workName(int work) {
+		return workNames == null || work < 0 || work >= workNames.length ? null : workNames[work];
+	}
+
+	/** feat/builder-sites: this plan's own label (null = none). */
+	public @Nullable String name() {
+		return name;
+	}
+
+	/** feat/builder-sites: the same plan (same entries, same order) labelled {@code name}. */
+	public BuildPlan named(@Nullable String name) {
+		return new BuildPlan(placements, work, works, workNames, name);
+	}
+
 	/** Smallest relative corner (ZERO for an empty plan). */
 	public BlockPos min() {
 		return min;
@@ -124,7 +153,7 @@ public final class BuildPlan {
 			}
 			k++;
 		}
-		return new BuildPlan(out, w, works);
+		return new BuildPlan(out, w, works, workNames, name);
 	}
 
 	/**
@@ -134,6 +163,7 @@ public final class BuildPlan {
 	public static final class Builder {
 		private final Map<BlockPos, Placement> entries = new LinkedHashMap<>();
 		private final Map<BlockPos, Integer> workAt = new java.util.HashMap<>();
+		private final Map<Integer, String> workNames = new java.util.HashMap<>();
 
 		private Builder() {
 		}
@@ -151,6 +181,14 @@ public final class BuildPlan {
 				workAt.put(key, work);
 			} else {
 				workAt.remove(key);
+			}
+			return this;
+		}
+
+		/** feat/builder-sites: names work {@code work} (see {@link BuildPlan#workName}); null or a negative work is ignored. */
+		public Builder nameWork(int work, @Nullable String name) {
+			if (work >= 0 && name != null) {
+				workNames.put(work, name);
 			}
 			return this;
 		}
@@ -191,7 +229,16 @@ public final class BuildPlan {
 				w[i] = v == null ? -1 : v;
 				max = Math.max(max, w[i]);
 			}
-			return new BuildPlan(list, w, max + 1);
+			String[] names = null;
+			if (!workNames.isEmpty()) {
+				names = new String[max + 1];
+				for (Map.Entry<Integer, String> e : workNames.entrySet()) {
+					if (e.getKey() <= max) {
+						names[e.getKey()] = e.getValue();
+					}
+				}
+			}
+			return new BuildPlan(list, w, max + 1, names, null);
 		}
 	}
 }

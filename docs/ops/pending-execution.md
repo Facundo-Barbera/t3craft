@@ -140,6 +140,10 @@ Quedan como estaban:
 - Falta: compilar en el PC (`tools/heavy.sh`: `compileJava compileClientJava`) y probar `/t3craft islands`: isla de aparición lista antes de entrar, puente que crece al acercarse a un borde, islas lejanas que se construyen al andar, caída al vacío con rescate. Línea RESTART en `docs/CHANGELOG-dev.md` (nuevo entrypoint cliente).
 - Toca `VanillaDemoWorld` (ahora público), `HqStyle`/`RingCampusStyle` (un método nuevo) y `fabric.mod.json`; no cambia el mundo HQ.
 
+### `feat/builder-sites`: escrita sin compilar ni jugar (pendiente de ejecución)
+- Builders por obras (`build.order: "sites"`, `"radial"` sigue de predeterminado): `SiteCursor`, `SiteProgram`, `SiteDispatch`. Propuesta y decisiones en `docs/plans/builder-scheduling.md`; qué fase está hecha, cómo probarla y qué dice el status en `docs/features/builder-sites.md`.
+- Falta: compilar en el PC (`tools/heavy.sh`) y que Facundo la juegue con la tabla "Trying it" de ese doc, comparando contra `"radial"`. Riesgos de compilación listados al final del doc. Línea RESTART en `docs/CHANGELOG-dev.md`.
+
 ### Siguiente, en orden
 1. **Aprobación de Facundo:**
    - plan de limpieza de código (`docs/plans/code-cleanup.md`, decisiones D1–D5);

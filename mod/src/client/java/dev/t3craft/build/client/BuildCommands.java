@@ -73,9 +73,9 @@ final class BuildCommands {
 		dev.t3craft.build.BuildBudget bb = dev.t3craft.build.BuildBudget.global();
 		dev.t3craft.build.BuildTuning t = bb.tuning();
 		c.getSource().sendFeedback(prefix().append(String.format(Locale.ROOT,
-				"build: %d blocks/tick max (now %d, throttle %.0f%%), %d concurrent jobs, %d fronts/job, %d effects/tick, autoThrottle %s @ %.0f ms",
+				"build: %d blocks/tick max (now %d, throttle %.0f%%), %d concurrent jobs, %d fronts/job, %d effects/tick, autoThrottle %s @ %.0f ms, order %s",
 				t.maxBlocksPerTick(), bb.effectiveMax(), bb.throttle() * 100, t.maxConcurrentJobs(), t.frontsPerJob(), t.maxEffectsPerTick(),
-				t.autoThrottle(), t.targetMspt())));
+				t.autoThrottle(), t.targetMspt(), t.sites() ? "sites" : t.radial() ? "radial" : "parts")));
 		return 1;
 	}
 
