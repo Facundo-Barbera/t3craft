@@ -1,18 +1,22 @@
 package dev.t3craft.client.t3ui.actions;
 
 import dev.t3craft.client.operate.OperateUi;
+import dev.t3craft.client.t3ui.kit.T3Button;
+import dev.t3craft.client.t3ui.kit.T3Dialog;
+import dev.t3craft.client.t3ui.kit.T3DialogScreen;
+import dev.t3craft.client.t3ui.kit.T3Draw;
+import dev.t3craft.client.t3ui.kit.T3Draw.Tone;
+import dev.t3craft.client.t3ui.kit.T3Field;
+import dev.t3craft.client.t3ui.kit.T3Select;
+import dev.t3craft.client.t3ui.kit.T3Toggle;
 import dev.t3craft.t3.OperateGate;
 import dev.t3craft.t3.OperateResult;
 import java.util.List;
-import net.minecraft.ChatFormatting;
+import java.util.Objects;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.FormattedCharSequence;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -22,27 +26,34 @@ import org.jspecify.annotations.Nullable;
  * {@code projects.mutate project.create} ({@link RegisterProjectForm}) through {@code OperateGate};
  * on success {@link Registered#onRegistered} runs with T3's project id and the dialog returns to
  * its parent. The new project reaches every list through the shell stream.
+ *
+ * <p>A kit dialog ({@link T3DialogScreen}, docs/features/ui-kit.md): an environment {@link T3Select}, two
+ * {@link T3Field}s, a {@link T3Toggle} and Register / Cancel, with a status line that follows the form
+ * (the folder name it will use, the first problem once Register was pressed, the answer of T3).
  */
-public final class RegisterProjectDialog extends Screen {
+public final class RegisterProjectDialog extends T3DialogScreen {
 	@FunctionalInterface
 	public interface Registered {
 		void onRegistered(String envId, String projectId);
 	}
 
-	private static final int W = 360;
+	private static final int W = 380;
 
-	private final @Nullable Screen parent;
+	private record Feedback(String text, Tone tone) {
+	}
+
 	private final Registered registered;
 	private final RegisterProjectForm form = new RegisterProjectForm();
-	private @Nullable EditBox pathBox;
-	private @Nullable EditBox titleBox;
+	/** The fields live as long as the screen: a rebuild keeps what was typed. */
+	private @Nullable T3Field pathField;
+	private @Nullable T3Field titleField;
 	private boolean busy;
 	private boolean showErrors;
-	private Component message = Component.empty();
+	private String message = "";
+	private Tone messageTone = Tone.MUTED;
 
 	public RegisterProjectDialog(@Nullable Screen parent, @Nullable String envId, Registered registered) {
-		super(Component.translatable("t3craft.actions.register_project.title"));
-		this.parent = parent;
+		super(Component.translatable("t3craft.actions.register_project.title"), parent);
 		this.registered = registered;
 		form.envId = envId;
 	}
@@ -65,63 +76,67 @@ public final class RegisterProjectDialog extends Screen {
 		return ActionsClient.gate().enabled(form.envId);
 	}
 
-	private int left() {
-		return width / 2 - w() / 2;
-	}
-
-	private int w() {
-		return Math.min(W, width - 24);
+	/** A "Label: %s" translation as a plain label, for the fields whose value is a control of their own. */
+	private static String label(String langKey) {
+		return T3Draw.template(langKey)[0].replaceAll("[:\\s]+$", "");
 	}
 
 	@Override
-	protected void init() {
+	protected T3Dialog buildDialog() {
 		List<String> es = envs();
 		if (form.envId == null || !es.contains(form.envId)) {
 			form.envId = es.stream().filter(e -> ActionsClient.gate().enabled(e)).findFirst().orElse(es.isEmpty() ? null : es.getFirst());
 		}
-		int x = left();
-		int w = w();
-		int half = w / 2 - 2;
-		int y = 34;
-		addRenderableWidget(Button.builder(Component.translatable("t3craft.actions.field.env",
-				form.envId == null ? "—" : ActionsClient.envLabel(form.envId)), b -> {
-					int i = es.indexOf(form.envId);
-					form.envId = es.isEmpty() ? null : es.get((i + 1) % es.size());
-					rebuildWidgets();
-				}).bounds(x, y, w, 20).build()).active = es.size() > 1 && !busy;
-		y += 36;
-		pathBox = new EditBox(font, x, y, w, 18, Component.translatable("t3craft.actions.field.path"));
-		pathBox.setMaxLength(RegisterProjectForm.MAX_PATH);
-		pathBox.setValue(form.workspaceRoot);
-		pathBox.setHint(Component.translatable("t3craft.actions.field.path.hint").withStyle(ChatFormatting.DARK_GRAY));
-		pathBox.setResponder(v -> {
-			form.workspaceRoot = v;
-			if (titleBox != null) {
-				titleBox.setHint(Component.literal(v.isBlank() ? "" : RegisterProjectForm.inferTitle(v)).withStyle(ChatFormatting.DARK_GRAY));
-			}
+		if (pathField == null) {
+			pathField = new T3Field(font, T3Draw.tr("t3craft.actions.field.path")).maxLength(RegisterProjectForm.MAX_PATH)
+					.hint(T3Draw.tr("t3craft.actions.field.path.hint")).onChange(v -> form.workspaceRoot = v);
+			pathField.setValue(form.workspaceRoot);
+			titleField = new T3Field(font, T3Draw.tr("t3craft.actions.field.name")).maxLength(RegisterProjectForm.MAX_TITLE)
+					.hint("Defaults to the folder name").onChange(v -> form.title = v);
+			titleField.setValue(form.title);
+		}
+
+		T3Select<String> env = new T3Select<>(es, ActionsClient::envLabel, form.envId, v -> {
+			form.envId = v;
+			rebuildWidgets(); // the Register button follows the environment's control
 		});
-		addRenderableWidget(pathBox);
-		y += 34;
-		titleBox = new EditBox(font, x, y, w, 18, Component.translatable("t3craft.actions.field.name"));
-		titleBox.setMaxLength(RegisterProjectForm.MAX_TITLE);
-		titleBox.setValue(form.title);
-		titleBox.setHint(Component.literal(form.workspaceRoot.isBlank() ? "" : RegisterProjectForm.inferTitle(form.workspaceRoot))
-				.withStyle(ChatFormatting.DARK_GRAY));
-		titleBox.setResponder(v -> form.title = v);
-		addRenderableWidget(titleBox);
-		y += 26;
-		addRenderableWidget(Button.builder(Component.translatable("t3craft.actions.field.create_missing",
-				form.createIfMissing ? CommonComponents.OPTION_ON : CommonComponents.OPTION_OFF), b -> {
-					form.createIfMissing = !form.createIfMissing;
-					rebuildWidgets();
-				}).bounds(x, y, w, 20).build());
-		y += 32;
-		Component label = canOperate() ? Component.translatable("t3craft.actions.register").withStyle(ChatFormatting.GOLD)
-				: Component.translatable(java.util.Objects.requireNonNullElse(ActionGate.disabledKey(ActionsClient.gate().state(form.envId)),
-						"t3craft.actions.enable_control")).withStyle(ChatFormatting.YELLOW);
-		addRenderableWidget(Button.builder(label, b -> register()).bounds(x, y, half, 20).build()).active = !busy && form.envId != null;
-		addRenderableWidget(Button.builder(CommonComponents.GUI_CANCEL, b -> onClose()).bounds(x + w - half, y, half, 20).build());
-		setInitialFocus(pathBox);
+		env.setEnabled(es.size() > 1 && !busy);
+
+		T3Toggle create = new T3Toggle(label("t3craft.actions.field.create_missing"), form.createIfMissing, v -> form.createIfMissing = v);
+		create.setTooltip("Off by default: a typo in the path then fails", "instead of creating a folder on the host.");
+
+		boolean can = canOperate();
+		String registerLabel = can ? T3Draw.tr("t3craft.actions.register")
+				: T3Draw.tr(Objects.requireNonNullElse(ActionGate.disabledKey(ActionsClient.gate().state(form.envId)), "t3craft.actions.enable_control"));
+		T3Button register = new T3Button(registerLabel, can ? T3Button.Style.PRIMARY : T3Button.Style.DEFAULT, this::register);
+		register.setEnabled(!busy && form.envId != null);
+
+		return new T3Dialog(title.getString(), W)
+				.labelled(label("t3craft.actions.field.env"), env)
+				.field(T3Draw.tr("t3craft.actions.field.path"), pathField)
+				.field(T3Draw.tr("t3craft.actions.field.name"), titleField)
+				.control(create)
+				.buttons(register, new T3Button(CommonComponents.GUI_CANCEL.getString(), this::onClose))
+				.text(() -> feedback().text(), () -> feedback().tone(), 3)
+				.initialFocus(pathField)
+				.defaultAction(this::register);
+	}
+
+	/** What the status line says now: T3's answer, else the first problem (after a Register), else the name the project will get. */
+	private Feedback feedback() {
+		if (!message.isEmpty()) {
+			return new Feedback(message, messageTone);
+		}
+		if (showErrors) {
+			List<String> errs = form.errors(canOperate(), List.of());
+			if (!errs.isEmpty()) {
+				return new Feedback(errs.getFirst(), Tone.ERROR);
+			}
+		}
+		if (!form.workspaceRoot.isBlank() && form.title.isBlank()) {
+			return new Feedback("Project name: " + RegisterProjectForm.inferTitle(form.workspaceRoot), Tone.MUTED);
+		}
+		return new Feedback("", Tone.MUTED);
 	}
 
 	private void register() {
@@ -135,62 +150,31 @@ public final class RegisterProjectDialog extends Screen {
 		showErrors = true;
 		RegisterProjectForm.Built b = form.build(true, List.of(), RegisterProjectForm.Ids::random);
 		if (b.action() == null) {
-			message = Component.literal(b.error()).withStyle(ChatFormatting.RED);
+			message = ""; // the first problem shows live in the status line
 			return;
 		}
 		busy = true;
 		String env = form.envId;
 		String localId = b.projectId();
-		message = Component.translatable("t3craft.operate.launch.sending").withStyle(ChatFormatting.YELLOW);
-		rebuildWidgets();
+		message = T3Draw.tr("t3craft.operate.launch.sending");
+		messageTone = Tone.WARN;
+		rebuildWidgets(); // Register and the environment select are off while T3 answers
 		OperateUi.run(b.action(), OperateGate.Origin.UI, this, r -> done(env, localId, r));
 	}
 
 	private void done(String env, @Nullable String localId, OperateResult r) {
 		busy = false;
 		if (!r.ok()) {
-			message = Component.literal(r.outcome().wire + ": " + r.message()).withStyle(ChatFormatting.RED);
+			message = r.outcome().wire + ": " + r.message();
+			messageTone = Tone.ERROR;
 			rebuildWidgets();
 			return;
 		}
 		String id = RegisterProjectForm.projectId(r);
 		Minecraft mc = Minecraft.getInstance();
-		mc.gui.setScreen(parent);
-		registered.onRegistered(env, id != null ? id : java.util.Objects.requireNonNullElse(localId, ""));
-	}
-
-	@Override
-	public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float a) {
-		super.extractRenderState(g, mouseX, mouseY, a);
-		int w = w();
-		g.centeredText(font, title.copy().withStyle(ChatFormatting.YELLOW), width / 2, 14, 0xFFFFFFFF);
-		if (pathBox != null) {
-			g.text(font, Component.translatable("t3craft.actions.field.path"), pathBox.getX(), pathBox.getY() - 10, 0xFFA0A0A0);
+		if (mc.gui.screen() == this) {
+			mc.gui.setScreen(parent);
 		}
-		if (titleBox != null) {
-			g.text(font, Component.translatable("t3craft.actions.field.name"), titleBox.getX(), titleBox.getY() - 10, 0xFFA0A0A0);
-		}
-		Component bottom = message;
-		if (bottom.getString().isEmpty() && showErrors) {
-			List<String> errs = form.errors(canOperate(), List.of());
-			if (!errs.isEmpty()) {
-				bottom = Component.literal(errs.getFirst()).withStyle(ChatFormatting.RED);
-			}
-		}
-		int my = height - 30;
-		for (FormattedCharSequence s : font.split(bottom, w)) {
-			g.centeredText(font, s, width / 2, my, 0xFFFFFFFF);
-			my += font.lineHeight;
-		}
-	}
-
-	@Override
-	public void onClose() {
-		minecraft.gui.setScreen(parent);
-	}
-
-	@Override
-	public boolean isPauseScreen() {
-		return false;
+		registered.onRegistered(env, id != null ? id : Objects.requireNonNullElse(localId, ""));
 	}
 }
