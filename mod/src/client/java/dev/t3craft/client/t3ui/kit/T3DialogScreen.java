@@ -4,7 +4,7 @@ import dev.t3craft.client.chat.ChatTheme;
 import dev.t3craft.client.chat.Rect;
 import java.util.List;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -41,9 +41,10 @@ public abstract class T3DialogScreen extends Screen {
 	protected void init() {
 		theme = ChatTheme.warmStudio();
 		dialog = buildDialog();
+		dialog.setScreen(this);
 		dialog.layout(font, theme, width, height, this::addRenderableWidget);
 		for (var child : children()) {
-			if (child instanceof EditBox box && box.isFocused()) {
+			if (child instanceof AbstractWidget box && box.isFocused()) {
 				setFocused(box); // rebuildWidgets() dropped the screen's focus; the new box kept its own flag
 			}
 		}
@@ -90,8 +91,18 @@ public abstract class T3DialogScreen extends Screen {
 	}
 
 	@Override
+	public boolean mouseDragged(MouseButtonEvent event, double dx, double dy) {
+		return dialog.mouseDragged(event.x(), event.y(), event.button()) || super.mouseDragged(event, dx, dy);
+	}
+
+	@Override
+	public boolean mouseReleased(MouseButtonEvent event) {
+		return dialog.mouseReleased(event.x(), event.y(), event.button()) || super.mouseReleased(event);
+	}
+
+	@Override
 	public boolean keyPressed(KeyEvent e) {
-		// an open select takes every key (Esc closes just the list); Esc otherwise reaches Screen → onClose()
+		// an open select takes every key (Esc closes just the list); Esc otherwise reaches Screen -> onClose()
 		return dialog.keyPressed(e) || super.keyPressed(e);
 	}
 

@@ -3,7 +3,7 @@ package dev.t3craft.client.t3ui.kit;
 import dev.t3craft.client.chat.ChatTheme;
 import dev.t3craft.client.chat.Rect;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
@@ -48,7 +48,7 @@ public class T3PanelScreen extends Screen implements T3PanelHost.Owner {
 		int h = Math.min(maxHeight(), height - 12);
 		host.layout(new Rect((width - w) / 2, (height - h) / 2, w, h), font, theme, this::addRenderableWidget);
 		for (var child : children()) {
-			if (child instanceof EditBox box && box.isFocused()) {
+			if (child instanceof AbstractWidget box && box.isFocused()) {
 				setFocused(box); // rebuildWidgets() dropped the screen's focus; the new box kept its own flag
 			}
 		}
@@ -107,17 +107,27 @@ public class T3PanelScreen extends Screen implements T3PanelHost.Owner {
 	}
 
 	@Override
+	public boolean mouseDragged(MouseButtonEvent event, double dx, double dy) {
+		return host.mouseDragged(event.x(), event.y(), event.button()) || super.mouseDragged(event, dx, dy);
+	}
+
+	@Override
+	public boolean mouseReleased(MouseButtonEvent event) {
+		return host.mouseReleased(event.x(), event.y(), event.button()) || super.mouseReleased(event);
+	}
+
+	@Override
 	public boolean keyPressed(KeyEvent e) {
 		if (host.keyPressed(e)) {
 			return true;
 		}
-		// Esc is the host's (it steps back through the pages); anything else goes to the focused text box
-		return !e.isEscape() && super.keyPressed(e);
+		// Esc is the host's (it steps back through the pages); a modal's boxes are the host's too; anything else goes to the focused text box
+		return !e.isEscape() && !host.modalOpen() && super.keyPressed(e);
 	}
 
 	@Override
 	public boolean charTyped(CharacterEvent event) {
-		return !host.modalOpen() && super.charTyped(event);
+		return host.modalOpen() ? host.charTyped(event) : super.charTyped(event);
 	}
 
 	@Override

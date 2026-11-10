@@ -4,6 +4,7 @@ import dev.t3craft.client.chat.ChatDraw;
 import dev.t3craft.client.chat.ChatTheme;
 import dev.t3craft.client.chat.Rect;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import java.util.function.Consumer;
@@ -11,17 +12,26 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The part of showing {@link T3Panel}s that every screen shares: the stack of pages (Settings →
+ * The part of showing {@link T3Panel}s that every screen shares: the stack of pages (Settings, then
  * Environments, Esc goes back), the paper frame with its header (title and a back / close button), the
  * confirmation modal over the page and the input routing around them. {@code T3Screen} owns one for its
  * settings and environments pages, {@link T3PanelScreen} owns one as a screen of its own.
  *
  * <p>The owner forwards its draw and input calls here while {@link #active()}, and skips its own
- * widgets for clicks and keys while {@link #modalOpen()} (the page's text boxes stay under the veil).
+ * widgets for clicks and keys while {@link #modalOpen()} (the page's text boxes stay under the veil). The
+ * owner forwards {@link #charTyped}, {@link #mouseDragged} and {@link #mouseReleased} too: typing into a
+ * field of the modal and dragging a scrollbar thumb need them.
+ *
+ * <p>A modal ({@link #modal}) is laid out once when it opens and again when the screen is laid out (a
+ * resize), not every frame, so it may hold text fields: the dialog draws and routes their boxes itself
+ * (they are not widgets of the screen).
+ *
+ * <p>Tab walks the page's controls and then the header button.
  */
 public final class T3PanelHost implements T3Panel.Host {
 	/** What the host needs from the screen that owns it. */
@@ -42,6 +52,10 @@ public final class T3PanelHost implements T3Panel.Host {
 	private final T3Form chrome = new T3Form();
 	private @Nullable T3Panel current;
 	private @Nullable T3Dialog modal;
+	private boolean modalPlaced;
+	private boolean modalFresh;
+	private @Nullable Font font;
+	private ChatTheme theme = ChatTheme.warmStudio();
 	private Rect frame = Rect.EMPTY;
 	private int pad = 8;
 
@@ -122,6 +136,11 @@ public final class T3PanelHost implements T3Panel.Host {
 	@Override
 	public void modal(@Nullable T3Dialog dialog) {
 		this.modal = dialog;
+		this.modalPlaced = false;
+		this.modalFresh = dialog != null;
+		if (dialog != null) {
+			dialog.setScreen(null); // its boxes are the dialog's own, not the screen's
+		}
 	}
 
 	@Override
@@ -135,12 +154,15 @@ public final class T3PanelHost implements T3Panel.Host {
 	public void layout(Rect area, Font font, ChatTheme t, Consumer<AbstractWidget> sink) {
 		frame = area;
 		pad = t.pad();
+		this.font = font;
+		this.theme = t;
+		modalPlaced = false; // the modal is laid out again at the next draw (a resize, F3+T)
 		chrome.clear();
 		T3Panel p = current;
 		if (p == null) {
 			return;
 		}
-		String label = stack.isEmpty() ? "✕" : "‹ Back";
+		String label = stack.isEmpty() ? "X" : "< Back";
 		T3Button back = new T3Button(label, T3Button.Style.GHOST, this::back);
 		int bw = Math.max(18, font.width(label) + 12);
 		back.setBounds(new Rect(area.right() - pad - bw, area.y() + pad - 2, bw, T3Control.H));
@@ -185,8 +207,14 @@ public final class T3PanelHost implements T3Panel.Host {
 		}
 		g.nextStratum();
 		T3Dialog.veil(g, t, screen.w(), screen.h());
-		modal.layout(font, t, screen.w(), screen.h(), w -> {
-		});
+		if (!modalPlaced) {
+			modal.layoutOwned(font, t, screen.w(), screen.h());
+			modalPlaced = true;
+			if (modalFresh) {
+				modalFresh = false;
+				modal.focusInitial(null);
+			}
+		}
 		modal.render(g, font, t, mx, my);
 		modal.renderOverlays(g, font, t, mx, my, screen);
 	}
@@ -211,7 +239,23 @@ public final class T3PanelHost implements T3Panel.Host {
 		if (p.overlayOpen()) {
 			return p.mouseClicked(mx, my, button);
 		}
+		T3Focus.dropNonInput(chrome.controls());
 		return chrome.mouseClicked(mx, my, button) || p.mouseClicked(mx, my, button);
+	}
+
+	/** A held button moved: a scrollbar thumb of the page follows it. */
+	public boolean mouseDragged(double mx, double my, int button) {
+		if (modal != null) {
+			return modal.mouseDragged(mx, my, button);
+		}
+		return current != null && current.mouseDragged(mx, my, button);
+	}
+
+	public boolean mouseReleased(double mx, double my, int button) {
+		if (modal != null) {
+			return modal.mouseReleased(mx, my, button);
+		}
+		return current != null && current.mouseReleased(mx, my, button);
 	}
 
 	public boolean mouseScrolled(double mx, double my, double dy) {
@@ -222,7 +266,12 @@ public final class T3PanelHost implements T3Panel.Host {
 		return current != null && current.mouseScrolled(mx, my, dy);
 	}
 
-	/** True when the key was the host's or the page's; Esc with nothing open goes back. */
+	/** Typed characters go to the modal's focused box; the page's boxes are the screen's own. */
+	public boolean charTyped(CharacterEvent e) {
+		return modal != null && modal.charTyped(e);
+	}
+
+	/** True when the key was the host's or the page's; Esc with nothing open goes back, Tab walks the controls. */
 	public boolean keyPressed(KeyEvent e) {
 		if (modal != null) {
 			if (e.isEscape()) {
@@ -242,6 +291,15 @@ public final class T3PanelHost implements T3Panel.Host {
 			}
 			return true;
 		}
-		return p.keyPressed(e);
+		if (T3Focus.isTab(e) && !p.overlayOpen()) {
+			List<T3Control> order = new ArrayList<>(p.focusOrder());
+			order.addAll(chrome.controls());
+			if (T3Focus.move(order, e.hasShiftDown(), owner.screen())) {
+				p.revealFocus();
+				return true;
+			}
+			return false;
+		}
+		return chrome.keyPressed(e) || p.keyPressed(e);
 	}
 }

@@ -38,6 +38,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.CharacterEvent;
@@ -378,7 +379,7 @@ public final class T3Screen extends Screen {
 		if (pages.active() && layout.main().w() > 0) {
 			pages.layout(layout.main(), font, theme, this::addRenderableWidget);
 			for (var child : children()) {
-				if (child instanceof EditBox pageBox && pageBox.isFocused()) {
+				if (child instanceof AbstractWidget pageBox && pageBox.isFocused()) {
 					setFocused(pageBox); // rebuildWidgets() dropped the screen's focus; the new box kept its own flag
 				}
 			}
@@ -1518,11 +1519,17 @@ public final class T3Screen extends Screen {
 
 	@Override
 	public boolean mouseDragged(MouseButtonEvent event, double dx, double dy) {
+		if (pages.active() && pages.mouseDragged(event.x(), event.y(), event.button())) {
+			return true; // a scrollbar thumb of the kit page
+		}
 		return (composer != null && composer.mouseDragged(event.x(), event.y())) || super.mouseDragged(event, dx, dy);
 	}
 
 	@Override
 	public boolean mouseReleased(MouseButtonEvent event) {
+		if (pages.active() && pages.mouseReleased(event.x(), event.y(), event.button())) {
+			return true;
+		}
 		return (composer != null && composer.mouseReleased()) || super.mouseReleased(event);
 	}
 
@@ -1671,7 +1678,7 @@ public final class T3Screen extends Screen {
 	@Override
 	public boolean charTyped(CharacterEvent event) {
 		if (pages.active()) {
-			return !pages.modalOpen() && super.charTyped(event); // the page's text box, or the sidebar search
+			return pages.modalOpen() ? pages.charTyped(event) : super.charTyped(event); // the modal's box, the page's text box, or the sidebar search
 		}
 		for (T3Slots.Popup p : popups) {
 			if (p.isOpen() && p.charTyped(event.codepoint())) {

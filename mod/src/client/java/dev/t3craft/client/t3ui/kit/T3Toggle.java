@@ -7,6 +7,7 @@ import dev.t3craft.client.chat.Rect;
 import java.util.function.Consumer;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.input.KeyEvent;
 
 /**
  * A labelled on/off switch (T3 Code's settings rows): the label on the left, a small track with a knob
@@ -50,6 +51,27 @@ public final class T3Toggle extends T3Control {
 		ChatDraw.round(g, track.x(), track.y(), track.w(), track.h(), !enabled() ? t.edge() : value ? t.accent() : t.disabled());
 		int kx = value ? track.right() - KNOB - 1 : track.x() + 1;
 		ChatDraw.round(g, kx, track.y() + 1, KNOB, KNOB, t.panelHi());
+		drawFocus(g, t);
+	}
+
+	private void flip() {
+		value = !value;
+		onChange.accept(value);
+	}
+
+	@Override
+	public boolean focusable() {
+		return true;
+	}
+
+	/** Enter or Space flips the switch while it has the keyboard. */
+	@Override
+	public boolean keyPressed(KeyEvent e) {
+		if (focused() && enabled() && visible() && T3Focus.isActivate(e)) {
+			flip();
+			return true;
+		}
+		return false;
 	}
 
 	@Override
@@ -57,8 +79,7 @@ public final class T3Toggle extends T3Control {
 		if (!enabled() || !visible() || !MouseButtons.isLeft(button) || !bounds().contains(mx, my)) {
 			return false;
 		}
-		value = !value;
-		onChange.accept(value);
+		flip();
 		return true;
 	}
 }

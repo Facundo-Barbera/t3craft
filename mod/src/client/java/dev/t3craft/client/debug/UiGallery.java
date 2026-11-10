@@ -20,6 +20,7 @@ import dev.t3craft.client.screen.PairScreen;
 import dev.t3craft.client.screen.SnoozeScreen;
 import dev.t3craft.client.t3ui.T3Screen;
 import dev.t3craft.client.t3ui.T3Slots;
+import dev.t3craft.client.t3ui.kit.T3KitDemoPanel;
 import dev.t3craft.client.t3ui.kit.T3PanelScreen;
 import dev.t3craft.t3.Environments;
 import dev.t3craft.t3.OperateAction;
@@ -89,6 +90,10 @@ public final class UiGallery {
 					() -> new dev.t3craft.client.pieces.PieceBrowserScreen(null)),
 			new Scenario("inbox-pieces", "Main T3 screen with the piece browser in the thread's place (the ⋯ menu → Pieces)",
 					() -> inbox(true, true).withPage(new dev.t3craft.client.pieces.PieceBrowserPanel())),
+			new Scenario("kit", "UI kit demo as a screen of its own: Tab / Enter / Space focus, list keys, draggable scrollbars, fields clipped in a scrolling page, a dialog with fields",
+					() -> new T3PanelScreen(null, new T3KitDemoPanel())),
+			new Scenario("inbox-kit", "The same UI kit demo inside the main T3 screen (the dialog with fields and the scrollbar drag go through T3Screen)",
+					() -> inbox(true, true).withPage(new T3KitDemoPanel())),
 			new Scenario("queue", "Queued runs (reads the live queue, empty without a connection)", () -> new QueueScreen(null, null)));
 
 	private UiGallery() {
