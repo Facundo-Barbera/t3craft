@@ -295,6 +295,7 @@ public final class HqRender {
 				case "--sizes" -> catalogSizes = Integer.parseInt(args[++i]);
 				case "--box" -> CatalogViews.boxes = args[++i]; // WxDxH[,WxDxH...]: exact catalog sizes instead of min/mid/max
 				case "--seeds" -> catalogSeeds = Integer.parseInt(args[++i]);
+				case "--boxes" -> CatalogViews.boxes = args[++i]; // same as --box
 				case "--radius" -> radius = Integer.parseInt(args[++i]);
 				case "--name" -> piece.name = args[++i];
 				case "--pad" -> piece.pad = Integer.parseInt(args[++i]);
