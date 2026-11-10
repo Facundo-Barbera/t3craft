@@ -93,6 +93,14 @@ final class SiteProgram {
 	static final int FLOOR_MIN = 12;
 	/** Real floors nearer than this to the one below do not start a storey. */
 	static final int STOREY_MIN = 3;
+	/**
+	 * #53: a <b>tower</b> (a building whose footprint has at most {@link #TOWER_COLS} columns and whose builder entries
+	 * span at least {@link #TOWER_HEIGHT} blocks) is cut into lifts of at least this many blocks where it has no real
+	 * floors: half as many storey gates (each one a wave barrier for the few bays of a narrow footprint).
+	 */
+	static final int TOWER_LIFT = 8;
+	static final int TOWER_COLS = 144;
+	static final int TOWER_HEIGHT = 16;
 	/** Rounds of one stage of one storey at most; what is left waits for the late rounds. */
 	static final int MAX_ROUNDS = 6;
 	/**
@@ -778,6 +786,8 @@ final class SiteProgram {
 				continue;
 			}
 			int need = Math.max(FLOOR_MIN, buildCols[s] / FLOOR_SHARE);
+			boolean tower = siteKind[s] == BUILDING && siteCols[s] <= TOWER_COLS && hi - lo + 1 >= TOWER_HEIGHT;
+			int siteLift = tower ? Math.max(lift, TOWER_LIFT) : lift;
 			IntArrayList bases = new IntArrayList();
 			BooleanArrayList real = new BooleanArrayList();
 			bases.add(lo);
@@ -789,7 +799,7 @@ final class SiteProgram {
 					continue;
 				}
 				// lifts between the base below and this floor (or the top), while at least a small storey is left over them
-				for (int cut = lastBase + lift; yy - cut >= STOREY_MIN && bases.size() < MAX_STOREYS; cut += lift) {
+				for (int cut = lastBase + siteLift; yy - cut >= STOREY_MIN && bases.size() < MAX_STOREYS; cut += siteLift) {
 					bases.add(cut);
 					real.add(false);
 				}

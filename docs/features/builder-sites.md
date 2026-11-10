@@ -246,6 +246,9 @@ New keys in `build`, all additive:
 | `sitesOpen` | 2 | sites open at once (one more when builders are to spare); 1 = one at a time |
 | `sitesAtOnce` | 3 | #53: sites built in parallel, each with its own crew (0..6); 0 = the #48 rules above (`sitesOpen`) |
 | `sitesCrew` | 16 | #53: builders of a big `"sites"` plan (1..16), read when the build starts; `radialCrewMax` stays the radial one |
+| `siteCrewLarge` | 10 | #53: a site with much left grows past `siteCrewMax` up to this (one more per 5 × `entriesPerBuilder` left) |
+| `siteBayCrew` | 3 | #53: builders on one bay at most (owner and helpers); was 2, fixed |
+| `speed` | `"normal"` | #53: `"calm"` (× 0.6), `"normal"`, `"fast"` (× 1.6): builders' pace and block budget of `"sites"` builds |
 
 Reused as they are: `entriesPerBuilder` (one more builder per this many entries the site has left), `radiusMin` +
 `radiusStep` (the carpet's radius), the corridor keys, `groundBlocksPerTick`, `fillBlocksPerTick`,
@@ -469,6 +472,47 @@ After `sites a/b` the line gets ` | parallel 2/3 retain 1 crew 16 120 b/s handov
 retained sites, builders of the job, builder blocks per second (all sites, smoothed over a few seconds), handovers.
 Each open site shows `focus`, `parallel` or `retain` (and `leaving`), and after its crew ` crew 5/6 48 b/s`: builders
 on it / its share, its blocks per second. ` near`: opened by proximity.
+
+## Tall and large sites (#53)
+
+"Todavía se siente muy lento. Las edificaciones verticales y un poco más grandes les cuesta." Read from the code, not
+measured.
+
+### Why a tower was slow
+
+| # | cause | where | effect |
+|---|---|---|---|
+| 1 | **walking inside the bay** | `SiteCursor.work` / `standFor` | a builder stands beside the column it places (on its own side) and walks again whenever the next entry is more than `REACH` (4) away on an axis. A bay is 6 wide and is laid in rows across the access direction, alternating, so a builder beside one edge walked across the bay about once or twice per layer, ~5–10 ticks each (0.6 blocks a tick, up to 20), against ~6 ticks of placing for a whole lift of a bay's wall. Walking took most of a builder's time, worst on towers where every layer is a short ring |
+| 2 | **few bays, few builders** | `SiteDispatch.crew`, `SiteCursor.pick` (`TASK_CREW` 2) | a narrow footprint is 1–4 bays, a wave one task per bay, and the crew is never more than the free tasks; one helper per task at most. A 10 × 10 tower used 2–4 builders out of 12 |
+| 3 | **`siteCrewMax` 6, whatever is left** | `staff` | a site with 30 000 entries got the same 6 builders as one with 2 000 |
+| 4 | **storey gates** | `SiteProgram` storeys (lifts of `siteStorey` 5) | a tower with no real floor every few blocks is a lift every 5 blocks: each lift is up to five stages, each one or more waves, each a barrier for the few bays. Many short waves = many tails (#48, cause 1) |
+| 5 | **the rear guard** | #48 dispatch | a tower left behind was 2 builders at 30 % (fixed by "Parallel sites") |
+
+Checked and **not** the cause: `climbBlocksPerTick` (10) **is** applied in `"sites"`: every task of 24 entries or more
+(`TALL_TASK`) is placed at it, the others at `blocksPerTick` (6). The global budget (`maxBlocksPerTick` 96, 8 ms/tick)
+is not reached by 2–4 builders at 6–10 blocks a tick; it can be with 16. The MSPT / FPS throttle cuts the budget only
+when the server or client is slow (`throttle` in the status).
+
+### What changed
+
+- **Stand by the middle of the bay** (1). When a builder has to move, it goes to the middle of its bay's builder columns
+  (the apron left out; helpers one block aside) whenever that reaches the column: from there the whole bay is within
+  `REACH`, so a task is one walk and then climbing in place. Bays merged past 6 blocks fall back to the old spot beside
+  the column. `walks/task` in the status counts the walks inside tasks per task taken: about 1 or less is the goal.
+- **More builders per bay** (2): `build.siteBayCrew` (3) builders on one task (the owner and two helpers; a helper joins
+  only while the task has 8 entries or more left, as before). The crew a site can use counts it: tasks × 3.
+- **Crew by volume** (3): `build.siteCrewLarge` (10): a site's maximum is `siteCrewMax`, one more per 5 ×
+  `entriesPerBuilder` (6 000) entries left, up to 10. A big hall with 24 000 left gets 10; a small module stays at 6.
+- **Taller lifts in towers** (4): a building with a footprint of 144 columns or fewer whose builder entries span 16
+  blocks or more is cut into lifts of 8 (at least `siteStorey`) where it has no real floors. Real floors still start
+  storeys as before, so a tower with floors keeps them; it still rises lift by lift, never column by column.
+- **Speed** (`build.speed`, Settings → *Build speed*): `calm` × 0.6, `normal` × 1, `fast` × 1.6 on the builders' pace
+  (`blocksPerTick` and `climbBlocksPerTick`) and on the global block budget while `build.order` is `"sites"`
+  (`BuildTuning.blockBudget`; other orders: unchanged). The 8 ms per tick cap and the MSPT / FPS throttle apply on top,
+  so "fast" cannot lag the server more than the time cap allows. Read every tick: it changes a running build.
+
+Kept: the wave barrier (a storey still closes before the next starts), the stages, the 70 / 30 pace, every per-tick
+time cap. These changes apply with `sitesAtOnce: 0` too (they are about the crew's work, not the dispatch).
 
 ## Not done / open
 

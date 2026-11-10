@@ -56,7 +56,10 @@ import java.util.List;
  *   "sitesOpen": 2,            // sites open at once: the focus and the one being closed (one more when builders are to spare); 1 = one at a time
  *   // feat/sites-parallel-pace (#53, order "sites"):
  *   "sitesAtOnce": 3,          // sites built in parallel (the player's and the others, each with its own crew); 0 = the #48 rules (sitesOpen)
- *   "sitesCrew": 16            // builders of a big "sites" plan, all sites together (radialCrewMax stays the radial one)
+ *   "sitesCrew": 16,           // builders of a big "sites" plan, all sites together (radialCrewMax stays the radial one)
+ *   "siteCrewLarge": 10,       // a site with much left grows past siteCrewMax up to this (one more per 5 × entriesPerBuilder left)
+ *   "siteBayCrew": 3,          // builders on one bay at most (its owner and helpers), so a narrow tower uses more than one per bay
+ *   "speed": "normal"          // "calm" (× 0.6), "normal" (× 1) or "fast" (× 1.6): builders' pace and block budget of "sites" builds
  * },
  * "buildNearPlayer": { "enabled": true, "radius": 48 }
  * }</pre>
@@ -70,7 +73,8 @@ public record BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int front
 		boolean nearPlayer, int nearPlayerRadius, boolean radial, int radialRing, int groundBlocksPerTick, int fillBlocksPerTick,
 		int foundationRingsAhead, int builderRingsAhead, int fillRingsBehind, double climbBlocksPerTick, int corridorLength, int corridorWidth,
 		int corridorBlocksPerTick, double corridorMsPerTick, int radiusMin, int radiusStep, int radialMinBuilders, int entriesPerBuilder,
-		int radialCrewMax, boolean sites, int siteCrewMin, int siteCrewMax, int siteStorey, int sitesOpen, int sitesAtOnce, int sitesCrew) {
+		int radialCrewMax, boolean sites, int siteCrewMin, int siteCrewMax, int siteStorey, int sitesOpen, int sitesAtOnce, int sitesCrew,
+		int siteCrewLarge, int siteBayCrew, String speed) {
 	public static final String SECTION = "build";
 	/** feat/build-near-player: top-level object {@code {enabled, radius}}. */
 	public static final String NEAR_SECTION = "buildNearPlayer";
@@ -87,6 +91,14 @@ public record BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int front
 	 * storeys, a front anchored where the player arrived.
 	 */
 	public static final String ORDER_SITES = "sites";
+	/**
+	 * #53: {@code build.speed} values, in the order Settings shows them, and their factor ({@link #speedFactor}). Declared
+	 * before {@link #DEFAULTS}: the constructor reads them while the class initialises.
+	 */
+	public static final String SPEED_CALM = "calm";
+	public static final String SPEED_NORMAL = "normal";
+	public static final String SPEED_FAST = "fast";
+	public static final List<String> SPEEDS = List.of(SPEED_CALM, SPEED_NORMAL, SPEED_FAST);
 	/** fix/build-radial-tune: fastFoundation off; ground 32, fill 128, rings ahead 1 / 1, fill 2 rings behind, climb 10. */
 	/**
 	 * fix/builder-round-radius: round work radius 5 blocks to start with, 4 blocks more each time the disc is done; builders
@@ -94,7 +106,7 @@ public record BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int front
 	 * within 24 blocks of the player, up to the crew (12 for a big radial plan).
 	 */
 	public static final BuildTuning DEFAULTS = new BuildTuning(96, 3, 8, 8, true, 40.0, false, 192, 10.0, 6.0, 8, true, 48, true, 5, 32, 128, 1, 0, 2,
-			10.0, 20, 7, 64, 3.0, 5, 4, 3, 1200, 12, false, 2, 6, 5, 2, 3, 16);
+			10.0, 20, 7, 64, 3.0, 5, 4, 3, 1200, 12, false, 2, 6, 5, 2, 3, 16, 10, 3, SPEED_NORMAL);
 	/** A radial plan with at least this many entries gets the bigger crew ({@link #radialCrewMax}) so the builders can grow with the work around the player. */
 	public static final int RADIAL_BIG_PLAN = 60_000;
 
@@ -141,6 +153,49 @@ public record BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int front
 		sitesOpen = clamp(sitesOpen, 1, 4);
 		sitesAtOnce = clamp(sitesAtOnce, 0, SITES_AT_ONCE_MAX);
 		sitesCrew = clamp(sitesCrew, 1, 16);
+		siteCrewLarge = clamp(siteCrewLarge, siteCrewMax, 16);
+		siteBayCrew = clamp(siteBayCrew, 1, 4);
+		speed = SPEED_CALM.equals(speed) || SPEED_FAST.equals(speed) ? speed : SPEED_NORMAL; // null or unknown: normal
+	}
+
+	/** #53 constructor: the #53 pace settings at their defaults (large site 10, 3 per bay, normal speed). */
+	public BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int frontsPerJob, int maxEffectsPerTick, boolean autoThrottle, double targetMspt,
+			boolean fastFoundation, int foundationBlocksPerTick, double foundationMsPerTick, double blocksPerTick, int crew, boolean nearPlayer,
+			int nearPlayerRadius, boolean radial, int radialRing, int groundBlocksPerTick, int fillBlocksPerTick, int foundationRingsAhead,
+			int builderRingsAhead, int fillRingsBehind, double climbBlocksPerTick, int corridorLength, int corridorWidth, int corridorBlocksPerTick,
+			double corridorMsPerTick, int radiusMin, int radiusStep, int radialMinBuilders, int entriesPerBuilder, int radialCrewMax, boolean sites,
+			int siteCrewMin, int siteCrewMax, int siteStorey, int sitesOpen, int sitesAtOnce, int sitesCrew) {
+		this(maxBlocksPerTick, maxConcurrentJobs, frontsPerJob, maxEffectsPerTick, autoThrottle, targetMspt, fastFoundation, foundationBlocksPerTick,
+				foundationMsPerTick, blocksPerTick, crew, nearPlayer, nearPlayerRadius, radial, radialRing, groundBlocksPerTick, fillBlocksPerTick,
+				foundationRingsAhead, builderRingsAhead, fillRingsBehind, climbBlocksPerTick, corridorLength, corridorWidth, corridorBlocksPerTick,
+				corridorMsPerTick, radiusMin, radiusStep, radialMinBuilders, entriesPerBuilder, radialCrewMax, sites, siteCrewMin, siteCrewMax, siteStorey,
+				sitesOpen, sitesAtOnce, sitesCrew, 10, 3, SPEED_NORMAL);
+	}
+
+	/**
+	 * #53: what {@code build.speed} multiplies: 0.6 calm, 1 normal, 1.6 fast. A {@code "sites"} build scales its builders'
+	 * pace ({@code blocksPerTick}, {@code climbBlocksPerTick}) and the global block budget ({@link #blockBudget}) by it;
+	 * the 8 ms per tick cap and the MSPT / FPS throttle still apply on top.
+	 */
+	public double speedFactor() {
+		return switch (speed) {
+			case SPEED_CALM -> 0.6;
+			case SPEED_FAST -> 1.6;
+			default -> 1.0;
+		};
+	}
+
+	/**
+	 * #53: the global block budget per tick before the throttle: {@link #maxBlocksPerTick}, times {@link #speedFactor}
+	 * while {@code build.order} is {@code "sites"} (other orders: unchanged).
+	 */
+	public int blockBudget() {
+		return sites ? (int) Math.max(1, Math.min(4096, Math.round(maxBlocksPerTick * speedFactor()))) : maxBlocksPerTick;
+	}
+
+	/** #53: most builders of a site with {@code left} builder entries left: {@link #siteCrewMax}, one more per 5 × {@link #entriesPerBuilder}, up to {@link #siteCrewLarge}. */
+	public int siteCrewFor(int left) {
+		return Math.max(siteCrewMax, Math.min(siteCrewLarge, siteCrewMax + Math.max(0, left) / Math.max(1, entriesPerBuilder * 5)));
 	}
 
 	/** #53: most sites {@code build.sitesAtOnce} may build in parallel. */
@@ -345,6 +400,18 @@ public record BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int front
 		int sOpen = (int) number(SECTION, s, "sitesOpen", d.sitesOpen(), 1, 4, true, warn);
 		int sAtOnce = (int) number(SECTION, s, "sitesAtOnce", d.sitesAtOnce(), 0, SITES_AT_ONCE_MAX, true, warn);
 		int sCrew = (int) number(SECTION, s, "sitesCrew", d.sitesCrew(), 1, 16, true, warn);
+		int sLarge = (int) number(SECTION, s, "siteCrewLarge", d.siteCrewLarge(), 1, 16, true, warn);
+		int sBay = (int) number(SECTION, s, "siteBayCrew", d.siteBayCrew(), 1, 4, true, warn);
+		String speed = d.speed();
+		if (s.has("speed")) {
+			JsonElement e = s.get("speed");
+			String v = e.isJsonPrimitive() && e.getAsJsonPrimitive().isString() ? e.getAsString().trim().toLowerCase(java.util.Locale.ROOT) : "";
+			if (SPEEDS.contains(v)) {
+				speed = v;
+			} else {
+				warn.add(SECTION + ".speed");
+			}
+		}
 		boolean near = d.nearPlayer();
 		int radius = d.nearPlayerRadius();
 		if (root.has(NEAR_SECTION)) {
@@ -357,7 +424,8 @@ public record BuildTuning(int maxBlocksPerTick, int maxConcurrentJobs, int front
 			}
 		}
 		return new Result(new BuildTuning(blocks, jobs, fronts, effects, auto, mspt, fast, fBlocks, fMs, pace, crew, near, radius, radial, ring, ground, fill, gAhead,
-				bAhead, behind, climb, cLen, cWidth, cBlocks, cMs, rMin, rStep, rBuilders, perBuilder, rCrew, sites, sMin, sMax, sStorey, sOpen, sAtOnce, sCrew), List.copyOf(warn));
+				bAhead, behind, climb, cLen, cWidth, cBlocks, cMs, rMin, rStep, rBuilders, perBuilder, rCrew, sites, sMin, sMax, sStorey, sOpen, sAtOnce, sCrew, sLarge,
+				sBay, speed), List.copyOf(warn));
 	}
 
 	private static boolean bool(String section, JsonObject s, String key, boolean def, List<String> warn) {

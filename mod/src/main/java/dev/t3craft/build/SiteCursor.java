@@ -79,7 +79,7 @@ public final class SiteCursor implements JobCursor {
 	static final int REACH = 4;
 	/** A builder climbs once the entry it places is this far above its feet. */
 	static final int RAISE_ABOVE = 3;
-	/** Most builders on one task (its owner and one helper)... */
+	/** Most builders on one task (its owner and one helper) with the #48 rules; #53: {@code build.siteBayCrew}... */
 	static final int TASK_CREW = 2;
 	/** ...and a helper joins only when the task has this many entries left. */
 	static final int HELP_MIN = 8;
@@ -339,6 +339,14 @@ public final class SiteCursor implements JobCursor {
 	private final double[] siteBps;
 	private long allMark;
 	private double allBps;
+	/** #53: builders on one task at most ({@code build.siteBayCrew}), read every tick. */
+	private int bayCrew = TASK_CREW;
+	/** #53: where a builder stands to reach a whole bay: the middle of its builder columns (the apron left out). */
+	private final int[] bayMidX;
+	private final int[] bayMidZ;
+	/** #53: walks a builder made inside a task (to the middle of its bay or, out of reach, beside a column), and tasks taken. */
+	private long taskWalks;
+	private long tasksTaken;
 
 	private @Nullable IntPredicate already;
 	private CrewCursor.@Nullable Walker walker;
@@ -402,6 +410,23 @@ public final class SiteCursor implements JobCursor {
 		idleWhy = new int[this.builders];
 		lent = new boolean[this.builders];
 		bayNbr = new int[p.bays][];
+		bayMidX = new int[p.bays];
+		bayMidZ = new int[p.bays];
+		for (int b = 0; b < p.bays; b++) {
+			double sx = 0;
+			double sz = 0;
+			int cnt = 0;
+			for (int k = p.bayColStart[b]; k < p.bayColStart[b + 1]; k++) {
+				int c = p.bayCols[k];
+				if (!p.apronCol[c]) {
+					sx += p.colX[c] + 0.5;
+					sz += p.colZ[c] + 0.5;
+					cnt++;
+				}
+			}
+			bayMidX[b] = cnt == 0 ? (int) Math.floor(p.bayX[b]) : (int) Math.floor(sx / cnt);
+			bayMidZ[b] = cnt == 0 ? (int) Math.floor(p.bayZ[b]) : (int) Math.floor(sz / cnt);
+		}
 		sitePlaced = new long[p.sites];
 		siteMark = new long[p.sites];
 		siteBps = new double[p.sites];
@@ -710,6 +735,7 @@ public final class SiteCursor implements JobCursor {
 			tickNo++;
 			airTicks = hasPlayer && !grounded ? airTicks + 1 : 0;
 			BuildTuning t = BuildBudget.global().tuning();
+			bayCrew = Math.max(1, t.siteBayCrew());
 			install();
 			if (parallel(t) && p.sites > 0 && hasPlayer && !airborne() && tickNo < dispatchAt) {
 				// #53: walking into a building is answered on this tick, not at the next dispatch round
@@ -1450,8 +1476,9 @@ public final class SiteCursor implements JobCursor {
 			if (o.finished) {
 				continue;
 			}
-			int max = tier[k] <= 1 ? t.siteCrewMax() : tier[k] == 2 ? SiteDispatch.RETAIN : SiteDispatch.LEAVING_CREW;
-			int tasks = o.prog == null ? (o.focus ? max : t.siteCrewMin()) : o.waveTasksLeft + aheadTasks(o);
+			// #53: a site with much left may grow past siteCrewMax (siteCrewLarge); a task takes up to siteBayCrew builders
+			int max = tier[k] <= 1 ? t.siteCrewFor(siteLeft[o.site]) : tier[k] == 2 ? SiteDispatch.RETAIN : SiteDispatch.LEAVING_CREW;
+			int tasks = o.prog == null ? (o.focus ? t.siteCrewMax() : t.siteCrewMin()) : o.waveTasksLeft * bayCrew + aheadTasks(o);
 			hard[k] = max;
 			cap[k] = tier[k] <= 1 ? SiteDispatch.crew(siteLeft[o.site], tasks, t.siteCrewMin(), max, t.entriesPerBuilder(), Integer.MAX_VALUE)
 					: Math.min(max, Math.max(1, tasks));
@@ -1634,7 +1661,8 @@ public final class SiteCursor implements JobCursor {
 			}
 		}
 		// #48: the wave a builder may start ahead counts too, so a short wave does not send builders away just before a long one
-		int tasks = o.prog == null ? builders : o.waveTasksLeft + aheadTasks(o);
+		// #53: a task takes up to build.siteBayCrew builders (a narrow tower has few bays)
+		int tasks = o.prog == null ? builders : o.waveTasksLeft * bayCrew + aheadTasks(o);
 		// #48: while the focus cannot open, the sites it waits for (leaving, closing their storey) take the free builders
 		boolean hurry = !o.focus && o.leaving && focusSite >= 0 && open[focusSite] == null;
 		if (o.finished) {
@@ -1642,7 +1670,8 @@ public final class SiteCursor implements JobCursor {
 		} else if (o.rear && !o.focus && !hurry) {
 			o.want = Math.min(Math.min(SiteDispatch.REAR, Math.max(1, tasks)), o.crew + free);
 		} else {
-			o.want = SiteDispatch.crew(siteLeft[o.site], tasks, t.siteCrewMin(), t.siteCrewMax(), t.entriesPerBuilder(), o.focus || hurry ? o.crew + free : o.crew);
+			o.want = SiteDispatch.crew(siteLeft[o.site], tasks, t.siteCrewMin(), t.siteCrewFor(siteLeft[o.site]), t.entriesPerBuilder(),
+					o.focus || hurry ? o.crew + free : o.crew);
 		}
 		for (int f = 0; f < builders && o.crew < o.want; f++) {
 			if (tSite[f] < 0) {
@@ -2155,7 +2184,9 @@ public final class SiteCursor implements JobCursor {
 	private void tickBuilders(double allowance, FrontCursor.Step step, BuildTuning t) {
 		long t0 = System.nanoTime();
 		try {
-			double climb = Math.max(perBuilder, t.climbBlocksPerTick());
+			// #53: build.speed scales the pace of every builder (and, BuildTuning.blockBudget, the global budget)
+			double pace = perBuilder * t.speedFactor();
+			double climb = Math.max(pace, t.climbBlocksPerTick() * t.speedFactor());
 			boolean focusWork = false;
 			boolean otherWork = false;
 			for (int f = 0; f < builders; f++) {
@@ -2184,12 +2215,12 @@ public final class SiteCursor implements JobCursor {
 			if (focusWork && otherWork) {
 				double total = credit;
 				// the focus always gets at least one placement when there is credit for one
-				double spent = work(1, Math.max(total * SiteDispatch.FOCUS_SHARE, Math.min(total, 1.0)), climb, used, step);
-				spent += work(2, total - spent, climb, used, step);
-				spent += work(1, total - spent, climb, used, step);
+				double spent = work(1, Math.max(total * SiteDispatch.FOCUS_SHARE, Math.min(total, 1.0)), pace, climb, used, step);
+				spent += work(2, total - spent, pace, climb, used, step);
+				spent += work(1, total - spent, pace, climb, used, step);
 				credit = total - spent;
 			} else {
-				credit -= work(0, credit, climb, used, step);
+				credit -= work(0, credit, pace, climb, used, step);
 			}
 			if (tickSkips >= BuildCursor.DEFAULT_MAX_SKIPS_PER_TICK) {
 				credit = Math.min(credit, 0.999); // bounded work per tick even where most of a site is already there
@@ -2203,7 +2234,7 @@ public final class SiteCursor implements JobCursor {
 	 * Lets the builders of {@code group} (0: all, 1: the focus site's, 2: the others) place up to {@code limit}
 	 * blocks, in turns; {@code used} counts each builder's placements this tick across calls. Returns the credit spent.
 	 */
-	private double work(int group, double limit, double climb, int[] used, FrontCursor.Step step) {
+	private double work(int group, double limit, double pace, double climb, int[] used, FrontCursor.Step step) {
 		double left = limit;
 		boolean progress = true;
 		while (left >= 1.0 && progress && state == JobState.RUNNING && tickSkips < BuildCursor.DEFAULT_MAX_SKIPS_PER_TICK) {
@@ -2222,7 +2253,7 @@ public final class SiteCursor implements JobCursor {
 					continue;
 				}
 				boolean tall = g.taskStart()[tk + 1] - g.taskStart()[tk] >= TALL_TASK;
-				if (used[f] >= (tall ? climb : perBuilder)) {
+				if (used[f] >= (tall ? climb : pace)) {
 					continue;
 				}
 				int i = taskHead(o, tk);
@@ -2237,6 +2268,7 @@ public final class SiteCursor implements JobCursor {
 				int c = p.colOf[i];
 				if (Math.abs(p.colX[c] - px[f]) > REACH || Math.abs(p.colZ[c] - pz[f]) > REACH) {
 					standFor(f, c, i); // out of reach: a short walk inside the bay
+					taskWalks++;
 					if (walkLeft[f] != 0) {
 						continue;
 					}
@@ -2429,7 +2461,7 @@ public final class SiteCursor implements JobCursor {
 					break;
 				}
 				int left = g.taskStart()[tk + 1] - o.taskNext[tk];
-				if (o.taskCrew[tk] < TASK_CREW && left >= HELP_MIN && left > helpLeft) {
+				if (o.taskCrew[tk] < bayCrew && left >= HELP_MIN && left > helpLeft) {
 					help = tk;
 					helpLeft = left;
 				}
@@ -2449,6 +2481,7 @@ public final class SiteCursor implements JobCursor {
 			o.taskCrew[tk]++;
 			o.working++;
 			o.fresh = false;
+			tasksTaken++;
 			int head = taskHead(o, tk);
 			standFor(f, p.colOf[head], head);
 			return;
@@ -2478,20 +2511,32 @@ public final class SiteCursor implements JobCursor {
 	 * side (else the centre's side), feet one below the block, on the scaffold (as {@link RadialCursor}).
 	 */
 	private void standFor(int f, int c, int i) {
-		int sx = Integer.signum(px[f] - p.colX[c]);
-		int sz = Integer.signum(pz[f] - p.colZ[c]);
-		if (sx == 0 && sz == 0) {
-			sx = p.colX[c] >= cx ? 1 : -1;
-		}
-		if (sx != 0 && sz != 0) {
-			if (Math.abs(px[f] - p.colX[c]) >= Math.abs(pz[f] - p.colZ[c])) {
-				sz = 0;
-			} else {
-				sx = 0;
+		int ax;
+		int az;
+		int b = p.bayOf[i];
+		// #53: by the middle of the bay (helpers one block aside), when that reaches this column: from there the whole bay is
+		// in reach (a bay is 6 wide, REACH 4), so the builder no longer walks across the bay at every row of every layer
+		int mx = b < 0 ? 0 : bayMidX[b] + (f % 3) - 1;
+		int mz = b < 0 ? 0 : bayMidZ[b] + (f / 3 % 3) - 1;
+		if (b >= 0 && (mx != p.colX[c] || mz != p.colZ[c]) && Math.abs(p.colX[c] - mx) <= REACH && Math.abs(p.colZ[c] - mz) <= REACH) {
+			ax = mx;
+			az = mz;
+		} else {
+			int sx = Integer.signum(px[f] - p.colX[c]);
+			int sz = Integer.signum(pz[f] - p.colZ[c]);
+			if (sx == 0 && sz == 0) {
+				sx = p.colX[c] >= cx ? 1 : -1;
 			}
+			if (sx != 0 && sz != 0) {
+				if (Math.abs(px[f] - p.colX[c]) >= Math.abs(pz[f] - p.colZ[c])) {
+					sz = 0;
+				} else {
+					sx = 0;
+				}
+			}
+			ax = p.colX[c] + sx;
+			az = p.colZ[c] + sz;
 		}
-		int ax = p.colX[c] + sx;
-		int az = p.colZ[c] + sz;
 		int nc = p.colAt.get(CrewPlanner.key(ax, 0, az));
 		int feet = p.y[i] - 1; // on the scaffold, the block at chest height
 		if (nc >= 0 && colTop[nc] != Integer.MIN_VALUE && colTop[nc] < p.y[i]) {
@@ -2533,7 +2578,9 @@ public final class SiteCursor implements JobCursor {
 		if (state.isTerminal()) {
 			return 0.0;
 		}
-		double climb = Math.max(perBuilder, BuildBudget.global().tuning().climbBlocksPerTick());
+		BuildTuning t = BuildBudget.global().tuning();
+		double pace = perBuilder * t.speedFactor(); // #53: build.speed
+		double climb = Math.max(pace, t.climbBlocksPerTick() * t.speedFactor());
 		double r = 0;
 		boolean any = false;
 		for (int f = 0; f < builders; f++) {
@@ -2541,10 +2588,10 @@ public final class SiteCursor implements JobCursor {
 				any = true;
 				r += climb;
 			} else if (tSite[f] >= 0) {
-				r += perBuilder;
+				r += pace;
 			}
 		}
-		return any ? r : Math.min(1.0, perBuilder);
+		return any ? r : Math.min(1.0, pace);
 	}
 
 	// ---- JobCursor ----------------------------------------------------------------------------
@@ -2713,6 +2760,10 @@ public final class SiteCursor implements JobCursor {
 			int lr = longestReason;
 			sb.append(String.format(Locale.ROOT, " longest %.1fs %s", longestIdle / 20.0, IDLE_NAMES[lr >= 0 && lr < IDLE_NAMES.length ? lr : 0]));
 		}
+		if (tasksTaken > 0) {
+			// #53: walks inside a task per task taken (each task begins with one walk to its bay)
+			sb.append(String.format(Locale.ROOT, " walks/task %.1f", taskWalks / (double) tasksTaken));
+		}
 		if (aheadPicks > 0 || lends > 0 || groundReserveTicks > 0) {
 			sb.append(" ahead ").append(aheadPicks).append(" lent ").append(lends).append(" ground-reserve ").append(groundReserveTicks);
 		}
@@ -2749,6 +2800,7 @@ public final class SiteCursor implements JobCursor {
 				sb.append(" retain ").append(ret);
 			}
 			sb.append(String.format(Locale.ROOT, " crew %d %.0f b/s", builders, allBps));
+			sb.append(" speed ").append(tn.speed()).append(" per-bay ").append(bayCrew);
 			if (handovers > 0) {
 				sb.append(" handovers ").append(handovers);
 			}

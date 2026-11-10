@@ -94,7 +94,7 @@ public final class BuildBudget {
 
 	public synchronized void tuning(BuildTuning t) {
 		tuning = t;
-		effectiveMax = TickGovernor.apply(t.maxBlocksPerTick(), governor.factor());
+		effectiveMax = TickGovernor.apply(t.blockBudget(), governor.factor()); // #53: build.speed scales a "sites" build's budget
 		remaining = Math.min(remaining, effectiveMax);
 	}
 
@@ -119,7 +119,7 @@ public final class BuildBudget {
 		}
 		workNanos = 0;
 		workBlocks = 0;
-		effectiveMax = capByTime(TickGovernor.apply(t.maxBlocksPerTick(), factor), nanosPerBlock, t.autoThrottle());
+		effectiveMax = capByTime(TickGovernor.apply(t.blockBudget(), factor), nanosPerBlock, t.autoThrottle());
 		if (t.autoThrottle()) {
 			lightDebt += Math.max(0, lightBlocks - LIGHT_FREE) * LIGHT_WEIGHT;
 			lightDebt = Math.min(lightDebt, 4.0 * t.maxBlocksPerTick()); // a long lantern run never stalls the next build
