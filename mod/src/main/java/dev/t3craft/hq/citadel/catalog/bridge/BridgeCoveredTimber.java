@@ -53,8 +53,8 @@ import net.minecraft.world.level.block.state.properties.WallSide;
  *  y0  ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒     deck               ▓▓▓▒▒▒▒▒▒▒▓▓▓  landing / deck
  * </pre>
  *
- * Size: 11–15 × 11–31 × 11+ (the roof is a half-pitch: the ridge stands {@code (w + 17) / 2} high at most;
- * from h 11 on the ridge cap and, one more block up, the finial rods fit).
+ * Size: 11–15 × 11–31 × 11+ (the roof is a half-pitch: the ridge stands at {@code (11 + (w - 1) / 2) / 2}, which is y8 at 11 wide
+ * and y9 at 15 wide; from h 11 on the ridge cap fits, and the finial rods one more block up (they are dropped below h 12 at 15 wide)).
  */
 public final class BridgeCoveredTimber implements Variant {
 	private static final BlockState POST = b(Blocks.DARK_OAK_LOG).setValue(BlockStateProperties.AXIS, Direction.Axis.Y);
