@@ -8,6 +8,25 @@ al mundo HQ: abre un menú propio, que vuelve a la pantalla de origen con **Esc*
 
 ## Qué hay en el menú
 
+- **Tipo de mapa** (#36, arriba de todo): un `T3Select` con los tipos del registro `MapTypes.all()`
+  (`dev.t3craft.mapgen`: hoy ciudadela e islas flotantes). No hay lista fija: un tipo que se registre aparece solo.
+  - Muestra el nombre (en el select) y la descripción corta del tipo elegido. Los textos salen de
+    `t3craft.maptype.<id>.name` / `.desc` si el idioma los tiene, y si no del propio registro (`MapTypes.name()` /
+    `summary()`, en inglés).
+  - La elección se guarda al momento en la clave aditiva **`mapType`** de `t3craft.json` (por defecto
+    `hybrid-ringcampus`, la ciudadela; un id desconocido cae a la ciudadela sin escribir nada), igual que `hqLayout`.
+    Antes el tipo solo se elegía con comandos (`/t3craft islands`, `/t3craft map open <id>`), sin clave de config.
+  - **Abrir** va al mundo del tipo elegido: la ciudadela, `DemoClient.open` (el mundo HQ, como siempre); las islas
+    flotantes, `IslandsClient.open` (lo que hace `/t3craft islands`: lo crea la primera vez y lo abre después). El
+    botón pasa a "Abrir &lt;tipo&gt;". Un tipo que el menú aún no sabe abrir deja Abrir apagado y su tooltip dice el
+    comando (`MapTypes.openWith()`).
+  - **Cada tipo tiene su propio mundo** (`saves/<carpeta>`), así que cambiar de tipo **no regenera nada** y no hace
+    falta modal: solo cambia a qué mundo va Abrir. Por eso el aviso con confirmación sigue siendo el de Reconstruir y
+    Resetear.
+  - La lista de layouts, Exportar/Recargar layouts, **Reconstruir** y **Resetear** son del mundo HQ: solo valen con
+    la ciudadela. Con otro tipo la lista se oculta (se explica que el tipo tiene su mundo propio) y esos botones quedan
+    apagados con el tooltip "Solo para el tipo de mapa Ciudadela HQ". Todavía no hay reset del mundo de islas (pendiente).
+
 > Un `hqLayout` de la config, o un mundo HQ guardado, con un id eliminado o desconocido cae a la
 > ciudadela y se escribe una línea WARN en el log (una por id). No se borra nada más que la elección
 > de layout.
@@ -61,11 +80,23 @@ se muestra un modal con el motivo (antes un `AlertScreen`) y no se toca nada. El
 | Clase | Qué hace | Test |
 |---|---|---|
 | `HqMenuModel` | Elegida, construida, persistencia solo si cambia, "reconstruir" solo si hay HQ construido y difiere, `warnLarge`, reset solo si existe el mundo | `HqMenuTest` |
-| `HqMenuBridge` | Une el menú con feat/hq-layouts (registro, `hqLayout`, `builtLayoutId`, `HqRebuild`) | — (cableado) |
-| `HqMenuPanel` | La página del kit (#26): cabecera con Abrir HQ, `T3List` de layouts, línea de estado, pie con Exportar/Recargar, Reconstruir y Resetear (modales de confirmación). Sus acciones externas pasan por `HqMenuPanel.Actions` (la galería usa unas falsas) | — (render) |
+| `HqMenuBridge` | Une el menú con feat/hq-layouts (registro, `hqLayout`, `builtLayoutId`, `HqRebuild`) y con los tipos de mapa (`MapTypes`, `mapType`, quién abre cada mundo) | — (cableado) |
+| `MapTypeModel` | Tipo de mapa elegido (#36): lista del registro, persistencia solo si cambia, `hqApplies()` (la ciudadela) | — |
+| `MapTypeConfig` | La clave `mapType` de la config (leer con respaldo a la ciudadela, guardar) | — (cableado) |
+| `HqMenuPanel` | La página del kit (#26): cabecera con Abrir, `T3Select` de tipo de mapa (#36), `T3List` de layouts, línea de estado, pie con Exportar/Recargar, Reconstruir y Resetear (modales de confirmación). Sus acciones externas pasan por `HqMenuPanel.Actions` (la galería usa unas falsas) | — (render) |
 | `HqMenuScreen` | Host `T3PanelScreen` (un `Screen` normal, no `T3Screen`: se abre desde la pantalla de título), ancho máximo 380 px, y las acciones reales sobre `DemoClient` | — (cableado) |
 
 `HqMenuList` y `HqMenuKeys` (geometría de la lista y teclas de la pantalla vanilla) se borraron en el #26: `T3List` hace
-ambas cosas. `/t3dev ui hq-menu` abre el menú con los layouts reales y un HQ construido falso.
+ambas cosas. `/t3dev ui hq-menu` abre el menú con los layouts reales, un HQ construido falso y tipos de mapa falsos junto a los dos
+reales (uno sin "abridor", para ver Abrir apagado); no abre ni guarda nada.
+
+`IslandsClient.open(mc, confirmed, back)` es ahora `public static` (antes un método privado de instancia con el mismo
+cuerpo): el comando `/t3craft islands` y el menú comparten el código. Es el único cambio fuera del menú; no toca el
+generador de islas ni los puentes.
+
+Probarlo en el juego (sin compilar aún): pantalla de título → "T3Craft HQ" → elegir "Floating islands" en Tipo de mapa
+(la lista de layouts se oculta; Reconstruir y Resetear quedan apagados) → "Abrir Floating islands" (crea
+`saves/t3craft-islands` la primera vez) → volver al título → "T3Craft HQ": el menú recuerda islas → elegir "Citadel HQ"
+→ "Abrir HQ" abre el mundo HQ.
 
 Textos en `en_us`, `es_es` y `es_mx` (`t3craft.hqmenu.*`).

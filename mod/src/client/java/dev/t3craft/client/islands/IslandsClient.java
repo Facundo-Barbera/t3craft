@@ -26,6 +26,7 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -158,7 +159,7 @@ public final class IslandsClient implements ClientModInitializer {
 		Pending p = pending;
 		pending = Pending.NONE;
 		if (p != Pending.NONE) {
-			open(mc, p == Pending.OPEN_CONFIRMED);
+			open(mc, p == Pending.OPEN_CONFIRMED, null);
 		}
 	}
 
@@ -168,7 +169,13 @@ public final class IslandsClient implements ClientModInitializer {
 		return s != null && VanillaDemoWorld.isDemoServer(s, IslandsWorld.FOLDER) ? s : null;
 	}
 
-	private void open(Minecraft mc, boolean confirmed) {
+	/**
+	 * Creates the islands world the first time and opens it afterwards: what {@code /t3craft islands} does, also
+	 * called by the HQ menu's map type selector. {@code back} is the screen to return to if vanilla cancels the
+	 * load (null: the title screen).
+	 */
+	public static void open(Minecraft mc, boolean confirmed, @Nullable Screen back) {
+		Screen origin = back != null ? back : new TitleScreen();
 		boolean inWorld = mc.level != null;
 		if (inWorld && islandsServer(mc) != null) {
 			say("you are already in " + IslandsWorld.NAME);
@@ -184,10 +191,10 @@ public final class IslandsClient implements ClientModInitializer {
 		boolean exists = VanillaDemoWorld.exists(mc, IslandsWorld.FOLDER);
 		T3Craft.LOGGER.info("[islands] {} '{}'", exists ? "OPEN" : "CREATE", IslandsWorld.FOLDER);
 		if (exists) {
-			VanillaDemoWorld.open(mc, IslandsWorld.FOLDER, new TitleScreen());
+			VanillaDemoWorld.open(mc, IslandsWorld.FOLDER, origin);
 		} else {
 			Settings s = pendingNew;
-			VanillaDemoWorld.createVoidWorld(mc, IslandsWorld.FOLDER, IslandsWorld.NAME, s != null ? s.seed() : IslandsWorld.DEFAULT_SEED, new TitleScreen());
+			VanillaDemoWorld.createVoidWorld(mc, IslandsWorld.FOLDER, IslandsWorld.NAME, s != null ? s.seed() : IslandsWorld.DEFAULT_SEED, origin);
 		}
 	}
 
