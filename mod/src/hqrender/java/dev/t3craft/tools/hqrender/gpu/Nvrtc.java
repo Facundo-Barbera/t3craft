@@ -18,15 +18,21 @@ final class Nvrtc {
 	private Nvrtc() {
 	}
 
-	/** Library candidates: {@code T3CRAFT_NVRTC}, the pip packages known on the render PC, then the loader's search path. */
+	/** Library candidates: {@code T3CRAFT_NVRTC}, the pip package inside each Python venv listed in {@code T3CRAFT_NVRTC_VENVS} (path-separated venv roots), then the loader's search path. */
 	private static String[] candidates() {
 		List<String> c = new ArrayList<>();
 		String env = System.getenv("T3CRAFT_NVRTC");
 		if (env != null && !env.isBlank()) {
 			c.add(env);
 		}
-		c.add("/home/user/ai-model-tutsipink/.venv/lib/python3.12/site-packages/nvidia/cuda_nvrtc/lib/libnvrtc.so.12");
-		c.add("/home/user/spark/lib/python3.12/site-packages/nvidia/cuda_nvrtc/lib/libnvrtc.so.12");
+		String venvs = System.getenv("T3CRAFT_NVRTC_VENVS");
+		if (venvs != null && !venvs.isBlank()) {
+			for (String venv : venvs.split(java.io.File.pathSeparator)) {
+				if (!venv.isBlank()) {
+					c.add(venv + "/lib/python3.12/site-packages/nvidia/cuda_nvrtc/lib/libnvrtc.so.12");
+				}
+			}
+		}
 		c.add("libnvrtc.so.12");
 		c.add("libnvrtc.so");
 		return c.toArray(new String[0]);

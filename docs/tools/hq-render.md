@@ -110,7 +110,7 @@ when the driver's cache has it), so at run time only the driver is needed. To ch
 ```
 # 1. edit mod/src/hqrender/cuda/trace.cu; a render job on the PC compiles it with NVRTC and keeps the PTX
 tools/render/submit.sh --layout hybrid-ringcampus --projects 4 --only hub --gpu-compare --gpu-nvrtc
-# 2. embed the PTX it wrote (needs the PC to have a libnvrtc.so.12: T3CRAFT_NVRTC or the pip package of the PC's Python venvs)
+# 2. embed the PTX it wrote (needs the PC to have a libnvrtc.so.12: T3CRAFT_NVRTC or T3CRAFT_NVRTC_VENVS, a path-separated list of Python venv roots whose pip package nvidia-cuda-nvrtc is used)
 python3 tools/render/gen-trace-ptx.py ~/.cache/t3craft-render/outbox/<job>/trace.ptx
 ```
 
