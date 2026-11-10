@@ -1,4 +1,4 @@
-package dev.t3craft.hq;
+package dev.t3craft.hq.plan;
 
 import dev.t3craft.blocks.KitGlowStripBlock;
 import dev.t3craft.blocks.KitRailingBlock;

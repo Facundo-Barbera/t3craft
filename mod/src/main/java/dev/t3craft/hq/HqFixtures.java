@@ -1,5 +1,6 @@
 package dev.t3craft.hq;
 
+import dev.t3craft.hq.plan.BuildPlan;
 import org.jspecify.annotations.Nullable;
 
 /**

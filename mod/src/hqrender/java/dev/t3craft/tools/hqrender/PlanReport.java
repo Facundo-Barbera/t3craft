@@ -8,16 +8,16 @@ import dev.t3craft.build.CrewCursor;
 import dev.t3craft.build.CrewSchedule;
 import dev.t3craft.build.FrontCursor;
 import dev.t3craft.build.JobState;
-import dev.t3craft.hq.Anchor;
-import dev.t3craft.hq.AnchorNames;
-import dev.t3craft.hq.Box;
-import dev.t3craft.hq.BuildPlan;
 import dev.t3craft.hq.HqBuild;
 import dev.t3craft.hq.HqLightMap;
-import dev.t3craft.hq.Placement;
-import dev.t3craft.hq.PlanProbe;
-import dev.t3craft.hq.Workstation;
 import dev.t3craft.hq.citadel.CitadelRelief;
+import dev.t3craft.hq.plan.Anchor;
+import dev.t3craft.hq.plan.AnchorNames;
+import dev.t3craft.hq.plan.Box;
+import dev.t3craft.hq.plan.BuildPlan;
+import dev.t3craft.hq.plan.Placement;
+import dev.t3craft.hq.plan.PlanProbe;
+import dev.t3craft.hq.plan.Workstation;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -1178,19 +1178,19 @@ public final class PlanReport {
 
 	/**
 	 * Fences, walls and panes connected on no side although a neighbour they connect to
-	 * ({@link dev.t3craft.hq.PlanConnect#connectsTo}) stands beside them. Must be 0. No per-cell catch:
+	 * ({@link dev.t3craft.hq.plan.PlanConnect#connectsTo}) stands beside them. Must be 0. No per-cell catch:
 	 * an exception fails the whole section, visibly.
 	 */
 	private void connect(BuildPlan plan, Options o) {
-		List<dev.t3craft.hq.PlanConnect.Isolated> all = new ArrayList<>();
-		for (dev.t3craft.hq.PlanConnect.Isolated i : dev.t3craft.hq.PlanConnect.isolated(plan)) {
+		List<dev.t3craft.hq.plan.PlanConnect.Isolated> all = new ArrayList<>();
+		for (dev.t3craft.hq.plan.PlanConnect.Isolated i : dev.t3craft.hq.plan.PlanConnect.isolated(plan)) {
 			if (in(i.pos())) {
 				all.add(i);
 			}
 		}
 		int connecting = 0;
 		for (Placement p : plan.placements()) {
-			if (in(p.rel()) && dev.t3craft.hq.PlanConnect.connecting(p.state())) {
+			if (in(p.rel()) && dev.t3craft.hq.plan.PlanConnect.connecting(p.state())) {
 				connecting++;
 			}
 		}
@@ -1198,7 +1198,7 @@ public final class PlanReport {
 		sb.append("  ").append(all.size()).append(" unconnected of ").append(connecting).append(" fences/walls/panes\n");
 		JsonArray lj = new JsonArray();
 		int n = 0;
-		for (dev.t3craft.hq.PlanConnect.Isolated i : all) {
+		for (dev.t3craft.hq.plan.PlanConnect.Isolated i : all) {
 			if (n++ < o.maxList) {
 				sb.append("    ").append(c(i.pos())).append(' ').append(id(i.state())).append(" -> ").append(i.towards().getName()).append(' ')
 						.append(id(i.neighbour())).append('\n');

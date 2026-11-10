@@ -1,6 +1,6 @@
 package dev.t3craft.piece;
 
-import dev.t3craft.hq.Placement;
+import dev.t3craft.hq.plan.Placement;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;

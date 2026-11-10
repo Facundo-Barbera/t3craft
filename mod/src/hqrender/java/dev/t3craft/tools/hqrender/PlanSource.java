@@ -1,6 +1,5 @@
 package dev.t3craft.tools.hqrender;
 
-import dev.t3craft.hq.BuildPlan;
 import dev.t3craft.hq.HqFixtures;
 import dev.t3craft.hq.HqGenerator;
 import dev.t3craft.hq.HqLayout;
@@ -10,6 +9,7 @@ import dev.t3craft.hq.HqStyles;
 import dev.t3craft.hq.RingCampusGeometry;
 import dev.t3craft.hq.layout.HqLayoutInfo;
 import dev.t3craft.hq.layout.HqLayouts;
+import dev.t3craft.hq.plan.BuildPlan;
 import java.util.List;
 
 /**

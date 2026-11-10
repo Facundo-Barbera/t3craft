@@ -4,7 +4,6 @@ import com.google.gson.JsonObject;
 import dev.t3craft.build.BuildPlan;
 import dev.t3craft.build.Placement;
 import dev.t3craft.client.npc.NpcInfo;
-import dev.t3craft.hq.Box;
 import dev.t3craft.hq.HqBuild;
 import dev.t3craft.hq.HqDiff;
 import dev.t3craft.hq.HqFixtures;
@@ -13,6 +12,7 @@ import dev.t3craft.hq.HqInput;
 import dev.t3craft.hq.HqLayout;
 import dev.t3craft.hq.HqPlans;
 import dev.t3craft.hq.HqSite;
+import dev.t3craft.hq.plan.Box;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -60,13 +60,13 @@ public final class DemoHq {
 	 * @param island     feat/hq-void-world: the HQ island's core area after this step (void worlds), else null
 	 * @param islandPart that island as a builders' part (already the first of {@code parts} when it changed), else null
 	 */
-	public record Step(HqLayout layout, dev.t3craft.hq.BuildPlan plan, String hash, int lift, List<BuildPlan> parts, boolean full, String fixtures,
+	public record Step(HqLayout layout, dev.t3craft.hq.plan.BuildPlan plan, String hash, int lift, List<BuildPlan> parts, boolean full, String fixtures,
 			VoidIsland.@Nullable Area island, @Nullable BuildPlan islandPart) {
 		public Step {
 			parts = List.copyOf(parts);
 		}
 
-		public Step(HqLayout layout, dev.t3craft.hq.BuildPlan plan, String hash, int lift, List<BuildPlan> parts, boolean full, String fixtures) {
+		public Step(HqLayout layout, dev.t3craft.hq.plan.BuildPlan plan, String hash, int lift, List<BuildPlan> parts, boolean full, String fixtures) {
 			this(layout, plan, hash, lift, parts, full, fixtures, null, null);
 		}
 
@@ -215,7 +215,7 @@ public final class DemoHq {
 	// ---- void island ----------------------------------------------------------------------------
 
 	/** The plan's footprint in demo-relative columns (baked with {@link #bakeSite}). */
-	public static VoidIsland.Area demoArea(dev.t3craft.hq.BuildPlan plan, int lift) {
+	public static VoidIsland.Area demoArea(dev.t3craft.hq.plan.BuildPlan plan, int lift) {
 		Box f = plan.footprint();
 		HqSite site = bakeSite(lift);
 		BlockPos a = site.cell(new BlockPos(f.minX(), f.minY(), f.minZ()));
@@ -225,10 +225,10 @@ public final class DemoHq {
 	}
 
 	/** Every cell the plan (and its plinth) takes, demo-relative. */
-	static VoidIsland.Taken taken(dev.t3craft.hq.BuildPlan plan, int lift) {
+	static VoidIsland.Taken taken(dev.t3craft.hq.plan.BuildPlan plan, int lift) {
 		HqSite site = bakeSite(lift);
 		List<BlockPos> cells = new ArrayList<>(plan.size());
-		for (dev.t3craft.hq.Placement p : plan.placements()) {
+		for (dev.t3craft.hq.plan.Placement p : plan.placements()) {
 			cells.add(site.cell(p.rel()));
 		}
 		return VoidIsland.Taken.of(cells);
@@ -316,7 +316,7 @@ public final class DemoHq {
 		if (diffable && previous != null && h.equals(previousHash)) {
 			return new Step(r.layout(), r.plan(), h, lift, List.of(), false, fixtures);
 		}
-		dev.t3craft.hq.BuildPlan before = null;
+		dev.t3craft.hq.plan.BuildPlan before = null;
 		if (diffable && previous != null) {
 			String layoutId = dev.t3craft.hq.layout.HqLayouts.active().id();
 			String pack = previousPack == null ? dev.t3craft.hq.pack.HqLayoutPacks.hash(layoutId) : previousPack;
@@ -332,9 +332,9 @@ public final class DemoHq {
 			List<BuildPlan> parts = new ArrayList<>();
 			if (previous != null && clearPrevious) {
 				// Only cell positions matter for the removals, so the fixtures the old HQ used do not.
-				dev.t3craft.hq.BuildPlan old = HqPlans.generate(previous);
+				dev.t3craft.hq.plan.BuildPlan old = HqPlans.generate(previous);
 				addIfAny(parts, plinthRemoval(old, r.plan(), lift));
-				for (List<dev.t3craft.hq.Placement> ps : HqDiff.between(old, r.plan(), vacated(lift, r.plan().footprint())).removals().values()) {
+				for (List<dev.t3craft.hq.plan.Placement> ps : HqDiff.between(old, r.plan(), vacated(lift, r.plan().footprint())).removals().values()) {
 					addIfAny(parts, bake(HqBuild.toBuildPlan(ps, HqBuild.Order.MODULES), lift));
 				}
 			}
@@ -364,7 +364,7 @@ public final class DemoHq {
 	}
 
 	/** Plinth first, then every group of the HQ in build order, all baked into demo coordinates. */
-	public static List<BuildPlan> full(dev.t3craft.hq.BuildPlan plan, int lift) {
+	public static List<BuildPlan> full(dev.t3craft.hq.plan.BuildPlan plan, int lift) {
 		List<BuildPlan> out = new ArrayList<>();
 		// feat/builder-sites: every part keeps the name of its group, so the merged plan can tell the building sites apart
 		addIfAny(out, plinth(plan, lift).named("plinth"));
@@ -422,7 +422,7 @@ public final class DemoHq {
 	}
 
 	/** Tuff under the HQ's footprint between the ground and the hub floor, where the plan has no cell. */
-	static BuildPlan plinth(dev.t3craft.hq.BuildPlan plan, int lift) {
+	static BuildPlan plinth(dev.t3craft.hq.plan.BuildPlan plan, int lift) {
 		List<Placement> out = new ArrayList<>();
 		Box f = plan.footprint();
 		HqSite site = bakeSite(lift);
@@ -440,7 +440,7 @@ public final class DemoHq {
 	}
 
 	/** What a cell the HQ no longer uses becomes (HQ-relative): air above the plinth, tuff in it, grass/dirt below. */
-	static dev.t3craft.hq.BuildPlan.Vacated vacated(int lift) {
+	static dev.t3craft.hq.plan.BuildPlan.Vacated vacated(int lift) {
 		return rel -> {
 			int y = rel.getY() + lift; // relative to the demo origin; the ground is y = -1
 			if (y >= 0) {
@@ -451,8 +451,8 @@ public final class DemoHq {
 	}
 
 	/** {@link #vacated(int)}, but plinth cells outside the new HQ's {@code footprint} become air (the plinth shrinks too). */
-	static dev.t3craft.hq.BuildPlan.Vacated vacated(int lift, Box footprint) {
-		dev.t3craft.hq.BuildPlan.Vacated inner = vacated(lift);
+	static dev.t3craft.hq.plan.BuildPlan.Vacated vacated(int lift, Box footprint) {
+		dev.t3craft.hq.plan.BuildPlan.Vacated inner = vacated(lift);
 		return rel -> {
 			int y = rel.getY() + lift;
 			boolean under = rel.getX() >= footprint.minX() && rel.getX() <= footprint.maxX() && rel.getZ() >= footprint.minZ()
@@ -465,7 +465,7 @@ public final class DemoHq {
 	}
 
 	/** Air where the old plinth stood outside the new footprint (cells the old plan had no block in). */
-	static BuildPlan plinthRemoval(dev.t3craft.hq.BuildPlan before, dev.t3craft.hq.BuildPlan after, int lift) {
+	static BuildPlan plinthRemoval(dev.t3craft.hq.plan.BuildPlan before, dev.t3craft.hq.plan.BuildPlan after, int lift) {
 		List<Placement> out = new ArrayList<>();
 		Box f = before.footprint();
 		Box g = after.footprint();

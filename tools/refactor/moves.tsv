@@ -11,3 +11,17 @@ dev.t3craft.blocks.RenderBlocks	dev.t3craft.tools.hqrender.RenderBlocks	#5 3a
 dev.t3craft.hq.HqAnchorSource	dev.t3craft.client.hq.HqAnchorSource	#5 3a
 dev.t3craft.hq.HqPreviewCommand	dev.t3craft.client.hq.HqPreviewCommand	#5 3a
 dev.t3craft.portable.PortableItems	dev.t3craft.survival.PortableItems	#5 3b
+dev.t3craft.hq.Anchor	dev.t3craft.hq.plan.Anchor	#5 3c
+dev.t3craft.hq.AnchorNames	dev.t3craft.hq.plan.AnchorNames	#5 3c
+dev.t3craft.hq.Box	dev.t3craft.hq.plan.Box	#5 3c
+dev.t3craft.hq.BuildPlan	dev.t3craft.hq.plan.BuildPlan	#5 3c
+dev.t3craft.hq.Placement	dev.t3craft.hq.plan.Placement	#5 3c
+dev.t3craft.hq.Workstation	dev.t3craft.hq.plan.Workstation	#5 3c
+dev.t3craft.hq.Palette	dev.t3craft.hq.plan.Palette	#5 3c
+dev.t3craft.hq.PlanApplier	dev.t3craft.hq.plan.PlanApplier	#5 3c
+dev.t3craft.hq.PlanBuilder	dev.t3craft.hq.plan.PlanBuilder	#5 3c
+dev.t3craft.hq.PlanConnect	dev.t3craft.hq.plan.PlanConnect	#5 3c
+dev.t3craft.hq.PlanLight	dev.t3craft.hq.plan.PlanLight	#5 3c
+dev.t3craft.hq.PlanNav	dev.t3craft.hq.plan.PlanNav	#5 3c
+dev.t3craft.hq.PlanProbe	dev.t3craft.hq.plan.PlanProbe	#5 3c
+dev.t3craft.hq.PlanShapes	dev.t3craft.hq.plan.PlanShapes	#5 3c

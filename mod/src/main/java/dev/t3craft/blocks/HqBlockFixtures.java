@@ -1,9 +1,9 @@
 package dev.t3craft.blocks;
 
-import dev.t3craft.hq.Anchor;
-import dev.t3craft.hq.BuildPlan;
 import dev.t3craft.hq.HqFixtures;
-import dev.t3craft.hq.Placement;
+import dev.t3craft.hq.plan.Anchor;
+import dev.t3craft.hq.plan.BuildPlan;
+import dev.t3craft.hq.plan.Placement;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;

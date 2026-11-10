@@ -1,13 +1,13 @@
 package dev.t3craft.hq.citadel;
 
-import dev.t3craft.hq.Anchor;
-import dev.t3craft.hq.AnchorNames;
 import dev.t3craft.hq.HqGenerator;
 import dev.t3craft.hq.HqGeometry;
 import dev.t3craft.hq.HqLayout;
 import dev.t3craft.hq.HqStyle;
 import dev.t3craft.hq.RingCampusGeometry;
 import dev.t3craft.hq.citadel.nature.Flora;
+import dev.t3craft.hq.plan.Anchor;
+import dev.t3craft.hq.plan.AnchorNames;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;

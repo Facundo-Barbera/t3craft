@@ -13,6 +13,8 @@ import static dev.t3craft.hq.HqGeometry.SEGMENT;
 import static dev.t3craft.hq.HqGeometry.SPINE;
 import static dev.t3craft.hq.HqGeometry.WING_WALL;
 
+import dev.t3craft.hq.plan.Box;
+import dev.t3craft.hq.plan.PlanBuilder;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.Map;

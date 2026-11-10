@@ -57,7 +57,7 @@ optional). Replacement is **by block**, after generation and lighting:
   DOOR, DECOR, PATH, GARDEN, GARDEN_TREE, LIGHT, DESK, BENCH, BOARD, COMPUTER_ON, COMPUTER_OFF,
   STATUS_LAMP, SCREEN, BEACON, TERMINAL, PLAQUE`). Every block of the plan whose block is that role's
   block in the style that draws this layout becomes the new block.
-- `palette`: any material field of `dev.t3craft.hq.Palette` (`plinth`, `woodFloor`, `darkPlanks`,
+- `palette`: any material field of `dev.t3craft.hq.plan.Palette` (`plinth`, `woodFloor`, `darkPlanks`,
   `copper`, `stairBlock`, `copperStairs`, ...; `air` excluded). Same rule: that field's block is replaced.
   Palette is the material set of the old classic style (removed); the export writes it only in
   `classic.json`, but the key still works in every pack as a block-to-block replacement.

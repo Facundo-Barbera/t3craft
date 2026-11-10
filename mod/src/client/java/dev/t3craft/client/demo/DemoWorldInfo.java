@@ -56,12 +56,12 @@ public record DemoWorldInfo(Path root, int originX, int originY, int originZ, bo
 			String built = DemoClient.builtLayoutId(info.root());
 			String layoutId = built != null ? built : dev.t3craft.client.hq.layout.HqLayoutConfig.selectedId();
 			dev.t3craft.hq.HqStyle style = dev.t3craft.hq.HqStyles.forLayout(layoutId);
-			java.util.concurrent.CompletableFuture<dev.t3craft.hq.BuildPlan> f = dev.t3craft.hq.HqEmptyPlan.start(style);
+			java.util.concurrent.CompletableFuture<dev.t3craft.hq.plan.BuildPlan> f = dev.t3craft.hq.HqEmptyPlan.start(style);
 			if (!f.isDone() || f.isCompletedExceptionally()) {
 				return null;
 			}
-			dev.t3craft.hq.BuildPlan empty = f.join();
-			dev.t3craft.hq.Anchor spawn = empty.anchor(dev.t3craft.hq.AnchorNames.SPAWN);
+			dev.t3craft.hq.plan.BuildPlan empty = f.join();
+			dev.t3craft.hq.plan.Anchor spawn = empty.anchor(dev.t3craft.hq.plan.AnchorNames.SPAWN);
 			if (spawn == null) {
 				return null;
 			}

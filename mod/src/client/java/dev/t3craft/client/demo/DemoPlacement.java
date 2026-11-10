@@ -29,8 +29,8 @@ public final class DemoPlacement {
 		}
 		try {
 			// fix/hq-load-build-portal: the shared empty plan (computed once, off-thread), not a new generator run per call
-			dev.t3craft.hq.BuildPlan empty = dev.t3craft.hq.HqEmptyPlan.of(style);
-			dev.t3craft.hq.Anchor spawn = empty.anchor(dev.t3craft.hq.AnchorNames.SPAWN);
+			dev.t3craft.hq.plan.BuildPlan empty = dev.t3craft.hq.HqEmptyPlan.of(style);
+			dev.t3craft.hq.plan.Anchor spawn = empty.anchor(dev.t3craft.hq.plan.AnchorNames.SPAWN);
 			if (spawn == null) {
 				return viewpoint(spec);
 			}

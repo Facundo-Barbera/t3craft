@@ -1,5 +1,8 @@
 package dev.t3craft.hq;
 
+import dev.t3craft.hq.plan.Box;
+import dev.t3craft.hq.plan.BuildPlan;
+import dev.t3craft.hq.plan.PlanBuilder;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;

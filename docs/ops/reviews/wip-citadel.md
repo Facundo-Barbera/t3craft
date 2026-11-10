@@ -147,7 +147,7 @@ Textuales, según `git merge-tree`:
 | Par | Archivo | Resolución recomendada |
 |---|---|---|
 | Casi todas las ramas, entre sí y con `main` | `docs/CHANGELOG-dev.md` | Conservar todas las líneas, la más reciente arriba. |
-| `1-light` + `fix/plan-connect` | `CitadelFinish.java` (solo imports) | Conservar `import dev.t3craft.hq.PlanConnect;` y quitar `import dev.t3craft.hq.PlanLight;` (`1-light` ya no lo usa). Orden resultante en `build()`: `fillAir`, `CitadelAmbience.lights`, `PlanShapes.resolve`, `PlanConnect.apply`, grupos, `light`. Es correcto: las luces invisibles no conectan con nada. |
+| `1-light` + `fix/plan-connect` | `CitadelFinish.java` (solo imports) | Conservar `import dev.t3craft.hq.plan.PlanConnect;` y quitar `import dev.t3craft.hq.plan.PlanLight;` (`1-light` ya no lo usa). Orden resultante en `build()`: `fillAir`, `CitadelAmbience.lights`, `PlanShapes.resolve`, `PlanConnect.apply`, grupos, `light`. Es correcto: las luces invisibles no conectan con nada. |
 | `scale` + `1-light` / `1-paths` / `2-hub` / `2-nodes` / `2-houses` / `2-roofs-yards` / `2-nature` | `CitadelFinish`, `CitadelGrounds`, `CitadelHub`, `CitadelNodes`, `CitadelBarrios` | No resolver a mano archivo por archivo: rehacer `scale` encima del swarm (ver orden). |
 | `citadel/lead-office-hook` + `2-houses` / `2-roofs-yards` | `CitadelBarrios.hall` (merge limpio salvo el CHANGELOG) | Merge limpio. Semántica: en un módulo lead, `HallInterior.furnish` (2-houses) amuebla antes de que `CitadelLeadOffice.place` ponga su oficina. Comprobar en el render que no se pisan. Si chocan, saltar `furnish` en los módulos lead. |
 | `citadel/lead-office-hook` + `scale` | `CitadelBarrios` | Conflicto real: portar el hook dentro del port de `scale` (`FH` → `c.fh`). |

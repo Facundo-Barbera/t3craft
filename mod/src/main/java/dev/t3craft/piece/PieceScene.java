@@ -1,8 +1,8 @@
 package dev.t3craft.piece;
 
 import dev.t3craft.drop.DropScene;
-import dev.t3craft.hq.Placement;
 import dev.t3craft.hq.SignTags;
+import dev.t3craft.hq.plan.Placement;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import net.minecraft.core.BlockPos;

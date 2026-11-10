@@ -1,7 +1,5 @@
 package dev.t3craft.hq.citadel;
 
-import dev.t3craft.hq.Anchor;
-import dev.t3craft.hq.AnchorNames;
 import dev.t3craft.hq.HqGenerator;
 import dev.t3craft.hq.HqGeometry;
 import dev.t3craft.hq.HqStyle;
@@ -13,6 +11,8 @@ import dev.t3craft.hq.citadel.hub.HubInterior;
 import dev.t3craft.hq.citadel.hub.HubRoof;
 import dev.t3craft.hq.citadel.hub.HubScreens;
 import dev.t3craft.hq.citadel.hub.HubUndercroft;
+import dev.t3craft.hq.plan.Anchor;
+import dev.t3craft.hq.plan.AnchorNames;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;

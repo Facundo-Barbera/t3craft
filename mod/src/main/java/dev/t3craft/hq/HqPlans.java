@@ -1,5 +1,7 @@
 package dev.t3craft.hq;
 
+import dev.t3craft.hq.plan.BuildPlan;
+import dev.t3craft.hq.plan.Placement;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;

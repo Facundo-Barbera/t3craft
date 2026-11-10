@@ -1,4 +1,4 @@
-package dev.t3craft.hq;
+package dev.t3craft.hq.plan;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -22,7 +22,7 @@ import org.jspecify.annotations.Nullable;
  * </ul>
  * Any violation throws {@link IllegalStateException}: an invalid plan is never produced.
  */
-final class PlanBuilder {
+public final class PlanBuilder {
 	/** Structure first, attached decoration after (see {@link BuildPlan} order contract). */
 	static final int SOLID = 0;
 	static final int DECOR = 1;
@@ -40,15 +40,15 @@ final class PlanBuilder {
 	private @Nullable String group;
 
 	/** Modules opened from now on belong to {@code group} (null: each module is its own group). */
-	void group(@Nullable String g) {
+	public void group(@Nullable String g) {
 		group = g;
 	}
 
-	void workstation(Workstation w) {
+	public void workstation(Workstation w) {
 		workstations.add(w);
 	}
 
-	Canvas module(String id, Box box, List<Box> holes) {
+	public Canvas module(String id, Box box, List<Box> holes) {
 		return open(id, box, holes, false);
 	}
 
@@ -90,13 +90,13 @@ final class PlanBuilder {
 		return cells.containsKey(BlockPos.asLong(x, y, z));
 	}
 
-	void anchor(Anchor a) {
+	public void anchor(Anchor a) {
 		if (anchors.put(a.name(), a) != null) {
 			throw new IllegalStateException("duplicate anchor " + a.name());
 		}
 	}
 
-	BuildPlan build() {
+	public BuildPlan build() {
 		if (open != null) {
 			throw new IllegalStateException("module " + open.module.id() + " still open");
 		}
@@ -169,7 +169,7 @@ final class PlanBuilder {
 	}
 
 	/** Write access to one module's cells. */
-	final class Canvas implements AutoCloseable {
+	public final class Canvas implements AutoCloseable {
 		final BuildPlan.Module module;
 		private final int index;
 		private final boolean sparse;
@@ -186,32 +186,32 @@ final class PlanBuilder {
 			return module.box();
 		}
 
-		Canvas set(int x, int y, int z, BlockState state) {
+		public Canvas set(int x, int y, int z, BlockState state) {
 			return put(x, y, z, state, null, SOLID);
 		}
 
-		Canvas set(BlockPos p, BlockState state) {
+		public Canvas set(BlockPos p, BlockState state) {
 			return put(p.getX(), p.getY(), p.getZ(), state, null, SOLID);
 		}
 
-		Canvas decor(int x, int y, int z, BlockState state) {
+		public Canvas decor(int x, int y, int z, BlockState state) {
 			return put(x, y, z, state, null, DECOR);
 		}
 
-		Canvas decor(BlockPos p, BlockState state) {
+		public Canvas decor(BlockPos p, BlockState state) {
 			return put(p.getX(), p.getY(), p.getZ(), state, null, DECOR);
 		}
 
-		Canvas hang(int x, int y, int z, BlockState state) {
+		public Canvas hang(int x, int y, int z, BlockState state) {
 			return put(x, y, z, state, null, HANGING);
 		}
 
-		Canvas decor(BlockPos p, BlockState state, @Nullable CompoundTag be) {
+		public Canvas decor(BlockPos p, BlockState state, @Nullable CompoundTag be) {
 			return put(p.getX(), p.getY(), p.getZ(), state, be, DECOR);
 		}
 
 		/** Fills the owned part of a box (clipped to this module) with one state. */
-		Canvas fill(int x1, int y1, int z1, int x2, int y2, int z2, BlockState state) {
+		public Canvas fill(int x1, int y1, int z1, int x2, int y2, int z2, BlockState state) {
 			Box b = Box.of(x1, y1, z1, x2, y2, z2);
 			for (int y = b.minY(); y <= b.maxY(); y++) {
 				for (int z = b.minZ(); z <= b.maxZ(); z++) {
@@ -225,7 +225,7 @@ final class PlanBuilder {
 			return this;
 		}
 
-		boolean owns(int x, int y, int z) {
+		public boolean owns(int x, int y, int z) {
 			if (sparse) {
 				Cell c = cells.get(BlockPos.asLong(x, y, z));
 				return module.box().contains(x, y, z) && (c == null || c.module == index);

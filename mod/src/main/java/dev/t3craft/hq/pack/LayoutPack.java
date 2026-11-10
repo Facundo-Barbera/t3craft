@@ -28,7 +28,7 @@ import org.jspecify.annotations.Nullable;
  * changes in a layout. Immutable; an empty pack changes nothing. See docs/features/hq-layout-packs.md.
  *
  * @param roles   {@code HqStyle.Role} name (upper case) → replacement
- * @param palette field of {@code dev.t3craft.hq.Palette} → replacement
+ * @param palette field of {@code dev.t3craft.hq.plan.Palette} → replacement
  * @param blocks  any block → replacement (applied last, over everything)
  * @param params  {@link LayoutParams} key → value (clamped when read)
  * @param rooms   module id → room

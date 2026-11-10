@@ -1,5 +1,7 @@
 package dev.t3craft.hq;
 
+import dev.t3craft.hq.plan.AnchorNames;
+import dev.t3craft.hq.plan.Box;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.core.BlockPos;

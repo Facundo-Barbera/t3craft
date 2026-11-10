@@ -1,8 +1,8 @@
 package dev.t3craft.hq.lead;
 
-import dev.t3craft.hq.Anchor;
-import dev.t3craft.hq.AnchorNames;
 import dev.t3craft.hq.HqLayout;
+import dev.t3craft.hq.plan.Anchor;
+import dev.t3craft.hq.plan.AnchorNames;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;

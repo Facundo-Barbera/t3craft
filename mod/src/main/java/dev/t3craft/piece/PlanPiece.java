@@ -1,6 +1,5 @@
 package dev.t3craft.piece;
 
-import dev.t3craft.hq.BuildPlan;
 import dev.t3craft.hq.HqFixtures;
 import dev.t3craft.hq.HqGenerator;
 import dev.t3craft.hq.HqInput;
@@ -10,11 +9,12 @@ import dev.t3craft.hq.HqEmptyPlan;
 import dev.t3craft.hq.HqPlans;
 import dev.t3craft.hq.HqStyle;
 import dev.t3craft.hq.HqStyles;
-import dev.t3craft.hq.Placement;
 import dev.t3craft.hq.RingCampusGeometry;
 import dev.t3craft.hq.layout.HqLayouts;
 import dev.t3craft.hq.lead.LeadOffices;
 import dev.t3craft.hq.pack.HqLayoutPacks;
+import dev.t3craft.hq.plan.BuildPlan;
+import dev.t3craft.hq.plan.Placement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;

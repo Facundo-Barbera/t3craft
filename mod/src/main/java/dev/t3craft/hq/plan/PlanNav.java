@@ -1,4 +1,4 @@
-package dev.t3craft.hq;
+package dev.t3craft.hq.plan;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;

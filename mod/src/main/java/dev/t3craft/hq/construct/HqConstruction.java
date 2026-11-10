@@ -1,10 +1,10 @@
 package dev.t3craft.hq.construct;
 
-import dev.t3craft.hq.BuildPlan;
 import dev.t3craft.hq.HqInput;
 import dev.t3craft.hq.HqLayout;
 import dev.t3craft.hq.HqSite;
-import dev.t3craft.hq.Placement;
+import dev.t3craft.hq.plan.BuildPlan;
+import dev.t3craft.hq.plan.Placement;
 import dev.t3craft.site.CellPlan;
 import dev.t3craft.site.SiteModule;
 import java.util.ArrayList;
