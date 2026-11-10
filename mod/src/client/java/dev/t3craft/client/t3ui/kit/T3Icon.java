@@ -46,6 +46,7 @@ public enum T3Icon {
 	INFO,
 	LINK,
 	LOCK,
+	MAXIMIZE_2,
 	MESSAGE_SQUARE,
 	MINUS,
 	PANEL_LEFT,

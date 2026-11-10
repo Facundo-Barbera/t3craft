@@ -55,12 +55,19 @@ receta que el buscador de `T3Screen`).
   `RightPanels.register(id, título, supplier)` donde cada feature enchufa la suya (el piece browser, `"pieces"`, lo registra
   `T3Screen`; luego diff, plan, cola). `T3Screen` reenvía dibujo y entrada como con sus páginas; las teclas van al panel
   mientras el último clic cayó dentro.
+* **Cabecera del panel derecho (#50):** con más de una página registrada, `T3RightPanel` cambia el título por un conmutador
+  (`T3Tabs` si caben los títulos, `T3Select` si no) y añade siempre un botón `maximize-2` que lleva la página al sitio del
+  hilo (`Owner.expand`). Lo hace con un gancho aditivo de `T3PanelHost`: `setHeader(Header)` coloca controles en la fila de
+  la cabecera, a la izquierda de la `x` / Back; se unen al cromo (Tab, tooltips, clic y el desplegable abierto encima de
+  todo) y devuelven dónde acaba el título. `atRoot()` dice si no hay subpágina. Sin `Header` nada cambia.
 * **`T3Splitter`** (#39): asa vertical en el hueco de 4 px entre dos paneles (más 1 px de margen a cada lado). Invisible en
   reposo; al pasar el puntero, lavado `hover`, regla `edge` y cursor de redimensionar; mientras se arrastra, regla `accent`.
   No sabe de anchos: avisa al `Listener` con la x del puntero (`drag`), una vez al soltar (`released`, ahí se guarda) y
   con doble clic (`reset`, ancho por defecto). Sin tokens nuevos.
 
 ## Iconos del kit (#28)
+
+`maximize-2` (#50, Lucide 1.70.0) es el botón "abrir a pantalla completa" de la cabecera del panel derecho.
 
 Los iconos son los `T3Icon` (SVG de Lucide, ver `docs/tools/icons.md`), tintados con tokens de `ChatTheme`.
 
@@ -198,8 +205,7 @@ kit, que no se tocaron porque son de otros hilos o de pantallas sin migrar (excl
 * Ya no queda ninguna pantalla de T3Craft con widgets vanilla salvo los diálogos vanilla que abren otros (p. ej. `ConfirmLinkScreen`
   para un enlace, el `ConfirmScreen` de `DemoClient` al salir de un mundo). `BaseConfigScreen` y el placeholder `ThreadChatScreen`
   se borraron en el #26 (nadie los usaba).
-* La cola todavía no se abre desde el menú del sidebar de `T3Screen` (solo `/t3craft queue` y la galería): toca `T3Screen`, queda
-  para después.
+* La cola se abre desde el menú ⋯ de `T3Screen` (#39, en el sitio del hilo) y, desde #50, como página del panel derecho (`queue`).
 * Los botones dentro de las filas de un `T3List` (la lista de entornos) no están en el orden de Tab: se llegan con el ratón.
   La lista sí es una parada de Tab, con su cursor de fila.
 * `T3TextArea` no se recorta en una página con scroll (ver arriba), y la selección con el ratón dentro de un diálogo con cajas

@@ -46,6 +46,20 @@ public final class T3PanelHost implements T3Panel.Host {
 		void left();
 	}
 
+	/**
+	 * Optional controls in the header row, next to the close / back button (#50: the right panel's page switcher and
+	 * its full-size button). Arranged at every {@link #layout}; they join the host's chrome, so they are drawn,
+	 * clicked, tooltipped and reached with Tab like the close button, and an open select of theirs is drawn on top.
+	 */
+	public interface Header {
+		/**
+		 * Places controls in {@code row}: the header line from the frame's left pad to just before the close / back
+		 * button. {@code root}: the root page is shown (no sub-page). Returns the x where the page title must end
+		 * ({@code row.x()} hides it, {@code row.right()} leaves it the whole row).
+		 */
+		int arrange(Rect row, boolean root, Consumer<T3Control> add);
+	}
+
 	private static final int HEADER_H = 18;
 
 	private final Owner owner;
@@ -59,6 +73,9 @@ public final class T3PanelHost implements T3Panel.Host {
 	private ChatTheme theme = ChatTheme.warmStudio();
 	private Rect frame = Rect.EMPTY;
 	private int pad = 8;
+	private @Nullable Header header;
+	/** Where the title ends this layout; -1 = the old rule (60 px kept clear for the button). */
+	private int titleRight = -1;
 
 	public T3PanelHost(Owner owner) {
 		this.owner = owner;
@@ -68,13 +85,23 @@ public final class T3PanelHost implements T3Panel.Host {
 		return current != null;
 	}
 
+	/** #50: controls the owner adds to the header row (null = none, the title and the close button only). */
+	public void setHeader(@Nullable Header header) {
+		this.header = header;
+	}
+
+	/** The root page is shown (no sub-page on top of it). */
+	public boolean atRoot() {
+		return stack.isEmpty();
+	}
+
 	public boolean modalOpen() {
 		return modal != null;
 	}
 
 	/** True while the current page has a popup open (a select's list): it takes the pointer even outside the page's frame. */
 	public boolean overlayOpen() {
-		return current != null && current.overlayOpen();
+		return current != null && (current.overlayOpen() || chrome.overlayOpen());
 	}
 
 	/** Starts the stack with {@code root}. */
@@ -170,6 +197,12 @@ public final class T3PanelHost implements T3Panel.Host {
 		int bw = Math.max(18, font.width(root ? "X" : "< Back") + 12);
 		back.setBounds(new Rect(area.right() - pad - bw, area.y() + pad - 2, bw, T3Control.H));
 		back.setTooltip(stack.isEmpty() ? "Close (Esc)" : "Back (Esc)");
+		titleRight = -1;
+		if (header != null) {
+			int rx = area.x() + pad;
+			Rect row = new Rect(rx, area.y() + pad - 2, Math.max(0, back.bounds().x() - 4 - rx), T3Control.H);
+			titleRight = header.arrange(row, root, chrome::add); // before the back button: Tab reaches them first
+		}
 		chrome.add(back);
 		Rect inner = new Rect(area.x() + pad, area.y() + pad + HEADER_H + 2, area.w() - 2 * pad, area.h() - 2 * pad - HEADER_H - 2);
 		p.layout(inner, font, t, sink);
@@ -184,7 +217,10 @@ public final class T3PanelHost implements T3Panel.Host {
 		int hx = covered ? -1 : mx;
 		int hy = covered ? -1 : my;
 		ChatDraw.panel(g, t, frame);
-		T3Draw.text(g, font, t, ChatDraw.clip(font, p.title(), frame.w() - 2 * pad - 60), frame.x() + pad, frame.y() + pad + 2, t.accent());
+		int titleW = titleRight < 0 ? frame.w() - 2 * pad - 60 : titleRight - frame.x() - pad;
+		if (titleW > 8) {
+			T3Draw.text(g, font, t, ChatDraw.clip(font, p.title(), titleW), frame.x() + pad, frame.y() + pad + 2, t.accent());
+		}
 		g.fill(frame.x() + pad, frame.y() + pad + HEADER_H - 2, frame.right() - pad, frame.y() + pad + HEADER_H - 1, t.edge());
 		chrome.render(g, font, t, hx, hy);
 		p.render(g, font, t, hx, hy);
@@ -199,8 +235,10 @@ public final class T3PanelHost implements T3Panel.Host {
 		}
 		if (modal == null) {
 			p.renderOverlays(g, font, t, mx, my, screen);
-			List<String> tip = p.overlayOpen() ? null : chrome.tooltip(mx, my);
-			if (tip == null && !p.overlayOpen()) {
+			chrome.renderOverlays(g, font, t, mx, my, screen);
+			boolean popup = p.overlayOpen() || chrome.overlayOpen();
+			List<String> tip = popup ? null : chrome.tooltip(mx, my);
+			if (tip == null && !popup) {
 				tip = p.tooltip(mx, my);
 			}
 			if (tip != null) {
@@ -239,6 +277,9 @@ public final class T3PanelHost implements T3Panel.Host {
 		if (p == null) {
 			return false;
 		}
+		if (chrome.overlayOpen()) {
+			return chrome.mouseClicked(mx, my, button); // a header select's list
+		}
 		if (p.overlayOpen()) {
 			return p.mouseClicked(mx, my, button);
 		}
@@ -266,6 +307,9 @@ public final class T3PanelHost implements T3Panel.Host {
 			modal.mouseScrolled(mx, my, dy);
 			return true; // the page under the veil does not scroll
 		}
+		if (chrome.overlayOpen()) {
+			return chrome.mouseScrolled(mx, my, dy);
+		}
 		return current != null && current.mouseScrolled(mx, my, dy);
 	}
 
@@ -287,6 +331,14 @@ public final class T3PanelHost implements T3Panel.Host {
 		T3Panel p = current;
 		if (p == null) {
 			return false;
+		}
+		if (chrome.overlayOpen()) {
+			if (e.isEscape()) {
+				chrome.closeOverlays();
+			} else {
+				chrome.keyPressed(e);
+			}
+			return true;
 		}
 		if (e.isEscape()) {
 			if (!p.escape()) {

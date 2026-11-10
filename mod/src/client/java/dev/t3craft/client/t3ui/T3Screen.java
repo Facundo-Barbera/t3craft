@@ -96,10 +96,16 @@ import org.jspecify.annotations.Nullable;
 public final class T3Screen extends Screen {
 	/** #39: id of the piece browser in {@link RightPanels} (the first right panel). */
 	public static final String PIECES_PANEL = "pieces";
+	/** #50: id of the run queue in {@link RightPanels} (the queue of the selected thread plus the working ones). */
+	public static final String QUEUE_PANEL = "queue";
 
 	static {
 		// #39: registered from the t3ui side, so client/pieces stays unchanged
 		RightPanels.registerIfAbsent(PIECES_PANEL, "Pieces", dev.t3craft.client.pieces.PieceBrowserPanel::new);
+		// #50: the run queue (fits from 180 px: one list, three icon buttons per run). This screen builds it itself
+		// (createRightPage) so it also watches the selected thread; the factory here watches the working ones only.
+		RightPanels.registerIfAbsent(QUEUE_PANEL, "Queue",
+				() -> new dev.t3craft.client.queue.QueuePanel(dev.t3craft.client.queue.QueuePanel.live(null)));
 	}
 
 	private static final DateTimeFormatter CLOCK = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault());
@@ -179,6 +185,26 @@ public final class T3Screen extends Screen {
 			if (minecraft != null && !laying) {
 				rebuildWidgets();
 			}
+		}
+
+		@Override
+		public @Nullable T3Panel create(String id) {
+			return createRightPage(id);
+		}
+
+		@Override
+		public void switchTo(String id) {
+			switchRightPanel(id);
+		}
+
+		@Override
+		public boolean canExpand() {
+			return true;
+		}
+
+		@Override
+		public void expand(String id) {
+			expandRightPanel(id);
 		}
 	});
 	private boolean rightOpen;
@@ -392,6 +418,15 @@ public final class T3Screen extends Screen {
 		return this;
 	}
 
+	/**
+	 * #50: the right panel at {@code px} for this screen only (the gallery's narrow and minimum-width scenarios). Not
+	 * saved unless the player drags; a later config reload goes back to the saved width.
+	 */
+	public T3Screen withRightWidth(int px) {
+		rightPref = Math.max(T3UiLayout.RIGHT_MIN, px);
+		return this;
+	}
+
 	/** #42: draws this screen at {@code pref} whatever the config says (the gallery's {@code inbox-scale}). */
 	public T3Screen withUiScale(UiScale.@Nullable Pref pref) {
 		uiScaleOverride = pref;
@@ -602,9 +637,9 @@ public final class T3Screen extends Screen {
 			return;
 		}
 		if (layout.compact()) {
-			T3Panel p = RightPanels.create(id);
+			T3Panel p = createRightPage(id);
 			if (p != null) {
-				openPage(p);
+				openFullPage(p);
 			}
 			return;
 		}
@@ -623,6 +658,52 @@ public final class T3Screen extends Screen {
 		}
 		layoutChanged();
 		rebuildWidgets();
+	}
+
+	/** #50: a fresh right panel page; the queue gets the selected thread as its focus, like the ⋯ menu's Queue. */
+	private @Nullable T3Panel createRightPage(String id) {
+		return QUEUE_PANEL.equals(id) ? newQueuePanel() : RightPanels.create(id);
+	}
+
+	/** #50: the panel header's switcher: show page {@code id} and remember it ({@code layout.rightPanel}). */
+	private void switchRightPanel(String id) {
+		if (id.equals(right.id())) {
+			return;
+		}
+		String before = right.id();
+		rightPanelId = id;
+		if (!right.open(id)) {
+			rightPanelId = before;
+			T3ThreadActions.notice("That panel is not available right now.");
+			return;
+		}
+		layoutChanged();
+	}
+
+	/**
+	 * #50: the panel header's full-size button: the page moves to the thread's place (the compact mode's way), and the
+	 * side panel closes so the page is not shown twice. U or the header icon brings the panel back.
+	 */
+	private void expandRightPanel(String id) {
+		T3Panel p = createRightPage(id);
+		if (p == null) {
+			T3ThreadActions.notice("That panel is not available right now.");
+			return;
+		}
+		right.close();
+		rightOpen = false;
+		rightFocused = false;
+		layoutChanged();
+		openFullPage(p);
+		rebuildWidgets();
+	}
+
+	/** A right panel page in the thread's place (the queue is released with the screen, like the ⋯ menu's). */
+	private void openFullPage(T3Panel p) {
+		if (p instanceof dev.t3craft.client.queue.QueuePanel q) {
+			queuePage = q;
+		}
+		openPage(p);
 	}
 
 	/** The widths or the right panel changed: saved shortly after ({@link #tickLayoutPrefs}), never per frame. */
@@ -705,12 +786,17 @@ public final class T3Screen extends Screen {
 	 * from the ⋯ menu. Watches the selected thread plus the working ones while it is shown.
 	 */
 	private void openQueuePage() {
+		dev.t3craft.client.queue.QueuePanel q = newQueuePanel();
+		queuePage = q;
+		openPage(q);
+	}
+
+	/** The live queue page, watching the selected thread (none for a draft) plus the working ones. */
+	private dev.t3craft.client.queue.QueuePanel newQueuePanel() {
 		String k = model.selectedKey();
 		dev.t3craft.client.queue.QueueStore.Key focusKey = k == null || selectedDraft() != null || k.indexOf(':') <= 0 ? null
 				: dev.t3craft.client.queue.QueueStore.Key.parse(k);
-		dev.t3craft.client.queue.QueuePanel q = new dev.t3craft.client.queue.QueuePanel(dev.t3craft.client.queue.QueuePanel.live(focusKey));
-		queuePage = q;
-		openPage(q);
+		return new dev.t3craft.client.queue.QueuePanel(dev.t3craft.client.queue.QueuePanel.live(focusKey));
 	}
 
 	/** A thread or a new draft was asked for by the user: the page makes way. */
@@ -762,6 +848,9 @@ public final class T3Screen extends Screen {
 		}
 		if (queuePage != null) {
 			queuePage.release(); // #39: stop watching queues; laid out again, the page watches again
+		}
+		if (right.page() instanceof dev.t3craft.client.queue.QueuePanel rq) {
+			rq.release(); // #50: the same for the queue in the right panel
 		}
 		sidebarSplitter.cancel();
 		rightSplitter.cancel();
