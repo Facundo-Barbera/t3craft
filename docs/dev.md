@@ -170,6 +170,7 @@ tuning; combined with F3+T it is the fast loop for visual work.
 | `pair`, `pair-readonly`, `operate-pair` | Kit dialogs: pairing (control by default / read-only) and enable-control |
 | `inbox-icons` | The main T3 screen with every sidebar and header icon in use (#27): pinned stars, folder and dock chevrons, Working / Snoozed / Settled, a worktree row, the agents chip with active and finished children |
 | `icons` | The icon gallery (#24): every `T3Icon` in a grid on both themes, 12 px in its three states and 32 px; the wheel scrolls (`docs/tools/icons.md`) |
+| `model-picker`, `composer-icons` | The composer's model picker open over a fake catalog; the composer with its icons (paperclip, thumbnails, error line, model chip, send) over a sender that sends nothing (#29) |
 | `queue` | The queued-runs screen (reads the live queue) |
 
 The fake environment is `t3dev-gallery`; its transcripts never reach the disk cache. Real things stay

@@ -12,6 +12,7 @@ import dev.t3craft.client.t3ui.kit.T3Control;
 import dev.t3craft.client.t3ui.kit.T3Draw;
 import dev.t3craft.client.t3ui.kit.T3Field;
 import dev.t3craft.client.t3ui.kit.T3Form;
+import dev.t3craft.client.t3ui.kit.T3Icon;
 import dev.t3craft.client.t3ui.kit.T3List;
 import dev.t3craft.client.t3ui.kit.T3Select;
 import dev.t3craft.client.t3ui.kit.T3Toggle;
@@ -35,7 +36,7 @@ import org.jspecify.annotations.Nullable;
  * kit controls on the {@link ChatTheme} tokens:
  * <ul>
  *   <li>a search box, then the providers (a scrolling list) beside the provider's models: favorites first
- *   (the square on the left of a row, kept in {@code config/t3craft/model-favorites.json} per
+ *   (the {@link T3Icon#STAR} on the left of a row, brass when it is a favorite, kept in {@code config/t3craft/model-favorites.json} per
  *   {@code environment/instance/model}), then T3's order, legacy models behind "Show legacy (N)" (a search looks
  *   through them too);</li>
  *   <li>under them the model's controls: a {@link T3Select} for its reasoning descriptor, one for every other
@@ -86,8 +87,10 @@ public final class ModelPicker {
 	private static final int LIST_ROWS = 9;
 	private static final int MIN_LIST_ROWS = 4;
 	private static final int POPUP_W = 330;
-	private static final int STAR = 6;
+	private static final int STAR = 10;
 	private static final int STAR_COL = 13;
+	/** Space taken by the icon before a setting's label (Reasoning, Access). */
+	private static final int LABEL_ICON = T3Icon.SIZE + 3;
 
 	private final Font font;
 	private final Mode mode;
@@ -126,7 +129,14 @@ public final class ModelPicker {
 	private @Nullable ChatTheme searchTheme;
 	private Rect popup = Rect.EMPTY;
 
-	private record Setting(@Nullable String label, T3Control control) {
+	private record Setting(@Nullable String label, T3Control control, @Nullable T3Icon icon) {
+		Setting(@Nullable String label, T3Control control) {
+			this(label, control, null);
+		}
+	}
+
+	/** What the closed chip shows: an icon or a text glyph (the provider's initial), the model and the detail. */
+	private record ChipParts(@Nullable T3Icon icon, String glyph, int glyphColor, String model, String detail) {
 	}
 
 	private ModelPicker(Font font, Mode mode, @Nullable String envId, @Nullable String threadId, @Nullable String threadTitle,
@@ -186,25 +196,27 @@ public final class ModelPicker {
 
 	/** Width of the composer chip for the current pick. */
 	public int chipWidth() {
-		String[] p = chipParts();
-		return ComposerSkin.chipWidth(font, p[0], p[1], withArrow(p[2]));
+		ChipParts p = chipParts();
+		return ComposerSkin.chipWidth(font, p.icon(), p.glyph(), p.model(), p.detail(), gate.state(envId) == ActionGate.State.ENABLED ? chevron() : null);
 	}
 
-	private String withArrow(String detail) {
-		String arrow = open ? "▴" : "▾";
-		return detail.isEmpty() ? arrow : detail + " " + arrow;
+	/** The chip's drop-down chevron: up while the popover is open. */
+	private T3Icon chevron() {
+		return open ? T3Icon.CHEVRON_UP : T3Icon.CHEVRON_DOWN;
 	}
 
-	/** {icon, model, detail} of the composer chip. */
-	private String[] chipParts() {
+	/** The composer chip's parts for the current pick. */
+	private ChipParts chipParts() {
 		if (gate.state(envId) != ActionGate.State.ENABLED) {
 			String key = ActionGate.disabledKey(gate.state(envId));
-			return new String[] {"⚠", Component.translatable(key == null ? "t3craft.actions.enable_control" : key).getString(), ""};
+			return new ChipParts(T3Icon.TRIANGLE_EXCLAMATION_POINT, "", ComposerSkin.WARN,
+					Component.translatable(key == null ? "t3craft.actions.enable_control" : key).getString(), "");
 		}
 		ModelPick p = logic.pick();
 		if (p == null) {
 			ProviderService.Entry entry = envId == null ? null : providers.catalog(envId);
-			return new String[] {"", entry != null && entry.phase() == ProviderService.Phase.LOADING ? "Loading models..." : "No models", ""};
+			return new ChipParts(null, "", ComposerSkin.TEXT,
+					entry != null && entry.phase() == ProviderService.Phase.LOADING ? "Loading models..." : "No models", "");
 		}
 		ProviderCatalog cat = logic.catalog();
 		ProviderCatalog.Provider prov = cat == null ? null : cat.provider(p.instanceId());
@@ -212,7 +224,7 @@ public final class ModelPicker {
 		String model = m == null ? p.model() : m.label();
 		String provLabel = prov == null ? "" : prov.label();
 		if (!provLabel.isEmpty() && model.regionMatches(true, 0, provLabel + " ", 0, provLabel.length() + 1)) {
-			model = model.substring(provLabel.length() + 1); // "Claude Opus 5.5" → "Opus 5.5", as T3's trigger
+			model = model.substring(provLabel.length() + 1); // "Claude Opus 5.5" -> "Opus 5.5", as T3's trigger
 		}
 		StringBuilder detail = new StringBuilder();
 		String reasoning = p.reasoningLabel(m);
@@ -222,34 +234,23 @@ public final class ModelPicker {
 		if (p.interaction() == Modes.Interaction.PLAN) {
 			detail.append(detail.isEmpty() ? "" : " · ").append("Plan");
 		}
-		return new String[] {providerGlyph(prov == null ? p.instanceId() : prov.driver()), model, detail.toString()};
+		String driver = prov == null ? p.instanceId() : prov.driver();
+		return new ChipParts(null, providerGlyph(prov == null ? p.instanceId() : provLabel), providerColor(driver), model, detail.toString());
 	}
 
-	/** A glyph standing for the provider's icon (the game font has no logos). */
-	static String providerGlyph(String driver) {
+	/**
+	 * The provider's mark: the initial of its name, as text (the game font has no logos; own SVG marks may come
+	 * later). ASCII, so it draws in every font.
+	 */
+	static String providerGlyph(String name) {
+		String n = name.strip();
+		return n.isEmpty() ? "?" : n.substring(0, 1).toUpperCase(java.util.Locale.ROOT);
+	}
+
+	/** Colour of the provider's initial: Claude in the theme's clay accent (its brand colour), the rest in the chip's text colour. */
+	static int providerColor(String driver) {
 		String d = driver.toLowerCase(java.util.Locale.ROOT);
-		if (d.contains("claude") || d.contains("anthropic")) {
-			return "✳";
-		}
-		if (d.contains("codex") || d.contains("openai") || d.contains("gpt")) {
-			return "◎";
-		}
-		if (d.contains("gemini") || d.contains("google")) {
-			return "✦";
-		}
-		if (d.contains("cursor")) {
-			return "▲";
-		}
-		return d.isEmpty() ? "•" : d.substring(0, 1).toUpperCase(java.util.Locale.ROOT);
-	}
-
-	static int providerColor(String glyph) {
-		return switch (glyph) {
-			case "✳" -> 0xFFD97757;
-			case "✦" -> 0xFF7AA7FF;
-			case "⚠" -> ComposerSkin.WARN;
-			default -> ComposerSkin.TEXT;
-		};
+		return d.contains("claude") || d.contains("anthropic") ? ChatTheme.warmStudio().accent() : ComposerSkin.TEXT;
 	}
 
 	/** The pick's runtime mode (access), null until there is a pick. */
@@ -387,9 +388,10 @@ public final class ModelPicker {
 		refreshCatalog();
 		ActionGate.State st = gate.state(envId);
 		boolean hover = Hits.inside(mouseX, mouseY, x, y, x + w, y + h);
-		String[] p = chipParts();
-		ComposerSkin.chip(g, font, x, y, p[0], providerColor(p[0]), p[1], st == ActionGate.State.ENABLED ? ComposerSkin.TEXT : ComposerSkin.WARN,
-				withArrow(p[2]), hover, open);
+		ChipParts p = chipParts();
+		ComposerSkin.chip(g, font, x, y, p.icon(), p.glyph(), p.glyphColor(), p.model(),
+				st == ActionGate.State.ENABLED ? ComposerSkin.TEXT : ComposerSkin.WARN, p.detail(), st == ActionGate.State.ENABLED ? chevron() : null,
+				hover, open);
 		if (st != ActionGate.State.ENABLED) {
 			if (st != ActionGate.State.NO_ENV) {
 				String env = envId;
@@ -477,7 +479,7 @@ public final class ModelPicker {
 		int labelW = 0;
 		for (Setting s : settings) {
 			if (s.label() != null) {
-				labelW = Math.max(labelW, font.width(s.label()) + 8);
+				labelW = Math.max(labelW, LABEL_ICON + font.width(s.label()) + 8);
 			}
 		}
 		labelW = Math.min(labelW, iw / 3);
@@ -530,7 +532,10 @@ public final class ModelPicker {
 		int ly = popup.y() + PAD + T3Control.H + GAP + listH + GAP + 1 + GAP;
 		for (Setting s : settings) {
 			if (s.label() != null) {
-				T3Draw.text(g, font, t, s.label(), ix + 2, ly + (T3Control.H - 8) / 2, t.muted());
+				if (s.icon() != null) {
+					T3Icon.draw(g, t, s.icon(), ix + 2, ly + (T3Control.H - T3Icon.SIZE) / 2, T3Icon.SIZE, t.muted());
+				}
+				T3Draw.text(g, font, t, s.label(), ix + 2 + LABEL_ICON, ly + (T3Control.H - 8) / 2, t.muted());
 			}
 			ly += T3Control.H + 3;
 		}
@@ -574,7 +579,7 @@ public final class ModelPicker {
 		if (m != null && pick != null) {
 			ProviderCatalog.Option reasoning = m.reasoning();
 			if (reasoning != null) {
-				settings.add(new Setting(reasoning.label(), optionSelect(reasoning, pick)));
+				settings.add(new Setting(reasoning.label(), optionSelect(reasoning, pick), T3Icon.BRAIN));
 			}
 			for (ProviderCatalog.Option o : m.extraSelects()) {
 				settings.add(new Setting(o.label(), optionSelect(o, pick)));
@@ -592,7 +597,7 @@ public final class ModelPicker {
 			}
 		}
 		if (pick != null) {
-			settings.add(new Setting("Access", accessSelect(pick)));
+			settings.add(new Setting("Access", accessSelect(pick), T3Icon.SHIELD));
 		}
 		form.clear();
 		form.add(search);
@@ -733,14 +738,12 @@ public final class ModelPicker {
 			if (sel) {
 				g.fill(r.x(), r.y(), r.right(), r.bottom(), t.selected());
 			}
-			int sx = r.x() + 4;
+			int sx = r.x() + (STAR_COL - STAR) / 2 + 1;
 			int sy = r.y() + (r.h() - STAR) / 2;
-			if (favorite(m)) {
-				g.fill(sx, sy, sx + STAR, sy + STAR, t.brass());
-			} else {
-				boolean overStar = mx >= r.x() && mx < r.x() + STAR_COL && r.contains(mx, my);
-				ChatDraw.outline(g, sx, sy, STAR, STAR, overStar ? t.brass() : t.disabled());
-			}
+			boolean overStar = mx >= r.x() && mx < r.x() + STAR_COL && r.contains(mx, my);
+			// a favorite is brass; otherwise muted at rest and accent under the pointer (the kit's icon tint)
+			int starTint = favorite(m) ? t.brass() : T3Icon.tint(t, overStar, true);
+			T3Icon.draw(g, t, T3Icon.STAR, sx, sy, STAR, starTint);
 			int right = r.right() - 4;
 			String badge = m.badge() != null ? m.badge() : m.isCustom() ? "custom" : null;
 			if (badge != null) {

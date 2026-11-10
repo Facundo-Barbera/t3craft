@@ -2,6 +2,7 @@ package dev.t3craft.client.t3ui;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.t3craft.client.chat.ChatDraw;
+import dev.t3craft.client.chat.ChatTheme;
 import dev.t3craft.client.chat.MouseButtons;
 import dev.t3craft.client.chat.Rect;
 import dev.t3craft.client.chat.compose.ComposerSkin;
@@ -10,6 +11,7 @@ import dev.t3craft.client.chat.compose.ComposerView;
 import dev.t3craft.client.t3ui.actions.ActionsClient;
 import dev.t3craft.client.t3ui.actions.NewThreadForm;
 import dev.t3craft.client.t3ui.actions.ProjectsService;
+import dev.t3craft.client.t3ui.kit.T3Icon;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
@@ -25,7 +27,7 @@ import org.jspecify.annotations.Nullable;
  * The two chips a {@link ThreadDraft} adds to the composer bar, each with a popover that opens
  * upwards (T3's composer menus open on the top side):
  * <ul>
- *   <li><b>project</b> ({@code DraftHeroProjectHeading} / the project picker): "▣ project", or
+ *   <li><b>project</b> ({@code DraftHeroProjectHeading} / the project picker): folder icon + "project", or
  *   "env · project" when several environments are paired; the popover lists every project of every
  *   connected environment ({@link ProjectsService}).</li>
  *   <li><b>workspace</b> ({@code BranchToolbarEnvModeSelector} + {@code WorktreeBaseBranchPicker}):
@@ -37,6 +39,9 @@ import org.jspecify.annotations.Nullable;
  */
 final class DraftControls {
 	private static final int ROW = 13;
+	/** The check icon of a selected popover row, and the column it takes. */
+	private static final int CHECK = 8;
+	private static final int CHECK_COL = CHECK + 5;
 
 	private final Supplier<@Nullable ThreadDraft> draft;
 	private final Consumer<ProjectsService.Project> onProject;
@@ -158,10 +163,11 @@ final class DraftControls {
 			if (hover || selected) {
 				ComposerSkin.round(g, r.x(), r.y(), r.w(), r.h(), hover ? ComposerSkin.HOVER : ComposerSkin.OPEN);
 			}
-			String check = selected ? "✓ " : "   ";
 			int tx = r.x() + 4;
-			g.text(font, check, tx, y + 3, ComposerSkin.TEXT, false);
-			tx += font.width("✓ ") + 1;
+			if (selected) {
+				T3Icon.draw(g, ChatTheme.warmStudio(), T3Icon.CHECK, tx, y + (ROW - CHECK) / 2, CHECK, ComposerSkin.TEXT);
+			}
+			tx += CHECK_COL;
 			int room = r.right() - tx - 4;
 			String d = detail == null ? "" : detail;
 			int dw = d.isEmpty() ? 0 : Math.min(font.width(d), room / 2);
@@ -187,7 +193,7 @@ final class DraftControls {
 		@Override
 		public int width(Font f) {
 			ThreadDraft d = draft.get();
-			return d == null ? 0 : Math.min(140, ComposerSkin.chipWidth(f, "▣", label(d), ""));
+			return d == null ? 0 : Math.min(140, ComposerSkin.chipWidth(f, T3Icon.FOLDER, "", label(d), "", null));
 		}
 
 		@Override
@@ -200,8 +206,9 @@ final class DraftControls {
 			cy = y;
 			cw = width(f);
 			boolean hover = mouseX >= x && mouseX < x + cw && mouseY >= y && mouseY < y + ComposerSkin.CHIP_H;
-			String l = ChatDraw.clip(f, label(d), cw - ComposerSkin.chipWidth(f, "▣", "", ""));
-			ComposerSkin.chip(g, f, x, y, "▣", 0xFF9AA7B8, l, ComposerSkin.TEXT, "", hover, open);
+			String l = ChatDraw.clip(f, label(d), cw - ComposerSkin.chipWidth(f, T3Icon.FOLDER, "", "", "", null));
+			ComposerSkin.chip(g, f, x, y, T3Icon.FOLDER, "", hover || open ? ComposerSkin.TEXT : ComposerSkin.MUTED, l, ComposerSkin.TEXT, "", null,
+					hover, open);
 			if (hover && !open) {
 				g.setTooltipForNextFrame(f, Component.literal("Project · " + d.envLabel + " / " + d.projectLabel), mouseX, mouseY);
 			}
@@ -216,7 +223,7 @@ final class DraftControls {
 			int shown = Math.max(1, Math.min(maxRows, ps.size()));
 			int w = 170;
 			for (ProjectsService.Project p : ps) {
-				w = Math.max(w, Math.min(260, font.width("✓ " + p.label() + "  " + p.envLabel()) + 20));
+				w = Math.max(w, Math.min(260, CHECK_COL + font.width(p.label() + "  " + p.envLabel()) + 20));
 			}
 			int h = 4 + 12 + shown * ROW + 4;
 			Rect fr = frame(g, w, h);
@@ -225,7 +232,7 @@ final class DraftControls {
 			header(g, "Project", x + 2, y);
 			y += 12;
 			if (ps.isEmpty()) {
-				g.text(font, "No projects. ⋯ › Register project…", x + 4, y + 3, ComposerSkin.MUTED, false);
+				g.text(font, "No projects. Menu > Register project...", x + 4, y + 3, ComposerSkin.MUTED, false);
 				return;
 			}
 			scroll = Math.max(0, Math.min(scroll, ps.size() - shown));
@@ -263,11 +270,12 @@ final class DraftControls {
 		@Override
 		public int width(Font f) {
 			ThreadDraft d = draft.get();
-			return d == null ? 0 : ComposerSkin.chipWidth(f, icon(d), d.workspace.workspace.label, detail(d));
+			return d == null ? 0 : ComposerSkin.chipWidth(f, icon(d), "", d.workspace.workspace.label, detail(d), null);
 		}
 
-		private static String icon(ThreadDraft d) {
-			return d.workspace.workspace == NewThreadForm.Workspace.WORKTREE ? "⑂" : "▢";
+		/** A worktree is a branch; the local checkout is the plain square T3 shows. */
+		private static T3Icon icon(ThreadDraft d) {
+			return d.workspace.workspace == NewThreadForm.Workspace.WORKTREE ? T3Icon.GIT_BRANCH : T3Icon.SQUARE;
 		}
 
 		private static String detail(ThreadDraft d) {
@@ -323,7 +331,8 @@ final class DraftControls {
 			cy = y;
 			cw = width(f);
 			boolean hover = mouseX >= x && mouseX < x + cw && mouseY >= y && mouseY < y + ComposerSkin.CHIP_H;
-			ComposerSkin.chip(g, f, x, y, icon(d), 0xFF9AA7B8, d.workspace.workspace.label, ComposerSkin.TEXT, detail(d), hover, open);
+			ComposerSkin.chip(g, f, x, y, icon(d), "", hover || open ? ComposerSkin.TEXT : ComposerSkin.MUTED, d.workspace.workspace.label,
+					ComposerSkin.TEXT, detail(d), null, hover, open);
 			if (hover && !open) {
 				g.setTooltipForNextFrame(f, Component.literal(d.workspace.workspace == NewThreadForm.Workspace.WORKTREE
 						? "Workspace · a new git worktree" : "Workspace · the project checkout"), mouseX, mouseY);
@@ -363,7 +372,7 @@ final class DraftControls {
 			header(g, "Branch name (optional)", x + 2, y - 2);
 			y += 10;
 			branchRect = new Rect(x + 2, y, iw - 4, 13);
-			field(g, branch, branchRect, "t3code/…");
+			field(g, branch, branchRect, "t3code/...");
 			y += 15;
 			boolean origin = d.workspace.startFromOrigin;
 			item(g, "Start from origin", null, origin, x, y, iw, mouseX, mouseY, () -> d.workspace.startFromOrigin = !d.workspace.startFromOrigin);

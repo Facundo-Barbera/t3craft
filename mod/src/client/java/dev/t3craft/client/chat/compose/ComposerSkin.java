@@ -1,7 +1,10 @@
 package dev.t3craft.client.chat.compose;
 
+import dev.t3craft.client.chat.ChatTheme;
+import dev.t3craft.client.t3ui.kit.T3Icon;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The look of T3 Code's composer ({@code ComposerSurface} / {@code ComposerControlsBar} /
@@ -36,6 +39,8 @@ public final class ComposerSkin {
 
 	/** Chip height in the composer bar. */
 	public static final int CHIP_H = 14;
+	/** Size of a {@link T3Icon} inside a chip (leading icon, trailing chevron). */
+	public static final int CHIP_ICON = 10;
 
 	/** Rounded box, radius 3 (rows 0/1 inset 2/1 px). */
 	public static void round(GuiGraphicsExtractor g, int x, int y, int w, int h, int color) {
@@ -80,50 +85,62 @@ public final class ComposerSkin {
 	}
 
 	/**
+	 * Width of a chip with an optional leading {@link T3Icon}, an optional text glyph (a provider's initial), a label, an
+	 * optional muted detail and an optional trailing icon (the chevron of a drop-down).
+	 */
+	public static int chipWidth(Font font, @Nullable T3Icon icon, String glyph, String label, String detail, @Nullable T3Icon trailing) {
+		int w = chipWidth(font, glyph, label, detail);
+		if (icon != null) {
+			w += CHIP_ICON + 4;
+		}
+		if (trailing != null) {
+			w += 3 + CHIP_ICON;
+		}
+		return w;
+	}
+
+	/**
 	 * A ghost chip (T3's {@code ComposerSelectControl}): no fill at rest, a soft fill on hover or
 	 * while its popover is open. Returns its width.
 	 */
 	public static int chip(GuiGraphicsExtractor g, Font font, int x, int y, String icon, int iconColor, String label, int labelColor,
 			String detail, boolean hover, boolean open) {
-		int w = chipWidth(font, icon, label, detail);
+		return chip(g, font, x, y, null, icon, iconColor, label, labelColor, detail, null, hover, open);
+	}
+
+	/**
+	 * The ghost chip with icons: {@code icon} (tinted {@code iconColor}) before the optional text {@code glyph} (same
+	 * colour), then the label and the detail, then {@code trailing} (muted, the text colour while hovered or open).
+	 * Returns its width.
+	 */
+	public static int chip(GuiGraphicsExtractor g, Font font, int x, int y, @Nullable T3Icon icon, String glyph, int iconColor, String label,
+			int labelColor, String detail, @Nullable T3Icon trailing, boolean hover, boolean open) {
+		int w = chipWidth(font, icon, glyph, label, detail, trailing);
 		if (hover || open) {
 			round(g, x, y, w, CHIP_H, open ? OPEN : HOVER);
 		}
+		ChatTheme t = ChatTheme.warmStudio(); // only for T3Icon's "no colour given" fallback: every tint here is explicit
 		int tx = x + 4;
 		int ty = y + (CHIP_H - 8) / 2;
-		if (!icon.isEmpty()) {
-			g.text(font, icon, tx, ty, iconColor, false);
-			tx += font.width(icon) + 4;
+		int iy = y + (CHIP_H - CHIP_ICON) / 2;
+		if (icon != null) {
+			T3Icon.draw(g, t, icon, tx, iy, CHIP_ICON, iconColor);
+			tx += CHIP_ICON + 4;
+		}
+		if (!glyph.isEmpty()) {
+			g.text(font, glyph, tx, ty, iconColor, false);
+			tx += font.width(glyph) + 4;
 		}
 		g.text(font, label, tx, ty, labelColor, false);
 		tx += font.width(label);
 		if (!detail.isEmpty()) {
 			g.text(font, detail, tx + 4, ty, MUTED, false);
+			tx += 4 + font.width(detail);
+		}
+		if (trailing != null) {
+			T3Icon.draw(g, t, trailing, tx + 3, iy, CHIP_ICON, hover || open ? TEXT : MUTED);
 		}
 		return w;
-	}
-
-	/** A 5×10 paperclip drawn with fills (the game font has no paperclip glyph). */
-	public static void paperclip(GuiGraphicsExtractor g, int x, int y, int c) {
-		g.fill(x + 1, y, x + 4, y + 1, c);
-		g.fill(x, y + 1, x + 1, y + 9, c);
-		g.fill(x + 4, y + 1, x + 5, y + 7, c);
-		g.fill(x + 1, y + 9, x + 3, y + 10, c);
-		g.fill(x + 3, y + 8, x + 4, y + 9, c);
-		g.fill(x + 2, y + 3, x + 3, y + 8, c);
-	}
-
-	/** An up arrow (send) centred in a {@code d}×{@code d} button. */
-	public static void arrowUp(GuiGraphicsExtractor g, int x, int y, int d, int c) {
-		int cx = x + d / 2;
-		int top = y + d / 2 - 4;
-		g.fill(cx - 1, top + 2, cx + 1, top + 9, c);
-		g.fill(cx - 2, top + 1, cx + 2, top + 3, c);
-		g.fill(cx - 3, top + 2, cx - 2, top + 4, c);
-		g.fill(cx + 2, top + 2, cx + 3, top + 4, c);
-		g.fill(cx - 4, top + 3, cx - 3, top + 5, c);
-		g.fill(cx + 3, top + 3, cx + 4, top + 5, c);
-		g.fill(cx - 1, top, cx + 1, top + 1, c);
 	}
 
 	/** A small rounded square (stop) centred in a {@code d}×{@code d} button. */

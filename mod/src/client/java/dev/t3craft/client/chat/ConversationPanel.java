@@ -18,6 +18,7 @@ import dev.t3craft.client.chat.ChatTurns.Role;
 import dev.t3craft.client.chat.ChatTurns.ToolRun;
 import dev.t3craft.client.chat.ChatTurns.Turn;
 import dev.t3craft.client.chat.Markdown.Span;
+import dev.t3craft.client.t3ui.kit.T3Icon;
 import dev.t3craft.client.t3ui.sidebar.Spinner;
 import dev.t3craft.t3.ThreadState;
 import java.net.URI;
@@ -171,6 +172,10 @@ public final class ConversationPanel implements AutoCloseable {
 	private @Nullable String operateEnv;
 	private long operateCheckedAt;
 	private final Set<String> expanded = new HashSet<>();
+	/** Toggle keys of the tool-run head lines of the last layout: they get a fold chevron where the text starts. */
+	private final Set<String> foldHeads = new HashSet<>();
+	/** Room the fold chevron takes before a run's summary. */
+	private static final int FOLD_W = 10;
 	/** Table layouts by (table, width), least recently used dropped first; cleared when the font changes. */
 	private final Map<TableKey, TableLayout.Result> tableCache = new LinkedHashMap<>(16, 0.75f, true) {
 		@Override
@@ -580,8 +585,8 @@ public final class ConversationPanel implements AutoCloseable {
 		Layout L = new Layout(font, w);
 		ThreadFeed.State st = f.state();
 		if (v.hasMoreHistory() || st.olderError() != null) {
-			String label = st.loadingOlder() ? "Loading earlier messages…"
-					: st.olderError() != null ? "⚠ " + st.olderError() + " (click to retry)" : "▲ Load earlier messages";
+			String label = st.loadingOlder() ? "Loading earlier messages..."
+					: st.olderError() != null ? "Could not load: " + st.olderError() + " (click to retry)" : "Load earlier messages";
 			L.add(t.row() + 4, 0, List.of(piece(font, label)), t.link(), 0, 0, null, 0, null, null, true, null, false, false);
 		} else if (v.synced() || !v.entries().isEmpty()) {
 			L.add(t.row() + 2, 0, List.of(), 0, 0, 0, null, 0, null, null, false, "Start of thread", false, false);
@@ -589,6 +594,7 @@ public final class ConversationPanel implements AutoCloseable {
 		Long prevAt = null;
 		long now = System.currentTimeMillis();
 		buildingChips = new HashMap<>();
+		foldHeads.clear();
 		List<ChatEntry> all = v.entries();
 		if (extra != null) {
 			List<ChatEntry> more = extra.entries();
@@ -741,10 +747,12 @@ public final class ConversationPanel implements AutoCloseable {
 		boolean open = expanded.contains(r.key());
 		ToolLine firstTool = ToolLine.of(r.entries().getFirst());
 		if (r.entries().size() > 1 || !open) {
-			String head = (open ? "▾ " : "▸ ") + r.summary(3) + (r.running() ? "  …" : "") + (r.failed() ? "  ✖" : "");
+			// the chevron (open or folded) is an icon drawn in the FOLD_W px before the summary, see drawFeed
+			String head = r.summary(3) + (r.running() ? "  ..." : "") + (r.failed() ? "  (failed)" : "");
 			int color = r.failed() ? t.errorText() : t.tool();
-			L.add(t.toolRow(), 15, List.of(piece(L.font, head)), color, stripe, 0, null, 0, firstTool.icon(), r.key(), false, null, false,
-					false);
+			foldHeads.add(r.key());
+			L.add(t.toolRow(), 15, List.of(new TextWrap.Piece(Span.plain(head), FOLD_W, L.font.width(head))), color, stripe, 0, null, 0,
+					firstTool.icon(), r.key(), false, null, false, false);
 			if (!open) {
 				return;
 			}
@@ -765,7 +773,7 @@ public final class ConversationPanel implements AutoCloseable {
 		int nw = L.font.width(name);
 		boolean failed = "failed".equals(e.status());
 		p.add(new TextWrap.Piece(Span.plain(name), 0, nw));
-		String suffix = (e.streaming() || "running".equals(e.status()) || "pending".equals(e.status())) ? " …" : failed ? " ✖" : "";
+		String suffix = (e.streaming() || "running".equals(e.status()) || "pending".equals(e.status())) ? " ..." : failed ? " (failed)" : "";
 		if (!tl.arg().isEmpty() && avail - nw > 12) {
 			String a = ChatDraw.clip(L.font, " " + tl.arg(), avail - nw - L.font.width(suffix));
 			p.add(new TextWrap.Piece(new Span(a, false, true, false, null), nw, L.font.width(a)));
@@ -1328,12 +1336,12 @@ public final class ConversationPanel implements AutoCloseable {
 			navY = y;
 			if (!pos.isEmpty()) {
 				nextX = right - 12;
-				ChatDraw.keycap(g, font, t, "›", nextX, y);
+				ChatDraw.keycap(g, t, T3Icon.CHEVRON_RIGHT, nextX, y, mouseX >= nextX && mouseX < nextX + 12 && mouseY >= y && mouseY < y + 12);
 				int pw = font.width(pos) + 10;
 				int pillX = nextX - 3 - pw;
 				ChatDraw.pill(g, font, t, pos, pillX, y, t.text());
 				prevX = pillX - 15;
-				ChatDraw.keycap(g, font, t, "‹", prevX, y);
+				ChatDraw.keycap(g, t, T3Icon.CHEVRON_LEFT, prevX, y, mouseX >= prevX && mouseX < prevX + 12 && mouseY >= y && mouseY < y + 12);
 				right = prevX - 6;
 			}
 			int hx = x;
@@ -1370,7 +1378,14 @@ public final class ConversationPanel implements AutoCloseable {
 				String conn = connection(st);
 				int cw = font.width(conn);
 				int ly = y + 13;
-				g.text(font, ChatDraw.clip(font, detail, w - cw - 8), x, ly, status == null ? t.muted() : t.color(status.state()), t.shadow());
+				int dx = x;
+				if (status != null) {
+					// the state's icon before its word (the word stays plain text: it is also the tooltip)
+					T3Icon.draw(g, t, ChatDraw.stateIcon(Attention.of(status.state(), false)), dx, ly, 8, t.color(status.state()));
+					dx += 11;
+				}
+				g.text(font, ChatDraw.clip(font, detail, w - cw - 8 - (dx - x)), dx, ly, status == null ? t.muted() : t.color(status.state()),
+						t.shadow());
 				int connColor = st == null ? t.muted() : st.phase() == ThreadFeed.Phase.LIVE ? t.done()
 						: st.phase() == ThreadFeed.Phase.FAILED ? t.error() : t.pending();
 				g.text(font, conn, x + w - cw, ly, connColor, t.shadow());
@@ -1545,6 +1560,10 @@ public final class ConversationPanel implements AutoCloseable {
 				ChatDraw.toolIcon(g, font, t, l.icon(), lx - 15, ly + (lh - 12) / 2);
 			}
 			boolean hot = hover != null && hover.line() == l && (l.toggle() != null || l.loadMore());
+			if (l.toggle() != null && foldHeads.contains(l.toggle())) {
+				T3Icon fold = expanded.contains(l.toggle()) ? T3Icon.CHEVRON_DOWN : T3Icon.CHEVRON_RIGHT;
+				T3Icon.draw(g, t, fold, lx, ly + (lh - 8) / 2, 8, hot ? t.accent() : t.muted());
+			}
 			for (TextWrap.Piece p : l.pieces()) {
 				int c = l.color();
 				String u = p.span().url();
