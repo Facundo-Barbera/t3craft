@@ -31,11 +31,21 @@ public class T3PanelScreen extends Screen implements T3PanelHost.Owner {
 		host.open(root);
 	}
 
+	/** Widest the frame gets (GUI pixels); a page that needs columns asks for more. */
+	protected int maxWidth() {
+		return MAX_W;
+	}
+
+	/** Tallest the frame gets. */
+	protected int maxHeight() {
+		return MAX_H;
+	}
+
 	@Override
 	protected void init() {
 		theme = ChatTheme.warmStudio();
-		int w = Math.min(MAX_W, width - 12);
-		int h = Math.min(MAX_H, height - 12);
+		int w = Math.min(maxWidth(), width - 12);
+		int h = Math.min(maxHeight(), height - 12);
 		host.layout(new Rect((width - w) / 2, (height - h) / 2, w, h), font, theme, this::addRenderableWidget);
 		for (var child : children()) {
 			if (child instanceof EditBox box && box.isFocused()) {

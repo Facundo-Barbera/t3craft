@@ -85,6 +85,10 @@ public final class UiGallery {
 					() -> new T3PanelScreen(null, new SettingsPanel(EnvironmentActions.DEFAULT).tab(2))),
 			new Scenario("environments", "Environment list with fake environments (ok, connecting, offline, one with control)",
 					() -> new T3PanelScreen(null, new EnvironmentsPanel(galleryActions()))),
+			new Scenario("pieces", "Piece browser as a screen of its own (the code catalog; Preview needs a world)",
+					() -> new dev.t3craft.client.pieces.PieceBrowserScreen(null)),
+			new Scenario("inbox-pieces", "Main T3 screen with the piece browser in the thread's place (the ⋯ menu → Pieces)",
+					() -> inbox(true, true).withPage(new dev.t3craft.client.pieces.PieceBrowserPanel())),
 			new Scenario("queue", "Queued runs (reads the live queue, empty without a connection)", () -> new QueueScreen(null, null)));
 
 	private UiGallery() {

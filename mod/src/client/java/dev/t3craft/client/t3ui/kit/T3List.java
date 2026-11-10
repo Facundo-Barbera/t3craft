@@ -64,6 +64,24 @@ public final class T3List<T> extends T3Control {
 		return items;
 	}
 
+	/** Scrolls to the first row (a new list of items). */
+	public T3List<T> scrollToTop() {
+		scroll = 0;
+		return this;
+	}
+
+	/** Scrolls the least that shows row {@code index} wholly; call after the list got its bounds. */
+	public T3List<T> ensureVisible(int index) {
+		int viewH = Math.max(rowH, bounds().h() - 4);
+		double top = (double) index * rowH;
+		if (top < scroll) {
+			scroll = top;
+		} else if (top + rowH > scroll + viewH) {
+			scroll = top + rowH - viewH;
+		}
+		return this;
+	}
+
 	private void clamp() {
 		double max = Math.max(0, (double) items.size() * rowH - view.h());
 		scroll = Math.max(0, Math.min(scroll, max));

@@ -94,6 +94,27 @@ public final class T3CraftCommands {
 					client.openNextTick(dev.t3craft.client.chat.ChatScreens.create(key.isEmpty() ? null : key));
 					return 1;
 				})))
+				// feat/piece-browser-ui: the piece browser (docs/features/piece-browser.md); with an id it opens on that piece
+				.then(literal("pieces")
+						.executes(c -> {
+							client.openNextTick(new dev.t3craft.client.pieces.PieceBrowserScreen(null));
+							return 1;
+						})
+						.then(argument("piece", StringArgumentType.word())
+								.suggests((c, b) -> {
+									dev.t3craft.client.pieces.PieceCatalog.all().forEach(p -> b.suggest(p.id()));
+									return b.buildFuture();
+								})
+								.executes(c -> {
+									String id = StringArgumentType.getString(c, "piece");
+									if (dev.t3craft.client.pieces.PieceCatalog.byId(id) == null) {
+										c.getSource().sendError(prefix().append(Component.literal("no piece '" + id + "'; /t3craft pieces opens the browser")));
+										return 0;
+									}
+									client.openNextTick(new dev.t3craft.client.pieces.PieceBrowserScreen(null,
+											new dev.t3craft.client.pieces.PieceBrowserPanel().select(id)));
+									return 1;
+								})))
 				.then(literal("envs").executes(c -> {
 					var list = new Environments(ModConfig.dataDir()).list();
 					if (list.isEmpty()) {
