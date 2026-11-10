@@ -75,7 +75,7 @@ public final class QueueCommands {
 	public static void build(CommandDispatcher<FabricClientCommandSource> d, T3CraftClient client) {
 		d.register(literal("t3craft").then(literal("queue")
 				.executes(c -> {
-					client.openNextTick(new QueueScreen(null, null));
+					client.openNextTick(new QueueScreen(null, (QueueStore.Key) null));
 					return 1;
 				})
 				.then(argument("thread", THREAD).suggests(threads(client)).executes(c -> list(c, client)))));
