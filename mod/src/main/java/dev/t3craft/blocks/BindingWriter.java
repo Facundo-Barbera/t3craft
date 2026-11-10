@@ -9,7 +9,9 @@ import net.minecraft.world.level.Level;
  * is placed or replaced). Only cells that hold one of the module's blocks, are loaded and whose
  * stored binding differs are written, so re-sending the same map is free and a steady HQ costs one
  * lookup per fixture. Cells without a t3craft block (a module not built yet, an archive shelf, a
- * vanilla HQ) are skipped.
+ * vanilla HQ) are skipped, and so are block entities whose binding was set by hand
+ * ({@link BoundBlockEntity#manual()}: the block's config page or {@code /t3craft blocks link}) until "Reset to
+ * automatic" clears the flag.
  */
 public final class BindingWriter {
 	private BindingWriter() {
@@ -23,7 +25,7 @@ public final class BindingWriter {
 			if (!level.isLoaded(pos)) {
 				continue;
 			}
-			if (level.getBlockEntity(pos) instanceof BoundBlockEntity be && !Binding.parse(be.binding()).equals(e.getValue())) {
+			if (level.getBlockEntity(pos) instanceof BoundBlockEntity be && !be.manual() && !Binding.parse(be.binding()).equals(e.getValue())) {
 				be.setBinding(e.getValue().wire());
 				changed++;
 			}

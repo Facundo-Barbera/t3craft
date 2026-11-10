@@ -2,6 +2,9 @@
 // Copyright (c) 2026 AgentCraft contributors. MIT License.
 package dev.t3craft.blocks;
 
+import com.mojang.serialization.Codec;
+import java.util.Map;
+import java.util.TreeMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -20,12 +23,30 @@ import net.minecraft.world.level.storage.ValueOutput;
  * ({@code {"binding": "..."}}, see {@link HqBlockFixtures}); it is saved with the world and synced to
  * the client with the chunk and on every change.
  *
+ * <p><b>Block config</b> (issue #33, additive keys, a world saved before them loads unchanged):
+ * <ul>
+ *   <li>{@code "manual"} (boolean, default false): the binding was chosen by hand (the block's config page,
+ *       {@code /t3craft blocks link}); {@link BindingWriter} leaves the block alone until "Reset to automatic"
+ *       clears it. Written only when true.</li>
+ *   <li>{@code "options"} (compound of strings, default empty): the block's own display options, read by its
+ *       renderer; a missing key means the default (today's look). Written only when not empty.</li>
+ * </ul>
+ * The binding resolution order does not change: the block's own data wins over the position fallback.
+ *
  * <p>Adapted from AgentCraft's {@code StationBlockEntity} (binding field, save/load, update packet
  * and update tag for client sync).
  */
 public abstract class BoundBlockEntity extends BlockEntity {
 	public static final String KEY = "binding";
+	public static final String MANUAL_KEY = "manual";
+	public static final String OPTIONS_KEY = "options";
+	/** Most option keys a block keeps, and the longest key / value (a page never needs more; junk data stays small). */
+	public static final int MAX_OPTIONS = 32;
+	public static final int MAX_OPTION_LENGTH = 64;
+	private static final Codec<Map<String, String>> OPTIONS_CODEC = Codec.unboundedMap(Codec.STRING, Codec.STRING);
 	private String binding = "";
+	private boolean manual;
+	private Map<String, String> options = Map.of();
 
 	protected BoundBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
 		super(type, pos, state);
@@ -50,6 +71,74 @@ public abstract class BoundBlockEntity extends BlockEntity {
 		}
 	}
 
+	/** True when the binding was set by hand: the HQ's automatic binding ({@link BindingWriter}) skips this block. */
+	public boolean manual() {
+		return manual;
+	}
+
+	/** The block's display options (read-only; missing key = default). */
+	public Map<String, String> options() {
+		return options;
+	}
+
+	/** One option, or {@code def} when it is not set. */
+	public String option(String key, String def) {
+		return options.getOrDefault(key, def);
+	}
+
+	/**
+	 * Server side: sets the whole config of the block (binding, manual flag, options) at once, saves and syncs it
+	 * when anything changed. {@code options} is cleaned ({@link #cleanOptions}). Returns true when it changed.
+	 */
+	public boolean setConfig(String value, boolean manual, Map<String, String> options) {
+		Map<String, String> o = cleanOptions(options);
+		boolean flags = manual != this.manual || !o.equals(this.options);
+		this.manual = manual;
+		this.options = o;
+		String before = binding;
+		setBinding(value); // syncs when the binding changed
+		if (flags && before.equals(binding)) {
+			setChanged();
+			sync();
+		}
+		return flags || !before.equals(binding);
+	}
+
+	/** Server side: sets the manual flag only (Reset to automatic clears it). */
+	public void setManual(boolean manual) {
+		if (manual != this.manual) {
+			this.manual = manual;
+			setChanged();
+			sync();
+		}
+	}
+
+	/** Sorted copy without empty, too long or extra entries. */
+	public static Map<String, String> cleanOptions(Map<String, String> in) {
+		TreeMap<String, String> out = new TreeMap<>();
+		if (in != null) {
+			for (Map.Entry<String, String> e : in.entrySet()) {
+				String k = e.getKey();
+				String v = e.getValue();
+				if (k == null || v == null || k.isEmpty() || v.isEmpty() || k.length() > MAX_OPTION_LENGTH || v.length() > MAX_OPTION_LENGTH) {
+					continue;
+				}
+				if (out.size() >= MAX_OPTIONS) {
+					break;
+				}
+				out.put(k, v);
+			}
+		}
+		return out.isEmpty() ? Map.of() : java.util.Collections.unmodifiableMap(out);
+	}
+
+	private void sync() {
+		Level level = getLevel();
+		if (level != null && !level.isClientSide()) {
+			level.sendBlockUpdated(getBlockPos(), getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
+		}
+	}
+
 	/** Server side, after {@link #setBinding} stored a different binding. */
 	protected void bindingChanged(Level level) {
 	}
@@ -58,6 +147,8 @@ public abstract class BoundBlockEntity extends BlockEntity {
 	protected void loadAdditional(ValueInput input) {
 		super.loadAdditional(input);
 		binding = Binding.parse(input.getStringOr(KEY, "")).wire();
+		manual = input.getBooleanOr(MANUAL_KEY, false);
+		options = cleanOptions(input.read(OPTIONS_KEY, OPTIONS_CODEC).orElse(Map.of()));
 	}
 
 	@Override
@@ -65,6 +156,12 @@ public abstract class BoundBlockEntity extends BlockEntity {
 		super.saveAdditional(output);
 		if (!binding.isEmpty()) {
 			output.putString(KEY, binding);
+		}
+		if (manual) {
+			output.putBoolean(MANUAL_KEY, true);
+		}
+		if (!options.isEmpty()) {
+			output.store(OPTIONS_KEY, OPTIONS_CODEC, options);
 		}
 	}
 
