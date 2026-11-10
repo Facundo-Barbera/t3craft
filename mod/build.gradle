@@ -127,7 +127,8 @@ tasks.register("uiRender", JavaExec) {
 // If Batik does not resolve or an icon does not rasterise, generateIcons fails and so does the build: the
 // game is never shipped without its icons.
 sourceSets {
-	icons
+	icons {
+	}
 }
 dependencies {
 	iconsImplementation "org.apache.xmlgraphics:batik-transcoder:${project.batik_version}"
