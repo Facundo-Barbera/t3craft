@@ -2,6 +2,7 @@ package dev.t3craft.client.islands;
 
 import dev.t3craft.T3Craft;
 import dev.t3craft.build.Placement;
+import dev.t3craft.client.chat.ChatTheme;
 import dev.t3craft.client.demo.VanillaDemoWorld;
 import dev.t3craft.mapgen.islands.Bridge;
 import dev.t3craft.mapgen.islands.BridgePlanner;
@@ -10,6 +11,7 @@ import dev.t3craft.mapgen.islands.IslandBlocks;
 import dev.t3craft.mapgen.islands.IslandField;
 import dev.t3craft.mapgen.islands.IslandProps;
 import dev.t3craft.mapgen.islands.IslandSize;
+import dev.t3craft.mapgen.islands.bridge.BridgeNetwork;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -18,17 +20,20 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.SoundType;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 
@@ -42,10 +47,14 @@ import org.jspecify.annotations.Nullable;
  *       {@value #GEN_RADIUS} blocks of a player that the world does not have yet are queued, nearest first, and
  *       built {@value #BLOCKS_PER_TICK} blocks per tick, only into loaded chunks. The spawn island is built
  *       before the first player joins.</li>
- *   <li><b>Bridges</b> appear when a player standing on an island comes within {@value #TRIGGER} blocks of the
- *       place where a bridge to a neighbour island leaves that island's edge: it grows from that edge to the
- *       other island, {@value #BRIDGE_STEPS_PER_TICK} cross-sections per tick, and the destination island is
- *       moved to the front of the queue. A finished bridge is remembered in {@link IslandsState}.</li>
+ *   <li><b>Bridges</b> (#32): islands link in up to eight directions ({@link BridgeNetwork}). For a player
+ *       standing on a built island the runtime picks the bridge exit that lies ahead of them (the way they walk,
+ *       or look when standing still) and is nearest ({@link #nearEdge}); within {@value #HINT} blocks the exit
+ *       shows end-rod sparks, within {@value #TRIGGER} blocks (while heading towards it, or {@value #CLOSE}
+ *       blocks in any direction) the bridge grows from that edge to the other island,
+ *       {@value #BRIDGE_STEPS_PER_TICK} cross-sections per tick with a chime, block sounds and sparks at its tip,
+ *       and the destination island is moved to the front of the queue. A finished bridge is remembered in
+ *       {@link IslandsState} (same ids as the first cut).</li>
  *   <li><b>No falling to death</b>: a player who drops far below every island (and does not fly, glide, ride or
  *       spectate) is put back where they last stood on solid ground.</li>
  * </ul>
@@ -54,7 +63,16 @@ final class IslandsRuntime {
 	static final int GEN_RADIUS = 140;
 	static final int BLOCKS_PER_TICK = 1500;
 	static final int BRIDGE_STEPS_PER_TICK = 2;
-	static final int TRIGGER = 9;
+	/** A bridge exit ahead of the player within this many blocks shows sparks. */
+	static final int HINT = 16;
+	/** A bridge exit ahead of the player within this many blocks starts the bridge. */
+	static final int TRIGGER = 7;
+	/** A bridge exit this close starts the bridge whichever way the player faces. */
+	static final int CLOSE = 3;
+	/** Cosine of the widest angle between heading and exit that still counts as "ahead" (about 70°). */
+	private static final double AHEAD = 0.35;
+	/** Cosine needed to start a bridge from {@value #TRIGGER} blocks (about 50°). */
+	private static final double TOWARDS = 0.65;
 	private static final int RESCUE_COOLDOWN = 20;
 
 	private static volatile @Nullable IslandsRuntime active;
@@ -65,7 +83,8 @@ final class IslandsRuntime {
 	private final Set<String> queued = new HashSet<>();
 	private final List<BridgeJob> bridgeJobs = new ArrayList<>();
 	private final Set<String> activeBridges = new HashSet<>();
-	private final Map<String, Optional<Bridge>> bridges = new HashMap<>();
+	private final BridgeNetwork network = new BridgeNetwork(field);
+	private final Map<UUID, Vec3> lastPos = new HashMap<>();
 	private final Map<UUID, BlockPos> lastSafe = new HashMap<>();
 	private final Map<UUID, Integer> cooldown = new HashMap<>();
 	private final int fallY = IslandsWorld.BASE_Y - IslandField.HEIGHT_RANGE - IslandSize.XLARGE.depth() - 20;
@@ -178,6 +197,10 @@ final class IslandsRuntime {
 			if (j.done()) {
 				state.addBridge(j.bridge.id());
 				activeBridges.remove(j.bridge.id());
+				BlockPos end = j.end();
+				if (end != null) {
+					level.playSound(null, end, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.BLOCKS, 1.5F, 1.4F);
+				}
 				it.remove();
 			}
 		}
@@ -195,36 +218,84 @@ final class IslandsRuntime {
 
 	// ------------------------------------------------------------------ bridges
 
-	private @Nullable Bridge bridge(Island a, Island b) {
-		return bridges.computeIfAbsent(BridgePlanner.idOf(a, b), k -> Optional.ofNullable(BridgePlanner.plan(a, b))).orElse(null);
-	}
-
-	/** A player standing on a built island near the spot where a bridge leaves it starts that bridge. */
+	/**
+	 * Picks the bridge exit of the island the player stands on that lies ahead of them: among the links not built
+	 * yet, those within {@value #HINT} blocks and less than about 70° off the player's heading (any direction
+	 * within {@value #CLOSE} blocks), the one with the lowest {@code distance × (2 - cos angle)}. Close enough and
+	 * heading towards it, the bridge starts; otherwise its exit shows sparks.
+	 */
 	private void nearEdge(ServerLevel level, ServerPlayer p) {
+		Vec3 head = heading(p);
 		Island cur = field.islandAt(p.getBlockX(), p.getBlockZ(), 1.5);
 		if (cur == null || p.getY() < cur.top() - 1 || p.getY() > cur.top() + 8 || !state.hasIsland(cur.id())) {
 			return;
 		}
-		for (Island n : field.neighbours(cur)) {
+		Bridge best = null;
+		Island bestTo = null;
+		double bestScore = Double.MAX_VALUE;
+		double bestDist = 0;
+		double bestCos = 0;
+		for (Island n : network.links(cur)) {
 			String id = BridgePlanner.idOf(cur, n);
 			if (state.hasBridge(id) || activeBridges.contains(id)) {
 				continue;
 			}
-			Bridge b = bridge(cur, n);
+			Bridge b = network.bridge(cur, n);
 			if (b == null) {
-				state.addBridge(id); // nothing to cross between them
 				continue;
 			}
 			BlockPos s = b.startOn(cur.id());
-			double dx = p.getX() - (s.getX() + 0.5);
-			double dz = p.getZ() - (s.getZ() + 0.5);
-			if (dx * dx + dz * dz <= (double) TRIGGER * TRIGGER) {
-				begin(p, cur, n, b);
+			double vx = s.getX() + 0.5 - p.getX();
+			double vz = s.getZ() + 0.5 - p.getZ();
+			double d = Math.sqrt(vx * vx + vz * vz);
+			if (d > HINT) {
+				continue;
 			}
+			double cos = d < 1e-3 ? 1.0 : (vx * head.x + vz * head.z) / d;
+			if (d > CLOSE && cos < AHEAD) {
+				continue;
+			}
+			double score = d * (2.0 - cos);
+			if (score < bestScore) {
+				bestScore = score;
+				best = b;
+				bestTo = n;
+				bestDist = d;
+				bestCos = cos;
+			}
+		}
+		if (best == null || bestTo == null) {
+			return;
+		}
+		if (bestDist <= CLOSE || (bestDist <= TRIGGER && bestCos >= TOWARDS)) {
+			begin(level, p, cur, bestTo, best);
+		} else {
+			hint(level, best.startOn(cur.id()));
 		}
 	}
 
-	private void begin(ServerPlayer p, Island from, Island to, Bridge b) {
+	/** Where the player is heading: the way they moved since the last check, or where they look when standing still. */
+	private Vec3 heading(ServerPlayer p) {
+		Vec3 now = p.position();
+		Vec3 before = lastPos.put(p.getUUID(), now);
+		if (before != null) {
+			double mx = now.x - before.x;
+			double mz = now.z - before.z;
+			if (mx * mx + mz * mz > 0.04) {
+				return new Vec3(mx, 0, mz).normalize();
+			}
+		}
+		Vec3 look = p.getLookAngle();
+		Vec3 flat = new Vec3(look.x, 0, look.z);
+		return flat.lengthSqr() > 1.0E-4 ? flat.normalize() : Vec3.ZERO;
+	}
+
+	/** End-rod sparks over a bridge exit: a small column of light where the deck will leave the edge. */
+	private static void hint(ServerLevel level, BlockPos s) {
+		level.sendParticles(ParticleTypes.END_ROD, s.getX() + 0.5, s.getY() + 1.6, s.getZ() + 0.5, 3, 0.35, 0.5, 0.35, 0.01);
+	}
+
+	private void begin(ServerLevel level, ServerPlayer p, Island from, Island to, Bridge b) {
 		activeBridges.add(b.id());
 		bridgeJobs.add(new BridgeJob(b, b.stepsFrom(from.id())));
 		if (!state.hasIsland(to.id())) {
@@ -237,8 +308,17 @@ final class IslandsRuntime {
 				});
 			}
 		}
-		p.sendSystemMessage(Component.literal("A bridge unfolds towards the " + to.size().label() + " island").withStyle(ChatFormatting.AQUA), true);
-		T3Craft.LOGGER.info("[islands] bridge {} starts at {} ({} steps)", b.id(), b.startOn(from.id()).toShortString(), b.steps().size());
+		BlockPos s = b.startOn(from.id());
+		level.playSound(null, s, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.BLOCKS, 1.5F, 0.8F);
+		p.sendSystemMessage(Component.literal("A " + b.style().label() + " bridge unfolds towards the " + to.size().label() + " island")
+				.withColor(accent()), true);
+		T3Craft.LOGGER.info("[islands] {} bridge {} starts at {} ({} deck steps, {} sections)", b.style().label(), b.id(), s.toShortString(),
+				b.deck(), b.steps().size());
+	}
+
+	/** Action-bar text colour: the theme's brass token. */
+	private static int accent() {
+		return ChatTheme.warmStudio().brass() & 0xFFFFFF;
 	}
 
 	// ------------------------------------------------------------------ falling
@@ -258,7 +338,7 @@ final class IslandsRuntime {
 			p.resetFallDistance();
 			p.needsSync = true;
 			cooldown.put(id, RESCUE_COOLDOWN);
-			p.sendSystemMessage(Component.literal("Back on solid ground: the void is not part of the islands.").withStyle(ChatFormatting.AQUA), true);
+			p.sendSystemMessage(Component.literal("Back on solid ground: the void is not part of the islands.").withColor(accent()), true);
 			T3Craft.LOGGER.info("[islands] {} fell off, back at {}", p.getGameProfile().name(), to.toShortString());
 		}
 	}
@@ -303,7 +383,11 @@ final class IslandsRuntime {
 		}
 	}
 
-	/** A bridge's cross-sections in building order. Placing is idempotent, so an interrupted bridge is simply built again. */
+	/**
+	 * A bridge's cross-sections in building order, each slice from what holds it up to its lights. Blocks take
+	 * their connections from what is already there ({@link Block#updateFromNeighbourShapes}), so rails join up as
+	 * they grow. Placing is idempotent, so an interrupted bridge is simply built again.
+	 */
 	private static final class BridgeJob {
 		final Bridge bridge;
 		private final List<Bridge.Step> steps;
@@ -318,19 +402,43 @@ final class IslandsRuntime {
 			return next >= steps.size();
 		}
 
+		/** The centre of the last section: where the bridge meets the far island. */
+		@Nullable BlockPos end() {
+			return steps.isEmpty() ? null : steps.get(steps.size() - 1).centre();
+		}
+
 		void run(ServerLevel level, int count) {
+			Bridge.Step tip = null;
 			for (int n = 0; n < count && next < steps.size(); n++) {
 				Bridge.Step s = steps.get(next);
 				for (Placement p : s.blocks()) {
 					if (!level.isLoaded(p.pos())) {
+						effects(level, tip);
 						return; // retried next tick
 					}
 				}
 				for (Placement p : s.blocks()) {
-					level.setBlock(p.pos(), p.state(), Block.UPDATE_ALL);
+					BlockState st = Block.updateFromNeighbourShapes(p.state(), level, p.pos());
+					level.setBlock(p.pos(), st, Block.UPDATE_ALL);
 				}
+				tip = s;
 				next++;
 			}
+			effects(level, tip);
+		}
+
+		/** Growth feedback at the tip: the deck's own placing sound and a few end-rod sparks. */
+		private static void effects(ServerLevel level, Bridge.@Nullable Step tip) {
+			if (tip == null) {
+				return;
+			}
+			BlockPos c = tip.centre();
+			BlockState deck = level.getBlockState(c);
+			if (!deck.isAir()) {
+				SoundType sound = deck.getSoundType();
+				level.playSound(null, c, sound.getPlaceSound(), SoundSource.BLOCKS, (sound.getVolume() + 1.0F) / 2.0F, sound.getPitch() * 0.8F);
+			}
+			level.sendParticles(ParticleTypes.END_ROD, c.getX() + 0.5, c.getY() + 1.2, c.getZ() + 0.5, 4, 0.6, 0.3, 0.6, 0.02);
 		}
 	}
 }
