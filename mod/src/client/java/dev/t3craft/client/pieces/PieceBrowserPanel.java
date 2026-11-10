@@ -7,11 +7,13 @@ import dev.t3craft.client.chat.MouseButtons;
 import dev.t3craft.client.chat.Rect;
 import dev.t3craft.client.pieces.PieceBrowserState.Sort;
 import dev.t3craft.client.pieces.PieceBrowserState.SizeChoice;
+import dev.t3craft.client.t3ui.SidebarModel;
 import dev.t3craft.client.t3ui.kit.T3Button;
 import dev.t3craft.client.t3ui.kit.T3Control;
 import dev.t3craft.client.t3ui.kit.T3Draw;
 import dev.t3craft.client.t3ui.kit.T3Draw.Tone;
 import dev.t3craft.client.t3ui.kit.T3Field;
+import dev.t3craft.client.t3ui.kit.T3Icon;
 import dev.t3craft.client.t3ui.kit.T3List;
 import dev.t3craft.client.t3ui.kit.T3Panel;
 import dev.t3craft.client.t3ui.kit.T3Select;
@@ -19,10 +21,11 @@ import dev.t3craft.client.t3ui.kit.T3Toggle;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ThreadLocalRandom;
 import net.minecraft.client.Minecraft;
@@ -40,7 +43,11 @@ import org.jspecify.annotations.Nullable;
  * answered. It lives inside {@code T3Screen} (the ⋯ menu → Pieces) and as {@link PieceBrowserScreen}
  * ({@code K}, {@code /t3craft pieces}, Settings → Connections).
  *
- * <p>The pieces come from {@link PieceCatalog}; the preview goes through {@link PiecePreviews#current()}.
+ * <p>The pieces come from {@link PieceCatalog} (or a fixed list, {@link #withCatalog}, for the gallery); the
+ * preview goes through {@link PiecePreviews#current()}, whose default runs the command {@link PieceRequest#command()}
+ * builds. The search folds case and accents like the sidebar ({@link SidebarModel#fold}). Icons (issue #30): folders,
+ * the favorite star of each row (brass when it is a favorite, click it to flip), eye / copy / star on the actions,
+ * shuffle for a random seed, a magnifier before the search box.
  * Everything the user chooses lives in {@link PieceBrowserState}, so reopening the browser lands where it was.
  * The page is arranged again after every change, like the other kit pages (the lists are fields, so their
  * scroll survives).
@@ -53,6 +60,8 @@ public final class PieceBrowserPanel extends T3Panel {
 	private static final int NARROW_W = 430;
 	private static final int FOOTER_LINES = 2;
 	private static final int TOP_TAGS = 40;
+	/** Room the favorite star takes at the right end of a piece row. */
+	private static final int STAR_W = T3Icon.SIZE + 6;
 
 	/** A row of the folder column: {@code path} null is "All pieces". */
 	private record Folder(@Nullable String path, String label, int depth, int count) {
@@ -63,6 +72,11 @@ public final class PieceBrowserPanel extends T3Panel {
 	}
 
 	private final PieceBrowserState state = PieceBrowserState.get();
+	/** A fixed catalog (the gallery's fake data), or null for {@link PieceCatalog}. */
+	private final @Nullable List<PieceEntry> fixedCatalog;
+	private final String fixedLabel;
+	/** With a fixed catalog the favorites stay in memory, so the gallery never writes the real favorites file. */
+	private final Set<String> localFavorites = new HashSet<>();
 	private final T3List<Folder> folderList;
 	private final T3List<PieceEntry> pieceList;
 	private final KeyNav keys = new KeyNav();
@@ -83,12 +97,27 @@ public final class PieceBrowserPanel extends T3Panel {
 	private Tone statusTone = Tone.MUTED;
 
 	public PieceBrowserPanel() {
-		PieceCatalog.refresh();
-		this.status = PieceCatalog.summary();
+		this(null, "");
+	}
+
+	/** The browser over a fixed list of pieces instead of {@link PieceCatalog} (the gallery's fake data). */
+	public static PieceBrowserPanel withCatalog(List<PieceEntry> entries, String label) {
+		List<PieceEntry> list = new ArrayList<>(entries);
+		list.sort(Comparator.comparing(PieceEntry::folder, String.CASE_INSENSITIVE_ORDER).thenComparing(PieceEntry::name, String.CASE_INSENSITIVE_ORDER));
+		return new PieceBrowserPanel(List.copyOf(list), label);
+	}
+
+	private PieceBrowserPanel(@Nullable List<PieceEntry> fixedCatalog, String fixedLabel) {
+		this.fixedCatalog = fixedCatalog;
+		this.fixedLabel = fixedLabel;
+		if (fixedCatalog == null) {
+			PieceCatalog.refresh();
+		}
+		this.status = summary();
 		this.folderList = new T3List<>(FOLDER_ROW, new T3List.Row<Folder>() {
 			@Override
 			public void render(GuiGraphicsExtractor g, Font font, ChatTheme t, Folder f, Rect rr, int mx, int my) {
-				drawFolder(g, font, t, f, rr);
+				drawFolder(g, font, t, f, rr, mx, my);
 			}
 
 			@Override
@@ -102,19 +131,26 @@ public final class PieceBrowserPanel extends T3Panel {
 		this.pieceList = new T3List<>(PIECE_ROW, new T3List.Row<PieceEntry>() {
 			@Override
 			public void render(GuiGraphicsExtractor g, Font font, ChatTheme t, PieceEntry e, Rect rr, int mx, int my) {
-				drawPiece(g, font, t, e, rr);
+				drawPiece(g, font, t, e, rr, mx, my);
 			}
 
 			@Override
 			public boolean mouseClicked(PieceEntry e, Rect rr, double mx, double my, int button) {
 				if (MouseButtons.isLeft(button)) {
-					select(e, false);
+					if (starRect(rr).contains(mx, my)) {
+						toggleFavorite(e);
+					} else {
+						select(e, false);
+					}
 				}
 				return true;
 			}
 
 			@Override
 			public @Nullable List<String> tooltip(PieceEntry e, Rect rr, double mx, double my) {
+				if (starRect(rr).contains(mx, my)) {
+					return List.of(isFavorite(e.id()) ? "Remove from favorites" : "Add to favorites");
+				}
 				List<String> tip = new ArrayList<>();
 				tip.add(e.id());
 				if (e.size() != null) {
@@ -130,7 +166,7 @@ public final class PieceBrowserPanel extends T3Panel {
 
 	/** Opens with {@code id} selected and its folder open (the {@code /t3craft pieces <id>} form). */
 	public PieceBrowserPanel select(@Nullable String id) {
-		PieceEntry e = PieceCatalog.byId(id);
+		PieceEntry e = byId(id);
 		if (e != null) {
 			state.selectedId = e.id();
 			state.clearFilters();
@@ -171,16 +207,55 @@ public final class PieceBrowserPanel extends T3Panel {
 		statusTone = tone;
 	}
 
+	// ---- the catalog and the favorites ---------------------------------------------------------------------
+
+	private List<PieceEntry> catalog() {
+		return fixedCatalog != null ? fixedCatalog : PieceCatalog.all();
+	}
+
+	private @Nullable PieceEntry byId(@Nullable String id) {
+		if (fixedCatalog == null) {
+			return PieceCatalog.byId(id);
+		}
+		for (PieceEntry e : fixedCatalog) {
+			if (e.id().equals(id)) {
+				return e;
+			}
+		}
+		return null;
+	}
+
+	private String summary() {
+		return fixedCatalog != null ? fixedCatalog.size() + " pieces from: " + fixedLabel : PieceCatalog.summary();
+	}
+
+	private boolean isFavorite(String id) {
+		return fixedCatalog != null ? localFavorites.contains(id) : state.isFavorite(id);
+	}
+
+	/** Flips the favorite flag; returns the new value. */
+	private boolean flipFavorite(String id) {
+		if (fixedCatalog == null) {
+			return state.toggleFavorite(id);
+		}
+		if (localFavorites.add(id)) {
+			return true;
+		}
+		localFavorites.remove(id);
+		return false;
+	}
+
 	// ---- the model -----------------------------------------------------------------------------------------
 
 	/** Filters and sorts. Runs first in {@link #arrange}; the header and the footer read what it left. */
 	private void refresh(int width) {
 		narrow = width < NARROW_W;
-		List<PieceEntry> all = PieceCatalog.all();
-		String[] words = state.query.isBlank() ? new String[0] : state.query.toLowerCase(Locale.ROOT).strip().split("\\s+");
+		List<PieceEntry> all = catalog();
+		// folded like the sidebar's search (case and accents), the same fold as PieceEntry.haystack
+		String[] words = state.query.isBlank() ? new String[0] : SidebarModel.fold(state.query).strip().split("\\s+");
 		List<PieceEntry> base = new ArrayList<>();
 		for (PieceEntry e : all) {
-			if (state.favoritesOnly && !state.isFavorite(e.id())) {
+			if (state.favoritesOnly && !isFavorite(e.id())) {
 				continue;
 			}
 			if (state.tag != null && !e.tags().contains(state.tag)) {
@@ -242,7 +317,7 @@ public final class PieceBrowserPanel extends T3Panel {
 	}
 
 	private @Nullable PieceEntry selected() {
-		return PieceCatalog.byId(state.selectedId);
+		return byId(state.selectedId);
 	}
 
 	private int selectedIndex() {
@@ -314,7 +389,9 @@ public final class PieceBrowserPanel extends T3Panel {
 		int y = h.y();
 		int w = h.w();
 		int sortW = Math.min(130, Math.max(92, w / 4));
-		pinField(search(), x, y, w - sortW - 4);
+		int iconW = T3Icon.SIZE + 4;
+		pin(new SearchMark(), x, y, iconW, T3Control.H);
+		pinField(search(), x + iconW, y, w - sortW - 4 - iconW);
 		pin(new T3Select<>(List.of(Sort.values()), Sort::label, state.sort, v -> {
 			state.sort = v;
 			pieceList.scrollToTop();
@@ -356,7 +433,7 @@ public final class PieceBrowserPanel extends T3Panel {
 
 	private T3Select<Opt> tagSelect() {
 		Map<String, Integer> counts = new HashMap<>();
-		for (PieceEntry e : PieceCatalog.all()) {
+		for (PieceEntry e : catalog()) {
 			for (String t : e.tags()) {
 				counts.merge(t, 1, Integer::sum);
 			}
@@ -423,7 +500,7 @@ public final class PieceBrowserPanel extends T3Panel {
 			place(folderList, cx, top, folderW, listH);
 			cx += folderW + GAP;
 		}
-		int total = PieceCatalog.all().size();
+		int total = catalog().size();
 		text(cx + 2, y0 + 1, listW, state.filtering() ? shown.size() + " of " + total + " pieces" : total + " pieces", Tone.MUTED);
 		pieceList.setItems(shown);
 		pieceList.setEmptyText(total == 0
@@ -448,7 +525,7 @@ public final class PieceBrowserPanel extends T3Panel {
 		if (p == null) {
 			y = text(x, y, w, "Pick a piece from the list.", Tone.NORMAL);
 			y = text(x, y + 4, w, "Up and Down move through the list. Enter in the search box asks for the preview of the selected piece.", Tone.MUTED);
-			return text(x, y + 6, w, PieceCatalog.summary(), Tone.MUTED);
+			return text(x, y + 6, w, summary(), Tone.MUTED);
 		}
 		y = text(x, y, w, p.name(), Tone.TITLE);
 		y = text(x, y, w, p.id(), Tone.CODE);
@@ -482,23 +559,25 @@ public final class PieceBrowserPanel extends T3Panel {
 			placeField(hField(), x + 2 * (fw + 4), y, w - 2 * (fw + 4));
 			y += T3Control.H + 4;
 		} else {
-			int[] box = boxFor(p, choice);
-			String what = box == null || box[0] == 0 ? "the piece's own default size" : box[0] + " x " + box[1] + " x " + box[2] + " (W x D x H)";
-			y = text(x + 2, y, w - 4, what, Tone.MUTED) + 4;
+			y = text(x + 2, y, w - 4, sizeText(p, choice), Tone.MUTED) + 4;
 		}
 
 		// seed
 		y = text(x, y, w, "Seed (same seed, same blocks)", Tone.MUTED);
-		int bw = 16 + 2 + 16 + 2 + 48 + 2;
+		int ib = T3Control.H;
+		int bw = 3 * (ib + 2);
 		placeField(seedField(), x, y, Math.max(40, w - bw));
 		int bx = x + Math.max(40, w - bw) + 2;
-		place(new T3Button("-", () -> nudgeSeed(-1)), bx, y, 16, T3Control.H);
-		place(new T3Button("+", () -> nudgeSeed(1)), bx + 18, y, 16, T3Control.H);
-		place(new T3Button("Random", () -> {
+		T3Button less = place(new T3Button(T3Icon.MINUS, null, () -> nudgeSeed(-1)), bx, y, ib, T3Control.H);
+		less.setTooltip("Previous seed");
+		Long cur = seed();
+		less.setEnabled(cur == null || cur > 0);
+		place(new T3Button(T3Icon.PLUS, null, () -> nudgeSeed(1)), bx + ib + 2, y, ib, T3Control.H).setTooltip("Next seed");
+		place(new T3Button(T3Icon.SHUFFLE, null, () -> {
 			state.seedText = Integer.toString(ThreadLocalRandom.current().nextInt(1, 100000));
 			seedField().setValue(state.seedText);
 			host().relayout();
-		}), bx + 36, y, 48, T3Control.H);
+		}), bx + 2 * (ib + 2), y, ib, T3Control.H).setTooltip("Random seed");
 		y += T3Control.H + 6;
 
 		place(new T3Toggle("Stay here after asking", state.keepOpen, v -> state.keepOpen = v), x, y, w, T3Control.H);
@@ -513,23 +592,43 @@ public final class PieceBrowserPanel extends T3Panel {
 		return c == SizeChoice.DEFAULT ? SizeChoice.MIDDLE : c;
 	}
 
-	/** {@code {w, d, h}} for the choice, {@code {0, 0, 0}} for "default size", null when custom text is not valid. */
-	private int @Nullable [] boxFor(PieceEntry p, SizeChoice c) {
-		PieceEntry.Dims d = p.size();
-		if (c == SizeChoice.CUSTOM) {
-			Integer w = dim(state.customW);
-			Integer dd = dim(state.customD);
-			Integer hh = dim(state.customH);
-			return w == null || dd == null || hh == null ? null : new int[] {w, dd, hh};
-		}
-		if (d == null || c == SizeChoice.DEFAULT) {
-			return new int[] {0, 0, 0};
-		}
+	/**
+	 * The {@code size} argument of the command (issue #30): Smallest {@code min}, Middle {@code mid}, Largest
+	 * {@code max}, Custom {@code WxDxH}, no size range {@code mid}. Null when the custom text is not valid.
+	 */
+	private @Nullable String sizeArg(SizeChoice c) {
 		return switch (c) {
-			case SMALLEST -> new int[] {d.minW(), d.minD(), d.minH()};
-			case LARGEST -> new int[] {Math.max(d.minW(), Math.min(24, d.maxW())), Math.max(d.minD(), Math.min(24, d.maxD())), d.minH() + 4};
-			default -> new int[] {(d.minW() + d.maxW()) / 2, (d.minD() + d.maxD()) / 2, d.minH() + 2};
+			case SMALLEST -> PieceRequest.MIN;
+			case LARGEST -> PieceRequest.MAX;
+			case MIDDLE, DEFAULT -> PieceRequest.MID;
+			case CUSTOM -> {
+				Integer w = dim(state.customW);
+				Integer d = dim(state.customD);
+				Integer h = dim(state.customH);
+				yield w == null || d == null || h == null ? null : PieceRequest.box(w, d, h);
+			}
 		};
+	}
+
+	/**
+	 * What a keyword size builds, for the line under the select. The footprint follows the game's rule
+	 * ({@code VariantPiece.box}: from the smallest side to the largest, capped at 24); the height depends on the
+	 * family, which the browser does not know, so it is left to the game.
+	 */
+	private static String sizeText(PieceEntry p, SizeChoice c) {
+		String kw = c == SizeChoice.SMALLEST ? PieceRequest.MIN : c == SizeChoice.LARGEST ? PieceRequest.MAX : PieceRequest.MID;
+		PieceEntry.Dims d = p.size();
+		if (d == null) {
+			return "the piece's own size (sends " + kw + ")";
+		}
+		double t = c == SizeChoice.SMALLEST ? 0.0 : c == SizeChoice.LARGEST ? 1.0 : 0.5;
+		int w = lerp(d.minW(), Math.max(d.minW(), Math.min(d.maxW(), 24)), t);
+		int dd = lerp(d.minD(), Math.max(d.minD(), Math.min(d.maxD(), 24)), t);
+		return w + " x " + dd + " footprint, height " + d.minH() + "+ as the game picks (sends " + kw + ")";
+	}
+
+	private static int lerp(int a, int b, double t) {
+		return (int) Math.round(a + (b - a) * t);
 	}
 
 	private static @Nullable Integer dim(String s) {
@@ -541,9 +640,11 @@ public final class PieceBrowserPanel extends T3Panel {
 		}
 	}
 
+	/** The seed, or null when it is not a whole number from 0 up (the command takes {@code longArg(0)}). */
 	private @Nullable Long seed() {
 		try {
-			return Long.parseLong(state.seedText.strip());
+			long s = Long.parseLong(state.seedText.strip());
+			return s >= 0 ? s : null;
 		} catch (NumberFormatException e) {
 			return null;
 		}
@@ -551,7 +652,7 @@ public final class PieceBrowserPanel extends T3Panel {
 
 	private void nudgeSeed(int by) {
 		Long s = seed();
-		state.seedText = Long.toString((s == null ? 0 : s) + by);
+		state.seedText = Long.toString(Math.max(0, (s == null ? 0 : s) + by));
 		seedField().setValue(state.seedText);
 		host().relayout();
 	}
@@ -594,32 +695,52 @@ public final class PieceBrowserPanel extends T3Panel {
 
 	// ---- rows --------------------------------------------------------------------------------------------------
 
-	private void drawFolder(GuiGraphicsExtractor g, Font font, ChatTheme t, Folder f, Rect rr) {
+	private void drawFolder(GuiGraphicsExtractor g, Font font, ChatTheme t, Folder f, Rect rr, int mx, int my) {
 		boolean sel = Objects.equals(f.path(), state.folder);
 		if (sel) {
 			ChatDraw.round(g, rr.x() + 1, rr.y(), rr.w() - 2, rr.h(), t.selected());
 		}
 		String count = Integer.toString(f.count());
 		int cw = font.width(count);
-		int tx = rr.x() + 5 + 7 * f.depth();
-		int color = sel ? t.accent() : f.count() == 0 ? t.disabled() : t.text();
+		int ix = rr.x() + 4 + 7 * f.depth();
+		boolean empty = f.count() == 0;
+		int iconTint = sel ? t.accent() : T3Icon.tint(t, rr.contains(mx, my), !empty);
+		T3Icon.draw(g, t, sel ? T3Icon.FOLDER_OPEN : T3Icon.FOLDER, ix, rr.y() + (rr.h() - T3Icon.SIZE) / 2, T3Icon.SIZE, iconTint);
+		int tx = ix + T3Icon.SIZE + 3;
+		int color = sel ? t.accent() : empty ? t.disabled() : t.text();
 		T3Draw.text(g, font, t, ChatDraw.clip(font, f.label(), rr.right() - 8 - cw - tx), tx, rr.y() + (rr.h() - 8) / 2, color);
 		T3Draw.text(g, font, t, count, rr.right() - 5 - cw, rr.y() + (rr.h() - 8) / 2, t.muted());
 	}
 
-	private void drawPiece(GuiGraphicsExtractor g, Font font, ChatTheme t, PieceEntry e, Rect rr) {
+	private void drawPiece(GuiGraphicsExtractor g, Font font, ChatTheme t, PieceEntry e, Rect rr, int mx, int my) {
 		boolean sel = e.id().equals(state.selectedId);
-		boolean fav = state.isFavorite(e.id());
+		boolean fav = isFavorite(e.id());
 		if (sel) {
 			ChatDraw.round(g, rr.x() + 1, rr.y() + 1, rr.w() - 2, rr.h() - 2, t.selected());
 		}
 		int tx = rr.x() + 6;
-		int right = rr.right() - 6 - (fav ? 9 : 0);
+		int right = rr.right() - 4 - STAR_W;
 		T3Draw.text(g, font, t, ChatDraw.clip(font, e.name(), right - tx), tx, rr.y() + 3, sel ? t.accent() : t.text());
 		String sub = e.folder().substring(e.folder().lastIndexOf('/') + 1) + (e.size() == null ? "" : "  |  " + e.size().text());
-		T3Draw.text(g, font, t, ChatDraw.clip(font, sub, rr.right() - 6 - tx), tx, rr.y() + 13, t.muted());
-		if (fav) { // a small brass marker, no glyph (the bitmap font has no star)
-			g.fill(rr.right() - 12, rr.y() + 4, rr.right() - 6, rr.y() + 10, t.brass());
+		T3Draw.text(g, font, t, ChatDraw.clip(font, sub, right - tx), tx, rr.y() + 13, t.muted());
+		// the favorite star: brass when it is one, muted when not, accent under the pointer (the tint is the fill)
+		Rect star = starRect(rr);
+		int tint = star.contains(mx, my) ? t.accent() : fav ? t.brass() : t.muted();
+		T3Icon.draw(g, t, T3Icon.STAR, star.x() + (star.w() - T3Icon.SIZE) / 2, star.y() + (star.h() - T3Icon.SIZE) / 2, T3Icon.SIZE, tint);
+	}
+
+	/** The clickable square of a row's favorite star, at its right end. */
+	private static Rect starRect(Rect rr) {
+		return new Rect(rr.right() - 4 - STAR_W, rr.y() + (rr.h() - STAR_W) / 2, STAR_W, STAR_W);
+	}
+
+	/** The magnifier before the search box: muted, accent while the box has the keyboard. */
+	private final class SearchMark extends T3Control {
+		@Override
+		public void render(GuiGraphicsExtractor g, Font font, ChatTheme t, int mx, int my) {
+			Rect r = bounds();
+			int tint = search != null && search.focused() ? t.accent() : t.muted();
+			T3Icon.draw(g, t, T3Icon.SEARCH, r.x() + (r.w() - T3Icon.SIZE) / 2, r.y() + (r.h() - T3Icon.SIZE) / 2, T3Icon.SIZE, tint);
 		}
 	}
 
@@ -631,23 +752,29 @@ public final class PieceBrowserPanel extends T3Panel {
 		boolean compact = f.w() < 340;
 		int x = f.x();
 		int y = f.y();
-		T3Button go = new T3Button(compact ? "Preview" : "Preview in game", T3Button.Style.PRIMARY, this::preview);
-		int goW = compact ? 64 : 112;
+		T3Button go = new T3Button(T3Icon.EYE, compact ? "Preview" : "Preview in game", T3Button.Style.PRIMARY, this::preview);
+		int goW = go.preferredWidth(font());
 		go.setEnabled(p != null);
 		go.setTooltip(p == null ? new String[] {"Select a piece first"}
 				: new String[] {"Asks the game to build it at real size:", "/" + describe(p), "(the browser closes unless \"Stay here\" is on)"});
 		pin(go, x, y, goW, T3Control.H);
 		x += goW + 4;
-		T3Button copy = new T3Button(compact ? "Copy" : "Copy command", this::copyCommand);
-		int copyW = compact ? 40 : 98;
+		T3Button copy = new T3Button(T3Icon.COPY, compact ? "Copy" : "Copy command", this::copyCommand);
+		int copyW = copy.preferredWidth(font());
 		copy.setEnabled(p != null);
 		copy.setTooltip("Puts the preview command on the clipboard", "(paste it in chat: T, Ctrl+V, Enter)");
 		pin(copy, x, y, copyW, T3Control.H);
 		x += copyW + 4;
-		boolean fav = p != null && state.isFavorite(p.id());
-		T3Button favourite = new T3Button(fav ? "Unfavorite" : "Favorite", this::toggleFavorite);
-		int favW = compact ? 66 : 84;
+		boolean fav = p != null && isFavorite(p.id());
+		T3Button favourite = new T3Button(T3Icon.STAR, compact ? null : fav ? "Unfavorite" : "Favorite", () -> {
+			PieceEntry sel = selected();
+			if (sel != null) {
+				toggleFavorite(sel);
+			}
+		});
+		int favW = favourite.preferredWidth(font());
 		favourite.setEnabled(p != null);
+		favourite.setTooltip(fav ? "Remove from favorites" : "Add to favorites");
 		pin(favourite, x, y, favW, T3Control.H);
 		x += favW + 4;
 		if (state.filtering() && f.right() - x >= 80) {
@@ -668,9 +795,9 @@ public final class PieceBrowserPanel extends T3Panel {
 
 	/** The request for the current choices, or null when the size or the seed is not a number. */
 	private @Nullable PieceRequest request(PieceEntry p) {
-		int[] box = boxFor(p, effectiveChoice(p));
+		String size = sizeArg(effectiveChoice(p));
 		Long seed = seed();
-		return box == null || seed == null ? null : new PieceRequest(p, state.front, box[0], box[1], box[2], seed);
+		return size == null || seed == null ? null : new PieceRequest(p, state.front, size, seed);
 	}
 
 	private @Nullable PieceRequest checkedRequest() {
@@ -682,7 +809,7 @@ public final class PieceBrowserPanel extends T3Panel {
 		}
 		PieceRequest r = request(p);
 		if (r == null) {
-			say(boxFor(p, effectiveChoice(p)) == null ? "Width, depth and height must be whole numbers from 1 to 64." : "The seed must be a whole number.", Tone.ERROR);
+			say(sizeArg(effectiveChoice(p)) == null ? "Width, depth and height must be whole numbers from 1 to 64." : "The seed must be a whole number, 0 or more.", Tone.ERROR);
 			host().relayout();
 		}
 		return r;
@@ -704,7 +831,7 @@ public final class PieceBrowserPanel extends T3Panel {
 		if (res.status() == PiecePreview.Status.SENT && !state.keepOpen) {
 			mc.gui.setScreen(null);
 			if (mc.player != null) {
-				mc.player.sendOverlayMessage(Component.literal("Piece browser: asked for " + r.piece().id() + " (" + r.front() + ", seed " + r.seed() + ")"));
+				mc.player.sendOverlayMessage(Component.literal("Piece browser: asked for " + r.piece().id() + " (" + r.size() + ", " + r.front() + ", seed " + r.seed() + ")"));
 			}
 			return;
 		}
@@ -721,12 +848,8 @@ public final class PieceBrowserPanel extends T3Panel {
 		host().relayout();
 	}
 
-	private void toggleFavorite() {
-		PieceEntry p = selected();
-		if (p == null) {
-			return;
-		}
-		boolean now = state.toggleFavorite(p.id());
+	private void toggleFavorite(PieceEntry p) {
+		boolean now = flipFavorite(p.id());
 		say((now ? "Added " : "Removed ") + p.name() + (now ? " to" : " from") + " your favorites.", Tone.OK);
 		host().relayout();
 	}
@@ -737,7 +860,7 @@ public final class PieceBrowserPanel extends T3Panel {
 			search.setValue("");
 		}
 		pieceList.scrollToTop();
-		say(PieceCatalog.summary(), Tone.MUTED);
+		say(summary(), Tone.MUTED);
 		host().relayout();
 	}
 }

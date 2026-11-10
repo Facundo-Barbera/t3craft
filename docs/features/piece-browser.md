@@ -13,12 +13,13 @@ so that trying pieces and variants is clicking instead of typing commands. Packa
 | `/t3craft pieces` | same; `/t3craft pieces <id>` opens with that piece selected and its folder open (tab-completes ids) |
 | Settings (J) → Connections → **Piece browser…** | same, Esc returns to Settings |
 | `T3Screen` ⋯ menu → **Pieces** | the page in the thread's place (sidebar stays), like Settings and Environments |
-| `/t3dev ui pieces`, `/t3dev ui inbox-pieces` | the gallery (docs/features/ui-kit.md) |
+| `/t3dev ui pieces`, `/t3dev ui inbox-pieces` | the gallery over fake pieces (`GalleryPieces`: folders, a sub-folder, accented names, a piece with no size; favorites kept in memory only) |
+| `/t3dev ui pieces-catalog` | the gallery over the real code catalog |
 
 ## The screen
 
 ```
-[ search: words of name / folder / tags ............ ] [ Sort v ]
+(o)[ search: words of name / folder / tags ......... ] [ Sort v ]
 [ Folder v (narrow only) ] [ Tag v ] [ Size v ] [ Favorites only ]
  Folders        N pieces                 Timber cottage            <- name
  All pieces 68  Timber cottage           house_timber_cottage      <- id
@@ -27,14 +28,15 @@ so that trying pieces and variants is clicking instead of typing commands. Packa
  House      21                           Faces       [South v]
    Japanese  3                           Plot size   [Middle of its range v]
    Stone     3                                       12 x 12 x 12 (W x D x H)
-   ...                                   Seed        [ 1 ........ ][-][+][Random]
+   ...                                   Seed        [ 1 ........ ][-][+][shuffle]
                                          [x] Stay here after asking
-[Preview in game] [Copy command] [Favorite] [Clear filters]
+[eye Preview in game] [copy Copy command] [star Favorite] [Clear filters]
  status line: what the last action did
 ```
 
 **Filters** (all combine; the folder counts follow the other filters):
-- **Search**: every word must appear in the piece's id, name, folder or tags (`cherry lamp`).
+- **Search**: every word must appear in the piece's id, name, folder or tags (`cherry lamp`). Case and accents are folded
+  like the sidebar's search (`SidebarModel.fold`, called, not copied): `cafe` finds "Café".
 - **Folder**: the column on the left (a select in the header when the window is narrower than ~430 GUI px). A folder includes its sub-folders.
 - **Tag**: the most common tags of the catalog with their counts.
 - **Size**: small (up to 6 blocks on the larger side), medium (7-12), large (13+).
@@ -47,11 +49,18 @@ seed box asks for the preview, Esc goes back / closes, the wheel scrolls the lis
 **Remembered** for the whole session (`PieceBrowserState`): filters, selected piece, facing, size choice, custom size, seed. Close and reopen
 and you are where you were. **Favorites** are kept on disk in `config/t3craft/piece-favorites.json` (a JSON array of ids).
 
+**Icons** (Lucide, `T3Icon`; issue #30): `folder` / `folder-open` (the chosen folder) in the folder column, a `star` at the
+right end of every piece row (brass = favorite, muted = not, accent under the pointer; click it to flip the favorite), `search`
+before the search box, `eye` / `copy` / `star` on the footer actions, `minus` / `plus` / `shuffle` next to the seed. Default tint
+muted, accent on hover, the disabled colour when it cannot be used (an empty folder).
+
 ## Asking for the preview
 
 Per piece the browser builds a `PieceRequest`: **facing** (north/east/south/west), **plot size** (smallest / middle / largest of the
-piece's range, or custom W x D x H from 1 to 64) and **seed** (same seed, same blocks; `-`, `+` and Random to walk through variants).
-A piece with no size range sends `0 0 0` ("default size").
+piece's range, or custom W x D x H from 1 to 64) and **seed** (a whole number from 0; same seed, same blocks; `-`, `+` and shuffle
+to walk through variants). The size goes out as the command's keyword: Smallest `min`, Middle `mid`, Largest `max`, Custom `WxDxH`;
+a piece with no size range sends `mid`. Under the select the browser shows the footprint the game will use for a keyword (its
+rule: from the smallest side to the largest, capped at 24); the height is the family's, picked by the game.
 
 **Preview in game** calls `PiecePreviews.current().request(request)` and shows the answer in the status line:
 
@@ -61,24 +70,24 @@ A piece with no size range sends `0 0 0` ("default size").
 | `UNAVAILABLE` | cannot be asked now (no world joined, no preview installed) | yellow, the browser stays |
 | `FAILED` | it was tried and threw | red, the browser stays |
 
-**Copy command** puts `/t3craft piece show <id> <front> <w> <d> <h> <seed>` on the clipboard (paste it in chat); the Preview button's
+**Copy command** puts `/t3craft piece show <id> <size> <n|e|s|w> <seed>` on the clipboard (paste it in chat); the Preview button's
 tooltip shows the exact command for the current choices.
 
 ### The hook (contract for the in-world preview)
 
-Default hook (`PiecePreviews.CommandPiecePreview`): runs the command as the player,
+Default hook (`PiecePreviews.CommandPiecePreview`): runs the command as the player. Since issue #30 (T12) it is exactly the
+grammar the in-world preview registers (`client/piece/PieceClient`, docs/features/piece-catalog-preview.md):
 
 ```
-/t3craft piece show <id> <north|east|south|west> <w> <d> <h> <seed>
+/t3craft piece show <id> <min|mid|max|WxDxH> <n|e|s|w> <seed>
 ```
 
-All six arguments are always present, in this order; `0 0 0` means "default size". **That command does not exist yet**: until the
-in-world preview (feat/piece-catalog-preview) registers it, the game answers "unknown command" in chat, and the browser's status line
-says so. Two ways to plug it in, with no change to the browser:
+The browser always sends the three optional arguments (size, front, seed), in this order. `size` is what `PieceSpec.validSize`
+accepts (sides 1 to 200; the browser's custom box stops at 64), `seed` is `>= 0` (`longArg(0)`). The stage only lives in the
+T3Craft HQ world; elsewhere the command says so in chat. The server grammar was not changed.
 
-1. Register the command above (a client command is fine: `ClientPacketListener.sendCommand` runs client commands locally).
-2. Or, from a client initializer, `PiecePreviews.install(request -> ...)` with a `PiecePreview` that calls its own API and returns
-   `PiecePreview.Result.sent("...")` / `unavailable(...)` / `failed(...)`. The message is what the user reads.
+To answer differently, from a client initializer, `PiecePreviews.install(request -> ...)` with a `PiecePreview` that calls its own API and returns
+`PiecePreview.Result.sent("...")` / `unavailable(...)` / `failed(...)`. The message is what the user reads.
 
 ## The catalog (and where the real one plugs in)
 
@@ -100,6 +109,7 @@ A `PieceEntry` is `id`, `name`, `folder` (`"House"` or a path `"House/Japanese"`
 | `PieceBrowserState` | session state + favorites file |
 | `PieceEntry`, `PieceCatalogSource`, `PieceCatalog`, `CodePieceSource` | the catalog side |
 | `PieceRequest`, `PiecePreview`, `PiecePreviews` | the preview side (request, hook, default command) |
+| `GalleryPieces` | fake catalog for `/t3dev ui pieces` (`PieceBrowserPanel.withCatalog`) |
 
 Kit additions this needed: `T3List.ensureVisible` / `scrollToTop`, `T3Panel.pinField` (a text box in the pinned header/footer),
 `T3PanelScreen.maxWidth` / `maxHeight` (a page that needs more than 560 x 400).
@@ -109,5 +119,5 @@ Kit additions this needed: `T3List.ensureVisible` / `scrollToTop`, `T3Panel.pinF
 - That `K` is free in the Controls screen and nothing else in the pack takes it.
 - Typing in the search box: the list re-filters about one tick later (by design: the page is rebuilt from `tick()`, not from the key event).
 - The three columns at GUI scale 2, 3 and 4; at 4 the folder column becomes the header select and the right column may scroll the page.
-- `sendCommand` with the default hook while joined to a world: unknown-command message in chat (expected until the preview exists).
-- Row text: only ASCII and Latin-1 glyphs are used on purpose (the bitmap font has no star; favorites are a brass square).
+- Preview from the HQ world builds the piece on the stage; from another world the chat says the stage lives in the HQ world.
+- Row text: only ASCII and Latin-1 glyphs; the favorite star is the Lucide sprite, tinted.

@@ -32,7 +32,7 @@ public final class PiecePreviews {
 			} catch (RuntimeException e) {
 				return Result.failed("Could not send /" + cmd + ": " + e.getMessage());
 			}
-			return Result.sent("Sent /" + cmd + ". If the chat says unknown command, the in-world preview is not in this build yet.");
+			return Result.sent("Sent /" + cmd + ". The piece stage lives in the T3Craft HQ world; the chat says what was built.");
 		}
 	}
 }
