@@ -5,7 +5,7 @@ Python 3 standard library only. Reads the shared render service spool (~/.cache/
 serves its PNGs as they are (HTTP caching, no image processing), keeps feedback notes per agent in
 ~/.cache/t3craft-coord/feedback/<agent>.md and writes render requests to the spool inbox.
 
-    python3 tools/studio/studio.py [--host 100.64.0.30] [--port 8765]
+    python3 tools/studio/studio.py [--host IP] [--port 8765]
 
 Started by the coordinator with tools/studio/start.sh. Docs: docs/tools/studio.md
 """
@@ -737,7 +737,7 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     ap = argparse.ArgumentParser(description="Citadel Studio (docs/tools/studio.md)")
-    ap.add_argument("--host", default="100.64.0.30", help="IP to listen on (the Tailscale one; never 0.0.0.0)")
+    ap.add_argument("--host", default=os.environ.get("T3CRAFT_STUDIO_HOST", "127.0.0.1"), help="IP to listen on (default $T3CRAFT_STUDIO_HOST or loopback; the Tailscale IP to be reachable; never 0.0.0.0)")
     ap.add_argument("--port", type=int, default=8765)
     a = ap.parse_args()
     if a.host in ("0.0.0.0", "::", ""):

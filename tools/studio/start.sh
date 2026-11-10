@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Citadel Studio (coordinator only): start it niced in the background, or stop / check it.
 #
-#   tools/studio/start.sh [--host IP] [--port N]   start (default 100.64.0.30:8765, the Tailscale IP)
+#   tools/studio/start.sh [--host IP] [--port N]   start (default $T3CRAFT_STUDIO_HOST or 127.0.0.1, port 8765)
 #   tools/studio/start.sh --status                 is it running? where?
 #   tools/studio/start.sh --stop                   stop it
 #

@@ -1,7 +1,7 @@
 # feat/hq-design: modular HQ (roster → layout → plan → builders)
 
 Package `dev.t3craft.hq`. Most of it is in the main source set. `HqPreviewCommand` and `HqAnchorSource`
-are in the client source set. The generator produces the HQ **as data**. It never touches the world.
+are in the client source set (`dev.t3craft.client.hq`). The generator produces the HQ **as data**. It never touches the world.
 Only `/t3craft debug hq-preview` writes blocks, and only in a singleplayer superflat world.
 
 ```

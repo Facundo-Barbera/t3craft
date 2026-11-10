@@ -1,6 +1,6 @@
 {
   "listen": {
-    "host": "100.64.0.10",
+    "host": "<tailscale-ip>",
     "port": 7878,
     "allowedHostnames": [
       "my-homelab.example.ts.net"

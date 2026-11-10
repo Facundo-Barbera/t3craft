@@ -15,7 +15,7 @@
 >
 > **Quality:** jobs sent to the PC default to `final` with `--ss 3` (`T3CRAFT_RENDER_SS`). `--preview` is ignored unless `T3CRAFT_RENDER_ALLOW_PREVIEW=1`. PNGs are always truecolour (the old 256-colour palette option was removed).
 >
-> Settings: `T3CRAFT_RENDER_HOST` (default `<user>@<tailscale-ip>`: Windows user `<windows-user>`, WSL user `<wsl-user>`), `T3CRAFT_RENDER_REMOTE_REPO`, `T3CRAFT_RENDER_REMOTE_JOBS`. `T3CRAFT_RENDER_MODE=local` is only for running ON the PC.
+> Settings: `T3CRAFT_RENDER_HOST` (**required**, no default: the ssh target `<user>@<pc>` of the render PC; without it `submit.sh` exits 64 with a message), `T3CRAFT_RENDER_REMOTE_REPO`, `T3CRAFT_RENDER_REMOTE_JOBS`. `T3CRAFT_RENDER_MODE=local` is only for running ON the PC.
 
 One long-lived JVM renders for every agent. Dozens of agents see their designs (HQ plans, and UI
 screens through the plug below) while the VPS (12 cores, 47 GB, shared) stays responsive.

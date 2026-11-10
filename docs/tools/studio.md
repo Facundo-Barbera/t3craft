@@ -17,7 +17,7 @@ It does no image processing: the PNGs of the render service are served as they a
 ## For the coordinator: start / stop
 
 ```bash
-tools/studio/start.sh                       # background, nice -n 10, on http://<tailscale-ip>:8765/
+tools/studio/start.sh                       # background, nice -n 10; listens on $T3CRAFT_STUDIO_HOST (default loopback), port 8765
 tools/studio/start.sh --host 100.x.y.z --port 8765
 tools/studio/start.sh --status
 tools/studio/start.sh --stop
