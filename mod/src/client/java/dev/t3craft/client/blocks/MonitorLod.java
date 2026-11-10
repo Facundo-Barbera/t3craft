@@ -191,7 +191,17 @@ public final class MonitorLod {
 	}
 
 	public static Layout layout(Level level, ScreenExtent e) {
-		float ppb = level == Level.NEAR ? nearPpb(e) : FAR_PPB;
+		return layout(level, e, 1f);
+	}
+
+	/**
+	 * Like {@link #layout(Level, ScreenExtent)} with a text size for the NEAR level ({@code density}, a monitor's
+	 * {@code textSize} option: above 1 more pixels per block, so smaller text and more rows; below 1 larger text).
+	 * FAR fits its text to the screen anyway and ignores it.
+	 */
+	public static Layout layout(Level level, ScreenExtent e, float density) {
+		float d = density > 0 ? density : 1f;
+		float ppb = level == Level.NEAR ? nearPpb(e) * d : FAR_PPB;
 		float bezel = BEZEL_PX * ppb / 16f;
 		float chin = CHIN_PX * ppb / 16f;
 		float innerW = e.width() * ppb - 2 * (bezel + PAD);

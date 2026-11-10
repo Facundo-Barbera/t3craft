@@ -1,5 +1,6 @@
 package dev.t3craft.client.blocks.config;
 
+import dev.t3craft.blocks.MonitorBlock;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Supplier;
@@ -10,10 +11,15 @@ import org.jspecify.annotations.Nullable;
  * Block type → its config page section. Sneak + right click (empty main hand) on a block whose class is
  * registered here opens {@link BlockConfigPanel}; any other block keeps its usual sneak behaviour. Client thread.
  *
- * <p>See {@link BlockConfigSection} for how to add a page.
+ * <p>Registered today: {@link MonitorBlock} ({@link MonitorConfigSection}). The other blocks get theirs in T10
+ * (see {@link BlockConfigSection} for how to add one).
  */
 public final class BlockConfigPages {
 	private static final Map<Class<? extends Block>, Supplier<BlockConfigSection>> PAGES = new LinkedHashMap<>();
+
+	static {
+		register(MonitorBlock.class, MonitorConfigSection::new);
+	}
 
 	private BlockConfigPages() {
 	}
