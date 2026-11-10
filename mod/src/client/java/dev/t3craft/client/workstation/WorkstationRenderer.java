@@ -68,6 +68,10 @@ final class WorkstationRenderer {
 		boolean archived;
 		/** The computer block draws its own screen (e.g. a t3craft monitor): our TextDisplay stays blank. */
 		boolean suppressed;
+		/** World text: the player is beyond the monitor's level-of-detail distance. */
+		boolean far;
+		/** Blank right now (suppressed, far or the source switched off). */
+		boolean blank;
 
 		Station(String key, StationPlacement placement, Display.TextDisplay screen) {
 			this.key = key;
@@ -89,6 +93,35 @@ final class WorkstationRenderer {
 	private boolean swept;
 	/** Computer blocks that draw their own screen; default none (vanilla blocks never do). */
 	private Predicate<BlockState> selfDisplay = state -> false;
+	/** World text: the viewer (eye) and the hide distance; NaN = unknown (never far). */
+	private double viewX = Double.NaN;
+	private double viewY;
+	private double viewZ;
+	private double hideBeyond;
+	private boolean screensOn = true;
+	/** Extra blocks before a far screen comes back (as the monitor's own LOD hysteresis). */
+	static final double FAR_HYSTERESIS = 2;
+
+	/**
+	 * World text (docs/features/world-text.md): where the player looks from, the distance beyond which
+	 * the screens hide ({@code blocks.monitor.nearDistance}, 0 = never) and {@code labels.hologram.workstationScreens}.
+	 */
+	void viewer(double x, double y, double z, double hideBeyond, boolean on) {
+		viewX = x;
+		viewY = y;
+		viewZ = z;
+		this.hideBeyond = hideBeyond;
+		this.screensOn = on;
+	}
+
+	/** Far test with hysteresis: a far screen comes back only {@link #FAR_HYSTERESIS} blocks closer. */
+	static boolean far(double distSq, double hideBeyond, boolean wasFar) {
+		if (!(hideBeyond > 0)) {
+			return false;
+		}
+		double d = wasFar ? hideBeyond : hideBeyond + FAR_HYSTERESIS;
+		return distSq > d * d;
+	}
 
 	/** See {@link WorkstationClient#setScreenSuppressor}. Null = none. */
 	void setSelfDisplay(@Nullable Predicate<BlockState> p) {
@@ -165,19 +198,27 @@ final class WorkstationRenderer {
 			}
 			if (created || checkBlocks) {
 				syncProp(lvl, s);
-				boolean suppress = selfDisplay.test(lvl.getBlockState(new BlockPos(p.computerX(), p.computerY(), p.computerZ())));
-				if (suppress != s.suppressed) {
-					s.suppressed = suppress;
-					if (suppress) {
-						s.screen.setText(Component.empty());
-						dev.t3craft.debug.PerfStats.count(dev.t3craft.debug.PerfStats.DISPLAY_SET_TEXT);
-						s.screen.setBackgroundColor(0);
-					} else if (screen == null) {
-						screen = cache.screen(t.key());
-					}
+				s.suppressed = selfDisplay.test(lvl.getBlockState(new BlockPos(p.computerX(), p.computerY(), p.computerZ())));
+			}
+			if (!Double.isNaN(viewX)) {
+				double dx = p.screenX() - viewX;
+				double dy = p.screenY() - viewY;
+				double dz = p.screenZ() - viewZ;
+				s.far = far(dx * dx + dy * dy + dz * dz, hideBeyond, s.far);
+			}
+			boolean blank = s.suppressed || s.far || !screensOn;
+			if (blank != s.blank || created) {
+				s.blank = blank;
+				if (blank) {
+					s.screen.setText(Component.empty());
+					dev.t3craft.debug.PerfStats.count(dev.t3craft.debug.PerfStats.DISPLAY_SET_TEXT);
+					s.screen.setBackgroundColor(0);
+					screen = null;
+				} else if (screen == null) {
+					screen = cache.screen(t.key()); // back in range: the current text
 				}
 			}
-			if (screen != null && !s.suppressed) {
+			if (screen != null && !s.blank) {
 				apply(s.screen, screen);
 			}
 		}

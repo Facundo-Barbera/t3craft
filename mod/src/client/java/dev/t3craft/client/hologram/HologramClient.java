@@ -105,7 +105,9 @@ public final class HologramClient implements ClientModInitializer {
 			return;
 		}
 		// fix/hq-gate-npcs: the hologram stands only in the HQ's own world and dimension
-		boolean enabled = ConfigManager.get().settings().hud().hologram() && HqPresence.allows(mc);
+		// world text: labels.hologram.hubHologram switches the card off on top of hud.hologram
+		boolean enabled = ConfigManager.get().settings().hud().hologram() && dev.t3craft.client.npc.LabelConfig.current().sources().hubHologram()
+				&& HqPresence.allows(mc);
 		if (!enabled) {
 			state.update(new HologramModel.Inputs(List.of(), 0, false, false));
 			renderer.clear(lvl);

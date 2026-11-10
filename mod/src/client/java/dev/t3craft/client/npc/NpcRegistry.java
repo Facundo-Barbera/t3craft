@@ -13,6 +13,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.HashSet;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.particles.ParticleTypes;
@@ -77,6 +79,16 @@ public final class NpcRegistry {
 	/** Near-panel text per NPC (compact mode shows it only when {@link NpcLabels.Visibility} says so). */
 	private final Map<String, Component> panelText = new HashMap<>();
 	private final Map<String, NpcLabels.Visibility> detail = new HashMap<>();
+	/** World text: NPCs whose name tag / detail panel show (decided once per tick by {@link #decide}). */
+	private Set<String> tagsShown = Set.of();
+	private Set<String> panelsShown = Set.of();
+	/** Measured once per label text: name tag width, panel width and lines (code points / lines). */
+	private final Map<String, Integer> tagCols = new HashMap<>();
+	private final Map<String, Integer> panelCols = new HashMap<>();
+	private final Map<String, Integer> panelLines = new HashMap<>();
+	private PlateLayout.@Nullable Cache plateCache;
+	/** Height of the name tag's centre line above the feet (blocks). */
+	static final double PLATE_BASE = 2.05;
 	/**
 	 * fix/hq-load-npc-reconcile: what each NPC's labels were built (or are being built) from; an NPC whose
 	 * key did not change is not re-labelled. Client thread.
@@ -611,6 +623,7 @@ public final class NpcRegistry {
 			npcByEntityId.remove(s.avatar().getId());
 			npcByEntityId.remove(s.panel().getId());
 			panelText.remove(id);
+			forgetMeasures(id);
 			panelBody.remove(id);
 			labelKey.remove(id);
 			detail.remove(id);
@@ -657,6 +670,7 @@ public final class NpcRegistry {
 					npcByEntityId.put(s.avatar().getId(), info.id());
 					npcByEntityId.put(s.panel().getId(), info.id());
 					labelKey.put(info.id(), key);
+					tagCols.put(info.id(), cols(l.nameTag()));
 					panelBody.put(info.id(), l.body());
 					setPanelText(info.id());
 					continue;
@@ -707,7 +721,12 @@ public final class NpcRegistry {
 			return;
 		}
 		Component extra = panelExtra.apply(id);
-		panelText.put(id, extra == null ? body : body.copy().append(extra));
+		Component text = extra == null ? body : body.copy().append(extra);
+		Component before = panelText.put(id, text);
+		if (!text.equals(before)) {
+			panelCols.put(id, cols(text));
+			panelLines.put(id, NpcLabels.lines(text.getString()));
+		}
 	}
 
 	/** Applies labels built for the current NPC, if they are still the wanted ones (key and generation). */
@@ -717,6 +736,7 @@ public final class NpcRegistry {
 			return; // gone, dropped, or re-labelled again since
 		}
 		s.avatar().update(l.key().info(), l.nameTag());
+		tagCols.put(l.id(), cols(l.nameTag()));
 		panelBody.put(l.id(), l.body());
 		setPanelText(l.id());
 	}
@@ -747,8 +767,22 @@ public final class NpcRegistry {
 		dev.t3craft.debug.PerfStats.step(dev.t3craft.debug.PerfStats.STEP_NPC_LABELS, t0);
 	}
 
+	private void forgetMeasures(String id) {
+		tagCols.remove(id);
+		panelCols.remove(id);
+		panelLines.remove(id);
+	}
+
 	/** Forgets every label (world change, clear): batches still running are dropped by generation. */
 	private void dropLabels() {
+		tagCols.clear();
+		panelCols.clear();
+		panelLines.clear();
+		tagsShown = Set.of();
+		panelsShown = Set.of();
+		if (plateCache != null) {
+			plateCache.clear();
+		}
 		labelGen++;
 		labelJobs.forEach(f -> f.cancel(false));
 		labelJobs.clear();
@@ -757,9 +791,17 @@ public final class NpcRegistry {
 	}
 
 	/**
-	 * Applies each panel's text: always on in detailed mode; in compact mode only while the player
-	 * is near, aims at the NPC or clicked it (hysteresis in {@link NpcLabels.Visibility}). With
-	 * {@code mc == null} (from reconcile) only re-applies the current visibility.
+	 * World text (docs/features/world-text.md): which name tags and detail panels show, once per tick.
+	 *
+	 * <ul>
+	 *   <li>Detailed mode: every tag and every panel (the old layout; only {@code hologram.npcTags} applies).</li>
+	 *   <li>Compact mode: a panel wants to open as before ({@link NpcLabels.Visibility}: near, aimed or
+	 *       clicked); only {@code maxPanels} of those open, clicked first, then aimed, then nearest. A
+	 *       name tag shows within {@code nearDistance} or while aimed at (with hysteresis); at most
+	 *       {@code maxVisible} plates show and none overlaps another ({@link PlateLayout}, recomputed
+	 *       only when something moved noticeably). The open panel's NPC is always among them.</li>
+	 * </ul>
+	 * With {@code mc == null} (from reconcile) only re-applies the last decision.
 	 */
 	private void updatePanels(@Nullable Minecraft mc) {
 		LabelConfig cfg = LabelConfig.current();
@@ -767,24 +809,16 @@ public final class NpcRegistry {
 			compactLabels = cfg.compact();
 			dirty = true; // rebuild name tags and panel texts for the new mode
 		}
-		Vec3 eye = mc == null || mc.player == null ? null : mc.player.getEyePosition();
-		Vec3 look = mc == null || mc.player == null ? null : mc.player.getViewVector(1f);
+		boolean on = cfg.sources().npcTags();
+		if (mc != null && mc.player != null) {
+			decide(mc, cfg, on);
+		}
 		for (Map.Entry<String, Spawned> e : spawned.entrySet()) {
+			String id = e.getKey();
 			Display.TextDisplay panel = e.getValue().panel();
-			Component text = panelText.get(e.getKey());
-			boolean show = text != null;
-			if (show && compactLabels) {
-				NpcLabels.Visibility v = detail.computeIfAbsent(e.getKey(), k -> new NpcLabels.Visibility());
-				if (eye != null) {
-					ThreadAvatar a = e.getValue().avatar();
-					double dist = a.position().distanceTo(mc.player.position());
-					double aim = NpcLabels.aimMiss(eye.x, eye.y, eye.z, look.x, look.y, look.z,
-							a.getX(), a.getY() + 1.2, a.getZ(), NpcLabels.AIM_RANGE);
-					show = v.update(dist, aim, cfg.detailDistance());
-				} else {
-					show = v.shown();
-				}
-			}
+			Component text = panelText.get(id);
+			boolean show = on && text != null && panelsShown.contains(id);
+			e.getValue().avatar().setTagHidden(!on || !tagsShown.contains(id));
 			Component want = show ? text : Component.empty();
 			if (!Objects.equals(panel.getText(), want)) {
 				panel.setText(want);
@@ -792,6 +826,110 @@ public final class NpcRegistry {
 				panel.setBackgroundColor(show ? 0x60000000 : 0);
 			}
 		}
+	}
+
+	/** Fills {@link #tagsShown} and {@link #panelsShown} for this tick. */
+	private void decide(Minecraft mc, LabelConfig cfg, boolean on) {
+		Set<String> tags = new HashSet<>();
+		Set<String> panels = new HashSet<>();
+		if (!on) {
+			tagsShown = tags;
+			panelsShown = panels;
+			return;
+		}
+		if (!compactLabels) {
+			for (String id : spawned.keySet()) {
+				tags.add(id);
+				if (panelText.get(id) != null) {
+					panels.add(id);
+				}
+			}
+			tagsShown = tags;
+			panelsShown = panels;
+			return;
+		}
+		Vec3 eye = mc.player.getEyePosition();
+		Vec3 look = mc.player.getViewVector(1f);
+		Vec3 feet = mc.player.position();
+		record Seen(String id, ThreadAvatar a, double dist, double aim, boolean wants, boolean pinned) {
+		}
+		List<Seen> seen = new ArrayList<>(spawned.size());
+		for (Map.Entry<String, Spawned> e : spawned.entrySet()) {
+			String id = e.getKey();
+			ThreadAvatar a = e.getValue().avatar();
+			double dist = a.position().distanceTo(feet);
+			double aim = NpcLabels.aimMiss(eye.x, eye.y, eye.z, look.x, look.y, look.z, a.getX(), a.getY() + 1.2, a.getZ(), NpcLabels.AIM_RANGE);
+			NpcLabels.Visibility v = detail.computeIfAbsent(id, k -> new NpcLabels.Visibility());
+			boolean wants = panelText.get(id) != null && v.update(dist, aim, cfg.detailDistance());
+			seen.add(new Seen(id, a, dist, aim, wants, v.pinned()));
+		}
+		// At most maxPanels detail panels: clicked first, then the aimed one, then the nearest.
+		List<Seen> wanting = new ArrayList<>();
+		for (Seen s : seen) {
+			if (s.wants()) {
+				wanting.add(s);
+			}
+		}
+		wanting.sort(java.util.Comparator.comparing((Seen s) -> !s.pinned()).thenComparingDouble(Seen::aim).thenComparingDouble(Seen::dist)
+				.thenComparing(Seen::id));
+		for (Seen s : wanting) {
+			if (cfg.maxPanels() > 0 && panels.size() >= cfg.maxPanels()) {
+				break;
+			}
+			panels.add(s.id());
+		}
+		// Name tag candidates: near or aimed (hysteresis on both), plus every open panel's NPC.
+		List<PlateLayout.Plate> plates = new ArrayList<>();
+		for (Seen s : seen) {
+			boolean was = tagsShown.contains(s.id());
+			double near = cfg.nearDistance();
+			boolean candidate = panels.contains(s.id()) || near <= 0 || s.dist() <= near + (was ? NpcLabels.HYSTERESIS : 0)
+					|| s.aim() <= (was ? NpcLabels.AIM_KEEP : NpcLabels.AIM_SHOW);
+			if (!candidate) {
+				continue;
+			}
+			int lines = 1 + (panels.contains(s.id()) ? panelLines.getOrDefault(s.id(), 0) : 0);
+			int cols = Math.max(tagCols.getOrDefault(s.id(), 8), panels.contains(s.id()) ? panelCols.getOrDefault(s.id(), 0) : 0);
+			double h = PlateLayout.height(lines, 1f);
+			ThreadAvatar a = s.a();
+			// The tag sits at ≈ 2.1 above the feet; an open panel grows upwards from there.
+			plates.add(new PlateLayout.Plate(s.id(), a.getX(), a.getY() + PLATE_BASE + h / 2, a.getZ(), PlateLayout.width(cols, 1f), h,
+					s.dist(), s.aim(), panels.contains(s.id())));
+		}
+		Set<String> visible = cfg.maxVisible() <= 0 && !cfg.declutter()
+				? idsOf(plates)
+				: declutter().update(plates, eye.x, eye.y, eye.z, cfg.maxVisible(), cfg.declutter());
+		tags.addAll(visible);
+		panels.retainAll(visible);
+		tagsShown = tags;
+		panelsShown = panels;
+	}
+
+	private static Set<String> idsOf(List<PlateLayout.Plate> plates) {
+		Set<String> out = new HashSet<>();
+		plates.forEach(p -> out.add(p.id()));
+		return out;
+	}
+
+	/** Lazy (hot-swap safe). */
+	private PlateLayout.Cache declutter() {
+		PlateLayout.Cache c = plateCache;
+		if (c == null) {
+			plateCache = c = new PlateLayout.Cache();
+		}
+		return c;
+	}
+
+	/** Longest line (code points) and line count of a label, for the declutter pass; measured once per text. */
+	static int cols(@Nullable Component c) {
+		if (c == null) {
+			return 0;
+		}
+		int best = 0;
+		for (String line : c.getString().split("\n", -1)) {
+			best = Math.max(best, line.codePointCount(0, line.length()));
+		}
+		return best;
 	}
 
 	private static Display.TextDisplay textDisplay(ClientLevel lvl, int background) {

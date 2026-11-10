@@ -151,5 +151,10 @@ public final class NpcLabels {
 		public boolean shown() {
 			return shown;
 		}
+
+		/** Opened by a click (or {@link #reveal}) and still within its {@link #CLICK_TICKS}. */
+		public boolean pinned() {
+			return pinned > 0;
+		}
 	}
 }
