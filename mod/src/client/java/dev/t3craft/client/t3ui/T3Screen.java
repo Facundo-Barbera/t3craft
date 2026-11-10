@@ -142,6 +142,8 @@ public final class T3Screen extends Screen {
 		}
 	});
 	private boolean menuOpen;
+	/** #39: the queue page last opened from the menu (its watches are dropped when the screen goes away). */
+	private dev.t3craft.client.queue.@Nullable QueuePanel queuePage;
 	private boolean projectMenuOpen;
 	/** Agents menu filter: false = active only (default), true = all children. */
 	private boolean agentsShowAll;
@@ -427,6 +429,19 @@ public final class T3Screen extends Screen {
 		openPage(new dev.t3craft.client.pieces.PieceBrowserPanel());
 	}
 
+	/**
+	 * #39: the run queue (the kit page {@link dev.t3craft.client.queue.QueuePanel}) in the thread panel's place,
+	 * from the ⋯ menu. Watches the selected thread plus the working ones while it is shown.
+	 */
+	private void openQueuePage() {
+		String k = model.selectedKey();
+		dev.t3craft.client.queue.QueueStore.Key focusKey = k == null || selectedDraft() != null || k.indexOf(':') <= 0 ? null
+				: dev.t3craft.client.queue.QueueStore.Key.parse(k);
+		dev.t3craft.client.queue.QueuePanel q = new dev.t3craft.client.queue.QueuePanel(dev.t3craft.client.queue.QueuePanel.live(focusKey));
+		queuePage = q;
+		openPage(q);
+	}
+
 	/** A thread or a new draft was asked for by the user: the page makes way. */
 	private void closePages() {
 		if (pages.active()) {
@@ -473,6 +488,9 @@ public final class T3Screen extends Screen {
 			}
 			c.close();
 			conversation = null;
+		}
+		if (queuePage != null) {
+			queuePage.release(); // #39: stop watching queues; laid out again, the page watches again
 		}
 		ThreadListCache.get().save(); // feat/t3-thread-cache: list + recent tails for the next game start
 		super.removed();
@@ -1226,6 +1244,7 @@ public final class T3Screen extends Screen {
 		items.add(new T3Slots.MenuItem("Archive", true, this::openArchive));
 		items.add(new T3Slots.MenuItem("Environments", true, this::openEnvironmentsPage));
 		items.add(new T3Slots.MenuItem("Pieces", true, this::openPiecesPage));
+		items.add(new T3Slots.MenuItem("Queue", true, this::openQueuePage));
 		items.add(new T3Slots.MenuItem("Settings", true, this::openSettingsPage));
 		items.add(new T3Slots.MenuItem(layout.compact() ? "Show thread" : wideSidebar ? "Hide sidebar (Ctrl+B)" : "Show sidebar (Ctrl+B)", true,
 				() -> setSidebarVisible(layout.compact() ? false : !wideSidebar)));
