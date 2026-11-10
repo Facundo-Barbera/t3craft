@@ -23,6 +23,7 @@ Segundo corte de los puentes en tiempo real del mapa `floating-islands` (primer 
 - Solo si el jugador está de pie sobre una isla ya construida (como antes).
 - **Rumbo**: lo que se movió desde la última comprobación (si ≥ 0,2 bloques); si está quieto, la dirección
   de la mirada (horizontal).
+- Solo cuando la isla ya tiene todos sus planes (`warmed`; ver "Vecinas", planificación repartida).
 - Candidatas: los enlaces de la isla (`BridgeNetwork.links`) aún no construidos, con su punto de salida
   (`Bridge.startOn`, la primera celda de tablero sobre el vacío) a ≤ `HINT` = 16 bloques y a menos de ~70°
   del rumbo (`cos ≥ 0,35`); a ≤ `CLOSE` = 3 bloques cuenta en cualquier dirección.
@@ -45,7 +46,7 @@ El paso 0 toca el borde de la isla `a` a la altura de su césped y el último el
 
 - **Línea**: la recta entre centros, un bloque por paso sobre el eje largo (como antes, así los puentes ya
   guardados coinciden). Los **bordes reales** se buscan columna a columna con el `TerrainShape` de
-  `IslandField.generate(ventana)` (no se asume un disco): el tablero va de la última columna con suelo de `a`
+  `IslandField.terrain(ventana)` (antes `generate(ventana).shape()`; no se asume un disco): el tablero va de la última columna con suelo de `a`
   a la primera de `b`. La identidad de la isla de cada columna sale de `Island.contains`.
 - **Sin puente** si las islas se tocan, si la recta vuelve a entrar en una isla a medio camino o si alguna
   columna del tablero, la barandilla o su refuerzo (±3 del eje) tiene suelo de una **tercera isla**.
@@ -79,9 +80,22 @@ desnivel: la misma pareja siempre da el mismo puente. Los empinados (modo escale
   2. deja al menos 1 columna libre con cada puente de eje que pueda llegar a su bloque (celdas `bx−1..bx+2`);
   3. deja esa misma holgura con las candidatas de los 4 bloques de esquina; si dos chocan, caen las dos (así
      el resultado no depende de quién pregunte primero).
+- **Longitud máxima de los ejes** (#40): un puente de eje de más de `MAX_AXIS_DECK` = 64 pasos de tablero no se
+  construye. Con XG en la mezcla (celda de 82) dos islas pequeñas vecinas pueden quedar a ~90 bloques. Para que
+  ninguna isla quede aislada, una isla **sin ningún otro enlace** (ni eje corto ni diagonal) conserva su puente de
+  eje más corto, sea cual sea su longitud (a igualdad, el de menor id). Es simétrico: el enlace existe si
+  cualquiera de las dos islas lo necesita (`axisLinked`, `lifeline`). Las diagonales siguen en ≤ 80. Los ejes
+  largos que no se construyen siguen contando como obstáculo al validar las diagonales (no cambia lo ya decidido).
 - Todo es determinista y simétrico; los planes se cachean en el `BridgeNetwork` del runtime.
-- `IslandField.generate` (de #31, solo lectura aquí) sigue publicando solo los 4 enlaces de eje como
-  `ON_DEMAND`; las diagonales solo las conoce `BridgeNetwork`.
+- **Planificación repartida** (#40): `BridgeNetwork.links(isla, maxPlanes)` planifica como mucho `maxPlanes` puentes
+  nuevos por llamada y devuelve `null` hasta tenerlos todos (guarda lo ya planificado). `IslandsRuntime` la llama
+  con 2 planes por comprobación: `nearEdge` (cada 4 ticks, ticks ≡ 0) y `warm` (ticks ≡ 2), que además de la
+  isla bajo el jugador prepara una a una las islas a las que se enlaza. Una isla entera (sus 4 ejes, sus 4
+  bloques de diagonales y los ejes que pueden chocar con ellas) se prepara en unos segundos sin tirón, y
+  `nearEdge` no da pistas ni arranca puentes hasta que la isla está lista. El planificador ahora pide solo el
+  suelo (`IslandField.terrain`) y descarta por caja las islas lejanas, que es lo que más costaba de cada plan.
+- `IslandField.generate` (de #31) sigue publicando solo los 4 enlaces de eje como `ON_DEMAND` (sin el límite de
+  longitud); las diagonales y el límite solo los conoce `BridgeNetwork`.
 
 ## Persistencia y mundos guardados
 
@@ -109,8 +123,12 @@ desnivel: la misma pareja siempre da el mismo puente. Los empinados (modo escale
 - `Component#withColor(int)` (ya usado en `Notifier`).
 - `Bridge` cambió de forma (record con `style`, `startA`, `startB`, `deck`); `BridgePlanner.plan` ahora pide
   el `IslandField`. Solo los usa `IslandsRuntime`.
-- La primera vez que un jugador pisa una isla se planifican de golpe unas decenas de puentes (ejes de la
-  zona para validar diagonales): un tirón corto en el hilo del servidor, luego cacheado.
+- (Resuelto en #40) La primera vez que un jugador pisaba una isla se planificaban de golpe unas decenas de puentes:
+  ahora se reparten en 2 planes por comprobación (ver "Vecinas").
+- Revisión cruzada de #40: sin errores de compilación a la vista; lo no confirmado está en la lista de
+  [`islands-worldgen.md`](islands-worldgen.md#riesgos-de-compilación-revisado-a-mano-sin-compilar).
+- Cruce #31/#32 corregido: la regeneración (`/t3craft islands regen`) solo limpiaba los pasillos de eje y dejaba en
+  pie los puentes diagonales; ahora limpia también la caja de cada diagonal.
 
 ## Prueba en juego
 

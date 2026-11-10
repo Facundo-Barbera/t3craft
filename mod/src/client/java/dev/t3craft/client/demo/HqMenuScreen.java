@@ -60,6 +60,31 @@ public final class HqMenuScreen extends T3PanelScreen {
 			}
 
 			@Override
+			public boolean canReset(MapTypes type) {
+				return HqMenuBridge.canReset(type);
+			}
+
+			@Override
+			public boolean worldExists(MapTypes type) {
+				return HqMenuBridge.worldExists(type);
+			}
+
+			@Override
+			public @Nullable String refusal(MapTypes type) {
+				return HqMenuBridge.resetRefusal(type);
+			}
+
+			@Override
+			public String resetBody(MapTypes type) {
+				return HqMenuBridge.resetBody(demo, type);
+			}
+
+			@Override
+			public String resetWorld(MapTypes type) {
+				return HqMenuBridge.resetWorld(demo, type);
+			}
+
+			@Override
 			public String exportPacks() {
 				return HqLayoutPackWatcher.exportNow();
 			}

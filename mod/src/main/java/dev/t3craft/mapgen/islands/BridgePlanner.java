@@ -139,7 +139,7 @@ public final class BridgePlanner {
 	private static TerrainShape ground(IslandField field, Island a, Island b, int n) {
 		int mx = Math.floorDiv(a.cx() + b.cx(), 2);
 		int mz = Math.floorDiv(a.cz() + b.cz(), 2);
-		return field.generate(new IslandField.Window(mx, mz, n / 2 + RAIL + 4)).shape();
+		return field.terrain(new IslandField.Window(mx, mz, n / 2 + RAIL + 4));
 	}
 
 	private static int owner(TerrainShape g, Island a, Island b, int x, int z) {

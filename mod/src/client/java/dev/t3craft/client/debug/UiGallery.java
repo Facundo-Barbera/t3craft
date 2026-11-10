@@ -452,6 +452,26 @@ public final class UiGallery {
 			}
 
 			@Override
+			public boolean canReset(MapTypes type) {
+				return type.id().equals(MapTypes.FLOATING_ISLANDS.id());
+			}
+
+			@Override
+			public boolean worldExists(MapTypes type) {
+				return canReset(type);
+			}
+
+			@Override
+			public String resetBody(MapTypes type) {
+				return "Gallery: a zip backup would be saved first, then only the " + type.name() + " world would be deleted. Nothing is touched here.";
+			}
+
+			@Override
+			public String resetWorld(MapTypes type) {
+				return "Gallery: would reset the " + type.name() + " world.";
+			}
+
+			@Override
 			public String exportPacks() {
 				return "Gallery: would export the layouts.";
 			}

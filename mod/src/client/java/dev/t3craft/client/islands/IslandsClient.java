@@ -9,12 +9,17 @@ import dev.t3craft.client.T3CraftCommands;
 import dev.t3craft.client.chat.ChatTheme;
 import dev.t3craft.client.debug.GuardedEvents;
 import dev.t3craft.client.demo.VanillaDemoWorld;
+import dev.t3craft.build.Placement;
 import dev.t3craft.mapgen.MapTypes;
+import dev.t3craft.mapgen.islands.Bridge;
+import dev.t3craft.mapgen.islands.BridgePlanner;
 import dev.t3craft.mapgen.islands.Island;
 import dev.t3craft.mapgen.islands.IslandField;
 import dev.t3craft.mapgen.islands.IslandMix;
+import dev.t3craft.mapgen.islands.bridge.BridgeNetwork;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -167,6 +172,11 @@ public final class IslandsClient implements ClientModInitializer {
 	private static @Nullable MinecraftServer islandsServer(Minecraft mc) {
 		MinecraftServer s = mc.getSingleplayerServer();
 		return s != null && VanillaDemoWorld.isDemoServer(s, IslandsWorld.FOLDER) ? s : null;
+	}
+
+	/** The save folder of the islands world: the only folder the HQ menu's Reset for this map type may delete. */
+	public static String worldFolder() {
+		return IslandsWorld.FOLDER;
 	}
 
 	/**
@@ -351,16 +361,34 @@ public final class IslandsClient implements ClientModInitializer {
 					islands.put(id, old.island(cell[0], cell[1]));
 				}
 			}
+			Set<String> near = new HashSet<>();
 			for (ServerPlayer p : players(server)) {
 				for (Island i : old.within(p.getBlockX(), p.getBlockZ(), NEAR_PLAYERS)) {
 					islands.putIfAbsent(i.id(), i);
+					near.add(i.id());
 				}
 			}
 			List<Box> boxes = new ArrayList<>();
+			BridgeNetwork network = new BridgeNetwork(old);
 			for (Island i : islands.values()) {
 				for (Island n : old.neighbours(i)) {
 					if (i.id().compareTo(n.id()) < 0 && islands.containsKey(n.id())) {
 						boxes.add(corridor(i, n, !built.contains(i.id()) && !built.contains(n.id())));
+					}
+				}
+				// Diagonal bridges (#32) run across the corner of four cells, outside every axis corridor: clear the box
+				// of the ones built, or that may be half built because a player stood near both islands.
+				for (int dz = -1; dz <= 1; dz += 2) {
+					Island n = old.island(i.gx() + 1, i.gz() + dz);
+					if (!islands.containsKey(n.id())) {
+						continue;
+					}
+					boolean wasBuilt = st.hasBridge(BridgePlanner.idOf(i, n));
+					if (wasBuilt || (near.contains(i.id()) && near.contains(n.id()))) {
+						Bridge b = network.bridge(i, n);
+						if (b != null) {
+							boxes.add(boxOf(b, !wasBuilt));
+						}
 					}
 				}
 			}
@@ -380,6 +408,26 @@ public final class IslandsClient implements ClientModInitializer {
 		private static Box corridor(Island a, Island b, boolean loadedOnly) {
 			return new Box(Math.min(a.cx(), b.cx()) - CORRIDOR, Math.min(a.top(), b.top()) - CORRIDOR, Math.min(a.cz(), b.cz()) - CORRIDOR,
 					Math.max(a.cx(), b.cx()) + CORRIDOR, Math.max(a.top(), b.top()) + CORRIDOR, Math.max(a.cz(), b.cz()) + CORRIDOR, loadedOnly);
+		}
+
+		/** The box round every block of a planned bridge (a diagonal one: its line is no corridor of two cell centres). */
+		private static Box boxOf(Bridge b, boolean loadedOnly) {
+			int minX = Integer.MAX_VALUE;
+			int minY = Integer.MAX_VALUE;
+			int minZ = Integer.MAX_VALUE;
+			int maxX = Integer.MIN_VALUE;
+			int maxY = Integer.MIN_VALUE;
+			int maxZ = Integer.MIN_VALUE;
+			for (Placement p : b.blocks()) {
+				BlockPos q = p.pos();
+				minX = Math.min(minX, q.getX());
+				minY = Math.min(minY, q.getY());
+				minZ = Math.min(minZ, q.getZ());
+				maxX = Math.max(maxX, q.getX());
+				maxY = Math.max(maxY, q.getY());
+				maxZ = Math.max(maxZ, q.getZ());
+			}
+			return new Box(minX - PAD, minY - PAD, minZ - PAD, maxX + PAD, maxY + PAD, maxZ + PAD, loadedOnly);
 		}
 
 		static void cancel() {

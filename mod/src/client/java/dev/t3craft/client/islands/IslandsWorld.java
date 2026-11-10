@@ -19,8 +19,8 @@ final class IslandsWorld {
 
 	/**
 	 * Seed of the islands world open now. Not a constant: {@link IslandsClient} sets it from the world's
-	 * {@link IslandsState} ({@link #use}) before {@link IslandsRuntime} starts, and the runtime makes its field from
-	 * it ({@code new IslandField(IslandsWorld.SEED, IslandsWorld.BASE_Y)}).
+	 * {@link IslandsState} ({@link #use}) before {@link IslandsRuntime} starts, and the runtime makes its field with
+	 * {@link #field()}.
 	 */
 	static volatile long SEED = DEFAULT_SEED;
 	private static volatile IslandMix mix = IslandMix.DEFAULT;
@@ -28,11 +28,10 @@ final class IslandsWorld {
 	private IslandsWorld() {
 	}
 
-	/** Makes {@code seed} and {@code m} the open world's: for {@link #field()} and for the runtime's own field. */
+	/** Makes {@code seed} and {@code m} the open world's: what {@link #field()} builds the field from. */
 	static void use(long seed, IslandMix m) {
 		SEED = seed;
 		mix = m;
-		IslandField.useSessionMix(m);
 	}
 
 	static IslandMix mix() {
