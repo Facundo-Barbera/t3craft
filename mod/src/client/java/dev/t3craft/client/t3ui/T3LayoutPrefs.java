@@ -19,18 +19,21 @@ import org.jspecify.annotations.Nullable;
  *   "rightOpen": true,
  *   "rightPanel": "pieces",   // a RightPanels id
  *   "maxWidth": 1280,         // optional: frame cap, at least 900 (default 1280)
- *   "maxHeight": 720          // optional: frame cap, at least 520 (default 720)
+ *   "maxHeight": 720,         // optional: frame cap, at least 520 (default 720)
+ *   "uiScale": "minecraft"    // optional (#42): "minecraft" (default), "auto" or a whole number 1..8, see UiScale
  * }
  * }</pre>
  *
  * <p>The screen writes the first four when a drag ends or the panel opens or closes (debounced, never per
- * frame), keeping every other key of the block as it is (the caps are only read, so their default can still
- * change). It re-reads the block every second, so {@code /t3craft config reload} or the reload key applies
+ * frame), keeping every other key of the block as it is (the caps and {@code uiScale} are only read here, so
+ * their default can still change; the settings row writes {@code uiScale} with {@link #saveUiScale}). It re-reads
+ * the block every second, so {@code /t3craft config reload} or the reload key applies
  * a hand edit to an open screen.
  */
-public record T3LayoutPrefs(int sidebarWidth, int rightWidth, boolean rightOpen, @Nullable String rightPanel, int maxWidth, int maxHeight) {
+public record T3LayoutPrefs(int sidebarWidth, int rightWidth, boolean rightOpen, @Nullable String rightPanel, int maxWidth, int maxHeight,
+		UiScale.Pref uiScale) {
 	public static final String CONFIG_KEY = "layout";
-	public static final T3LayoutPrefs DEFAULTS = new T3LayoutPrefs(0, 0, false, null, T3UiLayout.MAX_W, T3UiLayout.MAX_H);
+	public static final T3LayoutPrefs DEFAULTS = new T3LayoutPrefs(0, 0, false, null, T3UiLayout.MAX_W, T3UiLayout.MAX_H, UiScale.Pref.MINECRAFT);
 	/** Largest width or cap read from the file (anything larger is a typo). */
 	private static final int SANE_MAX = 8192;
 
@@ -61,7 +64,7 @@ public record T3LayoutPrefs(int sidebarWidth, int rightWidth, boolean rightOpen,
 		String panel = str(o, "rightPanel");
 		int mw = Math.max(T3UiLayout.MAX_W_MIN, Math.min(SANE_MAX, num(o, "maxWidth", T3UiLayout.MAX_W)));
 		int mh = Math.max(T3UiLayout.MAX_H_MIN, Math.min(SANE_MAX, num(o, "maxHeight", T3UiLayout.MAX_H)));
-		return new T3LayoutPrefs(sw, rw, open, panel, mw, mh);
+		return new T3LayoutPrefs(sw, rw, open, panel, mw, mh, UiScale.parse(o.get(UiScale.CONFIG_KEY)));
 	}
 
 	/**
@@ -86,6 +89,26 @@ public record T3LayoutPrefs(int sidebarWidth, int rightWidth, boolean rightOpen,
 		} catch (RuntimeException | LinkageError e) {
 			dev.t3craft.T3Craft.LOGGER.warn("[t3ui] layout not saved: {}", e.toString());
 			return null;
+		}
+	}
+
+	/**
+	 * #42: writes {@code uiScale} into the block (other keys kept) and saves the file; open T3 screens pick it up on
+	 * their next poll. False when the config could not be reached or saved.
+	 */
+	public static boolean saveUiScale(UiScale.Pref pref) {
+		try {
+			JsonElement before = ConfigManager.get().extra(CONFIG_KEY);
+			JsonObject o = before != null && before.isJsonObject() ? before.getAsJsonObject().deepCopy() : new JsonObject();
+			o.add(UiScale.CONFIG_KEY, pref.toJson());
+			ConfigManager.SaveResult r = ConfigManager.get().putExtra(CONFIG_KEY, o);
+			if (!r.ok()) {
+				dev.t3craft.T3Craft.LOGGER.warn("[t3ui] uiScale not saved: {}", r.message());
+			}
+			return r.ok();
+		} catch (RuntimeException | LinkageError e) {
+			dev.t3craft.T3Craft.LOGGER.warn("[t3ui] uiScale not saved: {}", e.toString());
+			return false;
 		}
 	}
 

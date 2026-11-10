@@ -4,6 +4,8 @@ import dev.t3craft.client.ModConfig;
 import dev.t3craft.client.chat.Rect;
 import dev.t3craft.client.config.T3CraftSettings.Notifications;
 import dev.t3craft.client.demo.DemoClient;
+import dev.t3craft.client.t3ui.T3LayoutPrefs;
+import dev.t3craft.client.t3ui.UiScale;
 import dev.t3craft.client.t3ui.kit.T3Button;
 import dev.t3craft.client.t3ui.kit.T3Control;
 import dev.t3craft.client.t3ui.kit.T3Draw;
@@ -55,6 +57,8 @@ public final class SettingsPanel extends T3Panel {
 	private @Nullable T3Field panelsField;
 	private String status = "";
 	private Tone statusTone = Tone.MUTED;
+	/** #42: the T3 screens' scale ({@code layout.uiScale}), written on "Save" like the rest of the page. */
+	private UiScale.Pref uiScaleDraft = UiScale.configured();
 
 	public SettingsPanel(EnvironmentActions actions) {
 		this.actions = actions;
@@ -165,6 +169,7 @@ public final class SettingsPanel extends T3Panel {
 		y += ROW;
 		y = toggle(x, y, w, "Hub hologram", draft.hud().hologram(), v -> draft = draft.withHud(draft.hud().withHologram(v)));
 		y = toggle(x, y, w, "Attention arrow", draft.hud().attentionArrow(), v -> draft = draft.withHud(draft.hud().withAttentionArrow(v)));
+		y = uiScaleRow(x, y, w);
 		y += 8;
 
 		String mode = "Mode: " + draft.mode() + (draft.mode().equals("bridge")
@@ -207,6 +212,7 @@ public final class SettingsPanel extends T3Panel {
 		y = link(x, y, w, T3Icon.SEND, "Outbound events...", () -> host().show(new OutboundPanel(new OutboundStore(ModConfig.dataDir()))));
 		y = link(x, y, w, T3Icon.REFRESH_CW, "Reload from disk", () -> {
 			draft = ConfigManager.get().load();
+			uiScaleDraft = UiScale.configured(); // #42
 			windowText = formatNumber(draft.recentWindowHours());
 			maxText = Integer.toString(draft.maxPerEnvironment());
 			if (windowField != null) {
@@ -375,6 +381,27 @@ public final class SettingsPanel extends T3Panel {
 		draft = draft.withNotifications(n().withAttention(a));
 	}
 
+	/** #42: "UI scale" select (Minecraft, Auto, 1..4, or the number the config already holds). */
+	private int uiScaleRow(int x, int y, int w) {
+		y = text(x + 4, y + 2, w - 8, "UI scale (T3 screens)", Tone.MUTED);
+		List<UiScale.Pref> options = new java.util.ArrayList<>(List.of(UiScale.Pref.MINECRAFT, UiScale.Pref.AUTO,
+				UiScale.Pref.fixed(1), UiScale.Pref.fixed(2), UiScale.Pref.fixed(3), UiScale.Pref.fixed(4)));
+		if (!options.contains(uiScaleDraft)) {
+			options.add(uiScaleDraft);
+		}
+		T3Select<UiScale.Pref> select = new T3Select<>(options, SettingsPanel::uiScaleLabel, uiScaleDraft, v -> uiScaleDraft = v);
+		place(select, x, y + 1, w, T3Control.H);
+		return y + T3Control.H + 5;
+	}
+
+	private static String uiScaleLabel(UiScale.Pref p) {
+		return switch (p.mode()) {
+			case MINECRAFT -> "Minecraft (the game's GUI scale)";
+			case AUTO -> "Auto (denser on large monitors)";
+			case FIXED -> "Scale " + p.fixed();
+		};
+	}
+
 	private static String barLabel(String mode) {
 		return switch (mode) {
 			case "also" -> "Also (toast and action bar)";
@@ -423,13 +450,19 @@ public final class SettingsPanel extends T3Panel {
 		ConfigManager.SaveResult r = ConfigManager.get().update(s -> next);
 		draft = ConfigManager.get().settings();
 		if (r.ok()) {
+			// #42: the UI scale lives in the layout prefs, written whatever the labels block does
+			boolean scaleOk = uiScaleDraft.equals(UiScale.configured()) || T3LayoutPrefs.saveUiScale(uiScaleDraft);
 			// the labels block is only touched when this page changed something in it
 			ConfigManager.SaveResult w = world.equals(worldTextSaved) ? r : world.save();
 			if (w.ok()) {
 				worldText = world;
 				worldTextSaved = world;
 				actions.reload();
-				say(r.message() + " and reloaded", Tone.OK);
+				if (scaleOk) {
+					say(r.message() + " and reloaded", Tone.OK);
+				} else {
+					say("Settings saved, but the UI scale could not be written", Tone.WARN);
+				}
 			} else {
 				say(w.message(), Tone.ERROR);
 			}

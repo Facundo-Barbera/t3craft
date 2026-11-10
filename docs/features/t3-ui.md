@@ -71,6 +71,37 @@ or Esc goes back to the list.
 
 Gallery: `/t3dev ui inbox-right-panel`.
 
+## Own UI scale (#42, part of #15)
+
+The T3 screens (this one, every kit page screen and kit dialog screen) can be drawn at their own GUI scale,
+apart from Minecraft's, so the T3 Code-like UI gets more density on a large monitor without changing the
+game's scale. Key `uiScale` in the same `layout` block:
+
+```json
+"layout": {"uiScale": "auto"}
+```
+
+- `"minecraft"` (default in this first delivery): the game's GUI scale, exactly as before; nothing is transformed.
+- `"auto"`: the largest **whole** scale at which the window keeps at least 960×540 logical units (1080p → 2,
+  1440p → 2, 4K → 4). Minecraft's "Auto" picks the largest scale that keeps 320×240, so this one is denser.
+- a whole number 1..8: that scale, meaning the same as Minecraft's GUI scale number (never more than the game
+  would allow for the window). Half steps are not offered: the bitmap font is uneven at them, and they wait for
+  the TTF font of #15. A decimal is rounded.
+
+Also in Settings → General → Display → *UI scale (T3 screens)*, written on Save. The open screen re-reads the
+block every second (`/t3craft config reload` or a hand edit) and lays itself out again when the scale changes.
+
+How (`t3ui/UiScale`): each root screen computes a `UiScale.Frame` in `init()` and sets its `width`/`height` to
+the logical size, so `T3UiLayout` (frame cap, compact mode under 330×170, panel limits) works in logical units.
+Drawing runs under a pose scaled by `scale / guiScale`, and during that pass the window reports the T3 scale as
+its GUI scale (restored in a `finally`), so scissor rectangles, `getGuiScaledWidth()`, the IME candidate area and
+tooltip placement need no change at their call sites; the frame's tooltips are drawn at the end of the scaled
+pass. Mouse events (click, drag, release, wheel, move) are divided once in the root screen before any panel sees
+them. Panels, kit widgets, menus and modals keep working in logical units and know nothing about it.
+
+Gallery: `/t3dev ui inbox-scale` (forced `auto`), `inbox-scale-2`, `inbox-scale-3` (scale 3 with the right panel
+open). If the game's own scale already equals the forced one the screen looks the same as `inbox`.
+
 ## What is copied from T3 Code (structure and behaviour only, no TS code)
 
 | t3craft | T3 Code (`~/projects/t3code-ref`) |

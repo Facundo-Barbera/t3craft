@@ -4,7 +4,9 @@ import dev.t3craft.client.chat.Rect;
 
 /**
  * Where everything of the unified T3 screen sits, in scaled GUI pixels (so it follows the window size
- * and the GUI scale). Pure Java.
+ * and the GUI scale). Pure Java. #42: with {@code layout.uiScale} set these are the T3 scale's logical units
+ * ({@link UiScale}): the screen passes its logical size, so the compact mode and the frame caps below are
+ * evaluated after that scale.
  *
  * <p>Structure of T3 Code's main layout ({@code apps/web/src/components/AppSidebarLayout.tsx} +
  * {@code ChatView.tsx}): sidebar on the left, the thread view in the middle with its header
