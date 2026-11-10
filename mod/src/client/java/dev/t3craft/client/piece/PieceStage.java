@@ -40,8 +40,10 @@ import org.jspecify.annotations.Nullable;
  * <p>The <b>stage</b> is one floor, far from the HQ and from the preview-drop showroom ({@link #OFFSET_X},
  * {@link #OFFSET_Z} from the HQ origin, at the island's ground level), sized to the piece on it
  * ({@link PieceScene}). One piece stands on it at a time. Changing piece, or reloading the same one, is a
- * <b>diff against what the world holds</b> in three steps, a few thousand blocks per server tick within a time
- * budget (a million-block building never stalls the game):
+ * <b>diff against what the world holds</b> in three steps, spread over server ticks: one {@link #step} a tick, within
+ * {@link #BUDGET_NS} (also checked at every chunk change, since touching an unloaded chunk loads it on this thread),
+ * so a million-block building never stalls the game. A newer offer drops the change still going up (no task or ticket
+ * to undo) and starts from what the world holds; the player is taken to the lobby once its cells are placed:
  * <ol>
  *   <li><b>place</b>: every cell of the new scene whose block differs from the world's;</li>
  *   <li><b>clear</b>: every cell of the previous scene that the new one does not have;</li>
@@ -58,12 +60,18 @@ final class PieceStage {
 	/** The stage's origin (north-west corner of its floor) is this far from the HQ origin. */
 	static final int OFFSET_X = -2000;
 	static final int OFFSET_Z = 3000;
-	/** Server time per tick spent on the stage. */
-	private static final long BUDGET_NS = 25_000_000L;
+	/**
+	 * Server time per tick spent on the stage, in total: {@link #step} runs once a tick, and the deadline is also checked
+	 * every time the work moves to another chunk (reading or placing in a chunk that is not loaded loads it, on this
+	 * thread, before returning), so a tick overshoots by one chunk and one batch at most.
+	 */
+	private static final long BUDGET_NS = 10_000_000L;
 	/** Cells handed to the applier at a time. */
-	private static final int BATCH = 1500;
+	private static final int BATCH = 500;
 	/** Cells inspected per round (most are equal to the world and cost only a read). */
-	private static final int LOOK = 30_000;
+	private static final int LOOK = 8_192;
+	/** Ticks between two progress lines in the player's action bar. */
+	private static final int PROGRESS_TICKS = 10;
 	private static final int COOLDOWN_TICKS = 60;
 	private static final String STATE_FILE = "t3craft-piece.json";
 	private static final BlockState AIR = Blocks.AIR.defaultBlockState();
@@ -113,10 +121,16 @@ final class PieceStage {
 		final long startedNs = System.nanoTime();
 		int phase = PLACE;
 		int i;
-		int sx;
+		/** Sweep cursor: tile of 16x16 columns (row by row), layer (top down), column inside the tile. */
+		int st;
 		int sy;
-		int sz;
+		int sl;
 		int changed;
+		/** True once a step touched the world: before that, a newer offer starts from the same point as this one. */
+		boolean started;
+		/** The player is taken to the lobby as soon as the cells they land on are placed. */
+		boolean goPending;
+		int steps;
 
 		Work(PieceScene next, @Nullable PieceScene prev, @Nullable Bounds sweepArea, UUID player) {
 			this.next = next;
@@ -132,8 +146,8 @@ final class PieceStage {
 				phase = CLEAR_PREV;
 			} else if (phase <= CLEAR_PREV && sweepArea != null) {
 				phase = SWEEP;
-				sx = 0;
-				sz = 0;
+				st = 0;
+				sl = 0;
 				sy = sweepArea.maxY();
 			} else {
 				phase = DONE;
@@ -246,10 +260,15 @@ final class PieceStage {
 		PieceScene next = o.scene() == null ? PieceScene.blank() : o.scene();
 		Work running = work;
 		Bounds known = bounds;
-		PieceScene prev = running != null ? null : current;
-		// the previous scene is only exact when nothing was half-built: otherwise (and for the first scene of a
-		// session, when the world may hold an older session's) the whole recorded area is checked
-		Bounds sweep = prev != null ? null : known;
+		// A change still going up is dropped here (nothing else holds on to it: no task, no ticket). The previous scene
+		// is only exact when nothing was half-built: otherwise (and for the first scene of a session, when the world may
+		// hold an older session's) the whole recorded area is checked. A change that has not touched the world yet
+		// (another offer taken in this same tick) leaves the world as it was, so its starting point is kept.
+		boolean untouched = running != null && !running.started;
+		PieceScene prev = untouched ? running.prev : running != null ? null : current;
+		Bounds sweep = untouched ? running.sweepArea : prev != null ? null : known;
+		// a trip asked for by the change that is dropped is not lost
+		boolean go = !next.isBlank() && p != null && (o.go() || running != null && running.goPending && running.player.equals(o.player()));
 		if (!next.isBlank()) {
 			Bounds grown = known == null ? Bounds.of(next) : known.union(next);
 			if (!grown.equals(known)) {
@@ -257,32 +276,28 @@ final class PieceStage {
 				writeState(w);
 			}
 		}
-		work = new Work(next, prev, sweep, o.player());
+		Work nw = new Work(next, prev, sweep, o.player());
+		nw.goPending = go;
+		work = nw;
 		building = true;
 		percent = 0;
-		if (o.go() && p != null && !next.isBlank()) {
-			step(server.overworld(), w); // the first cells are the lobby: it is there when the player lands
-			BlockPos here = p.blockPosition();
-			if (!inStage(here, w, next)) {
-				lastHq = new Spot(here, p.getYRot());
-			}
-			teleport(server, p, w.origin().offset(next.arrival()), next.arrivalYaw());
-		}
-		T3Craft.LOGGER.info("[piece] stage: {} ({} cells, {} to clear, sweep {})", next.isBlank() ? "clear" : next.id(), next.model().size(),
-				prev == null ? 0 : prev.model().size(), sweep != null);
+		// the first cells are the lobby: the player is taken there (by step) once those are placed, never before
+		T3Craft.LOGGER.info("[piece] stage: {} ({} cells, {} to clear, sweep {}{})", next.isBlank() ? "clear" : next.id(), next.model().size(),
+				prev == null ? 0 : prev.model().size(), sweep != null, running == null ? "" : ", replaces " + running.next.id() + " at " + running.percent() + "%");
 	}
 
-	/** Does up to {@link #BUDGET_NS} of the work in progress. */
+	/** Does up to {@link #BUDGET_NS} of the work in progress. Once a tick: it is the only place that places blocks. */
 	private void step(ServerLevel level, World w) {
 		Work k = work;
 		if (k == null) {
 			return;
 		}
+		k.started = true;
 		long deadline = System.nanoTime() + BUDGET_NS;
 		List<Placement> batch = new ArrayList<>(BATCH);
 		while (k.phase < DONE && System.nanoTime() < deadline) {
 			batch.clear();
-			collect(level, w, k, batch);
+			collect(level, w, k, batch, deadline);
 			if (!batch.isEmpty()) {
 				try {
 					PlanApplier.apply(level, w.origin(), batch);
@@ -293,17 +308,55 @@ final class PieceStage {
 			}
 		}
 		percent = k.percent();
+		if (k.goPending && (k.phase > PLACE || k.i >= k.next.lobbyCells())) {
+			k.goPending = false;
+			arrive(level.getServer(), w, k);
+		}
 		if (k.phase >= DONE) {
 			finish(level, w, k);
+		} else if (++k.steps % PROGRESS_TICKS == 0) {
+			progress(level.getServer(), k);
 		}
 	}
 
-	/** Fills {@code out} with what the work still has to change, looking at no more than {@link #LOOK} cells. */
-	private void collect(ServerLevel level, World w, Work k, List<Placement> out) {
+	/** The chunk (x, z) of a block position, as one number. */
+	private static long chunkOf(int x, int z) {
+		return ((long) (x >> 4) << 32) | ((z >> 4) & 0xFFFFFFFFL);
+	}
+
+	/** Takes the player of {@code k} to the lobby of its scene. */
+	private void arrive(MinecraftServer server, World w, Work k) {
+		ServerPlayer p = server.getPlayerList().getPlayer(k.player);
+		if (p == null) {
+			return;
+		}
+		BlockPos here = p.blockPosition();
+		if (!inStage(here, w, k.next)) {
+			lastHq = new Spot(here, p.getYRot());
+		}
+		teleport(server, p, w.origin().offset(k.next.arrival()), k.next.arrivalYaw());
+	}
+
+	/** A progress line in the action bar of the player who asked. */
+	private void progress(MinecraftServer server, Work k) {
+		ServerPlayer p = server.getPlayerList().getPlayer(k.player);
+		if (p != null) {
+			p.sendSystemMessage(Component.literal(k.next.isBlank() ? "Clearing the stage: " + k.percent() + "%" : "Building " + k.next.title() + ": " + k.percent() + "%")
+					.withStyle(ChatFormatting.GRAY), true);
+		}
+	}
+
+	/**
+	 * Fills {@code out} with what the work still has to change, looking at no more than {@link #LOOK} cells. Before
+	 * the work moves into another chunk than the last cell's it checks {@code deadline} and, if it has passed, returns
+	 * without taking the cell (the next tick starts there): that is where a chunk may be loaded or generated.
+	 */
+	private void collect(ServerLevel level, World w, Work k, List<Placement> out, long deadline) {
 		BlockPos o = w.origin();
 		BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
 		PieceModel nextModel = k.next.model();
 		int looked = 0;
+		long chunk = Long.MIN_VALUE;
 		while (out.size() < BATCH && looked < LOOK && k.phase < DONE) {
 			looked++;
 			if (k.phase == PLACE) {
@@ -311,9 +364,19 @@ final class PieceStage {
 					k.advance();
 					continue;
 				}
-				int idx = k.i++;
+				int idx = k.i;
 				long key = nextModel.key(idx);
-				m.set(o.getX() + BlockPos.getX(key), o.getY() + BlockPos.getY(key), o.getZ() + BlockPos.getZ(key));
+				int bx = o.getX() + BlockPos.getX(key);
+				int bz = o.getZ() + BlockPos.getZ(key);
+				long c = chunkOf(bx, bz);
+				if (c != chunk) {
+					if (System.nanoTime() >= deadline) {
+						return;
+					}
+					chunk = c;
+				}
+				k.i++;
+				m.set(bx, o.getY() + BlockPos.getY(key), bz);
 				CompoundTag tag = nextModel.tag(idx);
 				if (tag == null && level.getBlockState(m).equals(nextModel.state(idx))) {
 					continue;
@@ -325,30 +388,57 @@ final class PieceStage {
 					k.advance();
 					continue;
 				}
-				int idx = k.i++;
-				long key = prev.model().key(idx);
+				long key = prev.model().key(k.i);
 				if (nextModel.contains(key)) {
+					k.i++;
 					continue;
 				}
-				m.set(o.getX() + BlockPos.getX(key), o.getY() + BlockPos.getY(key), o.getZ() + BlockPos.getZ(key));
+				int bx = o.getX() + BlockPos.getX(key);
+				int bz = o.getZ() + BlockPos.getZ(key);
+				long c = chunkOf(bx, bz);
+				if (c != chunk) {
+					if (System.nanoTime() >= deadline) {
+						return;
+					}
+					chunk = c;
+				}
+				k.i++;
+				m.set(bx, o.getY() + BlockPos.getY(key), bz);
 				if (!level.getBlockState(m).isAir()) {
 					out.add(new Placement(BlockPos.of(key), AIR));
 				}
 			} else {
+				// The area is checked tile by tile (16x16 columns, every layer of one tile before the next), not layer by
+				// layer, so each chunk is visited once instead of once per layer.
 				Bounds area = k.sweepArea;
-				if (area == null || k.sy < area.minY()) {
+				int tilesX = area == null ? 0 : (area.width() + 15) >> 4;
+				int tiles = area == null ? 0 : tilesX * ((area.depth() + 15) >> 4);
+				if (area == null || k.st >= tiles) {
 					k.advance();
 					continue;
 				}
-				int x = k.sx;
+				int x = ((k.st % tilesX) << 4) + (k.sl & 15);
+				int z = ((k.st / tilesX) << 4) + (k.sl >> 4);
 				int y = k.sy;
-				int z = k.sz;
-				if (++k.sx >= area.width()) {
-					k.sx = 0;
-					if (++k.sz >= area.depth()) {
-						k.sz = 0;
-						k.sy--;
+				boolean inside = x < area.width() && z < area.depth();
+				if (inside) {
+					long c = chunkOf(o.getX() + x, o.getZ() + z);
+					if (c != chunk) {
+						if (System.nanoTime() >= deadline) {
+							return;
+						}
+						chunk = c;
 					}
+				}
+				if (++k.sl >= 256) {
+					k.sl = 0;
+					if (--k.sy < area.minY()) {
+						k.sy = area.maxY();
+						k.st++;
+					}
+				}
+				if (!inside) {
+					continue;
 				}
 				m.set(o.getX() + x, o.getY() + y, o.getZ() + z);
 				if (!level.getBlockState(m).isAir() && !nextModel.contains(BlockPos.asLong(x, y, z))) {
