@@ -184,6 +184,11 @@ public final class CitadelCanvas {
 	/** Rings of lots (set by the generator before any piece runs). */
 	public int rings;
 	public HqLayout layout;
+	/**
+	 * Issue #37: the slot painter of this plan ({@code mapgen.citadel.pieces = "slots"}), or null in legacy mode
+	 * (the default), where nothing in the plan changes. Set by the generator before any piece runs.
+	 */
+	public @Nullable CitadelSlots slots;
 	/** lot → module slot b (0..5) → module. */
 	public final Map<Integer, TreeMap<Integer, HqLayout.Module>> lots = new TreeMap<>();
 	public Map<Long, Zone> zones = Map.of();

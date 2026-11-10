@@ -120,13 +120,18 @@ public final class CitadelBarrios {
 		Mats mats = c.mats(lot, env);
 		lotGround(c, lot, l);
 		// the courtyard's centre: a cherry tree or a pool with planters
-		courtyardCentre(c, lot, l);
+		// (issue #37, "slots" mode: a piece from the slot's PieceSource, keeping the quadrants and corners)
+		if (CitadelSlots.courtCentre(c, l)) {
+			BarrioCourt.dressing(c, lot, l);
+		} else {
+			courtyardCentre(c, lot, l);
+		}
 		for (int h = 0; h < RingCampusGeometry.HALLS; h++) {
 			HqLayout.Module ground = mods.get(h);
 			HqLayout.Module upper = mods.get(h + RingCampusGeometry.HALLS);
 			if (ground != null || upper != null) {
 				hall(c, l, h, ground, upper, mats);
-			} else {
+			} else if (!CitadelSlots.hallSpot(c, l, h)) {
 				slotGarden(c, l.hall(h));
 			}
 		}
