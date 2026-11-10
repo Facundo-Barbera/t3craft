@@ -18,7 +18,8 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * The part of showing {@link T3Panel}s that every screen shares: the stack of pages (Settings, then
- * Environments, Esc goes back), the paper frame with its header (title and a back / close button), the
+ * Environments, Esc goes back), the paper frame with its header (title and a {@link T3Icon#CHEVRON_LEFT} back /
+ * {@link T3Icon#X} close button), the
  * confirmation modal over the page and the input routing around them. {@code T3Screen} owns one for its
  * settings and environments pages, {@link T3PanelScreen} owns one as a screen of its own.
  *
@@ -162,9 +163,11 @@ public final class T3PanelHost implements T3Panel.Host {
 		if (p == null) {
 			return;
 		}
-		String label = stack.isEmpty() ? "X" : "< Back";
-		T3Button back = new T3Button(label, T3Button.Style.GHOST, this::back);
-		int bw = Math.max(18, font.width(label) + 12);
+		// the widths of the old "X" / "< Back" text buttons, so the hit box does not move
+		boolean root = stack.isEmpty();
+		T3Button back = root ? new T3Button(T3Icon.X, null, T3Button.Style.GHOST, this::back)
+				: new T3Button(T3Icon.CHEVRON_LEFT, "Back", T3Button.Style.GHOST, this::back);
+		int bw = Math.max(18, font.width(root ? "X" : "< Back") + 12);
 		back.setBounds(new Rect(area.right() - pad - bw, area.y() + pad - 2, bw, T3Control.H));
 		back.setTooltip(stack.isEmpty() ? "Close (Esc)" : "Back (Esc)");
 		chrome.add(back);

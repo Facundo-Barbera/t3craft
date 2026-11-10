@@ -40,10 +40,16 @@ import org.jspecify.annotations.Nullable;
  * <p>Keyboard: Tab / Shift+Tab walk the dialog's controls (fields, selects, check boxes, buttons) in the
  * order they were added; Enter or Space presses a focused button; Enter anywhere else runs
  * {@link #defaultAction} (not in a multi-line box, where it types a new line). Esc is the host's.
+ *
+ * <p>{@link #closable()} puts a {@link T3Icon#X} button at the right of the title that does what Esc does
+ * ({@link #cancel()}); the mouse reaches it, Esc does the same from the keyboard. Off by default, so existing
+ * dialogs look as before.
  */
 public final class T3Dialog {
 	private static final int GAP = 4;
 	private static final int TITLE_H = 18;
+	/** Side of the close button in the title row. */
+	private static final int CLOSE = 14;
 
 	private interface Block {
 		int height(Font font, int w);
@@ -65,6 +71,8 @@ public final class T3Dialog {
 	private @Nullable Runnable onCancel;
 	private @Nullable Runnable defaultAction;
 	private @Nullable T3Control initialFocus;
+	private boolean closable;
+	private @Nullable T3IconButton close;
 
 	private int[] ys = new int[0];
 	private int left;
@@ -105,6 +113,18 @@ public final class T3Dialog {
 	public T3Dialog kvKey(String langKey, String value) {
 		String[] parts = T3Draw.template(langKey);
 		return kv(parts[0].stripTrailing(), value + parts[1]);
+	}
+
+	/** A wrapped paragraph after the tone's icon ({@link T3Draw#noticeIcon}: a triangle for WARN / ERROR, info otherwise). */
+	public T3Dialog notice(String s, Tone tone) {
+		blocks.add(new NoticeBlock(s, tone));
+		return this;
+	}
+
+	/** A close button ({@link T3Icon#X}) in the title row; it runs {@link #cancel()}, like Esc. */
+	public T3Dialog closable() {
+		this.closable = true;
+		return this;
 	}
 
 	public T3Dialog gap(int px) {
@@ -236,6 +256,12 @@ public final class T3Dialog {
 			b.place(font, t, left + pad, y, innerW, sink, form);
 			y += b.height(font, innerW) + GAP;
 		}
+		close = null;
+		if (closable) {
+			close = new T3IconButton(T3Icon.X, "Close (Esc)", this::cancel);
+			close.setBounds(new Rect(left + width - pad - CLOSE, top + pad - 3, CLOSE, CLOSE));
+			form.add(close);
+		}
 	}
 
 	/** The panel as last drawn, for hit-testing. */
@@ -253,7 +279,10 @@ public final class T3Dialog {
 
 	public void render(GuiGraphicsExtractor g, Font font, ChatTheme t, int mx, int my) {
 		ChatDraw.panel(g, t, new Rect(left, top, width, bottom(font) + pad - top));
-		T3Draw.text(g, font, t, ChatDraw.clip(font, title, innerW), left + pad, top + pad, t.accent());
+		T3Draw.text(g, font, t, ChatDraw.clip(font, title, innerW - (closable ? CLOSE + 4 : 0)), left + pad, top + pad, t.accent());
+		if (close != null) {
+			close.render(g, font, t, mx, my);
+		}
 		g.fill(left + pad, top + pad + 11, left + width - pad, top + pad + 12, t.edge());
 		for (Block b : blocks) {
 			b.render(g, font, t, mx, my);
@@ -405,6 +434,36 @@ public final class T3Dialog {
 		@Override
 		public void render(GuiGraphicsExtractor g, Font font, ChatTheme t, int mx, int my) {
 			T3Draw.wrapped(g, font, t, text.get(), x, y, w, T3Draw.color(t, tone.get()), reserve);
+		}
+	}
+
+	private static final class NoticeBlock implements Block {
+		private final String text;
+		private final Tone tone;
+		private int x;
+		private int y;
+		private int w;
+
+		NoticeBlock(String text, Tone tone) {
+			this.text = text;
+			this.tone = tone;
+		}
+
+		@Override
+		public int height(Font font, int width) {
+			return Math.max(T3Icon.SIZE, T3Draw.wrap(font, text, width - T3Draw.NOTICE_INDENT).size() * T3Draw.lineHeight(font) + 2);
+		}
+
+		@Override
+		public void place(Font font, ChatTheme t, int x, int y, int w, Consumer<AbstractWidget> sink, T3Form form) {
+			this.x = x;
+			this.y = y;
+			this.w = w;
+		}
+
+		@Override
+		public void render(GuiGraphicsExtractor g, Font font, ChatTheme t, int mx, int my) {
+			T3Draw.notice(g, font, t, tone, text, x, y + 2, w);
 		}
 	}
 

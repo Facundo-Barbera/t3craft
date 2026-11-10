@@ -9,6 +9,7 @@ import dev.t3craft.client.t3ui.kit.T3Control;
 import dev.t3craft.client.t3ui.kit.T3Dialog;
 import dev.t3craft.client.t3ui.kit.T3Draw;
 import dev.t3craft.client.t3ui.kit.T3Draw.Tone;
+import dev.t3craft.client.t3ui.kit.T3Icon;
 import dev.t3craft.client.t3ui.kit.T3List;
 import dev.t3craft.client.t3ui.kit.T3Panel;
 import dev.t3craft.client.t3ui.kit.T3Toggle;
@@ -52,7 +53,7 @@ public final class OutboundPanel extends T3Panel {
 		this.list = new T3List<>(ROW_H, new T3List.Row<Destination>() {
 			@Override
 			public void render(GuiGraphicsExtractor g, Font font, ChatTheme t, Destination d, Rect r, int mx, int my) {
-				drawRow(g, font, t, d, r);
+				drawRow(g, font, t, d, r, mx, my);
 			}
 
 			@Override
@@ -95,7 +96,7 @@ public final class OutboundPanel extends T3Panel {
 
 	@Override
 	protected void arrangeHeader(Rect header) {
-		pin(new T3Button("Add destination", T3Button.Style.PRIMARY, this::addDestination), header.x(), header.y(), 110, T3Control.H);
+		pin(new T3Button(T3Icon.PLUS, "Add destination", T3Button.Style.PRIMARY, this::addDestination), header.x(), header.y(), 110, T3Control.H);
 		pinText(header.x() + 118, header.y() + (T3Control.H - 8) / 2, cfg.destinations().size() + " / " + OutboundConfig.MAX_DESTINATIONS, Tone.MUTED);
 	}
 
@@ -113,8 +114,8 @@ public final class OutboundPanel extends T3Panel {
 		T3Toggle[] master = new T3Toggle[1];
 		master[0] = place(new T3Toggle("Send events outside the game", cfg.enabled(), on -> masterChanged(on, master[0])), x, y, w, T3Control.H);
 		y += T3Control.H + 4;
-		y = text(x + 4, y, w - 8, "Off by default. This sends data outside your computer.", Tone.WARN);
-		y = text(x + 4, y, w - 8, "URLs are stored like your T3 tokens and never shown.", Tone.MUTED) + 6;
+		y = notice(x + 4, y, w - 8, "Off by default. This sends data outside your computer.", Tone.WARN) + 2;
+		y = notice(x + 4, y, w - 8, "URLs are stored like your T3 tokens and never shown.", Tone.MUTED) + 6;
 
 		urlSet.clear();
 		for (Destination d : cfg.destinations()) {
@@ -127,10 +128,11 @@ public final class OutboundPanel extends T3Panel {
 		return y + h + 4;
 	}
 
-	private void drawRow(GuiGraphicsExtractor g, Font font, ChatTheme t, Destination d, Rect r) {
+	private void drawRow(GuiGraphicsExtractor g, Font font, ChatTheme t, Destination d, Rect r, int mx, int my) {
 		int x = r.x() + 6;
 		g.text(font, ChatDraw.clip(font, d.name(), r.w() - 24), x, r.y() + 3, d.enabled() ? t.text() : t.disabled(), t.shadow());
-		g.text(font, ">", r.right() - 12, r.y() + (r.h() - 8) / 2, t.muted(), false);
+		boolean hover = r.contains(mx, my);
+		T3Icon.draw(g, t, T3Icon.CHEVRON_RIGHT, r.right() - 15, r.y() + (r.h() - T3Icon.SIZE) / 2, T3Icon.SIZE, T3Icon.tint(t, hover, true));
 		boolean hasUrl = urlSet.getOrDefault(d.id(), false);
 		String[] part = {d.template().label, d.enabled() ? "on" : "off", hasUrl ? "URL set" : "no URL"};
 		int[] colour = {t.muted(), d.enabled() ? t.result() : t.disabled(), hasUrl ? t.muted() : t.youText()};

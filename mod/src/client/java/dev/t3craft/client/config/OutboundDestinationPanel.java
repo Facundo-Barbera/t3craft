@@ -7,6 +7,7 @@ import dev.t3craft.client.t3ui.kit.T3Control;
 import dev.t3craft.client.t3ui.kit.T3Draw;
 import dev.t3craft.client.t3ui.kit.T3Draw.Tone;
 import dev.t3craft.client.t3ui.kit.T3Field;
+import dev.t3craft.client.t3ui.kit.T3Icon;
 import dev.t3craft.client.t3ui.kit.T3Panel;
 import dev.t3craft.client.t3ui.kit.T3Select;
 import dev.t3craft.client.t3ui.kit.T3Toggle;
@@ -78,7 +79,7 @@ public final class OutboundDestinationPanel extends T3Panel {
 	protected void arrangeFooter(Rect footer) {
 		int y = footer.y() + 5;
 		int bw = 56;
-		pin(new T3Button("Back", () -> host().back()), footer.right() - bw, y, bw, T3Control.H);
+		pin(new T3Button(T3Icon.CHEVRON_LEFT, "Back", () -> host().back()), footer.right() - bw, y, bw, T3Control.H);
 		pin(new T3Button("Save", T3Button.Style.PRIMARY, this::save), footer.right() - 2 * bw - 4, y, bw, T3Control.H);
 		List<String> lines = T3Draw.wrap(font(), status, footer.w() - 2 * bw - 14, 2);
 		for (int i = 0; i < lines.size(); i++) {
@@ -91,7 +92,7 @@ public final class OutboundDestinationPanel extends T3Panel {
 		int w = Math.min(MAX_W, body.w() - 8);
 		int x = body.x() + (body.w() - w) / 2 - 3;
 		int y = y0 + 4;
-		y = text(x + 4, y, w - 8, "Everything this destination receives leaves your computer.", Tone.WARN) + 6;
+		y = notice(x + 4, y, w - 8, "Everything this destination receives leaves your computer.", Tone.WARN) + 6;
 
 		y = text(x + 4, y, w - 8, "Name", Tone.MUTED);
 		placeField(nameField(), x, y + 1, w);
@@ -111,9 +112,9 @@ public final class OutboundDestinationPanel extends T3Panel {
 		y = text(x + 4, y, w - 8, "Webhook URL (secret)", Tone.MUTED);
 		placeField(urlField().hint(urlSet ? "Stored. Paste a new URL to replace it" : "Paste the webhook URL here"), x, y + 1, w);
 		y += T3Control.H + 3;
-		y = text(x + 4, y, w - 8, urlSet ? "A URL is stored. It is never shown again." : "No URL stored yet: nothing is sent until you save one.",
+		y = notice(x + 4, y, w - 8, urlSet ? "A URL is stored. It is never shown again." : "No URL stored yet: nothing is sent until you save one.",
 				urlSet ? Tone.OK : Tone.WARN) + 3;
-		T3Button test = new T3Button("Send test", this::test);
+		T3Button test = new T3Button(T3Icon.SEND, "Send test", this::test);
 		test.setTooltip("Sends a test message to the stored URL.", "Save first if you just pasted a new one.");
 		place(test, x, y, w, T3Control.H);
 		y += ROW + 6;
@@ -122,14 +123,14 @@ public final class OutboundDestinationPanel extends T3Panel {
 			y = text(x + 4, y, w - 8, "Tap action URL (optional)", Tone.MUTED);
 			placeField(clickField(), x, y + 1, w);
 			y += T3Control.H + 3;
-			y = text(x + 4, y, w - 8, "{environment} and {thread} are filled in.", Tone.MUTED) + 6;
+			y = notice(x + 4, y, w - 8, "{environment} and {thread} are filled in.", Tone.MUTED) + 6;
 		}
 
 		y = toggle(x, y, w, "Pending only", d.pendingOnly(), v -> {
 			d = d.withPendingOnly(v);
 			host().relayout(); // the note under it follows
 		});
-		y = text(x + 4, y + 2, w - 8, d.pendingOnly()
+		y = notice(x + 4, y + 2, w - 8, d.pendingOnly()
 				? "Pending only: no titles, projects or text are sent, just 'something is pending'."
 				: "Thread titles, projects and environment ids are sent.", d.pendingOnly() ? Tone.OK : Tone.WARN) + 8;
 
@@ -139,7 +140,7 @@ public final class OutboundDestinationPanel extends T3Panel {
 		}
 		y += 8;
 
-		T3Button delete = new T3Button("Delete destination", T3Button.Style.DANGER, this::askDelete);
+		T3Button delete = new T3Button(T3Icon.TRASH, "Delete destination", T3Button.Style.DANGER, this::askDelete);
 		delete.setTooltip("Removes this destination and its stored URL.");
 		place(delete, x, y, w, T3Control.H);
 		return y + ROW + 6;

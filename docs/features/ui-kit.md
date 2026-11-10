@@ -1,4 +1,4 @@
-# feat/ui-native-kit: kit de UI propio y pantallas migradas (#14, B3 y B4); teclado, listas y campos (#22)
+# feat/ui-native-kit: kit de UI propio y pantallas migradas (#14, B3 y B4); teclado, listas y campos (#22); iconos (#28)
 
 Paquete del kit: `dev.t3craft.client.t3ui.kit` (`mod/src/client/java/dev/t3craft/client/t3ui/kit/`).
 Plan: `docs/plans/ui-browser-and-integrations.md`, frente B. La pregunta Q6 quedó respondida por Facundo al ver las
@@ -19,18 +19,19 @@ receta que el buscador de `T3Screen`).
 | Clase | Qué es |
 |---|---|
 | `T3Control` | Base: `bounds`, `enabled`, `visible`, tooltip, `render`, `mouseClicked`/`mouseDragged`/`mouseReleased`, popups (`overlayOpen`/`renderOverlay`) y el foco de teclado (`focusable`, `focused`, `focusIn`/`focusOut`, anillo latón). |
-| `T3Button` | Botón. Estilos `DEFAULT` (la píldora de `T3Screen`), `PRIMARY` (relleno acento), `DANGER` (relleno error), `GHOST`. Enter/Espacio lo pulsan con el foco. |
+| `T3Button` | Botón. Estilos `DEFAULT` (la píldora de `T3Screen`), `PRIMARY` (relleno acento), `DANGER` (relleno error), `GHOST`. Enter/Espacio lo pulsan con el foco. Puede llevar un `T3Icon` (icono + etiqueta, o solo icono con `T3Button.iconOnly(icon, tooltip, style, action)`). |
+| `T3IconButton` | Botón fantasma solo icono (sidebar, barras). Helpers con tooltip: `add` (`plus`), `remove` (`minus`), `refresh` (`refresh-cw`), `edit` (`pencil`), `delete` (`trash`), `copy`, `open` (`external-link`), `close` (`x`). No es parada de Tab. |
 | `T3Toggle` | Fila con etiqueta y un interruptor (pista + perilla), para ajustes que se aplican al instante. Enter/Espacio lo cambian con el foco. |
-| `T3Check` | Casilla de verificación con etiqueta (para una opción de un formulario). Marca dibujada con rellenos (sin glifo). Fila entera clicable; Enter/Espacio. |
+| `T3Check` | Casilla de verificación con etiqueta (para una opción de un formulario). La marca es el icono `check` tintado. Fila entera clicable; Enter/Espacio. |
 | `T3Field` | Campo de una línea: marco `ChatDraw.field` + `EditBox` sin borde. Conserva el texto entre reconstrucciones. En una página con scroll se recorta con scissor en el borde del viewport (`layoutClipped`). Para anfitriones que no son una pantalla (el popover del selector de modelo) dibuja y alimenta el `EditBox` con `renderBox`, `boxKeyPressed`, `boxCharTyped` y `setBoxFocused`. |
 | `T3TextArea` | Campo multilínea: marco `ChatDraw.field` + `MultiLineEditBox` sin borde (envuelve el texto, barra propia, Enter escribe un salto). Mismo ciclo de vida que `T3Field`. |
-| `T3Select<T>` | Desplegable: valor actual con un triángulo dibujado, lista debajo (o encima si no cabe), rueda, Arriba/Abajo/Enter/Esc. Con el foco, Enter/Espacio/Abajo lo abren. |
+| `T3Select<T>` | Desplegable: valor actual con `chevron-down` (`chevron-up` abierto) y un `check` en la opción elegida, lista debajo (o encima si no cabe), rueda, Arriba/Abajo/Enter/Esc. Con el foco, Enter/Espacio/Abajo lo abren. |
 | `T3List<T>` | Lista con scroll en un pozo `inset`: filas del mismo alto dibujadas por un `Row` (que puede llevar sus propios botones). Teclado (cursor de fila) y barra arrastrable. |
 | `T3Tabs` | Pestañas de texto con regla y subrayado de acento. Con el foco, Izquierda/Derecha cambian de pestaña. |
-| `T3Dialog` | Modal: título + pila de bloques (texto envuelto, `kv`, campos y cuadros multilínea con etiqueta, controles, fila de botones, widget vanilla). `T3Dialog.confirm(...)` para sí/no. |
+| `T3Dialog` | Modal: título + pila de bloques (texto envuelto, aviso con icono `notice`, `kv`, campos y cuadros multilínea con etiqueta, controles, fila de botones, widget vanilla). `T3Dialog.confirm(...)` para sí/no. `closable()` pone una `x` en el título (hace lo mismo que Esc). |
 | `T3Form` | Reparto de entrada: un control con popup abierto recibe antes el ratón y las teclas; si no, el de arriba. Reenvía arrastre y suelta. |
 | `T3Focus` | Tab / Mayús+Tab sobre una lista de controles (con vuelta al principio), y las teclas de activación (Enter, Espacio). |
-| `T3Draw` | Texto: envoltura sobre strings (se dibuja con el `shadow` del tema, no el sombreado vanilla), `Tone` (NORMAL, MUTED, WARN, ERROR, OK, CODE, TITLE), tooltip, y los trazos sin glifo: `focusRing`, `caret`, `tick`. |
+| `T3Draw` | Texto: envoltura sobre strings (se dibuja con el `shadow` del tema, no el sombreado vanilla), `Tone` (NORMAL, MUTED, WARN, ERROR, OK, CODE, TITLE), tooltip, avisos con icono (`notice`, `noticeIcon`), el anillo `focusRing` y los trazos antiguos `caret` y `tick` (el kit ya no los usa; siguen para quien los llame fuera). |
 | `T3KitDemoPanel` | Página de pruebas con todo el kit (galería `/t3dev ui kit`). |
 
 ### Hosts
@@ -38,13 +39,36 @@ receta que el buscador de `T3Screen`).
 * **`T3DialogScreen`**: una pantalla que es un solo `T3Dialog` sobre el fondo del kit. La subclase implementa
   `buildDialog()` (se llama en cada `init()`, así que lee su propio estado) y decide qué hace Esc en `onClose()`.
 * **`T3Panel`**: una *página* (no es pantalla). Declara su contenido en `arrange(...)`: `place`, `placeField`,
-  `placeTextArea`, `text`, `pin`/`pinField` (cabecera y pie fijos). Scroll con la rueda o arrastrando la barra cuando el
+  `placeTextArea`, `text`, `notice` (texto con el icono del tono), `pin`/`pinField` (cabecera y pie fijos). Scroll con la rueda o arrastrando la barra cuando el
   cuerpo es más alto que el área. Pide cosas a su host por `T3Panel.Host`: `relayout`, `show` (apilar otra página), `back`,
   `openScreen`, `modal`.
 * **`T3PanelHost`**: lo que comparten quienes muestran páginas: pila de páginas (Esc retrocede), marco de papel con
-  cabecera (título y botón X / < Back), diálogo modal sobre la página, Tab sobre los controles y el reparto de entrada.
+  cabecera (título y botón `x` / `chevron-left` Back), diálogo modal sobre la página, Tab sobre los controles y el reparto de entrada.
   Quien lo posee reenvía además `charTyped`, `mouseDragged` y `mouseReleased` (ver "Teclado y ratón").
 * **`T3PanelScreen`**: una página como pantalla propia, centrada sobre el fondo del kit.
+
+## Iconos del kit (#28)
+
+Los iconos son los `T3Icon` (SVG de Lucide, ver `docs/tools/icons.md`), tintados con tokens de `ChatTheme`.
+
+* **Tinte:** `muted` en reposo, `accent` bajo el puntero, `disabled` deshabilitado (`T3Icon.tint`). En `T3Button` `PRIMARY` y
+  `DANGER` el icono toma el color de la etiqueta (va sobre el relleno). Un aviso toma el color de su `Tone`.
+* **Cromo:** cerrar página `x` y atrás `chevron-left` (`T3PanelHost`, mismas cajas de clic que el texto `X` / `< Back` de
+  antes), `chevron-down`/`chevron-up` en `T3Select` y `check` en la opción elegida, `check` en `T3Check`, `x` opcional en
+  `T3Dialog.closable()`. `T3Tabs` y `T3List` no tenían chevrons; la fila de destinos de Outbound cambió su `>` por
+  `chevron-right`.
+* **Avisos:** `T3Panel.notice(x, y, w, texto, tone)`, `T3Dialog.notice(texto, tone)` y `T3Draw.notice(...)`. Icono por tono:
+  WARN y ERROR `triangle-exclamation-point`, OK `circle-check`, el resto `info`. El texto se envuelve al lado del icono.
+* **Páginas de config:** Environments (`plus` Pair new..., `refresh-cw` Refresh, por fila `eye`/`eye-off`, `pencil` Edit,
+  `trash` Unpair; el botón Unpair creció de 50 a 58 px para que quepa la etiqueta), Environment edit (`chevron-left` Back,
+  `refresh-cw` Reset, `minus` en la muestra "sin color", aviso `info`), Outbound (`plus` Add destination, avisos,
+  `chevron-right` por fila), Outbound destination (`chevron-left` Back, `send` Send test, `trash` Delete, avisos según el
+  estado de la URL y de "pending only") y Settings → Connections (`cloud` Environments..., `external-link` Piece browser... y
+  Key binds... porque abren otra pantalla, `send` Outbound events..., `refresh-cw` Reload from disk, triángulo en Reset HQ).
+  Los `…` de esas etiquetas pasaron a `...`. El comportamiento no cambió.
+* **No hay acciones de copiar ni enlaces externos** en `client/config/*`: `copy` y `external-link` quedan como helpers
+  (`T3IconButton.copy`, `T3IconButton.open`) para quien los necesite (el comando del host en Pair vive en `screen/`, fuera de
+  este hilo).
 
 ## Teclado y ratón (#22)
 
@@ -121,9 +145,9 @@ sidebar cierra la página. En el layout compacto la página ocupa la pantalla. L
 * Un diálogo de una pantalla propia (`T3DialogScreen`) mantiene los campos en la pantalla, no en el diálogo, para que
   sobrevivan a `rebuildWidgets()`.
 * Los popups (`T3Select`) se dibujan al final con `g.nextStratum()`, como los menús de `T3Screen`.
-* Texto del kit en ASCII/Latin-1. Nada de glifos que solo existen en Unifont (el triángulo de `T3Select`, la marca de
-  `T3Check` y el anillo se dibujan con rellenos; el botón de cabecera dice `X` y `< Back`; los recortes acaban en `...`):
-  `uiRender` dibuja esos glifos como cuadro de glifo ausente.
+* Texto del kit en ASCII/Latin-1. Nada de glifos que solo existen en Unifont: los símbolos son `T3Icon` (chevrons, marca,
+  cerrar, atrás) y el anillo se dibuja con rellenos; los recortes acaban en `...`. `uiRender` dibuja esos glifos como cuadro
+  de glifo ausente.
 * Colores solo de `ChatTheme`/`T3Draw.Tone`; un literal de color o un `ChatFormatting` en una pantalla del kit es un fallo.
 
 ## Auditoría de colores y textos literales (#22)
@@ -140,8 +164,8 @@ kit, que no se tocaron porque son de otros hilos o de pantallas sin migrar (excl
   `t3ui/sidebar/SidebarRow` (estados y acentos), `t3ui/actions/ThreadStatusChip` (`BG`), `t3ui/DraftControls` (gris del chip y
   fondo del campo). Convendría pasarlos a tokens de `ui-style.json` cuando alguien toque esas pantallas.
 * `config/EnvironmentsPanel` pinta `0xFF000000 | p.color()`: es el color elegido por el usuario (dato), no un token.
-* Texto con `…` (U+2026, fuera de Latin-1) en pantallas de otros hilos: `SettingsPanel` ("Environments…", "Piece browser…",
-  "Key binds…", "Outbound events…"), `EnvironmentsPanel` ("Pair new…"), `PairScreen` y `OperatePairScreen` (pista del enlace y
+* Texto con `…` (U+2026, fuera de Latin-1) en pantallas de otros hilos (los de `SettingsPanel` y `EnvironmentsPanel` ya se
+  pasaron a `...` en #28): `PairScreen` y `OperatePairScreen` (pista del enlace y
   "Pairing…"), la galería (un transcript de ejemplo). Se ven bien en el juego (la fuente cae a Unifont); solo `uiRender` los dibuja
   como cuadro. Pasarlos a `...` es un cambio de una línea cada uno.
 
@@ -155,7 +179,9 @@ kit, que no se tocaron porque son de otros hilos o de pantallas sin migrar (excl
   propias solo coloca el cursor (no arrastra la selección).
 * `uiRender` no tiene fixtures de estas pantallas: la galería (`/t3dev ui`) es el camino. Pendiente: un tipo de pantalla
   `settings`/`environments`/`pair` en `Mock` (requiere sembrar `ConfigManager` en modo headless).
-* El #15 (escala propia, fuente TTF, iconos) no se tocó; el kit dibuja con la fuente bitmap y el GUI scale de vanilla.
+* El #15 (escala propia, fuente TTF) no se tocó; el kit dibuja con la fuente bitmap y el GUI scale de vanilla. Los iconos
+  llegaron con #24 (pipeline) y #28 (este cromo).
+* `T3IconButton` no es parada de Tab (en el kit de pruebas se llega con el ratón; los `T3Button` con icono sí lo son).
 * Escrito sin compilar (regla de la VPS): el coordinador compila en la PC. Los nombres de la API de Minecraft 26.3 usados se
   comprobaron contra el jar (`EditBox`, `MultiLineEditBox.builder()`, `AbstractWidget`, `MouseButtonEvent`, `CharacterEvent`).
 
@@ -200,3 +226,12 @@ se abra encima del resto, y que Unpair / Revoke abran el modal y lo cierren con 
 4. *Dialog with fields*: se abre con el foco en el nombre; escribe, Tab pasa a las notas (Enter escribe un salto de línea), a
    la casilla y a los botones; Esc cierra. Haz clic en ambos cuadros para mover el cursor.
 5. Lo mismo en `inbox-kit` (T3Screen): el diálogo, el arrastre del pulgar y el tipeo deben comportarse igual.
+6. **Iconos (#28):** en *Controls*, los cuatro botones con icono + etiqueta (en Primary y Danger el icono va del color del
+   texto), "Open (disabled)" gris, el botón `info` solo icono con tooltip, la fila de `T3IconButton` (pasa el puntero: muted
+   pasa a accent con fondo; el último está deshabilitado) y los cuatro avisos (triángulo ámbar, info gris, check verde,
+   triángulo rojo). La casilla marcada muestra el `check`, la deshabilitada lo deja gris. El desplegable muestra
+   `chevron-down`, `chevron-up` abierto y un `check` en la opción elegida. El diálogo del pie tiene una `x` en el título que
+   lo cierra. La X de la cabecera de la página y, en una página apilada (Settings → Connections → Environments...), el
+   `chevron-left` Back siguen en el mismo sitio.
+7. Páginas de config: `/t3dev ui settings-connections`, `environments`, `environment-edit`, `outbound`,
+   `outbound-destination`: iconos en los botones y avisos con icono, mismas acciones de antes.

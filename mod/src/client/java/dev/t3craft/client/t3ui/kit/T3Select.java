@@ -14,13 +14,17 @@ import net.minecraft.client.input.KeyEvent;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A drop-down choice (T3 Code's select): the field shows the current option and a caret; a click opens a
+ * A drop-down choice (T3 Code's select): the field shows the current option and a chevron
+ * ({@link T3Icon#CHEVRON_DOWN}, {@link T3Icon#CHEVRON_UP} while open); a click opens a
  * list under it (over it when there is no room), a click on a row chooses, anything else closes. Up/Down
- * and Enter work while it is open. The list is drawn by {@link #renderOverlay}, after everything else.
+ * and Enter work while it is open; the chosen row carries a check. The list is drawn by {@link #renderOverlay},
+ * after everything else.
  */
 public final class T3Select<T> extends T3Control {
 	private static final int ROW_H = 12;
 	private static final int MAX_ROWS = 8;
+	/** Side of the check on the chosen row of the list. */
+	private static final int CHECK = 10;
 
 	private final List<T> options;
 	private final Function<T, String> label;
@@ -54,7 +58,8 @@ public final class T3Select<T> extends T3Control {
 		ChatDraw.field(g, t, r, open || hover);
 		String s = options.isEmpty() ? "-" : label.apply(options.get(Math.min(selected, options.size() - 1)));
 		g.text(font, ChatDraw.clip(font, s, r.w() - 20), r.x() + 5, r.y() + (r.h() - 8) / 2, enabled() ? t.text() : t.disabled(), t.shadow());
-		T3Draw.caret(g, r.right() - 12, r.y() + (r.h() - 4) / 2, enabled() ? (open || hover ? t.accent() : t.muted()) : t.disabled());
+		T3Icon.draw(g, t, open ? T3Icon.CHEVRON_UP : T3Icon.CHEVRON_DOWN, r.right() - 15, r.y() + (r.h() - T3Icon.SIZE) / 2, T3Icon.SIZE,
+				T3Icon.tint(t, open || hover, enabled()));
 		drawFocus(g, t);
 	}
 
@@ -108,7 +113,11 @@ public final class T3Select<T> extends T3Control {
 			} else if (idx == highlight) {
 				g.fill(rr.x(), rr.y(), rr.right(), rr.bottom(), t.hover());
 			}
-			g.text(font, ChatDraw.clip(font, label.apply(options.get(idx)), rr.w() - 6), rr.x() + 3, rr.y() + 2, t.text(), t.shadow());
+			g.text(font, ChatDraw.clip(font, label.apply(options.get(idx)), rr.w() - 18 - (options.size() > shown ? 8 : 0)), rr.x() + 3, rr.y() + 2, t.text(), t.shadow());
+			if (idx == selected) {
+				int cx = rr.right() - 13 - (options.size() > shown ? 8 : 0); // clear of the scrollbar
+				T3Icon.draw(g, t, T3Icon.CHECK, cx, rr.y() + 1, CHECK, t.accent());
+			}
 		}
 		if (options.size() > shown) {
 			ChatDraw.scrollbar(g, t, popup.right() - 8, popup.y() + 2, popup.h() - 4, options.size() * ROW_H, shown * ROW_H,

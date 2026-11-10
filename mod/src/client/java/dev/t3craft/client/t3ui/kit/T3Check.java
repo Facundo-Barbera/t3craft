@@ -12,7 +12,7 @@ import net.minecraft.client.input.KeyEvent;
 /**
  * A check box with a label to its right (for a choice that belongs to a form, like "Remember this";
  * {@link T3Toggle} is for settings that apply at once). The whole row is clickable; Enter or Space flips it
- * while it has the keyboard. The check mark is drawn with fills, so it needs no font glyph.
+ * while it has the keyboard. The mark is the {@link T3Icon#CHECK} sprite, tinted (no font glyph).
  */
 public final class T3Check extends T3Control {
 	private static final int BOX = 10;
@@ -57,7 +57,7 @@ public final class T3Check extends T3Control {
 		ChatDraw.round(g, b.x(), b.y(), BOX, BOX, fill);
 		ChatDraw.outline(g, b.x(), b.y(), BOX, BOX, edge);
 		if (value) {
-			T3Draw.tick(g, b.x(), b.y(), enabled() ? t.panelHi() : t.disabled());
+			T3Icon.draw(g, t, T3Icon.CHECK, b.x(), b.y(), BOX, enabled() ? t.panelHi() : t.disabled());
 		}
 		int tx = b.right() + 6;
 		g.text(font, ChatDraw.clip(font, label, r.right() - tx - 4), tx, r.y() + (r.h() - 8) / 2, enabled() ? t.text() : t.disabled(), t.shadow());

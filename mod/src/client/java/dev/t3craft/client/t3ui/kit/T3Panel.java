@@ -56,7 +56,11 @@ public abstract class T3Panel {
 		Screen screen();
 	}
 
-	private record Label(int x, int y, String text, Tone tone) {
+	/** A line of text; {@code icon} (or null) is drawn before it, at {@code x - NOTICE_INDENT} (the first line of a notice). */
+	private record Label(int x, int y, String text, Tone tone, @Nullable T3Icon icon) {
+		Label(int x, int y, String text, Tone tone) {
+			this(x, y, text, tone, null);
+		}
 	}
 
 	private static final int SCROLL_STEP = 14;
@@ -176,6 +180,21 @@ public abstract class T3Panel {
 		return y;
 	}
 
+	/**
+	 * A notice in the body: {@link T3Draw#noticeIcon} for {@code tone} (a triangle for WARN / ERROR, info otherwise),
+	 * then the text wrapped beside it. Returns the y under it.
+	 */
+	protected final int notice(int x, int y, int w, String s, Tone tone) {
+		int tx = x + T3Draw.NOTICE_INDENT;
+		boolean first = true;
+		for (String line : T3Draw.wrap(font, s, w - T3Draw.NOTICE_INDENT)) {
+			labels.add(new Label(tx, y, line, tone, first ? T3Draw.noticeIcon(tone) : null));
+			first = false;
+			y += T3Draw.lineHeight(font);
+		}
+		return y;
+	}
+
 	/** One line in the footer. */
 	protected final void pinText(int x, int y, String s, Tone tone) {
 		fixedLabels.add(new Label(x, y, s, tone));
@@ -242,7 +261,7 @@ public abstract class T3Panel {
 		g.enableScissor(viewport.x(), viewport.y(), viewport.right(), viewport.bottom());
 		for (Label l : labels) {
 			if (l.y() + font.lineHeight > viewport.y() && l.y() < viewport.bottom()) {
-				T3Draw.text(g, font, t, l.text(), l.x(), l.y(), T3Draw.color(t, l.tone()));
+				drawLabel(g, font, t, l);
 			}
 		}
 		form.render(g, font, t, viewport.contains(mx, my) ? mx : -1, my);
@@ -252,9 +271,17 @@ public abstract class T3Panel {
 			ChatDraw.scrollbar(g, t, barX(), barY(), barH(), contentH, barH(), barFraction(), hover);
 		}
 		for (Label l : fixedLabels) {
-			T3Draw.text(g, font, t, l.text(), l.x(), l.y(), T3Draw.color(t, l.tone()));
+			drawLabel(g, font, t, l);
 		}
 		fixed.render(g, font, t, mx, my);
+	}
+
+	private static void drawLabel(GuiGraphicsExtractor g, Font font, ChatTheme t, Label l) {
+		int color = T3Draw.color(t, l.tone());
+		if (l.icon() != null) {
+			T3Icon.draw(g, t, l.icon(), l.x() - T3Draw.NOTICE_INDENT, l.y() + 4 - T3Icon.SIZE / 2, T3Icon.SIZE, color);
+		}
+		T3Draw.text(g, font, t, l.text(), l.x(), l.y(), color);
 	}
 
 	/** After the host drew the vanilla widgets: open selects. */

@@ -15,10 +15,12 @@ import org.jspecify.annotations.Nullable;
  * ({@code /t3dev ui kit}, docs/features/ui-kit.md "Probarlo"). Nothing here touches the config or the
  * network: every control only writes a line in the footer.
  *
- * <p>Tab "Controls": a switch, check boxes, the four button styles, a select and a 60-row list (Up, Down,
+ * <p>Tab "Controls": a switch, check boxes, the four button styles, icon + label buttons, the icon-only
+ * buttons ({@link T3IconButton}'s helpers, one disabled), notices with their icons, a select and a 60-row list (Up, Down,
  * Home, End, Page Up, Page Down, Enter; drag its scrollbar). Tab "Text": a field and a multi-line box in
  * the scrolling body (the field is cut at the viewport's edge, the box is hidden until it fits), and a
- * second field below the fold (Tab to it and the page scrolls). The footer opens a dialog with fields.
+ * second field below the fold (Tab to it and the page scrolls). The footer opens a dialog with fields and a
+ * close button.
  */
 public final class T3KitDemoPanel extends T3Panel {
 	private static final List<String> TABS = List.of("Controls", "Text");
@@ -165,6 +167,32 @@ public final class T3KitDemoPanel extends T3Panel {
 		place(new T3Button("Danger", T3Button.Style.DANGER, () -> say("Danger pressed")), x + 2 * (bw + GAP), y, bw, H);
 		place(new T3Button("Ghost", T3Button.Style.GHOST, () -> say("Ghost pressed")), x + 3 * (bw + GAP), y, bw, H);
 		y += H + GAP;
+		y = text(x, y, w, "Icons: muted at rest, accent under the pointer, grey when disabled", Tone.TITLE);
+		place(new T3Button(T3Icon.PLUS, "Add", () -> say("Add pressed")), x, y, bw, H);
+		place(new T3Button(T3Icon.SEND, "Send", T3Button.Style.PRIMARY, () -> say("Send pressed")), x + (bw + GAP), y, bw, H);
+		place(new T3Button(T3Icon.TRASH, "Delete", T3Button.Style.DANGER, () -> say("Delete pressed")), x + 2 * (bw + GAP), y, bw, H);
+		place(new T3Button(T3Icon.REFRESH_CW, "Refresh", T3Button.Style.GHOST, () -> say("Refresh pressed")), x + 3 * (bw + GAP), y, bw, H);
+		y += H + GAP;
+		T3Button offLabelled = place(new T3Button(T3Icon.EXTERNAL_LINK, "Open (disabled)", () -> say("Open pressed")), x, y, 2 * bw + GAP, H);
+		offLabelled.setEnabled(false);
+		place(T3Button.iconOnly(T3Icon.INFO, "An icon-only T3Button: it needs a tooltip", T3Button.Style.DEFAULT, () -> say("Info pressed")),
+				x + 2 * (bw + GAP), y, H, H);
+		y += H + GAP;
+		List<T3IconButton> icons = List.of(T3IconButton.add("Add", () -> say("Add (icon)")), T3IconButton.remove("Remove", () -> say("Remove (icon)")),
+				T3IconButton.refresh("Refresh", () -> say("Refresh (icon)")), T3IconButton.edit("Edit", () -> say("Edit (icon)")),
+				T3IconButton.delete("Delete", () -> say("Delete (icon)")), T3IconButton.copy("Copy", () -> say("Copy (icon)")),
+				T3IconButton.open("Open outside", () -> say("Open (icon)")), T3IconButton.close("Close", () -> say("Close (icon)")),
+				T3IconButton.copy("Copy (disabled)", () -> say("Copy (disabled) pressed")));
+		for (int i = 0; i < icons.size(); i++) {
+			T3IconButton b = place(icons.get(i), x + i * (T3IconButton.SIZE + 2), y, T3IconButton.SIZE, T3IconButton.SIZE);
+			b.setEnabled(i < icons.size() - 1);
+		}
+		y += T3IconButton.SIZE + GAP;
+		y = notice(x, y, w, "A warning notice: the triangle takes the warning colour.", Tone.WARN) + 2;
+		y = notice(x, y, w, "An info notice, for a hint under a field. Long text wraps beside the icon, not under it, so the column stays clean.",
+				Tone.MUTED) + 2;
+		y = notice(x, y, w, "An OK notice.", Tone.OK) + 2;
+		y = notice(x, y, w, "An error notice.", Tone.ERROR) + GAP;
 		place(new T3Select<>(List.of("Small", "Medium", "Large"), s -> s, size, v -> {
 			size = v;
 			say("Select: " + v);
@@ -216,7 +244,8 @@ public final class T3KitDemoPanel extends T3Panel {
 		T3Field nameField = modalName();
 		T3TextArea notesArea = modalNotes();
 		T3Dialog d = new T3Dialog("Dialog with fields", 340);
-		d.text("This dialog is laid out once, not every frame. Its boxes are drawn by the dialog itself. Tab moves between them.", Tone.MUTED);
+		d.notice("This dialog is laid out once, not every frame. Its boxes are drawn by the dialog itself. Tab moves between them.", Tone.MUTED);
+		d.closable();
 		d.field("Name", nameField);
 		d.textArea("Notes", notesArea, 48);
 		d.control(new T3Check("Remember this", remember, v -> remember = v));

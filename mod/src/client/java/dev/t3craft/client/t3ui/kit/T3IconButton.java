@@ -27,6 +27,47 @@ public final class T3IconButton extends T3Control {
 		this.action = action;
 	}
 
+	/** An icon button with its tooltip. */
+	public T3IconButton(T3Icon icon, String tooltip, Runnable action) {
+		this(icon, action);
+		setTooltip(tooltip);
+	}
+
+	// ---- the usual ones (T3 Code's row and toolbar actions); the tooltip says what it does -------------------
+
+	public static T3IconButton add(String tooltip, Runnable action) {
+		return new T3IconButton(T3Icon.PLUS, tooltip, action);
+	}
+
+	public static T3IconButton remove(String tooltip, Runnable action) {
+		return new T3IconButton(T3Icon.MINUS, tooltip, action);
+	}
+
+	public static T3IconButton refresh(String tooltip, Runnable action) {
+		return new T3IconButton(T3Icon.REFRESH_CW, tooltip, action);
+	}
+
+	public static T3IconButton edit(String tooltip, Runnable action) {
+		return new T3IconButton(T3Icon.PENCIL, tooltip, action);
+	}
+
+	public static T3IconButton delete(String tooltip, Runnable action) {
+		return new T3IconButton(T3Icon.TRASH, tooltip, action);
+	}
+
+	public static T3IconButton copy(String tooltip, Runnable action) {
+		return new T3IconButton(T3Icon.COPY, tooltip, action);
+	}
+
+	/** Opens something outside the page (a browser, another screen). */
+	public static T3IconButton open(String tooltip, Runnable action) {
+		return new T3IconButton(T3Icon.EXTERNAL_LINK, tooltip, action);
+	}
+
+	public static T3IconButton close(String tooltip, Runnable action) {
+		return new T3IconButton(T3Icon.X, tooltip, action);
+	}
+
 	public T3Icon icon() {
 		return icon;
 	}
