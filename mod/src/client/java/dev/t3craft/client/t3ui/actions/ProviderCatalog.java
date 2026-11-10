@@ -12,9 +12,10 @@ import org.jspecify.annotations.Nullable;
 /**
  * The provider instances of one environment and their models, decoded tolerantly from
  * {@code server.getConfig} ({@code ServerConfig.providers}, {@code ServerProvider} /
- * {@code ServerProviderModel} in {@code packages/contracts/src/server.ts}). The effort of a model is
- * its first {@code select} option descriptor ({@code ModelCapabilities.optionDescriptors}), as
- * {@code TraitsPicker.getSelectedTraits} picks {@code primarySelectDescriptor}. Pure, immutable.
+ * {@code ServerProviderModel} in {@code packages/contracts/src/server.ts}). A model's controls are its
+ * option descriptors ({@code ModelCapabilities.optionDescriptors}): the reasoning select is the one with
+ * {@code role: "reasoning"}, else the first select, as {@code TraitsPicker} picks its primary select
+ * descriptor; the other selects and the booleans follow. Pure, immutable.
  */
 public record ProviderCatalog(List<Provider> providers) {
 	public static final ProviderCatalog EMPTY = new ProviderCatalog(List.of());
@@ -27,13 +28,32 @@ public record ProviderCatalog(List<Provider> providers) {
 	public record Choice(String id, String label, boolean isDefault) {
 	}
 
-	/** The model's effort control: a {@code select} descriptor ({@code effort}, {@code reasoningEffort}…). */
-	public record Effort(String id, String label, List<Choice> choices, @Nullable String currentValue) {
-		public Effort {
+	/** The two kinds of option descriptor the picker draws: a drop-down and an on/off switch. */
+	public enum Kind {
+		SELECT, BOOLEAN
+	}
+
+	/**
+	 * One option descriptor of a model ({@code ModelCapabilities.optionDescriptors}): a {@code select}
+	 * ({@code effort}, {@code reasoningEffort}...) with its {@link Choice}s, or a {@code boolean}
+	 * ({@code fastMode}, {@code thinking}...). {@code role} is T3's hint of what it controls
+	 * ({@code "reasoning"} marks the reasoning select).
+	 */
+	public record Option(Kind kind, String id, String label, @Nullable String role, @Nullable String description, List<Choice> choices,
+			@Nullable String currentValue, @Nullable Boolean currentBool) {
+		public Option {
 			choices = List.copyOf(choices);
 		}
 
-		/** {@code currentValue}, else the choice marked default, else null (T3 shows "Default"). */
+		public boolean isSelect() {
+			return kind == Kind.SELECT;
+		}
+
+		public boolean isReasoning() {
+			return "reasoning".equals(role);
+		}
+
+		/** Select: {@code currentValue}, else the choice marked default, else null (T3 shows "Default"). */
 		public @Nullable String defaultValue() {
 			if (currentValue != null && has(currentValue)) {
 				return currentValue;
@@ -51,9 +71,46 @@ public record ProviderCatalog(List<Provider> providers) {
 	}
 
 	/** {@code ServerProviderModel}. */
-	public record Model(String slug, String name, @Nullable String shortName, boolean isDefault, @Nullable Effort effort) {
+	public record Model(String slug, String name, @Nullable String shortName, boolean isDefault, boolean isLegacy, @Nullable String badge,
+			List<String> aliases, @Nullable String subProvider, boolean isCustom, List<Option> options) {
+		public Model {
+			aliases = List.copyOf(aliases);
+			options = List.copyOf(options);
+		}
+
 		public String label() {
 			return shortName != null ? shortName : name;
+		}
+
+		/** The reasoning control: the select with {@code role: "reasoning"}, else the first select; null when there is none. */
+		public @Nullable Option reasoning() {
+			Option first = null;
+			for (Option o : options) {
+				if (o.isSelect()) {
+					if (o.isReasoning()) {
+						return o;
+					}
+					if (first == null) {
+						first = o;
+					}
+				}
+			}
+			return first;
+		}
+
+		/** The other select descriptors, each its own drop-down under Reasoning. */
+		public List<Option> extraSelects() {
+			Option r = reasoning();
+			return options.stream().filter(o -> o.isSelect() && o != r).toList();
+		}
+
+		/** The boolean descriptors (fast, thinking...), each a switch under Reasoning. */
+		public List<Option> toggles() {
+			return options.stream().filter(o -> !o.isSelect()).toList();
+		}
+
+		public @Nullable Option option(@Nullable String id) {
+			return options.stream().filter(o -> o.id().equals(id)).findFirst().orElse(null);
 		}
 	}
 
@@ -162,23 +219,49 @@ public record ProviderCatalog(List<Provider> providers) {
 			return null;
 		}
 		String name = Objects.requireNonNullElse(blank(Json.str(o, "name")), slug);
+		List<String> aliases = new ArrayList<>();
+		JsonArray al = Json.arr(o, "aliases");
+		if (al != null) {
+			for (JsonElement e : al) {
+				String a = e.isJsonPrimitive() ? blank(e.getAsString()) : null;
+				if (a != null) {
+					aliases.add(a);
+				}
+			}
+		}
 		return new Model(slug, name, blank(Json.str(o, "shortName")), Boolean.TRUE.equals(Json.optBool(o, "isDefault")),
-				effort(Json.obj(o, "capabilities")));
+				Boolean.TRUE.equals(Json.optBool(o, "isLegacy")), blank(Json.str(o, "badge")), aliases, blank(Json.str(o, "subProvider")),
+				Boolean.TRUE.equals(Json.optBool(o, "isCustom")), options(Json.obj(o, "capabilities")));
 	}
 
-	/** The first {@code select} descriptor with at least one option, or null. */
-	static @Nullable Effort effort(@Nullable JsonObject caps) {
+	/**
+	 * The {@code select} descriptors with at least one option and the {@code boolean} ones, in the order
+	 * T3 lists them; other kinds are left out.
+	 */
+	static List<Option> options(@Nullable JsonObject caps) {
 		JsonArray ds = Json.arr(caps, "optionDescriptors");
 		if (ds == null) {
-			return null;
+			return List.of();
 		}
+		List<Option> out = new ArrayList<>();
 		for (JsonElement e : ds) {
-			if (!(e instanceof JsonObject d) || !"select".equals(Json.str(d, "type"))) {
+			if (!(e instanceof JsonObject d)) {
 				continue;
 			}
+			String type = Json.str(d, "type");
 			String id = blank(Json.str(d, "id"));
-			JsonArray opts = Json.arr(d, "options");
-			if (id == null || opts == null) {
+			if (id == null || out.stream().anyMatch(x -> x.id().equals(id))) {
+				continue;
+			}
+			String label = Objects.requireNonNullElse(blank(Json.str(d, "label")), id);
+			String role = blank(Json.str(d, "role"));
+			String description = blank(Json.str(d, "description"));
+			if ("boolean".equals(type)) {
+				out.add(new Option(Kind.BOOLEAN, id, label, role, description, List.of(), null, Json.optBool(d, "currentValue")));
+				continue;
+			}
+			JsonArray opts = "select".equals(type) ? Json.arr(d, "options") : null;
+			if (opts == null) {
 				continue;
 			}
 			List<Choice> choices = new ArrayList<>();
@@ -192,10 +275,10 @@ public record ProviderCatalog(List<Provider> providers) {
 				}
 			}
 			if (!choices.isEmpty()) {
-				return new Effort(id, Objects.requireNonNullElse(blank(Json.str(d, "label")), id), choices, blank(Json.str(d, "currentValue")));
+				out.add(new Option(Kind.SELECT, id, label, role, description, choices, blank(Json.str(d, "currentValue")), null));
 			}
 		}
-		return null;
+		return out;
 	}
 
 	private static @Nullable String blank(@Nullable String s) {

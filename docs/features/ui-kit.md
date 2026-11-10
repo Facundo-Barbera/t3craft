@@ -21,7 +21,7 @@ receta que el buscador de `T3Screen`).
 | `T3Control` | Base: `bounds`, `enabled`, `visible`, tooltip, `render`, `mouseClicked`, popups (`overlayOpen`/`renderOverlay`). |
 | `T3Button` | Botón. Estilos `DEFAULT` (la píldora de `T3Screen`), `PRIMARY` (relleno acento), `DANGER` (relleno error), `GHOST`. |
 | `T3Toggle` | Fila con etiqueta y un interruptor (pista + perilla). Reemplaza el botón vanilla "Etiqueta: ON/OFF" verde y rojo. |
-| `T3Field` | Campo de una línea: marco `ChatDraw.field` + `EditBox` sin borde. Conserva el texto entre reconstrucciones. |
+| `T3Field` | Campo de una línea: marco `ChatDraw.field` + `EditBox` sin borde. Conserva el texto entre reconstrucciones. Para anfitriones que no son una pantalla (el popover del selector de modelo) dibuja y alimenta el `EditBox` con `renderBox`, `boxKeyPressed`, `boxCharTyped` y `setBoxFocused`. |
 | `T3Select<T>` | Desplegable: valor actual con ▾, lista debajo (o encima si no cabe), rueda, ↑/↓/Enter/Esc. |
 | `T3List<T>` | Lista con scroll en un pozo `inset`: filas del mismo alto dibujadas por un `Row` (que puede llevar sus propios botones). |
 | `T3Tabs` | Pestañas de texto con regla y subrayado de acento. |

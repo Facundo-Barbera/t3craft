@@ -1,8 +1,21 @@
 package dev.t3craft.client.t3ui.actions;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import dev.t3craft.client.FavoritesStore;
+import dev.t3craft.client.chat.ChatDraw;
+import dev.t3craft.client.chat.ChatTheme;
 import dev.t3craft.client.chat.MouseButtons;
+import dev.t3craft.client.chat.Rect;
 import dev.t3craft.client.chat.compose.ComposerSkin;
+import dev.t3craft.client.t3ui.kit.T3Button;
+import dev.t3craft.client.t3ui.kit.T3Control;
+import dev.t3craft.client.t3ui.kit.T3Draw;
+import dev.t3craft.client.t3ui.kit.T3Field;
+import dev.t3craft.client.t3ui.kit.T3Form;
+import dev.t3craft.client.t3ui.kit.T3List;
+import dev.t3craft.client.t3ui.kit.T3Select;
+import dev.t3craft.client.t3ui.kit.T3Toggle;
+import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -13,14 +26,24 @@ import net.minecraft.network.chat.Component;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The composer's model / provider / effort picker (T3 Code {@code ComposerModelEffort} +
- * {@code ProviderModelPicker} + {@code TraitsPicker} + the runtime / plan toggles of
- * {@code ComposerControlsBar}), as one self-contained widget for the composer's control bar
- * (feat/chat-compose) or any panel.
+ * The composer's model / provider / reasoning picker (T3 Code {@code ComposerModelEffort} +
+ * {@code ProviderModelPicker} + {@code TraitsPicker} + the runtime toggle of {@code ComposerControlsBar}), as one
+ * self-contained widget for the composer's control bar or any panel.
  *
- * <p>Closed it is a chip {@code Provider · Model · Effort ▾}; a click opens a popup (upwards when
- * the chip is in the lower half of the screen) with the providers on the left, the provider's
- * models on the right, and rows for effort, access (runtime mode) and plan mode.
+ * <p>Closed it is the composer's chip {@code Provider Model Reasoning} ({@link ComposerSkin}); a click opens a
+ * popover (upwards when the chip is in the lower half of the screen, aligned to the chip's right edge) made of
+ * kit controls on the {@link ChatTheme} tokens:
+ * <ul>
+ *   <li>a search box, then the providers (a scrolling list) beside the provider's models: favorites first
+ *   (the square on the left of a row, kept in {@code config/t3craft/model-favorites.json} per
+ *   {@code environment/instance/model}), then T3's order, legacy models behind "Show legacy (N)" (a search looks
+ *   through them too);</li>
+ *   <li>under them the model's controls: a {@link T3Select} for its reasoning descriptor, one for every other
+ *   select descriptor and a {@link T3Toggle} for every boolean one (fast, thinking...), all sent as
+ *   {@code modelSelection.options};</li>
+ *   <li>Access: a {@link T3Select} with every runtime mode the provider supports; the selected mode's
+ *   description is its tooltip.</li>
+ * </ul>
  * <ul>
  *   <li>{@link #forThread}: changes are staged; "Apply" sends only the changed commands
  *   ({@link ThreadCommands#configure}) through {@code OperateGate}; {@link Listener#onPicked} after
@@ -29,14 +52,9 @@ import org.jspecify.annotations.Nullable;
  *   ({@link ProviderService#setDefaultPick}) and goes to {@link Listener#onPicked} at once.</li>
  * </ul>
  * Without control (operate) the chip is drawn disabled as "Enable control" and a click opens the
- * enable/pair screen. Host contract: {@link #setBounds}, {@link #render} last (the popup draws over
- * other widgets), {@link #mouseClicked} first (it consumes clicks while open), {@link #keyPressed}
- * (Esc closes), {@link #mouseScrolled}. Client thread only.
- *
- * <p>feat/t3-composer: {@link #composerChip()} draws the closed picker as T3's composer trigger
- * ({@code ComposerModelPicker}): provider icon, model and effort ("✳ Opus 5.5 · Medium", plus
- * "· Plan" in plan mode) as a ghost chip sized to its text ({@link #chipWidth()}); the popover opens
- * upwards, aligned to the chip's right edge, over the transcript.
+ * enable/pair screen. Host contract: {@link #setBounds}, {@link #render} last (the popover draws over other
+ * widgets), {@link #mouseClicked} first (it consumes clicks while open), {@link #keyPressed} and
+ * {@link #charTyped} (the search box; Esc closes), {@link #mouseScrolled}. Client thread only.
  */
 public final class ModelPicker {
 	@FunctionalInterface
@@ -49,19 +67,27 @@ public final class ModelPicker {
 		NEW_THREAD
 	}
 
-	private static final int ROW = 12;
-	private static final int BG = 0xF0101418;
-	private static final int CHIP = 0xFF1E252B;
-	private static final int CHIP_HOVER = 0xFF27414A;
-	private static final int BORDER = 0xFF3A6B73;
-	private static final int TEXT = 0xFFE6E6E6;
-	private static final int DIM = 0xFF8A949E;
-	private static final int ACCENT = 0xFF7DD3FC;
-	private static final int SELECTED = 0xFF27414A;
-	private static final int WARN = 0xFFFFAA00;
-	private static final int ERROR = 0xFFFF5555;
-	private static final int OK = 0xFF6EE7B7;
-	private static final int MAX_ROWS = 10;
+	/** A row of the models list: a model, or the "Show legacy" switch at the end. */
+	private record ModelRow(ProviderCatalog.@Nullable Model model, int legacyCount, boolean legacyShown) {
+		boolean isSwitch() {
+			return model == null;
+		}
+	}
+
+	/** A choice of a drop-down; {@code id} null is "Default" (nothing is sent). */
+	private record Opt(@Nullable String id, String label) {
+	}
+
+	private static final FavoritesStore FAVORITES = new FavoritesStore("model-favorites.json", "model picker");
+
+	private static final int ROW = 14;
+	private static final int PAD = 6;
+	private static final int GAP = 4;
+	private static final int LIST_ROWS = 9;
+	private static final int MIN_LIST_ROWS = 4;
+	private static final int POPUP_W = 330;
+	private static final int STAR = 6;
+	private static final int STAR_COL = 13;
 
 	private final Font font;
 	private final Mode mode;
@@ -76,14 +102,32 @@ public final class ModelPicker {
 	private int x;
 	private int y;
 	private int w;
-	private int h = 14;
-	private boolean composerChip;
+	private int h = ComposerSkin.CHIP_H;
 	private boolean open;
 	private boolean busy;
-	private int modelScroll;
-	private Component status = Component.empty();
-	private int statusColor = DIM;
+	private String status = "";
+	private T3Draw.Tone statusTone = T3Draw.Tone.MUTED;
 	private final Hits hits = new Hits();
+
+	// ---- the popover's controls ----------------------------------------------------------------------
+	private final T3Form form = new T3Form();
+	private final T3Field search;
+	private final T3List<ProviderCatalog.Provider> providerList;
+	private final T3List<ModelRow> modelList;
+	private final T3Button cancelButton;
+	private final T3Button applyButton;
+	/** Label and control of the model's settings under the lists, rebuilt when the model changes. */
+	private final List<Setting> settings = new ArrayList<>();
+	private @Nullable String builtFor;
+	private boolean showLegacy;
+	private boolean focusSearch;
+	private boolean reveal;
+	private @Nullable Rect searchRect;
+	private @Nullable ChatTheme searchTheme;
+	private Rect popup = Rect.EMPTY;
+
+	private record Setting(@Nullable String label, T3Control control) {
+	}
 
 	private ModelPicker(Font font, Mode mode, @Nullable String envId, @Nullable String threadId, @Nullable String threadTitle,
 			@Nullable ModelPick initial, Listener listener, ProviderService providers, ActionGate gate) {
@@ -96,6 +140,12 @@ public final class ModelPicker {
 		this.providers = providers;
 		this.gate = gate;
 		this.logic = new ModelPickerLogic(envId == null ? ProviderCatalog.EMPTY : providers.catalog(envId).catalog(), initial);
+		this.providerList = new T3List<>(ROW, new ProviderRow());
+		this.modelList = new T3List<>(ROW, new ModelsRow());
+		this.search = new T3Field(font, "Search models").hint("Search models...").maxLength(64).onChange(v -> modelList.scrollToTop())
+				.onSubmit(this::pickFirst);
+		this.cancelButton = new T3Button("Cancel", () -> close());
+		this.applyButton = new T3Button("Apply", T3Button.Style.PRIMARY, this::apply);
 	}
 
 	/**
@@ -115,11 +165,21 @@ public final class ModelPicker {
 				ActionsClient.gate());
 	}
 
+	/**
+	 * A new-thread picker over a fixed {@code server.getConfig} answer and an always-enabled gate, for the UI gallery
+	 * ({@code /t3dev ui model-picker}): no connection, no write.
+	 */
+	public static ModelPicker forGallery(Font font, String envId, com.google.gson.JsonObject serverConfig, Listener listener) {
+		ProviderService ps = new ProviderService(env -> java.util.concurrent.CompletableFuture.completedFuture(serverConfig),
+				System::currentTimeMillis);
+		ActionGate always = new ActionGate(env -> dev.t3craft.t3.OperateGate.Availability.ENABLED);
+		return new ModelPicker(font, Mode.NEW_THREAD, envId, null, null, null, listener, ps, always);
+	}
+
 	// ---- host API -------------------------------------------------------------------------------
 
-	/** Draws the closed picker as the composer's model chip (see the class comment). */
+	/** Marks this picker as the composer's chip (the only look it has); kept for the hosts that already call it. */
 	public ModelPicker composerChip() {
-		composerChip = true;
 		h = ComposerSkin.CHIP_H;
 		return this;
 	}
@@ -144,7 +204,7 @@ public final class ModelPicker {
 		ModelPick p = logic.pick();
 		if (p == null) {
 			ProviderService.Entry entry = envId == null ? null : providers.catalog(envId);
-			return new String[] {"", entry != null && entry.phase() == ProviderService.Phase.LOADING ? "Loading models…" : "No models", ""};
+			return new String[] {"", entry != null && entry.phase() == ProviderService.Phase.LOADING ? "Loading models..." : "No models", ""};
 		}
 		ProviderCatalog cat = logic.catalog();
 		ProviderCatalog.Provider prov = cat == null ? null : cat.provider(p.instanceId());
@@ -155,8 +215,9 @@ public final class ModelPicker {
 			model = model.substring(provLabel.length() + 1); // "Claude Opus 5.5" → "Opus 5.5", as T3's trigger
 		}
 		StringBuilder detail = new StringBuilder();
-		if (p.effortValue() != null) {
-			detail.append(m != null && m.effort() != null ? m.effort().labelOf(p.effortValue()) : p.effortValue());
+		String reasoning = p.reasoningLabel(m);
+		if (reasoning != null) {
+			detail.append(reasoning);
 		}
 		if (p.interaction() == Modes.Interaction.PLAN) {
 			detail.append(detail.isEmpty() ? "" : " · ").append("Plan");
@@ -202,11 +263,20 @@ public final class ModelPicker {
 		if (busy || gate.state(envId) != ActionGate.State.ENABLED) {
 			return;
 		}
-		open = !open;
-		if (open && envId != null) {
-			providers.invalidate(envId);
-			status = Component.empty();
+		if (open) {
+			close();
+			return;
 		}
+		open = true;
+		if (envId != null) {
+			providers.invalidate(envId);
+		}
+		status = "";
+		search.setValue("");
+		showLegacy = false;
+		reveal = true;
+		focusSearch = true;
+		builtFor = null;
 	}
 
 	public void setBounds(int x, int y, int w, int h) {
@@ -223,7 +293,7 @@ public final class ModelPicker {
 		}
 		envId = env;
 		seen = null;
-		open = false;
+		dismiss();
 		logic = new ModelPickerLogic(env == null ? ProviderCatalog.EMPTY : providers.catalog(env).catalog(), env == null ? null : providers.defaultPick(env));
 		if (mode == Mode.NEW_THREAD && logic.pick() != null) {
 			listener.onPicked(logic.pick());
@@ -242,8 +312,18 @@ public final class ModelPicker {
 		return open;
 	}
 
+	/** Closes the popover; a thread's staged changes are dropped. */
 	public void close() {
+		if (open && mode == Mode.THREAD) {
+			logic.reset();
+		}
+		dismiss();
+	}
+
+	private void dismiss() {
 		open = false;
+		search.setBoxFocused(false);
+		form.closeOverlays();
 	}
 
 	public boolean enabled() {
@@ -253,109 +333,60 @@ public final class ModelPicker {
 	// ---- input ----------------------------------------------------------------------------------
 
 	public boolean mouseClicked(double mx, double my, int button) {
+		if (open && (form.overlayOpen() || popup.contains(mx, my))) {
+			form.mouseClicked(mx, my, button); // a click on the popover is always the popover's
+			return true;
+		}
 		if (!MouseButtons.isLeft(button)) {
-			return open && popupContains(mx, my);
+			return false;
 		}
 		if (hits.click(mx, my)) {
 			return true;
 		}
 		if (open) {
-			// Click outside the popup closes it (and is consumed so the host does not act on it).
-			open = false;
-			if (mode == Mode.THREAD) {
-				logic.reset();
-			}
+			close(); // a click outside closes it and is consumed so the host does not act on it
 			return true;
 		}
 		return false;
 	}
 
 	public boolean keyPressed(KeyEvent e) {
-		if (open && e.key() == InputConstants.KEY_ESCAPE) {
-			open = false;
-			if (mode == Mode.THREAD) {
-				logic.reset();
-			}
+		if (!open) {
+			return false;
+		}
+		if (form.overlayOpen()) {
+			return form.keyPressed(e); // the open drop-down owns the keyboard (Esc closes only it)
+		}
+		if (e.key() == InputConstants.KEY_ESCAPE) {
+			close();
 			return true;
 		}
-		return false;
+		return form.keyPressed(e) || search.boxKeyPressed(e);
+	}
+
+	/** A typed character: it goes to the search box. */
+	public boolean charTyped(int codepoint) {
+		if (!open) {
+			return false;
+		}
+		return form.overlayOpen() || search.boxCharTyped(codepoint);
 	}
 
 	public boolean mouseScrolled(double mx, double my, double dy) {
-		if (!open || !popupContains(mx, my)) {
+		if (!open || !(form.overlayOpen() || popup.contains(mx, my))) {
 			return false;
 		}
-		int n = logic.models().size();
-		modelScroll = Math.max(0, Math.min(Math.max(0, n - MAX_ROWS), modelScroll - (int) Math.signum(dy)));
+		form.mouseScrolled(mx, my, dy);
 		return true;
 	}
 
 	// ---- drawing --------------------------------------------------------------------------------
-
-	private int popX0;
-	private int popY0;
-	private int popX1;
-	private int popY1;
-
-	private boolean popupContains(double mx, double my) {
-		return Hits.inside(mx, my, popX0, popY0, popX1, popY1);
-	}
 
 	public void render(GuiGraphicsExtractor g, int mouseX, int mouseY) {
 		hits.clear();
 		refreshCatalog();
 		ActionGate.State st = gate.state(envId);
 		boolean hover = Hits.inside(mouseX, mouseY, x, y, x + w, y + h);
-		if (composerChip) {
-			renderComposerChip(g, st, hover, mouseX, mouseY);
-			return;
-		}
-		g.fill(x, y, x + w, y + h, hover ? CHIP_HOVER : CHIP);
-		int ty = y + (h - font.lineHeight) / 2 + 1;
-		if (st != ActionGate.State.ENABLED) {
-			String key = ActionGate.disabledKey(st);
-			String label = "⚠ " + Component.translatable(key == null ? "t3craft.actions.enable_control" : key).getString();
-			g.text(font, font.plainSubstrByWidth(label, w - 6), x + 3, ty, WARN);
-			if (st != ActionGate.State.NO_ENV) {
-				String env = envId;
-				hits.add(x, y, x + w, y + h, () -> ActionsClient.enableControl(Minecraft.getInstance().gui.screen(), env));
-			}
-			open = false;
-			return;
-		}
-		ModelPick p = logic.pick();
-		ProviderService.Entry entry = envId == null ? null : providers.catalog(envId);
-		String label;
-		int color = TEXT;
-		if (p != null) {
-			label = p.label(logic.catalog()) + (p.interaction() == Modes.Interaction.PLAN ? " · Plan" : "");
-		} else if (entry != null && entry.phase() == ProviderService.Phase.LOADING) {
-			label = "Loading models…";
-			color = DIM;
-		} else {
-			label = entry != null && entry.error() != null ? "No models (" + entry.error() + ")" : "No models";
-			color = DIM;
-		}
-		String arrow = open ? " ▴" : " ▾";
-		g.text(font, font.plainSubstrByWidth(label, w - 6 - font.width(arrow)) + arrow, x + 3, ty, color);
-		if (!status.getString().isEmpty() && !open) {
-			g.text(font, font.plainSubstrByWidth(status.getString(), Math.max(40, w)), x, y - font.lineHeight - 1, statusColor);
-		}
-		if (!busy) {
-			hits.add(x, y, x + w, y + h, () -> {
-				open = !open;
-				if (open && envId != null) {
-					providers.invalidate(envId);
-					status = Component.empty();
-				}
-			});
-		}
-		if (open) {
-			renderPopup(g, mouseX, mouseY);
-		}
-	}
-
-	private void renderComposerChip(GuiGraphicsExtractor g, ActionGate.State st, boolean hover, int mouseX, int mouseY) {
 		String[] p = chipParts();
 		ComposerSkin.chip(g, font, x, y, p[0], providerColor(p[0]), p[1], st == ActionGate.State.ENABLED ? ComposerSkin.TEXT : ComposerSkin.WARN,
 				withArrow(p[2]), hover, open);
@@ -364,12 +395,13 @@ public final class ModelPicker {
 				String env = envId;
 				hits.add(x, y, x + w, y + h, () -> ActionsClient.enableControl(Minecraft.getInstance().gui.screen(), env));
 			}
-			open = false;
+			if (open) {
+				dismiss();
+			}
 			return;
 		}
 		if (hover && !open) {
-			String tip = status.getString().isEmpty() ? "Model · effort · access" : status.getString();
-			g.setTooltipForNextFrame(font, Component.literal(tip), mouseX, mouseY);
+			g.setTooltipForNextFrame(font, Component.literal(status.isEmpty() ? "Model · reasoning · access" : status), mouseX, mouseY);
 		}
 		if (!busy) {
 			hits.add(x, y, x + w, y + h, this::toggle);
@@ -388,6 +420,7 @@ public final class ModelPicker {
 			seen = c;
 			boolean hadPick = logic.pick() != null;
 			logic.setCatalog(c);
+			builtFor = null;
 			if (mode == Mode.NEW_THREAD && !hadPick && logic.pick() != null) {
 				providers.setDefaultPick(envId, logic.pick());
 				listener.onPicked(logic.pick());
@@ -396,158 +429,239 @@ public final class ModelPicker {
 	}
 
 	private void renderPopup(GuiGraphicsExtractor g, int mouseX, int mouseY) {
-		List<ProviderCatalog.Provider> ps = logic.providers();
-		List<ProviderCatalog.Model> ms = logic.models();
-		int leftW = 0;
-		for (ProviderCatalog.Provider p : ps) {
-			leftW = Math.max(leftW, font.width(p.label()) + 10);
-		}
-		leftW = Math.min(110, Math.max(60, leftW));
-		int rightW = 120;
-		for (ProviderCatalog.Model m : ms) {
-			rightW = Math.max(rightW, font.width(m.label()) + 16);
-		}
-		rightW = Math.min(180, rightW);
-		int pw = Math.max(w, leftW + rightW + 6);
-		int listRows = Math.max(1, Math.max(Math.min(MAX_ROWS, ps.size()), Math.min(MAX_ROWS, ms.size())));
-		ProviderCatalog.Effort effort = logic.effort();
-		int extraRows = (effort != null ? 1 : 0) + 1 + (logic.planAvailable() ? 1 : 0) + (mode == Mode.THREAD ? 1 : 0);
-		int ph = 4 + listRows * ROW + 4 + extraRows * (ROW + 2) + 2;
+		ChatTheme t = ChatTheme.warmStudio();
+		rebuildIfNeeded();
 		int screenH = Minecraft.getInstance().getWindow().getGuiScaledHeight();
 		int screenW = Minecraft.getInstance().getWindow().getGuiScaledWidth();
+		Rect screen = new Rect(0, 0, screenW, screenH);
+
+		// size: the lists give way when the settings under them do not fit
+		int settingsH = settings.size() * (T3Control.H + 3);
+		int footerH = mode == Mode.THREAD ? T3Control.H : 0;
+		int fixed = PAD + T3Control.H + GAP + GAP + 1 + GAP + settingsH + footerH + PAD;
+		int listH = Math.max(MIN_LIST_ROWS * ROW + 4, Math.min(LIST_ROWS * ROW + 4, screenH - 8 - fixed));
+		int pw = Math.min(screenW - 4, Math.max(POPUP_W, w));
+		int ph = fixed + listH;
 		boolean up = y > screenH / 2;
-		int anchorX = composerChip ? x + w - pw : x;
-		popX0 = Math.max(2, Math.min(anchorX, screenW - pw - 2));
-		popX1 = popX0 + pw;
-		popY0 = up ? Math.max(2, y - ph - 1) : y + h + 1;
-		popY1 = popY0 + ph;
+		int popX0 = Math.max(2, Math.min(x + w - pw, screenW - pw - 2));
+		int popY0 = up ? Math.max(2, y - ph - 1) : y + h + 1;
+		popup = new Rect(popX0, popY0, pw, ph);
 		g.nextStratum(); // over the text drawn before (the transcript)
-		if (composerChip) {
-			ComposerSkin.box(g, popX0 - 1, popY0 - 1, pw + 2, ph + 2, ComposerSkin.POPUP, ComposerSkin.BORDER_FOCUS);
-		} else {
-			g.fill(popX0 - 1, popY0 - 1, popX1 + 1, popY1 + 1, BORDER);
-			g.fill(popX0, popY0, popX1, popY1, BG);
+		ChatDraw.panel(g, t, popup);
+
+		// places
+		int ix = popX0 + PAD;
+		int iw = pw - 2 * PAD;
+		int cy = popY0 + PAD;
+		Rect searchBounds = new Rect(ix, cy, iw, T3Control.H);
+		if (!searchBounds.equals(searchRect) || t != searchTheme) {
+			search.layout(t, searchBounds, true);
+			searchRect = searchBounds;
+			searchTheme = t;
 		}
-		// Swallow clicks on the popup background.
-		hits.add(popX0, popY0, popX1, popY1, () -> {
-		});
-		int ly = popY0 + 4;
-		if (ps.isEmpty()) {
-			g.text(font, "T3 exposes no models for this environment.", popX0 + 4, ly, DIM);
+		if (focusSearch) {
+			search.setBoxFocused(true);
+			focusSearch = false;
 		}
-		ModelPick cur = logic.pick();
-		for (int i = 0; i < ps.size() && i < MAX_ROWS; i++) {
-			ProviderCatalog.Provider p = ps.get(i);
-			int ry = ly + i * ROW;
-			boolean sel = cur != null && cur.instanceId().equals(p.instanceId());
-			if (sel) {
-				g.fill(popX0 + 2, ry - 1, popX0 + leftW, ry + ROW - 1, SELECTED);
+		cy += T3Control.H + GAP;
+		int provW = 0;
+		for (ProviderCatalog.Provider pr : logic.providers()) {
+			provW = Math.max(provW, font.width(pr.label()) + 16);
+		}
+		provW = Math.min(Math.max(70, provW), iw / 3);
+		providerList.setBounds(new Rect(ix, cy, provW, listH));
+		modelList.setBounds(new Rect(ix + provW + GAP, cy, iw - provW - GAP, listH));
+		cy += listH + GAP;
+		g.fill(ix, cy, ix + iw, cy + 1, t.edge());
+		cy += 1 + GAP;
+		int labelW = 0;
+		for (Setting s : settings) {
+			if (s.label() != null) {
+				labelW = Math.max(labelW, font.width(s.label()) + 8);
 			}
-			g.text(font, font.plainSubstrByWidth(p.label(), leftW - 6), popX0 + 4, ry + 1, sel ? ACCENT : TEXT);
-			hits.add(popX0 + 2, ry - 1, popX0 + leftW, ry + ROW - 1, () -> {
-				if (logic.selectProvider(p.instanceId())) {
-					modelScroll = 0;
-					changed();
-				}
-			});
 		}
-		int rx = popX0 + leftW + 4;
-		g.fill(rx - 3, ly - 2, rx - 2, ly + listRows * ROW, BORDER);
-		modelScroll = Math.max(0, Math.min(modelScroll, Math.max(0, ms.size() - MAX_ROWS)));
-		for (int i = modelScroll; i < ms.size() && i < modelScroll + MAX_ROWS; i++) {
-			ProviderCatalog.Model m = ms.get(i);
-			int ry = ly + (i - modelScroll) * ROW;
-			boolean sel = cur != null && cur.model().equals(m.slug());
-			boolean hov = Hits.inside(mouseX, mouseY, rx, ry - 1, popX1 - 2, ry + ROW - 1);
-			if (sel || hov) {
-				g.fill(rx, ry - 1, popX1 - 2, ry + ROW - 1, sel ? SELECTED : CHIP);
+		labelW = Math.min(labelW, iw / 3);
+		for (Setting s : settings) {
+			if (s.label() == null) {
+				s.control().setBounds(new Rect(ix, cy, iw, T3Control.H));
+			} else {
+				s.control().setBounds(new Rect(ix + labelW, cy, iw - labelW, T3Control.H));
 			}
-			String name = (sel ? "✔ " : "  ") + m.label();
-			g.text(font, font.plainSubstrByWidth(name, popX1 - rx - 6), rx + 2, ry + 1, sel ? ACCENT : TEXT);
-			hits.add(rx, ry - 1, popX1 - 2, ry + ROW - 1, () -> {
-				if (logic.selectModel(m.slug())) {
-					changed();
-				}
-			});
+			cy += T3Control.H + 3;
 		}
-		int ry = ly + listRows * ROW + 4;
-		if (effort != null) {
-			ry = chipRow(g, effort.label(), ry, effortChoices(effort), cur == null ? null : cur.effortValue(), v -> {
-				if (logic.selectEffort(v)) {
-					changed();
-				}
-			});
+		if (mode == Mode.THREAD) {
+			int bw = 58;
+			applyButton.setBounds(new Rect(ix + iw - bw, cy, bw, T3Control.H));
+			cancelButton.setBounds(new Rect(ix + iw - 2 * bw - GAP, cy, bw, T3Control.H));
+			applyButton.setLabel(busy ? "Applying..." : "Apply");
+			applyButton.setEnabled(!busy && !logic.changed().isEmpty());
 		}
-		List<String[]> runtimes = logic.runtimeModes().stream().map(r -> new String[] {r.wire, r.label}).toList();
-		ry = chipRow(g, "Access", ry, runtimes, cur == null ? null : cur.runtime().wire, v -> {
-			Modes.Runtime r = Modes.Runtime.parse(v);
-			if (r != null && logic.selectRuntime(r)) {
+
+		// models and providers follow the search and the legacy switch
+		ModelPickerLogic.ModelView view = logic.modelView(search.value(), showLegacy, this::favorite);
+		List<ModelRow> rows = new ArrayList<>();
+		view.models().forEach(m -> rows.add(new ModelRow(m, 0, false)));
+		if (view.legacyCount() > 0) {
+			rows.add(new ModelRow(null, view.legacyCount(), showLegacy));
+		}
+		providerList.setItems(logic.providers());
+		providerList.setEmptyText(emptyProviders());
+		modelList.setItems(rows);
+		modelList.setEmptyText(search.value().isBlank() ? "No models." : "No model matches the search.");
+		if (reveal) {
+			reveal = false;
+			ModelPick cur = logic.pick();
+			List<ProviderCatalog.Provider> ps = logic.providers();
+			for (int i = 0; i < ps.size(); i++) {
+				if (cur != null && ps.get(i).instanceId().equals(cur.instanceId())) {
+					providerList.ensureVisible(i);
+				}
+			}
+			for (int i = 0; i < rows.size(); i++) {
+				if (cur != null && rows.get(i).model() != null && rows.get(i).model().slug().equals(cur.model())) {
+					modelList.ensureVisible(i);
+				}
+			}
+		}
+
+		// draw
+		form.render(g, font, t, mouseX, mouseY);
+		search.renderBox(g, mouseX, mouseY);
+		int ly = popup.y() + PAD + T3Control.H + GAP + listH + GAP + 1 + GAP;
+		for (Setting s : settings) {
+			if (s.label() != null) {
+				T3Draw.text(g, font, t, s.label(), ix + 2, ly + (T3Control.H - 8) / 2, t.muted());
+			}
+			ly += T3Control.H + 3;
+		}
+		if (mode == Mode.THREAD && !status.isEmpty()) {
+			int sw = cancelButton.bounds().x() - ix - GAP;
+			T3Draw.text(g, font, t, ChatDraw.clip(font, status, sw), ix + 2, ly + (T3Control.H - 8) / 2, T3Draw.color(t, statusTone));
+		}
+		form.renderOverlays(g, font, t, mouseX, mouseY, screen);
+		List<String> tip = form.overlayOpen() ? null : form.tooltip(mouseX, mouseY);
+		if (tip != null) {
+			List<String> lines = new ArrayList<>();
+			tip.forEach(l -> lines.addAll(T3Draw.wrap(font, l, 220)));
+			T3Draw.tooltip(g, font, lines, mouseX, mouseY);
+		}
+	}
+
+	private String emptyProviders() {
+		ProviderService.Entry entry = envId == null ? null : providers.catalog(envId);
+		if (entry != null && entry.phase() == ProviderService.Phase.LOADING) {
+			return "Loading models...";
+		}
+		return entry != null && entry.error() != null ? "No models (" + entry.error() + ")" : "T3 exposes no models for this environment.";
+	}
+
+	/**
+	 * (Re)creates the model's settings and the form's control list when the provider, model or catalog changed:
+	 * Reasoning, the other selects, the switches, Access.
+	 */
+	private void rebuildIfNeeded() {
+		if (form.overlayOpen()) {
+			return; // a catalog refresh must not close the drop-down the player is using
+		}
+		ModelPick pick = logic.pick();
+		ProviderCatalog.Model m = logic.model();
+		String key = pick == null ? "-" : pick.instanceId() + "/" + pick.model() + "/" + logic.runtimeModes();
+		if (key.equals(builtFor)) {
+			return;
+		}
+		builtFor = key;
+		settings.clear();
+		if (m != null && pick != null) {
+			ProviderCatalog.Option reasoning = m.reasoning();
+			if (reasoning != null) {
+				settings.add(new Setting(reasoning.label(), optionSelect(reasoning, pick)));
+			}
+			for (ProviderCatalog.Option o : m.extraSelects()) {
+				settings.add(new Setting(o.label(), optionSelect(o, pick)));
+			}
+			for (ProviderCatalog.Option o : m.toggles()) {
+				T3Toggle tg = new T3Toggle(o.label(), logic.toggleValue(o), v -> {
+					if (logic.setToggle(o.id(), v)) {
+						changed();
+					}
+				});
+				if (o.description() != null) {
+					tg.setTooltip(o.description());
+				}
+				settings.add(new Setting(null, tg));
+			}
+		}
+		if (pick != null) {
+			settings.add(new Setting("Access", accessSelect(pick)));
+		}
+		form.clear();
+		form.add(search);
+		form.add(providerList);
+		form.add(modelList);
+		settings.forEach(s -> form.add(s.control()));
+		if (mode == Mode.THREAD) {
+			form.add(cancelButton);
+			form.add(applyButton);
+		}
+	}
+
+	private T3Select<Opt> optionSelect(ProviderCatalog.Option o, ModelPick pick) {
+		List<Opt> opts = new ArrayList<>();
+		if (o.defaultValue() == null) {
+			opts.add(new Opt(null, "Default"));
+		}
+		o.choices().forEach(c -> opts.add(new Opt(c.id(), c.label())));
+		String chosen = pick.optionString(o.id());
+		String shown = chosen != null ? chosen : o.defaultValue();
+		Opt current = opts.stream().filter(op -> java.util.Objects.equals(op.id(), shown)).findFirst().orElse(null);
+		T3Select<Opt> sel = new T3Select<>(opts, Opt::label, current, op -> {
+			if (logic.selectOption(o.id(), op.id())) {
 				changed();
 			}
 		});
-		if (logic.planAvailable()) {
-			ry = chipRow(g, "Mode", ry, List.of(new String[] {"default", "Chat"}, new String[] {"plan", "Plan"}),
-					cur == null ? null : cur.interaction().wire, v -> {
-						if (logic.setPlan("plan".equals(v))) {
-							changed();
-						}
-					});
+		if (o.description() != null) {
+			sel.setTooltip(o.description());
 		}
-		if (mode == Mode.THREAD) {
-			boolean dirty = !logic.changed().isEmpty();
-			String apply = busy ? "Applying…" : "Apply";
-			int bw = font.width(apply) + 10;
-			int bx = popX1 - bw - 4;
-			g.fill(bx, ry, bx + bw, ry + ROW, dirty && !busy ? 0xFF2F6F4F : CHIP);
-			g.text(font, apply, bx + 5, ry + 2, dirty && !busy ? TEXT : DIM);
-			if (dirty && !busy) {
-				hits.add(bx, ry, bx + bw, ry + ROW, this::apply);
-			}
-			String cancel = "Cancel";
-			int cw = font.width(cancel) + 10;
-			int cx = bx - cw - 4;
-			g.fill(cx, ry, cx + cw, ry + ROW, CHIP);
-			g.text(font, cancel, cx + 5, ry + 2, TEXT);
-			hits.add(cx, ry, cx + cw, ry + ROW, () -> {
-				logic.reset();
-				open = false;
-			});
-		}
+		return sel;
 	}
 
-	private static List<String[]> effortChoices(ProviderCatalog.Effort e) {
-		java.util.ArrayList<String[]> out = new java.util.ArrayList<>();
-		if (e.defaultValue() == null) {
-			out.add(new String[] {null, "Default"});
-		}
-		for (ProviderCatalog.Choice c : e.choices()) {
-			out.add(new String[] {c.id(), c.label()});
-		}
-		return out;
+	/** Every runtime mode the provider supports; the selected mode's description is the tooltip. */
+	private T3Select<Modes.Runtime> accessSelect(ModelPick pick) {
+		List<Modes.Runtime> modes = logic.runtimeModes();
+		Modes.Runtime shown = modes.contains(pick.runtime()) ? pick.runtime() : modes.getFirst();
+		T3Select<Modes.Runtime> sel = new T3Select<>(modes, r -> r.label, shown, r -> {
+			if (logic.selectRuntime(r)) {
+				changed(); // rebuilds the select, whose tooltip is then the new mode's
+			}
+		});
+		sel.setTooltip(shown.label + ": " + shown.description);
+		return sel;
 	}
 
-	/** A labelled row of choice chips; returns the next row's y. */
-	private int chipRow(GuiGraphicsExtractor g, String label, int ry, List<String[]> choices, @Nullable String current,
-			java.util.function.Consumer<@Nullable String> pick) {
-		int cx = popX0 + 4;
-		g.text(font, label, cx, ry + 2, DIM);
-		cx += Math.max(44, font.width(label) + 6);
-		for (String[] c : choices) {
-			int cw = font.width(c[1]) + 8;
-			if (cx + cw > popX1 - 2) {
-				break;
+	private boolean favorite(ProviderCatalog.Model m) {
+		return FAVORITES.isFavorite(favoriteKey(m.slug()));
+	}
+
+	/** {@code envId/instanceId/slug}: the same slug in two environments or two instances is two favorites. */
+	private String favoriteKey(String slug) {
+		ProviderCatalog.Provider p = logic.provider();
+		return (envId == null ? "-" : envId) + "/" + (p == null ? "-" : p.instanceId()) + "/" + slug;
+	}
+
+	/** Enter in the search box: the first model of the list. */
+	private void pickFirst() {
+		for (ModelRow r : modelList.items()) {
+			if (r.model() != null) {
+				if (logic.selectModel(r.model().slug())) {
+					changed();
+				}
+				return;
 			}
-			boolean sel = java.util.Objects.equals(c[0], current);
-			g.fill(cx, ry, cx + cw, ry + ROW, sel ? SELECTED : CHIP);
-			g.text(font, c[1], cx + 4, ry + 2, sel ? ACCENT : TEXT);
-			String v = c[0];
-			hits.add(cx, ry, cx + cw, ry + ROW, () -> pick.accept(v));
-			cx += cw + 3;
 		}
-		return ry + ROW + 2;
 	}
 
 	private void changed() {
+		builtFor = null;
 		ModelPick p = logic.pick();
 		if (mode == Mode.NEW_THREAD && p != null && envId != null) {
 			providers.setDefaultPick(envId, p);
@@ -561,22 +675,121 @@ public final class ModelPicker {
 			return;
 		}
 		busy = true;
-		status = Component.literal("Applying…");
-		statusColor = WARN;
+		status = "Applying...";
+		statusTone = T3Draw.Tone.WARN;
 		Screen returnTo = Minecraft.getInstance().gui.screen();
 		ActionsClient.configureThread(envId, threadId, threadTitle, logic, returnTo, r -> {
 			busy = false;
 			if (r.ok()) {
-				open = false;
-				status = Component.literal("Model updated");
-				statusColor = OK;
+				dismiss();
+				status = "Model updated";
+				statusTone = T3Draw.Tone.OK;
 				if (logic.pick() != null) {
 					listener.onPicked(logic.pick());
 				}
 			} else {
-				status = Component.literal(dev.t3craft.t3.ThreadControl.feedback(r).text());
-				statusColor = ERROR;
+				status = dev.t3craft.t3.ThreadControl.feedback(r).text();
+				statusTone = T3Draw.Tone.ERROR;
 			}
 		});
+	}
+
+	// ---- rows -----------------------------------------------------------------------------------
+
+	private final class ProviderRow implements T3List.Row<ProviderCatalog.Provider> {
+		@Override
+		public void render(GuiGraphicsExtractor g, Font f, ChatTheme t, ProviderCatalog.Provider p, Rect r, int mx, int my) {
+			ModelPick cur = logic.pick();
+			boolean sel = cur != null && cur.instanceId().equals(p.instanceId());
+			if (sel) {
+				g.fill(r.x(), r.y(), r.right(), r.bottom(), t.selected());
+			}
+			g.text(f, ChatDraw.clip(f, p.label(), r.w() - 8), r.x() + 4, r.y() + (r.h() - 8) / 2, sel ? t.accent() : t.text(), t.shadow());
+		}
+
+		@Override
+		public boolean mouseClicked(ProviderCatalog.Provider p, Rect r, double mx, double my, int button) {
+			if (MouseButtons.isLeft(button) && logic.selectProvider(p.instanceId())) {
+				modelList.scrollToTop();
+				changed();
+			}
+			return true;
+		}
+	}
+
+	private final class ModelsRow implements T3List.Row<ModelRow> {
+		@Override
+		public void render(GuiGraphicsExtractor g, Font f, ChatTheme t, ModelRow row, Rect r, int mx, int my) {
+			int ty = r.y() + (r.h() - 8) / 2;
+			if (row.isSwitch()) {
+				boolean hov = r.contains(mx, my);
+				String label = (row.legacyShown() ? "Hide legacy (" : "Show legacy (") + row.legacyCount() + ")";
+				g.text(f, label, r.x() + STAR_COL + 2, ty, hov ? t.accent() : t.muted(), t.shadow());
+				return;
+			}
+			ProviderCatalog.Model m = row.model();
+			ModelPick cur = logic.pick();
+			boolean sel = cur != null && cur.model().equals(m.slug());
+			if (sel) {
+				g.fill(r.x(), r.y(), r.right(), r.bottom(), t.selected());
+			}
+			int sx = r.x() + 4;
+			int sy = r.y() + (r.h() - STAR) / 2;
+			if (favorite(m)) {
+				g.fill(sx, sy, sx + STAR, sy + STAR, t.brass());
+			} else {
+				boolean overStar = mx >= r.x() && mx < r.x() + STAR_COL && r.contains(mx, my);
+				ChatDraw.outline(g, sx, sy, STAR, STAR, overStar ? t.brass() : t.disabled());
+			}
+			int right = r.right() - 4;
+			String badge = m.badge() != null ? m.badge() : m.isCustom() ? "custom" : null;
+			if (badge != null) {
+				int bw = f.width(badge);
+				g.text(f, badge, right - bw, ty, t.brass(), t.shadow());
+				right -= bw + 6;
+			}
+			int tx = r.x() + STAR_COL + 2;
+			String name = ChatDraw.clip(f, m.label(), right - tx);
+			g.text(f, name, tx, ty, sel ? t.accent() : m.isLegacy() ? t.muted() : t.text(), t.shadow());
+			if (m.subProvider() != null) {
+				int sx2 = tx + f.width(name) + 6;
+				if (right - sx2 > 12) {
+					g.text(f, ChatDraw.clip(f, m.subProvider(), right - sx2), sx2, ty, t.ghost(), t.shadow());
+				}
+			}
+		}
+
+		@Override
+		public boolean mouseClicked(ModelRow row, Rect r, double mx, double my, int button) {
+			if (!MouseButtons.isLeft(button)) {
+				return true;
+			}
+			if (row.isSwitch()) {
+				showLegacy = !showLegacy;
+			} else if (mx < r.x() + STAR_COL) {
+				FAVORITES.toggle(favoriteKey(row.model().slug())); // the list re-sorts on the next frame
+			} else if (logic.selectModel(row.model().slug())) {
+				changed();
+			}
+			return true;
+		}
+
+		@Override
+		public @Nullable List<String> tooltip(ModelRow row, Rect r, double mx, double my) {
+			if (row.isSwitch()) {
+				return null;
+			}
+			ProviderCatalog.Model m = row.model();
+			if (mx < r.x() + STAR_COL) {
+				return List.of(favorite(m) ? "Remove from favorites" : "Add to favorites");
+			}
+			List<String> lines = new ArrayList<>();
+			lines.add(m.name());
+			lines.add(m.slug());
+			if (m.isLegacy()) {
+				lines.add("Legacy model");
+			}
+			return lines;
+		}
 	}
 }

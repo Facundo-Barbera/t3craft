@@ -9,6 +9,7 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.Component;
 import org.jspecify.annotations.Nullable;
@@ -126,6 +127,33 @@ public final class T3Field extends T3Control {
 			return;
 		}
 		ChatDraw.field(g, t, bounds(), focused());
+	}
+
+	// ---- hosts that are not a Screen (a popover over the composer) ------------------------------------------
+	// The box was never added as a widget, so the host draws it and feeds it the keys and characters itself.
+
+	/** Draws the box (text, caret, hint) over its frame. */
+	public void renderBox(GuiGraphicsExtractor g, int mx, int my) {
+		if (box != null && visible()) {
+			box.extractRenderState(g, mx, my, 0f);
+		}
+	}
+
+	/** Gives or takes the keyboard from the box without a host screen. */
+	public void setBoxFocused(boolean focused) {
+		if (box != null && box.isFocused() != focused) {
+			box.setFocused(focused);
+		}
+	}
+
+	/** An editing key (arrows, backspace, copy and paste...) while the box has focus; true when it used it. */
+	public boolean boxKeyPressed(KeyEvent e) {
+		return box != null && box.isFocused() && box.keyPressed(e);
+	}
+
+	/** A typed character while the box has focus; true when it took it. */
+	public boolean boxCharTyped(int codepoint) {
+		return box != null && box.isFocused() && box.charTyped(new CharacterEvent(codepoint));
 	}
 
 	/** Enter while focused runs {@link #onSubmit}; true when it did. */

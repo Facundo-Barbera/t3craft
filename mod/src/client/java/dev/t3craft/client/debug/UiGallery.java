@@ -89,6 +89,8 @@ public final class UiGallery {
 					() -> new dev.t3craft.client.pieces.PieceBrowserScreen(null)),
 			new Scenario("inbox-pieces", "Main T3 screen with the piece browser in the thread's place (the ⋯ menu → Pieces)",
 					() -> inbox(true, true).withPage(new dev.t3craft.client.pieces.PieceBrowserPanel())),
+			new Scenario("model-picker", "The composer's model picker open over a fake catalog (reasoning and extra selects, switches, access, favorites, legacy, many providers)",
+					ModelPickerGalleryScreen::new),
 			new Scenario("queue", "Queued runs (reads the live queue, empty without a connection)", () -> new QueueScreen(null, null)));
 
 	private UiGallery() {

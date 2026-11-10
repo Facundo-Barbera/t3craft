@@ -1,5 +1,5 @@
 {
-  "description": "The composer's model picker open: providers on the left, models on the right, effort, access and plan rows.",
+  "description": "The composer's model picker open: search, providers on the left, models on the right (legacy behind a switch), the model's selects and switches, access.",
   "environments": [{"id": "studio", "label": "Studio Mac", "status": "ok", "control": true}],
   "projects": [{"env": "studio", "id": "p-t3craft", "title": "t3craft"}],
   "threads": [
