@@ -79,3 +79,8 @@ Toggle "Hub hologram" en la pantalla de ajustes (si cabe la fila). Apagado → n
 - Sin declutter con nametags (`PlateLayout` de AgentCraft): se resuelve por altura.
 
 Adaptado de AgentCraft (MIT), `StatusLampRenderer` (holograma del Goal Atrium); ver `THIRD_PARTY_NOTICES.md`.
+
+**Update (world text, #34):** in the default `labels.style: "hologram"` the hologram is one card with a
+code-drawn progress ring, its `done/total` caption and a soft beam, plus bubbles over the decision
+podiums while a decision waits; `labels.hologram.hubHologram: false` switches both off. The lines
+above are the `"classic"` style. See `docs/features/world-text.md`.

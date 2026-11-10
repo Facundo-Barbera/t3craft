@@ -39,6 +39,30 @@ Tests: `mod/src/test/java/dev/t3craft/client/config/` (25 tests JUnit, todos en 
   siguen en `config/t3craft/credentials/` (main) y esta rama no los lee salvo para re-guardarlos
   intactos al renombrar.
 
+### World text (`labels`, #34)
+
+Additive block read by `client/npc/LabelConfig` (re-read within ~2 s); see `docs/features/world-text.md`.
+A missing key or a bad value keeps its default.
+
+| key | default | meaning |
+|---|---|---|
+| `labels.mode` | `"compact"` | `"detailed"` = the old layout (chips on the tag, panel always on, no caps, classic look) |
+| `labels.detailDistance` | `4.0` | blocks: a detail panel wants to open this close (0 to 64) |
+| `labels.titleMax` | `24` | code points of the title on the tag / in the open pill (4 to 128) |
+| `labels.style` | `"hologram"` | `"hologram"`: pill plates, event bubbles, podium bubble, hub card; `"classic"`: the look before |
+| `labels.nearDistance` | `12` | blocks: NPC tags / pills further away hide unless aimed at (0 = any distance) |
+| `labels.maxVisible` | `6` | NPC plates shown at once (0 = no cap) |
+| `labels.maxPanels` | `1` | detail panels open at once (0 = no cap) |
+| `labels.declutter` | `true` | hide the lower-ranked of two overlapping NPC plates |
+| `labels.hologram.npcTags` | `true` | NPC tags, pills and detail panels at all |
+| `labels.hologram.workstationScreens` | `true` | the desks' floating screens at all |
+| `labels.hologram.hubHologram` | `true` | the hub card (also needs `hud.hologram`) and the decision podium bubbles |
+| `labels.hologram.scheduleBoard` | `true` | the schedule board's text at all |
+
+`"hologram": false` switches every source off at once. The desk screens also hide beyond
+`blocks.monitor.nearDistance` (default 8, +2 of hysteresis). Previous behaviour:
+`"style": "classic", "nearDistance": 0, "maxVisible": 0, "maxPanels": 0, "declutter": false`.
+
 ### Pantallas
 - `SettingsScreen`: avisos (todos / chat / toasts / toasts de conexión), sonidos (todos / needs you /
   done / error), filtro por defecto (ventana reciente en horas, máx. por entorno, subagentes), botones

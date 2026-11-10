@@ -24,3 +24,7 @@ Config (additive, `config/t3craft.json`, re-read within ~2 s):
 
 `"mode": "detailed"` brings back the previous layout (chips on the name tag, panel always on).
 Pure logic and tests: `NpcLabels`, `LabelConfig`, `NpcLabelsTest`.
+
+**Update (world text, #34):** name tags now show only within `labels.nearDistance` or while aimed
+at, at most `labels.maxVisible` at once and never overlapping; only `labels.maxPanels` panel opens at
+a time; in the default hologram style the tag becomes a pill plate. See `docs/features/world-text.md`.
