@@ -39,11 +39,62 @@ centrada: una pieza de ancho `across` cubre `x ∈ [-(across-1)/2, across/2]`. U
   `lot_n_gate` (GATE) y `lot_n_hall_0..2` (MODULE, hijos del lote), más `spawn`. Un hueco lleva el tag
   `occupied` si un módulo del roster está en él. Los lotes se unen al hub con enlaces `SOLID`.
 - Gancho: `HqStyle.mapLayout(HqLayout)` (por defecto `null`); `RingCampusStyle` lo implementa.
-- **El pintor no cambió.** `RingCampusGenerator` / `hq.citadel.*` siguen dibujando los bloques exactamente como
-  antes (mismos bloques, mismo hash, mismo `buildKey`), porque las piezas de la ciudadela están horneadas en
-  ese código y reescribirlo sin compilar ni poder comparar renders era un riesgo que no valía la pena. Lo que
-  hay ahora es el **modelo** (forma + huecos) en paralelo, derivado de la misma geometría. Pasar el pintado
-  detrás de `PieceSource` es trabajo del catálogo de piezas, hueco a hueco.
+- **El pintor, por defecto, no cambió.** Con `mapgen.citadel.pieces = "legacy"` (el predeterminado)
+  `RingCampusGenerator` / `hq.citadel.*` dibujan los bloques exactamente como antes (mismos bloques, mismo hash,
+  mismo `buildKey`). Con `"slots"` algunos huecos se llenan a través de `PieceSource`: ver la sección siguiente.
+- Los huecos de sala y de portal (`roomSlot`) ya no pasan una fila más allá del muro del fondo cuando la sala
+  tiene fondo par (`halfDeep = (d - 1) / 2`).
+
+## La ciudadela por huecos (`mapgen.citadel.pieces`, issue #37)
+
+**Clave** (aditiva, solo lectura): `config/t3craft.json` → `"mapgen": {"citadel": {"pieces": "legacy" | "slots"}}`.
+Predeterminado `"legacy"`. Se lee en cada plan, así que cambiarla es RELOAD: el siguiente plan ya la usa (sin
+reiniciar). La propiedad `-Dt3craft.citadel.pieces=legacy|slots` gana al archivo (útil para renders sin Fabric).
+Un valor desconocido es `legacy` con un aviso en el log.
+
+**Cómo funciona** (`hq.citadel.CitadelSlots`): con `"slots"`, el generador calcula también el `MapLayout` de la
+ciudadela (`CitadelMapGenerator`) y, en los sitios de abajo, el pintor pide la pieza a la `PieceSource` del hueco
+(`CitadelSlots.source()`, por defecto `CitadelPieceSource`; el catálogo real se enchufa con
+`CitadelSlots.use(source)`). Le pasa el hueco movido a su propio marco (pinta plano, `y = 1`; el relieve sube cada
+terraza al final) y recortado a su **caja libre**, que puede ser menor que el hueco del mapa. Si la fuente no tiene
+nada que quepa, se pinta la pieza de siempre (camino viejo). Si la pieza taparía una columna de ancla, el spawn,
+una sala construida o una celda reservada, se vuelve a pedir con la caja un bloque menor por lado, hasta una sola
+celda, y si no hay suerte, camino viejo. Si la pieza cruza un escalón del relieve, también camino viejo. La pieza se
+sube con su terraza como un bloque (`CitadelCanvas.rigid`), igual que las del catálogo.
+
+| hueco | dónde | caja que se pide | familias (en orden; la primera sale de la semilla) | en vez de |
+|---|---|---|---|---|
+| `lot_n_court` (`PLAZA`) | centro del patio de cada barrio | `±s(1)` (5×5 a escala 2), alto `sy(8)`; reserva las anclas del lote (ala y paseo en `(2, 2)`) | fuente, pozo, estatua, árbol | árbol, estanque, fuente o cenador del centro; los cuadrantes y los faroles de las esquinas se quedan |
+| `lot_n_hall_h` (`MODULE`, sin `occupied`) | sitio de una sala aún no construida | el interior de la sala, frente al patio, alto `2·floorH` | casa, cenador, anexo, jardín | el jardín (o la casa de la ciudadela densa); el césped, el musgo y los arbustos de las esquinas se quedan |
+| `lot_n` (`MODULE`, sin `occupied`) | centro de un lote vacío | tamaño del patio (`±court`), alto `sy(12)`; solo con `catalog.enabled = 1` (el predeterminado) | centro de plaza, fuente, cenador, jardín | nada: luego `CitadelPlacement` compone el resto del lote alrededor (solo usa suelo blando libre) |
+
+Siempre por el camino viejo, en los dos modos: `hub` (`CENTRE`), `node_0..7` (`NODE`), `lot_n_gate` (`GATE`),
+las salas `occupied` (mesas, pantallas, anclas), los lotes `occupied` y `spawn`. `CitadelPieceSource` devuelve
+`null` para todos ellos, y también para cualquier hueco con el tag `occupied`. Un hueco con el tag
+`family:<familia>` (`family:fountain`) solo acepta esa familia.
+
+**Qué pieza** (`CitadelPieceSource`): para cada familia, cada variante del catálogo (`Catalog.of`) con peso > 0
+recibe la caja más grande de su rango que quepa en el hueco (primero el frente, luego el fondo; el alto es el del
+hueco). Entre las que caben elige por peso con la semilla del hueco. La variante se construye sola en un
+`CitadelCanvas` aparte, con el frente al norte y centrada en el origen (el marco de pieza), y vuelve como
+`mapgen.Piece`. El pintor la gira y la coloca con `SlotPlacer.place`, y deduce la capa de cada bloque, porque
+`Piece` no la lleva: faroles colgados y carteles de techo cuelgan; carteles de pared, estandartes y antorchas de
+pared van después de los sólidos.
+
+**Determinismo:** la semilla es `PieceSource.seedFor(slot, map)`: semilla del mapa (0 en la ciudadela), columna
+`x`, `z` del origen del hueco e id del hueco. No usa la altura, así que un hueco conserva su semilla cuando el
+relieve lo sube. El orden de los huecos es el del pintor. Mismo roster y misma configuración, mismo plan.
+
+**Presupuesto por tick:** no cambia. Esto solo cambia qué celdas tiene el plan, y los constructores lo colocan con
+su presupuesto de siempre.
+
+**Interfaz compartida (aditivo):** `PieceSource.seedFor(Slot, MapLayout)` (método estático nuevo; `pieceFor` no
+cambia). Nada más en `mapgen`.
+
+**Compararlo en el juego:** poner `"slots"` (o `"legacy"`) en `config/t3craft.json` y, dentro del mundo HQ,
+`/t3craft demo rebuild` (vuelve a generar el plan y lo construye encima). Para una comparación limpia, sin restos
+del otro modo: `/t3craft debug reset-hq` (+ `confirm`). Sin tocar el mundo: `/t3craft piece reload` y luego
+`/t3craft piece show hq_barrio_small` (o `hq_barrio_large`, `hq_ring_1`).
 
 ## Islas flotantes (`floating-islands`)
 
@@ -106,7 +157,9 @@ se toca; no hay forma de que los dos se mezclen (`VanillaDemoWorld.isDemoServer`
 1. Compilar en el PC: `./gradlew compileJava compileClientJava` (coordinador, con `tools/heavy.sh`).
 2. Jugarlo: `/t3craft islands`; comprobar que la isla de aparición aparece antes de entrar, que al andar
    hacia un borde sale el puente hacia la vecina y que las islas lejanas se van construyendo.
-3. Enganchar el catálogo de piezas a `PieceSource` (islas primero; luego el pintado del HQ hueco a hueco).
+3. Enganchar el catálogo de piezas a `PieceSource` (islas primero). La ciudadela ya pinta patios, sitios de sala
+   libres y centros de lotes vacíos por huecos con `mapgen.citadel.pieces = "slots"` (#37); falta probarlo en el
+   juego, y quedan por pasar el hub, los nodos, los portales y las salas.
 
 ## Cambios fuera de las carpetas nuevas
 
