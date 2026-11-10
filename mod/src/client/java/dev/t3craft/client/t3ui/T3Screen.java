@@ -271,6 +271,10 @@ public final class T3Screen extends Screen {
 	private double clickY;
 
 	private T3UiLayout layout = T3UiLayout.compute(0, 0, true);
+	/** #42: the T3 scale the screen was laid out with ({@link UiScale}); width / height are logical units. */
+	private UiScale.Frame uiFrame = UiScale.Frame.NATIVE;
+	/** #42: a scale forced for this screen (the gallery), or null = {@code layout.uiScale} in the config. */
+	private UiScale.@Nullable Pref uiScaleOverride;
 	private T3UiLayout.SidebarRects sr = T3UiLayout.sidebar(Rect.EMPTY);
 	private T3UiLayout.MainRects mr = T3UiLayout.main(Rect.EMPTY, 0);
 	private @Nullable EditBox search;
@@ -388,6 +392,17 @@ public final class T3Screen extends Screen {
 		return this;
 	}
 
+	/** #42: draws this screen at {@code pref} whatever the config says (the gallery's {@code inbox-scale}). */
+	public T3Screen withUiScale(UiScale.@Nullable Pref pref) {
+		uiScaleOverride = pref;
+		return this;
+	}
+
+	private UiScale.Pref uiScalePref() {
+		UiScale.Pref o = uiScaleOverride;
+		return o != null ? o : UiScale.configured();
+	}
+
 	/** Screen Esc returns to (the archive, a dialog's opener); null = back to the game. */
 	public T3Screen withParent(@Nullable Screen parent) {
 		this.parent = parent;
@@ -423,6 +438,8 @@ public final class T3Screen extends Screen {
 
 	@Override
 	protected void init() {
+		uiFrame = UiScale.frame(minecraft, uiScalePref());
+		uiFrame.applyTo(this, minecraft); // #42: width / height in logical units from here on (layout, compact mode, caps)
 		if (draft != null && ThreadDraft.kept == draft) {
 			ThreadDraft.kept = null; // back from a confirmation / pairing screen: still ours
 		}
@@ -761,6 +778,9 @@ public final class T3Screen extends Screen {
 		pages.tick();
 		right.tick();
 		tickLayoutPrefs();
+		if (ticks % LAYOUT_POLL_TICKS == 0 && minecraft != null && !UiScale.frame(minecraft, uiScalePref()).equals(uiFrame)) {
+			rebuildWidgets(); // #42: layout.uiScale changed (config reload, the settings row)
+		}
 		refresh();
 		if (conversation != null) {
 			conversation.tick();
@@ -995,12 +1015,27 @@ public final class T3Screen extends Screen {
 
 	@Override
 	public void extractBackground(GuiGraphicsExtractor g, int mouseX, int mouseY, float a) {
-		g.fill(0, 0, width, height, theme.backdrop());
-		g.fillGradient(0, 0, width, height, theme.backdropBottom() & 0x00FFFFFF, theme.backdropBottom());
+		uiFrame.render(g, () -> {
+			g.fill(0, 0, width, height, theme.backdrop());
+			g.fillGradient(0, 0, width, height, theme.backdropBottom() & 0x00FFFFFF, theme.backdropBottom());
+		});
 	}
 
+	/**
+	 * #42: everything is drawn in logical units under the T3 scale ({@link UiScale.Frame#render}); the mouse is
+	 * converted once here, and the frame's tooltips are drawn at the end of the same scaled pass.
+	 */
 	@Override
-	public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float a) {
+	public void extractRenderState(GuiGraphicsExtractor g, int guiMouseX, int guiMouseY, float a) {
+		int mouseX = uiFrame.toLogical(guiMouseX);
+		int mouseY = uiFrame.toLogical(guiMouseY);
+		uiFrame.render(g, () -> {
+			renderLogical(g, mouseX, mouseY, a);
+			uiFrame.flushDeferred(g, mouseX, mouseY, a);
+		});
+	}
+
+	private void renderLogical(GuiGraphicsExtractor g, int mouseX, int mouseY, float a) {
 		hits.clear();
 		menuHits.clear();
 		if (layout.sidebar().w() > 0) {
@@ -1770,8 +1805,34 @@ public final class T3Screen extends Screen {
 
 	// ---- input --------------------------------------------------------------------------------
 
+	// #42: Minecraft hands the events in its GUI units; they are converted to logical units once, here.
+
 	@Override
-	public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+	public boolean mouseClicked(MouseButtonEvent guiEvent, boolean doubleClick) {
+		return clicked(uiFrame.toLogical(guiEvent), doubleClick);
+	}
+
+	@Override
+	public boolean mouseDragged(MouseButtonEvent guiEvent, double dx, double dy) {
+		return dragged(uiFrame.toLogical(guiEvent), uiFrame.toLogical(dx), uiFrame.toLogical(dy));
+	}
+
+	@Override
+	public boolean mouseReleased(MouseButtonEvent guiEvent) {
+		return released(uiFrame.toLogical(guiEvent));
+	}
+
+	@Override
+	public boolean mouseScrolled(double guiX, double guiY, double scrollX, double scrollY) {
+		return scrolled(uiFrame.toLogical(guiX), uiFrame.toLogical(guiY), scrollX, scrollY);
+	}
+
+	@Override
+	public void mouseMoved(double guiX, double guiY) {
+		super.mouseMoved(uiFrame.toLogical(guiX), uiFrame.toLogical(guiY));
+	}
+
+	private boolean clicked(MouseButtonEvent event, boolean doubleClick) {
 		double mx = event.x();
 		double my = event.y();
 		int button = event.button();
@@ -1894,8 +1955,7 @@ public final class T3Screen extends Screen {
 		focus = T3UiKeys.Focus.LIST;
 	}
 
-	@Override
-	public boolean mouseDragged(MouseButtonEvent event, double dx, double dy) {
+	private boolean dragged(MouseButtonEvent event, double dx, double dy) {
 		if (sidebarSplitter.mouseDragged(event.x()) || rightSplitter.mouseDragged(event.x())) {
 			return true; // #39: resizing; the width is saved on release
 		}
@@ -1908,8 +1968,7 @@ public final class T3Screen extends Screen {
 		return (composer != null && composer.mouseDragged(event.x(), event.y())) || super.mouseDragged(event, dx, dy);
 	}
 
-	@Override
-	public boolean mouseReleased(MouseButtonEvent event) {
+	private boolean released(MouseButtonEvent event) {
 		boolean split = sidebarSplitter.mouseReleased();
 		split |= rightSplitter.mouseReleased();
 		if (split) {
@@ -1923,8 +1982,7 @@ public final class T3Screen extends Screen {
 		return (composer != null && composer.mouseReleased()) || super.mouseReleased(event);
 	}
 
-	@Override
-	public boolean mouseScrolled(double x, double y, double scrollX, double scrollY) {
+	private boolean scrolled(double x, double y, double scrollX, double scrollY) {
 		for (T3Slots.Popup p : popups) {
 			if (p.isOpen() && p.mouseScrolled(x, y, scrollY)) {
 				return true;
