@@ -42,7 +42,8 @@ Tests: `mod/src/test/java/dev/t3craft/client/config/` (25 tests JUnit, todos en 
 ### World text (`labels`, #34)
 
 Additive block read by `client/npc/LabelConfig` (re-read within ~2 s); see `docs/features/world-text.md`.
-A missing key or a bad value keeps its default.
+A missing key or a bad value keeps its default. Settings → World text edits the keys of this table except
+`mode`, `detailDistance` and `titleMax` (file only).
 
 | key | default | meaning |
 |---|---|---|

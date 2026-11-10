@@ -62,10 +62,21 @@ Applies in compact mode; `"style": "classic"` (or `"mode": "detailed"`) keeps th
 }
 ```
 
-Every key is documented in `docs/features/config.md` ("World text"). To get the previous behaviour
+Every key is documented in `docs/features/config.md` ("World text").
+
+## Settings page
+
+Settings has a fourth tab, **World text** (`client/config/SettingsPanel`, state and file merge in
+`client/config/WorldTextSettings`; gallery `/t3dev ui settings-world-text`). It edits `labels.style` (select),
+`nearDistance`, `maxVisible` and `maxPanels` (number fields, same ranges as the parser: 0 to 128 blocks, 0 to 256),
+`declutter` and the four `labels.hologram.*` switches. Like the other tabs it edits a draft; **Save** validates the
+numbers and writes the `labels` block of `config/t3craft.json` only when the tab changed something in it. The rest of
+the block (`mode`, `detailDistance`, `titleMax`, unknown keys) is kept, and a `"hologram": false` shorthand becomes the
+four explicit switches. **Reset to defaults** puts the draft back to the defaults of the table in `config.md` (Save keeps
+them). The game re-reads the file within ~2 s: no restart. "Reload from disk" (Connections) re-reads this tab too. To get the previous behaviour
 back: `"style": "classic", "nearDistance": 0, "maxVisible": 0, "maxPanels": 0, "declutter": false`
 (and `blocks.monitor.nearDistance` large, e.g. 64, for the desk screens).
 
 ## Out of scope
 
-The "World text" section of Settings (the keys are ready for it) and the per-surface `world` scale.
+The per-surface `world` scale.

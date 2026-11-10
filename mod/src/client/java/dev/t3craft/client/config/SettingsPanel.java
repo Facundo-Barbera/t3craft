@@ -34,7 +34,8 @@ import org.jspecify.annotations.Nullable;
 public final class SettingsPanel extends T3Panel {
 	private static final int ROW = 18;
 	private static final int MAX_W = 440;
-	private static final List<String> TABS = List.of("General", "Notifications", "Connections");
+	private static final List<String> TABS = List.of("General", "Notifications", "Connections", "World text");
+	private static final int TAB_WORLD_TEXT = 3;
 
 	private final EnvironmentActions actions;
 	private T3CraftSettings draft;
@@ -43,6 +44,15 @@ public final class SettingsPanel extends T3Panel {
 	private String maxText;
 	private @Nullable T3Field windowField;
 	private @Nullable T3Field maxField;
+	/** World text tab: the draft, what the file held when it was last read or saved, and the three number fields. */
+	private WorldTextSettings worldText;
+	private WorldTextSettings worldTextSaved;
+	private String nearText;
+	private String visibleText;
+	private String panelsText;
+	private @Nullable T3Field nearField;
+	private @Nullable T3Field visibleField;
+	private @Nullable T3Field panelsField;
 	private String status = "";
 	private Tone statusTone = Tone.MUTED;
 
@@ -51,6 +61,8 @@ public final class SettingsPanel extends T3Panel {
 		this.draft = ConfigManager.get().settings();
 		this.windowText = formatNumber(draft.recentWindowHours());
 		this.maxText = Integer.toString(draft.maxPerEnvironment());
+		this.worldTextSaved = WorldTextSettings.current();
+		loadWorldText(worldTextSaved);
 		if (ConfigManager.get().readOnly()) {
 			say("config/t3craft.json is from a newer T3Craft: changes will not be saved", Tone.ERROR);
 		} else if (!ConfigManager.get().warnings().isEmpty()) {
@@ -58,7 +70,7 @@ public final class SettingsPanel extends T3Panel {
 		}
 	}
 
-	/** Opens on tab {@code i} (0 General, 1 Notifications, 2 Connections): the gallery. */
+	/** Opens on tab {@code i} (0 General, 1 Notifications, 2 Connections, 3 World text): the gallery. */
 	public SettingsPanel tab(int i) {
 		this.tab = Math.max(0, Math.min(i, TABS.size() - 1));
 		return this;
@@ -113,6 +125,7 @@ public final class SettingsPanel extends T3Panel {
 		return switch (tab) {
 			case 0 -> general(x, y, w);
 			case 1 -> notifications(x, y, w);
+			case TAB_WORLD_TEXT -> worldTextTab(x, y, w);
 			default -> connections(x, y, w);
 		};
 	}
@@ -202,6 +215,8 @@ public final class SettingsPanel extends T3Panel {
 			if (maxField != null) {
 				maxField.setValue(maxText);
 			}
+			worldTextSaved = WorldTextSettings.current();
+			loadWorldText(worldTextSaved);
 			actions.reload();
 			say("Reloaded " + ConfigManager.get().file().getFileName(), Tone.OK);
 			host().relayout();
@@ -217,6 +232,95 @@ public final class SettingsPanel extends T3Panel {
 	private int link(int x, int y, int w, T3Icon icon, String label, Runnable action) {
 		place(new T3Button(icon, label, action), x, y, w, T3Control.H);
 		return y + ROW;
+	}
+
+	/** The floating text of the HQ (docs/features/world-text.md): the {@code labels} block of the config file. */
+	private int worldTextTab(int x, int y, int w) {
+		T3Field near = nearField();
+		T3Field visible = visibleField();
+		T3Field panels = panelsField();
+		y = heading(x, y, w, "Style");
+		y = text(x + 4, y, w - 8, "Hologram: one pill per NPC, speech bubbles on events and the hub card. Classic: the vanilla name tag.", Tone.MUTED);
+		T3Select<String> style = new T3Select<>(WorldTextSettings.STYLES, SettingsPanel::styleLabel, worldText.style(),
+				v -> worldText = worldText.withStyle(v));
+		place(style, x, y + 2, w, T3Control.H);
+		y += T3Control.H + 10;
+
+		y = heading(x, y, w, "NPC plates");
+		y = text(x + 4, y, w - 8, "Show plates within (blocks, 0 = any distance)", Tone.MUTED);
+		placeField(near, x, y + 1, w);
+		y += T3Control.H + 7;
+		y = text(x + 4, y, w - 8, "Plates shown at once (0 = no cap)", Tone.MUTED);
+		placeField(visible, x, y + 1, w);
+		y += T3Control.H + 7;
+		y = text(x + 4, y, w - 8, "Detail panels open at once (0 = no cap)", Tone.MUTED);
+		placeField(panels, x, y + 1, w);
+		y += T3Control.H + 5;
+		y = toggle(x, y, w, "Hide overlapping plates", worldText.declutter(), v -> worldText = worldText.withDeclutter(v));
+		y += 8;
+
+		y = heading(x, y, w, "Show world text for");
+		y = toggle(x, y, w, "NPC tags and panels", worldText.npcTags(), v -> worldText = worldText.withNpcTags(v));
+		y = toggle(x, y, w, "Desk screens", worldText.workstationScreens(), v -> worldText = worldText.withWorkstationScreens(v));
+		y = toggle(x, y, w, "Hub card and podium bubbles", worldText.hubHologram(), v -> worldText = worldText.withHubHologram(v));
+		y = toggle(x, y, w, "Schedule board", worldText.scheduleBoard(), v -> worldText = worldText.withScheduleBoard(v));
+		y += 8;
+
+		place(new T3Button(T3Icon.REFRESH_CW, "Reset to defaults", this::resetWorldText), x, y, w, T3Control.H);
+		y += ROW;
+		return text(x + 4, y + 2, w - 8, "Save writes the labels block of " + ConfigManager.get().file().getFileName()
+				+ "; the game picks it up within a couple of seconds.", Tone.MUTED) + 6;
+	}
+
+	private static String styleLabel(String style) {
+		return WorldTextSettings.CLASSIC.equals(style) ? "Classic" : "Hologram";
+	}
+
+	/** Puts {@code s} in the draft and in the three number fields. */
+	private void loadWorldText(WorldTextSettings s) {
+		worldText = s;
+		nearText = formatNumber(s.nearDistance());
+		visibleText = Integer.toString(s.maxVisible());
+		panelsText = Integer.toString(s.maxPanels());
+		if (nearField != null) {
+			nearField.setValue(nearText);
+		}
+		if (visibleField != null) {
+			visibleField.setValue(visibleText);
+		}
+		if (panelsField != null) {
+			panelsField.setValue(panelsText);
+		}
+	}
+
+	private void resetWorldText() {
+		loadWorldText(WorldTextSettings.DEFAULTS);
+		say("World text is back to its defaults: Save to keep them", Tone.MUTED);
+		host().relayout();
+	}
+
+	private T3Field nearField() {
+		if (nearField == null) {
+			nearField = new T3Field(font(), "Show plates within (blocks)").maxLength(8).onChange(v -> nearText = v);
+			nearField.setValue(nearText);
+		}
+		return nearField;
+	}
+
+	private T3Field visibleField() {
+		if (visibleField == null) {
+			visibleField = new T3Field(font(), "Plates shown at once").maxLength(4).onChange(v -> visibleText = v);
+			visibleField.setValue(visibleText);
+		}
+		return visibleField;
+	}
+
+	private T3Field panelsField() {
+		if (panelsField == null) {
+			panelsField = new T3Field(font(), "Detail panels open at once").maxLength(4).onChange(v -> panelsText = v);
+			panelsField.setValue(panelsText);
+		}
+		return panelsField;
 	}
 
 	// ---- state ---------------------------------------------------------------------------------------------
@@ -308,12 +412,27 @@ public final class SettingsPanel extends T3Panel {
 			say("Max per environment must be a whole number, 1 to " + T3CraftSettings.MAX_PER_ENV_LIMIT, Tone.ERROR);
 			return;
 		}
+		WorldTextSettings world;
+		try {
+			world = worldText.withNumbers(nearText, visibleText, panelsText);
+		} catch (IllegalArgumentException e) {
+			say(e.getMessage(), Tone.ERROR);
+			return;
+		}
 		T3CraftSettings next = draft.withVisibility(hours, max.intValue(), draft.includeSubagents());
 		ConfigManager.SaveResult r = ConfigManager.get().update(s -> next);
 		draft = ConfigManager.get().settings();
 		if (r.ok()) {
-			actions.reload();
-			say(r.message() + " and reloaded", Tone.OK);
+			// the labels block is only touched when this page changed something in it
+			ConfigManager.SaveResult w = world.equals(worldTextSaved) ? r : world.save();
+			if (w.ok()) {
+				worldText = world;
+				worldTextSaved = world;
+				actions.reload();
+				say(r.message() + " and reloaded", Tone.OK);
+			} else {
+				say(w.message(), Tone.ERROR);
+			}
 		} else {
 			say(r.message(), Tone.ERROR);
 		}

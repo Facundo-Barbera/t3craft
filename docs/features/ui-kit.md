@@ -109,7 +109,7 @@ Los iconos son los `T3Icon` (SVG de Lucide, ver `docs/tools/icons.md`), tintados
 
 | Pantalla | Ahora | Notas |
 |---|---|---|
-| **Settings** | `SettingsPanel` (página) + `SettingsScreen` (host `T3PanelScreen`) | Tres pestañas: General (filtro, HUD), Notifications (interruptores, sonidos, señales en segundo plano con un `T3Select` para la barra de acción) y Connections (Environments…, Key binds…, Outbound events…, Reload from disk, Reset HQ world). Pie con estado, Save y Done. Mismo borrador y mismas reglas de guardado que antes. |
+| **Settings** | `SettingsPanel` (página) + `SettingsScreen` (host `T3PanelScreen`) | Cuatro pestañas: General (filtro, HUD), Notifications (interruptores, sonidos, señales en segundo plano con un `T3Select` para la barra de acción), Connections (Environments…, Key binds…, Outbound events…, Reload from disk, Reset HQ world) y World text (estilo, límites de placas, fuentes de texto flotante y Reset to defaults; escribe el bloque `labels`, ver `docs/features/world-text.md`). Pie con estado, Save y Done. Mismo borrador y mismas reglas de guardado que antes. |
 | **Environments** | `EnvironmentsPanel` + `EnvironmentsScreen` | `T3List` con las cuatro acciones por fila; Pair new… y Refresh en la cabecera. Unpair y Revoke piden confirmación con un modal del kit sobre la página. |
 | **Pair** | `PairScreen` (`T3DialogScreen`) | Tres `T3Field`, interruptor de acceso (lectura + control / solo lectura), estado en vivo. Enter en cualquier campo empareja. |
 | **OperatePair** | `OperatePairScreen` (`T3DialogScreen`) | Aviso de riesgo, comando del host, campo, estado. |
@@ -218,6 +218,7 @@ Con el juego abierto (cliente de desarrollo), `/t3dev ui` lista los escenarios y
 /t3dev ui settings              ajustes como pantalla propia (General)
 /t3dev ui settings-notifications
 /t3dev ui settings-connections
+/t3dev ui settings-world-text
 /t3dev ui environments          lista de entornos falsos (ok, connecting, offline, con control)
 /t3dev ui pair                  emparejado (control por defecto)
 /t3dev ui pair-readonly
