@@ -119,7 +119,7 @@ desnivel: la misma pareja siempre da el mismo puente. Los empinados (modo escale
 
 - `SoundEvents.AMETHYST_BLOCK_CHIME` se usa como `SoundEvent` en `ServerLevel.playSound(null, pos, …)`;
   si en esta versión fuera un `Holder`, cambiar a `.value()`.
-- `Block.updateFromNeighbourShapes(state, level, pos)` (ya usado en `hq.PlanApplier`).
+- `Block.updateFromNeighbourShapes(state, level, pos)` (ya usado en `hq.plan.PlanApplier`).
 - `Component#withColor(int)` (ya usado en `Notifier`).
 - `Bridge` cambió de forma (record con `style`, `startA`, `startB`, `deck`); `BridgePlanner.plan` ahora pide
   el `IslandField`. Solo los usa `IslandsRuntime`.

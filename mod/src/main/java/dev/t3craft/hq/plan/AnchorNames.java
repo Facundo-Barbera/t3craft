@@ -1,8 +1,8 @@
 package dev.t3craft.hq.plan;
 
 import dev.t3craft.hq.HqInput;
-import dev.t3craft.hq.HqKit;
 import dev.t3craft.hq.HqLayout;
+import dev.t3craft.hq.style.HqKit;
 
 /**
  * Anchor names published by the HQ plan ({@link BuildPlan#anchors()}). Other modules (NPC behaviour,

@@ -1,11 +1,11 @@
 package dev.t3craft.piece;
 
-import dev.t3craft.hq.HqKit;
 import dev.t3craft.hq.RingCampusStyle;
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.catalog.Family;
 import dev.t3craft.hq.citadel.catalog.Plot;
 import dev.t3craft.hq.citadel.catalog.Variant;
+import dev.t3craft.hq.style.HqKit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;

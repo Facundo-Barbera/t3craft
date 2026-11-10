@@ -20,7 +20,7 @@ public record HqTarget(HqInput input, HqLayout layout, BuildPlan plan, List<Stri
 	public static HqTarget compute(HqInput input, @Nullable HqLayout previous, int maxModules) {
 		Set<String> dropped = new TreeSet<>();
 		HqInput in = input;
-		dev.t3craft.hq.HqStyle style = HqSiteFrame.style();
+		dev.t3craft.hq.style.HqStyle style = HqSiteFrame.style();
 		HqLayout layout = style.allocate(in, previous);
 		// Each pass removes the threads seated beyond capacity; desks of the others are kept, so it settles quickly.
 		for (int pass = 0; pass < 64 && over(layout, maxModules); pass++) {

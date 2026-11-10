@@ -6,6 +6,7 @@ import dev.t3craft.hq.plan.AnchorNames;
 import dev.t3craft.hq.plan.BuildPlan;
 import dev.t3craft.hq.plan.Placement;
 import dev.t3craft.hq.plan.Workstation;
+import dev.t3craft.hq.style.HqStyle;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;

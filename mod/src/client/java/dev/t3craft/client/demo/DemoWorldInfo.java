@@ -55,7 +55,7 @@ public record DemoWorldInfo(Path root, int originX, int originY, int originZ, bo
 		try {
 			String built = DemoClient.builtLayoutId(info.root());
 			String layoutId = built != null ? built : dev.t3craft.client.hq.layout.HqLayoutConfig.selectedId();
-			dev.t3craft.hq.HqStyle style = dev.t3craft.hq.HqStyles.forLayout(layoutId);
+			dev.t3craft.hq.style.HqStyle style = dev.t3craft.hq.style.HqStyles.forLayout(layoutId);
 			java.util.concurrent.CompletableFuture<dev.t3craft.hq.plan.BuildPlan> f = dev.t3craft.hq.HqEmptyPlan.start(style);
 			if (!f.isDone() || f.isCompletedExceptionally()) {
 				return null;

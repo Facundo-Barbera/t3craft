@@ -196,7 +196,7 @@ public final class HqConstruction {
 			old.cancel(false);
 		}
 		HqLayout layout = saved.layout();
-		dev.t3craft.hq.HqStyle style = HqSiteFrame.style();
+		dev.t3craft.hq.style.HqStyle style = HqSiteFrame.style();
 		int gen = ++loadGen;
 		loadLayout = layout;
 		loadStyle = style.id();

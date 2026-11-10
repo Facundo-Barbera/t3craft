@@ -23,7 +23,7 @@ public final class DemoPlacement {
 	 * validators and {@code DemoHqReachabilityTest}).
 	 */
 	public static int[] viewpoint(DemoWorldSpec spec, int worldMinY) {
-		dev.t3craft.hq.HqStyle style = dev.t3craft.hq.HqStyles.current();
+		dev.t3craft.hq.style.HqStyle style = dev.t3craft.hq.style.HqStyles.current();
 		if (!style.ownLayout()) {
 			return viewpoint(spec);
 		}

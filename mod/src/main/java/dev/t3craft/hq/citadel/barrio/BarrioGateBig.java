@@ -1,7 +1,6 @@
 package dev.t3craft.hq.citadel.barrio;
 
 import dev.t3craft.hq.HqLayout;
-import dev.t3craft.hq.HqStyle;
 import dev.t3craft.hq.RingCampusGeometry;
 import dev.t3craft.hq.RingCampusGeometry.Kind;
 import dev.t3craft.hq.RingCampusGeometry.Lot;
@@ -11,6 +10,7 @@ import dev.t3craft.hq.SignTags;
 import dev.t3craft.hq.citadel.CitadelBarrios;
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.CitadelCanvas.Mats;
+import dev.t3craft.hq.style.HqStyle;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeMap;

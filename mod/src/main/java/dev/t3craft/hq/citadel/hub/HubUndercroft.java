@@ -1,9 +1,9 @@
 package dev.t3craft.hq.citadel.hub;
 
-import dev.t3craft.hq.HqStyle;
 import dev.t3craft.hq.RingCampusGeometry.Kind;
 import dev.t3craft.hq.citadel.CitadelCanvas;
 import dev.t3craft.hq.citadel.CitadelHub;
+import dev.t3craft.hq.style.HqStyle;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.core.BlockPos;

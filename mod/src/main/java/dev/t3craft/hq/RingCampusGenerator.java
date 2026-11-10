@@ -15,6 +15,7 @@ import dev.t3craft.hq.citadel.CitadelFinish;
 import dev.t3craft.hq.plan.Anchor;
 import dev.t3craft.hq.plan.AnchorNames;
 import dev.t3craft.hq.plan.BuildPlan;
+import dev.t3craft.hq.style.HqKit;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;

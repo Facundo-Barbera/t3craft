@@ -172,7 +172,7 @@ public final class HallFacade {
 
 	/** The colour of the project of {@code lot} (its lead module's environment colour). */
 	public static DyeColor env(CitadelCanvas c, int lot) {
-		return dev.t3craft.hq.HqStyle.envColor(c.lots.get(lot).firstEntry().getValue());
+		return dev.t3craft.hq.style.HqStyle.envColor(c.lots.get(lot).firstEntry().getValue());
 	}
 
 	// ------------------------------------------------------------------ outside

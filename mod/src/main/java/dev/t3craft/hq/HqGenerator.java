@@ -14,6 +14,8 @@ import dev.t3craft.hq.plan.BuildPlan;
 import dev.t3craft.hq.plan.PlanBuilder;
 import dev.t3craft.hq.plan.PlanConnect;
 import dev.t3craft.hq.plan.Workstation;
+import dev.t3craft.hq.style.HqStyle;
+import dev.t3craft.hq.style.HqStyles;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;

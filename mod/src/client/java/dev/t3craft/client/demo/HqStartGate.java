@@ -86,7 +86,7 @@ final class HqStartGate {
 	/** {@code hq.startBuild} of the current config (never throws; invalid values are logged once and mean the default). */
 	static String mode() {
 		try {
-			return modeOf(dev.t3craft.client.config.ConfigManager.get().extra(dev.t3craft.hq.HqStyles.SECTION));
+			return modeOf(dev.t3craft.client.config.ConfigManager.get().extra(dev.t3craft.hq.style.HqStyles.SECTION));
 		} catch (RuntimeException | LinkageError e) {
 			return DEFAULT;
 		}

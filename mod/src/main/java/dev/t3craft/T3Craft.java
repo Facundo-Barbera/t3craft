@@ -19,7 +19,7 @@ public final class T3Craft implements ModInitializer {
 		T3CraftTab.register();
 		PortableItems.register();
 		SurvivalHooks.register();
-		dev.t3craft.hq.HqStyles.reload(); // hq.style from config/t3craft.json (default: cherry)
+		dev.t3craft.hq.style.HqStyles.reload(); // hq.style from config/t3craft.json (default: cherry)
 		LOGGER.info("T3Craft loaded (client-only mod; common side: portable T3 Terminal item)");
 	}
 }

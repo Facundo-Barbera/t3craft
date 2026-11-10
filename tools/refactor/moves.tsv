@@ -25,3 +25,8 @@ dev.t3craft.hq.PlanLight	dev.t3craft.hq.plan.PlanLight	#5 3c
 dev.t3craft.hq.PlanNav	dev.t3craft.hq.plan.PlanNav	#5 3c
 dev.t3craft.hq.PlanProbe	dev.t3craft.hq.plan.PlanProbe	#5 3c
 dev.t3craft.hq.PlanShapes	dev.t3craft.hq.plan.PlanShapes	#5 3c
+dev.t3craft.hq.HqStyle	dev.t3craft.hq.style.HqStyle	#5 3d
+dev.t3craft.hq.HqStyles	dev.t3craft.hq.style.HqStyles	#5 3d
+dev.t3craft.hq.CherryStyle	dev.t3craft.hq.style.CherryStyle	#5 3d
+dev.t3craft.hq.HqKit	dev.t3craft.hq.style.HqKit	#5 3d
+dev.t3craft.hq.VanillaHqKit	dev.t3craft.hq.style.VanillaHqKit	#5 3d

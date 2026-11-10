@@ -1,5 +1,6 @@
-package dev.t3craft.hq;
+package dev.t3craft.hq.style;
 
+import dev.t3craft.hq.HqFixtures;
 import java.util.Locale;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
