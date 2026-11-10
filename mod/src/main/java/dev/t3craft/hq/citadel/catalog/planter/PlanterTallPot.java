@@ -12,29 +12,44 @@ import dev.t3craft.hq.citadel.catalog.Plot;
 import dev.t3craft.hq.citadel.catalog.Variant;
 import net.minecraft.core.Direction;
 import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BambooLeaves;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
+import net.minecraft.world.level.block.state.properties.SlabType;
 
 /**
- * Concept: a tall glazed pot on a dark foot, planted (by seed) with a clump of bamboo or a dwarf
- * cherry tree. Pink terracotta and calcite banding for the cherry, bamboo blocks for the bamboo, so
- * the pot matches what grows in it; small flower pots and petals round its foot on wider plots.
+ * Concept: the street planter of the citadel, a tall pot on a dark foot. Every pot reads bottom to top as
+ * dark foot, coloured body, light lip, soil and plant; the body is two or three blocks high wherever the
+ * plot is tall enough. The material changes with the seed: terracotta with a quartz lip, polished
+ * deepslate with a polished-andesite lip, calcite with a cherry lip, or cherry planks with a quartz lip,
+ * always on a deepslate foot.
  *
  * <p>The tricks:
  * <ul>
- * <li><b>Gradient</b>: polished deepslate foot → coloured body → light calcite lip (on tall plots),
- *     then the plant: the vertical, slender opposite of the low stone planter.</li>
- * <li><b>Bamboo done right</b>: thick stalks, no leaves low, small leaves under the top, large on top;
- *     a second shorter stalk on wider plots so the clump is not a single stick.</li>
- * <li><b>Dwarf cherry</b>: a log trunk with a leaf crown, wider and two-tiered when the plot allows,
- *     pink petals fallen at the foot.</li>
+ * <li><b>Pot</b>: on a plot of 3 × 3 or more (and 4 high) it is a vase (see {@code vase}): a slim plus-shaped
+ *     foot, a body that swells to the full 3 × 3, and a rim of full blocks with lower corners round the soil.
+ *     On a plot 2 deep and 5 high the tall piece is a 2 × 2 jar (see {@code jar}), never a one-cell tower.
+ *     On a single cell it is a column foot, body, lip band, soil (see {@code unit}).</li>
+ * <li><b>Plants with presence</b>: an azalea mound (bush, leaves, moss carpet on the rim), a large fern,
+ *     a dwarf cherry with a leaf crown, or a clump of bamboo of different heights. Always on moss or
+ *     podzol that the pot itself carries, never on the ground of the plot.</li>
+ * <li><b>Use</b>: wide plots are composed, not stretched. A group of three heights (tall, mid, and a low
+ *     pedestal with a potted plant in front), a lantern post, and from 9 wide two vases flanking a
+ *     stone bench with an azalea hedge as its back.</li>
  * </ul>
- * Size: 1–3 × 1–3 × 3+ (the plant grows up to 4 blocks over the pot when there is height). A 1 × 1 plot
- * gets its own design: an urn on a stand (see {@code single}).
+ * Size: 1–11 × 1–5 × 3+ (the leader asks for 1–2 × 1 × 3; at height 3 a pot is foot, body and a ball of
+ * blossom or azalea, the low one a potted plant; from height 4 it carries real soil). Everything stays inside its plot, and the
+ * pots are blocks of their own, so nothing narrows a path.
  */
 public final class PlanterTallPot implements Variant {
+	/** The material of one pot scheme: dark foot, coloured body, light lip. */
+	private record Mat(BlockState foot, BlockState footAlt, Block footSlab, BlockState body, BlockState bodyAlt, BlockState urn,
+			BlockState lip, Block lipStairs, Block lipSlab) {
+	}
+
 	@Override
 	public String id() {
 		return "planter_tall_pot";
@@ -62,153 +77,411 @@ public final class PlanterTallPot implements Variant {
 
 	@Override
 	public int maxW() {
-		return 3;
+		return 11;
 	}
 
 	@Override
 	public int maxD() {
-		return 3;
+		return 5;
 	}
 
 	@Override
 	public void build(CitadelCanvas c, Plot p) {
 		int w = p.w();
 		int d = p.d();
-		if (w == 1 && d == 1) {
-			single(c, p);
+		int h = p.h();
+		Mat m = mat(p);
+		boolean mir = p.hash(7, 0, 3, 2) == 0; // which side the big pot goes
+		boolean vase = w >= 3 && d >= 3 && h >= 4;
+		int vb = vase ? (d - 3) / 2 + 1 : d >= 2 ? Math.min(d - 1, 2) : 0; // the row the pots stand on
+
+		if (w <= 2) {
+			cluster(c, p, m, 0, w, Math.min(vb, d - 1), mir);
 			return;
 		}
-		int cu = w / 2;
-		int cv = d / 2;
-		boolean bamboo = p.hash(0, 0, 0, 2) == 0;
-		int top = p.h() - 1;
-		boolean wide = w >= 3 && d >= 3; // a stepped two-tier pot: brown clay stairs climbing to the plant
-		int lip = p.h() >= 5 && !wide ? 2 : 1; // pot body y1 (and a calcite lip at y2 on tall plots)
-		int plantTop = Math.min(top, lip + (bamboo ? 4 : 3)); // the cherry trunk is short; the crown is bounded by the plot
-
-		// --- the pot
-		p.set(c, cu, 0, cv, p.hash(cu, 0, cv, 3) == 0 ? b(Blocks.CHISELED_DEEPSLATE) : b(Blocks.POLISHED_DEEPSLATE));
-		BlockState body = bamboo ? b(Blocks.BAMBOO_BLOCK) : b(Blocks.MUD_BRICKS); // brown clay body (pink terracotta rendered as a dark red block); bamboo block has axis Y by default
-		p.set(c, cu, 1, cv, body);
-		if (lip == 2) {
-			p.set(c, cu, 2, cv, body); // a two-high glazed body (no white band: stacked stripes read as a candy cane)
+		block(c, p, m, 0, vase, vb, mir, p.hash(0, 3, 0, 3));
+		int rest = w - 3;
+		if (rest <= 1) {
+			return;
 		}
-
-		// --- the plant
-		if (bamboo) {
-			bamboo(c, p, cu, cv, lip + 1, plantTop);
+		if (w >= 9) {
+			// flanking pair with a bench between them (lanterns at the ends of a wide gap)
+			block(c, p, m, w - 3, vase, vb, mir, (p.hash(0, 3, 0, 3) + 1) % 3);
+			int g = w - 6;
+			int bw = Math.min(g >= 5 ? g - 2 : g, 5);
+			int bu = 3 + (g - bw) / 2;
+			if (g >= 5) {
+				lantern(c, p, m, mx(p, mir, 3, 1), vb);
+				lantern(c, p, m, mx(p, mir, w - 4, 1), vb);
+			}
+			bench(c, p, m, bu, bw, vb, mir);
+			return;
+		}
+		if (rest >= 3) {
+			lantern(c, p, m, mx(p, mir, 3, 1), vb);
+		}
+		if (rest == 2) {
+			cluster(c, p, m, 3, 2, vb, mir);
 		} else {
-			cherry(c, p, cu, cv, lip + 1, plantTop);
+			int n = Math.min(3, rest - 1);
+			cluster(c, p, m, w - n, n, vb, mir);
 		}
+	}
 
-		if (wide) {
-			// the four corners: low moss, petals, a flowering bush or a slab, never the same twice
-			for (int[] k : new int[][] {{0, 0}, {w - 1, 0}, {0, d - 1}, {w - 1, d - 1}}) {
-				int h = p.hash(k[0], 0, k[1], 4);
-				p.set(c, k[0], 0, k[1], h == 0 ? b(Blocks.FLOWERING_AZALEA) : h == 1 ? b(Blocks.MOSS_CARPET)
-						: h == 2 ? petals(p, k[0], k[1]) : slab(Blocks.MUD_BRICK_SLAB));
-			}
+	/** A three-wide block of the composition: the vase on plots deep enough for it, else a group of three pots. */
+	private static void block(CitadelCanvas c, Plot p, Mat m, int u0, boolean vase, int vb, boolean mir, int kind) {
+		if (vase) {
+			vase(c, p, m, mx(p, mir, u0, 3), vb - 1, kind);
+		} else {
+			cluster(c, p, m, u0, 3, vb, mir);
 		}
+	}
 
-		// --- round the foot: small pots, petals, a slab step (only where the plot leaves room)
-		Direction[] around = {Direction.WEST, Direction.EAST, Direction.NORTH, Direction.SOUTH};
-		for (Direction dir : around) {
-			int u = cu + dir.getStepX();
-			int v = cv + dir.getStepZ();
-			if (!p.has(u, 0, v)) {
-				continue;
+	/** Mirrors a run of {@code width} cells starting at {@code u} when {@code mir}. */
+	private static int mx(Plot p, boolean mir, int u, int width) {
+		return mir ? p.w() - u - width : u;
+	}
+
+	// ------------------------------------------------------------------ materials
+
+	private static Mat mat(Plot p) {
+		return switch (p.hash(0, 0, 0, 4)) {
+			case 0 -> new Mat(b(Blocks.POLISHED_DEEPSLATE), b(Blocks.DEEPSLATE_BRICKS), Blocks.POLISHED_DEEPSLATE_SLAB,
+					terracotta(DyeColor.ORANGE), b(Blocks.TERRACOTTA), terracotta(DyeColor.ORANGE), b(Blocks.SMOOTH_QUARTZ),
+					Blocks.SMOOTH_QUARTZ_STAIRS,
+					Blocks.SMOOTH_QUARTZ_SLAB);
+			case 1 -> new Mat(b(Blocks.DEEPSLATE_TILES), b(Blocks.CRACKED_DEEPSLATE_TILES), Blocks.DEEPSLATE_TILE_SLAB,
+					b(Blocks.POLISHED_DEEPSLATE), b(Blocks.DEEPSLATE_BRICKS), b(Blocks.POLISHED_ANDESITE), b(Blocks.POLISHED_ANDESITE),
+					Blocks.POLISHED_ANDESITE_STAIRS, Blocks.POLISHED_ANDESITE_SLAB);
+			case 2 -> new Mat(b(Blocks.POLISHED_DEEPSLATE), b(Blocks.DEEPSLATE_BRICKS), Blocks.POLISHED_DEEPSLATE_SLAB,
+					b(Blocks.CALCITE), b(Blocks.POLISHED_DIORITE), b(Blocks.CALCITE), b(Blocks.CHERRY_PLANKS), Blocks.CHERRY_STAIRS,
+					Blocks.CHERRY_SLAB);
+			default -> new Mat(b(Blocks.POLISHED_DEEPSLATE), b(Blocks.DEEPSLATE_BRICKS), Blocks.POLISHED_DEEPSLATE_SLAB,
+					b(Blocks.CHERRY_PLANKS), b(Blocks.STRIPPED_CHERRY_LOG), b(Blocks.CHERRY_PLANKS), b(Blocks.SMOOTH_QUARTZ),
+					Blocks.SMOOTH_QUARTZ_STAIRS,
+					Blocks.SMOOTH_QUARTZ_SLAB);
+		};
+	}
+
+	private static BlockState foot(Mat m, Plot p, int u, int v) {
+		return p.hash(u, 0, v, 4) == 0 ? m.footAlt() : m.foot();
+	}
+
+	private static BlockState body(Mat m, Plot p, int u, int y, int v) {
+		return p.hash(u, y, v, 5) == 0 ? m.bodyAlt() : m.body();
+	}
+
+	/** The stem of a one-cell pot: a thin deepslate post. */
+	private static BlockState neck() {
+		return b(Blocks.POLISHED_DEEPSLATE_WALL).setValue(BlockStateProperties.UP, true);
+	}
+
+	private static BlockState soil(Plot p, int u, int v) {
+		return p.hash(u, 9, v, 3) == 0 ? b(Blocks.PODZOL) : b(Blocks.MOSS_BLOCK);
+	}
+
+	private static BlockState upperSlab(Block s) {
+		return slab(s).setValue(BlockStateProperties.SLAB_TYPE, SlabType.TOP);
+	}
+
+	/** 0 azalea, 1 fern, 2 bamboo, 3 dwarf tree. */
+	private static int kindOf(Plot p, int u, int v) {
+		return p.hash(u, 2, v, 4);
+	}
+
+	private static BlockState potted(int kind) {
+		return switch (kind) {
+			case 0 -> b(Blocks.POTTED_FLOWERING_AZALEA);
+			case 1 -> b(Blocks.POTTED_FERN);
+			case 2 -> b(Blocks.POTTED_BAMBOO);
+			default -> b(Blocks.POTTED_CHERRY_SAPLING);
+		};
+	}
+
+	// ------------------------------------------------------------------ the group
+
+	/**
+	 * {@code n} pots side by side from {@code u0} on row {@code vb}: of different heights (tall, mid, and a
+	 * low one), with a low pedestal pot in front of some of them when the plot is deep enough.
+	 */
+	private static void cluster(CitadelCanvas c, Plot p, Mat m, int u0, int n, int vb, boolean mir) {
+		if (p.d() >= 2 && p.h() >= 5 && n >= 2) {
+			// the tall one is a 2 x 2 jar (wide, not a stretched tower), with a mid pot beside it and a low one in front
+			int ju = mx(p, mir, u0, 2);
+			jar(c, p, m, ju, vb - 1, kindOf(p, ju, vb));
+			if (n >= 3) {
+				int u = mx(p, mir, u0 + 2, 1);
+				unit(c, p, m, u, vb, 1, kindOf(p, u, vb));
+				unit(c, p, m, u, vb - 1, 0, kindOf(p, u, vb - 1));
 			}
-			if (wide) {
-				// [depth] a stepped pot: a dark brick tier at the ground, clay stairs on it climbing to the body
-				p.set(c, u, 0, v, p.hash(u, 0, v, 3) == 0 ? b(Blocks.CRACKED_DEEPSLATE_BRICKS) : b(Blocks.DEEPSLATE_BRICKS));
-				p.set(c, u, 1, v, stairs(Blocks.MUD_BRICK_STAIRS, dir.getOpposite()));
-				continue;
-			}
-			int k = p.hash(u, 0, v, 4);
-			BlockState s = switch (k) {
-				case 0 -> b(Blocks.POTTED_PINK_TULIP);
-				case 1 -> slab(Blocks.POLISHED_DEEPSLATE_SLAB);
-				case 2 -> bamboo ? b(Blocks.MOSS_CARPET) : petals(p, u, v);
-				default -> bamboo ? b(Blocks.POTTED_BAMBOO) : b(Blocks.POTTED_CHERRY_SAPLING);
-			};
-			if (p.at(c, u, 0, v) == null) {
-				p.set(c, u, 0, v, s);
+			return;
+		}
+		int[] tiers = n == 1 ? new int[] {2} : n == 2 ? new int[] {2, 1} : new int[] {1, 2, 0};
+		for (int i = 0; i < n; i++) {
+			int u = mx(p, mir, u0 + i, 1);
+			unit(c, p, m, u, vb, tiers[i], kindOf(p, u, vb));
+			int vf = vb - 1;
+			if (vf >= 0 && tiers[i] >= 1 && (n == 1 || p.hash(u, 5, vb, 2) == 0)) {
+				unit(c, p, m, u, vf, 0, kindOf(p, u, vf));
 			}
 		}
 	}
 
 	/**
-	 * The 1 × 1 design: a blossom topiary in a pale pot on a dark stand. A deepslate wall stem (or a polished
-	 * foot and a slim fence stem when there is height), a calcite pot and a ball of cherry blossom on it:
-	 * dark → white → pink, the citadel palette in three blocks.
+	 * One pot on a single cell. Tier 0 is a low pedestal with a potted plant; tiers 1 and 2 (mid and tall)
+	 * are a dark foot, a coloured body of 1–3 blocks topped by a light lip band when it has two, moss or
+	 * podzol, and the plant. At height 3 there is no room for soil: foot, body and a potted plant or a leaf
+	 * ball.
 	 */
-	private static void single(CitadelCanvas c, Plot p) {
-		int y = 0;
-		if (p.h() >= 4) {
-			p.set(c, 0, y++, 0, p.hash(0, 0, 0, 3) == 0 ? b(Blocks.CHISELED_DEEPSLATE) : b(Blocks.POLISHED_DEEPSLATE));
+	private static void unit(CitadelCanvas c, Plot p, Mat m, int u, int v, int tier, int kind) {
+		int h = p.h();
+		if (tier == 0) {
+			p.set(c, u, 0, v, body(m, p, u, 0, v));
+			p.set(c, u, 1, v, potted(kind));
+			return;
 		}
-		p.set(c, 0, y, 0, y == 0 ? b(Blocks.POLISHED_DEEPSLATE_WALL).setValue(BlockStateProperties.UP, true) : b(Blocks.NETHER_BRICK_FENCE));
-		y++;
-		p.set(c, 0, y++, 0, b(Blocks.CALCITE)); // a pale glazed pot body against the dark stand
-		p.set(c, 0, y, 0, leaves(Blocks.CHERRY_LEAVES));
+		if (h == 3) {
+			// the mid pot has no foot (two high), the tall one has it (three): a pair is never level
+			int y = 0;
+			if (tier == 2) {
+				p.set(c, u, y++, v, neck()); // a slim stem under a full belly: an urn, not a post
+			}
+			p.set(c, u, y++, v, p.hash(u, 1, v, 4) == 0 ? m.bodyAlt() : m.urn());
+			// a ball of blossom or azalea: a shrub with presence on a one-cell pot
+			p.set(c, u, y, v, switch (p.hash(u, 4, v, 3)) {
+				case 0 -> leaves(Blocks.CHERRY_LEAVES);
+				case 1 -> leaves(Blocks.FLOWERING_AZALEA_LEAVES);
+				default -> leaves(Blocks.AZALEA_LEAVES);
+			});
+			return;
+		}
+		p.set(c, u, 0, v, neck());
+		int body = Math.max(1, Math.min(tier == 2 ? 2 : 1, h - 4)); // never a stretched tower: 5 or 6 high at most, plus the plant
+		for (int y = 1; y <= body; y++) {
+			p.set(c, u, y, v, y == body && body >= 2 ? m.lip() : body(m, p, u, y, v));
+		}
+		int sy = body + 1;
+		p.set(c, u, sy, v, soil(p, u, v));
+		int room = Math.min(h - sy - 1, 3);
+		int y1 = sy + 1;
+		if (kind == 2 && room >= 2) {
+			stalk(c, p, u, v, y1, y1 + room - 1);
+		} else if (kind == 1) {
+			if (room >= 2) {
+				p.set(c, u, y1, v, b(Blocks.LARGE_FERN).setValue(BlockStateProperties.DOUBLE_BLOCK_HALF, DoubleBlockHalf.LOWER));
+				p.set(c, u, y1 + 1, v, b(Blocks.LARGE_FERN).setValue(BlockStateProperties.DOUBLE_BLOCK_HALF, DoubleBlockHalf.UPPER));
+			} else {
+				p.set(c, u, y1, v, b(Blocks.FERN));
+			}
+		} else if (kind == 3 && room >= 3) {
+			int tr = room - 2;
+			for (int y = y1; y < y1 + tr; y++) {
+				p.set(c, u, y, v, b(Blocks.STRIPPED_CHERRY_LOG));
+			}
+			p.set(c, u, y1 + tr, v, leaves(Blocks.CHERRY_LEAVES));
+			p.set(c, u, y1 + tr + 1, v, leaves(Blocks.CHERRY_LEAVES));
+		} else {
+			p.set(c, u, y1, v, b(Blocks.FLOWERING_AZALEA));
+			if (room >= 2) {
+				p.set(c, u, y1 + 1, v, leaves(p.hash(u, 6, v, 2) == 0 ? Blocks.FLOWERING_AZALEA_LEAVES : Blocks.AZALEA_LEAVES));
+			}
+			if (room >= 4) {
+				p.set(c, u, y1 + 2, v, leaves(Blocks.FLOWERING_AZALEA_LEAVES));
+			}
+		}
 	}
 
-	/** A thick bamboo stalk from y0 to y1 with the right leaves, and a shorter one beside it if there is room. */
-	private static void bamboo(CitadelCanvas c, Plot p, int u, int v, int y0, int y1) {
-		stalk(c, p, u, v, y0, y1);
-		int su = p.has(u + 1, 0, v) ? u + 1 : p.has(u - 1, 0, v) ? u - 1 : -1;
-		if (su >= 0 && y1 - 1 > y0) {
-			// [silhouette] the second stalk grows from a small bamboo-mosaic pot of its own, two shorter
-			p.set(c, su, 0, v, b(Blocks.BAMBOO_MOSAIC));
-			stalk(c, p, su, v, 1, y1 - 2);
-		}
-	}
-
+	/** A bamboo stalk from y0 to y1 with the right leaves. */
 	private static void stalk(CitadelCanvas c, Plot p, int u, int v, int y0, int y1) {
 		for (int y = y0; y <= y1; y++) {
-			BambooLeaves l = y == y1 ? BambooLeaves.LARGE : y == y1 - 1 ? BambooLeaves.SMALL : BambooLeaves.NONE;
+			BambooLeaves l = y == y1 ? BambooLeaves.LARGE : y == y1 - 1 && y1 > y0 ? BambooLeaves.SMALL : BambooLeaves.NONE;
 			p.set(c, u, y, v, b(Blocks.BAMBOO).setValue(BlockStateProperties.AGE_1, 1).setValue(BlockStateProperties.BAMBOO_LEAVES, l));
 		}
 	}
 
-	/** A dwarf cherry: a log trunk with a leaf top, and a plus-shaped tier under it on plots wider than 1. */
-	private static void cherry(CitadelCanvas c, Plot p, int u, int v, int y0, int y1) {
-		if (y1 == y0) {
-			// no room for a trunk: a flowering azalea bush (a real shrub shape, not a leaf cube) on the pot
-			p.set(c, u, y0, v, b(Blocks.FLOWERING_AZALEA));
+	// ------------------------------------------------------------------ the jar
+
+	/**
+	 * A 2 x 2 jar at ({@code u0}, {@code v0}): a dark foot, a coloured body (two blocks with a light lip band from
+	 * height 6) and moss or podzol on all four cells, planted as a clump: four azaleas with a leafy crown, large
+	 * ferns, bamboo of three heights, or a dwarf cherry with the trunk on one cell and the crown over all four.
+	 */
+	private static void jar(CitadelCanvas c, Plot p, Mat m, int u0, int v0, int kind) {
+		int h = p.h();
+		int body = h >= 6 ? 2 : 1;
+		int sy = body + 1;
+		int room = Math.min(h - sy - 1, kind == 2 ? 3 : 2); // only the slim bamboo may stand three high
+		int y1 = sy + 1;
+		for (int du = 0; du < 2; du++) {
+			for (int dv = 0; dv < 2; dv++) {
+				int u = u0 + du;
+				int v = v0 + dv;
+				p.set(c, u, 0, v, foot(m, p, u, v));
+				for (int y = 1; y <= body; y++) {
+					p.set(c, u, y, v, y == body && body >= 2 ? m.lip() : body(m, p, u, y, v));
+				}
+				p.set(c, u, sy, v, soil(p, u, v));
+			}
+		}
+		int tu = u0 + p.hash(u0, 8, v0, 2); // the cell of the trunk, the tallest stalk
+		int tv = v0 + p.hash(u0, 9, v0, 2);
+		if (kind == 3 && room >= 2) {
+			int tr = Math.max(1, Math.min(room - 1, 2));
+			for (int y = y1; y < y1 + tr; y++) {
+				p.set(c, tu, y, tv, b(Blocks.STRIPPED_CHERRY_LOG));
+			}
+			int ry = y1 + tr - 1;
+			for (int du = 0; du < 2; du++) {
+				for (int dv = 0; dv < 2; dv++) {
+					int u = u0 + du;
+					int v = v0 + dv;
+					if (u != tu || v != tv) {
+						p.set(c, u, ry, v, leaves(p.hash(u, ry, v, 4) == 0 ? Blocks.FLOWERING_AZALEA_LEAVES : Blocks.CHERRY_LEAVES));
+					}
+					p.set(c, u, ry + 1, v, leaves(Blocks.CHERRY_LEAVES));
+				}
+			}
 			return;
 		}
-		for (int y = y0; y < y1; y++) {
-			p.set(c, u, y, v, b(Blocks.CHERRY_LOG));
-		}
-		// crown: a ring of leaves round the trunk top (corners too, one in four open), a plus above it
-		// and a crown leaf; the trunk is short so the crown sits low and reads as a tree, not a lollipop
-		int tier = y1 - 1;
-		for (int du = -1; du <= 1; du++) {
-			for (int dv = -1; dv <= 1; dv++) {
-				int lu = u + du;
-				int lv = v + dv;
-				if ((du == 0 && dv == 0) || !p.has(lu, tier, lv) || p.hash(lu, tier, lv, 4) == 0) {
-					continue;
+		for (int du = 0; du < 2; du++) {
+			for (int dv = 0; dv < 2; dv++) {
+				int u = u0 + du;
+				int v = v0 + dv;
+				boolean lead = u == tu && v == tv;
+				if (kind == 2 && room >= 2) {
+					if (p.hash(u, 7, v, 4) != 0 || lead) {
+						stalk(c, p, u, v, y1, y1 + (lead ? room : Math.max(1, room - 1 - p.hash(u, 6, v, 2))) - 1);
+					}
+				} else if (kind == 1) {
+					if (lead && room >= 2) {
+						p.set(c, u, y1, v, b(Blocks.LARGE_FERN).setValue(BlockStateProperties.DOUBLE_BLOCK_HALF, DoubleBlockHalf.LOWER));
+						p.set(c, u, y1 + 1, v, b(Blocks.LARGE_FERN).setValue(BlockStateProperties.DOUBLE_BLOCK_HALF, DoubleBlockHalf.UPPER));
+					} else {
+						p.set(c, u, y1, v, b(Blocks.FERN));
+					}
+				} else {
+					p.set(c, u, y1, v, b(Blocks.FLOWERING_AZALEA));
+					if (room >= 2 && (lead || p.hash(u, 5, v, 2) == 0)) {
+						p.set(c, u, y1 + 1, v, leaves(lead ? Blocks.FLOWERING_AZALEA_LEAVES : Blocks.AZALEA_LEAVES));
+					}
 				}
-				p.set(c, lu, tier, lv, leaves(Blocks.CHERRY_LEAVES));
 			}
-		}
-		for (Direction dir : new Direction[] {Direction.WEST, Direction.EAST, Direction.NORTH, Direction.SOUTH}) {
-			int lu = u + dir.getStepX();
-			int lv = v + dir.getStepZ();
-			if (p.has(lu, y1, lv)) {
-				p.set(c, lu, y1, lv, leaves(Blocks.CHERRY_LEAVES));
-			}
-		}
-		p.set(c, u, y1, v, leaves(Blocks.CHERRY_LEAVES));
-		if (y1 + 1 < p.h()) {
-			p.set(c, u, y1 + 1, v, leaves(Blocks.CHERRY_LEAVES));
 		}
 	}
 
-	private static BlockState petals(Plot p, int u, int v) {
-		return b(Blocks.PINK_PETALS).setValue(BlockStateProperties.FLOWER_AMOUNT, 1 + p.hash(u, 1, v, 4))
-				.setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH);
+	// ------------------------------------------------------------------ the vase
+
+	/**
+	 * A 3 × 3 vase at ({@code u0}, {@code v0}): a foot of full blocks with slab shoulders on the corners, a
+	 * body pinched to a plus shape (1–3 blocks), and a lip layer of full blocks with upper slabs over the
+	 * pinched corners (the flare) round one cell of soil. The plant crowns it.
+	 */
+	private static void vase(CitadelCanvas c, Plot p, Mat m, int u0, int v0, int kind) {
+		int h = p.h();
+		int body = h >= 9 ? 3 : h >= 7 ? 2 : 1;
+		int ly = body + 1;
+		int room = h - ly - 1;
+		for (int du = 0; du < 3; du++) {
+			for (int dv = 0; dv < 3; dv++) {
+				int u = u0 + du;
+				int v = v0 + dv;
+				boolean corner = du != 1 && dv != 1;
+				boolean centre = du == 1 && dv == 1;
+				if (!corner) {
+					p.set(c, u, 0, v, foot(m, p, u, v)); // a narrow plus-shaped foot: the pot is slim at the bottom
+				}
+				for (int y = 1; y <= body; y++) {
+					p.set(c, u, y, v, body(m, p, u, y, v)); // and swells to the full 3 x 3 over the empty foot corners
+				}
+				p.set(c, u, ly, v, centre ? soil(p, u, v) : corner ? upperSlab(m.lipSlab()) : m.lip());
+			}
+		}
+		vasePlant(c, p, u0 + 1, v0 + 1, ly, room, kind);
+	}
+
+	private static void vasePlant(CitadelCanvas c, Plot p, int cu, int cv, int ly, int room, int kind) {
+		int y1 = ly + 1;
+		int[][] edge = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+		if (kind == 2 && room >= 2) {
+			// dwarf cherry: a short trunk, a ring of blossom at its top and a plus on it
+			int tr = Math.max(1, Math.min(room - 1, 2)); // two at most: a taller trunk leaves a standable gap under the crown
+			for (int y = y1; y < y1 + tr; y++) {
+				p.set(c, cu, y, cv, b(Blocks.STRIPPED_CHERRY_LOG));
+			}
+			int ry = y1 + tr - 1;
+			for (int du = -1; du <= 1; du++) {
+				for (int dv = -1; dv <= 1; dv++) {
+					boolean cornerCell = du != 0 && dv != 0;
+					if ((du == 0 && dv == 0) || (cornerCell && p.hash(cu + du, ry, cv + dv, 3) == 0)) {
+						continue;
+					}
+					p.set(c, cu + du, ry, cv + dv, leaves(p.hash(cu + du, ry, cv + dv, 6) == 0 ? Blocks.FLOWERING_AZALEA_LEAVES : Blocks.CHERRY_LEAVES));
+				}
+			}
+			p.set(c, cu, ry + 1, cv, leaves(Blocks.CHERRY_LEAVES));
+			for (int[] e : edge) {
+				p.set(c, cu + e[0], ry + 1, cv + e[1], leaves(Blocks.CHERRY_LEAVES));
+			}
+			if (ry + 2 < p.h()) {
+				p.set(c, cu, ry + 2, cv, leaves(Blocks.FLOWERING_AZALEA_LEAVES));
+			}
+		} else if (kind == 1) {
+			// a large fern over a rim of moss carpet
+			if (room >= 2) {
+				p.set(c, cu, y1, cv, b(Blocks.LARGE_FERN).setValue(BlockStateProperties.DOUBLE_BLOCK_HALF, DoubleBlockHalf.LOWER));
+				p.set(c, cu, y1 + 1, cv, b(Blocks.LARGE_FERN).setValue(BlockStateProperties.DOUBLE_BLOCK_HALF, DoubleBlockHalf.UPPER));
+			} else {
+				p.set(c, cu, y1, cv, b(Blocks.FERN));
+			}
+			for (int[] e : edge) {
+				p.set(c, cu + e[0], y1, cv + e[1], b(Blocks.MOSS_CARPET));
+			}
+		} else {
+			// an azalea mound: the bush in the middle, leaves and moss on the rim, a crown of leaves above
+			p.set(c, cu, y1, cv, b(Blocks.FLOWERING_AZALEA));
+			boolean[] leafy = new boolean[4];
+			for (int i = 0; i < 4; i++) {
+				int[] e = edge[i];
+				int k = p.hash(cu + e[0], y1, cv + e[1], 4);
+				leafy[i] = k <= 1;
+				p.set(c, cu + e[0], y1, cv + e[1], k == 0 ? leaves(Blocks.AZALEA_LEAVES) : k == 1 ? leaves(Blocks.FLOWERING_AZALEA_LEAVES) : b(Blocks.MOSS_CARPET));
+			}
+			if (room >= 2) {
+				p.set(c, cu, y1 + 1, cv, leaves(Blocks.AZALEA_LEAVES));
+				for (int i = 0; i < 4; i++) {
+					if (leafy[i]) {
+						p.set(c, cu + edge[i][0], y1 + 1, cv + edge[i][1], leaves(Blocks.FLOWERING_AZALEA_LEAVES));
+					}
+				}
+			}
+			if (room >= 3) {
+				p.set(c, cu, y1 + 2, cv, leaves(Blocks.FLOWERING_AZALEA_LEAVES));
+			}
+		}
+	}
+
+	// ------------------------------------------------------------------ furniture
+
+	/** A lantern post: a dark base, a wall shaft of up to three blocks and a lantern on top. */
+	private static void lantern(CitadelCanvas c, Plot p, Mat m, int u, int v) {
+		int shaft = Math.max(1, Math.min(p.h() - 2, 3));
+		p.set(c, u, 0, v, foot(m, p, u, v));
+		for (int y = 1; y <= shaft; y++) {
+			p.set(c, u, y, v, b(Blocks.POLISHED_DEEPSLATE_WALL).setValue(BlockStateProperties.UP, true));
+		}
+		p.set(c, u, shaft + 1, v, b(Blocks.LANTERN));
+	}
+
+	/** A bench of {@code len} stair seats facing the front, with a low azalea hedge for a back. */
+	private static void bench(CitadelCanvas c, Plot p, Mat m, int u0, int len, int v, boolean mir) {
+		for (int i = 0; i < len; i++) {
+			int u = mx(p, mir, u0 + i, 1);
+			p.set(c, u, 0, v, stairs(m.lipStairs(), Direction.NORTH));
+			if (!p.has(u, 1, v + 1)) {
+				continue;
+			}
+			p.set(c, u, 0, v + 1, leaves(Blocks.AZALEA_LEAVES));
+			p.set(c, u, 1, v + 1, leaves(p.hash(u, 1, v + 1, 3) == 0 ? Blocks.FLOWERING_AZALEA_LEAVES : Blocks.AZALEA_LEAVES));
+		}
 	}
 }
