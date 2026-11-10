@@ -320,5 +320,15 @@
 	"t3craft.settings.buildorder.sites": "Sites (building sites with a crew each)",
 	"t3craft.settings.buildorder.radial": "Radial (around you, ring by ring)",
 	"t3craft.settings.buildorder.parts": "Parts (part by part)",
-	"t3craft.settings.buildorder.failed": "Settings saved, but the build order could not be written"
+	"t3craft.settings.buildorder.failed": "Settings saved, but the build order could not be written",
+	"t3craft.settings.buildorder.sitesatonce.label": "Sites at once",
+	"t3craft.settings.buildorder.sitesatonce.one": "1 site (yours; the ones you left keep 1 builder)",
+	"t3craft.settings.buildorder.sitesatonce.many": "%s sites",
+	"t3craft.settings.buildorder.sitesatonce.off": "Off (one focus and rear guards, as before)",
+	"t3craft.settings.buildorder.sitesatonce.help": "Sites order: buildings built in parallel, each with its own crew; the one you walk into gets the most. Applies at once.",
+	"t3craft.settings.buildorder.speed.label": "Build speed",
+	"t3craft.settings.buildorder.speed.calm": "Calm (× 0.6)",
+	"t3craft.settings.buildorder.speed.normal": "Normal",
+	"t3craft.settings.buildorder.speed.fast": "Fast (× 1.6)",
+	"t3craft.settings.buildorder.speed.help": "Sites order: the builders' pace and the block budget. The server's time limit per tick still applies. Applies at once."
 }

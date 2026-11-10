@@ -20,6 +20,11 @@ build starts, so it applies to the next one; a build already running keeps its o
 (`building HQ: hq v4, 17 part(s), order sites`), the `[demo]` log line and the first line of `/t3craft demo status` say which
 order is in use.
 
+Under it (#53), for the `"sites"` order only: **Sites at once** (1 to 6 sites built in parallel, or *Off* = the #48
+rules; writes `build.sitesAtOnce`) and **Build speed** (Calm / Normal / Fast; writes `build.speed`). Same pattern: each
+key is written only when it changed, the rest of the `build` section stays, the tuning is reloaded on *Save*. Both are
+read by a running build on its next tick (only the order and `build.sitesCrew` wait for the next build).
+
 By hand, `config/t3craft.json`:
 
 ```json
@@ -569,6 +574,18 @@ added to `BuildJob`, `BuildCommands`, `DemoBuildRun` and `DemoHq` against the re
 
 What can still fail only javac or the game will show: Minecraft API calls (`BlockState.getLightEmission`,
 `canOcclude`, `isAir`) are the same ones other classes in the repo already use.
+
+### Compile risks (#53)
+
+Not compiled either. Where a mistake is most likely:
+
+- `BuildTuning` has 40 record components now (5 new: `sitesAtOnce`, `sitesCrew`, `siteCrewLarge`, `siteBayCrew`,
+  `speed`). Two compatibility constructors (35 and 37 arguments) delegate in order; the arities were counted by a
+  script. `SPEEDS` is declared before `DEFAULTS` because the constructor runs while the class initialises.
+- `SiteCursor.work` gained a `pace` parameter (all four calls changed); `SettingsPanel` uses a `T3Select<Integer>` fed
+  by an `int` field (boxing both ways).
+- Logic that only the game will show: the share / recount loop of `staffParallel`, the proximity opening (`near`), and
+  standing by the middle of a bay (`walks/task` in the status should drop to about 1).
 
 ## Config and restarts
 

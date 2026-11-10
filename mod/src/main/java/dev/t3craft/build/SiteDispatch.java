@@ -25,6 +25,9 @@ package dev.t3craft.build;
  * returns: rules 1 and 3). A started site near the player that nobody works gets a rear guard too, while a slot and
  * two builders are free. {@link #openLimit}: one more site may be open when the crew has builders to spare. The
  * focus gets {@link #FOCUS_SHARE} of the pace, the others the rest.
+ *
+ * <p>#53: with {@code build.sitesAtOnce} over 0 the sites are built in parallel instead ({@link #activeLimit},
+ * {@link #retainSlots}, {@link #shares}, {@link #nearestFresh}; the state lives in {@code SiteCursor.dispatchParallel}).
  */
 final class SiteDispatch {
 	/** A site keeps the focus, and a started one keeps its place ahead of fresh ones, within this many blocks of the player. */

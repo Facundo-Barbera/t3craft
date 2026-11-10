@@ -61,6 +61,9 @@ public final class SettingsPanel extends T3Panel {
 	private UiScale.Pref uiScaleDraft = UiScale.configured();
 	/** The build order ({@code build.order}), written on "Save" when it changed (see {@link BuildOrderSettings}). */
 	private String buildOrderDraft = BuildOrderSettings.current();
+	/** #53: sites built at once ({@code build.sitesAtOnce}) and build speed ({@code build.speed}), saved with the build order. */
+	private int sitesAtOnceDraft = BuildOrderSettings.currentSitesAtOnce();
+	private String buildSpeedDraft = BuildOrderSettings.currentSpeed();
 
 	public SettingsPanel(EnvironmentActions actions) {
 		this.actions = actions;
@@ -219,6 +222,8 @@ public final class SettingsPanel extends T3Panel {
 			draft = ConfigManager.get().load();
 			uiScaleDraft = UiScale.configured(); // #42
 			buildOrderDraft = BuildOrderSettings.current();
+			sitesAtOnceDraft = BuildOrderSettings.currentSitesAtOnce();
+			buildSpeedDraft = BuildOrderSettings.currentSpeed();
 			windowText = formatNumber(draft.recentWindowHours());
 			maxText = Integer.toString(draft.maxPerEnvironment());
 			if (windowField != null) {
@@ -416,11 +421,32 @@ public final class SettingsPanel extends T3Panel {
 				v -> buildOrderDraft = v);
 		place(select, x, y + 1, w, T3Control.H);
 		y += T3Control.H + 4;
-		return text(x + 4, y, w - 8, T3Draw.tr("t3craft.settings.buildorder.help"), Tone.MUTED) + 2;
+		y = text(x + 4, y, w - 8, T3Draw.tr("t3craft.settings.buildorder.help"), Tone.MUTED) + 2;
+		// #53: sites built in parallel, and the builders' speed (both for the "sites" order, read by a running build)
+		y = text(x + 4, y + 4, w - 8, T3Draw.tr("t3craft.settings.buildorder.sitesatonce.label"), Tone.MUTED);
+		T3Select<Integer> atOnce = new T3Select<>(BuildOrderSettings.SITES_AT_ONCE, SettingsPanel::sitesAtOnceLabel, sitesAtOnceDraft,
+				v -> sitesAtOnceDraft = v);
+		place(atOnce, x, y + 1, w, T3Control.H);
+		y += T3Control.H + 4;
+		y = text(x + 4, y, w - 8, T3Draw.tr("t3craft.settings.buildorder.sitesatonce.help"), Tone.MUTED) + 2;
+		y = text(x + 4, y + 4, w - 8, T3Draw.tr("t3craft.settings.buildorder.speed.label"), Tone.MUTED);
+		T3Select<String> speed = new T3Select<>(BuildOrderSettings.SPEEDS, SettingsPanel::buildSpeedLabel, buildSpeedDraft, v -> buildSpeedDraft = v);
+		place(speed, x, y + 1, w, T3Control.H);
+		y += T3Control.H + 4;
+		return text(x + 4, y, w - 8, T3Draw.tr("t3craft.settings.buildorder.speed.help"), Tone.MUTED) + 2;
 	}
 
 	private static String buildOrderLabel(String order) {
 		return T3Draw.tr("t3craft.settings.buildorder." + order);
+	}
+
+	private static String sitesAtOnceLabel(Integer n) {
+		return n == 0 ? T3Draw.tr("t3craft.settings.buildorder.sitesatonce.off")
+				: n == 1 ? T3Draw.tr("t3craft.settings.buildorder.sitesatonce.one") : T3Draw.tr("t3craft.settings.buildorder.sitesatonce.many", n);
+	}
+
+	private static String buildSpeedLabel(String speed) {
+		return T3Draw.tr("t3craft.settings.buildorder.speed." + speed);
 	}
 
 	private static String barLabel(String mode) {
@@ -474,7 +500,7 @@ public final class SettingsPanel extends T3Panel {
 			// #42: the UI scale lives in the layout prefs, written whatever the labels block does
 			boolean scaleOk = uiScaleDraft.equals(UiScale.configured()) || T3LayoutPrefs.saveUiScale(uiScaleDraft);
 			// the build order lives in the build block: only written (and the tuning reloaded) when it changed
-			boolean orderOk = BuildOrderSettings.save(buildOrderDraft).ok();
+			boolean orderOk = BuildOrderSettings.save(buildOrderDraft, sitesAtOnceDraft, buildSpeedDraft).ok();
 			// the labels block is only touched when this page changed something in it
 			ConfigManager.SaveResult w = world.equals(worldTextSaved) ? r : world.save();
 			if (w.ok()) {
