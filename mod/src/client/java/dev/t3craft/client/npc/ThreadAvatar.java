@@ -73,7 +73,9 @@ public final class ThreadAvatar extends RemotePlayer {
 	@Override
 	public @Nullable PlayerTeam getTeam() {
 		if (!tagHidden) {
-			return super.getTeam();
+			// The scoreboard only hands out PlayerTeams; the cast keeps this compiling whichever of Team or PlayerTeam
+			// Entity#getTeam declares as its return type.
+			return (PlayerTeam) super.getTeam();
 		}
 		PlayerTeam t = hiddenTeam;
 		if (t == null) {
