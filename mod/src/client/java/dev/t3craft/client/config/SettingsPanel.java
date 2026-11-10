@@ -1,5 +1,6 @@
 package dev.t3craft.client.config;
 
+import dev.t3craft.client.ModConfig;
 import dev.t3craft.client.chat.Rect;
 import dev.t3craft.client.config.T3CraftSettings.Notifications;
 import dev.t3craft.client.demo.DemoClient;
@@ -12,6 +13,7 @@ import dev.t3craft.client.t3ui.kit.T3Panel;
 import dev.t3craft.client.t3ui.kit.T3Select;
 import dev.t3craft.client.t3ui.kit.T3Tabs;
 import dev.t3craft.client.t3ui.kit.T3Toggle;
+import dev.t3craft.outbound.OutboundStore;
 import java.util.List;
 import java.util.function.Consumer;
 import net.minecraft.client.Minecraft;
@@ -186,7 +188,7 @@ public final class SettingsPanel extends T3Panel {
 		y = link(x, y, w, "Environments…", () -> host().show(new EnvironmentsPanel(actions)));
 		y = link(x, y, w, "Piece browser…", () -> host().openScreen(new dev.t3craft.client.pieces.PieceBrowserScreen(host().screen())));
 		y = link(x, y, w, "Key binds…",() -> host().openScreen(new KeyBindsScreen(host().screen(), Minecraft.getInstance().options)));
-		y = link(x, y, w, "Outbound events…", () -> host().openScreen(new OutboundScreen(host().screen())));
+		y = link(x, y, w, "Outbound events…", () -> host().show(new OutboundPanel(new OutboundStore(ModConfig.dataDir()))));
 		y = link(x, y, w, "Reload from disk", () -> {
 			draft = ConfigManager.get().load();
 			windowText = formatNumber(draft.recentWindowHours());
