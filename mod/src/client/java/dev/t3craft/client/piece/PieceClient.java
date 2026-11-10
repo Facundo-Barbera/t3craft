@@ -15,6 +15,7 @@ import dev.t3craft.piece.Piece;
 import dev.t3craft.piece.PieceCatalog;
 import dev.t3craft.piece.PieceScene;
 import dev.t3craft.piece.PieceSpec;
+import dev.t3craft.piece.StructurePiece;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -44,7 +45,8 @@ import org.jspecify.annotations.Nullable;
  * and change it without restarting the client. See {@code docs/features/piece-catalog-preview.md}.
  *
  * <p>The catalog ({@link PieceCatalog}) lists what exists in the code: parts of the citadel (the hub, the cloister, the
- * nodes, a barrio), the classic HQ, the kit, rooms of layout packs, and every variant of the citadel catalog. This class
+ * nodes, a barrio), the big structures on their own (group {@code struct}: the leader's office, a lead's office, the hub, a
+ * gatehouse, a hall; issue #49), the classic HQ, the kit, rooms of layout packs, and every variant of the citadel catalog. This class
  * is the client half: it builds the piece asked for on a worker thread (a part of the citadel needs the whole plan: seconds),
  * hands the stage ({@link PieceScene}) to {@link PieceStage}, which diffs it into the world on the server thread, and owns
  * the commands:
@@ -290,7 +292,7 @@ public final class PieceClient {
 	}
 
 	private static boolean isBig(Piece p) {
-		return p.group().equals("hq") || p.group().equals("classic");
+		return p.group().equals("hq") || p.group().equals("classic") || p.group().equals(StructurePiece.GROUP);
 	}
 
 	/** Worker thread. */
@@ -323,6 +325,9 @@ public final class PieceClient {
 
 	/** Client thread. */
 	private static void ready(Minecraft mc, Piece piece, PieceSpec spec, String dims, int blocks, String detail, long ms) {
+		if (piece instanceof StructurePiece) {
+			dev.t3craft.client.pieces.PieceCatalog.refresh(); // issue #49: the browser shows the structure's measured size from now on
+		}
 		if (mc.player == null) {
 			return;
 		}
