@@ -1,6 +1,10 @@
 package dev.t3craft.client.t3ui;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
+import net.minecraft.client.KeyMapping;
+import net.minecraft.client.input.KeyEvent;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Keyboard navigation of the unified T3 screen as a pure decision (tested): which action a key means
@@ -12,9 +16,38 @@ import com.mojang.blaze3d.platform.InputConstants;
  * ({@code thread.previous}/{@code thread.next}), Ctrl+N new thread ({@code chat.new}), Ctrl+F
  * search. Game additions: ←/→ step the project filter, Esc backs out one level (menu → search →
  * compact thread → close).
+ *
+ * <p>#39: the right panel's toggle is a rebindable key mapping ({@value #TOGGLE_RIGHT_PANEL}, default U, in
+ * the Controls screen under T3Craft), registered once by {@link #register()} from the client init and
+ * checked by the screen with {@link #isToggleRightPanel} when the list has the keyboard. Ctrl+B stays the
+ * sidebar's.
  */
 public final class T3UiKeys {
+	/** Translation key and id of the right panel toggle's key mapping. */
+	public static final String TOGGLE_RIGHT_PANEL = "key.t3craft.toggle_right_panel";
+	private static @Nullable KeyMapping toggleRightPanel;
+
 	private T3UiKeys() {
+	}
+
+	/** Registers the key mappings of the T3 screen (once; from {@code T3CraftClient.onInitializeClient}). */
+	public static void register() {
+		if (toggleRightPanel == null) {
+			toggleRightPanel = KeyMappingHelper.registerKeyMapping(new KeyMapping(TOGGLE_RIGHT_PANEL, InputConstants.Type.KEYBOARD, InputConstants.KEY_U,
+					dev.t3craft.client.config.T3CraftKeys.CATEGORY));
+		}
+	}
+
+	/** The key pressed is the (rebindable) right panel toggle. */
+	public static boolean isToggleRightPanel(KeyEvent e) {
+		KeyMapping k = toggleRightPanel;
+		return k != null && k.matches(e);
+	}
+
+	/** The toggle's current key for tooltips ("U"), or empty when it is not registered. */
+	public static String toggleRightPanelLabel() {
+		KeyMapping k = toggleRightPanel;
+		return k == null ? "" : k.getTranslatedKeyMessage().getString();
 	}
 
 	public enum Focus {
