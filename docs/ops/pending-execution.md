@@ -264,9 +264,9 @@ Ola 2, pendiente:
 ## Arreglo del lag al iniciar un hilo: integrado
 `fix/new-thread-hitch` ya está en main (`a031a79`), compilado. Trae el detector de trabones: `/t3dev perf hitches`, con WARN en latest.log cuando un frame o tick pasa de ~50 ms. Si el lag sigue, ese log dice qué fue.
 
-## Renders en el PC de Facundo (my-pc): FUNCIONA (2026-11-09)
+## Renders en el PC de Facundo (<pc>): FUNCIONA (2026-11-09)
 - **Relay probado de punta a punta.** El job `prueba-relay` (`--catalog LAMP`) compiló en el PC, renderizó la galería con etiquetas y trajo PNGs y reporte a la VPS, con código de salida 0.
-- **Transporte:** scripts por stdin (`ssh -T user@100.64.0.20 < script`) y archivos en tar+base64. No se usa rsync ni scp.
+- **Transporte:** scripts por stdin (`ssh -T <user>@<tailscale-ip> < script`) y archivos en tar+base64. No se usa rsync ni scp.
 - **Aprobación de la sesión:** `~/.cache/t3craft-coord/renders-approved` en la VPS. Alcance: el swarm de diseño de la ciudadela.
 ## Revisiones a mano en curso (solo código)
 - `review/wip-catalog`: terminada. Las 16 ramas `cat/*` parecen listas para compilar; informe en `docs/ops/reviews/wip-catalog.md`, ya en main.

@@ -172,7 +172,7 @@ sub.close();                                               // la última vista h
 
 - **Un solo `EnvBadge`**: `dev.t3craft.client.chat.EnvBadge`. Tiene un color estable por id (o
   `environments.<id>.color` del config) y la inicial de la última palabra de la etiqueta
-  ("my-vps" → V, "my-mini" → M), con texto legible según la luminancia. El held screen
+  ("vps-env" → V, "<mini>" → M), con texto legible según la luminancia. El held screen
   (`HeldScreen`, `HeldScreenModel`) lo usa. `HeldScreenModel.Badge` y `portable/pending/EnvBadge`
   se eliminaron.
 - **Un solo modelo de conversación**: `ChatTranscript` + `ThreadFeed`. Se eliminó

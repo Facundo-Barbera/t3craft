@@ -10,9 +10,9 @@ Source of truth for types: `bridge/src/protocol.ts`. This document must match it
 ## Topology
 
 ```
-[PC: Minecraft + T3Craft mod]  --ws://<homelab-tailscale-ip-or-name>:7878-->  [my-homelab: bridge (systemd)]
-                                                                                 ├─ wss → my-vps T3 (own token)
-                                                                                 └─ http(s) → my-laptop T3 :3773 (own token)
+[PC: Minecraft + T3Craft mod]  --ws://<homelab-tailscale-ip-or-name>:7878-->  [<homelab>: bridge (systemd)]
+                                                                                 ├─ wss → vps-env T3 (own token)
+                                                                                 └─ http(s) → <laptop> T3 :3773 (own token)
 ```
 
 - The bridge listens **only** on the homelab's Tailscale IP (or loopback for tests). Wildcard
@@ -54,7 +54,7 @@ reconnect the mod sends `hello` again and replaces its whole NPC set with the ne
 {
   "id": "vps:thr_123",          // "<env>:<threadId>", unique across environments
   "env": "vps",
-  "envLabel": "my-vps",      // which machine the thread lives on
+  "envLabel": "vps-env",      // which machine the thread lives on
   "threadId": "thr_123",
   "title": "Fix login",         // already clipped
   "project": "telar",           // or null
@@ -62,7 +62,7 @@ reconnect the mod sends `hello` again and replaces its whole NPC set with the ne
   "color": "#FFAA00",           // draw label in this colour
   "glyph": "!",
   "label": "! Fix login",       // main nameplate line, drawn in `color`
-  "sublabel": "my-vps · telar", // second line, grey
+  "sublabel": "vps-env · telar", // second line, grey
   "activity": "Approval needed: command", // or null; short status / last message
   "priority": 0,                // lower first; the mod lays NPCs out in this order
   "settled": false              // the user settled the thread in T3 (mod may dim it)
@@ -80,7 +80,7 @@ The chat screen shows `label`, `sublabel` and `activity`. NPCs are laid out by a
 `config/t3craft.json` in the Minecraft instance (created with defaults on first start):
 
 ```json
-{ "bridgeUrl": "ws://my-homelab.<tailnet>.ts.net:7878/", "bridgeKey": null }
+{ "bridgeUrl": "ws://<homelab>.<tailnet>.ts.net:7878/", "bridgeKey": null }
 ```
 
 `bridgeUrl` defaults to `ws://127.0.0.1:7878/`; env `T3CRAFT_BRIDGE_URL` or
@@ -168,7 +168,7 @@ mod → {"v":1,"type":"hello","id":"m1","client":"t3craft-mod","version":"0.1.0"
 br  → {"v":1,"type":"ack","re":"m1","ok":true}
 br  → {"v":1,"type":"hello","bridge":"0.1.0","protocol":1}
 br  → {"v":1,"type":"snapshot","npcs":[{...NpcView...}]}
-br  → {"v":1,"type":"bridge.status","environments":[{"id":"vps","label":"my-vps","status":"ok"}]}
+br  → {"v":1,"type":"bridge.status","environments":[{"id":"vps","label":"vps-env","status":"ok"}]}
 br  → {"v":1,"type":"npc.upsert","npc":{...}}
-br  → {"v":1,"type":"notify","level":"warn","title":"Approval needed: command","text":"Fix login (my-vps)","color":"#FFAA00","npcId":"vps:thr_123"}
+br  → {"v":1,"type":"notify","level":"warn","title":"Approval needed: command","text":"Fix login (vps-env)","color":"#FFAA00","npcId":"vps:thr_123"}
 ```

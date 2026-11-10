@@ -10,9 +10,9 @@ attention, done, error, idle) and tagged with the machine it runs on.
 > the README rewrite is phase 6 (#8).
 
 ```
-[PC: Minecraft 26.3 + T3Craft mod]  --ws over Tailscale-->  [my-homelab: bridge (systemd)]
-                                                              ├─ my-vps T3        (own token)
-                                                              └─ my-laptop T3   (own token)
+[PC: Minecraft 26.3 + T3Craft mod]  --ws over Tailscale-->  [<homelab>: bridge (systemd)]
+                                                              ├─ vps-env T3        (own token)
+                                                              └─ <laptop> T3   (own token)
 ```
 
 - `mod/`: Fabric client-only mod (Minecraft 26.3, Java 25, Loom 1.19.4 no-remap, Mojang names).
@@ -38,16 +38,16 @@ server. The bridge below is legacy and frozen (`"mode": "bridge"`, see `bridge/R
    the mod pairs with **read + control** (`orchestration:operate`: send messages, approve, stop…)
    in a single pairing:
    ```bash
-   t3 auth pairing create --scope orchestration:read --scope orchestration:operate --base-url https://my-vps.example.ts.net
+   t3 auth pairing create --scope orchestration:read --scope orchestration:operate --base-url https://<vps>.<tailnet>.ts.net
    ```
    For a **read-only** pairing use only `--scope orchestration:read` and `/t3craft pair --read-only`
    (or the "Access" toggle on the pairing screen). Always pass explicit `--scope`s: without them
    the credential carries every scope. The mod refuses a session that grants anything beyond
    `orchestration:read` + `orchestration:operate`. Destructive actions ask for an in-game
    confirmation and every action lands in `config/t3craft/audit.log`. Details: `docs/features/operate.md`.
-2. In Minecraft run `/t3craft pair`, enter a name (shown on the villagers, e.g. `my-vps`) and
+2. In Minecraft run `/t3craft pair`, enter a name (shown on the villagers, e.g. `vps-env`) and
    paste the link (`https://host/pair#token=…`), or the bare code plus the T3 URL
-   (e.g. `http://my-laptop.<tailnet>.ts.net:3773`). Repeat for each environment. An
+   (e.g. `http://<laptop>.<tailnet>.ts.net:3773`). Repeat for each environment. An
    environment paired read-only can get control later with "Enable control" in the environments
    screen (or `/t3craft operate enable <env>`); `/t3craft operate revoke <env>` takes it back to
    read-only.
@@ -138,7 +138,7 @@ Fabric Loader 0.20.1 / Minecraft 26.3 instance. In direct mode (the default) pai
 `config/t3craft.json` of the instance (created on first start):
 
 ```json
-{ "bridgeUrl": "ws://my-homelab.<tailnet>.ts.net:7878/", "bridgeKey": null }
+{ "bridgeUrl": "ws://<homelab>.<tailnet>.ts.net:7878/", "bridgeKey": null }
 ```
 
 The default is `ws://127.0.0.1:7878/`. `T3CRAFT_BRIDGE_URL` or `-Dt3craft.bridgeUrl=` override it.

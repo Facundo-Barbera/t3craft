@@ -1005,7 +1005,7 @@ Pregunta de Facundo (2026-11-09): ¿se puede correr en el PC y verlo en el Mac, 
 antes hay un detalle del PC que decide todo lo demás.
 
 ### 14.1 Primero: ¿dónde corre el juego en el PC, en WSL o en Windows?
-El checkout del PC vive en WSL (`AGENTS.md`: my-pc, WSL, `~/projects/t3craft`). **Correr Minecraft dentro de WSL con WSLg no
+El checkout del PC vive en WSL (`AGENTS.md`: <pc>, WSL, `~/projects/t3craft`). **Correr Minecraft dentro de WSL con WSLg no
 es un buen camino:**
 - La aceleración de OpenGL por hardware en WSL2 suele quedar marcada como no soportada y cae al render por software
   (`llvmpipe`).
