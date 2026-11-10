@@ -155,8 +155,10 @@ public final class BuildJob {
 			boolean fast = cost == null && tuning.fastFoundation() && plan.size() > BuildPlanner.SYNC_PLAN_LIMIT;
 			// feat/build-radial: free jobs build around the player, column by column, ring by ring
 			this.radial = cost == null && tuning.radial() && plan.size() > BuildPlanner.SYNC_PLAN_LIMIT;
+			// feat/builder-sites: build.order "sites" builds the same kind of job site by site (SiteCursor) instead of ring by ring
 			java.util.function.Supplier<JobCursor> planned = radial
-					? () -> RadialCursor.plan(plan, f, blocksPerTick, tuning.radialRing(), focus, tuning.fastFoundation())
+					? tuning.sites() ? () -> SiteCursor.plan(plan, f, blocksPerTick, focus)
+							: () -> RadialCursor.plan(plan, f, blocksPerTick, tuning.radialRing(), focus, tuning.fastFoundation())
 					: !fast ? crew : () -> {
 				long s0 = System.nanoTime();
 				try {
@@ -307,6 +309,9 @@ public final class BuildJob {
 		if (live instanceof RadialCursor rc) {
 			rc.probe(there);
 			rc.walker(onWalk == null ? null : (front, index, stand, ticks) -> onWalk.walking(this, front, index, toWorld(stand), ticks));
+		} else if (live instanceof SiteCursor sc) {
+			sc.probe(there);
+			sc.walker(walk);
 		} else if (live instanceof FoundationCursor fc) {
 			fc.probe(there);
 			fc.walker(walk);
@@ -332,7 +337,7 @@ public final class BuildJob {
 			cursor.resume();
 		}
 		// fix/hq-load-build-portal: a radial free job waits for the chunk instead of dropping the block (FAILED is final)
-		boolean waitForChunks = m == null && (live == null || live instanceof RadialCursor);
+		boolean waitForChunks = m == null && (live == null || live instanceof RadialCursor || live instanceof SiteCursor);
 		FrontCursor.Step stepFn = (front, i) -> {
 			Placement p = plan.get(i);
 			if (m != null) {
@@ -614,12 +619,22 @@ public final class BuildJob {
 				rel = new double[] {h[0], h[1], playerWorld[1] - origin.getY(), playerWorld.length > 3 ? playerWorld[3] : 1.0};
 			}
 			rc.focus(rel, System.currentTimeMillis());
+		} else if (live instanceof SiteCursor sc) {
+			double[] rel = null;
+			if (playerWorld != null) {
+				double[] h = planFocus(playerWorld[0], playerWorld[2], origin, rotation);
+				rel = new double[] {h[0], h[1], playerWorld[1] - origin.getY(), playerWorld.length > 3 ? playerWorld[3] : 1.0};
+			}
+			sc.focus(rel, System.currentTimeMillis());
 		}
 	}
 
-	/** feat/build-radial: radial progress line (columns, centre), or null for other jobs. */
+	/** feat/build-radial: radial progress line (columns, centre), or null for other jobs. feat/builder-sites: the sites line of a {@link SiteCursor} job. */
 	public @Nullable String radialStatus() {
 		JobCursor live = cursor instanceof DeferredCursor d ? d.ready() : cursor;
+		if (live instanceof SiteCursor sc) {
+			return sc.describe();
+		}
 		return live instanceof RadialCursor rc ? rc.describe() : null;
 	}
 
@@ -660,6 +675,9 @@ public final class BuildJob {
 		JobCursor live = cursor instanceof DeferredCursor d ? d.ready() : cursor;
 		if (live instanceof RadialCursor rc) {
 			return rc.rate();
+		}
+		if (live instanceof SiteCursor sc) {
+			return sc.rate();
 		}
 		// feat/build-near-player: the foundation has its own budget; one block keeps the job's slot ticking
 		return cursor.fastPhase() ? Math.min(1.0, blocksPerTick) : blocksPerTick * fronts();

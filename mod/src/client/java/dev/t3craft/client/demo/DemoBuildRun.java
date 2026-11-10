@@ -95,6 +95,7 @@ final class DemoBuildRun {
 	static BuildPlan merge(List<BuildPlan> plans) {
 		BuildPlan.Builder b = BuildPlan.builder();
 		for (int j = 0; j < plans.size(); j++) {
+			b.nameWork(j, plans.get(j).name()); // feat/builder-sites: the group's name travels with the work
 			for (dev.t3craft.build.Placement e : plans.get(j).placements()) {
 				b.set(e.pos(), e.state(), e.blockEntity(), j);
 			}
@@ -133,7 +134,9 @@ final class DemoBuildRun {
 			BuildHandle h = radialHandle;
 			BuildJob j = h == null ? null : h.job();
 			String extra = j == null ? (merged != null ? " merging parts" : "") : " " + j.radialStatus();
-			return String.format(Locale.ROOT, "%s v%d, radial, %d part(s), %s%s", source.id(), source.version(), total,
+			// feat/builder-sites: build.order "sites" runs the same merged plan through SiteCursor; the line that follows is its own
+			String order = BuildBudget.global().tuning().sites() ? "sites" : "radial";
+			return String.format(Locale.ROOT, "%s v%d, %s, %d part(s), %s%s", source.id(), source.version(), order, total,
 					h == null ? "starting" : String.format(Locale.ROOT, "%s %.0f%%", h.phase().name().toLowerCase(Locale.ROOT), h.progress() * 100), extra);
 		}
 		StringBuilder sb = new StringBuilder();

@@ -237,7 +237,7 @@ public final class DemoHq {
 	/** The island under {@code plan} grown from {@code island.previous()}: its new area and the part that builds it. */
 	static Step withIsland(Step step, Island island) {
 		VoidIsland.Area area = demoArea(step.plan(), step.lift()).union(island.previous());
-		BuildPlan part = VoidIsland.island(area, taken(step.plan(), step.lift()), island.starter(), island.previous());
+		BuildPlan part = VoidIsland.island(area, taken(step.plan(), step.lift()), island.starter(), island.previous()).named("island");
 		List<BuildPlan> parts = new ArrayList<>();
 		boolean grows = island.previous() == null || !island.previous().equals(area);
 		if (!step.parts().isEmpty() && (grows || step.full()) && !part.isEmpty()) {
@@ -353,11 +353,11 @@ public final class DemoHq {
 		});
 		if (reshaped) {
 			addIfAny(parts, plinthRemoval(before, r.plan(), lift));
-			addIfAny(parts, plinth(r.plan(), lift));
+			addIfAny(parts, plinth(r.plan(), lift).named("plinth"));
 		}
 		diffParts.forEach((g, p) -> {
 			if (!g.startsWith(HqDiff.REMOVE_PREFIX)) {
-				addIfAny(parts, bake(p, lift));
+				addIfAny(parts, bake(p, lift).named(g));
 			}
 		});
 		return new Step(r.layout(), r.plan(), h, lift, parts, false, fixtures);
@@ -366,9 +366,10 @@ public final class DemoHq {
 	/** Plinth first, then every group of the HQ in build order, all baked into demo coordinates. */
 	public static List<BuildPlan> full(dev.t3craft.hq.BuildPlan plan, int lift) {
 		List<BuildPlan> out = new ArrayList<>();
-		addIfAny(out, plinth(plan, lift));
+		// feat/builder-sites: every part keeps the name of its group, so the merged plan can tell the building sites apart
+		addIfAny(out, plinth(plan, lift).named("plinth"));
 		for (Map.Entry<String, BuildPlan> e : HqPlans.byGroup(plan).entrySet()) {
-			addIfAny(out, bake(e.getValue(), lift));
+			addIfAny(out, bake(e.getValue(), lift).named(e.getKey()));
 		}
 		return out;
 	}
